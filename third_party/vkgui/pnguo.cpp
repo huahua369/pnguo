@@ -1,0 +1,17441 @@
+﻿
+/*
+
+xatlas
+
+2024-05-10 添加按钮控件
+2024-05-07 添加输入框控件
+2024-04-07 创建本文件，实现2d骨骼动画
+
+*/
+
+#if 1
+
+
+#include <pch1.h>
+
+#include <map>
+#include <pnguo.h>
+
+
+#include <stb_image.h>
+#include <stb_image_write.h>
+#include <stb_rect_pack.h>
+
+#include <tinyspline/tinysplinecxx.h>
+#include <clipper2/clipper.h> 
+using namespace Clipper2Lib;
+#include <SDL3/SDL_keycode.h>
+#include <print_time.h>
+#include <mapView.h>
+#include <event.h>
+
+//#include <tinysdl3.h>
+
+
+#ifndef no_cairo_ 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <cairo/cairo.h>
+#ifdef _WIN32
+#include <cairo/cairo-win32.h>
+#endif
+#include <cairo/cairo-svg.h>
+#include <cairo/cairo-pdf.h>
+#include <librsvg/rsvg.h>
+#include <pango/pango-layout.h>
+#include <pango/pangocairo.h>
+
+#ifdef __cplusplus
+}
+#endif
+#endif
+
+#ifndef NO_FONT_CX
+#include <hb.h>
+#include <hb-ot.h>
+#include <fontconfig/fontconfig.h> 
+#endif
+
+#include <stb_truetype.h>
+
+#ifdef max
+#undef max
+#undef min
+#endif // max
+
+
+std::string to_string(double _Val)
+{
+	const auto _Len = static_cast<size_t>(_scprintf("%.16g", _Val));
+	std::string _Str(_Len, '\0');
+	sprintf_s(&_Str[0], _Len + 1, "%.16g", _Val);
+	return _Str;
+}
+
+// 2d骨骼动画
+#if 1
+
+struct Transform_t
+{
+	glm::quat _rotation = {};
+	glm::vec3 _translation = glm::vec3(0, 0, 0);
+	glm::vec3 _scale = glm::vec3(1, 1, 1);
+
+	glm::mat4 LookAt(glm::vec4 source, glm::vec4 target, bool flipY)
+	{
+		auto mat = glm::inverse(glm::lookAt(glm::vec3(source), glm::vec3(target), glm::vec3(0, flipY ? -1 : 1, 0)));
+		return mat;
+	}
+
+	glm::mat4 GetWorldMat() const
+	{
+		return glm::translate(glm::vec3(_translation)) * glm::mat4(_rotation) * glm::scale(glm::vec3(_scale));
+	}
+};
+class transform2d_t
+{
+public:
+	//平移、缩放、 变形
+	glm::vec2 pos = {}, scale = {}, shear = {};
+	glm::vec2 anchor = {};//锚点
+	// 旋转,弧度
+	float rotation = 0;
+	glm::mat3 mt = glm::mat3(1.0);
+public:
+	transform2d_t();
+	~transform2d_t();
+	void set_degrees(float a) { rotation = glm::radians(a); }
+	glm::mat3 get() {
+		auto romt = glm::translate(glm::mat3(1.0), anchor) * glm::rotate(glm::mat3(1.0), rotation) * glm::translate(glm::mat3(1.0), -anchor);
+		mt = glm::translate(glm::mat3(1.0), pos) * romt * glm::scale(glm::mat3(1.0), scale) * glm::shearY(glm::mat3(1.0), shear.y) * glm::shearX(glm::mat3(1.0), shear.x);
+		return mt;
+	}
+	glm::vec2 getv2(const glm::vec2& ps)
+	{
+		glm::vec3 v2 = { ps, 1.0 };
+		v2 = mt * v2;
+		return v2;
+	}
+private:
+
+};
+
+transform2d_t::transform2d_t()
+{
+}
+
+transform2d_t::~transform2d_t()
+{
+}
+
+class tfAccessor
+{
+public:
+	const void* _data = NULL;
+	int _count = 0;
+	int _stride = 0;
+	int _dimension = 0;
+	int _type = 0;
+
+	glm::vec4 _min = {};
+	glm::vec4 _max = {};
+	tfAccessor() {}
+	~tfAccessor() {}
+	const void* Get(int i) const
+	{
+		if (i >= _count)
+			i = _count - 1;
+
+		return (const char*)_data + _stride * i;
+	}
+
+	int FindClosestFloatIndex(float val) const
+	{
+		int ini = 0;
+		int fin = _count - 1;
+
+		while (ini <= fin)
+		{
+			int mid = (ini + fin) / 2;
+			float v = *(const float*)Get(mid);
+
+			if (val < v)
+				fin = mid - 1;
+			else if (val > v)
+				ini = mid + 1;
+			else
+				return mid;
+		}
+
+		return fin;
+	}
+};
+class tfSampler
+{
+public:
+	tfAccessor _time;	// input
+	tfAccessor _value;	// output
+	void SampleLinear(float time, float* frac, float** pCurr, float** pNext) const
+	{
+		int curr_index = _time.FindClosestFloatIndex(time);
+		int next_index = std::min<int>(curr_index + 1, _time._count - 1);
+
+		if (curr_index < 0) curr_index++;
+
+		if (curr_index == next_index)
+		{
+			*frac = 0;
+			*pCurr = (float*)_value.Get(curr_index);
+			*pNext = (float*)_value.Get(next_index);
+			return;
+		}
+
+		float curr_time = *(float*)_time.Get(curr_index);
+		float next_time = *(float*)_time.Get(next_index);
+
+		*pCurr = (float*)_value.Get(curr_index);
+		*pNext = (float*)_value.Get(next_index);
+		*frac = (time - curr_time) / (next_time - curr_time);
+		assert(*frac >= 0 && *frac <= 1.0);
+	}
+};
+class tfChannel
+{
+public:
+	tfSampler* sampler = 0;
+	enum { TRANSLATION, ROTATION, SCALE, SHEAR/*, WEIGHTS*/ } transformType = {};
+	/* LINEAR\STEP:vec2 float vec2 vec2						值p
+	*  CUBIC : vec2[3] float[3] vec2[3] vec2[3]		值p,c,c1
+	*  bezier、bspline导出时转换成linear
+	 */
+	enum { LINEAR, STEP, CUBIC/*, BEZIER, BSPLINE*/ } interpolation = LINEAR;
+public:
+	tfChannel() {}
+	~tfChannel()
+	{
+	}
+};
+
+struct tfAnimation
+{
+	float duration;//动画持续时间
+	std::map<int, tfChannel> _channels;//节点id, 通道
+	std::string name;
+};
+struct tfNode
+{
+	std::vector<int> _children;
+	int skinIndex = -1;
+	int meshIndex = -1;
+	int channel = -1;			// 一节点只有一个通道
+	bool bIsJoint = false;
+	std::string _name;
+	transform2d_t _tranform;
+};
+struct tfScene
+{
+	std::vector<uint32_t> _nodes;
+};
+
+struct tfSkins
+{
+	tfAccessor _InverseBindMatrices;
+	tfNode* _skeleton = NULL;
+	std::vector<int> _jointsNodeIdx;
+};
+struct tfPrimitives
+{
+	glm::vec4 _center;
+	glm::vec4 _radius;
+};
+
+struct tfMesh
+{
+	std::vector<tfPrimitives> _primitives;	// 包围盒
+};
+// 渲染结构
+class component2d_t
+{
+public:
+	std::vector<tfScene> _scenes;
+	std::vector<tfSkins> _skins;
+	//std::vector<tfMesh> _meshs;
+	std::vector<tfSampler> samplers;		// 动画采样列表
+	std::vector<tfAnimation> animations;	// 动画列表
+	std::vector<tfNode> nodes;				// 节点列表
+	std::vector<glm::mat3> animatedMats;	// 缓存矩阵
+	std::vector<glm::mat3> worldSpaceMats;  // 处理层次结构后每个节点的世界空间矩阵
+	std::map<int, std::vector<glm::mat3>> worldSpaceSkeletonMats;// 蒙皮矩阵，遵循jointsNodeIdx顺序
+	std::vector<char*> buffers;				// 数据
+	uint32_t idx = 0;						// 当前执行的动画
+	component2d_t() {}
+	~component2d_t() {}
+	// translation，rotation，scale，shear，，，	
+	void update(float delta);
+
+private:
+	void SetAnimationTime(uint32_t animationIndex, float time);
+
+};
+// 关键帧
+struct keyframe_t
+{
+	float ktime;
+	// 旋转
+	float rotation = 0;
+	//平移、缩放、 变形
+	glm::vec2 pos = {}, scale = {}, shear = {};
+	int interpolation = 0;// linear=0，step=1，cubicspline=2
+};
+struct attachment_it
+{
+	void* tex = 0;			// 纹理
+	glm::vec4 color = {};	// 无单独顶点颜色时，skeleton->color * slot->color * attachment->color;
+	bool isActive = 0;		// 是否激活
+};
+struct slot_it
+{
+	glm::vec4 color = {};
+	int blend_mode = 0;				// 混合模式
+	attachment_t* attachment = 0;	// 附件
+};
+
+struct node_et {
+	std::vector<node_et*> children;
+};
+
+struct timeline_t
+{
+	std::string name;	//动画名称
+	float duration;		//动画持续时间
+	std::map<node_et*, std::vector<keyframe_t>> timeline;
+};
+
+// 编辑结构
+class component2d_editer_t
+{
+public:
+	std::vector<timeline_t*> animations;
+public:
+	component2d_editer_t();
+	~component2d_editer_t();
+
+private:
+
+};
+
+component2d_editer_t::component2d_editer_t()
+{
+}
+
+component2d_editer_t::~component2d_editer_t()
+{
+}
+
+void component2d_t::update(float delta)
+{
+	SetAnimationTime(idx, delta);
+}
+/*
+* https://github.khronos.org/glTF-Tutorials/gltfTutorial/gltfTutorial_007_Animations.html
+*  deltaTime = nextTime - previousTime
+ previousTangent = deltaTime * previousOutputTangent
+	nextTangent = deltaTime * nextInputTangent
+*/
+template<class T, class Tv>
+T cubicSpline1(const T& previousPoint, const T& previousTangent, const T& nextPoint, const T& nextTangent, const Tv& interpolationValue)
+{
+	auto t = interpolationValue;
+	auto t2 = t * t;
+	auto t3 = t2 * t;
+	T v1 = previousPoint; v1 *= (2.0 * t3 - 3.0 * t2 + 1.0);
+	T v2 = previousTangent; v2 *= (t3 - 2.0 * t2 + t);
+	T v3 = nextPoint; v3 *= (-2.0 * t3 + 3.0 * t2);
+	T v4 = nextTangent; v4 *= (t3 - t2);
+	return v1 + v2 + v3 + v4;
+}
+template <typename T>
+T cubicSpline(const T& vert0, const T& tang0, const T& vert1, const T& tang1, float t) {
+	float tt = t * t, ttt = tt * t;
+	float s2 = -2 * ttt + 3 * tt, s3 = ttt - tt;
+	float s0 = 1 - s2, s1 = s3 - tt + t;
+	T p0 = vert0;
+	T m0 = tang0;
+	T p1 = vert1;
+	T m1 = tang1;
+	return s0 * p0 + s1 * m0 * t + s2 * p1 + s3 * m1 * t;
+}
+void component2d_t::SetAnimationTime(uint32_t animationIndex, float dtime)
+{
+	if (animationIndex < animations.size())
+	{
+		tfAnimation* anim = &animations[animationIndex];
+		//loop animation
+		dtime = fmod(dtime, anim->duration);
+		for (auto it = anim->_channels.begin(); it != anim->_channels.end(); it++)
+		{
+			transform2d_t* pSourceTrans = &nodes[it->first]._tranform;
+			transform2d_t animated = *pSourceTrans;
+			float frac = 0.0, * pCurr = 0, * pNext = 0;
+			auto itn = it->second.interpolation;
+			if (it->second.interpolation == tfChannel::STEP) {
+				dtime = 0.0f;
+			}
+			it->second.sampler->SampleLinear(dtime, &frac, &pCurr, &pNext);
+			auto prev = (glm::vec2*)pCurr;
+			auto next = (glm::vec2*)pNext;
+			switch (it->second.transformType)
+			{
+			case tfChannel::TRANSLATION: {
+				// Animate translation
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					animated.pos = cubicSpline(*vert0, *tang0, *vert1, *tang1, frac);
+				}
+				else {
+					animated.pos = glm::mix(*prev, *next, frac); //linear((1.0f - frac) * prevpoint) + ((frac)*nextpoint);
+				}
+			}break;
+			case tfChannel::ROTATION: {
+				// Animate rotation 
+				auto prev = pCurr;
+				auto next = pNext;
+				glm::quat q;
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					q = glm::normalize(glm::quat(1.0, 0.0, 0.0, cubicSpline(*vert0, *tang0, *vert1, *tang1, frac)));
+				}
+				else {
+					glm::quat q1(1.0f, 0.0, 0.0, *prev);
+					glm::quat q2(1.0f, 0.0, 0.0, *next);
+					q = glm::slerp(q1, q2, frac);
+				}
+				animated.rotation = std::atan2(q.z, q.w);
+			}break;
+			case tfChannel::SCALE: {
+				// Animate scale 
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					animated.pos = cubicSpline(*vert0, *tang0, *vert1, *tang1, frac);
+				}
+				else {
+					animated.pos = glm::mix(*prev, *next, frac); //linear((1.0f - frac) * prevpoint) + ((frac)*nextpoint);
+				}
+			}break;
+			case tfChannel::SHEAR: {
+				// 变形动画
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					animated.pos = cubicSpline(*vert0, *tang0, *vert1, *tang1, frac);
+				}
+				else {
+					animated.pos = glm::mix(*prev, *next, frac); //linear((1.0f - frac) * prevpoint) + ((frac)*nextpoint);
+				}
+			}break;
+			default:
+				break;
+			}
+			animatedMats[it->first] = animated.get();
+		}
+	}
+}
+void skeleton_t::update(float delta)
+{
+	anim->update(delta);
+}
+void skeleton_t::set_active(uint32_t idx, uint32_t aidx)
+{
+	active_idx = idx;
+	active_aidx = aidx;
+	anim->idx = active_idx;
+
+}
+class packget2d_t :public skeleton_t
+{
+public:
+	component2d_t cpd = {};
+public:
+	packget2d_t();
+	~packget2d_t();
+
+private:
+
+};
+
+packget2d_t::packget2d_t()
+{
+}
+
+packget2d_t::~packget2d_t()
+{
+}
+// 加载骨骼动画
+skeleton_t* load_skeleton_file(const void* filepath)
+{
+	return 0;
+}
+skeleton_t* load_skeleton_mem(const void* d, size_t len)
+{
+	return 0;
+}
+
+
+
+
+
+
+
+
+#endif
+
+// 普通图集
+#if 1
+
+#if 0
+ndef STB_RECT_PACK_VERSION
+
+struct stbrp_rect
+{
+	// reserved for your use:
+	int            id;
+
+	// input:
+	uint16_t    w, h;
+
+	// output:
+	uint16_t    x, y;
+	int            was_packed;  // non-zero if valid packing
+
+}; // 16 bytes, nominally
+#endif
+#ifdef STB_RECT_PACK_VERSION
+class stb_packer
+{
+public:
+	stbrp_context _ctx = {};
+	std::vector<uint32_t> ptr;
+	tinyimage_cx img = {};
+	std::vector<stbrp_node> _rpns;
+public:
+	stb_packer() { }
+	~stb_packer() { }
+	tinyimage_cx* get() {
+		return (tinyimage_cx*)&img;
+	}
+	void init_target(int width, int height, bool newptr = true) {
+		assert(!(width < 10 || height < 10));
+		if (width < 10 || height < 10)return;
+		if (newptr) { ptr.resize(width * height); }
+		auto img = get();
+		img->width = width;
+		img->height = height;
+		img->isupdate = 1;
+		img->data = ptr.data();
+		_rpns.resize(width);
+		memset(_rpns.data(), 0, _rpns.size() * sizeof(stbrp_node));
+		stbrp_init_target(&_ctx, width, height, _rpns.data(), _rpns.size());
+		stbrp_setup_allow_out_of_mem(&_ctx, 0);
+	}
+	void clear() {
+		memset(_rpns.data(), 0, _rpns.size() * sizeof(stbrp_node));
+		init_target(_ctx.width, _ctx.height);
+	}
+	int push_rect(glm::ivec4* rc, int n)
+	{
+		if (!rc || n < 1)return 0;
+		std::vector<stbrp_rect> rct(n);
+		auto r = rc;
+		for (auto& it : rct)
+		{
+			it.w = r->z; it.h = r->w; r++;
+		}
+		int ret = stbrp_pack_rects(&_ctx, rct.data(), n);
+		r = rc;
+		for (auto& it : rct)
+		{
+			r->x = it.x; r->y = it.y; r++;
+		}
+		auto img = get();
+		img->isupdate = 1;
+		return ret;
+	}
+	int push_rect(glm::ivec2 rc, glm::ivec2* pos)
+	{
+		stbrp_rect rct[2] = {};
+		rct->w = rc.x;
+		rct->h = rc.y;
+		int ret = stbrp_pack_rects(&_ctx, rct, 1);
+		if (pos)
+		{
+			*pos = { rct->x,rct->y };
+		}
+		auto img = get();
+		img->isupdate = 1;
+		return ret;
+	}
+public:
+	// todo stb结构
+	int pack_rects(stbrp_rect* rects, int num_rects)
+	{
+		return stbrp_pack_rects(&_ctx, rects, num_rects);
+	}
+	void setup_allow_out_of_mem(int allow_out_of_mem)
+	{
+		stbrp_setup_allow_out_of_mem(&_ctx, allow_out_of_mem);
+	}
+	//可以选择库应该使用哪个打包启发式方法。不同启发式方法将为不同的数据集生成更好/更差的结果。 如果再次调用init，将重置为默认值。	
+	void setup_heuristic(int heuristic = 1)
+	{
+		stbrp_setup_heuristic(&_ctx, heuristic);
+	}
+private:
+
+};
+
+void test_rect()
+{
+	glm::ivec2 r = { 730,1000 };
+	stb_packer pack;
+	pack.init_target(r.x, r.y);
+	//hz::Image tespack;
+	//tespack.resize(r.x, r.y);
+	std::vector<uint32_t> colors = {
+	0xff0000ff,
+	0xff00ff00,
+	0xffff0000,
+	0xff0080ff,
+	0xff8000ff,
+	0xff00ff80,
+	0xff80ff00,
+	0xffff0080,
+	0xffff8000,
+
+	};
+	std::vector<glm::ivec2> rects = {
+		//{1120,800},
+		{700,300},
+		{470,300},
+		{230,140},
+		{230,140},
+		{350,140},
+		{360,300},
+		{350,140},
+	};
+	{
+		print_time at("stb pack");
+		int i = 0;
+		for (auto& it : rects)
+		{
+			glm::ivec2 prs;
+			int k = pack.push_rect({ it.x,it.y }, &prs);
+			if (k)
+			{
+				glm::ivec4 trc = { prs.x,prs.y,it.x,it.y };
+				auto c = colors[i++];
+				c |= 0x80000000;
+				//tespack.draw_rect(trc, 0, c);
+			}
+		}
+	}
+	std::string fn = "test_packer_stb.png";
+	//tespack.saveImage(fn);
+	exit(0);
+}
+
+#endif // STB_RECT_PACK_VERSION
+
+stbimage_load::stbimage_load()
+{
+}
+
+stbimage_load::stbimage_load(const char* fn)
+{
+	load(fn);
+}
+
+stbimage_load::~stbimage_load()
+{
+	stbi_image_free(data);
+}
+void stbimage_load::free_img(stbimage_load* p)
+{
+	if (p)
+		delete p;
+}
+stbimage_load* stbimage_load::new_load(const void* fnd, size_t len)
+{
+	stbimage_load t;
+	if (fnd)
+	{
+		if (len)
+			t.load_mem((char*)fnd, len);
+		else
+			t.load((char*)fnd);
+	}
+	if (t.data && t.width && t.height)
+	{
+		auto p = new stbimage_load();
+		if (p)
+		{
+			*p = t;
+			t.data = 0;
+		}
+		return p;
+	}
+	return nullptr;
+}
+void stbimage_load::tobgr()
+{
+	auto n = width * height;
+	auto t = (char*)data;
+	for (size_t i = 0; i < n; i++)
+	{
+		std::swap(*(t + 0), *(t + 2));
+		t += 4;
+	}
+}
+bool stbimage_load::load(const char* fn)
+{
+	hz::mfile_t mf;
+	if (!fn || !*fn)return false;
+	auto rawd = mf.open_d(fn, true);
+	if (!rawd)
+	{
+		return false;
+	}
+	data = stbi_load_from_memory((stbi_uc*)rawd, mf.size(), &width, &height, &rcomp, comp);
+	type = 0;
+	return (data ? true : false);
+}
+bool stbimage_load::load_mem(const char* d, size_t s)
+{
+	data = stbi_load_from_memory((stbi_uc*)d, s, &width, &height, &rcomp, comp);
+	type = 0;
+	return (data ? true : false);
+}
+void save_img_png(image_ptr_t* p, const char* str)
+{
+	if (p && str && *str) {
+		stbi_write_png(str, p->width, p->height, p->comp, p->data, p->stride);
+	}
+}
+
+// 预乘输出bgra，type=0为原数据是rgba
+void premultiply_data(int w, unsigned char* data, int type, bool multiply);
+
+
+struct u84
+{
+	uint8_t r, g, b, a;
+};
+inline double get_alpha_f(uint32_t c)
+{
+	auto* t = (u84*)&c;
+	return  t->a / 255.0;
+}
+inline bool is_alpha(uint32_t c)
+{
+	return (c & 0xFF000000);
+}
+inline uint32_t set_alpha(uint32_t c, uint32_t a)
+{
+	auto* t = (u84*)&c;
+	t->a = std::min(a, (uint32_t)255);
+	return c;
+}
+#ifdef USE_BGRA_PACKED_COLOR
+#define COL32_R_SHIFT    16
+#define COL32_G_SHIFT    8
+#define COL32_B_SHIFT    0
+#define COL32_A_SHIFT    24
+#define COL32_A_MASK     0xFF000000
+#else
+#define COL32_R_SHIFT    0
+#define COL32_G_SHIFT    8
+#define COL32_B_SHIFT    16
+#define COL32_A_SHIFT    24
+#define COL32_A_MASK     0xFF000000
+#endif
+glm::vec4 ColorConvertU32ToFloat4(uint32_t in)
+{
+	float s = 1.0f / 255.0f;
+	return glm::vec4(
+		((in >> COL32_R_SHIFT) & 0xFF) * s,
+		((in >> COL32_G_SHIFT) & 0xFF) * s,
+		((in >> COL32_B_SHIFT) & 0xFF) * s,
+		((in >> COL32_A_SHIFT) & 0xFF) * s);
+}
+void px_blend2c(uint32_t* pDstBmp, uint32_t src, uint32_t col)
+{
+	// C实现
+	unsigned char* pSrc = (unsigned char*)&src;
+	unsigned char* pDst = (unsigned char*)pDstBmp;
+	uint32_t below_A, below_R, below_G, below_B;
+	uint32_t above_A, above_R, above_G, above_B;
+	glm::vec4 cf;
+
+	above_B = *pSrc++;
+	above_G = *pSrc++;
+	above_R = *pSrc++;
+	above_A = *pSrc++;
+	if (col != -1 && above_A > 0)
+	{
+		cf = ColorConvertU32ToFloat4(col);
+		above_B = cf.x * above_B;
+		above_G = cf.y * above_G;
+		above_R = cf.z * above_B;
+		above_A = cf.w * above_A;
+	}
+	if (above_A == 0)
+	{
+		pDst += 4;
+		return;
+	}
+	below_B = *pDst;
+	below_G = *(pDst + 1);
+	below_R = *(pDst + 2);
+	below_A = *(pDst + 3);
+	if (below_A == 0)
+	{
+		*pDstBmp = src;
+		return;
+	}
+	uint32_t uc[] = { below_B - (below_B - above_B) * above_A / 255,
+		below_G - (below_G - above_G) * above_A / 255,
+		below_R - (below_R - above_R) * above_A / 255,
+	};
+	unsigned char d[4];
+	d[0] = below_B - (below_B - above_B) * above_A / 255;
+	d[1] = below_G - (below_G - above_G) * above_A / 255;
+	d[2] = below_R - (below_R - above_R) * above_A / 255;
+	auto lsa = pDst;
+	if (below_A == 255)
+		d[3] = 255;
+	else
+		d[3] = below_A - (below_A - above_A) * above_A / 255;
+	*pDst++ = d[0];
+	*pDst++ = d[1];
+	*pDst++ = d[2];
+	*pDst++ = d[3];
+	return;
+}
+// 灰度图转rgba
+void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend)
+{
+	if (src && src->data && src->comp == 1 && dst && dst->width > 0 && dst->height > 0 && dst->data && dst->comp == 4)
+	{
+		float brightness = 0;
+		int w = rc.z, h = rc.w, posx = rc.x, posy = rc.y;
+		glm::ivec2 ts = { dst->width,dst->height };
+		auto bdata = (uint32_t*)dst->data;
+		auto bit = (unsigned char*)(src->data) + (rc.y * src->width);
+
+		int pitch = src->width;
+		int ic = 0;
+		auto ca = get_alpha_f(col);
+		for (int j = 0; j < h && (j + dst_pos.y) < ts.y; j++)
+		{
+			auto pj = pitch * j;
+			unsigned char* pixel = bit + pj;
+			auto jp = j + dst_pos.y;
+			int64_t psy = (jp * ts.x);
+			if (psy < 0 || jp >= dst->height)
+			{
+				continue;
+			}
+			auto expanded_data = bdata + psy;
+			uint32_t* dc = (uint32_t*)expanded_data;
+			for (int i = 0; (i < w) && ((i + dst_pos.x) < ts.x); i++)
+			{
+				unsigned char c = pixel[i];
+				if (c)
+				{
+					uint32_t uc = 0, ut = std::min(255.0f, brightness * c + c);
+					if (ut > 255)ut = 255;
+					ut *= ca;
+					uc = set_alpha(col, ut);
+					if (isblend)
+					{
+						px_blend2c(&dc[i + dst_pos.x], uc, -1);
+					}
+					else {
+						dc[i + dst_pos.x] = uc;
+					}
+					ic++;
+				}
+			}
+		}
+		if (ic > 0)
+			dst->valid = true;
+	}
+}
+//单色位图1位
+void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color)
+{
+	int posx = dst_pos.x, posy = dst_pos.y;
+	int w = rc.z, h = rc.w;
+	glm::ivec2 outsize = { dst->width,dst->height };
+	unsigned char* bit = (unsigned char*)src->data;
+	auto bdata = (uint32_t*)dst->data;
+	for (int j = 0; j < h && (j + posy) < outsize.y; j++)
+	{
+		auto jp = j + posy;
+		int64_t psy = (jp * outsize.x);
+		if (psy < 0 || jp >= dst->height)
+		{
+			continue;
+		}
+		unsigned char* pixel = bit + src->stride * j;
+		auto expanded_data = bdata + psy;
+		unsigned int* dc = (unsigned int*)expanded_data;
+		for (int i = 0; (i < w) && ((i + posx) < outsize.x); i++)
+		{
+			unsigned char c = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0;
+			if (c)
+			{
+				dc[i + posx] = color;
+			}
+		}
+	}
+}
+void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, bool isblend)
+{
+	if (src && src->data && src->comp == 4 && dst && dst->width > 0 && dst->height > 0 && dst->data && dst->comp == 4)
+	{
+		int w = rc.z, h = rc.w, posx = rc.x, posy = rc.y;
+		glm::ivec2 ts = { dst->width,dst->height };
+		auto bdata = (uint32_t*)dst->data;
+		auto bit = (uint32_t*)(src->data) + (rc.y * src->width);
+
+		int pitch = src->width;
+		int ic = 0;
+		for (int j = 0; j < h && (j + dst_pos.y) < ts.y; j++)
+		{
+			auto pj = pitch * j;
+			auto pixel = bit + pj;
+			auto jp = j + dst_pos.y;
+			int64_t psy = (jp * ts.x);
+			if (psy < 0 || jp >= dst->height)
+			{
+				continue;
+			}
+			auto expanded_data = bdata + psy;
+			uint32_t* dc = (uint32_t*)expanded_data;
+			for (int i = 0; (i < w) && ((i + dst_pos.x) < ts.x); i++)
+			{
+				auto c = pixel[i];
+				if (c)
+				{
+					if (isblend)
+					{
+						px_blend2c(&dc[i + dst_pos.x], c, -1);
+					}
+					else {
+						dc[i + dst_pos.x] = c;
+					}
+					ic++;
+				}
+			}
+		}
+		if (ic > 0)
+			dst->valid = true;
+	}
+}
+
+
+
+
+
+
+vertex_v2::vertex_v2() {}
+vertex_v2::vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c) :position(p.x, p.y), tex_coord(u), color(c) { }
+vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c) :position(p), tex_coord(u), color(c) { }
+
+// 图集数据
+
+atlas_cx::atlas_cx()
+{
+}
+
+atlas_cx::~atlas_cx()
+{
+}
+void atlas_cx::add(image_rc_t* d, size_t count)
+{
+	if (d && count > 0)
+	{
+		_imgv.reserve(_imgv.size() + count);
+		for (size_t i = 0; i < count; i++)
+		{
+			auto it = d[i];
+			image_sliced_t dt = {};
+			dt.img_rc = it.img_rc;
+			dt.tex_rc = it.tex_rc;
+			dt.color = it.color;
+			_imgv.push_back(dt);
+		}
+	}
+}
+void atlas_cx::add(image_sliced_t* d, size_t count) {
+
+	if (d && count > 0)
+	{
+		_imgv.reserve(_imgv.size() + count);
+		for (size_t i = 0; i < count; i++)
+		{
+			auto dt = d[i];
+			_imgv.push_back(dt);
+		}
+	}
+}
+void atlas_cx::add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color) {
+
+	image_sliced_t dt = {};
+	dt.img_rc = rc;
+	dt.tex_rc = texrc;
+	dt.color = color;
+	dt.sliced = sliced;
+	_imgv.push_back(dt);
+}
+void atlas_cx::clear() {
+	_imgv.clear();
+}
+
+
+
+canvas_atlas::canvas_atlas()
+{
+}
+
+canvas_atlas::~canvas_atlas()
+{
+	if (destroy_texture_cb)
+	{
+		//for (auto it : _atlas_t)
+		for (auto it : _texs_t)
+		{
+			if (it)
+			{
+				auto p = it;
+				destroy_texture_cb(p);
+			}
+		}
+	}
+}
+void canvas_atlas::add_atlas(atlas_cx* p)
+{
+	if (p)
+	{
+		_atlas_cx.push_back(p); valid = true;
+	}
+}
+void canvas_atlas::remove_atlas(atlas_cx* p)
+{
+	if (p)
+	{
+		auto& v = _atlas_cx;
+		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
+	}
+}
+void canvas_atlas::add_atlas(atlas_t* p) {
+	if (p)
+	{
+		_atlas_t.push_back(p); valid = true;
+	}
+}
+void canvas_atlas::remove_atlas(atlas_t* p) {
+	if (p)
+	{
+		auto& v = _atlas_t;
+		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
+	}
+}
+image_ptr_t* canvas_atlas::new_image2(const void* file)
+{
+	return stbimage_load::new_load(file, 0);
+}
+image_ptr_t* canvas_atlas::new_image2mem(const void* d, size_t s)
+{
+	return stbimage_load::new_load(d, s);
+}
+void canvas_atlas::free_image(image_ptr_t* p)
+{
+	auto t = (stbimage_load*)p;
+	stbimage_load::free_img(t);
+}
+void canvas_atlas::convert_bgr_multiply(image_ptr_t* img)
+{
+	if (!img)return;
+	auto t = (unsigned char*)img->data;
+	if (img->type == 0 || !img->multiply) {
+		bool mul = !img->multiply;
+		for (size_t i = 0; i < img->height; i++)
+		{
+			premultiply_data(img->width, t, img->type, mul);
+			t += img->stride;
+		}
+		img->type = 1;
+	}
+}
+
+// 需要先创建纹理
+void canvas_atlas::apply()
+{
+	if (!valid || (_atlas_t.empty() && _atlas_cx.empty()))return;
+	clear();
+	for (auto it : _atlas_t)
+	{
+		image_rs r = {};
+		if (it->count < 1 || !it->img) { continue; }
+		r.img = it->img;
+		//_clip_rect = viewport;// it->clip;
+			//if (_clip_rect.z < 2 || _clip_rect.w < 2)
+			//{
+			//	_clip_rect.z = viewport.z;
+			//	_clip_rect.w = viewport.w;
+			//}
+		uint32_t color = -1;
+		if (it->sliced)
+		{
+			for (size_t i = 0; i < it->count; i++)
+			{
+				auto vt = it->img_rc[i];
+				r.rect = it->tex_rc[i];
+				r.size = { vt.z,vt.w };
+				glm::vec2 npos = vt;
+				r.sliced = it->sliced[i];
+				add_image(&r, npos, it->colors ? it->colors[i] : color);
+			}
+		}
+		else {
+			r.sliced = {};
+			for (size_t i = 0; i < it->count; i++)
+			{
+				auto vt = it->img_rc[i];
+				r.rect = it->tex_rc[i];
+				r.size = { vt.z,vt.w };
+				glm::vec2 npos = vt;
+				add_image(&r, npos, it->colors ? it->colors[i] : color);
+			}
+		}
+	}
+	for (auto it : _atlas_cx)
+	{
+		image_rs r = {};
+		if (it->_imgv.empty() || !it->img) { continue; }
+		r.img = it->img;
+		//_clip_rect = it->clip;
+		//if (_clip_rect.z < 2 || _clip_rect.w < 2)
+		//{
+		//	_clip_rect.z = viewport.z;
+		//	_clip_rect.w = viewport.w;
+		//}
+		uint32_t color = -1;
+		for (auto& kt : it->_imgv) {
+
+			auto vt = kt.img_rc;
+			r.rect = kt.tex_rc;
+			r.size = { vt.z,vt.w };
+			glm::vec2 npos = vt;
+			r.sliced = kt.sliced;
+			add_image(&r, npos, kt.color ? kt.color : color);
+		}
+	}
+	valid = false;
+}
+
+
+inline uint8_t is_rect_intersect(int x01, int x02, int y01, int y02,
+	int x11, int x12, int y11, int y12)
+{
+	int zx = abs(x01 + x02 - x11 - x12);
+	int x = abs(x01 - x02) + abs(x11 - x12);
+	int zy = abs(y01 + y02 - y11 - y12);
+	int y = abs(y01 - y02) + abs(y11 - y12);
+	if (zx <= x && zy <= y)
+		return 1;
+	else
+		return 0;
+}
+inline bool is_rect_intersect(glm::vec4 r1, glm::vec4 r2)
+{
+	//第一种情况：如果b.x > a.x + a.w，则a和b一定不相交，
+		//第二种情况：如果a.y > b.y + b.h，则a和b一定不相交，
+		//第三种情况：如果b.y > a.y + a.h，则a和b一定不相交，
+		//第四种情况：如果a.x > b.x + b.w，则a和b一定不相交
+	auto& a = r1; auto& b = r2;
+	if (a.x > b.x + b.z || b.x > a.x + a.z || a.y > b.y + b.w || b.y > a.y + a.w) {
+		return false;
+	}
+	else {
+		return true;
+	}
+	return is_rect_intersect(r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z, r2.w);
+	//return !(((r1.z < r2.x) || (r1.w > r2.y)) || ((r2.z < r1.x) || (r2.w > r1.y)));
+}
+bool canvas_atlas::nohas_clip(glm::ivec4 a)
+{
+	auto clip = _clip_rect;
+	if (clip.z > viewport.z || clip.z < 0)clip.z = viewport.z;
+	if (clip.w > viewport.w || clip.w < 0)clip.w = viewport.w;
+	if (clip.z < 0 || clip.w < 0)
+	{
+		return false;
+	}
+	return (!is_rect_intersect(clip, a));
+}
+void setVec(glm::vec3& d, const glm::vec2& s)
+{
+	//d = { s, 0.f };
+	d.x = s.x; d.y = s.y; d.z = 0.f;
+}
+void setVec(glm::vec3& d, const glm::vec3& s)
+{
+	d = s;
+	//d.x = s.x; d.y = s.y; d.z = s.z;
+}
+void setVec(glm::vec3& d, const glm::vec4& s)
+{
+	glm::vec4 d1 = s;
+	d.x = s.x; d.y = s.y; d.z = s.z;
+}
+void setVec(glm::dvec3& d, const glm::vec2& s)
+{
+	//d = { s, 0.f };
+	d.x = s.x; d.y = s.y; d.z = 0.f;
+}
+void setVec(glm::dvec3& d, const glm::vec3& s)
+{
+	d = s;
+	//d.x = s.x; d.y = s.y; d.z = s.z;
+}
+void setVec(glm::dvec3& d, const glm::vec4& s)
+{
+	glm::vec4 d1 = s;
+	d.x = s.x; d.y = s.y; d.z = s.z;
+}
+void PrimRectUV(const glm::vec2& a, const glm::vec2& c, const glm::vec2& uv_a, const glm::vec2& uv_c, const glm::vec4& col, int idx
+	, vertex_v2* wvtx, int* widx)
+{
+	glm::vec2 b(c.x, a.y), d(a.x, c.y), uv_b(uv_c.x, uv_a.y), uv_d(uv_a.x, uv_c.y);
+	widx[0] = idx; widx[1] = (idx + 1); widx[2] = (idx + 2);
+	widx[3] = idx; widx[4] = (idx + 2); widx[5] = (idx + 3);
+	wvtx[0].position = a; wvtx[0].tex_coord = uv_a; wvtx[0].color = col;
+	wvtx[1].position = b; wvtx[1].tex_coord = uv_b; wvtx[1].color = col;
+	wvtx[2].position = c; wvtx[2].tex_coord = uv_c; wvtx[2].color = col;
+	wvtx[3].position = d; wvtx[3].tex_coord = uv_d; wvtx[3].color = col;
+}
+struct vidptr_t {
+	vertex_v2* vtx = 0;
+	int* idx = 0;
+	size_t vsize = 0;
+	size_t isize = 0;
+	size_t vc = 0;
+	size_t ic = 0;
+};
+vidptr_t PrimReserve(canvas_atlas* ctx, int idx_count, int vtx_count)
+{
+	auto dc = &ctx->cmd_data[ctx->cmd_data.size() - 1];
+	dc->elemCount += idx_count;
+	dc->idxOffset;
+	dc->vtxOffset;
+	auto v = ctx->vtxs.size();
+	auto i = ctx->idxs.size();
+	//if (v + vtx_count >= _vtx_data.size())
+	{
+		auto ns = v + vtx_count;
+		ctx->vtxs.resize(ns);
+	}
+	//if (i + idx_count >= _idx_data.size())
+	{
+		auto ns = i + idx_count;
+		ctx->idxs.resize(ns);
+	}
+	auto r = vidptr_t{ &ctx->vtxs[v], &ctx->idxs[i], v, i, (size_t)vtx_count, (size_t)idx_count };
+	return r;
+}
+glm::vec4 color2f4(uint32_t c)
+{
+	glm::vec4 color4 = {};
+	struct cu4
+	{
+		uint8_t r, g, b, a;
+	};
+	auto color = (cu4*)&c;
+	color4.x = color->r / 255.0f;
+	color4.y = color->g / 255.0f;
+	color4.z = color->b / 255.0f;
+	color4.w = color->a / 255.0f;
+	return color4;
+}
+
+void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color32)
+{
+	auto& rect = p->rect;
+	auto a = glm::vec4(npos, p->size);
+	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
+	glm::vec4 v4 = { 0, 0, 1, 1 };
+	glm::vec4 uv = v4;
+	glm::vec2 s = size;
+	int* ts = (int*)p->img;
+	auto texsize = *((glm::ivec2*)ts);
+	if (!(rect.x < 0))
+	{
+		v4 = rect;
+		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
+		v4.z = glm::min(v4.z, (float)texsize.x);
+		v4.w = glm::min(v4.w, (float)texsize.y);
+		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y };
+		if (uv.x < 0)
+		{
+			uv.x = 0;
+		}
+		if (uv.y < 0)
+		{
+			uv.y = 0;
+		}
+	}
+	if (a.z < 0)
+		a.z *= -std::min(rect.z, texsize.x);
+	if (a.w < 0)
+		a.w *= -std::min(rect.w, texsize.y);
+	if (nohas_clip(a))
+		return;
+	glm::vec4 color3 = color2f4(color32);
+	if (p->sliced.x < 1)
+	{
+		glm::vec2 a1 = pos, b1 = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_b{ uv.z, uv.w };
+		auto ps = vtxs.size();
+		auto ix = idxs.size();
+		auto ic = 6;
+		auto& cd = cmd_data;
+		if (cd.empty())
+		{
+			cd.push_back({});
+		}
+		auto dt = &cd[cd.size() - 1];
+		auto clip = _clip_rect;
+		if (dt->texid != p->img && dt->clip_rect != clip)
+		{
+			if (dt->elemCount > 0)
+				cd.push_back({});
+			dt = &cd[cd.size() - 1];
+			dt->texid = p->img->texid;
+			dt->clip_rect = clip;
+			dt->vtxOffset = ps;
+			dt->idxOffset = 0;
+			dt->elemCount = 0;
+		}
+		auto od = PrimReserve(this, 6, 4);
+		PrimRectUV(a1, b1, uv_a, uv_b, color3, od.vsize, od.vtx, od.idx);
+	}
+	else
+	{
+		make_image_sliced(p->img->texid, a, texsize, p->sliced, rect, color32);
+	}
+
+}
+void canvas_atlas::clear()
+{
+	cmd_data.clear();
+	vtxs.clear();
+	idxs.clear();
+	_clip_rect = viewport;
+	_clip_rect.x = _clip_rect.y = 0;
+}
+/*
+
+
+九宫格渲染:
++--+---------------+--+
+|0 |       1       |2 |
++--+---------------+--+
+|  |               |  |
+|  |               |  |
+|3 |    center     |4 |
+|  |               |  |
++--+---------------+--+
+|5 |       6       |7 |
++--+---------------+--+
+
+九宫格:索引
+0  12                     14  2
+8  4                      6   10
+
+9  5                      7   11
+1  13                     15  3
++--+-------------------------+--+
+|  |                         |  |
++--+-------------------------+--+
+|  |                         |  |
+|  |                         |  |
++--+-------------------------+--+
+|  |                         |  |
++--+-------------------------+--+
+sliced.x=左宽，y上高，z右宽，w下高
+
+SDL_Vertex
+*/
+void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col)
+{
+	static std::vector<int> vt_index =// { 0,8,12,4,14,6,2,10,11,6,7,4,5,8,9,1,5,13,7,15,11,3 };//E_TRIANGLE_STRIP
+	{ 0, 8, 12, 8, 12, 4, 12, 4, 14, 4, 14, 6, 14, 6, 2, 6, 2, 10,
+		6, 7, 10, 7, 10, 11, 4, 5, 6, 5, 6, 7, 8, 9, 4, 9, 4, 5,
+		9, 1, 5, 1, 5, 13, 5, 13, 7, 13, 7, 15, 7, 15, 11, 15, 11, 3 };//E_TRIANGLE_LIST
+
+	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
+	glm::vec4 uv = { 0, 0, 1, 1 };
+	glm::vec4 v4 = { 0, 0, texsize.x, texsize.y };
+	if (!(rect.x < 0))
+	{
+		v4 = rect;
+		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
+		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y, };
+	}
+	float left = sliced.x,
+		top = sliced.y,
+		right = sliced.z,
+		bottom = sliced.w;
+	float x = pos.x, y = pos.y, width = size.x, height = size.y;
+	glm::vec4 suv = { (left + v4.x) / texsize.x, (top + v4.y) / texsize.y,
+		(v4.z - right) / texsize.x, (v4.w - bottom) / texsize.y };
+
+	//t_vector<vertex_v2>v;
+	std::vector<vertex_v2> vertex = {
+#if 1
+		//0
+		{{x, y}, {uv.x, uv.y}, col},
+		//1
+		{{x, y + height}, {uv.x, uv.w}, col},
+		//2
+		{{x + width, y}, {uv.z, uv.y}, col},
+		//3
+		{{x + width, y + height}, {uv.z, uv.w}, col},
+		//4
+		{{x + left, y + top}, {suv.x, suv.y}, col},
+		//5
+		{{x + left, y + height - bottom}, {suv.x, suv.w}, col},
+		//6
+		{{x + width - right, y + top}, {suv.z, suv.y}, col},
+		//7
+		{{x + width - right, y + height - bottom}, {suv.z, suv.w}, col},
+		//8
+		{{x, y + top}, {uv.x, suv.y}, col},
+		//9
+		{{x, y + height - bottom}, {uv.x, suv.w}, col},
+		//10
+		{{x + width, y + top}, {uv.z, suv.y}, col},
+		//11
+		{{x + width, y + height - bottom}, {uv.z, suv.w}, col},
+		//12
+		{{x + left, y}, {suv.x, uv.y}, col},
+		//13
+		{{x + left, y + height}, {suv.x, uv.w}, col},
+		//14
+		{{x + width - right, y}, {suv.z, uv.y}, col},
+		//15
+		{{x + width - right, y + height}, {suv.z, uv.w}, col},
+#else
+		//0
+		{{x, y}, {0.0f, 0.f}, col},
+		//1
+		{{x, y + height}, {0.f, 1.0f}, col},
+		//2
+		{{x + width, y}, {1.0f, 0.f}, col},
+		//3
+		{{x + width, y + height}, {1.0f, 1.0f}, col},
+		//4
+		{{x + left, y + top}, {0.0f + suv.x, 0.f + suv.y}, col},
+		//5
+		{{x + left, y + height - bottom}, {0.f + suv.x, 1.0f - suv.w}, col},
+		//6
+		{{x + width - right, y + top}, {1.0f - suv.z, 0.f + suv.z}, col},
+		//7
+		{{x + width - right, y + height - bottom}, {1.0f - suv.z, 1.0f - suv.w}, col},
+		//8
+		{{x, y + top}, {0.0f, 0.f + suv.y}, col},
+		//9
+		{{x, y + height - bottom}, {0.f, 1.0f - suv.w}, col},
+		//10
+		{{x + width, y + top}, {1.0f, 0.f + suv.y}, col},
+		//11
+		{{x + width, y + height - bottom}, {1.0f, 1.0f - suv.w}, col},
+		//12
+		{{x + left, y}, {0.0f + suv.x, 0.f}, col},
+		//13
+		{{x + left, y + height}, {0.f + suv.x, 1.0f}, col},
+		//14
+		{{x + width - right, y}, {1.0f - suv.z, 0.f}, col},
+		//15
+		{{x + width - right, y + height}, {1.0f - suv.z, 1.0f}, col},
+#endif
+	};
+	auto ps = vtxs.size();
+	auto ix = idxs.size();
+	auto ic = vt_index.size();
+	vtxs.resize(ps + vertex.size());
+	idxs.resize(ix + vt_index.size());
+	auto& cd = cmd_data;
+	if (cd.empty())
+	{
+		cd.push_back({});
+	}
+	auto dt = &cd[cd.size() - 1];
+	auto clip = _clip_rect;
+	if (dt->texid != user_image && dt->clip_rect != clip)
+	{
+		if (dt->elemCount > 0)
+			cd.push_back({});
+		dt = &cd[cd.size() - 1];
+		dt->texid = user_image;
+		dt->clip_rect = clip;
+		dt->vtxOffset = ps;
+		dt->idxOffset = 0;
+		dt->elemCount = ic;
+		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
+		memcpy(idxs.data() + ps, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
+	}
+	else
+	{
+		// 合批
+		dt->elemCount += ic;
+		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
+		auto pidx = idxs.data() + ix;
+		memcpy(pidx, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
+		for (size_t i = 0; i < ic; i++)
+		{
+			pidx[i] += ix;
+		}
+	}
+
+	return;
+}
+
+#endif
+
+// B样条线
+#if 1 
+
+bspline_ct::bspline_ct() {
+
+}
+bspline_ct::~bspline_ct() {
+	free_bspline(ptr); ptr = 0;
+}
+tinyspline::BSpline* bspline_ct::get()
+{
+	return (tinyspline::BSpline*)ptr;
+}
+std::vector<glm::vec2> bspline_ct::get_cp2()
+{
+	std::vector<glm::vec2> cp2;
+	tinyspline::BSpline* p = (tinyspline::BSpline*)ptr;
+	if (p) {
+		auto cp = p->controlPoints();
+		for (size_t i = 0; i < cp.size(); i++)
+		{
+			cp2.push_back({ cp[i],cp[i + 1] }); i++;
+		}
+	}
+	return cp2;
+}
+void* bspline_ct::new_bspline(glm::vec2* cp, int n, size_t degree) {
+	assert(!ptr);
+	if (!cp || n < 3 || degree < 2)return 0;
+	auto p = new tinyspline::BSpline(n, 2, degree);
+	if (p)
+	{
+		std::vector<tinyspline::real> ctrlp = p->controlPoints();
+		auto t = cp;
+#ifdef TINYSPLINE_FLOAT_PRECISION
+		auto d = (glm::vec2*)ctrlp.data();
+		memcpy(d, t, sizeof(glm::vec2) * n);
+#else
+		auto d = (glm::dvec2*)ctrlp.data();
+		for (size_t i = 0; i < n; i++)
+		{
+			d->x = t->x;
+			d->y = t->y;
+			t++; d++;
+		}
+#endif // TINYSPLINE_FLOAT_PRECISION
+		p->setControlPoints(ctrlp);
+		ptr = p;
+		dim = 2;
+	}
+	return p;
+}
+void* bspline_ct::new_bspline(glm::dvec2* cp, int n, size_t degree) {
+	assert(!ptr);
+	if (!cp || n < 3 || degree < 2)return 0;
+	auto p = new tinyspline::BSpline(n, 2, degree);
+	if (p)
+	{
+		std::vector<tinyspline::real> ctrlp = p->controlPoints();
+		auto t = cp;
+#ifdef TINYSPLINE_FLOAT_PRECISION
+		auto d = (glm::vec2*)ctrlp.data();
+		for (size_t i = 0; i < n; i++)
+		{
+			d->x = t->x;
+			d->y = t->y;
+			t++; d++;
+		}
+#else
+		auto d = (glm::dvec2*)ctrlp.data();
+		memcpy(d, t, sizeof(glm::dvec2) * n);
+#endif // TINYSPLINE_FLOAT_PRECISION
+		p->setControlPoints(ctrlp);
+		ptr = p;
+		dim = 2;
+	}
+	return p;
+}
+void* bspline_ct::new_bspline(glm::vec3* cp, int n, size_t degree) {
+	assert(!ptr);
+	if (!cp || n < 3 || degree < 2)return 0;
+	auto p = new tinyspline::BSpline(n, 3, degree);
+	if (p)
+	{
+		std::vector<tinyspline::real> ctrlp = p->controlPoints();
+		auto t = cp;
+#ifdef TINYSPLINE_FLOAT_PRECISION
+		auto d = (glm::vec3*)ctrlp.data();
+		memcpy(d, t, sizeof(glm::vec3) * n);
+#else
+		auto d = (glm::dvec3*)ctrlp.data();
+		for (size_t i = 0; i < n; i++)
+		{
+			d->x = t->x;
+			d->y = t->y;
+			d->z = t->z;
+			t++; d++;
+		}
+#endif // TINYSPLINE_FLOAT_PRECISION
+		p->setControlPoints(ctrlp);
+		ptr = p;
+		dim = 3;
+	}
+	return p;
+}
+void* bspline_ct::new_bspline(glm::dvec3* cp, int n, size_t degree) {
+	assert(!ptr);
+	if (!cp || n < 3 || degree < 2)return 0;
+	auto p = new tinyspline::BSpline(n, 3, degree);
+	if (p)
+	{
+		std::vector<tinyspline::real> ctrlp = p->controlPoints();
+		auto t = cp;
+#ifdef TINYSPLINE_FLOAT_PRECISION
+		auto d = (glm::vec3*)ctrlp.data();
+		for (size_t i = 0; i < n; i++)
+		{
+			d->x = t->x;
+			d->y = t->y;
+			d->z = t->z;
+			t++; d++;
+		}
+#else
+		auto d = (glm::dvec3*)ctrlp.data();
+		memcpy(d, t, sizeof(glm::dvec3) * n);
+#endif // TINYSPLINE_FLOAT_PRECISION
+		p->setControlPoints(ctrlp);
+		ptr = p;
+		dim = 3;
+	}
+	return p;
+}
+// nurbs
+void* bspline_ct::new_bspline(glm::vec4* cp, int n, size_t degree)
+{
+	assert(!ptr);
+	if (!cp || n < 3 || degree < 2)return 0;
+	auto p = new tinyspline::BSpline(n, 4, degree);
+	if (p)
+	{
+		std::vector<tinyspline::real> ctrlp = p->controlPoints();
+		auto t = cp;
+#ifdef TINYSPLINE_FLOAT_PRECISION
+		auto d = (glm::vec4*)ctrlp.data();
+		memcpy(d, t, sizeof(glm::vec4) * n);
+#else
+		auto d = (glm::dvec4*)ctrlp.data();
+		for (size_t i = 0; i < n; i++)
+		{
+			d->x = t->x;
+			d->y = t->y;
+			d->z = t->z;
+			d->w = t->w;
+			t++; d++;
+		}
+#endif // TINYSPLINE_FLOAT_PRECISION
+		p->setControlPoints(ctrlp);
+		ptr = p;
+		dim = 4;
+	}
+	return p;
+}
+void* bspline_ct::new_bspline(glm::dvec4* cp, int n, size_t degree)
+{
+	assert(!ptr);
+	if (!cp || n < 3 || degree < 2)return 0;
+	auto p = new tinyspline::BSpline(n, 4, degree);
+	if (p)
+	{
+		std::vector<tinyspline::real> ctrlp = p->controlPoints();
+		auto t = cp;
+#ifdef TINYSPLINE_FLOAT_PRECISION
+		auto d = (glm::vec4*)ctrlp.data();
+		for (size_t i = 0; i < n; i++)
+		{
+			d->x = t->x;
+			d->y = t->y;
+			d->z = t->z;
+			d->w = t->w;
+			t++; d++;
+		}
+#else
+		auto d = (glm::dvec4*)ctrlp.data();
+		memcpy(d, t, sizeof(glm::dvec4) * n);
+#endif // TINYSPLINE_FLOAT_PRECISION
+		p->setControlPoints(ctrlp);
+		ptr = p;
+		dim = 4;
+	}
+	return p;
+}
+std::vector<glm::vec2> bspline_ct::sample2(int m)
+{
+	std::vector<glm::vec2> ot;
+	auto t = (tinyspline::BSpline*)ptr;
+	if (t && dim == 2) {
+		auto sm = t->sample(m);
+		for (size_t i = 0; i < sm.size(); i++)
+		{
+			auto result = glm::vec2(sm[i], sm[i + 1]); i++;
+			ot.push_back(result);
+		}
+	}
+	return ot;
+}
+std::vector<glm::vec3> bspline_ct::sample3(int m)
+{
+	std::vector<glm::vec3> ot;
+	auto t = (tinyspline::BSpline*)ptr;
+	if (t && dim == 3) {
+		auto sm = t->sample(m);
+		for (size_t i = 0; i < sm.size(); i++)
+		{
+			auto result = glm::vec3(sm[i], sm[i + 1], sm[i + 2]); i += 2;
+			ot.push_back(result);
+		}
+	}
+	return ot;
+}
+std::vector<glm::vec4> bspline_ct::sample4(int m)
+{
+	std::vector<glm::vec4> ot;
+	auto t = (tinyspline::BSpline*)ptr;
+	if (t && dim == 4) {
+		auto sm = t->sample(m);
+		for (size_t i = 0; i < sm.size(); i++)
+		{
+			auto result = glm::vec4(sm[i], sm[i + 1], sm[i + 2], sm[i + 3]); i += 3;
+			ot.push_back(result);
+		}
+	}
+	return ot;
+}
+void bspline_ct::free_bspline(void* p)
+{
+	auto t = (tinyspline::BSpline*)p;
+	if (t) { delete t; }
+}
+#endif
+
+// 生成网格
+int make_grid(const glm::vec2& vsize, const glm::vec3& step_width, glm::vec2 nps, path_v* data)
+{
+	if (vsize.x < 1 || vsize.y < 1 || step_width.x < 1 || step_width.y < 1 || !data)return 0;
+	auto ks1 = vsize;
+	auto ks = vsize;
+	auto ks2 = vsize;
+	ks2 /= 2.0;
+	ks2 = glm::ceil(ks2);
+	ks.x /= step_width.x;
+	ks.y /= step_width.y;
+	ks = glm::ceil(ks);
+	ks += 2;
+
+	path_v pv, pv1;
+	int x = 0;
+	int sj = 0;
+	for (size_t i = 0; i < ks.x; i++)
+	{
+		glm::vec2 p1, p2;
+		p1.x = p2.x = x;
+		p1.y = -ks1.y;
+		p2.y = ks1.y;
+		if (x >= vsize.x)
+		{
+			p1 -= nps;
+			p2 -= nps;
+		}
+		else
+		{
+			p1 += nps;
+			p2 += nps;
+		}
+
+		if (sj == 0)
+		{
+			pv1.moveTo(p1); pv1.lineTo(p2);
+			sj = step_width.z;
+		}
+		else {
+			pv.moveTo(p1); pv.lineTo(p2);
+		}
+		sj--;
+		x += step_width.x;
+	}
+	int y = 0; sj = 0;
+	for (size_t i = 0; i < ks.y; i++)
+	{
+		glm::vec2 p1, p2;
+		p1.y = p2.y = y;
+		p1.x = -ks1.x;
+		p2.x = ks1.x;
+		if (y >= vsize.y)
+		{
+			p1 -= nps;
+			p2 -= nps;
+		}
+		else
+		{
+			p1 += nps;
+			p2 += nps;
+		}
+		if (sj == 0)
+		{
+			pv1.moveTo(p1); pv1.lineTo(p2);
+			sj = step_width.z;
+		}
+		else {
+			pv.moveTo(p1); pv.lineTo(p2);
+		}
+		sj--;
+		y += step_width.y;
+	}
+	{
+		if (pv.size())
+			data[0].swap(pv);
+		if (pv1.size())
+			data[1].swap(pv1);
+	}
+	return 2;
+}
+
+
+
+//CircleRect判断点是否在圆/矩形内
+bool in_box_cr(const glm::vec2& p, const glm::vec4* c)
+{
+	bool ret = false;
+	do {
+		if (!c)break;
+		if ((int)c->w > 0)
+		{
+			auto r = *c;
+			ret = !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z - 1) || (p.y > r.y + r.w - 1));
+		}
+		else {
+			//计算点p和 当前圆圆心c 的距离
+			int dis = distance(p, glm::vec2(c->x, c->y));
+			auto r = c->z - 1;
+			//和半径比较
+			ret = (dis <= r * r);
+		}
+	} while (0);
+	return ret;
+}
+
+glm::ivec2 check_box_cr(const glm::vec2& p, const glm::vec4* d, size_t count)
+{
+	bool ret = false;
+	if (!d)
+	{
+		return {};
+	}
+	glm::ivec2 rs = {};
+	auto c = d;
+	for (size_t i = 0; i < count; i++, c++)
+	{
+		if ((int)c->w > 0)
+		{
+			auto r = *c;
+			ret = !((p.x < r.x) || (p.y < r.y) || (p.x > r.z /*- 1*/) || (p.y > r.w /*- 1*/));
+			if (ret)
+			{
+				rs.x = ret;
+				rs.y = i;
+				break;
+			}
+		}
+		else {
+			//计算点p和 当前圆圆心c 的距离
+			int dis = distance(p, glm::vec2(c->x, c->y));
+			auto r = c->z /*- 1*/; if (ret)
+			{
+				//和半径比较
+				ret = (dis <= r * r);
+				rs.x = ret;
+				rs.y = i;
+				break;
+			}
+		}
+	}
+	return  rs;
+}
+glm::ivec2 check_box_cr1(const glm::vec2& p, const glm::vec4* d, size_t count, int stride)
+{
+	bool ret = false;
+	if (!d)
+	{
+		return {};
+	}
+	glm::ivec2 rs = {};
+	auto t = (char*)d;
+	for (size_t i = 0; i < count; i++, t += stride)
+	{
+		auto c = (glm::vec4*)t;
+		if ((int)c->w > 0)
+		{
+			auto r = *c;
+			ret = !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z /*- 1*/) || (p.y > r.y + r.w /*- 1*/));
+			if (ret)
+			{
+				rs.x = ret;
+				rs.y = i;
+				break;
+			}
+		}
+		else {
+			//计算点p和 当前圆圆心c 的距离
+			int dis = distance(p, glm::vec2(c->x, c->y));
+			auto r = c->z /*- 1*/; if (ret)
+			{
+				//和半径比较
+				ret = (dis <= r * r);
+				rs.x = ret;
+				rs.y = i;
+				break;
+			}
+		}
+	}
+	return  rs;
+}
+
+// rc= left,top,right,bottom
+bool rect_includes(const glm::vec4& rc, const glm::vec2& p)
+{
+	return (p.x >= rc.x) && (p.x <= rc.z) && (p.y >= rc.y) && (p.y <= rc.w);
+}
+// rc=left,top,right,bottom
+bool rect_includes(const glm::vec4& rc, const glm::vec4& other)
+{
+	return
+		(other.x >= rc.x) && (other.x <= rc.z) &&
+		(other.y >= rc.y) && (other.y <= rc.w) &&
+		(other.z >= rc.x) && (other.z <= rc.z) &&
+		(other.w >= rc.y) && (other.w <= rc.w)
+		;
+}
+
+// 矩形是否相交, r1={x,y,w,h}
+bool check_r2_cross(const glm::vec4& r1, const glm::vec4& r2)
+{
+	if (glm::max(r1.x, r2.x) <= glm::min(r1.x + r1.z, r2.x + r2.z) && glm::max(r1.y, r2.y) <= glm::min(r1.y + r1.w, r2.y + r2.w))
+	{
+		return true;   //有交集
+	}
+	else {
+		return false;   //无交集
+	}
+}
+
+// 圆是否相交
+bool check_c2(const glm::vec3& c, const glm::vec3& c1)
+{
+	bool r = true;
+	auto d = glm::distance(glm::vec2(c), glm::vec2(c1));
+	if (d > c.z * c.z || d > c1.z * c1.z)
+	{
+		r = false;
+	}
+	return r;
+}
+
+// 矩形和圆是否相交
+bool check_rc(const glm::vec4& rc, const glm::vec3& c)
+{
+	double x1 = rc.x, y1 = rc.y, x2 = rc.z, y2 = rc.w, r = c.z;
+	//条件1
+	double minx, miny;
+	//找出x方向与cx最接近的
+	minx = std::min(abs(x1 - c.x), abs(x2 - c.x));
+	//找出y方向与cy最接近的
+	miny = std::min(abs(y1 - c.y), abs(y2 - c.y));
+	if (minx * minx + miny * miny < r * r)return true;
+
+	//条件2
+	double x0 = (x1 + x2) / 2;
+	double y0 = (y1 + y2) / 2;
+	if ((abs(x0 - c.x) < abs(x2 - x1) / 2 + r) && abs(c.y - y0) < abs(y2 - y1) / 2)
+		return true;
+	if ((abs(y0 - c.y) < abs(y2 - y1) / 2 + r) && abs(c.x - x0) < abs(x2 - x1) / 2)
+		return true;
+
+	return 0;
+}
+
+
+
+
+
+
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif // !M_PI
+
+#ifndef THREE_SQRT
+#define EPSILON 1e-8
+#define EPSILON_NUMERIC 1e-4
+
+#define THREE_SQRT sqrt(3)
+#define ONE_THIRD (1.0 / 3.0)
+#define INTMAX_2 INTMAX_MAX
+#endif
+
+#if 1
+
+#if 1 
+bool isAroundZero(float val) {
+	return val > -EPSILON && val < EPSILON;
+}
+bool isNotAroundZero(float val) {
+	return val > EPSILON || val < -EPSILON;
+}
+/**
+ * 向量距离平方
+ */
+float v2DistSquare(float* v1, float* v2) {
+	return (v1[0] - v2[0]) * (v1[0] - v2[0])
+		+ (v1[1] - v2[1]) * (v1[1] - v2[1]);
+}
+/**
+ * 计算三次贝塞尔值
+ */
+float cubicAt(float p0, float p1, float p2, float p3, float t) {
+	auto onet = 1.0 - t;
+	return onet * onet * (onet * p0 + 3.0 * t * p1) + t * t * (t * p3 + 3.0 * onet * p2);
+}
+
+/**
+ * 计算三次贝塞尔导数值
+ */
+float cubicDerivativeAt(float p0, float p1, float p2, float p3, float t) {
+	auto onet = 1.0 - t;
+	return 3.0 * (
+		((p1 - p0) * onet + 2.0 * (p2 - p1) * t) * onet
+		+ (p3 - p2) * t * t
+		);
+}
+
+/**
+ * 计算三次贝塞尔方程根，使用盛金公式
+ */
+float cubicRootAt(float p0, float p1, float p2, float p3, float val, float* roots) {
+	// Evaluate roots of cubic functions
+	auto a = p3 + 3 * (p1 - p2) - p0;
+	auto b = 3 * (p2 - p1 * 2 + p0);
+	auto c = 3 * (p1 - p0);
+	auto d = p0 - val;
+
+	auto A = b * b - 3 * a * c;
+	auto B = b * c - 9 * a * d;
+	auto C = c * c - 3 * b * d;
+
+	auto n = 0;
+
+	if (isAroundZero(A) && isAroundZero(B)) {
+		if (isAroundZero(b)) {
+			roots[0] = 0;
+		}
+		else {
+			auto t1 = -c / b;  //t1, t2, t3, b is not zero
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+		}
+	}
+	else {
+		auto disc = B * B - 4 * A * C;
+
+		if (isAroundZero(disc)) {
+			auto K = B / A;
+			auto t1 = -b / a + K;  // t1, a is not zero
+			auto t2 = -K / 2.0;  // t2, t3
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+			if (t2 >= 0 && t2 <= 1) {
+				roots[n++] = t2;
+			}
+		}
+		else if (disc > 0) {
+			auto discSqrt = sqrt(disc);
+			auto Y1 = A * b + 1.5 * a * (-B + discSqrt);
+			auto Y2 = A * b + 1.5 * a * (-B - discSqrt);
+			if (Y1 < 0) {
+				Y1 = -pow(-Y1, ONE_THIRD);
+			}
+			else {
+				Y1 = pow(Y1, ONE_THIRD);
+			}
+			if (Y2 < 0) {
+				Y2 = -pow(-Y2, ONE_THIRD);
+			}
+			else {
+				Y2 = pow(Y2, ONE_THIRD);
+			}
+			auto t1 = (-b - (Y1 + Y2)) / (3 * a);
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+		}
+		else {
+			auto T = (2 * A * b - 3 * a * B) / (2 * sqrt(A * A * A));
+			auto theta = acos(T) / 3;
+			auto ASqrt = sqrt(A);
+			auto tmp = cos(theta);
+
+			auto t1 = (-b - 2 * ASqrt * tmp) / (3 * a);
+			auto t2 = (-b + ASqrt * (tmp + THREE_SQRT * sin(theta))) / (3 * a);
+			auto t3 = (-b + ASqrt * (tmp - THREE_SQRT * sin(theta))) / (3 * a);
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+			if (t2 >= 0 && t2 <= 1) {
+				roots[n++] = t2;
+			}
+			if (t3 >= 0 && t3 <= 1) {
+				roots[n++] = t3;
+			}
+		}
+	}
+	return n;
+}
+
+/**
+ * 计算三次贝塞尔方程极限值的位置
+ * @return 有效数目
+ */
+int cubicExtrema(float p0, float p1, float p2, float p3, float* extrema) {
+	auto b = 6 * p2 - 12 * p1 + 6 * p0;
+	auto a = 9 * p1 + 3 * p3 - 3 * p0 - 9 * p2;
+	auto c = 3 * p1 - 3 * p0;
+
+	auto n = 0;
+	if (isAroundZero(a)) {
+		if (isNotAroundZero(b)) {
+			auto t1 = -c / b;
+			if (t1 >= 0 && t1 <= 1) {
+				extrema[n++] = t1;
+			}
+		}
+	}
+	else {
+		auto disc = b * b - 4 * a * c;
+		if (isAroundZero(disc)) {
+			extrema[0] = -b / (2 * a);
+		}
+		else if (disc > 0) {
+			auto discSqrt = sqrt(disc);
+			auto t1 = (-b + discSqrt) / (2 * a);
+			auto t2 = (-b - discSqrt) / (2 * a);
+			if (t1 >= 0 && t1 <= 1) {
+				extrema[n++] = t1;
+			}
+			if (t2 >= 0 && t2 <= 1) {
+				extrema[n++] = t2;
+			}
+		}
+	}
+	return n;
+}
+
+/**
+ * 细分三次贝塞尔曲线,out[8]
+ */
+void cubicSubdivide(float p0, float p1, float p2, float p3, float t, float* out) {
+	auto p01 = (p1 - p0) * t + p0;
+	auto p12 = (p2 - p1) * t + p1;
+	auto p23 = (p3 - p2) * t + p2;
+
+	auto p012 = (p12 - p01) * t + p01;
+	auto p123 = (p23 - p12) * t + p12;
+
+	auto p0123 = (p123 - p012) * t + p012;
+	// Seg0
+	out[0] = p0;
+	out[1] = p01;
+	out[2] = p012;
+	out[3] = p0123;
+	// Seg1
+	out[4] = p0123;
+	out[5] = p123;
+	out[6] = p23;
+	out[7] = p3;
+}
+
+/**
+ * 投射点到三次贝塞尔曲线上，返回投射距离。
+ * 投射点有可能会有一个或者多个，这里只返回其中距离最短的一个。
+ * float out[2]
+ */
+double cubicProjectPoint(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float x, float y, float* out)
+{
+	// http://pomax.github.io/bezierinfo/#projections
+	auto t = 0.0;
+	auto interval = 0.005;
+	double d = INTMAX_2;
+	auto prev = 0.0;
+	auto next = 0.0;
+	auto d1 = 0.0;
+	auto d2 = 0.0;
+	float _v0[2] = {}, _v1[2] = {}, _v2[2] = {};
+	_v0[0] = x;
+	_v0[1] = y;
+
+	// 先粗略估计一下可能的最小距离的 t 值
+	// PENDING
+	for (auto _t = 0.0; _t < 1; _t += 0.05) {
+		_v1[0] = cubicAt(x0, x1, x2, x3, _t);
+		_v1[1] = cubicAt(y0, y1, y2, y3, _t);
+		d1 = v2DistSquare(_v0, _v1);
+		if (d1 < d) {
+			t = _t;
+			d = d1;
+		}
+	}
+	d = INTMAX_2;
+
+	// At most 32 iteration
+	for (auto i = 0; i < 32; i++) {
+		if (interval < EPSILON_NUMERIC) {
+			break;
+		}
+		prev = t - interval;
+		next = t + interval;
+		// t - interval
+		_v1[0] = cubicAt(x0, x1, x2, x3, prev);
+		_v1[1] = cubicAt(y0, y1, y2, y3, prev);
+
+		d1 = v2DistSquare(_v1, _v0);
+
+		if (prev >= 0 && d1 < d) {
+			t = prev;
+			d = d1;
+		}
+		else {
+			// t + interval
+			_v2[0] = cubicAt(x0, x1, x2, x3, next);
+			_v2[1] = cubicAt(y0, y1, y2, y3, next);
+			d2 = v2DistSquare(_v2, _v0);
+
+			if (next <= 1 && d2 < d) {
+				t = next;
+				d = d2;
+			}
+			else {
+				interval *= 0.5;
+			}
+		}
+	}
+	// t
+	if (out) {
+		out[0] = cubicAt(x0, x1, x2, x3, t);
+		out[1] = cubicAt(y0, y1, y2, y3, t);
+	}
+	// console.log(interval, i);
+	return sqrt(d);
+}
+
+/**
+ * 计算三次贝塞尔曲线长度
+ */
+double cubicLength(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float iteration)
+{
+	auto px = x0;
+	auto py = y0;
+
+	auto d = 0.0;
+
+	auto step = 1.0 / iteration;
+
+	for (auto i = 1; i <= iteration; i++) {
+		auto t = i * step;
+		auto x = cubicAt(x0, x1, x2, x3, t);
+		auto y = cubicAt(y0, y1, y2, y3, t);
+
+		double dx = x - px;
+		double dy = y - py;
+
+		d += sqrt(dx * dx + dy * dy);
+
+		px = x;
+		py = y;
+	}
+
+	return d;
+}
+
+/**
+ * 计算二次方贝塞尔值
+ */
+int quadraticAt(float p0, float p1, float p2, float t) {
+	auto onet = 1.0 - t;
+	return onet * (onet * p0 + 2 * t * p1) + t * t * p2;
+}
+
+/**
+ * 计算二次方贝塞尔导数值
+ */
+int quadraticDerivativeAt(float p0, float p1, float p2, float t) {
+	return 2.0 * ((1 - t) * (p1 - p0) + t * (p2 - p1));
+}
+
+/**
+ * 计算二次方贝塞尔方程根
+ * @return 有效根数目
+ */
+int quadraticRootAt(float p0, float p1, float p2, float val, float* roots) {
+	auto a = p0 - 2 * p1 + p2;
+	auto b = 2.0 * (p1 - p0);
+	auto c = p0 - val;
+
+	auto n = 0;
+	if (isAroundZero(a)) {
+		if (isNotAroundZero(b)) {
+			auto t1 = -c / b;
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+		}
+	}
+	else {
+		auto disc = b * b - 4 * a * c;
+		if (isAroundZero(disc)) {
+			auto t1 = -b / (2 * a);
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+		}
+		else if (disc > 0) {
+			auto discSqrt = sqrt(disc);
+			auto t1 = (-b + discSqrt) / (2 * a);
+			auto t2 = (-b - discSqrt) / (2 * a);
+			if (t1 >= 0 && t1 <= 1) {
+				roots[n++] = t1;
+			}
+			if (t2 >= 0 && t2 <= 1) {
+				roots[n++] = t2;
+			}
+		}
+	}
+	return n;
+}
+
+/**
+ * 计算二次贝塞尔方程极限值
+ */
+float quadraticExtremum(float p0, float p1, float p2) {
+	auto divider = p0 + p2 - 2 * p1;
+	if (divider == 0) {
+		// p1 is center of p0 and p2
+		return 0.5;
+	}
+	else {
+		return (p0 - p1) / divider;
+	}
+}
+
+/**
+ * 细分二次贝塞尔曲线
+ */
+void quadraticSubdivide(float p0, float p1, float p2, float t, float* out) {
+	auto p01 = (p1 - p0) * t + p0;
+	auto p12 = (p2 - p1) * t + p1;
+	auto p012 = (p12 - p01) * t + p01;
+
+	// Seg0
+	out[0] = p0;
+	out[1] = p01;
+	out[2] = p012;
+
+	// Seg1
+	out[3] = p012;
+	out[4] = p12;
+	out[5] = p2;
+}
+/**
+ * 投射点到二次贝塞尔曲线上，返回投射距离。
+ * 投射点有可能会有一个或者多个，这里只返回其中距离最短的一个。
+ * @param {number} x0
+ * @param {number} y0
+ * @param {number} x1
+ * @param {number} y1
+ * @param {number} x2
+ * @param {number} y2
+ * @param {number} x
+ * @param {number} y
+ * @param {Array.<number>} out 投射点
+ * @return {number}
+ */
+double quadraticProjectPoint(float x0, float y0, float x1, float y1, float x2, float y2, float x, float y, float* out) {
+	// http://pomax.github.io/bezierinfo/#projections
+	auto t = 0.0;
+	auto interval = 0.005;
+	auto d = INTMAX_2;
+
+	float _v0[2] = {}, _v1[2] = {}, _v2[2] = {};
+	_v0[0] = x;
+	_v0[1] = y;
+
+	// 先粗略估计一下可能的最小距离的 t 值
+	// PENDING
+	for (auto _t = 0.0; _t < 1; _t += 0.05) {
+		_v1[0] = quadraticAt(x0, x1, x2, _t);
+		_v1[1] = quadraticAt(y0, y1, y2, _t);
+		auto d1 = v2DistSquare(_v0, _v1);
+		if (d1 < d) {
+			t = _t;
+			d = d1;
+		}
+	}
+	d = INTMAX_2;
+
+	// At most 32 iteration
+	for (auto i = 0; i < 32; i++) {
+		if (interval < EPSILON_NUMERIC) {
+			break;
+		}
+		auto prev = t - interval;
+		auto next = t + interval;
+		// t - interval
+		_v1[0] = quadraticAt(x0, x1, x2, prev);
+		_v1[1] = quadraticAt(y0, y1, y2, prev);
+
+		auto d1 = v2DistSquare(_v1, _v0);
+
+		if (prev >= 0 && d1 < d) {
+			t = prev;
+			d = d1;
+		}
+		else {
+			// t + interval
+			_v2[0] = quadraticAt(x0, x1, x2, next);
+			_v2[1] = quadraticAt(y0, y1, y2, next);
+			auto d2 = v2DistSquare(_v2, _v0);
+			if (next <= 1 && d2 < d) {
+				t = next;
+				d = d2;
+			}
+			else {
+				interval *= 0.5;
+			}
+		}
+	}
+	// t
+	if (out) {
+		out[0] = quadraticAt(x0, x1, x2, t);
+		out[1] = quadraticAt(y0, y1, y2, t);
+	}
+	// console.log(interval, i);
+	return sqrt(d);
+}
+
+/**
+ * 计算二次贝塞尔曲线长度
+ */
+double quadraticLength(float x0, float y0, float x1, float y1, float x2, float y2, float iteration)
+{
+	auto px = x0;
+	auto py = y0;
+
+	auto d = 0.0;
+
+	auto step = 1 / iteration;
+
+	for (auto i = 1; i <= iteration; i++) {
+		auto t = i * step;
+		auto x = quadraticAt(x0, x1, x2, t);
+		auto y = quadraticAt(y0, y1, y2, t);
+
+		auto dx = x - px;
+		auto dy = y - py;
+
+		d += sqrt(dx * dx + dy * dy);
+
+		px = x;
+		py = y;
+	}
+
+	return d;
+}
+
+/**
+ * 三次贝塞尔曲线描边包含判断
+ */
+bool containStroke(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float lineWidth, float x, float y) {
+	if (lineWidth <= 0) {
+		return false;
+	}
+	auto _l = lineWidth;
+	// Quick reject
+	if (
+		(y > y0 + _l && y > y1 + _l && y > y2 + _l && y > y3 + _l)
+		|| (y < y0 - _l && y < y1 - _l && y < y2 - _l && y < y3 - _l)
+		|| (x > x0 + _l && x > x1 + _l && x > x2 + _l && x > x3 + _l)
+		|| (x < x0 - _l && x < x1 - _l && x < x2 - _l && x < x3 - _l)
+		) {
+		return false;
+	}
+	auto d = cubicProjectPoint(
+		x0, y0, x1, y1, x2, y2, x3, y3,
+		x, y, nullptr
+	);
+	return d <= _l / 2.0;
+}
+bool containStroke(cubic_v* c, float lineWidth, glm::vec2 p)
+{
+	return containStroke(c->p0.x, c->p0.y, c->p1.x, c->p1.y, c->p2.x, c->p2.y, c->p3.x, c->p3.y, lineWidth, p.x, p.y);
+}
+
+/**
+ * 计算二次贝塞尔曲线长度
+ */
+double quadraticLength(quadratic_v* c, float iteration)
+{
+	return quadraticLength(c->p0.x, c->p0.y, c->p1.x, c->p1.y, c->p2.x, c->p2.y, iteration);
+}
+
+/**
+ * 投射点到二次贝塞尔曲线上，返回投射距离。
+ * 投射点有可能会有一个或者多个，这里只返回其中距离最短的一个。
+ */
+double quadraticProjectPoint(quadratic_v* c, glm::vec2 p, glm::vec2* out)
+{
+	return quadraticProjectPoint(c->p0.x, c->p0.y, c->p1.x, c->p1.y, c->p2.x, c->p2.y, p.x, p.y, (float*)out);
+}
+/**
+ * 计算三次贝塞尔曲线长度
+ */
+double cubicLength(cubic_v* c, float iteration)
+{
+	return cubicLength(c->p0.x, c->p0.y, c->p1.x, c->p1.y, c->p2.x, c->p2.y, c->p3.x, c->p3.y, iteration);
+}
+/**
+ * 投射点到三次贝塞尔曲线上，返回投射距离。
+ * 投射点有可能会有一个或者多个，这里只返回其中距离最短的一个。
+ * float out[2]
+ */
+double cubicProjectPoint(cubic_v* c, glm::vec2 p, glm::vec2* out)
+{
+	return cubicProjectPoint(c->p0.x, c->p0.y, c->p1.x, c->p1.y, c->p2.x, c->p2.y, c->p3.x, c->p3.y, p.x, p.y, (float*)out);
+}
+// 返回点到线段的投射点
+glm::vec2 cpol(const glm::vec2& p1, const glm::vec2& a, const glm::vec2& b)
+{
+	return glm::closestPointOnLine(p1, a, b);
+}
+
+glm::vec3 cpol(const glm::vec3& p1, const glm::vec3& a, const glm::vec3& b)
+{
+	return glm::closestPointOnLine(p1, a, b);
+}
+
+
+
+//三次贝塞尔曲线
+//a1 * (1 - t) * (1 - t) * (1 - t) + 3 * a2 * t * (1 - t) * (1 - t) + 3 * a3 * t * t * (1 - t) + a4 * t * t * t;
+/*
+t:时间变量 [0-1]
+p1:首端点
+p2:末端点
+c1:首端点控制点
+c2:末端点控制点
+返回值：t时刻贝塞尔曲线上的点
+控制点、端点和返回值的数据类型为：vector2d
+
+ * 计算三次贝塞尔值
+*/
+float cubicAt1(float p0, float p1, float p2, float p3, float t) {
+	auto onet = 1.0 - t;
+	return onet * onet * (onet * p0 + 3.0 * t * p1) + t * t * (t * p3 + 3.0 * onet * p2);
+}
+glm::vec2 thirdOrderBeziercurve(double t, const glm::vec2& p1, const glm::vec2& c1, const glm::vec2& c2, const glm::vec2& p2) {
+	if (t < 0 || t>1)
+		return {};
+	return { cubicAt(p1.x, c1.x, c2.x, p2.x, t), cubicAt(p1.y, c1.y, c2.y, p2.y, t) };
+}
+
+//根据时间t获取打断后的两条贝塞尔曲线的控制点
+std::vector<glm::vec2> getControlPointByT(const glm::vec2& p1, const glm::vec2& c1, const glm::vec2& c2, const glm::vec2& p2, double t)
+{
+	//辅助点g
+	auto g = c1 * (1 - t) + (c2 * t);
+	auto c11 = p1 * (1 - t) + (c1 * t);
+	auto c21 = c11 * (1 - t) + (g * t);
+	auto c31 = c2 * (1 - t) + (p2 * t);
+	auto c22 = g * (1 - t) + (c31 * t);
+	return { c11, c21, c22, c31 };
+}
+//判断点是否在贝塞尔曲线上，如果在（误差范围内），返回时间t和逼近点
+/*
+  输入:
+	  p1,c1,c2,p2：是贝塞尔曲线的参数
+	  p:特定点坐标
+	  errorValue:误差值
+ 输出:
+  1.如果p点在贝塞尔曲线上，返回打断后的两条贝塞尔曲线的控制点和纠正点[c11,c21,c22,c31,rightPoint]
+  2.否则，返回[]
+*/
+std::vector<glm::vec2> getControlPointByPoint(const glm::vec2& p1, const glm::vec2& c1, const glm::vec2& c2, const glm::vec2& p2, const glm::vec2& p, double errorValue)
+{
+	double m = 1000000;
+	double t = 0;
+	glm::vec2 pt(-1, -1);
+	for (double i = 0; i <= 1; i = i + 0.01)
+	{
+		auto pi = thirdOrderBeziercurve(i, p1, c1, c2, p2);
+		auto d = glm::distance(pi, p);
+		if (d < m)
+		{
+			m = d;
+			t = i;
+			pt = pi;
+		}
+	}
+	if (m < errorValue)
+	{
+		return getControlPointByT(p1, c1, c2, p2, t);
+	}
+	return {};
+}
+
+// 分割曲线
+bool tessbc(glm::vec2* c, float t, std::vector<glm::vec2>* opt)
+{
+	glm::vec2* P1 = (glm::vec2*)(c);
+	glm::vec2* C1 = (glm::vec2*)(c + 1);
+	glm::vec2* C2 = (glm::vec2*)(c + 2);
+	glm::vec2* P2 = (glm::vec2*)(c + 3);
+
+	auto cb = thirdOrderBeziercurve(t, *P1, *C1, *C2, *P2);
+	auto ctrs = getControlPointByPoint(*P1, *C1, *C2, *P2, cb, 100); // 新控制点
+	if (ctrs.size() == 4)
+	{
+		opt->push_back(*c);
+		opt->push_back(ctrs[0]);
+		opt->push_back(ctrs[1]);
+		opt->push_back(cb);//中间点
+		opt->push_back(ctrs[2]);
+		opt->push_back(ctrs[3]);
+		opt->push_back(*P2);
+	}
+	return (ctrs.size() == 4);
+}
+
+
+#endif
+
+namespace bs {
+	double sol2(int nn, int k)  //计算多项式的系数C(nn,k)
+	{
+		int i;
+		double sum = 1;
+		for (i = 1; i <= nn; i++)
+			sum *= i;
+		for (i = 1; i <= k; i++)
+			sum /= i;
+		for (i = 1; i <= nn - k; i++)
+			sum /= i;
+		return sum;
+	}
+	template<class T2, class Td2>
+	void sol3(double t, T2* path, size_t count, size_t n, std::vector<Td2>& opt)  //计算Bezier曲线上点的坐标
+	{
+		glm::dvec2 point = {};
+		double Ber;
+		for (size_t k = 0; k < count; k++)
+		{
+			Ber = sol2(n - 1, k) * pow(t, k) * pow(1 - t, n - 1 - k);
+			point.x += path[k].x * Ber;
+			point.y += path[k].y * Ber;
+		}
+		opt.push_back(point);
+	}
+	template<class T2, class Td2>
+	void sol4(T2* path, size_t n, double m, bool first, std::vector<Td2>& opt)  //根据控制点，求曲线上的m个点
+	{
+		for (size_t i = 0; i <= m; i++)
+		{
+			if (i == 0 && !first)
+			{
+				continue;
+			}
+			sol3((double)i / (double)m, path, 4, n, opt);
+		}
+	}
+
+	template<class T2, class Td2>
+	void get_bezier(T2* path, size_t n, double m, bool first, std::vector<Td2>& r)
+	{
+		sol4(path, n, m, first, r);
+		return;
+	}
+
+}
+//!bs
+
+
+	/*
+	*	贝塞尔曲线，m为细分数量，first=true就是新开的线
+		3次bezier四个坐标一组，p0 p1 p2 p3
+		2次bezier设置p1\p2同样数值
+	*/
+std::vector<glm::vec2> get_bezier(glm::vec2* path, size_t n, double m, bool first)
+{
+	std::vector<glm::vec2> r = {};
+	bs::sol4(path, n, m, first, r);
+	return r;
+}
+std::vector<glm::vec2> get_bezier(cubic_v* path, size_t n, double m)
+{
+	std::vector<glm::vec2> r = {};
+	if (path && n > 0)
+	{
+		bs::sol4((glm::vec2*)path, n * 4, m, true, r);
+	}
+	return r;
+}
+std::vector<glm::dvec2> get_bezier64(cubic_v* path, size_t n, double m)
+{
+	std::vector<glm::dvec2> r = {};
+	if (path && n > 0)
+	{
+		bs::sol4((glm::vec2*)path, n * 4, m, true, r);
+	}
+	return r;
+}
+template<class T>
+std::vector<T> get_bezier_t(cubic_v* path, size_t n, double m)
+{
+	std::vector<T> r = {};
+	if (path && n > 0)
+	{
+		bs::sol4((glm::vec2*)path, n * 4, m, true, r);
+	}
+	return r;
+}
+
+
+void c2to3(cubic_v& c)
+{
+	static double dv = 2.0 / 3.0;
+	glm::vec2 c1, c2;
+	auto p0 = c.p0;
+	auto p1 = c.p1;
+	auto p2 = c.p3;
+	c1 = p1 - p0; c1 *= dv; c1 += p0;
+	c2 = p1 - p2; c2 *= dv; c2 += p2;
+	c.p1 = c1;
+	c.p2 = c2;
+}
+
+void build_cubic(const cubic_v& shape, float percent, float m, std::vector<glm::vec2>& ctx)
+{
+	auto x1 = shape.p0.x;
+	auto y1 = shape.p0.y;
+	auto x2 = shape.p3.x;
+	auto y2 = shape.p3.y;
+	auto cpx1 = shape.p1.x;
+	auto cpy1 = shape.p1.y;
+	auto cpx2 = shape.p2.x;
+	auto cpy2 = shape.p2.y;
+	if (percent == 0) {
+		return;
+	}
+	float out[8] = {};
+	// ctx.push_back(shape.p0);
+
+	if (cpx2 == 0 || cpy2 == 0) {
+		if (percent < 1) {
+			quadraticSubdivide(x1, cpx1, x2, percent, out);
+			cpx1 = out[1];
+			x2 = out[2];
+			quadraticSubdivide(y1, cpy1, y2, percent, out);
+			cpy1 = out[1];
+			y2 = out[2];
+		}
+		glm::vec2 v[4] = {};
+		v[0] = shape.p0;
+		auto p0 = v[0];
+		auto p2 = shape.p3;
+		auto p1 = glm::vec2(cpx1, cpy1);
+		glm::vec2 c1, c2;
+		{
+			static double dv = 2.0 / 3.0;
+			c1 = p1 - p0; c1 *= dv; c1 += p0;
+			c2 = p1 - p2; c2 *= dv; c2 += p2;
+			v[1] = c1; v[2] = c2;
+		}
+		v[3] = shape.p3;
+		v[3] = shape.p3;
+		bs::get_bezier(v, 4, m, 0, ctx);
+		//ctx.quadraticCurveTo(
+		//    cpx1, cpy1,
+		//    x2, y2
+		//);
+	}
+	else {
+		if (percent < 1) {
+			cubicSubdivide(x1, cpx1, cpx2, x2, percent, out);
+			cpx1 = out[1];
+			cpx2 = out[2];
+			x2 = out[3];
+			cubicSubdivide(y1, cpy1, cpy2, y2, percent, out);
+			cpy1 = out[1];
+			cpy2 = out[2];
+			y2 = out[3];
+		}
+		glm::vec2 v[4] = {};
+		v[0] = shape.p0;
+		v[1] = glm::vec2(cpx1, cpy1);
+		v[2] = glm::vec2(cpx2, cpy2);
+		v[3] = shape.p3;
+		bs::get_bezier(v, 4, m, 0, ctx);
+		//ctx.bezierCurveTo(
+		//    cpx1, cpy1,
+		//    cpx2, cpy2,
+		//    x2, y2
+		//);
+	}
+}
+#ifndef path_v_h
+#define path_v_h
+
+path_v::path_v()
+{
+}
+
+path_v::~path_v()
+{
+	//printf("%d\n", _data.size());
+}
+void path_v::swap(path_v& v) {
+	v._data.swap(_data);
+	std::swap(v._box, _box);
+	std::swap(v._pos, _pos);
+}
+path_v::vertex_t* path_v::data() {
+	return _data.empty() ? nullptr : _data.data();
+}
+
+size_t path_v::size()
+{
+	return _data.size();
+}
+size_t path_v::dsize()
+{
+	return _data.size() * sizeof(path_v::vertex_t);
+}
+size_t path_v::mcount()
+{
+	size_t c = 0;
+	for (auto& it : _data)
+	{
+		if (it.type == vtype_e::e_vmove)c++;
+	}
+	return c;
+}
+void tobox(const glm::vec2& v, glm::vec4& t)
+{
+	if (v.x < t.x)
+	{
+		t.x = v.x;
+	}
+	if (v.y < t.y)
+	{
+		t.y = v.y;
+	}
+	if (v.x > t.z)
+	{
+		t.z = v.x;
+	}
+	if (v.y > t.w)
+	{
+		t.w = v.y;
+	}
+
+}
+
+/*
+*
+*  0中心
+*   1     2
+	-------
+	|     |
+	-------
+	4     3
+*/
+glm::vec2 getbox2t(std::vector<glm::vec2>& vt, int t)
+{
+	glm::vec4 box = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
+	for (auto& it : vt)
+	{
+		tobox(it, box);
+	}
+	glm::vec2 cp = { box.z - box.x,box.w - box.y };
+	switch (t)
+	{
+	case 0:
+		cp *= 0.5;
+		break;
+	case 1:
+		cp = {};
+		break;
+	case 2:
+		cp.y = 0;
+		break;
+	case 3:
+		break;
+	case 4:
+		cp.x = 0;
+		break;
+	default:
+		break;
+	}
+	cp.x += box.x;
+	cp.y += box.y;
+	return cp;
+}
+
+glm::vec2 getbox2t(glm::vec4 box, int t)
+{
+	glm::vec2 cp = { box.z - box.x,box.w - box.y };
+	switch (t)
+	{
+	case 0:
+		cp *= 0.5;
+		break;
+	case 1:
+		cp = {};
+		break;
+	case 2:
+		cp.y = 0;
+		break;
+	case 3:
+		break;
+	case 4:
+		cp.x = 0;
+		break;
+	default:
+		break;
+	}
+	cp.x += box.x;
+	cp.y += box.y;
+	return cp;
+}
+
+glm::mat4 mkmat3(glm::vec2 pos, glm::vec2 scale, float rotate, glm::vec2 rotate_pos)
+{
+	// 平移
+	auto tm = glm::translate(glm::mat4(1.0f), glm::vec3(pos, .0f));
+	// 缩放
+	auto sm = glm::mat4(1.0);
+	assert((scale.x * scale.y) > 0);
+	if ((scale.x * scale.y) > 0)
+	{
+		sm = glm::scale(glm::mat4(1.0f), glm::vec3(scale, 1.0));
+	}
+	// 旋转
+	glm::vec3 rpos(rotate_pos, 0.0f);
+	auto rm = glm::translate(glm::mat4(1.0f), rpos) * glm::mat4_cast(glm::quat(glm::radians(glm::vec3(0, 0, rotate))))
+		* glm::translate(glm::mat4(1.0f), -rpos);
+	return tm * sm * rm;
+}
+
+void path_v::moveTo(const glm::vec2& p)
+{
+	auto v2ss = sizeof(glm::vec2);
+	vertex_t v = {};
+	v.type = vtype_e::e_vmove;
+	v.p = p;
+	_data.push_back(v);
+}
+void path_v::quadraticCurveTo(const glm::vec2& cp0, const glm::vec2& p)
+{
+	vertex_t v = {};
+	v.type = vtype_e::e_vcurve;
+	v.p = p;
+	v.c = cp0;
+	_data.push_back(v);
+	//tobox(cp0, box);
+	//tobox(p, box);
+}
+void path_v::bezierCurveTo(const glm::vec2& cp0, const glm::vec2& cp1, const glm::vec2& p)
+{
+	vertex_t v = {};
+	v.type = vtype_e::e_vcubic;
+	v.p = p;
+	v.c = cp0;
+	v.c1 = cp1;
+	_data.push_back(v);
+	//tobox(cp0, box);
+	//tobox(cp1, box);
+	//tobox(p, box);
+}
+
+void path_v::curveTo(const glm::vec2& cp0, const glm::vec2& p)
+{
+	vertex_t v = {};
+	v.type = vtype_e::e_vcurve;
+	v.p = p;
+	v.c = cp0;
+	_data.push_back(v);
+	//tobox(cp0, box);
+	//tobox(p, box);
+}
+void path_v::cubicTo(const glm::vec2& cp0, const glm::vec2& cp1, const glm::vec2& p)
+{
+	vertex_t v = {};
+	v.type = vtype_e::e_vcubic;
+	v.p = p;
+	v.c = cp0;
+	v.c1 = cp1;
+	_data.push_back(v);
+	//tobox(cp0, box);
+	//tobox(cp1, box);
+	//tobox(p, box);
+}
+
+void path_v::lineTo(const glm::vec2& p)
+{
+	vertex_t v = {};
+	v.type = vtype_e::e_vline;
+	v.p = p;
+	_data.push_back(v);
+	//tobox(p, box);
+}
+
+
+void path_v::moveTo(double x, double y)
+{
+	moveTo({ x,y });
+}
+void path_v::lineTo(double x, double y)
+{
+	lineTo({ x,y });
+}
+void path_v::curveTo(double cx, double cy, double c1x, double c1y, double x, double y)
+{
+	cubicTo({ cx,cy }, { c1x,c1y }, { x,y });
+}
+void path_v::lineTo2(double x, double y)
+{
+	auto pts = _data.rbegin();
+	double px, py, dx, dy;
+	if (_data.size()) {
+		auto pxy = pts;
+		px = pxy->p.x;
+		py = pxy->p.y;
+		dx = x - px;
+		dy = y - py;
+		vertex_t v = {};
+		v.type = vtype_e::e_vcubic;
+		v.c.x = (px + dx / 3.0f); v.c.y = (py + dy / 3.0f);
+		v.c1.x = (x - dx / 3.0f); v.c1.y = (y - dy / 3.0f);
+		v.p.x = x;
+		v.p.y = y;
+		_data.push_back(v);
+		//tobox(v.p, box);
+	}
+}
+void path_v::lineTo2(const glm::vec2& p)
+{
+	lineTo2(p.x, p.y);
+}
+void path_v::cubicBezTo(double cpx1, double cpy1, double cpx2, double cpy2, double x, double y)
+{
+	cubicTo({ cpx1,cpy1 }, { cpx2,cpy2 }, { x,y });
+}
+
+
+#define c_KAPPA90 (0.5522847493f)	// Length proportional to radius of a cubic bezier handle for 90deg arcs.
+
+
+
+void path_v::addCircle(const glm::vec2& c, double r)
+{
+	double cx = c.x, cy = c.y;
+	if (r > 0.0f) {
+		moveTo(cx + r, cy);
+		cubicBezTo(cx + r, cy + r * c_KAPPA90, cx + r * c_KAPPA90, cy + r, cx, cy + r);
+		cubicBezTo(cx - r * c_KAPPA90, cy + r, cx - r, cy + r * c_KAPPA90, cx - r, cy);
+		cubicBezTo(cx - r, cy - r * c_KAPPA90, cx - r * c_KAPPA90, cy - r, cx, cy - r);
+		cubicBezTo(cx + r * c_KAPPA90, cy - r, cx + r, cy - r * c_KAPPA90, cx + r, cy);
+	}
+}
+void path_v::addCircle(const glm::vec2* c, size_t n, double r)
+{
+	if (c && r > 0.0f)
+	{
+		for (size_t i = 0; i < n; i++)
+		{
+			addCircle(*c, r); c++;
+		}
+	}
+}
+void path_v::addCircle(const glm::vec3* c, size_t n)
+{
+	if (c)
+	{
+		for (size_t i = 0; i < n; i++)
+		{
+			if (c->z > 0.0f)
+				addCircle(*c, c->z);
+			c++;
+		}
+	}
+}
+
+void path_v::addEllipse(const glm::vec2& c, const glm::vec2& r)
+{
+	double cx = c.x, cy = c.y, rx = r.x, ry = r.y;
+	if (rx > 0.0f && ry > 0.0f) {
+		moveTo(cx + rx, cy);
+		cubicBezTo(cx + rx, cy + ry * c_KAPPA90, cx + rx * c_KAPPA90, cy + ry, cx, cy + ry);
+		cubicBezTo(cx - rx * c_KAPPA90, cy + ry, cx - rx, cy + ry * c_KAPPA90, cx - rx, cy);
+		cubicBezTo(cx - rx, cy - ry * c_KAPPA90, cx - rx * c_KAPPA90, cy - ry, cx, cy - ry);
+		cubicBezTo(cx + rx * c_KAPPA90, cy - ry, cx + rx, cy - ry * c_KAPPA90, cx + rx, cy);
+	}
+}
+void setrm(double& rx, double& ry, double w, double h)
+{
+	if (rx < 0.0f && ry > 0.0f) rx = ry;
+	if (ry < 0.0f && rx > 0.0f) ry = rx;
+	if (rx < 0.0f) rx = 0.0f;
+	if (ry < 0.0f) ry = 0.0f;
+	if (rx > w / 2.0f) rx = w / 2.0f;
+	if (ry > h / 2.0f) ry = h / 2.0f;
+}
+
+void path_v::addRect(const glm::vec4& a, const glm::vec2& r)
+{
+	double x = a.x, y = a.y, w = a.z, h = a.w, rx = r.x, ry = r.y;
+	setrm(rx, ry, w, h);
+	if (w != 0.0f && h != 0.0f) {
+
+		if (rx < 0.00001f || ry < 0.0001f) {
+			moveTo(x, y);
+			lineTo(x + w, y);
+			lineTo(x + w, y + h);
+			lineTo(x, y + h);
+			lineTo(x, y); //closePath
+		}
+		else {
+			moveTo(x + rx, y);
+			lineTo(x + w - rx, y);
+			cubicBezTo(x + w - rx * (1 - c_KAPPA90), y, x + w, y + ry * (1 - c_KAPPA90), x + w, y + ry);
+			lineTo(x + w, y + h - ry);
+			cubicBezTo(x + w, y + h - ry * (1 - c_KAPPA90), x + w - rx * (1 - c_KAPPA90), y + h, x + w - rx, y + h);
+			lineTo(x + rx, y + h);
+			cubicBezTo(x + rx * (1 - c_KAPPA90), y + h, x, y + h - ry * (1 - c_KAPPA90), x, y + h - ry);
+			lineTo(x, y + ry);
+			cubicBezTo(x, y + ry * (1 - c_KAPPA90), x + rx * (1 - c_KAPPA90), y, x + rx, y);
+			lineTo(x, y);
+		}
+	}
+}
+void path_v::add_lines(const glm::vec2* d, size_t size, bool isclose)
+{
+	if (d && size > 0)
+	{
+		_data.reserve(_data.size() + size);
+		moveTo(*d);
+		for (size_t i = 1; i < size; i++)
+		{
+			lineTo(d[i]);
+		}
+		if (isclose && *d != d[size - 1])
+		{
+			lineTo(*d);
+		}
+	}
+}
+void path_v::add_lines(const glm::dvec2* d, size_t size, bool isclose)
+{
+	if (d && size > 0)
+	{
+		_data.reserve(_data.size() + size);
+		moveTo(*d);
+		for (size_t i = 1; i < size; i++)
+		{
+			lineTo(d[i]);
+		}
+		if (isclose && *d != d[size - 1])
+		{
+			lineTo(*d);
+		}
+	}
+}
+path_v::vertex_t* path_v::getline2(int x, size_t* px)
+{
+	auto n = _data.size();
+	auto p = _data.data();
+	int xx = 0;
+	vertex_t* r = 0;
+	for (size_t i = 0; i < n; i++, p++)
+	{
+		if (p->type == vtype_e::e_vmove)
+		{
+			if (xx == x)
+			{
+				if (px)
+					*px = i;
+				r = p;
+				break;
+			}
+			xx++;
+		}
+	}
+	return r;
+}
+
+struct pvt_t
+{
+	path_v::vertex_t* first = 0, * second = 0;
+	size_t n = 0;
+};
+pvt_t get_idxlines(std::vector<path_v::vertex_t>& data, size_t idx, size_t count)
+{
+	auto n = data.size();
+	auto p = data.data();
+	int xx = 0;
+	path_v::vertex_t* r = 0, * e = p + n;
+	for (size_t i = 0; i < n; i++, p++)
+	{
+		if (p->type == path_v::vtype_e::e_vmove)
+		{
+			if (r)
+			{
+				count--;
+				e = p;
+				if (count < 1)
+					break;
+			}
+			else if (xx == idx)
+			{
+				r = p;
+			}
+			xx++;
+		}
+	}
+	size_t cn = e - r;
+	return { r, e , cn };
+}
+//反转路径内部一条线
+#if 1
+void path_v::reverse1(int idx)
+{
+#if 0
+	auto t = get_idxlines(_data, idx, 1);
+	if (t.first && t.n)
+	{
+		assert(t.first->type == vtype_e::e_vmove);
+		std::vector<vertex_t> tv;
+		tv.resize(t.n);
+		memcpy(tv.data(), t.first, sizeof(vertex_t) * t.n);
+		//std::reverse(t.first, t.second);
+		std::reverse(tv.begin(), tv.end());
+		auto p = tv.data();
+		for (size_t i = 0; i < tv.size(); i++, p++)
+		{
+			std::swap(p->c, p->c1);
+			p->p = (p + 1)->p;
+		}
+		auto ted = *tv.rbegin();
+		ted.type = vtype_e::e_vmove;
+		tv.insert(tv.begin(), ted);
+		tv.pop_back();
+		memcpy(t.first, tv.data(), sizeof(vertex_t) * t.n);
+	}
+#endif
+}
+void path_v::reverse_all()
+{
+#if 0
+	auto mc = mcount();
+	for (size_t i = 0; i < mc; i++)
+	{
+		reverse1(i);
+	}
+#endif
+	//std::reverse(_data.begin(), _data.end());
+}
+#endif
+
+
+
+
+void v2m3(glm::vec2& v, const glm::mat3* m)
+{
+	glm::vec3 ps(v, 1);
+	ps = (*m) * ps;
+	v = ps;
+}
+glm::vec2 v2m3(const glm::vec2& v, const glm::mat3& m) {
+	glm::vec3 ps(v, 1);
+	return m * ps;
+}
+void path_v::set_mat(const glm::mat3& m)
+{
+	v2m3(_pos, &m);
+	for (auto& it : _data) {
+		v2m3(it.p, &m);
+		if (it.type == vtype_e::e_vcurve)
+		{
+			v2m3(it.c, &m);
+		}
+		if (it.type == path_v::vtype_e::e_vcubic)
+		{
+			v2m3(it.c, &m);
+			v2m3(it.c1, &m);
+		}
+	}
+	cbox = true;
+}
+
+glm::vec2 path_v::get_size()
+{
+	glm::vec2 ret = { _box.z - _box.x,	_box.w - _box.y };// xy最小，zw最大
+	if (!(ret.x > 0 && ret.y > 0))
+	{
+		mkbox();
+		//ret = { _box.z - _box.x,	_box.w - _box.y };		
+	}
+	ret = { _box.z, _box.w };
+	return ret;
+}
+glm::vec4 path_v::mkbox() {
+	glm::vec4 bx = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
+	auto ds = _data.size();
+	if (ds > 3)
+	{
+		glm::vec2 k[] = { _data[ds - 1].p,_data[ds - 2].p };
+		if (k[0] == k[1])
+		{
+			_data.pop_back();
+		}
+	}
+	for (auto& it : _data) {
+		tobox(it.p, bx);
+		if (it.type == vtype_e::e_vcurve || it.type == vtype_e::e_vcubic)
+			tobox(it.c, bx);
+		if (it.type == vtype_e::e_vcubic)
+			tobox(it.c1, bx);
+	}
+	_box = bx;
+	return bx;
+}
+void path_v::incpos(const glm::vec2& p) {
+	for (auto& it : _data) {
+		it.p += p;
+		it.c += p;
+		it.c1 += p;
+	}
+}
+void path_v::mxfy(double fy)
+{
+	for (auto& d : _data) {
+		d.p.y *= fy;
+		d.c.y *= fy;
+		d.c1.y *= fy;
+	}
+}
+void path_v::add(const path_v::vertex_t& v)
+{
+	_data.push_back(v);
+}
+void path_v::insert(size_t idx, const vertex_t& v)
+{
+	if (idx > _data.size())
+		_data.push_back(v);
+	else
+		_data.insert(_data.begin() + idx, v);
+}
+void path_v::erase(size_t idx)
+{
+	if (idx > _data.size())
+	{
+		_data.pop_back();
+	}
+	else
+	{
+		_data.erase(_data.begin() + idx);
+	}
+}
+void path_v::add(const void* d, size_t size)
+{
+	int64_t n = size / sizeof(path_v::vertex_t);
+	if (d && n > 0)
+	{
+		_data.resize(n);
+		memcpy(_data.data(), d, n * sizeof(path_v::vertex_t));
+	}
+}
+void path_v::add(path_v* p)
+{
+	if (p && p->_data.size() > 1)
+	{
+		auto n = _data.size();
+		auto pn = p->_data.size();
+		_data.resize(pn + n);
+		memcpy(_data.data() + n, p->_data.data(), sizeof(vertex_t) * pn);
+	}
+}
+
+void path_v::closePath() {
+	if (_data.size() < 2)return;
+	glm::vec2 a = _data.rbegin()->p;
+	for (auto it = _data.rbegin(); it != _data.rend(); it++)
+	{
+		if (it->type == path_v::vtype_e::e_vmove)
+		{
+			auto e = glm::equal(it->p, a);
+			if (!e.x || !e.y)
+			{
+				lineTo(it->p);
+			}
+			break;
+		}
+	}
+
+}
+
+void getlineptr(path_v::vertex_t* d, int n, std::vector<glm::vec2>& o, double fpn)
+{
+	std::vector<glm::vec2>& bez = o;
+	auto p = d;
+	for (size_t i = 0; i < n; i++, p++)
+	{
+		switch (p->type)
+		{
+		case path_v::vtype_e::e_vmove:
+		case path_v::vtype_e::e_vline:
+		{
+			bez.push_back(p->p);
+		}break;
+		case path_v::vtype_e::e_vcurve:
+		{
+
+			bez.push_back(p->p);
+		}break;
+		case path_v::vtype_e::e_vcubic:
+		{
+
+			bez.push_back(p->p);
+			auto vb = get_bezier(bez.data(), bez.size(), fpn, true);
+		}break;
+		default:
+			break;
+		}
+	}
+
+}
+
+template<class T>
+void doflatten(pvt_t t, int m, std::vector<T>* flatten)
+{
+	size_t length = t.n;
+	auto p = t.first;
+	std::vector<T> nv;
+	for (size_t i = 0; i < length; i++, p++)
+	{
+		auto p0 = p - 1;
+		switch (p->type)
+		{
+		case path_v::vtype_e::e_vmove:
+		case path_v::vtype_e::e_vline:
+		{
+			nv.push_back(p->p);
+		}break;
+		case path_v::vtype_e::e_vcurve:
+		{
+			cubic_v cv = {};
+			cv.p0 = p0->p;
+			cv.p1 = p->c;
+			cv.p2 = p->c;
+			cv.p3 = p->p;
+			c2to3(cv);
+			auto vb = get_bezier_t<T>(&cv, 1, m);
+			if (vb.size() > m)
+				nv.insert(nv.end(), vb.begin() + 1, vb.end());
+		}break;
+		case path_v::vtype_e::e_vcubic:
+		{
+			cubic_v cv = {};
+			cv.p0 = p0->p;
+			cv.p1 = p->c;
+			cv.p2 = p->c1;
+			cv.p3 = p->p;
+			auto vb = get_bezier_t<T>(&cv, 1, m);
+			if (vb.size() > m)
+				nv.insert(nv.end(), vb.begin() + 1, vb.end());
+		}break;
+		default:
+			break;
+		}
+	}
+	if (nv.size())
+	{
+		auto pos = flatten->size();
+		flatten->resize(pos + nv.size());
+		memcpy(flatten->data() + pos, nv.data(), nv.size() * sizeof(T));
+	}
+}
+
+int path_v::get_flatten(size_t idx, size_t count, int m, void* vflatten, int type)
+{
+	std::vector<glm::vec2>* flatten = (std::vector<glm::vec2>*) vflatten;
+	std::vector<glm::dvec2>* flatten64 = (std::vector<glm::dvec2>*) vflatten;
+	if (!vflatten || idx > mcount() || _data.size() < 1 || m < 1)return -1;
+	auto t = get_idxlines(_data, idx, count);
+	if (type == 0)
+	{
+		doflatten(t, m, flatten);
+	}
+	else {
+		doflatten(t, m, flatten64);
+	}
+	return 0;
+}
+
+
+int path_v::get_expand(float width, path_v* opt)
+{
+	std::vector<glm::vec2> tv, ot;
+	auto  length = _data.size();
+	tv.reserve(length * 3);
+	for (size_t i = 0; i < length; i++)
+	{
+		auto& it = _data[i];
+		auto type = (vtype_e)it.type;
+		switch (type)
+		{
+		case path_v::vtype_e::e_vmove:
+			if (tv.size())
+			{
+				expand_polygon(tv.data(), tv.size(), width, ot);
+				tv.clear();
+			}
+			tv.push_back(it.p);
+			break;
+		case path_v::vtype_e::e_vline:
+			tv.push_back(it.p);
+			break;
+		case path_v::vtype_e::e_vcurve:
+			tv.push_back(it.c);
+			tv.push_back(it.p);
+			break;
+		case path_v::vtype_e::e_vcubic:
+			tv.push_back(it.c);
+			tv.push_back(it.c1);
+			tv.push_back(it.p);
+			break;
+		default:
+			break;
+		}
+	}
+	if (tv.size())
+	{
+		expand_polygon(tv.data(), tv.size(), width, ot);
+	}
+	if (ot.empty())
+	{
+		return 0;
+	}
+	if (!opt)opt = new path_v();
+	auto pt = ot.data();
+	if (opt)
+	{
+		for (size_t i = 0; i < length; i++)
+		{
+			auto it = _data[i];
+			auto type = (vtype_e)it.type;
+			switch (type)
+			{
+			case path_v::vtype_e::e_vmove:
+			case path_v::vtype_e::e_vline:
+				break;
+			case path_v::vtype_e::e_vcurve:
+				it.c = *pt;
+				pt++;
+				break;
+			case path_v::vtype_e::e_vcubic:
+				it.c = *pt;
+				pt++;
+				it.c1 = *pt;
+				pt++;
+				break;
+			default:
+				break;
+			}
+			it.p = *pt;
+			pt++;
+			opt->add(it);
+		}
+	}
+	else
+	{
+		for (size_t i = 0; i < length; i++)
+		{
+			auto& it = _data[i];
+			auto type = (vtype_e)it.type;
+			switch (type)
+			{
+			case path_v::vtype_e::e_vmove:
+			case path_v::vtype_e::e_vline:
+				break;
+			case path_v::vtype_e::e_vcurve:
+				it.c = *pt;
+				pt++;
+				break;
+			case path_v::vtype_e::e_vcubic:
+				it.c = *pt;
+				pt++;
+				it.c1 = *pt;
+				pt++;
+				break;
+			default:
+				break;
+			}
+			it.p = *pt;
+			pt++;
+		}
+	}
+	return 0;
+}
+
+// type取{Square=0, Round=1, Miter=2} ，不同width会使顶点数不同
+int path_v::get_expand_flatten(size_t idx, float width, int segments, int type, std::vector<std::vector<glm::vec2>>* ots, std::vector<int>* ccwv)
+{
+	auto ct = mcount();
+	if (_data.size() < 1 || segments < 1)return -1;
+	PathsD pd;
+	if (idx < _data.size())
+	{
+		ct = idx + 1;
+	}
+	else { idx = 0; }
+	std::vector<PointD> pv;
+	std::vector<glm::vec2> flatten, ot;
+	for (size_t x = idx; x < ct; x++)
+	{
+		pv.clear();
+		flatten.clear();
+		auto t = get_idxlines(_data, x, 1);
+		doflatten(t, segments, &flatten);//细分曲线
+		if (abs(width) < 2 || oldexp)
+		{
+			ot.clear();
+			expand_polygon(flatten.data(), flatten.size(), width, ot);
+			ots->push_back(ot);
+		}
+		else
+		{
+			pv.resize(flatten.size());
+			for (size_t i = 0; i < flatten.size(); i++)
+			{
+				pv[i] = { flatten[i].x, flatten[i].y };
+			}
+			// 判断是逆时针
+			bool ccw = IsPositive(pv);
+			if (ccwv)
+				ccwv->push_back(ccw);
+			pd.push_back(std::move(pv));
+		}
+	}
+	if (width != 0 && pd.size())
+	{
+		//Square=0, Round=1, Miter=2
+		if (type > 2 || type < 0)
+		{
+			type = 2;
+		}
+
+		// 扩展线段
+		auto rv = InflatePaths(pd, width, (JoinType)type, EndType::Polygon);
+		if (rv.size() && rv[0].size())
+		{
+			pd.swap(rv);
+		}
+	}
+
+	for (const auto& path : pd) {
+		flatten.clear();
+		flatten.reserve(path.size());
+		for (auto& it : path)
+		{
+			glm::vec2 pt = { it.x ,it.y };
+			flatten.push_back(pt);
+		}
+		if (flatten.size() && flatten[0] != flatten[flatten.size() - 1])
+		{
+			flatten.push_back(flatten[0]);
+		}
+		ots->push_back(flatten);
+	}
+
+	return 0;
+}
+void mkivec_round(std::vector<glm::vec2>& tv1)
+{
+	std::vector<glm::vec2> tt;
+	tt.reserve(tv1.size());
+	tt.push_back(tv1[0]);
+	glm::ivec2 last = glm::round(tv1[0]);
+	for (auto it : tv1)
+	{
+		glm::ivec2 xd = glm::round(it);
+		if (xd != last)
+		{
+			last = xd;
+			tt.push_back(it);
+		}
+	}
+	if (tt[0] != tt[tt.size() - 1])
+	{
+		tt.push_back(tt[0]);
+	}
+	tv1.swap(tt);
+
+}
+void mkivec_round(std::vector<glm::vec3>& tv1)
+{
+	std::vector<glm::vec3> tt;
+	tt.reserve(tv1.size());
+	tt.push_back(tv1[0]);
+	glm::ivec3 last = glm::round(tv1[0]);
+	for (auto it : tv1)
+	{
+		glm::ivec3 xd = glm::round(it);
+		if (xd != last)
+		{
+			last = xd;
+			tt.push_back(it);
+		}
+	}
+	if (tt[0] != tt[tt.size() - 1])
+	{
+		tt.push_back(tt[0]);
+	}
+	tv1.swap(tt);
+
+}
+int path_v::get_expand_flatten2(float expand, float scale, int segments, int type, std::vector<std::vector<glm::vec2>>* ots, bool is_round)
+{
+	auto ct = mcount();
+	if (_data.size() < 1 || segments < 1)return -1;
+	PathsD pd;
+	std::vector<PointD> pv;
+	std::vector<glm::vec2> flatten, ot;
+	for (size_t x = 0; x < ct; x++)
+	{
+		pv.clear();
+		flatten.clear();
+		auto t = get_idxlines(_data, x, 1);
+		doflatten(t, segments, &flatten);//细分曲线
+		{
+			pv.resize(flatten.size());
+			for (size_t i = 0; i < flatten.size(); i++)
+			{
+				pv[i] = { flatten[i].x, flatten[i].y };
+			}
+			// 判断是逆时针
+			bool ccw = IsPositive(pv);
+			//if (ccwv)
+			//	ccwv->push_back(ccw);
+			pd.push_back(std::move(pv));
+		}
+	}
+	if (expand != 0 && pd.size())
+	{
+		//Square=0, Round=1, Miter=2
+		if (type > 2 || type < 0)
+		{
+			type = 2;
+		}
+		// 扩展线段
+		auto rv = InflatePaths(pd, expand, (JoinType)type, EndType::Polygon);
+		if (rv.size() && rv[0].size())
+		{
+			pd.swap(rv);
+		}
+	}
+
+	for (const auto& path : pd) {
+		flatten.clear();
+		flatten.reserve(path.size());
+		for (auto& it : path)
+		{
+			glm::vec2 pt = { it.x ,it.y };
+			flatten.push_back(pt);
+		}
+		if (is_round)
+			mkivec_round(flatten);
+		if (abs(scale) != 0)
+		{
+			ot.clear();
+			expand_polygon(flatten.data(), flatten.size(), scale, ot);
+			flatten.swap(ot);
+		}
+		if (flatten.size() && flatten[0] != flatten[flatten.size() - 1])
+		{
+			flatten.push_back(flatten[0]);
+		}
+		ots->push_back(flatten);
+	}
+	return 0;
+}
+
+
+int path_v::get_expand_flatten(float width, int segments, int type, std::vector<std::vector<glm::vec2>>* ots)
+{
+	auto ct = ots->size();
+	std::vector<PointD> pv;
+	PathsD pd;
+	for (size_t x = 0; x < ct; x++)
+	{
+		pv.clear();
+		std::vector<glm::vec2>& flatten = ots->at(x);
+		pv.resize(flatten.size());
+		for (size_t i = 0; i < flatten.size(); i++)
+		{
+			pv[i] = { flatten[i].x, flatten[i].y };
+		}
+		// 判断是逆时针
+		bool ccw = IsPositive(pv);
+		pd.push_back(std::move(pv));
+	}
+	if (width != 0)
+	{
+		//Square=0, Round=1, Miter=2
+		if (type > 2 || type < 0)
+		{
+			type = 2;
+		}
+		// 扩展线段
+		auto rv = InflatePaths(pd, width, (JoinType)type, EndType::Polygon);
+		if (rv.size() && rv[0].size())
+		{
+			pd.swap(rv);
+		}
+	}
+	for (size_t i = 0; i < pd.size(); i++)
+	{
+		auto path = pd[i];
+		std::vector<glm::vec2>& flatten = ots->at(i);
+		flatten.clear();
+		flatten.reserve(path.size());
+		for (auto& it : path)
+		{
+			glm::vec2 pt = { it.x ,it.y };
+			flatten.push_back(pt);
+		}
+		if (flatten.size() && flatten[0] != flatten[flatten.size() - 1])
+		{
+			flatten.push_back(flatten[0]);
+		}
+	}
+	return 0;
+}
+
+
+
+
+//angle旋转角度(0-360)
+glm::vec2 path_v::rotate_pos(const glm::vec2& pos, const glm::vec2& center, double angle)
+{
+	double x = pos.x, y = pos.y;				//原始点坐标
+	double rx = center.x, ry = center.y;        //旋转中心点坐标
+	double nx, ny;								//旋转后的点坐标
+	double as, ac;
+	as = sin(angle * glm::pi<double>() / 180.0);
+	ac = cos(angle * glm::pi<double>() / 180.0);
+	nx = rx + ((x - rx) * ac - (y - ry) * as);
+	ny = ry + ((x - rx) * as + (y - ry) * ac);
+	return glm::vec2(nx, ny);
+}
+
+
+//向量外积
+double path_v::cross_v2(const glm::vec2& a, const glm::vec2& b)
+{
+	return a.x * b.y - a.y * b.x;
+}
+
+std::vector<glm::vec2> equidistant_zoom_contour(glm::vec2* polygon, int count, double margin, int rm)
+{
+	std::vector<PointD> pv; pv.resize(count);
+	for (size_t i = 0; i < count; i++)
+	{
+		pv[i] = { polygon[i].x,polygon[i].y };
+	}
+	// 判断是逆时针则相反扩展
+	bool ccw = IsPositive(pv);
+	if (ccw)
+	{
+		margin = -margin;
+	}
+	PathsD pd;
+	pd.push_back(std::move(pv));
+	//Square=0, Round=1, Miter=2
+	if (rm > 2 || rm < 0)
+	{
+		rm = 2;
+	}
+	auto rv = InflatePaths(pd, margin, (JoinType)rm, EndType::Polygon);// , 2, 0);
+#if 0
+	std::vector<std::vector<Point64>> contours;
+	contours.push_back({});
+	auto& td = contours[0];
+	td.reserve(count);
+	for (size_t i = 0; i < count; i++)
+	{
+		auto pt = polygon[i];
+		pt *= 1000.0;
+		td.push_back({ pt.x,pt.y });
+	}
+	ClipperOffset co;
+	// 默认JoinType::Round圆角，JoinType::Miter尖角	
+	co.AddPaths(contours, );
+	Paths64 solution;
+	co.Execute(margin, solution);
+#endif
+	std::vector<glm::vec2> result;
+	result.reserve(count);
+	for (const auto& path : rv) {
+		//result.insert(result.end(), path.begin(), path.end());
+		for (auto& it : path)
+		{
+			//glm::vec2 pt = { it.x / 1000.0,it.y / 1000.0 };
+			glm::vec2 pt = { it.x ,it.y };
+			result.push_back(pt);
+		}
+	}
+	return result;
+}
+
+
+void path_v::expand_polygon_c(glm::vec2* polygon, int count, float expand, int type, std::vector<glm::vec2>& ots)
+{
+	std::vector<glm::vec2> ot;
+#if 1  
+	auto nv = equidistant_zoom_contour(polygon, count, expand, type);
+	ot.swap(nv);
+#endif
+	if (ot.size())
+	{
+		ots.reserve(ots.size() + ot.size());
+		ots.insert(ots.end(), ot.begin(), ot.end());
+		ots.push_back(ot[0]);//ring环
+	}
+
+
+}
+void path_v::expand_polygon(glm::vec2* polygon, int count, float expand, std::vector<glm::vec2>& ots)
+{
+	// already ordered by anticlockwise
+	std::vector<glm::vec2> ot;
+	if (expand == 0)
+	{
+		ots.reserve(ots.size() + count);
+		ots.insert(ots.end(), polygon, polygon + count);
+		return;
+	}
+#if 1
+	if (polygon[0] == polygon[count - 1])count--;
+	// 1. vertex set
+	ot.reserve(ot.size() + count);
+	// 2. edge set and normalize it
+	std::vector<glm::vec2> dp, ndp;
+	for (int i = 0; i < count; i++) {
+		int next = (i == (count - 1) ? 0 : (i + 1));
+		auto dn = polygon[next] - polygon[i];
+		if (dn.x == 0)
+		{
+			dn.x = 0.0001;
+		}
+		if (dn.y == 0)
+		{
+			dn.y = 0.0001;
+		}
+		dp.push_back(dn);
+		float unitLen = 1.0f / glm::sqrt(dot(dp.at(i), dp.at(i)));
+		ndp.push_back(dp.at(i) * unitLen);
+	}
+	auto xd = abs(expand) * 2;
+	std::vector<double> crossv;
+	// 3. compute Line
+	//负数为内缩， 正数为外扩。 需要注意算法本身并没有检测内缩多少后折线会自相交，那不是本代码的示范意图
+	for (int i = 0; i < count; i++) {
+		int startIndex = (i == 0 ? (count - 1) : (i - 1));
+		int endIndex = i;
+		auto sinTheta = cross_v2(ndp.at(startIndex), ndp.at(endIndex));
+		crossv.push_back(sinTheta);
+		glm::vec2 orientVector = ndp.at(endIndex) - ndp.at(startIndex);//i.e. PV2-V1P=PV2+PV1
+		auto ex = glm::vec2(expand / sinTheta * orientVector.x, expand / sinTheta * orientVector.y);
+		auto pt = polygon[i];
+		ex += pt;
+		if (glm::isnan(ex.x) || glm::isinf(ex.x))
+		{
+			ex = pt;
+		}
+		auto kd = glm::distance(pt, ex);
+		ot.push_back(ex);
+	}
+
+#endif
+	if (ot.size())
+	{
+		ots.reserve(ots.size() + ot.size());
+		ots.insert(ots.end(), ot.begin(), ot.end());
+		ots.push_back(ot[0]);//ring环
+	}
+
+
+}
+
+bool path_v::is_ccw(int idx)
+{
+	std::vector<glm::dvec2>  ms1;
+	for (size_t i = 0; i < 1; i++)
+	{
+		ms1.clear();
+		get_flatten(i, 1, 2, &ms1, 1);
+	}
+	auto count = ms1.size();
+	std::vector<PointD> pv;
+	pv.resize(count);
+	for (size_t i = 0; i < count; i++)
+	{
+		pv[i] = { ms1[i].x,ms1[i].y };
+	}
+	// 判断是逆时针则相反扩展
+	bool ccw = IsPositive(pv);
+	return ccw;
+}
+#endif
+
+#endif // path_v_h
+
+
+#if 1
+void split_v(std::string str, const std::string& pattern, std::vector<std::string>& result)
+{
+	std::string::size_type pos;
+	str += pattern;//扩展字符串以方便操作
+	int size = str.size();
+	result.clear();
+	int ct = 0;
+	for (int i = 0; i < size; i++)
+	{
+		pos = str.find(pattern, i);
+		if (pos < size)
+		{
+			std::string s = str.substr(i, pos - i);
+			result.push_back(s);
+			i = pos + pattern.size() - 1;
+			ct++;
+		}
+	}
+}
+
+layout_text_x::layout_text_x()
+{
+}
+
+layout_text_x::~layout_text_x()
+{
+	for (auto it : msu) {
+		free_image_cr(it);
+	}
+}
+
+void layout_text_x::set_ctx(font_rctx* p)
+{
+	if (p)
+	{
+		ctx = p;
+	}
+}
+
+void layout_text_x::set_familys(const char* family)
+{
+	assert(ctx);
+	if (ctx && family && *family)
+	{
+		std::vector<std::string> result;
+		split_v(family, ",", result);
+		familyv.clear();
+		for (auto& it : result)
+		{
+			auto ft = ctx->get_font(it.c_str(), 0);
+			if (ft)
+			{
+				familyv.push_back(ft);
+			}
+		}
+	}
+}
+void layout_text_x::add_family(const char* family, const char* style) {
+	assert(ctx);
+	if (ctx && family && *family)
+	{
+		std::vector<std::string> result;
+		split_v(family, ",", result);
+		for (auto& it : result)
+		{
+			auto ft = ctx->get_font(it.c_str(), style);
+			if (ft)
+			{
+				familyv.push_back(ft);
+			}
+		}
+	}
+}
+void layout_text_x::clear_family()
+{
+	familyv.clear();
+}
+void layout_text_x::clear_text()
+{
+	tv.clear();
+}
+
+void layout_text_x::c_line_metrics(int fontsize) {
+	if (fontsize == 0)return;
+	if (cfontsize != fontsize)
+	{
+		glm::dvec2 r = {};
+		for (auto it : familyv)
+		{
+			double scale = fontsize == 0 ? 1.0 : it->get_scale(fontsize);
+			r.x = std::max(it->ascender * scale, r.x);
+			r.y = std::max((it->ascender - it->descender + it->lineGap) * scale, r.y);
+		}
+		cfontsize = fontsize; cbox2 = r;
+	}
+}
+int layout_text_x::get_baseline(int fontsize)
+{
+	c_line_metrics(fontsize);
+	return cbox2.x;
+}
+
+int layout_text_x::get_lineheight(int fontsize)
+{
+	c_line_metrics(fontsize);
+	return cbox2.y;
+}
+
+glm::ivec4 layout_text_x::get_text_rect(const void* str8, int len, int fontsize)
+{
+	auto str = (const char*)str8;
+	auto font = familyv[0];
+	glm::ivec4 ret = {};
+	int x = 0;
+	int y = 0;
+	int n = 1;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		uint32_t ch = 0;
+		str = md::get_u8_last(str, &ch);
+		if (ch == '\n')
+		{
+			ret.x = std::max(ret.x, x);
+			x = 0;
+			n++;
+			continue;
+		}
+		auto rc = font->get_char_extent(ch, fontsize, fdpi, &familyv);
+		x += rc.z;
+		y = std::max(rc.y, y);
+		ret.y = std::max(ret.y, y);
+	} while (str && *str);
+	ret.x = std::max(ret.x, x);
+	auto h = get_lineheight(fontsize);
+	ret.y = h * n;
+	return ret;
+}
+glm::ivec2 layout_text_x::add_text(const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
+{
+	glm::ivec2 ret = { tv.size(),0 };
+	text_image_t* p = 0;
+	cti.tv.clear();
+	if (len > 0)
+	{
+		std::string str((char*)str8, len);
+		p = get_glyph_item(str.c_str(), fontsize, &cti);
+	}
+	else
+	{
+		p = get_glyph_item(str8, fontsize, &cti);
+	}
+	if (p)
+	{
+		glm::vec2 rct = get_text_rect(str8, len, fontsize);
+		auto length = p->tv.size();
+		auto baseline = get_baseline(fontsize);
+		int h = get_lineheight(fontsize);
+		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, -baseline };
+		auto ps = ss * text_align - (rct * text_align + bearing);
+		ps.x += rc.x;
+		ps.y += rc.y;
+		glm::vec2 tps = {};
+		tv.reserve(tv.size() + length);
+		for (size_t i = 0; i < length; i++)
+		{
+			auto& it = p->tv[i];
+			if (it.cpt == '\n')
+			{
+				tps.y += h;
+				tps.x = 0;
+			}
+			it._dwpos += ps + tps;
+			tps.x += it.advance;
+			tv.push_back(it);
+		}
+		ret.y = p->tv.size();
+	}
+	return ret;
+}
+atlas_t* layout_text_x::get_atlas()
+{
+	auto ft = ctx->bcc._data.data();
+	auto n = ctx->bcc._data.size();
+	tem_iptr.clear();
+	tem_iptr.resize(n);
+	for (size_t i = 0; i < n; i++)
+	{
+		auto& rt = tem_iptr[i];
+		auto p = ft[i];
+		rt.ipt = to_imgptr(p);
+		rt.atlas.img = &rt.ipt;
+
+	}
+	{
+
+		image_ptr_t* img = 0;
+		glm::ivec4* img_rc = 0;	// 显示坐标、大小
+		glm::ivec4* tex_rc = 0;	// 纹理区域
+		glm::ivec4* sliced = 0;	// 九宫格渲染
+		uint32_t* colors = 0;	// 颜色混合/透明度
+		size_t count = 0;		// 数量
+		glm::ivec4 clip = {};	// 裁剪区域
+	};
+	return nullptr;
+}
+void layout_text_x::update_text()
+{
+	auto ft = ctx->bcc._data.data();
+	auto n = ctx->bcc._data.size();
+	for (size_t i = 0; i < n; i++)
+	{
+		auto p = ft[i];
+		auto img = to_imgptr(p);
+		if (p->ptr)
+		{
+			if (p->isupdate)
+			{
+				update_image_cr((cairo_surface_t*)p->ptr, &img);
+				p->isupdate = 0;
+			}
+		}
+		else {
+			cairo_surface_t* su = new_image_cr(&img);
+			if (su)
+			{
+				msu.push_back(su);
+				p->isupdate = 0;
+				p->ptr = su;
+			}
+		}
+	}
+}
+void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r)
+{
+	update_text();
+	int mx = r.y + r.x;
+	for (size_t i = r.x; i < mx; i++)
+	{
+		auto& it = tv[i];
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (ft)
+			{
+				draw_image(cr, ft, it._dwpos, it._rect);
+			}
+		}
+	}
+}
+void layout_text_x::draw_text(cairo_t* cr)
+{
+	update_text();
+	for (auto& it : tv)
+	{
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (ft)
+			{
+				draw_image(cr, ft, it._dwpos, it._rect);
+			}
+		}
+	}
+}
+
+text_path_t* layout_text_x::get_shape(const void* str8, int fontsize, text_path_t* opt)
+{
+	auto str = (const char*)str8;
+	do
+	{
+		if (!str || !(*str) || !opt) { opt = 0; break; }
+		font_t* r = 0;
+		int gidx = 0;
+		str = font_t::get_glyph_index_u8(str, &gidx, &r, &familyv);
+		if (r && gidx >= 0)
+		{
+			auto k = r->get_shape(gidx, fontsize, &opt->data);
+			if (k.count)
+			{
+				opt->tv.push_back(k);
+			}
+		}
+	} while (str && *str);
+	return opt;
+}
+
+text_image_t* layout_text_x::get_glyph_item(const void* str8, int fontsize, text_image_t* opt)
+{
+	auto str = (const char*)str8;
+	do
+	{
+		if (!str || !(*str) || !opt) { opt = 0; break; }
+		font_t* r = 0;
+		int gidx = 0;
+		if (*str == '\n')
+			gidx = 0;
+		uint32_t ch = 0;
+		md::get_u8_last(str, &ch);
+		str = font_t::get_glyph_index_u8(str, &gidx, &r, &familyv);
+		if (r && gidx >= 0)
+		{
+			auto k = r->get_glyph_item(gidx, ch, fontsize);
+			if (k._glyph_index)
+			{
+				k.cpt = ch;
+				opt->tv.push_back(k);
+			}
+		}
+		else {
+			font_item_t k = {};
+			k.cpt = ch;
+			k.advance = 0;
+			opt->tv.push_back(k);
+		}
+	} while (str && *str);
+	return opt;
+}
+
+#endif // 1
+
+
+
+
+#if 1
+
+#ifndef UTF8_FIRST
+#define UTF8_ASCII(b) (((unsigned char)(b)>=0x00)&&((unsigned char)(b)<=0x7F))
+#define UTF8_FIRST(b) (((unsigned char)(b)>=0xC0)&&((unsigned char)(b)<=0xFD))
+#define UTF8_OTHER(b) (((unsigned char)(b)>=0x80)&&((unsigned char)(b)<=0xBF))
+#endif // UTF8_FIRST
+//根据首字节,获取utf8字符后续所占字节数
+int get_utf8_last_num(unsigned char ch)
+{
+	static unsigned char t[] = {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00,
+		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+		0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+		0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0, 0 };
+	return t[ch];
+}
+int64_t get_utf8_count(const char* buffer, int64_t len)
+{
+	const char* p = 0, * pend = buffer + len;
+	int64_t count = 0;
+	if (!buffer || len <= 0)
+	{
+		return 0;
+	}
+	for (p = buffer; p < pend; p++)
+	{
+		if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
+		{
+			count++;
+			//p += get_utf8_last_num(*p);
+		}
+	}
+	return count;
+}
+// 获取一个utf8字符串开始位置
+const char* get_utf8_first(const char* str)
+{
+	const char* p = str;
+	for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p++);
+	return p;
+}
+// 获取前一个utf8位置
+const char* get_utf8_prev(const char* str)
+{
+	const char* p = str;
+	for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p--);
+	return p;
+}
+// 获取第n个字符的位置
+const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len = -1)
+{
+	const char* p = 0, * pend = (len == -1 ? (char*)len : buffer + len);
+	int64_t count = 0;
+	if (!buffer || len == 0)
+	{
+		return 0;
+	}
+	for (p = buffer; *p && p < pend; p++)
+	{
+		if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
+		{
+			count++;
+			if (count > pos)
+			{
+				break;
+			}
+		}
+	}
+	return p;
+}
+#endif // 1
+
+
+
+
+#ifndef no_cairo_
+
+
+
+glm::ivec4 get_text_extents(cairo_t* cr, const void* str, int len, font_xi* fx);
+class Ruler
+{
+public:
+	Ruler();
+	void set_range(double lower, double upper);
+	void set_page(double lower, double upper);
+	void set_selection(double lower, double upper);
+
+	//void add_track_widget(Gtk::Widget& widget);
+
+	glm::ivec2 get_drawing_size();
+	bool draw_scale(cairo_t* cr);
+	void draw_marker(cairo_t* cr);
+	glm::ivec4 marker_rect();
+	bool on_drawing_area_draw(cairo_t* cr, const glm::vec2& pos);
+	void on_style_updated();
+	void on_prefs_changed();
+
+	void on_motion(void* motion, double x, double y);
+	int on_click_pressed(void* click, int n_press, double x, double y);
+
+	void set_context_menu();
+	cairo_surface_t* draw_label(cairo_t* cr_in, const std::string& label_value, const glm::ivec2& ts);
+
+	glm::ivec2 drawingsize = {};
+	glm::ivec2 oldsize = {};
+	//Gtk::DrawingArea* _drawing_area;
+	//Inkscape::PrefObserver _watch_prefs;
+	//Gtk::Popover* _popover = nullptr;
+	int    _orientation = 0;
+	//Inkscape::Util::Unit const* _unit;
+	double _lower = 0;
+	double _upper = 100;
+	double _position = 0;
+	double _max_size = 100;
+
+	// Page block
+	double _page_lower = 0.0;
+	double _page_upper = 0.0;
+
+	// Selection block
+	double _sel_lower = 0.0;
+	double _sel_upper = 0.0;
+	double _sel_visible = true;
+	int is_yaxisdown = 0;
+	bool   has_page = false;
+	bool   _backing_store_valid = false;
+	bool   ruler_in = 0;//英尺
+	cairo_surface_t* _backing_store = 0;
+	glm::ivec4 _rect = {};
+
+	std::unordered_map<int, cairo_surface_t*> _label_cache;
+
+	// Cached style properties
+	glm::vec4 _shadow = { 0.0,0.00,0.0,0.5 };
+	glm::vec4 _foreground = { 1.0,1.0,1.0,1.0 };
+	glm::vec4 _cursor_color = { 0.87,0.384,0.384,1.0 };// 1.0, 0.50, 0.0, 1.0};//
+	glm::vec4 _page_fill = { 0.12, 0.12, 0.12, 1.0 };
+	glm::vec4 _select_fill = {  };
+	glm::vec4 _select_stroke = { 0.4,0.4,1.0,1.0 };
+	int _font_size = 8;
+	uint32_t _back_color = 0xff353535;
+	font_xi* fx = 0;
+};
+
+class canvas_dev;
+class tinyviewcanvas_x
+{
+public:
+	glm::ivec2 vpos = {}, size = {};	// 渲染偏移，大小
+	std::vector<path_v*>* _data = 0;
+	std::vector<path_v*> draw_data;
+	std::vector<glm::vec4> ddrect, vr;
+	// 填充颜色\线框颜色
+	glm::ivec2 color = { 0x20ffffff, 0xffFF8050 };
+	glm::vec4 bx = {};
+	glm::mat3 mx = glm::mat3(1.0);
+	glm::vec2 last_mouse = {}, eoffset = {};
+	glm::ivec4 hover_bx = {};		//当前鼠标对象包围框
+	int ckinc = 0;
+	int scaleStep = 20;
+	int scale = 100;
+	int oldscale = 0;
+	int minScale = 2, maxScale = 25600;
+	int line_width = 1.0;
+	cairo_surface_t* _backing_store = 0;
+
+	bool   _backing_store_valid = false;
+	bool   _mousezoom = true;
+	bool   has_move = false;
+	bool   has_scale = false;
+public:
+	tinyviewcanvas_x();
+	~tinyviewcanvas_x();
+	void set_size(const glm::ivec2& ss);
+	void set_view_move(bool is);	// 鼠标移动视图
+	void set_view_scale(bool is);	// 滚轮缩放视图
+	void draw(canvas_dev* c);
+	void on_button(int idx, int state, const glm::vec2& pos, int clicks);
+	void on_motion(const glm::vec2& ps);
+	void on_wheel(int deltaY);
+	void reset_view();
+	glm::ivec4 get_hbox();
+	glm::vec4 get_bbox();
+	glm::mat3 get_affine();
+	void hit_test(const glm::vec2& ps);
+private:
+	void draw_back();
+
+};
+
+
+
+#if 1
+
+void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r)
+{
+#ifndef M_PI
+	auto M_PI = glm::pi<double>();
+#endif
+	cairo_move_to(cr, x + r, y);
+	cairo_line_to(cr, x + width - r, y);
+	cairo_arc(cr, x + width - r, y + r, r, 3 * M_PI / 2, 2 * M_PI);
+	//cairo_move_to(cr, x + width, y + r);
+	cairo_line_to(cr, x + width, y + height - r);
+	cairo_arc(cr, x + width - r, y + height - r, r, 0, M_PI / 2);
+	//cairo_move_to(cr, x + width - r, y + height);
+	cairo_line_to(cr, x + r, y + height);
+	cairo_arc(cr, x + r, y + height - r, r, M_PI / 2, M_PI);
+	//cairo_move_to(cr, x, y + height - r);
+	cairo_line_to(cr, x, y + r);
+	cairo_arc(cr, x + r, y + r, r, M_PI, 3 * M_PI / 2.0);
+	cairo_close_path(cr);
+}
+// r，左右下左
+void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, const glm::vec4& r)
+{
+#ifndef M_PI
+	auto M_PI = glm::pi<double>();
+#endif
+	cairo_move_to(cr, x + r.x, y);
+	cairo_line_to(cr, x + width - r.y, y);
+	if (r.y)
+		cairo_arc(cr, x + width - r.y, y + r.y, r.y, 3 * M_PI / 2, 2 * M_PI);
+	//cairo_move_to(cr, x + width, y + r.y);
+	cairo_line_to(cr, x + width, y + height - r.z);
+	if (r.z)
+		cairo_arc(cr, x + width - r.z, y + height - r.z, r.z, 0, M_PI / 2);
+	//cairo_move_to(cr, x + width - r.z, y + height);
+	cairo_line_to(cr, x + r.w, y + height);
+	if (r.w)
+		cairo_arc(cr, x + r.w, y + height - r.w, r.w, M_PI / 2, M_PI);
+	//cairo_move_to(cr, x, y + height - r.w);
+	cairo_line_to(cr, x, y + r.x);
+	if (r.x > 0)
+		cairo_arc(cr, x + r.x, y + r.x, r.x, M_PI, 3 * M_PI / 2.0);
+	cairo_close_path(cr);
+}
+// 圆角矩形
+void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r)
+{
+	if (r > 0)
+	{
+		draw_round_rectangle(cr, rc.x, rc.y, rc.z, rc.w, r);
+	}
+	else {
+		cairo_rectangle(cr, rc.x, rc.y, rc.z, rc.w);
+	}
+}
+void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth, bool isbgr) {
+	bool stroke = linewidth > 0 && color;
+	if (fill)
+	{
+		if (isbgr)
+			set_color_bgr(cr, fill);
+		else
+			set_color(cr, fill);
+		if (stroke)
+			cairo_fill_preserve(cr);
+		else
+			cairo_fill(cr);
+	}
+	if (stroke)
+	{
+		cairo_set_line_width(cr, linewidth);
+		if (isbgr)
+			set_color_bgr(cr, color);
+		else
+			set_color(cr, color);
+		cairo_stroke(cr);
+	}
+}
+// 画圆
+void draw_circle(cairo_t* cr, const glm::vec2& pos, float r)
+{
+	cairo_arc(cr, pos.x, pos.y, r, 0, 2 * M_PI);
+}
+
+void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness)
+{
+	if (!cr || !points || points_count < 2 || !col)return;
+	cairo_save(cr);
+	cairo_translate(cr, pos.x, pos.y);
+	cairo_move_to(cr, points->x, points->y);
+	for (size_t i = 1; i < points_count; i++)
+	{
+		cairo_line_to(cr, points[i].x, points[i].y);
+	}
+	if (closed) { cairo_close_path(cr); }
+	cairo_set_line_width(cr, thickness);
+	set_color(cr, col);
+	cairo_stroke(cr);
+	cairo_restore(cr);
+}
+
+
+
+cairo_surface_t* new_clip_rect(int r)
+{
+	glm::vec4 rc = { 0,0,r * 4,r * 4 };
+	//auto d = new uint32_t[rc.z * rc.w];
+	auto rrc = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, rc.z, rc.w);
+	//auto rrc = cairo_image_surface_create_for_data((unsigned char*)d, CAIRO_FORMAT_ARGB32, rc.z, rc.w, rc.z * 4);
+	auto cr = cairo_create(rrc);
+	set_color(cr, -1);
+	draw_rectangle(cr, rc, r);
+	cairo_fill(cr);
+	cairo_destroy(cr);
+	return rrc;
+}
+void clip_rect(cairo_t* cr, cairo_surface_t* r)
+{
+	if (!cr || !r)return;
+	cairo_save(cr);
+	auto a = cairo_get_target(cr);
+	glm::vec2 aw = { cairo_image_surface_get_width(a), cairo_image_surface_get_height(a) };
+	cairo_set_operator(cr, CAIRO_OPERATOR_DEST_IN);
+	float w = cairo_image_surface_get_width(r);
+	float h = cairo_image_surface_get_height(r);
+	glm::vec2 w2 = { w * 0.5, h * 0.5 };
+
+	cairo_save(cr);
+	cairo_rectangle(cr, 0, 0, w2.x, w2.y);//左上角
+	cairo_clip(cr);
+	cairo_new_path(cr);
+	cairo_set_source_surface(cr, r, 0, 0);
+	cairo_paint(cr);
+	cairo_restore(cr);
+
+	cairo_save(cr);
+	cairo_rectangle(cr, aw.x - w2.x, 0, w2.x, w2.y);//右上角
+	cairo_clip(cr);
+	cairo_new_path(cr);
+	cairo_set_source_surface(cr, r, aw.x - w, 0);
+	cairo_paint(cr);
+	cairo_restore(cr);
+
+	cairo_save(cr);
+	cairo_rectangle(cr, 0, aw.y - w2.y, w2.x, w2.y);//左下角
+	cairo_clip(cr);
+	cairo_new_path(cr);
+	cairo_set_source_surface(cr, r, 0, aw.y - h);
+	cairo_paint(cr);
+	cairo_restore(cr);
+
+	cairo_save(cr);
+	cairo_rectangle(cr, aw.x - w2.x, aw.y - w2.y, w2.x, w2.y);//右下角
+	cairo_clip(cr);
+	cairo_new_path(cr);
+	cairo_set_source_surface(cr, r, aw.x - w, aw.y - h);
+	cairo_paint(cr);
+	cairo_restore(cr);
+
+	cairo_restore(cr);
+}
+
+canvas_dev::canvas_dev()
+{
+
+}
+
+
+
+canvas_dev::~canvas_dev()
+{
+	if (surface)
+		cairo_surface_destroy(surface);
+	if (cr)
+		cairo_destroy(cr);
+}
+canvas_dev* new_cairo(cairo_surface_t* surface, canvas_dev* p = 0)
+{
+	if (surface)
+	{
+		auto cr = cairo_create(surface);
+		if (cr)
+		{
+			if (!p)
+				p = new canvas_dev();
+			p->surface = surface;
+			p->cr = cr;
+			p->pixel = (uint32_t*)cairo_image_surface_get_data(surface);
+			p->dsize.x = cairo_image_surface_get_width(surface);
+			p->dsize.y = cairo_image_surface_get_height(surface);
+		}
+	}
+	return p;
+}
+canvas_dev* canvas_dev::new_cdev(const glm::ivec2& size, uint32_t* data)
+{
+	cairo_surface_t* surface = 0;
+	canvas_dev* p = 0;
+	if (!data)
+	{
+		p = new canvas_dev();
+		if (!p)return p;
+		p->tdata.resize(size.x * size.y);
+		data = p->tdata.data();
+	}
+	if (size.x > 0 && size.y > 0 && data)
+	{
+		surface = cairo_image_surface_create_for_data((unsigned char*)data, CAIRO_FORMAT_ARGB32, size.x, size.y, size.x * 4);
+	}
+	return new_cairo(surface, p);
+}
+
+canvas_dev* canvas_dev::new_cdev_svg(const glm::ivec2& size, const char* svgfn)
+{
+	auto surface = cairo_svg_surface_create(svgfn, size.x, size.y);
+	return new_cairo(surface);
+}
+
+canvas_dev* canvas_dev::new_cdev_dc(void* hdc)
+{
+#ifdef _WIN32
+	auto surface = cairo_win32_surface_create((HDC)hdc);// 根据HDC创建表面
+#endif 
+	return new_cairo(surface);
+}
+
+void canvas_dev::free_cdev(canvas_dev* p)
+{
+	if (p)delete p;
+}
+
+void canvas_dev::save_png(const char* fn)
+{
+	if (surface && fn && *fn)
+		cairo_surface_write_to_png(surface, fn);
+}
+void canvas_dev::save()
+{
+	cairo_save(cr);
+}
+
+#define SP_RGBA32_R_U(v) ((v) & 0xff)
+#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
+#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
+#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
+#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
+#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
+#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
+#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
+#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
+#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+void set_color(cairo_t* cr, uint32_t rgba)
+{
+	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
+		SP_RGBA32_G_F(rgba),
+		SP_RGBA32_B_F(rgba),
+		SP_RGBA32_A_F(rgba));
+}
+void set_color_bgr(cairo_t* cr, uint32_t c)
+{
+	cairo_set_source_rgba(cr,
+		SP_RGBA32_B_F(c),
+		SP_RGBA32_G_F(c),
+		SP_RGBA32_R_F(c),
+		SP_RGBA32_A_F(c));
+}
+void set_color_a(cairo_t* cr, uint32_t rgba, double a)
+{
+	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
+		SP_RGBA32_G_F(rgba),
+		SP_RGBA32_B_F(rgba),
+		SP_RGBA32_A_F(rgba) * a);
+}
+void set_source_rgba(cairo_t* cr, uint32_t rgba)
+{
+	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
+		SP_RGBA32_G_F(rgba),
+		SP_RGBA32_B_F(rgba),
+		SP_RGBA32_A_F(rgba));
+}
+void set_source_rgba(cairo_t* cr, glm::vec4 rgba)
+{
+	cairo_set_source_rgba(cr, rgba.x, rgba.y, rgba.z, rgba.w);
+}
+void set_source_rgba_x(cairo_t* cr, glm::vec4 rgba)
+{
+	cairo_set_source_rgba(cr, rgba.x * rgba.w, rgba.y * rgba.w, rgba.z * rgba.w, 1.0);
+}
+
+glm::vec2 v2xm3(const glm::vec2& v, const glm::mat3& m) {
+	glm::vec3 ps(v, 1.0);
+	return m * ps;
+}
+
+glm::vec4 get_boxm3(const glm::vec4& v, const glm::mat3& m) {
+	glm::vec3 ps = { v.x,v.y,1.0 };
+	glm::vec3 ps1 = { v.z,v.w ,1.0 };
+	ps = m * ps;
+	ps1 = m * ps1;
+	return glm::vec4(ps.x, ps.y, ps1.x, ps1.y);
+}
+
+
+glm::ivec4 canvas_dev::get_text_extents(const void* str, int len, font_xi* fx)
+{
+	char* t = (char*)str;
+	if (!str || !(*t))
+	{
+		return  glm::vec4();
+	}
+	if (len < 1)len = strlen(t);
+	cairo_text_extents_t extents = {};
+	cairo_select_font_face(cr, fx->family, (cairo_font_slant_t)fx->slant, (cairo_font_weight_t)fx->weight_bold);
+	cairo_set_font_size(cr, fx->font_size);
+	std::string str1((char*)str, len);
+	cairo_text_extents(cr, (char*)str1.c_str(), &extents);
+	return glm::vec4(extents.width, extents.height, extents.x_bearing, extents.y_bearing);
+}
+
+int fc1_f(float a)
+{
+	return a > 0 ? ceil(a) : floor(a);
+}
+glm::ivec4 fcv4(const glm::vec4& a)
+{
+	return { fc1_f(a.x), fc1_f(a.y), fc1_f(a.z), fc1_f(a.w) };
+}
+glm::ivec4 get_text_extents(cairo_t* cr, const void* str, int len, font_xi* fx)
+{
+	char* t = (char*)str;
+	if (!str || !(*t))
+	{
+		return  glm::vec4();
+	}
+	if (len < 1)len = strlen(t);
+	cairo_text_extents_t extents = {};
+	cairo_select_font_face(cr, fx->family, (cairo_font_slant_t)fx->slant, (cairo_font_weight_t)fx->weight_bold);
+	cairo_set_font_size(cr, fx->font_size);
+	std::string str1((char*)str, len);
+	cairo_text_extents(cr, (char*)str1.c_str(), &extents);
+	auto r = glm::vec4((extents.width), extents.height, extents.x_bearing, extents.y_bearing);
+	return fcv4(r);
+}
+
+
+void canvas_dev::begin(uint32_t color) {
+	cairo_save(cr); set_clear(color);
+}
+void canvas_dev::end() {
+	cairo_restore(cr);
+}
+void canvas_dev::set_pos(const glm::vec2& pos)
+{
+	cairo_translate(cr, pos.x, pos.y);
+}
+void canvas_dev::set_dscale(const glm::vec2& sc)
+{
+	cairo_surface_set_device_scale(surface, sc.x, sc.y);
+}
+void canvas_dev::set_dscale(double sc)
+{
+	cairo_surface_set_device_scale(surface, sc, sc);
+}
+void canvas_dev::set_dscalei(int& zoom)
+{
+	if (zoom < 1)zoom = 1;
+	if (zoom > max_zoom)zoom = max_zoom;
+	double sc = zoom / 100.0;
+	cairo_surface_set_device_scale(surface, sc, sc);
+}
+void canvas_dev::set_scale(double sc)
+{
+	cairo_scale(cr, sc, sc);
+}
+void canvas_dev::set_scalei(int& zoom)
+{
+	//if (zoom < 1)zoom = 1;
+	//if (zoom > max_zoom)zoom = max_zoom;
+	double sc = zoom / 100.0;
+	cairo_scale(cr, sc, sc);
+}
+uint32_t* canvas_dev::data()
+{
+	return surface ? (uint32_t*)cairo_image_surface_get_data(surface) : tdata.data();
+}
+void canvas_dev::set_clear(uint32_t color)
+{
+	if (pixel && cr)
+	{
+		if (color == 0) {
+			memset(tdata.data(), 0, tdata.size() * sizeof(int));
+		}
+		else {
+			for (auto& it : tdata) {
+				it = color;
+			}
+		}
+		// clear background
+		//cairo_save(cr);
+		//set_color(cr, color);
+		//cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+		//cairo_paint(cr);
+		//cairo_restore(cr);
+		//cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+	}
+}
+/*
+CAIRO_LINE_CAP_BUTT,	在起点（终点）开始（停止）直线
+CAIRO_LINE_CAP_ROUND,	圆形结尾，圆心为终点
+CAIRO_LINE_CAP_SQUARE	正方形结尾，正方形的中心是终点
+CAIRO_LINE_JOIN_MITER,	尖角
+CAIRO_LINE_JOIN_ROUND,	圆角
+CAIRO_LINE_JOIN_BEVEL	截断			 */
+template<class T>
+void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 scale)
+{
+	if (!p || !st || (!st->fill_color && !st->stroke_color || !cr))return;
+	auto t = p->v;
+	bool stroke = false;
+	cairo_save(cr);
+	pos += st->pos;
+	pos.x += p->x;
+	pos.y += p->y;
+	if (st->flip_y)
+	{
+		cairo_matrix_t flip_y = {};
+		cairo_matrix_init(&flip_y, 1, 0, 0, -1, 0, 0); // 垂直翻转
+		cairo_set_matrix(cr, &flip_y);
+		pos.y = -pos.y;
+	}
+	cairo_translate(cr, pos.x, pos.y);
+	if (st->scale.x > 0 && st->scale.y > 0)
+	{
+		cairo_scale(cr, st->scale.x, st->scale.y);
+	}
+	else if (scale.x > 0 && scale.y > 0)
+	{
+		cairo_scale(cr, scale.x, scale.y);
+	}
+	if (st->line_width > 0 && st->stroke_color)
+	{
+		stroke = true;
+		cairo_set_line_width(cr, st->line_width);
+		cairo_set_line_cap(cr, (cairo_line_cap_t)st->cap);
+		cairo_set_line_join(cr, (cairo_line_join_t)st->join);
+	}
+	if (st->dash.dashes && st->dash.num_dashes)
+	{
+		cairo_set_dash(cr, st->dash.dashes, st->dash.num_dashes, st->dash.offset);
+	}
+#ifdef tsave__test
+	std::vector<vertex_t16> tv16;
+	std::vector<std::vector<vertex_t16>> v;
+	tv16.reserve(p->count);
+#endif
+	auto mt = *t;
+	auto xt = *t;
+	for (size_t i = 0; i < p->count; i++, t++)
+	{
+		switch ((vte_e)t->type)
+		{
+		case vte_e::e_vmove:
+		{
+			if (i > 0)
+			{
+				if (xt.x == mt.x && xt.y == mt.y)
+					cairo_close_path(cr);
+#ifdef tsave__test
+				v.push_back(tv16); tv16.clear();
+#endif
+			}
+			mt = *t;
+			cairo_move_to(cr, t->x, t->y);
+		}break;
+		case vte_e::e_vline:
+		{
+			cairo_line_to(cr, t->x, t->y);
+		}break;
+		case vte_e::e_vcurve:
+		{
+			static double dv = 2.0 / 3.0;
+			auto p0 = glm::vec2(xt.x, xt.y);
+			auto p1 = glm::vec2(t->cx, t->cy);
+			auto p2 = glm::vec2(t->x, t->y);
+			glm::vec2 c1, c2;
+			{
+#if 1
+				c1 = p1 - p0; c1 *= dv; c1 += p0;
+				c2 = p1 - p2; c2 *= dv; c2 += p2;
+#else
+				static double dv = 2.0 / 3.0;
+				auto cx1 = p0.x + 2.0f / 3.0f * (p1.x - p0.x);
+				auto cy1 = p0.y + 2.0f / 3.0f * (p1.y - p0.y);
+				auto cx2 = p2.x + 2.0f / 3.0f * (p1.x - p2.x);
+				auto cy2 = p2.y + 2.0f / 3.0f * (p1.y - p2.y);
+				c1 = { cx1,cy1 }; c2 = { cx2,cy2 };
+#endif
+			}
+			//	C0 = Q0
+			//	C1 = Q0 + (2 / 3) (Q1 - Q0)
+			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
+			//	C3 = Q2
+			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
+		}break;
+		case vte_e::e_vcubic:
+		{
+			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
+
+		}break;
+		default:
+			break;
+		}
+#ifdef tsave__test
+		tv16.push_back(*t);
+#endif
+		xt = *t;
+	}
+	if (p->count > 2)
+	{
+		if (xt.x == mt.x && xt.y == mt.y)
+			cairo_close_path(cr);
+	}
+
+	if (st->fill_color)
+	{
+		set_color(cr, st->fill_color);
+		if (stroke)
+			cairo_fill_preserve(cr);
+		else
+			cairo_fill(cr);
+	}
+	if (stroke)
+	{
+		set_color(cr, st->stroke_color);
+		cairo_stroke(cr);
+	}
+	cairo_restore(cr);
+}
+
+
+struct path_txf
+{
+	float x, y;	// 坐标
+	int count;		// 数量
+	path_v::vertex_tf* v;	// 端点 
+};
+void draw_path_v(cairo_t* cr, path_v* p, style_path_t* st)
+{
+	if (!p || !st || p->_data.empty())return;
+	path_txf tf = {};
+	tf.count = p->_data.size();
+	tf.v = (path_v::vertex_tf*)p->data();
+	tf.x = p->_pos.x;
+	tf.y = p->_pos.y + p->_baseline;
+	glm::vec2 pos = {}, sc = {};
+	draw_path0(cr, &tf, st, pos, sc);
+}
+void canvas_dev::draw_path(path_v* p, style_path_t* st)
+{
+	if (!p || !st || p->_data.empty())return;
+	draw_path_v(cr, p, st);
+}
+
+void canvas_dev::draw_circle(std::vector<std::vector<glm::vec2>>* ov, float r, style_path_t* st)
+{
+	if (!ov || ov->empty())return;
+	path_v v;
+	for (auto& it : *ov)
+	{
+		for (auto& ct : it)
+		{
+			v.addCircle(ct, r);
+		}
+	}
+	draw_path(&v, st);
+}
+void canvas_dev::draw_rect(const glm::vec2& size, style_path_t* st)
+{
+	path_v v;
+	v.addRect({ 0,0,size }, {});
+	draw_path(&v, st);
+}
+void canvas_dev::draw_circle(std::vector<glm::vec2>* ov, float r, style_path_t* st)
+{
+	if (!ov || ov->empty())return;
+	path_v v;
+	for (auto& ct : *ov)
+	{
+		v.addCircle(ct, r);
+	}
+	draw_path(&v, st);
+}
+void canvas_dev::draw_line(std::vector<glm::vec2>* ov, style_path_t* st)
+{
+	if (!ov || ov->empty())return;
+	bool stroke = st->line_width > 0 && st->stroke_color;
+	if (stroke)
+	{
+		auto count = ov->size() / 2;
+		cairo_save(cr);
+		cairo_translate(cr, st->pos.x, st->pos.y);
+		set_color(cr, st->stroke_color);
+
+		cairo_set_line_width(cr, st->line_width);
+		cairo_set_line_cap(cr, (cairo_line_cap_t)st->cap);
+		cairo_set_line_join(cr, (cairo_line_join_t)st->join);
+
+		auto t = ov->data();
+		auto mt = *t;
+		auto xt = *t;
+		for (size_t i = 0; i < count; i++, t++)
+		{
+			mt = *t;
+			cairo_move_to(cr, t->x, t->y);
+			t++;
+			cairo_line_to(cr, t->x, t->y);
+			xt = *t;
+		}
+
+		cairo_stroke(cr);
+		cairo_restore(cr);
+	}
+}
+void canvas_dev::draw_line(const glm::vec4& t, uint32_t stroke_color, float linewidth)
+{
+	bool stroke = linewidth > 0 && stroke_color;
+	if (stroke)
+	{
+		cairo_save(cr);
+		set_color(cr, stroke_color);
+		cairo_set_line_width(cr, linewidth);
+		cairo_set_line_cap(cr, cairo_line_cap_t::CAIRO_LINE_CAP_SQUARE);
+		cairo_set_line_join(cr, cairo_line_join_t::CAIRO_LINE_JOIN_BEVEL);
+		cairo_move_to(cr, t.x, t.y);
+		cairo_line_to(cr, t.z, t.w);
+		cairo_stroke(cr);
+		cairo_restore(cr);
+	}
+}
+void canvas_dev::draw_line(const glm::vec2& t, const glm::vec2& t1, uint32_t stroke_color, float linewidth)
+{
+	bool stroke = linewidth > 0 && stroke_color;
+	if (stroke)
+	{
+		cairo_save(cr);
+		set_color(cr, stroke_color);
+		cairo_set_line_width(cr, linewidth);
+		cairo_set_line_cap(cr, cairo_line_cap_t::CAIRO_LINE_CAP_SQUARE);
+		cairo_set_line_join(cr, cairo_line_join_t::CAIRO_LINE_JOIN_BEVEL);
+		cairo_move_to(cr, t.x, t.y);
+		cairo_line_to(cr, t1.x, t.y);
+		cairo_stroke(cr);
+		cairo_restore(cr);
+	}
+}
+void canvas_dev::draw_line1(std::vector<glm::vec2>* ov, style_path_t* st)
+{
+	if (!ov || ov->empty())return;
+	bool stroke = st->line_width > 0 && st->stroke_color;
+	if (stroke)
+	{
+		auto count = ov->size();
+		cairo_save(cr);
+		cairo_translate(cr, st->pos.x, st->pos.y);
+		set_color(cr, st->stroke_color);
+
+		cairo_set_line_width(cr, st->line_width);
+		cairo_set_line_cap(cr, (cairo_line_cap_t)st->cap);
+		cairo_set_line_join(cr, (cairo_line_join_t)st->join);
+
+		auto t = ov->data();
+		auto mt = *t;
+		auto xt = *t;
+		cairo_move_to(cr, t->x, t->y);
+		t++;
+		for (size_t i = 1; i < count; i++, t++)
+		{
+			cairo_line_to(cr, t->x, t->y);
+			xt = *t;
+		}
+		if (count > 2)
+		{
+			if (xt.x == mt.x && xt.y == mt.y)
+				cairo_close_path(cr);
+		}
+		cairo_stroke(cr);
+		cairo_restore(cr);
+	}
+}
+
+void canvas_dev::draw_text(const void* str, const glm::vec2& pos, font_xi* fx)
+{
+	cairo_save(cr);
+	cairo_select_font_face(cr, fx->family, (cairo_font_slant_t)fx->slant, fx->weight_bold ? CAIRO_FONT_WEIGHT_BOLD : CAIRO_FONT_WEIGHT_NORMAL);
+	auto opt = cairo_font_options_create();
+	cairo_get_font_options(cr, opt);
+	auto k = cairo_get_antialias(cr);
+	auto k1 = cairo_font_options_get_antialias(opt);
+	//cairo_set_antialias(cr, CAIRO_ANTIALIAS_SUBPIXEL);
+	cairo_font_options_set_antialias(opt, CAIRO_ANTIALIAS_SUBPIXEL);
+	cairo_font_options_set_subpixel_order(opt, CAIRO_SUBPIXEL_ORDER_RGB);
+	cairo_font_options_set_color_mode(opt, CAIRO_COLOR_MODE_COLOR);
+	cairo_set_font_options(cr, opt);
+	cairo_move_to(cr, pos.x, pos.y);
+	cairo_set_font_size(cr, fx->font_size);
+	if (fx->color)
+		set_color(cr, fx->color);
+	cairo_show_text(cr, (char*)str);
+	cairo_font_options_destroy(opt);
+	cairo_restore(cr);
+	//cairo_paint_with_alpha(cr, 0.83);
+}
+
+
+class cairo_layout_text
+{
+public:
+	glm::ivec2 _size = {};	// 布局大小
+	std::string _family;
+	int _fontsize = 12;
+	int _linewidth = 2;
+	glm::ivec2 _color = {};
+	glm::vec2 align = {};
+	int baseline = 12;
+	int baseline_raw = 12;
+public:
+	cairo_layout_text();
+	~cairo_layout_text();
+	void set_size(const glm::ivec2& ss);
+	void set_style(const char* family, int fontsize, uint32_t color);
+	void set_style(const char* family, int fontsize, const glm::ivec2& color, int linewidth);
+	// x=0左，0.5中，1右。y也一样
+	void set_align(const glm::vec2& a);
+	// 渲染文本
+	void draw_text(cairo_t* cr, const void* str, const glm::vec2& pos);
+	// 渲染文字路径
+	void draw_text_path(cairo_t* cr, const void* str, const glm::vec2& pos);
+
+	glm::ivec4 get_text_ext(cairo_t* cr, const void* str);
+private:
+
+};
+cairo_layout_text::cairo_layout_text()
+{
+
+}
+
+cairo_layout_text::~cairo_layout_text()
+{
+}
+void cairo_layout_text::set_size(const glm::ivec2& ss)
+{
+	_size = ss;
+}
+void cairo_layout_text::set_style(const char* family, int fontsize, uint32_t color) {
+	if (family)_family = family;
+	if (color)_color.y = color;
+	if (fontsize > 0) _fontsize = fontsize;
+}
+void cairo_layout_text::set_style(const char* family, int fontsize, const glm::ivec2& color, int linewidth) {
+	if (family)_family = family;
+	_color = color;
+	if (fontsize > 0) _fontsize = fontsize;
+	if (linewidth > 0)_linewidth = linewidth;
+}
+void cairo_layout_text::set_align(const glm::vec2& a)
+{
+	align = a;
+}
+glm::ivec4 cairo_layout_text::get_text_ext(cairo_t* cr, const void* str)
+{
+	cairo_text_extents_t extents = {};
+	cairo_font_extents_t fext = {};
+	cairo_select_font_face(cr, _family.c_str(), cairo_font_slant_t::CAIRO_FONT_SLANT_NORMAL, /*fx->weight_bold ? CAIRO_FONT_WEIGHT_BOLD : */CAIRO_FONT_WEIGHT_NORMAL);
+	cairo_set_font_size(cr, _fontsize);
+	cairo_text_extents(cr, (char*)str, &extents);
+	cairo_font_extents(cr, &fext);
+	glm::vec2 bearing = { extents.x_bearing, extents.y_bearing };
+	glm::vec2 ext = { extents.width,extents.height };
+	baseline_raw = fext.ascent;	// 原始基线
+	glm::vec2 ss = _size;
+	auto ps = ss * align - (ext * align + bearing);
+	baseline = ps.y;  // 调整后基线
+	return { ps, extents.width, extents.height };
+}
+void cairo_layout_text::draw_text(cairo_t* cr, const void* str, const glm::vec2& pos)
+{
+	auto bx = get_text_ext(cr, str);
+	cairo_save(cr);
+	cairo_move_to(cr, pos.x + bx.x, pos.y + bx.y);
+	if (_color.y != 0)
+		set_color(cr, _color.y);
+	cairo_show_text(cr, (char*)str);
+	cairo_restore(cr);
+}
+// 渲染文字路径
+void cairo_layout_text::draw_text_path(cairo_t* cr, const void* str, const glm::vec2& pos)
+{
+	auto bx = get_text_ext(cr, str);
+	cairo_save(cr);
+	cairo_move_to(cr, pos.x + bx.x, pos.y + bx.y);
+	cairo_text_path(cr, (char*)str);
+	if (_color.x != 0)
+	{
+		set_color(cr, _color.x);
+		if (_color.y != 0)
+			cairo_fill_preserve(cr);
+		else {
+			cairo_fill(cr);
+		}
+	}
+	if (_color.y != 0)
+		set_color(cr, _color.y);
+	cairo_set_line_width(cr, _linewidth);
+	cairo_stroke(cr);
+	cairo_restore(cr);
+}
+
+glm::ivec4 get_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, const char* family, int font_size)
+{
+	cairo_text_extents_t extents = {};
+	if (family) {
+		cairo_select_font_face(cr, family, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+	}
+	if (font_size > 0)
+		cairo_set_font_size(cr, font_size);
+	cairo_text_extents(cr, str, &extents);
+	glm::vec2 bearing = { extents.x_bearing, extents.y_bearing };
+	glm::vec2 ext = { extents.width,extents.height };
+	glm::vec2 ss = boxsize;
+	auto ps = ss * text_align - (ext * text_align + bearing);
+	ps += pos;
+	auto r = glm::vec4(ps, extents.width, extents.height);
+	return fcv4(r);
+}
+
+void draw_text(cairo_t* cr, const char* str, const glm::ivec4& et, uint32_t text_color)
+{
+	if (text_color)
+	{
+		set_color(cr, text_color);
+		cairo_move_to(cr, et.x, et.y);
+		cairo_show_text(cr, str); // 文本渲染 
+	}
+}
+
+glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, uint32_t text_color, const char* family, int font_size)
+{
+	cairo_text_extents_t extents = {};
+	if (family) {
+		cairo_select_font_face(cr, family, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+	}
+	if (font_size > 0)
+		cairo_set_font_size(cr, font_size);
+	cairo_text_extents(cr, str, &extents);
+	glm::vec2 bearing = { extents.x_bearing, extents.y_bearing };
+	glm::vec2 ext = { extents.width, extents.height };
+	glm::vec2 ss = boxsize;
+	auto ps = pos;
+	if (ss.x > 0 || ss.y > 0)
+		ps += ss * text_align - (ext * text_align + bearing);
+	if (text_color)
+	{
+		set_color(cr, text_color);
+		cairo_move_to(cr, ps.x, ps.y);
+		cairo_show_text(cr, str); // 文本渲染 
+	}
+	return { ps, extents.x_advance, extents.y_advance };
+}
+inline int multiply_alpha(int alpha, int color)
+{
+	int temp = (alpha * color) + 0x80;
+	return ((temp + (temp >> 8)) >> 8);
+}
+// 预乘输出bgra，type=0为原数据是rgba
+void premultiply_data(int w, unsigned char* data, int type, bool multiply)
+{
+	for (size_t i = 0; i < w; i += 4) {
+		uint8_t* base = &data[i];
+		uint8_t  alpha = base[3];
+		uint32_t p;
+
+		if (alpha == 0) {
+			p = 0;
+		}
+		else {
+			uint8_t  red = base[0];
+			uint8_t  green = base[1];
+			uint8_t  blue = base[2];
+
+			if (alpha != 0xff && multiply) {
+				red = multiply_alpha(alpha, red);
+				green = multiply_alpha(alpha, green);
+				blue = multiply_alpha(alpha, blue);
+			}
+			if (type == 0)
+				p = ((uint32_t)alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
+			else
+				p = ((uint32_t)alpha << 24) | (blue << 16) | (green << 8) | (red << 0);
+		}
+		memcpy(base, &p, sizeof(uint32_t));
+	}
+}
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc)
+{
+	glm::vec2 ss = { rc.z, rc.w };
+	if (ss.x < 0)
+	{
+		ss.x = cairo_image_surface_get_width(image);
+	}
+	if (ss.y < 0)
+	{
+		ss.y = cairo_image_surface_get_height(image);
+	}
+	if (ss.x > 0 && ss.y > 0)
+	{
+		cairo_save(cr);
+		cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+		cairo_translate(cr, pos.x, pos.y);
+		cairo_set_source_surface(cr, image, -rc.x, -rc.y);
+
+		cairo_rectangle(cr, 0, 0, ss.x, ss.y);
+		cairo_fill(cr);
+		cairo_restore(cr);
+	}
+	return ss;
+}
+
+cairo_surface_t* new_image_cr(image_ptr_t* img)
+{
+	cairo_surface_t* image = 0;
+	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
+	auto px = new uint32_t[img->width * img->height];
+	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
+	memcpy(px, (unsigned char*)img->data, img->height * img->width * sizeof(int));
+	if (img->multiply && img->type == 1)
+	{
+	}
+	else {
+		int stride = cairo_image_surface_get_stride(image);
+		auto data = cairo_image_surface_get_data(image);
+		auto t = data;
+		auto ts = (unsigned char*)img->data;
+		for (size_t i = 0; i < img->height; i++)
+		{
+			premultiply_data(img->width * 4, t, img->type, !img->multiply);
+			t += stride;
+			ts += img->stride;
+		}
+		save_img_png(img, "update_text_img.png");
+		cairo_surface_write_to_png(image, "update_text_surface.png");
+	}
+	return image;
+}
+void update_image_cr(cairo_surface_t* image, image_ptr_t* img)
+{
+	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
+	if (img->multiply && img->type == 1)
+	{
+		auto data = cairo_image_surface_get_data(image);
+		memcpy(data, (unsigned char*)img->data, img->height * img->width * sizeof(int));
+	}
+	else {
+		int stride = cairo_image_surface_get_stride(image);
+		auto data = cairo_image_surface_get_data(image);
+		memcpy(data, (unsigned char*)img->data, img->height * img->width * sizeof(int));
+		auto t = data;
+		auto ts = (unsigned char*)img->data;
+		for (size_t i = 0; i < img->height; i++)
+		{
+			premultiply_data(img->width * 4, t, img->type, !img->multiply);
+			t += stride;
+			ts += img->stride;
+		}
+	}
+}
+void free_image_cr(cairo_surface_t* image)
+{
+	if (image)
+	{
+		auto data = (uint32_t*)cairo_image_surface_get_data(image);
+		delete[]data;
+		cairo_surface_destroy(image);
+
+	}
+}
+
+
+
+
+#if 0
+
+static
+struct pl {
+	void fo() {
+		pango_layout_new();
+		//Create a new PangoLayout object with attributes initialized to default values for a particular PangoContext.
+
+		pango_layout_deserialize();
+		//Loads data previously created via pango_layout_serialize().
+
+		//Instance methods
+		pango_layout_context_changed();
+		//Forces recomputation of any state in the PangoLayout that might depend on the layout’s context.
+
+		pango_layout_copy();
+		//Creates a deep copy - by - value of the layout.
+
+		pango_layout_get_alignment();
+		//Gets the alignment for the layout : how partial lines are positioned within the horizontal space available.
+
+		pango_layout_get_attributes();
+		//Gets the attribute list for the layout, if any.
+
+		pango_layout_get_auto_dir();
+		//Gets whether to calculate the base direction for the layout according to its contents.
+
+		//since: 1.4
+
+		pango_layout_get_baseline();
+		//Gets the Y position of baseline of the first line in layout.
+
+		pango_layout_get_caret_pos();
+		//Given an index within a layout, determines the positions that of the strong and weak cursors if the insertion point is at that index.
+
+		pango_layout_get_character_count();
+		//Returns the number of Unicode characters in the the text of layout.
+
+		pango_layout_get_context();
+		//Retrieves the PangoContext used for this layout.
+
+		pango_layout_get_cursor_pos();
+		//Given an index within a layout, determines the positions that of the strong and weak cursors if the insertion point is at that index.
+
+		pango_layout_get_direction();
+		//Gets the text direction at the given character position in layout.
+
+		pango_layout_get_ellipsize();
+		//Gets the type of ellipsization being performed for layout.
+
+		pango_layout_get_extents();
+		//Computes the logical and ink extents of layout.
+
+		pango_layout_get_font_description();
+		//Gets the font description for the layout, if any.
+
+		pango_layout_get_height();
+		//Gets the height of layout used for ellipsization.
+
+		pango_layout_get_indent();
+		//Gets the paragraph indent width in Pango units.
+
+		pango_layout_get_iter();
+		//Returns an iterator to iterate over the visual extents of the layout.
+
+		pango_layout_get_justify();
+		//Gets whether each complete line should be stretched to fill the entire width of the layout.
+
+		pango_layout_get_justify_last_line();
+		//Gets whether the last line should be stretched to fill the entire width of the layout.
+
+		pango_layout_get_line();
+		//Retrieves a particular line from a PangoLayout.
+
+		pango_layout_get_line_count();
+		//Retrieves the count of lines for the layout.
+
+		pango_layout_get_line_readonly();
+		//Retrieves a particular line from a PangoLayout.
+
+		pango_layout_get_line_spacing();
+		//Gets the line spacing factor of layout.
+
+		pango_layout_get_lines();
+		//Returns the lines of the layout as a list.
+
+		pango_layout_get_lines_readonly();
+		//Returns the lines of the layout as a list.
+
+		pango_layout_get_log_attrs();
+		//Retrieves an array of logical attributes for each character in the layout.
+
+		pango_layout_get_log_attrs_readonly();
+		//Retrieves an array of logical attributes for each character in the layout.
+
+		pango_layout_get_pixel_extents();
+		//Computes the logical and ink extents of layout in device units.
+
+		pango_layout_get_pixel_size();
+		//Determines the logical width and height of a PangoLayout in device units.
+
+		pango_layout_get_serial();
+		//Returns the current serial number of layout.
+
+		pango_layout_get_single_paragraph_mode();
+		//Obtains whether layout is in single paragraph mode.
+
+		pango_layout_get_size();
+		//Determines the logical width and height of a PangoLayout in Pango units.
+
+		pango_layout_get_spacing();
+		//Gets the amount of spacing between the lines of the layout.
+
+		pango_layout_get_tabs();
+		//Gets the current PangoTabArray used by this layout.
+
+		pango_layout_get_text();
+		//Gets the text in the layout.
+
+		pango_layout_get_unknown_glyphs_count();
+		//Counts the number of unknown glyphs in layout.
+
+		pango_layout_get_width();
+		//Gets the width to which the lines of the PangoLayout should wrap.
+
+		pango_layout_get_wrap();
+		//Gets the wrap mode for the layout.
+
+		pango_layout_index_to_line_x();
+		//Converts from byte index_ within the layout to line and X position.
+
+		pango_layout_index_to_pos();
+		//Converts from an index within a PangoLayout to the onscreen position corresponding to the grapheme at that index.
+
+		pango_layout_is_ellipsized();
+		//Queries whether the layout had to ellipsize any paragraphs.
+
+		pango_layout_is_wrapped();
+		//Queries whether the layout had to wrap any paragraphs.
+
+		pango_layout_move_cursor_visually();
+		//Computes a new cursor position from an old position and a direction.
+
+		pango_layout_serialize();
+		//Serializes the layout for later deserialization via pango_layout_deserialize().
+
+		pango_layout_set_alignment();
+		//Sets the alignment for the layout : how partial lines are positioned within the horizontal space available.
+
+		pango_layout_set_attributes();
+		//Sets the text attributes for a layout object.
+
+		pango_layout_set_auto_dir();
+		//Sets whether to calculate the base direction for the layout according to its contents.
+
+
+		pango_layout_set_ellipsize();
+		//Sets the type of ellipsization being performed for layout.
+
+
+		pango_layout_set_font_description();
+		//Sets the default font description for the layout.
+
+		pango_layout_set_height();
+		//Sets the height to which the PangoLayout should be ellipsized at.
+
+
+		pango_layout_set_indent();
+		//Sets the width in Pango units to indent each paragraph.
+
+		pango_layout_set_justify();
+		//Sets whether each complete line should be stretched to fill the entire width of the layout.
+
+		pango_layout_set_justify_last_line();
+		//Sets whether the last line should be stretched to fill the entire width of the layout.
+
+
+		pango_layout_set_line_spacing();
+		//Sets a factor for line spacing.
+
+
+		pango_layout_set_markup();
+		//Sets the layout text and attribute list from marked - up text.
+
+		pango_layout_set_markup_with_accel();
+		//Sets the layout text and attribute list from marked - up text.
+
+		pango_layout_set_single_paragraph_mode();
+		//Sets the single paragraph mode of layout.
+
+		pango_layout_set_spacing();
+		//Sets the amount of spacing in Pango units between the lines of the layout.
+
+		pango_layout_set_tabs();
+		//Sets the tabs to use for layout, overriding the default tabs.
+
+		pango_layout_set_text();
+		//Sets the text of the layout.
+
+		pango_layout_set_width();
+		//Sets the width to which the lines of the PangoLayout should wrap or ellipsized.
+
+		//@PANGO_WRAP_WORD: wrap lines at word boundaries.
+		//* @PANGO_WRAP_CHAR : wrap lines at character boundaries.
+		//* @PANGO_WRAP_WORD_CHAR : wrap lines at word boundaries, but fall back to  character boundaries if there is not enough space for a full word.
+		pango_layout_set_wrap();
+		//Sets the wrap mode.
+
+		pango_layout_write_to_file();
+		//A convenience method to serialize a layout to a file.
+
+
+		pango_layout_xy_to_index();
+		//Converts from X and Y position within a layout to the byte index to the character at that logical position.
+	}
+};
+
+#endif
+
+
+class layout_px
+{
+public:
+	PangoLayout* layout = 0, * fgp = 0;
+	glm::vec4 extents;
+	PangoRectangle r0, r1;
+	int y;
+	layout_px();
+	~layout_px();
+	void draw(cairo_t* cr) {
+		pango_cairo_update_layout(cr, layout);
+		//cairo_move_to(cr, 0 /*extents.x*/, r0.y - (r1.height - r0.height) * 0.5);
+		cairo_move_to(cr, 0, 0);
+		pango_cairo_show_layout(cr, layout);
+	}
+	void get_pixel_size(int& w, int& h)
+	{
+		w = extents.z;
+		h = extents.w;
+	}
+private:
+
+};
+
+layout_px::layout_px()
+{
+}
+
+layout_px::~layout_px()
+{
+	if (fgp)
+		g_object_unref(fgp);
+}
+
+layout_px create_pango_layout(const char* str, int fs)
+{
+
+	PangoFontMap* fontMap = pango_cairo_font_map_get_default();
+	//PangoFontMap* fontMap = pango_cairo_font_map_new();
+	PangoContext* context = pango_font_map_create_context(fontMap);
+	PangoLayout* layout = pango_layout_new(context);
+	//PangoLayout* layout = pango_cairo_create_layout(cr);
+	PangoFontDescription* desc;
+	desc = pango_font_description_new();
+	pango_font_description_set_family(desc, "Arial,NSimSun");
+	//pango_font_description_set_family(desc, "NSimSun");
+	pango_font_description_set_size(desc, fs * PANGO_SCALE);
+	//desc = pango_font_description_from_string(FONT);
+	pango_layout_set_font_description(layout, desc);
+	pango_font_description_free(desc);
+	//pango_layout_set_markup(layout, str, strlen(str));
+	//str = (char*)u8"😀工affab\na寺214668\n965";
+	int sizeX = (strlen(str) + 6) * fs;
+	//pango_layout_set_width(layout, sizeX * PANGO_SCALE);
+	pango_layout_set_text(layout, str, -1);
+	/* Draw the layout N_WORDS times in a circle */
+	//pango_cairo_update_layout(cr, layout);
+	layout_px r = {};
+	pango_layout_get_pixel_extents(layout, &r.r0, &r.r1);
+	int w = 0, h = 0;
+	pango_layout_get_pixel_size(layout, &w, &h);
+	int bl = (double)pango_layout_get_baseline(layout) / PANGO_SCALE;
+
+
+	g_object_unref(context);
+
+	r.y = bl;
+	r.extents = { r.r0.x,r.r0.y,r.r1.width,r.r1.height };
+	r.layout = layout;
+	return r;
+}
+void draw_text(cairo_t* cr, const void* str, const glm::vec2& pos, font_xi* fx)
+{
+	cairo_save(cr);
+#if 0
+	draw_text(cr, (char*)str, pos, fx->font_size);
+#else
+	cairo_select_font_face(cr, fx->family, (cairo_font_slant_t)fx->slant, fx->weight_bold ? CAIRO_FONT_WEIGHT_BOLD : CAIRO_FONT_WEIGHT_NORMAL);
+	auto opt = cairo_font_options_create();
+	cairo_get_font_options(cr, opt);
+	auto k = cairo_get_antialias(cr);
+	auto k1 = cairo_font_options_get_antialias(opt);
+	//cairo_set_antialias(cr, CAIRO_ANTIALIAS_SUBPIXEL);
+	cairo_font_options_set_antialias(opt, CAIRO_ANTIALIAS_SUBPIXEL);
+	cairo_font_options_set_subpixel_order(opt, CAIRO_SUBPIXEL_ORDER_RGB);
+	cairo_set_font_options(cr, opt);
+	cairo_move_to(cr, pos.x, pos.y);
+	cairo_set_font_size(cr, fx->font_size);
+	if (fx->color)
+		set_color(cr, fx->color);
+	cairo_show_text(cr, (char*)str);
+	cairo_font_options_destroy(opt);
+#endif
+	cairo_restore(cr);
+	//cairo_paint_with_alpha(cr, 0.83);
+}
+void canvas_dev::draw_circle(const glm::vec2& pos, float r, float linewidth, uint32_t color, uint32_t fill)
+{
+	cairo_save(cr);
+	bool stroke = linewidth > 0 && color;
+	if (fill)
+	{
+		set_color(cr, fill);
+		cairo_arc(cr, pos.x, pos.y, r, 0, 2 * M_PI);
+		cairo_fill(cr);
+	}
+	if (stroke)
+	{
+		set_color(cr, color);
+		cairo_arc(cr, pos.x, pos.y, r, 0, 2 * M_PI);
+		cairo_stroke(cr);
+	}
+	cairo_restore(cr);
+}
+void canvas_dev::draw_surface(cairo_surface_t* image, const glm::vec2& pos, double alpha)
+{
+	cairo_set_source_surface(cr, image, pos.x, pos.y);
+	cairo_paint_with_alpha(cr, alpha);
+}
+#if 1
+int canvas_dev::get_path(path_v* pt)
+{
+	int r = 0;
+	cairo_path_t* path;
+	cairo_path_data_t* data;
+
+	path = cairo_copy_path(cr);
+	if (!path)return 0;
+	r = path->num_data;
+	for (int i = 0; i < path->num_data; i += path->data[i].header.length) {
+		data = &path->data[i];
+		switch (data->header.type) {
+		case CAIRO_PATH_MOVE_TO:
+			pt->moveTo(data[1].point.x, data[1].point.y);
+			break;
+		case CAIRO_PATH_LINE_TO:
+			pt->lineTo(data[1].point.x, data[1].point.y);
+			break;
+		case CAIRO_PATH_CURVE_TO:
+			pt->curveTo(data[1].point.x, data[1].point.y,
+				data[2].point.x, data[2].point.y,
+				data[3].point.x, data[3].point.y);
+			break;
+		case CAIRO_PATH_CLOSE_PATH:
+			pt->closePath();
+			break;
+		}
+	}
+	cairo_path_destroy(path);
+	return 0;
+}
+#endif
+glm::vec4 canvas_dev::get_path_extents()
+{
+	double tc[4] = {};
+	auto t = tc;
+	if (cr)
+		cairo_path_extents(cr, t, t + 1, t + 2, t + 3);
+	return glm::vec4(tc[0], tc[1], tc[2], tc[3]);
+}
+
+#if 1
+
+glm::vec4 get_merged_rect(glm::vec4* rects, int length)
+{
+	if (length == 0) {
+		return {};
+	}
+	glm::vec4 r = rects[0];
+	for (size_t i = 1; i < length; i++)
+	{
+		auto it = rects[i];
+		r.x = std::min(r.x, it.x);
+		r.y = std::min(r.y, it.y);
+		r.z = std::max(r.z, it.z);
+		r.w = std::max(r.w, it.w);
+	}
+	return r;
+}
+glm::vec4 get_bboxs(std::vector<path_v*>& v)
+{
+	std::vector<glm::vec4> bboxs;
+	bboxs.reserve(v.size());
+	for (auto it : v)
+	{
+		auto v4 = it->mkbox();
+		bboxs.push_back(v4);
+	}
+	return get_merged_rect(bboxs.data(), bboxs.size());
+}
+#endif // 1
+
+tinyviewcanvas_x::tinyviewcanvas_x()
+{
+}
+
+tinyviewcanvas_x::~tinyviewcanvas_x()
+{
+	if (_backing_store)
+	{
+		cairo_surface_destroy(_backing_store);
+	}
+	_backing_store = 0;
+}
+
+void tinyviewcanvas_x::draw(canvas_dev* c) {
+
+	if (!_backing_store_valid)
+		draw_back();
+	auto cr = c->cr;
+	if (_backing_store)
+	{
+		cairo_save(cr);
+		cairo_set_source_surface(cr, _backing_store, 0, 0);
+		cairo_paint(cr);
+		cairo_restore(cr);
+	}
+}
+void tinyviewcanvas_x::set_size(const glm::ivec2& ss)
+{
+	if (ss != size)
+	{
+		size = ss;
+		if (_backing_store)
+		{
+			cairo_surface_destroy(_backing_store);
+			_backing_store = 0;
+		}
+	}
+}
+
+void tinyviewcanvas_x::set_view_move(bool is)
+{
+	has_move = is;
+}
+
+void tinyviewcanvas_x::set_view_scale(bool is)
+{
+	has_scale = is;
+}
+
+
+
+void tinyviewcanvas_x::draw_back() {
+	if (!_data)return;
+	print_time a("draw_back");
+	if (!_backing_store)
+		_backing_store = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size.x, size.y);
+	if (!_backing_store)return;
+	// Get context
+	cairo_t* cr = cairo_create(_backing_store);
+	{
+		cairo_save(cr);
+		set_color(cr, 0);
+		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+		cairo_paint(cr);
+		cairo_restore(cr);
+
+		//cairo_translate(cr, vpos.x, vpos.y);
+		cairo_matrix_t t = {};
+		auto a0 = mx[0];
+		auto a1 = mx[1];
+		auto a2 = mx[2];
+		//auto a3 = mx[3];
+		//cairo_matrix_init(&t, a0.x, 0, 0, a1.y, a3.x, a3.y); // 垂直翻转
+		//cairo_set_matrix(cr, &t);
+		cairo_translate(cr, a2.x + vpos.x, vpos.y + a2.y);
+
+		style_path_t st0 = {};
+		st0.line_width = line_width;
+		st0.fill_color = color.x;
+		st0.stroke_color = color.y;
+		st0.cap = 0;
+		st0.join = 1;
+		st0.pos = { 0.5,0.5 };
+		style_path_t* spt = &st0;
+		if (oldscale != scale)
+		{
+			print_time a("canvas draw");
+			auto m = get_affine();
+			ddrect.clear();
+			double sc = scale / 100.0;
+			glm::mat3 sx = glm::scale(glm::mat3(1.0), glm::vec2(sc, sc));
+			oldscale = scale;
+			for (auto it : draw_data)
+			{
+				delete it;
+			}
+			draw_data.clear();
+			for (auto it : *_data)
+			{
+				auto v23 = glm::vec3(it->_pos, 1.0);
+				auto v2s = glm::vec3(it->get_size(), 1.0);
+				glm::vec2 ips = mx * v23;// get_v2m4(it->_pos, &mx);
+				glm::vec2 ss = mx * v2s;// get_v2m4(it->get_size(), &mx);
+				auto nx = ips + ss;
+				if (ips.x > size.x || ips.y > size.y || nx.x < -vpos.x * 2 || nx.y < -vpos.y * 2)
+				{
+					//continue;
+				}
+				auto npv = new path_v(*it);
+				draw_data.push_back(npv);
+				npv->_pos.y += npv->_baseline;//基线
+				npv->_baseline = 0;
+				npv->set_mat(sx);
+				auto v4 = it->mkbox();
+				ddrect.push_back(v4);
+			}
+			bx = get_bboxs(draw_data);
+		}
+		{
+			print_time a("draw_path_v");
+			for (auto it : draw_data) {
+				draw_path_v(cr, it, spt);
+			}
+		}
+	}
+	_backing_store_valid = true;
+	cairo_destroy(cr);
+
+}
+
+void tinyviewcanvas_x::on_button(int idx, int state, const glm::vec2& pos1, int clicks)
+{
+	auto pos = pos1 - (glm::vec2)vpos;
+	//idx=1左，3右，2中
+	if (idx == 1)
+	{
+		if (state == 1 && ckinc == 0)
+		{
+			glm::vec2 a3 = mx[2];
+			last_mouse = pos - a3;
+		}
+		ckinc++;
+		if (state == 0)
+		{
+			ckinc = 0;
+		}
+
+	}
+	else if (idx == 3) {
+		if (state == 0)
+		{
+			reset_view();
+		}
+	}
+}
+void tinyviewcanvas_x::on_motion(const glm::vec2& pos1)
+{
+	auto pos = pos1 - (glm::vec2)vpos;
+	if (ckinc > 0)
+	{
+		if (has_move) {
+			auto mp = pos;
+			mp = pos - last_mouse;
+			auto t = glm::translate(glm::mat3(1.0), mp);
+			double sc = scale / 100.0;
+			auto s = glm::scale(glm::mat3(1.0), glm::vec2(sc, sc));
+			mx = t * s;
+			_backing_store_valid = false;
+		}
+	}
+	eoffset = pos;
+	hit_test(pos1);
+}
+void tinyviewcanvas_x::on_wheel(int deltaY)
+{
+	if (has_scale)
+	{
+		auto prevZoom = scale;
+		auto scale1 = scale;
+		auto zoom = (deltaY * scaleStep);
+		scale1 += zoom;
+		if (scale1 < minScale) {
+			scale = minScale;
+			return;
+		}
+		else if (scale1 > maxScale) {
+			scale = maxScale;
+			return;
+		}
+		double sc = scale1 / 100.0;
+		double sc1 = prevZoom / 100.0;
+		glm::vec2 nps = mx[2];
+		auto s = glm::scale(glm::mat3(1.0), glm::vec2(sc, sc));
+		auto t = glm::translate(glm::mat3(1.0), glm::vec2(nps));
+		mx = t * s;
+		scale = scale1;
+	}
+	hit_test(eoffset + (glm::vec2)vpos);
+	_backing_store_valid = false;
+}
+void tinyviewcanvas_x::reset_view()
+{
+	ckinc = 0;
+	scale = 100;
+	mx = glm::mat3(1.0);
+	_backing_store_valid = false;
+}
+
+glm::ivec4 tinyviewcanvas_x::get_hbox()
+{
+	return hover_bx;
+}
+glm::vec4 tinyviewcanvas_x::get_bbox()
+{
+	return bx;
+}
+
+glm::mat3 tinyviewcanvas_x::get_affine()
+{
+	glm::mat3 r = glm::translate(glm::mat3(1.0), glm::vec2(vpos));
+	return r * mx;
+}
+
+// 测试鼠标坐标的矩形
+void tinyviewcanvas_x::hit_test(const glm::vec2& ps)
+{
+	auto ae = get_affine();
+	auto m = glm::inverse(ae);//逆矩阵
+	auto p2 = v2xm3(ps, m);	 //坐标和矩阵相乘
+	auto k2 = check_box_cr(p2, ddrect.data(), ddrect.size());
+	hover_bx = {};
+	if (k2.x)
+	{
+		auto v4 = get_boxm3(ddrect[k2.y], ae);
+		v4.z -= v4.x;
+		v4.w -= v4.y;
+		hover_bx = { glm::floor(v4.x),glm::floor(v4.y),glm::round(v4.z),glm::round(v4.w) };
+	}
+}
+
+struct SPRulerMetric
+{
+	gdouble ruler_scale[16];
+	gint    subdivide[5];
+};
+
+// Ruler metric for general use.
+static SPRulerMetric const ruler_metric_general = {
+  { 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000 },
+  { 1, 5, 10, 50, 100 }
+};
+
+// Ruler metric for inch scales.
+static SPRulerMetric const ruler_metric_inches = {
+  { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768 },
+  { 1, 2, 4, 8, 16 }
+};
+
+// Half width of pointer triangle.
+static double half_width = 5.0;
+// 将像素转换为厘米
+double pixels_to_centimeters(int pixels, int dpi) {
+	return (pixels / dpi) * 2.54;
+}
+
+// 将像素转换为毫米
+double pixels_to_millimeters(int pixels, int dpi) {
+	return (pixels / dpi) * 25.4;
+}
+// 将毫米转换为像素
+double smillimeters_to_pixel(int mm, int dpi) {
+	return (dpi / 25.4) * mm;
+}
+
+// 将像素转换为英寸
+double pixels_to_inches(int pixels, int dpi) {
+	return pixels / dpi;
+}
+
+Ruler::Ruler()
+{
+
+}
+
+void Ruler::set_range(double lower, double upper)
+{
+	if (_lower != lower || _upper != upper) {
+
+		_lower = lower;
+		_upper = upper;
+		_max_size = _upper - _lower;
+		if (_max_size == 0) {
+			_max_size = 1;
+		}
+
+		_backing_store_valid = false;
+		//_drawing_area->queue_draw();
+	}
+}
+
+void Ruler::set_page(double lower, double upper)
+{
+	if (_page_lower != lower || _page_upper != upper) {
+		_page_lower = lower;
+		_page_upper = upper;
+
+		_backing_store_valid = false;
+		//_drawing_area->queue_draw();
+	}
+}
+
+void Ruler::set_selection(double lower, double upper)
+{
+	if (_sel_lower != lower || _sel_upper != upper) {
+		_sel_lower = lower;
+		_sel_upper = upper;
+
+		_backing_store_valid = false;
+		//_drawing_area->queue_draw();
+	}
+}
+
+glm::ivec2 Ruler::get_drawing_size()
+{
+	return  drawingsize;
+}
+#define orientation_horizontal 0
+
+
+#define getrgba(a,b,sp) lerp(a.sp,b.sp,ratio)
+
+glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio) {
+	auto lerp = [](double v0, double v1, double t) { return (1.0 - t) * v0 + t * v1; };
+	glm::dvec4 result = {};
+	result.x = getrgba(a, b, x);
+	result.y = getrgba(a, b, y);
+	result.z = getrgba(a, b, z);
+	result.w = getrgba(a, b, w);
+	return result;
+}
+cairo_pattern_t* create_cubic_gradient(
+	glm::vec4 rect,
+	glm::vec4 from,
+	glm::vec4 to,
+	glm::vec2 ctrl1,
+	glm::vec2 ctrl2,
+	glm::vec2 p0 = {},
+	glm::vec2 p1 = { 1,1 },
+	int steps = 8
+);
+cairo_pattern_t* create_cubic_gradient(
+	glm::vec4 rect,
+	glm::vec4 from,
+	glm::vec4 to,
+	glm::vec2 ctrl1,
+	glm::vec2 ctrl2,
+	glm::vec2 p0,
+	glm::vec2 p1,
+	int steps
+) {
+	// validate input points
+	for (auto&& pt : { p0, ctrl1, ctrl2, p1 }) {
+		if (pt.x < 0 || pt.x > 1 ||
+			pt.y < 0 || pt.y > 1) {
+			throw std::invalid_argument("Invalid points for cubic gradient; 0..1 coordinates expected.");
+		}
+	}
+	if (steps < 2 || steps > 999) {
+		throw std::invalid_argument("Invalid number of steps for cubic gradient; 2 to 999 steps expected.");
+	}
+	if (rect.x > rect.z)
+	{
+		std::swap(rect.x, rect.z);
+	}
+	if (rect.y > rect.w)
+	{
+		std::swap(rect.y, rect.w);
+	}
+	cairo_pattern_t* g = cairo_pattern_create_linear(rect.x, rect.y, rect.z, rect.w);
+
+	//cairo_pattern_t* cairo_pattern_create_radial(double cx0, double cy0, double radius0, double cx1, double cy1, double radius1);
+
+	--steps;
+	for (int step = 0; step <= steps; ++step) {
+		auto t = 1.0 * step / steps;
+		auto s = 1.0 - t;
+		auto p0t = p0;
+		auto p1t = p1;
+		auto c1 = ctrl1;
+		auto c2 = ctrl2;
+		p0t *= (t * t * t);
+		c1 *= (3 * t * t * s);
+		c2 *= (3 * t * s * s);
+		p1t *= (s * s * s);
+		//auto p = (t * t * t) * p0 + (3 * t * t * s) * ctrl1 + (3 * t * s * s) * ctrl2 + (s * s * s) * p1;
+		auto p = p0t + c1 + c2 + p1t;
+		auto offset = p.x;
+		auto ratio = p.y;
+
+		auto color = mix_colors(from, to, ratio);
+		cairo_pattern_add_color_stop_rgba(g, offset, color.x, color.y, color.z, color.w);
+	}
+
+	return g;
+}
+void paint_shadow(cairo_t* cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, bool rev, float r)
+{
+	auto trans = shadow;
+	trans.w = 0;
+	auto gr = rev ?
+		create_cubic_gradient(glm::vec4(0, 0, size_x, size_y), trans, shadow, glm::vec2(0.5, 0.0), glm::vec2(1.0, 0.5))
+		: create_cubic_gradient(glm::vec4(0, 0, size_x, size_y), shadow, trans, glm::vec2(0, 0.5), glm::vec2(0.5, 1));
+	//cairo_rectangle(cr, 0, 0, width, height);
+	draw_rectangle(cr, { 0,0,width,height }, r);
+	cairo_set_source(cr, gr);
+	cairo_fill(cr);
+	cairo_pattern_destroy(gr);
+}
+void paint_shadow(cairo_t* cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
+{
+	auto gr = rev ?
+		create_cubic_gradient(glm::vec4(0, 0, size_x, size_y), color_to, shadow, glm::vec2(0.5, 0.0), glm::vec2(1.0, 0.5))
+		: create_cubic_gradient(glm::vec4(0, 0, size_x, size_y), shadow, color_to, glm::vec2(0, 0.5), glm::vec2(0.5, 1));
+	//cairo_rectangle(cr, 0, 0, width, height);
+	draw_rectangle(cr, { 0,0,width,height }, r);
+	cairo_set_source(cr, gr);
+	cairo_fill(cr);
+	cairo_pattern_destroy(gr);
+}
+
+
+bool Ruler::draw_scale(cairo_t* cr_in)
+{
+	auto a = get_drawing_size();
+	int awidth = a.x, aheight = a.y;
+	// Create backing store (need surface_in to get scale factor correct).
+	if (oldsize != drawingsize)
+	{
+		oldsize = drawingsize;
+		auto surface_in = cairo_get_target(cr_in);
+		if (_backing_store)
+		{
+			cairo_surface_destroy(_backing_store);
+		}
+		_backing_store = cairo_surface_create_similar_image(surface_in, CAIRO_FORMAT_ARGB32, awidth, aheight);
+		//_backing_store = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, awidth, aheight);
+	}
+	if (!_backing_store)return false;
+	// Get context
+	cairo_t* cr = cairo_create(_backing_store);
+	cairo_save(cr);
+	set_color(cr, _back_color);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_paint(cr);
+	cairo_restore(cr);
+
+	// Color in page indication box
+	if (has_page)
+	{
+		double psize = std::abs(_page_upper - _page_lower);
+		if (psize > 0)
+		{
+
+			set_source_rgba(cr, _page_fill);
+			cairo_new_path(cr);
+
+			if (_orientation == orientation_horizontal) {
+				cairo_rectangle(cr, _page_lower, 0, psize, aheight);
+			}
+			else {
+				cairo_rectangle(cr, 0, _page_lower, awidth, is_yaxisdown > 0 ? psize : -psize);
+			}
+			cairo_fill(cr);
+		}
+	}
+
+	cairo_set_line_width(cr, 1.0);
+
+	// aparallel is the longer, oriented dimension of the ruler; aperpendicular shorter.
+	auto const [aparallel, aperpendicular] = _orientation == orientation_horizontal
+		? std::pair{ awidth , aheight }
+	: std::pair{ aheight, awidth };
+
+	// Draw bottom/right line of ruler
+	set_source_rgba(cr, _foreground);
+	if (_orientation == orientation_horizontal) {
+		cairo_move_to(cr, 0, aheight - 0.5);
+		cairo_line_to(cr, awidth, aheight - 0.5);
+	}
+	else {
+		cairo_move_to(cr, awidth - 0.5, 0);
+		cairo_line_to(cr, awidth - 0.5, aheight);
+	}
+	cairo_stroke(cr);
+
+	// Draw a shadow which overlaps any previously painted object. 
+	int gradient_size = 4;
+	if (_orientation == orientation_horizontal) {
+		paint_shadow(cr, 0, gradient_size, awidth, gradient_size, _shadow, 0);// 垂直方向
+	}
+	else {
+		paint_shadow(cr, gradient_size, 0, gradient_size, aheight, _shadow, 0);// 水平方向
+	}
+	// Figure out scale. Largest ticks must be far enough apart to fit largest text in vertical ruler.
+	// We actually require twice the distance.
+	uint32_t scale = std::ceil(abs(_max_size)); // Largest number
+	std::string scale_text = std::to_string(scale);
+	uint32_t digits = scale_text.length() + 1; // Add one for negative sign.
+	uint32_t minimum = digits * _font_size * 2;
+
+	auto const pixels_per_unit = aparallel / _max_size; // pixel per distance
+
+	SPRulerMetric ruler_metric = ruler_metric_general;
+	if (ruler_in) {
+		ruler_metric = ruler_metric_inches;
+	}
+
+	unsigned scale_index;
+	for (scale_index = 0; scale_index < G_N_ELEMENTS(ruler_metric.ruler_scale) - 1; ++scale_index) {
+		if (ruler_metric.ruler_scale[scale_index] * std::abs(pixels_per_unit) > minimum) break;
+	}
+
+	// Now we find out what is the subdivide index for the closest ticks we can draw
+	unsigned divide_index;
+	for (divide_index = 0; divide_index < G_N_ELEMENTS(ruler_metric.subdivide) - 1; ++divide_index) {
+		if (ruler_metric.ruler_scale[scale_index] * std::abs(pixels_per_unit) < 5 * ruler_metric.subdivide[divide_index + 1]) break;
+	}
+
+	// We'll loop over all ticks.
+	double pixels_per_tick = pixels_per_unit *
+		ruler_metric.ruler_scale[scale_index] / ruler_metric.subdivide[divide_index];
+
+	double units_per_tick = pixels_per_tick / pixels_per_unit;
+	double ticks_per_unit = 1.0 / units_per_tick;
+
+	// Find first and last ticks
+	int start = 0;
+	int end = 0;
+	if (_lower < _upper) {
+		start = std::floor(_lower * ticks_per_unit);
+		end = std::ceil(_upper * ticks_per_unit);
+	}
+	else {
+		start = std::floor(_upper * ticks_per_unit);
+		end = std::ceil(_lower * ticks_per_unit);
+	}
+
+	// Loop over all ticks
+	set_source_rgba(cr, _foreground);
+	for (int i = start; i < end + 1; ++i) {
+
+		// Position of tick (add 0.5 to center tick on pixel).
+		double position = std::floor(i * pixels_per_tick - _lower * pixels_per_unit) + 0.5;
+
+		// Height of tick
+		int size = aperpendicular - 7;
+		for (int j = divide_index; j > 0; --j) {
+			if (i % ruler_metric.subdivide[j] == 0) break;
+			size = size / 2 + 1;
+		}
+
+		// Draw text for major ticks.
+		if (i % ruler_metric.subdivide[divide_index] == 0) {
+			cairo_save(cr);
+
+			int label_value = std::round(i * units_per_tick);
+
+			auto& label = _label_cache[label_value];
+			auto lv = std::to_string(label_value);// +(char*)u8"图";
+			fx->font_size = _font_size;
+			//auto ws = get_text_extents(cr, lv.c_str(), lv.size(), fx);
+			if (!label) {
+				label = draw_label(cr, lv, { /*ws.x,ws.y*/ });
+			}
+			// Align text to pixel
+			int x = 3;// +_font_size * 0.5;
+			int y = position + 2.5;
+			if (_orientation == orientation_horizontal) {
+				x = position + 2.5;
+				y = 3;// +_font_size * 0.5;
+			}
+
+			// We don't know the surface height/width, damn you cairo.
+			//cairo_rectangle(cr, x, y, 100, 100);
+			//cairo_clip(cr);
+			cairo_set_source_surface(cr, label, x, y);
+			cairo_paint(cr);
+			cairo_restore(cr);
+
+		}
+
+		// Draw ticks
+		set_source_rgba(cr, _foreground);
+		if (_orientation == orientation_horizontal) {
+			cairo_move_to(cr, position, aheight - size);
+			cairo_line_to(cr, position, aheight);
+		}
+		else {
+			cairo_move_to(cr, awidth - size, position);
+			cairo_line_to(cr, awidth, position);
+		}
+		cairo_stroke(cr);
+	}
+
+	// Draw a selection bar
+	if (_sel_lower != _sel_upper && _sel_visible) {
+		const auto radius = 3.0;
+		const auto delta = _sel_upper - _sel_lower;
+		const auto dxy = delta > 0 ? radius : -radius;
+		double sy0 = _sel_lower;
+		double sy1 = _sel_upper;
+		double sx0 = floor(aperpendicular * 0.7);
+		double sx1 = sx0;
+
+		if (_orientation == orientation_horizontal) {
+			std::swap(sy0, sx0);
+			std::swap(sy1, sx1);
+		}
+
+		cairo_set_line_width(cr, 2.0);
+
+		if (fabs(delta) > 2 * radius) {
+			set_source_rgba(cr, _select_stroke);
+			if (_orientation == orientation_horizontal) {
+				cairo_move_to(cr, sx0 + dxy, sy0);
+				cairo_line_to(cr, sx1 - dxy, sy1);
+			}
+			else {
+				cairo_move_to(cr, sx0, sy0 + dxy);
+				cairo_line_to(cr, sx1, sy1 - dxy);
+			}
+			cairo_stroke(cr);
+		}
+
+		// Markers
+		set_source_rgba(cr, _select_fill);
+		cairo_new_path(cr);
+		cairo_arc(cr, sx0, sy0, radius, 0, 2 * M_PI);
+		cairo_arc(cr, sx1, sy1, radius, 0, 2 * M_PI);
+		cairo_fill(cr);
+
+		set_source_rgba(cr, _select_stroke);
+		cairo_new_path(cr);
+		cairo_arc(cr, sx0, sy0, radius, 0, 2 * M_PI);
+		cairo_stroke(cr);
+		cairo_new_path(cr);
+		cairo_arc(cr, sx1, sy1, radius, 0, 2 * M_PI);
+		cairo_stroke(cr);
+	}
+
+	_backing_store_valid = true;
+
+	cairo_destroy(cr);
+	return true;
+}
+#ifndef M_PI_2
+#define M_PI_2     1.57079632679489661923   // pi/2
+#endif
+cairo_surface_t* Ruler::draw_label(cairo_t* cr_in, const std::string& label_value, const glm::ivec2& ts)
+{
+	bool rotate = _orientation != orientation_horizontal;
+	//Glib::RefPtr<Pango::Layout> layout = create_pango_layout(std::to_string(label_value));
+	auto surface_in = cairo_get_target(cr_in);
+	auto ly = create_pango_layout(/*cr_in,*/ label_value.c_str(), _font_size);
+	auto layout = &ly;
+	int text_width = ts.x;
+	int text_height = ts.y;
+	layout->get_pixel_size(text_width, text_height);
+	if (rotate) {
+		std::swap(text_width, text_height);
+	}
+	auto surface = cairo_surface_create_similar_image(surface_in, CAIRO_FORMAT_ARGB32, text_width + 10, text_height + 10);
+	cairo_t* cr = cairo_create(surface);
+
+	cairo_save(cr);
+	set_source_rgba(cr, _foreground);
+	if (rotate) {
+		cairo_translate(cr, text_width / 2, text_height / 2);
+		cairo_rotate(cr, -M_PI_2);
+		cairo_translate(cr, -text_height / 2, -text_width / 2);
+	}
+	ly.fgp = ly.layout;
+	auto fx0 = *fx;
+	fx0.color = 0;
+	layout->draw(cr);
+	cairo_restore(cr);
+
+	cairo_surface_write_to_png(surface, "surface_label.png");
+	cairo_destroy(cr);
+	return surface;
+}
+void Ruler::draw_marker(cairo_t* cr)
+{
+	auto a = get_drawing_size();
+	int awidth = a.x, aheight = a.y;
+	set_source_rgba(cr, _cursor_color);
+	if (_orientation == orientation_horizontal) {
+		cairo_move_to(cr, _position, aheight);
+		cairo_line_to(cr, _position - half_width, aheight - half_width);
+		cairo_line_to(cr, _position + half_width, aheight - half_width);
+		cairo_close_path(cr);
+	}
+	else {
+		cairo_move_to(cr, awidth, _position);
+		cairo_line_to(cr, awidth - half_width, _position - half_width);
+		cairo_line_to(cr, awidth - half_width, _position + half_width);
+		cairo_close_path(cr);
+	}
+	cairo_fill(cr);
+}
+
+glm::ivec4 Ruler::marker_rect()
+{
+	auto a = get_drawing_size();
+	int awidth = a.x, aheight = a.y;
+	glm::ivec4 rect;
+	rect.x = 0;
+	rect.y = 0;
+	rect.z = 0;
+	rect.w = 0;
+
+	// Find size of rectangle to enclose triangle.
+	if (_orientation == orientation_horizontal) {
+		rect.x = std::floor(_position - half_width);
+		rect.y = std::floor(aheight - half_width);
+		rect.z = std::ceil(half_width * 2.0 + 1);
+		rect.w = std::ceil(half_width);
+	}
+	else {
+		rect.x = std::floor(awidth - half_width);
+		rect.y = std::floor(_position - half_width);
+		rect.z = std::ceil(half_width);
+		rect.w = std::ceil(half_width * 2.0 + 1);
+	}
+
+	return rect;
+}
+
+bool Ruler::on_drawing_area_draw(cairo_t* cr, const glm::vec2& pos)
+{
+	if (!_backing_store_valid) {
+		draw_scale(cr);
+
+		cairo_surface_write_to_png(_backing_store, "ruler1904.png");
+	}
+	cairo_save(cr);
+
+	cairo_translate(cr, pos.x, pos.y);
+	auto a = get_drawing_size();
+	int awidth = a.x, aheight = a.y;
+	glm::vec2 c2 = { awidth, aheight };
+	glm::vec2 c = {};
+	if (_orientation == orientation_horizontal) {
+		c.x = aheight;
+	}
+	else {
+		c.y = awidth;
+	}
+	cairo_rectangle(cr, c.x, c.y, c2.x, c2.y);
+	cairo_clip(cr);
+	cairo_set_source_surface(cr, _backing_store, 0, 0);
+	cairo_paint(cr);
+	if (c.x == 0)c.x -= 1;
+	if (c.y == 0)c.y -= 1;
+	cairo_translate(cr, c.x, c.y);
+	draw_marker(cr);
+	cairo_restore(cr);
+	return true;
+}
+
+void Ruler::on_style_updated()
+{
+	//Gtk::Box::on_style_updated();
+
+	//Glib::RefPtr<Gtk::StyleContext> style_context = get_style_context();
+
+	//// Cache all our colors to speed up rendering.
+
+	//_foreground = get_foreground_color(style_context);
+	//_font_size = get_font_size(*this);
+
+	//_shadow = get_color_with_class(style_context, "shadow");
+	//_page_fill = get_color_with_class(style_context, "page");
+
+	//style_context->add_class("selection");
+	//_select_fill = get_color_with_class(style_context, "background");
+	//_select_stroke = get_color_with_class(style_context, "border");
+	//style_context->remove_class("selection");
+
+	_label_cache.clear();
+	_backing_store_valid = false;
+
+	//queue_resize();
+	//_drawing_area->queue_draw();
+}
+
+void Ruler::on_prefs_changed()
+{
+	_sel_visible;
+	_backing_store_valid = false;
+}
+
+void Ruler::on_motion(void* motion, double x, double y)
+{
+	int drawing_x = std::lround(x), drawing_y = std::lround(y);
+	double const position = _orientation == orientation_horizontal ? drawing_x : drawing_y;
+	if (position == _position) return;
+
+	_position = position;
+	auto new_rect = marker_rect();
+	_rect = new_rect;
+}
+
+int Ruler::on_click_pressed(void* click, int n_press, double x, double y)
+{
+	return 0;
+}
+
+void Ruler::set_context_menu()
+{
+
+}
+
+
+#endif // 1
+
+#if 1
+
+
+class svg_dp
+{
+public:
+	RsvgHandle* handle = 0;
+	RsvgDimensionData dimension = {};
+public:
+	svg_dp(int dpi = 0);
+	~svg_dp();
+	static svg_dp* new_from_file(const void* fn, size_t len);
+	static svg_dp* new_from_data(const void* str, size_t len);
+	glm::vec2 get_pos_id(const char* id);
+	void get_bixbuf(const char* id);
+	void draw(cairo_t* cr);
+	void draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle);
+};
+
+svg_dp::svg_dp(int dpi)
+{
+	rsvg_set_default_dpi(dpi < 72.0 ? 72.0 : dpi);
+}
+
+svg_dp::~svg_dp()
+{
+	// 释放资源  
+	rsvg_handle_free(handle);
+}
+svg_dp* svg_dp::new_from_file(const void* fn, size_t len)
+{
+	GError* er = NULL;
+	auto handle = rsvg_handle_new_from_file((gchar*)fn, &er);
+	if (er != NULL) {
+		printf("Failed to load SVG file: %s\n", er->message);
+		return 0;
+	}
+	auto p = new svg_dp();
+	/* 获取SVG图像的尺寸 */
+	rsvg_handle_get_dimensions(handle, &p->dimension);
+	p->handle = handle;
+	return p;
+}
+svg_dp* svg_dp::new_from_data(const void* str, size_t len)
+{
+	GError* er = NULL;
+	auto handle = rsvg_handle_new_from_data((guint8*)str, len, &er);
+	if (er != NULL) {
+		printf("Failed to load SVG file: %s\n", er->message);
+		return 0;
+	}
+	auto p = new svg_dp();
+	/* 获取SVG图像的尺寸 */
+	rsvg_handle_get_dimensions(handle, &p->dimension);
+	p->handle = handle;
+	return p;
+}
+glm::vec2 svg_dp::get_pos_id(const char* id)
+{
+	RsvgPositionData pos = {};
+	auto r = rsvg_handle_get_position_sub(handle, &pos, id);
+	return glm::vec2(pos.x, pos.y);
+}
+
+void svg_dp::get_bixbuf(const char* id)
+{
+	auto pxb = id && *id ? rsvg_handle_get_pixbuf(handle) : rsvg_handle_get_pixbuf_sub(handle, id);
+	uint32_t length = 0;
+	auto px = gdk_pixbuf_get_pixels_with_length(pxb, &length);
+	auto w = gdk_pixbuf_get_width(pxb);
+	auto h = gdk_pixbuf_get_height(pxb);
+	auto st = gdk_pixbuf_get_rowstride(pxb);
+	//g_object_unref(pxb);
+	return;
+}
+
+
+void svg_dp::draw(cairo_t* cr)
+{
+	rsvg_handle_render_cairo(handle, cr);//渲染到窗口，有刷新事件需要重新执行，这里只渲染一次 
+}
+void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle)
+{
+	//get_bixbuf(0);
+	//print_time ad("draw dc");cairo_surface_t* surface, 
+	cairo_save(cr);
+	if (scale.x > 0 && scale.y > 0)
+		cairo_scale(cr, scale.x, scale.y);
+	if (angle > 0)
+		cairo_rotate(cr, angle);
+	cairo_translate(cr, pos.x, pos.y);
+	rsvg_handle_render_cairo(handle, cr);//渲染到窗口，有刷新事件需要重新执行，这里只渲染一次
+	//cairo_surface_flush(surface);
+	cairo_restore(cr);
+}
+
+svg_cx* new_svg_file(const void* fn, size_t len, int dpi) {
+	return (svg_cx*)svg_dp::new_from_file(fn, len);
+}
+svg_cx* new_svg_data(const void* str, size_t len, int dpi) {
+	return (svg_cx*)svg_dp::new_from_data(str, len);
+}
+void free_svg(svg_cx* svg)
+{
+	if (svg)
+	{
+		auto t = (svg_dp*)svg;
+		delete t;
+	}
+}
+void render_svg(cairo_t* cr, svg_cx* svg)
+{
+	if (cr && svg)
+	{
+		auto t = (svg_dp*)svg;
+		t->draw(cr);
+	}
+}
+void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle)
+{
+	if (cr && svg)
+	{
+		auto t = (svg_dp*)svg;
+		t->draw(cr, pos, scale, angle);
+	}
+}
+#endif // 1
+
+
+
+
+
+
+view_g::view_g()
+{
+	fx.family = (char*)u8"Calibri";
+	fx.font_size = fh;
+	ruler = new Ruler[2];
+	ruler[0].fx = &fx;
+	ruler[1].fx = &fx;
+	ruler[1]._orientation = 1;
+	vcanvas = new tinyviewcanvas_x();
+	rss = new_clip_rect(5);
+}
+
+view_g::~view_g()
+{
+	if (_backing_store)
+	{
+		cairo_surface_destroy(_backing_store);
+	}
+	_backing_store = 0;
+	if (rss)
+	{
+		//auto rd = (uint32_t*)cairo_image_surface_get_data(rss);
+		//if (rd)delete[]rd;
+		cairo_surface_destroy(rss);
+	}
+	rss = 0;
+	if (vcanvas) { delete vcanvas; vcanvas = 0; }
+	if (ruler) { delete[]ruler; ruler = 0; }
+}
+
+view_g* view_g::new_view(const glm::vec2& size)
+{
+	view_g* p = 0;
+	if (size.x > 1 && size.y > 1)
+	{
+		p = new view_g();
+		p->set_view(size);
+	}
+	return p;
+}
+void view_g::free_view(view_g* p)
+{
+	if (p)delete p;
+}
+void view_g::set_view(const glm::ivec2& size)
+{
+	if (!(size.x > 1 && size.y > 1)) {
+		assert(0);
+		return;
+	}
+	auto _hruler = ruler;
+	auto _vruler = _hruler + 1;
+	auto ss = size;
+	vsize = size;
+	ss.y = rsize.y;
+	_hruler->drawingsize = ss;
+	ss = size;
+	ss.x = rsize.x;
+	_vruler->drawingsize = ss;
+	vcanvas->set_size(size);
+	if (cdv && cdv->dsize != size)
+	{
+		canvas_dev::free_cdev(cdv);
+	}
+	cdv = canvas_dev::new_cdev(size, 0);
+	_backing_store_valid = false;
+}
+
+void view_g::on_motion(const glm::vec2& pos) {
+	glm::ivec2 ps = pos - rsize;
+	if (curpos != ps)
+	{
+		curpos = ps;
+
+		auto _hruler = ruler;
+		auto _vruler = _hruler + 1;
+		vcanvas->on_motion(pos);
+		_hruler->on_motion(0, ps.x, ps.y);
+		_vruler->on_motion(0, ps.x, ps.y);
+		update();
+	}
+}
+void view_g::on_button(int idx, int state, const glm::vec2& pos, int clicks) {
+	auto ps = pos - rsize;
+	if (state == 0 && is_ck)
+	{
+		is_ck = false;
+		glm::vec4 trc = { 0,0,rsize };
+		auto k2 = check_box_cr(pos, &trc, 1);
+		if (k2.x)
+		{
+			vcanvas->has_move = !vcanvas->has_move;
+			vcanvas->has_scale = vcanvas->has_move;
+		}
+	}
+	if (state == 1)
+	{
+		is_ck = true;
+	}
+	vcanvas->on_button(idx, state, pos, clicks);
+	update();
+	_draw_valid = true;
+}
+void view_g::on_wheel(double x, double y)
+{
+	vcanvas->on_wheel(y);
+	update();
+	_draw_valid = true;
+}
+void view_g::updateRulers()
+{
+	glm::vec4 viewbox = { 0,0, vsize };// _canvas->get_area_world();
+	glm::vec4 startbox = viewbox;
+	auto d2c_scalerot = vcanvas->get_affine();
+	auto _hruler = ruler;
+	auto _vruler = _hruler + 1;
+	auto zoom1 = d2c_scalerot[0].x;
+	glm::vec2 ps = vcanvas->vpos;
+	auto xxm = glm::inverse(d2c_scalerot);		// 逆矩阵
+	auto rulerbox = get_boxm3(startbox, xxm);
+	_hruler->set_range(rulerbox.x, rulerbox.z);	//设置水平标尺读数范围
+	_vruler->is_yaxisdown = is_yaxisdown;
+	if (is_yaxisdown)
+	{
+		_vruler->set_range(rulerbox.y, rulerbox.w);	//设置垂直标尺范围
+	}
+	else {
+		_vruler->set_range(-rulerbox.y, -rulerbox.w);
+	}
+
+	pagebox = { 0,0, wsize };
+	pagebox = get_boxm3(pagebox, d2c_scalerot);
+	_hruler->set_page(pagebox.x, pagebox.z);//水平
+	_vruler->set_page(pagebox.y, pagebox.w);
+
+	selbox = {};
+	// todo
+	selbox = get_boxm3(selbox, d2c_scalerot);
+	if (selbox.z > 0 && selbox.w > 0) {
+		_hruler->set_selection(selbox.x, selbox.z);//水平
+		_vruler->set_selection(selbox.y, selbox.w);
+	}
+}
+void view_g::mkpath()
+{
+	auto vss = vsize;
+	glm::vec2 sw = step_width;
+	sw *= step_width.z;
+	sw *= step_width.z; sw *= 2;
+	vss += sw;
+	int rct = make_grid(vss, step_width, { 0.5,0.5 }, pvdata);
+	draw_grid_back(vss);
+}
+
+
+void view_g::draw_grid_back(const glm::ivec2& vss)
+{
+	print_time a("draw_grid_back\n");
+	if (!_backing_store)
+		_backing_store = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, vss.x, vss.y);
+	if (!_backing_store)return;
+	// Get context
+	cairo_t* cr = cairo_create(_backing_store);
+	{
+		style_path_t st0 = {};
+		style_path_t st1 = {};
+		st1.stroke_color = wcolor.z;
+		st1.line_width = 1;
+		st0.fill_color = color.x;
+		//st0.box_color = color.y;// 0x80FF8050;
+		st0.stroke_color = color.z;// 0x80353535;
+		st0.line_width = 1.0f;
+		st0.cap = 0;
+		st0.join = 1;
+		auto stbc = st0;
+
+		stbc.stroke_color = color.w;// 0x80606060;
+
+		style_path_t* spt = &st0, * spt1 = &stbc;
+
+		if (spt && pvdata[0].size() > 0) {
+			draw_path_v(cr, &pvdata[0], spt);
+		}
+		if (spt1 && pvdata[1].size() > 1) {
+			draw_path_v(cr, &pvdata[1], spt1);
+		}
+
+	}
+	_backing_store_valid = true;
+	cairo_destroy(cr);
+}
+
+glm::mat3 view_g::get_mat()
+{
+	return vcanvas->get_affine();
+}
+
+glm::mat3x2 view_g::get_mat3x2()
+{
+	auto m = vcanvas->get_affine();
+	return glm::mat3x2(m);
+}
+glm::dmat3x2 view_g::get_dmat3x2()
+{
+	auto m = vcanvas->get_affine();
+	return glm::dmat3x2(m);
+}
+
+void view_g::on_event(uint32_t type, et_un_t* ep)
+{
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y }; mps -= vgpos;
+		on_motion(mps);
+	}
+	break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y }; mps -= vgpos;
+		on_button(p->button, p->state, mps, p->clicks);
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		on_wheel(p->x, p->y);
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		//on_keyboard(ep);
+	}
+	break;
+	}
+}
+
+void view_g::begin_draw() {
+	if (!cdv || !_draw_valid)return;
+	auto cr = cdv->cr;
+	cdv->begin(clear_color);
+	cairo_save(cr);
+	//cairo_translate(cr, vpos.x, vpos.y);
+	auto ae = vcanvas->get_affine();//视图矩阵
+	glm::vec2 aps = ae[2];
+	glm::vec2 sw = step_width;	// 单个网格宽、高
+	sw *= step_width.z;			// 数量
+	aps = glm::mod(aps, sw) - sw;
+	cairo_set_source_surface(cr, _backing_store, aps.x, aps.y);
+	cairo_paint(cr);
+	cairo_restore(cr);
+	cairo_save(cr);
+	auto tr = glm::transpose(ae);
+	auto ainv = glm::affineInverse(ae);
+	auto inv = glm::inverse(ae);
+	auto invtr = glm::inverseTranspose(ae);
+	//set_mat3(cr, ae);
+	set_color(cr, cross_color.x);
+	cairo_set_line_width(cr, cross_width);
+	glm::vec2 ds = { vsize };
+	auto _hruler = ruler;
+	auto _vruler = _hruler + 1;
+	ds.x = _hruler->_page_lower;
+	ds.y = _vruler->_page_lower;
+
+	if (cross_width == 1)
+		ds += 0.5;
+	// 十字线
+	cairo_move_to(cr, 0, ds.y);
+	cairo_line_to(cr, vsize.x, ds.y);
+	cairo_stroke(cr);
+	set_color(cr, cross_color.y);
+	cairo_move_to(cr, ds.x, 0);
+	cairo_line_to(cr, ds.x, vsize.y);
+	cairo_stroke(cr);
+	cairo_restore(cr);
+
+}
+void view_g::end_draw() {
+	if (!cdv || !_draw_valid)return;
+	auto cr = cdv->cr;
+	auto _hruler = ruler;
+	auto _vruler = _hruler + 1;
+	cairo_save(cr);
+	// 左上角背景
+	cairo_set_line_width(cr, 1);
+	set_color(cr, ruler ? ruler->_back_color : color.z);
+	cairo_rectangle(cr, 0, 0, rsize.x, rsize.y);
+	cairo_fill(cr);
+	//set_source_rgba(cr, ruler->_foreground);
+	int gradient_size = 4;
+	paint_shadow(cr, 0, gradient_size, rsize.x, gradient_size, _vruler->_shadow, 0);// 垂直方向  
+	paint_shadow(cr, gradient_size, 0, gradient_size, rsize.y, _vruler->_shadow, 0);// 水平方向 
+	cairo_restore(cr);
+
+	cairo_save(cr);
+	// 标尺
+	_hruler->on_drawing_area_draw(cr, {});
+	_vruler->on_drawing_area_draw(cr, {});
+	cairo_restore(cr);
+	//裁剪
+	clip_rect(cr, rss);
+	cdv->end();
+}
+void set_mat3(cairo_t* cr, const glm::mat3& m) {
+	auto mm = (glm::dmat3x2)m;
+	cairo_set_matrix(cr, (cairo_matrix_t*)&mm);
+}
+void view_g::draw()
+{
+	if (!cdv || !_draw_valid)return;
+	auto cr = cdv->cr;
+	cairo_save(cr);
+	vcanvas->draw(cdv);
+	cairo_restore(cr);
+}
+void view_g::update(float)
+{
+	if (!_backing_store_valid)
+	{
+		mkpath();
+		_draw_valid = true;
+	}
+	vcanvas->vpos = vpos;
+	updateRulers();
+	auto _hruler = ruler;
+	auto _vruler = _hruler + 1;
+	if (!vcanvas->_backing_store_valid || !_hruler->_backing_store_valid || !_vruler->_backing_store_valid)
+		_draw_valid = true;
+
+}
+#endif // !no_cairo_
+
+
+// font
+// todo font
+#if 1
+
+
+
+char const* sp_font_description_get_family(PangoFontDescription const* fontDescr)
+{
+	static auto const fontNameMap = std::map<std::string, std::string>{
+		{ "Sans", "sans-serif" },
+		{ "Serif", "serif" },
+		{ "Monospace", "monospace" }
+	};
+
+	char const* pangoFamily = pango_font_description_get_family(fontDescr);
+
+	if (pangoFamily) {
+		if (auto it = fontNameMap.find(pangoFamily); it != fontNameMap.end()) {
+			return it->second.c_str();
+		}
+	}
+
+	return pangoFamily;
+}
+
+
+
+
+#ifndef NO_FONT_CX 
+/*
+* 获取字体信息名
+1 family名
+2 样式名
+3 唯一标识符
+4 全名
+6 postscript名
+*/
+std::vector<std::string> get_name_idx(hb_face_t* face, int idx, const std::string& fn)
+{
+	uint32_t n = 0;
+	auto ns = hb_ot_name_list_names(face, &n);
+	std::string name;
+	std::vector<std::string> r;
+	for (size_t i = 0; i < n; i++)
+	{
+		auto it = ns[i];
+		if (it.name_id != idx)
+		{
+			continue;
+		}
+		uint32_t ss = 0;
+		auto kn8 = hb_ot_name_get_utf8(face, it.name_id, it.language, &ss, 0);
+		name.resize(kn8 + 1); ss = kn8 + 1;
+		auto kn = hb_ot_name_get_utf8(face, it.name_id, it.language, &ss, (char*)name.c_str());
+		//printf("%d\t%s\n", it.name_id, name.c_str());
+		name = name.c_str();
+		if (name.size() && name != fn)
+			r.push_back(name.c_str());
+	}
+	return r;
+}
+std::string get_pat_str(FcPattern* font, const char* o)
+{
+	FcChar8* s = nullptr;
+	std::string r;
+	if (o && ::FcPatternGetString(font, o, 0, &s) == FcResultMatch)
+	{
+		if (s)
+		{
+			r = (char*)s;
+		}
+	}
+	return r;
+}
+int get_pat_int(FcPattern* font, const char* o)
+{
+	int s = 0;
+	if (o && ::FcPatternGetInteger(font, o, 0, &s) == FcResultMatch)
+	{
+	}
+	return s;
+}
+
+#ifdef _WIN32111
+#define get_fmap pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT)
+#else
+#define get_fmap pango_cairo_font_map_get_default()
+#endif // _WIN32
+//pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT);
+
+std::map<std::string, fontns> get_allfont()
+{
+	int r = 0;
+	std::map<std::string, fontns> fyv;
+	PangoFontFamily** families = 0;
+	int nfamilies = 0;
+	PangoFontMap* fontmap = get_fmap;
+	pango_font_map_list_families(fontmap, &families, &nfamilies);
+
+	std::set<std::string> nns;
+	auto context = pango_font_map_create_context(fontmap);
+	for (int i = 0; i < nfamilies; i++) {
+		PangoFontFamily* family = families[i];
+		const char* family_name = pango_font_family_get_name(family);
+		auto descr = pango_font_description_new();
+		pango_font_description_set_family(descr, family_name);// (char*)u8"仿宋");
+		auto font = pango_font_map_load_font(fontmap, context, descr);
+
+		auto lang = pango_font_get_languages(font);//2052
+		auto hbfont = pango_font_get_hb_font(font);
+		hb_face_t* face = hb_font_get_face(hbfont);
+		uint32_t ss = 8;
+		wchar_t buf[8] = {};
+		char buf8[32] = {};
+		std::wstring namew;
+		auto name = get_name_idx(face, 1, family_name);
+		//auto st2 = get_name_idx(face, 2, family_name);
+		auto name4 = get_name_idx(face, 4, family_name);
+		nns.clear();
+		for (auto it : name)
+		{
+			nns.insert(it);
+		}
+		for (auto it : name4)
+		{
+			nns.insert(it);
+		}
+		//if (name.size())
+		//	printf("%s\n", name.size() > 1 ? name[1].c_str() : name[0].c_str());
+		pango_font_description_free(descr);
+		auto& kt = fyv[family_name];
+		kt.alias.swap(nns);
+		if (name4.size())
+			kt.fullname = name4[0];
+	}
+
+	if (context)
+	{
+		g_object_unref(context); context = 0;
+	}
+	if (FcInit()) {
+		{
+			//std::string yourFontFilePath = "seguiemj.ttf";
+			std::string yourFontFilePath = "C:\\Windows\\Fonts\\seguiemj.ttf";
+			const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();
+			FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
+		}
+		//{
+		//	std::string yourFontFilePath = "Noto-COLRv1-emojicompat.ttf";
+		//	const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();
+		//	FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
+		//}
+		FcPattern* pat = ::FcPatternCreate();
+		FcObjectSet* os = ::FcObjectSetBuild(FC_FILE, FC_FULLNAME, FC_FAMILY, FC_STYLE, FC_CHARSET, FC_WIDTH, (char*)0);
+		FcFontSet* fs = ::FcFontList(0, pat, os);
+		for (size_t i = 0; i < fs->nfont; ++i) {
+			FcPattern* font = fs->fonts[i];
+			FcChar8* family = nullptr;
+			FcChar8* family0 = nullptr;
+			FcChar8* fp = nullptr;
+			FcChar8* style = nullptr;
+			auto w = get_pat_int(font, FC_WIDTH);
+			auto ct = get_pat_str(font, FC_CHARSET);
+			auto fullname = get_pat_str(font, FC_FULLNAME);
+			auto fph = get_pat_str(font, FC_FILE);
+			if (fph.size())
+			{
+				auto ttf = fph.rfind(".ttf");
+				auto ttc = fph.rfind(".ttc");
+				auto otf = fph.rfind(".otf");
+				if (ttf != std::string::npos || ttc != std::string::npos || otf != std::string::npos) {
+
+					auto family = get_pat_str(font, FC_FAMILY);
+					auto style = get_pat_str(font, FC_STYLE);
+					if (family.size() && style.size())
+					{
+						auto& kt = fyv[family];
+						kt.fpath.push_back(fph);
+						kt.family = family;
+						if (kt.fullname.empty())
+							kt.fullname = fullname;
+						kt.style.push_back(style);
+					}
+				}
+			}
+		}
+
+		FcObjectSetDestroy(os);
+		FcPatternDestroy(pat);
+		FcFontSetDestroy(fs);
+
+		FcFini();
+	}
+	auto newfn = fyv;
+	for (auto& [k, v] : fyv) {
+		if (v.family.empty() || v.fpath.empty())
+		{
+			newfn.erase(k); r++;
+		}
+	}
+	fyv.swap(newfn);
+
+	return newfn;
+}
+// 枚举字体名称/路径名
+//std::map<std::string, fontns> get_all_font()
+//{
+//	static std::map<std::string, fontns> fyv = get_allfont();
+//	return fyv;
+//}
+struct font_impl;
+class path_v;
+class info_one;
+class fd_info0;
+
+
+class font_imp
+{
+public:
+	// add font string
+	std::string addstr = {};
+	struct mem_ft
+	{
+		char* data;
+		std::set<std::string> vname;
+	};
+private:
+	std::vector<font_t*> fonts;		// 字体
+	std::vector<fd_info0*> fd_data;	// 字体数据
+	std::vector<mem_ft> fd_data_m;	// 字体数据copy
+	std::map<std::string, font_t*>	mk;	// 字体名搜索
+public:
+	font_imp();
+	~font_imp();
+	std::vector<font_t*> add_font_file(const std::string& fn, std::vector<std::string>* pname);
+	std::vector<font_t*> add_font_mem(const char* data, size_t len, bool iscp, std::vector<std::string>* pname, int* rc);
+
+	int get_font_names(std::vector<std::string>* pname);
+	const char* get_font_names(const char* sp);
+	font_t* get_font(size_t idx);
+	size_t size();
+	void free_ft(const std::string& name);
+	void free_ftp(font_t* p);
+private:
+};
+
+
+#if 1
+class UTF16 {
+public:
+	static int toUCS4(const unsigned short* utf16, unsigned short* ucs4);
+	static int toUTF8(const unsigned short* utf16, unsigned char* utf8);
+	static int toUTF8(const unsigned short* utf16, int n, unsigned char* utf8);
+};
+
+using namespace std;
+
+int UTF16::toUCS4(const unsigned short* utf16, unsigned short* ucs4)
+{
+	if (utf16[0] >= 0xd800 && utf16[0] <= 0xdfff)
+	{
+		if (utf16[0] < 0xdc00)
+		{
+			if (utf16[1] >= 0xdc00 && utf16[1] <= 0xdfff)
+			{
+				ucs4[1] = (utf16[0] & 0x3ff);
+				ucs4[0] = (utf16[1] & 0x3ff);
+				ucs4[0] = ((ucs4[1] << 10) | ucs4[0]);
+				ucs4[1] = ((ucs4[1] >> 6) | 1);
+
+				//printf("%04x\n", ucs4[0]);
+				//printf("%04x\n", ucs4[1]);
+
+				return 2;
+			}
+
+			return -1;
+		}
+
+		return -1;
+	}
+	else
+	{
+		ucs4[0] = utf16[0];
+		ucs4[1] = 0x00;
+	}
+
+	return 1;
+}
+
+int UTF16::toUTF8(const unsigned short* utf16, unsigned char* utf8)
+{
+	unsigned short ucs4[2];
+	uint32_t* u = (uint32_t*)ucs4;
+	int w;
+
+	if (utf16[0] >= 0xd800 && utf16[0] <= 0xdfff)
+	{
+		if (utf16[0] < 0xdc00)
+		{
+			if (utf16[1] >= 0xdc00 && utf16[1] <= 0xdfff)
+			{
+				ucs4[1] = (utf16[0] & 0x3ff);
+				ucs4[0] = (utf16[1] & 0x3ff);
+				ucs4[0] = ((ucs4[1] << 10) | ucs4[0]);
+				ucs4[1] = ((ucs4[1] >> 6) | 1);
+			}
+			else
+			{
+				return -1;
+			}
+		}
+		else
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		ucs4[0] = utf16[0];
+		ucs4[1] = 0x00;
+	}
+
+	w = *u;
+
+	if (w <= 0x0000007f)
+	{
+		/*U-00000000 - U-0000007F:  0xxxxxxx*/
+		utf8[0] = (w & 0x7f);
+
+		return 1;
+	}
+	else if (w >= 0x00000080 && w <= 0x000007ff)
+	{
+		/*U-00000080 - U-000007FF:  110xxxxx 10xxxxxx*/
+		utf8[1] = (w & 0x3f) | 0x80;
+		utf8[0] = ((w >> 6) & 0x1f) | 0xc0;
+
+		return 2;
+	}
+	else if (w >= 0x00000800 && w <= 0x0000ffff)
+	{
+		/*U-00000800 - U-0000FFFF:  1110xxxx 10xxxxxx 10xxxxxx*/
+		utf8[2] = (w & 0x3f) | 0x80;
+		utf8[1] = ((w >> 6) & 0x3f) | 0x80;
+		utf8[0] = ((w >> 12) & 0x0f) | 0xe0;
+
+		return 3;
+	}
+	else if (w >= 0x00010000 && w <= 0x001fffff)
+	{
+		/*U-00010000 - U-001FFFFF:  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx*/
+		utf8[3] = (w & 0x3f) | 0x80;
+		utf8[2] = ((w >> 6) & 0x3f) | 0x80;
+		utf8[1] = ((w >> 12) & 0x3f) | 0x80;
+		utf8[0] = ((w >> 18) & 0x07) | 0xf0;
+
+		return 4;
+	}
+	else if (w >= 0x00200000 && w <= 0x03ffffff)
+	{
+		/*U-00200000 - U-03FFFFFF:  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx*/
+		utf8[4] = (w & 0x3f) | 0x80;
+		utf8[3] = ((w >> 6) & 0x3f) | 0x80;
+		utf8[2] = ((w >> 12) & 0x3f) | 0x80;
+		utf8[1] = ((w >> 18) & 0x3f) | 0x80;
+		utf8[0] = ((w >> 24) & 0x03) | 0xf8;
+
+		return 5;
+	}
+	else if (w >= 0x04000000 && w <= 0x7fffffff)
+	{
+		/*U-04000000 - U-7FFFFFFF:  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx*/
+		utf8[5] = (w & 0x3f) | 0x80;
+		utf8[4] = ((w >> 6) & 0x3f) | 0x80;
+		utf8[3] = ((w >> 12) & 0x3f) | 0x80;
+		utf8[2] = ((w >> 18) & 0x3f) | 0x80;
+		utf8[1] = ((w >> 24) & 0x03) | 0xf8;
+		utf8[0] = ((w >> 30) & 0x01) | 0xfc;
+
+		return 6;
+	}
+
+	return 0;
+}
+
+int UTF16::toUTF8(const unsigned short* utf16, int n, unsigned char* utf8)
+{
+	unsigned short ucs4[2];
+	uint32_t* u = (uint32_t*)ucs4;
+	int w;
+	int m = 0;
+	int e = 0;
+	int i = 0;
+	int j = 0;
+
+	for (i = 0; i < n; i += m)
+	{
+		if (utf16[i] >= 0xd800 && utf16[i] <= 0xdfff)
+		{
+			if (utf16[i] < 0xdc00)
+			{
+				if (utf16[i + 1] >= 0xdc00 && utf16[i + 1] <= 0xdfff)
+				{
+					ucs4[1] = (utf16[i + 0] & 0x3ff);
+					ucs4[0] = (utf16[i + 1] & 0x3ff);
+					ucs4[0] = ((ucs4[1] << 10) | ucs4[0]);
+					ucs4[1] = ((ucs4[1] >> 6) | 1);
+
+					m = 2;
+				}
+				else
+				{
+					m = -1;
+				}
+			}
+			else
+			{
+				m = -1;
+			}
+		}
+		else
+		{
+			ucs4[0] = utf16[i];
+			ucs4[1] = 0x00;
+
+			m = 1;
+		}
+
+		if (m == -1)
+		{
+			utf8[j] = 0x00;
+
+			return j;
+		}
+
+		w = *u;
+
+		e = 0;
+
+		if (w <= 0x0000007f)
+		{
+			/*U-00000000 - U-0000007F:  0xxxxxxx*/
+			utf8[j + 0] = (w & 0x7f);
+
+			e = 1;
+		}
+		else if (w >= 0x00000080 && w <= 0x000007ff)
+		{
+			/*U-00000080 - U-000007FF:  110xxxxx 10xxxxxx*/
+			utf8[j + 1] = (w & 0x3f) | 0x80;
+			utf8[j + 0] = ((w >> 6) & 0x1f) | 0xc0;
+
+			e = 2;
+		}
+		else if (w >= 0x00000800 && w <= 0x0000ffff)
+		{
+			/*U-00000800 - U-0000FFFF:  1110xxxx 10xxxxxx 10xxxxxx*/
+			utf8[j + 2] = (w & 0x3f) | 0x80;
+			utf8[j + 1] = ((w >> 6) & 0x3f) | 0x80;
+			utf8[j + 0] = ((w >> 12) & 0x0f) | 0xe0;
+
+			e = 3;
+		}
+		else if (w >= 0x00010000 && w <= 0x001fffff)
+		{
+			/*U-00010000 - U-001FFFFF:  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx*/
+			utf8[j + 3] = (w & 0x3f) | 0x80;
+			utf8[j + 2] = ((w >> 6) & 0x3f) | 0x80;
+			utf8[j + 1] = ((w >> 12) & 0x3f) | 0x80;
+			utf8[j + 0] = ((w >> 18) & 0x07) | 0xf0;
+
+			e = 4;
+		}
+		else if (w >= 0x00200000 && w <= 0x03ffffff)
+		{
+			/*U-00200000 - U-03FFFFFF:  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx*/
+			utf8[j + 4] = (w & 0x3f) | 0x80;
+			utf8[j + 3] = ((w >> 6) & 0x3f) | 0x80;
+			utf8[j + 2] = ((w >> 12) & 0x3f) | 0x80;
+			utf8[j + 1] = ((w >> 18) & 0x3f) | 0x80;
+			utf8[j + 0] = ((w >> 24) & 0x03) | 0xf8;
+
+			e = 5;
+		}
+		else if (w >= 0x04000000 && w <= 0x7fffffff)
+		{
+			/*U-04000000 - U-7FFFFFFF:  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx*/
+			utf8[j + 5] = (w & 0x3f) | 0x80;
+			utf8[j + 4] = ((w >> 6) & 0x3f) | 0x80;
+			utf8[j + 3] = ((w >> 12) & 0x3f) | 0x80;
+			utf8[j + 2] = ((w >> 18) & 0x3f) | 0x80;
+			utf8[j + 1] = ((w >> 24) & 0x03) | 0xf8;
+			utf8[j + 0] = ((w >> 30) & 0x01) | 0xfc;
+
+			e = 6;
+		}
+
+		j += e;
+	}
+
+	utf8[j] = 0x00;
+
+	return j;
+}
+
+
+info_one::info_one(int platform, int encoding, int language, int nameid, const char* name, int len)
+{
+	platform_id = platform;
+	encoding_id = encoding;
+	language_id = language;
+	name_id = nameid;
+	length_ = len;
+	std::wstring w;
+	size_t wlen = length_ / 2;
+	char* temp = (char*)name;
+	if (*temp)
+	{
+		name_a.assign(temp, length_);
+	}
+	ndata.assign(temp, length_);
+	auto ss = length_ / 2;
+
+	name_.assign((wchar_t*)name, length_ / 2);
+}
+char* att_ushort(char* p)
+{
+	std::swap(p[0], p[1]);
+	return p + 2;
+}
+
+std::string info_one::get_name()
+{
+	std::string n, gbkstr, u8str, wstr;
+	if (encoding_id)
+	{
+		auto sws = ndata.size() * 0.5;
+		std::string nd(ndata.c_str(), ndata.size());
+		char* temp = (char*)nd.data();
+		for (int i = 0; i < sws; ++i)
+		{
+			temp = att_ushort(temp);
+		}
+		u8str.resize(ndata.size());
+		UTF16::toUTF8((uint16_t*)nd.c_str(), (int)sws, (uint8_t*)u8str.data());
+
+		n = u8str.c_str();
+		switch (platform_id)
+		{
+		case 0:
+			// unicode
+			break;
+		case 1:
+			// Macintosh
+			break;
+		case 2:
+			// (reserved; do not use)
+			break;
+		case 3:
+			// Microsoft
+			if (encoding_id == 3 && language_id == 2052)
+			{
+				n = "";
+				char* tw = (char*)ndata.data();
+				tw++;
+				int len = length_ / 2;
+				for (size_t i = 0; i < len; i++, tw += 2)
+				{
+					auto it = *tw;
+					n.push_back(it);
+				}
+				//n = gbk_u8(n);
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	else {
+		n = name_a.c_str();
+	}
+	return n;
+}
+info_one::~info_one() {}
+
+
+#if 1
+#define FONS_NOTUSED(v)  (void)sizeof(v)
+typedef uint8_t byte;
+typedef int32_t Fixed;
+#define FWord int16_t
+#define uFWord uint16_t
+#define Card8 uint8_t
+#define Card16 uint16_t
+#define Card32 uint32_t
+
+#define head_VERSION VERSION(1, 0)
+
+#define DATE_TIME_SIZE 8
+typedef Card8 longDateTime[DATE_TIME_SIZE];
+
+/* TrueType Collection Header */
+typedef struct
+{
+	Card32 TTCTag;
+	Fixed Version;
+	Card32 DirectoryCount;
+	Card32* TableDirectory; /* [DirectoryCount] */
+	Card32 DSIGTag;
+	Card32 DSIGLength;
+	Card32 DSIGOffset;
+} ttcfTbl;
+typedef struct
+{
+	Fixed	version;//	0x00010000 if (version 1.0)
+	Fixed	fontRevision;//	set by font manufacturer
+	uint32_t	checkSumAdjustment;//	To compute : set it to 0, calculate the checksum for the 'head' table and put it in the table directory, sum the entire font as a uint32_t, then store 0xB1B0AFBA - sum. (The checksum for the 'head' table will be wrong as a result.That is OK; do not reset it.)
+	uint32_t	magicNumber;//	set to 0x5F0F3CF5
+	uint16_t	flags;/*	bit 0 - y value of 0 specifies baseline
+	bit 1 - x position of left most black bit is LSB
+	bit 2 - scaled point size and actual point size will differ(i.e. 24 point glyph differs from 12 point glyph scaled by factor of 2)
+	bit 3 - use integer scaling instead of fractional
+	bit 4 - (used by the Microsoft implementation of the TrueType scaler)
+	bit 5 - This bit should be set in fonts that are intended to e laid out vertically, and in which the glyphs have been drawn such that an x - coordinate of 0 corresponds to the desired vertical baseline.
+	bit 6 - This bit must be set to zero.
+	bit 7 - This bit should be set if the font requires layout for correct linguistic rendering(e.g.Arabic fonts).
+	bit 8 - This bit should be set for an AAT font which has one or more metamorphosis effects designated as happening by default.
+	bit 9 - This bit should be set if the font contains any strong right - to - left glyphs.
+	bit 10 - This bit should be set if the font contains Indic - style rearrangement effects.
+	bits 11 - 13 - Defined by Adobe.
+	bit 14 - This bit should be set if the glyphs in the font are simply generic symbols for code point ranges, such as for a last resort font.
+	*/
+	uint16_t	unitsPerEm;//	range from 64 to 16384
+	longDateTime	created;//	international date
+	longDateTime	modified;//	international date
+	FWord	xMin;//	for all glyph bounding boxes
+	FWord	yMin;//	for all glyph bounding boxes
+	FWord	xMax;//	for all glyph bounding boxes
+	FWord	yMax;//	for all glyph bounding boxes
+	uint16_t	macStyle;/*	bit 0 bold
+	bit 1 italic
+	bit 2 underline
+	bit 3 outline
+	bit 4 shadow
+	bit 5 condensed(narrow)
+	bit 6 extended*/
+	uint16_t	lowestRecPPEM;//	smallest readable size in pixels
+	int16_t	fontDirectionHint;/*	0 Mixed directional glyphs
+	1 Only strongly left to right glyphs
+	2 Like 1 but also contains neutrals
+	- 1 Only strongly right to left glyphs
+	- 2 Like - 1 but also contains neutrals*/
+	int16_t	indexToLocFormat;//	0 for short offsets, 1 for long
+	int16_t	glyphDataFormat;//	0 for current format
+
+}head_table;
+// Entry
+typedef struct sfnt_header_
+{
+	uint32_t tag = 0;
+	uint32_t checksum;
+	uint32_t offset; //From beginning of header.
+	uint32_t logicalLength;
+}sfnt_header;
+typedef struct
+{
+	Fixed version;
+	Card16 numTables;
+	Card16 searchRange;
+	Card16 entrySelector;
+	Card16 rangeShift;
+	sfnt_header* directory; /* [numTables] */
+} sfntTbl;
+typedef struct post_header_
+{
+	int32_t	format;//	Format of this table
+	int32_t	italicAngle;	//Italic angle in degrees
+	int16_t	underlinePosition;	//Underline position
+	int16_t	underlineThickness;	//Underline thickness
+	uint32_t	isFixedPitch;	//Font is monospaced; set to 1 if the font is monospaced and 0 otherwise(N.B., to maintain compatibility with older versions of the TrueType spec, accept any non - zero value as meaning that the font is monospaced)
+	uint32_t	minMemType42;	//Minimum memory usage when a TrueType font is downloaded as a Type 42 font
+	uint32_t	maxMemType42;	//Maximum memory usage when a TrueType font is downloaded as a Type 42 font
+	uint32_t	minMemType1;	//Minimum memory usage when a TrueType font is downloaded as a Type 1 font
+	uint32_t	maxMemType1;
+}post_header;
+typedef struct
+{
+	Fixed version;
+	FWord ascender;
+	FWord descender;
+	FWord lineGap;
+	uFWord advanceWidthMax;
+	FWord minLeftSideBearing;
+	FWord minRightSideBearing;
+	FWord xMaxExtent;
+	int16_t caretSlopeRise;
+	int16_t caretSlopeRun;
+	int16_t caretOffset;
+	int16_t reserved[4];
+	int16_t metricDataFormat;
+	uint16_t numberOfLongHorMetrics;
+} hheaTbl;
+
+
+typedef struct {
+	uint16_t format;
+	uint16_t length;
+	uint16_t language;
+	unsigned char glyphId[256];
+} Format0;
+#define FORMAT0_SIZE (uint16 * 3 + uint8 * 256)
+/*
+Format 2: High - byte mapping through table
+*/
+typedef struct {
+	unsigned short firstCode;
+	unsigned short entryCount;
+	short idDelta;
+	unsigned short idRangeOffset;
+} Segment2;
+#define SEGMENT2_SIZE (uint16 * 3 + int16 * 1)
+
+typedef struct {
+	unsigned short format;
+	unsigned short length;
+	unsigned short language;
+	unsigned short segmentKeys[256];
+	Segment2* segment;
+	unsigned short* glyphId;
+} Format2;
+// ------------------------------------------------------------------------------------------------
+struct Bitmap_p
+{
+	uint32_t    rows;
+	uint32_t    width;
+	int             pitch;
+	float			advance;
+	float			bearingX;
+	float			bearingY;
+	int             bit_depth;
+	unsigned char* buffer;
+	uint32_t	capacity = 0;
+	unsigned short  num_grays;
+	unsigned char   pixel_mode;
+	unsigned char   lcd_mode;
+	void* data = 0;
+	unsigned char   palette_mode;
+	void* palette;
+	int x, y;
+};
+
+union ft_key_s
+{
+	uint64_t u = 0;
+	struct
+	{
+		char32_t unicode_codepoint;
+		unsigned short font_dpi;
+		// 字号支持 1-255
+		unsigned char font_size;
+		// 模糊大小支持 0-255
+		unsigned char blur_size;
+		//unsigned char is_bitmap;
+	}v;
+};
+union ft_char_s
+{
+	uint64_t u = 0;
+	struct
+	{
+		char32_t unicode_codepoint;
+		unsigned short font_dpi;
+		// 字号支持 1-255
+		unsigned char font_size;
+	}v;
+};
+
+typedef enum  _Pixel_Mode_
+{
+	PX_NONE = 0,
+	PX_MONO,
+	PX_GRAY,
+	PX_GRAY2,
+	PX_GRAY4,
+	PX_LCD,
+	PX_LCD_V,
+	PX_BGRA,
+
+	PX_MAX      /* do not remove */
+
+} Pixel_Mode;
+
+typedef enum STT_
+{
+	TYPE_NONE = 0,
+	TYPE_EBLC, /* `EBLC' (Microsoft), */
+	/* `bloc' (Apple)      */
+	TYPE_CBLC, /* `CBLC' (Google)     */
+	TYPE_SBIX, /* `sbix' (Apple)      */
+	/* do not remove */
+	TYPE_MAX
+} sbit_table_type;
+
+#define DL_long(v) v=ttLONG(data);data+=4
+#define DL_short(v) v=ttSHORT(data);data+=2
+#define DL_ulong(v) v=ttULONG(data);data+=4
+#define DL_ushort(v) v=ttUSHORT(data);data+=2
+
+#define FONS_INVALID -1
+
+enum FONSflags {
+	FONS_ZERO_TOPLEFT = 1,
+	FONS_ZERO_BOTTOMLEFT = 2,
+};
+
+enum FONSalign {
+	// Horizontal align
+	FONS_ALIGN_LEFT = 1 << 0,	// Default
+	FONS_ALIGN_CENTER = 1 << 1,
+	FONS_ALIGN_RIGHT = 1 << 2,
+	// Vertical align
+	FONS_ALIGN_TOP = 1 << 3,
+	FONS_ALIGN_MIDDLE = 1 << 4,
+	FONS_ALIGN_BOTTOM = 1 << 5,
+	FONS_ALIGN_BASELINE = 1 << 6, // Default
+};
+
+enum FONSglyphBitmap {
+	FONS_GLYPH_BITMAP_OPTIONAL = 1,
+	FONS_GLYPH_BITMAP_REQUIRED = 2,
+};
+
+enum FONSerrorCode {
+	// Font atlas is full.
+	FONS_ATLAS_FULL = 1,
+	// Scratch memory used to render glyphs is full, requested size reported in 'val', you may need to bump up FONS_SCRATCH_BUF_SIZE.
+	FONS_SCRATCH_FULL = 2,
+	// Calls to fonsPushState has created too large stack, if you need deep state stack bump up FONS_MAX_STATES.
+	FONS_STATES_OVERFLOW = 3,
+	// Trying to pop too many states fonsPopState().
+	FONS_STATES_UNDERFLOW = 4,
+};
+
+#endif
+
+struct meta_tag
+{
+	std::string tag;
+	std::string v;
+};
+
+namespace md {
+
+	// Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+	// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+#ifndef FONS_UTF8_ACCEPT
+#define FONS_UTF8_ACCEPT 0
+#define FONS_UTF8_REJECT 12
+#endif // FONS_UTF8_ACCEPT
+
+	uint32_t fons_decutf8(uint32_t* state, uint32_t* codep, uint32_t byte)
+	{
+		static const unsigned char utf8d[] = {
+			// The first part of the table maps bytes to character classes that
+			// to reduce the size of the transition table and create bitmasks.
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+			7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+			8, 8, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			10, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 3, 3, 11, 6, 6, 6, 5, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+
+			// The second part is a transition table that maps a combination
+			// of a state of the automaton and a character class to a state.
+			0, 12, 24, 36, 60, 96, 84, 12, 12, 12, 48, 72, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+			12, 0, 12, 12, 12, 12, 12, 0, 12, 0, 12, 12, 12, 24, 12, 12, 12, 12, 12, 24, 12, 24, 12, 12,
+			12, 12, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12, 12, 12, 12, 24, 12, 12,
+			12, 12, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12, 12, 36, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12,
+			12, 36, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+		};
+
+		uint32_t type = utf8d[byte];
+
+		*codep = (*state != FONS_UTF8_ACCEPT) ?
+			(byte & 0x3fu) | (*codep << 6) :
+			(0xff >> type) & (byte);
+
+		*state = utf8d[256 + *state + type];
+		return *state;
+	}
+
+	uint32_t get_u8_idx(const char* str, int64_t idx)
+	{
+		uint32_t utf8state = 0;
+		uint32_t codepoint = 0;
+		str = utf8_char_pos(str, idx);
+		for (; str && *str; str++) {
+			if (fons_decutf8(&utf8state, &codepoint, *((const unsigned char*)str)))
+				continue;
+			break;
+		}
+		return codepoint;
+	}
+
+	const char* get_u8_last(const char* str, uint32_t* codepoint)
+	{
+		uint32_t utf8state = 0;
+		for (; str && *str; ) {
+			if (fons_decutf8(&utf8state, codepoint, *((const unsigned char*)str++)))
+				continue;
+			break;
+		}
+		return str;
+	}
+	// 将Unicode字符转换为UTF-8字节序列
+	void unicode_to_utf8(char* utf8, uint32_t unicode) {
+		if (unicode < 0x80) {
+			utf8[0] = unicode;
+			utf8[1] = 0;
+		}
+		else if (unicode < 0x800) {
+			utf8[0] = 0xC0 | (unicode >> 6);
+			utf8[1] = 0x80 | (unicode & 0x3F);
+			utf8[2] = 0;
+		}
+		else if (unicode < 0x10000) {
+			utf8[0] = 0xE0 | (unicode >> 12);
+			utf8[1] = 0x80 | ((unicode >> 6) & 0x3F);
+			utf8[2] = 0x80 | (unicode & 0x3F);
+			utf8[3] = 0;
+		}
+		else {
+			utf8[0] = 0xF0 | (unicode >> 18);
+			utf8[1] = 0x80 | ((unicode >> 12) & 0x3F);
+			utf8[2] = 0x80 | ((unicode >> 6) & 0x3F);
+			utf8[3] = 0x80 | (unicode & 0x3F);
+			utf8[4] = 0;
+		}
+	}
+	std::wstring u8to_w(const char* str, size_t len)
+	{
+		std::wstring wt;
+		uint32_t codepoint = 0;
+		auto t = str;
+		for (; t && *t && len > 0; len--)
+		{
+			t = md::get_u8_last(t, &codepoint);
+			if (codepoint)
+			{
+				wt.push_back(codepoint);
+			}
+			else { break; }
+		}
+		return wt;
+	}
+	std::string u16to_u8(uint16_t* str, size_t len)
+	{
+		char utf8_str[8] = {};
+		std::string r;
+		auto t = str;
+		for (size_t i = 0; t && *t && i < len; ++i, t++) {
+			unicode_to_utf8(utf8_str, *t);
+			if (utf8_str[0])
+			{
+				r += utf8_str; utf8_str[0] = 0;
+			}
+			else { break; }
+		}
+		return r;
+	}
+}
+struct font_impl :public stbtt_fontinfo
+{
+
+	int colr = -1, cpal = -1; // table locations as offset from start of .ttf
+
+	std::map<std::string, sfnt_header> _tb;
+	// EBLC	Embedded bitmap location data	嵌入式位图位置数据
+	int eblc = 0;
+	uint32_t sbit_table_size = 0;
+	int      sbit_table_type = 0;
+	uint32_t sbit_num_strikes = 0;
+	// EBDT	Embedded bitmap data	嵌入式位图数据 either `CBDT', `EBDT', or `bdat'
+	uint32_t ebdt_start = 0;
+	uint32_t ebdt_size = 0;
+	// EBSC	Embedded bitmap scaling data	嵌入式位图缩放数据
+	uint32_t ebsc = 0;
+	int format = 0;
+};
+struct hps_t {
+	head_table head;
+	hheaTbl hhea;
+	post_header post;
+};
+class stb_font
+{
+public:
+	stb_font()
+	{
+	}
+
+	~stb_font()
+	{
+	}
+	static font_impl* new_fontinfo()
+	{
+		return new font_impl();
+	}
+	static void free_fontinfo(font_impl* p)
+	{
+		font_impl* pf = (font_impl*)p;
+		delete pf;
+	}
+public:
+
+	static int init(void*)
+	{
+		return 1;
+	}
+
+	static int done(void*)
+	{
+		return 1;
+	}
+
+	static int loadFont(font_impl* font, const void* data, int idx, void* ud)
+	{
+		int stbError;
+		FONS_NOTUSED(idx);
+
+		font->userdata = ud;
+		int fso = get_offset(data, idx);
+		stbError = stbtt_InitFont(font, (unsigned char*)data, fso);
+		stbError = init_table(font, (unsigned char*)data, fso);
+		// 字体格式
+		font->format = ttUSHORT(font->data + font->index_map + 0);
+		return stbError;
+	}
+	static int get_numbers(const void* data)
+	{
+		return stbtt_GetNumberOfFonts((unsigned char*)data);
+	}
+	static int get_offset(const void* data, int idx)
+	{
+		return stbtt_GetFontOffsetForIndex((unsigned char*)data, idx);
+	}
+	static void getFontVMetrics(font_impl* font, int* ascent, int* descent, int* lineGap)
+	{
+		stbtt_GetFontVMetrics(font, ascent, descent, lineGap);
+	}
+	static void getFontHMetrics(font_impl* font, int glyph, int* advance, int* lsb)
+	{
+		stbtt_GetGlyphHMetrics(font, glyph, advance, lsb);
+		return;
+	}
+
+	static float getPixelHeightScale(font_impl* font, float size)
+	{
+		return size < 0 ? stbtt_ScaleForPixelHeight(font, -size) : stbtt_ScaleForMappingEmToPixels(font, size);
+	}
+
+	// 获取utf8字符
+	static const char* get_glyph_index_last(font_impl* font, const char* str, int* index)
+	{
+		uint32_t codepoint = 0;
+		uint32_t utf8state = 0;
+		*index = -1;
+		for (; str && *str && *index == -1; ++str) {
+			if (md::fons_decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
+				continue;
+			*index = stbtt_FindGlyphIndex(font, codepoint);
+		}
+		return str;
+	}
+
+	static uint32_t get_u8_to_u16(const char* str)
+	{
+		uint32_t codepoint = 0;
+		uint32_t utf8state = 0;
+		for (; str && *str; ++str) {
+			if (md::fons_decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
+				continue;
+			break;
+		}
+		return codepoint;
+	}
+	static const char* get_glyph_index(font_impl* font, const char* str, int* idx)
+	{
+		uint32_t codepoint = 0;
+		uint32_t utf8state = 0;
+		int index = -1;
+		for (; str && *str && index == -1; ++str) {
+			if (md::fons_decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
+				continue;
+			index = stbtt_FindGlyphIndex(font, codepoint);
+		}
+		*idx = index;
+		return str;
+	}
+
+
+#define BYTE_( p, i )  ( ((const unsigned char*)(p))[(i)] )
+#define BYTE_U16( p, i, s1 )  ( (uint16_t)( BYTE_( p, i ) ) << (s1) )
+#define BYTE_U32( p, i, s1 )  ( (uint32_t)( BYTE_( p, i ) ) << (s1) )
+#define PEEK_USHORT( p )  uint16_t( BYTE_U16( p, 0, 8 ) | BYTE_U16( p, 1, 0 ) )
+#define PEEK_LONG( p )  int32_t( BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) | BYTE_U32( p, 3,  0 ) )
+#define PEEK_ULONG( p )  uint32_t(BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) | BYTE_U32( p, 3,  0 ) )
+
+#define NEXT_CHAR( buffer ) ( (signed char)*buffer++ )
+
+#define NEXT_BYTE( buffer ) ( (unsigned char)*buffer++ )
+#define NEXT_SHORT( b ) ( (short)( b += 2, PEEK_USHORT( b - 2 ) ) )
+#define NEXT_USHORT( b ) ( (unsigned short)( b += 2, PEEK_USHORT( b - 2 ) ) )
+#define NEXT_LONG( buffer ) ( (long)( buffer += 4, PEEK_LONG( buffer - 4 ) ) )
+#define NEXT_ULONG( buffer ) ( (unsigned long)( buffer += 4, PEEK_ULONG( buffer - 4 ) ) )
+
+
+
+	static unsigned char* tt_cmap2_get_subheader(unsigned char* table, uint32_t char_code)
+	{
+		unsigned char* result = NULL;
+		if (char_code < 0x10000UL)
+		{
+			uint32_t   char_lo = (uint32_t)(char_code & 0xFF);
+			uint32_t   char_hi = (uint32_t)(char_code >> 8);
+			unsigned char* p = table + 6;    /* keys table */
+			unsigned char* subs = table + 518;  /* subheaders table */
+			unsigned char* sub;
+			if (char_hi == 0)
+			{
+				/* an 8-bit character code -- we use subHeader 0 in this case */
+				/* to test whether the character code is in the charmap       */
+				/*                                                            */
+				sub = subs;
+				p += char_lo * 2;
+				if (PEEK_USHORT(p) != 0)sub = 0;
+			}
+			else
+			{
+				p += char_hi * 2;
+				sub = subs + (uint64_t)PEEK_USHORT(p);
+			}
+			result = sub;
+		}
+		return result;
+	}
+
+	static int tt_cmap2_char_index(unsigned char* table, uint32_t char_code)
+	{
+		uint32_t   result = 0;
+		unsigned char* subheader;
+		subheader = tt_cmap2_get_subheader(table, char_code);
+		if (subheader)
+		{
+			unsigned char* p = subheader;
+			uint32_t   idx = ((uint32_t)(char_code) & 0xFF);
+			uint32_t   start, count;
+			int    delta;
+			uint32_t   offset;
+			start = NEXT_USHORT(p);
+			count = NEXT_USHORT(p);
+			delta = NEXT_SHORT(p);
+			offset = PEEK_USHORT(p);
+			idx -= start;
+			if (idx < count && offset != 0)
+			{
+				p += offset + 2 * idx;
+				idx = PEEK_USHORT(p);
+				if (idx != 0)
+					result = (uint32_t)((int)idx + delta) & 0xFFFFU;
+			}
+		}
+		return result;
+	}
+	static int get_ext_glyph_index(const stbtt_fontinfo* info, uint32_t codepoint)
+	{
+		int ret = 0;
+		// todo
+		return ret;
+	}
+	// GBK字符串
+	static int get_glyph_index2(font_impl* font, const char* t)
+	{
+		const stbtt_fontinfo* info = font;
+		int ret = 0;
+		uint8_t* data = info->data;
+		uint32_t index_map = info->index_map;
+		uint16_t format = ttUSHORT(data + index_map + 0);
+		uint32_t codepoint = 0;
+		if (format == 2) {
+			// @TODO: high-byte mapping for japanese/chinese/korean
+			codepoint = (uint32_t)t[0] & 0xff;
+			if (codepoint > 127)
+			{
+				codepoint <<= 8;
+				codepoint |= (uint32_t)t[1] & 0xff;
+			}
+			ret = tt_cmap2_char_index(data + index_map, codepoint);
+		}
+		return ret;
+	}
+
+	static int getGlyphIndex(font_impl* font, int codepoint)
+	{
+		return font->format == 2 ? get_ext_glyph_index(font, codepoint) : stbtt_FindGlyphIndex(font, codepoint);
+	}
+
+	static int buildGlyphBitmap(font_impl* font, int glyph, float scale,
+		int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1)
+	{
+		stbtt_GetGlyphHMetrics(font, glyph, advance, lsb);
+		stbtt_GetGlyphBitmapBox(font, glyph, scale, scale, x0, y0, x1, y1);
+		return 1;
+	}
+
+	static void renderGlyphBitmap(font_impl* font, unsigned char* output, int outWidth, int outHeight, int outStride,
+		float scaleX, float scaleY, int glyph)
+	{
+		stbtt_MakeGlyphBitmap(font, output, outWidth, outHeight, outStride, scaleX, scaleY, glyph);
+	}
+
+	static int getGlyphKernAdvance(font_impl* font, int glyph1, int glyph2)
+	{
+		return stbtt_GetGlyphKernAdvance(font, glyph1, glyph2);
+	}
+	// 
+	static int getKernAdvanceCH(font_impl* font, int ch1, int ch2)
+	{
+		return stbtt_GetCodepointKernAdvance(font, ch1, ch2);
+	}
+	static void get_head(font_impl* font, head_table* p)
+	{
+		if (font && p)
+		{
+			auto info = font;
+			auto data = info->data + info->head;
+			DL_long(p->version);
+			DL_long(p->fontRevision);
+			DL_long(p->checkSumAdjustment);
+			DL_long(p->magicNumber);
+			DL_ushort(p->flags);
+			DL_ushort(p->unitsPerEm);
+			int sldt = sizeof(longDateTime);
+			memcpy(p->created, data, sldt); data += sldt;
+			memcpy(p->modified, data, sldt); data += sldt;
+			auto pxy = info->data + info->head + 36;
+			DL_ushort(p->xMin);
+			DL_ushort(p->yMin);
+			DL_ushort(p->xMax);
+			DL_ushort(p->yMax);
+			DL_ushort(p->macStyle);
+			DL_ushort(p->lowestRecPPEM);
+			DL_short(p->fontDirectionHint);
+			DL_short(p->indexToLocFormat);
+			DL_short(p->glyphDataFormat);
+		}
+	}
+	static void get_hhea(font_impl* font, hheaTbl* hhea)
+	{
+		if (font && hhea)
+		{
+			auto info = font;
+			auto data = info->data + info->hhea;
+
+			DL_long(hhea->version);
+			DL_short(hhea->ascender);
+			DL_short(hhea->descender);
+			DL_short(hhea->lineGap);
+			DL_ushort(hhea->advanceWidthMax);
+			DL_short(hhea->minLeftSideBearing);
+			DL_short(hhea->minRightSideBearing);
+			DL_short(hhea->xMaxExtent);
+			DL_short(hhea->caretSlopeRise);
+			DL_short(hhea->caretSlopeRun);
+			DL_short(hhea->caretOffset);
+			DL_short(hhea->reserved[0]);
+			DL_short(hhea->reserved[1]);
+			DL_short(hhea->reserved[2]);
+			DL_short(hhea->reserved[3]);
+			DL_short(hhea->metricDataFormat);
+			DL_ushort(hhea->numberOfLongHorMetrics);
+		}
+	}
+	static glm::ivec4 get_bounding_box(font_impl* font)
+	{
+		int x0 = 0, y0 = 0, x1, y1; // =0 suppresses compiler warning
+		stbtt_GetFontBoundingBox(font, &x0, &y0, &x1, &y1);
+		return glm::ivec4(x0, y0, x1, y1);
+	}
+	static glm::ivec2 get_codepoint_hmetrics(font_impl* font, int ch)
+	{
+		int advance = 0, lsb = 0;
+		stbtt_GetCodepointHMetrics(font, ch, &advance, &lsb);
+		return glm::ivec2(advance, lsb);
+	}
+	static void stbtt_MakeGlyphBitmapSubpixel0(const stbtt_fontinfo* info, unsigned char* output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, float shift_x, float shift_y, int glyph, int xf)
+	{
+		int ix0, iy0, x1, y1;
+		stbtt_vertex* vertices;
+		int num_verts = stbtt_GetGlyphShape(info, glyph, &vertices);
+		stbtt__bitmap gbm;
+
+		stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y, shift_x, shift_y, &ix0, &iy0, &x1, &y1);
+		gbm.pixels = output;
+		gbm.w = out_w;
+		gbm.h = out_h;
+		gbm.stride = out_stride;
+		ix0 += xf;	// 修正某些抗锯齿裁剪
+		if (gbm.w && gbm.h)
+			stbtt_Rasterize(&gbm, 0.35f, vertices, num_verts, scale_x, scale_y, 0, 0, ix0, iy0, 1, info->userdata);
+
+		free(vertices);
+	}
+
+	static char* get_glyph_bitmap(font_impl* font, int gidx, double scale, glm::ivec4* ot, std::vector<char>* out, glm::vec3* adlsb, glm::vec2 lcd = { 1, 1 }, int xf = 0)
+	{
+		int ascent, descent, linegap;
+		int x0 = 0, y0 = 0, x1, y1;
+		stbtt_GetFontVMetrics(font, &ascent, &descent, &linegap);
+		int advancei, lsb;
+		stbtt_GetGlyphHMetrics(font, gidx, &advancei, &lsb);
+		double adv = advancei * scale;
+		double bearing = advancei * scale;
+		float shift_x = .0, shift_y = 0.0f;
+		stbtt_GetGlyphBitmapBoxSubpixel(font, gidx, scale * lcd.x, scale * lcd.y, shift_x, shift_y, &x0, &y0, &x1, &y1);
+		glm::ivec4 ot0 = {};
+		if (!ot)ot = &ot0;
+		adlsb->z = adv;
+		adlsb->x = bearing;
+		ot->x = x0;
+		ot->y = y0;
+		if (!out)
+		{
+			ot->z = x1 - x0;
+			ot->w = y1 - y0;
+		}
+		size_t pcs = (int64_t)ot->z * ot->w;
+		char* pxs = 0;
+		if (out)
+		{
+			if (out->size() < pcs)
+			{
+				out->resize(pcs);
+			}
+			pxs = out->data();
+			memset(pxs, 0, out->size());
+			if (xf == 0)
+				stbtt_MakeGlyphBitmapSubpixel(font, (unsigned char*)pxs, ot->z, ot->w, ot->z, scale * lcd.x, scale * lcd.y, shift_x, shift_y, gidx);
+			else
+				stbtt_MakeGlyphBitmapSubpixel0(font, (unsigned char*)pxs, ot->z, ot->w, ot->z, scale * lcd.x, scale * lcd.y, shift_x, shift_y, gidx, xf);
+		}
+
+		return pxs;
+	}
+public:
+	static std::string get_font_name(font_impl* font, std::map<int, std::vector<info_one>>* m)
+	{
+		int len = 0;
+		auto str = getFontNameString(font, m);
+		return str ? str : "";
+	}
+#if 1
+
+	static uint16_t ttUSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
+	static uint16_t ttSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
+	static uint32_t ttULONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
+	static int ttLONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
+#ifndef stbtt_tag4
+#define stbtt_tag4(p,c0,c1,c2,c3) ((p)[0] == (c0) && (p)[1] == (c1) && (p)[2] == (c2) && (p)[3] == (c3))
+#define stbtt_tag(p,str)           stbtt_tag4(p,str[0],str[1],str[2],str[3])
+#endif // !stbtt_tag4
+
+	// @OPTIMIZE: binary search
+	static uint32_t find_table(uint8_t* data, uint32_t fontstart, const char* tag)
+	{
+		int num_tables = ttUSHORT(data + fontstart + 4);
+		uint32_t tabledir = fontstart + 12;
+		int i;
+		char* t = 0;
+		for (i = 0; i < num_tables; ++i) {
+			uint32_t loc = tabledir + 16 * i;
+			t = (char*)data + loc + 0;
+			if (stbtt_tag(data + loc + 0, tag))
+				return ttULONG(data + loc + 8);
+		}
+		return 0;
+	}
+#endif // !1
+	static void enum_table(uint8_t* data, uint32_t fontstart, std::map<std::string, sfnt_header>& out)
+	{
+		char buf[128];
+		memcpy(buf, data + fontstart, 128);
+		int num_tables = ttUSHORT(data + fontstart + 4);
+		memcpy(buf, data + fontstart + 4, 4);
+		uint32_t tabledir = fontstart + 12;
+		int i;
+		char* t = 0;
+		std::string n;
+		sfnt_header sh;
+		if (num_tables > 0)
+		{
+			for (i = 0; i < num_tables; ++i) {
+				uint32_t loc = tabledir + 16 * i;
+				t = (char*)data + loc + 0;
+				memcpy(buf, t, 128);
+				n.assign(t, 4);
+				sh.tag = ttULONG(data + loc + 0);
+				sh.checksum = ttULONG(data + loc + 4);
+				sh.offset = ttULONG(data + loc + 8);
+				sh.logicalLength = ttULONG(data + loc + 12);
+				out[n] = sh; //{sh.tag, sh.checksum, sh.offset, sh.logicalLength};
+			}
+		}
+	}
+
+	// 获取字体信息
+	static const char* getFontNameString(const stbtt_fontinfo* font, std::map<int, std::vector<info_one>>* m)
+	{
+		int i, count, stringOffset;
+		uint8_t* fc = font->data;
+		uint32_t offset = font->fontstart;
+		uint32_t nm = find_table(fc, offset, "name");
+		if (!nm || !m) return 0;
+		std::map<int, std::vector<info_one>>& m1 = *m;
+		count = ttUSHORT(fc + nm + 2);
+		stringOffset = nm + ttUSHORT(fc + nm + 4);
+		for (i = 0; i < count; ++i) {
+			uint32_t loc = nm + 6 + 12 * i;
+			int platform = ttUSHORT(fc + loc + 0);
+			int encoding = ttUSHORT(fc + loc + 2);
+			int language = ttUSHORT(fc + loc + 4);
+			int nameid = ttUSHORT(fc + loc + 6);
+			int length = ttUSHORT(fc + loc + 8);
+			const char* name = (const char*)(fc + stringOffset + ttUSHORT(fc + loc + 10));
+			m1[language].push_back(info_one(platform, encoding, language, nameid, name, length));
+		}
+		return NULL;
+	}
+
+
+	struct metainfo_t
+	{
+		uint32_t	version;//	The version of the table format, currently 1
+		uint32_t	flags;//	Flags, currently unusedand set to 0
+		uint32_t	dataOffset;//	Offset from the beginning of the table to the data
+		uint32_t	numDataMaps;//	The number of data maps in the table
+	};
+	struct DataMaps_t
+	{
+		char tag[4];
+		uint32_t	dataOffset;//	Offset from the beginning of the table to the data for this tag
+		uint32_t	dataLength;//	Length of the data.The data is not required to be padded to any byte boundary.
+	};
+	struct metainfo_tw
+	{
+		uint32_t	version;//	Version number of the metadata table — set to 1.
+		uint32_t	flags;//	Flags — currently unused; set to 0.
+		uint32_t	reserved;//	Not used; should be set to 0.
+		uint32_t	dataMapsCount;//	The number of data maps in the table.
+		DataMaps_t dataMaps[1];//[dataMapsCount]	Array of data map records.
+	};
+	struct meta_tag_t
+	{
+		char tag[5];
+		std::string v;
+	};
+	// 获取字体meta信息
+	static int get_meta_string(const stbtt_fontinfo* font, std::vector<meta_tag>& mtv)
+	{
+		int i, count, stringOffset;
+		uint8_t* fc = font->data;
+		uint32_t offset = font->fontstart;
+		uint32_t nm = find_table(fc, offset, "meta");
+		if (!nm) return 0;
+		//font_t* ttp = (font_t*)font->userdata;
+		uint8_t* tp = fc + nm;
+		metainfo_tw meta = {};
+		uint32_t* ti = (uint32_t*)&meta;
+
+		for (int i = 0; i < 4; i++)
+			ti[i] = ttULONG(tp + i * 4);
+		if (meta.dataMapsCount > 0)
+		{
+			auto dm = (tp + 16);
+			auto dm1 = (tp);
+			mtv.resize(meta.dataMapsCount);
+			for (size_t i = 0; i < meta.dataMapsCount; i++)
+			{
+				auto& it = mtv[i];
+				it.tag.assign((char*)dm, 4);
+				auto offset = ttULONG(dm + 4);
+				auto length = ttULONG(dm + 8);
+				if (length > 0)
+					it.v.assign((char*)dm1 + offset, length);
+				dm += 12;
+			}
+		}
+		return 0;
+	}
+	class eblc_h
+	{
+	public:
+		uint16_t majorVersion = 0, minorVersion = 0;
+		uint32_t numSizes = 0;
+	public:
+		eblc_h()
+		{
+		}
+
+		~eblc_h()
+		{
+		}
+
+	private:
+
+	};
+	//// 获取ebdt信息
+	//static const char* get_ebdt(font_impl* font_i)
+	//{
+	//	const stbtt_fontinfo* font = &font_i->font;
+	//	int i, count, stringOffset;
+	//	uint8_t* fc = font->data;
+	//	uint32_t offset = font->fontstart;
+	//	uint32_t nm = get_tag(font_i, "EBDT");
+	//	uint32_t eblc = get_tag(font_i, "EBLC");
+	//	uint32_t ebsc = get_tag(font_i, "EBSC");
+	//	if (!nm) return 0;
+	//	font_t* ttp = (font_t*)font->userdata;
+	//	int majorVersion = ttUSHORT(fc + nm + 0);
+	//	int minorVersion = ttUSHORT(fc + nm + 2);
+	//	//eblc
+	//	uint32_t numSizes = ttULONG(fc + eblc + 4);
+	//	char* b = (char*)fc + eblc;
+	//	eblc_h* eblcp = (eblc_h*)b;
+
+	//	return NULL;
+	//}
+public:
+	// 获取字体轮廓
+	static stbtt_vertex* get_char_shape(font_impl* font, const char* str, int& verCount)
+	{
+		stbtt_vertex* stbVertex = NULL;
+		verCount = 0;
+		int idx = 0;
+		get_glyph_index(font, str, &idx);
+		if (!(idx < 0))
+			verCount = stbtt_GetGlyphShape(font, idx, &stbVertex);
+		return stbVertex;
+	}
+	static stbtt_vertex* get_char_shape(font_impl* font, int cp, int& verCount)
+	{
+		stbtt_vertex* stbVertex = NULL;
+		verCount = 0;
+		int idx = getGlyphIndex(font, cp);
+		if (!(idx < 0))
+			verCount = stbtt_GetGlyphShape(font, idx, &stbVertex);
+		return stbVertex;
+	}
+	static void free_shape(stbtt_fontinfo* font, stbtt_vertex* v)
+	{
+		stbtt_FreeShape(font, v);
+	}
+	static void free_shape(font_impl* font, stbtt_vertex* v)
+	{
+		stbtt_FreeShape(font, v);
+	}
+	static int init_table(font_impl* font, unsigned char* data, int fontstart)
+	{
+		enum_table(data, fontstart, font->_tb);
+
+		return 1;
+	}
+private:
+};//！stb_font
+
+
+void test_stbfont()
+{
+	auto str = L"stb";
+	/* 加载字体（.ttf）文件 */
+	long int size = 0;
+	unsigned char* fontBuffer = NULL;
+
+	FILE* fontFile = fopen("C:\\Windows\\Fonts\\Arial.ttf", "rb");
+	if (fontFile == NULL)
+	{
+		printf("Can not open font file!\n");
+		return;
+	}
+	fseek(fontFile, 0, SEEK_END); /* 设置文件指针到文件尾，基于文件尾偏移0字节 */
+	size = ftell(fontFile);       /* 获取文件大小（文件尾 - 文件头  单位：字节） */
+	fseek(fontFile, 0, SEEK_SET); /* 重新设置文件指针到文件头 */
+
+	fontBuffer = (unsigned char*)calloc(size, sizeof(unsigned char));
+	fread(fontBuffer, size, 1, fontFile);
+	fclose(fontFile);
+
+	/* 初始化字体 */
+	stbtt_fontinfo info;
+	if (!stbtt_InitFont(&info, fontBuffer, 0))
+	{
+		printf("stb init font failed\n");
+	}
+
+	/* 创建位图 */
+	int bitmap_w = 512; /* 位图的宽 */
+	int bitmap_h = 128; /* 位图的高 */
+	unsigned char* bitmap = (unsigned char*)calloc(bitmap_w * bitmap_h, sizeof(unsigned char));
+
+	/* 计算字体缩放 */
+	float pixels = 64.0;                                    /* 字体大小（字号） */
+	float scale = stbtt_ScaleForPixelHeight(&info, pixels); /* scale = pixels / (ascent - descent) */
+
+	/**
+	 * 获取垂直方向上的度量
+	 * ascent：字体从基线到顶部的高度；
+	 * descent：基线到底部的高度，通常为负值；
+	 * lineGap：两个字体之间的间距；
+	 * 行间距为：ascent - descent + lineGap。
+	*/
+	int ascent = 0;
+	int descent = 0;
+	int lineGap = 0;
+	stbtt_GetFontVMetrics(&info, &ascent, &descent, &lineGap);
+
+	/* 根据缩放调整字高 */
+	ascent = roundf(ascent * scale);
+	descent = roundf(descent * scale);
+
+	int x = 0; /*位图的x*/
+	auto nw = wcslen(str);
+	/* 循环加载str中每个字符 */
+	for (int i = 0; i < nw; ++i)
+	{
+		/**
+		  * 获取水平方向上的度量
+		  * advanceWidth：字宽；
+		  * leftSideBearing：左侧位置；
+		*/
+		int advanceWidth = 0;
+		int leftSideBearing = 0;
+		stbtt_GetCodepointHMetrics(&info, str[i], &advanceWidth, &leftSideBearing);
+
+		/* 获取字符的边框（边界） */
+		int c_x1, c_y1, c_x2, c_y2;
+		stbtt_GetCodepointBitmapBox(&info, str[i], scale, scale, &c_x1, &c_y1, &c_x2, &c_y2);
+
+		/* 计算位图的y (不同字符的高度不同） */
+		int y = ascent + c_y1;
+
+		/* 渲染字符 */
+		int byteOffset = x + roundf(leftSideBearing * scale) + (y * bitmap_w);
+		stbtt_MakeCodepointBitmap(&info, bitmap + byteOffset, c_x2 - c_x1, c_y2 - c_y1, bitmap_w, scale, scale, str[i]);
+
+		/* 调整x */
+		x += roundf(advanceWidth * scale);
+
+		/* 调整字距 */
+		int kern;
+		kern = stbtt_GetCodepointKernAdvance(&info, str[i], str[i + 1]);
+		x += roundf(kern * scale);
+	}
+
+	/* 将位图数据保存到1通道的png图像中 */
+	stbi_write_png("STB.png", bitmap_w, bitmap_h, 1, bitmap, bitmap_w);
+
+	free(fontBuffer);
+	free(bitmap);
+}
+
+//k=language_id			2052 简体中文	1033 英语
+
+std::string get_info_str(int language, int idx, std::map<int, std::vector<info_one>>& _detail)
+{
+	std::string ret;
+	int ls[] = { language, 1033 };
+
+	for (int i = 0; i < 2 && ret.empty(); i++)
+	{
+		auto it = _detail.find(ls[i]);
+		if (it != _detail.end())
+		{
+			auto& p = it->second;
+			for (size_t j = 0; j < p.size(); j++)
+			{
+				if (p[j].name_id == idx)
+				{
+					ret = (p[j].get_name());
+				}
+			}
+		}
+	}
+	return ret;
+}
+
+font_t::font_t()
+{
+	font = new font_impl();
+	hp = new hps_t();
+	assert(font);
+}
+void free_colorinfo(gcolors_t* colorinfo);
+
+font_t::~font_t()
+{
+	std::map<int, std::vector<info_one*>> detail;
+	for (auto& [k, v] : detail)
+	{
+		for (auto it : v)
+		{
+			if (it)
+			{
+				delete it;
+			}
+		}
+	}
+	detail.clear();
+	if (bitinfo)delete bitinfo; bitinfo = 0;
+	if (colorinfo) {
+		free_colorinfo(colorinfo);
+		delete colorinfo; colorinfo = 0;
+	}
+	if (font)delete font; font = 0;
+	if (hp)delete hp; hp = 0;
+}
+float font_t::get_scale(int px)
+{
+	return stb_font::getPixelHeightScale(font, px);
+}
+void font_t::init_post_table()
+{
+	hheaTbl hhea[1] = {}; head_table p[1] = {};
+	stb_font::get_hhea(font, hhea);
+	stb_font::get_head(font, p);
+	xMaxExtent = hhea->xMaxExtent;
+	lineGap = hhea->lineGap;
+}
+
+#ifndef TAGS_H_
+#define TAGS_H_
+
+
+#define MAKE_TAG(_x1, _x2, _x3, _x4) (uint32_t)(((uint32_t)_x1 << 24)|((uint32_t)_x2 << 16)|((uint32_t)_x3 << 8)|(uint32_t)_x4)
+
+
+#define TAG_avar  "avar"
+#define TAG_BASE  "BASE"
+#define TAG_bdat  "bdat"
+#define TAG_BDF   "BDF "
+#define TAG_bhed  "bhed"
+#define TAG_bloc  "bloc"
+#define TAG_bsln  "bsln"
+#define TAG_CBDT  "CBDT"
+#define TAG_CBLC  "CBLC"
+#define TAG_CFF   "CFF "
+#define TAG_CID   "CID "
+#define TAG_CPAL  "CPAL"
+#define TAG_COLR  "COLR"
+#define TAG_cmap  "cmap"
+#define TAG_cvar  "cvar"
+#define TAG_cvt   "cvt "
+#define TAG_DSIG  "DSIG"
+#define TAG_EBDT  "EBDT"
+#define TAG_EBLC  "EBLC"
+#define TAG_EBSC  "EBSC"
+#define TAG_feat  "feat"
+#define TAG_FOND  "FOND"
+#define TAG_fpgm  "fpgm"
+#define TAG_fvar  "fvar"
+#define TAG_gasp  "gasp"
+#define TAG_GDEF  "GDEF"
+#define TAG_glyf  "glyf"
+#define TAG_GPOS  "GPOS"
+#define TAG_GSUB  "GSUB"
+#define TAG_gvar  "gvar"
+#define TAG_hdmx  "hdmx"
+#define TAG_head  "head"
+#define TAG_hhea  "hhea"
+#define TAG_hmtx  "hmtx"
+#define TAG_JSTF  "JSTF"
+#define TAG_just  "just"
+#define TAG_kern  "kern"
+#define TAG_lcar  "lcar"
+#define TAG_loca  "loca"
+#define TAG_LTSH  "LTSH"
+#define TAG_LWFN  "LWFN"
+#define TAG_MATH  "MATH"
+#define TAG_maxp  "maxp"
+#define TAG_META  "META"
+#define TAG_MMFX  "MMFX"
+#define TAG_MMSD  "MMSD"
+#define TAG_mort  "mort"
+#define TAG_morx  "morx"
+#define TAG_name  "name"
+#define TAG_opbd  "opbd"
+#define TAG_OS2   "OS/2"
+#define TAG_OTTO  "OTTO"
+#define TAG_PCLT  "PCLT"
+#define TAG_POST  "POST"
+#define TAG_post  "post"
+#define TAG_prep  "prep"
+#define TAG_prop  "prop"
+#define TAG_sbix  "sbix"
+#define TAG_sfnt  "sfnt"
+#define TAG_SING  "SING"
+#define TAG_trak  "trak"
+#define TAG_true  "true"
+#define TAG_ttc   "ttc "
+#define TAG_ttcf  "ttcf"
+#define TAG_TYP1  "TYP1"
+#define TAG_typ1  "typ1"
+#define TAG_VDMX  "VDMX"
+#define TAG_vhea  "vhea"
+#define TAG_vmtx  "vmtx"
+#define TAG_wOFF  "wOFF"
+
+
+
+#endif /* TAGS_H_ */
+
+
+sfnt_header* get_tag(font_impl* font_i, const std::string& tag)
+{
+	auto it = font_i->_tb.find(tag);
+	return it != font_i->_tb.end() ? &it->second : nullptr;
+}
+
+
+typedef struct  LayerIterator_
+{
+	uint32_t   num_layers;
+	uint32_t   layer;
+	uint8_t* p;
+
+} LayerIterator;
+typedef struct  Palette_Data_ {
+	uint16_t         num_palettes;
+	const uint16_t* palette_name_ids;
+	const uint16_t* palette_flags;
+
+	uint16_t         num_palette_entries;
+	const uint16_t* palette_entry_name_ids;
+
+} Palette_Data;
+
+union Color_2
+{
+	uint32_t c;
+	struct {
+		uint8_t r, g, b, a;
+	};
+	struct {
+		uint8_t red, green, blue, alpha;
+	};
+};
+struct Cpal;
+struct Colr;
+struct gcolors_t
+{
+	Cpal* cpal;
+	Colr* colr;
+	/* glyph colors */
+	Palette_Data palette_data;         /* since 2.10 */
+	uint16_t palette_index;
+	Color_2* palette;
+	Color_2 foreground_color;
+	bool have_foreground_color;
+	char td[80];
+};
+struct GlyphSlot;
+
+typedef union {
+	uint32_t color;
+	struct {
+		unsigned char b, g, r, a;
+	} argb;
+} stbtt_color;
+bool stbtt_FontHasPalette(const stbtt_fontinfo* info);
+unsigned short stbtt_FontPaletteCount(const stbtt_fontinfo* info);
+unsigned short stbtt_FontPaletteGetColors(const stbtt_fontinfo* info, unsigned short paletteIndex, stbtt_color** colorPalette);
+//// Glyph layers (COLR) /////////////////////////////////////////////////////
+typedef struct {
+	unsigned short glyphid, colorid;
+} stbtt_glyphlayer;
+bool stbtt_FontHasLayers(const stbtt_fontinfo* info);
+unsigned short stbtt_GetGlyphLayers(const stbtt_fontinfo* info, unsigned short glypId, stbtt_glyphlayer** glyphLayer);
+unsigned short stbtt_GetCodepointLayers(const stbtt_fontinfo* info, unsigned short codePoint, stbtt_glyphlayer** glyphLayer);
+
+
+
+void free_colorinfo(gcolors_t* colorinfo) {
+
+	if (colorinfo->palette_data.palette_name_ids)delete[]colorinfo->palette_data.palette_name_ids;
+	if (colorinfo->palette_data.palette_flags)delete[]colorinfo->palette_data.palette_flags;
+	if (colorinfo->palette_data.palette_entry_name_ids)delete[]colorinfo->palette_data.palette_entry_name_ids;
+}
+
+
+int tt_face_load_colr(font_t* face, uint8_t* b, sfnt_header* sp);
+
+void tt_face_free_colr(font_t*);
+
+bool tt_face_get_colr_layer(font_t* face,
+	uint32_t            base_glyph,
+	uint32_t* aglyph_index,
+	uint32_t* acolor_index,
+	LayerIterator* iterator);
+// 获取颜色
+Color_2 get_c2(font_t* face1, uint32_t color_index);
+
+int tt_face_colr_blend_layer(font_t* face, uint32_t       color_index, GlyphSlot* dstSlot, GlyphSlot* srcSlot);
+
+
+int tt_face_load_cpal(font_t* face, uint8_t* b, sfnt_header* sp);
+
+void tt_face_free_cpal(font_t* face);
+
+int tt_face_palette_set(font_t* face, uint32_t  palette_index);
+// 初始化颜色
+int font_t::init_color()
+{
+	font_impl* font_i = font;
+	const stbtt_fontinfo* font = font_i;
+	int i, count, stringOffset;
+	uint8_t* fc = font->data;
+	uint32_t offset = font->fontstart, table_size = 0, sbit_num_strikes = 0;
+	uint32_t ebdt_start = 0, ebdt_size = 0;
+	sfnt_header* ebdt_table = 0;
+	auto cpal_table = get_tag(font_i, TAG_CPAL);
+	auto colr_table = get_tag(font_i, TAG_COLR);
+	if (!cpal_table || !colr_table)
+		return 0;
+	if (!colorinfo)
+		colorinfo = new gcolors_t();
+	font_t* ttp = (font_t*)font->userdata;
+	uint8_t* b = fc + cpal_table->offset;
+	uint8_t* b1 = fc + colr_table->offset;
+	tt_face_load_cpal(this, b, cpal_table);
+	tt_face_load_colr(this, b1, colr_table);
+
+	return 0;
+}
+
+int font_t::get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vector<uint32_t>& col)
+{
+	uint32_t aglyph_index = base_glyph;
+	uint32_t acolor_index = 0;
+	LayerIterator it = {};
+	for (;;)
+	{
+		if (!tt_face_get_colr_layer(this, aglyph_index, &aglyph_index, &acolor_index, &it))
+		{
+			break;
+		}
+		ag.push_back(aglyph_index);
+		col.push_back(get_c2(this, acolor_index).c);
+	}
+	return it.num_layers;
+}
+
+
+#ifndef no_colr
+
+uint32_t stbtt__find_table(uint8_t* data, uint32_t fontstart, const char* tag)
+{
+	int32_t num_tables = stb_font::ttUSHORT(data + fontstart + 4);
+	uint32_t tabledir = fontstart + 12;
+	int32_t i;
+	for (i = 0; i < num_tables; ++i) {
+		uint32_t loc = tabledir + 16 * i;
+		if (stbtt_tag(data + loc + 0, tag))
+			return stb_font::ttULONG(data + loc + 8);
+	}
+	return 0;
+}
+//////////////////////////////////////////////////////////////////////////////
+// Glyph layered color font support using COLR/CPAL tables
+//
+
+static int stbtt__get_cpal(font_impl* info)
+{
+	if (info->cpal < 0 && info != NULL) //Load table if not exists
+		info->cpal = stbtt__find_table(info->data, info->fontstart, "CPAL");
+	return info->cpal;
+}
+
+static int stbtt__get_colr(font_impl* info)
+{
+	if (info->colr < 0 && info != NULL) //Load table if not exists
+	{
+		info->colr = stbtt__find_table(info->data, info->fontstart, "COLR");
+		if (info->colr > 0) //swap bytes on table, so it can be returned
+		{
+			const uint32_t layerRecordsOffset = stb_font::ttULONG(info->data + info->colr + 8);
+			const uint16_t numLayerRecords = stb_font::ttUSHORT(info->data + info->colr + 12);
+			unsigned char* colOffset = info->data + info->colr + layerRecordsOffset;
+			for (int i = 0; i < numLayerRecords; i++) //Swap bytes
+			{
+				unsigned short* col = (unsigned short*)colOffset + (2 * i);
+				col[0] = (col[0] >> 8) | (col[0] << 8);
+				col[1] = (col[1] >> 8) | (col[1] << 8);
+			}
+		}
+	}
+	return info->colr;
+}
+
+bool stbtt_FontHasLayers(const font_impl* info)
+{
+	const int table_colr = stbtt__get_colr((font_impl*)info);
+	if (table_colr > 0 && info != NULL) //Check table and if theres glyphs
+		if (stb_font::ttUSHORT(info->data + table_colr + 2 /*numBaseGlyphRecords*/) > 0)
+			return 1;
+	return 0;
+}
+
+bool stbtt_FontHasPalette(const font_impl* info)
+{
+	const int table_cpal = stbtt__get_cpal((font_impl*)info);
+	if (table_cpal > 0 && info != NULL) //Check table and if theres palettes
+		if (stb_font::ttUSHORT(info->data + table_cpal + 4 /*numPalettes*/) > 0)
+			return 1;
+	return 0;
+}
+
+unsigned short stbtt_FontPaletteCount(const font_impl* info)
+{
+	const int table_cpal = stbtt__get_cpal((font_impl*)info);
+	if (table_cpal > 0 && info != NULL) //Check palettes and input
+	{
+		const uint16_t numPalettes = stb_font::ttUSHORT(info->data + table_cpal + 4);
+		return numPalettes; //Success
+	}
+	return 0; //Failed
+}
+
+unsigned short stbtt_FontPaletteGetColors(const font_impl* info, unsigned short paletteIndex, stbtt_color** colorPalette)
+{
+	const int table_cpal = stbtt__get_cpal((font_impl*)info);
+	if (table_cpal > 0 && info != NULL) //Check palettes
+	{
+		const uint16_t numPaletteEntries = stb_font::ttUSHORT(info->data + table_cpal + 2);
+		if (colorPalette)
+		{
+			const uint16_t numPalettes = stb_font::ttUSHORT(info->data + table_cpal + 4);
+			if (paletteIndex > numPalettes - 1) return 0; //Invalid palette index
+			const uint32_t colorRecordsArrayOffset = stb_font::ttULONG(info->data + table_cpal + 8);
+			const uint16_t colorRecordIndices = stb_font::ttUSHORT(info->data + table_cpal + 12 + (2 * paletteIndex));
+			const uint8_t* colorptr = info->data + table_cpal + colorRecordsArrayOffset + (colorRecordIndices * 4);
+			*colorPalette = (stbtt_color*)colorptr;
+		}
+		return numPaletteEntries;
+	}
+	return 0; //Failed
+}
+
+unsigned short stbtt_GetGlyphLayers(const font_impl* info, unsigned short glypId, stbtt_glyphlayer** glyphLayer)
+{
+	const int table_colr = stbtt__get_colr((font_impl*)info);
+	if (table_colr > 0 && info != NULL) //Check glyph table
+	{
+		const uint16_t numBaseGlyphRecords = stb_font::ttUSHORT(info->data + table_colr + 2);
+		const uint32_t baseGlyphRecordsOffset = stb_font::ttULONG(info->data + table_colr + 4);
+		const uint32_t layerRecordsOffset = stb_font::ttULONG(info->data + table_colr + 8);
+		int32_t low = 0;
+		int32_t high = (int32_t)numBaseGlyphRecords;
+		while (low < high) // Binary search, lookup glyph table.
+		{
+			int32_t mid = low + ((high - low) >> 1);
+			uint16_t foundGlyphID = stb_font::ttUSHORT(info->data + table_colr + baseGlyphRecordsOffset + (6 * mid));
+			if ((uint32_t)glypId < foundGlyphID) //Trim high
+				high = mid;
+			else if ((uint32_t)glypId > foundGlyphID) //Trim low
+				low = mid + 1;
+			else //Result found
+			{
+				const uint16_t numLayers = stb_font::ttUSHORT(info->data + table_colr + baseGlyphRecordsOffset + (6 * mid) + 4);
+				if (glyphLayer)
+				{
+					const uint16_t firstLayerIndex = stb_font::ttUSHORT(info->data + table_colr + baseGlyphRecordsOffset + (6 * mid) + 2);
+					const uint8_t* layerptr = info->data + table_colr + layerRecordsOffset + (firstLayerIndex * 4);
+					*glyphLayer = (stbtt_glyphlayer*)layerptr;
+				}
+				return numLayers; //Sucess
+			}
+		}
+	}
+	return 0; //Not found, failed
+}
+
+unsigned short stbtt_GetCodepointLayers(const font_impl* info, unsigned short codePoint, stbtt_glyphlayer** glyphLayer)
+{
+	return stbtt_GetGlyphLayers(info, stbtt_FindGlyphIndex(info, codePoint), glyphLayer); //Lookup by glyph id
+}
+#endif // !no_colr
+
+
+
+
+
+
+
+void init_bitmap_bitdepth(Bitmap_p* bitmap, int bit_depth);
+/*
+输入
+int gidx			字符索引号
+double height		期望高度
+bool first_bitmap	是否优先查找位图字体
+输出
+glm::ivec4* ot		x,y,z=width,w=height
+std::string* out	输出缓存区
+Bitmap_p* bitmap		输出位图信息
+返回1成功
+*/
+
+int font_t::get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, int lcd_type, uint32_t unicode_codepoint, int xf)
+{
+	int ret = 0;
+	if (gidx > 0)
+	{
+		double scale = get_scale(height);
+		//double scale = get_scale_height(height);
+		if (height < 0)
+		{
+			height *= -1;
+		}
+#ifndef _FONT_NO_BITMAP
+		if (first_bitmap)
+		{
+			// 解析位图
+			ret = get_glyph_bitmap(gidx, height, ot, bitmap, out);
+			// 找不到位图时尝试用自定义解码
+			if (!ret)
+				ret = get_custom_decoder_bitmap(unicode_codepoint, height, ot, bitmap, out);
+		}
+#endif
+		if (!ret)
+		{
+			// 解析轮廓并光栅化 
+			glm::vec3 adlsb = { 0,0,height };
+			glm::vec2 lcds[] = { {1, 1}, {3, 1}, {1, 3}, {4, 1, } };
+			stb_font::get_glyph_bitmap(font, gidx, scale, ot, out, &adlsb, lcds[lcd_type], xf);
+			if (bitmap)
+			{
+				auto hh = hp->hhea;
+				auto he = hp->hhea.ascender + hp->hhea.descender + hp->hhea.lineGap;
+				auto hef = hp->hhea.ascender - hp->hhea.descender + hp->hhea.lineGap;
+
+				double hed = (scale * he);//ceil
+				double hedf = (scale * hef);
+				double lg = (scale * hp->hhea.lineGap);
+				if (out)
+					bitmap->buffer = (unsigned char*)out->data();
+				bitmap->width = bitmap->pitch = ot->z;
+				bitmap->rows = ot->w;
+				bitmap->advance = adlsb.z;
+				bitmap->bearingX = adlsb.x;
+				bitmap->pixel_mode = PX_GRAY;	//255灰度图
+				bitmap->lcd_mode = lcd_type;
+				init_bitmap_bitdepth(bitmap, 8);
+				ret = 1;
+			}
+		}
+		if (bitmap)
+		{
+			bitmap->x = ot->x;
+			bitmap->y = ot->y;
+		}
+	}
+	return ret;
+}
+
+
+double font_t::get_base_line(double height)
+{
+	float scale = get_scale(height);
+	double f = ascender;
+	//return ceil(f * scale);
+	return floor(f * scale); // 向下取整
+}
+int font_t::get_xmax_extent(double height, int* line_gap)
+{
+	float scale = get_scale(height);
+	double f = xMaxExtent, lig = lineGap;
+	if (line_gap)
+	{
+		*line_gap = ceil(lig * scale);
+	}
+	return ceil(f * scale);
+}
+// 获取字体最大box
+glm::ivec4 font_t::get_bounding_box(double scale, bool is_align0)
+{
+	auto ret = stb_font::get_bounding_box(font);
+	if (is_align0)
+	{
+		if (ret.x != 0)
+		{
+			ret.z -= ret.x; ret.x = 0;
+		}
+		if (ret.y != 0)
+		{
+			ret.w -= ret.y; ret.y = 0;
+		}
+	}
+	glm::vec4 s = ret;
+	s *= scale;
+	return ceil(s);
+}
+tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>* opt)
+{
+	int vc = 0;
+	tinypath_t r = {};
+	if (!opt)return r;
+	auto p = &r;
+	stbtt_vertex* v = stb_font::get_char_shape(font, (char*)str8, vc);
+	if (v)
+	{
+		if (p && vc > 1)
+		{
+			auto pss = opt->size();
+			r.last = pss;
+			opt->resize(pss + vc);
+			r.v = opt->data() + pss;
+			p->count = vc;
+			for (size_t i = 0; i < vc; i++)
+			{
+				r.v[i].type = v[i].type;
+				r.v[i].x = v[i].x;
+				r.v[i].y = v[i].y;
+				r.v[i].cx = v[i].cx;
+				r.v[i].cy = v[i].cy;
+				r.v[i].cx1 = v[i].cx1;
+				r.v[i].cy1 = v[i].cy1;
+			}
+			if (height != 0)
+			{
+				float scale = get_scale(height);
+				if (scale > 0)
+				{
+					r.baseline = ascender * scale;
+					auto v1 = r.v;
+					for (size_t i = 0; i < vc; i++)
+					{
+						v1->x *= scale;
+						v1->y *= scale;
+						v1->cx *= scale;
+						v1->cy *= scale;
+						v1->cx1 *= scale;
+						v1->cy1 *= scale;
+						v1++;
+					}
+				}
+			}
+		}
+		stb_font::free_shape(font, v);
+	}
+	return r;
+}
+glm::ivec2 font_t::get_shape_box(const void* str8, int height)
+{
+	auto ch = stb_font::get_u8_to_u16((char*)str8);
+	glm::vec2 v = stb_font::get_codepoint_hmetrics(font, ch);
+	if (height != 0)
+	{
+		float scale = get_scale(height);
+		v *= scale;
+	}
+	return v;
+}
+tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt)
+{
+	int vc = 0;
+	tinypath_t r = {};
+	auto p = &r;
+	stbtt_vertex* v = stb_font::get_char_shape(font, cp, vc);
+	if (v)
+	{
+		if (p && vc > 1)
+		{
+			auto pss = opt->size();
+			r.last = pss;
+			opt->resize(pss + vc);
+			r.v = opt->data() + pss;
+			p->count = vc;
+			for (size_t i = 0; i < vc; i++)
+			{
+				r.v[i].type = v[i].type;
+				r.v[i].x = v[i].x;
+				r.v[i].y = v[i].y;
+				r.v[i].cx = v[i].cx;
+				r.v[i].cy = v[i].cy;
+				r.v[i].cx1 = v[i].cx1;
+				r.v[i].cy1 = v[i].cy1;
+			}
+			if (height != 0)
+			{
+				float scale = get_scale(height);
+				if (scale > 0)
+				{
+					r.baseline = ascender * scale;
+					auto v1 = r.v;
+					for (size_t i = 0; i < vc; i++)
+					{
+						v1->x *= scale;
+						v1->y *= scale;
+						v1->cx *= scale;
+						v1->cy *= scale;
+						v1->cx1 *= scale;
+						v1->cy1 *= scale;
+						v1++;
+					}
+				}
+			}
+		}
+		stb_font::free_shape(font, v);
+	}
+	return r;
+}
+
+// todo 获取字符大小
+
+glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigned short font_dpi, std::vector<font_t*>* fallbacks)
+{
+	ft_char_s cs;
+	cs.v.font_dpi = font_dpi;
+	cs.v.font_size = font_size;
+	cs.v.unicode_codepoint = ch;
+#if 0
+	{
+		auto it = _char_lut.find(cs.u);
+		if (it != _char_lut.end())
+		{
+			return it->second;
+		}
+	}
+#endif
+	glm::ivec3 ret = {};
+	font_t* rfont = nullptr;
+	auto g = get_glyph_index(ch, &rfont, fallbacks);
+	if (g)
+	{
+		double fns = round((double)font_size * font_dpi / 72.0);
+		double scale = rfont->get_scale(fns);
+		int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
+		stb_font::buildGlyphBitmap(rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+		double adv = scale * advance;
+		ret = { x1 - x0, y1 - y0, adv };
+		//_char_lut[cs.u] = ret;
+	}
+	return ret;
+}
+
+void font_t::clear_char_lut()
+{
+	//_char_lut.clear();
+}
+
+const char* font_t::get_glyph_index_u8(const char* u8str, int* oidx, font_t** renderFont, std::vector<font_t*>* fallbacks)
+{
+	int g = 0;
+	const char* str = u8str;
+	if (fallbacks)
+	{
+		for (auto it : *fallbacks)
+		{
+			str = stb_font::get_glyph_index(it->font, u8str, &g);
+			if (g > 0) {
+				*renderFont = it;
+				*oidx = g;
+				break;
+			}
+		}
+	}
+	return str;
+}
+
+union gcache_key
+{
+	uint64_t u;
+	struct {
+		uint32_t glyph_index;
+		uint16_t height;
+	}v;
+};
+font_item_t* font_t::push_gcache(uint32_t glyph_index, uint16_t height, tinyimage_cx* img, const glm::ivec4& rect, const glm::ivec2& pos)
+{
+	gcache_key k = {}; k.v.glyph_index = glyph_index; k.v.height = height;
+	auto& pt = _cache_glyphidx[k.u];
+	if (!pt)
+	{
+		if (cache_count == 0)
+		{
+			cache_data.push_back(new font_item_t[ccount]);
+			cache_count = ccount;
+		}
+		auto npt = cache_data.rbegin();
+		pt = *npt;
+		pt += ccount - cache_count;
+		cache_count--;
+	}
+	pt->_glyph_index = glyph_index;
+	pt->_image = img;
+	pt->_dwpos = pos;
+	pt->_rect = rect;
+	return pt;
+}
+font_item_t* font_t::get_gcache(uint32_t glyph_index, uint16_t height)
+{
+	gcache_key k = {}; k.v.glyph_index = glyph_index; k.v.height = height;
+	font_item_t* ret = 0;
+	auto it = _cache_glyphidx.find(k.u);
+	if (it != _cache_glyphidx.end())
+	{
+		ret = it->second;
+	}
+	return ret;
+}
+void font_t::clear_gcache()
+{
+	for (auto it : cache_data)
+	{
+		delete[]it;
+	}
+	cache_data.clear();
+	_cache_glyphidx.clear();
+}
+
+int font_t::get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector<font_t*>* fallbacks)
+{
+	int g = stb_font::getGlyphIndex(font, codepoint);
+	if (g == 0) {
+		if (fallbacks)
+		{
+			for (auto it : *fallbacks)
+			{
+				if (font == it->font)continue;
+				int fallbackIndex = stb_font::getGlyphIndex(it->font, codepoint);
+				if (fallbackIndex != 0) {
+					g = fallbackIndex;
+					*renderFont = it;
+					break;
+				}
+			}
+		}
+	}
+	else
+	{
+		*renderFont = this;
+	}
+	return g;
+}
+
+font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepoint, int fontsize)
+{
+	uint32_t col = -1;
+	int lcd_type = 0;
+	int linegap = 4;
+	font_t* rfont = this;
+	Bitmap_p bitmap[1] = {};
+	std::vector<char> bitbuf[1];
+	glm::ivec4 rc;
+	std::vector<font_item_t>  ps;
+	glm::ivec3 rets;
+	font_item_t ret = {};
+	if (-1 == glyph_index)
+		glyph_index = get_glyph_index(unicode_codepoint, &rfont, 0);
+	if (rfont && glyph_index)
+	{
+		auto rp = rfont->get_gcache(glyph_index, fontsize);
+		do {
+			if (rp)break;
+
+			auto bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, 0, lcd_type, unicode_codepoint);
+			if (colorinfo && bit)
+			{
+				glm::ivec4 bs = { rc.x, rc.y, bitmap->width, bitmap->rows };
+				std::vector<uint32_t> ag;
+				std::vector<uint32_t> cols;
+				if (get_gcolor(glyph_index, ag, cols))
+				{
+					glm::ivec2 pos;
+					tinyimage_cx* img = 0;
+					img = ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, 0);
+					for (size_t i = 0; i < ag.size(); i++)
+					{
+						bitbuf->clear();
+						bitbuf->resize(bitmap->width * bitmap->rows);
+						// -4修正填充
+						auto bit = rfont->get_glyph_image(ag[i], fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint, 0);
+						if (bit)
+						{
+							auto ps1 = pos;
+							ps1.x += bitmap->x - bs.x, ps1.y += bitmap->y + abs(bs.y);
+							img = ctx->push_cache_bitmap_old(bitmap, &ps1, cols[i], img, 0);
+						}
+					}
+					glm::ivec4 rc4 = { pos.x, pos.y, bs.z,bs.w };
+					if (img)
+					{
+						rp = rfont->push_gcache(glyph_index, fontsize, img, rc4, { bs.x,bs.y });
+						if (rp)
+						{
+							rp->color = -1;
+							rp->advance = bitmap->advance;
+						}
+					}
+					break;
+				}
+			}
+			bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint);
+			if (bit)
+			{
+				glm::ivec2 pos;
+				auto img = ctx->push_cache_bitmap(bitmap, &pos, linegap, col);
+				glm::ivec4 rc4 = { pos.x, pos.y, bitmap->width, bitmap->rows };
+				if (img)
+				{
+					rp = rfont->push_gcache(glyph_index, fontsize, img, rc4, { rc.x, rc.y });
+					rp->color = 0;
+					if (rp)rp->advance = bitmap->advance;
+				}
+			}
+		} while (0);
+		if (rp)
+			ret = *rp;
+	}
+	return ret;
+}
+
+
+
+#ifndef _FONT_NO_BITMAP
+
+#ifdef NO_CPU_LENDIAN
+#define UINT8_BITFIELD_BENDIAN
+#else
+#define UINT8_BITFIELD_LENDIAN
+#endif
+#ifdef UINT8_BITFIELD_LENDIAN
+#define UINT8_BITFIELD(f0, f1, f2, f3, f4, f5, f6, f7) \
+        uint8_t f0 : 1; \
+        uint8_t f1 : 1; \
+        uint8_t f2 : 1; \
+        uint8_t f3 : 1; \
+        uint8_t f4 : 1; \
+        uint8_t f5 : 1; \
+        uint8_t f6 : 1; \
+        uint8_t f7 : 1;
+#else
+#define UINT8_BITFIELD(f0, f1, f2, f3, f4, f5, f6, f7) \
+        uint8_t f7 : 1; \
+        uint8_t f6 : 1; \
+        uint8_t f5 : 1; \
+        uint8_t f4 : 1; \
+        uint8_t f3 : 1; \
+        uint8_t f2 : 1; \
+        uint8_t f1 : 1; \
+        uint8_t f0 : 1;
+#endif
+#define BYTE_BITFIELD UINT8_BITFIELD
+// EBLC头用到的结构
+struct SbitLineMetrics {
+	char ascender;
+	char descender;
+	uint8_t widthMax;
+	char caretSlopeNumerator;
+	char caretSlopeDenominator;
+	char caretOffset;
+	char minOriginSB;
+	char minAdvanceSB;
+	char maxBeforeBL;
+	char minAfterBL;
+	char pad1;
+	char pad2;
+};
+
+struct BigGlyphMetrics {
+	uint8_t height;
+	uint8_t width;
+	char horiBearingX;
+	char horiBearingY;
+	uint8_t horiAdvance;
+	char vertBearingX;
+	char vertBearingY;
+	uint8_t vertAdvance;
+};
+
+struct SmallGlyphMetrics {
+	uint8_t height;
+	uint8_t width;
+	char bearingX;
+	char bearingY;
+	uint8_t advance;
+};
+struct BitmapSizeTable {
+	uint32_t indexSubTableArrayOffset; //offset to indexSubtableArray from beginning of EBLC.
+	uint32_t indexTablesSize; //number of bytes in corresponding index subtables and array
+	uint32_t numberOfIndexSubTables; //an index subtable for each range or format change
+	uint32_t colorRef; //not used; set to 0.
+	SbitLineMetrics hori; //line metrics for text rendered horizontally
+	SbitLineMetrics vert; //line metrics for text rendered vertically
+	unsigned short startGlyphIndex; //lowest glyph index for this size
+	unsigned short endGlyphIndex; //highest glyph index for this size
+	uint8_t ppemX; //horizontal pixels per Em
+	uint8_t ppemY; //vertical pixels per Em
+	struct BitDepth {
+		enum Value : uint8_t {
+			BW = 1,
+			Gray4 = 2,
+			Gray16 = 4,
+			Gray256 = 8,
+		};
+		uint8_t value;
+	} bitDepth; //the Microsoft rasterizer v.1.7 or greater supports
+	union Flags {
+		struct Field {
+			//0-7
+			BYTE_BITFIELD(
+				Horizontal, // Horizontal small glyph metrics
+				Vertical,  // Vertical small glyph metrics
+				Reserved02,
+				Reserved03,
+				Reserved04,
+				Reserved05,
+				Reserved06,
+				Reserved07)
+		} field;
+		struct Raw {
+			static const char Horizontal = 1u << 0;
+			static const char Vertical = 1u << 1;
+			char value;
+		} raw;
+	} flags;
+}; //bitmapSizeTable[numSizes];
+
+struct IndexSubTableArray {
+	unsigned short firstGlyphIndex; //first glyph code of this range
+	unsigned short lastGlyphIndex; //last glyph code of this range (inclusive)
+	uint32_t additionalOffsetToIndexSubtable; //add to BitmapSizeTable::indexSubTableArrayOffset to get offset from beginning of 'EBLC'
+}; //indexSubTableArray[BitmapSizeTable::numberOfIndexSubTables];
+
+struct IndexSubHeader {
+	unsigned short indexFormat; //format of this indexSubTable
+	unsigned short imageFormat; //format of 'EBDT' image data
+	uint32_t imageDataOffset; //offset to image data in 'EBDT' table
+};
+
+// Variable metrics glyphs with 4 byte offsets
+struct IndexSubTable1 {
+	IndexSubHeader header;
+	//uint32_t offsetArray[lastGlyphIndex - firstGlyphIndex + 1 + 1]; //last element points to one past end of last glyph
+	//glyphData = offsetArray[glyphIndex - firstGlyphIndex] + imageDataOffset
+};
+
+// All Glyphs have identical metrics
+struct IndexSubTable2 {
+	IndexSubHeader header;
+	uint32_t imageSize; // all glyphs are of the same size
+	BigGlyphMetrics bigMetrics; // all glyphs have the same metrics; glyph data may be compressed, byte-aligned, or bit-aligned
+};
+
+// Variable metrics glyphs with 2 byte offsets
+struct IndexSubTable3 {
+	IndexSubHeader header;
+	//unsigned short offsetArray[lastGlyphIndex - firstGlyphIndex + 1 + 1]; //last element points to one past end of last glyph, may have extra element to force even number of elements
+	//glyphData = offsetArray[glyphIndex - firstGlyphIndex] + imageDataOffset
+};
+
+// Variable metrics glyphs with sparse glyph codes
+struct IndexSubTable4 {
+	IndexSubHeader header;
+	uint32_t numGlyphs;
+	struct CodeOffsetPair {
+		unsigned short glyphCode;
+		unsigned short offset; //location in EBDT
+	}; //glyphArray[numGlyphs+1]
+};
+
+// Constant metrics glyphs with sparse glyph codes
+struct IndexSubTable5 {
+	IndexSubHeader header;
+	uint32_t imageSize; //all glyphs have the same data size
+	BigGlyphMetrics bigMetrics; //all glyphs have the same metrics
+	uint32_t numGlyphs;
+	//unsigned short glyphCodeArray[numGlyphs] //must have even number of entries (set pad to 0)
+};
+
+union IndexSubTable {
+	IndexSubHeader header;
+	IndexSubTable1 format1;
+	IndexSubTable2 format2;
+	IndexSubTable3 format3;
+	IndexSubTable4 format4;
+	IndexSubTable5 format5;
+};
+
+union GlyphMetrics
+{
+	struct BigGlyphMetrics _big;
+	struct SmallGlyphMetrics _small;
+};
+class SBitDecoder
+{
+public:
+	Bitmap_p bitmap[1] = {};
+	std::vector<char> bitdata;
+	BigGlyphMetrics metrics[1] = {};
+	bool          metrics_loaded;
+	bool          bitmap_allocated;
+	uint8_t          bit_depth;
+
+	BitmapSizeTable* _bst;
+	std::vector<IndexSubTableArray>* _ist;
+
+	uint8_t* ebdt_base;
+	uint8_t* eblc_base;
+	uint8_t* eblc_limit;
+	uint8_t* p, * p_limit;
+
+	uint32_t _strike_index = 0;
+	font_t* _face = 0;
+
+	// 是否在回收状态
+	int _recycle = 0;
+public:
+	SBitDecoder()
+	{
+
+	}
+
+	~SBitDecoder()
+	{
+	}
+
+	int init(font_t* ttp, uint32_t strike_index);
+public:
+	IndexSubTableArray* get_image_offset(uint32_t glyph_index)
+	{
+		auto& ist = *_ist;
+		for (size_t i = 0; i < ist.size(); i++)
+		{
+			auto& it = ist[i];
+			if (glyph_index >= it.firstGlyphIndex && glyph_index <= it.lastGlyphIndex)
+			{
+				return &ist[i];
+			}
+		}
+		static IndexSubTableArray a;
+		a.firstGlyphIndex = 0;
+		a.lastGlyphIndex = 98;
+		a.additionalOffsetToIndexSubtable = 0;
+		return nullptr;
+	}
+	int resize_bitmap(uint32_t size)
+	{
+		if (size > bitdata.size())
+		{
+			bitmap->capacity = size;
+			bitdata.resize(size);
+			bitmap->buffer = (unsigned char*)bitdata.data();
+		}
+		memset(bitmap->buffer, 0, size);
+		return 0;
+	}
+private:
+
+};
+
+// 获取一个字体索引的位图
+int get_index(SBitDecoder* decoder, uint32_t glyph_index, int x_pos, int y_pos);
+int load_metrics(uint8_t** pp, uint8_t* limit, int big, BigGlyphMetrics* metrics);
+
+class bitmap_ttinfo
+{
+public:
+
+	sbit_table_type _sttype = sbit_table_type::TYPE_NONE;
+	// _sbit_table可能是CBLC、EBLC、bloc、sbix
+	sfnt_header* _sbit_table = 0;
+	sfnt_header* _ebdt_table = 0;
+	sfnt_header* _ebsc_table = 0;
+	std::vector<BitmapSizeTable> _bsts;
+	std::vector<std::vector<IndexSubTableArray>> _index_sub_table;
+	std::unordered_map<uint8_t, uint32_t> _msidx_table;
+	std::set<SBitDecoder*> _dec_table;
+	std::queue<SBitDecoder*> _free_dec;
+	//LockS _sbit_lock;
+	font_t* _t = 0;
+	// 自定义位图
+	tinyimage_cx _bimg = {};
+	uint32_t* _buf = 0;
+	// 支持的大小
+	std::vector<glm::ivec2> _chsize;
+	// 范围
+	std::vector<glm::ivec2> _unicode_rang;
+public:
+	bitmap_ttinfo() {
+
+	}
+	~bitmap_ttinfo() {
+		//Image::destroy(_buf);
+		if (_buf)
+		{
+			delete _buf; _buf = 0;
+		}
+		destroy_all_dec();
+	}
+	int get_sidx(int height)
+	{
+		auto it = _msidx_table.find(height);
+		return it != _msidx_table.end() ? it->second : -1;
+	}
+	std::unordered_map<uint8_t, uint32_t>* get_msidx_table()
+	{
+		return &_msidx_table;
+	}
+
+	// 创建sbit解码器
+	SBitDecoder* new_SBitDecoder()
+	{
+		SBitDecoder* p = nullptr;
+		//LOCK_W(_sbit_lock);
+#ifndef NO_SBIT_RECYCLE
+		if (_free_dec.size())
+		{
+			p = _free_dec.front();
+			_free_dec.pop();
+			p->_recycle = 0;
+		}
+		else
+#endif // !NO_SBIT_RECYCLE
+		{
+			p = new SBitDecoder();
+			_dec_table.insert(p);
+		}
+		return p;
+	}
+	// 回收
+	void recycle(SBitDecoder* p)
+	{
+		if (p)
+		{
+			//LOCK_W(_sbit_lock);
+			// 不是自己的不回收
+			auto it = _dec_table.find(p);
+			if (it != _dec_table.end() && p->_recycle == 0)
+			{
+#ifndef NO_SBIT_RECYCLE
+				p->_recycle = 1;
+				_free_dec.push(p);
+#else
+				_dec_table.erase(p);
+				delete p;
+#endif
+			}
+
+		}
+	}
+	void destroy_all_dec()
+	{
+		//LOCK_W(_sbit_lock);
+		for (auto it : _dec_table)
+			if (it)delete it;
+		_dec_table.clear();
+	}
+
+};
+int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
+{
+	int ret = 0;
+	SBitDecoder* decoder = this;
+	auto face = ttp->bitinfo;
+	if (!face->_ebdt_table || !face->_sbit_table
+		|| strike_index >= face->_bsts.size() || strike_index >= face->_index_sub_table.size())
+		return 0;
+	if (_face == ttp && _strike_index == strike_index)
+	{
+		return 1;
+	}
+	_face = ttp;
+	_strike_index = strike_index;
+	auto font_i = ttp->font;
+	const stbtt_fontinfo* font = font_i;
+	decoder->_bst = &face->_bsts[strike_index];
+	decoder->_ist = &face->_index_sub_table[strike_index];
+	uint8_t* fc = font->data;
+	decoder->eblc_base = fc + face->_sbit_table->offset;
+	decoder->ebdt_base = fc + face->_ebdt_table->offset;
+	decoder->metrics_loaded = 0;
+	decoder->bitmap_allocated = 0;
+	decoder->bit_depth = decoder->_bst->bitDepth.value;
+	decoder->p = decoder->eblc_base + decoder->_bst->indexSubTableArrayOffset;
+	decoder->p_limit = decoder->p + decoder->_bst->indexTablesSize;
+	ret = 1;
+	return ret;
+}
+
+typedef int(*SBitDecoder_LoadFunc)(SBitDecoder* decoder, uint8_t* p, uint8_t* plimit, int x_pos, int y_pos);
+// 复制位图到bitmap
+static int load_byte_aligned(SBitDecoder* decoder, uint8_t* p, uint8_t* limit, int x_pos, int y_pos)
+{
+	Bitmap_p* bitmap = decoder->bitmap;
+	uint8_t* line;
+	int      pitch, width, height, line_bits, h;
+	uint32_t     bit_height, bit_width;
+	bit_width = bitmap->width;
+	bit_height = bitmap->rows;
+	pitch = bitmap->pitch;
+	line = bitmap->buffer;
+
+	width = bitmap->width;
+	height = bitmap->rows;
+
+	line_bits = width * bitmap->bit_depth;
+
+	if (x_pos < 0 || (uint32_t)(x_pos + width) > bit_width ||
+		y_pos < 0 || (uint32_t)(y_pos + height) > bit_height)
+	{
+		printf("tt_sbit_decoder_load_byte_aligned:"
+			" invalid bitmap dimensions\n"); return 0;
+	}
+	if (p + ((line_bits + 7) >> 3) * height > limit)
+	{
+		printf("tt_sbit_decoder_load_byte_aligned: broken bitmap\n");
+		return 0;
+	}
+	/* now do the blit */
+	line += y_pos * pitch + (x_pos >> 3);
+	x_pos &= 7;
+
+	if (x_pos == 0)
+	{
+		for (h = height; h > 0; h--, line += pitch)
+		{
+			uint8_t* pwrite = line;
+			int    w;
+			for (w = line_bits; w >= 8; w -= 8)
+			{
+				pwrite[0] = (uint8_t)(pwrite[0] | *p++);
+				pwrite += 1;
+			}
+			if (w > 0)
+				pwrite[0] = (uint8_t)(pwrite[0] | (*p++ & (0xFF00U >> w)));
+		}
+	}
+	else  /* x_pos > 0 */
+	{
+		for (h = height; h > 0; h--, line += pitch)
+		{
+			uint8_t* pwrite = line;
+			int    w;
+			uint32_t   wval = 0;
+			for (w = line_bits; w >= 8; w -= 8)
+			{
+				wval = (uint32_t)(wval | *p++);
+				pwrite[0] = (uint8_t)(pwrite[0] | (wval >> x_pos));
+				pwrite += 1;
+				wval <<= 8;
+			}
+			if (w > 0)
+				wval = (uint32_t)(wval | (*p++ & (0xFF00U >> w)));
+			/* 读取所有位，并有'x_pos+w'位要写入 */
+			pwrite[0] = (uint8_t)(pwrite[0] | (wval >> x_pos));
+
+			if (x_pos + w > 8)
+			{
+				pwrite++;
+				wval <<= 8;
+				pwrite[0] = (uint8_t)(pwrite[0] | (wval >> x_pos));
+			}
+		}
+	}
+
+	return 1;
+}
+// 按像素位复制
+static int load_bit_aligned(SBitDecoder* decoder, uint8_t* p, uint8_t* limit, int x_pos, int y_pos)
+{
+	Bitmap_p* bitmap = decoder->bitmap;
+	int ret = 1;
+	uint8_t* line;
+	int      pitch, width, height, line_bits, h, nbits;
+	uint32_t     bit_height, bit_width;
+	unsigned short   rval;
+
+	bit_width = bitmap->width;
+	bit_height = bitmap->rows;
+	pitch = bitmap->pitch;
+	line = bitmap->buffer;
+
+	width = bit_width;
+	height = bit_height;
+
+	line_bits = width * bitmap->bit_depth;
+
+	if (x_pos < 0 || (uint32_t)(x_pos + width) > bit_width ||
+		y_pos < 0 || (uint32_t)(y_pos + height) > bit_height)
+	{
+		printf("tt_sbit_decoder_load_bit_aligned:"
+			" invalid bitmap dimensions\n");
+		return 0;
+	}
+
+	if (p + ((line_bits * height + 7) >> 3) > limit)
+	{
+		printf("tt_sbit_decoder_load_bit_aligned: broken bitmap\n");
+		return 0;
+	}
+
+	if (!line_bits || !height)
+	{
+		/* nothing to do */
+		return 0;
+	}
+
+	/* now do the blit */
+
+	/* adjust `line' to point to the first byte of the bitmap */
+	line += (uint64_t)y_pos * pitch + (x_pos >> 3);
+	x_pos &= 7;
+
+	/* the higher byte of `rval' is used as a buffer */
+	rval = 0;
+	nbits = 0;
+
+	for (h = height; h > 0; h--, line += pitch)
+	{
+		uint8_t* pwrite = line;
+		int    w = line_bits;
+		/* handle initial byte (in target bitmap) specially if necessary */
+		if (x_pos)
+		{
+			w = (line_bits < 8 - x_pos) ? line_bits : 8 - x_pos;
+			if (h == height)
+			{
+				rval = *p++;
+				nbits = x_pos;
+			}
+			else if (nbits < w)
+			{
+				if (p < limit)
+					rval |= *p++;
+				nbits += 8 - w;
+			}
+			else
+			{
+				rval >>= 8;
+				nbits -= w;
+			}
+
+			*pwrite++ |= ((rval >> nbits) & 0xFF) &
+				(~(0xFFU << w) << (8 - w - x_pos));
+			rval <<= 8;
+			w = line_bits - w;
+		}
+
+		/* handle medial bytes */
+		for (; w >= 8; w -= 8)
+		{
+			rval |= *p++;
+			*pwrite++ |= (rval >> nbits) & 0xFF;
+			rval <<= 8;
+		}
+
+		/* handle final byte if necessary */
+		if (w > 0)
+		{
+			if (nbits < w)
+			{
+				if (p < limit)
+					rval |= *p++;
+				*pwrite |= ((rval >> nbits) & 0xFF) & (0xFF00U >> w);
+				nbits += 8 - w;
+
+				rval <<= 8;
+			}
+			else
+			{
+				*pwrite |= ((rval >> nbits) & 0xFF) & (0xFF00U >> w);
+				nbits -= w;
+			}
+		}
+	}
+	return ret;
+}
+
+// 解码复制
+static int load_compound(SBitDecoder* decoder, uint8_t* p, uint8_t* limit, int x_pos, int y_pos)
+{
+	Bitmap_p* bitmap = decoder->bitmap;
+	int   num_components, error = 0;
+	num_components = stb_font::ttUSHORT(p); p += 2;
+	for (int i = 0; i < num_components; i++)
+	{
+		uint32_t  gindex = stb_font::ttUSHORT(p); p += 2;
+		char  dx = *p; p++;
+		char  dy = *p; p++;
+		/* NB: a recursive call */
+		error = get_index(decoder, gindex, x_pos + dx, y_pos + dy);
+		if (error)
+			break;
+	}
+	return 0;
+}
+// 分配位置空间
+static int alloc_bitmap(SBitDecoder* decoder)
+{
+	uint32_t     width, height;
+	uint32_t    size;
+	Bitmap_p* bitmap = decoder->bitmap;
+	int bit_depth = decoder->bit_depth;
+	BigGlyphMetrics* metrics = decoder->metrics;
+	width = metrics->width;
+	height = metrics->height;
+
+	bitmap->width = width;
+	bitmap->rows = height;
+	bitmap->bit_depth = bit_depth;
+
+	switch (bit_depth)
+	{
+	case 1:
+		bitmap->pixel_mode = Pixel_Mode::PX_MONO;
+		bitmap->pitch = (int)((bitmap->width + 7) >> 3);
+		bitmap->num_grays = 2;
+		break;
+
+	case 2:
+		bitmap->pixel_mode = Pixel_Mode::PX_GRAY2;
+		bitmap->pitch = (int)((bitmap->width + 3) >> 2);
+		bitmap->num_grays = 4;
+		break;
+
+	case 4:
+		bitmap->pixel_mode = Pixel_Mode::PX_GRAY4;
+		bitmap->pitch = (int)((bitmap->width + 1) >> 1);
+		bitmap->num_grays = 16;
+		break;
+
+	case 8:
+		bitmap->pixel_mode = Pixel_Mode::PX_GRAY;
+		bitmap->pitch = (int)(bitmap->width);
+		bitmap->num_grays = 256;
+		break;
+
+	case 32:
+		bitmap->pixel_mode = Pixel_Mode::PX_BGRA;
+		bitmap->pitch = (int)(bitmap->width * 4);
+		bitmap->num_grays = 256;
+		break;
+
+	default:
+		return 0;
+	}
+
+	size = bitmap->rows * (uint32_t)bitmap->pitch;
+
+	/* check that there is no empty image */
+	if (size == 0)
+		return 0;     /* exit successfully! */
+	decoder->resize_bitmap(size);
+	return 1;
+}
+// 解析加载位图
+static int load_bitmap(
+	SBitDecoder* decoder,
+	uint32_t glyph_format,
+	uint32_t glyph_start,
+	uint32_t glyph_size,
+	int x_pos, int y_pos)
+{
+	uint8_t* p, * p_limit, * data;
+	data = decoder->ebdt_base + glyph_start;
+	p = data;
+	p_limit = p + glyph_size;
+	//uint8_t* ebdt_base,  Bitmap_p* bitmap,
+	// 根据字形格式glyph_format读取数据int bit_depth,
+	BigGlyphMetrics* metrics = decoder->metrics;
+	switch (glyph_format)
+	{
+	case 1:
+	case 2:
+	case 8:
+	case 17:
+		load_metrics(&p, p_limit, 0, metrics);
+		break;
+	case 6:
+	case 7:
+	case 9:
+	case 18:
+		load_metrics(&p, p_limit, 1, metrics);
+		break;
+	default:
+		return 0;
+	}
+	SBitDecoder_LoadFunc  loader = 0;
+	int ret = 0;
+	{
+		switch (glyph_format)
+		{
+		case 1:
+		case 6:
+			loader = load_byte_aligned;
+			break;
+
+		case 2:
+		case 7:
+		{
+			/* Don't trust `glyph_format'.  For example, Apple's main Korean */
+			/* system font, `AppleMyungJo.ttf' (version 7.0d2e6), uses glyph */
+			/* format 7, but the data is format 6.  We check whether we have */
+			/* an excessive number of bytes in the image: If it is equal to  */
+			/* the value for a byte-aligned glyph, use the other loading     */
+			/* routine.                                                      */
+			/*                                                               */
+			/* Note that for some (width,height) combinations, where the     */
+			/* width is not a multiple of 8, the sizes for bit- and          */
+			/* byte-aligned data are equal, for example (7,7) or (15,6).  We */
+			/* then prefer what `glyph_format' specifies.                    */
+
+			int  width = metrics->width;
+			int  height = metrics->height;
+
+			int  bit_size = (width * height + 7) >> 3;
+			int  byte_size = height * ((width + 7) >> 3);
+
+
+			if (bit_size < byte_size &&
+				byte_size == (int)(p_limit - p))
+				loader = load_byte_aligned;
+			else
+				loader = load_bit_aligned;
+		}
+		break;
+
+		case 5:
+			loader = load_bit_aligned;
+			break;
+
+		case 8:
+			if (p + 1 > p_limit)
+				return 0;
+
+			p += 1;  /* skip padding */
+			/* fall-through */
+
+		case 9:
+			loader = load_compound;
+			break;
+
+		case 17: /* small metrics, PNG image data   */
+		case 18: /* big metrics, PNG image data     */
+		case 19: /* metrics in EBLC, PNG image data */
+#ifdef FT_CONFIG_OPTION_USE_PNG
+			loader = load_png;
+			break;
+#else
+			return 0;
+#endif /* FT_CONFIG_OPTION_USE_PNG */
+
+		default:
+			return 0;
+		}
+		ret = alloc_bitmap(decoder);
+		if (!ret)
+			return ret;
+	}
+
+	ret = loader(decoder, p, p_limit, x_pos, y_pos);
+
+	return ret;
+}
+
+// 获取一个字体索引的位图
+int get_index(SBitDecoder* decoder, uint32_t glyph_index, int x_pos, int y_pos)
+{
+	uint32_t image_start = 0, image_end = 0, image_offset = 0;
+	uint32_t   start, end, index_format, image_format;
+	uint8_t* p = decoder->p, * p_limit = decoder->p_limit;
+	auto it = decoder->get_image_offset(glyph_index);
+	if (!it)
+	{
+		return 0;
+	}
+	start = it->firstGlyphIndex;
+	end = it->lastGlyphIndex;
+	image_offset = it->additionalOffsetToIndexSubtable;
+	if (!image_offset)
+	{
+		//return 0;
+	}
+	p += image_offset;
+	//p_limit
+	index_format = stb_font::ttUSHORT(p);
+	image_format = stb_font::ttUSHORT(p + 2);
+	image_offset = stb_font::ttULONG(p + 4);
+	p += 8;
+	switch (index_format)
+	{
+	case 1: /* 4-byte offsets relative to `image_offset' */
+		p += (uint64_t)4 * (glyph_index - start);
+		if (p + 8 > p_limit)
+			return 0;
+		image_start = stb_font::ttULONG(p);
+		p += 4;
+		image_end = stb_font::ttULONG(p);
+		p += 4;
+		if (image_start == image_end)  /* missing glyph */
+			return 0;
+		break;
+	case 2: /* big metrics, constant image size */
+	{
+		uint32_t  image_size;
+		if (p + 12 > p_limit)
+			return 0;
+		image_size = stb_font::ttULONG(p);
+		p += 4;
+		if (!load_metrics(&p, p_limit, 1, decoder->metrics))return 0;
+		image_start = image_size * (glyph_index - start);
+		image_end = image_start + image_size;
+	}
+	break;
+	case 3: /* 2-byte offsets relative to 'image_offset' */
+		p += (uint64_t)2 * (glyph_index - start);
+		if (p + 4 > p_limit)
+			return 0;
+		image_start = stb_font::ttUSHORT(p);
+		p += 2;
+		image_end = stb_font::ttUSHORT(p);
+		p += 2;
+		if (image_start == image_end)  /* missing glyph */
+			return 0;
+		break;
+	case 4: /* sparse glyph array with (glyph,offset) pairs */
+	{
+		uint32_t  mm, num_glyphs;
+		if (p + 4 > p_limit)
+			return 0;
+		num_glyphs = stb_font::ttULONG(p);
+		p += 4;
+		/* overflow check for p + ( num_glyphs + 1 ) * 4 */
+		if (p + 4 > p_limit ||
+			num_glyphs > (uint32_t)(((p_limit - p) >> 2) - 1))
+			return 0;
+		for (mm = 0; mm < num_glyphs; mm++)
+		{
+			uint32_t  gindex = stb_font::ttUSHORT(p);
+			p += 2;
+			if (gindex == glyph_index)
+			{
+				image_start = stb_font::ttUSHORT(p);
+				p += 4;
+				image_end = stb_font::ttUSHORT(p);
+				break;
+			}
+			p += 2;
+		}
+		if (mm >= num_glyphs)
+			return 0;
+	}
+	break;
+	case 5: /* constant metrics with sparse glyph codes */
+	case 19:
+	{
+		uint32_t  image_size, mm, num_glyphs;
+		if (p + 16 > p_limit)
+			return 0;
+		image_size = stb_font::ttULONG(p);
+		p += 4;
+		if (!load_metrics(&p, p_limit, 1, decoder->metrics))return 0;
+		num_glyphs = stb_font::ttULONG(p);
+		p += 4;
+		/* overflow check for p + 2 * num_glyphs */
+		if (num_glyphs > (uint32_t)((p_limit - p) >> 1))
+			return 0;
+
+		for (mm = 0; mm < num_glyphs; mm++)
+		{
+			uint32_t  gindex = stb_font::ttUSHORT(p);
+			p += 2;
+			if (gindex == glyph_index)
+				break;
+		}
+		if (mm >= num_glyphs)
+			return 0;
+		image_start = image_size * mm;
+		image_end = image_start + image_size;
+	}
+	break;
+
+	default:
+		return 0;
+	}
+	if (image_start > image_end)
+	{
+		return 0;
+	}
+	image_end -= image_start;
+	image_start = image_offset + image_start;
+	return load_bitmap(decoder, image_format, image_start, image_end, x_pos, y_pos);
+}
+
+// 获取子表
+static void get_index_sub_table(uint8_t* d, uint32_t n, std::vector<IndexSubTableArray>& out)
+{
+	out.resize(n);
+	for (int i = 0; i < n; i++)
+	{
+		out[i].firstGlyphIndex = stb_font::ttUSHORT(d);
+		out[i].lastGlyphIndex = stb_font::ttUSHORT(d + 2);
+		out[i].additionalOffsetToIndexSubtable = stb_font::ttULONG(d + 4);
+		d += 8;
+	}
+	return;
+}
+// 获取BitmapSizeTable
+njson get_bitmap_size_table(uint8_t* blc, uint32_t count,
+	std::vector<BitmapSizeTable>& bsts,
+	std::vector<std::vector<IndexSubTableArray>>& index_sub_table, std::unordered_map<uint8_t, uint32_t>& ms)
+{
+	auto b = blc + 8;
+	bsts.resize(count);
+	index_sub_table.resize(count);
+	njson ns, n;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto& it = bsts[i];
+		it.indexSubTableArrayOffset = stb_font::ttULONG(b); //offset to indexSubtableArray from beginning of EBLC.
+		b += 4;
+		it.indexTablesSize = stb_font::ttULONG(b); //number of bytes in corresponding index subtables and array
+		b += 4;
+		it.numberOfIndexSubTables = stb_font::ttULONG(b); //an index subtable for each range or format change
+		b += 4;
+		it.colorRef = stb_font::ttULONG(b); //not used; set to 0.
+		b += 4;
+		memcpy(&it.hori, b, sizeof(SbitLineMetrics));
+		b += sizeof(SbitLineMetrics);
+		memcpy(&it.vert, b, sizeof(SbitLineMetrics));
+		b += sizeof(SbitLineMetrics);
+		it.startGlyphIndex = stb_font::ttUSHORT(b); //lowest glyph index for this size
+		b += 2;
+		it.endGlyphIndex = stb_font::ttUSHORT(b); //highest glyph index for this size
+		b += 2;
+		it.ppemX = *b; //horizontal pixels per Em
+		b += 1;
+		it.ppemY = *b; //vertical pixels per Em
+		b += 1;
+		it.bitDepth.value = *b;
+		b += 1;
+		it.flags.raw.value = *b;
+		b += 1;
+		get_index_sub_table(blc + it.indexSubTableArrayOffset, it.numberOfIndexSubTables, index_sub_table[i]);
+		n["ppem"] = { it.ppemX, it.ppemY };
+		ms[it.ppemY] = i;
+		n["id"] = i;
+		ns.push_back(n);
+	}
+	return ns;
+}
+int load_metrics(uint8_t** pp, uint8_t* limit, int big, BigGlyphMetrics* metrics)
+{
+	uint8_t* p = *pp;
+	if (p + 5 > limit)
+		return 0;
+	metrics->height = p[0];
+	metrics->width = p[1];
+	metrics->horiBearingX = (char)p[2];
+	metrics->horiBearingY = (char)p[3];
+	metrics->horiAdvance = p[4];
+	p += 5;
+	if (big)
+	{
+		if (p + 3 > limit)
+			return 0;
+		metrics->vertBearingX = (char)p[0];
+		metrics->vertBearingY = (char)p[1];
+		metrics->vertAdvance = p[2];
+		p += 3;
+	}
+	else
+	{
+		/* avoid uninitialized data in case there is no vertical info -- */
+		metrics->vertBearingX = 0;
+		metrics->vertBearingY = 0;
+		metrics->vertAdvance = 0;
+	}
+	*pp = p;
+	return 1;
+}
+
+
+unsigned char fdata[2180] = {
+	0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+	0x00, 0x00, 0x02, 0xF0, 0x00, 0x00, 0x00, 0x2A, 0x01, 0x03, 0x00, 0x00, 0x00, 0xEF, 0x52, 0xFD,
+	0x59, 0x00, 0x00, 0x00, 0x03, 0x73, 0x42, 0x49, 0x54, 0x08, 0x08, 0x08, 0xDB, 0xE1, 0x4F, 0xE0,
+	0x00, 0x00, 0x00, 0x06, 0x50, 0x4C, 0x54, 0x45, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x55, 0xC2,
+	0xD3, 0x7E, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x0E, 0x9C, 0x00, 0x00,
+	0x0E, 0x9C, 0x01, 0x07, 0x94, 0x53, 0xDD, 0x00, 0x00, 0x00, 0x1C, 0x74, 0x45, 0x58, 0x74, 0x53,
+	0x6F, 0x66, 0x74, 0x77, 0x61, 0x72, 0x65, 0x00, 0x41, 0x64, 0x6F, 0x62, 0x65, 0x20, 0x46, 0x69,
+	0x72, 0x65, 0x77, 0x6F, 0x72, 0x6B, 0x73, 0x20, 0x43, 0x53, 0x36, 0xE8, 0xBC, 0xB2, 0x8C, 0x00,
+	0x00, 0x00, 0x16, 0x74, 0x45, 0x58, 0x74, 0x43, 0x72, 0x65, 0x61, 0x74, 0x69, 0x6F, 0x6E, 0x20,
+	0x54, 0x69, 0x6D, 0x65, 0x00, 0x31, 0x32, 0x2F, 0x31, 0x30, 0x2F, 0x32, 0x30, 0x4A, 0xBE, 0xBD,
+	0xE5, 0x00, 0x00, 0x07, 0xCB, 0x49, 0x44, 0x41, 0x54, 0x48, 0x89, 0xAD, 0xD6, 0x5F, 0x6C, 0x14,
+	0xC7, 0x19, 0x00, 0x70, 0x13, 0xA3, 0x1C, 0x8A, 0x48, 0x5C, 0x13, 0xA9, 0xBA, 0x07, 0x83, 0xA3,
+	0x82, 0x1A, 0xF1, 0xD0, 0x2A, 0x4D, 0x54, 0xC5, 0xFC, 0x8B, 0x41, 0xED, 0x0B, 0x2A, 0x6D, 0xF2,
+	0x80, 0xED, 0x2A, 0x04, 0xDC, 0x88, 0x4A, 0xA9, 0x82, 0x8C, 0x4D, 0x08, 0x77, 0x29, 0x9B, 0xE3,
+	0x72, 0x3D, 0xA9, 0x26, 0xAA, 0xCB, 0x29, 0x42, 0x15, 0x95, 0x90, 0xB9, 0x07, 0x94, 0xA2, 0xE0,
+	0x82, 0x43, 0x2D, 0xDF, 0x62, 0x6F, 0xC6, 0x1B, 0xB3, 0x84, 0x93, 0xD5, 0x86, 0x93, 0x52, 0xA1,
+	0x85, 0x2E, 0x7B, 0x13, 0x74, 0x45, 0x2B, 0xD5, 0xEC, 0x7D, 0xB6, 0x4E, 0xEE, 0x60, 0x8F, 0xF7,
+	0xA6, 0xDF, 0xEC, 0xDE, 0x81, 0x6D, 0x6C, 0xE7, 0x8F, 0x3A, 0x2F, 0x77, 0x3B, 0xBB, 0xFB, 0x9B,
+	0x6F, 0xBF, 0xF9, 0x66, 0x76, 0x6B, 0x44, 0xBB, 0x10, 0xDC, 0xD3, 0xC5, 0xD7, 0x68, 0xB3, 0xF1,
+	0x54, 0x1C, 0x16, 0xE9, 0x2F, 0x2B, 0x67, 0x5E, 0xA9, 0x59, 0xA2, 0x89, 0x76, 0x26, 0x38, 0xA7,
+	0xF2, 0xB2, 0xAF, 0x1A, 0xC3, 0x83, 0xA2, 0xCE, 0x66, 0xC5, 0xB4, 0x48, 0xE7, 0xE8, 0x40, 0x76,
+	0x0E, 0xCF, 0xED, 0x8F, 0x97, 0xE2, 0xF3, 0xC3, 0x05, 0x35, 0x1A, 0xF0, 0xFB, 0xF3, 0x4D, 0x3C,
+	0xD4, 0xB4, 0x3F, 0x25, 0xBC, 0xF2, 0xFD, 0xC9, 0xDB, 0x4D, 0x3F, 0x59, 0xD9, 0xB0, 0xEB, 0xF1,
+	0x15, 0x8F, 0x3F, 0x73, 0xDC, 0xE8, 0x69, 0xDA, 0xF1, 0xDC, 0x67, 0x3B, 0x37, 0xAC, 0x05, 0x8C,
+	0xBD, 0x2C, 0x3C, 0xD1, 0x09, 0x54, 0x63, 0x73, 0x79, 0x3A, 0xB1, 0x14, 0x4F, 0x67, 0x6E, 0xB4,
+	0xEA, 0x0C, 0x8E, 0xE1, 0x65, 0x7B, 0x7B, 0xCD, 0xC3, 0xC7, 0xE8, 0xDE, 0xA8, 0xE0, 0x22, 0x7A,
+	0x30, 0x6F, 0x76, 0x64, 0xAC, 0x0E, 0xAA, 0x75, 0x7E, 0xDF, 0xEC, 0x88, 0x98, 0x2D, 0x99, 0x1B,
+	0x07, 0x2E, 0x10, 0x56, 0xE1, 0x31, 0x45, 0x3C, 0xE0, 0xD9, 0x57, 0xF2, 0x13, 0x6D, 0xBF, 0xD0,
+	0x99, 0xBB, 0x0F, 0xAF, 0xB2, 0x6D, 0x7A, 0x38, 0x56, 0xB6, 0xA3, 0x71, 0x56, 0xAB, 0xBE, 0x7A,
+	0xDD, 0x74, 0x2F, 0xAA, 0x2E, 0x1D, 0x86, 0x1F, 0xB6, 0x21, 0xCF, 0x90, 0xEF, 0xFF, 0x56, 0xFC,
+	0x8C, 0xD3, 0xFA, 0x32, 0x2B, 0x36, 0x35, 0xD7, 0x96, 0x6D, 0xFA, 0xC9, 0xF8, 0x93, 0x2F, 0x15,
+	0xDE, 0xF0, 0x40, 0xE4, 0xBF, 0xB8, 0xF8, 0xA2, 0x7B, 0xE2, 0xC5, 0x3B, 0x74, 0x08, 0xFE, 0xD2,
+	0xB6, 0x3F, 0xB2, 0x89, 0x65, 0x06, 0xA3, 0xFD, 0x31, 0xC9, 0x5F, 0xDF, 0x7A, 0xE8, 0x7A, 0xC3,
+	0xFA, 0xF4, 0xE6, 0xE8, 0xEA, 0xAD, 0xC6, 0xD5, 0x3F, 0xBF, 0xBE, 0xE1, 0x4F, 0x3B, 0x9F, 0x6F,
+	0xE0, 0xB0, 0x0C, 0x5F, 0xFA, 0xA8, 0x9D, 0x15, 0x5F, 0xC2, 0x99, 0xB3, 0x69, 0x7C, 0xCF, 0xDB,
+	0xB6, 0x7D, 0x4A, 0x40, 0xAD, 0xFD, 0xC5, 0x45, 0x8C, 0x3E, 0xF3, 0x03, 0x8C, 0xBE, 0x55, 0xED,
+	0x8C, 0x8C, 0xB0, 0xCC, 0x30, 0xA3, 0x31, 0x8E, 0x3C, 0x66, 0x4C, 0x55, 0x3A, 0xE8, 0x30, 0x6B,
+	0xB5, 0x3A, 0x32, 0x0A, 0x0E, 0x7B, 0x40, 0x1D, 0x59, 0x26, 0x7A, 0x31, 0x71, 0x64, 0xAC, 0xDD,
+	0x4F, 0x8E, 0x67, 0xE7, 0xC5, 0x8E, 0x29, 0xDB, 0x66, 0xF8, 0xC8, 0xE4, 0xD6, 0xEF, 0x4D, 0x77,
+	0x84, 0xC9, 0xDC, 0xB7, 0x9E, 0xEA, 0xFC, 0x2E, 0x8D, 0xAA, 0x9B, 0xC7, 0xF3, 0x9E, 0xE4, 0xAF,
+	0x59, 0x6E, 0xF7, 0xBB, 0x2E, 0x1D, 0xF2, 0xF9, 0x59, 0x96, 0xB9, 0xCC, 0xD4, 0x63, 0xCB, 0xF1,
+	0x33, 0x37, 0x3E, 0xEA, 0xE7, 0x54, 0xA6, 0x13, 0x65, 0xE5, 0x88, 0x6D, 0x77, 0xE2, 0xD4, 0xC6,
+	0x8B, 0x19, 0x9C, 0x5A, 0x8E, 0xFC, 0xC1, 0x56, 0xB3, 0xF3, 0xA0, 0x19, 0x55, 0x8F, 0x8E, 0xE7,
+	0xED, 0x4A, 0xF4, 0xBA, 0xE2, 0x56, 0xA2, 0x17, 0xB2, 0x3F, 0xB7, 0x1C, 0x4F, 0x67, 0x0A, 0x99,
+	0x76, 0x2C, 0x4C, 0x28, 0xF3, 0x42, 0x4F, 0x78, 0xF2, 0xC4, 0xB6, 0x42, 0x3A, 0xE6, 0x95, 0xBD,
+	0xC9, 0xE7, 0x9A, 0x8C, 0x95, 0xEF, 0xFE, 0x23, 0x74, 0xA9, 0xE6, 0x95, 0x5F, 0x66, 0x7B, 0xB6,
+	0x17, 0x72, 0x47, 0xC7, 0x7A, 0xD6, 0xE2, 0xA4, 0x88, 0x2B, 0x5B, 0x27, 0xAE, 0x35, 0xFC, 0x34,
+	0x35, 0xB0, 0x63, 0xF7, 0xAE, 0xC2, 0xD5, 0x77, 0x0E, 0x19, 0x47, 0xC7, 0x8A, 0xEB, 0x96, 0x8B,
+	0x5E, 0xCE, 0x3E, 0xAE, 0x5A, 0x2A, 0x1E, 0x54, 0xB2, 0x37, 0x67, 0x25, 0xF9, 0x4B, 0xCD, 0xA9,
+	0xAC, 0xDA, 0x58, 0x2A, 0xF8, 0xC3, 0x75, 0x7F, 0x09, 0x42, 0x70, 0x07, 0x2D, 0x2B, 0xE9, 0x65,
+	0xF8, 0xE5, 0xDA, 0x6C, 0x7C, 0xFE, 0xF1, 0x44, 0x73, 0xD0, 0xEB, 0xF7, 0x67, 0x0B, 0x7E, 0x5F,
+	0x33, 0x26, 0xF3, 0x5B, 0xF2, 0x4B, 0x8D, 0x2A, 0x72, 0x4B, 0x9D, 0x8A, 0xF3, 0x4F, 0xE7, 0xF1,
+	0xA6, 0x88, 0x0B, 0xC7, 0xD3, 0x83, 0x73, 0x5F, 0x0B, 0x4F, 0xDD, 0xE7, 0x71, 0xB6, 0xC4, 0xB9,
+	0xDC, 0x6F, 0xA7, 0xB6, 0xCF, 0xE5, 0xA1, 0xFF, 0xE0, 0x16, 0x85, 0x05, 0x9B, 0x4E, 0xD9, 0x81,
+	0x54, 0xE3, 0xE5, 0x4D, 0x5F, 0x1A, 0x98, 0x63, 0xCA, 0x44, 0x61, 0x09, 0x82, 0x94, 0xE5, 0xB5,
+	0x71, 0x91, 0x9E, 0x15, 0x69, 0xB8, 0x37, 0x3F, 0x7F, 0x34, 0x56, 0x9E, 0x17, 0x3D, 0xB4, 0x77,
+	0xB4, 0x1C, 0x41, 0x5E, 0xFA, 0x65, 0x2B, 0x15, 0x01, 0xED, 0xBF, 0x45, 0x12, 0xC5, 0xED, 0x93,
+	0x4F, 0xDA, 0xC5, 0xBA, 0x55, 0x5D, 0xCF, 0x74, 0x1D, 0x4F, 0xAE, 0xDC, 0x3E, 0xF9, 0xD8, 0x0B,
+	0xC9, 0xEB, 0x75, 0xAB, 0x56, 0x3C, 0xF6, 0xC4, 0xAA, 0xFA, 0xD0, 0x48, 0x39, 0x78, 0x52, 0xCA,
+	0xE3, 0x14, 0x8A, 0x62, 0x01, 0x2F, 0xE6, 0xF3, 0xB3, 0x7F, 0xDC, 0x3D, 0x05, 0x0C, 0xDA, 0x30,
+	0x3D, 0x65, 0x02, 0x11, 0xD8, 0x02, 0x1E, 0x51, 0xF0, 0x6E, 0xAF, 0xF8, 0x37, 0x88, 0xB8, 0x9A,
+	0x7A, 0xD1, 0x86, 0xBC, 0x3B, 0xFD, 0x42, 0x87, 0xAD, 0x46, 0xC6, 0x0F, 0xA8, 0x6F, 0xDA, 0xC3,
+	0xF0, 0x90, 0xC7, 0x7A, 0x2B, 0x57, 0xF9, 0xF8, 0xE2, 0xBC, 0xE8, 0x78, 0x7B, 0x4A, 0x30, 0x48,
+	0x21, 0xEF, 0x11, 0x60, 0xC5, 0xCB, 0xBF, 0x41, 0x3E, 0x57, 0x9E, 0x58, 0x57, 0x3C, 0x6F, 0x1E,
+	0x71, 0x2D, 0x96, 0x47, 0xDE, 0x9E, 0x1E, 0xD8, 0x67, 0x2B, 0x11, 0xA1, 0xA8, 0x6F, 0x8E, 0x9B,
+	0xDF, 0x8C, 0x2F, 0xE7, 0x8F, 0xBC, 0x15, 0x67, 0xD0, 0x1F, 0xF0, 0x70, 0x46, 0x3B, 0x17, 0x33,
+	0x0E, 0xE7, 0x88, 0x10, 0x31, 0xE4, 0x3D, 0x2B, 0x42, 0x91, 0x27, 0xFC, 0xC7, 0xC8, 0xD7, 0xC5,
+	0x95, 0xE1, 0xFF, 0x8C, 0x9B, 0x54, 0x97, 0xBB, 0x77, 0xB6, 0xEE, 0xA9, 0xAD, 0xBF, 0x9A, 0xF8,
+	0x67, 0xEA, 0x44, 0xAA, 0xEB, 0xD7, 0x93, 0xC9, 0x2B, 0xCF, 0xAE, 0x7E, 0xFA, 0x7B, 0x4F, 0xEC,
+	0xAC, 0x0F, 0x3D, 0xCA, 0xD3, 0xCD, 0xE7, 0x31, 0xFA, 0xDD, 0xA1, 0x89, 0x46, 0x8E, 0xBC, 0xAB,
+	0xF7, 0x2B, 0xD6, 0x1F, 0xE4, 0xD2, 0x52, 0xCE, 0x9B, 0x4F, 0x7A, 0x37, 0xBB, 0xE8, 0x28, 0xE4,
+	0xB7, 0xCD, 0x0C, 0xEE, 0x33, 0x94, 0xF6, 0x34, 0xF2, 0x0C, 0x74, 0x9F, 0xD7, 0x22, 0xAE, 0xA5,
+	0xB9, 0x9F, 0x43, 0x91, 0x1E, 0x1D, 0x38, 0x68, 0x6B, 0x67, 0x40, 0x3E, 0x99, 0xD6, 0x89, 0xE7,
+	0x16, 0xE4, 0xBE, 0xEE, 0x35, 0xC9, 0x53, 0x8C, 0x1E, 0x79, 0x7A, 0xAF, 0xBD, 0x5F, 0x21, 0x5C,
+	0x60, 0x72, 0xF8, 0xF9, 0x9C, 0x8C, 0xFE, 0xF6, 0x5E, 0x4C, 0x0E, 0xF2, 0x54, 0xE9, 0x04, 0x65,
+	0xF8, 0xDF, 0xE3, 0x15, 0xBE, 0x10, 0xF1, 0x6E, 0x6E, 0x71, 0x6D, 0x7C, 0x3F, 0x1E, 0x55, 0x91,
+	0xD7, 0x9B, 0xE5, 0xD0, 0x26, 0x5D, 0x18, 0x3D, 0xBE, 0x45, 0x5E, 0xFB, 0x2B, 0xF2, 0x72, 0x99,
+	0x33, 0x02, 0x23, 0xA0, 0xF9, 0x3C, 0x4E, 0xAD, 0xB8, 0xA4, 0x21, 0x1F, 0xE4, 0x7E, 0x26, 0xB3,
+	0x8F, 0xFE, 0x4C, 0xF2, 0x53, 0xE3, 0x10, 0xD7, 0x47, 0x90, 0xB7, 0x22, 0x9E, 0xC5, 0x4B, 0xC8,
+	0x37, 0x07, 0x3C, 0x5D, 0x9C, 0x87, 0xB2, 0xFD, 0xEA, 0x05, 0x1D, 0xEB, 0xFE, 0x13, 0x51, 0x62,
+	0x16, 0x56, 0x8E, 0xA6, 0x2A, 0x44, 0xCD, 0x61, 0x61, 0x4E, 0xE7, 0x35, 0x59, 0x39, 0x45, 0x59,
+	0x39, 0xFF, 0xCA, 0x74, 0x50, 0x35, 0x02, 0x0A, 0x99, 0xB2, 0x21, 0xEA, 0xF3, 0x7E, 0x72, 0xC0,
+	0x96, 0xC9, 0x91, 0xFC, 0x08, 0x28, 0xDB, 0x70, 0x68, 0x75, 0x91, 0xA9, 0xDD, 0xF2, 0x56, 0x9C,
+	0xCB, 0x12, 0x28, 0x31, 0x27, 0x19, 0x6A, 0x6C, 0x78, 0x87, 0x1B, 0xB9, 0x9C, 0x4E, 0xD9, 0xF4,
+	0x9D, 0xEF, 0xD4, 0x85, 0xBB, 0xD6, 0x4F, 0x1E, 0x4F, 0xDE, 0xDE, 0xBE, 0x26, 0x79, 0x38, 0x75,
+	0xED, 0xF9, 0x75, 0x5B, 0x63, 0x53, 0x3D, 0xD7, 0x42, 0x3E, 0x3F, 0x5A, 0xB7, 0x6E, 0x75, 0x17,
+	0x9E, 0xBB, 0xB7, 0x6B, 0xCD, 0xEF, 0x7E, 0x64, 0x5C, 0x79, 0xAA, 0xB1, 0xA1, 0x77, 0x6A, 0x0C,
+	0x1E, 0x99, 0xDA, 0xA0, 0xA4, 0x3C, 0x1D, 0x79, 0x31, 0xE7, 0x23, 0x46, 0x9F, 0xB3, 0x54, 0xCA,
+	0xFE, 0x92, 0x16, 0xA5, 0xEA, 0x71, 0xEA, 0x66, 0xF5, 0x5F, 0xB1, 0x72, 0x0F, 0x96, 0xA8, 0xDF,
+	0x00, 0x37, 0x85, 0x47, 0xF8, 0xA0, 0xCD, 0xD9, 0x86, 0x17, 0xB4, 0x72, 0xF3, 0x23, 0x5D, 0x9F,
+	0x06, 0x55, 0x3E, 0x29, 0x44, 0xA3, 0x3F, 0xE0, 0x64, 0xD0, 0xDD, 0x28, 0x63, 0x5D, 0x9C, 0xFF,
+	0xFF, 0x37, 0x26, 0x68, 0x8D, 0x70, 0xE5, 0xBF, 0xB4, 0xA7, 0x7F, 0xE3, 0xBB, 0xEF, 0x88, 0x6E,
+	0x47, 0xA4, 0x97, 0x3E, 0x3F, 0xCB, 0x9A, 0x3F, 0xAC, 0x11, 0x96, 0x7C, 0x4D, 0xD1, 0x60, 0xCB,
+	0x5C, 0x26, 0x43, 0x8F, 0x36, 0xD0, 0x99, 0x25, 0x16, 0xFB, 0xE6, 0xAC, 0x34, 0xCE, 0x28, 0xAF,
+	0x01, 0xCB, 0x35, 0xB4, 0x1C, 0x65, 0xC1, 0x75, 0xDC, 0x61, 0x86, 0xC1, 0x13, 0x4E, 0xC2, 0xC8,
+	0xCA, 0xB1, 0x74, 0x23, 0x0B, 0xA1, 0xD1, 0x50, 0x6D, 0xAD, 0x11, 0x4E, 0x8E, 0xD6, 0x37, 0xD6,
+	0x37, 0x65, 0x6B, 0xB3, 0xB5, 0xA3, 0x2B, 0xC2, 0xE1, 0x8D, 0xE1, 0xFA, 0x04, 0xD0, 0xB9, 0x9B,
+	0x7E, 0xAE, 0xB4, 0x70, 0x28, 0xE4, 0x45, 0x0D, 0xA8, 0xEE, 0xE0, 0x1E, 0x15, 0x3F, 0x03, 0xFD,
+	0x93, 0xDC, 0xCA, 0x12, 0x52, 0xD2, 0x2D, 0x42, 0x34, 0x3C, 0x10, 0x94, 0x68, 0xA0, 0x11, 0x0D,
+	0x8F, 0x70, 0xB3, 0xD3, 0xF4, 0x81, 0x5E, 0xFF, 0xA0, 0x83, 0x90, 0x3E, 0xA2, 0x29, 0x15, 0xBE,
+	0x19, 0xBF, 0x69, 0x4B, 0xA2, 0x39, 0x57, 0x6A, 0x4E, 0x2D, 0xC6, 0x0B, 0x77, 0xB0, 0x4D, 0xC5,
+	0xD7, 0xB2, 0xFF, 0x62, 0xE6, 0x84, 0x49, 0x5E, 0xE7, 0x84, 0xC8, 0xA9, 0x01, 0xF2, 0xA1, 0x83,
+	0x9E, 0xAA, 0x4A, 0x5E, 0xD5, 0x4F, 0xF6, 0xC6, 0x48, 0x8C, 0x10, 0x40, 0xDE, 0xD2, 0x78, 0x85,
+	0xD7, 0xF1, 0x29, 0x5D, 0x59, 0xC8, 0x7A, 0x35, 0x7A, 0x98, 0xC7, 0x27, 0x54, 0x9F, 0xDF, 0x28,
+	0x2F, 0x66, 0xC8, 0x7B, 0xE3, 0x3E, 0xEF, 0x08, 0x48, 0xB0, 0xDE, 0x16, 0x53, 0x8B, 0x23, 0x1F,
+	0x47, 0xBE, 0x5F, 0x3F, 0x75, 0x41, 0xF2, 0x3A, 0x10, 0xAD, 0xCF, 0x32, 0xF1, 0x79, 0x1F, 0xF0,
+	0xB0, 0x0C, 0x6F, 0x65, 0x5F, 0xEE, 0x47, 0x3E, 0x5B, 0xE1, 0x3D, 0x6E, 0x75, 0x9F, 0x65, 0x16,
+	0x71, 0x80, 0xE2, 0x87, 0x7F, 0x8B, 0xD9, 0x1D, 0x27, 0xDD, 0xDD, 0x92, 0x4F, 0xE9, 0x27, 0x25,
+	0x9F, 0xA4, 0x40, 0xAC, 0x3E, 0xA7, 0xCA, 0x67, 0xCF, 0x15, 0x46, 0x8D, 0xE4, 0xE8, 0xD9, 0x54,
+	0xE1, 0x12, 0xAC, 0x58, 0x6F, 0x3C, 0x7B, 0xB7, 0x7E, 0x34, 0xB9, 0xA9, 0x7E, 0xC3, 0xFB, 0xE1,
+	0x44, 0x95, 0x2F, 0xF5, 0x7D, 0x80, 0xBC, 0xF9, 0x9E, 0x48, 0x60, 0x36, 0x18, 0x77, 0x2C, 0xAD,
+	0x97, 0x39, 0x43, 0x7E, 0x5C, 0xAC, 0xC5, 0x0A, 0xA2, 0x4F, 0xCA, 0xE8, 0x07, 0x06, 0x63, 0xC9,
+	0x98, 0xEA, 0xF8, 0x3C, 0x40, 0xC0, 0x6B, 0xA7, 0x6D, 0x4C, 0x97, 0xD6, 0x0B, 0x5C, 0x85, 0x4C,
+	0x2F, 0x39, 0x7D, 0xEB, 0x73, 0x4C, 0x9E, 0x16, 0xB1, 0x88, 0xC6, 0xB0, 0x5C, 0x24, 0x3F, 0x75,
+	0x77, 0x4F, 0x35, 0x39, 0xC8, 0x33, 0xAE, 0xE1, 0x6B, 0xC5, 0xFA, 0x0C, 0xAB, 0x15, 0x03, 0x68,
+	0x31, 0x88, 0xE4, 0x0F, 0xF9, 0xB9, 0xEF, 0x1B, 0x8C, 0xE9, 0x31, 0x95, 0x03, 0x31, 0x4F, 0xE2,
+	0xB3, 0x01, 0x93, 0x77, 0x94, 0x88, 0x2E, 0x79, 0x02, 0xBC, 0x1F, 0x32, 0x04, 0x1B, 0x95, 0xC9,
+	0x1B, 0x74, 0x2C, 0xE6, 0x47, 0x2F, 0x44, 0x62, 0xEA, 0xC6, 0x81, 0xEA, 0xD4, 0x22, 0x0F, 0xDE,
+	0x7B, 0xC8, 0x13, 0x4F, 0xE6, 0x90, 0xB1, 0x16, 0x0D, 0x79, 0x5D, 0x57, 0x1E, 0xF2, 0x9A, 0x87,
+	0xBC, 0x69, 0x55, 0xF9, 0xBF, 0x23, 0x9F, 0x80, 0x2C, 0xF2, 0xA9, 0x0A, 0x6F, 0xE0, 0xF9, 0x0B,
+	0x60, 0x41, 0x85, 0xB7, 0x06, 0x6F, 0xBC, 0x21, 0x2A, 0x99, 0xA4, 0x84, 0x51, 0xC2, 0x49, 0xC0,
+	0x63, 0xE5, 0x88, 0xB3, 0xF2, 0x0E, 0xA2, 0x07, 0x85, 0xD9, 0x37, 0x14, 0xD3, 0x7F, 0x8E, 0x7F,
+	0x89, 0x83, 0x3C, 0x82, 0x7E, 0x72, 0x90, 0xD7, 0x41, 0x27, 0x7E, 0x72, 0x7C, 0x5E, 0x0E, 0xDF,
+	0xE7, 0x38, 0x50, 0xCD, 0xFD, 0xE0, 0x60, 0x44, 0xBE, 0x4F, 0x70, 0x81, 0xA7, 0xA9, 0x85, 0x85,
+	0xC9, 0x35, 0x1B, 0xD3, 0xEB, 0xC8, 0xBA, 0x77, 0xB0, 0xE4, 0x35, 0xAD, 0xC2, 0x93, 0x3E, 0x0D,
+	0x6B, 0x5F, 0x8E, 0x0D, 0x26, 0xA9, 0xF2, 0x03, 0xA7, 0xED, 0x21, 0x02, 0x06, 0x1E, 0x69, 0x92,
+	0x3F, 0x7D, 0x8B, 0x12, 0x77, 0x08, 0x2C, 0xCB, 0xB1, 0xAB, 0xBC, 0xA1, 0xBD, 0x2F, 0xE4, 0xA6,
+	0x40, 0x45, 0x5A, 0x77, 0x46, 0x13, 0xC6, 0x97, 0xD9, 0x02, 0x18, 0x38, 0x3C, 0xAE, 0x5A, 0xC7,
+	0x08, 0x87, 0xB2, 0xA1, 0xDA, 0xC6, 0x6C, 0x38, 0xC9, 0xEA, 0x57, 0x6C, 0x5C, 0x9B, 0x6D, 0xCC,
+	0x36, 0x24, 0xB3, 0x06, 0x98, 0xE1, 0x6C, 0x6D, 0xC0, 0x8F, 0x9D, 0x2B, 0x5C, 0x35, 0x92, 0x24,
+	0x9C, 0xE4, 0xF5, 0xC9, 0x35, 0x61, 0xE3, 0xDC, 0xDD, 0x50, 0xB2, 0x74, 0x15, 0xAC, 0x0F, 0x20,
+	0x51, 0x49, 0x8E, 0xFF, 0x69, 0xEC, 0xE9, 0x92, 0x9F, 0xB7, 0xCD, 0x2F, 0x58, 0xE3, 0xD1, 0xE0,
+	0x67, 0xFA, 0x41, 0xC7, 0x1D, 0xEF, 0xE1, 0x32, 0xC5, 0x45, 0xA8, 0xF9, 0x7F, 0xF4, 0xEA, 0xAE,
+	0x05, 0x72, 0x4B, 0x7B, 0xC0, 0x07, 0x0B, 0x64, 0x5E, 0x5B, 0xC0, 0xD7, 0x89, 0x85, 0x0D, 0xA5,
+	0xEA, 0x7E, 0x6E, 0x08, 0xD1, 0xED, 0xFF, 0x69, 0xBC, 0x5F, 0xE9, 0x49, 0xFB, 0xEE, 0xFF, 0x00,
+	0xAA, 0xCF, 0x5C, 0xA0, 0xB7, 0x28, 0x68, 0xF7, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+	0xAE, 0x42, 0x60, 0x82
+};
+
+/*
+新宋体ascii 94个符号位图数据
+// 12号像素是6*14宽高
+char r[2] = { 0x21, 0x7e };
+12：6*14=564
+14：7*16=658
+16：8*18=752
+*/
+void nsimsun_ascii(bitmap_ttinfo* obt)
+{
+	std::string str = R"(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)";
+	uint32_t* img = obt->_buf;
+	if (!img)
+	{
+		stbimage_load lad;
+		if (lad.load_mem((char*)fdata, 2180))
+		{
+			img = new uint32_t[lad.width * lad.height];
+			obt->_buf = img;
+			memcpy(img, lad.data, sizeof(uint32_t) * lad.width * lad.height);
+			obt->_bimg.data = img;
+			obt->_bimg.width = lad.width;
+			obt->_bimg.height = lad.height;
+			obt->_bimg.format = 0;
+		}
+	}
+
+	if (!img)
+	{
+		obt->_chsize.clear();
+		obt->_unicode_rang.clear();
+		return;
+	}
+	// 支持的大小
+	obt->_chsize = { {12, 6}, {14, 7}, {16, 8} };
+	// 范围
+	obt->_unicode_rang = { {0x21, 0x7e}, {0x21, 0x7e}, {0x21, 0x7e} };
+}
+
+
+int font_t::init_sbit()
+{
+	auto font_i = font;
+	const stbtt_fontinfo* font = font_i;
+	int i, count, stringOffset;
+	uint8_t* fc = font->data;
+	uint32_t offset = font->fontstart, table_size = 0, sbit_num_strikes = 0;
+	uint32_t ebdt_start = 0, ebdt_size = 0;
+	sfnt_header* ebdt_table = 0;
+	auto sbit_table = get_tag(font_i, TAG_CBLC);
+	sbit_table_type stt = sbit_table_type::TYPE_NONE;
+	do
+	{
+		if (sbit_table)
+		{
+			stt = sbit_table_type::TYPE_CBLC;
+			break;
+		}
+		sbit_table = get_tag(font_i, TAG_EBLC);
+		if (sbit_table)
+		{
+			stt = sbit_table_type::TYPE_EBLC;
+			break;
+		}
+		sbit_table = get_tag(font_i, TAG_bloc);
+		if (sbit_table)
+		{
+			stt = sbit_table_type::TYPE_EBLC;
+			break;
+		}
+		sbit_table = get_tag(font_i, TAG_sbix);
+		if (sbit_table)
+		{
+			stt = sbit_table_type::TYPE_SBIX;
+			break;
+		}
+		else
+		{
+			// error
+			return 0;
+		}
+	} while (0);
+	table_size = sbit_table->logicalLength;
+	switch (stt)
+	{
+	case sbit_table_type::TYPE_EBLC:
+	case sbit_table_type::TYPE_CBLC:
+	{
+		uint8_t* p = fc + sbit_table->offset;
+		uint32_t   count;
+		int majorVersion = stb_font::ttUSHORT(p + 0);
+		int minorVersion = stb_font::ttUSHORT(p + 2);
+		uint32_t num_strikes = stb_font::ttULONG(p + 4);
+		if (num_strikes >= 0x10000UL)
+		{
+			return 0;
+		}
+
+		/*
+		*  Count the number of strikes available in the table.  We are a bit
+		*  paranoid there and don't trust the data.
+		*/
+		count = num_strikes;
+		if (8 + 48UL * count > table_size)
+			count = (uint32_t)((table_size - 8) / 48);
+		sbit_num_strikes = count;
+	}
+	break;
+	case sbit_table_type::TYPE_SBIX:
+	{
+		//TODO		解析SBIX
+	}
+	break;
+	default:
+		break;
+	}
+	do
+	{
+		ebdt_table = get_tag(font_i, TAG_CBDT);
+		if (ebdt_table) break;
+		ebdt_table = get_tag(font_i, TAG_EBDT);
+		if (ebdt_table) break;
+		ebdt_table = get_tag(font_i, TAG_bdat);
+		if (!ebdt_table) return 0;
+	} while (0);
+
+	auto ebsc_table = get_tag(font_i, TAG_EBSC);
+	font_t* ttp = (font_t*)font->userdata;
+	uint8_t* b = fc + sbit_table->offset;
+	count = stb_font::ttULONG(b + 4);
+	if (!count)
+	{
+		return 0;
+	}
+	bitinfo = new bitmap_ttinfo();
+	// 位图表eblc
+	//std::vector<BitmapSizeTable> bsts;
+	//std::vector<std::vector<IndexSubTableArray>> index_sub_table;
+	njson ns = get_bitmap_size_table(b, count, bitinfo->_bsts, bitinfo->_index_sub_table, bitinfo->_msidx_table);
+#if 0
+	//ndef nnDEBUG
+	printf("<%s>包含位图大小\n", _aname.c_str());
+	for (auto& it : ns)
+		printf("%s\n", it.dump().c_str());
+#endif // !nnDEBUG
+	// 位图数据表ebdt
+	b = fc + ebdt_table->offset;
+	glm::ivec2 version = { stb_font::ttUSHORT(b + 0), stb_font::ttUSHORT(b + 2) };
+	bitinfo->_sbit_table = sbit_table;
+	bitinfo->_ebdt_table = ebdt_table;
+	bitinfo->_ebsc_table = ebsc_table;
+	if (ns.size()) {
+		first_bitmap = true;
+	}
+	return ns.size();
+}
+
+
+#endif // !_FONT_NO_BITMAP
+
+
+
+#ifndef NO_COLOR_FONT
+
+/**************************************************************************
+ *
+ * `COLR' table specification:
+ *
+ *   https://www.microsoft.com/typography/otspec/colr.htm
+ *
+ */
+
+
+
+ /* NOTE: These are the table sizes calculated through the specs. */
+#define BASE_GLYPH_SIZE            6
+#define LAYER_SIZE                 4
+#define COLR_HEADER_SIZE          14
+
+
+struct BaseGlyphRecord
+{
+	uint16_t  gid;
+	uint16_t  first_layer_index;
+	uint16_t  num_layers;
+
+};
+
+
+struct Colr
+{
+	uint16_t  version;
+	uint16_t  num_base_glyphs;
+	uint16_t  num_layers;
+
+	uint8_t* base_glyphs;
+	uint8_t* layers;
+
+	/* The memory which backs up the `COLR' table. */
+	void* table;
+	unsigned long  table_size;
+
+};
+typedef uint32_t Offset32;
+struct colr_v0 {
+	uint16_t	version;//	Table version number—set to 0.
+	uint16_t	numBaseGlyphRecords;//	Number of BaseGlyph records.
+	Offset32	baseGlyphRecordsOffset;//	Offset to baseGlyphRecords array, from beginning of COLR table.
+	Offset32	layerRecordsOffset;//	Offset to layerRecords array, from beginning of COLR table.
+	uint16_t	numLayerRecords;//	Number of Layer records.
+};
+struct colr_v1 {
+	uint16_t	version;//	Table version number—set to 1.
+	uint16_t	numBaseGlyphRecords;//	Number of BaseGlyph records; may be 0 in a version 1 table.
+	Offset32	baseGlyphRecordsOffset;//	Offset to baseGlyphRecords array, from beginning of COLR table(may be NULL).
+	Offset32	layerRecordsOffset;//	Offset to layerRecords array, from beginning of COLR table(may be NULL).
+	uint16_t	numLayerRecords;//	Number of Layer records; may be 0 in a version 1 table.
+	Offset32	baseGlyphListOffset;//	Offset to BaseGlyphList table, from beginning of COLR table.
+	Offset32	layerListOffset;//	Offset to LayerList table, from beginning of COLR table(may be NULL).
+	Offset32	clipListOffset;//	Offset to ClipList table, from beginning of COLR table(may be NULL).
+	Offset32	varIndexMapOffset;//	Offset to DeltaSetIndexMap table, from beginning of COLR table(may be NULL).
+	Offset32	itemVariationStoreOffset;//	Offset to ItemVariationStore, from beginning of COLR table(may be NULL).
+};
+
+int	tt_face_load_colr(font_t* face, uint8_t* b, sfnt_header* sp)
+{
+	int   error = 0;
+	//FT_Memory  memory = face->root.memory;
+
+	uint8_t* table = b;
+	uint8_t* p = NULL;
+
+	Colr* colr = NULL;
+
+	uint32_t  base_glyph_offset, layer_offset;
+	uint32_t  table_size = sp->logicalLength;
+	auto cp = face->colorinfo;
+
+	/* `COLR' always needs `CPAL' */
+	//if (!face->cpal)
+	//	return FT_THROW(Invalid_File_Format);
+
+	//error = face->goto_table(face, TTAG_COLR, stream, &table_size);
+	//if (error)
+	//	goto NoColr;
+	do {
+
+		if (table_size < COLR_HEADER_SIZE)break;
+		//	goto InvalidTable;
+
+		//if (FT_FRAME_EXTRACT(table_size, table))
+		//	goto NoColr;
+
+		p = table;
+		colr = (Colr*)cp->td;
+
+		if (!(colr))
+			break;
+		auto cv0 = (colr_v0*)p;
+		auto cv1 = (colr_v1*)p;
+		colr->version = NEXT_USHORT(p);
+		if (colr->version > 1)
+		{
+			error = -1; break;
+		}
+
+		colr->num_base_glyphs = NEXT_USHORT(p);
+		base_glyph_offset = NEXT_ULONG(p);
+
+		if (base_glyph_offset >= table_size)
+		{
+			error = -1; break;
+		}
+		if (colr->num_base_glyphs * BASE_GLYPH_SIZE >
+			table_size - base_glyph_offset)
+		{
+			error = -1; break;
+		}
+
+		layer_offset = NEXT_ULONG(p);
+		colr->num_layers = NEXT_USHORT(p);
+
+		if (layer_offset >= table_size)
+		{
+			error = -1; break;
+		}
+		if (colr->num_layers * LAYER_SIZE > table_size - layer_offset)
+		{
+			error = -1; break;
+		}
+
+		colr->base_glyphs = (uint8_t*)(table + base_glyph_offset);
+		colr->layers = (uint8_t*)(table + layer_offset);
+		colr->table = table;
+		colr->table_size = table_size;
+
+		cp->colr = colr;
+
+
+	} while (0);
+
+	return error;
+}
+
+
+void tt_face_free_colr(font_t* p)
+{
+	//sfnt_header* sp = face->root.stream;
+	////FT_Memory  memory = face->root.memory;
+
+	//Colr* colr = (Colr*)face->colr;
+
+
+	//if (colr)
+	//{
+	//	FT_FRAME_RELEASE(colr->table);
+	//	FT_FREE(colr);
+	//}
+}
+
+
+static bool find_base_glyph_record(uint8_t* base_glyph_begin,
+	int            num_base_glyph,
+	uint32_t           glyph_id,
+	BaseGlyphRecord* record)
+{
+	int  min = 0;
+	int  max = num_base_glyph - 1;
+
+
+	while (min <= max)
+	{
+		int    mid = min + (max - min) / 2;
+		uint8_t* p = base_glyph_begin + mid * BASE_GLYPH_SIZE;
+
+		uint16_t  gid = NEXT_USHORT(p);
+
+
+		if (gid < glyph_id)
+			min = mid + 1;
+		else if (gid > glyph_id)
+			max = mid - 1;
+		else
+		{
+			record->gid = gid;
+			record->first_layer_index = NEXT_USHORT(p);
+			record->num_layers = NEXT_USHORT(p);
+
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+bool tt_face_get_colr_layer(font_t* face,
+	uint32_t            base_glyph,
+	uint32_t* aglyph_index,
+	uint32_t* acolor_index,
+	LayerIterator* iterator)
+{
+	Colr* colr = (Colr*)face->colorinfo->colr;
+	BaseGlyphRecord  glyph_record = {};
+	auto cp = face->colorinfo;
+
+	if (!colr)
+		return 0;
+
+	if (!iterator->p)
+	{
+		uint32_t  offset;
+
+
+		/* first call to function */
+		iterator->layer = 0;
+
+		if (!find_base_glyph_record(colr->base_glyphs,
+			colr->num_base_glyphs,
+			base_glyph,
+			&glyph_record))
+			return 0;
+
+		if (glyph_record.num_layers)
+			iterator->num_layers = glyph_record.num_layers;
+		else
+			return 0;
+
+		offset = LAYER_SIZE * glyph_record.first_layer_index;
+		if (offset + LAYER_SIZE * glyph_record.num_layers > colr->table_size)
+			return 0;
+
+		iterator->p = colr->layers + offset;
+	}
+
+	if (iterator->layer >= iterator->num_layers)
+		return 0;
+
+	*aglyph_index = NEXT_USHORT(iterator->p);
+	*acolor_index = NEXT_USHORT(iterator->p);
+
+	if (*aglyph_index >= (uint32_t)(face->num_glyphs) ||
+		(*acolor_index != 0xFFFF &&
+			*acolor_index >= cp->palette_data.num_palette_entries))
+		return 0;
+
+	iterator->layer++;
+
+	return 1;
+}
+
+#define PALETTE_FOR_LIGHT_BACKGROUND  0x01
+#define PALETTE_FOR_DARK_BACKGROUND   0x02
+Color_2 get_c2(font_t* face1, uint32_t color_index)
+{
+	Color_2 c = {};
+	auto face = face1->colorinfo;
+	if (color_index == 0xFFFF)
+	{
+		if (face->have_foreground_color)
+		{
+			c.b = face->foreground_color.blue;
+			c.g = face->foreground_color.green;
+			c.r = face->foreground_color.red;
+			c.alpha = face->foreground_color.alpha;
+		}
+		else
+		{
+			if (face->palette_data.palette_flags &&
+				(face->palette_data.palette_flags[face->palette_index] &
+					PALETTE_FOR_DARK_BACKGROUND))
+			{
+				/* white opaque */
+				c.b = 0xFF;
+				c.g = 0xFF;
+				c.r = 0xFF;
+				c.alpha = 0xFF;
+			}
+			else
+			{
+				/* black opaque */
+				c.b = 0x00;
+				c.g = 0x00;
+				c.r = 0x00;
+				c.alpha = 0xFF;
+			}
+		}
+	}
+	else
+	{
+		c = face->palette[color_index];
+	}
+	return c;
+}
+int tt_face_colr_blend_layer(font_t* face1,
+	uint32_t       color_index,
+	GlyphSlot* dstSlot,
+	GlyphSlot* srcSlot)
+{
+	int  error = 0;
+	auto face = face1->colorinfo;
+	uint32_t  x, y;
+	uint8_t  b, g, r, alpha;
+
+	uint32_t  size;
+	uint8_t* src;
+	uint8_t* dst;
+#if 0
+
+	if (!dstSlot->bitmap.buffer)
+	{
+		/* Initialize destination of color bitmap */
+		/* with the size of first component.      */
+		dstSlot->bitmap_left = srcSlot->bitmap_left;
+		dstSlot->bitmap_top = srcSlot->bitmap_top;
+
+		dstSlot->bitmap.width = srcSlot->bitmap.width;
+		dstSlot->bitmap.rows = srcSlot->bitmap.rows;
+		dstSlot->bitmap.pixel_mode = FT_PIXEL_MODE_BGRA;
+		dstSlot->bitmap.pitch = (int)dstSlot->bitmap.width * 4;
+		dstSlot->bitmap.num_grays = 256;
+
+		size = dstSlot->bitmap.rows * (uint32_t)dstSlot->bitmap.pitch;
+
+		error = ft_glyphslot_alloc_bitmap(dstSlot, size);
+		if (error)
+			return error;
+
+		FT_MEM_ZERO(dstSlot->bitmap.buffer, size);
+	}
+	else
+	{
+		/* Resize destination if needed such that new component fits. */
+		int  x_min, x_max, y_min, y_max;
+
+
+		x_min = FT_MIN(dstSlot->bitmap_left, srcSlot->bitmap_left);
+		x_max = FT_MAX(dstSlot->bitmap_left + (int)dstSlot->bitmap.width,
+			srcSlot->bitmap_left + (int)srcSlot->bitmap.width);
+
+		y_min = FT_MIN(dstSlot->bitmap_top - (int)dstSlot->bitmap.rows,
+			srcSlot->bitmap_top - (int)srcSlot->bitmap.rows);
+		y_max = FT_MAX(dstSlot->bitmap_top, srcSlot->bitmap_top);
+
+		if (x_min != dstSlot->bitmap_left ||
+			x_max != dstSlot->bitmap_left + (int)dstSlot->bitmap.width ||
+			y_min != dstSlot->bitmap_top - (int)dstSlot->bitmap.rows ||
+			y_max != dstSlot->bitmap_top)
+		{
+			FT_Memory  memory = face->root.memory;
+
+			uint32_t  width = (uint32_t)(x_max - x_min);
+			uint32_t  rows = (uint32_t)(y_max - y_min);
+			uint32_t  pitch = width * 4;
+
+			uint8_t* buf = NULL;
+			uint8_t* p;
+			uint8_t* q;
+
+
+			size = rows * pitch;
+			if (FT_ALLOC(buf, size))
+				return error;
+
+			p = dstSlot->bitmap.buffer;
+			q = buf +
+				(int)pitch * (y_max - dstSlot->bitmap_top) +
+				4 * (dstSlot->bitmap_left - x_min);
+
+			for (y = 0; y < dstSlot->bitmap.rows; y++)
+			{
+				FT_MEM_COPY(q, p, dstSlot->bitmap.width * 4);
+
+				p += dstSlot->bitmap.pitch;
+				q += pitch;
+			}
+
+			ft_glyphslot_set_bitmap(dstSlot, buf);
+
+			dstSlot->bitmap_top = y_max;
+			dstSlot->bitmap_left = x_min;
+
+			dstSlot->bitmap.width = width;
+			dstSlot->bitmap.rows = rows;
+			dstSlot->bitmap.pitch = (int)pitch;
+
+			dstSlot->internal->flags |= FT_GLYPH_OWN_BITMAP;
+			dstSlot->format = FT_GLYPH_FORMAT_BITMAP;
+		}
+	}
+
+	if (color_index == 0xFFFF)
+	{
+		if (face->have_foreground_color)
+		{
+			b = face->foreground_color.blue;
+			g = face->foreground_color.green;
+			r = face->foreground_color.red;
+			alpha = face->foreground_color.alpha;
+		}
+		else
+		{
+			if (face->palette_data.palette_flags &&
+				(face->palette_data.palette_flags[face->palette_index] &
+					FT_PALETTE_FOR_DARK_BACKGROUND))
+			{
+				/* white opaque */
+				b = 0xFF;
+				g = 0xFF;
+				r = 0xFF;
+				alpha = 0xFF;
+			}
+			else
+			{
+				/* black opaque */
+				b = 0x00;
+				g = 0x00;
+				r = 0x00;
+				alpha = 0xFF;
+			}
+		}
+	}
+	else
+	{
+		b = face->palette[color_index].blue;
+		g = face->palette[color_index].green;
+		r = face->palette[color_index].red;
+		alpha = face->palette[color_index].alpha;
+	}
+
+	/* XXX Convert if srcSlot.bitmap is not grey? */
+	src = srcSlot->bitmap.buffer;
+	dst = dstSlot->bitmap.buffer +
+		dstSlot->bitmap.pitch * (dstSlot->bitmap_top - srcSlot->bitmap_top) +
+		4 * (srcSlot->bitmap_left - dstSlot->bitmap_left);
+
+	for (y = 0; y < srcSlot->bitmap.rows; y++)
+	{
+		for (x = 0; x < srcSlot->bitmap.width; x++)
+		{
+			int  aa = src[x];
+			int  fa = alpha * aa / 255;
+
+			int  fb = b * fa / 255;
+			int  fg = g * fa / 255;
+			int  fr = r * fa / 255;
+
+			int  ba2 = 255 - fa;
+
+			int  bb = dst[4 * x + 0];
+			int  bg = dst[4 * x + 1];
+			int  br = dst[4 * x + 2];
+			int  ba = dst[4 * x + 3];
+
+
+			dst[4 * x + 0] = (uint8_t)(bb * ba2 / 255 + fb);
+			dst[4 * x + 1] = (uint8_t)(bg * ba2 / 255 + fg);
+			dst[4 * x + 2] = (uint8_t)(br * ba2 / 255 + fr);
+			dst[4 * x + 3] = (uint8_t)(ba * ba2 / 255 + fa);
+		}
+
+		src += srcSlot->bitmap.pitch;
+		dst += dstSlot->bitmap.pitch;
+	}
+#endif
+	return error;
+}
+
+
+
+/**************************************************************************
+ *
+ * `CPAL' table specification:
+ *
+ *   https://www.microsoft.com/typography/otspec/cpal.htm
+ *
+ */
+
+ /* NOTE: These are the table sizes calculated through the specs. */
+#define CPAL_V0_HEADER_BASE_SIZE  12
+#define COLOR_SIZE                 4
+
+
+  /* all data from `CPAL' not covered in FT_Palette_Data */
+struct Cpal
+{
+	uint16_t  version;        /* Table version number (0 or 1 supported). */
+	uint16_t  num_colors;               /* Total number of color records, */
+	/* combined for all palettes.     */
+	uint8_t* colors;                              /* RGBA array of colors */
+	uint8_t* color_indices; /* Index of each palette's first color record */
+	/* in the combined color record array.        */
+
+/* The memory which backs up the `CPAL' table. */
+	void* table;
+	uint32_t  table_size;
+
+};
+
+
+
+int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
+{
+	int   error = 0;
+	//FT_Memory  memory = face->root.memory;
+	auto face = face1->colorinfo;
+	uint8_t* table = b;
+	uint8_t* p = NULL;
+
+	Cpal* cpal = NULL;
+
+	uint32_t  colors_offset = 0;
+	uint32_t  table_size = sp->logicalLength;
+
+#if 1
+	//error = face->goto_table(face, TTAG_CPAL, stream, &table_size);
+	//if (error)
+	//	goto NoCpal;
+	do {
+
+		if (table_size < CPAL_V0_HEADER_BASE_SIZE)
+			break;
+
+		//if (FT_FRAME_EXTRACT(table_size, table))
+		//	goto NoCpal;
+
+		p = table;
+		cpal = (Cpal*)&face->td[40];
+		if (!cpal)
+			break;
+
+		cpal->version = NEXT_USHORT(p);
+		if (cpal->version > 1)
+		{
+			error = -1; break;
+		}
+
+		face->palette_data.num_palette_entries = NEXT_USHORT(p);
+		face->palette_data.num_palettes = NEXT_USHORT(p);
+
+		cpal->num_colors = NEXT_USHORT(p);
+		colors_offset = NEXT_ULONG(p);
+
+		if (CPAL_V0_HEADER_BASE_SIZE +
+			face->palette_data.num_palettes * 2U > table_size)
+		{
+			error = -1; break;
+		}
+
+		if (colors_offset >= table_size)
+		{
+			error = -1; break;
+		}
+		if (cpal->num_colors * COLOR_SIZE > table_size - colors_offset)
+		{
+			error = -1; break;
+		}
+
+		if (face->palette_data.num_palette_entries > cpal->num_colors)
+		{
+			error = -1; break;
+		}
+
+		cpal->color_indices = p;
+		cpal->colors = (uint8_t*)(table + colors_offset);
+
+		if (cpal->version == 1)
+		{
+			uint32_t    type_offset, label_offset, entry_label_offset;
+			uint16_t* array0 = NULL;
+			uint16_t* limit;
+			uint16_t* q;
+
+
+			if (CPAL_V0_HEADER_BASE_SIZE +
+				face->palette_data.num_palettes * 2U +
+				3U * 4 > table_size)
+			{
+				error = -1; break;
+			}
+
+			p += face->palette_data.num_palettes * 2;
+
+			type_offset = NEXT_ULONG(p);
+			label_offset = NEXT_ULONG(p);
+			entry_label_offset = NEXT_ULONG(p);
+
+			if (type_offset)
+			{
+				if (type_offset >= table_size)
+				{
+					error = -1; break;
+				}
+				if (face->palette_data.num_palettes * 2 >
+					table_size - type_offset)
+				{
+					error = -1; break;
+				}
+				array0 = new uint16_t[face->palette_data.num_palettes];
+				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palettes))
+				{
+					error = -2; break;
+				}
+
+				p = table + type_offset;
+				q = array0;
+				limit = q + face->palette_data.num_palettes;
+
+				while (q < limit)
+					*q++ = NEXT_USHORT(p);
+
+				face->palette_data.palette_flags = array0;
+			}
+
+			if (label_offset)
+			{
+				if (label_offset >= table_size)
+				{
+					error = -1; break;
+				}
+				if (face->palette_data.num_palettes * 2 >
+					table_size - label_offset)
+				{
+					error = -1; break;
+				}
+
+				//if (FT_QNEW_ARRAY(array, face->palette_data.num_palettes))
+
+				array0 = new uint16_t[face->palette_data.num_palettes];
+				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palettes))
+				{
+					error = -2; break;
+				}
+
+				p = table + label_offset;
+				q = array0;
+				limit = q + face->palette_data.num_palettes;
+
+				while (q < limit)
+					*q++ = NEXT_USHORT(p);
+
+				face->palette_data.palette_name_ids = array0;
+			}
+
+			if (entry_label_offset)
+			{
+				if (entry_label_offset >= table_size)
+				{
+					error = -1; break;
+				}
+				if (face->palette_data.num_palette_entries * 2 >
+					table_size - entry_label_offset)
+				{
+					error = -1; break;
+				}
+
+				array0 = new uint16_t[face->palette_data.num_palette_entries];
+				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palette_entries))
+				{
+					error = -2; break;
+				}
+
+				p = table + entry_label_offset;
+				q = array0;
+				limit = q + face->palette_data.num_palette_entries;
+
+				while (q < limit)
+					*q++ = NEXT_USHORT(p);
+
+				face->palette_data.palette_entry_name_ids = array0;
+			}
+		}
+
+		cpal->table = table;
+		cpal->table_size = table_size;
+
+		face->cpal = cpal;
+
+		/* set up default palette */
+		face->palette = new Color_2[face->palette_data.num_palette_entries];
+		//if (!face1->uac.new_mem(, face->palette_data.num_palette_entries))
+		if (!face->palette) {
+			error = -2; break;
+		}
+
+		if (tt_face_palette_set(face1, 0))
+		{
+			error = -1; break;
+		}
+		error = 0;
+		break;
+
+	} while (0);
+	if (error < 0)
+	{
+		//InvalidTable:
+		//	error = -1;// FT_THROW(Invalid_Table);
+
+		//NoCpal:
+			//FT_FRAME_RELEASE(table);
+		//face1->uac.free_mem(cpal, 1);
+
+		face->cpal = NULL;
+
+	}
+	/* arrays in `face->palette_data' and `face->palette' */
+	/* are freed in `sfnt_done_face'                      */
+#endif
+	return error;
+}
+
+
+void tt_face_free_cpal(font_t* face)
+{
+	//sfnt_header* sp = face->colorinfo.;
+	//FT_Memory  memory = face->root.memory;
+
+	//Cpal* cpal = (Cpal*)face->cpal;
+
+
+	//if (cpal)
+	{
+		//	FT_FRAME_RELEASE(cpal->table);
+		//	FT_FREE(cpal);
+	}
+}
+
+int tt_face_palette_set(font_t* face, uint32_t  palette_index)
+{
+	Cpal* cpal = (Cpal*)face->colorinfo->cpal;
+	auto cp = face->colorinfo;
+	uint8_t* offset;
+	uint8_t* p;
+
+	Color_2* q;
+	Color_2* limit;
+
+	uint16_t  color_index;
+
+	if (!cpal || palette_index >= cp->palette_data.num_palettes)
+		return -6;// FT_THROW(Invalid_Argument);
+
+	offset = cpal->color_indices + 2 * palette_index;
+	color_index = PEEK_USHORT(offset);
+
+	if (color_index + cp->palette_data.num_palette_entries >
+		cpal->num_colors)
+		return -7;// FT_THROW(Invalid_Table);
+
+	p = cpal->colors + COLOR_SIZE * color_index;
+	q = (Color_2*)cp->palette;
+	limit = q + cp->palette_data.num_palette_entries;
+
+	while (q < limit)
+	{
+		q->blue = NEXT_BYTE(p);
+		q->green = NEXT_BYTE(p);
+		q->red = NEXT_BYTE(p);
+		q->alpha = NEXT_BYTE(p);
+
+		q++;
+	}
+
+	return 0;
+}
+
+
+
+
+
+
+#endif // !NO_COLOR_FONT
+
+
+
+
+
+int font_t::get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out)
+{
+	Bitmap_p* bitmap = 0;
+	int x_pos = 0, y_pos = 0, ret = 0;
+	int sidx = bitinfo->get_sidx(height);
+	if (sidx < 0)
+	{
+		return 0;
+	}
+	int x = 10, y = 10;
+	SBitDecoder* decoder = bitinfo->new_SBitDecoder();
+	decoder->init(this, sidx);
+	bitmap = decoder->bitmap;
+	BigGlyphMetrics* metrics = decoder->metrics;
+
+	if (get_index(decoder, gidx, x_pos, y_pos))
+	{
+		if (out) {
+			out->resize((uint64_t)bitmap->rows * bitmap->pitch);
+			memcpy(out->data(), bitmap->buffer, out->size());
+		}
+		if (ot) {
+			ot->x = metrics->horiBearingX;
+			ot->y = -metrics->horiBearingY;
+			ot->z = bitmap->width;
+			ot->w = bitmap->rows;
+		}
+		auto ha = metrics->horiAdvance;
+		bitmap->advance = std::max(metrics->horiAdvance, metrics->vertAdvance);
+		if (out_bitmap)
+		{
+			*out_bitmap = *bitmap;
+			if (out)
+				out_bitmap->buffer = (unsigned char*)out->data();
+		}
+		ret = 2;
+	}
+	else
+	{
+		ret = 0;
+	}
+	bitinfo->recycle(decoder);
+	return ret;
+}
+
+void init_bitmap_bitdepth(Bitmap_p* bitmap, int bit_depth)
+{
+	bitmap->bit_depth = bit_depth;
+
+	switch (bit_depth)
+	{
+	case 1:
+		bitmap->pixel_mode = Pixel_Mode::PX_MONO;
+		bitmap->pitch = (int)((bitmap->width + 7) >> 3);
+		bitmap->num_grays = 2;
+		break;
+
+	case 2:
+		bitmap->pixel_mode = Pixel_Mode::PX_GRAY2;
+		bitmap->pitch = (int)((bitmap->width + 3) >> 2);
+		bitmap->num_grays = 4;
+		break;
+
+	case 4:
+		bitmap->pixel_mode = Pixel_Mode::PX_GRAY4;
+		bitmap->pitch = (int)((bitmap->width + 1) >> 1);
+		bitmap->num_grays = 16;
+		break;
+
+	case 8:
+		bitmap->pixel_mode = Pixel_Mode::PX_GRAY;
+		bitmap->pitch = (int)(bitmap->width);
+		bitmap->num_grays = 256;
+		break;
+
+	case 32:
+		bitmap->pixel_mode = Pixel_Mode::PX_BGRA;
+		bitmap->pitch = (int)(bitmap->width * 4);
+		bitmap->num_grays = 256;
+		break;
+
+	default:
+		return;
+	}
+}
+int font_t::get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out)
+{
+	auto& bch = bitinfo->_chsize;
+	auto& bur = bitinfo->_unicode_rang;
+	auto img = (tinyimage_cx*)&bitinfo->_bimg;
+	int ret = 0;
+	if (img && bch.size())
+	{
+		// 910=12，11=14，12/13=16f
+		glm::ivec2 uc = {}, bc = {}; size_t idx = 0;
+		int inc = 2;
+		if (height & 1)
+		{
+			height--;
+			inc--;
+		}
+		for (size_t i = 0; i < bch.size(); i++)
+		{
+			auto& it = bch[i];
+			if (it.x == height)
+			{
+				uc = bur[i];
+				bc = it;
+				break;
+			}
+			idx += it.x;
+		}
+		if (!uc.x || !uc.y || !unicode_codepoint)
+		{
+			return ret;
+		}
+		if (unicode_codepoint >= uc.x && unicode_codepoint <= uc.y)
+		{
+			int px = (unicode_codepoint - uc.x) * bc.y;
+			int py = idx;
+			out_bitmap->rows = bc.x;
+			out_bitmap->width = bc.y;
+			init_bitmap_bitdepth(out_bitmap, 32);
+			// RGBA
+			out_bitmap->pitch = bc.y * 4;
+			out_bitmap->advance = bc.y;
+			if (ot) {
+				ot->x = 0;
+				ot->y = -bc.x + inc;
+				ot->z = bc.y;
+				ot->w = bc.x;
+			}
+
+			size_t size = out_bitmap->rows * (uint64_t)out_bitmap->pitch;
+			if (out) {
+				if (size > out->size())
+				{
+					out->resize(size);
+				}
+				out_bitmap->buffer = (unsigned char*)out->data();
+				std::vector<uint32_t> tem;
+				tem.reserve(bc.y * bc.x);
+				size_t x1 = std::min(img->width, px + bc.y);
+				size_t y1 = std::min(img->height, py + bc.x);
+				for (size_t y = py; y < y1; y++)
+				{
+					for (size_t x = px; x < x1; x++)
+					{
+						auto c = img->data[y * img->width + x];
+						if (c == 0xff000000)
+						{
+							c = 0;
+						}
+						tem.push_back(c);
+					}
+				}
+				memcpy(out_bitmap->buffer, tem.data(), size);
+			}
+			ret = 1;
+		}
+	}
+	return ret;
+}
+
+
+bitmap_cache_cx::bitmap_cache_cx()
+{
+	// 填充20x20白色
+	auto pt = get_last_packer(false);
+	if (!pt)return;
+	glm::ivec2 pos = {};
+	auto ret = pt->push_rect({ 20, 20 }, &pos);
+	auto ptr = pt->get();
+	auto px = ptr->data + pos.x;
+	px += pos.y * width;
+	for (size_t i = 0; i < 20; i++)
+	{
+		memset(px, -1, 20 * sizeof(int));
+		px += width;
+	}
+}
+
+bitmap_cache_cx::~bitmap_cache_cx()
+{
+}
+
+void bitmap_cache_cx::clear()
+{
+	for (auto it : _packer)
+	{
+		if (it)delete it;
+	}
+	_packer.clear();
+	_data.clear();
+}
+stb_packer* bitmap_cache_cx::get_last_packer(bool isnew)
+{
+	if (_packer.empty() || isnew)
+	{
+		auto p = new stb_packer();
+		if (!p)return 0;
+		_packer.push_back(p);
+		p->init_target(width, width);
+		_data.push_back((tinyimage_cx*)p->get());
+	}
+	return *_packer.rbegin();
+}
+tinyimage_cx* bitmap_cache_cx::push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap, uint32_t col)
+{
+	int width = bitmap->width + linegap, height = bitmap->rows + linegap;
+	glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
+
+	auto pt = get_last_packer(false);
+	if (!pt)return 0;
+	auto ret = pt->push_rect({ width, height }, pos);
+	if (!ret)
+	{
+		pt = get_last_packer(true);
+		ret = pt->push_rect({ width, height }, pos);
+	}
+	if (ret)
+	{
+		rc4.x = pos->x;
+		rc4.y = pos->y;
+		image_ptr_t src = {}, dst = {};
+		auto ptr = pt->get();
+		dst.data = ptr->data;
+		dst.width = ptr->width;
+		dst.height = ptr->height;
+
+		src.data = bitmap->buffer;
+		src.stride = bitmap->pitch;
+		src.width = bitmap->width;
+		src.height = bitmap->rows;
+		src.comp = 1;
+		switch (bitmap->bit_depth)
+		{
+		case 1:
+		{
+			bit_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, col);
+		}
+		break;
+		case 8:
+		{
+			gray_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, col, true);
+		}
+		break;
+		case 32:
+		{
+			src.comp = 4;
+			rgba_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, true);
+		}
+		break;
+		default:
+			break;
+		}
+		ptr->isupdate = 1; // 更新缓存标志
+	}
+	return pt->get();
+}
+tinyimage_cx* bitmap_cache_cx::push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, tinyimage_cx* oldimg, int linegap)
+{
+	int width = bitmap->width + linegap, height = bitmap->rows + linegap;
+	glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
+
+	if (!oldimg)
+	{
+		return push_cache_bitmap(bitmap, pos, linegap, col);
+	}
+	else {
+		rc4.x = pos->x;
+		rc4.y = pos->y;
+
+		image_ptr_t src = {}, dst = {};
+		dst.data = oldimg->data;
+		dst.width = oldimg->width;
+		dst.height = oldimg->height;
+
+		src.data = bitmap->buffer;
+		src.stride = bitmap->pitch;
+		src.width = bitmap->width;
+		src.height = bitmap->rows;
+		src.comp = 1;
+		gray_copy2rgba(&dst, &src, { rc4.x - linegap,rc4.y }, { 0,0,rc4.z,rc4.w }, col, true);
+		oldimg->isupdate = 1;
+	}
+	return oldimg;
+}
+
+
+image_ptr_t to_imgptr(tinyimage_cx* p)
+{
+	image_ptr_t r = {};
+	r.width = p->width;
+	r.height = p->height;
+	r.data = p->data;
+	r.type = p->format;
+	r.comp = 4;
+	return r;
+}
+
+
+
+
+std::map<int, std::vector<info_one>> font_t::get_detail()
+{
+	std::map<int, std::vector<info_one>> detail;
+	stb_font ft;
+	ft.get_font_name(font, &detail);
+	return detail;
+}
+
+
+class fd_info0
+{
+public:
+	hz::mfile_t* _fp = nullptr;
+	char* _data = nullptr;
+	int64_t _size = 0;
+	std::set<std::string> vname;
+public:
+	fd_info0()
+	{
+	}
+	fd_info0(hz::mfile_t* p)
+	{
+		init(p);
+	}
+
+	~fd_info0()
+	{
+		free_mv();
+	}
+	void free_mv()
+	{
+		auto dp = _data;
+		if (_fp)
+		{
+			if (dp == _fp->data())dp = 0;
+			delete (_fp); _fp = 0;
+		}
+		if (dp)
+		{
+			delete[]dp; dp = 0;
+		}
+	}
+	void init(hz::mfile_t* p)
+	{
+		_fp = p;
+		if (_fp)
+		{
+			_data = (char*)_fp->data();
+			_size = _fp->size();
+		}
+	}
+	char* data()
+	{
+		return _data;
+	}
+	int64_t size()
+	{
+		return _size;
+	}
+private:
+
+};
+font_imp::font_imp()
+{
+}
+
+font_imp::~font_imp()
+{
+#if 0
+	if (prun)
+	{
+		delete prun; prun = 0;
+	}
+#endif
+	for (auto it : fd_data)
+	{
+		delete it;
+	}
+	for (auto it : fonts)
+	{
+		delete it;
+	}
+	for (auto it : fd_data_m)
+	{
+		delete[] it.data;
+	}
+}
+size_t font_imp::size()
+{
+	return fonts.size();
+}
+std::vector<font_t*> font_imp::add_font_file(const std::string& fn, std::vector<std::string>* pname)
+{
+	std::vector<font_t*> ret;
+	auto mv = new hz::mfile_t();
+	auto md = mv->open_d(fn, true);
+	if (!md)
+	{
+		delete mv;
+		return ret;
+	}
+	if (mv && mv->get_file_size())
+	{
+		int rc = 0;
+		auto fdi = new fd_info0(mv);
+		ret = add_font_mem(fdi->data(), fdi->size(), false, pname, &rc);
+		if (rc > 0)
+		{
+			fd_data.emplace_back(fdi);
+			for (auto it : ret)
+			{
+				fdi->vname.insert(it->_name);
+			}
+		}
+		else {
+			delete fdi;
+		}
+	}
+	return ret;
+}
+
+std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool iscp, std::vector<std::string>* pname, int* rc)
+{
+	std::vector<font_t*> fp;
+	mem_ft mft = {};
+	if (iscp)
+	{
+		char* cpd = new char[len];
+		if (!cpd)return fp;
+		memcpy(cpd, data, len);
+		mft.data = cpd;
+		data = cpd;
+	}
+	stb_font ft;
+	int nums = ft.get_numbers(data);
+	int hr = 0;
+	std::vector<std::string> tpn;
+	std::string sv;
+	if (!pname)
+		pname = &tpn;
+	std::set<font_t*> fs;
+	for (size_t i = 0; i < nums; i++)
+	{
+		font_t* font = new font_t();
+		hr = ft.loadFont(font->font, data, i, 0);
+		if (hr)
+		{
+			font->num_glyphs = font->font->numGlyphs;
+			int ascent = 0, descent = 0, lineGap = 0;
+			ft.getFontVMetrics(font->font, &ascent, &descent, &lineGap);
+			auto fh = ascent - descent;
+			std::vector<meta_tag>	_meta;
+			std::map<int, std::vector<info_one>> detail;
+			//auto& detail = font->detail;
+			ft.get_font_name(font->font, &detail);
+			//font->fh = fh;
+			font->_index = i;
+			font->ascender = (float)ascent;
+			font->descender = (float)descent;
+			font->lineh = (float)(fh + lineGap);
+			font->_name = get_info_str(2052, 1, detail);
+			font->fullname = get_info_str(2052, 4, detail);
+			auto& mt = mk[font->_name];
+			if (mt)
+			{
+				fs.insert(font);
+				fp.push_back(mt);
+				continue;
+			}
+			mft.vname.insert(font->_name);
+			if (rc)
+				*rc += 1;
+			mt = font;
+			fp.push_back(font);
+
+			fonts.push_back(font);
+			if (pname)
+			{
+				pname->push_back(font->_name);
+			}
+			auto cn_name = get_info_str(1033, 1, detail);
+			//font->_aname = u8_gbk(font->_name);
+			auto a_style = get_info_str(2052, 2, detail);
+			auto a_style1 = get_info_str(1033, 2, detail);
+			auto str6 = get_info_str(2052, 6, detail);
+			auto str61 = get_info_str(1033, 6, detail);
+			font->_style = a_style1;
+			ft.get_meta_string(font->font, _meta);
+			for (auto& it : _meta)
+			{
+				if (it.tag == "slng")
+				{
+					font->_slng = it.v;
+				}
+			}
+			font->init_post_table();
+			font->init_color();
+#ifndef _FONT_NO_BITMAP
+			font->init_sbit();
+			if (cn_name == "NSimSun")
+			{
+				nsimsun_ascii(font->bitinfo);
+			}
+#endif // !_FONT_NO_BITMAP
+		}
+		else
+		{
+			fs.insert(font);
+		}
+	}
+	for (auto it : fs)
+	{
+		if (it)
+			delete it;
+	}
+	if (mft.vname.size())
+	{
+		fd_data_m.push_back(mft);
+	}
+	return fp;
+}
+
+int font_imp::get_font_names(std::vector<std::string>* pname)
+{
+	if (pname)
+	{
+		pname->clear();
+		pname->reserve(fonts.size());
+		for (auto it : fonts)
+		{
+			pname->push_back(it->_name);
+		}
+	}
+	return fonts.size();
+}
+const char* font_imp::get_font_names(const char* split)
+{
+	if (fonts.empty())return 0;
+	if (!split || !*split)
+	{
+		split = ",";
+	}
+	std::string str;
+	for (auto& it : fonts)
+	{
+		str += it->_name + split;
+	}
+	addstr = str.c_str();
+	return addstr.c_str();
+}
+
+font_t* font_imp::get_font(size_t idx)
+{
+	font_t* p = 0;
+	if (fonts.empty())return p;
+	if (idx < fonts.size())
+	{
+		p = fonts[idx];
+	}
+	else {
+		p = *fonts.rbegin();
+	}
+	return p;
+}
+void font_imp::free_ft(const std::string& name)
+{
+	font_t* p = 0;
+	for (auto it : fonts) {
+		if (it->_name == name)
+		{
+			p = it; free_ftp(p);
+			break;
+		}
+	}
+}
+void font_imp::free_ftp(font_t* p)
+{
+	for (auto pt = fd_data.begin(); pt != fd_data.end(); pt++) {
+		auto mt = *pt;
+		auto br = mt->vname.find(p->_name);
+		if (br != mt->vname.end()) {
+			mt->vname.erase(p->_name);
+			if (mt->vname.empty())
+			{
+				auto& v = fd_data;
+				delete mt;
+				v.erase(pt);
+			}
+			break;
+		}
+	}
+
+	for (auto pt = fd_data_m.begin(); pt != fd_data_m.end(); pt++) {
+		auto& mt = pt;
+		auto br = mt->vname.find(p->_name);
+		if (br != mt->vname.end()) {
+			mt->vname.erase(p->_name);
+			if (mt->vname.empty())
+			{
+				auto& v = fd_data_m;
+				delete[]mt->data;
+				v.erase(pt);
+			}
+			break;
+		}
+	}
+	auto& v = fonts;
+	delete p;
+	v.erase(std::remove(v.begin(), v.end(), p), v.end());
+}
+#endif
+
+
+font_rctx::font_rctx()
+{
+	fyv = get_allfont();
+	imp = new font_imp();
+	PangoFontMap* fontMap = get_fmap;
+	pcontext = pango_font_map_create_context(fontMap);
+	layout = pango_layout_new(pcontext);
+	gclt.insert(layout);
+	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
+	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
+}
+
+font_rctx::~font_rctx()
+{
+	if (imp)delete imp;
+	imp = 0;
+	for (auto& [k, v] : fyv) {
+		for (auto it : v.vptr)
+		{
+			auto p = (font_t*)it;
+			if (p)
+			{
+				//delete p;
+
+			}
+		}
+	}
+	for (auto it : gclt)
+	{
+		if (it)
+		{
+			g_object_unref(it); it = 0;
+		}
+	}
+	if (pcontext)
+	{
+		g_object_unref(pcontext); pcontext = 0;
+	}
+	fyv.clear();
+}
+
+int font_rctx::get_count()
+{
+	return fyv.size();
+}
+
+int font_rctx::get_count_style(int idx)
+{
+	int r = 0;
+	for (auto& [k, v] : fyv) {
+		if (idx == 0)
+		{
+			r = v.style.size();
+			break;
+		}
+		idx--;
+	}
+	return r;
+}
+
+const char* font_rctx::get_family(int idx)
+{
+	std::string* r = 0;
+	for (auto& [k, v] : fyv) {
+		if (idx == 0)
+		{
+			r = &v.family;
+			break;
+		}
+		idx--;
+	}
+	return r ? r->c_str() : nullptr;
+}
+
+const char* font_rctx::get_family_en(const char* family)
+{
+	const std::string* r = 0;
+	std::string ret;
+	if (!r)
+	{
+		std::set<std::string> nst;
+		std::string n;
+		auto t = family;
+		for (size_t i = 0; *t; i++)
+		{
+			if (*t == ',')
+			{
+				nst.insert(n); n.clear();
+			}
+			else {
+				n.push_back(*t);
+			}
+			t++;
+		}
+		if (n.size())
+		{
+			nst.insert(n);
+		}
+		for (auto& it : nst) {
+			const std::string* r = 0;
+			for (auto& [k, v] : fyv) {
+				auto ats = v.alias.find(it);
+				if (k.find(it) != std::string::npos || v.fullname == it || ats != v.alias.end())
+				{
+					r = &k;
+					break;
+				}
+			}
+			ret += (r) ? r->c_str() : it;
+			ret.push_back(',');
+		}
+		if (ret.size() > 1)
+		{
+			ret.pop_back();
+		}
+		temfamily = ret;
+		r = &temfamily;
+	}
+	return r ? r->c_str() : nullptr;
+}
+
+const char* font_rctx::get_family_full(int idx)
+{
+	std::string* r = 0;
+	for (auto& [k, v] : fyv) {
+		if (idx == 0)
+		{
+			r = &v.fullname;
+			break;
+		}
+		idx--;
+	}
+	return r ? r->c_str() : nullptr;
+}
+
+const char* font_rctx::get_family_style(int idx, int stidx)
+{
+	std::string* r = 0;
+	size_t st = stidx;
+	for (auto& [k, v] : fyv) {
+		if (idx == 0)
+		{
+			if (v.style.size())
+			{
+				if (st > v.style.size())
+					st = 0;
+				r = &v.style[st];
+			}
+			break;
+		}
+		idx--;
+	}
+	return r ? r->c_str() : nullptr;
+}
+font_t* font_rctx::get_mk(fontns& v, size_t st)
+{
+	if (v.vptr.empty())
+	{
+		v.vptr.resize(v.style.size());
+	}
+	auto r = (font_t*)v.vptr[st];
+	if (!r)
+	{
+		auto vn = v.family;
+		auto stn = v.style[st];
+		auto pv = imp->add_font_file(v.fpath[st], 0);
+		for (auto it : pv)
+		{
+			if ((vn == it->_name || v.fullname == it->fullname) && it->_style.find(stn) != std::string::npos)
+			{
+				r = it;
+				r->ctx = &bcc;
+				v.vptr[st] = it;
+				current = it;
+			}
+		}
+	}
+	return r;
+}
+font_t* font_rctx::get_font(int idx, int styleidx)
+{
+	font_t* r = 0;
+	size_t st = styleidx;
+	for (auto& [k, v] : fyv) {
+		if (idx == 0)
+		{
+			if (v.style.size())
+			{
+				if (st > v.style.size())
+					st = 0;
+			}
+			r = get_mk(v, st);
+			break;
+		}
+		idx--;
+	}
+	return r;
+}
+
+font_t* font_rctx::get_font(const char* family, const char* style)
+{
+	font_t* r = 0;
+	size_t st = 0;
+	{
+		auto ft = fyv.find(family);
+		if (ft != fyv.end())
+		{
+			do {
+				r = get_mk(ft->second, st);
+				if (!style || (!*style))break;
+				for (size_t i = 1; i < ft->second.style.size(); i++)
+				{
+					if (style == ft->second.style[i])
+					{
+						r = get_mk(ft->second, i);
+						break;
+					}
+				}
+			} while (0);
+		}
+	}
+	if (!r)
+	{
+		for (auto& [k, v] : fyv) {
+			auto ats = v.alias.find(family);
+			if (k.find(family) != std::string::npos || v.fullname == family || ats != v.alias.end())
+			{
+				r = get_mk(v, st);
+				if (!style || (!*style))break;
+				for (size_t i = 1; i < v.style.size(); i++)
+				{
+					if (style == v.style[i])
+					{
+						r = get_mk(v, i);
+						break;
+					}
+				}
+				break;
+			}
+		}
+	}
+	return r;
+}
+
+font_t* font_rctx::get_font_cur()
+{
+	return current;
+}
+font_t* font_rctx::get_mfont(const std::string& name) {
+	auto it = fzv.find(name);
+	return it != fzv.end() ? it->second : nullptr;
+}
+std::vector<font_t*> font_rctx::add2file(const std::string& fn, std::vector<std::string>* pname)
+{
+	auto r = imp->add_font_file(fn, pname);
+	for (auto it : r)
+	{
+		it->ctx = &bcc;
+		auto& oldp = fzv[it->_name];
+		if (oldp)
+		{
+			imp->free_ft(oldp->_name);
+		}
+		oldp = it;
+	}
+	return r;
+}
+std::vector<font_t*> font_rctx::add2mem(const char* data, size_t len, bool iscp, std::vector<std::string>* pname)
+{
+	auto r = imp->add_font_mem(data, len, true, pname, 0);
+	for (auto it : r)
+	{
+		it->ctx = &bcc;
+		auto& oldp = fzv[it->_name];
+		if (oldp)
+		{
+			imp->free_ft(oldp->_name);
+		}
+		oldp = it;
+	}
+	return r;
+}
+void font_rctx::free_font(const std::string& name)
+{
+	for (auto& [k, v] : fyv) {
+		auto ats = v.alias.find(name);
+		if (k == name || v.fullname == name || ats != v.alias.end())
+		{
+			v.vptr;
+			for (auto it : v.vptr) {
+				imp->free_ftp((font_t*)it);
+			}
+			v.vptr.clear();
+			break;
+		}
+	}
+}
+
+
+font_rctx* new_fonts_ctx()
+{
+	return new font_rctx();
+}
+void free_fonts_ctx(font_rctx* p)
+{
+	if (p)delete p;
+}
+
+
+void font_rctx::set_family_size(const std::string& fam, int fs)
+{
+	auto en = get_family_en(fam.c_str());
+	if (en)
+	{
+		family = en;
+	}
+	else {
+		family = fam;
+	}
+	fontsize = fs > 5 ? fs : 12;
+	if (!layout)
+	{
+		layout = pango_layout_new(pcontext);
+		gclt.insert(layout);
+	}
+	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
+	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
+
+	PangoFontDescription* desc = pango_font_description_new();
+	pango_font_description_set_family(desc, family.c_str());
+	pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+	pango_layout_set_font_description(layout, desc);
+	pango_font_description_free(desc);
+
+}
+text_layout_t font_rctx::get_text_layout(const std::string& str, text_layout_t* lt)
+{
+	text_layout_t ret = {};
+	auto lay = lt && lt->layout ? lt->layout : pango_layout_copy(layout);
+	gclt.insert(lay);
+	pango_layout_set_text(lay, str.c_str(), str.size());
+	int h = 0;
+	auto line = pango_layout_get_line(lay, 0);
+	pango_layout_line_get_height(line, &h);
+	ret.lineheight = h / PANGO_SCALE;
+	pango_layout_get_pixel_size(lay, &ret.rc.x, &ret.rc.y);
+	ret.baseline = pango_layout_get_baseline(lay) / PANGO_SCALE;
+	ret.ctx = this;
+	ret.layout = lay;
+	if (lt)*lt = ret;
+	return ret;
+}
+void font_rctx::draw_text(cairo_t* cr, text_layout_t* lt)
+{
+	if (!cr || !lt || !lt->layout || !lt->text_color)return;
+	cairo_save(cr);
+	pango_cairo_update_layout(cr, lt->layout);
+	set_color(cr, lt->text_color);
+	cairo_translate(cr, lt->pos.x, lt->pos.y);
+	auto fcp = cairo_get_scaled_font(cr);
+	pango_cairo_show_layout(cr, lt->layout);
+#if 0
+	//cairo_scaled_font_t* csf = pango_cairo_font_get_scaled_font(font);
+	std::vector<PangoGlyphString*> vpgs;
+	std::vector<PangoLayoutLine*> lvs;
+	PangoLayoutIter* it = pango_layout_get_iter(lt->layout);
+	for (;;) {
+		auto lv = pango_layout_iter_get_line(it);
+		if (!lv)break;
+		for (;;) {
+			auto r = pango_layout_iter_get_run(it);
+			if (r)
+			{
+				r->item->analysis.font;
+				vpgs.push_back(r->glyphs);
+			}
+			if (!pango_layout_iter_next_run(it))break;
+		}
+		lvs.push_back(lv);
+		if (!pango_layout_iter_next_line(it))break;
+	}
+	pango_layout_iter_free(it);
+
+	//pango_cairo_show_glyph_item(cr, "", r);
+	//pango_cairo_layout_path(cr, lt->layout);
+#endif
+	cairo_restore(cr);
+	if (lt->once)
+	{
+		if (lt->layout)
+		{
+			gclt.erase(lt->layout);
+			g_object_unref(lt->layout); lt->layout = 0;
+		}
+	}
+}
+void font_rctx::free_textlayout(text_layout_t* lt)
+{
+	if (lt)
+	{
+		if (lt->layout)
+		{
+			gclt.erase(lt->layout);
+			g_object_unref(lt->layout); lt->layout = 0;
+		}
+	}
+}
+
+#if 0
+void layout_text()
+{
+
+	auto cr = cairo_create(sur);
+	size_t length = dtimg.size();
+	auto dt = dtimg.data();
+	for (size_t i = 0; i < length; i++)
+	{
+		*dt = back_color; dt++;
+	}
+
+
+	cairo_save(cr);
+#if 0
+	int gradient_size = 6;
+
+	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 0);// 垂直方向 
+	cairo_save(cr);
+	cairo_translate(cr, 0, size.y - gradient_size);
+	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 1);// 垂直方向,下
+	cairo_restore(cr);
+	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 0);// 水平方向 
+	cairo_save(cr);
+	cairo_translate(cr, size.x - gradient_size, 0);
+	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 1);// 水平方向，右
+	cairo_restore(cr);
+#endif
+
+	cairo_translate(cr, -scroll_pos.x + align_pos.x, -scroll_pos.y + align_pos.y);
+
+	auto v = get_bounds();
+	if (v.x != v.y && rangerc.size()) {
+		set_color(cr, select_color);
+		for (auto& it : rangerc)
+		{
+			cairo_rectangle(cr, it.x, it.y, it.z, it.w);
+			cairo_fill(cr);
+		}
+	}
+	set_color(cr, text_color);
+	pango_cairo_show_layout(cr, layout);
+	cairo_restore(cr);
+	cairo_destroy(cr);
+
+}
+
+#endif
+
+
+
+#endif
+// !NO_FONT_CX
+
+#endif
+// !font
+
+#ifndef NO_FLEX_CX 
+
+flex_item::flex_item()
+{
+}
+
+flex_item::~flex_item()
+{
+	if (children)
+		delete children;
+	children = 0;
+}
+
+
+
+void flex_item::update_should_order_children()
+{
+	if (order != 0 && parent != NULL) {
+		parent->should_order_children = true;
+	}
+}
+
+
+flex_item* flex_item::init()
+{
+	flex_item* item = this;
+	assert(item != NULL);
+	*item = {};
+	item->parent = NULL;
+	if (item->children)
+		item->children->clear();
+	item->should_order_children = false;
+	return item;
+}
+
+
+void flex_item::item_add(flex_item* child)
+{
+	flex_item* item = this;
+	if (!item->children) {
+		item->children = new std::vector<flex_item*>();
+	}
+	item->children->push_back(child);
+	child->parent = item;
+	child->update_should_order_children();
+}
+
+
+void flex_item::item_insert(uint32_t index, flex_item* child)
+{
+	flex_item* item = this;
+	if (!item->children) {
+		item->children = new std::vector<flex_item*>();
+	}
+	assert(index <= item->children->size());
+	item->children->insert(item->children->begin() + index, child);
+	child->parent = item;
+	child->update_should_order_children();
+}
+
+
+flex_item* flex_item::item_delete(uint32_t index)
+{
+	flex_item* item = this;
+	if (!children || children->empty())return nullptr;
+	assert(index < item->children->size());
+	assert(item->children->size() > 0);
+	auto& v = *children;
+	flex_item* child = v[index];
+	children->erase(children->begin() + index);
+	return child;
+}
+
+flex_item* flex_item::detach(flex_item* child)
+{
+	flex_item* item = this;
+	if (!children || !child || !(item->children->size() > 0))return child;
+	auto& v = *children;
+	v.erase(std::remove(v.begin(), v.end(), child), v.end());
+	child->parent = NULL;
+	return child;
+}
+
+
+flex_item* flex_item_root(flex_item* item)
+{
+	while (item->parent != NULL) {
+		item = item->parent;
+	}
+	return item;
+}
+//
+//#define FRAME_GETTER(name, index) \
+//     float flex_item_get_frame_##name(flex_item *item) { \
+//        return item->frame[index]; \
+//    }
+//
+//FRAME_GETTER(x, 0)
+//FRAME_GETTER(y, 1)
+//FRAME_GETTER(width, 2)
+//FRAME_GETTER(height, 3)
+//
+//#undef FRAME_GETTER
+
+struct flex_layout {
+	// Set during init.
+	bool wrap;
+	bool reverse;               // whether main axis is reversed
+	bool reverse2;              // whether cross axis is reversed (wrap only)
+	bool vertical;
+	float size_dim;             // main axis parent size
+	float align_dim;            // cross axis parent size
+	uint32_t frame_pos_i;   // main axis position
+	uint32_t frame_pos2_i;  // cross axis position
+	uint32_t frame_size_i;  // main axis size
+	uint32_t frame_size2_i; // cross axis size
+	//uint32_t* ordered_indices;
+	std::vector<uint32_t> ordered_indices;
+	// Set for each line layout.
+	float line_dim;             // the cross axis size
+	float flex_dim;             // the flexible part of the main axis size
+	float extra_flex_dim;       // sizes of flexible items
+	float flex_grows;
+	float flex_shrinks;
+	float pos2;                 // cross axis position
+
+	// Calculated layout lines - only tracked when needed:
+	//   - if the root's align_content property isn't set to FLEX_ALIGN_START
+	//   - or if any child item doesn't have a cross-axis size set
+	bool need_lines;
+	struct flex_layout_line {
+		uint32_t child_begin;
+		uint32_t child_end;
+		float size;
+	};
+	std::vector<flex_layout_line> lines;
+	//uint32_t lines_count;
+	float lines_sizes;
+	//uint32_t lines_cap;
+};
+
+void layout_init(flex_item* item, float width, float height, struct flex_layout* layout)
+{
+	assert(item->padding_left >= 0);
+	assert(item->padding_right >= 0);
+	assert(item->padding_top >= 0);
+	assert(item->padding_bottom >= 0);
+	width -= item->padding_left + item->padding_right;
+	height -= item->padding_top + item->padding_bottom;
+	assert(width >= 0);
+	assert(height >= 0);
+
+	layout->reverse = false;
+	layout->vertical = true;
+	switch (item->direction) {
+	case flex_item::flex_direction::ROW_REVERSE:
+		layout->reverse = true;
+	case flex_item::flex_direction::ROW:
+		layout->vertical = false;
+		layout->size_dim = width;
+		layout->align_dim = height;
+		layout->frame_pos_i = 0;
+		layout->frame_pos2_i = 1;
+		layout->frame_size_i = 2;
+		layout->frame_size2_i = 3;
+		break;
+
+	case flex_item::flex_direction::COLUMN_REVERSE:
+		layout->reverse = true;
+	case flex_item::flex_direction::COLUMN:
+		layout->size_dim = height;
+		layout->align_dim = width;
+		layout->frame_pos_i = 1;
+		layout->frame_pos2_i = 0;
+		layout->frame_size_i = 3;
+		layout->frame_size2_i = 2;
+		break;
+
+	default:
+		assert(false && "incorrect direction");
+	}
+
+	layout->ordered_indices.clear();
+	if (item->children && item->should_order_children && item->children->size() > 0) {
+		layout->ordered_indices.resize(item->children->size());
+		uint32_t* indices = layout->ordered_indices.data();
+		assert(indices != NULL);
+		// Creating a list of item indices sorted using the children's `order'
+		// attribute values. We are using a simple insertion sort as we need
+		// stability (insertion order must be preserved) and cross-platform
+		// support. We should eventually switch to merge sort (or something
+		// else) if the number of items becomes significant enough.
+		auto& icv = *item->children;
+		for (uint32_t i = 0; i < item->children->size(); i++) {
+			indices[i] = i;
+			for (uint32_t j = i; j > 0; j--) {
+				uint32_t prev = indices[j - 1];
+				uint32_t curr = indices[j];
+				if (icv[prev]->order <= icv[curr]->order) {
+					break;
+				}
+				indices[j - 1] = curr;
+				indices[j] = prev;
+			}
+		}
+	}
+
+	layout->flex_dim = 0;
+	layout->flex_grows = 0;
+	layout->flex_shrinks = 0;
+
+	layout->reverse2 = false;
+	layout->wrap = item->wrap != flex_item::flex_wrap::NO_WRAP;
+	if (layout->wrap) {
+		if (item->wrap == flex_item::flex_wrap::WRAP_REVERSE) {
+			layout->reverse2 = true;
+			layout->pos2 = layout->align_dim;
+		}
+	}
+	else {
+		layout->pos2 = layout->vertical
+			? item->padding_left : item->padding_top;
+	}
+
+	layout->need_lines = layout->wrap && item->align_content != flex_item::flex_align::ALIGN_START;
+	layout->lines.clear();
+	layout->lines_sizes = 0;
+}
+
+void layout_cleanup(struct flex_layout* layout)
+{
+	layout->ordered_indices.clear();
+	layout->lines.clear();
+}
+
+#define LAYOUT_RESET() \
+    do { \
+        layout->line_dim = layout->wrap ? 0 : layout->align_dim; \
+        layout->flex_dim = layout->size_dim; \
+        layout->extra_flex_dim = 0; \
+        layout->flex_grows = 0; \
+        layout->flex_shrinks = 0; \
+    } \
+    while (0)
+
+#define LAYOUT_CHILD_AT(item, i) ((*item->children)[(layout->ordered_indices.size() ? layout->ordered_indices[i] : i)])
+//flex_item* LAYOUT_CHILD_AT(flex_item* item, int i, struct flex_layout* layout) {
+//	auto x=(layout->ordered_indices.size() ? layout->ordered_indices[i] : i);
+//	((*item->children)[x]);
+//}
+
+
+#define _LAYOUT_FRAME(child, name) child->frame[layout->frame_##name##_i]
+
+#define CHILD_POS(child) _LAYOUT_FRAME(child, pos)
+#define CHILD_POS2(child) _LAYOUT_FRAME(child, pos2)
+#define CHILD_SIZE(child) _LAYOUT_FRAME(child, size)
+#define CHILD_SIZE2(child) _LAYOUT_FRAME(child, size2)
+
+#define CHILD_MARGIN(child, if_vertical, if_horizontal) \
+    (layout->vertical \
+     ? child->margin_##if_vertical \
+     : child->margin_##if_horizontal)
+
+
+bool layout_align(flex_item::flex_align align, float flex_dim, uint32_t children_count, float* pos_p, float* spacing_p, bool stretch_allowed)
+{
+	assert(flex_dim > 0);
+
+	float pos = 0;
+	float spacing = 0;
+	switch (align) {
+	case flex_item::flex_align::ALIGN_START:
+		break;
+
+	case flex_item::flex_align::ALIGN_END:
+		pos = flex_dim;
+		break;
+
+	case flex_item::flex_align::ALIGN_CENTER:
+		pos = flex_dim / 2;
+		break;
+
+	case flex_item::flex_align::ALIGN_SPACE_BETWEEN:
+		if (children_count > 0) {
+			spacing = flex_dim / (children_count - 1);
+		}
+		break;
+
+	case flex_item::flex_align::ALIGN_SPACE_AROUND:
+		if (children_count > 0) {
+			spacing = flex_dim / children_count;
+			pos = spacing / 2;
+		}
+		break;
+
+	case flex_item::flex_align::ALIGN_SPACE_EVENLY:
+		if (children_count > 0) {
+			spacing = flex_dim / (children_count + 1);
+			pos = spacing;
+		}
+		break;
+
+	case flex_item::flex_align::ALIGN_STRETCH:
+		if (stretch_allowed) {
+			spacing = flex_dim / children_count;
+			break;
+		}
+		// fall through
+		break;
+	default:
+		return false;
+	}
+
+	*pos_p = pos;
+	*spacing_p = spacing;
+	return true;
+}
+
+flex_item::flex_align child_align(flex_item* child, flex_item* parent)
+{
+	auto align = child->align_self;
+	if (align == flex_item::flex_align::ALIGN_AUTO) {
+		align = parent->align_items;
+	}
+	return align;
+}
+
+void flex_item::layout_items(uint32_t child_begin, uint32_t child_end, uint32_t children_count, struct flex_layout* layout, uint32_t last_count)
+{
+	flex_item* item = this;
+	assert(children_count <= (child_end - child_begin));
+	if (children_count <= 0) {
+		return;
+	}
+	if (last_count > 0 && last_count > children_count)
+	{
+		//children_count = last_count;
+	}
+	if (layout->flex_dim > 0 && layout->extra_flex_dim > 0) {
+		// If the container has a positive flexible space, let's add to it
+		// the sizes of all flexible children->
+		layout->flex_dim += layout->extra_flex_dim;
+	}
+
+	// Determine the main axis initial position and optional spacing.
+	float pos = 0;
+	float spacing = 0;
+	if (layout->flex_grows == 0 && layout->flex_dim > 0) {
+		if (!layout_align(item->justify_content, layout->flex_dim,
+			children_count, &pos, &spacing, false))
+		{
+			assert(0 && "incorrect justify_content");
+		}
+		if (layout->reverse) {
+			pos = layout->size_dim - pos;
+		}
+	}
+
+	if (layout->reverse) {
+		pos -= layout->vertical ? item->padding_bottom : item->padding_right;
+	}
+	else {
+		pos += layout->vertical ? item->padding_top : item->padding_left;
+	}
+	if (layout->wrap && layout->reverse2) {
+		layout->pos2 -= layout->line_dim;
+	}
+
+	for (uint32_t i = child_begin; i < child_end; i++) {
+		flex_item* child = LAYOUT_CHILD_AT(item, i);
+		if (child->position == flex_position::POS_ABSOLUTE) {
+			// Already positioned.
+			continue;
+		}
+
+		// Grow or shrink the main axis item size if needed.
+		float flex_size = 0;
+		if (layout->flex_dim > 0) {
+			if (child->grow != 0) {
+				CHILD_SIZE(child) = 0; // Ignore previous size when growing.
+				flex_size = (layout->flex_dim / layout->flex_grows)
+					* child->grow;
+			}
+		}
+		else if (layout->flex_dim < 0) {
+			if (child->shrink != 0) {
+				flex_size = (layout->flex_dim / layout->flex_shrinks)
+					* child->shrink;
+			}
+		}
+		CHILD_SIZE(child) += flex_size;
+
+		// Set the cross axis position (and stretch the cross axis size if
+		// needed).
+		float align_size = CHILD_SIZE2(child);
+		float align_pos = layout->pos2 + 0;
+		switch (child_align(child, item)) {
+		case flex_align::ALIGN_END:
+			align_pos += layout->line_dim - align_size
+				- CHILD_MARGIN(child, right, bottom);
+			break;
+
+		case flex_align::ALIGN_CENTER:
+			align_pos += (layout->line_dim / 2) - (align_size / 2)
+				+ (CHILD_MARGIN(child, left, top)
+					- CHILD_MARGIN(child, right, bottom));
+			break;
+
+		case flex_align::ALIGN_STRETCH:
+			if (align_size == 0) {
+				CHILD_SIZE2(child) = layout->line_dim
+					- (CHILD_MARGIN(child, left, top)
+						+ CHILD_MARGIN(child, right, bottom));
+			}
+			// fall through
+
+		case flex_align::ALIGN_START:
+			align_pos += CHILD_MARGIN(child, left, top);
+			break;
+
+		default:
+			assert(false && "incorrect align_self");
+		}
+		CHILD_POS2(child) = align_pos;
+
+		// Set the main axis position.
+		if (layout->reverse) {
+			pos -= CHILD_MARGIN(child, bottom, right);
+			pos -= CHILD_SIZE(child);
+			CHILD_POS(child) = pos;
+			pos -= spacing;
+			pos -= CHILD_MARGIN(child, top, left);
+		}
+		else {
+			pos += CHILD_MARGIN(child, top, left);
+			CHILD_POS(child) = pos;
+			pos += CHILD_SIZE(child);
+			pos += spacing;
+			pos += CHILD_MARGIN(child, bottom, right);
+		}
+
+		// Now that the item has a frame, we can layout its children.
+		child->layout_item(child->frame[2], child->frame[3]);
+	}
+
+	if (layout->wrap && !layout->reverse2) {
+		layout->pos2 += layout->line_dim;
+	}
+
+	if (layout->need_lines) {
+		struct flex_layout::flex_layout_line line[1] = {};
+		line->child_begin = child_begin;
+		line->child_end = child_end;
+		line->size = layout->line_dim;
+		layout->lines.push_back(line[0]);
+		layout->lines_sizes += line->size;
+	}
+}
+
+void flex_item::layout_item(float width, float height)
+{
+	flex_item* item = this;
+	if (!item->children || item->children->size() == 0) {
+		return;
+	}
+
+	struct flex_layout layout_s = { 0 }, * layout = &layout_s;
+	layout_init(item, width, height, &layout_s);
+
+	LAYOUT_RESET();
+	uint32_t last_count = 0;
+	uint32_t last_layout_child = 0;
+	uint32_t relative_children_count = 0;
+	for (uint32_t i = 0; i < item->children->size(); i++) {
+		flex_item* child = LAYOUT_CHILD_AT(item, i);
+
+		// Items with an absolute position have their frames determined
+		// directly and are skipped during layout.
+		if (child->position == flex_position::POS_ABSOLUTE) {
+#define ABSOLUTE_SIZE(val, pos1, pos2, dim) \
+            (!isnan(val) \
+             ? val \
+             : (!isnan(pos1) && !isnan(pos2) \
+                 ? dim - pos2 - pos1 \
+                 : 0))
+
+#define ABSOLUTE_POS(pos1, pos2, size, dim) \
+            (!isnan(pos1) \
+             ? pos1 \
+             : (!isnan(pos2) \
+                 ? dim - size - pos2 \
+                 : 0))
+
+			float child_width = ABSOLUTE_SIZE(child->width, child->left,
+				child->right, width);
+
+			float child_height = ABSOLUTE_SIZE(child->height, child->top,
+				child->bottom, height);
+
+			float child_x = ABSOLUTE_POS(child->left, child->right,
+				child_width, width);
+
+			float child_y = ABSOLUTE_POS(child->top, child->bottom,
+				child_height, height);
+
+			child->frame[0] = child_x;
+			child->frame[1] = child_y;
+			child->frame[2] = child_width;
+			child->frame[3] = child_height;
+
+			// Now that the item has a frame, we can layout its children.
+			child->layout_item(child->frame[2], child->frame[3]);
+
+#undef ABSOLUTE_POS
+#undef ABSOLUTE_SIZE
+			continue;
+		}
+
+		// Initialize frame.
+		child->frame[0] = 0;
+		child->frame[1] = 0;
+		child->frame[2] = child->width;
+		child->frame[3] = child->height;
+
+		// Main axis size defaults to 0.
+		if (isnan(CHILD_SIZE(child))) {
+			CHILD_SIZE(child) = 0;
+		}
+
+		// Cross axis size defaults to the parent's size (or line size in wrap
+		// mode, which is calculated later on).
+		if (isnan(CHILD_SIZE2(child))) {
+			if (layout->wrap) {
+				layout->need_lines = true;
+			}
+			else {
+				CHILD_SIZE2(child) = (layout->vertical ? width : height)
+					- CHILD_MARGIN(child, left, top)
+					- CHILD_MARGIN(child, right, bottom);
+			}
+		}
+
+		// Call the self_sizing callback if provided. Only non-NAN values
+		// are taken into account. If the item's cross-axis align property
+		// is set to stretch, ignore the value returned by the callback.
+		if (child->self_sizing != NULL) {
+			float size[2] = { child->frame[2], child->frame[3] };
+
+			child->self_sizing(child, size);
+
+			for (uint32_t j = 0; j < 2; j++) {
+				uint32_t size_off = j + 2;
+				if (size_off == layout->frame_size2_i
+					&& child_align(child, item) == flex_align::ALIGN_STRETCH) {
+					continue;
+				}
+				float val = size[j];
+				if (!isnan(val)) {
+					child->frame[size_off] = val;
+				}
+			}
+		}
+
+		// Honor the `basis' property which overrides the main-axis size.
+		if (!(isnan(child->basis) || child->basis < 0)) {
+			assert(child->basis >= 0);
+			CHILD_SIZE(child) = child->basis;
+		}
+
+		float child_size = CHILD_SIZE(child);
+		if (layout->wrap) {
+			if (layout->flex_dim < child_size) {
+				// Not enough space for this child on this line, layout the
+				// remaining items and move it to a new line.
+				item->layout_items(last_layout_child, i, relative_children_count, layout, last_count);
+
+				LAYOUT_RESET();
+				last_layout_child = i;
+				if (last_count < relative_children_count)
+					last_count = relative_children_count;
+				relative_children_count = 0;
+			}
+
+			float child_size2 = CHILD_SIZE2(child);
+			if (!isnan(child_size2) && child_size2 > layout->line_dim) {
+				layout->line_dim = child_size2;
+			}
+		}
+
+		assert(child->grow >= 0);
+		assert(child->shrink >= 0);
+
+		layout->flex_grows += child->grow;
+		layout->flex_shrinks += child->shrink;
+
+		layout->flex_dim -= child_size
+			+ (CHILD_MARGIN(child, top, left)
+				+ CHILD_MARGIN(child, bottom, right));
+
+		relative_children_count++;
+
+		if (child_size > 0 && child->grow > 0) {
+			layout->extra_flex_dim += child_size;
+		}
+	}
+
+	// Layout remaining items in wrap mode, or everything otherwise.
+	item->layout_items(last_layout_child, item->children ? item->children->size() : 0, relative_children_count, layout, last_count);
+
+	// In wrap mode we may need to tweak the position of each line according to
+	// the align_content property as well as the cross-axis size of items that
+	// haven't been set yet.
+	if (layout->need_lines && layout->lines.size() > 0) {
+		float pos = 0;
+		float spacing = 0;
+		float flex_dim = layout->align_dim - layout->lines_sizes;
+		if (flex_dim > 0) {
+			if (!layout_align(item->align_content, flex_dim, layout->lines.size(), &pos, &spacing, true))
+			{
+				assert(0 && "incorrect align_content");
+			}
+		}
+
+		float old_pos = 0;
+		if (layout->reverse2) {
+			pos = layout->align_dim - pos;
+			old_pos = layout->align_dim;
+		}
+
+		for (uint32_t i = 0; i < layout->lines.size(); i++) {
+			auto line = &layout->lines[i];
+
+			if (layout->reverse2) {
+				pos -= line->size;
+				pos -= spacing;
+				old_pos -= line->size;
+			}
+
+			// Re-position the children of this line, honoring any child
+			// alignment previously set within the line.
+			for (uint32_t j = line->child_begin; j < line->child_end;
+				j++) {
+				flex_item* child = LAYOUT_CHILD_AT(item, j);
+				if (child->position == flex_position::POS_ABSOLUTE) {
+					// Should not be re-positioned.
+					continue;
+				}
+				if (isnan(CHILD_SIZE2(child))) {
+					// If the child's cross axis size hasn't been set it, it
+					// defaults to the line size.
+					CHILD_SIZE2(child) = line->size
+						+ (item->align_content == flex_align::ALIGN_STRETCH
+							? spacing : 0);
+				}
+				CHILD_POS2(child) = pos + (CHILD_POS2(child) - old_pos);
+			}
+
+			if (!layout->reverse2) {
+				pos += line->size;
+				pos += spacing;
+				old_pos += line->size;
+			}
+		}
+	}
+
+	layout_cleanup(layout);
+}
+
+#undef CHILD_MARGIN
+#undef CHILD_POS
+#undef CHILD_POS2
+#undef CHILD_SIZE
+#undef CHILD_SIZE2
+#undef _LAYOUT_FRAME
+#undef LAYOUT_CHILD_AT
+#undef LAYOUT_RESET
+
+
+void flex_item::layout()
+{
+	assert(parent == NULL);
+	assert(!isnan(width));
+	assert(!isnan(height));
+	assert(self_sizing == NULL);
+	layout_item(width, height);
+}
+
+
+
+
+#endif // !NO_FLEX_CX
+
+// 编辑框实现
+#ifndef NO_EDIT
+
+class text_ctx_cx
+{
+public:
+	glm::ivec2 pos = {}, size = {};
+	PangoContext* context = 0;
+	PangoLayout* layout = 0;
+	PangoLayout* layout_editing = 0;
+	tinyimage_cx* cacheimg = 0;
+	cairo_surface_t* sur = 0;
+	std::string editingstr;
+	std::string family = {};
+	int fontsize = 8;
+	uint32_t back_color = 0x06001020;		//背景色
+	uint32_t text_color = 0xffffffff;
+	std::vector<uint32_t> dtimg;
+	std::vector<glm::ivec4> rangerc;
+	glm::ivec2 cpos = {};					// 当前鼠标坐标
+	glm::ivec2 scroll_pos = {};				// 滚动坐标
+	glm::ivec2 _align_pos = {};				// 对齐偏移坐标
+	glm::vec2 text_align = { 0, 0.5 };		// 对齐
+	//std::string text;
+	glm::ivec3 cursor = { 1,-1,0 };				// 闪烁光标。宽度、颜色、毫秒
+	int select_color = 0x80ffb399;
+	int editing_text_color = -1;
+	glm::vec4 _shadow = { 0.0,0.0,0.0,0.5 };
+	glm::vec4 box_color = { 0.2,0.2,0.2,0.5 };
+	int64_t ccursor = 0;	//当前光标
+	int64_t ccursor8 = 0;	//当前光标字符
+	int64_t bounds[2] = {};	//当前选择
+	int64_t caret_old = {};		//保存输入光标
+	glm::ivec3 cursor_pos = {};
+	glm::i64vec2 cur_select = {};
+	int ckselect = 0;
+	int lineheight = 10;//行高
+	int clineidx = 0;	// 当前行
+	int c_ct = 0;
+	int c_d = 0;
+	int _baseline = 0;
+	int ascent = 0, descent = 0;
+	bool valid = true;
+	bool autobr = false;
+	bool is_scroll = true;
+	bool is_hover = false;
+	bool single_line = false;
+	bool show_input_cursor = true;
+	bool hover_text = false;
+	bool upft = true;
+public:
+	text_ctx_cx();
+	~text_ctx_cx();
+
+	void set_autobr(bool is);
+	void set_size(const glm::ivec2& ss);
+	void set_desc(const char* str);
+	void set_family(const char* family);
+	void set_font_size(int fs);
+
+	void set_text(const std::string& str);
+	void set_editing(const std::string& str);
+	void set_markup(const std::string& str);
+	void set_cursor(const glm::ivec3& c);
+	glm::ivec4 get_extents();
+	glm::ivec2 get_pixel_size();
+	int get_baseline();
+	size_t get_xy_to_index(int x, int y, const char* str);
+	glm::ivec4 get_line_extents(int lidx, int idx, int dir);
+	glm::ivec2 get_line_length(int idx);
+	glm::i64vec2 get_bounds();
+	std::vector<glm::ivec4> get_bounds_px();
+	void up_caret();
+	bool update(float delta);
+	void draw(cairo_t* cr);
+
+	bool hit_test(const glm::ivec2& ps);
+	void up_cursor(bool is);
+	void set_single(bool is);
+	glm::ivec4 get_cursor_posv(PangoLayout* layout, int idx);
+	glm::ivec2 get_layout_position(PangoLayout* layout);
+private:
+};
+text_ctx_cx::text_ctx_cx()
+{
+	PangoFontMap* fontMap = get_fmap;
+	context = pango_font_map_create_context(fontMap);
+	//pango_context_set_round_glyph_positions(context, 0);
+	layout = pango_layout_new(context);
+	layout_editing = pango_layout_copy(layout);
+	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
+	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
+#ifdef _WIN32
+	auto n = GetCaretBlinkTime();
+	if (cursor.z < 10)
+	{
+		cursor.z = n;
+	}
+#else
+	cursor.z = 500;
+#endif
+}
+
+text_ctx_cx::~text_ctx_cx()
+{
+	if (context)
+	{
+		g_object_unref(context); context = 0;
+	}
+	if (layout)
+	{
+		g_object_unref(layout); layout = 0;
+	}
+	if (layout_editing)
+	{
+		g_object_unref(layout_editing); layout_editing = 0;
+	}
+	if (sur)
+	{
+		cairo_surface_destroy(sur); sur = 0;
+	}
+}
+
+void text_ctx_cx::set_autobr(bool is)
+{
+	pango_layout_set_width(layout, is ? size.x * PANGO_SCALE : -1);
+	//pango_layout_set_height(layout, size.y * PANGO_SCALE);
+}
+void text_ctx_cx::set_size(const glm::ivec2& ss)
+{
+	if (size != ss)
+	{
+		size = ss;
+		if (sur)
+		{
+			cairo_surface_destroy(sur);
+		}
+		dtimg.resize(size.x * size.y);
+		sur = cairo_image_surface_create_for_data((unsigned char*)dtimg.data(), CAIRO_FORMAT_ARGB32, size.x, size.y, size.x * sizeof(int));
+		cacheimg = (tinyimage_cx*)dtimg.data();
+		cacheimg->width = size.x;
+		cacheimg->height = size.y;
+		cacheimg->format = 1;
+		cacheimg->isupdate = 1;
+		valid = true;
+	}
+}
+
+void text_ctx_cx::set_desc(const char* str)
+{
+	auto desc = pango_font_description_from_string(str);// "Sans Bold Italic Condensed 22.5px");
+	if (desc)
+	{
+		pango_layout_set_font_description(layout, desc);
+		pango_font_description_free(desc);
+		valid = true;
+	}
+}
+
+void text_ctx_cx::set_single(bool is) {
+	single_line = is;
+	if (size.y > 0 && single_line)
+		pango_layout_set_height(layout, size.y * PANGO_SCALE);
+	else
+		pango_layout_set_height(layout, -1);
+	pango_layout_set_single_paragraph_mode(layout, is);
+}
+void text_ctx_cx::set_family(const char* familys)
+{
+	if (familys && *familys)
+	{
+		family = familys;
+		PangoFontDescription* desc = pango_font_description_new();
+		pango_font_description_set_family(desc, family.c_str());
+		pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+		pango_layout_set_font_description(layout, desc);
+		pango_layout_set_font_description(layout_editing, desc);
+		pango_font_description_free(desc);
+		upft = true;
+		valid = true;
+	}
+}
+
+void text_ctx_cx::set_font_size(int fs)
+{
+	if (fs > 2)
+	{
+		fontsize = fs;
+		PangoFontDescription* desc = pango_font_description_new();
+		pango_font_description_set_family(desc, family.c_str());
+		pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+		pango_layout_set_font_description(layout, desc);
+		pango_layout_set_font_description(layout_editing, desc);
+		pango_font_description_free(desc);
+		pango_layout_set_line_spacing(layout, 1.2);
+		auto kf = pango_layout_get_line_spacing(layout) / PANGO_SCALE * 1.0;
+		valid = true;
+	}
+}
+
+void text_ctx_cx::set_text(const std::string& str)
+{
+	pango_layout_set_text(layout, str.c_str(), str.size());
+	int h = 0;
+	auto line = pango_layout_get_line(layout, 0);
+	pango_layout_line_get_height(line, &h);
+	lineheight = h / PANGO_SCALE;
+	get_bounds_px();
+	valid = true;
+}
+
+void text_ctx_cx::set_editing(const std::string& str)
+{
+	editingstr = str;
+	pango_layout_set_text(layout_editing, str.c_str(), str.size());
+	//pango_layout_set_markup(layout_editing, str.c_str(), str.size());
+	valid = true;
+}
+
+void text_ctx_cx::set_markup(const std::string& str)
+{
+	pango_layout_set_markup(layout, str.c_str(), str.size());
+	int h = 0;
+	auto line = pango_layout_get_line(layout, 0);
+	pango_layout_line_get_height(line, &h);
+	lineheight = h / PANGO_SCALE;
+	valid = true;
+}
+
+void text_ctx_cx::set_cursor(const glm::ivec3& c)
+{
+	cursor = c;
+}
+
+glm::ivec4 text_ctx_cx::get_extents()
+{
+	PangoRectangle ink_rect = {};
+	PangoRectangle logical_rect = {};
+	pango_layout_get_pixel_extents(layout, &ink_rect, &logical_rect);
+	return glm::ivec4(ink_rect.x, ink_rect.y, ink_rect.width, ink_rect.height);
+}
+
+glm::ivec2 text_ctx_cx::get_pixel_size()
+{
+	int w = 0, h = 0;
+	pango_layout_get_pixel_size(layout, &w, &h);
+	return glm::ivec2(w, h);
+}
+
+int text_ctx_cx::get_baseline()
+{
+	return glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
+}
+size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
+{
+	x += scroll_pos.x - _align_pos.x;
+	y += scroll_pos.y - _align_pos.y;
+	if (c_d != 0)
+	{
+		c_d = -1; c_ct = 0;
+	}
+	if (x < 0)
+	{
+		x = 0;
+	}
+	if (y < 0)
+	{
+		y = 0;
+	}
+	auto cc = pango_layout_get_character_count(layout);
+	int lc = pango_layout_get_line_count(layout);
+	glm::ivec2 lps = {};
+	pango_layout_get_pixel_size(layout, &lps.x, &lps.y);
+	if (y > lps.y)
+		y = lps.y - 1;
+	int index = 0, trailing = 0;
+	auto ls = pango_layout_get_lines_readonly(layout);
+	bool k = pango_layout_xy_to_index(layout, x * PANGO_SCALE, y * PANGO_SCALE, &index, &trailing);
+	int x_pos = 0;
+	int lidx = 0;
+	pango_layout_index_to_line_x(layout, index, 0, &lidx, &x_pos);
+
+
+	x_pos /= PANGO_SCALE;
+	auto cursor = index + trailing;
+	if (!k)
+	{
+		auto nk = get_line_length(cursor);
+		cursor = nk.x;
+	}
+	auto cp = str + cursor;
+	auto chp = get_utf8_first(cp);
+	int ps = chp - cp;
+	cursor += ps;
+	cursor;
+	clineidx = lidx;
+	//printf("%d\t%d\n", ccursor, ps);
+	PangoRectangle ink_rect = {};
+	PangoRectangle logical_rect = {};
+	pango_layout_get_pixel_extents(layout, &ink_rect, &logical_rect);	//cairo_move_to(cr, 0 /*extents.x*/, ink_rect.y - (logical_rect.height - ink_rect.height) * 0.5);
+	// 获取基线位置
+	int y_pos = pango_layout_get_baseline(layout);
+	int h = 0;
+	auto line = pango_layout_get_line(layout, lidx);
+	pango_layout_line_get_height(line, &h);
+	lineheight = h / PANGO_SCALE;
+	return cursor;
+}
+
+glm::ivec2 text_ctx_cx::get_layout_position(PangoLayout* layout)
+{
+	const int text_height = size.y;
+	PangoRectangle logical_rect;
+	int y_pos, area_height;
+	PangoLayoutLine* line;
+
+
+	area_height = PANGO_SCALE * text_height;
+
+	line = (PangoLayoutLine*)pango_layout_get_lines_readonly(layout)->data;
+	pango_layout_line_get_extents(line, NULL, &logical_rect);
+
+	/* Align primarily for locale's ascent/descent */
+	if (_baseline < 0)
+		y_pos = ((area_height - ascent - descent) / 2 +
+			ascent + logical_rect.y);
+	else
+		y_pos = PANGO_SCALE * _baseline - pango_layout_get_baseline(layout);
+
+	/* Now see if we need to adjust to fit in actual drawn string */
+	if (logical_rect.height > area_height)
+		y_pos = (area_height - logical_rect.height) / 2;
+	else if (y_pos < 0)
+		y_pos = 0;
+	else if (y_pos + logical_rect.height > area_height)
+		y_pos = area_height - logical_rect.height;
+
+	y_pos = y_pos / PANGO_SCALE;
+	return { -scroll_pos.x, y_pos };
+}
+int layout_get_char_width(PangoLayout* layout)
+{
+	int width;
+	PangoFontMetrics* metrics;
+	const PangoFontDescription* font_desc;
+	PangoContext* context = pango_layout_get_context(layout);
+
+	font_desc = pango_layout_get_font_description(layout);
+	if (!font_desc)
+		font_desc = pango_context_get_font_description(context);
+
+	metrics = pango_context_get_metrics(context, font_desc, NULL);
+	width = pango_font_metrics_get_approximate_char_width(metrics);
+	pango_font_metrics_unref(metrics);
+
+	return width;
+}
+gboolean text_util_get_block_cursor_location(PangoLayout* layout, int index, PangoRectangle* pos, gboolean* at_line_end)
+{
+	PangoRectangle strong_pos, weak_pos;
+	PangoLayoutLine* layout_line;
+	gboolean rtl;
+	int line_no;
+	const char* text;
+
+	g_return_val_if_fail(layout != NULL, FALSE);
+	g_return_val_if_fail(index >= 0, FALSE);
+	g_return_val_if_fail(pos != NULL, FALSE);
+
+	pango_layout_index_to_pos(layout, index, pos);
+
+	if (pos->width != 0)
+	{
+		/* cursor is at some visible character, good */
+		if (at_line_end)
+			*at_line_end = FALSE;
+		if (pos->width < 0)
+		{
+			pos->x += pos->width;
+			pos->width = -pos->width;
+		}
+		return TRUE;
+	}
+
+	pango_layout_index_to_line_x(layout, index, FALSE, &line_no, NULL);
+	layout_line = pango_layout_get_line_readonly(layout, line_no);
+	g_return_val_if_fail(layout_line != NULL, FALSE);
+
+	text = pango_layout_get_text(layout);
+
+	if (index < pango_layout_line_get_start_index(layout_line) + pango_layout_line_get_length(layout_line))
+	{
+		/* this may be a zero-width character in the middle of the line,
+		 * or it could be a character where line is wrapped, we do want
+		 * block cursor in latter case */
+		if (g_utf8_next_char(text + index) - text !=
+			pango_layout_line_get_start_index(layout_line) + pango_layout_line_get_length(layout_line))
+		{
+			/* zero-width character in the middle of the line, do not
+			 * bother with block cursor */
+			return FALSE;
+		}
+	}
+
+	/* Cursor is at the line end. It may be an empty line, or it could
+	 * be on the left or on the right depending on text direction, or it
+	 * even could be in the middle of visual layout in bidi text. */
+
+	pango_layout_get_cursor_pos(layout, index, &strong_pos, &weak_pos);
+
+	if (strong_pos.x != weak_pos.x)
+	{
+		/* do not show block cursor in this case, since the character typed
+		 * in may or may not appear at the cursor position */
+		return FALSE;
+	}
+
+	/* In case when index points to the end of line, pos->x is always most right
+	 * pixel of the layout line, so we need to correct it for RTL text. */
+	if (pango_layout_line_get_length(layout_line))
+	{
+		if (pango_layout_line_get_resolved_direction(layout_line) == PANGO_DIRECTION_RTL)
+		{
+			PangoLayoutIter* iter;
+			PangoRectangle line_rect;
+			int i;
+			int left, right;
+			const char* p;
+
+			p = g_utf8_prev_char(text + index);
+
+			pango_layout_line_index_to_x(layout_line, p - text, FALSE, &left);
+			pango_layout_line_index_to_x(layout_line, p - text, TRUE, &right);
+			pos->x = MIN(left, right);
+
+			iter = pango_layout_get_iter(layout);
+			for (i = 0; i < line_no; i++)
+				pango_layout_iter_next_line(iter);
+			pango_layout_iter_get_line_extents(iter, NULL, &line_rect);
+			pango_layout_iter_free(iter);
+
+			rtl = TRUE;
+			pos->x += line_rect.x;
+		}
+		else
+			rtl = FALSE;
+	}
+	else
+	{
+		PangoContext* context = pango_layout_get_context(layout);
+		rtl = pango_context_get_base_dir(context) == PANGO_DIRECTION_RTL;
+	}
+
+	pos->width = layout_get_char_width(layout);
+
+	if (rtl)
+		pos->x -= pos->width - 1;
+
+	if (at_line_end)
+		*at_line_end = TRUE;
+
+	return pos->width != 0;
+}
+
+glm::ivec2 get_index2pos(PangoLayout* layout, int idx) {
+	PangoRectangle pos = {};
+	pango_layout_index_to_pos(layout, idx, &pos);
+	auto r = (glm::ivec4*)&pos;
+	*r /= PANGO_SCALE;
+	return *r;
+}
+// 输入行号，索引号，方向，输出行号选择范围
+glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
+{
+	//pango_layout_get_line_count
+	auto line = pango_layout_get_line(layout, lidx);
+	auto lst = pango_layout_get_lines(layout);
+	PangoRectangle ink_rect = {};
+	PangoRectangle logical_rect = {};
+	glm::ivec4 rt = {};
+	gboolean at_line_end = 0;
+	PangoRectangle tpos = {};
+	if (line)
+	{
+		int h = 0;
+		pango_layout_line_get_height(line, &h);
+		h = h / PANGO_SCALE;
+		auto xi = pango_layout_line_get_start_index(line);
+		{
+			gboolean rb = text_util_get_block_cursor_location(layout, idx > 0 ? idx : xi, &tpos, &at_line_end);
+			pango_layout_get_cursor_pos(layout, idx > 0 ? idx : xi, &ink_rect, &logical_rect);
+			auto r = (glm::ivec4*)&logical_rect;
+			auto r1 = (glm::ivec4*)&tpos;
+			*r /= PANGO_SCALE;
+			*r1 /= PANGO_SCALE;
+			rt.x = r->x;
+			rt.y = r->y;
+			rt.w = h;// r->w;
+		}
+		if (dir)
+		{
+			pango_layout_get_cursor_pos(layout, xi, &ink_rect, &logical_rect);
+			auto r = (glm::ivec4*)&logical_rect;
+			*r /= PANGO_SCALE;
+			rt.z = rt.x;
+			rt.x = r->x;
+		}
+		else {
+			pango_layout_line_get_pixel_extents(line, &ink_rect, &logical_rect);
+			rt.z = logical_rect.width - rt.x;
+		}
+		int lh = 0;
+		pango_layout_line_get_height(line, &lh);
+		lh /= PANGO_SCALE;
+	}
+	return rt;
+}
+glm::ivec2 text_ctx_cx::get_line_length(int index)
+{
+	int x_pos = 0;
+	int lidx = 0;
+	pango_layout_index_to_line_x(layout, index, 0, &lidx, &x_pos);
+	x_pos /= PANGO_SCALE;
+	auto line = pango_layout_get_line(layout, lidx);
+	int len = pango_layout_line_get_length(line);
+	pango_layout_index_to_line_x(layout, len, 0, &lidx, &x_pos);
+	glm::ivec2 ret = { line->start_index + len, x_pos / PANGO_SCALE };
+	return ret;
+}
+
+glm::i64vec2 text_ctx_cx::get_bounds()
+{
+	glm::i64vec2 v = { bounds[0] , bounds[1] };
+	if (v.x > v.y) { std::swap(v.x, v.y); }
+	return v;
+}
+glm::ivec2 geti2x(PangoLayout* layout, int x)
+{
+	int x_pos = 0;
+	int lidx = 0;
+	pango_layout_index_to_line_x(layout, x, 0, &lidx, &x_pos);
+	x_pos /= PANGO_SCALE;
+	return glm::ivec2(x_pos, lidx);
+}
+
+glm::ivec4 text_ctx_cx::get_cursor_posv(PangoLayout* layout, int idx)
+{
+	std::vector<glm::ivec4> rv;
+	PangoRectangle sw[2] = {};
+	pango_layout_get_cursor_pos(layout, idx, &sw[0], &sw[1]);
+	auto r = (glm::ivec4*)&sw[1];
+	*r /= PANGO_SCALE;
+	//r->y = lineheight * ly;
+	return *r;
+}
+
+std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
+{
+	std::vector<glm::ivec4> rv;
+	PangoRectangle sw[2] = {};
+	pango_layout_get_caret_pos(layout, idx, &sw[0], &sw[1]);
+	rv.push_back(*(glm::ivec4*)&sw[0]);
+	rv.push_back(*(glm::ivec4*)&sw[1]);
+	for (auto& it : rv) {
+		it /= PANGO_SCALE;
+	}
+	return rv;
+}
+int get_line_height(PangoLayout* layout, int idx) {
+	auto line = pango_layout_get_line(layout, idx);
+	int h = 0;
+	pango_layout_line_get_height(line, &h);
+	h = h / PANGO_SCALE;
+	return h;
+}
+glm::ivec2 get_layout_size(PangoLayout* layout)
+{
+	PangoRectangle ink, logical;
+	pango_layout_get_extents(layout, &ink, &logical);
+	return { logical.width / PANGO_SCALE,logical.height / PANGO_SCALE };
+}
+struct it_rect
+{
+	glm::ivec4 line_rect = {}, char_rect = {};
+	glm::ivec2 yr = {};
+	int baseline = 0;
+};
+it_rect get_iter(PangoLayoutIter* iter) {
+
+	it_rect ret = {};
+	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&ret.line_rect);
+	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&ret.char_rect);
+	pango_layout_iter_get_line_yrange(iter, &ret.yr.x, &ret.yr.y);
+	ret.baseline = pango_layout_iter_get_baseline(iter);
+	ret.line_rect /= PANGO_SCALE;
+	ret.char_rect /= PANGO_SCALE;
+	ret.yr /= PANGO_SCALE;
+	ret.baseline /= PANGO_SCALE;
+	return ret;
+}
+std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
+{
+	std::vector<glm::ivec4> r;
+	int x_pos = 0;
+	int lidx = 0;
+	auto v = get_bounds();
+	auto v1 = geti2x(layout, v.x);
+	auto v2 = geti2x(layout, v.y);
+	if (v.x != v.y)
+	{
+		v = v;
+	}
+	auto vp1 = get_index2pos(layout, v.x);
+	auto vp2 = get_index2pos(layout, v.y);
+
+	auto nk = get_line_length(v.x);
+	auto nk1 = get_line_length(v.y);
+	//pango_layout_move_cursor_visually()
+	//auto text = pango_layout_get_text(layout);
+	//std::string str;
+	//if (text)
+	//{
+	//	str = text;
+	//}
+	auto ss = get_layout_size(layout);
+	auto sw0 = get_cursor_posv(layout, v.x);
+	auto sw1 = get_cursor_posv(layout, v.y);
+	//sw0.w = get_line_height(layout, v1.y);
+	std::vector<glm::ivec4> rs, rss;
+	int line_no = pango_layout_get_line_count(layout);
+	//pango_layout_line_index_to_x(layout, p - text, FALSE, &left);
+	//pango_layout_line_index_to_x(layout, p - text, TRUE, &right);
+	//pos->x = MIN(left, right);
+	auto iter = pango_layout_get_iter(layout);
+	for (int i = 0; i < line_no; i++)
+	{
+		auto rc = get_iter(iter);
+		if (i != v1.y)
+		{
+			pango_layout_iter_next_line(iter); continue;
+		}
+		if (v1.y == v2.y)
+		{
+			rss.push_back({ rc.line_rect.x + sw0.x,rc.yr.x,sw1.x - sw0.x,rc.yr.y - rc.yr.x });
+			break;
+		}
+		else
+		{
+			glm::ivec4 f = { rc.line_rect.x + sw0.x,rc.yr.x,rc.line_rect.z - sw0.x,rc.yr.y - rc.yr.x };
+			rss.push_back(f);
+			pango_layout_iter_next_line(iter);
+			for (size_t x = v1.y + 1; x < v2.y; x++)
+			{
+				rc = get_iter(iter);
+				glm::ivec4 c = { rc.line_rect.x,rc.yr.x,rc.line_rect.z,rc.yr.y - rc.yr.x };
+				rss.push_back(c);
+				pango_layout_iter_next_line(iter);
+			}
+			rc = get_iter(iter);
+			f = { rc.line_rect.x ,rc.yr.x, sw1.x ,rc.yr.y - rc.yr.x };
+			rss.push_back(f);
+			break;
+		}
+	}
+	pango_layout_iter_free(iter);
+	rangerc = rss;
+	return r;
+}
+
+void text_ctx_cx::up_caret()
+{
+	auto kc = pango_layout_get_line_count(layout);
+	auto lps = get_layout_position(layout);
+	PangoRectangle sw[4] = {};
+	auto v1 = geti2x(layout, ccursor);
+	auto f = get_line_extents(v1.y, ccursor, 0);
+
+	pango_layout_get_cursor_pos(layout, ccursor, &sw[0], &sw[1]);
+	pango_layout_get_caret_pos(layout, ccursor, &sw[2], &sw[3]);
+	glm::ivec4 caret = { sw->x,sw->y,sw[2].x,sw[2].y };
+	caret /= PANGO_SCALE;
+	int h = sw->height;
+	h /= PANGO_SCALE;
+	cursor_pos = caret; cursor_pos.z = h;
+}
+glm::ivec2 get_line_info(PangoLayout* layout, int line)
+{
+	glm::ivec2 ret = {};
+	int ct = pango_layout_get_line_count(layout);
+	if (line >= ct)line = ct - 1;
+	if (line < 0)line = 0;
+	PangoLayoutLine* pl = pango_layout_get_line(layout, line);
+	if (pl)
+	{
+		ret = { pl->start_index , pl->length };
+	}
+	return ret;
+}
+void renderer_draw_layout(cairo_t* cr, PangoLayout* layout, int x, int y, int baseline)
+{
+	PangoLayoutIter* iter;
+	g_return_if_fail(PANGO_IS_LAYOUT(layout));
+	iter = pango_layout_get_iter(layout);
+	do
+	{
+		PangoRectangle   logical_rect;
+		PangoLayoutLine* line;
+		//int              baseline;
+
+		line = pango_layout_iter_get_line_readonly(iter);
+		glm::ivec2 yy = {};
+		pango_layout_iter_get_line_yrange(iter, &yy.x, &yy.y);
+		pango_layout_iter_get_line_extents(iter, NULL, &logical_rect);
+		if (baseline == 0)
+			baseline = pango_layout_iter_get_baseline(iter);
+		cairo_save(cr);
+		yy /= PANGO_SCALE;
+		cairo_translate(cr, x + logical_rect.x, y + baseline + yy.x);
+		pango_cairo_show_layout_line(cr, line);
+		cairo_restore(cr);
+	} while (pango_layout_iter_next_line(iter));
+
+	pango_layout_iter_free(iter);
+
+}
+bool text_ctx_cx::update(float delta)
+{
+	c_ct += delta * 1000.0 * c_d;
+	if (c_ct > cursor.z)
+	{
+		c_d = -1;
+		c_ct = cursor.z;
+		valid = true;
+	}
+	if (c_ct < 0)
+	{
+		c_d = 1; c_ct = 0;
+		valid = true;
+	}
+	if (!valid)return false;
+	auto cr = cairo_create(sur);
+#if 1 
+	size_t length = dtimg.size();
+	auto dt = dtimg.data();
+	for (size_t i = 0; i < length; i++)
+	{
+		*dt = back_color; dt++;
+	}
+#else
+	set_color(cr, back_color);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_paint(cr);
+#endif
+	cairo_save(cr);
+#if 0
+	int gradient_size = 6;
+
+	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 0);// 垂直方向 
+	cairo_save(cr);
+	cairo_translate(cr, 0, size.y - gradient_size);
+	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 1);// 垂直方向,下
+	cairo_restore(cr);
+	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 0);// 水平方向 
+	cairo_save(cr);
+	cairo_translate(cr, size.x - gradient_size, 0);
+	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 1);// 水平方向，右
+	cairo_restore(cr);
+#endif
+	pango_cairo_update_layout(cr, layout);
+
+	//if (upft)
+	//{
+	//	upft = false; 
+	//	auto bs = pango_layout_get_baseline(layout);
+	//	auto bsp = pango_attr_baseline_shift_new(bs);
+	//	//pango_layout_set_line_spacing(layout, 1.2);
+	//	//PangoAttribute* ab = pango_attr_line_height_new_absolute(2 * fontsize * PANGO_SCALE);
+	//	auto lst = pango_attr_list_new();
+	//	//pango_attr_list_insert(lst, pango_attr_size_new(1 * fontsize * PANGO_SCALE));
+	//	pango_attr_list_insert(lst, bsp);
+	//	pango_layout_set_attributes(layout, lst);
+	//	pango_attr_list_unref(lst); 
+	//}
+
+	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
+	if (upft)
+	{
+		_baseline = get_baseline();
+		upft = false;
+	}
+	if (single_line) {
+		glm::vec2 ext = { 0,lineheight }, ss = size;
+		auto ps = ss * text_align - (ext * text_align);
+		_align_pos.y = ps.y;
+	}
+	cairo_translate(cr, -scroll_pos.x + _align_pos.x, -scroll_pos.y + _align_pos.y);
+
+	auto v = get_bounds();
+	if (v.x != v.y && rangerc.size()) {
+		set_color(cr, select_color);
+		for (auto& it : rangerc)
+		{
+			cairo_rectangle(cr, it.x, it.y, it.z, it.w);
+			cairo_fill(cr);
+		}
+	}
+	set_color(cr, text_color);
+	auto b = pango_layout_get_ellipsize(layout);
+	pango_cairo_show_layout(cr, layout);
+	//renderer_draw_layout(cr, layout, 0, 0, _baseline);
+	cairo_restore(cr);
+	cairo_destroy(cr);
+	bool ret = valid;
+	valid = false;
+	return true;
+}
+uint32_t get_reverse_color(uint32_t color) {
+	uint8_t* c = (uint8_t*)&color;
+	c[0] = 255 - c[0];
+	c[1] = 255 - c[1];
+	c[2] = 255 - c[2];
+	return color;
+}
+void text_ctx_cx::draw(cairo_t* cr)
+{
+	//printf("text_ctx_cx::draw\t%s\n",);
+	cairo_save(cr);
+	// 裁剪区域
+	cairo_rectangle(cr, pos.x, pos.y, size.x, size.y);
+	cairo_clip(cr);
+	auto ps = pos - scroll_pos + _align_pos;
+	auto oldop = cairo_get_operator(cr);
+	cairo_set_source_surface(cr, sur, pos.x, pos.y);
+	cairo_paint(cr);
+	double x = ps.x + cursor_pos.x, y = ps.y + cursor_pos.y;
+	if (show_input_cursor && c_d == 1 && cursor.x > 0 && cursor_pos.z > 0)
+	{
+		set_color(cr, cursor.y);
+		cairo_rectangle(cr, x, y, cursor.x, cursor_pos.z);
+		cairo_fill(cr);
+	}
+	cairo_restore(cr);
+	auto bbc = box_color;
+	set_source_rgba(cr, bbc);
+	cairo_rectangle(cr, pos.x - 0.5, pos.y - 0.5, size.x + 1, size.y + 1);
+	cairo_set_line_width(cr, 1);
+	cairo_stroke(cr);
+	// 编辑中的文本
+	if (editingstr.size())
+	{
+		cairo_save(cr);
+		cairo_translate(cr, x, y);
+
+		pango_cairo_update_layout(cr, layout_editing);
+		glm::ivec2 lps = {};
+		pango_layout_get_pixel_size(layout_editing, &lps.x, &lps.y);
+		if (lps.y < lineheight)
+			lps.y = lineheight;
+		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
+
+		set_color(cr, get_reverse_color(editing_text_color));
+		cairo_rectangle(cr, 0, 0, lps.x, lps.y + 2);
+		cairo_fill(cr);
+		set_color(cr, editing_text_color);
+		pango_cairo_show_layout(cr, layout_editing);
+
+		cairo_move_to(cr, lss.x, lss.y);
+		cairo_line_to(cr, lss.z, lss.w);
+		cairo_set_line_width(cr, 1);
+		cairo_stroke(cr);
+		cairo_restore(cr);
+	}
+}
+
+bool text_ctx_cx::hit_test(const glm::ivec2& ps)
+{
+	auto p2 = ps;
+	glm::vec4 rc = { 0,0,size };
+	auto k2 = check_box_cr(p2, &rc, 1);
+	return (k2.x);
+}
+
+double dcscroll(double cp, double isx, double scroll_increment_x, int& scrollx)
+{
+	double ret = .0;
+	if (cp < scrollx)
+	{
+		ret = floor(std::max(0.0, cp - scroll_increment_x));
+		scrollx = ret;
+	}
+	else if (cp - isx >= scrollx && isx > 0)
+	{
+		ret = floor(cp - isx + scroll_increment_x);
+		scrollx = ret;
+	}
+	return ret;
+}
+
+void text_ctx_cx::up_cursor(bool is)
+{
+	if (is)
+	{
+		up_caret();
+		glm::ivec2 cs = cursor_pos;
+		//cs.y += cursor_pos.z;
+		//pango_layout_get_pixel_size(layout, &cs.x, &cs.y);//content_size
+		auto evs = size;		// 视图大小
+		auto h = cursor_pos.z;	// 行高
+		if (h < 1)h = 1;
+		evs.x -= _align_pos.x;
+		int ey = evs.y - cursor_pos.z;
+		//ey *= h;
+		glm::ivec2 pos = {};
+		if (is_scroll) {
+			dcscroll(cs.x, evs.x, 2, scroll_pos.x);
+			dcscroll(cs.y, ey, h, scroll_pos.y);
+		}
+		else
+		{
+			scroll_pos = { .0, .0 };
+		}
+		if (!(cs.x < 0 || cs.y < 0))
+		{
+			pos.x += cs.x;
+			pos.y += cs.y;
+		}
+	}
+}
+edit_tl::edit_tl()
+{
+	ctx = new text_ctx_cx();
+	set_family("NSimSun", 12);
+	set_align_pos({ 4, 4 });
+	set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
+}
+
+edit_tl::~edit_tl()
+{
+	if (ctx)delete ctx; ctx = 0;
+}
+void edit_tl::set_single(bool is) {
+	ctx->set_single(is);
+	single_line = is;
+}
+void edit_tl::set_family(const char* familys, int fontsize) {
+	if (fontsize > 0)
+		ctx->fontsize = fontsize;
+	ctx->set_family(familys);
+}
+void edit_tl::set_show_input_cursor(bool ab)
+{
+	ctx->show_input_cursor = ab;
+}
+void edit_tl::inputchar(const char* str)
+{
+	int sn = strlen(str);
+	if (!str || !sn || ctx->ccursor < 0 || ctx->ccursor>_text.size())
+	{
+		return;
+	}
+	std::string sstr = str;
+	ctx->single_line = single_line;
+	if (single_line)
+	{
+		auto& v = sstr;
+		v.erase(std::remove(v.begin(), v.end(), '\r'), v.end());
+		v.erase(std::remove(v.begin(), v.end(), '\n'), v.end());
+	}
+	_text.insert(ctx->ccursor, sstr);
+	ctx->ccursor += sn;
+	ctx->set_text(_text);
+	ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor;
+	ctx->up_cursor(true);
+}
+bool edit_tl::remove_bounds()
+{
+	bool r = 0;
+	auto v = ctx->get_bounds();
+	if (v.x != v.y) {
+		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.x;
+		remove_char(v.x, v.y - v.x);//删除选择的字符	 
+		r = true;
+	}
+	return r;
+}
+void edit_tl::remove_char(size_t idx, int count)
+{
+	if (idx < _text.size() && count > 0)
+	{
+		_text.erase(idx, count);
+		ctx->set_text(_text);
+		ctx->ccursor = idx;
+	}
+}
+void edit_tl::set_cursor(const glm::ivec3& c)
+{
+	if (ctx && c.z > 0)ctx->set_cursor(c);
+}
+uint32_t rgb2bgr(uint32_t c) {
+	uint32_t r = c;
+	auto c8 = (uint8_t*)&r;
+	std::swap(c8[0], c8[2]);
+	return r;
+}
+void edit_tl::set_color(const glm::ivec4& c) {
+	ctx->back_color = rgb2bgr(c.x);
+	ctx->text_color = c.y;
+	ctx->select_color = c.z;
+	ctx->editing_text_color = c.w;
+}
+void edit_tl::set_text(const void* str0, int len)
+{
+	char* str = (char*)str0;
+	if (str)
+	{
+		if (len < 0)len = strlen(str);
+		std::string nstr(str, len);
+		if (nstr != _text)
+		{
+			_text.swap(nstr);
+			ctx->set_text(_text);
+		}
+	}
+	else {
+		_text.clear();
+		ctx->set_text(_text);
+	}
+	ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = _text.size();
+}
+void edit_tl::add_text(const void* str0, int len)
+{
+	char* str = (char*)str0;
+	if (str && *str)
+	{
+		if (len < 0)len = strlen(str);
+		std::string nstr(str, len);
+		auto ps = _text.size();
+		_text += (nstr);
+		ctx->set_text(_text);
+		ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = ps + len;
+	}
+}
+void edit_tl::set_size(const glm::ivec2& ss)
+{
+	size = ss;
+	if (ss.x > 0 && ss.y > 0)
+		ctx->set_size(ss);
+}
+void edit_tl::set_pos(const glm::ivec2& ps) {
+	ctx->pos = pos = ps;
+}
+void edit_tl::set_align_pos(const glm::vec2& ps)
+{
+	ctx->_align_pos = ps;
+}
+void edit_tl::set_align(const glm::vec2& a)
+{
+	ctx->text_align = a;
+}
+glm::ivec4 edit_tl::input_pos() {
+	auto p = this;
+	glm::ivec2 cpos = p->ctx->cursor_pos;
+	return { p->ppos + p->ctx->pos + cpos - p->ctx->scroll_pos + p->ctx->_align_pos,2, p->ctx->cursor_pos.z + 2 };
+}
+std::string edit_tl::get_select_str()
+{
+	auto cx = ctx->get_bounds();
+	if (cx.x == cx.y)return "";
+	return std::string(_text.substr(cx.x, cx.y - cx.x));
+}
+std::wstring edit_tl::get_select_wstr()
+{
+	auto cx = ctx->get_bounds();
+	if (cx.x == cx.y)return L"";
+	return std::wstring(hz::u8_to_u16(_text.substr(cx.x, cx.y - cx.x)));
+}
+// 发送事件到本edit
+void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
+
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y }; mps -= ctx->pos + ppos;
+		if (ctx->hit_test(mps) || mdown)
+		{
+			ctx->is_hover = true;
+			p->cursor = (int)cursor_st::cursor_ibeam;//设置输入光标
+
+			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
+			auto bp = ctx->cur_select;
+
+			if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
+			{
+				p->cursor = (int)cursor_st::cursor_arrow;
+				ctx->hover_text = true;
+			}
+			else {
+				ctx->hover_text = false;
+			}
+			if (mdown)
+			{
+				if (ctx->ckselect == 2 && ep->form)
+				{
+					ctx->ckselect = 3;
+					std::wstring ws = get_select_wstr();
+					ws.push_back(0);
+					bool ok = dragdrop_begin(ws.c_str(), ws.size());
+					if (ok && !_read_only) {
+						auto ccr = ctx->get_bounds();
+						auto d = bp.y - bp.x;
+
+						if (ctx->ccursor < bp.x)
+						{
+							bp += d;
+						}
+						else { ccr += d; }
+						ctx->bounds[0] = bp.x;
+						ctx->bounds[1] = bp.y;
+						remove_bounds();
+						//printf("%p\t%d\t%d\n", this, ccr.x, bp.x);
+						if (ctx->ckselect != 3)
+						{
+							ctx->bounds[0] = ccr.x;
+							ctx->ccursor = ctx->bounds[1] = ccr.y;
+						}
+						ctx->cur_select = ctx->get_bounds();
+						ctx->get_bounds_px();
+						ctx->up_cursor(true); mdown = false;
+					}
+					break;
+				}
+				if (ctx->ckselect == 0)
+					ctx->bounds[1] = ctx->ccursor = cx;
+				ctx->get_bounds_px();
+				ctx->up_cursor(true);
+
+			}
+		}
+		else if (ctx->is_hover) {
+			p->cursor = (int)cursor_st::cursor_arrow;
+			ctx->is_hover = false;
+		}
+	}
+	break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y }; mps -= ctx->pos + ppos;
+		ctx->cpos = mps;
+		if (ctx->hit_test(mps))
+		{
+			ep->ret = 1;
+			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
+
+			if (p->state == 0 && mdown && p->button == 1 && p->clicks == 1) //左键单击
+			{
+				if (ep->form)
+				{
+					form_set_input_ptr(ep->form, get_input_state(this, 1));
+					ctx->c_d = -1; is_input = true;
+				}
+				else {
+					ctx->c_d = 0; is_input = false;
+				}
+			}
+			if (p->state)
+			{
+				auto bp = ctx->cur_select;
+				if (ctx->hover_text)
+				{
+					ctx->ckselect = 2;
+				}
+				else
+				{
+					ctx->ckselect = 0;
+					ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = cx;
+					ctx->up_cursor(true);
+				}
+				mdown = true;
+			}
+		}
+		else {
+			if (!mdown)
+			{
+			}
+		}
+		if (!p->state)
+		{
+			ctx->cur_select = ctx->get_bounds();
+			ctx->ckselect = 1;
+			mdown = false;
+		}
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		if (ctx->is_hover)
+		{
+			auto p = e->w;
+			glm::ivec2 mps = { p->x,p->y };
+			auto& sp = ctx->scroll_pos;
+			sp.y -= mps.y * ctx->lineheight;
+			auto lss = get_layout_size(ctx->layout);
+			lss.y -= ctx->lineheight;
+			if (sp.y < 0)
+			{
+				sp.y = 0;
+			}
+			if (sp.y > lss.y)
+			{
+				sp.y = lss.y;
+			}
+		}
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		if (is_input)
+			on_keyboard(ep);
+	}
+	break;
+	case devent_type_e::text_editing_e:
+	{
+		if (!is_input)break;
+		auto& p = e->e;
+		ctx->caret_old = ctx->ccursor;
+		std::string str;
+		if (p->text) {
+			str = p->text;
+		}
+		else {
+			str.clear();
+		}
+		//printf("text_editing_e:%s\n", str.c_str());
+		if (str.size())
+		{
+			auto ipos = input_pos();
+			p->x = ipos.x;
+			p->y = ipos.y;
+			p->w = ipos.z;
+			p->h = ipos.w;
+		}
+		ctx->set_editing(str);
+	}
+	break;
+	case devent_type_e::text_input_e:
+	{
+		auto p = e->t;
+		remove_bounds();
+		inputchar(p->text);
+	}
+	break;
+	case devent_type_e::finger_e:
+	{
+		auto p = e->f;
+		glm::ivec2 mps = ctx->cpos;
+	}
+	break;
+	case devent_type_e::mgesture_e:
+	{
+
+	}
+	break;
+	case devent_type_e::ole_drop_e:
+	{
+		auto p = e->d;
+		glm::ivec2 mps = { p->x,p->y }; mps -= ctx->pos + ppos;
+		ctx->cpos = mps;
+		if (ctx->hit_test(mps))
+		{
+			ep->ret = 1;
+			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
+			auto bp = ctx->cur_select;
+
+			if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
+			{
+				ctx->hover_text = true;
+				//if (p->has) { *(p->has) = 0; }
+				ctx->up_cursor(true);
+				break;
+			}
+			else {
+				ctx->hover_text = false;
+			}
+			if (p->has) { *(p->has) = 1; }
+			if (ep->form) { form_set_input_ptr(ep->form, get_input_state(this, 1)); }
+			ctx->ccursor = cx;
+
+			is_input = true;
+			ctx->c_d = -1;
+			if (p->count && p->str) {
+				for (size_t i = 0; i < p->count; i++)
+				{
+					if (p->fmt == 1 && i) // 1是文件添加分隔符
+					{
+						inputchar("; ");
+					}
+					inputchar(p->str[i]);
+				}
+				ctx->ckselect = 1;
+				ctx->bounds[0] = cx;
+				ctx->bounds[1] = ctx->ccursor;
+				ctx->get_bounds_px();
+				//printf("ole %p\t%d %d \n", this, cx, ctx->ccursor);
+				ctx->cur_select = ctx->get_bounds();
+				ctx->up_cursor(true);
+			}
+			else { ctx->up_cursor(true); }
+		}
+		else {
+			ctx->c_d = 0; is_input = false;
+			ctx->up_cursor(true);
+		}
+	}
+	break;
+	default:
+		break;
+	}
+
+}
+glm::ivec2 get_cl(char* str, int cursor)
+{
+	auto cp = str + cursor;
+	auto chp = get_utf8_first(cp);
+	int ps = chp - cp;
+	cursor += ps;
+	int n = 0;
+	for (size_t i = 0; i < cursor; i++)
+	{
+		if (str[i] == '\n') { n++; }
+	}
+	return { cursor, n };
+}
+int get_cl_count(char* str, int c0, int c1)
+{
+	int n = 0;
+	for (size_t i = c0; i < c1; i++)
+	{
+		auto cp = str + i;
+		auto chp = get_utf8_first(cp);
+		int ps = chp - cp;
+		i += ps;
+		n++;
+	}
+	return n;
+}
+void edit_tl::on_keyboard(et_un_t* ep)
+{
+	auto p = ep->v.k;
+	if (!p->state)
+	{
+		do {
+			if (!p->kmod & 1)break;
+			switch (p->keycode) {
+			case SDLK_a:
+			{
+				ctx->ccursor = _text.size();
+				ctx->bounds[0] = 0;
+				ctx->bounds[1] = ctx->ccursor;
+				ctx->get_bounds_px();
+				ctx->up_cursor(true);
+			}
+			break;
+			case SDLK_x:
+			case SDLK_c:
+			{
+				//auto cp1 = ext->get_cpos2(0);
+				//auto cp2 = ext->get_cpos2(1);
+				//auto str = _storage_buf->get_range(cp1, cp2);
+				auto rb = ctx->get_bounds();
+				if (rb.x != rb.y)
+				{
+					auto str = _text.substr(rb.x, rb.y - rb.x);
+					if (str.size())
+					{
+						set_clipboard(str.c_str());
+						if (p->keycode == SDLK_x && !_read_only)
+						{
+							remove_bounds();
+							ctx->up_cursor(true);
+						}
+					}
+				}
+			}
+			break;
+			case SDLK_v:
+			{
+				auto str = get_clipboard();
+				inputchar(str.c_str());
+			}
+			break;
+			case SDLK_y:
+				//is_redo = true;	//_storage_buf->redo();
+				break;
+			case SDLK_z:
+				//is_undo = true;	//_storage_buf->undo();
+				break;
+			}
+		} while (0);
+	}
+	if (!p->state || ctx->editingstr.size())
+	{
+		return;
+	}
+
+	bool isupcursor = false;
+	switch (p->keycode)
+	{
+	case SDLK_TAB:
+	{
+		inputchar("\t");
+	}
+	break;
+	case SDLK_BACKSPACE:
+	{
+		if (!remove_bounds()) {
+			const char* str = _text.c_str();
+			auto p = get_utf8_prev(str + ctx->ccursor - 1);
+			size_t idx = p - str;
+			size_t ct = ctx->ccursor - idx;
+			remove_char(idx, ct);//删除一个字符
+
+			ctx->up_cursor(true);
+		}
+	}
+	break;
+	case SDLK_PRINTSCREEN:
+	{}
+	break;
+	case SDLK_SCROLLLOCK:
+	{}
+	break;
+	case SDLK_PAUSE:
+	{}
+	break;
+	case SDLK_INSERT:
+	{
+
+	}
+	break;
+	case SDLK_PAGEDOWN:
+	{
+
+	}
+	break;
+	case SDLK_PAGEUP:
+	{
+
+	}
+	break;
+	case SDLK_DELETE:
+	{
+		if (!remove_bounds()) {
+			const char* str = _text.c_str();
+			auto p = get_utf8_first(str + ctx->ccursor + 1);
+			size_t idx = p - str;
+			size_t ct = idx - ctx->ccursor;
+			remove_char(ctx->ccursor, ct);
+			ctx->up_cursor(true);
+		}
+	}
+	break;
+	case SDLK_HOME:
+	{
+		auto ts = _text.size();
+		auto c = get_cl(_text.data(), ctx->ccursor);
+		auto lp2 = get_line_info(ctx->layout, c.y);
+		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = lp2.x;
+		ctx->up_cursor(true);
+	}
+	break;
+	case SDLK_END:
+	{
+		auto ts = _text.size();
+		auto c = get_cl(_text.data(), ctx->ccursor);
+		auto lp2 = get_line_info(ctx->layout, c.y);
+		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = lp2.x + lp2.y;
+		ctx->up_cursor(true);
+	}
+	break;
+	case SDLK_RIGHT:
+	{
+		auto v = ctx->get_bounds();
+		auto ts = _text.size();
+		if (v.x != v.y) {
+			ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.y;
+		}
+		else
+		{
+			const char* str = _text.c_str();
+			auto p = get_utf8_first(str + ctx->ccursor + 1);
+			size_t idx = p - str;
+			ctx->ccursor = idx;
+		}
+		if (ctx->ccursor > ts)ctx->ccursor = ts;
+		ctx->up_cursor(true);
+	}
+	break;
+	case SDLK_LEFT:
+	{
+		auto v = ctx->get_bounds();
+		if (v.x != v.y) {
+			ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.x;
+			break;
+		}
+		else
+		{
+			const char* str = _text.c_str();
+			auto p = get_utf8_prev(str + ctx->ccursor - 1);
+			size_t idx = p - str;
+			ctx->ccursor = idx;
+		}
+		if (ctx->ccursor < 0)ctx->ccursor = 0;
+		ctx->up_cursor(true);
+	}
+	break;
+	case SDLK_DOWN:
+	{
+		auto ts = _text.size();
+		auto c = get_cl(_text.data(), ctx->ccursor);
+		auto& idx = c.y;
+		auto lpo2 = get_line_info(ctx->layout, idx);
+		auto lp2 = get_line_info(ctx->layout, ++idx);
+		auto x = get_cl_count(_text.data(), lpo2.x, ctx->ccursor);
+		if (x >= lp2.y)
+		{
+			x = lp2.x + lp2.y;
+		}
+		else
+		{
+			const char* str = _text.c_str() + lp2.x;
+			auto p = utf8_char_pos(str, x);
+			x = p - _text.c_str();
+		}
+		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = x;
+		ctx->up_cursor(true);
+	}
+	break;
+	case SDLK_UP:
+	{
+		auto ts = _text.size();
+		auto c = get_cl(_text.data(), ctx->ccursor);
+		auto& idx = c.y;
+		auto lpo2 = get_line_info(ctx->layout, idx);
+		auto lp2 = get_line_info(ctx->layout, --idx);
+		auto x = get_cl_count(_text.data(), lpo2.x, ctx->ccursor);
+		if (x >= lp2.y)
+		{
+			x = lp2.x + lp2.y;
+		}
+		else
+		{
+			const char* str = _text.c_str() + lp2.x;
+			auto p = utf8_char_pos(str, x);
+			x = p - _text.c_str();
+		}
+		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = x;
+		ctx->up_cursor(true);
+	}
+	break;
+	case SDLK_RETURN:
+	{
+		remove_bounds();
+		if (!single_line)
+		{
+			inputchar("\n");
+		}
+		ctx->up_cursor(true);
+	}
+	break;
+	default:
+		break;
+	}
+}
+
+// 更新渲染啥的
+bool edit_tl::update(float delta) {
+	if (!is_input)
+	{
+		ctx->c_d = 0;
+	}
+	glm::ivec2 ss = size;
+	if (ctx->size != ss) {
+		ctx->set_size(ss);
+	}
+	glm::ivec2 ps = pos;
+	if (ctx->pos != ps) {
+		ctx->pos = ps;
+	}
+	return ctx->update(delta);
+}
+// 获取纹理/或者渲染到cairo
+tinyimage_cx* edit_tl::get_render_data() {
+	return ctx->cacheimg;
+}
+void edit_tl::draw(cairo_t* cr)
+{
+	ctx->draw(cr);
+}
+#ifdef INPUT_STATE_TH
+input_state_t* get_input_state(void* ptr, int t)
+{
+	static input_state_t r = {};
+	if (t)
+	{
+		if (r.ptr)
+		{
+			auto p = (edit_tl*)r.ptr;
+			p->is_input = false;
+		}
+		r.ptr = ptr;
+	}
+	if (ptr && r.ptr)
+	{
+		auto p = (edit_tl*)r.ptr;
+		if (!r.cb)
+			r.cb = [](uint32_t type, et_un_t* e, void* ud) { if (ud) { ((edit_tl*)ud)->on_event_e(type, e); }	};
+	}
+	return &r;
+}
+
+#endif // INPUT_STATE_TH
+
+#ifndef NO_TVIEW
+
+class tview_x
+{
+public:
+	glm::ivec2 vpos = {}, size = {};	// 渲染偏移，大小 
+	std::vector<glm::vec4> ddrect;
+	// 填充颜色\线框颜色
+	glm::ivec4 color = { 0xff353535, -1 ,0,0 };
+	cairo_surface_t* _backing_store = 0;
+	cairo_surface_t* rss = 0;
+	image_ptr_t img_rc = {};
+	std::vector<uint32_t> _imgdata;
+	glm::mat3 mx = glm::mat3(1.0);
+	glm::vec2 last_mouse = {}, eoffset = {};
+	glm::ivec4 hover_bx = {}, bx = {};		//当前鼠标对象包围框
+	int ckinc = 0;
+	int scaleStep = 2;
+	int scale = 100;
+	int oldscale = 0;
+	int minScale = 2, maxScale = 25600;
+	bool   _backing_store_valid = false;
+	bool   has_move = false;
+	bool   has_scale = false;
+public:
+	tview_x();
+	~tview_x();
+	void set_size(const glm::ivec2& ss);
+	void set_view_move(bool is);	// 鼠标移动视图
+	void set_view_scale(bool is);	// 滚轮缩放视图
+	void set_rss(int r);
+	void on_button(int idx, int state, const glm::vec2& pos, int clicks);
+	void on_motion(const glm::vec2& ps);
+	void on_wheel(int deltaY);
+	void reset_view();
+	image_ptr_t* get_ptr();
+	glm::ivec4 get_hbox();
+	glm::vec4 get_bbox();
+	glm::mat3 get_affine();
+	void hit_test(const glm::vec2& ps);
+	cairo_t* begin_frame();
+	void end_frame(cairo_t* cr);
+	void set_draw_update()
+	{
+		_backing_store_valid = false;
+	}
+private:
+
+};
+
+
+tview_x::tview_x()
+{
+	rss = new_clip_rect(5);
+}
+
+tview_x::~tview_x()
+{
+	if (rss)
+	{
+		cairo_surface_destroy(rss);
+	}
+	rss = 0;
+	if (_backing_store)
+	{
+		cairo_surface_destroy(_backing_store);
+	}
+	_backing_store = 0;
+}
+image_ptr_t* tview_x::get_ptr()
+{
+	return  &img_rc;
+}
+
+cairo_t* tview_x::begin_frame()
+{
+	cairo_t* cr = 0;
+	if (!_backing_store_valid && _backing_store)
+	{
+		cr = cairo_create(_backing_store);
+		size_t length = size.x * size.y;
+		auto img = (uint32_t*)cairo_image_surface_get_data(_backing_store);
+		if (color.x == 0) {
+			memset(img, 0, length * sizeof(int));
+		}
+		else {
+			for (size_t i = 0; i < length; i++)
+			{
+				img[i] = color.x;
+			}
+		}
+
+		//cairo_set_operator(cr, CAIRO_OPERATOR_ADD);
+		if (oldscale != scale)
+		{
+			oldscale = scale;
+			//print_time a("canvas draw");
+			auto m = get_affine();
+		}
+
+	}
+	return cr;
+}
+void tview_x::end_frame(cairo_t* cr) {
+
+	if (!_backing_store_valid)
+	{
+		_backing_store_valid = true;
+		clip_rect(cr, rss);
+		cairo_destroy(cr);
+	}
+}
+void tview_x::set_size(const glm::ivec2& ss)
+{
+	if (ss != size)
+	{
+		size = ss;
+		if (_backing_store)
+		{
+			cairo_surface_destroy(_backing_store);
+			_backing_store = 0;
+		}
+		_imgdata.resize(size.x * size.y);
+		if (!_backing_store)
+		{
+			_backing_store = cairo_image_surface_create_for_data((unsigned char*)_imgdata.data(), CAIRO_FORMAT_ARGB32, size.x, size.y, size.x * 4);
+		}
+		auto img = (uint32_t*)cairo_image_surface_get_data(_backing_store);
+		img_rc.width = size.x;
+		img_rc.height = size.y;
+		img_rc.type = 1;
+		img_rc.comp = 4;
+		img_rc.data = img;
+		img_rc.multiply = true;
+	}
+}
+
+void tview_x::set_view_move(bool is)
+{
+	has_move = is;
+}
+
+void tview_x::set_view_scale(bool is)
+{
+	has_scale = is;
+}
+
+void tview_x::set_rss(int r)
+{
+	if (r > 0)
+	{
+		if (rss)
+		{
+			cairo_surface_destroy(rss);
+		}
+		rss = new_clip_rect(r);
+	}
+}
+
+
+
+void tview_x::on_button(int idx, int state, const glm::vec2& pos1, int clicks)
+{
+	auto pos = pos1 - (glm::vec2)vpos;
+	//idx=1左，3右，2中
+	if (idx == 1)
+	{
+		if (state == 1 && ckinc == 0)
+		{
+			glm::vec2 a3 = mx[2];
+			last_mouse = pos - a3;
+		}
+		ckinc++;
+		if (state == 0)
+		{
+			ckinc = 0;
+		}
+
+	}
+	else if (idx == 3) {
+		if (state == 0)
+		{
+			//reset_view();
+		}
+	}
+}
+void tview_x::on_motion(const glm::vec2& pos1)
+{
+	auto pos = pos1 - (glm::vec2)vpos;
+	if (ckinc > 0)
+	{
+		if (has_move) {
+			auto mp = pos;
+			mp = pos - last_mouse;
+			auto t = glm::translate(glm::mat3(1.0), mp);
+			double sc = scale / 100.0;
+			auto s = glm::scale(glm::mat3(1.0), glm::vec2(sc, sc));
+			mx = t * s;
+			_backing_store_valid = false;
+		}
+	}
+	eoffset = pos;
+	hit_test(pos1);
+}
+void tview_x::on_wheel(int deltaY)
+{
+	if (has_scale)
+	{
+		auto prevZoom = scale;
+		auto scale1 = scale;
+		auto zoom = (deltaY * scaleStep);
+		scale1 += zoom;
+		if (scale1 < minScale) {
+			scale = minScale;
+			return;
+		}
+		else if (scale1 > maxScale) {
+			scale = maxScale;
+			return;
+		}
+		double sc = scale1 / 100.0;
+		double sc1 = prevZoom / 100.0;
+		glm::vec2 nps = mx[2];
+		auto s = glm::scale(glm::mat3(1.0), glm::vec2(sc, sc));
+		auto t = glm::translate(glm::mat3(1.0), glm::vec2(nps));
+		mx = t * s;
+		scale = scale1;
+	}
+	hit_test(eoffset + (glm::vec2)vpos);
+	_backing_store_valid = false;
+}
+void tview_x::reset_view()
+{
+	ckinc = 0;
+	scale = 100;
+	mx = glm::mat3(1.0);
+	_backing_store_valid = false;
+}
+
+glm::ivec4 tview_x::get_hbox()
+{
+	return hover_bx;
+}
+glm::vec4 tview_x::get_bbox()
+{
+	return bx;
+}
+
+glm::mat3 tview_x::get_affine()
+{
+	glm::mat3 r = glm::translate(glm::mat3(1.0), glm::vec2(vpos));
+	return r * mx;
+}
+
+// 测试鼠标坐标的矩形
+void tview_x::hit_test(const glm::vec2& ps)
+{
+	auto ae = get_affine();
+	auto m = glm::inverse(ae);//逆矩阵
+	auto p2 = v2xm3(ps, m);	 //坐标和矩阵相乘
+	auto k2 = check_box_cr(p2, ddrect.data(), ddrect.size());
+	hover_bx = {};
+	if (k2.x)
+	{
+		auto v4 = get_boxm3(ddrect[k2.y], ae);
+		v4.z -= v4.x;
+		v4.w -= v4.y;
+		hover_bx = { glm::floor(v4.x),glm::floor(v4.y),glm::round(v4.z),glm::round(v4.w) };
+	}
+}
+
+#endif // !NO_TVIEW
+
+
+
+void widget_on_event(widget_base* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
+
+
+plane_cx::plane_cx()
+{
+	tv = new tview_x();
+}
+
+plane_cx::~plane_cx()
+{
+	if (tv)
+	{
+		delete tv; tv = 0;
+	}
+	if (_pat)
+	{
+		delete _pat; _pat = 0;
+	}
+}
+glm::ivec2 plane_cx::get_pos() {
+	return glm::ivec2(viewport.x, viewport.y);
+}
+void plane_cx::set_pos(const glm::ivec2& ps) {
+	tpos = ps;
+	viewport.x = ps.x; viewport.y = ps.y;
+}
+void plane_cx::set_size(const glm::ivec2& ss) {
+	if (ss.x > 0 && ss.y > 0)
+	{
+		viewport.z = ss.x; viewport.w = ss.y;
+		_clip_rect = { 0,0,ss.x,ss.y };
+		if (tv)
+			tv->set_size(ss);
+		else
+			return;
+		if (!_pat)
+		{
+			_pat = new atlas_t();
+			add_atlas(_pat);
+		}
+		_pat->img = tv->get_ptr();
+		_pat->img->valid = true;
+		_pat->img_rc = &_clip_rect;
+		_pat->tex_rc = (glm::ivec4*)&tv->vpos;
+		_pat->tex_rc->x = 0; _pat->tex_rc->y = 0;
+		_pat->count = 1;
+		_pat->clip = _clip_rect;
+	}
+}
+glm::vec2 plane_cx::get_size()
+{
+	return glm::vec2(tv->size);
+}
+size_t plane_cx::add_res(const std::string& fn)
+{
+
+	return 0;
+}
+size_t plane_cx::add_res(const char* data, int len)
+{
+
+	return 0;
+}
+
+void plane_cx::set_colors(const glm::ivec4& c)
+{
+	tv->color = c;
+	tv->color.x = rgb2bgr(c.x);
+}
+void plane_cx::add_text(const std::string& str)
+{
+	text_item_t v = {};
+	v.color = text_color;
+	v.fontsize = fontsize;
+	v.familys = familys;
+	v.text = str;
+	txtv.push_back(v);
+}
+void plane_cx::move2end(widget_base* p)
+{
+	if (p)
+	{
+		widget_p wp = {};
+		wp.type = 3; wp.v.e = (edit_tl*)p;
+		auto& v = widgets;
+		v.erase(std::remove_if(v.begin(), v.end(), [=](widget_p& pr) {return pr.v.e == wp.v.e; }), v.end());
+		v.push_back(wp);
+	}
+}
+
+edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, bool single_line) {
+	edit_tl* edit1 = new edit_tl();
+	if (edit1) {
+		auto ss = size;
+		//edit1->set_pos({ 0, 0 });
+		edit1->set_size(ss);
+		edit1->set_single(single_line);
+		edit1->set_family(familys.c_str(), fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同
+		//edit1->set_family((char*)u8"Microsoft YaHei", 14);
+		//edit1->set_align_pos({ 4, 4 });
+		//edit1->set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
+		edit1->ppos = get_pos();
+		widget_p wp = {};
+		wp.type = 3; wp.v.e = edit1;
+		widgets.push_back(wp);
+	}
+	return edit1;
+}
+gradient_btn* plane_cx::add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor)
+{
+	gradient_btn* gb = new gradient_btn();
+	if (gb) {
+		gb->init({ 0,0,size }, label, bcolor);
+		gb->family = familys;
+		gb->font_size = fontsize;
+		widget_p wp = {};
+		wp.type = 1; wp.v.gbtn = gb;
+		widgets.push_back(wp);
+	}
+	return gb;
+}
+color_btn* plane_cx::add_cbutton(const std::string& label, const glm::ivec2& size, int idx)
+{
+	color_btn* gb = new color_btn();
+	if (gb)
+	{
+		gb->str = label;
+		gb->family = familys;
+		gb->font_size = fontsize;
+		gb->set_btn_color_bgr(idx);
+		gb->size = size;
+		widget_p wp = {};
+		wp.type = 0; wp.v.cbtn = gb;
+		widgets.push_back(wp);
+	}
+	return gb;
+}
+
+void plane_cx::set_family_size(const std::string& fam, int fs, uint32_t color)
+{
+	if (fam.size())
+		familys = fam;
+	if (fs > 0)
+		fontsize = fs;
+	text_color = color;
+}
+
+
+
+void plane_cx::update(float delta)
+{
+	//print_time a("plane_cx::update");
+	int ic = 0;
+	for (auto& it : widgets) {
+		switch (it.type)
+		{
+		case 0:
+		{
+			//it.v.cbtn->update(delta);
+			it.v.cbtn->set_state();
+		}
+		break;
+		case 1:
+		{
+			it.v.gbtn->set_state();
+			//it.v.gbtn->update(delta);
+		}
+		break;
+		case 2:
+		{
+			//it.v.ibtn->update(delta);
+		}
+		break;
+		case 3:
+		{
+			ic += it.v.e->update(delta);
+		}
+		break;
+		default:
+			break;
+		}
+	}
+	if (ic > 0 || evupdate > 0)tv->set_draw_update();
+	auto kms = delta * 1000;
+	dms -= kms;
+	if (dms > 0 || kms <= 0)
+		return;
+	dms = dmsset;
+	auto cr = tv->begin_frame();
+	if (cr)
+	{
+		evupdate = 0;
+		cairo_save(cr);
+		// 更新渲染
+		//set_color(cr, 0xff0080ff);
+		//cairo_rectangle(cr, 10, 10, 20, 20);
+		//cairo_fill_preserve(cr);
+		//set_color(cr, 0x80ff8000);
+		//cairo_stroke(cr);
+		//cairo_translate(cr, 10, 36);
+		set_color(cr, -1);
+		glm::vec2 ps = {};
+		for (auto& it : txtv)
+		{
+			if (!it.layout.layout || it.bd_valid)
+			{
+				font_ctx->set_family_size(it.familys, it.fontsize);
+				auto fc = font_ctx->get_text_layout(it.text, &it.layout);
+				it.layout.text_color = it.color;
+				it.bd_valid = false;
+
+			}
+			it.layout.pos = ps;
+			ps.y += it.layout.rc.y;
+			font_ctx->draw_text(cr, &it.layout);
+		}
+		cairo_restore(cr);
+		cairo_save(cr);
+		for (auto& it : widgets) {
+			switch (it.type)
+			{
+			case 0:
+			{
+				it.v.cbtn->draw(cr);
+			}
+			break;
+			case 1:
+			{
+				it.v.gbtn->draw(cr);
+			}
+			break;
+			case 2:
+			{
+				it.v.ibtn->draw(cr);
+			}
+			break;
+			case 3:
+			{
+				it.v.e->draw(cr);
+			}
+			break;
+			default:
+				break;
+			}
+		}
+#if debugpx
+		auto px = (uint32_t*)cairo_image_surface_get_data(tv->_backing_store);
+		*px = 0;
+		memset(px, 0, 20 * 4);
+		set_color(cr, 0x8000ff00);
+		draw_rectangle(cr, { 0,0,100,100 }, 0);
+		cairo_fill(cr);
+		uint32_t pxs[20] = {};
+		memcpy(pxs, px, 20 * 4);
+#endif
+		cairo_restore(cr);
+		if (draw_cb)
+		{
+			cairo_save(cr);
+			draw_cb(cr);
+			cairo_restore(cr);
+		}
+
+		// 边框线 
+		auto ls = get_size(); ls -= 1;
+		draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
+		fill_stroke(cr, 0, border.x, border.y, false);
+		tv->end_frame(cr);
+		_pat->img->valid = true;
+	}
+}
+
+flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& ms)
+{
+	flex_item* p = 0;
+	auto length = v.size();
+	if (r && length)
+	{
+		p = new flex_item[length];
+		if (p)
+		{
+			for (size_t i = 0; i < length; i++)
+			{
+				v[i].z += ms.x; v[i].w += ms.y;
+				p[i].width = v[i].z;
+				p[i].height = v[i].w;
+				r->item_add(p + i);
+			}
+			r->layout();
+
+			for (size_t i = 0; i < length; i++)
+			{
+				if (p[i].position != flex_item::flex_position::POS_ABSOLUTE) {
+					v[i].x = p[i].frame[0] + pos.x;
+					v[i].y = p[i].frame[1] + pos.x;
+				}
+			}
+		}
+	}
+	return p;
+}
+
+void plane_cx::mk_layout()
+{
+	flex_item root;
+	auto ss = get_size();
+	root.width = ss.x;
+	root.height = ss.y;
+	root.justify_content = _css.justify_content;
+	root.align_content = _css.align_content;
+	root.align_items = _css.align_items;
+	root.wrap = _css.wrap;
+	root.direction = _css.direction;
+
+	std::vector<glm::vec4> layouts;
+	layouts.reserve(widgets.size());
+	for (auto& it : widgets) {
+		auto p = (widget_base*)it.v.cbtn;
+		layouts.push_back({ p->pos, p->size });
+	}
+	flex_item* c = flexlayout(&root, layouts, _lpos, _lms);
+
+	if (c)
+	{
+		auto length = widgets.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto p = (widget_base*)widgets[i].v.cbtn;
+			auto it = layouts[i];
+			glm::vec2 itss = { it.z,it.w };
+			p->pos = it;
+			p->pos += itss * _css.pos_align - (p->size * _css.pos_align);
+		}
+		delete[] c;
+	}
+}
+
+void plane_cx::on_motion(const glm::vec2& pos) {
+	glm::ivec2 ps = pos;
+	if (ckinc > 0 && draggable)
+	{
+		set_pos(ps - curpos);
+	}
+
+	tv->on_motion(ps - tpos);
+	update(0);
+
+}
+void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, int r) {
+	glm::ivec2 ps = pos;
+	if (idx == 1)
+	{
+		glm::vec4 trc = viewport;
+		auto k2 = check_box_cr1(pos, &trc, 1, sizeof(glm::vec4));
+		if (k2.x)
+		{
+			if (draggable && state == 1)
+				form_move2end(form, this); // 移动窗口前面
+			if (!r)
+			{
+				if (state == 1 && ckinc == 0)
+				{
+					curpos = ps - tpos;
+					ckinc++;
+				}
+				if (on_click)
+					on_click(this, state, ckinc);	// 执行单击事件
+			}
+			ckup = 1;
+		}
+		else {
+			ckup = 0;
+		}
+		if (state == 0)
+		{
+			if (ckinc)
+				ckup = 1;
+			ckinc = 0;
+		}
+	}
+	tv->on_button(idx, state, ps - tpos, clicks);
+	update(0);
+	_draw_valid = true;
+}
+void plane_cx::on_wheel(double x, double y)
+{
+
+	update(0);
+	_draw_valid = true;
+}
+void plane_cx::on_event(uint32_t type, et_un_t* ep)
+{
+	auto e = &ep->v;
+	if (!visible)return;
+	auto t = (devent_type_e)type;
+	glm::ivec2 vgpos = viewport;
+	int r1 = 0;
+	auto ppos = get_pos();
+	if (t == devent_type_e::mouse_move_e)
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y };
+		glm::vec4 trc = viewport;
+		auto k2 = check_box_cr1(mps, &trc, 1, 0);
+		if (k2.x) {
+			_bst |= (int)BTN_STATE::STATE_HOVER;
+			r1 = 1;
+			p->cursor = (int)cursor_st::cursor_arrow;
+		}
+		else {
+			_bst &= ~(int)BTN_STATE::STATE_HOVER;
+		}
+	}
+	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+		auto pw = (widget_base*)it->v.cbtn;
+		if (pw->_disabled_events)continue;
+		switch (it->type)
+		{
+		case 0:
+		case 1:
+		case 2:
+		{
+			widget_on_event(pw, type, ep, ppos);
+			if (ep->ret && t == devent_type_e::mouse_button_e)
+			{
+				auto p = e->b;
+				if (p->state == 1)
+					get_input_state(0, 1);
+			}
+		}
+		break;
+		case 3:
+		{
+			it->v.e->ppos = ppos;
+			it->v.e->on_event_e(type, ep);
+		}
+		break;
+		default:
+			break;
+		}
+		if (ep->ret)break;
+	}
+	if (!ep->ret)
+		ep->ret = r1;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y }; //mps -= vgpos;
+		on_motion(mps);
+	}
+	break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y }; //mps -= vgpos;
+		on_button(p->button, p->state, mps, p->clicks, ep->ret);
+		//printf("ck:%d\t%p\n", ckinc, this);
+		if (ckup > 0)
+			ep->ret = 1;
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		on_wheel(p->x, p->y);
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		//on_keyboard(ep);
+	}
+	break;
+	}
+	evupdate++;
+}
+
+#endif // !NO_EDIT
+
+// 杂算法
+#if 1
+namespace pn {
+	void tobox(const glm::vec2& v, glm::vec4& t)
+	{
+		if (v.x < t.x)
+		{
+			t.x = v.x;
+		}
+		if (v.y < t.y)
+		{
+			t.y = v.y;
+		}
+		if (v.x > t.z)
+		{
+			t.z = v.x;
+		}
+		if (v.y > t.w)
+		{
+			t.w = v.y;
+		}
+
+	}
+
+	/*
+	*
+	*  0中心
+	*   1     2
+		-------
+		|     |
+		-------
+		4     3
+	*/
+	glm::vec2 getbox2t(std::vector<glm::vec2>& vt, int t)
+	{
+		glm::vec4 box = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
+		for (auto& it : vt)
+		{
+			tobox(it, box);
+		}
+		glm::vec2 cp = { box.z - box.x,box.w - box.y };
+		switch (t)
+		{
+		case 0:
+			cp *= 0.5;
+			break;
+		case 1:
+			cp = {};
+			break;
+		case 2:
+			cp.y = 0;
+			break;
+		case 3:
+			break;
+		case 4:
+			cp.x = 0;
+			break;
+		default:
+			break;
+		}
+		cp.x += box.x;
+		cp.y += box.y;
+		return cp;
+	}
+
+	glm::vec2 getbox2t(const glm::vec4& box, int t)
+	{
+		glm::vec2 cp = { box.z - box.x,box.w - box.y };
+		switch (t)
+		{
+		case 0:
+			cp *= 0.5;
+			break;
+		case 1:
+			cp = {};
+			break;
+		case 2:
+			cp.y = 0;
+			break;
+		case 3:
+			break;
+		case 4:
+			cp.x = 0;
+			break;
+		default:
+			break;
+		}
+		cp.x += box.x;
+		cp.y += box.y;
+		return cp;
+	}
+
+	/*
+	缩放模式
+	xy从中心扩展
+	固定1左上角，2右上角，3右下角，4左下角，来缩放xy
+	单扩展 x左右、y上下
+	获取图形包围盒，返回坐标t=0中心，1左上角，2右上角，3右下角，4左下角，
+	*/
+	glm::mat3 box_scale(const glm::vec4& box, int ddot, glm::vec2 sc, bool inve)
+	{
+		auto cp = getbox2t(box, ddot);
+		glm::vec2 cp0 = {};
+		glm::vec2 scale = sc;
+		glm::mat3 m(1.0);
+		// 缩放
+		assert(scale.x > 0 && scale.y > 0);
+		if (scale.x > 0 && scale.y > 0)
+		{
+			m = glm::translate(glm::mat3(1.0f), cp) * glm::scale(glm::mat3(1.0f), scale) * glm::translate(glm::mat3(1.0f), -cp);
+			if (inve)
+			{
+				m = glm::inverse(m);	// 反向操作 
+			}
+		}
+		return m;
+	}
+}
+//!pn
+#endif // 1
+
+#if 1
+/*
+<表格、树形>
+数据结构设计:
+	网格线：		虚线/实线、颜色
+	背景：		纯色
+	内容store：	数值、文本、简单公式、图片/SVG
+
+*/
+
+
+#endif // 1
+
+
+#if 1
+// 默认按钮样式
+
+void image_btn::draw(cairo_t* g) {
+
+}
+
+btn_cols_t* color_btn::set_btn_color_bgr(size_t idx)
+{
+	static std::vector<std::array<uint32_t, 8>> bcs = { { 0xFFffffff, 0xFF409eff, 0xFF409eff, 0xFF66b1ff, 0xFFe6e6e6, 0xFF0d84ff, 0xFF0d84ff ,0 },
+		{ 0xFFffffff, 0xFF67c23a, 0xFF67c23a, 0xFF85ce61, 0xFFe6e6e6, 0xFF529b2e, 0xFF529b2e ,0},
+		{ 0xFFffffff, 0xFF909399, 0xFF909399, 0xFFa6a9ad, 0xFFe6e6e6, 0xFF767980, 0xFF767980 ,0},
+		{ 0xFFffffff, 0xFFe6a23c, 0xFFe6a23c, 0xFFebb563, 0xFFe6e6e6, 0xFFd48a1b, 0xFFd48a1b ,0 },
+		{ 0xFFffffff, 0xFFf56c6c, 0xFFf56c6c, 0xFFf78989, 0xFFe6e6e6, 0xFFf23c3c, 0xFFf23c3c ,0 }
+	};
+	auto ret = (btn_cols_t*)((idx < bcs.size()) ? bcs[idx].data() : nullptr);
+	if (ret)
+	{
+		bgr = 1;
+		pdc = *ret;
+	}
+	return ret;
+}
+#define UF_COLOR
+union u_col
+{
+	uint32_t uc;
+	unsigned char u[4];
+	struct urgba
+	{
+		unsigned char r, g, b, a;
+	}c;
+};
+#define FCV 255.0
+#define FCV1 256.0
+inline uint32_t set_alpha_xf(uint32_t c, double af)
+{
+	if (af < 0)af = 0;
+	//uint32_t a = af * FCV;
+	u_col* t = (u_col*)&c;
+	double a = t->c.a * af + 0.5;
+	if (a > 255)
+		t->c.a = 255;
+	else
+		t->c.a = a;
+	return c;
+}
+inline uint32_t set_alpha_xf2(uint32_t c, double af)
+{
+	if (af < 0)af = 0;
+	u_col* t = (u_col*)&c;
+	t->c.r *= af;
+	t->c.g *= af;
+	t->c.b *= af;
+	return c;
+}
+inline uint32_t set_alpha_x(uint32_t c, uint32_t a0)
+{
+	u_col* t = (u_col*)&c;
+	double af = a0 / FCV;
+	double a = t->c.a * af + 0.5;
+	if (a > 255)
+		t->c.a = 255;
+	else
+		t->c.a = a;
+	return c;
+}
+inline uint32_t set_alpha_f(uint32_t c, double af)
+{
+	if (af > 1)af = 1;
+	if (af < 0)af = 0;
+	uint32_t a = af * FCV + 0.5;
+	u_col* t = (u_col*)&c;
+	t->c.a = a;
+	return c;
+}
+
+inline glm::vec4 to_c4(uint32_t c)
+{
+	u_col* t = (u_col*)&c;
+	glm::vec4 fc;
+	float* f = &fc.x;
+	for (int i = 0; i < 4; i++)
+	{
+		*f++ = t->u[i] / FCV;
+	}
+	return  fc;
+}
+
+void gradient_btn::draw(cairo_t* g)
+{
+	auto p = this;
+	float x = p->pos.x, y = p->pos.y, w = p->size.x, h = p->size.y;
+	int pushed = p->mPushed ? 0 : 1;
+	uint32_t gradTop = p->gradTop;
+	uint32_t gradBot = p->gradBot;
+	uint32_t borderDark = p->borderDark;
+	uint32_t borderLight = p->borderLight;
+	double oa = p->opacity;
+	auto ns = p->size;
+
+	auto bc = effect == uTheme::light ? p->back_color : set_alpha_xf2(p->back_color, get_alpha_f(p->back_color));
+	double rounding = p->rounding;
+	glm::vec2 ns1 = { w * 0.5, h * 0.5 };
+	auto nr = (int)std::min(ns1.x, ns1.y);
+	if (rounding > nr)
+	{
+		rounding = nr;
+	}
+	cairo_save(g);
+	cairo_translate(g, x, y);
+	if (is_alpha(bc))
+	{
+		bc = set_alpha_f(bc, oa);
+		draw_rectangle(g, { thickness,thickness, w - thickness, h - thickness * 2 }, rounding);
+		set_color(g, bc);
+		cairo_fill(g);
+	}
+	if (p->mPushed) {
+		gradTop = set_alpha_f(gradTop, 0.8f);
+		gradBot = set_alpha_f(gradBot, 0.8f);
+	}
+	else {
+		double v = 1 - get_alpha_f(p->back_color);
+		auto gv = p->mEnabled ? v : v * .5f + .5f;
+		gradTop = set_alpha_xf(gradTop, gv);
+		gradBot = set_alpha_xf(gradBot, gv);
+	}
+	auto gt = to_c4(gradTop);
+	auto gt1 = to_c4(gradBot);
+	gradTop = set_alpha_xf(gradTop, oa);
+	gradBot = set_alpha_xf(gradBot, oa);
+	borderLight = set_alpha_xf(borderLight, oa);
+	borderDark = set_alpha_xf(borderDark, oa);
+	// 渐变
+	glm::vec4 r;
+	if (rounding > 0)
+	{
+		r = { rounding, rounding, rounding, rounding };
+	}
+	glm::vec2 rct = { w - thickness, h - thickness * 2 };
+	glm::vec4 gtop = to_c4(gradTop);
+	glm::vec4 gbot = to_c4(gradBot);
+
+	cairo_save(g);
+	if (effect == uTheme::dark)
+		cairo_translate(g, thickness, thickness);
+	else if (p->mPushed)
+		cairo_translate(g, thickness, thickness);
+	paint_shadow(g, 0, rct.y, rct.x, rct.y, gtop, gbot, 0, rounding);// 垂直方向
+	cairo_restore(g);
+	// 渲染标签
+
+	glm::vec2 ps = {};
+	if (p->mPushed) {
+		ps += thickness;
+	}
+	if (text_color_shadow)
+	{
+		auto rc = draw_text_align(g, p->str.c_str(), ps + glm::vec2(thickness, thickness), ns, text_align, text_color_shadow, p->family.c_str(), p->font_size);
+	}
+	auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
+	//draw_text_align(g, p->str.c_str(), { rc.x + rc.z,rc.y }, {}, {}, p->text_color, p->family.c_str(), p->font_size + 10);
+
+	// 边框
+	cairo_set_line_width(g, thickness);
+	set_color(g, borderLight);
+	draw_rectangle(g, { 0.5f,  (p->mPushed ? 0.5f : 1.5f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
+	cairo_stroke(g);
+	set_color(g, borderDark);
+	draw_rectangle(g, { 0.5f,  0.5f, w, h - 0.5 }, rounding);
+	cairo_stroke(g);
+	cairo_restore(g);
+}
+
+
+const char* gradient_btn::c_str()
+{
+	return str.c_str();
+}
+
+void gradient_btn::init(glm::ivec4 rect, const std::string& text, uint32_t back_color, uint32_t text_color)
+{
+	auto p = this;
+	auto& info = *p;
+	info.pos = { rect.x, rect.y };
+	info.size = { rect.z, rect.w };
+	info.rounding = 4;
+	info.back_color = back_color;
+	info.text_color = text_color;
+	info.opacity = 1;
+	info.str = text.c_str();
+	info.borderLight = 0xff5c5c5c;
+	info.borderDark = 0xff1d1d1d;
+	return;
+}
+void gradient_btn::set_state()
+{
+	auto p = this;
+	if (!p)return;
+	auto& info = *p;
+
+	// (sta & hz::BTN_STATE::STATE_FOCUS)
+	uint32_t gradTop = 0xff4a4a4a;
+	uint32_t gradBot = 0xff3a3a3a;
+
+	info.mPushed = (bst & (int)BTN_STATE::STATE_ACTIVE);
+	info.mMouseFocus = (bst & (int)BTN_STATE::STATE_HOVER);
+	if (bst & (int)BTN_STATE::STATE_DISABLE)
+		info.mEnabled = false;
+	if (info.mPushed) {
+		gradTop = 0xff292929;
+		gradBot = 0xff1d1d1d;
+	}
+	else if (info.mMouseFocus && info.mEnabled) {
+		gradTop = 0x80404040;
+		gradBot = 0x80303030;
+	}
+	info.gradTop = gradTop;
+	info.gradBot = gradBot;
+}
+
+
+
+void color_btn::set_state()
+{
+	if (bst == _old_bst)return;
+	_old_bst = bst;
+	auto p = this;
+	btn_cols_t* pdc = &p->pdc;
+	p->_disabled = (bst & (int)BTN_STATE::STATE_DISABLE);
+	if (p->_disabled)
+	{
+		p->hover = false;
+		p->dfill = pdc->background_color;
+		p->dcol = pdc->border_color;
+		if (p->effect == uTheme::dark)
+		{
+			p->dcol = 0;
+			p->dtext_color = (p->text_color) ? p->text_color : pdc->font_color;
+		}
+		if (p->effect == uTheme::light)
+		{
+			p->dcol = set_alpha_xf(p->dcol, p->light * 3);
+			p->dfill = set_alpha_xf(p->dfill, p->light);
+			p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+		}
+		if (p->effect == uTheme::plain)
+		{
+			p->dfill = 0;
+			p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+		}
+		p->dcol = set_alpha_x(p->dcol, p->disabled_alpha);
+		p->dfill = set_alpha_x(p->dfill, p->disabled_alpha);
+		p->dtext_color = set_alpha_x(p->dtext_color, p->disabled_alpha);
+	}
+	else
+	{
+		bool isdown = mPushed = (bst & (int)BTN_STATE::STATE_ACTIVE);
+		p->hover = (bst & (int)BTN_STATE::STATE_HOVER);
+		if (isdown)
+		{
+			p->dfill = pdc->active_background_color;
+			p->dcol = pdc->active_border_color;
+			if (p->effect == uTheme::plain)
+			{
+				p->dfill = set_alpha_xf(p->dcol, p->light);
+			}
+			else {
+				p->dtext_color = (p->text_color) ? p->text_color : pdc->active_font_color;
+			}
+			if (p->effect == uTheme::light)
+			{
+				p->dfill = set_alpha_f(p->dfill, p->light * 5);
+			}
+			if (p->effect == uTheme::dark)
+			{
+				p->dcol = 0;
+			}
+		}
+		else if (p->hover)
+		{
+			uint32_t ac = pdc->hover_color;
+			p->dfill = pdc->hover_color;
+			if (pdc->hover_border_color)
+				p->dcol = pdc->hover_border_color;
+
+			if (p->effect == uTheme::plain)
+			{
+				p->dcol = pdc->border_color;
+				p->dfill = set_alpha_xf(p->dcol, p->light);
+			}
+			if (p->effect == uTheme::light)
+			{
+				p->dfill = set_alpha_f(p->dfill, p->light * 5);
+				p->dtext_color = (p->text_color) ? p->text_color : pdc->font_color;
+			}
+		}
+		else {
+			p->dfill = pdc->background_color;
+			p->dcol = pdc->border_color;
+			if (p->effect == uTheme::dark)
+			{
+				p->dcol = 0;
+				p->dtext_color = (p->text_color) ? p->text_color : pdc->font_color;
+			}
+			if (p->effect == uTheme::light)
+			{
+				p->dcol = set_alpha_xf(p->dcol, p->light * 3);
+				p->dfill = set_alpha_xf(p->dfill, p->light);
+				p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+			}
+			if (p->effect == uTheme::plain)
+			{
+				p->dfill = 0;
+				p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+			}
+		}
+	}
+	return;
+}
+
+void color_btn::draw(cairo_t* g)
+{
+	auto p = this;
+	auto ns = p->size;
+	cairo_save(g);
+	cairo_translate(g, p->pos.x, p->pos.y);
+	if (p->dfill)
+	{
+		if (p->_circle)
+		{
+			auto sp = p->pos;
+			auto r = lround(p->size.y * 0.5);
+			sp += r;
+			draw_circle(g, sp, r);
+		}
+		else
+		{
+			draw_rectangle(g, { 0.5,0.5, p->size }, p->rounding);
+		}
+		fill_stroke(g, p->dfill, 0, 0, bgr);
+	}
+	// 渲染标签
+	glm::vec2 ps = {};
+	if (p->mPushed) {
+		ps.x += 1.0f; ps.y += 1.0f;
+	}
+	auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
+
+	if (p->dcol)
+	{
+		if (p->_circle)
+		{
+			auto sp = p->pos;
+			auto r = lround(p->size.y * 0.5);
+			sp += r;
+			draw_circle(g, sp, r);
+		}
+		else
+		{
+			draw_rectangle(g, { 0.5,0.5, p->size }, p->rounding);
+		}
+		fill_stroke(g, 0, p->dcol, p->thickness, bgr);
+	}
+
+	cairo_restore(g);
+}
+
+#if 1
+// 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
+void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	if (!wp)return;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+	{
+		auto p = e->m;
+		glm::vec2 mps = { p->x,p->y }; mps -= pos;
+		// 判断是否鼠标进入
+		auto k = check_box_cr1(mps, (glm::vec4*)&wp->pos, 1, 0);
+		if (k.x) { wp->bst |= (int)BTN_STATE::STATE_HOVER; }
+		else { wp->bst &= ~(int)BTN_STATE::STATE_HOVER; }
+		if (wp->cb)
+		{
+			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
+				wp->cb(wp, (int)event_type2::on_move, mps);
+			if (wp->bst & (int)BTN_STATE::STATE_ACTIVE) {
+				auto dps = mps - wp->curpos;
+				wp->cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+			}
+		}
+	}
+	break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::vec2 mps = { p->x,p->y }; mps -= pos;
+		if (wp->bst & (int)BTN_STATE::STATE_HOVER) {
+			if (p->state == 1)
+			{
+				ep->ret = 1;
+			}
+			if (p->button == 1) {
+				if (p->state == 1) {
+					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
+					wp->curpos = mps - wp->pos;
+					if (wp->cb) { wp->cb(wp, (int)event_type2::on_down, mps); }
+				}
+				else {
+					wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+					if (wp->cb) {
+						wp->cb(wp, (int)event_type2::on_up, mps);
+						int tc = (int)event_type2::on_click; //左键单击
+						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
+						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+						wp->cb(wp, tc, mps);
+					}
+					if (wp->click_cb)
+					{
+						wp->click_cb(wp, p->clicks);
+					}
+				}
+			}
+		}
+		if (p->state == 0) {
+			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
+		}
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		glm::vec2 mps = { p->x, p->y };
+		if (wp->cb) {
+			wp->cb(wp, (int)event_type2::on_scroll, mps);
+		}
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		// todo
+		//on_keyboard(ep);
+	}
+	break;
+	default:
+		break;
+	}
+
+}
+#endif // 1
+
+
+
+listview_cx::listview_cx()
+{
+}
+
+listview_cx::~listview_cx()
+{
+}
+
+void listview_cx::set_title(column_ht* p, int count)
+{
+	if (!p)count = 0;
+	titles.clear(); titles.reserve(count);
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		auto& kt = titles.emplace_back(*p);
+		kt.idx = i;
+	}
+	data_valid = true;
+}
+
+// 获取行数
+size_t listview_cx::get_count()
+{
+	return stores.size();
+}
+// 列数
+size_t listview_cx::get_column_count()
+{
+	return titles.size();
+}
+// 添加一行到后面
+void listview_cx::push_back(const std::vector<std::string>& t)
+{
+	stores.push_back(t);
+	data_valid = true;
+}
+// 插入一行
+void listview_cx::insert(size_t pos, const std::vector<std::string>& t)
+{
+	stores.insert(stores.begin() + pos, t);
+	data_valid = true;
+}
+void listview_cx::update(size_t pos, const std::vector<std::string>& t)	// 更新整行
+{
+	if (pos < stores.size())
+	{
+		stores[pos] = t;
+		data_valid = true;
+	}
+}
+void listview_cx::update(size_t pos, size_t idx, const std::string& str)	// 更新一格
+{
+	if (pos < stores.size())
+	{
+		auto& it = stores[pos];
+		if (idx < it.size())
+		{
+			it[idx] = str;
+			data_valid = true;
+		}
+	}
+}
+std::vector<std::string>* listview_cx::get_line(size_t pos)
+{
+	return (pos < stores.size()) ? &stores[pos] : nullptr;
+}
+// 移动列位置，移动的列，移到pos。移动不影响上面输入数据的排序
+void listview_cx::move_column(size_t idx, size_t pos)
+{
+	if (idx < titles.size() && idx != pos)
+	{
+		auto it = titles[idx];
+		titles.insert(titles.begin() + pos, it);
+		if (idx > pos)idx++;
+		titles.erase(titles.begin() + idx);
+		data_valid = true;
+	}
+}
+
+void listview_cx::sort_column(size_t idx, int asc)
+{
+	if (idx < titles.size())
+	{
+		std::sort(stores.begin(), stores.end(), [idx, asc](std::vector<std::string>& a, std::vector<std::string>& b)
+			{
+				if (asc > 0) { return a[idx] > b[idx]; }
+				else { return a[idx] < b[idx]; }
+			});
+	}
+}
+
+render_lv::render_lv()
+{
+}
+
+render_lv::~render_lv()
+{
+}
+
+void render_lv::set_style(const std::string& family, int fs, uint32_t tcolor)
+{
+	familys = family;
+	if (fs > 0)
+		fontsize = fs;
+	text_color = tcolor;
+}
+
+void render_lv::binding(plane_cx* p)
+{
+	plane = p;
+}
+
+
+#endif // 1
+
+
+#if 1
+
+typedef enum {
+	HINT_DEFAULT,
+	HINT_NONE,
+	HINT_AUTO,
+	HINT_SLIGHT,
+	HINT_MEDIUM,
+	HINT_FULL
+} HintMode;
+
+typedef enum {
+	SUBPIXEL_DEFAULT,
+	SUBPIXEL_RGB,
+	SUBPIXEL_BGR,
+	SUBPIXEL_VRGB,
+	SUBPIXEL_VBGR
+} SubpixelOrder;
+
+typedef enum {
+	ANTIALIAS_DEFAULT,
+	ANTIALIAS_NONE,
+	ANTIALIAS_GRAY,
+	ANTIALIAS_SUBPIXEL
+} Antialias;
+
+typedef enum {
+	HINT_METRICS_DEFAULT,
+	HINT_METRICS_ON,
+	HINT_METRICS_OFF
+} HintMetrics;
+
+typedef void (*RenderCallback) (PangoLayout* layout,
+	int          x,
+	int          y,
+	gpointer     cb_context,
+	gpointer     cb_data);
+typedef void (*TransformCallback) (PangoContext* context,
+	PangoMatrix* transform,
+	gpointer      cb_context,
+	gpointer      cb_data);
+
+void fail(const char* format, ...) G_GNUC_PRINTF(1, 2) G_GNUC_NORETURN;
+
+void   parse_options(int               argc,
+	char* argv[]);
+void   do_output(PangoContext* context,
+	RenderCallback    render_cb,
+	TransformCallback transform_cb,
+	gpointer          cb_context,
+	gpointer          cb_data,
+	int* width,
+	int* height);
+void   finalize(void);
+gchar* get_options_string(void);
+
+typedef struct _PangoViewer PangoViewer;
+
+typedef struct _CairoViewerIface CairoViewerIface;
+
+struct _CairoViewerIface
+{
+	const PangoViewer* backend_class;
+
+	cairo_surface_t* (*create_surface) (gpointer instance,
+		gpointer surface,
+		int      width,
+		int      height);
+
+	void (*paint_background) (gpointer  instance,
+		cairo_t* cr);
+};
+
+gpointer cairo_viewer_iface_create(const CairoViewerIface** iface_out);
+
+void cairo_viewer_add_options(GOptionGroup* group);
+
+struct _PangoViewer {
+
+	const char* name;
+
+	const char* id;
+
+	const char* write_suffix;
+
+	gpointer(*create) (const PangoViewer* klass);
+
+	void (*destroy) (gpointer instance);
+
+	PangoContext* (*get_context) (gpointer instance);
+
+	gpointer(*create_surface) (gpointer instance,
+		int      width,
+		int      height);
+
+	void (*destroy_surface) (gpointer instance,
+		gpointer surface);
+
+	void (*render) (gpointer      instance,
+		gpointer      surface,
+		PangoContext* context,
+		int* width,
+		int* height,
+		gpointer      state);
+
+	/* The following can be NULL */
+
+	void (*write) (gpointer instance,
+		gpointer surface,
+		FILE* stream,
+		int      width,
+		int      height);
+
+	gpointer(*create_window) (gpointer    instance,
+		const char* title,
+		int         width,
+		int         height);
+
+	void (*destroy_window) (gpointer instance,
+		gpointer window);
+
+	gpointer(*display) (gpointer instance,
+		gpointer surface,
+		gpointer window,
+		int      width,
+		int      height,
+		gpointer state);
+
+	void (*load) (gpointer instance,
+		gpointer surface,
+		guchar* buffer,
+		int      width,
+		int      height,
+		int      stride);
+
+	void (*save) (gpointer instance,
+		gpointer surface,
+		guchar* buffer,
+		int      width,
+		int      height,
+		int      stride);
+
+	GOptionGroup* (*get_option_group) (const PangoViewer* klass);
+};
+
+static int opt_annotate = 0;
+
+typedef struct
+{
+	const CairoViewerIface* iface;
+
+	gpointer backend;
+
+	PangoFontMap* fontmap;
+	cairo_font_options_t* font_options;
+	gboolean subpixel_positions;
+} CairoViewer;
+
+gboolean opt_display = TRUE;
+int opt_dpi = 96;
+gboolean opt_pixels = FALSE;
+const char* opt_font = "";
+gboolean opt_header = FALSE;
+const char* opt_output = NULL;
+int opt_margin_t = 10;
+int opt_margin_r = 10;
+int opt_margin_b = 10;
+int opt_margin_l = 10;
+int opt_markup = FALSE;
+gboolean opt_rtl = FALSE;
+double opt_rotate = 0;
+gboolean opt_auto_dir = TRUE;
+const char* opt_text = NULL;
+gboolean opt_waterfall = FALSE;
+int opt_width = -1;
+int opt_height = -1;
+int opt_indent = 0;
+int opt_spacing = 0;
+double opt_line_spacing = -1.0;
+gboolean opt_justify = 0;
+int opt_runs = 1;
+PangoAlignment opt_align = PANGO_ALIGN_LEFT;
+PangoEllipsizeMode opt_ellipsize = PANGO_ELLIPSIZE_NONE;
+PangoGravity opt_gravity = PANGO_GRAVITY_SOUTH;
+PangoGravityHint opt_gravity_hint = PANGO_GRAVITY_HINT_NATURAL;
+HintMode opt_hinting = HINT_DEFAULT;
+HintMetrics opt_hint_metrics = HINT_METRICS_DEFAULT;
+SubpixelOrder opt_subpixel_order = SUBPIXEL_DEFAULT;
+Antialias opt_antialias = ANTIALIAS_DEFAULT;
+gboolean opt_subpixel_positions = FALSE;
+PangoWrapMode opt_wrap = PANGO_WRAP_WORD_CHAR;
+gboolean opt_wrap_set = FALSE;
+static const char* opt_pangorc = NULL; /* Unused */
+const PangoViewer* opt_viewer = NULL;
+const char* opt_language = NULL;
+gboolean opt_single_par = FALSE;
+PangoColor opt_fg_color = { 0, 0, 0 };
+guint16 opt_fg_alpha = 65535;
+gboolean opt_bg_set = FALSE;
+PangoColor opt_bg_color = { 65535, 65535, 65535 };
+guint16 opt_bg_alpha = 65535;
+
+/* Text (or markup) to render */
+static char* text;
+
+static gpointer
+pangocairo_view_create(const PangoViewer* klass G_GNUC_UNUSED)
+{
+	CairoViewer* instance;
+
+	instance = g_slice_new(CairoViewer);
+
+	instance->backend = cairo_viewer_iface_create(&instance->iface);
+
+	instance->fontmap = pango_cairo_font_map_new();
+	pango_cairo_font_map_set_resolution(PANGO_CAIRO_FONT_MAP(instance->fontmap), opt_dpi);
+
+	instance->font_options = cairo_font_options_create();
+	if (opt_hinting != HINT_DEFAULT)
+	{
+		if (opt_hinting == HINT_NONE)
+			cairo_font_options_set_hint_style(instance->font_options, CAIRO_HINT_STYLE_NONE);
+		else if (opt_hinting == HINT_SLIGHT ||
+			opt_hinting == HINT_AUTO)
+			cairo_font_options_set_hint_style(instance->font_options, CAIRO_HINT_STYLE_SLIGHT);
+		else if (opt_hinting == HINT_MEDIUM)
+			cairo_font_options_set_hint_style(instance->font_options, CAIRO_HINT_STYLE_MEDIUM);
+		else if (opt_hinting == HINT_FULL)
+			cairo_font_options_set_hint_style(instance->font_options, CAIRO_HINT_STYLE_FULL);
+	}
+
+	if (opt_subpixel_order != SUBPIXEL_DEFAULT)
+		cairo_font_options_set_subpixel_order(instance->font_options, (cairo_subpixel_order_t)opt_subpixel_order);
+
+	if (opt_hint_metrics != HINT_METRICS_DEFAULT)
+		cairo_font_options_set_hint_metrics(instance->font_options, (cairo_hint_metrics_t)opt_hint_metrics);
+
+	if (opt_antialias != ANTIALIAS_DEFAULT)
+		cairo_font_options_set_antialias(instance->font_options, (cairo_antialias_t)opt_antialias);
+
+	instance->subpixel_positions = opt_subpixel_positions;
+
+	return instance;
+}
+
+static void
+pangocairo_view_destroy(gpointer instance)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+
+	cairo_font_options_destroy(c->font_options);
+
+	g_object_unref(c->fontmap);
+
+	c->iface->backend_class->destroy(c->backend);
+
+	cairo_debug_reset_static_data();
+
+	g_slice_free(CairoViewer, c);
+}
+
+static PangoContext*
+pangocairo_view_get_context(gpointer instance)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+	PangoContext* context;
+
+	context = pango_font_map_create_context(c->fontmap);
+	pango_cairo_context_set_font_options(context, c->font_options);
+	pango_context_set_round_glyph_positions(context, !c->subpixel_positions);
+
+	return context;
+}
+
+typedef struct
+{
+	gpointer backend;
+
+	cairo_surface_t* cairo;
+} CairoSurface;
+
+static gpointer
+pangocairo_view_create_surface(gpointer instance,
+	int      width,
+	int      height)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+	CairoSurface* surface;
+
+	surface = g_slice_new(CairoSurface);
+
+	surface->backend = c->iface->backend_class->create_surface(c->backend,
+		width, height);
+
+	surface->cairo = c->iface->create_surface(c->backend,
+		surface->backend,
+		width, height);
+
+	return surface;
+}
+
+static void
+pangocairo_view_destroy_surface(gpointer instance,
+	gpointer surface)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+	CairoSurface* c_surface = (CairoSurface*)surface;
+
+	c->iface->backend_class->destroy_surface(c->backend, c_surface->backend);
+	cairo_surface_destroy(c_surface->cairo);
+
+	g_slice_free(CairoSurface, surface);
+}
+
+static void
+render_callback(PangoLayout* layout,
+	int          x,
+	int          y,
+	gpointer     context,
+	gpointer     state)
+{
+	cairo_t* cr = (cairo_t*)context;
+	int annotate = (GPOINTER_TO_INT(state) + opt_annotate) % 4;
+
+	cairo_save(cr);
+	cairo_translate(cr, x, y);
+
+	if (annotate)
+	{
+		cairo_pattern_t* pattern;
+		PangoRectangle ink, logical;
+		double lw = cairo_get_line_width(cr);
+		PangoLayoutIter* iter;
+
+		pango_layout_get_extents(layout, &ink, &logical);
+
+		if (annotate >= 2)
+		{
+			/* draw resolved gravity "roof" in blue */
+			cairo_save(cr);
+			cairo_translate(cr,
+				(double)logical.x / PANGO_SCALE,
+				(double)logical.y / PANGO_SCALE);
+			cairo_scale(cr,
+				(double)logical.width / PANGO_SCALE * 0.5,
+				(double)logical.height / PANGO_SCALE * 0.5);
+			cairo_translate(cr, 1.0, 1.0);
+			cairo_rotate(cr,
+				pango_gravity_to_rotation(
+					pango_context_get_gravity(
+						pango_layout_get_context(layout))));
+			cairo_move_to(cr, -1.0, -1.0);
+			cairo_rel_line_to(cr, +1.0, -0.2); /* /   */
+			cairo_rel_line_to(cr, +1.0, +0.2); /*   \ */
+			cairo_close_path(cr);             /*  -  */
+			pattern = cairo_pattern_create_linear(0, -1.0, 0, -1.2);
+			cairo_pattern_add_color_stop_rgba(pattern, 0.0, 0.0, 0.0, 1.0, 0.0);
+			cairo_pattern_add_color_stop_rgba(pattern, 1.0, 0.0, 0.0, 1.0, 0.15);
+			cairo_set_source(cr, pattern);
+			cairo_fill(cr);
+			/* once more, without close_path this time */
+			cairo_move_to(cr, -1.0, -1.0);
+			cairo_rel_line_to(cr, +1.0, -0.2); /* /   */
+			cairo_rel_line_to(cr, +1.0, +0.2); /*   \ */
+			/* silly line_width is not locked :(. get rid of scale. */
+			cairo_restore(cr);
+			cairo_save(cr);
+			cairo_set_source_rgba(cr, 0.0, 0.0, 0.7, 0.2);
+			cairo_stroke(cr);
+			cairo_restore(cr);
+
+
+			/* draw block progression arrow in green */
+			cairo_save(cr);
+			cairo_translate(cr,
+				(double)logical.x / PANGO_SCALE,
+				(double)logical.y / PANGO_SCALE);
+			cairo_scale(cr,
+				(double)logical.width / PANGO_SCALE * 0.5,
+				(double)logical.height / PANGO_SCALE * 0.5);
+			cairo_translate(cr, 1.0, 1.0);
+			cairo_move_to(cr, -0.4, -0.7);
+			cairo_rel_line_to(cr, +0.8, 0.0); /*  --   */
+			cairo_rel_line_to(cr, 0.0, +0.9); /*    |  */
+			cairo_rel_line_to(cr, +0.4, 0.0); /*     - */
+			cairo_rel_line_to(cr, -0.8, +0.5); /*    /  */
+			cairo_rel_line_to(cr, -0.8, -0.5); /*  \    */
+			cairo_rel_line_to(cr, +0.4, 0.0); /* -     */
+			cairo_close_path(cr);             /*  |    */
+			pattern = cairo_pattern_create_linear(0, -0.7, 0, 0.7);
+			cairo_pattern_add_color_stop_rgba(pattern, 0.0, 0.0, 1.0, 0.0, 0.0);
+			cairo_pattern_add_color_stop_rgba(pattern, 1.0, 0.0, 1.0, 0.0, 0.15);
+			cairo_set_source(cr, pattern);
+			cairo_fill_preserve(cr);
+			/* silly line_width is not locked :(. get rid of scale. */
+			cairo_restore(cr);
+			cairo_save(cr);
+			cairo_set_source_rgba(cr, 0.0, 0.7, 0.0, 0.2);
+			cairo_stroke(cr);
+			cairo_restore(cr);
+		}
+
+		/* draw baselines with line direction arrow in orange */
+		cairo_save(cr);
+		cairo_set_source_rgba(cr, 1.0, 0.5, 0.0, 0.5);
+		iter = pango_layout_get_iter(layout);
+		do
+		{
+			PangoLayoutLine* line = pango_layout_iter_get_line(iter);
+			double width = (double)logical.width / PANGO_SCALE;
+
+			y = pango_layout_iter_get_baseline(iter);
+			cairo_save(cr);
+			cairo_translate(cr,
+				(double)logical.x / PANGO_SCALE + width * 0.5,
+				(double)y / PANGO_SCALE);
+			if (line->resolved_dir)
+				cairo_scale(cr, -1, 1);
+			cairo_move_to(cr, -width * .5, -lw * 0.2);
+			cairo_rel_line_to(cr, +width * .9, -lw * 0.3);
+			cairo_rel_line_to(cr, 0, -lw);
+			cairo_rel_line_to(cr, +width * .1, +lw * 1.5);
+			cairo_rel_line_to(cr, -width * .1, +lw * 1.5);
+			cairo_rel_line_to(cr, 0, -lw);
+			cairo_rel_line_to(cr, -width * .9, -lw * 0.3);
+			cairo_close_path(cr);
+			cairo_fill(cr);
+			cairo_restore(cr);
+		} while (pango_layout_iter_next_line(iter));
+		pango_layout_iter_free(iter);
+		cairo_restore(cr);
+
+		/* draw the logical rect in red */
+		cairo_save(cr);
+		cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.5);
+
+		cairo_rectangle(cr,
+			(double)logical.x / PANGO_SCALE - lw / 2,
+			(double)logical.y / PANGO_SCALE - lw / 2,
+			(double)logical.width / PANGO_SCALE + lw,
+			(double)logical.height / PANGO_SCALE + lw);
+		cairo_stroke(cr);
+		cairo_restore(cr);
+
+		/* draw the ink rect in green */
+		cairo_save(cr);
+		cairo_set_source_rgba(cr, 0.0, 1.0, 0.0, 0.5);
+		cairo_rectangle(cr,
+			(double)ink.x / PANGO_SCALE - lw / 2,
+			(double)ink.y / PANGO_SCALE - lw / 2,
+			(double)ink.width / PANGO_SCALE + lw,
+			(double)ink.height / PANGO_SCALE + lw);
+		cairo_stroke(cr);
+		cairo_restore(cr);
+
+		if (opt_annotate >= 3)
+		{
+			/* draw the logical rects for lines in red */
+			cairo_save(cr);
+			cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.5);
+
+			iter = pango_layout_get_iter(layout);
+			do
+			{
+				PangoRectangle rect;
+
+				pango_layout_iter_get_line_extents(iter, NULL, &rect);
+				cairo_rectangle(cr,
+					(double)rect.x / PANGO_SCALE - lw / 2,
+					(double)rect.y / PANGO_SCALE - lw / 2,
+					(double)rect.width / PANGO_SCALE + lw,
+					(double)rect.height / PANGO_SCALE + lw);
+				cairo_stroke(cr);
+			} while (pango_layout_iter_next_line(iter));
+			pango_layout_iter_free(iter);
+			cairo_restore(cr);
+		}
+	}
+
+	cairo_move_to(cr, 0, 0);
+	pango_cairo_show_layout(cr, layout);
+
+	cairo_restore(cr);
+
+	cairo_surface_flush(cairo_get_target(cr));
+}
+
+static void
+transform_callback(PangoContext* context,
+	PangoMatrix* matrix,
+	gpointer      cr_context,
+	gpointer      state G_GNUC_UNUSED)
+{
+	cairo_t* cr = (cairo_t*)cr_context;
+	cairo_matrix_t cairo_matrix;
+
+	if (matrix)
+	{
+		cairo_matrix.xx = matrix->xx;
+		cairo_matrix.yx = matrix->yx;
+		cairo_matrix.xy = matrix->xy;
+		cairo_matrix.yy = matrix->yy;
+		cairo_matrix.x0 = matrix->x0;
+		cairo_matrix.y0 = matrix->y0;
+	}
+	else
+	{
+		cairo_matrix_init_identity(&cairo_matrix);
+	}
+
+	cairo_set_matrix(cr, &cairo_matrix);
+
+	pango_cairo_update_context(cr, context);
+}
+
+static void
+pangocairo_view_render(gpointer      instance,
+	gpointer      surface,
+	PangoContext* context,
+	int* width,
+	int* height,
+	gpointer      state)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+	cairo_t* cr;
+	CairoSurface* c_surface = (CairoSurface*)surface;
+
+	g_assert(surface);
+
+	cr = cairo_create(c_surface->cairo);
+
+	transform_callback(context, NULL, cr, state);
+
+	c->iface->paint_background(instance, cr);
+
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+	cairo_set_source_rgba(cr,
+		opt_fg_color.red / 65535.,
+		opt_fg_color.green / 65535.,
+		opt_fg_color.blue / 65535.,
+		opt_fg_alpha / 65535.);
+
+	do_output(context, render_callback, transform_callback, cr, state, width, height);
+
+	cairo_destroy(cr);
+}
+
+#ifdef HAVE_CAIRO_PNG
+static cairo_status_t
+write_func(void* closure,
+	const unsigned char* data,
+	uint32_t         length)
+{
+	FILE* stream = (FILE*)closure;
+	uint32_t l;
+
+	l = fwrite(data, 1, length, stream);
+
+	return l == length ? CAIRO_STATUS_SUCCESS : CAIRO_STATUS_WRITE_ERROR;
+}
+
+static void
+pangocairo_view_write(gpointer instance G_GNUC_UNUSED,
+	gpointer surface,
+	FILE* stream,
+	int      width G_GNUC_UNUSED,
+	int      height G_GNUC_UNUSED)
+{
+	CairoSurface* c_surface = (CairoSurface*)surface;
+
+	cairo_surface_write_to_png_stream(c_surface->cairo, write_func, stream);
+}
+#endif
+
+static gpointer
+pangocairo_view_create_window(gpointer    instance,
+	const char* title,
+	int         width,
+	int         height)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+
+	if (!c->iface->backend_class->create_window)
+		return NULL;
+
+	return c->iface->backend_class->create_window(c->backend,
+		title,
+		width, height);
+}
+
+static void
+pangocairo_view_destroy_window(gpointer instance,
+	gpointer window)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+
+	c->iface->backend_class->destroy_window(c->backend,
+		window);
+}
+
+static gpointer
+pangocairo_view_display(gpointer instance,
+	gpointer surface,
+	gpointer window,
+	int width, int height,
+	gpointer state)
+{
+	CairoViewer* c = (CairoViewer*)instance;
+	CairoSurface* c_surface = (CairoSurface*)surface;
+
+	return c->iface->backend_class->display(c->backend,
+		c_surface->backend,
+		window,
+		width, height,
+		state);
+}
+
+static GOptionGroup*
+pangocairo_view_get_option_group(const PangoViewer* klass G_GNUC_UNUSED)
+{
+	GOptionEntry entries[] =
+	{
+	  {"annotate",	0, 0, G_OPTION_ARG_INT, &opt_annotate,
+	   "Annotate the output",				"1, 2 or 3"},
+	  {NULL}
+	};
+	GOptionGroup* group;
+
+	group = g_option_group_new("cairo",
+		"Cairo backend options:",
+		"Options understood by the cairo backend",
+		NULL,
+		NULL);
+
+	g_option_group_add_entries(group, entries);
+
+	cairo_viewer_add_options(group);
+
+	return group;
+}
+
+const PangoViewer pangocairo_viewer = {
+  "PangoCairo",
+  "cairo",
+#ifdef HAVE_CAIRO_PNG
+  "png",
+#else
+  NULL,
+#endif
+  pangocairo_view_create,
+  pangocairo_view_destroy,
+  pangocairo_view_get_context,
+  pangocairo_view_create_surface,
+  pangocairo_view_destroy_surface,
+  pangocairo_view_render,
+#ifdef HAVE_CAIRO_PNG
+  pangocairo_view_write,
+#else
+  NULL,
+#endif
+  pangocairo_view_create_window,
+  pangocairo_view_destroy_window,
+  pangocairo_view_display,
+  NULL,
+  NULL,
+  pangocairo_view_get_option_group
+};
+#endif // 1
+
+#if 0
+bool          InputText(const char* label, char* buf, size_t buf_size, ImGuiInputTextFlags flags = 0, ImGuiInputTextCallback callback = NULL, void* user_data = NULL);
+bool          InputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size = ImVec2(0, 0), ImGuiInputTextFlags flags = 0, ImGuiInputTextCallback callback = NULL, void* user_data = NULL);
+// 带提示的输入框
+bool          InputTextWithHint(const char* label, const char* hint, char* buf, size_t buf_size, ImGuiInputTextFlags flags = 0, ImGuiInputTextCallback callback = NULL, void* user_data = NULL);
+bool          InputFloat(const char* label, float* v, float step = 0.0f, float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0);
+bool          InputFloat2(const char* label, float v[2], const char* format = "%.3f", ImGuiInputTextFlags flags = 0);
+bool          InputFloat3(const char* label, float v[3], const char* format = "%.3f", ImGuiInputTextFlags flags = 0);
+bool          InputFloat4(const char* label, float v[4], const char* format = "%.3f", ImGuiInputTextFlags flags = 0);
+bool          InputInt(const char* label, int* v, int step = 1, int step_fast = 100, ImGuiInputTextFlags flags = 0);
+bool          InputInt2(const char* label, int v[2], ImGuiInputTextFlags flags = 0);
+bool          InputInt3(const char* label, int v[3], ImGuiInputTextFlags flags = 0);
+bool          InputInt4(const char* label, int v[4], ImGuiInputTextFlags flags = 0);
+bool          InputDouble(const char* label, double* v, double step = 0.0, double step_fast = 0.0, const char* format = "%.6f", ImGuiInputTextFlags flags = 0);
+#endif // 1
+
+template<class T>
+void free_obt(T*& p) {
+	if (p) {
+		delete p; p = 0;
+	}
+}
+
+#endif
