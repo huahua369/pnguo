@@ -5,7 +5,8 @@
 CMakeLists.txt修改`SDL3DIR_ROOT`和`SDL3_DIR`
 
 - vcpkg安装依赖库，根据需求安装，例如`vcpkg install PkgConfig:x64-windows-static`\
-<code>PkgConfig
+```
+PkgConfig
 SDL3
 OpenSSL
 glm
@@ -24,4 +25,15 @@ LIBRSVG
 GTHREAD
 EnTT
 OpenCV
-</code>
+```
+
+## To Do 
+	- [x] 2d骨骼动画渲染
+	- [x] 2d图集渲染
+	- [x] 面板
+	- [x] 按钮
+	- [x] 输入框：单行、多行
+	- [ ] 多选框
+	- [ ] 单选框
+	- [ ] 表格视图
+	- [ ] 树形视图
