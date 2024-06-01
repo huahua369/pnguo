@@ -46,7 +46,7 @@ vkvg
 - [ ] 3D渲染器
 
 ## 描述
-主实现在目录`third_party/vkgui` 文件读写、
+主实现在目录`third_party/vkgui` 文件读写、窗口创建等。
 
 复制整个third_party目录到自己项目，如需要使用vkvg则取消vkvgcx.cpp这行的注释
 ```
