@@ -25,6 +25,7 @@ LIBRSVG
 GTHREAD
 EnTT
 OpenCV
+vkvg
 ```
 
 ## To Do 
@@ -38,3 +39,5 @@ OpenCV
 - [ ] 单选框
 - [ ] 表格视图
 - [ ] 树形视图
+- [ ] 颜色拾取
+
