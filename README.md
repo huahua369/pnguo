@@ -2,9 +2,8 @@
 基于SDL3的简易gui实现。
 
 编译说明：
-1. 拉取仓库代码```git clone https://github.com/huahua369/pnguo.git```
+1. 拉取仓库代码```git clone https://github.com/huahua369/pnguo.git```更新代码```git pull```
 2. CMakeLists.txt修改`SDL3DIR_ROOT`和`SDL3_DIR`
-
 3. vcpkg安装依赖库，根据需求安装，例如```vcpkg install PkgConfig:x64-windows-static```
 ```
 PkgConfig
