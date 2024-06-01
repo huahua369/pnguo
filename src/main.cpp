@@ -367,7 +367,6 @@ int main()
 
 	}
 	pcu->update();
-
 	auto txt = new layout_text_x();
 	{
 		pl1->draggable = true; //可拖动
@@ -379,7 +378,6 @@ int main()
 		txt->set_ctx(app->font_ctx);
 		int fontsize = 26;
 		glm::vec2 text_align = { 0.1,0.1 };
-
 		//txt->add_family("Consolas", 0);
 		//txt->add_family((char*)u8"XITS Math", 0);
 		txt->add_family((char*)u8"新宋体", 0);

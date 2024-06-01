@@ -143,5 +143,7 @@ list(APPEND lklib
 target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(tcmp PRIVATE ${lklib})
  
+#复制测试文本
+file(COPY src/SH_600938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 # TODO: 如有需要，请添加测试并安装目标。
 
