@@ -82,6 +82,7 @@ list(APPEND src_cmp
 #测试
 list(APPEND src_cmp  
     ${VKVG_SRC} 
+    "src/charts.cpp"
     "src/main.cpp"
     "rc/resource1.rc"
 ) 
@@ -144,6 +145,6 @@ target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(tcmp PRIVATE ${lklib})
  
 #复制测试文本
-file(COPY src/SH_600938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+file(COPY src/sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 # TODO: 如有需要，请添加测试并安装目标。
 
