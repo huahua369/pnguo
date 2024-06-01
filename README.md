@@ -4,7 +4,7 @@
 编译说明：
 CMakeLists.txt修改`SDL3DIR_ROOT`和`SDL3_DIR`
 
-vcpkg安装依赖库，根据需求安装，例如`vcpkg install PkgConfig:x64-windows-static`
+vcpkg安装依赖库，根据需求安装，例如`vcpkg install PkgConfig:x64-windows-static`\
 `PkgConfig
 SDL3
 OpenSSL
