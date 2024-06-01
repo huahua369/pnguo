@@ -46,5 +46,22 @@ vkvg
 - [ ] 3D渲染器
 
 ## 描述
+主实现在目录`third_party/vkgui` 文件读写、
+
+复制整个third_party目录到自己项目，如需要使用vkvg则取消vkvgcx.cpp这行的注释
+```
+list(APPEND src_cpp   
+"third_party/stb_src/stb_src.c" 
+"third_party/vkgui/mapView.cpp"
+"third_party/vkgui/tinysdl3.cpp"
+"third_party/vkgui/pnguo.cpp"
+"third_party/vkgui/win_core.cpp" 
+"third_party/tinyspline/parson.c"
+"third_party/tinyspline/tinyspline.c"
+"third_party/tinyspline/tinysplinecxx.cpp" 
+#"third_party/vkvg/vkvgcx.cpp"  
+)
+```
+
 windows支持OLE拖放，支持渲染已有vulkan纹理，vkvg代码修改了一些编译错误。
 
