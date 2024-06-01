@@ -146,5 +146,16 @@ target_link_libraries(tcmp PRIVATE ${lklib})
  
 #复制测试文本
 file(COPY src/sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+
+#3d渲染器
+#add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
+#add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE)
+
+add_subdirectory(third_party/cauldron)
+add_subdirectory(third_party/vdrender/DX12)
+add_subdirectory(third_party/vdrender/VK)
+
+
 # TODO: 如有需要，请添加测试并安装目标。
+
 
