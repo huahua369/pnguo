@@ -1,4 +1,4 @@
-// AMD SampleVK sample code
+﻿// AMD SampleVK sample code
 // 
 // Copyright(c) 2020 Advanced Micro Devices, Inc.All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -54,6 +54,52 @@ private:
 	bool                        m_loadingScene = false;
 
 	Renderer* m_pRenderer = NULL;
+	UIState                     m_UIState;
+	float                       m_fontSize;
+	Camera                      m_camera;
+
+	float                       m_time = 0; // Time accumulator in seconds, used for animation.
+
+	// json config file
+	json                        m_jsonConfigFile;
+	std::vector<std::string>    m_sceneNames;
+	int                         m_activeScene;
+	int                         m_activeCamera;
+	bool                        m_bPlay;
+};
+
+class sample_cx :public Framework_cx
+{
+public:
+	sample_cx();
+	~sample_cx();
+	void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight) override;
+	void OnCreate() override;
+	void OnDestroy() override;
+	void OnRender() override;
+	bool OnEvent(MSG msg) override;
+	void OnResize(bool resizeRender) override;
+	void OnUpdateDisplay() override;
+
+	void BuildUI();
+	void LoadScene(int sceneIndex);
+
+	void OnUpdate();
+
+	void HandleInput();
+	void UpdateCamera(Camera& cam);
+
+private:
+
+	bool                        m_bIsBenchmarking;
+
+	GLTFCommon* m_pGltfLoader = NULL;
+	std::vector<GLTFCommon*>    _loaders;
+	bool                        m_loadingScene = false;
+
+	Renderer_cx* m_pRenderer = NULL;
+	VkRenderPass _rp = 0;
+	DisplayMode _dm = DISPLAYMODE_SDR;
 	UIState                     m_UIState;
 	float                       m_fontSize;
 	Camera                      m_camera;

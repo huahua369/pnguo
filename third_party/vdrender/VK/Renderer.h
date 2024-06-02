@@ -152,3 +152,85 @@ private:
 	bool bHDR = false;
 };
 
+
+class Renderer_cx
+{
+public:
+	Renderer_cx(const_vk* p);
+	~Renderer_cx();
+	void OnCreate(Device* pDevice, VkRenderPass rp);
+	void OnDestroy();
+
+	void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
+	void OnDestroyWindowSizeDependentResources(); 
+	void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
+	void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
+
+	int LoadScene(GLTFCommon* pGLTFCommon, int Stage = 0);
+	void UnloadScene();
+	void unloadgltf(robj_info* p);
+
+	void AllocateShadowMaps(GLTFCommon* pGLTFCommon);
+
+	const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
+
+	void OnRender(const UIState* pState, const Camera& Cam);
+
+private:
+	Device* m_pDevice = 0;
+	const_vk ct = {};
+	uint32_t                        m_Width = {};
+	uint32_t                        m_Height = {};
+
+	VkRect2D                        m_RectScissor = {};
+	VkViewport                      m_Viewport = {};
+
+	// Initialize helper classes
+	ResourceViewHeaps               m_ResourceViewHeaps = {};
+	UploadHeap                      m_UploadHeap = {};
+	DynamicBufferRing               m_ConstantBufferRing = {};
+	StaticBufferPool                m_VidMemBufferPool = {};
+	StaticBufferPool                m_SysMemBufferPool = {};
+	CommandListRing                 m_CommandListRing = {};
+	GPUTimestamps                   m_GPUTimer = {};
+
+	// effects
+	Bloom                           m_Bloom = {};
+	SkyDome                         m_SkyDome = {};
+	DownSamplePS                    m_DownSample = {};
+	SkyDomeProc                     m_SkyDomeProc = {};
+	ToneMapping                     m_ToneMappingPS = {};
+	ToneMappingCS                   m_ToneMappingCS = {};
+	ColorConversionPS               m_ColorConversionPS = {};
+	TAA                             m_TAA = {};
+	MagnifierPS                     m_MagnifierPS = {};
+
+	// GBuffer and render passes
+	GBuffer                         m_GBuffer = {};
+	GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};
+	GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};
+	GBufferRenderPass               m_RenderPassFullGBuffer = {};
+
+	// shadowmaps
+	VkRenderPass                    m_Render_pass_shadow = {};
+
+
+	// widgets
+	Wireframe                       m_Wireframe = {};
+	WireframeBox                    m_WireframeBox = {};
+	//Axis							_axis= {};
+	CheckerBoardFloor				_cbf = {};
+	std::vector<TimeStamp>          m_TimeStamps = {};
+
+	AsyncPool                       m_AsyncPool = {};
+	// 渲染对象
+	std::vector<robj_info*>         _robject = {};
+	robj_info* currobj = {};
+
+	std::vector<SceneShadowInfo>    m_shadowMapPool = {};
+	std::vector<VkImageView>        m_ShadowSRVPool = {};
+	std::vector<GltfDepthPass*>     _depthpass = {};
+	bool bHDR = false;
+	bool                            m_bMagResourceReInit = false;
+};
+

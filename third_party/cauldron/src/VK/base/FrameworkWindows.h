@@ -1,4 +1,4 @@
-// AMD Cauldron code
+﻿// AMD Cauldron code
 // 
 // Copyright(c) 2020 Advanced Micro Devices, Inc.All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -82,6 +82,85 @@ namespace CAULDRON_VK
 
 		// Swapchain management
 		SwapChain         m_swapChain;
+		bool              m_VsyncEnabled;
+		PresentationMode  m_fullscreenMode;
+		PresentationMode  m_previousFullscreenMode;
+
+		// Display management
+		HMONITOR                  m_monitor;
+		bool                      m_FreesyncHDROptionEnabled;
+		DisplayMode               m_previousDisplayModeNamesIndex;
+		DisplayMode               m_currentDisplayModeNamesIndex ;
+		std::vector<DisplayMode>  m_displayModesAvailable;
+		std::vector<const char*>  m_displayModesNamesAvailable;
+		bool                      m_enableLocalDimming;
+
+		// System info
+		struct SystemInfo
+		{
+			std::string mCPUName = "UNAVAILABLE";
+			std::string mGPUName = "UNAVAILABLE";
+			std::string mGfxAPI  = "UNAVAILABLE";
+		};
+		SystemInfo  m_systemInfo;
+	};
+	class Framework_cx
+	{
+	public:
+		Framework_cx(LPCSTR name);
+		virtual ~Framework_cx() {}
+
+		// Client (Sample) application interface
+		virtual void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight) = 0;
+		virtual void OnCreate() = 0;
+		virtual void OnDestroy() = 0;
+		virtual void OnRender() = 0;
+		virtual bool OnEvent(MSG msg) = 0;
+		virtual void OnResize(bool resizeRender) = 0;
+		virtual void OnUpdateDisplay() = 0;
+
+		// Device & swapchain management
+		void DeviceInit(HWND WindowsHandle);
+		void DeviceShutdown();
+		void BeginFrame();
+		void EndFrame();	//Present
+
+		// Fullscreen management & window events are handled by Cauldron instead of the client applications.
+		void ToggleFullScreen();
+		void HandleFullScreen();
+		void OnActivate(bool windowActive);
+		void OnWindowMove();
+		void UpdateDisplay();
+		void OnResize(uint32_t Width, uint32_t Height);
+		void OnLocalDimmingChanged();
+
+		// Getters
+		inline LPCSTR             GetName() const { return m_Name.c_str(); }
+		inline uint32_t           GetWidth() const { return m_Width; }
+		inline uint32_t           GetHeight() const { return m_Height; }
+		inline DisplayMode        GetCurrentDisplayMode() const { return m_currentDisplayModeNamesIndex; }
+		inline size_t             GetNumDisplayModes() const { return m_displayModesAvailable.size(); }
+		inline const char* const* GetDisplayModeNames() const { return &m_displayModesNamesAvailable[0]; }
+		inline bool               GetLocalDimmingEnableState() const { return m_enableLocalDimming; }
+
+	protected:
+		std::string m_Name; // sample application name
+		int m_Width ;  // application window dimensions
+		int m_Height;  // application window dimensions
+
+		// Simulation management
+		double m_lastFrameTime;
+		double m_deltaTime;
+
+		// Device management
+		HWND   m_windowHwnd;
+		Device m_device;
+		bool   m_stablePowerState;
+		bool   m_isCpuValidationLayerEnabled;
+		bool   m_isGpuValidationLayerEnabled;
+
+		// Swapchain management
+		// SwapChain         m_swapChain;
 		bool              m_VsyncEnabled;
 		PresentationMode  m_fullscreenMode;
 		PresentationMode  m_previousFullscreenMode;

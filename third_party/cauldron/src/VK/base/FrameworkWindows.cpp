@@ -319,6 +319,7 @@ static std::string GetCPUNameString()
 
 namespace CAULDRON_VK
 {
+#if 1
 	FrameworkWindows::FrameworkWindows(LPCSTR name)
 		: m_Name(name)
 		, m_Width(0)
@@ -622,5 +623,314 @@ namespace CAULDRON_VK
 		m_device.GPUFlush();
 		fsHdrSetLocalDimmingMode(m_swapChain.GetSwapChain(), m_enableLocalDimming);
 	}
+#endif
+#if 1
+	Framework_cx::Framework_cx(LPCSTR name)
+		: m_Name(name)
+		, m_Width(0)
+		, m_Height(0)
 
+		// Simulation management
+		, m_lastFrameTime(MillisecondsNow())
+		, m_deltaTime(0.0)
+
+		// Device management
+		, m_windowHwnd(NULL)
+		, m_device()
+		, m_stablePowerState(false)
+		, m_isCpuValidationLayerEnabled(ENABLE_CPU_VALIDATION_DEFAULT)
+		, m_isGpuValidationLayerEnabled(ENABLE_GPU_VALIDATION_DEFAULT)
+
+		// Swapchain management
+		//, m_swapChain()
+		, m_VsyncEnabled(false)
+		, m_fullscreenMode(PRESENTATIONMODE_WINDOWED)
+		, m_previousFullscreenMode(PRESENTATIONMODE_WINDOWED)
+
+		// Display management
+		, m_monitor()
+		, m_FreesyncHDROptionEnabled(false)
+		, m_previousDisplayModeNamesIndex(DISPLAYMODE_SDR)
+		, m_currentDisplayModeNamesIndex(DISPLAYMODE_SDR)
+		, m_displayModesAvailable()
+		, m_displayModesNamesAvailable()
+		, m_enableLocalDimming(true)
+
+		// System info
+		, m_systemInfo() // initialized after device
+	{
+	}
+
+	void Framework_cx::DeviceInit(HWND WindowsHandle)
+	{
+		// Store the windows handle (other things need it later)
+		m_windowHwnd = WindowsHandle;
+
+		std::vector<std::string> dnv;
+		const char* selectname = 0;
+
+		// Create Device
+		m_device.OnCreate(m_Name.c_str(), "Cauldron v1.4", m_isCpuValidationLayerEnabled, m_isGpuValidationLayerEnabled, m_windowHwnd, selectname, &dnv);
+		m_device.CreatePipelineCache();
+
+		// Get the monitor
+		m_monitor = MonitorFromWindow(m_windowHwnd, MONITOR_DEFAULTTONEAREST);
+
+		// Create Swapchain
+		uint32_t dwNumberOfBackBuffers = 2;
+		//m_swapChain.OnCreate(&m_device, dwNumberOfBackBuffers, m_windowHwnd);
+
+		//m_swapChain.EnumerateDisplayModes(&m_displayModesAvailable, &m_displayModesNamesAvailable);
+		//
+		if (m_previousFullscreenMode != m_fullscreenMode)
+		{
+			HandleFullScreen();
+			m_previousFullscreenMode = m_fullscreenMode;
+		}
+
+		// Get system info
+		std::string dummyStr;
+		m_device.GetDeviceInfo(&m_systemInfo.mGPUName, &dummyStr); // 2nd parameter is unused
+		m_systemInfo.mCPUName = GetCPUNameString();
+		m_systemInfo.mGfxAPI = "Vulkan";
+	}
+
+	void Framework_cx::DeviceShutdown()
+	{
+		// Fullscreen state should always be false before exiting the app.
+		if (m_fullscreenMode == PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN)
+		{
+			//m_swapChain.SetFullScreen(false);
+		}
+
+		//m_swapChain.OnDestroyWindowSizeDependentResources();
+		//m_swapChain.OnDestroy();
+
+		m_device.DestroyPipelineCache();
+		m_device.OnDestroy();
+	}
+
+	void Framework_cx::ToggleFullScreen()
+	{
+		if (m_fullscreenMode == PRESENTATIONMODE_WINDOWED)
+		{
+			m_fullscreenMode = PRESENTATIONMODE_BORDERLESS_FULLSCREEN;
+		}
+		else
+		{
+			m_fullscreenMode = PRESENTATIONMODE_WINDOWED;
+		}
+
+		HandleFullScreen();
+		m_previousFullscreenMode = m_fullscreenMode;
+	}
+
+	void Framework_cx::HandleFullScreen()
+	{
+		// Flush the gpu to make sure we don't change anything still active
+		m_device.GPUFlush();
+		if (!m_windowHwnd)return;
+		// -------------------- For HDR only.
+		// If FS2 modes, always fallback to SDR
+		if (m_fullscreenMode == PRESENTATIONMODE_WINDOWED &&
+			(m_displayModesAvailable[m_currentDisplayModeNamesIndex] == DISPLAYMODE_FSHDR_Gamma22 ||
+				m_displayModesAvailable[m_currentDisplayModeNamesIndex] == DISPLAYMODE_FSHDR_SCRGB))
+		{
+			m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
+		}
+		// when hdr10 modes, fall back to SDR unless windowMode hdr is enabled
+		else if (m_fullscreenMode == PRESENTATIONMODE_WINDOWED && !CheckIfWindowModeHdrOn() &&
+			(m_displayModesAvailable[m_currentDisplayModeNamesIndex] != DISPLAYMODE_SDR))
+		{
+			m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
+		}
+		// For every other case go back to previous state
+		else
+		{
+			m_currentDisplayModeNamesIndex = m_previousDisplayModeNamesIndex;
+		}
+		// -------------------- For HDR only.
+		bool resizeResources = false;
+		switch (m_fullscreenMode)
+		{
+		case PRESENTATIONMODE_WINDOWED:
+		{
+			if (m_previousFullscreenMode == PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN)
+			{
+				//m_swapChain.SetFullScreen(false);
+			}
+
+			SetFullscreen(m_windowHwnd, false);
+
+			break;
+		}
+
+		case PRESENTATIONMODE_BORDERLESS_FULLSCREEN:
+		{
+			if (m_previousFullscreenMode == PRESENTATIONMODE_WINDOWED)
+			{
+				SetFullscreen(m_windowHwnd, true);
+			}
+			else if (m_previousFullscreenMode == PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN)
+			{
+				//m_swapChain.SetFullScreen(false);
+
+				resizeResources = true;
+			}
+
+			break;
+		}
+
+		case PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN:
+		{
+			if (m_previousFullscreenMode == PRESENTATIONMODE_WINDOWED)
+			{
+				SetFullscreen(m_windowHwnd, true);
+
+				// This should automatically call OnResize thanks to WM_SIZE with correct presentation mode.
+			}
+			else if (m_previousFullscreenMode == PRESENTATIONMODE_BORDERLESS_FULLSCREEN)
+			{
+				resizeResources = true;
+			}
+
+			//m_swapChain.SetFullScreen(true);
+
+			break;
+		}
+		}
+
+		RECT clientRect = {};
+		GetClientRect(m_windowHwnd, &clientRect);
+		uint32_t nw = clientRect.right - clientRect.left;
+		uint32_t nh = clientRect.bottom - clientRect.top;
+		resizeResources = (resizeResources && nw == m_Width && nh == m_Height);
+		OnResize(nw, nh);
+		if (resizeResources)
+		{
+			UpdateDisplay();
+			OnResize(true);
+		}
+	}
+
+	void Framework_cx::OnActivate(bool WindowActive)
+	{
+		if (!m_windowHwnd)return;
+		// *********************************************************************************
+		// Edge case for handling Fullscreen Exclusive (FSE) mode 
+		// FSE<->FSB transitions are handled here and at the end of EndFrame().
+		if (WindowActive &&
+			m_windowHwnd == GetForegroundWindow() &&
+			m_fullscreenMode == PRESENTATIONMODE_BORDERLESS_FULLSCREEN &&
+			m_previousFullscreenMode == PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN)
+		{
+			m_fullscreenMode = PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN;
+			m_previousFullscreenMode = PRESENTATIONMODE_BORDERLESS_FULLSCREEN;
+			HandleFullScreen();
+			m_previousFullscreenMode = m_fullscreenMode;
+		}
+		// *********************************************************************************
+
+		if (m_displayModesAvailable[m_currentDisplayModeNamesIndex] == DisplayMode::DISPLAYMODE_SDR &&
+			m_displayModesAvailable[m_previousDisplayModeNamesIndex] == DisplayMode::DISPLAYMODE_SDR)
+			return;
+
+		if (CheckIfWindowModeHdrOn() &&
+			(m_displayModesAvailable[m_currentDisplayModeNamesIndex] == DISPLAYMODE_HDR10_2084 ||
+				m_displayModesAvailable[m_currentDisplayModeNamesIndex] == DISPLAYMODE_HDR10_SCRGB))
+			return;
+
+		// Fall back HDR to SDR when window is fullscreen but not the active window or foreground window
+		DisplayMode old = m_currentDisplayModeNamesIndex;
+		m_currentDisplayModeNamesIndex = WindowActive && (m_fullscreenMode != PRESENTATIONMODE_WINDOWED) ? m_previousDisplayModeNamesIndex : DisplayMode::DISPLAYMODE_SDR;
+		if (old != m_currentDisplayModeNamesIndex)
+		{
+			UpdateDisplay();
+			OnResize(true);
+		}
+	}
+
+	void Framework_cx::OnWindowMove()
+	{
+		if (!m_windowHwnd)return;
+		HMONITOR currentMonitor = MonitorFromWindow(m_windowHwnd, MONITOR_DEFAULTTONEAREST);
+		if (m_monitor != currentMonitor)
+		{
+			//m_swapChain.EnumerateDisplayModes(&m_displayModesAvailable, &m_displayModesNamesAvailable);
+			m_monitor = currentMonitor;
+			m_previousDisplayModeNamesIndex = m_currentDisplayModeNamesIndex = DISPLAYMODE_SDR;
+			OnResize(m_Width, m_Height);
+			UpdateDisplay();
+		}
+	}
+
+	void Framework_cx::OnResize(uint32_t width, uint32_t height)
+	{
+		bool fr = (m_Width != width || m_Height != height);
+		m_Width = width;
+		m_Height = height;
+		if (fr)
+		{
+			UpdateDisplay();
+			OnResize(true);
+		}
+	}
+
+	void Framework_cx::UpdateDisplay()
+	{
+		// Nothing was changed in UI
+		if (m_displayModesAvailable[m_currentDisplayModeNamesIndex] < 0)
+		{
+			m_currentDisplayModeNamesIndex = m_previousDisplayModeNamesIndex;
+			return;
+		}
+
+		// Flush GPU
+		m_device.GPUFlush();
+
+		//m_swapChain.OnDestroyWindowSizeDependentResources();
+
+		//m_swapChain.OnCreateWindowSizeDependentResources(m_Width, m_Height, m_VsyncEnabled, m_displayModesAvailable[m_currentDisplayModeNamesIndex], m_fullscreenMode, m_enableLocalDimming);
+
+		// Call sample defined UpdateDisplay()
+		OnUpdateDisplay();
+	}
+
+	// BeginFrame will handle time updates and other start of frame logic needed
+	void Framework_cx::BeginFrame()
+	{
+		// Get timings
+		double timeNow = MillisecondsNow();
+		m_deltaTime = (float)(timeNow - m_lastFrameTime);
+		m_lastFrameTime = timeNow;
+	}
+
+	// EndFrame will handle Present and other end of frame logic needed
+	void Framework_cx::EndFrame()
+	{
+		//VkResult res = m_swapChain.Present();
+
+		//// *********************************************************************************
+		//// Edge case for handling Fullscreen Exclusive (FSE) mode
+		//// Usually OnActivate() detects application changing focus and that's where this transition is handled.
+		//// However, SwapChain::GetFullScreen() returns true when we handle the event in the OnActivate() block,
+		//// which is not expected. Hence we handle FSE -> FSB transition here at the end of the frame.
+		//if (res == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+		//{
+		//	// For sanity check: it should only be possible when we are in FULLSCREENMODE_EXCLUSIVE_FULLSCREEN mode
+		//	assert(m_fullscreenMode == PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN);
+
+		//	m_fullscreenMode = PRESENTATIONMODE_BORDERLESS_FULLSCREEN;
+		//	HandleFullScreen();
+		//}
+		// *********************************************************************************
+	}
+
+	void Framework_cx::OnLocalDimmingChanged()
+	{
+		// Flush GPU
+		m_device.GPUFlush();
+		//fsHdrSetLocalDimmingMode(m_swapChain.GetSwapChain(), m_enableLocalDimming);
+	}
+#endif
 } // namespace CAULDRON_VK
