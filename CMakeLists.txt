@@ -76,7 +76,7 @@ list(APPEND src_cmp
 "third_party/tinyspline/parson.c"
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
-#"third_party/vkvg/vkvgcx.cpp"  
+"third_party/vkvg/vkvgcx.cpp"  
 )
 
 #测试

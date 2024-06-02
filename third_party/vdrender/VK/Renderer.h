@@ -152,7 +152,11 @@ private:
 	bool bHDR = false;
 };
 
-
+struct fbo_cxt {
+	VkRenderPass renderPass = 0;
+	VkFramebuffer framebuffer = 0;
+	VkFence fence = {};
+};
 class Renderer_cx
 {
 public:
@@ -162,7 +166,7 @@ public:
 	void OnDestroy();
 
 	void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
-	void OnDestroyWindowSizeDependentResources(); 
+	void OnDestroyWindowSizeDependentResources();
 	void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
 	void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
 
@@ -175,7 +179,7 @@ public:
 	const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 	void OnRender(const UIState* pState, const Camera& Cam);
-
+	void render2buf(VkCommandBuffer cmdBuf1);
 private:
 	Device* m_pDevice = 0;
 	const_vk ct = {};
@@ -230,7 +234,16 @@ private:
 	std::vector<SceneShadowInfo>    m_shadowMapPool = {};
 	std::vector<VkImageView>        m_ShadowSRVPool = {};
 	std::vector<GltfDepthPass*>     _depthpass = {};
+
+	VkFence pass_fence = {};
+	fbo_cxt _fbo = {};
+	DisplayMode _dm = DISPLAYMODE_SDR;
 	bool bHDR = false;
-	bool                            m_bMagResourceReInit = false;
+	bool m_bMagResourceReInit = false;
+	bool bUseMagnifier = false;
+	int   SelectedTonemapperIndex = 0;
+	float Exposure = 1.0;
+
+	bool  bUseTAA;
 };
 

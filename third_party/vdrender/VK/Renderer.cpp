@@ -745,12 +745,11 @@ void Renderer::OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSw
 
 					SetPerfMarkerEnd(cmdBuf1);
 				}
-				//{
-				//	glm::mat4 spotlightMatrix = glm::inverse(lights[0].mLightViewProj);
-				//	glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
-				//	glm::mat4 amx = worldMatrix, vcolor;
-				//	_cbf.Draw(cmdBuf1, &amx, &vcolor);
-				//}
+				{
+					glm::mat4 worldMatrix = mCameraCurrViewProj;
+					glm::mat4 amx = worldMatrix, vcolor;
+					_cbf.Draw(cmdBuf1, &amx, &vcolor);
+				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
 		}
@@ -1192,6 +1191,14 @@ void Renderer_cx::OnCreate(Device* pDevice, VkRenderPass rp)
 	// Make sure upload heap has finished uploading before continuing
 	m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 	m_UploadHeap.FlushAndFinish();
+	// Create fence
+	{
+		VkFenceCreateInfo fence_ci = {};
+		fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+		auto res = vkCreateFence(m_pDevice->GetDevice(), &fence_ci, NULL, &pass_fence);
+		assert(res == VK_SUCCESS);
+	}
 }
 
 //--------------------------------------------------------------------------------------
@@ -1224,7 +1231,7 @@ void Renderer_cx::OnDestroy()
 	m_GBuffer.OnDestroy();
 
 	vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr);
-
+	vkDestroyFence(m_pDevice->GetDevice(), pass_fence, 0); pass_fence = 0;
 	m_UploadHeap.OnDestroy();
 	m_GPUTimer.OnDestroy();
 	m_VidMemBufferPool.OnDestroy();
@@ -1811,12 +1818,11 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 
 					SetPerfMarkerEnd(cmdBuf1);
 				}
-				//{
-				//	glm::mat4 spotlightMatrix = glm::inverse(lights[0].mLightViewProj);
-				//	glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
-				//	glm::mat4 amx = worldMatrix, vcolor;
-				//	_cbf.Draw(cmdBuf1, &amx, &vcolor);
-				//}
+				{
+					glm::mat4 worldMatrix = mCameraCurrViewProj;
+					glm::mat4 amx = worldMatrix, vcolor;
+					_cbf.Draw(cmdBuf1, &amx, &vcolor);
+				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
 		}
@@ -1944,24 +1950,85 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 		}
 
 
-#if 0
-		// Start tracking input/output resources at this point to handle HDR and SDR render paths 
-		VkImage      ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource();
-		VkImageView  SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;
+	}
+}
+void Renderer_cx::render2buf(VkCommandBuffer cmdBuf1)
+{
+#if 1
+	// Start tracking input/output resources at this point to handle HDR and SDR render paths 
+	VkImage      ImgCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource();
+	VkImageView  SRVCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;
 
-		// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
-		bHDR = pSwapChain->GetDisplayMode() != DISPLAYMODE_SDR;
-		if (bHDR)
+	VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+	// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
+	bHDR = _dm != DISPLAYMODE_SDR;
+	if (bHDR)
+	{
+		// In place Tonemapping ------------------------------------------------------------------------
 		{
-			// In place Tonemapping ------------------------------------------------------------------------
+			VkImageMemoryBarrier barrier = {};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.pNext = NULL;
+			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.image = ImgCurrentInput;
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+			m_ToneMappingCS.Draw(cmdBuf1, SRVCurrentInput, Exposure, SelectedTonemapperIndex, m_Width, m_Height);
+
+			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier.image = ImgCurrentInput;
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+		}
+
+		// Render HUD  ------------------------------------------------------------------------
+		{
+#if 0
+			if (bUseMagnifier)
+			{
+				m_MagnifierPS.BeginPass(cmdBuf1, renderArea);
+			}
+			else
+			{
+				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+			}
+
+			vkCmdSetScissor(cmdBuf1, 0, 1, &m_RectScissor);
+			vkCmdSetViewport(cmdBuf1, 0, 1, &m_Viewport);
+
+			//m_ImGUI.Draw(cmdBuf1);
+
+			if (bUseMagnifier)
+			{
+				m_MagnifierPS.EndPass(cmdBuf1);
+			}
+			else
+			{
+				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+			}
+
+			if (bHDR && !bUseMagnifier)
 			{
 				VkImageMemoryBarrier barrier = {};
 				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 				barrier.pNext = NULL;
-				barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1970,95 +2037,41 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 				barrier.subresourceRange.baseArrayLayer = 0;
 				barrier.subresourceRange.layerCount = 1;
 				barrier.image = ImgCurrentInput;
-				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-
-				m_ToneMappingCS.Draw(cmdBuf1, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex, m_Width, m_Height);
-
-				barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-				barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-				barrier.image = ImgCurrentInput;
-				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 			}
 
-			// Render HUD  ------------------------------------------------------------------------
-			{
-
-				if (pState->bUseMagnifier)
-				{
-					m_MagnifierPS.BeginPass(cmdBuf1, renderArea);
-				}
-				else
-				{
-					m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
-				}
-
-				vkCmdSetScissor(cmdBuf1, 0, 1, &m_RectScissor);
-				vkCmdSetViewport(cmdBuf1, 0, 1, &m_Viewport);
-
-				m_ImGUI.Draw(cmdBuf1);
-
-				if (pState->bUseMagnifier)
-				{
-					m_MagnifierPS.EndPass(cmdBuf1);
-				}
-				else
-				{
-					m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
-				}
-
-				if (bHDR && !pState->bUseMagnifier)
-				{
-					VkImageMemoryBarrier barrier = {};
-					barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-					barrier.pNext = NULL;
-					barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-					barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-					barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-					barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-					barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					barrier.subresourceRange.baseMipLevel = 0;
-					barrier.subresourceRange.levelCount = 1;
-					barrier.subresourceRange.baseArrayLayer = 0;
-					barrier.subresourceRange.layerCount = 1;
-					barrier.image = ImgCurrentInput;
-					vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-				}
-
-				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
-			}
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
+#endif
 		}
+	}
 
-		// submit command buffer
-		{
-			VkResult res = vkEndCommandBuffer(cmdBuf1);
-			assert(res == VK_SUCCESS);
+	// submit command buffer
+	{
+		VkResult res = vkEndCommandBuffer(cmdBuf1);
+		assert(res == VK_SUCCESS);
 
-			VkSubmitInfo submit_info;
-			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submit_info.pNext = NULL;
-			submit_info.waitSemaphoreCount = 0;
-			submit_info.pWaitSemaphores = NULL;
-			submit_info.pWaitDstStageMask = NULL;
-			submit_info.commandBufferCount = 1;
-			submit_info.pCommandBuffers = &cmdBuf1;
-			submit_info.signalSemaphoreCount = 0;
-			submit_info.pSignalSemaphores = NULL;
-			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, VK_NULL_HANDLE);
-			assert(res == VK_SUCCESS);
-		}
+		VkSubmitInfo submit_info;
+		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit_info.pNext = NULL;
+		submit_info.waitSemaphoreCount = 0;
+		submit_info.pWaitSemaphores = NULL;
+		submit_info.pWaitDstStageMask = NULL;
+		submit_info.commandBufferCount = 1;
+		submit_info.pCommandBuffers = &cmdBuf1;
+		submit_info.signalSemaphoreCount = 0;
+		submit_info.pSignalSemaphores = NULL;
+		res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
+		assert(res == VK_SUCCESS);
 	}
 	{
 		// Wait for swapchain (we are going to render to it) -----------------------------------
-		int imageIndex = pSwapChain->WaitForSwapChain();
+		//int imageIndex = pSwapChain->WaitForSwapChain();
+		vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+		vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
 
 		// Keep tracking input/output resource views 
-		auto ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
-		auto SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
+		auto ImgCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
+		auto SRVCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
 
 		m_CommandListRing.OnBeginFrame();
 
@@ -2081,8 +2094,8 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 			VkRenderPassBeginInfo rp_begin = {};
 			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			rp_begin.pNext = NULL;
-			rp_begin.renderPass = pSwapChain->GetRenderPass();
-			rp_begin.framebuffer = pSwapChain->GetFramebuffer(imageIndex);
+			rp_begin.renderPass = _fbo.renderPass;
+			rp_begin.framebuffer = _fbo.framebuffer;
 			rp_begin.renderArea.offset.x = 0;
 			rp_begin.renderArea.offset.y = 0;
 			rp_begin.renderArea.extent.width = m_Width;
@@ -2106,14 +2119,14 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 		{
 			// Tonemapping ------------------------------------------------------------------------
 			{
-				m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex);
+				m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, Exposure, SelectedTonemapperIndex);
 				m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
 			}
 
 			// Render HUD  -------------------------------------------------------------------------
 			{
-				m_ImGUI.Draw(cmdBuf2);
-				m_GPUTimer.GetTimeStamp(cmdBuf2, "ImGUI Rendering");
+				//m_ImGUI.Draw(cmdBuf2);
+				//m_GPUTimer.GetTimeStamp(cmdBuf2, "ImGUI Rendering");
 			}
 		}
 
@@ -2130,8 +2143,6 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 
 			VkSemaphore ImageAvailableSemaphore;
 			VkSemaphore RenderFinishedSemaphores;
-			VkFence CmdBufExecutedFences;
-			pSwapChain->GetSemaphores(&ImageAvailableSemaphore, &RenderFinishedSemaphores, &CmdBufExecutedFences);
 
 			VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			VkSubmitInfo submit_info2;
@@ -2145,10 +2156,11 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 			submit_info2.signalSemaphoreCount = 1;
 			submit_info2.pSignalSemaphores = &RenderFinishedSemaphores;
 
-			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info2, CmdBufExecutedFences);
+			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info2, _fbo.fence);
 			assert(res == VK_SUCCESS);
 		}
-#endif
 	}
+#endif
+
 }
 #endif

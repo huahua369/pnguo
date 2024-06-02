@@ -481,7 +481,6 @@ void test(const char* fn)
 	vkvg_clear(ctx);
 	vkvg_save(ctx);
 	vkvg_set_fill_rule(ctx, VKVG_FILL_RULE_EVEN_ODD);
-
 	vkvg_move_to(ctx, 10.0, 10.0);
 	vkvg_line_to(ctx, 150.0, 120.0);
 	vkvg_line_to(ctx, 120.0, 220.0);
@@ -491,10 +490,16 @@ void test(const char* fn)
 	vkvg_set_line_join(ctx, vkvg_line_join_t::VKVG_LINE_JOIN_ROUND);
 	vkvg_set_source_color(ctx, 0xff000000);
 	vkvg_stroke(ctx);
-
+	vkvg_restore(ctx);
+	vkvg_destroy(ctx);
+	vkvg_surface_resolve(surf);//msaa采样转换输出
+	if (!fn || !*fn)
+		fn = "offscreen.png";
+	vkvg_surface_write_to_png(surf, fn);
+	vkvg_surface_destroy(surf);
 	//vkvg_set_source_rgb(ctx, 0, 0, 0);
 	//vkvg_paint(ctx);
-	vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.9);
+	//vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.9);
 
 	//vkvg_font_extents_t fe;
 	//vkvg_font_extents(ctx, &fe);
@@ -504,16 +509,5 @@ void test(const char* fn)
 	//print_boxed(ctx, "This is a test string!", 20, 250, 20);
 	//print_boxed(ctx, "ANOTHER ONE TO CHECK..", 20, 350, 20);
 
-	vkvg_restore(ctx);
-
-
-
-	vkvg_destroy(ctx);
-
-	vkvg_surface_resolve(surf);//msaa采样转换输出
-	if (!fn || !*fn)
-		fn = "offscreen.png";
-	vkvg_surface_write_to_png(surf, fn);
-	vkvg_surface_destroy(surf);
 }
 #endif
