@@ -69,14 +69,14 @@ public:
 
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
-	int _fps = 60;
+	int _fps = 28;
 
 public:
 	app_cx();
 	~app_cx();
 
 	form_x* new_form(const std::string& title, const glm::ivec2& ws, int flags);
-	form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int fgs); 
+	form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int fgs);
 public:
 	int run_loop(int t);
 	void call_cb(SDL_Event* e);
@@ -110,6 +110,7 @@ public:
 	app_cx* app = 0;				// 应用ctx
 	glm::ivec2 _size = {};			// 窗口大小
 	glm::ivec2 display_size = {};	// 窗口显示大小
+	glm::ivec2 save_size = {};	// 保存窗口大小
 	glm::vec2 display_framebuffer_scale = {};
 	SDL_Renderer* renderer = 0;
 	std::function<void(float delta, int* ret)> up_cb;	// 更新动画等
@@ -159,6 +160,7 @@ public:
 	void set_input_ptr(void* ud);				// 设置接收输入法的对象指针 
 	void set_capture();
 	void release_capture();
+	void on_size(const glm::ivec2& ss);
 	//销毁窗口
 	void destroy();
 	// 关闭窗口
@@ -217,7 +219,6 @@ public:
 	void new_tool_tip(const glm::ivec2& pos, const void* str);
 
 private:
-
 };
 
 // 获取粘贴板文本

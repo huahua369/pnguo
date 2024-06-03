@@ -28,10 +28,10 @@ DVC_EXPORT int rvk(HINSTANCE hInstance, LPSTR lpCmdLine, int nCmdShow, LPCSTR Na
 DVC_EXPORT int rdx12(HINSTANCE hInstance, LPSTR lpCmdLine, int nCmdShow, LPCSTR Name);
 int main()
 {
-	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
-	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan /*| ef_resizable*/,true };
+	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable,true };
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 = ptf.has_renderer ? app->new_form_renderer(ptf.title, ptf.size, ptf.flags) : app->new_form(ptf.title, ptf.size, ptf.flags));
 

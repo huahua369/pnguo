@@ -288,7 +288,7 @@ app_cx::app_cx()
 #endif // _WIN32
 	system_cursor = (SDL_Cursor**) new size_t[SDL_SystemCursor::SDL_NUM_SYSTEM_CURSORS];
 	memset(system_cursor, 0, sizeof(void*) * SDL_SystemCursor::SDL_NUM_SYSTEM_CURSORS);
-	set_fps(0);
+	set_fps(_fps);
 #if _WIN32
 	auto hr = OleInitialize(NULL);
 #endif
@@ -1277,9 +1277,17 @@ int on_call_we(const SDL_Event* e, form_x* pw, int* wcount)
 		}break;
 		case SDL_EVENT_WINDOW_MINIMIZED:
 		{
+			pw->save_size = pw->_size;
+			pw->on_size({});
 		}break;
 		case SDL_EVENT_WINDOW_RESTORED:
 		{
+			pw->on_size(pw->save_size);
+		}break; 
+		case SDL_EVENT_WINDOW_RESIZED:
+		{
+			pw->save_size = pw->_size;
+			pw->on_size({ e->window.data1,e->window.data2 });
 		}break;
 		default:
 			on_call_emit(e, pw);
@@ -1288,7 +1296,11 @@ int on_call_we(const SDL_Event* e, form_x* pw, int* wcount)
 	}
 	return 0;
 }
-
+void form_x::on_size(const glm::ivec2& ss)
+{
+	if (ss != _size)
+		_size = ss;
+}
 
 
 void form_x::destroy()
@@ -1361,7 +1373,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* av, int fb_width, int fb_he
 	for (auto& pcmd : av->cmd_data)
 	{
 		glm::vec2 clip_min((pcmd.clip_rect.x - clip_off.x) * clip_scale.x, (pcmd.clip_rect.y - clip_off.y) * clip_scale.y);
-		glm::vec2 clip_max((pcmd.clip_rect.z - clip_off.x) * clip_scale.x, (pcmd.clip_rect.w - clip_off.y) * clip_scale.y); 
+		glm::vec2 clip_max((pcmd.clip_rect.z - clip_off.x) * clip_scale.x, (pcmd.clip_rect.w - clip_off.y) * clip_scale.y);
 		if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
 		{
 			SDL_SetRenderClipRect(renderer, 0);
