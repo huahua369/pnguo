@@ -407,6 +407,11 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws
 		rn = "opengles2";
 	}
 	renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str(), 0);
+	int vsync = 0;
+	if (renderer) {
+		SDL_GetRenderVSync(renderer, &vsync);
+		SDL_SetRenderVSync(renderer, 0);
+	}
 	auto pw = new form_x();
 	if (!pw)
 	{
@@ -1283,7 +1288,7 @@ int on_call_we(const SDL_Event* e, form_x* pw, int* wcount)
 		case SDL_EVENT_WINDOW_RESTORED:
 		{
 			pw->on_size(pw->save_size);
-		}break; 
+		}break;
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			pw->save_size = pw->_size;
@@ -1765,12 +1770,12 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w };
 		SDL_SetTextInputRect(&rect);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target)

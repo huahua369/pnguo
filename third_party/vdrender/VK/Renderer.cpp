@@ -1577,29 +1577,122 @@ void Renderer_cx::AllocateShadowMaps(GLTFCommon* pGLTFCommon)
 //--------------------------------------------------------------------------------------
 void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 {
+	// Let our resource managers do some house keeping 
+	m_ConstantBufferRing.OnBeginFrame();
+
+	// command buffer calls
+	VkCommandBuffer cmdBuf1 = m_CommandListRing.GetNewCommandList();
+
 	{
-		// Let our resource managers do some house keeping 
-		m_ConstantBufferRing.OnBeginFrame();
+		VkCommandBufferBeginInfo cmd_buf_info;
+		cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		cmd_buf_info.pNext = NULL;
+		cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		cmd_buf_info.pInheritanceInfo = NULL;
+		VkResult res = vkBeginCommandBuffer(cmdBuf1, &cmd_buf_info);
+		assert(res == VK_SUCCESS);
+	}
 
-		// command buffer calls
-		VkCommandBuffer cmdBuf1 = m_CommandListRing.GetNewCommandList();
+	m_GPUTimer.OnBeginFrame(cmdBuf1, &m_TimeStamps);
 
+	// Sets the perFrame data 
+	glm::mat4 mCameraCurrViewProj = {};
+	Light* lights = 0;
+	int lightCount = 0;
+	{
+		per_frame* pPerFrame = NULL;
+		for (auto it : _robject)
 		{
-			VkCommandBufferBeginInfo cmd_buf_info;
-			cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			cmd_buf_info.pNext = NULL;
-			cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-			cmd_buf_info.pInheritanceInfo = NULL;
-			VkResult res = vkBeginCommandBuffer(cmdBuf1, &cmd_buf_info);
-			assert(res == VK_SUCCESS);
+			if (it->m_pGLTFTexturesAndBuffers)
+			{
+				// fill as much as possible using the GLTF (camera, lights, ...)
+				pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(Cam);
+				mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
+				lights = pPerFrame->lights;
+				lightCount = pPerFrame->lightCount;
+				// Set some lighting factors
+				pPerFrame->iblFactor = pState->IBLFactor;
+				pPerFrame->emmisiveFactor = pState->EmissiveFactor;
+				pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
+				pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
+
+				pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
+				pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
+				pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
+				pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+				pPerFrame->lodBias = 0.0f;
+				it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
+				it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
+			}
+		}
+	}
+
+	// Render all shadow maps
+
+	if (_depthpass.size())
+	{
+		SetPerfMarkerBegin(cmdBuf1, "ShadowPass");
+
+		VkClearValue depth_clear_values[1];
+		depth_clear_values[0].depthStencil.depth = 1.0f;
+		depth_clear_values[0].depthStencil.stencil = 0;
+
+		VkRenderPassBeginInfo rp_begin;
+		rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		rp_begin.pNext = NULL;
+		rp_begin.renderPass = m_Render_pass_shadow;
+		rp_begin.renderArea.offset.x = 0;
+		rp_begin.renderArea.offset.y = 0;
+		rp_begin.clearValueCount = 1;
+		rp_begin.pClearValues = depth_clear_values;
+		int idx = 0;
+		std::vector<SceneShadowInfo>::iterator ShadowMap = m_shadowMapPool.begin();
+		while (ShadowMap < m_shadowMapPool.end())
+		{
+			// Clear shadow map
+			rp_begin.framebuffer = ShadowMap->ShadowFrameBuffer;
+			rp_begin.renderArea.extent.width = ShadowMap->ShadowResolution;
+			rp_begin.renderArea.extent.height = ShadowMap->ShadowResolution;
+
+			vkCmdBeginRenderPass(cmdBuf1, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+			// Render to shadow map
+			SetViewportAndScissor(cmdBuf1, 0, 0, ShadowMap->ShadowResolution, ShadowMap->ShadowResolution);
+
+			for (auto it : _depthpass)
+			{
+				// Set per frame constant buffer values
+				GltfDepthPass::per_frame* cbPerFrame = it->SetPerFrameConstants();
+				cbPerFrame->mViewProj = lights[ShadowMap->LightIndex].mLightViewProj;
+				it->Draw(cmdBuf1);
+			}
+
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");
+
+			vkCmdEndRenderPass(cmdBuf1);
+
+			++ShadowMap;
 		}
 
-		m_GPUTimer.OnBeginFrame(cmdBuf1, &m_TimeStamps);
+		SetPerfMarkerEnd(cmdBuf1);
+	}
 
-		// Sets the perFrame data 
-		glm::mat4 mCameraCurrViewProj = {};
-		Light* lights = 0;
-		int lightCount = 0;
+	// Render Scene to the GBuffer ------------------------------------------------
+	SetPerfMarkerBegin(cmdBuf1, "Color pass");
+
+	VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+
+	if (_robject.size() > 0)
+	{
+		const bool bWireframe = pState->WireframeMode != UIState::WireframeMode::WIREFRAME_MODE_OFF;
+
+		std::vector<GltfPbrPass::BatchList> opaque, transparent;
+		std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
+
+		for (auto it : _robject) {
+			it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
+		}
+		if (bWireframe)// pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 		{
 			per_frame* pPerFrame = NULL;
 			for (auto it : _robject)
@@ -1620,309 +1713,172 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 					pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
 					pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
 					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+					pPerFrame->wireframeOptions.w = (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 					pPerFrame->lodBias = 0.0f;
 					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
 					it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
 				}
 			}
-		}
-
-		// Render all shadow maps
-
-		if (_depthpass.size())
-		{
-			SetPerfMarkerBegin(cmdBuf1, "ShadowPass");
-
-			VkClearValue depth_clear_values[1];
-			depth_clear_values[0].depthStencil.depth = 1.0f;
-			depth_clear_values[0].depthStencil.stencil = 0;
-
-			VkRenderPassBeginInfo rp_begin;
-			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			rp_begin.pNext = NULL;
-			rp_begin.renderPass = m_Render_pass_shadow;
-			rp_begin.renderArea.offset.x = 0;
-			rp_begin.renderArea.offset.y = 0;
-			rp_begin.clearValueCount = 1;
-			rp_begin.pClearValues = depth_clear_values;
-			int idx = 0;
-			std::vector<SceneShadowInfo>::iterator ShadowMap = m_shadowMapPool.begin();
-			while (ShadowMap < m_shadowMapPool.end())
-			{
-				// Clear shadow map
-				rp_begin.framebuffer = ShadowMap->ShadowFrameBuffer;
-				rp_begin.renderArea.extent.width = ShadowMap->ShadowResolution;
-				rp_begin.renderArea.extent.height = ShadowMap->ShadowResolution;
-
-				vkCmdBeginRenderPass(cmdBuf1, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-
-				// Render to shadow map
-				SetViewportAndScissor(cmdBuf1, 0, 0, ShadowMap->ShadowResolution, ShadowMap->ShadowResolution);
-
-				for (auto it : _depthpass)
-				{
-					// Set per frame constant buffer values
-					GltfDepthPass::per_frame* cbPerFrame = it->SetPerFrameConstants();
-					cbPerFrame->mViewProj = lights[ShadowMap->LightIndex].mLightViewProj;
-					it->Draw(cmdBuf1);
-				}
-
-				m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");
-
-				vkCmdEndRenderPass(cmdBuf1);
-
-				++ShadowMap;
-			}
-
-			SetPerfMarkerEnd(cmdBuf1);
-		}
-
-		// Render Scene to the GBuffer ------------------------------------------------
-		SetPerfMarkerBegin(cmdBuf1, "Color pass");
-
-		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
-
-		if (_robject.size() > 0)
-		{
-			const bool bWireframe = pState->WireframeMode != UIState::WireframeMode::WIREFRAME_MODE_OFF;
-
-			std::vector<GltfPbrPass::BatchList> opaque, transparent;
-			std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
-
 			for (auto it : _robject) {
-				it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
-			}
-			if (bWireframe)// pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
-			{
-				per_frame* pPerFrame = NULL;
-				for (auto it : _robject)
-				{
-					if (it->m_pGLTFTexturesAndBuffers)
-					{
-						// fill as much as possible using the GLTF (camera, lights, ...)
-						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(Cam);
-						mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
-						lights = pPerFrame->lights;
-						lightCount = pPerFrame->lightCount;
-						// Set some lighting factors
-						pPerFrame->iblFactor = pState->IBLFactor;
-						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
-						pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
-						pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
-
-						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
-						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
-						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-						pPerFrame->wireframeOptions.w = (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
-						pPerFrame->lodBias = 0.0f;
-						it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
-						it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
-					}
-				}
-				for (auto it : _robject) {
-					it->m_GLTFPBR->BuildBatchLists(&opaque1, &transparent1, bWireframe);
-				}
-			}
-
-			// Render opaque 
-			{
-				m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
-				if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
-				{
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);
-				}
-				else
-				{
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
-				}
-
-				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
-
-				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-			}
-
-			// Render skydome
-			{
-				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
-
-				if (pState->SelectedSkydomeTypeIndex == 1)
-				{
-					glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
-					m_SkyDome.Draw(cmdBuf1, clipToView);
-
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
-				}
-				else if (pState->SelectedSkydomeTypeIndex == 0)
-				{
-					SkyDomeProc::Constants skyDomeConstants;
-					skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
-					skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, 0.0f);
-					skyDomeConstants.turbidity = 10.0f;
-					skyDomeConstants.rayleigh = 2.0f;
-					skyDomeConstants.mieCoefficient = 0.005f;
-					skyDomeConstants.mieDirectionalG = 0.8f;
-					skyDomeConstants.luminance = 1.0f;
-					m_SkyDomeProc.Draw(cmdBuf1, skyDomeConstants);
-
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome Proc");
-				}
-
-				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
-			}
-
-			// draw transparent geometry
-			{
-				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
-
-				std::sort(transparent.begin(), transparent.end());
-				GltfPbrPass::DrawBatchList(cmdBuf1, &transparent, bWireframe);
-				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
-
-				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
-			}
-
-			// draw object's bounding boxes
-			{
-				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
-				// todo 渲染bounding boxes
-				if (pState->bDrawBoundingBoxes && _robject.size())
-				{
-					for (auto it : _robject)
-					{
-						if (it->m_GLTFBBox)
-						{
-							it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);// pPerFrame->mCameraCurrViewProj);
-						}
-					}
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
-				}
-
-				// draw light's frustums
-				if (pState->bDrawLightFrustum)
-				{
-					SetPerfMarkerBegin(cmdBuf1, "light frustums");
-
-					glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
-					glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
-					glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-					for (uint32_t i = 0; i < lightCount; i++)
-					{
-						glm::mat4 spotlightMatrix = glm::inverse(lights[i].mLightViewProj);
-						glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
-						m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
-					}
-
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
-
-					SetPerfMarkerEnd(cmdBuf1);
-				}
-				{
-					glm::mat4 worldMatrix = mCameraCurrViewProj;
-					glm::mat4 amx = worldMatrix, vcolor;
-					_cbf.Draw(cmdBuf1, &amx, &vcolor);
-				}
-				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+				it->m_GLTFPBR->BuildBatchLists(&opaque1, &transparent1, bWireframe);
 			}
 		}
-		else
+
+		// Render opaque 
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+			if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+			{
+				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
+				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);
+			}
+			else
+			{
+				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
+			}
+
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
+
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
+		}
+
+		// Render skydome
+		{
 			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+
+			if (pState->SelectedSkydomeTypeIndex == 1)
+			{
+				glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
+				m_SkyDome.Draw(cmdBuf1, clipToView);
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
+			}
+			else if (pState->SelectedSkydomeTypeIndex == 0)
+			{
+				SkyDomeProc::Constants skyDomeConstants;
+				skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
+				skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, 0.0f);
+				skyDomeConstants.turbidity = 10.0f;
+				skyDomeConstants.rayleigh = 2.0f;
+				skyDomeConstants.mieCoefficient = 0.005f;
+				skyDomeConstants.mieDirectionalG = 0.8f;
+				skyDomeConstants.luminance = 1.0f;
+				m_SkyDomeProc.Draw(cmdBuf1, skyDomeConstants);
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome Proc");
+			}
+
 			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 		}
 
-		VkImageMemoryBarrier barrier[1] = {};
-		barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		barrier[0].pNext = NULL;
-		barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		barrier[0].subresourceRange.baseMipLevel = 0;
-		barrier[0].subresourceRange.levelCount = 1;
-		barrier[0].subresourceRange.baseArrayLayer = 0;
-		barrier[0].subresourceRange.layerCount = 1;
-		barrier[0].image = m_GBuffer.m_HDR.Resource();
-		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
-
-		SetPerfMarkerEnd(cmdBuf1);
-
-		// Post proc---------------------------------------------------------------------------
-
-		// Bloom, takes HDR as input and applies bloom to it.
+		// draw transparent geometry
 		{
-			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
+			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 
-			// Downsample pass
-			m_DownSample.Draw(cmdBuf1);
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "Downsample");
+			std::sort(transparent.begin(), transparent.end());
+			GltfPbrPass::DrawBatchList(cmdBuf1, &transparent, bWireframe);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 
-			// Bloom pass (needs the downsampled data)
-			m_Bloom.Draw(cmdBuf1);
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom");
-
-			SetPerfMarkerEnd(cmdBuf1);
+			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 		}
 
-		// Apply TAA & Sharpen to m_HDR
-		if (pState->bUseTAA)
+		// draw object's bounding boxes
 		{
+			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+			// todo 渲染bounding boxes
+			if (pState->bDrawBoundingBoxes && _robject.size())
 			{
-				VkImageMemoryBarrier barrier = {};
-				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-				barrier.pNext = NULL;
-				barrier.srcAccessMask = 0;
-				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				barrier.subresourceRange.baseMipLevel = 0;
-				barrier.subresourceRange.levelCount = 1;
-				barrier.subresourceRange.baseArrayLayer = 0;
-				barrier.subresourceRange.layerCount = 1;
-
-				VkImageMemoryBarrier barriers[3];
-				barriers[0] = barrier;
-				barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-				barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-				barriers[0].image = m_GBuffer.m_DepthBuffer.Resource();
-
-				barriers[1] = barrier;
-				barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-				barriers[1].image = m_GBuffer.m_MotionVectors.Resource();
-
-				// no layout transition but we still need to wait
-				barriers[2] = barrier;
-				barriers[2].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barriers[2].image = m_GBuffer.m_HDR.Resource();
-
-				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 3, barriers);
+				for (auto it : _robject)
+				{
+					if (it->m_GLTFBBox)
+					{
+						it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);// pPerFrame->mCameraCurrViewProj);
+					}
+				}
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
 			}
 
-			m_TAA.Draw(cmdBuf1);
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
+			// draw light's frustums
+			if (pState->bDrawLightFrustum)
+			{
+				SetPerfMarkerBegin(cmdBuf1, "light frustums");
+
+				glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
+				glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
+				glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				for (uint32_t i = 0; i < lightCount; i++)
+				{
+					glm::mat4 spotlightMatrix = glm::inverse(lights[i].mLightViewProj);
+					glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
+					m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+				}
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
+
+				SetPerfMarkerEnd(cmdBuf1);
+			}
+			{
+				glm::mat4 worldMatrix = mCameraCurrViewProj;
+				glm::mat4 amx = worldMatrix, vcolor;
+				_cbf.Draw(cmdBuf1, &amx, &vcolor);
+			}
+			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 		}
+	}
+	else
+	{
+		m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+		m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
+		m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+		m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+	}
 
+	VkImageMemoryBarrier barrier[1] = {};
+	barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier[0].pNext = NULL;
+	barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier[0].subresourceRange.baseMipLevel = 0;
+	barrier[0].subresourceRange.levelCount = 1;
+	barrier[0].subresourceRange.baseArrayLayer = 0;
+	barrier[0].subresourceRange.layerCount = 1;
+	barrier[0].image = m_GBuffer.m_HDR.Resource();
+	vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
-		// Magnifier Pass: m_HDR as input, pass' own output
-		if (pState->bUseMagnifier)
+	SetPerfMarkerEnd(cmdBuf1);
+
+	// Post proc---------------------------------------------------------------------------
+
+	// Bloom, takes HDR as input and applies bloom to it.
+	{
+		SetPerfMarkerBegin(cmdBuf1, "PostProcess");
+
+		// Downsample pass
+		m_DownSample.Draw(cmdBuf1);
+		m_GPUTimer.GetTimeStamp(cmdBuf1, "Downsample");
+
+		// Bloom pass (needs the downsampled data)
+		m_Bloom.Draw(cmdBuf1);
+		m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom");
+
+		SetPerfMarkerEnd(cmdBuf1);
+	}
+
+	// Apply TAA & Sharpen to m_HDR
+	if (pState->bUseTAA)
+	{
 		{
 			VkImageMemoryBarrier barrier = {};
 			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			barrier.pNext = NULL;
-			barrier.srcAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-			barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-			barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier.srcAccessMask = 0;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1930,36 +1886,74 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 			barrier.subresourceRange.levelCount = 1;
 			barrier.subresourceRange.baseArrayLayer = 0;
 			barrier.subresourceRange.layerCount = 1;
-			barrier.image = m_MagnifierPS.GetPassOutputResource();
 
-			if (m_bMagResourceReInit)
-			{
-				barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-				m_bMagResourceReInit = false;
-			}
-			else
-			{
-				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-			}
+			VkImageMemoryBarrier barriers[3];
+			barriers[0] = barrier;
+			barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			barriers[0].image = m_GBuffer.m_DepthBuffer.Resource();
 
-			// Note: assumes the input texture (specified in OnCreateWindowSizeDependentResources()) is in read state
-			m_MagnifierPS.Draw(cmdBuf1, pState->MagnifierParams);
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "Magnifier");
+			barriers[1] = barrier;
+			barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barriers[1].image = m_GBuffer.m_MotionVectors.Resource();
+
+			// no layout transition but we still need to wait
+			barriers[2] = barrier;
+			barriers[2].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barriers[2].image = m_GBuffer.m_HDR.Resource();
+
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 3, barriers);
 		}
 
-
+		m_TAA.Draw(cmdBuf1);
+		m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
 	}
-}
-void Renderer_cx::render2buf(VkCommandBuffer cmdBuf1)
-{
+
+
+	// Magnifier Pass: m_HDR as input, pass' own output
+	if (pState->bUseMagnifier)
+	{
+		VkImageMemoryBarrier barrier = {};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.pNext = NULL;
+		barrier.srcAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.image = m_MagnifierPS.GetPassOutputResource();
+
+		if (m_bMagResourceReInit)
+		{
+			barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+			m_bMagResourceReInit = false;
+		}
+		else
+		{
+			barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+		}
+
+		// Note: assumes the input texture (specified in OnCreateWindowSizeDependentResources()) is in read state
+		m_MagnifierPS.Draw(cmdBuf1, pState->MagnifierParams);
+		m_GPUTimer.GetTimeStamp(cmdBuf1, "Magnifier");
+	}
+
 #if 1
 	// Start tracking input/output resources at this point to handle HDR and SDR render paths 
-	VkImage      ImgCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource();
-	VkImageView  SRVCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;
+	VkImage      ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource();
+	VkImageView  SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;
 
-	VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+	//VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 	// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
 	bHDR = _dm != DISPLAYMODE_SDR;
 	if (bHDR)
@@ -1983,7 +1977,7 @@ void Renderer_cx::render2buf(VkCommandBuffer cmdBuf1)
 			barrier.image = ImgCurrentInput;
 			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 
-			m_ToneMappingCS.Draw(cmdBuf1, SRVCurrentInput, Exposure, SelectedTonemapperIndex, m_Width, m_Height);
+			m_ToneMappingCS.Draw(cmdBuf1, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex, m_Width, m_Height);
 
 			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -2070,8 +2064,8 @@ void Renderer_cx::render2buf(VkCommandBuffer cmdBuf1)
 		vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
 
 		// Keep tracking input/output resource views 
-		auto ImgCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
-		auto SRVCurrentInput = bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
+		auto ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
+		auto SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
 
 		m_CommandListRing.OnBeginFrame();
 
@@ -2119,7 +2113,7 @@ void Renderer_cx::render2buf(VkCommandBuffer cmdBuf1)
 		{
 			// Tonemapping ------------------------------------------------------------------------
 			{
-				m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, Exposure, SelectedTonemapperIndex);
+				m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex);
 				m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
 			}
 

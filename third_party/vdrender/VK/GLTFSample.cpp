@@ -429,6 +429,7 @@ void GLTFSample::OnRender()
 	ImGUI_UpdateIO();
 	ImGui::NewFrame();
 
+	std::string Filename;
 	if (m_loadingScene)
 	{
 		// the scene loads in chuncks, that way we can show a progress bar
@@ -444,7 +445,6 @@ void GLTFSample::OnRender()
 	{
 		// Benchmarking takes control of the time, and exits the app when the animation is done
 		std::vector<TimeStamp> timeStamps = m_pRenderer->GetTimingValues();
-		std::string Filename;
 		m_time = BenchmarkLoop(timeStamps, &m_camera, Filename);
 	}
 	else

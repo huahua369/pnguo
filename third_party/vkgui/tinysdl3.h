@@ -69,7 +69,7 @@ public:
 
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
-	int _fps = 28;
+	int _fps = 60;
 
 public:
 	app_cx();

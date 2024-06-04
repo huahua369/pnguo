@@ -179,7 +179,6 @@ public:
 	const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 	void OnRender(const UIState* pState, const Camera& Cam);
-	void render2buf(VkCommandBuffer cmdBuf1);
 private:
 	Device* m_pDevice = 0;
 	const_vk ct = {};
@@ -240,10 +239,6 @@ private:
 	DisplayMode _dm = DISPLAYMODE_SDR;
 	bool bHDR = false;
 	bool m_bMagResourceReInit = false;
-	bool bUseMagnifier = false;
-	int   SelectedTonemapperIndex = 0;
-	float Exposure = 1.0;
 
-	bool  bUseTAA;
 };
 
