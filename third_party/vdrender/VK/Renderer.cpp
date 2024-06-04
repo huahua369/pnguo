@@ -655,6 +655,7 @@ void Renderer::OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSw
 			// Render opaque 
 			{
 				m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+#if 1
 				if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 				{
 					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
@@ -664,6 +665,9 @@ void Renderer::OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSw
 				{
 					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
 				}
+#else
+				GltfPbrPass::DrawBatchList(cmdBuf1, bWireframe ? &opaque1 : &opaque, bWireframe);
+#endif
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
@@ -1727,6 +1731,7 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 		// Render opaque 
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+#if 0
 			if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 			{
 				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
@@ -1736,7 +1741,9 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 			{
 				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
 			}
-
+#else
+			GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
+#endif
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
