@@ -141,6 +141,7 @@ list(APPEND lklib
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     rvk
+    rdx12
 )
 target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(tcmp PRIVATE ${lklib})

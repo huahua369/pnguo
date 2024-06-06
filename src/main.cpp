@@ -26,9 +26,189 @@
 
 DVC_EXPORT int rvk(HINSTANCE hInstance, LPSTR lpCmdLine, int nCmdShow, LPCSTR Name);
 DVC_EXPORT int rdx12(HINSTANCE hInstance, LPSTR lpCmdLine, int nCmdShow, LPCSTR Name);
+struct v22
+{
+	glm::vec2 a, b;
+};
+glm::vec2 draw_r(cairo_t* cr, glm::vec4 t, float aj) {
+	t.w = 1;
+	glm::mat4 a = glm::rotate(glm::radians(aj), glm::vec3(1.0, 0.0, 0.0));//沿Z轴旋转90度
+	auto t2 = a * t;
+	auto tt = t;
+	tt *= 6;
+	draw_circle(cr, tt, 2);
+	fill_stroke(cr, 0xffffffff, 0, 1, false);
+	tt = t2;
+	tt *= 6;
+	draw_circle(cr, tt, 2);
+	fill_stroke(cr, 0xff00ff00, 0, 1, false);
+	return t2;
+}
+
+
+
+#include <clipper2/clipper.h> 
+using namespace Clipper2Lib;
+void tobox(const glm::vec2& v, glm::vec4& t);
+void tobox0(const glm::vec2& v, glm::vec4& t)
+{
+	if (v.x < t.x)
+	{
+		t.x = v.x;
+	}
+	if (v.y < t.y)
+	{
+		t.y = v.y;
+	}
+	if (v.x > t.z)
+	{
+		t.z = v.x;
+	}
+	if (v.y > t.w)
+	{
+		t.w = v.y;
+	}
+
+}
+
+/*
+*
+*  0中心
+*   1     2
+	-------
+	|     |
+	-------
+	4     3
+*/
+glm::vec2 getbox2t_(std::vector<glm::vec2>& vt, int t)
+{
+	glm::vec4 box = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
+	for (auto& it : vt)
+	{
+		tobox(it, box);
+	}
+	glm::vec2 cp = { box.z - box.x,box.w - box.y };
+	switch (t)
+	{
+	case 0:
+		cp *= 0.5;
+		break;
+	case 1:
+		cp = {};
+		break;
+	case 2:
+		cp.y = 0;
+		break;
+	case 3:
+		break;
+	case 4:
+		cp.x = 0;
+		break;
+	default:
+		break;
+	}
+	cp.x += box.x;
+	cp.y += box.y;
+	return cp;
+}
+glm::vec2 getbox2t_(const glm::vec2* vt, int count, int t)
+{
+	glm::vec4 box = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
+	for (size_t i = 0; i < count; i++)
+	{
+		auto it = vt[i];
+		tobox(it, box);
+	}
+	glm::vec2 cp = { box.z - box.x,box.w - box.y };
+	switch (t)
+	{
+	case 0:
+		cp *= 0.5;
+		break;
+	case 1:
+		cp = {};
+		break;
+	case 2:
+		cp.y = 0;
+		break;
+	case 3:
+		break;
+	case 4:
+		cp.x = 0;
+		break;
+	default:
+		break;
+	}
+	cp.x += box.x;
+	cp.y += box.y;
+	return cp;
+}
+
+glm::vec2 getbox2t_(glm::vec4 box, int t)
+{
+	glm::vec2 cp = { box.z - box.x,box.w - box.y };
+	switch (t)
+	{
+	case 0:
+		cp *= 0.5;
+		break;
+	case 1:
+		cp = {};
+		break;
+	case 2:
+		cp.y = 0;
+		break;
+	case 3:
+		break;
+	case 4:
+		cp.x = 0;
+		break;
+	default:
+		break;
+	}
+	cp.x += box.x;
+	cp.y += box.y;
+	return cp;
+}
+// 缩放基于获取图形包围盒，返回坐标t=0中心，1左上角，2右上角，3右下角，4左下角，
+void scale_pts(glm::vec2* pts, int count, const glm::vec2& sc, int ddot, bool inv)
+{
+	auto cp = getbox2t_(pts, count, ddot);//获取包围盒
+	glm::vec2 cp0 = {};
+	glm::vec2 scale = sc;
+	// 缩放
+	assert(scale.x > 0 && scale.y > 0);
+	if (scale.x > 0 && scale.y > 0)
+	{
+		auto m = glm::translate(glm::mat3(1.0f), glm::vec2(cp)) * glm::scale(glm::mat3(1.0f), scale)
+			* glm::translate(glm::mat3(1.0f), glm::vec2(-cp));
+		if (inv)
+		{
+			m = glm::inverse(m);// 撤销执行反向操作 
+		}
+		auto v = pts;
+		for (size_t i = 0; i < count; i++)
+		{
+			glm::vec3 v3 = { v[i] ,1.0 };
+			v[i] = glm::vec2(m * v3);
+		}
+	}
+}
+void draw_pts(cairo_t* cr, std::vector<glm::vec2>& ptv, uint32_t c) {
+
+	cairo_move_to(cr, ptv[0].x, ptv[0].y);
+	for (size_t i = 1; i < ptv.size(); i++)
+	{
+		auto v2 = ptv[i];
+		cairo_line_to(cr, v2.x, v2.y);
+	}
+	cairo_close_path(cr);
+	fill_stroke(cr, 0, c, 1, false);
+}
 int main()
 {
-	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
+	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
 	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable,true };
@@ -64,7 +244,7 @@ int main()
 	{
 		hz::mfile_t msh;
 		auto tp = msh.open_d("sh938.txt", true);// 读取从通达信导出的历史k线数据
-		
+
 		if (tp)
 		{
 			const char* t = tp;
@@ -109,8 +289,50 @@ int main()
 
 		auto et1 = pl1->add_input("", { 100,30 }, true);
 		et1->set_pos({ 10,10 });
+
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
+				cairo_translate(cr, 150, 50);
+				static std::vector<glm::vec2> ptv = {};
+				ptv = { {0,0},{0,150},{150,150},{150,0} };
+				glm::vec2 sc = { 0.264583319 ,0.264583319 }, bs = { 1.0,1.0 };
+				int ddot = 1;
+				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
+				draw_pts(cr, ptv, 0xffff802C);// 渲染路径线
+
+				sc = bs / sc;
+				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
+				draw_pts(cr, ptv, 0xff80ff2C);
+
+				sc = bs / sc;
+				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
+				draw_pts(cr, ptv, 0xff0080ff);
+				return;
+				cairo_translate(cr, 150, 50);
+				glm::vec4 t = { 1,1,1,1 };
+				glm::vec4 t1 = { 3,2,1,1 };
+				auto v1 = draw_r(cr, t, 90);
+				auto v2 = draw_r(cr, t1, 90);
+				v1 *= 6;
+				v2 *= 6;
+				cairo_move_to(cr, v1.x, v1.y);
+				cairo_line_to(cr, v2.x, v2.y);
+				fill_stroke(cr, 0, -1, 1, false);
+				auto tk = t;
+				auto tk1 = t1;
+				tk *= 6;
+				tk1 *= 6;
+				cairo_move_to(cr, tk.x, tk.y);
+				cairo_line_to(cr, tk1.x, tk1.y);
+				fill_stroke(cr, 0, 0xff0000ff, 1, false);
+
+				draw_r(cr, t, 90);
+				draw_r(cr, t1, 90);
+				glm::vec2 tt = { 0,0 };
+				draw_circle(cr, tt, 2);
+				fill_stroke(cr, 0xff0080ff, 0, 1, false);
+
+				cairo_translate(cr, -150, -50);
 				cairo_translate(cr, 10, 100);
 				draw_rectangle(cr, { 0.5,0.5,260 + 4,90 + 4 }, 4);
 				fill_stroke(cr, 0x80805c42, 0xffff802C, 1, false);
@@ -135,13 +357,13 @@ int main()
 		pl3->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl3->draw_cb = [=](cairo_t* cr)
 			{
-				int y = 10;
+				int y1 = 10;
 
 				cairo_save(cr);
 				for (auto it : txt->msu)
 				{
-					auto ss = draw_image(cr, it, { 10, y }, { 0,0,1024,512 });
-					y += ss.y + 10;
+					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
+					y1 += ss.y + 10;
 				}
 				cairo_restore(cr);
 			};

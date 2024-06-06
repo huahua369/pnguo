@@ -16542,6 +16542,83 @@ void color_btn::draw(cairo_t* g)
 	cairo_restore(g);
 }
 
+
+void draw_radios(cairo_t* cr, radio_info_t* p)
+{
+	draw_circle(cr, p->pos, p->radius);
+	fill_stroke(cr, p->dcol, p->dfill, p->thickness, 0);
+	draw_circle(cr, p->pos, p->swidth);
+	fill_stroke(cr, p->dcol, p->dfill, p->thickness, 0);
+}
+
+void draw_radios(cairo_t* cr, radio_g* p)
+{
+	if (cr && p) {
+		for (auto& it : p->vs)
+		{
+			draw_radios(cr, &it);
+		}
+	}
+}
+
+// check打勾
+void drawCheckMark(cairo_t* cr, glm::vec2 pos, uint32_t col, float sz1, bool mixed)
+{
+	if (!col)
+		return;
+	float sz = sz1;
+	float thickness = std::max(sz / 5.0f, 1.0f);
+	sz -= thickness * 0.5f;
+	pos += glm::vec2(thickness * 0.25f, thickness * 0.25f);
+
+	float third = sz / 3.0f;
+	float bx = pos.x + third;
+	float td = sz - third * 0.5f;
+	float by = pos.y + td;
+	if (mixed)
+	{
+		td = thickness * 0.5f;
+		auto ps = glm::vec2(pos.x + td, by - third);
+		cairo_move_to(cr, ps.x, ps.y);
+		ps.x += sz1 - thickness;
+		cairo_line_to(cr, ps.x, ps.y);
+	}
+	else {
+		cairo_move_to(cr, bx - third, by - third);
+		cairo_line_to(cr, bx, by);
+		cairo_line_to(cr, bx + third * 2.0f, by - third * 2.0f);
+	}
+	fill_stroke(cr, 0, col, thickness, 0);
+}
+void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
+{
+	if (!p)return;
+	auto cc = p->check_col;
+	glm::ivec2 ps = pn->pos;
+	draw_rectangle(cr, { ps.x,ps.y,p->square_sz,p->square_sz }, p->rounding);
+	fill_stroke(cr, p->fill, p->col, p->thickness, 0);
+	const float pad = std::max(1.0f, floor(p->square_sz / 6.0f));
+	if (pn->new_alpha >= 0)
+		cc = set_alpha_f(cc, pn->new_alpha);
+	drawCheckMark(cr, (glm::vec2)ps + glm::vec2(pad, pad), cc, p->square_sz - pad * 2.0f, pn->mixed);
+}
+void draw_checkboxs(cairo_t* cr, checkbox_g* p)
+{
+	if (cr && p) {
+		for (auto& it : p->vs)
+		{
+			draw_checkbox(cr, &p->style, &it);
+		}
+	}
+}
+
+
+
+
+
+
+
+
 #if 1
 // 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {

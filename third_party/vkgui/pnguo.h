@@ -1202,6 +1202,58 @@ public:
 	void draw(cairo_t* g);
 };
 
+struct radio_style_t
+{
+	uint32_t col = 0xffFF9E40, fill = 0xffffffff, col0 = 0x88666666, textcol = 0xff666666;
+	float radius = 7;
+	float delay_time = 1.0;		// 动画时间1秒
+};
+
+struct check_style_t {
+	uint32_t col = 0xffFF9E40;
+	uint32_t fill = 0xffffffff;
+	uint32_t check_col = 0xffffffff;
+	float rounding = 2;
+	float square_sz = 14;
+	float thickness = 1.0;
+	float delay_time = 1.0;		// 动画时间1秒
+};
+struct radio_info_t
+{
+	glm::vec2 pos;	// 坐标
+	uint32_t fill = 0, dfill = 0, dcol = 0;
+	float radius = 7.0;
+	float swidth = 0.;
+	float dt = 0;	// 动画进度
+	float thickness = 1.0;
+	bool value = 0; // 选中值
+};
+struct checkbox_info_t
+{
+	glm::vec2 pos;	// 坐标
+	float dt = 0;	// 动画进度
+	float new_alpha = -1;		// 动画控制
+	bool mixed = false;			// 是否满
+	bool value = 0; // 选中值
+};
+
+// 单选组
+struct radio_g :public widget_base
+{
+	radio_style_t style = {};	// 风格id
+	std::vector<radio_info_t> vs;
+};
+// 复选组
+struct checkbox_g :public widget_base
+{
+	check_style_t style = {};	// 风格id
+	std::vector<checkbox_info_t> vs;
+};
+
+void draw_radios(cairo_t* cr, radio_g* p);
+void draw_checkboxs(cairo_t* cr, checkbox_g* p);
+
+
 #endif // 1
 
 class form_x;
