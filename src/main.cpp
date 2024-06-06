@@ -208,7 +208,7 @@ void draw_pts(cairo_t* cr, std::vector<glm::vec2>& ptv, uint32_t c) {
 int main()
 {
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
+	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
 	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable,true };

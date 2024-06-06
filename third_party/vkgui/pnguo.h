@@ -1040,6 +1040,8 @@ struct widget_base
 
 	int _old_bst = 0;			// 鼠标状态
 	bool _disabled_events = false;
+	virtual bool update(float delta);
+	virtual void draw(cairo_t* cr);
 };
 
 
@@ -1139,14 +1141,15 @@ enum class BTN_STATE :uint8_t
 	STATE_DISABLE = 0x10,
 };
 
-// 图片按钮
+// todo图片按钮
 struct image_btn :public widget_base {
 	std::string str;
 
 	atlas_t dsi = {};
 	std::vector<glm::ivec4> data;
 	int show_idx = 0;	// 参考BTN_STATE
-	void draw(cairo_t* g);
+	bool update(float delta);
+	void draw(cairo_t* cr);
 };
 // 纯色按钮
 struct color_btn :public widget_base
@@ -1167,9 +1170,9 @@ struct color_btn :public widget_base
 	bool bgr = 0;
 public:
 	btn_cols_t* set_btn_color_bgr(size_t idx);
-	void set_state();
 
-	void draw(cairo_t* g);
+	bool update(float delta);
+	void draw(cairo_t* cr);
 };
 
 // 渐变按钮
@@ -1198,15 +1201,15 @@ struct gradient_btn :public widget_base
 public:
 	const char* c_str();
 	void init(glm::ivec4 rect, const std::string& text, uint32_t back_color = 0, uint32_t text_color = -1);
-	void set_state();
-	void draw(cairo_t* g);
+
+	bool update(float delta);
+	void draw(cairo_t* cr);
 };
 
 struct radio_style_t
 {
 	uint32_t col = 0xffFF9E40, fill = 0xffffffff, col0 = 0x88666666, textcol = 0xff666666;
 	float radius = 7;
-	float delay_time = 1.0;		// 动画时间1秒
 };
 
 struct check_style_t {
@@ -1221,20 +1224,26 @@ struct check_style_t {
 struct radio_info_t
 {
 	glm::vec2 pos;	// 坐标
+	std::string text;
 	uint32_t fill = 0, dfill = 0, dcol = 0;
 	float radius = 7.0;
 	float swidth = 0.;
 	float dt = 0;	// 动画进度
+	float duration = .00;	// 动画时间
 	float thickness = 1.0;
 	bool value = 0; // 选中值
+	bool value1 = 0; // 选中值动画
 };
 struct checkbox_info_t
 {
 	glm::vec2 pos;	// 坐标
+	std::string text;
 	float dt = 0;	// 动画进度
+	float duration = 1.0;	// 动画时间
 	float new_alpha = -1;		// 动画控制
 	bool mixed = false;			// 是否满
 	bool value = 0; // 选中值
+	bool value1 = 0; // 选中值动画
 };
 
 // 单选组
@@ -1242,16 +1251,35 @@ struct radio_g :public widget_base
 {
 	radio_style_t style = {};	// 风格id
 	std::vector<radio_info_t> vs;
+public:
+	bool update(float delta);
+	void draw(cairo_t* cr);
 };
 // 复选组
 struct checkbox_g :public widget_base
 {
 	check_style_t style = {};	// 风格id
 	std::vector<checkbox_info_t> vs;
+public:
+	bool update(float delta);
+	void draw(cairo_t* cr);
 };
 
-void draw_radios(cairo_t* cr, radio_g* p);
-void draw_checkboxs(cairo_t* cr, checkbox_g* p);
+// 开关
+struct switch_tl :public widget_base
+{
+	std::string text[2];
+	glm::ivec3 color = { 0xffff9e40, 0xff4c4c4c,-1 }; // 开/关/圆点颜色 { 0xff66ce13, 0xff4949ff };
+	uint32_t dcol = 0;	// 渲染的颜色 
+	float cpos = 0;		// 动画坐标
+	float cv = 0.8;		// 圆点大小基于字体大小
+	checkbox_info_t v = {};
+	bool inline_prompt = false;
+public:
+	bool update(float delta);
+	void draw(cairo_t* cr);
+};
+
 
 
 #endif // 1
@@ -1265,16 +1293,6 @@ struct text_item_t
 	uint32_t color;
 	text_layout_t layout;
 	bool bd_valid = true;
-};
-struct widget_p {
-	int type = 0;
-	union
-	{
-		color_btn* cbtn;
-		gradient_btn* gbtn;
-		image_btn* ibtn;
-		edit_tl* e;
-	}v = {};
 };
 // 容器用
 struct layout_info_x {
@@ -1297,7 +1315,7 @@ public:
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
 	std::function<void(cairo_t* cr)> draw_cb;
 	std::vector<text_item_t> txtv;
-	std::vector<widget_p> widgets;
+	std::vector<widget_base*> widgets;
 	std::vector<image_ptr_t*> images;
 	std::vector<svg_cx*> svgs;
 	layout_info_x _css = {};		// 布局样式

@@ -13656,6 +13656,18 @@ void flex_item::layout()
 
 #endif // !NO_FLEX_CX
 
+
+
+bool widget_base::update(float delta)
+{
+	return false;
+}
+
+void widget_base::draw(cairo_t* cr)
+{
+}
+
+
 // 编辑框实现
 #ifndef NO_EDIT
 
@@ -15636,14 +15648,12 @@ void plane_cx::add_text(const std::string& str)
 	v.text = str;
 	txtv.push_back(v);
 }
-void plane_cx::move2end(widget_base* p)
+void plane_cx::move2end(widget_base* wp)
 {
-	if (p)
+	if (wp)
 	{
-		widget_p wp = {};
-		wp.type = 3; wp.v.e = (edit_tl*)p;
 		auto& v = widgets;
-		v.erase(std::remove_if(v.begin(), v.end(), [=](widget_p& pr) {return pr.v.e == wp.v.e; }), v.end());
+		v.erase(std::remove_if(v.begin(), v.end(), [=](widget_base* pr) {return pr == wp; }), v.end());
 		v.push_back(wp);
 	}
 }
@@ -15660,9 +15670,7 @@ edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, b
 		//edit1->set_align_pos({ 4, 4 });
 		//edit1->set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
 		edit1->ppos = get_pos();
-		widget_p wp = {};
-		wp.type = 3; wp.v.e = edit1;
-		widgets.push_back(wp);
+		widgets.push_back(edit1);
 	}
 	return edit1;
 }
@@ -15673,9 +15681,7 @@ gradient_btn* plane_cx::add_gbutton(const std::string& label, const glm::ivec2& 
 		gb->init({ 0,0,size }, label, bcolor);
 		gb->family = familys;
 		gb->font_size = fontsize;
-		widget_p wp = {};
-		wp.type = 1; wp.v.gbtn = gb;
-		widgets.push_back(wp);
+		widgets.push_back(gb);
 	}
 	return gb;
 }
@@ -15689,9 +15695,7 @@ color_btn* plane_cx::add_cbutton(const std::string& label, const glm::ivec2& siz
 		gb->font_size = fontsize;
 		gb->set_btn_color_bgr(idx);
 		gb->size = size;
-		widget_p wp = {};
-		wp.type = 0; wp.v.cbtn = gb;
-		widgets.push_back(wp);
+		widgets.push_back(gb);
 	}
 	return gb;
 }
@@ -15712,33 +15716,7 @@ void plane_cx::update(float delta)
 	//print_time a("plane_cx::update");
 	int ic = 0;
 	for (auto& it : widgets) {
-		switch (it.type)
-		{
-		case 0:
-		{
-			//it.v.cbtn->update(delta);
-			it.v.cbtn->set_state();
-		}
-		break;
-		case 1:
-		{
-			it.v.gbtn->set_state();
-			//it.v.gbtn->update(delta);
-		}
-		break;
-		case 2:
-		{
-			//it.v.ibtn->update(delta);
-		}
-		break;
-		case 3:
-		{
-			ic += it.v.e->update(delta);
-		}
-		break;
-		default:
-			break;
-		}
+		ic += it->update(delta);
 	}
 	if (ic > 0 || evupdate > 0)tv->set_draw_update();
 	auto kms = delta * 1000;
@@ -15777,31 +15755,7 @@ void plane_cx::update(float delta)
 		cairo_restore(cr);
 		cairo_save(cr);
 		for (auto& it : widgets) {
-			switch (it.type)
-			{
-			case 0:
-			{
-				it.v.cbtn->draw(cr);
-			}
-			break;
-			case 1:
-			{
-				it.v.gbtn->draw(cr);
-			}
-			break;
-			case 2:
-			{
-				it.v.ibtn->draw(cr);
-			}
-			break;
-			case 3:
-			{
-				it.v.e->draw(cr);
-			}
-			break;
-			default:
-				break;
-			}
+			it->draw(cr);
 		}
 #if debugpx
 		auto px = (uint32_t*)cairo_image_surface_get_data(tv->_backing_store);
@@ -15875,7 +15829,7 @@ void plane_cx::mk_layout()
 	std::vector<glm::vec4> layouts;
 	layouts.reserve(widgets.size());
 	for (auto& it : widgets) {
-		auto p = (widget_base*)it.v.cbtn;
+		auto p = (widget_base*)it;
 		layouts.push_back({ p->pos, p->size });
 	}
 	flex_item* c = flexlayout(&root, layouts, _lpos, _lms);
@@ -15885,7 +15839,7 @@ void plane_cx::mk_layout()
 		auto length = widgets.size();
 		for (size_t i = 0; i < length; i++)
 		{
-			auto p = (widget_base*)widgets[i].v.cbtn;
+			auto p = (widget_base*)widgets[i];
 			auto it = layouts[i];
 			glm::vec2 itss = { it.z,it.w };
 			p->pos = it;
@@ -15972,14 +15926,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		}
 	}
 	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
-		auto pw = (widget_base*)it->v.cbtn;
+		auto pw = (widget_base*)*it;
 		if (pw->_disabled_events)continue;
-		switch (it->type)
-		{
-		case 0:
-		case 1:
-		case 2:
-		{
+		auto pt = dynamic_cast<edit_tl*>(pw);
+		if (!pt) {
 			widget_on_event(pw, type, ep, ppos);
 			if (ep->ret && t == devent_type_e::mouse_button_e)
 			{
@@ -15988,15 +15938,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 					get_input_state(0, 1);
 			}
 		}
-		break;
-		case 3:
+		else
 		{
-			it->v.e->ppos = ppos;
-			it->v.e->on_event_e(type, ep);
-		}
-		break;
-		default:
-			break;
+			pt->ppos = ppos;
+			pt->on_event_e(type, ep);
 		}
 		if (ep->ret)break;
 	}
@@ -16176,6 +16121,9 @@ namespace pn {
 #if 1
 // 默认按钮样式
 
+bool image_btn::update(float) {
+	return false;
+}
 void image_btn::draw(cairo_t* g) {
 
 }
@@ -16369,10 +16317,12 @@ void gradient_btn::init(glm::ivec4 rect, const std::string& text, uint32_t back_
 	info.borderDark = 0xff1d1d1d;
 	return;
 }
-void gradient_btn::set_state()
+bool gradient_btn::update(float delta)
 {
 	auto p = this;
-	if (!p)return;
+	if (!p)return false;
+	if (bst == _old_bst)return false;
+	_old_bst = bst;
 	auto& info = *p;
 
 	// (sta & hz::BTN_STATE::STATE_FOCUS)
@@ -16393,13 +16343,14 @@ void gradient_btn::set_state()
 	}
 	info.gradTop = gradTop;
 	info.gradBot = gradBot;
+	return true;
 }
 
 
 
-void color_btn::set_state()
+bool color_btn::update(float)
 {
-	if (bst == _old_bst)return;
+	if (bst == _old_bst)return false;
 	_old_bst = bst;
 	auto p = this;
 	btn_cols_t* pdc = &p->pdc;
@@ -16492,7 +16443,7 @@ void color_btn::set_state()
 			}
 		}
 	}
-	return;
+	return true;
 }
 
 void color_btn::draw(cairo_t* g)
@@ -17516,3 +17467,79 @@ void free_obt(T*& p) {
 }
 
 #endif
+
+bool radio_g::update(float delta)
+{
+	for (auto& it : vs)
+	{
+		if (it.value != it.value1)
+		{
+			auto dt = fmod(delta, it.duration);
+			it.dt += delta;
+			float t = it.value ? glm::mix(0.0f, it.radius - it.thickness, dt) : glm::mix(it.radius - it.thickness, 0.0f, dt);
+			it.swidth = t;
+			if (it.dt >= it.duration) {
+				it.value1 = it.value; it.dt = 0;
+			}
+		}
+	}
+	return false;
+}
+
+void radio_g::draw(cairo_t* cr)
+{
+	draw_radios(cr, this);
+}
+
+bool checkbox_g::update(float delta)
+{
+	for (auto& it : vs)
+	{
+		if (it.value != it.value1)
+		{
+			auto dt = fmod(delta, it.duration);
+			it.dt += delta;
+			float t = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
+			it.new_alpha = t;
+			if (it.dt >= it.duration) {
+				it.value1 = it.value; it.dt = 0;
+			}
+		}
+	}
+	return false;
+}
+
+void checkbox_g::draw(cairo_t* cr)
+{
+	draw_checkboxs(cr, this);
+}
+
+bool switch_tl::update(float delta)
+{
+	auto& it = v;
+	if (it.value != it.value1)
+	{
+		auto dt = fmod(delta, it.duration);
+		it.dt += delta;
+		dcol = it.value ? glm::mix(color.y, color.x, dt) : glm::mix(color.x, color.y, dt);
+		cpos = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
+		if (it.dt >= it.duration) {
+			it.value1 = it.value; it.dt = 0;
+		}
+	}
+	return false;
+}
+
+void switch_tl::draw(cairo_t* cr)
+{
+	auto h = font_size;
+	auto fc = h * cv;
+	auto ss = h * 3.0;
+	auto ns = h * (1.0 - cv) * 2.0;
+	draw_rectangle(cr, { pos, ss, h }, rounding);
+	fill_stroke(cr, dcol, 0, 0, 0);
+	auto cp = pos;
+	cp.x += (ss - ns) * cpos + ns * 0.5;
+	draw_circle(cr, cp, fc);
+	fill_stroke(cr, color.z, 0, 0, 0);
+}
