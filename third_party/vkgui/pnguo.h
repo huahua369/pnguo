@@ -1251,7 +1251,9 @@ struct radio_g :public widget_base
 {
 	radio_style_t style = {};	// 风格id
 	std::vector<radio_info_t> vs;
+	uint32_t active = -1;		// 选中的idx
 public:
+	void push(const std::string& str, bool v);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1261,6 +1263,7 @@ struct checkbox_g :public widget_base
 	check_style_t style = {};	// 风格id
 	std::vector<checkbox_info_t> vs;
 public:
+	void push(const std::string& str, bool v);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };

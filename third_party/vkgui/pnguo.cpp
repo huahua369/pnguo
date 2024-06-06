@@ -17468,6 +17468,14 @@ void free_obt(T*& p) {
 
 #endif
 
+void radio_g::push(const std::string& str, bool v)
+{
+	radio_info_t k = {};
+	k.text = str;
+	k.value = v; k.value1 = !v;
+	vs.push_back(k);
+}
+
 bool radio_g::update(float delta)
 {
 	for (auto& it : vs)
@@ -17489,6 +17497,14 @@ bool radio_g::update(float delta)
 void radio_g::draw(cairo_t* cr)
 {
 	draw_radios(cr, this);
+}
+
+void checkbox_g::push(const std::string& str, bool v)
+{
+	checkbox_info_t k = {};
+	k.text = str;
+	k.value = v; k.value1 = !v;
+	vs.push_back(k);
 }
 
 bool checkbox_g::update(float delta)
