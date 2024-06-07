@@ -17484,6 +17484,7 @@ bool radio_g::update(float delta)
 		{
 			auto dt = fmod(delta, it.duration);
 			it.dt += delta;
+			dt = it.dt / it.duration;
 			float t = it.value ? glm::mix(0.0f, it.radius - it.thickness, dt) : glm::mix(it.radius - it.thickness, 0.0f, dt);
 			it.swidth = t;
 			if (it.dt >= it.duration) {
@@ -17515,6 +17516,7 @@ bool checkbox_g::update(float delta)
 		{
 			auto dt = fmod(delta, it.duration);
 			it.dt += delta;
+			dt = it.dt / it.duration;
 			float t = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
 			it.new_alpha = t;
 			if (it.dt >= it.duration) {
@@ -17530,6 +17532,12 @@ void checkbox_g::draw(cairo_t* cr)
 	draw_checkboxs(cr, this);
 }
 
+void switch_tl::set_value(bool b)
+{
+	v.value = b;
+	v.value1 = !b;
+}
+
 bool switch_tl::update(float delta)
 {
 	auto& it = v;
@@ -17537,25 +17545,32 @@ bool switch_tl::update(float delta)
 	{
 		auto dt = fmod(delta, it.duration);
 		it.dt += delta;
-		dcol = it.value ? glm::mix(color.y, color.x, dt) : glm::mix(color.x, color.y, dt);
-		cpos = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
 		if (it.dt >= it.duration) {
 			it.value1 = it.value; it.dt = 0;
+			dt = 1.0;
 		}
+		else
+		{
+			dt = it.dt / it.duration;
+		}
+		dcol = it.value ? glm::mix(color.y, color.x, dt) : glm::mix(color.x, color.y, dt);
+		cpos = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
+
 	}
 	return false;
 }
 
 void switch_tl::draw(cairo_t* cr)
 {
-	auto h = font_size;
-	auto fc = h * cv;
-	auto ss = h * 3.0;
-	auto ns = h * (1.0 - cv) * 2.0;
-	draw_rectangle(cr, { pos, ss, h }, rounding);
+	auto h = height;
+	auto fc = h * cv * 0.5;
+	auto ss = h * wf;
+	draw_rectangle(cr, { pos, ss, h }, h * 0.5);
 	fill_stroke(cr, dcol, 0, 0, 0);
 	auto cp = pos;
-	cp.x += (ss - ns) * cpos + ns * 0.5;
+	auto ps = h * 0.5;
+	cp.x += (ss - h) * cpos + h * 0.5;
+	cp.y += ps;
 	draw_circle(cr, cp, fc);
 	fill_stroke(cr, color.z, 0, 0, 0);
 }

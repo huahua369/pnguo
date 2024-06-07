@@ -1209,6 +1209,7 @@ public:
 struct radio_style_t
 {
 	uint32_t col = 0xffFF9E40, fill = 0xffffffff, col0 = 0x88666666, textcol = 0xff666666;
+	uint32_t line_col = 0xff4c4c4c;
 	float radius = 7;
 };
 
@@ -1216,6 +1217,7 @@ struct check_style_t {
 	uint32_t col = 0xffFF9E40;
 	uint32_t fill = 0xffffffff;
 	uint32_t check_col = 0xffffffff;
+	uint32_t line_col = 0xff4c4c4c;
 	float rounding = 2;
 	float square_sz = 14;
 	float thickness = 1.0;
@@ -1232,7 +1234,7 @@ struct radio_info_t
 	float duration = .00;	// 动画时间
 	float thickness = 1.0;
 	bool value = 0; // 选中值
-	bool value1 = 0; // 选中值动画
+	bool value1 = 1; // 选中值动画
 };
 struct checkbox_info_t
 {
@@ -1243,7 +1245,7 @@ struct checkbox_info_t
 	float new_alpha = -1;		// 动画控制
 	bool mixed = false;			// 是否满
 	bool value = 0; // 选中值
-	bool value1 = 0; // 选中值动画
+	bool value1 = 1; // 选中值动画
 };
 
 // 单选组
@@ -1275,10 +1277,13 @@ struct switch_tl :public widget_base
 	glm::ivec3 color = { 0xffff9e40, 0xff4c4c4c,-1 }; // 开/关/圆点颜色 { 0xff66ce13, 0xff4949ff };
 	uint32_t dcol = 0;	// 渲染的颜色 
 	float cpos = 0;		// 动画坐标
-	float cv = 0.8;		// 圆点大小基于字体大小
+	float cv = 0.7;		// 圆点大小 
+	float height = 20;
+	float wf = 2.1;
 	checkbox_info_t v = {};
 	bool inline_prompt = false;
 public:
+	void set_value(bool b);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };

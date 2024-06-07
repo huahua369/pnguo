@@ -208,7 +208,7 @@ void draw_pts(cairo_t* cr, std::vector<glm::vec2>& ptv, uint32_t c) {
 int main()
 {
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc"); 
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
 	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable,true };
@@ -289,7 +289,14 @@ int main()
 
 		auto et1 = pl1->add_input("", { 100,30 }, true);
 		et1->set_pos({ 10,10 });
-
+		auto sw = new switch_tl();
+		auto sw1 = new switch_tl();
+		auto rs = new radio_g();
+		auto cb = new checkbox_g();
+		sw->set_value(0);
+		sw1->set_value(1);
+		sw->update(10.1);
+		sw1->update(10.1);
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_translate(cr, 150, 50);
@@ -307,6 +314,10 @@ int main()
 				sc = bs / sc;
 				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
 				draw_pts(cr, ptv, 0xff0080ff);
+				sw->pos = { 0,200 };
+				sw1->pos = { 60,200 };
+				sw->draw(cr);
+				sw1->draw(cr);
 				return;
 				cairo_translate(cr, 150, 50);
 				glm::vec4 t = { 1,1,1,1 };
