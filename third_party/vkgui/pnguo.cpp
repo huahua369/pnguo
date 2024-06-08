@@ -13925,10 +13925,7 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 {
 	x += scroll_pos.x - _align_pos.x;
 	y += scroll_pos.y - _align_pos.y;
-	if (c_d != 0)
-	{
-		c_d = -1; c_ct = 0;
-	}
+
 	if (x < 0)
 	{
 		x = 0;
@@ -14502,7 +14499,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 	auto oldop = cairo_get_operator(cr);
 	cairo_set_source_surface(cr, sur, pos.x, pos.y);
 	cairo_paint(cr);
-	double x = ps.x + cursor_pos.x, y = ps.y + cursor_pos.y;
+	double x = ps.x + cursor_pos.x, y = ps.y + cursor_pos.y; 
 	if (show_input_cursor && c_d == 1 && cursor.x > 0 && cursor_pos.z > 0)
 	{
 		set_color(cr, cursor.y);
@@ -15718,6 +15715,8 @@ void plane_cx::update(float delta)
 	for (auto& it : widgets) {
 		ic += it->update(delta);
 	}
+	if (update_cb)
+		ic += update_cb(delta);
 	if (ic > 0 || evupdate > 0)tv->set_draw_update();
 	auto kms = delta * 1000;
 	dms -= kms;
@@ -16493,75 +16492,6 @@ void color_btn::draw(cairo_t* g)
 	cairo_restore(g);
 }
 
-
-void draw_radios(cairo_t* cr, radio_info_t* p)
-{
-	draw_circle(cr, p->pos, p->radius);
-	fill_stroke(cr, p->dcol, p->dfill, p->thickness, 0);
-	draw_circle(cr, p->pos, p->swidth);
-	fill_stroke(cr, p->dcol, p->dfill, p->thickness, 0);
-}
-
-void draw_radios(cairo_t* cr, radio_g* p)
-{
-	if (cr && p) {
-		for (auto& it : p->vs)
-		{
-			draw_radios(cr, &it);
-		}
-	}
-}
-
-// check打勾
-void drawCheckMark(cairo_t* cr, glm::vec2 pos, uint32_t col, float sz1, bool mixed)
-{
-	if (!col)
-		return;
-	float sz = sz1;
-	float thickness = std::max(sz / 5.0f, 1.0f);
-	sz -= thickness * 0.5f;
-	pos += glm::vec2(thickness * 0.25f, thickness * 0.25f);
-
-	float third = sz / 3.0f;
-	float bx = pos.x + third;
-	float td = sz - third * 0.5f;
-	float by = pos.y + td;
-	if (mixed)
-	{
-		td = thickness * 0.5f;
-		auto ps = glm::vec2(pos.x + td, by - third);
-		cairo_move_to(cr, ps.x, ps.y);
-		ps.x += sz1 - thickness;
-		cairo_line_to(cr, ps.x, ps.y);
-	}
-	else {
-		cairo_move_to(cr, bx - third, by - third);
-		cairo_line_to(cr, bx, by);
-		cairo_line_to(cr, bx + third * 2.0f, by - third * 2.0f);
-	}
-	fill_stroke(cr, 0, col, thickness, 0);
-}
-void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
-{
-	if (!p)return;
-	auto cc = p->check_col;
-	glm::ivec2 ps = pn->pos;
-	draw_rectangle(cr, { ps.x,ps.y,p->square_sz,p->square_sz }, p->rounding);
-	fill_stroke(cr, p->fill, p->col, p->thickness, 0);
-	const float pad = std::max(1.0f, floor(p->square_sz / 6.0f));
-	if (pn->new_alpha >= 0)
-		cc = set_alpha_f(cc, pn->new_alpha);
-	drawCheckMark(cr, (glm::vec2)ps + glm::vec2(pad, pad), cc, p->square_sz - pad * 2.0f, pn->mixed);
-}
-void draw_checkboxs(cairo_t* cr, checkbox_g* p)
-{
-	if (cr && p) {
-		for (auto& it : p->vs)
-		{
-			draw_checkbox(cr, &p->style, &it);
-		}
-	}
-}
 
 
 
@@ -17468,6 +17398,77 @@ void free_obt(T*& p) {
 
 #endif
 
+
+
+
+// todo ui
+
+
+
+void draw_radios(cairo_t* cr, radio_info_t* p, radio_style_t* ps)
+{
+	if (ps->radius > 0) {
+		draw_circle(cr, p->pos, ps->radius);
+		if (p->value || p->swidth > 0)
+			fill_stroke(cr, ps->col, 0, ps->thickness, 0);
+		else
+			fill_stroke(cr, 0, ps->line_col, ps->thickness, 0);
+	}
+	if (p->swidth > 0) {
+		draw_circle(cr, p->pos, p->swidth);
+		fill_stroke(cr, ps->innc, 0, ps->thickness, 0);
+	}
+}
+
+
+// check打勾
+void drawCheckMark(cairo_t* cr, glm::vec2 pos, uint32_t col, float sz1, bool mixed)
+{
+	if (!col)
+		return;
+	float sz = sz1;
+	float thickness = std::max(sz / 5.0f, 1.0f);
+	sz -= thickness * 0.5f;
+	pos += glm::vec2(thickness * 0.25f, thickness * 0.25f);
+
+	float third = sz / 3.0f;
+	float bx = pos.x + third;
+	float td = sz - third * 0.5f;
+	float by = pos.y + td;
+	if (mixed)
+	{
+		td = thickness * 0.5f;
+		auto ps = glm::vec2(pos.x + td, by - third);
+		cairo_move_to(cr, ps.x, ps.y);
+		ps.x += sz1 - thickness;
+		cairo_line_to(cr, ps.x, ps.y);
+	}
+	else {
+		cairo_move_to(cr, bx - third, by - third);
+		cairo_line_to(cr, bx, by);
+		cairo_line_to(cr, bx + third * 2.0f, by - third * 2.0f);
+	}
+	fill_stroke(cr, 0, col, thickness, 0);
+}
+void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
+{
+	if (!p)return;
+	auto cc = p->check_col;
+	glm::ivec2 ps = pn->pos;
+	draw_rectangle(cr, { ps.x,ps.y,p->square_sz,p->square_sz }, p->rounding);
+	if (pn->value || pn->new_alpha > 0)
+		fill_stroke(cr, p->fill, p->col, p->thickness, 0);
+	else
+		fill_stroke(cr, 0, p->line_col, p->thickness, 0);
+	const float pad = std::max(1.0f, floor(p->square_sz / 6.0f));
+	if (pn->new_alpha > 0)
+	{
+		cc = set_alpha_f(cc, pn->new_alpha);
+		drawCheckMark(cr, (glm::vec2)ps + glm::vec2(pad, pad), cc, p->square_sz - pad * 2.0f, pn->mixed);
+	}
+}
+
+
 void radio_g::push(const std::string& str, bool v)
 {
 	radio_info_t k = {};
@@ -17478,26 +17479,53 @@ void radio_g::push(const std::string& str, bool v)
 
 bool radio_g::update(float delta)
 {
+	int ic = 0;
 	for (auto& it : vs)
 	{
 		if (it.value != it.value1)
 		{
-			auto dt = fmod(delta, it.duration);
-			it.dt += delta;
-			dt = it.dt / it.duration;
-			float t = it.value ? glm::mix(0.0f, it.radius - it.thickness, dt) : glm::mix(it.radius - it.thickness, 0.0f, dt);
-			it.swidth = t;
-			if (it.dt >= it.duration) {
-				it.value1 = it.value; it.dt = 0;
+			auto dt = fmod(delta, style.duration);
+			if (style.duration > 0) {
+				it.dt += delta;
+				if (it.dt >= style.duration) {
+					it.value1 = it.value; it.dt = 0;
+					dt = 1.0;
+				}
+				else
+				{
+					dt = it.dt / style.duration;
+				}
 			}
+			else {
+				dt = 1.0;
+			}
+			float t = it.value ? glm::mix(style.radius - style.thickness, style.thickness * 2.0f, dt) : glm::mix(style.thickness * 2.0f, style.radius - style.thickness, dt);
+			it.swidth = t;
+			if (!it.value && it.dt == 0)it.swidth = 0;
+			ic++;
 		}
 	}
-	return false;
+	return ic > 0;
 }
 
 void radio_g::draw(cairo_t* cr)
 {
-	draw_radios(cr, this);
+	auto p = this;
+	if (cr && p) {
+		cairo_save(cr);
+		glm::ivec2 poss = p->pos;
+		cairo_translate(cr, 0.5 + poss.x, 0.5 + poss.y);
+		int x = 0;
+		for (auto& it : p->vs)
+		{
+			it.pos = {};
+			it.pos.x = x * style.radius * 5;
+			it.pos += style.radius;
+			draw_radios(cr, &it, &style);
+			x++;
+		}
+		cairo_restore(cr);
+	}
 }
 
 void checkbox_g::push(const std::string& str, bool v)
@@ -17510,26 +17538,53 @@ void checkbox_g::push(const std::string& str, bool v)
 
 bool checkbox_g::update(float delta)
 {
+	int ic = 0;
 	for (auto& it : vs)
 	{
+		auto duration = it.duration > 0 ? it.duration : style.duration;
 		if (it.value != it.value1)
 		{
-			auto dt = fmod(delta, it.duration);
-			it.dt += delta;
-			dt = it.dt / it.duration;
+			auto dt = fmod(delta, duration);
+			if (duration > 0)
+			{
+				it.dt += delta;
+				if (it.dt >= duration) {
+					it.value1 = it.value; it.dt = 0;
+					dt = 1.0;
+				}
+				else
+				{
+					dt = it.dt / duration;
+				}
+			}
+			else {
+				dt = 1.0;
+			}
+
 			float t = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
 			it.new_alpha = t;
-			if (it.dt >= it.duration) {
-				it.value1 = it.value; it.dt = 0;
-			}
+			ic++;
 		}
 	}
-	return false;
+	return ic > 0;
 }
 
 void checkbox_g::draw(cairo_t* cr)
 {
-	draw_checkboxs(cr, this);
+	auto p = this;
+	if (cr && p) {
+		cairo_save(cr);
+		glm::ivec2 poss = p->pos;
+		cairo_translate(cr, 0.5 + poss.x, 0.5 + poss.y);
+		int x = 0;
+		for (auto& it : p->vs)
+		{
+			it.pos.x = x * p->style.square_sz * 2.5;
+			draw_checkbox(cr, &p->style, &it);
+			x++;
+		}
+		cairo_restore(cr);
+	}
 }
 
 void switch_tl::set_value(bool b)
@@ -17540,24 +17595,30 @@ void switch_tl::set_value(bool b)
 
 bool switch_tl::update(float delta)
 {
+	int ic = 0;
 	auto& it = v;
 	if (it.value != it.value1)
 	{
 		auto dt = fmod(delta, it.duration);
-		it.dt += delta;
-		if (it.dt >= it.duration) {
-			it.value1 = it.value; it.dt = 0;
+		if (it.duration > 0) {
+			it.dt += delta;
+			if (it.dt >= it.duration) {
+				it.value1 = it.value; it.dt = 0;
+				dt = 1.0;
+			}
+			else
+			{
+				dt = it.dt / it.duration;
+			}
+		}
+		else {
 			dt = 1.0;
 		}
-		else
-		{
-			dt = it.dt / it.duration;
-		}
-		dcol = it.value ? glm::mix(color.y, color.x, dt) : glm::mix(color.x, color.y, dt);
+		dcol = it.value ? glm::mix(color.y, color.x, 1.0f) : glm::mix(color.x, color.y, 1.0f);
 		cpos = it.value ? glm::mix(0.0f, 1.0f, dt) : glm::mix(1.0f, 0.0f, dt);
-
+		ic++;
 	}
-	return false;
+	return ic > 0;
 }
 
 void switch_tl::draw(cairo_t* cr)

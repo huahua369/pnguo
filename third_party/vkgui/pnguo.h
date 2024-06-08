@@ -1208,31 +1208,29 @@ public:
 
 struct radio_style_t
 {
-	uint32_t col = 0xffFF9E40, fill = 0xffffffff, col0 = 0x88666666, textcol = 0xff666666;
+	uint32_t col = 0xffFF9E40, innc = 0xffffffff, textcol = 0xff666666;
 	uint32_t line_col = 0xff4c4c4c;
 	float radius = 7;
+	float thickness = 1.0;
+	float duration = 1.0;	// 动画时间 
 };
 
 struct check_style_t {
 	uint32_t col = 0xffFF9E40;
-	uint32_t fill = 0xffffffff;
+	uint32_t fill = 0xffff8020;
 	uint32_t check_col = 0xffffffff;
 	uint32_t line_col = 0xff4c4c4c;
 	float rounding = 2;
 	float square_sz = 14;
 	float thickness = 1.0;
-	float delay_time = 1.0;		// 动画时间1秒
+	float duration = 1.0;	// 动画时间 
 };
 struct radio_info_t
 {
 	glm::vec2 pos;	// 坐标
 	std::string text;
-	uint32_t fill = 0, dfill = 0, dcol = 0;
-	float radius = 7.0;
 	float swidth = 0.;
 	float dt = 0;	// 动画进度
-	float duration = .00;	// 动画时间
-	float thickness = 1.0;
 	bool value = 0; // 选中值
 	bool value1 = 1; // 选中值动画
 };
@@ -1279,7 +1277,7 @@ struct switch_tl :public widget_base
 	float cpos = 0;		// 动画坐标
 	float cv = 0.7;		// 圆点大小 
 	float height = 20;
-	float wf = 2.1;
+	float wf = 2.1;		// 宽比例
 	checkbox_info_t v = {};
 	bool inline_prompt = false;
 public:
@@ -1322,6 +1320,7 @@ public:
 	font_rctx* font_ctx = 0;	// 字体管理器
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
 	std::function<void(cairo_t* cr)> draw_cb;
+	std::function<bool(float delta)> update_cb;
 	std::vector<text_item_t> txtv;
 	std::vector<widget_base*> widgets;
 	std::vector<image_ptr_t*> images;

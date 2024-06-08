@@ -9,7 +9,8 @@
 #include <cairo/cairo.h>
 #include <stdfloat>
 #include "charts.h"
-
+#include <vulkan/vulkan.h>
+#include <vkvg/vkvgcx.h>
 /*
 	todo
 	样式：
@@ -205,6 +206,12 @@ void draw_pts(cairo_t* cr, std::vector<glm::vec2>& ptv, uint32_t c) {
 	cairo_close_path(cr);
 	fill_stroke(cr, 0, c, 1, false);
 }
+struct vkdinfo {
+	VkDevice				vkDev;					/**< Vulkan Logical Device */
+	VkPhysicalDeviceMemoryProperties phyMemProps;	/**< Vulkan Physical device memory properties */
+	VkPhysicalDevice		phy;					/**< Vulkan Physical device */
+	VkInstance				instance;				/**< Vulkan instance */
+};
 int main()
 {
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
@@ -214,7 +221,8 @@ int main()
 	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable,true };
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 = ptf.has_renderer ? app->new_form_renderer(ptf.title, ptf.size, ptf.flags) : app->new_form(ptf.title, ptf.size, ptf.flags));
-
+	auto vkdev = form0->get_dev();
+	bool bindless = form0->has_variable();
 	int cpun = call_data((int)cdtype_e::cpu_count, 0);
 	auto pw = form0;
 	printf((char*)u8"启动\n cpu核心数量:%d\n", cpun);
@@ -292,11 +300,27 @@ int main()
 		auto sw = new switch_tl();
 		auto sw1 = new switch_tl();
 		auto rs = new radio_g();
-		auto cb = new checkbox_g();
+		auto ckb = new checkbox_g();
+		rs->push("a", false);
+		rs->push("b", true);
+		ckb->push("a", false);
+		ckb->push("b", true);
 		sw->set_value(0);
 		sw1->set_value(1);
-		sw->update(10.1);
-		sw1->update(10.1);
+
+		pl1->update_cb = [=](float delta)
+			{
+				sw->pos = { 0,200 };
+				sw1->pos = { 60,200 };
+				rs->pos = { 0,240 };
+				ckb->pos = { 0,260 };
+				int ic = 0;
+				ic += sw->update(delta);
+				ic += sw1->update(delta);
+				ic += rs->update(delta);
+				ic += ckb->update(delta);
+				return ic > 0;
+			};
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_translate(cr, 150, 50);
@@ -314,10 +338,11 @@ int main()
 				sc = bs / sc;
 				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
 				draw_pts(cr, ptv, 0xff0080ff);
-				sw->pos = { 0,200 };
-				sw1->pos = { 60,200 };
+
 				sw->draw(cr);
 				sw1->draw(cr);
+				rs->draw(cr);
+				ckb->draw(cr);
 				return;
 				cairo_translate(cr, 150, 50);
 				glm::vec4 t = { 1,1,1,1 };

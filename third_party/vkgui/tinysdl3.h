@@ -203,6 +203,8 @@ public:
 	void move2end(plane_cx* p);
 	dev_info_cx get_dev();
 	glm::ivec2 get_size();
+	// 是否支持Bindless
+	bool has_variable();
 public:
 
 	void update(float delta);

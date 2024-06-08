@@ -7,7 +7,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>  
-
+#include <vulkan/vulkan.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <dwmapi.h>
@@ -1770,12 +1770,12 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w };
 		SDL_SetTextInputRect(&rect);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target)
@@ -1870,7 +1870,26 @@ dev_info_cx form_x::get_dev()
 	return c;
 }
 
-
+bool form_x::has_variable()
+{
+	dev_info_cx c = get_dev();
+	if (!c.phy)return false;
+	VkPhysicalDeviceFeatures fea = {};
+	vkGetPhysicalDeviceFeatures((VkPhysicalDevice)c.phy, &fea);
+	VkPhysicalDeviceProperties dp = {};
+	vkGetPhysicalDeviceProperties((VkPhysicalDevice)c.phy, &dp);
+	// 各向异性过滤
+	bool anis = fea.samplerAnisotropy;
+	auto maxanis = dp.limits.maxSamplerAnisotropy;
+	VkPhysicalDeviceDescriptorIndexingFeatures phyIndexingFeatures = {};
+	phyIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+	VkPhysicalDeviceFeatures2 phyFeatures = {};
+	phyFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	phyFeatures.pNext = &phyIndexingFeatures;
+	vkGetPhysicalDeviceFeatures2((VkPhysicalDevice)c.phy, &phyFeatures);
+	// 是否支持Bindless
+	return phyIndexingFeatures.runtimeDescriptorArray && phyIndexingFeatures.descriptorBindingVariableDescriptorCount;
+}
 
 #endif
 
