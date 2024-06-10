@@ -14803,6 +14803,10 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				if (ctx->ckselect == 0)
 					ctx->bounds[1] = ctx->ccursor = cx;
 				ctx->get_bounds_px();
+				if (ctx->c_d != 0)
+				{
+					ctx->c_d = -1; ctx->c_ct = -1;// 更新光标
+				}
 				ctx->up_cursor(true);
 
 			}
@@ -14832,6 +14836,11 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				}
 				else {
 					ctx->c_d = 0; is_input = false;
+				}
+				auto bp = ctx->cur_select;
+				if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
+				{
+					ctx->hover_text = false;
 				}
 			}
 			if (p->state)
@@ -14942,8 +14951,8 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			ep->ret = 1;
 			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
 			auto bp = ctx->cur_select;
-
-			if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
+			printf("%d\n", ctx->c_ct);
+			if (ctx->ckselect == 3 && bp.x != bp.y && (cx >= bp.x && cx < bp.y))
 			{
 				ctx->hover_text = true;
 				//if (p->has) { *(p->has) = 0; }
@@ -14958,7 +14967,10 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			ctx->ccursor = cx;
 
 			is_input = true;
-			ctx->c_d = -1;
+			if (ctx->c_d != 0)
+			{
+				ctx->c_d = -1; ctx->c_ct = -1;// 更新光标
+			}
 			if (p->count && p->str) {
 				for (size_t i = 0; i < p->count; i++)
 				{
