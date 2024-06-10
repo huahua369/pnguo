@@ -14499,7 +14499,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 	auto oldop = cairo_get_operator(cr);
 	cairo_set_source_surface(cr, sur, pos.x, pos.y);
 	cairo_paint(cr);
-	double x = ps.x + cursor_pos.x, y = ps.y + cursor_pos.y; 
+	double x = ps.x + cursor_pos.x, y = ps.y + cursor_pos.y;
 	if (show_input_cursor && c_d == 1 && cursor.x > 0 && cursor_pos.z > 0)
 	{
 		set_color(cr, cursor.y);
@@ -15846,6 +15846,32 @@ void plane_cx::mk_layout()
 		}
 		delete[] c;
 	}
+}
+
+bool plane_cx::hittest(const glm::ivec2& p)
+{
+	bool r = false;
+	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)get_size();
+	glm::vec4 rc = { ips,ips + ss };
+	if (rect_includes(rc, p)) {
+		if (draggable)
+		{
+			r = true;
+		}
+		else
+		{
+			for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+				auto pw = (widget_base*)*it;
+				if (pw->_disabled_events || !pw->visible)continue;
+				glm::vec2 mps = p; mps -= ips;
+				// 判断是否鼠标在控件上
+				auto k = check_box_cr1(mps, (glm::vec4*)&(pw->pos), 1, 0);
+				if (k.x) { r = true; }
+			}
+		}
+	}
+	//printf("%p\t%d\n", this, (int)r);
+	return r;
 }
 
 void plane_cx::on_motion(const glm::vec2& pos) {

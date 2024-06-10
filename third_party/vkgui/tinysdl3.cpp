@@ -1492,6 +1492,19 @@ void form_x::new_tool_tip(const glm::ivec2& pos, const void* str)
 
 }
 
+bool form_x::hittest(const glm::ivec2& pos)
+{
+	_HitTest = false;
+	for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
+	{
+		if ((*it)->visible && (*it)->hittest(pos))
+		{
+			_HitTest = true; break;
+		}
+	}
+	return _HitTest;
+}
+
 
 
 
@@ -1606,10 +1619,12 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 		if (fw)
 		{
 			tbh = fw->titlebarheight;
+			if (!fw->hittest({ area->x,area->y }))
+				ret = SDL_HITTEST_DRAGGABLE; break;
 		}
-		// Title bar
-		if (area->y < tbh && area->x < winWidth - 128)
+		else if (area->y < tbh && area->x < winWidth - 128)
 		{
+			// Title bar
 			ret = SDL_HITTEST_DRAGGABLE; break;
 		}
 
@@ -1632,7 +1647,7 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 
 	} while (0);
 
-	printf("%d\n", ret);
+	//printf("%d\n", ret);
 	return ret;
 }
 

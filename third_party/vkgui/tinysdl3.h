@@ -74,7 +74,7 @@ public:
 public:
 	app_cx();
 	~app_cx();
-	 
+
 	form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int flags, bool derender);
 public:
 	int run_loop(int t);
@@ -145,6 +145,7 @@ public:
 	// 锁定鼠标
 	bool capture_type = true;
 	bool close_type = true;		// 关闭按钮风格：true关闭退出，false则隐藏窗口
+	bool _HitTest = true;
 public:
 	form_x();
 	~form_x();
@@ -220,7 +221,8 @@ public:
 	void set_clipboard(const char* str);
 	bool do_dragdrop_begin(const wchar_t* str, size_t size);
 	void new_tool_tip(const glm::ivec2& pos, const void* str);
-
+	// 返回是否命中ui
+	bool hittest(const glm::ivec2& pos);
 private:
 };
 

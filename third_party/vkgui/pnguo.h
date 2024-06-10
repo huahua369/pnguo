@@ -1040,6 +1040,7 @@ struct widget_base
 
 	int _old_bst = 0;			// 鼠标状态
 	bool _disabled_events = false;
+	bool visible = true;
 	virtual bool update(float delta);
 	virtual void draw(cairo_t* cr);
 };
@@ -1361,6 +1362,8 @@ public:
 	void update(float delta);
 	// 更新布局
 	void mk_layout();
+	// 返回是否命中ui
+	bool hittest(const glm::ivec2& pos);
 private:
 	void on_motion(const glm::vec2& pos);
 	// 	idx=1左，3右，2中
