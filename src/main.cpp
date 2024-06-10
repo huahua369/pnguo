@@ -197,11 +197,11 @@ void scale_pts(glm::vec2* pts, int count, const glm::vec2& sc, int ddot, bool in
 }
 void draw_pts(cairo_t* cr, std::vector<glm::vec2>& ptv, uint32_t c) {
 
-	cairo_move_to(cr, ptv[0].x, ptv[0].y);
+	cairo_move_to(cr, (int)ptv[0].x, (int)ptv[0].y);
 	for (size_t i = 1; i < ptv.size(); i++)
 	{
 		auto v2 = ptv[i];
-		cairo_line_to(cr, v2.x, v2.y);
+		cairo_line_to(cr, (int)v2.x, (int)v2.y);
 	}
 	cairo_close_path(cr);
 	fill_stroke(cr, 0, c, 1, false);
@@ -214,13 +214,20 @@ struct vkdinfo {
 };
 int main()
 {
+	// 一格一物：		固体块、墙、气体、液体。种类不到200种
+	// 可在气液体重叠：	固体、物件、建筑
+	uint8_t aa[256 * 384] = {};
+	auto qyt = new	uint16_t[256 * 384];
+	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
-	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable,true };
+	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable | ef_borderless,true };
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-	//form_x* form0 = ptf.has_renderer ? app->new_form_renderer(ptf.title, ptf.size, ptf.flags) : app->new_form(ptf.title, ptf.size, ptf.flags));
+	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
+	form0->set_alpha(true);
+	//form0->set_alpha(false);
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
 	int cpun = call_data((int)cdtype_e::cpu_count, 0);
@@ -324,6 +331,11 @@ int main()
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_translate(cr, 150, 50);
+				sw->draw(cr);
+				sw1->draw(cr);
+				rs->draw(cr);
+				ckb->draw(cr);
+				cairo_translate(cr, 150.5, 50.5);
 				static std::vector<glm::vec2> ptv = {};
 				ptv = { {0,0},{0,150},{150,150},{150,0} };
 				glm::vec2 sc = { 0.264583319 ,0.264583319 }, bs = { 1.0,1.0 };
@@ -339,10 +351,6 @@ int main()
 				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
 				draw_pts(cr, ptv, 0xff0080ff);
 
-				sw->draw(cr);
-				sw1->draw(cr);
-				rs->draw(cr);
-				ckb->draw(cr);
 				return;
 				cairo_translate(cr, 150, 50);
 				glm::vec4 t = { 1,1,1,1 };

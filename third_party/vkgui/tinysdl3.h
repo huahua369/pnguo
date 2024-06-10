@@ -74,9 +74,8 @@ public:
 public:
 	app_cx();
 	~app_cx();
-
-	form_x* new_form(const std::string& title, const glm::ivec2& ws, int flags);
-	form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int fgs);
+	 
+	form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int flags, bool derender);
 public:
 	int run_loop(int t);
 	void call_cb(SDL_Event* e);
@@ -177,6 +176,8 @@ public:
 	// 设置窗口图标
 	void set_icon(const char* fn);
 	void set_icon(const uint32_t* d, int w, int h);
+	// 设置透明窗口
+	void set_alpha(bool is);
 	// type:0==RGBA。 static_tex? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA

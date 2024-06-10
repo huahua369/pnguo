@@ -344,40 +344,8 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_UTILITY;
 	return flags;
 }
-form_x* app_cx::new_form(const std::string& title, const glm::ivec2& ws1, int fgs)
-{
-	auto ws = ws1;
-#ifdef __ANDROID__
-	ws.x = Android_ScreenWidth;
-	ws.y = Android_ScreenHeight;
-#endif 
-	SDL_Window* window = SDL_CreateWindow(title.c_str(), ws.x, ws.y, get_flags(fgs));
-	if (!window)
-	{
-		return 0;
-	}
-	auto pw = new form_x();
-	if (!pw)
-	{
-		SDL_DestroyWindow(window);
-		return 0;
-	}
-	pw->app = this;
-	pw->_ptr = window;
-	pw->_size = ws;
-	pce::set_property(window, "form_x", pw);
-	HWND hWnd = (HWND)pce::get_windowptr(window);
-	if (fgs & ef_borderless)
-	{
-		SDL_SetWindowHitTest(window, HitTestCallback2, pw);
-	}
-	pw->init_dragdrop();
-	forms.push_back(pw);
-	return pw;
-}
-
 int on_call_we(const SDL_Event* e, form_x* pw, int* wcount);
-form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws1, int fgs)
+form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws1, int fgs, bool derender)
 {
 	auto ws = ws1;
 #ifdef __ANDROID__
@@ -392,21 +360,23 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws
 	{
 		return 0;
 	}
-	std::string rn;
-	auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
-	if (rdv.find("vulkan") != rdv.end())
-	{
-		rn = "vulkan";
+	if (derender) {
+		std::string rn;
+		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
+		if (rdv.find("vulkan") != rdv.end())
+		{
+			rn = "vulkan";
+		}
+		else if (rdv.find("direct3d12") != rdv.end())
+		{
+			rn = "direct3d12";
+		}
+		else if (rdv.find("opengles2") != rdv.end())
+		{
+			rn = "opengles2";
+		}
+		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str(), 0);
 	}
-	else if (rdv.find("direct3d12") != rdv.end())
-	{
-		rn = "direct3d12";
-	}
-	else if (rdv.find("opengles2") != rdv.end())
-	{
-		rn = "opengles2";
-	}
-	renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str(), 0);
 	int vsync = 0;
 	if (renderer) {
 		SDL_GetRenderVSync(renderer, &vsync);
@@ -416,7 +386,8 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws
 	if (!pw)
 	{
 		SDL_DestroyWindow(window);
-		SDL_DestroyRenderer(renderer);
+		if (renderer)
+			SDL_DestroyRenderer(renderer);
 		return 0;
 	}
 	pw->app = this;
@@ -425,6 +396,13 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws
 	pw->_size = ws;
 	pce::set_property(window, "form_x", pw);
 	SDL_SetWindowTitle(window, title.c_str());
+#ifdef _WIN32
+	HWND hWnd = (HWND)pce::get_windowptr(window);
+	if (fgs & ef_borderless)
+	{
+		SDL_SetWindowHitTest(window, HitTestCallback2, pw);
+	}
+#endif
 	pw->init_dragdrop();
 	forms.push_back(pw);
 
@@ -1585,6 +1563,14 @@ void form_x::set_icon(const uint32_t* d, int w, int h)
 	SDL_DestroySurface(icon);
 }
 
+void form_x::set_alpha(bool is)
+{
+#ifdef _WIN32
+	auto hWnd = (HWND)pce::get_windowptr(_ptr);
+	pce::EnableBlurBehindWindowMY(hWnd, is);
+#endif
+}
+
 
 
 SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void* data)
@@ -1920,7 +1906,7 @@ uint64_t call_data(int type, void* data)
 		if (p && p->app)
 		{
 			auto app = (app_cx*)p->app;
-			ret = (uint64_t)(p->has_renderer ? app->new_form_renderer(p->title, p->size, p->flags) : app->new_form(p->title, p->size, p->flags));
+			ret = (uint64_t)app->new_form_renderer(p->title, p->size, p->flags, p->has_renderer);
 		}
 	}
 	break;
