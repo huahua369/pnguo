@@ -1039,6 +1039,7 @@ struct widget_base
 	std::function<void(void* p, int clicks)> click_cb;					//点击事件
 
 	int _old_bst = 0;			// 鼠标状态
+	int cks = 0;
 	bool _disabled_events = false;
 	bool visible = true;
 	virtual bool update(float delta);
@@ -1213,7 +1214,7 @@ struct radio_style_t
 	uint32_t line_col = 0xff4c4c4c;
 	float radius = 7;
 	float thickness = 1.0;
-	float duration = 1.0;	// 动画时间 
+	float duration = 0.25;	// 动画时间 
 };
 
 struct check_style_t {
@@ -1224,7 +1225,7 @@ struct check_style_t {
 	float rounding = 2;
 	float square_sz = 14;
 	float thickness = 1.0;
-	float duration = 1.0;	// 动画时间 
+	float duration = .250;	// 动画时间 
 };
 struct radio_info_t
 {
@@ -1240,31 +1241,31 @@ struct checkbox_info_t
 	glm::vec2 pos;	// 坐标
 	std::string text;
 	float dt = 0;	// 动画进度
-	float duration = 1.0;	// 动画时间
+	float duration = .250;	// 动画时间
 	float new_alpha = -1;		// 动画控制
 	bool mixed = false;			// 是否满
 	bool value = 0; // 选中值
 	bool value1 = 1; // 选中值动画
 };
 
-// 单选组
-struct radio_g :public widget_base
+// 单选
+struct radio_tl :public widget_base
 {
 	radio_style_t style = {};	// 风格id
-	std::vector<radio_info_t> vs;
+	radio_info_t v;
 	uint32_t active = -1;		// 选中的idx
 public:
-	void push(const std::string& str, bool v);
+	void set_value(const std::string& str, bool v);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
-// 复选组
-struct checkbox_g :public widget_base
+// 复选
+struct checkbox_tl :public widget_base
 {
 	check_style_t style = {};	// 风格id
-	std::vector<checkbox_info_t> vs;
+	checkbox_info_t v;
 public:
-	void push(const std::string& str, bool v);
+	void set_value(const std::string& str, bool v);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1352,6 +1353,7 @@ public:
 	size_t add_res(const char* data, int len);
 	void add_text(const std::string& str);
 	void move2end(widget_base* p);
+	void add_widget(widget_base* p);
 
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
 	edit_tl* add_input(const std::string& label, const glm::ivec2& size, bool single_line);

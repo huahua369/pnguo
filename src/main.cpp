@@ -282,7 +282,7 @@ int main()
 	pcu->update();
 	auto txt = new layout_text_x();
 	{
-		//pl1->draggable = true; //可拖动
+		pl1->draggable = true; //可拖动
 		pl1->set_size({ 830,600 });
 		pl1->set_pos({ 100,100 });
 		pl1->set_colors({ 0xff121212,-1,0,0 });
@@ -306,35 +306,39 @@ int main()
 		et1->set_pos({ 10,10 });
 		auto sw = new switch_tl();
 		auto sw1 = new switch_tl();
-		auto rs = new radio_g();
-		auto ckb = new checkbox_g();
-		rs->push("a", false);
-		rs->push("b", true);
-		ckb->push("a", false);
-		ckb->push("b", true);
+		auto rs = new radio_tl();
+		auto ckb = new checkbox_tl();
+		rs->set_value("a", false);
+		ckb->set_value("b", true);
 		sw->set_value(0);
 		sw1->set_value(1);
-
+		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
+		pl1->add_widget(sw);
+		pl1->add_widget(sw1);
+		pl1->add_widget(rs);
+		pl1->add_widget(ckb);
+		sw->size = { 45,20 };
+		sw1->size = { 45,20 };
+		rs->size = { 14,14 };
+		ckb->size = { 14,14 };
+		pl1->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
+		pl1->mk_layout();
 		pl1->update_cb = [=](float delta)
 			{
-				sw->pos = { 0,200 };
-				sw1->pos = { 60,200 };
-				rs->pos = { 0,240 };
-				ckb->pos = { 0,260 };
-				int ic = 0;
-				ic += sw->update(delta);
-				ic += sw1->update(delta);
-				ic += rs->update(delta);
-				ic += ckb->update(delta);
-				return ic > 0;
+				//int ic = 0;
+				//ic += sw->update(delta);
+				//ic += sw1->update(delta);
+				//ic += rs->update(delta);
+				//ic += ckb->update(delta);
+				return 0;
 			};
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
-				cairo_translate(cr, 150, 50);
-				sw->draw(cr);
-				sw1->draw(cr);
-				rs->draw(cr);
-				ckb->draw(cr);
+				//cairo_translate(cr, 150, 50);
+				//sw->draw(cr);
+				//sw1->draw(cr);
+				//rs->draw(cr);
+				//ckb->draw(cr);
 				cairo_translate(cr, 150.5, 50.5);
 				static std::vector<glm::vec2> ptv = {};
 				ptv = { {0,0},{0,150},{150,150},{150,0} };

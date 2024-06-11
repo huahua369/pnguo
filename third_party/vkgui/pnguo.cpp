@@ -15667,6 +15667,12 @@ void plane_cx::move2end(widget_base* wp)
 	}
 }
 
+void plane_cx::add_widget(widget_base* p)
+{
+	if (p)
+		widgets.push_back(p);
+}
+
 edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, bool single_line) {
 	edit_tl* edit1 = new edit_tl();
 	if (edit1) {
@@ -16574,6 +16580,7 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 			{
 				ep->ret = 1;
 			}
+			wp->cks = p->clicks;
 			if (p->button == 1) {
 				if (p->state == 1) {
 					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
@@ -17507,19 +17514,34 @@ void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
 }
 
 
-void radio_g::push(const std::string& str, bool v)
+void radio_tl::set_value(const std::string& str, bool bv)
 {
 	radio_info_t k = {};
 	k.text = str;
-	k.value = v; k.value1 = !v;
-	vs.push_back(k);
+	k.value = bv; k.value1 = !bv;
+	v = k;
 }
 
-bool radio_g::update(float delta)
+bool radio_tl::update(float delta)
 {
 	int ic = 0;
-	for (auto& it : vs)
+	//if (bst == _old_bst)return false;
+
+	// (sta & hz::BTN_STATE::STATE_FOCUS) 
+	//info.mMouseFocus = (bst & (int)BTN_STATE::STATE_HOVER);
+	//if (bst & (int)BTN_STATE::STATE_DISABLE)
+
 	{
+		auto& it = v;
+		if (size.x <= 0) {
+			size.x = style.radius * 2;
+		}
+		if (size.y <= 0) {
+			size.y = style.radius * 2;
+		}
+		if (bst & (int)BTN_STATE::STATE_ACTIVE && it.value == it.value1) {
+			it.value = !it.value;
+		}
 		if (it.value != it.value1)
 		{
 			auto dt = fmod(delta, style.duration);
@@ -17528,6 +17550,8 @@ bool radio_g::update(float delta)
 				if (it.dt >= style.duration) {
 					it.value1 = it.value; it.dt = 0;
 					dt = 1.0;
+
+					_old_bst = bst;
 				}
 				else
 				{
@@ -17546,7 +17570,7 @@ bool radio_g::update(float delta)
 	return ic > 0;
 }
 
-void radio_g::draw(cairo_t* cr)
+void radio_tl::draw(cairo_t* cr)
 {
 	auto p = this;
 	if (cr && p) {
@@ -17554,8 +17578,8 @@ void radio_g::draw(cairo_t* cr)
 		glm::ivec2 poss = p->pos;
 		cairo_translate(cr, 0.5 + poss.x, 0.5 + poss.y);
 		int x = 0;
-		for (auto& it : p->vs)
 		{
+			auto& it = v;
 			it.pos = {};
 			it.pos.x = x * style.radius * 5;
 			it.pos += style.radius;
@@ -17566,19 +17590,29 @@ void radio_g::draw(cairo_t* cr)
 	}
 }
 
-void checkbox_g::push(const std::string& str, bool v)
+void checkbox_tl::set_value(const std::string& str, bool bv)
 {
 	checkbox_info_t k = {};
 	k.text = str;
-	k.value = v; k.value1 = !v;
-	vs.push_back(k);
+	k.value = bv; k.value1 = !bv;
+	v = k;
 }
 
-bool checkbox_g::update(float delta)
+bool checkbox_tl::update(float delta)
 {
 	int ic = 0;
-	for (auto& it : vs)
+
 	{
+		auto& it = v;
+		if (size.x <= 0) {
+			size.x = style.square_sz;
+		}
+		if (size.y <= 0) {
+			size.y = style.square_sz;
+		}
+		if (bst & (int)BTN_STATE::STATE_ACTIVE && it.value == it.value1) {
+			it.value = !it.value;
+		}
 		auto duration = it.duration > 0 ? it.duration : style.duration;
 		if (it.value != it.value1)
 		{
@@ -17589,6 +17623,7 @@ bool checkbox_g::update(float delta)
 				if (it.dt >= duration) {
 					it.value1 = it.value; it.dt = 0;
 					dt = 1.0;
+					_old_bst = bst;
 				}
 				else
 				{
@@ -17607,7 +17642,7 @@ bool checkbox_g::update(float delta)
 	return ic > 0;
 }
 
-void checkbox_g::draw(cairo_t* cr)
+void checkbox_tl::draw(cairo_t* cr)
 {
 	auto p = this;
 	if (cr && p) {
@@ -17615,8 +17650,8 @@ void checkbox_g::draw(cairo_t* cr)
 		glm::ivec2 poss = p->pos;
 		cairo_translate(cr, 0.5 + poss.x, 0.5 + poss.y);
 		int x = 0;
-		for (auto& it : p->vs)
 		{
+			auto& it = v;
 			it.pos.x = x * p->style.square_sz * 2.5;
 			draw_checkbox(cr, &p->style, &it);
 			x++;
@@ -17635,6 +17670,9 @@ bool switch_tl::update(float delta)
 {
 	int ic = 0;
 	auto& it = v;
+	if (bst & (int)BTN_STATE::STATE_ACTIVE && it.value == it.value1) {
+		it.value = !it.value;
+	}
 	if (it.value != it.value1)
 	{
 		auto dt = fmod(delta, it.duration);
@@ -17643,6 +17681,7 @@ bool switch_tl::update(float delta)
 			if (it.dt >= it.duration) {
 				it.value1 = it.value; it.dt = 0;
 				dt = 1.0;
+				_old_bst = bst;
 			}
 			else
 			{
@@ -17664,6 +17703,12 @@ void switch_tl::draw(cairo_t* cr)
 	auto h = height;
 	auto fc = h * cv * 0.5;
 	auto ss = h * wf;
+	if (size.x <= 0) {
+		size.x = ss;
+	}
+	if (size.y <= 0) {
+		size.y = h;
+	}
 	draw_rectangle(cr, { pos, ss, h }, h * 0.5);
 	fill_stroke(cr, dcol, 0, 0, 0);
 	auto cp = pos;

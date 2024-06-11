@@ -752,7 +752,7 @@ void Renderer::OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSw
 				{
 					glm::mat4 worldMatrix = mCameraCurrViewProj;
 					glm::mat4 amx = worldMatrix, vcolor;
-					_cbf.Draw(cmdBuf1, &amx, &vcolor);
+					//_cbf.Draw(cmdBuf1, &amx, &vcolor);
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
@@ -1731,7 +1731,7 @@ void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
 		// Render opaque 
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
-#if 0
+#if 1
 			if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 			{
 				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
