@@ -375,7 +375,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws
 		{
 			rn = "opengles2";
 		}
-		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str(), 0);
+		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str());
 	}
 	int vsync = 0;
 	if (renderer) {
@@ -454,19 +454,19 @@ void app_cx::set_defcursor(uint32_t t)
 	switch ((cursor_st)t)
 	{
 	case cursor_st::cursor_arrow:
-		set_syscursor(SDL_SYSTEM_CURSOR_ARROW);
+		set_syscursor(SDL_SYSTEM_CURSOR_DEFAULT);
 		break;
 	case cursor_st::cursor_ibeam:
-		set_syscursor(SDL_SYSTEM_CURSOR_IBEAM);
+		set_syscursor(SDL_SYSTEM_CURSOR_TEXT);
 		break;
 	case cursor_st::cursor_wait:
 		set_syscursor(SDL_SYSTEM_CURSOR_WAIT);
 		break;
 	case cursor_st::cursor_no:
-		set_syscursor(SDL_SYSTEM_CURSOR_NO);
+		set_syscursor(SDL_SYSTEM_CURSOR_NOT_ALLOWED);
 		break;
 	case cursor_st::cursor_hand:
-		set_syscursor(SDL_SYSTEM_CURSOR_HAND);
+		set_syscursor(SDL_SYSTEM_CURSOR_POINTER);
 		break;
 	default:
 		break;
