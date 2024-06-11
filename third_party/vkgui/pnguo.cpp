@@ -15589,6 +15589,10 @@ plane_cx::plane_cx()
 
 plane_cx::~plane_cx()
 {
+	for (auto it : widgets) {
+		if (it)delete it;
+	}
+	widgets.clear();
 	if (tv)
 	{
 		delete tv; tv = 0;
@@ -15672,6 +15676,53 @@ void plane_cx::add_widget(widget_base* p)
 	if (p)
 		widgets.push_back(p);
 }
+// 新增控件：单选0、复选1、开关2
+widget_base* plane_cx::add_widget_bool(int type, const std::string& label, bool v)
+{
+	widget_base* p = 0;
+	switch (type)
+	{
+	case 0:
+	{
+		auto ckb = new checkbox_tl();
+		if (ckb) {
+			ckb->set_value(label, v);
+			ckb->size = { ckb->style.square_sz,0 };
+			ckb->size.y = ckb->size.x;
+			p = ckb;
+		}
+	}
+	break;
+	case 1:
+	{
+		auto rs = new radio_tl();
+		if (rs) {
+			rs->set_value(label, v);
+			rs->size = { rs->style.radius * 2,0 };
+			rs->size.y = rs->size.x;
+			p = rs;
+		}
+	}
+	break;
+	case 2:
+	{
+		auto sw = new switch_tl();
+		if (sw) {
+			sw->set_value(v);
+			sw->size = { sw->height * sw->wf,sw->height };
+			p = sw;
+		}
+	}
+	break;
+	default:
+		break;
+	}
+	if (p) {
+		p->_autofree = true;
+		add_widget(p);
+	}
+	return p;
+}
 
 edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, bool single_line) {
 	edit_tl* edit1 = new edit_tl();
@@ -15686,6 +15737,7 @@ edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, b
 		//edit1->set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
 		edit1->ppos = get_pos();
 		widgets.push_back(edit1);
+		edit1->_autofree = true;
 	}
 	return edit1;
 }
@@ -15697,6 +15749,7 @@ gradient_btn* plane_cx::add_gbutton(const std::string& label, const glm::ivec2& 
 		gb->family = familys;
 		gb->font_size = fontsize;
 		widgets.push_back(gb);
+		gb->_autofree = true;
 	}
 	return gb;
 }
@@ -15711,6 +15764,7 @@ color_btn* plane_cx::add_cbutton(const std::string& label, const glm::ivec2& siz
 		gb->set_btn_color_bgr(idx);
 		gb->size = size;
 		widgets.push_back(gb);
+		gb->_autofree = true;
 	}
 	return gb;
 }

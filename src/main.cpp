@@ -304,23 +304,16 @@ int main()
 
 		auto et1 = pl1->add_input("", { 100,30 }, true);
 		et1->set_pos({ 10,10 });
-		auto sw = new switch_tl();
-		auto sw1 = new switch_tl();
-		auto rs = new radio_tl();
-		auto ckb = new checkbox_tl();
-		rs->set_value("a", false);
-		ckb->set_value("b", true);
-		sw->set_value(0);
-		sw1->set_value(1);
+		pl1->add_widget_bool(2, "", true);
+		pl1->add_widget_bool(2, "", false);
+		auto sw1 = (switch_tl*)pl1->add_widget_bool(2, "", true);
+		auto sw2 = (switch_tl*)pl1->add_widget_bool(2, "", false);
+		pl1->add_widget_bool(0, "", false);
+		pl1->add_widget_bool(0, "", true);
+		pl1->add_widget_bool(1, "", false);
+		pl1->add_widget_bool(1, "", true); 
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
-		pl1->add_widget(sw);
-		pl1->add_widget(sw1);
-		pl1->add_widget(rs);
-		pl1->add_widget(ckb);
-		sw->size = { 45,20 };
-		sw1->size = { 45,20 };
-		rs->size = { 14,14 };
-		ckb->size = { 14,14 };
+		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 }; 
 		pl1->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
 		pl1->mk_layout();
 		pl1->update_cb = [=](float delta)

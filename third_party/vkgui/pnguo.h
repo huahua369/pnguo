@@ -1042,6 +1042,7 @@ struct widget_base
 	int cks = 0;
 	bool _disabled_events = false;
 	bool visible = true;
+	bool _autofree = false;
 	virtual bool update(float delta);
 	virtual void draw(cairo_t* cr);
 };
@@ -1214,7 +1215,7 @@ struct radio_style_t
 	uint32_t line_col = 0xff4c4c4c;
 	float radius = 7;
 	float thickness = 1.0;
-	float duration = 0.25;	// 动画时间 
+	float duration = 0.28;	// 动画时间 
 };
 
 struct check_style_t {
@@ -1225,7 +1226,7 @@ struct check_style_t {
 	float rounding = 2;
 	float square_sz = 14;
 	float thickness = 1.0;
-	float duration = .250;	// 动画时间 
+	float duration = 0.28;	// 动画时间 
 };
 struct radio_info_t
 {
@@ -1241,7 +1242,7 @@ struct checkbox_info_t
 	glm::vec2 pos;	// 坐标
 	std::string text;
 	float dt = 0;	// 动画进度
-	float duration = .250;	// 动画时间
+	float duration = 0.28;	// 动画时间
 	float new_alpha = -1;		// 动画控制
 	bool mixed = false;			// 是否满
 	bool value = 0; // 选中值
@@ -1353,9 +1354,10 @@ public:
 	size_t add_res(const char* data, int len);
 	void add_text(const std::string& str);
 	void move2end(widget_base* p);
-	void add_widget(widget_base* p);
-
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
+	void add_widget(widget_base* p);
+	// 新增控件：单选0、复选1、开关2
+	widget_base* add_widget_bool(int type, const std::string& label, bool v);
 	edit_tl* add_input(const std::string& label, const glm::ivec2& size, bool single_line);
 	gradient_btn* add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor);
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
