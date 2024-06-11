@@ -150,7 +150,10 @@ namespace pce {
 		bool isnew = false;
 		if (!region)
 		{
-			region = CreateRectRgn(0, 0, -1, -1);
+			//POINT pts[] = { {0,0},{500,10},{550,500},{0,0} };
+			//int pn[] = { 3,1 };
+			region = CreateRectRgn(0, 0, -1, -1);//CreatePolyPolygonRgn(pts,pn, 1,WINDING);// 
+			//SetWindowRgn(window, region, 0);
 			isnew = true;
 		}
 		if (enable && 0 != region)

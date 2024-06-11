@@ -226,7 +226,7 @@ int main()
 	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable | ef_borderless,true };
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
-	//form0->set_alpha(true);
+	form0->set_alpha(true);
 	//form0->set_alpha(false);
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
