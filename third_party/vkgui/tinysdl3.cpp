@@ -160,7 +160,7 @@ namespace pce {
 		{
 			blurBehind.dwFlags |= DWM_BB_BLURREGION;
 			blurBehind.hRgnBlur = region;
-		}
+		} 
 		MARGINS margins = { -1 };
 		//DwmExtendFrameIntoClientArea(window, &margins);
 		hr = ::DwmEnableBlurBehindWindow(window, &blurBehind);
@@ -1781,6 +1781,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 #endif
 	} while (0);
 
+}
+void form_x::enable_window(bool bEnable)
+{
+#ifdef _WIN32
+	auto hWnd = (HWND)pce::get_windowptr(_ptr); 
+	EnableWindow(hWnd, bEnable);
+#endif
 }
 void form_x::push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target)
 {

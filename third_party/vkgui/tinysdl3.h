@@ -174,6 +174,8 @@ public:
 	void stop_text_input();
 	bool text_input_active();
 	void set_ime_pos(const glm::ivec4& r);
+	// 禁用窗口鼠标键盘操作。模态窗口用
+	void enable_window(bool bEnable);
 	// 设置窗口图标
 	void set_icon(const char* fn);
 	void set_icon(const uint32_t* d, int w, int h);
