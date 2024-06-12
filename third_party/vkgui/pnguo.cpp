@@ -4203,7 +4203,11 @@ glm::ivec4 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 }
 glm::ivec2 layout_text_x::add_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
 {
-	glm::ivec2 ret = { tv.size(),0 };
+	return build_text(idx, rc, text_align, str8, len, fontsize, tv);
+}
+glm::ivec2 layout_text_x::build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv)
+{
+	glm::ivec2 ret = { rtv.size(), 0 };
 	text_image_t* p = 0;
 	cti.tv.clear();
 	if (len > 0)
@@ -4226,7 +4230,7 @@ glm::ivec2 layout_text_x::add_text(size_t idx, const glm::vec4& rc, const glm::v
 		ps.x += rc.x;
 		ps.y += rc.y;
 		glm::vec2 tps = {};
-		tv.reserve(tv.size() + length);
+		rtv.reserve(rtv.size() + length);
 		for (size_t i = 0; i < length; i++)
 		{
 			auto& it = p->tv[i];
@@ -4237,15 +4241,11 @@ glm::ivec2 layout_text_x::add_text(size_t idx, const glm::vec4& rc, const glm::v
 			}
 			it._apos = ps + tps;
 			tps.x += it.advance;
-			tv.push_back(it);
+			rtv.push_back(it);
 		}
 		ret.y = p->tv.size();
 	}
 	return ret;
-}
-std::vector<font_item_t> layout_text_x::build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
-{
-	return std::vector<font_item_t>();
 }
 atlas_t* layout_text_x::get_atlas()
 {
@@ -5092,7 +5092,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			}
 			mt = *t;
 			cairo_move_to(cr, t->x, t->y);
-		}break;
+			}break;
 		case vte_e::e_vline:
 		{
 			cairo_line_to(cr, t->x, t->y);
@@ -5122,7 +5122,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
 			//	C3 = Q2
 			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
-		}break;
+			}break;
 		case vte_e::e_vcubic:
 		{
 			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
@@ -5135,7 +5135,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5156,7 +5156,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+		}
 
 
 struct path_txf
@@ -9673,7 +9673,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -10179,8 +10179,8 @@ public:
 #endif
 			}
 
+			}
 		}
-	}
 	void destroy_all_dec()
 	{
 		//LOCK_W(_sbit_lock);
@@ -10189,7 +10189,7 @@ public:
 		_dec_table.clear();
 	}
 
-};
+	};
 int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
 {
 	int ret = 0;

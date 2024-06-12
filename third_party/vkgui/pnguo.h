@@ -768,7 +768,7 @@ public:
 	glm::ivec4 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
-	std::vector<font_item_t> build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
+	glm::ivec2 build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
 
 	// 获取路径数据
 	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);

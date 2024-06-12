@@ -319,20 +319,11 @@ int main()
 		pl1->mk_layout();
 		pl1->update_cb = [=](float delta)
 			{
-				//int ic = 0;
-				//ic += sw->update(delta);
-				//ic += sw1->update(delta);
-				//ic += rs->update(delta);
-				//ic += ckb->update(delta);
+
 				return 0;
 			};
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
-				//cairo_translate(cr, 150, 50);
-				//sw->draw(cr);
-				//sw1->draw(cr);
-				//rs->draw(cr);
-				//ckb->draw(cr);
 				if (0) {
 					cairo_as _cas(cr);
 					cairo_translate(cr, 50.5, 40.5);
