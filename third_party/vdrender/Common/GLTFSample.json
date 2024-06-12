@@ -7,7 +7,7 @@
     "height": 900,
     "activeScene": 1,
     "benchmark": false,
-    "vsync": false,
+    "vsync": true,
     "stablePowerState": false,
     "FreesyncHDROptionEnabled": false,
     "fontsize":  13

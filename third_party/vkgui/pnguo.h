@@ -396,13 +396,14 @@ struct font_item_t
 {
 public:
 	uint32_t _glyph_index = 0;
-	tinyimage_cx* _image = nullptr;		// 排列int width,height,v2pad,data  
-	// 缓存位置xy, 字符图像zw(width,height)
-	glm::ivec4 _rect;
-	// 渲染偏移坐标
-	glm::ivec2 _dwpos;
 	// 原始的advance
 	int advance = 0;
+	// 渲染偏移坐标
+	glm::ivec2 _dwpos = {};
+	tinyimage_cx* _image = nullptr;		// 排列int width,height,v2pad,data  
+	// 缓存位置xy, 字符图像zw(width,height)
+	glm::ivec4 _rect = {};
+	glm::ivec2 _apos = {};// 布局坐标
 	// 彩色字体时用
 	uint32_t color = 0;
 	int cpt = 0;
@@ -741,10 +742,9 @@ class layout_text_x
 {
 public:
 	font_rctx* ctx = 0;
-	std::vector<font_t*> familyv;
-	int cfontsize = 0;
+	std::vector<std::vector<font_t*>> familyv;
+	std::vector<glm::ivec3> cfb;
 	int fdpi = 72;
-	glm::vec2 cbox2 = {};
 	text_path_t ctp = {};	// 临时缓存
 	text_image_t cti = {};
 	std::vector<cairo_surface_t*> msu;
@@ -755,38 +755,45 @@ public:
 	layout_text_x();
 	~layout_text_x();
 	void set_ctx(font_rctx* p);
-	// 可设置多个字体。会覆盖原有设置
-	void set_familys(const char* family);
-	// 添加字体
-	void add_family(const char* family, const char* style);
+	// 添加字体,返回序号
+	size_t add_familys(const char* familys, const char* style);
 	void clear_family();
 	void clear_text();
 
 	// 获取基线
-	int get_baseline(int fontsize);
+	int get_baseline(size_t idx, int fontsize);
 	// 获取行高
-	int get_lineheight(int fontsize);
-
-	glm::ivec4 get_text_rect(const void* str8, int len, int fontsize);
-
-
-	glm::ivec2 add_text(const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
+	int get_lineheight(size_t idx, int fontsize);
+	// 获取文本区域大小
+	glm::ivec4 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	// 添加文本到渲染
+	glm::ivec2 add_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
+	std::vector<font_item_t> build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
 
 	// 获取路径数据
-	text_path_t* get_shape(const void* str8, int fontsize, text_path_t* opt);
+	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);
 	// 获取渲染数据
-	text_image_t* get_glyph_item(const void* str8, int fontsize, text_image_t* opt);
-
+	text_image_t* get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt);
+	// 渲染部分文本
 	void draw_text(cairo_t* cr, const glm::ivec2& r);
-	void draw_text(cairo_t* cr);
-
-
+	// 渲染全部文本
+	void draw_text(cairo_t* cr); 
+	// 获取图集
 	atlas_t* get_atlas();
 private:
 	void update_text();
-	void c_line_metrics(int fontsize);
+	void c_line_metrics(size_t idx, int fontsize);
 };
 
+class cairo_as
+{
+public:
+	cairo_as(cairo_t* p);
+	~cairo_as();
+
+private:
+	cairo_t* cr = 0;
+};
 
 class canvas_dev
 {
@@ -1029,7 +1036,8 @@ struct widget_base
 	int bst = 1;			// 鼠标状态
 	glm::vec2 pos = {};		// 控件坐标
 	glm::vec2 size = {};	// 控件大小
-	glm::vec2 curpos = {};	// 当前鼠标坐标
+	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
+	glm::ivec2 cmpos = {};	// 当前鼠标坐标
 	std::string family;
 	float font_size = 16;
 	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
@@ -1042,6 +1050,7 @@ struct widget_base
 	int cks = 0;
 	bool _disabled_events = false;
 	bool visible = true;
+	bool has_drag = false;	// 是否有拖动事件
 	bool _autofree = false;
 	virtual bool update(float delta);
 	virtual void draw(cairo_t* cr);
@@ -1319,12 +1328,12 @@ class plane_cx :public canvas_atlas
 public:
 	tview_x* tv = {};			// 视图管理
 	atlas_t* _pat = 0;			// 渲染面板用
-	form_x* form = 0;			// 绑定的窗口
-	font_rctx* font_ctx = 0;	// 字体管理器
+	form_x* form = 0;			// 绑定的窗口 
+	layout_text_x* ltx = 0;		// 文本渲染管理
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
 	std::function<void(cairo_t* cr)> draw_cb;
 	std::function<bool(float delta)> update_cb;
-	std::vector<text_item_t> txtv;
+	//std::vector<text_item_t> txtv;
 	std::vector<widget_base*> widgets;
 	std::vector<image_ptr_t*> images;
 	std::vector<svg_cx*> svgs;
@@ -1345,14 +1354,14 @@ public:
 public:
 	plane_cx();
 	~plane_cx();
+	void set_fontctx(font_rctx* p);
 	glm::ivec2 get_pos();
 	void set_pos(const glm::ivec2& ps);
 	void set_size(const glm::ivec2& ss);
 	glm::vec2 get_size();
 	void set_colors(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
-	size_t add_res(const char* data, int len);
-	void add_text(const std::string& str);
+	size_t add_res(const char* data, int len); 
 	void move2end(widget_base* p);
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
 	void add_widget(widget_base* p);

@@ -160,7 +160,7 @@ namespace pce {
 		{
 			blurBehind.dwFlags |= DWM_BB_BLURREGION;
 			blurBehind.hRgnBlur = region;
-		} 
+		}
 		MARGINS margins = { -1 };
 		//DwmExtendFrameIntoClientArea(window, &margins);
 		hr = ::DwmEnableBlurBehindWindow(window, &blurBehind);
@@ -1785,7 +1785,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 void form_x::enable_window(bool bEnable)
 {
 #ifdef _WIN32
-	auto hWnd = (HWND)pce::get_windowptr(_ptr); 
+	auto hWnd = (HWND)pce::get_windowptr(_ptr);
 	EnableWindow(hWnd, bEnable);
 #endif
 }
@@ -1841,7 +1841,7 @@ void form_x::bind(plane_cx* p)
 			unbind(p);
 		}
 		p->form = this;
-		p->font_ctx = app->font_ctx;
+		p->set_fontctx(app->font_ctx);
 		_planes.push_back(p);
 		add_event(p, [](uint32_t type, et_un_t* e, void* ud) { ((plane_cx*)ud)->on_event(type, e); });
 		add_canvas_atlas(p);

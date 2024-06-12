@@ -41,7 +41,7 @@ void GLTFSample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t*
 	*pHeight = 1080;
 	m_activeScene = 0;          //load the first one by default
 	m_bIsBenchmarking = false;
-	m_VsyncEnabled = false;
+	m_VsyncEnabled = true;
 	m_fontSize = 13.f;
 	m_activeCamera = 0;
 
@@ -55,7 +55,7 @@ void GLTFSample::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t*
 			m_activeCamera = jData.value("activeCamera", m_activeCamera);
 			m_isCpuValidationLayerEnabled = jData.value("CpuValidationLayerEnabled", m_isCpuValidationLayerEnabled);
 			m_isGpuValidationLayerEnabled = jData.value("GpuValidationLayerEnabled", m_isGpuValidationLayerEnabled);
-			m_VsyncEnabled = jData.value("vsync", m_VsyncEnabled);
+			m_VsyncEnabled = jData.value("vsync", m_VsyncEnabled); 
 			m_FreesyncHDROptionEnabled = jData.value("FreesyncHDROptionEnabled", m_FreesyncHDROptionEnabled);
 			m_bIsBenchmarking = jData.value("benchmark", m_bIsBenchmarking);
 			m_fontSize = jData.value("fontsize", m_fontSize);

@@ -216,18 +216,18 @@ int main()
 {
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
-	 
+
 	auto qyt = new	uint16_t[256 * 384];
 	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
-	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable | ef_borderless,true };
+	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable/* | ef_borderless*/,true };
 	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
-	form0->set_alpha(true);
+	//form0->set_alpha(true);
 	//form0->set_alpha(false);
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
@@ -294,16 +294,16 @@ int main()
 		glm::vec2 text_align = { 0.1,0.1 };
 		//txt->add_family("Consolas", 0);
 		//txt->add_family((char*)u8"XITS Math", 0);
-		txt->add_family((char*)u8"新宋体", 0);
-		txt->add_text({ 0 + 2,0 + 2,260,90 }, text_align, title.c_str(), -1, 16);
+		auto xps = txt->add_familys((char*)u8"新宋体", 0);
+		txt->add_text(xps, { 0 + 2,0 + 2,260,90 }, text_align, title.c_str(), -1, 16);
 		//txt->add_text({ 0 + 2,0 + 2,200,90 }, text_align, u8"↣ ↠ ↦ ↤ → ← ↔ ⇒ ⇐ ⇔\n 𝔹 ℂ 𝔽 ℕ ℙ ℚ ℝ 𝕋 ℤ \nα β χ δ Δ γ Γ ϵ ɛ η \nκ λ Λ μ ν ω Ω ϕ φ Φ \nπ Π ψ Ψ ρ σ Σ τ θ ϑ Θ υ \nξ Ξ ζ 𝔸 𝐀 𝔄 𝕬 𝐴 𝑨", -1, 18);
-		txt->clear_family();
+		//txt->clear_family();
 		//txt->add_family("Consolas", 0);
-		txt->add_family((char*)u8"楷体", 0);
-		txt->add_family("Segoe UI Emoji", 0); text_align = { 0.0,0.1 };
-		txt->add_text({ 330 + 2 ,0 + 2 ,400,90 }, text_align, u8"🍊🍇 \n5日线, 10日线, 20日线, 30日线", -1, fontsize);
+		xps = txt->add_familys((char*)u8"楷体,Segoe UI Emoji", 0);
+		text_align = { 0.0,0.1 };
+		txt->add_text(xps, { 330 + 2 ,0 + 2 ,400,90 }, text_align, u8"🍊🍇 \n5日线, 10日线, 20日线, 30日线", -1, fontsize);
 
-		auto et1 = pl1->add_input("", { 100,30 }, true);
+		auto et1 = pl1->add_input("", { 100,20 }, true);
 		et1->set_pos({ 10,10 });
 		pl1->add_widget_bool(2, "", true);
 		pl1->add_widget_bool(2, "", false);
@@ -312,9 +312,9 @@ int main()
 		pl1->add_widget_bool(0, "", false);
 		pl1->add_widget_bool(0, "", true);
 		pl1->add_widget_bool(1, "", false);
-		pl1->add_widget_bool(1, "", true); 
+		pl1->add_widget_bool(1, "", true);
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
-		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 }; 
+		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		pl1->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
 		pl1->mk_layout();
 		pl1->update_cb = [=](float delta)
@@ -333,62 +333,69 @@ int main()
 				//sw1->draw(cr);
 				//rs->draw(cr);
 				//ckb->draw(cr);
-				cairo_translate(cr, 150.5, 50.5);
-				static std::vector<glm::vec2> ptv = {};
-				ptv = { {0,0},{0,150},{150,150},{150,0} };
-				glm::vec2 sc = { 0.264583319 ,0.264583319 }, bs = { 1.0,1.0 };
-				int ddot = 1;
-				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
-				draw_pts(cr, ptv, 0xffff802C);// 渲染路径线
+				if (0) {
+					cairo_as _cas(cr);
+					cairo_translate(cr, 50.5, 40.5);
+					static std::vector<glm::vec2> ptv = {};
+					ptv = { {0,0},{0,150},{150,150},{150,0} };
+					glm::vec2 sc = { 0.264583319 ,0.264583319 }, bs = { 1.0,1.0 };
+					int ddot = 1;
+					scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
+					draw_pts(cr, ptv, 0xffff802C);// 渲染路径线
 
-				sc = bs / sc;
-				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
-				draw_pts(cr, ptv, 0xff80ff2C);
+					sc = bs / sc;
+					scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
+					draw_pts(cr, ptv, 0xff80ff2C);
 
-				sc = bs / sc;
-				scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
-				draw_pts(cr, ptv, 0xff0080ff);
+					sc = bs / sc;
+					scale_pts(ptv.data(), ptv.size(), sc, ddot, 0);
+					draw_pts(cr, ptv, 0xff0080ff);
+				}
 
-				return;
-				cairo_translate(cr, 150, 50);
-				glm::vec4 t = { 1,1,1,1 };
-				glm::vec4 t1 = { 3,2,1,1 };
-				auto v1 = draw_r(cr, t, 90);
-				auto v2 = draw_r(cr, t1, 90);
-				v1 *= 6;
-				v2 *= 6;
-				cairo_move_to(cr, v1.x, v1.y);
-				cairo_line_to(cr, v2.x, v2.y);
-				fill_stroke(cr, 0, -1, 1, false);
-				auto tk = t;
-				auto tk1 = t1;
-				tk *= 6;
-				tk1 *= 6;
-				cairo_move_to(cr, tk.x, tk.y);
-				cairo_line_to(cr, tk1.x, tk1.y);
-				fill_stroke(cr, 0, 0xff0000ff, 1, false);
+				//return;
+				if(0){
+					cairo_as _cas(cr);
+					cairo_translate(cr, 150, 150);
+					glm::vec4 t = { 1,1,1,1 };
+					glm::vec4 t1 = { 3,2,1,1 };
+					auto v1 = draw_r(cr, t, 90);
+					auto v2 = draw_r(cr, t1, 90);
+					v1 *= 6;
+					v2 *= 6;
+					cairo_move_to(cr, v1.x, v1.y);
+					cairo_line_to(cr, v2.x, v2.y);
+					fill_stroke(cr, 0, -1, 1, false);
+					auto tk = t;
+					auto tk1 = t1;
+					tk *= 6;
+					tk1 *= 6;
+					cairo_move_to(cr, tk.x, tk.y);
+					cairo_line_to(cr, tk1.x, tk1.y);
+					fill_stroke(cr, 0, 0xff0000ff, 1, false);
 
-				draw_r(cr, t, 90);
-				draw_r(cr, t1, 90);
-				glm::vec2 tt = { 0,0 };
-				draw_circle(cr, tt, 2);
-				fill_stroke(cr, 0xff0080ff, 0, 1, false);
+					draw_r(cr, t, 90);
+					draw_r(cr, t1, 90);
+					glm::vec2 tt = { 0,0 };
+					draw_circle(cr, tt, 2);
+					fill_stroke(cr, 0xff0080ff, 0, 1, false);
+				}
+				{
+					cairo_as _cas(cr);
+					cairo_translate(cr, 10, 50);
+					draw_rectangle(cr, { 0.5,0.5,260 + 4,90 + 4 }, 4);
+					fill_stroke(cr, 0x80805c42, 0xffff802C, 1, false);
+					draw_rectangle(cr, { 330.5,0.5,400 + 4,90 + 4 }, 4);
+					fill_stroke(cr, 0xff422e21, 0xffff802C, 1, false);
 
-				cairo_translate(cr, -150, -50);
-				cairo_translate(cr, 10, 100);
-				draw_rectangle(cr, { 0.5,0.5,260 + 4,90 + 4 }, 4);
-				fill_stroke(cr, 0x80805c42, 0xffff802C, 1, false);
-				draw_rectangle(cr, { 330.5,0.5,400 + 4,90 + 4 }, 4);
-				fill_stroke(cr, 0xff422e21, 0xffff802C, 1, false);
-
-				draw_rectangle(cr, { 0,0,260 ,90 }, 4);
-				draw_rectangle(cr, { 330.5,0.5,400 + 4,90 + 4 }, 4);
-				draw_rectangle(cr, { 0,150,800,300 }, 4);
-				cairo_clip(cr);
-				cairo_new_path(cr);
-				txt->draw_text(cr);
-				pcu->cidx = std::atoi(et1->_text.c_str());
-				pcu->update_draw(cr);
+					draw_rectangle(cr, { 0,0,260 ,90 }, 4);
+					draw_rectangle(cr, { 330.5,0.5,400 + 4,90 + 4 }, 4);
+					draw_rectangle(cr, { 0,150,800,300 }, 4);
+					cairo_clip(cr);
+					cairo_new_path(cr);
+					txt->draw_text(cr);
+					pcu->cidx = std::atoi(et1->_text.c_str());
+					pcu->update_draw(cr);
+				}
 			};
 	}
 	{
@@ -411,7 +418,7 @@ int main()
 			};
 	}
 	{
-		//pl2->draggable = true; //可拖动
+		pl2->draggable = true; //可拖动*
 		pl2->set_size({ 830,600 });
 		pl2->set_pos({ 10,10 });
 		pl2->set_colors({ 0xff121212,-1,0,0 });
