@@ -14821,13 +14821,14 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 	{
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y }; mps -= ctx->pos + ppos;
+		bool isequal = ctx->cpos == mps;
 		ctx->cpos = mps;
 		if (ctx->hit_test(mps))
 		{
 			ep->ret = 1;
 			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
 
-			if (p->state == 0 && mdown && p->button == 1 && p->clicks == 1) //左键单击
+			if (p->state == 0 && mdown && isequal && p->button == 1 && p->clicks == 1) //左键单击
 			{
 				if (ep->form)
 				{
@@ -14842,6 +14843,9 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				{
 					ctx->hover_text = false;
 				}
+				ctx->ckselect = 0;
+				ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = cx;
+				ctx->up_cursor(true);
 			}
 			if (p->state)
 			{
@@ -14951,7 +14955,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			ep->ret = 1;
 			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
 			auto bp = ctx->cur_select;
-			printf("%d\n", ctx->c_ct);
+			//printf("%d\n", ctx->c_ct);
 			if (ctx->ckselect == 3 && bp.x != bp.y && (cx >= bp.x && cx < bp.y))
 			{
 				ctx->hover_text = true;

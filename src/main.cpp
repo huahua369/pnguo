@@ -216,7 +216,7 @@ int main()
 {
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
-	uint8_t aa[256 * 384] = {};
+	 
 	auto qyt = new	uint16_t[256 * 384];
 	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
@@ -224,7 +224,7 @@ int main()
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
 	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable | ef_borderless,true };
-	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
 	form0->set_alpha(true);
