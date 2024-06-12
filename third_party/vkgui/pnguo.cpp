@@ -4201,11 +4201,11 @@ glm::ivec4 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	ret.y = h * n;
 	return ret;
 }
-glm::ivec2 layout_text_x::add_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
+glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
 {
 	return build_text(idx, rc, text_align, str8, len, fontsize, tv);
 }
-glm::ivec2 layout_text_x::build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv)
+glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv)
 {
 	glm::ivec2 ret = { rtv.size(), 0 };
 	text_image_t* p = 0;
@@ -4225,6 +4225,8 @@ glm::ivec2 layout_text_x::build_text(size_t idx, const glm::vec4& rc, const glm:
 		auto length = p->tv.size();
 		auto baseline = get_baseline(idx, fontsize);
 		int h = get_lineheight(idx, fontsize);
+		if (rc.z < 1)rc.z = rct.x;
+		if (rc.w < 1)rc.w = h;
 		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, -baseline };
 		auto ps = ss * text_align - (rct * text_align + bearing);
 		ps.x += rc.x;
@@ -4302,7 +4304,6 @@ void layout_text_x::update_text()
 }
 void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r)
 {
-	update_text();
 	int mx = r.y + r.x;
 	for (size_t i = r.x; i < mx; i++)
 	{
@@ -5092,7 +5093,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			}
 			mt = *t;
 			cairo_move_to(cr, t->x, t->y);
-			}break;
+		}break;
 		case vte_e::e_vline:
 		{
 			cairo_line_to(cr, t->x, t->y);
@@ -5122,7 +5123,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
 			//	C3 = Q2
 			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
-			}break;
+		}break;
 		case vte_e::e_vcubic:
 		{
 			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
@@ -5135,7 +5136,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-		}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5156,7 +5157,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-		}
+}
 
 
 struct path_txf
@@ -9673,7 +9674,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-	}
+}
 
 void font_t::clear_char_lut()
 {
@@ -10179,8 +10180,8 @@ public:
 #endif
 			}
 
-			}
 		}
+	}
 	void destroy_all_dec()
 	{
 		//LOCK_W(_sbit_lock);
@@ -10189,7 +10190,7 @@ public:
 		_dec_table.clear();
 	}
 
-	};
+};
 int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
 {
 	int ret = 0;
@@ -15686,53 +15687,73 @@ void plane_cx::move2end(widget_base* wp)
 	}
 }
 
+size_t plane_cx::add_familys(const char* familys, const char* style)
+{
+	return ltx->add_familys(familys, style);
+}
+
 void plane_cx::add_widget(widget_base* p)
 {
 	if (p)
 		widgets.push_back(p);
 }
-// 新增控件：单选0、复选1、开关2
-widget_base* plane_cx::add_widget_bool(int type, const std::string& label, bool v)
+switch_tl* plane_cx::add_switch(const std::string& label, const std::string& label2, bool v, bool inlinetxt)
 {
-	widget_base* p = 0;
-	switch (type)
-	{
-	case 0:
-	{
-		auto ckb = new checkbox_tl();
-		if (ckb) {
-			ckb->set_value(label, v);
-			ckb->size = { ckb->style.square_sz,0 };
-			ckb->size.y = ckb->size.x;
-			p = ckb;
-		}
-	}
-	break;
-	case 1:
-	{
-		auto rs = new radio_tl();
-		if (rs) {
-			rs->set_value(label, v);
-			rs->size = { rs->style.radius * 2,0 };
-			rs->size.y = rs->size.x;
-			p = rs;
-		}
-	}
-	break;
-	case 2:
-	{
-		auto sw = new switch_tl();
-		if (sw) {
-			sw->set_value(v);
-			sw->size = { sw->height * sw->wf,sw->height };
-			p = sw;
-		}
-	}
-	break;
-	default:
-		break;
-	}
+	auto p = new switch_tl();
 	if (p) {
+		p->set_value(v);
+		p->size = { p->height * p->wf,p->height };
+		if (ltx && ltx->ctx) {
+			glm::vec4 rc = { 0, 0, 0, 0 };
+			glm::vec2 talign = { 0,0.5 };
+			if (label.size())
+			{
+				p->txtps = ltx->add_text(0, rc, talign, label.c_str(), label.size(), fontsize);
+				p->size.x += rc.z; p->size.y = rc.w;
+			}
+			if (label2.size())
+			{
+				p->txtps2 = ltx->add_text(0, rc, talign, label2.c_str(), label2.size(), fontsize);
+			}
+		}
+		p->_autofree = true;
+		add_widget(p);
+	}
+	return p;
+}
+checkbox_tl* plane_cx::add_checkbox(const std::string& label, bool v)
+{
+	auto p = new checkbox_tl();
+	if (p) {
+		p->set_value(label, v);
+		p->size = { p->style.square_sz,0 };
+		p->size.y = p->size.x;
+		glm::vec4 rc = { 0, 0, 0, 0 };
+		glm::vec2 talign = { 0,0.5 };
+		if (label.size())
+		{
+			p->txtps = ltx->add_text(0, rc, talign, label.c_str(), label.size(), fontsize);
+			p->size.x += rc.z; p->size.y = rc.w;
+		}
+		p->_autofree = true;
+		add_widget(p);
+	}
+	return p;
+}
+radio_tl* plane_cx::add_radio(const std::string& label, bool v)
+{
+	auto p = new radio_tl();
+	if (p) {
+		p->set_value(label, v);
+		p->size = { p->style.radius * 2,0 };
+		p->size.y = p->size.x;
+		glm::vec4 rc = { 0, 0, 0, 0 };
+		glm::vec2 talign = { 0,0.5 };
+		if (label.size())
+		{
+			p->txtps = ltx->add_text(0, rc, talign, label.c_str(), label.size(), fontsize);
+			p->size.x += rc.z; p->size.y = rc.w;
+		}
 		p->_autofree = true;
 		add_widget(p);
 	}
@@ -15840,8 +15861,17 @@ void plane_cx::update(float delta)
 		//}
 		//cairo_restore(cr);
 		cairo_save(cr);
+		ltx->update_text();
 		for (auto& it : widgets) {
 			it->draw(cr);
+			if (it->txtps.y > 0)
+			{
+				ltx->draw_text(cr, it->txtps);
+			}
+			if (it->txtps2.y > 0)
+			{
+				ltx->draw_text(cr, it->txtps2);
+			}
 		}
 #if debugpx
 		auto px = (uint32_t*)cairo_image_surface_get_data(tv->_backing_store);

@@ -295,24 +295,27 @@ int main()
 		//txt->add_family("Consolas", 0);
 		//txt->add_family((char*)u8"XITS Math", 0);
 		auto xps = txt->add_familys((char*)u8"新宋体", 0);
-		txt->add_text(xps, { 0 + 2,0 + 2,260,90 }, text_align, title.c_str(), -1, 16);
+		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
+		txt->add_text(xps, rcc1, text_align, title.c_str(), -1, 16);
 		//txt->add_text({ 0 + 2,0 + 2,200,90 }, text_align, u8"↣ ↠ ↦ ↤ → ← ↔ ⇒ ⇐ ⇔\n 𝔹 ℂ 𝔽 ℕ ℙ ℚ ℝ 𝕋 ℤ \nα β χ δ Δ γ Γ ϵ ɛ η \nκ λ Λ μ ν ω Ω ϕ φ Φ \nπ Π ψ Ψ ρ σ Σ τ θ ϑ Θ υ \nξ Ξ ζ 𝔸 𝐀 𝔄 𝕬 𝐴 𝑨", -1, 18);
 		//txt->clear_family();
 		//txt->add_family("Consolas", 0);
+		auto pxps = pl1->add_familys((char*)u8"新宋体,Segoe UI Emoji", 0);
 		xps = txt->add_familys((char*)u8"楷体,Segoe UI Emoji", 0);
 		text_align = { 0.0,0.1 };
-		txt->add_text(xps, { 330 + 2 ,0 + 2 ,400,90 }, text_align, u8"🍊🍇 \n5日线, 10日线, 20日线, 30日线", -1, fontsize);
+		glm::vec4 rcc = { 330 + 2 ,0 + 2 ,400,90 };
+		txt->add_text(xps, rcc, text_align, u8"🍊🍇 \n5日线, 10日线, 20日线, 30日线", -1, fontsize);
 
 		auto et1 = pl1->add_input("", { 100,20 }, true);
 		et1->set_pos({ 10,10 });
-		pl1->add_widget_bool(2, "", true);
-		pl1->add_widget_bool(2, "", false);
-		auto sw1 = (switch_tl*)pl1->add_widget_bool(2, "", true);
-		auto sw2 = (switch_tl*)pl1->add_widget_bool(2, "", false);
-		pl1->add_widget_bool(0, "", false);
-		pl1->add_widget_bool(0, "", true);
-		pl1->add_widget_bool(1, "", false);
-		pl1->add_widget_bool(1, "", true);
+		pl1->add_switch("", "", true, false);
+		pl1->add_switch("", "", false, false);
+		auto sw1 = (switch_tl*)pl1->add_switch((char*)u8"开", (char*)u8"关", true, false);
+		auto sw2 = (switch_tl*)pl1->add_switch("", "", false, false);
+		pl1->add_checkbox("cc", false);
+		pl1->add_checkbox("cc1", true);
+		pl1->add_radio("cc2", false);
+		pl1->add_radio("cc3", true);
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		pl1->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
@@ -344,7 +347,7 @@ int main()
 				}
 
 				//return;
-				if(0){
+				if (0) {
 					cairo_as _cas(cr);
 					cairo_translate(cr, 150, 150);
 					glm::vec4 t = { 1,1,1,1 };

@@ -767,8 +767,8 @@ public:
 	// 获取文本区域大小
 	glm::ivec4 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
 	// 添加文本到渲染
-	glm::ivec2 add_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
-	glm::ivec2 build_text(size_t idx, const glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
+	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
+	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
 
 	// 获取路径数据
 	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);
@@ -777,11 +777,11 @@ public:
 	// 渲染部分文本
 	void draw_text(cairo_t* cr, const glm::ivec2& r);
 	// 渲染全部文本
-	void draw_text(cairo_t* cr); 
+	void draw_text(cairo_t* cr);
 	// 获取图集
 	atlas_t* get_atlas();
-private:
 	void update_text();
+private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
 
@@ -1046,6 +1046,8 @@ struct widget_base
 	std::function<void(void* p, int type, const glm::vec2& mps)> cb;	//通用事件处理
 	std::function<void(void* p, int clicks)> click_cb;					//点击事件
 
+	glm::ivec2 txtps = {};
+	glm::ivec2 txtps2 = {};
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;
 	bool _disabled_events = false;
@@ -1263,7 +1265,7 @@ struct radio_tl :public widget_base
 {
 	radio_style_t style = {};	// 风格id
 	radio_info_t v;
-	uint32_t active = -1;		// 选中的idx
+	uint32_t active = -1;		// 选中的idx 
 public:
 	void set_value(const std::string& str, bool v);
 	bool update(float delta);
@@ -1273,7 +1275,7 @@ public:
 struct checkbox_tl :public widget_base
 {
 	check_style_t style = {};	// 风格id
-	checkbox_info_t v;
+	checkbox_info_t v; 
 public:
 	void set_value(const std::string& str, bool v);
 	bool update(float delta);
@@ -1361,12 +1363,16 @@ public:
 	glm::vec2 get_size();
 	void set_colors(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
-	size_t add_res(const char* data, int len); 
+	size_t add_res(const char* data, int len);
 	void move2end(widget_base* p);
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
+	// 添加字体,返回序号
+	size_t add_familys(const char* familys, const char* style);
 	void add_widget(widget_base* p);
-	// 新增控件：单选0、复选1、开关2
-	widget_base* add_widget_bool(int type, const std::string& label, bool v);
+	// 新增控件：开关、复选、单选
+	switch_tl* add_switch(const std::string& label, const std::string& label2, bool v, bool inlinetxt);
+	checkbox_tl* add_checkbox(const std::string& label, bool v);
+	radio_tl* add_radio(const std::string& label, bool v);
 	edit_tl* add_input(const std::string& label, const glm::ivec2& size, bool single_line);
 	gradient_btn* add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor);
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);

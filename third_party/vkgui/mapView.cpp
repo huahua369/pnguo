@@ -1024,7 +1024,7 @@ namespace hz
 			g_error_free(error);
 		}
 		else {
-			g_print("转换成功: %s\n", utf8_string);
+			//g_print("转换成功: %s\n", utf8_string);
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
@@ -1046,7 +1046,7 @@ namespace hz
 			g_error_free(error);
 		}
 		else {
-			g_print("转换成功: %s\n", utf8_string);
+			//g_print("转换成功: %s\n", utf8_string);
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
