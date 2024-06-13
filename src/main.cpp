@@ -280,26 +280,27 @@ int main()
 
 		}
 	}
-	pcu->update(); 
+	pcu->update();
 	{
 		pl1->draggable = true; //可拖动
 		pl1->set_size({ 830,600 });
 		pl1->set_pos({ 100,100 });
 		pl1->set_colors({ 0xff121212,-1,0,0 });
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
-		 
+
 		int fontsize = 26;
 		glm::vec2 text_align = { 0.1,0.1 };
 		//txt->add_family("Consolas", 0);
 		//txt->add_family((char*)u8"XITS Math", 0);
 		//auto xps = txt->add_familys((char*)u8"楷体,新宋体", 0);
-		//glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 }; 
+		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
 		//txt->add_text({ 0 + 2,0 + 2,200,90 }, text_align, u8"↣ ↠ ↦ ↤ → ← ↔ ⇒ ⇐ ⇔\n 𝔹 ℂ 𝔽 ℕ ℙ ℚ ℝ 𝕋 ℤ \nα β χ δ Δ γ Γ ϵ ɛ η \nκ λ Λ μ ν ω Ω ϕ φ Φ \nπ Π ψ Ψ ρ σ Σ τ θ ϑ Θ υ \nξ Ξ ζ 𝔸 𝐀 𝔄 𝕬 𝐴 𝑨", -1, 18);
 		//txt->clear_family();
 		//txt->add_family("Consolas", 0);
-		auto pxps = pl1->add_familys((char*)u8"新宋体,Segoe UI Emoji", 0); 
-		text_align = { 0.0,0.1 }; 
-
+		auto pxps = pl1->add_familys((char*)u8"新宋体,Segoe UI Emoji", 0);
+		text_align = { 0.0,0.1 };
+		auto txt = pl1->ltx;
+		txt->add_text(0, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🍆abcg", -1, 60);
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
 		et1->set_pos({ 10,10 });
@@ -323,6 +324,9 @@ int main()
 			};
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
+				cairo_as _cas(cr);
+				cairo_translate(cr, 0, 10);
+				txt->draw_text(cr, -1);
 				return;
 				if (0) {
 					cairo_as _cas(cr);
@@ -383,7 +387,7 @@ int main()
 					draw_rectangle(cr, { 0,150,800,300 }, 4);
 					cairo_clip(cr);
 					cairo_new_path(cr);
-					//txt->draw_text(cr, -1);
+					txt->draw_text(cr, -1);
 					pcu->cidx = std::atoi(et1->_text.c_str());
 					pcu->update_draw(cr);
 				}
