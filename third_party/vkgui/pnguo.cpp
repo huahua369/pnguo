@@ -4098,6 +4098,7 @@ layout_text_x::~layout_text_x()
 	for (auto it : msu) {
 		free_image_cr(it);
 	}
+	free_image_cr(ctemp);
 }
 
 void layout_text_x::set_ctx(font_rctx* p)
@@ -4198,7 +4199,8 @@ glm::ivec4 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	} while (str && *str);
 	ret.x = std::max(ret.x, x);
 	auto h = get_lineheight(idx, fontsize);
-	ret.y = h * n;
+	if (n > 1)
+		ret.y = h * n;
 	return ret;
 }
 glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
@@ -4227,8 +4229,10 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 		int h = get_lineheight(idx, fontsize);
 		if (rc.z < 1)rc.z = rct.x;
 		if (rc.w < 1)rc.w = h;
-		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, -baseline };
-		auto ps = ss * text_align - (rct * text_align + bearing);
+		if (ctrc.y < h)ctrc.y = h;
+
+		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
+		auto ps = (ss - rct) * text_align + bearing;
 		ps.x += rc.x;
 		ps.y += rc.y;
 		glm::vec2 tps = {};
@@ -4243,6 +4247,7 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 			}
 			it._apos = ps + tps;
 			tps.x += it.advance;
+			if (ctrc.x < it.advance)ctrc.x = it.advance;
 			rtv.push_back(it);
 		}
 		ret.y = p->tv.size();
@@ -4280,6 +4285,17 @@ void layout_text_x::update_text()
 {
 	auto ft = ctx->bcc._data.data();
 	auto n = ctx->bcc._data.size();
+	if (ctrc.x > 0 && ctrc.y > 0 && oldrc < ctrc)
+	{
+		if (ctemp)
+			free_image_cr(ctemp);
+		auto px = new uint32_t[ctrc.x * ctrc.y];
+		if (px)
+		{
+			oldrc = ctrc;
+			ctemp = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, ctrc.x, ctrc.y, ctrc.x * sizeof(int));
+		}
+	}
 	for (size_t i = 0; i < n; i++)
 	{
 		auto p = ft[i];
@@ -4313,7 +4329,23 @@ void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color)
 			auto ft = (cairo_surface_t*)it._image->ptr;
 			if (ft)
 			{
-				draw_image(cr, ft, it._dwpos + it._apos, it._rect, color);
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color, ctemp);
+			}
+		}
+	}
+}
+void layout_text_x::draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color)
+{
+	auto mx = rtv.size();
+	for (size_t i = 0; i < mx; i++)
+	{
+		auto& it = rtv[i];
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (ft)
+			{
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color, ctemp);
 			}
 		}
 	}
@@ -4328,7 +4360,7 @@ void layout_text_x::draw_text(cairo_t* cr, uint32_t color)
 			auto ft = (cairo_surface_t*)it._image->ptr;
 			if (ft)
 			{
-				draw_image(cr, ft, it._dwpos + it._apos, it._rect, color);
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color, ctemp);
 			}
 		}
 	}
@@ -5169,7 +5201,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-		}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5190,7 +5222,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-	}
+}
 
 
 struct path_txf
@@ -5556,7 +5588,10 @@ void premultiply_data(int w, unsigned char* data, int type, bool multiply)
 		memcpy(base, &p, sizeof(uint32_t));
 	}
 }
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color)
+glm::ivec2 get_surface_size(cairo_surface_t* p) {
+	return { cairo_image_surface_get_width(p), cairo_image_surface_get_height(p) };
+}
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, cairo_surface_t* tp)
 {
 	glm::vec2 ss = { rc.z, rc.w };
 	if (ss.x < 0)
@@ -5567,20 +5602,44 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	{
 		ss.y = cairo_image_surface_get_height(image);
 	}
-	if (color && ss.x > 0 && ss.y > 0)
+	if (ss.x > 0 && ss.y > 0)
 	{
-		cairo_save(cr);
-		cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-		cairo_translate(cr, pos.x, pos.y);
-		cairo_set_source_surface(cr, image, -rc.x, -rc.y);
-		cairo_rectangle(cr, 0, 0, ss.x, ss.y);
-		if (color != -1) {
-			cairo_fill_preserve(cr);
-			cairo_set_operator(cr, CAIRO_OPERATOR_MULTIPLY);
-			set_color(cr, color);
+		if (tp && color > 0 && color != -1)
+		{
+			cairo_t* crt = cairo_create(tp);
+			auto d = (uint32_t*)cairo_image_surface_get_data(tp);
+			auto tss = get_surface_size(tp);
+			memset(d, 0, tss.x * tss.y * sizeof(int));
+			cairo_save(crt);
+			cairo_set_operator(crt, CAIRO_OPERATOR_OVER);
+			cairo_set_source_surface(crt, image, -rc.x, -rc.y);
+			cairo_rectangle(crt, 0, 0, ss.x, ss.y);
+			if (color != -1) {
+				cairo_fill_preserve(crt);
+				cairo_set_operator(crt, CAIRO_OPERATOR_IN);
+				set_color(crt, color);
+			}
+			cairo_fill(crt);
+			cairo_restore(crt);
+			cairo_destroy(crt);
+
+			cairo_save(cr);
+			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+			cairo_translate(cr, pos.x, pos.y);
+			cairo_set_source_surface(cr, tp, 0, 0);
+			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
+			cairo_fill(cr);
+			cairo_restore(cr);
 		}
-		cairo_fill(cr);
-		cairo_restore(cr);
+		else {
+			cairo_save(cr);
+			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+			cairo_translate(cr, pos.x, pos.y);
+			cairo_set_source_surface(cr, image, -rc.x, -rc.y);
+			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
+			cairo_fill(cr);
+			cairo_restore(cr);
+		}
 	}
 	return ss;
 }
@@ -5640,7 +5699,6 @@ void free_image_cr(cairo_surface_t* image)
 		auto data = (uint32_t*)cairo_image_surface_get_data(image);
 		delete[]data;
 		cairo_surface_destroy(image);
-
 	}
 }
 
@@ -9695,7 +9753,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -9711,7 +9769,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-	}
+}
 
 void font_t::clear_char_lut()
 {
@@ -11616,7 +11674,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -13818,7 +13876,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -14530,7 +14588,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
@@ -15810,7 +15868,7 @@ edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, b
 		//edit1->set_align_pos({ 4, 4 });
 		//edit1->set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
 		edit1->ppos = get_pos();
-		widgets.push_back(edit1);
+		add_widget(edit1);
 		edit1->_autofree = true;
 	}
 	return edit1;
@@ -15822,7 +15880,7 @@ gradient_btn* plane_cx::add_gbutton(const std::string& label, const glm::ivec2& 
 		gb->init({ 0,0,size }, label, bcolor);
 		gb->family = familys;
 		gb->font_size = fontsize;
-		widgets.push_back(gb);
+		add_widget(gb);
 		gb->_autofree = true;
 	}
 	return gb;
@@ -15837,7 +15895,7 @@ color_btn* plane_cx::add_cbutton(const std::string& label, const glm::ivec2& siz
 		gb->font_size = fontsize;
 		gb->set_btn_color_bgr(idx);
 		gb->size = size;
-		widgets.push_back(gb);
+		add_widget(gb);
 		gb->_autofree = true;
 	}
 	return gb;
@@ -15927,8 +15985,8 @@ void plane_cx::update(float delta)
 		fill_stroke(cr, 0, border.x, border.y, false);
 		tv->end_frame(cr);
 		_pat->img->valid = true;
-		}
 	}
+}
 
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& ms)
 {
@@ -16450,12 +16508,19 @@ void gradient_btn::draw(cairo_t* g)
 	if (p->mPushed) {
 		ps += thickness;
 	}
+	glm::vec4 rc = { ps, ns };
+	ltx->tem_rtv.clear();
+	ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
+	ltx->update_text();
 	if (text_color_shadow)
 	{
-		auto rc = draw_text_align(g, p->str.c_str(), ps + glm::vec2(thickness, thickness), ns, text_align, text_color_shadow, p->family.c_str(), p->font_size);
+		cairo_as _aa_(g);
+		cairo_translate(g, thickness, thickness);
+		ltx->draw_text(g, ltx->tem_rtv, text_color_shadow);
+		//rc = draw_text_align(g, p->str.c_str(), ps + glm::vec2(thickness, thickness), ns, text_align, text_color_shadow, p->family.c_str(), p->font_size);
 	}
-	auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
-	//draw_text_align(g, p->str.c_str(), { rc.x + rc.z,rc.y }, {}, {}, p->text_color, p->family.c_str(), p->font_size + 10);
+	ltx->draw_text(g, ltx->tem_rtv, p->text_color);
+	//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
 
 	// 边框
 	cairo_set_line_width(g, thickness);
@@ -16644,7 +16709,13 @@ void color_btn::draw(cairo_t* g)
 	if (p->mPushed) {
 		ps.x += 1.0f; ps.y += 1.0f;
 	}
-	auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
+
+	glm::vec4 rc = { ps, ns };
+	ltx->tem_rtv.clear();
+	ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
+	ltx->update_text();
+	ltx->draw_text(g, ltx->tem_rtv, p->text_color);
+	//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
 
 	if (p->dcol)
 	{

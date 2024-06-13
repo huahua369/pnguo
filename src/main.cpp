@@ -243,6 +243,11 @@ int main()
 	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
+	auto fontn = (char*)u8"新宋体,Segoe UI Emoji";
+	fontn = (char*)u8"黑体,Segoe UI Emoji";
+	pl1->add_familys(fontn, 0);
+	pl2->add_familys(fontn, 0);
+	pl3->add_familys(fontn, 0);
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
 	pl3->visible = false;
 	//pl1->visible = false;
@@ -293,13 +298,13 @@ int main()
 		//txt->add_family("Consolas", 0);
 		//txt->add_family((char*)u8"XITS Math", 0);
 		//auto xps = txt->add_familys((char*)u8"楷体,新宋体", 0);
-		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
+
 		//txt->add_text({ 0 + 2,0 + 2,200,90 }, text_align, u8"↣ ↠ ↦ ↤ → ← ↔ ⇒ ⇐ ⇔\n 𝔹 ℂ 𝔽 ℕ ℙ ℚ ℝ 𝕋 ℤ \nα β χ δ Δ γ Γ ϵ ɛ η \nκ λ Λ μ ν ω Ω ϕ φ Φ \nπ Π ψ Ψ ρ σ Σ τ θ ϑ Θ υ \nξ Ξ ζ 𝔸 𝐀 𝔄 𝕬 𝐴 𝑨", -1, 18);
 		//txt->clear_family();
 		//txt->add_family("Consolas", 0);
-		auto pxps = pl1->add_familys((char*)u8"新宋体,Segoe UI Emoji", 0);
 		text_align = { 0.0,0.1 };
 		auto txt = pl1->ltx;
+		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
 		txt->add_text(0, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🍆abcg", -1, 60);
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
@@ -325,8 +330,13 @@ int main()
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
-				cairo_translate(cr, 0, 10);
-				txt->draw_text(cr, -1);
+				cairo_translate(cr, 0, 30);
+				txt->draw_text(cr, 0xff0080ff);
+
+				/*	glm::vec4 rc = { ps, ns };
+					ltx->tem_rtv.clear();
+					ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
+					ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
 				return;
 				if (0) {
 					cairo_as _cas(cr);
@@ -426,7 +436,7 @@ int main()
 		edit_tl* et1, * et2;
 		{
 			pl2->set_family_size((char*)u8"NSimSun", 16, -1);// 按钮和edit字号标准不同
-			auto gb2 = pl2->add_cbutton((char*)u8"图库目录", { 80,30 }, 0);
+			auto gb2 = pl2->add_cbutton((char*)u8"🍑图库目录", { 80,30 }, 0);
 			gb2->effect = uTheme::light;
 			gb2->light = 0.2 * 0;
 			gb2->_disabled_events = true;

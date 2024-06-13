@@ -749,8 +749,12 @@ public:
 	text_image_t cti = {};
 	std::vector<cairo_surface_t*> msu;
 	std::vector<font_item_t> tv;
+	std::vector<font_item_t> tem_rtv;	// 临时缓存用
 	// todo
 	std::vector<atlas_cx> tem_iptr;
+	// 渲染缓存
+	cairo_surface_t* ctemp = 0;
+	glm::ivec2 ctrc = {}, oldrc = {};
 public:
 	layout_text_x();
 	~layout_text_x();
@@ -777,6 +781,8 @@ public:
 	text_image_t* get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt);
 	// 渲染部分文本
 	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
+	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
+	 
 	// 渲染全部文本
 	void draw_text(cairo_t* cr, uint32_t color);
 	// 获取图集
@@ -1425,7 +1431,8 @@ glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, c
 cairo_surface_t* new_image_cr(image_ptr_t* img);
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
 void free_image_cr(cairo_surface_t* image);
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1);
+glm::ivec2 get_surface_size(cairo_surface_t* p);
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1, cairo_surface_t* tp = 0);
 #endif
 /*
 <表格、树形>
