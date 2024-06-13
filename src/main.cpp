@@ -306,18 +306,20 @@ int main()
 		glm::vec4 rcc = { 330 + 2 ,0 + 2 ,400,90 };
 		txt->add_text(xps, rcc, text_align, u8"🍊🍇 \n5日线, 10日线, 20日线, 30日线", -1, fontsize);
 
-		auto et1 = pl1->add_input("", { 100,20 }, true);
+		auto et1 = pl1->add_input("", { 100,22 }, true);
+		glm::vec2 bs = { 50,22 };
 		et1->set_pos({ 10,10 });
-		pl1->add_switch("", "", true, false);
-		pl1->add_switch("", "", false, false);
-		auto sw1 = (switch_tl*)pl1->add_switch((char*)u8"开", (char*)u8"关", true, false);
-		auto sw2 = (switch_tl*)pl1->add_switch("", "", false, false);
-		pl1->add_checkbox("cc", false);
-		pl1->add_checkbox("cc1", true);
-		pl1->add_radio("cc2", false);
-		pl1->add_radio("cc3", true);
+		pl1->add_switch(bs, "", true);
+		pl1->add_switch(bs, "", false);
+		auto sw1 = (switch_tl*)pl1->add_switch(bs, (char*)u8"开", true);
+		auto sw2 = (switch_tl*)pl1->add_switch(bs, "k", false);
+		pl1->add_checkbox(bs, "cc", false);
+		pl1->add_checkbox(bs, "cc1", true);
+		pl1->add_radio(bs, "cc2", false);
+		pl1->add_radio(bs, "cc3", true);
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
+		//sw2->text_color = {};
 		pl1->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
 		pl1->mk_layout();
 		pl1->update_cb = [=](float delta)
@@ -327,6 +329,7 @@ int main()
 			};
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
+				return;
 				if (0) {
 					cairo_as _cas(cr);
 					cairo_translate(cr, 50.5, 40.5);
@@ -386,7 +389,7 @@ int main()
 					draw_rectangle(cr, { 0,150,800,300 }, 4);
 					cairo_clip(cr);
 					cairo_new_path(cr);
-					txt->draw_text(cr);
+					txt->draw_text(cr, -1);
 					pcu->cidx = std::atoi(et1->_text.c_str());
 					pcu->update_draw(cr);
 				}

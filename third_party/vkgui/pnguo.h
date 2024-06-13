@@ -89,13 +89,13 @@ enum class BlendMode_e :int {
 #define col_white 0xffffffff
 //uint32_t color = col_white;			// 混合颜色，默认白色不混合
 #endif
-
+ 
 struct image_ptr_t
 {
 	int width = 0, height = 0;
 	int type = 0;				// 0=rgba，1=bgra
 	int stride = 0;
-	void* data = 0;				// 像素数据
+	uint32_t* data = 0;			// 像素数据
 	void* texid = 0;			// 纹理指针
 	void* ptr = 0;				// 用户数据
 	int comp = 4;				// 通道数
@@ -164,8 +164,9 @@ class atlas_cx
 {
 public:
 	image_ptr_t* img = 0;
-	std::vector<image_sliced_t> _imgv;
+	image_ptr_t img_raw = {};
 	glm::ivec4 clip = {};	// 裁剪区域
+	std::vector<image_sliced_t> _imgv;
 public:
 	atlas_cx();
 	~atlas_cx();
@@ -370,19 +371,19 @@ public:
 	~info_one();
 	std::string get_name();
 };
-struct tinyimage_cx {
-	int width = 0, height = 0;
-	int isupdate = 1;
-	int format = 0;		// 0rgba, 1bgra
-	uint32_t* data = 0;  //rgba
-	void* ptr = 0;
-};
-struct tinyimagef_cx {
-	float width = 0, height = 0;// count=width*height*4
-	int isupdate = 1;
-	int format = 0;
-	float data[0];
-};
+//struct tinyimage_cx {
+//	int width = 0, height = 0;
+//	int isupdate = 1;
+//	int format = 0;		// 0rgba, 1bgra
+//	uint32_t* data = 0;  //rgba
+//	void* ptr = 0;
+//};
+//struct tinyimagef_cx {
+//	float width = 0, height = 0;// count=width*height*4
+//	int isupdate = 1;
+//	int format = 0;
+//	float data[0];
+//};
 class svg_cx {
 public:
 	void* ptr;
@@ -400,7 +401,7 @@ public:
 	int advance = 0;
 	// 渲染偏移坐标
 	glm::ivec2 _dwpos = {};
-	tinyimage_cx* _image = nullptr;		// 排列int width,height,v2pad,data  
+	image_ptr_t* _image = nullptr;		// 排列int width,height,v2pad,data  
 	// 缓存位置xy, 字符图像zw(width,height)
 	glm::ivec4 _rect = {};
 	glm::ivec2 _apos = {};// 布局坐标
@@ -419,21 +420,21 @@ class bitmap_cache_cx
 {
 public:
 	std::vector<stb_packer*> _packer;
-	std::vector<tinyimage_cx*> _data;
+	std::vector<image_ptr_t*> _data;
 	int width = 1024;					// 纹理宽高
 public:
 	bitmap_cache_cx();
 	~bitmap_cache_cx();
 
-	tinyimage_cx* push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
-	tinyimage_cx* push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, tinyimage_cx* ret, int linegap = 0);
+	image_ptr_t* push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
+	image_ptr_t* push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, image_ptr_t* ret, int linegap = 0);
 	// 清空所有缓存
 	void clear();
 private:
 	stb_packer* get_last_packer(bool isnew);
 
 };
-image_ptr_t to_imgptr(tinyimage_cx* p);
+//image_ptr_t to_imgptr(tinyimage_cx* p);
 
 struct hps_t;
 class fd_info0;
@@ -500,7 +501,7 @@ public:
 private:
 
 	// 字形索引缓存
-	font_item_t* push_gcache(uint32_t glyph_index, uint16_t height, tinyimage_cx* img, const glm::ivec4& rect, const glm::ivec2& pos);
+	font_item_t* push_gcache(uint32_t glyph_index, uint16_t height, image_ptr_t* img, const glm::ivec4& rect, const glm::ivec2& pos);
 	font_item_t* get_gcache(uint32_t glyph_index, uint16_t height);
 	int get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, int lcd_type, uint32_t unicode_codepoint, int xf = 0);
 	int get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vector<uint32_t>& col);
@@ -750,7 +751,7 @@ public:
 	std::vector<cairo_surface_t*> msu;
 	std::vector<font_item_t> tv;
 	// todo
-	std::vector<text_atlas_t> tem_iptr;
+	std::vector<atlas_cx> tem_iptr;
 public:
 	layout_text_x();
 	~layout_text_x();
@@ -775,9 +776,9 @@ public:
 	// 获取渲染数据
 	text_image_t* get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt);
 	// 渲染部分文本
-	void draw_text(cairo_t* cr, const glm::ivec2& r);
+	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
 	// 渲染全部文本
-	void draw_text(cairo_t* cr);
+	void draw_text(cairo_t* cr, uint32_t color);
 	// 获取图集
 	atlas_t* get_atlas();
 	void update_text();
@@ -1038,6 +1039,7 @@ struct widget_base
 	glm::vec2 size = {};	// 控件大小
 	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
 	glm::ivec2 cmpos = {};	// 当前鼠标坐标
+	std::string text;
 	std::string family;
 	float font_size = 16;
 	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
@@ -1045,7 +1047,7 @@ struct widget_base
 	float thickness = 1.0;	// 边框线粗
 	std::function<void(void* p, int type, const glm::vec2& mps)> cb;	//通用事件处理
 	std::function<void(void* p, int clicks)> click_cb;					//点击事件
-
+	layout_text_x* ltx = 0;
 	glm::ivec2 txtps = {};
 	glm::ivec2 txtps2 = {};
 	int _old_bst = 0;			// 鼠标状态
@@ -1106,7 +1108,7 @@ public:
 	// 更新渲染啥的
 	bool update(float delta);
 	// 获取纹理/或者渲染到cairo
-	tinyimage_cx* get_render_data();
+	image_ptr_t* get_render_data();
 	void draw(cairo_t* cr);
 
 	glm::ivec4 input_pos();
@@ -1222,7 +1224,7 @@ public:
 
 struct radio_style_t
 {
-	uint32_t col = 0xffFF9E40, innc = 0xffffffff, textcol = 0xff666666;
+	uint32_t col = 0xffFF9E40, innc = 0xffffffff, text_col = 0xff666666;
 	uint32_t line_col = 0xff4c4c4c;
 	float radius = 7;
 	float thickness = 1.0;
@@ -1234,6 +1236,7 @@ struct check_style_t {
 	uint32_t fill = 0xffff8020;
 	uint32_t check_col = 0xffffffff;
 	uint32_t line_col = 0xff4c4c4c;
+	uint32_t text_col = 0xff666666;
 	float rounding = 2;
 	float square_sz = 14;
 	float thickness = 1.0;
@@ -1275,7 +1278,7 @@ public:
 struct checkbox_tl :public widget_base
 {
 	check_style_t style = {};	// 风格id
-	checkbox_info_t v; 
+	checkbox_info_t v;
 public:
 	void set_value(const std::string& str, bool v);
 	bool update(float delta);
@@ -1284,14 +1287,14 @@ public:
 
 // 开关
 struct switch_tl :public widget_base
-{
-	std::string text[2];
+{ 
 	glm::ivec3 color = { 0xffff9e40, 0xff4c4c4c,-1 }; // 开/关/圆点颜色 { 0xff66ce13, 0xff4949ff };
+	glm::ivec2 text_color = { 0xffff9e40, 0xff4c4c4c }; // 文本颜色;
 	uint32_t dcol = 0;	// 渲染的颜色 
 	float cpos = 0;		// 动画坐标
 	float cv = 0.7;		// 圆点大小 
 	float height = 20;
-	float wf = 2.1;		// 宽比例
+	float wf = 2.1;		// 宽比例 
 	checkbox_info_t v = {};
 	bool inline_prompt = false;
 public:
@@ -1370,9 +1373,9 @@ public:
 	size_t add_familys(const char* familys, const char* style);
 	void add_widget(widget_base* p);
 	// 新增控件：开关、复选、单选
-	switch_tl* add_switch(const std::string& label, const std::string& label2, bool v, bool inlinetxt);
-	checkbox_tl* add_checkbox(const std::string& label, bool v);
-	radio_tl* add_radio(const std::string& label, bool v);
+	switch_tl* add_switch(const glm::ivec2& size, const std::string& label, bool v, bool inlinetxt = false);
+	checkbox_tl* add_checkbox(const glm::ivec2& size, const std::string& label, bool v);
+	radio_tl* add_radio(const glm::ivec2& size, const std::string& label, bool v);
 	edit_tl* add_input(const std::string& label, const glm::ivec2& size, bool single_line);
 	gradient_btn* add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor);
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
@@ -1422,7 +1425,7 @@ glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, c
 cairo_surface_t* new_image_cr(image_ptr_t* img);
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
 void free_image_cr(cairo_surface_t* image);
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc);
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1);
 #endif
 /*
 <表格、树形>
