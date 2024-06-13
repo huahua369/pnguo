@@ -89,7 +89,7 @@ enum class BlendMode_e :int {
 #define col_white 0xffffffff
 //uint32_t color = col_white;			// 混合颜色，默认白色不混合
 #endif
- 
+
 struct image_ptr_t
 {
 	int width = 0, height = 0;
@@ -164,7 +164,6 @@ class atlas_cx
 {
 public:
 	image_ptr_t* img = 0;
-	image_ptr_t img_raw = {};
 	glm::ivec4 clip = {};	// 裁剪区域
 	std::vector<image_sliced_t> _imgv;
 public:
@@ -770,7 +769,8 @@ public:
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
 	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
-
+	// 输出到图集
+	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
 	// 获取路径数据
 	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);
 	// 获取渲染数据
@@ -1287,7 +1287,7 @@ public:
 
 // 开关
 struct switch_tl :public widget_base
-{ 
+{
 	glm::ivec3 color = { 0xffff9e40, 0xff4c4c4c,-1 }; // 开/关/圆点颜色 { 0xff66ce13, 0xff4949ff };
 	glm::ivec2 text_color = { 0xffff9e40, 0xff4c4c4c }; // 文本颜色;
 	uint32_t dcol = 0;	// 渲染的颜色 

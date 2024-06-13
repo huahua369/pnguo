@@ -4334,6 +4334,39 @@ void layout_text_x::draw_text(cairo_t* cr, uint32_t color)
 	}
 }
 
+void layout_text_x::text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt)
+{
+	if (opt && tv.size())
+	{
+		int mx = r.y + r.x;
+		atlas_cx ac = {};
+		ac.img = tv[r.x]._image;
+		for (size_t i = r.x; i < mx; i++)
+		{
+			auto& it = tv[i];
+			if (it._image == ac.img)
+			{
+				ac.add({ it._dwpos,it._rect.z,it._rect.w }, it._rect, {}, it.color ? it.color : color);
+			}
+			else {
+				if (ac._imgv.size())
+				{
+					opt->push_back(ac);
+					ac.clear();
+				}
+				ac.img = it._image;
+				ac.add({ it._dwpos,it._rect.z,it._rect.w }, it._rect, {}, it.color ? it.color : color);
+			}
+		}
+		if (ac._imgv.size())
+		{
+			opt->push_back(ac);
+			ac.clear();
+		}
+	}
+
+}
+
 text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt)
 {
 	auto str = (const char*)str8;
@@ -5136,7 +5169,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5157,7 +5190,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+	}
 
 
 struct path_txf
@@ -9662,7 +9695,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-	}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -9678,7 +9711,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -11583,7 +11616,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -13785,7 +13818,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -14497,7 +14530,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
@@ -15894,8 +15927,8 @@ void plane_cx::update(float delta)
 		fill_stroke(cr, 0, border.x, border.y, false);
 		tv->end_frame(cr);
 		_pat->img->valid = true;
+		}
 	}
-}
 
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& ms)
 {

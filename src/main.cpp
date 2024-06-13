@@ -280,31 +280,25 @@ int main()
 
 		}
 	}
-	pcu->update();
-	auto txt = new layout_text_x();
+	pcu->update(); 
 	{
 		pl1->draggable = true; //可拖动
 		pl1->set_size({ 830,600 });
 		pl1->set_pos({ 100,100 });
 		pl1->set_colors({ 0xff121212,-1,0,0 });
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
-
-		txt->set_ctx(app->font_ctx);
+		 
 		int fontsize = 26;
 		glm::vec2 text_align = { 0.1,0.1 };
 		//txt->add_family("Consolas", 0);
 		//txt->add_family((char*)u8"XITS Math", 0);
-		auto xps = txt->add_familys((char*)u8"新宋体", 0);
-		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
-		txt->add_text(xps, rcc1, text_align, title.c_str(), -1, 16);
+		//auto xps = txt->add_familys((char*)u8"楷体,新宋体", 0);
+		//glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 }; 
 		//txt->add_text({ 0 + 2,0 + 2,200,90 }, text_align, u8"↣ ↠ ↦ ↤ → ← ↔ ⇒ ⇐ ⇔\n 𝔹 ℂ 𝔽 ℕ ℙ ℚ ℝ 𝕋 ℤ \nα β χ δ Δ γ Γ ϵ ɛ η \nκ λ Λ μ ν ω Ω ϕ φ Φ \nπ Π ψ Ψ ρ σ Σ τ θ ϑ Θ υ \nξ Ξ ζ 𝔸 𝐀 𝔄 𝕬 𝐴 𝑨", -1, 18);
 		//txt->clear_family();
 		//txt->add_family("Consolas", 0);
-		auto pxps = pl1->add_familys((char*)u8"新宋体,Segoe UI Emoji", 0);
-		xps = txt->add_familys((char*)u8"楷体,Segoe UI Emoji", 0);
-		text_align = { 0.0,0.1 };
-		glm::vec4 rcc = { 330 + 2 ,0 + 2 ,400,90 };
-		txt->add_text(xps, rcc, text_align, u8"🍊🍇 \n5日线, 10日线, 20日线, 30日线", -1, fontsize);
+		auto pxps = pl1->add_familys((char*)u8"新宋体,Segoe UI Emoji", 0); 
+		text_align = { 0.0,0.1 }; 
 
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
@@ -389,7 +383,7 @@ int main()
 					draw_rectangle(cr, { 0,150,800,300 }, 4);
 					cairo_clip(cr);
 					cairo_new_path(cr);
-					txt->draw_text(cr, -1);
+					//txt->draw_text(cr, -1);
 					pcu->cidx = std::atoi(et1->_text.c_str());
 					pcu->update_draw(cr);
 				}
@@ -406,11 +400,11 @@ int main()
 				int y1 = 10;
 
 				cairo_save(cr);
-				for (auto it : txt->msu)
-				{
-					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
-					y1 += ss.y + 10;
-				}
+				//for (auto it : txt->msu)
+				//{
+				//	auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
+				//	y1 += ss.y + 10;
+				//}
 				cairo_restore(cr);
 			};
 	}
