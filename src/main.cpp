@@ -364,18 +364,50 @@ int main()
 
 		}
 		{
-			auto pro = pl1->add_progress("%d%%", { 100,20 }, 0.125);
+			auto pro = pl1->add_progress("%", { 100,20 }, 0.06);
 			pro->rounding = 10;
 		}
 		{
-			auto pro = pl1->add_progress("%d%%", { 100,20 }, 0.5);
+			auto pro = pl1->add_progress("%", { 100,20 }, 0.125);
 			pro->rounding = 10;
+		}
+		{
+			auto pro = pl1->add_progress("%", { 100,20 }, 0.5);
+			pro->rounding = 10;
+		}
+		{
+			auto pro = pl1->add_progress("%", { 100,20 }, 1);
+			pro->rounding = 10;
+		}
+		{
+			auto pro = pl1->add_progress("%", { 160,20 }, 0);
+			pro->rounding = 10;
+			pro->text_inside = false;
+			pro->set_value(0.8);
+		}
+		{
+			auto pro = pl1->add_progress("%", { 160,20 }, 0);
+			pro->rounding = 10;
+			pro->text_inside = false;
+			pro->set_value(0.98);
+		}
+		{
+			auto pro = pl1->add_progress("%", { 160,20 }, 0);
+			pro->rounding = 10;
+			pro->right_inside = true;
+			pro->set_value(0.68);
+		}
+		{
+			auto pro = pl1->add_progress("%", { 160,26 }, 0);
+			pro->rounding = 12;
+			pro->right_inside = true;
+			pro->set_value(1);
 		}
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		//sw2->text_color = {};
 		pl1->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
-		pl1->mk_layout();
+
 		pl1->update_cb = [=](float delta)
 			{
 
@@ -529,7 +561,7 @@ int main()
 						double ss = 0.0;
 						int cn = 0;
 						// todo
-						std::string str = (char*)u8"成功添加" + std::to_string(cn) + (char*)u8"张图片，耗时(秒):" + to_string(ss) + "\n";
+						std::string str = (char*)u8"成功添加" + std::to_string(cn) + (char*)u8"张图片，耗时(秒):" + pg::to_string(ss) + "\n";
 						et2->add_text(str.c_str(), str.size());
 						fpath += "\n";
 						et2->add_text(fpath.c_str(), fpath.size());

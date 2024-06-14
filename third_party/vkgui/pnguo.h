@@ -9,8 +9,10 @@
 typedef struct _PangoContext PangoContext;
 struct input_state_t;
 
-std::string to_string(double _Val);
-
+namespace pg
+{
+	std::string to_string(double _Val);
+}
 /*
 图集画布
 class canvas_atlas
@@ -1035,7 +1037,7 @@ private:
 };
 
 #endif // NO_FLEX_CX
-
+class plane_cx;
 //  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 struct widget_base
 {
@@ -1058,6 +1060,7 @@ struct widget_base
 	glm::ivec2 txtps2 = {};
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;				// 鼠标点击状态
+	plane_cx* parent = 0;
 	bool _disabled_events = false;
 	bool visible = true;
 	bool has_drag = false;	// 是否有拖动事件
@@ -1321,16 +1324,34 @@ public:
 struct progress_tl :public widget_base
 {
 	std::string format;				// 格式
-	glm::ivec2 vr = { 0, 100 };		// 范围
+	glm::vec2 vr = { 0, 100 };		// 范围
 	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色
 	uint32_t text_color = 0xffffffff;
 	double value = 0.0;				// 当前进度
-	int step = 2;					// 文本间隔
+	int width = 0;					// 宽度
+	int right_inside = 0;			// 右对齐
 	bool text_inside = true;
 public:
 	void set_value(double b);
 	void set_vr(const glm::ivec2& r);
-	int  get_v();
+	double get_v();
+	bool update(float delta);
+	void draw(cairo_t* cr);
+};
+
+// 颜色控件
+struct color_tl :public widget_base
+{
+	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
+	glm::vec3 hsv = {};				// 0-1保存hsv
+	uint32_t text_color = 0xffffffff;//文本颜色 
+	int width = 0;					// 宽度
+	int height = 0;					// 单行高度 
+	bool alpha = true;				// 显示透明通道
+public:
+	void set_color(uint32_t c);
+	void set_hsv(const glm::vec3& c); 
+
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1392,6 +1413,7 @@ public:
 	int dms = 16, dmsset = 16;	// 渲染间隔ms
 	bool _draw_valid = true;
 	bool draggable = false;
+	bool uplayout = true;
 public:
 	plane_cx();
 	~plane_cx();

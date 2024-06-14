@@ -66,12 +66,15 @@ extern "C" {
 #endif // max
 
 
-std::string to_string(double _Val)
+namespace pg
 {
-	const auto _Len = static_cast<size_t>(_scprintf("%.16g", _Val));
-	std::string _Str(_Len, '\0');
-	sprintf_s(&_Str[0], _Len + 1, "%.16g", _Val);
-	return _Str;
+	std::string to_string(double _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%.16g", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%.16g", _Val);
+		return _Str;
+	}
 }
 
 // 2d骨骼动画
@@ -15798,7 +15801,8 @@ void plane_cx::add_widget(widget_base* p)
 	if (p)
 	{
 		p->ltx = ltx;
-		widgets.push_back(p);
+		p->parent = this;
+		widgets.push_back(p); uplayout = true;
 	}
 }
 switch_tl* plane_cx::add_switch(const glm::ivec2& size, const std::string& label, bool v, bool inlinetxt)
@@ -15952,6 +15956,10 @@ void plane_cx::update(float delta)
 	if (update_cb)
 		ic += update_cb(delta);
 	if (ic > 0 || evupdate > 0)tv->set_draw_update();
+
+	if (uplayout) {
+		mk_layout();
+	}
 	auto kms = delta * 1000;
 	dms -= kms;
 	if (dms > 0 || kms <= 0)
@@ -16081,6 +16089,7 @@ void plane_cx::mk_layout()
 		}
 		delete[] c;
 	}
+	uplayout = false;
 }
 
 bool plane_cx::hittest(const glm::ivec2& p)
@@ -18031,11 +18040,15 @@ void progress_tl::set_value(double b)
 	value = b;
 	if (format.size())
 	{
-		auto k = get_v();
+		double k = get_v();
 		std::string vv;
-		vv.resize(format.size() + 12);
-		sprintf(vv.data(), format.c_str(), k);
-		text = vv.c_str();
+		text = pg::to_string(k) + format;
+		width = size.x;
+		if (text.size() && !text_inside) {
+			auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+			size.x = width + rk.x + rounding * 0.5;
+			if (parent)parent->uplayout = true;
+		}
 	}
 }
 
@@ -18044,7 +18057,7 @@ void progress_tl::set_vr(const glm::ivec2& r)
 	vr = r;
 }
 
-int progress_tl::get_v()
+double progress_tl::get_v()
 {
 	return glm::mix(vr.x, vr.y, value);
 }
@@ -18059,32 +18072,42 @@ void progress_tl::draw(cairo_t* cr)
 	cairo_as _as_(cr);
 	glm::ivec2 poss = pos;
 	glm::ivec2 ss = size;
+	ss.x = width;
 	cairo_translate(cr, poss.x, poss.y);
 	draw_rectangle(cr, { 0.5,0.5, ss.x, ss.y }, rounding);
 	fill_stroke(cr, color.y, 0, 0, 0);
 	double xx = ss.x * value;
+	int kx = 0;
+	int r = rounding;
 	if (xx > 0)
 	{
 		cairo_as _as_a(cr);
 		if (xx < rounding * 2)
 		{
-			draw_rectangle(cr, { 0,0, xx, ss.y }, 0);
+			draw_rectangle(cr, { 0,0, xx, ss.y }, r);
 			cairo_clip(cr);
-			xx = rounding * 2;
+			xx = r * 2;
+			kx = 1;
 		}
-		draw_rectangle(cr, { 0.5,0.5, xx, ss.y }, rounding);
+		draw_rectangle(cr, { 0.5,0.5, xx, ss.y }, r);
 		fill_stroke(cr, color.x, 0, 0, 0);
 	}
 	if (text.size()) {
-		int st = step;
 		auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
 		if (text_inside) {
-			ss.x = xx; st = 0;
+			ss.x = xx;
+			ss.x -= r * 0.5;
 		}
 		else {
-			st = rk.x;
+			ss.x = size.x;
 		}
-		ss.x += st;
+		if (kx) {
+
+			ss.x += rk.x;
+		}
+		if (right_inside) {
+			ss.x = size.x - r * 0.5;
+		}
 		glm::vec2 ta = { 1,0.5 };
 		glm::vec4 rc = { 0, 0, ss };
 		ltx->tem_rtv.clear();
@@ -18092,4 +18115,21 @@ void progress_tl::draw(cairo_t* cr)
 		ltx->update_text();
 		ltx->draw_text(cr, ltx->tem_rtv, text_color);
 	}
+}
+
+void color_tl::set_color(uint32_t c)
+{
+}
+
+void color_tl::set_hsv(const glm::vec3& c)
+{
+}
+
+bool color_tl::update(float delta)
+{
+	return false;
+}
+
+void color_tl::draw(cairo_t* cr)
+{
 }
