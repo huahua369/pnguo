@@ -782,7 +782,7 @@ public:
 	// 渲染部分文本
 	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
 	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
-	 
+
 	// 渲染全部文本
 	void draw_text(cairo_t* cr, uint32_t color);
 	// 获取图集
@@ -1268,15 +1268,21 @@ struct checkbox_info_t
 	bool value = 0; // 选中值
 	bool value1 = 1; // 选中值动画
 };
-
+struct radio_tl;
+struct group_radio_t
+{
+	radio_tl* active = 0;
+};
 // 单选
 struct radio_tl :public widget_base
 {
 	radio_style_t style = {};	// 风格id
 	radio_info_t v;
-	uint32_t active = -1;		// 选中的idx 
+	group_radio_t* gr = 0;		// 组 
 public:
 	void set_value(const std::string& str, bool v);
+	void set_value(bool v);
+	void set_value();
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1287,6 +1293,8 @@ struct checkbox_tl :public widget_base
 	checkbox_info_t v;
 public:
 	void set_value(const std::string& str, bool v);
+	void set_value(bool v);
+	void set_value();
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1305,6 +1313,7 @@ struct switch_tl :public widget_base
 	bool inline_prompt = false;
 public:
 	void set_value(bool b);
+	void set_value();
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1349,7 +1358,7 @@ public:
 	std::vector<image_ptr_t*> images;
 	std::vector<svg_cx*> svgs;
 	layout_info_x _css = {};		// 布局样式
-	glm::vec2 _lpos = { 10,10 }, _lms = { 6,6 };
+	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 偏移，加宽
 	std::string familys = "Arial,NSimSun";
 	int fontsize = 12;
 	uint32_t text_color = -1;
@@ -1381,10 +1390,11 @@ public:
 	// 新增控件：开关、复选、单选
 	switch_tl* add_switch(const glm::ivec2& size, const std::string& label, bool v, bool inlinetxt = false);
 	checkbox_tl* add_checkbox(const glm::ivec2& size, const std::string& label, bool v);
-	radio_tl* add_radio(const glm::ivec2& size, const std::string& label, bool v);
+	radio_tl* add_radio(const glm::ivec2& size, const std::string& label, bool v, group_radio_t* gp);
 	edit_tl* add_input(const std::string& label, const glm::ivec2& size, bool single_line);
 	gradient_btn* add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor);
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
+	color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
 	// 窗口执行事件
 	void on_event(uint32_t type, et_un_t* e);
 	void update(float delta);

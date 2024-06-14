@@ -4201,6 +4201,8 @@ glm::ivec4 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	auto h = get_lineheight(idx, fontsize);
 	if (n > 1)
 		ret.y = h * n;
+	else
+		ret.y = fontsize;
 	return ret;
 }
 glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
@@ -15837,10 +15839,11 @@ checkbox_tl* plane_cx::add_checkbox(const glm::ivec2& size, const std::string& l
 	}
 	return p;
 }
-radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, bool v)
+radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, bool v, group_radio_t* gp)
 {
 	auto p = new radio_tl();
 	if (p) {
+		p->gr = gp;
 		p->set_value(label, v);
 		p->text = label;
 		p->size = size;
@@ -15899,6 +15902,19 @@ color_btn* plane_cx::add_cbutton(const std::string& label, const glm::ivec2& siz
 		gb->_autofree = true;
 	}
 	return gb;
+}
+
+color_btn* plane_cx::add_label(const std::string& label, const glm::ivec2& size, int idx)
+{
+	auto p = add_cbutton(label, size, idx);
+	if (p)
+	{
+		p->effect = uTheme::light;
+		p->light = 0;
+		p->text_align.x = 0;
+		//p->_disabled_events = true;
+	}
+	return p;
 }
 
 void plane_cx::set_family_size(const std::string& fam, int fs, uint32_t color)
@@ -16047,7 +16063,7 @@ void plane_cx::mk_layout()
 			auto it = layouts[i];
 			glm::vec2 itss = { it.z,it.w };
 			p->pos = it;
-			p->pos += itss * _css.pos_align - (p->size * _css.pos_align);
+			p->pos += (itss - p->size) * _css.pos_align;
 		}
 		delete[] c;
 	}
@@ -16067,7 +16083,7 @@ bool plane_cx::hittest(const glm::ivec2& p)
 		{
 			for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
 				auto pw = (widget_base*)*it;
-				if (pw->_disabled_events || !pw->visible)continue;
+				if (!pw->visible || pw->_disabled_events)continue;
 				glm::vec2 mps = p; mps -= ips;
 				// 判断是否鼠标在控件上
 				auto k = check_box_cr1(mps, (glm::vec4*)&(pw->pos), 1, 0);
@@ -16157,7 +16173,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
 		auto pw = (widget_base*)*it;
-		if (pw->_disabled_events)continue;
+		if (!pw->visible || pw->_disabled_events)continue;
 		auto pt = dynamic_cast<edit_tl*>(pw);
 		if (!pt) {
 			widget_on_event(pw, type, ep, ppos);
@@ -16635,6 +16651,7 @@ bool color_btn::update(float)
 			if (p->effect == uTheme::light)
 			{
 				p->dfill = set_alpha_f(p->dfill, p->light * 5);
+				p->dcol = set_alpha_f(p->dcol, p->light * 6);
 			}
 			if (p->effect == uTheme::dark)
 			{
@@ -16687,7 +16704,8 @@ void color_btn::draw(cairo_t* g)
 {
 	auto p = this;
 	auto ns = p->size;
-	cairo_save(g);
+
+	cairo_as _as_(g);
 	cairo_translate(g, p->pos.x, p->pos.y);
 	if (p->dfill)
 	{
@@ -16733,7 +16751,11 @@ void color_btn::draw(cairo_t* g)
 		fill_stroke(g, 0, p->dcol, p->thickness, bgr);
 	}
 
-	cairo_restore(g);
+	//if ((bst & (int)BTN_STATE::STATE_HOVER))
+	//{
+	//	draw_rectangle(g, { 0,0,size.x,size.y }, p->rounding);
+	//	fill_stroke(g, 0, 0x80ff8000, 1, 0);
+	//}
 }
 
 
@@ -17726,6 +17748,30 @@ void radio_tl::set_value(const std::string& str, bool bv)
 	k.text = str;
 	k.value = bv; k.value1 = !bv;
 	v = k;
+	if (bv)
+	{
+		set_value();
+	}
+}
+
+void radio_tl::set_value(bool bv)
+{
+	v.value = bv;
+	if (bv)
+	{
+		set_value();
+	}
+}
+
+void radio_tl::set_value()
+{
+	v.value = true;
+	if (gr && this != gr->active)
+	{
+		if (gr->active)
+			gr->active->set_value(false);
+		gr->active = this;
+	}
 }
 
 bool radio_tl::update(float delta)
@@ -17746,7 +17792,8 @@ bool radio_tl::update(float delta)
 			size.y = style.radius * 2;
 		}
 		if (cks > 0 && it.value == it.value1) {
-			it.value = !it.value; cks = 0;
+			cks = 0;
+			set_value();
 		}
 		if (it.value != it.value1)
 		{
@@ -17793,6 +17840,11 @@ void radio_tl::draw(cairo_t* cr)
 			draw_radios(cr, &it, &style);
 			x++;
 		}
+		//if ((bst & (int)BTN_STATE::STATE_HOVER))
+		//{
+		//	draw_rectangle(cr, { 0,0,size.x,size.y }, style.radius * 0.2);
+		//	fill_stroke(cr, 0, 0x80ff8000, 1, 0);
+		//}
 	}
 }
 
@@ -17802,6 +17854,16 @@ void checkbox_tl::set_value(const std::string& str, bool bv)
 	k.text = str;
 	k.value = bv; k.value1 = !bv;
 	v = k;
+}
+
+void checkbox_tl::set_value(bool bv)
+{
+	v.value = bv;
+}
+
+void checkbox_tl::set_value()
+{
+	v.value = !v.value;
 }
 
 bool checkbox_tl::update(float delta)
@@ -17817,7 +17879,7 @@ bool checkbox_tl::update(float delta)
 			size.y = style.square_sz;
 		}
 		if (cks > 0 && it.value == it.value1) {
-			it.value = !it.value; cks = 0;
+			set_value(); cks = 0;
 		}
 		auto duration = it.duration > 0 ? it.duration : style.duration;
 		if (it.value != it.value1)
@@ -17863,6 +17925,11 @@ void checkbox_tl::draw(cairo_t* cr)
 			draw_checkbox(cr, &p->style, &it);
 			x++;
 		}
+		//if ((bst & (int)BTN_STATE::STATE_HOVER))
+		//{
+		//	draw_rectangle(cr, { 0,0,size.x,size.y }, style.square_sz * 0.2);
+		//	fill_stroke(cr, 0, 0x80ff8000, 1, 0);
+		//}
 	}
 }
 
@@ -17872,12 +17939,17 @@ void switch_tl::set_value(bool b)
 	v.value1 = !b;
 }
 
+void switch_tl::set_value()
+{
+	v.value = !v.value;
+}
+
 bool switch_tl::update(float delta)
 {
 	int ic = 0;
 	auto& it = v;
 	if (cks > 0 && it.value == it.value1) {
-		it.value = !it.value; cks = 0;
+		cks = 0; set_value();
 	}
 	if (it.value != it.value1)
 	{
@@ -17908,8 +17980,6 @@ void switch_tl::draw(cairo_t* cr)
 {
 	cairo_as _as_(cr);
 	glm::ivec2 poss = pos;
-	poss.y += (size.y - height) * 0.5;
-	cairo_translate(cr, poss.x, poss.y);
 	auto h = height;
 	auto fc = h * cv * 0.5;
 	auto ss = h * wf;
@@ -17919,6 +17989,9 @@ void switch_tl::draw(cairo_t* cr)
 	if (size.y <= 0) {
 		size.y = h;
 	}
+	poss.x += (size.x - ss) * 0.5;
+	poss.y += (size.y - height) * 0.5;
+	cairo_translate(cr, poss.x, poss.y);
 	draw_rectangle(cr, { 0.5,0.5, ss, h }, h * 0.5);
 	fill_stroke(cr, dcol, 0, 0, 0);
 	glm::vec2 cp = {};
@@ -17930,4 +18003,9 @@ void switch_tl::draw(cairo_t* cr)
 		fill_stroke(cr, color.z, 0, 0, 0);
 	}
 
+	//if ((bst & (int)BTN_STATE::STATE_HOVER))
+	//{
+	//	draw_rectangle(cr, { 0,0,size.x,size.y }, h * 0.2);
+	//	fill_stroke(cr, 0, 0x80ff8000, 1, 0);
+	//}
 }

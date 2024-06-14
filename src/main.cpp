@@ -244,7 +244,7 @@ int main()
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji";
-	fontn = (char*)u8"黑体,Segoe UI Emoji";
+	//fontn = (char*)u8"黑体,Segoe UI Emoji";
 	pl1->add_familys(fontn, 0);
 	pl2->add_familys(fontn, 0);
 	pl3->add_familys(fontn, 0);
@@ -292,7 +292,7 @@ int main()
 		pl1->set_pos({ 100,100 });
 		pl1->set_colors({ 0xff121212,-1,0,0 });
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
-
+		pl1->fontsize = 16;
 		int fontsize = 26;
 		glm::vec2 text_align = { 0.1,0.1 };
 		//txt->add_family("Consolas", 0);
@@ -305,7 +305,7 @@ int main()
 		text_align = { 0.0,0.1 };
 		auto txt = pl1->ltx;
 		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
-		txt->add_text(0, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🍆abcg", -1, 60);
+		txt->add_text(0, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🌶🍆abcg", -1, 60);
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
 		et1->set_pos({ 10,10 });
@@ -313,10 +313,54 @@ int main()
 		pl1->add_switch(bs, "", false);
 		auto sw1 = (switch_tl*)pl1->add_switch(bs, (char*)u8"开", true);
 		auto sw2 = (switch_tl*)pl1->add_switch(bs, "k", false);
-		pl1->add_checkbox(bs, "cc", false);
-		pl1->add_checkbox(bs, "cc1", true);
-		pl1->add_radio(bs, "cc2", false);
-		pl1->add_radio(bs, "cc3", true);
+		bs.x = 16;
+		bs.y = 16;
+		{
+			auto ck1 = pl1->add_checkbox(bs, "cc", false);
+			bs.x = 90;
+			bs.y = 30;
+			auto kcb = pl1->add_label((char*)u8"🌽玉米", bs, 0);
+			kcb->click_cb = [=](void* ptr, int clicks) {
+				ck1->set_value();
+				};
+		}
+		bs.x = 16;
+		bs.y = 16;
+		{
+			auto ck1 = pl1->add_checkbox(bs, "cc1", false); 
+			bs.x = 90;
+			bs.y = 30;
+			auto kcb = pl1->add_label((char*)u8"g🍖🌶🌶", bs, 0);
+			kcb->click_cb = [=](void* ptr, int clicks) {
+				ck1->set_value();
+				};
+		}
+		auto gr = new group_radio_t();
+		bs.x = 16;
+		bs.y = 16;
+		auto r1 = pl1->add_radio(bs, "cc2", true, gr);
+		{
+			bs.x = 90;
+			bs.y = 30;
+			auto kcb = pl1->add_label((char*)u8"🍇葡萄", bs, 0);
+			kcb->click_cb = [=](void* ptr, int clicks) {
+				r1->set_value();
+				};
+
+		}
+		bs.x = 16;
+		bs.y = 16;
+		auto r2 = pl1->add_radio(bs, "cc3", true, gr);
+		{
+			bs.x = 90;
+			bs.y = 30;
+			auto kcb = pl1->add_label((char*)u8"🥝猕猴桃", bs, 0);
+			kcb->click_cb = [=](void* ptr, int clicks) {
+				r2->set_value();
+				};
+
+		}
+
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		//sw2->text_color = {};
