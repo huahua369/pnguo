@@ -1317,8 +1317,16 @@ public:
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
+// 进度条
+struct progress_bar_tl :public widget_base
+{
 
+};
+// 下拉框。可单选/多选
+struct clist_tl :public widget_base
+{
 
+};
 
 #endif // 1
 
