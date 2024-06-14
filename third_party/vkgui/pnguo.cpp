@@ -15917,6 +15917,20 @@ color_btn* plane_cx::add_label(const std::string& label, const glm::ivec2& size,
 	return p;
 }
 
+progress_tl* plane_cx::add_progress(const std::string& format, const glm::ivec2& size, double v)
+{
+	auto p = new progress_tl();
+	if (p)
+	{
+		p->size = size;
+		p->format = format;
+		p->set_value(v);
+		add_widget(p);
+		p->_autofree = true;
+	}
+	return p;
+}
+
 void plane_cx::set_family_size(const std::string& fam, int fs, uint32_t color)
 {
 	if (fam.size())
@@ -18008,4 +18022,74 @@ void switch_tl::draw(cairo_t* cr)
 	//	draw_rectangle(cr, { 0,0,size.x,size.y }, h * 0.2);
 	//	fill_stroke(cr, 0, 0x80ff8000, 1, 0);
 	//}
+}
+
+void progress_tl::set_value(double b)
+{
+	if (b < 0)b = 0;
+	if (b > 1)b = 1;
+	value = b;
+	if (format.size())
+	{
+		auto k = get_v();
+		std::string vv;
+		vv.resize(format.size() + 12);
+		sprintf(vv.data(), format.c_str(), k);
+		text = vv.c_str();
+	}
+}
+
+void progress_tl::set_vr(const glm::ivec2& r)
+{
+	vr = r;
+}
+
+int progress_tl::get_v()
+{
+	return glm::mix(vr.x, vr.y, value);
+}
+
+bool progress_tl::update(float delta)
+{
+	return false;
+}
+
+void progress_tl::draw(cairo_t* cr)
+{
+	cairo_as _as_(cr);
+	glm::ivec2 poss = pos;
+	glm::ivec2 ss = size;
+	cairo_translate(cr, poss.x, poss.y);
+	draw_rectangle(cr, { 0.5,0.5, ss.x, ss.y }, rounding);
+	fill_stroke(cr, color.y, 0, 0, 0);
+	double xx = ss.x * value;
+	if (xx > 0)
+	{
+		cairo_as _as_a(cr);
+		if (xx < rounding * 2)
+		{
+			draw_rectangle(cr, { 0,0, xx, ss.y }, 0);
+			cairo_clip(cr);
+			xx = rounding * 2;
+		}
+		draw_rectangle(cr, { 0.5,0.5, xx, ss.y }, rounding);
+		fill_stroke(cr, color.x, 0, 0, 0);
+	}
+	if (text.size()) {
+		int st = step;
+		auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+		if (text_inside) {
+			ss.x = xx; st = 0;
+		}
+		else {
+			st = rk.x;
+		}
+		ss.x += st;
+		glm::vec2 ta = { 1,0.5 };
+		glm::vec4 rc = { 0, 0, ss };
+		ltx->tem_rtv.clear();
+		ltx->build_text(0, rc, ta, text.c_str(), -1, font_size, ltx->tem_rtv);
+		ltx->update_text();
+		ltx->draw_text(cr, ltx->tem_rtv, text_color);
+	}
 }

@@ -229,6 +229,9 @@ int main()
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
 	//form0->set_alpha(true);
 	//form0->set_alpha(false);
+	form0->up_cb = [](float dt, int* rms) {
+		//	*rms = 8;
+		};
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
 	int cpun = call_data((int)cdtype_e::cpu_count, 0);
@@ -327,7 +330,7 @@ int main()
 		bs.x = 16;
 		bs.y = 16;
 		{
-			auto ck1 = pl1->add_checkbox(bs, "cc1", false); 
+			auto ck1 = pl1->add_checkbox(bs, "cc1", false);
 			bs.x = 90;
 			bs.y = 30;
 			auto kcb = pl1->add_label((char*)u8"g🍖🌶🌶", bs, 0);
@@ -360,7 +363,14 @@ int main()
 				};
 
 		}
-
+		{
+			auto pro = pl1->add_progress("%d%%", { 100,20 }, 0.125);
+			pro->rounding = 10;
+		}
+		{
+			auto pro = pl1->add_progress("%d%%", { 100,20 }, 0.5);
+			pro->rounding = 10;
+		}
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		//sw2->text_color = {};
@@ -374,7 +384,7 @@ int main()
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
-				cairo_translate(cr, 0, 30);
+				cairo_translate(cr, 0, 300);
 				txt->draw_text(cr, 0xff0080ff);
 
 				/*	glm::vec4 rc = { ps, ns };

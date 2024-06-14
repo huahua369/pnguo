@@ -1057,7 +1057,7 @@ struct widget_base
 	glm::ivec2 txtps = {};
 	glm::ivec2 txtps2 = {};
 	int _old_bst = 0;			// 鼠标状态
-	int cks = 0;
+	int cks = 0;				// 鼠标点击状态
 	bool _disabled_events = false;
 	bool visible = true;
 	bool has_drag = false;	// 是否有拖动事件
@@ -1318,10 +1318,23 @@ public:
 	void draw(cairo_t* cr);
 };
 // 进度条
-struct progress_bar_tl :public widget_base
+struct progress_tl :public widget_base
 {
-
+	std::string format;				// 格式
+	glm::ivec2 vr = { 0, 100 };		// 范围
+	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色
+	uint32_t text_color = 0xffffffff;
+	double value = 0.0;				// 当前进度
+	int step = 2;					// 文本间隔
+	bool text_inside = true;
+public:
+	void set_value(double b);
+	void set_vr(const glm::ivec2& r);
+	int  get_v();
+	bool update(float delta);
+	void draw(cairo_t* cr);
 };
+
 // 下拉框。可单选/多选
 struct clist_tl :public widget_base
 {
@@ -1403,6 +1416,7 @@ public:
 	gradient_btn* add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor);
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
 	color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
+	progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
 	// 窗口执行事件
 	void on_event(uint32_t type, et_un_t* e);
 	void update(float delta);
