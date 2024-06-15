@@ -1368,7 +1368,8 @@ struct colorpick_tl :public widget_base
 	bool alpha = true;				// 显示透明通道
 public:
 	void init(uint32_t c, int w, int h, bool alpha);
-	void set_color(uint32_t c);
+	uint32_t get_color();	// 获取颜色
+	void set_color2hsv(uint32_t c);
 	void set_hsv(const glm::vec3& c);
 	void set_hsv(const glm::vec4& c);
 	void set_posv(const glm::ivec2& poss);

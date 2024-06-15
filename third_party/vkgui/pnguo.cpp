@@ -17864,7 +17864,7 @@ bool radio_tl::update(float delta)
 		if (size.y <= 0) {
 			size.y = style.radius * 2;
 		}
-		if (cks > 0 && v.value == v.value1) { 
+		if (cks > 0 && v.value == v.value1) {
 			cks = 0; set_value();
 		}
 		if (it.value != it.value1)
@@ -17936,7 +17936,7 @@ void checkbox_tl::set_value(bool bv)
 void checkbox_tl::set_value()
 {
 	v.value1 = v.value;
-	v.value = !v.value; 
+	v.value = !v.value;
 }
 
 bool checkbox_tl::on_mevent(int type, const glm::vec2& mps)
@@ -18193,28 +18193,26 @@ void progress_tl::draw(cairo_t* cr)
 	}
 }
 
-void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
+// Convert rgb floats ([0-1],[0-1],[0-1]) to hsv floats ([0-1],[0-1],[0-1]), from Foley & van Dam p592
+// Optimized http://lolengine.net/blog/2013/01/13/fast-rgb-to-hsv
+glm::vec4 RGBtoHSV(glm::u8vec4* c)
 {
-	set_color(c);
-	width = w;
-	height = h;
-	if (width < 1)
-		width = 100;
-	if (height < font_size)
-		height = ltx->get_lineheight(0, font_size);
-	h = height + step;
-	size.x = width;
-	int hn = 4;
-	if (alpha)hn++;
-	size.y = h * hn;
+	double r = c->x / 255.0, g = c->y / 255.0, b = c->z / 255.0, a = c->w / 255.0;
+	double K = 0.;
+	if (g < b)
+	{
+		std::swap(g, b);
+		K = -1.;
+	}
+	if (r < g)
+	{
+		std::swap(r, g);
+		K = -2. / 6. - K;
+	}
+	const float chroma = r - (g < b ? g : b);
+	glm::vec4 hsv = { fabs(K + (g - b) / (6.0 * chroma + 1e-20f)), chroma / (r + 1e-20f), r ,a };
+	return hsv;
 }
-
-void colorpick_tl::set_color(uint32_t c)
-{
-	color.y = color.x;
-	color.x = c;
-}
-
 // Convert hsv floats ([0-1],[0-1],[0-1]) to rgb floats ([0-1],[0-1],[0-1]), from Foley & van Dam p593
 // also http://en.wikipedia.org/wiki/HSL_and_HSV
 void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
@@ -18244,15 +18242,51 @@ void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
 	case 5: default: otc.x = v; otc.y = p; otc.z = q; break;
 	}
 }
+
+void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
+{
+	set_color2hsv(c);
+	width = w;
+	height = h;
+	if (width < 1)
+		width = 100;
+	if (height < font_size)
+		height = ltx->get_lineheight(0, font_size);
+	h = height + step;
+	size.x = width;
+	int hn = 4;
+	if (alpha)hn++;
+	size.y = h * hn;
+}
+
+uint32_t colorpick_tl::get_color()
+{
+	glm::vec4 hc = {};
+	HSVtoRGB(hsv, hc);
+	glm::u8vec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
+	return *((uint32_t*)&c);
+}
+
+void colorpick_tl::set_color2hsv(uint32_t c)
+{
+	color.y = color.x;
+	color.x = c;
+	hsv = RGBtoHSV((glm::u8vec4*)&c);
+}
+
 void colorpick_tl::set_hsv(const glm::vec3& c)
 {
 	hsv.x = c.x;
 	hsv.y = c.y;
 	hsv.z = c.z;
+	color.y = color.x;
+	color.x = get_color();
 }
 void colorpick_tl::set_hsv(const glm::vec4& c)
 {
 	hsv = c;
+	color.y = color.x;
+	color.x = get_color();
 }
 void colorpick_tl::set_posv(const glm::ivec2& poss)
 {
@@ -18412,7 +18446,7 @@ void colorpick_tl::draw(cairo_t* cr)
 	{
 		cairo_translate(cr, cpx, yh);
 		draw_linear(cr, { cw,height }, col_hues, 7);	// H 
-		glm::ivec4 rcc = { cw * hsv.x,-step * 0.5,step - 2, height + step };
+		glm::ivec4 rcc = { (cw - step) * hsv.x,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
