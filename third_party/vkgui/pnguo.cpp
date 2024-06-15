@@ -17843,7 +17843,6 @@ bool radio_tl::on_mevent(int type, const glm::vec2& mps)
 	auto et = (event_type2)type;
 	if (et == event_type2::on_click)
 	{
-		set_value();
 	}
 	return false;
 }
@@ -17864,6 +17863,9 @@ bool radio_tl::update(float delta)
 		}
 		if (size.y <= 0) {
 			size.y = style.radius * 2;
+		}
+		if (cks > 0 && v.value == v.value1) { 
+			cks = 0; set_value();
 		}
 		if (it.value != it.value1)
 		{
@@ -17933,7 +17935,8 @@ void checkbox_tl::set_value(bool bv)
 
 void checkbox_tl::set_value()
 {
-	v.value = !v.value;
+	v.value1 = v.value;
+	v.value = !v.value; 
 }
 
 bool checkbox_tl::on_mevent(int type, const glm::vec2& mps)
@@ -17941,7 +17944,6 @@ bool checkbox_tl::on_mevent(int type, const glm::vec2& mps)
 	auto et = (event_type2)type;
 	if (et == event_type2::on_click)
 	{
-		set_value();
 	}
 	return false;
 }
@@ -17959,6 +17961,9 @@ bool checkbox_tl::update(float delta)
 			size.y = style.square_sz;
 		}
 
+		if (cks > 0 && v.value == v.value1) {
+			cks = 0; set_value();
+		}
 		auto duration = it.duration > 0 ? it.duration : style.duration;
 		if (it.value != it.value1)
 		{
@@ -18019,6 +18024,7 @@ void switch_tl::set_value(bool b)
 
 void switch_tl::set_value()
 {
+	v.value1 = v.value;
 	v.value = !v.value;
 }
 
@@ -18027,7 +18033,6 @@ bool switch_tl::on_mevent(int type, const glm::vec2& mps)
 	auto et = (event_type2)type;
 	if (et == event_type2::on_click)
 	{
-		set_value();
 	}
 	return false;
 }
@@ -18036,6 +18041,9 @@ bool switch_tl::update(float delta)
 {
 	int ic = 0;
 	auto& it = v;
+	if (cks > 0 && v.value == v.value1) {
+		cks = 0; set_value();
+	}
 	if (it.value != it.value1)
 	{
 		auto dt = fmod(delta, it.duration);
