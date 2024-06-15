@@ -747,6 +747,7 @@ public:
 	std::vector<std::vector<font_t*>> familyv;
 	std::vector<glm::ivec3> cfb;
 	int fdpi = 72;
+	int heightline = 0;		// 固定行高
 	text_path_t ctp = {};	// 临时缓存
 	text_image_t cti = {};
 	std::vector<cairo_surface_t*> msu;
@@ -771,7 +772,7 @@ public:
 	// 获取行高
 	int get_lineheight(size_t idx, int fontsize);
 	// 获取文本区域大小
-	glm::ivec4 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	glm::ivec2 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
 	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
@@ -1340,17 +1341,22 @@ public:
 };
 
 // 颜色控件
-struct color_tl :public widget_base
+struct colorpick_tl :public widget_base
 {
 	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
-	glm::vec3 hsv = {};				// 0-1保存hsv
-	uint32_t text_color = 0xffffffff;//文本颜色 
+	glm::vec4 hsv = {}, oldhsv = {};	// 0-1保存hsv
+	uint32_t text_color = 0xffaaaaaa;//文本颜色 
+	uint32_t bc_color = 0xff232323;//边框 
 	int width = 0;					// 宽度
 	int height = 0;					// 单行高度 
+	int step = 4;					// 行间隔 
+	std::string hsvstr;
 	bool alpha = true;				// 显示透明通道
 public:
+	void init(uint32_t c, int w, int h, bool alpha);
 	void set_color(uint32_t c);
-	void set_hsv(const glm::vec3& c); 
+	void set_hsv(const glm::vec3& c);
+	void set_hsv(const glm::vec4& c);
 
 	bool update(float delta);
 	void draw(cairo_t* cr);
@@ -1439,6 +1445,7 @@ public:
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
 	color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
 	progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
+	colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
 	// 窗口执行事件
 	void on_event(uint32_t type, et_un_t* e);
 	void update(float delta);

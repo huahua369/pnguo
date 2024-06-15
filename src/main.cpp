@@ -246,9 +246,11 @@ int main()
 	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
-	auto fontn = (char*)u8"新宋体,Segoe UI Emoji";
+	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
+	auto fontn2 = (char*)u8"Consolas,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
 	pl1->add_familys(fontn, 0);
+	pl1->add_familys(fontn2, 0);
 	pl2->add_familys(fontn, 0);
 	pl3->add_familys(fontn, 0);
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
@@ -402,6 +404,12 @@ int main()
 			pro->rounding = 12;
 			pro->right_inside = true;
 			pro->set_value(1);
+		}
+		{
+			auto cp = pl1->add_colorpick(0, 200, 20, true);
+			cp->font_size = 16;
+			cp->init(0, 200, 20, true);
+			cp->set_hsv({ 0.62,1,0.91,0.68 });
 		}
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
