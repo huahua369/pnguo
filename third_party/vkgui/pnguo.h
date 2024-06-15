@@ -1066,6 +1066,8 @@ struct widget_base
 	bool visible = true;
 	bool has_drag = false;	// 是否有拖动事件
 	bool _autofree = false;
+	//event_type2
+	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
 	virtual void draw(cairo_t* cr);
 };
@@ -1287,6 +1289,8 @@ public:
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);
 	void set_value();
+
+	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1299,6 +1303,8 @@ public:
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);
 	void set_value();
+
+	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1318,6 +1324,8 @@ struct switch_tl :public widget_base
 public:
 	void set_value(bool b);
 	void set_value();
+
+	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1336,6 +1344,8 @@ public:
 	void set_value(double b);
 	void set_vr(const glm::ivec2& r);
 	double get_v();
+
+	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1350,14 +1360,20 @@ struct colorpick_tl :public widget_base
 	int width = 0;					// 宽度
 	int height = 0;					// 单行高度 
 	int step = 4;					// 行间隔 
-	std::string hsvstr;
+	int cw = 0;						// 颜色宽
+	int cpx = 0;					// 颜色x坐标
+	int dx = -1;
+	std::string hsvstr, colorstr;
+	std::vector<font_item_t> tem_rtv;
 	bool alpha = true;				// 显示透明通道
 public:
 	void init(uint32_t c, int w, int h, bool alpha);
 	void set_color(uint32_t c);
 	void set_hsv(const glm::vec3& c);
 	void set_hsv(const glm::vec4& c);
+	void set_posv(const glm::ivec2& poss);
 
+	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };

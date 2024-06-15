@@ -13778,6 +13778,11 @@ void flex_item::layout()
 
 
 
+bool widget_base::on_mevent(int type, const glm::vec2& mps)
+{
+	return false;
+}
+
 bool widget_base::update(float delta)
 {
 	return false;
@@ -16824,13 +16829,23 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 		auto k = check_box_cr1(mps, (glm::vec4*)&wp->pos, 1, 0);
 		if (k.x) { wp->bst |= (int)BTN_STATE::STATE_HOVER; }
 		else { wp->bst &= ~(int)BTN_STATE::STATE_HOVER; }
-		if (wp->cb)
+
 		{
 			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
-				wp->cb(wp, (int)event_type2::on_move, mps);
+			{
+				wp->on_mevent((int)event_type2::on_move, mps);
+				if (wp->cb)
+				{
+					wp->cb(wp, (int)event_type2::on_move, mps);
+				}
+			}
 			if (wp->bst & (int)BTN_STATE::STATE_ACTIVE) {
 				auto dps = mps - wp->curpos;
-				wp->cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
+				if (wp->cb)
+				{
+					wp->cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+				}
 			}
 		}
 	}
@@ -16851,17 +16866,22 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
 					wp->curpos = mps - (glm::ivec2)wp->pos;
 					wp->cks = 0;
+					wp->on_mevent((int)event_type2::on_down, mps);
 					if (wp->cb) { wp->cb(wp, (int)event_type2::on_down, mps); }
 				}
 				else {
 					if ((wp->bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
 					{
 						wp->cks = p->clicks;
+						wp->on_mevent((int)event_type2::on_up, mps);
 						if (wp->cb) {
 							wp->cb(wp, (int)event_type2::on_up, mps);
-							int tc = (int)event_type2::on_click; //左键单击
-							if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
-							else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+						}
+						int tc = (int)event_type2::on_click; //左键单击
+						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
+						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+						wp->on_mevent(tc, mps);
+						if (wp->cb) {
 							wp->cb(wp, tc, mps);
 						}
 						if (wp->click_cb)
@@ -16876,6 +16896,7 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 		if (p->state == 0) {
 			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
+			wp->on_mevent((int)event_type2::mouse_up, mps);
 		}
 	}
 	break;
@@ -16883,6 +16904,7 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 	{
 		auto p = e->w;
 		glm::vec2 mps = { p->x, p->y };
+		wp->on_mevent((int)event_type2::on_scroll, mps);
 		if (wp->cb) {
 			wp->cb(wp, (int)event_type2::on_scroll, mps);
 		}
@@ -17816,6 +17838,16 @@ void radio_tl::set_value()
 	}
 }
 
+bool radio_tl::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	if (et == event_type2::on_click)
+	{
+		set_value();
+	}
+	return false;
+}
+
 bool radio_tl::update(float delta)
 {
 	int ic = 0;
@@ -17832,10 +17864,6 @@ bool radio_tl::update(float delta)
 		}
 		if (size.y <= 0) {
 			size.y = style.radius * 2;
-		}
-		if (cks > 0 && it.value == it.value1) {
-			cks = 0;
-			set_value();
 		}
 		if (it.value != it.value1)
 		{
@@ -17908,6 +17936,16 @@ void checkbox_tl::set_value()
 	v.value = !v.value;
 }
 
+bool checkbox_tl::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	if (et == event_type2::on_click)
+	{
+		set_value();
+	}
+	return false;
+}
+
 bool checkbox_tl::update(float delta)
 {
 	int ic = 0;
@@ -17920,9 +17958,7 @@ bool checkbox_tl::update(float delta)
 		if (size.y <= 0) {
 			size.y = style.square_sz;
 		}
-		if (cks > 0 && it.value == it.value1) {
-			set_value(); cks = 0;
-		}
+
 		auto duration = it.duration > 0 ? it.duration : style.duration;
 		if (it.value != it.value1)
 		{
@@ -17986,13 +18022,20 @@ void switch_tl::set_value()
 	v.value = !v.value;
 }
 
+bool switch_tl::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	if (et == event_type2::on_click)
+	{
+		set_value();
+	}
+	return false;
+}
+
 bool switch_tl::update(float delta)
 {
 	int ic = 0;
 	auto& it = v;
-	if (cks > 0 && it.value == it.value1) {
-		cks = 0; set_value();
-	}
 	if (it.value != it.value1)
 	{
 		auto dt = fmod(delta, it.duration);
@@ -18081,6 +18124,12 @@ double progress_tl::get_v()
 	return glm::mix(vr.x, vr.y, value);
 }
 
+bool progress_tl::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	return false;
+}
+
 bool progress_tl::update(float delta)
 {
 	return false;
@@ -18160,16 +18209,16 @@ void colorpick_tl::set_color(uint32_t c)
 
 // Convert hsv floats ([0-1],[0-1],[0-1]) to rgb floats ([0-1],[0-1],[0-1]), from Foley & van Dam p593
 // also http://en.wikipedia.org/wiki/HSL_and_HSV
-void HSVtoRGB(const glm::vec3& hsv, glm::vec4& otc)
+void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
 {
 	float h = hsv.x, s = hsv.y, v = hsv.z;
+	otc.w = hsv.w;
 	if (s == 0.0f)
 	{
 		// gray
 		otc.x = otc.y = otc.z = v;
 		return;
 	}
-
 	h = fmod(h, 1.0f) / (60.0f / 360.0f);
 	int   i = (int)h;
 	float f = h - (float)i;
@@ -18197,11 +18246,52 @@ void colorpick_tl::set_hsv(const glm::vec4& c)
 {
 	hsv = c;
 }
+void colorpick_tl::set_posv(const glm::ivec2& poss)
+{
+	double htp = height + step;
+	double cw0 = cw - step;
+	if (poss.x >= 0 && poss.y >= 0)
+	{
+		double xf = (double)poss.x / cw0;
+		if (xf > 1)xf = 1;
+		if (xf < 0)xf = 0;
+		int x4 = alpha ? 4 : 3;
+		if (dx >= 0 && dx < x4)
+		{
+			hsv[dx] = xf;
+		}
+	}
+}
+bool colorpick_tl::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	glm::ivec2 poss = mps - pos;
+	glm::ivec2 ss = size;
+	poss.x -= cpx;
+	poss.y -= height + step;
+	double htp = height + step;
+	if (et == event_type2::on_down) {
+		dx = poss.y / htp;
+	}
+	if (et == event_type2::on_click)
+	{
+		set_posv(poss);
+	}
+	if (et == event_type2::on_drag)
+	{
+		poss += curpos;
+		set_posv(poss);
+	}
+
+
+	return false;
+}
 
 bool colorpick_tl::update(float delta)
 {
 	if (hsv != oldhsv || hsvstr.empty())
 	{
+		int* k = nullptr;
 		oldhsv = hsv;
 		int h = hsv.x * 360;
 		int s = hsv.y * 100;
@@ -18213,6 +18303,32 @@ bool colorpick_tl::update(float delta)
 		if (alpha)
 		{
 			hsvstr += "\nA:" + std::to_string(a) + "%";
+		}
+		else { hsv.w = 1; }
+		glm::vec4 hc = {};
+		HSVtoRGB(hsv, hc);
+		char buf[256] = {};
+		glm::ivec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
+		sprintf(buf, "#%02X%02X%02X%02X %d,%d,%d,%d", c.x, c.y, c.z, c.w, c.x, c.y, c.z, c.w);
+		colorstr = buf;
+		if (ltx)
+		{
+			glm::ivec2 ss = size;
+			glm::vec2 ta = { 0, 0.5 };
+			glm::vec4 rc = { 0, height + step, ss };
+			rc.w -= rc.y;
+			tem_rtv.clear();
+			auto rk = ltx->get_text_rect(1, hsvstr.c_str(), -1, font_size);
+			ltx->heightline = rc.y;
+			ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, tem_rtv);
+			rc.y = 0; rc.x += rk.x + step;
+			rc.z = ss.x - rk.x - step;
+			rc.w = height; ta.x = 0.5;
+			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
+			ltx->heightline = 0;
+			ltx->update_text();
+			cpx = rk.x + step;
+			cw = (ss.x - cpx - step);
 		}
 	}
 
@@ -18264,77 +18380,66 @@ void colorpick_tl::draw(cairo_t* cr)
 	glm::ivec2 poss = pos;
 	glm::ivec2 ss = size;
 	cairo_translate(cr, poss.x, poss.y);
-	int xx = 0;
 	if (ltx)
 	{
 		glm::vec2 ta = { 0, 0.5 };
 		glm::vec4 rc = { 0, height + step, ss };
 		rc.w -= rc.y;
-		ltx->tem_rtv.clear();
-		auto rk = ltx->get_text_rect(1, hsvstr.c_str(), -1, font_size);
-		ltx->heightline = rc.y;
-		ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, ltx->tem_rtv);
-		ltx->update_text();
-		ltx->draw_text(cr, ltx->tem_rtv, text_color);
-		ltx->heightline = 0;
-		xx = rk.x;
+		ltx->draw_text(cr, tem_rtv, text_color);
 	}
-	auto ps = step;
-	ss.x -= xx + step;
 	float style_alpha8 = 1;
-	//uint32_t col_hues[] = { 0xff0000ff	,0xff00ffff,0xff00ff00,0xffffff00	,0xffff0000,0xffff00ff,	0xff0000ff };
+	//uint32_t col_hues[] = { 0xff0000ff,0xff00ffff,0xff00ff00,0xffffff00,0xffff0000,0xffff00ff,0xff0000ff };
 	const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,style_alpha8), glm::vec4(1,1,0,style_alpha8), glm::vec4(0,1,0,style_alpha8)
 		, glm::vec4(0,1,1,style_alpha8), glm::vec4(0,0,1,style_alpha8), glm::vec4(1,0,1,style_alpha8), glm::vec4(1,0,0,style_alpha8) };
 	int yh = height + step;
 	glm::vec4 hc = {};
 	HSVtoRGB(hsv, hc);
-	hc.w = hsv.w;
 	{
 		glm::vec4 cc = {};
-		draw_grid_fill(cr, { xx, height }, { -1,0xffdfdfdf }, height * 0.5);// 填充格子
-		draw_rectangle(cr, { 0,0,xx, height }, 0);
+		draw_grid_fill(cr, { cpx, height }, { -1,0xffdfdfdf }, height * 0.5);// 填充格子
+		draw_rectangle(cr, { 0,0,cpx, height }, 0);
 		set_source_rgba(cr, hc);
 		cairo_fill(cr);// 填充当前颜色
 	}
 	{
-		cairo_translate(cr, xx + ps, yh);
-		draw_linear(cr, { ss.x,height }, col_hues, 7);	// H 
-		glm::ivec4 rcc = { (ss.x - step) * hsv.x,-step * 0.5,step - 2, height + step };
+		cairo_translate(cr, cpx, yh);
+		draw_linear(cr, { cw,height }, col_hues, 7);	// H 
+		glm::ivec4 rcc = { cw * hsv.x,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
-		rcf.x += 0.5;rcf.y += 0.5;
+		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
 		fill_stroke(cr, -1, bc_color, thickness, false);
 	}
 	{
 		cairo_translate(cr, 0, yh);
 		glm::vec4 cc[] = { {1,1,1,1}, hc };
-		draw_grid_fill(cr, { ss.x, height }, { -1,-1 }, height * 0.5);// 背景色
-		draw_linear(cr, { ss.x, height }, cc, 2);	// S
-		glm::ivec4 rcc = { (ss.x - step) * hsv.y,-step * 0.5,step - 2, height + step };
+		draw_grid_fill(cr, { cw, height }, { -1,-1 }, height * 0.5);// 背景色
+		draw_linear(cr, { cw, height }, cc, 2);	// S
+		glm::ivec4 rcc = { (cw - step) * hsv.y,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
-		rcf.x += 0.5;rcf.y += 0.5;
+		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
 		fill_stroke(cr, -1, bc_color, thickness, false);
 	}
 	{
 		cairo_translate(cr, 0, yh);
 		glm::vec4 cc[] = { {0,0,0,1}, hc };
-		draw_grid_fill(cr, { ss.x, height }, { -1,-1 }, height * 0.5);// 背景色
-		draw_linear(cr, { ss.x, height }, cc, 2);	// V
-		glm::ivec4 rcc = { (ss.x - step) * hsv.z,-step * 0.5,step - 2, height + step };
+		draw_grid_fill(cr, { cw, height }, { -1,-1 }, height * 0.5);// 背景色
+		draw_linear(cr, { cw, height }, cc, 2);	// V
+		glm::ivec4 rcc = { (cw - step) * hsv.z,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
-		rcf.x += 0.5;rcf.y += 0.5;
+		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
 		fill_stroke(cr, -1, bc_color, thickness, false);
 	}
 	{
 		cairo_translate(cr, 0, yh);
 		glm::vec4 cc[] = { {0,0,0,0}, {1,1,1,1} };
-		draw_grid_fill(cr, { ss.x, height }, { -1,0xffdfdfdf }, height * 0.5);//背景色
-		draw_linear(cr, { ss.x, height }, cc, 2);	// A
-		glm::ivec4 rcc = { (ss.x- step*0.5) * hsv.w,-step * 0.5,step - 2, height + step };
+		draw_grid_fill(cr, { cw, height }, { -1,0xffdfdfdf }, height * 0.5);//背景色
+		draw_linear(cr, { cw, height }, cc, 2);	// A
+		glm::ivec4 rcc = { (cw - step) * hsv.w,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
-		rcf.x += 0.5;rcf.y += 0.5;
+		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
 		fill_stroke(cr, -1, bc_color, thickness, false);
 	}

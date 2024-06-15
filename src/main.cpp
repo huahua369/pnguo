@@ -366,7 +366,7 @@ int main()
 
 		}
 		{
-			auto pro = pl1->add_progress("%", { 100,20 }, 0.06);
+			auto pro = pl1->add_progress("%", { 100,30 }, 0.06);
 			pro->rounding = 10;
 		}
 		{
@@ -406,9 +406,9 @@ int main()
 			pro->set_value(1);
 		}
 		{
-			auto cp = pl1->add_colorpick(0, 200, 20, true);
+			auto cp = pl1->add_colorpick(0, 250, 20, true);
 			cp->font_size = 16;
-			cp->init(0, 200, 20, true);
+			cp->init(0, 250, 20, true);
 			cp->set_hsv({ 0.62,1,0.91,0.68 });
 		}
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
