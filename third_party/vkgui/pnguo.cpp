@@ -18405,7 +18405,8 @@ void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
 	if (height < font_size)
 		height = ltx->get_lineheight(0, font_size);
 	h = height + step;
-	size.x = width;
+	size.x = width;	
+	cpx = height * 2.5;
 	int hn = 4;
 	if (alpha)hn++;
 	size.y = h * hn;
@@ -18512,17 +18513,18 @@ bool colorpick_tl::update(float delta)
 			glm::vec4 rc = { 0, height + step, ss };
 			rc.w -= rc.y;
 			tem_rtv.clear();
-			auto rk = ltx->get_text_rect(1, hsvstr.c_str(), -1, font_size);
+			//auto rk = ltx->get_text_rect(1, "H:00%%"/* hsvstr.c_str()*/, -1, font_size);
 			ltx->heightline = rc.y;
 			ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, tem_rtv);
-			rc.y = 0; rc.x += rk.x + step;
-			rc.z = ss.x - rk.x - step;
+		
+			rc.y = 0; rc.x += cpx;
+			rc.z = ss.x - cpx - step * 2;
 			rc.w = height; ta.x = 0.5;
 			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
 			ltx->heightline = 0;
 			ltx->update_text();
-			cpx = rk.x + step;
-			cw = (ss.x - cpx - step);
+			//cpx = rk.x + step;
+			cw = (ss.x - cpx - step * 2);
 		}
 	}
 
