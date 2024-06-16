@@ -1064,6 +1064,7 @@ struct widget_base
 	plane_cx* parent = 0;
 	bool _disabled_events = false;
 	bool visible = true;
+	bool typepos = false;		// true绝对坐标，false布局计算
 	bool has_drag = false;	// 是否有拖动事件
 	bool _autofree = false;
 	//event_type2
@@ -1379,10 +1380,28 @@ public:
 	void draw(cairo_t* cr);
 };
 
-// 下拉框。可单选/多选
-struct clist_tl :public widget_base
+// 滚动条
+struct scroll_bar :public widget_base
 {
+	int _view_size = 0;			// 视图大小
+	int _content_size = 0;		// 内容大小 
+	int _offset = 0;			// 偏移量
+	int _rc_width = 0;			// 滑块宽度
+	int _dir = 0;				// 方向
+	glm::ivec3 thumb_size_m = {};
+	glm::vec2 tps = {};
+	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0 };		// 背景色，滑块颜色，滑块高亮颜色，备用颜色
+	uint32_t _tcc = 0;			// 滑块当前颜色
+	int t_offset = 0;			// 偏移量
+	bool hover = 0;
+public:
+	void set_viewsize(int vs, int cs, int rcw);
+	bool on_mevent(int type, const glm::vec2& mps);
+	bool update(float delta);
+	void draw(cairo_t* cr);
 
+
+	void set_posv(const glm::ivec2& poss);
 };
 
 #endif // 1
@@ -1423,6 +1442,7 @@ public:
 	std::vector<image_ptr_t*> images;
 	std::vector<svg_cx*> svgs;
 	layout_info_x _css = {};		// 布局样式
+	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
 	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 偏移，加宽
 	std::string familys = "Arial,NSimSun";
 	int fontsize = 12;
@@ -1442,6 +1462,7 @@ public:
 	~plane_cx();
 	void set_fontctx(font_rctx* p);
 	glm::ivec2 get_pos();
+	glm::ivec2 get_spos();
 	void set_pos(const glm::ivec2& ps);
 	void set_size(const glm::ivec2& ss);
 	glm::vec2 get_size();
@@ -1452,7 +1473,11 @@ public:
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
 	// 添加字体,返回序号
 	size_t add_familys(const char* familys, const char* style);
+	// 添加滚动条
+	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v);
+	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 	void add_widget(widget_base* p);
+	void remove_widget(widget_base* p);
 	// 新增控件：开关、复选、单选
 	switch_tl* add_switch(const glm::ivec2& size, const std::string& label, bool v, bool inlinetxt = false);
 	checkbox_tl* add_checkbox(const glm::ivec2& size, const std::string& label, bool v);
@@ -1493,7 +1518,7 @@ void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_circle(cairo_t* cr, const glm::vec2& pos, float r);
-void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth, bool isbgr);
+void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
 void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness);
 
 cairo_surface_t* new_clip_rect(int r);

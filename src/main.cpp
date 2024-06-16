@@ -411,6 +411,19 @@ int main()
 			cp->init(0, 250, 20, true);
 			cp->set_hsv({ 0.62,1,0.91,0.68 });
 		}
+		auto pss = pl1->get_size();
+		int width = 10;
+		int border = 2;
+		{
+			auto cp = pl1->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
+			pl1->bind_scroll_bar(cp, true); // 绑定垂直滚动条
+		}
+		{
+			auto cp = pl1->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
+			pl1->bind_scroll_bar(cp, false); // 绑定水平滚动条
+		}
+
+
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		//sw2->text_color = {};
@@ -427,10 +440,7 @@ int main()
 				cairo_translate(cr, 0, 300);
 				txt->draw_text(cr, 0xff0080ff);
 
-				/*	glm::vec4 rc = { ps, ns };
-					ltx->tem_rtv.clear();
-					ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
-					ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
+
 				return;
 				if (0) {
 					cairo_as _cas(cr);

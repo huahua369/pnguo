@@ -14689,6 +14689,71 @@ double dcscroll(double cp, double isx, double scroll_increment_x, int& scrollx)
 	return ret;
 }
 
+//template <typename T>
+//inline T clamp(T v, T mn, T mx) { return (v < mn) ? mn : (v > mx) ? mx : v; }
+// 输入：视图大小、内容大小、滚动宽度
+// 输出：x水平大小，y垂直大小，z为水平的滚动区域宽，w垂直滚动高
+glm::vec4 calcu_scrollbar_size(const glm::vec2 vps, const glm::vec2 content_width, const glm::vec2 scroll_width, const glm::ivec4& count)
+{
+	auto scw = scroll_width;
+	scw.x = scroll_width.x * count.x + count.z;
+	scw.y = scroll_width.y * count.y + count.w;
+	auto dif = vps - scw;
+	bool isx = (dif.x < content_width.x) && vps.x < content_width.x;
+	bool isy = (dif.y < content_width.y) && vps.y < content_width.y;
+	int inc = (isx ? 1 : 0) + (isy ? 1 : 0);
+	if (!isy)
+		scw.x -= count.z;
+	if (!isx)
+		scw.y -= count.w;
+	auto calc_cb = [](double vw, double cw, double scw, double sw)
+		{
+			double win_size_contents_v = cw,
+				win_size_avail_v = vw - scw,
+				scrollbar_size_v = win_size_avail_v;//scrollbar_size_v是实际大小
+			auto win_size_v = std::max(std::max(win_size_contents_v, win_size_avail_v), 1.0);
+			auto GrabMinSize = sw;			// std::clamp
+			auto grab_h_pixels = glm::clamp(scrollbar_size_v * (win_size_avail_v / win_size_v), GrabMinSize, scrollbar_size_v);
+			auto grab_h_norm = grab_h_pixels / scrollbar_size_v;
+			return glm::vec2{ grab_h_pixels, scrollbar_size_v };
+		};
+	auto x = calc_cb(vps.x, content_width.x, scw.x, scroll_width.x);
+	auto y = calc_cb(vps.y, content_width.y, scw.y, scroll_width.y);
+	if (!(x.x < x.y) || !isx)
+		x.x = 0;
+	if (!(y.x < y.y) || !isy)
+		y.x = 0;
+	glm::vec4 ret = { x.x, y.x, x.y, y.y };
+	return ret;
+}
+
+// 输入：视图大小、内容大小、滚动宽度 ,count
+// 输出：x水平大小，y为水平的滚动区域宽，z是否显示滚动条
+glm::vec3 calcu_scrollbar_size(int vps, int content_width, int scroll_width, int count)
+{
+	//计算去掉按钮时视图大小
+	auto scw = scroll_width;
+	scw = scroll_width * count;
+	auto dif = vps - scw;
+	bool isx = (dif < content_width) && vps < content_width;
+
+	auto calc_cb = [](double vw, double cw, double scw, double sw)
+		{
+			double win_size_contents_v = cw,
+				win_size_avail_v = vw - scw,
+				scrollbar_size_v = win_size_avail_v;
+			auto win_size_v = std::max(std::max(win_size_contents_v, win_size_avail_v), 1.0);
+			auto GrabMinSize = sw;
+			auto grab_h_pixels = clamp(scrollbar_size_v * (win_size_avail_v / win_size_v), GrabMinSize, scrollbar_size_v);
+			auto grab_h_norm = grab_h_pixels / scrollbar_size_v;
+			return glm::vec2{ grab_h_pixels, scrollbar_size_v };
+		};
+	auto x = calc_cb(vps, content_width, scw, scroll_width);
+	if (!(x.x < x.y) || !isx)
+		x.x = 0;
+	return glm::vec3(x.x, x.y, isx);
+}
+
 void text_ctx_cx::up_cursor(bool is)
 {
 	if (is)
@@ -15720,6 +15785,14 @@ plane_cx::plane_cx()
 
 plane_cx::~plane_cx()
 {
+	remove_widget(horizontal);
+	remove_widget(vertical);
+	if (horizontal)
+		delete horizontal;
+	horizontal = 0;
+	if (vertical)
+		delete vertical;
+	vertical = 0;
 	for (auto it : widgets) {
 		if (it)delete it;
 	}
@@ -15744,6 +15817,16 @@ void plane_cx::set_fontctx(font_rctx* p)
 }
 glm::ivec2 plane_cx::get_pos() {
 	return glm::ivec2(viewport.x, viewport.y);
+}
+glm::ivec2 plane_cx::get_spos()
+{
+	glm::vec2 sps = {};
+
+	if (horizontal)
+		sps.x = -horizontal->_offset;
+	if (vertical)
+		sps.y = -vertical->_offset;
+	return sps;
 }
 void plane_cx::set_pos(const glm::ivec2& ps) {
 	tpos = ps;
@@ -15809,6 +15892,59 @@ size_t plane_cx::add_familys(const char* familys, const char* style)
 	return ltx->add_familys(familys, style);
 }
 
+scroll_bar* plane_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v)
+{
+	auto p = new scroll_bar();
+	if (p)
+	{
+		add_widget(p);
+		p->typepos = true;
+		p->size = size;
+		auto ss = get_size();
+		glm::ivec2 dw = {};
+		if (!v)
+		{
+			if (p->size.x < 0)
+				p->size.x = ss.x - border.z * 2;
+			p->pos.y = ss.y - border.y;
+			p->pos.x = border.z;
+			dw.y = 1;
+			p->_dir = 0;
+		}
+		if (v)
+		{
+			if (p->size.y < 0)
+				p->size.y = ss.y - border.z * 2;
+			p->pos.x = ss.x - (border.y);
+			p->pos.y = border.z;
+			dw.x = 1;
+			p->_dir = 1;
+		}
+		if (p->size.x < rcw) {
+			p->size.x = rcw;
+		}
+		if (p->size.y < rcw) {
+			p->size.y = rcw;
+		}
+		dw *= p->size;
+		p->pos -= dw;
+		p->set_viewsize(vs, cs, rcw);
+	}
+	return p;
+}
+
+void plane_cx::bind_scroll_bar(scroll_bar* p, bool v)
+{
+	if (p)
+	{
+		if (v)
+			vertical = p;
+		else
+			horizontal = p;
+		remove_widget(p);
+	}
+}
+
 void plane_cx::add_widget(widget_base* p)
 {
 	if (p)
@@ -15816,6 +15952,16 @@ void plane_cx::add_widget(widget_base* p)
 		p->ltx = ltx;
 		p->parent = this;
 		widgets.push_back(p); uplayout = true;
+	}
+}
+void plane_cx::remove_widget(widget_base* p)
+{
+	auto& v = widgets;
+	auto ps = v.size();
+	v.erase(std::remove(v.begin(), v.end(), p), v.end());
+	if (v.size() != ps)
+	{
+		valid = true; uplayout = true;
 	}
 }
 switch_tl* plane_cx::add_switch(const glm::ivec2& size, const std::string& label, bool v, bool inlinetxt)
@@ -15974,6 +16120,14 @@ void plane_cx::update(float delta)
 {
 	//print_time a("plane_cx::update");
 	int ic = 0;
+	if (horizontal)
+	{
+		horizontal->update(delta);
+	}
+	if (vertical) {
+		vertical->update(delta);
+	}
+	auto sps = get_spos();	// 获取滚动量
 	for (auto& it : widgets) {
 		ic += it->update(delta);
 	}
@@ -15993,54 +16147,33 @@ void plane_cx::update(float delta)
 	if (cr)
 	{
 		evupdate = 0;
-		//cairo_save(cr);
-		//// 更新渲染
-		////set_color(cr, 0xff0080ff);
-		////cairo_rectangle(cr, 10, 10, 20, 20);
-		////cairo_fill_preserve(cr);
-		////set_color(cr, 0x80ff8000);
-		////cairo_stroke(cr);
-		////cairo_translate(cr, 10, 36);
-		//set_color(cr, -1);
-		//glm::vec2 ps = {};
-		//for (auto& it : txtv)
-		//{
-		//	if (!it.layout.layout || it.bd_valid)
-		//	{
-		//		font_ctx->set_family_size(it.familys, it.fontsize);
-		//		auto fc = font_ctx->get_text_layout(it.text, &it.layout);
-		//		it.layout.text_color = it.color;
-		//		it.bd_valid = false;
-
-		//	}
-		//	it.layout.pos = ps;
-		//	ps.y += it.layout.rc.y;
-		//	font_ctx->draw_text(cr, &it.layout);
-		//}
-		//cairo_restore(cr);
-		cairo_save(cr);
-		ltx->update_text();
-		for (auto& it : widgets) {
-			it->draw(cr);
-		}
-#if debugpx
-		auto px = (uint32_t*)cairo_image_surface_get_data(tv->_backing_store);
-		*px = 0;
-		memset(px, 0, 20 * 4);
-		set_color(cr, 0x8000ff00);
-		draw_rectangle(cr, { 0,0,100,100 }, 0);
-		cairo_fill(cr);
-		uint32_t pxs[20] = {};
-		memcpy(pxs, px, 20 * 4);
-#endif
-		cairo_restore(cr);
-		if (draw_cb)
 		{
-			cairo_save(cr);
-			draw_cb(cr);
-			cairo_restore(cr);
-		}
+			{
+				cairo_as _aa_(cr);
+				if (horizontal)
+					cairo_translate(cr, -horizontal->_offset, 0);
+				if (vertical)
+					cairo_translate(cr, 0, -vertical->_offset);
 
+				ltx->update_text();
+				for (auto& it : widgets) {
+					it->draw(cr);
+				}
+				if (draw_cb)
+				{
+					cairo_save(cr);
+					draw_cb(cr);
+					cairo_restore(cr);
+				}
+			}
+			if (horizontal)
+			{
+				horizontal->draw(cr);
+			}
+			if (vertical) {
+				vertical->draw(cr);
+			}
+		}
 		// 边框线 
 		auto ls = get_size(); ls -= 1;
 		draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
@@ -16093,19 +16226,22 @@ void plane_cx::mk_layout()
 	root.direction = _css.direction;
 
 	std::vector<glm::vec4> layouts;
+	std::vector<widget_base*> wbs;
 	layouts.reserve(widgets.size());
+	wbs.reserve(widgets.size());
 	for (auto& it : widgets) {
 		auto p = (widget_base*)it;
+		if (p->typepos)continue;
 		layouts.push_back({ p->pos, p->size });
+		wbs.push_back(p);
 	}
 	flex_item* c = flexlayout(&root, layouts, _lpos, _lms);
-
 	if (c)
 	{
-		auto length = widgets.size();
+		auto length = wbs.size();
 		for (size_t i = 0; i < length; i++)
 		{
-			auto p = (widget_base*)widgets[i];
+			auto p = (widget_base*)wbs[i];
 			auto it = layouts[i];
 			glm::vec2 itss = { it.z,it.w };
 			p->pos = it;
@@ -16115,12 +16251,24 @@ void plane_cx::mk_layout()
 	}
 	uplayout = false;
 }
-
+bool vht(const std::vector<widget_base*>& widgets, const glm::ivec2& p, glm::ivec2 ips) {
+	bool r = false;
+	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+		auto pw = (widget_base*)*it;
+		if (!pw || !pw->visible || pw->_disabled_events)continue;
+		glm::vec2 mps = p; mps -= ips;
+		// 判断是否鼠标在控件上
+		auto k = check_box_cr1(mps, (glm::vec4*)&(pw->pos), 1, 0);
+		if (k.x) { r = true; }
+	}
+	return r;
+}
 bool plane_cx::hittest(const glm::ivec2& p)
 {
 	bool r = false;
+	auto sps = get_spos();
 	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)get_size();
-	glm::vec4 rc = { ips,ips + ss };
+	glm::vec4 rc = { ips ,ips + ss };
 	if (rect_includes(rc, p)) {
 		if (draggable)
 		{
@@ -16128,13 +16276,9 @@ bool plane_cx::hittest(const glm::ivec2& p)
 		}
 		else
 		{
-			for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
-				auto pw = (widget_base*)*it;
-				if (!pw->visible || pw->_disabled_events)continue;
-				glm::vec2 mps = p; mps -= ips;
-				// 判断是否鼠标在控件上
-				auto k = check_box_cr1(mps, (glm::vec4*)&(pw->pos), 1, 0);
-				if (k.x) { r = true; }
+			r = vht(widgets, p, ips + sps);
+			if (!r) {
+				r = vht({ vertical ,horizontal }, p, ips);
 			}
 		}
 	}
@@ -16191,7 +16335,6 @@ void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, i
 }
 void plane_cx::on_wheel(double x, double y)
 {
-
 	update(0);
 	_draw_valid = true;
 }
@@ -16203,6 +16346,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	glm::ivec2 vgpos = viewport;
 	int r1 = 0;
 	auto ppos = get_pos();
+	auto sps = get_spos();
 	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
@@ -16218,6 +16362,14 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			_bst &= ~(int)BTN_STATE::STATE_HOVER;
 		}
 	}
+
+	if (horizontal) {
+		widget_on_event(horizontal, type, ep, ppos);
+	}
+	if (vertical) {
+		widget_on_event(vertical, type, ep, ppos);
+	}
+	ppos += sps;
 	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
 		auto pw = (widget_base*)*it;
 		if (!pw->visible || pw->_disabled_events)continue;
@@ -18486,4 +18638,132 @@ void colorpick_tl::draw(cairo_t* cr)
 		fill_stroke(cr, -1, bc_color, thickness, false);
 	}
 
+}
+
+void scroll_bar::set_viewsize(int vs, int cs, int rcw)
+{
+	_view_size = vs;
+	_content_size = cs;
+	_rc_width = rcw;
+}
+
+bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	glm::ivec2 poss = mps - pos;
+	glm::ivec2 ss = size;
+	poss -= tps;
+	int px = _dir ? 0 : 1;
+	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
+	auto pts = poss[_dir];
+	pts -= _offset;
+	if (et == event_type2::on_move) {
+		auto pts = poss[_dir];
+		pts -= _offset;
+		if (pts < 0 || pts > thumb_size_m.x)
+		{
+			_tcc = _color.y;
+		}
+		else {
+			_tcc = _color.z;
+		}
+	}
+
+	if (et == event_type2::on_scroll) {
+
+	}
+
+	if (et == event_type2::on_down) {
+		t_offset = pts;
+		if (pts < 0 || pts > thumb_size_m.x)
+		{
+			hover = false;
+		}
+		else {
+			hover = true;
+		}
+	}
+	if (et == event_type2::on_click)
+	{
+		hover = true;
+		if (pts < 0) {
+			t_offset = 0;
+		}
+		if (pts > thumb_size_m.x) {
+			t_offset = thumb_size_m.x;
+		}
+		set_posv(poss);
+		hover = false;
+	}
+	if (et == event_type2::on_drag)
+	{
+		poss += curpos;
+		set_posv(poss);
+	}
+	return false;
+}
+
+bool scroll_bar::update(float delta)
+{
+	// 箭头、滑块按钮初始大小一样
+	int vrc = _view_size - _rc_width;
+	auto vs = _view_size;
+	int px = _dir ? 0 : 1;
+	glm::ivec2 ss = size;
+	auto pxs = (ss[px] - _rc_width) * 0.5;
+	glm::ivec3 sbs = calcu_scrollbar_size(vs, _content_size, pxs, 2);
+	tps = { pxs,pxs };
+	thumb_size_m = sbs;
+	if ((bst & (int)BTN_STATE::STATE_HOVER)) {
+
+	}
+	else {
+		//hover = false;
+		if (!(bst & (int)BTN_STATE::STATE_ACTIVE))
+			_tcc = _color.y;
+	}
+	if (bst & (int)BTN_STATE::STATE_ACTIVE) {
+		//hover = true;
+	}
+	return false;
+}
+
+void scroll_bar::draw(cairo_t* cr)
+{
+	cairo_as _as_a(cr);
+	glm::ivec2 poss = pos;
+	glm::ivec2 ss = size;
+
+	cairo_translate(cr, poss.x, poss.y);
+	{
+		// 背景
+		draw_rectangle(cr, { 0,0,ss }, rounding);
+		fill_stroke(cr, _color.x, 0, 0, 0);
+		// 滑块
+		glm::ivec4 trc = { 0,0,_rc_width ,_rc_width };
+		int px = _dir ? 0 : 1;
+		auto pxs = (ss[px] - _rc_width) * 0.5;
+		trc.x = pxs;
+		trc.y = pxs;
+		trc[_dir] += _offset;
+		trc[2 + _dir] = thumb_size_m.x;
+		if (thumb_size_m.z)
+		{
+			draw_rectangle(cr, trc, _rc_width * 0.5);
+			fill_stroke(cr, _tcc, 0, 0, 0);
+		}
+	}
+}
+
+void scroll_bar::set_posv(const glm::ivec2& poss)
+{
+	if (!hover)return;
+	glm::ivec2 ss = size;
+	int px = _dir ? 0 : 1;
+	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
+	auto pts = poss[_dir];
+	pts -= t_offset;
+	if (pts < 0)pts = 0;
+	if (pts > ss[_dir] - tsm)pts = ss[_dir] - tsm;
+	_offset = pts;
 }
