@@ -254,7 +254,7 @@ int main()
 	pl2->add_familys(fontn, 0);
 	pl3->add_familys(fontn, 0);
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
-	pl3->visible = false;
+	//pl3->visible = false;
 	//pl1->visible = false;
 
 

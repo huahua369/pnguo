@@ -30,9 +30,6 @@ using namespace Clipper2Lib;
 #include <mapView.h>
 #include <event.h>
 
-//#include <tinysdl3.h>
-
-
 #ifndef no_cairo_ 
 #ifdef __cplusplus
 extern "C" {
@@ -18672,7 +18669,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	}
 
 	if (et == event_type2::on_scroll) {
-
+		_offset += mps.x;
 	}
 
 	if (et == event_type2::on_down) {
