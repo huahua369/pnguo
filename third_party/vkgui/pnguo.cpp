@@ -4781,6 +4781,7 @@ void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, con
 	cairo_move_to(cr, pos.x + tpos[0].x, pos.y + tpos[0].y);
 	cairo_line_to(cr, pos.x + tpos[1].x, pos.y + tpos[1].y);
 	cairo_line_to(cr, pos.x + tpos[2].x, pos.y + tpos[2].y);
+	cairo_close_path(cr);
 }
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth, bool isbgr) {
 	bool stroke = linewidth > 0 && color;

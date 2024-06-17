@@ -418,7 +418,7 @@ int main()
 			auto cp = pl1->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
 			pl1->bind_scroll_bar(cp, true); // 绑定垂直滚动条
 			cp->_pos_width = width * 2;
-			cp->hover_sc =1;
+			cp->hover_sc = 1;
 		}
 		{
 			auto cp = pl1->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
@@ -442,8 +442,6 @@ int main()
 				cairo_as _cas(cr);
 				cairo_translate(cr, 0, 300);
 				txt->draw_text(cr, 0xff0080ff);
-
-
 				return;
 				if (0) {
 					cairo_as _cas(cr);
@@ -521,11 +519,21 @@ int main()
 				int y1 = 10;
 
 				cairo_save(cr);
-				//for (auto it : txt->msu)
-				//{
-				//	auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
-				//	y1 += ss.y + 10;
-				//}
+				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
+				fill_stroke(cr, -1, 0);
+				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
+				fill_stroke(cr, 0, -1,1);
+
+				auto txt = pl1->ltx;
+				txt->update_text();
+				auto txt2 = pl2->ltx;
+				auto txt3 = pl3->ltx;
+				cairo_translate(cr, 10, 300);
+				for (auto it : txt->msu)
+				{
+					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
+					y1 += ss.y + 10;
+				}
 				cairo_restore(cr);
 			};
 	}
