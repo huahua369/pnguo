@@ -214,7 +214,7 @@ public:
 public:
 	canvas_atlas();
 	~canvas_atlas();
-	void add_atlas(atlas_cx* p);		// 添加显示的图集
+	void add_atlas(atlas_cx* p);	// 添加显示的图集
 	void remove_atlas(atlas_cx* p);	// 删除显示的图集
 	void add_atlas(atlas_t* p);		// 添加显示的图集
 	void remove_atlas(atlas_t* p);	// 删除显示的图集
@@ -1392,8 +1392,11 @@ struct scroll_bar :public widget_base
 	glm::vec2 tps = {};
 	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0 };		// 背景色，滑块颜色，滑块高亮颜色，备用颜色
 	uint32_t _tcc = 0;			// 滑块当前颜色
+	int _pos_width = 1;			// 滚动宽度
 	int t_offset = 0;			// 偏移量
 	bool hover = 0;
+	bool hover_sc = 0;
+	bool limit = 1;
 public:
 	void set_viewsize(int vs, int cs, int rcw);
 	bool on_mevent(int type, const glm::vec2& mps);
@@ -1438,7 +1441,7 @@ public:
 	std::function<void(cairo_t* cr)> draw_cb;
 	std::function<bool(float delta)> update_cb;
 	//std::vector<text_item_t> txtv;
-	std::vector<widget_base*> widgets;
+	std::vector<widget_base*> widgets, event_wts, event_wts1;
 	std::vector<image_ptr_t*> images;
 	std::vector<svg_cx*> svgs;
 	layout_info_x _css = {};		// 布局样式
@@ -1518,6 +1521,10 @@ void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_circle(cairo_t* cr, const glm::vec2& pos, float r);
+// 三角形基于矩形内 
+//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
+//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
+void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
 void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness);
 

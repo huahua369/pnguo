@@ -417,10 +417,13 @@ int main()
 		{
 			auto cp = pl1->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
 			pl1->bind_scroll_bar(cp, true); // 绑定垂直滚动条
+			cp->_pos_width = width * 2;
+			cp->hover_sc =1;
 		}
 		{
 			auto cp = pl1->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
 			pl1->bind_scroll_bar(cp, false); // 绑定水平滚动条
+			cp->_pos_width = width;
 		}
 
 

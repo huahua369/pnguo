@@ -21,8 +21,11 @@ xatlas
 #include <stb_image.h>
 #include <stb_image_write.h>
 #include <stb_rect_pack.h>
-
+// 样条线算法
 #include <tinyspline/tinysplinecxx.h>
+// 三角化算法
+#include <earcut.hpp>
+// 多边形算法
 #include <clipper2/clipper.h> 
 using namespace Clipper2Lib;
 #include <SDL3/SDL_keycode.h>
@@ -4737,6 +4740,47 @@ void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r)
 	else {
 		cairo_rectangle(cr, rc.x, rc.y, rc.z, rc.w);
 	}
+}
+void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
+{
+	glm::vec2 tpos[3] = {};
+	float df = dirspos.y;
+	switch ((int)dirspos.x)
+	{
+	case 0:
+	{
+		tpos[0] = { size.x * df, 0 };
+		tpos[1] = { size.x, size.y };
+		tpos[2] = { 0, size.y };
+	}
+	break;
+	case 1:
+	{
+		tpos[0] = { size.x, size.y * df };
+		tpos[1] = { 0, size.y };
+		tpos[2] = { 0, 0 };
+	}
+	break;
+	case 2:
+	{
+		tpos[0] = { size.x * df, size.y };
+		tpos[1] = { 0, 0 };
+		tpos[2] = { size.x, 0 };
+	}
+	break;
+	case 3:
+	{
+		tpos[0] = { 0, size.y * df };
+		tpos[1] = { size.x, 0 };
+		tpos[2] = { size.x, size.y };
+	}
+	break;
+	default:
+		break;
+	}
+	cairo_move_to(cr, pos.x + tpos[0].x, pos.y + tpos[0].y);
+	cairo_line_to(cr, pos.x + tpos[1].x, pos.y + tpos[1].y);
+	cairo_line_to(cr, pos.x + tpos[2].x, pos.y + tpos[2].y);
 }
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth, bool isbgr) {
 	bool stroke = linewidth > 0 && color;
@@ -16335,6 +16379,29 @@ void plane_cx::on_wheel(double x, double y)
 	update(0);
 	_draw_valid = true;
 }
+
+bool on_wpe(widget_base* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
+{
+	bool r = false;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	auto pt = dynamic_cast<edit_tl*>(pw);
+	if (!pt) {
+		widget_on_event(pw, type, ep, ppos);
+		if (ep->ret && t == devent_type_e::mouse_button_e)
+		{
+			auto p = e->b;
+			if (p->state == 1)
+				get_input_state(0, 1);
+		}
+	}
+	else
+	{
+		pt->ppos = ppos;
+		pt->on_event_e(type, ep);
+	}
+	return (ep->ret);
+}
 void plane_cx::on_event(uint32_t type, et_un_t* ep)
 {
 	auto e = &ep->v;
@@ -16359,32 +16426,31 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			_bst &= ~(int)BTN_STATE::STATE_HOVER;
 		}
 	}
-
+	event_wts.clear();
+	event_wts1.clear();
+	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+		if ((*it)->bst && (int)BTN_STATE::STATE_HOVER)
+			event_wts.push_back(*it);
+		else
+			event_wts1.push_back(*it);
+	}
 	if (horizontal) {
 		widget_on_event(horizontal, type, ep, ppos);
 	}
-	if (vertical) {
+	if (vertical && !ep->ret) {
 		widget_on_event(vertical, type, ep, ppos);
 	}
 	ppos += sps;
-	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 		auto pw = (widget_base*)*it;
-		if (!pw->visible || pw->_disabled_events)continue;
-		auto pt = dynamic_cast<edit_tl*>(pw);
-		if (!pt) {
-			widget_on_event(pw, type, ep, ppos);
-			if (ep->ret && t == devent_type_e::mouse_button_e)
-			{
-				auto p = e->b;
-				if (p->state == 1)
-					get_input_state(0, 1);
-			}
-		}
-		else
-		{
-			pt->ppos = ppos;
-			pt->on_event_e(type, ep);
-		}
+		if (!pw || !pw->visible || pw->_disabled_events)continue;
+		on_wpe(pw, type, ep, ppos);
+		if (ep->ret)break;
+	}
+	for (auto it = event_wts1.begin(); it != event_wts1.end(); it++) {
+		auto pw = (widget_base*)*it;
+		if (!pw || !pw->visible || pw->_disabled_events)continue;
+		on_wpe(pw, type, ep, ppos);
 		if (ep->ret)break;
 	}
 	if (!ep->ret)
@@ -16964,19 +17030,20 @@ void color_btn::draw(cairo_t* g)
 
 #if 1
 // 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
-void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
-	if (!wp)return;
+bool widget_on_move(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	bool hover = false;
+	if (!wp)return hover;
 	auto e = &ep->v;
 	auto t = (devent_type_e)type;
-	switch (t)
-	{
-	case devent_type_e::mouse_move_e:
+	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
 		// 判断是否鼠标进入
 		auto k = check_box_cr1(mps, (glm::vec4*)&wp->pos, 1, 0);
-		if (k.x) { wp->bst |= (int)BTN_STATE::STATE_HOVER; }
+		if (k.x) {
+			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
+		}
 		else { wp->bst &= ~(int)BTN_STATE::STATE_HOVER; }
 
 		{
@@ -16998,7 +17065,18 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 			}
 		}
 	}
-	break;
+	return hover;
+}
+
+void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	if (!wp)return;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+		widget_on_move(wp, type, ep, pos);
+		break;
 	case devent_type_e::mouse_button_e:
 	{
 		auto p = e->b;
@@ -17053,7 +17131,7 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 	{
 		auto p = e->w;
 		glm::vec2 mps = { p->x, p->y };
-		wp->on_mevent((int)event_type2::on_scroll, mps);
+		ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
 		if (wp->cb) {
 			wp->cb(wp, (int)event_type2::on_scroll, mps);
 		}
@@ -18402,7 +18480,7 @@ void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
 	if (height < font_size)
 		height = ltx->get_lineheight(0, font_size);
 	h = height + step;
-	size.x = width;	
+	size.x = width;
 	cpx = height * 2.5;
 	int hn = 4;
 	if (alpha)hn++;
@@ -18513,7 +18591,7 @@ bool colorpick_tl::update(float delta)
 			//auto rk = ltx->get_text_rect(1, "H:00%%"/* hsvstr.c_str()*/, -1, font_size);
 			ltx->heightline = rc.y;
 			ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, tem_rtv);
-		
+
 			rc.y = 0; rc.x += cpx;
 			rc.z = ss.x - cpx - step * 2;
 			rc.w = height; ta.x = 0.5;
@@ -18656,33 +18734,25 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
 	auto pts = poss[_dir];
 	pts -= _offset;
-	if (et == event_type2::on_move) {
-		auto pts = poss[_dir];
-		pts -= _offset;
-		if (pts < 0 || pts > thumb_size_m.x)
-		{
-			_tcc = _color.y;
-		}
-		else {
-			_tcc = _color.z;
-		}
-	}
-
-	if (et == event_type2::on_scroll) {
-		_offset += mps.x;
-	}
-
-	if (et == event_type2::on_down) {
-		t_offset = pts;
-		if (pts < 0 || pts > thumb_size_m.x)
-		{
-			hover = false;
-		}
-		else {
-			hover = true;
-		}
-	}
-	if (et == event_type2::on_click)
+	switch (et)
+	{
+	case event_type2::none:
+		break;
+	case event_type2::mouse_move:
+		break;
+	case event_type2::mouse_down:
+		break;
+	case event_type2::mouse_up:
+		break;
+	case event_type2::mouse_wheel:
+		break;
+	case event_type2::on_keypress:
+		break;
+	case event_type2::on_input:
+		break;
+	case event_type2::on_editing:
+		break;
+	case event_type2::on_click:
 	{
 		hover = true;
 		if (pts < 0) {
@@ -18694,10 +18764,68 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		set_posv(poss);
 		hover = false;
 	}
-	if (et == event_type2::on_drag)
+	break;
+	case event_type2::on_dblclick:
+		break;
+	case event_type2::on_tripleclick:
+		break;
+	case event_type2::on_enter:
+		break;
+	case event_type2::on_leave:
+		break;
+	case event_type2::on_move:
+	{
+		auto pts = poss[_dir];
+		pts -= _offset;
+		if (pts < 0 || pts > thumb_size_m.x)
+		{
+			_tcc = _color.y;
+		}
+		else {
+			_tcc = _color.z;
+		}
+	}
+	break;
+	case event_type2::on_down:
+	{
+		t_offset = pts;
+		if (pts < 0 || pts > thumb_size_m.x)
+		{
+			hover = false;
+		}
+		else {
+			hover = true;
+		}
+	}
+	break;
+	case event_type2::on_up:
+		break;
+	case event_type2::on_hover:
+		break;
+	case event_type2::on_scroll:
+	{
+		if (bst & (int)BTN_STATE::STATE_HOVER || hover_sc)
+		{
+			auto pts = (-mps.y * _pos_width) + _offset;
+			auto st = ss[_dir] - tsm;
+			if (limit)
+			{
+				if (pts < 0)pts = 0;
+				if (pts > st)pts = st;
+			}
+			_offset = pts;
+			return true;
+		}
+	}
+	break;
+	case event_type2::on_drag:
 	{
 		poss += curpos;
 		set_posv(poss);
+	}
+	break;
+	default:
+		break;
 	}
 	return false;
 }
@@ -18762,7 +18890,10 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
 	auto pts = poss[_dir];
 	pts -= t_offset;
-	if (pts < 0)pts = 0;
-	if (pts > ss[_dir] - tsm)pts = ss[_dir] - tsm;
+	if (limit)
+	{
+		if (pts < 0)pts = 0;
+		if (pts > ss[_dir] - tsm)pts = ss[_dir] - tsm;
+	}
 	_offset = pts;
 }
