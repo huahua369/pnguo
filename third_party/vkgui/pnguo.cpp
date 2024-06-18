@@ -18801,15 +18801,67 @@ grid_view::~grid_view()
 
 void grid_view::set_size(size_t x, size_t y)
 {
+	if (x > 0)
+		_column_width.resize(x);
+	if (y > 0)
+		_row_height.resize(y);
+	valid = true;
 }
 
 void grid_view::set_width(size_t idx, float v)
 {
+	if (idx < _column_width.size())
+	{
+		_column_width[idx].x = v; valid = true;
+	}
 }
 
 void grid_view::set_height(size_t idx, float v)
 {
+	if (idx < _row_height.size())
+	{
+		_row_height[idx].x = v; valid = true;
+	}
 }
+
+glm::vec2 grid_view::get_size()
+{
+	glm::vec2 r = {};
+	if (valid)
+	{
+		for (auto& it : _column_width)
+		{
+			it.y = r.x;
+			r.x += it.x;
+		}
+		for (auto& it : _row_height)
+		{
+			it.y = r.y;
+			r.y += it.x;
+		}
+		_size = r; valid = false;
+	}
+	else { r = _size; }
+	return r;
+}
+glm::vec4 grid_view::get(const glm::ivec2& pos)
+{
+	glm::vec4 r = {};
+	glm::uvec2 px = pos;
+	if (valid) { get_size(); }
+	if (px.x < _column_width.size())
+	{
+		r.x = _column_width[px.x].y;
+		r.z = _column_width[px.x].x;
+	}
+	if (px.y < _row_height.size())
+	{
+		r.y = _row_height[px.y].y;
+		r.w = _row_height[px.y].x;
+	}
+	return r;
+}
+
 
 
 

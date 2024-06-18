@@ -5,6 +5,10 @@
 	关系：窗口->面板->控件/图形
 	面板持有控件，窗口分发事件给面板。
 
+
+	2024-06-18	增加网格视图算法初步实现grid_view
+
+
 - [ ] 表格视图：	listview_cx继承自面板，渲染图标/文本
 - [ ] 树形视图：	treeview_cx继承自面板，图标/文本
 - [ ] 属性视图：	valueview_cx继承自面板，标签/数值/文本/下拉框/复选框/单选
@@ -1528,12 +1532,15 @@ color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
 progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
 colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
 */
+
 class grid_view
 {
 public:
 	// 行列的宽高
-	std::vector<float> _row_height;
-	std::vector<float> _column_width;
+	std::vector<glm::vec2> _column_width;	// 列宽，x宽，y为本列坐标缓存
+	std::vector<glm::vec2> _row_height;		// 行高，x高，y为本行坐标缓存
+	glm::vec2 _size = {};
+	bool valid = true;
 public:
 	grid_view();
 	~grid_view();
@@ -1543,6 +1550,10 @@ public:
 	void set_width(size_t idx, float v);
 	// 设置行高，idx为列索引，v行高
 	void set_height(size_t idx, float v);
+	// 获取总大小
+	glm::vec2 get_size();
+	// 获取指定坐标单元格的坐标/大小。
+	glm::vec4 get(const glm::ivec2& pos);
 private:
 
 };
