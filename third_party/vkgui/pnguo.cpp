@@ -24,7 +24,7 @@ xatlas
 // 样条线算法
 #include <tinyspline/tinysplinecxx.h>
 // 三角化算法
-#include <earcut.hpp>
+//#include <earcut.hpp>
 // 多边形算法
 #include <clipper2/clipper.h> 
 using namespace Clipper2Lib;
@@ -15152,7 +15152,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 	break;
 	case devent_type_e::ole_drop_e:
 	{
-		auto p = e->d;
+		auto p = e->d;	// 接收ole拖放数据
 		glm::ivec2 mps = { p->x,p->y }; mps -= ctx->pos + ppos;
 		ctx->cpos = mps;
 		if (ctx->hit_test(mps))
@@ -16162,23 +16162,19 @@ void plane_cx::update(float delta)
 	{
 		evupdate = 0;
 		{
+			ltx->update_text();
+			for (auto& it : widgets) {
+				cairo_as __cas_(cr);
+				auto scp = sps * it->hscroll;
+				if (scp.x != 0 || scp.y != 0)
+					cairo_translate(cr, scp.x, scp.y);// 滚动条影响
+				it->draw(cr);
+			}
+			if (draw_cb)
 			{
 				cairo_as _aa_(cr);
-				if (horizontal)
-					cairo_translate(cr, -horizontal->_offset, 0);
-				if (vertical)
-					cairo_translate(cr, 0, -vertical->_offset);
-
-				ltx->update_text();
-				for (auto& it : widgets) {
-					it->draw(cr);
-				}
-				if (draw_cb)
-				{
-					cairo_save(cr);
-					draw_cb(cr);
-					cairo_restore(cr);
-				}
+				cairo_translate(cr, sps.x, sps.y);
+				draw_cb(cr);
 			}
 			if (horizontal)
 			{
@@ -16229,6 +16225,7 @@ flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& 
 
 void plane_cx::mk_layout()
 {
+	if (custom_layout)return;// 自定义布局计算则退出默认而已计算
 	flex_item root;
 	auto ss = get_size();
 	root.width = ss.x;
@@ -16265,12 +16262,13 @@ void plane_cx::mk_layout()
 	}
 	uplayout = false;
 }
-bool vht(const std::vector<widget_base*>& widgets, const glm::ivec2& p, glm::ivec2 ips) {
+bool vht(const std::vector<widget_base*>& widgets, const glm::ivec2& p, glm::ivec2 ips, const glm::ivec2& scroll_pos) {
 	bool r = false;
 	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
 		auto pw = (widget_base*)*it;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		glm::vec2 mps = p; mps -= ips;
+		mps -= pw->hscroll * scroll_pos;
 		// 判断是否鼠标在控件上
 		auto k = check_box_cr1(mps, (glm::vec4*)&(pw->pos), 1, 0);
 		if (k.x) { r = true; }
@@ -16290,9 +16288,9 @@ bool plane_cx::hittest(const glm::ivec2& p)
 		}
 		else
 		{
-			r = vht(widgets, p, ips + sps);
+			r = vht(widgets, p, ips, sps);
 			if (!r) {
-				r = vht({ vertical ,horizontal }, p, ips);
+				r = vht({ vertical ,horizontal }, p, ips, sps);
 			}
 		}
 	}
@@ -16413,17 +16411,19 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	if (vertical && !ep->ret) {
 		widget_on_event(vertical, type, ep, ppos);
 	}
-	ppos += sps;
+
 	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 		auto pw = (widget_base*)*it;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
-		on_wpe(pw, type, ep, ppos);
+		auto vpos = sps * pw->hscroll;
+		on_wpe(pw, type, ep, ppos + vpos);
 		if (ep->ret)break;
 	}
 	for (auto it = event_wts1.begin(); it != event_wts1.end(); it++) {
 		auto pw = (widget_base*)*it;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
-		on_wpe(pw, type, ep, ppos);
+		auto vpos = sps * pw->hscroll;
+		on_wpe(pw, type, ep, ppos + vpos);
 		if (ep->ret)break;
 	}
 	if (!ep->ret)
@@ -16601,6 +16601,11 @@ namespace pn {
 
 #if 1
 // 默认按钮样式
+
+bool image_btn::on_mevent(int type, const glm::vec2& mps)
+{
+	return false;
+}
 
 bool image_btn::update(float) {
 	return false;
@@ -18484,8 +18489,10 @@ bool colorpick_tl::update(float delta)
 			//cpx = rk.x + step;
 			cw = (ss.x - cpx - step * 2);
 		}
+		if (on_change_cb) {
+			on_change_cb(this, get_color());
+		}
 	}
-
 	return false;
 }
 void draw_grid_fill(cairo_t* cr, const glm::vec2& ss, const glm::ivec2& cols, int width)
@@ -18781,6 +18788,33 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 	_offset = pts;
 }
 
+
+
+// 格子布局
+grid_view::grid_view()
+{
+}
+
+grid_view::~grid_view()
+{
+}
+
+void grid_view::set_size(size_t x, size_t y)
+{
+}
+
+void grid_view::set_width(size_t idx, float v)
+{
+}
+
+void grid_view::set_height(size_t idx, float v)
+{
+}
+
+
+
+
+
 listview_cx::listview_cx()
 {
 }
@@ -18788,7 +18822,7 @@ listview_cx::listview_cx()
 listview_cx::~listview_cx()
 {
 }
- 
+
 void listview_cx::set_title(column_lv* p, int count)
 {
 	if (!p)count = 0;

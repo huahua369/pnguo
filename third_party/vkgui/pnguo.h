@@ -1,5 +1,7 @@
 ﻿/*
 * pnguo
+	本文件的实现：骨骼动画、图集、控件、面板、字体管理、字体软光栅渲染、flex布局算法、简易路径path_v、样条线、stb加载图片、svg加载、cairo画布输出svg等
+
 	关系：窗口->面板->控件/图形
 	面板持有控件，窗口分发事件给面板。
 
@@ -1057,6 +1059,7 @@ struct widget_base
 	layout_text_x* ltx = 0;
 	glm::ivec2 txtps = {};
 	glm::ivec2 txtps2 = {};
+	glm::ivec2 hscroll = { 1,1 };
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;				// 鼠标点击状态
 	plane_cx* parent = 0;
@@ -1171,10 +1174,12 @@ enum class BTN_STATE :uint8_t
 // todo图片按钮
 struct image_btn :public widget_base {
 	std::string str;
-
-	atlas_t dsi = {};
+	image_ptr_t* img = 0;
+	image_sliced_t state_img[5] = {};
 	std::vector<glm::ivec4> data;
 	int show_idx = 0;	// 参考BTN_STATE
+public:
+	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
@@ -1364,6 +1369,7 @@ struct colorpick_tl :public widget_base
 	int dx = -1;
 	std::string hsvstr, colorstr;
 	std::vector<font_item_t> tem_rtv;
+	std::function<void(colorpick_tl* p, uint32_t col)> on_change_cb;
 	bool alpha = true;				// 显示透明通道
 public:
 	void init(uint32_t c, int w, int h, bool alpha);
@@ -1455,6 +1461,7 @@ public:
 	bool _draw_valid = true;
 	bool draggable = false;
 	bool uplayout = true;
+	bool custom_layout = false;	// 使用自定义布局计算
 public:
 	plane_cx();
 	~plane_cx();
@@ -1510,12 +1517,43 @@ struct column_lv
 	int idx = 0;		// 初始序号
 	bool visible = true;//是否显示列
 };
+/*
+switch_tl* add_switch(const glm::ivec2& size, const std::string& label, bool v, bool inlinetxt = false);
+checkbox_tl* add_checkbox(const glm::ivec2& size, const std::string& label, bool v);
+radio_tl* add_radio(const glm::ivec2& size, const std::string& label, bool v, group_radio_t* gp);
+edit_tl* add_input(const std::string& label, const glm::ivec2& size, bool single_line);
+gradient_btn* add_gbutton(const std::string& label, const glm::ivec2& size, uint32_t bcolor);
+color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
+color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
+progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
+colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
+*/
+class grid_view
+{
+public:
+	// 行列的宽高
+	std::vector<float> _row_height;
+	std::vector<float> _column_width;
+public:
+	grid_view();
+	~grid_view();
+	// 设置列行数量
+	void set_size(size_t x, size_t y);
+	// 设置列宽，idx为列索引，v宽度
+	void set_width(size_t idx, float v);
+	// 设置行高，idx为列索引，v行高
+	void set_height(size_t idx, float v);
+private:
+
+};
+
 // 列表视图控件。显示文本、image_ptr_t、svg_cx
 class listview_cx :public plane_cx
 {
 public:
 	std::vector<column_lv> _title;	// 标题信息
 	std::vector<void*> _data;		// 数据
+
 
 	bool data_valid = false;
 public:
@@ -1685,44 +1723,7 @@ struct cell_store_pos64
 };
 
 
-// 固定表格  
 
-//struct column_ht
-//{
-//	std::string title;	// 文本
-//	std::string format;	// 数字格式化
-//	int width = 0;		// 宽
-//	int align = 0;		// 0左，1中，2右
-//	int idx = 0;		// 初始序号
-//};
-//class listview_cx
-//{
-//public:
-//	std::vector<column_ht> titles;					// 标题信息
-//	std::vector<std::vector<std::string>> stores;	// 保存数据
-//	bool data_valid = true;	// 更新了数据
-//public:
-//	listview_cx();
-//	~listview_cx();
-//	void set_title(column_ht* p, int count);
-//	// 获取行数
-//	size_t get_count();
-//	// 列数
-//	size_t get_column_count();
-//	// 添加一行到后面
-//	void push_back(const std::vector<std::string>& t);
-//	// 插入一行
-//	void insert(size_t pos, const std::vector<std::string>& t);
-//	void update(size_t pos, const std::vector<std::string>& t);	// 更新整行
-//	void update(size_t pos, size_t idx, const std::string& str);	// 更新一格
-//	std::vector<std::string>* get_line(size_t pos);
-//	// 移动列位置，移动的列，移到pos。移动不影响上面输入数据的排序
-//	void move_column(size_t idx, size_t pos);
-//	// 排序的列，asc=0小到大，1大到小
-//	void sort_column(size_t idx, int asc);
-//private:
-//
-//};
 // 列表渲染
 class render_lv
 {
@@ -1752,6 +1753,7 @@ namespace md {
 	std::string u16to_u8(uint16_t* str, size_t len);
 	std::wstring u8to_w(const char* str, size_t len);
 }
+
 // 实现在tinysdl3.cpp
 void form_move2end(form_x* f, plane_cx* ud);
 // 设置接收输入的控件

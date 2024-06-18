@@ -240,14 +240,15 @@ int main()
 	auto pl1 = new plane_cx();
 	auto pl2 = new plane_cx();
 	auto pl3 = new plane_cx();
+	pl2->_lms = { 6,6 };
 	pl1->border = { 0x80ff802C,1,5 };
 	pl2->border = { 0x80ff802C,1,5 };
 	pl3->border = { 0x80ff802C,1,5 };
 	pw->bind(pl2);	// 绑定到窗口
-	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
+	pw->bind(pl3);	// 绑定到窗口
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
-	auto fontn2 = (char*)u8"Consolas,Times New Roman";
+	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
 	pl1->add_familys(fontn, 0);
 	pl1->add_familys(fontn2, 0);
@@ -366,49 +367,64 @@ int main()
 				};
 
 		}
+		std::vector<progress_tl*> prv;
 		{
 			auto pro = pl1->add_progress("%", { 100,30 }, 0.06);
 			pro->rounding = 10;
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 100,20 }, 0.125);
 			pro->rounding = 10;
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 100,20 }, 0.5);
 			pro->rounding = 10;
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 100,20 }, 1);
 			pro->rounding = 10;
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 160,20 }, 0);
 			pro->rounding = 10;
 			pro->text_inside = false;
 			pro->set_value(0.8);
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 160,20 }, 0);
 			pro->rounding = 10;
 			pro->text_inside = false;
 			pro->set_value(0.98);
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 160,20 }, 0);
 			pro->rounding = 10;
 			pro->right_inside = true;
 			pro->set_value(0.68);
+			prv.push_back(pro);
 		}
 		{
 			auto pro = pl1->add_progress("%", { 160,26 }, 0);
 			pro->rounding = 12;
 			pro->right_inside = true;
 			pro->set_value(1);
+			prv.push_back(pro);
 		}
 		{
 			auto cp = pl1->add_colorpick(0, 250, 20, true);
 			cp->font_size = 16;
+			cp->on_change_cb = [=](colorpick_tl* p, uint32_t col)
+				{
+					for (auto it : prv) {
+						it->color.x = col;
+					}
+				};
 			cp->init(0, 250, 20, true);
 			cp->set_hsv({ 0.62,1,0.91,0.68 });
 		}
@@ -518,7 +534,7 @@ int main()
 		pl3->update_cb = [=](float delta)
 			{
 
-				return 1;
+				return 0;
 			};
 		pl3->draw_cb = [=](cairo_t* cr)
 			{
@@ -528,27 +544,10 @@ int main()
 				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
 				fill_stroke(cr, -1, 0);
 				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1,1);
+				fill_stroke(cr, 0, -1, 1);
 
-				{
-					cairo_translate(cr, 10, 200);
-					cairo_pattern_t* linpat, * radpat;
-					linpat = cairo_pattern_create_linear(0, 0, 1, 1);
-					cairo_pattern_add_color_stop_rgb(linpat, 0, 0, 0.3, 0.8);
-					cairo_pattern_add_color_stop_rgb(linpat, 1, 0, 0.8, 0.3);
 
-					radpat = cairo_pattern_create_radial(0.5, 0.5, 0.25, 0.5, 0.5, 0.75);
-					cairo_pattern_add_color_stop_rgba(radpat, 0, 0, 0, 0, 1);
-					cairo_pattern_add_color_stop_rgba(radpat, 0.5, 0, 0, 0, 0);
-
-					cairo_set_source(cr, linpat);
-					draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
-					//fill_stroke(cr, -1, 0);
-				//	cairo_mask(cr, radpat);
-
-				}
-
-				cairo_translate(cr, 10, 100);
+				cairo_translate(cr, 10, 200);
 				auto txt = pl1->ltx;
 				for (auto it : txt->msu)
 				{
