@@ -754,9 +754,7 @@ public:
 	std::vector<font_item_t> tv;
 	std::vector<font_item_t> tem_rtv;	// 临时缓存用
 	// todo
-	std::vector<atlas_cx> tem_iptr;
-	// 渲染缓存
-	cairo_surface_t* ctemp = 0;
+	std::vector<atlas_cx> tem_iptr; 
 	glm::ivec2 ctrc = {}, oldrc = {};
 public:
 	layout_text_x();
@@ -1406,7 +1404,35 @@ public:
 
 	void set_posv(const glm::ivec2& poss);
 };
-
+struct column_lv
+{
+	std::string title;	// 文本 
+	int width = 0;		// 宽
+	glm::vec2 align = { 0.5,0.5 };	// 0左，0.5中，1右
+	int idx = 0;		// 初始序号
+	bool visible = true;//是否显示列
+};
+// 固定列表控件。显示图标svg文本
+struct listview_tl :public widget_base
+{
+	std::vector<column_lv> _title;	// 标题信息
+	std::vector<void*> _data;		// 数据
+	std::function<void(listview_tl* lv, cairo_t* cr, void* cdata, size_t idx)> draw_column_cb;	// 返回列字符串，cdata行数据，idx列号
+public:
+	void set_title(column_lv* p, int count);
+	void insert_line(void* data, size_t pos);
+	void remove_line(size_t pos);
+public:
+	bool on_mevent(int type, const glm::vec2& mps);
+	bool update(float delta);
+	void draw(cairo_t* cr);
+};
+/*
+- [ ] 表格视图：	渲染图标/文本
+- [ ] 树形视图：	图标/文本
+- [ ] 属性视图：	标签/数值/文本/下拉框/复选框/单选
+- [ ] 富文本：	字体样式、图片、排版、数据格式定义
+*/
 #endif // 1
 
 class form_x;
@@ -1542,7 +1568,7 @@ cairo_surface_t* new_image_cr(image_ptr_t* img);
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
 void free_image_cr(cairo_surface_t* image);
 glm::ivec2 get_surface_size(cairo_surface_t* p);
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1, cairo_surface_t* tp = 0);
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1);
 #endif
 /*
 <表格、树形>

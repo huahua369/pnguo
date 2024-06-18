@@ -243,8 +243,8 @@ int main()
 	pl1->border = { 0x80ff802C,1,5 };
 	pl2->border = { 0x80ff802C,1,5 };
 	pl3->border = { 0x80ff802C,1,5 };
-	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
+	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto fontn2 = (char*)u8"Consolas,Times New Roman";
@@ -311,6 +311,7 @@ int main()
 		auto txt = pl1->ltx;
 		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
 		txt->add_text(0, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🌶🍆abcg", -1, 60);
+		txt->update_text();
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
 		et1->set_pos({ 10,10 });
@@ -514,27 +515,47 @@ int main()
 		pl3->set_pos({ 10,10 });
 		pl3->set_colors({ 0xff121212,-1,0,0 });
 		pl3->on_click = [](plane_cx* p, int state, int clicks) {};
+		pl3->update_cb = [=](float delta)
+			{
+
+				return 1;
+			};
 		pl3->draw_cb = [=](cairo_t* cr)
 			{
 				int y1 = 10;
+				cairo_as _ss_(cr);
 
-				cairo_save(cr);
 				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
 				fill_stroke(cr, -1, 0);
 				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
 				fill_stroke(cr, 0, -1,1);
 
+				{
+					cairo_translate(cr, 10, 200);
+					cairo_pattern_t* linpat, * radpat;
+					linpat = cairo_pattern_create_linear(0, 0, 1, 1);
+					cairo_pattern_add_color_stop_rgb(linpat, 0, 0, 0.3, 0.8);
+					cairo_pattern_add_color_stop_rgb(linpat, 1, 0, 0.8, 0.3);
+
+					radpat = cairo_pattern_create_radial(0.5, 0.5, 0.25, 0.5, 0.5, 0.75);
+					cairo_pattern_add_color_stop_rgba(radpat, 0, 0, 0, 0, 1);
+					cairo_pattern_add_color_stop_rgba(radpat, 0.5, 0, 0, 0, 0);
+
+					cairo_set_source(cr, linpat);
+					draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
+					//fill_stroke(cr, -1, 0);
+				//	cairo_mask(cr, radpat);
+
+				}
+
+				cairo_translate(cr, 10, 100);
 				auto txt = pl1->ltx;
-				txt->update_text();
-				auto txt2 = pl2->ltx;
-				auto txt3 = pl3->ltx;
-				cairo_translate(cr, 10, 300);
 				for (auto it : txt->msu)
 				{
 					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
 					y1 += ss.y + 10;
 				}
-				cairo_restore(cr);
+
 			};
 	}
 	{

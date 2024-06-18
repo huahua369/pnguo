@@ -4101,7 +4101,6 @@ layout_text_x::~layout_text_x()
 	for (auto it : msu) {
 		free_image_cr(it);
 	}
-	free_image_cr(ctemp);
 }
 
 void layout_text_x::set_ctx(font_rctx* p)
@@ -4295,17 +4294,6 @@ void layout_text_x::update_text()
 {
 	auto ft = ctx->bcc._data.data();
 	auto n = ctx->bcc._data.size();
-	if (ctrc.x > 0 && ctrc.y > 0 && oldrc < ctrc)
-	{
-		if (ctemp)
-			free_image_cr(ctemp);
-		auto px = new uint32_t[ctrc.x * ctrc.y];
-		if (px)
-		{
-			oldrc = ctrc;
-			ctemp = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, ctrc.x, ctrc.y, ctrc.x * sizeof(int));
-		}
-	}
 	for (size_t i = 0; i < n; i++)
 	{
 		auto p = ft[i];
@@ -4339,7 +4327,7 @@ void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color)
 			auto ft = (cairo_surface_t*)it._image->ptr;
 			if (ft)
 			{
-				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color, ctemp);
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color);
 			}
 		}
 	}
@@ -4355,7 +4343,7 @@ void layout_text_x::draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, 
 			auto ft = (cairo_surface_t*)it._image->ptr;
 			if (ft)
 			{
-				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color, ctemp);
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color);
 			}
 		}
 	}
@@ -4370,7 +4358,7 @@ void layout_text_x::draw_text(cairo_t* cr, uint32_t color)
 			auto ft = (cairo_surface_t*)it._image->ptr;
 			if (ft)
 			{
-				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color, ctemp);
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color);
 			}
 		}
 	}
@@ -5646,7 +5634,7 @@ void premultiply_data(int w, unsigned char* data, int type, bool multiply)
 glm::ivec2 get_surface_size(cairo_surface_t* p) {
 	return { cairo_image_surface_get_width(p), cairo_image_surface_get_height(p) };
 }
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, cairo_surface_t* tp)
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color)
 {
 	glm::vec2 ss = { rc.z, rc.w };
 	if (ss.x < 0)
@@ -5659,31 +5647,15 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	}
 	if (ss.x > 0 && ss.y > 0)
 	{
-		if (tp && color > 0 && color != -1)
+		if (color > 0 && color != -1)
 		{
-			cairo_t* crt = cairo_create(tp);
-			auto d = (uint32_t*)cairo_image_surface_get_data(tp);
-			auto tss = get_surface_size(tp);
-			memset(d, 0, tss.x * tss.y * sizeof(int));
-			cairo_save(crt);
-			cairo_set_operator(crt, CAIRO_OPERATOR_OVER);
-			cairo_set_source_surface(crt, image, -rc.x, -rc.y);
-			cairo_rectangle(crt, 0, 0, ss.x, ss.y);
-			if (color != -1) {
-				cairo_fill_preserve(crt);
-				cairo_set_operator(crt, CAIRO_OPERATOR_IN);
-				set_color(crt, color);
-			}
-			cairo_fill(crt);
-			cairo_restore(crt);
-			cairo_destroy(crt);
-
 			cairo_save(cr);
 			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 			cairo_translate(cr, pos.x, pos.y);
-			cairo_set_source_surface(cr, tp, 0, 0);
 			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
-			cairo_fill(cr);
+			cairo_clip(cr);
+			set_color(cr, color);
+			cairo_mask_surface(cr, image, -rc.x, -rc.y);
 			cairo_restore(cr);
 		}
 		else {

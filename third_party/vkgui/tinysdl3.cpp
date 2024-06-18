@@ -1659,8 +1659,8 @@ SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, in
 	SDL_Texture* p = 0;
 	if (renderer && width > 0 && height > 0)
 	{
-		if (type == 0)type = SDL_PIXELFORMAT_ABGR8888;
-		if (type == 1)type = SDL_PIXELFORMAT_ARGB8888;
+		if (type == 0)type = SDL_PIXELFORMAT_ABGR8888;//rgba
+		if (type == 1)type = SDL_PIXELFORMAT_ARGB8888;//bgra
 		p = SDL_CreateTexture(renderer, (SDL_PixelFormatEnum)type, static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, width, height);
 		if (p && data)
 		{
