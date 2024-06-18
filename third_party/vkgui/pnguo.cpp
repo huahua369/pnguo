@@ -17125,96 +17125,6 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 
 
 
-listview_cx::listview_cx()
-{
-}
-
-listview_cx::~listview_cx()
-{
-}
-
-void listview_cx::set_title(column_ht* p, int count)
-{
-	if (!p)count = 0;
-	titles.clear(); titles.reserve(count);
-	for (size_t i = 0; i < count; i++, p++)
-	{
-		auto& kt = titles.emplace_back(*p);
-		kt.idx = i;
-	}
-	data_valid = true;
-}
-
-// 获取行数
-size_t listview_cx::get_count()
-{
-	return stores.size();
-}
-// 列数
-size_t listview_cx::get_column_count()
-{
-	return titles.size();
-}
-// 添加一行到后面
-void listview_cx::push_back(const std::vector<std::string>& t)
-{
-	stores.push_back(t);
-	data_valid = true;
-}
-// 插入一行
-void listview_cx::insert(size_t pos, const std::vector<std::string>& t)
-{
-	stores.insert(stores.begin() + pos, t);
-	data_valid = true;
-}
-void listview_cx::update(size_t pos, const std::vector<std::string>& t)	// 更新整行
-{
-	if (pos < stores.size())
-	{
-		stores[pos] = t;
-		data_valid = true;
-	}
-}
-void listview_cx::update(size_t pos, size_t idx, const std::string& str)	// 更新一格
-{
-	if (pos < stores.size())
-	{
-		auto& it = stores[pos];
-		if (idx < it.size())
-		{
-			it[idx] = str;
-			data_valid = true;
-		}
-	}
-}
-std::vector<std::string>* listview_cx::get_line(size_t pos)
-{
-	return (pos < stores.size()) ? &stores[pos] : nullptr;
-}
-// 移动列位置，移动的列，移到pos。移动不影响上面输入数据的排序
-void listview_cx::move_column(size_t idx, size_t pos)
-{
-	if (idx < titles.size() && idx != pos)
-	{
-		auto it = titles[idx];
-		titles.insert(titles.begin() + pos, it);
-		if (idx > pos)idx++;
-		titles.erase(titles.begin() + idx);
-		data_valid = true;
-	}
-}
-
-void listview_cx::sort_column(size_t idx, int asc)
-{
-	if (idx < titles.size())
-	{
-		std::sort(stores.begin(), stores.end(), [idx, asc](std::vector<std::string>& a, std::vector<std::string>& b)
-			{
-				if (asc > 0) { return a[idx] > b[idx]; }
-				else { return a[idx] < b[idx]; }
-			});
-	}
-}
 
 render_lv::render_lv()
 {
@@ -18869,4 +18779,79 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 		if (pts > ss[_dir] - tsm)pts = ss[_dir] - tsm;
 	}
 	_offset = pts;
+}
+
+listview_cx::listview_cx()
+{
+}
+
+listview_cx::~listview_cx()
+{
+}
+ 
+void listview_cx::set_title(column_lv* p, int count)
+{
+	if (!p)count = 0;
+	_title.clear(); _title.reserve(count);
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		auto& kt = _title.emplace_back(*p);
+		kt.idx = i;
+	}
+	data_valid = true;
+}
+
+// 获取行数
+size_t listview_cx::get_count()
+{
+	return _data.size();
+}
+// 列数
+size_t listview_cx::get_column_count()
+{
+	return _title.size();
+}
+
+void listview_cx::on_event(uint32_t type, et_un_t* e)
+{
+	plane_cx::on_event(type, e);
+}
+
+void listview_cx::update(float delta)
+{
+	plane_cx::update(delta);
+}
+
+
+treeview_cx::treeview_cx()
+{
+}
+
+treeview_cx::~treeview_cx()
+{
+}
+void treeview_cx::on_event(uint32_t type, et_un_t* e)
+{
+	plane_cx::on_event(type, e);
+}
+void treeview_cx::update(float delta)
+{
+	plane_cx::update(delta);
+}
+valueview_cx::valueview_cx()
+{
+}
+
+valueview_cx::~valueview_cx()
+{
+}
+
+void valueview_cx::on_event(uint32_t type, et_un_t* e)
+{
+	plane_cx::on_event(type, e);
+}
+
+void valueview_cx::update(float delta)
+{
+	plane_cx::update(delta);
 }

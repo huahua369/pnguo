@@ -1,4 +1,15 @@
-﻿#pragma once
+﻿/*
+* pnguo
+	关系：窗口->面板->控件/图形
+	面板持有控件，窗口分发事件给面板。
+
+- [ ] 表格视图：	listview_cx继承自面板，渲染图标/文本
+- [ ] 树形视图：	treeview_cx继承自面板，图标/文本
+- [ ] 属性视图：	valueview_cx继承自面板，标签/数值/文本/下拉框/复选框/单选
+- [ ] 富文本：	继承自面板，字体样式、图片、排版、数据格式定义
+*/
+
+#pragma once
 #include <list>
 #include <map>
 #include <set>
@@ -251,7 +262,7 @@ class bspline_ct
 {
 public:
 	void* ptr = 0;	// tinyspline::BSpline*
-	int dim = 0;	// dimension 2/3/4
+	int dim = 0;	// dimension vec2/3/4
 public:
 	bspline_ct();
 	~bspline_ct();
@@ -372,20 +383,9 @@ public:
 	~info_one();
 	std::string get_name();
 };
-//struct tinyimage_cx {
-//	int width = 0, height = 0;
-//	int isupdate = 1;
-//	int format = 0;		// 0rgba, 1bgra
-//	uint32_t* data = 0;  //rgba
-//	void* ptr = 0;
-//};
-//struct tinyimagef_cx {
-//	float width = 0, height = 0;// count=width*height*4
-//	int isupdate = 1;
-//	int format = 0;
-//	float data[0];
-//};
-class svg_cx {
+
+class svg_cx
+{
 public:
 	void* ptr;
 	int width;
@@ -754,7 +754,7 @@ public:
 	std::vector<font_item_t> tv;
 	std::vector<font_item_t> tem_rtv;	// 临时缓存用
 	// todo
-	std::vector<atlas_cx> tem_iptr; 
+	std::vector<atlas_cx> tem_iptr;
 	glm::ivec2 ctrc = {}, oldrc = {};
 public:
 	layout_text_x();
@@ -1404,35 +1404,6 @@ public:
 
 	void set_posv(const glm::ivec2& poss);
 };
-struct column_lv
-{
-	std::string title;	// 文本 
-	int width = 0;		// 宽
-	glm::vec2 align = { 0.5,0.5 };	// 0左，0.5中，1右
-	int idx = 0;		// 初始序号
-	bool visible = true;//是否显示列
-};
-// 固定列表控件。显示图标svg文本
-struct listview_tl :public widget_base
-{
-	std::vector<column_lv> _title;	// 标题信息
-	std::vector<void*> _data;		// 数据
-	std::function<void(listview_tl* lv, cairo_t* cr, void* cdata, size_t idx)> draw_column_cb;	// 返回列字符串，cdata行数据，idx列号
-public:
-	void set_title(column_lv* p, int count);
-	void insert_line(void* data, size_t pos);
-	void remove_line(size_t pos);
-public:
-	bool on_mevent(int type, const glm::vec2& mps);
-	bool update(float delta);
-	void draw(cairo_t* cr);
-};
-/*
-- [ ] 表格视图：	渲染图标/文本
-- [ ] 树形视图：	图标/文本
-- [ ] 属性视图：	标签/数值/文本/下拉框/复选框/单选
-- [ ] 富文本：	字体样式、图片、排版、数据格式定义
-*/
 #endif // 1
 
 class form_x;
@@ -1466,10 +1437,8 @@ public:
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
 	std::function<void(cairo_t* cr)> draw_cb;
 	std::function<bool(float delta)> update_cb;
-	//std::vector<text_item_t> txtv;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
-	std::vector<image_ptr_t*> images;
-	std::vector<svg_cx*> svgs;
+
 	layout_info_x _css = {};		// 布局样式
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
 	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 偏移，加宽
@@ -1518,8 +1487,8 @@ public:
 	progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
 	colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
 	// 窗口执行事件
-	void on_event(uint32_t type, et_un_t* e);
-	void update(float delta);
+	virtual void on_event(uint32_t type, et_un_t* e);
+	virtual void update(float delta);
 	// 更新布局
 	void mk_layout();
 	// 返回是否命中ui
@@ -1530,6 +1499,69 @@ private:
 	void on_button(int idx, int state, const glm::vec2& pos, int clicks, int r);
 	void on_wheel(double x, double y);
 };
+
+
+
+struct column_lv
+{
+	std::string title;	// 文本 
+	int width = 0;		// 宽
+	glm::vec2 align = { 0.5,0.5 };	// 0左，0.5中，1右
+	int idx = 0;		// 初始序号
+	bool visible = true;//是否显示列
+};
+// 列表视图控件。显示文本、image_ptr_t、svg_cx
+class listview_cx :public plane_cx
+{
+public:
+	std::vector<column_lv> _title;	// 标题信息
+	std::vector<void*> _data;		// 数据
+
+	bool data_valid = false;
+public:
+	listview_cx();
+	~listview_cx();
+
+public:
+	void set_title(column_lv* p, int count);
+	void insert_line(void* data, size_t pos);
+	void remove_line(size_t pos);
+	size_t get_count();
+	size_t get_column_count();
+public:
+	virtual void on_event(uint32_t type, et_un_t* e);
+	virtual void update(float delta);
+private:
+
+};
+class treeview_cx :public plane_cx
+{
+public:
+	treeview_cx();
+	~treeview_cx();
+public:
+	virtual void on_event(uint32_t type, et_un_t* e);
+	virtual void update(float delta);
+private:
+
+};
+class valueview_cx :public plane_cx
+{
+public:
+	valueview_cx();
+	~valueview_cx();
+
+public:
+	virtual void on_event(uint32_t type, et_un_t* e);
+	virtual void update(float delta);
+private:
+
+};
+
+
+
+
+
 
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& ms);
 
@@ -1655,42 +1687,42 @@ struct cell_store_pos64
 
 // 固定表格  
 
-struct column_ht
-{
-	std::string title;	// 文本
-	std::string format;	// 数字格式化
-	int width = 0;		// 宽
-	int align = 0;		// 0左，1中，2右
-	int idx = 0;		// 初始序号
-};
-class listview_cx
-{
-public:
-	std::vector<column_ht> titles;					// 标题信息
-	std::vector<std::vector<std::string>> stores;	// 保存数据
-	bool data_valid = true;	// 更新了数据
-public:
-	listview_cx();
-	~listview_cx();
-	void set_title(column_ht* p, int count);
-	// 获取行数
-	size_t get_count();
-	// 列数
-	size_t get_column_count();
-	// 添加一行到后面
-	void push_back(const std::vector<std::string>& t);
-	// 插入一行
-	void insert(size_t pos, const std::vector<std::string>& t);
-	void update(size_t pos, const std::vector<std::string>& t);	// 更新整行
-	void update(size_t pos, size_t idx, const std::string& str);	// 更新一格
-	std::vector<std::string>* get_line(size_t pos);
-	// 移动列位置，移动的列，移到pos。移动不影响上面输入数据的排序
-	void move_column(size_t idx, size_t pos);
-	// 排序的列，asc=0小到大，1大到小
-	void sort_column(size_t idx, int asc);
-private:
-
-};
+//struct column_ht
+//{
+//	std::string title;	// 文本
+//	std::string format;	// 数字格式化
+//	int width = 0;		// 宽
+//	int align = 0;		// 0左，1中，2右
+//	int idx = 0;		// 初始序号
+//};
+//class listview_cx
+//{
+//public:
+//	std::vector<column_ht> titles;					// 标题信息
+//	std::vector<std::vector<std::string>> stores;	// 保存数据
+//	bool data_valid = true;	// 更新了数据
+//public:
+//	listview_cx();
+//	~listview_cx();
+//	void set_title(column_ht* p, int count);
+//	// 获取行数
+//	size_t get_count();
+//	// 列数
+//	size_t get_column_count();
+//	// 添加一行到后面
+//	void push_back(const std::vector<std::string>& t);
+//	// 插入一行
+//	void insert(size_t pos, const std::vector<std::string>& t);
+//	void update(size_t pos, const std::vector<std::string>& t);	// 更新整行
+//	void update(size_t pos, size_t idx, const std::string& str);	// 更新一格
+//	std::vector<std::string>* get_line(size_t pos);
+//	// 移动列位置，移动的列，移到pos。移动不影响上面输入数据的排序
+//	void move_column(size_t idx, size_t pos);
+//	// 排序的列，asc=0小到大，1大到小
+//	void sort_column(size_t idx, int asc);
+//private:
+//
+//};
 // 列表渲染
 class render_lv
 {
