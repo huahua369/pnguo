@@ -18429,9 +18429,9 @@ void slider_tl::draw(cairo_t* cr)
 	glm::ivec2 ss = size;
 	cairo_translate(cr, poss.x, poss.y);
 	int y = (ss.y - height) * 0.5;
-	draw_rectangle(cr, { 0.5 + sl.x,0.5 + y, ss.x - sl.x, height }, rounding);
+	draw_rectangle(cr, { 0.5  ,0.5 + y, ss.x , height }, rounding);
 	fill_stroke(cr, color.y, 0, 0, 0);
-	double xx = (ss.x - sl.x) * value;
+	double xx = (ss.x) * value;
 	int kx = 0;
 	int r = rounding;
 	if (xx >= 0)
@@ -18446,12 +18446,12 @@ void slider_tl::draw(cairo_t* cr)
 				x1 = r * 2;
 				kx = 1;
 			}
-			draw_rectangle(cr, { 0.5 + sl.x,0.5 + y, x1, height }, r);
+			draw_rectangle(cr, { 0.5  ,0.5 + y, x1, height }, r);
 			fill_stroke(cr, color.x, 0, 0, 0);
 		}
 		if (sl.x > 0) {
-			xx = glm::clamp((float)xx, (float)0, (float)ss.x - sl.x);
-			draw_circle(cr, { xx + sl.x ,ss.y * 0.5 }, sl.x);
+			xx = glm::clamp((float)xx, (float)0, (float)ss.x);
+			draw_circle(cr, { xx ,ss.y * 0.5 }, sl.x);
 			fill_stroke(cr, sl.y, color.x, thickness, 0);
 		}
 	}
