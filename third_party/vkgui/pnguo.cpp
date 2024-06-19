@@ -16392,6 +16392,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	int r1 = 0;
 	auto ppos = get_pos();
 	auto sps = get_spos();
+	bool hov = _bst & (int)BTN_STATE::STATE_HOVER;
 	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
@@ -16402,9 +16403,11 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			_bst |= (int)BTN_STATE::STATE_HOVER;
 			r1 = 1;
 			p->cursor = (int)cursor_st::cursor_arrow;
+			hov = true;
 		}
 		else {
 			_bst &= ~(int)BTN_STATE::STATE_HOVER;
+			hov = false;
 		}
 	}
 	event_wts.clear();
@@ -16416,9 +16419,17 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			event_wts1.push_back(*it);
 	}
 	if (horizontal) {
+		if (horizontal->hover_sc && hov)
+		{
+			(horizontal->bst |= (int)BTN_STATE::STATE_HOVER);
+		}
 		widget_on_event(horizontal, type, ep, ppos);
 	}
 	if (vertical && !ep->ret) {
+		if (vertical->hover_sc && hov)
+		{
+			(vertical->bst |= (int)BTN_STATE::STATE_HOVER);
+		}
 		widget_on_event(vertical, type, ep, ppos);
 	}
 
@@ -18720,7 +18731,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		break;
 	case event_type2::on_scroll:
 	{
-		if (bst & (int)BTN_STATE::STATE_HOVER || hover_sc)
+		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER)))
 		{
 			auto pts = (-mps.y * _pos_width) + _offset;
 			auto st = ss[_dir] - tsm;
@@ -18777,6 +18788,9 @@ bool scroll_bar::update(float delta)
 				scale_w = 1;
 			}
 		}
+		else {
+			_offset = 0;
+		}
 		thumb_size_m = sbs;
 		valid = false;
 	}
@@ -18828,7 +18842,7 @@ int scroll_bar::get_offset()
 
 void scroll_bar::set_posv(const glm::ivec2& poss)
 {
-	if (!hover)return;
+	if (!hover || thumb_size_m.z <= 0)return;
 	glm::ivec2 ss = size;
 	int px = _dir ? 0 : 1;
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;

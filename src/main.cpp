@@ -265,7 +265,7 @@ int main()
 		p->border = { 0x80ff802C,1,5 };
 		pw->bind(p);	
 		p->set_size({ 100,600 });
-		p->set_pos({ 200,100 });
+		p->set_pos({ 500,100 });
 		p->set_colors({ 0xff121212,-1,0,0 });
 		auto pss = p->get_size();
 		int width = 10;
