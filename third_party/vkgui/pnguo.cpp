@@ -18779,7 +18779,7 @@ bool scroll_bar::update(float delta)
 			{
 				sbs.x = _rc_width;
 			}
-			// 滚动条宽度-滑块宽度+视图宽度
+			// 滚动条宽度-滑块宽度-边框偏移
 			auto vci = ss1 - sbs.x - tsm;
 			scale_w = abs((double)(_content_size - (vs)) / vci);
 			//assert(!(scale_w < 1));
