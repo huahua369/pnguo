@@ -18408,7 +18408,7 @@ bool slider_tl::on_mevent(int type, const glm::vec2& mps)
 		poss += curpos;
 		if (poss.x >= 0 && poss.y >= 0)
 		{
-			double xf = (double)poss.x / (ss.x - sl.x);
+			double xf = (double)poss.x / (ss.x);
 			if (xf > 1)xf = 1;
 			if (xf < 0)xf = 0;
 			value = xf;
