@@ -257,13 +257,13 @@ int main()
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
 	pl3->visible = false;
 	pl2->visible = false;
-	pl1->visible = false;
+	//pl1->visible = false;
 	{
-		auto p = new plane_cx(); 
+		auto p = new plane_cx();
 		p->draggable = true; //可拖动
 		p->_lms = { 6,6 };
 		p->border = { 0x80ff802C,1,5 };
-		pw->bind(p);	
+		pw->bind(p);
 		p->set_size({ 100,600 });
 		p->set_pos({ 500,100 });
 		p->set_colors({ 0xff121212,-1,0,0 });
@@ -281,7 +281,7 @@ int main()
 			p->bind_scroll_bar(cp, false); // 绑定水平滚动条
 			cp->_pos_width = width;
 		}
-		glm::vec2 cs = {500,600};
+		glm::vec2 cs = { 500,600 };
 		auto vs = p->get_size();
 		vs -= 22;
 		p->set_view(vs, cs);
@@ -331,6 +331,7 @@ int main()
 		plane_cx* p = listp;
 		p->custom_layout = true;
 		p->fontsize = 16;
+
 		std::vector<std::string> cstr = { (char*)u8"名称" ,(char*)u8"状态",(char*)u8"描述" };
 		std::vector<std::string> cstr1 = { (char*)u8"checkbox 测试1" ,(char*)u8"checkbox 测试2",(char*)u8"checkbox 测试3" };
 		std::vector<std::string> cstr2 = { (char*)u8"radio 测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
@@ -458,6 +459,8 @@ int main()
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
 		et1->set_pos({ 10,10 });
+
+
 		pl1->add_switch(bs, "", true);
 		pl1->add_switch(bs, "", false);
 		auto sw1 = (switch_tl*)pl1->add_switch(bs, (char*)u8"开", true);
@@ -570,6 +573,11 @@ int main()
 			cp->init(0, 250, 20, true);
 			cp->set_hsv({ 0.62,1,0.91,0.68 });
 		}
+		bs = { 200, 12 };
+		auto slider = pl1->add_slider(bs, 7, 0.2);
+		slider->sl.y = 0xffffffff;
+		slider->thickness = 2;
+		slider->rounding = 3;
 		auto pss = pl1->get_size();
 		int width = 10;
 		int border = 2;

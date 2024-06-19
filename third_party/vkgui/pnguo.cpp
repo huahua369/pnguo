@@ -16118,6 +16118,21 @@ progress_tl* plane_cx::add_progress(const std::string& format, const glm::ivec2&
 	return p;
 }
 
+slider_tl* plane_cx::add_slider(const glm::ivec2& size, int h, double v)
+{
+	auto p = new slider_tl();
+	if (p)
+	{
+		p->size = size;
+		p->height = h;
+		p->sl.x = size.y * 0.5;
+		add_widget(p);
+		p->set_value(v);
+		p->_autofree = true;
+	}
+	return p;
+}
+
 colorpick_tl* plane_cx::add_colorpick(uint32_t c, int w, int h, bool alpha)
 {
 	auto p = new colorpick_tl();
@@ -16392,7 +16407,6 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	int r1 = 0;
 	auto ppos = get_pos();
 	auto sps = get_spos();
-	bool hov = _bst & (int)BTN_STATE::STATE_HOVER;
 	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
@@ -16403,11 +16417,11 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			_bst |= (int)BTN_STATE::STATE_HOVER;
 			r1 = 1;
 			p->cursor = (int)cursor_st::cursor_arrow;
-			hov = true;
+			_hover = true;
 		}
 		else {
 			_bst &= ~(int)BTN_STATE::STATE_HOVER;
-			hov = false;
+			_hover = false;
 		}
 	}
 	event_wts.clear();
@@ -16419,17 +16433,9 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			event_wts1.push_back(*it);
 	}
 	if (horizontal) {
-		if (horizontal->hover_sc && hov)
-		{
-			(horizontal->bst |= (int)BTN_STATE::STATE_HOVER);
-		}
 		widget_on_event(horizontal, type, ep, ppos);
 	}
 	if (vertical && !ep->ret) {
-		if (vertical->hover_sc && hov)
-		{
-			(vertical->bst |= (int)BTN_STATE::STATE_HOVER);
-		}
 		widget_on_event(vertical, type, ep, ppos);
 	}
 
@@ -17956,6 +17962,10 @@ radio_tl::~radio_tl()
 	gr = 0;
 }
 
+void radio_tl::bind_ptr(bool* p)
+{
+}
+
 void radio_tl::set_value(const std::string& str, bool bv)
 {
 	radio_info_t k = {};
@@ -18070,6 +18080,10 @@ void radio_tl::draw(cairo_t* cr)
 	}
 }
 
+void checkbox_tl::bind_ptr(bool* p)
+{
+}
+
 void checkbox_tl::set_value(const std::string& str, bool bv)
 {
 	checkbox_info_t k = {};
@@ -18164,6 +18178,10 @@ void checkbox_tl::draw(cairo_t* cr)
 		//	fill_stroke(cr, 0, 0x80ff8000, 1, 0);
 		//}
 	}
+}
+
+void switch_tl::bind_ptr(bool* p)
+{
 }
 
 void switch_tl::set_value(bool b)
@@ -18342,6 +18360,111 @@ void progress_tl::draw(cairo_t* cr)
 		ltx->draw_text(cr, ltx->tem_rtv, text_color);
 	}
 }
+
+
+
+void slider_tl::bind_ptr(double* p)
+{
+}
+
+void slider_tl::set_value(double b)
+{
+	if (b < 0)b = 0;
+	if (b > 1)b = 1;
+	value = b;
+
+}
+
+void slider_tl::set_vr(const glm::ivec2& r)
+{
+	vr = r;
+}
+
+double slider_tl::get_v()
+{
+	return glm::mix(vr.x, vr.y, value);
+}
+
+bool slider_tl::on_mevent(int type, const glm::vec2& mps)
+{
+	auto et = (event_type2)type;
+	glm::ivec2 poss = mps - pos;
+	glm::ivec2 ss = size;
+	if (et == event_type2::on_down) {
+
+	}
+	if (et == event_type2::on_click)
+	{
+		if (poss.x >= 0 && poss.y >= 0)
+		{
+			double xf = (double)poss.x / ss.x;
+			if (xf > 1)xf = 1;
+			if (xf < 0)xf = 0;
+			value = xf;
+		}
+	}
+	if (et == event_type2::on_drag)
+	{
+		poss += curpos;
+		if (poss.x >= 0 && poss.y >= 0)
+		{
+			double xf = (double)poss.x / (ss.x - sl.x);
+			if (xf > 1)xf = 1;
+			if (xf < 0)xf = 0;
+			value = xf;
+		}
+	}
+	return false;
+}
+
+bool slider_tl::update(float delta)
+{
+	return false;
+}
+
+void slider_tl::draw(cairo_t* cr)
+{
+	cairo_as _as_(cr);
+	glm::ivec2 poss = pos;
+	glm::ivec2 ss = size;
+	cairo_translate(cr, poss.x, poss.y);
+	int y = (ss.y - height) * 0.5;
+	draw_rectangle(cr, { 0.5 + sl.x,0.5 + y, ss.x - sl.x, height }, rounding);
+	fill_stroke(cr, color.y, 0, 0, 0);
+	double xx = (ss.x - sl.x) * value;
+	int kx = 0;
+	int r = rounding;
+	if (xx >= 0)
+	{
+		{
+			cairo_as _as_a(cr);
+			auto x1 = xx;
+			if (xx < rounding * 2)
+			{
+				draw_rectangle(cr, { 0,0, xx, height }, r);
+				cairo_clip(cr);
+				x1 = r * 2;
+				kx = 1;
+			}
+			draw_rectangle(cr, { 0.5 + sl.x,0.5 + y, x1, height }, r);
+			fill_stroke(cr, color.x, 0, 0, 0);
+		}
+		if (sl.x > 0) {
+			xx = glm::clamp((float)xx, (float)0, (float)ss.x - sl.x);
+			draw_circle(cr, { xx + sl.x ,ss.y * 0.5 }, sl.x);
+			fill_stroke(cr, sl.y, color.x, thickness, 0);
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
 
 // Convert rgb floats ([0-1],[0-1],[0-1]) to hsv floats ([0-1],[0-1],[0-1]), from Foley & van Dam p592
 // Optimized http://lolengine.net/blog/2013/01/13/fast-rgb-to-hsv
@@ -18731,7 +18854,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		break;
 	case event_type2::on_scroll:
 	{
-		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER)))
+		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
 		{
 			auto pts = (-mps.y * _pos_width) + _offset;
 			auto st = ss[_dir] - tsm;

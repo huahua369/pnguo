@@ -1269,6 +1269,7 @@ struct radio_info_t
 	std::function<void(void* p, bool v)> on_change_cb;
 	float swidth = 0.;
 	float dt = 0;	// 动画进度
+	bool* pv = 0;
 	bool value = 0; // 选中值
 	bool value1 = 1; // 选中值动画
 };
@@ -1279,7 +1280,8 @@ struct checkbox_info_t
 	std::function<void(void* p, bool v)> on_change_cb;
 	float dt = 0;	// 动画进度
 	float duration = 0.28;	// 动画时间
-	float new_alpha = -1;		// 动画控制
+	float new_alpha = -1;		// 动画控制	
+	bool* pv = 0;
 	bool mixed = false;			// 是否满
 	bool value = 0; // 选中值
 	bool value1 = 1; // 选中值动画
@@ -1300,6 +1302,7 @@ public:
 	radio_tl();
 	~radio_tl();
 public:
+	void bind_ptr(bool* p);
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);
 	void set_value();
@@ -1314,6 +1317,7 @@ struct checkbox_tl :public widget_base
 	check_style_t style = {};	// 风格id
 	checkbox_info_t v;
 public:
+	void bind_ptr(bool* p);
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);
 	void set_value();
@@ -1336,6 +1340,7 @@ struct switch_tl :public widget_base
 	checkbox_info_t v = {};
 	bool inline_prompt = false;
 public:
+	void bind_ptr(bool* p);
 	void set_value(bool b);
 	void set_value();
 
@@ -1363,7 +1368,25 @@ public:
 	bool update(float delta);
 	void draw(cairo_t* cr);
 };
+// 滑块
+struct slider_tl :public widget_base
+{
+	glm::vec2 vr = { 0, 100 };		// 范围
+	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色 
+	glm::ivec2 sl = { 6,0xff363636 };	// 滑块半径颜色
+	int height = 0;
+	double value = 0.0;				// 当前进度
+	double* pv = 0;
+public:
+	void bind_ptr(double* p);
+	void set_value(double b);
+	void set_vr(const glm::ivec2& r);
+	double get_v();
 
+	bool on_mevent(int type, const glm::vec2& mps);
+	bool update(float delta);
+	void draw(cairo_t* cr);
+};
 // 颜色控件
 struct colorpick_tl :public widget_base
 {
@@ -1473,6 +1496,7 @@ public:
 	int evupdate = 0;
 	int dms = 16, dmsset = 16;	// 渲染间隔ms
 	bool _draw_valid = true;
+	bool _hover = false;
 	bool draggable = false;
 	bool uplayout = true;
 	bool custom_layout = false;	// 使用自定义布局计算
@@ -1507,6 +1531,7 @@ public:
 	color_btn* add_cbutton(const std::string& label, const glm::ivec2& size, int idx);
 	color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
 	progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
+	slider_tl* add_slider(const glm::ivec2& size, int h, double v);
 	colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
 	// 窗口执行事件
 	virtual void on_event(uint32_t type, et_un_t* e);
