@@ -15886,6 +15886,14 @@ size_t plane_cx::add_res(const char* data, int len)
 	return 0;
 }
 
+void plane_cx::set_view(const glm::ivec2& view_size, const glm::ivec2& content_size)
+{
+	if (horizontal)
+		horizontal->set_viewsize(view_size.x, content_size.x, 0);
+	if (vertical)
+		vertical->set_viewsize(view_size.y, content_size.y, 0);
+}
+
 void plane_cx::set_colors(const glm::ivec4& c)
 {
 	tv->color = c;
@@ -18627,7 +18635,8 @@ void scroll_bar::set_viewsize(int vs, int cs, int rcw)
 {
 	_view_size = vs;
 	_content_size = cs;
-	_rc_width = rcw;
+	if (rcw > 0)
+		_rc_width = rcw;
 }
 
 bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
@@ -18746,6 +18755,9 @@ bool scroll_bar::update(float delta)
 	auto pxs = (ss[px] - _rc_width) * 0.5;
 	glm::ivec3 sbs = calcu_scrollbar_size(vs, _content_size, pxs, 2);
 	tps = { pxs,pxs };
+	sbs.x = vs - (_content_size - vs);
+	if (sbs.x < _rc_width)
+		sbs.x = _rc_width;
 	thumb_size_m = sbs;
 	if ((bst & (int)BTN_STATE::STATE_HOVER)) {
 
@@ -18867,12 +18879,12 @@ glm::vec4 grid_view::get(const glm::ivec2& pos)
 	if (valid) { get_size(); }
 	if (px.x < _column_width.size())
 	{
-		r.x = _column_width[px.x].y;
+		r.x = _pos.x + _column_width[px.x].y;
 		r.z = _column_width[px.x].x;
 	}
 	if (px.y < _row_height.size())
 	{
-		r.y = _row_height[px.y].y;
+		r.y = _pos.y + _row_height[px.y].y;
 		r.w = _row_height[px.y].x;
 	}
 	return r;
@@ -18964,7 +18976,7 @@ void valueview_cx::update(float delta)
 std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* p, int clicks)> cb)
 {
 	std::vector<color_btn*> rv;
-	if (p && p->ltx) { 
+	if (p && p->ltx) {
 		for (auto& it : t)
 		{
 			glm::vec2 bs;
@@ -18981,15 +18993,14 @@ std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t
 std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb)
 {
 	std::vector<checkbox_com> rv;
-	if (p && p->ltx) { 
+	if (p && p->ltx) {
 		for (auto& it : t)
 		{
 			glm::vec2 bs;
-			bs.x = bs.y = p->fontsize;
+			bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
 			auto c = p->add_checkbox(bs, it, false);
 			c->v.on_change_cb = cb;
 			bs.x = width;
-			bs.y = p->ltx->get_lineheight(0, bs.y);
 			auto kcb = p->add_label(it, bs, 0);
 			kcb->click_cb = [=](void* ptr, int clicks)
 				{
@@ -19008,11 +19019,10 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 		for (auto& it : t)
 		{
 			glm::vec2 bs;
-			bs.x = bs.y = p->fontsize;
+			bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
 			auto c = p->add_radio(bs, it, false, gr);
 			c->v.on_change_cb = cb;
 			bs.x = width;
-			bs.y = p->ltx->get_lineheight(0, bs.y);
 			auto kcb = p->add_label(it, bs, 0);
 			kcb->click_cb = [=](void* ptr, int clicks)
 				{

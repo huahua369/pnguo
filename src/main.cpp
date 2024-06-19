@@ -265,7 +265,7 @@ int main()
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
 	{
-		listp->draggable = true; //可拖动
+		//listp->draggable = true; //可拖动
 		listp->set_size({ 300,600 });
 		listp->set_pos({ 100,100 });
 		listp->set_colors({ 0xff121212,-1,0,0 });
@@ -292,6 +292,63 @@ int main()
 		c.title = (char*)u8"描述";
 		listp->add_title(c);
 
+		plane_cx* p = listp;
+		p->custom_layout = true;
+		p->fontsize = 16;
+		std::vector<std::string> cstr = { (char*)u8"名称" ,(char*)u8"状态",(char*)u8"描述" };
+		std::vector<std::string> cstr1 = { (char*)u8"checkbox 测试1" ,(char*)u8"checkbox 测试2",(char*)u8"checkbox 测试3" };
+		std::vector<std::string> cstr2 = { (char*)u8"radio 测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
+		width = 150;
+		std::vector<color_btn*> cbv = new_label(p, cstr, width, [](void* ptr, int clicks)
+			{
+				auto pr = (color_btn*)ptr;
+
+			});
+		std::vector<checkbox_com> ckv = new_checkbox(p, cstr1, width, [=](void* ptr, bool v)
+			{
+				auto pr = (checkbox_tl*)ptr;
+
+			});
+		std::vector<radio_com> rcv = new_radio(p, cstr2, width, [=](void* ptr, bool v)
+			{
+				auto pr = (radio_tl*)ptr;
+			});
+		auto gv = new grid_view();
+		gv->set_size(3, 10);
+		gv->_pos = { 6,6 };
+		for (size_t i = 0; i < 3; i++)
+		{
+			gv->set_width(i, width + 30);
+		}
+		for (size_t i = 0; i < 10; i++)
+		{
+			gv->set_height(i, 30);
+		}
+		auto cs = gv->get_size();
+		auto vs = p->get_size();
+		p->set_view(vs, cs);
+		for (size_t i = 0; i < cbv.size(); i++)
+		{
+			auto rc = gv->get({ i,0 });
+			auto it = cbv[i];
+			it->pos = rc;
+		}
+		for (size_t i = 0; i < ckv.size(); i++)
+		{
+			auto rc = gv->get({ i,1 });
+			auto& it = ckv[i];
+			it.c->pos = rc;
+			it.b->pos = rc;
+			it.b->pos.x += it.c->size.x * 1.5;
+		}
+		for (size_t i = 0; i < rcv.size(); i++)
+		{
+			auto rc = gv->get({ i,2 });
+			auto& it = rcv[i];
+			it.c->pos = rc;
+			it.b->pos = rc;
+			it.b->pos.x += it.c->size.x * 1.5;
+		}
 
 	}
 

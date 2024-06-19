@@ -1484,6 +1484,7 @@ public:
 	void set_colors(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
+	void set_view(const glm::ivec2& view_size, const glm::ivec2& content_size);
 	void move2end(widget_base* p);
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
 	// 添加字体,返回序号
@@ -1545,6 +1546,7 @@ public:
 	// 行列的宽高
 	std::vector<glm::vec2> _column_width;	// 列宽，x宽，y为本列坐标缓存
 	std::vector<glm::vec2> _row_height;		// 行高，x高，y为本行坐标缓存
+	glm::vec2 _pos = {};
 	glm::vec2 _size = {};
 	bool valid = true;
 public:
