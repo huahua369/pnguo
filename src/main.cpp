@@ -258,6 +258,42 @@ int main()
 	pl3->visible = false;
 	pl2->visible = false;
 	pl1->visible = false;
+	{
+		auto p = new plane_cx(); 
+		p->draggable = true; //可拖动
+		p->_lms = { 6,6 };
+		p->border = { 0x80ff802C,1,5 };
+		pw->bind(p);	
+		p->set_size({ 100,600 });
+		p->set_pos({ 200,100 });
+		p->set_colors({ 0xff121212,-1,0,0 });
+		auto pss = p->get_size();
+		int width = 10;
+		int border = 2;
+		{
+			auto cp = p->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
+			p->bind_scroll_bar(cp, true); // 绑定垂直滚动条
+			cp->_pos_width = width * 2;//滚轮事件每次滚动量
+			cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		}
+		{
+			auto cp = p->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
+			p->bind_scroll_bar(cp, false); // 绑定水平滚动条
+			cp->_pos_width = width;
+		}
+		glm::vec2 cs = {500,600};
+		auto vs = p->get_size();
+		vs -= 22;
+		p->set_view(vs, cs);
+		p->draw_cb = [=](cairo_t* cr)
+			{
+				cairo_as _cas(cr);
+				cairo_translate(cr, 6, 6);
+				draw_rectangle(cr, { 0.5,0.5,cs.x,cs.y }, 4);
+				fill_stroke(cr, 0x20805c42, 0xffff802C, 1, false);
+				return;
+			};
+	}
 	// 创建列表视图
 	auto listp = new listview_cx();
 	listp->border = { 0x80ff802C,1,5 };
@@ -265,7 +301,7 @@ int main()
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
 	{
-		//listp->draggable = true; //可拖动
+		listp->draggable = true; //可拖动
 		listp->set_size({ 300,600 });
 		listp->set_pos({ 100,100 });
 		listp->set_colors({ 0xff121212,-1,0,0 });
@@ -326,6 +362,7 @@ int main()
 		}
 		auto cs = gv->get_size();
 		auto vs = p->get_size();
+		vs -= 22;
 		p->set_view(vs, cs);
 		for (size_t i = 0; i < cbv.size(); i++)
 		{
@@ -350,6 +387,14 @@ int main()
 			it.b->pos.x += it.c->size.x * 1.5;
 		}
 
+		p->draw_cb = [=](cairo_t* cr)
+			{
+				cairo_as _cas(cr);
+				cairo_translate(cr, 6, 6);
+				draw_rectangle(cr, { 0.5,0.5,cs.x,cs.y }, 4);
+				fill_stroke(cr, 0x20805c42, 0xffff802C, 1, false);
+				return;
+			};
 	}
 
 

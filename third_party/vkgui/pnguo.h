@@ -1399,7 +1399,6 @@ struct scroll_bar :public widget_base
 {
 	int _view_size = 0;			// 视图大小
 	int _content_size = 0;		// 内容大小 
-	int _offset = 0;			// 偏移量
 	int _rc_width = 0;			// 滑块宽度
 	int _dir = 0;				// 方向
 	glm::ivec3 thumb_size_m = {};
@@ -1408,15 +1407,20 @@ struct scroll_bar :public widget_base
 	uint32_t _tcc = 0;			// 滑块当前颜色
 	int _pos_width = 1;			// 滚动宽度
 	int t_offset = 0;			// 偏移量
+	float scale_w = 1.0;		// 滚动比例
 	bool hover = 0;
 	bool hover_sc = 0;
 	bool limit = 1;
+	bool valid = 1;
+private:
+	int _offset = 0;			// 偏移量
 public:
 	void set_viewsize(int vs, int cs, int rcw);
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
 
+	int get_offset();
 
 	void set_posv(const glm::ivec2& poss);
 };

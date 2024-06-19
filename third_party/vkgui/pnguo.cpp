@@ -15837,9 +15837,9 @@ glm::ivec2 plane_cx::get_spos()
 	glm::vec2 sps = {};
 
 	if (horizontal)
-		sps.x = -horizontal->_offset;
+		sps.x = -horizontal->get_offset();
 	if (vertical)
-		sps.y = -vertical->_offset;
+		sps.y = -vertical->get_offset();
 	return sps;
 }
 void plane_cx::set_pos(const glm::ivec2& ps) {
@@ -18637,6 +18637,7 @@ void scroll_bar::set_viewsize(int vs, int cs, int rcw)
 	_content_size = cs;
 	if (rcw > 0)
 		_rc_width = rcw;
+	valid = true;
 }
 
 bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
@@ -18748,17 +18749,37 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 bool scroll_bar::update(float delta)
 {
 	// 箭头、滑块按钮初始大小一样
-	int vrc = _view_size - _rc_width;
-	auto vs = _view_size;
-	int px = _dir ? 0 : 1;
-	glm::ivec2 ss = size;
-	auto pxs = (ss[px] - _rc_width) * 0.5;
-	glm::ivec3 sbs = calcu_scrollbar_size(vs, _content_size, pxs, 2);
-	tps = { pxs,pxs };
-	sbs.x = vs - (_content_size - vs);
-	if (sbs.x < _rc_width)
-		sbs.x = _rc_width;
-	thumb_size_m = sbs;
+	if (valid)
+	{
+		int vrc = _view_size - _rc_width;
+		auto vs = _view_size;
+		int px = _dir ? 0 : 1;
+		glm::ivec2 ss = size;
+		auto pxs = (ss[px] - _rc_width) * 0.5;
+		auto ss1 = ss[_dir];
+		auto ss2 = pos[_dir];
+		glm::ivec3 sbs = calcu_scrollbar_size(vs, _content_size, pxs, 2);
+		tps = { pxs,pxs };
+		sbs.x = ss1 - (_content_size - vs);
+
+		int tsm = tps[_dir] * 2.0;
+		if (sbs.z > 0) {
+			if (sbs.x < _rc_width)
+			{
+				sbs.x = _rc_width;
+			}
+			// 滚动条宽度-滑块宽度+视图宽度
+			auto vci = ss1 - sbs.x - tsm;
+			scale_w = abs((double)(_content_size - (vs)) / vci);
+			//assert(!(scale_w < 1));
+			if (scale_w < 1)
+			{
+				scale_w = 1;
+			}
+		}
+		thumb_size_m = sbs;
+		valid = false;
+	}
 	if ((bst & (int)BTN_STATE::STATE_HOVER)) {
 
 	}
@@ -18798,6 +18819,11 @@ void scroll_bar::draw(cairo_t* cr)
 			fill_stroke(cr, _tcc, 0, 0, 0);
 		}
 	}
+}
+
+int scroll_bar::get_offset()
+{
+	return scale_w * _offset;
 }
 
 void scroll_bar::set_posv(const glm::ivec2& poss)
