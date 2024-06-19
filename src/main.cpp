@@ -255,8 +255,48 @@ int main()
 	pl2->add_familys(fontn, 0);
 	pl3->add_familys(fontn, 0);
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
-	//pl3->visible = false;
-	//pl1->visible = false;
+	pl3->visible = false;
+	pl2->visible = false;
+	pl1->visible = false;
+	// 创建列表视图
+	auto listp = new listview_cx();
+	listp->border = { 0x80ff802C,1,5 };
+	pw->bind(listp);	// 绑定到窗口	
+	listp->add_familys(fontn, 0);
+	listp->add_familys(fontn2, 0);
+	{
+		listp->draggable = true; //可拖动
+		listp->set_size({ 300,600 });
+		listp->set_pos({ 100,100 });
+		listp->set_colors({ 0xff121212,-1,0,0 });
+		auto pss = listp->get_size();
+		int width = 10;
+		int border = 2;
+		{
+			auto cp = listp->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
+			listp->bind_scroll_bar(cp, true); // 绑定垂直滚动条
+			cp->_pos_width = width * 2;//滚轮事件每次滚动量
+			cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		}
+		{
+			auto cp = listp->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
+			listp->bind_scroll_bar(cp, false); // 绑定水平滚动条
+			cp->_pos_width = width;
+		}
+		column_lv c = {};
+		c.width = 100;
+		c.title = (char*)u8"名称";
+		listp->add_title(c);
+		c.title = (char*)u8"状态";
+		listp->add_title(c);
+		c.title = (char*)u8"描述";
+		listp->add_title(c);
+
+
+	}
+
+
+
 
 
 	charts_u1* pcu = new charts_u1();

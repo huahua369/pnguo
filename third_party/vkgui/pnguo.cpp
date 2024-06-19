@@ -16021,6 +16021,8 @@ radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, 
 	auto p = new radio_tl();
 	if (p) {
 		p->gr = gp;
+		if (gp)
+			gp->ct++;
 		add_widget(p);
 		p->set_value(label, v);
 		p->text = label;
@@ -17921,6 +17923,20 @@ void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
 }
 
 
+radio_tl::radio_tl()
+{
+}
+
+radio_tl::~radio_tl()
+{
+	if (gr && gr->ct > 0) {
+		gr->ct--;
+		if (gr->ct <= 0)
+			delete gr;
+	}
+	gr = 0;
+}
+
 void radio_tl::set_value(const std::string& str, bool bv)
 {
 	radio_info_t k = {};
@@ -18863,28 +18879,29 @@ glm::vec4 grid_view::get(const glm::ivec2& pos)
 }
 
 
-
-
-
-
 listview_cx::listview_cx()
 {
 }
 
 listview_cx::~listview_cx()
 {
+	if (gv)delete gv; gv = 0;
 }
 
-void listview_cx::set_title(column_lv* p, int count)
+void listview_cx::add_title(const column_lv& p)
 {
-	if (!p)count = 0;
-	_title.clear(); _title.reserve(count);
-	for (size_t i = 0; i < count; i++, p++)
-	{
-		auto& kt = _title.emplace_back(*p);
-		kt.idx = i;
-	}
+	auto ps = _title.size();
+	auto& kt = _title.emplace_back(p);
+	kt.idx = ps;
 	data_valid = true;
+}
+
+void listview_cx::set_view_size(const glm::ivec2& sv, const glm::ivec2& crsize)
+{
+	if (!gv)
+		gv = new grid_view();
+	rc = crsize;
+	set_size(sv);
 }
 
 // 获取行数
@@ -18940,4 +18957,69 @@ void valueview_cx::on_event(uint32_t type, et_un_t* e)
 void valueview_cx::update(float delta)
 {
 	plane_cx::update(delta);
+}
+
+
+
+std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* p, int clicks)> cb)
+{
+	std::vector<color_btn*> rv;
+	if (p && p->ltx) { 
+		for (auto& it : t)
+		{
+			glm::vec2 bs;
+			bs.x = bs.y = p->fontsize;
+			bs.x = width;
+			bs.y = p->ltx->get_lineheight(0, bs.y);
+			auto kcb = p->add_label(it, bs, 0);
+			rv.push_back(kcb);
+		}
+	}
+	return rv;
+}
+
+std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb)
+{
+	std::vector<checkbox_com> rv;
+	if (p && p->ltx) { 
+		for (auto& it : t)
+		{
+			glm::vec2 bs;
+			bs.x = bs.y = p->fontsize;
+			auto c = p->add_checkbox(bs, it, false);
+			c->v.on_change_cb = cb;
+			bs.x = width;
+			bs.y = p->ltx->get_lineheight(0, bs.y);
+			auto kcb = p->add_label(it, bs, 0);
+			kcb->click_cb = [=](void* ptr, int clicks)
+				{
+					c->set_value();
+				};
+			rv.push_back({ c,kcb });
+		}
+	}
+	return rv;
+}
+std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb)
+{
+	std::vector<radio_com> rv;
+	if (p && p->ltx) {
+		auto gr = new group_radio_t();
+		for (auto& it : t)
+		{
+			glm::vec2 bs;
+			bs.x = bs.y = p->fontsize;
+			auto c = p->add_radio(bs, it, false, gr);
+			c->v.on_change_cb = cb;
+			bs.x = width;
+			bs.y = p->ltx->get_lineheight(0, bs.y);
+			auto kcb = p->add_label(it, bs, 0);
+			kcb->click_cb = [=](void* ptr, int clicks)
+				{
+					c->set_value();
+				};
+			rv.push_back({ c,kcb });
+		}
+	}
+	return rv;
 }

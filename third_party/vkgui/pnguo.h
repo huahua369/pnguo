@@ -1266,6 +1266,7 @@ struct radio_info_t
 {
 	glm::vec2 pos;	// 坐标
 	std::string text;
+	std::function<void(void* p, bool v)> on_change_cb;
 	float swidth = 0.;
 	float dt = 0;	// 动画进度
 	bool value = 0; // 选中值
@@ -1275,6 +1276,7 @@ struct checkbox_info_t
 {
 	glm::vec2 pos;	// 坐标
 	std::string text;
+	std::function<void(void* p, bool v)> on_change_cb;
 	float dt = 0;	// 动画进度
 	float duration = 0.28;	// 动画时间
 	float new_alpha = -1;		// 动画控制
@@ -1286,6 +1288,7 @@ struct radio_tl;
 struct group_radio_t
 {
 	radio_tl* active = 0;
+	int ct = 0;
 };
 // 单选
 struct radio_tl :public widget_base
@@ -1293,6 +1296,9 @@ struct radio_tl :public widget_base
 	radio_style_t style = {};	// 风格id
 	radio_info_t v;
 	group_radio_t* gr = 0;		// 组 
+public:
+	radio_tl();
+	~radio_tl();
 public:
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);
@@ -1558,23 +1564,29 @@ private:
 
 };
 
+
+
 // 列表视图控件。显示文本、image_ptr_t、svg_cx
 class listview_cx :public plane_cx
 {
 public:
 	std::vector<column_lv> _title;	// 标题信息
-	std::vector<void*> _data;		// 数据
+	// 表格要显示的字符串 
+	std::list<std::vector<std::string>> _data;
 
-
+	grid_view* gv = 0;
+	std::vector<font_item_t> tem_rtv;
+	glm::ivec2 rc = {};	// 默认行列的宽高
 	bool data_valid = false;
 public:
 	listview_cx();
 	~listview_cx();
 
 public:
-	void set_title(column_lv* p, int count);
-	void insert_line(void* data, size_t pos);
-	void remove_line(size_t pos);
+	void add_title(const column_lv& p);
+	// 设置视图大小
+	void set_view_size(const glm::ivec2& sv, const glm::ivec2& crsize);
+
 	size_t get_count();
 	size_t get_column_count();
 public:
@@ -1709,7 +1721,7 @@ struct format_style {
 };
 // 对齐格式
 struct align_style {
-	glm::ivec2 a;	// x左中右，y上中下。0/1/2
+	glm::vec2 a;	// x水平，y垂直
 	bool autobr = false;// 自动换行
 };
 //图片/svg
@@ -1732,6 +1744,9 @@ struct cell_store_pos64
 	cell_store* value = 0;
 	glm::i64vec2 pos = {};			// 64位坐标
 };
+
+
+
 
 
 
@@ -1771,3 +1786,20 @@ void form_move2end(form_x* f, plane_cx* ud);
 void form_set_input_ptr(form_x* f, void* ud);
 // OLO拖放文本
 bool dragdrop_begin(const wchar_t* str, size_t size);
+
+// 创建控件
+struct checkbox_com
+{
+	checkbox_tl* c = 0;
+	color_btn* b = 0;
+};
+struct radio_com
+{
+	radio_tl* c = 0;
+	color_btn* b = 0;
+};
+std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* p, int clicks)> cb);
+std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
+std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
+
+
