@@ -264,7 +264,7 @@ int main()
 		pmodal = p;
 		//p->draggable = true; //可拖动
 		p->_lms = { 6,6 };
-		p->border = { 0x80ff802C,1,5 }; 
+		p->border = { 0x80ff802C,1,5 };
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		pw->bind(p);
 		p->set_size({ 100,600 });
@@ -272,17 +272,10 @@ int main()
 		p->set_colors({ 0xff121212,-1,0,0 });
 		auto pss = p->get_size();
 		int width = 10;
-		int border = 2;
+		int rcw = 8;
 		{
-			auto cp = p->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
-			p->bind_scroll_bar(cp, true); // 绑定垂直滚动条
-			cp->_pos_width = width * 2;//滚轮事件每次滚动量
-			cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
-		}
-		{
-			auto cp = p->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
-			p->bind_scroll_bar(cp, false); // 绑定水平滚动条
-			cp->_pos_width = width;
+			// 设置带滚动条
+			p->set_scroll(width, rcw, { 0,0 });
 		}
 		glm::vec2 cs = { 500,600 };
 		auto vs = p->get_size();
@@ -310,17 +303,10 @@ int main()
 		listp->set_colors({ 0xff121212,-1,0,0 });
 		auto pss = listp->get_size();
 		int width = 10;
-		int border = 2;
+		int rcw = 8;
 		{
-			auto cp = listp->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
-			listp->bind_scroll_bar(cp, true); // 绑定垂直滚动条
-			cp->_pos_width = width * 2;//滚轮事件每次滚动量
-			cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
-		}
-		{
-			auto cp = listp->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
-			listp->bind_scroll_bar(cp, false); // 绑定水平滚动条
-			cp->_pos_width = width;
+			// 设置带滚动条
+			listp->set_scroll(width, rcw, { 0,0 });
 		}
 		column_lv c = {};
 		c.width = 100;
@@ -380,7 +366,7 @@ int main()
 			auto& it = ckv[i];
 			it.c->pos = rc;
 			it.b->pos = rc;
-			it.b->pos.x += it.c->size.x * 1.5;
+			it.b->pos.x += it.c->size.x;
 		}
 		for (size_t i = 0; i < rcv.size(); i++)
 		{
@@ -388,7 +374,7 @@ int main()
 			auto& it = rcv[i];
 			it.c->pos = rc;
 			it.b->pos = rc;
-			it.b->pos.x += it.c->size.x * 1.5;
+			it.b->pos.x += it.c->size.x;
 		}
 
 		p->draw_cb = [=](cairo_t* cr)
@@ -610,18 +596,12 @@ int main()
 			slider->reverse_color = 1;
 		}
 		auto pss = pl1->get_size();
+
 		int width = 10;
-		int border = 2;
+		int rcw = 8;
 		{
-			auto cp = pl1->add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y * 2, 8, true);
-			pl1->bind_scroll_bar(cp, true); // 绑定垂直滚动条
-			cp->_pos_width = width * 2;
-			cp->hover_sc = 1;
-		}
-		{
-			auto cp = pl1->add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x * 2, 8, false);
-			pl1->bind_scroll_bar(cp, false); // 绑定水平滚动条
-			cp->_pos_width = width;
+			// 设置带滚动条
+			pl1->set_scroll(width, rcw, { 0,0 });
 		}
 
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };

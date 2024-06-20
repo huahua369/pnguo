@@ -1009,7 +1009,7 @@ public:
 
 	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
 	flex_direction direction = flex_direction::ROW;			// 父元素:
-	flex_wrap wrap = flex_wrap::WRAP;						// 父元素:是否换行
+	flex_wrap wrap = flex_wrap::WRAP;						// 父元素:是否换行，超出宽度自动换行
 	bool should_order_children = false;
 
 	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
@@ -1518,14 +1518,16 @@ public:
 	void set_colors(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
+	// 设置本面板滚动条
+	void set_scroll(int width, int rcw, const glm::ivec2& pos_width);
 	void set_view(const glm::ivec2& view_size, const glm::ivec2& content_size);
+	void set_scroll_visible(const glm::ivec2& hv);
 	void move2end(widget_base* p);
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
 	// 添加字体,返回序号
 	size_t add_familys(const char* familys, const char* style);
 	// 添加滚动条
 	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v);
-	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 	void add_widget(widget_base* p);
 	void remove_widget(widget_base* p);
 	// 新增控件：开关、复选、单选
@@ -1547,6 +1549,7 @@ public:
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
 private:
+	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 	void on_motion(const glm::vec2& pos);
 	// 	idx=1左，3右，2中
 	void on_button(int idx, int state, const glm::vec2& pos, int clicks, int r);

@@ -15886,12 +15886,41 @@ size_t plane_cx::add_res(const char* data, int len)
 	return 0;
 }
 
+void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width)
+{
+	auto pss = get_size();
+	{
+		auto cp = add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true);
+		bind_scroll_bar(cp, true); // 绑定垂直滚动条
+		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
+		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+	}
+	{
+		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false);
+		bind_scroll_bar(cp, false); // 绑定水平滚动条
+		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
+	}
+}
+
 void plane_cx::set_view(const glm::ivec2& view_size, const glm::ivec2& content_size)
 {
 	if (horizontal)
 		horizontal->set_viewsize(view_size.x, content_size.x, 0);
 	if (vertical)
 		vertical->set_viewsize(view_size.y, content_size.y, 0);
+}
+
+void plane_cx::set_scroll_visible(const glm::ivec2& hv)
+{
+	if (horizontal)//水平滚动条
+	{
+		horizontal->visible = hv.x;
+	}
+	//垂直滚动条
+	if (vertical)
+	{
+		vertical->visible = hv.y;
+	}
 }
 
 void plane_cx::set_colors(const glm::ivec4& c)
@@ -15966,6 +15995,7 @@ void plane_cx::bind_scroll_bar(scroll_bar* p, bool v)
 		remove_widget(p);
 	}
 }
+
 
 void plane_cx::add_widget(widget_base* p)
 {
@@ -19213,6 +19243,7 @@ std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::strin
 		{
 			glm::vec2 bs;
 			bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
+			bs.x *= 1.5;
 			auto c = p->add_checkbox(bs, it, false);
 			c->v.on_change_cb = cb;
 			bs.x = width;
@@ -19235,6 +19266,7 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 		{
 			glm::vec2 bs;
 			bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
+			bs.x *= 1.5;
 			auto c = p->add_radio(bs, it, false, gr);
 			c->v.on_change_cb = cb;
 			bs.x = width;
