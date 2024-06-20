@@ -16263,7 +16263,7 @@ void plane_cx::update(float delta)
 	}
 }
 
-flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& ms)
+flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap)
 {
 	flex_item* p = 0;
 	auto length = v.size();
@@ -16274,7 +16274,7 @@ flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& 
 		{
 			for (size_t i = 0; i < length; i++)
 			{
-				v[i].z += ms.x; v[i].w += ms.y;
+				v[i].z += gap.x; v[i].w += gap.y;
 				p[i].width = v[i].z;
 				p[i].height = v[i].w;
 				r->item_add(p + i);

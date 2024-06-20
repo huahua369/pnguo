@@ -1667,7 +1667,7 @@ private:
 
 
 
-flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& ms);
+flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap);
 
 svg_cx* new_svg_file(const void* fn, size_t len, int dpi);
 svg_cx* new_svg_data(const void* str, size_t len, int dpi);
