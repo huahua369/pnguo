@@ -259,15 +259,16 @@ int main()
 	pl2->visible = false;
 	//pl1->visible = false;
 	plane_cx* pmodal = 0;
+
 	{
 		auto p = new plane_cx();
 		pmodal = p;
-		//p->draggable = true; //可拖动
+		p->draggable = true; //可拖动
 		p->_lms = { 6,6 };
 		p->border = { 0x80ff802C,1,5 };
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		pw->bind(p);
-		p->set_size({ 100,600 });
+		p->set_size({ 800,600 });
 		p->set_pos({ 500,100 });
 		p->set_colors({ 0xff121212,-1,0,0 });
 		auto pss = p->get_size();
@@ -277,16 +278,41 @@ int main()
 			// 设置带滚动条
 			p->set_scroll(width, rcw, { 0,0 });
 		}
-		glm::vec2 cs = { 500,600 };
+		glm::vec2 cs = { 1500,600 };
 		auto vs = p->get_size();
 		vs -= 22;
 		p->set_view(vs, cs);
+
+
+		flex_item root;
+		auto ss = p->get_size();
+		root.width = ss.x - 100;
+		root.height = ss.y;
+		root.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
+		root.align_content = flex_item::flex_align::ALIGN_START;
+		root.align_items = flex_item::flex_align::ALIGN_CENTER;
+		root.wrap = flex_item::flex_wrap::WRAP;
+		root.direction = flex_item::flex_direction::ROW;
+
+		std::vector<glm::vec4> layouts = { {0,0,20,20},{0,0,60,30},{0,0,100,20},{0,0,200,60},{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} };
+		glm::vec2 rsize = { root.width,root.height };
+		flex_item* c = flexlayout(&root, layouts, {}, {  });
 		p->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
 				cairo_translate(cr, 6, 6);
-				draw_rectangle(cr, { 0.5,0.5,cs.x,cs.y }, 4);
-				fill_stroke(cr, 0x20805c42, 0xffff802C, 1, false);
+				draw_rectangle(cr, { 0.5,0.5, rsize }, 4);
+				fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
+				if (c)
+				{
+					auto length = layouts.size();
+					for (size_t i = 0; i < length; i++)
+					{
+						auto it = layouts[i];
+						draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
+						fill_stroke(cr, 0xf0805c42, 0xffff802C, 1, false);
+					}
+				}
 				return;
 			};
 	}
