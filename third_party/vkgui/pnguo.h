@@ -1439,6 +1439,8 @@ struct scroll_bar :public widget_base
 	int _pos_width = 1;			// 滚动宽度
 	int t_offset = 0;			// 偏移量
 	float scale_w = 1.0;		// 滚动比例
+	float scale_s = 0.6;		// 显示比例
+	glm::vec2 scale_s0 = { 0.6,0.8 };		// 显示比例
 	bool hover = 0;
 	bool hover_sc = 0;
 	bool limit = 1;

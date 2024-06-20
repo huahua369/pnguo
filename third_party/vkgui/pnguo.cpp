@@ -18910,6 +18910,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		if (pts > thumb_size_m.x) {
 			t_offset = thumb_size_m.x;
 		}
+		t_offset = thumb_size_m.x * 0.5;
 		set_posv(poss);
 		hover = false;
 	}
@@ -18933,6 +18934,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		else {
 			_tcc = _color.z;
 		}
+		scale_s = scale_s0.y;
 	}
 	break;
 	case event_type2::on_down:
@@ -19019,7 +19021,9 @@ bool scroll_bar::update(float delta)
 	}
 	if (!(bst & (int)BTN_STATE::STATE_HOVER)) {
 		if (!(bst & (int)BTN_STATE::STATE_ACTIVE))
-			_tcc = _color.y;
+		{
+			_tcc = _color.y; scale_s = scale_s0.x;
+		}
 	}
 	return r;
 }
@@ -19036,16 +19040,17 @@ void scroll_bar::draw(cairo_t* cr)
 		draw_rectangle(cr, { 0,0,ss }, rounding);
 		fill_stroke(cr, _color.x, 0, 0, 0);
 		// 滑块
-		glm::ivec4 trc = { 0,0,_rc_width ,_rc_width };
+		double rw = _rc_width * scale_s;
+		glm::ivec4 trc = { 0,0,rw,rw };
 		int px = _dir ? 0 : 1;
-		auto pxs = (ss[px] - _rc_width) * 0.5;
+		auto pxs = ceil((ss[px] - rw) * 0.5);
 		trc.x = pxs;
 		trc.y = pxs;
 		trc[_dir] += _offset;
 		trc[2 + _dir] = thumb_size_m.x;
 		if (thumb_size_m.z)
 		{
-			draw_rectangle(cr, trc, _rc_width * 0.5);
+			draw_rectangle(cr, trc, _rc_width * 0.5 * scale_s);
 			fill_stroke(cr, _tcc, 0, 0, 0);
 		}
 	}
