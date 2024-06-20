@@ -1199,6 +1199,7 @@ struct color_btn :public widget_base
 	uint32_t text_color = 0xffffffff;
 	int disabled_alpha = 0x30;
 	uTheme effect = uTheme::dark;
+	glm::vec2 pushedps = {};
 	bool _circle = false;			// 圆形按钮
 	bool _disabled = false;
 	bool mPushed = false;

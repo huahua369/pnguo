@@ -16344,7 +16344,7 @@ void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, i
 	{
 		glm::vec4 trc = viewport;
 		auto k2 = check_box_cr1(pos, &trc, 1, sizeof(glm::vec4));
- 
+
 		if (k2.x)
 		{
 			if (draggable && state == 1)
@@ -16496,7 +16496,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		//on_keyboard(ep);
 	}
 	break;
-	} 
+	}
 	evupdate++;
 }
 
@@ -17003,7 +17003,7 @@ void color_btn::draw(cairo_t* g)
 	// 渲染标签
 	glm::vec2 ps = {};
 	if (p->mPushed) {
-		ps.x += 1.0f; ps.y += 1.0f;
+		ps += pushedps;
 	}
 
 	glm::vec4 rc = { ps, ns };
@@ -17986,7 +17986,8 @@ void radio_tl::set_value(const std::string& str, bool bv)
 	if (bv)
 	{
 		set_value();
-	}else{
+	}
+	else {
 		if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 	}
 }
@@ -17997,7 +17998,8 @@ void radio_tl::set_value(bool bv)
 	if (bv)
 	{
 		set_value();
-	}else{
+	}
+	else {
 		if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 	}
 }
