@@ -5,7 +5,7 @@
 	关系：窗口->面板->控件/图形
 	面板持有控件，窗口分发事件给面板。
 
-
+	2024-06-19	增加slider_tl滑块控件
 	2024-06-18	增加网格视图算法初步实现grid_view
 
 
@@ -1374,13 +1374,16 @@ struct slider_tl :public widget_base
 	glm::vec2 vr = { 0, 100 };		// 范围
 	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色 
 	glm::ivec2 sl = { 6,0xff363636 };	// 滑块半径颜色
-	int height = 0;
+	int wide = 0;
 	double value = 0.0;				// 当前进度
 	double* pv = 0;
+	int vertical = 0;				// 垂直模式1
 public:
 	void bind_ptr(double* p);
 	void set_value(double b);
 	void set_vr(const glm::ivec2& r);
+	// 设置圆大小
+	void set_cw(int cw);
 	double get_v();
 
 	bool on_mevent(int type, const glm::vec2& mps);

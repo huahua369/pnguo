@@ -574,10 +574,19 @@ int main()
 			cp->set_hsv({ 0.62,1,0.91,0.68 });
 		}
 		bs = { 200, 12 };
-		auto slider = pl1->add_slider(bs, 7, 0.2);
-		slider->sl.y = 0xffffffff;
-		slider->thickness = 2;
-		slider->rounding = 3;
+		{
+			auto slider = pl1->add_slider(bs, 7, 0.2);
+			slider->sl.y = -1;
+			slider->thickness = 2;
+			slider->rounding = 3;
+		}
+		{
+			bs = { 12, 200 };
+			auto slider = pl1->add_slider(bs, 7, 0.2);
+			slider->sl.y = 0xff3030f8;
+			slider->thickness = 2;
+			slider->rounding = 3;
+		}
 		auto pss = pl1->get_size();
 		int width = 10;
 		int border = 2;

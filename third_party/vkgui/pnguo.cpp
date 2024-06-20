@@ -14302,7 +14302,7 @@ glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
 			*r1 /= PANGO_SCALE;
 			rt.x = r->x;
 			rt.y = r->y;
-			rt.w = h;// r->w;
+			rt.w = h;
 		}
 		if (dir)
 		{
@@ -16124,8 +16124,12 @@ slider_tl* plane_cx::add_slider(const glm::ivec2& size, int h, double v)
 	if (p)
 	{
 		p->size = size;
-		p->height = h;
-		p->sl.x = size.y * 0.5;
+		p->wide = h;
+		p->vertical = size.y > size.x;
+		if (p->vertical)
+			p->sl.x = size.x * 0.5;
+		else
+			p->sl.x = size.y * 0.5;
 		add_widget(p);
 		p->set_value(v);
 		p->_autofree = true;
@@ -16437,6 +16441,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	if (vertical && !ep->ret) {
 		widget_on_event(vertical, type, ep, ppos);
+
 	}
 
 	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
@@ -16460,14 +16465,14 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	case devent_type_e::mouse_move_e:
 	{
 		auto p = e->m;
-		glm::ivec2 mps = { p->x,p->y }; //mps -= vgpos;
+		glm::ivec2 mps = { p->x,p->y };
 		on_motion(mps);
 	}
 	break;
 	case devent_type_e::mouse_button_e:
 	{
 		auto p = e->b;
-		glm::ivec2 mps = { p->x,p->y }; //mps -= vgpos;
+		glm::ivec2 mps = { p->x,p->y };
 		on_button(p->button, p->state, mps, p->clicks, ep->ret);
 		//printf("ck:%d\t%p\n", ckinc, this);
 		if (ckup > 0)
@@ -16478,6 +16483,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 		auto p = e->w;
 		on_wheel(p->x, p->y);
+		if (_hover)
+		{
+			ep->ret = 1;		// 滚轮独占本事件
+		}
 	}
 	break;
 	case devent_type_e::keyboard_e:
@@ -18380,6 +18389,11 @@ void slider_tl::set_vr(const glm::ivec2& r)
 	vr = r;
 }
 
+void slider_tl::set_cw(int cw)
+{
+	sl.x = cw;
+}
+
 double slider_tl::get_v()
 {
 	return glm::mix(vr.x, vr.y, value);
@@ -18395,9 +18409,9 @@ bool slider_tl::on_mevent(int type, const glm::vec2& mps)
 	}
 	if (et == event_type2::on_click)
 	{
-		if (poss.x >= 0 && poss.y >= 0)
+		if (poss[vertical] >= 0)
 		{
-			double xf = (double)poss.x / ss.x;
+			double xf = (double)poss[vertical] / ss[vertical];
 			if (xf > 1)xf = 1;
 			if (xf < 0)xf = 0;
 			value = xf;
@@ -18406,9 +18420,9 @@ bool slider_tl::on_mevent(int type, const glm::vec2& mps)
 	if (et == event_type2::on_drag)
 	{
 		poss += curpos;
-		if (poss.x >= 0 && poss.y >= 0)
+		if (poss[vertical] >= 0)
 		{
-			double xf = (double)poss.x / (ss.x);
+			double xf = (double)poss[vertical] / ss[vertical];
 			if (xf > 1)xf = 1;
 			if (xf < 0)xf = 0;
 			value = xf;
@@ -18428,12 +18442,37 @@ void slider_tl::draw(cairo_t* cr)
 	glm::ivec2 poss = pos;
 	glm::ivec2 ss = size;
 	cairo_translate(cr, poss.x, poss.y);
-	int y = (ss.y - height) * 0.5;
-	draw_rectangle(cr, { 0.5  ,0.5 + y, ss.x , height }, rounding);
-	fill_stroke(cr, color.y, 0, 0, 0);
-	double xx = (ss.x) * value;
+	glm::vec4 brc = {}, cliprc, crc;
+	int x = 0, y = 0;
+	double xx = (ss[vertical]) * value;
+	glm::vec2 spos = {};
 	int kx = 0;
 	int r = rounding;
+	auto x1 = xx;
+	if (xx < rounding * 2) {
+		x1 = r * 2;
+		kx = 1;
+	}
+	if (vertical)
+	{
+		x = (ss.x - wide) * 0.5;
+		brc = { 0.5 + x ,0.5 + y , wide, ss.y };
+		cliprc = { 0,0, wide, xx };
+		xx = glm::clamp((float)xx, (float)0, (float)ss.y);
+		spos = { ss.x * 0.5,xx };
+		crc = { 0.5 + x,0.5 + y, wide, x1 };
+	}
+	else {
+		y = (ss.y - wide) * 0.5;
+		brc = { 0.5 + x ,0.5 + y, ss.x , wide };
+		cliprc = { 0,0, xx, wide };
+		xx = glm::clamp((float)xx, (float)0, (float)ss.x);
+		spos = { xx ,ss.y * 0.5 };
+
+		crc = { 0.5 + x,0.5 + y, x1, wide };
+	}
+	draw_rectangle(cr, brc, rounding);
+	fill_stroke(cr, color.y, 0, 0, 0);
 	if (xx >= 0)
 	{
 		{
@@ -18441,17 +18480,16 @@ void slider_tl::draw(cairo_t* cr)
 			auto x1 = xx;
 			if (xx < rounding * 2)
 			{
-				draw_rectangle(cr, { 0,0, xx, height }, r);
+				draw_rectangle(cr, cliprc, r);
 				cairo_clip(cr);
 				x1 = r * 2;
 				kx = 1;
 			}
-			draw_rectangle(cr, { 0.5  ,0.5 + y, x1, height }, r);
+			draw_rectangle(cr, crc, r);
 			fill_stroke(cr, color.x, 0, 0, 0);
 		}
 		if (sl.x > 0) {
-			xx = glm::clamp((float)xx, (float)0, (float)ss.x);
-			draw_circle(cr, { xx ,ss.y * 0.5 }, sl.x);
+			draw_circle(cr, spos, sl.x);
 			fill_stroke(cr, sl.y, color.x, thickness, 0);
 		}
 	}
@@ -18883,6 +18921,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 bool scroll_bar::update(float delta)
 {
 	// 箭头、滑块按钮初始大小一样
+	bool r = valid;
 	if (valid)
 	{
 		int vrc = _view_size - _rc_width;
@@ -18900,7 +18939,7 @@ bool scroll_bar::update(float delta)
 		if (sbs.z > 0) {
 			if (sbs.x < _rc_width)
 			{
-				sbs.x = _rc_width;
+				sbs.x = _rc_width * 2;
 			}
 			// 滚动条宽度-滑块宽度-边框偏移
 			auto vci = ss1 - sbs.x - tsm;
@@ -18917,18 +18956,11 @@ bool scroll_bar::update(float delta)
 		thumb_size_m = sbs;
 		valid = false;
 	}
-	if ((bst & (int)BTN_STATE::STATE_HOVER)) {
-
-	}
-	else {
-		//hover = false;
+	if (!(bst & (int)BTN_STATE::STATE_HOVER)) {
 		if (!(bst & (int)BTN_STATE::STATE_ACTIVE))
 			_tcc = _color.y;
 	}
-	if (bst & (int)BTN_STATE::STATE_ACTIVE) {
-		//hover = true;
-	}
-	return false;
+	return r;
 }
 
 void scroll_bar::draw(cairo_t* cr)
