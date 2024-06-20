@@ -212,6 +212,138 @@ struct vkdinfo {
 	VkPhysicalDevice		phy;					/**< Vulkan Physical device */
 	VkInstance				instance;				/**< Vulkan instance */
 };
+
+class div2_t
+{
+public:
+	struct v6_t :public glm::vec4
+	{
+		float px, py;
+	};
+	std::vector<glm::vec4> rcs;
+	std::vector<flex_item> rcs_st, c2;
+	std::vector<std::vector<v6_t>> childs;
+public:
+	div2_t();
+	~div2_t();
+	void set_root(const std::vector<int>& r);
+	void set_root_style(size_t idx, const flex_item& it);
+	void add_child(size_t idx, const glm::vec2& ss);
+	void layout();
+	void draw(cairo_t* cr);
+private:
+
+};
+
+div2_t::div2_t()
+{
+}
+
+div2_t::~div2_t()
+{
+}
+
+void div2_t::set_root(const std::vector<int>& r)
+{
+	rcs.clear();
+	for (auto it : r)
+		rcs.push_back({ 0,0,it,0 });
+	childs.resize(rcs.size());
+	rcs_st.resize(rcs.size());
+}
+
+void div2_t::set_root_style(size_t idx, const flex_item& it)
+{
+	rcs_st[idx] = it;
+}
+
+void div2_t::add_child(size_t idx, const glm::vec2& ss)
+{
+	childs[idx].push_back({ { 0,0, ss},0,0 });
+}
+
+void div2_t::layout()
+{
+	auto length = rcs.size();
+	flex_item r1;
+	r1.width = 1024;
+	r1.height = 0;
+	for (size_t x = 0; x < length; x++)
+	{
+		auto r = &rcs_st[x];
+		auto it = rcs[x];
+		r->width = it.z;
+		r->height = it.w;
+		r1.item_add(r);
+	}
+	std::vector<std::vector<flex_item>> c;
+	c.resize(length);
+	for (size_t x = 0; x < length; x++)
+	{
+		auto& v = childs[x];
+		auto r = &rcs_st[x];
+		r->clear();
+		// todo 子元素可以设置更多属性，这里用默认值
+		c[x].resize(v.size());
+		flex_item* p = c[x].data();
+		if (p)
+		{
+			for (size_t i = 0; i < v.size(); i++)
+			{
+				//v[i].z += ms.x; v[i].w += ms.y;
+				p[i].width = v[i].z;
+				p[i].height = v[i].w;
+				if (x == 2)
+					p[i].grow = 1;
+				r->item_add(p + i);
+			}
+		}
+	}
+	r1.layout();
+	for (size_t x = 0; x < length; x++)
+	{
+		auto rt = &rcs_st[x];
+		auto& it = rcs[x];
+		if (rt->position != flex_item::flex_position::POS_ABSOLUTE) {
+			it.x = rt->frame[0];
+			it.y = rt->frame[1];
+		}
+		auto& v = childs[x];
+		flex_item* p = c[x].data();
+		for (size_t i = 0; i < v.size(); i++)
+		{
+			if (p[i].position != flex_item::flex_position::POS_ABSOLUTE) {
+				v[i].x = p[i].frame[0];
+				v[i].y = p[i].frame[1];
+				v[i].px = p[i].frame[2];
+				v[i].py = p[i].frame[3];
+			}
+		}
+	}
+
+}
+
+void div2_t::draw(cairo_t* cr)
+{
+	auto length = rcs.size();
+	for (size_t x = 0; x < length; x++)
+	{
+		auto it = rcs[x];
+		if (it.w <= 0)it.w = 1024;
+		draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
+		fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
+		auto& v = childs[x];
+		auto n = v.size();
+		for (size_t i = 0; i < n; i++)
+		{
+			auto vt = v[i];
+			draw_rectangle(cr, { 0.5 + vt.x + it.x,0.5 + vt.y + it.y,vt.px,vt.py }, 4);
+			fill_stroke(cr, 0xf0805c42, 0xffff802C, 1, false);
+		}
+	}
+}
+
+
 int main()
 {
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
@@ -255,8 +387,8 @@ int main()
 	pl2->add_familys(fontn, 0);
 	pl3->add_familys(fontn, 0);
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
-	pl3->visible = false;
-	pl2->visible = false;
+	//pl3->visible = false;
+	//pl2->visible = false;
 	//pl1->visible = false;
 	plane_cx* pmodal = 0;
 
@@ -264,10 +396,12 @@ int main()
 		auto p = new plane_cx();
 		pmodal = p;
 		p->draggable = true; //可拖动
+		pw->bind(p);
+		p->add_familys(fontn, 0);
 		p->_lms = { 6,6 };
 		p->border = { 0x80ff802C,1,5 };
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
-		pw->bind(p);
+
 		p->set_size({ 800,600 });
 		p->set_pos({ 500,100 });
 		p->set_colors({ 0xff121212,-1,0,0 });
@@ -278,7 +412,7 @@ int main()
 			// 设置带滚动条
 			p->set_scroll(width, rcw, { 0,0 });
 		}
-		glm::vec2 cs = { 1500,600 };
+		glm::vec2 cs = { 1500,1600 };
 		auto vs = p->get_size();
 		vs -= 22;
 		p->set_view(vs, cs);
@@ -288,31 +422,58 @@ int main()
 		auto ss = p->get_size();
 		root.width = ss.x - 100;
 		root.height = ss.y;
-		root.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
+		root.justify_content = flex_item::flex_align::ALIGN_START;
 		root.align_content = flex_item::flex_align::ALIGN_START;
 		root.align_items = flex_item::flex_align::ALIGN_CENTER;
 		root.wrap = flex_item::flex_wrap::WRAP;
 		root.direction = flex_item::flex_direction::ROW;
 
-		std::vector<glm::vec4> layouts = { {0,0,20,20},{0,0,60,30},{0,0,100,20},{0,0,200,60},{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} ,{0,0,80,20} };
+		std::vector<glm::vec4> layouts = { 		 };
 		glm::vec2 rsize = { root.width,root.height };
-		flex_item* c = flexlayout(&root, layouts, {}, {  });
+		flex_item* c = flexlayout(&root, layouts, {}, { 6,16 });
+		div2_t* div = new div2_t();
+		div->set_root({ 200,200,66,500 });
+		div->set_root_style(0, root);
+		//div->set_root_style(1, root);
+		root.justify_content = flex_item::flex_align::ALIGN_END;
+		root.direction = flex_item::flex_direction::COLUMN;
+		root.align_content = flex_item::flex_align::ALIGN_START;
+		div->set_root_style(2, root);
+		root.align_content = flex_item::flex_align::ALIGN_START;
+		div->set_root_style(3, root);
+		div->add_child(2, { 60,60 });
+		div->add_child(2, { 60,160 });
+		div->add_child(2, { 60,60 });
+		div->rcs[2].w = 500;
+		div->rcs[3].w = 500;
+		for (size_t i = 0; i < 8; i++)
+		{
+			div->add_child(3, { 60,20 });
+		}
+		{
+			auto& cc = div->childs[2];
+			div->c2.resize(cc.size());
+			for (size_t i = 0; i < cc.size(); i++)
+			{
+				div->c2[i].grow = 1;// 320.0 / cc[i].w;
+			}
+		}
+		div->layout();
+		{
+			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
+			gb2->effect = uTheme::light;
+			gb2->pdc;
+			gb2->click_cb = [=](void* ptr, int clicks) {
+				div->add_child(0, { 60,60 });
+				div->layout();
+				};
+		}
 		p->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
-				cairo_translate(cr, 6, 6);
-				draw_rectangle(cr, { 0.5,0.5, rsize }, 4);
-				fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
-				if (c)
-				{
-					auto length = layouts.size();
-					for (size_t i = 0; i < length; i++)
-					{
-						auto it = layouts[i];
-						draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
-						fill_stroke(cr, 0xf0805c42, 0xffff802C, 1, false);
-					}
-				}
+				cairo_translate(cr, 6, 50);
+
+				div->draw(cr);
 				return;
 			};
 	}
@@ -765,6 +926,7 @@ int main()
 			pl2->set_family_size((char*)u8"NSimSun,Segoe UI Emoji", 12, -1);
 			et1 = pl2->add_input("", { 400,30 }, true);
 			et2 = pl2->add_input("", { 620,300 }, false);
+			et2->set_autobr(true);
 		}
 		pl2->set_family_size((char*)u8"NSimSun", 16, -1);// 按钮和edit字号标准不同
 		{

@@ -13180,6 +13180,13 @@ flex_item* flex_item::detach(flex_item* child)
 	return child;
 }
 
+void flex_item::clear()
+{
+	if (children && children->size()) {
+		children->clear();
+	}
+}
+
 
 flex_item* flex_item_root(flex_item* item)
 {
@@ -14823,6 +14830,10 @@ void edit_tl::set_show_input_cursor(bool ab)
 {
 	ctx->show_input_cursor = ab;
 }
+void edit_tl::set_autobr(bool ab)
+{
+	ctx->set_autobr(ab);
+}
 void edit_tl::inputchar(const char* str)
 {
 	int sn = strlen(str);
@@ -16274,7 +16285,7 @@ flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& 
 			{
 				if (p[i].position != flex_item::flex_position::POS_ABSOLUTE) {
 					v[i].x = p[i].frame[0] + pos.x;
-					v[i].y = p[i].frame[1] + pos.x;
+					v[i].y = p[i].frame[1] + pos.y;
 				}
 			}
 		}

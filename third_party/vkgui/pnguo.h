@@ -1034,6 +1034,8 @@ public:
 	void item_insert(uint32_t index, flex_item* child);
 	flex_item* item_delete(uint32_t index);
 	flex_item* detach(flex_item* child);
+	// 清空子元素
+	void clear();
 	// 执行布局计算
 	void layout();
 private:
@@ -1116,7 +1118,8 @@ public:
 	void set_family(const char* familys, int fontsize);
 	// 设置是否显示输入光标
 	void set_show_input_cursor(bool ab);
-
+	// 设置自动换行
+	void set_autobr(bool ab);
 	// 删除位置，字符数量
 	void remove_char(size_t idx, int count);
 	// 删除选择的文本
