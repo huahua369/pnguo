@@ -16344,6 +16344,13 @@ void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, i
 	{
 		glm::vec4 trc = viewport;
 		auto k2 = check_box_cr1(pos, &trc, 1, sizeof(glm::vec4));
+		if (_modal)
+		{
+			if (!k2.x && on_click_outer) {
+				on_click_outer(this, state, ckinc);
+			}
+			k2.x = true;
+		}
 		if (k2.x)
 		{
 			if (draggable && state == 1)
@@ -16417,6 +16424,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		glm::ivec2 mps = { p->x,p->y };
 		glm::vec4 trc = viewport;
 		auto k2 = check_box_cr1(mps, &trc, 1, 0);
+		if (_modal)
+		{
+			k2.x = true;
+		}
 		if (k2.x) {
 			_bst |= (int)BTN_STATE::STATE_HOVER;
 			r1 = 1;
@@ -16494,6 +16505,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		//on_keyboard(ep);
 	}
 	break;
+	}
+	if (_modal)
+	{
+		ep->ret = 1;
 	}
 	evupdate++;
 }
@@ -17984,6 +17999,8 @@ void radio_tl::set_value(const std::string& str, bool bv)
 	if (bv)
 	{
 		set_value();
+	}else{
+		if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 	}
 }
 
@@ -17993,6 +18010,8 @@ void radio_tl::set_value(bool bv)
 	if (bv)
 	{
 		set_value();
+	}else{
+		if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 	}
 }
 
@@ -18004,6 +18023,7 @@ void radio_tl::set_value()
 		if (gr->active)
 			gr->active->set_value(false);
 		gr->active = this;
+		if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 	}
 }
 
@@ -18099,17 +18119,20 @@ void checkbox_tl::set_value(const std::string& str, bool bv)
 	k.text = str;
 	k.value = bv; k.value1 = !bv;
 	v = k;
+	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
 void checkbox_tl::set_value(bool bv)
 {
 	v.value = bv;
+	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
 void checkbox_tl::set_value()
 {
 	v.value1 = v.value;
 	v.value = !v.value;
+	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
 bool checkbox_tl::on_mevent(int type, const glm::vec2& mps)
@@ -18197,12 +18220,14 @@ void switch_tl::set_value(bool b)
 {
 	v.value = b;
 	v.value1 = !b;
+	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
 void switch_tl::set_value()
 {
 	v.value1 = v.value;
 	v.value = !v.value;
+	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
 bool switch_tl::on_mevent(int type, const glm::vec2& mps)
@@ -18461,6 +18486,9 @@ void slider_tl::draw(cairo_t* cr)
 		xx = glm::clamp((float)xx, (float)0, (float)ss.y);
 		spos = { ss.x * 0.5,xx };
 		crc = { 0.5 + x,0.5 + y, wide, x1 };
+		if (reverse_color) {
+			crc = { 0.5 + x,0.5 + y + x1, wide, ss.y - x1 };
+		}
 	}
 	else {
 		y = (ss.y - wide) * 0.5;
@@ -18470,6 +18498,9 @@ void slider_tl::draw(cairo_t* cr)
 		spos = { xx ,ss.y * 0.5 };
 
 		crc = { 0.5 + x,0.5 + y, x1, wide };
+		if (reverse_color) {
+			crc = { 0.5 + x + x1,0.5 + y,ss.x - x1, wide };
+		}
 	}
 	draw_rectangle(cr, brc, rounding);
 	fill_stroke(cr, color.y, 0, 0, 0);
@@ -18478,13 +18509,13 @@ void slider_tl::draw(cairo_t* cr)
 		{
 			cairo_as _as_a(cr);
 			auto x1 = xx;
-			if (xx < rounding * 2)
-			{
-				draw_rectangle(cr, cliprc, r);
-				cairo_clip(cr);
-				x1 = r * 2;
-				kx = 1;
-			}
+			//if (xx < rounding * 2)
+			//{
+			//	draw_rectangle(cr, cliprc, r);
+			//	cairo_clip(cr);
+			//	x1 = r * 2;
+			//	kx = 1;
+			//}
 			draw_rectangle(cr, crc, r);
 			fill_stroke(cr, color.x, 0, 0, 0);
 		}

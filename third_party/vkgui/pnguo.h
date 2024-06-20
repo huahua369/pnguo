@@ -1378,6 +1378,7 @@ struct slider_tl :public widget_base
 	double value = 0.0;				// 当前进度
 	double* pv = 0;
 	int vertical = 0;				// 垂直模式1
+	bool reverse_color = 0;
 public:
 	void bind_ptr(double* p);
 	void set_value(double b);
@@ -1481,6 +1482,7 @@ public:
 	form_x* form = 0;			// 绑定的窗口 
 	layout_text_x* ltx = 0;		// 文本渲染管理
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
+	std::function<void(plane_cx* p, int state, int clicks)> on_click_outer;//模态窗口点中外围时
 	std::function<void(cairo_t* cr)> draw_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
@@ -1503,6 +1505,7 @@ public:
 	bool draggable = false;
 	bool uplayout = true;
 	bool custom_layout = false;	// 使用自定义布局计算
+	bool _modal = false;			// 模态窗口
 public:
 	plane_cx();
 	~plane_cx();

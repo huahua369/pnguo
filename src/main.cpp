@@ -258,11 +258,15 @@ int main()
 	pl3->visible = false;
 	pl2->visible = false;
 	//pl1->visible = false;
+	plane_cx* pmodal = 0;
 	{
 		auto p = new plane_cx();
-		p->draggable = true; //可拖动
+		pmodal = p;
+		//p->draggable = true; //可拖动
 		p->_lms = { 6,6 };
 		p->border = { 0x80ff802C,1,5 };
+		p->_modal = true;
+		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		pw->bind(p);
 		p->set_size({ 100,600 });
 		p->set_pos({ 500,100 });
@@ -475,6 +479,9 @@ int main()
 			kcb->click_cb = [=](void* ptr, int clicks) {
 				ck1->set_value();
 				};
+			ck1->v.on_change_cb = [=](void* p, bool v) {
+				pmodal->visible = v;
+				};
 		}
 		bs.x = 16;
 		bs.y = 16;
@@ -587,6 +594,22 @@ int main()
 			slider->thickness = 2;
 			slider->rounding = 3;
 		}
+		{
+			bs = { 200, 12 };
+			auto slider = pl1->add_slider(bs, 7, 0.2);
+			slider->sl.y = 0xff3030f8;
+			slider->thickness = 2;
+			slider->rounding = 3;
+			slider->reverse_color = 1;
+		}
+		{
+			bs = { 12, 200 };
+			auto slider = pl1->add_slider(bs, 7, 0.2);
+			slider->sl.y = 0xff3030f8;
+			slider->thickness = 2;
+			slider->rounding = 3;
+			slider->reverse_color = 1;
+		}
 		auto pss = pl1->get_size();
 		int width = 10;
 		int border = 2;
@@ -602,7 +625,6 @@ int main()
 			cp->_pos_width = width;
 		}
 
-
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		sw2->color = { 0xff66ce13, 0xff4949ff ,-1 };
 		//sw2->text_color = {};
@@ -616,8 +638,8 @@ int main()
 		pl1->draw_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
-				cairo_translate(cr, 0, 300);
-				txt->draw_text(cr, 0xff0080ff);
+				//cairo_translate(cr, 0, 300);
+				//txt->draw_text(cr, 0xff0080ff);
 				return;
 				if (0) {
 					cairo_as _cas(cr);
