@@ -966,7 +966,7 @@ void form_x::trigger(uint32_t etype, void* e)
 	auto cbs = events[(uint32_t)type];
 	auto cbs0 = *events_a;
 	auto iptr = input_ptr;
-	lkecb.unlock();
+	lkecb.unlock(); 
 	et_un_t et = {};
 	do
 	{
@@ -980,7 +980,11 @@ void form_x::trigger(uint32_t etype, void* e)
 			}
 			return;
 		}
-		if (cbs.empty() && cbs0.empty())break;
+		if (cbs.empty() && cbs0.empty())break; 
+		if (et.ret)
+		{
+			break;
+		}
 		for (auto it = cbs.rbegin(); it != cbs.rend(); it++)
 		{
 			if (it->cb) {

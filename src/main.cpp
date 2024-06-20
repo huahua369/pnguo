@@ -264,8 +264,7 @@ int main()
 		pmodal = p;
 		//p->draggable = true; //可拖动
 		p->_lms = { 6,6 };
-		p->border = { 0x80ff802C,1,5 };
-		p->_modal = true;
+		p->border = { 0x80ff802C,1,5 }; 
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		pw->bind(p);
 		p->set_size({ 100,600 });

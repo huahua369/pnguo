@@ -16344,13 +16344,7 @@ void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, i
 	{
 		glm::vec4 trc = viewport;
 		auto k2 = check_box_cr1(pos, &trc, 1, sizeof(glm::vec4));
-		if (_modal)
-		{
-			if (!k2.x && on_click_outer) {
-				on_click_outer(this, state, ckinc);
-			}
-			k2.x = true;
-		}
+ 
 		if (k2.x)
 		{
 			if (draggable && state == 1)
@@ -16424,10 +16418,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		glm::ivec2 mps = { p->x,p->y };
 		glm::vec4 trc = viewport;
 		auto k2 = check_box_cr1(mps, &trc, 1, 0);
-		if (_modal)
-		{
-			k2.x = true;
-		}
+
 		if (k2.x) {
 			_bst |= (int)BTN_STATE::STATE_HOVER;
 			r1 = 1;
@@ -16505,11 +16496,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		//on_keyboard(ep);
 	}
 	break;
-	}
-	if (_modal)
-	{
-		ep->ret = 1;
-	}
+	} 
 	evupdate++;
 }
 

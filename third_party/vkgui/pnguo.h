@@ -1504,8 +1504,7 @@ public:
 	bool _hover = false;
 	bool draggable = false;
 	bool uplayout = true;
-	bool custom_layout = false;	// 使用自定义布局计算
-	bool _modal = false;			// 模态窗口
+	bool custom_layout = false;	// 使用自定义布局计算 
 public:
 	plane_cx();
 	~plane_cx();

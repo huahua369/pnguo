@@ -132,6 +132,7 @@ public:
 	void* activate_ptr = 0;	// 激活的对象
 	std::vector<event_fw>* events = 0;
 	std::vector<event_fw>* events_a = 0;
+	std::vector<event_fw> first_cs;	// 优先
 
 	// 接收拖动OLE管理
 	hz::drop_regs* dragdrop = 0;
