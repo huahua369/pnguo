@@ -330,8 +330,8 @@ void div2_t::draw(cairo_t* cr)
 	{
 		auto it = rcs[x];
 		if (it.w <= 0)it.w = 1024;
-		draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
-		fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
+		//draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
+		//fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
 		auto& v = childs[x];
 		auto n = v.size();
 		for (size_t i = 0; i < n; i++)
@@ -357,6 +357,18 @@ void draw_treenode(cairo_t* cr, layout_text_x* ltx)
 	ltx->update_text();
 	ltx->draw_text(cr, ltx->tem_rtv, text_color);
 }
+struct text_render_t
+{
+	glm::vec4 rc = {};		// 渲染区域
+	glm::vec2 align = {};	// 对齐区域
+	int font_size = 16;		// 字号大小
+	int font = 0;			// 字体集序号
+	const char* str = 0;
+	int len = 0;			// 字符串长度
+	bool autobr = false;	// 自动换行
+	bool clip = true;		// 启用裁剪
+};
+
 struct node_ts
 {
 	std::string str;
@@ -490,10 +502,17 @@ int main()
 		{
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
 			gb2->effect = uTheme::light;
-			gb2->pdc;
-			gb2->click_cb = [=](void* ptr, int clicks) {
-				div->add_child(0, { 60,60 });
-				div->layout();
+			gb2->hscroll = {};
+			gb2->click_cb = [=](void* ptr, int clicks)
+				{
+					div->add_child(0, { 60,60 });
+					div->layout();
+					auto cbt = p->add_cbutton((char*)u8"🍑new", { 80,30 }, 0);
+					cbt->font_size = 16;
+					cbt->effect = uTheme::light;
+					cbt->pdc;
+					cbt->hscroll = {};
+					cbt->light = 0.1;
 				};
 		}
 		p->draw_cb = [=](cairo_t* cr)
@@ -513,7 +532,7 @@ int main()
 	listp->add_familys(fontn2, 0);
 	{
 		listp->draggable = true; //可拖动
-		listp->set_size({ 300,600 });
+		listp->set_size({ 500,600 });
 		listp->set_pos({ 100,100 });
 		listp->set_colors({ pbc,-1,0,0 });
 		auto pss = listp->get_size();
@@ -536,7 +555,7 @@ int main()
 		p->custom_layout = true;
 		p->fontsize = 16;
 
-		std::vector<std::string> cstr = { (char*)u8"名称" ,(char*)u8"状态",(char*)u8"描述" };
+		std::vector<std::string> cstr = { (char*)u8"名 称" ,(char*)u8"状\t态",(char*)u8"描述" };
 		std::vector<std::string> cstr1 = { (char*)u8"checkbox 测试1" ,(char*)u8"checkbox 测试2",(char*)u8"checkbox 测试3" };
 		std::vector<std::string> cstr2 = { (char*)u8"radio 测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
 		width = 150;
@@ -598,6 +617,7 @@ int main()
 				cairo_translate(cr, 6, 6);
 				draw_rectangle(cr, { 0.5,0.5,cs.x,cs.y }, 4);
 				fill_stroke(cr, 0x20805c42, 0xffff802C, 1, false);
+				auto ltx = p->ltx;
 				return;
 			};
 	}

@@ -4254,6 +4254,10 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 				tps.y += h;
 				tps.x = 0;
 			}
+			if (it.cpt == '\t')
+			{
+				it.advance = fontsize;
+			}
 			it._apos = ps + tps;
 			tps.x += it.advance;
 			if (ctrc.x < it.advance)ctrc.x = it.advance;
@@ -4263,6 +4267,7 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 	}
 	return ret;
 }
+
 atlas_t* layout_text_x::get_atlas()
 {
 	auto ft = ctx->bcc._data.data();
@@ -5244,7 +5249,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5265,7 +5270,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+	}
 
 
 struct path_txf
@@ -9780,7 +9785,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-	}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -9796,7 +9801,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -11701,7 +11706,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -13915,7 +13920,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -14627,7 +14632,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
@@ -19213,28 +19218,28 @@ tree_node_t* tree_view_cx::insert(tree_node_t* parent, const std::string& str, v
 	p->raw = data;
 	p->parent = parent;
 	p->level = 0;
-	return insert(p, parent); 
+	return insert(p, parent);
 }
 tree_node_t* tree_view_cx::insert(tree_node_t* c, tree_node_t* parent)
 {
 	auto p = parent;
-	if (!p) {		 
+	if (!p) {
 		p = &_root;		// 不提供parent则插入到根节点
 	}
 	if (c && p)
 	{
 		c->parent = p;
 		if (!p->child) p->child = new std::vector<tree_node_t*>();
-		if (p->child) p->child->push_back(c); 
+		if (p->child) p->child->push_back(c);
 		cup_node = true;
 	}
 	return c;
 }
 void tree_view_cx::on_event(uint32_t type, et_un_t* e)
-{ 
+{
 }
 void tree_view_cx::update(float delta)
-{ 
+{
 }
 valueview_cx::valueview_cx()
 {
