@@ -19199,20 +19199,42 @@ void listview_cx::update(float delta)
 }
 
 
-treeview_cx::treeview_cx()
+tree_view_cx::tree_view_cx()
 {
 }
 
-treeview_cx::~treeview_cx()
+tree_view_cx::~tree_view_cx()
 {
 }
-void treeview_cx::on_event(uint32_t type, et_un_t* e)
+tree_node_t* tree_view_cx::insert(tree_node_t* parent, const std::string& str, void* data)
 {
-	plane_cx::on_event(type, e);
+	auto p = new tree_node_t();
+	p->title = str;
+	p->raw = data;
+	p->parent = parent;
+	p->level = 0;
+	return insert(p, parent); 
 }
-void treeview_cx::update(float delta)
+tree_node_t* tree_view_cx::insert(tree_node_t* c, tree_node_t* parent)
 {
-	plane_cx::update(delta);
+	auto p = parent;
+	if (!p) {		 
+		p = &_root;		// 不提供parent则插入到根节点
+	}
+	if (c && p)
+	{
+		c->parent = p;
+		if (!p->child) p->child = new std::vector<tree_node_t*>();
+		if (p->child) p->child->push_back(c); 
+		cup_node = true;
+	}
+	return c;
+}
+void tree_view_cx::on_event(uint32_t type, et_un_t* e)
+{ 
+}
+void tree_view_cx::update(float delta)
+{ 
 }
 valueview_cx::valueview_cx()
 {

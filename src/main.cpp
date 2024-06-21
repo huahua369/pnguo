@@ -342,13 +342,41 @@ void div2_t::draw(cairo_t* cr)
 		}
 	}
 }
-
-
+// 渲染树节点
+void draw_treenode(cairo_t* cr, layout_text_x* ltx)
+{
+	std::string text;
+	int font_size = 16;
+	int text_color = -1;
+	auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+	glm::ivec2 ss = { 100,100 };
+	glm::vec2 align = { 1,0.5 };
+	glm::vec4 rc = { 0, 0, ss };
+	ltx->tem_rtv.clear();
+	ltx->build_text(0, rc, align, text.c_str(), -1, font_size, ltx->tem_rtv);
+	ltx->update_text();
+	ltx->draw_text(cr, ltx->tem_rtv, text_color);
+}
+struct node_ts
+{
+	std::string str;
+	tree_node_t* parent = 0;				// 父级
+	std::vector<tree_node_t*>* child = 0;	// 孩子 
+	int _level = 0;
+	bool _expand = 0;
+};
+void loadtestdata()
+{
+	auto ed = hz::read_json("ed.json");
+	for (auto& [k, v] : ed.items()) {
+		printf("%s\n", k.c_str());
+	}
+}
 int main()
 {
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
-
+	loadtestdata();
 	auto qyt = new	uint16_t[256 * 384];
 	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
@@ -393,7 +421,7 @@ int main()
 	//pl3->visible = false;
 	//pl2->visible = false;
 	//pl1->visible = false; 
-	 
+
 	{
 		auto p = pl4;
 		p->draggable = true; //可拖动

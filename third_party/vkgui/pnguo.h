@@ -432,8 +432,9 @@ public:
 public:
 	bitmap_cache_cx();
 	~bitmap_cache_cx();
-
+	// 复制像素到装箱，从pos返回坐标
 	image_ptr_t* push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
+	// 叠加到已有位置
 	image_ptr_t* push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, image_ptr_t* ret, int linegap = 0);
 	// 清空所有缓存
 	void clear();
@@ -1640,17 +1641,35 @@ public:
 private:
 
 };
-class treeview_cx :public plane_cx
+struct tree_node_t
+{
+	std::string title;					// 显示的标题文本
+	void* raw = 0;						// 自定义数据，比如用于显示图标啥的
+	tree_node_t* parent = 0;			// 父级
+	std::vector<tree_node_t*>* child = 0;// 孩子 
+	int level = 0;						// 层级，自动计算 
+	bool _expand = false;				// 是否展开 
+};
+
+class tree_view_cx
 {
 public:
-	treeview_cx();
-	~treeview_cx();
+	tree_node_t _root = {};
+
+	bool cup_node = true;
+public:
+	tree_view_cx();
+	~tree_view_cx();
+	tree_node_t* insert(tree_node_t* parent, const std::string& str, void* data);
+	tree_node_t* insert(tree_node_t* c, tree_node_t* parent);
 public:
 	virtual void on_event(uint32_t type, et_un_t* e);
 	virtual void update(float delta);
 private:
 
 };
+
+
 class valueview_cx :public plane_cx
 {
 public:
