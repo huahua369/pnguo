@@ -1319,8 +1319,10 @@ void form_x::update(float delta)
 	{
 		up_cb(delta, &dwt);
 	}
-	for (auto it : _planes) {
-		it->update(delta);
+
+	for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
+	{
+		(*it)->update(delta);
 	}
 	auto ktd = atlas.data();
 	auto length = atlas.size();

@@ -372,13 +372,16 @@ int main()
 	auto pl1 = new plane_cx();
 	auto pl2 = new plane_cx();
 	auto pl3 = new plane_cx();
+	auto pl4 = new plane_cx();
 	pl2->_lms = { 6,6 };
 	pl1->border = { 0x80ff802C,1,5 };
 	pl2->border = { 0x80ff802C,1,5 };
 	pl3->border = { 0x80ff802C,1,5 };
+	uint32_t pbc = 0x80121212;
+	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
-	pw->bind(pl3);	// 绑定到窗口
+	pw->bind(pl4);
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
@@ -389,14 +392,11 @@ int main()
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
 	//pl3->visible = false;
 	//pl2->visible = false;
-	//pl1->visible = false;
-	plane_cx* pmodal = 0;
-
+	//pl1->visible = false; 
+	 
 	{
-		auto p = new plane_cx();
-		pmodal = p;
+		auto p = pl4;
 		p->draggable = true; //可拖动
-		pw->bind(p);
 		p->add_familys(fontn, 0);
 		p->_lms = { 6,6 };
 		p->border = { 0x80ff802C,1,5 };
@@ -404,7 +404,7 @@ int main()
 
 		p->set_size({ 800,600 });
 		p->set_pos({ 500,100 });
-		p->set_colors({ 0xff121212,-1,0,0 });
+		p->set_colors({ pbc,-1,0,0 });
 		auto pss = p->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -487,7 +487,7 @@ int main()
 		listp->draggable = true; //可拖动
 		listp->set_size({ 300,600 });
 		listp->set_pos({ 100,100 });
-		listp->set_colors({ 0xff121212,-1,0,0 });
+		listp->set_colors({ pbc,-1,0,0 });
 		auto pss = listp->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -615,7 +615,7 @@ int main()
 		pl1->draggable = true; //可拖动
 		pl1->set_size({ 830,600 });
 		pl1->set_pos({ 100,100 });
-		pl1->set_colors({ 0xff121212,-1,0,0 });
+		pl1->set_colors({ pbc,-1,0,0 });
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl1->fontsize = 16;
 		int fontsize = 26;
@@ -652,7 +652,7 @@ int main()
 				ck1->set_value();
 				};
 			ck1->v.on_change_cb = [=](void* p, bool v) {
-				pmodal->visible = v;
+				//pmodal->visible = v;
 				};
 		}
 		bs.x = 16;
@@ -876,7 +876,7 @@ int main()
 		pl3->draggable = true; //可拖动
 		pl3->set_size({ 1400,600 });
 		pl3->set_pos({ 10,10 });
-		pl3->set_colors({ 0xff121212,-1,0,0 });
+		pl3->set_colors({ 0xff000000,-1,0,0 });
 		pl3->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl3->update_cb = [=](float delta)
 			{
@@ -896,6 +896,7 @@ int main()
 
 				cairo_translate(cr, 10, 200);
 				auto txt = pl1->ltx;
+				txt->update_text();
 				for (auto it : txt->msu)
 				{
 					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
@@ -908,7 +909,7 @@ int main()
 		pl2->draggable = true; //可拖动*
 		pl2->set_size({ 830,600 });
 		pl2->set_pos({ 10,10 });
-		pl2->set_colors({ 0xff121212,-1,0,0 });
+		pl2->set_colors({ pbc,-1,0,0 });
 		pl2->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl2->draw_cb = [=](cairo_t* cr)
 			{
