@@ -4805,6 +4805,19 @@ void draw_circle(cairo_t* cr, const glm::vec2& pos, float r)
 	cairo_arc(cr, pos.x, pos.y, r, 0, 2 * M_PI);
 }
 
+void draw_ellipse(cairo_t* cr, const glm::vec2& c, const glm::vec2& r)
+{
+	double cx = c.x, cy = c.y, rx = r.x, ry = r.y;
+	if (rx > 0.0f && ry > 0.0f) {
+		cairo_move_to(cr,cx + rx, cy);
+		cairo_curve_to(cr, cx + rx, cy + ry * c_KAPPA90, cx + rx * c_KAPPA90, cy + ry, cx, cy + ry);
+		cairo_curve_to(cr, cx - rx * c_KAPPA90, cy + ry, cx - rx, cy + ry * c_KAPPA90, cx - rx, cy);
+		cairo_curve_to(cr, cx - rx, cy - ry * c_KAPPA90, cx - rx * c_KAPPA90, cy - ry, cx, cy - ry);
+		cairo_curve_to(cr, cx + rx * c_KAPPA90, cy - ry, cx + rx, cy - ry * c_KAPPA90, cx + rx, cy);
+		cairo_close_path(cr);
+	}
+}
+
 void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness)
 {
 	if (!cr || !points || points_count < 2 || !col)return;
@@ -5249,7 +5262,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-		}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5270,7 +5283,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-	}
+}
 
 
 struct path_txf
@@ -9785,7 +9798,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -9801,7 +9814,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-	}
+}
 
 void font_t::clear_char_lut()
 {
@@ -11706,7 +11719,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -13920,7 +13933,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -14632,7 +14645,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];

@@ -1704,6 +1704,7 @@ void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_circle(cairo_t* cr, const glm::vec2& pos, float r);
+void draw_ellipse(cairo_t* cr, const glm::vec2& pos, const glm::vec2& r);
 // 三角形基于矩形内 
 //	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 //	 spos = 50;		// 尖角点位置0-1，中间就是0.5

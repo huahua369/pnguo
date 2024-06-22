@@ -615,8 +615,10 @@ int main()
 			{
 				cairo_as _cas(cr);
 				cairo_translate(cr, 6, 6);
-				draw_rectangle(cr, { 0.5,0.5,cs.x,cs.y }, 4);
-				fill_stroke(cr, 0x20805c42, 0xffff802C, 1, false);
+				draw_rectangle(cr, { 0,0,cs.x,cs.y }, 4);
+				fill_stroke(cr, 0xf0805c42, 0xffff802C, 2, false);
+				draw_ellipse(cr, { 200,200 }, { 120,20 });
+				fill_stroke(cr, 0xf0805c42, 0xff0080ff, 2, false);
 				auto ltx = p->ltx;
 				return;
 			};
