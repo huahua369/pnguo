@@ -1649,26 +1649,39 @@ struct tree_node_t
 	std::vector<tree_node_t*>* child = 0;// 孩子 
 	int level = 0;						// 层级，自动计算 
 	bool _expand = false;				// 是否展开 
+	bool _autofree = false;				// 是否内部释放 
 };
 
+/*
+添加节点、删除节点
+*/
 class tree_view_cx
 {
 public:
-	tree_node_t _root = {};
-
-	bool cup_node = true;
+	tree_node_t _root = {};				// 根节点
+	std::vector<tree_node_t*> showlist;	// 显示列表
+	std::vector<font_item_t> tem_rtv;	// 文字渲染缓存
+	glm::ivec2 scroll_pos, scroll_pos_old;// 滚动坐标
+	std::function<void(tree_node_t* p)> on_click;	// 点中节点
+	std::function<void(tree_node_t* p)> on_hover;	// 鼠标在节点上
+	plane_cx* plane = 0;
 public:
 	tree_view_cx();
 	~tree_view_cx();
+	void binding(plane_cx* p);
 	tree_node_t* insert(tree_node_t* parent, const std::string& str, void* data);
 	tree_node_t* insert(tree_node_t* c, tree_node_t* parent);
+	void remove(tree_node_t* p);
+	void set_scroll_pos(const glm::ivec2& scp);
 public:
-	virtual void on_event(uint32_t type, et_un_t* e);
-	virtual void update(float delta);
+	// 鼠标事件
+	void on_mevent(int type, const glm::vec2& mps);
+	void update(float delta);
+	// 渲染树 
+	void draw(cairo_t* cr);
 private:
 
 };
-
 
 class valueview_cx :public plane_cx
 {

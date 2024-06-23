@@ -14585,9 +14585,9 @@ bool text_ctx_cx::update(float delta)
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_paint(cr);
 #endif
-	cairo_save(cr); 
+	cairo_save(cr);
 	pango_cairo_update_layout(cr, layout);
-	 
+
 	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
 	if (upft)
 	{
@@ -14612,7 +14612,7 @@ bool text_ctx_cx::update(float delta)
 	}
 	set_color(cr, text_color);
 	auto b = pango_layout_get_ellipsize(layout);
-	pango_cairo_show_layout(cr, layout); 
+	pango_cairo_show_layout(cr, layout);
 	cairo_restore(cr);
 	cairo_destroy(cr);
 	bool ret = valid;
@@ -19202,6 +19202,11 @@ tree_view_cx::tree_view_cx()
 
 tree_view_cx::~tree_view_cx()
 {
+	remove(&_root);
+}
+void tree_view_cx::binding(plane_cx* p)
+{
+	plane = p;
 }
 tree_node_t* tree_view_cx::insert(tree_node_t* parent, const std::string& str, void* data)
 {
@@ -19210,6 +19215,7 @@ tree_node_t* tree_view_cx::insert(tree_node_t* parent, const std::string& str, v
 	p->raw = data;
 	p->parent = parent;
 	p->level = 0;
+	p->_autofree = true;
 	return insert(p, parent);
 }
 tree_node_t* tree_view_cx::insert(tree_node_t* c, tree_node_t* parent)
@@ -19223,15 +19229,50 @@ tree_node_t* tree_view_cx::insert(tree_node_t* c, tree_node_t* parent)
 		c->parent = p;
 		if (!p->child) p->child = new std::vector<tree_node_t*>();
 		if (p->child) p->child->push_back(c);
-		cup_node = true;
 	}
 	return c;
 }
-void tree_view_cx::on_event(uint32_t type, et_un_t* e)
+void tree_view_cx::remove(tree_node_t* p)
+{
+	std::stack<tree_node_t*> q;
+	if (p)
+	{
+		q.push(p);
+		for (; q.size();)
+		{
+			auto t = q.top(); q.pop();
+			if (t->child) {
+				for (auto it : *t->child)
+				{
+					if (it && it->_autofree) {
+						q.push(it);
+					}
+				}
+				delete t->child;
+			}
+			if (t)
+			{
+				if (t->_autofree)
+					delete t;
+			}
+		}
+	}
+}
+void tree_view_cx::set_scroll_pos(const glm::ivec2& scp)
+{
+	scroll_pos = scp;
+}
+
+
+void tree_view_cx::on_mevent(int type, const glm::vec2& mps)
 {
 }
 void tree_view_cx::update(float delta)
 {
+}
+void tree_view_cx::draw(cairo_t* cr)
+{
+
 }
 valueview_cx::valueview_cx()
 {

@@ -592,7 +592,8 @@ int main()
 		{
 			auto rc = gv->get({ i,0 });
 			auto it = cbv[i];
-			it->pos = rc;
+			it->pos = rc;	
+			it->pos += 4;
 		}
 		for (size_t i = 0; i < ckv.size(); i++)
 		{
@@ -601,6 +602,8 @@ int main()
 			it.c->pos = rc;
 			it.b->pos = rc;
 			it.b->pos.x += it.c->size.x;
+			it.c->pos += 4;
+			it.b->pos += 4;
 		}
 		for (size_t i = 0; i < rcv.size(); i++)
 		{
@@ -609,6 +612,8 @@ int main()
 			it.c->pos = rc;
 			it.b->pos = rc;
 			it.b->pos.x += it.c->size.x;
+			it.c->pos += 4;
+			it.b->pos += 4;
 		}
 
 		p->draw_back_cb = [=](cairo_t* cr)
@@ -616,7 +621,7 @@ int main()
 				cairo_as _cas(cr);
 				cairo_translate(cr, 6, 6);
 				draw_rectangle(cr, { 0,0,cs.x,cs.y }, 4);
-				fill_stroke(cr, 0xf0805c42, 0xffff802C, 2, false);
+				fill_stroke(cr, 0xf05c8042, 0xffff802C, 2, false);
 				draw_ellipse(cr, { 200,200 }, { 120,20 });
 				fill_stroke(cr, 0xf0805c42, 0xff0080ff, 2, false);
 				draw_ellipse(cr, { 400,200 }, { 120,20 });
