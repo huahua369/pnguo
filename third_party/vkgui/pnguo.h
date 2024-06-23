@@ -795,7 +795,7 @@ public:
 	void draw_text(cairo_t* cr, uint32_t color);
 	// 获取图集
 	atlas_t* get_atlas();
-	void update_text();
+	bool update_text();
 private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
@@ -1490,7 +1490,7 @@ public:
 	layout_text_x* ltx = 0;		// 文本渲染管理
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
 	std::function<void(plane_cx* p, int state, int clicks)> on_click_outer;//模态窗口点中外围时
-	std::function<void(cairo_t* cr)> draw_cb;
+	std::function<void(cairo_t* cr)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
 

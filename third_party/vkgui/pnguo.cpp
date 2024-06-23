@@ -4295,8 +4295,9 @@ atlas_t* layout_text_x::get_atlas()
 	};
 	return nullptr;
 }
-void layout_text_x::update_text()
+bool layout_text_x::update_text()
 {
+	bool r = false;
 	auto ft = ctx->bcc._data.data();
 	auto n = ctx->bcc._data.size();
 	for (size_t i = 0; i < n; i++)
@@ -4307,7 +4308,7 @@ void layout_text_x::update_text()
 			if (p->valid)
 			{
 				update_image_cr((cairo_surface_t*)p->ptr, p);
-				p->valid = 0;
+				p->valid = 0; r = true;
 			}
 		}
 		else {
@@ -4315,11 +4316,12 @@ void layout_text_x::update_text()
 			if (su)
 			{
 				msu.push_back(su);
-				p->valid = 0;
+				p->valid = 0; r = true;
 				p->ptr = su;
 			}
 		}
 	}
+	return r;
 }
 void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color)
 {
@@ -4809,7 +4811,7 @@ void draw_ellipse(cairo_t* cr, const glm::vec2& c, const glm::vec2& r)
 {
 	double cx = c.x, cy = c.y, rx = r.x, ry = r.y;
 	if (rx > 0.0f && ry > 0.0f) {
-		cairo_move_to(cr,cx + rx, cy);
+		cairo_move_to(cr, cx + rx, cy);
 		cairo_curve_to(cr, cx + rx, cy + ry * c_KAPPA90, cx + rx * c_KAPPA90, cy + ry, cx, cy + ry);
 		cairo_curve_to(cr, cx - rx * c_KAPPA90, cy + ry, cx - rx, cy + ry * c_KAPPA90, cx - rx, cy);
 		cairo_curve_to(cr, cx - rx, cy - ry * c_KAPPA90, cx - rx * c_KAPPA90, cy - ry, cx, cy - ry);
@@ -14583,37 +14585,9 @@ bool text_ctx_cx::update(float delta)
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_paint(cr);
 #endif
-	cairo_save(cr);
-#if 0
-	int gradient_size = 6;
-
-	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 0);// 垂直方向 
-	cairo_save(cr);
-	cairo_translate(cr, 0, size.y - gradient_size);
-	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 1);// 垂直方向,下
-	cairo_restore(cr);
-	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 0);// 水平方向 
-	cairo_save(cr);
-	cairo_translate(cr, size.x - gradient_size, 0);
-	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 1);// 水平方向，右
-	cairo_restore(cr);
-#endif
+	cairo_save(cr); 
 	pango_cairo_update_layout(cr, layout);
-
-	//if (upft)
-	//{
-	//	upft = false; 
-	//	auto bs = pango_layout_get_baseline(layout);
-	//	auto bsp = pango_attr_baseline_shift_new(bs);
-	//	//pango_layout_set_line_spacing(layout, 1.2);
-	//	//PangoAttribute* ab = pango_attr_line_height_new_absolute(2 * fontsize * PANGO_SCALE);
-	//	auto lst = pango_attr_list_new();
-	//	//pango_attr_list_insert(lst, pango_attr_size_new(1 * fontsize * PANGO_SCALE));
-	//	pango_attr_list_insert(lst, bsp);
-	//	pango_layout_set_attributes(layout, lst);
-	//	pango_attr_list_unref(lst); 
-	//}
-
+	 
 	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
 	if (upft)
 	{
@@ -14638,8 +14612,7 @@ bool text_ctx_cx::update(float delta)
 	}
 	set_color(cr, text_color);
 	auto b = pango_layout_get_ellipsize(layout);
-	pango_cairo_show_layout(cr, layout);
-	//renderer_draw_layout(cr, layout, 0, 0, _baseline);
+	pango_cairo_show_layout(cr, layout); 
 	cairo_restore(cr);
 	cairo_destroy(cr);
 	bool ret = valid;
@@ -15582,7 +15555,7 @@ public:
 	glm::vec4 get_bbox();
 	glm::mat3 get_affine();
 	void hit_test(const glm::vec2& ps);
-	cairo_t* begin_frame();
+	cairo_t* begin_frame(bool redraw);
 	void end_frame(cairo_t* cr);
 	void set_draw_update()
 	{
@@ -15616,10 +15589,10 @@ image_ptr_t* tview_x::get_ptr()
 	return  &img_rc;
 }
 
-cairo_t* tview_x::begin_frame()
+cairo_t* tview_x::begin_frame(bool redraw)
 {
 	cairo_t* cr = 0;
-	if (!_backing_store_valid && _backing_store)
+	if (redraw || !_backing_store_valid && _backing_store)
 	{
 		cr = cairo_create(_backing_store);
 		size_t length = size.x * size.y;
@@ -16235,22 +16208,28 @@ void plane_cx::update(float delta)
 	}
 	if (update_cb)
 		ic += update_cb(delta);
-	if (ic > 0 || evupdate > 0)tv->set_draw_update();
-
 	if (uplayout) {
 		mk_layout();
 	}
+	ic += ltx->update_text();
+	if (ic > 0 || evupdate > 0)tv->set_draw_update();
+
 	auto kms = delta * 1000;
 	dms -= kms;
 	if (dms > 0 || kms <= 0)
 		return;
 	dms = dmsset;
-	auto cr = tv->begin_frame();
+	auto cr = tv->begin_frame(0);
 	if (cr)
 	{
 		evupdate = 0;
 		{
-			ltx->update_text();
+			if (draw_back_cb)
+			{
+				cairo_as _aa_(cr);
+				cairo_translate(cr, sps.x, sps.y);
+				draw_back_cb(cr);
+			}
 			for (auto& it : widgets) {
 				cairo_as __cas_(cr);
 				auto scp = sps * it->hscroll;
@@ -16258,11 +16237,11 @@ void plane_cx::update(float delta)
 					cairo_translate(cr, scp.x, scp.y);// 滚动条影响
 				it->draw(cr);
 			}
-			if (draw_cb)
+			if (draw_front_cb)
 			{
 				cairo_as _aa_(cr);
 				cairo_translate(cr, sps.x, sps.y);
-				draw_cb(cr);
+				draw_front_cb(cr);
 			}
 			if (horizontal)
 			{
@@ -18760,7 +18739,7 @@ bool colorpick_tl::update(float delta)
 			rc.w = height; ta.x = 0.5;
 			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
 			ltx->heightline = 0;
-			ltx->update_text();
+			//ltx->update_text();
 			//cpx = rk.x + step;
 			cw = (ss.x - cpx - step * 2);
 		}

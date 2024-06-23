@@ -338,7 +338,7 @@ void div2_t::draw(cairo_t* cr)
 		{
 			auto vt = v[i];
 			draw_rectangle(cr, { 0.5 + vt.x + it.x,0.5 + vt.y + it.y,vt.px,vt.py }, 4);
-			fill_stroke(cr, 0xf0805c42, 0xffff802C, 1, false);
+			fill_stroke(cr, 0xff805c42, 0xff2C80ff, 1, false);
 		}
 	}
 }
@@ -512,10 +512,10 @@ int main()
 					cbt->effect = uTheme::light;
 					cbt->pdc;
 					cbt->hscroll = {};
-					cbt->light = 0.1;
+					cbt->light = 1;
 				};
 		}
-		p->draw_cb = [=](cairo_t* cr)
+		p->draw_back_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
 				cairo_translate(cr, 6, 50);
@@ -611,7 +611,7 @@ int main()
 			it.b->pos.x += it.c->size.x;
 		}
 
-		p->draw_cb = [=](cairo_t* cr)
+		p->draw_back_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
 				cairo_translate(cr, 6, 6);
@@ -619,6 +619,8 @@ int main()
 				fill_stroke(cr, 0xf0805c42, 0xffff802C, 2, false);
 				draw_ellipse(cr, { 200,200 }, { 120,20 });
 				fill_stroke(cr, 0xf0805c42, 0xff0080ff, 2, false);
+				draw_ellipse(cr, { 400,200 }, { 120,20 });
+				fill_stroke(cr, 0x8ffa2000, 0xff0000ff, 2, false);
 				auto ltx = p->ltx;
 				return;
 			};
@@ -851,7 +853,7 @@ int main()
 
 				return 0;
 			};
-		pl1->draw_cb = [=](cairo_t* cr)
+		pl1->draw_back_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
 				//cairo_translate(cr, 0, 300);
@@ -933,7 +935,7 @@ int main()
 
 				return 0;
 			};
-		pl3->draw_cb = [=](cairo_t* cr)
+		pl3->draw_back_cb = [=](cairo_t* cr)
 			{
 				int y1 = 10;
 				cairo_as _ss_(cr);
@@ -946,7 +948,7 @@ int main()
 
 				cairo_translate(cr, 10, 200);
 				auto txt = pl1->ltx;
-				txt->update_text();
+				//txt->update_text();
 				for (auto it : txt->msu)
 				{
 					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
@@ -961,7 +963,7 @@ int main()
 		pl2->set_pos({ 10,10 });
 		pl2->set_colors({ pbc,-1,0,0 });
 		pl2->on_click = [](plane_cx* p, int state, int clicks) {};
-		pl2->draw_cb = [=](cairo_t* cr)
+		pl2->draw_back_cb = [=](cairo_t* cr)
 			{
 			};
 		int cc = 1;
