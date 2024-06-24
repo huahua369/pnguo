@@ -5717,6 +5717,18 @@ cairo_surface_t* new_image_cr(image_ptr_t* img)
 	}
 	return image;
 }
+cairo_surface_t* new_image_cr(const glm::ivec2& size)
+{
+	cairo_surface_t* image = 0;
+	image_ptr_t img[1] = {};
+	img->width = size.x;
+	img->height = size.y;
+	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
+	auto px = new uint32_t[img->width * img->height];
+	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
+	memset(px, 0, img->width * img->height * sizeof(int));
+	return image;
+}
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img)
 {
 	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
@@ -5747,6 +5759,12 @@ void free_image_cr(cairo_surface_t* image)
 		delete[]data;
 		cairo_surface_destroy(image);
 	}
+}
+
+void image_save_png(cairo_surface_t* surface, const char* fn)
+{
+	if (surface && fn && *fn)
+		cairo_surface_write_to_png(surface, fn);
 }
 
 

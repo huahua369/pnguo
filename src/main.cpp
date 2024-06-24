@@ -425,6 +425,7 @@ int main()
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
+	//size_t add_familys(const char* familys, const char* style)
 	pl1->add_familys(fontn, 0);
 	pl1->add_familys(fontn2, 0);
 	pl2->add_familys(fontn, 0);
@@ -532,9 +533,9 @@ int main()
 	listp->add_familys(fontn2, 0);
 	{
 		listp->draggable = true; //可拖动
-		listp->set_size({ 500,600 });
+		listp->set_size({ 800,1000 });
 		listp->set_pos({ 100,100 });
-		listp->set_colors({ pbc,-1,0,0 });
+		listp->set_colors({ 0xff333333,-1,0,0 });
 		auto pss = listp->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -556,8 +557,8 @@ int main()
 		p->fontsize = 16;
 
 		std::vector<std::string> cstr = { (char*)u8"名 称" ,(char*)u8"状\t态",(char*)u8"描述" };
-		std::vector<std::string> cstr1 = { (char*)u8"checkbox 测试1" ,(char*)u8"checkbox 测试2",(char*)u8"checkbox 测试3" };
-		std::vector<std::string> cstr2 = { (char*)u8"radio 测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
+		std::vector<std::string> cstr1 = { (char*)u8"checkbox 🍇测试1" ,(char*)u8"checkbox 测试2",(char*)u8"checkbox 测试3" };
+		std::vector<std::string> cstr2 = { (char*)u8"radio 🍍测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
 		width = 150;
 		std::vector<color_btn*> cbv = new_label(p, cstr, width, [](void* ptr, int clicks)
 			{
@@ -587,12 +588,12 @@ int main()
 		auto cs = gv->get_size();
 		auto vs = p->get_size();
 		vs -= 22;
-		p->set_view(vs, cs);
+		p->set_view(vs, { 1500,2500 });
 		for (size_t i = 0; i < cbv.size(); i++)
 		{
 			auto rc = gv->get({ i,0 });
 			auto it = cbv[i];
-			it->pos = rc;	
+			it->pos = rc;
 			it->pos += 4;
 		}
 		for (size_t i = 0; i < ckv.size(); i++)
@@ -615,7 +616,13 @@ int main()
 			it.c->pos += 4;
 			it.b->pos += 4;
 		}
+		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 200);
+		auto blsur = new_image_cr({ bl->width * 3,bl->height * 3 });
+		{
+			cairo_t* cr = cairo_create(blsur);
+			render_svg(cr, bl, {}, { 2.0,2.0 }, 0);
 
+		}
 		p->draw_back_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
@@ -627,6 +634,7 @@ int main()
 				draw_ellipse(cr, { 400,200 }, { 120,20 });
 				fill_stroke(cr, 0x8ffa2000, 0xff0000ff, 2, false);
 				auto ltx = p->ltx;
+				draw_image(cr, blsur, { 10,320 }, { 0,0,-1,-1 });
 				return;
 			};
 	}

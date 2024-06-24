@@ -1736,8 +1736,10 @@ void draw_text(cairo_t* cr, const char* str, const glm::ivec4& et, uint32_t text
 glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, uint32_t text_color, const char* family, int font_size);
 
 cairo_surface_t* new_image_cr(image_ptr_t* img);
+cairo_surface_t* new_image_cr(const glm::ivec2& size);
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
 void free_image_cr(cairo_surface_t* image);
+void image_save_png(cairo_surface_t* cr, const char* fn);
 glm::ivec2 get_surface_size(cairo_surface_t* p);
 glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1);
 #endif
