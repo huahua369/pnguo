@@ -3,6 +3,7 @@
 #include <vkgui/pnguo.h>
 #include <vkgui/tinysdl3.h>
 #include <vkgui/mapView.h>
+#include <vkgui/print_time.h>
 
 #include <iostream>
 
@@ -11,6 +12,7 @@
 #include "charts.h"
 #include <vulkan/vulkan.h>
 #include <vkvg/vkvgcx.h>
+
 /*
 	todo
 	样式：
@@ -588,7 +590,7 @@ int main()
 		auto cs = gv->get_size();
 		auto vs = p->get_size();
 		vs -= 22;
-		p->set_view(vs, { 1500,2500 });
+		p->set_view(vs, { 1500,1620 });
 		for (size_t i = 0; i < cbv.size(); i++)
 		{
 			auto rc = gv->get({ i,0 });
@@ -616,13 +618,18 @@ int main()
 			it.c->pos += 4;
 			it.b->pos += 4;
 		}
-		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 200);
-		auto blsur = new_image_cr({ bl->width * 3,bl->height * 3 });
-		{
-			cairo_t* cr = cairo_create(blsur);
-			render_svg(cr, bl, {}, { 2.0,2.0 }, 0);
-
-		}
+		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
+		auto blsur = new_image_cr({ bl->width * 2,bl->height * 2 });
+		static int svginc = 0;
+		std::thread th([=]()
+			{
+				print_time a("load svg");
+				cairo_t* cr = cairo_create(blsur);
+				render_svg(cr, bl, {}, { 1.0,1.0 }, 0);
+				svginc = 1;
+				p->set_update();
+			});
+		th.detach();
 		p->draw_back_cb = [=](cairo_t* cr)
 			{
 				cairo_as _cas(cr);
@@ -634,7 +641,8 @@ int main()
 				draw_ellipse(cr, { 400,200 }, { 120,20 });
 				fill_stroke(cr, 0x8ffa2000, 0xff0000ff, 2, false);
 				auto ltx = p->ltx;
-				draw_image(cr, blsur, { 10,320 }, { 0,0,-1,-1 });
+				if (svginc)
+					draw_image(cr, blsur, { 10,320 }, { 0,0,-1,-1 });
 				return;
 			};
 	}

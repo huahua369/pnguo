@@ -1432,20 +1432,20 @@ struct scroll_bar :public widget_base
 	int _view_size = 0;			// 视图大小
 	int _content_size = 0;		// 内容大小 
 	int _rc_width = 0;			// 滑块宽度
-	int _dir = 0;				// 方向
-	glm::ivec3 thumb_size_m = {};
-	glm::vec2 tps = {};
+	int _dir = 0;				// 方向，0=水平，1=垂直
+	glm::ivec3 thumb_size_m = {};// 滚动范围
+	glm::vec2 tps = {};			
 	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0 };		// 背景色，滑块颜色，滑块高亮颜色，备用颜色
 	uint32_t _tcc = 0;			// 滑块当前颜色
 	int _pos_width = 1;			// 滚动宽度
 	int t_offset = 0;			// 偏移量
 	float scale_w = 1.0;		// 滚动比例
 	float scale_s = 0.6;		// 显示比例
-	glm::vec2 scale_s0 = { 0.6,0.8 };		// 显示比例
-	bool hover = 0;
+	glm::vec2 scale_s0 = { 0.6,0.8 };	// 显示比例，用于鼠标进入变形
+	bool hover = 0;				// 保存鼠标进入状态
 	bool hover_sc = 0;
-	bool limit = 1;
-	bool valid = 1;
+	bool limit = 1;				// 是否限制在滚动范围
+	bool valid = 1;				// 是否重新渲染
 private:
 	int _offset = 0;			// 偏移量
 public:
@@ -1453,9 +1453,7 @@ public:
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
-
-	int get_offset();
-
+	int get_offset();			// 获取滚动偏移
 	void set_posv(const glm::ivec2& poss);
 };
 #endif // 1
@@ -1547,6 +1545,7 @@ public:
 	progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
 	slider_tl* add_slider(const glm::ivec2& size, int h, double v);
 	colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
+	void set_update();
 	// 窗口执行事件
 	virtual void on_event(uint32_t type, et_un_t* e);
 	virtual void update(float delta);

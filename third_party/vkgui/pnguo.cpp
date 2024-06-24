@@ -16209,6 +16209,10 @@ void plane_cx::set_family_size(const std::string& fam, int fs, uint32_t color)
 
 
 
+void plane_cx::set_update()
+{
+	evupdate++;
+}
 void plane_cx::update(float delta)
 {
 	//print_time a("plane_cx::update");
@@ -18878,7 +18882,7 @@ void colorpick_tl::draw(cairo_t* cr)
 	}
 
 }
-
+#if 1
 void scroll_bar::set_viewsize(int vs, int cs, int rcw)
 {
 	_view_size = vs;
@@ -18899,23 +18903,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	auto pts = poss[_dir];
 	pts -= _offset;
 	switch (et)
-	{
-	case event_type2::none:
-		break;
-	case event_type2::mouse_move:
-		break;
-	case event_type2::mouse_down:
-		break;
-	case event_type2::mouse_up:
-		break;
-	case event_type2::mouse_wheel:
-		break;
-	case event_type2::on_keypress:
-		break;
-	case event_type2::on_input:
-		break;
-	case event_type2::on_editing:
-		break;
+	{ 
 	case event_type2::on_click:
 	{
 		hover = true;
@@ -18929,15 +18917,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		set_posv(poss);
 		hover = false;
 	}
-	break;
-	case event_type2::on_dblclick:
-		break;
-	case event_type2::on_tripleclick:
-		break;
-	case event_type2::on_enter:
-		break;
-	case event_type2::on_leave:
-		break;
+	break; 
 	case event_type2::on_move:
 	{
 		auto pts = poss[_dir];
@@ -18963,11 +18943,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 			hover = true;
 		}
 	}
-	break;
-	case event_type2::on_up:
-		break;
-	case event_type2::on_hover:
-		break;
+	break; 
 	case event_type2::on_scroll:
 	{
 		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
@@ -19091,7 +19067,7 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 	}
 	_offset = pts;
 }
-
+#endif
 
 
 // 格子布局
