@@ -153,6 +153,7 @@ target_link_libraries(tcmp PRIVATE ${lklib})
 file(COPY src/sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 file(COPY src/ed.json DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 file(COPY src/blender_icons.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+file(COPY src/button20.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 
 #3d渲染器
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)

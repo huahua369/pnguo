@@ -619,6 +619,7 @@ int main()
 			it.b->pos += 4;
 		}
 		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
+		svg_cx* bl1 = new_svg_file("button20.svg", 0, 96);
 		auto blsur = new_image_cr({ bl->width * 2,bl->height * 2 });
 		static int svginc = 0;
 		std::thread th([=]()
@@ -626,6 +627,7 @@ int main()
 				print_time a("load svg");
 				cairo_t* cr = cairo_create(blsur);
 				render_svg(cr, bl, {}, { 1.0,1.0 }, 0);
+				render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
 				svginc = 1;
 				p->set_update();
 			});

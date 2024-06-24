@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm" />
+  <defs
+     id="defs1">
+    <filter
+       inkscape:label="Translucent"
+       inkscape:menu="Bevels"
+       inkscape:menu-tooltip="Illuminated translucent plastic or glass effect"
+       x="-0.73580605"
+       y="-1.8770562"
+       width="2.4716121"
+       height="4.7541124"
+       style="color-interpolation-filters:sRGB"
+       id="filter26">
+      <feBlend
+         in2="SourceGraphic"
+         mode="screen"
+         result="result1"
+         id="feBlend21" />
+      <feGaussianBlur
+         stdDeviation="8"
+         result="result6"
+         id="feGaussianBlur21" />
+      <feComposite
+         operator="xor"
+         in="result6"
+         in2="SourceGraphic"
+         id="feComposite21" />
+      <feGaussianBlur
+         stdDeviation="5"
+         result="result2"
+         id="feGaussianBlur22" />
+      <feComposite
+         operator="atop"
+         in2="result1"
+         result="result92"
+         id="feComposite22" />
+      <feComposite
+         operator="xor"
+         in="result2"
+         result="result4"
+         in2="result92"
+         id="feComposite23" />
+      <feGaussianBlur
+         stdDeviation="1"
+         result="result3"
+         in="result4"
+         id="feGaussianBlur23" />
+      <feSpecularLighting
+         surfaceScale="3"
+         specularConstant="1.5"
+         specularExponent="45"
+         result="result5"
+         id="feSpecularLighting23">
+        <fePointLight
+           x="-5000"
+           y="-8000"
+           z="20000"
+           id="fePointLight23" />
+      </feSpecularLighting>
+      <feComposite
+         operator="in"
+         in2="SourceGraphic"
+         result="result93"
+         id="feComposite24" />
+      <feComposite
+         operator="arithmetic"
+         k2="1"
+         k3="2"
+         in="result3"
+         in2="result93"
+         result="result94"
+         id="feComposite25"
+         k1="0"
+         k4="0" />
+      <feComposite
+         operator="atop"
+         in="result5"
+         in2="result94"
+         result="result95"
+         id="feComposite26" />
+      <feBlend
+         mode="screen"
+         in2="result95"
+         id="feBlend26" />
+    </filter>
+  </defs>
+  <g
+     inkscape:label="图层 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#115dec;stroke-width:0.264583;filter:url(#filter26)"
+       id="rect1-5"
+       width="45.664207"
+       height="17.90037"
+       x="42.434059"
+       y="41.778648" />
+  </g>
+</svg>
