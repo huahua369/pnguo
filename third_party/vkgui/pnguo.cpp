@@ -15914,11 +15914,13 @@ void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width)
 		bind_scroll_bar(cp, true); // 绑定垂直滚动条
 		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
 		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->hscroll = {};
 	}
 	{
 		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false);
 		bind_scroll_bar(cp, false); // 绑定水平滚动条
 		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
+		cp->hscroll = {};
 	}
 }
 
@@ -16379,7 +16381,7 @@ bool plane_cx::hittest(const glm::ivec2& p)
 		{
 			r = vht(widgets, p, ips, sps);
 			if (!r) {
-				r = vht({ vertical ,horizontal }, p, ips, sps);
+				r = vht({ vertical ,horizontal }, p, ips, {});
 			}
 		}
 	}

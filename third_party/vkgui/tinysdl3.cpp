@@ -482,8 +482,7 @@ void app_cx::get_event()
 {
 	SDL_Event e = {};
 	while (SDL_PollEvent(&e) != 0)
-	{
-		//printf("%d\n", e.type);
+	{ 
 		switch (e.type) {
 		case SDL_EVENT_QUIT:
 		{

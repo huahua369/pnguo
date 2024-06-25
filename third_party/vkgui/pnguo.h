@@ -1066,7 +1066,7 @@ struct widget_base
 	layout_text_x* ltx = 0;
 	glm::ivec2 txtps = {};
 	glm::ivec2 txtps2 = {};
-	glm::ivec2 hscroll = { 1,1 };
+	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;				// 鼠标点击状态
 	plane_cx* parent = 0;

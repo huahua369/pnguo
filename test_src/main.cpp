@@ -401,6 +401,7 @@ int main()
 	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	ptf.flags = ef_vulkan | ef_transparent | ef_borderless;
+	ptf.size = { 820,620 };
 	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
 	form1->set_alpha(true);
@@ -448,7 +449,7 @@ int main()
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 
 		p->set_size({ 800,600 });
-		p->set_pos({ 500,100 });
+		p->set_pos({ 0,0 });
 		p->set_colors({ pbc,-1,0,0 });
 		auto pss = p->get_size();
 		int width = 10;
@@ -536,9 +537,9 @@ int main()
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
 	{
-		listp->draggable = true; //可拖动
-		listp->set_size({ 800,1000 });
-		listp->set_pos({ 100,100 });
+		//listp->draggable = true; //可拖动
+		listp->set_size({ 800,600 });
+		listp->set_pos({ 10,10 });
 		listp->set_colors({ 0xff333333,-1,0,0 });
 		auto pss = listp->get_size();
 		int width = 10;
@@ -622,14 +623,16 @@ int main()
 		}
 		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
 		svg_cx* bl1 = new_svg_file("button20.svg", 0, 96);
+		svg_cx* bl2 = new_svg_file("button21.svg", 0, 96);
 		auto blsur = new_image_cr({ bl->width * 2,bl->height * 2 });
 		static int svginc = 0;
 		std::thread th([=]()
 			{
 				print_time a("load svg");
 				cairo_t* cr = cairo_create(blsur);
-				render_svg(cr, bl, {}, { 1.0,1.0 }, 0);
+				//render_svg(cr, bl, {}, { 1.0,1.0 }, 0);
 				render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
+				render_svg(cr, bl2, { 400,bl->height + 100 }, { 1.0,1.0 }, 0);
 				svginc = 1;
 				p->set_update();
 			});
