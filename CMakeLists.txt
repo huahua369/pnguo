@@ -85,8 +85,8 @@ list(APPEND src_cmp
 #测试
 list(APPEND src_cmp  
     ${VKVG_SRC} 
-    "src/charts.cpp"
-    "src/main.cpp"
+    "test_src/charts.cpp"
+    "test_src/main.cpp"
     "rc/resource1.rc"
 ) 
 
@@ -150,10 +150,10 @@ target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(tcmp PRIVATE ${lklib})
  
 #复制测试文本
-file(COPY src/sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY src/ed.json DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY src/blender_icons.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY src/button20.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+file(COPY test_src/sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+file(COPY test_src/ed.json DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+file(COPY test_src/blender_icons.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+file(COPY test_src/button20.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 
 #3d渲染器
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
