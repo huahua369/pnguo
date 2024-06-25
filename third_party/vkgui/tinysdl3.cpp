@@ -334,6 +334,8 @@ uint32_t get_flags(int fgs)
 		SDL_SetHintWithPriority("SDL_BORDERLESS_WINDOWED_STYLE", "1", SDL_HINT_OVERRIDE);
 
 	}
+	if (fgs & ef_fullscreen)
+		flags |= SDL_WINDOW_FULLSCREEN;
 	if (fgs & ef_resizable)
 		flags |= SDL_WINDOW_RESIZABLE;
 	//flags |= SDL_WINDOW_MOUSE_GRABBED;//锁定鼠标在窗口内

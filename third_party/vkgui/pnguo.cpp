@@ -16499,10 +16499,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			event_wts1.push_back(*it);
 	}
 	if (horizontal) {
-		widget_on_event(horizontal, type, ep, ppos);
+		widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
 	}
 	if (vertical && !ep->ret) {
-		widget_on_event(vertical, type, ep, ppos);
+		widget_on_event(vertical, type, ep, ppos);// 垂直滚动条
 
 	}
 

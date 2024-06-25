@@ -16,7 +16,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
+#define ADBIT(x) (1<<x)
 struct image_raw_x
 {
 	int w = 0, h = 0;
@@ -239,12 +239,13 @@ void set_col_u8();
 // 窗口属性
 enum form_flags_e
 {
-	ef_null = 0,		//ef_default
-	ef_vulkan = 1,		//vk渲染
-	ef_resizable = 2,	//可以拉伸大小
-	ef_transparent = 4,	//透明
-	ef_borderless = 8,	//无系统边框
-	ef_utility = 0x10,	//不出现在任务栏
+	ef_null = ADBIT(0),		//ef_default
+	ef_vulkan = ADBIT(1),		//vk渲染
+	ef_resizable = ADBIT(2),	//可以拉伸大小
+	ef_transparent = ADBIT(3),	//透明
+	ef_borderless = ADBIT(4),	//无系统边框
+	ef_utility = ADBIT(5),	//不出现在任务栏
+	ef_fullscreen = ADBIT(6),
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息

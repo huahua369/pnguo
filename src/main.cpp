@@ -397,11 +397,13 @@ int main()
 	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
-	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable/* | ef_borderless*/,true };
+	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable ,true };
 	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+	ptf.flags = ef_vulkan | ef_transparent | ef_borderless;
+	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
-	//form0->set_alpha(true);
+	form1->set_alpha(true);
 	//form0->set_alpha(false);
 	form0->up_cb = [](float dt, int* rms) {
 		//	*rms = 8;
@@ -530,7 +532,7 @@ int main()
 	// 创建列表视图
 	auto listp = new listview_cx();
 	listp->border = { 0x80ff802C,1,5 };
-	pw->bind(listp);	// 绑定到窗口	
+	form1->bind(listp);	// 绑定到窗口	
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
 	{
