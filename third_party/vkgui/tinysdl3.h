@@ -75,7 +75,8 @@ public:
 	app_cx();
 	~app_cx();
 
-	form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int flags, bool derender);
+	//form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int flags, bool derender);
+	form_x* new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent);
 public:
 	int run_loop(int t);
 	void call_cb(SDL_Event* e);
@@ -169,6 +170,7 @@ public:
 	// 显示/隐藏窗口
 	void show();
 	void hide();
+	void raise();
 	bool get_visible();
 	// 开始输入法
 	void start_text_input();
@@ -239,19 +241,23 @@ void set_col_u8();
 // 窗口属性
 enum form_flags_e
 {
-	ef_null = ADBIT(0),		//ef_default
-	ef_vulkan = ADBIT(1),		//vk渲染
-	ef_resizable = ADBIT(2),	//可以拉伸大小
-	ef_transparent = ADBIT(3),	//透明
-	ef_borderless = ADBIT(4),	//无系统边框
-	ef_utility = ADBIT(5),	//不出现在任务栏
-	ef_fullscreen = ADBIT(6),
+	ef_null = ADBIT(0),			// ef_default
+	ef_vulkan = ADBIT(1),		// vk渲染
+	ef_resizable = ADBIT(2),	// 可以拉伸大小
+	ef_transparent = ADBIT(3),	// 透明
+	ef_borderless = ADBIT(4),	// 无系统边框
+	ef_popup = ADBIT(5),		// 弹出式窗口，需要有父窗口
+	ef_tooltip = ADBIT(6),		// 工具提示窗口，需要有父窗口
+	ef_utility = ADBIT(7),		// 不出现在任务栏
+	ef_fullscreen = ADBIT(8),	// 全屏
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息
 struct form_newinfo_t {
 	void* app = 0;
+	form_x* parent = 0;
 	const char* title = 0;
+	glm::ivec2 pos;
 	glm::ivec2 size;
 	int flags = 0;
 	bool has_renderer = 0;

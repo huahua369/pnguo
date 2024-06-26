@@ -345,12 +345,16 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_TRANSPARENT;
 	if (fgs & ef_vulkan)
 		flags |= SDL_WINDOW_VULKAN;
-	if (fgs & ef_utility)
+	if (fgs & ef_tooltip)
+		flags |= SDL_WINDOW_TOOLTIP;
+	if (fgs & ef_popup)
+		flags |= SDL_WINDOW_POPUP_MENU;
+	else if (fgs & ef_utility)
 		flags |= SDL_WINDOW_UTILITY;
 	return flags;
 }
 int on_call_we(const SDL_Event* e, form_x* pw, int* wcount);
-form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws1, int fgs, bool derender)
+form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent)
 {
 	auto ws = ws1;
 #ifdef __ANDROID__
@@ -359,7 +363,11 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& ws
 #endif
 	SDL_Window* window = 0;
 	SDL_Renderer* renderer = 0;
-	window = SDL_CreateWindow(title.c_str(), ws.x, ws.y, get_flags(fgs));
+	auto flags = get_flags(fgs);
+	if (fgs & ef_tooltip || fgs & ef_popup)
+		window = SDL_CreatePopupWindow(parent->_ptr, pos.x, pos.y, ws.x, ws.y, flags);
+	else
+		window = SDL_CreateWindow(title.c_str(), ws.x, ws.y, flags);
 	//SDL_CreateWindowAndRenderer(ws.x, ws.y, get_flags(fgs), &window, &renderer);
 	if (!window)
 	{
@@ -482,7 +490,7 @@ void app_cx::get_event()
 {
 	SDL_Event e = {};
 	while (SDL_PollEvent(&e) != 0)
-	{ 
+	{
 		switch (e.type) {
 		case SDL_EVENT_QUIT:
 		{
@@ -967,7 +975,7 @@ void form_x::trigger(uint32_t etype, void* e)
 	auto cbs = events[(uint32_t)type];
 	auto cbs0 = *events_a;
 	auto iptr = input_ptr;
-	lkecb.unlock(); 
+	lkecb.unlock();
 	et_un_t et = {};
 	do
 	{
@@ -981,7 +989,7 @@ void form_x::trigger(uint32_t etype, void* e)
 			}
 			return;
 		}
-		if (cbs.empty() && cbs0.empty())break; 
+		if (cbs.empty() && cbs0.empty())break;
 		if (et.ret)
 		{
 			break;
@@ -1039,6 +1047,10 @@ void form_x::show() {
 }
 void form_x::hide() {
 	SDL_HideWindow(_ptr);
+}
+void form_x::raise()
+{
+	SDL_RaiseWindow(_ptr);
 }
 bool form_x::get_visible()
 {
@@ -1938,7 +1950,7 @@ uint64_t call_data(int type, void* data)
 		if (p && p->app)
 		{
 			auto app = (app_cx*)p->app;
-			ret = (uint64_t)app->new_form_renderer(p->title, p->size, p->flags, p->has_renderer);
+			ret = (uint64_t)app->new_form_renderer(p->title, p->pos, p->size, p->flags, p->has_renderer, p->parent);
 		}
 	}
 	break;

@@ -394,14 +394,19 @@ int main()
 	auto qyt = new	uint16_t[256 * 384];
 	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
-	form_newinfo_t ptf = { app,(char*)u8"窗口1",ws, ef_vulkan | ef_resizable ,true };
+	form_newinfo_t ptf = {};
+	ptf.app = app; ptf.title = (char*)u8"窗口1";
+	ptf.size = ws;
+	ptf.flags = ef_vulkan | ef_resizable;
+	ptf.has_renderer = true;
 	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-	ptf.flags = ef_vulkan | ef_transparent | ef_borderless;
+	ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;// | ef_utility;
 	ptf.size = { 820,620 };
+	ptf.parent = form0;
 	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
 	form1->set_alpha(true);
@@ -511,6 +516,7 @@ int main()
 			gb2->hscroll = {};
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
+					form1->hide();
 					div->add_child(0, { 60,60 });
 					div->layout();
 					auto cbt = p->add_cbutton((char*)u8"🍑new", { 80,30 }, 0);
@@ -519,6 +525,10 @@ int main()
 					cbt->pdc;
 					cbt->hscroll = {};
 					cbt->light = 1;
+					cbt->click_cb = [=](void* ptr, int clicks)
+						{
+							form1->show();
+						};
 				};
 		}
 		p->draw_back_cb = [=](cairo_t* cr)
@@ -624,7 +634,18 @@ int main()
 		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
 		svg_cx* bl1 = new_svg_file("button20.svg", 0, 96);
 		svg_cx* bl2 = new_svg_file("button21.svg", 0, 96);
+		int xn = bl->width * 2 * bl->height * 2;
 		auto blsur = new_image_cr({ bl->width * 2,bl->height * 2 });
+		auto pxd = (uint32_t*)cairo_image_surface_get_data(blsur);
+		if (pxd)
+		{
+			auto stride = cairo_image_surface_get_stride(blsur) / 4;
+			stride *= bl->height * 2;
+			for (size_t i = 0; i < xn; i++)
+			{
+				pxd[i] = 0;
+			}
+		}
 		static int svginc = 0;
 		std::thread th([=]()
 			{
