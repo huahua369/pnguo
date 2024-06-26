@@ -1889,7 +1889,18 @@ struct style_plane_t {
 	float radius = 4;		// 矩形圆角
 
 };
+// 对话框
+class dialog_cx
+{
+public:
 
+public:
+	dialog_cx();
+	~dialog_cx();
+
+private:
+
+};
 
 // 创建列表框，菜单
 plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc);

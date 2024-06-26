@@ -413,9 +413,9 @@ int main()
 	form1->set_alpha(true);
 	//form0->set_alpha(false);
 	form0->on_close_cb = [=]() {
-		form1->close();
 		return 0;// 返回1关闭窗口，返回0隐藏窗口
 		};
+	form0->enable_window(0);
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
 	int cpun = call_data((int)cdtype_e::cpu_count, 0);
@@ -518,7 +518,7 @@ int main()
 			gb2->hscroll = {};
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
-					form1->hide();
+					//form1->hide();
 					div->add_child(0, { 60,60 });
 					div->layout();
 					auto cbt = p->add_cbutton((char*)u8"🍑new", { 80,30 }, 0);
@@ -529,7 +529,11 @@ int main()
 					cbt->light = 1;
 					cbt->click_cb = [=](void* ptr, int clicks)
 						{
+							static int kc = 0;
+							if (kc != 0)return;
+							kc++;
 							form1->show();
+							form1->close();
 						};
 				};
 		}
@@ -585,7 +589,7 @@ int main()
 		std::vector<checkbox_com> ckv = new_checkbox(p, cstr1, width, [=](void* ptr, bool v)
 			{
 				auto pr = (checkbox_tl*)ptr;
-
+				form0->enable_window(1);
 			});
 		std::vector<radio_com> rcv = new_radio(p, cstr2, width, [=](void* ptr, bool v)
 			{

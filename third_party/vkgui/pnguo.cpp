@@ -19363,3 +19363,16 @@ plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane
 {
 	return nullptr;
 }
+
+#if 1
+
+
+dialog_cx::dialog_cx()
+{
+}
+
+dialog_cx::~dialog_cx()
+{
+}
+
+#endif // 1
