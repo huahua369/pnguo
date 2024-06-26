@@ -15000,7 +15000,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					ctx->ckselect = 3;
 					std::wstring ws = get_select_wstr();
 					ws.push_back(0);
-					bool ok = dragdrop_begin(ws.c_str(), ws.size());
+					bool ok = parent && parent->dragdrop_begin ? parent->dragdrop_begin(ws.c_str(), ws.size()) : false;
 					if (ok && !_read_only) {
 						auto ccr = ctx->get_bounds();
 						auto d = bp.y - bp.x;
@@ -15068,7 +15068,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			{
 				if (ep->form)
 				{
-					form_set_input_ptr(ep->form, get_input_state(this, 1));
+					if (parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); };
 					ctx->c_d = -1; is_input = true;
 				}
 				else {
@@ -15192,7 +15192,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				ctx->hover_text = false;
 			}
 			if (p->has) { *(p->has) = 1; }
-			if (ep->form) { form_set_input_ptr(ep->form, get_input_state(this, 1)); }
+			if (ep->form && parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); }
 			ctx->ccursor = cx;
 
 			is_input = true;
@@ -18905,7 +18905,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	auto pts = poss[_dir];
 	pts -= _offset;
 	switch (et)
-	{ 
+	{
 	case event_type2::on_click:
 	{
 		hover = true;
@@ -18919,7 +18919,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		set_posv(poss);
 		hover = false;
 	}
-	break; 
+	break;
 	case event_type2::on_move:
 	{
 		auto pts = poss[_dir];
@@ -18945,7 +18945,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 			hover = true;
 		}
 	}
-	break; 
+	break;
 	case event_type2::on_scroll:
 	{
 		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
@@ -19351,4 +19351,14 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 		}
 	}
 	return rv;
+}
+
+plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, const glm::ivec4& bc)
+{
+	return nullptr;
+}
+
+plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, const glm::ivec4& bc)
+{
+	return nullptr;
 }

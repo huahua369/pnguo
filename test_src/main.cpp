@@ -404,9 +404,10 @@ int main()
 	ptf.has_renderer = true;
 	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-	ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;// | ef_utility;
+	ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;//ef_tooltip;// | ef_utility;
 	ptf.size = { 820,620 };
 	ptf.parent = form0;
+	ptf.pos = { 1600,2200 };
 	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
 	form1->set_alpha(true);
@@ -571,7 +572,7 @@ int main()
 		p->custom_layout = true;
 		p->fontsize = 16;
 
-		std::vector<std::string> cstr = { (char*)u8"名 称" ,(char*)u8"状\t态",(char*)u8"描述" };
+		std::vector<std::string> cstr = { (char*)u8"名 \n称" ,(char*)u8"状\t态",(char*)u8"描述" };
 		std::vector<std::string> cstr1 = { (char*)u8"checkbox 🍇测试1" ,(char*)u8"checkbox 测试2",(char*)u8"checkbox 测试3" };
 		std::vector<std::string> cstr2 = { (char*)u8"radio 🍍测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
 		width = 150;

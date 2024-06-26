@@ -1861,6 +1861,9 @@ void form_x::bind(plane_cx* p)
 		}
 		p->form = this;
 		p->set_fontctx(app->font_ctx);
+		p->form_move2end = form_move2end;
+		p->form_set_input_ptr = form_set_input_ptr;
+		p->dragdrop_begin = dragdrop_begin;
 		_planes.push_back(p);
 		add_event(p, [](uint32_t type, et_un_t* e, void* ud) { ((plane_cx*)ud)->on_event(type, e); });
 		add_canvas_atlas(p);

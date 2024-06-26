@@ -231,6 +231,13 @@ public:
 private:
 };
 
+
+void form_move2end(form_x* f, plane_cx* ud);
+// 设置接收输入的控件
+void form_set_input_ptr(form_x* f, void* ud);
+// OLO拖放文本
+bool dragdrop_begin(const wchar_t* str, size_t size);
+
 // 获取粘贴板文本
 std::string get_clipboard();
 // 设置粘贴板文本

@@ -1434,7 +1434,7 @@ struct scroll_bar :public widget_base
 	int _rc_width = 0;			// 滑块宽度
 	int _dir = 0;				// 方向，0=水平，1=垂直
 	glm::ivec3 thumb_size_m = {};// 滚动范围
-	glm::vec2 tps = {};			
+	glm::vec2 tps = {};
 	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0 };		// 背景色，滑块颜色，滑块高亮颜色，备用颜色
 	uint32_t _tcc = 0;			// 滑块当前颜色
 	int _pos_width = 1;			// 滚动宽度
@@ -1491,6 +1491,12 @@ public:
 	std::function<void(cairo_t* cr)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
+	// 移到最后
+	void (*form_move2end)(form_x* f, plane_cx* ud) = 0;
+	// 设置接收输入的控件
+	void (*form_set_input_ptr)(form_x* f, void* ud) = 0;
+	// OLO拖放文本
+	bool (*dragdrop_begin)(const wchar_t* str, size_t size) = 0;
 
 	layout_info_x _css = {};		// 布局样式
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
@@ -1859,12 +1865,6 @@ namespace md {
 	std::wstring u8to_w(const char* str, size_t len);
 }
 
-// 实现在tinysdl3.cpp
-void form_move2end(form_x* f, plane_cx* ud);
-// 设置接收输入的控件
-void form_set_input_ptr(form_x* f, void* ud);
-// OLO拖放文本
-bool dragdrop_begin(const wchar_t* str, size_t size);
 
 // 创建控件
 struct checkbox_com
@@ -1881,4 +1881,7 @@ std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t
 std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 
-
+// 创建列表框，菜单
+plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, const glm::ivec4& bc);
+// 创建工具提示面板，color={背景色，边框色，文本颜色，字号}
+plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, const glm::ivec4& bc);
