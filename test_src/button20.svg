@@ -7,6 +7,7 @@
    viewBox="0 0 210 297"
    version="1.1"
    id="svg1"
+   sodipodi:docname="button20.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -110,6 +111,13 @@
      inkscape:label="图层 1"
      inkscape:groupmode="layer"
      id="layer1">
+    <rect
+       style="fill:#000000;stroke-width:0.264583"
+       id="rect1"
+       width="142.83763"
+       height="87.309967"
+       x="2.9225092"
+       y="8.7675276" />
     <rect
        style="fill:#115dec;stroke-width:0.264583;filter:url(#filter26)"
        id="rect1-5"
