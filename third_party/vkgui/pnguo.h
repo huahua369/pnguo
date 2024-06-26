@@ -1881,7 +1881,18 @@ std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t
 std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 
+struct style_plane_t {
+	image_ptr_t* img = 0;	// 图标纹理
+	glm::ivec2 color = {};	// 背景色，边框色
+	int text_color = -1;	// 文本颜色
+	float thickness = 1.0;	// 线宽
+	float radius = 4;		// 矩形圆角
+
+};
+
+
 // 创建列表框，菜单
-plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, const glm::ivec4& bc);
+plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc);
 // 创建工具提示面板，color={背景色，边框色，文本颜色，字号}
-plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, const glm::ivec4& bc);
+plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane_t* bc);
+

@@ -412,8 +412,9 @@ int main()
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
 	form1->set_alpha(true);
 	//form0->set_alpha(false);
-	form0->up_cb = [](float dt, int* rms) {
-		//	*rms = 8;
+	form0->on_close_cb = [=]() {
+		form1->close();
+		return 0;// 返回1关闭窗口，返回0隐藏窗口
 		};
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();

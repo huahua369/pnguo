@@ -353,7 +353,7 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_UTILITY;
 	return flags;
 }
-int on_call_we(const SDL_Event* e, form_x* pw, int* wcount);
+int on_call_we(const SDL_Event* e, form_x* pw);
 form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent)
 {
 	auto ws = ws1;
@@ -365,7 +365,9 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	SDL_Renderer* renderer = 0;
 	auto flags = get_flags(fgs);
 	if (fgs & ef_tooltip || fgs & ef_popup)
+	{
 		window = SDL_CreatePopupWindow(parent->_ptr, pos.x, pos.y, ws.x, ws.y, flags);
+	}
 	else
 		window = SDL_CreateWindow(title.c_str(), ws.x, ws.y, flags);
 	//SDL_CreateWindowAndRenderer(ws.x, ws.y, get_flags(fgs), &window, &renderer);
@@ -403,6 +405,10 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 			SDL_DestroyRenderer(renderer);
 		return 0;
 	}
+	if (parent)
+	{
+		parent->childfs.push_back(pw);
+	}
 	pw->app = this;
 	pw->_ptr = window;
 	pw->renderer = renderer;
@@ -425,14 +431,9 @@ void app_cx::call_cb(SDL_Event* e)
 {
 	auto fwp = SDL_GetWindowFromID(e->window.windowID);
 	auto fw = (form_x*)pce::get_property(fwp, "form_x");
+	int rw = 0;
 	if (fw) {
-		int pwc = 0;
-		int rw = on_call_we(e, fw, &pwc);
-		if (pwc < 0)
-		{
-			auto& v = forms;
-			v.erase(std::remove(v.begin(), v.end(), fw), v.end());
-		}
+		rw = on_call_we(e, fw);
 	}
 }
 void app_cx::sleep_ms(int ms)
@@ -484,6 +485,12 @@ void app_cx::set_defcursor(uint32_t t)
 	default:
 		break;
 	}
+}
+
+void app_cx::remove(form_x* fw)
+{
+	auto& v = forms;
+	v.erase(std::remove(v.begin(), v.end(), fw), v.end());
 }
 
 void app_cx::get_event()
@@ -833,6 +840,12 @@ form_x::~form_x()
 	}
 	events = 0;
 	events_a = 0;
+	for (auto it : childfs) {
+		it->_ptr = 0;
+		delete it; 
+	}
+	app->remove(this);
+	childfs.clear();
 	destroy();
 	sdlfree(clipstr); clipstr = 0;
 }
@@ -1033,10 +1046,10 @@ void form_x::release_capture()
 // 关闭窗口
 void form_x::close() {
 	SDL_Event e = {};
-	e.type /*= SDL_WINDOWEVENT;
-	e.window.event*/ = SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+	e.type = e.window.type = SDL_EVENT_WINDOW_CLOSE_REQUESTED;
 	e.window.windowID = SDL_GetWindowID(_ptr);
 	SDL_PushEvent(&e);
+	//SDL_SendWindowEvent(_ptr, SDL_EVENT_WINDOW_CLOSE_REQUESTED, 0, 0);
 }
 // 显示/隐藏窗口
 void form_x::show() {
@@ -1237,7 +1250,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	}
 	return false;
 }
-int on_call_we(const SDL_Event* e, form_x* pw, int* wcount)
+int on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
 	int r = 0;
@@ -1246,6 +1259,8 @@ int on_call_we(const SDL_Event* e, form_x* pw, int* wcount)
 		//switch (e->window.event)
 		switch (e->type)
 		{
+		case SDL_EVENT_WINDOW_DESTROYED: {
+		}break;
 		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 		{
 			int cbr = 0;
@@ -1256,7 +1271,6 @@ int on_call_we(const SDL_Event* e, form_x* pw, int* wcount)
 			if (pw->close_type || cbr == 1)
 			{
 				pw->destroy();
-				if (wcount) { (*wcount)--; }
 				delete pw;
 			}
 			else {

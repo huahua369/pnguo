@@ -84,7 +84,7 @@ public:
 	void set_fps(int n);
 	void set_syscursor(int type);
 	void set_defcursor(uint32_t t);
-
+	void remove(form_x* f);
 private:
 	void get_event();
 
@@ -134,7 +134,7 @@ public:
 	std::vector<event_fw>* events = 0;
 	std::vector<event_fw>* events_a = 0;
 	std::vector<event_fw> first_cs;	// 优先
-
+	std::vector<form_x*> childfs;
 	// 接收拖动OLE管理
 	hz::drop_regs* dragdrop = 0;
 	// 默认接收ole

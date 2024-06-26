@@ -4241,6 +4241,7 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 		if (ctrc.y < h)ctrc.y = h;
 
 		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
+		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
 		auto ps = (ss - rct) * text_align + bearing;
 		ps.x += rc.x;
 		ps.y += rc.y;
@@ -19353,12 +19354,12 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 	return rv;
 }
 
-plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, const glm::ivec4& bc)
+plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc)
 {
 	return nullptr;
 }
 
-plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, const glm::ivec4& bc)
+plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane_t* bc)
 {
 	return nullptr;
 }
