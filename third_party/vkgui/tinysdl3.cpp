@@ -844,8 +844,8 @@ form_x::~form_x()
 		it->_ptr = 0;
 		delete it; 
 	}
-	app->remove(this);
 	childfs.clear();
+	app->remove(this);
 	destroy();
 	sdlfree(clipstr); clipstr = 0;
 }

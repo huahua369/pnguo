@@ -23,6 +23,16 @@
 		文本
 	图形渲染
 		线、方块、圆、三角形、路径线、位图
+
+cd build
+cmake ..
+
+# install in a different path. eg ~/test/usr/lib
+cmake -DCMAKE_INSTALL_PREFIX=~/test ..
+
+# static build
+cmake -DBUILD_SHARED_LIBS=OFF ..
+ninja -C build
 */
 
 #define DVC_EXPORT extern "C" __declspec(dllimport)
@@ -464,6 +474,7 @@ int main()
 		{
 			// 设置带滚动条
 			p->set_scroll(width, rcw, { 0,0 });
+			p->set_scroll_hide(1);
 		}
 		glm::vec2 cs = { 1500,1600 };
 		auto vs = p->get_size();
@@ -514,19 +525,29 @@ int main()
 		div->layout();
 		{
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
+			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 80,30 }, 4);
+			g3->_absolute = true;
+			g3->pos = { 30,20 };
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
+			gb2->rounding = 14;
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
+					auto btn = (color_btn*)ptr;
+					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
+					pos.y += btn->size.y;
+					static int xt = 0;
 					//form1->hide();
 					div->add_child(0, { 60,60 });
 					div->layout();
-					auto cbt = p->add_cbutton((char*)u8"🍑new", { 80,30 }, 0);
+					auto cbt = p->add_cbutton((char*)u8"🍑new", { 80,30 }, xt++);
+					if (xt > 4)xt = 0;
 					cbt->font_size = 16;
 					cbt->effect = uTheme::light;
 					cbt->pdc;
 					cbt->hscroll = {};
-					cbt->light = 1;
+					cbt->light = 0.36;
+					cbt->rounding = 14;
 					cbt->click_cb = [=](void* ptr, int clicks)
 						{
 							static int kc = 0;
@@ -563,6 +584,7 @@ int main()
 		{
 			// 设置带滚动条
 			listp->set_scroll(width, rcw, { 0,0 });
+			listp->set_scroll_hide(1);
 		}
 		column_lv c = {};
 		c.width = 100;
@@ -657,7 +679,7 @@ int main()
 			{
 				print_time a("load svg");
 				cairo_t* cr = cairo_create(blsur);
-				//render_svg(cr, bl, {}, { 1.0,1.0 }, 0);
+				//render_svg(cr, bl, {}, { 2.0,2.0 }, 0);
 				render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
 				render_svg(cr, bl2, { 400,bl->height + 100 }, { 1.0,1.0 }, 0);
 				svginc = 1;
@@ -896,6 +918,7 @@ int main()
 		{
 			// 设置带滚动条
 			pl1->set_scroll(width, rcw, { 0,0 });
+			pl1->set_scroll_hide(1);
 		}
 
 		sw1->color = { 0xff66ce13, 0xff4949ff ,-1 };

@@ -1045,7 +1045,15 @@ private:
 };
 
 #endif // NO_FLEX_CX
+
 class plane_cx;
+// 判断拾取
+struct pickup_t
+{
+	glm::vec2 pos = {};		// 坐标
+	glm::vec3 angle = {};	// 距离x-y，角度z
+
+};
 //  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 struct widget_base
 {
@@ -1072,7 +1080,7 @@ struct widget_base
 	plane_cx* parent = 0;
 	bool _disabled_events = false;
 	bool visible = true;
-	bool typepos = false;		// true绝对坐标，false布局计算
+	bool _absolute = false;		// true绝对坐标，false布局计算
 	bool has_drag = false;	// 是否有拖动事件
 	bool _autofree = false;
 	//event_type2
@@ -1444,6 +1452,7 @@ struct scroll_bar :public widget_base
 	glm::vec2 scale_s0 = { 0.6,0.8 };	// 显示比例，用于鼠标进入变形
 	bool hover = 0;				// 保存鼠标进入状态
 	bool hover_sc = 0;
+	bool hideble = 0;			// 隐藏滚动条
 	bool limit = 1;				// 是否限制在滚动范围
 	bool valid = 1;				// 是否重新渲染
 private:
@@ -1530,6 +1539,7 @@ public:
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条
 	void set_scroll(int width, int rcw, const glm::ivec2& pos_width);
+	void set_scroll_hide(bool is);// 是否隐藏滚动条
 	void set_view(const glm::ivec2& view_size, const glm::ivec2& content_size);
 	void set_scroll_visible(const glm::ivec2& hv);
 	void move2end(widget_base* p);
@@ -1572,8 +1582,9 @@ private:
 struct column_lv
 {
 	std::string title;	// 文本 
-	int width = 0;		// 宽
 	glm::vec2 align = { 0.5,0.5 };	// 0左，0.5中，1右
+	int type = 0;		// 类型
+	int width = 0;		// 宽
 	int idx = 0;		// 初始序号
 	bool visible = true;//是否显示列
 };
@@ -1603,6 +1614,8 @@ public:
 	~grid_view();
 	// 设置列行数量
 	void set_size(size_t x, size_t y);
+	void add_col(int width);
+	void add_row(int height);
 	// 设置列宽，idx为列索引，v宽度
 	void set_width(size_t idx, float v);
 	// 设置行高，idx为列索引，v行高
@@ -1887,8 +1900,31 @@ struct style_plane_t {
 	int text_color = -1;	// 文本颜色
 	float thickness = 1.0;	// 线宽
 	float radius = 4;		// 矩形圆角
+};
+
+
+struct column_lvt
+{
+	std::string title;	// 文本 
+	glm::vec2 align = { 0.5,0.5 };	// 0左，0.5中，1右
+	int width = 0;		// 宽
+	int idx = 0;		// 初始序号
+	bool visible = true;//是否显示列
+};
+// 列表框
+class list_box_cx
+{
+public:
+	int font_size = 16;
+public:
+	list_box_cx();
+	~list_box_cx();
+
+private:
 
 };
+
+
 // 对话框
 class dialog_cx
 {

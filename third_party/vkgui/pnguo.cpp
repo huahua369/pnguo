@@ -15925,6 +15925,14 @@ void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width)
 	}
 }
 
+void plane_cx::set_scroll_hide(bool is)
+{
+	if (horizontal)
+		horizontal->hideble = is;
+	if (vertical)
+		vertical->hideble = is;
+}
+
 void plane_cx::set_view(const glm::ivec2& view_size, const glm::ivec2& content_size)
 {
 	if (horizontal)
@@ -15972,7 +15980,7 @@ scroll_bar* plane_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int
 	if (p)
 	{
 		add_widget(p);
-		p->typepos = true;
+		p->_absolute = true;
 		p->size = size;
 		auto ss = get_size();
 		glm::ivec2 dw = {};
@@ -16334,7 +16342,7 @@ void plane_cx::mk_layout()
 	wbs.reserve(widgets.size());
 	for (auto& it : widgets) {
 		auto p = (widget_base*)it;
-		if (p->typepos)continue;
+		if (p->_absolute)continue;
 		layouts.push_back({ p->pos, p->size });
 		wbs.push_back(p);
 	}
@@ -16508,21 +16516,36 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		widget_on_event(vertical, type, ep, ppos);// 垂直滚动条
 
 	}
-
+	widget_base* hpw = 0;
 	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 		auto pw = (widget_base*)*it;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		auto vpos = sps * pw->hscroll;
 		on_wpe(pw, type, ep, ppos + vpos);
-		if (ep->ret)break;
+		if (ep->ret) {
+			hpw = pw;
+			break;
+		}
 	}
 	for (auto it = event_wts1.begin(); it != event_wts1.end(); it++) {
 		auto pw = (widget_base*)*it;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		auto vpos = sps * pw->hscroll;
 		on_wpe(pw, type, ep, ppos + vpos);
-		if (ep->ret)break;
+		if (ep->ret) {
+			hpw = pw; break;
+		}
 	}
+	if (hpw && t == devent_type_e::mouse_move_e)
+	{
+		for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
+			auto pw = (widget_base*)*it;
+			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue;
+			pw->bst &= ~(int)BTN_STATE::STATE_HOVER;
+			// 鼠标离开
+		}
+	}
+
 	if (!ep->ret)
 		ep->ret = r1;
 	switch (t)
@@ -17122,6 +17145,8 @@ bool widget_on_move(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2
 		auto k = check_box_cr1(mps, (glm::vec4*)&wp->pos, 1, 0);
 		if (k.x) {
 			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
+			if (!(wp->bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
+				ep->ret = 1;
 		}
 		else { wp->bst &= ~(int)BTN_STATE::STATE_HOVER; }
 
@@ -19028,11 +19053,13 @@ void scroll_bar::draw(cairo_t* cr)
 	glm::ivec2 poss = pos;
 	glm::ivec2 ss = size;
 
-	cairo_translate(cr, poss.x, poss.y);
 	{
+		cairo_translate(cr, poss.x, poss.y);
 		// 背景
-		draw_rectangle(cr, { 0,0,ss }, rounding);
-		fill_stroke(cr, _color.x, 0, 0, 0);
+		if (!hideble || thumb_size_m.z) {
+			draw_rectangle(cr, { 0,0,ss }, rounding);
+			fill_stroke(cr, _color.x, 0, 0, 0);
+		}
 		// 滑块
 		double rw = _rc_width * scale_s;
 		glm::ivec4 trc = { 0,0,rw,rw };
@@ -19089,6 +19116,24 @@ void grid_view::set_size(size_t x, size_t y)
 	if (y > 0)
 		_row_height.resize(y);
 	valid = true;
+}
+
+void grid_view::add_col(int width)
+{
+	if (width > 0)
+	{
+		_column_width.push_back({ width,0 });
+		valid = true;
+	}
+}
+
+void grid_view::add_row(int height)
+{
+	if (height > 0)
+	{
+		_row_height.push_back({ height,0 });
+		valid = true;
+	}
 }
 
 void grid_view::set_width(size_t idx, float v)
@@ -19366,6 +19411,13 @@ plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane
 
 #if 1
 
+list_box_cx::list_box_cx()
+{
+}
+
+list_box_cx::~list_box_cx()
+{
+}
 
 dialog_cx::dialog_cx()
 {
