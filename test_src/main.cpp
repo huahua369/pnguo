@@ -420,7 +420,7 @@ int main()
 	ptf.pos = { 1600,2200 };
 	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
-	//form1->set_alpha(true);
+	form1->set_alpha(true);
 	//form0->set_alpha(false);
 	form0->on_close_cb = [=]() {
 		return 0;// 返回1关闭窗口，返回0隐藏窗口
@@ -534,7 +534,7 @@ int main()
 			gb2->rounding = 14;
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
-					form1->bind(listp);	// 绑定到窗口	
+					form1->bind(listp);	// 绑定到新窗口	
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
 					pos.y += btn->size.y;
