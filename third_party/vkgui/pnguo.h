@@ -799,7 +799,7 @@ public:
 private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
-
+// auto save 
 class cairo_as
 {
 public:
@@ -1443,7 +1443,7 @@ struct scroll_bar :public widget_base
 	int _dir = 0;				// 方向，0=水平，1=垂直
 	glm::ivec3 thumb_size_m = {};// 滚动范围
 	glm::vec2 tps = {};
-	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0 };		// 背景色，滑块颜色，滑块高亮颜色，备用颜色
+	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0xffC8641E };		// 背景色，滑块颜色，滑块高亮颜色，激活颜色
 	uint32_t _tcc = 0;			// 滑块当前颜色
 	int _pos_width = 1;			// 滚动宽度
 	int t_offset = 0;			// 偏移量

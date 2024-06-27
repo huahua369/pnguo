@@ -420,12 +420,12 @@ int main()
 	ptf.pos = { 1600,2200 };
 	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
-	form1->set_alpha(true);
+	//form1->set_alpha(true);
 	//form0->set_alpha(false);
 	form0->on_close_cb = [=]() {
 		return 0;// 返回1关闭窗口，返回0隐藏窗口
 		};
-	form0->enable_window(0);
+	//form0->enable_window(0);
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
 	int cpun = call_data((int)cdtype_e::cpu_count, 0);
@@ -435,6 +435,7 @@ int main()
 	auto pl2 = new plane_cx();
 	auto pl3 = new plane_cx();
 	auto pl4 = new plane_cx();
+	auto listp = new listview_cx();
 	pl2->_lms = { 6,6 };
 	pl1->border = { 0x80ff802C,1,5 };
 	pl2->border = { 0x80ff802C,1,5 };
@@ -533,6 +534,7 @@ int main()
 			gb2->rounding = 14;
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
+					form1->bind(listp);	// 绑定到窗口	
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
 					pos.y += btn->size.y;
@@ -554,7 +556,7 @@ int main()
 							if (kc != 0)return;
 							kc++;
 							form1->show();
-							form1->close();
+							//form1->close();
 						};
 				};
 		}
@@ -568,9 +570,8 @@ int main()
 			};
 	}
 	// 创建列表视图
-	auto listp = new listview_cx();
 	listp->border = { 0x80ff802C,1,5 };
-	form1->bind(listp);	// 绑定到窗口	
+	pw->bind(listp);	// 绑定到窗口	
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
 	{

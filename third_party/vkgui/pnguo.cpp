@@ -19044,6 +19044,9 @@ bool scroll_bar::update(float delta)
 			_tcc = _color.y; scale_s = scale_s0.x;
 		}
 	}
+	if ((bst & (int)BTN_STATE::STATE_ACTIVE) && _color.w) {
+		_tcc = _color.w;
+	}
 	return r;
 }
 

@@ -179,6 +179,13 @@ public:
 	void set_ime_pos(const glm::ivec4& r);
 	// 禁用窗口鼠标键盘操作。模态窗口用
 	void enable_window(bool bEnable);
+	// 移动鼠标到窗口指定位置
+	void set_mouse_pos(const glm::ivec2& pos);
+	void set_mouse_pos_global(const glm::ivec2& pos);
+	// 显示/隐藏鼠标
+	void show_cursor();
+	void hide_cursor();
+
 	// 设置窗口图标
 	void set_icon(const char* fn);
 	void set_icon(const uint32_t* d, int w, int h);

@@ -752,6 +752,7 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 				it->img->texid = 0;
 			}
 		}
+		p->valid = true;
 		p->_renderer = renderer;
 		p->destroy_texture_cb = (void(*)(void* tex))SDL_DestroyTexture;
 	}
@@ -842,7 +843,7 @@ form_x::~form_x()
 	events_a = 0;
 	for (auto it : childfs) {
 		it->_ptr = 0;
-		delete it; 
+		delete it;
 	}
 	childfs.clear();
 	app->remove(this);
@@ -1821,6 +1822,22 @@ void form_x::enable_window(bool bEnable)
 	auto hWnd = (HWND)pce::get_windowptr(_ptr);
 	EnableWindow(hWnd, bEnable);
 #endif
+}
+void form_x::set_mouse_pos(const glm::ivec2& pos)
+{
+	SDL_WarpMouseInWindow(_ptr, pos.x, pos.y);
+}
+void form_x::set_mouse_pos_global(const glm::ivec2& pos)
+{
+	SDL_WarpMouseGlobal(pos.x, pos.y);
+}
+void form_x::show_cursor()
+{
+	SDL_ShowCursor();
+}
+void form_x::hide_cursor()
+{
+	SDL_HideCursor();
 }
 void form_x::push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target)
 {
