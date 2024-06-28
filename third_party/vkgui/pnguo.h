@@ -1054,6 +1054,7 @@ struct pickup_t
 struct widget_base
 {
 	int id = 0;
+	int wtype = 0;
 	int bst = 1;			// 鼠标状态
 	glm::vec2 pos = {};		// 控件坐标
 	glm::vec2 size = {};	// 控件大小
@@ -1839,6 +1840,20 @@ struct cell_store_pos64
 	glm::i64vec2 pos = {};			// 64位坐标
 };
 
+// 表格填充支持的控件类型
+enum class widget_type :uint32_t {
+	wt_null,
+	wt_text,
+	wt_image,
+	wt_edit,
+	wt_color_btn,
+	wt_gradient_btn,
+	wt_radio_btn,
+	wt_checkbox_btn,
+	wt_switch_btn,
+	wt_progress,
+	wt_slider
+};
 
 
 
