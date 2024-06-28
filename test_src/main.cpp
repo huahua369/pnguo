@@ -15,6 +15,8 @@
 
 /*
 	todo
+	输入数据，自动创建控件、窗口
+
 	样式：
 		填充色、边框颜色、线粗、段数、段长
 		字体名、字号、颜色
@@ -537,7 +539,7 @@ int main()
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
 					form1->bind(listp);	// 绑定到新窗口	
-				 
+
 					form1->raise();
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
@@ -604,8 +606,8 @@ int main()
 		p->custom_layout = true;
 		p->fontsize = 16;
 
-		std::vector<std::string> cstr = { (char*)u8"名 \n称" ,(char*)u8"状\t态",(char*)u8"描述" };
-		std::vector<std::string> cstr1 = { (char*)u8"checkbox 🍇测试1" ,(char*)u8"checkbox ✅测试2",(char*)u8"checkbox 测试3" };
+		std::vector<std::string> cstr = { (char*)u8"名称" ,(char*)u8"状\t态",(char*)u8"描述" };
+		std::vector<std::string> cstr1 = { (char*)u8"checkbox 🍇测试1" ,(char*)u8"checkbox ✅测试2",(char*)u8"" };
 		std::vector<std::string> cstr2 = { (char*)u8"radio 🍍测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
 		width = 150;
 		std::vector<color_btn*> cbv = new_label(p, cstr, width, [](void* ptr, int clicks)
@@ -684,10 +686,11 @@ int main()
 			{
 				print_time a("load svg");
 				cairo_t* cr = cairo_create(blsur);
-				//render_svg(cr, bl, {}, { 2.0,2.0 }, 0);
-				render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
-				render_svg(cr, bl2, { 400,bl->height + 100 }, { 1.0,1.0 }, 0);
+				render_svg(cr, bl, {}, { 1.0,1.0 }, 0, 0);// "#g21571");
+				//render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
+				//render_svg(cr, bl2, { 400,bl->height + 100 }, { 1.0,1.0 }, 0);
 				svginc = 1;
+				cairo_destroy(cr);
 				p->set_update();
 			});
 		th.detach();

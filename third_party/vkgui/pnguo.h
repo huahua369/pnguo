@@ -1065,7 +1065,7 @@ struct widget_base
 	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
 	int rounding = 4;		// 圆角
 	float thickness = 1.0;	// 边框线粗
-	std::function<void(void* p, int type, const glm::vec2& mps)> cb;	//通用事件处理
+	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
 	std::function<void(void* p, int clicks)> click_cb;					//点击事件
 	layout_text_x* ltx = 0;
 	glm::ivec2 txtps = {};
@@ -1722,7 +1722,7 @@ svg_cx* new_svg_data(const void* str, size_t len, int dpi);
 void free_svg(svg_cx* svg);
 #if 1
 void render_svg(cairo_t* cr, svg_cx* svg);
-void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle);
+void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id = 0);
 
 void set_color(cairo_t* cr, uint32_t rgba);
 void set_color_bgr(cairo_t* cr, uint32_t c);

@@ -7025,7 +7025,7 @@ public:
 	glm::vec2 get_pos_id(const char* id);
 	void get_bixbuf(const char* id);
 	void draw(cairo_t* cr);
-	void draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle);
+	void draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id);
 };
 
 svg_dp::svg_dp(int dpi)
@@ -7090,7 +7090,7 @@ void svg_dp::draw(cairo_t* cr)
 {
 	rsvg_handle_render_cairo(handle, cr);//渲染到窗口，有刷新事件需要重新执行，这里只渲染一次 
 }
-void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle)
+void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id)
 {
 	//get_bixbuf(0);
 	//print_time ad("draw dc");cairo_surface_t* surface, 
@@ -7100,7 +7100,20 @@ void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, dou
 	if (angle > 0)
 		cairo_rotate(cr, angle);
 	cairo_translate(cr, pos.x, pos.y);
-	rsvg_handle_render_cairo(handle, cr);//渲染到窗口，有刷新事件需要重新执行，这里只渲染一次
+	if (id && *id)
+	{
+		RsvgPositionData poss = {};
+		if (!rsvg_handle_get_position_sub(handle, &poss, id)) {
+			return;
+		}
+		/* Move the whole thing to 0, 0 so the object to export is at the origin */
+		cairo_translate(cr, -poss.x, -poss.y);
+		rsvg_handle_render_cairo_sub(handle, cr, id);
+	}
+	else
+	{
+		rsvg_handle_render_cairo(handle, cr);//渲染到窗口，有刷新事件需要重新执行，这里只渲染一次
+	}
 	//cairo_surface_flush(surface);
 	cairo_restore(cr);
 }
@@ -7127,12 +7140,12 @@ void render_svg(cairo_t* cr, svg_cx* svg)
 		t->draw(cr);
 	}
 }
-void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle)
+void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id)
 {
 	if (cr && svg)
 	{
 		auto t = (svg_dp*)svg;
-		t->draw(cr, pos, scale, angle);
+		t->draw(cr, pos, scale, angle, id);
 	}
 }
 #endif // 1
@@ -16495,10 +16508,12 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			r1 = 1;
 			p->cursor = (int)cursor_st::cursor_arrow;
 			_hover = true;
+			//printf("_hover\n");
 		}
 		else {
 			_bst &= ~(int)BTN_STATE::STATE_HOVER;
 			_hover = false;
+			//printf("on_leave\n");
 		}
 	}
 	event_wts.clear();
@@ -16540,9 +16555,16 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 		for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 			auto pw = (widget_base*)*it;
-			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue;
+			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue; 
+			auto vpos = sps * pw->hscroll;
+			auto p = e->m;
+			glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
+			bool isd = pw->cmpos == mps;
+			pw->cmpos = mps;
 			pw->bst &= ~(int)BTN_STATE::STATE_HOVER;
 			// 鼠标离开
+			pw->on_mevent((int)event_type2::on_leave, mps);
+			if (pw->mevent_cb) { pw->mevent_cb(pw, (int)event_type2::on_leave, mps); }
 		}
 	}
 
@@ -17154,17 +17176,17 @@ bool widget_on_move(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2
 			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
 			{
 				wp->on_mevent((int)event_type2::on_move, mps);
-				if (wp->cb)
+				if (wp->mevent_cb)
 				{
-					wp->cb(wp, (int)event_type2::on_move, mps);
+					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
 				}
 			}
 			if (wp->bst & (int)BTN_STATE::STATE_ACTIVE) {
 				auto dps = mps - wp->curpos;
 				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
-				if (wp->cb)
+				if (wp->mevent_cb)
 				{
-					wp->cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
 				}
 			}
 		}
@@ -17198,22 +17220,22 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 					wp->curpos = mps - (glm::ivec2)wp->pos;
 					wp->cks = 0;
 					wp->on_mevent((int)event_type2::on_down, mps);
-					if (wp->cb) { wp->cb(wp, (int)event_type2::on_down, mps); }
+					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
 				}
 				else {
 					if ((wp->bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
 					{
 						wp->cks = p->clicks;
 						wp->on_mevent((int)event_type2::on_up, mps);
-						if (wp->cb) {
-							wp->cb(wp, (int)event_type2::on_up, mps);
+						if (wp->mevent_cb) {
+							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
 						}
 						int tc = (int)event_type2::on_click; //左键单击
 						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
 						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
 						wp->on_mevent(tc, mps);
-						if (wp->cb) {
-							wp->cb(wp, tc, mps);
+						if (wp->mevent_cb) {
+							wp->mevent_cb(wp, tc, mps);
 						}
 						if (wp->click_cb)
 						{
@@ -17228,6 +17250,9 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
 			wp->on_mevent((int)event_type2::mouse_up, mps);
+			if (wp->mevent_cb) {
+				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
+			}
 		}
 	}
 	break;
@@ -17236,8 +17261,8 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 		auto p = e->w;
 		glm::vec2 mps = { p->x, p->y };
 		ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
-		if (wp->cb) {
-			wp->cb(wp, (int)event_type2::on_scroll, mps);
+		if (wp->mevent_cb) {
+			wp->mevent_cb(wp, (int)event_type2::on_scroll, mps);
 		}
 	}
 	break;
