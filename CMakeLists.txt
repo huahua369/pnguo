@@ -3,7 +3,7 @@
 #
 cmake_minimum_required (VERSION 3.8)
 set(VCPKG_TARGET_TRIPLET x64-windows-static)
-set(CMAKE_TOOLCHAIN_FILE "C:/sdk/vcpkg/scripts/buildsystems/vcpkg.cmake")
+set(CMAKE_TOOLCHAIN_FILE "E:/sdk/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
 IF(WIN32)
 set(CMAKE_CXX_STANDARD 23)

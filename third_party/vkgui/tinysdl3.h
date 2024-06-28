@@ -2,6 +2,7 @@
 #include <string>
 #include <set>
 #include <mutex>
+#include <queue>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,7 +67,7 @@ public:
 	font_rctx* font_ctx = 0;
 	SDL_Cursor** system_cursor = 0;	// 系统光标
 	Timer* fct = {};
-
+	std::queue<form_x*> reforms;
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
 	int _fps = 60;
@@ -85,6 +86,7 @@ public:
 	void set_syscursor(int type);
 	void set_defcursor(uint32_t t);
 	void remove(form_x* f);
+	void clearf();
 private:
 	void get_event();
 
@@ -148,6 +150,7 @@ public:
 	bool capture_type = true;
 	bool close_type = true;		// 关闭按钮风格：true关闭退出，false则隐藏窗口
 	bool _HitTest = true;
+	bool _ref = false;
 public:
 	form_x();
 	~form_x();

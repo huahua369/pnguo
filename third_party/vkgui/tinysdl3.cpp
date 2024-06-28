@@ -489,8 +489,26 @@ void app_cx::set_defcursor(uint32_t t)
 
 void app_cx::remove(form_x* fw)
 {
-	auto& v = forms;
-	v.erase(std::remove(v.begin(), v.end(), fw), v.end());
+	if (fw)
+	{
+		auto& v = forms;
+		v.erase(std::remove(v.begin(), v.end(), fw), v.end());
+		if (!fw->_ref)
+		{
+			fw->_ref = 1;
+			reforms.push(fw);
+		}
+	}
+}
+
+void app_cx::clearf()
+{
+	for (; reforms.size();) {
+		auto it = reforms.front();
+		if (it)
+			delete it;
+		reforms.pop();
+	}
 }
 
 void app_cx::get_event()
@@ -508,6 +526,7 @@ void app_cx::get_event()
 		}
 		call_cb(&e);
 	}
+	clearf();
 	if (forms.empty())
 	{
 		prev_time = 0;
@@ -843,9 +862,10 @@ form_x::~form_x()
 	events_a = 0;
 	for (auto it : childfs) {
 		it->_ptr = 0;
-		delete it;
+		app->remove(it);
 	}
 	childfs.clear();
+	_ref = 1;
 	app->remove(this);
 	destroy();
 	sdlfree(clipstr); clipstr = 0;
@@ -1065,7 +1085,7 @@ void form_x::hide() {
 void form_x::raise()
 {
 	SDL_RaiseWindow(_ptr);
-} 
+}
 bool form_x::get_visible()
 {
 	auto f = SDL_GetWindowFlags(_ptr);
@@ -1808,12 +1828,12 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w };
 		SDL_SetTextInputRect(&rect);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
