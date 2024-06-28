@@ -170,12 +170,14 @@ public:
 	// 显示/隐藏窗口
 	void show();
 	void hide();
-	void raise();
+	// 置顶窗口
+	void raise(); 
 	bool get_visible();
 	// 开始输入法
 	void start_text_input();
 	void stop_text_input();
 	bool text_input_active();
+	// 设置输入法坐标
 	void set_ime_pos(const glm::ivec4& r);
 	// 禁用窗口鼠标键盘操作。模态窗口用
 	void enable_window(bool bEnable);
@@ -200,6 +202,7 @@ public:
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
 	void set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply = false);
 	void free_texture(SDL_Texture* p);
+	// 获取纹理vk image
 	void* get_texture_vk(SDL_Texture* p);
 	// 添加纹理渲染。target = 0背景层，1上层
 	void push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target);

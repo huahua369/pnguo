@@ -1065,7 +1065,7 @@ void form_x::hide() {
 void form_x::raise()
 {
 	SDL_RaiseWindow(_ptr);
-}
+} 
 bool form_x::get_visible()
 {
 	auto f = SDL_GetWindowFlags(_ptr);
