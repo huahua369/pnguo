@@ -1067,7 +1067,7 @@ struct widget_base
 	int rounding = 4;		// 圆角
 	float thickness = 1.0;	// 边框线粗
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
-	std::function<void(void* p, int clicks)> click_cb;					//点击事件
+	std::function<void(void* p, int clicks)> click_cb;						//点击事件
 	layout_text_x* ltx = 0;
 	glm::ivec2 txtps = {};
 	glm::ivec2 txtps2 = {};
@@ -1080,6 +1080,7 @@ struct widget_base
 	bool _absolute = false;		// true绝对坐标，false布局计算
 	bool has_drag = false;	// 是否有拖动事件
 	bool _autofree = false;
+	bool has_hover_sc = 0;	// 滚动在父级接收
 	//event_type2
 	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
@@ -1749,11 +1750,16 @@ glm::ivec4 get_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, co
 void draw_text(cairo_t* cr, const char* str, const glm::ivec4& et, uint32_t text_color);
 // box渲染对齐文本
 glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, uint32_t text_color, const char* family, int font_size);
-
+#ifndef key_def_data
+#define key_def_data 1024
+#define key_def_data_iptr 1025
+#endif
 cairo_surface_t* new_image_cr(image_ptr_t* img);
 cairo_surface_t* new_image_cr(const glm::ivec2& size);
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
 void free_image_cr(cairo_surface_t* image);
+void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void (*destroy_func)(void* data));
+void* image_get_ud(cairo_surface_t* p, uint64_t key);
 void image_save_png(cairo_surface_t* cr, const char* fn);
 glm::ivec2 get_surface_size(cairo_surface_t* p);
 glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1);
@@ -1854,9 +1860,23 @@ enum class widget_type :uint32_t {
 	wt_progress,
 	wt_slider
 };
+// 列表渲染
+class rlistview_cx
+{
+public:
+	glm::ivec2 pos = {}, size = { -1,-1 };	// 坐标、视图大小
+	std::vector<cairo_surface_t*> imagelist;
+public:
+	rlistview_cx();
+	~rlistview_cx();
+	size_t add_image(const std::string& fn);
+	// 渲染输入滚动条坐标
+	void draw(cairo_t* cr, const glm::ivec2& scroll_pos);
 
+	void clear_image();
+private:
 
-
+};
 
 
 // 列表渲染

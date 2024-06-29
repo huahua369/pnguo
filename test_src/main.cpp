@@ -686,8 +686,8 @@ int main()
 			{
 				print_time a("load svg");
 				cairo_t* cr = cairo_create(blsur);
-				//render_svg(cr, bl, {}, { 1.0,1.0 }, 0, 0);// "#g14475");
-				render_svg(cr, bl, {}, { 1.0,1.0 }, 0, "#g14475");
+				render_svg(cr, bl, {}, { 1.0,1.0 }, 0, 0);// "#g14475");
+				//render_svg(cr, bl, {}, { 1.0,1.0 }, 0, "#g14475");
 				//render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
 				//render_svg(cr, bl2, { 400,bl->height + 100 }, { 1.0,1.0 }, 0);
 				svginc = 1;
@@ -697,7 +697,7 @@ int main()
 		th.detach();
 		p->draw_back_cb = [=](cairo_t* cr)
 			{
-				print_time a("draw svg");
+				//print_time a("draw svg");
 				cairo_as _cas(cr);
 				cairo_translate(cr, 6, 6);
 				draw_rectangle(cr, { 0,0,cs.x,cs.y }, 4);
