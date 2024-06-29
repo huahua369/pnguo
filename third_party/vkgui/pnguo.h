@@ -22,6 +22,10 @@
 typedef struct _PangoContext PangoContext;
 struct input_state_t;
 
+#ifndef BIT_INC
+#define BIT_INC(x) (1<<x)
+#endif
+
 namespace pg
 {
 	std::string to_string(double _Val);
@@ -1042,6 +1046,36 @@ private:
 
 #endif // NO_FLEX_CX
 
+class grid_view
+{
+public:
+	// 行列的宽高
+	std::vector<glm::vec2> _column_width;	// 列宽，x宽，y为本列坐标缓存
+	std::vector<glm::vec2> _row_height;		// 行高，x高，y为本行坐标缓存
+	glm::vec2 _pos = {};
+	glm::vec2 _size = {};
+	bool valid = true;
+public:
+	grid_view();
+	~grid_view();
+	// 设置列行数量
+	void set_size(size_t x, size_t y);
+	void add_col(int width);
+	void add_row(int height);
+	// 设置列宽，idx为列索引，v宽度
+	void set_width(size_t idx, float v);
+	// 设置行高，idx为列索引，v行高
+	void set_height(size_t idx, float v);
+	// 获取总大小
+	glm::vec2 get_size();
+	// 获取指定坐标单元格的坐标/大小。
+	glm::vec4 get(const glm::ivec2& pos);
+private:
+
+};
+
+
+
 class plane_cx;
 // 判断拾取
 struct pickup_t
@@ -1069,8 +1103,7 @@ struct widget_base
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
 	std::function<void(void* p, int clicks)> click_cb;						//点击事件
 	layout_text_x* ltx = 0;
-	glm::ivec2 txtps = {};
-	glm::ivec2 txtps2 = {};
+
 	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;				// 鼠标点击状态
@@ -1178,11 +1211,11 @@ enum class uTheme :uint8_t {
 */
 enum class BTN_STATE :uint8_t
 {
-	STATE_NOMAL = 1,
-	STATE_HOVER = 2,
-	STATE_ACTIVE = 4,
-	STATE_FOCUS = 8,
-	STATE_DISABLE = 0x10,
+	STATE_NOMAL = BIT_INC(0),
+	STATE_HOVER = BIT_INC(1),
+	STATE_ACTIVE = BIT_INC(2),
+	STATE_FOCUS = BIT_INC(3),
+	STATE_DISABLE = BIT_INC(4),
 };
 
 // todo图片按钮
@@ -1597,35 +1630,6 @@ color_btn* add_label(const std::string& label, const glm::ivec2& size, int idx);
 progress_tl* add_progress(const std::string& format, const glm::ivec2& size, double v);
 colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
 */
-
-class grid_view
-{
-public:
-	// 行列的宽高
-	std::vector<glm::vec2> _column_width;	// 列宽，x宽，y为本列坐标缓存
-	std::vector<glm::vec2> _row_height;		// 行高，x高，y为本行坐标缓存
-	glm::vec2 _pos = {};
-	glm::vec2 _size = {};
-	bool valid = true;
-public:
-	grid_view();
-	~grid_view();
-	// 设置列行数量
-	void set_size(size_t x, size_t y);
-	void add_col(int width);
-	void add_row(int height);
-	// 设置列宽，idx为列索引，v宽度
-	void set_width(size_t idx, float v);
-	// 设置行高，idx为列索引，v行高
-	void set_height(size_t idx, float v);
-	// 获取总大小
-	glm::vec2 get_size();
-	// 获取指定坐标单元格的坐标/大小。
-	glm::vec4 get(const glm::ivec2& pos);
-private:
-
-};
-
 
 
 // 列表视图控件。显示文本、image_ptr_t、svg_cx

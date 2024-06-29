@@ -17,7 +17,9 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-#define ADBIT(x) (1<<x)
+#ifndef BIT_INC
+#define BIT_INC(x) (1<<x)
+#endif
 struct image_raw_x
 {
 	int w = 0, h = 0;
@@ -174,7 +176,7 @@ public:
 	void show();
 	void hide();
 	// 置顶窗口
-	void raise(); 
+	void raise();
 	bool get_visible();
 	// 开始输入法
 	void start_text_input();
@@ -261,15 +263,15 @@ void set_col_u8();
 // 窗口属性
 enum form_flags_e
 {
-	ef_null = ADBIT(0),			// ef_default
-	ef_vulkan = ADBIT(1),		// vk渲染
-	ef_resizable = ADBIT(2),	// 可以拉伸大小
-	ef_transparent = ADBIT(3),	// 透明
-	ef_borderless = ADBIT(4),	// 无系统边框
-	ef_popup = ADBIT(5),		// 弹出式窗口，需要有父窗口
-	ef_tooltip = ADBIT(6),		// 工具提示窗口，需要有父窗口
-	ef_utility = ADBIT(7),		// 不出现在任务栏
-	ef_fullscreen = ADBIT(8),	// 全屏
+	ef_null = 0,			// ef_default
+	ef_fullscreen = BIT_INC(0),	// 全屏
+	ef_vulkan = BIT_INC(1),		// vk渲染
+	ef_resizable = BIT_INC(2),	// 可以拉伸大小
+	ef_transparent = BIT_INC(3),	// 透明
+	ef_borderless = BIT_INC(4),	// 无系统边框
+	ef_popup = BIT_INC(5),		// 弹出式窗口，需要有父窗口
+	ef_tooltip = BIT_INC(6),		// 工具提示窗口，需要有父窗口
+	ef_utility = BIT_INC(7),		// 不出现在任务栏
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息

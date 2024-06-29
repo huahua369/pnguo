@@ -16125,8 +16125,7 @@ checkbox_tl* plane_cx::add_checkbox(const glm::ivec2& size, const std::string& l
 		glm::vec4 rc = { 0, 0, 0, 0 };
 		glm::vec2 talign = { 0,0.5 };
 		if (label.size())
-		{
-			//	p->txtps = ltx->add_text(0, rc, talign, label.c_str(), label.size(), fontsize);
+		{ 
 		}
 		p->_autofree = true;
 	}
@@ -16146,8 +16145,7 @@ radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, 
 		glm::vec4 rc = { 0, 0, 0, 0 };
 		glm::vec2 talign = { 0,0.5 };
 		if (label.size())
-		{
-			//	p->txtps = ltx->add_text(0, rc, talign, label.c_str(), label.size(), fontsize);
+		{ 
 		}
 		p->_autofree = true;
 	}
@@ -16157,14 +16155,10 @@ radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, 
 edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, bool single_line) {
 	edit_tl* edit1 = new edit_tl();
 	if (edit1) {
-		auto ss = size;
-		//edit1->set_pos({ 0, 0 });
+		auto ss = size; 
 		edit1->set_size(ss);
 		edit1->set_single(single_line);
-		edit1->set_family(familys.c_str(), fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同
-		//edit1->set_family((char*)u8"Microsoft YaHei", 14);
-		//edit1->set_align_pos({ 4, 4 });
-		//edit1->set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
+		edit1->set_family(familys.c_str(), fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同		 
 		edit1->ppos = get_pos();
 		add_widget(edit1);
 		edit1->_autofree = true;
@@ -16206,8 +16200,7 @@ color_btn* plane_cx::add_label(const std::string& label, const glm::ivec2& size,
 	{
 		p->effect = uTheme::light;
 		p->light = 0;
-		p->text_align.x = 0;
-		//p->_disabled_events = true;
+		p->text_align.x = 0; 
 	}
 	return p;
 }
@@ -17559,11 +17552,6 @@ void radio_tl::draw(cairo_t* cr)
 			draw_radios(cr, &it, &style);
 			x++;
 		}
-		//if ((bst & (int)BTN_STATE::STATE_HOVER))
-		//{
-		//	draw_rectangle(cr, { 0,0,size.x,size.y }, style.radius * 0.2);
-		//	fill_stroke(cr, 0, 0x80ff8000, 1, 0);
-		//}
 	}
 }
 
