@@ -7102,7 +7102,9 @@ void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, dou
 	cairo_translate(cr, pos.x, pos.y);
 	if (id && *id)
 	{
+		RsvgDimensionData dim = {};
 		RsvgPositionData poss = {};
+		rsvg_handle_get_dimensions_sub(handle, &dim, id);
 		if (!rsvg_handle_get_position_sub(handle, &poss, id)) {
 			return;
 		}
@@ -16555,7 +16557,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 		for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 			auto pw = (widget_base*)*it;
-			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue; 
+			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue;
 			auto vpos = sps * pw->hscroll;
 			auto p = e->m;
 			glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
@@ -18634,6 +18636,27 @@ void slider_tl::draw(cairo_t* cr)
 
 
 
+// H in [0,360)
+// S, V, R, G, B in [0,1]
+glm::vec4 convertHSVtoRGB(const glm::vec4& hsv)
+{
+	double H = hsv.x * 360.0, S = hsv.y, V = hsv.z;
+	double R, G, B;
+	int Hi = int(floor(H / 60.)) % 6;
+	double f = H / 60. - Hi;
+	double p = V * (1 - S);
+	double q = V * (1 - f * S);
+	double t = V * (1 - (1 - f) * S);
+	switch (Hi) {
+	case 0: R = V, G = t, B = p; break;
+	case 1: R = q, G = V, B = p; break;
+	case 2: R = p, G = V, B = t; break;
+	case 3: R = p, G = q, B = V; break;
+	case 4: R = t, G = p, B = V; break;
+	case 5: R = V, G = p, B = q; break;
+	}
+	return { R,G,B,hsv.w };
+}
 
 
 
@@ -18708,6 +18731,7 @@ uint32_t colorpick_tl::get_color()
 {
 	glm::vec4 hc = {};
 	HSVtoRGB(hsv, hc);
+	//auto hc1 = convertHSVtoRGB(hsv);
 	glm::u8vec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
 	return *((uint32_t*)&c);
 }
