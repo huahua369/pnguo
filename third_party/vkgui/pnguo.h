@@ -1865,14 +1865,18 @@ class rlistview_cx
 {
 public:
 	glm::ivec2 pos = {}, size = { -1,-1 };	// 坐标、视图大小
-	std::vector<cairo_surface_t*> imagelist;
+	grid_view gv;							// 网格
+	std::vector<cairo_surface_t*> imagelist;// 图标列表
+	void* _data = 0;	// 渲染数据 
 public:
 	rlistview_cx();
 	~rlistview_cx();
+	void set_data(void* d);
+	// 图片/svg
 	size_t add_image(const std::string& fn);
 	// 渲染输入滚动条坐标
 	void draw(cairo_t* cr, const glm::ivec2& scroll_pos);
-
+	// 清空图片
 	void clear_image();
 private:
 

@@ -18807,6 +18807,11 @@ rlistview_cx::~rlistview_cx()
 	clear_image();
 }
 
+void rlistview_cx::set_data(void* d)
+{
+	_data = d;
+}
+
 size_t rlistview_cx::add_image(const std::string& fn)
 {
 	size_t r = imagelist.size();
