@@ -869,6 +869,7 @@ form_x::~form_x()
 	app->remove(this);
 	destroy();
 	sdlfree(clipstr); clipstr = 0;
+	_ptr = 0;
 }
 
 void form_x::init_dragdrop()
@@ -1292,7 +1293,7 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 			if (pw->close_type || cbr == 1)
 			{
 				pw->destroy();
-				delete pw;
+				pw->app->remove(pw); 
 			}
 			else {
 				pw->hide();
@@ -1344,9 +1345,13 @@ void form_x::on_size(const glm::ivec2& ss)
 void form_x::destroy()
 {
 	if (_ptr)
+	{
 		SDL_DestroyWindow(_ptr); _ptr = 0;
+	}
 	if (renderer)
+	{
 		SDL_DestroyRenderer(renderer); renderer = 0;
+	}
 }
 
 void form_x::update(float delta)
@@ -1552,11 +1557,14 @@ void form_x::new_tool_tip(const glm::ivec2& pos, const void* str)
 bool form_x::hittest(const glm::ivec2& pos)
 {
 	_HitTest = false;
-	for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
+	if(_ptr)
 	{
-		if ((*it)->visible && (*it)->hittest(pos))
+		for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
 		{
-			_HitTest = true; break;
+			if ((*it)->visible && (*it)->hittest(pos))
+			{
+				_HitTest = true; break;
+			}
 		}
 	}
 	return _HitTest;

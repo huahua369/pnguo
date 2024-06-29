@@ -16125,7 +16125,7 @@ checkbox_tl* plane_cx::add_checkbox(const glm::ivec2& size, const std::string& l
 		glm::vec4 rc = { 0, 0, 0, 0 };
 		glm::vec2 talign = { 0,0.5 };
 		if (label.size())
-		{ 
+		{
 		}
 		p->_autofree = true;
 	}
@@ -16145,7 +16145,7 @@ radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, 
 		glm::vec4 rc = { 0, 0, 0, 0 };
 		glm::vec2 talign = { 0,0.5 };
 		if (label.size())
-		{ 
+		{
 		}
 		p->_autofree = true;
 	}
@@ -16155,7 +16155,7 @@ radio_tl* plane_cx::add_radio(const glm::ivec2& size, const std::string& label, 
 edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, bool single_line) {
 	edit_tl* edit1 = new edit_tl();
 	if (edit1) {
-		auto ss = size; 
+		auto ss = size;
 		edit1->set_size(ss);
 		edit1->set_single(single_line);
 		edit1->set_family(familys.c_str(), fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同		 
@@ -16200,7 +16200,7 @@ color_btn* plane_cx::add_label(const std::string& label, const glm::ivec2& size,
 	{
 		p->effect = uTheme::light;
 		p->light = 0;
-		p->text_align.x = 0; 
+		p->text_align.x = 0;
 	}
 	return p;
 }
@@ -16553,14 +16553,21 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		else
 			event_wts1.push_back(*it);
 	}
-	{
+	do {
+		bool isv = devent_type_e::mouse_wheel_e == t;
+		if (isv) {
+			if (!_hover)
+			{
+				break;
+			}
+		}
 		if (horizontal) {
 			widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
 		}
-		if (vertical && !ep->ret) {
+		if (vertical && (!ep->ret)) {
 			widget_on_event(vertical, type, ep, ppos);// 垂直滚动条 
 		}
-	}
+	} while (0);
 	widget_base* hpw = 0;
 	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 		auto pw = (widget_base*)*it;
@@ -18346,8 +18353,10 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	break;
 	case event_type2::on_scroll:
 	{
+		printf("scroll\t%p\n", this);
 		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
 		{
+			printf("on_scroll\t%p\n", this);
 			auto pts = (-mps.y * _pos_width) + _offset;
 			auto st = ss[_dir] - tsm;
 			if (limit)
