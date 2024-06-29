@@ -1869,9 +1869,11 @@ class rlistview_cx
 {
 public:
 	glm::ivec2 pos = {}, size = { -1,-1 };	// 坐标、视图大小
+
 	grid_view gv;							// 网格
 	std::vector<cairo_surface_t*> imagelist;// 图标列表
-	void* _data = 0;	// 渲染数据 
+	void* _data = 0;						// 渲染数据 
+	layout_text_x* ltx = 0;					// 文本渲染管理
 public:
 	rlistview_cx();
 	~rlistview_cx();
