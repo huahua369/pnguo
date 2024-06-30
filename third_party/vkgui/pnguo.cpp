@@ -1019,6 +1019,54 @@ void atlas_cx::clear() {
 }
 
 
+mesh2d_cx::mesh2d_cx()
+{
+}
+
+mesh2d_cx::~mesh2d_cx()
+{
+}
+
+void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip)
+{
+	auto ps = vtxs.size();
+	auto ix = idxs.size();
+	auto ic = vt_index.size();
+	vtxs.resize(ps + vertex.size());
+	idxs.resize(ix + vt_index.size());
+	auto& cd = cmd_data;
+	if (cd.empty())
+	{
+		cd.push_back({});
+	}
+	auto dt = &cd[cd.size() - 1];
+	if (dt->texid != user_image && dt->clip_rect != clip)
+	{
+		if (dt->elemCount > 0)
+			cd.push_back({});
+		dt = &cd[cd.size() - 1];
+		dt->texid = user_image;
+		dt->clip_rect = clip;
+		dt->vtxOffset = ps;
+		dt->idxOffset = 0;
+		dt->elemCount = ic;
+		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
+		memcpy(idxs.data() + ps, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
+	}
+	else
+	{
+		// 合批
+		dt->elemCount += ic;
+		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
+		auto pidx = idxs.data() + ix;
+		memcpy(pidx, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
+		for (size_t i = 0; i < ic; i++)
+		{
+			pidx[i] += ix;
+		}
+	}
+
+}
 
 canvas_atlas::canvas_atlas()
 {
@@ -1250,7 +1298,7 @@ struct vidptr_t {
 	size_t vc = 0;
 	size_t ic = 0;
 };
-vidptr_t PrimReserve(canvas_atlas* ctx, int idx_count, int vtx_count)
+vidptr_t PrimReserve(mesh2d_cx* ctx, int idx_count, int vtx_count)
 {
 	auto dc = &ctx->cmd_data[ctx->cmd_data.size() - 1];
 	dc->elemCount += idx_count;
@@ -1322,10 +1370,10 @@ void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color3
 	if (p->sliced.x < 1)
 	{
 		glm::vec2 a1 = pos, b1 = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_b{ uv.z, uv.w };
-		auto ps = vtxs.size();
-		auto ix = idxs.size();
+		auto ps = _mesh.vtxs.size();
+		auto ix = _mesh.idxs.size();
 		auto ic = 6;
-		auto& cd = cmd_data;
+		auto& cd = _mesh.cmd_data;
 		if (cd.empty())
 		{
 			cd.push_back({});
@@ -1343,7 +1391,7 @@ void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color3
 			dt->idxOffset = 0;
 			dt->elemCount = 0;
 		}
-		auto od = PrimReserve(this, 6, 4);
+		auto od = PrimReserve(&_mesh, 6, 4);
 		PrimRectUV(a1, b1, uv_a, uv_b, color3, od.vsize, od.vtx, od.idx);
 	}
 	else
@@ -1354,9 +1402,9 @@ void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color3
 }
 void canvas_atlas::clear()
 {
-	cmd_data.clear();
-	vtxs.clear();
-	idxs.clear();
+	_mesh.cmd_data.clear();
+	_mesh.vtxs.clear();
+	_mesh.idxs.clear();
 	_clip_rect = viewport;
 	_clip_rect.x = _clip_rect.y = 0;
 }
@@ -1487,43 +1535,8 @@ void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm:
 		{{x + width - right, y + height}, {1.0f - suv.z, 1.0f}, col},
 #endif
 	};
-	auto ps = vtxs.size();
-	auto ix = idxs.size();
-	auto ic = vt_index.size();
-	vtxs.resize(ps + vertex.size());
-	idxs.resize(ix + vt_index.size());
-	auto& cd = cmd_data;
-	if (cd.empty())
-	{
-		cd.push_back({});
-	}
-	auto dt = &cd[cd.size() - 1];
-	auto clip = _clip_rect;
-	if (dt->texid != user_image && dt->clip_rect != clip)
-	{
-		if (dt->elemCount > 0)
-			cd.push_back({});
-		dt = &cd[cd.size() - 1];
-		dt->texid = user_image;
-		dt->clip_rect = clip;
-		dt->vtxOffset = ps;
-		dt->idxOffset = 0;
-		dt->elemCount = ic;
-		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
-		memcpy(idxs.data() + ps, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
-	}
-	else
-	{
-		// 合批
-		dt->elemCount += ic;
-		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
-		auto pidx = idxs.data() + ix;
-		memcpy(pidx, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
-		for (size_t i = 0; i < ic; i++)
-		{
-			pidx[i] += ix;
-		}
-	}
+
+	_mesh.add(vertex, vt_index, user_image, _clip_rect);
 
 	return;
 }
@@ -1634,7 +1647,7 @@ void* bspline_ct::new_bspline(glm::vec3* cp, int n, size_t degree) {
 		dim = 3;
 	}
 	return p;
-}
+		}
 void* bspline_ct::new_bspline(glm::dvec3* cp, int n, size_t degree) {
 	assert(!ptr);
 	if (!cp || n < 3 || degree < 2)return 0;
@@ -1659,9 +1672,9 @@ void* bspline_ct::new_bspline(glm::dvec3* cp, int n, size_t degree) {
 		p->setControlPoints(ctrlp);
 		ptr = p;
 		dim = 3;
-	}
+		}
 	return p;
-}
+	}
 // nurbs
 void* bspline_ct::new_bspline(glm::vec4* cp, int n, size_t degree)
 {
@@ -1746,9 +1759,9 @@ std::vector<glm::vec3> bspline_ct::sample3(int m)
 			auto result = glm::vec3(sm[i], sm[i + 1], sm[i + 2]); i += 2;
 			ot.push_back(result);
 		}
-	}
-	return ot;
 }
+	return ot;
+	}
 std::vector<glm::vec4> bspline_ct::sample4(int m)
 {
 	std::vector<glm::vec4> ot;
@@ -3336,7 +3349,7 @@ void path_v::set_mat(const glm::mat3& m)
 		if (it.type == vtype_e::e_vcurve)
 		{
 			v2m3(it.c, &m);
-		}
+}
 		if (it.type == path_v::vtype_e::e_vcubic)
 		{
 			v2m3(it.c, &m);
@@ -5246,7 +5259,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 				auto cy2 = p2.y + 2.0f / 3.0f * (p1.y - p2.y);
 				c1 = { cx1,cy1 }; c2 = { cx2,cy2 };
 #endif
-			}
+		}
 			//	C0 = Q0
 			//	C1 = Q0 + (2 / 3) (Q1 - Q0)
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
@@ -5305,7 +5318,7 @@ void draw_path_v(cairo_t* cr, path_v* p, style_path_t* st)
 	tf.y = p->_pos.y + p->_baseline;
 	glm::vec2 pos = {}, sc = {};
 	draw_path0(cr, &tf, st, pos, sc);
-}
+		}
 void canvas_dev::draw_path(path_v* p, style_path_t* st)
 {
 	if (!p || !st || p->_data.empty())return;
@@ -6054,7 +6067,7 @@ layout_px::~layout_px()
 {
 	if (fgp)
 		g_object_unref(fgp);
-}
+	}
 
 layout_px create_pango_layout(const char* str, int fs)
 {
@@ -9901,8 +9914,8 @@ const char* font_t::get_glyph_index_u8(const char* u8str, int* oidx, font_t** re
 				*renderFont = it;
 				*oidx = g;
 				break;
-			}
-		}
+}
+}
 	}
 	return str;
 }
@@ -12517,13 +12530,13 @@ std::vector<font_t*> font_imp::add_font_file(const std::string& fn, std::vector<
 			{
 				fdi->vname.insert(it->_name);
 			}
-		}
+	}
 		else {
 			delete fdi;
 		}
-	}
-	return ret;
 }
+	return ret;
+	}
 
 std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool iscp, std::vector<std::string>* pname, int* rc)
 {
@@ -13215,7 +13228,7 @@ flex_item* flex_item::init()
 		item->children->clear();
 	item->should_order_children = false;
 	return item;
-}
+	}
 
 
 void flex_item::item_add(flex_item* child)
@@ -14035,7 +14048,7 @@ void text_ctx_cx::set_size(const glm::ivec2& ss)
 		if (sur)
 		{
 			cairo_surface_destroy(sur);
-		}
+	}
 		dtimg.resize(size.x * size.y);
 		sur = cairo_image_surface_create_for_data((unsigned char*)dtimg.data(), CAIRO_FORMAT_ARGB32, size.x, size.y, size.x * sizeof(int));
 		cacheimg = {};
@@ -14045,7 +14058,7 @@ void text_ctx_cx::set_size(const glm::ivec2& ss)
 		cacheimg.type = 1;
 		cacheimg.valid = 1;
 		valid = true;
-	}
+}
 }
 
 void text_ctx_cx::set_desc(const char* str)

@@ -195,9 +195,7 @@ public:
 private:
 
 };
-
-// 图集画布
-class canvas_atlas
+class mesh2d_cx
 {
 public:
 	struct draw_cmd_c
@@ -207,7 +205,23 @@ public:
 		uint32_t vtxOffset = 0;
 		uint32_t idxOffset = 0;
 		uint32_t elemCount = 0;
-	};
+	};	
+	std::vector<draw_cmd_c> cmd_data;
+	std::vector<vertex_v2> vtxs;
+	std::vector<int> idxs;
+public:
+	mesh2d_cx();
+	~mesh2d_cx();
+
+	void add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip);
+private:
+
+};
+
+// 图集画布
+class canvas_atlas
+{
+public: 
 	struct image_rs
 	{
 		image_ptr_t* img = 0;
@@ -215,9 +229,7 @@ public:
 		glm::ivec4 rect = { 0,0,-1,-1 };	// *区域/坐标大小
 		glm::ivec4 sliced = {};				// 九宫格渲染 left top right bottom 
 	};
-	std::vector<draw_cmd_c> cmd_data;
-	std::vector<vertex_v2> vtxs;
-	std::vector<int> idxs;
+	mesh2d_cx _mesh;
 
 	std::vector<atlas_cx*> _atlas_cx;	// 显示的图集
 	std::vector<atlas_t*> _atlas_t;		// 显示的图集

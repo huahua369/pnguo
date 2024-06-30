@@ -91,6 +91,7 @@ namespace pce {
 		return 0;
 	}
 
+#ifdef _WIN32
 	bool windowColorKey(SDL_Window* window, COLORREF colorKey) {
 		HWND hWnd = (HWND)get_windowptr(window);
 
@@ -166,7 +167,7 @@ namespace pce {
 		//PostMessageW(window, WM_NCPAINT, 0, 0);
 		return hr;
 	}
-
+#endif
 
 }//!pce
 
@@ -440,7 +441,7 @@ void app_cx::sleep_ms(int ms)
 void app_cx::set_fps(int n) {
 	if (n > 0)
 	{
-		_fps = n;
+		_fps = n; fms = 1000.0 / n;
 		fct->set_fps(n);
 	}
 }
@@ -508,26 +509,29 @@ void app_cx::clearf()
 	}
 }
 
-void app_cx::get_event()
+int app_cx::get_event()
 {
 	SDL_Event e = {};
+	int64_t ts = 0;
 	while (SDL_PollEvent(&e) != 0)
 	{
-		switch (e.type) {
-		case SDL_EVENT_QUIT:
+		if (e.type == SDL_EVENT_KEY_DOWN/* && e.key.repeat*/)
 		{
-			break;
+			SDL_SetEventEnabled(SDL_EVENT_KEY_DOWN, 0);
+			ts = 2;
 		}
-		default:
-			break;
+		if (e.type == SDL_EVENT_KEY_UP) {
+			SDL_SetEventEnabled(SDL_EVENT_KEY_DOWN, 1);
 		}
 		call_cb(&e);
+		break;
 	}
 	clearf();
 	if (forms.empty())
 	{
 		prev_time = 0;
 	}
+	return ts;
 }
 
 int app_cx::run_loop(int t)
@@ -550,8 +554,8 @@ int app_cx::run_loop(int t)
 			}
 		}
 		prev_time = curr_time;
-		get_event();
-		if (_fps > 0)
+		int gev = get_event();
+		if (_fps > 0 && gev < 1)
 		{
 			auto kt = (fct->get_time() + fct->extra_time);
 			do {
@@ -1105,7 +1109,16 @@ void et2key(const SDL_Event* e, keyboard_et* ekm)
 	ekm->mod = e->key.keysym.mod;                 /**< current key modifiers */
 	ekm->state = e->key.state;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
 	ekm->repeat = e->key.repeat;       /**< Non-zero if this is a key repeat */
+	static int64_t ts = 0, ts1 = 0;
 
+	if (ekm->repeat > 0) {
+		ts += (e->button.timestamp - ts1) * 0.000001;
+		ekm->repeat = ekm->repeat;
+		printf("ms: %d\n", ts); ts = 0; ts1 = e->button.timestamp;
+	}
+	else {
+		ts = 0; ts1 = e->button.timestamp;
+	}
 	int f1 = SDLK_F1;
 	int ms = SDL_GetModState();
 	static int kcs[] = { SDLK_END, SDLK_DOWN, SDLK_PAGEDOWN, SDLK_LEFT, 0, SDLK_RIGHT, SDLK_HOME, SDLK_UP, SDLK_PAGEUP, SDLK_INSERT, SDLK_DELETE };
@@ -1405,14 +1418,14 @@ void form_x::update(float delta)
 	//SDL_Delay(dwt);
 }
 // todo 图集渲染
-void draw_data(SDL_Renderer* renderer, canvas_atlas* av, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
+void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
 {
 	glm::vec2 clip_off = {};
 	glm::vec2 clip_scale = render_scale;
 
-	if (av->viewport.z > 0 && av->viewport.w > 0)
-		SDL_SetRenderViewport(renderer, (SDL_Rect*)&av->viewport);
-
+	if (dc->viewport.z > 0 && dc->viewport.w > 0)
+		SDL_SetRenderViewport(renderer, (SDL_Rect*)&dc->viewport);
+	auto av = &dc->_mesh;
 	auto vd = (SDL_Vertex*)av->vtxs.data();
 	auto idv = av->idxs.data();
 	auto vbs = av->vtxs.size();
@@ -1839,7 +1852,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w };
 		SDL_SetTextInputRect(&rect);

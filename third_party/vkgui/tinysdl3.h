@@ -73,7 +73,7 @@ public:
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
 	int _fps = 26;
-
+	int fms = 0;
 public:
 	app_cx();
 	~app_cx();
@@ -90,7 +90,7 @@ public:
 	void remove(form_x* f);
 	void clearf();
 private:
-	void get_event();
+	int get_event();
 
 };
 
