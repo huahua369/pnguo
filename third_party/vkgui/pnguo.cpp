@@ -1152,7 +1152,7 @@ void canvas_atlas::apply()
 	{
 		image_rs r = {};
 		if (it->count < 1 || !it->img) { continue; }
-		r.img = it->img; 
+		r.img = it->img;
 		uint32_t color = -1;
 		if (it->sliced)
 		{
@@ -1182,7 +1182,7 @@ void canvas_atlas::apply()
 	{
 		image_rs r = {};
 		if (it->_imgv.empty() || !it->img) { continue; }
-		r.img = it->img; 
+		r.img = it->img;
 		uint32_t color = -1;
 		for (auto& kt : it->_imgv) {
 
@@ -1635,7 +1635,7 @@ void* bspline_ct::new_bspline(glm::vec3* cp, int n, size_t degree) {
 		dim = 3;
 	}
 	return p;
-		}
+}
 void* bspline_ct::new_bspline(glm::dvec3* cp, int n, size_t degree) {
 	assert(!ptr);
 	if (!cp || n < 3 || degree < 2)return 0;
@@ -1660,9 +1660,9 @@ void* bspline_ct::new_bspline(glm::dvec3* cp, int n, size_t degree) {
 		p->setControlPoints(ctrlp);
 		ptr = p;
 		dim = 3;
-		}
-	return p;
 	}
+	return p;
+}
 // nurbs
 void* bspline_ct::new_bspline(glm::vec4* cp, int n, size_t degree)
 {
@@ -1747,9 +1747,9 @@ std::vector<glm::vec3> bspline_ct::sample3(int m)
 			auto result = glm::vec3(sm[i], sm[i + 1], sm[i + 2]); i += 2;
 			ot.push_back(result);
 		}
-}
-	return ot;
 	}
+	return ot;
+}
 std::vector<glm::vec4> bspline_ct::sample4(int m)
 {
 	std::vector<glm::vec4> ot;
@@ -3337,7 +3337,7 @@ void path_v::set_mat(const glm::mat3& m)
 		if (it.type == vtype_e::e_vcurve)
 		{
 			v2m3(it.c, &m);
-}
+		}
 		if (it.type == path_v::vtype_e::e_vcubic)
 		{
 			v2m3(it.c, &m);
@@ -5247,7 +5247,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 				auto cy2 = p2.y + 2.0f / 3.0f * (p1.y - p2.y);
 				c1 = { cx1,cy1 }; c2 = { cx2,cy2 };
 #endif
-		}
+			}
 			//	C0 = Q0
 			//	C1 = Q0 + (2 / 3) (Q1 - Q0)
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
@@ -5306,7 +5306,7 @@ void draw_path_v(cairo_t* cr, path_v* p, style_path_t* st)
 	tf.y = p->_pos.y + p->_baseline;
 	glm::vec2 pos = {}, sc = {};
 	draw_path0(cr, &tf, st, pos, sc);
-		}
+}
 void canvas_dev::draw_path(path_v* p, style_path_t* st)
 {
 	if (!p || !st || p->_data.empty())return;
@@ -6055,7 +6055,7 @@ layout_px::~layout_px()
 {
 	if (fgp)
 		g_object_unref(fgp);
-	}
+}
 
 layout_px create_pango_layout(const char* str, int fs)
 {
@@ -9902,8 +9902,8 @@ const char* font_t::get_glyph_index_u8(const char* u8str, int* oidx, font_t** re
 				*renderFont = it;
 				*oidx = g;
 				break;
-}
-}
+			}
+		}
 	}
 	return str;
 }
@@ -12518,13 +12518,13 @@ std::vector<font_t*> font_imp::add_font_file(const std::string& fn, std::vector<
 			{
 				fdi->vname.insert(it->_name);
 			}
-	}
+		}
 		else {
 			delete fdi;
 		}
-}
-	return ret;
 	}
+	return ret;
+}
 
 std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool iscp, std::vector<std::string>* pname, int* rc)
 {
@@ -13216,7 +13216,7 @@ flex_item* flex_item::init()
 		item->children->clear();
 	item->should_order_children = false;
 	return item;
-	}
+}
 
 
 void flex_item::item_add(flex_item* child)
@@ -14036,7 +14036,7 @@ void text_ctx_cx::set_size(const glm::ivec2& ss)
 		if (sur)
 		{
 			cairo_surface_destroy(sur);
-	}
+		}
 		dtimg.resize(size.x * size.y);
 		sur = cairo_image_surface_create_for_data((unsigned char*)dtimg.data(), CAIRO_FORMAT_ARGB32, size.x, size.y, size.x * sizeof(int));
 		cacheimg = {};
@@ -14046,7 +14046,7 @@ void text_ctx_cx::set_size(const glm::ivec2& ss)
 		cacheimg.type = 1;
 		cacheimg.valid = 1;
 		valid = true;
-}
+	}
 }
 
 void text_ctx_cx::set_desc(const char* str)
@@ -18796,6 +18796,48 @@ plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane
 
 #if 1
 
+cairo_surface_t* load_imagesvg(const std::string& fn, float scale)
+{
+	cairo_surface_t* p = 0;
+	if (fn.rfind(".svg") != std::string::npos)
+	{
+		svg_cx* bl = new_svg_file(fn.c_str(), 0, 96);
+		int xn = bl->width * bl->height;
+		float sc = scale > 1 ? scale : 1;
+		auto blsur = new_image_cr({ bl->width * sc ,bl->height * sc });
+		auto pxd = (uint32_t*)cairo_image_surface_get_data(blsur);
+		if (pxd)
+		{
+			p = blsur;
+			auto stride = cairo_image_surface_get_stride(blsur) / 4;
+			stride *= bl->height;
+			for (size_t i = 0; i < xn; i++)
+			{
+				pxd[i] = 0;
+			}
+			image_set_ud(p, key_def_data_svgptr, bl, (cairo_destroy_func_t)free_svg);
+			std::thread th([=]()
+				{
+					print_time a("load svg");
+					cairo_t* cr = cairo_create(blsur);
+					render_svg(cr, bl, {}, { scale, scale }, 0, 0);
+					image_set_ud(blsur, key_def_data_done, (void*)1, 0);
+					cairo_destroy(cr);
+				});
+			th.detach();
+		}
+	}
+	else {
+		image_ptr_t* ptr = stbimage_load::new_load(fn.c_str(), 0);
+		if (ptr)
+		{
+			p = new_image_cr(ptr);
+			image_set_ud(p, key_def_data_iptr, ptr, (cairo_destroy_func_t)stbimage_load::free_img);
+		}
+	}
+	return p;
+}
+
 rlistview_cx::rlistview_cx()
 {
 }
@@ -18813,41 +18855,9 @@ void rlistview_cx::set_data(void* d)
 size_t rlistview_cx::add_image(const std::string& fn)
 {
 	size_t r = imagelist.size();
-	if (fn.rfind(".svg") != std::string::npos)
-	{
-		svg_cx* bl = new_svg_file(fn.c_str(), 0, 96);
-		int xn = bl->width * bl->height;
-		auto blsur = new_image_cr({ bl->width  ,bl->height });
-		auto pxd = (uint32_t*)cairo_image_surface_get_data(blsur);
-		if (pxd)
-		{
-			imagelist.push_back(blsur);
-			auto stride = cairo_image_surface_get_stride(blsur) / 4;
-			stride *= bl->height;
-			for (size_t i = 0; i < xn; i++)
-			{
-				pxd[i] = 0;
-			}
-			std::thread th([=]()
-				{
-					print_time a("load svg");
-					cairo_t* cr = cairo_create(blsur);
-					render_svg(cr, bl, {}, { 1.0,1.0 }, 0, 0);
-					image_set_ud(blsur, 1, (void*)1, 0);
-					cairo_destroy(cr);
-				});
-			th.detach();
-		}
-	}
-	else {
-		image_ptr_t* ptr = stbimage_load::new_load(fn.c_str(), 0);
-		if (ptr)
-		{
-			auto sur = new_image_cr(ptr);
-			image_set_ud(sur, key_def_data_iptr, ptr, (cairo_destroy_func_t)stbimage_load::free_img);
-			imagelist.push_back(sur);
-		}
-	}
+	auto sur = load_imagesvg(fn, 1);
+	if (sur)
+		imagelist.push_back(sur);
 	return r;
 }
 
@@ -18890,11 +18900,50 @@ menu_cx::menu_cx()
 
 menu_cx::~menu_cx()
 {
+	free_image_cr(icon);
 }
+
+void menu_cx::set_fontctx(font_rctx* p)
+{
+	fctx = p;
+}
+
+void menu_cx::set_image(const std::string& fn, const glm::ivec2& icon_size, const glm::ivec2& pos, const glm::ivec2& stride, float scale)
+{
+	if (!(scale > 0)) { scale = 1.0; }
+	auto sur = load_imagesvg(fn, scale);
+	if (sur)
+	{
+		free_image_cr(icon);
+		icon = sur;
+	}
+	_icon_size = icon_size; _pos = pos; _stride = stride;
+}
+
 
 menu_cx::node_t* menu_cx::add(const std::string& str, int icon, int id, menu_cx::node_t* parent)
 {
-	return nullptr;
+	menu_cx::node_t* ret = 0;
+	menu_cx::node_t v = {};
+	v.title = str;
+	v.icon = icon;
+	v.id = id;
+	if (!parent)
+	{
+		lvm.push_back(v);
+		ret = &(lvm.back());
+	}
+	else
+	{
+		parent->child.push_back(v);
+		ret = &(parent->child.back());
+	}
+	return ret;
+}
+
+void menu_cx::apply()
+{
+
 }
 
 

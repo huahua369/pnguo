@@ -1735,12 +1735,15 @@ private:
 
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap);
 
+#if 1
 svg_cx* new_svg_file(const void* fn, size_t len, int dpi);
 svg_cx* new_svg_data(const void* str, size_t len, int dpi);
 void free_svg(svg_cx* svg);
-#if 1
 void render_svg(cairo_t* cr, svg_cx* svg);
 void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id = 0);
+
+// 加载svg或图片
+cairo_surface_t* load_imagesvg(const std::string& fn, float scale);
 
 void set_color(cairo_t* cr, uint32_t rgba);
 void set_color_bgr(cairo_t* cr, uint32_t c);
@@ -1769,6 +1772,8 @@ glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, c
 #ifndef key_def_data
 #define key_def_data 1024
 #define key_def_data_iptr 1025
+#define key_def_data_svgptr 1026
+#define key_def_data_done 1000
 #endif
 cairo_surface_t* new_image_cr(image_ptr_t* img);
 cairo_surface_t* new_image_cr(const glm::ivec2& size);
@@ -1988,14 +1993,24 @@ public:
 		node_t* parent = 0;	// 父级
 		std::list<node_t> child;// 孩子  
 	};
-	std::list<node_t> lvm = {};	// 根菜单
-	node_t* _active = 0;		// 当前激活的菜单
+	std::list<node_t> lvm = {};		// 根菜单
+	std::list<plane_cx> vp = {};	// ui管理
+	node_t* _active = 0;			// 当前激活的菜单
+	font_rctx* fctx = 0;			// 字体管理
+	cairo_surface_t* icon = 0;
+	glm::ivec2 _icon_size = {}, _pos = {}, _stride = {};
 	std::function<void(node_t* p)> on_click;
 public:
 	menu_cx();
 	~menu_cx();
+	void set_fontctx(font_rctx* p);
+	// 图片/svg、图标大小、开始坐标、图标间隔
+	void set_image(const std::string& fn, const glm::ivec2& icon_size, const glm::ivec2& pos, const glm::ivec2& stride, float scale);
 	// 添加菜单
 	node_t* add(const std::string& str, int icon, int id, node_t* parent);
+
+	// 自动创建ui
+	void apply();
 private:
 
 };
