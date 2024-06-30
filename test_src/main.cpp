@@ -712,11 +712,15 @@ int main()
 				fill_stroke(cr, 0x8ffa2000, 0xff0000ff, 2, false);
 				auto ltx = p->ltx;
 				if (svginc)
+				{
 					draw_image(cr, blsur, { 10,320 }, { 0,0,-1,-1 });
-
-				glm::vec4 cf = { 0,1,0,0.8 }, ct = { 0.0,0.5,0.0,0.5 };
+				}
+				rect_shadow_t rs = {};
+				rs.cfrom = { 0,1,0,0.8 }, rs.cto = { 0.0,0.5,0.0,0.5 };
+				rs.radius = 8;
+				rs.segment = 8;
 				// 边框阴影
-				draw_rectangle_gradient(cr, pss.x, pss.y, 5, cf, ct);
+				draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
 				return;
 			};
 	}
@@ -1042,8 +1046,11 @@ int main()
 				fill_stroke(cr, 0, -1, 1);
 
 				cairo_translate(cr, 200, 200);
-				glm::vec4 cf = { 0,1,0,0.8 }, ct = { 0.0,0.5,0.0,0.5 };
-				draw_rectangle_gradient(cr, 200, 100, 20, cf, ct);
+				rect_shadow_t rs = {};
+				rs.cfrom = { 0,1,0,0.8 }, rs.cto = { 0.0,0.5,0.0,0.5 };
+				rs.radius = 20;
+				rs.segment = 8;
+				draw_rectangle_gradient(cr, 200, 100, rs);
 				auto txt = pl1->ltx;
 				//txt->update_text();
 				for (auto it : txt->msu)

@@ -1529,7 +1529,17 @@ struct layout_info_x {
 	flex_item::flex_direction direction = flex_item::flex_direction::ROW;		// 行/列
 	flex_item::flex_wrap wrap = flex_item::flex_wrap::WRAP;						// 是否换行
 };
-
+struct rect_shadow_t
+{
+	float radius = 4;	// 半径
+	int segment = 6;	// 细分段
+	glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
+	/*	cubic
+		X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+		Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+	*/
+	cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
+};
 // 面板，继承图集
 class plane_cx :public canvas_atlas
 {
@@ -1773,7 +1783,7 @@ glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio);
 X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
 Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
 */
-void draw_rectangle_gradient(cairo_t* cr, int width, int height, float radius, const glm::vec4& cfrom, const glm::vec4& cto, const cubic_v& cuv = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } });
+void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shadow_t& rs);
 
 // 获取对齐坐标
 glm::ivec4 get_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, const char* family, int font_size);

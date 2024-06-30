@@ -4910,15 +4910,18 @@ X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点）
 Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
 */
 
-void draw_rectangle_gradient(cairo_t* cr, int width, int height, float radius, const glm::vec4& cfrom, const glm::vec4& cto, const cubic_v& cuv)
+void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shadow_t& rs)
 {
 	std::vector<stops_t> color_stops;
-	auto bv = get_bezier(&cuv, 1, 6);
+	float radius = rs.radius;
+	if (radius < 1 || width < 2 || height < 2)
+		return;
+	auto bv = get_bezier(&rs.cubic, 1, rs.segment > 3 ? rs.segment : 3);
 	for (size_t i = 0; i < bv.size(); i++)
 	{
 		float ratio = bv[i].x;
 		float a = bv[i].y;
-		glm::vec4 color = mix_colors(cfrom, cto, ratio);
+		glm::vec4 color = mix_colors(rs.cfrom, rs.cto, ratio);
 		color_stops.push_back({ ratio,color.x, color.y, color.z, color.w * a });
 	}
 	if (width < 2 * radius)
@@ -5008,6 +5011,7 @@ void draw_rectangle_gradient(cairo_t* cr, int width, int height, float radius, c
 	cairo_pattern_destroy(lg_left);
 	cairo_pattern_destroy(lg_right);
 }
+
 cairo_as::cairo_as(cairo_t* p) :cr(p)
 {
 	if (cr)
@@ -5374,7 +5378,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-		}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5395,7 +5399,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-	}
+}
 
 
 struct path_txf
@@ -9975,7 +9979,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -9991,7 +9995,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-	}
+}
 
 void font_t::clear_char_lut()
 {
@@ -11896,7 +11900,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -14110,7 +14114,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -14793,7 +14797,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
