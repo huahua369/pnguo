@@ -588,6 +588,7 @@ int main()
 		listp->set_size({ 800,600 });
 		listp->set_pos({ 10,10 });
 		listp->set_colors({ 0xff333333,-1,0,0 });
+		listp->set_colors({ 0,0,0,0 });
 		auto pss = listp->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -712,6 +713,10 @@ int main()
 				auto ltx = p->ltx;
 				if (svginc)
 					draw_image(cr, blsur, { 10,320 }, { 0,0,-1,-1 });
+
+				glm::vec4 cf = { 0,1,0,0.8 }, ct = { 0.0,0.5,0.0,0.5 };
+				// 边框阴影
+				draw_rectangle_gradient(cr, pss.x, pss.y, 5, cf, ct);
 				return;
 			};
 	}
@@ -1036,8 +1041,9 @@ int main()
 				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
 				fill_stroke(cr, 0, -1, 1);
 
-
-				cairo_translate(cr, 10, 200);
+				cairo_translate(cr, 200, 200);
+				glm::vec4 cf = { 0,1,0,0.8 }, ct = { 0.0,0.5,0.0,0.5 };
+				draw_rectangle_gradient(cr, 200, 100, 20, cf, ct);
 				auto txt = pl1->ltx;
 				//txt->update_text();
 				for (auto it : txt->msu)

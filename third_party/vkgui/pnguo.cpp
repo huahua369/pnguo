@@ -2734,13 +2734,13 @@ namespace bs {
 		3次bezier四个坐标一组，p0 p1 p2 p3
 		2次bezier设置p1\p2同样数值
 	*/
-std::vector<glm::vec2> get_bezier(glm::vec2* path, size_t n, double m, bool first)
+std::vector<glm::vec2> get_bezier(const glm::vec2* path, size_t n, double m, bool first)
 {
 	std::vector<glm::vec2> r = {};
 	bs::sol4(path, n, m, first, r);
 	return r;
 }
-std::vector<glm::vec2> get_bezier(cubic_v* path, size_t n, double m)
+std::vector<glm::vec2> get_bezier(const cubic_v* path, size_t n, double m)
 {
 	std::vector<glm::vec2> r = {};
 	if (path && n > 0)
@@ -2749,7 +2749,7 @@ std::vector<glm::vec2> get_bezier(cubic_v* path, size_t n, double m)
 	}
 	return r;
 }
-std::vector<glm::dvec2> get_bezier64(cubic_v* path, size_t n, double m)
+std::vector<glm::dvec2> get_bezier64(const cubic_v* path, size_t n, double m)
 {
 	std::vector<glm::dvec2> r = {};
 	if (path && n > 0)
@@ -2759,7 +2759,7 @@ std::vector<glm::dvec2> get_bezier64(cubic_v* path, size_t n, double m)
 	return r;
 }
 template<class T>
-std::vector<T> get_bezier_t(cubic_v* path, size_t n, double m)
+std::vector<T> get_bezier_t(const cubic_v* path, size_t n, double m)
 {
 	std::vector<T> r = {};
 	if (path && n > 0)
@@ -4899,7 +4899,115 @@ void clip_rect(cairo_t* cr, cairo_surface_t* r)
 
 	cairo_restore(cr);
 }
+struct stops_t {
+	float o;
+	float x, y, z, w;
+};
+/*
+用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
+这里使用下面的曲线形式，其中
+X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+*/
 
+void draw_rectangle_gradient(cairo_t* cr, int width, int height, float radius, const glm::vec4& cfrom, const glm::vec4& cto, const cubic_v& cuv)
+{
+	std::vector<stops_t> color_stops;
+	auto bv = get_bezier(&cuv, 1, 6);
+	for (size_t i = 0; i < bv.size(); i++)
+	{
+		float ratio = bv[i].x;
+		float a = bv[i].y;
+		glm::vec4 color = mix_colors(cfrom, cto, ratio);
+		color_stops.push_back({ ratio,color.x, color.y, color.z, color.w * a });
+	}
+	if (width < 2 * radius)
+	{
+		width = 2 * radius;
+	}
+	if (height < 2 * radius)
+	{
+		height = 2 * radius;
+	}
+
+	//# radial gradient center points for four corners, top - left, top - right, etc
+	glm::vec2 corner_tl = glm::vec2(radius, radius);
+	glm::vec2 corner_tr = glm::vec2(width - radius, radius);
+	glm::vec2 corner_bl = glm::vec2(radius, height - radius);
+	glm::vec2 corner_br = glm::vec2(width - radius, height - radius);
+	std::vector<glm::vec2> corner_points = { corner_tl, corner_tr, corner_br, corner_bl };
+
+	//# linear gradient rectangle info for four sides
+	glm::vec4 side_top = glm::vec4(radius, 0, width - 2 * radius, radius);
+	glm::vec4 side_bottom = glm::vec4(radius, height - radius, width - 2 * radius, radius);
+	glm::vec4 side_left = glm::vec4(0, radius, radius, height - 2 * radius);
+	glm::vec4 side_right = glm::vec4(width - radius, radius, radius, height - 2 * radius);
+
+	//# draw four corners through radial gradient
+	int i = 0;
+	for (auto& point : corner_points)
+	{
+		cairo_pattern_t* rg = cairo_pattern_create_radial(point[0], point[1], 0, point[0], point[1], radius);
+		for (auto& stop : color_stops)
+		{
+			cairo_pattern_add_color_stop_rgba(rg, stop.o, stop.x, stop.y, stop.z, stop.w);
+		}
+		cairo_move_to(cr, point[0], point[1]);
+		double	angle1 = M_PI + 0.5 * M_PI * i, angle2 = angle1 + 0.5 * M_PI;
+		cairo_arc(cr, point[0], point[1], radius, angle1, angle2);
+		cairo_set_source(cr, rg);
+		cairo_fill(cr);
+		cairo_pattern_destroy(rg);
+		i++;
+	}
+
+	//# draw four sides through linear gradient
+	//# top side
+
+	cairo_pattern_t* lg_top = cairo_pattern_create_linear(side_top[0], side_top[1] + radius, side_top[0], side_top[1]);
+	for (auto& stop : color_stops)
+	{
+		cairo_pattern_add_color_stop_rgba(lg_top, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	draw_rectangle(cr, side_top, 0);
+	cairo_set_source(cr, lg_top);
+	cairo_fill(cr);
+
+	//# bottom side
+	cairo_pattern_t* lg_bottom = cairo_pattern_create_linear(side_bottom[0], side_bottom[1], side_bottom[0], side_bottom[1] + radius);
+	for (auto& stop : color_stops)
+	{
+		cairo_pattern_add_color_stop_rgba(lg_bottom, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	draw_rectangle(cr, side_bottom, 0);
+	cairo_set_source(cr, lg_bottom);
+	cairo_fill(cr);
+
+	//# left side
+	cairo_pattern_t* lg_left = cairo_pattern_create_linear(side_left[0] + radius, side_left[1], side_left[0], side_left[1]);
+	for (auto& stop : color_stops)
+	{
+		cairo_pattern_add_color_stop_rgba(lg_left, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	draw_rectangle(cr, side_left, 0);
+	cairo_set_source(cr, lg_left);
+	cairo_fill(cr);
+
+	//# right side
+	cairo_pattern_t* lg_right = cairo_pattern_create_linear(side_right[0], side_right[1], side_right[0] + radius, side_right[1]);
+	for (auto& stop : color_stops)
+	{
+		cairo_pattern_add_color_stop_rgba(lg_right, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	draw_rectangle(cr, side_right, 0);
+	cairo_set_source(cr, lg_right);
+	cairo_fill(cr);
+
+	cairo_pattern_destroy(lg_top);
+	cairo_pattern_destroy(lg_bottom);
+	cairo_pattern_destroy(lg_left);
+	cairo_pattern_destroy(lg_right);
+}
 cairo_as::cairo_as(cairo_t* p) :cr(p)
 {
 	if (cr)
@@ -5266,7 +5374,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -5287,7 +5395,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+	}
 
 
 struct path_txf
@@ -6546,7 +6654,8 @@ glm::ivec2 Ruler::get_drawing_size()
 
 #define getrgba(a,b,sp) lerp(a.sp,b.sp,ratio)
 
-glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio) {
+glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio)
+{
 	auto lerp = [](double v0, double v1, double t) { return (1.0 - t) * v0 + t * v1; };
 	glm::dvec4 result = {};
 	result.x = getrgba(a, b, x);
@@ -9866,7 +9975,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-	}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -9882,7 +9991,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -11787,7 +11896,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -14001,7 +14110,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -14684,7 +14793,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];

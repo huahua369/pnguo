@@ -1764,6 +1764,17 @@ cairo_surface_t* new_clip_rect(int r);
 void clip_rect(cairo_t* cr, cairo_surface_t* r);
 void paint_shadow(cairo_t* cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, bool rev, float r = 0);//color_to=shadow;shadow.w=0;
 void paint_shadow(cairo_t* cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r = 0);
+
+// 采样颜色
+glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio);
+/*
+用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
+这里使用下面的曲线形式，其中
+X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+*/
+void draw_rectangle_gradient(cairo_t* cr, int width, int height, float radius, const glm::vec4& cfrom, const glm::vec4& cto, const cubic_v& cuv = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } });
+
 // 获取对齐坐标
 glm::ivec4 get_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, const char* family, int font_size);
 void draw_text(cairo_t* cr, const char* str, const glm::ivec4& et, uint32_t text_color);
