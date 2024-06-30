@@ -540,6 +540,7 @@ int main()
 				{
 					form1->bind(listp);	// 绑定到新窗口	
 					listp->draggable = false;
+					listp->set_pos({});
 					//form1->raise();
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
@@ -1041,8 +1042,8 @@ int main()
 				//txt->update_text();
 				for (auto it : txt->msu)
 				{
-					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
-					y1 += ss.y + 10;
+					//auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
+					//y1 += ss.y + 10;
 				}
 
 			};

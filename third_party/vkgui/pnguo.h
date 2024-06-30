@@ -205,14 +205,14 @@ public:
 		uint32_t vtxOffset = 0;
 		uint32_t idxOffset = 0;
 		uint32_t elemCount = 0;
-	};	
-	std::vector<draw_cmd_c> cmd_data;
-	std::vector<vertex_v2> vtxs;
-	std::vector<int> idxs;
+	};
+	std::vector<draw_cmd_c> cmd_data;	// 渲染命令
+	std::vector<vertex_v2> vtxs;		// 顶点数据
+	std::vector<int> idxs;				// 索引
 public:
 	mesh2d_cx();
 	~mesh2d_cx();
-
+	// 添加相同纹理/裁剪区域则自动合批
 	void add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip);
 private:
 
@@ -221,7 +221,7 @@ private:
 // 图集画布
 class canvas_atlas
 {
-public: 
+public:
 	struct image_rs
 	{
 		image_ptr_t* img = 0;
@@ -1535,7 +1535,7 @@ class plane_cx :public canvas_atlas
 {
 public:
 	tview_x* tv = {};			// 视图管理
-	atlas_t* _pat = 0;			// 渲染面板用
+	atlas_t* _pat = 0;			// 渲染面板背景
 	form_x* form = 0;			// 绑定的窗口 
 	layout_text_x* ltx = 0;		// 文本渲染管理
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
@@ -1977,6 +1977,28 @@ private:
 
 };
 
+class menu_cx
+{
+public:
+	struct node_t
+	{
+		std::string title;	// 显示的标题文本
+		int icon = 0;		// 图标序号
+		int id = 0;
+		node_t* parent = 0;	// 父级
+		std::list<node_t> child;// 孩子  
+	};
+	std::list<node_t> lvm = {};	// 根菜单
+	node_t* _active = 0;		// 当前激活的菜单
+	std::function<void(node_t* p)> on_click;
+public:
+	menu_cx();
+	~menu_cx();
+	// 添加菜单
+	node_t* add(const std::string& str, int icon, int id, node_t* parent);
+private:
+
+};
 
 // 对话框
 class dialog_cx

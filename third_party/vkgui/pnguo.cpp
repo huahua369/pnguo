@@ -1152,13 +1152,7 @@ void canvas_atlas::apply()
 	{
 		image_rs r = {};
 		if (it->count < 1 || !it->img) { continue; }
-		r.img = it->img;
-		//_clip_rect = viewport;// it->clip;
-			//if (_clip_rect.z < 2 || _clip_rect.w < 2)
-			//{
-			//	_clip_rect.z = viewport.z;
-			//	_clip_rect.w = viewport.w;
-			//}
+		r.img = it->img; 
 		uint32_t color = -1;
 		if (it->sliced)
 		{
@@ -1188,13 +1182,7 @@ void canvas_atlas::apply()
 	{
 		image_rs r = {};
 		if (it->_imgv.empty() || !it->img) { continue; }
-		r.img = it->img;
-		//_clip_rect = it->clip;
-		//if (_clip_rect.z < 2 || _clip_rect.w < 2)
-		//{
-		//	_clip_rect.z = viewport.z;
-		//	_clip_rect.w = viewport.w;
-		//}
+		r.img = it->img; 
 		uint32_t color = -1;
 		for (auto& kt : it->_imgv) {
 
@@ -18366,10 +18354,10 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	break;
 	case event_type2::on_scroll:
 	{
-		printf("scroll\t%p\n", this);
+		//printf("scroll\t%p\n", this);
 		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
 		{
-			printf("on_scroll\t%p\n", this);
+			//printf("on_scroll\t%p\n", this);
 			auto pts = (-mps.y * _pos_width) + _offset;
 			auto st = ss[_dir] - tsm;
 			if (limit)
@@ -18894,3 +18882,20 @@ dialog_cx::~dialog_cx()
 }
 
 #endif // 1
+
+
+menu_cx::menu_cx()
+{
+}
+
+menu_cx::~menu_cx()
+{
+}
+
+menu_cx::node_t* menu_cx::add(const std::string& str, int icon, int id, menu_cx::node_t* parent)
+{
+	return nullptr;
+}
+
+
+
