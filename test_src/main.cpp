@@ -419,7 +419,7 @@ int main()
 	ptf.has_renderer = true;
 	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-	ptf.flags = ef_vulkan | ef_transparent | ef_borderless;// | ef_popup;//ef_tooltip;// | ef_utility;
+	ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;//ef_tooltip;// | ef_utility;
 	ptf.size = { 820,620 };
 	ptf.parent = form0;
 	ptf.pos = { 1600,2200 };
@@ -539,8 +539,8 @@ int main()
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
 					form1->bind(listp);	// 绑定到新窗口	
-
-					form1->raise();
+					listp->draggable = false;
+					//form1->raise();
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
 					pos.y += btn->size.y;
@@ -558,6 +558,8 @@ int main()
 					cbt->rounding = 14;
 					cbt->click_cb = [=](void* ptr, int clicks)
 						{
+							form0->bind(listp);	// 绑定到新窗口	
+							listp->draggable = true;
 							static int kc = 0;
 							if (kc != 0)return;
 							kc++;
@@ -581,7 +583,7 @@ int main()
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
 	{
-		//listp->draggable = true; //可拖动
+		listp->draggable = true; //可拖动
 		listp->set_size({ 800,600 });
 		listp->set_pos({ 10,10 });
 		listp->set_colors({ 0xff333333,-1,0,0 });
@@ -706,7 +708,7 @@ int main()
 				fill_stroke(cr, 0xf0805c42, 0xff0080ff, 2, false);
 				draw_ellipse(cr, { 400,200 }, { 120,20 });
 				fill_stroke(cr, 0x8ffa2000, 0xff0000ff, 2, false);
-				auto ltx = p->ltx;				 
+				auto ltx = p->ltx;
 				if (svginc)
 					draw_image(cr, blsur, { 10,320 }, { 0,0,-1,-1 });
 				return;

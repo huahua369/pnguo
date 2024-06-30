@@ -150,10 +150,7 @@ namespace pce {
 		bool isnew = false;
 		if (!region)
 		{
-			//POINT pts[] = { {0,0},{500,10},{550,500},{0,0} };
-			//int pn[] = { 3,1 };
-			region = CreateRectRgn(0, 0, -1, -1);//CreatePolyPolygonRgn(pts,pn, 1,WINDING);// 
-			//SetWindowRgn(window, region, 0);
+			region = CreateRectRgn(0, 0, -1, -1);
 			isnew = true;
 		}
 		if (enable && 0 != region)
@@ -559,7 +556,7 @@ int app_cx::run_loop(int t)
 			auto kt = (fct->get_time() + fct->extra_time);
 			do {
 				get_event();
-				SDL_Delay(2);
+				sleep_ms(2);
 			} while ((fct->get_time() + fct->extra_time) < fct->screen_ticks_per_frame);
 			if (fct->get_time() < (fct->screen_ticks_per_frame)) {
 				fct->extra_time -= fct->screen_ticks_per_frame - fct->get_time();
@@ -1293,7 +1290,7 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 			if (pw->close_type || cbr == 1)
 			{
 				pw->destroy();
-				pw->app->remove(pw); 
+				pw->app->remove(pw);
 			}
 			else {
 				pw->hide();
@@ -1356,7 +1353,6 @@ void form_x::destroy()
 
 void form_x::update(float delta)
 {
-
 	// Setup display size (every frame to accommodate for window resizing)
 	int w, h;
 	int display_w, display_h;
@@ -1366,7 +1362,13 @@ void form_x::update(float delta)
 	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h);
 	display_size = { w, h };
 	if (w > 0 && h > 0)
+	{
 		display_framebuffer_scale = glm::vec2((float)display_w / w, (float)display_h / h);
+	}
+	else
+	{
+		return;
+	}
 	int dwt = 0;
 	if (up_cb)
 	{
@@ -1399,7 +1401,8 @@ void form_x::update(float delta)
 	for (auto kt : skeletons) {
 		kt->update(delta);
 	}
-	SDL_Delay(dwt);
+	app_cx::sleep_ms(dwt);
+	//SDL_Delay(dwt);
 }
 // todo 图集渲染
 void draw_data(SDL_Renderer* renderer, canvas_atlas* av, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
@@ -1435,7 +1438,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* av, int fb_width, int fb_he
 }
 void form_x::present()
 {
-	if (!renderer || !app || !app->r2d)return;
+	if (!renderer || !app || !app->r2d || display_size.x < 1 || display_size.y < 1)return;
 	float rsx = 1.0f;
 	float rsy = 1.0f;
 	SDL_GetRenderScale(renderer, &rsx, &rsy);
@@ -1557,7 +1560,7 @@ void form_x::new_tool_tip(const glm::ivec2& pos, const void* str)
 bool form_x::hittest(const glm::ivec2& pos)
 {
 	_HitTest = false;
-	if(_ptr)
+	if (_ptr)
 	{
 		for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
 		{
@@ -1836,12 +1839,12 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w };
 		SDL_SetTextInputRect(&rect);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
