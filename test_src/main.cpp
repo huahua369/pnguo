@@ -407,7 +407,7 @@ int main()
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
 	loadtestdata();
-	auto buf = new hz::buffer_t();
+
 	auto qyt = new	uint16_t[256 * 384];
 	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");

@@ -6,6 +6,64 @@
 	编辑文本
 
 	原始加载数据不变，编辑的内容保存在额外文本块，视图引用数据
+void test()
+{
+	auto buf = new hz::buffer_t();
+	buf->append("abc", -1);
+
+	struct input_info_t
+	{
+		glm::ivec2 pos;
+		glm::ivec2 pos1;
+		std::string str;
+	};
+	std::vector<input_info_t> _iit;// 操作列表
+	int cuinc = 0;
+	auto ic = cuinc;
+	bool single_line = false;
+	glm::ivec2 r = {};
+	for (auto& it : _iit)
+	{
+		if (it.pos > it.pos1)
+		{
+			std::swap(it.pos, it.pos1);
+		}
+		if (it.str.empty())
+		{
+			// 执行删除
+			buf->remove(it.pos, it.pos1);
+			r = it.pos; cuinc++;
+			//printf("\t光标d:%d\t%d\t%d\n", (int)it.str.size(), r.x, r.y);
+		}
+		else {
+			// 插入文本
+			if (single_line)
+			{
+				std::remove(it.str.begin(), it.str.end(), '\n');
+			}
+			//if (tvt && tvt->on_input)
+			//{
+			//	tvt->on_input(&it.str);// 执行回调函数
+			//}
+			if (it.str.empty())
+			{
+				r = it.pos;
+			}
+			else {
+				r = buf->insert(it.pos, it.str.c_str(), it.str.size(), &it.pos1);// 插入文本
+			}
+			cuinc++;
+			//printf("\t光标:%d\t%d\t%d\n", (int)it.str.size(), r.x, r.y);
+		}
+	}
+	if (ic != cuinc)
+	{
+		buf->clear_redo(); // 清空重做栈
+	}
+	glm::ivec2 cp1 = { 0,0 }, cp2 = { 0,2 };
+	// 获取选中文本
+	auto str = buf->get_range(cp1, cp2);
+}
 */
 #pragma once
 
