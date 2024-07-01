@@ -43,7 +43,7 @@ extern "C" {
 #endif
 #include <cairo/cairo-svg.h>
 #include <cairo/cairo-pdf.h>
-   
+
 #ifndef NO_SVG
 #include <librsvg/rsvg.h>
 #endif
@@ -16213,6 +16213,34 @@ void plane_cx::set_scroll_hide(bool is)
 		horizontal->hideble = is;
 	if (vertical)
 		vertical->hideble = is;
+}
+
+void plane_cx::set_scroll_pos(const glm::ivec2& ps, bool v)
+{
+	if (v)
+	{
+		if (vertical)
+			vertical->pos = ps;
+	}
+	else
+	{
+		if (horizontal)
+			horizontal->pos = ps;
+	}
+}
+
+void plane_cx::set_scroll_size(const glm::ivec2& ps, bool v)
+{
+	if (v)
+	{
+		if (vertical)
+		vertical->size = ps;
+	}
+	else
+	{
+		if (horizontal)
+		horizontal->size = ps;
+	}
 }
 
 void plane_cx::set_view(const glm::ivec2& view_size, const glm::ivec2& content_size)

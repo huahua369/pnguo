@@ -1508,14 +1508,16 @@ void form_x::present()
 			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 		}
 	}
+	{
 
-	if (skelet_viewport.z > 0 && skelet_viewport.w > 0)
-		SDL_SetRenderViewport(renderer, (SDL_Rect*)&skelet_viewport);
-	if (skelet_clip.z > 0 && skelet_clip.w > 0)
-		SDL_SetRenderClipRect(renderer, (SDL_Rect*)&skelet_clip);
-	// 渲染骨骼动画
-	for (auto kt : skeletons) {
-		app->r2d->draw_data(renderer, kt);
+		if (skelet_viewport.z > 0 && skelet_viewport.w > 0)
+			SDL_SetRenderViewport(renderer, (SDL_Rect*)&skelet_viewport);
+		if (skelet_clip.z > 0 && skelet_clip.w > 0)
+			SDL_SetRenderClipRect(renderer, (SDL_Rect*)&skelet_clip);
+		// 渲染骨骼动画
+		for (auto kt : skeletons) {
+			app->r2d->draw_data(renderer, kt);
+		}
 	}
 	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
 	SDL_SetRenderClipRect(renderer, &viewport);

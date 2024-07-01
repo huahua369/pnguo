@@ -1589,9 +1589,10 @@ public:
 	// OLO拖放文本
 	bool (*dragdrop_begin)(const wchar_t* str, size_t size) = 0;
 
-	layout_info_x _css = {};		// 布局样式
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
-	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 偏移，加宽
+
+	layout_info_x _css = {};		// 布局样式
+	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "Arial,NSimSun";
 	int fontsize = 12;
 	uint32_t text_color = -1;
@@ -1622,6 +1623,8 @@ public:
 	// 设置本面板滚动条
 	void set_scroll(int width, int rcw, const glm::ivec2& pos_width);
 	void set_scroll_hide(bool is);// 是否隐藏滚动条
+	void set_scroll_pos(const glm::ivec2& ps, bool v);
+	void set_scroll_size(const glm::ivec2& ps, bool v);
 	void set_view(const glm::ivec2& view_size, const glm::ivec2& content_size);
 	void set_scroll_visible(const glm::ivec2& hv);
 	void move2end(widget_base* p);
