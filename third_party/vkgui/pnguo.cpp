@@ -43,7 +43,10 @@ extern "C" {
 #endif
 #include <cairo/cairo-svg.h>
 #include <cairo/cairo-pdf.h>
+   
+#ifndef NO_SVG
 #include <librsvg/rsvg.h>
+#endif
 #include <pango/pango-layout.h>
 #include <pango/pangocairo.h>
 
@@ -7064,8 +7067,10 @@ void Ruler::set_context_menu()
 class svg_dp
 {
 public:
+#ifndef NO_SVG
 	RsvgHandle* handle = 0;
 	RsvgDimensionData dimension = {};
+#endif
 public:
 	svg_dp(int dpi = 0);
 	~svg_dp();
@@ -7079,57 +7084,73 @@ public:
 
 svg_dp::svg_dp(int dpi)
 {
+#ifndef NO_SVG
 	rsvg_set_default_dpi(dpi < 72.0 ? 72.0 : dpi);
+#endif
 }
 
 svg_dp::~svg_dp()
 {
+#ifndef NO_SVG
 	// 释放资源  
 	rsvg_handle_free(handle);
+#endif
 }
 svg_dp* svg_dp::new_from_file(const void* fn, size_t len)
 {
+	svg_dp* p = 0;
+#ifndef NO_SVG
 	GError* er = NULL;
 	auto handle = rsvg_handle_new_from_file((gchar*)fn, &er);
 	if (er != NULL) {
 		printf("Failed to load SVG file: %s\n", er->message);
 		return 0;
 	}
-	auto p = new svg_dp();
+	p = new svg_dp();
 	/* 获取SVG图像的尺寸 */
 	rsvg_handle_get_dimensions(handle, &p->dimension);
 	p->handle = handle;
+#endif
 	return p;
 }
 svg_dp* svg_dp::new_from_data(const void* str, size_t len)
 {
 	GError* er = NULL;
+	svg_dp* p = 0;
+#ifndef NO_SVG
 	auto handle = rsvg_handle_new_from_data((guint8*)str, len, &er);
 	if (er != NULL) {
 		printf("Failed to load SVG file: %s\n", er->message);
 		return 0;
 	}
-	auto p = new svg_dp();
+	p = new svg_dp();
 	/* 获取SVG图像的尺寸 */
 	rsvg_handle_get_dimensions(handle, &p->dimension);
 	p->handle = handle;
+#endif
 	return p;
 }
 glm::vec2 svg_dp::get_pos_id(const char* id)
 {
+#ifndef NO_SVG
 	RsvgPositionData pos = {};
 	auto r = rsvg_handle_get_position_sub(handle, &pos, id);
 	return glm::vec2(pos.x, pos.y);
+#else
+	return {};
+#endif
 }
 
 void svg_dp::get_bixbuf(const char* id)
 {
+#ifndef NO_SVG
 	auto pxb = id && *id ? rsvg_handle_get_pixbuf(handle) : rsvg_handle_get_pixbuf_sub(handle, id);
 	uint32_t length = 0;
 	auto px = gdk_pixbuf_get_pixels_with_length(pxb, &length);
 	auto w = gdk_pixbuf_get_width(pxb);
 	auto h = gdk_pixbuf_get_height(pxb);
 	auto st = gdk_pixbuf_get_rowstride(pxb);
+#endif
 	//g_object_unref(pxb);
 	return;
 }
@@ -7137,12 +7158,13 @@ void svg_dp::get_bixbuf(const char* id)
 
 void svg_dp::draw(cairo_t* cr)
 {
+#ifndef NO_SVG
 	rsvg_handle_render_cairo(handle, cr);//渲染到窗口，有刷新事件需要重新执行，这里只渲染一次 
+#endif
 }
 void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id)
 {
-	//get_bixbuf(0);
-	//print_time ad("draw dc");cairo_surface_t* surface, 
+#ifndef NO_SVG
 	cairo_save(cr);
 	if (scale.x > 0 && scale.y > 0)
 		cairo_scale(cr, scale.x, scale.y);
@@ -7167,6 +7189,7 @@ void svg_dp::draw(cairo_t* cr, const glm::vec2& pos, const glm::vec2& scale, dou
 	}
 	//cairo_surface_flush(surface);
 	cairo_restore(cr);
+#endif
 }
 
 svg_cx* new_svg_file(const void* fn, size_t len, int dpi) {

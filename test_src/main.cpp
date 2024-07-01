@@ -456,7 +456,7 @@ void loadtestdata()
 		printf("%s\n", k.c_str());
 	}
 }
-
+ 
 
 int main()
 {
@@ -472,6 +472,7 @@ int main()
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
+#if 1
 	auto app = new_app();
 	form_newinfo_t ptf = {};
 	ptf.app = app; ptf.title = (char*)u8"窗口1";
@@ -484,19 +485,20 @@ int main()
 	ptf.size = { 820,620 };
 	ptf.parent = form0;
 	ptf.pos = { 1600,2200 };
-	form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+	//form_x* form1 = 0;// (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form_x* form0 =  app->new_form_renderer(ptf.title, ptf.size, ptf.flags,ptf.has_renderer);
-	form1->set_alpha(true);
-	//form0->set_alpha(false);
-	form0->on_close_cb = [=]() {
-		return 0;// 返回1关闭窗口，返回0隐藏窗口
-		};
+	//form1->set_alpha(true);
+	////form0->set_alpha(false);
+	//form0->on_close_cb = [=]() {
+	//	return 0;// 返回1关闭窗口，返回0隐藏窗口
+	//	};
 	//form0->enable_window(0);
 	auto vkdev = form0->get_dev();
 	bool bindless = form0->has_variable();
 	int cpun = call_data((int)cdtype_e::cpu_count, 0);
 	auto pw = form0;
 	printf((char*)u8"启动\n cpu核心数量:%d\n", cpun);
+#endif
 	auto pl1 = new plane_cx();
 	auto pl2 = new plane_cx();
 	auto pl3 = new plane_cx();
@@ -599,7 +601,7 @@ int main()
 			gb2->rounding = 14;
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
-					form1->bind(listp);	// 绑定到新窗口	
+					//form1->bind(listp);	// 绑定到新窗口	
 					listp->draggable = false;
 					listp->set_pos({});
 					//form1->raise();
@@ -620,12 +622,12 @@ int main()
 					cbt->rounding = 14;
 					cbt->click_cb = [=](void* ptr, int clicks)
 						{
-							form0->bind(listp);	// 绑定到新窗口	
+							//form0->bind(listp);	// 绑定到新窗口	
 							listp->draggable = true;
 							static int kc = 0;
 							if (kc != 0)return;
 							kc++;
-							form1->show();
+							//form1->show();
 							//form1->close();
 						};
 				};
@@ -683,7 +685,7 @@ int main()
 		std::vector<checkbox_com> ckv = new_checkbox(p, cstr1, width, [=](void* ptr, bool v)
 			{
 				auto pr = (checkbox_tl*)ptr;
-				form0->enable_window(1);
+				//form0->enable_window(1);
 			});
 		std::vector<radio_com> rcv = new_radio(p, cstr2, width, [=](void* ptr, bool v)
 			{

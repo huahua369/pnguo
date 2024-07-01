@@ -4,6 +4,8 @@
 #include <vector>
 #include <list>
 #include <functional>
+#include <thread>
+#include <mutex>
 // 定义glm启用simd
 #define GLM_FORCE_INTRINSICS
 //#define GLM_FORCE_XYZW_ONLY

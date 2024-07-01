@@ -1449,20 +1449,6 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 
 	if (dc->viewport.z > 0 && dc->viewport.w > 0)
 		SDL_SetRenderViewport(renderer, (SDL_Rect*)&dc->viewport);
-	SDL_Rect r0 = {};
-	{
-		glm::vec2 clip_min((dc->_clip_rect.x - clip_off.x) * clip_scale.x, (dc->_clip_rect.y - clip_off.y) * clip_scale.y);
-		glm::vec2 clip_max((dc->_clip_rect.z - clip_off.x) * clip_scale.x, (dc->_clip_rect.w - clip_off.y) * clip_scale.y);
-		if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
-		{
-			//SDL_SetRenderClipRect(renderer, 0);
-		}
-		else
-		{
-			r0 = { (int)(clip_min.x), (int)(clip_min.y), (int)(clip_max.x - clip_min.x), (int)(clip_max.y - clip_min.y) };
-			//SDL_SetRenderClipRect(renderer, &r0);
-		}
-	}
 
 	auto av = &dc->_mesh;
 	auto vd = (SDL_Vertex*)av->vtxs.data();
