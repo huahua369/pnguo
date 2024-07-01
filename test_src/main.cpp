@@ -392,6 +392,63 @@ struct node_ts
 	int _level = 0;
 	bool _expand = 0;
 };
+struct input_info_t
+{
+	glm::ivec2 pos;
+	glm::ivec2 pos1;
+	std::string str;
+};
+// set_data、remove、insert、clear_redo、undo、redo
+void test()
+{
+	auto buf = new hz::buffer_t();
+	std::vector<input_info_t> _iit;// 操作列表
+	buf->set_data("abc", -1);
+	int cuinc = 0;
+	auto ic = cuinc;
+	bool single_line = false;
+	glm::ivec2 r = {};
+	for (auto& it : _iit)
+	{
+		if (it.pos > it.pos1)
+		{
+			std::swap(it.pos, it.pos1);
+		}
+		if (it.str.empty())
+		{
+			// 执行删除
+			buf->remove(it.pos, it.pos1);
+			r = it.pos; cuinc++;
+			//printf("\t光标d:%d\t%d\t%d\n", (int)it.str.size(), r.x, r.y);
+		}
+		else {
+			// 插入文本
+			if (single_line)
+			{
+				std::remove(it.str.begin(), it.str.end(), '\n');
+			}
+			//if (tvt && tvt->on_input)
+			//	tvt->on_input(&it.str);// 执行回调函数
+
+			if (it.str.empty())
+			{
+				r = it.pos;
+			}
+			else {
+				r = buf->insert(it.pos, it.str.c_str(), it.str.size(), &it.pos1);// 插入文本
+			}
+			cuinc++;
+			//printf("\t光标:%d\t%d\t%d\n", (int)it.str.size(), r.x, r.y);
+		}
+	}
+	if (ic != cuinc)
+	{
+		buf->clear_redo(); // 清空重做栈
+	}
+	glm::ivec2 cp1 = { 0,0 }, cp2 = { 0,2 };
+	// 获取选中文本
+	auto str = buf->get_range(cp1, cp2);
+}
 void loadtestdata()
 {
 	auto ed = hz::read_json("ed.json");
@@ -399,6 +456,8 @@ void loadtestdata()
 		printf("%s\n", k.c_str());
 	}
 }
+
+
 int main()
 {
 #ifdef _DEBUG
@@ -722,14 +781,17 @@ int main()
 				rs.radius = 8;
 				rs.segment = 8;
 				// 边框阴影
-				draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
+				//draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
 				return;
 			};
 		{
 			rect_shadow_t rs = {};
-			rs.cfrom = { 0,1,0,0.8 }, rs.cto = { 0.0,0.5,0.0,0.5 };
-			rs.radius = 8;
+			rs.cfrom = { 0.43,0.4,0.9,1 }, rs.cto = { 0.43,0.4,0.9,1 };
+			rs.cfrom = { 0.9,0.4,0.09,1 }, rs.cto = { 0.9,0.4,0.09,1 };
+			//rs.cfrom = { 1,0.01,0.09,1 }, rs.cto = { 0,0.01,0.9,1 };
+			rs.radius = 10;
 			rs.segment = 8;
+			rs.cubic = { {0.0,0.96},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
 			p->set_shadow(rs);
 		}
 	}
@@ -1059,7 +1121,7 @@ int main()
 				rs.cfrom = { 0,1,0,0.8 }, rs.cto = { 0.0,0.5,0.0,0.5 };
 				rs.radius = 20;
 				rs.segment = 8;
-				draw_rectangle_gradient(cr, 200, 100, rs);
+				//draw_rectangle_gradient(cr, 200, 100, rs);
 				auto txt = pl1->ltx;
 				//txt->update_text();
 				for (auto it : txt->msu)

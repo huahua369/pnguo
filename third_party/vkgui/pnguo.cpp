@@ -965,8 +965,13 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 
 
 vertex_v2::vertex_v2() {}
-vertex_v2::vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c) :position(p.x, p.y), tex_coord(u), color(c) { }
-vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c) :position(p), tex_coord(u), color(c) { }
+vertex_v2::vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c) :position(p.x, p.y), tex_coord(u) {
+	color = colorv4(c);
+}
+vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c) :position(p), tex_coord(u) {
+	color = colorv4(c);
+}
+vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4 c) :position(p), tex_coord(u), color(c) { }
 
 // 图集数据
 
@@ -1029,6 +1034,8 @@ mesh2d_cx::~mesh2d_cx()
 
 void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip)
 {
+	auto ps0 = vertex.size();
+	auto ix0 = vt_index.size();
 	auto ps = vtxs.size();
 	auto ix = idxs.size();
 	auto ic = vt_index.size();
@@ -1040,7 +1047,8 @@ void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, 
 		cd.push_back({});
 	}
 	auto dt = &cd[cd.size() - 1];
-	if (dt->texid != user_image && dt->clip_rect != clip)
+	auto pidx = idxs.data() + ix;
+	if (dt->texid != user_image || dt->clip_rect != clip)
 	{
 		if (dt->elemCount > 0)
 			cd.push_back({});
@@ -1048,23 +1056,23 @@ void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, 
 		dt->texid = user_image;
 		dt->clip_rect = clip;
 		dt->vtxOffset = ps;
-		dt->idxOffset = 0;
+		dt->idxOffset = ix;
 		dt->elemCount = ic;
-		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
-		memcpy(idxs.data() + ps, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
+		dt->vCount = ps0;
 	}
 	else
 	{
 		// 合批
 		dt->elemCount += ic;
-		memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
-		auto pidx = idxs.data() + ix;
-		memcpy(pidx, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
+		dt->vCount += ps0;
+		auto idt = vt_index.data();
 		for (size_t i = 0; i < ic; i++)
 		{
-			pidx[i] += ix;
+			idt[i] += ix;
 		}
 	}
+	memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
+	memcpy(pidx, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
 
 }
 
@@ -1148,6 +1156,23 @@ void canvas_atlas::apply()
 {
 	if (!valid || (_atlas_t.empty() && _atlas_cx.empty()))return;
 	clear();
+
+	for (auto it : _atlas_cx)
+	{
+		image_rs r = {};
+		if (it->_imgv.empty() || !it->img) { continue; }
+		r.img = it->img;
+		uint32_t color = -1;
+		for (auto& kt : it->_imgv) {
+
+			auto vt = kt.img_rc;
+			r.rect = kt.tex_rc;
+			r.size = { vt.z,vt.w };
+			glm::vec2 npos = vt;
+			r.sliced = kt.sliced;
+			add_image(&r, npos, kt.color ? kt.color : color, it->clip);
+		}
+	}
 	for (auto it : _atlas_t)
 	{
 		image_rs r = {};
@@ -1163,7 +1188,7 @@ void canvas_atlas::apply()
 				r.size = { vt.z,vt.w };
 				glm::vec2 npos = vt;
 				r.sliced = it->sliced[i];
-				add_image(&r, npos, it->colors ? it->colors[i] : color);
+				add_image(&r, npos, it->colors ? it->colors[i] : color, it->clip);
 			}
 		}
 		else {
@@ -1174,24 +1199,8 @@ void canvas_atlas::apply()
 				r.rect = it->tex_rc[i];
 				r.size = { vt.z,vt.w };
 				glm::vec2 npos = vt;
-				add_image(&r, npos, it->colors ? it->colors[i] : color);
+				add_image(&r, npos, it->colors ? it->colors[i] : color, it->clip);
 			}
-		}
-	}
-	for (auto it : _atlas_cx)
-	{
-		image_rs r = {};
-		if (it->_imgv.empty() || !it->img) { continue; }
-		r.img = it->img;
-		uint32_t color = -1;
-		for (auto& kt : it->_imgv) {
-
-			auto vt = kt.img_rc;
-			r.rect = kt.tex_rc;
-			r.size = { vt.z,vt.w };
-			glm::vec2 npos = vt;
-			r.sliced = kt.sliced;
-			add_image(&r, npos, kt.color ? kt.color : color);
 		}
 	}
 	valid = false;
@@ -1290,6 +1299,7 @@ vidptr_t PrimReserve(mesh2d_cx* ctx, int idx_count, int vtx_count)
 {
 	auto dc = &ctx->cmd_data[ctx->cmd_data.size() - 1];
 	dc->elemCount += idx_count;
+	dc->vCount += vtx_count;
 	dc->idxOffset;
 	dc->vtxOffset;
 	auto v = ctx->vtxs.size();
@@ -1322,7 +1332,7 @@ glm::vec4 color2f4(uint32_t c)
 	return color4;
 }
 
-void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color32)
+void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color32, const glm::ivec4& clip)
 {
 	auto& rect = p->rect;
 	auto a = glm::vec4(npos, p->size);
@@ -1339,14 +1349,8 @@ void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color3
 		v4.z = glm::min(v4.z, (float)texsize.x);
 		v4.w = glm::min(v4.w, (float)texsize.y);
 		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y };
-		if (uv.x < 0)
-		{
-			uv.x = 0;
-		}
-		if (uv.y < 0)
-		{
-			uv.y = 0;
-		}
+		if (uv.x < 0) { uv.x = 0; }
+		if (uv.y < 0) { uv.y = 0; }
 	}
 	if (a.z < 0)
 		a.z *= -std::min(rect.z, texsize.x);
@@ -1357,34 +1361,21 @@ void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color3
 	glm::vec4 color3 = color2f4(color32);
 	if (p->sliced.x < 1)
 	{
-		glm::vec2 a1 = pos, b1 = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_b{ uv.z, uv.w };
-		auto ps = _mesh.vtxs.size();
-		auto ix = _mesh.idxs.size();
-		auto ic = 6;
-		auto& cd = _mesh.cmd_data;
-		if (cd.empty())
-		{
-			cd.push_back({});
-		}
-		auto dt = &cd[cd.size() - 1];
-		auto clip = _clip_rect;
-		if (dt->texid != p->img && dt->clip_rect != clip)
-		{
-			if (dt->elemCount > 0)
-				cd.push_back({});
-			dt = &cd[cd.size() - 1];
-			dt->texid = p->img->texid;
-			dt->clip_rect = clip;
-			dt->vtxOffset = ps;
-			dt->idxOffset = 0;
-			dt->elemCount = 0;
-		}
-		auto od = PrimReserve(&_mesh, 6, 4);
-		PrimRectUV(a1, b1, uv_a, uv_b, color3, od.vsize, od.vtx, od.idx);
+		glm::vec2 av = pos, cv = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_c{ uv.z, uv.w };
+		auto& col = color3;
+		glm::vec2 bv(cv.x, av.y), dv(av.x, cv.y), uv_b(uv_c.x, uv_a.y), uv_d(uv_a.x, uv_c.y);
+		static std::vector<int> deidx = { 0,1,2,0,2,3 };
+		std::vector<vertex_v2> vertex = {
+			{av, uv_a, col},
+			{bv, uv_b, col},
+			{cv, uv_c, col},
+			{dv, uv_d, col},
+		};
+		_mesh.add(vertex, deidx, p->img->texid, clip);// 添加矩形(两个三角形)到mesh
 	}
 	else
 	{
-		make_image_sliced(p->img->texid, a, texsize, p->sliced, rect, color32);
+		make_image_sliced(p->img->texid, a, texsize, p->sliced, rect, color32, clip);// 生成九宫格到mesh
 	}
 
 }
@@ -1429,7 +1420,7 @@ sliced.x=左宽，y上高，z右宽，w下高
 
 SDL_Vertex
 */
-void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col)
+void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip)
 {
 	static std::vector<int> vt_index =// { 0,8,12,4,14,6,2,10,11,6,7,4,5,8,9,1,5,13,7,15,11,3 };//E_TRIANGLE_STRIP
 	{ 0, 8, 12, 8, 12, 4, 12, 4, 14, 4, 14, 6, 14, 6, 2, 6, 2, 10,
@@ -1524,7 +1515,7 @@ void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm:
 #endif
 	};
 
-	_mesh.add(vertex, vt_index, user_image, _clip_rect);
+	_mesh.add(vertex, vt_index, user_image, clip);
 
 	return;
 }
@@ -5018,6 +5009,13 @@ void canvas_dev::save()
 #define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
 #define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
 #define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+
+glm::vec4 colorv4(uint32_t rgba) {
+	return { SP_RGBA32_R_F(rgba), SP_RGBA32_G_F(rgba), SP_RGBA32_B_F(rgba), SP_RGBA32_A_F(rgba) };
+}
+glm::vec4 colorv4_bgr(uint32_t bgra) {
+	return { SP_RGBA32_B_F(bgra), SP_RGBA32_G_F(bgra),SP_RGBA32_R_F(bgra), SP_RGBA32_A_F(bgra) };
+}
 void set_color(cairo_t* cr, uint32_t rgba)
 {
 	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
@@ -16054,10 +16052,14 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 	if (px0) {
 		r.img_rc = { 0,0,ss.x,ss.y };
 		r.tex_rc = { ps.x,ps.y,ss.x,ss.y };
-		r.sliced = { rs.radius,rs.radius,rs.radius,rs.radius };
+		r.sliced.x = r.sliced.y = r.sliced.z = r.sliced.w = rs.radius + 1;
 		r.color = -1;
 		img = px0;
 	}
+#ifdef _DEBUG
+	image_save_png(sur, "temp/gshadow.png");
+#endif
+	free_image_cr(sur);
 	cairo_destroy(cr);
 	return r;
 }
@@ -16661,8 +16663,9 @@ void plane_cx::set_shadow(const rect_shadow_t& rs)
 	a->img = gs->img;
 	a->img->type = 1;
 	auto ss = get_size();
-	ss += rs.radius * 2;
+	ss -= rs.radius * 2;
 	rcs.img_rc = { -rs.radius,-rs.radius,ss.x,ss.y };
+	rcs.img_rc.x = rcs.img_rc.y = rs.radius;
 	a->add(&rcs, 1);
 	add_atlas(a);
 }

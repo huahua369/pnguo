@@ -162,6 +162,7 @@ public:
 	vertex_v2();
 	vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c);
 	vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c);
+	vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4  c);
 };
 
 // 简易stb_image加载
@@ -211,6 +212,7 @@ public:
 		uint32_t vtxOffset = 0;
 		uint32_t idxOffset = 0;
 		uint32_t elemCount = 0;
+		uint32_t vCount = 0;
 	};
 	std::vector<draw_cmd_c> cmd_data;	// 渲染命令
 	std::vector<vertex_v2> vtxs;		// 顶点数据
@@ -263,11 +265,11 @@ public:
 	// 窗口调用 
 	void apply();	// 创建顶点啥的
 private:
-	void add_image(image_rs* r, const glm::vec2& pos, uint32_t color);
+	void add_image(image_rs* r, const glm::vec2& pos, uint32_t color, const glm::ivec4& clip);
 	void clear();	//清除渲染数据
 	bool nohas_clip(glm::ivec4 a);
 	// 创建九宫格顶点
-	void make_image_sliced(void* img, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col);
+	void make_image_sliced(void* img, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip);
 };
 
 /*
@@ -1785,6 +1787,8 @@ void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2&
 // 加载svg或图片
 cairo_surface_t* load_imagesvg(const std::string& fn, float scale);
 
+glm::vec4 colorv4(uint32_t rgba);
+glm::vec4 colorv4_bgr(uint32_t bgra);
 void set_color(cairo_t* cr, uint32_t rgba);
 void set_color_bgr(cairo_t* cr, uint32_t c);
 void set_color_a(cairo_t* cr, uint32_t rgba, double a);

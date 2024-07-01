@@ -800,6 +800,17 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 				it->img->texid = 0;
 			}
 		}
+		for (auto it : p->_atlas_cx)
+		{
+			if (it->img && it->img->texid)
+			{
+				auto ptx = (SDL_Texture*)it->img->texid;
+				SDL_DestroyTexture(ptx);
+				auto& v = p->_texs_t;
+				v.erase(std::remove(v.begin(), v.end(), ptx), v.end());
+				it->img->texid = 0;
+			}
+		}
 		p->valid = true;
 		p->_renderer = renderer;
 		p->destroy_texture_cb = (void(*)(void* tex))SDL_DestroyTexture;
@@ -1438,6 +1449,21 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 
 	if (dc->viewport.z > 0 && dc->viewport.w > 0)
 		SDL_SetRenderViewport(renderer, (SDL_Rect*)&dc->viewport);
+	SDL_Rect r0 = {};
+	{
+		glm::vec2 clip_min((dc->_clip_rect.x - clip_off.x) * clip_scale.x, (dc->_clip_rect.y - clip_off.y) * clip_scale.y);
+		glm::vec2 clip_max((dc->_clip_rect.z - clip_off.x) * clip_scale.x, (dc->_clip_rect.w - clip_off.y) * clip_scale.y);
+		if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
+		{
+			//SDL_SetRenderClipRect(renderer, 0);
+		}
+		else
+		{
+			r0 = { (int)(clip_min.x), (int)(clip_min.y), (int)(clip_max.x - clip_min.x), (int)(clip_max.y - clip_min.y) };
+			//SDL_SetRenderClipRect(renderer, &r0);
+		}
+	}
+
 	auto av = &dc->_mesh;
 	auto vd = (SDL_Vertex*)av->vtxs.data();
 	auto idv = av->idxs.data();
@@ -1459,7 +1485,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 		}
 		//SDL_SetTextureBlendMode(states.texture, states.blendMode);
 		auto tex = (SDL_Texture*)pcmd.texid;
-		SDL_RenderGeometry(renderer, tex, vd + pcmd.vtxOffset, vbs - pcmd.vtxOffset, ibs ? idv - pcmd.idxOffset : nullptr, pcmd.elemCount);
+		SDL_RenderGeometry(renderer, tex, vd + pcmd.vtxOffset, pcmd.vCount, ibs ? idv + pcmd.idxOffset : nullptr, pcmd.elemCount);
 	}
 }
 void form_x::present()
@@ -1865,7 +1891,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w };
 		SDL_SetTextInputRect(&rect);
