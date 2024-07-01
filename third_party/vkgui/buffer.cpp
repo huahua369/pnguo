@@ -129,7 +129,7 @@ namespace hz {
 			_cmdstack = new operate_stack();
 			_cmdstack->free_cb = [=](undoable_operate* p)
 				{
-					push_able(unobj, (text_able*)p);
+					push_able(0, (text_able*)p);
 				};
 		}
 
@@ -138,8 +138,7 @@ namespace hz {
 
 	buffer_t::~buffer_t()
 	{
-		if (_storage)delete _storage; _storage = 0;
-		if (unobj)delete unobj; unobj = 0;
+		if (_storage)delete _storage; _storage = 0; 
 		if (_cmdstack)delete _cmdstack; _cmdstack = 0;
 	}
 
@@ -331,7 +330,7 @@ namespace hz {
 	{
 		assert(!(!str || length < 1));
 		if (!str || !_cmdstack)return;
-		text_able* p = get_able(unobj);
+		text_able* p = get_able(0);
 		p->_op_type = e_undo::OP_UNDO;
 		{
 			cmd_text_t ct;
@@ -355,7 +354,7 @@ namespace hz {
 		{
 			return;
 		}
-		text_able* p = get_able(unobj);
+		text_able* p = get_able(0);
 		p->_op_type = e_undo::OP_UNDO;
 		{
 			cmd_text_t ct;
@@ -371,13 +370,13 @@ namespace hz {
 			_cmdstack->push_operate(p);
 		}
 		else {
-			push_able(unobj, p);
+			push_able(0, p);
 		}
 	}
 	// glm::ivec2 pos, glm::ivec2 pos2
 	void buffer_t::cmd_remove(const std::vector<glm::ivec4>& vpos)
 	{
-		text_able* p = get_able(unobj);
+		text_able* p = get_able(0);
 		p->_op_type = e_undo::OP_UNDO;
 		for (auto& it : vpos)
 		{
@@ -394,7 +393,7 @@ namespace hz {
 			_cmdstack->push_operate(p);
 		}
 		else {
-			push_able(unobj, p);
+			push_able(0, p);
 		}
 	}
 

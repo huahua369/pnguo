@@ -186,8 +186,8 @@ namespace hz {
 	};
 	// 节点保存字符串信息
 	struct piece_t {
-		glm::ivec2 _start;	// 位置开始
-		glm::ivec2 _end;	// 结尾
+		glm::ivec2 _start = {};	// 位置开始
+		glm::ivec2 _end = {};	// 结尾
 
 		int length = 0;			// 字符数,utf8
 		int lineFeedCnt = 0;	// 换行符数
@@ -270,7 +270,6 @@ namespace hz {
 		size_t nodeStartOffset;
 	};
 	class text_able;
-	class objs_text_able_cx;
 	// todo buffer
 	class buffer_t
 	{
@@ -319,12 +318,6 @@ namespace hz {
 		int _line_average = 0;
 		int _rl[2] = {};
 		std::map<int, int> _linesize;
-		// 撤销管理
-		objs_text_able_cx* unobj = 0;
-		// 撤销栈内存专用
-		//auto_destroy_cx _dcun;
-		//pmalloc_t<piece_t> _acn;
-
 		PieceTree* _storage = 0;
 	public:
 		buffer_t();
@@ -480,8 +473,6 @@ namespace hz {
 		};
 		vline_t _lastVisitedLine = {};
 		size_t _node_count = 0;
-		//auto_destroy_cx adc;
-		//pmalloc_t<node_rbt> _acn;
 		std::set<node_rbt*> _gf;
 	public:
 		PieceTree();
@@ -584,30 +575,5 @@ namespace hz {
 		//void free_node(node_rbt* p);
 	};
 
-#if 0
-	// 简易创建对象
-	template<typename Ty, typename alloc_ty, typename ...Args>
-	Ty* newObj(alloc_ty& ac, Ty*& ret, Args...args)
-	{
-
-		Ty* p = (Ty*)ac.allocate_bytes(sizeof(Ty));
-		if (p)
-		{
-			ac.construct(p, args...);
-		}
-		ret = p;
-		return p;
-	}
-	template<typename Ty, typename alloc_ty>
-	void freeObj(Ty* p, alloc_ty* ac)
-	{
-		if (p && ac)
-		{
-			ac->destroy(p);
-			ac->deallocate_bytes(p, sizeof(Ty));
-		}
-}
-#endif
-	//}
 }
 //!hz
