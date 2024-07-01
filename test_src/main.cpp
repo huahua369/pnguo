@@ -13,6 +13,7 @@
 #include <vulkan/vulkan.h>
 #include <vkvg/vkvgcx.h>
 
+#include <vkgui/buffer.h>
 /*
 	todo
 	输入数据，自动创建控件、窗口
@@ -406,6 +407,7 @@ int main()
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
 	loadtestdata();
+	auto buf = new hz::buffer_t();
 	auto qyt = new	uint16_t[256 * 384];
 	qyt[0] = -1;
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
@@ -723,6 +725,13 @@ int main()
 				draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
 				return;
 			};
+		{
+			rect_shadow_t rs = {};
+			rs.cfrom = { 0,1,0,0.8 }, rs.cto = { 0.0,0.5,0.0,0.5 };
+			rs.radius = 8;
+			rs.segment = 8;
+			p->set_shadow(rs);
+		}
 	}
 
 

@@ -4095,10 +4095,12 @@ void split_v(std::string str, const std::string& pattern, std::vector<std::strin
 
 layout_text_x::layout_text_x()
 {
+	gs = new gshadow_cx();
 }
 
 layout_text_x::~layout_text_x()
 {
+	if (gs)delete gs; gs = 0;
 	for (auto it : msu) {
 		free_image_cr(it);
 	}
@@ -4462,103 +4464,6 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fo
 	return opt;
 }
 
-#endif // 1
-
-
-
-
-#if 1
-
-#ifndef UTF8_FIRST
-#define UTF8_ASCII(b) (((unsigned char)(b)>=0x00)&&((unsigned char)(b)<=0x7F))
-#define UTF8_FIRST(b) (((unsigned char)(b)>=0xC0)&&((unsigned char)(b)<=0xFD))
-#define UTF8_OTHER(b) (((unsigned char)(b)>=0x80)&&((unsigned char)(b)<=0xBF))
-#endif // UTF8_FIRST
-//根据首字节,获取utf8字符后续所占字节数
-int get_utf8_last_num(unsigned char ch)
-{
-	static unsigned char t[] = {
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00,
-		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-		0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
-		0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0, 0 };
-	return t[ch];
-}
-int64_t get_utf8_count(const char* buffer, int64_t len)
-{
-	const char* p = 0, * pend = buffer + len;
-	int64_t count = 0;
-	if (!buffer || len <= 0)
-	{
-		return 0;
-	}
-	for (p = buffer; p < pend; p++)
-	{
-		if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
-		{
-			count++;
-			//p += get_utf8_last_num(*p);
-		}
-	}
-	return count;
-}
-// 获取一个utf8字符串开始位置
-const char* get_utf8_first(const char* str)
-{
-	const char* p = str;
-	for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p++);
-	return p;
-}
-// 获取前一个utf8位置
-const char* get_utf8_prev(const char* str)
-{
-	const char* p = str;
-	for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p--);
-	return p;
-}
-// 获取第n个字符的位置
-const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len = -1)
-{
-	const char* p = 0, * pend = (len == -1 ? (char*)len : buffer + len);
-	int64_t count = 0;
-	if (!buffer || len == 0)
-	{
-		return 0;
-	}
-	for (p = buffer; *p && p < pend; p++)
-	{
-		if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
-		{
-			count++;
-			if (count > pos)
-			{
-				break;
-			}
-		}
-	}
-	return p;
-}
 #endif // 1
 
 
@@ -5845,18 +5750,19 @@ cairo_surface_t* new_image_cr(image_ptr_t* img)
 	}
 	return image;
 }
-cairo_surface_t* new_image_cr(const glm::ivec2& size)
+cairo_surface_t* new_image_cr(const glm::ivec2& size, uint32_t* data)
 {
 	cairo_surface_t* image = 0;
 	image_ptr_t img[1] = {};
 	img->width = size.x;
 	img->height = size.y;
 	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
-	auto px = new uint32_t[img->width * img->height];
+	auto px = data ? data : new uint32_t[img->width * img->height];
 	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
 	if (image)
 	{
-		image_set_ud(image, key_def_data, px, destroy_image_data);
+		if (!data)
+			image_set_ud(image, key_def_data, px, destroy_image_data);
 		memset(px, 0, img->width * img->height * sizeof(int));
 	}
 	else {
@@ -8539,7 +8445,7 @@ namespace md {
 	{
 		uint32_t utf8state = 0;
 		uint32_t codepoint = 0;
-		str = utf8_char_pos(str, idx);
+		str = utf8_char_pos(str, idx, -1);
 		for (; str && *str; str++) {
 			if (fons_decutf8(&utf8state, &codepoint, *((const unsigned char*)str)))
 				continue;
@@ -8614,7 +8520,108 @@ namespace md {
 		}
 		return r;
 	}
+
+
+
+#if 1
+
+#ifndef UTF8_FIRST
+#define UTF8_ASCII(b) (((unsigned char)(b)>=0x00)&&((unsigned char)(b)<=0x7F))
+#define UTF8_FIRST(b) (((unsigned char)(b)>=0xC0)&&((unsigned char)(b)<=0xFD))
+#define UTF8_OTHER(b) (((unsigned char)(b)>=0x80)&&((unsigned char)(b)<=0xBF))
+#endif // UTF8_FIRST
+	//根据首字节,获取utf8字符后续所占字节数
+	int get_utf8_last_num(unsigned char ch)
+	{
+		static unsigned char t[] = {
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00,
+			0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+			0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+			0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+			0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+			0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0, 0 };
+		return t[ch];
+	}
+	int64_t get_utf8_count(const char* buffer, int64_t len)
+	{
+		const char* p = 0, * pend = buffer + len;
+		int64_t count = 0;
+		if (!buffer || len <= 0)
+		{
+			return 0;
+		}
+		for (p = buffer; p < pend; p++)
+		{
+			if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
+			{
+				count++;
+				//p += get_utf8_last_num(*p);
+			}
+		}
+		return count;
+	}
+	// 获取一个utf8字符串开始位置
+	const char* get_utf8_first(const char* str)
+	{
+		const char* p = str;
+		for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p++);
+		return p;
+	}
+	// 获取前一个utf8位置
+	const char* get_utf8_prev(const char* str)
+	{
+		const char* p = str;
+		for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p--);
+		return p;
+	}
+	// 获取第n个字符的位置
+	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len)
+	{
+		const char* p = 0, * pend = (len == -1 ? (char*)len : buffer + len);
+		int64_t count = 0;
+		if (!buffer || len == 0)
+		{
+			return 0;
+		}
+		for (p = buffer; *p && p < pend; p++)
+		{
+			if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
+			{
+				count++;
+				if (count > pos)
+				{
+					break;
+				}
+			}
+		}
+		return p;
+	}
+#endif // 1
+
+
 }
+//!md
+
+
 struct font_impl :public stbtt_fontinfo
 {
 
@@ -12474,6 +12481,55 @@ image_ptr_t* bitmap_cache_cx::push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* po
 	}
 	return pt->get();
 }
+image_ptr_t* bitmap_cache_cx::push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2* pos, int linegap, uint32_t col)
+{
+	int width = bitmap->width + linegap, height = bitmap->height + linegap;
+	glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->height };
+
+	auto pt = get_last_packer(false);
+	if (!pt)return 0;
+	auto ret = pt->push_rect({ width, height }, pos);
+	if (!ret)
+	{
+		pt = get_last_packer(true);
+		ret = pt->push_rect({ width, height }, pos);
+	}
+	if (ret)
+	{
+		rc4.x = pos->x;
+		rc4.y = pos->y;
+		image_ptr_t src = *bitmap, dst = {};
+		auto ptr = pt->get();
+		dst.data = (uint32_t*)ptr->data;
+		dst.width = ptr->width;
+		dst.height = ptr->height;
+
+		switch (bitmap->comp)
+		{
+		case 0:
+		{
+			src.comp = 1;
+			bit_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, col);
+		}
+		break;
+		case 1:
+		{
+			src.comp = 1;
+			gray_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, col, true);
+		}
+		break;
+		case 4:
+		{
+			rgba_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, true);
+		}
+		break;
+		default:
+			break;
+		}
+		ptr->valid = 1; // 更新缓存标志
+	}
+	return pt->get();
+}
 image_ptr_t* bitmap_cache_cx::push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, image_ptr_t* oldimg, int linegap)
 {
 	int width = bitmap->width + linegap, height = bitmap->rows + linegap;
@@ -14302,7 +14358,7 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 		cursor = nk.x;
 	}
 	auto cp = str + cursor;
-	auto chp = get_utf8_first(cp);
+	auto chp = md::get_utf8_first(cp);
 	int ps = chp - cp;
 	cursor += ps;
 	cursor;
@@ -15394,7 +15450,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 glm::ivec2 get_cl(char* str, int cursor)
 {
 	auto cp = str + cursor;
-	auto chp = get_utf8_first(cp);
+	auto chp = md::get_utf8_first(cp);
 	int ps = chp - cp;
 	cursor += ps;
 	int n = 0;
@@ -15410,7 +15466,7 @@ int get_cl_count(char* str, int c0, int c1)
 	for (size_t i = c0; i < c1; i++)
 	{
 		auto cp = str + i;
-		auto chp = get_utf8_first(cp);
+		auto chp = md::get_utf8_first(cp);
 		int ps = chp - cp;
 		i += ps;
 		n++;
@@ -15488,7 +15544,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 	{
 		if (!remove_bounds()) {
 			const char* str = _text.c_str();
-			auto p = get_utf8_prev(str + ctx->ccursor - 1);
+			auto p = md::get_utf8_prev(str + ctx->ccursor - 1);
 			size_t idx = p - str;
 			size_t ct = ctx->ccursor - idx;
 			remove_char(idx, ct);//删除一个字符
@@ -15525,7 +15581,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 	{
 		if (!remove_bounds()) {
 			const char* str = _text.c_str();
-			auto p = get_utf8_first(str + ctx->ccursor + 1);
+			auto p = md::get_utf8_first(str + ctx->ccursor + 1);
 			size_t idx = p - str;
 			size_t ct = idx - ctx->ccursor;
 			remove_char(ctx->ccursor, ct);
@@ -15561,7 +15617,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		else
 		{
 			const char* str = _text.c_str();
-			auto p = get_utf8_first(str + ctx->ccursor + 1);
+			auto p = md::get_utf8_first(str + ctx->ccursor + 1);
 			size_t idx = p - str;
 			ctx->ccursor = idx;
 		}
@@ -15579,7 +15635,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		else
 		{
 			const char* str = _text.c_str();
-			auto p = get_utf8_prev(str + ctx->ccursor - 1);
+			auto p = md::get_utf8_prev(str + ctx->ccursor - 1);
 			size_t idx = p - str;
 			ctx->ccursor = idx;
 		}
@@ -15602,7 +15658,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		else
 		{
 			const char* str = _text.c_str() + lp2.x;
-			auto p = utf8_char_pos(str, x);
+			auto p = md::utf8_char_pos(str, x, -1);
 			x = p - _text.c_str();
 		}
 		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = x;
@@ -15624,7 +15680,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		else
 		{
 			const char* str = _text.c_str() + lp2.x;
-			auto p = utf8_char_pos(str, x);
+			auto p = md::utf8_char_pos(str, x, -1);
 			x = p - _text.c_str();
 		}
 		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = x;
@@ -15967,7 +16023,47 @@ void tview_x::hit_test(const glm::vec2& ps)
 
 #endif // !NO_TVIEW
 
+#if 1
+gshadow_cx::gshadow_cx()
+{
+}
 
+gshadow_cx::~gshadow_cx()
+{
+}
+
+image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
+{
+	image_sliced_t r = {};
+	glm::ivec2 ss = { rs.radius * 3, rs.radius * 3 };
+	timg.resize(ss.x * ss.y);
+	auto sur = new_image_cr(ss, timg.data());
+	cairo_t* cr = cairo_create(sur);
+	// 边框阴影
+	draw_rectangle_gradient(cr, ss.x, ss.y, rs);
+
+	image_ptr_t px = {};
+	px.width = ss.x;
+	px.height = ss.y;
+	px.type = 1;
+	px.stride = ss.x * sizeof(int);
+	px.data = timg.data();
+	px.comp = 4;
+	glm::ivec2 ps = {};
+	auto px0 = bcc.push_cache_bitmap(&px, &ps);
+	if (px0) {
+		r.img_rc = { 0,0,ss.x,ss.y };
+		r.tex_rc = { ps.x,ps.y,ss.x,ss.y };
+		r.sliced = { rs.radius,rs.radius,rs.radius,rs.radius };
+		r.color = -1;
+		img = px0;
+	}
+	cairo_destroy(cr);
+	return r;
+}
+
+
+#endif
 
 void widget_on_event(widget_base* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
 
@@ -16550,6 +16646,25 @@ bool plane_cx::hittest(const glm::ivec2& p)
 	}
 	//printf("%p\t%d\n", this, (int)r);
 	return r;
+}
+
+gshadow_cx* plane_cx::get_gs()
+{
+	return ltx ? ltx->gs : nullptr;
+}
+
+void plane_cx::set_shadow(const rect_shadow_t& rs)
+{
+	auto gs = get_gs();
+	auto rcs = gs->new_rect(rs);
+	auto a = new atlas_cx();
+	a->img = gs->img;
+	a->img->type = 1;
+	auto ss = get_size();
+	ss += rs.radius * 2;
+	rcs.img_rc = { -rs.radius,-rs.radius,ss.x,ss.y };
+	a->add(&rcs, 1);
+	add_atlas(a);
 }
 
 void plane_cx::on_motion(const glm::vec2& pos) {

@@ -75,6 +75,7 @@ list(APPEND src_cmp
 "third_party/vkgui/mapView.cpp"
 "third_party/vkgui/tinysdl3.cpp"
 "third_party/vkgui/pnguo.cpp"
+"third_party/vkgui/buffer.cpp"
 "third_party/vkgui/win_core.cpp" 
 "third_party/tinyspline/parson.c"
 "third_party/tinyspline/tinyspline.c"

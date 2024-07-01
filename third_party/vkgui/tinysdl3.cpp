@@ -756,6 +756,34 @@ SDL_PixelFormatEnum get_rgbafe() {
 	int depth = 32;
 	return SDL_GetPixelFormatEnumForMasks(depth, rmask, gmask, bmask, amask);
 }
+SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
+	SDL_Texture* pr = 0;
+	if (img && img->width > 0 && img->height > 0)
+	{
+		SDL_Texture* ptx = (SDL_Texture*)img->texid;
+		if (renderer && !ptx)
+		{
+			auto ty = img->type;
+			if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
+			if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
+			ptx = SDL_CreateTexture(renderer, (SDL_PixelFormatEnum)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
+			img->texid = ptx;
+			img->valid = true;
+			pr = ptx;
+			// 设置texture 混合模式
+			//SDL_SetTextureBlendMode(p, SDL_BLENDMODE_BLEND);
+			SDL_SetTextureBlendMode(ptx, get_blend((BlendMode_e)img->blendmode, img->multiply));
+		}
+		if (img->data && img->valid)
+		{
+			//print_time a("SDL_UpdateTexture");
+			img->valid = false;
+			if (img->stride < 1)img->stride = img->width * 4;
+			SDL_UpdateTexture(ptx, 0, img->data, img->stride);
+		}
+	}
+	return pr;
+}
 void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 {
 	if (!p)return;
@@ -778,30 +806,15 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 	}
 	for (auto it : p->_atlas_t)
 	{
-		if (it->img && it->img->width > 0 && it->img->height > 0)
-		{
-			SDL_Texture* ptx = (SDL_Texture*)it->img->texid;
-			if (renderer && !ptx)
-			{
-				auto ty = it->img->type;
-				if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
-				if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
-				ptx = SDL_CreateTexture(renderer, (SDL_PixelFormatEnum)ty, it->img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, it->img->width, it->img->height);
-				it->img->texid = ptx;
-				it->img->valid = true;
-				p->_texs_t.push_back(ptx);
-				// 设置texture 混合模式
-				//SDL_SetTextureBlendMode(p, SDL_BLENDMODE_BLEND);
-				SDL_SetTextureBlendMode(ptx, get_blend((BlendMode_e)it->img->blendmode, it->img->multiply));
-			}
-			if (p && it->img->data && it->img->valid)
-			{
-				//print_time a("SDL_UpdateTexture");
-				it->img->valid = false;
-				if (it->img->stride < 1)it->img->stride = it->img->width * 4;
-				SDL_UpdateTexture(ptx, 0, it->img->data, it->img->stride);
-			}
-		}
+		auto ptx = newuptex(renderer, it->img);
+		if (ptx)
+			p->_texs_t.push_back(ptx);
+	}
+	for (auto it : p->_atlas_cx)
+	{
+		auto ptx = newuptex(renderer, it->img);
+		if (ptx)
+			p->_texs_t.push_back(ptx);
 	}
 
 	p->apply();

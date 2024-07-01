@@ -26,6 +26,12 @@ struct input_state_t;
 #define BIT_INC(x) (1<<x)
 #endif
 
+namespace md {
+	int64_t get_utf8_count(const char* buffer, int64_t len);
+	const char* get_u8_last(const char* str, uint32_t* codepoint);
+	uint32_t get_u8_idx(const char* str, int64_t idx);
+	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
+}
 namespace pg
 {
 	std::string to_string(double _Val);
@@ -117,7 +123,7 @@ struct image_ptr_t
 	uint32_t* data = 0;			// 像素数据
 	void* texid = 0;			// 纹理指针
 	void* ptr = 0;				// 用户数据
-	int comp = 4;				// 通道数
+	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
 	int  blendmode = 0;			// 混合模式
 	bool static_tex = false;	// 静态纹理
 	bool multiply = false;		// 预乘的纹理
@@ -446,6 +452,7 @@ public:
 	~bitmap_cache_cx();
 	// 复制像素到装箱，从pos返回坐标
 	image_ptr_t* push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
+	image_ptr_t* push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
 	// 叠加到已有位置
 	image_ptr_t* push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, image_ptr_t* ret, int linegap = 0);
 	// 清空所有缓存
@@ -759,6 +766,7 @@ struct text_atlas_t
 	atlas_t atlas = {};
 	image_ptr_t ipt = {};
 };
+class gshadow_cx;
 class layout_text_x
 {
 public:
@@ -775,6 +783,8 @@ public:
 	// todo
 	std::vector<atlas_cx> tem_iptr;
 	glm::ivec2 ctrc = {}, oldrc = {};
+
+	gshadow_cx* gs = 0;
 public:
 	layout_text_x();
 	~layout_text_x();
@@ -1540,6 +1550,22 @@ struct rect_shadow_t
 	*/
 	cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
 };
+// 阴影管理
+class gshadow_cx
+{
+public:
+	bitmap_cache_cx bcc = {};				// 纹理缓存
+	atlas_cx atc = {};
+	std::vector<uint32_t> timg;
+	image_ptr_t* img = 0;
+public:
+	gshadow_cx();
+	~gshadow_cx();
+	image_sliced_t new_rect(const rect_shadow_t& rs);
+private:
+
+};
+
 // 面板，继承图集
 class plane_cx :public canvas_atlas
 {
@@ -1622,6 +1648,10 @@ public:
 	void mk_layout();
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
+public:
+	gshadow_cx* get_gs();
+	// 设置边框阴影
+	void set_shadow(const rect_shadow_t& rs);
 private:
 	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 	void on_motion(const glm::vec2& pos);
@@ -1797,7 +1827,7 @@ glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, c
 #define key_def_data_done 1000
 #endif
 cairo_surface_t* new_image_cr(image_ptr_t* img);
-cairo_surface_t* new_image_cr(const glm::ivec2& size);
+cairo_surface_t* new_image_cr(const glm::ivec2& size, uint32_t* data = 0);
 void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
 void free_image_cr(cairo_surface_t* image);
 void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void (*destroy_func)(void* data));
