@@ -459,12 +459,14 @@ void loadtestdata()
 
 canvas_atlas* set_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const glm::ivec2& pos)
 {
-	auto gs = new gshadow_cx();
 	auto p = new canvas_atlas();
+	auto gs = p->new_gs();
 	auto rcs = gs->new_rect(rs);
 	auto a = new atlas_cx();
 	a->img = gs->img;
 	a->img->type = 1;
+	a->autofree = true; 
+	p->autofree = true;
 	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
 	rcs.img_rc.x = rcs.img_rc.y = rs.radius;
 	a->add(&rcs, 1);
@@ -545,10 +547,10 @@ int main()
 	ptf.flags = ef_vulkan | ef_resizable;
 	ptf.has_renderer = true;
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-
+	//form0->_focus_lost_hide = true;
 	// 菜单窗口
 	form_x* mf1 = new_form_popup(form0, 500, 500);
-	std::vector<std::string> mvs = { "m1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
+	std::vector<std::string> mvs = { (char*)u8"测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
 	auto m1 = new_menu(mf1, 230, mvs, [](int idx)
 		{
 			printf("click:%d\n", idx);
@@ -678,6 +680,7 @@ int main()
 			gb2->rounding = 14;
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
+					mf1->show();
 					//form1->bind(listp);	// 绑定到新窗口	
 					listp->draggable = false;
 					listp->set_pos({});

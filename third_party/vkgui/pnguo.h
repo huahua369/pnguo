@@ -188,6 +188,7 @@ public:
 	image_ptr_t* img = 0;
 	glm::ivec4 clip = {};	// 裁剪区域
 	std::vector<image_sliced_t> _imgv;
+	bool autofree = 0;
 public:
 	atlas_cx();
 	~atlas_cx();
@@ -221,7 +222,7 @@ public:
 private:
 
 };
-
+class gshadow_cx;
 // 图集画布
 class canvas_atlas
 {
@@ -235,6 +236,7 @@ public:
 	};
 	mesh2d_cx _mesh;
 
+	std::vector<gshadow_cx*> _gs;		// 阴影管理
 	std::vector<atlas_cx*> _atlas_cx;	// 显示的图集
 	std::vector<atlas_t*> _atlas_t;		// 显示的图集
 	std::vector<void* > _texs_t;		// 图集的纹理
@@ -244,9 +246,11 @@ public:
 	void(*destroy_texture_cb)(void* tex) = 0;//删除纹理回调 
 	bool valid = false;
 	bool visible = true;
+	bool autofree = 0;
 public:
 	canvas_atlas();
 	~canvas_atlas();
+	gshadow_cx* new_gs();
 	void add_atlas(atlas_cx* p);	// 添加显示的图集
 	void remove_atlas(atlas_cx* p);	// 删除显示的图集
 	void add_atlas(atlas_t* p);		// 添加显示的图集
@@ -1556,6 +1560,7 @@ public:
 	atlas_cx atc = {};
 	std::vector<uint32_t> timg;
 	image_ptr_t* img = 0;
+	bool autofree = 0;
 public:
 	gshadow_cx();
 	~gshadow_cx();

@@ -1108,6 +1108,21 @@ canvas_atlas::~canvas_atlas()
 			}
 		}
 	}
+	for (auto it : _gs) {
+		if (it && it->autofree)delete it;
+	}
+	_gs.clear();
+	for (auto it : _atlas_cx) {
+		if (it && it->autofree)delete it;
+	}
+	_atlas_cx.clear();
+}
+gshadow_cx* canvas_atlas::new_gs()
+{
+	auto p = new gshadow_cx();
+	p->autofree = 1;
+	_gs.push_back(p);
+	return p;
 }
 void canvas_atlas::add_atlas(atlas_cx* p)
 {

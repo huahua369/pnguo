@@ -7,6 +7,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>  
+#include <SDL3/SDL_system.h>  
 #include <vulkan/vulkan.h>
 #ifdef _WIN32
 #include <windows.h>
@@ -246,6 +247,34 @@ int sem_s::wait_try()
 }
 // 窗口应用管理
 #if 1
+
+#ifdef _WIN32
+
+SDL_bool wMessageHook(void* userdata, MSG* msg) {
+	auto app = (app_cx*)userdata;
+	if (app && msg)
+	{
+		switch (msg->message)
+		{
+		case WM_NCLBUTTONDOWN:
+		case WM_NCRBUTTONDOWN:
+		case WM_NCMBUTTONDOWN:
+			app->nc_down = true;
+			break;
+		case WM_NCLBUTTONUP:
+		case WM_NCRBUTTONUP:
+		case WM_NCMBUTTONUP:
+			app->nc_down = false;
+			break;
+		default:
+			break;
+		}
+	}
+	return 1;
+}
+#endif
+
+
 app_cx::app_cx()
 {
 	set_col_u8();
@@ -292,6 +321,7 @@ app_cx::app_cx()
 	set_fps(_fps);
 #if _WIN32
 	auto hr = OleInitialize(NULL);
+	SDL_SetWindowsMessageHook(wMessageHook, this);
 #endif
 }
 
@@ -419,6 +449,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	{
 		SDL_SetWindowHitTest(window, HitTestCallback2, pw);
 	}
+
 #endif
 	pw->init_dragdrop();
 	forms.push_back(pw);
@@ -525,6 +556,16 @@ int app_cx::get_event()
 		}
 		call_cb(&e);
 		break;
+	}
+	if (nc_down)
+	{
+		for (auto it : forms) {
+			it->hide_child();
+		}
+		//printf("event:1\t%d\n", (int)e.type);
+		nc_down = false;
+	}
+	else { 
 	}
 	clearf();
 	if (forms.empty())
@@ -885,6 +926,11 @@ form_x::~form_x()
 	}
 	events = 0;
 	events_a = 0;
+	for (auto it : atlas) {
+		if (it && it->autofree)
+			delete it;
+	}
+	atlas.clear();
 	for (auto it : childfs) {
 		it->_ptr = 0;
 		app->remove(it);
@@ -1183,7 +1229,6 @@ ole_drop_et*/
 bool on_call_emit(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return false;
-	static int xx = 0;
 	switch (e->type)
 	{
 	case SDL_EVENT_MOUSE_MOTION:
@@ -1239,6 +1284,10 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		ft.touchId = e->tfinger.fingerID;
 		ft.x = e->tfinger.x; ft.y = e->tfinger.y;
 		ft.pressure = e->tfinger.pressure;
+		if (e->type == SDL_EVENT_FINGER_DOWN)
+		{
+			pw->hide_child();
+		}
 		pw->trigger((uint32_t)devent_type_e::finger_e, &ft);
 
 	}break;
@@ -1253,6 +1302,10 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		t.clicks = e->button.clicks;
 		t.x = e->button.x;
 		t.y = e->button.y;
+		if (t.state)
+		{
+			pw->hide_child();
+		}
 		pw->trigger((uint32_t)devent_type_e::mouse_button_e, &t);
 		if (pw && pw->capture_type)
 		{
@@ -1261,8 +1314,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 				pw->set_capture();		// 锁定鼠标	
 			}
 			else {
-				pw->release_capture();	// 释放鼠标
-				xx = 0;
+				pw->release_capture();	// 释放鼠标			
 				// 开始输入法
 				if (pw->input_ptr)
 				{
@@ -1307,7 +1359,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		pw->trigger((uint32_t)devent_type_e::keyboard_e, &t);
 	}
 	break;
-	}
+}
 	return false;
 }
 int on_call_we(const SDL_Event* e, form_x* pw)
@@ -1350,11 +1402,12 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 		}break;
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
 		{
-
+			pw->focus_lost();
 		}break;
 		case SDL_EVENT_WINDOW_MINIMIZED:
 		{
 			pw->save_size = pw->_size;
+			pw->hide_child();
 			pw->on_size({});
 		}break;
 		case SDL_EVENT_WINDOW_RESTORED:
@@ -1397,6 +1450,13 @@ void form_x::update(float delta)
 	// Setup display size (every frame to accommodate for window resizing)
 	int w, h;
 	int display_w, display_h;
+#ifdef _WIN32
+	//glm::vec2 mps = {  };
+	//auto ms = SDL_GetMouseState(&mps.x, &mps.y);
+	//if (ms) {
+	//	hide_child();
+	//}
+#endif
 	SDL_GetWindowSize(_ptr, &w, &h);
 	if (SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED)
 		w = h = 0;
@@ -1615,6 +1675,26 @@ bool form_x::hittest(const glm::ivec2& pos)
 		}
 	}
 	return _HitTest;
+}
+
+void form_x::focus_lost()
+{
+	if (_focus_lost_hide)
+	{
+		hide();
+	}
+	else
+	{
+		hide_child();
+	}
+}
+
+void form_x::hide_child()
+{
+	for (auto it : childfs) {
+		if (it->_focus_lost_hide)
+			it->hide();
+	}
 }
 
 
@@ -1894,7 +1974,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
@@ -2130,6 +2210,7 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		if (form1) {
 			form1->set_alpha(true);
 			form1->mmove_type = 0;
+			form1->_focus_lost_hide = true;
 		}
 	}
 	return form1;

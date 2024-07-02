@@ -74,6 +74,7 @@ public:
 	uint32_t prev_time = 0;
 	int _fps = 26;
 	int fms = 0;
+	bool nc_down = 0;
 public:
 	app_cx();
 	~app_cx();
@@ -155,6 +156,7 @@ public:
 	bool mmove_type = true;		// 鼠标拖动
 	bool _HitTest = true;
 	bool _ref = false;
+	bool _focus_lost_hide = false;	// 失去焦点隐藏
 public:
 	form_x();
 	~form_x();
@@ -246,6 +248,8 @@ public:
 	void new_tool_tip(const glm::ivec2& pos, const void* str);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
+	void focus_lost();
+	void hide_child();
 private:
 };
 
