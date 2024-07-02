@@ -13,6 +13,7 @@
 #include <vulkan/vulkan.h>
 #include <vkvg/vkvgcx.h>
 
+#include <vkgui/event.h>
 #include <vkgui/buffer.h>
 /*
 	todo
@@ -465,7 +466,7 @@ canvas_atlas* set_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const gl
 	auto a = new atlas_cx();
 	a->img = gs->img;
 	a->img->type = 1;
-	a->autofree = true; 
+	a->autofree = true;
 	p->autofree = true;
 	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
 	rcs.img_rc.x = rcs.img_rc.y = rs.radius;
@@ -678,9 +679,13 @@ int main()
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
+			gb2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
+				{
+					if ((int)event_type2::on_down == type)
+						mf1->show_reverse();
+				};
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
-					mf1->show();
 					//form1->bind(listp);	// 绑定到新窗口	
 					listp->draggable = false;
 					listp->set_pos({});

@@ -157,6 +157,8 @@ public:
 	bool _HitTest = true;
 	bool _ref = false;
 	bool _focus_lost_hide = false;	// 失去焦点隐藏
+	bool visible = true;
+	bool visible_old = true; 
 public:
 	form_x();
 	~form_x();
@@ -179,6 +181,7 @@ public:
 	// 显示/隐藏窗口
 	void show();
 	void hide();
+	void show_reverse();
 	// 置顶窗口
 	void raise();
 	bool get_visible();

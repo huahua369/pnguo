@@ -261,11 +261,11 @@ SDL_bool wMessageHook(void* userdata, MSG* msg) {
 		case WM_NCMBUTTONDOWN:
 			app->nc_down = true;
 			break;
-		case WM_NCLBUTTONUP:
-		case WM_NCRBUTTONUP:
-		case WM_NCMBUTTONUP:
-			app->nc_down = false;
-			break;
+			//case WM_NCLBUTTONUP:
+			//case WM_NCRBUTTONUP:
+			//case WM_NCMBUTTONUP:
+			//	app->nc_down = false;
+			//	break;
 		default:
 			break;
 		}
@@ -554,19 +554,18 @@ int app_cx::get_event()
 		if (e.type == SDL_EVENT_KEY_UP) {
 			SDL_SetEventEnabled(SDL_EVENT_KEY_DOWN, 1);
 		}
+		if (nc_down)
+		{
+			for (auto it : forms) {
+				it->hide_child();
+			}
+			//printf("event:1\t%d\n", (int)e.type);
+			nc_down = false;
+		}
 		call_cb(&e);
 		break;
 	}
-	if (nc_down)
-	{
-		for (auto it : forms) {
-			it->hide_child();
-		}
-		//printf("event:1\t%d\n", (int)e.type);
-		nc_down = false;
-	}
-	else { 
-	}
+
 	clearf();
 	if (forms.empty())
 	{
@@ -587,6 +586,21 @@ int app_cx::run_loop(int t)
 			for (auto it : forms)
 			{
 				it->update(delta);
+				if (it->visible_old != it->visible)
+				{
+					it->visible_old = it->visible;
+					if (it->visible)
+					{
+						auto flags = SDL_GetWindowFlags(it->_ptr);
+						//SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU ? "1" : "0");
+						SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, (flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU) ? "0" : "1");
+						SDL_ShowWindow(it->_ptr);
+					}
+					else
+					{
+						SDL_HideWindow(it->_ptr);
+					}
+				}
 			}
 
 			for (auto it : forms)
@@ -1146,13 +1160,13 @@ void form_x::close() {
 }
 // 显示/隐藏窗口
 void form_x::show() {
-	auto flags = SDL_GetWindowFlags(_ptr);
-	//SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU ? "1" : "0");
-	SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU ? "0" : "1");
-	SDL_ShowWindow(_ptr);
+	visible = true;
 }
 void form_x::hide() {
-	SDL_HideWindow(_ptr);
+	visible = false;
+}
+void form_x::show_reverse() {
+	visible = !visible_old;
 }
 void form_x::raise()
 {
@@ -1307,6 +1321,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 			pw->hide_child();
 		}
 		pw->trigger((uint32_t)devent_type_e::mouse_button_e, &t);
+
 		if (pw && pw->capture_type)
 		{
 			if (t.state)
@@ -1359,7 +1374,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		pw->trigger((uint32_t)devent_type_e::keyboard_e, &t);
 	}
 	break;
-}
+	}
 	return false;
 }
 int on_call_we(const SDL_Event* e, form_x* pw)
@@ -1407,7 +1422,6 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 		case SDL_EVENT_WINDOW_MINIMIZED:
 		{
 			pw->save_size = pw->_size;
-			pw->hide_child();
 			pw->on_size({});
 		}break;
 		case SDL_EVENT_WINDOW_RESTORED:
@@ -1540,7 +1554,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 }
 void form_x::present()
 {
-	if (!renderer || !app || !app->r2d || display_size.x < 1 || display_size.y < 1)return;
+	if (!visible || !renderer || !app || !app->r2d || display_size.x < 1 || display_size.y < 1)return;
 	float rsx = 1.0f;
 	float rsy = 1.0f;
 	SDL_GetRenderScale(renderer, &rsx, &rsy);
@@ -1974,7 +1988,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
