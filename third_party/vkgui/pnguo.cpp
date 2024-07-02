@@ -7249,7 +7249,6 @@ view_g::view_g()
 	ruler[1].fx = &fx;
 	ruler[1]._orientation = 1;
 	vcanvas = new tinyviewcanvas_x();
-	rss = new_clip_rect(5);
 }
 
 view_g::~view_g()
@@ -7261,8 +7260,6 @@ view_g::~view_g()
 	_backing_store = 0;
 	if (rss)
 	{
-		//auto rd = (uint32_t*)cairo_image_surface_get_data(rss);
-		//if (rd)delete[]rd;
 		cairo_surface_destroy(rss);
 	}
 	rss = 0;
@@ -15851,7 +15848,7 @@ private:
 
 tview_x::tview_x()
 {
-	rss = new_clip_rect(5);
+	//rss = new_clip_rect(5);
 }
 
 tview_x::~tview_x()
@@ -15906,7 +15903,8 @@ void tview_x::end_frame(cairo_t* cr) {
 	if (!_backing_store_valid)
 	{
 		_backing_store_valid = true;
-		clip_rect(cr, rss);
+		if (rss)
+			clip_rect(cr, rss);
 		cairo_destroy(cr);
 	}
 }
@@ -16180,6 +16178,7 @@ void plane_cx::set_size(const glm::ivec2& ss) {
 	{
 		viewport.z = ss.x; viewport.w = ss.y;
 		_clip_rect = { 0,0,ss.x,ss.y };
+		uplayout = true;
 		if (tv)
 			tv->set_size(ss);
 		else
@@ -16655,6 +16654,7 @@ flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& 
 
 void plane_cx::mk_layout()
 {
+	uplayout = false;
 	if (custom_layout)return;// 自定义布局计算则退出默认而已计算
 	flex_item root;
 	auto ss = get_size();
@@ -16690,7 +16690,6 @@ void plane_cx::mk_layout()
 		}
 		delete[] c;
 	}
-	uplayout = false;
 }
 bool vht(const std::vector<widget_base*>& widgets, const glm::ivec2& p, glm::ivec2 ips, const glm::ivec2& scroll_pos) {
 	bool r = false;

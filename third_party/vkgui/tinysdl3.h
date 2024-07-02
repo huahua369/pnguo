@@ -227,6 +227,7 @@ public:
 	void move2end(plane_cx* p);
 	dev_info_cx get_dev();
 	glm::ivec2 get_size();
+	void set_pos(const glm::vec2& pos);
 	// 是否支持Bindless
 	bool has_variable();
 public:

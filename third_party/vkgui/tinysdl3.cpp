@@ -1792,6 +1792,11 @@ glm::ivec2 form_x::get_size()
 {
 	return _size;
 }
+void form_x::set_pos(const glm::vec2& pos)
+{
+	if (_ptr)
+		SDL_SetWindowPosition(_ptr, pos.x, pos.y);
+}
 SDL_Texture* form_x::new_texture(image_raw_x* p, bool multiply)
 {
 	return (!p || p->w < 2 || p->h < 2) ? nullptr : new_texture(p->w, p->h, p->format, p->data, p->pitch, 0, false, multiply);
@@ -1891,13 +1896,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+	}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
