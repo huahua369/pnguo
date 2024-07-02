@@ -457,13 +457,42 @@ void loadtestdata()
 	}
 }
 
+canvas_atlas* set_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const glm::ivec2& pos)
+{
+	auto gs = new gshadow_cx();
+	auto p = new canvas_atlas();
+	auto rcs = gs->new_rect(rs);
+	auto a = new atlas_cx();
+	a->img = gs->img;
+	a->img->type = 1;
+	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
+	rcs.img_rc.x = rcs.img_rc.y = rs.radius;
+	a->add(&rcs, 1);
+	p->add_atlas(a);
+	return p;
+}
 plane_cx* new_menu(form_x* f, int width, const std::vector<std::string>& v, std::function<void(int idx)> cb) {
 	auto p = new plane_cx();
 	if (p)
 	{
 		if (width < 1)
 			width = 100;
-		p->border = { 0xff505050,1,0 };
+
+		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
+		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
+
+		rect_shadow_t rs = {};
+		rs.cfrom = { 0.43,0.4,0.9,1 }, rs.cto = { 0.43,0.4,0.9,1 };
+		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
+		//rs.cfrom = { 1,0.01,0.09,1 }, rs.cto = { 0,0.01,0.9,1 };
+		rs.radius = 10;
+		rs.segment = 8;
+		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
+		ss += 10;
+		auto pa = set_shadow(rs, ss, {});
+		f->add_canvas_atlas(pa);
+		ss -= 10;
+		p->border = { 0xff606060,1,0 };
 		p->fontsize = 16;
 		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
 		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
@@ -473,7 +502,6 @@ plane_cx* new_menu(form_x* f, int width, const std::vector<std::string>& v, std:
 		f->bind(p);
 		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 		p->add_familys(fontn, 0);
-		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
 		size_t i = 0;
 		for (auto& it : v) {
 			auto pcb = p->add_cbutton(it, iss, 2);
@@ -488,8 +516,9 @@ plane_cx* new_menu(form_x* f, int width, const std::vector<std::string>& v, std:
 			}
 			i++;
 		}
-		p->set_size({ width,i * iss.y + 6 });
+		p->set_size(ss);
 		p->set_pos({ 10,10 });
+
 	}
 	return p;
 }
@@ -515,12 +544,8 @@ int main()
 	ptf.size = ws;
 	ptf.flags = ef_vulkan | ef_resizable;
 	ptf.has_renderer = true;
-	//form_x* form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-	ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;//ef_tooltip;// | ef_utility;
-	ptf.size = { 820,620 };
-	ptf.parent = form0;
-	ptf.pos = { 1600,2200 };
+
 	// 菜单窗口
 	form_x* mf1 = new_form_popup(form0, 500, 500);
 	std::vector<std::string> mvs = { "m1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
@@ -560,6 +585,11 @@ int main()
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
 	pw->bind(pl4);
+	pl1->set_rss(5);
+	pl2->set_rss(5);
+	pl3->set_rss(5);
+	pl4->set_rss(5);
+	listp->set_rss(5);
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
@@ -819,7 +849,7 @@ int main()
 				draw_ellipse(cr, { 200,200 }, { 120,20 });
 				fill_stroke(cr, 0xf0805c42, 0xff0080ff, 2, false);
 				draw_ellipse(cr, { 400,200 }, { 120,20 });
-				fill_stroke(cr, 0x8ffa2000, 0xff0000ff, 2, false);
+				fill_stroke(cr, 0x8ffa2000, 0xff4d4dff, 2, false);
 				auto ltx = p->ltx;
 				if (svginc)
 				{

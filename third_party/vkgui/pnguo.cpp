@@ -16747,6 +16747,12 @@ void plane_cx::set_shadow(const rect_shadow_t& rs)
 	add_atlas(a);
 }
 
+void plane_cx::set_rss(int r)
+{
+	if (tv)
+		tv->set_rss(r);
+}
+
 void plane_cx::on_motion(const glm::vec2& pos) {
 	glm::ivec2 ps = pos;
 	if (ckinc > 0 && draggable)

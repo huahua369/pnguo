@@ -1706,8 +1706,10 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 	const int RESIZE_AREA = 8;
 	const int RESIZE_AREAC = RESIZE_AREA * 2;
 	SDL_HitTestResult ret = SDL_HITTEST_NORMAL;
+	auto fw = (form_x*)data;
 	do
 	{
+		if (fw && fw->mmove_type == false)break;
 		// Resize top
 		if (area->x < RESIZE_AREAC && area->y < RESIZE_AREAC)
 		{
@@ -1726,24 +1728,20 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 			ret = SDL_HITTEST_RESIZE_TOP; break;
 		}
 
-		auto fw = (form_x*)data;
 		int tbh = 0;
 		if (fw)
 		{
-			if (fw->mmove_type)
-			{
-				tbh = fw->titlebarheight;
-				if (tbh > 0) {
-					if (area->y < tbh && area->x < winWidth - 128)
-					{
-						// Title bar
-						ret = SDL_HITTEST_DRAGGABLE; break;
-					}
-				}
-				else if (!fw->hittest({ area->x,area->y }))
+			tbh = fw->titlebarheight;
+			if (tbh > 0) {
+				if (area->y < tbh && area->x < winWidth - 128)
 				{
+					// Title bar
 					ret = SDL_HITTEST_DRAGGABLE; break;
 				}
+			}
+			else if (!fw->hittest({ area->x,area->y }))
+			{
+				ret = SDL_HITTEST_DRAGGABLE; break;
 			}
 		}
 
@@ -1896,13 +1894,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-	}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)

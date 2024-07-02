@@ -1652,7 +1652,9 @@ public:
 public:
 	gshadow_cx* get_gs();
 	// 设置边框阴影
-	void set_shadow(const rect_shadow_t& rs);
+	void set_shadow(const rect_shadow_t& rs); 
+	// 圆角裁剪
+	void set_rss(int r);
 private:
 	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 	void on_motion(const glm::vec2& pos);
