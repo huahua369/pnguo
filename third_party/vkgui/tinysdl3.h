@@ -148,10 +148,11 @@ public:
 
 	std::mutex lkecb;
 	// 标题栏高度
-	int titlebarheight = 22;
+	int titlebarheight = 0;
 	// 锁定鼠标
 	bool capture_type = true;
 	bool close_type = true;		// 关闭按钮风格：true关闭退出，false则隐藏窗口
+	bool mmove_type = true;		// 鼠标拖动
 	bool _HitTest = true;
 	bool _ref = false;
 public:
@@ -302,3 +303,9 @@ int run_app(void* app, int count);
 app_cx* new_app();
 void* new_app0();
 void free_app(void* app);
+
+// 菜单窗口
+form_x* new_form_popup(form_x* parent, int width, int height);
+// 提示窗口
+form_x* new_form_tooltip(form_x* parent, int width, int height);
+

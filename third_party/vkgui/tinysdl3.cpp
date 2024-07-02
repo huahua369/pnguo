@@ -1727,17 +1727,24 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 		}
 
 		auto fw = (form_x*)data;
-		int tbh = 22;
+		int tbh = 0;
 		if (fw)
 		{
-			tbh = fw->titlebarheight;
-			if (!fw->hittest({ area->x,area->y }))
-				ret = SDL_HITTEST_DRAGGABLE; break;
-		}
-		else if (area->y < tbh && area->x < winWidth - 128)
-		{
-			// Title bar
-			ret = SDL_HITTEST_DRAGGABLE; break;
+			if (fw->mmove_type)
+			{
+				tbh = fw->titlebarheight;
+				if (tbh > 0) {
+					if (area->y < tbh && area->x < winWidth - 128)
+					{
+						// Title bar
+						ret = SDL_HITTEST_DRAGGABLE; break;
+					}
+				}
+				else if (!fw->hittest({ area->x,area->y }))
+				{
+					ret = SDL_HITTEST_DRAGGABLE; break;
+				}
+			}
 		}
 
 		if (area->x < RESIZE_AREAC && area->y > winHeight - RESIZE_AREAC)
@@ -2102,4 +2109,45 @@ void form_move2end(form_x* f, plane_cx* ud) {
 }
 void form_set_input_ptr(form_x* f, void* ud) {
 	if (f) { f->set_input_ptr(ud); }
+}
+
+form_x* new_form_popup(form_x* parent, int width, int height)
+{
+	form_x* form1 = 0;
+	if (parent && width > 0 && height > 0)
+	{
+		form_newinfo_t ptf = {};
+		ptf.app = parent->app; ptf.title = (char*)u8"menu";
+		ptf.size = { width,height };
+		ptf.has_renderer = true;
+		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;
+		ptf.parent = parent;
+		ptf.pos = { 0,0 };
+		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+		if (form1) {
+			form1->set_alpha(true);
+			form1->mmove_type = 0;
+		}
+	}
+	return form1;
+}
+form_x* new_form_tooltip(form_x* parent, int width, int height)
+{
+	form_x* form1 = 0;
+	if (parent && width > 0 && height > 0)
+	{
+		form_newinfo_t ptf = {};
+		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
+		ptf.size = { width,height };
+		ptf.has_renderer = true;
+		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_tooltip;//  ef_utility;
+		ptf.parent = parent;
+		ptf.pos = { 0,0 };
+		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+		if (form1) {
+			form1->set_alpha(true);
+			form1->mmove_type = 0;
+		}
+	}
+	return form1;
 }
