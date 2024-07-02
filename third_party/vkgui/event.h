@@ -97,6 +97,7 @@ struct text_editing_et
 struct text_input_et
 {
 	char* text;  // The input text 
+	int x, y, w, h;
 };
 // touch事件结构体
 struct finger_et {
@@ -167,6 +168,7 @@ struct input_state_t
 {
 	void* ptr = 0;
 	std::function<void(uint32_t type, et_un_t* e, void* ud)> cb = nullptr;
+	int x, y, w, h;
 };
 #endif
 

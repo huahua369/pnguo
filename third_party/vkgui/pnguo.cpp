@@ -1,12 +1,23 @@
 ﻿
 /*
+	Copyright (c) 华仔
+	188665600@qq.com
 
-xatlas
+	本文件的实现：骨骼动画、图集、控件、面板、字体管理、字体软光栅渲染、flex布局算法、简易路径path_v、样条线、stb加载图片、svg加载、cairo画布输出svg等
 
-2024-05-10 添加按钮控件
-2024-05-07 添加输入框控件
-2024-04-07 创建本文件，实现2d骨骼动画
+	关系：窗口->面板->控件/图形
+	面板持有控件，窗口分发事件给面板。
 
+
+	2024-07-01	增加矩形阴影生成。修复九宫格mesh渲染。
+	2024-06-19	增加slider_tl滑块控件
+	2024-06-18	增加网格视图算法初步实现grid_view
+	2024-05-10 添加按钮控件
+	2024-05-07 添加输入框控件
+	2024-04-07 创建本文件，实现2d骨骼动画
+
+	xatlas模型uv展开库
+	todo菜单：独立窗口(可选)-面板（单选、多选、图文按钮）
 */
 
 #if 1
@@ -15190,7 +15201,8 @@ void edit_tl::set_align(const glm::vec2& a)
 glm::ivec4 edit_tl::input_pos() {
 	auto p = this;
 	glm::ivec2 cpos = p->ctx->cursor_pos;
-	return { p->ppos + p->ctx->pos + cpos - p->ctx->scroll_pos + p->ctx->_align_pos,2, p->ctx->cursor_pos.z + 2 };
+	return { p->ppos + p->ctx->pos + cpos - p->ctx->scroll_pos + p->ctx->_align_pos
+		,2, p->ctx->cursor_pos.z + 2 };
 }
 std::string edit_tl::get_select_str()
 {
@@ -15304,14 +15316,6 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			}
 			if (p->state)
 			{
-				if (ep->form)
-				{
-					if (parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); };
-					ctx->c_d = -1; is_input = true;
-				}
-				else {
-					ctx->c_d = 0; is_input = false;
-				}
 				auto bp = ctx->cur_select;
 				if (ctx->hover_text)
 				{
@@ -15322,6 +15326,14 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					ctx->ckselect = 0;
 					ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = cx;
 					ctx->up_cursor(true);
+				}
+				if (ep->form)
+				{
+					if (parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); };
+					ctx->c_d = -1; is_input = true;
+				}
+				else {
+					ctx->c_d = 0; is_input = false;
 				}
 				mdown = true;
 			}
@@ -15370,22 +15382,27 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 	{
 		if (!is_input)break;
 		auto& p = e->e;
-		ctx->caret_old = ctx->ccursor;
+		bool setimepos = false;
+		if (ctx->caret_old != ctx->ccursor)
+		{
+			ctx->caret_old = ctx->ccursor; setimepos = true;
+		}
 		std::string str;
 		if (p->text) {
 			str = p->text;
 		}
-		else {
-			str.clear();
-		}
-		//printf("text_editing_e:%s\n", str.c_str());
 		if (str.size())
 		{
-			auto ipos = input_pos();
+			setimepos = true;
+		}
+		if (setimepos)
+		{
+			auto ipos = input_pos();// 计算输入法坐标
 			p->x = ipos.x;
 			p->y = ipos.y;
 			p->w = ipos.z;
 			p->h = ipos.w;
+			//printf("text_editing_e:%s\t%d\n", str.c_str(), ipos.x);
 		}
 		ctx->set_editing(str);
 	}
@@ -15395,6 +15412,11 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 		auto p = e->t;
 		remove_bounds();
 		inputchar(p->text);
+		auto ipos = input_pos();// 计算输入法坐标
+		p->x = ipos.x;
+		p->y = ipos.y + 3;
+		p->w = ipos.z;
+		p->h = ipos.w;
 	}
 	break;
 	case devent_type_e::finger_e:
@@ -15756,6 +15778,7 @@ input_state_t* get_input_state(void* ptr, int t)
 		if (r.ptr)
 		{
 			auto p = (edit_tl*)r.ptr;
+			p->ctx->editingstr.clear();
 			p->is_input = false;
 		}
 		r.ptr = ptr;
@@ -15763,6 +15786,10 @@ input_state_t* get_input_state(void* ptr, int t)
 	if (ptr && r.ptr)
 	{
 		auto p = (edit_tl*)r.ptr;
+		if (p) {
+			*((glm::ivec4*)&r.x) = p->input_pos();
+			r.y += 3;
+		}
 		if (!r.cb)
 			r.cb = [](uint32_t type, et_un_t* e, void* ud) { if (ud) { ((edit_tl*)ud)->on_event_e(type, e); }	};
 	}
@@ -16234,12 +16261,12 @@ void plane_cx::set_scroll_size(const glm::ivec2& ps, bool v)
 	if (v)
 	{
 		if (vertical)
-		vertical->size = ps;
+			vertical->size = ps;
 	}
 	else
 	{
 		if (horizontal)
-		horizontal->size = ps;
+			horizontal->size = ps;
 	}
 }
 

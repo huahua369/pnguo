@@ -134,6 +134,7 @@ public:
 	std::string title;
 	char* clipstr = 0;
 	input_state_t* input_ptr = 0;	// 接收输入法的对象
+	glm::ivec4 ime_pos = {};
 	void* activate_ptr = 0;	// 激活的对象
 	std::vector<event_fw>* events = 0;
 	std::vector<event_fw>* events_a = 0;

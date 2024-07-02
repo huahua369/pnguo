@@ -1267,6 +1267,8 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 				if (pw->input_ptr)
 				{
 					pw->start_text_input();
+					auto irc = (glm::ivec4*)&pw->input_ptr->x;
+					pw->set_ime_pos(*irc);
 				}
 			}
 		}
@@ -1277,6 +1279,8 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		text_input_et t = {};
 		t.text = e->text.text;
 		pw->trigger((uint32_t)devent_type_e::text_input_e, &t);
+		auto irc = (glm::ivec4*)&t.x;
+		pw->set_ime_pos(*irc);
 	}
 	break;
 	case SDL_EVENT_TEXT_EDITING:
@@ -1859,8 +1863,9 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 {
 	do
 	{
-		if (r.w < 0 && r.z < 0)break;
-#ifdef xx_WIN32
+		if (!(r.w >= 0 && r.z > 0))break;
+		ime_pos = r;
+#ifdef _WIN320
 		auto hWnd = (HWND)pce::get_windowptr(_ptr);
 		if (!hWnd)break;
 		HIMC hIMC = ::ImmGetContext(hWnd);
@@ -1881,7 +1886,8 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			::ImmReleaseContext(hWnd, hIMC);
 		}
 #else 
-		SDL_Rect rect = { r.x,r.y, r.z, r.w };
+		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
+		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
 	} while (0);
