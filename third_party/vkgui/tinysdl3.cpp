@@ -623,21 +623,6 @@ int app_cx::run_loop(int t)
 			for (auto it : forms)
 			{
 				it->update(delta);
-				if (it->visible_old != it->visible)
-				{
-					it->visible_old = it->visible;
-					if (it->visible)
-					{
-						auto flags = SDL_GetWindowFlags(it->_ptr);
-						//SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU ? "1" : "0");
-						SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, (flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU) ? "0" : "1");
-						SDL_ShowWindow(it->_ptr);
-					}
-					else
-					{
-						SDL_HideWindow(it->_ptr);
-					}
-				}
 			}
 
 			for (auto it : forms)
@@ -1198,13 +1183,19 @@ void form_x::close() {
 }
 // 显示/隐藏窗口
 void form_x::show() {
-	visible = true;
+
+	lock_auto_x lx(&lkqcv);
+	qcmd_value.push({ (int)fcv_type::e_show,0,0,0 });
 }
 void form_x::hide() {
-	visible = false;
+
+	lock_auto_x lx(&lkqcv);
+	qcmd_value.push({ (int)fcv_type::e_hide,0,0,0 });
 }
 void form_x::show_reverse() {
-	visible = !visible_old;
+
+	lock_auto_x lx(&lkqcv);
+	qcmd_value.push({ (int)fcv_type::e_visible_rev,0,0,0 });
 }
 void form_x::raise()
 {
@@ -1496,22 +1487,77 @@ void form_x::destroy()
 		SDL_DestroyRenderer(renderer); renderer = 0;
 	}
 }
+void show_window(SDL_Window* ptr, bool visible) {
 
+	if (visible)
+	{
+		auto flags = SDL_GetWindowFlags(ptr);
+		//SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU ? "1" : "0");
+		SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, (flags & SDL_WINDOW_TOOLTIP || flags & SDL_WINDOW_POPUP_MENU) ? "0" : "1");
+		SDL_ShowWindow(ptr);
+	}
+	else
+	{
+		SDL_HideWindow(ptr);
+	}
+}
 void form_x::update(float delta)
 {
 	// Setup display size (every frame to accommodate for window resizing)
 	int w, h;
 	int display_w, display_h;
-#ifdef _WIN32
-	//glm::vec2 mps = {  };
-	//auto ms = SDL_GetMouseState(&mps.x, &mps.y);
-	//if (ms) {
-	//	hide_child();
-	//}
-#endif
+
 	SDL_GetWindowSize(_ptr, &w, &h);
 	if (SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED)
 		w = h = 0;
+
+	if (qcmd_value.size() && _ptr) {
+		lock_auto_x lx(&lkqcv);
+		glm::ivec2 oldsize = { w,h }, old_pos = get_pos(), ss, ps;
+		for (; qcmd_value.size();)
+		{
+			auto v = qcmd_value.front(); qcmd_value.pop();
+			auto t = (fcv_type)v.x;
+			switch (t)
+			{
+			case fcv_type::e_null:
+				break;
+			case fcv_type::e_show:
+				visible = true;
+				break;
+			case fcv_type::e_hide:
+				visible = false;
+				break;
+			case fcv_type::e_visible_rev:
+				visible = !visible_old;
+				break;
+			case fcv_type::e_size:
+				ss = { v.y, v.z };
+				break;
+			case fcv_type::e_pos:
+				ps = { v.y, v.z };
+				break;
+			default:
+				break;
+			}
+		}
+		if (oldsize != ss)
+			SDL_SetWindowSize(_ptr, ss.x, ss.y);
+		if (visible_old != visible)
+		{
+			visible_old = visible;
+			if (visible && old_pos != ps)
+				SDL_SetWindowPosition(_ptr, ps.x, ps.y);// 显示前移动
+			show_window(_ptr, visible);
+			if (!visible && old_pos != ps)
+				SDL_SetWindowPosition(_ptr, ps.x, ps.y);// 先隐藏再移动
+		}
+		else {
+			if (old_pos != ps)
+				SDL_SetWindowPosition(_ptr, ps.x, ps.y);
+		}
+	}
+
 	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h);
 	display_size = { w, h };
 	if (w > 0 && h > 0)
@@ -1920,12 +1966,26 @@ SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, in
 }
 glm::ivec2 form_x::get_size()
 {
-	return _size;
+	glm::ivec2 r = {};
+	SDL_GetWindowSize(_ptr, &r.x, &r.y);
+	return r;
 }
-void form_x::set_pos(const glm::vec2& pos)
+glm::ivec2 form_x::get_pos()
 {
-	if (_ptr)
-		SDL_SetWindowPosition(_ptr, pos.x, pos.y);
+	glm::ivec2 r = {};
+	SDL_GetWindowPosition(_ptr, &r.x, &r.y);
+	return r;
+}
+void form_x::set_size(const glm::vec2& v)
+{
+	lock_auto_x lx(&lkqcv);
+	qcmd_value.push({ (int)fcv_type::e_size,v,0 });
+}
+void form_x::set_pos(const glm::vec2& v)
+{
+	lock_auto_x lx(&lkqcv);
+	qcmd_value.push({ (int)fcv_type::e_pos,v,0 });
+
 }
 SDL_Texture* form_x::new_texture(image_raw_x* p, bool multiply)
 {
@@ -2026,13 +2086,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-	}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)

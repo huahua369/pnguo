@@ -110,7 +110,14 @@ struct event_fw {
 	void* ptr = 0;
 	std::function<void(uint32_t type, et_un_t* e, void* ud)> cb = nullptr;
 };
-
+enum class fcv_type {
+	e_null,
+	e_show,
+	e_hide,
+	e_visible_rev,
+	e_size,
+	e_pos
+};
 class form_x
 {
 public:
@@ -149,8 +156,8 @@ public:
 	// 默认接收ole
 	hz::drop_info_cx* _oledrop = 0;
 	int _dx = -1, _dy = -1;
-
-	std::mutex lkecb;
+	std::queue<glm::ivec4> qcmd_value;	// 操作列表
+	std::mutex lkecb, lkqcv;
 	// 标题栏高度
 	int titlebarheight = 0;
 	// 锁定鼠标
@@ -160,6 +167,7 @@ public:
 	bool _HitTest = true;
 	bool _ref = false;
 	bool _focus_lost_hide = false;	// 失去焦点隐藏
+private:
 	bool visible = true;
 	bool visible_old = true;
 public:
@@ -235,6 +243,8 @@ public:
 	void move2end(plane_cx* p);
 	dev_info_cx get_dev();
 	glm::ivec2 get_size();
+	glm::ivec2 get_pos();
+	void set_size(const glm::vec2& v);
 	void set_pos(const glm::vec2& pos);
 	// 是否支持Bindless
 	bool has_variable();

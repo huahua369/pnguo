@@ -469,7 +469,7 @@ canvas_atlas* set_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const gl
 	a->autofree = true;
 	p->autofree = true;
 	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
-	rcs.img_rc.x = rcs.img_rc.y = rs.radius;
+	rcs.img_rc.x = rcs.img_rc.y = 0 * rs.radius;
 	a->add(&rcs, 1);
 	p->add_atlas(a);
 	return p;
@@ -485,16 +485,14 @@ plane_cx* new_menu(form_x* f, int width, const std::vector<std::string>& v, std:
 		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
 
 		rect_shadow_t rs = {};
-		rs.cfrom = { 0.43,0.4,0.9,1 }, rs.cto = { 0.43,0.4,0.9,1 };
 		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
-		//rs.cfrom = { 1,0.01,0.09,1 }, rs.cto = { 0,0.01,0.9,1 };
 		rs.radius = 10;
 		rs.segment = 8;
 		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
-		ss += 10;
+		ss += rs.radius;
 		auto pa = set_shadow(rs, ss, {});
 		f->add_canvas_atlas(pa);
-		ss -= 10;
+		ss -= rs.radius;
 		p->border = { 0xff606060,1,0 };
 		p->fontsize = 16;
 		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
@@ -520,8 +518,9 @@ plane_cx* new_menu(form_x* f, int width, const std::vector<std::string>& v, std:
 			i++;
 		}
 		p->set_size(ss);
-		p->set_pos({ 10,10 });
-
+		p->set_pos({ rs.radius * 0,rs.radius * 0 });
+		ss += rs.radius;
+		f->set_size(ss);
 	}
 	return p;
 }
@@ -681,8 +680,15 @@ int main()
 			gb2->rounding = 14;
 			gb2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 				{
+					auto cp = (color_btn*)p;
 					if ((int)event_type2::on_down == type)
-						mf1->show_reverse();
+					{
+						auto cps = cp->get_pos();
+						cps.y += cp->size.y;
+						//mf1->show_reverse();
+						mf1->show();
+						mf1->set_pos(cps);
+					}
 				};
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
@@ -695,7 +701,7 @@ int main()
 					pos.y += btn->size.y;
 					static int xt = 0;
 					//form1->hide();
-					div->add_child(0, { 60,60 });
+					//div->add_child(0, { 60,60 });
 					div->layout();
 					auto cbt = p->add_cbutton((char*)u8"🍑new", { 80,30 }, xt++);
 					if (xt > 4)xt = 0;
@@ -705,6 +711,17 @@ int main()
 					cbt->hscroll = {};
 					cbt->light = 0.36;
 					cbt->rounding = 14;
+					cbt->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
+						{
+							auto cp = (color_btn*)p;
+							if ((int)event_type2::on_down == type)
+							{
+								auto cps = cp->get_pos();
+								cps.y += cp->size.y;
+								mf1->set_pos(cps);
+								mf1->show();
+							}
+						};
 					cbt->click_cb = [=](void* ptr, int clicks)
 						{
 							//form0->bind(listp);	// 绑定到新窗口	

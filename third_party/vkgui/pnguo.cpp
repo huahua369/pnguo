@@ -8,7 +8,7 @@
 	关系：窗口->面板->控件/图形
 	面板持有控件，窗口分发事件给面板。
 
-
+	2024-07-03	增加菜单实现
 	2024-07-01	增加矩形阴影生成。修复九宫格mesh渲染。
 	2024-06-19	增加slider_tl滑块控件
 	2024-06-18	增加网格视图算法初步实现grid_view
@@ -1098,7 +1098,6 @@ canvas_atlas::~canvas_atlas()
 {
 	if (destroy_texture_cb)
 	{
-		//for (auto it : _atlas_t)
 		for (auto it : _texs_t)
 		{
 			if (it)
@@ -4135,6 +4134,7 @@ void layout_text_x::set_ctx(font_rctx* p)
 }
 
 size_t layout_text_x::add_familys(const char* familys, const char* style) {
+	if (!ctx)return 0;
 	assert(ctx);
 	size_t rs = 0;
 	if (ctx && familys && *familys)
@@ -14112,6 +14112,18 @@ void widget_base::draw(cairo_t* cr)
 {
 }
 
+glm::ivec2 widget_base::get_pos()
+{
+	glm::ivec2 ps = pos;
+	if (parent) {
+		auto pss = parent->get_pos();
+		auto ss = parent->get_spos();
+		ss *= hscroll;
+		ps += pss + ss;
+	}
+	return ps;
+}
+
 
 // 编辑框实现
 #ifndef NO_EDIT
@@ -16322,7 +16334,7 @@ void plane_cx::move2end(widget_base* wp)
 
 size_t plane_cx::add_familys(const char* familys, const char* style)
 {
-	return ltx->add_familys(familys, style);
+	return ltx ? ltx->add_familys(familys, style) : 0;
 }
 
 scroll_bar* plane_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v)
@@ -17600,6 +17612,7 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 						int tc = (int)event_type2::on_click; //左键单击
 						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
 						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+						wp->_clicks = p->clicks;
 						wp->on_mevent(tc, mps);
 						if (wp->mevent_cb) {
 							wp->mevent_cb(wp, tc, mps);

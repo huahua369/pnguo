@@ -1118,6 +1118,7 @@ struct widget_base
 	glm::vec2 size = {};	// 控件大小
 	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
 	glm::ivec2 cmpos = {};	// 当前鼠标坐标
+	glm::ivec2 ppos = {};	// 父级坐标 
 	std::string text;
 	std::string family;
 	float font_size = 16;
@@ -1125,7 +1126,8 @@ struct widget_base
 	int rounding = 4;		// 圆角
 	float thickness = 1.0;	// 边框线粗
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
-	std::function<void(void* p, int clicks)> click_cb;						//点击事件
+	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
+	int _clicks = 0;		// 点击数量
 	layout_text_x* ltx = 0;
 
 	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
@@ -1142,6 +1144,7 @@ struct widget_base
 	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
 	virtual void draw(cairo_t* cr);
+	virtual glm::ivec2 get_pos();
 };
 
 
@@ -1157,7 +1160,6 @@ public:
 	std::string _text;								// 保存行文本
 	std::function<void(edit_tl* ptr)> changed_cb;	// 文本改变时执行回调函数
 
-	glm::ivec2 ppos = {};	// 父级坐标 
 	bool single_line = false;
 	bool mdown = false;
 	bool _read_only = false;
