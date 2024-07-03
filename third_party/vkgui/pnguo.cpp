@@ -16916,7 +16916,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	for (size_t i = 0; i < length; i++)
 	{
 		//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
-		auto pw = (widget_base*)event_wts[i];
+		auto pw = event_wts[i];
 		icc++;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		auto vpos = sps * pw->hscroll;
@@ -16926,8 +16926,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			break;
 		}
 	}
-	for (auto it = event_wts1.begin(); it != event_wts1.end(); it++) {
-		auto pw = (widget_base*)*it;
+	auto ln = event_wts1.size();
+	for (size_t i = 0; i < ln; i++)
+	{
+		auto pw = event_wts1[i];
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		auto vpos = sps * pw->hscroll;
 		on_wpe(pw, type, ep, ppos + vpos);
@@ -16937,8 +16939,8 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	if (hpw && t == devent_type_e::mouse_move_e)
 	{
-		for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
-			auto pw = (widget_base*)*it;
+		for (size_t i = 0; i < length; i++) {
+			auto pw = event_wts[i];
 			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue;
 			auto vpos = sps * pw->hscroll;
 			auto p = e->m;
