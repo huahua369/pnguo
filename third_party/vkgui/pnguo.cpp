@@ -16912,8 +16912,11 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	} while (0);
 	widget_base* hpw = 0;
 	int icc = 0;
-	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
-		auto pw = (widget_base*)*it;
+	auto length = event_wts.size();
+	for (size_t i = 0; i < length; i++)
+	{
+		//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
+		auto pw = (widget_base*)event_wts[i];
 		icc++;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		auto vpos = sps * pw->hscroll;
