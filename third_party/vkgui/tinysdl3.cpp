@@ -260,6 +260,7 @@ SDL_bool wMessageHook(void* userdata, MSG* msg) {
 		case WM_NCRBUTTONDOWN:
 		case WM_NCMBUTTONDOWN:
 			app->nc_down = true;
+			app->kncdown();
 			break;
 			//case WM_NCLBUTTONUP:
 			//case WM_NCRBUTTONUP:
@@ -576,7 +577,17 @@ const char* app_cx::get_power_str()
 	auto p = get_power_info();
 	return power_str((SDL_PowerState)p.z);
 }
-
+void app_cx::kncdown()
+{
+	if (nc_down)
+	{
+		for (auto it : forms) {
+			it->hide_child();
+		}
+		//printf("event:1\t \n");
+		nc_down = false;
+	}
+}
 int app_cx::get_event()
 {
 	SDL_Event e = {};
@@ -591,14 +602,6 @@ int app_cx::get_event()
 		if (e.type == SDL_EVENT_KEY_UP) {
 			SDL_SetEventEnabled(SDL_EVENT_KEY_DOWN, 1);
 		}
-		if (nc_down)
-		{
-			for (auto it : forms) {
-				it->hide_child();
-			}
-			//printf("event:1\t%d\n", (int)e.type);
-			nc_down = false;
-		}
 		call_cb(&e);
 		break;
 	}
@@ -607,6 +610,12 @@ int app_cx::get_event()
 	if (forms.empty())
 	{
 		prev_time = 0;
+	}
+	if (e.type) {
+		for (auto it : forms)
+		{
+			it->update_w();
+		}
 	}
 	return ts;
 }
@@ -1501,19 +1510,20 @@ void show_window(SDL_Window* ptr, bool visible) {
 		SDL_HideWindow(ptr);
 	}
 }
-void form_x::update(float delta)
+void form_x::update_w()
 {
-	// Setup display size (every frame to accommodate for window resizing)
 	int w, h;
-	int display_w, display_h;
-
 	SDL_GetWindowSize(_ptr, &w, &h);
 	if (SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED)
 		w = h = 0;
+	_size.x = w;
+	_size.y = h;
+	int qc = qcmd_value.size();
 
 	if (qcmd_value.size() && _ptr) {
+		//printf("mm%d\n", qc);
 		lock_auto_x lx(&lkqcv);
-		glm::ivec2 oldsize = { w,h }, old_pos = get_pos(), ss, ps;
+		glm::ivec2 oldsize = { w,h }, old_pos = get_pos(), ss = oldsize, ps = old_pos;
 		for (; qcmd_value.size();)
 		{
 			auto v = qcmd_value.front(); qcmd_value.pop();
@@ -1523,10 +1533,10 @@ void form_x::update(float delta)
 			case fcv_type::e_null:
 				break;
 			case fcv_type::e_show:
-				visible = true;
+				visible = true; visible_old = false;
 				break;
 			case fcv_type::e_hide:
-				visible = false;
+				visible = false; visible_old = true;
 				break;
 			case fcv_type::e_visible_rev:
 				visible = !visible_old;
@@ -1542,7 +1552,9 @@ void form_x::update(float delta)
 			}
 		}
 		if (oldsize != ss)
+		{
 			SDL_SetWindowSize(_ptr, ss.x, ss.y);
+		}
 		if (visible_old != visible)
 		{
 			visible_old = visible;
@@ -1557,12 +1569,18 @@ void form_x::update(float delta)
 				SDL_SetWindowPosition(_ptr, ps.x, ps.y);
 		}
 	}
+}
+void form_x::update(float delta)
+{
+	// Setup display size (every frame to accommodate for window resizing)
+
+	int display_w, display_h;
 
 	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h);
-	display_size = { w, h };
-	if (w > 0 && h > 0)
+	display_size = _size;
+	if (_size.x > 0 && _size.y > 0)
 	{
-		display_framebuffer_scale = glm::vec2((float)display_w / w, (float)display_h / h);
+		display_framebuffer_scale = glm::vec2((float)display_w / _size.x, (float)display_h / _size.y);
 	}
 	else
 	{
@@ -1583,7 +1601,7 @@ void form_x::update(float delta)
 	for (size_t i = 0; i < length; i++)
 	{
 		auto kt = ktd[i];
-		if (w > 0 && h > 0)
+		if (_size.x > 0 && _size.y > 0)
 		{
 			if (kt->viewport.z <= 0)
 			{

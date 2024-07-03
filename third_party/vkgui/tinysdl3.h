@@ -92,7 +92,8 @@ public:
 	void clearf();
 
 	glm::vec3 get_power_info();
-	const char* get_power_str();
+	const char* get_power_str(); 
+	void kncdown();
 private:
 	int get_event();
 
@@ -249,7 +250,7 @@ public:
 	// 是否支持Bindless
 	bool has_variable();
 public:
-
+	void update_w();
 	void update(float delta);
 	void present();
 

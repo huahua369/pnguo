@@ -458,72 +458,6 @@ void loadtestdata()
 	}
 }
 
-canvas_atlas* set_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const glm::ivec2& pos)
-{
-	auto p = new canvas_atlas();
-	auto gs = p->new_gs();
-	auto rcs = gs->new_rect(rs);
-	auto a = new atlas_cx();
-	a->img = gs->img;
-	a->img->type = 1;
-	a->autofree = true;
-	p->autofree = true;
-	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
-	rcs.img_rc.x = rcs.img_rc.y = 0 * rs.radius;
-	a->add(&rcs, 1);
-	p->add_atlas(a);
-	return p;
-}
-plane_cx* new_menu(form_x* f, int width, const std::vector<std::string>& v, std::function<void(int idx)> cb) {
-	auto p = new plane_cx();
-	if (p)
-	{
-		if (width < 1)
-			width = 100;
-
-		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
-		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
-
-		rect_shadow_t rs = {};
-		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
-		rs.radius = 10;
-		rs.segment = 8;
-		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
-		ss += rs.radius;
-		auto pa = set_shadow(rs, ss, {});
-		f->add_canvas_atlas(pa);
-		ss -= rs.radius;
-		p->border = { 0xff606060,1,0 };
-		p->fontsize = 16;
-		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
-		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.direction = flex_item::flex_direction::COLUMN;
-		f->bind(p);
-		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
-		p->add_familys(fontn, 0);
-		size_t i = 0;
-		for (auto& it : v) {
-			auto pcb = p->add_cbutton(it, iss, 2);
-			pcb->light = 0.051;
-			pcb->effect = uTheme::light;
-			pcb->pdc.hover_border_color = pcb->pdc.border_color;
-			pcb->pdc.border_color = 0;
-			pcb->text_align = { 0.1,0.5 };
-			if (pcb && cb)
-			{
-				pcb->click_cb = [=](void*, int) {cb(i); };
-			}
-			i++;
-		}
-		p->set_size(ss);
-		p->set_pos({ rs.radius * 0,rs.radius * 0 });
-		ss += rs.radius;
-		f->set_size(ss);
-	}
-	return p;
-}
 
 int main()
 {
@@ -551,10 +485,10 @@ int main()
 	// 菜单窗口
 	form_x* mf1 = new_form_popup(form0, 500, 500);
 	std::vector<std::string> mvs = { (char*)u8"测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
-	auto m1 = new_menu(mf1, 230, mvs, [](int idx)
-		{
-			printf("click:%d\n", idx);
-		});
+	//auto m1 = new_menu(mf1, 230, mvs, [](int idx)
+	//	{
+	//		printf("click:%d\n", idx);
+	//	});
 	mf1->set_pos({ 20,20 });
 	// 提示窗口
 	//form_x* new_form_tooltip(form_x * parent, int width, int height);
@@ -684,16 +618,17 @@ int main()
 					if ((int)event_type2::on_down == type)
 					{
 						auto cps = cp->get_pos();
-						cps.y += cp->size.y;
+						cps.y += cp->size.y + cp->thickness;
 						//mf1->show_reverse();
-						mf1->show();
+						cps.y *= -1;
+						//mf1->show();
 						mf1->set_pos(cps);
 					}
 				};
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
 					//form1->bind(listp);	// 绑定到新窗口	
-					listp->draggable = false;
+					listp->draggable = true;
 					listp->set_pos({});
 					//form1->raise();
 					auto btn = (color_btn*)ptr;
@@ -717,9 +652,9 @@ int main()
 							if ((int)event_type2::on_down == type)
 							{
 								auto cps = cp->get_pos();
-								cps.y += cp->size.y;
+								cps.y += cp->size.y + cp->thickness;
 								mf1->set_pos(cps);
-								mf1->show();
+								//mf1->show();
 							}
 						};
 					cbt->click_cb = [=](void* ptr, int clicks)

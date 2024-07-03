@@ -19238,16 +19238,21 @@ dialog_cx::~dialog_cx()
 
 menu_cx::menu_cx()
 {
+	ltx = new layout_text_x();
+	can = new canvas_atlas();
 }
 
 menu_cx::~menu_cx()
 {
 	free_image_cr(icon);
+	if (ltx)delete ltx; ltx = 0;
+	if (can)delete can; can = 0;
 }
 
 void menu_cx::set_fontctx(font_rctx* p)
 {
-	fctx = p;
+	if (p && ltx)
+		ltx->set_ctx(p);
 }
 
 void menu_cx::set_image(const std::string& fn, const glm::ivec2& icon_size, const glm::ivec2& pos, const glm::ivec2& stride, float scale)
@@ -19283,9 +19288,79 @@ menu_cx::node_t* menu_cx::add(const std::string& str, int icon, int id, menu_cx:
 	return ret;
 }
 
+
+plane_cx* menu_cx::new_menu(form_x* f, int width, menu_cx::node_t* np, std::function<void(int idx)> cb)
+{
+	auto p = np->ui ? np->ui : new plane_cx();
+	if (p)
+	{
+		np->ui = p;
+		if (width < 1)
+			width = 100;
+
+		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
+		glm::ivec2 ss = { width,np->child.size() * iss.y + 6 };
+
+		rect_shadow_t rs = {};
+		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
+		rs.radius = 10;
+		rs.segment = 8;
+		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
+		ss += rs.radius;
+		auto pa = new_shadow(rs, ss, {});
+		ss -= rs.radius;
+		p->border = { 0xff606060,1,0 };
+		p->fontsize = 16;
+		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
+		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
+		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
+		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
+		p->_css.direction = flex_item::flex_direction::COLUMN;
+	
+		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
+		p->add_familys(fontn, 0);
+		size_t i = 0;
+		for (auto& it : np->child) {
+			auto pcb = p->add_cbutton(it.title, iss, 2);
+			pcb->light = 0.051;
+			pcb->effect = uTheme::light;
+			pcb->pdc.hover_border_color = pcb->pdc.border_color;
+			pcb->pdc.border_color = 0;
+			pcb->text_align = { 0.1,0.5 };
+			if (pcb && cb)
+			{
+				pcb->click_cb = [=](void*, int) {cb(i); };
+			}
+			i++;
+		}
+		p->set_size(ss);
+		p->set_pos({ rs.radius * 0,rs.radius * 0 });
+		ss += rs.radius;
+		np->fsize = ss;
+		//f->add_canvas_atlas(pa);
+		//f->bind(p);
+		//f->set_size(ss);
+	}
+	return p;
+}
+
 void menu_cx::apply()
 {
 
+}
+
+atlas_cx* menu_cx::new_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const glm::ivec2& pos)
+{
+	auto rcs = ltx->gs->new_rect(rs);
+	auto a = new atlas_cx();
+	a->img = ltx->gs->img;
+	a->img->type = 1;
+	a->autofree = true;
+	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
+	rcs.img_rc.x = rcs.img_rc.y = 0 * rs.radius;
+	a->add(&rcs, 1);
+	can->add_atlas(a);
+	return a;
 }
 
 

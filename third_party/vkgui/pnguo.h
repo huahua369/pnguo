@@ -1659,7 +1659,7 @@ public:
 public:
 	gshadow_cx* get_gs();
 	// 设置边框阴影
-	void set_shadow(const rect_shadow_t& rs); 
+	void set_shadow(const rect_shadow_t& rs);
 	// 圆角裁剪
 	void set_rss(int r);
 private:
@@ -2054,13 +2054,18 @@ public:
 		int icon = 0;		// 图标序号
 		int id = 0;
 		node_t* parent = 0;	// 父级
+		plane_cx* ui = 0;
+		glm::ivec2 fsize = {};//窗口大小
 		std::list<node_t> child;// 孩子  
 	};
 	std::list<node_t> lvm = {};		// 根菜单
 	std::list<plane_cx> vp = {};	// ui管理
 	node_t* _active = 0;			// 当前激活的菜单
-	font_rctx* fctx = 0;			// 字体管理
+	layout_text_x* ltx = 0;			// 字体管理
+
 	cairo_surface_t* icon = 0;
+	canvas_atlas* can = 0;
+
 	glm::ivec2 _icon_size = {}, _pos = {}, _stride = {};
 	std::function<void(node_t* p)> on_click;
 public:
@@ -2074,6 +2079,8 @@ public:
 
 	// 自动创建ui
 	void apply();
+	atlas_cx* new_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const glm::ivec2& pos);
+	plane_cx* new_menu(form_x* f, int width, menu_cx::node_t* np, std::function<void(int idx)> cb);
 private:
 
 };
