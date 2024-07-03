@@ -90,6 +90,9 @@ public:
 	void set_defcursor(uint32_t t);
 	void remove(form_x* f);
 	void clearf();
+
+	glm::vec3 get_power_info();
+	const char* get_power_str();
 private:
 	int get_event();
 
@@ -158,7 +161,7 @@ public:
 	bool _ref = false;
 	bool _focus_lost_hide = false;	// 失去焦点隐藏
 	bool visible = true;
-	bool visible_old = true; 
+	bool visible_old = true;
 public:
 	form_x();
 	~form_x();

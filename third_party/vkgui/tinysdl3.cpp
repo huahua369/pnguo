@@ -539,6 +539,43 @@ void app_cx::clearf()
 		reforms.pop();
 	}
 }
+const char* power_str(SDL_PowerState t) {
+	const char* r = 0;
+	switch (t)
+	{
+	case SDL_POWERSTATE_ERROR:
+		r = (char*)u8"确定电源状态时出错";
+		break;
+	case SDL_POWERSTATE_UNKNOWN:r = (char*)u8"无法确定电源状态";
+		break;
+	case SDL_POWERSTATE_ON_BATTERY:r = (char*)u8"未插入电源，使用电池运行";
+		break;
+	case SDL_POWERSTATE_NO_BATTERY:r = (char*)u8"无电池";
+		break;
+	case SDL_POWERSTATE_CHARGING:r = (char*)u8"充电中";
+		break;
+	case SDL_POWERSTATE_CHARGED:r = (char*)u8"接通电源，电池已充满";
+		break;
+	default:
+		break;
+	}
+	return r;
+}
+glm::vec3 app_cx::get_power_info()
+{
+	glm::vec3 v = {};
+	int s = 0, p = 0;
+	v.z = SDL_GetPowerInfo(&s, &p);
+	v.x = s < 0 ? 0 : s;
+	v.y = p < 0 ? 0.0 : 0.01 * p;
+	return v;
+}
+
+const char* app_cx::get_power_str()
+{
+	auto p = get_power_info();
+	return power_str((SDL_PowerState)p.z);
+}
 
 int app_cx::get_event()
 {
@@ -607,6 +644,7 @@ int app_cx::run_loop(int t)
 			{
 				it->present();
 			}
+			auto power = get_power_info();
 		}
 		prev_time = curr_time;
 		int gev = get_event();
@@ -1988,13 +2026,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+	}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
