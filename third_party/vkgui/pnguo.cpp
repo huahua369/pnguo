@@ -16911,8 +16911,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		}
 	} while (0);
 	widget_base* hpw = 0;
+	int icc = 0;
 	for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 		auto pw = (widget_base*)*it;
+		icc++;
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
 		auto vpos = sps * pw->hscroll;
 		on_wpe(pw, type, ep, ppos + vpos);
@@ -19275,21 +19277,19 @@ menu_cx::node_t* menu_cx::add(const std::string& str, int icon, int id, menu_cx:
 	v.title = str;
 	v.icon = icon;
 	v.id = id;
+	v.idx = _idx;
+	_idx++;
 	if (!parent)
 	{
-		lvm.push_back(v);
-		ret = &(lvm.back());
+		parent = &lvm;
 	}
-	else
-	{
-		parent->child.push_back(v);
-		ret = &(parent->child.back());
-	}
+	parent->child.push_back(v);
+	ret = &(parent->child.back());
 	return ret;
 }
 
 
-plane_cx* menu_cx::new_menu(form_x* f, int width, menu_cx::node_t* np, std::function<void(int idx)> cb)
+plane_cx* menu_cx::new_menu(int width, int indep, menu_cx::node_t* np, std::function<void(int idx, int id)> cb)
 {
 	auto p = np->ui ? np->ui : new plane_cx();
 	if (p)
@@ -19301,22 +19301,26 @@ plane_cx* menu_cx::new_menu(form_x* f, int width, menu_cx::node_t* np, std::func
 		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
 		glm::ivec2 ss = { width,np->child.size() * iss.y + 6 };
 
-		rect_shadow_t rs = {};
-		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
-		rs.radius = 10;
-		rs.segment = 8;
-		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
-		ss += rs.radius;
-		auto pa = new_shadow(rs, ss, {});
-		ss -= rs.radius;
+		if (sli.tex_rc.x < radius)
+		{
+			rect_shadow_t rs = {};
+			rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
+			rs.radius = radius;
+			rs.segment = 8;
+			rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
+			set_sli(rs);
+		}
+		ss += radius;
+		auto pa = new_shadow(ss, {});
+		ss -= radius;
 		p->border = { 0xff606060,1,0 };
 		p->fontsize = 16;
 		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
 		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
 		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
 		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.direction = flex_item::flex_direction::COLUMN;
-	
+		p->_css.direction = np->dir_row ? flex_item::flex_direction::ROW : flex_item::flex_direction::COLUMN;
+		p->set_fontctx(ltx->ctx);
 		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 		p->add_familys(fontn, 0);
 		size_t i = 0;
@@ -19329,14 +19333,15 @@ plane_cx* menu_cx::new_menu(form_x* f, int width, menu_cx::node_t* np, std::func
 			pcb->text_align = { 0.1,0.5 };
 			if (pcb && cb)
 			{
-				pcb->click_cb = [=](void*, int) {cb(i); };
+				pcb->click_cb = [=](void*, int) {cb(it.idx, it.id); };
 			}
 			i++;
 		}
 		p->set_size(ss);
-		p->set_pos({ rs.radius * 0,rs.radius * 0 });
-		ss += rs.radius;
+		p->set_pos({ radius * 0,radius * 0 });
+		ss += radius;
 		np->fsize = ss;
+		np->indep = indep > 0;
 		//f->add_canvas_atlas(pa);
 		//f->bind(p);
 		//f->set_size(ss);
@@ -19344,20 +19349,26 @@ plane_cx* menu_cx::new_menu(form_x* f, int width, menu_cx::node_t* np, std::func
 	return p;
 }
 
+void menu_cx::set_sli(const rect_shadow_t& rs)
+{
+	if (ltx && ltx->gs)
+		sli = ltx->gs->new_rect(rs);
+}
+
 void menu_cx::apply()
 {
 
 }
 
-atlas_cx* menu_cx::new_shadow(const rect_shadow_t& rs, const glm::ivec2& ss, const glm::ivec2& pos)
+atlas_cx* menu_cx::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
 {
-	auto rcs = ltx->gs->new_rect(rs);
+	auto rcs = sli;
 	auto a = new atlas_cx();
 	a->img = ltx->gs->img;
 	a->img->type = 1;
 	a->autofree = true;
 	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
-	rcs.img_rc.x = rcs.img_rc.y = 0 * rs.radius;
+	rcs.img_rc.x = rcs.img_rc.y = 0;
 	a->add(&rcs, 1);
 	can->add_atlas(a);
 	return a;

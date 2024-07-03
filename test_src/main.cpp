@@ -489,7 +489,18 @@ int main()
 	//	{
 	//		printf("click:%d\n", idx);
 	//	});
+	menu_cx* mc = new menu_cx();
+	mc->set_fontctx(app->font_ctx);
+	for (size_t i = 0; i < mvs.size(); i++)
+	{
+		mc->add(mvs[i], 0, i, 0);
+	}
 	mf1->set_pos({ 20,20 });
+	mc->new_menu(200, 1, &mc->lvm, [](int idx, int id)
+		{
+			printf("click:%d\n", idx);
+		});
+	bind_menu(mf1, mc);
 	// 提示窗口
 	//form_x* new_form_tooltip(form_x * parent, int width, int height);
 
@@ -621,7 +632,7 @@ int main()
 						cps.y += cp->size.y + cp->thickness;
 						//mf1->show_reverse();
 						cps.y *= -1;
-						//mf1->show();
+						mf1->show();
 						mf1->set_pos(cps);
 					}
 				};
@@ -654,7 +665,7 @@ int main()
 								auto cps = cp->get_pos();
 								cps.y += cp->size.y + cp->thickness;
 								mf1->set_pos(cps);
-								//mf1->show();
+								mf1->show();
 							}
 						};
 					cbt->click_cb = [=](void* ptr, int clicks)
@@ -1165,7 +1176,7 @@ int main()
 				//txt->update_text();
 				for (auto it : txt->msu)
 				{
-					//auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
+					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });
 					//y1 += ss.y + 10;
 				}
 

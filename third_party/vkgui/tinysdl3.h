@@ -57,6 +57,7 @@ struct et_un_t;
 class font_rctx;
 class render_2d;
 class plane_cx;
+class menu_cx;
 class form_x;
 class Timer;
 // 管理窗口等资源
@@ -92,7 +93,7 @@ public:
 	void clearf();
 
 	glm::vec3 get_power_info();
-	const char* get_power_str(); 
+	const char* get_power_str();
 	void kncdown();
 private:
 	int get_event();
@@ -331,3 +332,4 @@ form_x* new_form_popup(form_x* parent, int width, int height);
 // 提示窗口
 form_x* new_form_tooltip(form_x* parent, int width, int height);
 
+void bind_menu(form_x* f, menu_cx* m);

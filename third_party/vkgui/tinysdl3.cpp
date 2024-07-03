@@ -2365,3 +2365,19 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 	}
 	return form1;
 }
+
+void bind_menu(form_x* f, menu_cx* m)
+{
+	if (f && m && m->lvm.child.size())
+	{		
+		if (m->form)
+		{
+			m->form->remove(m->can);
+		}
+		f->add_canvas_atlas(m->can);
+		f->bind(m->lvm.ui);
+		if (m->lvm.indep) {
+			f->set_size(m->lvm.fsize);
+		}
+	}
+}
