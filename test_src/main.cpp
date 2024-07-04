@@ -485,22 +485,24 @@ int main()
 	// 菜单窗口
 	form_x* mf1 = new_form_popup(form0, 500, 500);
 	std::vector<std::string> mvs = { (char*)u8"测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
-	//auto m1 = new_menu(mf1, 230, mvs, [](int idx)
-	//	{
-	//		printf("click:%d\n", idx);
-	//	});
-	//menu_cx* mc = new menu_cx();
-	//mc->set_fontctx(app->font_ctx);
-	//for (size_t i = 0; i < mvs.size(); i++)
-	//{
-	//	mc->add(mvs[i], 0, i, 0);
-	//}
-	//mc->new_menu(200, 1, &mc->lvm, [](int idx, int id)
-	//	{
-	//		printf("click:%d\n", idx);
-	//	});
+	layout_text_x* ltx = new layout_text_x();
+	canvas_atlas* backca = new canvas_atlas();
+	ltx->set_ctx(app->font_ctx);
+
+	auto m1 = ltx->new_menu(200, 1, mvs, [](int type, int idx)
+		{
+			if (type)
+				printf("click:%d\t%d\n", type, idx);
+			else
+				printf("move:%d\t%d\n", type, idx);
+		});
+	backca->add_atlas(m1.back);
+	mf1->add_canvas_atlas(backca);
+	mf1->bind(m1.p);
 	mf1->set_pos({ 20,20 });
-	mf1->close();
+	mf1->set_size(m1.fsize);
+	mf1->hide();
+	//mf1->close();
 	//show_menu(app, mc);
 	// 提示窗口
 	//form_x* new_form_tooltip(form_x * parent, int width, int height);

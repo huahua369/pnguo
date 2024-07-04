@@ -769,6 +769,15 @@ struct text_atlas_t
 	image_ptr_t ipt = {};
 };
 class gshadow_cx;
+class plane_cx;
+
+struct pvm_t
+{
+	atlas_cx* back = 0;	// 背景
+	plane_cx* p = 0;		// 控件
+	glm::vec2 fsize = {};
+};
+
 class layout_text_x
 {
 public:
@@ -819,10 +828,13 @@ public:
 
 	// 渲染全部文本
 	void draw_text(cairo_t* cr, uint32_t color);
-	// 获取图集
+	// todo获取图集
 	atlas_t* get_atlas();
 	bool update_text();
+	// 创建阴影
 	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
+	// 创建菜单
+	pvm_t new_menu(int width, int dir_row, const std::vector<std::string> v, std::function<void(int type, int id)> cb);
 private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
@@ -1103,7 +1115,6 @@ private:
 
 
 
-class plane_cx;
 // 判断拾取
 struct pickup_t
 {
@@ -2047,7 +2058,7 @@ public:
 private:
 
 };
- 
+
 
 // 对话框
 class dialog_cx

@@ -4369,6 +4369,71 @@ atlas_cx* layout_text_x::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
 	//can->add_atlas(a);
 	return a;
 }
+
+pvm_t layout_text_x::new_menu(int width, int dir_row, const std::vector<std::string> v, std::function<void(int type, int id)> cb)
+{
+	pvm_t ret = {};
+	auto ltx = this;
+	auto p = new plane_cx();
+	if (p && v.size() && width > 0)
+	{
+		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
+		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
+
+		auto radius = ltx->sli_radius;
+		ss += radius;
+		auto pa = ltx->new_shadow(ss, {});
+		ss -= radius;
+		p->border = { 0xff606060,1,0 };
+		p->fontsize = 16;
+		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
+		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
+		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
+		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
+		p->_css.direction = dir_row ? flex_item::flex_direction::ROW : flex_item::flex_direction::COLUMN;
+		p->set_fontctx(ltx->ctx);
+		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
+		p->add_familys(fontn, 0);
+		size_t i = 0;
+		for (auto& it : v) {
+			auto pcb = p->add_cbutton(it, iss, 2);
+			pcb->light = 0.051;
+			pcb->effect = uTheme::light;
+			pcb->pdc.hover_border_color = pcb->pdc.border_color;
+			pcb->pdc.border_color = 0;
+			pcb->text_align = { 0.1,0.5 };
+			if (pcb && cb)
+			{
+				pcb->click_cb = [=](void*, int) {cb(1, i); };
+				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
+					if (type == (int)event_type2::on_move) {
+						cb(0, i);
+					}
+					};
+			}
+			i++;
+		}
+		p->set_size(ss);
+		p->set_pos({ radius * 0,radius * 0 });
+		ss += radius;
+		//f->add_canvas_atlas(pa);
+		//f->bind(p);
+		//f->set_size(ss);
+		ret.fsize = ss;
+		ret.p = p;
+		ret.back = pa;
+	}
+	return ret;
+}
+
+
+
+
+
+
+
+
+
 void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color)
 {
 	int mx = r.y + r.x;
@@ -19263,58 +19328,3 @@ dialog_cx::~dialog_cx()
 }
 
 #endif // 1
-
-
-
-plane_cx* new_menu(layout_text_x* ltx, int width, int dir_row, const std::vector<std::string> v, std::function<void(int type, int id)> cb)
-{
-	auto p = new plane_cx();
-	if (p && v.size() && width > 0)
-	{
-		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
-		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
-
-		auto radius = ltx->sli_radius;
-		ss += radius;
-		auto pa = ltx->new_shadow(ss, {});
-		ss -= radius;
-		p->border = { 0xff606060,1,0 };
-		p->fontsize = 16;
-		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
-		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.direction = dir_row ? flex_item::flex_direction::ROW : flex_item::flex_direction::COLUMN;
-		p->set_fontctx(ltx->ctx);
-		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
-		p->add_familys(fontn, 0);
-		size_t i = 0;
-		for (auto& it : v) {
-			auto pcb = p->add_cbutton(it, iss, 2);
-			pcb->light = 0.051;
-			pcb->effect = uTheme::light;
-			pcb->pdc.hover_border_color = pcb->pdc.border_color;
-			pcb->pdc.border_color = 0;
-			pcb->text_align = { 0.1,0.5 };
-			if (pcb && cb)
-			{
-				pcb->click_cb = [=](void*, int) {cb(1, i); };
-				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
-					if (type == (int)event_type2::on_move) {
-						cb(0, i);
-					}
-					};
-			}
-			i++;
-		}
-		p->set_size(ss);
-		p->set_pos({ radius * 0,radius * 0 });
-		ss += radius;
-		//f->add_canvas_atlas(pa);
-		//f->bind(p);
-		//f->set_size(ss);
-	}
-	return p;
-}
-
-
