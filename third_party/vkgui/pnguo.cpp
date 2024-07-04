@@ -4347,6 +4347,28 @@ bool layout_text_x::update_text()
 	}
 	return r;
 }
+atlas_cx* layout_text_x::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
+{
+	if (sli.tex_rc.x < sli_radius)
+	{
+		rect_shadow_t rs = {};
+		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
+		rs.radius = sli_radius;
+		rs.segment = 8;
+		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
+		sli = gs->new_rect(rs);
+	}
+	auto rcs = sli;
+	auto a = new atlas_cx();
+	a->img = gs->img;
+	a->img->type = 1;
+	a->autofree = true;
+	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
+	rcs.img_rc.x = rcs.img_rc.y = 0;
+	a->add(&rcs, 1);
+	//can->add_atlas(a);
+	return a;
+}
 void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color)
 {
 	int mx = r.y + r.x;
@@ -19243,80 +19265,18 @@ dialog_cx::~dialog_cx()
 #endif // 1
 
 
-menu_cx::menu_cx()
-{
-	ltx = new layout_text_x();
-	can = new canvas_atlas();
-}
 
-menu_cx::~menu_cx()
+plane_cx* new_menu(layout_text_x* ltx, int width, int dir_row, const std::vector<std::string> v, std::function<void(int type, int id)> cb)
 {
-	free_image_cr(icon);
-	if (ltx)delete ltx; ltx = 0;
-	if (can)delete can; can = 0;
-}
-
-void menu_cx::set_fontctx(font_rctx* p)
-{
-	if (p && ltx)
-		ltx->set_ctx(p);
-}
-
-void menu_cx::set_image(const std::string& fn, const glm::ivec2& icon_size, const glm::ivec2& pos, const glm::ivec2& stride, float scale)
-{
-	if (!(scale > 0)) { scale = 1.0; }
-	auto sur = load_imagesvg(fn, scale);
-	if (sur)
+	auto p = new plane_cx();
+	if (p && v.size() && width > 0)
 	{
-		free_image_cr(icon);
-		icon = sur;
-	}
-	_icon_size = icon_size; _pos = pos; _stride = stride;
-}
-
-
-menu_cx::node_t* menu_cx::add(const std::string& str, int icon, int id, menu_cx::node_t* parent)
-{
-	menu_cx::node_t* ret = 0;
-	menu_cx::node_t v = {};
-	v.title = str;
-	v.icon = icon;
-	v.id = id;
-	v.idx = _idx;
-	_idx++;
-	if (!parent)
-	{
-		parent = &lvm;
-	}
-	parent->child.push_back(v);
-	ret = &(parent->child.back());
-	return ret;
-}
-
-
-plane_cx* menu_cx::new_menu(int width, int indep, menu_cx::node_t* np, std::function<void(int idx, int id)> cb)
-{
-	auto p = np->ui ? np->ui : new plane_cx();
-	if (p)
-	{
-		np->ui = p;
-		if (width < 1)
-			width = 100;
-
 		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
-		glm::ivec2 ss = { width,np->child.size() * iss.y + 6 };
+		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
 
-		if (sli.tex_rc.x < radius)
-		{
-			rect_shadow_t rs = {};
-			rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
-			rs.radius = radius;
-			rs.segment = 8;
-			rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
-			set_sli(rs);
-		}
+		auto radius = ltx->sli_radius;
 		ss += radius;
-		auto pa = new_shadow(ss, {});
+		auto pa = ltx->new_shadow(ss, {});
 		ss -= radius;
 		p->border = { 0xff606060,1,0 };
 		p->fontsize = 16;
@@ -19324,13 +19284,13 @@ plane_cx* menu_cx::new_menu(int width, int indep, menu_cx::node_t* np, std::func
 		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
 		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
 		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.direction = np->dir_row ? flex_item::flex_direction::ROW : flex_item::flex_direction::COLUMN;
+		p->_css.direction = dir_row ? flex_item::flex_direction::ROW : flex_item::flex_direction::COLUMN;
 		p->set_fontctx(ltx->ctx);
 		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 		p->add_familys(fontn, 0);
 		size_t i = 0;
-		for (auto& it : np->child) {
-			auto pcb = p->add_cbutton(it.title, iss, 2);
+		for (auto& it : v) {
+			auto pcb = p->add_cbutton(it, iss, 2);
 			pcb->light = 0.051;
 			pcb->effect = uTheme::light;
 			pcb->pdc.hover_border_color = pcb->pdc.border_color;
@@ -19338,46 +19298,23 @@ plane_cx* menu_cx::new_menu(int width, int indep, menu_cx::node_t* np, std::func
 			pcb->text_align = { 0.1,0.5 };
 			if (pcb && cb)
 			{
-				pcb->click_cb = [=](void*, int) {cb(it.idx, it.id); };
+				pcb->click_cb = [=](void*, int) {cb(1, i); };
+				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
+					if (type == (int)event_type2::on_move) {
+						cb(0, i);
+					}
+					};
 			}
 			i++;
 		}
 		p->set_size(ss);
 		p->set_pos({ radius * 0,radius * 0 });
 		ss += radius;
-		np->fsize = ss;
-		np->indep = indep > 0;
 		//f->add_canvas_atlas(pa);
 		//f->bind(p);
 		//f->set_size(ss);
 	}
 	return p;
 }
-
-void menu_cx::set_sli(const rect_shadow_t& rs)
-{
-	if (ltx && ltx->gs)
-		sli = ltx->gs->new_rect(rs);
-}
-
-void menu_cx::apply()
-{
-
-}
-
-atlas_cx* menu_cx::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
-{
-	auto rcs = sli;
-	auto a = new atlas_cx();
-	a->img = ltx->gs->img;
-	a->img->type = 1;
-	a->autofree = true;
-	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
-	rcs.img_rc.x = rcs.img_rc.y = 0;
-	a->add(&rcs, 1);
-	can->add_atlas(a);
-	return a;
-}
-
 
 

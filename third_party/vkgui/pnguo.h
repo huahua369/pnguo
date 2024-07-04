@@ -786,6 +786,8 @@ public:
 	std::vector<atlas_cx> tem_iptr;
 	glm::ivec2 ctrc = {}, oldrc = {};
 
+	image_sliced_t sli = {};
+	int sli_radius = 10;
 	gshadow_cx* gs = 0;
 public:
 	layout_text_x();
@@ -820,6 +822,7 @@ public:
 	// 获取图集
 	atlas_t* get_atlas();
 	bool update_text();
+	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
 private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
@@ -2044,53 +2047,7 @@ public:
 private:
 
 };
-
-class menu_cx
-{
-public:
-	struct node_t
-	{
-		std::string title;	// 显示的标题文本
-		int icon = 0;		// 图标序号
-		int id = 0;			// 用户id
-		int idx = 0;		// 自增
-		node_t* parent = 0;	// 父级
-		plane_cx* ui = 0; 
-		form_x* form = 0;	// 窗口绑定
-		glm::ivec2 fsize = {};//窗口大小
-		std::list<node_t> child;// 孩子  
-		bool indep = false;	// 是否独立窗口
-		bool dir_row = 0;		// 行排列
-	};
-	node_t lvm = {};		// 根菜单
-	std::list<plane_cx> vp = {};	// ui管理
-	node_t* _active = 0;			// 当前激活的菜单
-	layout_text_x* ltx = 0;			// 字体管理
-	image_sliced_t sli = {};
-	cairo_surface_t* icon = 0;
-	canvas_atlas* can = 0;
-	form_x* form = 0;	// 窗口绑定
-	int radius = 10;
-	int _idx = 0;
-	glm::ivec2 _icon_size = {}, _pos = {}, _stride = {};
-	std::function<void(node_t* p)> on_click;
-public:
-	menu_cx();
-	~menu_cx();
-	void set_fontctx(font_rctx* p);
-	// 图片/svg、图标大小、开始坐标、图标间隔
-	void set_image(const std::string& fn, const glm::ivec2& icon_size, const glm::ivec2& pos, const glm::ivec2& stride, float scale);
-	// 添加菜单
-	node_t* add(const std::string& str, int icon, int id, node_t* parent);
-
-	// 自动创建ui
-	void apply();
-	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
-	plane_cx* new_menu(int width, int indep,menu_cx::node_t* np, std::function<void(int idx, int id)> cb);
-	void set_sli(const rect_shadow_t& rs);
-private:
-
-};
+ 
 
 // 对话框
 class dialog_cx

@@ -489,18 +489,19 @@ int main()
 	//	{
 	//		printf("click:%d\n", idx);
 	//	});
-	menu_cx* mc = new menu_cx();
-	mc->set_fontctx(app->font_ctx);
-	for (size_t i = 0; i < mvs.size(); i++)
-	{
-		mc->add(mvs[i], 0, i, 0);
-	}
+	//menu_cx* mc = new menu_cx();
+	//mc->set_fontctx(app->font_ctx);
+	//for (size_t i = 0; i < mvs.size(); i++)
+	//{
+	//	mc->add(mvs[i], 0, i, 0);
+	//}
+	//mc->new_menu(200, 1, &mc->lvm, [](int idx, int id)
+	//	{
+	//		printf("click:%d\n", idx);
+	//	});
 	mf1->set_pos({ 20,20 });
-	mc->new_menu(200, 1, &mc->lvm, [](int idx, int id)
-		{
-			printf("click:%d\n", idx);
-		});
-	bind_menu(mf1, mc);
+	mf1->close();
+	//show_menu(app, mc);
 	// 提示窗口
 	//form_x* new_form_tooltip(form_x * parent, int width, int height);
 

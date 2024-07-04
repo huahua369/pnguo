@@ -58,6 +58,7 @@ class font_rctx;
 class render_2d;
 class plane_cx;
 class menu_cx;
+struct mnode_t;
 class form_x;
 class Timer;
 // 管理窗口等资源
@@ -153,6 +154,7 @@ public:
 	std::vector<event_fw>* events_a = 0;
 	std::vector<event_fw> first_cs;	// 优先
 	std::vector<form_x*> childfs;
+	form_x* parent = 0;
 	// 接收拖动OLE管理
 	hz::drop_regs* dragdrop = 0;
 	// 默认接收ole
@@ -250,6 +252,10 @@ public:
 	void set_pos(const glm::vec2& pos);
 	// 是否支持Bindless
 	bool has_variable();
+
+	// 显示菜单
+	void show_menu(mnode_t* m);
+	void remove_f(form_x* c);
 public:
 	void update_w();
 	void update(float delta);
@@ -331,5 +337,3 @@ void free_app(void* app);
 form_x* new_form_popup(form_x* parent, int width, int height);
 // 提示窗口
 form_x* new_form_tooltip(form_x* parent, int width, int height);
-
-void bind_menu(form_x* f, menu_cx* m);

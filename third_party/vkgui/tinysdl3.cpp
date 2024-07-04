@@ -436,6 +436,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	}
 	if (parent)
 	{
+		pw->parent = parent;
 		parent->childfs.push_back(pw);
 	}
 	pw->app = this;
@@ -1414,7 +1415,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	break;
 	}
 	return false;
-}
+	}
 int on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
@@ -1435,8 +1436,14 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 			}
 			if (pw->close_type || cbr == 1)
 			{
-				pw->destroy();
-				pw->app->remove(pw);
+				if (pw->parent)
+				{
+					pw->parent->remove_f(pw);
+				}
+				else {
+					pw->destroy();
+					pw->app->remove(pw);
+				}
 			}
 			else {
 				pw->hide();
@@ -1508,6 +1515,31 @@ void show_window(SDL_Window* ptr, bool visible) {
 	else
 	{
 		SDL_HideWindow(ptr);
+	}
+}
+//void form_x::show_menu(mnode_t* m)
+//{
+//	if (m && m->child.size())
+//	{
+//		if (m->indep) {
+//			form_x* f = new_form_popup(this, m->fsize.x, m->fsize.y);
+//			f->bind(m->ui);
+//			f->set_size(m->fsize);
+//			f->set_pos(m->fpos);
+//		}
+//		else {
+//			m->ui->set_pos(m->fpos);
+//			bind(m->ui);
+//		}
+//	}
+//}
+void form_x::remove_f(form_x* p)
+{
+	if (p)
+	{
+		auto& v = childfs;
+		v.erase(std::remove_if(v.begin(), v.end(), [p](form_x* r) {return r == p; }), v.end());
+		app->remove(p);
 	}
 }
 void form_x::update_w()
@@ -2104,13 +2136,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+	}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
@@ -2368,16 +2400,16 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 
 void bind_menu(form_x* f, menu_cx* m)
 {
-	if (f && m && m->lvm.child.size())
-	{		
-		if (m->form)
-		{
-			m->form->remove(m->can);
-		}
-		f->add_canvas_atlas(m->can);
-		f->bind(m->lvm.ui);
-		if (m->lvm.indep) {
-			f->set_size(m->lvm.fsize);
-		}
-	}
+	//if (f && m && m->lvm.child.size())
+	//{
+	//	if (m->form)
+	//	{
+	//		m->form->remove(m->can);
+	//	}
+	//	f->add_canvas_atlas(m->can);
+	//	f->bind(m->lvm.ui);
+	//	if (m->lvm.indep) {
+	//		f->set_size(m->lvm.fsize);
+	//	}
+	//}
 }
