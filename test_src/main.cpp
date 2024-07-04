@@ -489,10 +489,13 @@ int main()
 	canvas_atlas* backca = new canvas_atlas();
 	ltx->set_ctx(app->font_ctx);
 
-	auto m1 = ltx->new_menu(200, 1, mvs, [](int type, int idx)
+	auto m1 = ltx->new_menu(200, 1, mvs, [=](int type, int idx)
 		{
 			if (type)
+			{
+				mf1->hide();
 				printf("click:%d\t%d\n", type, idx);
+			}
 			else
 				printf("move:%d\t%d\n", type, idx);
 		});
@@ -620,25 +623,12 @@ int main()
 		div->layout();
 		{
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
-			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 80,30 }, 4);
+			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 80,30 }, 3);
 			g3->_absolute = true;
 			g3->pos = { 30,20 };
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
-			gb2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
-				{
-					auto cp = (color_btn*)p;
-					if ((int)event_type2::on_down == type)
-					{
-						auto cps = cp->get_pos();
-						cps.y += cp->size.y + cp->thickness;
-						//mf1->show_reverse();
-						cps.y *= -1;
-						mf1->show();
-						mf1->set_pos(cps);
-					}
-				};
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
 					//form1->bind(listp);	// 绑定到新窗口	
@@ -681,6 +671,48 @@ int main()
 							//form1->show();
 							//form1->close();
 						};
+				};
+			g3->mevent_cb = [](void* p, int type, const glm::vec2& mps)
+				{
+					auto pc = (color_btn*)p;
+					auto t = (event_type2)type;
+					switch (t)
+					{
+					case event_type2::on_click:
+						break;
+					case event_type2::on_dblclick:
+						break;
+					case event_type2::on_tripleclick:
+						break;
+					case event_type2::on_move:
+						break;
+					case event_type2::on_down:
+						break;
+					case event_type2::on_up:
+						break;
+					case event_type2::on_scroll:
+						break;
+					case event_type2::on_drag:
+					{
+						pc->pos = mps;
+					}
+					break;
+					default:
+						break;
+					}
+				};
+			gb2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
+				{
+					auto cp = (color_btn*)p;
+					if ((int)event_type2::on_down == type)
+					{
+						auto cps = cp->get_pos();
+						cps.y += cp->size.y + cp->thickness;
+						//mf1->show_reverse();
+						cps.y *= -1;
+						mf1->show();
+						mf1->set_pos(cps);
+					}
 				};
 		}
 		p->draw_back_cb = [=](cairo_t* cr)

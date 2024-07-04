@@ -4404,7 +4404,13 @@ pvm_t layout_text_x::new_menu(int width, int dir_row, const std::vector<std::str
 			pcb->text_align = { 0.1,0.5 };
 			if (pcb && cb)
 			{
-				pcb->click_cb = [=](void*, int) {cb(1, i); };
+				pcb->click_cb = [=](void* pr, int)
+					{
+						cb(1, i);
+						auto pc = (color_btn*)pr;
+						if (pc)
+							pc->bst = (int)BTN_STATE::STATE_NOMAL;
+					};
 				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
 					if (type == (int)event_type2::on_move) {
 						cb(0, i);
