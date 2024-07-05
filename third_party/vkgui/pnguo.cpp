@@ -4159,6 +4159,14 @@ size_t layout_text_x::add_familys(const char* familys, const char* style) {
 	}
 	return rs;
 }
+void layout_text_x::cpy_familys(layout_text_x* p)
+{
+	if (p)
+	{
+		familyv = p->familyv;
+		cfb = p->cfb;
+	}
+}
 void layout_text_x::clear_family()
 {
 	familyv.clear();
@@ -4171,7 +4179,7 @@ void layout_text_x::clear_text()
 
 void layout_text_x::c_line_metrics(size_t idx, int fontsize) {
 	if (idx >= familyv.size())idx = 0;
-	if (fontsize == 0 || idx >= cfb.size())return;
+	if (fontsize == 0 || idx >= cfb.size() || familyv.empty())return;
 	if (cfb[idx].z != fontsize)
 	{
 		glm::dvec2 r = {};
@@ -4188,6 +4196,7 @@ void layout_text_x::c_line_metrics(size_t idx, int fontsize) {
 }
 int layout_text_x::get_baseline(size_t idx, int fontsize)
 {
+	if (familyv.empty())return 0;
 	if (idx >= familyv.size())idx = 0;
 	c_line_metrics(idx, fontsize);
 	return cfb[idx].x;
@@ -4195,6 +4204,7 @@ int layout_text_x::get_baseline(size_t idx, int fontsize)
 
 int layout_text_x::get_lineheight(size_t idx, int fontsize)
 {
+	if (familyv.empty())return 0;
 	if (idx >= familyv.size())idx = 0;
 	c_line_metrics(idx, fontsize);
 	return heightline ? heightline : cfb[idx].y;
@@ -4370,33 +4380,47 @@ atlas_cx* layout_text_x::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
 	return a;
 }
 
-pvm_t layout_text_x::new_menu(int width, int dir_row, const std::vector<std::string> v, std::function<void(int type, int id)> cb)
+pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::string>& v, std::function<void(int type, int id)> cb)
 {
 	pvm_t ret = {};
 	auto ltx = this;
 	auto p = new plane_cx();
-	if (p && v.size() && width > 0)
+	if (p && v.size())
 	{
-		glm::ivec2 iss = { width - 6, p->fontsize * 2 };
-		glm::ivec2 ss = { width,v.size() * iss.y + 6 };
+		p->fontsize = 16;
+		int lheight = height > 0 ? height : ltx->get_lineheight(0, p->fontsize) * 1.5;
+		if (width < 0)
+		{
+			int xw = lheight;
+			for (auto& it : v)
+			{
+				auto rc = ltx->get_text_rect(0, it.c_str(), it.size(), p->fontsize);
+				if (xw < rc.x) {
+					xw = rc.x;
+				}
+			}
+			width = xw + lheight;
+		}
+		ret.w = width;
+		ret.h = lheight;
+		ret.cpos = { 3,3 };
+		glm::ivec2 iss = { width , lheight };
+		p->border = { 0xff606060,1,0 };
+		glm::ivec2 ss = { width + p->border.y * 7, v.size() * lheight + p->border.y * 7 };
 
 		auto radius = ltx->sli_radius;
 		ss += radius;
 		auto pa = ltx->new_shadow(ss, {});
 		ss -= radius;
-		p->border = { 0xff606060,1,0 };
-		p->fontsize = 16;
 		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
-		p->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
-		p->_css.direction = dir_row ? flex_item::flex_direction::ROW : flex_item::flex_direction::COLUMN;
+		p->custom_layout = true;
 		p->set_fontctx(ltx->ctx);
-		auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
-		p->add_familys(fontn, 0);
+		p->ltx->cpy_familys(ltx);
 		size_t i = 0;
 		for (auto& it : v) {
 			auto pcb = p->add_cbutton(it, iss, 2);
+			pcb->pos = { 0, i * lheight };
+			pcb->pos += ret.cpos;
 			pcb->light = 0.051;
 			pcb->effect = uTheme::light;
 			pcb->pdc.hover_border_color = pcb->pdc.border_color;
@@ -4430,6 +4454,14 @@ pvm_t layout_text_x::new_menu(int width, int dir_row, const std::vector<std::str
 		ret.back = pa;
 	}
 	return ret;
+}
+
+void layout_text_x::free_menu(pvm_t pt)
+{
+	if (pt.p)
+		delete pt.p;
+	if (pt.back)
+		delete pt.back;
 }
 
 

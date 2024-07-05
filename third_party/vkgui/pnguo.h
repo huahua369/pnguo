@@ -776,6 +776,8 @@ struct pvm_t
 	atlas_cx* back = 0;	// 背景
 	plane_cx* p = 0;		// 控件
 	glm::vec2 fsize = {};
+	glm::vec2 cpos = {};
+	int w, h;
 };
 
 class layout_text_x
@@ -804,6 +806,7 @@ public:
 	void set_ctx(font_rctx* p);
 	// 添加字体,返回序号
 	size_t add_familys(const char* familys, const char* style);
+	void cpy_familys(layout_text_x* p);
 	void clear_family();
 	void clear_text();
 
@@ -834,7 +837,8 @@ public:
 	// 创建阴影
 	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
 	// 创建菜单
-	pvm_t new_menu(int width, int dir_row, const std::vector<std::string> v, std::function<void(int type, int id)> cb);
+	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, std::function<void(int type, int id)> cb);
+	void free_menu(pvm_t pt);
 private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
@@ -1610,7 +1614,7 @@ public:
 	layout_info_x _css = {};		// 布局样式
 	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "Arial,NSimSun";
-	int fontsize = 12;
+	int fontsize = 16;
 	uint32_t text_color = -1;
 	glm::ivec3 border = {};	// 颜色，线粗，圆角
 	glm::ivec2 curpos = {}, tpos = {};// 鼠标状态

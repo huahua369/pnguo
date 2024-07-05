@@ -459,6 +459,8 @@ void loadtestdata()
 }
 
 
+
+
 int main()
 {
 #ifdef _DEBUG
@@ -482,31 +484,43 @@ int main()
 	ptf.has_renderer = true;
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	//form0->_focus_lost_hide = true;
-	// 菜单窗口
-	form_x* mf1 = new_form_popup(form0, 500, 500);
-	std::vector<std::string> mvs = { (char*)u8"测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
-	layout_text_x* ltx = new layout_text_x();
-	canvas_atlas* backca = new canvas_atlas();
-	ltx->set_ctx(app->font_ctx);
-
-	auto m1 = ltx->new_menu(200, 1, mvs, [=](int type, int idx)
+	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
+	menu_cx* mc = new menu_cx();	// 菜单管理
+	mc->set_main(form0);
+	mc->add_familys(fontn);
+	std::vector<std::string> mvs = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
+	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
+	int cidx = 1;
+	// 创建菜单
+	auto pm31 = mc->new_menu(-1, 22, mvs1, [=](mitem_t* pm, int type, int idx)
 		{
 			if (type)
 			{
-				mf1->hide();
+				pm->hide(true);	// 点击隐藏
 				printf("click:%d\t%d\n", type, idx);
 			}
 			else
 				printf("move:%d\t%d\n", type, idx);
 		});
-	backca->add_atlas(m1.back);
-	mf1->add_canvas_atlas(backca);
-	mf1->bind(m1.p);
-	mf1->set_pos({ 20,20 });
-	mf1->set_size(m1.fsize);
-	mf1->hide();
-	//mf1->close();
-	//show_menu(app, mc);
+	auto pm3 = mc->new_menu(-1, 22, mvs, [=](mitem_t* pm, int type, int idx)
+		{
+			if (type)
+			{
+				if (idx != cidx)
+					pm->hide(true);	// 点击隐藏
+				printf("click:%d\t%d\n", type, idx);
+			}
+			else
+			{
+				if (idx == cidx)
+					pm31->show(pm->get_idx_pos(idx));// 显示子菜单
+				else
+					pm31->hide(false);
+				printf("move:%d\t%d\n", type, idx);
+			}
+		});
+	pm31->parent = pm3;
+	pm3->show({ 100,100 }); // 显示菜单
 	// 提示窗口
 	//form_x* new_form_tooltip(form_x * parent, int width, int height);
 
@@ -543,7 +557,6 @@ int main()
 	pl3->set_rss(5);
 	pl4->set_rss(5);
 	listp->set_rss(5);
-	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
 	//size_t add_familys(const char* familys, const char* style)
@@ -653,12 +666,33 @@ int main()
 					cbt->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 						{
 							auto cp = (color_btn*)p;
-							if ((int)event_type2::on_down == type)
+							auto t = (event_type2)type;
+							switch (t)
+							{
+							case event_type2::on_click:
+								break;
+							case event_type2::on_dblclick:
+								break;
+							case event_type2::on_tripleclick:
+								break;
+							case event_type2::on_move:
+								break;
+							case event_type2::on_down:
 							{
 								auto cps = cp->get_pos();
 								cps.y += cp->size.y + cp->thickness;
-								mf1->set_pos(cps);
-								mf1->show();
+								pm3->show(cps);
+							}
+							break;
+							case event_type2::on_up:
+								break;
+							case event_type2::on_drag:
+							{
+								cp->pos = mps;
+							}
+							break;
+							default:
+								break;
 							}
 						};
 					cbt->click_cb = [=](void* ptr, int clicks)
@@ -708,10 +742,8 @@ int main()
 					{
 						auto cps = cp->get_pos();
 						cps.y += cp->size.y + cp->thickness;
-						//mf1->show_reverse();
 						cps.y *= -1;
-						mf1->show();
-						mf1->set_pos(cps);
+						pm3->show(cps);
 					}
 				};
 		}

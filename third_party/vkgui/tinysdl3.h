@@ -252,9 +252,7 @@ public:
 	void set_pos(const glm::vec2& pos);
 	// 是否支持Bindless
 	bool has_variable();
-
-	// 显示菜单
-	void show_menu(mnode_t* m);
+	 
 	void remove_f(form_x* c);
 public:
 	void update_w();
@@ -277,6 +275,45 @@ public:
 private:
 };
 
+class menu_cx;
+class mitem_t
+{
+public:
+	std::vector<std::string> v;
+	std::function<void(mitem_t* p, int type, int id)> ckm_cb;
+	int width = -1;		// 菜单宽度
+	int height = 0;	// 菜单项高
+	glm::ivec2 pos = {};
+	menu_cx* m = 0;
+	form_x* f = 0;
+	mitem_t* parent = 0;	// 父级
+	pvm_t pv = {};
+	canvas_atlas* backgs = 0;
+	layout_text_x* ltx = 0;
+public:
+	mitem_t();
+	~mitem_t();
+	void show(const glm::vec2& pos);
+	void hide(bool hp);
+	void set_data(int width, int height, const std::vector<std::string>& mvs);
+	glm::ivec2 get_idx_pos(int idx);
+};
+class menu_cx
+{
+public:
+	form_x* form = 0;			// 主窗口 
+	std::vector<std::string> familys;
+public:
+	menu_cx();
+	~menu_cx();
+	void set_main(form_x* f);
+	void add_familys(const char* family);
+	mitem_t* new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb);
+	void show_item(mitem_t* it, const glm::vec2& pos);
+	void free_item(mitem_t* p);
+private:
+
+};
 
 void form_move2end(form_x* f, plane_cx* ud);
 // 设置接收输入的控件

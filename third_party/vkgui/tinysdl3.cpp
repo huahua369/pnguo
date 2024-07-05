@@ -1,6 +1,5 @@
 ﻿
 #include <pch1.h>
-#include <tinysdl3.h>
 
 #include <print_time.h>
 
@@ -20,6 +19,7 @@
 #include <win_core_dragdrop.h>
 #endif  
 #include <pnguo.h>
+#include <tinysdl3.h>
 #include <event.h>
 
 #ifdef max
@@ -1415,7 +1415,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	break;
 	}
 	return false;
-	}
+}
 int on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
@@ -2136,13 +2136,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-	}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
@@ -2398,18 +2398,126 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 	return form1;
 }
 
-void bind_menu(form_x* f, menu_cx* m)
+mitem_t::mitem_t()
 {
-	//if (f && m && m->lvm.child.size())
-	//{
-	//	if (m->form)
-	//	{
-	//		m->form->remove(m->can);
-	//	}
-	//	f->add_canvas_atlas(m->can);
-	//	f->bind(m->lvm.ui);
-	//	if (m->lvm.indep) {
-	//		f->set_size(m->lvm.fsize);
-	//	}
-	//}
+	backgs = new canvas_atlas();
+	ltx = new layout_text_x();
+}
+
+mitem_t::~mitem_t()
+{
+	if (f)
+		f->close();
+	if (backgs)delete backgs; backgs = 0;
+	if (ltx)delete ltx; ltx = 0;
+}
+
+void mitem_t::show(const glm::vec2& ps)
+{
+	if (pv.p) {
+		auto cv = pv.p->widgets;
+		auto length = cv.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto it = cv[i];
+			if (it)
+				it->bst = (int)BTN_STATE::STATE_NOMAL;
+		}
+	}
+	pos = ps;
+	if (f) {
+		f->set_pos(pos);
+		f->show();
+	}
+	else {
+		m->show_item(this, pos);
+	}
+
+}
+
+void mitem_t::hide(bool hp)
+{
+	if (f)
+		f->hide();
+	else {
+
+	}
+	if (parent && hp)
+		parent->hide(1);
+}
+
+void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
+{
+	width = w;
+	height = h;
+	v = mvs;
+	backgs->remove_atlas(pv.back);
+	ltx->free_menu(pv);
+	auto p = this;
+	pv = ltx->new_menu(width, height, mvs, [=](int type, int idx)
+		{
+			if (ckm_cb)
+				ckm_cb(p, type, idx);
+		});
+	backgs->add_atlas(pv.back);
+}
+
+glm::ivec2 mitem_t::get_idx_pos(int idx)
+{
+	auto ps = pos;
+	ps.x += pv.w + pv.cpos.x + pv.p->border.y;
+	ps.y += idx * pv.h;
+	return ps;
+}
+
+menu_cx::menu_cx()
+{
+}
+
+menu_cx::~menu_cx()
+{
+}
+void menu_cx::set_main(form_x* f)
+{
+	form = f;
+}
+void menu_cx::add_familys(const char* family)
+{
+	if (family && *family)
+		familys.push_back(family);
+}
+mitem_t* menu_cx::new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb)
+{
+	auto p = new mitem_t();
+	if (p) {
+		p->m = this;
+		p->ckm_cb = cb;
+		p->ltx->set_ctx(form->app->font_ctx);
+		for (auto it : familys) {
+			p->ltx->add_familys(it.c_str(), 0);
+		}
+		p->set_data(width, height, mvs);
+	}
+	return p;
+}
+void menu_cx::show_item(mitem_t* it, const glm::vec2& pos)
+{
+	auto mf1 = it->f ? it->f : new_form_popup(form, it->pv.fsize.x, it->pv.fsize.y);
+	if (it->f)
+	{
+		it->f->remove(it->backgs);
+		it->f->unbind(it->pv.p);
+	}
+	it->f = mf1;
+	mf1->add_canvas_atlas(it->backgs);
+	mf1->bind(it->pv.p);
+	mf1->set_size(it->pv.fsize);
+	mf1->set_pos(pos);
+	mf1->show();
+}
+
+void menu_cx::free_item(mitem_t* p)
+{
+	if (p)
+		delete p;
 }
