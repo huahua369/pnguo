@@ -1,4 +1,4 @@
-﻿# pnguo
+﻿# pnguo vkgui
 基于SDL3的简易gui实现。
 
 编译说明：
@@ -10,7 +10,7 @@ git clone https://github.com/huahua369/pnguo.git
 ```
 git pull
 ```
-2. CMakeLists.txt修改`SDL3DIR_ROOT`和`SDL3_DIR`
+2. CMakeLists.txt修改`SDL3DIR_ROOT`和`SDL3_DIR`需要自行编译SDL3，本代码依赖库为静态库，如要改成引用动态库则改txt前面set(VCPKG_TARGET_TRIPLET x64-windows)
 3. vcpkg安装依赖库，根据需求安装，例如```vcpkg install PkgConfig:x64-windows-static```
 ```
 PkgConfig
