@@ -663,9 +663,9 @@ int main()
 					cbt->hscroll = {};
 					cbt->light = 0.36;
 					cbt->rounding = 14;
-					cbt->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
+					cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 						{
-							auto cp = (color_btn*)p;
+							auto cp = (color_btn*)pt;
 							auto t = (event_type2)type;
 							switch (t)
 							{
@@ -688,6 +688,7 @@ int main()
 								break;
 							case event_type2::on_drag:
 							{
+								p->move2end(cp);
 								cp->pos = mps;
 							}
 							break;
