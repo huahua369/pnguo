@@ -1,4 +1,10 @@
-﻿#pragma once
+﻿/*
+	Copyright (c) 华仔
+	188665600@qq.com
+
+	本文件的实现SDL封装，管理实例、窗口、菜单组件、信号量
+*/
+#pragma once
 #include <string>
 #include <set>
 #include <mutex>
@@ -20,13 +26,7 @@ extern "C" {
 #ifndef BIT_INC
 #define BIT_INC(x) (1<<x)
 #endif
-struct image_raw_x
-{
-	int w = 0, h = 0;
-	int pitch = 0;		// 1行的字节宽度
-	int format = 0;		// 0=rgba,1=bgra
-	uint32_t* data = 0;
-};
+ 
 
 // todo 创建atlas_t、canvas_atlas、skeleton_t
 
@@ -61,7 +61,7 @@ class menu_cx;
 struct mnode_t;
 class form_x;
 class Timer;
-// 管理窗口等资源
+// 管理实例：管理窗口等资源
 class app_cx
 {
 public:
@@ -223,8 +223,7 @@ public:
 	// type:0==RGBA。 static_tex? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA
-	SDL_Texture* new_texture(int width, int height, void* vkptr, int format);
-	SDL_Texture* new_texture(image_raw_x* p, bool multiply = false);
+	SDL_Texture* new_texture(int width, int height, void* vkptr, int format); 
 
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
 	void set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply = false);

@@ -2037,10 +2037,7 @@ void form_x::set_pos(const glm::vec2& v)
 	qcmd_value.push({ (int)fcv_type::e_pos,v,0 });
 
 }
-SDL_Texture* form_x::new_texture(image_raw_x* p, bool multiply)
-{
-	return (!p || p->w < 2 || p->h < 2) ? nullptr : new_texture(p->w, p->h, p->format, p->data, p->pitch, 0, false, multiply);
-}
+
 SDL_Texture* form_x::new_texture(int width, int height, void* vkptr, int format)
 {
 	SDL_Texture* texture = 0;
