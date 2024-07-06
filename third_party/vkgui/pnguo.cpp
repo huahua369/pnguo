@@ -5825,7 +5825,7 @@ void premultiply_data(int w, unsigned char* data, int type, bool multiply)
 glm::ivec2 get_surface_size(cairo_surface_t* p) {
 	return { cairo_image_surface_get_width(p), cairo_image_surface_get_height(p) };
 }
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color)
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& dsize)
 {
 	glm::vec2 ss = { rc.z, rc.w };
 	if (ss.x < 0)
@@ -5838,11 +5838,17 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	}
 	if (ss.x > 0 && ss.y > 0)
 	{
+		glm::vec2 sc = { 1,1 };
+		if (dsize.x > 0 && dsize.y > 0) {
+			sc = dsize / ss;
+		}
 		if (color > 0 && color != -1)
 		{
 			cairo_save(cr);
 			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 			cairo_translate(cr, pos.x, pos.y);
+			if (sc.x != 1 || sc.y != 1)
+				cairo_scale(cr, sc.x, sc.y);
 			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
 			cairo_clip(cr);
 			set_color(cr, color);
@@ -5853,6 +5859,8 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 			cairo_save(cr);
 			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 			cairo_translate(cr, pos.x, pos.y);
+			if (sc.x != 1 || sc.y != 1)
+				cairo_scale(cr, sc.x, sc.y);
 			cairo_set_source_surface(cr, image, -rc.x, -rc.y);
 			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
 			cairo_fill(cr);
@@ -10154,8 +10162,8 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		if (it != _char_lut.end())
 		{
 			return it->second;
-		}
-	}
+}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -12076,7 +12084,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -14351,7 +14359,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -15034,7 +15042,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];

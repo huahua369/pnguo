@@ -1137,7 +1137,7 @@ struct widget_base
 	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
 	glm::ivec2 cmpos = {};	// 当前鼠标坐标
 	glm::ivec2 ppos = {};	// 父级坐标 
-	std::string text;
+	std::string text;		// 内部显示用字符串
 	std::string family;
 	float font_size = 16;
 	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
@@ -1864,7 +1864,7 @@ void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void (*destroy_fun
 void* image_get_ud(cairo_surface_t* p, uint64_t key);
 void image_save_png(cairo_surface_t* cr, const char* fn);
 glm::ivec2 get_surface_size(cairo_surface_t* p);
-glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1);
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1, const glm::vec2& dsize = { -1,-1 });
 #endif
 /*
 <表格、树形>

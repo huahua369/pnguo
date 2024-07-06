@@ -635,6 +635,19 @@ int main()
 		}
 		div->layout();
 		{
+			auto img = p->new_image2("E:\\tx\\0.jpg");
+			auto imgsur = new_image_cr(img);
+			glm::vec2 ds = { img->width * 0.3 ,img->height * 0.3 };
+			if (img->width + 100 > cs.x)
+			{
+				cs.x = img->width + 100;
+			}
+			if (img->height + 100 > cs.y)
+			{
+				cs.y = img->height + 100;
+			}
+			p->set_view(vs, cs);
+
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
 			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 80,30 }, 3);
 			g3->_absolute = true;
@@ -747,15 +760,22 @@ int main()
 						pm3->show(cps);
 					}
 				};
-		}
-		p->draw_back_cb = [=](cairo_t* cr)
-			{
-				cairo_as _cas(cr);
-				cairo_translate(cr, 6, 50);
+			p->draw_back_cb = [=](cairo_t* cr)
+				{
+					cairo_as _cas(cr);
+					cairo_translate(cr, 6, 50);
 
-				div->draw(cr);
-				return;
-			};
+					div->draw(cr);
+					return;
+				};
+			p->draw_front_cb = [=](cairo_t* cr)
+				{
+					cairo_as _cas(cr);
+					cairo_translate(cr, 6, 50);
+					draw_image(cr, imgsur, { 10,10 }, { 0,0,-1,-1 }, -1, ds);
+					return;
+				};
+		}
 	}
 	// 创建列表视图
 	listp->border = { 0x80ff802C,1,5 };
