@@ -15,6 +15,8 @@
 
 #include <vkgui/event.h>
 #include <vkgui/buffer.h>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/Body.h>
 /*
 	todo
 	输入数据，自动创建窗口、控件、
@@ -635,9 +637,9 @@ int main()
 		}
 		div->layout();
 		{
-			auto img = p->new_image2("E:\\tx\\0.jpg");
+			auto img = p->new_image2("E:\\tx\\03.gif");
 			auto imgsur = new_image_cr(img);
-			glm::vec2 ds = { img->width * 0.3 ,img->height * 0.3 };
+			glm::vec2 ds = { img->width  ,img->height };
 			if (img->width + 100 > cs.x)
 			{
 				cs.x = img->width + 100;
@@ -772,7 +774,8 @@ int main()
 				{
 					cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
-					draw_image(cr, imgsur, { 10,10 }, { 0,0,-1,-1 }, -1, ds);
+					draw_image(cr, imgsur, { 10,10 }, { 0,0,-1,-1 }, -1, ds);// { 500, 500 }, { 100,100,100,100 });
+
 					return;
 				};
 		}

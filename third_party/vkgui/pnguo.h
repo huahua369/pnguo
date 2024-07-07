@@ -1864,7 +1864,10 @@ void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void (*destroy_fun
 void* image_get_ud(cairo_surface_t* p, uint64_t key);
 void image_save_png(cairo_surface_t* cr, const char* fn);
 glm::ivec2 get_surface_size(cairo_surface_t* p);
+// 渲染图片到cr
 glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1, const glm::vec2& dsize = { -1,-1 });
+// 渲染九宫格图片
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& size, const glm::vec4& sliced);
 #endif
 /*
 <表格、树形>

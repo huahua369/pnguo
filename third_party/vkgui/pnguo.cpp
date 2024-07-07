@@ -5870,6 +5870,54 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	return ss;
 }
 
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& size, const glm::vec4& sliced)
+{
+	glm::vec2 ss = { rc.z, rc.w };
+	if (ss.x < 0)
+	{
+		ss.x = cairo_image_surface_get_width(image);
+	}
+	if (ss.y < 0)
+	{
+		ss.y = cairo_image_surface_get_height(image);
+	}
+#if 0
+	cairo_as _a(cr);
+	//cairo_scale(cr, scale.x, scale.y);
+	// 上层
+	{
+		glm::vec2 v[] = { {sliced.x,sliced.y}, {ss.x - (sliced.x + sliced.z),sliced.y }, { sliced.z,sliced.y } };
+		glm::vec2 vpos[3] = { {0,0},{sliced.x,0},{sliced.x + v[1].x,0} };
+		for (size_t i = 0; i < 3; i++)
+		{
+			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
+			draw_image(cr, image, vpos[i] + pos, rc0, color);
+		}
+	} 
+	// 中层
+	{
+		glm::vec2 v[] = { {sliced.x,ss.y - (sliced.y + sliced.w)}, { ss.x - (sliced.x + sliced.z),ss.y - (sliced.y + sliced.w) }, { sliced.z,ss.y - (sliced.y + sliced.w) } };
+		glm::vec2 vpos[3] = { {0,sliced.y},{sliced.x,sliced.y},{sliced.x + v[1].x,sliced.y} };
+		for (size_t i = 0; i < 3; i++)
+		{
+			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
+			draw_image(cr, image, vpos[i] + pos, rc0, color);
+		}
+	}
+	// 下层
+	{
+		glm::vec2 v[] = { {sliced.x,sliced.w},{ss.x - (sliced.x + sliced.z),sliced.w},{sliced.z,sliced.w} };
+		glm::vec2 vpos[3] = { {0,ss.y - sliced.w},{sliced.x,ss.y - sliced.w},{sliced.x + v[1].x,ss.y - sliced.w} };
+		for (size_t i = 0; i < 3; i++)
+		{
+			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
+			draw_image(cr, image, vpos[i] + pos, rc0, color);
+		}
+	}
+#endif
+	return ss;
+}
+
 void destroy_image_data(void* d) {
 	auto p = (uint32_t*)d;
 	if (d)delete[]p;
@@ -10162,8 +10210,8 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		if (it != _char_lut.end())
 		{
 			return it->second;
-}
-}
+		}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -12084,7 +12132,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -14359,7 +14407,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -15042,7 +15090,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
