@@ -1254,11 +1254,20 @@ int main()
 			{
 				int y1 = 10;
 				cairo_as _ss_(cr);
-
+				 
+				cairo_set_line_width(cr, 1.0);
 				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
 				fill_stroke(cr, -1, 0);
 				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
 				fill_stroke(cr, 0, -1, 1);
+
+				cairo_scale(cr, 5, 5);
+				draw_triangle(cr, { 10.5,12.5 }, { 14.5,19 }, { 1,0.5 });
+				fill_stroke(cr, 0, -1, 2);
+				cairo_set_hairline(cr, 1);// 开启最小宽度线
+				draw_triangle(cr, { 15.5,12.5 }, { 14.5,19 }, { 1,0.5 });
+				fill_stroke(cr, 0, -1, 2);
+
 
 				cairo_translate(cr, 200, 200);
 				rect_shadow_t rs = {};
@@ -1267,7 +1276,8 @@ int main()
 				rs.segment = 8;
 				//draw_rectangle_gradient(cr, 200, 100, rs);
 				auto txt = pl1->ltx;
-				//txt->update_text();
+				//txt->update_text();	
+				cairo_scale(cr, 0.5, 0.5);
 				for (auto it : txt->msu)
 				{
 					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });

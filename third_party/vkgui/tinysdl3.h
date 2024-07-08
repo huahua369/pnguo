@@ -294,6 +294,7 @@ public:
 	~mitem_t();
 	void show(const glm::vec2& pos);
 	void hide(bool hp);
+	void close();
 	void set_data(int width, int height, const std::vector<std::string>& mvs);
 	glm::ivec2 get_idx_pos(int idx);
 };

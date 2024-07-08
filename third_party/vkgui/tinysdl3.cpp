@@ -2405,6 +2405,7 @@ mitem_t::~mitem_t()
 {
 	if (f)
 		f->close();
+	f = 0;
 	if (backgs)delete backgs; backgs = 0;
 	if (ltx)delete ltx; ltx = 0;
 }
@@ -2441,6 +2442,13 @@ void mitem_t::hide(bool hp)
 	}
 	if (parent && hp)
 		parent->hide(1);
+}
+
+void mitem_t::close()
+{
+	if (f)
+		f->close();
+	f = 0;
 }
 
 void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
