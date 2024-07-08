@@ -5893,7 +5893,7 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
 			draw_image(cr, image, vpos[i] + pos, rc0, color);
 		}
-	} 
+	}
 	// 中层
 	{
 		glm::vec2 v[] = { {sliced.x,ss.y - (sliced.y + sliced.w)}, { ss.x - (sliced.x + sliced.z),ss.y - (sliced.y + sliced.w) }, { sliced.z,ss.y - (sliced.y + sliced.w) } };
@@ -18460,7 +18460,8 @@ void slider_tl::draw(cairo_t* cr)
 		spos = { ss.x * 0.5,xx };
 		crc = { 0.5 + x,0.5 + y, wide, x1 };
 		if (reverse_color) {
-			crc = { 0.5 + x,0.5 + y + x1, wide, ss.y - x1 };
+			x1 -= rounding;
+			crc = { 0.5 + x,0.5 + y + x1 , wide, ss.y - x1 };
 		}
 	}
 	else {
@@ -18469,10 +18470,10 @@ void slider_tl::draw(cairo_t* cr)
 		cliprc = { 0,0, xx, wide };
 		xx = glm::clamp((float)xx, (float)0, (float)ss.x);
 		spos = { xx ,ss.y * 0.5 };
-
 		crc = { 0.5 + x,0.5 + y, x1, wide };
 		if (reverse_color) {
-			crc = { 0.5 + x + x1,0.5 + y,ss.x - x1, wide };
+			x1 -= rounding;
+			crc = { 0.5 + x + x1 ,0.5 + y,ss.x - x1, wide };
 		}
 	}
 	draw_rectangle(cr, brc, rounding);

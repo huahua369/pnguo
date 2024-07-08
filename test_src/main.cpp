@@ -64,8 +64,6 @@ glm::vec2 draw_r(cairo_t* cr, glm::vec4 t, float aj) {
 	return t2;
 }
 
-
-
 #include <clipper2/clipper.h> 
 using namespace Clipper2Lib;
 void tobox(const glm::vec2& v, glm::vec4& t);
@@ -812,6 +810,11 @@ int main()
 		p->custom_layout = true;
 		p->fontsize = 16;
 
+		// 进度条
+		auto pro0 = p->add_progress("%", { 100,30 }, 0.06);
+		pro0->rounding = 10;
+		pro0->pos = { 100,100 };
+		pro0->hscroll = {};
 		std::vector<std::string> cstr = { (char*)u8"名称" ,(char*)u8"状\t态",(char*)u8"描述" };
 		std::vector<std::string> cstr1 = { (char*)u8"checkbox 🍇测试1" ,(char*)u8"checkbox ✅测试2",(char*)u8"" };
 		std::vector<std::string> cstr2 = { (char*)u8"radio 🍍测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
@@ -1125,14 +1128,14 @@ int main()
 		{
 			bs = { 12, 200 };
 			auto slider = pl1->add_slider(bs, 7, 0.2);
-			slider->sl.y = 0xff3030f8;
+			slider->sl.y = 0xff6666ff;
 			slider->thickness = 2;
 			slider->rounding = 3;
 		}
 		{
 			bs = { 200, 12 };
 			auto slider = pl1->add_slider(bs, 7, 0.2);
-			slider->sl.y = 0xff3030f8;
+			slider->sl.y = 0xff6666ff;
 			slider->thickness = 2;
 			slider->rounding = 3;
 			slider->reverse_color = 1;
@@ -1140,7 +1143,7 @@ int main()
 		{
 			bs = { 12, 200 };
 			auto slider = pl1->add_slider(bs, 7, 0.2);
-			slider->sl.y = 0xff3030f8;
+			slider->sl.y = 0xff6666ff;
 			slider->thickness = 2;
 			slider->rounding = 3;
 			slider->reverse_color = 1;
