@@ -2874,6 +2874,1383 @@ void build_cubic(const cubic_v& shape, float percent, float m, std::vector<glm::
 #ifndef path_v_h
 #define path_v_h
 
+
+namespace gp {
+
+	struct ctan_t
+	{
+		glm::vec2 t[2];		// 切线
+		glm::vec2 angle;	// 2切线点角弧度
+		glm::vec3 center;	// 圆xy坐标，z半径
+	};
+	// 路径圆角信息
+	struct path_node_t
+	{
+		glm::vec2* pos;		// 顶点坐标
+		glm::vec2* angle;	// 2切线点角弧度
+		glm::vec3* center;	// 圆心坐标xy/半径z，半径小于等于0则不圆角
+		int* lengths;
+		int n;
+		int count;			// 顶点数量
+		int cap;			// 分配的顶点数量空间
+		int caplen;
+
+	};
+
+	struct fv_it
+	{
+		glm::vec2* pos = 0;		// 顶点坐标
+		glm::vec2* angle = 0;	// 2切线点角弧度
+		glm::vec3* center = 0;	// 圆心坐标xy/半径z 
+		int* lengths = 0;
+		int count = 0;
+		fv_it() {}
+		fv_it(path_node_t* p) {
+			pos = p->pos;		// 顶点坐标
+			angle = p->angle;	// 2切线点角弧度
+			center = p->center;	// 圆心坐标xy/半径z 
+			lengths = p->lengths;
+			count = p->n;
+		}
+		void inc(int n)
+		{
+			pos += n;
+			angle += n;
+			center += n;
+		}
+
+	};
+	// 获取圆角弧度a的坐标，圆心x=0,y=0
+	glm::vec2 get_circle(float a, float r);
+	glm::vec3 get_circle(float a, const glm::vec3& c);
+
+	// 输入三点，角点ptr2，输出圆
+	glm::vec3 get_circle3(glm::vec2 pt1, glm::vec2 pt2, glm::vec2 pt3, float radius);
+	// 获取点p到圆的两条切线
+	glm::vec4 gtan(const glm::vec2& P, const glm::vec3& c);
+
+
+	// 点v的方位角
+	//float atan2v(glm::vec2 v);
+	// 正数向上取整，负数向下
+	int floor2ceil(float a);
+	// 从两个路径创建面
+	int for_cvertex(fv_it& fv, fv_it& fv1, size_t num_segments, std::vector<glm::vec3>& tv, glm::vec2 z, bool pccw);
+	// 判断两条内外线相交
+	// todo 获取切线
+	void do_tan(glm::vec2* pts, int nSize, float radius, float maxangle, path_node_t* pn, int first, bool ccw, float a);
+
+
+	int floor2ceil(float a)
+	{
+		return a > 0 ? ceil(a) : floor(a);
+	}
+	glm::ivec2 fc2(const glm::vec2& a, float x)
+	{
+		return { floor2ceil(a.x * x), floor2ceil(a.y * x) };
+	}
+	glm::ivec4 fc4(const glm::vec4& a)
+	{
+		return { floor2ceil(a.x), floor2ceil(a.y), floor2ceil(a.z), floor2ceil(a.w) };
+	}
+	//返回角度{angle,dir}方向右、顺时针为负, 左、逆时针为正
+	glm::vec2 angle_v3(glm::vec2 v[3])
+	{
+		glm::vec2& a = v[0], & b = v[1], & c = v[2];
+
+		auto c0 = glm::normalize(a - b);
+		auto c1 = glm::normalize(b - c);
+		auto ak = glm::angle(c0, c1);
+		auto ak1 = glm::degrees(ak);
+		glm::vec3 axis = glm::normalize(glm::cross(glm::vec3(c0, 0), glm::vec3(c1, 0)));
+		//float oriented_angle = glm::orientedAngle(glm::vec3(a, 0), glm::vec3(b, 0), axis);
+		ak1 = floor2ceil(180.0 + ak1 * axis.z);
+		return glm::vec2(ak1, floor2ceil(axis.z));
+	}
+	glm::vec2 angle_v3(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c)
+	{
+		auto c0 = glm::normalize(a - b);
+		auto c1 = glm::normalize(b - c);
+		auto ak = glm::angle(c0, c1);
+		auto ak1 = glm::degrees(ak);
+		glm::vec3 axis = glm::normalize(glm::cross(glm::vec3(c0, 0), glm::vec3(c1, 0)));
+		//float oriented_angle = glm::orientedAngle(glm::vec3(a, 0), glm::vec3(b, 0), axis);
+		ak1 = 180.0 + ak1 * axis.z;
+		return glm::vec2(floor2ceil(ak1), floor2ceil(axis.z));
+	}
+
+	//# 向量角度
+	auto angle_v2(glm::vec2 v1, glm::vec2 v2) {
+		return acos(glm::dot(v1, v2) / (length(v1) * length(v2)));
+	}
+	/*
+	a/c = sin(A)
+	a = sinA*c
+	a/sinA = c
+	b/c = cosA
+	b/cosA = a
+	ABC角，abc边长
+	B |\
+	  | \
+	a |  \ c
+	  |___\
+	C   b   A
+	atan2
+	输入边长对角获取另外边长
+	*/
+	glm::vec2 get_st(float a, float A)
+	{
+		float c = a / sin(A * glm::pi<double>() / 180.0);
+		float b = a / tan(A * glm::pi<double>() / 180.0);
+		return { c,b };
+	}
+	glm::vec2 get_ct(float b, float A)
+	{
+		float c = b / cos(A * glm::pi<double>() / 180.0);
+		float a = b * tan(A * glm::pi<double>() / 180.0);
+		return { c,a };
+	}
+	glm::vec2 dotf(glm::vec2 v, double f)
+	{
+		v *= f;
+		return v;
+	}
+
+
+
+	glm::vec2 get_circle(float a, float r)
+	{
+		return glm::vec2(r * cos(a), r * sin(a));
+	}
+	glm::vec3 get_circle(float a, const glm::vec3& c)
+	{
+		return glm::vec3(c.x + c.z * cos(a), c.y + c.z * sin(a), 0);
+	}
+	float atan2v(const glm::vec2& v)
+	{
+		return atan2(v.y, v.x);
+	}
+
+	// 输入三点，角点ptr2，输出圆
+	glm::vec3 get_circle3(glm::vec2 pt1, glm::vec2 pt2, glm::vec2 pt3, float radius)
+	{
+		glm::vec3 r = {};
+		auto vec2_1 = pt1 - pt2;
+		auto vec2_3 = pt3 - pt2;
+		if (!(radius > 0))
+		{
+			return r;
+		}
+		auto dt1 = std::min(glm::distance(pt1, pt2), glm::distance(pt3, pt2)) * 0.5;
+		//计算两向量夹角的余弦值
+		double dCos = glm::dot(vec2_1, vec2_3) / (glm::length(vec2_1) * glm::length(vec2_3));
+		double dTheta = acos(dCos);
+		//求角平分线
+		auto vecBisector = glm::normalize(vec2_1) + glm::normalize(vec2_3);
+		double dR = radius;
+		double dDist = dR / sin(dTheta / 2.0);
+		auto dv = dR / dDist;
+		//圆心
+		auto center = glm::vec2(pt2 + dotf(normalize(vecBisector), dDist));
+		// 求出点到圆心的距离
+		auto distance = glm::distance(pt2, center);
+		// 判断是否符合要求 distance<=r 不符合则返回空
+		if (!(distance <= dR || glm::isnan(center.x) || glm::isnan(center.y)))
+		{
+			r = { center, radius };
+		}
+		return r;
+	}
+	// 获取点p到圆的两条切线
+	glm::vec4 gtan(const glm::vec2& P, const glm::vec3& c)
+	{
+		glm::vec2 C = { c.x,c.y }; float r = c.z;
+		// 求出点到圆心的距离
+		auto distance = glm::distance(P, C);
+		// 判断是否符合要求 distance<=r 不符合则返回 否则进行运算
+		if (distance <= r || r <= 0) {
+			//printf("您输入的数值不在范围内!\n");
+			return {};
+		}
+		auto pc = P - C;
+		// 计算切线与点心连线的夹角
+		auto angle = asin(r / distance);
+		auto angle1 = atan2(pc.y, pc.x);// 点P的方位角
+		auto angle2 = angle1 + angle;			// 切线点角度1
+		auto angle3 = angle1 - angle;			// 切线点角度2
+		glm::vec4 ret = { C + get_circle(angle2, r),C + get_circle(angle3, r) };
+		return ret;
+	}
+
+	double angle_between_vectors(double ux, double uy, double vx, double vy)
+	{
+		double dot = ux * vx + uy * vy;
+		double umag = sqrt(ux * ux + uy * uy);
+		double vmag = sqrt(vx * vx + vy * vy);
+		double c = dot / (umag * vmag);
+		if (c > 1.0)
+			c = 1.0;
+		if (c < -1.0)
+			c = -1.0;
+		double a = acos(c);
+		if (ux * vy - uy * vx < 0.0)
+			a = -a;
+		return a;
+	}
+	/*
+	struct ctan_t
+	{
+		glm::vec2 t[2];		// 切线
+		glm::vec2 angle;	// 2切线点角弧度
+		glm::vec3 center;	// 圆xy坐标，z半径
+	};
+	*/
+	// 输入三点，角点ptr2，输出圆心和切线点坐标
+	ctan_t get_tan(glm::vec2 pt1, glm::vec2 pt2, glm::vec2 pt3, float radius)
+	{
+		ctan_t r = {};
+		auto vec2_1 = pt1 - pt2;
+		auto vec2_3 = pt3 - pt2;
+		if (radius <= 0) { return r; }
+		auto dt1 = std::min(glm::distance(pt1, pt2), glm::distance(pt3, pt2)) * 0.5;
+		//计算两向量夹角的余弦值
+		double dCos = glm::dot(vec2_1, vec2_3) / (glm::length(vec2_1) * glm::length(vec2_3));
+		double dTheta = acos(dCos);
+		//求角平分线
+		auto vecBisector = glm::normalize(vec2_1) + glm::normalize(vec2_3);
+		double dR = radius;
+		int nc = 1;
+		do {
+			double dDist = dR / sin(dTheta / 2.0);
+			auto dv = dR / dDist;
+			//圆心
+			auto center = glm::vec2(pt2 + dotf(normalize(vecBisector), dDist));
+			// 求出点到圆心的距离
+			auto distance = glm::distance(pt2, center);
+			// 判断是否符合要求 distance<=r 不符合则返回 否则进行运算
+			if (distance <= dR || glm::isnan(center.x) || glm::isnan(center.y)) { r = {}; break; }
+			r.center = { center , dR };
+			// 计算切线与点心连线的夹角
+			auto angle = glm::radians(90.0) - asin(dR / distance);
+			auto angle1 = atan2v(pt2 - center);	// 点P的方位角 
+			r.angle = { angle1 + angle, angle1 - angle }; // 切线点角度1/2
+			r.t[0] = center + get_circle(r.angle.x, dR); r.t[1] = center + get_circle(r.angle.y, dR);
+			float dis[] = { glm::distance(r.t[0], pt2), glm::distance(r.t[1], pt2) };
+			{
+				auto t1 = std::min(dis[0], dis[1]);
+				if (t1 > dt1)
+				{
+					dR = dt1 * dv;
+					continue;
+				}
+			}
+			break;
+		} while (nc--);
+		return r;
+	}
+
+	// 判断两条内外线相交
+	// todo 获取切线
+	void do_tan(glm::vec2* pts, int nSize, float radius, float maxangle, path_node_t* pn, int first, bool ccw, float a)
+	{
+		if (!pts || nSize < 2 || !pn || radius <= 0)
+		{
+			return;
+		}
+		if (maxangle > 180)
+		{
+			maxangle = 180;
+		}
+		if (maxangle <= 0)
+		{
+			maxangle = 180;
+		}
+
+		auto nn = nSize;
+		int dn = 1;
+		if (pts[0] == pts[nn - 1])
+		{
+			dn = 2;
+			nn--;
+		}
+		int cw = ccw ? -1 : 1;
+		for (int i = 0; i < nn; i++)
+		{
+			int x0 = i - 1, x1 = i + 1;
+			if (x0 < 0)x0 = nSize - dn;
+			glm::vec2 pt1 = pts[(x0)];
+			glm::vec2 pt2 = pts[i];
+			glm::vec2 pt3 = pts[x1];
+
+			auto j = angle_v3(pt1, pt2, pt3);			// 计算三点角度
+			auto v0 = glm::distance(pt1, pt2);
+			auto v1 = glm::distance(pt2, pt3);
+			auto ny = floor2ceil(j.y * cw);
+			auto axx = j.x;
+			bool ccw1 = ccw;
+			float r = radius;
+			if (ccw1)
+			{
+				if (a > 0 && axx < maxangle)
+				{
+					ny = -1; ccw1 = false; r = a;
+				}
+				else
+				{
+					axx = 360.0 - axx;
+				}
+			}
+			ctan_t t = {};
+			if (ny < 0 && axx < maxangle)
+				t = get_tan(pt1, pt2, pt3, r);
+			// 逆时针序的要翻转圆角位置
+			if (ccw1)
+				std::swap(t.angle.x, t.angle.y);
+			if (glm::isnan(t.angle.x) || glm::isnan(t.angle.x))
+			{
+				t = {};
+			}
+			pn->angle[first + i] = t.angle;
+			pn->center[first + i] = t.center;
+		}
+	}
+
+	void getctan(glm::vec2* pts, size_t nSize, float radius, float maxangle, int ccw, glm::vec2* angle, glm::vec3* center)
+	{
+		auto nn = nSize;
+		int dn = 1;
+		if (pts[0] == pts[nn - 1])
+		{
+			dn = 2;
+			nn--;
+		}
+		int cw = ccw ? -1 : 1;
+		if (radius > 0)
+		{
+			for (int i = 0; i < nn; i++)
+			{
+				int x0 = i - 1, x1 = i + 1;
+				if (x0 < 0)x0 = nSize - dn;
+				glm::vec2 pt1 = pts[(x0)];
+				glm::vec2 pt2 = pts[i];
+				glm::vec2 pt3 = pts[x1];
+				auto j = angle_v3(pt1, pt2, pt3);			// 计算三点角度
+				auto v0 = glm::distance(pt1, pt2);
+				auto v1 = glm::distance(pt2, pt3);
+				auto ny = floor2ceil(j.y * cw);
+				if (ny > 0 && ccw == -1) {
+					ny = -1;
+				}
+				auto axx = j.x;
+				bool ccw1 = ccw && axx > 180;
+				float r = radius;
+				if (ccw1)
+				{
+					axx = 360.0 - axx;
+				}
+				ctan_t t = {};
+				if (ny < 0 && axx < maxangle)
+					t = get_tan(pt1, pt2, pt3, r);
+				// 逆时针序的要翻转圆角位置
+				if (ccw1)
+					std::swap(t.angle.x, t.angle.y);
+				if (glm::isnan(t.angle.x) || glm::isnan(t.angle.x))
+				{
+					t = {};
+				}
+				angle[i] = t.angle;
+				center[i] = t.center;
+			}
+		}
+		else {
+			ctan_t t = {};
+			for (int i = 0; i < nn; i++)
+			{
+				angle[i] = t.angle;
+				center[i] = t.center;
+			}
+		}
+		return;
+	}
+	struct path_node_tafdsf
+	{
+		glm::vec2* pos;		// 顶点坐标
+		glm::vec2* angle;	// 2切线点角弧度
+		glm::vec3* center;	// 圆心坐标xy/半径z，半径小于等于0则不圆角
+		int* lengths;
+		int n;
+		int count;			// 顶点数量
+		int cap;			// 分配的顶点数量空间
+		int caplen;
+
+	};
+
+
+	void free_path_node(path_node_t* t)
+	{
+		if (t)
+		{
+			auto p = (glm::vec4*)t;
+			delete[] p;
+		}
+	}
+	path_node_t* new_node0(path_v* sp, size_t sn)
+	{
+		path_node_t* p = 0;
+		int ret = 0;
+		do
+		{
+			if (!sp || sp->size() < 2 /*|| sp->n < 1 || !sp->s || !sp->lengths*/)break;
+			int64_t ac = sizeof(path_node_t);
+
+			ac += sn * sizeof(glm::vec2);
+
+			std::vector<int> ls;
+			int64_t x = -1;
+			size_t spn = 0;
+			for (auto& it : sp->_data)
+			{
+				if (it.type == path_v::vtype_e::e_vmove)
+				{
+					spn++;
+					ls.push_back(1);
+					x++;
+				}
+				else {
+					ls[x]++;
+				}
+			}
+			ac += spn * sizeof(int);
+
+			auto acount = ac / sizeof(glm::vec4);
+			acount++;
+			auto mem0 = new glm::vec4[acount];
+			p = (path_node_t*)mem0;
+			auto cp = (char*)mem0;
+			cp += sizeof(path_node_t);
+			//cp += sn * sizeof(glm::vec2);
+			p->lengths = (int*)cp;
+			cp += spn * sizeof(int);
+			p->pos = (glm::vec2*)cp;
+			p->cap = sn;
+			p->count = sp->size();	// 顶点数量
+			for (size_t i = 0; i < spn; i++)
+			{
+				p->lengths[i] = ls[i];
+			}
+			p->caplen = spn;
+			auto pt = p->pos;		// 顶点坐标
+			pt += p->count;
+			//p->angle = pt;			// 2切线点角弧度
+			pt += p->count;
+			//p->center = (glm::vec3*)pt;				// 圆心坐标xy/半径z，半径小于等于0则不圆角 
+		} while (0);
+
+		return p;
+	}
+
+	// 删除前面的
+	void push_forward(std::vector<glm::vec2>& nv, const glm::vec2& p0, double ds)
+	{
+		if (nv.size() == 0 && (ds > 0))
+		{
+			size_t n = 0;
+			for (auto it = nv.rbegin(); it != nv.rend(); it++)
+			{
+				if (glm::distance(p0, *it) > ds)
+				{
+					break;
+				}
+				n++;
+			}
+			if (n > 0)
+			{
+				nv.resize(nv.size() - n);
+			}
+		}
+	}
+	// 删除插入开头的
+	void push_dv2(std::vector<glm::vec2>& nv, std::vector<glm::vec2>& points, const glm::vec2& ds)
+	{
+		size_t idx = 0, idx1 = 0;
+		auto pts = points.size();
+		auto pt = points.data();
+		double lds = 0.0;
+		if ((ds.x > 0 || ds.y > 0) && pts > 2) {
+			for (size_t i = 1; i < points.size(); i++)
+			{
+				auto t0 = pt[i - 1];
+				auto t = pt[i];
+				lds += glm::distance(t, t0);
+				if (lds > ds.x)
+				{
+					idx = i; lds = 0.0;
+					break;
+				}
+			}
+			lds = 0.0;
+			for (size_t i = points.size() - 1; i > idx; i--)
+			{
+				auto t0 = pt[i - 1];
+				auto t = pt[i];
+				lds += glm::distance(t, t0);
+				if (lds > ds.y)
+				{
+					idx1 = i; lds = 0.0;
+					break;
+				}
+			}
+			if (idx != 0 && (nv.empty() || pt[0] != *nv.rbegin()))
+				nv.push_back(pt[0]);
+			if (idx < points.size() && idx1 < points.size() && idx < idx1)
+			{
+				for (size_t i = idx; i < idx1; i++)
+				{
+					nv.push_back(pt[i]);
+				}
+			}
+			if (idx1 < points.size() - 1)
+				nv.push_back(*points.rbegin());
+		}
+		else {
+			if (nv.size() && pt[0] == *nv.rbegin())
+			{
+				pt++; pts--;
+			}
+			for (size_t i = 0; i < pts; i++)
+			{
+				nv.push_back(pt[i]);
+			}
+		}
+
+
+	}
+	// todo
+	path_node_t* new_path_node(path_v* sp, float expand, float radius, float less_angle, int ccw, size_t num_segments, float ml, float ds)
+	{
+		float maxangle = less_angle;
+		if (!sp || sp->size() < 2)
+		{
+			return 0;
+		}
+		auto td = sp->data();
+		float exp = expand;
+		std::vector<glm::vec2> posv, anglev;
+		std::vector<glm::vec3> centerv;
+		std::vector<int> lengths;
+		auto spn = sp->mcount();
+		std::vector<std::vector<glm::vec2>> tvs;
+		sp->get_expand_flatten2(0, expand, num_segments, ml, ds, 2, &tvs, 0);
+		auto length = tvs.size();
+		// 细分直线
+		std::vector<glm::vec2> ttd, ttd1;
+		if (ml > 0 && ds > 0) {
+			for (auto& it : tvs) {
+				auto ss = it.size();
+				auto td = it.data();
+				ttd.reserve(ss);
+				ttd.clear();
+				for (size_t i = 1; i < ss; i++)
+				{
+					ttd1.clear();
+					auto pt0 = td[i - 1];
+					auto pt1 = td[i];
+					auto dc = glm::distance(pt0, pt1);
+					int dc0 = dc / ml;
+					if (dc0 > 0)
+					{
+						for (size_t x = 0; x < dc0; x++)
+						{
+							ttd1.push_back(glm::mix(pt0, pt1, (double)x / dc0));
+						}
+					}
+					ttd1.push_back(pt1);
+					glm::vec2 dist = { ds * 3,ds * 3 };
+					push_dv2(ttd, ttd1, dist);
+				}
+				it.swap(ttd);
+
+			}
+		}
+		for (size_t i = 0; i < length; i++)
+		{
+			auto& tv = tvs[i];
+			auto tvs = tv.size();
+			auto pc = posv.size();
+			posv.resize(pc + tvs);
+			anglev.resize(pc + tvs);
+			centerv.resize(pc + tvs);
+			memcpy(posv.data() + pc, tv.data(), sizeof(glm::vec2) * tvs);
+			// 圆角
+			glm::vec2* angle = anglev.data() + pc;
+			glm::vec3* center = centerv.data() + pc;
+			getctan(tv.data(), tv.size(), radius, maxangle, ccw, angle, center);
+			lengths.push_back(tv.size());
+		}
+
+		size_t act = posv.size() * 4;
+		path_node_t* pn = new_node0(sp, act);
+
+		pn->n = length;
+		pn->count = posv.size();
+		memcpy(pn->pos, posv.data(), sizeof(glm::vec2) * posv.size());
+
+		auto pa = pn->pos + posv.size();
+		auto pc = pa + anglev.size();
+		pn->angle = pa;
+		pn->center = (glm::vec3*)pc;
+		memcpy(pn->angle, anglev.data(), sizeof(glm::vec2) * anglev.size());
+		memcpy(pn->center, centerv.data(), sizeof(glm::vec3) * centerv.size());
+		memcpy(pn->lengths, lengths.data(), sizeof(int) * lengths.size());
+		return pn;
+	}
+
+	path_node_t* new_path_node_exp(path_v* sp, float expand, float scale, float radius, float less_angle, int type, bool rccw, size_t num_segments, float ml, float ds, bool is_round)
+	{
+		float maxangle = less_angle;
+		if (!sp || sp->size() < 2)
+		{
+			return 0;
+		}
+		auto td = sp->data();
+		float exp = expand;
+		std::vector<glm::vec2> posv, anglev;
+		std::vector<glm::vec3> centerv;
+		std::vector<int> lengths;
+		auto spn = sp->mcount();
+		std::vector<std::vector<glm::vec2>> _tvs;
+		sp->get_expand_flatten2(expand, scale, num_segments, ml, ds, type, &_tvs, is_round);
+		auto length = _tvs.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto& tv = _tvs[i];
+			auto tvs = tv.size();
+			if (tvs < 2)continue;
+			auto pc = posv.size();
+			posv.resize(pc + tvs);
+			anglev.resize(pc + tvs);
+			centerv.resize(pc + tvs);
+			memcpy(posv.data() + pc, tv.data(), sizeof(glm::vec2) * tvs);
+			// 圆角
+			glm::vec2* angle = anglev.data() + pc;
+			glm::vec3* center = centerv.data() + pc;
+			getctan(tv.data(), tv.size(), radius, maxangle, rccw, angle, center);
+			lengths.push_back(tv.size());
+		}
+
+		size_t act = posv.size() * 4;
+		path_node_t* pn = new_node0(sp, act);
+
+		pn->n = length;
+		pn->count = posv.size();
+		memcpy(pn->pos, posv.data(), sizeof(glm::vec2) * posv.size());
+
+		auto pa = pn->pos + posv.size();
+		auto pc = pa + anglev.size();
+		pn->angle = pa;
+		pn->center = (glm::vec3*)pc;
+		memcpy(pn->angle, anglev.data(), sizeof(glm::vec2) * anglev.size());
+		memcpy(pn->center, centerv.data(), sizeof(glm::vec3) * centerv.size());
+		memcpy(pn->lengths, lengths.data(), sizeof(int) * lengths.size());
+		return pn;
+	}
+
+
+
+	template<class T, class T1>
+	auto getk(T& m, const T1& k)
+	{
+		auto it = m.find(k);
+		return it != m.end() ? it->second : nullptr;
+	}
+	void mkivec(std::vector<glm::vec3>& tv1, int d);
+	void mkivec(std::vector<glm::vec2>& tv1, int d);
+	// 获取圆角顶点
+	int for_vertex(glm::vec2* pts, glm::vec2* angle, glm::vec3* center, int nSize, size_t num_segments, std::vector<glm::vec2>& tv)
+	{
+		auto nn = nSize;
+		int dn = 1;
+		if (pts[0] == pts[nn - 1])
+		{
+			dn = 2;
+			nn--;
+		}
+		//tv.reserve(nn * cn); 
+		for (int i = 0; i < nn; i++)
+		{
+			auto ps = pts[i];
+			auto a = angle[i];
+			auto c = center[i];
+			if (c.z > 0)
+			{
+				auto cn = num_segments;
+				auto an = glm::normalize(a);
+				auto al = glm::length(a);
+				auto p1 = get_circle(a.x, c);
+				auto p2 = get_circle(a.y, c);
+				double k = glm::distance(a.x, a.y);
+				auto kd = glm::degrees(k);
+				if (cn == 0)
+				{
+					cn = kd;
+				}
+				tv.push_back(p1);
+				for (int x = 1; x < cn; x++)
+				{
+					auto d = (double)x / cn;
+					auto a1 = glm::mix(an.x, an.y, d) * al;
+					auto ps1 = get_circle(a1, c);
+					tv.push_back(ps1);
+				}
+				//auto kka = angle_v3(tv1.data());
+				tv.push_back(p2);
+			}
+			else {
+				tv.push_back(ps);
+			}
+		}
+
+		//mkivec(tv, 100);
+		if (tv.size() && tv[0] != tv[tv.size() - 1])
+		{
+			tv.push_back(tv[0]);
+		}
+		return nSize;
+	}
+	// 坐标，角度，圆，段数，高度，输出圆角点或单点
+	int get_fv(glm::vec2 ps, glm::vec2 a, glm::vec3 c, size_t num_segments, float z, std::vector<glm::vec3>& tv)
+	{
+		if (c.z > 0)
+		{
+			auto cn = num_segments;
+			auto an = glm::normalize(a);
+			auto al = glm::length(a);
+			auto p1 = get_circle(a.x, c);
+			auto p2 = get_circle(a.y, c);
+			if (cn == 0)
+			{
+				double k = glm::distance(a.x, a.y);
+				cn = glm::degrees(k);//如不指定段数则用弧度转换为度
+			}
+			p1.z = z;
+			tv.push_back(p1);
+			for (int x = 1; x < cn; x++)
+			{
+				auto d = (double)x / cn;
+				auto a1 = glm::mix(an.x, an.y, d) * al;
+				auto ps1 = get_circle(a1, c);
+				ps1.z = z;
+				tv.push_back(ps1);
+			}
+			p2.z = z;
+			tv.push_back(p2);
+		}
+		else {
+			tv.push_back({ ps, z });
+		}
+		return 0;
+	}
+
+	// 计算法向量
+	glm::vec3 normal_v3(glm::vec3* dv)
+	{
+		glm::vec3 a = dv[0], b = dv[1], c = dv[2];
+		auto ba = b - a;
+		auto ca = c - a;
+		auto cr = cross(ba, ca);
+		auto nv = normalize(cr);
+
+		if (glm::isnan(nv.x) || glm::isnan(nv.y) || glm::isnan(nv.z))
+		{
+			printf((char*)u8"error 错误的三角形\n");
+			//assert(0);
+		}
+		return nv;
+	}
+	void get3(std::vector<glm::vec3>* v, std::vector<glm::vec3>* v1, std::vector<glm::vec3>& tv)
+	{
+		auto& s = v[0];
+		auto& s1 = v[1];
+		auto& t = v1[0];
+		auto& t1 = v1[1];
+		glm::ivec4 n = { s.size(),s1.size(),t.size(),t1.size() };
+		int kc = 0;
+		// 圆角三角形
+		if (n.x > 1)
+		{
+			if (n.z > 1)
+			{
+				int cn = n.x - 1;
+				for (size_t i = 0; i < cn; i++)
+				{
+					glm::vec3 tr[3] = { s[i],t[i],t[i + 1] };
+					glm::vec3 tr1[3] = { s[i + 1] ,s[i], t[i + 1] };
+					auto nv = normal_v3(tr);
+					auto nv1 = normal_v3(tr1);
+					tv.push_back(s[i]);
+					tv.push_back(t[i]);
+					tv.push_back(t[i + 1]);
+
+					tv.push_back(s[i + 1]);
+					tv.push_back(s[i]);
+					tv.push_back(t[i + 1]);
+				}
+			}
+			else
+			{
+				auto d = t[0];
+				int cn = n.x - 1;
+				for (size_t i = 0; i < cn; i++)
+				{
+					glm::vec3 tr[3] = { s[i],d,s[i + 1] };
+					auto nv = normal_v3(tr);
+					tv.push_back(tr[0]);
+					tv.push_back(tr[1]);
+					tv.push_back(tr[2]);
+				}
+			}
+		}
+		else {
+			if (n.z > 1)
+			{
+				auto d = s[0];
+				int cn = n.z - 1;
+				for (size_t i = 0; i < cn; i++)
+				{
+					glm::vec3 tr[3] = { t[i],d,t[i + 1] };
+					glm::vec3 tr1[3] = { t[i + 1],d,t[i] };
+					auto nv = normal_v3(tr);
+					auto nv1 = normal_v3(tr1);
+					tv.push_back(tr[2]);
+					tv.push_back(tr[1]);
+					tv.push_back(tr[0]);
+				}
+			}
+		}
+		// 单点三角形2个
+		{
+			glm::vec3 tr[3] = { s[n.x - 1] ,t[n.z - 1] ,s1[0] };
+			glm::vec3 tr1[3] = { s1[0],t[n.z - 1],t1[0] };
+			tv.push_back(s[n.x - 1]);
+			tv.push_back(t[n.z - 1]);
+			tv.push_back(s1[0]);
+
+			tv.push_back(s1[0]);
+			tv.push_back(t[n.z - 1]);
+			tv.push_back(t1[0]);
+		}
+	}
+
+	// 旧函数
+	int get_fv(fv_it& fv, int i, size_t num_segments, float z, std::vector<glm::vec3>& tv)
+	{
+		auto ps = fv.pos[i];
+		auto a = fv.angle[i];
+		auto c = fv.center[i];
+		return get_fv(ps, a, c, num_segments, z, tv);
+	}
+	path_v pd2pv(PathsD* p)
+	{
+		path_v r;
+		for (auto& it : *p)
+		{
+			r.moveTo(it[0].x, it[0].y);
+			for (size_t i = 1; i < it.size(); i++)
+			{
+				r.lineTo(it[i].x, it[i].y);
+			}
+			r.lineTo(it[0].x, it[0].y);
+		}
+		return r;
+	}
+	PathsD fv2pathsd(fv_it* p, int num_segments)
+	{
+		PathsD r;
+		auto fv = *p;
+		float z = 0;
+		for (size_t x = 0; x < p->count; x++)
+		{
+			auto nn = *fv.lengths;
+			std::vector<glm::vec3> tv1;
+			PathD v0;
+			for (int i = 0; i < nn; i++)
+			{
+				tv1.clear();
+				get_fv(fv, i, num_segments, z, tv1);
+				for (auto& it : tv1)
+				{
+					v0.push_back({ it.x,it.y });
+				}
+			}
+			r.push_back(v0);
+			fv.inc(*fv.lengths);
+			fv.lengths++;
+		}
+		return r;
+	}
+
+
+	void mkivec(std::vector<glm::vec3>& tv1, int d)
+	{
+		std::vector<glm::vec3> tt;
+		tt.reserve(tv1.size());
+		tt.push_back(tv1[0]);
+		glm::vec3 x = { d,d,d };
+		glm::ivec3 last = tv1[0] * x;
+		for (auto it : tv1)
+		{
+			glm::ivec3 xd = it * x;
+			if (xd != last)
+			{
+				last = xd;
+				tt.push_back(it);
+			}
+		}
+		if (tt[0] != tt[tt.size() - 1])
+		{
+			tt.push_back(tt[0]);
+		}
+		tv1.swap(tt);
+
+	}
+	void mkivec(std::vector<glm::vec2>& tv1, int d)
+	{
+		std::vector<glm::vec2> tt;
+		tt.reserve(tv1.size());
+		tt.push_back(tv1[0]);
+		glm::vec2 x = { d,d };
+		glm::ivec2 last = tv1[0] * x;
+		for (auto it : tv1)
+		{
+			glm::ivec2 xd = it * x;
+			if (xd != last)
+			{
+				last = xd;
+				tt.push_back(it);
+			}
+		}
+		if (tt[0] != tt[tt.size() - 1])
+		{
+			tt.push_back(tt[0]);
+		}
+		tv1.swap(tt);
+
+	}
+	void mkivec_round(std::vector<glm::vec2>& tv1)
+	{
+		std::vector<glm::vec2> tt;
+		tt.reserve(tv1.size());
+		tt.push_back(tv1[0]);
+		glm::ivec2 last = glm::round(tv1[0]);
+		for (auto it : tv1)
+		{
+			glm::ivec2 xd = glm::round(it);
+			if (xd != last)
+			{
+				last = xd;
+				tt.push_back(it);
+			}
+		}
+		if (tt[0] != tt[tt.size() - 1])
+		{
+			tt.push_back(tt[0]);
+		}
+		tv1.swap(tt);
+
+	}
+	void mkivec_round(std::vector<glm::vec3>& tv1)
+	{
+		std::vector<glm::vec3> tt;
+		tt.reserve(tv1.size());
+		tt.push_back(tv1[0]);
+		glm::ivec3 last = glm::round(tv1[0]);
+		for (auto it : tv1)
+		{
+			glm::ivec3 xd = glm::round(it);
+			if (xd != last)
+			{
+				last = xd;
+				tt.push_back(it);
+			}
+		}
+		if (tt[0] != tt[tt.size() - 1])
+		{
+			tt.push_back(tt[0]);
+		}
+		tv1.swap(tt);
+
+	}
+	// 从两个路径创建面
+	int for_cvertex_old(fv_it& fv, fv_it& fv1, size_t num_segments, std::vector<glm::vec3>& opt, glm::vec2 z)
+	{
+		auto nn = *fv.lengths;
+		std::vector<glm::vec3> tv1[2], tv2[2], t[2];
+		get_fv(fv, 0, num_segments, z.x, t[0]);
+		get_fv(fv1, 0, num_segments, z.y, t[1]);
+		tv1[0] = t[0];
+		tv2[0] = t[1];
+		nn--;
+		std::vector<glm::vec3> tv;
+		tv.reserve(tv.size() + fv.count * 3);
+
+		//auto a2 = gs::area_ofRingSigned(tv2.data(), tv2.size());
+		for (int i = 1; i < nn; i++)
+		{
+			glm::ivec2 n0, n1;
+			n0[0] = tv1[0].size();
+			n1[0] = tv2[0].size();
+			tv1[1].clear();
+			tv2[1].clear();
+			get_fv(fv, i, num_segments, z.x, tv1[1]);
+			get_fv(fv1, i, num_segments, z.y, tv2[1]);
+
+			n0[1] = tv1[1].size();
+			n1[1] = tv2[1].size();
+
+			get3(tv1, tv2, tv);
+
+			tv1[0].swap(tv1[1]);
+			tv2[0].swap(tv2[1]);
+		}
+		tv1[1] = t[0];
+		tv2[1] = t[1];
+		get3(tv1, tv2, tv);
+
+		//mkivec(tv, 100);
+		opt.insert(opt.begin(), tv.begin(), tv.end());
+		fv.inc(*fv.lengths);
+		fv1.inc(*fv1.lengths);
+		fv.lengths++;
+		fv1.lengths++;
+		return 0;
+	}
+
+
+
+
+
+#if 1
+
+	namespace trianglulate_wall_detail {
+		using Vec = glm::vec3;
+		using Sc = float;
+		class Ring {
+			size_t idx = 0, nextidx = 1, startidx = 0, begin = 0, end = 0;
+
+		public:
+			explicit Ring(size_t from, size_t to) : begin(from), end(to) { init(begin); }
+
+			size_t size() const { return end - begin; }
+			std::pair<size_t, size_t> pos() const { return { idx, nextidx }; }
+			bool is_lower() const { return idx < size(); }
+
+			void inc()
+			{
+				if (nextidx != startidx) nextidx++;
+				if (nextidx == end) nextidx = begin;
+				idx++;
+				if (idx == end) idx = begin;
+			}
+
+			void init(size_t pos)
+			{
+				startidx = begin + (pos - begin) % size();
+				idx = startidx;
+				nextidx = begin + (idx + 1 - begin) % size();
+			}
+
+			bool is_finished() const { return nextidx == idx; }
+		};
+
+		template<class Sc>
+		static Sc sq_dst(const Vec& v1, const Vec& v2)
+		{
+			Vec v = v1 - v2;
+			return v.x * v.x + v.y * v.y /*+ v.z() * v.z()*/;
+		}
+
+		template<class Sc>
+		static Sc trscore(const Ring& onring,
+			const Ring& offring,
+			const std::vector<Vec>& pts)
+		{
+			Sc a = sq_dst<Sc>(pts[onring.pos().first], pts[offring.pos().first]);
+			Sc b = sq_dst<Sc>(pts[onring.pos().second], pts[offring.pos().first]);
+			return (std::abs(a) + std::abs(b)) / 2.;
+		}
+
+		template<class Sc>
+		class Triangulator {
+			const std::vector<Vec>* pts;
+			Ring* onring, * offring;
+
+			double calc_score() const
+			{
+				return trscore<Sc>(*onring, *offring, *pts);
+			}
+
+			void synchronize_rings()
+			{
+				Ring lring = *offring;
+				auto minsc = trscore<Sc>(*onring, lring, *pts);
+				size_t imin = lring.pos().first;
+
+				lring.inc();
+
+				while (!lring.is_finished()) {
+					double score = trscore<Sc>(*onring, lring, *pts);
+					if (score < minsc) { minsc = score; imin = lring.pos().first; }
+					lring.inc();
+				}
+
+				offring->init(imin);
+			}
+
+			void emplace_indices(std::vector<glm::ivec3>& indices)
+			{
+				glm::ivec3 tr{ int(onring->pos().first), int(onring->pos().second),
+						 int(offring->pos().first) };
+				if (onring->is_lower()) std::swap(tr[0], tr[1]);
+				indices.emplace_back(tr);
+			}
+
+		public:
+			void run(std::vector<glm::ivec3>& indices)
+			{
+				synchronize_rings();
+
+				double score = 0, prev_score = 0;
+				while (!onring->is_finished() || !offring->is_finished()) {
+					prev_score = score;
+					if (onring->is_finished() || (score = calc_score()) > prev_score) {
+						std::swap(onring, offring);
+					}
+					else {
+						emplace_indices(indices);
+						onring->inc();
+					}
+				}
+			}
+
+			explicit Triangulator(const std::vector<Vec>* points,
+				Ring& lower,
+				Ring& upper)
+				: pts{ points }, onring{ &upper }, offring{ &lower }
+			{}
+		};
+
+		void triangulate_wall(std::vector<Vec>& pts,
+			std::vector<glm::ivec3>& ind,
+			const std::vector<Vec>& lower,
+			const std::vector<Vec>& upper,
+			double                   lower_z_mm,
+			double                   upper_z_mm)
+		{
+			using namespace trianglulate_wall_detail;
+
+			if (upper.size() < 3 || lower.size() < 3) return;
+
+			pts.reserve(lower.size() + upper.size());
+			for (auto& p : lower)
+				pts.emplace_back(Vec{ p.x,p.y, lower_z_mm });
+			for (auto& p : upper)
+				pts.emplace_back(Vec{ p.x,p.y, upper_z_mm });
+
+			ind.reserve(2 * (lower.size() + upper.size()));
+
+			Ring lring{ 0, lower.size() }, uring{ lower.size(), pts.size() };
+			Triangulator<float> t{ &pts, lring, uring };
+			t.run(ind);
+		}
+		void triangulate_wall(std::vector<Vec>& opts,
+			const std::vector<Vec>& lower,
+			const std::vector<Vec>& upper,
+			double                   lower_z_mm,
+			double                   upper_z_mm)
+		{
+			using namespace trianglulate_wall_detail;
+
+			if (upper.size() < 3 || lower.size() < 3) return;
+			std::vector<Vec> pts;
+			std::vector<glm::ivec3> ind;
+			pts.reserve(lower.size() + upper.size());
+			for (auto& p : lower)
+				pts.emplace_back(Vec{ p.x,p.y, lower_z_mm });
+			for (auto& p : upper)
+				pts.emplace_back(Vec{ p.x,p.y, upper_z_mm });
+
+			ind.reserve(2 * (lower.size() + upper.size()));
+
+			Ring lring{ 0, lower.size() }, uring{ lower.size(), pts.size() };
+			Triangulator<float> t{ &pts, lring, uring };
+			t.run(ind);
+			opts.reserve(ind.size() * 3 + opts.size());
+			for (auto& it : ind) {
+				opts.push_back(pts[it.x]);
+				opts.push_back(pts[it.y]);
+				opts.push_back(pts[it.z]);
+			}
+		}
+
+	} // namespace trianglulate_wall_detail
+
+#endif // 1
+
+	// 计算区域面积，负数则环是逆时针
+	template<class T>
+	double area_ofRingSigned(T* ring, size_t count)
+	{
+		std::size_t rlen = count;
+		if (rlen < 3 || !ring) {
+			return 0.0;
+		}
+
+		double sum = 0.0;
+		/*
+		 * Based on the Shoelace formula.
+		 * http://en.wikipedia.org/wiki/Shoelace_formula
+		 */
+		double x0 = ring[0].x;
+		for (std::size_t i = 1; i < rlen - 1; i++) {
+			double x = ring[i].x - x0;
+			double y1 = ring[i + 1].y;
+			double y2 = ring[i - 1].y;
+			sum += x * (y2 - y1);
+		}
+		return sum / 2.0;
+	}
+	// 判断是否为逆时针区域
+	template<class T>
+	bool isCCWArea(const std::vector<T>& ring)
+	{
+		return area_ofRingSigned(ring.data(), ring.size()) < 0;
+	}
+	// todo constrained_delaunay_triangulation
+	int for_cvertex(fv_it& fv, fv_it& fv1, size_t num_segments, std::vector<glm::vec3>& tv, glm::vec2 z, bool pccw)
+	{
+		auto nn = *fv.lengths;
+		tv.reserve(tv.size() + fv.count * 3);
+
+		std::vector<glm::vec3> tv1, tv2;
+		for (int i = 0; i < nn; i++)
+		{
+			get_fv(fv, i, num_segments, z.x, tv1);
+		}
+		auto nn1 = *fv1.lengths;
+		for (int i = 0; i < nn1; i++)
+		{
+			get_fv(fv1, i, num_segments, z.y, tv2);
+		}
+
+		auto a1 = area_ofRingSigned(tv1.data(), tv1.size());
+		auto a2 = area_ofRingSigned(tv2.data(), tv2.size());
+		//if (a1 != 0 && a2 != 0)
+		//{
+		//	gs::geos_constrained_delaunay_triangulation(tv1.data(), tv1.size(), tv2.data(), tv2.size(), tv, pccw);
+		//}
+		//else if (tv1.size())
+		//{
+		//	gs::geos_delaunay_triangulation_pt(tv1.data(), tv1.size(), 0.0, tv, 0);
+		//}
+
+		fv.inc(*fv.lengths);
+		fv1.inc(*fv1.lengths);
+		fv.lengths++;
+		fv1.lengths++;
+		return 0;
+	}
+
+
+	void copy_plane1(std::vector<glm::vec2>* p, float z, bool ccw, std::vector<glm::vec3>* opt)
+	{
+		if (opt)
+		{
+			auto n = p->size();
+			auto ct = opt->size();
+			opt->resize(ct + p->size());
+			auto t = opt->data() + ct;
+			auto t1 = p->data();
+			for (size_t i = 0; i < n; i++)
+			{
+				*t = { *t1,z };
+				t++; t1++;
+			}
+			if (ccw)
+			{
+				t = opt->data() + ct;
+				for (size_t i = 2; i < n; i += 3)
+				{
+					std::swap(t[i], t[i - 1]);
+				}
+			}
+		}
+	}
+	void copy_plane1(std::vector<glm::vec2>* p, bool ccw, std::vector<glm::vec2>* opt)
+	{
+		if (opt)
+		{
+			auto n = p->size();
+			auto ct = opt->size();
+			opt->resize(ct + p->size());
+			auto t = opt->data() + ct;
+			auto t1 = p->data();
+			for (size_t i = 0; i < n; i++)
+			{
+				*t = *t1;
+				t++; t1++;
+			}
+			if (ccw)
+			{
+				t = opt->data() + ct;
+				for (size_t i = 2; i < n; i += 3)
+				{
+					std::swap(t[i], t[i - 1]);
+				}
+			}
+		}
+	}
+	void copy_plane1(std::vector<glm::vec3>* p, float z, bool ccw, std::vector<glm::vec3>* opt)
+	{
+		if (opt)
+		{
+			auto n = p->size();
+			auto ct = opt->size();
+			opt->resize(ct + p->size());
+			auto t = opt->data() + ct;
+			auto t1 = p->data();
+			for (size_t i = 0; i < n; i++)
+			{
+				*t = *t1; t->z = z;
+				t++; t1++;
+			}
+			if (ccw)
+			{
+				t = opt->data() + ct;
+				for (size_t i = 2; i < n; i += 3)
+				{
+					std::swap(t[i], t[i - 1]);
+				}
+			}
+		}
+	}
+	// ccw=0,1,全部角度-1
+	PathsD path_round(path_v* ptr, int ccw, float radius, int num_segments, int ml, int ds)
+	{
+		PathsD r;
+		glm::vec3 k = { 0,radius, ccw };// t->expand[j], t->radius[j], t->ccw[j]	};
+
+		auto pt = gp::new_path_node(ptr, k.x, k.y, ptr->angle, ccw, num_segments, ml, ds);
+		if (!pt)return r;
+		fv_it fv = { pt };
+		r = fv2pathsd(&fv, num_segments);
+		gp::free_path_node(pt);
+		return r;
+	}
+
+	//！gp
+}
+
+
 path_v::path_v()
 {
 }
@@ -3851,6 +5228,343 @@ int path_v::get_expand_flatten2(float expand, float scale, int segments, int typ
 			flatten.swap(ot);
 		}
 		if (flatten.size() && flatten[0] != flatten[flatten.size() - 1])
+		{
+			flatten.push_back(flatten[0]);
+		}
+		ots->push_back(flatten);
+	}
+	return 0;
+}
+
+
+void doflatten(path_v::flatten_t* fp)
+{
+	size_t length = fp->n;
+	auto p = fp->first;
+	float objspace_flatness_squared = 0.1;
+	std::vector<glm::vec2> nv;
+	std::vector<glm::vec2> points;
+	std::vector<std::vector<glm::vec2>> pv, pv1;
+	std::vector<glm::ivec2> pvc;
+	//fp->oldfp = 1;
+	for (size_t i = 0; i < length; i++, p++)
+	{
+		auto m = fp->mc;
+		auto p0 = p - 1;
+		points.clear();
+		switch (p->type)
+		{
+		case path_v::vtype_e::e_vmove:
+		case path_v::vtype_e::e_vline:
+		{
+			points.push_back(p->p);
+		}break;
+		case path_v::vtype_e::e_vcurve:
+		{
+			cubic_v cv = {};
+			cv.p0 = p0->p;
+			cv.p1 = p->c;
+			cv.p2 = p->c;
+			cv.p3 = p->p;
+			c2to3(cv);
+			if (fp->mlen > 0) {
+				quadratic_v q = { p0->p ,p->c,p->p };
+				double ql = quadraticLength(&q, fp->mc);
+				m = ql / fp->mlen;
+				if (m < 2)
+					m = 2;
+			}
+			//if (fp->oldfp)
+			//{
+			//	auto fs = 1.0 / m;
+			//	points.clear();
+			//	tesselate_curve(&points, p0->p.x, p0->p.y, p->c.x, p->c.y, p->p.x, p->p.y, fs > 0 ? fs : objspace_flatness_squared, 0);
+			//}
+			//else
+			{
+				points = get_bezier_t<glm::vec2>(&cv, 1, m);
+			}
+			pvc.push_back({ i,i + points.size() });
+		}break;
+		case path_v::vtype_e::e_vcubic:
+		{
+			cubic_v cv = {};
+			cv.p0 = p0->p;
+			cv.p1 = p->c;
+			cv.p2 = p->c1;
+			cv.p3 = p->p;
+			if (fp->mlen > 0) {
+				double ql = cubicLength(&cv, fp->mc);
+				m = ql / fp->mlen;
+				if (m < 2)
+					m = 2;
+			}
+			//if (fp->oldfp)
+			//{
+			//	auto fs = 1.0 / m;
+			//	points.clear();
+			//	tesselate_cubic(&points, p0->p.x, p0->p.y, p->c.x, p->c.y, p->c1.x, p->c1.y, p->p.x, p->p.y, fs > 0 ? fs : objspace_flatness_squared, 0);
+			//}
+			//else
+			{
+				points = get_bezier_t<glm::vec2>(&cv, 1, m);
+			}
+			pvc.push_back({ i,i + points.size() });
+		}break;
+		default:
+			break;
+		}
+		if (points.size())
+		{
+			if (p0->p == points[0])
+			{
+				points.erase(points.begin());
+			}
+			pv.push_back(points);
+		}
+	}
+	length = pv.size();
+	points.clear();
+	for (size_t i = 0; i < length; i++)
+	{
+		auto& it = pv[i];
+		auto nc = it.size();
+		for (auto& vt : it) {
+			points.push_back(vt);
+		}
+	}
+	if (points.size() > 2)
+	{
+		length = points.size();
+		points.push_back(points[1]);
+		std::vector<glm::ivec3> av, tav;
+		// 计算角度
+		for (size_t i = 1; i < length; i++)
+		{
+			auto& it0 = points[i - 1];
+			auto& it = points[i];
+			auto& it1 = points[i + 1];
+			glm::ivec2 aa = gp::angle_v3(it0, it, it1);
+			auto dd = glm::distance(it0, it);
+			auto dd1 = glm::distance(it, it1);
+			auto ang = aa.x;
+			bool has = (aa.y < 0 && aa.x < fp->angle);
+			if (aa.y > 0 && ang > 180 && !has)
+			{
+				ang = 360 - ang;
+				//ang = abs(ang); 
+				has = ang < fp->angle;
+			}
+			if (has && (dd < fp->dist || dd1 < fp->dist))
+			{
+				av.push_back({ aa,i });
+			}
+			tav.push_back({ aa,i });
+		}
+		//if (av.size() == 7)
+		//	printf((char*)"xt\n");
+		auto tpv = points;
+		length = points.size() - 1;
+		std::vector<glm::vec3> ptvs;
+		ptvs.resize(length);
+		for (size_t i = 0; i < length; i++)
+		{
+			ptvs[i] = { points[i],0 };
+		}
+		for (auto& it : av) {
+			length = ptvs.size();
+			double dd = 0.0;
+			size_t idx = it.z;
+			{
+				auto xf = it.z;
+				if (xf == ptvs.size() - 1)
+					xf = 0;
+				for (size_t i = xf; i < length; i++)
+				{
+					auto& it0 = points[i];
+					auto& it1 = points[i + 1];
+					dd += glm::distance(it1, it0);
+					if (dd > fp->dist)
+					{
+						idx = i;
+						break;
+					}
+				}
+				if (idx != xf)
+				{
+					for (size_t x = xf + 1; x < idx; x++)
+					{
+						ptvs[x].z = 1;
+					}
+				}
+			}
+			idx = it.z;
+			dd = 0;
+			for (size_t i = it.z; i > 1; i--)
+			{
+				auto& it0 = points[i];
+				auto& it1 = points[i - 1];
+				dd += glm::distance(it1, it0);
+				if (dd > fp->dist)
+				{
+					idx = i;
+					break;
+				}
+			}
+			if (idx != it.z)
+			{
+				for (size_t x = idx + 1; x < it.z; x++)
+				{
+					ptvs[x].z = 1;
+				}
+			}
+		}
+		nv.reserve(ptvs.size());
+		int xk = 0;
+		for (auto& it : ptvs) {
+			if (it.z < 1)
+				nv.push_back(it);
+		}
+	}
+	//push_dv2(nv, points, dist);
+	if (nv.size())
+	{
+		auto pos = fp->flatten->size();
+		fp->flatten->resize(pos + nv.size());
+		memcpy(fp->flatten->data() + pos, nv.data(), nv.size() * sizeof(glm::vec2));
+	}
+}
+
+int path_v::get_expand_flatten2(float expand, float scale, int segments, float ml, float ds, int type, std::vector<std::vector<glm::vec2>>* ots, bool is_round, bool is_close)
+{
+	auto ct = mcount();
+	if (_data.size() < 1 || segments < 1)return -1;
+	PathsD pd;
+	std::vector<PointD> pv;
+	std::vector<glm::vec2> flatten, ot;
+	for (size_t x = 0; x < ct; x++)
+	{
+		pv.clear();
+		flatten.clear();
+		auto t = get_idxlines(_data, x, 1);
+		flatten_t fp = {};
+		fp.flatten = &flatten;
+		fp.mc = segments;
+		fp.mlen = ml;
+		fp.n = t.n;
+		fp.first = t.first;
+		fp.dist = ds;
+		fp.angle = angle;
+		doflatten(&fp);//细分曲线
+		{
+			pv.resize(flatten.size());
+			for (size_t i = 0; i < flatten.size(); i++)
+			{
+				pv[i] = { flatten[i].x, flatten[i].y };
+			}
+			// 判断是逆时针
+			bool ccw = IsPositive(pv);
+			//if (ccwv)
+			//	ccwv->push_back(ccw);
+			pd.push_back(std::move(pv));
+		}
+	}
+	if (expand != 0 && pd.size())
+	{
+		//Square=0, Round=1, Miter=2
+		if (type > 2 || type < 0)
+		{
+			type = 2;
+		}
+		// 扩展线段
+		auto rv = InflatePaths(pd, expand, (JoinType)type, EndType::Polygon);
+		if (rv.size() && rv[0].size())
+		{
+			pd.swap(rv);
+		}
+	}
+
+	for (const auto& path : pd) {
+		flatten.clear();
+		flatten.reserve(path.size());
+		for (auto& it : path)
+		{
+			glm::vec2 pt = { it.x ,it.y };
+			flatten.push_back(pt);
+		}
+		if (is_round)
+			gp::mkivec_round(flatten);
+		if (abs(scale) != 0)
+		{
+			ot.clear();
+			expand_polygon(flatten.data(), flatten.size(), scale, ot);
+			flatten.swap(ot);
+		}
+		if (is_close && flatten.size() && flatten[0] != flatten[flatten.size() - 1])
+		{
+			flatten.push_back(flatten[0]);
+		}
+		ots->push_back(flatten);
+	}
+	return 0;
+}
+
+int path_v::get_expand_flatten3(float expand, float scale, int segments, float ml, float ds, int type, int etype, std::vector<std::vector<glm::vec2>>* ots, bool is_close)
+{
+	auto ct = mcount();
+	if (_data.size() < 1 || segments < 1)return -1;
+	PathsD pd;
+	std::vector<PointD> pv;
+	std::vector<glm::vec2> flatten, ot;
+	for (size_t x = 0; x < ct; x++)
+	{
+		pv.clear();
+		flatten.clear();
+		auto t = get_idxlines(_data, x, 1);
+		flatten_t fp = {};
+		fp.flatten = &flatten;
+		fp.mc = segments;
+		fp.mlen = ml;
+		fp.n = t.n;
+		fp.first = t.first;
+		fp.dist = ds;
+		fp.angle = angle;
+		doflatten(&fp);//细分曲线
+		{
+			pv.resize(flatten.size());
+			for (size_t i = 0; i < flatten.size(); i++)
+			{
+				pv[i] = { flatten[i].x, flatten[i].y };
+			}
+			// 判断是逆时针
+			bool ccw = IsPositive(pv);
+			pd.push_back(std::move(pv));
+		}
+	}
+	if (expand != 0 && pd.size())
+	{
+		//Square=0, Round=1, Miter=2
+		if (type > 2 || type < 0)
+		{
+			type = 2;
+		}
+		// 扩展线段
+		auto rv = InflatePaths(pd, expand, (JoinType)type, (EndType)etype);
+		if (rv.size() && rv[0].size())
+		{
+			pd.swap(rv);
+		}
+	}
+
+	for (const auto& path : pd) {
+		flatten.clear();
+		flatten.reserve(path.size());
+		for (auto& it : path)
+		{
+			glm::vec2 pt = { it.x ,it.y };
+			flatten.push_back(pt);
+		}
+		if (is_close && flatten.size() && flatten[0] != flatten[flatten.size() - 1])
 		{
 			flatten.push_back(flatten[0]);
 		}
@@ -4887,6 +6601,24 @@ void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, i
 	set_color(cr, col);
 	cairo_stroke(cr);
 	cairo_restore(cr);
+}
+
+void draw_polyline(cairo_t* cr, const PathsD* p, bool closed)
+{
+	if (!cr || !p || p->size() < 1)return;
+	auto& d = *p;
+	auto length = d.size();
+	for (size_t i = 0; i < length; i++)
+	{
+		auto points = d[i];
+		cairo_move_to(cr, points[0].x, points[0].y);
+		auto points_count = points.size();
+		for (size_t i = 1; i < points_count; i++)
+		{
+			cairo_line_to(cr, points[i].x, points[i].y);
+		}
+		if (closed) { cairo_close_path(cr); }
+	}
 }
 
 
@@ -14325,6 +16057,8 @@ public:
 	uint32_t text_color = 0xffffffff;
 	std::vector<uint32_t> dtimg;
 	std::vector<glm::ivec4> rangerc;
+	PathsD range_path;
+	path_v ptr_path;
 	glm::ivec2 cpos = {};					// 当前鼠标坐标
 	glm::ivec2 scroll_pos = {};				// 滚动坐标
 	glm::ivec2 _align_pos = {};				// 对齐偏移坐标
@@ -14356,6 +16090,7 @@ public:
 	bool show_input_cursor = true;
 	bool hover_text = false;
 	bool upft = true;
+	bool roundselect = true;	// 圆角选区
 public:
 	text_ctx_cx();
 	~text_ctx_cx();
@@ -14938,6 +16673,7 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	//pango_layout_line_index_to_x(layout, p - text, TRUE, &right);
 	//pos->x = MIN(left, right);
 	auto iter = pango_layout_get_iter(layout);
+	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
 	for (int i = 0; i < line_no; i++)
 	{
 		auto rc = get_iter(iter);
@@ -14952,13 +16688,13 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 		}
 		else
 		{
-			glm::ivec4 f = { rc.line_rect.x + sw0.x,rc.yr.x,rc.line_rect.z - sw0.x,rc.yr.y - rc.yr.x };
+			glm::ivec4 f = { rc.line_rect.x + sw0.x,rc.yr.x,(rc.line_rect.z - sw0.x) + pwidth,rc.yr.y - rc.yr.x };
 			rss.push_back(f);
 			pango_layout_iter_next_line(iter);
 			for (size_t x = v1.y + 1; x < v2.y; x++)
 			{
 				rc = get_iter(iter);
-				glm::ivec4 c = { rc.line_rect.x,rc.yr.x,rc.line_rect.z,rc.yr.y - rc.yr.x };
+				glm::ivec4 c = { rc.line_rect.x,rc.yr.x,rc.line_rect.z + pwidth,rc.yr.y - rc.yr.x };
 				rss.push_back(c);
 				pango_layout_iter_next_line(iter);
 			}
@@ -14968,7 +16704,40 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 			break;
 		}
 	}
+
 	pango_layout_iter_free(iter);
+	if (roundselect)
+	{
+		PathsD subjects;
+		PathD a;
+		for (size_t i = 0; i < rss.size(); i++)
+		{
+			auto& it = rss[i];
+			if (it.z < 1)
+				it.z = pwidth;
+			a.push_back({ it.x,it.y });
+			a.push_back({ it.x + it.z,it.y });
+			a.push_back({ it.x + it.z,it.y + it.w });
+			a.push_back({ it.x,it.y + it.w });
+			subjects.push_back(a);
+			a.clear();
+		}
+		subjects = Union(subjects, FillRule::NonZero, 6);
+		//range_path = InflatePaths(subjects, 0.5, JoinType::Round, EndType::Polygon);
+		auto sn = subjects.size();
+		if (sn > 0)
+		{
+			path_v& ptr = ptr_path;
+			ptr._data.clear();
+			for (size_t i = 0; i < sn; i++)
+			{
+				auto& it = subjects[i];
+				ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
+			}
+			range_path = gp::path_round(&ptr, -1, fontsize * 0.2, 16, 0, 0);
+		}
+		else { range_path.clear(); }
+	}
 	rangerc = rss;
 	return r;
 }
@@ -15076,10 +16845,19 @@ bool text_ctx_cx::update(float delta)
 	auto v = get_bounds();
 	if (v.x != v.y && rangerc.size()) {
 		set_color(cr, select_color);
-		for (auto& it : rangerc)
+		if (roundselect)
 		{
-			cairo_rectangle(cr, it.x, it.y, it.z, it.w);
-			cairo_fill(cr);
+			if (range_path.size() && range_path[0].size() > 3) {
+				draw_polyline(cr, &range_path, true);
+				cairo_fill(cr);
+			}
+		}
+		else {
+			for (auto& it : rangerc)
+			{
+				draw_rectangle(cr, it, std::min(it.z, it.w) * 0.18);
+				cairo_fill(cr);
+			}
 		}
 	}
 	set_color(cr, text_color);

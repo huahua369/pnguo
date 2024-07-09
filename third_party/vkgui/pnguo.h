@@ -656,6 +656,16 @@ public:
 		vtype_e type;
 		uint8_t padding;
 		uint16_t padding1;
+	};	
+	struct flatten_t
+	{
+		path_v::vertex_t* first = 0;
+		size_t n = 0;
+		int mc; float mlen;
+		std::vector<glm::vec2>* flatten;
+		float dist = 0;			// 距离剔除
+		int angle = 100;		// 优化小于100度的
+		bool oldfp = false;
 	};
 	std::vector<vertex_t> _data;
 	// xy最小，zw最大
@@ -665,6 +675,7 @@ public:
 	uint64_t ud = 0;
 	int _baseline = 0;
 	wchar_t text = 0;
+	int angle = 100;
 	bool oldexp = false;
 	bool flip_y = false;	//生成模型时翻转y
 	bool cbox = false;
@@ -747,6 +758,10 @@ public:
 	int get_expand_flatten(float width, int segments, int type, std::vector<std::vector<glm::vec2>>* iod);
 
 	int get_expand_flatten2(float expand, float scale, int segments, int type, std::vector<std::vector<glm::vec2>>* ots, bool is_round);
+
+	int get_expand_flatten2(float expand, float scale, int segments, float ml, float ds, int type, std::vector<std::vector<glm::vec2>>* ots, bool is_round, bool is_close = 1);
+
+	int get_expand_flatten3(float expand, float scale, int segments, float ml, float ds, int type, int etype, std::vector<std::vector<glm::vec2>>* ots, bool is_close);
 
 	bool is_ccw(int idx);
 private:

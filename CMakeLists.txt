@@ -131,7 +131,7 @@ pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)
 
 find_package(EnTT CONFIG REQUIRED) 
 find_package(OpenCV CONFIG REQUIRED)
-find_package(unofficial-joltphysics CONFIG REQUIRED)
+#find_package(unofficial-joltphysics CONFIG REQUIRED)
 
 set(lklib)
 list(APPEND lklib  
@@ -149,7 +149,7 @@ list(APPEND lklib
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     rvk
     rdx12
-    unofficial::joltphysics::Jolt
+   # unofficial::joltphysics::Jolt
 )
 target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(tcmp PRIVATE ${lklib})
