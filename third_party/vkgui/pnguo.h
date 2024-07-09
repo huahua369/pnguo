@@ -789,6 +789,7 @@ class plane_cx;
 struct pvm_t
 {
 	atlas_cx* back = 0;	// 背景
+	atlas_cx* front = 0;	// 前景
 	plane_cx* p = 0;		// 控件
 	glm::vec2 fsize = {};
 	glm::vec2 cpos = {};

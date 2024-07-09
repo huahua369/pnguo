@@ -1303,7 +1303,7 @@ int main()
 			gb2->light = 0.2 * 0;
 			gb2->_disabled_events = true;
 			gb2->pdc;
-			pl2->set_family_size((char*)u8"NSimSun,Segoe UI Emoji", 30, -1);
+			pl2->set_family_size((char*)u8"NSimSun,Segoe UI Emoji", 16, -1);
 			et1 = pl2->add_input("", { 400,30 }, true);
 			et2 = pl2->add_input("", { 620,300 }, false);
 			et2->set_autobr(true);

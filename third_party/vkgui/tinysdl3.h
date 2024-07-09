@@ -26,7 +26,7 @@ extern "C" {
 #ifndef BIT_INC
 #define BIT_INC(x) (1<<x)
 #endif
- 
+
 
 // todo 创建atlas_t、canvas_atlas、skeleton_t
 
@@ -223,7 +223,7 @@ public:
 	// type:0==RGBA。 static_tex? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA
-	SDL_Texture* new_texture(int width, int height, void* vkptr, int format); 
+	SDL_Texture* new_texture(int width, int height, void* vkptr, int format);
 
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
 	void set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply = false);
@@ -251,7 +251,7 @@ public:
 	void set_pos(const glm::vec2& pos);
 	// 是否支持Bindless
 	bool has_variable();
-	 
+
 	void remove_f(form_x* c);
 public:
 	void update_w();
@@ -287,7 +287,7 @@ public:
 	form_x* f = 0;
 	mitem_t* parent = 0;	// 父级
 	pvm_t pv = {};
-	canvas_atlas* backgs = 0;
+	canvas_atlas* backgs = 0, * fronts = 0;// 背景和前景
 	layout_text_x* ltx = 0;
 public:
 	mitem_t();

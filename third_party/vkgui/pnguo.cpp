@@ -16057,8 +16057,9 @@ public:
 	uint32_t text_color = 0xffffffff;
 	std::vector<uint32_t> dtimg;
 	std::vector<glm::ivec4> rangerc;
-	PathsD range_path;
+	PathsD range_path;						// 圆角选区缓存
 	path_v ptr_path;
+	float round_path = 0.28;				// 圆角比例
 	glm::ivec2 cpos = {};					// 当前鼠标坐标
 	glm::ivec2 scroll_pos = {};				// 滚动坐标
 	glm::ivec2 _align_pos = {};				// 对齐偏移坐标
@@ -16734,7 +16735,7 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 				auto& it = subjects[i];
 				ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
 			}
-			range_path = gp::path_round(&ptr, -1, fontsize * 0.2, 16, 0, 0);
+			range_path = gp::path_round(&ptr, -1, fontsize * round_path, 16, 0, 0);
 		}
 		else { range_path.clear(); }
 	}

@@ -2398,6 +2398,7 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 mitem_t::mitem_t()
 {
 	backgs = new canvas_atlas();
+	fronts = new canvas_atlas();
 	ltx = new layout_text_x();
 }
 
@@ -2407,6 +2408,7 @@ mitem_t::~mitem_t()
 		f->close();
 	f = 0;
 	if (backgs)delete backgs; backgs = 0;
+	if (fronts)delete fronts; fronts = 0;
 	if (ltx)delete ltx; ltx = 0;
 }
 
@@ -2457,6 +2459,7 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 	height = h;
 	v = mvs;
 	backgs->remove_atlas(pv.back);
+	fronts->remove_atlas(pv.front);
 	ltx->free_menu(pv);
 	auto p = this;
 	pv = ltx->new_menu(width, height, mvs, [=](int type, int idx)
@@ -2465,6 +2468,7 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 				ckm_cb(p, type, idx);
 		});
 	backgs->add_atlas(pv.back);
+	fronts->add_atlas(pv.front);
 }
 
 glm::ivec2 mitem_t::get_idx_pos(int idx)
@@ -2511,11 +2515,13 @@ void menu_cx::show_item(mitem_t* it, const glm::vec2& pos)
 	if (it->f)
 	{
 		it->f->remove(it->backgs);
+		it->f->remove(it->fronts);
 		it->f->unbind(it->pv.p);
 	}
 	it->f = mf1;
 	mf1->add_canvas_atlas(it->backgs);
 	mf1->bind(it->pv.p);
+	mf1->add_canvas_atlas(it->fronts);
 	mf1->set_size(it->pv.fsize);
 	mf1->set_pos(pos);
 	mf1->show();
