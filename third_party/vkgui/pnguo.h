@@ -1885,6 +1885,10 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 // 渲染九宫格图片
 glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& size, const glm::vec4& sliced);
 #endif
+
+int64_t get_rand(int f, int s);
+
+
 /*
 <表格、树形>
 数据结构设计:
@@ -2096,8 +2100,4 @@ private:
 
 };
 
-// 创建列表框，菜单
-plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc);
-// 创建工具提示面板，color={背景色，边框色，文本颜色，字号}
-plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane_t* bc);
 

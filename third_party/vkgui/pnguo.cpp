@@ -26,6 +26,7 @@
 #include <pch1.h>
 
 #include <map>
+#include <random>
 #include <pnguo.h>
 
 
@@ -7648,6 +7649,14 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	}
 #endif
 	return ss;
+}
+
+int64_t get_rand(int f, int s)
+{
+	static std::random_device rd;  //如果可用的话，从一个随机数发生器上获得一个真正的随机数
+	static std::mt19937 gen(rd()); //gen是一个使用rd()作种子初始化的标准梅森旋转算法的随机数发生器
+	std::uniform_int_distribution<> distrib(f, s);
+	return distrib(gen);
 }
 
 void destroy_image_data(void* d) {
@@ -21091,17 +21100,7 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 	}
 	return rv;
 }
-
-plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc)
-{
-	return nullptr;
-}
-
-plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane_t* bc)
-{
-	return nullptr;
-}
-
+ 
 #if 1
 
 cairo_surface_t* load_imagesvg(const std::string& fn, float scale)

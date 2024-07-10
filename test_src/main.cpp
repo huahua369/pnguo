@@ -653,6 +653,7 @@ int main()
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
+
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
 					//form1->bind(listp);	// 绑定到新窗口	
@@ -671,7 +672,7 @@ int main()
 					cbt->font_size = 16;
 					cbt->effect = uTheme::light;
 					cbt->pdc;
-					cbt->hscroll = {};
+					cbt->hscroll = { get_rand(0,1),get_rand(0,1) };
 					cbt->light = 0.36;
 					cbt->rounding = 14;
 					cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
@@ -763,14 +764,14 @@ int main()
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 
-					div->draw(cr);
+					//div->draw(cr);
+					//draw_image(cr, imgsur, { 10,10 }, { 0,0,-1,-1 }, -1, ds);// { 500, 500 }, { 100,100,100,100 });
 					return;
 				};
 			p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
-					draw_image(cr, imgsur, { 10,10 }, { 0,0,-1,-1 }, -1, ds);// { 500, 500 }, { 100,100,100,100 });
 
 					return;
 				};
