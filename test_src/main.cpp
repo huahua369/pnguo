@@ -474,7 +474,7 @@ int main()
 	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 #if 1
-	auto app = new_app(); 
+	auto app = new_app();
 	form_newinfo_t ptf = {};
 	ptf.app = app; ptf.title = (char*)u8"窗口1";
 	ptf.size = ws;
@@ -758,17 +758,17 @@ int main()
 						pm3->show(cps);
 					}
 				};
-			p->draw_back_cb = [=](cairo_t* cr)
+			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
-					cairo_as _cas(cr);
+					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 
 					div->draw(cr);
 					return;
 				};
-			p->draw_front_cb = [=](cairo_t* cr)
+			p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
-					cairo_as _cas(cr);
+					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 					draw_image(cr, imgsur, { 10,10 }, { 0,0,-1,-1 }, -1, ds);// { 500, 500 }, { 100,100,100,100 });
 
@@ -902,10 +902,10 @@ int main()
 				p->set_update();
 			});
 		th.detach();
-		p->draw_back_cb = [=](cairo_t* cr)
+		p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
 				//print_time a("draw svg");
-				cairo_as _cas(cr);
+				//cairo_as _cas(cr);
 				cairo_translate(cr, 6, 6);
 				draw_rectangle(cr, { 0,0,cs.x,cs.y }, 4);
 				fill_stroke(cr, 0xf05c8042, 0xffff802C, 2, false);
@@ -1166,9 +1166,9 @@ int main()
 
 				return 0;
 			};
-		pl1->draw_back_cb = [=](cairo_t* cr)
+		pl1->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
-				cairo_as _cas(cr);
+				//cairo_as _cas(cr);
 				//cairo_translate(cr, 0, 300);
 				//txt->draw_text(cr, 0xff0080ff);
 				return;
@@ -1248,11 +1248,11 @@ int main()
 
 				return 0;
 			};
-		pl3->draw_back_cb = [=](cairo_t* cr)
+		pl3->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
 				int y1 = 10;
-				cairo_as _ss_(cr);
-				 
+				//cairo_as _ss_(cr);
+
 				cairo_set_line_width(cr, 1.0);
 				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
 				fill_stroke(cr, -1, 0);
@@ -1290,7 +1290,7 @@ int main()
 		pl2->set_pos({ 10,10 });
 		pl2->set_colors({ pbc,-1,0,0 });
 		pl2->on_click = [](plane_cx* p, int state, int clicks) {};
-		pl2->draw_back_cb = [=](cairo_t* cr)
+		pl2->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
 			};
 		int cc = 1;

@@ -656,7 +656,7 @@ public:
 		vtype_e type;
 		uint8_t padding;
 		uint16_t padding1;
-	};	
+	};
 	struct flatten_t
 	{
 		path_v::vertex_t* first = 0;
@@ -1615,7 +1615,7 @@ public:
 	layout_text_x* ltx = 0;		// 文本渲染管理
 	std::function<void(plane_cx* p, int state, int clicks)> on_click;
 	std::function<void(plane_cx* p, int state, int clicks)> on_click_outer;//模态窗口点中外围时
-	std::function<void(cairo_t* cr)> draw_back_cb, draw_front_cb;
+	std::function<void(cairo_t* cr, const glm::vec2& scroll)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
 	// 移到最后

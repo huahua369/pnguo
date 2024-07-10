@@ -18576,8 +18576,7 @@ void plane_cx::update(float delta)
 			if (draw_back_cb)
 			{
 				cairo_as _aa_(cr);
-				cairo_translate(cr, sps.x, sps.y);
-				draw_back_cb(cr);
+				draw_back_cb(cr, sps);
 			}
 			for (auto& it : widgets) {
 				cairo_as __cas_(cr);
@@ -18589,8 +18588,7 @@ void plane_cx::update(float delta)
 			if (draw_front_cb)
 			{
 				cairo_as _aa_(cr);
-				cairo_translate(cr, sps.x, sps.y);
-				draw_front_cb(cr);
+				draw_front_cb(cr, sps);
 			}
 			if (horizontal)
 			{
