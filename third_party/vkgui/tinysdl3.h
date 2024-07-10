@@ -155,6 +155,7 @@ public:
 	std::vector<event_fw> first_cs;	// 优先
 	std::vector<form_x*> childfs;
 	form_x* parent = 0;
+	form_x* tooltip = 0;	// 提示窗口
 	// 接收拖动OLE管理
 	hz::drop_regs* dragdrop = 0;
 	// 默认接收ole
@@ -253,6 +254,8 @@ public:
 	bool has_variable();
 
 	void remove_f(form_x* c);
+	// 清空控件
+	void clear_wt();
 public:
 	void update_w();
 	void update(float delta);

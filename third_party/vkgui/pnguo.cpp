@@ -18936,7 +18936,9 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			pw->bst &= ~(int)BTN_STATE::STATE_HOVER;
 			// 鼠标离开
 			pw->on_mevent((int)event_type2::on_leave, mps);
-			if (pw->mevent_cb) { pw->mevent_cb(pw, (int)event_type2::on_leave, mps); }
+			if (pw->mevent_cb) {
+				pw->mevent_cb(pw, (int)event_type2::on_leave, mps); 
+			}
 		}
 	}
 

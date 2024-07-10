@@ -956,13 +956,11 @@ form_x::form_x()
 form_x::~form_x()
 {
 	//lock_auto_x lx(&lkecb);
-	auto pks = _planes;
-	for (auto it : pks)
-	{
-		unbind(it);
-		delete it;
+	clear_wt();
+	for (auto it : childfs) {
+		it->_ptr = 0;
+		app->remove(it);
 	}
-	_planes.clear();
 	if (events)
 	{
 		delete[] events;
@@ -973,15 +971,6 @@ form_x::~form_x()
 	}
 	events = 0;
 	events_a = 0;
-	for (auto it : atlas) {
-		if (it && it->autofree)
-			delete it;
-	}
-	atlas.clear();
-	for (auto it : childfs) {
-		it->_ptr = 0;
-		app->remove(it);
-	}
 	childfs.clear();
 	_ref = 1;
 	app->remove(this);
@@ -1541,6 +1530,22 @@ void form_x::remove_f(form_x* p)
 		v.erase(std::remove_if(v.begin(), v.end(), [p](form_x* r) {return r == p; }), v.end());
 		app->remove(p);
 	}
+}
+void form_x::clear_wt()
+{
+	auto pks = _planes;
+	for (auto it : pks)
+	{
+		unbind(it);
+		if (it->autofree)
+			delete it;
+	}
+	_planes.clear();
+	for (auto it : atlas) {
+		if (it && it->autofree)
+			delete it;
+	}
+	atlas.clear();
 }
 void form_x::update_w()
 {

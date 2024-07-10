@@ -15,6 +15,7 @@
 
 #include <vkgui/event.h>
 #include <vkgui/buffer.h>
+#include <vkgui/page.h>
 
 /*
 	todo
@@ -719,7 +720,7 @@ int main()
 							//form1->close();
 						};
 				};
-			g3->mevent_cb = [](void* p, int type, const glm::vec2& mps)
+			g3->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 				{
 					auto pc = (color_btn*)p;
 					auto t = (event_type2)type;
@@ -732,7 +733,20 @@ int main()
 					case event_type2::on_tripleclick:
 						break;
 					case event_type2::on_move:
-						break;
+					{
+						style_tooltip stp = {};
+						stp.family = fontn;
+						glm::vec2 ps = g3->get_pos() + g3->ppos;
+						ps.x = g3->cmpos.x;
+						ps.y += g3->size.y + 6;
+						show_tooltip(form0, (char*)u8"提示信息！", ps, &stp);
+					}
+					break;
+					case event_type2::on_leave:
+					{
+						hide_tooltip(form0);
+					}
+					break;
 					case event_type2::on_down:
 						break;
 					case event_type2::on_up:

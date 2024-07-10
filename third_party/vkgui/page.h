@@ -6,10 +6,19 @@
 
 	用于创建控件之类页面元素。
 */
+class form_x;
 class plane_cx;
 struct style_plane_t;
+struct style_tooltip
+{
+	const char* family = 0;
+	int fonst_size = 16;
+	int text_color = -1;	// 文本颜色
+	glm::ivec2 color = {};	// 背景色，边框色
+	float thickness = 1.0;	// 线宽
+	float radius = 4;		// 矩形圆角 
+};
 
-// 创建列表框，菜单
-plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc);
-// 创建工具提示面板，color={背景色，边框色，文本颜色，字号}
-plane_cx* new_tooltip(const std::string& str, const glm::ivec2& pos, style_plane_t* bc);
+// 显示工具提示面板 
+void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc);
+void hide_tooltip(form_x* form);

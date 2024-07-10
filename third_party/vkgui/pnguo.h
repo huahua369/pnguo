@@ -1645,6 +1645,7 @@ public:
 	bool draggable = false;
 	bool uplayout = true;
 	bool custom_layout = false;	// 使用自定义布局计算 
+	bool autofree = true;
 public:
 	plane_cx();
 	~plane_cx();
