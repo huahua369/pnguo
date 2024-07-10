@@ -16092,6 +16092,7 @@ public:
 	int c_d = 0;
 	int _baseline = 0;
 	int ascent = 0, descent = 0;
+	char pwd = 0;
 	bool valid = true;
 	bool autobr = false;
 	bool is_scroll = true;
@@ -16254,7 +16255,21 @@ void text_ctx_cx::set_font_size(int fs)
 
 void text_ctx_cx::set_text(const std::string& str)
 {
-	pango_layout_set_text(layout, str.c_str(), str.size());
+	std::string pws;
+	auto length = str.size();
+	if (length && pwd)
+	{
+		pws.resize(length);
+		for (size_t i = 0; i < length; i++)
+		{
+			pws[i] = pwd;
+		}
+		pango_layout_set_text(layout, pws.c_str(), pws.size());
+	}
+	else
+	{
+		pango_layout_set_text(layout, str.c_str(), str.size());
+	}
 	int h = 0;
 	auto line = pango_layout_get_line(layout, 0);
 	pango_layout_line_get_height(line, &h);
@@ -17071,6 +17086,10 @@ edit_tl::~edit_tl()
 void edit_tl::set_single(bool is) {
 	ctx->set_single(is);
 	single_line = is;
+}
+void edit_tl::set_pwd(char ch)
+{
+	if (ctx)ctx->pwd = ch;
 }
 void edit_tl::set_family(const char* familys, int fontsize) {
 	if (fontsize > 0)
@@ -21100,7 +21119,7 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 	}
 	return rv;
 }
- 
+
 #if 1
 
 cairo_surface_t* load_imagesvg(const std::string& fn, float scale)

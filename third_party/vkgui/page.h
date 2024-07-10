@@ -6,7 +6,8 @@
 
 	用于创建控件之类页面元素。
 */
-
+class plane_cx;
+struct style_plane_t;
 
 // 创建列表框，菜单
 plane_cx* new_listbox(const std::vector<std::string>& v, const glm::ivec2& pos, style_plane_t* bc);

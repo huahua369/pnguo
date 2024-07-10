@@ -1306,6 +1306,7 @@ int main()
 			gb2->pdc;
 			pl2->set_family_size((char*)u8"NSimSun,Segoe UI Emoji", 16, -1);
 			et1 = pl2->add_input("", { 400,30 }, true);
+			et1->set_pwd('*');
 			et2 = pl2->add_input("", { 620,300 }, false);
 			et2->set_autobr(true);
 		}

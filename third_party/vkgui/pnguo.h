@@ -1192,8 +1192,7 @@ class edit_tl :public widget_base
 public:
 	text_ctx_cx* ctx = 0;							// 布局/渲染/事件处理
 	std::string _text;								// 保存行文本
-	std::function<void(edit_tl* ptr)> changed_cb;	// 文本改变时执行回调函数
-
+	std::function<void(edit_tl* ptr)> changed_cb;	// 文本改变时执行回调函数 
 	bool single_line = false;
 	bool mdown = false;
 	bool _read_only = false;
@@ -1202,6 +1201,8 @@ public:
 	edit_tl();
 	~edit_tl();
 	void set_single(bool is);
+	// 设置为密码框比如'*'
+	void set_pwd(char ch);
 	// 设置utf8文本
 	void set_text(const void* str, int len);
 	void add_text(const void* str, int len);
