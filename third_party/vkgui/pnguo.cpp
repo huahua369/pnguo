@@ -16034,14 +16034,15 @@ void widget_base::draw(cairo_t* cr)
 {
 }
 
-glm::ivec2 widget_base::get_pos()
+glm::ivec2 widget_base::get_pos(bool has_parent)
 {
 	glm::ivec2 ps = pos;
 	if (parent) {
 		auto pss = parent->get_pos();
 		auto ss = parent->get_spos();
 		ss *= hscroll;
-		ps += pss + ss;
+		ps += ss;
+		if (has_parent) { ps += pss; }
 	}
 	return ps;
 }
@@ -18937,7 +18938,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			// 鼠标离开
 			pw->on_mevent((int)event_type2::on_leave, mps);
 			if (pw->mevent_cb) {
-				pw->mevent_cb(pw, (int)event_type2::on_leave, mps); 
+				pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
 			}
 		}
 	}
@@ -19537,14 +19538,34 @@ bool widget_on_move(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2
 	{
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
+		wp->mmpos = mps;
 		// 判断是否鼠标进入
 		auto k = check_box_cr1(mps, (glm::vec4*)&wp->pos, 1, 0);
 		if (k.x) {
+			bool hoverold = wp->bst & (int)BTN_STATE::STATE_HOVER;
 			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
 			if (!(wp->bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
 				ep->ret = 1;
+			if (!hoverold)
+			{
+				// 鼠标进入
+				wp->on_mevent((int)event_type2::on_enter, mps);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_enter, mps);
+				}
+			}
 		}
-		else { wp->bst &= ~(int)BTN_STATE::STATE_HOVER; }
+		else {
+			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
+			{
+				wp->bst &= ~(int)BTN_STATE::STATE_HOVER;
+				// 鼠标离开
+				wp->on_mevent((int)event_type2::on_leave, mps);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_leave, mps);
+				}
+			}
+		}
 
 		{
 			if (wp->bst & (int)BTN_STATE::STATE_HOVER)

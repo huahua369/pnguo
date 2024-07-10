@@ -733,13 +733,17 @@ int main()
 					case event_type2::on_tripleclick:
 						break;
 					case event_type2::on_move:
+						break;
+					case event_type2::on_enter:
 					{
 						style_tooltip stp = {};
 						stp.family = fontn;
-						glm::vec2 ps = g3->get_pos() + g3->ppos;
-						ps.x = g3->cmpos.x;
-						ps.y += g3->size.y + 6;
-						show_tooltip(form0, (char*)u8"提示信息！", ps, &stp);
+						stp.fonst_size = 14;
+						glm::vec2 cps = g3->get_pos();
+						glm::vec2 cps0 = g3->get_pos(false);
+						cps.y += g3->size.y + g3->thickness;
+						cps.x += g3->mmpos.x - cps0.x;
+						show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
 					}
 					break;
 					case event_type2::on_leave:

@@ -1152,6 +1152,7 @@ struct widget_base
 	glm::vec2 size = {};	// 控件大小
 	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
 	glm::ivec2 cmpos = {};	// 当前鼠标坐标
+	glm::ivec2 mmpos = {};	// 当前鼠标坐标
 	glm::ivec2 ppos = {};	// 父级坐标 
 	std::string text;		// 内部显示用字符串
 	std::string family;
@@ -1178,7 +1179,7 @@ struct widget_base
 	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
 	virtual void draw(cairo_t* cr);
-	virtual glm::ivec2 get_pos();
+	virtual glm::ivec2 get_pos(bool has_parent = true);
 };
 
 
@@ -1629,7 +1630,7 @@ public:
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
 
 	layout_info_x _css = {};		// 布局样式
-	glm::vec2 _lpos = { 10,10 }, _lms = { 2,2 };// 布局偏移，子元素加宽
+	glm::vec2 _lpos = { 0,0 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "Arial,NSimSun";
 	int fontsize = 16;
 	uint32_t text_color = -1;
