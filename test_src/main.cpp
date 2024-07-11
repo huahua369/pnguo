@@ -741,7 +741,7 @@ int main()
 						stp.fonst_size = 14;
 						glm::vec2 cps = g3->get_pos();
 						glm::vec2 cps0 = g3->get_pos(false);
-						cps.y += g3->size.y + g3->thickness;
+						cps.y += g3->size.y + g3->thickness + 10;
 						cps.x += g3->mmpos.x - cps0.x;
 						show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
 					}
