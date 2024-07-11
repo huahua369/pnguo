@@ -458,13 +458,20 @@ void loadtestdata()
 	}
 }
 
-
+#include "mcut/mcut_cx.h"
 
 int main()
 {
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 #endif
+
+	mesh_mx m1, m2;
+	m1.load_stl("E:\\d3\\20mmbox.stl");
+	m2.load_stl("E:\\d3\\cone.stl");
+	m1.begin();
+	m1.dispatch(&m2, flags_b::INTERSECTION);
+	m1.end();
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
 	loadtestdata();

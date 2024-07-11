@@ -84,6 +84,17 @@ list(APPEND src_cmp
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
 "third_party/vkvg/vkvgcx.cpp"  
+
+"third_party/mcut/bvh.cpp"  
+"third_party/mcut/frontend.cpp"  
+"third_party/mcut/hmesh.cpp"  
+"third_party/mcut/kernel.cpp"  
+"third_party/mcut/math.cpp"  
+"third_party/mcut/preproc.cpp"  
+"third_party/mcut/shewchuk.c"  
+"third_party/mcut/mcut.cpp"  
+"third_party/mcut/mcut_cx.cpp"  
+"third_party/mcut/stlrw.cpp"  
 )
 
 #测试
@@ -99,6 +110,7 @@ add_executable (tcmp ${src_cmp} )
 
 include_directories("third_party") 
 include_directories("third_party/vkgui") 
+include_directories("third_party/mcut") 
 
 include_directories("third_party/vkvg")
 include_directories("third_party/vkvg/src")

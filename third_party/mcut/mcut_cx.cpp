@@ -34,6 +34,7 @@ void mesh_mx::load_stl(const char* path)
 			{
 				return;
 			}
+			vertices.vf = vf;
 			type = 0;
 			vf->resize(length * 3);
 			auto dt = vf->data();
@@ -63,10 +64,10 @@ void mesh_mx::begin()
 }
 void mesh_mx::dispatch(mesh_mx* cut, flags_b f)
 {
-	if (!cut || cut->type != type)return;
+	if (!cut || cut->type != type || !vertices.vd || !cut->vertices.vd)return;
 	McContext context = (McContext)ctx;
 
-	uint32_t flags = type ? MC_DISPATCH_VERTEX_ARRAY_DOUBLE : MC_DISPATCH_VERTEX_ARRAY_FLOAT;
+	uint32_t flags = 0;// type ? MC_DISPATCH_VERTEX_ARRAY_DOUBLE : MC_DISPATCH_VERTEX_ARRAY_FLOAT;
 	switch (f)
 	{
 	case flags_b::A_NOT_B:
@@ -87,26 +88,132 @@ void mesh_mx::dispatch(mesh_mx* cut, flags_b f)
 	//
 	//  do the cutting
 	// 
-	status = mcDispatch(
-		context, flags,
-		//MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, // We need vertex and face maps to propagate normals
-		// source mesh
-		type ? vertices.vd->data() : vertices.vf->data(),
-		faces.data(),
-		face_sizes.data(),
-		type ? vertices.vd->size() : vertices.vf->size(),
-		face_sizes.size(),
-		// cut mesh
-		type ? cut->vertices.vd->data() : cut->vertices.vf->data(),
-		cut->faces.data(),
-		cut->face_sizes.data(),
-		type ? cut->vertices.vd->size() : cut->vertices.vf->size(),
-		cut->face_sizes.size(), );
+	McResult status = {};
+	if (type) {
+		status = mcDispatch(
+			context, flags | MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
+			//MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, // We need vertex and face maps to propagate normals
+			// source mesh
+			vertices.vd->data(),
+			faces.data(),
+			face_sizes.data(),
+			vertices.vd->size(),
+			face_sizes.size(),
+			// cut mesh
+			cut->vertices.vd->data(),
+			cut->faces.data(),
+			cut->face_sizes.data(),
+			cut->vertices.vd->size(),
+			cut->face_sizes.size());
+	}
+	else
+	{
+		status = mcDispatch(
+			context, flags | MC_DISPATCH_VERTEX_ARRAY_FLOAT,
+			//MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, // We need vertex and face maps to propagate normals
+			// source mesh
+			vertices.vf->data(),
+			faces.data(),
+			face_sizes.data(),
+			vertices.vf->size(),
+			face_sizes.size(),
+			// cut mesh
+			cut->vertices.vf->data(),
+			cut->faces.data(),
+			cut->face_sizes.data(),
+			cut->vertices.vf->size(),
+			cut->face_sizes.size());
+	}
+
+	assert(status == MC_NO_ERROR);
+	//
+  // query the number of available connected components after the cut
+  // 
+
+	McUint32 connectedComponentCount;
+	std::vector<McConnectedComponent> connectedComponents;
+
+	status = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &connectedComponentCount);
 
 	assert(status == MC_NO_ERROR);
 
+	if (connectedComponentCount == 0) {
+		fprintf(stdout, "no connected components found\n");
+		exit(EXIT_FAILURE);
+	}
+
+	connectedComponents.resize(connectedComponentCount); // allocate for the amount we want to get
+
+	status = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)connectedComponents.size(), connectedComponents.data(), NULL);
+
+	assert(status == MC_NO_ERROR);
+
+	//
+	//  query the data of each connected component 
+	// 
+
+	for (McInt32 i = 0; i < (McInt32)connectedComponents.size(); ++i) {
+
+		McConnectedComponent cc = connectedComponents[i]; // connected compoenent id
+		McSize numBytes = 0;
+
+		//
+		// vertices
+		// 
+
+		status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes);
+
+		assert(status == MC_NO_ERROR);
+
+		McUint32 ccVertexCount = (McUint32)(numBytes / (sizeof(McFloat) * 3ull));
+		std::vector<McFloat> ccVertices(ccVertexCount * 3u);
+
+		status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (McVoid*)ccVertices.data(), NULL);
+
+		assert(status == MC_NO_ERROR);
+
+		//
+		// faces
+		// 
+
+		numBytes = 0;
+
+		status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
+
+		assert(status == MC_NO_ERROR);
+
+		std::vector<McUint32> ccFaceIndices;
+		ccFaceIndices.resize(numBytes / sizeof(McUint32));
+
+		status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, (McVoid*)ccFaceIndices.data(), NULL);
+
+		assert(status == MC_NO_ERROR);
+
+		//
+		// face sizes (vertices per face)
+		// 
+
+		numBytes = 0;
+
+		status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
+
+		assert(status == MC_NO_ERROR);
+
+		std::vector<McUint32> ccFaceSizes;
+		ccFaceSizes.resize(numBytes / sizeof(McUint32));
+
+		status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, (McVoid*)ccFaceSizes.data(), NULL);
+
+		assert(status == MC_NO_ERROR);
+
+		//
+		// save connected component (mesh) to an .stl file
+		// 
 
 
+	}
+	status = mcReleaseConnectedComponents(context, 0, NULL);
+	assert(status == MC_NO_ERROR);
 }
 
 // destroy context
