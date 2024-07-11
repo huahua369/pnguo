@@ -2,6 +2,8 @@
 	创建时候2024-07-11
 */
 
+
+// booleanOps
 enum class flags_b {
 	null,
 	A_NOT_B,
@@ -15,7 +17,7 @@ class mesh_mx
 public:
 	union vts
 	{
-		std::vector<glm::vec3>* vf;		// 32位
+		std::vector<glm::vec3>* vf = nullptr;		// 32位
 		std::vector<glm::dvec3>* vd;	// 64位
 	}vertices;
 	int type = 0;	// 0=32,1=64
@@ -28,7 +30,7 @@ public:
 	~mesh_mx();
 	// 加载STL模型
 	void load_stl(const char* path);
-	
+
 	void begin();
 	void dispatch(mesh_mx* cut, flags_b f);
 	void end();
