@@ -630,11 +630,12 @@ int app_cx::run_loop(int t)
 		if (prev_time > 0)
 		{
 			float delta = (float)(curr_time - prev_time) / 1000.0f;
-			for (auto it : forms)
+			auto length = forms.size();
+			for (size_t i = 0; i < length; i++)
 			{
+				auto it = forms[i];
 				it->update(delta);
 			}
-
 			for (auto it : forms)
 			{
 				it->present();

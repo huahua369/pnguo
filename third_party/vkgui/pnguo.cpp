@@ -18132,7 +18132,7 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 #endif
 
 void widget_on_event(widget_base* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
-
+void send_hover(widget_base* wp, const glm::vec2& mps);
 
 plane_cx::plane_cx()
 {
@@ -18581,6 +18581,24 @@ void plane_cx::update(float delta)
 		vertical->update(delta);
 	}
 	auto sps = get_spos();	// 获取滚动量
+
+	// 
+	if (_hover_eq.z > 0)
+	{
+		_hover_eq.x += delta;
+		if (_hover_eq.x > _hover_eq.y) {
+			auto length = event_wts.size();
+			for (size_t i = 0; i < length; i++)
+			{
+				//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
+				auto pw = event_wts[i];
+				if (!pw || !pw->visible || pw->_disabled_events || !(pw->bst & (int)BTN_STATE::STATE_HOVER))continue;
+				auto vpos = sps * pw->hscroll;
+				send_hover(pw, _move_pos);
+			}
+			_hover_eq.z = 0;
+		}
+	}
 	for (auto& it : widgets) {
 		ic += it->update(delta);
 	}
@@ -18865,9 +18883,16 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			r1 = 1;
 			p->cursor = (int)cursor_st::cursor_arrow;
 			_hover = true;
+			if (_move_pos != mps)
+			{
+				_move_pos = mps;
+				_hover_eq.x = 0;
+			}
 			//printf("_hover\n");
 		}
 		else {
+			_move_pos = mps;
+			_hover_eq.z = 0;
 			_bst &= ~(int)BTN_STATE::STATE_HOVER;
 			if (ckinc == 0)
 				_hover = false;
@@ -18882,6 +18907,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		else
 			event_wts1.push_back(*it);
 	}
+
 	do {
 		bool isv = devent_type_e::mouse_wheel_e == t;
 		if (isv) {
@@ -18900,6 +18926,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	widget_base* hpw = 0;
 	int icc = 0;
 	auto length = event_wts.size();
+	_hover_eq.z = (length > 0) ? 1 : 0;
 	for (size_t i = 0; i < length; i++)
 	{
 		//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
@@ -19677,6 +19704,16 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 	}
 
 }
+void send_hover(widget_base* wp, const glm::vec2& mps) {
+
+	wp->on_mevent((int)event_type2::on_hover, mps);
+	if (wp->mevent_cb)
+	{
+		wp->mevent_cb(wp, (int)event_type2::on_hover, mps);
+	}
+}
+
+
 #endif // 1
 
 

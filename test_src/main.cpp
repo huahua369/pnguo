@@ -734,15 +734,15 @@ int main()
 						break;
 					case event_type2::on_move:
 						break;
-					case event_type2::on_enter:
+					case event_type2::on_hover:
 					{
+						// 0.5秒触发悬停事件
 						style_tooltip stp = {};
 						stp.family = fontn;
 						stp.fonst_size = 14;
-						glm::vec2 cps = g3->get_pos();
-						glm::vec2 cps0 = g3->get_pos(false);
-						cps.y += g3->size.y + g3->thickness + 10;
-						cps.x += g3->mmpos.x - cps0.x;
+						glm::vec2 cps = g3->parent->get_pos();
+						cps += g3->mmpos;
+						cps.y += 20;
 						show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
 					}
 					break;
@@ -752,8 +752,10 @@ int main()
 					}
 					break;
 					case event_type2::on_down:
+						hide_tooltip(form0);
 						break;
 					case event_type2::on_up:
+						hide_tooltip(form0);
 						break;
 					case event_type2::on_scroll:
 						break;
