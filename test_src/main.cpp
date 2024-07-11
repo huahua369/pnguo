@@ -761,6 +761,7 @@ int main()
 						break;
 					case event_type2::on_drag:
 					{
+						hide_tooltip(form0);
 						pc->pos = mps;
 					}
 					break;

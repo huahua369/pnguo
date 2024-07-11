@@ -18592,10 +18592,11 @@ void plane_cx::update(float delta)
 			{
 				//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 				auto pw = event_wts[i];
-				if (!pw || !pw->visible || pw->_disabled_events || !(pw->bst & (int)BTN_STATE::STATE_HOVER))continue;
+				if (!pw || !pw->visible || pw->_disabled_events || !(pw->bst & (int)BTN_STATE::STATE_HOVER) || pw->bst & (int)BTN_STATE::STATE_ACTIVE)continue;
 				auto vpos = sps * pw->hscroll;
 				send_hover(pw, _move_pos);
 			}
+			_hover_eq.x = 0;
 			_hover_eq.z = 0;
 		}
 	}
