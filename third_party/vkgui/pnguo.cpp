@@ -5965,6 +5965,7 @@ glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& t
 }
 glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv)
 {
+	assert(fontsize < 800);
 	glm::ivec2 ret = { rtv.size(), 0 };
 	text_image_t* p = 0;
 	cti.tv.clear();

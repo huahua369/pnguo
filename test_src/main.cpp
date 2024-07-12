@@ -465,13 +465,61 @@ int main()
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 #endif
-
+#if 1
 	mesh_mx m1, m2;
-	m1.load_stl("E:\\d3\\20mmbox.stl");
-	m2.load_stl("E:\\d3\\cone.stl");
+	m1.load_stl("E:\\d3\\cube.stl");
+	//m1.load_obj("E:\\d3\\g.obj");
+	//m2.load_stl("E:\\d3\\cone.stl");
+	m2.load_stl("E:\\d3\\cube1.stl");
+	//m1.load_obj("E:\\d3\\cone.obj");
+	//m1.load_obj("E:\\d3\\cube.obj");
+	//m2.load_obj("E:\\d3\\cube1.obj");
+
+#if 1
+	glm::vec3 srcMeshVertices[] = {
+		{ -5, -5, 5},  // vertex 0
+		{5, -5, 5},   // vertex 1
+		{5, 5, 5},    // vertex 2
+		{-5, 5, 5},   // vertex 3
+		{-5, -5, -5}, // vertex 4
+		{5, -5, -5},  // vertex 5
+		{5, 5, -5},   // vertex 6
+		{-5, 5, -5}   // vertex 7
+	};
+
+	uint32_t srcMeshFaces[] = {
+		0, 1, 2, 3, // face 0
+		7, 6, 5, 4, // face 1
+		1, 5, 6, 2, // face 2
+		0, 3, 7, 4, // face 3
+		3, 2, 6, 7, // face 4
+		4, 5, 1, 0  // face 5
+	};
+
+	uint32_t srcMeshFaceSizes[] = { 4, 4, 4, 4, 4, 4 };
+
+	uint32_t srcMeshVertexCount = 8;
+	uint32_t srcMeshFaceCount = 6;
+	//m1.set_data(srcMeshVertices, 8, srcMeshFaces, 24, 4, srcMeshFaceSizes, 6);
+
+	glm::vec3 cutMeshVertices[] = {
+		{ -20, -4, 0}, // vertex 0
+		{0, 20, 20},  // vertex 1
+		{20, -4, 0},  // vertex 2
+		{0, 20, -20}  // vertex 3
+	};
+
+	uint32_t cutMeshFaces[] = {
+		0, 1, 2, // face 0
+		0, 2, 3  // face 1
+	};
+	//m2.set_data(cutMeshVertices, 4, cutMeshFaces, 6, 3, 0, 0);
+#endif
+
 	m1.begin();
 	m1.dispatch(&m2, flags_b::INTERSECTION);
 	m1.end();
+#endif
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
 	loadtestdata();
@@ -1280,20 +1328,22 @@ int main()
 		pl3->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
 				int y1 = 10;
-				//cairo_as _ss_(cr);
+				{
+					cairo_as _ss_(cr);
 
-				cairo_set_line_width(cr, 1.0);
-				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
-				fill_stroke(cr, -1, 0);
-				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1, 1);
+					cairo_set_line_width(cr, 1.0);
+					draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
+					fill_stroke(cr, -1, 0);
+					draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
+					fill_stroke(cr, 0, -1, 1);
 
-				cairo_scale(cr, 5, 5);
-				draw_triangle(cr, { 10.5,12.5 }, { 14.5,19 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1, 2);
-				cairo_set_hairline(cr, 1);// 开启最小宽度线
-				draw_triangle(cr, { 15.5,12.5 }, { 14.5,19 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1, 2);
+					cairo_scale(cr, 5, 5);
+					draw_triangle(cr, { 10.5,12.5 }, { 14.5,19 }, { 1,0.5 });
+					fill_stroke(cr, 0, -1, 2);
+					cairo_set_hairline(cr, 1);// 开启最小宽度线
+					draw_triangle(cr, { 15.5,12.5 }, { 14.5,19 }, { 1,0.5 });
+					fill_stroke(cr, 0, -1, 2);
+				}
 
 
 				cairo_translate(cr, 200, 200);
@@ -1304,7 +1354,7 @@ int main()
 				//draw_rectangle_gradient(cr, 200, 100, rs);
 				auto txt = pl1->ltx;
 				//txt->update_text();	
-				cairo_scale(cr, 0.5, 0.5);
+				//cairo_scale(cr, 0.5, 0.5);
 				for (auto it : txt->msu)
 				{
 					auto ss = draw_image(cr, it, { 10, y1 }, { 0,0,1024,512 });

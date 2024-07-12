@@ -23,14 +23,16 @@ public:
 	int type = 0;	// 0=32,1=64
 	std::vector<uint32_t> faces, face_sizes;
 	// 顶点数量vertices，面数量 face_sizes
-
+	uint32_t num_faces = 0;
 	void* ctx = 0;
 public:
 	mesh_mx();
 	~mesh_mx();
 	// 加载STL模型
 	void load_stl(const char* path);
-
+	void load_obj(const char* path);
+	void set_data(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum, int fsize, uint32_t* face_sizes, size_t face_sizes_num);
+	void set_data(const glm::dvec3* v, size_t n, uint32_t* idx, size_t idxnum, int fsize, uint32_t* face_sizes, size_t face_sizes_num);
 	void begin();
 	void dispatch(mesh_mx* cut, flags_b f);
 	void end();

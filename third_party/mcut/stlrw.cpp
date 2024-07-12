@@ -264,6 +264,7 @@ void stl3d_cx::load(const std::string& fn)
 		{
 			load_binary(d, cfs);
 		}
+		neighbors_start.resize(faces.size());
 	}
 }
 

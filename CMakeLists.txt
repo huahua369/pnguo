@@ -95,6 +95,7 @@ list(APPEND src_cmp
 "third_party/mcut/mcut.cpp"  
 "third_party/mcut/mcut_cx.cpp"  
 "third_party/mcut/stlrw.cpp"  
+"third_party/mcut/obj.c"
 )
 
 #测试
@@ -106,7 +107,7 @@ list(APPEND src_cmp
 ) 
 
 # 将源代码添加到此项目的可执行文件。
-add_executable (tcmp ${src_cmp} ) 
+add_executable (tcmp ${src_cmp}  ) 
 
 include_directories("third_party") 
 include_directories("third_party/vkgui") 

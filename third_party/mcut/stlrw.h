@@ -16,10 +16,30 @@ struct stl_face_t
 };
 glm::vec3 normal_v3(glm::vec3* dv);
 float normal_v2(glm::vec2* dv);
+
+struct stl_neighbors {
+	stl_neighbors() { reset(); }
+	void reset() {
+		neighbor[0] = -1;
+		neighbor[1] = -1;
+		neighbor[2] = -1;
+		which_vertex_not[0] = -1;
+		which_vertex_not[1] = -1;
+		which_vertex_not[2] = -1;
+	}
+	int num_neighbors() const { return 3 - ((this->neighbor[0] == -1) + (this->neighbor[1] == -1) + (this->neighbor[2] == -1)); }
+
+	// Index of a neighbor facet.
+	int   neighbor[3];
+	// Index of an opposite vertex at the neighbor face.
+	char  which_vertex_not[3];
+};
+
 class stl3d_cx
 {
 public:
 	std::vector<stl_face_t> faces;
+	std::vector<stl_neighbors> neighbors_start;
 	// 模型宽高厚
 	glm::vec3 size = {};
 	glm::vec3 bounding[2] = {};
