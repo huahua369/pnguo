@@ -459,18 +459,17 @@ void loadtestdata()
 }
 
 #include "mcut/mcut_cx.h"
-
+#include <variant>
 int main()
 {
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 #endif
-#if 1
-	mesh_mx m1, m2;
-	m1.load_stl("E:\\d3\\cube.stl");
+#if 1 
+	//m1.load_stl("E:\\d3\\cube.stl");
 	//m1.load_obj("E:\\d3\\g.obj");
 	//m2.load_stl("E:\\d3\\cone.stl");
-	m2.load_stl("E:\\d3\\cube1.stl");
+	//m2.load_stl("E:\\d3\\cube1.stl");
 	//m1.load_obj("E:\\d3\\cone.obj");
 	//m1.load_obj("E:\\d3\\cube.obj");
 	//m2.load_obj("E:\\d3\\cube1.obj");
@@ -515,10 +514,16 @@ int main()
 	};
 	//m2.set_data(cutMeshVertices, 4, cutMeshFaces, 6, 3, 0, 0);
 #endif
-
-	m1.begin();
-	m1.dispatch(&m2, flags_b::INTERSECTION);
-	m1.end();
+	mesh_triangle_cx* m1 = new_mesh("E:\\d3\\cone0.stl");// stl
+	mesh_triangle_cx* m2 = new_mesh("E:\\d3\\cube.stl");
+	std::vector<mesh_triangle_cx> opt;
+	make_boolean(m1, m2, opt, flags_b::A_NOT_B);
+	for (size_t i = 0; i < opt.size(); i++)
+	{
+		auto& it = opt[i];
+		std::string fn = "temp/boolean_" + std::to_string(i) + ".stl";
+		mesh_save_stl(&it, fn.c_str(), 0);
+	}
 #endif
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑

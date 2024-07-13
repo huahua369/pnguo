@@ -77,6 +77,43 @@ stl3d_cx::~stl3d_cx()
 {
 }
 // 添加三角面
+int stl3d_cx::add(glm::vec3* p, int n, int resn)
+{
+	int ret = 0;
+	auto ps = faces.size();
+	if (resn > 0)
+		faces.reserve(ps + resn);
+	if (p && n >= 3)
+	{
+		auto c = n / 3;
+		auto v3 = sizeof(glm::vec3) * 3;
+		glm::vec3 pss = pos;
+		size_t nc = (pos.x != 0 || pos.y != 0 || pos.z != 0) ? 3 : 0;
+		for (int i = 0; i < c; i++)
+		{
+			stl_face_t v = {};
+			auto t = &v;
+			memcpy(t->v, p, v3);
+			for (size_t x = 0; x < nc; x++)
+			{
+				auto& it = t->v[x];
+				it += pss;
+			}
+			auto n3 = normal2(*t);
+			if (glm::isnan(n3.x) || glm::isnan(n3.y) || glm::isnan(n3.z))
+			{
+				t++;
+				ret--;
+			}
+			else {
+				faces.push_back(v);
+			}
+			p += 3;
+		}
+	}
+	return ret;
+}
+// 添加三角面
 int stl3d_cx::add(glm::vec3* p, int n, glm::vec3 pos)
 {
 	int ret = 0;

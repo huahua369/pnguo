@@ -4,39 +4,51 @@
 
 
 // booleanOps
-enum class flags_b {
-	null,
-	A_NOT_B,
-	B_NOT_A,
-	UNION,
-	INTERSECTION
+enum class flags_b :uint8_t {
+	A_NOT_B,		// 减
+	B_NOT_A,		// 反向减
+	UNION,			// 合并
+	INTERSECTION	// 交集
 };
 
-class mesh_mx
+struct mesh_triangle_cx
 {
 public:
-	union vts
-	{
-		std::vector<glm::vec3>* vf = nullptr;		// 32位
-		std::vector<glm::dvec3>* vd;	// 64位
-	}vertices;
-	int type = 0;	// 0=32,1=64
-	std::vector<uint32_t> faces, face_sizes;
-	// 顶点数量vertices，面数量 face_sizes
-	uint32_t num_faces = 0;
-	void* ctx = 0;
+	enum class eft :uint8_t {
+		eNormal,  // normal face
+		eSmallOverhang,  // small overhang
+		eSmallHole,      // face with small hole
+		eExteriorAppearance,  // exterior appearance
+		eMaxNumFaceTypes
+	};
+	struct FaceProperty {
+		double	area = 0.0;
+		eft		type = eft::eNormal;
+	};
+	std::vector<glm::ivec3>	indices;
+	std::vector<glm::vec3>	vertices;
+	std::vector<FaceProperty> properties;
 public:
-	mesh_mx();
-	~mesh_mx();
-	// 加载STL模型
-	void load_stl(const char* path);
-	void load_obj(const char* path);
-	void set_data(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum, int fsize, uint32_t* face_sizes, size_t face_sizes_num);
-	void set_data(const glm::dvec3* v, size_t n, uint32_t* idx, size_t idxnum, int fsize, uint32_t* face_sizes, size_t face_sizes_num);
-	void begin();
-	void dispatch(mesh_mx* cut, flags_b f);
-	void end();
-private:
+	mesh_triangle_cx(std::vector<glm::ivec3> indices_, std::vector<glm::vec3> vertices_);
+	mesh_triangle_cx(std::vector<glm::vec3> vertices_, std::vector<glm::ivec3> indices_);
+	mesh_triangle_cx();
+	void set_data(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum);
+	void set_data(const glm::dvec3* v, size_t n, uint32_t* idx, size_t idxnum);
+	void clear();
 
+	size_t memsize() const;
+	bool empty() const;
+	glm::vec3 get_vertex(int facet_idx, int vertex_idx) const;
+	float facet_area(int facet_idx) const;
 };
+// stl、obj
+mesh_triangle_cx* new_mesh(const char* path);
+mesh_triangle_cx* new_mesh(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum);
+mesh_triangle_cx* new_mesh(const glm::dvec3* v, size_t n, uint32_t* idx, size_t idxnum);
+void free_mesh(mesh_triangle_cx* p);
+// type=0二进制，2文本
+void mesh_save_stl(mesh_triangle_cx* p, const char* fn, int type = 0);
+
+// 布尔运算
+void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 

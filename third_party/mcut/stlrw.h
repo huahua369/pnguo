@@ -50,6 +50,7 @@ public:
 
 	~stl3d_cx();
 public:
+	int add(glm::vec3* p, int n, int resn);
 	// 增加三角形，n顶点数量,大于3
 	int add(glm::vec3* p, int n, glm::vec3 pos = {});
 	int add(glm::vec2* p, int n, glm::vec3 pos = {});
