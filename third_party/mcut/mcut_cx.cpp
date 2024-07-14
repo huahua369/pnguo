@@ -443,60 +443,6 @@ int KDTree<DIM, Real>::findNearestBruteForce(const Point& pt)
 }
 #endif
 
-// 加载stl模型
-void load_stl(const char* path)
-{
-	if (path && *path)
-	{
-		stl3d_cx st;
-		st.load(path);
-		auto length = st.faces.size();
-		mesh_triangle_cx its = {};
-		if (length)
-		{
-			stl_generate_shared_vertices(&st, its);
-			std::vector<glm::vec3> vf[1];
-			std::vector<uint32_t> idxs;
-			idxs.reserve(length * 3);
-			vf->reserve(length * 3);
-			auto dt = vf->data();
-			auto ft = st.faces.data();
-			KDTree<3, float> tree;
-			for (size_t i = 0; i < length; i++)
-			{
-				for (unsigned j = 0; j < 3; j++) {
-					unsigned index;
-					auto vec = ft[i].v[j];
-					int ind = tree.findNearest(vec);
-					if ((ind < 0) || (glm::distance(vec, tree.getPoint(ind)) > 1.0e-8)) {
-						index = tree.size();
-						tree.insert(vec);
-						vf->push_back(vec);
-					}
-					else {
-						index = ind;
-					}
-					idxs.push_back(index);
-				}
-				//memcpy(dt, &ft[i].v, sizeof(glm::vec3) * 3);
-				//dt += 3;
-				//face_sizes[i] = 3;
-			}
-			for (size_t i = 0; i < length * 3; i++)
-			{
-				//idxs[i] = i;
-			}
-			//set_data(vf->data(), vf->size(), idxs.data(), idxs.size(), 3, 0, 0);
-			auto vs = its.vertices.size();
-			auto is = its.indices.size() * 3;
-			vs = 6;
-			is = 6;
-			//set_data(its.vertices.data(), vs, (uint32_t*)its.indices.data(), is, 3, 0, 0);
-		}
-	}
-}
-
-
 
 mesh_triangle_cx mcut_to_triangle_mesh(const McutMesh& mcutmesh)
 {

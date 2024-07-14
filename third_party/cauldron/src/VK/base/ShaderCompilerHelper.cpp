@@ -189,6 +189,7 @@ namespace CAULDRON_VK
             {
                 std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
                 VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, pDefines, &SpvData, &SpvSize);
+                assert(SpvSize != 0);
             }
 
             assert(SpvSize != 0);

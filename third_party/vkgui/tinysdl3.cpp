@@ -324,6 +324,15 @@ app_cx::app_cx()
 	auto hr = OleInitialize(NULL);
 	SDL_SetWindowsMessageHook(wMessageHook, this);
 #endif
+#ifdef EVWATCH
+	SDL_AddEventWatch([](void* userdata, SDL_Event* e) {
+		auto ctx = (app_cx*)userdata;
+		if (ctx && e) {
+			ctx->call_cb(e);
+		}
+		return 0;
+		}, this);
+#endif
 }
 
 app_cx::~app_cx()
@@ -591,8 +600,9 @@ void app_cx::kncdown()
 }
 int app_cx::get_event()
 {
-	SDL_Event e = {};
 	int64_t ts = 0;
+#if 1
+	SDL_Event e = {};
 	while (SDL_PollEvent(&e) != 0)
 	{
 		if (e.type == SDL_EVENT_KEY_DOWN/* && e.key.repeat*/)
@@ -603,16 +613,19 @@ int app_cx::get_event()
 		if (e.type == SDL_EVENT_KEY_UP) {
 			SDL_SetEventEnabled(SDL_EVENT_KEY_DOWN, 1);
 		}
+#ifndef EVWATCH
 		call_cb(&e);
+#endif
 		break;
 	}
-
+#endif
 	clearf();
 	if (forms.empty())
 	{
 		prev_time = 0;
 	}
-	if (e.type) {
+	if (e.type) 
+	{
 		for (auto it : forms)
 		{
 			it->update_w();
@@ -1227,7 +1240,7 @@ void et2key(const SDL_Event* e, keyboard_et* ekm)
 	if (ekm->repeat > 0) {
 		ts += (e->button.timestamp - ts1) * 0.000001;
 		ekm->repeat = ekm->repeat;
-		printf("ms: %d\n", ts); ts = 0; ts1 = e->button.timestamp;
+		//printf("ms: %d\n", ts); ts = 0; ts1 = e->button.timestamp;
 	}
 	else {
 		ts = 0; ts1 = e->button.timestamp;

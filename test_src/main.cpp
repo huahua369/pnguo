@@ -39,6 +39,12 @@ cmake -DCMAKE_INSTALL_PREFIX=~/test ..
 # static build
 cmake -DBUILD_SHARED_LIBS=OFF ..
 ninja -C build
+
+
+渲染器配置
+资源管理：加载、卸载
+渲染指令
+
 */
 
 #define DVC_EXPORT extern "C" __declspec(dllimport)
@@ -465,6 +471,10 @@ int main()
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 #endif
+
+	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	glm::ivec2 ws = { 1280,800 };
 #if 1 
 	//m1.load_stl("E:\\d3\\cube.stl");
 	//m1.load_obj("E:\\d3\\g.obj");
@@ -528,12 +538,6 @@ int main()
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
 	loadtestdata();
-
-	auto qyt = new	uint16_t[256 * 384];
-	qyt[0] = -1;
-	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	glm::ivec2 ws = { 1280,800 };
 #if 1
 	auto app = new_app();
 	form_newinfo_t ptf = {};
