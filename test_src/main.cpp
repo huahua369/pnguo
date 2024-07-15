@@ -782,6 +782,7 @@ int main()
 				};
 			g3->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 				{
+					static int enterst = 0;
 					auto pc = (color_btn*)p;
 					auto t = (event_type2)type;
 					switch (t)
@@ -794,20 +795,26 @@ int main()
 						break;
 					case event_type2::on_move:
 						break;
+					case event_type2::on_enter:
+						enterst++;
+						break;
 					case event_type2::on_hover:
 					{
 						// 0.5秒触发悬停事件
 						style_tooltip stp = {};
 						stp.family = fontn;
 						stp.fonst_size = 14;
-						glm::vec2 cps = g3->parent->get_pos();
-						cps += g3->mmpos;
+						glm::vec2 cps = mps;
 						cps.y += 20;
-						show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+						if (enterst == 1) {
+							show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+						}
+						enterst++;
 					}
 					break;
 					case event_type2::on_leave:
 					{
+						enterst = 0;
 						hide_tooltip(form0);
 					}
 					break;

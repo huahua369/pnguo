@@ -20853,7 +20853,7 @@ void scroll_bar::draw(cairo_t* cr)
 		auto pxs = ceil((ss[px] - rw) * 0.5);
 		trc.x = pxs;
 		trc.y = pxs;
-		trc[_dir] += _offset;
+		trc[_dir] = tps[_dir] + _offset;
 		trc[2 + _dir] = thumb_size_m.x;
 		if (thumb_size_m.z)
 		{
@@ -20876,10 +20876,11 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
 	auto pts = poss[_dir];
 	pts -= t_offset;
+	int mx = ss[_dir] - tsm;
 	if (limit)
 	{
 		if (pts < 0)pts = 0;
-		if (pts > ss[_dir] - tsm)pts = ss[_dir] - tsm;
+		if (pts > mx)pts = mx;
 	}
 	_offset = pts;
 }
