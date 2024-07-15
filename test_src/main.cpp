@@ -469,7 +469,7 @@ int main()
 #endif
 
 	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 	glm::ivec2 ws = { 1280,800 };
 #if 1 
 	//m1.load_stl("E:\\d3\\cube.stl");

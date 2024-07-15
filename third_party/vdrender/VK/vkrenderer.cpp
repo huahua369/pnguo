@@ -38,3 +38,17 @@ void BBoxPass::clear()
 	boxs.clear();
 	box_ms.clear();
 }
+
+vkdg_cx* new_vkdg(dev_info_cx* c)
+{
+	auto p = new vkdg_cx();
+	if (c) {
+
+	}
+	return p;
+}
+
+void free_vkdg(vkdg_cx* p)
+{
+	if (p)delete p;
+}

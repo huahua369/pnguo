@@ -658,12 +658,12 @@ void Renderer::OnRender(const UIState* pState, const Camera& Cam, SwapChain* pSw
 #if 1
 				if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 				{
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);
+					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);		// 渲染正常
+					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);	// 渲染线框
 				}
 				else
 				{
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
+					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);	// 正常渲染PBR
 				}
 #else
 				GltfPbrPass::DrawBatchList(cmdBuf1, bWireframe ? &opaque1 : &opaque, bWireframe);

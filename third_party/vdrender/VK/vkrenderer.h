@@ -12,10 +12,12 @@
 // 资源管理：加载、卸载
 // 渲染指令
 
+struct dev_info_cx;
+
 class vkdg_cx
 {
 public:
-
+	void* ctx = 0;
 public:
 	vkdg_cx();
 	~vkdg_cx();
@@ -48,3 +50,8 @@ public:
 private:
 
 };
+
+
+// 创建渲染器
+vkdg_cx* new_vkdg(dev_info_cx* c = 0);
+void free_vkdg(vkdg_cx* p);
