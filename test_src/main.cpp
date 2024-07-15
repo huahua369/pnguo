@@ -41,10 +41,6 @@ cmake -DBUILD_SHARED_LIBS=OFF ..
 ninja -C build
 
 
-渲染器配置
-资源管理：加载、卸载
-渲染指令
-
 */
 
 #define DVC_EXPORT extern "C" __declspec(dllimport)

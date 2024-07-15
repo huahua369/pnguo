@@ -1620,7 +1620,7 @@ public:
 	std::function<void(cairo_t* cr, const glm::vec2& scroll)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
-	glm::dvec3 _hover_eq = { 0,0.5,0 };	// 时间
+	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
 	glm::ivec2 _move_pos = {};
 	// 移到最后
 	void (*form_move2end)(form_x* f, plane_cx* ud) = 0;

@@ -18584,21 +18584,21 @@ void plane_cx::update(float delta)
 	auto sps = get_spos();	// 获取滚动量
 
 	// 
-	if (_hover_eq.z > 0)
+	//printf("type\t%d\n", _hover_eq.w);
+	if (_hover_eq.z > 0 && (devent_type_e)_hover_eq.w == devent_type_e::mouse_move_e)
 	{
 		_hover_eq.x += delta;
+		// 大于设置时间触发hover事件
 		if (_hover_eq.x > _hover_eq.y) {
 			auto length = event_wts.size();
 			for (size_t i = 0; i < length; i++)
 			{
-				//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
 				auto pw = event_wts[i];
 				if (!pw || !pw->visible || pw->_disabled_events || !(pw->bst & (int)BTN_STATE::STATE_HOVER) || pw->bst & (int)BTN_STATE::STATE_ACTIVE)continue;
 				auto vpos = sps * pw->hscroll;
 				send_hover(pw, _move_pos);
 			}
-			_hover_eq.x = 0;
-			_hover_eq.z = 0;
+			_hover_eq.x = _hover_eq.z = 0;//重置
 		}
 	}
 	for (auto& it : widgets) {
@@ -18873,6 +18873,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	int r1 = 0;
 	auto ppos = get_pos();
 	auto sps = get_spos();
+	_hover_eq.w = type;
 	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
@@ -18928,7 +18929,6 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	widget_base* hpw = 0;
 	int icc = 0;
 	auto length = event_wts.size();
-	_hover_eq.z = (length > 0) ? 1 : 0;
 	for (size_t i = 0; i < length; i++)
 	{
 		//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
@@ -18981,6 +18981,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y };
 		on_motion(mps);
+		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
 	}
 	break;
 	case devent_type_e::mouse_button_e:
@@ -18988,6 +18989,8 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y };
 		on_button(p->button, p->state, mps, p->clicks, ep->ret);
+
+		_hover_eq.z = 0;
 		//printf("ck:%d\t%p\n", ckinc, this);
 		if (ckup > 0)
 			ep->ret = 1;
