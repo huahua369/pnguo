@@ -540,7 +540,7 @@ int main()
 	ptf.app = app; ptf.title = (char*)u8"窗口1";
 	ptf.size = ws;
 	ptf.flags = ef_vulkan | ef_resizable;
-	ptf.has_renderer s= true;
+	ptf.has_renderer = true;
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 
 	auto sdldev = form0->get_dev();

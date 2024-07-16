@@ -1,4 +1,8 @@
-﻿
+﻿/*
+vk渲染器
+
+
+*/
 #include "pch1.h"
 #include "vkrenderer.h"
 
@@ -372,28 +376,32 @@ namespace cvk
 		m_deviceProperties2.pNext = &m_subgroupProperties;
 
 		vkGetPhysicalDeviceProperties2(m_physicaldevice, &m_deviceProperties2);
+	
+		{
 
 #if defined(_WIN32)
-		// Crate a Win32 Surface
-		//
-		VkWin32SurfaceCreateInfoKHR createInfo = {};
-		createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		createInfo.pNext = NULL;
-		createInfo.hinstance = NULL;
-		createInfo.hwnd = (HWND)pw;
-		res = vkCreateWin32SurfaceKHR(m_instance, &createInfo, NULL, &m_surface);
+			// Crate a Win32 Surface
+			//
+			VkWin32SurfaceCreateInfoKHR createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+			createInfo.pNext = NULL;
+			createInfo.hinstance = NULL;
+			createInfo.hwnd = (HWND)pw;
+			res = vkCreateWin32SurfaceKHR(m_instance, &createInfo, NULL, &m_surface);
 #elif __ANDROID__
-		ANativeWindow* window = (ANativeWindow*)pw;// platformWindow_;
-		VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
-		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-		surfaceCreateInfo.window = window;
-		//if (surface)
-		//	vkDestroySurfaceKHR(instance, surface, 0);
-		surface = 0;
-		err = vkCreateAndroidSurfaceKHR(_instance, &surfaceCreateInfo, NULL, &surface);
+			ANativeWindow* window = (ANativeWindow*)pw;// platformWindow_;
+			VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
+			surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+			surfaceCreateInfo.window = window;
+			//if (surface)
+			//	vkDestroySurfaceKHR(instance, surface, 0);
+			surface = 0;
+			err = vkCreateAndroidSurfaceKHR(_instance, &surfaceCreateInfo, NULL, &surface);
 #else
 #error platform not supported
 #endif
+		}
+
 		// Find a graphics device and a queue that can present to the above surface
 		//
 		graphics_queue_family_index = UINT32_MAX;
@@ -490,7 +498,7 @@ namespace cvk
 		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2 = {};
 		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		physicalDeviceFeatures2.features = physicalDeviceFeatures;
-		physicalDeviceFeatures2.pNext = &robustness2; 
+		physicalDeviceFeatures2.pNext = &robustness2;
 		if (dev)
 		{
 			m_device = dev;
@@ -600,7 +608,7 @@ namespace cvk
 		//DestroyInstance(m_instance);
 #endif
 		m_instance = VK_NULL_HANDLE;
-		}
+	}
 
 	void Device::GPUFlush()
 	{
@@ -628,7 +636,7 @@ namespace cvk
 	//
 
 
-	}
+}
 
 
 vkdg_cx::vkdg_cx()
