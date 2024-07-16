@@ -16,7 +16,7 @@
 #include <vkgui/event.h>
 #include <vkgui/buffer.h>
 #include <vkgui/page.h>
-
+#include <vkgui/vkrenderer.h>
 /*
 	todo
 	输入数据，自动创建窗口、控件、
@@ -540,8 +540,13 @@ int main()
 	ptf.app = app; ptf.title = (char*)u8"窗口1";
 	ptf.size = ws;
 	ptf.flags = ef_vulkan | ef_resizable;
-	ptf.has_renderer = true;
+	ptf.has_renderer s= true;
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+
+	auto sdldev = form0->get_dev();
+	auto vkd = new_vkdg(&sdldev);
+
+
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	menu_cx* mc = new menu_cx();	// 菜单管理

@@ -84,6 +84,7 @@ list(APPEND src_cmp
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
 "third_party/vkvg/vkvgcx.cpp"  
+"third_party/vkgui/vkrenderer.cpp"  
 
 "third_party/mcut/bvh.cpp"  
 "third_party/mcut/frontend.cpp"  
@@ -130,7 +131,8 @@ find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 #find_package(NanoSVG CONFIG REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(Vulkan REQUIRED)
+find_package(Vulkan REQUIRED) 
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(harfbuzz CONFIG REQUIRED)
 find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
@@ -151,6 +153,7 @@ set(lklib)
 list(APPEND lklib  
     ZLIB::ZLIB
     Vulkan::Vulkan 
+    Vulkan::Headers GPUOpen::VulkanMemoryAllocator
     PkgConfig::LIBRSVG
     glm::glm-header-only
     nlohmann_json::nlohmann_json
@@ -161,8 +164,8 @@ list(APPEND lklib
     PkgConfig::Clipper2  PkgConfig::Clipper2Z 
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
-    rvk
-    rdx12
+   # rvk
+   # rdx12
    # unofficial::joltphysics::Jolt
 )
 target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})

@@ -6,8 +6,7 @@
 	UI.cpp
     UI.h
     stdafx.cpp
-    stdafx.h
-    "vkrenderer.cpp"
+    stdafx.h 
     dpiawarescaling.manifest)
 
 source_group("Sources" FILES ${sources})

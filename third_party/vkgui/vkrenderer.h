@@ -18,6 +18,7 @@ class vkdg_cx
 {
 public:
 	void* ctx = 0;
+	void* dev = 0;
 public:
 	vkdg_cx();
 	~vkdg_cx();
