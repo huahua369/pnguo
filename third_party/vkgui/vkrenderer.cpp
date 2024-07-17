@@ -1383,7 +1383,7 @@ namespace vkr {
 		//VkFormat _format = VK_FORMAT_R8G8B8A8_UNORM;
 		uint32_t _format = 37;
 		int64_t _alloc_size = 0;		// 数据字节大小
-		VkDevice _dev = nullptr;
+		Device* _dev = nullptr;
 		std::string _name;
 		ImageLayoutBarrier _image_layout = ImageLayoutBarrier::SHADER_READ;
 		void* user_data = 0;
@@ -1397,7 +1397,7 @@ namespace vkr {
 		VkSamplerYcbcrConversion ycbcr_sampler_conversion = {};
 	public:
 		dvk_texture();
-		dvk_texture(VkDevice dev);
+		dvk_texture(Device *dev);
 
 		~dvk_texture();
 
@@ -13518,6 +13518,8 @@ namespace vkr {
 		void AdjustMagnifierSize(float increment = 0.05f);
 		void AdjustMagnifierMagnification(float increment = 1.00f);
 	};
+
+	class fbo_info_cx;
 	// todo renderer
 	class Renderer_cx
 	{
@@ -13541,6 +13543,7 @@ namespace vkr {
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 		void OnRender(const UIState* pState, const Camera& Cam);
+		void set_fbo(fbo_info_cx* p);
 	private:
 		Device* m_pDevice = 0;
 		const_vk ct = {};
@@ -13606,6 +13609,40 @@ namespace vkr {
 
 }
 //!vkr
+
+
+namespace vkr {
+
+
+	// todo texture
+
+	dvk_texture::dvk_texture()
+	{
+		descriptor = new VkDescriptorImageInfo();
+		_info = new VkImageCreateInfo();
+		//_header = new IMG_INFO();
+	}
+
+	dvk_texture::dvk_texture(Device* dev) :_dev(dev)
+	{
+		descriptor = new VkDescriptorImageInfo();
+		_info = new VkImageCreateInfo();
+	}
+
+	dvk_texture::~dvk_texture()
+	{
+		if (ycbcr_sampler_conversion)
+		{
+			//_dev->destroy_samplerYcbcrConversion(_dev->device, ycbcr_sampler_conversion, 0);
+			//vkDestroySamplerYcbcrConversion(_dev->device, ycbcr_sampler_conversion, 0);
+		}
+		//free_image();
+		//delop(_header);
+		//delop(_info);
+		//delop(descriptor);
+	}
+
+}
 
 
 namespace vkr {
@@ -14155,7 +14192,7 @@ namespace vkr {
 			if (isColor)
 			{
 				for (auto& it : framebuffers)
-					it.color._dev = _dev->GetDevice();
+					it.color._dev = _dev;
 			}
 		}
 
@@ -15289,6 +15326,12 @@ namespace vkr {
 #endif
 
 	}
+	void Renderer_cx::set_fbo(fbo_info_cx* p)
+	{
+		_fbo.fence = p->_fence;
+		_fbo.framebuffer = p->framebuffers[0].framebuffer;
+		_fbo.renderPass = p->renderPass;
+	}
 #endif
 
 
@@ -15325,7 +15368,7 @@ namespace vkr {
 		double  m_deltaTime = 0.0;
 
 		bool                        m_bIsBenchmarking = false;
-
+		fbo_info_cx* _fbo = 0;
 		GLTFCommon* m_pGltfLoader = NULL;
 		std::vector<GLTFCommon*>    _loaders;
 		bool                        m_loadingScene = false;
@@ -15533,8 +15576,13 @@ namespace vkr {
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
 		_rp = newRenderPass(m_device, VK_FORMAT_R8G8B8A8_SRGB);
-		m_pRenderer->OnCreate(m_device, _rp);
 
+		auto f = new fbo_info_cx();
+		f->_dev = m_device;
+		f->initFBO(m_Width, m_Height, _rp);
+		m_pRenderer->set_fbo(f);
+		m_pRenderer->OnCreate(m_device, _rp);
+		_fbo = f;
 		// init GUI (non gfx stuff)
 		//ImGUI_Init((void*)m_windowHwnd);
 		m_UIState.Initialize();
