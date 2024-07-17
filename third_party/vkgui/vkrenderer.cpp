@@ -3716,7 +3716,112 @@ namespace vkr
 // todo GltfPbrPass
 namespace vkr
 {
+	// todo GPUTimestamps
 
+	void GPUTimestamps::OnCreate(Device* pDevice, uint32_t numberOfBackBuffers)
+	{
+		m_pDevice = pDevice;
+		m_NumberOfBackBuffers = numberOfBackBuffers;
+		m_frame = 0;
+
+		const VkQueryPoolCreateInfo queryPoolCreateInfo =
+		{
+			VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,     // VkStructureType                  sType
+			NULL,                                         // const void*                      pNext
+			(VkQueryPoolCreateFlags)0,                    // VkQueryPoolCreateFlags           flags
+			VK_QUERY_TYPE_TIMESTAMP ,                     // VkQueryType                      queryType
+			MaxValuesPerFrame * numberOfBackBuffers,      // deUint32                         entryCount
+			0,                                            // VkQueryPipelineStatisticFlags    pipelineStatistics
+		};
+
+		VkResult res = vkCreateQueryPool(pDevice->GetDevice(), &queryPoolCreateInfo, NULL, &m_QueryPool);
+	}
+
+	void GPUTimestamps::OnDestroy()
+	{
+		vkDestroyQueryPool(m_pDevice->GetDevice(), m_QueryPool, nullptr);
+
+		for (uint32_t i = 0; i < m_NumberOfBackBuffers; i++)
+			m_labels[i].clear();
+	}
+
+	void GPUTimestamps::GetTimeStamp(VkCommandBuffer cmd_buf, const char* label)
+	{
+		uint32_t measurements = (uint32_t)m_labels[m_frame].size();
+		uint32_t offset = m_frame * MaxValuesPerFrame + measurements;
+
+		vkCmdWriteTimestamp(cmd_buf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPool, offset);
+
+		m_labels[m_frame].push_back(label);
+	}
+
+	void GPUTimestamps::GetTimeStampUser(TimeStamp ts)
+	{
+		m_cpuTimeStamps[m_frame].push_back(ts);
+	}
+
+	void GPUTimestamps::OnBeginFrame(VkCommandBuffer cmd_buf, std::vector<TimeStamp>* pTimestamps)
+	{
+		std::vector<TimeStamp>& cpuTimeStamps = m_cpuTimeStamps[m_frame];
+		std::vector<std::string>& gpuLabels = m_labels[m_frame];
+
+		pTimestamps->clear();
+		pTimestamps->reserve(cpuTimeStamps.size() + gpuLabels.size());
+
+		// copy CPU timestamps
+		//
+		for (uint32_t i = 0; i < cpuTimeStamps.size(); i++)
+		{
+			pTimestamps->push_back(cpuTimeStamps[i]);
+		}
+
+		// copy GPU timestamps
+		//
+		uint32_t offset = m_frame * MaxValuesPerFrame;
+
+		uint32_t measurements = (uint32_t)gpuLabels.size();
+		if (measurements > 0)
+		{
+			// timestampPeriod is the number of nanoseconds per timestamp value increment
+			double microsecondsPerTick = (1e-3f * m_pDevice->GetPhysicalDeviceProperries().limits.timestampPeriod);
+			{
+				UINT64 TimingsInTicks[256] = {};
+				VkResult res = vkGetQueryPoolResults(m_pDevice->GetDevice(), m_QueryPool, offset, measurements, measurements * sizeof(UINT64), &TimingsInTicks, sizeof(UINT64), VK_QUERY_RESULT_64_BIT);
+				if (res == VK_SUCCESS)
+				{
+					for (uint32_t i = 1; i < measurements; i++)
+					{
+						TimeStamp ts = { m_labels[m_frame][i], float(microsecondsPerTick * (double)(TimingsInTicks[i] - TimingsInTicks[i - 1])) };
+						pTimestamps->push_back(ts);
+					}
+
+					// compute total
+					TimeStamp ts = { "Total GPU Time", float(microsecondsPerTick * (double)(TimingsInTicks[measurements - 1] - TimingsInTicks[0])) };
+					pTimestamps->push_back(ts);
+				}
+				else
+				{
+					pTimestamps->push_back({ "GPU counters are invalid", 0.0f });
+				}
+			}
+		}
+
+		vkCmdResetQueryPool(cmd_buf, m_QueryPool, offset, MaxValuesPerFrame);
+
+		// we always need to clear these ones
+		cpuTimeStamps.clear();
+		gpuLabels.clear();
+
+		GetTimeStamp(cmd_buf, "Begin Frame");
+	}
+
+	void GPUTimestamps::OnEndFrame()
+	{
+		m_frame = (m_frame + 1) % m_NumberOfBackBuffers;
+	}
+
+
+	// todo t2b
 	bool GLTFTexturesAndBuffers::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing)
 	{
 		m_pDevice = pDevice;
@@ -5445,7 +5550,7 @@ namespace vkr
 		image_info.queueFamilyIndexCount = 0;
 		image_info.pQueueFamilyIndices = NULL;
 		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		image_info.usage = usage;     
+		image_info.usage = usage;
 		image_info.flags = flags;
 		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;   // VK_IMAGE_TILING_LINEAR should never be used and will never be faster
 
@@ -5600,7 +5705,7 @@ namespace vkr
 		image_info.queueFamilyIndexCount = 0;
 		image_info.pQueueFamilyIndices = NULL;
 		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;     
+		image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		image_info.flags = 0;
 		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;   // VK_IMAGE_TILING_LINEAR should never be used and will never be faster
 
@@ -8631,6 +8736,990 @@ namespace vkr {
 
 		SetPerfMarkerEnd(cmd_buf);
 	}
+	// todo bloom
+
+	void Bloom::OnCreate(
+		Device* pDevice,
+		ResourceViewHeaps* pResourceViewHeaps,
+		DynamicBufferRing* pConstantBufferRing,
+		StaticBufferPool* pStaticBufferPool,
+		VkFormat outFormat
+	)
+	{
+		m_pDevice = pDevice;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pConstantBufferRing = pConstantBufferRing;
+		m_outFormat = outFormat;
+
+		m_blur.OnCreate(pDevice, m_pResourceViewHeaps, m_pConstantBufferRing, pStaticBufferPool, m_outFormat);
+
+		// Create Descriptor Set Layout (for each mip level we will create later on the individual Descriptor Sets)
+		//
+		{
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+			layoutBindings[0].binding = 0;
+			layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			layoutBindings[0].descriptorCount = 1;
+			layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[0].pImmutableSamplers = NULL;
+
+			layoutBindings[1].binding = 1;
+			layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[1].descriptorCount = 1;
+			layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[1].pImmutableSamplers = NULL;
+
+			VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+			descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptor_layout.pNext = NULL;
+			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+			descriptor_layout.pBindings = layoutBindings.data();
+
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->GetDevice(), &descriptor_layout, NULL, &m_descriptorSetLayout);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Create a Render pass that accounts for blending
+		//
+		m_blendPass = SimpleColorBlendRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		//blending add
+		{
+			VkPipelineColorBlendAttachmentState att_state[1];
+			att_state[0].colorWriteMask = 0xf;
+			att_state[0].blendEnable = VK_TRUE;
+			att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
+			att_state[0].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state[0].dstColorBlendFactor = VK_BLEND_FACTOR_CONSTANT_COLOR;
+			att_state[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+
+			VkPipelineColorBlendStateCreateInfo cb;
+			cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			cb.flags = 0;
+			cb.pNext = NULL;
+			cb.attachmentCount = 1;
+			cb.pAttachments = att_state;
+			cb.logicOpEnable = VK_FALSE;
+			cb.logicOp = VK_LOGIC_OP_NO_OP;
+			cb.blendConstants[0] = 1.0f;
+			cb.blendConstants[1] = 1.0f;
+			cb.blendConstants[2] = 1.0f;
+			cb.blendConstants[3] = 1.0f;
+
+			m_blendAdd.OnCreate(pDevice, m_blendPass, "blend.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout, &cb);
+		}
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Allocate descriptors for the mip chain
+		//
+		for (int i = 0; i < BLOOM_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_mip[i].m_descriptorSet);
+		}
+
+		// Allocate descriptors for the output pass
+		//
+		m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_output.m_descriptorSet);
+
+		m_doBlur = true;
+		m_doUpscale = true;
+	}
+
+	void Bloom::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mipCount, Texture* pOutput)
+	{
+		m_Width = Width;
+		m_Height = Height;
+		m_mipCount = mipCount;
+
+		m_blur.OnCreateWindowSizeDependentResources(m_pDevice, Width, Height, pInput, mipCount);
+
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			pInput->CreateSRV(&m_mip[i].m_SRV, i);     // source (pInput)
+			pInput->CreateRTV(&m_mip[i].m_RTV, i);     // target (pInput)
+
+			// Create framebuffer for target
+			//
+			{
+				VkImageView attachments[1] = { m_mip[i].m_RTV };
+
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_blendPass;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachments;
+				fb_info.width = Width >> i;
+				fb_info.height = Height >> i;
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_mip[i].m_frameBuffer);
+				assert(res == VK_SUCCESS);
+
+				SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].m_frameBuffer, "BloomBlended");
+			}
+
+			// Set descriptors        
+			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_mip[i].m_descriptorSet);
+			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, &m_sampler, m_mip[i].m_descriptorSet);
+		}
+
+		{
+			// output pass
+			pOutput->CreateRTV(&m_output.m_RTV, 0);
+
+			// Create framebuffer for target
+			//
+			{
+				VkImageView attachments[1] = { m_output.m_RTV };
+
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_blendPass;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachments;
+				fb_info.width = Width * 2;
+				fb_info.height = Height * 2;
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_output.m_frameBuffer);
+				assert(res == VK_SUCCESS);
+
+				SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_output.m_frameBuffer, "BloomOutput");
+			}
+
+			// Set descriptors        
+			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_output.m_descriptorSet);
+			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[1].m_SRV, &m_sampler, m_output.m_descriptorSet);
+		}
+
+		// set weights of each mip level
+		m_mip[0].m_weight = 1.0f - 0.08f;
+		m_mip[1].m_weight = 0.25f;
+		m_mip[2].m_weight = 0.75f;
+		m_mip[3].m_weight = 1.5f;
+		m_mip[4].m_weight = 2.5f;
+		m_mip[5].m_weight = 3.0f;
+
+		// normalize weights
+		float n = 0;
+		for (uint32_t i = 1; i < 6; i++)
+			n += m_mip[i].m_weight;
+
+		for (uint32_t i = 1; i < 6; i++)
+			m_mip[i].m_weight /= n;
+	}
+
+	void Bloom::OnDestroyWindowSizeDependentResources()
+	{
+		m_blur.OnDestroyWindowSizeDependentResources();
+
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_mip[i].m_frameBuffer, NULL);
+		}
+
+		vkDestroyImageView(m_pDevice->GetDevice(), m_output.m_RTV, NULL);
+		vkDestroyFramebuffer(m_pDevice->GetDevice(), m_output.m_frameBuffer, NULL);
+	}
+
+	void Bloom::OnDestroy()
+	{
+		for (int i = 0; i < BLOOM_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->FreeDescriptor(m_mip[i].m_descriptorSet);
+		}
+
+		m_pResourceViewHeaps->FreeDescriptor(m_output.m_descriptorSet);
+
+		m_blur.OnDestroy();
+
+		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+
+		m_blendAdd.OnDestroy();
+
+		vkDestroyRenderPass(m_pDevice->GetDevice(), m_blendPass, NULL);
+	}
+
+	void Bloom::Draw(VkCommandBuffer cmd_buf)
+	{
+		SetPerfMarkerBegin(cmd_buf, "Bloom");
+
+		//float weights[6] = { 0.25, 0.75, 1.5, 2, 2.5, 3.0 };
+
+		// given a RT, and its mip chain m0, m1, m2, m3, m4 
+		// 
+		// m4 = blur(m5)
+		// m4 = blur(m4) + w5 *m5
+		// m3 = blur(m3) + w4 *m4
+		// m2 = blur(m2) + w3 *m3
+		// m1 = blur(m1) + w2 *m2
+		// m0 = blur(m0) + w1 *m1
+		// RT = 0.92 * RT + 0.08 * m0
+
+		// blend and upscale
+		for (int i = m_mipCount - 1; i >= 0; i--)
+		{
+			// blur mip level
+			//
+			if (m_doBlur)
+			{
+				m_blur.Draw(cmd_buf, i);
+				// force wait for the draw to completely finish
+				// TODO: need to find a better way to do it
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 0, NULL);
+			}
+
+			// blend with mip above   
+			SetPerfMarkerBegin(cmd_buf, "blend above");
+
+			Bloom::cbBlend* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(Bloom::cbBlend), (void**)&data, &constantBuffer);
+
+			if (i != 0)
+			{
+				VkRenderPassBeginInfo rp_begin = {};
+				rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				rp_begin.pNext = NULL;
+				rp_begin.renderPass = m_blendPass;
+				rp_begin.framebuffer = m_mip[i - 1].m_frameBuffer;
+				rp_begin.renderArea.offset.x = 0;
+				rp_begin.renderArea.offset.y = 0;
+				rp_begin.renderArea.extent.width = m_Width >> (i - 1);
+				rp_begin.renderArea.extent.height = m_Height >> (i - 1);
+				rp_begin.clearValueCount = 0;
+				rp_begin.pClearValues = NULL;
+				vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+				SetViewportAndScissor(cmd_buf, 0, 0, m_Width >> (i - 1), m_Height >> (i - 1));
+
+				float blendConstants[4] = { m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight };
+				vkCmdSetBlendConstants(cmd_buf, blendConstants);
+
+				data->weight = 1.0f;
+			}
+			else
+			{
+				//composite
+				VkRenderPassBeginInfo rp_begin = {};
+				rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				rp_begin.pNext = NULL;
+				rp_begin.renderPass = m_blendPass;
+				rp_begin.framebuffer = m_output.m_frameBuffer;
+				rp_begin.renderArea.offset.x = 0;
+				rp_begin.renderArea.offset.y = 0;
+				rp_begin.renderArea.extent.width = m_Width * 2;
+				rp_begin.renderArea.extent.height = m_Height * 2;
+				rp_begin.clearValueCount = 0;
+				rp_begin.pClearValues = NULL;
+				vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+				SetViewportAndScissor(cmd_buf, 0, 0, m_Width * 2, m_Height * 2);
+
+				float blendConstants[4] = { m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight };
+				vkCmdSetBlendConstants(cmd_buf, blendConstants);
+
+				data->weight = 1.0f - m_mip[i].m_weight;
+			}
+
+			if (m_doUpscale)
+				m_blendAdd.Draw(cmd_buf, &constantBuffer, m_mip[i].m_descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+			SetPerfMarkerEnd(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void Bloom::Gui()
+	{
+		//bool opened = true;
+		//if (ImGui::Begin("Bloom Controls", &opened))
+		//{
+		//	ImGui::Checkbox("Blur Bloom Stages", &m_doBlur);
+		//	ImGui::Checkbox("Upscaling", &m_doUpscale);
+
+		//	ImGui::SliderFloat("weight 0", &m_mip[0].m_weight, 0.0f, 1.0f);
+
+		//	for (int i = 1; i < m_mipCount; i++)
+		//	{
+		//		char buf[32];
+		//		sprintf_s<32>(buf, "weight %i", i);
+		//		ImGui::SliderFloat(buf, &m_mip[i].m_weight, 0.0f, 4.0f);
+		//	}
+		//}
+		//ImGui::End();
+	}
+	// todo blur
+
+	void BlurPS::OnCreate(
+		Device* pDevice,
+		ResourceViewHeaps* pResourceViewHeaps,
+		DynamicBufferRing* pConstantBufferRing,
+		StaticBufferPool* pStaticBufferPool,
+		VkFormat format
+	)
+	{
+		m_pDevice = pDevice;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pConstantBufferRing = pConstantBufferRing;
+
+		m_outFormat = format;
+
+		// Create Descriptor Set Layout, the shader needs a uniform dynamic buffer and a texture + sampler
+		// The Descriptor Sets will be created and initialized once we know the input to the shader, that happens in OnCreateWindowSizeDependentResources()
+		{
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+			layoutBindings[0].binding = 0;
+			layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			layoutBindings[0].descriptorCount = 1;
+			layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[0].pImmutableSamplers = NULL;
+
+			layoutBindings[1].binding = 1;
+			layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[1].descriptorCount = 1;
+			layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[1].pImmutableSamplers = NULL;
+
+			VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+			descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptor_layout.pNext = NULL;
+			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+			descriptor_layout.pBindings = layoutBindings.data();
+
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->GetDevice(), &descriptor_layout, NULL, &m_descriptorSetLayout);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Create a Render pass that will discard the contents of the render target.
+		//
+		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		// The sampler we want to use for downsampling, all linear
+		//
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Use helper class to create the fullscreen pass 
+		//
+		m_directionalBlur.OnCreate(pDevice, m_in, "blur.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout);
+
+		// Allocate descriptors for the mip chain
+		//
+		for (int i = 0; i < BLURPS_MAX_MIP_LEVELS; i++)
+		{
+			// Horizontal pass
+			//
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_horizontalMip[i].m_descriptorSet);
+
+			// Vertical pass
+			//
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_verticalMip[i].m_descriptorSet);
+		}
+
+	}
+
+	void BlurPS::OnCreateWindowSizeDependentResources(Device* pDevice, uint32_t Width, uint32_t Height, Texture* pInput, int mipCount)
+	{
+		m_Width = Width;
+		m_Height = Height;
+		m_mipCount = mipCount;
+
+		m_inputTexture = pInput;
+
+		// Create a temporary texture to hold the horizontal pass (only now we know the size of the render target we want to downsample, hence we create the temporary render target here)
+		//
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = NULL;
+		image_info.imageType = VK_IMAGE_TYPE_2D;
+		image_info.format = m_outFormat;
+		image_info.extent.width = m_Width;
+		image_info.extent.height = m_Height;
+		image_info.extent.depth = 1;
+		image_info.mipLevels = mipCount;
+		image_info.arrayLayers = 1;
+		image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+		image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image_info.queueFamilyIndexCount = 0;
+		image_info.pQueueFamilyIndices = NULL;
+		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+		image_info.flags = 0;
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;   // VK_IMAGE_TILING_LINEAR should never be used and will never be faster
+		m_tempBlur.Init(m_pDevice, &image_info, "BlurHorizontal");
+
+		// Create framebuffers and views for the mip chain
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			// Horizontal pass, from pInput to m_tempBlur
+			//
+			{
+				pInput->CreateSRV(&m_horizontalMip[i].m_SRV, i);     // source (pInput)
+				m_tempBlur.CreateRTV(&m_horizontalMip[i].m_RTV, i);  // target (m_tempBlur)
+
+				// Create framebuffer for target
+				//
+				{
+					VkImageView attachments[1] = { m_horizontalMip[i].m_RTV };
+
+					VkFramebufferCreateInfo fb_info = {};
+					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+					fb_info.pNext = NULL;
+					fb_info.renderPass = m_in;
+					fb_info.attachmentCount = 1;
+					fb_info.pAttachments = attachments;
+					fb_info.width = Width >> i;
+					fb_info.height = Height >> i;
+					fb_info.layers = 1;
+					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_horizontalMip[i].m_frameBuffer);
+					assert(res == VK_SUCCESS);
+
+					SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_horizontalMip[i].m_frameBuffer, "BlurPSHorizontal");
+				}
+
+				// Create Descriptor sets (all of them use the same Descriptor Layout)            
+				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_horizontalMip[i].m_descriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_horizontalMip[i].m_SRV, &m_sampler, m_horizontalMip[i].m_descriptorSet);
+			}
+
+			// Vertical pass, from m_tempBlur back to pInput
+			//
+			{
+				m_tempBlur.CreateSRV(&m_verticalMip[i].m_SRV, i);   // source (pInput)(m_tempBlur)
+				pInput->CreateRTV(&m_verticalMip[i].m_RTV, i);      // target (pInput)
+
+				{
+					VkImageView attachments[1] = { m_verticalMip[i].m_RTV };
+
+					VkFramebufferCreateInfo fb_info = {};
+					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+					fb_info.pNext = NULL;
+					fb_info.renderPass = m_in;
+					fb_info.attachmentCount = 1;
+					fb_info.pAttachments = attachments;
+					fb_info.width = Width >> i;
+					fb_info.height = Height >> i;
+					fb_info.layers = 1;
+					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_verticalMip[i].m_frameBuffer);
+					assert(res == VK_SUCCESS);
+
+					SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_verticalMip[i].m_frameBuffer, "BlurPSVertical");
+				}
+
+				// create and update descriptor
+				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_verticalMip[i].m_descriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_verticalMip[i].m_SRV, &m_sampler, m_verticalMip[i].m_descriptorSet);
+			}
+		}
+	}
+
+	void BlurPS::OnDestroyWindowSizeDependentResources()
+	{
+		// destroy views and framebuffers of the vertical and horizontal passes
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			vkDestroyImageView(m_pDevice->GetDevice(), m_horizontalMip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_horizontalMip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_horizontalMip[i].m_frameBuffer, NULL);
+
+			vkDestroyImageView(m_pDevice->GetDevice(), m_verticalMip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_verticalMip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_verticalMip[i].m_frameBuffer, NULL);
+		}
+
+		// Destroy temporary render target used to hold the horizontal pass
+		//
+		m_tempBlur.OnDestroy();
+	}
+
+	void BlurPS::OnDestroy()
+	{
+		// destroy views
+		for (int i = 0; i < BLURPS_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->FreeDescriptor(m_horizontalMip[i].m_descriptorSet);
+			m_pResourceViewHeaps->FreeDescriptor(m_verticalMip[i].m_descriptorSet);
+		}
+
+		m_directionalBlur.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		vkDestroyRenderPass(m_pDevice->GetDevice(), m_in, NULL);
+	}
+
+	void BlurPS::Draw(VkCommandBuffer cmd_buf, int mipLevel)
+	{
+		SetPerfMarkerBegin(cmd_buf, "blur");
+
+		SetViewportAndScissor(cmd_buf, 0, 0, m_Width >> mipLevel, m_Height >> mipLevel);
+
+		// horizontal pass
+		//
+		{
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_in;
+			rp_begin.framebuffer = m_horizontalMip[mipLevel].m_frameBuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width >> mipLevel;
+			rp_begin.renderArea.extent.height = m_Height >> mipLevel;
+			rp_begin.clearValueCount = 0;
+			rp_begin.pClearValues = NULL;
+			vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+			BlurPS::cbBlur* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(BlurPS::cbBlur), (void**)&data, &constantBuffer);
+			data->dirX = 1.0f / (float)(m_Width >> mipLevel);
+			data->dirY = 0.0f / (float)(m_Height >> mipLevel);
+			data->mipLevel = mipLevel;
+			m_directionalBlur.Draw(cmd_buf, &constantBuffer, m_horizontalMip[mipLevel].m_descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+		}
+
+		// Memory barrier to transition input texture layout from shader read to render target
+		// Note the miplevel
+		//
+		{
+			VkImageMemoryBarrier barrier[1] = {};
+
+			// transition input to render target
+			barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier[0].pNext = nullptr;
+			barrier[0].srcAccessMask = 0;
+			barrier[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			barrier[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier[0].image = m_inputTexture->Resource();
+			barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier[0].subresourceRange.baseMipLevel = mipLevel;
+			barrier[0].subresourceRange.levelCount = 1;
+			barrier[0].subresourceRange.baseArrayLayer = 0;
+			barrier[0].subresourceRange.layerCount = 1;
+
+			vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+		}
+
+		// vertical pass
+		//
+		{
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_in;
+			rp_begin.framebuffer = m_verticalMip[mipLevel].m_frameBuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width >> mipLevel;
+			rp_begin.renderArea.extent.height = m_Height >> mipLevel;
+			rp_begin.clearValueCount = 0;
+			rp_begin.pClearValues = NULL;
+			vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+			BlurPS::cbBlur* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(BlurPS::cbBlur), (void**)&data, &constantBuffer);
+			data->dirX = 0.0f / (float)(m_Width >> mipLevel);
+			data->dirY = 1.0f / (float)(m_Height >> mipLevel);
+			data->mipLevel = mipLevel;
+			m_directionalBlur.Draw(cmd_buf, &constantBuffer, m_verticalMip[mipLevel].m_descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void BlurPS::Draw(VkCommandBuffer cmd_buf)
+	{
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			Draw(cmd_buf, i);
+		}
+	}
+
+	// todo cc
+
+	void ColorConversionPS::OnCreate(Device* pDevice, VkRenderPass renderPass, ResourceViewHeaps* pResourceViewHeaps, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);
+		}
+
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[0].pImmutableSamplers = NULL;
+
+		layoutBindings[1].binding = 1;
+		layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layoutBindings[1].descriptorCount = 1;
+		layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[1].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
+
+		m_ColorConversion.OnCreate(m_pDevice, renderPass, "ColorConversionPS.glsl", "main", "", pStaticBufferPool, pDynamicBufferRing, m_descriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
+
+		m_descriptorIndex = 0;
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_descriptorSet[i]);
+	}
+
+	void ColorConversionPS::OnDestroy()
+	{
+		m_ColorConversion.OnDestroy();
+
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
+
+		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+
+		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+	}
+
+	void ColorConversionPS::UpdatePipelines(VkRenderPass renderPass, DisplayMode displayMode)
+	{
+		m_ColorConversion.UpdatePipeline(renderPass, NULL, VK_SAMPLE_COUNT_1_BIT);
+
+		m_colorConversionConsts.m_displayMode = displayMode;
+
+		if (displayMode != DISPLAYMODE_SDR)
+		{
+#ifdef fsHdrGetDisplayInfo
+			const VkHdrMetadataEXT* pHDRMetatData = fsHdrGetDisplayInfo();
+
+			m_colorConversionConsts.m_displayMinLuminancePerNits = (float)pHDRMetatData->minLuminance / 80.0f; // RGB(1, 1, 1) maps to 80 nits in scRGB;
+			m_colorConversionConsts.m_displayMaxLuminancePerNits = (float)pHDRMetatData->maxLuminance / 80.0f; // This means peak white equals RGB(m_maxLuminanace/80.0f, m_maxLuminanace/80.0f, m_maxLuminanace/80.0f) in scRGB;
+
+			FillDisplaySpecificPrimaries(
+				pHDRMetatData->whitePoint.x, pHDRMetatData->whitePoint.y,
+				pHDRMetatData->displayPrimaryRed.x, pHDRMetatData->displayPrimaryRed.y,
+				pHDRMetatData->displayPrimaryGreen.x, pHDRMetatData->displayPrimaryGreen.y,
+				pHDRMetatData->displayPrimaryBlue.x, pHDRMetatData->displayPrimaryBlue.y
+			);
+
+			SetupGamutMapperMatrices(
+				ColorSpace_REC709,
+				ColorSpace_Display,
+				&m_colorConversionConsts.m_contentToMonitorRecMatrix);
+#endif
+		}
+	}
+
+	void ColorConversionPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
+	{
+		SetPerfMarkerBegin(cmd_buf, "ColorConversion");
+
+		VkDescriptorBufferInfo cbTonemappingHandle;
+		ColorConversionConsts* pColorConversionConsts;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(ColorConversionConsts), (void**)&pColorConversionConsts, &cbTonemappingHandle);
+		*pColorConversionConsts = m_colorConversionConsts;
+
+		// We'll be modifying the descriptor set(DS), to prevent writing on a DS that is in use we 
+		// need to do some basic buffering. Just to keep it safe and simple we'll have 10 buffers.
+		VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
+		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
+
+		// modify Descriptor set
+		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, &m_sampler, descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ColorConversionConsts), descriptorSet);
+
+		// Draw!
+		m_ColorConversion.Draw(cmd_buf, &cbTonemappingHandle, descriptorSet);
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+	// todo downs
+
+	void DownSamplePS::OnCreate(
+		Device* pDevice,
+		ResourceViewHeaps* pResourceViewHeaps,
+		DynamicBufferRing* pConstantBufferRing,
+		StaticBufferPool* pStaticBufferPool,
+		VkFormat outFormat
+	)
+	{
+		m_pDevice = pDevice;
+		m_pStaticBufferPool = pStaticBufferPool;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pConstantBufferRing = pConstantBufferRing;
+		m_outFormat = outFormat;
+
+		// Create Descriptor Set Layout, the shader needs a uniform dynamic buffer and a texture + sampler
+		// The Descriptor Sets will be created and initialized once we know the input to the shader, that happens in OnCreateWindowSizeDependentResources()
+		{
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+			layoutBindings[0].binding = 0;
+			layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			layoutBindings[0].descriptorCount = 1;
+			layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[0].pImmutableSamplers = NULL;
+
+			layoutBindings[1].binding = 1;
+			layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[1].descriptorCount = 1;
+			layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[1].pImmutableSamplers = NULL;
+
+			VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+			descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptor_layout.pNext = NULL;
+			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+			descriptor_layout.pBindings = layoutBindings.data();
+
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->GetDevice(), &descriptor_layout, NULL, &m_descriptorSetLayout);
+			assert(res == VK_SUCCESS);
+		}
+
+		// In Render pass
+		//
+		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		// The sampler we want to use for downsampling, all linear
+		//
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Use helper class to create the fullscreen pass
+		//
+		m_downscale.OnCreate(pDevice, m_in, "DownSamplePS.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout);
+
+		// Allocate descriptors for the mip chain
+		//
+		for (int i = 0; i < DOWNSAMPLEPS_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_mip[i].descriptorSet);
+		}
+	}
+
+	void DownSamplePS::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mipCount)
+	{
+		m_Width = Width;
+		m_Height = Height;
+		m_mipCount = mipCount;
+
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = NULL;
+		image_info.imageType = VK_IMAGE_TYPE_2D;
+		image_info.format = m_outFormat;
+		image_info.extent.width = m_Width >> 1;
+		image_info.extent.height = m_Height >> 1;
+		image_info.extent.depth = 1;
+		image_info.mipLevels = mipCount;
+		image_info.arrayLayers = 1;
+		image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+		image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image_info.queueFamilyIndexCount = 0;
+		image_info.pQueueFamilyIndices = NULL;
+		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT); //TODO    
+		image_info.flags = 0;
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		m_result.Init(m_pDevice, &image_info, "DownsampleMip");
+
+		// Create views for the mip chain
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			// source -----------
+			//
+			if (i == 0)
+			{
+				pInput->CreateSRV(&m_mip[i].m_SRV, 0);
+			}
+			else
+			{
+				m_result.CreateSRV(&m_mip[i].m_SRV, i - 1);
+			}
+
+			// Create and initialize the Descriptor Sets (all of them use the same Descriptor Layout)        
+			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(DownSamplePS::cbDownscale), m_mip[i].descriptorSet);
+			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, &m_sampler, m_mip[i].descriptorSet);
+
+			// destination -----------
+			//
+			m_result.CreateRTV(&m_mip[i].RTV, i);
+
+			// Create framebuffer 
+			{
+				VkImageView attachments[1] = { m_mip[i].RTV };
+
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_in;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachments;
+				fb_info.width = m_Width >> (i + 1);
+				fb_info.height = m_Height >> (i + 1);
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_mip[i].frameBuffer);
+				assert(res == VK_SUCCESS);
+
+				std::string ResourceName = "DownsamplePS";
+				ResourceName += std::to_string(i);
+
+				SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].frameBuffer, ResourceName.c_str());
+			}
+		}
+	}
+
+	void DownSamplePS::OnDestroyWindowSizeDependentResources()
+	{
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_mip[i].frameBuffer, NULL);
+		}
+
+		m_result.OnDestroy();
+	}
+
+	void DownSamplePS::OnDestroy()
+	{
+		for (int i = 0; i < DOWNSAMPLEPS_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->FreeDescriptor(m_mip[i].descriptorSet);
+		}
+
+		m_downscale.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+
+		vkDestroyRenderPass(m_pDevice->GetDevice(), m_in, NULL);
+	}
+
+	void DownSamplePS::Draw(VkCommandBuffer cmd_buf)
+	{
+		SetPerfMarkerBegin(cmd_buf, "Downsample");
+
+		// downsample
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_in;
+			rp_begin.framebuffer = m_mip[i].frameBuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width >> (i + 1);
+			rp_begin.renderArea.extent.height = m_Height >> (i + 1);
+			rp_begin.clearValueCount = 0;
+			rp_begin.pClearValues = NULL;
+			vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+			SetViewportAndScissor(cmd_buf, 0, 0, m_Width >> (i + 1), m_Height >> (i + 1));
+
+			cbDownscale* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(cbDownscale), (void**)&data, &constantBuffer);
+			data->invWidth = 1.0f / (float)(m_Width >> i);
+			data->invHeight = 1.0f / (float)(m_Height >> i);
+			data->mipLevel = i;
+
+			m_downscale.Draw(cmd_buf, &constantBuffer, m_mip[i].descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void DownSamplePS::Gui()
+	{
+		//bool opened = true;
+		//ImGui::Begin("DownSamplePS", &opened);
+
+		//for (int i = 0; i < m_mipCount; i++)
+		//{
+		//	ImGui::Image((ImTextureID)m_mip[i].m_SRV, ImVec2(320 / 2, 180 / 2));
+		//}
+
+		//ImGui::End();
+	}
+
+	// todo
+
+
+
 	// todo
 
 
@@ -11558,6 +12647,123 @@ namespace vkr {
 		}
 		return -1;
 	}
+
+	int GetDimensions(const std::string& str)
+	{
+		if (str == "SCALAR")    return  1;
+		else if (str == "VEC2") return  2;
+		else if (str == "VEC3") return  3;
+		else if (str == "VEC4") return  4;
+		else if (str == "MAT4") return  4 * 4;
+		else return  -1;
+	}
+
+	void SplitGltfAttribute(std::string attribute, std::string* semanticName, uint32_t* semanticIndex)
+	{
+		*semanticIndex = 0;
+
+		if (isdigit(attribute.back()))
+		{
+			*semanticIndex = attribute.back() - '0';
+
+			attribute.pop_back();
+			if (attribute.back() == '_')
+				attribute.pop_back();
+		}
+
+		*semanticName = attribute;
+	}
+
+	glm::vec4 GetVector(const njson::array_t& accessor)
+	{
+		return glm::vec4(accessor[0], accessor[1], accessor[2], (accessor.size() == 4) ? accessor[3].get<double>() : 0.0);
+	}
+
+	glm::mat4 GetMatrix(const njson::array_t& accessor)
+	{
+		return glm::mat4(
+			glm::vec4(accessor[0], accessor[1], accessor[2], accessor[3]),
+			glm::vec4(accessor[4], accessor[5], accessor[6], accessor[7]),
+			glm::vec4(accessor[8], accessor[9], accessor[10], accessor[11]),
+			glm::vec4(accessor[12], accessor[13], accessor[14], accessor[15]));
+	}
+
+	template <class type>
+	type GetElement(const njson::object_t* pRoot, const char* path, type pDefault)
+	{
+		const char* p = path;
+		char token[128];
+		while (true)
+		{
+			for (; *p != '/' && *p != 0 && *p != '['; p++);
+			memcpy(token, path, p - path);
+			token[p - path] = 0;
+
+			auto it = pRoot->find(token);
+			if (it == pRoot->end())
+				return pDefault;
+
+			if (*p == '[')
+			{
+				p++;
+				int i = atoi(p);
+				for (; *p != 0 && *p != ']'; p++);
+				pRoot = it->second.at(i).get_ptr<const njson::object_t*>();
+				p++;
+			}
+			else
+			{
+				if (it->second.is_object())
+					pRoot = it->second.get_ptr<const njson::object_t*>();
+				else
+				{
+					return it->second.get<type>();
+				}
+			}
+			p++;
+			path = p;
+		}
+
+		return pDefault;
+	}
+
+	std::string GetElementString(const njson::object_t& root, const char* path, std::string pDefault)
+	{
+		return GetElement<std::string>(&root, path, pDefault);
+	}
+
+	bool GetElementBoolean(const njson::object_t& root, const char* path, bool def)
+	{
+		return GetElement<bool>(&root, path, def);
+	}
+
+	float GetElementFloat(const njson::object_t& root, const char* path, float def)
+	{
+		return GetElement<float>(&root, path, def);
+	}
+
+	int GetElementInt(const njson::object_t& root, const char* path, int def)
+	{
+		return GetElement<int>(&root, path, def);
+	}
+
+	njson::array_t GetElementJsonArray(const njson::object_t& root, const char* path, njson::array_t def)
+	{
+		return GetElement<njson::array_t>(&root, path, def);
+	}
+
+	glm::vec4 GetElementVector(njson::object_t& root, const char* path, glm::vec4 def)
+	{
+		if (root.find(path) != root.end() && !root[path].is_null())
+		{
+			return GetVector(root[path].get<njson::array_t>());
+		}
+		else
+			return def;
+	}
+
+
+
 	void GLTFCommon::GetBufferDetails(int accessor, tfAccessor* pAccessor) const
 	{
 
@@ -11904,6 +13110,7 @@ namespace vkr {
 
 
 	};
+	// todo cmdlr
 	class CommandListRing
 	{
 	public:
@@ -12103,4 +13310,1790 @@ namespace vkr {
 }
 //!vkr
 
+
+namespace vkr {
+	static const int backBufferCount = 3;
+	// todo clring
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreate
+	//
+	//--------------------------------------------------------------------------------------
+	void CommandListRing::OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerBackBuffer, bool compute /* = false */)
+	{
+		m_pDevice = pDevice;
+		m_numberOfAllocators = numberOfBackBuffers;
+		m_commandListsPerBackBuffer = commandListsPerBackBuffer;
+
+		m_pCommandBuffers = new CommandBuffersPerFrame[m_numberOfAllocators]();
+
+		// Create command allocators, for each frame in flight we wannt to have a single Command Allocator, and <commandListsPerBackBuffer> command buffers
+		//
+		for (uint32_t a = 0; a < m_numberOfAllocators; a++)
+		{
+			CommandBuffersPerFrame* pCBPF = &m_pCommandBuffers[a];
+
+			// Create allocator
+			//
+			VkCommandPoolCreateInfo cmd_pool_info = {};
+			cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			cmd_pool_info.pNext = NULL;
+			if (compute == false)
+			{
+				cmd_pool_info.queueFamilyIndex = pDevice->GetGraphicsQueueFamilyIndex();
+			}
+			else
+			{
+				cmd_pool_info.queueFamilyIndex = pDevice->GetComputeQueueFamilyIndex();
+			}
+			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+			VkResult res = vkCreateCommandPool(pDevice->GetDevice(), &cmd_pool_info, NULL, &pCBPF->m_commandPool);
+			assert(res == VK_SUCCESS);
+
+			// Create command buffers
+			//
+			pCBPF->m_pCommandBuffer = new VkCommandBuffer[m_commandListsPerBackBuffer];
+			VkCommandBufferAllocateInfo cmd = {};
+			cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			cmd.pNext = NULL;
+			cmd.commandPool = pCBPF->m_commandPool;
+			cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			cmd.commandBufferCount = commandListsPerBackBuffer;
+			res = vkAllocateCommandBuffers(pDevice->GetDevice(), &cmd, pCBPF->m_pCommandBuffer);
+			assert(res == VK_SUCCESS);
+
+			pCBPF->m_UsedCls = 0;
+		}
+
+		m_frameIndex = 0;
+		m_pCurrentFrame = &m_pCommandBuffers[m_frameIndex % m_numberOfAllocators];
+		m_frameIndex++;
+		m_pCurrentFrame->m_UsedCls = 0;
+	}
+
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroy
+	//
+	//--------------------------------------------------------------------------------------
+	void CommandListRing::OnDestroy()
+	{
+		//release and delete command allocators
+		for (uint32_t a = 0; a < m_numberOfAllocators; a++)
+		{
+			vkFreeCommandBuffers(m_pDevice->GetDevice(), m_pCommandBuffers[a].m_commandPool, m_commandListsPerBackBuffer, m_pCommandBuffers[a].m_pCommandBuffer);
+
+			vkDestroyCommandPool(m_pDevice->GetDevice(), m_pCommandBuffers[a].m_commandPool, NULL);
+		}
+
+		delete[] m_pCommandBuffers;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// GetNewCommandList
+	//
+	//--------------------------------------------------------------------------------------
+	VkCommandBuffer CommandListRing::GetNewCommandList()
+	{
+		VkCommandBuffer commandBuffer = m_pCurrentFrame->m_pCommandBuffer[m_pCurrentFrame->m_UsedCls++];
+
+		assert(m_pCurrentFrame->m_UsedCls < m_commandListsPerBackBuffer); //if hit increase commandListsPerBackBuffer
+
+		return commandBuffer;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnBeginFrame
+	//
+	//--------------------------------------------------------------------------------------
+	void CommandListRing::OnBeginFrame()
+	{
+		m_pCurrentFrame = &m_pCommandBuffers[m_frameIndex % m_numberOfAllocators];
+
+		m_pCurrentFrame->m_UsedCls = 0;
+
+		m_frameIndex++;
+	}
+
+	// todo vkrenderer
+#if 1
+	Renderer_cx::Renderer_cx(const_vk* p)
+	{
+		if (p)
+			ct = *p;
+	}
+
+
+	Renderer_cx::~Renderer_cx()
+	{
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreate
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnCreate(Device* pDevice, VkRenderPass rp)
+	{
+		m_pDevice = pDevice;
+
+		// Initialize helpers
+
+		// Create all the heaps for the resources views
+		/*const uint32_t cbvDescriptorCount = 2000;
+		const uint32_t srvDescriptorCount = 8000;
+		const uint32_t uavDescriptorCount = 10;
+		const uint32_t samplerDescriptorCount = 20;*/
+		m_ResourceViewHeaps.OnCreate(pDevice, ct.cbvDescriptorCount, ct.srvDescriptorCount, ct.uavDescriptorCount, ct.samplerDescriptorCount);
+
+		// Create a commandlist ring for the Direct queue
+		//uint32_t commandListsPerBackBuffer = 8;
+		m_CommandListRing.OnCreate(pDevice, backBufferCount, ct.commandListsPerBackBuffer);
+
+		// Create a 'dynamic' constant buffer
+		//const uint32_t constantBuffersMemSize = 200 * 1024 * 1024;
+		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, ct.constantBuffersMemSize, (char*)"Uniforms");
+
+		// Create a 'static' pool for vertices and indices 
+		//const uint32_t staticGeometryMemSize = (1 * 128) * 1024 * 1024;
+		m_VidMemBufferPool.OnCreate(pDevice, ct.staticGeometryMemSize, true, "StaticGeom");
+
+		// Create a 'static' pool for vertices and indices in system memory
+		//const uint32_t systemGeometryMemSize = 32 * 1024;
+		m_SysMemBufferPool.OnCreate(pDevice, ct.systemGeometryMemSize, false, "PostProcGeom");
+
+		// initialize the GPU time stamps module
+		m_GPUTimer.OnCreate(pDevice, backBufferCount);
+
+		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
+		//const uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
+		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
+
+		// Create GBuffer and render passes
+		//
+		{
+			m_GBuffer.OnCreate(
+				pDevice,
+				&m_ResourceViewHeaps,
+				{
+					{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
+					{ GBUFFER_FORWARD, VK_FORMAT_R16G16B16A16_SFLOAT},
+					{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
+				},
+				1
+				);
+
+			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;
+			bool bClear = true;
+			m_RenderPassFullGBufferWithClear.OnCreate(&m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");
+			m_RenderPassFullGBuffer.OnCreate(&m_GBuffer, fullGBuffer, !bClear, "m_RenderPassFullGBuffer");
+			m_RenderPassJustDepthAndHdr.OnCreate(&m_GBuffer, GBUFFER_DEPTH | GBUFFER_FORWARD, !bClear, "m_RenderPassJustDepthAndHdr");
+		}
+
+		// Create render pass shadow, will clear contents
+		{
+			VkAttachmentDescription depthAttachments;
+			AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, NULL, &depthAttachments);
+		}
+
+		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "..\\media\\cauldron-media\\envmaps\\papermill\\diffuse.dds", "..\\media\\cauldron-media\\envmaps\\papermill\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
+		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
+		//_cbf.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+
+		//_axis.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+
+
+		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
+		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
+		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
+		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
+
+		// Create tonemapping pass
+		m_ToneMappingCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
+		m_ToneMappingPS.OnCreate(m_pDevice, rp, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
+		m_ColorConversionPS.OnCreate(pDevice, rp, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
+
+		// Initialize UI rendering resources
+		//m_ImGUI.OnCreate(m_pDevice, pSwapChain->GetRenderPass(), &m_UploadHeap, &m_ConstantBufferRing, FontSize);
+
+		// Make sure upload heap has finished uploading before continuing
+		m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+		m_UploadHeap.FlushAndFinish();
+		// Create fence
+		{
+			VkFenceCreateInfo fence_ci = {};
+			fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+			auto res = vkCreateFence(m_pDevice->GetDevice(), &fence_ci, NULL, &pass_fence);
+			assert(res == VK_SUCCESS);
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroy 
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnDestroy()
+	{
+		m_AsyncPool.Flush();
+
+		//m_ImGUI.OnDestroy();
+		m_ColorConversionPS.OnDestroy();
+		m_ToneMappingPS.OnDestroy();
+		m_ToneMappingCS.OnDestroy();
+		m_TAA.OnDestroy();
+		m_Bloom.OnDestroy();
+		m_DownSample.OnDestroy();
+		//m_MagnifierPS.OnDestroy();
+		m_WireframeBox.OnDestroy();
+		m_Wireframe.OnDestroy();
+		//_cbf.OnDestroy();
+		//_axis.OnDestroy();
+		m_SkyDomeProc.OnDestroy();
+		m_SkyDome.OnDestroy();
+
+		m_RenderPassFullGBufferWithClear.OnDestroy();
+		m_RenderPassJustDepthAndHdr.OnDestroy();
+		m_RenderPassFullGBuffer.OnDestroy();
+		m_GBuffer.OnDestroy();
+
+		vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr);
+		vkDestroyFence(m_pDevice->GetDevice(), pass_fence, 0); pass_fence = 0;
+		m_UploadHeap.OnDestroy();
+		m_GPUTimer.OnDestroy();
+		m_VidMemBufferPool.OnDestroy();
+		m_SysMemBufferPool.OnDestroy();
+		m_ConstantBufferRing.OnDestroy();
+		m_ResourceViewHeaps.OnDestroy();
+		m_CommandListRing.OnDestroy();
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreateWindowSizeDependentResources
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height)
+	{
+		m_Width = Width;
+		m_Height = Height;
+
+		// Set the viewport
+		//
+		m_Viewport.x = 0;
+		m_Viewport.y = (float)Height;
+		m_Viewport.width = (float)Width;
+		m_Viewport.height = -(float)(Height);
+		m_Viewport.minDepth = (float)0.0f;
+		m_Viewport.maxDepth = (float)1.0f;
+
+		// Create scissor rectangle
+		//
+		m_RectScissor.extent.width = Width;
+		m_RectScissor.extent.height = Height;
+		m_RectScissor.offset.x = 0;
+		m_RectScissor.offset.y = 0;
+
+		// Create GBuffer
+		//
+		m_GBuffer.OnCreateWindowSizeDependentResources(Width, Height);
+
+		// Create frame buffers for the GBuffer render passes
+		//
+		m_RenderPassFullGBufferWithClear.OnCreateWindowSizeDependentResources(Width, Height);
+		m_RenderPassJustDepthAndHdr.OnCreateWindowSizeDependentResources(Width, Height);
+		m_RenderPassFullGBuffer.OnCreateWindowSizeDependentResources(Width, Height);
+
+		// Update PostProcessing passes
+		//
+		m_DownSample.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer.m_HDR, 6); //downsample the HDR texture 6 times
+		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer.m_HDR);
+		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer);
+		//m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer.m_HDR);
+		m_bMagResourceReInit = true;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroyWindowSizeDependentResources
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnDestroyWindowSizeDependentResources()
+	{
+		m_Bloom.OnDestroyWindowSizeDependentResources();
+		m_DownSample.OnDestroyWindowSizeDependentResources();
+		m_TAA.OnDestroyWindowSizeDependentResources();
+		//m_MagnifierPS.OnDestroyWindowSizeDependentResources();
+
+		m_RenderPassFullGBufferWithClear.OnDestroyWindowSizeDependentResources();
+		m_RenderPassJustDepthAndHdr.OnDestroyWindowSizeDependentResources();
+		m_RenderPassFullGBuffer.OnDestroyWindowSizeDependentResources();
+		m_GBuffer.OnDestroyWindowSizeDependentResources();
+	}
+
+	void Renderer_cx::OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier)
+	{
+		// Update the pipelines if the swapchain render pass has changed (for example when the format of the swapchain changes)
+		//
+		m_ColorConversionPS.UpdatePipelines(rp, dm);
+		m_ToneMappingPS.UpdatePipelines(rp);
+
+		//m_ImGUI.UpdatePipeline((pSwapChain->GetDisplayMode() == DISPLAYMODE_SDR) ? pSwapChain->GetRenderPass() : bUseMagnifier ? m_MagnifierPS.GetPassRenderPass() : m_RenderPassJustDepthAndHdr.GetRenderPass());
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnUpdateLocalDimmingChangedResources
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm)
+	{
+		m_ColorConversionPS.UpdatePipelines(rp, dm);
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// LoadScene
+	//
+	//--------------------------------------------------------------------------------------
+	int Renderer_cx::LoadScene(GLTFCommon* pGLTFCommon, int Stage)
+	{
+		// show loading progress
+		//
+		//ImGui::OpenPopup("Loading");
+		//if (ImGui::BeginPopupModal("Loading", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		//{
+		//	float progress = (float)Stage / 12.0f;
+		//	ImGui::ProgressBar(progress, ImVec2(0.f, 0.f), NULL);
+		//	ImGui::EndPopup();
+		//}
+
+		// use multi threading
+		AsyncPool* pAsyncPool = &m_AsyncPool;
+
+		// Loading stages
+		//
+		if (Stage == 0)
+		{
+			if (!currobj)
+				currobj = new robj_info();
+		}
+		else if (Stage == 5)
+		{
+			Profile p("m_pGltfLoader->Load");
+
+			currobj->m_pGLTFTexturesAndBuffers = new GLTFTexturesAndBuffers();
+			currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_VidMemBufferPool, &m_ConstantBufferRing);
+		}
+		else if (Stage == 6)
+		{
+			Profile p("LoadTextures");
+
+			// here we are loading onto the GPU all the textures and the inverse matrices
+			// this data will be used to create the PBR and Depth passes       
+			currobj->m_pGLTFTexturesAndBuffers->LoadTextures(pAsyncPool);
+			currobj->m_pGLTFTexturesAndBuffers->LoadGeometry();
+		}
+		else if (Stage == 7)
+		{
+			Profile p("m_GLTFDepth->OnCreate");
+
+			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
+			currobj->m_GLTFDepth = new GltfDepthPass();
+			currobj->m_GLTFDepth->OnCreate(
+				m_pDevice,
+				m_Render_pass_shadow,
+				&m_UploadHeap,
+				&m_ResourceViewHeaps,
+				&m_ConstantBufferRing,
+				&m_VidMemBufferPool,
+				currobj->m_pGLTFTexturesAndBuffers,
+				pAsyncPool
+			);
+
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+			m_UploadHeap.FlushAndFinish();
+		}
+		else if (Stage == 8)
+		{
+			Profile p("m_GLTFPBR->OnCreate");
+
+			// same thing as above but for the PBR pass
+			currobj->m_GLTFPBR = new GltfPbrPass();
+			currobj->m_GLTFPBR->OnCreate(
+				m_pDevice,
+				&m_UploadHeap,
+				&m_ResourceViewHeaps,
+				&m_ConstantBufferRing,
+				&m_VidMemBufferPool,
+				currobj->m_pGLTFTexturesAndBuffers,
+				&m_SkyDome,
+				false, // use SSAO mask
+				m_ShadowSRVPool,
+				&m_RenderPassFullGBufferWithClear,
+				pAsyncPool
+			);
+
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+			m_UploadHeap.FlushAndFinish();
+		}
+		else if (Stage == 9)
+		{
+			Profile p("m_GLTFBBox->OnCreate");
+
+			// just a bounding box pass that will draw boundingboxes instead of the geometry itself
+			currobj->m_GLTFBBox = new GltfBBoxPass();
+			currobj->m_GLTFBBox->OnCreate(
+				m_pDevice,
+				m_RenderPassJustDepthAndHdr.GetRenderPass(),
+				&m_ResourceViewHeaps,
+				&m_ConstantBufferRing,
+				&m_VidMemBufferPool,
+				currobj->m_pGLTFTexturesAndBuffers,
+				&m_Wireframe
+			);
+
+			// we are borrowing the upload heap command list for uploading to the GPU the IBs and VBs
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+
+		}
+		else if (Stage == 10)
+		{
+			Profile p("Flush");
+
+			m_UploadHeap.FlushAndFinish();
+
+			//once everything is uploaded we dont need the upload heaps anymore
+			//m_VidMemBufferPool.FreeUploadHeap();
+			_robject.push_back(currobj);
+			_depthpass.push_back(currobj->m_GLTFDepth);
+			currobj = 0;
+			// tell caller that we are done loading the map
+			return 0;
+		}
+
+		Stage++;
+		return Stage;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// UnloadScene
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::unloadgltf(robj_info* p)
+	{
+		if (!p)return;
+
+		if (p->m_GLTFPBR)
+		{
+			p->m_GLTFPBR->OnDestroy();
+			delete p->m_GLTFPBR;
+			p->m_GLTFPBR = NULL;
+		}
+
+		if (p->m_GLTFDepth)
+		{
+			p->m_GLTFDepth->OnDestroy();
+			delete p->m_GLTFDepth;
+			p->m_GLTFDepth = NULL;
+		}
+
+		if (p->m_GLTFBBox)
+		{
+			p->m_GLTFBBox->OnDestroy();
+			delete p->m_GLTFBBox;
+			p->m_GLTFBBox = NULL;
+		}
+
+		if (p->m_pGLTFTexturesAndBuffers)
+		{
+			p->m_pGLTFTexturesAndBuffers->OnDestroy();
+			delete p->m_pGLTFTexturesAndBuffers;
+			p->m_pGLTFTexturesAndBuffers = NULL;
+		}
+		// todo 阴影
+		assert(m_shadowMapPool.size() == m_ShadowSRVPool.size());
+		while (!m_shadowMapPool.empty())
+		{
+			m_shadowMapPool.back().ShadowMap.OnDestroy();
+			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
+			m_ShadowSRVPool.pop_back();
+			m_shadowMapPool.pop_back();
+		}
+
+		delete p;
+	}
+	void Renderer_cx::UnloadScene()
+	{
+		// wait for all the async loading operations to finish
+		m_AsyncPool.Flush();
+
+		m_pDevice->GPUFlush();
+		for (auto it : _robject)
+			unloadgltf(it);
+		_robject.clear();
+	}
+
+	void Renderer_cx::AllocateShadowMaps(GLTFCommon* pGLTFCommon)
+	{
+		if (m_shadowMapPool.size())return;
+		// Go through the lights and allocate shadow information
+		uint32_t NumShadows = 0;
+		for (int i = 0; i < pGLTFCommon->m_lightInstances.size(); ++i)
+		{
+			const tfLight& lightData = pGLTFCommon->m_lights[pGLTFCommon->m_lightInstances[i].m_lightId];
+			if (lightData.m_shadowResolution)
+			{
+				SceneShadowInfo ShadowInfo;
+				ShadowInfo.ShadowResolution = lightData.m_shadowResolution;
+				ShadowInfo.ShadowIndex = NumShadows++;
+				ShadowInfo.LightIndex = i;
+				m_shadowMapPool.push_back(ShadowInfo);
+			}
+		}
+
+		if (NumShadows > MaxShadowInstances)
+		{
+			Trace("Number of shadows has exceeded maximum supported. Please grow value in gltfCommon.h/perFrameStruct.h");
+			throw;
+		}
+
+		// If we had shadow information, allocate all required maps and bindings
+		if (!m_shadowMapPool.empty())
+		{
+			std::vector<SceneShadowInfo>::iterator CurrentShadow = m_shadowMapPool.begin();
+			for (uint32_t i = 0; CurrentShadow < m_shadowMapPool.end(); ++i, ++CurrentShadow)
+			{
+				CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
+				CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
+
+				// Create render pass shadow, will clear contents
+				{
+					VkAttachmentDescription depthAttachments;
+					AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+
+					// Create frame buffer
+					VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+					VkFramebufferCreateInfo fb_info = {};
+					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+					fb_info.pNext = NULL;
+					fb_info.renderPass = m_Render_pass_shadow;
+					fb_info.attachmentCount = 1;
+					fb_info.pAttachments = attachmentViews;
+					fb_info.width = CurrentShadow->ShadowResolution;
+					fb_info.height = CurrentShadow->ShadowResolution;
+					fb_info.layers = 1;
+					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
+					assert(res == VK_SUCCESS);
+				}
+
+				VkImageView ShadowSRV;
+				CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
+				m_ShadowSRVPool.push_back(ShadowSRV);
+			}
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnRender
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
+	{
+		// Let our resource managers do some house keeping 
+		m_ConstantBufferRing.OnBeginFrame();
+
+		// command buffer calls
+		VkCommandBuffer cmdBuf1 = m_CommandListRing.GetNewCommandList();
+
+		{
+			VkCommandBufferBeginInfo cmd_buf_info;
+			cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			cmd_buf_info.pNext = NULL;
+			cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			cmd_buf_info.pInheritanceInfo = NULL;
+			VkResult res = vkBeginCommandBuffer(cmdBuf1, &cmd_buf_info);
+			assert(res == VK_SUCCESS);
+		}
+
+		m_GPUTimer.OnBeginFrame(cmdBuf1, &m_TimeStamps);
+
+		// Sets the perFrame data 
+		glm::mat4 mCameraCurrViewProj = {};
+		Light* lights = 0;
+		int lightCount = 0;
+		{
+			per_frame* pPerFrame = NULL;
+			for (auto it : _robject)
+			{
+				if (it->m_pGLTFTexturesAndBuffers)
+				{
+					// fill as much as possible using the GLTF (camera, lights, ...)
+					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(Cam);
+					mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
+					lights = pPerFrame->lights;
+					lightCount = pPerFrame->lightCount;
+					// Set some lighting factors
+					pPerFrame->iblFactor = pState->IBLFactor;
+					pPerFrame->emmisiveFactor = pState->EmissiveFactor;
+					pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
+					pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
+
+					pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
+					pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
+					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
+					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+					pPerFrame->lodBias = 0.0f;
+					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
+					it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
+				}
+			}
+		}
+
+		// Render all shadow maps
+
+		if (_depthpass.size())
+		{
+			SetPerfMarkerBegin(cmdBuf1, "ShadowPass");
+
+			VkClearValue depth_clear_values[1];
+			depth_clear_values[0].depthStencil.depth = 1.0f;
+			depth_clear_values[0].depthStencil.stencil = 0;
+
+			VkRenderPassBeginInfo rp_begin;
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_Render_pass_shadow;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.clearValueCount = 1;
+			rp_begin.pClearValues = depth_clear_values;
+			int idx = 0;
+			std::vector<SceneShadowInfo>::iterator ShadowMap = m_shadowMapPool.begin();
+			while (ShadowMap < m_shadowMapPool.end())
+			{
+				// Clear shadow map
+				rp_begin.framebuffer = ShadowMap->ShadowFrameBuffer;
+				rp_begin.renderArea.extent.width = ShadowMap->ShadowResolution;
+				rp_begin.renderArea.extent.height = ShadowMap->ShadowResolution;
+
+				vkCmdBeginRenderPass(cmdBuf1, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+				// Render to shadow map
+				SetViewportAndScissor(cmdBuf1, 0, 0, ShadowMap->ShadowResolution, ShadowMap->ShadowResolution);
+
+				for (auto it : _depthpass)
+				{
+					// Set per frame constant buffer values
+					GltfDepthPass::per_frame* cbPerFrame = it->SetPerFrameConstants();
+					cbPerFrame->mViewProj = lights[ShadowMap->LightIndex].mLightViewProj;
+					it->Draw(cmdBuf1);
+				}
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");
+
+				vkCmdEndRenderPass(cmdBuf1);
+
+				++ShadowMap;
+			}
+
+			SetPerfMarkerEnd(cmdBuf1);
+		}
+
+		// Render Scene to the GBuffer ------------------------------------------------
+		SetPerfMarkerBegin(cmdBuf1, "Color pass");
+
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+
+		if (_robject.size() > 0)
+		{
+			const bool bWireframe = pState->WireframeMode != UIState::WireframeMode::WIREFRAME_MODE_OFF;
+
+			std::vector<GltfPbrPass::BatchList> opaque, transparent;
+			std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
+
+			for (auto it : _robject) {
+				it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
+			}
+			if (bWireframe)// pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+			{
+				per_frame* pPerFrame = NULL;
+				for (auto it : _robject)
+				{
+					if (it->m_pGLTFTexturesAndBuffers)
+					{
+						// fill as much as possible using the GLTF (camera, lights, ...)
+						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(Cam);
+						mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
+						lights = pPerFrame->lights;
+						lightCount = pPerFrame->lightCount;
+						// Set some lighting factors
+						pPerFrame->iblFactor = pState->IBLFactor;
+						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
+						pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
+						pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
+
+						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
+						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
+						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
+						pPerFrame->wireframeOptions.w = (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+						pPerFrame->lodBias = 0.0f;
+						it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
+						it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
+					}
+				}
+				for (auto it : _robject) {
+					it->m_GLTFPBR->BuildBatchLists(&opaque1, &transparent1, bWireframe);
+				}
+			}
+
+			// Render opaque 
+			{
+				m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+#if 1
+				if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+				{
+					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
+					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);
+				}
+				else
+				{
+					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
+				}
+#else
+				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
+#endif
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
+
+				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
+			}
+
+			// Render skydome
+			{
+				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+
+				if (pState->SelectedSkydomeTypeIndex == 1)
+				{
+					glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
+					m_SkyDome.Draw(cmdBuf1, clipToView);
+
+					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
+				}
+				else if (pState->SelectedSkydomeTypeIndex == 0)
+				{
+					SkyDomeProc::Constants skyDomeConstants;
+					skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
+					skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, 0.0f);
+					skyDomeConstants.turbidity = 10.0f;
+					skyDomeConstants.rayleigh = 2.0f;
+					skyDomeConstants.mieCoefficient = 0.005f;
+					skyDomeConstants.mieDirectionalG = 0.8f;
+					skyDomeConstants.luminance = 1.0f;
+					m_SkyDomeProc.Draw(cmdBuf1, skyDomeConstants);
+
+					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome Proc");
+				}
+
+				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+			}
+
+			// draw transparent geometry
+			{
+				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
+
+				std::sort(transparent.begin(), transparent.end());
+				GltfPbrPass::DrawBatchList(cmdBuf1, &transparent, bWireframe);
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
+
+				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
+			}
+
+			// draw object's bounding boxes
+			{
+				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+				// todo 渲染bounding boxes
+				if (pState->bDrawBoundingBoxes && _robject.size())
+				{
+					for (auto it : _robject)
+					{
+						if (it->m_GLTFBBox)
+						{
+							it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);// pPerFrame->mCameraCurrViewProj);
+						}
+					}
+					m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
+				}
+
+				// draw light's frustums
+				if (pState->bDrawLightFrustum)
+				{
+					SetPerfMarkerBegin(cmdBuf1, "light frustums");
+
+					glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
+					glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
+					glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+					for (uint32_t i = 0; i < lightCount; i++)
+					{
+						glm::mat4 spotlightMatrix = glm::inverse(lights[i].mLightViewProj);
+						glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
+						m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+					}
+
+					m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
+
+					SetPerfMarkerEnd(cmdBuf1);
+				}
+				{
+					//glm::mat4 worldMatrix = mCameraCurrViewProj;
+					//glm::mat4 amx = worldMatrix, vcolor;
+					//_cbf.Draw(cmdBuf1, &amx, &vcolor);
+				}
+				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+			}
+		}
+		else
+		{
+			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
+			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+		}
+
+		VkImageMemoryBarrier barrier[1] = {};
+		barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier[0].pNext = NULL;
+		barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier[0].subresourceRange.baseMipLevel = 0;
+		barrier[0].subresourceRange.levelCount = 1;
+		barrier[0].subresourceRange.baseArrayLayer = 0;
+		barrier[0].subresourceRange.layerCount = 1;
+		barrier[0].image = m_GBuffer.m_HDR.Resource();
+		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+
+		SetPerfMarkerEnd(cmdBuf1);
+
+		// Post proc---------------------------------------------------------------------------
+
+		// Bloom, takes HDR as input and applies bloom to it.
+		{
+			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
+
+			// Downsample pass
+			m_DownSample.Draw(cmdBuf1);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Downsample");
+
+			// Bloom pass (needs the downsampled data)
+			m_Bloom.Draw(cmdBuf1);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom");
+
+			SetPerfMarkerEnd(cmdBuf1);
+		}
+
+		// Apply TAA & Sharpen to m_HDR
+		if (pState->bUseTAA)
+		{
+			{
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.pNext = NULL;
+				barrier.srcAccessMask = 0;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+
+				VkImageMemoryBarrier barriers[3];
+				barriers[0] = barrier;
+				barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+				barriers[0].image = m_GBuffer.m_DepthBuffer.Resource();
+
+				barriers[1] = barrier;
+				barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				barriers[1].image = m_GBuffer.m_MotionVectors.Resource();
+
+				// no layout transition but we still need to wait
+				barriers[2] = barrier;
+				barriers[2].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[2].image = m_GBuffer.m_HDR.Resource();
+
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 3, barriers);
+			}
+
+			m_TAA.Draw(cmdBuf1);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
+		}
+
+
+#if 0
+		// Magnifier Pass: m_HDR as input, pass' own output
+		if (pState->bUseMagnifier)
+		{
+			VkImageMemoryBarrier barrier = {};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.pNext = NULL;
+			barrier.srcAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.image = m_MagnifierPS.GetPassOutputResource();
+
+			if (m_bMagResourceReInit)
+			{
+				barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+				m_bMagResourceReInit = false;
+			}
+			else
+			{
+				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+			}
+
+			// Note: assumes the input texture (specified in OnCreateWindowSizeDependentResources()) is in read state
+			m_MagnifierPS.Draw(cmdBuf1, pState->MagnifierParams);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Magnifier");
+
+		}
+#endif
+#if 1
+		// Start tracking input/output resources at this point to handle HDR and SDR render paths 
+		VkImage      ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer.m_HDR.Resource();
+		VkImageView  SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer.m_HDRSRV;
+
+		//VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
+		bHDR = _dm != DISPLAYMODE_SDR;
+		if (bHDR)
+		{
+			// In place Tonemapping ------------------------------------------------------------------------
+			{
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.pNext = NULL;
+				barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+				barrier.image = ImgCurrentInput;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+				m_ToneMappingCS.Draw(cmdBuf1, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex, m_Width, m_Height);
+
+				barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				barrier.image = ImgCurrentInput;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+			}
+
+			// Render HUD  ------------------------------------------------------------------------
+			{
+#if 0
+				if (bUseMagnifier)
+				{
+					m_MagnifierPS.BeginPass(cmdBuf1, renderArea);
+				}
+				else
+				{
+					m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+				}
+
+				vkCmdSetScissor(cmdBuf1, 0, 1, &m_RectScissor);
+				vkCmdSetViewport(cmdBuf1, 0, 1, &m_Viewport);
+
+				//m_ImGUI.Draw(cmdBuf1);
+
+				if (bUseMagnifier)
+				{
+					m_MagnifierPS.EndPass(cmdBuf1);
+				}
+				else
+				{
+					m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+				}
+
+				if (bHDR && !bUseMagnifier)
+				{
+					VkImageMemoryBarrier barrier = {};
+					barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+					barrier.pNext = NULL;
+					barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+					barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+					barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+					barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					barrier.subresourceRange.baseMipLevel = 0;
+					barrier.subresourceRange.levelCount = 1;
+					barrier.subresourceRange.baseArrayLayer = 0;
+					barrier.subresourceRange.layerCount = 1;
+					barrier.image = ImgCurrentInput;
+					vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+				}
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
+#endif
+			}
+		}
+
+		// submit command buffer
+		{
+			VkResult res = vkEndCommandBuffer(cmdBuf1);
+			assert(res == VK_SUCCESS);
+
+			VkSubmitInfo submit_info;
+			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit_info.pNext = NULL;
+			submit_info.waitSemaphoreCount = 0;
+			submit_info.pWaitSemaphores = NULL;
+			submit_info.pWaitDstStageMask = NULL;
+			submit_info.commandBufferCount = 1;
+			submit_info.pCommandBuffers = &cmdBuf1;
+			submit_info.signalSemaphoreCount = 0;
+			submit_info.pSignalSemaphores = NULL;
+			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
+			assert(res == VK_SUCCESS);
+		}
+		{
+			// Wait for swapchain (we are going to render to it) -----------------------------------
+			//int imageIndex = pSwapChain->WaitForSwapChain();
+			vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
+
+			// Keep tracking input/output resource views 
+			auto ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
+			auto SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
+
+			m_CommandListRing.OnBeginFrame();
+
+			VkCommandBuffer cmdBuf2 = m_CommandListRing.GetNewCommandList();
+
+			{
+				VkCommandBufferBeginInfo cmd_buf_info;
+				cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				cmd_buf_info.pNext = NULL;
+				cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+				cmd_buf_info.pInheritanceInfo = NULL;
+				VkResult res = vkBeginCommandBuffer(cmdBuf2, &cmd_buf_info);
+				assert(res == VK_SUCCESS);
+			}
+
+			SetPerfMarkerBegin(cmdBuf2, "Swapchain RenderPass");
+
+			// prepare render pass
+			{
+				VkRenderPassBeginInfo rp_begin = {};
+				rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				rp_begin.pNext = NULL;
+				rp_begin.renderPass = _fbo.renderPass;
+				rp_begin.framebuffer = _fbo.framebuffer;
+				rp_begin.renderArea.offset.x = 0;
+				rp_begin.renderArea.offset.y = 0;
+				rp_begin.renderArea.extent.width = m_Width;
+				rp_begin.renderArea.extent.height = m_Height;
+				rp_begin.clearValueCount = 0;
+				rp_begin.pClearValues = NULL;
+				vkCmdBeginRenderPass(cmdBuf2, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+			}
+
+			vkCmdSetScissor(cmdBuf2, 0, 1, &m_RectScissor);
+			vkCmdSetViewport(cmdBuf2, 0, 1, &m_Viewport);
+
+			if (bHDR)
+			{
+				m_ColorConversionPS.Draw(cmdBuf2, SRVCurrentInput);
+				m_GPUTimer.GetTimeStamp(cmdBuf2, "Color Conversion");
+			}
+
+			// For SDR pipeline, we apply the tonemapping and then draw the GUI and skip the color conversion
+			else
+			{
+				// Tonemapping ------------------------------------------------------------------------
+				{
+					m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex);
+					m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
+				}
+
+				// Render HUD  -------------------------------------------------------------------------
+				{
+					//m_ImGUI.Draw(cmdBuf2);
+					//m_GPUTimer.GetTimeStamp(cmdBuf2, "ImGUI Rendering");
+				}
+			}
+
+			SetPerfMarkerEnd(cmdBuf2);
+
+			m_GPUTimer.OnEndFrame();
+
+			vkCmdEndRenderPass(cmdBuf2);
+
+			// Close & Submit the command list ----------------------------------------------------
+			{
+				VkResult res = vkEndCommandBuffer(cmdBuf2);
+				assert(res == VK_SUCCESS);
+
+				VkSemaphore ImageAvailableSemaphore;
+				VkSemaphore RenderFinishedSemaphores;
+
+				VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				VkSubmitInfo submit_info2;
+				submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submit_info2.pNext = NULL;
+				submit_info2.waitSemaphoreCount = 1;
+				submit_info2.pWaitSemaphores = &ImageAvailableSemaphore;
+				submit_info2.pWaitDstStageMask = &submitWaitStage;
+				submit_info2.commandBufferCount = 1;
+				submit_info2.pCommandBuffers = &cmdBuf2;
+				submit_info2.signalSemaphoreCount = 1;
+				submit_info2.pSignalSemaphores = &RenderFinishedSemaphores;
+
+				res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info2, _fbo.fence);
+				assert(res == VK_SUCCESS);
+			}
+		}
+#endif
+
+	}
+#endif
+
+
+
+	class sample_cx
+	{
+	public:
+		sample_cx();
+		~sample_cx();
+		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
+		void OnCreate();
+		void OnDestroy();
+		void OnRender();
+		bool OnEvent(MSG msg);
+		void OnResize(bool resizeRender);
+		void OnUpdateDisplay();
+		
+		void BeginFrame();
+		void BuildUI();
+		void LoadScene(int sceneIndex);
+
+		void OnUpdate();
+
+		void HandleInput();
+		void UpdateCamera(Camera& cam);
+
+	private:
+		Device m_device;
+		int m_Width;  // application window dimensions
+		int m_Height;  // application window dimensions
+
+		// Simulation management
+		double  m_lastFrameTime;
+		double  m_deltaTime;
+
+		bool                        m_bIsBenchmarking;
+
+		GLTFCommon* m_pGltfLoader = NULL;
+		std::vector<GLTFCommon*>    _loaders;
+		bool                        m_loadingScene = false;
+
+		Renderer_cx* m_pRenderer = NULL;
+		VkRenderPass _rp = 0;
+		DisplayMode _dm = DISPLAYMODE_SDR;
+		UIState                     m_UIState;
+		float                       m_fontSize;
+		Camera                      m_camera;
+
+		float                       m_time = 0; // Time accumulator in seconds, used for animation.
+
+		// njson config file
+		njson                        m_jsonConfigFile;
+		std::vector<std::string>    m_sceneNames;
+		int                         m_activeScene;
+		int                         m_activeCamera;
+		bool                        m_bPlay;
+	};
+#if 1
+	sample_cx::sample_cx() 
+	{
+		m_time = 0;
+		m_bPlay = true;
+
+		m_pGltfLoader = NULL;
+	}
+	sample_cx::~sample_cx() {}
+	//--------------------------------------------------------------------------------------
+	//
+	// OnParseCommandLine
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight)
+	{
+		// set some default values
+		*pWidth = 1920;
+		*pHeight = 1080;
+		m_activeScene = 0;          //load the first one by default
+		m_bIsBenchmarking = false;
+		//m_VsyncEnabled = false;
+		m_fontSize = 13.f;
+		m_activeCamera = 0;
+
+		// read globals
+		auto process = [&](njson jData)
+			{
+				*pWidth = jData.value("width", *pWidth);
+				*pHeight = jData.value("height", *pHeight);
+				//m_fullscreenMode = jData.value("presentationMode", m_fullscreenMode);
+				m_activeScene = jData.value("activeScene", m_activeScene);
+				m_activeCamera = jData.value("activeCamera", m_activeCamera);
+				//m_isCpuValidationLayerEnabled = jData.value("CpuValidationLayerEnabled", m_isCpuValidationLayerEnabled);
+				//m_isGpuValidationLayerEnabled = jData.value("GpuValidationLayerEnabled", m_isGpuValidationLayerEnabled);
+				//m_VsyncEnabled = jData.value("vsync", m_VsyncEnabled);
+				//m_FreesyncHDROptionEnabled = jData.value("FreesyncHDROptionEnabled", m_FreesyncHDROptionEnabled);
+				m_bIsBenchmarking = jData.value("benchmark", m_bIsBenchmarking);
+				m_fontSize = jData.value("fontsize", m_fontSize);
+			};
+
+		//read json globals from commandline
+		//
+		try
+		{
+			if (strlen(lpCmdLine) > 0)
+			{
+				auto j3 = njson::parse(lpCmdLine);
+				process(j3);
+			}
+		}
+		catch (njson::parse_error)
+		{
+			Trace("Error parsing commandline\n");
+			exit(0);
+		}
+
+		// read config file (and override values from commandline if so)
+		//
+		{
+			std::ifstream f("sample_cx.json");
+			if (!f)
+			{
+				MessageBox(NULL, "Config file not found!\n", "Cauldron Panic!", MB_ICONERROR);
+				exit(0);
+			}
+
+			try
+			{
+				f >> m_jsonConfigFile;
+			}
+			catch (njson::parse_error)
+			{
+				MessageBox(NULL, "Error parsing sample_cx.json!\n", "Cauldron Panic!", MB_ICONERROR);
+				exit(0);
+			}
+		}
+
+		njson globals = m_jsonConfigFile["globals"];
+		process(globals);
+
+		// get the list of scenes
+		for (const auto& scene : m_jsonConfigFile["scenes"])
+			m_sceneNames.push_back(scene["name"]);
+	}
+
+	VkRenderPass newRenderPass(Device* pDevice, VkFormat format)
+	{
+		// color RT
+		VkAttachmentDescription attachments[1];
+		attachments[0].format = format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		attachments[0].flags = 0;
+
+		VkAttachmentReference color_reference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+		VkSubpassDescription subpass = {};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.flags = 0;
+		subpass.inputAttachmentCount = 0;
+		subpass.pInputAttachments = NULL;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &color_reference;
+		subpass.pResolveAttachments = NULL;
+		subpass.pDepthStencilAttachment = NULL;
+		subpass.preserveAttachmentCount = 0;
+		subpass.pPreserveAttachments = NULL;
+
+		VkSubpassDependency dep = {};
+		dep.dependencyFlags = 0;
+		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.dstSubpass = 0;
+		dep.srcAccessMask = 0;
+		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+
+		VkRenderPassCreateInfo rp_info = {};
+		rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		rp_info.pNext = NULL;
+		rp_info.attachmentCount = 1;
+		rp_info.pAttachments = attachments;
+		rp_info.subpassCount = 1;
+		rp_info.pSubpasses = &subpass;
+		rp_info.dependencyCount = 1;
+		rp_info.pDependencies = &dep;
+		VkRenderPass m_render_pass_swap_chain = {};
+		VkResult res = vkCreateRenderPass(pDevice->GetDevice(), &rp_info, NULL, &m_render_pass_swap_chain);
+		assert(res == VK_SUCCESS);
+		return m_render_pass_swap_chain;
+	}
+
+	void DestroyRenderPass(Device* pDevice, VkRenderPass rp)
+	{
+		if (rp != VK_NULL_HANDLE)
+		{
+			vkDestroyRenderPass(pDevice->GetDevice(), rp, nullptr);
+		}
+	}
+
+	void UIState::Initialize()
+	{
+		// init magnifier params
+		//for (int ch = 0; ch < 3; ++ch) this->MagnifierParams.fBorderColorRGB[ch] = MAGNIFIER_BORDER_COLOR__FREE[ch]; // start at 'free' state
+
+		// init GUI state
+		this->SelectedTonemapperIndex = 0;
+		this->bUseTAA = true;
+		this->bUseMagnifier = false;
+		this->bLockMagnifierPosition = this->bLockMagnifierPositionHistory = false;
+		this->SelectedSkydomeTypeIndex = 0;
+		this->Exposure = 1.0f;
+		this->IBLFactor = 2.0f;
+		this->EmissiveFactor = 1.0f;
+		this->bDrawLightFrustum = false;
+		this->bDrawBoundingBoxes = false;
+		this->WireframeMode = WireframeMode::WIREFRAME_MODE_OFF;
+		this->WireframeColor[0] = 0.0f;
+		this->WireframeColor[1] = 1.0f;
+		this->WireframeColor[2] = 0.0f;
+		this->bShowControlsWindow = true;
+		this->bShowProfilerWindow = true;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreate
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnCreate()
+	{
+		// Init the shader compiler
+		InitDirectXCompiler();
+		CreateShaderCache();
+
+		// Create a instance of the renderer and initialize it, we need to do that for each GPU
+		m_pRenderer = new Renderer_cx(nullptr);
+		_rp = newRenderPass(&m_device, VK_FORMAT_R8G8B8A8_SRGB);
+		m_pRenderer->OnCreate(&m_device, _rp);
+
+		// init GUI (non gfx stuff)
+		//ImGUI_Init((void*)m_windowHwnd);
+		m_UIState.Initialize();
+
+		OnResize(true);
+		OnUpdateDisplay();
+
+		// Init Camera, looking at the origin
+		m_camera.LookAt(glm::vec4(0, 0, 5, 0), glm::vec4(0, 0, 0, 0));
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroy
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnDestroy()
+	{
+		//ImGUI_Shutdown();
+
+		m_device.GPUFlush();
+
+		m_pRenderer->UnloadScene();
+		m_pRenderer->OnDestroyWindowSizeDependentResources();
+		m_pRenderer->OnDestroy();
+
+		delete m_pRenderer;
+
+		// shut down the shader compiler 
+		DestroyShaderCache(&m_device);
+
+		if (m_pGltfLoader)
+		{
+			delete m_pGltfLoader;
+			m_pGltfLoader = NULL;
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnEvent, win32 sends us events and we forward them to ImGUI
+	//
+	//--------------------------------------------------------------------------------------
+	bool sample_cx::OnEvent(MSG msg)
+	{
+		//if (ImGUI_WndProcHandler(msg.hwnd, msg.message, msg.wParam, msg.lParam))
+		//	return true;
+
+		// handle function keys (F1, F2...) here, rest of the input is handled
+		// by imGUI later in HandleInput() function
+		const WPARAM& KeyPressed = msg.wParam;
+		switch (msg.message)
+		{
+		case WM_KEYUP:
+		case WM_SYSKEYUP:
+			/* WINDOW TOGGLES */
+			if (KeyPressed == VK_F1) m_UIState.bShowControlsWindow ^= 1;
+			if (KeyPressed == VK_F2) m_UIState.bShowProfilerWindow ^= 1;
+			break;
+		}
+
+		return true;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnResize
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnResize(bool resizeRender)
+	{
+		// destroy resources (if we are not minimized)
+		if (resizeRender && m_Width && m_Height && m_pRenderer)
+		{
+			m_pRenderer->OnDestroyWindowSizeDependentResources();
+			m_pRenderer->OnCreateWindowSizeDependentResources(m_Width, m_Height);
+		}
+		if (m_Width && m_Height)
+			m_camera.SetFov(AMD_PI_OVER_4, m_Width, m_Height, 0.1f, 1000.0f);
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// UpdateDisplay
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnUpdateDisplay()
+	{
+		// Destroy resources (if we are not minimized)
+		if (m_pRenderer)
+		{
+			m_pRenderer->OnUpdateDisplayDependentResources(_rp, _dm, m_UIState.bUseMagnifier);
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// LoadScene
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::LoadScene(int sceneIndex)
+	{
+		njson scene = m_jsonConfigFile["scenes"][sceneIndex];
+		// release everything and load the GLTF, just the light json data, the rest (textures and geometry) will be done in the main loop
+		if (m_pGltfLoader != NULL)
+		{
+			//m_pRenderer->UnloadScene();
+			//m_pRenderer->OnDestroyWindowSizeDependentResources();
+			//m_pRenderer->OnDestroy();
+			//m_pGltfLoader->Unload();
+			//m_pRenderer->OnCreate(&m_device, &m_swapChain, m_fontSize);
+			//m_pRenderer->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height);
+		}
+
+		//delete(m_pGltfLoader);
+		m_pGltfLoader = new GLTFCommon();
+		_loaders.push_back(m_pGltfLoader);
+		if (m_pGltfLoader->Load(scene["directory"], scene["filename"]) == false)
+		{
+			MessageBox(NULL, "The selected model couldn't be found, please check the documentation", "Cauldron Panic!", MB_ICONERROR);
+			exit(0);
+		}
+
+
+		// Load the UI settings, and also some defaults cameras and lights, in case the GLTF has none
+		{
+#define LOAD(j, key, val) val = j.value(key, val)
+
+			// global settings
+			LOAD(scene, "TAA", m_UIState.bUseTAA);
+			LOAD(scene, "toneMapper", m_UIState.SelectedTonemapperIndex);
+			LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
+			LOAD(scene, "exposure", m_UIState.Exposure);
+			LOAD(scene, "iblFactor", m_UIState.IBLFactor);
+			LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
+			LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
+
+			// Add a default light in case there are none
+			if (m_pGltfLoader->m_lights.size() == 0)
+			{
+				tfNode n;
+				n.m_tranform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+
+				tfLight l;
+				l.m_type = tfLight::LIGHT_SPOTLIGHT;
+				l.m_intensity = scene.value("intensity", 1.0f);
+				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+				l.m_range = 15;
+				l.m_outerConeAngle = AMD_PI_OVER_4;
+				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+				l.m_shadowResolution = 1024;
+
+				m_pGltfLoader->AddLight(n, l);
+			}
+
+			// Allocate shadow information (if any)
+			m_pRenderer->AllocateShadowMaps(m_pGltfLoader);
+
+			// set default camera
+			njson camera = scene["camera"];
+			m_activeCamera = scene.value("activeCamera", m_activeCamera);
+			glm::vec4 from = GetVector(GetElementJsonArray(camera, "defaultFrom", { 0.0, 0.0, 10.0 }));
+			glm::vec4 to = GetVector(GetElementJsonArray(camera, "defaultTo", { 0.0, 0.0, 0.0 }));
+			m_camera.LookAt(from, to);
+
+			// set benchmarking state if enabled 
+			//if (m_bIsBenchmarking)
+			//{
+			//	std::string deviceName;
+			//	std::string driverVersion;
+			//	m_device.GetDeviceInfo(&deviceName, &driverVersion);
+			//	BenchmarkConfig(scene["BenchmarkSettings"], m_activeCamera, m_pGltfLoader, deviceName, driverVersion);
+			//}
+
+			// indicate the mainloop we started loading a GLTF and it needs to load the rest (textures and geometry)
+			m_loadingScene = true;
+		}
+	}
+
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnUpdate
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnUpdate()
+	{
+		//ImGuiIO& io = ImGui::GetIO();
+
+		////If the mouse was not used by the GUI then it's for the camera
+		////
+		//if (io.WantCaptureMouse)
+		//{
+		//	io.MouseDelta.x = 0;
+		//	io.MouseDelta.y = 0;
+		//	io.MouseWheel = 0;
+		//}
+
+		// Update Camera
+		UpdateCamera(m_camera);
+		if (m_UIState.bUseTAA)
+		{
+			static uint32_t Seed = 0;
+			m_camera.SetProjectionJitter(m_Width, m_Height, Seed);
+		}
+		else
+			m_camera.SetProjectionJitter(0.f, 0.f);
+
+		// Keyboard & Mouse
+		HandleInput();
+
+		// Animation Update
+		if (m_bPlay)
+			m_time += (float)m_deltaTime / 1000.0f; // animation time in seconds
+
+		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(1, 0, 0));
+		//m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.0001, 0.0001, 0.0001));
+		static int nn[10] = {};
+		int i = 0;
+		for (auto it : _loaders)
+		{
+			auto n = it->get_animation_count();
+			it->SetAnimationTime(nn[i++], m_time);
+			it->TransformScene(0, m);
+			m = glm::mat4(1.0f);
+		}
+	}
+
+	void sample_cx::HandleInput()
+	{
+#if 0
+		auto fnIsKeyTriggered = [&io](char key) { return io.KeysDown[key] && io.KeysDownDuration[key] == 0.0f; };
+
+		// Handle Keyboard/Mouse input here
+
+		/* MAGNIFIER CONTROLS */
+		if (fnIsKeyTriggered('L'))                       m_UIState.ToggleMagnifierLock();
+		if (fnIsKeyTriggered('M') || io.MouseClicked[2]) // middle mouse / M key toggles magnifier
+		{
+			m_UIState.bUseMagnifier ^= 1;
+			// We need to update IMGUI's renderpass to draw to magnfier's renderpass when in hdr
+			// Hence, flush GPU and update it through OnUpdateDisplay
+			// Which needs to do the same thing when display mode is changed.
+			m_device.GPUFlush();
+			OnUpdateDisplay();
+		}
+
+		if (io.MouseClicked[1] && m_UIState.bUseMagnifier) // right mouse click
+			m_UIState.ToggleMagnifierLock();
+#endif
+	}
+
+	void sample_cx::UpdateCamera(Camera& cam)
+	{
+		float yaw = cam.GetYaw();
+		float pitch = cam.GetPitch();
+		float distance = cam.GetDistance();
+
+		cam.UpdatePreviousMatrices(); // set previous view matrix
+#if 0
+		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
+		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
+		{
+			yaw -= io.MouseDelta.x / 100.f;
+			pitch += io.MouseDelta.y / 100.f;
+		}
+
+		// Choose camera movement depending on setting
+		if (m_activeCamera == 0)
+		{
+			// If nothing has changed, don't calculate an update (we are getting micro changes in view causing bugs)
+			if (!io.MouseWheel && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
+				return;
+
+			//  Orbiting
+			distance -= (float)io.MouseWheel / 3.0f;
+			distance = std::max<float>(distance, 0.1f);
+
+			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
+
+			cam.UpdateCameraPolar(yaw, pitch,
+				panning ? -io.MouseDelta.x / 100.0f : 0.0f,
+				panning ? io.MouseDelta.y / 100.0f : 0.0f,
+				distance);
+		}
+		else if (m_activeCamera == 1)
+		{
+			//  WASD
+			cam.UpdateCameraWASD(yaw, pitch, io.KeysDown, io.DeltaTime);
+		}
+
+#endif
+		if (m_activeCamera > 1)
+		{
+			// Use a camera from the GLTF
+			m_pGltfLoader->GetCamera(m_activeCamera - 2, &cam);
+		}
+	}
+
+	void sample_cx::BeginFrame()
+	{
+		// Get timings
+		double timeNow = MillisecondsNow();
+		m_deltaTime = (float)(timeNow - m_lastFrameTime);
+		m_lastFrameTime = timeNow;
+	}
+	//--------------------------------------------------------------------------------------
+	//
+	// OnRender, updates the state from the UI, animates, transforms and renders the scene
+	//
+	//--------------------------------------------------------------------------------------
+	void sample_cx::OnRender()
+	{
+		// Do any start of frame necessities
+		BeginFrame();
+
+		//ImGUI_UpdateIO();
+		//ImGui::NewFrame();
+
+		if (m_loadingScene)
+		{
+			// the scene loads in chuncks, that way we can show a progress bar
+			static int loadingStage = 0;
+			loadingStage = m_pRenderer->LoadScene(m_pGltfLoader, loadingStage);
+			if (loadingStage == 0)
+			{
+				//m_time = 0;
+				m_loadingScene = false;
+			}
+		}
+		//else if (m_pGltfLoader && m_bIsBenchmarking)
+		//{
+		//	// Benchmarking takes control of the time, and exits the app when the animation is done
+		//	std::vector<TimeStamp> timeStamps = m_pRenderer->GetTimingValues();
+		//	std::string Filename;
+		//	m_time = BenchmarkLoop(timeStamps, &m_camera, Filename);
+		//}
+		else
+		{
+			//BuildUI();  // UI logic. Note that the rendering of the UI happens later.
+			OnUpdate(); // Update camera, handle keyboard/mouse input
+		}
+
+		// Do Render frame using AFR
+		m_pRenderer->OnRender(&m_UIState, m_camera);
+
+		// Framework will handle Present and some other end of frame logic
+		//EndFrame();
+	}
+#endif
+
+
+
+
+}
+//!vkr
 
