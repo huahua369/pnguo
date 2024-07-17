@@ -1098,6 +1098,376 @@ namespace vkr {
 		bool    isCubemap()const;
 	};
 
+	class pipeline_ptr_info;
+	class queuethread_cx;
+
+#ifndef YUV_INFO_ST
+#define YUV_INFO_ST
+	struct yuv_info_t {
+		void* ctx = 0;
+		void* data[3] = {};
+		uint32_t size[3] = {};
+		uint32_t ws[3] = {};
+		uint32_t width = 0, height = 0;
+		int8_t format = 0;		// 0=420, 1=422, 2=444
+		int8_t b = 8;			// bpp=8,10,12,16
+		int8_t t = 0;			// 1plane时422才有0=gbr, 1=brg
+		int8_t plane = 0;		// 1 2 3
+		int rotate = 0;
+	};
+#define t_vector std::vector
+#endif
+	enum class ImageLayoutBarrier
+	{
+		UNDEFINED,
+		TRANSFER_DST,
+		COLOR_ATTACHMENT,
+		DEPTH_STENCIL_ATTACHMENT,
+		TRANSFER_SRC,
+		PRESENT_SRC,
+		SHADER_READ,
+		DEPTH_STENCIL_READ,
+		ComputeGeneralRW,
+		PixelGeneralRW,
+	};// todo dvk_buffer
+	class dvk_buffer
+	{
+	public:
+		VkBuffer buffer = 0;
+		VkDevice device = 0;
+		VkDeviceMemory memory = 0;
+		VkDevice _dev = 0;
+		VkDescriptorBufferInfo* descriptor = 0;
+		//std::vector<char> descriptors;
+		//VkDescriptorType	dtype;// =
+		/*
+			VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,
+			VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+			texel storage dynamic
+		*/
+		uint32_t dtype = 6;
+		VkDeviceSize _size = 0;
+		VkDeviceSize _capacity = 0;
+		uint32_t	 _count = 0, stride = 0;
+		uint32_t	 type_ = 0;
+
+		VkDeviceSize alignment = 0;
+		void* mapped = nullptr;
+
+		/** @brief Usage flags to be filled by external source at buffer creation (to query at some later point) */
+		//VkBufferUsageFlags usageFlags = 0;
+		uint32_t usageFlags = 0;
+		/** @brief Memory propertys flags to be filled by external source at buffer creation (to query at some later point) */
+		//VkMemoryPropertyFlags memoryPropertyFlags = 0;
+		uint32_t memoryPropertyFlags = 0;
+
+		uint32_t e_size = 0;
+		uint32_t fpos = -1;
+		uint32_t fsize = 0;
+		//std::vector<char>				data;
+		std::vector<VkDeviceSize> pOffsets;
+	public:
+		dvk_buffer(VkDevice dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data);
+		virtual ~dvk_buffer();
+
+		// 可以创建所有buffer
+		static dvk_buffer* create(VkDevice dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data = nullptr);
+		// TEXEL_BUFFER
+		static dvk_buffer* new_texel(VkDevice dev, bool storage, uint32_t size, void* data);
+		static dvk_buffer* new_staging(VkDevice dev, uint32_t size, void* data);
+		// device_local=true则CPU不能访问	compute_rw=compute shader是否可读写
+		static dvk_buffer* new_vbo(VkDevice dev, bool device_local, bool compute_rw, uint32_t size, void* data = nullptr);
+		static dvk_buffer* new_indirect(VkDevice dev, bool device_local, uint32_t size, void* data = nullptr);
+		// 索引数量count，type 0=16，1=32
+		static dvk_buffer* new_ibo(VkDevice dev, int type, bool device_local, uint32_t count, void* data = nullptr);
+		// , uint32_t usage1可以增加vbo\ibo使用
+		static dvk_buffer* new_ubo(VkDevice dev, uint32_t size, void* data = nullptr, uint32_t usage1 = 0);
+		static dvk_buffer* new_ssbo(VkDevice dev, uint32_t size, void* data = nullptr);
+		// todo*不能用
+		static void copy_buffer(dvk_buffer* dst, dvk_buffer* src, uint64_t dst_offset = 0, uint64_t src_offset = 0, int64_t size = -1);
+	public:
+		//operator VkBuffer () { return buffer; }
+
+		void setDesType(uint32_t dt);
+
+		// 重置大小
+		void resize(size_t size);
+	public:
+		bool make_data(void* data, size_t size, size_t offset = 0, bool isun = true);
+		void* map(VkDeviceSize dsize, VkDeviceSize offset = 0);
+		void* get_map(VkDeviceSize offset = 0);
+		void unmap();
+		uint32_t flush(VkDeviceSize dsize, VkDeviceSize offset = 0);
+		uint32_t flush();
+		size_t set_data(void* data, size_t size, size_t offset, bool is_flush, bool iscp = true);
+		void copy_to(void* data, size_t size);
+		uint32_t invalidate(VkDeviceSize size_, VkDeviceSize offset = 0);
+
+		void destroybuf();
+
+	};
+	// todo staging_buffer
+	class dvk_staging_buffer
+	{
+	public:
+		VkBuffer buffer = 0;
+		VkDeviceMemory mem = 0;
+		VkDevice _dev = 0;
+
+		VkDeviceSize bufferSize = 0, memSize = 0;
+
+		void* mapped = nullptr;
+		bool isd = true;
+	public:
+		dvk_staging_buffer();
+
+		virtual	~dvk_staging_buffer();
+		void freeBuffer();
+		void initBuffer(VkDevice dev, VkDeviceSize size);
+		char* map();
+		void unmap();
+		void copyToBuffer(void* data, size_t bsize);
+		void copyGetBuffer(std::vector<char>& outbuf);
+		size_t getBufSize();
+		void getBuffer(char* outbuf, size_t len);
+	};
+
+	template<typename T> inline T alignUp(T& val, T alignment)
+	{
+		auto r = (val + alignment - (T)1) & ~(alignment - (T)1);
+		val = r;
+		return r;
+	}
+
+	// align val to the next multiple of alignment
+	template<typename T> inline T AlignUp(T val, T alignment)
+	{
+		return (val + alignment - (T)1) & ~(alignment - (T)1);
+	}
+	// align val to the previous multiple of alignment
+	template<typename T> inline T AlignDown(T val, T alignment)
+	{
+		return val & ~(alignment - (T)1);
+	}
+	template<typename T> inline T DivideRoundingUp(T a, T b)
+	{
+		return (a + b - (T)1) / b;
+	}
+	// 动态缓冲区
+	class dynamic_buffer_cx
+	{
+	public:
+		VkDevice dev = 0;
+		dvk_buffer* _ubo = 0;
+		char* mdata = 0;
+		int64_t last = 0;
+		uint32_t _ubo_align = 64;
+	public:
+		// acsize预分配大小，是否vbo\ibo混用vibo = false, 是否混用transfer
+		dynamic_buffer_cx(VkDevice d, size_t acsize, bool vibo = false, bool transfer = false);
+		~dynamic_buffer_cx();
+	public:
+		// 增加空间，原先分配的空间则会失效
+		void append(size_t size);
+		// 重新获取数据指针
+		char* get_ptr(uint32_t offset);
+		void flush(size_t pos, size_t size);
+		// 清空分配
+		void clear();
+		// 删除内存显存占用
+		void free_mem();
+		// 分配n个对象大小的空间
+		template<class T>
+		uint32_t alloc_obj(T*& t, int n = 1) {
+			uint32_t r = 0;
+			t = (T*)alloc(sizeof(T) * n, &r);
+			return r;
+		}
+		char* alloc(size_t size, uint32_t* offset);
+		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
+	private:
+
+	};
+	class upload_cx
+	{
+	public:
+		struct cp2mem_t
+		{
+			VkImage image;
+			VkBufferImageCopy icp;
+			VkImageMemoryBarrier preb, postb;
+			VkBuffer buffer;
+		};
+		struct clearimage {
+			VkImage image;
+			glm::vec4 c;
+		};
+		struct COPY_T
+		{
+			VkImage _image; VkBufferImageCopy _bic;
+		};
+		VkDevice _dev = nullptr;						// 设备
+		dynamic_buffer_cx* db = 0;						// 缓存自动扩容
+		size_t ncap = 0;								// 初始大小
+		size_t last_size = 0, last_pos = 0, ups = 0;	// 最后的大小
+		t_vector<VkImageMemoryBarrier> toPreBarrier;
+		t_vector<COPY_T> _copies;
+		t_vector<clearimage> _clear_cols;
+		t_vector<VkImageMemoryBarrier> toPostBarrier;
+
+		t_vector<cp2mem_t> cp2m;
+
+
+		queuethread_cx* _queue = {};
+		VkCommandPool _commandPool = {};
+		VkCommandBuffer _pCommandBuffer = {};
+		VkFence _fence = {};
+		std::atomic_int64_t a = {};
+		bool isprint = true;
+	public:
+		upload_cx();
+		~upload_cx();
+		// size初始缓存大小
+		void init(VkDevice dev, size_t size, int idxqueue);
+		void on_destroy();
+		// 纹理数据复制到这里
+		char* get_tbuf(size_t size, size_t uAlign);
+		void AddPreBarrier(VkImageMemoryBarrier imb);
+		void addCopy(VkImage image, VkBufferImageCopy bic);
+		void AddPostBarrier(VkImageMemoryBarrier imb);
+
+		void flush();
+		int flushAndFinish(int wait_time = -1);
+		void addClear(VkImage image, glm::vec4 color);
+
+
+		// 显存不够用时，没纹理上传，释放缓存占用
+		void free_buf();
+
+		VkBuffer get_resource();
+		VkCommandBuffer get_cmdbuf();
+
+		void cmd_begin();
+		void cmd_end();
+	public:
+		void add_pre(VkImage image, VkFormat format, uint32_t aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout
+			, uint32_t mipLevel = 1, uint32_t layerCount = 1);
+		void add_post(VkImage image, VkFormat format, uint32_t aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout
+			, uint32_t mipLevel = 1, uint32_t layerCount = 1);
+		// 复制纹理到内存
+		void add_copy2mem(VkImage image, VkBufferImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkBuffer buffer);
+
+	private:
+
+	};
+	class dvk_texture
+	{
+	public:
+		VkImage _image = 0;
+		VkImageView _view = 0;
+		VkSampler sampler = 0;
+		VkDeviceMemory image_memory = 0;
+		int64_t cap_device_mem_size = 0;
+		int cap_inc = 0, caps = 8;			// 分配8次就重新释放显存
+		VkDescriptorImageInfo* descriptor = {};
+		VkImageCreateInfo* _info = 0;
+		uint32_t width = 0, height = 0;
+		uint32_t mipLevels = 1;
+		uint32_t layerCount = 1;
+		uint32_t _depth = 1;
+		//VkDescriptorType dtype = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		//VkFormat _format = VK_FORMAT_R8G8B8A8_UNORM;
+		uint32_t _format = 37;
+		int64_t _alloc_size = 0;		// 数据字节大小
+		VkDevice _dev = nullptr;
+		std::string _name;
+		ImageLayoutBarrier _image_layout = ImageLayoutBarrier::SHADER_READ;
+		void* user_data = 0;
+		void* uimg = 0;
+		void* mapped = nullptr;
+		IMG_INFO* _header = 0;
+		void* ad = 0;
+		void* ad1 = 0;
+		pipeline_ptr_info* pipe = 0;
+		yuv_info_t yuv = {};
+		VkSamplerYcbcrConversion ycbcr_sampler_conversion = {};
+	public:
+		dvk_texture();
+		dvk_texture(VkDevice dev);
+
+		~dvk_texture();
+
+		bool check_format();
+
+		void OnDestroy();
+		glm::ivec2 get_size();
+	public:
+
+		static dvk_texture* new_yuv(yuv_info_t yuv, upload_cx* up);
+		//static dvk_texture* new_2d(const std::string& filename, upload_cx* up, ImageLayoutBarrier imageLayout = ImageLayoutBarrier::SHADER_READ);
+		//static dvk_texture* new_image2d(Image* img, upload_cx* up, ImageLayoutBarrier imageLayout = ImageLayoutBarrier::SHADER_READ, bool storage = false);
+		//static dvk_texture* new_image2d(Image* img, VkDevice dev, ImageLayoutBarrier imageLayout = ImageLayoutBarrier::SHADER_READ, bool storage = false);
+		static dvk_texture* new_image2d(void* buffer, VkDeviceSize bufferSize, uint32_t format, uint32_t w, uint32_t h, upload_cx* up, uint32_t imageUsageFlags, ImageLayoutBarrier imageLayout = ImageLayoutBarrier::SHADER_READ);
+		static dvk_texture* new_image2d(const char* fn, upload_cx* up, bool srgb);
+		static dvk_texture* new_image2d(upload_cx* up, const void* data, int size, int width, int height, bool useSRGB, uint32_t format, uint32_t dxformat);
+		//static dvk_texture* new_storage2d(Image* img, upload_cx* up, bool is_compute = false);
+		static dvk_texture* new_storage2d(const std::string& filename, upload_cx* up, bool is_compute = false);
+		static dvk_texture* new_storage2d(VkDevice dev, int width, int height, uint32_t format = 0, bool is_compute = false, bool sampled = true);
+		static dvk_texture* new_render_target_color(VkDevice dev, int width, int height, uint32_t format = 0, uint32_t sampleCount = 1);
+		static dvk_texture* new_render_target_depth(VkDevice dev, int width, int height, uint32_t format = 0, uint32_t sampleCount = 1);
+
+		//Image* save2Image(Image* outimage, upload_cx* q, bool unpm);
+		bool save2file(const char* fn, queuethread_cx* q, bool unpm);
+		VkDescriptorImageInfo* get_descriptor_image_info();
+
+	public:
+		int32_t Init(VkDevice pDevice, VkImageCreateInfo* pCreateInfo, const char* name = nullptr);
+		int32_t InitRenderTarget(VkDevice pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, VkImageUsageFlags usage, bool bUAV, const char* name = nullptr, VkImageCreateFlagBits flags = (VkImageCreateFlagBits)0);
+		int32_t InitDepthStencil(VkDevice pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, const char* name = nullptr);
+		bool InitFromFile(upload_cx* pUploadHeap, const char* szFilename, bool useSRGB = false, VkImageUsageFlags usageFlags = 0, float cutOff = 1.0f);
+		bool InitFromData(upload_cx* uploadHeap, IMG_INFO& header, VkImageUsageFlags usageFlags = 0, bool useSRGB = false, const char* name = nullptr);
+
+		VkImage Resource() const { return _image; }
+		// 目标视图
+		VkImageView CreateRTV(VkImageView* pRV, int mipLevel = -1, VkFormat format = VK_FORMAT_UNDEFINED);
+		// shader资源视图
+		VkImageView CreateSRV(VkImageView* pImageView, int mipLevel = -1);
+		// 深度
+		VkImageView CreateDSV(VkImageView* pView);
+		VkImageView CreateCubeSRV(VkImageView* pImageView);
+		// 创建image
+		VkImage CreateTextureCommitted(upload_cx* pUploadHeap, const char* pName, bool useSRGB, VkImageUsageFlags usageFlags);
+		void upload_data(upload_cx* up, IMG_INFO* info, uint32_t bufferOffset);
+
+		void set_data(const void* data, int size, int width, int height, uint32_t format, upload_cx* up);
+
+		//void set_data(Image* img, upload_cx* up);
+
+		void up_yuv(yuv_info_t yuv, upload_cx* up, int wms = -1);
+		void up_rgba(upload_cx* up, glm::ivec4 rc, uint32_t* data, int dw, int wms);
+		void clear_color(upload_cx* up, glm::vec4 c);
+	private:
+		void free_image();
+		static dvk_texture* new2d_priv(const std::string& filename
+			, upload_cx* up
+			, ImageLayoutBarrier imageLayout /*= ImageLayoutBarrier::SHADER_READ*/
+			//VkImageUsageFlags
+			, uint32_t imageUsageFlags /*= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT*/
+		);
+	public:
+		void get_buffer(char* outbuf, upload_cx* q);// , dvk_queue* q);
+
+		char* map();
+		void unmap();
+	};
+
+
+
+
 	typedef enum GBufferFlagBits
 	{
 		GBUFFER_NONE = 0,
@@ -2577,20 +2947,20 @@ namespace vkr {
 
 	AxisAlignedBoundingBox GetAABBInGivenSpace(const glm::mat4& mTransform, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
 
-	// align val to the next multiple of alignment
-	template<typename T> inline T AlignUp(T val, T alignment)
-	{
-		return (val + alignment - (T)1) & ~(alignment - (T)1);
-	}
-	// align val to the previous multiple of alignment
-	template<typename T> inline T AlignDown(T val, T alignment)
-	{
-		return val & ~(alignment - (T)1);
-	}
-	template<typename T> inline T DivideRoundingUp(T a, T b)
-	{
-		return (a + b - (T)1) / b;
-	}
+	//// align val to the next multiple of alignment
+	//template<typename T> inline T AlignUp(T val, T alignment)
+	//{
+	//	return (val + alignment - (T)1) & ~(alignment - (T)1);
+	//}
+	//// align val to the previous multiple of alignment
+	//template<typename T> inline T AlignDown(T val, T alignment)
+	//{
+	//	return val & ~(alignment - (T)1);
+	//}
+	//template<typename T> inline T DivideRoundingUp(T a, T b)
+	//{
+	//	return (a + b - (T)1) / b;
+	//}
 
 	class Profile
 	{
@@ -13432,17 +13802,56 @@ namespace vkr {
 		(vkCreateSampler(dev, &sampler_create_info, nullptr, &sampler));
 		return sampler;
 	}
+
+	uint32_t getMemoryType(Device* dev, uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound)
+	{
+		auto memoryProperties = dev->GetPhysicalDeviceMemoryProperties();
+		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+		{
+			if ((typeBits & 1) == 1)
+			{
+				if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				{
+					if (memTypeFound)
+					{
+						*memTypeFound = true;
+					}
+					return i;
+				}
+			}
+			typeBits >>= 1;
+		}
+
+#if defined(__ANDROID__)
+		//todo : Exceptions are disabled by default on Android (need to add LOCAL_CPP_FEATURES += exceptions to Android.mk), so for now just return zero
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+		}
+		return 0;
+#else
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+			return 0;
+		}
+		else
+		{
+			throw std::runtime_error("Could not find a matching memory type");
+		}
+#endif
+	}
 	//创建图像
-	int64_t createImage(VkDevice dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
-		, Texture* texture, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
+	int64_t createImage(Device* dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
+		, dvk_texture* texture, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
 	{
 		VkImageView* imageview;
 		VkMemoryAllocateInfo memAlloc = {};
 		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		VkMemoryRequirements memReqs;
-		auto device = dev;
-#if 0
-		VkImage* image = &texture->im;
+		auto device = dev->GetDevice();
+#if 1
+		VkImage* image = &texture->_image;
 		VkDeviceMemory mem = texture->image_memory;
 		if (texture->_image)
 		{
@@ -13468,7 +13877,7 @@ namespace vkr {
 				dh = (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			}
 			do {
-				memAlloc.memoryTypeIndex = vkc::getMemoryType(dev, memReqs.memoryTypeBits, dh, &memTypeFound);
+				memAlloc.memoryTypeIndex = getMemoryType(dev, memReqs.memoryTypeBits, dh, &memTypeFound);
 				if (!memTypeFound && dh != VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 				{
 					dh = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -13492,7 +13901,7 @@ namespace vkr {
 		}
 		(vkCreateImageView(device, viewinfo, nullptr, &texture->_view));
 		if (sampler)
-			createSampler(dev, sampler, info);
+			createSampler(device, sampler, info);
 #endif
 		return memAlloc.allocationSize;
 	}
@@ -13518,8 +13927,8 @@ namespace vkr {
 		public:
 			VkFramebuffer framebuffer = 0;
 			//深度、模板缓冲
-			Texture color;
-			Texture depth_stencil;
+			dvk_texture color;
+			dvk_texture depth_stencil;
 			VkDescriptorImageInfo descriptor = {};
 			// Semaphore used to synchronize between offscreen and final scene rendering
 			//信号量用于在屏幕外和最终场景渲染之间进行同步
@@ -13583,7 +13992,6 @@ namespace vkr {
 			isColor = true;// !swapchainbuffers || swapchainbuffers->empty();
 			// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
 			resetCommandBuffers();
-			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
 
 			if (!renderPass)
 			{
@@ -13610,19 +14018,13 @@ namespace vkr {
 			if (!sampler)
 				createSampler(_dev->GetDevice(), &sampler, &samplerinfo);
 
-			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
 			// Create num frame buffers
 			resetFramebuffer(width, height);
-			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
 		}
 
 		//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
 		void resetFramebuffer(int width, int height)
 		{
-			/*if (width & 1)
-				width++;
-			if (height & 1)
-				height++;*/
 			_width = width;
 			_height = height;
 #ifdef _WIN32
@@ -13658,10 +14060,10 @@ namespace vkr {
 			{
 				for (auto& it : framebuffers)
 				{
-					createImage(_dev->GetDevice(), &image, &colorImageView, &it.color, 0);
-					//it.color.width = width;
-					//it.color.height = height;
-					//it.color._format = colorFormat;
+					createImage(_dev, &image, &colorImageView, &it.color, 0);
+					it.color.width = width;
+					it.color.height = height;
+					it.color._format = colorFormat;
 				}
 				if (!_fence)
 				{
@@ -13705,8 +14107,8 @@ namespace vkr {
 			}
 			for (auto& it : framebuffers)
 			{
-				//createImage(_dev, &image, &depthStencilView, &it.depth_stencil, 0);
-				//it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
+				createImage(_dev, &image, &depthStencilView, &it.depth_stencil, 0);
+				it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
 			}
 
 			VkImageView attachments[2];
@@ -13714,8 +14116,8 @@ namespace vkr {
 			for (auto& it : framebuffers)
 			{
 				inc++;
-				//attachments[0] = it.color._view;
-				//attachments[1] = it.depth_stencil._view;
+				attachments[0] = it.color._view;
+				attachments[1] = it.depth_stencil._view;
 				VkFramebufferCreateInfo fbufCreateInfo = {};
 				fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 				fbufCreateInfo.renderPass = renderPass;
@@ -13727,7 +14129,7 @@ namespace vkr {
 				auto hr = vkCreateFramebuffer(_dev->GetDevice(), &fbufCreateInfo, nullptr, &it.framebuffer);
 				// Fill a descriptor for later use in a descriptor set
 				it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				//it.descriptor.imageView = it.color._view;
+				it.descriptor.imageView = it.color._view;
 				it.descriptor.sampler = sampler;
 			}
 		}
@@ -13752,8 +14154,8 @@ namespace vkr {
 			}
 			if (isColor)
 			{
-				//for (auto& it : framebuffers)
-				//	it.color._dev = _dev;
+				for (auto& it : framebuffers)
+					it.color._dev = _dev->GetDevice();
 			}
 		}
 
