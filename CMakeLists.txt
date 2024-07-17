@@ -136,6 +136,7 @@ find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(harfbuzz CONFIG REQUIRED)
 find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 #find_package(GEOS CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
     pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
@@ -168,7 +169,7 @@ list(APPEND lklib
    # rdx12
    # unofficial::joltphysics::Jolt
 )
-target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR})
+target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
  
 #复制测试文本
