@@ -545,8 +545,18 @@ int main()
 
 	auto sdldev = form0->get_dev();
 	auto vkd = new_vkdg(&sdldev);
-
-
+	if (vkd) {
+		load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
+		std::thread jt([=]()
+			{
+				while (1)
+				{
+					vkd->update();
+					vkd->on_render();
+				}
+			});
+		jt.detach();
+	}
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	menu_cx* mc = new menu_cx();	// 菜单管理

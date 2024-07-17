@@ -22,7 +22,8 @@ public:
 public:
 	vkdg_cx();
 	~vkdg_cx();
-
+	void update();
+	void on_render();
 private:
 
 };
@@ -56,3 +57,4 @@ private:
 // 创建渲染器
 vkdg_cx* new_vkdg(dev_info_cx* c = 0);
 void free_vkdg(vkdg_cx* p);
+void load_gltf(vkdg_cx* p, const char* fn);

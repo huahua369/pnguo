@@ -655,40 +655,6 @@ namespace vkr
 //!vkr
 
 
-vkdg_cx::vkdg_cx()
-{
-}
-
-vkdg_cx::~vkdg_cx()
-{
-}
-
-
-
-BBoxPass::BBoxPass()
-{
-}
-
-BBoxPass::~BBoxPass()
-{
-}
-
-void BBoxPass::add(glm::mat4* m, BBoxPass::box_t* vcr, size_t count)
-{
-	if (!m || !vcr || !count)return;
-	auto nps = boxs.size();
-	for (size_t i = 0; i < count; i++)
-	{
-		boxs.push_back(vcr[i]);
-	}
-	box_ms.push_back({ m,nps,count });
-}
-
-void BBoxPass::clear()
-{
-	boxs.clear();
-	box_ms.clear();
-}
 
 void DeviceShutdown(vkr::Device* dev)
 {
@@ -740,47 +706,6 @@ static std::string GetCPUNameString()
 }
 
 #endif
-vkdg_cx* new_vkdg(dev_info_cx* c)
-{
-	auto p = new vkdg_cx();
-	if (c) {
-
-
-#if 1		// System info
-		struct SystemInfo
-		{
-			std::string mCPUName = "UNAVAILABLE";
-			std::string mGPUName = "UNAVAILABLE";
-			std::string mGfxAPI = "UNAVAILABLE";
-		};
-		SystemInfo m_systemInfo;
-		bool cpuvalid = false;
-		bool gpuvalid = false;
-		auto dev = new vkr::Device();
-		dev->OnCreate(c, cpuvalid, gpuvalid, 0, 0, 0);
-		dev->CreatePipelineCache();
-		// Get system info
-		std::string dummyStr;
-		dev->GetDeviceInfo(&m_systemInfo.mGPUName, &dummyStr); // 2nd parameter is unused
-		m_systemInfo.mCPUName = GetCPUNameString();
-		m_systemInfo.mGfxAPI = "Vulkan";
-
-
-#endif // 0
-
-
-	}
-	return p;
-}
-
-void free_vkdg(vkdg_cx* p)
-{
-	if (p)
-	{
-		DeviceShutdown((vkr::Device*)p->dev);
-		delete p;
-	}
-}
 
 // todo vkr
 namespace vkr {
@@ -2673,10 +2598,10 @@ namespace vkr {
 		const char* m_label;
 	public:
 		Profile(const char* label) {
-			m_startTime = MillisecondsNow(); m_label = label;
+			m_startTime = MillisecondsNow(); m_label = label ? label : "";
 		}
 		~Profile() {
-			Trace(format("*** %s  %f ms\n", m_label, (MillisecondsNow() - m_startTime)));
+			printf("*** %s  %f ms\n", m_label, (MillisecondsNow() - m_startTime));
 		}
 	};
 
@@ -6575,26 +6500,28 @@ namespace vkr
 
 		std::unique_lock<std::mutex> lock(m_mutex);
 		Flush();
-		Trace("flushing %i", m_copies.size());
+		if (m_copies.size()) {
+			Trace("flushing %i", m_copies.size());
 
-		//apply pre barriers in one go
-		if (m_toPreBarrier.size() > 0)
-		{
-			vkCmdPipelineBarrier(GetCommandList(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, (uint32_t)m_toPreBarrier.size(), m_toPreBarrier.data());
-			m_toPreBarrier.clear();
-		}
+			//apply pre barriers in one go
+			if (m_toPreBarrier.size() > 0)
+			{
+				vkCmdPipelineBarrier(GetCommandList(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, (uint32_t)m_toPreBarrier.size(), m_toPreBarrier.data());
+				m_toPreBarrier.clear();
+			}
 
-		for (auto c : m_copies)
-		{
-			vkCmdCopyBufferToImage(GetCommandList(), GetResource(), c.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &c.m_bufferImageCopy);
-		}
-		m_copies.clear();
+			for (auto c : m_copies)
+			{
+				vkCmdCopyBufferToImage(GetCommandList(), GetResource(), c.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &c.m_bufferImageCopy);
+			}
+			m_copies.clear();
 
-		//apply post barriers in one go
-		if (m_toPostBarrier.size() > 0)
-		{
-			vkCmdPipelineBarrier(GetCommandList(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, (uint32_t)m_toPostBarrier.size(), m_toPostBarrier.data());
-			m_toPostBarrier.clear();
+			//apply post barriers in one go
+			if (m_toPostBarrier.size() > 0)
+			{
+				vkCmdPipelineBarrier(GetCommandList(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, (uint32_t)m_toPostBarrier.size(), m_toPostBarrier.data());
+				m_toPostBarrier.clear();
+			}
 		}
 
 		// Close 
@@ -12151,8 +12078,8 @@ namespace vkr {
 		char* bytes = 0;// rawdata.data();
 		auto size = 0;// rawdata.size();
 		bool ret = false;
-		std::string basedir = path;// GetBaseDir(fn);
-		if (filename.find(".glb") != std::string::npos)
+		std::string basedir = path;// GetBaseDir(fn); 
+		if (filename.empty() && basedir.find(".glb") != std::string::npos || filename.find(".glb") != std::string::npos)
 		{
 			ret = loader.LoadBinaryFromFile(pm, &err, &warn, path + filename);
 		}
@@ -13264,7 +13191,7 @@ namespace vkr {
 
 		// effects
 		Bloom                           m_Bloom = {};
-		SkyDome                         m_SkyDome = {};
+		//SkyDome                         m_SkyDome = {};
 		DownSamplePS                    m_DownSample = {};
 		SkyDomeProc                     m_SkyDomeProc = {};
 		ToneMapping                     m_ToneMappingPS = {};
@@ -13419,8 +13346,471 @@ namespace vkr {
 		m_frameIndex++;
 	}
 
-	// todo vkrenderer
 #if 1
+	//创建信号
+	void createSemaphore(VkDevice dev, VkSemaphore* semaphore, VkSemaphoreCreateInfo* semaphoreCreateInfo)
+	{
+		VkSemaphoreCreateInfo semaphore_create_info = {
+			VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,      // VkStructureType          sType
+			nullptr,                                      // const void*              pNext
+			0                                             // VkSemaphoreCreateFlags   flags
+		};
+		if (!semaphoreCreateInfo)
+			semaphoreCreateInfo = &semaphore_create_info;
+		auto hr = vkCreateSemaphore(dev, semaphoreCreateInfo, nullptr, semaphore);
+		return;
+	}
+	//创建采样器
+	bool createSampler(VkDevice dev, VkSampler* sampler, VkSamplerCreateInfo* info)
+	{
+		VkSamplerCreateInfo sampler_create_info = {
+			VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,                // VkStructureType            sType
+			nullptr,                                              // const void*                pNext
+			0,                                                    // VkSamplerCreateFlags       flags
+			VK_FILTER_LINEAR,                                     // VkFilter                   magFilter
+			VK_FILTER_LINEAR,                                     // VkFilter                   minFilter
+			VK_SAMPLER_MIPMAP_MODE_LINEAR,                       // VkSamplerMipmapMode        mipmapMode
+			VK_SAMPLER_ADDRESS_MODE_REPEAT,                // VkSamplerAddressMode       addressModeU
+			VK_SAMPLER_ADDRESS_MODE_REPEAT,                // VkSamplerAddressMode       addressModeV
+			VK_SAMPLER_ADDRESS_MODE_REPEAT,                // VkSamplerAddressMode       addressModeW
+			0.0f,                                                 // float                      mipLodBias
+			VK_FALSE,                                             // VkBool32                   anisotropyEnable
+			1.0f,                                                 // float                      maxAnisotropy
+			VK_FALSE,                                             // VkBool32                   compareEnable
+			VK_COMPARE_OP_ALWAYS,                                 // VkCompareOp                compareOp
+			0.0f,                                                 // float                      minLod
+			0.0f,                                                 // float                      maxLod
+			VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,              // VkBorderColor              borderColor
+			VK_FALSE                                              // VkBool32                   unnormalizedCoordinates
+		};
+		return vkCreateSampler(dev, info ? info : &sampler_create_info, nullptr, sampler) == VK_SUCCESS;
+	}
+
+	VkSampler createSampler(VkDevice dev, VkFilter filter = VK_FILTER_LINEAR, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_REPEAT)
+	{
+		VkSampler sampler = 0;
+		// Create sampler
+		VkSamplerCreateInfo samplerCreateInfo = {};
+		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.magFilter = filter;
+		samplerCreateInfo.minFilter = filter;
+		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		//samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		//samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		//samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerCreateInfo.addressModeU = samplerCreateInfo.addressModeV = samplerCreateInfo.addressModeW = addressMode;
+		samplerCreateInfo.mipLodBias = 0.0f;
+		samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+		samplerCreateInfo.minLod = 0.0f;
+		samplerCreateInfo.maxLod = 0.0f;
+		samplerCreateInfo.compareEnable = VK_FALSE;
+		// Enable anisotropic filtering
+		samplerCreateInfo.maxAnisotropy = 8;
+		samplerCreateInfo.anisotropyEnable = VK_FALSE;
+		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;// VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+		VkSamplerCreateInfo sampler_create_info = {
+			VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,                // VkStructureType            sType
+			nullptr,                                              // const void*                pNext
+			0,                                                    // VkSamplerCreateFlags       flags
+			VK_FILTER_LINEAR,                                     // VkFilter                   magFilter
+			VK_FILTER_LINEAR,                                     // VkFilter                   minFilter
+			VK_SAMPLER_MIPMAP_MODE_LINEAR,                       // VkSamplerMipmapMode        mipmapMode
+			VK_SAMPLER_ADDRESS_MODE_REPEAT,						  // VkSamplerAddressMode       addressModeU
+			VK_SAMPLER_ADDRESS_MODE_REPEAT,						  // VkSamplerAddressMode       addressModeV
+			VK_SAMPLER_ADDRESS_MODE_REPEAT,						  // VkSamplerAddressMode       addressModeW
+			0.0f,                                                 // float                      mipLodBias
+			VK_FALSE,                                             // VkBool32                   anisotropyEnable
+			1.0f,                                                 // float                      maxAnisotropy
+			VK_FALSE,                                             // VkBool32                   compareEnable
+			VK_COMPARE_OP_ALWAYS,                                 // VkCompareOp                compareOp
+			0.0f,                                                 // float                      minLod
+			0.0f,                                                 // float                      maxLod
+			VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,              // VkBorderColor              borderColor
+			VK_FALSE                                              // VkBool32                   unnormalizedCoordinates
+		};
+		(vkCreateSampler(dev, &sampler_create_info, nullptr, &sampler));
+		return sampler;
+	}
+	//创建图像
+	int64_t createImage(VkDevice dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
+		, Texture* texture, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
+	{
+		VkImageView* imageview;
+		VkMemoryAllocateInfo memAlloc = {};
+		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		VkMemoryRequirements memReqs;
+		auto device = dev;
+#if 0
+		VkImage* image = &texture->im;
+		VkDeviceMemory mem = texture->image_memory;
+		if (texture->_image)
+		{
+			vkDestroyImage(device, texture->_image, 0); texture->_image = 0;
+		}
+		auto hr = (vkCreateImage(device, imageinfo, nullptr, image));
+		vkGetImageMemoryRequirements(device, texture->_image, &memReqs);
+		// 设备内存分配空间小于需求的重新申请内存
+		if (texture->cap_device_mem_size < memReqs.size)
+		{
+			texture->cap_inc = 0;
+			if (texture->image_memory)
+			{
+				vkFreeMemory(device, texture->image_memory, 0);
+				texture->image_memory = 0;
+			}
+			memAlloc.allocationSize = memReqs.size;
+			texture->cap_device_mem_size = memReqs.size;
+			VkBool32 memTypeFound = 0;
+			uint32_t dh = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			if ((imageinfo->usage & VK_IMAGE_USAGE_STORAGE_BIT))
+			{
+				dh = (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			}
+			do {
+				memAlloc.memoryTypeIndex = vkc::getMemoryType(dev, memReqs.memoryTypeBits, dh, &memTypeFound);
+				if (!memTypeFound && dh != VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+				{
+					dh = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+					continue;
+				}
+				break;
+			} while (1);
+
+			auto hr = vkAllocateMemory(device, &memAlloc, nullptr, &mem);
+			assert(hr == VK_SUCCESS);
+			texture->image_memory = mem;
+		}
+		texture->cap_inc++;
+		// 绑定显存
+		(vkBindImageMemory(device, texture->_image, mem, 0));
+
+		viewinfo->image = texture->_image;
+		if (texture->_view)
+		{
+			vkDestroyImageView(device, texture->_view, 0);
+		}
+		(vkCreateImageView(device, viewinfo, nullptr, &texture->_view));
+		if (sampler)
+			createSampler(dev, sampler, info);
+#endif
+		return memAlloc.allocationSize;
+	}
+	VkFence createFence(VkDevice dev, VkFenceCreateFlags flags = VK_FENCE_CREATE_SIGNALED_BIT)
+	{
+		VkFenceCreateInfo fence_create_info = {
+			VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,              // VkStructureType                sType
+			nullptr,                                          // const void                    *pNext
+			flags                      // VkFenceCreateFlags             flags
+		};
+
+		VkFence fence = 0;
+		(vkCreateFence(dev, &fence_create_info, nullptr, &fence));
+		return fence;
+	}
+	// todo fbo
+
+	class fbo_info_cx
+	{
+	public:
+		class FBO
+		{
+		public:
+			VkFramebuffer framebuffer = 0;
+			//深度、模板缓冲
+			Texture color;
+			Texture depth_stencil;
+			VkDescriptorImageInfo descriptor = {};
+			// Semaphore used to synchronize between offscreen and final scene rendering
+			//信号量用于在屏幕外和最终场景渲染之间进行同步
+			VkSemaphore semaphore = VK_NULL_HANDLE;
+		public:
+			FBO() {}
+			~FBO() {}
+		};
+		size_t count_ = 0;
+		int _width = 0, _height = 0;
+		//dvk_swapchain* _swapc = 0;
+		VkRenderPass renderPass = 0, nrp = 0;
+		//采样器
+		VkSampler sampler = 0;
+		// 渲染到纹理同步cpu
+		VkFence _fence = 0;
+		// 缓冲区列表
+		std::vector<FBO> framebuffers;
+
+		Device* _dev = nullptr;
+		VkClearValue clearValues[2] = {};
+		// VK_FORMAT_B8G8R8A8_UNORM, 浮点纹理 VK_FORMAT_R32G32B32A32_SFLOAT;
+		VkFormat depthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT, colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+		bool isColor = false;	//渲染到纹理则为true
+
+		int cmdcount = 0;
+		// Command buffers used for rendering
+		std::vector<VkCommandBuffer> drawCmdBuffers;
+		//std::vector<dvk_cmd> dcmds;
+	public:
+		fbo_info_cx()
+		{
+		}
+
+		~fbo_info_cx()
+		{
+		}
+
+		void setClearValues(uint32_t color, float depth = 1.0f, uint32_t Stencil = 0)
+		{
+			//float r[] = { vk_R(color) / 255.0f,  vk_G(color) / 255.0f,  vk_B(color) / 255.0f,  vk_A(color) / 255.0f };
+			//memcpy(&clearValues[0].color, r, sizeof(float) * 4);
+			unsigned char* uc = (unsigned char*)&color;
+			clearValues[0].color = { uc[0] / 255.0f, uc[1] / 255.0f, uc[2] / 255.0f, uc[3] / 255.0f };
+			clearValues[1].depthStencil = { depth, Stencil };
+		}
+
+		void setClearValues(float* color, float depth = 1.0f, uint32_t Stencil = 0)
+		{
+			clearValues[0].color = { {color[0], color[1], color[2], color[3]} };
+			clearValues[1].depthStencil = { depth, Stencil };
+		}
+
+
+
+		//swapchainbuffers交换链
+		void initFBO(int width, int height, VkRenderPass rp)
+		{
+			_width = width; _height = height;
+			//是否创建颜色缓冲纹理
+			isColor = true;// !swapchainbuffers || swapchainbuffers->empty();
+			// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
+			resetCommandBuffers();
+			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
+
+			if (!renderPass)
+			{
+				if (!rp)
+				{
+					//nrp = rp = _dev->new_render_pass(colorFormat, depthFormat);
+				}
+				renderPass = rp;
+			}
+			// Create sampler to sample from the color attachments
+			VkSamplerCreateInfo samplerinfo = {};
+			samplerinfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			samplerinfo.magFilter = VK_FILTER_LINEAR;
+			samplerinfo.minFilter = VK_FILTER_LINEAR;
+			samplerinfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			samplerinfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerinfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerinfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerinfo.mipLodBias = 0.0f;
+			samplerinfo.maxAnisotropy = 1;
+			samplerinfo.minLod = 0.0f;
+			samplerinfo.maxLod = 1.0f;
+			samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+			if (!sampler)
+				createSampler(_dev->GetDevice(), &sampler, &samplerinfo);
+
+			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
+			// Create num frame buffers
+			resetFramebuffer(width, height);
+			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
+		}
+
+		//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
+		void resetFramebuffer(int width, int height)
+		{
+			/*if (width & 1)
+				width++;
+			if (height & 1)
+				height++;*/
+			_width = width;
+			_height = height;
+#ifdef _WIN32
+			destroyImage();
+#endif
+			// Color attachment
+			VkImageCreateInfo image = {};
+			image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			image.imageType = VK_IMAGE_TYPE_2D;
+			image.format = colorFormat;
+			image.extent.width = width;
+			image.extent.height = height;
+			image.extent.depth = 1;
+			image.mipLevels = 1;
+			image.arrayLayers = 1;
+			image.samples = VK_SAMPLE_COUNT_1_BIT;
+			image.tiling = VK_IMAGE_TILING_OPTIMAL;
+			// We will sample directly from the color attachment
+			image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+			VkImageViewCreateInfo colorImageView = {};
+			colorImageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			colorImageView.format = colorFormat;
+			colorImageView.flags = 0;
+			colorImageView.subresourceRange = {};
+			colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			colorImageView.subresourceRange.baseMipLevel = 0;
+			colorImageView.subresourceRange.levelCount = 1;
+			colorImageView.subresourceRange.baseArrayLayer = 0;
+			colorImageView.subresourceRange.layerCount = 1;
+			if (isColor)
+			{
+				for (auto& it : framebuffers)
+				{
+					createImage(_dev->GetDevice(), &image, &colorImageView, &it.color, 0);
+					//it.color.width = width;
+					//it.color.height = height;
+					//it.color._format = colorFormat;
+				}
+				if (!_fence)
+				{
+					_fence = createFence(_dev->GetDevice());
+				}
+			}
+			else
+			{
+				//int i = 0;
+				//for (auto it : *swapchainbuffers)
+				//{
+				//	if (framebuffers.size() > i)
+				//	{
+				//		framebuffers[i].color._dev = _dev;
+				//		framebuffers[i].color._image = it.image;
+				//		framebuffers[i].color._view = it._view;
+				//		framebuffers[i].color.width = width;
+				//		framebuffers[i].color.height = height;
+				//		framebuffers[i].color._format = (VkFormat)it.colorFormat;
+				//		i++;
+				//	}
+				//}
+			}
+			// Depth stencil attachment
+			image.format = depthFormat;
+			image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+			VkImageViewCreateInfo depthStencilView = {};
+			depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			depthStencilView.format = depthFormat;
+			depthStencilView.flags = 0;
+			depthStencilView.subresourceRange = {};
+			depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			depthStencilView.subresourceRange.baseMipLevel = 0;
+			depthStencilView.subresourceRange.levelCount = 1;
+			depthStencilView.subresourceRange.baseArrayLayer = 0;
+			depthStencilView.subresourceRange.layerCount = 1;
+			if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+				depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			}
+			for (auto& it : framebuffers)
+			{
+				//createImage(_dev, &image, &depthStencilView, &it.depth_stencil, 0);
+				//it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
+			}
+
+			VkImageView attachments[2];
+			int inc = 0;
+			for (auto& it : framebuffers)
+			{
+				inc++;
+				//attachments[0] = it.color._view;
+				//attachments[1] = it.depth_stencil._view;
+				VkFramebufferCreateInfo fbufCreateInfo = {};
+				fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fbufCreateInfo.renderPass = renderPass;
+				fbufCreateInfo.attachmentCount = 2;
+				fbufCreateInfo.pAttachments = attachments;
+				fbufCreateInfo.width = width;
+				fbufCreateInfo.height = height;
+				fbufCreateInfo.layers = 1;
+				auto hr = vkCreateFramebuffer(_dev->GetDevice(), &fbufCreateInfo, nullptr, &it.framebuffer);
+				// Fill a descriptor for later use in a descriptor set
+				it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				//it.descriptor.imageView = it.color._view;
+				it.descriptor.sampler = sampler;
+			}
+		}
+		void reset_fbo(int width, int height)
+		{
+			resetFramebuffer(width, height);
+		}
+		void resetCommandBuffers()
+		{
+			if (count_ < 1)
+				return;
+			destroy_all();
+			framebuffers.resize(count_);
+			drawCmdBuffers.resize(count_);
+			for (auto& it : framebuffers)
+			{
+				//it.depth_stencil._dev = _dev;
+				if (it.semaphore == VK_NULL_HANDLE)
+				{
+					createSemaphore(_dev->GetDevice(), &it.semaphore, 0);
+				}
+			}
+			if (isColor)
+			{
+				//for (auto& it : framebuffers)
+				//	it.color._dev = _dev;
+			}
+		}
+
+
+		void build_cmd_empty()
+		{
+			{
+				VkCommandBufferBeginInfo cmdBufInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, 0, 0 };
+				VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 0, 0, 0, 0, 0, 0 };
+				renderPassBeginInfo.renderPass = renderPass;
+				renderPassBeginInfo.renderArea.offset.x = 0;
+				renderPassBeginInfo.renderArea.offset.y = 0;
+				renderPassBeginInfo.renderArea.extent.width = _width;
+				renderPassBeginInfo.renderArea.extent.height = _height;
+				renderPassBeginInfo.clearValueCount = 2;
+				renderPassBeginInfo.pClearValues = clearValues;
+
+				for (size_t i = 0; i < framebuffers.size(); ++i)
+				{
+
+					// Set target frame buffer
+					renderPassBeginInfo.framebuffer = framebuffers[i].framebuffer;
+
+					(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+
+					// Draw the particle system using the update vertex buffer
+
+					vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+
+					vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+					(vkEndCommandBuffer(drawCmdBuffers[i]));
+				}
+			}
+		}
+	public:
+
+		void destroyImage()
+		{
+			for (auto& it : framebuffers)
+			{
+				if (it.framebuffer)
+					vkDestroyFramebuffer(_dev->GetDevice(), it.framebuffer, 0);
+				it.framebuffer = 0;
+			}
+		}
+		void destroy_all()
+		{
+			destroyImage();
+			renderPass = 0;
+		}
+	private:
+
+	};
+
+	// todo vkrenderer
 	Renderer_cx::Renderer_cx(const_vk* p)
 	{
 		if (p)
@@ -13501,7 +13891,7 @@ namespace vkr {
 			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, NULL, &depthAttachments);
 		}
 
-		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "..\\media\\cauldron-media\\envmaps\\papermill\\diffuse.dds", "..\\media\\cauldron-media\\envmaps\\papermill\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
+		//m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "..\\media\\cauldron-media\\envmaps\\papermill\\diffuse.dds", "..\\media\\cauldron-media\\envmaps\\papermill\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
@@ -13558,7 +13948,7 @@ namespace vkr {
 		//_cbf.OnDestroy();
 		//_axis.OnDestroy();
 		m_SkyDomeProc.OnDestroy();
-		m_SkyDome.OnDestroy();
+		//m_SkyDome.OnDestroy();
 
 		m_RenderPassFullGBufferWithClear.OnDestroy();
 		m_RenderPassJustDepthAndHdr.OnDestroy();
@@ -13735,7 +14125,7 @@ namespace vkr {
 				&m_ConstantBufferRing,
 				&m_VidMemBufferPool,
 				currobj->m_pGLTFTexturesAndBuffers,
-				&m_SkyDome,
+				0,//&m_SkyDome,
 				false, // use SSAO mask
 				m_ShadowSRVPool,
 				&m_RenderPassFullGBufferWithClear,
@@ -14084,14 +14474,14 @@ namespace vkr {
 			{
 				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
 
-				if (pState->SelectedSkydomeTypeIndex == 1)
-				{
-					glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
-					m_SkyDome.Draw(cmdBuf1, clipToView);
+				//if (pState->SelectedSkydomeTypeIndex == 1)
+				//{
+				//	glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
+				//	m_SkyDome.Draw(cmdBuf1, clipToView);
 
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
-				}
-				else if (pState->SelectedSkydomeTypeIndex == 0)
+				//	m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
+				//}
+				//else if (pState->SelectedSkydomeTypeIndex == 0)
 				{
 					SkyDomeProc::Constants skyDomeConstants;
 					skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
@@ -14513,26 +14903,26 @@ namespace vkr {
 		bool OnEvent(MSG msg);
 		void OnResize(bool resizeRender);
 		void OnUpdateDisplay();
-		
+
 		void BeginFrame();
 		void BuildUI();
-		void LoadScene(int sceneIndex);
+		void LoadScene(const char* fn);
 
 		void OnUpdate();
 
 		void HandleInput();
 		void UpdateCamera(Camera& cam);
 
-	private:
-		Device m_device;
-		int m_Width;  // application window dimensions
-		int m_Height;  // application window dimensions
+	public:
+		Device* m_device = 0;
+		int m_Width = 1280;  // application window dimensions
+		int m_Height = 800;  // application window dimensions
 
 		// Simulation management
-		double  m_lastFrameTime;
-		double  m_deltaTime;
+		double  m_lastFrameTime = 0.0;
+		double  m_deltaTime = 0.0;
 
-		bool                        m_bIsBenchmarking;
+		bool                        m_bIsBenchmarking = false;
 
 		GLTFCommon* m_pGltfLoader = NULL;
 		std::vector<GLTFCommon*>    _loaders;
@@ -14550,12 +14940,12 @@ namespace vkr {
 		// njson config file
 		njson                        m_jsonConfigFile;
 		std::vector<std::string>    m_sceneNames;
-		int                         m_activeScene;
-		int                         m_activeCamera;
-		bool                        m_bPlay;
+		int                         m_activeScene = 0;
+		int                         m_activeCamera = 0;
+		bool                        m_bPlay = 0;
 	};
 #if 1
-	sample_cx::sample_cx() 
+	sample_cx::sample_cx()
 	{
 		m_time = 0;
 		m_bPlay = true;
@@ -14571,14 +14961,16 @@ namespace vkr {
 	void sample_cx::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight)
 	{
 		// set some default values
-		*pWidth = 1920;
-		*pHeight = 1080;
+		if (pWidth)
+			*pWidth = 1920;
+		if (pHeight)
+			*pHeight = 1080;
 		m_activeScene = 0;          //load the first one by default
 		m_bIsBenchmarking = false;
 		//m_VsyncEnabled = false;
 		m_fontSize = 13.f;
 		m_activeCamera = 0;
-
+#if 0
 		// read globals
 		auto process = [&](njson jData)
 			{
@@ -14638,6 +15030,7 @@ namespace vkr {
 		// get the list of scenes
 		for (const auto& scene : m_jsonConfigFile["scenes"])
 			m_sceneNames.push_back(scene["name"]);
+#endif
 	}
 
 	VkRenderPass newRenderPass(Device* pDevice, VkFormat format)
@@ -14737,8 +15130,8 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		_rp = newRenderPass(&m_device, VK_FORMAT_R8G8B8A8_SRGB);
-		m_pRenderer->OnCreate(&m_device, _rp);
+		_rp = newRenderPass(m_device, VK_FORMAT_R8G8B8A8_SRGB);
+		m_pRenderer->OnCreate(m_device, _rp);
 
 		// init GUI (non gfx stuff)
 		//ImGUI_Init((void*)m_windowHwnd);
@@ -14760,7 +15153,7 @@ namespace vkr {
 	{
 		//ImGUI_Shutdown();
 
-		m_device.GPUFlush();
+		m_device->GPUFlush();
 
 		m_pRenderer->UnloadScene();
 		m_pRenderer->OnDestroyWindowSizeDependentResources();
@@ -14769,7 +15162,7 @@ namespace vkr {
 		delete m_pRenderer;
 
 		// shut down the shader compiler 
-		DestroyShaderCache(&m_device);
+		DestroyShaderCache(m_device);
 
 		if (m_pGltfLoader)
 		{
@@ -14840,9 +15233,9 @@ namespace vkr {
 	// LoadScene
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::LoadScene(int sceneIndex)
+	void sample_cx::LoadScene(const char* fn)
 	{
-		njson scene = m_jsonConfigFile["scenes"][sceneIndex];
+		njson scene;// = m_jsonConfigFile["scenes"][sceneIndex];
 		// release everything and load the GLTF, just the light json data, the rest (textures and geometry) will be done in the main loop
 		if (m_pGltfLoader != NULL)
 		{
@@ -14850,32 +15243,32 @@ namespace vkr {
 			//m_pRenderer->OnDestroyWindowSizeDependentResources();
 			//m_pRenderer->OnDestroy();
 			//m_pGltfLoader->Unload();
-			//m_pRenderer->OnCreate(&m_device, &m_swapChain, m_fontSize);
+			//m_pRenderer->OnCreate(m_device, &m_swapChain, m_fontSize);
 			//m_pRenderer->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height);
 		}
 
 		//delete(m_pGltfLoader);
 		m_pGltfLoader = new GLTFCommon();
-		_loaders.push_back(m_pGltfLoader);
-		if (m_pGltfLoader->Load(scene["directory"], scene["filename"]) == false)
+		_loaders.push_back(m_pGltfLoader);//);// scene["directory"], scene["filename"]
+		if (m_pGltfLoader->Load(fn, "") == false)
 		{
 			MessageBox(NULL, "The selected model couldn't be found, please check the documentation", "Cauldron Panic!", MB_ICONERROR);
-			exit(0);
+			return;
 		}
 
 
 		// Load the UI settings, and also some defaults cameras and lights, in case the GLTF has none
 		{
-#define LOAD(j, key, val) val = j.value(key, val)
+			//#define LOAD(j, key, val) val = j.value(key, val)
 
 			// global settings
-			LOAD(scene, "TAA", m_UIState.bUseTAA);
-			LOAD(scene, "toneMapper", m_UIState.SelectedTonemapperIndex);
-			LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
-			LOAD(scene, "exposure", m_UIState.Exposure);
-			LOAD(scene, "iblFactor", m_UIState.IBLFactor);
-			LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
-			LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
+			//LOAD(scene, "TAA", m_UIState.bUseTAA);
+			//LOAD(scene, "toneMapper", m_UIState.SelectedTonemapperIndex);
+			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
+			//LOAD(scene, "exposure", m_UIState.Exposure);
+			//LOAD(scene, "iblFactor", m_UIState.IBLFactor);
+			//LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
+			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
 
 			// Add a default light in case there are none
 			if (m_pGltfLoader->m_lights.size() == 0)
@@ -14885,7 +15278,7 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = scene.value("intensity", 1.0f);
+				l.m_intensity = 1.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
@@ -14900,10 +15293,10 @@ namespace vkr {
 
 			// set default camera
 			njson camera = scene["camera"];
-			m_activeCamera = scene.value("activeCamera", m_activeCamera);
-			glm::vec4 from = GetVector(GetElementJsonArray(camera, "defaultFrom", { 0.0, 0.0, 10.0 }));
-			glm::vec4 to = GetVector(GetElementJsonArray(camera, "defaultTo", { 0.0, 0.0, 0.0 }));
-			m_camera.LookAt(from, to);
+			m_activeCamera = 0;// scene.value("activeCamera", m_activeCamera);
+			//glm::vec4 from = GetVector(GetElementJsonArray(camera, "defaultFrom", { 0.0, 0.0, 10.0 }));
+			//glm::vec4 to = GetVector(GetElementJsonArray(camera, "defaultTo", { 0.0, 0.0, 0.0 }));
+			//m_camera.LookAt(from, to);
 
 			// set benchmarking state if enabled 
 			//if (m_bIsBenchmarking)
@@ -15097,3 +15490,104 @@ namespace vkr {
 }
 //!vkr
 
+
+vkdg_cx::vkdg_cx()
+{
+}
+
+vkdg_cx::~vkdg_cx()
+{
+}
+
+void vkdg_cx::update()
+{
+	if (ctx) {
+		auto tx = (vkr::sample_cx*)ctx;
+		tx->OnUpdate();
+	}
+}
+
+void vkdg_cx::on_render()
+{
+	if (ctx) {
+		auto tx = (vkr::sample_cx*)ctx;
+		tx->OnRender();
+	}
+}
+
+
+
+BBoxPass::BBoxPass()
+{
+}
+
+BBoxPass::~BBoxPass()
+{
+}
+
+void BBoxPass::add(glm::mat4* m, BBoxPass::box_t* vcr, size_t count)
+{
+	if (!m || !vcr || !count)return;
+	auto nps = boxs.size();
+	for (size_t i = 0; i < count; i++)
+	{
+		boxs.push_back(vcr[i]);
+	}
+	box_ms.push_back({ m,nps,count });
+}
+
+void BBoxPass::clear()
+{
+	boxs.clear();
+	box_ms.clear();
+}
+vkdg_cx* new_vkdg(dev_info_cx* c)
+{
+	auto p = new vkdg_cx();
+	vkr::Log::InitLogSystem();
+	if (c) {
+#if 1		// System info
+		struct SystemInfo
+		{
+			std::string mCPUName = "UNAVAILABLE";
+			std::string mGPUName = "UNAVAILABLE";
+			std::string mGfxAPI = "UNAVAILABLE";
+		};
+		SystemInfo m_systemInfo;
+		bool cpuvalid = false;
+		bool gpuvalid = false;
+		auto dev = new vkr::Device();
+		dev->OnCreate(c, cpuvalid, gpuvalid, 0, 0, 0);
+		dev->CreatePipelineCache();
+		// Get system info
+		std::string dummyStr;
+		dev->GetDeviceInfo(&m_systemInfo.mGPUName, &dummyStr); // 2nd parameter is unused
+		m_systemInfo.mCPUName = GetCPUNameString();
+		m_systemInfo.mGfxAPI = "Vulkan";
+
+		p->dev = dev;
+#endif // 1
+		auto tx = new vkr::sample_cx();
+		tx->m_device = dev;
+		tx->OnParseCommandLine(0, 0, 0);
+		tx->OnCreate();
+		p->ctx = tx;
+	}
+	return p;
+}
+
+void free_vkdg(vkdg_cx* p)
+{
+	if (p)
+	{
+		DeviceShutdown((vkr::Device*)p->dev);
+		delete p;
+	}
+}
+
+void load_gltf(vkdg_cx* p, const char* fn)
+{
+	if (!p || !fn)return;
+	auto tx = (vkr::sample_cx*)p->ctx;
+	tx->LoadScene(fn);
+}
