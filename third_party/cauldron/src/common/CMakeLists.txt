@@ -1,4 +1,4 @@
-include(common)
+﻿include(common)
 
 set(base_src
     "base/Sequence.cpp"
@@ -39,9 +39,12 @@ target_include_directories (Cauldron_Common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(media_src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../media/brdfLut.dds
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../media/diffuse.dds
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../media/specular.dds
 )
 
-copyTargetCommand("${media_src}" ${CMAKE_HOME_DIRECTORY}/bin copied_common_media_src)
+#copyTargetCommand("${media_src}" ${CMAKE_HOME_DIRECTORY}/bin copied_common_media_src) 
+copyTargetCommand("${media_src}" ${EXECUTABLE_OUTPUT_PATH}/images copied_common_media_src)
 add_dependencies (Cauldron_Common copied_common_media_src)
 
 source_group("Base"         FILES ${base_src})

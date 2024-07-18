@@ -20,6 +20,8 @@ vk渲染器
 #elif __ANDROID__
 #include <vulkan/vulkan_android.h>
 #endif
+
+#ifndef NOT_VULKAN
 #ifdef USE_VMA
 //#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -5034,7 +5036,7 @@ namespace vkr
 
 		// Load BRDF look up table for the PBR shader
 		//
-		m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, "BrdfLut.dds", false); // LUT images are stored as linear
+		m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, "images/BrdfLut.dds", false); // LUT images are stored as linear
 		m_brdfLutTexture.CreateSRV(&m_brdfLutView);
 
 		/////////////////////////////////////////////
@@ -13623,7 +13625,7 @@ namespace vkr {
 
 		// effects
 		Bloom                           m_Bloom = {};
-		//SkyDome                         m_SkyDome = {};
+		SkyDome                         m_SkyDome = {};
 		DownSamplePS                    m_DownSample = {};
 		SkyDomeProc                     m_SkyDomeProc = {};
 		ToneMapping                     m_ToneMappingPS = {};
@@ -15592,7 +15594,7 @@ namespace vkr {
 			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, NULL, &depthAttachments);
 		}
 
-		//m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "..\\media\\cauldron-media\\envmaps\\papermill\\diffuse.dds", "..\\media\\cauldron-media\\envmaps\\papermill\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
+		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", "images\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
@@ -15826,7 +15828,7 @@ namespace vkr {
 				&m_ConstantBufferRing,
 				&m_VidMemBufferPool,
 				currobj->m_pGLTFTexturesAndBuffers,
-				0,//&m_SkyDome,
+				&m_SkyDome,
 				false, // use SSAO mask
 				m_ShadowSRVPool,
 				&m_RenderPassFullGBufferWithClear,
@@ -17371,3 +17373,5 @@ void load_gltf(vkdg_cx* p, const char* fn)
 	auto tx = (vkr::sample_cx*)p->ctx;
 	tx->LoadScene(fn);
 }
+
+#endif
