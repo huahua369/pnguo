@@ -16857,15 +16857,12 @@ namespace vkr {
 
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
-		f->colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
+		f->colorFormat = VK_FORMAT_B8G8R8A8_SRGB;// VK_FORMAT_B8G8R8A8_UNORM;
 		f->initFBO(m_Width, m_Height, 1, _rp);
 		m_pRenderer->set_fbo(f);
 		m_pRenderer->OnCreate(m_device, _rp);
 		_fbo = f;
-		// init GUI (non gfx stuff)
-		//ImGUI_Init((void*)m_windowHwnd);
 		m_UIState.Initialize();
-
 		OnResize(true);
 		OnUpdateDisplay();
 
