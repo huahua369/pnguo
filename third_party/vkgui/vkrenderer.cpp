@@ -1889,7 +1889,7 @@ namespace vkr {
 	struct Transform
 	{
 		//glm::quat
-		glm::mat4   m_rotation = {};//MAT4::identity();
+		glm::mat4   m_rotation = glm::identity<glm::mat4>();//MAT4::identity();
 		glm::vec4   m_translation = glm::vec4(0, 0, 0, 0);
 		glm::vec4   m_scale = glm::vec4(1, 1, 1, 0);
 
@@ -12815,7 +12815,7 @@ namespace vkr {
 				tfnode->m_tranform.m_scale = glm::vec4(glm::make_vec3(node.scale.data()), 0.0f);// getv4(node.scale, glm::vec4(1, 1, 1, 0));//GetElementVector(node, "scale", glm::vec4(1, 1, 1, 0));
 
 			tfnode->m_name = node.name.c_str() ? node.name : "unnamed";// GetElementString(node, "name", "unnamed");
-			tfnode->m_tranform.m_rotation = {};//glm::mat4::identity();
+			tfnode->m_tranform.m_rotation = glm::identity<glm::mat4>();
 			if (node.rotation.size())
 			{
 				glm::quat q = glm::make_quat(node.rotation.data());
@@ -16169,7 +16169,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-				}
+			}
 
 			// Render skydome
 			{
@@ -16253,7 +16253,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-			}
+		}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -16467,8 +16467,8 @@ namespace vkr {
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
+			}
 		}
-	}
 
 		// submit command buffer
 		{
@@ -16603,7 +16603,7 @@ namespace vkr {
 		}
 #endif
 
-}
+	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p)
 	{
 		_fbo.fence = p->_fence;
@@ -16657,7 +16657,7 @@ namespace vkr {
 		UIState                     m_UIState;
 		float                       m_fontSize;
 		Camera                      m_camera;
-
+		mouse_state_t io = {};
 		float                       m_time = 0; // Time accumulator in seconds, used for animation.
 
 		// njson config file
@@ -16828,8 +16828,8 @@ namespace vkr {
 		this->bLockMagnifierPosition = this->bLockMagnifierPositionHistory = false;
 		this->SelectedSkydomeTypeIndex = 0;
 		this->Exposure = 1.0f;
-		this->IBLFactor = 2.0f;
-		this->EmissiveFactor = 1.0f;
+		this->IBLFactor = 3.0f;
+		this->EmissiveFactor = 30.0f;
 		this->bDrawLightFrustum = false;
 		this->bDrawBoundingBoxes = false;
 		this->WireframeMode = WireframeMode::WIREFRAME_MODE_OFF;
@@ -17004,7 +17004,7 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 1.0;//scene.value("intensity", 1.0f);
+				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
@@ -17050,12 +17050,12 @@ namespace vkr {
 
 		////If the mouse was not used by the GUI then it's for the camera
 		////
-		//if (io.WantCaptureMouse)
-		//{
-		//	io.MouseDelta.x = 0;
-		//	io.MouseDelta.y = 0;
-		//	io.MouseWheel = 0;
-		//}
+		if (io.WantCaptureMouse)
+		{
+			io.MouseDelta.x = 0;
+			io.MouseDelta.y = 0;
+			io.MouseWheel = 0;
+		}
 
 		// Update Camera
 		UpdateCamera(m_camera);
@@ -17118,7 +17118,7 @@ namespace vkr {
 		float distance = cam.GetDistance();
 
 		cam.UpdatePreviousMatrices(); // set previous view matrix
-#if 0
+#if 1
 		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
 		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
 		{
@@ -17164,6 +17164,7 @@ namespace vkr {
 		double timeNow = MillisecondsNow();
 		m_deltaTime = (float)(timeNow - m_lastFrameTime);
 		m_lastFrameTime = timeNow;
+		io.DeltaTime = m_deltaTime;
 	}
 	//--------------------------------------------------------------------------------------
 	//
@@ -17229,7 +17230,7 @@ void vkdg_cx::update()
 {
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;
-		tx->OnUpdate();
+		tx->io = tx->io;
 	}
 }
 

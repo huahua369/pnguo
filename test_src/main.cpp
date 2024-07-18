@@ -521,15 +521,21 @@ int main()
 	};
 	//m2.set_data(cutMeshVertices, 4, cutMeshFaces, 6, 3, 0, 0);
 #endif
-	mesh_triangle_cx* m1 = new_mesh("E:\\d3\\cone0.stl");// stl
-	mesh_triangle_cx* m2 = new_mesh("E:\\d3\\cube.stl");
-	std::vector<mesh_triangle_cx> opt;
-	make_boolean(m1, m2, opt, flags_b::A_NOT_B);
-	for (size_t i = 0; i < opt.size(); i++)
 	{
-		auto& it = opt[i];
-		std::string fn = "temp/boolean_" + std::to_string(i) + ".stl";
-		mesh_save_stl(&it, fn.c_str(), 0);
+		std::thread a([]()
+			{
+				mesh_triangle_cx* m1 = new_mesh("E:\\d3\\cone0.stl");// stl
+				mesh_triangle_cx* m2 = new_mesh("E:\\d3\\cube.stl");
+				std::vector<mesh_triangle_cx> opt;
+				make_boolean(m1, m2, opt, flags_b::A_NOT_B);
+				for (size_t i = 0; i < opt.size(); i++)
+				{
+					auto& it = opt[i];
+					std::string fn = "temp/boolean_" + std::to_string(i) + ".stl";
+					mesh_save_stl(&it, fn.c_str(), 0);
+				}
+			});
+		a.detach();
 	}
 #endif
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
@@ -551,7 +557,8 @@ int main()
 	void* vkptrdst = 0;
 	if (vkd) {
 		int xk = 0;
-		load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
+		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
+		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
 		//while (xk < 100) {
 		//	vkd->update();
 		//	vkd->on_render();
@@ -571,7 +578,7 @@ int main()
 				vkptr = vr.vkimageptr;
 				d3tex = tex;
 				vkptrdst = form0->get_texture_vk(d3tex);
-				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 1);
+				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
 				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 0,0,vr.size.x,vr.size.y }, 0);
 			}
 		}
@@ -1371,7 +1378,7 @@ int main()
 				}
 			};
 	}
-	{
+	if(0){
 		pl3->draggable = true; //可拖动
 		pl3->set_size({ 1400,600 });
 		pl3->set_pos({ 10,10 });
@@ -1384,6 +1391,7 @@ int main()
 			};
 		pl3->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
+				return;
 				int y1 = 10;
 				{
 					cairo_as _ss_(cr);
@@ -1420,7 +1428,7 @@ int main()
 
 			};
 	}
-	{
+	if(0){
 		pl2->draggable = true; //可拖动*
 		pl2->set_size({ 830,600 });
 		pl2->set_pos({ 10,10 });
