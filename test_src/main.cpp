@@ -571,7 +571,7 @@ int main()
 				vkptr = vr.vkimageptr;
 				d3tex = tex;
 				vkptrdst = form0->get_texture_vk(d3tex);
-				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
+				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 1);
 				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 0,0,vr.size.x,vr.size.y }, 0);
 			}
 		}

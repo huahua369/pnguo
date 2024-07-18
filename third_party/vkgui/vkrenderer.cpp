@@ -16853,7 +16853,7 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		_rp = newRenderPass(m_device, VK_FORMAT_B8G8R8A8_UNORM);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
+		_rp = newRenderPass(m_device, VK_FORMAT_B8G8R8A8_SRGB);// VK_FORMAT_R8G8B8A8_SRGB);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
 
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
