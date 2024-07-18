@@ -13,17 +13,27 @@
 // 渲染指令
 
 struct dev_info_cx;
-
+struct image_vkr
+{
+	glm::ivec2 size = {};
+	void* vkimageptr = 0;
+};
 class vkdg_cx
 {
 public:
 	void* ctx = 0;
 	void* dev = 0;
+	void* qupload = 0;
+	std::vector<uint32_t> dt;
+	int width = 0, height = 0;
 public:
 	vkdg_cx();
 	~vkdg_cx();
 	void update();
 	void on_render();
+	image_vkr get_vkimage(int idx);
+	void save_fbo(int idx);
+	void copy2(int idx, void* vkptr);
 private:
 
 };

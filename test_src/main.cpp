@@ -17,6 +17,7 @@
 #include <vkgui/buffer.h>
 #include <vkgui/page.h>
 #include <vkgui/vkrenderer.h>
+#include <stb_image_write.h>
 /*
 	todo
 	输入数据，自动创建窗口、控件、
@@ -545,23 +546,41 @@ int main()
 
 	auto sdldev = form0->get_dev();
 	auto vkd = new_vkdg(&sdldev);
+	SDL_Texture* d3tex = 0;
+	void* vkptr = 0;
+	void* vkptrdst = 0;
 	if (vkd) {
+		int xk = 0;
 		load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
-		std::thread jt([=]()
+		//while (xk < 100) {
+		//	vkd->update();
+		//	vkd->on_render();
+		//	Sleep(10);
+		//	xk++;
+		//}
+
+		//form0->get_texture_data(d3tex, 0);
+
+		auto vr = vkd->get_vkimage(0);
+		if (vr.vkimageptr)
+		{
+			//auto tex = form0->new_texture(vr.size.x, vr.size.y, 1, 0, 0);
+			auto tex = form0->new_texture(vr.size.x, vr.size.y, vr.vkimageptr, 1);// bgra纹理
+			if (tex)
 			{
-				while (1)
-				{
-					vkd->update();
-					vkd->on_render();
-				}
-			});
-		jt.detach();
+				vkptr = vr.vkimageptr;
+				d3tex = tex;
+				vkptrdst = form0->get_texture_vk(d3tex);
+				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
+				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 0,0,vr.size.x,vr.size.y }, 0);
+			}
+		}
 	}
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	menu_cx* mc = new menu_cx();	// 菜单管理
-	mc->set_main(form0);
-	mc->add_familys(fontn);
+	//mc->set_main(form0);
+	//mc->add_familys(fontn);
 	std::vector<std::string> mvs = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
 	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
 	int cidx = 1;
@@ -1267,7 +1286,18 @@ int main()
 
 		pl1->update_cb = [=](float delta)
 			{
-
+				vkd->update();
+				vkd->on_render();
+				static void* vkptrdst = 0;
+				if (!vkptrdst)
+					vkptrdst = form0->get_texture_vk(d3tex);
+				//vkd->copy2(0, vkptrdst);
+				bool ks = false;
+				if (ks) {
+					vkd->save_fbo(0);
+					stbi_write_png("temp/fbovkr.png", vkd->width, vkd->height, 4, vkd->dt.data(), 0);
+				}
+				//form0->get_texture_data(d3tex, 0);
 				return 0;
 			};
 		pl1->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)

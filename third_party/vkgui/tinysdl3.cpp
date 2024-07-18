@@ -6,7 +6,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>  
-#include <SDL3/SDL_system.h>  
+#include <SDL3/SDL_system.h>   
 #include <vulkan/vulkan.h>
 #ifdef _WIN32
 #include <windows.h>
@@ -624,7 +624,7 @@ int app_cx::get_event()
 	{
 		prev_time = 0;
 	}
-	if (e.type) 
+	if (e.type)
 	{
 		for (auto it : forms)
 		{
@@ -1765,6 +1765,8 @@ void form_x::present()
 		}
 	}
 
+	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
+	SDL_SetRenderClipRect(renderer, &viewport);
 	{
 		auto ktd = textures[1].data();
 		auto length = textures[1].size();
@@ -2060,7 +2062,7 @@ void form_x::set_pos(const glm::vec2& v)
 SDL_Texture* form_x::new_texture(int width, int height, void* vkptr, int format)
 {
 	SDL_Texture* texture = 0;
-	if (renderer && width > 0 && height > 0)
+	if (renderer && width > 0 && height > 0 && vkptr)
 	{
 		int access = SDL_TEXTUREACCESS_STATIC;
 		if (format == 0)
@@ -2100,6 +2102,20 @@ void form_x::set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply)
 	if (p)
 		SDL_SetTextureBlendMode(p, get_blend((BlendMode_e)b, multiply));
 }
+void* form_x::get_texture_data(SDL_Texture* p, int* ss)
+{
+	SDL_Rect r = { 0,0,1280,800 };
+	void* ptr = 0;
+	int pitch = 0;
+	auto hr = SDL_LockTexture(p, 0, &ptr, &pitch);
+	std::vector<uint32_t> pd;
+	pd.resize(r.w * r.h);
+	if (ptr) {
+		memcpy(pd.data(), ptr, pd.size() * sizeof(int));
+	}
+	SDL_UnlockTexture(p);
+	return ptr;
+}
 void form_x::free_texture(SDL_Texture* p)
 {
 	if (p)
@@ -2111,7 +2127,10 @@ void* form_x::get_texture_vk(SDL_Texture* p)
 	SDL_PropertiesID props = SDL_GetTextureProperties(p);
 	auto ra = (void*)SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, 0);
 	auto r = (void*)SDL_GetProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, 0);
-	return (void*)SDL_GetProperty(props, SDL_PROP_TEXTURE_VULKAN_TEXTURE_NUMBER, 0);
+	if (r)ra = r;
+	auto r1 = (void*)SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_VULKAN_TEXTURE_NUMBER, 0);
+	if (r1)ra = r1;
+	return ra;
 }
 void form_x::start_text_input()
 {
@@ -2152,13 +2171,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)

@@ -87,7 +87,7 @@ void mitem_t::show(const glm::vec2& ps)
 		f->set_pos(pos);
 		f->show();
 	}
-	else {
+	else if(m){
 		m->show_item(this, pos);
 	}
 
@@ -156,7 +156,7 @@ void menu_cx::add_familys(const char* family)
 mitem_t* menu_cx::new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb)
 {
 	auto p = new mitem_t();
-	if (p) {
+	if (p && form) {
 		p->m = this;
 		p->ckm_cb = cb;
 		p->ltx->set_ctx(form->app->font_ctx);
@@ -169,6 +169,7 @@ mitem_t* menu_cx::new_menu(int width, int height, const std::vector<std::string>
 }
 void menu_cx::show_item(mitem_t* it, const glm::vec2& pos)
 {
+	if (!form)return;
 	auto mf1 = it->f ? it->f : new_form_popup(form, it->pv.fsize.x, it->pv.fsize.y);
 	if (it->f)
 	{

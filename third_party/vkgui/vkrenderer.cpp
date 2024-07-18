@@ -28,7 +28,7 @@ vk渲染器
 typedef uint32_t DXGI_FORMAT;
 #endif
 #include <tinysdl3.h>
-
+#include <print_time.h>
 
 #define TINYGLTF_IMPLEMENTATION 
 #include <tiny_gltf.h>
@@ -361,6 +361,57 @@ namespace vkr
 		pDp->AddDeviceExtensionName(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
 	}
 
+	VkQueueFamilyProperties* get_queue_fp(VkQueueFamilyProperties* queueFamilyProperties, int c, VkQueueFlagBits queueFlags)
+	{
+		VkQueueFamilyProperties* ret = 0;
+		do {
+			if (queueFlags & VK_QUEUE_COMPUTE_BIT)
+			{
+				for (uint32_t i = 0; i < c; i++)
+				{
+					if ((queueFamilyProperties[i].queueFlags & queueFlags) && ((queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0))
+					{
+						ret = &queueFamilyProperties[i];
+						break;
+					}
+				}
+				if (ret)
+				{
+					break;
+				}
+			}
+
+			// Dedicated queue for transfer
+			// Try to find a queue family index that supports transfer but not graphics and compute
+			if (queueFlags & VK_QUEUE_TRANSFER_BIT)
+			{
+				for (uint32_t i = 0; i < c; i++)
+				{
+					if ((queueFamilyProperties[i].queueFlags & queueFlags) && ((queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) && ((queueFamilyProperties[i].queueFlags & VK_QUEUE_COMPUTE_BIT) == 0))
+					{
+						ret = &queueFamilyProperties[i];
+						break;
+					}
+				}
+				if (ret)
+				{
+					break;
+				}
+			}
+
+			// For other queue types or if no separate compute queue is present, return the first one to support the requested flags
+			for (uint32_t i = 0; i < c; i++)
+			{
+				if (queueFamilyProperties[i].queueFlags & queueFlags)
+				{
+					ret = &queueFamilyProperties[i];
+					break;
+				}
+			}
+		} while (0);
+		return ret;
+	}
+
 	void Device::OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp)
 	{
 		VkResult res;
@@ -417,6 +468,7 @@ namespace vkr
 #endif
 		}
 
+		auto qfp = get_queue_fp(queue_props.data(), queue_family_count, VK_QUEUE_GRAPHICS_BIT);
 		// Find a graphics device and a queue that can present to the above surface
 		//
 		graphics_queue_family_index = UINT32_MAX;
@@ -479,7 +531,7 @@ namespace vkr
 		VkDeviceQueueCreateInfo queue_info[2] = {};
 		queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queue_info[0].pNext = NULL;
-		queue_info[0].queueCount = 1;
+		queue_info[0].queueCount = 1;// qfp->queueCount;
 		queue_info[0].pQueuePriorities = queue_priorities;
 		queue_info[0].queueFamilyIndex = graphics_queue_family_index;
 		queue_info[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -544,7 +596,6 @@ namespace vkr
 		allocatorInfo.instance = m_instance;
 		vmaCreateAllocator(&allocatorInfo, &m_hAllocator);
 #endif
-
 		// create queues
 		//
 		vkGetDeviceQueue(m_device, graphics_queue_family_index, 0, &graphics_queue);
@@ -1136,7 +1187,7 @@ namespace vkr {
 		VkBuffer buffer = 0;
 		VkDevice device = 0;
 		VkDeviceMemory memory = 0;
-		VkDevice _dev = 0;
+		Device* _dev = 0;
 		VkDescriptorBufferInfo* descriptor = 0;
 		//std::vector<char> descriptors;
 		//VkDescriptorType	dtype;// =
@@ -1171,22 +1222,22 @@ namespace vkr {
 		//std::vector<char>				data;
 		std::vector<VkDeviceSize> pOffsets;
 	public:
-		dvk_buffer(VkDevice dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data);
+		dvk_buffer(Device* dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data);
 		virtual ~dvk_buffer();
 
 		// 可以创建所有buffer
-		static dvk_buffer* create(VkDevice dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data = nullptr);
+		static dvk_buffer* create(Device* dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data = nullptr);
 		// TEXEL_BUFFER
-		static dvk_buffer* new_texel(VkDevice dev, bool storage, uint32_t size, void* data);
-		static dvk_buffer* new_staging(VkDevice dev, uint32_t size, void* data);
+		static dvk_buffer* new_texel(Device* dev, bool storage, uint32_t size, void* data);
+		static dvk_buffer* new_staging(Device* dev, uint32_t size, void* data);
 		// device_local=true则CPU不能访问	compute_rw=compute shader是否可读写
-		static dvk_buffer* new_vbo(VkDevice dev, bool device_local, bool compute_rw, uint32_t size, void* data = nullptr);
-		static dvk_buffer* new_indirect(VkDevice dev, bool device_local, uint32_t size, void* data = nullptr);
+		static dvk_buffer* new_vbo(Device* dev, bool device_local, bool compute_rw, uint32_t size, void* data = nullptr);
+		static dvk_buffer* new_indirect(Device* dev, bool device_local, uint32_t size, void* data = nullptr);
 		// 索引数量count，type 0=16，1=32
-		static dvk_buffer* new_ibo(VkDevice dev, int type, bool device_local, uint32_t count, void* data = nullptr);
+		static dvk_buffer* new_ibo(Device* dev, int type, bool device_local, uint32_t count, void* data = nullptr);
 		// , uint32_t usage1可以增加vbo\ibo使用
-		static dvk_buffer* new_ubo(VkDevice dev, uint32_t size, void* data = nullptr, uint32_t usage1 = 0);
-		static dvk_buffer* new_ssbo(VkDevice dev, uint32_t size, void* data = nullptr);
+		static dvk_buffer* new_ubo(Device* dev, uint32_t size, void* data = nullptr, uint32_t usage1 = 0);
+		static dvk_buffer* new_ssbo(Device* dev, uint32_t size, void* data = nullptr);
 		// todo*不能用
 		static void copy_buffer(dvk_buffer* dst, dvk_buffer* src, uint64_t dst_offset = 0, uint64_t src_offset = 0, int64_t size = -1);
 	public:
@@ -1227,7 +1278,7 @@ namespace vkr {
 
 		virtual	~dvk_staging_buffer();
 		void freeBuffer();
-		void initBuffer(VkDevice dev, VkDeviceSize size);
+		void initBuffer(Device* dev, VkDeviceSize size);
 		char* map();
 		void unmap();
 		void copyToBuffer(void* data, size_t bsize);
@@ -1261,14 +1312,14 @@ namespace vkr {
 	class dynamic_buffer_cx
 	{
 	public:
-		VkDevice dev = 0;
+		Device* dev = 0;
 		dvk_buffer* _ubo = 0;
 		char* mdata = 0;
 		int64_t last = 0;
 		uint32_t _ubo_align = 64;
 	public:
 		// acsize预分配大小，是否vbo\ibo混用vibo = false, 是否混用transfer
-		dynamic_buffer_cx(VkDevice d, size_t acsize, bool vibo = false, bool transfer = false);
+		dynamic_buffer_cx(Device* d, size_t acsize, bool vibo = false, bool transfer = false);
 		~dynamic_buffer_cx();
 	public:
 		// 增加空间，原先分配的空间则会失效
@@ -1302,6 +1353,13 @@ namespace vkr {
 			VkImageMemoryBarrier preb, postb;
 			VkBuffer buffer;
 		};
+		struct cp2img_t
+		{
+			VkImage image;
+			VkImageCopy icp;
+			VkImageMemoryBarrier preb, postb;
+			VkImage dst;
+		};
 		struct clearimage {
 			VkImage image;
 			glm::vec4 c;
@@ -1310,7 +1368,7 @@ namespace vkr {
 		{
 			VkImage _image; VkBufferImageCopy _bic;
 		};
-		VkDevice _dev = nullptr;						// 设备
+		Device* _dev = nullptr;						// 设备
 		dynamic_buffer_cx* db = 0;						// 缓存自动扩容
 		size_t ncap = 0;								// 初始大小
 		size_t last_size = 0, last_pos = 0, ups = 0;	// 最后的大小
@@ -1320,9 +1378,8 @@ namespace vkr {
 		t_vector<VkImageMemoryBarrier> toPostBarrier;
 
 		t_vector<cp2mem_t> cp2m;
+		t_vector<cp2img_t> cp2img;
 
-
-		queuethread_cx* _queue = {};
 		VkCommandPool _commandPool = {};
 		VkCommandBuffer _pCommandBuffer = {};
 		VkFence _fence = {};
@@ -1332,7 +1389,7 @@ namespace vkr {
 		upload_cx();
 		~upload_cx();
 		// size初始缓存大小
-		void init(VkDevice dev, size_t size, int idxqueue);
+		void init(Device* dev, size_t size, int idxqueue);
 		void on_destroy();
 		// 纹理数据复制到这里
 		char* get_tbuf(size_t size, size_t uAlign);
@@ -1360,6 +1417,8 @@ namespace vkr {
 			, uint32_t mipLevel = 1, uint32_t layerCount = 1);
 		// 复制纹理到内存
 		void add_copy2mem(VkImage image, VkBufferImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkBuffer buffer);
+		// 复制到另一个纹理
+		void add_copy2img(VkImage image, VkImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkImage dst);
 
 	private:
 
@@ -1397,7 +1456,7 @@ namespace vkr {
 		VkSamplerYcbcrConversion ycbcr_sampler_conversion = {};
 	public:
 		dvk_texture();
-		dvk_texture(Device *dev);
+		dvk_texture(Device* dev);
 
 		~dvk_texture();
 
@@ -1460,7 +1519,7 @@ namespace vkr {
 		);
 	public:
 		void get_buffer(char* outbuf, upload_cx* q);// , dvk_queue* q);
-
+		void copy2image(VkImage img, upload_cx* q);
 		char* map();
 		void unmap();
 	};
@@ -13613,6 +13672,1118 @@ namespace vkr {
 
 namespace vkr {
 
+	uint32_t getMemoryType(Device* dev, uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound)
+	{
+		auto memoryProperties = dev->GetPhysicalDeviceMemoryProperties();
+		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+		{
+			if ((typeBits & 1) == 1)
+			{
+				if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				{
+					if (memTypeFound)
+					{
+						*memTypeFound = true;
+					}
+					return i;
+				}
+			}
+			typeBits >>= 1;
+		}
+
+#if defined(__ANDROID__)
+		//todo : Exceptions are disabled by default on Android (need to add LOCAL_CPP_FEATURES += exceptions to Android.mk), so for now just return zero
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+		}
+		return 0;
+#else
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+			return 0;
+		}
+		else
+		{
+			throw std::runtime_error("Could not find a matching memory type");
+		}
+#endif
+	}
+
+	VkResult create_buffer(Device* dev, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags
+		, size_t size, VkBuffer* buffer, VkDeviceMemory* memory, void* data, size_t* cap_size, void* _this)
+	{
+
+		auto device = dev->GetDevice();
+		// Create the buffer handle
+		VkBufferCreateInfo bufferCreateInfo = {};
+		bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferCreateInfo.usage = usageFlags;
+		bufferCreateInfo.size = size;
+		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		if (!(*buffer))
+			(vkCreateBuffer(device, &bufferCreateInfo, nullptr, buffer));
+
+		// Create the memory backing up the buffer handle
+		VkMemoryRequirements memReqs;
+		VkMemoryAllocateInfo memAlloc = {};
+		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		vkGetBufferMemoryRequirements(device, *buffer, &memReqs);
+		//if (memReqs.size < 4096)
+		//{
+		//	memAlloc.allocationSize = 4096;
+		//}
+		//else
+		{
+			memAlloc.allocationSize = memReqs.size;
+		}
+		assert(memAlloc.allocationSize >= size);
+		// Find a memory type index that fits the properties of the buffer
+		VkBool32 memTypeFound = 0;
+		memAlloc.memoryTypeIndex = getMemoryType(dev, memReqs.memoryTypeBits, memoryPropertyFlags, &memTypeFound);
+#ifdef _WIN32
+		printf("create_buffer\t[%p]\tallocationSize:%d\tsize:%d\n", _this, (int)memAlloc.allocationSize, (int)size);
+#endif
+		if (*memory)
+			assert(0);
+		auto hr = (vkAllocateMemory(device, &memAlloc, nullptr, memory));
+
+		if (cap_size)
+		{
+			*cap_size = size;// memAlloc.allocationSize;
+		}
+		// If a pointer to the buffer data has been passed, map the buffer and copy over the data
+		// 如果已传递指向缓冲区数据的指针，请映射缓冲区并在数据上进行复制
+		if (data != nullptr && !(memoryPropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+		{
+			void* mapped = 0;
+			(vkMapMemory(device, *memory, 0, size, 0, &mapped));
+			memcpy(mapped, data, size);
+			// 如果没有请求主机一致性，请手动刷新以使写入可见
+			// If host coherency hasn't been requested, do a manual flush to make writes visible
+			if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+			{
+				VkMappedMemoryRange mappedRange = {};
+				mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+				mappedRange.memory = *memory;
+				mappedRange.offset = 0;
+				mappedRange.size = size;
+				vkFlushMappedMemoryRanges(device, 1, &mappedRange);
+			}
+			vkUnmapMemory(device, *memory);
+		}
+		// Attach the memory to the buffer object
+		hr = (vkBindBufferMemory(device, *buffer, *memory, 0));
+
+		return hr;
+	}
+#ifndef dvkbuffer
+
+	dvk_buffer::dvk_buffer(Device* dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data) :_dev(dev), _size(size)
+		, usageFlags(usage), memoryPropertyFlags(mempro)
+	{
+		assert(dev);
+		if (dev)
+		{
+			descriptor = new VkDescriptorBufferInfo();
+			device = dev->GetDevice();
+			create_buffer(dev, usage, (VkMemoryPropertyFlags)mempro, size, &buffer, &memory, data, &_capacity, this);
+		}
+	}
+
+	dvk_buffer::~dvk_buffer()
+	{
+		if (descriptor)delete descriptor; descriptor = 0;
+		destroybuf();
+	}
+	void dvk_buffer::destroybuf()
+	{
+		unmap();
+		if (buffer)
+		{
+			vkDestroyBuffer(device, buffer, nullptr);
+			buffer = 0;
+		}
+		if (memory)
+		{
+			vkFreeMemory(device, memory, nullptr);
+			memory = 0;
+		}
+		//buffer.clear();
+		//descriptors.clear();
+	}
+
+	void dvk_buffer::resize(size_t size)
+	{
+		if (size > _capacity)
+		{
+			destroybuf();
+			create_buffer(_dev, usageFlags, (VkMemoryPropertyFlags)memoryPropertyFlags, size, &buffer, &memory, nullptr, &_capacity, this);
+		}
+		_size = size;
+		mapped = 0;
+	}
+#if 0
+	{
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT = 0x00000001,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT = 0x00000002,
+			VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT = 0x00000004,
+			VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT = 0x00000008,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT = 0x00000010,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT = 0x00000020,
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT = 0x00000040,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT = 0x00000080,
+			VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT = 0x00000100,
+			VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT = 0x00000800,
+			VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT = 0x00001000,
+			VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT = 0x00000200,
+			VK_BUFFER_USAGE_RAY_TRACING_BIT_NV = 0x00000400,
+			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_EXT = 0x00020000,
+	}
+#endif
+
+
+	VkMemoryPropertyFlags get_mpflags(bool device_local, uint32_t* usage)
+	{
+		VkMemoryPropertyFlags mempro = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		if (device_local)
+		{
+			mempro = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			if (usage)
+				*usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		}
+		return mempro;
+	}
+	dvk_buffer* dvk_buffer::create(Device* dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data)
+	{
+		return new dvk_buffer(dev, usage, mempro, size, data);
+	}
+	dvk_buffer* dvk_buffer::new_texel(Device* dev, bool storage, uint32_t size, void* data)
+	{
+		uint32_t usage = (storage ? (uint32_t)VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT : (uint32_t)VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+		VkMemoryPropertyFlags mempro = get_mpflags(false, &usage);
+		auto p = new dvk_buffer(dev, usage, mempro, size, data);
+
+		return p;
+	}
+	dvk_buffer* dvk_buffer::new_staging(Device* dev, uint32_t size, void* data)
+	{
+		uint32_t usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		VkMemoryPropertyFlags mempro = get_mpflags(false, &usage);
+		auto p = new dvk_buffer(dev, usage, mempro, size, data);
+
+		return p;
+	}
+	dvk_buffer* dvk_buffer::new_vbo(Device* dev, bool device_local, bool compute_rw, uint32_t size, void* data)
+	{
+		uint32_t usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		VkMemoryPropertyFlags mempro = get_mpflags(device_local, &usage);
+		if (compute_rw)
+		{
+			usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		}
+		auto p = new dvk_buffer(dev, usage, mempro, size, data);
+
+		p->descriptor->buffer = p->buffer;
+		p->descriptor->offset = 0;
+		p->descriptor->range = -1;
+		return p;
+	}
+	dvk_buffer* dvk_buffer::new_indirect(Device* dev, bool device_local, uint32_t size, void* data)
+	{
+		uint32_t usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+		VkMemoryPropertyFlags mempro = get_mpflags(device_local, &usage);
+		auto p = new dvk_buffer(dev, usage, mempro, size, data);
+
+		p->descriptor->buffer = p->buffer;
+		p->descriptor->offset = 0;
+		p->descriptor->range = -1;
+		return p;
+	}
+	dvk_buffer* dvk_buffer::new_ibo(Device* dev, int type, bool device_local, uint32_t count, void* data)
+	{
+		uint32_t usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+		uint32_t indexBufferSize = count * (type ? sizeof(uint32_t) : sizeof(uint16_t));
+		VkMemoryPropertyFlags mempro = get_mpflags(device_local, &usage);
+		// todo new
+		auto p = new dvk_buffer(dev, usage, mempro, indexBufferSize, data);
+		p->descriptor->buffer = p->buffer;
+		p->descriptor->offset = 0;
+		p->descriptor->range = -1;
+
+		return p;
+	}
+	dvk_buffer* dvk_buffer::new_ubo(Device* dev, uint32_t size, void* data, uint32_t usage1)
+	{
+		uint32_t usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | usage1;
+		VkMemoryPropertyFlags mempro = get_mpflags(false, &usage);
+		auto p = new dvk_buffer(dev, usage, mempro, size, data);
+		p->descriptor->buffer = p->buffer;
+		p->descriptor->offset = 0;
+		p->descriptor->range = -1;
+
+		return p;
+	}
+
+	dvk_buffer* dvk_buffer::new_ssbo(Device* dev, uint32_t size, void* data)
+	{
+		uint32_t usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		VkMemoryPropertyFlags mempro = get_mpflags(false, &usage);
+		auto p = new dvk_buffer(dev, usage, mempro, size, data);
+		p->descriptor->buffer = p->buffer;
+		p->descriptor->offset = 0;
+		p->descriptor->range = -1;
+		return p;
+	}
+
+	void dvk_buffer::copy_buffer(dvk_buffer* dst, dvk_buffer* src, uint64_t dst_offset, uint64_t src_offset, int64_t size)
+	{
+#if 0
+		assert(dst->_size <= src->_size);
+		auto dev = (Device*)dst->_dev;
+		auto devs = (Device*)src->_dev;
+		if (dev != devs)
+		{
+			assert(_dev == devs);
+			return;
+		}
+		auto device = dev->GetDevice();
+		auto qctx = _dev->get_graphics_queue(1);
+		auto cp = qctx->new_cmd_pool();
+		auto copyQueue = qctx->get_vkptr();
+		VkCommandBuffer copyCmd = vkc::createCommandBuffer1(device, cp->command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+
+		VkBufferCopy bufferCopy = {};
+
+		bufferCopy.size = (size > 0) ? size : src->_size;
+		if (dst->_size < bufferCopy.size)
+		{
+			bufferCopy.size = dst->_size;
+			assert(dst->_size >= bufferCopy.size);
+		}
+		bufferCopy.dstOffset = dst_offset;
+		bufferCopy.srcOffset = src_offset;
+
+		vkCmdCopyBuffer(copyCmd, src->buffer, dst->buffer, 1, &bufferCopy);
+		vkc::flushCommandBuffer(device, copyCmd, cp->command_pool, copyQueue, true);
+		qctx->free_cmd_pool(cp);
+#endif
+	}
+	void dvk_buffer::setDesType(uint32_t dt)
+	{
+		dtype = (VkDescriptorType)dt;
+	}
+
+	bool dvk_buffer::make_data(void* data, size_t size, size_t offset, bool isun)
+	{
+		map(size, offset);
+		if (mapped)
+		{
+			memcpy(mapped, data, size);
+			if (isun)unmap();
+			return true;
+		}
+		return false;
+	}
+	size_t dvk_buffer::set_data(void* data, size_t size, size_t offset, bool is_flush, bool iscp)
+	{
+		if (_size < size)
+			return 0;
+		if (!mapped)map(_size, 0);
+		assert(mapped);
+		if (iscp)
+			memcpy((char*)mapped + offset, data, size);
+		if (is_flush)
+		{
+			flush(size, offset);
+		}
+		if (fpos > offset)
+		{
+			fpos = offset;
+		}
+		if (fsize < size + offset)
+		{
+			fsize = size + offset;
+		}
+		return size + offset;
+	}
+
+	void dvk_buffer::copy_to(void* data, size_t size)
+	{
+		set_data(data, size, 0, false);
+	}
+
+	//uint32_t dvk_buffer::bind(VkDeviceSize offset)
+	//{
+	//	return vkBindBufferMemory(device, buffer, memory, offset);
+	//}
+
+
+	void* dvk_buffer::map(VkDeviceSize m_size, VkDeviceSize offset)
+	{
+		if (mapped)return mapped;
+		if (m_size > _size || m_size == 0)
+		{
+			m_size = _size;
+		}
+		VkResult r = vkMapMemory(device, memory, offset, m_size, 0, &mapped);
+		assert(r == VK_SUCCESS);
+		return mapped;
+	}
+	uint32_t dvk_buffer::flush(VkDeviceSize size_, VkDeviceSize offset)
+	{
+		VkMappedMemoryRange mappedRange = {};
+		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		mappedRange.memory = memory;
+		mappedRange.offset = offset;
+		mappedRange.size = size_ > 0 ? size_ : -1;
+		return vkFlushMappedMemoryRanges(device, 1, &mappedRange);
+	}
+	uint32_t dvk_buffer::flush()
+	{
+		auto ret = flush(fsize, fpos);
+		fpos = -1;
+		fsize = 0;
+		return ret;
+	}
+	void dvk_buffer::unmap()
+	{
+		if (mapped)
+		{
+			vkUnmapMemory(device, memory);
+			mapped = nullptr;
+		}
+	}
+	// todo new_descriptor有问题
+	//void* dvk_buffer::new_descriptor(VkDeviceSize s, VkDeviceSize offset)
+	//{
+	//	auto pos = descriptors.size();
+	//	descriptors.resize(pos + sizeof(VkDescriptorBufferInfo));
+	//	auto p = (VkDescriptorBufferInfo*)&descriptors[pos];
+	//	p->offset = offset;
+	//	p->buffer = buffer;
+	//	p->range = s;
+	//	return p;
+	//}
+
+	void* dvk_buffer::get_map(VkDeviceSize offset)
+	{
+		char* p = (char*)mapped;
+		assert(p);
+		return p + offset;
+	}
+
+	uint32_t dvk_buffer::invalidate(VkDeviceSize size_, VkDeviceSize offset)
+	{
+		VkMappedMemoryRange mappedRange = {};
+		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		mappedRange.memory = memory;
+		mappedRange.offset = offset;
+		mappedRange.size = size_;
+		return vkInvalidateMappedMemoryRanges(device, 1, &mappedRange);
+	}
+
+#endif // !dvkbuffer
+
+	// todo dynamic_buffer
+
+	dynamic_buffer_cx::dynamic_buffer_cx(Device* d, size_t acsize, bool vibo, bool transfer) :dev(d)
+	{
+		assert(dev);
+		if (dev)
+		{
+			_ubo_align = 512;// dev->get_ubo_align();
+			if (!acsize)
+			{
+				acsize = 64 * 1024;// dev->get_ubo_range();
+			}
+			uint32_t usage = 0;
+			if (vibo)
+			{
+				usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+			}
+			if (transfer)
+			{
+				usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			}
+			size_t a = 512;
+			acsize = AlignUp(acsize, a);
+			_ubo = dvk_buffer::new_ubo(dev, acsize, 0, usage);
+			clear();
+		}
+	}
+
+	dynamic_buffer_cx::~dynamic_buffer_cx()
+	{
+		if (_ubo)delete _ubo; _ubo = 0;
+	}
+
+	void dynamic_buffer_cx::append(size_t size)
+	{
+		size_t a = 512;
+		size = AlignUp(size, a);
+		_ubo->resize(_ubo->_size + size);
+		mdata = (char*)_ubo->map(-1);
+		assert(mdata);
+	}
+
+	char* dynamic_buffer_cx::get_ptr(uint32_t offset)
+	{
+		assert(mdata);
+		return mdata + offset;
+	}
+
+	void dynamic_buffer_cx::flush(size_t pos, size_t size)
+	{
+		VkResult res = {};
+		VkMappedMemoryRange range[1] = {};
+		range[0].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		range[0].memory = _ubo->memory;
+		range[0].size = size;
+		res = vkFlushMappedMemoryRanges(dev->GetDevice(), 1, range);
+		assert(res == VK_SUCCESS);
+	}
+
+	void dynamic_buffer_cx::clear()
+	{
+		last = 0;
+		if (!mdata)
+			mdata = (char*)_ubo->map(-1);
+	}
+
+	void dynamic_buffer_cx::free_mem()
+	{
+		_ubo->destroybuf();
+		mdata = 0;
+	}
+
+	char* dynamic_buffer_cx::alloc(size_t size, uint32_t* offset)
+	{
+		assert(mdata);
+		uint32_t r = last;
+		size_t a = _ubo_align;
+		alignUp(size, a);
+		auto nac = r + size;
+		if (nac < 0 || nac > _ubo->_size)
+		{
+			assert("'dynamic' buffers空间不足!");
+			return 0;
+		}
+		auto ret = mdata + r;
+		if (offset) {
+			*offset = r;
+		}
+		last = nac;
+		return ret;
+	}
+
+	bool dynamic_buffer_cx::AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut)
+	{
+		//size = AlignUp(size, 256u);
+
+		uint32_t memOffset = 0;
+		*pData = alloc(size, &memOffset);
+		if (!*pData)
+		{
+			assert("Ran out of mem for 'dynamic' buffers, please increase the allocated size");
+			return false;
+		}
+
+		pOut->buffer = _ubo->buffer;
+		pOut->offset = memOffset;
+		pOut->range = size;
+
+		return true;
+	}
+
+
+	// todo dvk_staging_buffer
+
+	dvk_staging_buffer::dvk_staging_buffer()
+	{
+	}
+
+	dvk_staging_buffer::~dvk_staging_buffer()
+	{
+		freeBuffer();
+	}
+
+	void dvk_staging_buffer::freeBuffer()
+	{
+		if (isd)
+		{
+			// Clean up staging resources
+			if (mem)
+				vkFreeMemory(_dev, mem, nullptr);
+			if (buffer)
+				vkDestroyBuffer(_dev, buffer, nullptr);
+		}
+		mem = 0;
+		buffer = 0;
+	}
+
+	void dvk_staging_buffer::initBuffer(Device* dev, VkDeviceSize size)
+	{
+		_dev = dev->GetDevice();
+		if (bufferSize != size)
+		{
+			bufferSize = size;
+		}
+		if (size > memSize)
+		{
+			freeBuffer();
+		}
+		// Create a host-visible staging buffer that contains the raw image data
+		if (!buffer)
+		{
+			VkMemoryAllocateInfo memAllocInfo = {};
+			memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			VkMemoryRequirements memReqs;
+
+			VkBufferCreateInfo bufferCreateInfo = {};
+			bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			bufferCreateInfo.size = bufferSize;
+			// This buffer is used as a transfer source for the buffer copy
+			bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+			auto hr = (vkCreateBuffer(_dev, &bufferCreateInfo, nullptr, &buffer));
+
+			// Get memory requirements for the staging buffer (alignment, memory type bits)
+			vkGetBufferMemoryRequirements(_dev, buffer, &memReqs);
+			memSize = memReqs.size;
+			memAllocInfo.allocationSize = memReqs.size;
+			// Get memory type index for a host visible buffer
+			VkBool32 memTypeFound = 0;
+			memAllocInfo.memoryTypeIndex = getMemoryType(dev, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &memTypeFound);
+
+			hr = (vkAllocateMemory(_dev, &memAllocInfo, nullptr, &mem));
+			hr = (vkBindBufferMemory(_dev, buffer, mem, 0));
+
+		}
+	}
+
+	char* dvk_staging_buffer::map()
+	{
+		if (!mapped)
+			(vkMapMemory(_dev, mem, 0, memSize, 0, (void**)&mapped));
+		return (char*)mapped;
+	}
+	void  dvk_staging_buffer::unmap()
+	{
+		assert(mem);
+		if (!mem)return;
+		// 如果没有请求主机一致性，请手动刷新以使写入可见
+		// If host coherency hasn't been requested, do a manual flush to make writes visible
+		//if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+		{
+			VkMappedMemoryRange mappedRange = {};
+			mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+			mappedRange.memory = mem;
+			mappedRange.offset = 0;
+			mappedRange.size = memSize;
+			vkFlushMappedMemoryRanges(_dev, 1, &mappedRange);
+		}
+		vkUnmapMemory(_dev, mem);
+	}
+
+	void dvk_staging_buffer::copyToBuffer(void* data, size_t bsize)
+	{
+		// Copy texture data into staging buffer
+		if (data)
+		{
+			auto hr = (vkMapMemory(_dev, mem, 0, memSize, 0, (void**)&mapped));
+			memcpy(mapped, data, bsize);
+			// 如果没有请求主机一致性，请手动刷新以使写入可见
+			// If host coherency hasn't been requested, do a manual flush to make writes visible
+			//if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+			{
+				VkMappedMemoryRange mappedRange = {};
+				mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+				mappedRange.memory = mem;
+				mappedRange.offset = 0;
+				mappedRange.size = bsize;
+				vkFlushMappedMemoryRanges(_dev, 1, &mappedRange);
+			}
+			vkUnmapMemory(_dev, mem);
+		}
+	}
+
+	void dvk_staging_buffer::copyGetBuffer(std::vector<char>& outbuf)
+	{
+		outbuf.resize(bufferSize);
+		// Copy texture data into staging buffer
+		uint8_t* data;
+		auto hr = (vkMapMemory(_dev, mem, 0, memSize, 0, (void**)&data));
+		memcpy(outbuf.data(), data, bufferSize);
+		vkUnmapMemory(_dev, mem);
+	}
+
+	size_t dvk_staging_buffer::getBufSize()
+	{
+		return memSize;
+	}
+
+	void dvk_staging_buffer::getBuffer(char* outbuf, size_t len)
+	{
+		len = std::min((size_t)bufferSize, len);
+		uint8_t* data;
+		auto hr = (vkMapMemory(_dev, mem, 0, memSize, 0, (void**)&data));
+		memcpy(outbuf, data, len);
+		vkUnmapMemory(_dev, mem);
+	}
+	// todo upload_cx
+	upload_cx::upload_cx()
+	{
+	}
+
+	upload_cx::~upload_cx()
+	{
+		on_destroy();
+	}
+	void upload_cx::init(Device* dev, size_t size, int idxqueue)
+	{
+		if (_dev)return;
+		_dev = dev;
+		assert(_dev);
+		ncap = size;
+		VkResult res;
+		auto device = dev->GetDevice();
+		db = new dynamic_buffer_cx(dev, size, false, true);
+		// 获取列队
+
+		// Create command list and allocators 
+		{
+			VkCommandPoolCreateInfo cmd_pool_info = {};
+			cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			cmd_pool_info.queueFamilyIndex = _dev->GetGraphicsQueueFamilyIndex();// get_familyIndex(0);// GetGraphicsQueueFamilyIndex();
+			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+			res = vkCreateCommandPool(device, &cmd_pool_info, NULL, &_commandPool);
+			assert(res == VK_SUCCESS);
+
+			VkCommandBufferAllocateInfo cmd = {};
+			cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			cmd.pNext = NULL;
+			cmd.commandPool = _commandPool;
+			cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			cmd.commandBufferCount = 1;
+			res = vkAllocateCommandBuffers(device, &cmd, &_pCommandBuffer);
+			assert(res == VK_SUCCESS);
+		}
+		// Create fence
+		{
+			VkFenceCreateInfo fence_ci = {};
+			fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+			fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+			res = vkCreateFence(device, &fence_ci, NULL, &_fence);
+			assert(res == VK_SUCCESS);
+		}
+
+		{
+			//VkCommandBufferBeginInfo cmd_buf_info = {};
+			//cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			//res = vkBeginCommandBuffer(_pCommandBuffer, &cmd_buf_info);
+			//assert(res == VK_SUCCESS);
+		}
+	}
+	void upload_cx::on_destroy()
+	{
+		//delop(db);
+		if (db)delete db; db = 0;
+		//vkDestroyBuffer(_dev->device, _buffer, NULL);
+		//vkUnmapMemory(_dev->device, _deviceMemory);
+		//vkFreeMemory(_dev->device, _deviceMemory, NULL);
+		if (_commandPool && _pCommandBuffer)
+		{
+			vkFreeCommandBuffers(_dev->GetDevice(), _commandPool, 1, &_pCommandBuffer);
+			vkDestroyCommandPool(_dev->GetDevice(), _commandPool, NULL);
+			_commandPool = {}; _pCommandBuffer = {};
+		}
+		if (_fence)
+		{
+			vkDestroyFence(_dev->GetDevice(), _fence, NULL);
+			_fence = {};
+		}
+	}
+	char* upload_cx::get_tbuf(size_t size, size_t uAlign)
+	{
+		auto ns = ncap - (last_pos + last_size);
+		flush();
+		if (!uAlign)uAlign = 512;
+		size = AlignUp(size, uAlign);
+		if (ns < size)
+		{
+			flushAndFinish();
+		}
+		if (ncap < size)
+		{
+			db->append(size - ncap);
+		}
+		uint32_t ps = 0;
+		auto d = db->alloc(size, &ps);
+		last_pos = ps;
+		last_size = size;
+		ups = size;
+		return d;
+	}
+	void upload_cx::AddPreBarrier(VkImageMemoryBarrier imb)
+	{
+		toPreBarrier.push_back(imb);
+	}
+	void upload_cx::addCopy(VkImage image, VkBufferImageCopy bic)
+	{
+		_copies.push_back({ image,bic });
+	}
+	void upload_cx::AddPostBarrier(VkImageMemoryBarrier imb)
+	{
+		toPostBarrier.push_back(imb);
+	}
+	void upload_cx::flush()
+	{
+		if (ups > 0)
+		{
+			db->flush(last_pos, last_size); ups = 0;
+		}
+	}
+	int upload_cx::flushAndFinish(int wait_time)
+	{
+		if (cp2m.empty() && cp2img.empty() && toPreBarrier.empty())return 0;
+		// Reset so it can be reused
+		flush();	// 刷新数据缓存
+		auto cbf = get_cmdbuf();
+		auto bf = get_resource();
+		VkResult res;
+
+		//vkResetFences(_dev->device, 1, &_fence);
+
+		cmd_begin();
+
+		if (toPreBarrier.size() > 0)
+		{
+			vkCmdPipelineBarrier(cbf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT
+				, 0, 0, NULL, 0, NULL, (uint32_t)toPreBarrier.size(), toPreBarrier.data());
+		}
+
+		for (auto c : _copies)
+		{
+			vkCmdCopyBufferToImage(cbf, bf, c._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &c._bic);
+		}
+		for (auto it : _clear_cols)
+		{
+			VkImageSubresourceRange srRange = {};
+			srRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			srRange.baseMipLevel = 0;
+			srRange.levelCount = VK_REMAINING_MIP_LEVELS;
+			srRange.baseArrayLayer = 0;
+			srRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+			VkClearColorValue ccv;
+			ccv.float32[0] = it.c[0];
+			ccv.float32[1] = it.c[1];
+			ccv.float32[2] = it.c[2];
+			ccv.float32[3] = it.c[3];
+
+			vkCmdClearColorImage(cbf, it.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ccv, 1, &srRange);
+
+		}
+		//apply post barriers in one go
+		if (toPostBarrier.size() > 0)
+		{
+			vkCmdPipelineBarrier(cbf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+				, 0, 0, NULL, 0, NULL, (uint32_t)toPostBarrier.size(), toPostBarrier.data());
+		}
+
+		// 复制纹理到内存
+		VkPipelineStageFlags mask2 = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+		if (cp2m.size())
+		{
+			for (auto& it : cp2m)
+			{
+				vkCmdPipelineBarrier(cbf, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.preb);
+			}
+			for (auto& it : cp2m)
+			{
+				vkCmdCopyImageToBuffer(cbf, it.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, it.buffer, 1, &it.icp);
+			}
+			for (auto& it : cp2m)
+			{
+				vkCmdPipelineBarrier(cbf, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.postb);
+			}
+		}
+		// 复制纹理到纹理
+		if (cp2img.size())
+		{
+			for (auto& it : cp2img)
+			{
+				vkCmdPipelineBarrier(cbf, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.preb);
+			}
+			for (auto& it : cp2img)
+			{
+				vkCmdCopyImage(cbf, it.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, it.dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &it.icp);
+			}
+			for (auto& it : cp2img)
+			{
+				vkCmdPipelineBarrier(cbf, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.postb);
+			}
+		}
+
+
+		// Close 
+		cmd_end();
+#if 0
+		if (_queue)
+		{
+			a = 0;
+			_queue->push(_pCommandBuffer, _fence, &a);
+			int r = 0;
+			do {
+				// 等待GPU返回
+				print_time Pt("vkQueueSubmit upload", isprint);
+				res = _queue->wait_status(_fence, &a, wait_time);
+				assert(res == VK_SUCCESS);
+				if (res != VK_SUCCESS)
+				{
+					r = -7;
+					break;
+				}
+
+			} while (0);
+		}
+#else
+		{
+			// 等待GPU返回
+			print_time Pt("vkQueueSubmit upload", isprint);
+			VkSubmitInfo submit_info;
+			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit_info.pNext = NULL;
+			submit_info.waitSemaphoreCount = 0;
+			submit_info.pWaitSemaphores = NULL;
+			submit_info.pWaitDstStageMask = NULL;
+			submit_info.commandBufferCount = 1;
+			submit_info.pCommandBuffers = &_pCommandBuffer;
+			submit_info.signalSemaphoreCount = 0;
+			submit_info.pSignalSemaphores = NULL;
+			res = vkQueueSubmit(_dev->GetGraphicsQueue(), 1, &submit_info, _fence);
+			assert(res == VK_SUCCESS);
+			vkWaitForFences(_dev->GetDevice(), 1, &_fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(_dev->GetDevice(), 1, &_fence);
+		}
+#endif
+
+		toPreBarrier.clear();
+		_copies.clear();
+		_clear_cols.clear();
+		toPostBarrier.clear();
+		cp2m.clear();
+		db->clear();
+		last_size = last_pos = ups = 0;
+		return res;
+	}
+
+	void upload_cx::addClear(VkImage image, glm::vec4 color)
+	{
+		_clear_cols.push_back({ image,color });
+	}
+
+	void upload_cx::free_buf()
+	{
+		ncap = 0;
+		db->free_mem();
+	}
+
+	VkBuffer upload_cx::get_resource() { return db->_ubo->buffer; }
+	VkCommandBuffer upload_cx::get_cmdbuf() { return _pCommandBuffer; }
+
+	void upload_cx::cmd_begin()
+	{
+		VkCommandBufferBeginInfo cmd_buf_info = {};
+		cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		auto res = vkBeginCommandBuffer(_pCommandBuffer, &cmd_buf_info);
+		assert(res == VK_SUCCESS);
+	}
+
+	void upload_cx::cmd_end()
+	{
+		auto res = vkEndCommandBuffer(_pCommandBuffer);
+		assert(res == VK_SUCCESS);
+	}
+
+	void upload_cx::add_pre(VkImage image, VkFormat format, uint32_t aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevel, uint32_t layerCount)
+	{
+		VkImageMemoryBarrier copy_barrier = {};
+		copy_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		copy_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		copy_barrier.oldLayout = oldLayout;
+		copy_barrier.newLayout = newLayout;
+		copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		copy_barrier.image = image;
+		copy_barrier.subresourceRange.aspectMask = aspectMask;
+		copy_barrier.subresourceRange.levelCount = mipLevel;
+		copy_barrier.subresourceRange.layerCount = layerCount;
+
+		toPreBarrier.push_back(copy_barrier);
+	}
+
+	void upload_cx::add_post(VkImage image, VkFormat format, uint32_t aspectMask, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevel, uint32_t layerCount)
+	{
+		VkImageMemoryBarrier use_barrier = {};
+		use_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		use_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		use_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		use_barrier.oldLayout = oldLayout;
+		use_barrier.newLayout = newLayout;
+		use_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		use_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		use_barrier.image = image;
+		use_barrier.subresourceRange.aspectMask = aspectMask;
+		use_barrier.subresourceRange.levelCount = mipLevel;
+		use_barrier.subresourceRange.layerCount = layerCount;
+		toPostBarrier.push_back(use_barrier);
+	}
+
+	VkImageMemoryBarrier get_layout(
+		VkImage image,
+		VkImageAspectFlags aspectMask,
+		VkImageLayout oldImageLayout,
+		VkImageLayout newImageLayout,
+		VkImageSubresourceRange subresourceRange);
+
+	void upload_cx::add_copy2mem(VkImage image, VkBufferImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkBuffer buffer)
+	{
+		// Image barrier for optimal image (target)
+		// Optimal image will be used as destination for the copy
+		auto preb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+		// Change texture image layout to shader read after all mip levels have been copied
+		auto postb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, il, subresourceRange);
+		cp2m.push_back({ image,  icp,  preb,  postb,  buffer });
+	}
+	void upload_cx::add_copy2img(VkImage image, VkImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkImage buffer)
+	{
+		// Image barrier for optimal image (target)
+		// Optimal image will be used as destination for the copy
+		auto preb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+		// Change texture image layout to shader read after all mip levels have been copied
+		auto postb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, il, subresourceRange);
+		cp2img.push_back({ image,  icp,  preb,  postb,  buffer });
+	}
+
+	VkImageMemoryBarrier get_layout(
+		VkImage image,
+		VkImageAspectFlags aspectMask,
+		VkImageLayout oldImageLayout,
+		VkImageLayout newImageLayout,
+		VkImageSubresourceRange subresourceRange)
+	{
+		// Create an image barrier object
+		VkImageMemoryBarrier imageMemoryBarrier = {};
+		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.oldLayout = oldImageLayout;
+		imageMemoryBarrier.newLayout = newImageLayout;
+		imageMemoryBarrier.image = image;
+		imageMemoryBarrier.subresourceRange = subresourceRange;
+
+		// Source layouts (old)
+		// Source access mask controls actions that have to be finished on the old layout
+		// before it will be transitioned to the new layout
+		switch (oldImageLayout)
+		{
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+			// Image layout is undefined (or does not matter)
+			// Only valid as initial layout
+			// No flags required, listed only for completeness
+			imageMemoryBarrier.srcAccessMask = 0;
+			break;
+
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			// Image is preinitialized
+			// Only valid as initial layout for linear images, preserves memory contents
+			// Make sure host writes have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			// Image is a color attachment
+			// Make sure any writes to the color buffer have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			// Image is a depth/stencil attachment
+			// Make sure any writes to the depth/stencil buffer have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			// Image is a transfer source
+			// Make sure any reads from the image have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			// Image is a transfer destination
+			// Make sure any writes to the image have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			// Image is read by a shader
+			// Make sure any shader reads from the image have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		}
+
+		// Target layouts (new)
+		// Destination access mask controls the dependency for the new image layout
+		switch (newImageLayout)
+		{
+		case VK_IMAGE_LAYOUT_GENERAL:
+			// Image will be used as a transfer destination
+			// Make sure any writes to the image have been finished
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			// Image will be used as a transfer destination
+			// Make sure any writes to the image have been finished
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			// Image will be used as a transfer source
+			// Make sure any reads from and writes to the image have been finished
+			imageMemoryBarrier.srcAccessMask = imageMemoryBarrier.srcAccessMask | VK_ACCESS_TRANSFER_READ_BIT;
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			// Image will be used as a color attachment
+			// Make sure any writes to the color buffer have been finished
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			// Image layout will be used as a depth/stencil attachment
+			// Make sure any writes to depth/stencil buffer have been finished
+			imageMemoryBarrier.dstAccessMask = imageMemoryBarrier.dstAccessMask | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			// Image will be read in a shader (sampler, input attachment)
+			// Make sure any writes to the image have been finished
+			if (imageMemoryBarrier.srcAccessMask == 0)
+			{
+				imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+			}
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		}
+
+		return imageMemoryBarrier;
+	}
+
 
 	// todo texture
 
@@ -13642,6 +14813,132 @@ namespace vkr {
 		//delop(descriptor);
 	}
 
+	uint32_t GetImageLayout(ImageLayoutBarrier target)
+	{
+		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		switch (target)
+		{
+		case ImageLayoutBarrier::UNDEFINED:
+		{
+			layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		}
+		break;
+
+		case ImageLayoutBarrier::TRANSFER_DST:
+		{
+			layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		}
+		break;
+
+		case ImageLayoutBarrier::COLOR_ATTACHMENT:
+		{
+			layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
+		break;
+
+		case ImageLayoutBarrier::DEPTH_STENCIL_ATTACHMENT:
+		{
+			layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		}
+		break;
+
+		case ImageLayoutBarrier::TRANSFER_SRC:
+		{
+			layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		}
+		break;
+
+		case ImageLayoutBarrier::PRESENT_SRC:
+		{
+			layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		}
+		break;
+
+		case ImageLayoutBarrier::SHADER_READ:
+		{
+			layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
+		break;
+
+		case ImageLayoutBarrier::DEPTH_STENCIL_READ:
+		{
+			layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		}
+		break;
+
+		case ImageLayoutBarrier::PixelGeneralRW:
+		case ImageLayoutBarrier::ComputeGeneralRW:
+		{
+			layout = VK_IMAGE_LAYOUT_GENERAL;
+		}
+		break;
+		default:
+		{
+			//MLOGE("Unknown ImageLayoutBarrier %d", (int32)target);
+		}
+		break;
+		}
+
+		return layout;
+	}
+
+	void dvk_texture::get_buffer(char* outbuf, upload_cx* q)//, dvk_queue* q)
+	{
+		dvk_staging_buffer staging;
+		size_t as = width * height * 4, align = 512;
+		as = alignUp(as, align);
+		staging.initBuffer(_dev, as ? as : _alloc_size);
+		VkImageAspectFlags    aspectMask = (VkImageAspectFlags)(_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+		VkBufferImageCopy bufferCopyRegion = {};
+		bufferCopyRegion.imageSubresource.aspectMask = aspectMask;
+		bufferCopyRegion.imageSubresource.mipLevel = 0;
+		bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+		bufferCopyRegion.imageSubresource.layerCount = 1;
+		bufferCopyRegion.imageExtent.width = width;
+		bufferCopyRegion.imageExtent.height = height;
+		bufferCopyRegion.imageExtent.depth = 1;
+		bufferCopyRegion.bufferOffset = 0;
+		bufferCopyRegion.bufferImageHeight = height;
+		bufferCopyRegion.bufferRowLength = width;
+		VkImageSubresourceRange subresourceRange = {};
+		subresourceRange.aspectMask = aspectMask;
+		subresourceRange.baseMipLevel = 0;
+		subresourceRange.levelCount = mipLevels;
+		subresourceRange.layerCount = 1;
+		VkImageLayout il = !descriptor ? (VkImageLayout)GetImageLayout(_image_layout) : descriptor->imageLayout;
+		q->add_copy2mem(_image, bufferCopyRegion, subresourceRange, aspectMask, il, staging.buffer);
+		q->flushAndFinish();
+		staging.getBuffer(outbuf, -1);
+	}
+	void dvk_texture::copy2image(VkImage img, upload_cx* q)
+	{
+		size_t as = width * height * 4, align = 512;
+		as = alignUp(as, align);
+		VkImageAspectFlags    aspectMask = (VkImageAspectFlags)(_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+		VkImageCopy cr = {};
+		cr.dstOffset = {};
+		cr.dstSubresource.aspectMask = aspectMask;
+		cr.dstSubresource.mipLevel = 0;
+		cr.dstSubresource.baseArrayLayer = 0;
+		cr.dstSubresource.layerCount = 1;
+
+		cr.extent.width = width;
+		cr.extent.height = height;
+		cr.extent.depth = 1;
+
+		cr.srcOffset = {};
+		cr.srcSubresource = cr.dstSubresource;
+
+		VkImageSubresourceRange subresourceRange = {};
+		subresourceRange.aspectMask = aspectMask;
+		subresourceRange.baseMipLevel = 0;
+		subresourceRange.levelCount = mipLevels;
+		subresourceRange.layerCount = 1;
+		VkImageLayout il = !descriptor ? (VkImageLayout)GetImageLayout(_image_layout) : descriptor->imageLayout;
+		q->add_copy2img(_image, cr, subresourceRange, aspectMask, il, img);
+		q->flushAndFinish();
+	}
 }
 
 
@@ -13754,6 +15051,8 @@ namespace vkr {
 	}
 
 #if 1
+
+
 	//创建信号
 	void createSemaphore(VkDevice dev, VkSemaphore* semaphore, VkSemaphoreCreateInfo* semaphoreCreateInfo)
 	{
@@ -13840,44 +15139,6 @@ namespace vkr {
 		return sampler;
 	}
 
-	uint32_t getMemoryType(Device* dev, uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound)
-	{
-		auto memoryProperties = dev->GetPhysicalDeviceMemoryProperties();
-		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
-		{
-			if ((typeBits & 1) == 1)
-			{
-				if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
-				{
-					if (memTypeFound)
-					{
-						*memTypeFound = true;
-					}
-					return i;
-				}
-			}
-			typeBits >>= 1;
-		}
-
-#if defined(__ANDROID__)
-		//todo : Exceptions are disabled by default on Android (need to add LOCAL_CPP_FEATURES += exceptions to Android.mk), so for now just return zero
-		if (memTypeFound)
-		{
-			*memTypeFound = false;
-		}
-		return 0;
-#else
-		if (memTypeFound)
-		{
-			*memTypeFound = false;
-			return 0;
-		}
-		else
-		{
-			throw std::runtime_error("Could not find a matching memory type");
-		}
-#endif
-	}
 	//创建图像
 	int64_t createImage(Device* dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
 		, dvk_texture* texture, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
@@ -14022,9 +15283,10 @@ namespace vkr {
 
 
 		//swapchainbuffers交换链
-		void initFBO(int width, int height, VkRenderPass rp)
+		void initFBO(int width, int height, int count, VkRenderPass rp)
 		{
 			_width = width; _height = height;
+			count_ = count;
 			//是否创建颜色缓冲纹理
 			isColor = true;// !swapchainbuffers || swapchainbuffers->empty();
 			// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
@@ -14183,7 +15445,7 @@ namespace vkr {
 			drawCmdBuffers.resize(count_);
 			for (auto& it : framebuffers)
 			{
-				//it.depth_stencil._dev = _dev;
+				it.depth_stencil._dev = _dev;
 				if (it.semaphore == VK_NULL_HANDLE)
 				{
 					createSemaphore(_dev->GetDevice(), &it.semaphore, 0);
@@ -14907,7 +16169,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-			}
+				}
 
 			// Render skydome
 			{
@@ -14991,7 +16253,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-		}
+			}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -15205,11 +16467,14 @@ namespace vkr {
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
-			}
 		}
+	}
 
 		// submit command buffer
 		{
+			vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
+			//print_time a("qsubmit 0");
 			VkResult res = vkEndCommandBuffer(cmdBuf1);
 			assert(res == VK_SUCCESS);
 
@@ -15225,13 +16490,12 @@ namespace vkr {
 			submit_info.pSignalSemaphores = NULL;
 			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
 			assert(res == VK_SUCCESS);
+			//vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+			//vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
 		}
 		{
 			// Wait for swapchain (we are going to render to it) -----------------------------------
 			//int imageIndex = pSwapChain->WaitForSwapChain();
-			vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
-
 			// Keep tracking input/output resource views 
 			auto ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
 			auto SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
@@ -15311,21 +16575,35 @@ namespace vkr {
 				VkSubmitInfo submit_info2;
 				submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 				submit_info2.pNext = NULL;
-				submit_info2.waitSemaphoreCount = 1;
-				submit_info2.pWaitSemaphores = &ImageAvailableSemaphore;
+				submit_info2.waitSemaphoreCount = 1 * 0;
+				submit_info2.pWaitSemaphores = 0;// &ImageAvailableSemaphore;
 				submit_info2.pWaitDstStageMask = &submitWaitStage;
 				submit_info2.commandBufferCount = 1;
 				submit_info2.pCommandBuffers = &cmdBuf2;
-				submit_info2.signalSemaphoreCount = 1;
-				submit_info2.pSignalSemaphores = &RenderFinishedSemaphores;
+				submit_info2.signalSemaphoreCount = 1 * 0;
+				submit_info2.pSignalSemaphores = 0;// &RenderFinishedSemaphores;
 
-				res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info2, _fbo.fence);
-				assert(res == VK_SUCCESS);
+				{
+					//print_time a("qsubmit");
+					res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info2, _fbo.fence);
+					assert(res == VK_SUCCESS);
+					vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+
+				}
+				//while (1) {
+
+				//	auto hrs = vkGetFenceStatus(m_pDevice->GetDevice(), _fbo.fence);
+				//	printf("vkGetFenceStatus\t%d\n", (int)hrs);
+				//	if (hrs == VK_SUCCESS) {
+				//		break;
+				//	}
+				//	Sleep(1);
+				//}
 			}
 		}
 #endif
 
-	}
+}
 	void Renderer_cx::set_fbo(fbo_info_cx* p)
 	{
 		_fbo.fence = p->_fence;
@@ -15575,11 +16853,12 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		_rp = newRenderPass(m_device, VK_FORMAT_R8G8B8A8_SRGB);
+		_rp = newRenderPass(m_device, VK_FORMAT_B8G8R8A8_UNORM);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
 
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
-		f->initFBO(m_Width, m_Height, _rp);
+		f->colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
+		f->initFBO(m_Width, m_Height, 1, _rp);
 		m_pRenderer->set_fbo(f);
 		m_pRenderer->OnCreate(m_device, _rp);
 		_fbo = f;
@@ -15963,6 +17242,59 @@ void vkdg_cx::on_render()
 		auto tx = (vkr::sample_cx*)ctx;
 		tx->OnRender();
 	}
+}
+
+image_vkr vkdg_cx::get_vkimage(int idx)
+{
+	image_vkr r = {};
+	if (ctx) {
+		auto tx = (vkr::sample_cx*)ctx;
+		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
+			r.vkimageptr = tx->_fbo->framebuffers[idx].color._image;
+			r.size = { tx->_fbo->framebuffers[idx].color.width,tx->_fbo->framebuffers[idx].color.height };
+			width = r.size.x;
+			height = r.size.y;
+		}
+	}
+	return r;
+}
+
+void vkdg_cx::save_fbo(int idx)
+{
+	if (ctx) {
+		auto q = (vkr::upload_cx*)qupload;
+		if (!q)
+		{
+			q = new vkr::upload_cx();
+			q->init((vkr::Device*)dev, width * height * 6, 0);
+			qupload = q;
+		}
+		auto tx = (vkr::sample_cx*)ctx;
+		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
+			auto ptex = &tx->_fbo->framebuffers[idx].color;
+			dt.resize(width * height);
+			ptex->get_buffer((char*)dt.data(), q);
+		}
+	}
+}
+
+void vkdg_cx::copy2(int idx, void* vkptr)
+{
+	if (ctx && vkptr) {
+		auto q = (vkr::upload_cx*)qupload;
+		if (!q)
+		{
+			q = new vkr::upload_cx();
+			q->init((vkr::Device*)dev, width * height * 6, 0);
+			qupload = q;
+		}
+		auto tx = (vkr::sample_cx*)ctx;
+		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
+			auto ptex = &tx->_fbo->framebuffers[idx].color;
+			ptex->copy2image((VkImage)vkptr, q);
+		}
+	}
+
 }
 
 

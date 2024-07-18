@@ -228,6 +228,7 @@ public:
 
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
 	void set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply = false);
+	void* get_texture_data(SDL_Texture* p, int* ss);
 	void free_texture(SDL_Texture* p);
 	// 获取纹理vk image
 	void* get_texture_vk(SDL_Texture* p);

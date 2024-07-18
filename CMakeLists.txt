@@ -165,7 +165,7 @@ list(APPEND lklib
     PkgConfig::Clipper2  PkgConfig::Clipper2Z 
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
-   # rvk
+    rvk
    # rdx12
    # unofficial::joltphysics::Jolt
 )
