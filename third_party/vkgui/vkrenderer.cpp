@@ -30,6 +30,7 @@ vk渲染器
 typedef uint32_t DXGI_FORMAT;
 #endif
 #include <tinysdl3.h>
+#include <event.h>
 #include <print_time.h>
 
 #define TINYGLTF_IMPLEMENTATION 
@@ -17114,6 +17115,7 @@ namespace vkr {
 				panning ? -io.MouseDelta.x / 100.0f : 0.0f,
 				panning ? io.MouseDelta.y / 100.0f : 0.0f,
 				distance);
+
 		}
 		else if (m_activeCamera == 1)
 		{
@@ -17202,11 +17204,16 @@ vkdg_cx::~vkdg_cx()
 {
 }
 
-void vkdg_cx::update()
+void vkdg_cx::update(mouse_state_t* io)
 {
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;
-		tx->io = tx->io;
+		tx->io = *io;
+		{
+			io->MouseDelta.x = 0;
+			io->MouseDelta.y = 0;
+			io->MouseWheel = 0;
+		}
 	}
 }
 
@@ -17215,6 +17222,7 @@ void vkdg_cx::on_render()
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;
 		tx->OnRender();
+		 
 	}
 }
 

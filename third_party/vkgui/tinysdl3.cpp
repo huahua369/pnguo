@@ -965,6 +965,7 @@ form_x::form_x()
 {
 	events = new std::vector<event_fw>[(uint32_t)devent_type_e::max_det];
 	events_a = new std::vector<event_fw>();
+	io = new mouse_state_t();
 }
 
 form_x::~form_x()
@@ -975,6 +976,11 @@ form_x::~form_x()
 		it->_ptr = 0;
 		app->remove(it);
 	}
+	if (io)
+	{
+		delete io;
+	}
+	io = 0;
 	if (events)
 	{
 		delete[] events;
@@ -1296,6 +1302,15 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		mt.xrel = e->motion.xrel;
 		mt.yrel = e->motion.yrel;		// The relative motion in the XY direction 
 		mt.which = e->motion.which;		// 鼠标实例 
+		if (pw->io) {
+			pw->io->MousePos = { mt.x,mt.y };
+			pw->io->MouseDelta = { mt.xrel,mt.yrel };
+			int ms = SDL_GetModState();
+			pw->io->KeyCtrl = (ms & SDL_KMOD_LCTRL || ms & SDL_KMOD_RCTRL);
+			pw->io->KeyShift = (ms & SDL_KMOD_LSHIFT || ms & SDL_KMOD_RSHIFT);
+			pw->io->KeyAlt = (ms & SDL_KMOD_LALT || ms & SDL_KMOD_RALT);
+			pw->io->KeySuper = (ms & SDL_KMOD_LGUI || ms & SDL_KMOD_RGUI);
+		}
 		pw->trigger((uint32_t)devent_type_e::mouse_move_e, &mt);
 
 		if (mt.cursor > 0) {
@@ -1312,6 +1327,11 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		wt.y = e->wheel.y;
 		float preciseX = e->wheel.mouse_x;// preciseX;
 		float preciseY = e->wheel.mouse_y;
+
+		if (pw->io) {
+			pw->io->MouseWheel = wt.y;
+			pw->io->MouseWheelH = wt.x;
+		}
 		pw->trigger((uint32_t)devent_type_e::mouse_wheel_e, &wt);
 	}
 	break;
@@ -1361,6 +1381,9 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		if (t.state)
 		{
 			pw->hide_child();
+		}
+		if (pw->io) {
+			pw->io->MouseDown[t.button - 1] = t.state;
 		}
 		pw->trigger((uint32_t)devent_type_e::mouse_button_e, &t);
 
@@ -2171,7 +2194,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+	}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);

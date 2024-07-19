@@ -104,6 +104,7 @@ private:
 class skeleton_t;
 class canvas_atlas;
 struct input_state_t;
+struct mouse_state_t;
 namespace hz {
 	class drop_regs;
 	class drop_info_cx;
@@ -150,6 +151,7 @@ public:
 	input_state_t* input_ptr = 0;	// 接收输入法的对象
 	glm::ivec4 ime_pos = {};
 	void* activate_ptr = 0;	// 激活的对象
+	mouse_state_t* io = 0;
 	std::vector<event_fw>* events = 0;
 	std::vector<event_fw>* events_a = 0;
 	std::vector<event_fw> first_cs;	// 优先
