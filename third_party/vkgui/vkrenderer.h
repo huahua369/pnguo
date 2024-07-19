@@ -49,6 +49,8 @@ public:
 	void update();
 	void on_render();
 	image_vkr get_vkimage(int idx);
+	// 重置大小
+	void resize(int w, int h);
 	void save_fbo(int idx);
 	void copy2(int idx, void* vkptr);
 private:

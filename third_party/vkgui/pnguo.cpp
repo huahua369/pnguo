@@ -19897,13 +19897,7 @@ bool radio_tl::on_mevent(int type, const glm::vec2& mps)
 
 bool radio_tl::update(float delta)
 {
-	int ic = 0;
-	//if (bst == _old_bst)return false;
-
-	// (sta & hz::BTN_STATE::STATE_FOCUS) 
-	//info.mMouseFocus = (bst & (int)BTN_STATE::STATE_HOVER);
-	//if (bst & (int)BTN_STATE::STATE_DISABLE)
-
+	int ic = 0; 
 	{
 		auto& it = v;
 		if (size.x <= 0) {

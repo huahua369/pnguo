@@ -558,16 +558,10 @@ int main()
 	if (vkd) {
 		int xk = 0;
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
-		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
-		//while (xk < 100) {
-		//	vkd->update();
-		//	vkd->on_render();
-		//	Sleep(10);
-		//	xk++;
-		//}
-
-		//form0->get_texture_data(d3tex, 0);
-
+		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
+		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+ 
+		vkd->resize(800, 600);
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)
 		{
@@ -579,10 +573,25 @@ int main()
 				d3tex = tex;
 				vkptrdst = form0->get_texture_vk(d3tex);
 				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
-				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 0,0,vr.size.x,vr.size.y }, 0);
+				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 100,100,vr.size.x,vr.size.y }, 0);
 			}
 		}
 	}
+	form0->up_cb = [=](float delta, int* ret)
+		{
+			vkd->update();
+			vkd->on_render();
+			static void* vkptrdst = 0;
+			if (!vkptrdst)
+				vkptrdst = form0->get_texture_vk(d3tex);
+			//vkd->copy2(0, vkptrdst);
+			bool ks = false;
+			if (ks) {
+				vkd->save_fbo(0);
+				stbi_write_png("temp/fbovkr.png", vkd->width, vkd->height, 4, vkd->dt.data(), 0);
+			}
+			//form0->get_texture_data(d3tex, 0);
+		};
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	menu_cx* mc = new menu_cx();	// 菜单管理
@@ -1293,18 +1302,6 @@ int main()
 
 		pl1->update_cb = [=](float delta)
 			{
-				vkd->update();
-				vkd->on_render();
-				static void* vkptrdst = 0;
-				if (!vkptrdst)
-					vkptrdst = form0->get_texture_vk(d3tex);
-				//vkd->copy2(0, vkptrdst);
-				bool ks = false;
-				if (ks) {
-					vkd->save_fbo(0);
-					stbi_write_png("temp/fbovkr.png", vkd->width, vkd->height, 4, vkd->dt.data(), 0);
-				}
-				//form0->get_texture_data(d3tex, 0);
 				return 0;
 			};
 		pl1->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
@@ -1378,7 +1375,7 @@ int main()
 				}
 			};
 	}
-	if(0){
+	if (0) {
 		pl3->draggable = true; //可拖动
 		pl3->set_size({ 1400,600 });
 		pl3->set_pos({ 10,10 });
@@ -1428,7 +1425,7 @@ int main()
 
 			};
 	}
-	if(0){
+	if (0) {
 		pl2->draggable = true; //可拖动*
 		pl2->set_size({ 830,600 });
 		pl2->set_pos({ 10,10 });

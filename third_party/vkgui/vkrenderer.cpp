@@ -16529,8 +16529,11 @@ namespace vkr {
 				rp_begin.renderArea.offset.y = 0;
 				rp_begin.renderArea.extent.width = m_Width;
 				rp_begin.renderArea.extent.height = m_Height;
-				rp_begin.clearValueCount = 0;
-				rp_begin.pClearValues = NULL;
+				VkClearValue clearValues[2] = {};
+				clearValues->color = { 0.0f, 0.0f, 0.0f, 0.0f };
+				clearValues[1].depthStencil = { 1.0f, 0 };
+				rp_begin.clearValueCount = 2;
+				rp_begin.pClearValues = clearValues;
 				vkCmdBeginRenderPass(cmdBuf2, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 			}
 
@@ -16657,7 +16660,6 @@ namespace vkr {
 		VkRenderPass _rp = 0;
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		UIState                     m_UIState;
-		float                       m_fontSize;
 		Camera                      m_camera;
 		mouse_state_t io = {};
 		float                       m_time = 0; // Time accumulator in seconds, used for animation.
@@ -16677,7 +16679,9 @@ namespace vkr {
 
 		m_pGltfLoader = NULL;
 	}
-	sample_cx::~sample_cx() {}
+	sample_cx::~sample_cx() {
+		if (_fbo)delete _fbo; _fbo = 0;
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// OnParseCommandLine
@@ -16692,70 +16696,9 @@ namespace vkr {
 			*pHeight = 1080;
 		m_activeScene = 0;          //load the first one by default
 		m_bIsBenchmarking = false;
-		//m_VsyncEnabled = false;
-		m_fontSize = 13.f;
+		//m_VsyncEnabled = false; 
 		m_activeCamera = 0;
-#if 0
-		// read globals
-		auto process = [&](njson jData)
-			{
-				*pWidth = jData.value("width", *pWidth);
-				*pHeight = jData.value("height", *pHeight);
-				//m_fullscreenMode = jData.value("presentationMode", m_fullscreenMode);
-				m_activeScene = jData.value("activeScene", m_activeScene);
-				m_activeCamera = jData.value("activeCamera", m_activeCamera);
-				//m_isCpuValidationLayerEnabled = jData.value("CpuValidationLayerEnabled", m_isCpuValidationLayerEnabled);
-				//m_isGpuValidationLayerEnabled = jData.value("GpuValidationLayerEnabled", m_isGpuValidationLayerEnabled);
-				//m_VsyncEnabled = jData.value("vsync", m_VsyncEnabled);
-				//m_FreesyncHDROptionEnabled = jData.value("FreesyncHDROptionEnabled", m_FreesyncHDROptionEnabled);
-				m_bIsBenchmarking = jData.value("benchmark", m_bIsBenchmarking);
-				m_fontSize = jData.value("fontsize", m_fontSize);
-			};
 
-		//read json globals from commandline
-		//
-		try
-		{
-			if (strlen(lpCmdLine) > 0)
-			{
-				auto j3 = njson::parse(lpCmdLine);
-				process(j3);
-			}
-		}
-		catch (njson::parse_error)
-		{
-			Trace("Error parsing commandline\n");
-			exit(0);
-		}
-
-		// read config file (and override values from commandline if so)
-		//
-		{
-			std::ifstream f("sample_cx.json");
-			if (!f)
-			{
-				MessageBox(NULL, "Config file not found!\n", "Cauldron Panic!", MB_ICONERROR);
-				exit(0);
-			}
-
-			try
-			{
-				f >> m_jsonConfigFile;
-			}
-			catch (njson::parse_error)
-			{
-				MessageBox(NULL, "Error parsing sample_cx.json!\n", "Cauldron Panic!", MB_ICONERROR);
-				exit(0);
-			}
-		}
-
-		njson globals = m_jsonConfigFile["globals"];
-		process(globals);
-
-		// get the list of scenes
-		for (const auto& scene : m_jsonConfigFile["scenes"])
-			m_sceneNames.push_back(scene["name"]);
-#endif
 	}
 
 	VkRenderPass newRenderPass(Device* pDevice, VkFormat format)
@@ -16830,8 +16773,8 @@ namespace vkr {
 		this->bLockMagnifierPosition = this->bLockMagnifierPositionHistory = false;
 		this->SelectedSkydomeTypeIndex = 0;
 		this->Exposure = 1.0f;
-		this->IBLFactor = 3.0f;
-		this->EmissiveFactor = 30.0f;
+		this->IBLFactor = 1.0f;//3
+		this->EmissiveFactor = 10.0f;//30
 		this->bDrawLightFrustum = false;
 		this->bDrawBoundingBoxes = false;
 		this->WireframeMode = WireframeMode::WIREFRAME_MODE_OFF;
@@ -16886,7 +16829,7 @@ namespace vkr {
 		m_pRenderer->UnloadScene();
 		m_pRenderer->OnDestroyWindowSizeDependentResources();
 		m_pRenderer->OnDestroy();
-
+		DestroyRenderPass(m_device, _rp); _rp = 0;
 		delete m_pRenderer;
 
 		// shut down the shader compiler 
@@ -16935,6 +16878,8 @@ namespace vkr {
 		// destroy resources (if we are not minimized)
 		if (resizeRender && m_Width && m_Height && m_pRenderer)
 		{
+			_fbo->reset_fbo(m_Width, m_Height);
+			m_pRenderer->set_fbo(_fbo);
 			m_pRenderer->OnDestroyWindowSizeDependentResources();
 			m_pRenderer->OnCreateWindowSizeDependentResources(m_Width, m_Height);
 		}
@@ -17076,8 +17021,10 @@ namespace vkr {
 		if (m_bPlay)
 			m_time += (float)m_deltaTime / 1000.0f; // animation time in seconds
 
-		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(1, 0, 0));
-		//m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.0001, 0.0001, 0.0001));
+		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -1, 0));
+		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(3, 3, 3));
+		m = m * glm::rotate(glm::radians(10.0f), glm::vec3( 1,0, 0));
+		m = m * glm::rotate(glm::radians(15.0f), glm::vec3( 0,1, 0));
 		static int nn[10] = {};
 		int i = 0;
 		for (auto it : _loaders)
@@ -17259,6 +17206,16 @@ image_vkr vkdg_cx::get_vkimage(int idx)
 	return r;
 }
 
+void vkdg_cx::resize(int w, int h) {
+	if (ctx) {
+		auto tx = (vkr::sample_cx*)ctx;
+		if (w > 0 && h > 0 && (w != tx->m_Width || h != tx->m_Height)) {
+			tx->m_Width = w;
+			tx->m_Height = h;
+			tx->OnResize(true);
+		}
+	}
+}
 void vkdg_cx::save_fbo(int idx)
 {
 	if (ctx) {
@@ -17338,6 +17295,11 @@ vkdg_cx* new_vkdg(dev_info_cx* c)
 		SystemInfo m_systemInfo;
 		bool cpuvalid = false;
 		bool gpuvalid = false;
+#ifdef _DEBUG
+		cpuvalid = 1;
+		gpuvalid = 1;
+#endif // _DEBUG
+
 		auto dev = new vkr::Device();
 		dev->OnCreate(c, cpuvalid, gpuvalid, 0, 0, 0);
 		dev->CreatePipelineCache();

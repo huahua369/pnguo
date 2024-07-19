@@ -1395,8 +1395,8 @@ struct checkbox_info_t
 struct radio_tl;
 struct group_radio_t
 {
-	radio_tl* active = 0;
-	int ct = 0;
+	radio_tl* active = 0;	// 激活的radio
+	int ct = 0;				// 引用计数
 };
 // 单选
 struct radio_tl :public widget_base

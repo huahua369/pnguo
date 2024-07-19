@@ -44,6 +44,11 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/perFrameStruct.h
 )
+set(Images_src
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/brdfLut.dds 
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/diffuse.dds 
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/specular.dds 
+)
 
 add_library (vkgui STATIC ${vkgui_src})
 
@@ -51,6 +56,7 @@ target_link_libraries (vkgui Vulkan::Vulkan glm::glm-header-only PkgConfig::LIBR
 target_include_directories (vkgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)
 copyTargetCommand("${Shaders_PostProc_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_postproc_src)
-add_dependencies(vkgui copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src)
+copyTargetCommand("${Images_src}" ${EXECUTABLE_OUTPUT_PATH}/images copied_Images_src)
+add_dependencies(vkgui copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src copied_Images_src)
 
  
