@@ -524,16 +524,16 @@ int main()
 	{
 		std::thread a([]()
 			{
-				mesh_triangle_cx* m1 = new_mesh("E:\\d3\\cone0.stl");// stl
-				mesh_triangle_cx* m2 = new_mesh("E:\\d3\\cube.stl");
-				std::vector<mesh_triangle_cx> opt;
-				make_boolean(m1, m2, opt, flags_b::A_NOT_B);
-				for (size_t i = 0; i < opt.size(); i++)
-				{
-					auto& it = opt[i];
-					std::string fn = "temp/boolean_" + std::to_string(i) + ".stl";
-					mesh_save_stl(&it, fn.c_str(), 0);
-				}
+				//mesh_triangle_cx* m1 = new_mesh("E:\\d3\\cone0.stl");// stl
+				//mesh_triangle_cx* m2 = new_mesh("E:\\d3\\cube.stl");
+				//std::vector<mesh_triangle_cx> opt;
+				//make_boolean(m1, m2, opt, flags_b::A_NOT_B);
+				//for (size_t i = 0; i < opt.size(); i++)
+				//{
+				//	auto& it = opt[i];
+				//	std::string fn = "temp/boolean_" + std::to_string(i) + ".stl";
+				//	mesh_save_stl(&it, fn.c_str(), 0);
+				//}
 			});
 		a.detach();
 	}
@@ -559,6 +559,8 @@ int main()
 		int xk = 0;
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
 		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
+		load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
+		load_gltf(vkd, R"(E:\model\old_tree.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
  
 		vkd->resize(800, 600);

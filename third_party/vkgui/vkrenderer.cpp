@@ -16652,8 +16652,9 @@ namespace vkr {
 
 		bool                        m_bIsBenchmarking = false;
 		fbo_info_cx* _fbo = 0;
-		GLTFCommon* m_pGltfLoader = NULL;
+		GLTFCommon* _tmpgc = 0;
 		std::vector<GLTFCommon*>    _loaders;
+		std::queue<GLTFCommon*> _lts;
 		bool                        m_loadingScene = false;
 
 		Renderer_cx* m_pRenderer = NULL;
@@ -16677,7 +16678,6 @@ namespace vkr {
 		m_time = 0;
 		m_bPlay = true;
 
-		m_pGltfLoader = NULL;
 	}
 	sample_cx::~sample_cx() {
 		if (_fbo)delete _fbo; _fbo = 0;
@@ -16835,11 +16835,11 @@ namespace vkr {
 		// shut down the shader compiler 
 		DestroyShaderCache(m_device);
 
-		if (m_pGltfLoader)
+		for (auto it : _loaders)
 		{
-			delete m_pGltfLoader;
-			m_pGltfLoader = NULL;
+			delete it;
 		}
+		_loaders.clear();
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -16910,7 +16910,7 @@ namespace vkr {
 	{
 		njson scene;// = m_jsonConfigFile["scenes"][sceneIndex];
 		// release everything and load the GLTF, just the light json data, the rest (textures and geometry) will be done in the main loop
-		if (m_pGltfLoader != NULL)
+		//if (m_pGltfLoader != NULL)
 		{
 			//m_pRenderer->UnloadScene();
 			//m_pRenderer->OnDestroyWindowSizeDependentResources();
@@ -16921,9 +16921,9 @@ namespace vkr {
 		}
 
 		//delete(m_pGltfLoader);
-		m_pGltfLoader = new GLTFCommon();
-		_loaders.push_back(m_pGltfLoader);//);// scene["directory"], scene["filename"]
-		if (m_pGltfLoader->Load(fn, "") == false)
+		auto pgc = new GLTFCommon();
+		_lts.push(pgc);
+		if (pgc->Load(fn, "") == false)
 		{
 			MessageBox(NULL, "The selected model couldn't be found, please check the documentation", "Cauldron Panic!", MB_ICONERROR);
 			return;
@@ -16944,7 +16944,7 @@ namespace vkr {
 			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
 
 			// Add a default light in case there are none
-			if (m_pGltfLoader->m_lights.size() == 0)
+			if (pgc->m_lights.size() == 0)
 			{
 				tfNode n;
 				n.m_tranform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
@@ -16958,11 +16958,11 @@ namespace vkr {
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
 				l.m_shadowResolution = 1024;
 
-				m_pGltfLoader->AddLight(n, l);
+				pgc->AddLight(n, l);
 			}
 
 			// Allocate shadow information (if any)
-			m_pRenderer->AllocateShadowMaps(m_pGltfLoader);
+			m_pRenderer->AllocateShadowMaps(pgc);
 
 			// set default camera
 			njson camera = scene["camera"];
@@ -17023,8 +17023,8 @@ namespace vkr {
 
 		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -1, 0));
 		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(3, 3, 3));
-		m = m * glm::rotate(glm::radians(10.0f), glm::vec3( 1,0, 0));
-		m = m * glm::rotate(glm::radians(15.0f), glm::vec3( 0,1, 0));
+		m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
+		m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
 		static int nn[10] = {};
 		int i = 0;
 		for (auto it : _loaders)
@@ -17032,7 +17032,7 @@ namespace vkr {
 			auto n = it->get_animation_count();
 			it->SetAnimationTime(nn[i++], m_time);
 			it->TransformScene(0, m);
-			m = glm::mat4(1.0f);
+			//m = glm::mat4(1.0f);
 		}
 	}
 
@@ -17103,7 +17103,7 @@ namespace vkr {
 		if (m_activeCamera > 1)
 		{
 			// Use a camera from the GLTF
-			m_pGltfLoader->GetCamera(m_activeCamera - 2, &cam);
+			//m_pGltfLoader->GetCamera(m_activeCamera - 2, &cam);
 		}
 	}
 
@@ -17128,13 +17128,18 @@ namespace vkr {
 		//ImGUI_UpdateIO();
 		//ImGui::NewFrame();
 
-		if (m_loadingScene)
+		if (_lts.size() || _tmpgc)
 		{
 			// the scene loads in chuncks, that way we can show a progress bar
 			static int loadingStage = 0;
-			loadingStage = m_pRenderer->LoadScene(m_pGltfLoader, loadingStage);
+			if (!_tmpgc) {
+				_tmpgc = _lts.front(); _lts.pop();
+			}
+			loadingStage = m_pRenderer->LoadScene(_tmpgc, loadingStage);
 			if (loadingStage == 0)
 			{
+				_loaders.push_back(_tmpgc);
+				_tmpgc = 0;
 				//m_time = 0;
 				m_loadingScene = false;
 			}
