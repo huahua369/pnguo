@@ -676,7 +676,7 @@ int main()
 		p->border = { 0x80ff802C,1,5 };
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 
-		p->set_size({ 800,600 });
+		p->set_size({ 500,600 });
 		p->set_pos({ 0,0 });
 		p->set_colors({ pbc,-1,0,0 });
 		auto pss = p->get_size();
@@ -913,7 +913,7 @@ int main()
 	listp->add_familys(fontn2, 0);
 	{
 		listp->draggable = true; //可拖动
-		listp->set_size({ 800,600 });
+		listp->set_size({ 500,600 });
 		listp->set_pos({ 10,10 });
 		listp->set_colors({ 0xff333333,-1,0,0 });
 		listp->set_colors({ 0,0,0,0 });
@@ -1107,7 +1107,7 @@ int main()
 	pcu->update();
 	{
 		pl1->draggable = true; //可拖动
-		pl1->set_size({ 830,600 });
+		pl1->set_size({ 530,600 });
 		pl1->set_pos({ 100,100 });
 		pl1->set_colors({ pbc,-1,0,0 });
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
