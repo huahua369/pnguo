@@ -2506,12 +2506,12 @@ namespace vkr {
 		struct Constants
 		{
 			glm::mat4 invViewProj;
-			glm::vec4 vSunDirection;
-			float rayleigh;
-			float turbidity;
-			float mieCoefficient;
-			float luminance;
-			float mieDirectionalG;
+			glm::vec4 vSunDirection;		// 太阳方向
+			float rayleigh = 2;				// 瑞利散射，视觉效果就是傍晚晚霞的红光的深度
+			float turbidity = 10;			// 浑浊度
+			float mieCoefficient = 0.005;	// 散射系数
+			float luminance = 1.0;			// 亮度
+			float mieDirectionalG = 0.8;	// 定向散射值
 		};
 
 		void OnCreate(Device* pDevice, VkRenderPass renderPass, UploadHeap* pUploadHeap, VkFormat outFormat, ResourceViewHeaps* pResourceViewHeaps, DynamicBufferRing* pDynamicBufferRing, StaticBufferPool* pStaticBufferPool, VkSampleCountFlagBits sampleDescCount);
@@ -13665,7 +13665,8 @@ namespace vkr {
 
 		// shadowmaps
 		VkRenderPass                    m_Render_pass_shadow = {};
-
+		// 程序天空盒参数
+		SkyDomeProc::Constants			skyDomeConstants = {};
 
 		// widgets
 		Wireframe                       m_Wireframe = {};
@@ -15617,6 +15618,15 @@ namespace vkr {
 			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, NULL, &depthAttachments);
 		}
 
+		{
+			skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, 0.0f);
+			skyDomeConstants.turbidity = 10.0f;
+			skyDomeConstants.rayleigh = 2.0f;
+			skyDomeConstants.mieCoefficient = 0.005f;
+			skyDomeConstants.mieDirectionalG = 0.8f;
+			skyDomeConstants.luminance = 1.0f;
+		}
+
 		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", "images\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
@@ -16209,14 +16219,8 @@ namespace vkr {
 				//}
 				//else if (pState->SelectedSkydomeTypeIndex == 0)
 				{
-					SkyDomeProc::Constants skyDomeConstants;
 					skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
-					skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, 0.0f);
-					skyDomeConstants.turbidity = 10.0f;
-					skyDomeConstants.rayleigh = 2.0f;
-					skyDomeConstants.mieCoefficient = 0.005f;
-					skyDomeConstants.mieDirectionalG = 0.8f;
-					skyDomeConstants.luminance = 1.0f;
+
 					m_SkyDomeProc.Draw(cmdBuf1, skyDomeConstants);
 
 					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome Proc");
@@ -17016,8 +17020,6 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void sample_cx::OnUpdate()
 	{
-		//ImGuiIO& io = ImGui::GetIO();
-
 		////If the mouse was not used by the GUI then it's for the camera
 		////
 		if (io.WantCaptureMouse)
@@ -17044,16 +17046,17 @@ namespace vkr {
 		if (m_bPlay)
 			m_time += (float)m_deltaTime / 1000.0f; // animation time in seconds
 
-		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -2, 0));
-		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.3, .3, .3));
-		m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
-		m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
+		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
+		//m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.3, .3, .3));
+		//m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
+		//m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
 		static int nn[10] = {};
 		int i = 0;
+		static float speed = 1.2;
 		for (auto it : _loaders)
 		{
 			auto n = it->get_animation_count();
-			it->SetAnimationTime(nn[i++], m_time);
+			it->SetAnimationTime(nn[i++], m_time * speed);
 			it->TransformScene(0, m);
 			//m = glm::mat4(1.0f);
 		}
@@ -17148,10 +17151,7 @@ namespace vkr {
 	{
 		// Do any start of frame necessities
 		BeginFrame();
-
-		//ImGUI_UpdateIO();
-		//ImGui::NewFrame();
-
+		 
 		if (_lts.size() || _tmpgc)
 		{
 			// the scene loads in chuncks, that way we can show a progress bar
@@ -17222,7 +17222,7 @@ void vkdg_cx::on_render()
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;
 		tx->OnRender();
-		 
+
 	}
 }
 
