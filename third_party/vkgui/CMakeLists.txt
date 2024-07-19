@@ -1,0 +1,56 @@
+﻿include(${CMAKE_CURRENT_SOURCE_DIR}/common.cmake)
+
+set(vkgui_src
+"mapView.cpp"
+"tinysdl3.cpp"
+"pnguo.cpp"
+"buffer.cpp"
+"win_core.cpp" 
+"page.cpp"  
+"vkrenderer.cpp"  
+)
+ 
+set(Shaders_PostProc_src
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/blend.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/blur.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/DownSamplePS.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/tonemappers.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/tonemapping.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/TAASharpenerCS.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/TAA.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/tonemappingCS.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/ColorConversionPS.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/MagnifierPS.glsl
+)
+
+set(Shaders_GLTF_src
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-frag.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-vert.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTF_VS2PS_IO.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPBRLighting.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFDepthPass-frag.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFDepthPass-vert.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFMotionVectorsPass-frag.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFMotionVectorsPass-vert.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDome.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDome.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/functions.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PBRTextures.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shadowFiltering.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PixelParams.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinning.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/perFrameStruct.h
+)
+
+add_library (vkgui STATIC ${vkgui_src})
+
+target_link_libraries (vkgui Vulkan::Vulkan glm::glm-header-only PkgConfig::LIBRSVG)
+target_include_directories (vkgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
+copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)
+copyTargetCommand("${Shaders_PostProc_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_postproc_src)
+add_dependencies(vkgui copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src)
+
+ 

@@ -74,17 +74,11 @@ SET (VKVG_PUBLIC_HEADERS "third_party/vkvg/vkvg.h;third_party/vkvg/vkvg-svg.h")
 
 list(APPEND src_cmp    
 "third_party/stb_src/stb_src.c" 
-"third_party/vkgui/mapView.cpp"
-"third_party/vkgui/tinysdl3.cpp"
-"third_party/vkgui/pnguo.cpp"
-"third_party/vkgui/buffer.cpp"
-"third_party/vkgui/win_core.cpp" 
-"third_party/vkgui/page.cpp"  
+
 "third_party/tinyspline/parson.c"
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
 "third_party/vkvg/vkvgcx.cpp"  
-"third_party/vkgui/vkrenderer.cpp"  
 
 "third_party/mcut/bvh.cpp"  
 "third_party/mcut/frontend.cpp"  
@@ -106,6 +100,7 @@ list(APPEND src_cmp
     "test_src/main.cpp"
     "rc/resource1.rc"
 ) 
+
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (tcmp ${src_cmp}  ) 
@@ -165,7 +160,7 @@ list(APPEND lklib
     PkgConfig::Clipper2  PkgConfig::Clipper2Z 
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
-    rvk
+    vkgui
    # rdx12
    # unofficial::joltphysics::Jolt
 )
@@ -180,11 +175,10 @@ file(COPY test_src/button20.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 file(COPY test_src/button21.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
 
 #3d渲染器
+
+add_subdirectory(third_party/vkgui)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE)
 
-add_subdirectory(third_party/cauldron)
-add_subdirectory(third_party/vdrender/DX12)
-add_subdirectory(third_party/vdrender/VK)
-
+add_dependencies(tcmp vkgui)
 # TODO: 如有需要，请添加测试并安装目标。
