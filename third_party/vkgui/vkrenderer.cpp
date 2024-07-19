@@ -4919,6 +4919,28 @@ namespace vkr
 		} while (0);
 	}
 
+	int get_vint(tinygltf::Value& t, const char* k)
+	{
+		int x = 0;
+		if (t.Has(k))
+		{
+			x = t.Get(k).GetNumberAsInt();
+		}
+		return x;
+	}
+	int get_v2int(tinygltf::Value& t, const char* k, const char* k1)
+	{
+		int x = 0;
+		if (t.Has(k))
+		{
+			auto& t1 = t.Get(k);
+			if (t1.Has(k1))
+			{
+				x = t1.Get(k1).GetNumberAsInt();
+			}
+		}
+		return x;
+	}
 	void GetSrgbAndCutOffOfImageGivenItsUse(int imageIndex, const std::vector<tinygltf::Material>* p, bool* pSrgbOut, float* pCutoff)
 	{
 		auto& materials = *p;
@@ -4938,14 +4960,14 @@ namespace vkr
 			if (material.extensions.find("KHR_materials_pbrSpecularGlossiness") != material.extensions.end())
 			{
 				auto mpbrsg = material.extensions["KHR_materials_pbrSpecularGlossiness"];
-				auto sgtidx = mpbrsg.Get("specularGlossinessTexture").Get("index").GetNumberAsInt();
+				auto sgtidx = get_v2int(mpbrsg, "specularGlossinessTexture", "index");
 				if (sgtidx == imageIndex)
 				{
 					*pSrgbOut = true;
 					return;
 				}
 				// "extensions/KHR_materials_pbrSpecularGlossiness/diffuseTexture/index"
-				auto dtidx = mpbrsg.Get("diffuseTexture").Get("index").GetNumberAsInt();
+				auto dtidx = get_v2int(mpbrsg, "diffuseTexture", "index");
 				if (dtidx == imageIndex)
 				{
 					*pSrgbOut = true;
@@ -17021,8 +17043,8 @@ namespace vkr {
 		if (m_bPlay)
 			m_time += (float)m_deltaTime / 1000.0f; // animation time in seconds
 
-		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -1, 0));
-		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(3, 3, 3));
+		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -2, 0));
+		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.3, .3, .3));
 		m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
 		m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
 		static int nn[10] = {};

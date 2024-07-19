@@ -560,7 +560,7 @@ int main()
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
 		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
 		load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		load_gltf(vkd, R"(E:\model\old_tree.glb)");
+		//load_gltf(vkd, R"(E:\model\old_tree.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
  
 		vkd->resize(800, 600);
