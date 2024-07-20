@@ -795,7 +795,7 @@ struct pvm_t
 	glm::vec2 cpos = {};
 	int w, h;
 };
-
+// todo 字体纹理缓存管理
 class layout_text_x
 {
 public:

@@ -6162,9 +6162,6 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		p->set_size(ss);
 		p->set_pos({ radius * 0,radius * 0 });
 		ss += radius;
-		//f->add_canvas_atlas(pa);
-		//f->bind(p);
-		//f->set_size(ss);
 		ret.fsize = ss;
 		ret.p = p;
 		ret.back = pa;

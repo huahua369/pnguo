@@ -9969,7 +9969,7 @@ namespace vkr {
 		image_info.queueFamilyIndexCount = 0;
 		image_info.pQueueFamilyIndices = NULL;
 		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT); //TODO    
+		image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 		image_info.flags = 0;
 		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
 		m_result.Init(m_pDevice, &image_info, "DownsampleMip");
@@ -13520,6 +13520,7 @@ namespace vkr {
 		VkRenderPass renderPass = 0;
 		VkFramebuffer framebuffer = 0;
 		VkFence fence = {};
+		VkSemaphore sem = {};
 	};
 	struct PassParameters
 	{
@@ -15281,7 +15282,7 @@ namespace vkr {
 		int cmdcount = 0;
 		// Command buffers used for rendering
 		std::vector<VkCommandBuffer> drawCmdBuffers;
-		//std::vector<dvk_cmd> dcmds;
+		//std::vector<dvk_cmd> dcmds; 
 	public:
 		fbo_info_cx()
 		{
@@ -16515,8 +16516,8 @@ namespace vkr {
 			submit_info.pWaitDstStageMask = NULL;
 			submit_info.commandBufferCount = 1;
 			submit_info.pCommandBuffers = &cmdBuf1;
-			submit_info.signalSemaphoreCount = 0;
-			submit_info.pSignalSemaphores = NULL;
+			submit_info.signalSemaphoreCount = 1;
+			submit_info.pSignalSemaphores = &_fbo.sem;	// 完成发信号
 			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
 			assert(res == VK_SUCCESS);
 			//vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
@@ -16607,13 +16608,13 @@ namespace vkr {
 				VkSubmitInfo submit_info2;
 				submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 				submit_info2.pNext = NULL;
-				submit_info2.waitSemaphoreCount = 1 * 0;
-				submit_info2.pWaitSemaphores = 0;// &ImageAvailableSemaphore;
+				submit_info2.waitSemaphoreCount = 1;
+				submit_info2.pWaitSemaphores = &_fbo.sem;	// 收到信号再执行 
 				submit_info2.pWaitDstStageMask = &submitWaitStage;
 				submit_info2.commandBufferCount = 1;
 				submit_info2.pCommandBuffers = &cmdBuf2;
-				submit_info2.signalSemaphoreCount = 1 * 0;
-				submit_info2.pSignalSemaphores = 0;// &RenderFinishedSemaphores;
+				submit_info2.signalSemaphoreCount = 0;
+				submit_info2.pSignalSemaphores = 0;// todo 渲染完成信号&RenderFinishedSemaphores;
 
 				{
 					//print_time a("qsubmit");
@@ -16622,15 +16623,6 @@ namespace vkr {
 					vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
 
 				}
-				//while (1) {
-
-				//	auto hrs = vkGetFenceStatus(m_pDevice->GetDevice(), _fbo.fence);
-				//	printf("vkGetFenceStatus\t%d\n", (int)hrs);
-				//	if (hrs == VK_SUCCESS) {
-				//		break;
-				//	}
-				//	Sleep(1);
-				//}
 			}
 		}
 #endif
@@ -16640,6 +16632,7 @@ namespace vkr {
 	{
 		_fbo.fence = p->_fence;
 		_fbo.framebuffer = p->framebuffers[0].framebuffer;
+		_fbo.sem = p->framebuffers[0].semaphore;
 		_fbo.renderPass = p->renderPass;
 	}
 #endif
@@ -17151,7 +17144,7 @@ namespace vkr {
 	{
 		// Do any start of frame necessities
 		BeginFrame();
-		 
+
 		if (_lts.size() || _tmpgc)
 		{
 			// the scene loads in chuncks, that way we can show a progress bar
