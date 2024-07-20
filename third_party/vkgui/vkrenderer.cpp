@@ -2730,6 +2730,24 @@ namespace vkr {
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
+	class pbr_pass
+	{
+	public:
+		VkSampler m_samplerPbr = VK_NULL_HANDLE, m_samplerShadow = VK_NULL_HANDLE;
+		// PBR Brdf
+		Texture m_brdfLutTexture;
+		VkImageView m_brdfLutView = VK_NULL_HANDLE;
+		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
+	public:
+		pbr_pass();
+		~pbr_pass();
+
+	private:
+
+	};
+
+
+
 	struct DepthMaterial
 	{
 		int m_textureCount = 0;
@@ -5110,6 +5128,7 @@ namespace vkr
 				for (auto const& value : textureIds)
 					texturesBase[value.first] = m_pGLTFTexturesAndBuffers->GetTextureViewByID(value.second);
 
+				//tfmat->m_pbrMaterialParameters.m_defines["MAX_LIGHT_INSTANCES"] = "1";
 				CreateDescriptorTableForMaterialTextures(tfmat, texturesBase, pSkyDome, ShadowMapViewPool, bUseSSAOMask);
 			}
 
@@ -5768,7 +5787,20 @@ namespace vkr
 		vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
 
 	}
+
+	// todo pbr_pass
+	pbr_pass::pbr_pass()
+	{
+	}
+
+	pbr_pass::~pbr_pass()
+	{
+	}
+
+
 }
+//!vkr
+
 // 纹理
 
 namespace vkr
@@ -15589,8 +15621,9 @@ namespace vkr {
 			skyDomeConstants.mieDirectionalG = 0.8f;
 			skyDomeConstants.luminance = 1.0f;
 		}
-
-		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", "images\\specular.dds", VK_SAMPLE_COUNT_1_BIT);
+		auto specular = /*"images\\default_specular.dds";*/ "images\\specular.dds";
+		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps
+			, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);

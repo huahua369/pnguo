@@ -48,6 +48,7 @@ set(Images_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/brdfLut.dds 
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/diffuse.dds 
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/specular.dds 
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/default_specular.dds 
 )
 
 add_library (vkgui STATIC ${vkgui_src})
