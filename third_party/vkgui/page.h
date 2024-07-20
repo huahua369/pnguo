@@ -14,7 +14,7 @@ struct style_tooltip
 	const char* family = 0;
 	int fonst_size = 16;
 	int text_color = -1;	// 文本颜色
-	glm::ivec2 color = {};	// 背景色，边框色
+	glm::ivec2 color = {0xf0121212,0xaaffffff};	// 背景色，边框色
 	float thickness = 1.0;	// 线宽
 	float radius = 4;		// 矩形圆角 
 };

@@ -23,11 +23,11 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 
 	div->_lpos = { 0,0 }; div->_lms = { 0,0 };
 	//div->_lms = { 6,6 };
-	div->border = { 0x80aaaaaa,1,0 };
+	div->border = { bc->color.y,bc->thickness,bc->radius,bc->color.x };
 	auto ft = div->ltx;
 	auto rc = ft->get_text_rect(0, str.c_str(), str.size(), bc->fonst_size);
 	auto h = ft->get_lineheight(0, bc->fonst_size);
-	div->set_colors({ 0xff000000,-1,0,0 });
+	div->set_clear_color(0);
 	auto drc = rc;
 
 	drc += h;
@@ -87,7 +87,7 @@ void mitem_t::show(const glm::vec2& ps)
 		f->set_pos(pos);
 		f->show();
 	}
-	else if(m){
+	else if (m) {
 		m->show_item(this, pos);
 	}
 

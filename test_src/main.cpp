@@ -563,7 +563,7 @@ int main()
 		load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
- 
+
 		vkd->resize(800, 600);
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)
@@ -599,8 +599,8 @@ int main()
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	menu_cx* mc = new menu_cx();	// 菜单管理
-	//mc->set_main(form0);
-	//mc->add_familys(fontn);
+	mc->set_main(form0);
+	mc->add_familys(fontn);
 	std::vector<std::string> mvs = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
 	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
 	int cidx = 1;
@@ -657,10 +657,11 @@ int main()
 	auto pl4 = new plane_cx();
 	auto listp = new listview_cx();
 	pl2->_lms = { 6,6 };
-	pl1->border = { 0x80ff802C,1,5 };
-	pl2->border = { 0x80ff802C,1,5 };
-	pl3->border = { 0x80ff802C,1,5 };
 	uint32_t pbc = 0x80121212;
+
+	pl1->set_border({ 0x80ff802C,1,5,pbc });
+	pl2->set_border({ 0x80ff802C,1,5,pbc });
+	pl3->set_border({ 0x80ff802C,1,5 ,pbc });
 	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
@@ -686,12 +687,11 @@ int main()
 		p->draggable = true; //可拖动
 		p->add_familys(fontn, 0);
 		p->_lms = { 6,6 };
-		p->border = { 0x80ff802C,1,5 };
+		p->set_border({ 0x80ff802C,1,5 ,pbc });
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 
 		p->set_size({ 500,600 });
 		p->set_pos({ 0,0 });
-		p->set_colors({ pbc,-1,0,0 });
 		auto pss = p->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -920,7 +920,7 @@ int main()
 		}
 	}
 	// 创建列表视图
-	listp->border = { 0x80ff802C,1,5 };
+	listp->set_border({ 0x80ff802C,1,5,0xff333333 });
 	pw->bind(listp);	// 绑定到窗口	
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);
@@ -928,8 +928,6 @@ int main()
 		listp->draggable = true; //可拖动
 		listp->set_size({ 500,600 });
 		listp->set_pos({ 10,10 });
-		listp->set_colors({ 0xff333333,-1,0,0 });
-		listp->set_colors({ 0,0,0,0 });
 		auto pss = listp->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -1122,7 +1120,7 @@ int main()
 		pl1->draggable = true; //可拖动
 		pl1->set_size({ 530,600 });
 		pl1->set_pos({ 100,100 });
-		pl1->set_colors({ pbc,-1,0,0 });
+		//pl1->set_clear_color(pbc);
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl1->fontsize = 16;
 		int fontsize = 26;
@@ -1383,7 +1381,7 @@ int main()
 		pl3->draggable = true; //可拖动
 		pl3->set_size({ 1400,600 });
 		pl3->set_pos({ 10,10 });
-		pl3->set_colors({ 0xff000000,-1,0,0 });
+		//pl3->set_clear_color(0xff000000);
 		pl3->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl3->update_cb = [=](float delta)
 			{
@@ -1433,7 +1431,7 @@ int main()
 		pl2->draggable = true; //可拖动*
 		pl2->set_size({ 830,600 });
 		pl2->set_pos({ 10,10 });
-		pl2->set_colors({ pbc,-1,0,0 });
+		//pl2->set_clear_color(pbc);
 		pl2->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl2->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{

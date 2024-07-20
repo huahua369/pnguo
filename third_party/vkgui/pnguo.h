@@ -1636,7 +1636,7 @@ public:
 	std::string familys = "Arial,NSimSun";
 	int fontsize = 16;
 	uint32_t text_color = -1;
-	glm::ivec3 border = {};	// 颜色，线粗，圆角
+	glm::ivec4 border = {};	// 颜色，线粗，圆角，背景色
 	glm::ivec2 curpos = {}, tpos = {};// 鼠标状态
 	int ckinc = 0;
 	int ckup = 0;
@@ -1658,7 +1658,8 @@ public:
 	void set_pos(const glm::ivec2& ps);
 	void set_size(const glm::ivec2& ss);
 	glm::vec2 get_size();
-	void set_colors(const glm::ivec4& c);
+	void set_clear_color(uint32_t c);
+	void set_border(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条

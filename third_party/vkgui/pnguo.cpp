@@ -6121,7 +6121,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		ret.h = lheight;
 		ret.cpos = { 3,3 };
 		glm::ivec2 iss = { width , lheight };
-		p->border = { 0xff606060,1,0 };
+		p->set_border({ 0xff606060,1,0,0xf0121212 });
 		glm::ivec2 ss = { width + p->border.y * 7, v.size() * lheight + p->border.y * 7 };
 
 		auto radius = ltx->sli_radius;
@@ -17819,8 +17819,8 @@ class tview_x
 public:
 	glm::ivec2 vpos = {}, size = {};	// 渲染偏移，大小 
 	std::vector<glm::vec4> ddrect;
-	// 填充颜色\线框颜色
-	glm::ivec4 color = { 0xff353535, -1 ,0,0 };
+	// 填充颜色 
+	uint32_t clear_color = 0;
 	cairo_surface_t* _backing_store = 0;
 	cairo_surface_t* rss = 0;
 	image_ptr_t img_rc = {};
@@ -17894,13 +17894,13 @@ cairo_t* tview_x::begin_frame(bool redraw)
 		cr = cairo_create(_backing_store);
 		size_t length = size.x * size.y;
 		auto img = (uint32_t*)cairo_image_surface_get_data(_backing_store);
-		if (color.x == 0) {
+		if (clear_color == 0) {
 			memset(img, 0, length * sizeof(int));
 		}
 		else {
 			for (size_t i = 0; i < length; i++)
 			{
-				img[i] = color.x;
+				img[i] = clear_color;
 			}
 		}
 
@@ -18307,10 +18307,12 @@ void plane_cx::set_scroll_visible(const glm::ivec2& hv)
 	}
 }
 
-void plane_cx::set_colors(const glm::ivec4& c)
+void plane_cx::set_clear_color(uint32_t c)
 {
-	tv->color = c;
-	tv->color.x = rgb2bgr(c.x);
+	tv->clear_color = rgb2bgr(c);
+}
+void plane_cx::set_border(const glm::ivec4& c) {
+	border = c;
 }
 void plane_cx::move2end(widget_base* wp)
 {
@@ -18621,7 +18623,11 @@ void plane_cx::update(float delta)
 	if (cr)
 	{
 		evupdate = 0;
+		auto ls = get_size(); ls -= 1;
 		{
+			// 背景 
+			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
+			fill_stroke(cr, border.w, 0, 0, false);
 			if (draw_back_cb)
 			{
 				cairo_as _aa_(cr);
@@ -18647,8 +18653,7 @@ void plane_cx::update(float delta)
 				vertical->draw(cr);
 			}
 		}
-		// 边框线 
-		auto ls = get_size(); ls -= 1;
+		// 边框线  
 		draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
 		fill_stroke(cr, 0, border.x, border.y, false);
 		tv->end_frame(cr);
@@ -19897,7 +19902,7 @@ bool radio_tl::on_mevent(int type, const glm::vec2& mps)
 
 bool radio_tl::update(float delta)
 {
-	int ic = 0; 
+	int ic = 0;
 	{
 		auto& it = v;
 		if (size.x <= 0) {
