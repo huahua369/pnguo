@@ -16033,7 +16033,7 @@ namespace vkr {
 
 	//--------------------------------------------------------------------------------------
 	//
-	// OnRender
+	// todo OnRender
 	//
 	//--------------------------------------------------------------------------------------
 	void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
@@ -17140,7 +17140,7 @@ namespace vkr {
 		double timeNow = MillisecondsNow();
 		m_deltaTime = (float)(timeNow - m_lastFrameTime);
 		m_lastFrameTime = timeNow;
-		io.DeltaTime = m_deltaTime;
+		io.DeltaTime;// = m_deltaTime;
 	}
 	//--------------------------------------------------------------------------------------
 	//

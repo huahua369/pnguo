@@ -21,6 +21,7 @@ struct style_tooltip
 
 class menu_cx;
 class layout_text_x;
+// 菜单项
 class mitem_t
 {
 public:
@@ -44,6 +45,7 @@ public:
 	void set_data(int width, int height, const std::vector<std::string>& mvs);
 	glm::ivec2 get_idx_pos(int idx);
 };
+// 菜单管理器
 class menu_cx
 {
 public:

@@ -1661,6 +1661,9 @@ void form_x::update(float delta)
 		return;
 	}
 	int dwt = 0;
+	if (io) {
+		io->DeltaTime = delta;
+	}
 	if (up_cb)
 	{
 		up_cb(delta, &dwt);
