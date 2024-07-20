@@ -4282,44 +4282,6 @@ namespace vkr
 			// copy textures and apply barriers, then flush the GPU
 			m_pUploadHeap->FlushAndFinish();
 		}
-#if 0
-		else if (m_pGLTFCommon->j3.find("images") != m_pGLTFCommon->j3.end())
-		{
-			m_pTextureNodes = &m_pGLTFCommon->j3["textures"];
-			const json& images = m_pGLTFCommon->j3["images"];
-			const json& materials = m_pGLTFCommon->j3["materials"];
-
-			std::vector<Async*> taskQueue(images.size());
-
-			m_textures.resize(images.size());
-			m_textureViews.resize(images.size());
-			for (int imageIndex = 0; imageIndex < images.size(); imageIndex++)
-			{
-				Texture* pTex = &m_textures[imageIndex];
-				std::string filename = m_pGLTFCommon->m_path + images[imageIndex]["uri"].get<std::string>();
-
-				ExecAsyncIfThereIsAPool(pAsyncPool, [imageIndex, pTex, this, filename, materials]()
-					{
-						bool useSRGB;
-						float cutOff;
-						GetSrgbAndCutOffOfImageGivenItsUse(imageIndex, materials, &useSRGB, &cutOff);
-
-						bool result = pTex->InitFromFile(m_pDevice, m_pUploadHeap, filename.c_str(), useSRGB, 0 /*VkImageUsageFlags*/, cutOff);
-						assert(result != false);
-
-						m_textures[imageIndex].CreateSRV(&m_textureViews[imageIndex]);
-					});
-			}
-
-			LoadGeometry();
-
-			if (pAsyncPool)
-				pAsyncPool->Flush();
-
-			// copy textures and apply barriers, then flush the GPU
-			m_pUploadHeap->FlushAndFinish();
-		}
-#endif	
 	}
 
 	template<class T>
@@ -4905,9 +4867,9 @@ namespace vkr
 				float roughnessFactor = pbrMetallicRoughness.roughnessFactor;
 				tfmat->m_params.m_metallicRoughnessValues = glm::vec4(metallicFactor, roughnessFactor, 0, 0);
 				tfmat->m_params.m_baseColorFactor = pbrMetallicRoughness.baseColorFactor.size() ? tov4(pbrMetallicRoughness.baseColorFactor) : ones;
+				tfmat->m_defines["MATERIAL_METALLICROUGHNESS"] = "1";
 				if (pbrMetallicRoughness.baseColorTexture.index != -1)
 				{
-					tfmat->m_defines["MATERIAL_METALLICROUGHNESS"] = "1";
 					textureIds["baseColorTexture"] = pbrMetallicRoughness.baseColorTexture.index;
 					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughness.baseColorTexture.texCoord);
 				}
