@@ -3,6 +3,14 @@ vk渲染器
 
 创建日期：2024-07-16
 
+
+ 变形动画实现：
+	float u_morphWeights[WEIGHT_COUNT];//插值权重数据
+	for(int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec4 displacement = getDisplacement(vertexID, i);// 顶点目标坐标：使用顶点id获取
+		pos += u_morphWeights[i] * displacement;
+	}
 */
 #include "pch1.h"
 #include "vkrenderer.h"
@@ -2136,7 +2144,8 @@ namespace vkr {
 		std::map<int, std::vector<Matrix2>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 
 		per_frame m_perFrameData;
-
+		std::map<int, std::vector<glm::vec3>> targets_data;
+		std::map<int, std::vector<glm::dvec3>> targets_datad;
 	public:
 		bool Load(const std::string& path, const std::string& filename);
 		void Unload();
@@ -11836,6 +11845,7 @@ namespace vkr {
 		return res;
 	}
 
+
 	//
 	// VKCompileFromString
 	//
@@ -12669,7 +12679,18 @@ namespace vkr {
 	//{
 	//	return glm::vec4(accessor[0], accessor[1], accessor[2], (accessor.size() == 4) ? accessor[3] : 0);
 	//}
-
+	void* get_bvd(tinygltf::Model* pm, int bufferViewIdx, int byteOffset, std::vector<char*>& m_buffersData)
+	{
+		auto& bufferView = pm->bufferViews[bufferViewIdx];
+		int32_t bufferIdx = bufferView.buffer;
+		assert(bufferIdx >= 0);
+		char* buffer = m_buffersData[bufferIdx];
+		int32_t offset = bufferView.byteOffset;
+		int byteLength = bufferView.byteLength; 
+		offset += byteOffset;
+		byteLength -= byteOffset;
+		return &buffer[offset];
+	}
 	void GLTFCommon::load_Meshes()
 	{
 		//m_pAccessors = &j3["accessors"];
@@ -12700,7 +12721,32 @@ namespace vkr {
 				for (size_t n = 0; n < tn; n++)
 				{
 					auto it = tar[n];
-					glm::ivec2 v2 = { 0,it.begin()->second };
+					glm::ivec2 v2 = { 0, it.begin()->second };
+					auto& tacc = pm->accessors[v2.y];
+					if (tacc.type == TINYGLTF_TYPE_VEC3)
+					{
+						switch (tacc.componentType)
+						{
+						case TINYGLTF_COMPONENT_TYPE_FLOAT:
+						{
+							auto& td = targets_data[v2.y];
+							td.resize(tacc.count);
+							auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
+							memcpy(td.data(), data, sizeof(glm::vec3) * tacc.count);
+						}
+						break;
+						case TINYGLTF_COMPONENT_TYPE_DOUBLE:
+						{
+							auto& td = targets_datad[v2.y];
+							td.resize(tacc.count);
+							auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
+							memcpy(td.data(), data, sizeof(glm::dvec3) * tacc.count);
+						}
+						break;
+						default:
+							break;
+						}
+					}
 					auto& kn = it.begin()->first;// POSITION,NORMAL,TANGENT
 					switch (kn[0])
 					{

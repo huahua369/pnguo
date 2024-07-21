@@ -66,7 +66,11 @@ void gltfVertexFactory()
 #endif
 
 	mat4 transMatrix = GetWorldMatrix() * skinningMatrix;
-	vec4 pos = transMatrix * vec4(a_Position,1);
+	vec4 pos = vec4(a_Position,1);
+#ifdef ID_MORPHING_DATA
+	pos += getTargetPosition(gl_VertexID);
+#endif
+    pos = transMatrix * pos;
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
 	gl_Position = GetCameraViewProj() * pos; // needs w for proper perspective correction
 

@@ -41,3 +41,17 @@ mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
     return skinningMatrix;
 }
 #endif
+
+#ifdef ID_MORPHING_DATA
+
+layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing
+{
+    vec4 u_morph_pos[];
+} per_morphing_data;
+
+vec4 getTargetPosition(int vertexID)
+{
+    return u_morph_pos[vertexID];
+}
+
+#endif
