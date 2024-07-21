@@ -2,7 +2,7 @@
 #include "skinning.h"
 
 //--------------------------------------------------------------------------------------
-//  For VS layout
+//  增加变形For VS layout
 //--------------------------------------------------------------------------------------
 
 #ifdef ID_POSITION
@@ -44,6 +44,9 @@
 #ifdef ID_JOINTS_1
     layout (location = ID_JOINTS_1) in  uvec4 a_Joints1;
 #endif
+#ifdef ID_TARGETS
+    layout (location = ID_TARGETS) in  vec4 a_Targets;
+#endif
 
 layout (location = 0) out VS2PS Output;
 
@@ -68,7 +71,7 @@ void gltfVertexFactory()
 	mat4 transMatrix = GetWorldMatrix() * skinningMatrix;
 	vec4 pos = vec4(a_Position,1);
 #ifdef ID_MORPHING_DATA
-	pos += getTargetPosition(gl_VertexID);
+	pos += getTargetPosition(a_Targets);
 #endif
     pos = transMatrix * pos;
 	Output.WorldPos = vec3(pos.xyz) / pos.w;

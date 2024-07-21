@@ -11824,6 +11824,9 @@ namespace vkr {
 			{
 				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
 				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, pDefines, &SpvData, &SpvSize);
+				if (SpvSize == 0) {
+					printf("\n%s\n", shader.c_str());
+				}
 				assert(SpvSize != 0);
 			}
 
@@ -12686,7 +12689,7 @@ namespace vkr {
 		assert(bufferIdx >= 0);
 		char* buffer = m_buffersData[bufferIdx];
 		int32_t offset = bufferView.byteOffset;
-		int byteLength = bufferView.byteLength; 
+		int byteLength = bufferView.byteLength;
 		offset += byteOffset;
 		byteLength -= byteOffset;
 		return &buffer[offset];

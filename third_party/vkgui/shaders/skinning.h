@@ -1,3 +1,4 @@
+// 变形、骨骼
 // AMD Cauldron code
 // 
 // Copyright(c) 2018 Advanced Micro Devices, Inc.All rights reserved.
@@ -16,6 +17,14 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+#ifdef ID_MORPHING_DATA
+
+layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing
+{
+    float u_morph_pos[];
+} per_morphing_data;
+#endif
 
 #ifdef ID_SKINNING_MATRICES
 
@@ -42,16 +51,16 @@ mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 }
 #endif
 
-#ifdef ID_MORPHING_DATA
-
-layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing
+#ifdef ID_MORPHING_DATA 
+vec4 getTargetPosition(vec4 targets)
 {
-    vec4 u_morph_pos[];
-} per_morphing_data;
-
-vec4 getTargetPosition(int vertexID)
-{
-    return u_morph_pos[vertexID];
+    vec4 pos = vec4(0);
+    for (int i = 0; i < WEIGHT_COUNT; i++)
+    { 
+        pos += u_morphWeights[i] * targets;
+    }
+    return pos;
 }
 
 #endif
+
