@@ -1882,11 +1882,13 @@ namespace vkr {
 	{
 		glm::vec4 m_center;
 		glm::vec4 m_radius;
+		std::vector<glm::ivec2> targets;//[“POSITION”，“NORMAL”，//“TANGENT”]
 	};
 
 	struct tfMesh
 	{
 		std::vector<tfPrimitives> m_pPrimitives;
+		std::vector<float> weights;
 	};
 
 	struct Transform
@@ -1895,13 +1897,13 @@ namespace vkr {
 		glm::mat4   m_rotation = glm::identity<glm::mat4>();//MAT4::identity();
 		glm::vec4   m_translation = glm::vec4(0, 0, 0, 0);
 		glm::vec4   m_scale = glm::vec4(1, 1, 1, 0);
-
+		float		m_weights;	// 变形插值数据
 		void LookAt(glm::vec4 source, glm::vec4 target, bool flipY);
 
 		glm::mat4 GetWorldMat() const
 		{
-			//return MAT4::translation(m_translation.getXYZ()) * m_rotation * MAT4::scale(m_scale.getXYZ());
-			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * /*glm::mat4*/(m_rotation)*glm::scale(glm::mat4(1), glm::vec3(m_scale));
+			return //glm::shear(glm::mat4(1), glm::vec3(m_translation), glm::vec2(1.0 - m_weights, 1.0 - m_weights), glm::vec2(1.0 - m_weights, 1.0 - m_weights), glm::vec2(1.0 - m_weights, 1.0 - m_weights))*
+				glm::translate(glm::mat4(1), glm::vec3(m_translation)) * (m_rotation)*glm::scale(glm::mat4(1), glm::vec3(m_scale));
 		}
 
 	};
@@ -1968,6 +1970,25 @@ namespace vkr {
 			*frac = (time - curr_time) / (next_time - curr_time);
 			assert(*frac >= 0 && *frac <= 1.0);
 		}
+		glm::ivec2 get_tidx(float time, float* frac) const
+		{
+			int curr_index = m_time.FindClosestFloatIndex(time);
+			int next_index = std::min<int>(curr_index + 1, m_time.m_count - 1);
+
+			if (curr_index < 0) curr_index++;
+
+			if (curr_index == next_index)
+			{
+				*frac = 0;
+				return { curr_index,next_index };
+			}
+
+			float curr_time = *(float*)m_time.Get(curr_index);
+			float next_time = *(float*)m_time.Get(next_index);
+			*frac = (time - curr_time) / (next_time - curr_time);
+			assert(*frac >= 0 && *frac <= 1.0);
+			return { curr_index,next_index };
+		}
 	};
 
 	class tfChannel
@@ -1978,11 +1999,13 @@ namespace vkr {
 			delete m_pTranslation;
 			delete m_pRotation;
 			delete m_pScale;
+			delete m_pWeights;
 		}
 
 		tfSampler* m_pTranslation;
 		tfSampler* m_pRotation;
 		tfSampler* m_pScale;
+		tfSampler* m_pWeights;
 	};
 
 	struct tfAnimation
@@ -12672,8 +12695,34 @@ namespace vkr {
 				pPrimitive->m_radius = max1 - pPrimitive->m_center;
 
 				pPrimitive->m_center = glm::vec4(glm::vec3(pPrimitive->m_center), 1.0f); //set the W to 1 since this is a position not a direction
+				auto& tar = primitives[p].targets;
+				auto tn = tar.size();
+				for (size_t n = 0; n < tn; n++)
+				{
+					auto it = tar[n];
+					glm::ivec2 v2 = { 0,it.begin()->second };
+					auto& kn = it.begin()->first;// POSITION,NORMAL,TANGENT
+					switch (kn[0])
+					{
+					case 'P':v2.x = 0; break;
+					case 'N':v2.x = 1; break;
+					case 'T':v2.x = 2; break;
+					default:
+						break;
+					}
+					pPrimitive->targets.push_back(v2);
+				}
+			}
+			auto& weights = meshes[i].weights;
+			auto& pw = tfmesh->weights;
+			auto length = weights.size();
+			pw.resize(length);
+			for (size_t w = 0; w < length; w++)
+			{
+				pw[w] = weights[w];
 			}
 		}
+		return;
 	}
 	void GLTFCommon::load_lights()
 	{
@@ -12844,7 +12893,9 @@ namespace vkr {
 			{
 				tfnode->m_tranform.m_rotation = (glm::make_mat4x4(node.matrix.data()));
 			}
-
+			if (node.weights.size()) {
+				tfnode->m_tranform.m_weights = 1;
+			}
 		}
 	}
 	void GLTFCommon::load_scenes()
@@ -12940,6 +12991,12 @@ namespace vkr {
 					assert(tfsmp->m_value.m_stride == 3 * 4);
 					assert(tfsmp->m_value.m_dimension == 3);
 				}
+				else if (path == "weights")
+				{
+					tfchannel->m_pWeights = tfsmp;
+					assert(tfsmp->m_value.m_stride == 4);
+					assert(tfsmp->m_value.m_dimension == 1);
+				}
 			}
 		}
 	}
@@ -13002,7 +13059,38 @@ namespace vkr {
 				{
 					animated.m_scale = pSourceTrans->m_scale;
 				}
+				if (it->second.m_pWeights)
+				{
+					auto mesh = m_meshes[m_nodes[it->first].meshIndex];
+					auto wp = it->second.m_pWeights;
+					auto tidx = wp->get_tidx(time, &frac);
 
+					auto mn = mesh.weights.size();
+					float* tt = (float*)wp->m_value.m_data;
+					for (size_t i = 0; i < mn; i++)
+					{
+						auto t = tt + mn * tidx.x;
+						mesh.weights[i] = glm::mix(t[0], t[1], frac);
+					}
+					if (0) {
+						std::vector<float> ts, wos;
+						std::vector<std::vector<float>> ws;
+						auto tc = wp->m_time.m_count;
+						ws.resize(tc);	// 帧数
+						for (size_t i = 0; i < tc; i++)
+						{
+							float* tt = (float*)wp->m_time.Get(i);
+							ts.push_back(*tt);
+						}
+						for (size_t x = 0; x < tc; x++)
+						{
+							ws[x].resize(mn);// 通道数
+							memcpy(ws[x].data(), tt, sizeof(float) * mn);
+							tt += mn;
+						}
+						animated.m_weights = animated.m_weights;
+					}
+				}
 				m_animatedMats[it->first] = animated.GetWorldMat();
 			}
 		}
@@ -15680,7 +15768,7 @@ namespace vkr {
 		//_cbf.OnDestroy();
 		//_axis.OnDestroy();
 		m_SkyDomeProc.OnDestroy();
-		//m_SkyDome.OnDestroy();
+		m_SkyDome.OnDestroy();
 
 		m_RenderPassFullGBufferWithClear.OnDestroy();
 		m_RenderPassJustDepthAndHdr.OnDestroy();
@@ -16206,14 +16294,14 @@ namespace vkr {
 			{
 				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
 
-				//if (pState->SelectedSkydomeTypeIndex == 1)
-				//{
-				//	glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
-				//	m_SkyDome.Draw(cmdBuf1, clipToView);
+				if (pState->SelectedSkydomeTypeIndex == 1)
+				{
+					glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
+					m_SkyDome.Draw(cmdBuf1, clipToView);
 
-				//	m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
-				//}
-				//else if (pState->SelectedSkydomeTypeIndex == 0)
+					m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
+				}
+				else if (pState->SelectedSkydomeTypeIndex == 0)
 				{
 					skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
 
@@ -17032,7 +17120,7 @@ namespace vkr {
 
 		// Animation Update
 		if (m_bPlay)
-			m_time += (float)m_deltaTime / 1000.0f; // animation time in seconds
+			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
 
 		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
 		//m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.3, .3, .3));
@@ -17040,7 +17128,7 @@ namespace vkr {
 		//m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
 		static int nn[10] = {};
 		int i = 0;
-		static float speed = 1.2;
+		static float speed = 1.0;
 		for (auto it : _loaders)
 		{
 			auto n = it->get_animation_count();
