@@ -580,6 +580,8 @@ int main()
 				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 100,100,vr.size.x,vr.size.y }, 0);
 			}
 		}
+
+		auto pipe = vkd->new_pipe("base3d.vert.glsl", "base3d.frag.glsl");
 	}
 	form0->up_cb = [=](float delta, int* ret)
 		{

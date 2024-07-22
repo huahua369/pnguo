@@ -21,6 +21,8 @@ set(Shaders_PostProc_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/tonemappingCS.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/ColorConversionPS.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/MagnifierPS.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/base3d.vert.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/base3d.frag.glsl
 )
 
 set(Shaders_GLTF_src

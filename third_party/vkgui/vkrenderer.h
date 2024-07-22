@@ -38,6 +38,7 @@ public:
 	void resize(int w, int h);
 	void save_fbo(int idx);
 	void copy2(int idx, void* vkptr);
+	void* new_pipe(const char* vertexShader, const char* pixelShader);
 private:
 
 };
