@@ -551,7 +551,7 @@ int main()
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 
 	auto sdldev = form0->get_dev();
-	auto vkd = new_vkdg(&sdldev);
+	vkdg_cx* vkd = 0;// new_vkdg(&sdldev);
 	SDL_Texture* d3tex = 0;
 	void* vkptr = 0;
 	void* vkptrdst = 0;
@@ -586,8 +586,8 @@ int main()
 	form0->up_cb = [=](float delta, int* ret)
 		{
 
-			vkd->update(form0->io);
-			vkd->on_render();
+			//vkd->update(form0->io);
+			//vkd->on_render();
 			static void* vkptrdst = 0;
 			if (!vkptrdst)
 				vkptrdst = form0->get_texture_vk(d3tex);
@@ -929,7 +929,7 @@ int main()
 	listp->add_familys(fontn2, 0);
 	{
 		listp->draggable = true; //可拖动
-		listp->set_size({ 500,600 });
+		listp->set_size({ 600,600 });
 		listp->set_pos({ 10,10 });
 		auto pss = listp->get_size();
 		int width = 10;
@@ -1067,7 +1067,7 @@ int main()
 				rs.radius = 8;
 				rs.segment = 8;
 				// 边框阴影
-				//draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
+				draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
 				return;
 			};
 		{
