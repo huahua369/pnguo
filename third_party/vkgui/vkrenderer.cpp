@@ -40,12 +40,9 @@ typedef uint32_t DXGI_FORMAT;
 #include <tinysdl3.h>
 #include <event.h>
 #include <print_time.h>
-
+#include <mapView.h>
 #define TINYGLTF_IMPLEMENTATION 
 #include <tiny_gltf.h>
-
-#include <codecvt>
-#include <locale>
 
 namespace vkr
 {
@@ -3027,8 +3024,8 @@ namespace vkr {
 
 	double MillisecondsNow();
 	std::string format(const char* format, ...);
-	bool ReadFile(const char* name, char** data, size_t* size, bool isbinary);
-	bool SaveFile(const char* name, void const* data, size_t size, bool isbinary);
+	bool readfile(const char* name, char** data, size_t* size, bool isbinary);
+	bool savefile(const char* name, void const* data, size_t size, bool isbinary);
 	void Trace(const std::string& str);
 	void Trace(const char* pFormat, ...);
 	bool LaunchProcess(const char* commandLine, const char* filenameErr);
@@ -3105,7 +3102,7 @@ namespace vkr {
 		HANDLE m_FileHandle = INVALID_HANDLE_VALUE;
 #define MAX_INFLIGHT_WRITES 32
 
-		OVERLAPPED m_OverlappedData[MAX_INFLIGHT_WRITES];
+		OVERLAPPED m_OverlappedData[MAX_INFLIGHT_WRITES] = {};
 		uint32_t m_CurrentIOBufferIndex = 0;
 
 		uint32_t m_WriteOffset = 0;
@@ -11420,7 +11417,7 @@ namespace vkr {
 		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* ppData, UINT* pBytes)
 		{
 			std::string fullpath = GetShaderCompilerLibDir() + pFileName;
-			return ReadFile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
+			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
 		}
 		HRESULT Close(LPCVOID pData)
 		{
@@ -11444,7 +11441,7 @@ namespace vkr {
 
 			LPCVOID pData;
 			size_t bytes;
-			HRESULT hr = ReadFile(fullpath, (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
+			HRESULT hr = readfile(fullpath, (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
 
 			if (hr == E_FAIL)
 			{
@@ -11481,7 +11478,7 @@ namespace vkr {
 		}
 
 #ifdef USE_DXC_SPIRV_FROM_DISK
-		if (ReadFile(filenameOut.c_str(), outSpvData, outSpvSize, true) && *outSpvSize > 0)
+		if (readfile(filenameOut.c_str(), outSpvData, outSpvSize, true) && *outSpvSize > 0)
 		{
 			//Trace(format("thread 0x%04x compile: %p disk\n", GetCurrentThreadId(), hash));
 			return true;
@@ -11573,7 +11570,7 @@ namespace vkr {
 			}
 			preprocessedCode += std::string((char*)pCode1->GetBufferPointer());
 			preprocessedCode += "\n";
-			SaveFile(filenameHlsl.c_str(), preprocessedCode.c_str(), preprocessedCode.size(), false);
+			savefile(filenameHlsl.c_str(), preprocessedCode.c_str(), preprocessedCode.size(), false);
 
 			IDxcOperationResult* pOpRes;
 			HRESULT res;
@@ -11589,7 +11586,7 @@ namespace vkr {
 				{
 					char pPDBName[1024];
 					sprintf_s(pPDBName, "%s\\%ls", GetShaderCompilerCacheDir().c_str(), *pDebugBlobName);
-					SaveFile(pPDBName, pPDB->GetBufferPointer(), pPDB->GetBufferSize(), true);
+					savefile(pPDBName, pPDB->GetBufferPointer(), pPDB->GetBufferSize(), true);
 				}
 			}
 			else
@@ -11632,7 +11629,7 @@ namespace vkr {
 					pError->Release();
 
 #ifdef USE_DXC_SPIRV_FROM_DISK
-				SaveFile(filenameOut.c_str(), *outSpvData, *outSpvSize, true);
+				savefile(filenameOut.c_str(), *outSpvData, *outSpvSize, true);
 #endif
 				return true;
 			}
@@ -11644,7 +11641,7 @@ namespace vkr {
 				Trace("*** Error compiling %p.hlsl ***\n", hash);
 
 				std::string filenameErr = GetShaderCompilerCacheDir() + format("\\%p.err", hash);
-				SaveFile(filenameErr.c_str(), pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize(), false);
+				savefile(filenameErr.c_str(), pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize(), false);
 
 				std::string errMsg = std::string((char*)pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize());
 				Trace(errMsg);
@@ -11716,7 +11713,7 @@ namespace vkr {
 
 			if (LaunchProcess(commandLine.c_str(), filenameErr.c_str()) == true)
 			{
-				ReadFile(filenameSpv.c_str(), outSpvData, outSpvSize, true);
+				readfile(filenameSpv.c_str(), outSpvData, outSpvSize, true);
 				assert(*outSpvSize != 0);
 				return true;
 			}
@@ -11819,11 +11816,11 @@ namespace vkr {
 
 #ifdef USE_SPIRV_FROM_DISK
 			std::string filenameSpv = format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash);
-			if (ReadFile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
+			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
 #endif
 			{
 				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
-				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, pDefines, &SpvData, &SpvSize);
+				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, &SpvData, &SpvSize);
 				if (SpvSize == 0) {
 					printf("\n%s\n", shader.c_str());
 				}
@@ -11884,7 +11881,7 @@ namespace vkr {
 		char fullpath[1024];
 		sprintf_s(fullpath, "%s\\%s", GetShaderCompilerLibDir().c_str(), pFilename);
 
-		if (ReadFile(fullpath, &pShaderCode, &size, false))
+		if (readfile(fullpath, &pShaderCode, &size, false))
 		{
 			VkResult res = VKCompileFromString(device, sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
 			SetResourceName(device, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)pShader->module, pFilename);
@@ -11899,14 +11896,16 @@ namespace vkr {
 	//
 	void CreateShaderCache()
 	{
+#if 0
 		PWSTR path = NULL;
 		SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path);
 		std::wstring sShaderCachePathW = std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK";
 		CreateDirectoryW((std::wstring(path) + L"\\AMD").c_str(), 0);
 		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron").c_str(), 0);
-		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK").c_str(), 0);
-
-		InitShaderCompilerCache("ShaderLibVK", std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(sShaderCachePathW));
+		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK").c_str(), 0); //std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(sShaderCachePathW)
+#endif
+		std::string scp = hz::genfn("cache/shadervk/");
+		InitShaderCompilerCache("ShaderLibVK", scp);
 	}
 
 	//
@@ -11984,7 +11983,9 @@ namespace vkr {
 
 	void Trace(const std::string& str)
 	{
-		std::mutex mutex;
+
+#ifdef _WIN32
+		static std::mutex mutex;
 		std::unique_lock<std::mutex> lock(mutex);
 
 		// Output to attached debugger
@@ -11992,11 +11993,13 @@ namespace vkr {
 
 		// Also log to file
 		Log::Trace(str.c_str());
+#endif
 	}
 
 	void Trace(const char* pFormat, ...)
 	{
-		std::mutex mutex;
+#ifdef _WIN32
+		static std::mutex mutex;
 		std::unique_lock<std::mutex> lock(mutex);
 
 		va_list args;
@@ -12014,12 +12017,13 @@ namespace vkr {
 
 		// Also log to file
 		Log::Trace(buf.Data());
+#endif
 	}
 
 	//
 	//  Reads a file into a buffer
 	//
-	bool ReadFile(const char* name, char** data, size_t* size, bool isbinary)
+	bool readfile(const char* name, char** data, size_t* size, bool isbinary)
 	{
 		FILE* file;
 
@@ -12067,7 +12071,7 @@ namespace vkr {
 		return true;
 	}
 
-	bool SaveFile(const char* name, void const* data, size_t size, bool isbinary)
+	bool savefile(const char* name, void const* data, size_t size, bool isbinary)
 	{
 		FILE* file;
 		if (fopen_s(&file, name, isbinary ? "wb" : "w") == 0)
@@ -12085,6 +12089,7 @@ namespace vkr {
 	//
 	bool LaunchProcess(const char* commandLine, const char* filenameErr)
 	{
+#ifdef _WIN32
 		char cmdLine[1024];
 		strcpy_s<1024>(cmdLine, commandLine);
 
@@ -12155,7 +12160,7 @@ namespace vkr {
 		{
 			Trace(format("*** Can't launch: %s \n", commandLine));
 		}
-
+#endif
 		return false;
 	}
 
@@ -12321,22 +12326,20 @@ namespace vkr {
 
 	Log::Log()
 	{
-		PWSTR path = NULL;
-		SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path);
-		CreateDirectoryW((std::wstring(path) + L"\\AMD").c_str(), 0);
-		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron\\").c_str(), 0);
-		std::wstring pn = L"Cauldron.log";
-		std::string pna = "Cauldron.log";
-
+		std::wstring pn = L"temp/cvkr.log";
+		std::string pna = "temp/cvkr.log";
+		hz::genfn(pna);
 		_fp = fopen(pna.c_str(), "a+");
 		if (!_fp)
 		{
+#ifdef _WIN32 
 			m_FileHandle = CreateFileW(pn.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_FLAG_OVERLAPPED, nullptr);
 			assert(m_FileHandle != INVALID_HANDLE_VALUE);
 
 			// Initialize the overlapped structure for asynchronous write
 			for (uint32_t i = 0; i < MAX_INFLIGHT_WRITES; i++)
 				m_OverlappedData[i] = { 0 };
+#endif
 
 		}
 	}
@@ -12347,9 +12350,11 @@ namespace vkr {
 		{
 			fclose(_fp); _fp = 0;
 		}
+#ifdef _WIN32 
 		if (m_FileHandle)
 			CloseHandle(m_FileHandle);
 		m_FileHandle = INVALID_HANDLE_VALUE;
+#endif
 	}
 
 	void OverlappedCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped)
@@ -12365,6 +12370,7 @@ namespace vkr {
 			fwrite(LogString, s, 1, _fp);
 			return;
 		}
+#ifdef _WIN32 
 		OVERLAPPED* pOverlapped = &m_OverlappedData[m_CurrentIOBufferIndex];
 
 		// Make sure any previous write with this overlapped structure has completed
@@ -12379,6 +12385,7 @@ namespace vkr {
 
 		bool result = WriteFileEx(m_FileHandle, LogString, static_cast<DWORD>(strlen(LogString)), pOverlapped, OverlappedCompletionRoutine);
 		assert(result);
+#endif
 	}
 #endif // 1
 
@@ -12441,7 +12448,7 @@ namespace vkr {
 						pch++;
 
 						char* pShaderCode = NULL;
-						if (ReadFile(includeName, &pShaderCode, NULL, false))
+						if (readfile(includeName, &pShaderCode, NULL, false))
 						{
 							hash = HashShaderString(pRootDir, pShaderCode, hash);
 							free(pShaderCode);
