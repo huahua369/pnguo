@@ -4,7 +4,7 @@ vk渲染器
 创建日期：2024-07-16
 
 
- 变形动画实现：
+ todo 变形动画实现：
 	float u_morphWeights[WEIGHT_COUNT];//插值权重数据
 	for(int i = 0; i < WEIGHT_COUNT; i++)
 	{
@@ -1899,16 +1899,14 @@ namespace vkr {
 	struct Transform
 	{
 		//glm::quat
-		glm::mat4   m_rotation = glm::identity<glm::mat4>();//MAT4::identity();
+		glm::mat4   m_rotation = glm::identity<glm::mat4>();
 		glm::vec4   m_translation = glm::vec4(0, 0, 0, 0);
 		glm::vec4   m_scale = glm::vec4(1, 1, 1, 0);
-		float		m_weights;	// 变形插值数据
 		void LookAt(glm::vec4 source, glm::vec4 target, bool flipY);
 
 		glm::mat4 GetWorldMat() const
 		{
-			return //glm::shear(glm::mat4(1), glm::vec3(m_translation), glm::vec2(1.0 - m_weights, 1.0 - m_weights), glm::vec2(1.0 - m_weights, 1.0 - m_weights), glm::vec2(1.0 - m_weights, 1.0 - m_weights))*
-				glm::translate(glm::mat4(1), glm::vec3(m_translation)) * (m_rotation)*glm::scale(glm::mat4(1), glm::vec3(m_scale));
+			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * (m_rotation)*glm::scale(glm::mat4(1), glm::vec3(m_scale));
 		}
 
 	};
@@ -2755,7 +2753,7 @@ namespace vkr {
 		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
 
 		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, VkImageView>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
-		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, bool bUseSSAOMask);
+		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, int morphing_size, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
@@ -2849,7 +2847,7 @@ namespace vkr {
 		VkSampler m_sampler = VK_NULL_HANDLE;
 		VkDescriptorBufferInfo m_perFrameDesc;
 
-		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive);
+		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, int morphing_size);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, DepthPrimitives* pPrimitive);
 	};
 
@@ -3695,7 +3693,8 @@ namespace vkr
 							{
 								int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive);
+								auto ts = primitive.targets.size() * 0;// todo 变形
+								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, ts);
 								CreatePipeline(inputLayout, defines, pPrimitive);
 							}
 						});
@@ -3795,7 +3794,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive)
+	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, int morphing_size)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layout_bindings(2);
 		layout_bindings[0].binding = 0;
@@ -3826,7 +3825,18 @@ namespace vkr
 
 			layout_bindings.push_back(b);
 		}
-
+		if (morphing_size > 0)
+		{
+			VkDescriptorSetLayoutBinding b;
+			// 变形动画
+			b.binding = 3;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
+		}
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_descriptorSetLayout, &pPrimitive->m_descriptorSet);
 
 		// set descriptors entries
@@ -3837,6 +3847,10 @@ namespace vkr
 		if (inverseMatrixBufferSize > 0)
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet);
+		}
+		if (morphing_size > 0)
+		{
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_descriptorSet);
 		}
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pPrimitive->m_descriptorSetLayout };
@@ -5210,7 +5224,8 @@ namespace vkr
 							//
 							int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 							int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, bUseSSAOMask);
+							auto ts = primitive.targets.size() * 0;// todo 变形
+							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, ts, bUseSSAOMask);
 							CreatePipeline(inputLayout, defines, pPrimitive);
 						});
 				}
@@ -5387,7 +5402,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, bool bUseSSAOMask)
+	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, int morphing_size, bool bUseSSAOMask)
 	{
 		// Creates descriptor set layout binding for the constant buffers
 		//
@@ -5410,7 +5425,7 @@ namespace vkr
 		(*pAttributeDefines)["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
 
 		// Constant buffer holding the skinning matrices
-		if (inverseMatrixBufferSize >= 0)
+		if (inverseMatrixBufferSize > 0)
 		{
 			VkDescriptorSetLayoutBinding b;
 
@@ -5424,6 +5439,18 @@ namespace vkr
 
 			layout_bindings.push_back(b);
 		}
+		if (morphing_size > 0)
+		{
+			VkDescriptorSetLayoutBinding b;
+			// 变形动画
+			b.binding = 3;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
+		}
 
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
 
@@ -5432,9 +5459,13 @@ namespace vkr
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(per_frame), pPrimitive->m_uniformsDescriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(per_object), pPrimitive->m_uniformsDescriptorSet);
 
-		if (inverseMatrixBufferSize >= 0)
+		if (inverseMatrixBufferSize > 0)
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet);
+		}
+		if (morphing_size > 0)
+		{
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_uniformsDescriptorSet);
 		}
 
 		// Create the pipeline layout
@@ -12731,42 +12762,46 @@ namespace vkr {
 				for (size_t n = 0; n < tn; n++)
 				{
 					auto it = tar[n];
-					glm::ivec2 v2 = { 0, it.begin()->second };
-					auto& tacc = pm->accessors[v2.y];
-					if (tacc.type == TINYGLTF_TYPE_VEC3)
+					for (auto& [k, v] : it)
 					{
-						switch (tacc.componentType)
+						glm::ivec2 v2 = { 0, v };
+						auto& tacc = pm->accessors[v];
+						//if (tacc.type == TINYGLTF_TYPE_VEC3)
+						//{
+						//	switch (tacc.componentType)
+						//	{
+						//	case TINYGLTF_COMPONENT_TYPE_FLOAT:
+						//	{
+						//		auto& td = targets_data[v];
+						//		td.resize(tacc.count);
+						//		auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
+						//		memcpy(td.data(), data, sizeof(glm::vec3) * tacc.count);
+						//	}
+						//	break;
+						//	case TINYGLTF_COMPONENT_TYPE_DOUBLE:
+						//	{
+						//		auto& td = targets_datad[v2.y];
+						//		td.resize(tacc.count);
+						//		auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
+						//		memcpy(td.data(), data, sizeof(glm::dvec3) * tacc.count);
+						//	}
+						//	break;
+						//	default:
+						//		break;
+						//	}
+						//}
+						auto& kn = k;// POSITION,NORMAL,TANGENT
+						switch (kn[0])
 						{
-						case TINYGLTF_COMPONENT_TYPE_FLOAT:
-						{
-							auto& td = targets_data[v2.y];
-							td.resize(tacc.count);
-							auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
-							memcpy(td.data(), data, sizeof(glm::vec3) * tacc.count);
-						}
-						break;
-						case TINYGLTF_COMPONENT_TYPE_DOUBLE:
-						{
-							auto& td = targets_datad[v2.y];
-							td.resize(tacc.count);
-							auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
-							memcpy(td.data(), data, sizeof(glm::dvec3) * tacc.count);
-						}
-						break;
+						case 'P':v2.x = 0; break;
+						case 'N':v2.x = 1;
+							break;
+						case 'T':v2.x = 2; break;
 						default:
 							break;
 						}
+						pPrimitive->targets.push_back(v2);
 					}
-					auto& kn = it.begin()->first;// POSITION,NORMAL,TANGENT
-					switch (kn[0])
-					{
-					case 'P':v2.x = 0; break;
-					case 'N':v2.x = 1; break;
-					case 'T':v2.x = 2; break;
-					default:
-						break;
-					}
-					pPrimitive->targets.push_back(v2);
 				}
 			}
 			auto& weights = meshes[i].weights;
@@ -12950,7 +12985,7 @@ namespace vkr {
 				tfnode->m_tranform.m_rotation = (glm::make_mat4x4(node.matrix.data()));
 			}
 			if (node.weights.size()) {
-				tfnode->m_tranform.m_weights = 1;
+				// todo node weights
 			}
 		}
 	}
@@ -13144,7 +13179,6 @@ namespace vkr {
 							memcpy(ws[x].data(), tt, sizeof(float) * mn);
 							tt += mn;
 						}
-						animated.m_weights = animated.m_weights;
 					}
 				}
 				m_animatedMats[it->first] = animated.GetWorldMat();
