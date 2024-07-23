@@ -9,7 +9,179 @@
 #include <print_time.h>
 #define let auto
 namespace hz {
+	enum BufferType {
+		ORIGINAL,
+		ADD
+	};
 
+	struct Piece {
+		BufferType bufferType;
+		size_t start;
+		size_t length;
+
+		Piece(BufferType type, size_t start, size_t length) : bufferType(type), start(start), length(length) {}
+	};
+
+	class PieceTable {
+	private:
+		std::string originalBuffer;
+		std::string addBuffer;
+		std::vector<Piece> pieces;
+
+		struct Operation {
+			enum Type {
+				_INSERT,
+				_DELETE
+			} type;
+			size_t position;
+			std::string text;
+
+			Operation(Type type, size_t position, const std::string& text) : type(type), position(position), text(text) {}
+		};
+
+		std::stack<Operation> undoStack;
+		std::stack<Operation> redoStack;
+
+	public:
+		PieceTable(const std::string& text) {
+			originalBuffer = text;
+			pieces.emplace_back(ORIGINAL, 0, text.length());
+		}
+
+		void insert(size_t position, const std::string& text) {
+			insertPiece(position, text, true);
+			while (!redoStack.empty()) redoStack.pop(); // Clear redo stack on new operation
+		}
+
+		void deleteText(size_t position, size_t length) {
+			deletePiece(position, length, true);
+			while (!redoStack.empty()) redoStack.pop(); // Clear redo stack on new operation
+		}
+
+		void undo() {
+			if (undoStack.empty()) return;
+			Operation op = undoStack.top();
+			undoStack.pop();
+
+			if (op.type == Operation::_INSERT) {
+				deletePiece(op.position, op.text.length(), false);
+			}
+			else if (op.type == Operation::_DELETE) {
+				insertPiece(op.position, op.text, false);
+			}
+
+			redoStack.push(op);
+		}
+
+		void redo() {
+			if (redoStack.empty()) return;
+			Operation op = redoStack.top();
+			redoStack.pop();
+
+			if (op.type == Operation::_INSERT) {
+				insertPiece(op.position, op.text, false);
+			}
+			else if (op.type == Operation::_DELETE) {
+				deletePiece(op.position, op.text.length(), false);
+			}
+
+			undoStack.push(op);
+		}
+
+		std::string getText() {
+			std::string result;
+
+			for (const auto& piece : pieces) {
+				if (piece.bufferType == ORIGINAL) {
+					result.append(originalBuffer.substr(piece.start, piece.length));
+				}
+				else {
+					result.append(addBuffer.substr(piece.start, piece.length));
+				}
+			}
+
+			return result;
+		}
+
+	private:
+		void insertPiece(size_t position, const std::string& text, bool recordOperation) {
+			size_t addStart = addBuffer.length();
+			addBuffer.append(text);
+			size_t addLength = text.length();
+
+			std::vector<Piece> newPieces;
+			size_t currentPos = 0;
+
+			for (auto& piece : pieces) {
+				if (currentPos + piece.length <= position) {
+					newPieces.push_back(piece);
+					currentPos += piece.length;
+				}
+				else {
+					if (position > currentPos) {
+						size_t splitLength = position - currentPos;
+						newPieces.emplace_back(piece.bufferType, piece.start, splitLength);
+						piece.start += splitLength;
+						piece.length -= splitLength;
+					}
+
+					newPieces.emplace_back(ADD, addStart, addLength);
+					newPieces.push_back(piece);
+					currentPos = position;
+				}
+			}
+
+			if (currentPos < position) {
+				newPieces.emplace_back(ADD, addStart, addLength);
+			}
+
+			pieces = newPieces;
+
+			if (recordOperation) {
+				undoStack.emplace(Operation::_INSERT, position, text);
+			}
+		}
+
+		void deletePiece(size_t position, size_t length, bool recordOperation) {
+			std::vector<Piece> newPieces;
+			size_t currentPos = 0;
+			std::string deletedText;
+
+			for (auto& piece : pieces) {
+				if (currentPos + piece.length <= position) {
+					newPieces.push_back(piece);
+					currentPos += piece.length;
+				}
+				else {
+					if (position > currentPos) {
+						size_t splitLength = position - currentPos;
+						newPieces.emplace_back(piece.bufferType, piece.start, splitLength);
+						piece.start += splitLength;
+						piece.length -= splitLength;
+						currentPos += splitLength;
+					}
+
+					if (piece.length > length) {
+						deletedText.append((piece.bufferType == ORIGINAL ? originalBuffer : addBuffer).substr(piece.start, length));
+						piece.start += length;
+						piece.length -= length;
+						length = 0;
+						newPieces.push_back(piece);
+					}
+					else {
+						deletedText.append((piece.bufferType == ORIGINAL ? originalBuffer : addBuffer).substr(piece.start, piece.length));
+						length -= piece.length;
+					}
+				}
+			}
+
+			pieces = newPieces;
+
+			if (recordOperation) {
+				undoStack.emplace(Operation::_DELETE, position, deletedText);
+			}
+		}
+	};
 	///////////-------text_able文本框操作--------------------------------------
 
 	class text_able :public undoable_operate

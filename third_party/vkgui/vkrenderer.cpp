@@ -2118,7 +2118,7 @@ namespace vkr {
 		float               m_distance;
 		float               m_fovV, m_fovH;
 		float               m_near, m_far;
-		float               m_aspectRatio;
+		float               m_aspectRatio = 0.0f;
 
 		float               m_speed = 1.0f;
 		float               m_yaw = 0.0f;
@@ -8433,11 +8433,37 @@ namespace vkr {
 		glm::vec4 dir = PolarToVector(yaw, pitch) * m_distance;
 		LookAt(GetPosition(), GetPosition() - dir);
 	}
+	glm::vec4 p2v(float yaw, float pitch)
+	{
+		yaw = glm::radians(yaw);
+		pitch = glm::radians(pitch);
+		return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
+	}
+	void rotateCameraAroundPoint(glm::vec3& cameraPos, glm::vec3 focusPoint, glm::vec3 upVector, float angle) {
+		// 计算相机到焦点的向量
+		glm::vec3 toFocus = focusPoint - cameraPos;
 
+		// 计算旋转轴，它是相机上方向和到焦点的垂直向量的叉乘结果
+		glm::vec3 axis = glm::normalize(glm::cross(upVector, toFocus));
+
+		// 创建一个四元数，表示绕给定轴的旋转
+		glm::quat rotationQuat = glm::angleAxis(angle, axis);
+
+		// 旋转相机位置
+		cameraPos = glm::vec3(glm::rotate(rotationQuat, glm::vec3(toFocus)) + focusPoint);
+
+		// 旋转相机的上方向（如果需要）
+		// upVector = glm::vec3(glm::rotate(rotationQuat, glm::vec3(upVector)));
+	}
 	void Camera::UpdateCameraPolar(float yaw, float pitch, float x, float y, float distance)
 	{
-		pitch = std::max(-XM_PIDIV2 + 1e-3f, std::min(pitch, XM_PIDIV2 - 1e-3f));
-
+#if 1 
+		auto a = glm::degrees(pitch);
+		float pi = pitch;//90、-90
+		auto p0 = pitch;
+		pitch = std::max(-XM_PIDIV2 + 1e-3f, std::min(pitch, XM_PIDIV2 - 1e-3f)); 
+		//if (yaw < 0)yaw = 0;//偏航角
+		//if (pitch < 0)pitch = 0;//俯仰角
 		// Trucks camera, moves the camera parallel to the view plane.
 		m_eyePos += GetSide() * x * distance / 10.0f;
 		m_eyePos += GetUp() * y * distance / 10.0f;
@@ -8445,12 +8471,97 @@ namespace vkr {
 		// Orbits camera, rotates a camera about the target
 		glm::vec4 dir = GetDirection();
 		glm::vec4 pol = PolarToVector(yaw, pitch);
-
+		auto pol0 = glm::vec4(sinf(yaw) * cosf(pi), sinf(pitch), cosf(yaw) * cosf(pi), 0);
+		auto v = p2v(0, 90);
+		auto v1 = p2v(90, 90);
+		auto v2 = p2v(-290, 190);
 		glm::vec4 at = m_eyePos - (dir * m_distance);
+		dir = at + (pol * distance);
+		LookAt(dir, at);
+		printf("%.03f\n", m_yaw);
+#else
+		// Trucks camera, moves the camera parallel to the view plane.
+		m_eyePos += GetSide() * x * distance / 10.0f;
+		m_eyePos += GetUp() * y * distance / 10.0f;
 
-		LookAt(at + (pol * distance), at);
+		// Orbits camera, rotates a camera about the target
+		glm::vec4 dir = GetDirection();// 方向
+		glm::vec4 pol = PolarToVector(yaw, pitch);
+
+
+		glm::vec4 at = m_eyePos - (dir * m_distance);//目标坐标 
+
+		//LookAt(dir, at);
+
+		glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
+		glm::quat qYaw = glm::angleAxis(-yaw, glm::vec3(0, 1, 0));
+		glm::quat qRoll = glm::angleAxis(roll, glm::vec3(0, 0, 1));
+
+		//For a FPS camera we can omit roll
+		glm::quat orientation = qPitch * qYaw;
+		orientation = glm::normalize(orientation);
+		glm::mat4 rotate = glm::mat4_cast(orientation);
+
+		glm::mat4 translate = glm::mat4(1.0f);
+		auto x0 = glm::translate(translate, (glm::vec3)-m_eyePos);
+		translate = glm::translate(translate, (glm::vec3)at);
+		glm::mat4 sc = glm::scale(glm::vec3(m_distance / 10.0, m_distance / 10.0, m_distance / 10.0));
+		//m_View = LookAtRH(m_eyePos, at, flipY);
+		m_distance = glm::length(at - m_eyePos);
+		m_View = x0 * rotate;// (-translate)* rotate* (translate)*x0;
+		m_yaw = yaw;
+		m_pitch = pitch;
+#endif
 	}
+#if 0
+	void UpdateView(float yaw, float pitch, float roll)
+	{
+		//FPS camera:  RotationX(pitch) * RotationY(yaw)
+		glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
+		glm::quat qYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
+		glm::quat qRoll = glm::angleAxis(roll, glm::vec3(0, 0, 1));
 
+		//For a FPS camera we can omit roll
+		glm::quat orientation = qPitch * qYaw;
+		orientation = glm::normalize(orientation);
+		glm::mat4 rotate = glm::mat4_cast(orientation);
+
+		glm::mat4 translate = glm::mat4(1.0f);
+		translate = glm::translate(translate, -eye);
+
+		viewMatrix = rotate * translate;
+	}
+	void RotatePitch(float rads) // rotate around cams local X axis
+	{
+		glm::quat qPitch = glm::angleAxis(rads, glm::vec3(1, 0, 0));
+
+		m_orientation = glm::normalize(qPitch) * m_orientation;
+		glm::mat4 rotate = glm::mat4_cast(m_orientation);
+
+		glm::mat4 translate = glm::mat4(1.0f);
+		translate = glm::translate(translate, -eye);
+
+		m_viewMatrix = rotate * translate;
+	}
+	void Update(float deltaTimeSeconds)
+	{
+		//FPS camera:  RotationX(pitch) * RotationY(yaw)
+		glm::quat qPitch = glm::angleAxis(m_d_pitch, glm::vec3(1, 0, 0));
+		glm::quat qYaw = glm::angleAxis(m_d_yaw, glm::vec3(0, 1, 0));
+		glm::quat qRoll = glm::angleAxis(m_d_roll, glm::vec3(0, 0, 1));
+
+		//For a FPS camera we can omit roll
+		glm::quat m_d_orientation = qPitch * qYaw;
+		glm::quat delta = glm::mix(glm::quat(0, 0, 0, 0), m_d_orientation, deltaTimeSeconds);
+		m_orientation = glm::normalize(delta) * m_orientation;
+		glm::mat4 rotate = glm::mat4_cast(orientation);
+
+		glm::mat4 translate = glm::mat4(1.0f);
+		translate = glm::translate(translate, -eye);
+
+		viewMatrix = rotate * translate;
+	}
+#endif
 	//--------------------------------------------------------------------------------------
 	//
 	// SetProjectionJitter
@@ -13674,7 +13785,7 @@ namespace vkr {
 		uint32_t systemGeometryMemSize = 32 * 1024;
 
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
-		uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
+		uint32_t uploadHeapMemSize = 500 * 1024 * 1024;
 	};
 	struct robj_info {
 		//gltf passes
@@ -14127,7 +14238,7 @@ namespace vkr {
 		uint32_t usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 		uint32_t indexBufferSize = count * (type ? sizeof(uint32_t) : sizeof(uint16_t));
 		VkMemoryPropertyFlags mempro = get_mpflags(device_local, &usage);
-		// todo new
+
 		auto p = new dvk_buffer(dev, usage, mempro, indexBufferSize, data);
 		p->descriptor->buffer = p->buffer;
 		p->descriptor->offset = 0;
@@ -14135,6 +14246,7 @@ namespace vkr {
 
 		return p;
 	}
+	// todo new ubo
 	dvk_buffer* dvk_buffer::new_ubo(Device* dev, uint32_t size, void* data, uint32_t usage1)
 	{
 		uint32_t usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | usage1;
@@ -14276,17 +14388,7 @@ namespace vkr {
 			mapped = nullptr;
 		}
 	}
-	// todo new_descriptor有问题
-	//void* dvk_buffer::new_descriptor(VkDeviceSize s, VkDeviceSize offset)
-	//{
-	//	auto pos = descriptors.size();
-	//	descriptors.resize(pos + sizeof(VkDescriptorBufferInfo));
-	//	auto p = (VkDescriptorBufferInfo*)&descriptors[pos];
-	//	p->offset = offset;
-	//	p->buffer = buffer;
-	//	p->range = s;
-	//	return p;
-	//}
+
 
 	void* dvk_buffer::get_map(VkDeviceSize offset)
 	{
@@ -17301,7 +17403,8 @@ namespace vkr {
 			distance = std::max<float>(distance, 0.1f);
 
 			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
-
+			//if (yaw < 0)yaw = 0;//偏航角
+			//if (pitch < 0)pitch = 0;//俯仰角
 			cam.UpdateCameraPolar(yaw, pitch,
 				panning ? -io.MouseDelta.x / 100.0f : 0.0f,
 				panning ? io.MouseDelta.y / 100.0f : 0.0f,
@@ -17479,7 +17582,7 @@ namespace vkr {
 		layoutBindings[1].pImmutableSamplers = NULL;
 
 		m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
-		
+
 		/////////////////////////////////////////////
 		// Create the pipeline layout using the descriptoset
 

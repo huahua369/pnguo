@@ -551,7 +551,7 @@ int main()
 	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 
 	auto sdldev = form0->get_dev();
-	vkdg_cx* vkd = 0;// new_vkdg(&sdldev);
+	vkdg_cx* vkd = new_vkdg(&sdldev);
 	SDL_Texture* d3tex = 0;
 	void* vkptr = 0;
 	void* vkptrdst = 0;
@@ -586,8 +586,8 @@ int main()
 	form0->up_cb = [=](float delta, int* ret)
 		{
 
-			//vkd->update(form0->io);
-			//vkd->on_render();
+			vkd->update(form0->io);
+			vkd->on_render();
 			static void* vkptrdst = 0;
 			if (!vkptrdst)
 				vkptrdst = form0->get_texture_vk(d3tex);

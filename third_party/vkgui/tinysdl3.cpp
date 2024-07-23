@@ -1382,8 +1382,12 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		{
 			pw->hide_child();
 		}
-		if (pw->io) {
+		pw->hittest({ t.x,t.y });
+		if (pw->io && !pw->_HitTest) {
 			pw->io->MouseDown[t.button - 1] = t.state;
+		}
+		else {
+			pw->io->MouseDown[t.button - 1] = 0;
 		}
 		pw->trigger((uint32_t)devent_type_e::mouse_button_e, &t);
 
@@ -2197,13 +2201,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-	}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputRect(&rect);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
