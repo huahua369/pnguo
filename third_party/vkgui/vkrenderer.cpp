@@ -2115,6 +2115,7 @@ namespace vkr {
 		glm::mat4       m_Proj;
 		glm::mat4       m_PrevView;
 		glm::vec4       m_eyePos;
+		glm::quat		mqt = {};
 		float               m_distance;
 		float               m_fovV, m_fovH;
 		float               m_near, m_far;
@@ -8348,6 +8349,9 @@ namespace vkr {
 		m_View = {};// glm::mat4::identity();
 		m_eyePos = glm::vec4(0, 0, 0, 0);
 		m_distance = -1;
+		glm::quat qx = glm::angleAxis(0.0f, glm::vec3(1, 0, 0));
+		glm::quat qy = glm::angleAxis(0.0f, glm::vec3(0, 1, 0));
+		mqt = qx * qy;
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -8455,13 +8459,30 @@ namespace vkr {
 		// 旋转相机的上方向（如果需要）
 		// upVector = glm::vec3(glm::rotate(rotationQuat, glm::vec3(upVector)));
 	}
+
+
 	void Camera::UpdateCameraPolar(float yaw, float pitch, float x, float y, float distance)
 	{
 #if 1 
+		//glm::vec2 ax = { pitch , yaw };
+		//ax *= -XM_PIDIV2;
+		//glm::quat qt = glm::angleAxis(ax.y, glm::vec3(0, 1, 0)) * mqt;
+		//qt = glm::angleAxis(ax.x, qt * glm::vec3(1, 0, 0)) * qt;
+		//mqt = qt;
 		auto a = glm::degrees(pitch);
+		if (a > 90)
+		{
+			pitch += XM_PIDIV2;
+			yaw -= XM_PIDIV2;
+		}
+		if (a < -90)
+		{
+			pitch -= XM_PIDIV2;
+			yaw += XM_PIDIV2;
+		}
 		float pi = pitch;//90、-90
 		auto p0 = pitch;
-		pitch = std::max(-XM_PIDIV2 + 1e-3f, std::min(pitch, XM_PIDIV2 - 1e-3f)); 
+		//pitch = std::max(-XM_PIDIV2 + 1e-3f, std::min(pitch, XM_PIDIV2 - 1e-3f));
 		//if (yaw < 0)yaw = 0;//偏航角
 		//if (pitch < 0)pitch = 0;//俯仰角
 		// Trucks camera, moves the camera parallel to the view plane.
@@ -8472,12 +8493,17 @@ namespace vkr {
 		glm::vec4 dir = GetDirection();
 		glm::vec4 pol = PolarToVector(yaw, pitch);
 		auto pol0 = glm::vec4(sinf(yaw) * cosf(pi), sinf(pitch), cosf(yaw) * cosf(pi), 0);
-		auto v = p2v(0, 90);
-		auto v1 = p2v(90, 90);
-		auto v2 = p2v(-290, 190);
 		glm::vec4 at = m_eyePos - (dir * m_distance);
-		dir = at + (pol * distance);
-		LookAt(dir, at);
+		auto neps = at + (pol * distance);
+		//glm::quat rotation = glm::quat(glm::vec3(pitch, yaw, 0.0f));
+		glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
+		glm::quat qYaw = glm::angleAxis(-yaw, glm::vec3(0, 1, 0));
+		mqt = qPitch * qYaw * mqt;
+
+		// 计算新的相机位置
+		glm::vec4 position = mqt * (dir * distance);
+		neps = at + position;
+		LookAt(neps, at);
 		printf("%.03f\n", m_yaw);
 #else
 		// Trucks camera, moves the camera parallel to the view plane.
@@ -17384,6 +17410,8 @@ namespace vkr {
 
 		cam.UpdatePreviousMatrices(); // set previous view matrix
 #if 1
+		yaw = 0;
+		pitch = 0;
 		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
 		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
 		{
