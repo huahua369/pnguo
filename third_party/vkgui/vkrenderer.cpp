@@ -8526,10 +8526,12 @@ namespace vkr {
 		}
 		//auto m0 = glm::rotate(glm::mat4(1.0), -c->pitch, glm::vec3(1.0, 0.0, 0.0));
 		//m0 = m0 * glm::toMat4(c->qt);
-
+		float x = c->pitch, y = c->yaw;
+		float a = 1.0 + 0.2f * (sqrt(x * x + y * y) - 1.0);
 		glm::quat qut = c->qt;
 		qut *= glm::angleAxis(c->yaw, glm::vec3(0.0, 1.0, 0.0));
-		qut *= glm::angleAxis(-c->pitch, glm::vec3(1.0, 0.0, 0.0));//glm::quat(glm::vec3(c->pitch, 0.0, 0.0));//
+		qut *= glm::angleAxis(c->pitch, glm::vec3(1.0, 0.0, 0.0));
+		qut = c->qt * glm::angleAxis(a, glm::vec3(x, y, 0.0));
 		//auto m1 = glm::toMat4(qut);
 		glm::quat temp = qut;
 		glm::quat temp1 = c->qt * qut;
@@ -8763,12 +8765,12 @@ namespace vkr {
 		ext->Vy = ext->Vz = 0;
 		ext->Angle = 0;
 		ext->Dx = ext->Dy = ext->Dz = 0;
- 
-		ext->m_Dir[0] = ext->m_Dir[1] = ext->m_Dir[2] = 0; 
+
+		ext->m_Dir[0] = ext->m_Dir[1] = ext->m_Dir[2] = 0;
 		int i, j;
 		for (i = 0; i < 3; ++i)
 			for (j = 0; j < 3; ++j)
-				ext->m_Permute[i][j] = (i == j) ? 1.0f : 0.0f; 
+				ext->m_Permute[i][j] = (i == j) ? 1.0f : 0.0f;
 		ext->ConvertToAxisAngle();
 	}
 
@@ -8952,7 +8954,7 @@ namespace vkr {
 	{
 		if (is_eulerAngles)
 		{
-			ryp.x += yaw;
+			ryp.x += -yaw;
 			ryp.y += pitch;
 			yaw = glm::radians(ryp.x);
 			pitch = glm::radians(ryp.y);
@@ -8961,8 +8963,8 @@ namespace vkr {
 			// yaw = 0;  //偏航角
 			// pitch = 0;//俯仰角
 			// Trucks camera, moves the camera parallel to the view plane.
-			m_eyePos += GetSide() * x * distance / 100.0f;
-			m_eyePos += GetUp() * y * distance / 100.0f;
+			m_eyePos += GetSide() * x * distance / 1000.0f;
+			m_eyePos += GetUp() * y * distance / 1000.0f;
 
 			// Orbits camera, rotates a camera about the target
 			glm::vec4 dir = GetDirection();
@@ -8973,6 +8975,7 @@ namespace vkr {
 		}
 		else
 		{
+#if 0
 			float roll = 0.0;
 			glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
 			glm::quat qYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
@@ -8992,47 +8995,45 @@ namespace vkr {
 			glm::mat4 translate = glm::translate(glm::mat4(1.0f), -eye);
 			m_View = rotate * translate;
 			m_eyePos = at + (mqt * dir * distance);
-		}
-		return;
-#if 0
-		auto pol0 = glm::vec4(sinf(yaw) * cosf(pi), sinf(pitch), cosf(yaw) * cosf(pi), 0);
-		auto a = pitch_ad + pitch;// glm::degrees(pitch);
-		if (a > 90)
-		{
-			pitch = 0;
-			//yaw -= XM_PIDIV2;
-		}
-		if (a < -90)
-		{
-			pitch = 0;
-			//yaw += XM_PIDIV2;
-		}
-		pitch_ad += pitch;
-		camera_info& pc = pca;
-		pc.camera_up = glm::vec3(0, 1, 0);
-		pc.yaw = glm::radians(yaw);
-		pc.pitch = glm::radians(pitch);
-		pc.camera_position_delta = (glm::vec3)GetSide() * x * distance / 100.0f;
-		pc.camera_position_delta += (glm::vec3)GetUp() * y * distance / 100.0f;
-		pc.camera_position = m_eyePos;
-		//pc._distance = m_distance;
-		pc.distance = distance;
+#else
+			//auto pol0 = glm::vec4(sinf(yaw) * cosf(pi), sinf(pitch), cosf(yaw) * cosf(pi), 0);
+			//auto a = pca.yp.y + pitch;// glm::degrees(pitch);
+			//if (a > 90)
+			//{
+			//	pitch = 0;
+			//	//yaw -= XM_PIDIV2;
+			//}
+			//if (a < -90)
+			//{
+			//	pitch = 0;
+			//	//yaw += XM_PIDIV2;
+			//}
+			//pca.yp.y += pitch;
+			camera_info& pc = pca;
+			pc.camera_up = glm::vec3(0, 1, 0);
+			pc.yaw = glm::radians(yaw);
+			pc.pitch = glm::radians(pitch);
+			pc.camera_position_delta = (glm::vec3)GetSide() * x * distance / 1000.0f;
+			pc.camera_position_delta += (glm::vec3)GetUp() * y * distance / 1000.0f;
+			pc.camera_position = m_eyePos;
+			//pc._distance = m_distance;
+			pc.distance = distance;
 
+			lookat2q(&pc, m_View);
+			//LookAt(pc.camera_position, pc.camera_look_at);
+			auto mv = glm::translate(-pc.camera_position) * glm::mat4(pc.qt);
+			auto eye = glm::vec4(pc.qt * pc.camera_position, 1.0);
+			auto sview = LookAtRH(eye, (pc.camera_look_at), flipY);
+			//auto sview = lookatlh(eye, (pc.camera_look_at), flipY);
+			m_View = mv;
+			if ((mv[3][1] - sview[3][1]) > 0.01f)
+				printf("dif:%.2f\t%.2f", mv[3][1], sview[3][1]);
+			m_distance = glm::length(pc.camera_look_at - (glm::vec3)m_eyePos);
+			m_eyePos = -eye;// m_View[3];
 
-		lookat2q(&pc, m_View);
-		//LookAt(pc.camera_position, pc.camera_look_at);
-		auto mv = glm::translate(-pc.camera_position) * glm::mat4(pc.qt);
-		auto eye = glm::vec4(pc.qt * pc.camera_position, 1.0);
-		auto sview = LookAtRH(eye, (pc.camera_look_at), flipY);
-		//auto sview = lookatlh(eye, (pc.camera_look_at), flipY);
-		m_View = sview;
-		if ((mv[3][1] - sview[3][1]) > 0.01f)
-			printf("dif:%.2f\t%.2f", mv[3][1], sview[3][1]);
-		m_distance = glm::length(pc.camera_look_at - (glm::vec3)m_eyePos);
-		m_eyePos = eye;// m_View[3];
-
-		//printf("%.03f\n", m_yaw);
+			//printf("%.03f\n", m_yaw);
 #endif
+		}
 	}
 #if 0
 	void UpdateView(float yaw, float pitch, float roll)
@@ -17660,7 +17661,7 @@ namespace vkr {
 		// Init Camera, looking at the origin
 		m_camera.LookAt(glm::vec4(0, 0, 5, 0), glm::vec4(0, 0, 0, 0));
 		// todo set camera
-		m_camera.is_eulerAngles = false;
+		//m_camera.is_eulerAngles = false;
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -17920,10 +17921,11 @@ namespace vkr {
 		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
 		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
 		{
-			yaw -= io.MouseDelta.x;// / 100.f;
+			yaw += io.MouseDelta.x;// / 100.f;
 			pitch += io.MouseDelta.y;// / 100.f;
-			yaw *= 0.5;
-			pitch *= 0.5;
+			if (yaw != 0) {
+				yaw = yaw;
+			}
 		}
 
 		// Choose camera movement depending on setting
