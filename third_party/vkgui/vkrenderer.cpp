@@ -2141,6 +2141,7 @@ namespace vkr {
 		float               m_yaw = 0.0f;
 		float               m_pitch = 0.0f;
 		float               m_roll = 0.0f;
+	public:
 		glm::vec3	ryp = {};
 		bool flipY = false;
 		bool is_eulerAngles = true;
@@ -8557,6 +8558,396 @@ namespace vkr {
 		auto up = glm::vec3(0, flipY ? -1 : 1, 0);
 		return glm::lookAt(position, target, up);
 	}
+
+	const float  FLOAT_EPS = 1.0e-7f;
+	const float  FLOAT_EPS_SQ = 1.0e-14f;
+	const float  FLOAT_PI = 3.14159265358979323846f;
+	const double DOUBLE_EPS = 1.0e-14;
+	const double DOUBLE_EPS_SQ = 1.0e-28;
+	const double DOUBLE_PI = 3.14159265358979323846;
+	inline double DegToRad(double degree) { return degree * (DOUBLE_PI / 180.0); }
+	inline double RadToDeg(double radian) { return radian * (180.0 / DOUBLE_PI); }
+	glm::vec4 ConvertToAxisAngle(glm::quat q)
+	{
+		double Qx = q.x, Qy = q.y, Qz = q.z, Qs = q.w;    // Quat value
+		double Vx, Vy, Vz, Angle; // Not used
+
+		if (fabs(Qs) > (1.0 + FLOAT_EPS))
+		{
+			//Vx = Vy = Vz = 0; // no, keep the previous value
+			Angle = 0;
+		}
+		else
+		{
+			double a;
+			if (Qs >= 1.0f)
+				a = 0; // and keep V
+			else if (Qs <= -1.0f)
+				a = DOUBLE_PI; // and keep V
+			else if (fabs(Qx * Qx + Qy * Qy + Qz * Qz + Qs * Qs) < FLOAT_EPS_SQ)
+				a = 0;
+			else
+			{
+				a = acos(Qs);
+				if (a * Angle < 0) // Preserve the sign of Angle
+					a = -a;
+				double f = 1.0f / sin(a);
+				Vx = Qx * f;
+				Vy = Qy * f;
+				Vz = Qz * f;
+			}
+			Angle = 2.0 * a;
+		}
+
+		//  if( Angle>FLOAT_PI )
+		//      Angle -= 2.0f*FLOAT_PI;
+		//  else if( Angle<-FLOAT_PI )
+		//      Angle += 2.0f*FLOAT_PI;
+		Angle = RadToDeg(Angle);
+
+		if (fabs(Angle) < FLOAT_EPS && fabs(Vx * Vx + Vy * Vy + Vz * Vz) < FLOAT_EPS_SQ)
+			Vx = 1.0e-7;    // all components cannot be null
+		return glm::vec4(Vx, Vy, Vz, Angle);
+	}
+
+	glm::quat ConvertFromAxisAngle(glm::vec4 v)
+	{
+		double Qx = 0, Qy = 0, Qz = 0, Qs = 1;    // Quat value
+		double Vx = v.x, Vy = v.y, Vz = v.z, Angle = v.w; // Not used
+		double n = Vx * Vx + Vy * Vy + Vz * Vz;
+		if (fabs(n) > FLOAT_EPS_SQ)
+		{
+			double f = 0.5 * DegToRad(Angle);
+			Qs = cos(f);
+			//do not normalize
+			//if( fabs(n - 1.0)>FLOAT_EPS_SQ )
+			//  f = sin(f) * (1.0/sqrt(n)) ;
+			//else
+			//  f = sin(f);
+			f = sin(f);
+
+			Qx = Vx * f;
+			Qy = Vy * f;
+			Qz = Vz * f;
+		}
+		else
+		{
+			Qs = 1.0;
+			Qx = Qy = Qz = 0.0;
+		}
+		return glm::quat(Qs, Qx, Qy, Qz);
+	}
+
+	static inline void QuatMult(double* out, const double* q1, const double* q2)
+	{
+		out[0] = q1[3] * q2[0] + q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1];
+		out[1] = q1[3] * q2[1] + q1[1] * q2[3] + q1[2] * q2[0] - q1[0] * q2[2];
+		out[2] = q1[3] * q2[2] + q1[2] * q2[3] + q1[0] * q2[1] - q1[1] * q2[0];
+		out[3] = q1[3] * q2[3] - (q1[0] * q2[0] + q1[1] * q2[1] + q1[2] * q2[2]);
+	}
+
+	static inline void QuatFromAxisAngle(double* out, const double* axis, double angle)
+	{
+		double n = axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2];
+		if (fabs(n) > DOUBLE_EPS)
+		{
+			double f = 0.5 * angle;
+			out[3] = cos(f);
+			f = sin(f) / sqrt(n);
+			out[0] = axis[0] * f;
+			out[1] = axis[1] * f;
+			out[2] = axis[2] * f;
+		}
+		else
+		{
+			out[3] = 1.0;
+			out[0] = out[1] = out[2] = 0.0;
+		}
+	}
+
+	static inline void Vec3Cross(double* out, const double* a, const double* b)
+	{
+		out[0] = a[1] * b[2] - a[2] * b[1];
+		out[1] = a[2] * b[0] - a[0] * b[2];
+		out[2] = a[0] * b[1] - a[1] * b[0];
+	}
+
+	static inline double Vec3Dot(const double* a, const double* b)
+	{
+		return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+	}
+
+	static inline void Vec3RotY(float* x, float* y, float* z)
+	{
+		(void)y;
+		float tmp = *x;
+		*x = -*z;
+		*z = tmp;
+	}
+
+	static inline void Vec3RotZ(float* x, float* y, float* z)
+	{
+		(void)z;
+		float tmp = *x;
+		*x = -*y;
+		*y = tmp;
+	}
+	void QuatFromDir(double* outQx, double* outQy, double* outQz, double* outQs, double dx, double dy, double dz)
+	{
+		// compute a quaternion that rotates (1,0,0) to (dx,dy,dz)
+
+		double dn = sqrt(dx * dx + dy * dy + dz * dz);
+		if (dn < DOUBLE_EPS_SQ)
+		{
+			*outQx = *outQy = *outQz = 0;
+			*outQs = 1;
+		}
+		else
+		{
+			double rotAxis[3] = { 0, -dz, dy };
+			if (rotAxis[0] * rotAxis[0] + rotAxis[1] * rotAxis[1] + rotAxis[2] * rotAxis[2] < DOUBLE_EPS_SQ)
+			{
+				rotAxis[0] = rotAxis[1] = 0;
+				rotAxis[2] = 1;
+			}
+			double rotAngle = acos(dx / dn);
+			double rotQuat[4];
+			QuatFromAxisAngle(rotQuat, rotAxis, rotAngle);
+			*outQx = rotQuat[0];
+			*outQy = rotQuat[1];
+			*outQz = rotQuat[2];
+			*outQs = rotQuat[3];
+		}
+	}
+	class quat_ext
+	{
+	public:
+		double               Qx, Qy, Qz, Qs;    // Quat value
+		double               Vx, Vy, Vz, Angle; // Not used
+		double               Dx, Dy, Dz;        // Dir value set when used as a direction
+		float m_Permute[3][3];   // Permute frame axis
+		double               m_OrigQuat[4];
+		double               m_Dir[3];          // If not zero, display one direction vector
+		float                m_OrigX, m_OrigY;
+		double               m_PrevX, m_PrevY;
+	public:
+		quat_ext();
+		~quat_ext();
+		void init();
+		inline void          Permute(float* outX, float* outY, float* outZ, float x, float y, float z);
+		inline void          PermuteInv(float* outX, float* outY, float* outZ, float x, float y, float z);
+		inline void          Permute(double* outX, double* outY, double* outZ, double x, double y, double z);
+		inline void          PermuteInv(double* outX, double* outY, double* outZ, double x, double y, double z);
+
+		void ConvertToAxisAngle();
+		void ConvertFromAxisAngle();
+		glm::quat get();
+	private:
+
+	};
+
+	quat_ext::quat_ext()
+	{
+	}
+
+	quat_ext::~quat_ext()
+	{
+	}
+
+	void quat_ext::init()
+	{
+		auto ext = this;
+		ext->Qx = ext->Qy = ext->Qz = 0;
+		ext->Qs = 1;
+		ext->Vx = 1;
+		ext->Vy = ext->Vz = 0;
+		ext->Angle = 0;
+		ext->Dx = ext->Dy = ext->Dz = 0;
+ 
+		ext->m_Dir[0] = ext->m_Dir[1] = ext->m_Dir[2] = 0; 
+		int i, j;
+		for (i = 0; i < 3; ++i)
+			for (j = 0; j < 3; ++j)
+				ext->m_Permute[i][j] = (i == j) ? 1.0f : 0.0f; 
+		ext->ConvertToAxisAngle();
+	}
+
+	void quat_ext::ConvertToAxisAngle()
+	{
+		if (fabs(Qs) > (1.0 + FLOAT_EPS))
+		{
+			//Vx = Vy = Vz = 0; // no, keep the previous value
+			Angle = 0;
+		}
+		else
+		{
+			double a;
+			if (Qs >= 1.0f)
+				a = 0; // and keep V
+			else if (Qs <= -1.0f)
+				a = DOUBLE_PI; // and keep V
+			else if (fabs(Qx * Qx + Qy * Qy + Qz * Qz + Qs * Qs) < FLOAT_EPS_SQ)
+				a = 0;
+			else
+			{
+				a = acos(Qs);
+				if (a * Angle < 0) // Preserve the sign of Angle
+					a = -a;
+				double f = 1.0f / sin(a);
+				Vx = Qx * f;
+				Vy = Qy * f;
+				Vz = Qz * f;
+			}
+			Angle = 2.0 * a;
+		}
+
+		//  if( Angle>FLOAT_PI )
+		//      Angle -= 2.0f*FLOAT_PI;
+		//  else if( Angle<-FLOAT_PI )
+		//      Angle += 2.0f*FLOAT_PI;
+		Angle = RadToDeg(Angle);
+
+		if (fabs(Angle) < FLOAT_EPS && fabs(Vx * Vx + Vy * Vy + Vz * Vz) < FLOAT_EPS_SQ)
+			Vx = 1.0e-7;    // all components cannot be null
+	}
+
+	void quat_ext::ConvertFromAxisAngle()
+	{
+		double n = Vx * Vx + Vy * Vy + Vz * Vz;
+		if (fabs(n) > FLOAT_EPS_SQ)
+		{
+			double f = 0.5 * DegToRad(Angle);
+			Qs = cos(f);
+			//do not normalize
+			//if( fabs(n - 1.0)>FLOAT_EPS_SQ )
+			//  f = sin(f) * (1.0/sqrt(n)) ;
+			//else
+			//  f = sin(f);
+			f = sin(f);
+
+			Qx = Vx * f;
+			Qy = Vy * f;
+			Qz = Vz * f;
+		}
+		else
+		{
+			Qs = 1.0;
+			Qx = Qy = Qz = 0.0;
+		}
+	}
+	glm::quat quat_ext::get()
+	{
+		return glm::quat(Qs, Qx, Qy, Qz);
+	}
+	void quat_ext::Permute(float* outX, float* outY, float* outZ, float x, float y, float z)
+	{
+		float px = x, py = y, pz = z;
+		*outX = m_Permute[0][0] * px + m_Permute[1][0] * py + m_Permute[2][0] * pz;
+		*outY = m_Permute[0][1] * px + m_Permute[1][1] * py + m_Permute[2][1] * pz;
+		*outZ = m_Permute[0][2] * px + m_Permute[1][2] * py + m_Permute[2][2] * pz;
+	}
+
+	void quat_ext::PermuteInv(float* outX, float* outY, float* outZ, float x, float y, float z)
+	{
+		float px = x, py = y, pz = z;
+		*outX = m_Permute[0][0] * px + m_Permute[0][1] * py + m_Permute[0][2] * pz;
+		*outY = m_Permute[1][0] * px + m_Permute[1][1] * py + m_Permute[1][2] * pz;
+		*outZ = m_Permute[2][0] * px + m_Permute[2][1] * py + m_Permute[2][2] * pz;
+	}
+
+	void quat_ext::Permute(double* outX, double* outY, double* outZ, double x, double y, double z)
+	{
+		double px = x, py = y, pz = z;
+		*outX = m_Permute[0][0] * px + m_Permute[1][0] * py + m_Permute[2][0] * pz;
+		*outY = m_Permute[0][1] * px + m_Permute[1][1] * py + m_Permute[2][1] * pz;
+		*outZ = m_Permute[0][2] * px + m_Permute[1][2] * py + m_Permute[2][2] * pz;
+	}
+
+	void quat_ext::PermuteInv(double* outX, double* outY, double* outZ, double x, double y, double z)
+	{
+		double px = x, py = y, pz = z;
+		*outX = m_Permute[0][0] * px + m_Permute[0][1] * py + m_Permute[0][2] * pz;
+		*outY = m_Permute[1][0] * px + m_Permute[1][1] * py + m_Permute[1][2] * pz;
+		*outZ = m_Permute[2][0] * px + m_Permute[2][1] * py + m_Permute[2][2] * pz;
+	}
+
+	static inline float QuatD(int w, int h)
+	{
+		return (float)glm::min(abs(w), abs(h)) - 4;
+	}
+
+	static inline int QuatPX(float x, int w, int h)
+	{
+		return (int)(x * 0.5f * QuatD(w, h) + (float)w * 0.5f + 0.5f);
+	}
+
+	static inline int QuatPY(float y, int w, int h)
+	{
+		return (int)(-y * 0.5f * QuatD(w, h) + (float)h * 0.5f - 0.5f);
+	}
+
+	static inline float QuatIX(int x, int w, int h)
+	{
+		return (2.0f * (float)x - (float)w - 1.0f) / QuatD(w, h);
+	}
+
+	static inline float QuatIY(int y, int w, int h)
+	{
+		return (-2.0f * (float)y + (float)h - 1.0f) / QuatD(w, h);
+	}
+
+	void MouseMotionCB(int mouseX, int mouseY, int w, int h, quat_ext* ext)
+	{
+		double x = QuatIX(mouseX, w, h);
+		double y = QuatIY(mouseY, w, h);
+		double z = 1;
+		double px, py, pz, ox, oy, oz;
+		ext->PermuteInv(&px, &py, &pz, x, y, z);
+		ext->PermuteInv(&ox, &oy, &oz, ext->m_OrigX, ext->m_OrigY, 1);
+		double n0 = sqrt(ox * ox + oy * oy + oz * oz);
+		double n1 = sqrt(px * px + py * py + pz * pz);
+		if (n0 > DOUBLE_EPS && n1 > DOUBLE_EPS)
+		{
+			double v0[] = { ox / n0, oy / n0, oz / n0 };
+			double v1[] = { px / n1, py / n1, pz / n1 };
+			double axis[3];
+			Vec3Cross(axis, v0, v1);
+			double sa = sqrt(Vec3Dot(axis, axis));
+			double ca = Vec3Dot(v0, v1);
+			double angle = atan2(sa, ca);
+			if (x * x + y * y > 1.0)
+				angle *= 1.0 + 0.2f * (sqrt(x * x + y * y) - 1.0);
+			double qrot[4], qres[4], qorig[4];
+			QuatFromAxisAngle(qrot, axis, angle);
+			double nqorig = sqrt(ext->m_OrigQuat[0] * ext->m_OrigQuat[0] + ext->m_OrigQuat[1] * ext->m_OrigQuat[1] + ext->m_OrigQuat[2] * ext->m_OrigQuat[2] + ext->m_OrigQuat[3] * ext->m_OrigQuat[3]);
+			if (fabs(nqorig) > DOUBLE_EPS_SQ)
+			{
+				qorig[0] = ext->m_OrigQuat[0] / nqorig;
+				qorig[1] = ext->m_OrigQuat[1] / nqorig;
+				qorig[2] = ext->m_OrigQuat[2] / nqorig;
+				qorig[3] = ext->m_OrigQuat[3] / nqorig;
+				QuatMult(qres, qrot, qorig);
+				ext->Qx = qres[0];
+				ext->Qy = qres[1];
+				ext->Qz = qres[2];
+				ext->Qs = qres[3];
+			}
+			else
+			{
+				ext->Qx = qrot[0];
+				ext->Qy = qrot[1];
+				ext->Qz = qrot[2];
+				ext->Qs = qrot[3];
+			}
+			//ext->CopyToVar();
+			//if (bar != NULL)
+			//	bar->NotUpToDate();
+
+			ext->m_PrevX = x;
+			ext->m_PrevY = y;
+		}
+	}
+
 	void Camera::UpdateCameraPolar(float yaw, float pitch, float x, float y, float distance)
 	{
 		if (is_eulerAngles)
@@ -8586,7 +8977,7 @@ namespace vkr {
 			glm::quat qPitch = glm::angleAxis(pitch, glm::vec3(1, 0, 0));
 			glm::quat qYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
 			glm::quat qRoll = glm::angleAxis(roll, glm::vec3(0, 0, 1));
-
+			//ConvertFromAxisAngle();
 			//For a FPS camera we can omit roll
 			glm::quat orientation = qPitch * qYaw;
 			orientation = glm::normalize(orientation);
@@ -8596,11 +8987,11 @@ namespace vkr {
 			m_eyePos += GetSide() * x * distance / 100.0f;
 			m_eyePos += GetUp() * y * distance / 100.0f;
 			glm::vec4 dir = GetDirection();
-			glm::vec4 at = m_eyePos - (dir * m_distance);	// 计算目标点
-			glm::vec3 eye = at + (mqt * dir * distance);
+			glm::vec4 at = glm::vec4(0.0, 0.0, 0.0, 1.0);// m_eyePos - (dir * m_distance);	// 计算目标点
+			glm::vec3 eye = at + (dir * distance);
 			glm::mat4 translate = glm::translate(glm::mat4(1.0f), -eye);
 			m_View = rotate * translate;
-			m_eyePos = glm::vec4(eye, 1.0);
+			m_eyePos = at + (mqt * dir * distance);
 		}
 		return;
 #if 0
@@ -17268,6 +17659,8 @@ namespace vkr {
 
 		// Init Camera, looking at the origin
 		m_camera.LookAt(glm::vec4(0, 0, 5, 0), glm::vec4(0, 0, 0, 0));
+		// todo set camera
+		m_camera.is_eulerAngles = false;
 	}
 
 	//--------------------------------------------------------------------------------------
