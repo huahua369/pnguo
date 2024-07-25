@@ -2130,7 +2130,10 @@ namespace vkr {
 		glm::mat4       m_Proj;
 		glm::mat4       m_PrevView;
 		glm::vec4       m_eyePos;
+		glm::vec4       atPos;
 		glm::quat		mqt = {};
+		glm::vec3		_axis = {};
+		float			_angle = 0;
 		camera_info		pca = {};
 		float               m_distance;
 		float               m_fovV, m_fovH;
@@ -8369,6 +8372,7 @@ namespace vkr {
 	{
 		m_View = {};// glm::mat4::identity();
 		m_eyePos = glm::vec4(0, 0, 0, 0);
+		atPos = glm::vec4(0, 0, 0, 0);
 		m_distance = -1;
 		glm::quat qx = glm::angleAxis(0.0f, glm::vec3(1, 0, 0));
 		glm::quat qy = glm::angleAxis(0.0f, glm::vec3(0, 1, 0));
@@ -8983,21 +8987,24 @@ namespace vkr {
 		{
 #if 1	
 			yaw = glm::radians(yaw);
-			pitch = glm::radians(pitch);
-			m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * m_eyePos;
+			pitch = glm::radians(pitch); 
 			glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
 			glm::quat qy = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * qx;
 			mqt = glm::normalize(qy);
 			glm::mat4 rotate = glm::mat4_cast(mqt);
-			m_eyePos += GetSide() * x * distance / 100.0f;
-			m_eyePos += GetUp() * y * distance / 100.0f;
+			//m_eyePos += GetSide() * x * distance / 100.0f;
+			//m_eyePos += GetUp() * y * distance / 100.0f; 
+			atPos += GetSide() * x * distance / 100.0f;
+			atPos += GetUp() * y * distance / 100.0f;
 			glm::vec4 dir = GetDirection();
-			glm::vec4 at = m_eyePos - (dir * m_distance);	// 计算新目标点
-			glm::vec3 eye = at + (dir * distance);
-			glm::mat4 translate = glm::translate(glm::mat4(1.0f), -eye);
+			glm::vec4 at = atPos; 
+			auto eye = at + glm::vec4(0, 0, distance, 1.0); 
+			m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // todo 相机坐标
+
+			glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
 			m_View = translate * rotate;
-			m_eyePos = mqt * glm::vec4(eye, 1.0);				// todo 相机坐标
-			m_distance = glm::length(at - m_eyePos);	// 新距离
+			m_distance = distance;	// 新距离
+
 #else 
 			camera_info& pc = pca;
 			pc.camera_up = glm::vec3(0, 1, 0);
@@ -17930,6 +17937,7 @@ namespace vkr {
 			distance = std::max<float>(distance, 0.1f);
 
 			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
+
 			//if (yaw < 0)yaw = 0;//偏航角
 			//if (pitch < 0)pitch = 0;//俯仰角
 			cam.UpdateCameraPolar(yaw, pitch,
