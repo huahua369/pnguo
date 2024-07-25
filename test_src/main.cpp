@@ -902,7 +902,7 @@ int main()
 				};
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
-					auto v3 = vkd->get_value(1);
+					auto v3 = vkd->get_value(0);
 					g3->str = "x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
