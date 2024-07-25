@@ -459,20 +459,7 @@ void loadtestdata()
 	for (auto& [k, v] : ed.items()) {
 		printf("%s\n", k.c_str());
 	}
-}
-
-#include "mcut/mcut_cx.h"
-#include <variant>
-int main()
-{
-#ifdef _DEBUG
-	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-#endif
-
-	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	glm::ivec2 ws = { 1280,800 };
-#if 1 
+#if 1
 	//m1.load_stl("E:\\d3\\cube.stl");
 	//m1.load_obj("E:\\d3\\g.obj");
 	//m2.load_stl("E:\\d3\\cone.stl");
@@ -540,16 +527,27 @@ int main()
 #endif
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
-	loadtestdata();
+
+}
+
+#include "mcut/mcut_cx.h"
+#include <variant>
+int main()
+{
+#ifdef _DEBUG
+	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+#endif
+
+	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	glm::ivec2 ws = { 1280,800 };
+
 #if 1
 	auto app = new_app();
 	form_newinfo_t ptf = {};
 	ptf.app = app; ptf.title = (char*)u8"窗口1";
-	ptf.size = ws;
-	ptf.flags = ef_vulkan | ef_resizable;
-	ptf.has_renderer = true;
-	form_x* form0 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
-
+	form_x* form0 = (form_x*)new_form(app, ptf.title, ws.x, ws.y, -1, -1, 0);
+	//loadtestdata();
 	auto sdldev = form0->get_dev();
 	vkdg_cx* vkd = new_vkdg(&sdldev);
 	SDL_Texture* d3tex = 0;
@@ -765,9 +763,9 @@ int main()
 			p->set_view(vs, cs);
 
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
-			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 80,30 }, 3);
+			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 380,30 }, 3);
 			g3->_absolute = true;
-			g3->pos = { 30,20 };
+			g3->pos = { 30,120 };
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
@@ -893,6 +891,7 @@ int main()
 						break;
 					}
 				};
+
 			gb2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 				{
 					auto cp = (color_btn*)p;
@@ -906,6 +905,8 @@ int main()
 				};
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
+					auto v3 = vkd->get_value(1);
+					g3->str = "x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 

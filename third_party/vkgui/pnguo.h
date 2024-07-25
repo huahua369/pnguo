@@ -31,6 +31,7 @@ namespace md {
 namespace pg
 {
 	std::string to_string(double _Val);
+	std::string to_string(double _Val, const char* fmt);
 }
 /*
 图集画布

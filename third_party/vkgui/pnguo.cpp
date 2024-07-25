@@ -90,6 +90,14 @@ namespace pg
 		sprintf_s(&_Str[0], _Len + 1, "%.16g", _Val);
 		return _Str;
 	}
+	std::string to_string(double _Val, const char* fmt)
+	{
+		if (!fmt || !*fmt)fmt = "%.16g";
+		const auto _Len = static_cast<size_t>(_scprintf(fmt, _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, fmt, _Val);
+		return _Str;
+	}
 }
 
 // 2d骨骼动画

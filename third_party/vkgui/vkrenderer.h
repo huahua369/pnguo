@@ -34,6 +34,8 @@ public:
 	void update(mouse_state_t* io);
 	void on_render();
 	image_vkr get_vkimage(int idx);
+	// 获取内部数据，0相机坐标
+	glm::vec3 get_value(int idx);
 	// 重置大小
 	void resize(int w, int h);
 	void save_fbo(int idx);

@@ -335,7 +335,8 @@ int run_app(void* app, int count);
 app_cx* new_app();
 void* new_app0();
 void free_app(void* app);
-
+// 创建主窗口，-1默认坐标
+form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags);
 // 菜单窗口
 form_x* new_form_popup(form_x* parent, int width, int height);
 // 提示窗口

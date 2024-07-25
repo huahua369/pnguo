@@ -402,12 +402,16 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	SDL_Window* window = 0;
 	SDL_Renderer* renderer = 0;
 	auto flags = get_flags(fgs);
+	bool setpos = false;
 	if (fgs & ef_tooltip || fgs & ef_popup)
 	{
 		window = SDL_CreatePopupWindow(parent->_ptr, pos.x, pos.y, ws.x, ws.y, flags);
 	}
 	else
+	{
+		setpos = (pos.x > 0 && pos.y > 0);
 		window = SDL_CreateWindow(title.c_str(), ws.x, ws.y, flags);
+	}
 	//SDL_CreateWindowAndRenderer(ws.x, ws.y, get_flags(fgs), &window, &renderer);
 	if (!window)
 	{
@@ -447,6 +451,9 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	{
 		pw->parent = parent;
 		parent->childfs.push_back(pw);
+	}
+	if (setpos) {
+		pw->set_pos(pos);
 	}
 	pw->app = this;
 	pw->_ptr = window;
@@ -2420,7 +2427,22 @@ void form_move2end(form_x* f, plane_cx* ud) {
 void form_set_input_ptr(form_x* f, void* ud) {
 	if (f) { f->set_input_ptr(ud); }
 }
+form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags) {
 
+	form_x* form1 = 0;
+	if (width > 0 && height > 0)
+	{
+		form_newinfo_t ptf = {};
+		ptf.app = app; ptf.title = title;
+		ptf.size = { width,height };
+		ptf.has_renderer = true;
+		ptf.flags = flags ? flags : ef_vulkan | ef_resizable;
+		ptf.parent = 0;
+		ptf.pos = { x,y };
+		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+	}
+	return form1;
+}
 form_x* new_form_popup(form_x* parent, int width, int height)
 {
 	form_x* form1 = 0;
@@ -2430,7 +2452,7 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"menu";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_popup;
+		ptf.flags = ef_vulkan | ef_resizable | ef_borderless | ef_popup;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);

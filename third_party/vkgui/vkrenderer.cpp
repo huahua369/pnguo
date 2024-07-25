@@ -8949,19 +8949,26 @@ namespace vkr {
 			ext->m_PrevY = y;
 		}
 	}
-
+	float modv(float x, float y) {
+		if (x < -y) {
+			x = fmod(x, -y);
+		}
+		if (x > y) {
+			x = fmod(x, y);
+		}
+		return x;
+	}
 	void Camera::UpdateCameraPolar(float yaw, float pitch, float x, float y, float distance)
 	{
 		if (is_eulerAngles)
 		{
 			ryp.x += -yaw;
 			ryp.y += pitch;
+			ryp.x = modv(ryp.x, 360);
+			//ryp.y = modv(ryp.y, 90);
+			ryp.y = std::max(-90.0f + 1e-3f, std::min(ryp.y, 90.0f - 1e-3f));
 			yaw = glm::radians(ryp.x);
 			pitch = glm::radians(ryp.y);
-			pitch = std::max(-XM_PIDIV2 + 1e-3f, std::min(pitch, XM_PIDIV2 - 1e-3f));
-			ryp.y = glm::degrees(pitch);
-			// yaw = 0;  //偏航角
-			// pitch = 0;//俯仰角
 			// Trucks camera, moves the camera parallel to the view plane.
 			m_eyePos += GetSide() * x * distance / 1000.0f;
 			m_eyePos += GetUp() * y * distance / 1000.0f;
@@ -8970,6 +8977,7 @@ namespace vkr {
 			glm::vec4 dir = GetDirection();
 			glm::vec4 pol = PolarToVector(yaw, pitch);
 			glm::vec4 at = m_eyePos - (dir * m_distance);	// 计算目标点
+
 			auto neps = at + (pol * distance);
 			LookAt(neps, at);
 		}
@@ -18362,7 +18370,24 @@ image_vkr vkdg_cx::get_vkimage(int idx)
 	}
 	return r;
 }
-
+glm::vec3 vkdg_cx::get_value(int idx)
+{
+	glm::vec3 r = {};
+	if (!ctx) return r;
+	auto tx = (vkr::sample_cx*)ctx;
+	switch (idx)
+	{
+	case 0:
+		r = tx->m_camera.GetPosition();
+		break;
+	case 1:
+		r = { tx->m_camera.GetYaw(),tx->m_camera.GetPitch(),0 };
+		break;
+	default:
+		break;
+	}
+	return r;
+}
 void vkdg_cx::resize(int w, int h) {
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;
