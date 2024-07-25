@@ -528,6 +528,8 @@ void loadtestdata()
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
 
+	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
+	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 }
 
 #include "mcut/mcut_cx.h"
@@ -537,16 +539,11 @@ int main()
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 #endif
-
-	//return rdx12((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
-	glm::ivec2 ws = { 1280,800 };
-
 #if 1
+	glm::ivec2 ws = { 1280,800 };
 	auto app = new_app();
-	form_newinfo_t ptf = {};
-	ptf.app = app; ptf.title = (char*)u8"窗口1";
-	form_x* form0 = (form_x*)new_form(app, ptf.title, ws.x, ws.y, -1, -1, 0);
+	const char* wtitle = (char*)u8"窗口1";
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	//loadtestdata();
 	auto sdldev = form0->get_dev();
 	vkdg_cx* vkd = new_vkdg(&sdldev);
