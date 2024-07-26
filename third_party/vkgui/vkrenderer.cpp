@@ -5533,7 +5533,33 @@ namespace vkr
 		assert(res == VK_SUCCESS);
 		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pPrimitive->m_pipelineLayout, "GltfPbrPass PL");
 	}
-
+	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
+	{
+		VkPipelineColorBlendAttachmentState color_blend =
+		{
+			VK_TRUE,                                                      // VkBool32                                       blendEnable
+			VK_BLEND_FACTOR_SRC_ALPHA,                                    // VkBlendFactor                                  srcColorBlendFactor
+			VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstColorBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      colorBlendOp
+			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcAlphaBlendFactor
+			VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstAlphaBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      alphaBlendOp
+			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
+			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+		};
+		VkPipelineColorBlendAttachmentState color_no_blend = {
+			VK_FALSE,                                                     // VkBool32                                       blendEnable
+			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcColorBlendFactor
+			VK_BLEND_FACTOR_ZERO,                                         // VkBlendFactor                                  dstColorBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      colorBlendOp
+			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcAlphaBlendFactor
+			VK_BLEND_FACTOR_ZERO,                                         // VkBlendFactor                                  dstAlphaBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      alphaBlendOp
+			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
+			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+		};
+		out = blend ? color_blend : color_no_blend;
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// CreatePipeline
@@ -5602,6 +5628,8 @@ namespace vkr
 		if (defines.Has("HAS_FORWARD_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
+			get_blend((defines.Has("DEF_alphaMode_BLEND")), att_state);
+#if 0
 			att_state.colorWriteMask = 0xf;
 			att_state.blendEnable = (defines.Has("DEF_alphaMode_BLEND"));
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
@@ -5610,6 +5638,7 @@ namespace vkr
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+#endif
 			att_states.push_back(att_state);
 		}
 		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
@@ -8501,54 +8530,7 @@ namespace vkr {
 		}
 		glm::vec3 v2_n = -v2;
 		return (float)XM_PI - 2.0f * glm::asin(glm::length(v2_n - v1) / 2.0f);
-	}
-	void lookat2q(camera_info* c, glm::mat3 m)
-	{
-		glm::vec3 axis = glm::cross(c->camera_direction, c->camera_up);
-		//qut = glm::angleAxis(-c->pitch, qut * glm::vec3(1.0, 0.0, 0.0)) * qut;
-		//glm::quat qut = glm::quat(glm::vec3(-c->pitch, c->yaw, 0.0));
-		c->yp.x += c->yaw;
-		c->yp.y += c->pitch;
-		const glm::vec3 zvec_global = { 0.0f, 0.0f, 1.0f };
-		// m = glm::toMat3(c->qt);
-		glm::mat3 inv = glm::inverse(m);// invert_m3_m3(m_inv, m);
-		auto xaxis = glm::axis(c->qt);
-		if (glm::abs(c->yp.y) > XM_PIDIV2) {
-			float fac;
-			xaxis = glm::cross(zvec_global, inv[2]);
-			if (glm::dot(xaxis, inv[0]) < 0) {
-				xaxis = -xaxis;
-			}
-			fac = angle_normalized_v3v3(zvec_global, inv[2]) / float(XM_PI);
-			//fac = glm::angle(zvec_global, inv[2]) / float(XM_PI);
-			fac = fabsf(fac - 0.5f) * 2;
-			fac = fac * fac;
-			xaxis = glm::mix(xaxis, inv[0], fac);//interp
-		}
-		else {
-			xaxis = inv[0];
-		}
-		//auto m0 = glm::rotate(glm::mat4(1.0), -c->pitch, glm::vec3(1.0, 0.0, 0.0));
-		//m0 = m0 * glm::toMat4(c->qt);
-		float x = c->pitch, y = c->yaw;
-		float a = 1.0 + 0.2f * (sqrt(x * x + y * y) - 1.0);
-		glm::quat qut = {};// ;
-		qut = glm::angleAxis(c->yaw, glm::vec3(0.0, 1.0, 0.0)) * c->qt;
-		qut *= glm::angleAxis(c->pitch, qut * glm::vec3(1.0, 0.0, 0.0));//xaxis);// 
-		//qut = c->qt * glm::angleAxis(a, glm::vec3(x, y, 0.0));
-		//auto m1 = glm::toMat4(qut);
-		glm::quat temp = qut;
-		glm::quat temp1 = c->qt * qut;
-		c->qt = glm::normalize(temp);
-		c->camera_position += c->camera_position_delta;
-		c->camera_look_at = c->camera_position - (c->camera_direction * c->_distance);
-		//auto dir = glm::rotate(qut, c->camera_direction);
-		c->camera_position = glm::vec4(c->camera_look_at + c->camera_direction * c->distance, 1.0);
-		c->_distance = glm::length(c->camera_look_at - (glm::vec3)c->camera_position);
-		//c->camera_direction = dir;
-		printf("yaw:%.2f\tpitch%.2f\n", c->yp.x, c->yp.y);
-	}
-	// 
+	} 
 	glm::mat4 update_yp(glm::ivec3 r, float radius, glm::vec3& position, glm::vec3& target, bool flipY)
 	{
 		float yaw = r.x;
@@ -8844,115 +8826,7 @@ namespace vkr {
 	glm::quat quat_ext::get()
 	{
 		return glm::quat(Qs, Qx, Qy, Qz);
-	}
-	void quat_ext::Permute(float* outX, float* outY, float* outZ, float x, float y, float z)
-	{
-		float px = x, py = y, pz = z;
-		*outX = m_Permute[0][0] * px + m_Permute[1][0] * py + m_Permute[2][0] * pz;
-		*outY = m_Permute[0][1] * px + m_Permute[1][1] * py + m_Permute[2][1] * pz;
-		*outZ = m_Permute[0][2] * px + m_Permute[1][2] * py + m_Permute[2][2] * pz;
-	}
-
-	void quat_ext::PermuteInv(float* outX, float* outY, float* outZ, float x, float y, float z)
-	{
-		float px = x, py = y, pz = z;
-		*outX = m_Permute[0][0] * px + m_Permute[0][1] * py + m_Permute[0][2] * pz;
-		*outY = m_Permute[1][0] * px + m_Permute[1][1] * py + m_Permute[1][2] * pz;
-		*outZ = m_Permute[2][0] * px + m_Permute[2][1] * py + m_Permute[2][2] * pz;
-	}
-
-	void quat_ext::Permute(double* outX, double* outY, double* outZ, double x, double y, double z)
-	{
-		double px = x, py = y, pz = z;
-		*outX = m_Permute[0][0] * px + m_Permute[1][0] * py + m_Permute[2][0] * pz;
-		*outY = m_Permute[0][1] * px + m_Permute[1][1] * py + m_Permute[2][1] * pz;
-		*outZ = m_Permute[0][2] * px + m_Permute[1][2] * py + m_Permute[2][2] * pz;
-	}
-
-	void quat_ext::PermuteInv(double* outX, double* outY, double* outZ, double x, double y, double z)
-	{
-		double px = x, py = y, pz = z;
-		*outX = m_Permute[0][0] * px + m_Permute[0][1] * py + m_Permute[0][2] * pz;
-		*outY = m_Permute[1][0] * px + m_Permute[1][1] * py + m_Permute[1][2] * pz;
-		*outZ = m_Permute[2][0] * px + m_Permute[2][1] * py + m_Permute[2][2] * pz;
-	}
-
-	static inline float QuatD(int w, int h)
-	{
-		return (float)glm::min(abs(w), abs(h)) - 4;
-	}
-
-	static inline int QuatPX(float x, int w, int h)
-	{
-		return (int)(x * 0.5f * QuatD(w, h) + (float)w * 0.5f + 0.5f);
-	}
-
-	static inline int QuatPY(float y, int w, int h)
-	{
-		return (int)(-y * 0.5f * QuatD(w, h) + (float)h * 0.5f - 0.5f);
-	}
-
-	static inline float QuatIX(int x, int w, int h)
-	{
-		return (2.0f * (float)x - (float)w - 1.0f) / QuatD(w, h);
-	}
-
-	static inline float QuatIY(int y, int w, int h)
-	{
-		return (-2.0f * (float)y + (float)h - 1.0f) / QuatD(w, h);
-	}
-
-	void MouseMotionCB(int mouseX, int mouseY, int w, int h, quat_ext* ext)
-	{
-		double x = QuatIX(mouseX, w, h);
-		double y = QuatIY(mouseY, w, h);
-		double z = 1;
-		double px, py, pz, ox, oy, oz;
-		ext->PermuteInv(&px, &py, &pz, x, y, z);
-		ext->PermuteInv(&ox, &oy, &oz, ext->m_OrigX, ext->m_OrigY, 1);
-		double n0 = sqrt(ox * ox + oy * oy + oz * oz);
-		double n1 = sqrt(px * px + py * py + pz * pz);
-		if (n0 > DOUBLE_EPS && n1 > DOUBLE_EPS)
-		{
-			double v0[] = { ox / n0, oy / n0, oz / n0 };
-			double v1[] = { px / n1, py / n1, pz / n1 };
-			double axis[3];
-			Vec3Cross(axis, v0, v1);
-			double sa = sqrt(Vec3Dot(axis, axis));
-			double ca = Vec3Dot(v0, v1);
-			double angle = atan2(sa, ca);
-			if (x * x + y * y > 1.0)
-				angle *= 1.0 + 0.2f * (sqrt(x * x + y * y) - 1.0);
-			double qrot[4], qres[4], qorig[4];
-			QuatFromAxisAngle(qrot, axis, angle);
-			double nqorig = sqrt(ext->m_OrigQuat[0] * ext->m_OrigQuat[0] + ext->m_OrigQuat[1] * ext->m_OrigQuat[1] + ext->m_OrigQuat[2] * ext->m_OrigQuat[2] + ext->m_OrigQuat[3] * ext->m_OrigQuat[3]);
-			if (fabs(nqorig) > DOUBLE_EPS_SQ)
-			{
-				qorig[0] = ext->m_OrigQuat[0] / nqorig;
-				qorig[1] = ext->m_OrigQuat[1] / nqorig;
-				qorig[2] = ext->m_OrigQuat[2] / nqorig;
-				qorig[3] = ext->m_OrigQuat[3] / nqorig;
-				QuatMult(qres, qrot, qorig);
-				ext->Qx = qres[0];
-				ext->Qy = qres[1];
-				ext->Qz = qres[2];
-				ext->Qs = qres[3];
-			}
-			else
-			{
-				ext->Qx = qrot[0];
-				ext->Qy = qrot[1];
-				ext->Qz = qrot[2];
-				ext->Qs = qrot[3];
-			}
-			//ext->CopyToVar();
-			//if (bar != NULL)
-			//	bar->NotUpToDate();
-
-			ext->m_PrevX = x;
-			ext->m_PrevY = y;
-		}
-	}
+	} 
 	float modv(float x, float y) {
 		if (x < -y) {
 			x = fmod(x, -y);
@@ -8987,18 +8861,18 @@ namespace vkr {
 		{
 #if 1	
 			yaw = glm::radians(yaw);
-			pitch = glm::radians(pitch); 
+			pitch = glm::radians(pitch);
 			glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
 			glm::quat qy = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * qx;
 			mqt = glm::normalize(qy);
 			glm::mat4 rotate = glm::mat4_cast(mqt);
 			//m_eyePos += GetSide() * x * distance / 100.0f;
 			//m_eyePos += GetUp() * y * distance / 100.0f; 
-			atPos += GetSide() * x * distance / 100.0f;
-			atPos += GetUp() * y * distance / 100.0f;
+			atPos.x += x * distance / 1000.0f;
+			atPos.y += y * distance / 1000.0f;
 			glm::vec4 dir = GetDirection();
-			glm::vec4 at = atPos; 
-			auto eye = at + glm::vec4(0, 0, distance, 1.0); 
+			glm::vec4 at = atPos;
+			auto eye = at + glm::vec4(0, 0, distance, 1.0);
 			m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // todo 相机坐标
 
 			glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
@@ -17937,7 +17811,7 @@ namespace vkr {
 			distance = std::max<float>(distance, 0.1f);
 
 			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
-
+			if (panning) { yaw = 0; pitch = 0; }
 			//if (yaw < 0)yaw = 0;//偏航角
 			//if (pitch < 0)pitch = 0;//俯仰角
 			cam.UpdateCameraPolar(yaw, pitch,

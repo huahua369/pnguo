@@ -538,6 +538,7 @@ int main()
 {
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 #endif
 #if 1
 	glm::ivec2 ws = { 1280,800 };
