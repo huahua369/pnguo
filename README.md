@@ -18,7 +18,7 @@ git submodule update --init --recursive --depth 1
 ```
 git pull
 ```
-2. CMakeLists.txt可修改编译SDL3参数，，本代码依赖库为静态库，如要改成引用动态库则改txt前面set(VCPKG_TARGET_TRIPLET x64-windows)
+2. CMakeLists.txt可修改编译SDL3参数，SDL目录的vcxproj、sln建议删掉，本代码依赖库为静态库，如要改成引用动态库则改txt前面set(VCPKG_TARGET_TRIPLET x64-windows)
 3. vcpkg安装依赖库，根据需求安装，例如```vcpkg install PkgConfig:x64-windows-static```
 ```
 PkgConfig
