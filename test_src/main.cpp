@@ -41,7 +41,6 @@ cmake -DCMAKE_INSTALL_PREFIX=~/test ..
 cmake -DBUILD_SHARED_LIBS=OFF ..
 ninja -C build
 
-
 */
 
 #define DVC_EXPORT extern "C" __declspec(dllimport)
