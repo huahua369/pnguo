@@ -9,7 +9,14 @@
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "-j8",
-      "ctestCommandArgs": ""
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "SDL3_DIR",
+          "value": "",
+          "type": "PATH"
+        }
+      ]
     },
     {
       "name": "x64-Release",

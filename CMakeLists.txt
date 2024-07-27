@@ -46,8 +46,8 @@ set(platform_dir "${platform_dir}d")
 else()
 set(CBT "Release")
 endif() 
-set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
-set(SDL3_DIR "E:/sdk/SDL3/out/install/x64-${CBT}/cmake")
+#set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
+#set(SDL3_DIR "E:/sdk/SDL3/out/install/x64-${CBT}/cmake")
 message("sdl ${SDL3_DIR}")
 message("stb路径 ${Stb_DIR}")
 message("type--${CMAKE_BUILD_TYPE}")
@@ -62,17 +62,53 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MT")
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 #设置执行文件输出目录
 set(EXECUTABLE_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH})
-  
-#vkvg 
+   
+
+#第三方库
+set(SDL_STATIC ON)
+set(SDL_SHARED OFF)
+set(SDL_RENDER_D3D OFF)
+set(SDL_OPENGL OFF)
+set(SDL_OPENGLES OFF)
+set(SDL_DUMMYCAMERA OFF)
+set(SDL_DUMMYAUDIO OFF)
+set(SDL_DISKAUDIO OFF)
+set(SDL_DUMMYVIDEO OFF)
+set(SDL_DIRECTX OFF)
+set(SDL_LIBC ON)
+set(SDL_WASAPI ON)
+set(SDL_RENDER_VULKAN ON)
+add_subdirectory(third_bin/SDL)
+
+
+add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 add_definitions(-DVKVG_RECORDING)
 add_definitions(-DVKH_USE_VMA)
-add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
+
+find_package(PkgConfig REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(Stb REQUIRED) 
+find_package(nlohmann_json REQUIRED)
+find_package(Vulkan REQUIRED) 
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(harfbuzz CONFIG REQUIRED)
+find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h") 
+find_package(EnTT CONFIG REQUIRED) 
+pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
+pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)
+pkg_check_modules(LIBRSVG librsvg-2.0 IMPORTED_TARGET REQUIRED)
+pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)
+
+#vkvg 
 FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c
   third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp 
 )
 SET (VKVG_PUBLIC_HEADERS "third_party/vkvg/vkvg.h;third_party/vkvg/vkvg-svg.h")
 
-list(APPEND src_cmp    
+list(APPEND tpv_src    
+ ${VKVG_SRC} 
 "third_party/stb_src/stb_src.c" 
 
 "third_party/tinyspline/parson.c"
@@ -93,92 +129,24 @@ list(APPEND src_cmp
 "third_party/mcut/obj.c"
 )
 
-#测试
-list(APPEND src_cmp  
-    ${VKVG_SRC} 
-    "test_src/charts.cpp"
-    "test_src/main.cpp"
-    "rc/resource1.rc"
-) 
-
-
-# 将源代码添加到此项目的可执行文件。
-add_executable (tcmp ${src_cmp}  ) 
-
 include_directories("third_party") 
 include_directories("third_party/vkgui") 
 include_directories("third_party/mcut") 
-
 include_directories("third_party/vkvg")
 include_directories("third_party/vkvg/src")
 include_directories("third_party/vkvg/src/recording")
 include_directories("third_party/vkh/include")
 include_directories("third_party/vkh/src")
 
-include_directories("${SDL3DIR_ROOT}/include")
-list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
-find_package(SDL3 CONFIG REQUIRED)
-
-#message("stb路径 ${Stb_INCLUDE_DIR}")
-find_package(OpenSSL REQUIRED)
- 
-find_package(glm CONFIG REQUIRED)
-find_package(Stb REQUIRED)
-#find_package(NanoSVG CONFIG REQUIRED)
-find_package(nlohmann_json REQUIRED)
-find_package(Vulkan REQUIRED) 
-find_package(VulkanMemoryAllocator CONFIG REQUIRED)
-find_package(ZLIB REQUIRED)
-find_package(harfbuzz CONFIG REQUIRED)
-find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
-find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
-#find_package(GEOS CONFIG REQUIRED)
-find_package(PkgConfig REQUIRED)
-    pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
-    pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)
-       
-find_package(libuv CONFIG REQUIRED)
-pkg_check_modules(LIBRSVG librsvg-2.0 IMPORTED_TARGET REQUIRED)
-pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)
-
-find_package(EnTT CONFIG REQUIRED) 
-find_package(OpenCV CONFIG REQUIRED)
-#find_package(unofficial-joltphysics CONFIG REQUIRED)
-
-set(lklib)
-list(APPEND lklib  
-    ZLIB::ZLIB
-    Vulkan::Vulkan 
-    Vulkan::Headers GPUOpen::VulkanMemoryAllocator
-    PkgConfig::LIBRSVG
-    glm::glm-header-only
-    nlohmann_json::nlohmann_json
-    OpenSSL::SSL OpenSSL::Crypto
-    #${SDL3_STATIC_LIBRARIES}
-    ${SDL3_LIBRARIES}
-    harfbuzz::harfbuzz 
-    PkgConfig::Clipper2  PkgConfig::Clipper2Z 
-    $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
-    opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
-    vkgui
-   # rdx12
-   # unofficial::joltphysics::Jolt
-)
-target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(tcmp PRIVATE ${lklib})
- 
-#复制测试文本
-file(COPY test_src/sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY test_src/ed.json DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY test_src/blender_icons.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY test_src/button20.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-file(COPY test_src/button21.svg DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+add_library (tpv STATIC ${tpv_src})
+target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
+target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json)
 
 #3d渲染器
-
 add_subdirectory(third_party/vkgui)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE)
 
-add_dependencies(tcmp vkgui)
+add_subdirectory(test_src)
+add_dependencies(tcmp vkgui tpv)
 # TODO: 如有需要，请添加测试并安装目标。

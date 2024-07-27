@@ -17543,7 +17543,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		do {
 			if (!p->kmod & 1)break;
 			switch (p->keycode) {
-			case SDLK_a:
+			case SDLK_A:
 			{
 				ctx->ccursor = _text.size();
 				ctx->bounds[0] = 0;
@@ -17552,8 +17552,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 				ctx->up_cursor(true);
 			}
 			break;
-			case SDLK_x:
-			case SDLK_c:
+			case SDLK_X:
+			case SDLK_C:
 			{
 				//auto cp1 = ext->get_cpos2(0);
 				//auto cp2 = ext->get_cpos2(1);
@@ -17565,7 +17565,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 					if (str.size())
 					{
 						set_clipboard(str.c_str());
-						if (p->keycode == SDLK_x && !_read_only)
+						if (p->keycode == SDLK_X && !_read_only)
 						{
 							remove_bounds();
 							ctx->up_cursor(true);
@@ -17574,16 +17574,16 @@ void edit_tl::on_keyboard(et_un_t* ep)
 				}
 			}
 			break;
-			case SDLK_v:
+			case SDLK_V:
 			{
 				auto str = get_clipboard();
 				inputchar(str.c_str());
 			}
 			break;
-			case SDLK_y:
+			case SDLK_Y:
 				//is_redo = true;	//_storage_buf->redo();
 				break;
-			case SDLK_z:
+			case SDLK_Z:
 				//is_undo = true;	//_storage_buf->undo();
 				break;
 			}

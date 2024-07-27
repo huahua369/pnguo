@@ -37,7 +37,7 @@ std::string get_clipboard()
 		if (p)
 		{
 			ret = p;
-			SDL_free(p);
+			SDL_free((void*)p);
 		}
 	}
 	return ret;
@@ -69,11 +69,11 @@ namespace pce {
 
 	void set_property(SDL_Window* w, const char* str, void* p)
 	{
-		SDL_SetProperty(SDL_GetWindowProperties(w), str, p);
+		SDL_SetPointerProperty(SDL_GetWindowProperties(w), str, p);
 	}
 	void* get_property(SDL_Window* w, const char* str)
 	{
-		return SDL_GetProperty(SDL_GetWindowProperties(w), str, 0);
+		return SDL_GetPointerProperty(SDL_GetWindowProperties(w), str, 0);
 	}
 
 	void* get_windowptr(SDL_Window* w)
@@ -82,7 +82,7 @@ namespace pce {
 		//SDL_VERSION(&systemInfo.version);
 		//SDL_GetWindowWMInfo(_ptr, &systemInfo);
 #ifdef _WIN32
-		return get_property(w, "SDL.window.win32.hwnd");
+		return get_property(w, SDL_PROP_WINDOW_WIN32_HWND_POINTER);// "SDL.window.win32.hwnd");
 		//return systemInfo.info.win.window;
 #elif __ANDROID__
 	//return systemInfo.info.android.window;
@@ -234,7 +234,7 @@ sem_s::~sem_s()
 
 void sem_s::post()
 {
-	SDL_PostSemaphore(sem);
+	SDL_SignalSemaphore(sem);
 }
 
 int sem_s::wait(int ms)
@@ -295,8 +295,8 @@ app_cx::app_cx()
 	}
 	// Enable native IME.
 	SDL_SetHintWithPriority(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1", SDL_HINT_OVERRIDE);
-	SDL_SetHintWithPriority(SDL_HINT_IME_INTERNAL_EDITING, "1", SDL_HINT_OVERRIDE);
-	SDL_SetHintWithPriority(SDL_HINT_IME_SHOW_UI, "1", SDL_HINT_OVERRIDE);
+	//SDL_SetHintWithPriority(SDL_HINT_IME_INTERNAL_EDITING, "1", SDL_HINT_OVERRIDE);
+	//SDL_SetHintWithPriority(SDL_HINT_IME_SHOW_UI, "1", SDL_HINT_OVERRIDE);
 #ifdef __ANDROID__
 	SDL_SetHintWithPriority(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1", SDL_HINT_OVERRIDE);
 	SDL_SetHintWithPriority(SDL_HINT_TOUCH_MOUSE_EVENTS, "1", SDL_HINT_OVERRIDE);
@@ -859,11 +859,11 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 }
 
 
-SDL_PixelFormatEnum get_rgbafe() {
+SDL_PixelFormat get_rgbafe() {
 	uint32_t rmask, gmask, bmask, amask;
 	rmask = 0x000000FF; gmask = 0x0000FF00; bmask = 0x00FF0000; amask = 0xFF000000;	// RGBA8888模式 
 	int depth = 32;
-	return SDL_GetPixelFormatEnumForMasks(depth, rmask, gmask, bmask, amask);
+	return SDL_GetPixelFormatForMasks(depth, rmask, gmask, bmask, amask);
 }
 SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 	SDL_Texture* pr = 0;
@@ -875,7 +875,7 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 			auto ty = img->type;
 			if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
 			if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
-			ptx = SDL_CreateTexture(renderer, (SDL_PixelFormatEnum)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
+			ptx = SDL_CreateTexture(renderer, (SDL_PixelFormat)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
 			img->texid = ptx;
 			img->valid = true;
 			pr = ptx;
@@ -1240,12 +1240,11 @@ void et2key(const SDL_Event* e, keyboard_et* ekm)
 	if (!e || !(e->type == SDL_EVENT_KEY_DOWN || e->type == SDL_EVENT_KEY_UP))return;
 	int ks = 0;
 	auto pk = SDL_GetKeyboardState(&ks);
-	int key = e->key.keysym.scancode;
-
-	ekm->sym = (e->key.keysym.sym);
-	ekm->keycode = SDL_GetKeyFromScancode(e->key.keysym.scancode);
+	int key = (int)e->key.scancode;
+	ekm->sym = (e->key.key);
+	ekm->keycode = SDL_GetKeyFromScancode(e->key.scancode, e->key.mod);
 	ekm->scancode = key;      /**< SDL physical key code - see ::SDL_Scancode for details */
-	ekm->mod = e->key.keysym.mod;                 /**< current key modifiers */
+	ekm->mod = e->key.mod;                 /**< current key modifiers */
 	ekm->state = e->key.state;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
 	ekm->repeat = e->key.repeat;       /**< Non-zero if this is a key repeat */
 	static int64_t ts = 0, ts1 = 0;
@@ -1420,7 +1419,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	case SDL_EVENT_TEXT_INPUT:
 	{
 		text_input_et t = {};
-		t.text = e->text.text;
+		t.text = (char*)e->text.text;
 		pw->trigger((uint32_t)devent_type_e::text_input_e, &t);
 		auto irc = (glm::ivec4*)&t.x;
 		pw->set_ime_pos(*irc);
@@ -1429,7 +1428,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	case SDL_EVENT_TEXT_EDITING:
 	{
 		text_editing_et t = {};
-		t.text = e->edit.text;
+		t.text = (char*)e->edit.text;
 		t.start = e->edit.start;
 		t.length = e->edit.length;
 		pw->trigger((uint32_t)devent_type_e::text_editing_e, &t);
@@ -1825,7 +1824,7 @@ char* form_x::get_clipboard0()
 	char* ret = 0;
 	if (SDL_HasClipboardText())
 	{
-		ret = SDL_GetClipboardText();
+		ret = (char*)SDL_GetClipboardText();
 		if (clipstr)
 			SDL_free(clipstr);
 		clipstr = ret;
@@ -1910,23 +1909,22 @@ void form_x::hide_child()
 SDL_Surface* SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask)
 {
 	return SDL_CreateSurface(width, height,
-		SDL_GetPixelFormatEnumForMasks(depth, Rmask, Gmask, Bmask, Amask));
+		SDL_GetPixelFormatForMasks(depth, Rmask, Gmask, Bmask, Amask));
 }
 
 SDL_Surface* SDL_CreateRGBSurfaceWithFormat(Uint32 flags, int width, int height, int depth, Uint32 format)
 {
-	return SDL_CreateSurface(width, height, (SDL_PixelFormatEnum)format);
+	return SDL_CreateSurface(width, height, (SDL_PixelFormat)format);
 }
 
 SDL_Surface* SDL_CreateRGBSurfaceFrom(void* pixels, int width, int height, int depth, int pitch, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask)
 {
-	return SDL_CreateSurfaceFrom(pixels, width, height, pitch,
-		SDL_GetPixelFormatEnumForMasks(depth, Rmask, Gmask, Bmask, Amask));
+	return SDL_CreateSurfaceFrom(width, height, SDL_GetPixelFormatForMasks(depth, Rmask, Gmask, Bmask, Amask), pixels, pitch);
 }
 
 SDL_Surface* SDL_CreateRGBSurfaceWithFormatFrom(void* pixels, int width, int height, int depth, int pitch, Uint32 format)
 {
-	return SDL_CreateSurfaceFrom(pixels, width, height, pitch, (SDL_PixelFormatEnum)format);
+	return SDL_CreateSurfaceFrom(width, height, (SDL_PixelFormat)format, pixels, pitch);
 }
 #else
 SDL_Surface* SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask);
@@ -2061,7 +2059,7 @@ SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, in
 	{
 		if (type == 0)type = SDL_PIXELFORMAT_ABGR8888;//rgba
 		if (type == 1)type = SDL_PIXELFORMAT_ARGB8888;//bgra
-		p = SDL_CreateTexture(renderer, (SDL_PixelFormatEnum)type, static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, width, height);
+		p = SDL_CreateTexture(renderer, (SDL_PixelFormat)type, static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, width, height);
 		if (p && data)
 		{
 			if (stride < 1)stride = width * 4;
@@ -2128,7 +2126,10 @@ void form_x::update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int strid
 		SDL_Rect rect = { rc.x,rc.y,rc.z,rc.w };
 		if (rect.w < 1)
 		{
-			SDL_QueryTexture(p, 0, 0, &rc.z, &rc.w);
+			glm::vec2 ss = {};
+			SDL_GetTextureSize(p, &ss.x, &ss.y);
+			rect.w = ss.x;
+			rect.h = ss.y;
 		}
 		if (stride < 1)stride = rc.z * 4;
 		SDL_UpdateTexture(p, rect.h > 1 && rect.w > 1 ? &rect : nullptr, data, stride);
@@ -2163,7 +2164,7 @@ void* form_x::get_texture_vk(SDL_Texture* p)
 	if (!p)return nullptr;
 	SDL_PropertiesID props = SDL_GetTextureProperties(p);
 	auto ra = (void*)SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, 0);
-	auto r = (void*)SDL_GetProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, 0);
+	auto r = (void*)SDL_GetPointerProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, 0);
 	if (r)ra = r;
 	auto r1 = (void*)SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_VULKAN_TEXTURE_NUMBER, 0);
 	if (r1)ra = r1;
@@ -2171,17 +2172,17 @@ void* form_x::get_texture_vk(SDL_Texture* p)
 }
 void form_x::start_text_input()
 {
-	if (!SDL_TextInputActive())
-		SDL_StartTextInput();
+	if (!SDL_TextInputActive(_ptr))
+		SDL_StartTextInput(_ptr);
 }
 void form_x::stop_text_input()
 {
-	if (SDL_TextInputActive())
-		SDL_StopTextInput();
+	if (SDL_TextInputActive(_ptr))
+		SDL_StopTextInput(_ptr);
 }
 bool form_x::text_input_active()
 {
-	return SDL_TextInputActive();
+	return SDL_TextInputActive(_ptr);
 }
 void form_x::set_ime_pos(const glm::ivec4& r)
 {
@@ -2212,7 +2213,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
-		SDL_SetTextInputRect(&rect);
+		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
 	} while (0);
 
@@ -2326,9 +2327,9 @@ dev_info_cx form_x::get_dev()
 	if (renderer)
 	{
 		SDL_PropertiesID pid = SDL_GetRendererProperties(renderer);
-		c.inst = (void*)SDL_GetProperty(pid, SDL_PROP_RENDERER_VULKAN_INSTANCE_POINTER, 0);
-		c.phy = (void*)SDL_GetProperty(pid, SDL_PROP_RENDERER_VULKAN_PHYSICAL_DEVICE_POINTER, 0);
-		c.vkdev = (void*)SDL_GetProperty(pid, SDL_PROP_RENDERER_VULKAN_DEVICE_POINTER, 0);
+		c.inst = (void*)SDL_GetPointerProperty(pid, SDL_PROP_RENDERER_VULKAN_INSTANCE_POINTER, 0);
+		c.phy = (void*)SDL_GetPointerProperty(pid, SDL_PROP_RENDERER_VULKAN_PHYSICAL_DEVICE_POINTER, 0);
+		c.vkdev = (void*)SDL_GetPointerProperty(pid, SDL_PROP_RENDERER_VULKAN_DEVICE_POINTER, 0);
 		c.qFamIdx = SDL_GetNumberProperty(pid, SDL_PROP_RENDERER_VULKAN_GRAPHICS_QUEUE_FAMILY_INDEX_NUMBER, 0);
 		//c.qFamIdx = SDL_GetNumberProperty(pid, SDL_PROP_RENDERER_VULKAN_PRESENT_QUEUE_FAMILY_INDEX_NUMBER, 0);
 	}
