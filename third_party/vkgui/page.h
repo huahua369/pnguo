@@ -65,3 +65,49 @@ private:
 // 显示工具提示面板 
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc);
 void hide_tooltip(form_x* form);
+
+struct style_plane_t {
+	image_ptr_t* img = 0;	// 图标纹理
+	glm::ivec2 color = {};	// 背景色，边框色
+	int text_color = -1;	// 文本颜色
+	float thickness = 1.0;	// 线宽
+	float radius = 4;		// 矩形圆角
+};
+
+
+struct column_lvt
+{
+	std::string title;	// 文本 
+	glm::vec2 align = { 0.5,0.5 };	// 0左，0.5中，1右
+	int width = 0;		// 宽
+	int idx = 0;		// 初始序号
+	bool visible = true;//是否显示列
+};
+// 列表框
+class list_box_cx
+{
+public:
+	int font_size = 16;
+public:
+	list_box_cx();
+	~list_box_cx();
+
+private:
+
+};
+
+
+// 对话框
+class dialog_cx
+{
+public:
+
+public:
+	dialog_cx();
+	~dialog_cx();
+
+private:
+
+};
+
+

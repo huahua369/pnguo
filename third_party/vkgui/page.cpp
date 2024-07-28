@@ -9,7 +9,7 @@
 #include "pnguo.h"
 #include "tinysdl3.h"
 #include "page.h"
-
+#if 1
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc)
 {
 	if (!form || !bc || str.empty())return;
@@ -191,3 +191,25 @@ void menu_cx::free_item(mitem_t* p)
 	if (p)
 		delete p;
 }
+#endif
+
+// todo 列表视图
+#if 1
+
+list_box_cx::list_box_cx()
+{
+}
+
+list_box_cx::~list_box_cx()
+{
+}
+
+dialog_cx::dialog_cx()
+{
+}
+
+dialog_cx::~dialog_cx()
+{
+}
+
+#endif // 1

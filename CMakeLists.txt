@@ -5,7 +5,6 @@ cmake_minimum_required (VERSION 3.8)
 set(VCPKG_TARGET_TRIPLET x64-windows-static)
 set(CMAKE_TOOLCHAIN_FILE "E:/sdk/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
-
 IF(WIN32)
 set(CMAKE_CXX_STANDARD 23)
 else()
@@ -17,6 +16,7 @@ project ("pnguo")
 
 message("msvc: ${CMAKE_SYSTEM_VERSION}")
 message("CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
+message("VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
 
 # 如果支持，请为 MSVC 编译器启用热重载。
 if (POLICY CMP0141)
@@ -46,6 +46,7 @@ set(platform_dir "${platform_dir}d")
 else()
 set(CBT "Release")
 endif() 
+
 #set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
 #set(SDL3_DIR "E:/sdk/SDL3/out/install/x64-${CBT}/cmake")
 message("sdl ${SDL3_DIR}")

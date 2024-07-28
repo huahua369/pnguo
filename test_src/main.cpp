@@ -547,7 +547,7 @@ int main()
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();
 	vkdg_cx* vkd = new_vkdg(&sdldev); // 创建vk渲染器
-	SDL_Texture* d3tex = 0; 
+	SDL_Texture* d3tex = 0;
 	if (vkd) {
 		int xk = 0;
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
@@ -563,7 +563,7 @@ int main()
 		{
 			auto tex = form0->new_texture(vr.size.x, vr.size.y, vr.vkimageptr, 1);// bgra纹理
 			if (tex)
-			{ 
+			{
 				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
 				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 100,100,vr.size.x,vr.size.y }, 0);
 			}
@@ -573,12 +573,12 @@ int main()
 	form0->up_cb = [=](float delta, int* ret)
 		{
 			vkd->update(form0->io);
-			vkd->on_render();		 
+			//vkd->on_render();		 
 			bool ks = false;
 			if (ks) {
 				vkd->save_fbo(0);
 				stbi_write_png("temp/fbovkr.png", vkd->width, vkd->height, 4, vkd->dt.data(), 0);
-			} 
+			}
 		};
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
@@ -1023,7 +1023,7 @@ int main()
 				cairo_t* cr = cairo_create(blsur);
 				render_svg(cr, bl, {}, { 1.0,1.0 }, 0, 0);// "#g14475");
 				//render_svg(cr, bl, {}, { 1.0,1.0 }, 0, "#g14475");
-				//render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
+				render_svg(cr, bl1, { 0,bl->height + 100 }, { 1.0,1.0 }, 0);
 				//render_svg(cr, bl2, { 400,bl->height + 100 }, { 1.0,1.0 }, 0);
 				svginc = 1;
 				cairo_destroy(cr);
@@ -1034,7 +1034,7 @@ int main()
 			{
 				//print_time a("draw svg");
 				//cairo_as _cas(cr);
-				cairo_translate(cr, 6, 6);
+				cairo_translate(cr, 6 + scroll.x, 6 + scroll.y);
 				draw_rectangle(cr, { 0,0,cs.x,cs.y }, 4);
 				fill_stroke(cr, 0xf05c8042, 0xffff802C, 2, false);
 				draw_ellipse(cr, { 200,200 }, { 120,20 });
@@ -1433,7 +1433,7 @@ int main()
 			gb2->light = 0.2 * 0;
 			gb2->_disabled_events = true;
 			gb2->pdc;
-			pl2->set_family_size((char*)u8"NSimSun,Segoe UI Emoji", 16, -1);
+			pl2->set_family_size((char*)u8"NSimSun,Segoe UI Emoji", 12, -1);
 			et1 = pl2->add_input("", { 400,30 }, true);
 			et1->set_pwd('*');
 			et2 = pl2->add_input("", { 620,300 }, false);

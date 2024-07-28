@@ -21271,20 +21271,5 @@ void rlistview_cx::clear_image()
 }
 
 
-list_box_cx::list_box_cx()
-{
-}
-
-list_box_cx::~list_box_cx()
-{
-}
-
-dialog_cx::dialog_cx()
-{
-}
-
-dialog_cx::~dialog_cx()
-{
-}
 
 #endif // 1
