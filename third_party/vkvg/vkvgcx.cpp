@@ -164,6 +164,7 @@ struct path_txf_vg
 
 void draw_path_vkvg(void* cr, path_v* p, style_path_t* st)
 {
+#if 0
 	if (!p || !st || p->_data.empty())return;
 	path_txf_vg tf = {};
 	tf.count = p->_data.size();
@@ -171,6 +172,7 @@ void draw_path_vkvg(void* cr, path_v* p, style_path_t* st)
 	tf.x = p->_pos.x;
 	tf.y = p->_pos.y + p->_baseline;
 	draw_path_vkvg((VkvgContext)cr, &tf, st);
+#endif
 }
 
 vkvg_ctx::vkvg_ctx(VkvgSurface surf)

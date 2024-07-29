@@ -48,7 +48,7 @@ set(CBT "Release")
 endif() 
 
 #set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
-#set(SDL3_DIR "E:/sdk/SDL3/out/install/x64-${CBT}/cmake")
+#set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
 message("sdl ${SDL3_DIR}")
 message("stb路径 ${Stb_DIR}")
 message("type--${CMAKE_BUILD_TYPE}")
@@ -59,13 +59,15 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT") 
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MT") 
  
-#设置库文件输出目录
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 #设置执行文件输出目录
-set(EXECUTABLE_OUTPUT_PATH ${LIBRARY_OUTPUT_PATH})
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
+#设置库文件输出目录
+set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
    
 
 #第三方库
+
+if(NOT DEFINED SDL3DIR_ROOT)
 set(SDL_STATIC ON)
 set(SDL_SHARED OFF)
 set(SDL_RENDER_D3D OFF)
@@ -80,7 +82,9 @@ set(SDL_LIBC ON)
 set(SDL_WASAPI ON)
 set(SDL_RENDER_VULKAN ON)
 add_subdirectory(third_bin/SDL)
-
+else()
+find_package(SDL3 REQUIRED) 
+endif()
 
 add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 add_definitions(-DVKVG_RECORDING)
@@ -100,7 +104,7 @@ find_package(EnTT CONFIG REQUIRED)
 pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
 pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)
 pkg_check_modules(LIBRSVG librsvg-2.0 IMPORTED_TARGET REQUIRED)
-pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)
+pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED) 
 
 #vkvg 
 FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c
@@ -116,6 +120,7 @@ list(APPEND tpv_src
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
 "third_party/vkvg/vkvgcx.cpp"  
+"third_party/vkgui/mapView.cpp"  
 
 "third_party/mcut/bvh.cpp"  
 "third_party/mcut/frontend.cpp"  
@@ -140,8 +145,11 @@ include_directories("third_party/vkh/include")
 include_directories("third_party/vkh/src")
 
 add_library (tpv STATIC ${tpv_src})
+#add_library (tpv SHARED ${tpv_src})
 target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json)
+target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
+PkgConfig::GTHREAD
+)
 
 #3d渲染器
 add_subdirectory(third_party/vkgui)
@@ -149,5 +157,6 @@ add_subdirectory(third_party/vkgui)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE)
 
 add_subdirectory(test_src)
-add_dependencies(tcmp vkgui tpv)
+add_dependencies(vkgui tpv)
+add_dependencies(tcmp vkgui)
 # TODO: 如有需要，请添加测试并安装目标。

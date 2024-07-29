@@ -1,5 +1,48 @@
 ﻿#pragma once
+
+#ifdef MC_STATIC
+#  define MC_EXPORT extern
+#else
+#ifdef _WIN32
+#ifdef __cplusplus
+#  ifndef MC_IMPORT
+#    define MC_EXPORT extern "C" __declspec(dllexport)
+#    define MCPP_EXPORT extern __declspec(dllexport)
+#  else
+#    define MC_EXPORT extern "C" __declspec(dllimport)
+#    define MCPP_EXPORT __declspec(dllimport)
+#  endif
+#else
+#  ifndef MC_IMPORT
+#    define MC_EXPORT extern __declspec(dllexport)
+#  else
+#    define MC_EXPORT extern __declspec(dllimport)
+#  endif
+#endif
+#else
+#ifdef __cplusplus
+#define MC_EXPORT extern "C" __attribute__((visibility ("default")))
+#define MCPP_EXPORT __attribute__((visibility ("default")))
+#else
+#define MC_EXPORT extern __attribute__((visibility ("default")))
+#define MCPP_EXPORT 
+#endif
+#endif // _WIN32
+#endif
+
+#ifndef MC_API
+#ifdef _WIN32
+#define MC_API __cdecl
+#else
+#define MC_API __cdecl
+#endif
+#endif
+
+
 #include <cstdint>
+#include <stdint.h>
+#include <stdbool.h>
+
 #include <stack>
 #include <vector>
 #include <list>

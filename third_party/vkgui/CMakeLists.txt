@@ -54,8 +54,13 @@ set(Images_src
 )
 
 add_library (vkgui STATIC ${vkgui_src})
+#add_library (vkgui SHARED ${vkgui_src})
 
-target_link_libraries (vkgui PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json SDL3::SDL3)
+target_link_libraries (vkgui PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json 
+    PkgConfig::Clipper2  PkgConfig::Clipper2Z 
+    tpv
+    SDL3::SDL3
+)
 target_include_directories (vkgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)
 copyTargetCommand("${Shaders_PostProc_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_postproc_src)

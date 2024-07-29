@@ -331,10 +331,10 @@ enum class cdtype_e :uint32_t
 // 导出接口
 uint64_t call_data(int type, void* data);
 // 运行消息循环count==0则死循环, 执行循环次数
-int run_app(void* app, int count);
+MC_EXPORT int run_app(void* app, int count);
 app_cx* new_app();
-void* new_app0();
-void free_app(void* app);
+MC_EXPORT void* new_app0();
+MC_EXPORT void free_app(void* app);
 // 创建主窗口，-1默认坐标
 form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags);
 // 菜单窗口

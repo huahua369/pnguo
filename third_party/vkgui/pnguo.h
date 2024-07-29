@@ -23,10 +23,12 @@ struct input_state_t;
 #endif
 
 namespace md {
-	int64_t get_utf8_count(const char* buffer, int64_t len);
-	const char* get_u8_last(const char* str, uint32_t* codepoint);
+	int64_t get_utf8_count(const char* buffer, int64_t len); 
+	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);   
 	uint32_t get_u8_idx(const char* str, int64_t idx);
-	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
+	const char* get_u8_last(const char* str, uint32_t* codepoint);
+	std::string u16to_u8(uint16_t* str, size_t len);
+	std::wstring u8to_w(const char* str, size_t len);
 }
 namespace pg
 {
@@ -2040,12 +2042,6 @@ private:
 
 };
 
-namespace md {
-	uint32_t get_u8_idx(const char* str, int64_t idx);
-	const char* get_u8_last(const char* str, uint32_t* codepoint);
-	std::string u16to_u8(uint16_t* str, size_t len);
-	std::wstring u8to_w(const char* str, size_t len);
-}
 
 
 // 创建控件
@@ -2062,4 +2058,4 @@ struct radio_com
 std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* p, int clicks)> cb);
 std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
- 
+

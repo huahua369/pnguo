@@ -9,6 +9,9 @@
 #include "pnguo.h"
 #include "tinysdl3.h"
 #include "page.h"
+
+#include "buffer.h"
+
 #if 1
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc)
 {
@@ -212,4 +215,207 @@ dialog_cx::~dialog_cx()
 {
 }
 
+#endif // 1
+
+#if 1
+
+div2_t::div2_t()
+{
+}
+
+div2_t::~div2_t()
+{
+}
+
+void div2_t::set_root(const std::vector<int>& r)
+{
+	rcs.clear();
+	for (auto it : r)
+		rcs.push_back({ 0,0,it,0 });
+	childs.resize(rcs.size());
+	rcs_st.resize(rcs.size());
+}
+
+void div2_t::set_root_style(size_t idx, const flex_item& it)
+{
+	rcs_st[idx] = it;
+}
+
+void div2_t::add_child(size_t idx, const glm::vec2& ss)
+{
+	childs[idx].push_back({ { 0,0, ss},0,0 });
+}
+
+void div2_t::layout()
+{
+	auto length = rcs.size();
+	flex_item r1;
+	r1.width = 1024;
+	r1.height = 0;
+	for (size_t x = 0; x < length; x++)
+	{
+		auto r = &rcs_st[x];
+		auto it = rcs[x];
+		r->width = it.z;
+		r->height = it.w;
+		r1.item_add(r);
+	}
+	std::vector<std::vector<flex_item>> c;
+	c.resize(length);
+	for (size_t x = 0; x < length; x++)
+	{
+		auto& v = childs[x];
+		auto r = &rcs_st[x];
+		r->clear();
+		// todo 子元素可以设置更多属性，这里用默认值
+		c[x].resize(v.size());
+		flex_item* p = c[x].data();
+		if (p)
+		{
+			for (size_t i = 0; i < v.size(); i++)
+			{
+				//v[i].z += ms.x; v[i].w += ms.y;
+				p[i].width = v[i].z;
+				p[i].height = v[i].w;
+				if (x == 2)
+					p[i].grow = 1;
+				r->item_add(p + i);
+			}
+		}
+	}
+	r1.layout();
+	for (size_t x = 0; x < length; x++)
+	{
+		auto rt = &rcs_st[x];
+		auto& it = rcs[x];
+		if (rt->position != flex_item::flex_position::POS_ABSOLUTE) {
+			it.x = rt->frame[0];
+			it.y = rt->frame[1];
+		}
+		auto& v = childs[x];
+		flex_item* p = c[x].data();
+		for (size_t i = 0; i < v.size(); i++)
+		{
+			if (p[i].position != flex_item::flex_position::POS_ABSOLUTE) {
+				v[i].x = p[i].frame[0];
+				v[i].y = p[i].frame[1];
+				v[i].px = p[i].frame[2];
+				v[i].py = p[i].frame[3];
+			}
+		}
+	}
+
+}
+
+void div2_t::draw(cairo_t* cr)
+{
+	auto length = rcs.size();
+	for (size_t x = 0; x < length; x++)
+	{
+		auto it = rcs[x];
+		if (it.w <= 0)it.w = 1024;
+		//draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
+		//fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
+		auto& v = childs[x];
+		auto n = v.size();
+		for (size_t i = 0; i < n; i++)
+		{
+			auto vt = v[i];
+			draw_rectangle(cr, { 0.5 + vt.x + it.x,0.5 + vt.y + it.y,vt.px,vt.py }, 4);
+			fill_stroke(cr, 0xff805c42, 0xff2C80ff, 1, false);
+		}
+	}
+}
+// 渲染树节点
+void draw_treenode(cairo_t* cr, layout_text_x* ltx)
+{
+	std::string text;
+	int font_size = 16;
+	int text_color = -1;
+	auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+	glm::ivec2 ss = { 100,100 };
+	glm::vec2 align = { 1,0.5 };
+	glm::vec4 rc = { 0, 0, ss };
+	ltx->tem_rtv.clear();
+	ltx->build_text(0, rc, align, text.c_str(), -1, font_size, ltx->tem_rtv);
+	ltx->update_text();
+	ltx->draw_text(cr, ltx->tem_rtv, text_color);
+}
+struct text_render_t
+{
+	glm::vec4 rc = {};		// 渲染区域
+	glm::vec2 align = {};	// 对齐区域
+	int font_size = 16;		// 字号大小
+	int font = 0;			// 字体集序号
+	const char* str = 0;
+	int len = 0;			// 字符串长度
+	bool autobr = false;	// 自动换行
+	bool clip = true;		// 启用裁剪
+};
+
+struct node_ts
+{
+	std::string str;
+	tree_node_t* parent = 0;				// 父级
+	std::vector<tree_node_t*>* child = 0;	// 孩子 
+	int _level = 0;
+	bool _expand = 0;
+};
+struct input_info_t
+{
+	glm::ivec2 pos;
+	glm::ivec2 pos1;
+	std::string str;
+};
+// set_data、remove、insert、clear_redo、undo、redo
+void test()
+{
+	auto buf = new hz::buffer_t();
+	std::vector<input_info_t> _iit;// 操作列表
+	buf->set_data("abc", -1);
+	int cuinc = 0;
+	auto ic = cuinc;
+	bool single_line = false;
+	glm::ivec2 r = {};
+	for (auto& it : _iit)
+	{
+		if (it.pos > it.pos1)
+		{
+			std::swap(it.pos, it.pos1);
+		}
+		if (it.str.empty())
+		{
+			// 执行删除
+			buf->remove(it.pos, it.pos1);
+			r = it.pos; cuinc++;
+			//printf("\t光标d:%d\t%d\t%d\n", (int)it.str.size(), r.x, r.y);
+		}
+		else {
+			// 插入文本
+			if (single_line)
+			{
+				std::remove(it.str.begin(), it.str.end(), '\n');
+			}
+			//if (tvt && tvt->on_input)
+			//	tvt->on_input(&it.str);// 执行回调函数
+
+			if (it.str.empty())
+			{
+				r = it.pos;
+			}
+			else {
+				r = buf->insert(it.pos, it.str.c_str(), it.str.size(), &it.pos1);// 插入文本
+			}
+			cuinc++;
+			//printf("\t光标:%d\t%d\t%d\n", (int)it.str.size(), r.x, r.y);
+		}
+	}
+	if (ic != cuinc)
+	{
+		buf->clear_redo(); // 清空重做栈
+	}
+	glm::ivec2 cp1 = { 0,0 }, cp2 = { 0,2 };
+	// 获取选中文本
+	auto str = buf->get_range(cp1, cp2);
+}
 #endif // 1
