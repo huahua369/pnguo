@@ -66,7 +66,6 @@ set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
    
 
 #第三方库
-
 if(NOT DEFINED SDL3DIR_ROOT)
 set(SDL_STATIC ON)
 set(SDL_SHARED OFF)
@@ -81,7 +80,7 @@ set(SDL_DIRECTX OFF)
 set(SDL_LIBC ON)
 set(SDL_WASAPI ON)
 set(SDL_RENDER_VULKAN ON)
-add_subdirectory(third_bin/SDL)
+add_subdirectory(third_lib/SDL)
 else()
 find_package(SDL3 REQUIRED) 
 endif()
