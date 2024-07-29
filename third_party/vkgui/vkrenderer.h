@@ -75,3 +75,20 @@ private:
 vkdg_cx* new_vkdg(dev_info_cx* c = 0);
 void free_vkdg(vkdg_cx* p);
 void load_gltf(vkdg_cx* p, const char* fn);
+
+// 顶点数据、纹理、矩阵、灯光、渲染命令
+struct light_info_t
+{
+	// 平行光、点光源、聚光灯
+	enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
+	LightType	m_type = LIGHT_DIRECTIONAL; 
+	glm::vec4	m_color;					// 颜色
+	float		m_range;					// 范围
+	float       m_intensity = 0.0f;			// 强度
+	float       m_innerConeAngle = 0.0f;	// 内锥角
+	float       m_outerConeAngle = 0.0f;	// 外锥角
+	uint32_t    m_shadowResolution = 1024;	// 阴影分辨率
+	float       m_bias = 70.0f / 100000.0f;	// 偏差
+	glm::vec3	m_position;
+};
+

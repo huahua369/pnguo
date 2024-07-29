@@ -8530,7 +8530,7 @@ namespace vkr {
 		}
 		glm::vec3 v2_n = -v2;
 		return (float)XM_PI - 2.0f * glm::asin(glm::length(v2_n - v1) / 2.0f);
-	} 
+	}
 	glm::mat4 update_yp(glm::ivec3 r, float radius, glm::vec3& position, glm::vec3& target, bool flipY)
 	{
 		float yaw = r.x;
@@ -8826,7 +8826,7 @@ namespace vkr {
 	glm::quat quat_ext::get()
 	{
 		return glm::quat(Qs, Qx, Qy, Qz);
-	} 
+	}
 	float modv(float x, float y) {
 		if (x < -y) {
 			x = fmod(x, -y);
@@ -17331,8 +17331,13 @@ namespace vkr {
 		_fbo.renderPass = p->renderPass;
 	}
 #endif
-
-
+	 
+	struct SystemInfo
+	{
+		std::string mCPUName = "UNAVAILABLE";
+		std::string mGPUName = "UNAVAILABLE";
+		std::string mGfxAPI = "UNAVAILABLE";
+	};
 
 	class sample_cx
 	{
@@ -17380,12 +17385,14 @@ namespace vkr {
 		mouse_state_t io = {};
 		float                       m_time = 0; // Time accumulator in seconds, used for animation.
 
+		SystemInfo systemi = {};
 		// njson config file
 		njson                        m_jsonConfigFile;
 		std::vector<std::string>    m_sceneNames;
 		int                         m_activeScene = 0;
 		int                         m_activeCamera = 0;
 		bool                        m_bPlay = 0;
+		bool bShowProfilerWindow = true;
 	};
 #if 1
 	sample_cx::sample_cx()
@@ -17668,8 +17675,8 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
-				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+				l.m_intensity = 50.0 * 0.5;//scene.value("intensity", 1.0f);
+				l.m_color = glm::vec4(1.0f, 0.10f, 0.10f, 0.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
@@ -17710,6 +17717,77 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void sample_cx::OnUpdate()
 	{
+		if (bShowProfilerWindow)
+		{
+			constexpr size_t NUM_FRAMES = 128;
+			static float FRAME_TIME_ARRAY[NUM_FRAMES] = { 0 };
+
+			// track highest frame rate and determine the max value of the graph based on the measured highest value
+			static float RECENT_HIGHEST_FRAME_TIME = 0.0f;
+			constexpr int FRAME_TIME_GRAPH_MAX_FPS[] = { 800, 240, 120, 90, 60, 45, 30, 15, 10, 5, 4, 3, 2, 1 };
+			static float  FRAME_TIME_GRAPH_MAX_VALUES[_countof(FRAME_TIME_GRAPH_MAX_FPS)] = { 0 }; // us
+			for (int i = 0; i < _countof(FRAME_TIME_GRAPH_MAX_FPS); ++i) { FRAME_TIME_GRAPH_MAX_VALUES[i] = 1000000.f / FRAME_TIME_GRAPH_MAX_FPS[i]; }
+
+			//scrolling data and average FPS computing
+			const std::vector<TimeStamp>& timeStamps = m_pRenderer->GetTimingValues();
+			const bool bTimeStampsAvailable = timeStamps.size() > 0;
+			if (bTimeStampsAvailable)
+			{
+				RECENT_HIGHEST_FRAME_TIME = 0;
+				FRAME_TIME_ARRAY[NUM_FRAMES - 1] = timeStamps.back().m_microseconds;
+				for (uint32_t i = 0; i < NUM_FRAMES - 1; i++)
+				{
+					FRAME_TIME_ARRAY[i] = FRAME_TIME_ARRAY[i + 1];
+				}
+				RECENT_HIGHEST_FRAME_TIME = std::max(RECENT_HIGHEST_FRAME_TIME, FRAME_TIME_ARRAY[NUM_FRAMES - 1]);
+			}
+			const float& frameTime_us = FRAME_TIME_ARRAY[NUM_FRAMES - 1];
+			const float  frameTime_ms = frameTime_us * 0.001f;
+			const int fps = bTimeStampsAvailable ? static_cast<int>(1000000.0f / frameTime_us) : 0;
+
+			// UI  
+			//ImGui::Begin("PROFILER (F2)", &m_UIState.bShowProfilerWindow);
+
+			std::string txtrs = std::format("Resolution : %ix%i", m_Width, m_Height);
+			std::string txtAPI = std::format("API        : %s", systemi.mGfxAPI.c_str());
+			std::string txtGPU = std::format("GPU        : %s", systemi.mGPUName.c_str());
+			std::string txtCPU = std::format("CPU        : %s", systemi.mCPUName.c_str());
+			std::string txtFPS = std::format("FPS        : %d (%.2f ms)", fps, frameTime_ms);
+
+			//if (ImGui::CollapsingHeader("GPU Timings", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				//std::string msOrUsButtonText = m_UIState.bShowMilliseconds ? "Switch to microseconds(us)" : "Switch to milliseconds(ms)";
+				//if (ImGui::Button(msOrUsButtonText.c_str())) {
+				//	m_UIState.bShowMilliseconds = !m_UIState.bShowMilliseconds;
+				//}
+				//
+
+				//if (m_isCpuValidationLayerEnabled || m_isGpuValidationLayerEnabled)
+				//{
+					//std::string txt=std::formatColored(ImVec4(1, 1, 0, 1), "WARNING: Validation layer is switched on");
+					//std::string txt=std::format("Performance numbers may be inaccurate!");
+				//}
+
+				// find the index of the FrameTimeGraphMaxValue as the next higher-than-recent-highest-frame-time in the pre-determined value list
+				size_t iFrameTimeGraphMaxValue = 0;
+				for (uint64_t i = 0; i < _countof(FRAME_TIME_GRAPH_MAX_VALUES); ++i)
+				{
+					if (RECENT_HIGHEST_FRAME_TIME < FRAME_TIME_GRAPH_MAX_VALUES[i]) // FRAME_TIME_GRAPH_MAX_VALUES are in increasing order
+					{
+						iFrameTimeGraphMaxValue = std::min(_countof(FRAME_TIME_GRAPH_MAX_VALUES) - 1, i + 1);
+						break;
+					}
+				}
+				//ImGui::PlotLines("", FRAME_TIME_ARRAY, NUM_FRAMES, 0, "GPU frame time (us)", 0.0f, FRAME_TIME_GRAPH_MAX_VALUES[iFrameTimeGraphMaxValue], ImVec2(0, 80));
+
+				for (uint32_t i = 0; i < timeStamps.size(); i++)
+				{
+					float value = m_UIState.bShowMilliseconds ? timeStamps[i].m_microseconds / 1000.0f : timeStamps[i].m_microseconds;
+					const char* pStrUnit = m_UIState.bShowMilliseconds ? "ms" : "us";
+					std::string txt = std::format("%-18s: %7.2f %s", timeStamps[i].m_label.c_str(), value, pStrUnit);
+				}
+			}
+		}
 		////If the mouse was not used by the GUI then it's for the camera
 		////
 		if (io.WantCaptureMouse)
@@ -18335,14 +18413,7 @@ vkdg_cx* new_vkdg(dev_info_cx* c)
 	auto p = new vkdg_cx();
 	vkr::Log::InitLogSystem();
 	if (c) {
-#if 1		// System info
-		struct SystemInfo
-		{
-			std::string mCPUName = "UNAVAILABLE";
-			std::string mGPUName = "UNAVAILABLE";
-			std::string mGfxAPI = "UNAVAILABLE";
-		};
-		SystemInfo m_systemInfo;
+		vkr::SystemInfo m_systemInfo;
 		bool cpuvalid = false;
 		bool gpuvalid = false;
 #ifdef _DEBUG
@@ -18359,10 +18430,10 @@ vkdg_cx* new_vkdg(dev_info_cx* c)
 		m_systemInfo.mCPUName = GetCPUNameString();
 		m_systemInfo.mGfxAPI = "Vulkan";
 
-		p->dev = dev;
-#endif // 1
+		p->dev = dev; 
 		auto tx = new vkr::sample_cx();
 		tx->m_device = dev;
+		tx->systemi = m_systemInfo;
 		tx->OnParseCommandLine(0, 0, 0);
 		tx->OnCreate();
 		p->ctx = tx;
