@@ -419,3 +419,439 @@ void test()
 	auto str = buf->get_range(cp1, cp2);
 }
 #endif // 1
+
+// todo 树
+#if 0
+		// 去掉头尾空格
+std::string trim(const std::string& str, const char* pch)
+{
+	auto s = str;
+	if (s.empty())
+	{
+		return s;
+	}
+	s.erase(0, s.find_first_not_of(pch));
+	s.erase(s.find_last_not_of(pch) + 1);
+	return s;
+}
+std::string trim_ch(const std::string& str, const std::string& pch)
+{
+	std::string r = str;
+	if (pch.size() && str.size())
+	{
+		size_t p1 = 0, p2 = str.size();
+		for (int i = 0; i < str.size(); i++)
+		{
+			auto ch = str[i];
+			if (pch.find(ch) == std::string::npos)
+			{
+				p1 = i;
+				break;
+			}
+		}
+		for (int i = str.size() - 1; i > 0; i--)
+		{
+			auto ch = str[i];
+			if (pch.find(ch) == std::string::npos)
+			{
+				p2 = i + 1;
+				break;
+			}
+		}
+		r = str.substr(p1, (p2 - p1));
+	}
+	return r;
+}
+static uint64_t toUInt(const njson& v, uint64_t de = 0)
+{
+	uint64_t ret = de;
+	if (v.is_number())
+	{
+		ret = v.get<uint64_t>();
+	}
+	else if (!v.is_null())
+	{
+		ret = std::atoll(trim(v.dump(), "\"").c_str());
+	}
+	return ret;
+}
+
+njson& push_button(const void* str, int cidx, int eid, njson& btn)
+{
+	njson it;
+	it["s"] = (char*)(str ? str : "");
+	it["cidx"] = cidx;
+	it["eid"] = eid;
+	btn.push_back(it);
+	return *btn.rbegin();
+}
+njson& push_button(const void* str, int cidx, int eid, njson& btn, glm::ivec2 size, int fh)
+{
+	njson it;
+	it["s"] = (char*)(str ? str : "");
+	it["cidx"] = cidx;
+	it["eid"] = eid;
+	it["fontheight"] = fh;
+	it["size"] = { size.x,size.y };
+	btn.push_back(it);
+	return *btn.rbegin();
+}
+
+
+void set_moveto(njson& v, glm::vec2 target, glm::vec2 from, float mt, float wait)
+{
+	njson& t = v;
+	t["mt"] = mt;
+	t["wait"] = wait;
+	t["from"] = { from.x, from.y };
+	t["target"] = { target.x,target.y };
+	t.erase("pad");
+}
+void set_moveto(njson& v, float mt, glm::vec2 target, float wait)
+{
+	njson& t = v;
+	t["mt"] = mt;
+	t["wait"] = wait;
+	t["target"] = { target.x,target.y };
+	t.erase("pad");
+}
+void set_moveto(njson& v, glm::vec2 pad, float mt, float wait)
+{
+	njson& t = v;
+	t["mt"] = mt;
+	t["wait"] = wait;
+	t["pad"] = { pad.x,pad.y };
+	t.erase("target");
+
+}
+void set_ps(njson& v, glm::vec2 size, glm::vec2 pos, bool is)
+{
+	v["pos"] = { pos.x,pos.y };
+	v["size"] = { size.x,size.y };
+	if (is)
+		v["on"] = is;
+	else
+		v.erase("on");
+}
+void freecb(njson* p)
+{
+	if (p)
+	{
+		njson& c = *p;
+		auto cb = (std::function<void(int, njson*)>*)toUInt(c[".click"]);
+		if (cb)
+		{
+			delete cb;
+		}
+		delete p;
+	}
+}
+
+template<class T>
+T* get_ptr0(world_cx* ctx, const char* gid, int idx, int type)
+{
+	T* p = 0;
+	if (ctx && gid && *gid)
+	{
+		auto u = ctx->get_ptr2(gid, type);
+		if (u.n)
+		{
+			if (idx < 0 || idx > u.n)idx = 0;
+			p = (T*)u.p[idx];
+		}
+	}
+	return p;
+}
+inline ui::scroll_view_u* get_svptr(world_cx* c, const char* gid, int idx)
+{
+	return get_ptr0<ui::scroll_view_u>(c, gid, idx, 1);
+}
+inline ui::div_u* get_divptr(world_cx* c, const char* gid, int idx)
+{
+	return get_ptr0<ui::div_u>(c, gid, idx, 0);
+}
+
+ui::scroll_view_u* world_cx::get_svptr(const char* gid, int idx) {
+	return get_ptr0<ui::scroll_view_u>(this, gid, idx, 1);
+}
+ui::div_u* world_cx::get_divptr(const char* gid, int idx) {
+	return get_ptr0<ui::div_u>(this, gid, idx, 0);
+}
+
+#define merge_j(dst,src) 	do{for (auto& [k, v] : src.items())	{ dst[k] = v;	}}while(0)
+/*
+	菜单开关动画实现，通过gid操作坐标，修改g的参数返回到动画处理系统执行
+	idx=操作的index，sp为间隔{x子项，y父级}，mt为移动到目标毫秒数，one=true则关闭所有，只展开一个父项。
+	vsize返回展开后大小，方便设置滚动视图
+*/
+bool get_switch(njson& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* vsize)
+{
+	bool ret = false;
+	float wait = 0.0, sp3 = sp.z;
+	glm::vec2 t = { sp.x,sp.y }, vsize0 = {};
+	if (!vsize)vsize = &vsize0;
+	do {
+		if (idx >= g.size() && idx >= 0) { break; }
+		glm::vec2 pos = toVec2(g[0]["pos"]);
+		for (size_t x = 0; x < g.size(); x++) {
+			auto& vt = g[x]; auto& v1 = vt["v"];
+			bool oc = vt.find("on") != vt.end() ? toBool(vt["on"]) : false;
+			if (one && x != idx) { vt["on"] = false; oc = false; }
+			if (x == idx) { oc = !oc; vt["on"] = oc; }
+			for (size_t i = 0; i < v1.size(); i++) {
+				auto& kt = v1[i];
+				glm::vec2 c0 = toVec2(kt["size"]);
+				if (i > 0) {
+					if (!oc) {
+						bool visi = toBool(kt["visible"]);
+						if (visi) {
+							kt["wait0"] = 0; kt["visible"] = false;	// 隐藏子项
+							glm::vec2 ps1 = { -c0.x * 3, 0 };
+							set_moveto(kt, ps1, mt, wait);	// 移动子项到外面
+						}
+						continue;
+					}
+					if (one || x == idx) { if (oc) { kt["wait0"] = 0; kt["visible"] = true; } }
+				}
+				vsize->y += c0.y + t.x;
+				pos.y += t.x;
+				auto ps1 = pos;
+				if (i > 0) { ps1.x += sp3; }
+				vsize->x = std::max(vsize->x, c0.x + ps1.x);
+				set_moveto(kt, mt, ps1, wait);	// 移动到目标
+				pos.y += c0.y;
+			}
+			pos.y += t.y;
+			vsize->y += t.y;
+		}
+		ret = true;
+	} while (0);
+	save_json(g, "temp/tr1758.json", 2);
+	return ret;
+}
+
+void on_navclick(uint64_t idx, void* p)
+{
+	auto d = (njson*)p;
+	if (d)
+	{
+		auto& n = *d;
+		auto ctx = (world_cx*)toUInt(n["$ctx"]);
+		auto& at = n["$at"];
+		auto& b = n["$base"];
+		glm::vec2 vsize;
+		auto gid = toStr(b["gid"]);
+		auto asize = toVec4(b["asize"]);
+		auto sp = toVec4(b["sp"]);
+		auto emt = toFloat(b["expmt"]);
+		auto xtype = toBool(b["xtype"]); // 单个展开
+		// 获取开关动画参数
+		if (get_switch(at, idx, sp, sp.w, xtype, &vsize))
+		{
+			if (ctx)
+			{
+				auto sv = get_svptr(ctx, gid.c_str(), 0);
+				auto dp = get_divptr(ctx, gid.c_str(), 0);
+				if (ctx)
+					ctx->push_action(at);	// 提交动画执行
+
+				if (idx == 0 && dp)
+				{
+					bool on1 = toBool(at[idx]["on"]);
+					glm::vec2 ss = {};
+					if (on1)
+					{
+						ss = { asize.z,asize.w };
+					}
+					else {
+						ss = { asize.x,asize.y };
+					}
+					dp->at_size(ss, emt);
+					if (sv)
+						sv->at_size(ss, emt);
+				}
+				if (sv)
+				{
+					sv->set_content_size(vsize);  // 设置滚动视图内容大小
+				}
+			}
+		}
+		auto cb = (std::function<void(int, njson*)>*)toUInt((*d)[".click"]);
+		if (cb && *cb)
+		{
+			(*cb)(idx, d);
+		}
+	}
+}
+
+
+// 创建导航菜单, cb单击回调
+void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
+{
+	glm::ivec2 size = { 220, 680 }, pos = { 10,10 };
+	glm::ivec2 ps = { 10,10 };
+	glm::ivec2 ss = { 180,50 };
+	glm::ivec2 fh = { 22, 18 };
+	glm::ivec2 space = { 2, 6 };
+	glm::ivec2 effect = { 0, 1 };
+	glm::ivec2 color_idx = { 0, 4 };
+	glm::ivec2 scroll = { 10, 10 };
+	glm::ivec2 crow_size = { 10, 10 };
+	float padx = 20;
+	float fr = toFloat(info["round"], 0.1);
+	float mt = toFloat(info["mt"], 0.2);
+	bool xtype = toBool(info["xtype"]);
+	njson btn, r;
+	int i = 0, i1 = d.size();
+	njson tr;
+	int y = 0;
+	std::string gid = toStr(info["gid"], "list_nav");
+	toiVec2(info["pos"], pos);		// 整体坐标
+	toiVec2(info["cpos"], ps);		// 坐标
+	toiVec2(info["size"], size);		// 大小
+	toiVec2(info["fontheight"], fh);		// 字高
+	toiVec2(info["space"], space);		// 间隔
+	toiVec2(info["row_size"], ss);		// 行宽高
+	toiVec2(info["color_idx"], color_idx);		// 风格颜色
+	toiVec2(info["effect"], effect);		// 风格
+	toiVec2(info["scroll"], scroll);		// 滚动量
+	toiVec2(info["crow_size"], crow_size);		// 子元素大小
+	glm::vec2 ips;
+	toVec2(info["ips"], ips);		// 偏移
+	uint32_t divc[2] = {};
+	auto fillc = info["btn_fillcolor"];
+	auto bc = info["btn_bordercolor"];
+	padx = toInt(info["indent"], padx);
+	njson kstr0;
+	for (auto it : d)
+	{
+		auto s2 = it.begin();
+		auto str = toStr(s2.key());
+		auto& t0 = push_button(str.c_str(), color_idx.x, i, btn, ss, fh.x);
+		auto& kt = s2.value();
+		njson atn;
+		atn["gid"] = gid + "_" + std::to_string(i);
+		t0["gid"] = atn["gid"];
+		t0["effect"] = effect.x;
+		if (bc.size())
+			t0["border_color"] = bc[0];//? bc : 0xccff9e40;
+		if (fillc.size())
+			t0["fill_color"] = fillc[0];//? bc : 0xccff9e40;
+		auto ps1 = ps;
+		ps1.y += y;
+		t0["pos"] = { ps1.x,  ps1.y };
+		t0["sps"] = { ips.x,0.5 };
+		//t0["ips"] = { ips.x, 0 };
+		atn["pos"] = { ps1.x,  ps1.y };
+		y += ss.y + space.x;
+		{
+			auto& t = atn["v"][0];
+			set_ps(t, ss, ps1, false);
+			t["s"] = str;
+		}
+		for (size_t x = 0; x < kt.size(); x++)
+		{
+			auto nt = toStr(kt[x]);
+			glm::vec2 c2 = { crow_size.x - padx,crow_size.y };
+			ps1 = ps;
+			ps1.y += y;
+			auto& t = atn["v"][x + 1];
+			set_ps(t, c2, ps1, false);
+			t["s"] = nt;
+			kstr0.push_back(nt);
+			auto& c0 = push_button(nt.c_str(), color_idx.y, i1++, btn, c2, fh.y);
+			c0["gid"] = atn["gid"];
+			c0["effect"] = effect.y;
+			//c0["has_drag_pos"] = 1;
+			c0["pos"] = { ps1.x,  ps1.y };
+			if (bc.size() > 1)
+				c0["border_color"] = bc[1];
+			if (fillc.size() > 1)
+				c0["fill_color"] = fillc[1];
+
+			c0["sps"] = { ips.y,0.5 };
+			//c0["ips"] = { ips.y,0 };
+			y += c2.y + space.x;
+		}
+		y += space.y;
+		atn["size"] = kt.size();
+		tr.push_back(atn);
+		i++;
+	}
+	njson* od = new njson();
+	(*od)["$count"] = d.size();
+	(*od)["$at"] = tr;
+	(*od)["$ctx"] = (uint64_t)this;
+	njson base;
+	base["sp"] = { space.x,space.y,padx,mt };
+	base["xtype"] = xtype;
+	base["gid"] = gid;
+	base["asize"] = info["asize"];
+	base["expmt"] = info["expmt"];
+	(*od)["$base"] = base;
+	{
+		auto& kn = btn;
+		auto fontsize = fh.x;
+		int m = 0;
+		njson b1;
+		for (int i = 0; i < kn.size(); i++)
+		{
+			b1.clear();
+			auto it = kn[i];
+			b1["t"] = "button";
+			b1["fround"] = fr;
+			b1["abs"] = true;// 使用动画控制坐标，所以设置绝对坐标
+			for (auto& [k, v] : it.items())
+				b1[k] = v;
+			b1[".e"] = (uint64_t)on_navclick;
+			b1[".eid"] = it["eid"];
+			b1[".eud"] = (uint64_t)od;
+			r.push_back(b1);
+			m++;
+		}
+	}
+
+	if (cb)
+	{
+		auto ncb = new std::function<void(int, njson*)>(cb);
+		(*od)[".click"] = (uint64_t)ncb;
+	}
+	njson dv;
+	dv["pid"] = 0;	// pid==0是根节点
+	dv["dragable"] = 0;	// 可拖动
+	dv["front"] = 0 * 1;	// 点击前置显示
+	dv["rounding"] = info["rounding"];	// 圆角
+	glm::ivec2 s = { size.x, size.y };
+	dv["size"] = { s.x,s.y };
+	dv["pos"] = { pos.x,pos.y };
+	merge_j(dv, info);
+	dv["t"] = "div";
+	dv[".dp"] = (uint64_t)od;
+	dv[".onfree"] = (uint64_t)freecb;
+	njson rv;
+	rv["t"] = "view";
+	dv["fill"] = 0;	dv["border"] = 0; dv.erase("color");
+	//rv["border"] = 0x80a05000;	rv["fill"] = 0xff505050; // 边框背景颜色
+	rv["color"] = info["color"];
+	rv["rounding"] = info["rounding"];	// 圆角
+	// auto_size{xy一般为负数(直接和父级相加)，zw要大于0}
+	rv["auto_size"] = { 0,0,1,1 };
+	rv["abs"] = 1;
+	rv["size"] = { size.x,size.y };
+	rv["vss"] = { size.x - 100,y };
+	rv["step"] = { scroll.x, scroll.y };
+	rv["sc_visible"] = info["sc_visible"];
+	rv["gid"] = gid;
+	rv[".c"] = r;
+	dv[".c"].push_back(rv);
+	new_widget(dv, 0);
+	glm::vec2 vsize;
+	if (get_switch(tr, -1, { space.x,space.y,padx }, 0, xtype, &vsize))
+	{
+		auto sv = get_svptr(gid.c_str(), 0);
+		push_action(tr);
+		if (sv)
+			sv->set_content_size(vsize);
+	}
+}
+#endif

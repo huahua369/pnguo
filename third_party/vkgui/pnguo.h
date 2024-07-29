@@ -23,8 +23,8 @@ struct input_state_t;
 #endif
 
 namespace md {
-	int64_t get_utf8_count(const char* buffer, int64_t len); 
-	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);   
+	int64_t get_utf8_count(const char* buffer, int64_t len);
+	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
 	uint32_t get_u8_idx(const char* str, int64_t idx);
 	const char* get_u8_last(const char* str, uint32_t* codepoint);
 	std::string u16to_u8(uint16_t* str, size_t len);
@@ -1897,6 +1897,74 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 
 int64_t get_rand(int f, int s);
 
+
+struct action_show_t
+{
+	void* ptr = 0;
+	float wait = 0.0f;
+	bool v = false;
+};
+
+// 动画到目标
+template<class T>
+class vat_t
+{
+public:
+	int t = 0;
+	float mt = 1;
+	// 开始、目标
+	T first = {}, target = {};
+	// ct当前时间，mt设置时间
+	float ct = 0;
+	// 返回值：0不执行，1执行结束，2执行中
+	int updata_t(float deltaTime, T& dst);
+};
+/* 路径动画命令。支持1/2/3维路径运动
+	等待(秒)e_wait=0, 
+	跳到e_vmove = 1, 
+	直线到e_vline=2, 
+	2阶曲线到e_vcurve=3, 
+	3阶曲线到e_vcubic=4
+*/
+struct action_t
+{
+public:
+	std::vector<float> cmds;
+	void* ptr = 0;
+	int16_t dim = 2;	// 1=float，2=vec2，3=vec3，4=vec4
+	int16_t type = 0;	// 类型，0顺序，1同时执行
+	int cidx = 0;		// 当前执行的命令序号
+	float* dst = 0;		// 结果 
+private:
+	bool _pause = false;
+public:
+	action_t();
+	~action_t();
+	// 设置接收结果指针
+	void set_dst(float* p);
+	void set_dst(glm::vec2* p);
+	void set_dst(glm::vec3* p);
+	void set_dst(glm::vec4* p);
+	// 添加等待n秒后执行
+	void add_wait(float st);
+	// 添加路径动画命令,	mt移动所需时间(秒)，dim类型{1=float，2=vec2，3=vec3，4=vec4}，
+	// target为路径数据，第一个值e_wait=0, e_vmove = 1, e_vline=2, e_vcurve=3, e_vcubic=4，后面跟着坐标，count为坐标数量
+	int add(float mt, int dim, float* target, int count);
+
+	void play();	// 执行
+	void pause();	// 暂停
+	// 返回值：0不执行，1执行结束，2执行中
+	int updata_t(float deltaTime, float& ct);
+	// 清空命令
+	void clear();
+};
+
+// 直线移动，时间秒，目标，原坐标可选
+action_t* move2w(float mt, const glm::vec2& target, glm::vec2* src, float wait);
+// 在原坐标为原点增加移动
+action_t* move2inc(const glm::vec2& pad, float mt, float wait);
+action_t* at_size(const glm::vec2& dst, float mt);
+action_show_t* wait_show(bool visible, float wait);
 
 /*
 <表格、树形>
