@@ -65,8 +65,8 @@ vkvg
 - [ ] 属性视图
 - [ ] 对话框
 - [ ] 文本编辑、16进制文件编辑
-- (x) gltf pbr渲染器
-- ( ) 3D gizmo
+- [x] gltf pbr渲染器
+- [ ] 3D gizmo
 
 ## 描述
 主实现在目录`third_party/vkgui` 文件读写、窗口创建等。
