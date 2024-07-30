@@ -310,7 +310,7 @@ namespace hz {
 
 	buffer_t::~buffer_t()
 	{
-		if (_storage)delete _storage; _storage = 0; 
+		if (_storage)delete _storage; _storage = 0;
 		if (_cmdstack)delete _cmdstack; _cmdstack = 0;
 	}
 
@@ -415,11 +415,7 @@ namespace hz {
 	{
 		cmd_remove(vpos);
 	}
-
-	void buffer_t::view_remove(const glm::ivec2& pos, const glm::ivec2& pos2)
-	{
-	}
-
+	 
 	glm::ivec2 buffer_t::undo()
 	{
 		update();
@@ -570,8 +566,7 @@ namespace hz {
 	}
 
 	size_t buffer_t::view_rows(size_t first, size_t n, std::string& ostr)
-	{
-		size_t ret = 0;
+	{ 
 		ostr.clear();
 		if (first < _view.line_start || first > _view.line_start + _view.line_cnt)
 		{
@@ -584,16 +579,19 @@ namespace hz {
 		{
 			ostr = get_range({ 1, first }, { -1, first + n - 1 });
 		}
-		return ret;
+		return ostr.size();
 	}
 	// 获取指定行字符串
 	std::string buffer_t::get_row_str(size_t y, size_t x /*= 0*/, size_t len /*= -1*/)
 	{
 		auto ret = _storage->getLineRawContent(y);
-		if (len > 0 && len != -1 && ret.size() > len)
+		if (ret.size())
 		{
-			ret.resize(len);
-		}
+			if (len > ret.size())len = ret.size();
+			if (x < ret.size() && x > 0) {
+				ret = ret.substr(x, len - x);
+			}
+		} 
 		return ret;
 	}
 	// 获取所有字符串
@@ -2553,7 +2551,7 @@ namespace hz {
 			return newPieces;
 		}
 
-		auto b0 = _buffers.begin(); 
+		auto b0 = _buffers.begin();
 		let startOffset = b0->count;
 		let lineStarts = createLineStartsFast(text, false);
 
@@ -2625,11 +2623,11 @@ namespace hz {
 			let prevAccumulatedValue = getAccumulatedValue(x, lineNumber - cache->nodeStartLineNumber - 1);
 			let& buffer = x->piece._bt->buffer;
 			let startOffset = offsetInBuffer(x->piece._bt, x->piece._start);
-			if (cache->nodeStartLineNumber + x->piece.lineFeedCnt == lineNumber) { 
+			if (cache->nodeStartLineNumber + x->piece.lineFeedCnt == lineNumber) {
 				get_sub_string(x->piece._bt, startOffset + prevAccumulatedValue, /*startOffset +*/ x->piece.length - prevAccumulatedValue, ret);
 			}
 			else {
-				let accumulatedValue = getAccumulatedValue(x, lineNumber - cache->nodeStartLineNumber); 
+				let accumulatedValue = getAccumulatedValue(x, lineNumber - cache->nodeStartLineNumber);
 				return get_sub_string(x->piece._bt, startOffset + prevAccumulatedValue, /*startOffset +*/ accumulatedValue - endOffset - prevAccumulatedValue);
 			}
 		}
@@ -2647,14 +2645,14 @@ namespace hz {
 					let startOffset = offsetInBuffer(x->piece._bt, x->piece._start);
 					nodeStartOffset += x->size_left;
 					_searchCache->set({ x, nodeStartOffset, (int)(originalLineNumber - (lineNumber - 1 - x->lf_left)) });
-					 
+
 					return get_sub_string(x->piece._bt, startOffset + prevAccumulatedValue, /*startOffset +*/ accumulatedValue - endOffset - prevAccumulatedValue);
 				}
 				else if (x->lf_left + x->piece.lineFeedCnt == lineNumber - 1) {
 					let prevAccumulatedValue = getAccumulatedValue(x, lineNumber - x->lf_left - 2);
 					let& buffer = x->piece._bt->buffer;
 					let startOffset = offsetInBuffer(x->piece._bt, x->piece._start);
-					 
+
 					ret = get_sub_string(x->piece._bt, startOffset + prevAccumulatedValue, /*startOffset +*/ x->piece.length - prevAccumulatedValue);
 					break;
 				}

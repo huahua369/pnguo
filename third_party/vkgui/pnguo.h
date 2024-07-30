@@ -1930,7 +1930,7 @@ struct action_t
 {
 public:
 	std::vector<float> cmds;
-	void* ptr = 0;
+	void* ptr = 0;		// 用户指针
 	int16_t dim = 2;	// 1=float，2=vec2，3=vec3，4=vec4
 	int16_t type = 0;	// 类型，0顺序，1同时执行
 	int cidx = 0;		// 当前执行的命令序号

@@ -8865,15 +8865,13 @@ namespace vkr {
 			glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
 			glm::quat qy = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * qx;
 			mqt = glm::normalize(qy);
-			glm::mat4 rotate = glm::mat4_cast(mqt);
-			//m_eyePos += GetSide() * x * distance / 100.0f;
-			//m_eyePos += GetUp() * y * distance / 100.0f; 
+			glm::mat4 rotate = glm::mat4_cast(mqt); 
 			atPos.x += x * distance / 1000.0f;
 			atPos.y += y * distance / 1000.0f;
 			glm::vec4 dir = GetDirection();
-			glm::vec4 at = atPos;
+			glm::vec4 at = atPos;	// 观察目标坐标
 			auto eye = at + glm::vec4(0, 0, distance, 1.0);
-			m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // todo 相机坐标
+			m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // *相机坐标
 
 			glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
 			m_View = translate * rotate;

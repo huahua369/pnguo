@@ -404,16 +404,13 @@ namespace hz {
 		void remove(const std::vector<glm::ivec4>& vpos);
 		// 总行数量
 		size_t row_size();
-		// 获取指定行字符串
+		// 获取指定行y偏移x或指定长度的字符串
 		std::string get_row_str(size_t y, size_t x = 0, size_t len = -1);
 		// 获取所有字符串
-		std::string get_row_str();
-		// 获取指定行号数量的字符串：first_row开始行号，count行数，cb(str=字符串，size=字节，count=字数)
-		void get_row_str_cb(int first_row, int count, std::function<void(const char* str, int size, int count)> cb);
+		std::string get_row_str(); 
 		std::string get_range(const glm::ivec2& pos, const glm::ivec2& pos2);
 	private:
-
-		// 获取开始行号，n行数据，返回整行数据。
+		// 获取开始行号，n行数据，返回字节数。
 		size_t view_rows(size_t first, size_t n, std::string& ostr);
 		// 遍历保存数据，可能会返回多个数据块
 		void save(size_t first, size_t n, std::function<void(block_t* bk)> cb);
@@ -430,9 +427,7 @@ namespace hz {
 		void cmd_remove(const glm::ivec2& pos, const glm::ivec2& pos2);
 		// 批量删除
 		void cmd_remove(const std::vector<glm::ivec4>& vpos);
-
-		// 删除数据
-		void view_remove(const glm::ivec2& pos, const glm::ivec2& pos2);
+		 
 		// 批量删除
 		//void view_remove(const std::vector<glm::ivec4>& vpos);
 		void cmd_insert(cmd_text_t* ct);
