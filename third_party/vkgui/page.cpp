@@ -419,6 +419,61 @@ void test()
 	auto str = buf->get_range(cp1, cp2);
 }
 #endif // 1
+#if 1
+
+
+/* 路径动画命令。支持1/2/3维路径运动
+	等待(秒)e_wait=0,
+	跳到e_vmove = 1,
+	直线到e_vline=2,
+	2阶曲线到e_vcurve=3,
+	3阶曲线到e_vcubic=4
+*/
+action_t::action_t() {}
+action_t::~action_t() {}
+// 设置接收结果指针
+void action_t::set_dst(float* p) {}
+void action_t::set_dst(glm::vec2* p) {}
+void action_t::set_dst(glm::vec3* p) {}
+void action_t::set_dst(glm::vec4* p) {}
+// 添加等待n秒后执行
+void action_t::add_wait(float st) {}
+// 添加路径动画命令,	mt移动所需时间(秒)，dim类型{1=float，2=vec2，3=vec3，4=vec4}，
+// target为路径数据，第一个值e_wait=0, e_vmove = 1, e_vline=2, e_vcurve=3, e_vcubic=4，后面跟着坐标，count为坐标数量
+int action_t::add(float mt, int dim, float* target, int count) {
+	return 0;
+}
+// 执行
+void action_t::play() {}
+// 暂停
+void action_t::pause() {}
+// 返回值：0不执行，1执行结束，2执行中
+int action_t::updata_t(float deltaTime, float& ct) {
+	return 0;
+}
+// 清空命令
+void action_t::clear()
+{}
+
+// 直线移动，时间秒，目标，原坐标可选
+action_t* move2w(float mt, const glm::vec2& target, glm::vec2* src, float wait)
+{
+	return 0;
+}
+// 在原坐标为原点增加移动
+action_t* move2inc(const glm::vec2& pad, float mt, float wait)
+{
+	return 0;
+}
+action_t* at_size(const glm::vec2& dst, float mt)
+{
+	return 0;
+}
+action_show_t* wait_show(bool visible, float wait)
+{
+	return 0;
+}
+#endif // 1
 
 // todo 树
 #if 0

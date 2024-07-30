@@ -18,6 +18,8 @@
 #include <vkgui/page.h>
 #include <vkgui/vkrenderer.h>
 #include <stb_image_write.h>
+
+#include <mimalloc-new-delete.h>
 /*
 	todo
 	输入数据，自动创建窗口、控件、
@@ -321,10 +323,12 @@ int main()
 #endif
 	//loadtestdata();
 	auto app = new_app0();
-#if 1
-#if 1
+	 
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
+
+#if 1
+#if 1
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();
 	vkdg_cx* vkd = new_vkdg(&sdldev); // 创建vk渲染器
@@ -354,7 +358,7 @@ int main()
 	form0->up_cb = [=](float delta, int* ret)
 		{
 			vkd->update(form0->io);
-			vkd->on_render();		 
+			vkd->on_render();
 			bool ks = false;
 			if (ks) {
 				vkd->save_fbo(0);

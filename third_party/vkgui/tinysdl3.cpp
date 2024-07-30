@@ -25,8 +25,7 @@
 #ifdef max
 #undef max
 #undef min
-#endif // max
-
+#endif // max 
 
 std::string get_clipboard()
 {

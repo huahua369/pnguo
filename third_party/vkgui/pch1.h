@@ -38,7 +38,6 @@
 #endif
 #endif
 
-
 #include <cstdint>
 #include <stdint.h>
 #include <stdbool.h>
