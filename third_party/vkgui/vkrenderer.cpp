@@ -8865,9 +8865,11 @@ namespace vkr {
 			glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
 			glm::quat qy = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * qx;
 			mqt = glm::normalize(qy);
-			glm::mat4 rotate = glm::mat4_cast(mqt); 
+			glm::mat4 rotate = glm::mat4_cast(mqt);
 			atPos.x += x * distance / 1000.0f;
 			atPos.y += y * distance / 1000.0f;
+			//glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(atPos));
+			//rotate = rotate * t;
 			glm::vec4 dir = GetDirection();
 			glm::vec4 at = atPos;	// 观察目标坐标
 			auto eye = at + glm::vec4(0, 0, distance, 1.0);
@@ -17329,7 +17331,7 @@ namespace vkr {
 		_fbo.renderPass = p->renderPass;
 	}
 #endif
-	 
+
 	struct SystemInfo
 	{
 		std::string mCPUName = "UNAVAILABLE";
@@ -18428,7 +18430,7 @@ vkdg_cx* new_vkdg(dev_info_cx* c)
 		m_systemInfo.mCPUName = GetCPUNameString();
 		m_systemInfo.mGfxAPI = "Vulkan";
 
-		p->dev = dev; 
+		p->dev = dev;
 		auto tx = new vkr::sample_cx();
 		tx->m_device = dev;
 		tx->systemi = m_systemInfo;
