@@ -432,28 +432,205 @@ void test()
 action_t::action_t() {}
 action_t::~action_t() {}
 // 设置接收结果指针
-void action_t::set_dst(float* p) {}
-void action_t::set_dst(glm::vec2* p) {}
-void action_t::set_dst(glm::vec3* p) {}
-void action_t::set_dst(glm::vec4* p) {}
-// 添加等待n秒后执行
-void action_t::add_wait(float st) {}
+void action_t::set_dst(float* p) {
+	dst = p; _dim = 1;
+}
+void action_t::set_dst(glm::vec2* p) {
+	dst = (float*)p; _dim = 2;
+}
+void action_t::set_dst(glm::vec3* p) {
+	dst = (float*)p; _dim = 3;
+}
+void action_t::set_dst(glm::vec4* p) {
+	dst = (float*)p; _dim = 4;
+}
+// 添加等待n秒后执行后续命令
+void action_t::add_wait(float st) {
+	cmds.push_back({ 0, st,1,0 });
+	_count++;
+}
 // 添加路径动画命令,	mt移动所需时间(秒)，dim类型{1=float，2=vec2，3=vec3，4=vec4}，
-// target为路径数据，第一个值e_wait=0, e_vmove = 1, e_vline=2, e_vcurve=3, e_vcubic=4，后面跟着坐标，count为坐标数量
+// target为路径数据，第一个值e_vmove = 1, e_vline=2, e_vcurve=3, e_vcubic=4，后面跟着坐标，count为坐标数量
+// 曲线glm::vec2 p, c, c1;
 int action_t::add(float mt, int dim, float* target, int count) {
+	if (!target || count < 1 || dim < 1 || dim != _dim || !(mt > 0))return -1;
+	cmds.reserve(cmds.size() + count * 3);
+	cmds.push_back({ 1, mt , count, 0 });//1是路径，mt为这条路径执行总时间，count路径点数量
+	_count++;
+	if (dim == 1)
+	{
+		for (size_t i = 0; i < count; i++)
+		{
+			int t = *target; target++;
+			auto pt = target;
+			cmds.push_back({ t, 1,0,0 });
+			switch (t)
+			{
+			case 1:
+			case 2:
+			{
+				cmds.push_back({ *pt,0,0,0 });
+				target++;
+			}
+			break;
+			case 3:
+			{
+				cmds.push_back({ pt[0],pt[1], 0,0 });
+				target += dim * 2;
+			}
+			break;
+			case 4:
+			{
+				cmds.push_back({ pt[0],pt[1],pt[2],0 });
+				target += dim * 3;
+			}
+			break;
+			default:
+				break;
+			}
+		}
+	}
+	else if (dim == 2)
+	{
+		for (size_t i = 0; i < count; i++)
+		{
+			int t = *target; target++;
+			auto pt = (glm::vec2*)target;
+			int ks[] = { 0,1,1,1,2 };
+			cmds.push_back({ t, ks[t],0,0 });
+			switch (t)
+			{
+			case 1:
+			case 2:
+			{
+				cmds.push_back({ *pt,0,0 });
+				target += dim;
+			}
+			break;
+			case 3:
+			{
+				cmds.push_back({ pt[0], pt[1] });
+				target += dim * 2;
+			}
+			break;
+			case 4:
+			{
+				cmds.push_back({ pt[0],pt[1] });
+				cmds.push_back({ pt[2],0,0 });
+				target += dim * 3;
+			}
+			break;
+			default:
+				break;
+			}
+		}
+	}
+	else if (dim == 3)
+	{
+		for (size_t i = 0; i < count; i++)
+		{
+			int t = *target; target++;
+			auto pt = (glm::vec3*)target;
+			int ks[] = { 0,1,1,2,3 };
+			cmds.push_back({ t, ks[t],0,0 });
+			switch (t)
+			{
+			case 1:
+			case 2:
+			{
+				glm::vec4 k = { *pt, 0 };
+				cmds.push_back(k);
+				target += dim;
+			}
+			break;
+			case 3:
+			{
+				cmds.push_back({ *pt, 0 });
+				pt++;
+				cmds.push_back({ *pt, 0 });
+				target += dim * 2;
+			}
+			break;
+			case 4:
+			{
+				cmds.push_back({ *pt, 0 });
+				pt++;
+				cmds.push_back({ *pt, 0 });
+				pt++;
+				cmds.push_back({ *pt, 0 });
+				target += dim * 3;
+			}
+			break;
+			default:
+				break;
+			}
+		}
+	}
+	else if (dim == 4)
+	{
+		for (size_t i = 0; i < count; i++)
+		{
+			int t = *target; target++;
+			auto pt = (glm::vec4*)target;
+			int ks[] = { 0,1,1,2,3 };
+			cmds.push_back({ t, ks[t],0,0 });
+			switch (t)
+			{
+			case 1:
+			case 2:
+			{
+				cmds.push_back(*pt);
+				target += dim;
+			}
+			break;
+			case 3:
+			{
+				cmds.push_back(*pt);
+				pt++;
+				cmds.push_back(*pt);
+				target += dim * 2;
+			}
+			break;
+			case 4:
+			{
+				cmds.push_back(*pt);
+				pt++;
+				cmds.push_back(*pt);
+				pt++;
+				cmds.push_back(*pt);
+				target += dim * 3;
+			}
+			break;
+			default:
+				break;
+			}
+		}
+	}
 	return 0;
 }
 // 执行
-void action_t::play() {}
+void action_t::play() {
+	_pause = false;
+}
 // 暂停
-void action_t::pause() {}
+void action_t::pause() {
+	_pause = true;
+}
 // 返回值：0不执行，1执行结束，2执行中
-int action_t::updata_t(float deltaTime, float& ct) {
+int action_t::updata_t(float deltaTime) {
+	if (_pause)return 0;
+	ctime += deltaTime;
+
+
 	return 0;
 }
 // 清空命令
 void action_t::clear()
-{}
+{
+	_count = 0;
+	ctime = 0;
+	cmds.clear();
+}
 
 // 直线移动，时间秒，目标，原坐标可选
 action_t* move2w(float mt, const glm::vec2& target, glm::vec2* src, float wait)
