@@ -14797,6 +14797,10 @@ font_t* font_rctx::get_mk(fontns& v, size_t st)
 	{
 		v.vptr.resize(v.style.size());
 	}
+	if (v.style.empty())
+	{
+		return 0;
+	}
 	auto r = (font_t*)v.vptr[st];
 	if (!r)
 	{

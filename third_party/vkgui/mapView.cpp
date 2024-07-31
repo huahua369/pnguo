@@ -38,6 +38,7 @@
 #include <sys/timeb.h>
 #include <direct.h>
 #define mkdir(a, b) _mkdir(a)
+#define mkdirw(a, b) _wmkdir(a)
 #else
 #include <sys/stat.h>
 #include <sys/inotify.h>
@@ -46,7 +47,11 @@
 
 
 namespace md {
-
+	bool validate_u8(const char* str, int len)
+	{
+		if (len < 0)len = strlen(str);
+		return len > 0 ? g_utf8_validate(str, len, 0) : false;
+	}
 	// Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 	// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 #ifndef FONS_UTF8_ACCEPT
@@ -296,6 +301,19 @@ namespace hz
 		}
 		return strBase;
 	}
+	std::wstring replace(std::wstring strBase, const std::wstring& strSrc, const std::wstring& strDes)
+	{
+		std::wstring::size_type pos = 0;
+		std::wstring::size_type srcLen = strSrc.size();
+		std::wstring::size_type desLen = strDes.size();
+		pos = strBase.find(strSrc, pos);
+		while ((pos != std::wstring::npos))
+		{
+			strBase.replace(pos, srcLen, strDes);
+			pos = strBase.find(strSrc, (pos + desLen));
+		}
+		return strBase;
+	}
 
 	enum PathE
 	{
@@ -347,11 +365,63 @@ namespace hz
 				*t = chr;
 		}
 	}
+	void check_make_path(const std::wstring& filename, unsigned int mod/* = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH*/)
+	{
+		wchar_t* file_name = (wchar_t*)filename.c_str();
+		wchar_t* t = file_name;
+		wchar_t chr = L'/';
+		wchar_t* ch = wcschr(t, '\\');
+		if (ch)
+		{
+			chr = *ch;
+		}
+
+		for (; t && *t; t++)
+		{
+			for (; !(*t == '/' || *t == '\\') && *t; t++);
+			if (*t)
+			{
+				chr = *t;
+				*t = 0;
+			}
+			else
+			{
+				break;
+			}
+			if (_waccess(file_name, 0) != -1)
+			{
+				if (t)
+					*t = chr;
+				continue;
+			}
+#ifdef _WIN32
+			mkdirw(file_name);
+#else
+#ifndef __ANDROID__
+			mkdir(file_name, mod);
+#endif
+#endif
+			if (t)
+				*t = chr;
+		}
+	}
 	std::string genfn(std::string fn)
 	{
 #ifdef _WIN32
 		fn = replace(fn, "/", "\\");
 		fn = replace(fn, "\\\\", "\\");
+#else
+		fn = replace(fn, "\\", "/");
+		fn = replace(fn, "//", "/");
+#endif // _WNI32
+		check_make_path(fn, pathdrive | pathdir);
+		return fn;
+	}
+	std::wstring genfn(std::wstring fn)
+	{
+#ifdef _WIN32
+		fn = replace(fn, L"/", L"\\");
+		fn = replace(fn, L"\\\\", L"\\");
 #else
 		fn = replace(fn, "\\", "/");
 		fn = replace(fn, "//", "/");
@@ -373,7 +443,18 @@ namespace hz
 	bool mfile_t::open_m(const std::string& fn, bool is_rdonly, bool is_shared, bool is_async)
 	{
 		bool ret = true;
-		std::string fnn = genfn(fn);
+		std::wstring fnn;
+		std::string fnna;
+		// 验证路径是否为utf8
+		if (md::validate_u8(fn.c_str(), fn.size()))
+		{
+			fnn = u8_to_u16(fn);
+			fnn = genfn(fnn);
+		}
+		else
+		{
+			fnna = genfn(fn);
+		}
 		_is_rdonly = is_rdonly;
 		int dwcd = OPEN_EXISTING;
 		_flags_o = GENERIC_READ;
@@ -388,8 +469,14 @@ namespace hz
 			_flags |= FILE_SHARE_WRITE;
 		}
 		//打开磁盘上的文件得到句柄   
-		hFile = CreateFileA(fnn.c_str(), _flags_o, _flags, NULL, dwcd
-			, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		if (fnna.size())
+		{
+			hFile = CreateFileA(fnna.c_str(), _flags_o, _flags, NULL, dwcd, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		}
+		else if (fnn.size())
+		{
+			hFile = CreateFileW(fnn.c_str(), _flags_o, _flags, NULL, dwcd, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		}
 		//判断文件是否创建成功 
 		if (hFile == INVALID_HANDLE_VALUE)
 		{
@@ -525,7 +612,13 @@ namespace hz
 	bool mfile_t::open_m(const std::string& fnn, bool is_rdonly, bool is_shared, bool is_async)
 	{
 		bool ret = true;
-		std::string fn = genfn(fnn);
+		std::string fn;
+		// 验证路径是否为utf8
+		if (!md::validate_u8(fnn.c_str(), fnn.size()))
+		{
+			fn = gbk_to_u8(fnn);
+		}
+		fn = genfn(fn);
 		_is_rdonly = is_rdonly;
 
 		_flags_o = is_async ? O_ASYNC : O_SYNC;

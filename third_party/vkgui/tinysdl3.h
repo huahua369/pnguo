@@ -74,7 +74,7 @@ public:
 	std::queue<form_x*> reforms;
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
-	int _fps = 60;
+	int _fps = 56;
 	int fms = 0;
 	bool nc_down = 0;
 public:

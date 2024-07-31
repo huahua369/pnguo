@@ -1858,7 +1858,7 @@ namespace vkr {
 #else
 		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;;
 		VkDeviceMemory   m_deviceMemoryVid = VK_NULL_HANDLE;;
-#endif
+#endif 
 	};
 
 
@@ -6964,14 +6964,19 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	void UploadHeap::OnDestroy()
 	{
-		vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
-		vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
-		vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
+		if(m_buffer)
+		{
+			vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
+			vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
+			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
 
-		vkFreeCommandBuffers(m_pDevice->GetDevice(), m_commandPool, 1, &m_pCommandBuffer);
-		vkDestroyCommandPool(m_pDevice->GetDevice(), m_commandPool, NULL);
+			vkFreeCommandBuffers(m_pDevice->GetDevice(), m_commandPool, 1, &m_pCommandBuffer);
+			vkDestroyCommandPool(m_pDevice->GetDevice(), m_commandPool, NULL);
 
-		vkDestroyFence(m_pDevice->GetDevice(), m_fence, NULL);
+			vkDestroyFence(m_pDevice->GetDevice(), m_fence, NULL);
+
+			m_buffer = 0;
+		}
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -14176,7 +14181,7 @@ namespace vkr {
 		// Create a commandlist ring for the Direct queue
 		uint32_t commandListsPerBackBuffer = 8;
 		// Create a 'dynamic' constant buffer
-		uint32_t constantBuffersMemSize = 200 * 1024 * 1024;
+		uint32_t constantBuffersMemSize = 5 * 1024 * 1024;
 		// Create a 'static' pool for vertices and indices 
 		uint32_t staticGeometryMemSize = (1 * 128) * 1024 * 1024;
 		// Create a 'static' pool for vertices and indices in system memory
@@ -14332,6 +14337,7 @@ namespace vkr {
 
 		void OnRender(const UIState* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p);
+		void freeVidMBP();
 	private:
 		Device* m_pDevice = 0;
 		const_vk ct = {};
@@ -16594,7 +16600,7 @@ namespace vkr {
 			m_UploadHeap.FlushAndFinish();
 
 			//once everything is uploaded we dont need the upload heaps anymore
-			//m_VidMemBufferPool.FreeUploadHeap();
+			//m_VidMemBufferPool.FreeUploadHeap(); 
 			_robject.push_back(currobj);
 			_depthpass.push_back(currobj->m_GLTFDepth);
 			currobj = 0;
@@ -17330,6 +17336,11 @@ namespace vkr {
 		_fbo.sem = p->framebuffers[0].semaphore;
 		_fbo.renderPass = p->renderPass;
 	}
+	void Renderer_cx::freeVidMBP()
+	{
+		m_VidMemBufferPool.FreeUploadHeap();
+		m_UploadHeap.OnDestroy();
+	}
 #endif
 
 	struct SystemInfo
@@ -17944,6 +17955,8 @@ namespace vkr {
 				_tmpgc = 0;
 				//m_time = 0;
 				m_loadingScene = false;
+				if (_lts.empty())
+					m_pRenderer->freeVidMBP();
 			}
 		}
 		//else if (m_pGltfLoader && m_bIsBenchmarking)

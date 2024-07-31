@@ -241,6 +241,8 @@ namespace hz
 
 
 namespace md {
+	// 验证是否为ut8编码
+	bool validate_u8(const char* str, int len);
 	int64_t get_utf8_count(const char* buffer, int64_t len);
 	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
 	uint32_t get_u8_idx(const char* str, int64_t idx);
