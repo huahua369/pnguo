@@ -790,6 +790,7 @@ int main()
 	auto pw = form0;
 	printf((char*)u8"启动\n cpu核心数量:%d\n", cpun);
 #endif
+	auto mainmenu = new plane_cx();
 	auto pl1 = new plane_cx();
 	auto pl2 = new plane_cx();
 	auto pl3 = new plane_cx();
@@ -801,10 +802,14 @@ int main()
 	pl1->set_border({ 0x80ff802C,1,5,pbc });
 	pl2->set_border({ 0x80ff802C,1,5,pbc });
 	pl3->set_border({ 0x80ff802C,1,5 ,pbc });
+	pw->bind(mainmenu);	// 绑定到窗口
 	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
 	pw->bind(pl4);
+	pl2->visible = false;
+	pl3->visible = false;
+	mainmenu->set_rss(5);
 	pl1->set_rss(5);
 	pl2->set_rss(5);
 	pl3->set_rss(5);
@@ -813,6 +818,7 @@ int main()
 	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
 	//size_t add_familys(const char* familys, const char* style)
+	mainmenu->add_familys(fontn, 0);
 	pl1->add_familys(fontn, 0);
 	pl1->add_familys(fontn2, 0);
 	pl2->add_familys(fontn, 0);
@@ -822,6 +828,35 @@ int main()
 	//pl2->visible = false;
 	//pl1->visible = false; 
 	{
+		auto p = mainmenu;
+		//p->draggable = true; //可拖动
+		p->set_border({ 0,1,5 ,pbc });
+		// 主菜单
+		std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
+		p->_lms = { 2,2 };
+		p->fontsize = 16;
+		p->set_size({ form0->get_size().x-1,50 });
+		p->set_pos({});	
+		glm::vec2 cs = { 1500,1600 };
+		auto vs = p->get_size();
+		
+		p->set_view(vs, cs);
+		for (auto& it : mvs)
+		{
+			auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
+			cbt->effect = uTheme::light;
+			cbt->hscroll = {};
+			cbt->rounding = 0;
+			cbt->light = 0.1;
+						
+			cbt->click_cb = [=](void* ptr, int clicks)
+				{
+					printf("%s\n", cbt->str.c_str());
+				};
+		}
+	}
+
+	{
 		auto p = pl4;
 		p->draggable = true; //可拖动
 		p->add_familys(fontn, 0);
@@ -830,7 +865,7 @@ int main()
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		p->fontsize = 26;
 		p->set_size({ 500,600 });
-		p->set_pos({ 0,0 });
+		p->set_pos({ 200,10 });
 		auto pss = p->get_size();
 		int width = 10;
 		int rcw = 8;

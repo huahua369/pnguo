@@ -5935,10 +5935,12 @@ int layout_text_x::get_lineheight(size_t idx, int fontsize)
 
 glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 {
+	glm::ivec2 ret = {};
+	if (familyv.empty())
+		return ret;
 	auto str = (const char*)str8;
 	if (idx >= familyv.size())idx = 0;
 	auto font = familyv[idx][0];
-	glm::ivec2 ret = {};
 	int x = 0;
 	int y = 0;
 	int n = 1;
@@ -5975,6 +5977,7 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 {
 	assert(fontsize < 800);
 	glm::ivec2 ret = { rtv.size(), 0 };
+	if (!ctx) { return ret; }
 	text_image_t* p = 0;
 	cti.tv.clear();
 	if (idx >= familyv.size())idx = 0;
@@ -6056,6 +6059,7 @@ atlas_t* layout_text_x::get_atlas()
 bool layout_text_x::update_text()
 {
 	bool r = false;
+	if (!ctx)return r;
 	auto ft = ctx->bcc._data.data();
 	auto n = ctx->bcc._data.size();
 	for (size_t i = 0; i < n; i++)
@@ -18413,8 +18417,10 @@ void plane_cx::update(float delta)
 		auto ls = get_size(); ls -= 1;
 		{
 			// 背景 
-			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
-			fill_stroke(cr, border.w, 0, 0, false);
+			if (border.w) {
+				draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
+				fill_stroke(cr, border.w, 0, 0, false);
+			}
 			if (draw_back_cb)
 			{
 				cairo_as _aa_(cr);
@@ -18441,8 +18447,11 @@ void plane_cx::update(float delta)
 			}
 		}
 		// 边框线  
-		draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
-		fill_stroke(cr, 0, border.x, border.y, false);
+		if (border.x)
+		{
+			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
+			fill_stroke(cr, 0, border.x, border.y, false);
+		}
 		tv->end_frame(cr);
 		_pat->img->valid = true;
 	}
