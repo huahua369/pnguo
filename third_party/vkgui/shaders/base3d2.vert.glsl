@@ -1,4 +1,4 @@
-﻿#version 450
+#version 450
 
 layout(binding=0) uniform u_UniformBuffer {
     mat4 u_mvpMatrix;
@@ -15,12 +15,13 @@ out gl_PerVertex
 };
 
 layout(location = 0) out struct{
-    vec4 col;
+    vec4 col[2];
     vec2 uv;
 } o;
 
 void main(){
     gl_Position = u_mvpMatrix * vec4(pos.xyz, 1);
     o.uv = uv;
-    o.col = col;  
+    o.col[0] = col; 
+    o.col[1] = col1;
 }
