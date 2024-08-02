@@ -20,6 +20,7 @@
 #include <stb_image_write.h>
 
 #include <mimalloc-new-delete.h>
+
 /*
 	todo
 	输入数据，自动创建窗口、控件、
@@ -92,7 +93,29 @@ void tobox0(const glm::vec2& v, glm::vec4& t)
 	}
 
 }
+static uint64_t toUInt(const njson& v, uint64_t de = 0)
+{
+	uint64_t ret = de;
+	if (v.is_number())
+	{
+		ret = v.get<uint64_t>();
+	}
+	else if (!v.is_null())
+	{
+		ret = std::atoll(md::trim(v.dump(), "\"").c_str());
+	}
+	return ret;
+}
 
+njson& push_btn(const void* str, int cidx, int eid, njson& btn)
+{
+	njson it;
+	it["s"] = (char*)(str ? str : "");
+	it["cidx"] = cidx;
+	it["eid"] = eid;
+	btn.push_back(it);
+	return *btn.rbegin();
+}
 /*
 *
 *  0中心
@@ -103,7 +126,7 @@ void tobox0(const glm::vec2& v, glm::vec4& t)
 	4     3
 */
 glm::vec2 getbox2t_(std::vector<glm::vec2>& vt, int t)
-{
+{ 
 	glm::vec4 box = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
 	for (auto& it : vt)
 	{

@@ -654,46 +654,6 @@ action_show_t* wait_show(bool visible, float wait)
 
 // todo 树
 #if 0
-		// 去掉头尾空格
-std::string trim(const std::string& str, const char* pch)
-{
-	auto s = str;
-	if (s.empty())
-	{
-		return s;
-	}
-	s.erase(0, s.find_first_not_of(pch));
-	s.erase(s.find_last_not_of(pch) + 1);
-	return s;
-}
-std::string trim_ch(const std::string& str, const std::string& pch)
-{
-	std::string r = str;
-	if (pch.size() && str.size())
-	{
-		size_t p1 = 0, p2 = str.size();
-		for (int i = 0; i < str.size(); i++)
-		{
-			auto ch = str[i];
-			if (pch.find(ch) == std::string::npos)
-			{
-				p1 = i;
-				break;
-			}
-		}
-		for (int i = str.size() - 1; i > 0; i--)
-		{
-			auto ch = str[i];
-			if (pch.find(ch) == std::string::npos)
-			{
-				p2 = i + 1;
-				break;
-			}
-		}
-		r = str.substr(p1, (p2 - p1));
-	}
-	return r;
-}
 static uint64_t toUInt(const njson& v, uint64_t de = 0)
 {
 	uint64_t ret = de;

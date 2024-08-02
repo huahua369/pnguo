@@ -253,4 +253,6 @@ namespace md {
 	uint32_t fons_decutf8(uint32_t* state, uint32_t* codep, uint32_t byte);
 	const char* get_utf8_first(const char* str);
 	const char* get_utf8_prev(const char* str);
+	std::string trim(const std::string& str, const char* pch);
+	std::string trim_ch(const std::string& str, const std::string& pch);
 }
