@@ -420,7 +420,239 @@ void test()
 }
 #endif // 1
 #if 1
+	enum InterpolationPath_e :uint8_t
+	{
+		TRANSLATION,
+		ROTATION,
+		SCALE,
+		WEIGHTS
+	};
+	enum InterpolationModes_e :uint8_t
+	{
+		LINEAR,
+		STEP,
+		CUBICSPLINE
+	};
+	struct sampler_t
+	{
+		size_t input;
+		size_t output;
+		InterpolationModes_e interpolation;
+	};
+	struct accessor_t
+	{
+		float* _data;	// 数量
+		size_t _stride;	// float=1、vec2、vec3、vec4\quat=4
+		size_t _count;		// 数量
+		size_t size() {
+			return _count;
+		}
+		float* data() {
+			return _data;
+		}
+		const void* get(int i) const
+		{
+			if (i >= _count)
+				i = _count - 1;
 
+			return _data + _stride * i;
+		}
+
+		int FindClosestFloatIndex(float val) const
+		{
+			int ini = 0;
+			int fin = _count - 1;
+
+			while (ini <= fin)
+			{
+				int mid = (ini + fin) / 2;
+				float v = *(const float*)get(mid);
+
+				if (val < v)
+					fin = mid - 1;
+				else if (val > v)
+					ini = mid + 1;
+				else
+					return mid;
+			}
+
+			return fin;
+		}
+		float operator[](size_t _Pos) {
+			return _data[_Pos];
+		}
+	};
+// todo 动画插值算法
+class interpolator_cx
+{
+public:
+
+	// 获取插值
+	//glm::vec4 interpolate(accessor_t* accessors, int target_path, sampler_t& sampler, float t, int stride, float maxTime)
+public:
+	size_t prevKey = 0;	// 当前帧
+	float prevT = 0.0;	// 当前时间
+public:
+	glm::vec4 slerpQuat(float* q1, float* q2, float t)
+	{
+		glm::quat r = glm::normalize(glm::slerp(glm::make_quat(q1), glm::make_quat(q2), t));
+		return { r.x,r.y,r.z,r.w };
+	}
+
+	glm::vec4 step(int prevKey, float* output, int stride)
+	{
+		glm::vec4 result = {};
+		for (auto i = 0; i < stride; ++i)
+		{
+			result[i] = output[prevKey * stride + i];
+		}
+		return result;
+	}
+
+	glm::vec4 linear(int prevKey, int nextKey, float* output, float t, int stride)
+	{
+		glm::vec4 result = {};
+		for (auto i = 0; i < stride; ++i)
+		{
+			result[i] = output[prevKey * stride + i] * (1 - t) + output[nextKey * stride + i] * t;
+		}
+		return result;
+	}
+	glm::vec4 linear_v3(float* prev, float* next, float t)
+	{
+		return glm::mix(glm::vec4(prev[0], prev[1], prev[2], 0), glm::vec4(next[0], next[1], next[2], 0), t);
+	}
+
+	glm::vec4 cubicSpline(int prevKey, int nextKey, float* output, float keyDelta, float t, int stride)
+	{
+		// stride: Count of components (4 in a quaternion).
+		// Scale by 3, because each output entry consist of two tangents and one data-point.
+		auto prevIndex = prevKey * stride * 3;
+		auto nextIndex = nextKey * stride * 3;
+		auto A = 0;
+		auto V = 1 * stride;
+		auto B = 2 * stride;
+
+		glm::vec4 result = {};// (stride);
+		auto tSq = pow(t, 2);
+		auto tCub = pow(t, 3);
+
+		// We assume that the components in output are laid out like this: in-tangent, point, out-tangent.
+		// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#appendix-c-spline-interpolation
+		for (size_t i = 0; i < stride; ++i)
+		{
+			auto v0 = output[prevIndex + i + V];
+			auto a = keyDelta * output[nextIndex + i + A];
+			auto b = keyDelta * output[prevIndex + i + B];
+			auto v1 = output[nextIndex + i + V];
+
+			result[i] = ((2 * tCub - 3 * tSq + 1) * v0) + ((tCub - 2 * tSq + t) * b) + ((-2 * tCub + 3 * tSq) * v1) + ((tCub - tSq) * a);
+		}
+
+		return result;
+	}
+
+	void resetKey()
+	{
+		prevKey = 0;
+	}
+
+	glm::vec4 getv4x(float* a, int offset, int stride) {
+		glm::vec4 tensor = {};
+		for (int i = 0; i < stride; ++i) {
+			tensor[i] = a[offset + i];
+		}
+		return tensor;
+	}
+	// 获取插值
+	glm::vec4 interpolate(accessor_t* accessors, int target_path, sampler_t& sampler, float t, int stride, float maxTime)
+	{
+		if (t < 0)
+		{
+			return {};
+		}
+
+		auto& input = accessors[sampler.input];
+		auto& output = accessors[sampler.output];
+
+		if (output.size() == stride) // no interpolation for single keyFrame animations
+		{
+			return getv4x(output.data(), 0, stride);
+		}
+
+		// Wrap t around, so the animation loops.
+		// Make sure that t is never earlier than the first keyframe and never later then the last keyframe.
+		t = fmod(t, maxTime);
+		t = glm::clamp(t, input[0], input[input.size() - 1]);
+
+		if (prevT > t)
+		{
+			prevKey = 0;
+		}
+
+		prevT = t;
+
+		// Find next keyframe: min{ t of input | t > prevKey }
+		size_t nextKey = 0;
+		for (size_t i = prevKey; i < input.size(); ++i)
+		{
+			if (t <= input[i])
+			{
+				nextKey = glm::clamp(i, (size_t)1, input.size() - 1);
+				break;
+			}
+		}
+		prevKey = glm::clamp(nextKey - 1, (size_t)0, nextKey);
+
+		auto keyDelta = input[nextKey] - input[prevKey];
+
+		// Normalize t: [t0, t1] -> [0, 1]
+		auto tn = (t - input[prevKey]) / keyDelta;
+		// channel.target.path
+		if (target_path == (int)InterpolationPath_e::ROTATION)
+		{
+
+			if (InterpolationModes_e::CUBICSPLINE == sampler.interpolation)
+			{
+				// GLTF requires cubic spline interpolation for quaternions.
+				// https://github.com/KhronosGroup/glTF/issues/1386
+				auto result = cubicSpline(prevKey, nextKey, output.data(), keyDelta, tn, 4);
+				result = glm::normalize(result);
+				return result;
+			}
+			else if (sampler.interpolation == InterpolationModes_e::LINEAR)
+			{
+				auto q0 = getQuat(output.data(), prevKey);
+				auto q1 = getQuat(output.data(), nextKey);
+				return slerpQuat(&q0.x, &q1.x, tn);
+			}
+			else if (sampler.interpolation == InterpolationModes_e::STEP)
+			{
+				return getQuat(output.data(), prevKey);
+			}
+
+		}
+
+		switch (sampler.interpolation)
+		{
+		case InterpolationModes_e::STEP:
+			return step(prevKey, output.data(), stride);
+		case InterpolationModes_e::CUBICSPLINE:
+			return cubicSpline(prevKey, nextKey, output.data(), keyDelta, tn, stride);
+		default:
+			return linear(prevKey, nextKey, output.data(), tn, stride);
+		}
+	}
+
+	glm::vec4 getQuat(float* output, int index)
+	{
+		auto x = output[4 * index];
+		auto y = output[4 * index + 1];
+		auto z = output[4 * index + 2];
+		auto w = output[4 * index + 3];
+		return glm::vec4(x, y, z, w);
+	}
+};
 
 /* 路径动画命令。支持1/2/3维路径运动
 	等待(秒)e_wait=0,
