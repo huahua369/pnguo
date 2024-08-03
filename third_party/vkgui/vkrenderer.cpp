@@ -6964,7 +6964,7 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	void UploadHeap::OnDestroy()
 	{
-		if(m_buffer)
+		if (m_buffer)
 		{
 			vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
 			vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
@@ -12956,6 +12956,7 @@ namespace vkr {
 	}
 #endif // 1
 
+	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void*);
 #if 1
 
 	//
@@ -12964,7 +12965,7 @@ namespace vkr {
 	size_t HashShaderString(const char* pRootDir, const char* pShader, size_t hash)
 	{
 		hash = Hash(pShader, strlen(pShader), hash);
-
+		std::vector<unsigned char> tfd;
 		const char* pch = pShader;
 		while (*pch != 0)
 		{
@@ -13014,11 +13015,17 @@ namespace vkr {
 
 						pch++;
 
-						char* pShaderCode = NULL;
-						if (readfile(includeName, &pShaderCode, NULL, false))
+						//char* pShaderCode = NULL;
+						//if (readfile(includeName, &pShaderCode, NULL, false))
+						//{
+						//	hash = HashShaderString(pRootDir, pShaderCode, hash);
+						//	free(pShaderCode);
+						//}
+						tfd.clear();
+						vkmReadWholeFile(&tfd, 0, includeName, 0);
+						if (tfd.size())
 						{
-							hash = HashShaderString(pRootDir, pShaderCode, hash);
-							free(pShaderCode);
+							hash = HashShaderString(pRootDir, (char*)tfd.data(), hash);
 						}
 					}
 				}
@@ -13040,8 +13047,8 @@ namespace vkr {
 #define ftelli64 ftello64
 #endif // _WIN32
 
-	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err,
-		const std::string& filepath, void*) {
+	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void*)
+	{
 #ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
 		if (asset_manager) {
 			AAsset* asset = AAssetManager_open(asset_manager, filepath.c_str(),
