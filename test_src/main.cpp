@@ -766,10 +766,13 @@ int main()
 		ltx.set_ctx(ftc);
 		ltx.add_familys(fontn, 0);
 		text_path_t tp = {};
-		auto gsp = ltx.get_shape(0, u8"工", 200, &tp);
+		auto gsp = ltx.get_shape(0, u8"测", 200, &tp);
 		if (tp.tv.size())
 		{
 
+			//auto hr= get_flatten(&tp.tv[0], 8, 1, 2, std::vector<glm::vec2>*flatten);
+
+			//gp:: constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>*paths, std::vector<glm::vec3>&ms, bool rccw, bool pccw)
 		}
 	}
 	menu_cx* mc = new menu_cx();	// 菜单管理

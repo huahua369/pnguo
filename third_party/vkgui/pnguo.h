@@ -396,6 +396,18 @@ struct tinypath_t
 	int last = 0;
 
 };
+
+struct tinyflatten_t
+{
+	vertex_v2f* first = 0;
+	size_t n = 0;
+	int mc; float mlen;
+	std::vector<glm::vec2>* flatten;
+	float dist = 0;			// 距离剔除
+	int angle = 100;		// 优化小于100度的
+	bool oldfp = false;
+};
+
 struct font_impl;
 class info_one
 {
@@ -647,6 +659,7 @@ namespace gpv {
 
 namespace gp {
 	using plane3_t = std::vector<glm::vec3>;
+
 	struct cmd_plane_t
 	{
 		path_v* pv = 0;					// 路径，优先级0
@@ -664,6 +677,10 @@ namespace gp {
 		int radius_a = 150;				// 小于角度执行圆角
 		bool is_expand = 0;				// 1扩展（顶点数不一致）、0比例缩放（有自相交问题）
 	};
+	 
+	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten);
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw);
+
 	// 单线面，先扩展后比例
 	int build_plane1(cmd_plane_t* c, float expand, float scale, float z);
 	// 单面打孔，tr.x=半径，tr.y=间隔
@@ -723,6 +740,7 @@ namespace gp {
 		int radius = 0;
 	};
 	glm::vec4 mkcustom(void* njsonptr, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
+
 }
 
 
@@ -808,7 +826,8 @@ public:
 	void addEllipse(const glm::vec2& c, const glm::vec2& r);
 	void addRect(const glm::vec4& a, const glm::vec2& r);
 	void add(const vertex_t& v);
-	void add(const void* d, size_t size);
+	void set_data(const vertex_t* d, size_t size);
+	void set_data(const tinypath_t* d);
 	void add_lines(const glm::vec2* d, size_t size, bool isclose = false);
 	void add_lines(const glm::dvec2* d, size_t size, bool isclose = false);
 
@@ -872,8 +891,8 @@ private:
 
 struct text_path_t
 {
-	std::vector<tinypath_t> tv;
-	std::vector<vertex_f> data;
+	std::vector<tinypath_t> tv;	// 每个字的路径
+	std::vector<vertex_f> data;	// 所有路径数据
 };
 struct text_image_t
 {

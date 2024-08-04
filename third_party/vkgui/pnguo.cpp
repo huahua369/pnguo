@@ -4630,7 +4630,7 @@ namespace gp {
 		return n == 0;
 
 	}
-
+	 
 
 	// 创建裁剪平面
 	size_t cplane(cmd_plane_t* c, PathsD& subjects, PathsD* clips, PathsD* hole, float z, bool pccw, const glm::ivec2& rev, bool isin);
@@ -4665,7 +4665,7 @@ namespace gp {
 
 			}
 			auto pos = c->opt->size();
-			gs::geos_constrained_delaunay_triangulation_v(&tr, *c->opt, c->rccw.x, c->pccw);
+			gs::constrained_delaunay_triangulation_v(&tr, *c->opt, c->rccw.x, c->pccw);
 			auto ss = c->opt->size();
 			auto t = c->opt->data() + pos;
 			for (size_t i = pos; i < ss; i++)
@@ -6250,7 +6250,7 @@ namespace gp {
 #endif
 	}
 
-	void geos_constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw)
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw)
 	{
 		if (!paths || paths->empty())return;
 		// allocate triangulator
@@ -7559,7 +7559,7 @@ void path_v::erase(size_t idx)
 		_data.erase(_data.begin() + idx);
 	}
 }
-void path_v::add(const void* d, size_t size)
+void path_v::set_data(const path_v::vertex_t* d, size_t size)
 {
 	int64_t n = size / sizeof(path_v::vertex_t);
 	if (d && n > 0)
@@ -7568,6 +7568,23 @@ void path_v::add(const void* d, size_t size)
 		memcpy(_data.data(), d, n * sizeof(path_v::vertex_t));
 	}
 }
+void path_v::set_data(const tinypath_t* d) {
+	if (d && d->v && d->count > 0)
+	{
+		_data.resize(d->count);
+		auto length = d->count;
+		auto pd = _data.data();
+		auto pt = (vertex_v2f*)d->v;
+		for (size_t i = 0; i < length; i++)
+		{
+			pd[i].type = (vtype_e)pt[i].type;
+			pd[i].p = pt[i].p;
+			pd[i].c = pt[i].c;
+			pd[i].c1 = pt[i].c1;
+		}
+	}
+}
+
 void path_v::add(path_v* p)
 {
 	if (p && p->_data.size() > 1)
@@ -7782,7 +7799,8 @@ void mkivec_round(std::vector<glm::vec3>& tv1)
 }
 
 
-void doflatten(path_v::flatten_t* fp)
+template<class T>
+void doflatten(T* fp)//path_v::flatten_t* fp)
 {
 	size_t length = fp->n;
 	auto p = fp->first;
@@ -7791,13 +7809,13 @@ void doflatten(path_v::flatten_t* fp)
 	std::vector<glm::vec2> points;
 	std::vector<std::vector<glm::vec2>> pv, pv1;
 	std::vector<glm::ivec2> pvc;
-	//fp->oldfp = 1;
+
 	for (size_t i = 0; i < length; i++, p++)
 	{
 		auto m = fp->mc;
 		auto p0 = p - 1;
 		points.clear();
-		switch (p->type)
+		switch ((path_v::vtype_e)p->type)
 		{
 		case path_v::vtype_e::e_vmove:
 		case path_v::vtype_e::e_vline:
@@ -7888,8 +7906,6 @@ void doflatten(path_v::flatten_t* fp)
 			}
 			tav.push_back({ aa,i });
 		}
-		//if (av.size() == 7)
-		//	printf((char*)"xt\n");
 		auto tpv = points;
 		length = points.size() - 1;
 		std::vector<glm::vec3> ptvs;
@@ -7953,7 +7969,6 @@ void doflatten(path_v::flatten_t* fp)
 				nv.push_back(it);
 		}
 	}
-	//push_dv2(nv, points, dist);
 	if (nv.size())
 	{
 		auto pos = fp->flatten->size();
@@ -7975,6 +7990,21 @@ int path_v::get_flatten(size_t idx, size_t count, int m, float ml, float ds, std
 	fp.dist = ds;
 	fp.angle = angle;
 	doflatten(&fp);
+}
+namespace gp {
+	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten)
+	{
+		if (!flatten || p || p->count < 1 || m < 1)return -1;
+		tinyflatten_t fp = {};
+		fp.flatten = flatten;
+		fp.mc = m;
+		fp.mlen = ml;
+		fp.n = p->count;
+		fp.first = (vertex_v2f*)p->v;
+		fp.dist = ds;
+		fp.angle = 160;
+		doflatten(&fp);
+	}
 }
 
 int path_v::get_expand_flatten(size_t idx, float width, int segments, float ml, float ds, int type, std::vector<std::vector<glm::vec2>>* ots, std::vector<int>* ccwv)
@@ -8274,7 +8304,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	}
 	bool rccw = false;
 	std::vector<glm::vec3> ms3;
-	gp::geos_constrained_delaunay_triangulation_v(&tr, ms3, rccw, pccw);
+	gp::constrained_delaunay_triangulation_v(&tr, ms3, rccw, pccw);
 
 	for (auto& it : ms3)
 		ms.push_back(it);
@@ -8285,7 +8315,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	if (is_reverse)
 	{
 		std::reverse(ms.begin() + pos, ms.end());
-	}
+}
 #endif
 	return ms.size() - pos;
 }
@@ -9869,7 +9899,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -9890,7 +9920,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+	}
 
 
 struct path_txf
@@ -14431,7 +14461,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-	}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -14447,7 +14477,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -16352,7 +16382,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -18637,7 +18667,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -19377,7 +19407,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
