@@ -17885,8 +17885,8 @@ namespace vkr {
 		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
 		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
 		{
-			yaw += io.MouseDelta.x;// / 100.f;
-			pitch += io.MouseDelta.y;// / 100.f;
+			yaw += io.MouseDelta.x;
+			pitch += io.MouseDelta.y;
 			if (yaw != 0) {
 				yaw = yaw;
 			}
