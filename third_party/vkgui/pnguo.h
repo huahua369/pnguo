@@ -631,6 +631,55 @@ struct cubic_v
 #define path_v_dh
 #endif // !path_v_dh
 
+class path_v;
+
+namespace gpv {
+	using Path64 = std::vector<glm::i64vec2>;
+	using PathD = std::vector<glm::dvec2>;
+	using Path = std::vector<glm::vec2>;
+	using Paths64 = std::vector<Path64>;
+	using Paths = std::vector<Path>;
+	using PathsD = std::vector<PathD>;
+	// 输入路径，输出细分圆角路径线，ccw=0,1,全部角度-1
+	Paths path_round_0(path_v* ptr, int ccw, float radius, int num_segments, int ml, int ds);
+	PathsD path_round_1(path_v* ptr, int ccw, float radius, int num_segments, int ml, int ds);
+}
+
+namespace gp {
+	using plane3_t = std::vector<glm::vec3>;
+	struct cmd_plane_t
+	{
+		path_v* pv = 0;					// 路径，优先级0
+		gpv::Paths* fv = 0;				// 自定义折线路径，1
+		gpv::PathsD* dv = 0;			// 自定义折线路径，2
+		plane3_t* opt = 0;				// *输出三角形
+		int type = 2;					// 扩展大小可选类型Square=0, Round=1, Miter=2
+		int radius = 0;					// 圆角半径
+		glm::ivec2 rccw = {}; 			// 圆角顺序
+		int pccw = 0;					// 面的顺序
+		int segments = 8;				// 段数
+		float segments_len = 0.0;		// 细分长度
+		float dist = 0.0;				// 细分裁剪距离
+		float thickness = 1.0;			// 厚度
+		int radius_a = 150;				// 小于角度执行圆角
+		bool is_expand = 0;				// 1扩展（顶点数不一致）、0比例缩放（有自相交问题）
+	};
+	// 单线面，先扩展后比例
+	int build_plane1(cmd_plane_t* c, float expand, float scale, float z);
+	// 单面打孔，tr.x=半径，tr.y=间隔
+	int build_plane1hole(cmd_plane_t* c, float scale, float z, const glm::vec2& tr, std::vector<glm::vec2>* cshape, std::vector<glm::ivec2>* idx, std::vector<glm::vec3>* vpos);
+	// 打孔双路径面
+	int build_plane2hole(cmd_plane_t* c, float scale, float expand, float z, const glm::vec2& tr, bool rv, std::vector<glm::vec2>* cshape, std::vector<glm::ivec2>* idx, std::vector<glm::vec3>* vpos);
+	// 缩放2裁剪面
+	int build_plane2sc(cmd_plane_t* c, float scale, float scale1, float z, bool rv);
+	// 双路径面， 比例扩展两条路径成竖面
+	int build_plane3(cmd_plane_t* c, const glm::vec2& scale, const glm::vec2& z);
+	int build_plane3(cmd_plane_t* c, float scale, const glm::vec2& z);
+	// 生成竖面，单线
+	int build_plane0(cmd_plane_t* c, const glm::vec2& scale, const glm::vec2& z);
+}
+
+
 class path_v
 {
 public:

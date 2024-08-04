@@ -80,6 +80,28 @@ extern "C" {
 #undef min
 #endif // max
 
+#if 1 
+#include <earcut.hpp> 
+namespace mapbox {
+	namespace util {
+
+		template <>
+		struct nth<0, glm::vec2> {
+			inline static auto get(const glm::vec2& t) {
+				return t.x;
+			};
+		};
+		template <>
+		struct nth<1, glm::vec2> {
+			inline static auto get(const glm::vec2& t) {
+				return t.y;
+			};
+		};
+
+	} // namespace util
+} // namespace mapbox
+#endif
+
 
 namespace pg
 {
@@ -4246,7 +4268,7 @@ namespace gp {
 	PathsD path_round(path_v* ptr, int ccw, float radius, int num_segments, int ml, int ds)
 	{
 		PathsD r;
-		glm::vec3 k = { 0,radius, ccw };// t->expand[j], t->radius[j], t->ccw[j]	};
+		glm::vec3 k = { 0,radius, ccw };
 
 		auto pt = gp::new_path_node(ptr, k.x, k.y, ptr->angle, ccw, num_segments, ml, ds);
 		if (!pt)return r;
@@ -4255,11 +4277,333 @@ namespace gp {
 		gp::free_path_node(pt);
 		return r;
 	}
+	gpv::PathsD path_round_1(path_v* ptr, int ccw, float radius, int num_segments, int ml, int ds)
+	{
+		PathsD r;
+		glm::vec3 k = { 0,radius, ccw };
+		auto pt = gp::new_path_node(ptr, k.x, k.y, ptr->angle, ccw, num_segments, ml, ds);
+		if (pt);
+		{
+			fv_it fv = { pt };
+			r = fv2pathsd(&fv, num_segments);
+			gp::free_path_node(pt);
+		}
+		return *((gpv::PathsD*)&r);
+	}
+
 
 	//！gp
 }
+namespace gp {
+
+	void p2tri(cmd_plane_t* c, std::vector<std::vector<glm::vec2>>& tr, float z, bool pccw)
+	{
+		using N = uint32_t;
+		std::vector<N> indices = mapbox::earcut<N>(tr);
+		auto length = indices.size();
+		std::vector<glm::vec2> dt;
+		dt.reserve(tr.size() * c->segments);
+		for (auto& it : tr)
+		{
+			for (auto v : it)
+				dt.push_back(v);
+		}
+		if (pccw)
+		{
+			for (size_t i = 0; i < length; i++)
+			{
+				int x = indices[i + 2];
+				int x1 = indices[i + 1];
+				int x2 = indices[i];
+				c->opt->push_back({ dt[x] ,z });
+				c->opt->push_back({ dt[x1] ,z });
+				c->opt->push_back({ dt[x2] ,z });
+				i += 2;
+			}
+		}
+		else {
+			for (size_t i = 0; i < length; i++)
+			{
+				int x = indices[i];
+				int x1 = indices[i + 1];
+				int x2 = indices[i + 2];
+				c->opt->push_back({ dt[x] ,z });
+				c->opt->push_back({ dt[x1] ,z });
+				c->opt->push_back({ dt[x2] ,z });
+				i += 2;
+			}
+		}
+
+	}
 
 
+	class polygon_ct
+	{
+	public:
+		std::vector<PathsD*> _c;
+	public:
+		polygon_ct();
+		~polygon_ct();
+		void make(PathsD* src, bool isin = false);
+		size_t triangulate(cmd_plane_t* c, float z, bool pccw);
+	private:
+
+	};
+
+	polygon_ct::polygon_ct()
+	{
+	}
+
+	polygon_ct::~polygon_ct()
+	{
+		for (auto it : _c)
+		{
+			if (it)
+			{
+				delete it;
+			}
+		}
+		_c.clear();
+	}
+
+	bool in_polygon(const PathD& c, const PathD& src)
+	{
+		int outsideCnt = 0;
+		for (auto& pt : c)
+		{
+			PointInPolygonResult result = PointInPolygon(pt, src);
+			if (result == PointInPolygonResult::IsInside) --outsideCnt;
+			else if (result == PointInPolygonResult::IsOutside) ++outsideCnt;
+			if (outsideCnt > 1) { return false; }
+			else if (outsideCnt < -1) break;
+		}
+		return true;
+	}
+
+	void polygon_ct::make(PathsD* src, bool isin)
+	{
+		std::map<int, std::vector<PathsD*>> mpd;
+		std::vector<PathD> c1;
+		for (auto& it : *src)
+		{
+			// 判断是逆时针
+			bool ccw = IsPositive(it);
+			int a = Area(it);
+			if (a == 0)
+			{
+				continue;
+			}
+			if (isin)
+			{
+				if (a < 0)
+				{
+					auto p = new PathsD();
+					p->push_back(std::move(it));
+					mpd[a].push_back(p);
+				}
+				else
+				{
+					c1.push_back(std::move(it));
+				}
+			}
+			else {
+				if (a > 0)
+				{
+					auto p = new PathsD();
+					p->push_back(std::move(it));
+					mpd[a].push_back(p);
+				}
+				else
+				{
+					c1.push_back(std::move(it));
+				}
+			}
+		}
+		size_t xc = 0;
+		for (auto& it : c1) {
+			for (auto& [k, v] : mpd)
+			{
+				bool isb = false;
+				for (auto ct : v)
+				{
+					if (in_polygon(it, ct->at(0)))//判断包含关系
+					{
+						ct->push_back(it); xc++; isb = true; break;
+					}
+				}
+				if (isb)
+					break;
+			}
+		}
+		for (auto& [k, v] : mpd)
+		{
+			for (auto ct : v)
+			{
+				_c.push_back(ct);
+			}
+		}
+	}
+
+	size_t polygon_ct::triangulate(cmd_plane_t* c, float z, bool pccw)
+	{
+		auto pos = c->opt->size();
+		{
+			print_time a("earcut1");
+			for (auto vt : _c)
+			{
+				std::vector<glm::vec2> nl;
+				std::vector<std::vector<glm::vec2>> tr;
+				std::vector<int> as, cs;
+				for (auto& it : *vt)
+				{
+					nl.clear();
+					// 判断是逆时针
+					bool ccw = IsPositive(it);
+					int a = Area(it);
+					as.push_back(a);
+					cs.push_back(ccw);
+					for (auto& v : it)
+					{
+						nl.push_back({ v.x,v.y });
+					}
+					if (nl[0] != nl[nl.size() - 1])
+						nl.push_back(nl[0]);
+					tr.push_back(nl);
+				}
+				p2tri(c, tr, z, pccw);
+			}
+		}
+		return  c->opt->size() - pos;
+	}
+	// 创建裁剪平面
+	size_t cplane(cmd_plane_t* c, PathsD& subjects, PathsD* clips, PathsD* hole, float z, bool pccw, const glm::ivec2& rev, bool isin)
+	{
+		PathsD	solution = clips ? Difference(subjects, *clips, FillRule::NonZero, 6) : subjects;
+		if (solution.empty())
+		{
+			solution = clips ? Difference(*clips, subjects, FillRule::NonZero, 6) : subjects;
+		}
+		if (hole && hole->size())
+			solution = Difference(solution, *hole, FillRule::NonZero, 6);
+		polygon_ct pct;
+		pct.make(&solution, isin);
+		return pct.triangulate(c, z, pccw);
+	}
+	// 创建孔洞的竖面
+	size_t mkhole_ext(PathsD& hole, cmd_plane_t* c, const glm::vec2& dz, bool pccw)
+	{
+		bool is_round = 0;
+		size_t cn = 0;
+		path_v pv;
+		auto length = hole.size();
+		if (length == 0)return cn;
+		for (size_t i = 0; i < length; i++)
+		{
+			auto it = hole[i];
+			pv.add_lines((glm::dvec2*)it.data(), it.size(), true);
+		}
+		auto pt1 = gp::new_path_node_exp(&pv, 0, 0, c->radius, c->radius_a, c->type, c->rccw.x, c->segments, c->segments_len, c->segments_len, is_round);
+		if (!pt1)return cn;
+
+		gp::fv_it fv = { pt1 };
+		gp::fv_it fv1 = { pt1 };
+		std::vector<glm::vec3> opt;
+		for (size_t x = 0; x < fv.count; x++)
+		{
+			if (*fv.lengths == *fv1.lengths)
+			{
+				for_cvertex_old(fv, fv1, c->segments, opt, dz);
+			}
+		}
+		cn = opt.size();
+		if (pccw) {
+			auto tv = opt.data();
+			for (size_t i = 2; i < cn; i += 3)
+			{
+				std::swap(tv[i], tv[i - 1]);
+			}
+		}
+		if (cn)
+		{
+			auto pos = c->opt->size();
+			c->opt->resize(pos + cn);
+			memcpy(c->opt->data() + pos, opt.data(), cn * sizeof(glm::vec3));
+		}
+		gp::free_path_node(pt1);
+		return cn;
+	}
+	//创建竖面
+	size_t mk_ext(gp::path_node_t* pt1, cmd_plane_t* c, const glm::vec2& dz, bool pccw)
+	{
+		size_t cn = 0;
+		if (!pt1)return cn;
+		gp::fv_it fv = { pt1 };
+		gp::fv_it fv1 = { pt1 };
+		std::vector<glm::vec3> opt;
+		for (size_t x = 0; x < fv.count; x++)
+		{
+			if (*fv.lengths == *fv1.lengths)
+			{
+				for_cvertex_old(fv, fv1, c->segments, opt, dz);
+			}
+		}
+		cn = opt.size();
+		if (pccw) {
+			auto tv = opt.data();
+			for (size_t i = 2; i < cn; i += 3)
+			{
+				std::swap(tv[i], tv[i - 1]);
+			}
+		}
+		if (cn)
+		{
+			auto pos = c->opt->size();
+			c->opt->resize(pos + cn);
+			memcpy(c->opt->data() + pos, opt.data(), cn * sizeof(glm::vec3));
+		}
+		return cn;
+	}
+	void D2s64(PathsD& s, Paths64& d) {
+		if (s.size())
+		{
+			d.resize(s.size());
+			size_t i = 0;
+			for (auto& it : s) {
+				auto& vt = d[i]; i++;
+				vt.resize(it.size());
+				auto n = it.size();
+				for (size_t x = 0; x < n; x++)
+				{
+					vt[x] = { it[x].x,it[x].y };
+				}
+			}
+		}
+	}
+	// 判断距离多边形
+	bool nb_poly(std::vector<std::vector<glm::vec2>>& p, const glm::vec2& pt, float ds, size_t& nk) {
+		int n = 0;
+		nk = -1;
+		for (auto& it : p)
+		{
+			auto length = it.size();
+			for (size_t i = 1; i < length; i++)
+			{
+				glm::vec2 c = glm::mix(it[i - 1], it[i], 0.5);
+				auto d = glm::distance(pt, c);
+				if (d < ds)
+				{
+					n++;
+				}
+				if (nk > d)
+					nk = d;
+			}
+		}
+		return n == 0;
+
+	}
+
+}
+//! gpv
 path_v::path_v()
 {
 }
@@ -7178,7 +7522,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -7199,7 +7543,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+	}
 
 
 struct path_txf
@@ -11740,7 +12084,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-	}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -11756,7 +12100,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -13661,7 +14005,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -15946,7 +16290,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -16686,7 +17030,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
