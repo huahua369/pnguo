@@ -17812,7 +17812,7 @@ namespace vkr {
 		{
 			io.MouseDelta.x = 0;
 			io.MouseDelta.y = 0;
-			io.MouseWheel = 0;
+			io.wheel = {};
 		}
 
 		// Update Camera
@@ -17896,14 +17896,15 @@ namespace vkr {
 		if (m_activeCamera == 0)
 		{
 			// If nothing has changed, don't calculate an update (we are getting micro changes in view causing bugs)
-			if (!io.MouseWheel && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
+			int wy = io.wheel.y;
+			if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
 			{
 				pitch = io.DeltaTime * 60;
 				return;
 			}
 
 			//  Orbiting
-			distance -= (float)io.MouseWheel / 3.0f;
+			distance -= (float)io.wheel.y / 3.0f;
 			distance = std::max<float>(distance, 0.1f);
 
 			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
@@ -18301,7 +18302,7 @@ void vkdg_cx::update(mouse_state_t* io)
 		{
 			io->MouseDelta.x = 0;
 			io->MouseDelta.y = 0;
-			io->MouseWheel = 0;
+			io->wheel.y = 0;
 		}
 	}
 }

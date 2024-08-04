@@ -186,12 +186,10 @@ struct mouse_state_t
 {
 	float       DeltaTime;
 	glm::vec2   MouseDelta;
-	glm::vec2   MousePos;                       // Mouse position, in pixels. Set to ImVec2(-FLT_MAX, -FLT_MAX) if mouse is unavailable (on another screen, etc.)
-	bool        MouseDown[5];                   // Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Others buttons allows us to track if the mouse is being used by your application + available to user as a convenience via IsMouse** API.
-	float       MouseWheel;                     // Mouse wheel Vertical: 1 unit scrolls about 5 lines text.
-	float       MouseWheelH;                    // Mouse wheel Horizontal. Most users don't have a mouse with an horizontal wheel, may not be filled by all backends.
+	glm::vec2   MousePos;			// Mouse position, in pixels. Set to ImVec2(-FLT_MAX, -FLT_MAX) if mouse is unavailable (on another screen, etc.)
+	bool        MouseDown[5];		// Mouse buttons: 0=left, 1=right, 2=middle + extras (ImGuiMouseButton_COUNT == 5). Dear ImGui mostly uses left and right buttons. Others buttons allows us to track if the mouse is being used by your application + available to user as a convenience via IsMouse** API.
+	glm::vec2   wheel;				// x=Horizontal，y=Vertical: 1 unit scrolls about 5 lines text. 
 	bool        KeysDown[512];
-
 	bool        KeyCtrl;
 	bool        KeyShift;
 	bool        KeyAlt;
