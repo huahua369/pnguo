@@ -677,6 +677,52 @@ namespace gp {
 	int build_plane3(cmd_plane_t* c, float scale, const glm::vec2& z);
 	// 生成竖面，单线
 	int build_plane0(cmd_plane_t* c, const glm::vec2& scale, const glm::vec2& z);
+
+	// 获取细分后的曲线
+	struct pv_st {
+		path_v* v = 0;
+		int count = 0;
+	};
+	pv_st build_plane3_v(cmd_plane_t* c, const glm::vec2& scale, const glm::vec2& z, const std::string& fn, void (*cb)(path_v* pv, int count, const std::string& fn, bool fy));
+
+	// 命令
+	struct dv_cmd_t
+	{
+		glm::vec2 expand;		// 扩展大小
+		glm::ivec2 ccw;			// 圆角顺序
+		glm::vec2 plane_z;		// 面高度
+		glm::vec2 radius;		// 圆角半径大小 
+		glm::ivec2 plane_ccw;	// 面的顺序
+		int plane_type;			// 面类型，1是单路径面，2是双路径面
+		void set_plane1(float expand, bool ccw, float z, float radius, int v_ccw1, int ptype);
+		void set_plane2(float expand, bool ccw, float z, float radius, int v_ccw1);
+	};
+	// 墙
+	struct dv_wall_t
+	{
+		glm::vec2 expand;
+		glm::vec2 height;
+		glm::vec2 r;			// 圆角
+		glm::ivec2 ccw;			// 圆角顺序
+		int plane_ccw = 0;		//0=外墙outer,1=内墙inner
+	};
+	typedef std::vector<dv_cmd_t> vec_cmd;
+	typedef std::vector<dv_wall_t> vec_wall;
+	struct base_mv_t
+	{
+		// 大小，xy宽深度为0则不改，z高度
+		glm::vec3 box_size = { 0, 0, 20 };
+		// 尺寸缩放比例，默认1不缩放
+		glm::vec3 box_scale = { 1.0,1.0,1.0 };
+		// 分段数量
+		int segments = 12;
+		float ds = 1.0;
+		// 轮廓厚度默认1
+		float thickness = 1.0;
+		// 0不倒角, 圆角半径
+		int radius = 0;
+	};
+	glm::vec4 mkcustom(void* njsonptr, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
 }
 
 
@@ -800,20 +846,24 @@ public:
 	void incpos(const glm::vec2& p);
 	void mxfy(double fy);
 	// 曲线序号，段数，输出std::vector<glm::vec2/glm::dvec2>，type=0，1是double
-	int get_flatten(size_t idx, size_t count, int m, void* flatten, int type);
+	//int get_flatten(size_t idx, size_t count, int m, void* flatten, int type);
+	int get_flatten(size_t idx, size_t count, int m, float ml, float ds, std::vector<glm::vec2>* flatten);
 
 	// 获取扩展路径,输出到opt，空则修改自身。顶点数相同，注意自相交
 	int get_expand(float width, path_v* opt);
 
 	// type取{Square=0, Round=1, Miter=2} ，不同width会使顶点数不同
-	int get_expand_flatten(size_t idx, float width, int segments, int type, std::vector<std::vector<glm::vec2>>* ots, std::vector<int>* ccwv);
+	int get_expand_flatten(size_t idx, float width, int segments, float ml, float ds, int type, std::vector<std::vector<glm::vec2>>* ots, std::vector<int>* ccwv);
 	int get_expand_flatten(float width, int segments, int type, std::vector<std::vector<glm::vec2>>* iod);
-
-	int get_expand_flatten2(float expand, float scale, int segments, int type, std::vector<std::vector<glm::vec2>>* ots, bool is_round);
 
 	int get_expand_flatten2(float expand, float scale, int segments, float ml, float ds, int type, std::vector<std::vector<glm::vec2>>* ots, bool is_round, bool is_close = 1);
 
 	int get_expand_flatten3(float expand, float scale, int segments, float ml, float ds, int type, int etype, std::vector<std::vector<glm::vec2>>* ots, bool is_close);
+
+	// 三角化，曲线细分段，是否转置成反面0/1，输出到ms数组
+	int triangulate(int segments, float ml, float ds, bool pccw, std::vector<glm::vec2>* ms);
+	// 获取每条边的中心点拉高z
+	int get_triangulate_center_line(int segments, float ml, float ds, int is_reverse, const glm::vec2& z, std::vector<glm::vec3>* ms);
 
 	bool is_ccw(int idx);
 private:

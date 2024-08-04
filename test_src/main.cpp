@@ -126,7 +126,7 @@ njson& push_btn(const void* str, int cidx, int eid, njson& btn)
 	4     3
 */
 glm::vec2 getbox2t_(std::vector<glm::vec2>& vt, int t)
-{ 
+{
 	glm::vec4 box = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
 	for (auto& it : vt)
 	{
@@ -760,9 +760,23 @@ int main()
 		};
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
+	auto ftc = app->font_ctx;
+	{
+		layout_text_x ltx = {};
+		ltx.set_ctx(ftc);
+		ltx.add_familys(fontn, 0);
+		text_path_t tp = {};
+		auto gsp = ltx.get_shape(0, u8"工", 200, &tp);
+		if (tp.tv.size())
+		{
+
+		}
+	}
 	menu_cx* mc = new menu_cx();	// 菜单管理
 	mc->set_main(form0);
 	mc->add_familys(fontn);
+
+
 	std::vector<std::string> mvs = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
 	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
 	int cidx = 1;
@@ -850,7 +864,7 @@ int main()
 	pl4->visible = false;
 	pl3->visible = false;
 	pl2->visible = false;
-	pl1->visible = false; 
+	pl1->visible = false;
 	//listp->visible = false;
 	{
 		auto p = mainmenu;
@@ -860,11 +874,11 @@ int main()
 		std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
 		p->_lms = { 2,2 };
 		p->fontsize = 16;
-		p->set_size({ form0->get_size().x-1,50 });
-		p->set_pos({});	
+		p->set_size({ form0->get_size().x - 1,50 });
+		p->set_pos({});
 		glm::vec2 cs = { 1500,1600 };
 		auto vs = p->get_size();
-		
+
 		p->set_view(vs, cs);
 		for (auto& it : mvs)
 		{
@@ -873,7 +887,7 @@ int main()
 			cbt->hscroll = {};
 			cbt->rounding = 0;
 			cbt->light = 0.1;
-						
+
 			cbt->click_cb = [=](void* ptr, int clicks)
 				{
 					printf("%s\n", cbt->str.c_str());
