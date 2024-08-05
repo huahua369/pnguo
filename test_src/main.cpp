@@ -786,7 +786,7 @@ int main()
 		gp::tinyface3_idx_t tf3 = {};
 		gp::mesh_mt tf4 = {};			// 四边形
 		gp::mesh_mt tf5 = {};			// 四边形
-		et.count = 0;
+		et.count = 1;
 		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
 		gp::build_line3d({ 1,9,1 }, { 10,1,1 }, { 4,3 }, &et, &tf5);
 		std::vector<mesh_triangle_cx> mv;

@@ -7343,7 +7343,7 @@ namespace gp {
 			glm::vec3 c1 = pos1;
 			c1.y = c1.z + size.y - style->depth;
 			c1.z = style->depth;
-			int ct = (style->count + 1) * 2.0;
+			int ct = (style->count) * 2.0 + 2;
 			double st = glm::pi<double>() / ct;
 			glm::vec3 ce = {};
 			std::vector<glm::vec3>* pv[] = { &vh,&vh0 };
@@ -7390,7 +7390,8 @@ namespace gp {
 		auto& fida = opt->faceIndicesArray;
 		auto& fs = opt->faceSizesArray;
 		fs.reserve(vh.size() + vh0.size());
-		size_t idx = 0;
+		size_t oldidx = dva.size() / 3;
+		size_t idx = dva.size() / 3;
 		if (vh.size() > 1) {
 			auto length = vh.size();
 			for (size_t i = 0; i < length; i++)
@@ -7417,8 +7418,9 @@ namespace gp {
 				idx += 2;
 			}
 		}
-		if (vh0.size() > 100) {
-			idx = dva.size() / 3;
+		auto cidx = dva.size() / 3;
+		if (vh0.size() > 1) {
+			idx = cidx;
 			auto length = vh0.size();
 			for (size_t i = 0; i < length; i++)
 			{
@@ -7444,6 +7446,43 @@ namespace gp {
 				idx += 2;
 			}
 		}
+		// 封闭端面
+		oldidx;
+		cidx;
+		auto cct = vh.size();
+		auto cct0 = vh0.size();
+		//左
+		fida.push_back(oldidx);
+		fida.push_back(cidx);
+		fida.push_back(cidx + 1);
+		fida.push_back(oldidx + 1);
+		fs.push_back(4);
+
+		for (size_t i = 0; i < cct; i++)
+		{
+			fida.push_back(oldidx);
+			fida.push_back(cidx);
+			fida.push_back(oldidx + i * 2);
+			fida.push_back(cidx + i * 2);
+			fs.push_back(4);
+		}
+		//右
+		fida.push_back(oldidx + cidx - 2);
+		fida.push_back(oldidx + cidx - 1);
+		fida.push_back(cidx + cct0 * 2 - 1);
+		fida.push_back(cidx + cct0 * 2 - 2);
+		fs.push_back(4);
+		oldidx++;
+		cidx++;
+		for (size_t i = 0; i < cct; i++)
+		{
+			fida.push_back(oldidx);
+			fida.push_back(cidx + i * 2);
+			fida.push_back(oldidx + i * 2);
+			fida.push_back(cidx);
+			fs.push_back(4);
+		}
+
 	}
 
 
