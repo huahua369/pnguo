@@ -853,11 +853,11 @@ bool do_boolean_single(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boole
 		MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessary
 		boolOpFlags,                           // filter flags which specify the type of output we want
 		// source mesh
-		reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()), reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
-		srcMesh.faceSizesArray.data(), static_cast<uint32_t>(srcMesh.vertexCoordsArray.size() / 3), static_cast<uint32_t>(srcMesh.faceSizesArray.size()),
+		 (srcMesh.vertexCoordsArray.data()), (uint32_t*)(srcMesh.faceIndicesArray.data()),
+		srcMesh.faceSizesArray.data(), (uint32_t)(srcMesh.vertexCoordsArray.size() / 3), (uint32_t)(srcMesh.faceSizesArray.size()),
 		// cut mesh
-		reinterpret_cast<const void*>(cutMesh.vertexCoordsArray.data()), cutMesh.faceIndicesArray.data(), cutMesh.faceSizesArray.data(),
-		static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3), static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
+		 (cutMesh.vertexCoordsArray.data()), cutMesh.faceIndicesArray.data(), cutMesh.faceSizesArray.data(),
+		(uint32_t)(cutMesh.vertexCoordsArray.size() / 3), (uint32_t)(cutMesh.faceSizesArray.size()));
 	if (err != MC_NO_ERROR) {
 		std::cout << "MCUT mcDispatch fails! err=" << err;
 		mcReleaseContext(context);
@@ -905,7 +905,7 @@ bool do_boolean_single(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boole
 		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, numBytes, ccFaceIndices.data(), NULL);
 		std::vector<uint32_t> faceSizes(ccFaceIndices.size() / 3, 3);
 
-		const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
+		const uint32_t ccFaceCount = (uint32_t)(faceSizes.size());
 
 		// Here we show, how to know when connected components, pertain particular boolean operations.
 		McPatchLocation patchLocation = (McPatchLocation)0;
@@ -1177,6 +1177,16 @@ void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_
 	triangle_mesh_to_mcut(*cut_mesh, cutMesh);
 	do_boolean(srcMesh, cutMesh, boolean_opts);
 	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
+	if (!tri_src.empty())
+		dst_mesh.push_back(std::move(tri_src));
+}
+
+void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
+{
+	if (!src_mesh || !cut_mesh)return;
+	McutMesh* srcMesh = (McutMesh*)src_mesh, * cutMesh = (McutMesh*)cut_mesh;
+	do_boolean_single(*srcMesh, *cutMesh, boolean_opts); 
+	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(*srcMesh);
 	if (!tri_src.empty())
 		dst_mesh.push_back(std::move(tri_src));
 }

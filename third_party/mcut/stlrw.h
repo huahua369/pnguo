@@ -65,8 +65,8 @@ public:
 	void load(const std::string& fn);
 	// 判断是二进制/字符串
 	int get_stlFormat(const char* data, int64_t size);
-	// 保存 二进制2/字符串1
-	int save(const std::string& fn, int fmt = 2);
+	// 保存 二进制0/字符串1
+	int save(const std::string& fn, int fmt = 0);
 	int save_ascii(const std::string& fn);
 	int save_binary(const std::string& fn);
 	int save_binary(std::vector<char>& opt);

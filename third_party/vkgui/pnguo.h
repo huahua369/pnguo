@@ -778,6 +778,13 @@ namespace gp {
 		std::vector<glm::ivec3>	indices;	// 只支持三角形
 		std::vector<glm::vec3>	vertices;
 		std::vector<glm::ivec2>	blocks;		// 分块
+	}; 
+	// 多边形
+	struct mesh_mt
+	{ 
+		std::vector<uint32_t> faceSizesArray;
+		std::vector<uint32_t> faceIndicesArray;
+		std::vector<double>   vertexCoordsArray;
 	};
 	struct extrude_t {
 		float depth = 0;		// 深度
@@ -786,7 +793,7 @@ namespace gp {
 		glm::ivec2 type = { 0,1 };	//样式  x.0=v，1=U，2=|_|，y=-1倒过来
 	};
 	// 生成3D扩展线模型
-	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, tinyface3_idx_t* opt);
+	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, mesh_mt* opt);
 
 }
 

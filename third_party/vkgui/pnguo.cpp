@@ -7316,7 +7316,7 @@ namespace gp {
 	};
 	*/
 	// 生成3D扩展线模型 
-	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, tinyface3_idx_t* opt)
+	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, mesh_mt* opt)
 	{
 		std::vector<glm::vec2> ots;
 		auto d = pos2 - pos1;
@@ -7327,7 +7327,7 @@ namespace gp {
 		std::vector<glm::vec3> v = { pos1 + v1,pos1 + v2,  pos2 + v1,pos2 + v2 };
 		auto vz = pos1;
 		vz.z += style->depth * style->type.y;
-		std::vector<glm::vec3> vh,vh0;
+		std::vector<glm::vec3> vh, vh0;
 		switch (style->type.x)
 		{
 		case 0:
@@ -7341,29 +7341,31 @@ namespace gp {
 		{
 			style->depth = size.x * 0.5;
 			glm::vec3 c1 = pos1;
-			c1.y = c1.z;
+			c1.y = c1.z + size.y - style->depth;
 			c1.z = style->depth;
 			int ct = (style->count + 1) * 2.0;
 			double st = glm::pi<double>() / ct;
-			double k = 0;
 			glm::vec3 ce = {};
-			std::vector<glm::vec3>* pv[] = {&vh,&vh0};
-			for (size_t x = 0; x < 2;x++) 
+			std::vector<glm::vec3>* pv[] = { &vh,&vh0 };
+			for (size_t x = 0; x < 2; x++)
 			{
+				double k = 0;
 				auto pvt = pv[x];
-				c1.z += x * style->thickness;
+				c1.z -= x * style->thickness;
 				for (size_t i = 0; i < ct + 1; i++)
 				{
 					ce = get_circle(k, c1);
 					k += st;
 					//ce.z = ce.y;
 					//ce.y = pos1.y;
-					pvt->push_back(ce);
 					if (i == 0) {
 						pvt->push_back(ce);
 					}
+					pvt->push_back(ce);
 				}
+				ce.y = pos1.z;
 				pvt->push_back(ce);
+				pvt[0][0].y = pos1.z;
 			}
 		}
 		break;
@@ -7382,8 +7384,76 @@ namespace gp {
 		default:
 			break;
 		}
-		if (ots.size()) {
+		opt->vertexCoordsArray.reserve((vh.size() + vh0.size()) * 3);
+		opt->faceIndicesArray.reserve((vh.size() + vh0.size()) * 3);
+		auto& dva = opt->vertexCoordsArray;
+		auto& fida = opt->faceIndicesArray;
+		auto& fs = opt->faceSizesArray;
+		fs.reserve(vh.size() + vh0.size());
+		size_t idx = 0;
+		if (vh.size() > 1) {
+			auto length = vh.size();
+			for (size_t i = 1; i < length; i++)
+			{
+				auto it = vh[i - 1];
+				auto it1 = vh[i];
+				it.z = it.y;
+				it.y = pos1.y;
+				it1.z = it1.y;
+				it1.y = pos1.y;
+				dva.push_back(it.x);
+				dva.push_back(it.y);
+				dva.push_back(it.z);
+				dva.push_back(it1.x);
+				dva.push_back(it1.y);
+				dva.push_back(it1.z);
+				it += d;
+				dva.push_back(it.x);
+				dva.push_back(it.y);
+				dva.push_back(it.z);
+				it1 += d;
+				dva.push_back(it1.x);
+				dva.push_back(it1.y);
+				dva.push_back(it1.z);
 
+				fida.push_back(idx);
+				fida.push_back(idx + 2);
+				fida.push_back(idx + 3);
+				fida.push_back(idx + 1);
+				fs.push_back(4);
+			}
+		}
+		if (vh0.size() == 1) {
+			auto length = vh0.size();
+			for (size_t i = 1; i < length; i++)
+			{
+				auto it = vh[i - 1];
+				auto it1 = vh[i];
+				it.z = it.y;
+				it.y = pos1.y;
+				it1.z = it1.y;
+				it1.y = pos1.y;
+				dva.push_back(it.x);
+				dva.push_back(it.y);
+				dva.push_back(it.z);
+				dva.push_back(it1.x);
+				dva.push_back(it1.y);
+				dva.push_back(it1.z);
+				it += d;
+				dva.push_back(it.x);
+				dva.push_back(it.y);
+				dva.push_back(it.z);
+				it1 += d;
+				dva.push_back(it1.x);
+				dva.push_back(it1.y);
+				dva.push_back(it1.z);
+
+				fida.push_back(idx);
+				fida.push_back(idx + 1);
+				fida.push_back(idx + 3);
+				fida.push_back(idx + 2);
+				fs.push_back(4);
+			}
 		}
 	}
 

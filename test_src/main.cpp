@@ -751,8 +751,8 @@ int main()
 	}
 	form0->up_cb = [=](float delta, int* ret)
 		{
-			vkd->update(form0->io);
-			vkd->on_render();
+			//vkd->update(form0->io);
+			//vkd->on_render();
 			bool ks = false;
 			if (ks) {
 				vkd->save_fbo(0);
@@ -763,7 +763,6 @@ int main()
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto ftc = app->font_ctx;
 	do {
-		gp::tinyface3_idx_t tf3 = {};
 		auto 变 = ftc;
 		layout_text_x ltx = {};
 		ltx.set_ctx(ftc);
@@ -784,8 +783,23 @@ int main()
 			sc.save(fn, 0);
 		}
 		gp::extrude_t et = { 3,6,1,{1,1} };
-		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf3);
-		//gp::constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>*paths, std::vector<glm::vec3>&ms, bool rccw, bool pccw)
+		gp::tinyface3_idx_t tf3 = {};
+		gp::mesh_mt tf4 = {};			// 四边形
+		gp::mesh_mt tf5 = {};			// 四边形
+		et.count = 0;
+		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
+		gp::build_line3d({ 1,2,0 }, { 10,1,0 }, { 6,5 }, &et, &tf5);
+		std::vector<mesh_triangle_cx> mv;
+		make_boolean(&tf4, &tf5, mv, flags_b::A_NOT_B);
+
+		if (mv.size())
+		{
+			for (int i = 0; i < mv.size(); i++) {
+				auto& it = mv[i];
+				std::string fn = "temp/test_boolean" + std::to_string(i) + ".stl";
+				mesh_save_stl(&it, fn.c_str());
+			}
+		}
 
 	} while (0);
 	menu_cx* mc = new menu_cx();	// 菜单管理
