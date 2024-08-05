@@ -788,9 +788,9 @@ int main()
 		gp::mesh_mt tf5 = {};			// 四边形
 		et.count = 0;
 		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
-		gp::build_line3d({ 1,2,0 }, { 10,1,0 }, { 6,5 }, &et, &tf5);
+		gp::build_line3d({ 1,9,1 }, { 10,1,1 }, { 4,3 }, &et, &tf5);
 		std::vector<mesh_triangle_cx> mv;
-		make_boolean(&tf4, &tf5, mv, flags_b::A_NOT_B);
+		make_boolean(&tf4, &tf5, mv, flags_b::INTERSECTION);
 
 		if (mv.size())
 		{

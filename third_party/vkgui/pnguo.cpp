@@ -7393,66 +7393,55 @@ namespace gp {
 		size_t idx = 0;
 		if (vh.size() > 1) {
 			auto length = vh.size();
-			for (size_t i = 1; i < length; i++)
+			for (size_t i = 0; i < length; i++)
 			{
-				auto it = vh[i - 1];
-				auto it1 = vh[i];
+				auto it = vh[i];
 				it.z = it.y;
 				it.y = pos1.y;
-				it1.z = it1.y;
-				it1.y = pos1.y;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
-				dva.push_back(it1.x);
-				dva.push_back(it1.y);
-				dva.push_back(it1.z);
 				it += d;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
-				it1 += d;
-				dva.push_back(it1.x);
-				dva.push_back(it1.y);
-				dva.push_back(it1.z);
 
+			}
+			for (size_t i = 1; i < length; i++)
+			{
 				fida.push_back(idx);
-				fida.push_back(idx + 2);
-				fida.push_back(idx + 3);
 				fida.push_back(idx + 1);
+				fida.push_back(idx + 3);
+				fida.push_back(idx + 2);
 				fs.push_back(4);
+				idx += 2;
 			}
 		}
-		if (vh0.size() == 1) {
+		if (vh0.size() > 100) {
+			idx = dva.size() / 3;
 			auto length = vh0.size();
-			for (size_t i = 1; i < length; i++)
+			for (size_t i = 0; i < length; i++)
 			{
-				auto it = vh[i - 1];
-				auto it1 = vh[i];
+				auto it = vh0[i];
 				it.z = it.y;
 				it.y = pos1.y;
-				it1.z = it1.y;
-				it1.y = pos1.y;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
-				dva.push_back(it1.x);
-				dva.push_back(it1.y);
-				dva.push_back(it1.z);
 				it += d;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
-				it1 += d;
-				dva.push_back(it1.x);
-				dva.push_back(it1.y);
-				dva.push_back(it1.z);
 
+			}
+			for (size_t i = 1; i < length; i++)
+			{
 				fida.push_back(idx);
-				fida.push_back(idx + 1);
-				fida.push_back(idx + 3);
 				fida.push_back(idx + 2);
+				fida.push_back(idx + 3);
+				fida.push_back(idx + 1);
 				fs.push_back(4);
+				idx += 2;
 			}
 		}
 	}
