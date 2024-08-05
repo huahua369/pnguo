@@ -763,6 +763,7 @@ int main()
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto ftc = app->font_ctx;
 	do {
+		auto 变 = ftc;
 		layout_text_x ltx = {};
 		ltx.set_ctx(ftc);
 		ltx.add_familys(fontn, 0);
@@ -772,7 +773,8 @@ int main()
 		if (tp.tv.empty())break;
 		path_v pv;
 		pv.set_data(&tp.tv[0]);
-		pv.triangulate(8, 1, 2, 0, &ms);
+		glm::dvec2 ad;
+		pv.triangulate(8, 1, 1, 0, &ms);
 		if (ms.size())
 		{
 			stl3d_cx sc;

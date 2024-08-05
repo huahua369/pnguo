@@ -6258,7 +6258,7 @@ namespace gp {
 	}
 	void delaunay_triangulation_pt(glm::vec2* pt, int n, double tolerance, std::vector<glm::vec3>* msp, bool pccw)
 	{
-		if (!pt || !n)return;	
+		if (!pt || !n)return;
 		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
 		std::vector<vec2> v3;
 		std::vector<cdt::edge_t> cc_face_edges;
@@ -6288,13 +6288,13 @@ namespace gp {
 			auto t2 = cdt.vertices[t[0]];
 			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
 			t2 = cdt.vertices[t[1]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(),0));
+			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
 			t2 = cdt.vertices[t[2]];
 			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
 		}
 	}
 
-	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw, double z)
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z)
 	{
 		if (!paths || paths->empty())return;
 		// allocate triangulator
@@ -6322,15 +6322,78 @@ namespace gp {
 		if (!cdt::check_topology(cdt)) { return; }
 		if (cdt.triangles.empty()) { return; }
 		ms.reserve(ms.size() + cdt.triangles.size() * 3);
-		for (auto& it : cdt.triangles) {
-			auto& t = it.vertices;
-			auto t2 = cdt.vertices[t[0]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-			t2 = cdt.vertices[t[1]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-			t2 = cdt.vertices[t[2]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+		if (pccw)
+		{
+			for (auto& it : cdt.triangles) {
+				auto& t = it.vertices;
+				auto t2 = cdt.vertices[t[2]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+				t2 = cdt.vertices[t[1]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+				t2 = cdt.vertices[t[0]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+			}
 		}
+		else
+		{
+			for (auto& it : cdt.triangles) {
+				auto& t = it.vertices;
+				auto t2 = cdt.vertices[t[0]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+				t2 = cdt.vertices[t[1]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+				t2 = cdt.vertices[t[2]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+			}
+		}
+	}
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& vd, std::vector<glm::ivec3>& idxs, bool pccw, double z)
+	{
+		if (!paths || paths->empty())return;
+		// allocate triangulator
+		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+		std::vector<vec2> v3;
+		std::vector<cdt::edge_t> cc_face_edges;
+		for (auto& it : *paths)
+		{
+			int cct = it.size();
+			cc_face_edges.reserve(cct + cc_face_edges.size());
+			auto ss = v3.size();
+			for (uint32_t i = 0; i < cct; ++i) {
+				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+			}
+			auto& ps = it;
+			v3.reserve(cct + v3.size());
+			for (size_t i = 0; i < ps.size(); i++)
+			{
+				v3.push_back({ ps[i].x, ps[i].y });
+			}
+		}
+		cdt.insert_vertices(v3);
+		cdt.insert_edges(cc_face_edges);
+		cdt.erase_outer_triangles_and_holes();
+		if (!cdt::check_topology(cdt)) { return; }
+		if (cdt.triangles.empty()) { return; }
+		vd.resize(cdt.vertices.size());
+		size_t x = 0;
+		for (auto& it : cdt.vertices) {
+			vd[x++] = { it.x(),it.y(),z };
+		}
+		idxs.resize(cdt.triangles.size());
+		x = 0;
+		if (pccw)
+		{
+			for (auto& it : cdt.triangles) {
+				idxs[x++] = { it.vertices[2],it.vertices[1], it.vertices[0] };
+			}
+		}
+		else
+		{
+			for (auto& it : cdt.triangles) {
+				idxs[x++] = { it.vertices[0],it.vertices[1],it.vertices[2] };
+			}
+		}
+
 	}
 
 
@@ -6881,41 +6944,288 @@ namespace gp {
 		this->plane_ccw[1] = v_ccw1;
 	}
 
-	glm::vec4 mkcustom(void* nptr, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount)
+	struct closed_ta
 	{
-		njson& n = *((njson*)nptr);
-		glm::vec4 v4 = {};
-		auto m = toInt(n["m"], 20);
-		auto ct = toInt(n["ct"], 0);
-		std::vector<glm::vec2> v, v1;
-		do {
-			get_v2s(n, "v", v);
-			get_v2s(n, "v1", v1);
-			std::vector<glm::vec2> bs, bs1;
-			mkspline(v, ct, m, bs);
-			mkspline(v1, ct, m, bs1);
-			if (bs.empty())
+		int type = 0;		// 0为顶，1为底
+		// 封闭厚度
+		float thickness = 0;
+		// 台阶 宽、高、厚度、方向(0=上平，1下平)
+		glm::vec4 step = {};
+	};
+	struct step_info_t
+	{
+		float pos = 0;			//坐标
+		float expand = 0;		//全局偏移
+		float radius = 0;		//圆角
+		float thickness = 1.0;	// 墙厚
+		float k = 0;			// 补高
+		float expand0 = 0;		//全局内偏移
+		cmd_plane_t* c = 0;		//输出
+	};
+	template<class T2>
+	void swapv2max(T2& v)
+	{
+		if (v.x < v.y)
+		{
+			std::swap(v.x, v.y);
+		}
+	}
+
+	glm::vec2 add_footstep(int dir, glm::vec3 v, glm::vec2 w, glm::vec2 r, float all_expand, cmd_plane_t* c)
+	{
+		glm::vec2 dz[2];
+		float y = v.y;
+		float z = v.z;
+		if (dir == 0)
+		{
+			dz[0] = { z + y, z + y };
+			dz[1] = { 0 + y, z + y };
+		}
+		else {
+			dz[0] = { z + y,  y };
+			dz[1] = { y,  y };
+		}
+		if (r.x > 0 && r.y < 0)
+		{
+			r.y = r.x * 2.0;
+		}
+		// 台阶 
+		dv_cmd_t a = {};
+		a.set_plane1(w.x + all_expand, true, dz[0].x, r.x, 0, 2);
+		a.set_plane2(w.y + all_expand, true, dz[0].y, r.y, 0);
+		if (a.plane_z.x != a.plane_z.y || a.expand.x != a.expand.y)
+		{
+			auto c1 = *c;
+			c = &c1;
+			c->radius = r.x;
+			c->rccw = { 1,1 };
+			c->pccw = 0;
+			build_plane3(c, a.expand, a.plane_z);
+		}
+		a = {};
+		a.set_plane1(w.x + all_expand, true, dz[1].x, r.x, 1, 2);
+		a.set_plane2(w.y + all_expand, true, dz[1].y, r.y, 1);
+		if (a.plane_z.x != a.plane_z.y || a.expand.x != a.expand.y)
+		{
+			auto c1 = *c;
+			c = &c1;
+			c->radius = r.x;
+			c->rccw = { 1,1 };
+			c->pccw = 1;
+			build_plane3(c, a.expand, a.plane_z);
+		}
+		a = {};
+		// 外墙
+		dv_wall_t wt = {};
+		wt.height = { dz[0].x ,dz[1].x };
+		return wt.height;
+	}
+
+	void new_step(closed_t* ct, step_info_t* p)
+	{
+		auto c = p->c;
+		float r = p->radius;
+		float innerexp = -p->thickness;// 内壁收缩值
+		glm::vec3 v1 = ct->step, v2 = ct->step;
+		glm::vec2 pos = { p->pos,p->pos };
+		glm::vec2 height = {  };
+		glm::vec2 height1 = {  };
+		glm::vec2 height2 = {  };
+		glm::vec2 n2 = {  };
+		float expand = p->expand;
+		float expand0 = p->expand0 + innerexp;
+		int pc = 0;
+		if (p->k < 0)
+			p->k = 0;
+		// 墙面
+		if (ct->step.x > 0)
+		{
+			switch (ct->type)
 			{
+			case 0:
+				pos += v1.y + v1.z + p->k;
+				v2.y = p->pos + p->k;
+				height1.y = p->pos + v1.z + p->k;
+				height2.x = p->pos + p->k;
+				height2.y = p->pos;
+				break;
+			case 1:
+				pos -= v1.y + v1.z + p->k;
+				v2.y = p->pos - (p->k + v1.z);
+				height1.y = p->pos - (v1.z + p->k);
+				height2.x = p->pos - p->k;
+				height2.y = p->pos;
+				break;
+			default:
 				break;
 			}
+			height = { pos.x, p->pos };
+			height1.x = pos.x;
+			swapv2max(height);
+			swapv2max(height1);
+			swapv2max(height2);
+			c->pccw = ct->type;
+			c->rccw = { 0,1 };
+			build_plane3(c, { expand,expand0 }, pos);
+			n2 = add_footstep(ct->step.w, v2, { expand0 ,expand0 - ct->step.x }, { r ,r }, 0, c);
+
+		}
+		else
+		{
+			glm::ivec2 pccw = { 0,1 };
+			switch (ct->type)
+			{
+			case 0:
+				pos += ct->thickness + p->k;
+				pos.y -= ct->thickness;
+				height2.x = p->pos + p->k;
+				height2.y = p->pos;
+				break;
+			case 1:
+				pos -= ct->thickness + p->k;
+				pos.y += ct->thickness;
+				height2.x = p->pos - p->k;
+				height2.y = p->pos;
+				pccw = { 1,0 };
+				pc = 1;
+				break;
+			default:
+				break;
+			}
+			height = { pos.x, p->pos };
+			if (ct->thickness > 0)
+			{
+				c->pccw = pccw.x;
+				c->rccw = { 0,0 };
+				build_plane1(c, 0, expand, pos.x);//外面			
+				c->pccw = pccw.y;
+				c->rccw = { 1,1 };
+				build_plane1(c, 0, expand0, pos.y);//内面
+			}
+			else {
+				c->pccw = ct->type;
+				c->rccw = { 0,1 }; pos.y = pos.x;
+				build_plane3(c, { expand,expand0 }, pos);
+			}
+			swapv2max(height);
+		}
+		//外墙
+		c->pccw = 1;
+		c->rccw = { 0,0 };
+		if (height.x != height.y)
+			build_plane3(c, expand, height);
+		c->rccw = { 1,1 };
+		c->pccw = pc;
+		//内墙
+		if (height1.x != height1.y)
+			build_plane3(c, expand0, height1);
+		if ((height2.x != height2.y))
+			build_plane3(c, expand0, height2);
+
+	}
+
+	glm::vec4 get_step(const njson& v, double d = 0)
+	{
+		glm::vec4 rv = { d, d, d, d };
+		if (v.is_number())
+		{
+			rv.z = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			if (v.size() == 4)
+			{
+				for (size_t i = 0; i < 4; i++)
+				{
+					rv[i] = v[i].get<double>();
+				}
+			}
+			else
+			{
+				rv.z = v[0].get<double>();
+			}
+		}
+		return rv;
+	}
+	void mkstep(base_mv_t& bmt, mkcustom_dt* n, glm::vec2 pos, glm::vec2 k, cmd_plane_t* c)
+	{
+		closed_t clt = {};
+		auto se2 = n->step_expand;
+		auto se20 = n->step_expand0;
+		float tt = 0, tt1 = 0;
+		if (n->step.x < 0) {
+			clt.type = 0;
+			auto v4 = n->step;
+			if ((v4.y + v4.z + v4.w) > 1)
+			{
+				clt.step = v4;
+				tt = clt.step.y;
+			}
+			else {
+				clt.thickness = v4.x;
+				tt = clt.thickness;
+
+			}
+			// 顶 
+			step_info_t sp = {};
+			sp.c = c;
+			sp.radius = bmt.radius;
+			sp.thickness = bmt.thickness;
+			sp.k = k.x;
+			sp.pos = pos.x;
+			sp.expand = se2.x;
+			sp.expand0 = se20.x;
+			new_step(&clt, &sp);
+		}
+		clt = {};
+		if (n->step1.y < 0) {
+			clt.type = 1;
+			auto v4 = n->step1;
+			if ((v4.y + v4.z + v4.w) > 1)
+			{
+				clt.step = v4;
+				tt1 = clt.step.y;
+			}
+			else {
+				clt.thickness = v4.x;
+				tt1 = clt.thickness;
+			}
+			// 底 
+			step_info_t sp = {};
+			sp.c = c;
+			sp.radius = bmt.radius;
+			sp.thickness = bmt.thickness;
+			sp.k = k.y;
+			sp.pos = pos.y;
+			sp.expand = se2.y;
+			sp.expand0 = se20.y;
+			new_step(&clt, &sp);
+		}
+	}
+	// 生成B样条线约束的竖三角面
+	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount)
+	{
+		glm::vec4 v4 = {};
+		do {
+			std::vector<glm::vec2> bs, bs1;
+			mkspline(np->v, np->ct, np->m, bs);		// v外壁
+			mkspline(np->v1, np->ct, np->m, bs1);	// v1内壁
+			if (bs.empty()) { break; }
 			glm::vec2 sth = { bm.box_size.z,0 };
 			std::vector<glm::vec2> sw;
 			{
 				vec_wall wv0, wv1;
-				v = {};
 				float thickness = bm.thickness;
 				c->radius = bm.radius;
-				c->pccw = 1;//生成外面
+				c->pccw = 1;//生成外壁面
 				c->rccw = { 0,0 };
 				auto bsc = bs.size();
 				auto pt = bs.data();
 				bsc--;
-
 				glm::vec2 tk = {};
 				glm::vec2 mmin = glm::vec2(INT_MAX, INT_MAX);
 				glm::vec2 mmax = glm::vec2(-INT_MAX, -INT_MAX);
 				auto uc = bcount;
-				//c->is_expand = 1;
 				for (size_t i = 0; i < bsc; i++, pt++)
 				{
 					auto pt1 = pt + 1;
@@ -6924,14 +7234,14 @@ namespace gp {
 					gbx(v, mmin, mmax);
 					gbx(*pt1, mmin, mmax);
 					tk = { pt->x,pt1->x };
-					build_plane3(c, tk, { pt->y,pt1->y });
+					build_plane3(c, tk, { pt->y, pt1->y }); // 生成一圈三角形
 				}
 				sw.push_back(bs[0]);
 				sw.push_back(*bs.rbegin());
 				v4 = { mmin,mmax };
 				glm::vec2 nh = { v4.w ,v4.y };
 				sth = nh;
-				c->pccw = 0;//生成内面
+				c->pccw = 0;//生成内壁面
 				c->rccw = { 1,1 };
 				if (bs1.empty())
 				{
@@ -6942,7 +7252,6 @@ namespace gp {
 					bsc = bs1.size(); bsc--;
 				}
 				auto pt0 = pt;
-				//c->is_expand = true;
 				float yy = 0;
 				for (size_t i = 0; i < bsc; i++, pt++)
 				{
@@ -6955,47 +7264,41 @@ namespace gp {
 				bt.x -= thickness;
 				sw.push_back(bt);
 				bt = { tk.y,0 };
-				//bt.x -= thickness;
 				sw.push_back(bt);
-				//c->is_expand = false;
 			}
 
-			std::vector<float> vs = get_vs(n, "step2");
+			glm::vec2 vs = np->step2;
 			int kc = 0;
 			auto ctk = c->thickness;
 
-			vs.resize(2);
-			if (n.find("step") != n.end())
+			if (np->step.x >= 0)
 			{
-				auto vst = get_vs(n, "step");
-				if (vst.size() == 1 && vst[0] == 0)
+				auto vst = np->step;
+				if (vst.y == 0 && vst[0] == 0)
 				{
 					vs[0] = 1;
 				}
 			}
-			if (n.find("step1") != n.end())
+			if (np->step1.x >= 0)
 			{
-				auto vst = get_vs(n, "step1");
-				if (vst.size() == 1 && vst[0] == 0)
+				auto vst = np->step1;
+				if (vst.y == 0 && vst[0] == 0)
 				{
 					vs[1] = 1;
 				}
 			}
 			glm::vec2 tk1 = { sw[0].x,sw[2].x };
 			glm::vec2 tk2 = { sw[1].x,sw[3].x };
-			n["step_expand"] = { tk1.x,tk2.x };
-			n["step_expand0"] = { tk1.y + ctk,tk2.y + ctk };
-			if (vs.size() > 0) {
+			np->step_expand = { tk1.x,tk2.x };
+			np->step_expand0 = { tk1.y + ctk,tk2.y + ctk };
+			{
 				if (vs[0] == 1)
 				{
 					c->pccw = 0;//生成端面 上
 					c->rccw = { 0,1 };
 					c->thickness = 0;
 					build_plane3(c, { tk1.x, tk1.y }, { sw[0].y ,sw[0].y });
-					if (n.find("step") != n.end())
-					{
-						n.erase("step");
-					}
+					np->step.x = -1;
 				}
 				if (vs[1] == 1)
 				{
@@ -7003,13 +7306,12 @@ namespace gp {
 					c->rccw = { 0,1 };
 					c->thickness = 0;
 					build_plane3(c, { tk2.x, tk2.y }, { sw[1].y ,sw[1].y });
-					if (n.find("step1") != n.end())
-					{
-						n.erase("step1");
-					}
+					np->step1.x = -1;
 				}
 				kc++;
 			}
+			c->thickness = ctk;
+			mkstep(bm, np, sth, k, c);
 		} while (0);
 		return v4;
 	}
@@ -8137,8 +8439,6 @@ int path_v::get_expand_flatten2(float expand, float scale, int segments, float m
 			}
 			// 判断是逆时针
 			bool ccw = IsPositive(pv);
-			//if (ccwv)
-			//	ccwv->push_back(ccw);
 			pd.push_back(std::move(pv));
 		}
 	}
@@ -8309,7 +8609,6 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	if (!p)return 0;
 	auto& ms = *p;
 	auto pos = ms.size();
-#if 1
 	auto pt = gp::new_path_node(this, 0, 0, 0, 0, segments, ml, ds);
 	std::vector<std::vector<glm::vec2>>  tr;
 	std::vector<glm::vec2>  tv1;
@@ -8323,15 +8622,13 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 		fv.inc(n);
 		tr.push_back(tv1);
 	}
-	bool rccw = false;
 	std::vector<glm::vec3> ms3;
-	gp::constrained_delaunay_triangulation_v(&tr, ms3, rccw, pccw);
+	gp::constrained_delaunay_triangulation_v(&tr, ms3, pccw);
 
 	for (auto& it : ms3)
 		ms.push_back(it);
 	gp::free_path_node(pt);
-#else
-	gs::geos_polygons2triangula(this, 0, segments, ms);
+#if 0
 	// 反向三角形
 	if (is_reverse)
 	{
@@ -8340,6 +8637,8 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 #endif
 	return ms.size() - pos;
 }
+
+
 int path_v::get_triangulate_center_line(int segments, float ml, float ds, int is_reverse, const glm::vec2& z2, std::vector<glm::vec3>* ms)
 {
 	std::vector<glm::vec2> pv, pdt;
@@ -9877,7 +10176,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			}
 			mt = *t;
 			cairo_move_to(cr, t->x, t->y);
-		}break;
+			}break;
 		case vte_e::e_vline:
 		{
 			cairo_line_to(cr, t->x, t->y);
@@ -9907,7 +10206,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
 			//	C3 = Q2
 			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
-		}break;
+			}break;
 		case vte_e::e_vcubic:
 		{
 			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
@@ -9941,7 +10240,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+		}
 
 
 struct path_txf
@@ -14498,7 +14797,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -15004,8 +15303,8 @@ public:
 #endif
 			}
 
+			}
 		}
-	}
 	void destroy_all_dec()
 	{
 		//LOCK_W(_sbit_lock);
@@ -15014,7 +15313,7 @@ public:
 		_dec_table.clear();
 	}
 
-};
+	};
 int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
 {
 	int ret = 0;

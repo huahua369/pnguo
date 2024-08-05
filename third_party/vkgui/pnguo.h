@@ -679,7 +679,7 @@ namespace gp {
 	};
 
 	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten);
-	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw, double z = 0.0);
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z = 0.0);
 
 	// 单线面，先扩展后比例
 	int build_plane1(cmd_plane_t* c, float expand, float scale, float z);
@@ -725,6 +725,29 @@ namespace gp {
 	};
 	typedef std::vector<dv_cmd_t> vec_cmd;
 	typedef std::vector<dv_wall_t> vec_wall;
+	// 上下封闭输入结构
+	struct closed_t
+	{
+		int type = 0;		// 0为顶，1为底
+		// 封闭厚度
+		float thickness = 0;
+		// 台阶 宽、高、厚度、方向(0=上平，1下平)
+		glm::vec4 step = {};
+	};
+	struct mkcustom_dt
+	{
+		// 壁曲线参数
+		int m = 20;
+		int ct = 0;
+		std::vector<glm::vec2> v, v1;
+
+		// 台阶参数
+		glm::vec2 step_expand = {};
+		glm::vec2 step_expand0 = {}; 
+		glm::vec4 step = {};				// 上台阶, 端面厚度x，-1则无封面。4个参数则台阶
+		glm::vec4 step1 = {};				// 下台阶
+		glm::vec2 step2 = {};
+	};
 	struct base_mv_t
 	{
 		// 大小，xy宽深度为0则不改，z高度
@@ -739,7 +762,7 @@ namespace gp {
 		// 0不倒角, 圆角半径
 		int radius = 0;
 	};
-	glm::vec4 mkcustom(void* njsonptr, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
+	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
 
 }
 
