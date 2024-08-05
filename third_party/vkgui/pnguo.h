@@ -778,13 +778,16 @@ namespace gp {
 		std::vector<glm::ivec3>	indices;	// 只支持三角形
 		std::vector<glm::vec3>	vertices;
 		std::vector<glm::ivec2>	blocks;		// 分块
-	}; 
+	};
 	// 多边形
 	struct mesh_mt
-	{ 
+	{
 		std::vector<uint32_t> faceSizesArray;
 		std::vector<uint32_t> faceIndicesArray;
 		std::vector<double>   vertexCoordsArray;
+	public:
+		void add_vertex(const glm::dvec3* v, size_t n);
+		void add_vertex(const glm::vec3* v, size_t n);
 	};
 	struct extrude_t {
 		float depth = 0;		// 深度

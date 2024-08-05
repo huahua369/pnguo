@@ -853,10 +853,10 @@ bool do_boolean_single(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boole
 		MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessary
 		boolOpFlags,                           // filter flags which specify the type of output we want
 		// source mesh
-		 (srcMesh.vertexCoordsArray.data()), (uint32_t*)(srcMesh.faceIndicesArray.data()),
+		(srcMesh.vertexCoordsArray.data()), (uint32_t*)(srcMesh.faceIndicesArray.data()),
 		srcMesh.faceSizesArray.data(), (uint32_t)(srcMesh.vertexCoordsArray.size() / 3), (uint32_t)(srcMesh.faceSizesArray.size()),
 		// cut mesh
-		 (cutMesh.vertexCoordsArray.data()), cutMesh.faceIndicesArray.data(), cutMesh.faceSizesArray.data(),
+		(cutMesh.vertexCoordsArray.data()), cutMesh.faceIndicesArray.data(), cutMesh.faceSizesArray.data(),
 		(uint32_t)(cutMesh.vertexCoordsArray.size() / 3), (uint32_t)(cutMesh.faceSizesArray.size()));
 	if (err != MC_NO_ERROR) {
 		std::cout << "MCUT mcDispatch fails! err=" << err;
@@ -1185,8 +1185,10 @@ void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_t
 {
 	if (!src_mesh || !cut_mesh)return;
 	McutMesh* srcMesh = (McutMesh*)src_mesh, * cutMesh = (McutMesh*)cut_mesh;
-	do_boolean_single(*srcMesh, *cutMesh, boolean_opts); 
-	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(*srcMesh);
-	if (!tri_src.empty())
-		dst_mesh.push_back(std::move(tri_src));
+	if(do_boolean_single(*srcMesh, *cutMesh, boolean_opts))
+	{
+		mesh_triangle_cx tri_src = mcut_to_triangle_mesh(*srcMesh);
+		if (!tri_src.empty())
+			dst_mesh.push_back(std::move(tri_src));
+	}
 }

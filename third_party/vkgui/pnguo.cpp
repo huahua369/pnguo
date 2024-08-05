@@ -7307,6 +7307,34 @@ namespace gp {
 		} while (0);
 		return v4;
 	}
+
+
+
+
+	void mesh_mt::add_vertex(const glm::dvec3* v, size_t n)
+	{
+		if (v && n > 0)
+		{
+			auto ps = vertexCoordsArray.size();
+			vertexCoordsArray.resize(vertexCoordsArray.size() + n * 3);
+			memcpy(vertexCoordsArray.data() + ps, v, sizeof(glm::dvec3) * n);
+		}
+	}
+	void mesh_mt::add_vertex(const glm::vec3* v, size_t n)
+	{
+		if (v && n > 0)
+		{
+			auto ps = vertexCoordsArray.size();
+			vertexCoordsArray.reserve(vertexCoordsArray.size() + n * 3);
+			for (size_t i = 0; i < n; i++)
+			{
+				vertexCoordsArray.push_back(v->x);
+				vertexCoordsArray.push_back(v->y);
+				vertexCoordsArray.push_back(v->z);
+				v++;
+			}
+		}
+	}
 	/*
 		struct extrude_t {
 		float depth = 0;		// 深度
@@ -7419,6 +7447,7 @@ namespace gp {
 			}
 		}
 		auto cidx = dva.size() / 3;
+#if 0
 		if (vh0.size() > 1) {
 			idx = cidx;
 			auto length = vh0.size();
@@ -7446,6 +7475,8 @@ namespace gp {
 				idx += 2;
 			}
 		}
+#endif
+#if 0
 		// 封闭端面
 		oldidx;
 		cidx;
@@ -7482,7 +7513,7 @@ namespace gp {
 			fida.push_back(cidx);
 			fs.push_back(4);
 		}
-
+#endif
 	}
 
 

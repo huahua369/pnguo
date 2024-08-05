@@ -751,8 +751,8 @@ int main()
 	}
 	form0->up_cb = [=](float delta, int* ret)
 		{
-			//vkd->update(form0->io);
-			//vkd->on_render();
+			vkd->update(form0->io);
+			vkd->on_render();
 			bool ks = false;
 			if (ks) {
 				vkd->save_fbo(0);
@@ -790,7 +790,45 @@ int main()
 		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
 		gp::build_line3d({ 1,9,1 }, { 10,1,1 }, { 4,3 }, &et, &tf5);
 		std::vector<mesh_triangle_cx> mv;
-		make_boolean(&tf4, &tf5, mv, flags_b::INTERSECTION);
+		gp::mesh_mt tc4 = {};
+		glm::dvec3 v3[] = {
+			{ -5, -5, 5}, // 0
+			{5, -5, 5 }, // 1
+			{5, 5, 5	}, //2
+			{-5, 5, 5}, //3
+			{-5, -5, -5}, //4
+			{5, -5, -5}, //5
+			{5, 5, -5}, //6
+			{-5, 5, -5 }//7
+		};
+		tc4.add_vertex(v3, 8);
+		tc4.faceIndicesArray = {
+			0, 1, 2, 3, //0
+			7, 6, 5, 4, //1
+			1, 5, 6, 2, //2
+			0, 3, 7, 4, //3
+			3, 2, 6, 7, //4
+			4, 5, 1, 0 //5
+		};
+		tc4.faceSizesArray = { 4, 4, 4, 4, 4, 4 };// 四边形
+		gp::mesh_mt tv4 = {};
+		{
+			glm::dvec3 v3[] = {
+				{  -20, -4, 0}, //0
+				{0, 20, 20}, //1
+				{20, -4, 0}, //2
+				{0, 20, -20}, //3 
+			};
+			tv4.add_vertex(v3, 4);
+			tv4.faceIndicesArray = {
+				 0, 1, 2, //0
+				 0, 2, 3 //1
+			};
+			tv4.faceSizesArray = { 3,3 };// 两个三角面
+		}
+
+
+		make_boolean(&tc4, &tv4, mv, flags_b::INTERSECTION);
 
 		if (mv.size())
 		{

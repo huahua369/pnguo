@@ -17228,8 +17228,8 @@ namespace vkr {
 			submit_info.pSignalSemaphores = &_fbo.sem;	// 完成发信号
 			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
 			assert(res == VK_SUCCESS);
-			//vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			//vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
+		/*	vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);*/
 		}
 		{
 			// Wait for swapchain (we are going to render to it) -----------------------------------
@@ -17881,7 +17881,7 @@ namespace vkr {
 		cam.UpdatePreviousMatrices(); // set previous view matrix
 #if 1
 		yaw = 0;
-		pitch = 0;
+		pitch = 0.0;
 		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
 		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
 		{
@@ -17899,8 +17899,9 @@ namespace vkr {
 			int wy = io.wheel.y;
 			if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
 			{
-				pitch = io.DeltaTime * 60;
-				return;
+				//pitch = io.DeltaTime * 60;
+				yaw = io.DeltaTime * 60;
+				//return;
 			}
 
 			//  Orbiting
