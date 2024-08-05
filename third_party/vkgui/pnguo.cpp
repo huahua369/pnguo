@@ -4630,7 +4630,7 @@ namespace gp {
 		return n == 0;
 
 	}
-	 
+
 
 	// 创建裁剪平面
 	size_t cplane(cmd_plane_t* c, PathsD& subjects, PathsD* clips, PathsD* hole, float z, bool pccw, const glm::ivec2& rev, bool isin);
@@ -6214,103 +6214,123 @@ namespace gp {
 #endif
 
 	// todo delaunay_triangulation
-	void geos_delaunay_triangulation_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>* ms, bool pccw)
+	void delaunay_triangulation_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>& ms, bool pccw)
 	{
 		if (!pt || !n)return;
-#if 0
-		geos_cx gx;
-		auto cp = gx.cs_copyFromBuffer(pt, n);
-		if (cp)
+		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+		std::vector<vec2> v3;
+		std::vector<cdt::edge_t> cc_face_edges;
+		std::vector<float> z;
 		{
-			auto k = gx.geom_createLineString(cp);
-			auto pd = gx.DelaunayTriangulation(k, tolerance, 0);
-			add_mesh(gx, pd, *ms, pccw);
-			gx.geom_destroy(k);
+			int cct = n;
+			cc_face_edges.reserve(cct + cc_face_edges.size());
+			auto ss = v3.size();
+			for (uint32_t i = 0; i < cct; ++i) {
+				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+			}
+			auto& ps = pt;
+			v3.reserve(cct + v3.size());
+			for (size_t i = 0; i < n; i++)
+			{
+				v3.push_back({ ps[i].x, ps[i].y });
+				z.push_back(ps[i].z);
+			}
 		}
-#endif
+		cdt.insert_vertices(v3);
+		cdt.insert_edges(cc_face_edges);
+		cdt.erase_outer_triangles_and_holes();
+		if (!cdt::check_topology(cdt)) { return; }
+		if (cdt.triangles.empty()) { return; }
+		ms.reserve(ms.size() + cdt.triangles.size() * 3);
+		for (auto& it : cdt.triangles) {
+			auto& t = it.vertices;
+			auto t2 = cdt.vertices[t[0]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[0]]));
+			t2 = cdt.vertices[t[1]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[1]]));
+			t2 = cdt.vertices[t[2]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[2]]));
+		}
 	}
-	void geos_delaunay_triangulation_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>& ms, bool pccw)
+	void delaunay_triangulation_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>* ms, bool pccw)
 	{
-		geos_delaunay_triangulation_pt(pt, n, tolerance, &ms, pccw);
+		delaunay_triangulation_pt(pt, n, tolerance, *ms, pccw);
 	}
-	void geos_delaunay_triangulation_pt(glm::vec2* pt, int n, double tolerance, std::vector<glm::vec3>* ms, bool pccw)
+	void delaunay_triangulation_pt(glm::vec2* pt, int n, double tolerance, std::vector<glm::vec3>* msp, bool pccw)
 	{
-		if (!pt || !n)return;
-#if 0
-		geos_cx gx;
-		std::vector<glm::dvec2> buf;
-		auto cp = gx.cs_copyFromBuffer(pt, n);
-		if (cp)
+		if (!pt || !n)return;	
+		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+		std::vector<vec2> v3;
+		std::vector<cdt::edge_t> cc_face_edges;
 		{
-			auto k = gx.geom_createLineString(cp);
-			auto pd = gx.DelaunayTriangulation(k, tolerance, 0);
-			add_mesh(gx, pd, *ms, pccw);
-			gx.geom_destroy(k);
+			int cct = n;
+			cc_face_edges.reserve(cct + cc_face_edges.size());
+			auto ss = v3.size();
+			for (uint32_t i = 0; i < cct; ++i) {
+				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+			}
+			auto& ps = pt;
+			v3.reserve(cct + v3.size());
+			for (size_t i = 0; i < n; i++)
+			{
+				v3.push_back({ ps[i].x, ps[i].y });
+			}
 		}
-#endif
+		cdt.insert_vertices(v3);
+		cdt.insert_edges(cc_face_edges);
+		cdt.erase_outer_triangles_and_holes();
+		if (!cdt::check_topology(cdt)) { return; }
+		if (cdt.triangles.empty()) { return; }
+		auto& ms = *msp;
+		ms.reserve(ms.size() + cdt.triangles.size() * 3);
+		for (auto& it : cdt.triangles) {
+			auto& t = it.vertices;
+			auto t2 = cdt.vertices[t[0]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
+			t2 = cdt.vertices[t[1]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(),0));
+			t2 = cdt.vertices[t[2]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
+		}
 	}
 
-	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw)
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw, double z)
 	{
 		if (!paths || paths->empty())return;
 		// allocate triangulator
 		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
 		std::vector<vec2> v3;
 		std::vector<cdt::edge_t> cc_face_edges;
-		int cc_face_vcount = (*paths)[0].size();
-		for (uint32_t i = 0; i < cc_face_vcount; ++i) {
-			cc_face_edges.push_back(cdt::edge_t(i, (i + 1) % cc_face_vcount));
-		}
-		auto& ps = (*paths)[0];
-		for (size_t i = 0; i < ps.size(); i++)
+		for (auto& it : *paths)
 		{
-			v3[i] = { ps[i].x,ps[i].y };
+			int cct = it.size();
+			cc_face_edges.reserve(cct + cc_face_edges.size());
+			auto ss = v3.size();
+			for (uint32_t i = 0; i < cct; ++i) {
+				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+			}
+			auto& ps = it;
+			v3.reserve(cct + v3.size());
+			for (size_t i = 0; i < ps.size(); i++)
+			{
+				v3.push_back({ ps[i].x, ps[i].y });
+			}
 		}
 		cdt.insert_vertices(v3); // potentially perturbed (if duplicates exist)
 		cdt.insert_edges(cc_face_edges);
-		cdt.erase_outer_triangles(); // do the constrained delaunay triangulation
-
-		if (!cdt::check_topology(cdt)) {
-
-			return; // skip to next face (will leave a hole in the output)
+		cdt.erase_outer_triangles_and_holes(); // do the constrained delaunay triangulation
+		if (!cdt::check_topology(cdt)) { return; }
+		if (cdt.triangles.empty()) { return; }
+		ms.reserve(ms.size() + cdt.triangles.size() * 3);
+		for (auto& it : cdt.triangles) {
+			auto& t = it.vertices;
+			auto t2 = cdt.vertices[t[0]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+			t2 = cdt.vertices[t[1]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+			t2 = cdt.vertices[t[2]];
+			ms.push_back(glm::vec3(t2.x(), t2.y(), z));
 		}
-
-		if (cdt.triangles.empty()) {
-			return; // skip to next face (will leave a hole in the output)
-		}
-
-		//
-		// In the following, we will now save the produce triangles into the
-		// output array "cc_face_triangulation".
-		//
-
-		// number of CDT triangles
-		const uint32_t cc_face_triangle_count = (uint32_t)cdt.triangles.size();
-
-		//
-		// We insert triangles into "cc_face_triangulation" by using a
-		// breadth-first search-like flood-fill strategy to "walk" the
-		// triangles of the CDT. We start from a prescribed triangle next to the
-		// boundary of "cc_face_iter".
-		//
-
-		// map vertices to CDT triangles
-		// Needed for the BFS traversal of triangles
-		std::vector<std::vector<uint32_t>> vertex_to_triangle_map(cc_face_vcount, std::vector<uint32_t>());
-
-		// for each CDT triangle
-		//for (uint32_t i = 0; i < cc_face_triangle_count; ++i) {
-
-		//	const cdt::triangle_t& triangle = SAFE_ACCESS(cdt.triangles, i);
-
-		//	// for each triangle vertex
-		//	for (uint32_t j = 0; j < 3; j++) {
-		//		const uint32_t cdt_vertex_id = SAFE_ACCESS(triangle.vertices, j);
-		//		const uint32_t cc_face_vertex_id = SAFE_ACCESS(face_to_cdt_vmap, cdt_vertex_id);
-		//		std::vector<uint32_t>& incident_triangles = SAFE_ACCESS(vertex_to_triangle_map, cc_face_vertex_id);
-		//		incident_triangles.push_back(i); // save mapping
-		//	}
-		//}
 	}
 
 
@@ -7582,6 +7602,7 @@ void path_v::set_data(const tinypath_t* d) {
 			pd[i].c = pt[i].c;
 			pd[i].c1 = pt[i].c1;
 		}
+		_baseline = d->baseline;
 	}
 }
 
@@ -7800,7 +7821,7 @@ void mkivec_round(std::vector<glm::vec3>& tv1)
 
 
 template<class T>
-void doflatten(T* fp)//path_v::flatten_t* fp)
+void doflatten(T* fp)
 {
 	size_t length = fp->n;
 	auto p = fp->first;
@@ -7994,7 +8015,7 @@ int path_v::get_flatten(size_t idx, size_t count, int m, float ml, float ds, std
 namespace gp {
 	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten)
 	{
-		if (!flatten || p || p->count < 1 || m < 1)return -1;
+		if (!flatten || !p || p->count < 1 || m < 1)return -1;
 		tinyflatten_t fp = {};
 		fp.flatten = flatten;
 		fp.mc = m;
@@ -8315,7 +8336,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	if (is_reverse)
 	{
 		std::reverse(ms.begin() + pos, ms.end());
-}
+	}
 #endif
 	return ms.size() - pos;
 }
@@ -8364,7 +8385,7 @@ int path_v::get_triangulate_center_line(int segments, float ml, float ds, int is
 	}
 	std::vector<glm::vec3> m3;
 	for (auto& it : mtv) {
-		gp::geos_delaunay_triangulation_pt(it.data(), it.size(), 0.0, m3, !is_reverse);
+		gp::delaunay_triangulation_pt(it.data(), it.size(), 0.0, m3, !is_reverse);
 	}
 	if (ms)
 	{
@@ -9899,7 +9920,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-		}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -9920,7 +9941,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-	}
+}
 
 
 struct path_txf
@@ -14461,7 +14482,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -14477,7 +14498,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-	}
+}
 
 void font_t::clear_char_lut()
 {
@@ -16382,7 +16403,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -18667,7 +18688,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -19407,7 +19428,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];

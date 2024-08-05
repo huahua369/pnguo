@@ -5,6 +5,7 @@
 #include <vkgui/tinysdl3.h>
 #include <vkgui/mapView.h>
 #include <vkgui/print_time.h>
+#include <mcut/stlrw.h>
 
 #include <iostream>
 
@@ -761,20 +762,27 @@ int main()
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto ftc = app->font_ctx;
-	{
+	do {
 		layout_text_x ltx = {};
 		ltx.set_ctx(ftc);
 		ltx.add_familys(fontn, 0);
 		text_path_t tp = {};
-		auto gsp = ltx.get_shape(0, u8"测", 200, &tp);
-		if (tp.tv.size())
+		auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
+		std::vector<glm::vec2> ms;
+		if (tp.tv.empty())break;
+		path_v pv;
+		pv.set_data(&tp.tv[0]);
+		pv.triangulate(8, 1, 2, 0, &ms);
+		if (ms.size())
 		{
-
-			//auto hr= get_flatten(&tp.tv[0], 8, 1, 2, std::vector<glm::vec2>*flatten);
-
-			//gp:: constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>*paths, std::vector<glm::vec3>&ms, bool rccw, bool pccw)
+			stl3d_cx sc;
+			sc.add(ms.data(), ms.size()); 
+			auto fn = "temp/cct3.stl";
+			sc.save(fn, 0);
 		}
-	}
+		//gp::constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>*paths, std::vector<glm::vec3>&ms, bool rccw, bool pccw)
+
+	} while (0);
 	menu_cx* mc = new menu_cx();	// 菜单管理
 	mc->set_main(form0);
 	mc->add_familys(fontn);

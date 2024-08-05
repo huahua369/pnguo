@@ -677,9 +677,9 @@ namespace gp {
 		int radius_a = 150;				// 小于角度执行圆角
 		bool is_expand = 0;				// 1扩展（顶点数不一致）、0比例缩放（有自相交问题）
 	};
-	 
+
 	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten);
-	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw);
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool rccw, bool pccw, double z = 0.0);
 
 	// 单线面，先扩展后比例
 	int build_plane1(cmd_plane_t* c, float expand, float scale, float z);
