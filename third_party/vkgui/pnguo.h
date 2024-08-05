@@ -660,6 +660,15 @@ namespace gpv {
 namespace gp {
 	using plane3_t = std::vector<glm::vec3>;
 
+	// 获取圆角弧度a的坐标，圆心x=0,y=0
+	glm::vec2 get_circle(float a, float r);
+	glm::vec3 get_circle(float a, const glm::vec3& c);
+
+	// 输入三点，角点ptr2，输出圆
+	glm::vec3 get_circle3(glm::vec2 pt1, glm::vec2 pt2, glm::vec2 pt3, float radius);
+	// 获取点p到圆的两条切线
+	glm::vec4 gtan(const glm::vec2& P, const glm::vec3& c);
+
 	struct cmd_plane_t
 	{
 		path_v* pv = 0;					// 路径，优先级0
@@ -743,7 +752,7 @@ namespace gp {
 
 		// 台阶参数
 		glm::vec2 step_expand = {};
-		glm::vec2 step_expand0 = {}; 
+		glm::vec2 step_expand0 = {};
 		glm::vec4 step = {};				// 上台阶, 端面厚度x，-1则无封面。4个参数则台阶
 		glm::vec4 step1 = {};				// 下台阶
 		glm::vec2 step2 = {};
@@ -762,7 +771,22 @@ namespace gp {
 		// 0不倒角, 圆角半径
 		int radius = 0;
 	};
+	// 生成B样条线约束的竖三角面
 	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
+	struct tinyface3_idx_t
+	{
+		std::vector<glm::ivec3>	indices;	// 只支持三角形
+		std::vector<glm::vec3>	vertices;
+		std::vector<glm::ivec2>	blocks;		// 分块
+	};
+	struct extrude_t {
+		float depth = 0;		// 深度
+		float count = 5;		// 分辨率
+		float thickness = 1.0;	// 厚度
+		glm::ivec2 type = { 0,1 };	//样式  x.0=v，1=U，2=|_|，y=-1倒过来
+	};
+	// 生成3D扩展线模型
+	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, tinyface3_idx_t* opt);
 
 }
 
@@ -874,12 +898,12 @@ public:
 public:
 	static glm::vec2 rotate_pos(const glm::vec2& pos, const glm::vec2& center, double angle);
 	//向量外积
-	double cross_v2(const glm::vec2& a, const glm::vec2& b);
+	static double cross_v2(const glm::vec2& a, const glm::vec2& b);
 	// 扩展多边形,会有自相交bug，但顶点数相同
-	void expand_polygon(glm::vec2* polygon, int count, float expand, std::vector<glm::vec2>& ots);
+	static void expand_polygon(glm::vec2* polygon, int count, float expand, std::vector<glm::vec2>& ots);
 
 	//type取{Square=0, Round=1, Miter=2}顶数会不同
-	void expand_polygon_c(glm::vec2* polygon, int count, float expand, int type, std::vector<glm::vec2>& ots);
+	static void expand_polygon_c(glm::vec2* polygon, int count, float expand, int type, std::vector<glm::vec2>& ots);
 public:
 	// 获取整体大小
 	glm::vec2 get_size();

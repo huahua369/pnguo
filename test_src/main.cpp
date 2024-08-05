@@ -763,6 +763,7 @@ int main()
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto ftc = app->font_ctx;
 	do {
+		gp::tinyface3_idx_t tf3 = {};
 		auto 变 = ftc;
 		layout_text_x ltx = {};
 		ltx.set_ctx(ftc);
@@ -778,10 +779,12 @@ int main()
 		if (ms.size())
 		{
 			stl3d_cx sc;
-			sc.add(ms.data(), ms.size()); 
+			sc.add(ms.data(), ms.size());
 			auto fn = "temp/cct3.stl";
 			sc.save(fn, 0);
 		}
+		gp::extrude_t et = { 3,6,1,{1,1} };
+		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf3);
 		//gp::constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>*paths, std::vector<glm::vec3>&ms, bool rccw, bool pccw)
 
 	} while (0);

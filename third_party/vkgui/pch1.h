@@ -206,6 +206,14 @@ namespace glm
 	{
 		return { v1.x * v2,v1.y * v2 };
 	}
+	static glm::vec3 operator*(glm::vec3 const& v1, float v2)
+	{
+		return { v1.x * v2, v1.y * v2, v1.z * v2 };
+	}
+	static glm::vec4 operator*(glm::vec4 const& v1, float v2)
+	{
+		return { v1.x * v2, v1.y * v2, v1.z * v2, v1.w * v2 };
+	}
 
 };
 #endif // !GLM_OPERATOR
