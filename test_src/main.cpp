@@ -784,8 +784,10 @@ int main()
 			gp::mesh3_mt tf3 = {};
 			gp::mesh_mt tf4 = {};			// 四边形网络
 			gp::mesh_mt tf5 = {};			// 四边形网络
-			et.count = 6;
+			et.count = 1;
+			et.type.x = 0;
 			gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
+			et.type.x = 2;
 			gp::build_line3d({ 1,9,0.5 }, { 10,1,0.5 }, { 3,3 }, &et, &tf5);
 			std::string fns[] = {
 				"a_not_b",		// 差集a-=b

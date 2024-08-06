@@ -7347,6 +7347,9 @@ namespace gp {
 		}
 	}
 	/*
+	绕x轴旋转180度的四元数为(1, 0, 0, 0)。‌
+	绕y轴旋转180度的四元数为(0, 1, 0, 0)。‌
+	绕z轴旋转180度的四元数为(0, 0, 1, 0)。‌
 		struct extrude_t {
 		float depth = 0;		// 深度
 		float count = 5;		// 分辨率
@@ -7354,6 +7357,63 @@ namespace gp {
 		glm::ivec2 type = {};	//样式  x.0=v，1=U，2=|_|，y=-1倒过来
 	};
 	*/
+	glm::vec3 make_poscb(float a, float r, const glm::vec2& rx, int type)
+	{
+		glm::vec3 ret = {};
+		auto pi = (glm::pi<float>());
+		auto pi2 = (glm::pi<float>() * 0.5);
+		switch (type)
+		{
+		case 0:
+		{
+			// V形
+			ret.x = glm::mix(r, -r, rx.x / rx.y);
+			if (a > pi2)
+				a = pi - a;
+			ret.z = glm::mix(0.0f, r, a / pi2);
+			ret.y = 0;
+		}break;
+		case 1:
+		{
+			ret.x = cos(a) * r; // 半圆
+			ret.z = sin(a) * r;
+			ret.y = 0;
+		}break;
+		case 2:
+		{
+			glm::ivec2 ri = rx;
+			if (ri.x == 0 || ri.x == ri.y)
+			{
+				ret.x = glm::mix(r, -r, rx.x / rx.y);
+				ret.z = 0;
+			}
+			else
+			{
+				// 方形
+				if (a > pi2)
+					a = pi - a;
+				if (ri.x < rx.y * 0.5)
+				{
+					ret.x = r;
+					ret.z = r;
+				}
+				else if (ri.x > rx.y * 0.5)
+				{
+					ret.x = -r;;
+					ret.z = r;
+				}
+				else
+				{
+					ret.x = 0; ret.z = r;
+				}
+			}
+			ret.y = 0;
+		}break;
+		default:
+			break;
+		}
+		return ret;
+	}
 	// 生成3D扩展线模型 
 	void build_line3d(const glm::vec3& p1, const glm::vec3& p2, const glm::ivec2& size, extrude_bevel_t* style, mesh_mt* opt)
 	{
@@ -7373,22 +7433,15 @@ namespace gp {
 		vz.z += style->depth * style->type.y;
 		std::vector<glm::vec3> vh, vh0;
 		glm::quat qt = {}; qt.w = 1;
-		switch (style->type.x)
-		{
-		case 0:
-		{
-			vh.push_back(v[0]);
-			vh.push_back(vz);
-			vh.push_back(v[1]);
-		}
-		break;
-		case 1:
 		{
 			style->depth = size.x * 0.5;
 			glm::vec3 c1 = pos1;
 			c1.y = size.y - style->depth;
 			c1.z = style->depth;
-			int ct = (style->count) * 2.0 + 2;
+			int sct = (style->count);
+			if (style->type.x == 2)
+				sct = 1;
+			int ct = sct * 2.0 + 2;
 			double st = glm::pi<double>() / ct;
 			glm::vec3 ce = {};
 			std::vector<glm::vec3>* pv[] = { &vh,&vh0 };
@@ -7403,14 +7456,12 @@ namespace gp {
 				double k = 0;
 				auto pvt = pv[j];
 				c1.z -= j * style->thickness;
+				glm::vec2 rx = { 0, ct };
 				for (size_t i = 0; i < ct + 1; i++)
 				{
-					float angle = k;
-					float x = cos(angle) * c1.z;
-					float z = sin(angle) * c1.z;
-					float y = 0;
+					rx.x = i;
+					glm::vec3 vcs = make_poscb(k, c1.z, rx, style->type.x);
 					k += st;
-					glm::vec3 vcs = { x,y,z };
 					vcs = qt * vcs;
 					if (i == 0) {
 						vcs.z += yy;
@@ -7431,22 +7482,6 @@ namespace gp {
 					}
 				}
 			}
-		}
-		break;
-		case 2:
-		{
-			vh.push_back(v[0]);
-			auto vz1 = v[0];
-			auto vz2 = v[1];
-			vz1.z += style->depth * style->type.y;
-			vz2.z += style->depth * style->type.y;
-			vh.push_back(vz1);
-			vh.push_back(vz2);
-			vh.push_back(v[1]);
-		}
-		break;
-		default:
-			break;
 		}
 		opt->vertexCoordsArray.reserve((vh.size() + vh0.size()) * 3);
 		opt->faceIndicesArray.reserve((vh.size() + vh0.size()) * 3);
@@ -10418,7 +10453,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			}
 			mt = *t;
 			cairo_move_to(cr, t->x, t->y);
-		}break;
+			}break;
 		case vte_e::e_vline:
 		{
 			cairo_line_to(cr, t->x, t->y);
@@ -10448,7 +10483,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
 			//	C3 = Q2
 			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
-		}break;
+			}break;
 		case vte_e::e_vcubic:
 		{
 			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
@@ -10461,7 +10496,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-	}
+		}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -10482,7 +10517,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-}
+		}
 
 
 struct path_txf
@@ -15039,7 +15074,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-}
+	}
 
 void font_t::clear_char_lut()
 {
@@ -15545,8 +15580,8 @@ public:
 #endif
 			}
 
+			}
 		}
-	}
 	void destroy_all_dec()
 	{
 		//LOCK_W(_sbit_lock);
@@ -15555,7 +15590,7 @@ public:
 		_dec_table.clear();
 	}
 
-};
+	};
 int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
 {
 	int ret = 0;
