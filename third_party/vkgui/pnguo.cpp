@@ -3039,6 +3039,17 @@ namespace gp {
 		ak1 = 180.0 + ak1 * axis.z;
 		return glm::vec2(floor2ceil(ak1), floor2ceil(axis.z));
 	}
+	glm::vec2 angle_v3_r(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c)
+	{
+		auto c0 = glm::normalize(a - b);
+		auto c1 = glm::normalize(b - c);
+		auto ak = glm::angle(c0, c1);
+		auto ak1 = glm::degrees(ak);
+		glm::vec3 axis = glm::normalize(glm::cross(glm::vec3(c0, 0), glm::vec3(c1, 0)));
+		//float oriented_angle = glm::orientedAngle(glm::vec3(a, 0), glm::vec3(b, 0), axis);
+		ak1 = 180.0 + ak1 * axis.z;
+		return glm::vec2(glm::radians((float)(ak1)), floor2ceil(axis.z));
+	}
 
 	//# 向量角度
 	auto angle_v2(glm::vec2 v1, glm::vec2 v2) {
@@ -7344,10 +7355,15 @@ namespace gp {
 	};
 	*/
 	// 生成3D扩展线模型 
-	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_bevel_t* style, mesh_mt* opt)
+	void build_line3d(const glm::vec3& p1, const glm::vec3& p2, const glm::ivec2& size, extrude_bevel_t* style, mesh_mt* opt)
 	{
+		glm::vec3 pos1 = p1, pos2 = p2;
 		std::vector<glm::vec2> ots;
 		auto d = pos2 - pos1;
+		if (d.y < 0) {
+			std::swap(pos1, pos2);
+			d = pos2 - pos1;
+		}
 		glm::vec3 d0 = { -d.y,d.x, d.z };
 		d0 = glm::normalize(d0);
 		auto v1 = d0 * size.x * 0.5;
@@ -7356,6 +7372,7 @@ namespace gp {
 		auto vz = pos1;
 		vz.z += style->depth * style->type.y;
 		std::vector<glm::vec3> vh, vh0;
+		glm::quat qt = {}; qt.w = 1;
 		switch (style->type.x)
 		{
 		case 0:
@@ -7369,31 +7386,50 @@ namespace gp {
 		{
 			style->depth = size.x * 0.5;
 			glm::vec3 c1 = pos1;
-			c1.y = c1.z + size.y - style->depth;
+			c1.y = size.y - style->depth;
 			c1.z = style->depth;
 			int ct = (style->count) * 2.0 + 2;
 			double st = glm::pi<double>() / ct;
 			glm::vec3 ce = {};
 			std::vector<glm::vec3>* pv[] = { &vh,&vh0 };
-			for (size_t x = 0; x < 2; x++)
+
+			float yy = pos1.y * 0;
+			float zz = pos1.z;
+			auto angle1 = atan2v(v[1] - pos1);	// 点P的方位角 
+			auto a1 = glm::degrees(angle1);
+			qt = glm::angleAxis(angle1, glm::vec3(0, 0, 1));
+			for (size_t j = 0; j < 2; j++)
 			{
 				double k = 0;
-				auto pvt = pv[x];
-				c1.z -= x * style->thickness;
+				auto pvt = pv[j];
+				c1.z -= j * style->thickness;
 				for (size_t i = 0; i < ct + 1; i++)
 				{
-					ce = get_circle(k, c1);
+					float angle = k;
+					float x = cos(angle) * c1.z;
+					float z = sin(angle) * c1.z;
+					float y = 0;
 					k += st;
-					//ce.z = ce.y;
-					//ce.y = pos1.y;
+					glm::vec3 vcs = { x,y,z };
+					vcs = qt * vcs;
 					if (i == 0) {
-						pvt->push_back(ce);
+						vcs.z += yy;
+						pvt->push_back(vcs);
+						vcs.z += c1.y;
+						pvt->push_back(vcs);
 					}
-					pvt->push_back(ce);
+					else if (i == ct) {
+						vcs.z += c1.y;
+						pvt->push_back(vcs);
+						vcs.z += yy - c1.y;
+						pvt->push_back(vcs);
+					}
+					else
+					{
+						vcs.z += c1.y;
+						pvt->push_back(vcs);
+					}
 				}
-				ce.y = pos1.z;
-				pvt->push_back(ce);
-				pvt[0][0].y = pos1.z;
 			}
 		}
 		break;
@@ -7425,12 +7461,13 @@ namespace gp {
 			for (size_t i = 0; i < length; i++)
 			{
 				auto it = vh[i];
-				it.z = it.y;
-				it.y = pos1.y;
+				auto v2 = it + d;
+				it += pos1;
+				v2 += pos1;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
-				it += d;
+				it = v2;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
@@ -7447,19 +7484,20 @@ namespace gp {
 			}
 		}
 		auto cidx = dva.size() / 3;
-#if 0
+#if 1
 		if (vh0.size() > 1) {
 			idx = cidx;
 			auto length = vh0.size();
 			for (size_t i = 0; i < length; i++)
 			{
 				auto it = vh0[i];
-				it.z = it.y;
-				it.y = pos1.y;
+				auto v2 = it + d;
+				it += pos1;
+				v2 += pos1;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
-				it += d;
+				it = v2;
 				dva.push_back(it.x);
 				dva.push_back(it.y);
 				dva.push_back(it.z);
@@ -7476,7 +7514,7 @@ namespace gp {
 			}
 		}
 #endif
-#if 0
+#if 1
 		// 封闭端面
 		oldidx;
 		cidx;
@@ -7489,11 +7527,11 @@ namespace gp {
 		fida.push_back(oldidx + 1);
 		fs.push_back(4);
 
-		for (size_t i = 0; i < cct; i++)
+		for (size_t i = 0; i < cct - 1; i++)
 		{
-			fida.push_back(oldidx);
-			fida.push_back(cidx);
 			fida.push_back(oldidx + i * 2);
+			fida.push_back(oldidx + (i + 1) * 2);
+			fida.push_back(cidx + (i + 1) * 2);
 			fida.push_back(cidx + i * 2);
 			fs.push_back(4);
 		}
@@ -7505,12 +7543,12 @@ namespace gp {
 		fs.push_back(4);
 		oldidx++;
 		cidx++;
-		for (size_t i = 0; i < cct; i++)
+		for (size_t i = 0; i < cct - 1; i++)
 		{
-			fida.push_back(oldidx);
-			fida.push_back(cidx + i * 2);
 			fida.push_back(oldidx + i * 2);
-			fida.push_back(cidx);
+			fida.push_back(cidx + i * 2);
+			fida.push_back(cidx + (i + 1) * 2);
+			fida.push_back(oldidx + (i + 1) * 2);
 			fs.push_back(4);
 		}
 #endif

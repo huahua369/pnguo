@@ -5,9 +5,9 @@
 
 // booleanOps
 enum class flags_b :uint8_t {
-	A_NOT_B,		// 减
-	B_NOT_A,		// 反向减
-	UNION,			// 合并
+	A_NOT_B,		// 差集a-=b
+	B_NOT_A,		// 差集b-=a
+	UNION,			// 并集
 	INTERSECTION	// 交集
 };
 
@@ -41,6 +41,13 @@ public:
 	glm::vec3 get_vertex(int facet_idx, int vertex_idx) const;
 	float facet_area(int facet_idx) const;
 };
+struct mmesh_t
+{
+	// variables for mesh data in a format suited for mcut
+	std::vector<uint32_t> faceSizesArray;
+	std::vector<uint32_t> faceIndicesArray;
+	std::vector<double>   vertexCoordsArray;
+};
 // stl、obj
 mesh_triangle_cx* new_mesh(const char* path);
 mesh_triangle_cx* new_mesh(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum);
@@ -48,6 +55,8 @@ mesh_triangle_cx* new_mesh(const glm::dvec3* v, size_t n, uint32_t* idx, size_t 
 void free_mesh(mesh_triangle_cx* p);
 // type=0二进制，1文本
 void mesh_save_stl(mesh_triangle_cx* p, const char* fn, int type = 0);
+// mmesh_t*
+void mesh_save_stl(const void* src_mesh, const char* fn, int type = 0);
 
 // 布尔运算
 void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);

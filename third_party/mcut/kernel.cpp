@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
  *  This file is part of the MCUT project, which is comprised of a library 
  *  for surface mesh cutting, example programs and test programs.
  * 

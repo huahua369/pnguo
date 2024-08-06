@@ -773,18 +773,17 @@ namespace gp {
 	};
 	// 生成B样条线约束的竖三角面
 	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
-	struct tinyface3_idx_t
+	struct mesh3_mt
 	{
-		std::vector<glm::ivec3>	indices;	// 只支持三角形
-		std::vector<glm::vec3>	vertices;
-		std::vector<glm::ivec2>	comp_blocks;		// 组件
+		std::vector<glm::ivec3>	indices;	// 三角形索引
+		std::vector<glm::vec3>	vertices;	// 顶点坐标
 	};
 	// 多边形
 	struct mesh_mt
 	{
-		std::vector<uint32_t> faceSizesArray;
-		std::vector<uint32_t> faceIndicesArray;
-		std::vector<double>   vertexCoordsArray;
+		std::vector<uint32_t> faceSizesArray;		// 面的边数3/4
+		std::vector<uint32_t> faceIndicesArray;		// 索引
+		std::vector<double>   vertexCoordsArray;	// 顶点坐标
 	public:
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);

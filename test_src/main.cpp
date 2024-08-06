@@ -782,14 +782,42 @@ int main()
 			auto fn = "temp/cct3.stl";
 			sc.save(fn, 0);
 		}
-		gp::extrude_bevel_t et = { 0,3,6,1,{1,1} };
-		gp::tinyface3_idx_t tf3 = {};
-		gp::mesh_mt tf4 = {};			// 四边形
-		gp::mesh_mt tf5 = {};			// 四边形
-		et.count = 1;
-		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
-		gp::build_line3d({ 1,9,1 }, { 10,1,1 }, { 4,3 }, &et, &tf5);
 		std::vector<mesh_triangle_cx> mv;
+		gp::extrude_bevel_t et = { 0,3,6,1,{1,1} };
+		gp::mesh3_mt tf3 = {};
+		gp::mesh_mt tf4 = {};			// 四边形网络
+		gp::mesh_mt tf5 = {};			// 四边形网络
+		et.count = 6;
+		gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
+		gp::build_line3d({ 1,9,0.5 }, { 10,1,0.5 }, { 3,3 }, &et, &tf5);
+		std::string fns[] = {
+			"a_not_b",		// 差集a-=b
+			"b_not_a",		// 差集b-=a
+			"union",		// 并集
+			"intersection"	// 交集
+		};
+		{
+			print_time aadk("bool mesh");
+			make_boolean(&tf4, &tf5, mv, flags_b::A_NOT_B);
+		}
+		{
+			print_time aadk("bool mesh");
+			make_boolean(&tf4, &tf5, mv, flags_b::B_NOT_A);
+
+		}
+		{
+			print_time aadk("bool mesh");
+			make_boolean(&tf4, &tf5, mv, flags_b::UNION);
+		}
+		{
+			print_time aadk("bool mesh");
+			make_boolean(&tf4, &tf5, mv, flags_b::INTERSECTION);
+		}
+		std::string fn = "temp/test_boolean_tf4.stl";
+		mesh_save_stl(&tf4, fn.c_str());
+		fn = "temp/test_boolean_tf5.stl";
+		mesh_save_stl(&tf5, fn.c_str());
+#if 0
 		gp::mesh_mt tc4 = {};
 		glm::dvec3 v3[] = {
 			{ -5, -5, 5}, // 0
@@ -805,12 +833,12 @@ int main()
 		tc4.faceIndicesArray = {
 			0, 1, 2, 3, //0
 			7, 6, 5, 4, //1
-			//1, 5, 6, 2, //2
+			1, 5, 6, 2, //2
 			0, 3, 7, 4, //3
 			3, 2, 6, 7, //4
 			4, 5, 1, 0 //5
 		};
-		tc4.faceSizesArray = { 4, 4, 4, 4, 4/*, 4*/ };// 四边形
+		tc4.faceSizesArray = { 4, 4, 4, 4, 4, 4 };// 四边形
 		gp::mesh_mt tv4 = {};
 		{
 			glm::dvec3 v3[] = {
@@ -831,15 +859,16 @@ int main()
 		make_boolean(&tc4, &tv4, mv, flags_b::INTERSECTION);
 		if (mv.empty())
 			make_boolean(&tc4, &tv4, mv, flags_b::UNION);
-
+#endif
 		if (mv.size())
 		{
 			for (int i = 0; i < mv.size(); i++) {
 				auto& it = mv[i];
-				std::string fn = "temp/test_boolean" + std::to_string(i) + ".stl";
+				std::string fn = "temp/test_boolean" + fns[i] + ".stl";
 				mesh_save_stl(&it, fn.c_str());
 			}
 		}
+		exit(0);
 
 	} while (0);
 	menu_cx* mc = new menu_cx();	// 菜单管理

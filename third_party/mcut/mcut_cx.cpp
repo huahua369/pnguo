@@ -7,16 +7,9 @@
 #include "obj.h"
 #include <iostream>
 #if 1
-struct McutMesh
-{
-	// variables for mesh data in a format suited for mcut
-	std::vector<uint32_t> faceSizesArray;
-	std::vector<uint32_t> faceIndicesArray;
-	std::vector<double>   vertexCoordsArray;
-};
 
-bool empty(const McutMesh& mesh) { return mesh.vertexCoordsArray.empty() || mesh.faceIndicesArray.empty(); }
-void triangle_mesh_to_mcut(const mesh_triangle_cx& src_mesh, McutMesh& srcMesh, const glm::mat4& src_nm = glm::identity<glm::mat4>())
+bool empty(const mmesh_t& mesh) { return mesh.vertexCoordsArray.empty() || mesh.faceIndicesArray.empty(); }
+void triangle_mesh_to_mcut(const mesh_triangle_cx& src_mesh, mmesh_t& srcMesh, const glm::mat4& src_nm = glm::identity<glm::mat4>())
 {
 	// vertices precision convention and copy
 	srcMesh.vertexCoordsArray.reserve(src_mesh.vertices.size() * 3);
@@ -41,9 +34,9 @@ void triangle_mesh_to_mcut(const mesh_triangle_cx& src_mesh, McutMesh& srcMesh, 
 		srcMesh.faceSizesArray.push_back((uint32_t)3);
 	}
 }
-McutMesh triangle_mesh_to_mcut(const mesh_triangle_cx& M)
+mmesh_t triangle_mesh_to_mcut(const mesh_triangle_cx& M)
 {
-	McutMesh ot;
+	mmesh_t ot;
 	triangle_mesh_to_mcut(M, ot);
 	return ot;
 }
@@ -444,7 +437,7 @@ int KDTree<DIM, Real>::findNearestBruteForce(const Point& pt)
 #endif
 
 
-mesh_triangle_cx mcut_to_triangle_mesh(const McutMesh& mcutmesh)
+mesh_triangle_cx mcut_to_triangle_mesh(const mmesh_t& mcutmesh)
 {
 	uint32_t ccVertexCount = mcutmesh.vertexCoordsArray.size() / 3;
 	auto& ccVertices = mcutmesh.vertexCoordsArray;
@@ -490,7 +483,7 @@ mesh_triangle_cx mcut_to_triangle_mesh(const McutMesh& mcutmesh)
 	mesh_triangle_cx out(vertices, faces);
 	return out;
 }
-void merge_mcut_meshes(McutMesh& src, const McutMesh& cut) {
+void merge_mcut_meshes(mmesh_t& src, const mmesh_t& cut) {
 	auto cs = cut.faceIndicesArray.size();
 	auto vs = add_v(src.vertexCoordsArray, cut.vertexCoordsArray) / 3;
 	auto ids = add_v(src.faceIndicesArray, cut.faceIndicesArray);
@@ -844,7 +837,7 @@ uint32_t get_opflags(flags_b f) {
 
 
 
-bool do_boolean_single(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boolean_opts)
+bool do_boolean_single(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean_opts)
 {
 	// create context
 	McContext context = MC_NULL_HANDLE;
@@ -908,7 +901,7 @@ bool do_boolean_single(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boole
 	std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
 	err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_FRAGMENT, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
 
-	McutMesh outMesh;
+	mmesh_t outMesh;
 	int N_vertices = 0;
 	// traversal of all connected components
 	for (int n = 0; n < numConnComps; ++n) {
@@ -977,7 +970,7 @@ bool do_boolean_single(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boole
 	return true;
 }
 
-void do_boolean(McutMesh& srcMesh, const McutMesh& cutMesh, flags_b boolean_opts)
+void do_boolean(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean_opts)
 {
 	auto tri_src = mcut_to_triangle_mesh(srcMesh);
 	std::vector<mesh_triangle_cx> src_parts = its_split(tri_src);
@@ -1192,11 +1185,18 @@ void mesh_save_stl(mesh_triangle_cx* p, const char* fn, int type)
 	}
 	sc.save(fn, type);
 }
+void mesh_save_stl(const void* src_mesh, const char* fn, int type)
+{
+	auto p = (mmesh_t*)src_mesh;
+	if (!p || !fn || *fn == 0 || p->faceSizesArray.empty() || p->vertexCoordsArray.empty() || p->faceIndicesArray.empty())return;
+	auto tm = mcut_to_triangle_mesh(*p);
+	mesh_save_stl(&tm, fn, type);
+}
 
 void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
 {
 	if (!src_mesh || !cut_mesh)return;
-	McutMesh srcMesh, cutMesh;
+	mmesh_t srcMesh, cutMesh;
 	triangle_mesh_to_mcut(*src_mesh, srcMesh);
 	triangle_mesh_to_mcut(*cut_mesh, cutMesh);
 	do_boolean(srcMesh, cutMesh, boolean_opts);
@@ -1208,10 +1208,10 @@ void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
 {
 	if (!src_mesh || !cut_mesh)return;
-	McutMesh* srcMesh = (McutMesh*)src_mesh, * cutMesh = (McutMesh*)cut_mesh;
-	if (do_boolean_single(*srcMesh, *cutMesh, boolean_opts))
+	mmesh_t srcMesh = *(mmesh_t*)src_mesh, cutMesh = *(mmesh_t*)cut_mesh;
+	if (do_boolean_single(srcMesh, cutMesh, boolean_opts))
 	{
-		mesh_triangle_cx tri_src = mcut_to_triangle_mesh(*srcMesh);
+		mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
 		if (!tri_src.empty())
 			dst_mesh.push_back(std::move(tri_src));
 	}
