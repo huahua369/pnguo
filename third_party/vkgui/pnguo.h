@@ -777,7 +777,7 @@ namespace gp {
 	{
 		std::vector<glm::ivec3>	indices;	// 只支持三角形
 		std::vector<glm::vec3>	vertices;
-		std::vector<glm::ivec2>	blocks;		// 分块
+		std::vector<glm::ivec2>	comp_blocks;		// 组件
 	};
 	// 多边形
 	struct mesh_mt
@@ -789,17 +789,18 @@ namespace gp {
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);
 	};
-	struct extrude_t {
+	// 挤出、倒角
+	struct extrude_bevel_t {
+		float bevel_width = 0;	// 挤出宽度
 		float depth = 0;		// 深度
 		float count = 5;		// 分辨率
 		float thickness = 1.0;	// 厚度
 		glm::ivec2 type = { 0,1 };	//样式  x.0=v，1=U，2=|_|，y=-1倒过来
 	};
 	// 生成3D扩展线模型
-	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, mesh_mt* opt);
+	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_bevel_t* style, mesh_mt* opt);
 
 }
-
 
 class path_v
 {

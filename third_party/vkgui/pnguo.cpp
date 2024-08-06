@@ -7344,7 +7344,7 @@ namespace gp {
 	};
 	*/
 	// 生成3D扩展线模型 
-	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_t* style, mesh_mt* opt)
+	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, extrude_bevel_t* style, mesh_mt* opt)
 	{
 		std::vector<glm::vec2> ots;
 		auto d = pos2 - pos1;

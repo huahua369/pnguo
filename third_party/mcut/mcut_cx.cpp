@@ -463,12 +463,27 @@ mesh_triangle_cx mcut_to_triangle_mesh(const McutMesh& mcutmesh)
 	int faceVertexOffsetBase = 0;
 
 	// for each face in CC
-	std::vector<glm::ivec3> faces(ccFaceCount);
+	std::vector<glm::ivec3> faces;
+	faces.reserve(ccFaceCount);
 	for (uint32_t f = 0; f < ccFaceCount; ++f) {
 		int faceSize = faceSizes.at(f);
 
 		// for each vertex in face
-		for (int v = 0; v < faceSize; v++) { faces[f][v] = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v]; }
+		glm::ivec4 ind = {};
+		auto vx = std::min(faceSize, 4);
+		for (int v = 0; v < faceSize; v++) {
+			ind[v] = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
+		}
+		if (faceSize == 3) {
+			faces.push_back(ind);
+		}
+		else if (faceSize == 4)
+		{
+			faces.push_back(ind);
+			ind.y = ind.z;
+			ind.z = ind.w;
+			faces.push_back(ind);
+		}
 		faceVertexOffsetBase += faceSize;
 	}
 
@@ -476,6 +491,15 @@ mesh_triangle_cx mcut_to_triangle_mesh(const McutMesh& mcutmesh)
 	return out;
 }
 void merge_mcut_meshes(McutMesh& src, const McutMesh& cut) {
+	auto cs = cut.faceIndicesArray.size();
+	auto vs = add_v(src.vertexCoordsArray, cut.vertexCoordsArray) / 3;
+	auto ids = add_v(src.faceIndicesArray, cut.faceIndicesArray);
+	add_v(src.faceSizesArray, cut.faceSizesArray);
+	for (size_t i = 0; i < cs; i++)
+	{
+		src.faceIndicesArray[ids + i] += vs;
+	}
+	return;
 	mesh_triangle_cx all_its;
 	auto tri_src = mcut_to_triangle_mesh(src);
 	auto tri_cut = mcut_to_triangle_mesh(cut);
@@ -1185,7 +1209,7 @@ void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_t
 {
 	if (!src_mesh || !cut_mesh)return;
 	McutMesh* srcMesh = (McutMesh*)src_mesh, * cutMesh = (McutMesh*)cut_mesh;
-	if(do_boolean_single(*srcMesh, *cutMesh, boolean_opts))
+	if (do_boolean_single(*srcMesh, *cutMesh, boolean_opts))
 	{
 		mesh_triangle_cx tri_src = mcut_to_triangle_mesh(*srcMesh);
 		if (!tri_src.empty())

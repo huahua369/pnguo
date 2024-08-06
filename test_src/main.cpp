@@ -782,7 +782,7 @@ int main()
 			auto fn = "temp/cct3.stl";
 			sc.save(fn, 0);
 		}
-		gp::extrude_t et = { 3,6,1,{1,1} };
+		gp::extrude_bevel_t et = { 0,3,6,1,{1,1} };
 		gp::tinyface3_idx_t tf3 = {};
 		gp::mesh_mt tf4 = {};			// 四边形
 		gp::mesh_mt tf5 = {};			// 四边形
@@ -805,12 +805,12 @@ int main()
 		tc4.faceIndicesArray = {
 			0, 1, 2, 3, //0
 			7, 6, 5, 4, //1
-			1, 5, 6, 2, //2
+			//1, 5, 6, 2, //2
 			0, 3, 7, 4, //3
 			3, 2, 6, 7, //4
 			4, 5, 1, 0 //5
 		};
-		tc4.faceSizesArray = { 4, 4, 4, 4, 4, 4 };// 四边形
+		tc4.faceSizesArray = { 4, 4, 4, 4, 4/*, 4*/ };// 四边形
 		gp::mesh_mt tv4 = {};
 		{
 			glm::dvec3 v3[] = {
@@ -829,6 +829,8 @@ int main()
 
 
 		make_boolean(&tc4, &tv4, mv, flags_b::INTERSECTION);
+		if (mv.empty())
+			make_boolean(&tc4, &tv4, mv, flags_b::UNION);
 
 		if (mv.size())
 		{

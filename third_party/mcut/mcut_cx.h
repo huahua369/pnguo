@@ -53,3 +53,11 @@ void mesh_save_stl(mesh_triangle_cx* p, const char* fn, int type = 0);
 void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 
+
+template<class T>
+size_t add_v(T& src, const T& v) {
+	auto ps = src.size();
+	src.resize(src.size() + v.size());
+	memcpy(src.data() + ps, v.data(), sizeof(v[0]) * v.size());
+	return ps;
+}
