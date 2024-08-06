@@ -8553,6 +8553,7 @@ int path_v::get_flatten(size_t idx, size_t count, int m, float ml, float ds, std
 	fp.dist = ds;
 	fp.angle = angle;
 	doflatten(&fp);
+	return 0;
 }
 namespace gp {
 	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten)
@@ -8567,6 +8568,7 @@ namespace gp {
 		fp.dist = ds;
 		fp.angle = 160;
 		doflatten(&fp);
+		return 0;
 	}
 }
 

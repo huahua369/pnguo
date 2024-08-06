@@ -47,11 +47,7 @@ cmake -DBUILD_SHARED_LIBS=OFF ..
 ninja -C build
 
 */
-
-#define DVC_EXPORT extern "C" __declspec(dllimport)
-
-DVC_EXPORT int rvk(HINSTANCE hInstance, LPSTR lpCmdLine, int nCmdShow, LPCSTR Name);
-DVC_EXPORT int rdx12(HINSTANCE hInstance, LPSTR lpCmdLine, int nCmdShow, LPCSTR Name);
+ 
 //struct v22
 //{
 //	glm::vec2 a, b;
