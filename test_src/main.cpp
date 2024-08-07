@@ -22,7 +22,6 @@
 
 #include <mimalloc.h>
 #include <mimalloc-new-delete.h>
-
 /*
 	todo
 	输入数据，自动创建窗口、控件、
@@ -47,7 +46,7 @@ cmake -DBUILD_SHARED_LIBS=OFF ..
 ninja -C build
 
 */
- 
+
 //struct v22
 //{
 //	glm::vec2 a, b;
@@ -271,62 +270,6 @@ void loadtestdata()
 	//m1.load_obj("E:\\d3\\cube.obj");
 	//m2.load_obj("E:\\d3\\cube1.obj");
 
-#if 1
-	glm::vec3 srcMeshVertices[] = {
-		{ -5, -5, 5},  // vertex 0
-		{5, -5, 5},   // vertex 1
-		{5, 5, 5},    // vertex 2
-		{-5, 5, 5},   // vertex 3
-		{-5, -5, -5}, // vertex 4
-		{5, -5, -5},  // vertex 5
-		{5, 5, -5},   // vertex 6
-		{-5, 5, -5}   // vertex 7
-	};
-
-	uint32_t srcMeshFaces[] = {
-		0, 1, 2, 3, // face 0
-		7, 6, 5, 4, // face 1
-		1, 5, 6, 2, // face 2
-		0, 3, 7, 4, // face 3
-		3, 2, 6, 7, // face 4
-		4, 5, 1, 0  // face 5
-	};
-
-	uint32_t srcMeshFaceSizes[] = { 4, 4, 4, 4, 4, 4 };
-
-	uint32_t srcMeshVertexCount = 8;
-	uint32_t srcMeshFaceCount = 6;
-	//m1.set_data(srcMeshVertices, 8, srcMeshFaces, 24, 4, srcMeshFaceSizes, 6);
-
-	glm::vec3 cutMeshVertices[] = {
-		{ -20, -4, 0}, // vertex 0
-		{0, 20, 20},  // vertex 1
-		{20, -4, 0},  // vertex 2
-		{0, 20, -20}  // vertex 3
-	};
-
-	uint32_t cutMeshFaces[] = {
-		0, 1, 2, // face 0
-		0, 2, 3  // face 1
-	};
-	//m2.set_data(cutMeshVertices, 4, cutMeshFaces, 6, 3, 0, 0);
-#endif
-	{
-		std::thread a([]()
-			{
-				//mesh_triangle_cx* m1 = new_mesh("E:\\d3\\cone0.stl");// stl
-				//mesh_triangle_cx* m2 = new_mesh("E:\\d3\\cube.stl");
-				//std::vector<mesh_triangle_cx> opt;
-				//make_boolean(m1, m2, opt, flags_b::A_NOT_B);
-				//for (size_t i = 0; i < opt.size(); i++)
-				//{
-				//	auto& it = opt[i];
-				//	std::string fn = "temp/boolean_" + std::to_string(i) + ".stl";
-				//	mesh_save_stl(&it, fn.c_str(), 0);
-				//}
-			});
-		a.detach();
-	}
 #endif
 	// 一格一物：		固体块、墙、气体、液体。种类不到200种
 	// 可在气液体重叠：	固体、物件、建筑
@@ -334,8 +277,9 @@ void loadtestdata()
 	//return rvk((HINSTANCE)GetModuleHandle(0), (char*)"", SW_SHOW, "abc");
 }
 
+#include <xatlas/xatlas_c.h>
 #include "mcut/mcut_cx.h"
-#include <variant>
+//#include <variant>
 
 struct GizmoGeomInfo {
 	int nverts;
@@ -760,7 +704,8 @@ int main()
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto ftc = app->font_ctx;
 	std::thread attt([=]() {
-		do { 
+		do {
+			xatlasAtlas* xa = xatlasCreate();
 			layout_text_x ltx = {};
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
@@ -816,6 +761,18 @@ int main()
 			mesh_save_stl(&tf4, fn.c_str());
 			fn = "temp/test_boolean_tf5.stl";
 			mesh_save_stl(&tf5, fn.c_str());
+
+			mesh_triangle_cx mta;
+			mta.set_data(wm_gizmo_geom_data_arrow.verts, wm_gizmo_geom_data_arrow.nverts, (uint32_t*)wm_gizmo_geom_data_arrow.indices, wm_gizmo_geom_data_arrow.ntris * 3);		
+			fn = "temp/test_arrow.stl";
+			mesh_save_stl(&mta, fn.c_str());
+			mta.set_data(wm_gizmo_geom_data_cube.verts, wm_gizmo_geom_data_cube.nverts, (uint32_t*)wm_gizmo_geom_data_cube.indices, wm_gizmo_geom_data_cube.ntris * 3);
+			fn = "temp/test_cube.stl";
+			mesh_save_stl(&mta, fn.c_str());
+			mta.set_data(wm_gizmo_geom_data_dial.verts, wm_gizmo_geom_data_dial.nverts, (uint32_t*)wm_gizmo_geom_data_dial.indices, wm_gizmo_geom_data_dial.ntris * 3);
+			fn = "temp/test_dial.stl";
+			mesh_save_stl(&mta, fn.c_str());
+
 #if 0
 			gp::mesh_mt tc4 = {};
 			glm::dvec3 v3[] = {
@@ -866,7 +823,7 @@ int main()
 					std::string fn = "temp/test_boolean" + fns[i] + ".stl";
 					mesh_save_stl(&it, fn.c_str());
 				}
-			} 
+			}
 
 		} while (0);
 		});

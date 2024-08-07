@@ -88,6 +88,7 @@ endif()
 add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 add_definitions(-DVKVG_RECORDING)
 add_definitions(-DVKH_USE_VMA)
+add_definitions(-DXATLAS_C_API=1)
 
 find_package(PkgConfig REQUIRED)
 find_package(mimalloc CONFIG REQUIRED)
@@ -133,6 +134,7 @@ list(APPEND tpv_src
 "third_party/mcut/mcut_cx.cpp"  
 "third_party/mcut/stlrw.cpp"  
 "third_party/mcut/obj.c"
+"third_party/xatlas/xatlas.cpp"
 )
 
 include_directories("third_party") 
