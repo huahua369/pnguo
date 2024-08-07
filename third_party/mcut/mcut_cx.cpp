@@ -460,20 +460,16 @@ mesh_triangle_cx mcut_to_triangle_mesh(const mmesh_t& mcutmesh)
 	faces.reserve(ccFaceCount);
 	for (uint32_t f = 0; f < ccFaceCount; ++f) {
 		int faceSize = faceSizes.at(f);
-
 		// for each vertex in face
 		glm::ivec4 ind = {};
 		auto vx = std::min(faceSize, 4);
 		for (int v = 0; v < faceSize; v++) {
 			ind[v] = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
 		}
-		if (faceSize == 3) {
-			faces.push_back(ind);
-		}
-		else if (faceSize == 4)
-		{
-			faces.push_back(ind);
-			ind.y = ind.z;
+		faces.push_back(ind);
+		if (faceSize == 4)
+		{ 
+			ind.y = ind.z;// 0 1 2 3 多一个三角形0 2 3
 			ind.z = ind.w;
 			faces.push_back(ind);
 		}

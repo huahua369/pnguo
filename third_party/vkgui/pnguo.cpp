@@ -7451,6 +7451,7 @@ namespace gp {
 			auto angle1 = atan2v(v[1] - pos1);	// 点P的方位角 
 			auto a1 = glm::degrees(angle1);
 			qt = glm::angleAxis(angle1, glm::vec3(0, 0, 1));
+
 			for (size_t j = 0; j < 2; j++)
 			{
 				double k = 0;
@@ -7479,6 +7480,14 @@ namespace gp {
 					{
 						vcs.z += c1.y;
 						pvt->push_back(vcs);
+					}
+				}
+				if (style->type.y < 0)
+				{
+					for (auto& it : *pvt)
+					{
+						it.z *= -1;
+						it.z += size.y;
 					}
 				}
 			}
@@ -7587,6 +7596,19 @@ namespace gp {
 			fs.push_back(4);
 		}
 #endif
+
+		if (style->type.y < 0)
+		{
+			auto ns = fida.size();
+			auto d = fida.data();
+			for (size_t i = 0; i < ns; i+=4)
+			{ 
+				// 正序 0 1 2 3
+				// 反序 0 3 2 1	
+				std::swap(d[i + 1], d[i + 3]);
+			}
+		}
+		return;
 	}
 
 
@@ -8910,7 +8932,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	if (is_reverse)
 	{
 		std::reverse(ms.begin() + pos, ms.end());
-	}
+}
 #endif
 	return ms.size() - pos;
 }
@@ -10453,7 +10475,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			}
 			mt = *t;
 			cairo_move_to(cr, t->x, t->y);
-			}break;
+		}break;
 		case vte_e::e_vline:
 		{
 			cairo_line_to(cr, t->x, t->y);
@@ -10483,7 +10505,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
 			//	C3 = Q2
 			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
-			}break;
+		}break;
 		case vte_e::e_vcubic:
 		{
 			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
@@ -10517,7 +10539,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-		}
+	}
 
 
 struct path_txf
@@ -10973,11 +10995,11 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 		{
 			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
 			draw_image(cr, image, vpos[i] + pos, rc0, color);
-		}
 	}
+}
 #endif
 	return ss;
-}
+	}
 
 int64_t get_rand(int f, int s)
 {
@@ -15057,8 +15079,8 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		if (it != _char_lut.end())
 		{
 			return it->second;
-		}
-	}
+}
+}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -15074,7 +15096,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;
-	}
+}
 
 void font_t::clear_char_lut()
 {
@@ -15580,8 +15602,8 @@ public:
 #endif
 			}
 
-			}
 		}
+	}
 	void destroy_all_dec()
 	{
 		//LOCK_W(_sbit_lock);
@@ -15590,7 +15612,7 @@ public:
 		_dec_table.clear();
 	}
 
-	};
+};
 int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
 {
 	int ret = 0;
@@ -16979,7 +17001,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-	}
+}
 #endif
 	return error;
 }
@@ -19264,7 +19286,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -20004,7 +20026,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];

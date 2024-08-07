@@ -703,12 +703,14 @@ int main()
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
 	auto ftc = app->font_ctx;
+	static std::atomic_bool kinit = false;
 	std::thread attt([=]() {
 		do {
 			xatlasAtlas* xa = xatlasCreate();
 			layout_text_x ltx = {};
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
+			kinit = true;
 			text_path_t tp = {};
 			auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
 			std::vector<glm::vec2> ms;
@@ -729,9 +731,11 @@ int main()
 			gp::mesh3_mt tf3 = {};
 			gp::mesh_mt tf4 = {};			// 四边形网络
 			gp::mesh_mt tf5 = {};			// 四边形网络
-			et.count = 1;
-			et.type.x = 0;
+			et.count = 6;
+			et.type.x = 2;
+			et.type.y = -1;
 			gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
+			
 			et.type.x = 2;
 			gp::build_line3d({ 1,9,0.5 }, { 10,1,0.5 }, { 3,3 }, &et, &tf5);
 			std::string fns[] = {
@@ -828,6 +832,9 @@ int main()
 		} while (0);
 		});
 	attt.detach();
+	while (!kinit) {
+		Sleep(1);
+	}
 	menu_cx* mc = new menu_cx();	// 菜单管理
 	mc->set_main(form0);
 	mc->add_familys(fontn);
