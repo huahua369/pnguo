@@ -689,6 +689,7 @@ namespace gp {
 
 	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten);
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z = 0.0);
+	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& vd, std::vector<glm::ivec3>& idxs, bool pccw, double z);
 
 	// 单线面，先扩展后比例
 	int build_plane1(cmd_plane_t* c, float expand, float scale, float z);

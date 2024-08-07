@@ -131,9 +131,9 @@ list(APPEND tpv_src
 "third_party/mcut/preproc.cpp"  
 "third_party/mcut/shewchuk.c"  
 "third_party/mcut/mcut.cpp"  
-"third_party/mcut/mcut_cx.cpp"  
 "third_party/mcut/stlrw.cpp"  
 "third_party/mcut/obj.c"
+"third_party/mcut/mcut_cx.cpp"  
 "third_party/xatlas/xatlas.cpp"
 )
 

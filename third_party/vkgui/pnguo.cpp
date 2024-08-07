@@ -6377,23 +6377,24 @@ namespace gp {
 		cdt.erase_outer_triangles_and_holes();
 		if (!cdt::check_topology(cdt)) { return; }
 		if (cdt.triangles.empty()) { return; }
-		vd.resize(cdt.vertices.size());
+		auto n = vd.size();
+		vd.reserve(n + cdt.vertices.size());
 		size_t x = 0;
 		for (auto& it : cdt.vertices) {
-			vd[x++] = { it.x(),it.y(),z };
+			vd.push_back({ it.x(),it.y(),z });
 		}
-		idxs.resize(cdt.triangles.size());
+		idxs.reserve(cdt.triangles.size());
 		x = 0;
 		if (pccw)
 		{
 			for (auto& it : cdt.triangles) {
-				idxs[x++] = { it.vertices[2],it.vertices[1], it.vertices[0] };
+				idxs.push_back({ n + it.vertices[2],n + it.vertices[1],n + it.vertices[0] });
 			}
 		}
 		else
 		{
 			for (auto& it : cdt.triangles) {
-				idxs[x++] = { it.vertices[0],it.vertices[1],it.vertices[2] };
+				idxs.push_back({ n + it.vertices[0],n + it.vertices[1],n + it.vertices[2] });
 			}
 		}
 
@@ -7451,8 +7452,8 @@ namespace gp {
 			auto angle1 = atan2v(v[1] - pos1);	// 点P的方位角 
 			auto a1 = glm::degrees(angle1);
 			qt = glm::angleAxis(angle1, glm::vec3(0, 0, 1));
-
-			for (size_t j = 0; j < 2; j++)
+			int jc = style->thickness > 0 ? 2 : 1;
+			for (size_t j = 0; j < jc; j++)
 			{
 				double k = 0;
 				auto pvt = pv[j];
@@ -7500,31 +7501,105 @@ namespace gp {
 		fs.reserve(vh.size() + vh0.size());
 		size_t oldidx = dva.size() / 3;
 		size_t idx = dva.size() / 3;
+		size_t rc = 0;
 		if (vh.size() > 1) {
 			auto length = vh.size();
-			for (size_t i = 0; i < length; i++)
+			if (style->thickness > 0)
 			{
-				auto it = vh[i];
-				auto v2 = it + d;
-				it += pos1;
-				v2 += pos1;
-				dva.push_back(it.x);
-				dva.push_back(it.y);
-				dva.push_back(it.z);
-				it = v2;
-				dva.push_back(it.x);
-				dva.push_back(it.y);
-				dva.push_back(it.z);
+				for (size_t i = 0; i < length; i++)
+				{
+					auto it = vh[i];
+					auto v2 = it + d;
+					it += pos1;
+					v2 += pos1;
+					dva.push_back(it.x);
+					dva.push_back(it.y);
+					dva.push_back(it.z);
+					it = v2;
+					dva.push_back(it.x);
+					dva.push_back(it.y);
+					dva.push_back(it.z);
 
+				}
+				for (size_t i = 1; i < length; i++)
+				{
+					fida.push_back(idx);
+					fida.push_back(idx + 1);
+					fida.push_back(idx + 3);
+					fida.push_back(idx + 2);
+					fs.push_back(4);
+					idx += 2;
+				}
 			}
-			for (size_t i = 1; i < length; i++)
-			{
-				fida.push_back(idx);
-				fida.push_back(idx + 1);
-				fida.push_back(idx + 3);
-				fida.push_back(idx + 2);
+			else {
+
+				std::vector<std::vector<glm::vec2>> paths;
+				std::vector<std::vector<glm::vec2>> paths1;
+				paths.resize(1);
+				paths1.resize(1);
+				for (size_t i = 0; i < length; i++)
+				{
+					auto it = vh[i];
+					it += pos1;
+					paths[0].push_back({ it.x,it.z });
+					dva.push_back(it.x);
+					dva.push_back(it.y);
+					dva.push_back(it.z);
+				}
+				auto idx2 = dva.size() / 3;
+				for (size_t i = 0; i < length; i++)
+				{
+					auto it = vh[i];
+					auto v2 = it + d;
+					v2 += pos1;
+					paths1[0].push_back({ v2.x,v2.z });
+					it = v2;
+					dva.push_back(it.x);
+					dva.push_back(it.y);
+					dva.push_back(it.z);
+				}
+				// 侧面
+				for (size_t i = 1; i < length; i++)
+				{
+					fida.push_back(idx);
+					fida.push_back(idx + idx2);
+					fida.push_back(idx + idx2 + 1);
+					fida.push_back(idx + 1);
+					fs.push_back(4);
+					idx++;
+				}
+				// 底
+				fida.push_back(oldidx);
+				fida.push_back(oldidx + length - 1);
+				fida.push_back(oldidx + idx2 + length - 1);
+				fida.push_back(oldidx + idx2);
 				fs.push_back(4);
-				idx += 2;
+				rc = fida.size();
+				// 左右
+				std::vector<glm::vec3> vd; std::vector<glm::ivec3>  idxs;
+				constrained_delaunay_triangulation_v(&paths, vd, idxs, 0, 0);
+				if (idxs.size())
+				{
+					for (auto it : idxs)
+					{
+						fida.push_back(oldidx + it.x);
+						fida.push_back(oldidx + it.y);
+						fida.push_back(oldidx + it.z);
+						fs.push_back(3);
+					}
+				}
+				vd.clear();
+				idxs.clear();
+				constrained_delaunay_triangulation_v(&paths1, vd, idxs, 0, 0);
+				if (idxs.size())
+				{
+					for (auto it : idxs) {
+						fida.push_back(oldidx + idx2 + it.x);
+						fida.push_back(oldidx + idx2 + it.z);
+						fida.push_back(oldidx + idx2 + it.y);
+						fs.push_back(3);
+					}
+				}
 			}
 		}
 		auto cidx = dva.size() / 3;
@@ -7559,55 +7634,68 @@ namespace gp {
 		}
 #endif
 #if 1
-		// 封闭端面
-		oldidx;
-		cidx;
+		// 封闭端面 
 		auto cct = vh.size();
 		auto cct0 = vh0.size();
-		//左
-		fida.push_back(oldidx);
-		fida.push_back(cidx);
-		fida.push_back(cidx + 1);
-		fida.push_back(oldidx + 1);
-		fs.push_back(4);
-
-		for (size_t i = 0; i < cct - 1; i++)
+		if (cct0 > 0 && cct > 0)
 		{
-			fida.push_back(oldidx + i * 2);
-			fida.push_back(oldidx + (i + 1) * 2);
-			fida.push_back(cidx + (i + 1) * 2);
-			fida.push_back(cidx + i * 2);
+			//左
+			fida.push_back(oldidx);
+			fida.push_back(cidx);
+			fida.push_back(cidx + 1);
+			fida.push_back(oldidx + 1);
 			fs.push_back(4);
-		}
-		//右
-		fida.push_back(oldidx + cidx - 2);
-		fida.push_back(oldidx + cidx - 1);
-		fida.push_back(cidx + cct0 * 2 - 1);
-		fida.push_back(cidx + cct0 * 2 - 2);
-		fs.push_back(4);
-		oldidx++;
-		cidx++;
-		for (size_t i = 0; i < cct - 1; i++)
-		{
-			fida.push_back(oldidx + i * 2);
-			fida.push_back(cidx + i * 2);
-			fida.push_back(cidx + (i + 1) * 2);
-			fida.push_back(oldidx + (i + 1) * 2);
-			fs.push_back(4);
-		}
-#endif
 
+			for (size_t i = 0; i < cct - 1; i++)
+			{
+				fida.push_back(oldidx + i * 2);
+				fida.push_back(oldidx + (i + 1) * 2);
+				fida.push_back(cidx + (i + 1) * 2);
+				fida.push_back(cidx + i * 2);
+				fs.push_back(4);
+			}
+			//右
+			fida.push_back(oldidx + cidx - 2);
+			fida.push_back(oldidx + cidx - 1);
+			fida.push_back(cidx + cct0 * 2 - 1);
+			fida.push_back(cidx + cct0 * 2 - 2);
+			fs.push_back(4);
+			oldidx++;
+			cidx++;
+			for (size_t i = 0; i < cct - 1; i++)
+			{
+				fida.push_back(oldidx + i * 2);
+				fida.push_back(cidx + i * 2);
+				fida.push_back(cidx + (i + 1) * 2);
+				fida.push_back(oldidx + (i + 1) * 2);
+				fs.push_back(4);
+			}
+		}
 		if (style->type.y < 0)
 		{
 			auto ns = fida.size();
 			auto d = fida.data();
-			for (size_t i = 0; i < ns; i+=4)
-			{ 
+			auto ps = fs.data();
+			if (rc > 0)
+				ns = rc;
+			for (size_t i = 0; i < ns; )
+			{
 				// 正序 0 1 2 3
 				// 反序 0 3 2 1	
-				std::swap(d[i + 1], d[i + 3]);
+				if (*ps == 4)
+				{
+					std::swap(d[i + 1], d[i + 3]);
+				}
+				else if (*ps == 3) {
+					// 0 1 2改成0 2 1
+					std::swap(d[i + 1], d[i + 2]);
+				}
+				i += *ps;
+				ps++;
 			}
 		}
+#endif
+
 		return;
 	}
 
@@ -8932,7 +9020,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	if (is_reverse)
 	{
 		std::reverse(ms.begin() + pos, ms.end());
-}
+	}
 #endif
 	return ms.size() - pos;
 }
@@ -10518,7 +10606,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-		}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -10539,7 +10627,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		cairo_stroke(cr);
 	}
 	cairo_restore(cr);
-	}
+}
 
 
 struct path_txf
@@ -10995,11 +11083,11 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 		{
 			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
 			draw_image(cr, image, vpos[i] + pos, rc0, color);
+		}
 	}
-}
 #endif
 	return ss;
-	}
+}
 
 int64_t get_rand(int f, int s)
 {
@@ -15079,8 +15167,8 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		if (it != _char_lut.end())
 		{
 			return it->second;
-}
-}
+		}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -17001,7 +17089,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -19286,7 +19374,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -20026,7 +20114,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];

@@ -731,19 +731,23 @@ int main()
 			gp::mesh3_mt tf3 = {};
 			gp::mesh_mt tf4 = {};			// 四边形网络
 			gp::mesh_mt tf5 = {};			// 四边形网络
+			gp::mesh_mt tf6 = {};			// 四边形网络
 			et.count = 6;
-			et.type.x = 2;
-			et.type.y = -1;
+			et.type.x = 0;
+			//et.type.y = -1;
+			et.thickness = 0;// 0为实心
 			gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
-			
-			et.type.x = 2;
+			et.type.x = 1;
 			gp::build_line3d({ 1,9,0.5 }, { 10,1,0.5 }, { 3,3 }, &et, &tf5);
+			et.type.x = 2;
+			gp::build_line3d({ 1,2,0.5 }, { 10,12,0.5 }, { 5,3 }, &et, &tf6);
 			std::string fns[] = {
 				"a_not_b",		// 差集a-=b
 				"b_not_a",		// 差集b-=a
 				"union",		// 并集
 				"intersection"	// 交集
 			};
+#if 0
 			{
 				print_time aadk("bool mesh");
 				make_boolean(&tf4, &tf5, mv, flags_b::A_NOT_B);
@@ -761,13 +765,16 @@ int main()
 				print_time aadk("bool mesh");
 				make_boolean(&tf4, &tf5, mv, flags_b::INTERSECTION);
 			}
+#endif
 			std::string fn = "temp/test_boolean_tf4.stl";
 			mesh_save_stl(&tf4, fn.c_str());
 			fn = "temp/test_boolean_tf5.stl";
 			mesh_save_stl(&tf5, fn.c_str());
+			fn = "temp/test_boolean_tf6.stl";
+			mesh_save_stl(&tf6, fn.c_str());
 
 			mesh_triangle_cx mta;
-			mta.set_data(wm_gizmo_geom_data_arrow.verts, wm_gizmo_geom_data_arrow.nverts, (uint32_t*)wm_gizmo_geom_data_arrow.indices, wm_gizmo_geom_data_arrow.ntris * 3);		
+			mta.set_data(wm_gizmo_geom_data_arrow.verts, wm_gizmo_geom_data_arrow.nverts, (uint32_t*)wm_gizmo_geom_data_arrow.indices, wm_gizmo_geom_data_arrow.ntris * 3);
 			fn = "temp/test_arrow.stl";
 			mesh_save_stl(&mta, fn.c_str());
 			mta.set_data(wm_gizmo_geom_data_cube.verts, wm_gizmo_geom_data_cube.nverts, (uint32_t*)wm_gizmo_geom_data_cube.indices, wm_gizmo_geom_data_cube.ntris * 3);
