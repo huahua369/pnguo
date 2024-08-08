@@ -7416,7 +7416,7 @@ namespace gp {
 		return ret;
 	}
 	// 生成3D扩展线模型 
-	void build_line3d(const glm::vec3& p1, const glm::vec3& p2, const glm::ivec2& size, extrude_bevel_t* style, mesh_mt* opt)
+	void build_line3d(const glm::vec3& p1, const glm::vec3& p2, const glm::ivec2& size, line_style_t* style, mesh_mt* opt)
 	{
 		glm::vec3 pos1 = p1, pos2 = p2;
 		std::vector<glm::vec2> ots;
@@ -7466,8 +7466,11 @@ namespace gp {
 					k += st;
 					vcs = qt * vcs;
 					if (i == 0) {
+						auto vz = vcs.z;
 						vcs.z += yy;
-						pvt->push_back(vcs);
+						vcs.z += style->bottom_thickness * j;
+						pvt->push_back(vcs);//右
+						vcs.z = vz;
 						vcs.z += c1.y;
 						pvt->push_back(vcs);
 					}
@@ -7475,12 +7478,22 @@ namespace gp {
 						vcs.z += c1.y;
 						pvt->push_back(vcs);
 						vcs.z += yy - c1.y;
-						pvt->push_back(vcs);
+						vcs.z += style->bottom_thickness * j;
+						pvt->push_back(vcs);//左
 					}
 					else
 					{
 						vcs.z += c1.y;
 						pvt->push_back(vcs);
+					}
+				}
+				auto z0 = (*pvt)[0];
+				auto pvd = pvt->data();// 更新错误高度
+				for (size_t i = 1; i < pvt->size() - 1; i++)
+				{
+					auto& it = pvd[i];
+					if (it.z < z0.z) {
+						it.z = glm::mix(pvd[i - 1].z, pvd[i + 1].z, 0.5f);
 					}
 				}
 				if (style->type.y < 0)
@@ -7639,12 +7652,36 @@ namespace gp {
 		auto cct0 = vh0.size();
 		if (cct0 > 0 && cct > 0)
 		{
-			//左
-			fida.push_back(oldidx);
-			fida.push_back(cidx);
-			fida.push_back(cidx + 1);
-			fida.push_back(oldidx + 1);
-			fs.push_back(4);
+			//左/前
+			if (style->bottom_thickness > 0)
+			{
+				fida.push_back(oldidx);					// 前右
+				fida.push_back(cidx);
+				fida.push_back(cidx + cct0 * 2 - 2);// 前左
+				fida.push_back(oldidx + cidx - 2);
+				fs.push_back(4);
+
+				// 内
+				fida.push_back(cidx);
+				fida.push_back(cidx + 1);				 
+				fida.push_back(cidx + cct0 * 2 - 1);// 后
+				fida.push_back(cidx + cct0 * 2 - 2);// 前左
+				fs.push_back(4);
+				// 外
+				fida.push_back(oldidx);					// 前右
+				fida.push_back(oldidx + cidx - 2); //前
+				fida.push_back(oldidx + cidx - 1); //后下
+				fida.push_back(oldidx + 1);//后
+				fs.push_back(4);
+			}
+			else
+			{
+				fida.push_back(oldidx);
+				fida.push_back(cidx);
+				fida.push_back(cidx + 1);
+				fida.push_back(oldidx + 1);
+				fs.push_back(4);
+			}
 
 			for (size_t i = 0; i < cct - 1; i++)
 			{
@@ -7654,12 +7691,23 @@ namespace gp {
 				fida.push_back(cidx + i * 2);
 				fs.push_back(4);
 			}
-			//右
-			fida.push_back(oldidx + cidx - 2);
-			fida.push_back(oldidx + cidx - 1);
-			fida.push_back(cidx + cct0 * 2 - 1);
-			fida.push_back(cidx + cct0 * 2 - 2);
-			fs.push_back(4);
+			//右/后
+			if (style->bottom_thickness > 0)
+			{
+				fida.push_back(cidx + 1);
+				fida.push_back(oldidx + 1);
+				fida.push_back(oldidx + cidx - 1);//后
+				fida.push_back(cidx + cct0 * 2 - 1);
+				fs.push_back(4);
+			}
+			else
+			{
+				fida.push_back(oldidx + cidx - 2);//前
+				fida.push_back(oldidx + cidx - 1);//后
+				fida.push_back(cidx + cct0 * 2 - 1);
+				fida.push_back(cidx + cct0 * 2 - 2);
+				fs.push_back(4);
+			}
 			oldidx++;
 			cidx++;
 			for (size_t i = 0; i < cct - 1; i++)

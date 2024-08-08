@@ -727,15 +727,16 @@ int main()
 				sc.save(fn, 0);
 			}
 			std::vector<mesh_triangle_cx> mv;
-			gp::extrude_bevel_t et = { 0,3,6,1,{1,1} };
+			gp::line_style_t et = { 3,6,1,0,{1,1} };
 			gp::mesh3_mt tf3 = {};
 			gp::mesh_mt tf4 = {};			// 四边形网络
 			gp::mesh_mt tf5 = {};			// 四边形网络
 			gp::mesh_mt tf6 = {};			// 四边形网络
 			et.count = 6;
 			et.type.x = 0;
+			et.bottom_thickness = 0.8;
 			//et.type.y = -1;
-			et.thickness = 0;// 0为实心
+			et.thickness = 0.9;// 0为实心
 			gp::build_line3d({ 1,1,0 }, { 10,10,0 }, { 6,5 }, &et, &tf4);
 			et.type.x = 1;
 			gp::build_line3d({ 1,9,0.5 }, { 10,1,0.5 }, { 3,3 }, &et, &tf5);
