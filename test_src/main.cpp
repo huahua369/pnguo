@@ -711,6 +711,7 @@ int main()
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
 			kinit = true;
+			break;
 			text_path_t tp = {};
 			auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
 			std::vector<glm::vec2> ms;
@@ -932,10 +933,10 @@ int main()
 	pl2->add_familys(fontn, 0);
 	pl3->add_familys(fontn, 0);
 	//pl2->_css.justify_content = flex_item::flex_align::ALIGN_SPACE_EVENLY;
-	pl4->visible = false;
-	pl3->visible = false;
-	pl2->visible = false;
-	pl1->visible = false;
+	//pl4->visible = false;
+	//pl3->visible = false;
+	//pl2->visible = false;
+	//pl1->visible = false;
 	//listp->visible = false;
 	{
 		auto p = mainmenu;

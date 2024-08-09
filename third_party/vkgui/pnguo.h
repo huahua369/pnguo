@@ -1355,6 +1355,7 @@ struct widget_base
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;				// 鼠标点击状态
 	plane_cx* parent = 0;
+	double dtime = 0.0;
 	bool _disabled_events = false;
 	bool visible = true;
 	bool _absolute = false;		// true绝对坐标，false布局计算

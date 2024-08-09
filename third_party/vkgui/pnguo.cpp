@@ -7663,7 +7663,7 @@ namespace gp {
 
 				// 内
 				fida.push_back(cidx);
-				fida.push_back(cidx + 1);				 
+				fida.push_back(cidx + 1);
 				fida.push_back(cidx + cct0 * 2 - 1);// 后
 				fida.push_back(cidx + cct0 * 2 - 2);// 前左
 				fs.push_back(4);
@@ -22671,9 +22671,19 @@ bool gradient_btn::update(float delta)
 
 
 
-bool color_btn::update(float)
+bool color_btn::update(float delta)
 {
-	if (bst == _old_bst)return false;
+	dtime += delta;
+	auto dt = dtime;
+	if (dt > 0.150) {
+		if (str != text)
+			text = str;
+		dtime = 0;
+	}
+	else
+	{
+		if (bst == _old_bst)return false;
+	}
 	_old_bst = bst;
 	auto p = this;
 	btn_cols_t* pdc = &p->pdc;
