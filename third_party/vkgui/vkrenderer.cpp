@@ -14310,13 +14310,14 @@ namespace vkr {
 		VkRect2D                        m_RectScissor = {};
 		VkViewport                      m_Viewport = {};
 
-		// Initialize helper classes
+		// Initialize helper classes资源管理
 		ResourceViewHeaps               m_ResourceViewHeaps = {};
 		UploadHeap                      m_UploadHeap = {};
 		DynamicBufferRing               m_ConstantBufferRing = {};
 		StaticBufferPool                m_VidMemBufferPool = {};
 		StaticBufferPool                m_SysMemBufferPool = {};
 		CommandListRing                 m_CommandListRing = {};
+
 		GPUTimestamps                   m_GPUTimer = {};
 
 		// effects
