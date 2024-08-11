@@ -8863,8 +8863,7 @@ namespace vkr {
 			m_distance = glm::length(at - m_eyePos);
 		}
 		else
-		{
-#if 1	
+		{ 
 			yaw = glm::radians(yaw);
 			pitch = glm::radians(pitch);
 			glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
@@ -8872,9 +8871,7 @@ namespace vkr {
 			mqt = glm::normalize(qy);
 			glm::mat4 rotate = glm::mat4_cast(mqt);
 			atPos.x += x * distance / 1000.0f;
-			atPos.y += y * distance / 1000.0f;
-			//glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(atPos));
-			//rotate = rotate * t;
+			atPos.y += y * distance / 1000.0f; 
 			glm::vec4 dir = GetDirection();
 			glm::vec4 at = atPos;	// 观察目标坐标
 			auto eye = at + glm::vec4(0, 0, distance, 1.0);
@@ -8882,30 +8879,7 @@ namespace vkr {
 
 			glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
 			m_View = translate * rotate;
-			m_distance = distance;	// 新距离
-
-#else 
-			camera_info& pc = pca;
-			pc.camera_up = glm::vec3(0, 1, 0);
-			pc.yaw = glm::radians(yaw);
-			pc.pitch = glm::radians(pitch);
-			pc.camera_position_delta = (glm::vec3)GetSide() * x * distance / 1000.0f;
-			pc.camera_position_delta += (glm::vec3)GetUp() * y * distance / 1000.0f;
-			pc.camera_position = m_eyePos;
-			//pc._distance = m_distance;
-			pc.distance = distance;
-			pc.camera_direction = GetDirection();
-			lookat2q(&pc, m_View);
-			//LookAt(pc.camera_position, pc.camera_look_at);
-			auto mv = /*glm::translate(-pc.camera_position) **/ glm::mat4(pc.qt);
-			auto eye = glm::vec4(pc.qt * pc.camera_position, 1.0);
-			auto sview = LookAtRH(eye, (pc.camera_look_at), flipY);
-			//auto sview = lookatlh(eye, (pc.camera_look_at), flipY);
-			m_View = mv;
-			m_eyePos = eye;// m_View[3];
-
-			//printf("%.03f\n", m_yaw);
-#endif
+			m_distance = distance;	// 新距离 
 		}
 	}
 #if 0
