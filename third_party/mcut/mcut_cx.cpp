@@ -443,24 +443,23 @@ mesh_triangle_cx mcut_to_triangle_mesh(const mmesh_t& mcutmesh)
 	auto& ccVertices = mcutmesh.vertexCoordsArray;
 	auto& ccFaceIndices = mcutmesh.faceIndicesArray;
 	auto& faceSizes = mcutmesh.faceSizesArray;
-	uint32_t ccFaceCount = faceSizes.size();
-	// rearrange vertices/faces and save into result mesh
+	uint32_t ccFaceCount = faceSizes.size(); 
 	std::vector<glm::vec3> vertices(ccVertexCount);
 	for (uint32_t i = 0; i < ccVertexCount; i++) {
 		vertices[i][0] = (float)ccVertices[(uint64_t)i * 3 + 0];
 		vertices[i][1] = (float)ccVertices[(uint64_t)i * 3 + 1];
 		vertices[i][2] = (float)ccVertices[(uint64_t)i * 3 + 2];
 	}
+	 
+	int64_t faceVertexOffsetBase = 0;
+	std::vector<int> poly;
 
-	// output faces
-	int faceVertexOffsetBase = 0;
-
-	// for each face in CC
+	// 循环每个面
 	std::vector<glm::ivec3> faces;
 	faces.reserve(ccFaceCount);
 	for (uint32_t f = 0; f < ccFaceCount; ++f) {
 		int faceSize = faceSizes.at(f);
-		// for each vertex in face
+		// 转成三角面
 		if (faceSize == 3 || faceSize == 4) {
 			glm::ivec4 ind = {};
 			auto vx = std::min(faceSize, 4);
@@ -472,6 +471,18 @@ mesh_triangle_cx mcut_to_triangle_mesh(const mmesh_t& mcutmesh)
 			{
 				ind.y = ind.z;// 0 1 2 3 多一个三角形0 2 3
 				ind.z = ind.w;
+				faces.push_back(ind);
+			}
+		}
+		else if (faceSize > 4) {
+			poly.resize(faceSize);
+			for (int v = 0; v < faceSize; v++) {
+				poly[v] = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
+			}
+			int n = faceSize - 2;
+			for (size_t i = 0; i < n; i++)
+			{
+				glm::ivec3 ind = { 0,i + 1,i + 2 };
 				faces.push_back(ind);
 			}
 		}
@@ -1111,8 +1122,8 @@ mesh_triangle_cx* new_mesh(const char* path)
 				p->set_data(vf->data(), vf->size(), idxs.data(), idxs.size());
 #endif // 0 
 
+			}
 		}
-	}
 		else if (fn.rfind(".obj") != std::string::npos) {
 
 			MioMesh srcMesh = {
@@ -1144,7 +1155,7 @@ mesh_triangle_cx* new_mesh(const char* path)
 			p->set_data((glm::dvec3*)srcMesh.pVertices, srcMesh.numVertices, srcMesh.pFaceVertexIndices, srcMesh.numFaces * 3);
 			mioFreeMesh(&srcMesh);
 		}
-}
+	}
 	return p;
 }
 

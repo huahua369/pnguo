@@ -782,7 +782,7 @@ namespace gp {
 	// 多边形
 	struct mesh_mt
 	{
-		std::vector<uint32_t> faceSizesArray;		// 面的边数3/4的，多边形支持布尔、暂不支持导出三角形
+		std::vector<uint32_t> faceSizesArray;		// 面的边数3/4、多边形
 		std::vector<uint32_t> faceIndicesArray;		// 索引
 		std::vector<double>   vertexCoordsArray;	// 顶点坐标
 	public:
