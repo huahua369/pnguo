@@ -1369,7 +1369,7 @@ namespace hz
 		// 将GBK转换为UTF-8
 		utf8_string = g_convert(fstr, -1, "UTF-8", "GBK", 0, NULL, &error);
 		if (error) {
-			g_warning("转换出错: %s", error->message);
+			g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
@@ -1391,7 +1391,7 @@ namespace hz
 		gsize cs = str.size() * 2;
 		utf8_string = g_convert(fstr, cs, "UTF-8", "UTF-16LE", 0, NULL, &error);
 		if (error) {
-			g_warning("转换出错: %s", error->message);
+			g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
@@ -1413,11 +1413,11 @@ namespace hz
 		gsize cs = str.size() * 2;
 		utf8_string = g_convert(fstr, cs, "GBK", "UTF-16LE", 0, NULL, &error);
 		if (error) {
-			g_warning("转换出错: %s", error->message);
+			g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
-			g_print("转换成功: %s\n", utf8_string);
+			//g_print("转换成功: %s\n", utf8_string);
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
@@ -1434,11 +1434,11 @@ namespace hz
 		// 将GBK转换为UTF-8
 		utf8_string = g_convert(fstr, -1, "GBK", "UTF-8", 0, NULL, &error);
 		if (error) {
-			g_warning("转换出错: %s", error->message);
+			g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
-			g_print("转换成功: %s\n", utf8_string);
+			//g_print("转换成功: %s\n", utf8_string);
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
@@ -1453,11 +1453,11 @@ namespace hz
 		gsize cs = str.size();
 		tstr = g_convert(fstr, cs, "UTF-16LE", "UTF-8", 0, NULL, &error);
 		if (error) {
-			g_warning("转换出错: %s", error->message);
+			g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
-			g_print("转换成功: %s\n", tstr);
+			//g_print((char*)u8"转换成功: %s\n", tstr);
 			ret = (wchar_t*)tstr;
 			g_free(tstr);
 		}
@@ -1472,11 +1472,11 @@ namespace hz
 		gsize cs = str.size();
 		tstr = g_convert(fstr, cs, "UTF-16LE", "GBK", 0, NULL, &error);
 		if (error) {
-			g_warning("转换出错: %s", error->message);
+			g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
-			g_print("转换成功: %s\n", tstr);
+			//g_print("转换成功: %s\n", tstr);
 			ret = (wchar_t*)tstr;
 			g_free(tstr);
 		}

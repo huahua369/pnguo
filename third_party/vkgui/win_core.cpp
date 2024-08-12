@@ -287,7 +287,7 @@ namespace hz {
 			DEVMODEW* devMode = (DEVMODEW*)pPrinterData->pDevMode;
 			if (devMode == 0)
 			{
-				printf("获取打印机设置时发生了错误.\n");
+				printf((char*)u8"获取打印机设置时发生了错误.\n");
 				ResetDCW(hdcPrint, devMode);
 				//解锁全局对象，对应GlobalLock
 				GlobalUnlock(pPrinterData->pDevMode);
@@ -1043,7 +1043,7 @@ namespace hz {
 			if (!WriteFile(_fd, pSendBuffer, dwExpectSend, &rs, NULL))
 			{
 				//写串口失败
-				printf("发送失败!\n");
+				printf((char*)"发送失败!\n");
 				_sendSta = 4;
 				ret = 1;
 

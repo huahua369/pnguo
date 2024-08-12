@@ -56,7 +56,7 @@ void set_col_u8()
 	//freopen_s(&tempFile, "conin$", "r+t", stdin); //reopen the stdin, we can use std::cout.
 	//freopen_s(&tempFile, "conout$", "w+t", stdout);
 	system("color 00");
-	system("CHCP 65001");
+	system("CHCP 65001"); 
 #endif
 
 }

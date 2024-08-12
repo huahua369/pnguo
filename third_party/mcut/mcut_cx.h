@@ -48,7 +48,7 @@ struct mmesh_t
 	std::vector<uint32_t> faceIndicesArray;
 	std::vector<double>   vertexCoordsArray;
 };
-// stl、obj
+// 加载stl、obj
 mesh_triangle_cx* new_mesh(const char* path);
 mesh_triangle_cx* new_mesh(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum);
 mesh_triangle_cx* new_mesh(const glm::dvec3* v, size_t n, uint32_t* idx, size_t idxnum);
@@ -60,6 +60,7 @@ void mesh_save_stl(const void* src_mesh, const char* fn, int type = 0);
 
 // 布尔运算
 void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
+// mmesh_t*
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 
 

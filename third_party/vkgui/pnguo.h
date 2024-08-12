@@ -774,6 +774,8 @@ namespace gp {
 	};
 	// 生成B样条线约束的竖三角面
 	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
+	
+	// 三角形
 	struct mesh3_mt
 	{
 		std::vector<glm::ivec3>	indices;	// 三角形索引
@@ -788,7 +790,17 @@ namespace gp {
 	public:
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);
+	}; 
+	// 简易材质
+	struct mesh_material_mt
+	{
+		std::vector<uint32_t> color;	// 颜色uv数量对应顶点坐标
+		std::vector<glm::vec2> uv;
+		uint32_t line_color = 0;		// 线颜色
+		uint32_t line_width = 0;		// 线宽
 	};
+
+
 	// 挤出、倒角
 	struct extrude_bevel_t {
 		float bevel_width = 0;	// 挤出宽度
