@@ -1207,7 +1207,7 @@ void et2key(const SDL_Event* e, keyboard_et* ekm)
 	auto pk = SDL_GetKeyboardState(&ks);
 	int key = (int)e->key.scancode;
 	ekm->sym = (e->key.key);
-	ekm->keycode = SDL_GetKeyFromScancode(e->key.scancode, e->key.mod);
+	ekm->keycode = SDL_GetKeyFromScancode(e->key.scancode, e->key.mod, 1);
 	ekm->scancode = key;      /**< SDL physical key code - see ::SDL_Scancode for details */
 	ekm->mod = e->key.mod;                 /**< current key modifiers */
 	ekm->state = e->key.state;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
@@ -1557,11 +1557,15 @@ void form_x::clear_wt()
 	}
 	_planes[0].clear();
 	_planes[1].clear();
-	for (auto it : atlas) {
-		if (it && it->autofree)
-			delete it;
+	for (size_t i = 0; i < 2; i++)
+	{
+		auto& tt = atlas[i];
+		for (auto it : tt) {
+			if (it && it->autofree)
+				delete it;
+		}
+		tt.clear();
 	}
-	atlas.clear();
 }
 void form_x::update_w()
 {
@@ -1654,24 +1658,26 @@ void form_x::update(float delta)
 			(*it)->update(delta);
 		}
 	}
-	auto ktd = atlas.data();
-	auto length = atlas.size();
-	for (size_t i = 0; i < length; i++)
+
+	for (size_t i = 0; i < 2; i++)
 	{
-		auto kt = ktd[i];
-		if (_size.x > 0 && _size.y > 0)
+		auto& it = atlas[i];
+		for (auto kt : it)
 		{
-			if (kt->viewport.z <= 0)
+			if (_size.x > 0 && _size.y > 0)
 			{
-				kt->viewport.z = display_size.x;
+				if (kt->viewport.z <= 0)
+				{
+					kt->viewport.z = display_size.x;
+				}
+				if (kt->viewport.w <= 0)
+				{
+					kt->viewport.w = display_size.y;
+				}
 			}
-			if (kt->viewport.w <= 0)
-			{
-				kt->viewport.w = display_size.y;
-			}
+			if (kt->visible)
+				canvas_atlas_update(kt, renderer, delta);
 		}
-		if (kt->visible)
-			canvas_atlas_update(kt, renderer, delta);
 	}
 	for (auto kt : skeletons) {
 		kt->update(delta);
@@ -1760,13 +1766,10 @@ void form_x::present()
 	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
 	SDL_SetRenderClipRect(renderer, &viewport);
 	// 渲染图集/UI
-	{
-		auto ktd = atlas.data();
-		auto length = atlas.size();
-		for (size_t i = 0; i < length; i++)
-			//for (auto a : atlas)
+	for (int i = 0; i < 2; i++) {
+		auto& it = atlas[i];
+		for (auto a : it)
 		{
-			auto a = ktd[i];
 			if (a->visible)
 				draw_data(renderer, a, fb_width, fb_height, render_scale, display_size);
 		}
@@ -2241,10 +2244,11 @@ void form_x::add_skeleton(skeleton_t* p)
 	if (p)
 		skeletons.push_back(p);
 }
-void form_x::add_canvas_atlas(canvas_atlas* p)
+void form_x::add_canvas_atlas(canvas_atlas* p, int level)
 {
+	level = glm::clamp(level, 0, 1);
 	if (p)
-		atlas.push_back(p);
+		atlas[level].push_back(p);
 }
 void form_x::remove(skeleton_t* p)
 {
@@ -2253,8 +2257,10 @@ void form_x::remove(skeleton_t* p)
 }
 void form_x::remove(canvas_atlas* p)
 {
-	auto& v = atlas;
-	v.erase(std::remove(v.begin(), v.end(), p), v.end());
+	for (int i = 0; i < 2; i++) {
+		auto& v = atlas[i];
+		v.erase(std::remove(v.begin(), v.end(), p), v.end());
+	}
 }
 
 void form_x::bind(plane_cx* p, int level)

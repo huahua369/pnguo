@@ -136,7 +136,7 @@ public:
 	std::function<int()> on_close_cb;		// 关闭事件
 
 	std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
-	std::vector<canvas_atlas*> atlas;		// 图集渲染列表		简单贴图或ui用
+	std::vector<canvas_atlas*> atlas[2];		// 图集渲染列表		简单贴图或ui用
 	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
 	struct tex_rs {
 		SDL_Texture* tex = 0;
@@ -238,7 +238,7 @@ public:
 
 	// 添加动画、图集渲染
 	void add_skeleton(skeleton_t* p);
-	void add_canvas_atlas(canvas_atlas* p);
+	void add_canvas_atlas(canvas_atlas* p, int level = 0);
 	void remove(skeleton_t* p);
 	void remove(canvas_atlas* p);
 	// 绑定面板组件
