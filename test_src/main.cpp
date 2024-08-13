@@ -26,13 +26,11 @@
 	todo
 	顶点数据、纹理/颜色数据、mvp矩阵
 
-	VK_PRIMITIVE_TOPOLOGY_POINT_LIST
 	VK_PRIMITIVE_TOPOLOGY_LINE_LIST
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 
 	VK_POLYGON_MODE_FILL = 0,
 	VK_POLYGON_MODE_LINE = 1,
-	VK_POLYGON_MODE_POINT = 2,
 cd build
 cmake ..
 
@@ -909,7 +907,7 @@ int main()
 	pl1->set_border({ 0x80ff802C,1,5,pbc });
 	pl2->set_border({ 0x80ff802C,1,5,pbc });
 	pl3->set_border({ 0x80ff802C,1,5 ,pbc });
-	pw->bind(mainmenu);	// 绑定到窗口
+	pw->bind(mainmenu, 1);	// 绑定到窗口
 	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口

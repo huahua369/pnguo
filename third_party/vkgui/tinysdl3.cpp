@@ -56,7 +56,7 @@ void set_col_u8()
 	//freopen_s(&tempFile, "conin$", "r+t", stdin); //reopen the stdin, we can use std::cout.
 	//freopen_s(&tempFile, "conout$", "w+t", stdout);
 	system("color 00");
-	system("CHCP 65001"); 
+	system("CHCP 65001");
 #endif
 
 }
@@ -969,7 +969,7 @@ private:
 };
 form_x::form_x()
 {
-	events = new std::vector<event_fw>[(uint32_t)devent_type_e::max_det];
+	//events = new std::vector<event_fw>[(uint32_t)devent_type_e::max_det];
 	events_a = new std::vector<event_fw>();
 	io = new mouse_state_t();
 }
@@ -987,15 +987,10 @@ form_x::~form_x()
 		delete io;
 	}
 	io = 0;
-	if (events)
-	{
-		delete[] events;
-	}
 	if (events_a)
 	{
 		delete events_a;
 	}
-	events = 0;
 	events_a = 0;
 	childfs.clear();
 	_ref = 1;
@@ -1084,11 +1079,6 @@ void form_x::set_curr_drop(hz::drop_info_cx* p)
 		dragdrop->set_target(p);
 #endif
 }
-void form_x::add_event(uint32_t type, void* ud, std::function<void(uint32_t type, et_un_t* e, void* ud)> cb)
-{
-	lock_auto_x lx(&lkecb);
-	events[type].push_back({ ud, cb });
-}
 
 void form_x::add_event(void* ud, std::function<void(uint32_t type, et_un_t* e, void* ud)> cb)
 {
@@ -1097,15 +1087,6 @@ void form_x::add_event(void* ud, std::function<void(uint32_t type, et_un_t* e, v
 	events_a->push_back({ ud, cb });
 }
 
-size_t form_x::remove_event(uint32_t type, void* ud)
-{
-	lock_auto_x lx(&lkecb);
-	//events[type].erase(ud);
-	auto& v = events[type];
-	auto ns = v.size();
-	v.erase(std::remove_if(v.begin(), v.end(), [ud](event_fw& r) {return r.ptr == ud; }), v.end());
-	return ns - v.size();
-}
 
 size_t form_x::remove_event(void* ud)
 {
@@ -1140,7 +1121,6 @@ void form_x::trigger(uint32_t etype, void* e)
 {
 	devent_type_e type = (devent_type_e)etype;
 	lkecb.lock();
-	auto cbs = events[(uint32_t)type];
 	auto cbs0 = *events_a;
 	auto iptr = input_ptr;
 	lkecb.unlock();
@@ -1157,21 +1137,7 @@ void form_x::trigger(uint32_t etype, void* e)
 			}
 			return;
 		}
-		if (cbs.empty() && cbs0.empty())break;
-		if (et.ret)
-		{
-			break;
-		}
-		for (auto it = cbs.rbegin(); it != cbs.rend(); it++)
-		{
-			if (it->cb) {
-				it->cb((uint32_t)type, &et, it->ptr);
-				if (et.ret)
-				{
-					break;
-				}
-			}
-		}
+		if (cbs0.empty())break;
 		if (et.ret)
 		{
 			break;
@@ -1579,14 +1545,18 @@ void form_x::remove_f(form_x* p)
 }
 void form_x::clear_wt()
 {
-	auto pks = _planes;
-	for (auto it : pks)
+	for (int i = 0; i < 2; i++)
 	{
-		unbind(it);
-		if (it->autofree)
-			delete it;
+		auto pks = _planes[i];
+		for (auto it : pks)
+		{
+			unbind(it);
+			if (it->autofree)
+				delete it;
+		}
 	}
-	_planes.clear();
+	_planes[0].clear();
+	_planes[1].clear();
 	for (auto it : atlas) {
 		if (it && it->autofree)
 			delete it;
@@ -1678,9 +1648,11 @@ void form_x::update(float delta)
 		up_cb(delta, &dwt);
 	}
 
-	for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
-	{
-		(*it)->update(delta);
+	for (int i = 0; i < 2; i++) {
+		for (auto it = _planes[i].begin(); it != _planes[i].end(); it++)
+		{
+			(*it)->update(delta);
+		}
 	}
 	auto ktd = atlas.data();
 	auto length = atlas.size();
@@ -1870,11 +1842,13 @@ bool form_x::hittest(const glm::ivec2& pos)
 	_HitTest = false;
 	if (_ptr)
 	{
-		for (auto it = _planes.rbegin(); it != _planes.rend(); it++)
-		{
-			if ((*it)->visible && (*it)->hittest(pos))
+		for (int i = 1; i >= 0; i--) {
+			for (auto it = _planes[i].rbegin(); it != _planes[i].rend(); it++)
 			{
-				_HitTest = true; break;
+				if ((*it)->visible && (*it)->hittest(pos))
+				{
+					_HitTest = true; break;
+				}
 			}
 		}
 	}
@@ -2283,10 +2257,11 @@ void form_x::remove(canvas_atlas* p)
 	v.erase(std::remove(v.begin(), v.end(), p), v.end());
 }
 
-void form_x::bind(plane_cx* p)
+void form_x::bind(plane_cx* p, int level)
 {
 	if (p)
 	{
+		level = glm::clamp(level, 0, 1);
 		if (p->form)
 		{
 			unbind(p);
@@ -2296,7 +2271,7 @@ void form_x::bind(plane_cx* p)
 		p->form_move2end = form_move2end;
 		p->form_set_input_ptr = form_set_input_ptr;
 		p->dragdrop_begin = dragdrop_begin;
-		_planes.push_back(p);
+		_planes[level].push_back(p);
 		add_event(p, [](uint32_t type, et_un_t* e, void* ud) { ((plane_cx*)ud)->on_event(type, e); });
 		add_canvas_atlas(p);
 	}
@@ -2308,8 +2283,10 @@ void form_x::unbind(plane_cx* p) {
 		{
 			p->form->remove_event(p);
 			p->form->remove(p);
-			auto& v = p->form->_planes;
-			v.erase(std::remove(v.begin(), v.end(), p), v.end());
+			for (int i = 0; i < 2; i++) {
+				auto& v = p->form->_planes[i];
+				v.erase(std::remove(v.begin(), v.end(), p), v.end());
+			}
 			p->form = 0;
 		}
 	}

@@ -8863,7 +8863,7 @@ namespace vkr {
 			m_distance = glm::length(at - m_eyePos);
 		}
 		else
-		{ 
+		{
 			yaw = glm::radians(yaw);
 			pitch = glm::radians(pitch);
 			glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
@@ -8871,7 +8871,7 @@ namespace vkr {
 			mqt = glm::normalize(qy);
 			glm::mat4 rotate = glm::mat4_cast(mqt);
 			atPos.x += x * distance / 1000.0f;
-			atPos.y += y * distance / 1000.0f; 
+			atPos.y += y * distance / 1000.0f;
 			glm::vec4 dir = GetDirection();
 			glm::vec4 at = atPos;	// 观察目标坐标
 			auto eye = at + glm::vec4(0, 0, distance, 1.0);
@@ -14152,7 +14152,7 @@ namespace vkr {
 		VkImageView     ShadowDSV;
 		VkFramebuffer   ShadowFrameBuffer;
 	} SceneShadowInfo;
-	 
+
 	struct robj_info {
 		//gltf passes
 		GltfPbrPass* m_GLTFPBR;
@@ -17185,8 +17185,8 @@ namespace vkr {
 			submit_info.pSignalSemaphores = &_fbo.sem;	// 完成发信号
 			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
 			assert(res == VK_SUCCESS);
-		/*	vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);*/
+			/*	vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+				vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);*/
 		}
 		{
 			// Wait for swapchain (we are going to render to it) -----------------------------------

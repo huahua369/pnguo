@@ -137,7 +137,7 @@ public:
 
 	std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
 	std::vector<canvas_atlas*> atlas;		// 图集渲染列表		简单贴图或ui用
-	std::vector<plane_cx*> _planes;
+	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
 	struct tex_rs {
 		SDL_Texture* tex = 0;
 		glm::vec4 src = {}, dst = {};
@@ -152,7 +152,6 @@ public:
 	glm::ivec4 ime_pos = {};
 	void* activate_ptr = 0;	// 激活的对象
 	mouse_state_t* io = 0;
-	std::vector<event_fw>* events = 0;
 	std::vector<event_fw>* events_a = 0;
 	std::vector<event_fw> first_cs;	// 优先
 	std::vector<form_x*> childfs;
@@ -182,9 +181,7 @@ public:
 	~form_x();
 	void init_dragdrop();
 	void set_curr_drop(hz::drop_info_cx* p);
-	void add_event(uint32_t type, void* ud, std::function<void(uint32_t type, et_un_t* e, void* ud)> cb);
 	void add_event(void* ud, std::function<void(uint32_t type, et_un_t* e, void* ud)> cb);
-	size_t remove_event(uint32_t type, void* ud);
 	size_t remove_event(void* ud);
 	void move2end_e(void* ud);
 	void trigger(uint32_t etype, void* e);
@@ -245,7 +242,7 @@ public:
 	void remove(skeleton_t* p);
 	void remove(canvas_atlas* p);
 	// 绑定面板组件
-	void bind(plane_cx* p);
+	void bind(plane_cx* p, int level = 0);
 	void unbind(plane_cx* p);
 	void move2end(plane_cx* p);
 	dev_info_cx get_dev();
