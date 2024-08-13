@@ -1137,22 +1137,42 @@ void form_x::trigger(uint32_t etype, void* e)
 			}
 			return;
 		}
-		if (cbs0.empty())break;
 		if (et.ret)
 		{
 			break;
 		}
-		for (auto it = cbs0.rbegin(); it != cbs0.rend(); it++)
+		if (cbs0.size()) 
 		{
-			if (it->cb) {
-				it->cb((uint32_t)type, &et, it->ptr);
+			for (auto it = cbs0.rbegin(); it != cbs0.rend(); it++)
+			{
+				if (it->cb) {
+					it->cb((uint32_t)type, &et, it->ptr);
+					if (et.ret)
+					{
+						break;
+					}
+				}
+			}
+			if (et.ret)
+			{
+				break;
+			}
+		}
+		for (int i = 1; i >= 0; i--) {
+			auto pt = _planes[i];
+			for (auto it = pt.rbegin(); it != pt.rend(); it++)
+			{
+				(*it)->on_event((uint32_t)type, &et);
 				if (et.ret)
 				{
 					break;
 				}
 			}
+			if (et.ret)
+			{
+				break;
+			}
 		}
-
 	} while (0);
 }
 void form_x::set_capture()
@@ -2185,7 +2205,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
@@ -2277,9 +2297,8 @@ void form_x::bind(plane_cx* p, int level)
 		p->form_move2end = form_move2end;
 		p->form_set_input_ptr = form_set_input_ptr;
 		p->dragdrop_begin = dragdrop_begin;
-		_planes[level].push_back(p);
-		add_event(p, [](uint32_t type, et_un_t* e, void* ud) { ((plane_cx*)ud)->on_event(type, e); });
-		add_canvas_atlas(p);
+		_planes[level].push_back(p); 
+		add_canvas_atlas(p, level);
 	}
 }
 void form_x::unbind(plane_cx* p) {
