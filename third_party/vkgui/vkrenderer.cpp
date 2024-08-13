@@ -3432,7 +3432,7 @@ namespace vkr
 		rs.depthBiasConstantFactor = 0;
 		rs.depthBiasClamp = 0;
 		rs.depthBiasSlopeFactor = 0;
-		rs.lineWidth = 3.0f;
+		rs.lineWidth = 2.0f;
 
 		VkPipelineColorBlendAttachmentState att_state[1];
 		att_state[0].colorWriteMask = 0xf;
@@ -17858,7 +17858,7 @@ namespace vkr {
 			{
 				//pitch = io.DeltaTime * 60;
 				yaw = io.DeltaTime * 60;
-				//return;
+				return;
 			}
 
 			//  Orbiting
