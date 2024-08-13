@@ -21894,7 +21894,11 @@ void plane_cx::update(float delta)
 		{
 			// 背景 
 			if (border.w) {
-				draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
+				glm::vec4 rf = { 0.,0.,ls };
+				if (border.x > 0) {
+					rf.x = rf.y = 0.5;
+				}
+				draw_rectangle(cr, rf, border.z);
 				fill_stroke(cr, border.w, 0, 0, false);
 			}
 			if (draw_back_cb)
@@ -21923,7 +21927,7 @@ void plane_cx::update(float delta)
 			}
 		}
 		// 边框线  
-		if (border.x)
+		if (border.x > 0)
 		{
 			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
 			fill_stroke(cr, 0, border.x, border.y, false);

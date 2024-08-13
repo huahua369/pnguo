@@ -795,9 +795,18 @@ namespace gp {
 	struct mesh_material_mt
 	{
 		std::vector<uint32_t> color;	// 颜色uv数量对应顶点坐标
-		std::vector<glm::vec2> uv;
-		uint32_t line_color = 0;		// 线颜色
-		uint32_t line_width = 0;		// 线宽
+		std::vector<glm::vec2> uv; 
+	};
+	// 点、线模式
+	struct point_draw_t
+	{
+		uint32_t color = 0;
+		uint32_t width = 0;
+	};
+	struct line_draw_t
+	{
+		uint32_t color = 0;
+		uint32_t width = 0;
 	};
 
 
@@ -1858,6 +1867,7 @@ public:
 	void set_size(const glm::ivec2& ss);
 	glm::vec2 get_size();
 	void set_clear_color(uint32_t c);
+	// 线颜色，线粗，圆角，背景色
 	void set_border(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);

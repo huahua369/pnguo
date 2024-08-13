@@ -661,8 +661,8 @@ int main()
 #if 1
 #if 1
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
-	auto sdldev = form0->get_dev();
-	vkdg_cx* vkd = new_vkdg(&sdldev); // 创建vk渲染器
+	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器
 	SDL_Texture* d3tex = 0;
 	if (vkd) {
 		int xk = 0;
@@ -937,7 +937,7 @@ int main()
 	{
 		auto p = mainmenu;
 		//p->draggable = true; //可拖动
-		p->set_border({ 0,1,5 ,pbc });
+		p->set_border({ 0,1,0,0xff000000 });
 		// 主菜单
 		std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
 		p->_lms = { 2,2 };
