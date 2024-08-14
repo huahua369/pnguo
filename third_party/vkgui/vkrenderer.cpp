@@ -14313,9 +14313,9 @@ namespace vkr {
 		// Initialize helper classes资源管理
 		ResourceViewHeaps               m_ResourceViewHeaps = {};
 		UploadHeap                      m_UploadHeap = {};
-		DynamicBufferRing               m_ConstantBufferRing = {};
-		StaticBufferPool                m_VidMemBufferPool = {};
-		StaticBufferPool                m_SysMemBufferPool = {};
+		DynamicBufferRing               m_ConstantBufferRing = {};	// 动态常量缓冲区
+		StaticBufferPool                m_VidMemBufferPool = {};	// 静态顶点/索引缓冲区
+		//StaticBufferPool                m_SysMemBufferPool = {};	// 静态几何缓冲区系统
 		CommandListRing                 m_CommandListRing = {};
 
 		GPUTimestamps                   m_GPUTimer = {};
@@ -16246,7 +16246,7 @@ namespace vkr {
 
 		// Create a 'static' pool for vertices and indices in system memory
 		//const uint32_t systemGeometryMemSize = 32 * 1024;
-		m_SysMemBufferPool.OnCreate(pDevice, ct.systemGeometryMemSize, false, "PostProcGeom");
+		//m_SysMemBufferPool.OnCreate(pDevice, ct.systemGeometryMemSize, false, "PostProcGeom");
 
 		// initialize the GPU time stamps module
 		m_GPUTimer.OnCreate(pDevice, backBufferCount);
@@ -16362,7 +16362,7 @@ namespace vkr {
 		m_UploadHeap.OnDestroy();
 		m_GPUTimer.OnDestroy();
 		m_VidMemBufferPool.OnDestroy();
-		m_SysMemBufferPool.OnDestroy();
+		//m_SysMemBufferPool.OnDestroy();
 		m_ConstantBufferRing.OnDestroy();
 		m_ResourceViewHeaps.OnDestroy();
 		m_CommandListRing.OnDestroy();
@@ -17789,7 +17789,7 @@ namespace vkr {
 		if (m_bPlay)
 			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
 
-		auto m = glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
+		auto m = glm::mat4(1.0f);// glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
 		//m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.3, .3, .3));
 		//m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
 		//m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));

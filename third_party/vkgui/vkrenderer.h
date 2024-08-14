@@ -22,11 +22,11 @@ namespace vkr {
 		uint32_t samplerDescriptorCount = 20;
 		// Create a commandlist ring for the Direct queue
 		uint32_t commandListsPerBackBuffer = 8;
-		// Create a 'dynamic' constant buffer
+		// Create a 'dynamic' constant buffer动态常量缓冲区大小
 		uint32_t constantBuffersMemSize = 5 * 1024 * 1024;
-		// Create a 'static' pool for vertices and indices 
+		// Create a 'static' pool for vertices and indices 静态顶点/索引缓冲区大小
 		uint32_t staticGeometryMemSize = (1 * 128) * 1024 * 1024;
-		// Create a 'static' pool for vertices and indices in system memory
+		// Create a 'static' pool for vertices and indices in system memory静态几何缓冲区大小
 		uint32_t systemGeometryMemSize = 32 * 1024;
 
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
