@@ -47,9 +47,6 @@ else()
 set(CBT "Release")
 endif() 
 
-#set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
-#set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
-message("sdl ${SDL3_DIR}")
 message("stb路径 ${Stb_DIR}")
 message("type--${CMAKE_BUILD_TYPE}")
 
@@ -65,6 +62,9 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
    
 
+#set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
+#set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
+#message("sdl ${SDL3_DIR}")
 #第三方库
 if(NOT DEFINED SDL3DIR_ROOT)
 set(SDL_STATIC ON)
@@ -163,3 +163,11 @@ add_subdirectory(test_src)
 add_dependencies(vkgui tpv)
 add_dependencies(tcmp vkgui)
 # TODO: 如有需要，请添加测试并安装目标。
+
+list(APPEND snake_src     
+"third_lib/SDL/examples/game/01-snake/main.c" 
+"third_lib/SDL/examples/game/01-snake/snake.c" 
+)
+add_executable (snake ${snake_src}  ) 
+target_link_libraries(snake PRIVATE SDL3::SDL3 mimalloc-static
+)

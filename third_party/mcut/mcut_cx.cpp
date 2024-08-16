@@ -443,14 +443,14 @@ mesh_triangle_cx mcut_to_triangle_mesh(const mmesh_t& mcutmesh)
 	auto& ccVertices = mcutmesh.vertexCoordsArray;
 	auto& ccFaceIndices = mcutmesh.faceIndicesArray;
 	auto& faceSizes = mcutmesh.faceSizesArray;
-	uint32_t ccFaceCount = faceSizes.size(); 
+	uint32_t ccFaceCount = faceSizes.size();
 	std::vector<glm::vec3> vertices(ccVertexCount);
 	for (uint32_t i = 0; i < ccVertexCount; i++) {
 		vertices[i][0] = (float)ccVertices[(uint64_t)i * 3 + 0];
 		vertices[i][1] = (float)ccVertices[(uint64_t)i * 3 + 1];
 		vertices[i][2] = (float)ccVertices[(uint64_t)i * 3 + 2];
 	}
-	 
+
 	int64_t faceVertexOffsetBase = 0;
 	std::vector<int> poly;
 
@@ -1159,6 +1159,55 @@ mesh_triangle_cx* new_mesh(const char* path)
 	return p;
 }
 
+mesh_triangle_cx* new_mesh_stl(const char* data, size_t size)
+{
+	mesh_triangle_cx* p = 0;
+	if (data && size)
+	{
+		p = new mesh_triangle_cx();
+		{
+			stl3d_cx st;
+			st.load_binary((char*)data, size);
+			auto length = st.faces.size();
+			if (length > 0)
+			{
+#if 0
+				stl_generate_shared_vertices(&st, *p);
+#else
+				std::vector<glm::vec3> vf[1];
+				std::vector<uint32_t> idxs;
+				idxs.reserve(length * 3);
+				vf->reserve(length * 3);
+				auto dt = vf->data();
+				auto ft = st.faces.data();
+				KDTree<3, float> tree;
+				for (size_t i = 0; i < length; i++)
+				{
+					for (unsigned j = 0; j < 3; j++) {
+						unsigned index;
+						auto vec = ft[i].v[j];
+						int ind = tree.findNearest(vec);
+						if ((ind < 0) || (glm::distance(vec, tree.getPoint(ind)) > 1.0e-8)) {
+							index = tree.size();
+							tree.insert(vec);
+							vf->push_back(vec);
+						}
+						else {
+							index = ind;
+						}
+						idxs.push_back(index);
+					}
+				}
+				p->set_data(vf->data(), vf->size(), idxs.data(), idxs.size());
+#endif // 0 
+
+			}
+		}
+
+	}
+	return p;
+}
+
 mesh_triangle_cx* new_mesh(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum)
 {
 	auto p = new mesh_triangle_cx();
@@ -1208,6 +1257,17 @@ void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_
 	mmesh_t srcMesh, cutMesh;
 	triangle_mesh_to_mcut(*src_mesh, srcMesh);
 	triangle_mesh_to_mcut(*cut_mesh, cutMesh);
+	do_boolean(srcMesh, cutMesh, boolean_opts);
+	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
+	if (!tri_src.empty())
+		dst_mesh.push_back(std::move(tri_src));
+}
+
+void make_boolean(const mesh_triangle_cx* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
+{
+	if (!src_mesh || !cut_mesh)return;
+	mmesh_t srcMesh, cutMesh = *(mmesh_t*)cut_mesh;
+	triangle_mesh_to_mcut(*src_mesh, srcMesh);
 	do_boolean(srcMesh, cutMesh, boolean_opts);
 	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
 	if (!tri_src.empty())

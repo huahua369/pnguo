@@ -80,8 +80,7 @@ public:
 public:
 	app_cx();
 	~app_cx();
-
-	//form_x* new_form_renderer(const std::string& title, const glm::ivec2& ws, int flags, bool derender);
+	 
 	form_x* new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent);
 public:
 	int run_loop(int t);
