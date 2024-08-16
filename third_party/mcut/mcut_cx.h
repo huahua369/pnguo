@@ -61,6 +61,7 @@ void mesh_save_stl(const void* src_mesh, const char* fn, int type = 0);
 
 // 布尔运算
 void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
+void make_boolean(const void* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 void make_boolean(const mesh_triangle_cx* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 // mmesh_t*
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);

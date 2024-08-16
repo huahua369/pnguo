@@ -7435,10 +7435,10 @@ namespace gp {
 		std::vector<glm::vec3> vh, vh0;
 		glm::quat qt = {}; qt.w = 1;
 		{
-			style->depth = size.x * 0.5;
+			auto style_depth = size.x * 0.5;
 			glm::vec3 c1 = pos1;
-			c1.y = size.y - style->depth;
-			c1.z = style->depth;
+			c1.y = size.y - style_depth;
+			c1.z = style_depth;
 			int sct = (style->count);
 			if (style->type.x == 2)
 				sct = 1;

@@ -1274,6 +1274,19 @@ void make_boolean(const mesh_triangle_cx* src_mesh, const void* cut_mesh, std::v
 		dst_mesh.push_back(std::move(tri_src));
 }
 
+void make_boolean(const void* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
+{
+	if (!src_mesh || !cut_mesh)return;
+	mmesh_t srcMesh = *(mmesh_t*)src_mesh, cutMesh;
+	triangle_mesh_to_mcut(*cut_mesh, cutMesh);
+	if (do_boolean_single(srcMesh, cutMesh, boolean_opts))
+	{
+		mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
+		if (!tri_src.empty())
+			dst_mesh.push_back(std::move(tri_src));
+	}
+}
+
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
 {
 	if (!src_mesh || !cut_mesh)return;

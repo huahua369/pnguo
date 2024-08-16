@@ -707,7 +707,7 @@ int main()
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
 			kinit = true;
-			break;
+			 
 			text_path_t tp = {};
 			auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
 			std::vector<glm::vec2> ms;
