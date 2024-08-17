@@ -5,6 +5,7 @@
 
 // booleanOps
 enum class flags_b :uint8_t {
+	ALL = -1,		// 所有
 	A_NOT_B,		// 差集a-=b
 	B_NOT_A,		// 差集b-=a
 	UNION,			// 并集
@@ -58,14 +59,21 @@ void free_mesh(mesh_triangle_cx* p);
 void mesh_save_stl(mesh_triangle_cx* p, const char* fn, int type = 0);
 // mmesh_t*
 void mesh_save_stl(const void* src_mesh, const char* fn, int type = 0);
+// 合并不相交的模型
+void its_merge(mesh_triangle_cx& A, const mesh_triangle_cx& B);
 
 // 布尔运算
 void make_boolean(const mesh_triangle_cx* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
-void make_boolean(const void* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 void make_boolean(const mesh_triangle_cx* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
-// mmesh_t*
+void make_boolean(const void* src_mesh, const mesh_triangle_cx* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
-
+// 单个
+void make_boolean_s(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts);
+// 分割成独立模型
+std::vector<mesh_triangle_cx> mesh_split(mesh_triangle_cx* srcMesh);
+std::vector<mesh_triangle_cx> mesh_split(void* srcMesh);
+size_t mesh_split(mesh_triangle_cx* srcMesh, std::vector<mesh_triangle_cx>* opt);
+size_t mesh_split(void* srcMesh, std::vector<mesh_triangle_cx>* opt);
 
 template<class T>
 size_t add_v(T& src, const T& v) {

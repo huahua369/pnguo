@@ -822,10 +822,34 @@ MCAPI_ATTR void MCAPI_CALL mcDebugOutput(McDebugSource source,
 	}
 }
 
+/*
+MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE = (1 << 5), 计算位于切割网格上方的片段。< Compute fragments that are above the cut-mesh.
+MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW = (1 << 6), 计算位于切割网格下方的片段。< Compute fragments that are below the cut-mesh.
+MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED = (1 << 7), 计算部分切割的片段，即既不在切割网格的上方也不在切割网格下方。注意：此标志不能与 ：：MC_DISPATCH_REQUIRE_THROUGH_CUTS一起使用。
+< Compute fragments that are partially cut i.e. neither above nor below the cut-mesh. NOTE: This flag may not be used with ::MC_DISPATCH_REQUIRE_THROUGH_CUTS.
+
+MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE = (1 << 8), 计算内部完全密封（填充孔）的碎片。< Compute fragments that are fully sealed (hole-filled) on the interior.
+MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE = (1 << 9), 计算外部完全密封（填充孔洞）的碎片。< Compute fragments that are fully sealed (hole-filled) on the exterior.
+
+MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE = (1 << 10), 计算未密封的碎片（未填充的孔）。< Compute fragments that are not sealed (holes not filled).
+
+MC_DISPATCH_FILTER_PATCH_INSIDE = (1 << 11), 计算源网格内部的面片（用于填充孔的面片）。< Compute patches on the inside of the source mesh (those used to fill holes).
+MC_DISPATCH_FILTER_PATCH_OUTSIDE = (1 << 12), 计算源网格外部的补丁。< Compute patches on the outside of the source mesh.
+
+MC_DISPATCH_FILTER_SEAM_SRCMESH = (1 << 13), 计算接缝，该接缝与源网格相同，但沿切割路径放置了新的边。注意：仅当调度操作计算完整（贯穿）切割时，才会计算来自源网格的接缝。
+< Compute the seam which is the same as the source-mesh but with new edges placed along the cut path. Note: a seam from the source-mesh will only be computed if the dispatch operation computes a complete (through) cut.
+
+MC_DISPATCH_FILTER_SEAM_CUTMESH = (1 << 14), 计算接缝，它与切割网格相同，但沿切割路径放置了新的边。注意：仅当调度操作计算完整（贯穿）切割时，才会计算切割网格的接缝。
+< Compute the seam which is the same as the cut-mesh but with new edges placed along the cut path. Note: a seam from the cut-mesh will only be computed if the dispatch operation computes a complete (through) cut.
+
+*/
 uint32_t get_opflags(flags_b f) {
 	uint32_t flags = 0;
 	switch (f)
 	{
+	case flags_b::ALL:
+		flags = MC_DISPATCH_FILTER_ALL;
+		break;
 	case flags_b::A_NOT_B:
 		flags |= MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
 		break;
@@ -1009,6 +1033,19 @@ void do_boolean(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean_opts)
 		}
 	}
 	else if (boolean_opts == flags_b::INTERSECTION) {
+		for (size_t i = 0; i < src_parts.size(); i++) {
+			for (size_t j = 0; j < cut_parts.size(); j++) {
+				auto src_part = triangle_mesh_to_mcut(src_parts[i]);
+				auto cut_part = triangle_mesh_to_mcut(cut_parts[j]);
+				bool success = do_boolean_single(src_part, cut_part, boolean_opts);
+				if (success) {
+					auto tri_part = mcut_to_triangle_mesh(src_part);
+					its_merge(all_its, tri_part);
+				}
+			}
+		}
+	}
+	else if (boolean_opts == flags_b::ALL) {
 		for (size_t i = 0; i < src_parts.size(); i++) {
 			for (size_t j = 0; j < cut_parts.size(); j++) {
 				auto src_part = triangle_mesh_to_mcut(src_parts[i]);
@@ -1279,15 +1316,22 @@ void make_boolean(const void* src_mesh, const mesh_triangle_cx* cut_mesh, std::v
 	if (!src_mesh || !cut_mesh)return;
 	mmesh_t srcMesh = *(mmesh_t*)src_mesh, cutMesh;
 	triangle_mesh_to_mcut(*cut_mesh, cutMesh);
-	if (do_boolean_single(srcMesh, cutMesh, boolean_opts))
-	{
-		mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
-		if (!tri_src.empty())
-			dst_mesh.push_back(std::move(tri_src));
-	}
+	do_boolean(srcMesh, cutMesh, boolean_opts);
+	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
+	if (!tri_src.empty())
+		dst_mesh.push_back(std::move(tri_src));
 }
 
 void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
+{
+	if (!src_mesh || !cut_mesh)return;
+	mmesh_t srcMesh = *(mmesh_t*)src_mesh, cutMesh = *(mmesh_t*)cut_mesh;
+	do_boolean(srcMesh, cutMesh, boolean_opts);
+	mesh_triangle_cx tri_src = mcut_to_triangle_mesh(srcMesh);
+	if (!tri_src.empty())
+		dst_mesh.push_back(std::move(tri_src));
+}
+void make_boolean_s(const void* src_mesh, const void* cut_mesh, std::vector<mesh_triangle_cx>& dst_mesh, flags_b boolean_opts)
 {
 	if (!src_mesh || !cut_mesh)return;
 	mmesh_t srcMesh = *(mmesh_t*)src_mesh, cutMesh = *(mmesh_t*)cut_mesh;
@@ -1297,4 +1341,42 @@ void make_boolean(const void* src_mesh, const void* cut_mesh, std::vector<mesh_t
 		if (!tri_src.empty())
 			dst_mesh.push_back(std::move(tri_src));
 	}
+}
+
+std::vector<mesh_triangle_cx> mesh_split(mesh_triangle_cx* srcMesh)
+{
+	return its_split(*srcMesh);
+}
+std::vector<mesh_triangle_cx> mesh_split(void* srcMesh)
+{
+	auto tri_src = mcut_to_triangle_mesh(*(mmesh_t*)srcMesh);
+	return its_split(tri_src);
+}
+
+size_t mesh_split(mesh_triangle_cx* srcMesh, std::vector<mesh_triangle_cx>* opt) {
+	size_t ret = 0;
+	if (opt)
+	{
+		ret = opt->size();
+		auto v = its_split(*srcMesh);
+		for (auto& it : v) {
+			opt->push_back(std::move(it));
+		}
+		ret = opt->size() - ret;
+	}
+	return ret;
+}
+size_t mesh_split(void* srcMesh, std::vector<mesh_triangle_cx>* opt) {
+	size_t ret = 0;
+	if (opt)
+	{
+		ret = opt->size();
+		auto tri_src = mcut_to_triangle_mesh(*(mmesh_t*)srcMesh);
+		auto v = its_split(tri_src);
+		for (auto& it : v) {
+			opt->push_back(std::move(it));
+		}
+		ret = opt->size() - ret;
+	}
+	return ret;
 }
