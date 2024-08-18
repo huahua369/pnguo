@@ -745,11 +745,11 @@ int main()
 				"union",		// 并集
 				"intersection"	// 交集
 			};
-#if 0
 			{
 				print_time aadk("bool mesh");
 				make_boolean(&tf4, &tf5, mv, flags_b::A_NOT_B);
 			}
+#if 0
 			{
 				print_time aadk("bool mesh");
 				make_boolean(&tf4, &tf5, mv, flags_b::B_NOT_A);
