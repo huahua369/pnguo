@@ -774,25 +774,49 @@ namespace gp {
 	};
 	// 生成B样条线约束的竖三角面
 	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
-	
+
 	// 多边形
 	struct mesh_mt
 	{
 		std::vector<uint32_t> face_size;		// 面的边数3\4、多边形
 		std::vector<uint32_t> face_indice;		// 索引
 		std::vector<double> vertex_coord;		// 顶点坐标
-		std::vector<glm::uvec2> halfedge;		// 半边
 	public:
+		// 查找循环边，输入一个边序号，返回边
+		std::vector<glm::uvec2> find_edge_loop(uint32_t idx);
+		// 查找循环面，输入一个面序号，返回面
+		std::vector<glm::uvec4> find_face_loop(uint32_t idx);
+
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);
-	}; 	
+	};
+	// 面编辑结构
+	struct edit_mesh_t
+	{
+		struct halfedge_t
+		{
+			glm::uvec2 indice = {};					//顶点索引，x=开头，y下一点索引
+			size_t front_half, back_half, rev_half;	// 前后反半边
+			size_t face_idx;						// 面集合序号
+		};
+		struct face_t {
+			glm::uvec2 half[4]; // 半边集合索引，最多支持四边形
+
+		};
+		std::map<glm::uvec2, size_t> _m;		// 半边集合，key{点索引，下一点索引}，数据索引
+		std::vector<halfedge_t> _data;			// 半边集合数据
+		std::vector<face_t> _face;				// 面集合
+		mesh_mt* mesh = 0;							// 网格数据
+		// 生成半边
+		void build_halfedge();
+	};
 	// 三角形
 	struct mesh3_mt
 	{
 		std::vector<glm::ivec3>	indices;	// 三角形索引
 		std::vector<glm::vec3>	vertices;	// 顶点坐标
-	}; 
-	 
+	};
+
 
 	// 挤出、倒角
 	struct extrude_bevel_t {

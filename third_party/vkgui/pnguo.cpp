@@ -7323,6 +7323,41 @@ namespace gp {
 
 
 
+	//void mesh_mt::build_halfedge()
+	//{
+	//	// 半边需要加载数据有索引、面边数
+	//	if (face_size.empty() || face_indice.empty())return;
+	//	auto fx = face_indice.data();
+	//	auto fs = face_size.size();
+	//	auto fds = face_size.data();
+	//	halfedge.clear();
+	//	halfedge.reserve(fs * 4);
+	//	for (auto& ft : face_size)
+	//	{
+	//		switch (ft)
+	//		{
+	//		case 3:
+	//		{
+	//			auto idx = (glm::uvec3*)fx;
+	//			halfedge.push_back({ idx->x,idx->y });
+	//			halfedge.push_back({ idx->y,idx->z });
+	//			halfedge.push_back({ idx->z,idx->x });
+
+	//		}break;
+	//		case 4:
+	//		{
+	//			auto idx = (glm::uvec4*)fx;
+	//			halfedge.push_back({ idx->x,idx->y });
+	//			halfedge.push_back({ idx->y,idx->z });
+	//			halfedge.push_back({ idx->z,idx->w });
+	//			halfedge.push_back({ idx->w,idx->x });
+	//		}break;
+	//		default:
+	//			break;
+	//		}
+	//		fx += ft;
+	//	}
+	//}
 	void mesh_mt::add_vertex(const glm::dvec3* v, size_t n)
 	{
 		if (v && n > 0)

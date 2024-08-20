@@ -117,9 +117,10 @@ namespace vkr {
 	// 多边形
 	struct mesh_mt
 	{
-		std::vector<uint32_t> faceSizesArray;		// 面的边数3/4、多边形
-		std::vector<uint32_t> faceIndicesArray;		// 索引
-		std::vector<double>   vertexCoordsArray;	// 顶点坐标
+		std::vector<uint32_t> face_size;		// 面的边数3\4、多边形
+		std::vector<uint32_t> face_indice;		// 索引
+		std::vector<double> vertex_coord;		// 顶点坐标
+		std::vector<glm::uvec2> halfedge;		// 半边
 	public:
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);
