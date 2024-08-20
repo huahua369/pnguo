@@ -13,7 +13,7 @@
 // 渲染指令
 
 namespace vkr {
-	 
+
 	struct const_vk {
 		// Create all the heaps for the resources views
 		uint32_t cbvDescriptorCount = 2000;
@@ -97,19 +97,66 @@ vkdg_cx* new_vkdg(dev_info_cx* c = 0);
 void free_vkdg(vkdg_cx* p);
 void load_gltf(vkdg_cx* p, const char* fn);
 
-// 顶点数据、纹理、矩阵、灯光、渲染命令
-struct light_info_t
-{
-	// 平行光、点光源、聚光灯
-	enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
-	LightType	m_type = LIGHT_DIRECTIONAL; 
-	glm::vec4	m_color;					// 颜色
-	float		m_range;					// 范围
-	float       m_intensity = 0.0f;			// 强度
-	float       m_innerConeAngle = 0.0f;	// 内锥角
-	float       m_outerConeAngle = 0.0f;	// 外锥角
-	uint32_t    m_shadowResolution = 1024;	// 阴影分辨率
-	float       m_bias = 70.0f / 100000.0f;	// 偏差
-	glm::vec3	m_position;
-};
+namespace vkr {
+	// 顶点数据、纹理、矩阵、灯光、渲染命令
+	struct light_info_t
+	{
+		// 平行光、点光源、聚光灯
+		enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
+		LightType	_type = LIGHT_DIRECTIONAL;
+		glm::vec4	_color;					// 颜色
+		float		_range;					// 范围
+		float       _intensity = 0.0f;			// 强度
+		float       _innerConeAngle = 0.0f;	// 内锥角
+		float       _outerConeAngle = 0.0f;	// 外锥角
+		uint32_t    _shadowResolution = 1024;	// 阴影分辨率
+		float       _bias = 70.0f / 100000.0f;	// 偏差
+		glm::vec3	_position;
+	};
 
+	// 多边形
+	struct mesh_mt
+	{
+		std::vector<uint32_t> faceSizesArray;		// 面的边数3/4、多边形
+		std::vector<uint32_t> faceIndicesArray;		// 索引
+		std::vector<double>   vertexCoordsArray;	// 顶点坐标
+	public:
+		void add_vertex(const glm::dvec3* v, size_t n);
+		void add_vertex(const glm::vec3* v, size_t n);
+	};
+	// 三角形
+	struct mesh3_mt
+	{
+		std::vector<glm::ivec3>	indices;	// 三角形索引
+		std::vector<glm::vec3>	vertices;	// 顶点坐标
+	};
+	// 简易材质
+	struct mesh_material_mt
+	{
+		std::vector<uint32_t> color;	// 颜色uv数量对应顶点坐标
+		std::vector<glm::vec2> uv;
+	};
+	// 点、线模式
+	struct point_draw_t
+	{
+		uint32_t color = 0;
+		uint32_t width = 0;
+	};
+	struct line_draw_t
+	{
+		uint32_t color = 0;
+		uint32_t width = 0;
+	};
+	// 渲染数据
+	struct rdata_t {
+		mesh3_mt* d = 0;
+		glm::mat4 m;
+		bool visible = true;
+	};
+	// 添加渲染数据对象
+	void vkdg_add(vkdg_cx* p, rdata_t* d);
+	// 删除对象
+	void vkdg_remove(vkdg_cx* p, rdata_t* d);
+	
+}
+//!vkr

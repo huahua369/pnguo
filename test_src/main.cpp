@@ -723,6 +723,14 @@ int main()
 				auto fn = "temp/cct3.stl";
 				sc.save(fn, 0);
 			}
+
+
+
+
+
+
+
+
 			std::vector<mesh_triangle_cx> mv;
 			gp::line_style_t et = { 3,6,1,0,{1,1} };
 			gp::mesh3_mt tf3 = {};
@@ -795,7 +803,7 @@ int main()
 				{-5, 5, -5 }//7
 			};
 			tc4.add_vertex(v3, 8);
-			tc4.faceIndicesArray = {
+			tc4.face_indices = {
 				0, 1, 2, 3, //0
 				7, 6, 5, 4, //1
 				1, 5, 6, 2, //2
@@ -803,7 +811,7 @@ int main()
 				3, 2, 6, 7, //4
 				4, 5, 1, 0 //5
 			};
-			tc4.faceSizesArray = { 4, 4, 4, 4, 4, 4 };// 四边形
+			tc4.face_sizes = { 4, 4, 4, 4, 4, 4 };// 四边形
 			gp::mesh_mt tv4 = {};
 			{
 				glm::dvec3 v3[] = {
@@ -813,11 +821,11 @@ int main()
 					{0, 20, -20}, //3 
 				};
 				tv4.add_vertex(v3, 4);
-				tv4.faceIndicesArray = {
+				tv4.face_indices = {
 					 0, 1, 2, //0
 					 0, 2, 3 //1
 				};
-				tv4.faceSizesArray = { 3,3 };// 两个三角面
+				tv4.face_sizes = { 3,3 };// 两个三角面
 			}
 
 
@@ -1210,7 +1218,7 @@ int main()
 	listp->add_familys(fontn2, 0);
 	{
 		listp->draggable = true; //可拖动
-		listp->set_size({ 600,600 });
+		listp->set_size({ 1600,800 });
 		listp->set_pos({ 10,10 });
 		auto pss = listp->get_size();
 		int width = 10;
@@ -1298,7 +1306,8 @@ int main()
 			it.c->pos += 4;
 			it.b->pos += 4;
 		}
-		svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
+		//svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
+		svg_cx* bl = new_svg_file("E:\\tx\\Ghostscript_Tiger.svg", 0, 96);
 		svg_cx* bl1 = new_svg_file("button20.svg", 0, 96);
 		svg_cx* bl2 = new_svg_file("button21.svg", 0, 96);
 		int xn = bl->width * 2 * bl->height * 2;
@@ -1348,7 +1357,7 @@ int main()
 				rs.radius = 8;
 				rs.segment = 8;
 				// 边框阴影
-				draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
+				//draw_rectangle_gradient(cr, cs.x * 2, cs.y * 2, rs);
 				return;
 			};
 		{

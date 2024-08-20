@@ -120,7 +120,7 @@ struct image_ptr_t
 	int type = 0;				// 0=rgba，1=bgra
 	int stride = 0;
 	uint32_t* data = 0;			// 像素数据
-	void* texid = 0;			// 纹理指针
+	void* texid = 0;			// 纹理指针，由调用方自动生成管理
 	void* ptr = 0;				// 用户数据
 	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
 	int  blendmode = 0;			// 混合模式
@@ -778,37 +778,21 @@ namespace gp {
 	// 多边形
 	struct mesh_mt
 	{
-		std::vector<uint32_t> faceSizesArray;		// 面的边数3/4、多边形
-		std::vector<uint32_t> faceIndicesArray;		// 索引
-		std::vector<double>   vertexCoordsArray;	// 顶点坐标
+		std::vector<uint32_t> face_size;		// 面的边数3\4、多边形
+		std::vector<uint32_t> face_indice;		// 索引
+		std::vector<double> vertex_coord;		// 顶点坐标
+		std::vector<glm::uvec2> halfedge;		// 半边
 	public:
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);
-	}; 
+	}; 	
 	// 三角形
 	struct mesh3_mt
 	{
 		std::vector<glm::ivec3>	indices;	// 三角形索引
 		std::vector<glm::vec3>	vertices;	// 顶点坐标
-	};
-	// 简易材质
-	struct mesh_material_mt
-	{
-		std::vector<uint32_t> color;	// 颜色uv数量对应顶点坐标
-		std::vector<glm::vec2> uv; 
-	};
-	// 点、线模式
-	struct point_draw_t
-	{
-		uint32_t color = 0;
-		uint32_t width = 0;
-	};
-	struct line_draw_t
-	{
-		uint32_t color = 0;
-		uint32_t width = 0;
-	};
-
+	}; 
+	 
 
 	// 挤出、倒角
 	struct extrude_bevel_t {
@@ -829,7 +813,7 @@ namespace gp {
 	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, line_style_t* style, mesh_mt* opt);
 
 }
-
+// todo path_v
 class path_v
 {
 public:

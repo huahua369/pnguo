@@ -1437,7 +1437,7 @@ void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color3
 	glm::vec4 v4 = { 0, 0, 1, 1 };
 	glm::vec4 uv = v4;
 	glm::vec2 s = size;
-	int* ts = (int*)p->img;
+	auto ts = p->img;
 	auto texsize = *((glm::ivec2*)ts);
 	if (!(rect.x < 0))
 	{
@@ -7327,22 +7327,22 @@ namespace gp {
 	{
 		if (v && n > 0)
 		{
-			auto ps = vertexCoordsArray.size();
-			vertexCoordsArray.resize(vertexCoordsArray.size() + n * 3);
-			memcpy(vertexCoordsArray.data() + ps, v, sizeof(glm::dvec3) * n);
+			auto ps = vertex_coord.size();
+			vertex_coord.resize(vertex_coord.size() + n * 3);
+			memcpy(vertex_coord.data() + ps, v, sizeof(glm::dvec3) * n);
 		}
 	}
 	void mesh_mt::add_vertex(const glm::vec3* v, size_t n)
 	{
 		if (v && n > 0)
 		{
-			auto ps = vertexCoordsArray.size();
-			vertexCoordsArray.reserve(vertexCoordsArray.size() + n * 3);
+			auto ps = vertex_coord.size();
+			vertex_coord.reserve(vertex_coord.size() + n * 3);
 			for (size_t i = 0; i < n; i++)
 			{
-				vertexCoordsArray.push_back(v->x);
-				vertexCoordsArray.push_back(v->y);
-				vertexCoordsArray.push_back(v->z);
+				vertex_coord.push_back(v->x);
+				vertex_coord.push_back(v->y);
+				vertex_coord.push_back(v->z);
 				v++;
 			}
 		}
@@ -7506,11 +7506,11 @@ namespace gp {
 				}
 			}
 		}
-		opt->vertexCoordsArray.reserve((vh.size() + vh0.size()) * 3);
-		opt->faceIndicesArray.reserve((vh.size() + vh0.size()) * 3);
-		auto& dva = opt->vertexCoordsArray;
-		auto& fida = opt->faceIndicesArray;
-		auto& fs = opt->faceSizesArray;
+		opt->vertex_coord.reserve((vh.size() + vh0.size()) * 3);
+		opt->face_indice.reserve((vh.size() + vh0.size()) * 3);
+		auto& dva = opt->vertex_coord;
+		auto& fida = opt->face_indice;
+		auto& fs = opt->face_size;
 		fs.reserve(vh.size() + vh0.size());
 		size_t oldidx = dva.size() / 3;
 		size_t idx = dva.size() / 3;
