@@ -645,6 +645,23 @@ GizmoGeomInfo wm_gizmo_geom_data_dial = {
 	/*indices*/dial_n::indices,
 };
 
+static std::string toStr(const njson& v, const std::string& des = "")
+{
+	std::string ret = des;
+	if (v.is_null())
+	{
+		//ret = "";
+	}
+	else if (v.is_string())
+	{
+		ret = v.get<std::string>();
+	}
+	else
+	{
+		ret = md::trim(v.dump(), "\"");
+	}
+	return ret;
+}
 
 int main()
 {
@@ -657,7 +674,8 @@ int main()
 
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
-
+	njson v = 0;
+	auto ksfd = toStr(v);
 #if 1
 #if 1
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
@@ -707,7 +725,7 @@ int main()
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
 			kinit = true;
-			 
+
 			text_path_t tp = {};
 			auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
 			std::vector<glm::vec2> ms;

@@ -806,7 +806,7 @@ namespace gp {
 		std::map<glm::uvec2, size_t> _m;		// 半边集合，key{点索引，下一点索引}，数据索引
 		std::vector<halfedge_t> _data;			// 半边集合数据
 		std::vector<face_t> _face;				// 面集合
-		mesh_mt* mesh = 0;							// 网格数据
+		mesh_mt* mesh = 0;						// 网格数据
 		// 生成半边
 		void build_halfedge();
 	};
