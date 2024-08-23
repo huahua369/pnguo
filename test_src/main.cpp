@@ -22,6 +22,7 @@
 
 #include <mimalloc.h>
 #include <mimalloc-new-delete.h>
+
 /*
 	todo
 	顶点数据、纹理/颜色数据、mvp矩阵
@@ -671,7 +672,7 @@ int main()
 #endif
 	//loadtestdata();
 	auto app = new_app();
-
+ 
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
 	njson v = 0;
@@ -680,9 +681,9 @@ int main()
 #if 1
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器
+	vkdg_cx* vkd = 0;// new_vkdg(&sdldev);	// 创建vk渲染器
 	SDL_Texture* d3tex = 0;
-	if (vkd) {
+	if (vkd && d3tex) {
 		int xk = 0;
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
@@ -706,10 +707,10 @@ int main()
 	}
 	form0->up_cb = [=](float delta, int* ret)
 		{
-			vkd->update(form0->io);
-			vkd->on_render();
+			//vkd->update(form0->io);
+			//vkd->on_render();
 			bool ks = false;
-			if (ks) {
+			if (ks && vkd) {
 				vkd->save_fbo(0);
 				stbi_write_png("temp/fbovkr.png", vkd->width, vkd->height, 4, vkd->dt.data(), 0);
 			}
@@ -725,6 +726,7 @@ int main()
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
 			kinit = true;
+			return;
 
 			text_path_t tp = {};
 			auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
@@ -1055,17 +1057,17 @@ int main()
 		}
 		div->layout();
 		{
-			auto img = p->new_image2("E:\\tx\\03.gif");
-			auto imgsur = new_image_cr(img);
-			glm::vec2 ds = { img->width  ,img->height };
-			if (img->width + 100 > cs.x)
-			{
-				cs.x = img->width + 100;
-			}
-			if (img->height + 100 > cs.y)
-			{
-				cs.y = img->height + 100;
-			}
+			//auto img = p->new_image2("E:\\tx\\03.gif");
+			//auto imgsur = new_image_cr(img);
+			//glm::vec2 ds = { img->width  ,img->height };
+			//if (img->width + 100 > cs.x)
+			//{
+			//	cs.x = img->width + 100;
+			//}
+			//if (img->height + 100 > cs.y)
+			//{
+			//	cs.y = img->height + 100;
+			//}
 			p->set_view(vs, cs);
 
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
@@ -1211,6 +1213,7 @@ int main()
 				};
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
+					if (!vkd)return;
 					auto v3 = vkd->get_value(0);
 					g3->str = "x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					//cairo_as _cas(cr);
@@ -1325,7 +1328,7 @@ int main()
 			it.b->pos += 4;
 		}
 		//svg_cx* bl = new_svg_file("blender_icons.svg", 0, 96);
-		svg_cx* bl = new_svg_file("E:\\tx\\Ghostscript_Tiger.svg", 0, 96);
+		svg_cx* bl = new_svg_file("Ghostscript_Tiger.svg", 0, 96);
 		svg_cx* bl1 = new_svg_file("button20.svg", 0, 96);
 		svg_cx* bl2 = new_svg_file("button21.svg", 0, 96);
 		int xn = bl->width * 2 * bl->height * 2;

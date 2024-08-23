@@ -2,7 +2,6 @@
 # 项目特定的逻辑。
 #
 cmake_minimum_required (VERSION 3.8)
-set(VCPKG_TARGET_TRIPLET x64-windows-static)
 set(CMAKE_TOOLCHAIN_FILE "E:/sdk/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
 IF(WIN32)
@@ -13,6 +12,16 @@ endif()
 set(CMAKE_CXX_EXTENSIONS ON)
 
 project ("pnguo")
+
+message("VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
+if(VCPKG_TARGET_TRIPLET STREQUAL "x64-windows")
+set(VCPKG_TARGET_TRIPLET x64-windows-static)
+endif()
+if(VCPKG_TARGET_TRIPLET STREQUAL "x86-windows")
+set(VCPKG_TARGET_TRIPLET x86-windows-static)
+endif()
+set(VCPKG_CRT_LINKAGE static)
+set(VCPKG_LIBRARY_LINKAGE static)
 
 message("msvc: ${CMAKE_SYSTEM_VERSION}")
 message("CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
@@ -90,7 +99,6 @@ add_definitions(-DVKVG_RECORDING)
 add_definitions(-DVKH_USE_VMA)
 add_definitions(-DXATLAS_C_API=1)
 
-find_package(PkgConfig REQUIRED)
 find_package(mimalloc CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED) 
@@ -102,11 +110,12 @@ find_package(harfbuzz CONFIG REQUIRED)
 find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h") 
 find_package(EnTT CONFIG REQUIRED) 
+find_package(PkgConfig REQUIRED)
 pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
 pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)
 pkg_check_modules(LIBRSVG librsvg-2.0 IMPORTED_TARGET REQUIRED)
-pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED) 
-
+pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)  
+pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2) 
 #vkvg 
 FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c
   third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp 
@@ -152,6 +161,8 @@ target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIR
 target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
 PkgConfig::GTHREAD
 mimalloc-static
+
+PkgConfig::LIBGIT2
 )
 
 #3d渲染器
