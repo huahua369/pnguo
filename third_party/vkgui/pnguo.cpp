@@ -15104,10 +15104,10 @@ union gcache_key
 	uint64_t u;
 	struct {
 		uint32_t glyph_index;
-		uint16_t height;
+		uint32_t height;
 	}v;
 };
-font_item_t* font_t::push_gcache(uint32_t glyph_index, uint16_t height, image_ptr_t* img, const glm::ivec4& rect, const glm::ivec2& pos)
+font_item_t* font_t::push_gcache(uint32_t glyph_index, uint32_t height, image_ptr_t* img, const glm::ivec4& rect, const glm::ivec2& pos)
 {
 	gcache_key k = {}; k.v.glyph_index = glyph_index; k.v.height = height;
 	auto& pt = _cache_glyphidx[k.u];
@@ -15129,7 +15129,7 @@ font_item_t* font_t::push_gcache(uint32_t glyph_index, uint16_t height, image_pt
 	pt->_rect = rect;
 	return pt;
 }
-font_item_t* font_t::get_gcache(uint32_t glyph_index, uint16_t height)
+font_item_t* font_t::get_gcache(uint32_t glyph_index, uint32_t height)
 {
 	gcache_key k = {}; k.v.glyph_index = glyph_index; k.v.height = height;
 	font_item_t* ret = 0;
