@@ -662,10 +662,9 @@ static std::string toStr(const njson& v, const std::string& des = "")
 		ret = md::trim(v.dump(), "\"");
 	}
 	return ret;
-}
-
+} 
 int main()
-{
+{ 
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
