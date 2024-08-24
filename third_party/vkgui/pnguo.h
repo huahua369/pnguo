@@ -482,7 +482,7 @@ private:
 
 struct hps_t;
 class fd_info0;
-
+// 单个字体
 class font_t
 {
 public:
@@ -494,11 +494,11 @@ public:
 	int64_t num_glyphs = 0;
 	uint32_t  _index = 0;
 
-	float ascender = .0;
-	float descender = .0;
-	float lineh = .0;
+	float ascender = 0.0;
+	float descender = 0.0;
+	float lineh = 0.0;
 	double  xMaxExtent = 0.0, lineGap = 0.0;
-	std::map<uint64_t, font_item_t*> _cache_glyphidx;
+	std::map<uint64_t, font_item_t*> _cache_glyphidx;	// 缓存字形
 	std::vector<font_item_t*> cache_data;
 	int cache_count = 0;
 	int ccount = 84;
@@ -507,11 +507,8 @@ public:
 
 	bitmap_ttinfo* bitinfo = 0;
 	gcolors_t* colorinfo = 0;
-	bitmap_cache_cx* ctx = 0;  //纹理缓存
-
-	// 宽度缓存表
-	//std::unordered_map<uint64_t, glm::ivec3> _char_lut;
-
+	bitmap_cache_cx* ctx = 0;  //纹理缓存，多个字体共用
+	 
 	bool first_bitmap = false;
 public:
 	font_t();
