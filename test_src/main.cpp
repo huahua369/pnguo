@@ -662,16 +662,16 @@ static std::string toStr(const njson& v, const std::string& des = "")
 		ret = md::trim(v.dump(), "\"");
 	}
 	return ret;
-} 
+}
 int main()
-{ 
+{
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 #endif
 	//loadtestdata();
 	auto app = new_app();
- 
+
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
 	njson v = 0;
@@ -715,7 +715,7 @@ int main()
 			}
 		};
 	//form0->_focus_lost_hide = true;
-	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";
+	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto ftc = app->font_ctx;
 	static std::atomic_bool kinit = false;
 	std::thread attt([=]() {
@@ -725,24 +725,35 @@ int main()
 			ltx.set_ctx(ftc);
 			ltx.add_familys(fontn, 0);
 			kinit = true;
-			return;
 
 			text_path_t tp = {};
-			auto gsp = ltx.get_shape(0, u8"a", 60, &tp);
+			auto gsp = ltx.get_shape(0, u8"囍", 60, &tp);// fontsize=0获取原始大小
 			std::vector<glm::vec2> ms;
 			if (tp.tv.empty())break;
 			path_v pv;
-			pv.set_data(&tp.tv[0]);
+			pv.set_data(tp.tv.data(), tp.tv.size());
+
+			save_png_v(&pv, 1, "temp/cct3h.png", 1, 10);
 			glm::dvec2 ad;
-			pv.triangulate(8, 1, 1, 0, &ms);
+			pv.triangulate(8, 1, 1, 0, &ms,0);
 			if (ms.size())
 			{
 				stl3d_cx sc;
 				sc.add(ms.data(), ms.size());
-				auto fn = "temp/cct3.stl";
+				auto fn = "temp/cct3h_cdt.stl";
+				sc.save(fn, 0);
+			}
+			ms.clear();
+			pv.triangulate(8, 1, 1, 0, &ms,1);
+			if (ms.size())
+			{
+				stl3d_cx sc;
+				sc.add(ms.data(), ms.size());
+				auto fn = "temp/cct3h_gr.stl";
 				sc.save(fn, 0);
 			}
 
+			return;
 
 
 
@@ -1070,9 +1081,11 @@ int main()
 			p->set_view(vs, cs);
 
 			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
-			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 380,30 }, 3);
+			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 380,130 }, 3);
 			g3->_absolute = true;
 			g3->pos = { 30,120 };
+			g3->font_size = 60;
+			g3->text_align = { 0,0.5 };
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
@@ -1212,9 +1225,8 @@ int main()
 				};
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
-					if (!vkd)return;
-					auto v3 = vkd->get_value(0);
-					g3->str = "x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
+					auto v3 = vkd ? vkd->get_value(0) : glm::vec3();
+					g3->str = (char*)u8"한ABCabc x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 

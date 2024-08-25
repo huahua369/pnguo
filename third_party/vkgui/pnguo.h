@@ -393,8 +393,9 @@ struct tinypath_t
 	vertex_f* v = 0;
 	int count = 0;
 	int baseline = 0;
-	int last = 0;
-
+	int first = 0;
+	int advance = 0;
+	glm::ivec2 bearing = {};
 };
 
 struct tinyflatten_t
@@ -508,7 +509,7 @@ public:
 	bitmap_ttinfo* bitinfo = 0;
 	gcolors_t* colorinfo = 0;
 	bitmap_cache_cx* ctx = 0;  //纹理缓存，多个字体共用
-	 
+
 	bool first_bitmap = false;
 public:
 	font_t();
@@ -519,9 +520,10 @@ public:
 	// 获取字体最大box
 	glm::ivec4 get_bounding_box(double scale, bool is_align0);
 	// 输入utf8获取轮廓，height=0则获取原始大小。提供opt
-	tinypath_t get_shape(const void* str8, int height, std::vector<vertex_f>* opt);
+	tinypath_t get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv);
 	glm::ivec2 get_shape_box(const void* str8, int height);
-	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt);
+	glm::ivec2 get_shape_box(uint32_t ch, int height);
+	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv);
 public:
 	// 获取字符大小
 	glm::ivec3 get_char_extent(char32_t ch, unsigned char font_size, unsigned short font_dpi, std::vector<font_t*>* fallbacks);
@@ -922,7 +924,7 @@ public:
 	void addRect(const glm::vec4& a, const glm::vec2& r);
 	void add(const vertex_t& v);
 	void set_data(const vertex_t* d, size_t size);
-	void set_data(const tinypath_t* d);
+	void set_data(const tinypath_t* d, int count);
 	void add_lines(const glm::vec2* d, size_t size, bool isclose = false);
 	void add_lines(const glm::dvec2* d, size_t size, bool isclose = false);
 
@@ -956,6 +958,7 @@ public:
 	// 获取整体大小
 	glm::vec2 get_size();
 	glm::vec4 mkbox();
+	glm::vec4 mkbox_npos();
 	void add(path_v* p);
 	void incpos(const glm::vec2& p);
 	void mxfy(double fy);
@@ -974,8 +977,8 @@ public:
 
 	int get_expand_flatten3(float expand, float scale, int segments, float ml, float ds, int type, int etype, std::vector<std::vector<glm::vec2>>* ots, bool is_close);
 
-	// 三角化，曲线细分段，是否转置成反面0/1，输出到ms数组
-	int triangulate(int segments, float ml, float ds, bool pccw, std::vector<glm::vec2>* ms);
+	// 三角化，曲线细分段，是否转置成反面0/1，输出到ms数组。type=0cdt，1=割耳
+	int triangulate(int segments, float ml, float ds, bool pccw, std::vector<glm::vec2>* ms, int type = 0);
 	// 获取每条边的中心点拉高z
 	int get_triangulate_center_line(int segments, float ml, float ds, int is_reverse, const glm::vec2& z, std::vector<glm::vec3>* ms);
 
@@ -983,6 +986,7 @@ public:
 private:
 
 };
+void save_png_v(path_v* pv, int count, const std::string& fn, bool fy, float sc);
 
 struct text_path_t
 {

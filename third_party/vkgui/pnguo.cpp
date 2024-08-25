@@ -8118,6 +8118,64 @@ glm::vec4 path_v::mkbox() {
 	_box = bx;
 	return bx;
 }
+glm::vec4 path_v::mkbox_npos() {
+	glm::vec4 r = {};
+	glm::vec4 bx = { INT_MAX,INT_MAX,INT_MIN,INT_MIN };
+	auto ds = _data.size();
+	float m = 20;
+	if (ds > 2)
+	{
+		glm::vec2 k[] = { _data[ds - 1].p,_data[ds - 2].p };
+		if (k[0] == k[1])
+		{
+			_data.pop_back();
+		}
+	}
+	glm::vec2 ltp = {};
+	for (auto& it : _data) {
+		tobox(it.p, bx);
+		if (it.type == vtype_e::e_vcurve)
+		{
+			cubic_v cv = {};
+			cv.p0 = ltp;
+			cv.p1 = it.c;
+			cv.p2 = it.c;
+			cv.p3 = it.p;
+			c2to3(cv);
+			auto vb = get_bezier_t<glm::vec2>(&cv, 1, m);
+			if (vb.size())
+			{
+				for (auto vt : vb) {
+					tobox(vt, bx);
+				}
+			}
+			else {
+				tobox(it.c, bx);
+			}
+		}
+		if (it.type == path_v::vtype_e::e_vcubic)
+		{
+			cubic_v cv = {};
+			cv.p0 = ltp;
+			cv.p1 = it.c;
+			cv.p2 = it.c1;
+			cv.p3 = it.p;
+			auto vb = get_bezier_t<glm::vec2>(&cv, 1, m);
+			if (vb.size())
+			{
+				for (auto vt : vb) {
+					tobox(vt, bx);
+				}
+			}
+			else {
+				tobox(it.c, bx);
+				tobox(it.c1, bx);
+			}
+		}
+		ltp = it.p;
+	}
+	return bx;
+}
 void path_v::incpos(const glm::vec2& p) {
 	for (auto& it : _data) {
 		it.p += p;
@@ -8164,21 +8222,30 @@ void path_v::set_data(const path_v::vertex_t* d, size_t size)
 		memcpy(_data.data(), d, n * sizeof(path_v::vertex_t));
 	}
 }
-void path_v::set_data(const tinypath_t* d) {
-	if (d && d->v && d->count > 0)
+void path_v::set_data(const tinypath_t* d, int count) {
+	if (!d || !d->v || d->count < 3 || count < 1)return;
+	size_t ct = 0;
+
+	for (size_t i = 0; i < count; i++)
 	{
-		_data.resize(d->count);
-		auto length = d->count;
+		ct += d[i].count;
+		_baseline = std::max(_baseline, d[i].baseline);
+	}
+	{
+		_data.resize(ct);
+		auto length = ct;
 		auto pd = _data.data();
-		auto pt = (vertex_v2f*)d->v;
-		for (size_t i = 0; i < length; i++)
-		{
-			pd[i].type = (vtype_e)pt[i].type;
-			pd[i].p = pt[i].p;
-			pd[i].c = pt[i].c;
-			pd[i].c1 = pt[i].c1;
+		for (size_t j = 0; j < count; j++) {
+			auto& it = d[j];
+			auto pt = (vertex_v2f*)it.v;
+			for (size_t i = 0; i < it.count; i++, pd++)
+			{
+				pd->type = (vtype_e)pt[i].type;
+				pd->p = pt[i].p;
+				pd->c = pt[i].c;
+				pd->c1 = pt[i].c1;
+			}
 		}
-		_baseline = d->baseline;
 	}
 }
 
@@ -8877,40 +8944,138 @@ int path_v::get_expand_flatten(float width, int segments, int type, std::vector<
 	}
 	return 0;
 }
+// 判断点是否在多边形内
+int pnpoly_aos(int nvert, const float* verts, float testx, float testy) {
+	int i, j;
+	bool c = 0;
+	for (i = 0, j = nvert - 1; i < nvert; j = i++) {
+		if (((verts[i * 2 + 1] > testy) != (verts[j * 2 + 1] > testy)) &&
+			(testx < (verts[j * 2] - verts[i * 2]) * (testy - verts[i * 2 + 1]) / (verts[j * 2 + 1] - verts[i * 2 + 1]) + verts[i * 2])) {
+			c = !c;
+		}
+	}
+	return c;
+}
+glm::vec2 pnpoly_aos(int nvert, const glm::vec2* verts, const glm::vec2& test) {
+	int i, j;
+	bool c = 0;
+	float d = glm::distance2(test, verts[0]);
+	for (i = 0, j = nvert - 1; i < nvert; j = i++) {
+		if (((verts[i].y > test.y) != (verts[j].y > test.y)) &&
+			(test.x < (verts[j].x - verts[i].x) * (test.y - verts[i].y) / (verts[j].y - verts[i].y) + verts[i].x)) {
+			c = !c;
+		}
+		auto d1 = glm::distance2(test, verts[i]);
+		if (d1 < d)
+			d = d1;
+	}
+	return { c, d };
+}
 
-
-
-int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector<glm::vec2>* p)
+int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector<glm::vec2>* p, int type)
 {
 	if (!p)return 0;
 	auto& ms = *p;
 	auto pos = ms.size();
 	auto pt = gp::new_path_node(this, 0, 0, 0, 0, segments, ml, ds);
-	std::vector<std::vector<glm::vec2>>  tr;
+	std::vector<std::vector<glm::vec2>>  tr, tr1;
 	std::vector<glm::vec2>  tv1;
-
+	float z = 0.0;
 	gp::fv_it fv = { pt };
+	std::vector<PointD> pv;
 	for (size_t i = 0; i < fv.count; i++)
 	{
 		auto n = fv.lengths[i];
 		tv1.clear();
 		gp::for_vertex(fv.pos, fv.angle, fv.center, n, segments, tv1);
 		fv.inc(n);
-		tr.push_back(tv1);
+
+		pv.resize(tv1.size());
+		for (size_t i = 0; i < tv1.size(); i++)
+		{
+			pv[i] = { tv1[i].x,tv1[i].y };
+		}
+		bool ccw = IsPositive(pv);
+		if (ccw)
+			tr1.push_back(tv1);
+		else
+		{
+			tr.push_back(tv1);
+		}
 	}
 	std::vector<glm::vec3> ms3;
-	gp::constrained_delaunay_triangulation_v(&tr, ms3, pccw, 0);
+	auto nc = tr.size();
+	std::map<size_t, std::vector<std::vector<glm::vec2>>> shell;
+	for (size_t i = 0; i < nc; i++)
+	{
+		shell[i].push_back(tr[i]);
+	}
+	for (auto& it : tr1)
+	{
+		float dis = -1;
+		int64_t c = -1;
+		std::vector<glm::vec2> disv;
+		for (size_t i = 0; i < nc; i++)
+		{
+			auto n = tr[i].size();
+			auto& st = tr[i];
+			glm::vec2 ps = it[0];
+			float dis1 = 0;
+			auto bd = pnpoly_aos(n, st.data(), ps);// 返回是否在多边形内、最短距离
+			disv.push_back(bd);
+			if (bd.x > 0)
+			{
+				if (dis < 0 || bd.y < dis)
+				{
+					c = i;
+					dis = bd.y;
+				}
+			}
+		}
+		if (c >= 0)
+		{
+			shell[c].push_back(it);//holes
+		}
+	}
+	if (type == 1) {
+		gp::cmd_plane_t c[1] = {};
+		c->opt = &ms3;
+		c->segments = segments;
+		PathsD	solution;
+		for (auto& [k, v] : shell)
+		{
+			solution.clear();
+			for (auto& it : v) {
+				if (it.size() > 2)
+				{
+					pv.resize(it.size());
+					for (size_t i = 0; i < it.size(); i++)
+					{
+						pv[i] = { it[i].x,it[i].y };
+					}
+					solution.push_back(pv);
+				}
+			}
+			if (v.size())
+			{
+				gp::polygon_ct pct;
+				pct.make(&solution, true);
+				pct.triangulate(c, 0, pccw);
+			}
+		}
+	}
+	else
+	{
+		for (auto& [k, v] : shell)
+		{
+			if (v.size())
+				gp::constrained_delaunay_triangulation_v(&v, ms3, pccw, z);
+		}
+	}
 
 	for (auto& it : ms3)
 		ms.push_back(it);
-	gp::free_path_node(pt);
-#if 0
-	// 反向三角形
-	if (is_reverse)
-	{
-		std::reverse(ms.begin() + pos, ms.end());
-	}
-#endif
+	gp::free_path_node(pt); 
 	return ms.size() - pos;
 }
 
@@ -9126,6 +9291,181 @@ bool path_v::is_ccw(int idx)
 	return ccw;
 }
 #endif
+struct qv
+{
+	glm::vec2 p0, p1, p2;
+};
+struct q2
+{
+	glm::vec2 p1, p2;
+};
+struct cubic_v1
+{
+	glm::vec2 p0, p1, p2, p3;	// p1 p2是控制点
+};
+void c2to3(cubic_v1& c)
+{
+	static double dv = 2.0 / 3.0;
+	glm::vec2 c1, c2;
+	auto p0 = c.p0;
+	auto p1 = c.p1;
+	auto p2 = c.p3;
+	c1 = p1 - p0; c1 *= dv; c1 += p0;
+	c2 = p1 - p2; c2 *= dv; c2 += p2;
+	c.p1 = c1;
+	c.p2 = c2;
+}
+cubic_v1 q2c(qv* p)
+{
+	cubic_v1 cv = {};
+	cv.p0 = p->p0;
+	cv.p1 = p->p1;
+	cv.p2 = p->p1;
+	cv.p3 = p->p2;
+	c2to3(cv);
+	return cv;
+}
+// 画圆
+void draw_circle(cairo_t* cr, const glm::vec2& pos, float r, const glm::ivec2& c)
+{
+	cairo_arc(cr, pos.x, pos.y, r, 0, 2 * M_PI);
+	if (c.x != 0)
+	{
+		set_color(cr, c.x);
+		if (c.y != 0)
+			cairo_fill_preserve(cr);
+		else
+			cairo_fill(cr);
+	}
+	if (c.y != 0)
+	{
+		set_color(cr, c.y);
+		cairo_stroke(cr);
+	}
+}
+void save_png_v(path_v* pv, int count, const std::string& fn, bool fy, float sc1)
+{
+	//std::vector<vertex_i32> vs;
+	auto rc = pv->mkbox_npos();
+	glm::ivec2 ss = { rc.z ,rc.w };
+	//ss += glm::abs(pv->_pos);
+	ss *= sc1 + 2;
+	printf("save_png_v %d\t%d\n\n", ss.x, ss.y);
+	cairo_surface_t* sur = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, ss.x, ss.y);
+	auto cr = cairo_create(sur);
+	auto pxd = (uint32_t*)cairo_image_surface_get_data(sur);
+	for (size_t i = 0; i < ss.x * ss.y; i++)
+	{
+		pxd[i] = 0xff000000;
+	}
+	cairo_matrix_t flip_y = {};
+	cairo_matrix_init(&flip_y, 1, 0, 0, -1, 0, 0); // 垂直翻转
+	float sc = sc1 > 0 ? sc1 : 1.0;
+	for (size_t x = 0; x < count; x++)
+	{
+		auto kt = pv; pv++;
+		if (!kt)continue;
+		glm::vec2 pos = kt->_pos;
+		pos *= sc;
+		cairo_save(cr);
+		//cairo_translate(cr, 0, kt->_baseline);
+		cairo_translate(cr, 0, kt->_baseline * sc);
+		cairo_translate(cr, pos.x, fy ? -pos.y : pos.y);
+		if (fy)
+			cairo_transform(cr, &flip_y);
+		auto v1 = kt->_data;
+		auto v = v1.data();
+		auto ks = kt->_data.size();
+		for (int i = 0; i < ks; i++)
+		{
+			auto& it = v[i];
+			auto mt = (path_v::vertex_t*)&it;
+			mt->p *= sc;
+			mt->c *= sc;
+			mt->c1 *= sc;
+		}
+		for (int i = 0; i < ks; i++)
+		{
+			auto& it = v[i];
+			auto mt = (path_v::vertex_t*)&it;
+			//vs.push_back(it);
+			auto type = (path_v::vtype_e)v[i].type;
+			switch (type)
+			{
+			case path_v::vtype_e::e_vmove:
+				cairo_move_to(cr, it.p.x, it.p.y);
+				//printf("m%.02f,%.02f ", it.x, it.y * -1.0);
+				break;
+			case path_v::vtype_e::e_vline:
+				cairo_line_to(cr, it.p.x, it.p.y);
+				//printf("l%.02f,%.02f ", it.x, it.y * -1.0);
+				break;
+			case path_v::vtype_e::e_vcurve:
+			{
+				qv q;
+				q.p0 = { v[i - 1].p.x, v[i - 1].p.y };
+				q.p1 = { v[i].c.x, v[i].c.y };
+				q.p2 = { v[i].p.x, v[i].p.y };
+				auto c = q2c(&q);
+				cairo_curve_to(cr, c.p1.x, c.p1.y, c.p2.x, c.p2.y, c.p3.x, c.p3.y);
+				//printf("q%.02f,%.02f %.02f,%.02f ", it.cx, it.cy * -1.0, it.x, it.y * -1.0);
+			}
+			break;
+			case path_v::vtype_e::e_vcubic:
+			{
+				cubic_v1 c = {};
+				c.p1 = { v[i].c.x, v[i].c.y };
+				c.p2 = { v[i].c1.x, v[i].c1.y };
+				c.p3 = { v[i].p.x, v[i].p.y };
+				cairo_curve_to(cr, c.p1.x, c.p1.y, c.p2.x, c.p2.y, c.p3.x, c.p3.y);
+			}
+			break;
+			default:
+				break;
+			}
+		}
+		if (ks > 2)
+		{
+			cairo_close_path(cr);
+			cairo_set_source_rgb(cr, 1, 0.51, 0);
+			//cairo_fill_preserve(cr);
+		}
+		cairo_set_line_width(cr, 1.0);
+		cairo_set_source_rgba(cr, 0, 0.51, 1, 0.8);
+		cairo_stroke(cr);
+
+		uint32_t cc[2] = { 0xffff8000 ,0xff0080ff };
+		int r = 2;
+		for (int i = 0; i < ks; i++)
+		{
+			auto& it = v[i];
+			auto mt = (path_v::vertex_t*)&it;
+			//vs.push_back(it);
+			auto type = (path_v::vtype_e)v[i].type;
+			draw_circle(cr, mt->p, r, { cc[x], 0 });
+			switch (type)
+			{
+			case path_v::vtype_e::e_vcurve:
+			{
+				draw_circle(cr, mt->c, r, { 0xff0080ff, 0 });
+			}
+			break;
+			case path_v::vtype_e::e_vcubic:
+			{
+				draw_circle(cr, mt->c, r, { 0xff0080ff, 0 });
+				draw_circle(cr, mt->c1, r, { 0xff0080ff, 0 });
+			}
+			break;
+			default:
+				break;
+			}
+		}
+		cairo_restore(cr);
+	}
+	cairo_destroy(cr);
+	cairo_surface_write_to_png(sur, fn.c_str());
+	cairo_surface_destroy(sur);
+}
 
 #endif // path_v_h
 
@@ -9598,6 +9938,7 @@ text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize
 {
 	auto str = (const char*)str8;
 	if (idx >= familyv.size())idx = 0;
+	int adv = 0;
 	do
 	{
 		if (!str || !(*str) || !opt) { opt = 0; break; }
@@ -9607,13 +9948,22 @@ text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize
 		str = font_t::get_glyph_index_u8(str, &gidx, &r, &familyv[idx]);
 		if (r && gidx >= 0)
 		{
-			auto k = r->get_shape(ts, fontsize, &opt->data);
+			auto k = r->get_shape(ts, fontsize, &opt->data, adv);
+			adv += k.advance;
 			if (k.count)
 			{
 				opt->tv.push_back(k);
 			}
 		}
 	} while (str && *str);
+	if (opt) {
+		auto pd = opt->data.data();
+		for (size_t i = 0; i < opt->tv.size(); i++)
+		{
+			auto& it = opt->tv[i];
+			it.v = pd + it.first;
+		}
+	}
 	return opt;
 }
 
@@ -14931,7 +15281,7 @@ glm::ivec4 font_t::get_bounding_box(double scale, bool is_align0)
 	s *= scale;
 	return ceil(s);
 }
-tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>* opt)
+tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv)
 {
 	int vc = 0;
 	tinypath_t r = {};
@@ -14942,8 +15292,12 @@ tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>
 	{
 		if (p && vc > 1)
 		{
+			auto bs = get_shape_box(str8, height);
+			r.advance = bs.x;
+			r.bearing = { bs.y,0 };
+			adv += bs.y;
 			auto pss = opt->size();
-			r.last = pss;
+			r.first = pss;
 			opt->resize(pss + vc);
 			r.v = opt->data() + pss;
 			p->count = vc;
@@ -14976,6 +15330,16 @@ tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>
 					}
 				}
 			}
+			{
+				auto v1 = r.v;
+				for (size_t i = 0; i < vc; i++)
+				{
+					v1->x += adv;
+					v1->cx += adv;
+					v1->cx1 += adv;
+					v1++;
+				}
+			}
 		}
 		stb_font::free_shape(font, v);
 	}
@@ -14992,7 +15356,17 @@ glm::ivec2 font_t::get_shape_box(const void* str8, int height)
 	}
 	return v;
 }
-tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt)
+glm::ivec2 font_t::get_shape_box(uint32_t ch, int height)
+{
+	glm::vec2 v = stb_font::get_codepoint_hmetrics(font, ch);
+	if (height != 0)
+	{
+		float scale = get_scale(height);
+		v *= scale;
+	}
+	return v;
+}
+tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv)
 {
 	int vc = 0;
 	tinypath_t r = {};
@@ -15002,8 +15376,11 @@ tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt)
 	{
 		if (p && vc > 1)
 		{
+			auto bs = get_shape_box(cp, height);
+			r.advance = bs.x;
+			r.bearing = { bs.y,0 };
 			auto pss = opt->size();
-			r.last = pss;
+			r.first = pss;
 			opt->resize(pss + vc);
 			r.v = opt->data() + pss;
 			p->count = vc;
@@ -15034,6 +15411,16 @@ tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt)
 						v1->cy1 *= scale;
 						v1++;
 					}
+				}
+			}
+			{
+				auto v1 = r.v;
+				for (size_t i = 0; i < vc; i++)
+				{
+					v1->x += adv;
+					v1->cx += adv;
+					v1->cx1 += adv;
+					v1++;
 				}
 			}
 		}
