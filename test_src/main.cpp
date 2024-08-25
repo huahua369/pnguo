@@ -727,7 +727,7 @@ int main()
 			kinit = true;
 
 			text_path_t tp = {};
-			auto gsp = ltx.get_shape(0, u8"囍", 60, &tp);// fontsize=0获取原始大小
+			auto gsp = ltx.get_shape(0, u8"做爱", 60, &tp);// fontsize=0获取原始大小
 			std::vector<glm::vec2> ms;
 			if (tp.tv.empty())break;
 			path_v pv;

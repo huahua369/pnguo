@@ -4318,13 +4318,14 @@ namespace gp {
 }
 namespace gp {
 
-	void p2tri(cmd_plane_t* c, std::vector<std::vector<glm::vec2>>& tr, float z, bool pccw)
+	void p2tri(plane3_t* opt, std::vector<std::vector<glm::vec2>>& tr, float z, bool pccw)
 	{
 		using N = uint32_t;
 		std::vector<N> indices = mapbox::earcut<N>(tr);
 		auto length = indices.size();
 		std::vector<glm::vec2> dt;
-		dt.reserve(tr.size() * c->segments);
+		dt.reserve(length);
+		opt->reserve(opt->size() + length);
 		for (auto& it : tr)
 		{
 			for (auto v : it)
@@ -4337,9 +4338,9 @@ namespace gp {
 				int x = indices[i + 2];
 				int x1 = indices[i + 1];
 				int x2 = indices[i];
-				c->opt->push_back({ dt[x] ,z });
-				c->opt->push_back({ dt[x1] ,z });
-				c->opt->push_back({ dt[x2] ,z });
+				opt->push_back({ dt[x] ,z });
+				opt->push_back({ dt[x1] ,z });
+				opt->push_back({ dt[x2] ,z });
 				i += 2;
 			}
 		}
@@ -4349,9 +4350,45 @@ namespace gp {
 				int x = indices[i];
 				int x1 = indices[i + 1];
 				int x2 = indices[i + 2];
-				c->opt->push_back({ dt[x] ,z });
-				c->opt->push_back({ dt[x1] ,z });
-				c->opt->push_back({ dt[x2] ,z });
+				opt->push_back({ dt[x] ,z });
+				opt->push_back({ dt[x1] ,z });
+				opt->push_back({ dt[x2] ,z });
+				i += 2;
+			}
+		}
+
+	}
+	void p2tri_ind(mesh3_mt* opt, std::vector<std::vector<glm::vec2>>& tr, float z, bool pccw)
+	{
+		using N = uint32_t;
+		std::vector<N> indices = mapbox::earcut<N>(tr);
+		auto length = indices.size();
+		std::vector<glm::vec2> dt;
+		dt.reserve(length);
+		auto pss = opt->vertices.size();
+		opt->vertices.reserve(opt->vertices.size());
+		for (auto& it : tr)
+		{
+			for (auto v : it)
+			{
+				dt.push_back(v);
+				opt->vertices.push_back(glm::vec3(v, z));
+			}
+		}
+		if (pccw)
+		{
+			for (size_t i = 0; i < length; i++)
+			{
+				glm::ivec3 x = { indices[i + 2] + pss, indices[i + 1] + pss, indices[i] + pss };
+				opt->indices.push_back(x);
+				i += 2;
+			}
+		}
+		else {
+			for (size_t i = 0; i < length; i++)
+			{
+				glm::ivec3 x = { indices[i] + pss, indices[i + 1] + pss, indices[i + 2] + pss };
+				opt->indices.push_back(x);
 				i += 2;
 			}
 		}
@@ -4367,7 +4404,8 @@ namespace gp {
 		polygon_ct();
 		~polygon_ct();
 		void make(PathsD* src, bool isin = false);
-		size_t triangulate(cmd_plane_t* c, float z, bool pccw);
+		size_t triangulate(plane3_t* opt, float z, bool pccw);
+		size_t triangulate(mesh3_mt* opt, float z, bool pccw);
 	private:
 
 	};
@@ -4466,9 +4504,9 @@ namespace gp {
 		}
 	}
 
-	size_t polygon_ct::triangulate(cmd_plane_t* c, float z, bool pccw)
+	size_t polygon_ct::triangulate(plane3_t* opt, float z, bool pccw)
 	{
-		auto pos = c->opt->size();
+		auto pos = opt->size();
 		{
 			print_time a("earcut1");
 			for (auto vt : _c)
@@ -4492,10 +4530,41 @@ namespace gp {
 						nl.push_back(nl[0]);
 					tr.push_back(nl);
 				}
-				p2tri(c, tr, z, pccw);
+				p2tri(opt, tr, z, pccw);
 			}
 		}
-		return  c->opt->size() - pos;
+		return opt->size() - pos;
+	}
+	size_t polygon_ct::triangulate(mesh3_mt* opt, float z, bool pccw)
+	{
+		auto pos = opt->indices.size();
+		{
+			print_time a("earcut1");
+			for (auto vt : _c)
+			{
+				std::vector<glm::vec2> nl;
+				std::vector<std::vector<glm::vec2>> tr;
+				std::vector<int> as, cs;
+				for (auto& it : *vt)
+				{
+					nl.clear();
+					// 判断是逆时针
+					bool ccw = IsPositive(it);
+					int a = Area(it);
+					as.push_back(a);
+					cs.push_back(ccw);
+					for (auto& v : it)
+					{
+						nl.push_back({ v.x,v.y });
+					}
+					if (nl[0] != nl[nl.size() - 1])
+						nl.push_back(nl[0]);
+					tr.push_back(nl);
+				}
+				p2tri_ind(opt, tr, z, pccw);
+			}
+		}
+		return opt->indices.size() - pos;
 	}
 	// 创建裁剪平面
 	size_t cplane(cmd_plane_t* c, PathsD& subjects, PathsD* clips, PathsD* hole, float z, bool pccw, const glm::ivec2& rev, bool isin)
@@ -4509,7 +4578,7 @@ namespace gp {
 			solution = Difference(solution, *hole, FillRule::NonZero, 6);
 		polygon_ct pct;
 		pct.make(&solution, isin);
-		return pct.triangulate(c, z, pccw);
+		return pct.triangulate(c->opt, z, pccw);
 	}
 	// 创建孔洞的竖面
 	size_t mkhole_ext(PathsD& hole, cmd_plane_t* c, const glm::vec2& dz, bool pccw)
@@ -9040,7 +9109,6 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 	if (type == 1) {
 		gp::cmd_plane_t c[1] = {};
 		c->opt = &ms3;
-		c->segments = segments;
 		PathsD	solution;
 		for (auto& [k, v] : shell)
 		{
@@ -9060,7 +9128,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 			{
 				gp::polygon_ct pct;
 				pct.make(&solution, true);
-				pct.triangulate(c, 0, pccw);
+				pct.triangulate(c->opt, 0, pccw);
 			}
 		}
 	}
@@ -9075,7 +9143,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 
 	for (auto& it : ms3)
 		ms.push_back(it);
-	gp::free_path_node(pt); 
+	gp::free_path_node(pt);
 	return ms.size() - pos;
 }
 
@@ -9291,6 +9359,236 @@ bool path_v::is_ccw(int idx)
 	return ccw;
 }
 #endif
+
+namespace gp {
+
+	int triangulates(std::vector<glm::vec2>* poly, int n, bool pccw, std::vector<glm::vec2>* p, int type)
+	{
+		if (!p)return 0;
+		auto& ms = *p;
+		auto pos = ms.size();
+		std::vector<std::vector<glm::vec2>>  tr, tr1;
+		float z = 0.0;
+		std::vector<PointD> pv;
+		for (size_t i = 0; i < n; i++)
+		{
+			auto& tv1 = poly[i];
+			pv.resize(tv1.size());
+			for (size_t i = 0; i < tv1.size(); i++)
+			{
+				pv[i] = { tv1[i].x,tv1[i].y };
+			}
+			bool ccw = IsPositive(pv);
+			if (ccw)
+				tr1.push_back(tv1);
+			else
+			{
+				tr.push_back(tv1);
+			}
+		}
+		std::vector<glm::vec3> ms3;
+		auto nc = tr.size();
+		std::map<size_t, std::vector<std::vector<glm::vec2>>> shell;
+		for (size_t i = 0; i < nc; i++)
+		{
+			shell[i].push_back(tr[i]);
+		}
+		for (auto& it : tr1)
+		{
+			float dis = -1;
+			int64_t c = -1;
+			std::vector<glm::vec2> disv;
+			for (size_t i = 0; i < nc; i++)
+			{
+				auto n = tr[i].size();
+				auto& st = tr[i];
+				glm::vec2 ps = it[0];
+				float dis1 = 0;
+				auto bd = pnpoly_aos(n, st.data(), ps);// 返回是否在多边形内、最短距离
+				disv.push_back(bd);
+				if (bd.x > 0)
+				{
+					if (dis < 0 || bd.y < dis)
+					{
+						c = i;
+						dis = bd.y;
+					}
+				}
+			}
+			if (c >= 0)
+			{
+				shell[c].push_back(it);//holes
+			}
+		}
+		if (type == 1) {
+			gp::cmd_plane_t c[1] = {};
+			c->opt = &ms3;
+			PathsD	solution;
+			for (auto& [k, v] : shell)
+			{
+				solution.clear();
+				for (auto& it : v) {
+					if (it.size() > 2)
+					{
+						pv.resize(it.size());
+						for (size_t i = 0; i < it.size(); i++)
+						{
+							pv[i] = { it[i].x,it[i].y };
+						}
+						solution.push_back(pv);
+					}
+				}
+				if (v.size())
+				{
+					gp::polygon_ct pct;
+					pct.make(&solution, true);
+					pct.triangulate(c->opt, 0, pccw);
+				}
+			}
+		}
+		else
+		{
+			for (auto& [k, v] : shell)
+			{
+				if (v.size())
+					gp::constrained_delaunay_triangulation_v(&v, ms3, pccw, z);
+			}
+		}
+
+		for (auto& it : ms3)
+			ms.push_back(it);
+	}
+
+	void triangle_to_mesh(const mesh3_mt& src_mesh, mesh_mt& dstMesh, const glm::mat4& src_nm = glm::identity<glm::mat4>())
+	{
+		auto ps = dstMesh.vertex_coord.size() / 3;
+		// vertices precision convention and copy
+		dstMesh.vertex_coord.reserve(src_mesh.vertices.size() * 3);
+		for (int i = 0; i < src_mesh.vertices.size(); ++i) {
+			const glm::vec3 v = src_nm * glm::vec4(src_mesh.vertices[i], 1.0);
+			dstMesh.vertex_coord.push_back(v[0]);
+			dstMesh.vertex_coord.push_back(v[1]);
+			dstMesh.vertex_coord.push_back(v[2]);
+		}
+
+		// faces copy
+		dstMesh.face_indice.reserve(src_mesh.indices.size() * 3);
+		dstMesh.face_size.reserve(src_mesh.indices.size());
+		for (int i = 0; i < src_mesh.indices.size(); ++i) {
+			const int& f0 = src_mesh.indices[i][0];
+			const int& f1 = src_mesh.indices[i][1];
+			const int& f2 = src_mesh.indices[i][2];
+			dstMesh.face_indice.push_back(f0 + ps);
+			dstMesh.face_indice.push_back(f1 + ps);
+			dstMesh.face_indice.push_back(f2 + ps);
+
+			dstMesh.face_size.push_back((uint32_t)3);
+		}
+	}
+	mesh_mt triangle_to_mesh(const mesh3_mt& M)
+	{
+		mesh_mt ot;
+		triangle_to_mesh(M, ot);
+		return ot;
+	}
+	int triangulates(std::vector<glm::vec2>* poly, int n, bool pccw, mesh_mt* opt, int type)
+	{
+		if (!opt || !poly || n < 1)return 0;
+		std::vector<glm::vec3> ms;
+		auto pos = ms.size();
+		std::vector<std::vector<glm::vec2>>  tr, tr1;
+		float z = 0.0;
+		std::vector<PointD> pv;
+		for (size_t i = 0; i < n; i++)
+		{
+			auto& tv1 = poly[i];
+			pv.resize(tv1.size());
+			for (size_t i = 0; i < tv1.size(); i++)
+			{
+				pv[i] = { tv1[i].x,tv1[i].y };
+			}
+			bool ccw = IsPositive(pv);
+			if (ccw)
+				tr1.push_back(tv1);
+			else
+			{
+				tr.push_back(tv1);
+			}
+		}
+		mesh3_mt m3;
+		std::vector<glm::vec3> ms3;
+		auto nc = tr.size();
+		std::map<size_t, std::vector<std::vector<glm::vec2>>> shell;
+		for (size_t i = 0; i < nc; i++)
+		{
+			shell[i].push_back(tr[i]);
+		}
+		for (auto& it : tr1)
+		{
+			float dis = -1;
+			int64_t c = -1;
+			std::vector<glm::vec2> disv;
+			for (size_t i = 0; i < nc; i++)
+			{
+				auto n = tr[i].size();
+				auto& st = tr[i];
+				glm::vec2 ps = it[0];
+				float dis1 = 0;
+				auto bd = pnpoly_aos(n, st.data(), ps);// 返回是否在多边形内、最短距离
+				disv.push_back(bd);
+				if (bd.x > 0)
+				{
+					if (dis < 0 || bd.y < dis)
+					{
+						c = i;
+						dis = bd.y;
+					}
+				}
+			}
+			if (c >= 0)
+			{
+				shell[c].push_back(it);//holes
+			}
+		}
+		if (type == 0)
+		{
+			for (auto& [k, v] : shell)
+			{
+				if (v.size())
+					gp::constrained_delaunay_triangulation_v(&v, m3.vertices, m3.indices, pccw, z);
+			}
+		}
+		else {
+			gp::cmd_plane_t c[1] = {};
+			c->opt = &ms;
+			PathsD	solution;
+			for (auto& [k, v] : shell)
+			{
+				solution.clear();
+				for (auto& it : v) {
+					if (it.size() > 2)
+					{
+						pv.resize(it.size());
+						for (size_t i = 0; i < it.size(); i++)
+						{
+							pv[i] = { it[i].x,it[i].y };
+						}
+						solution.push_back(pv);
+					}
+				}
+				if (v.size())
+				{
+					gp::polygon_ct pct;
+					pct.make(&solution, true);
+					pct.triangulate(&m3, 0, pccw);
+				}
+			}
+		}
+		triangle_to_mesh(m3, *opt);
+	}
+}
+//!gp
+
 struct qv
 {
 	glm::vec2 p0, p1, p2;

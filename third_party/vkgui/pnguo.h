@@ -839,6 +839,9 @@ namespace gp {
 	// 生成3D扩展线模型
 	void build_line3d(const glm::vec3& pos1, const glm::vec3& pos2, const glm::ivec2& size, line_style_t* style, mesh_mt* opt);
 
+	// 多边形三角化，输出到3角面网络opt，自动判断洞，，pccw是否置反三角面，type 0=CDT,1=割耳法
+	int triangulates(std::vector<glm::vec2>* poly, int n, bool pccw, mesh_mt* opt, int type);
+
 }
 // todo path_v
 class path_v
