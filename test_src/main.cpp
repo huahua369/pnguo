@@ -727,7 +727,7 @@ int main()
 			kinit = true;
 
 			text_path_t tp = {};
-			auto gsp = ltx.get_shape(0, u8"做爱", 60, &tp);// fontsize=0获取原始大小
+			auto gsp = ltx.get_shape(0, u8"爱", 60, &tp);// fontsize=0获取原始大小
 			std::vector<glm::vec2> ms;
 			if (tp.tv.empty())break;
 			path_v pv;
@@ -735,7 +735,7 @@ int main()
 
 			save_png_v(&pv, 1, "temp/cct3h.png", 1, 10);
 			glm::dvec2 ad;
-			pv.triangulate(8, 1, 1, 0, &ms,0);
+			pv.triangulate(8, 1, 1, 0, &ms, 0);
 			if (ms.size())
 			{
 				stl3d_cx sc;
@@ -744,7 +744,7 @@ int main()
 				sc.save(fn, 0);
 			}
 			ms.clear();
-			pv.triangulate(8, 1, 1, 0, &ms,1);
+			pv.triangulate(8, 1, 1, 0, &ms, 1);
 			if (ms.size())
 			{
 				stl3d_cx sc;
@@ -1080,16 +1080,17 @@ int main()
 			//}
 			p->set_view(vs, cs);
 
-			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 80,30 }, 0);
+			auto gb2 = p->add_cbutton((char*)u8"🍑add", { 180,50 }, 0);
 			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 380,130 }, 3);
 			g3->_absolute = true;
 			g3->pos = { 30,120 };
-			g3->font_size = 60;
+			g3->font_size = 30;
+			gb2->font_size = 28;
 			g3->text_align = { 0,0.5 };
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
-
+			glm::vec2 text_aligns[7] = { {0,0},{0.5,0},{0.0,0.5},{0.5,0.5},{1,0},{0.0,1},{1,1} };
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
 					//form1->bind(listp);	// 绑定到新窗口	
@@ -1100,6 +1101,7 @@ int main()
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
 					pos.y += btn->size.y;
 					static int xt = 0;
+					static int xk = 0;
 					//form1->hide();
 					//div->add_child(0, { 60,60 });
 					div->layout();
@@ -1110,7 +1112,9 @@ int main()
 					cbt->pdc;
 					cbt->hscroll = { get_rand(0,1),get_rand(0,1) };
 					cbt->light = 0.36;
-					cbt->rounding = 14;
+					cbt->rounding = 4;
+					cbt->text_align = text_aligns[xk]; xk++;
+					if (xk > 6)xk = 0;
 					cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 						{
 							auto cp = (color_btn*)pt;
