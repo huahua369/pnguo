@@ -51,11 +51,7 @@
 // 定义glm启用simd
 #define GLM_FORCE_INTRINSICS
 //#define GLM_FORCE_XYZW_ONLY
-#include <glm/glm.hpp>
-#include <glm/gtx/vector_angle.hpp>
-#include <glm/gtx/closest_point.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/matrix_transform_2d.hpp>
+#include <glm/glm.hpp>  
 
 #include <glm/gtx/intersect.hpp>
 #include <glm/gtx/vector_angle.hpp>
@@ -63,6 +59,7 @@
 #include <glm/gtc/type_ptr.hpp> 
 #include <glm/gtc/matrix_transform.hpp> 
 #include <glm/gtc/matrix_inverse.hpp> 
+#include <glm/gtx/matrix_transform_2d.hpp>
 
 #include <nlohmann/json.hpp>
 
