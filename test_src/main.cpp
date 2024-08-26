@@ -668,8 +668,7 @@ int main()
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-#endif
-	//loadtestdata();
+#endif 
 	auto app = new_app();
 
 	glm::ivec2 ws = { 1280,800 };
