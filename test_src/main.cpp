@@ -680,9 +680,9 @@ int main()
 #if 1
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-	vkdg_cx* vkd = 0;// new_vkdg(&sdldev);	// 创建vk渲染器
+	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器
 	SDL_Texture* d3tex = 0;
-	if (vkd && d3tex) {
+	if (vkd) {
 		int xk = 0;
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
@@ -706,8 +706,8 @@ int main()
 	}
 	form0->up_cb = [=](float delta, int* ret)
 		{
-			//vkd->update(form0->io);
-			//vkd->on_render();
+			vkd->update(form0->io);
+			vkd->on_render();
 			bool ks = false;
 			if (ks && vkd) {
 				vkd->save_fbo(0);
