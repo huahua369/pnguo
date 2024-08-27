@@ -2433,18 +2433,10 @@ namespace vkr {
 		bool                       m_doUpscale;
 
 	public:
-		void OnCreate(
-			Device* pDevice,
-			ResourceViewHeaps* pHeaps,
-			DynamicBufferRing* pConstantBufferRing,
-			StaticBufferPool* pResourceViewHeaps,
-			VkFormat format
-		);
+		void OnCreate(Device* pDevice, ResourceViewHeaps* pHeaps, DynamicBufferRing* pConstantBufferRing, StaticBufferPool* pResourceViewHeaps, VkFormat format);
 		void OnDestroy();
-
 		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mipCount, Texture* pOutput);
 		void OnDestroyWindowSizeDependentResources();
-
 		void Draw(VkCommandBuffer cmd_buf);
 
 		void Gui();
@@ -5655,7 +5647,7 @@ namespace vkr
 		res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pPrimitive->m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
 		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)pPrimitive->m_pipelineWireframe, "GltfPbrPass Wireframe P");
-	}
+		}
 
 	//--------------------------------------------------------------------------------------
 	//
@@ -5982,7 +5974,7 @@ namespace vkr
 
 	}
 
-}
+	}
 //!vkr
 
 // 纹理
@@ -6357,7 +6349,7 @@ namespace vkr
 		}
 
 		return tex;
-	}
+		}
 
 	void Texture::LoadAndUpload(Device* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D)
 	{
@@ -8060,7 +8052,7 @@ namespace vkr
 
 
 
-}
+	}
 
 // todo post
 
@@ -10437,7 +10429,7 @@ namespace vkr {
 
 
 
-}
+		}
 //!vkr
 
 // todo 通用函数 
@@ -10451,7 +10443,7 @@ namespace vkr {
 	WICLoader::~WICLoader()
 	{
 		free(m_pData);
-	}
+}
 
 	bool WICLoader::Load(const char* pFilename, float cutOff, IMG_INFO* pInfo)
 	{
@@ -11600,7 +11592,7 @@ namespace vkr {
 			}
 #endif
 			return true;
-		}
+				}
 
 		void UpdateCache(size_t hash, T* pValue)
 		{
@@ -11635,7 +11627,7 @@ namespace vkr {
 				func(it);
 			}
 		}
-	};
+			};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -12134,7 +12126,7 @@ namespace vkr {
 					printf("\n%s\n", shader.c_str());
 				}
 				assert(SpvSize != 0);
-			}
+		}
 
 			assert(SpvSize != 0);
 			CreateModule(device, SpvData, SpvSize, &pShader->module);
@@ -12142,7 +12134,7 @@ namespace vkr {
 #ifdef USE_MULTITHREADED_CACHE
 			s_shaderCache.UpdateCache(hash, &pShader->module);
 #endif
-		}
+	}
 
 		pShader->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		pShader->pNext = NULL;
@@ -12152,7 +12144,7 @@ namespace vkr {
 		pShader->pName = pShaderEntryPoint;
 
 		return res;
-	}
+		}
 
 
 	//
@@ -12837,7 +12829,7 @@ namespace vkr {
 		}
 		return fp;// hz::File::read_binary_file(filepath.c_str(), *out);
 #endif
-	}
+		}
 	void Transform::LookAt(glm::vec4 source, glm::vec4 target, bool flipY)
 	{
 		//auto p3 = math::Point3(source.x, source.y, source.z);
@@ -13903,7 +13895,7 @@ namespace vkr {
 
 
 
-}
+	}
 //! vkr 
 // todo renderer
 namespace vkr {
@@ -15394,7 +15386,7 @@ namespace vkr {
 		q->add_copy2img(_image, cr, subresourceRange, aspectMask, il, img);
 		q->flushAndFinish();
 	}
-}
+	}
 
 
 namespace vkr {
@@ -17056,7 +17048,7 @@ namespace vkr {
 		}
 #endif
 
-	}
+				}
 	void Renderer_cx::set_fbo(fbo_info_cx* p)
 	{
 		_fbo.fence = p->_fence;
@@ -18004,7 +17996,7 @@ namespace vkr {
 	}
 
 
-}
+	}
 //!vkr
 
 

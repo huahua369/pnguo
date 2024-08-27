@@ -663,6 +663,13 @@ static std::string toStr(const njson& v, const std::string& des = "")
 	}
 	return ret;
 }
+struct curl_data_t
+{
+	std::vector<char> data;
+	std::atomic_int progress = 0;	// 进度字节数
+	int all_size = 0;	// 总字节数
+};
+
 int main()
 {
 #ifdef _DEBUG
