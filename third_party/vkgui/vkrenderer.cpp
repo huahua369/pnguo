@@ -2812,10 +2812,12 @@ namespace vkr {
 		Texture m_brdfLutTexture;
 		VkImageView m_brdfLutView = VK_NULL_HANDLE;
 		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
+		Device* _pDevice = 0;
 	public:
 		pbr_pass();
 		~pbr_pass();
-
+		// 创建共用资源
+		void new_pbrts(Device* pDevice, UploadHeap* pUploadHeap, const char* brdflut);
 	private:
 
 	};
@@ -4675,7 +4677,7 @@ namespace vkr
 		pPbrMaterialParameters->m_params.m_metallicRoughnessValues = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 		pPbrMaterialParameters->m_params.m_specularGlossinessFactor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 	}
-	 
+
 	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName)
 	{
 		// search if any *TexCoord mentions this channel
@@ -4938,6 +4940,7 @@ namespace vkr
 
 		return (index > -1);
 	}
+	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim);
 	//--------------------------------------------------------------------------------------
 	//
 	// OnCreate
@@ -4970,8 +4973,27 @@ namespace vkr
 		m_pRenderPass->GetCompilerDefines(rtDefines);
 
 		// Load BRDF look up table for the PBR shader
-		//
-		m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, "images/BrdfLut.dds", false); // LUT images are stored as linear
+		if (0)
+			m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, "images/BrdfLut.dds", false); // LUT images are stored as linear
+		if (1) {
+			int cs = 256;
+			auto brdf = generateCookTorranceBRDFLUT(cs);
+			IMG_INFO header = {};
+			unsigned char* buffer = (unsigned char*)brdf.data();
+			VkDeviceSize   bufferSize = cs * cs * sizeof(int);
+			header.width = cs;
+			header.height = cs;
+			header.depth = 1;
+			header.arraySize = 1;
+			header.mipMapCount = 1;
+#ifdef _WIN32
+			header.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+#else
+			header.vkformat = VK_FORMAT_R8G8B8A8_UNORM;
+#endif
+			header.bitCount = 32;
+			m_brdfLutTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "brdf", false);
+		}
 		m_brdfLutTexture.CreateSRV(&m_brdfLutView);
 
 		/////////////////////////////////////////////
@@ -5775,6 +5797,172 @@ namespace vkr
 	{
 	}
 
+	glm::vec2 hammersley(uint32_t i, uint32_t N) {
+		// Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
+		uint32_t bits = (i << 16u) | (i >> 16u);
+		bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+		bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+		bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+		bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+		float rdi = float(bits) * static_cast<float>(2.3283064365386963e-10);
+		return glm::vec2(float(i) / float(N), rdi);
+	}
+
+	float G1(float k, float NoV) {
+		return NoV / (NoV * (1.0f - k) + k);
+	}
+
+	// Geometric Shadowing function
+	float gSmith(float NoL, float NoV, float roughness) {
+		float k = (roughness * roughness) * 0.5f;
+		return G1(k, NoL) * G1(k, NoV);
+	}
+
+	// Sample a half-vector in world space
+	// Based on http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_slides.pdf
+	glm::vec3 importanceSampleGGX(glm::vec2 Xi, float roughness, glm::vec3 N) {
+		// Maps a 2D point to a hemisphere with spread based on roughness
+		float a = roughness * roughness;
+		float phi = 2.0f * glm::pi<float>() * Xi.x;
+		float cosTheta = sqrt(glm::clamp((1.0f - Xi.y) / (1.0f + (a * a - 1.0f) * Xi.y), 0.0f, 1.0f));
+		float sinTheta = sqrt(glm::clamp(1.0f - cosTheta * cosTheta, 0.0f, 1.0f));
+
+		glm::vec3 H = glm::vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
+
+		glm::vec3 up = glm::abs(N.z) < 0.999 ? glm::vec3(0, 0, 1) : glm::vec3(1, 0, 0);
+		glm::vec3 tangent = glm::normalize(glm::cross(up, N));
+		glm::vec3 bitangent = glm::cross(N, tangent);
+
+		return glm::normalize(tangent * H.x + bitangent * H.y + N * H.z);
+	}
+
+	// http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf
+	glm::vec2 integrateBRDF(float roughness, float NoV) {
+		const glm::vec3 N = glm::vec3(0.0, 0.0, 1.0); // normal always pointing forward.
+		const glm::vec3 V = glm::vec3(sqrt(glm::clamp(1.0 - NoV * NoV, 0.0, 1.0)), 0.0, NoV);
+		float A = 0.0f;
+		float B = 0.0f;
+
+		uint32_t numSamples = 1024u;
+		for (uint32_t i = 0u; i < numSamples; ++i) {
+			glm::vec2 Xi = hammersley(i, numSamples);
+			glm::vec3 H = importanceSampleGGX(Xi, roughness, N);
+			glm::vec3 L = 2.0f * glm::dot(V, H) * H - V;
+
+			float NoL = glm::max(glm::dot(N, L), 0.0f);
+			if (NoL > 0.0f) {
+				float NoH = glm::max(glm::dot(N, H), 0.001f);
+				float VoH = glm::max(glm::dot(V, H), 0.001f);
+				float currentNoV = glm::max(glm::dot(N, V), 0.001f);
+
+				const float G = gSmith(NoL, currentNoV, roughness);
+
+				const float G_Vis = (G * VoH) / (NoH * currentNoV /*avoid division by zero*/);
+				const float Fc = pow(1.0f - VoH, 5.0f);
+
+				A += (1.0f - Fc) * G_Vis;
+				B += Fc * G_Vis;
+			}
+		}
+		return glm::vec2(A, B) / float(numSamples);
+	}
+
+	// Call this to generate the BRDF Lookup table as a data array on a .h file ready to be used.
+	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim)
+	{
+		// byte *data = new byte[mapDim * mapDim * sizeof(glm::detail::hdata) * 2];
+		std::vector<uint32_t> data;
+		data.resize(mapDim * mapDim);
+		auto d = data.data();
+		uint32_t offset = 0;
+		for (uint32_t j = 0; j < mapDim; ++j) {
+			for (uint32_t i = 0; i < mapDim; ++i) {
+				glm::vec2 v2 = integrateBRDF((static_cast<float>(j) + .5f) / static_cast<float>(mapDim),
+					((static_cast<float>(i) + .5f) / static_cast<float>(mapDim)));
+				//uint16_t halfR = glm::detail::toFloat16(v2.r);
+				//uint16_t halfG = glm::detail::toFloat16(v2.g);
+				uint8_t halfR = v2.r * 255.0;
+				uint8_t halfG = v2.g * 255.0;
+				auto pt = d + offset;
+				auto t = (glm::u8vec4*)pt;
+				t->r = halfR;
+				t->g = halfG;
+				t->b = 0;
+				t->a = 0xff;
+				offset++;
+			}
+		}
+		return data;
+		// Ref<Texture2D> texture = Texture2D::create(data, mapDim, mapDim, TextureFormatEnum::R16G16_SFLOAT,
+		// MipmapData::Options::DoNothing); delete [] data; return texture;
+	}
+
+	// 共用资源
+	void pbr_pass::new_pbrts(Device* pDevice, UploadHeap* pUploadHeap, const char* brdflut)
+	{
+		_pDevice = pDevice;
+		// Load BRDF look up table for the PBR shader
+		//
+		m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, brdflut ? brdflut : "images/BrdfLut.dds", false); // LUT images are stored as linear
+		m_brdfLutTexture.CreateSRV(&m_brdfLutView);
+
+		/////////////////////////////////////////////
+		// Create Samplers
+
+		//for pbr materials
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.minLod = 0;
+			info.maxLod = 10000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
+			assert(res == VK_SUCCESS);
+		}
+
+		// specular BRDF lut sampler
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
+			assert(res == VK_SUCCESS);
+		}
+
+		// shadowmap sampler
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.compareEnable = VK_TRUE;
+			info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
+			assert(res == VK_SUCCESS);
+		}
+
+	}
 
 }
 //!vkr
@@ -8393,7 +8581,7 @@ namespace vkr {
 		auto up = glm::vec3(0, flipY ? -1 : 1, 0);
 		return glm::lookAt(position, target, up);
 	}
-	  
+
 	float modv(float x, float y) {
 		if (x < -y) {
 			x = fmod(x, -y);
@@ -13195,7 +13383,7 @@ namespace vkr {
 				//
 				if (it->second.m_pTranslation != NULL)
 				{
-					it->second.m_pTranslation->SampleLinear(time, &frac, &pCurr, &pNext); 
+					it->second.m_pTranslation->SampleLinear(time, &frac, &pCurr, &pNext);
 					animated.m_translation = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
 				}
 				else
@@ -13206,7 +13394,7 @@ namespace vkr {
 				//
 				if (it->second.m_pRotation != NULL)
 				{
-					it->second.m_pRotation->SampleLinear(time, &frac, &pCurr, &pNext); 
+					it->second.m_pRotation->SampleLinear(time, &frac, &pCurr, &pNext);
 					glm::quat r = glm::normalize(glm::slerp(glm::make_quat(pCurr), glm::make_quat(pNext), frac));
 					animated.m_rotation = glm::mat4(r);
 				}
@@ -13218,7 +13406,7 @@ namespace vkr {
 				//
 				if (it->second.m_pScale != NULL)
 				{
-					it->second.m_pScale->SampleLinear(time, &frac, &pCurr, &pNext); 
+					it->second.m_pScale->SampleLinear(time, &frac, &pCurr, &pNext);
 					animated.m_scale = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
 				}
 				else
