@@ -1106,6 +1106,7 @@ namespace vkr {
 		UINT32           mipMapCount;
 		DXGI_FORMAT      format;
 		UINT32           bitCount;
+		VkFormat		 vkformat;
 	};
 
 	//Loads a Image file
@@ -1625,7 +1626,7 @@ namespace vkr {
 		void GetAttachmentList(GBufferFlags flags, std::vector<VkImageView>* pAttachments, std::vector<VkClearValue>* pClearValues);
 		VkRenderPass CreateRenderPass(GBufferFlags flags, bool bClear);
 
-		void GetCompilerDefines(DefineList& defines);
+		//void GetCompilerDefines(DefineList& defines);
 		VkSampleCountFlagBits  GetSampleCount() { return m_sampleCount; }
 		Device* GetDevice() { return m_pDevice; }
 
@@ -2396,9 +2397,41 @@ namespace vkr {
 		};
 	};
 
+#ifndef BLOOM_MAX_MIP_LEVELS 
 #define BLOOM_MAX_MIP_LEVELS 12
+#endif
 	class Bloom
 	{
+	private:
+		struct cbBlend
+		{
+			float weight;
+		};
+		struct Pass
+		{
+			VkImageView     m_RTV;
+			VkImageView     m_SRV;
+			VkFramebuffer   m_frameBuffer;
+			VkDescriptorSet m_descriptorSet;
+			float m_weight;
+		};
+		Device* m_pDevice = nullptr;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+		DynamicBufferRing* m_pConstantBufferRing;
+		Pass                       m_mip[BLOOM_MAX_MIP_LEVELS] = {};
+		Pass                       m_output = {};
+		BlurPS                     m_blur;
+		PostProcPS                 m_blendAdd;
+		VkDescriptorSetLayout      m_descriptorSetLayout;
+		VkSampler                  m_sampler;
+		VkRenderPass               m_blendPass;
+		VkFormat                   m_outFormat;
+		uint32_t                   m_Width;
+		uint32_t                   m_Height;
+		int                        m_mipCount;
+		bool                       m_doBlur;
+		bool                       m_doUpscale;
+
 	public:
 		void OnCreate(
 			Device* pDevice,
@@ -2416,46 +2449,6 @@ namespace vkr {
 
 		void Gui();
 
-	private:
-		Device* m_pDevice = nullptr;
-
-		ResourceViewHeaps* m_pResourceViewHeaps;
-		DynamicBufferRing* m_pConstantBufferRing;
-
-		VkFormat                   m_outFormat;
-
-		uint32_t                   m_Width;
-		uint32_t                   m_Height;
-		int                        m_mipCount;
-
-		bool                       m_doBlur;
-		bool                       m_doUpscale;
-
-		struct cbBlend
-		{
-			float weight;
-		};
-
-		struct Pass
-		{
-			VkImageView     m_RTV;
-			VkImageView     m_SRV;
-			VkFramebuffer   m_frameBuffer;
-			VkDescriptorSet m_descriptorSet;
-			float m_weight;
-		};
-
-		Pass                       m_mip[BLOOM_MAX_MIP_LEVELS] = {};
-		Pass                       m_output = {};
-
-		BlurPS                     m_blur;
-		PostProcPS                 m_blendAdd;
-
-		VkDescriptorSetLayout      m_descriptorSetLayout;
-
-		VkSampler                  m_sampler;
-
-		VkRenderPass               m_blendPass;
 	};
 
 	class ColorConversionPS
@@ -4940,7 +4933,6 @@ namespace vkr
 
 		return (index > -1);
 	}
-	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim);
 	//--------------------------------------------------------------------------------------
 	//
 	// OnCreate
@@ -4973,11 +4965,15 @@ namespace vkr
 		m_pRenderPass->GetCompilerDefines(rtDefines);
 
 		// Load BRDF look up table for the PBR shader
-		if (0)
+		if (1)
+		{
+			print_time Pt("load BRDFLUT", 1);
 			m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, "images/BrdfLut.dds", false); // LUT images are stored as linear
-		if (1) {
-			int cs = 256;
-			auto brdf = generateCookTorranceBRDFLUT(cs);
+		}
+		if (0) {
+			print_time Pt("generate BRDFLUT", 1);
+			const int cs = 256;
+			static auto brdf = generateCookTorranceBRDFLUT(cs, 0);
 			IMG_INFO header = {};
 			unsigned char* buffer = (unsigned char*)brdf.data();
 			VkDeviceSize   bufferSize = cs * cs * sizeof(int);
@@ -4986,11 +4982,7 @@ namespace vkr
 			header.depth = 1;
 			header.arraySize = 1;
 			header.mipMapCount = 1;
-#ifdef _WIN32
-			header.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-#else
-			header.vkformat = VK_FORMAT_R8G8B8A8_UNORM;
-#endif
+			header.vkformat = VK_FORMAT_R16G16_SFLOAT;
 			header.bitCount = 32;
 			m_brdfLutTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "brdf", false);
 		}
@@ -5868,33 +5860,44 @@ namespace vkr
 	}
 
 	// Call this to generate the BRDF Lookup table as a data array on a .h file ready to be used.
-	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim)
+	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim, int type)
 	{
 		// byte *data = new byte[mapDim * mapDim * sizeof(glm::detail::hdata) * 2];
 		std::vector<uint32_t> data;
 		data.resize(mapDim * mapDim);
 		auto d = data.data();
 		uint32_t offset = 0;
-		for (uint32_t j = 0; j < mapDim; ++j) {
-			for (uint32_t i = 0; i < mapDim; ++i) {
-				glm::vec2 v2 = integrateBRDF((static_cast<float>(j) + .5f) / static_cast<float>(mapDim),
-					((static_cast<float>(i) + .5f) / static_cast<float>(mapDim)));
-				//uint16_t halfR = glm::detail::toFloat16(v2.r);
-				//uint16_t halfG = glm::detail::toFloat16(v2.g);
-				uint8_t halfR = v2.r * 255.0;
-				uint8_t halfG = v2.g * 255.0;
-				auto pt = d + offset;
-				auto t = (glm::u8vec4*)pt;
-				t->r = halfR;
-				t->g = halfG;
-				t->b = 0;
-				t->a = 0xff;
-				offset++;
+		if (type == 0) {
+			for (uint32_t j = 0; j < mapDim; ++j) {
+				for (uint32_t i = 0; i < mapDim; ++i) {
+					glm::vec2 v2 = integrateBRDF((static_cast<float>(j) + .5f) / static_cast<float>(mapDim), ((static_cast<float>(i) + .5f) / static_cast<float>(mapDim)));
+					uint16_t halfR = glm::detail::toFloat16(v2.r);
+					uint16_t halfG = glm::detail::toFloat16(v2.g);
+					auto pt = d + offset;
+					auto t = (glm::u16vec2*)pt;
+					t->x = halfR;
+					t->y = halfG;
+					offset++;
+				}
+			}
+		}
+		else {
+			for (uint32_t j = 0; j < mapDim; ++j) {
+				for (uint32_t i = 0; i < mapDim; ++i) {
+					glm::vec2 v2 = integrateBRDF((static_cast<float>(j) + .5f) / static_cast<float>(mapDim), ((static_cast<float>(i) + .5f) / static_cast<float>(mapDim)));
+					uint8_t halfR = v2.r * 255.0;
+					uint8_t halfG = v2.g * 255.0;
+					auto pt = d + offset;
+					auto t = (glm::u8vec4*)pt;
+					t->r = halfR;
+					t->g = halfG;
+					t->b = 0;
+					t->a = 0xff;
+					offset++;
+				}
 			}
 		}
 		return data;
-		// Ref<Texture2D> texture = Texture2D::create(data, mapDim, mapDim, TextureFormatEnum::R16G16_SFLOAT,
-		// MipmapData::Options::DoNothing); delete [] data; return texture;
 	}
 
 	// 共用资源
@@ -5902,8 +5905,23 @@ namespace vkr
 	{
 		_pDevice = pDevice;
 		// Load BRDF look up table for the PBR shader
-		//
-		m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, brdflut ? brdflut : "images/BrdfLut.dds", false); // LUT images are stored as linear
+		auto br = m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, brdflut, false); // LUT images are stored as linear
+		if (!br) {
+			print_time Pt("generate BRDFLUT", 1);
+			const int cs = 256;
+			static auto brdf = generateCookTorranceBRDFLUT(cs, 0);
+			IMG_INFO header = {};
+			unsigned char* buffer = (unsigned char*)brdf.data();
+			VkDeviceSize   bufferSize = cs * cs * sizeof(int);
+			header.width = cs;
+			header.height = cs;
+			header.depth = 1;
+			header.arraySize = 1;
+			header.mipMapCount = 1;
+			header.vkformat = VK_FORMAT_R16G16_SFLOAT;
+			header.bitCount = 32;
+			m_brdfLutTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "brdf", false);
+		}
 		m_brdfLutTexture.CreateSRV(&m_brdfLutView);
 
 		/////////////////////////////////////////////
@@ -6281,7 +6299,7 @@ namespace vkr
 			m_header.format = SetFormatGamma(m_header.format, useSRGB);
 		}
 
-		m_format = TranslateDxgiFormatIntoVulkans((DXGI_FORMAT)m_header.format);
+		m_format = m_header.vkformat ? m_header.vkformat : TranslateDxgiFormatIntoVulkans((DXGI_FORMAT)m_header.format);
 
 		VkImage tex;
 
@@ -6486,7 +6504,7 @@ namespace vkr
 	{
 		m_pDevice = pDevice;
 		assert(m_pResource == NULL);
-
+		if (!pFilename || !(*pFilename))return false;
 		ImgLoader* img = CreateImageLoader(pFilename);
 		bool result = img->Load(pFilename, cutOff, &m_header);
 		if (result)
