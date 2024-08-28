@@ -47,6 +47,79 @@
 
 
 namespace md {
+
+	bool isNum(const std::string& str)
+	{
+		std::stringstream sin_(str);
+		double d;
+		int64_t i64;
+		char c;
+		if (!(sin_ >> i64))
+		{
+			return false;
+		}
+		if (!(sin_ >> d))
+		{
+			return false;
+		}
+		if (sin_ >> c)
+		{
+			return false;
+		}
+		return true;
+	}
+	void split(std::string str, const std::string& pattern, std::vector<std::string>& result)
+	{
+		std::string::size_type pos;
+		str += pattern;//扩展字符串以方便操作
+		int size = str.size();
+		result.clear();
+		int ct = 0;
+		for (int i = 0; i < size; i++)
+		{
+			pos = str.find(pattern, i);
+			if (pos < size)
+			{
+				std::string s = str.substr(i, pos - i);
+				result.push_back(s);
+				i = pos + pattern.size() - 1;
+				ct++;
+			}
+		}
+	}
+
+	std::vector<std::string> split(const std::string& str, const std::string& pattern)
+	{
+		std::vector<std::string> vs;
+		split(str, pattern, vs);
+		return vs;
+	}
+	// 多分割符
+	std::vector<std::string> split_m(const std::string& str, const std::string& pattern, bool is_space)
+	{
+		std::vector<std::string> vs;
+		std::string tem;
+		for (auto ch : str)
+		{
+			if (pattern.find(ch) == -1 || pattern.empty())
+			{
+				tem.push_back(ch);
+			}
+			else
+			{
+				if (tem == "" && !is_space)
+					continue;
+				vs.push_back(tem);
+				tem = "";
+			}
+		}
+		if (tem != "")
+		{
+			vs.push_back(tem);
+		}
+		return vs;
+	}
+
 	bool validate_u8(const char* str, int len)
 	{
 		if (len < 0)len = strlen(str);

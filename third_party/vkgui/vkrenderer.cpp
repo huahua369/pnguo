@@ -11761,13 +11761,7 @@ namespace vkr {
 		}
 	};
 
-	bool DXCompileToDXO(size_t hash,
-		const char* pSrcCode,
-		const DefineList* pDefines,
-		const char* pEntryPoint,
-		const char* pParams,
-		char** outSpvData,
-		size_t* outSpvSize)
+	bool DXCompileToDXO(size_t hash, const char* pSrcCode, const DefineList* pDefines, const char* pEntryPoint, const char* pParams, char** outSpvData, size_t* outSpvSize)
 	{
 		//detect output bytecode type (DXBC/SPIR-V) and use proper extension
 		std::string filenameOut;
@@ -11800,7 +11794,8 @@ namespace vkr {
 		//
 		wchar_t names[50][128];
 		wchar_t values[50][128];
-		DxcDefine defines[50];
+		std::vector<DxcDefine> defines;
+		defines.reserve(50);
 		int defineCount = 0;
 		if (pDefines != NULL)
 		{
@@ -11808,9 +11803,11 @@ namespace vkr {
 			{
 				swprintf_s<128>(names[defineCount], L"%S", it->first.c_str());
 				swprintf_s<128>(values[defineCount], L"%S", it->second.c_str());
-				defines[defineCount].Name = names[defineCount];
-				defines[defineCount].Value = values[defineCount];
+				DxcDefine d = {};
+				d.Name = names[defineCount];
+				d.Value = values[defineCount];
 				defineCount++;
+				defines.push_back(d);
 			}
 		}
 
@@ -11824,47 +11821,62 @@ namespace vkr {
 		IDxcLibrary* pLibrary;
 		ThrowIfFailed(s_dxc_create_func(CLSID_DxcLibrary, IID_PPV_ARGS(&pLibrary)));
 
-		IDxcBlobEncoding* pSource;
+		IDxcBlobEncoding* pSource = 0;
 		ThrowIfFailed(pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pSrcCode, (UINT32)strlen(pSrcCode), CP_UTF8, &pSource));
-
+		if (!pSource)
+			return false;
 		IDxcCompiler2* pCompiler;
 		ThrowIfFailed(s_dxc_create_func(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler)));
 
 		IncluderDxc Includer(pLibrary);
 
 		std::vector<LPCWSTR> ppArgs;
+		std::wstring twstr;
+		std::string params;
 		// splits params string into an array of strings
 		{
 
-			char params[1024];
-			strcpy_s<1024>(params, pParams);
-
-			char* next_token;
-			char* token = strtok_s(params, " ", &next_token);
-			while (token != NULL) {
-				wchar_t wide_str[1024];
-				swprintf_s<1024>(wide_str, L"%S", token);
-
-				const size_t wide_str2_len = wcslen(wide_str) + 1;
-				wchar_t* wide_str2 = (wchar_t*)malloc(wide_str2_len * sizeof(wchar_t));
-				wcscpy_s(wide_str2, wide_str2_len, wide_str);
-				ppArgs.push_back(wide_str2);
-
-				token = strtok_s(NULL, " ", &next_token);
+			if (pParams && *pParams)
+				params = pParams;
+			auto pv = md::split(params, " ");
+			for (auto& it : pv) {
+				auto w = md::u8to_w(it.c_str(), it.size());
+				auto pos = twstr.size();
+				w.push_back(0);
+				twstr.append(w);
+				ppArgs.push_back((wchar_t*)pos);
 			}
+			auto ws = twstr.data();
+			for (auto& it : ppArgs) {
+				it = ws + (size_t)it;
+			}
+			//char* next_token;
+			//char* token = strtok_s(params.data(), " ", &next_token);
+			//while (token != NULL) {
+			//	wchar_t wide_str[1024];
+			//	swprintf_s<1024>(wide_str, L"%S", token);
+
+			//	const size_t wide_str2_len = wcslen(wide_str) + 1;
+			//	wchar_t* wide_str2 = (wchar_t*)malloc(wide_str2_len * sizeof(wchar_t));
+			//	wcscpy_s(wide_str2, wide_str2_len, wide_str);
+			//	ppArgs.push_back(wide_str2);
+
+			//	token = strtok_s(NULL, " ", &next_token);
+			//}
 		}
 
 		wchar_t  pEntryPointW[256];
 		swprintf_s<256>(pEntryPointW, L"%S", pEntryPoint);
 
 		IDxcOperationResult* pResultPre;
-		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines, defineCount, &Includer, &pResultPre);
+		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines.data(), defineCount, &Includer, &pResultPre);
 		if (res1 == S_OK)
 		{
 			Microsoft::WRL::ComPtr<IDxcBlob> pCode1;
 			pResultPre->GetResult(pCode1.GetAddressOf());
 			std::string preprocessedCode = "";
-			preprocessedCode = "// dxc -E" + std::string(pEntryPoint) + " " + std::string(pParams) + " " + filenameHlsl + "\n\n";
+
+			preprocessedCode = "// dxc -E" + std::string(pEntryPoint) + " " + params + " " + filenameHlsl + "\n\n";
 			if (pDefines)
 			{
 				for (auto it = pDefines->begin(); it != pDefines->end(); it++)
@@ -11881,7 +11893,7 @@ namespace vkr {
 			{
 				Microsoft::WRL::ComPtr<IDxcBlob> pPDB;
 				LPWSTR pDebugBlobName[1024];
-				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW, L"", ppArgs.data(), (UINT32)ppArgs.size(), defines, defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
+				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW, L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
 
 				// Setup the correct name for the PDB
 				if (pPDB)
@@ -11893,16 +11905,16 @@ namespace vkr {
 			}
 			else
 			{
-				res = pCompiler->Compile(pSource, NULL, pEntryPointW, L"", ppArgs.data(), (UINT32)ppArgs.size(), defines, defineCount, &Includer, &pOpRes);
+				res = pCompiler->Compile(pSource, NULL, pEntryPointW, L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes);
 			}
 
 			// Clean up allocated memory
-			while (!ppArgs.empty())
-			{
-				LPCWSTR pWString = ppArgs.back();
-				ppArgs.pop_back();
-				free((void*)pWString);
-			}
+			//while (!ppArgs.empty())
+			//{
+			//	LPCWSTR pWString = ppArgs.back();
+			//	ppArgs.pop_back();
+			//	free((void*)pWString);
+			//}
 
 			pSource->Release();
 			pLibrary->Release();
@@ -11937,8 +11949,9 @@ namespace vkr {
 			}
 			else
 			{
-				IDxcBlobEncoding* pErrorUtf8;
-				pLibrary->GetBlobAsUtf8(pError, &pErrorUtf8);
+				IDxcBlobEncoding* pErrorUtf8 = 0;
+				if (pError)
+					pLibrary->GetBlobAsUtf8(pError, &pErrorUtf8);
 
 				Trace("*** Error compiling %p.hlsl ***\n", hash);
 
@@ -12880,7 +12893,7 @@ namespace vkr {
 		}
 		return fp;// hz::File::read_binary_file(filepath.c_str(), *out);
 #endif
-		}
+	}
 	void Transform::LookAt(glm::vec4 source, glm::vec4 target, bool flipY)
 	{
 		//auto p3 = math::Point3(source.x, source.y, source.z);
@@ -13946,7 +13959,7 @@ namespace vkr {
 
 
 
-	}
+}
 //! vkr 
 // todo renderer
 namespace vkr {
@@ -15065,7 +15078,7 @@ namespace vkr {
 			assert(res == VK_SUCCESS);
 			vkWaitForFences(_dev->GetDevice(), 1, &_fence, VK_TRUE, UINT64_MAX);
 			vkResetFences(_dev->GetDevice(), 1, &_fence);
-	}
+		}
 #endif
 
 		toPreBarrier.clear();
@@ -15437,7 +15450,7 @@ namespace vkr {
 		q->add_copy2img(_image, cr, subresourceRange, aspectMask, il, img);
 		q->flushAndFinish();
 	}
-	}
+}
 
 
 namespace vkr {
@@ -16969,7 +16982,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
 			}
-			}
+		}
 
 		// submit command buffer
 		{
@@ -17098,7 +17111,7 @@ namespace vkr {
 		}
 #endif
 
-		}
+	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
 		_fbo.fence = p->_fence;
@@ -18046,7 +18059,7 @@ namespace vkr {
 	}
 
 
-	}
+}
 //!vkr
 
 
