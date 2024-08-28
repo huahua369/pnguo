@@ -669,12 +669,15 @@ struct curl_data_t
 	std::atomic_int progress = 0;	// 进度字节数
 	int all_size = 0;	// 总字节数
 };
-
+#include <vector>
 int main()
 {
+	std::vector<int> a;
+	a.shrink_to_fit();
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
 	auto app = new_app();
 

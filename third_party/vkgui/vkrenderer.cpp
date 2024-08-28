@@ -65,6 +65,7 @@ typedef uint32_t DXGI_FORMAT;
 #include <mapView.h>
 #define TINYGLTF_IMPLEMENTATION 
 #include <tiny_gltf.h>
+#include <zlib.h>
 
 namespace vkr
 {
@@ -1171,8 +1172,7 @@ namespace vkr {
 		{
 			UINT8* pixels;
 			uint32_t width, height, offset;
-		} footprints[6][12];
-
+		};// footprints[6][12];
 
 		VkImage CreateTextureCommitted(Device* pDevice, UploadHeap* pUploadHeap, const char* pName, bool useSRGB = false, VkImageUsageFlags usageFlags = 0);
 		void LoadAndUpload(Device* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D);
@@ -4311,6 +4311,7 @@ namespace vkr
 
 				ExecAsyncIfThereIsAPool(pAsyncPool, [imageIndex, pTex, this, filename, pm]()
 					{
+						print_time Pt("load texture", 1);
 						bool useSRGB;
 						float cutOff;
 						auto& img = pm->images[imageIndex];
@@ -5647,7 +5648,7 @@ namespace vkr
 		res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pPrimitive->m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
 		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)pPrimitive->m_pipelineWireframe, "GltfPbrPass Wireframe P");
-		}
+	}
 
 	//--------------------------------------------------------------------------------------
 	//
@@ -5974,7 +5975,7 @@ namespace vkr
 
 	}
 
-	}
+}
 //!vkr
 
 // 纹理
@@ -6349,7 +6350,7 @@ namespace vkr
 		}
 
 		return tex;
-		}
+	}
 
 	void Texture::LoadAndUpload(Device* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D)
 	{
@@ -8052,7 +8053,7 @@ namespace vkr
 
 
 
-	}
+}
 
 // todo post
 
@@ -10429,7 +10430,7 @@ namespace vkr {
 
 
 
-		}
+}
 //!vkr
 
 // todo 通用函数 
@@ -10443,7 +10444,7 @@ namespace vkr {
 	WICLoader::~WICLoader()
 	{
 		free(m_pData);
-}
+	}
 
 	bool WICLoader::Load(const char* pFilename, float cutOff, IMG_INFO* pInfo)
 	{
@@ -11592,7 +11593,7 @@ namespace vkr {
 			}
 #endif
 			return true;
-				}
+		}
 
 		void UpdateCache(size_t hash, T* pValue)
 		{
@@ -11627,7 +11628,7 @@ namespace vkr {
 				func(it);
 			}
 		}
-			};
+	};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -12092,9 +12093,10 @@ namespace vkr {
 		VkResult res = VK_SUCCESS;
 
 		//compute hash
-		//
+		// 
 		size_t hash;
-		hash = HashShaderString((GetShaderCompilerLibDir() + "\\").c_str(), pshader);
+		auto sf = (GetShaderCompilerLibDir() + "\\");
+		hash = HashShaderString(sf.c_str(), pshader);
 		hash = Hash(pShaderEntryPoint, strlen(pShaderEntryPoint), hash);
 		hash = Hash(shaderCompilerParams, strlen(shaderCompilerParams), hash);
 		hash = Hash((char*)&shader_type, sizeof(shader_type), hash);
@@ -12104,7 +12106,7 @@ namespace vkr {
 		}
 
 #define USE_MULTITHREADED_CACHE 
-		//#define USE_SPIRV_FROM_DISK   
+#define USE_SPIRV_FROM_DISK   
 
 #ifdef USE_MULTITHREADED_CACHE
 		// Compile if not in cache
@@ -12112,9 +12114,10 @@ namespace vkr {
 		if (s_shaderCache.CacheMiss(hash, &pShader->module))
 #endif
 		{
+			auto strk = format("%p", hash);
+			print_time Pt("Compile Pipeline" + strk, 1);
 			char* SpvData = NULL;
 			size_t SpvSize = 0;
-
 #ifdef USE_SPIRV_FROM_DISK
 			std::string filenameSpv = format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash);
 			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
@@ -12126,15 +12129,23 @@ namespace vkr {
 					printf("\n%s\n", shader.c_str());
 				}
 				assert(SpvSize != 0);
-		}
-
+			}
+			else {
+				if (SpvSize == 0) {
+					printf("\n%s\n", strk.c_str());
+				}
+			}
+			//auto c = crc32(-1, (Bytef*)pshader, strlen(pshader));  
 			assert(SpvSize != 0);
 			CreateModule(device, SpvData, SpvSize, &pShader->module);
 
 #ifdef USE_MULTITHREADED_CACHE
 			s_shaderCache.UpdateCache(hash, &pShader->module);
 #endif
-	}
+		}
+		else {
+			//print_time Pt("no Compile Pipeline", 1);
+		}
 
 		pShader->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		pShader->pNext = NULL;
@@ -12144,7 +12155,7 @@ namespace vkr {
 		pShader->pName = pShaderEntryPoint;
 
 		return res;
-		}
+	}
 
 
 	//
@@ -12369,6 +12380,50 @@ namespace vkr {
 		if (size != NULL)
 			*size = fileLen;
 
+		return true;
+	}
+	bool readfile(const char* name, std::vector<char>& data, bool isbinary)
+	{
+		FILE* file;
+
+		//Open file
+		if (fopen_s(&file, name, isbinary ? "rb" : "r") != 0)
+		{
+			return false;
+		}
+
+		//Get file length
+		fseek(file, 0, SEEK_END);
+		size_t fileLen = ftell(file);
+		fseek(file, 0, SEEK_SET);
+
+		// if ascii add one more char to accomodate for the \0
+		if (!isbinary)
+			fileLen++;
+
+		//Allocate memory
+		data.resize(std::max<size_t>(fileLen, 1));
+		char* buffer = data.data();// (char*)malloc(std::max<size_t>(fileLen, 1));
+		if (!buffer)
+		{
+			fclose(file);
+			return false;
+		}
+
+		//Read file contents into buffer
+		size_t bytesRead = 0;
+		if (fileLen > 0)
+		{
+			bytesRead = fread(buffer, 1, fileLen, file);
+		}
+		fclose(file);
+
+		if (!isbinary)
+		{
+			buffer[bytesRead] = 0;
+			fileLen = bytesRead;
+		}
+		data.resize(fileLen);
 		return true;
 	}
 
@@ -12700,6 +12755,7 @@ namespace vkr {
 	{
 		hash = Hash(pShader, strlen(pShader), hash);
 		std::vector<unsigned char> tfd;
+		std::vector<char> td;
 		const char* pch = pShader;
 		while (*pch != 0)
 		{
@@ -12749,16 +12805,11 @@ namespace vkr {
 
 						pch++;
 
-						//char* pShaderCode = NULL;
-						//if (readfile(includeName, &pShaderCode, NULL, false))
-						//{
-						//	hash = HashShaderString(pRootDir, pShaderCode, hash);
-						//	free(pShaderCode);
-						//}
 						tfd.clear();
 						vkmReadWholeFile(&tfd, 0, includeName, 0);
 						if (tfd.size())
 						{
+							tfd.push_back(0);
 							hash = HashShaderString(pRootDir, (char*)tfd.data(), hash);
 						}
 					}
@@ -14055,7 +14106,7 @@ namespace vkr {
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 		void OnRender(const UIState* pState, const Camera& Cam);
-		void set_fbo(fbo_info_cx* p);
+		void set_fbo(fbo_info_cx* p, int idx);
 		void freeVidMBP();
 	private:
 		Device* m_pDevice = 0;
@@ -15014,7 +15065,7 @@ namespace vkr {
 			assert(res == VK_SUCCESS);
 			vkWaitForFences(_dev->GetDevice(), 1, &_fence, VK_TRUE, UINT64_MAX);
 			vkResetFences(_dev->GetDevice(), 1, &_fence);
-		}
+	}
 #endif
 
 		toPreBarrier.clear();
@@ -16253,7 +16304,6 @@ namespace vkr {
 		else if (Stage == 7)
 		{
 			Profile p("m_GLTFDepth->OnCreate");
-
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
 			currobj->m_GLTFDepth->OnCreate(
@@ -16919,7 +16969,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
 			}
-		}
+			}
 
 		// submit command buffer
 		{
@@ -17048,12 +17098,12 @@ namespace vkr {
 		}
 #endif
 
-				}
-	void Renderer_cx::set_fbo(fbo_info_cx* p)
+		}
+	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
 		_fbo.fence = p->_fence;
-		_fbo.framebuffer = p->framebuffers[0].framebuffer;
-		_fbo.sem = p->framebuffers[0].semaphore;
+		_fbo.framebuffer = p->framebuffers[idx].framebuffer;
+		_fbo.sem = p->framebuffers[idx].semaphore;
 		_fbo.renderPass = p->renderPass;
 	}
 	void Renderer_cx::freeVidMBP()
@@ -17256,8 +17306,8 @@ namespace vkr {
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
 		f->colorFormat = VK_FORMAT_B8G8R8A8_SRGB;// VK_FORMAT_B8G8R8A8_UNORM;
-		f->initFBO(m_Width, m_Height, 1, _rp);
-		m_pRenderer->set_fbo(f);
+		f->initFBO(m_Width, m_Height, 2, _rp);
+		m_pRenderer->set_fbo(f, 0);
 		m_pRenderer->OnCreate(m_device, _rp);
 		_fbo = f;
 		m_UIState.Initialize();
@@ -17334,7 +17384,7 @@ namespace vkr {
 		if (resizeRender && m_Width && m_Height && m_pRenderer)
 		{
 			_fbo->reset_fbo(m_Width, m_Height);
-			m_pRenderer->set_fbo(_fbo);
+			m_pRenderer->set_fbo(_fbo, 0);
 			m_pRenderer->OnDestroyWindowSizeDependentResources();
 			m_pRenderer->OnCreateWindowSizeDependentResources(m_Width, m_Height);
 		}
