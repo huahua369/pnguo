@@ -11702,11 +11702,13 @@ namespace vkr {
 		std::string fullshaderCompilerPath = "dxcompiler.dll";
 		std::string fullshaderDXILPath = "dxil.dll";
 
-		HMODULE dxil_module = ::LoadLibrary(fullshaderDXILPath.c_str());
+		//HMODULE dxil_module = ::LoadLibrary(fullshaderDXILPath.c_str());
 
-		HMODULE dxc_module = ::LoadLibrary(fullshaderCompilerPath.c_str());
-		if (dxc_module)
-			s_dxc_create_func = (DxcCreateInstanceProc)::GetProcAddress(dxc_module, "DxcCreateInstance");
+		//HMODULE dxc_module = ::LoadLibrary(fullshaderCompilerPath.c_str());
+		//if (dxc_module)
+		//	s_dxc_create_func = (DxcCreateInstanceProc)::GetProcAddress(dxc_module, "DxcCreateInstance");
+		//else
+		s_dxc_create_func = DxcCreateInstance;
 
 		return s_dxc_create_func != NULL;
 	}
@@ -11790,10 +11792,9 @@ namespace vkr {
 
 		std::string filenamePdb = GetShaderCompilerCacheDir() + format("\\%p.lld", hash);
 
+		std::wstring twstr;
 		// get defines
-		//
-		wchar_t names[50][128];
-		wchar_t values[50][128];
+		// 
 		std::vector<DxcDefine> defines;
 		defines.reserve(50);
 		int defineCount = 0;
@@ -11801,16 +11802,21 @@ namespace vkr {
 		{
 			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
 			{
-				swprintf_s<128>(names[defineCount], L"%S", it->first.c_str());
-				swprintf_s<128>(values[defineCount], L"%S", it->second.c_str());
+				auto w = md::u8to_w(it->first.c_str(), it->first.size());
+				auto w2 = md::u8to_w(it->second.c_str(), it->second.size());
 				DxcDefine d = {};
-				d.Name = names[defineCount];
-				d.Value = values[defineCount];
+				auto pos = twstr.size();
+				w.push_back(0);
+				twstr.append(w);
+				auto pos2 = twstr.size();
+				w.push_back(0);
+				twstr.append(w2);
+				d.Name = (wchar_t*)pos;
+				d.Value = (wchar_t*)pos2;
 				defineCount++;
 				defines.push_back(d);
 			}
 		}
-
 		// check whether DXCompiler is initialized
 		if (s_dxc_create_func == nullptr)
 		{
@@ -11831,7 +11837,6 @@ namespace vkr {
 		IncluderDxc Includer(pLibrary);
 
 		std::vector<LPCWSTR> ppArgs;
-		std::wstring twstr;
 		std::string params;
 		// splits params string into an array of strings
 		{
@@ -11846,28 +11851,17 @@ namespace vkr {
 				twstr.append(w);
 				ppArgs.push_back((wchar_t*)pos);
 			}
-			auto ws = twstr.data();
-			for (auto& it : ppArgs) {
-				it = ws + (size_t)it;
-			}
-			//char* next_token;
-			//char* token = strtok_s(params.data(), " ", &next_token);
-			//while (token != NULL) {
-			//	wchar_t wide_str[1024];
-			//	swprintf_s<1024>(wide_str, L"%S", token);
-
-			//	const size_t wide_str2_len = wcslen(wide_str) + 1;
-			//	wchar_t* wide_str2 = (wchar_t*)malloc(wide_str2_len * sizeof(wchar_t));
-			//	wcscpy_s(wide_str2, wide_str2_len, wide_str);
-			//	ppArgs.push_back(wide_str2);
-
-			//	token = strtok_s(NULL, " ", &next_token);
-			//}
+		}
+		auto ws = twstr.data();
+		for (auto& it : ppArgs) {
+			it = ws + (size_t)it;
+		}
+		for (auto& it : defines) {
+			it.Name = ws + (size_t)it.Name;
+			it.Value = ws + (size_t)it.Value;
 		}
 
-		wchar_t  pEntryPointW[256];
-		swprintf_s<256>(pEntryPointW, L"%S", pEntryPoint);
-
+		auto pEntryPointW = md::u8to_w(pEntryPoint, -1);
 		IDxcOperationResult* pResultPre;
 		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines.data(), defineCount, &Includer, &pResultPre);
 		if (res1 == S_OK)
@@ -11888,12 +11882,12 @@ namespace vkr {
 
 			IDxcOperationResult* pOpRes;
 			HRESULT res;
-
+#if 0
 			if (false)
 			{
 				Microsoft::WRL::ComPtr<IDxcBlob> pPDB;
 				LPWSTR pDebugBlobName[1024];
-				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW, L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
+				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
 
 				// Setup the correct name for the PDB
 				if (pPDB)
@@ -11904,17 +11898,10 @@ namespace vkr {
 				}
 			}
 			else
+#endif
 			{
-				res = pCompiler->Compile(pSource, NULL, pEntryPointW, L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes);
+				res = pCompiler->Compile(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes);
 			}
-
-			// Clean up allocated memory
-			//while (!ppArgs.empty())
-			//{
-			//	LPCWSTR pWString = ppArgs.back();
-			//	ppArgs.pop_back();
-			//	free((void*)pWString);
-			//}
 
 			pSource->Release();
 			pLibrary->Release();

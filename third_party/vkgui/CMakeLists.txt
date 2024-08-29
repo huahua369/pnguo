@@ -60,6 +60,7 @@ target_link_libraries (vkgui PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers G
     PkgConfig::Clipper2  PkgConfig::Clipper2Z 
     tpv
     SDL3::SDL3
+    dxcompiler
 )
 target_include_directories (vkgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)
