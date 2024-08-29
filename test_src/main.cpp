@@ -26,7 +26,12 @@
 /*
 	todo
 	顶点数据、纹理/颜色数据、mvp矩阵
-
+	渲染目标、着色器、管线、数据、指令
+	- [x] PBR管线
+	- [ ] 通用无光照管线
+	- [ ] 地形管线（光照）
+	- [ ] 粒子管线(光照)
+	- [ ] 粒子管线(无光照)
 	VK_PRIMITIVE_TOPOLOGY_LINE_LIST
 	VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 
@@ -672,8 +677,16 @@ struct curl_data_t
 #include <vector>
 int main()
 {
-	std::vector<int> a;
-	a.shrink_to_fit();
+	{
+		for (size_t i = 0; i < 2; i++)
+		{
+			int a = 2 + i;
+			printf("%d\n", a);
+		}
+		int a = 10;
+		printf("\n");
+
+	}
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
