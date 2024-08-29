@@ -677,16 +677,6 @@ struct curl_data_t
 #include <vector>
 int main()
 {
-	{
-		for (size_t i = 0; i < 2; i++)
-		{
-			int a = 2 + i;
-			printf("%d\n", a);
-		}
-		int a = 10;
-		printf("\n");
-
-	}
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
@@ -707,12 +697,13 @@ int main()
 	if (vkd) {
 		int xk = 0;
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
-		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
+		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
 		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
+		load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
-		load_gltf(vkd, R"(E:\model\cube18.glb)");
+
+		//load_gltf(vkd, R"(E:\model\cube18.glb)");
 		vkd->resize(800, 600);
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)
