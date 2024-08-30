@@ -1923,6 +1923,7 @@ namespace vkr {
 		glm::vec4 m_center;
 		glm::vec4 m_radius;
 		std::vector<glm::ivec2> targets;//[“POSITION”，“NORMAL”，//“TANGENT”]
+		uint32_t vcount = 0;
 	};
 
 	struct tfMesh
@@ -5439,7 +5440,7 @@ namespace vkr
 
 							// create an input layout from the required attributes
 							// shader's can tell the slots from the #defines
-							//
+							// todo 加载顶点数据到显存
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
 							m_pGLTFTexturesAndBuffers->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 
@@ -5566,7 +5567,7 @@ namespace vkr
 		{
 			PBRMaterial* tfmat = &m_materialsData[i];
 
-			DefineList def = tfmat->m_pbrMaterialParameters.m_defines;
+			DefineList& def = tfmat->m_pbrMaterialParameters.m_defines;
 
 			auto id = def.find("ID_SSAO");
 			if (id != def.end())
@@ -5673,8 +5674,16 @@ namespace vkr
 			b.descriptorType = dt;
 			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
+			// 变形动画
+			b.binding = 4;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			b.descriptorType = dt;
+			(*pAttributeDefines)["ID_TARGET_DATA"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
 		}
-
+		// todo pbr buffer初始化
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
 
 		// Init descriptors sets for the constant buffers
@@ -5688,6 +5697,7 @@ namespace vkr
 		}
 		if (morphing_size > 0)
 		{
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
 			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 
@@ -13387,6 +13397,7 @@ namespace vkr {
 				pPrimitive->m_radius = max1 - pPrimitive->m_center;
 
 				pPrimitive->m_center = glm::vec4(glm::vec3(pPrimitive->m_center), 1.0f); //set the W to 1 since this is a position not a direction
+				pPrimitive->vcount = accessor.count;
 				auto& tar = primitives[p].targets;
 				auto tn = tar.size();
 				for (size_t n = 0; n < tn; n++)
@@ -13396,31 +13407,7 @@ namespace vkr {
 					{
 						glm::ivec2 v2 = { 0, v };
 						auto& tacc = pm->accessors[v];
-						//if (tacc.type == TINYGLTF_TYPE_VEC3)
-						//{
-						//	switch (tacc.componentType)
-						//	{
-						//	case TINYGLTF_COMPONENT_TYPE_FLOAT:
-						//	{
-						//		auto& td = targets_data[v];
-						//		td.resize(tacc.count);
-						//		auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
-						//		memcpy(td.data(), data, sizeof(glm::vec3) * tacc.count);
-						//	}
-						//	break;
-						//	case TINYGLTF_COMPONENT_TYPE_DOUBLE:
-						//	{
-						//		auto& td = targets_datad[v2.y];
-						//		td.resize(tacc.count);
-						//		auto data = get_bvd(pm, tacc.bufferView, tacc.byteOffset, m_buffersData);
-						//		memcpy(td.data(), data, sizeof(glm::dvec3) * tacc.count);
-						//	}
-						//	break;
-						//	default:
-						//		break;
-						//	}
-						//}
-						auto& kn = k;// POSITION,NORMAL,TANGENT
+						auto& kn = k;// POSITION,NORMAL,TANGENT==vec3
 						switch (kn[0])
 						{
 						case 'P':v2.x = 0; break;
@@ -13429,6 +13416,22 @@ namespace vkr {
 						case 'T':v2.x = 2; break;
 						default:
 							break;
+						}
+						if (kn == "TEXCOORD_0")//vec2
+						{
+							v2.x = 3;
+						}
+						if (kn == "TEXCOORD_1")
+						{
+							v2.x = 4;
+						}
+						if (kn == "COLOR_0")//vec3/4
+						{
+							v2.x = 5;
+						}
+						if (kn == "COLOR_1")
+						{
+							v2.x = 6;
 						}
 						pPrimitive->targets.push_back(v2);
 					}
