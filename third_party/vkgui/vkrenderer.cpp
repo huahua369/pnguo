@@ -33,6 +33,18 @@ vk渲染流程:
 		vec4 displacement = getDisplacement(vertexID, i);// 顶点目标坐标：使用顶点id获取
 		pos += u_morphWeights[i] * displacement;
 	}
+定义常量
+HAS_MORPH_TARGETS是否开启morph
+ID_MORPHING_DATA 绑定binding
+ID_TARGET_DATA绑定ssbo的binding，统一转换成vec4数组
+vertex_count顶点数量
+MORPH_TARGET_POSITION_OFFSET
+MORPH_TARGET_NORMAL_OFFSET
+MORPH_TARGET_TANGENT_OFFSET
+MORPH_TARGET_TEXCOORD_OFFSET
+MORPH_TARGET_TEXCOORD1_OFFSET
+MORPH_TARGET_COLOR_0_OFFSET
+
 */
 #include "pch1.h"
 #include "vkrenderer.h"

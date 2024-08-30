@@ -68,7 +68,7 @@ vec4 getDisplacement(int vertexID, int targetIndex)
 vec4 getTargetPosition(int vertexID)
 {
 	vec4 pos = vec4(0);
-#ifdef HAS_MORPH_TARGET_POSITION 
+#ifdef MORPH_TARGET_POSITION_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);
@@ -83,7 +83,7 @@ vec3 getTargetNormal(int vertexID)
 {
 	vec3 normal = vec3(0);
 
-#ifdef HAS_MORPH_TARGET_NORMAL 
+#ifdef MORPH_TARGET_NORMAL_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_NORMAL_OFFSET + i * vertex_count).xyz;
@@ -99,7 +99,7 @@ vec3 getTargetTangent(int vertexID)
 {
 	vec3 tangent = vec3(0);
 
-#ifdef HAS_MORPH_TARGET_TANGENT 
+#ifdef MORPH_TARGET_TANGENT_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i * vertex_count).xyz;
@@ -114,7 +114,7 @@ vec2 getTargetTexCoord0(int vertexID)
 {
 	vec2 uv = vec2(0);
 
-#ifdef HAS_MORPH_TARGET_TEXCOORD_0 
+#ifdef MORPH_TARGET_TEXCOORD_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).xy;
@@ -129,10 +129,10 @@ vec2 getTargetTexCoord1(int vertexID)
 {
 	vec2 uv = vec2(0);
 
-#ifdef HAS_MORPH_TARGET_TEXCOORD_1 
+#ifdef MORPH_TARGET_TEXCOORD_1_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
-		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).zw;
+		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_1_OFFSET + i * vertex_count).zw;
 		uv += md.u_morphWeights[i] * displacement;
 	}
 #endif
@@ -144,7 +144,7 @@ vec4 getTargetColor0(int vertexID)
 {
 	vec4 color = vec4(0);
 
-#ifdef HAS_MORPH_TARGET_COLOR_0 
+#ifdef MORPH_TARGET_COLOR_0_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_COLOR_0_OFFSET + i * vertex_count);
