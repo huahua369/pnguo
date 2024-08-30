@@ -88,7 +88,7 @@ layout(location = HAS_MOTION_VECTORS_RT) out vec2 Output_motionVect;
 
 layout (scalar, set=0, binding = 0) uniform perFrame 
 {
-	PerFrame myPerFrame;
+	PerFrame myPerFrame; 
 };
 
 //--------------------------------------------------------------------------------------

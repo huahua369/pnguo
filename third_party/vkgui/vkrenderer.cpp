@@ -1816,7 +1816,7 @@ namespace vkr {
 		bool AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
 		bool AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
 		void OnBeginFrame();
-		void SetDescriptorSet(int i, uint32_t size, VkDescriptorSet descriptorSet);
+		void SetDescriptorSet(int i, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
 	private:
 		Device* m_pDevice;
@@ -2196,7 +2196,7 @@ namespace vkr {
 		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
 
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
-		std::map<int, std::vector<Matrix2>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
+		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 
 		per_frame m_perFrameData;
 		std::map<int, std::vector<glm::vec3>> targets_data;
@@ -3856,14 +3856,14 @@ namespace vkr
 		layout_bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		layout_bindings[1].pImmutableSamplers = NULL;
 		(*pAttributeDefines)["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
-
+		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		if (inverseMatrixBufferSize > 0)
 		{
 			VkDescriptorSetLayoutBinding b;
 
 			// skinning matrices
 			b.binding = 2;
-			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;// VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;// |
+			b.descriptorType = dt;// VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;// ;// |
 			b.descriptorCount = 1;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.pImmutableSamplers = NULL;
@@ -3879,7 +3879,7 @@ namespace vkr
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			b.descriptorType = dt;
 			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
 		}
@@ -3892,11 +3892,11 @@ namespace vkr
 
 		if (inverseMatrixBufferSize > 0)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet);
+			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet, dt);
 		}
 		if (morphing_size > 0)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_descriptorSet);
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_descriptorSet, dt);
 		}
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pPrimitive->m_descriptorSetLayout };
@@ -4951,11 +4951,11 @@ namespace vkr
 	{
 		for (auto& t : m_pGLTFCommon->m_worldSpaceSkeletonMats)
 		{
-			std::vector<Matrix2>* matrices = &t.second;
+			auto matrices = &t.second;
 
 			VkDescriptorBufferInfo perSkeleton = {};
-			Matrix2* cbPerSkeleton;
-			uint32_t size = (uint32_t)(matrices->size() * sizeof(Matrix2));
+			glm::mat4* cbPerSkeleton = 0;
+			uint32_t size = (uint32_t)(matrices->size() * sizeof(glm::mat4));
 			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbPerSkeleton, &perSkeleton);
 			memcpy(cbPerSkeleton, matrices->data(), size);
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
@@ -5646,6 +5646,7 @@ namespace vkr
 		layout_bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		(*pAttributeDefines)["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
 
+		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		// Constant buffer holding the skinning matrices
 		if (inverseMatrixBufferSize > 0)
 		{
@@ -5656,7 +5657,7 @@ namespace vkr
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			b.descriptorType = dt;
 			(*pAttributeDefines)["ID_SKINNING_MATRICES"] = std::to_string(b.binding);
 
 			layout_bindings.push_back(b);
@@ -5669,7 +5670,7 @@ namespace vkr
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			b.descriptorType = dt;
 			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
 		}
@@ -5683,11 +5684,11 @@ namespace vkr
 
 		if (inverseMatrixBufferSize > 0)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet);
+			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 		if (morphing_size > 0)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_uniformsDescriptorSet);
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 
 		// Create the pipeline layout
@@ -8355,7 +8356,7 @@ namespace vkr
 		m_mem.OnBeginFrame();
 	}
 
-	void DynamicBufferRing::SetDescriptorSet(int index, uint32_t size, VkDescriptorSet descriptorSet)
+	void DynamicBufferRing::SetDescriptorSet(int index, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
 	{
 		VkDescriptorBufferInfo out = {};
 		out.buffer = m_buffer;
@@ -8368,7 +8369,8 @@ namespace vkr
 		write.pNext = NULL;
 		write.dstSet = descriptorSet;
 		write.descriptorCount = 1;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		int dk = dt;
+		write.descriptorType = (VkDescriptorType)(dk > 0 ? dt : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 		write.pBufferInfo = &out;
 		write.dstArrayElement = 0;
 		write.dstBinding = index;
@@ -14015,7 +14017,7 @@ namespace vkr {
 			return -1;
 
 		//return m_skins[id].m_InverseBindMatrices.m_count * (4 * 4 * sizeof(float));
-		return m_skins[id].m_InverseBindMatrices.m_count * (sizeof(Matrix2));
+		return m_skins[id].m_InverseBindMatrices.m_count * (sizeof(glm::mat4));// Matrix2));
 	}
 
 	//
@@ -14077,10 +14079,10 @@ namespace vkr {
 			//pick the matrices that affect the skin and multiply by the inverse of the bind      
 			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;
 
-			std::vector<Matrix2>& skinningMats = m_worldSpaceSkeletonMats[i];
+			auto& skinningMats = m_worldSpaceSkeletonMats[i];
 			for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
 			{
-				skinningMats[j].Set(m_worldSpaceMats[skin.m_jointsNodeIdx[j]].GetCurrent() * pM[j]);
+				skinningMats[j] = (m_worldSpaceMats[skin.m_jointsNodeIdx[j]].GetCurrent() * pM[j]);// todo Set
 			}
 		}
 	}
@@ -16855,6 +16857,7 @@ namespace vkr {
 					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 					pPerFrame->lodBias = 0.0f;
 					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
+					// 更新骨骼矩阵到ubo
 					it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
 				}
 			}

@@ -19,13 +19,13 @@
 // THE SOFTWARE.
 
 #ifdef ID_MORPHING_DATA
-layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing_mw
+layout(std140, binding = ID_MORPHING_DATA) buffer per_morphing_mw
 {
-	float u_morphWeights[2048];
+	float u_morphWeights[];
 } md;
-layout(std140, binding = ID_TARGET_DATA) uniform per_morphing
-{ 
-	vec4 d[2048]; 
+layout(std140, binding = ID_TARGET_DATA) buffer per_morphing
+{
+	vec4 d[];
 } per_target_data;
 #endif
 
@@ -35,21 +35,20 @@ struct Matrix2
 {
 	mat4 m_current;
 	mat4 m_previous;
-};
+}; 
 
-
-layout(set = 0, binding = ID_SKINNING_MATRICES) uniform perSkeleton
+layout(set = 0, binding = ID_SKINNING_MATRICES) buffer perSkeleton
 {
-	Matrix2 u_ModelMatrix[512];
+	mat4 u_ModelMatrix[];
 };
- 
+
 mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 {
 	mat4 skinningMatrix =
-		Weights.x * u_ModelMatrix[Joints.x].m_current +
-		Weights.y * u_ModelMatrix[Joints.y].m_current +
-		Weights.z * u_ModelMatrix[Joints.z].m_current +
-		Weights.w * u_ModelMatrix[Joints.w].m_current;
+		Weights.x * u_ModelMatrix[Joints.x] +
+		Weights.y * u_ModelMatrix[Joints.y] +
+		Weights.z * u_ModelMatrix[Joints.z] +
+		Weights.w * u_ModelMatrix[Joints.w];
 	return skinningMatrix;
 }
 #endif
