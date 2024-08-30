@@ -2,7 +2,7 @@
 #include "skinning.h"
 
 //--------------------------------------------------------------------------------------
-//  增加变形For VS layout
+//  For VS layout
 //--------------------------------------------------------------------------------------
 
 #ifdef ID_POSITION
@@ -49,7 +49,6 @@
 #endif
 
 layout (location = 0) out VS2PS Output;
-
 void gltfVertexFactory()
 {
 #ifdef ID_WEIGHTS_0
@@ -86,24 +85,44 @@ void gltfVertexFactory()
 #endif
 
 #ifdef ID_NORMAL
-	Output.Normal = normalize(vec3(transMatrix * vec4(a_Normal.xyz, 0.0)));
+    vec3 normal = a_Normal;
+#ifdef HAS_MORPH_TARGETS
+    normal += getTargetNormal(gl_VertexID);
+#endif
+	Output.Normal = normalize(vec3(transMatrix * vec4(normal.xyz, 0.0)));
 #endif
 
 #ifdef ID_TANGENT
-	Output.Tangent = normalize(vec3(transMatrix * vec4(a_Tangent.xyz, 0.0)));
+    vec3 tangent = a_Tangent.xyz;
+#ifdef HAS_MORPH_TARGETS
+    tangent += getTargetTangent(gl_VertexID);
+#endif
+	Output.Tangent = normalize(vec3(transMatrix * vec4(tangent.xyz, 0.0)));
 	Output.Binormal = cross(Output.Normal, Output.Tangent) * a_Tangent.w;
 #endif
 
+
 #ifdef ID_COLOR_0
-	Output.Color0 = a_Color0;
+	Output.Color0 = a_Color0; 
+#ifdef HAS_MORPH_TARGETS
+    Output.Color0 = clamp(Output.Color0 + getTargetColor0(gl_VertexID), 0.0f, 1.0f);
+#endif 
 #endif
 
 #ifdef ID_TEXCOORD_0
 	Output.UV0 = a_UV0;
+#ifdef HAS_MORPH_TARGETS
+    Output.UV0 += getTargetTexCoord0(gl_VertexID); 
+#endif
+
 #endif
 
 #ifdef ID_TEXCOORD_1
 	Output.UV1 = a_UV1;
+#ifdef HAS_MORPH_TARGETS 
+    Output.UV1 += getTargetTexCoord1(gl_VertexID);
+#endif
+
 #endif  
 }
 

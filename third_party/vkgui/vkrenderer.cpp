@@ -4171,13 +4171,13 @@ namespace vkr {
 	class base3d_cx
 	{
 	public:
-		Device* m_pDevice=0;
+		Device* m_pDevice = 0;
 
-		DynamicBufferRing* m_pDynamicBufferRing=0;
-		ResourceViewHeaps* m_pResourceViewHeaps=0;
+		DynamicBufferRing* m_pDynamicBufferRing = 0;
+		ResourceViewHeaps* m_pResourceViewHeaps = 0;
 
-		VkPipeline m_pipeline=0;
-		VkPipelineLayout m_pipelineLayout=0;
+		VkPipeline m_pipeline = 0;
+		VkPipelineLayout m_pipelineLayout = 0;
 
 		VkDescriptorSet             m_descriptorSet;
 		VkDescriptorSetLayout       m_descriptorSetLayout;
@@ -4691,6 +4691,23 @@ namespace vkr
 			{
 				for (auto& primitive : mesh.primitives)
 				{
+					for (auto& it : primitive.targets)
+					{
+						for (auto& [k, id] : it)
+						{
+							// todo 变形数据，数量和顶点数量相同
+							tfAccessor vertexBufferAcc = {};
+							m_pGLTFCommon->GetBufferDetails(id, &vertexBufferAcc);
+							VkDescriptorBufferInfo vbv = {};
+							// Pos=vec3
+							// Normal=vec3
+							// Tangent=vec3
+							// UV=vec2
+							// COLOR=vec4
+							//m_pStaticBufferPool->AllocBuffer(vertexBufferAcc.m_count, vertexBufferAcc.m_stride, vertexBufferAcc.m_data, &vbv);
+							//m_vertexBufferMap[id] = vbv;
+						}
+					}
 					//
 					//  Load vertex buffers
 					//
@@ -5371,6 +5388,7 @@ namespace vkr
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
 				auto& primitives = meshes[i].primitives;
+				auto& weights = meshes[i].weights;
 
 				// Loop through all the primitives (sets of triangles with a same material) and 
 				// 1) create an input layout for the geometry
@@ -5392,6 +5410,10 @@ namespace vkr
 							auto mat = primitive.material;// .find("material");
 							pPrimitive->m_pMaterial = (mat != -1) ? &m_materialsData[mat] : &m_defaultMaterial;
 
+							auto ts = primitive.targets.size();// todo 变形
+							if (ts > 0) {
+								printf("targets %ulld\n", ts);
+							}
 							// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
 							//
 							DefineList defines = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_defines + rtDefines;
@@ -5412,8 +5434,7 @@ namespace vkr
 							//
 							int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 							int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-							auto ts = primitive.targets.size() * 0;// todo 变形
-							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, ts, bUseSSAOMask);
+							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, ts * 0, bUseSSAOMask);
 							CreatePipeline(inputLayout, defines, pPrimitive);
 						});
 				}

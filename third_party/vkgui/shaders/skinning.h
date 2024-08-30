@@ -20,13 +20,13 @@
 
 #ifdef ID_MORPHING_DATA
 
-layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing
+layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing_mw
 {
-    float u_morph_pos[];
-} per_morphing_data;
+	float u_morphWeights[];
+} md;
 layout(std140, binding = ID_TARGET_DATA) uniform per_morphing
 {
-    vec4 d[];
+	vec4 d[];
 } per_target_data;
 #endif
 
@@ -34,24 +34,24 @@ layout(std140, binding = ID_TARGET_DATA) uniform per_morphing
 
 struct Matrix2
 {
-    mat4 m_current;
-    mat4 m_previous;
+	mat4 m_current;
+	mat4 m_previous;
 };
 
 
-layout (std140, binding = ID_SKINNING_MATRICES) uniform perSkeleton
+layout(std140, binding = ID_SKINNING_MATRICES) uniform perSkeleton
 {
-    Matrix2 u_ModelMatrix[200];
+	Matrix2 u_ModelMatrix[200];
 } myPerSkeleton;
 
 mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 {
-    mat4 skinningMatrix =
-        Weights.x * myPerSkeleton.u_ModelMatrix[Joints.x].m_current +
-        Weights.y * myPerSkeleton.u_ModelMatrix[Joints.y].m_current +
-        Weights.z * myPerSkeleton.u_ModelMatrix[Joints.z].m_current +
-        Weights.w * myPerSkeleton.u_ModelMatrix[Joints.w].m_current;
-    return skinningMatrix;
+	mat4 skinningMatrix =
+		Weights.x * myPerSkeleton.u_ModelMatrix[Joints.x].m_current +
+		Weights.y * myPerSkeleton.u_ModelMatrix[Joints.y].m_current +
+		Weights.z * myPerSkeleton.u_ModelMatrix[Joints.z].m_current +
+		Weights.w * myPerSkeleton.u_ModelMatrix[Joints.w].m_current;
+	return skinningMatrix;
 }
 #endif
 
@@ -60,100 +60,100 @@ mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 #ifdef HAS_MORPH_TARGETS
 // 获取目标数据
 vec4 getDisplacement(int vertexID, int targetIndex)
-{ 
-    return per_target_data.d[vertexID + targetIndex];
+{
+	return per_target_data.d[vertexID + targetIndex];
 }
 #endif
 
 
 vec4 getTargetPosition(int vertexID)
 {
-    vec4 pos = vec4(0);
+	vec4 pos = vec4(0);
 #ifdef HAS_MORPH_TARGET_POSITION 
-    for(int i = 0; i < WEIGHT_COUNT; i++)
-    {
-        vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);
-        pos += u_morphWeights[i] * displacement;
-    }
+	for (int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec4 displacement = getDisplacement(MORPH_TARGET_POSITION_OFFSET, vertexID * WEIGHT_COUNT + i);
+		pos += md.u_morphWeights[i] * displacement;
+	}
 #endif
 
-    return pos;
+	return pos;
 }
 
 vec3 getTargetNormal(int vertexID)
 {
-    vec3 normal = vec3(0);
+	vec3 normal = vec3(0);
 
 #ifdef HAS_MORPH_TARGET_NORMAL 
-    for(int i = 0; i < WEIGHT_COUNT; i++)
-    {
-        vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_NORMAL_OFFSET + i * vertex_count).xyz;
-        normal += u_morphWeights[i] * displacement;
-    }
+	for (int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_NORMAL_OFFSET + i * vertex_count).xyz;
+		normal += md.u_morphWeights[i] * displacement;
+	}
 #endif
 
-    return normal;
+	return normal;
 }
 
 
 vec3 getTargetTangent(int vertexID)
 {
-    vec3 tangent = vec3(0);
+	vec3 tangent = vec3(0);
 
 #ifdef HAS_MORPH_TARGET_TANGENT 
-    for(int i = 0; i < WEIGHT_COUNT; i++)
-    {
-        vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i, vertex_count).xyz;
-        tangent += u_morphWeights[i] * displacement;
-    }
+	for (int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i, vertex_count).xyz;
+		tangent += md.u_morphWeights[i] * displacement;
+	}
 #endif
 
-    return tangent;
+	return tangent;
 }
 
 vec2 getTargetTexCoord0(int vertexID)
 {
-    vec2 uv = vec2(0);
+	vec2 uv = vec2(0);
 
 #ifdef HAS_MORPH_TARGET_TEXCOORD_0 
-    for(int i = 0; i < WEIGHT_COUNT; i++)
-    {
-        vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).xy;
-        uv += u_morphWeights[i] * displacement;
-    }
+	for (int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).xy;
+		uv += md.u_morphWeights[i] * displacement;
+	}
 #endif
 
-    return uv;
+	return uv;
 }
 
 vec2 getTargetTexCoord1(int vertexID)
 {
-    vec2 uv = vec2(0);
+	vec2 uv = vec2(0);
 
 #ifdef HAS_MORPH_TARGET_TEXCOORD_1 
-    for(int i = 0; i < WEIGHT_COUNT; i++)
-    {
-        vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).zw;
-        uv += u_morphWeights[i] * displacement;
-    }
+	for (int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).zw;
+		uv += md.u_morphWeights[i] * displacement;
+	}
 #endif
 
-    return uv;
+	return uv;
 }
 
 vec4 getTargetColor0(int vertexID)
 {
-    vec4 color = vec4(0);
+	vec4 color = vec4(0);
 
 #ifdef HAS_MORPH_TARGET_COLOR_0 
-    for(int i = 0; i < WEIGHT_COUNT; i++)
-    {
-        vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_COLOR_0_OFFSET + i * vertex_count);
-        color += u_morphWeights[i] * displacement;
-    }
+	for (int i = 0; i < WEIGHT_COUNT; i++)
+	{
+		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_COLOR_0_OFFSET + i * vertex_count);
+		color += md.u_morphWeights[i] * displacement;
+	}
 #endif
 
-    return color;
+	return color;
 }
 
 #endif
