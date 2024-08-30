@@ -19,14 +19,13 @@
 // THE SOFTWARE.
 
 #ifdef ID_MORPHING_DATA
-
 layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing_mw
 {
 	float u_morphWeights[];
 } md;
 layout(std140, binding = ID_TARGET_DATA) uniform per_morphing
-{
-	vec4 d[];
+{ 
+	vec4 d[]; 
 } per_target_data;
 #endif
 
@@ -72,7 +71,7 @@ vec4 getTargetPosition(int vertexID)
 #ifdef HAS_MORPH_TARGET_POSITION 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
-		vec4 displacement = getDisplacement(MORPH_TARGET_POSITION_OFFSET, vertexID * WEIGHT_COUNT + i);
+		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);
 		pos += md.u_morphWeights[i] * displacement;
 	}
 #endif
@@ -103,7 +102,7 @@ vec3 getTargetTangent(int vertexID)
 #ifdef HAS_MORPH_TARGET_TANGENT 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
-		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i, vertex_count).xyz;
+		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i * vertex_count).xyz;
 		tangent += md.u_morphWeights[i] * displacement;
 	}
 #endif

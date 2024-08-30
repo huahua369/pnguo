@@ -4699,6 +4699,7 @@ namespace vkr
 							tfAccessor vertexBufferAcc = {};
 							m_pGLTFCommon->GetBufferDetails(id, &vertexBufferAcc);
 							VkDescriptorBufferInfo vbv = {};
+							//glm::vec3[targets][vcount];
 							// Pos=vec3
 							// Normal=vec3
 							// Tangent=vec3
