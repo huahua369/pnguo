@@ -19,10 +19,12 @@
 // THE SOFTWARE.
 
 #ifdef ID_MORPHING_DATA
+// 插值数据
 layout(std140, binding = ID_MORPHING_DATA) buffer per_morphing_mw
 {
 	float u_morphWeights[];
 } md;
+// 目标数据：每个顶点有插值数据数量的vec3
 layout(std140, binding = ID_TARGET_DATA) buffer per_morphing
 {
 	vec4 d[];
