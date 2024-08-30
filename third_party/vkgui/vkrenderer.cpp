@@ -3863,7 +3863,7 @@ namespace vkr
 
 			// skinning matrices
 			b.binding = 2;
-			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;// VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;// |
 			b.descriptorCount = 1;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.pImmutableSamplers = NULL;
@@ -17896,7 +17896,8 @@ namespace vkr {
 			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
 
 		auto m = glm::mat4(1.0f);// glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
-		//m = m * glm::scale(glm::mat4(1.0f), glm::vec3(0.3, .3, .3));
+		static float scc = 1.0;
+		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(scc));
 		//m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
 		//m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
 		static int nn[10] = {};

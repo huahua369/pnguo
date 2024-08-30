@@ -21,11 +21,11 @@
 #ifdef ID_MORPHING_DATA
 layout(std140, binding = ID_MORPHING_DATA) uniform per_morphing_mw
 {
-	float u_morphWeights[];
+	float u_morphWeights[2048];
 } md;
 layout(std140, binding = ID_TARGET_DATA) uniform per_morphing
 { 
-	vec4 d[]; 
+	vec4 d[2048]; 
 } per_target_data;
 #endif
 
@@ -38,18 +38,18 @@ struct Matrix2
 };
 
 
-layout(std140, binding = ID_SKINNING_MATRICES) uniform perSkeleton
+layout(set = 0, binding = ID_SKINNING_MATRICES) uniform perSkeleton
 {
-	Matrix2 u_ModelMatrix[200];
-} myPerSkeleton;
-
+	Matrix2 u_ModelMatrix[512];
+};
+ 
 mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 {
 	mat4 skinningMatrix =
-		Weights.x * myPerSkeleton.u_ModelMatrix[Joints.x].m_current +
-		Weights.y * myPerSkeleton.u_ModelMatrix[Joints.y].m_current +
-		Weights.z * myPerSkeleton.u_ModelMatrix[Joints.z].m_current +
-		Weights.w * myPerSkeleton.u_ModelMatrix[Joints.w].m_current;
+		Weights.x * u_ModelMatrix[Joints.x].m_current +
+		Weights.y * u_ModelMatrix[Joints.y].m_current +
+		Weights.z * u_ModelMatrix[Joints.z].m_current +
+		Weights.w * u_ModelMatrix[Joints.w].m_current;
 	return skinningMatrix;
 }
 #endif
