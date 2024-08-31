@@ -675,8 +675,10 @@ struct curl_data_t
 	int all_size = 0;	// 总字节数
 };
 #include <vector>
+void test_rect();
 int main()
 {
+	 //test_rect();
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
