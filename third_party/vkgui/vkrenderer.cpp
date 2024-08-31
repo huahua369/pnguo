@@ -1980,56 +1980,8 @@ namespace vkr {
 		std::vector<int> m_jointsNodeIdx;
 	};
 
-	class tfSampler
-	{
-	public:
-		tfAccessor m_time;
-		tfAccessor m_value;
-		int interpolation = 0;// linear=0，step=1，cubicspline=2
-		void SampleLinear(float time, float* frac, float** pCurr, float** pNext) const
-		{
-			int curr_index = m_time.FindClosestFloatIndex(time);
-			int next_index = std::min<int>(curr_index + 1, m_time.m_count - 1);
-
-			if (curr_index < 0) curr_index++;
-
-			if (curr_index == next_index)
-			{
-				*frac = 0;
-				*pCurr = (float*)m_value.Get(curr_index);
-				*pNext = (float*)m_value.Get(next_index);
-				return;
-			}
-
-			float curr_time = *(float*)m_time.Get(curr_index);
-			float next_time = *(float*)m_time.Get(next_index);
-
-			*pCurr = (float*)m_value.Get(curr_index);
-			*pNext = (float*)m_value.Get(next_index);
-			*frac = (time - curr_time) / (next_time - curr_time);
-			assert(*frac >= 0 && *frac <= 1.0);
-		}
-		glm::ivec2 get_tidx(float time, float* frac) const
-		{
-			int curr_index = m_time.FindClosestFloatIndex(time);
-			int next_index = std::min<int>(curr_index + 1, m_time.m_count - 1);
-
-			if (curr_index < 0) curr_index++;
-
-			if (curr_index == next_index)
-			{
-				*frac = 0;
-				return { curr_index,next_index };
-			}
-
-			float curr_time = *(float*)m_time.Get(curr_index);
-			float next_time = *(float*)m_time.Get(next_index);
-			*frac = (time - curr_time) / (next_time - curr_time);
-			assert(*frac >= 0 && *frac <= 1.0);
-			return { curr_index,next_index };
-		}
-	};
 	class tfChannel;
+	class tfSampler;
 	// 插值器
 
 	class gltfInterpolator
@@ -2039,13 +1991,6 @@ namespace vkr {
 		double prevT = 0.0;
 
 	public:
-		glm::quat slerpQuat(const glm::quat& q1, const glm::quat& q2, float t)
-		{
-			auto qn1 = glm::normalize(q1);
-			auto qn2 = glm::normalize(q2);
-			auto quatResult = glm::slerp(qn1, qn2, t);
-			return glm::normalize(quatResult);
-		}
 
 		glm::vec4 step(size_t prevKey, float* output, int stride, std::vector<float>& rb)
 		{
@@ -2126,38 +2071,91 @@ namespace vkr {
 
 		glm::quat getQuat(float* output, size_t index)
 		{
-			auto x = output[index];
-			auto y = output[index + 1];
-			auto z = output[index + 2];
-			auto w = output[index + 3];
+			auto x = output[4 * index];
+			auto y = output[4 * index + 1];
+			auto z = output[4 * index + 2];
+			auto w = output[4 * index + 3];
 			return glm::quat(w, x, y, z);
 		}
-		glm::vec4 interpolate(tfChannel* channel, float t, float maxTime, std::vector<float>* rb);
+		glm::vec4 interpolate(tfChannel* channel, tfSampler* sampler, float t, float maxTime, std::vector<float>* rb);
 	};
 
+	class tfSampler
+	{
+	public:
+		tfAccessor m_time;
+		tfAccessor m_value;
+		gltfInterpolator interpolator = {};
+		int mstride = 0;
+		int interpolation = 0;	// linear=0，step=1，cubicspline=2
+		int path = 0;			// 0"translation",1"rotation",2"scale",3"weights"; 
+		void SampleLinear(float time, float* frac, float** pCurr, float** pNext) const
+		{
+			int curr_index = m_time.FindClosestFloatIndex(time);
+			int next_index = std::min<int>(curr_index + 1, m_time.m_count - 1);
+
+			if (curr_index < 0) curr_index++;
+
+			if (curr_index == next_index)
+			{
+				*frac = 0;
+				*pCurr = (float*)m_value.Get(curr_index);
+				*pNext = (float*)m_value.Get(next_index);
+				return;
+			}
+
+			float curr_time = *(float*)m_time.Get(curr_index);
+			float next_time = *(float*)m_time.Get(next_index);
+
+			*pCurr = (float*)m_value.Get(curr_index);
+			*pNext = (float*)m_value.Get(next_index);
+			*frac = (time - curr_time) / (next_time - curr_time);
+			assert(*frac >= 0 && *frac <= 1.0);
+		}
+		glm::ivec2 get_tidx(float time, float* frac) const
+		{
+			int curr_index = m_time.FindClosestFloatIndex(time);
+			int next_index = std::min<int>(curr_index + 1, m_time.m_count - 1);
+
+			if (curr_index < 0) curr_index++;
+
+			if (curr_index == next_index)
+			{
+				*frac = 0;
+				return { curr_index,next_index };
+			}
+
+			float curr_time = *(float*)m_time.Get(curr_index);
+			float next_time = *(float*)m_time.Get(next_index);
+			*frac = (time - curr_time) / (next_time - curr_time);
+			assert(*frac >= 0 && *frac <= 1.0);
+			return { curr_index,next_index };
+		}
+	};
 	class tfChannel
 	{
 	public:
 		~tfChannel()
 		{
-			if (sampler)
-				delete sampler;
-		}
-		int path = 0;// 0"translation",1"rotation",2"scale",3"weights"; 
-		int mstride = 0;
-		tfSampler* sampler = 0;
+			for (size_t i = 0; i < 4; i++)
+			{
 
-		gltfInterpolator interpolator = {};
+				if (sampler[i])
+					delete sampler[i];
+				sampler[i] = 0;
+			}
+		}
+		tfSampler* sampler[4] = {};
+
 	};
 
-	glm::vec4 gltfInterpolator::interpolate(tfChannel* channel, float t, float maxTime, std::vector<float>* rb)
+	glm::vec4 gltfInterpolator::interpolate(tfChannel* channel, tfSampler* sampler, float t, float maxTime, std::vector<float>* rb)
 	{
-		if (!(t > 0))
+		if (!(t > 0) || !sampler)
 		{
 			return {};
 		}
-		tfSampler* sampler = channel->sampler;
-		int stride = channel->mstride > 0 ? channel->mstride : sampler->m_value.m_dimension;
+		int stride = sampler->mstride > 0 ? sampler->mstride : sampler->m_value.m_dimension;
 		size_t ilength = sampler->m_time.m_count;
 		size_t vlength = sampler->m_value.m_count;
 		float* input = (float*)sampler->m_time.m_data;
@@ -2199,7 +2197,7 @@ namespace vkr {
 		// Normalize t: [t0, t1] -> [0, 1]
 		auto tn = (t - input[prevKey]) / keyDelta;
 		// 0"translation",1"rotation",2"scale",3"weights";
-		if (channel->path == 1)
+		if (sampler->path == 1)
 		{
 			glm::quat qr = {};
 			//linear=0，step=1，cubicspline=2
@@ -2209,7 +2207,7 @@ namespace vkr {
 			{
 				auto q0 = getQuat(output, prevKey);
 				auto q1 = getQuat(output, nextKey);
-				auto r = slerpQuat(q0, q1, tn);
+				auto r = glm::normalize(glm::slerp(q0, q1, tn));
 				glm::quat q(r.w, r.x, r.y, r.z);
 				qr = q;
 			}
@@ -13878,8 +13876,7 @@ namespace vkr {
 				int sampler = channel.sampler;
 				int node = channel.target_node;// GetElementInt(channel, "target/node", -1);
 				std::string path = channel.target_path;// GetElementString(channel, "target/path", std::string());
-				auto& np = m_nodes[node];
-				auto& mp = m_meshes[np.meshIndex];
+
 				tfChannel* tfchannel;
 				auto ch = tfanim->m_channels.find(node);
 				if (ch == tfanim->m_channels.end())
@@ -13903,35 +13900,42 @@ namespace vkr {
 				// Get value line
 				//
 				GetBufferDetails(samplers[sampler].output, &tfsmp->m_value);
-				tfchannel->sampler = tfsmp;
-				tfchannel->mstride = tfsmp->m_value.m_dimension;
+				tfsmp->mstride = tfsmp->m_value.m_dimension;
 				// Index appropriately
 				// 
 				if (path == "translation")
 				{
-					tfchannel->path = 0;
+					tfsmp->path = 0;
 					assert(tfsmp->m_value.m_stride == 3 * 4);
 					assert(tfsmp->m_value.m_dimension == 3);
 				}
 				else if (path == "rotation")
 				{
-					tfchannel->path = 1;
+					tfsmp->path = 1;
 					assert(tfsmp->m_value.m_stride == 4 * 4);
 					assert(tfsmp->m_value.m_dimension == 4);
 				}
 				else if (path == "scale")
 				{
-					tfchannel->path = 2;
+					tfsmp->path = 2;
 					assert(tfsmp->m_value.m_stride == 3 * 4);
 					assert(tfsmp->m_value.m_dimension == 3);
 				}
 				else if (path == "weights")
 				{
-					tfchannel->mstride = mp.weights.size();
-					tfchannel->path = 3;
+					if (node >= 0)
+					{
+						auto& np = m_nodes[node];
+						if (np.meshIndex >= 0) {
+							auto& mp = m_meshes[np.meshIndex];
+							tfsmp->mstride = mp.weights.size();
+						}
+					}
+					tfsmp->path = 3;
 					assert(tfsmp->m_value.m_stride == 4);
 					assert(tfsmp->m_value.m_dimension == 1);
 				}
+				tfchannel->sampler[tfsmp->path] = tfsmp;
 			}
 		}
 	}
@@ -13946,7 +13950,7 @@ namespace vkr {
 	{
 		if (animationIndex < m_animations.size())
 		{
-			std::vector<float> rb;
+			std::vector<float> rbs[4];
 			tfAnimation* anim = &m_animations[animationIndex];
 			auto t1 = time;
 			//loop animation
@@ -13958,13 +13962,16 @@ namespace vkr {
 				Transform animated = {};
 				float frac, * pCurr, * pNext;
 				auto c = &it->second;
-				auto v4 = c->interpolator.interpolate(c, t1, anim->m_duration, &rb);
-				// Animate translation
-				// 0"translation",1"rotation",2"scale",3"weights";
-				if (it->second.path == 0)
+				for (size_t k = 0; k < 4; k++) {
+					auto& rb = rbs[k];
+					auto v4 = it->second.sampler[k]->interpolator.interpolate(c, it->second.sampler[k], t1, anim->m_duration, &rb);
+				}
+				// Animate translation 
+				if (it->second.sampler[0])
 				{
-					it->second.sampler->SampleLinear(time, &frac, &pCurr, &pNext);
-					animated.m_translation = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
+					//it->second.sampler[0]->SampleLinear(time, &frac, &pCurr, &pNext);
+					//auto ov4 = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
+					animated.m_translation = glm::vec4(rbs[0][0], rbs[0][1], rbs[0][2], 0);
 				}
 				else
 				{
@@ -13972,10 +13979,11 @@ namespace vkr {
 				}
 				// Animate rotation
 				//
-				if (it->second.path == 1)
+				if (it->second.sampler[1])
 				{
-					it->second.sampler->SampleLinear(time, &frac, &pCurr, &pNext);
-					glm::quat r = glm::normalize(glm::slerp(glm::make_quat(pCurr), glm::make_quat(pNext), frac));
+					//it->second.sampler[1]->SampleLinear(time, &frac, &pCurr, &pNext);
+					glm::quat r(rbs[1][3], rbs[1][0], rbs[1][1], rbs[1][2]);
+					//glm::quat r2 = glm::normalize(glm::slerp(glm::make_quat(pCurr), glm::make_quat(pNext), frac));
 					animated.m_rotation = glm::mat4(r);
 				}
 				else
@@ -13984,47 +13992,20 @@ namespace vkr {
 				}
 				// Animate scale
 				//
-				if (it->second.path == 2)
+				if (it->second.sampler[2])
 				{
-					it->second.sampler->SampleLinear(time, &frac, &pCurr, &pNext);
-					animated.m_scale = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
+					//it->second.sampler[2]->SampleLinear(time, &frac, &pCurr, &pNext);
+					//auto ov4 = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
+					animated.m_scale = glm::vec4(rbs[2][0], rbs[2][1], rbs[2][2], 0);
 				}
 				else
 				{
 					animated.m_scale = pSourceTrans->m_scale;
 				}
 
-				if (it->second.path == 3)
+				if (it->second.sampler[3])
 				{
-					auto mesh = m_meshes[m_nodes[it->first].meshIndex];
-					auto wp = it->second.sampler;
-					auto tidx = wp->get_tidx(time, &frac);
-
-					auto mn = mesh.weights.size();
-					float* tt = (float*)wp->m_value.m_data;
-					for (size_t i = 0; i < mn; i++)
-					{
-						auto t = tt + mn * tidx.x;
-						mesh.weights[i] = glm::mix(t[0], t[1], frac);
-					}
-					if (0) {
-						std::vector<float> ts, wos;
-						std::vector<std::vector<float>> ws;
-						auto tc = wp->m_time.m_count;
-						ws.resize(tc);	// 帧数
-						for (size_t i = 0; i < tc; i++)
-						{
-							float* tt = (float*)wp->m_time.Get(i);
-							ts.push_back(*tt);
-						}
-						for (size_t x = 0; x < tc; x++)
-						{
-							ws[x].resize(mn);// 通道数
-							memcpy(ws[x].data(), tt, sizeof(float) * mn);
-							tt += mn;
-						}
-					}
-					m_animated_morphWeights[it->first];
+					rbs[3];
 				}
 				m_animatedMats[it->first] = animated.GetWorldMat();
 			}
