@@ -2029,23 +2029,229 @@ namespace vkr {
 			return { curr_index,next_index };
 		}
 	};
+	class tfChannel;
+	// 插值器
+
+	class gltfInterpolator
+	{
+	public:
+		size_t prevKey = 0;
+		double prevT = 0.0;
+
+	public:
+		glm::quat slerpQuat(const glm::quat& q1, const glm::quat& q2, float t)
+		{
+			auto qn1 = glm::normalize(q1);
+			auto qn2 = glm::normalize(q2);
+			auto quatResult = glm::slerp(qn1, qn2, t);
+			return glm::normalize(quatResult);
+		}
+
+		glm::vec4 step(size_t prevKey, float* output, int stride, std::vector<float>& rb)
+		{
+			glm::vec4 result = {};
+			for (size_t i = 0; i < stride; ++i)
+			{
+				rb[i] = output[prevKey * stride + i];
+				if (i < 4)
+					result[i] = rb[i];
+			}
+			return result;
+		}
+
+		glm::vec4 linear(size_t prevKey, size_t nextKey, float* output, float t, int stride, std::vector<float>& rb)
+		{
+			glm::vec4 result = {};
+			for (size_t i = 0; i < stride; ++i)
+			{
+				rb[i] = output[prevKey * stride + i] * (1 - t) + output[nextKey * stride + i] * t;
+				if (i < 4)
+					result[i] = rb[i];
+			}
+			return result;
+		}
+		// https://github.khronos.org/glTF-Tutorials/gltfTutorial/gltfTutorial_007_Animations.html
+		template <typename T>
+		T cubicSpline(const T& vert0, const T& tang0, const T& vert1, const T& tang1, float t) {
+			float tt = t * t, ttt = tt * t;
+			float s2 = -2 * ttt + 3 * tt, s3 = ttt - tt;
+			float s0 = 1 - s2, s1 = s3 - tt + t;
+			T p0 = vert0;
+			T m0 = tang0;
+			T p1 = vert1;
+			T m1 = tang1;
+			return s0 * p0 + s1 * m0 * t + s2 * p1 + s3 * m1 * t;
+		}
+		glm::vec4 cubicSpline(size_t prevKey, size_t nextKey, float* output, float keyDelta, float t, int stride, std::vector<float>& rb)
+		{
+			// stride: Count of components (4 in a quaternion).
+			// Scale by 3, because each output entry consist of two tangents and one data-point.
+			auto prevIndex = prevKey * stride * 3;
+			auto nextIndex = nextKey * stride * 3;
+			size_t A = 0;
+			size_t V = 1 * stride;
+			size_t B = 2 * stride;
+
+			glm::vec4 result = {};
+			float tSq = t * t;
+			float tCub = tSq * t;
+			// We assume that the components in output are laid out like this: in-tangent, point, out-tangent.
+			// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#appendix-c-spline-interpolation
+			for (size_t i = 0; i < stride; ++i)
+			{
+				auto v0 = output[prevIndex + i + V];
+				auto a = keyDelta * output[nextIndex + i + A];
+				auto b = keyDelta * output[prevIndex + i + B];
+				auto v1 = output[nextIndex + i + V];
+				rb[i] = ((2.0 * tCub - 3.0 * tSq + 1.0) * v0) + ((tCub - 2.0 * tSq + t) * b) + ((-2.0 * tCub + 3.0 * tSq) * v1) + ((tCub - tSq) * a);
+				if (i < 4)
+					result[i] = rb[i];
+			}
+			return result;
+		}
+
+		void resetKey()
+		{
+			prevKey = 0;
+		}
+		size_t get_v4(float* v, int idx, int stride, std::vector<float>& rb) {
+			auto& r = rb;
+			v += idx;
+			for (size_t i = 0; i < stride; i++)
+			{
+				r[i] = v[i];
+			}
+			return rb.size();
+		}
+
+		glm::quat getQuat(float* output, size_t index)
+		{
+			auto x = output[index];
+			auto y = output[index + 1];
+			auto z = output[index + 2];
+			auto w = output[index + 3];
+			return glm::quat(w, x, y, z);
+		}
+		glm::vec4 interpolate(tfChannel* channel, float t, float maxTime, std::vector<float>* rb);
+	};
 
 	class tfChannel
 	{
 	public:
 		~tfChannel()
 		{
-			delete m_pTranslation;
-			delete m_pRotation;
-			delete m_pScale;
-			delete m_pWeights;
+			if (sampler)
+				delete sampler;
 		}
+		int path = 0;// 0"translation",1"rotation",2"scale",3"weights"; 
+		int mstride = 0;
+		tfSampler* sampler = 0;
 
-		tfSampler* m_pTranslation;
-		tfSampler* m_pRotation;
-		tfSampler* m_pScale;
-		tfSampler* m_pWeights;
+		gltfInterpolator interpolator = {};
 	};
+
+	glm::vec4 gltfInterpolator::interpolate(tfChannel* channel, float t, float maxTime, std::vector<float>* rb)
+	{
+		if (!(t > 0))
+		{
+			return {};
+		}
+		tfSampler* sampler = channel->sampler;
+		int stride = channel->mstride > 0 ? channel->mstride : sampler->m_value.m_dimension;
+		size_t ilength = sampler->m_time.m_count;
+		size_t vlength = sampler->m_value.m_count;
+		float* input = (float*)sampler->m_time.m_data;
+		float* output = (float*)sampler->m_value.m_data;
+
+		std::vector<float> rb1;
+		if (!rb)rb = &rb1;
+		rb->resize(stride);
+
+		if (vlength == stride) // no interpolation for single keyFrame animations
+		{
+			get_v4(output, 0, stride, *rb);
+			auto kr = *rb;
+			return glm::vec4(kr[0], kr[1], kr[2], kr[3]);
+		}
+		// Wrap t around, so the animation loops.
+		// Make sure that t is never earlier than the first keyframe and never later then the last keyframe.
+		t = fmod(t, maxTime);
+		t = glm::clamp(t, input[0], input[ilength - 1]);
+		if (prevT > t)
+		{
+			prevKey = 0;
+		}
+		prevT = t;
+		// Find next keyframe: min{ t of input | t > prevKey }
+		size_t nextKey = 0;
+		for (size_t i = prevKey; i < ilength; ++i)
+		{
+			if (t <= input[i])
+			{
+				nextKey = glm::clamp(i, (size_t)1, ilength - 1);
+				break;
+			}
+		}
+		prevKey = glm::clamp(nextKey - 1, (size_t)0, nextKey);
+
+		auto keyDelta = input[nextKey] - input[prevKey];
+
+		// Normalize t: [t0, t1] -> [0, 1]
+		auto tn = (t - input[prevKey]) / keyDelta;
+		// 0"translation",1"rotation",2"scale",3"weights";
+		if (channel->path == 1)
+		{
+			glm::quat qr = {};
+			//linear=0，step=1，cubicspline=2
+			switch (sampler->interpolation)
+			{
+			case 0:
+			{
+				auto q0 = getQuat(output, prevKey);
+				auto q1 = getQuat(output, nextKey);
+				auto r = slerpQuat(q0, q1, tn);
+				glm::quat q(r.w, r.x, r.y, r.z);
+				qr = q;
+			}
+			break;
+			case 1:
+			{
+				auto r = getQuat(output, prevKey);
+				glm::quat q(r.w, r.x, r.y, r.z);
+				qr = q;
+			}
+			break;
+			case 2:
+			{
+				// GLTF requires cubic spline interpolation for quaternions.
+				// https://github.com/KhronosGroup/glTF/issues/1386
+				auto r = cubicSpline(prevKey, nextKey, output, keyDelta, tn, 4, *rb);
+				glm::quat q(r.w, r.x, r.y, r.z);
+				qr = glm::normalize(q);
+			}
+			break;
+			default:
+				break;
+			}
+			if (rb)
+				*rb = { qr.x, qr.y, qr.z, qr.w };
+			return glm::vec4(qr.x, qr.y, qr.z, qr.w);
+		}
+		glm::vec4 ret = {};
+		switch (sampler->interpolation)
+		{
+		case 1:
+			ret = step(prevKey, output, stride, *rb);
+			break;
+		case 2:
+			ret = cubicSpline(prevKey, nextKey, output, keyDelta, tn, stride, *rb);
+			break;
+		default:
+			ret = linear(prevKey, nextKey, output, tn, stride, *rb);
+			break;
+		}
+		return ret;
+	}
 
 	struct tfAnimation
 	{
@@ -3209,8 +3415,11 @@ namespace vkr {
 	void GetSrgbAndCutOffOfImageGivenItsUse(int imageIndex, const std::vector<tinygltf::Material>* p, bool* pSrgbOut, float* pCutoff);
 
 
+
 }
 //!vkr
+
+
 
 template <typename T>
 const T& tinygltf::Value::Get() const {
@@ -13669,9 +13878,9 @@ namespace vkr {
 				int sampler = channel.sampler;
 				int node = channel.target_node;// GetElementInt(channel, "target/node", -1);
 				std::string path = channel.target_path;// GetElementString(channel, "target/path", std::string());
-
+				auto& np = m_nodes[node];
+				auto& mp = m_meshes[np.meshIndex];
 				tfChannel* tfchannel;
-
 				auto ch = tfanim->m_channels.find(node);
 				if (ch == tfanim->m_channels.end())
 				{
@@ -13694,30 +13903,32 @@ namespace vkr {
 				// Get value line
 				//
 				GetBufferDetails(samplers[sampler].output, &tfsmp->m_value);
-
+				tfchannel->sampler = tfsmp;
+				tfchannel->mstride = tfsmp->m_value.m_dimension;
 				// Index appropriately
 				// 
 				if (path == "translation")
 				{
-					tfchannel->m_pTranslation = tfsmp;
+					tfchannel->path = 0;
 					assert(tfsmp->m_value.m_stride == 3 * 4);
 					assert(tfsmp->m_value.m_dimension == 3);
 				}
 				else if (path == "rotation")
 				{
-					tfchannel->m_pRotation = tfsmp;
+					tfchannel->path = 1;
 					assert(tfsmp->m_value.m_stride == 4 * 4);
 					assert(tfsmp->m_value.m_dimension == 4);
 				}
 				else if (path == "scale")
 				{
-					tfchannel->m_pScale = tfsmp;
+					tfchannel->path = 2;
 					assert(tfsmp->m_value.m_stride == 3 * 4);
 					assert(tfsmp->m_value.m_dimension == 3);
 				}
 				else if (path == "weights")
 				{
-					tfchannel->m_pWeights = tfsmp;
+					tfchannel->mstride = mp.weights.size();
+					tfchannel->path = 3;
 					assert(tfsmp->m_value.m_stride == 4);
 					assert(tfsmp->m_value.m_dimension == 1);
 				}
@@ -13728,198 +13939,6 @@ namespace vkr {
 	{
 		return m_animations.size();
 	}
-	// 插值器
-
-	class gltfInterpolator
-	{
-	public:
-		size_t prevKey = 0;
-		double prevT = 0.0;
-
-
-		glm::quat slerpQuat(const glm::quat& q1, const glm::quat& q2, float t)
-		{
-			auto qn1 = glm::normalize(q1);
-			auto qn2 = glm::normalize(q2);
-			auto quatResult = glm::slerp(qn1, qn2, t);
-			return glm::normalize(quatResult);
-		}
-
-		glm::vec4 step(size_t prevKey, float* output, int stride)
-		{
-			glm::vec4 result = {};
-			assert(stride < 5);
-			for (size_t i = 0; i < stride; ++i)
-			{
-				result[i] = output[prevKey * stride + i];
-			}
-			return result;
-		}
-
-		glm::vec4 linear(size_t prevKey, size_t nextKey, float* output, float t, int stride)
-		{
-			glm::vec4 result = {};
-			assert(stride < 5);
-			for (size_t i = 0; i < stride; ++i)
-			{
-				result[i] = output[prevKey * stride + i] * (1 - t) + output[nextKey * stride + i] * t;
-			}
-			return result;
-		}
-		// https://github.khronos.org/glTF-Tutorials/gltfTutorial/gltfTutorial_007_Animations.html
-		template <typename T>
-		T cubicSpline(const T& vert0, const T& tang0, const T& vert1, const T& tang1, float t) {
-			float tt = t * t, ttt = tt * t;
-			float s2 = -2 * ttt + 3 * tt, s3 = ttt - tt;
-			float s0 = 1 - s2, s1 = s3 - tt + t;
-			T p0 = vert0;
-			T m0 = tang0;
-			T p1 = vert1;
-			T m1 = tang1;
-			return s0 * p0 + s1 * m0 * t + s2 * p1 + s3 * m1 * t;
-		}
-		glm::vec4 cubicSpline(size_t prevKey, size_t nextKey, float* output, float keyDelta, float t, int stride)
-		{
-			// stride: Count of components (4 in a quaternion).
-			// Scale by 3, because each output entry consist of two tangents and one data-point.
-			auto prevIndex = prevKey * stride * 3;
-			auto nextIndex = nextKey * stride * 3;
-			size_t A = 0;
-			size_t V = 1 * stride;
-			size_t B = 2 * stride;
-
-			glm::vec4 result = {};
-			float tSq = t * t;
-			float tCub = tSq * t;
-			// We assume that the components in output are laid out like this: in-tangent, point, out-tangent.
-			// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#appendix-c-spline-interpolation
-			for (size_t i = 0; i < stride; ++i)
-			{
-				auto v0 = output[prevIndex + i + V];
-				auto a = keyDelta * output[nextIndex + i + A];
-				auto b = keyDelta * output[prevIndex + i + B];
-				auto v1 = output[nextIndex + i + V];
-				result[i] = ((2.0 * tCub - 3.0 * tSq + 1.0) * v0) + ((tCub - 2.0 * tSq + t) * b) + ((-2.0 * tCub + 3.0 * tSq) * v1) + ((tCub - tSq) * a);
-			}
-			return result;
-		}
-
-		void resetKey()
-		{
-			prevKey = 0;
-		}
-		glm::vec4 get_v4(float* v, int idx, int stride) {
-			glm::vec4 r = {};
-			v += idx;
-			for (size_t i = 0; i < stride; i++)
-			{
-				r[i] = v[i];
-			}
-			return r;
-		}
-		glm::vec4 interpolate(tfChannel* channel, tfSampler* sampler, float t, int stride, float maxTime)
-		{
-			if (!(t > 0))
-			{
-				return {};
-			}
-			size_t ilength = sampler->m_time.m_count;
-			size_t vlength = sampler->m_value.m_count;
-			float* input = (float*)sampler->m_time.m_data;
-			float* output = (float*)sampler->m_value.m_data;
-
-			if (vlength == stride) // no interpolation for single keyFrame animations
-			{
-				return get_v4(output, 0, stride);
-			}
-			// Wrap t around, so the animation loops.
-			// Make sure that t is never earlier than the first keyframe and never later then the last keyframe.
-			t = fmod(t, maxTime);
-			t = glm::clamp(t, input[0], input[ilength - 1]);
-			if (prevT > t)
-			{
-				prevKey = 0;
-			}
-			prevT = t;
-			// Find next keyframe: min{ t of input | t > prevKey }
-			size_t nextKey = 0;
-			for (size_t i = prevKey; i < ilength; ++i)
-			{
-				if (t <= input[i])
-				{
-					nextKey = glm::clamp(i, (size_t)1, ilength - 1);
-					break;
-				}
-			}
-			prevKey = glm::clamp(nextKey - 1, (size_t)0, nextKey);
-
-			auto keyDelta = input[nextKey] - input[prevKey];
-
-			// Normalize t: [t0, t1] -> [0, 1]
-			auto tn = (t - input[prevKey]) / keyDelta;
-
-			if (channel->m_pRotation)
-			{
-				glm::quat qr = {};
-				//linear=0，step=1，cubicspline=2
-				switch (sampler->interpolation)
-				{
-				case 0:
-				{
-					auto q0 = getQuat(output, prevKey);
-					auto q1 = getQuat(output, nextKey);
-					auto r = slerpQuat(q0, q1, tn);
-					glm::quat q(r.w, r.x, r.y, r.z);
-					qr = q;
-				}
-				break;
-				case 1:
-				{
-					auto r = getQuat(output, prevKey);
-					glm::quat q(r.w, r.x, r.y, r.z);
-					qr = q;
-				}
-				break;
-				case 2:
-				{
-					// GLTF requires cubic spline interpolation for quaternions.
-					// https://github.com/KhronosGroup/glTF/issues/1386
-					auto r = cubicSpline(prevKey, nextKey, output, keyDelta, tn, 4);
-					glm::quat q(r.w, r.x, r.y, r.z);
-					qr = glm::normalize(q);
-				}
-				break;
-				default:
-					break;
-				}
-				return glm::vec4(qr.x, qr.y, qr.z, qr.w);
-			}
-			glm::vec4 ret = {};
-			switch (sampler->interpolation)
-			{
-			case 1:
-				ret = step(prevKey, output, stride);
-				break;
-			case 2:
-				ret = cubicSpline(prevKey, nextKey, output, keyDelta, tn, stride);
-				break;
-			default:
-				ret = linear(prevKey, nextKey, output, tn, stride);
-				break;
-			}
-			return ret;
-		}
-
-		glm::quat getQuat(float* output, size_t index)
-		{
-			auto x = output[index];
-			auto y = output[index + 1];
-			auto z = output[index + 2];
-			auto w = output[index + 3];
-			return glm::quat(w, x, y, z);
-		}
-	};
-
 	//
 	// Animates the matrices (they are still in object space)
 	//
@@ -13927,21 +13946,24 @@ namespace vkr {
 	{
 		if (animationIndex < m_animations.size())
 		{
+			std::vector<float> rb;
 			tfAnimation* anim = &m_animations[animationIndex];
-
+			auto t1 = time;
 			//loop animation
 			time = fmod(time, anim->m_duration);
 
 			for (auto it = anim->m_channels.begin(); it != anim->m_channels.end(); it++)
 			{
 				Transform* pSourceTrans = &m_nodes[it->first].m_tranform;
-				Transform animated;
+				Transform animated = {};
 				float frac, * pCurr, * pNext;
+				auto c = &it->second;
+				auto v4 = c->interpolator.interpolate(c, t1, anim->m_duration, &rb);
 				// Animate translation
-				//
-				if (it->second.m_pTranslation != NULL)
+				// 0"translation",1"rotation",2"scale",3"weights";
+				if (it->second.path == 0)
 				{
-					it->second.m_pTranslation->SampleLinear(time, &frac, &pCurr, &pNext);
+					it->second.sampler->SampleLinear(time, &frac, &pCurr, &pNext);
 					animated.m_translation = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
 				}
 				else
@@ -13950,9 +13972,9 @@ namespace vkr {
 				}
 				// Animate rotation
 				//
-				if (it->second.m_pRotation != NULL)
+				if (it->second.path == 1)
 				{
-					it->second.m_pRotation->SampleLinear(time, &frac, &pCurr, &pNext);
+					it->second.sampler->SampleLinear(time, &frac, &pCurr, &pNext);
 					glm::quat r = glm::normalize(glm::slerp(glm::make_quat(pCurr), glm::make_quat(pNext), frac));
 					animated.m_rotation = glm::mat4(r);
 				}
@@ -13962,19 +13984,20 @@ namespace vkr {
 				}
 				// Animate scale
 				//
-				if (it->second.m_pScale != NULL)
+				if (it->second.path == 2)
 				{
-					it->second.m_pScale->SampleLinear(time, &frac, &pCurr, &pNext);
+					it->second.sampler->SampleLinear(time, &frac, &pCurr, &pNext);
 					animated.m_scale = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
 				}
 				else
 				{
 					animated.m_scale = pSourceTrans->m_scale;
 				}
-				if (it->second.m_pWeights)
+
+				if (it->second.path == 3)
 				{
 					auto mesh = m_meshes[m_nodes[it->first].meshIndex];
-					auto wp = it->second.m_pWeights;
+					auto wp = it->second.sampler;
 					auto tidx = wp->get_tidx(time, &frac);
 
 					auto mn = mesh.weights.size();
@@ -14163,7 +14186,7 @@ namespace vkr {
 			offset += byteOffset;
 			byteLength -= byteOffset;
 
-			pAccessor->m_data = &buffer[offset];
+			pAccessor->m_data = buffer + offset;
 			pAccessor->m_dimension = tinygltf::GetNumComponentsInType(inAccessor.type);
 			pAccessor->m_type = GetFormatSize(inAccessor.componentType);
 			pAccessor->m_stride = pAccessor->m_dimension * pAccessor->m_type;
@@ -14975,7 +14998,7 @@ namespace vkr {
 		vkc::flushCommandBuffer(device, copyCmd, cp->command_pool, copyQueue, true);
 		qctx->free_cmd_pool(cp);
 #endif
-}
+	}
 	void dvk_buffer::setDesType(uint32_t dt)
 	{
 		dtype = (VkDescriptorType)dt;
@@ -15543,7 +15566,7 @@ namespace vkr {
 					break;
 				}
 
-	} while (0);
+			} while (0);
 		}
 #else
 		{
@@ -17168,14 +17191,14 @@ namespace vkr {
 				else
 				{
 					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
-			}
+				}
 #else
 				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
 #endif
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-		}
+			}
 
 			// Render skydome
 			{
@@ -17253,7 +17276,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-	}
+		}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -17463,11 +17486,11 @@ namespace vkr {
 					barrier.subresourceRange.layerCount = 1;
 					barrier.image = ImgCurrentInput;
 					vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-		}
+				}
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
-}
+			}
 		}
 
 		// submit command buffer
