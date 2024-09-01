@@ -2390,10 +2390,7 @@ namespace vkr {
 		std::vector<tfAnimation> m_animations;
 		std::vector<float> acv[4];				// 缓存动画结果	
 		std::vector<char*> m_buffersData;
-
-		const njson* m_pAccessors;
-		const njson* m_pBufferViews;
-
+		  
 		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
 		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
@@ -13559,10 +13556,7 @@ namespace vkr {
 			glm::vec4(accessor[8], accessor[9], accessor[10], accessor[11]),
 			glm::vec4(accessor[12], accessor[13], accessor[14], accessor[15]));
 	}
-	//glm::vec4 GetVector(const json::array_t& accessor)
-	//{
-	//	return glm::vec4(accessor[0], accessor[1], accessor[2], (accessor.size() == 4) ? accessor[3] : 0);
-	//}
+ 
 	void* get_bvd(tinygltf::Model* pm, int bufferViewIdx, int byteOffset, std::vector<char*>& m_buffersData)
 	{
 		auto& bufferView = pm->bufferViews[bufferViewIdx];
@@ -13576,9 +13570,7 @@ namespace vkr {
 		return &buffer[offset];
 	}
 	void GLTFCommon::load_Meshes()
-	{
-		//m_pAccessors = &j3["accessors"];
-		//m_pBufferViews = &j3["bufferViews"];
+	{ 
 		auto& meshes = pm->meshes;
 		m_meshes.resize(meshes.size());
 		for (int i = 0; i < meshes.size(); i++)
@@ -13591,10 +13583,10 @@ namespace vkr {
 				tfPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 
 				int positionId = primitives[p].attributes["POSITION"];
-				auto& accessor = pm->accessors[positionId];// m_pAccessors->at(positionId);
+				auto& accessor = pm->accessors[positionId]; 
 
-				glm::vec4 max1 = getv4(accessor.maxValues, glm::vec4(0, 0, 0, 0));// = GetVector(GetElementJsonArray(accessor, "max", { 0.0, 0.0, 0.0, 0.0 }));
-				glm::vec4 min1 = getv4(accessor.minValues, glm::vec4(0, 0, 0, 0));// = GetVector(GetElementJsonArray(accessor, "min", { 0.0, 0.0, 0.0, 0.0 }));
+				glm::vec4 max1 = getv4(accessor.maxValues, glm::vec4(0, 0, 0, 0)); 
+				glm::vec4 min1 = getv4(accessor.minValues, glm::vec4(0, 0, 0, 0)); 
 
 				pPrimitive->m_center = (min1 + max1) * 0.5f;
 				pPrimitive->m_radius = max1 - pPrimitive->m_center;
@@ -13640,7 +13632,7 @@ namespace vkr {
 					}
 				}
 			}
-			auto& weights = meshes[i].weights;
+			auto& weights = meshes[i].weights;// 默认变形插值数据
 			auto& pw = tfmesh->weights;
 			auto length = weights.size();
 			pw.resize(length);
@@ -13659,15 +13651,15 @@ namespace vkr {
 			for (int i = 0; i < pm->lights.size(); i++)
 			{
 				auto& light = pm->lights[i];
-				m_lights[i].m_color = getv4(light.color, glm::vec4(1, 1, 1, 0));// GetElementVector(light, "color", glm::vec4(1, 1, 1, 0));
-				m_lights[i].m_range = light.range;// GetElementFloat(light, "range", 105);
-				m_lights[i].m_intensity = light.intensity;// GetElementFloat(light, "intensity", 1);
-				m_lights[i].m_innerConeAngle = light.spot.innerConeAngle;//GetElementFloat(light, "spot/innerConeAngle", 0);
-				m_lights[i].m_outerConeAngle = light.spot.outerConeAngle;// GetElementFloat(light, "spot/outerConeAngle", XM_PIDIV4);
+				m_lights[i].m_color = getv4(light.color, glm::vec4(1, 1, 1, 0));
+				m_lights[i].m_range = light.range; 
+				m_lights[i].m_intensity = light.intensity; 
+				m_lights[i].m_innerConeAngle = light.spot.innerConeAngle; 
+				m_lights[i].m_outerConeAngle = light.spot.outerConeAngle; 
 
-				std::string lightName = light.name;// GetElementString(light, "name", "");
+				std::string lightName = light.name; 
 
-				std::string lightType = light.type;// GetElementString(light, "type", "");
+				std::string lightType = light.type; 
 				if (lightType == "spot")
 					m_lights[i].m_type = tfLight::LIGHT_SPOTLIGHT;
 				else if (lightType == "point")
