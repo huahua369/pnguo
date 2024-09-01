@@ -1098,7 +1098,7 @@ int main()
 			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 380,130 }, 3);
 			g3->_absolute = true;
 			g3->pos = { 30,120 };
-			g3->font_size = 30;
+			g3->font_size = 90;
 			gb2->font_size = 28;
 			g3->text_align = { 0,0.5 };
 			gb2->effect = uTheme::light;
@@ -1244,7 +1244,7 @@ int main()
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
 					auto v3 = vkd ? vkd->get_value(0) : glm::vec3();
-					g3->str = (char*)u8"한ABCabc x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
+					g3->str = (char*)u8"图AgylBCabc x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 

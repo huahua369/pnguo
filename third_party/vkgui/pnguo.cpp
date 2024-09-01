@@ -19,8 +19,7 @@
 	xatlas模型uv展开库
 	todo菜单：独立窗口(可选)-面板（单选、多选、图文按钮）
 */
-
-#if 1
+ 
 
 
 #include <pch1.h>
@@ -510,7 +509,7 @@ void component2d_t::SetAnimationTime(uint32_t animationIndex, float dtime)
 				}
 			}break;
 			case tfChannel::SHEAR: {
-				// 变形动画
+				// 斜切动画
 				if (it->second.interpolation == tfChannel::CUBIC) {
 					auto vert0 = prev + 1;
 					auto tang0 = prev + 2;
@@ -11668,10 +11667,10 @@ cairo_surface_t* new_image_cr(image_ptr_t* img)
 				t += stride;
 				ts += img->stride;
 			}
-#define _DEBUG
-			save_img_png(img, "update_text_img.png");
-			cairo_surface_write_to_png(image, "update_text_surface.png");
-#endif
+			//#define _DEBUG
+			//			save_img_png(img, "update_text_img.png");
+			//			cairo_surface_write_to_png(image, "update_text_surface.png");
+			//#endif
 		}
 	}
 	else {
@@ -22465,6 +22464,16 @@ void plane_cx::update(float delta)
 		}
 		tv->end_frame(cr);
 		_pat->img->valid = true;
+	}
+	bool savetext = false;
+	if (savetext)
+	{
+		int i = 0;
+		for (auto img : ltx->msu)
+		{
+			std::string fn = "cache/update_text_img_" + std::to_string(i++) + ".png";
+			cairo_surface_write_to_png(img, fn.c_str());
+		}
 	}
 }
 

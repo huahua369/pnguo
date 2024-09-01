@@ -1982,8 +1982,8 @@ namespace vkr {
 
 	class tfChannel;
 	class tfSampler;
-	// 插值器
 
+	// 插值器
 	class gltfInterpolator
 	{
 	public:
@@ -2139,7 +2139,6 @@ namespace vkr {
 		{
 			for (size_t i = 0; i < 4; i++)
 			{
-
 				if (sampler[i])
 					delete sampler[i];
 				sampler[i] = 0;
@@ -2390,7 +2389,7 @@ namespace vkr {
 		std::vector<tfAnimation> m_animations;
 		std::vector<float> acv[4];				// 缓存动画结果	
 		std::vector<char*> m_buffersData;
-		  
+
 		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
 		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
@@ -13556,7 +13555,7 @@ namespace vkr {
 			glm::vec4(accessor[8], accessor[9], accessor[10], accessor[11]),
 			glm::vec4(accessor[12], accessor[13], accessor[14], accessor[15]));
 	}
- 
+
 	void* get_bvd(tinygltf::Model* pm, int bufferViewIdx, int byteOffset, std::vector<char*>& m_buffersData)
 	{
 		auto& bufferView = pm->bufferViews[bufferViewIdx];
@@ -13570,7 +13569,7 @@ namespace vkr {
 		return &buffer[offset];
 	}
 	void GLTFCommon::load_Meshes()
-	{ 
+	{
 		auto& meshes = pm->meshes;
 		m_meshes.resize(meshes.size());
 		for (int i = 0; i < meshes.size(); i++)
@@ -13583,10 +13582,10 @@ namespace vkr {
 				tfPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 
 				int positionId = primitives[p].attributes["POSITION"];
-				auto& accessor = pm->accessors[positionId]; 
+				auto& accessor = pm->accessors[positionId];
 
-				glm::vec4 max1 = getv4(accessor.maxValues, glm::vec4(0, 0, 0, 0)); 
-				glm::vec4 min1 = getv4(accessor.minValues, glm::vec4(0, 0, 0, 0)); 
+				glm::vec4 max1 = getv4(accessor.maxValues, glm::vec4(0, 0, 0, 0));
+				glm::vec4 min1 = getv4(accessor.minValues, glm::vec4(0, 0, 0, 0));
 
 				pPrimitive->m_center = (min1 + max1) * 0.5f;
 				pPrimitive->m_radius = max1 - pPrimitive->m_center;
@@ -13652,14 +13651,14 @@ namespace vkr {
 			{
 				auto& light = pm->lights[i];
 				m_lights[i].m_color = getv4(light.color, glm::vec4(1, 1, 1, 0));
-				m_lights[i].m_range = light.range; 
-				m_lights[i].m_intensity = light.intensity; 
-				m_lights[i].m_innerConeAngle = light.spot.innerConeAngle; 
-				m_lights[i].m_outerConeAngle = light.spot.outerConeAngle; 
+				m_lights[i].m_range = light.range;
+				m_lights[i].m_intensity = light.intensity;
+				m_lights[i].m_innerConeAngle = light.spot.innerConeAngle;
+				m_lights[i].m_outerConeAngle = light.spot.outerConeAngle;
 
-				std::string lightName = light.name; 
+				std::string lightName = light.name;
 
-				std::string lightType = light.type; 
+				std::string lightType = light.type;
 				if (lightType == "spot")
 					m_lights[i].m_type = tfLight::LIGHT_SPOTLIGHT;
 				else if (lightType == "point")
@@ -13940,7 +13939,7 @@ namespace vkr {
 	{
 		if (animationIndex < m_animations.size())
 		{
-			tfAnimation* anim = &m_animations[animationIndex]; 
+			tfAnimation* anim = &m_animations[animationIndex];
 			time = fmod(time, anim->m_duration);
 			for (auto it = anim->m_channels.begin(); it != anim->m_channels.end(); it++)
 			{
