@@ -1998,9 +1998,8 @@ namespace vkr {
 			for (size_t i = 0; i < stride; ++i)
 			{
 				rb[i] = output[prevKey * stride + i];
-				if (i < 4)
-					result[i] = rb[i];
 			}
+			memcpy(&result, rb.data(), std::min(4, stride) * sizeof(float));
 			return result;
 		}
 
@@ -2010,9 +2009,8 @@ namespace vkr {
 			for (size_t i = 0; i < stride; ++i)
 			{
 				rb[i] = output[prevKey * stride + i] * (1 - t) + output[nextKey * stride + i] * t;
-				if (i < 4)
-					result[i] = rb[i];
 			}
+			memcpy(&result, rb.data(), std::min(4, stride) * sizeof(float));
 			return result;
 		}
 		// https://github.khronos.org/glTF-Tutorials/gltfTutorial/gltfTutorial_007_Animations.html
@@ -2049,9 +2047,8 @@ namespace vkr {
 				auto b = keyDelta * output[prevIndex + i + B];
 				auto v1 = output[nextIndex + i + V];
 				rb[i] = ((2.0 * tCub - 3.0 * tSq + 1.0) * v0) + ((tCub - 2.0 * tSq + t) * b) + ((-2.0 * tCub + 3.0 * tSq) * v1) + ((tCub - tSq) * a);
-				if (i < 4)
-					result[i] = rb[i];
 			}
+			memcpy(&result, rb.data(), std::min(4, stride) * sizeof(float));
 			return result;
 		}
 
@@ -2059,14 +2056,16 @@ namespace vkr {
 		{
 			prevKey = 0;
 		}
-		size_t get_v4(float* v, int idx, int stride, std::vector<float>& rb) {
+		glm::vec4 get_v4(float* v, int idx, int stride, std::vector<float>& rb) {
 			auto& r = rb;
 			v += idx;
+			glm::vec4 result = {};
 			for (size_t i = 0; i < stride; i++)
 			{
 				r[i] = v[i];
 			}
-			return rb.size();
+			memcpy(&result, rb.data(), std::min(4, stride) * sizeof(float));
+			return result;
 		}
 
 		glm::quat getQuat(float* output, size_t index)
@@ -2086,6 +2085,7 @@ namespace vkr {
 		tfAccessor m_time;
 		tfAccessor m_value;
 		gltfInterpolator interpolator = {};
+		std::vector<float>* weights = 0;
 		int mstride = 0;
 		int interpolation = 0;	// linear=0，step=1，cubicspline=2
 		int path = 0;			// 0"translation",1"rotation",2"scale",3"weights"; 
@@ -2167,9 +2167,7 @@ namespace vkr {
 
 		if (vlength == stride) // no interpolation for single keyFrame animations
 		{
-			get_v4(output, 0, stride, *rb);
-			auto kr = *rb;
-			return glm::vec4(kr[0], kr[1], kr[2], kr[3]);
+			return get_v4(output, 0, stride, *rb);
 		}
 		// Wrap t around, so the animation loops.
 		// Make sure that t is never earlier than the first keyframe and never later then the last keyframe.
@@ -2214,9 +2212,7 @@ namespace vkr {
 			break;
 			case 1:
 			{
-				auto r = getQuat(output, prevKey);
-				glm::quat q(r.w, r.x, r.y, r.z);
-				qr = q;
+				qr = glm::normalize(getQuat(output, prevKey));
 			}
 			break;
 			case 2:
@@ -2231,8 +2227,7 @@ namespace vkr {
 			default:
 				break;
 			}
-			if (rb)
-				*rb = { qr.x, qr.y, qr.z, qr.w };
+			*rb = { qr.x, qr.y, qr.z, qr.w };
 			return glm::vec4(qr.x, qr.y, qr.z, qr.w);
 		}
 		glm::vec4 ret = {};
@@ -2393,6 +2388,7 @@ namespace vkr {
 		std::vector<tfNode> m_nodes;
 
 		std::vector<tfAnimation> m_animations;
+		std::vector<float> acv[4];				// 缓存动画结果	
 		std::vector<char*> m_buffersData;
 
 		const njson* m_pAccessors;
@@ -13929,6 +13925,7 @@ namespace vkr {
 						if (np.meshIndex >= 0) {
 							auto& mp = m_meshes[np.meshIndex];
 							tfsmp->mstride = mp.weights.size();
+							tfsmp->weights = &mp.weights;
 						}
 					}
 					tfsmp->path = 3;
@@ -13946,67 +13943,42 @@ namespace vkr {
 	//
 	// Animates the matrices (they are still in object space)
 	//
+	//loop animation
 	void GLTFCommon::SetAnimationTime(uint32_t animationIndex, float time)
 	{
 		if (animationIndex < m_animations.size())
 		{
-			std::vector<float> rbs[4];
-			tfAnimation* anim = &m_animations[animationIndex];
-			auto t1 = time;
-			//loop animation
+			tfAnimation* anim = &m_animations[animationIndex]; 
 			time = fmod(time, anim->m_duration);
-
 			for (auto it = anim->m_channels.begin(); it != anim->m_channels.end(); it++)
 			{
 				Transform* pSourceTrans = &m_nodes[it->first].m_tranform;
 				Transform animated = {};
 				float frac, * pCurr, * pNext;
 				auto c = &it->second;
+				animated.m_translation = pSourceTrans->m_translation;
+				animated.m_rotation = pSourceTrans->m_rotation;
+				animated.m_scale = pSourceTrans->m_scale;
 				for (size_t k = 0; k < 4; k++) {
-					auto& rb = rbs[k];
-					auto v4 = it->second.sampler[k]->interpolator.interpolate(c, it->second.sampler[k], t1, anim->m_duration, &rb);
+					auto& rb = acv[k];
+					auto st = it->second.sampler[k];
+					if (st)
+					{
+						// 插值类型支持：线性、步长、三次样条插值
+						auto v4 = st->interpolator.interpolate(c, st, time, anim->m_duration, &rb);
+						if (k == 0)
+							animated.m_translation = v4;
+						if (k == 1)
+							animated.m_rotation = glm::mat4(glm::quat(v4.w, v4.x, v4.y, v4.z));
+						if (k == 2)
+							animated.m_scale = v4;
+					}
 				}
-				// Animate translation 
-				if (it->second.sampler[0])
-				{
-					//it->second.sampler[0]->SampleLinear(time, &frac, &pCurr, &pNext);
-					//auto ov4 = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
-					animated.m_translation = glm::vec4(rbs[0][0], rbs[0][1], rbs[0][2], 0);
-				}
-				else
-				{
-					animated.m_translation = pSourceTrans->m_translation;
-				}
-				// Animate rotation
-				//
-				if (it->second.sampler[1])
-				{
-					//it->second.sampler[1]->SampleLinear(time, &frac, &pCurr, &pNext);
-					glm::quat r(rbs[1][3], rbs[1][0], rbs[1][1], rbs[1][2]);
-					//glm::quat r2 = glm::normalize(glm::slerp(glm::make_quat(pCurr), glm::make_quat(pNext), frac));
-					animated.m_rotation = glm::mat4(r);
-				}
-				else
-				{
-					animated.m_rotation = pSourceTrans->m_rotation;
-				}
-				// Animate scale
-				//
-				if (it->second.sampler[2])
-				{
-					//it->second.sampler[2]->SampleLinear(time, &frac, &pCurr, &pNext);
-					//auto ov4 = glm::mix(glm::vec4(pCurr[0], pCurr[1], pCurr[2], 0), glm::vec4(pNext[0], pNext[1], pNext[2], 0), frac);
-					animated.m_scale = glm::vec4(rbs[2][0], rbs[2][1], rbs[2][2], 0);
-				}
-				else
-				{
-					animated.m_scale = pSourceTrans->m_scale;
-				}
-
 				if (it->second.sampler[3])
 				{
-					rbs[3];
+					acv[3];	// todo 变形动画
 				}
+				// it->first是节点idx
 				m_animatedMats[it->first] = animated.GetWorldMat();
 			}
 		}
