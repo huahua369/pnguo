@@ -96,6 +96,7 @@ endif()
 
 add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 add_definitions(-DVKVG_RECORDING)
+
 add_definitions(-DVKH_USE_VMA)
 add_definitions(-DXATLAS_C_API=1)
 

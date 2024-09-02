@@ -58,7 +58,7 @@ void _fonts_cache_create (VkvgDevice dev){
 #endif
 
 #if defined(VKVG_LCD_FONT_FILTER) && defined(FT_CONFIG_OPTION_SUBPIXEL_RENDERING)
-	FT_CHECK_RESULT(FT_Library_SetLcdFilter (cache->library, FT_LCD_FILTER_LIGHT));
+	//FT_CHECK_RESULT(FT_Library_SetLcdFilter (cache->library, FT_LCD_FILTER_LIGHT));
 	cache->texFormat = FB_COLOR_FORMAT;
 	cache->texPixelSize = 4;
 #else

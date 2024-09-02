@@ -676,6 +676,7 @@ struct curl_data_t
 };
 #include <vector>
 void test_rect();
+void test_vkvg(const char* fn);
 int main()
 {
 	 //test_rect();
@@ -694,6 +695,8 @@ int main()
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器
+
+	test_vkvg("cache/test_vkvg.png");
 	SDL_Texture* d3tex = 0;
 	if (vkd) {
 		int xk = 0;
@@ -729,7 +732,7 @@ int main()
 			}
 		};
 	//form0->_focus_lost_hide = true;
-	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+	auto fontn = (char*)u8"微软雅黑,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto ftc = app->font_ctx;
 	static std::atomic_bool kinit = false;
 	std::thread attt([=]() {
@@ -1098,9 +1101,10 @@ int main()
 			auto g3 = p->add_cbutton((char*)u8"🍑重叠", { 380,130 }, 3);
 			g3->_absolute = true;
 			g3->pos = { 30,120 };
-			g3->font_size = 90;
+			g3->font_size = 16;
 			gb2->font_size = 28;
 			g3->text_align = { 0,0.5 };
+			g3->pdc.background_color = 0xff000000;
 			gb2->effect = uTheme::light;
 			gb2->hscroll = {};
 			gb2->rounding = 14;
@@ -1244,7 +1248,7 @@ int main()
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
 					auto v3 = vkd ? vkd->get_value(0) : glm::vec3();
-					g3->str = (char*)u8"图AgylBCabc x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
+					g3->str = (char*)u8" 16微软雅黑,Segoe UI Emoji x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 

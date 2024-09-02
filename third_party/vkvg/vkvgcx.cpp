@@ -473,7 +473,7 @@ void vkvgtest(form_x* pw) {
 }
 #endif
 #if 1
-void test(const char* fn)
+void test_vkvg(const char* fn)
 {
 	vkvg_dev* vctx = new_vkvgdev();
 	auto dev = vctx->dev;
@@ -502,6 +502,14 @@ void test(const char* fn)
 	//vkvg_set_source_rgb(ctx, 0, 0, 0);
 	//vkvg_paint(ctx);
 	//vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.9);
+
+	//vkvg_load_font_from_path(ctx, "C:\\Windows\\Fonts\\consola.ttf", "consola");
+	//vkvg_set_font_size(ctx, 12);
+	//vkvg_select_font_face(ctx, "consola");
+	//vkvg_set_font_size(ctx, 16);
+
+	//vkvg_move_to(ctx, 100.0, 100.0);
+	//vkvg_show_text(ctx, "vkvg");
 
 	//vkvg_font_extents_t fe;
 	//vkvg_font_extents(ctx, &fe);
