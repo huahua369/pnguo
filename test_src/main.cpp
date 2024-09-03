@@ -677,15 +677,19 @@ struct curl_data_t
 #include <vector>
 void test_rect();
 void test_vkvg(const char* fn);
+double fmod1(double x, double y) {
+	return x - trunc(x / y) * y;
+}
+
 int main()
 {
-	 //test_rect();
+	//test_rect();
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
-	auto app = new_app(); 
+	auto app = new_app();
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
 	njson v = 0;
@@ -736,7 +740,10 @@ int main()
 	auto sss = (char*)u8"جيد 微软雅黑 ,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto ftc = app->font_ctx;
 
-	do_text(sss,0,strlen(sss));
+	do_text(sss, 0, strlen(sss));
+	double f0 = fmod(-0.56, 0.5);
+	double f1 = fmod1(-0.56, 0.5);
+	double f2 = fmod1(-0.5, 0.5);
 
 
 	static std::atomic_bool kinit = false;
@@ -999,7 +1006,7 @@ int main()
 		//p->draggable = true; //可拖动✔
 		p->set_border({ 0,1,0,0xff000000 });
 		// 主菜单
-		std::vector<std::string> mvs = { (char*)u8"文🥩件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
+		std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
 		p->_lms = { 2,2 };
 		p->fontsize = 16;
 		p->set_size({ form0->get_size().x - 1,50 });

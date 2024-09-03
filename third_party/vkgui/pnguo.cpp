@@ -26322,5 +26322,7 @@ void do_text(const char* str, size_t first, size_t count)
 	}
 	return;
 }
-
+#else
+void do_text(const char* str, size_t first, size_t count)
+{}
 #endif // 1
