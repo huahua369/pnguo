@@ -251,8 +251,9 @@ namespace md {
 	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
 	uint32_t get_u8_idx(const char* str, int64_t idx);
 	const char* get_u8_last(const char* str, uint32_t* codepoint);
-	std::string u16to_u8(uint16_t* str, size_t len);
-	std::wstring u8to_w(const char* str, size_t len);
+	std::string u16_u8(uint16_t* str, size_t len);
+	std::wstring u8_u16(const std::string& str);
+	std::wstring u8_w(const char* str, size_t len);
 
 	uint32_t fons_decutf8(uint32_t* state, uint32_t* codep, uint32_t byte);
 	const char* get_utf8_first(const char* str);

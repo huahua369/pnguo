@@ -19,7 +19,7 @@
 	xatlas模型uv展开库
 	todo菜单：独立窗口(可选)-面板（单选、多选、图文按钮）
 */
- 
+
 
 
 #include <pch1.h>
@@ -84,6 +84,16 @@ extern "C" {
 #include <hb-ot.h>
 #include <fontconfig/fontconfig.h> 
 #endif
+
+
+#include <unicode/uchar.h>
+#include <unicode/ucnv.h>
+#include <unicode/utypes.h>
+#include <unicode/ucsdet.h>
+#include <unicode/unistr.h>
+#include <unicode/ustring.h>
+#include <unicode/ubidi.h> 
+#include <unicode/uscript.h>  
 
 #include <stb_truetype.h>
 
@@ -25092,5 +25102,1225 @@ void rlistview_cx::clear_image()
 }
 
 
+
+#endif // 1
+
+// todo icu
+#if 1
+
+	// DLL动态加载
+class Shared //:public Res
+{
+private:
+	void* _ptr = 0;
+	std::once_flag oc;
+	bool isinit = false;
+public:
+	static std::string toLower(const std::string& s)
+	{
+		std::string str;
+		std::transform(s.begin(), s.end(), str.begin(), ::tolower);
+		return str;
+	}
+	static Shared* loadShared1(Shared* ptr, const std::string& fnstr, std::vector<std::string>* pdir = nullptr)
+	{
+#ifdef NDEBUG
+		auto nd = "debug";
+#else
+		auto nd = "release";
+#endif // NDEBUG
+		bool is = ptr->loadFile(fnstr);
+		if (!is && pdir)
+		{
+			for (auto it : *pdir)
+			{
+				auto str = toLower(it);
+				if (str.find(nd) != std::string::npos)
+				{
+					continue;
+				}
+				if ('/' != *it.rbegin() && '\\' != *it.rbegin())
+				{
+					it.push_back('/');
+				}
+				is = ptr->loadFile(it + fnstr);
+				if (is)
+				{
+					break;
+				}
+			}
+		}
+		if (!is)
+		{
+			ptr = nullptr;
+		}
+		return ptr;
+	}
+	static Shared* loadShared(const std::string& fnstr, std::vector<std::string>* pdir = nullptr)
+	{
+#ifdef NDEBUG
+		auto nd = "debug";
+#else
+		auto nd = "release";
+#endif // NDEBUG
+		Shared* ptr = new Shared();
+		bool is = ptr->loadFile(fnstr);
+		if (!is && pdir)
+		{
+			for (auto it : *pdir)
+			{
+				auto nit = toLower(it);
+				if (nit.find(nd) != std::string::npos)
+				{
+					continue;
+				}
+				if ('/' != *it.rbegin() && '\\' != *it.rbegin())
+				{
+					it.push_back('/');
+				}
+				is = ptr->loadFile(it + fnstr);
+				if (is)
+				{
+					break;
+				}
+			}
+		}
+		if (!is)
+		{
+			delete ptr;
+			ptr = nullptr;
+		}
+		if (ptr) {
+
+		}
+		return ptr;
+	}
+	static void destroy(Shared* p)
+	{
+		if (p)
+			delete p;
+	}
+public:
+	bool loadFile(const std::string& fnstr)
+	{
+#ifdef _WIN32
+#define _DL_OPEN(d) LoadLibraryExA(d,0,LOAD_WITH_ALTERED_SEARCH_PATH)
+		const char* sysdirstr = nullptr;
+		const char* sys64 = nullptr;
+#else
+#define _DL_OPEN(d) dlopen(d,RTLD_NOW)
+		const char* sysdirstr = "/usr/local/lib/";
+		const char* sys64 = "/system/lib64/";
+#endif
+		//std::call_once(oc, [=]() {
+		int inc = 0;
+		std::string dfn = fnstr;
+		std::string errstr;
+		isinit = false;
+		do
+		{
+			_ptr = _DL_OPEN(dfn.c_str());
+			if (_ptr)break;
+#ifndef _WIN32
+			auto er = dlerror();
+			if (er)
+				errstr = er;
+#endif // !_WIN32
+#ifdef __FILE__h__
+			dfn = File::getAP(dfn);
+#endif
+			_ptr = _DL_OPEN(dfn.c_str());
+			if (_ptr)break;
+			if (sysdirstr)
+			{
+				dfn = sysdirstr + fnstr;
+				_ptr = _DL_OPEN(dfn.c_str());
+			}
+			if (_ptr)break;
+			if (sys64)
+			{
+				dfn = sys64 + fnstr;
+				_ptr = _DL_OPEN(dfn.c_str());
+			}
+			if (!_ptr) {
+				errstr = getLastError();
+				printf("Could not load %s dll library!\n", fnstr.c_str());
+			}
+		} while (0);
+
+		if (_ptr)
+		{
+			isinit = true;
+		}
+		return isinit;
+	}
+	void dll_close()
+	{
+		if (_ptr)
+		{
+
+#ifdef _WIN32
+			FreeLibrary((HMODULE)_ptr);
+#else
+			dlclose(_ptr);
+#endif
+			_ptr = 0;
+		}
+	}
+	void* _dlsym(const char* funcname)
+	{
+#if defined(_WIN32)
+#define __dlsym GetProcAddress
+#define LIBPTR HMODULE
+#else
+#define __dlsym dlsym
+#define LIBPTR void*
+#endif
+		void* func = (void*)__dlsym((LIBPTR)_ptr, funcname);
+		if (!func)
+			func = (void*)__dlsym((LIBPTR)_ptr, funcname);
+		return func;
+#undef __dlsym
+#undef LIBPTR
+	}
+
+	// 批量获取
+	void dllsyms(const char** funs, void** outbuf, int n)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			auto fcn = funs[i];
+			if (fcn)
+			{
+				auto it = _dlsym(fcn);
+				if (it)
+				{
+					outbuf[i] = it;
+				}
+			}
+		}
+	}
+	// 批量获取
+
+	void dlsyms(const std::vector<std::string>& funs, void** outbuf)
+	{
+		auto n = funs.size();
+		for (size_t i = 0; i < n; i++)
+		{
+			auto fcn = funs[i];
+			if (fcn.size())
+			{
+				auto it = _dlsym(fcn.c_str());
+				if (it)
+				{
+					outbuf[i] = it;
+				}
+			}
+		}
+	}
+	void dlsyms(const std::vector<const char*>& funs, void** outbuf)
+	{
+		auto n = funs.size();
+		for (size_t i = 0; i < n; i++)
+		{
+			auto fcn = funs[i];
+			if (fcn && *fcn)
+			{
+				auto it = _dlsym(fcn);
+				if (it)
+				{
+					outbuf[i] = it;
+				}
+			}
+		}
+	}
+	//template<class T>
+	//T get_cb(const char* str, T& ot)
+	//{
+	//	T ret = (T)_dlsym(str);
+	//	ot = ret;
+	//	return ret;
+	//}
+	template<class T>
+	T get_cb(const std::string& str, T& ot)
+	{
+		T ret = (T)_dlsym(str.c_str());
+		ot = ret;
+		return ret;
+	}
+	template<class T>
+	T get_cb(const std::string& str, T* ot)
+	{
+		T ret = (T)_dlsym(str.c_str());
+		if (ot)
+			*ot = ret;
+		return ret;
+	}
+	template<class T>
+	T get_cb(const std::string& str)
+	{
+		T ret = (T)_dlsym(str.c_str());
+		return ret;
+	}
+	static void* dllsym(void* ptr, const char* fn)
+	{
+		Shared* ctx = (Shared*)ptr;
+		void* ret = nullptr;
+		if (ctx)
+		{
+			ret = ctx->_dlsym(fn);
+		}
+		return ret;
+	}
+	std::string getLastError()
+	{
+		std::string str;
+#ifdef _WIN32
+
+		char* buf = 0;
+		FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buf, 0, NULL);
+		if (buf)
+		{
+			str = buf;
+			LocalFree(buf);
+		}
+#else
+#ifdef errno
+		str = strerror(errno);
+#endif
+#endif // _WIN32
+		return str;
+	}
+public:
+	Shared()
+	{
+	}
+
+	~Shared()
+	{
+		dll_close();
+	}
+
+private:
+
+};
+
+struct icu_lib_t
+{
+	void (*_ubidi_setPara)(UBiDi* pBiDi, const UChar* text, int32_t length, UBiDiLevel paraLevel, UBiDiLevel* embeddingLevels, UErrorCode* pErrorCode);
+	int32_t(*_ubidi_countRuns) (UBiDi* pBiDi, UErrorCode* pErrorCode);
+	UBiDi* (*_ubidi_open)(void);
+	void (*_ubidi_close)(UBiDi* pBiDi);
+	UBiDiDirection(*_ubidi_getVisualRun)(UBiDi* pBiDi, int32_t runIndex, int32_t* pLogicalStart, int32_t* pLength);
+	int32_t(*_ucnv_convert)(const char* toConverterName, const char* fromConverterName, char* target, int32_t targetCapacity, const char* source, int32_t sourceLength, UErrorCode* pErrorCode);
+	UScriptCode(*_uscript_getScript)(UChar32 codepoint, UErrorCode* err);
+	UBool(*_uscript_hasScript)(UChar32 c, UScriptCode sc);
+	const char* (*_uscript_getName)(UScriptCode scriptCode);
+	const char* (*_uscript_getShortName)(UScriptCode scriptCode);
+	void* _handle;
+};
+
+
+#ifdef _WIN32
+const char* exts = ".dll";
+#else
+const char* exts = ".so";
+#endif // _WIN32
+#ifdef EAD_ICONV
+static iconv_info_t ic = {};
+#endif
+static std::once_flag icof, icuf;
+static std::set<std::string> lsic;
+static icu_lib_t* icub = 0;
+
+Shared* loadso(const std::string& dlln)
+{
+	auto so = Shared::loadShared(dlln + exts);
+	return so;
+}
+icu_lib_t* get_icu(int v)
+{
+#define mxv 1000
+	if (!icub)
+	{
+		try {
+			std::string dlln = "libicuuc";
+			std::string dlln0 = "icudt";
+			int v1 = v;
+#ifdef _WIN32
+			dlln = "icuuc" + std::to_string(v1);
+			dlln0 = "icudt" + std::to_string(v1);
+			auto so0 = loadso(dlln0);
+			auto so = loadso(dlln);
+			if (!so0)
+			{
+				dlln0 = "icudt";
+				so0 = loadso(dlln0);
+			}
+			if (!so)
+			{
+				dlln = "icuuc";
+				so = loadso(dlln);
+			}
+#else
+			auto so = loadso(dlln);
+#endif // _WIN32
+
+			if (!so) {
+				so = loadso(dlln);
+				if (!so)
+					throw std::runtime_error("-1");
+			}
+			std::string n;
+			void* uc = 0;
+
+#if 1 
+			int nc = 0;
+			do
+			{
+				for (int i = v1; i > 0; i--)
+				{
+					auto n1 = std::to_string(i);
+					auto k = "ubidi_close_" + n1;
+					auto fb = so->_dlsym(k.c_str());
+					if (fb)
+					{
+						n = n1;
+						uc = fb;
+						break;
+					}
+				}
+				if (n.empty() && nc == 0) { v1 = mxv; nc++; continue; }
+
+			} while (0);
+#endif
+			std::vector<std::string> str = { "ubidi_setPara","ubidi_countRuns","ubidi_open","ubidi_close","ubidi_getVisualRun"
+			,"ucnv_convert" , "uscript_getScript","uscript_hasScript","uscript_getName","uscript_getShortName" };
+			if (n.size())
+			{
+				for (auto& it : str)
+				{
+					it += "_" + n;
+				}
+			}
+			icu_lib_t tb = {};
+			so->dlsyms(str, (void**)&tb);
+			if (tb._ubidi_close)
+			{
+				icub = new icu_lib_t();
+				*icub = tb;
+				icub->_handle = so;
+			}
+			else {
+				Shared::destroy(so);
+			}
+		}
+		catch (const std::exception& e)
+		{
+			auto ew = e.what();
+			if (ew)
+			{
+				printf(ew);
+				printf("load icu error!\n");
+			}
+		}
+	}
+	return icub;
+}
+
+void un_icu()
+{
+	if (icub)
+	{
+
+		if (icub->_handle)
+		{
+			Shared::destroy((Shared*)icub->_handle);
+		}
+		delete icub;
+		icub = 0;
+	}
+}
+
+void init_icu()
+{
+	if (!icub)
+		get_icu(U_ICU_VERSION_MAJOR_NUM);
+}
+
+
+
+
+struct ScriptRecord
+{
+	UChar32 startChar;
+	UChar32 endChar;
+	UScriptCode scriptCode;
+};
+
+struct ParenStackEntry
+{
+	int32_t pairIndex;
+	UScriptCode scriptCode;
+};
+
+class ScriptRun /*: public UObject*/ {
+public:
+	ScriptRun();
+	~ScriptRun();
+
+	ScriptRun(const UChar chars[], int32_t length);
+
+	ScriptRun(const UChar chars[], int32_t start, int32_t length);
+
+	void reset();
+
+	void reset(int32_t start, int32_t count);
+
+	void reset(const UChar chars[], int32_t start, int32_t length);
+
+	int32_t getScriptStart();
+
+	int32_t getScriptEnd();
+
+	UScriptCode getScriptCode();
+
+	UBool next();
+
+	/**
+	 * ICU "poor man's RTTI", returns a UClassID for the actual class.
+	 *
+	 * @stable ICU 2.2
+	 */
+	virtual inline UClassID getDynamicClassID() const { return getStaticClassID(); }
+
+	/**
+	 * ICU "poor man's RTTI", returns a UClassID for this class.
+	 *
+	 * @stable ICU 2.2
+	 */
+	static inline UClassID getStaticClassID() { return (UClassID)&fgClassID; }
+
+	icu_lib_t* icub = 0;
+private:
+
+	static UBool sameScript(int32_t scriptOne, int32_t scriptTwo);
+
+	int32_t charStart;
+	int32_t charLimit;
+	const UChar* charArray;
+
+	int32_t scriptStart;
+	int32_t scriptEnd;
+	UScriptCode scriptCode;
+
+	ParenStackEntry parenStack[128];
+	int32_t parenSP;
+
+	static int8_t highBit(int32_t value);
+	static int32_t getPairIndex(UChar32 ch);
+
+	static UChar32 pairedChars[];
+	static const int32_t pairedCharCount;
+	static const int32_t pairedCharPower;
+	static const int32_t pairedCharExtra;
+
+	/**
+	 * The address of this static class variable serves as this class's ID
+	 * for ICU "poor man's RTTI".
+	 */
+	static const char fgClassID;
+};
+
+const char ScriptRun::fgClassID = 0;
+
+UChar32 ScriptRun::pairedChars[] = {
+	0x0028, 0x0029, // ascii paired punctuation
+	0x003c, 0x003e,
+	0x005b, 0x005d,
+	0x007b, 0x007d,
+	0x00ab, 0x00bb, // guillemets
+	0x2018, 0x2019, // general punctuation
+	0x201c, 0x201d,
+	0x2039, 0x203a,
+	0x3008, 0x3009, // chinese paired punctuation
+	0x300a, 0x300b,
+	0x300c, 0x300d,
+	0x300e, 0x300f,
+	0x3010, 0x3011,
+	0x3014, 0x3015,
+	0x3016, 0x3017,
+	0x3018, 0x3019,
+	0x301a, 0x301b
+};
+#ifndef UPRV_LENGTHOF
+#define UPRV_LENGTHOF(a) (int32_t)(sizeof(a)/sizeof((a)[0]))
+#endif
+const int32_t ScriptRun::pairedCharCount = UPRV_LENGTHOF(pairedChars);
+const int32_t ScriptRun::pairedCharPower = 1 << highBit(pairedCharCount);
+const int32_t ScriptRun::pairedCharExtra = pairedCharCount - pairedCharPower;
+
+int8_t ScriptRun::highBit(int32_t value)
+{
+	if (value <= 0) {
+		return -32;
+	}
+
+	int8_t bit = 0;
+
+	if (value >= 1 << 16) {
+		value >>= 16;
+		bit += 16;
+	}
+
+	if (value >= 1 << 8) {
+		value >>= 8;
+		bit += 8;
+	}
+
+	if (value >= 1 << 4) {
+		value >>= 4;
+		bit += 4;
+	}
+
+	if (value >= 1 << 2) {
+		value >>= 2;
+		bit += 2;
+	}
+
+	if (value >= 1 << 1) {
+		value >>= 1;
+		bit += 1;
+	}
+
+	return bit;
+}
+
+int32_t ScriptRun::getPairIndex(UChar32 ch)
+{
+	int32_t probe = pairedCharPower;
+	int32_t index = 0;
+
+	if (ch >= pairedChars[pairedCharExtra]) {
+		index = pairedCharExtra;
+	}
+
+	while (probe > (1 << 0)) {
+		probe >>= 1;
+
+		if (ch >= pairedChars[index + probe]) {
+			index += probe;
+		}
+	}
+
+	if (pairedChars[index] != ch) {
+		index = -1;
+	}
+
+	return index;
+}
+
+UBool ScriptRun::sameScript(int32_t scriptOne, int32_t scriptTwo)
+{
+	return scriptOne <= USCRIPT_INHERITED || scriptTwo <= USCRIPT_INHERITED || scriptOne == scriptTwo;
+}
+
+UBool ScriptRun::next()
+{
+
+	int32_t startSP = parenSP;  // used to find the first new open character
+	UErrorCode error = U_ZERO_ERROR;
+
+	// if we've fallen off the end of the text, we're done
+	if (scriptEnd >= charLimit || !icub || !icub->_uscript_getScript || !icub->_uscript_hasScript) {
+		return false;
+	}
+
+	scriptCode = USCRIPT_COMMON;
+
+	for (scriptStart = scriptEnd; scriptEnd < charLimit; scriptEnd += 1) {
+		UChar   high = charArray[scriptEnd];
+		UChar32 ch = high;
+
+		// if the character is a high surrogate and it's not the last one
+		// in the text, see if it's followed by a low surrogate
+		if (high >= 0xD800 && high <= 0xDBFF && scriptEnd < charLimit - 1)
+		{
+			UChar low = charArray[scriptEnd + 1];
+
+			// if it is followed by a low surrogate,
+			// consume it and form the full character
+			if (low >= 0xDC00 && low <= 0xDFFF) {
+				ch = (high - 0xD800) * 0x0400 + low - 0xDC00 + 0x10000;
+				scriptEnd += 1;
+			}
+		}
+		//uscript_getCode();
+		UScriptCode sc = icub->_uscript_getScript(ch, &error);
+		if (sc == USCRIPT_ARABIC)
+		{
+			if (icub->_uscript_hasScript(ch, USCRIPT_UGARITIC))
+			{
+				sc = USCRIPT_UGARITIC;
+			}
+		}
+		int32_t pairIndex = getPairIndex(ch);
+
+		// Paired character handling:
+		//
+		// if it's an open character, push it onto the stack.
+		// if it's a close character, find the matching open on the
+		// stack, and use that script code. Any non-matching open
+		// characters above it on the stack will be poped.
+		if (pairIndex >= 0) {
+			if ((pairIndex & 1) == 0) {
+				parenStack[++parenSP].pairIndex = pairIndex;
+				parenStack[parenSP].scriptCode = scriptCode;
+			}
+			else if (parenSP >= 0) {
+				int32_t pi = pairIndex & ~1;
+
+				while (parenSP >= 0 && parenStack[parenSP].pairIndex != pi) {
+					parenSP -= 1;
+				}
+
+				if (parenSP < startSP) {
+					startSP = parenSP;
+				}
+
+				if (parenSP >= 0) {
+					sc = parenStack[parenSP].scriptCode;
+				}
+			}
+		}
+
+		if (sameScript(scriptCode, sc)) {
+			if (scriptCode <= USCRIPT_INHERITED && sc > USCRIPT_INHERITED) {
+				scriptCode = sc;
+
+				// now that we have a final script code, fix any open
+				// characters we pushed before we knew the script code.
+				while (startSP < parenSP) {
+					parenStack[++startSP].scriptCode = scriptCode;
+				}
+			}
+
+			// if this character is a close paired character,
+			// pop it from the stack
+			if (pairIndex >= 0 && (pairIndex & 1) != 0 && parenSP >= 0) {
+				parenSP -= 1;
+				startSP -= 1;
+			}
+		}
+		else {
+			// if the run broke on a surrogate pair,
+			// end it before the high surrogate
+			if (ch >= 0x10000) {
+				scriptEnd -= 1;
+			}
+
+			break;
+		}
+	}
+
+	return true;
+}
+
+ScriptRun::ScriptRun()
+{
+	reset(NULL, 0, 0);
+}
+ScriptRun::~ScriptRun()
+{
+}
+
+ScriptRun::ScriptRun(const UChar chars[], int32_t length)
+{
+	reset(chars, 0, length);
+}
+
+ScriptRun::ScriptRun(const UChar chars[], int32_t start, int32_t length)
+{
+	reset(chars, start, length);
+}
+
+int32_t ScriptRun::getScriptStart()
+{
+	return scriptStart;
+}
+
+int32_t ScriptRun::getScriptEnd()
+{
+	return scriptEnd;
+}
+
+UScriptCode ScriptRun::getScriptCode()
+{
+	return scriptCode;
+}
+
+void ScriptRun::reset()
+{
+	scriptStart = charStart;
+	scriptEnd = charStart;
+	scriptCode = USCRIPT_INVALID_CODE;
+	parenSP = -1;
+}
+
+void ScriptRun::reset(int32_t start, int32_t length)
+{
+	charStart = start;
+	charLimit = start + length;
+
+	reset();
+}
+
+void ScriptRun::reset(const UChar chars[], int32_t start, int32_t length)
+{
+	charArray = chars;
+
+	reset(start, length);
+}
+
+//UObject::UObject(){}
+//UObject::~UObject(){}
+
+static hb_script_t get_script(const char* str)
+{
+#define KN(v,v1) {#v1,#v},{#v,#v}
+	static std::map<std::string, std::string> ms =
+	{
+		KN(Adlm, Adlam),
+		KN(Aghb, Caucasian_Albanian),
+		KN(Ahom, Ahom),
+		KN(Arab, Arabic),
+		KN(Armi, Imperial_Aramaic),
+		KN(Armn, Armenian),
+		KN(Avst, Avestan),
+		KN(Bali, Balinese),
+		KN(Bamu, Bamum),
+		KN(Bass, Bassa_Vah),
+		KN(Batk, Batak),
+		KN(Beng, Bengali),
+		KN(Bhks, Bhaiksuki),
+		KN(Bopo, Bopomofo),
+		KN(Brah, Brahmi),
+		KN(Brai, Braille),
+		KN(Bugi, Buginese),
+		KN(Buhd, Buhid),
+		KN(Cakm, Chakma),
+		KN(Cans, Canadian_Aboriginal),
+		KN(Cari, Carian),
+		KN(Cham, Cham),
+		KN(Cher, Cherokee),
+		KN(Chrs, Chorasmian),
+		KN(Copt, Coptic),
+		KN(Cprt, Cypriot),
+		KN(Cyrl, Cyrillic),
+		KN(Deva, Devanagari),
+		KN(Diak, Dives_Akuru),
+		KN(Dogr, Dogra),
+		KN(Dsrt, Deseret),
+		KN(Dupl, Duployan),
+		KN(Egyp, Egyptian_Hieroglyphs),
+		KN(Elba, Elbasan),
+		KN(Elym, Elymaic),
+		KN(Ethi, Ethiopic),
+		KN(Geor, Georgian),
+		KN(Glag, Glagolitic),
+		KN(Gong, Gunjala_Gondi),
+		KN(Gonm, Masaram_Gondi),
+		KN(Goth, Gothic),
+		KN(Gran, Grantha),
+		KN(Grek, Greek),
+		KN(Gujr, Gujarati),
+		KN(Guru, Gurmukhi),
+		KN(Hang, Hangul),
+		KN(Hani, Han),
+		KN(Hani, Hans),
+		KN(Hani, Hant),
+		KN(Hano, Hanunoo),
+		KN(Hatr, Hatran),
+		KN(Hebr, Hebrew),
+		KN(Hira, Hiragana),
+		KN(Hluw, Anatolian_Hieroglyphs),
+		KN(Hmng, Pahawh_Hmong),
+		KN(Hmnp, Nyiakeng_Puachue_Hmong),
+		KN(Hrkt, Katakana_Or_Hiragana),
+		KN(Hung, Old_Hungarian),
+		KN(Ital, Old_Italic),
+		KN(Java, Javanese),
+		KN(Kali, Kayah_Li),
+		KN(Kana, Katakana),
+		KN(Khar, Kharoshthi),
+		KN(Khmr, Khmer),
+		KN(Khoj, Khojki),
+		KN(Kits, Khitan_Small_Script),
+		KN(Knda, Kannada),
+		KN(Kthi, Kaithi),
+		KN(Lana, Tai_Tham),
+		KN(Laoo, Lao),
+		KN(Latn, Latin),
+		KN(Lepc, Lepcha),
+		KN(Limb, Limbu),
+		KN(Lina, Linear_A),
+		KN(Linb, Linear_B),
+		KN(Lisu, Lisu),
+		KN(Lyci, Lycian),
+		KN(Lydi, Lydian),
+		KN(Mahj, Mahajani),
+		KN(Maka, Makasar),
+		KN(Mand, Mandaic),
+		KN(Mani, Manichaean),
+		KN(Marc, Marchen),
+		KN(Medf, Medefaidrin),
+		KN(Mend, Mende_Kikakui),
+		KN(Merc, Meroitic_Cursive),
+		KN(Mero, Meroitic_Hieroglyphs),
+		KN(Mlym, Malayalam),
+		KN(Modi, Modi),
+		KN(Mong, Mongolian),
+		KN(Mroo, Mro),
+		KN(Mtei, Meetei_Mayek),
+		KN(Mult, Multani),
+		KN(Mymr, Myanmar),
+		KN(Nand, Nandinagari),
+		KN(Narb, Old_North_Arabian),
+		KN(Nbat, Nabataean),
+		KN(Newa, Newa),
+		KN(Nkoo, Nko),
+		KN(Nshu, Nushu),
+		KN(Ogam, Ogham),
+		KN(Olck, Ol_Chiki),
+		KN(Orkh, Old_Turkic),
+		KN(Orya, Oriya),
+		KN(Osge, Osage),
+		KN(Osma, Osmanya),
+		KN(Palm, Palmyrene),
+		KN(Pauc, Pau_Cin_Hau),
+		KN(Perm, Old_Permic),
+		KN(Phag, Phags_Pa),
+		KN(Phli, Inscriptional_Pahlavi),
+		KN(Phlp, Psalter_Pahlavi),
+		KN(Phnx, Phoenician),
+		KN(Plrd, Miao),
+		KN(Prti, Inscriptional_Parthian),
+		KN(Rjng, Rejang),
+		KN(Rohg, Hanifi_Rohingya),
+		KN(Runr, Runic),
+		KN(Samr, Samaritan),
+		KN(Sarb, Old_South_Arabian),
+		KN(Saur, Saurashtra),
+		KN(Sgnw, SignWriting),
+		KN(Shaw, Shavian),
+		KN(Shrd, Sharada),
+		KN(Sidd, Siddham),
+		KN(Sind, Khudawadi),
+		KN(Sinh, Sinhala),
+		KN(Sogd, Sogdian),
+		KN(Sogo, Old_Sogdian),
+		KN(Sora, Sora_Sompeng),
+		KN(Soyo, Soyombo),
+		KN(Sund, Sundanese),
+		KN(Sylo, Syloti_Nagri),
+		KN(Syrc, Syriac),
+		KN(Tagb, Tagbanwa),
+		KN(Takr, Takri),
+		KN(Tale, Tai_Le),
+		KN(Talu, New_Tai_Lue),
+		KN(Taml, Tamil),
+		KN(Tang, Tangut),
+		KN(Tavt, Tai_Viet),
+		KN(Telu, Telugu),
+		KN(Tfng, Tifinagh),
+		KN(Tglg, Tagalog),
+		KN(Thaa, Thaana),
+		KN(Thai, Thai),
+		KN(Tibt, Tibetan),
+		KN(Tirh, Tirhuta),
+		KN(Ugar, Ugaritic),
+		KN(Vaii, Vai),
+		KN(Wara, Warang_Citi),
+		KN(Wcho, Wancho),
+		KN(Xpeo, Old_Persian),
+		KN(Xsux, Cuneiform),
+		KN(Yezi, Yezidi),
+		KN(Yiii, Yi),
+		KN(Zanb, Zanabazar_Square),
+		KN(Zinh, Inherited),
+		KN(Zyyy, Common),
+		KN(Zzzz, Unknonn)
+	};
+#undef KN
+	hb_script_t ret = HB_SCRIPT_UNKNOWN;
+	auto it = ms.find(str);
+	if (it != ms.end())
+	{
+		ret = hb_script_from_string(it->second.c_str(), 4);
+	}
+	return ret;
+}
+
+struct char_item_t
+{
+	unsigned int glyph_index;	// 索引
+	glm::ivec2 offset;			// 偏移
+	glm::ivec2 adv;				// xy_advance
+	glm::ivec2 size;			// 原始大小
+};
+struct str_info_t
+{
+	union str_t
+	{
+		const uint8_t* p8;
+		const uint16_t* p16;
+		const uint32_t* p32 = 0;
+	}str;
+	unsigned int	type = 0;
+	int             text_length = -1;
+	unsigned int    item_offset = 0;
+	int             item_length = -1;
+	str_info_t() {}
+	str_info_t(const char* s, int tlen = -1, unsigned int pos = 0, int ilen = -1) :text_length(tlen), item_offset(pos), item_length(ilen)
+	{
+		str.p8 = (uint8_t*)s;
+	}
+	str_info_t(const uint16_t* s, int tlen = -1, unsigned int pos = 0, int ilen = -1) :type(1), text_length(tlen), item_offset(pos), item_length(ilen)
+	{
+		str.p16 = (uint16_t*)s;
+	}
+	str_info_t(const uint32_t* s, int tlen = -1, unsigned int pos = 0, int ilen = -1) :type(2), text_length(tlen), item_offset(pos), item_length(ilen)
+	{
+		str.p32 = (uint32_t*)s;
+	}
+};
+struct bidi_item
+{
+	hb_script_t sc;
+	std::string s;
+	uint32_t first, second;
+	bool rtl = false;
+};
+enum class lt_dir
+{
+	invalid = 0,
+	ltr = 4,	// 左-右
+	rtl,		// 右-左
+	ttb,		// 竖
+	btt			// 倒竖
+};
+class word_key
+{
+private:
+	// hb_script_t
+	std::set<int> _sc;
+	std::set<char> _split_ch;
+public:
+	word_key();
+	~word_key();
+	void push(int sc);
+	// hb_script_t
+	bool is_word(int sc);
+	int get_split(char c);
+private:
+
+};
+struct dlinfo_t
+{
+	font_t* font;
+	double font_height;
+	lt_dir dir;
+	//Image* img;
+	// x,y ,z=baseline
+	//glm::ivec3 pos;
+	bool is_word1;
+	word_key* wks = 0;
+	// out
+	glm::ivec2 rc;
+};
+struct lt_item_t
+{
+	unsigned int _glyph_index = 0;
+	// 缓存位置xy, 字符图像zw(width,height)
+	glm::ivec4 _rect;
+	// 渲染偏移坐标
+	glm::ivec2 _dwpos;
+	// 原始的advance
+	int advance = 0;
+	// hb偏移
+	glm::ivec2 _offset;
+	// hb计算的
+	glm::ivec2 adv;
+	// 字符
+	char32_t ch[8] = {};
+	int chlen = 0;
+	uint32_t cluster = 0;
+	// 连词
+	int last_n = 0;
+	// 渲染颜色
+	uint32_t color = 0;
+	image_ptr_t* _image = nullptr;
+	bool rtl = false;
+};
+
+class hb_cx
+{
+public:
+	enum class hb_dir
+	{
+		invalid = 0,
+		ltr = 4,	// 左-右
+		rtl,		// 右-左
+		ttb,		// 竖
+		btt			// 倒竖
+	};
+private:
+	std::map<font_t*, hb_font_t*> _font;
+	hb_buffer_t* _buffer = 0;
+public:
+	hb_cx();
+	~hb_cx();
+	font_t* push_font(font_t* p);
+	void shape(const str_info_t& str, font_t* ttp, hb_dir dir);
+	void shape(const str_info_t* str, font_t* ttp, hb_dir dir);
+	//int tolayout(const std::string& str, font_t* ttf, double fontheight, bool is_word1, word_key& wks, std::vector<lt_item_t>& outlt);
+	int tolayout(const std::string& str, dlinfo_t* info, std::vector<lt_item_t>& outlt);
+	glm::ivec2 draw_to_image(const std::string& str, font_t* ttf, double fontheight, image_ptr_t* img, glm::ivec3 dstpos);
+public:
+
+private:
+	void free_font();
+};
+
+
+struct BidiScriptRunRecords {
+	bool isRtl;
+	std::deque<ScriptRecord> records;
+};
+static void collectBidiScriptRuns(BidiScriptRunRecords& scriptRunRecords,
+	const UChar* chars, int32_t start, int32_t end, bool isRTL) {
+	scriptRunRecords.isRtl = isRTL;
+
+	ScriptRun scriptRun(chars, start, end);
+	scriptRun.icub = get_icu(U_ICU_VERSION_MAJOR_NUM);
+	while (scriptRun.next()) {
+		ScriptRecord scriptRecord;
+		scriptRecord.startChar = scriptRun.getScriptStart();
+		scriptRecord.endChar = scriptRun.getScriptEnd();
+		scriptRecord.scriptCode = scriptRun.getScriptCode();
+
+		scriptRunRecords.records.push_back(scriptRecord);
+	}
+}
+
+word_key::word_key()
+{
+	_sc.insert(HB_SCRIPT_HAN);
+	_split_ch.insert(' ');
+	_split_ch.insert('\t');
+}
+
+word_key::~word_key()
+{
+}
+void word_key::push(int sc)
+{
+	_sc.insert(sc);
+}
+bool word_key::is_word(int sc)
+{
+	return _sc.find(sc) != _sc.end();
+}
+int word_key::get_split(char c)
+{
+	return _split_ch.find(c) != _split_ch.end();
+}
+
+void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
+{
+	//print_time ftpt("ubidi");
+
+	static auto icub = get_icu(U_ICU_VERSION_MAJOR_NUM);
+	do {
+		if (!icub)
+		{
+			icub = get_icu(U_ICU_VERSION_MAJOR_NUM);
+		}
+		if (!icub)return;
+		if (!icub->_ubidi_open)
+		{
+			return;
+		}
+	} while (0);
+
+
+	UBiDi* bidi = icub->_ubidi_open();
+	UBiDiLevel bidiReq = UBIDI_DEFAULT_LTR;
+	int stringLen = len;
+	if (bidi) {
+		UErrorCode status = U_ZERO_ERROR;
+		// Set callbacks to override bidi classes of new emoji
+		//ubidi_setClassCallback(bidi, emojiBidiOverride, nullptr, nullptr, nullptr, &status);
+		if (!U_SUCCESS(status)) {
+			printf("error setting bidi callback function, status = %d", status);
+			return;
+		}
+		info.reserve(len);
+		icub->_ubidi_setPara(bidi, testChars, stringLen, bidiReq, NULL, &status);
+		if (U_SUCCESS(status)) {
+			//int paraDir = ubidi_getParaLevel(bidi);
+			size_t rc = icub->_ubidi_countRuns(bidi, &status); 
+			for (size_t i = 0; i < rc; ++i) {
+				int32_t startRun = 0;
+				int32_t lengthRun = 0;
+				UBiDiDirection runDir = icub->_ubidi_getVisualRun(bidi, i, &startRun, &lengthRun);
+				bool isRTL = (runDir == UBIDI_RTL);
+				//printf("Processing Bidi Run = %lld -- run-start = %d, run-len = %d, isRTL = %d\n", i, startRun, lengthRun, isRTL);
+				BidiScriptRunRecords scriptRunRecords;
+				collectBidiScriptRuns(scriptRunRecords, testChars, startRun, lengthRun, isRTL);
+
+				//print_time ftpt("ubidi_2");
+				while (!scriptRunRecords.records.empty()) {
+					ScriptRecord scriptRecord;
+					if (scriptRunRecords.isRtl) {
+						scriptRecord = scriptRunRecords.records.back();
+						scriptRunRecords.records.pop_back();
+					}
+					else {
+						scriptRecord = scriptRunRecords.records.front();
+						scriptRunRecords.records.pop_front();
+					}
+
+					uint32_t     start = scriptRecord.startChar;
+					uint32_t     end = scriptRecord.endChar;
+					UScriptCode code = scriptRecord.scriptCode;
+					auto scrn = icub->_uscript_getName(code);
+					auto sc = get_script(scrn);
+					std::string u8strd = md::u16_u8((uint16_t*)(testChars + start), end - start);
+					info.push_back({ sc, u8strd, start, end, isRTL });
+					//printf("Script '%s' from %d to %d.\t%d\n", scrn, start, end, sc);
+				}
+			}
+		}
+	}
+	return;
+}
+
+
+void do_text(const char* str, size_t first, size_t count)
+{
+	auto t = md::utf8_char_pos(str, first, count);
+	auto te = md::utf8_char_pos(t, count, count);
+	auto wk = md::u8_w(t, te - t);
+	const uint16_t* str1 = (const uint16_t*)wk.c_str();
+	size_t n = wk.size();
+	std::vector<bidi_item> bidiinfo;
+	{
+		//print_time ftpt("bidi a");
+		do_bidi((UChar*)str1, n, bidiinfo);
+		std::stable_sort(bidiinfo.begin(), bidiinfo.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
+	}
+	return;
+}
 
 #endif // 1

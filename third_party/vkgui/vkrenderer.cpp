@@ -12313,8 +12313,8 @@ namespace vkr {
 		{
 			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
 			{
-				auto w = md::u8to_w(it->first.c_str(), it->first.size());
-				auto w2 = md::u8to_w(it->second.c_str(), it->second.size());
+				auto w = md::u8_u16(it->first);
+				auto w2 = md::u8_u16(it->second);
 				DxcDefine d = {};
 				auto pos = twstr.size();
 				w.push_back(0);
@@ -12356,7 +12356,7 @@ namespace vkr {
 				params = pParams;
 			auto pv = md::split(params, " ");
 			for (auto& it : pv) {
-				auto w = md::u8to_w(it.c_str(), it.size());
+				auto w = md::u8_u16(it.c_str() );
 				auto pos = twstr.size();
 				w.push_back(0);
 				twstr.append(w);
@@ -12372,7 +12372,7 @@ namespace vkr {
 			it.Value = ws + (size_t)it.Value;
 		}
 
-		auto pEntryPointW = md::u8to_w(pEntryPoint, -1);
+		auto pEntryPointW = md::u8_w(pEntryPoint, -1);
 		IDxcOperationResult* pResultPre;
 		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines.data(), defineCount, &Includer, &pResultPre);
 		if (res1 == S_OK)

@@ -2287,3 +2287,6 @@ std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t
 std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 
+
+void do_text(const char* str, size_t first, size_t count);
+

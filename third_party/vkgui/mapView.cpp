@@ -213,7 +213,11 @@ namespace md {
 			utf8[4] = 0;
 		}
 	}
-	std::wstring u8to_w(const char* str, size_t len)
+	std::wstring u8_u16(const std::string& str)
+	{
+		return u8_w(str.c_str(), str.size());
+	}
+	std::wstring u8_w(const char* str, size_t len)
 	{
 		std::wstring wt;
 		uint32_t codepoint = 0;
@@ -229,7 +233,7 @@ namespace md {
 		}
 		return wt;
 	}
-	std::string u16to_u8(uint16_t* str, size_t len)
+	std::string u16_u8(uint16_t* str, size_t len)
 	{
 		char utf8_str[8] = {};
 		std::string r;
@@ -1003,7 +1007,7 @@ namespace hz
 		auto rh = SHGetSpecialFolderLocation(hWnd, CSIDL_DRIVES, &ppidl);
 		if (ppidl == NULL)
 			MessageBox(hWnd, "启动路径浏览失败", "提示", MB_OK);
-		std::wstring wt = md::u8to_w(title.c_str(), -1);
+		std::wstring wt = md::u8_u16(title);
 		//初始化入口参数bi开始  
 		bi.hwndOwner = hWnd;
 		bi.pidlRoot = ppidl;//根目录  
@@ -1026,7 +1030,7 @@ namespace hz
 			SHGetPathFromIDListW(pIDList, szResult);
 			//sFolderPath就是我们选择的路径  
 
-			ret = md::u16to_u8((uint16_t*)szResult, -1);
+			ret = md::u16_u8((uint16_t*)szResult, -1);
 			//printf("Select path %s\n", szResult);
 		}
 
@@ -1107,9 +1111,9 @@ namespace hz
 			if (it == '\t')
 				it = '\0';
 		}
-		auto wt = md::u8to_w(title.c_str(), -1);
-		auto fwt = md::u8to_w(filter.c_str(), -1);
-		auto cp = md::u8to_w(strCurrentPath.c_str(), -1);
+		auto wt = md::u8_u16(title);
+		auto fwt = md::u8_u16(filter);
+		auto cp = md::u8_u16(strCurrentPath);
 		//设置过滤  
 		opfn.lpstrFilter = fwt.size() ? fwt.c_str() : L"所有文件\0*.*\0\0文本文件\0*.txt\0";
 		//默认过滤器索引设为1  
@@ -1129,7 +1133,7 @@ namespace hz
 			//在文本框中显示文件路径  
 			//if (rfunc)
 			{
-				ret = md::u16to_u8((uint16_t*)strFilename, -1);
+				ret = md::u16_u8((uint16_t*)strFilename, -1);
 			}
 		}
 #endif
@@ -1227,9 +1231,9 @@ namespace hz
 		opfn.lStructSize = sizeof(OPENFILENAMEW);//结构体大小  
 		opfn.hwndOwner = (HWND)hWnd;
 
-		auto wt = md::u8to_w(title.c_str(), -1);
-		auto fwt = md::u8to_w(filter.c_str(), -1);
-		auto cp = md::u8to_w(strCurrentPath.c_str(), -1);
+		auto wt = md::u8_u16(title);
+		auto fwt = md::u8_u16(filter);
+		auto cp = md::u8_u16(strCurrentPath);
 		//设置过滤  
 		opfn.lpstrFilter = fwt.size() ? fwt.c_str() : L"所有文件\0*.*\0\0文本文件\0*.txt\0";
 		//默认过滤器索引设为1  
@@ -1259,7 +1263,7 @@ namespace hz
 				{
 					st = t;
 					t += st.size() + 1;
-					sfn.push_back(md::u16to_u8((uint16_t*)st.c_str(), -1));
+					sfn.push_back(md::u16_u8((uint16_t*)st.c_str(), -1));
 				}
 				if (sfn.size() > 1)
 				{

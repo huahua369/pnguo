@@ -732,8 +732,13 @@ int main()
 			}
 		};
 	//form0->_focus_lost_hide = true;
-	auto fontn = (char*)u8"微软雅黑,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+	auto sss = (char*)u8"جيد 微软雅黑 ,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto ftc = app->font_ctx;
+
+	do_text(sss,0,strlen(sss));
+
+
 	static std::atomic_bool kinit = false;
 	std::thread attt([=]() {
 		do {
@@ -991,10 +996,10 @@ int main()
 	//listp->visible = false;
 	{
 		auto p = mainmenu;
-		//p->draggable = true; //可拖动
+		//p->draggable = true; //可拖动✔
 		p->set_border({ 0,1,0,0xff000000 });
 		// 主菜单
-		std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
+		std::vector<std::string> mvs = { (char*)u8"文🥩件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
 		p->_lms = { 2,2 };
 		p->fontsize = 16;
 		p->set_size({ form0->get_size().x - 1,50 });
