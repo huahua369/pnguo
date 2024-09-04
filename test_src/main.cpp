@@ -737,12 +737,12 @@ int main()
 		};
 	//form0->_focus_lost_hide = true;
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
-	auto sss = (char*)u8"جيد 微软雅黑 ,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+	auto sss = (char*)u8" جيد 新宋体 ,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto ftc = app->font_ctx;
 
 	do_text(sss, 0, strlen(sss));
-	double f0 = fmod(-0.56, 0.5);
-	double f1 = fmod1(-0.56, 0.5);
+	double f0 = fmod(-2.5, 2);
+	double f1 = fmod1(-2.5, 2);
 	double f2 = fmod1(-0.5, 0.5);
 
 
@@ -1260,7 +1260,8 @@ int main()
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
 					auto v3 = vkd ? vkd->get_value(0) : glm::vec3();
-					g3->str = (char*)u8" 16微软雅黑,Segoe UI Emoji x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
+					g3->str = (char*)u8" x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
+					g3->str = sss + g3->str;
 					//cairo_as _cas(cr);
 					cairo_translate(cr, 6, 50);
 

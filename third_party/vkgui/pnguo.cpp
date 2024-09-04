@@ -10278,6 +10278,7 @@ text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize
 	}
 	return opt;
 }
+// todo get_glyph_item
 
 text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt)
 {
@@ -18500,12 +18501,14 @@ std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool i
 			//auto& detail = font->detail;
 			ft.get_font_name(font->font, &detail);
 			//font->fh = fh;
+			font->dataSize = len;
 			font->_index = i;
 			font->ascender = (float)ascent;
 			font->descender = (float)descent;
 			font->lineh = (float)(fh + lineGap);
 			font->_name = get_info_str(2052, 1, detail);
 			font->fullname = get_info_str(2052, 4, detail);
+			font->_namew = md::u8_u16(font->_name);
 			auto& mt = mk[font->_name];
 			if (mt)
 			{
@@ -26236,6 +26239,291 @@ int word_key::get_split(char c)
 	return _split_ch.find(c) != _split_ch.end();
 }
 
+// todo hb
+#if 1
+static int icn = 0;
+hb_cx::hb_cx()
+{
+	_buffer = hb_buffer_create();
+	icn++;
+}
+
+hb_cx::~hb_cx()
+{
+	free_font();
+	icn--;
+	auto kuf = hb_buffer_get_unicode_funcs(_buffer);
+	hb_buffer_destroy(_buffer);
+	if (icn == 0)
+	{
+		hb_unicode_funcs_destroy(kuf);
+	}
+}
+
+font_t* hb_cx::push_font(font_t* p)
+{
+	font_t* ret = 0;
+	if (!p || _font.find(p) != _font.end())
+	{
+		return 0;
+	}
+	hb_blob_t* blob = hb_blob_create((char*)p->font->data, p->dataSize, HB_MEMORY_MODE_READONLY, 0, 0); //HB_MEMORY_MODE_WRITABLEhb_blob_create_from_file(ttfn);
+	if (hb_blob_get_length(blob) > 0)
+	{
+		hb_face_t* face = hb_face_create(blob, p->_index);
+		hb_font_t* hbf = hb_font_create(face);
+		if (face && hbf)
+		{
+			//unsigned int upem = hb_face_get_upem(face);
+			//hb_font_set_scale(hbf, upem, upem);
+			//hb_font_set_ppem(hbf, ppem, ppem);
+			_font[p] = hbf;
+			ret = p;
+		}
+	}
+	if (blob)
+		hb_blob_destroy(blob);
+	return ret;
+}
+void hb_cx::shape(const str_info_t& s, font_t* ttp, hb_dir dir)
+{
+	shape(&s, ttp, dir);
+}
+void hb_cx::shape(const str_info_t* str, font_t* ttp, hb_dir dir)
+{
+	if (_font.find(ttp) == _font.end())
+	{
+		return;
+	}
+	auto font = _font[ttp];
+	if (font)
+	{
+		hb_buffer_t* buf = _buffer;
+		hb_buffer_clear_contents(buf);
+		hb_buffer_set_direction(buf, (hb_direction_t)dir); 
+		typedef void(*bufadd_func)(hb_buffer_t* buffer, const void* text, int text_length, unsigned int item_offset, int item_length);
+		static bufadd_func cb[3] = { (bufadd_func)hb_buffer_add_utf8, (bufadd_func)hb_buffer_add_utf16, (bufadd_func)hb_buffer_add_utf32 };
+		if (str->type < 3)
+		{
+			cb[str->type](buf, str->str.p8, str->text_length, str->item_offset, str->item_length);
+			hb_buffer_guess_segment_properties(buf);
+			hb_shape(font, buf, nullptr, 0);
+		} 
+
+	}
+}
+
+int hb_cx::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<lt_item_t>& outlt)
+//int hb_cx::tolayout(const std::string& str, font_t* ttf, double fontheight, bool is_word1, word_key& wks, std::vector<lt_item_t>& outlt)
+{
+	hb_buffer_t* buf = _buffer;
+	unsigned int count = hb_buffer_get_length(buf);
+	if (count == 0)
+	{
+		return 0;
+	}
+	font_t* ttf = dinfo->font;
+	double fontheight = dinfo->font_height;
+	bool is_word1 = dinfo->is_word1;
+	word_key& wks = *dinfo->wks;
+	hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buf, nullptr);
+	hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, nullptr);
+	auto scale_h = ttf->get_scale(fontheight);
+	//auto dir = hb_buffer_get_direction(buf);
+	auto pstr = str.c_str();
+	//auto uc = hz::get_utf8_count(u8p, str.size());
+	outlt.reserve(outlt.size() + count);
+	size_t bidx = outlt.size();
+	size_t n = 0;
+	size_t sc = str.size();
+	const char* laststr = 0;
+	int64_t last_cluster = infos[0].cluster; char32_t cp32;
+	bool isn = sc != count;
+	std::vector<int64_t> cluster;
+	int ic = 1;
+	bool isback = (dinfo->dir == lt_dir::ltr) || (dinfo->dir == lt_dir::ttb);
+	if (!isback)
+		cluster.push_back(sc);
+	// 收集cluster判断是否连写
+	for (unsigned int i = 0; i < count; i++)
+	{
+		cluster.push_back(infos[i].cluster);
+	}
+	if (isback) { cluster.push_back(sc); }
+	else {
+		ic = 0;	//std::reverse(cluster.begin(), cluster.end());
+	}
+
+	for (unsigned int i = 0; i < count; i++)
+	{
+		hb_glyph_info_t* info = &infos[i];
+		hb_glyph_position_t* pos = &positions[i];
+		glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
+		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+		unsigned int cp = 0;
+		laststr = md::get_u8_last(pstr + info->cluster, &cp);
+		cp32 = cp;
+		auto git = ttf->get_glyph_item(info->codepoint, cp, fontheight);
+
+		lt_item_t lti = {};
+		//memcpy(&lti, &git, sizeof(ftg_item));
+		lti._image = git._image;
+		lti.color = git.color;
+		lti._glyph_index = git._glyph_index;
+		lti._rect = git._rect;
+		lti._dwpos = git._dwpos;
+		lti.advance = git.advance;
+		lti.rtl = !isback;
+		lti.adv = adv;
+		lti._offset = offset;
+		lti.ch[0] = cp;
+		lti.chlen = 1;
+		if (isn)
+		{
+			int64_t clu[2] = { info->cluster, cluster[i + ic] };
+			if (clu[0] > clu[1]) { std::swap(clu[0], clu[1]); }
+			int64_t dif = clu[1];
+			if (clu[0] != clu[1])
+			{
+				int c = 0;
+				unsigned int cp1 = 0;
+				auto uc =md:: get_utf8_count(pstr + clu[0], clu[1] - clu[0]);
+				if (uc > 1)
+				{
+					laststr = pstr + clu[0];
+					for (int k = 0; k < uc; k++)
+					{
+						laststr = md::get_u8_last(laststr, &cp1);
+						assert(c < 8);
+						lti.ch[c++] = cp1;
+					}
+				}
+				lti.chlen = uc;
+			}
+			if (dif == 1)
+			{
+				cp32 = 0;
+			}
+		}
+		bool isctr = false;
+		{
+
+			static std::string ctn = R"(~!@#$%^&*()-+/\|/;'',.<>?`)";
+			static std::u16string cn = uR"(【】、；‘：“’”，。、《》？（）——！￥)";
+			if (cn.find(cp) != std::u16string::npos)
+				isctr = true;
+			if (cp < 255 && ctn.find(cp) != std::string::npos)
+				isctr = false;
+			if (cp < 255 && iscntrl(cp))
+			{
+				do
+				{
+					isctr = true;
+				} while (0);
+				if (cp != '\t')
+					lti.adv.x = 0;
+			}
+		}
+		lti.last_n = 0;
+		lti.cluster = info->cluster;
+		bool issplit = (cp < 255 && wks.get_split(cp));
+		bool ispush = (is_word1 && cp > 255) || count - i == 1;
+		//if (abs(info->cluster - last_cluster) > 2)
+		//{
+		//	issplit = true;
+		//}
+		last_cluster = info->cluster;
+		//ispush = true;
+		if (issplit || isctr)
+		{
+			if (n > 0)
+			{
+				outlt[bidx].last_n = n;
+				bidx += n; n = 0;
+			}
+			ispush = true;
+		}
+		n++;
+		outlt.push_back(lti);
+		// 分割
+		if (ispush)
+		{
+			outlt[bidx].last_n = n;
+			bidx += n; n = 0;
+		}
+		//printf("%d\t", (int)adv.x);
+	}
+
+	//printf("\n");
+	return count;
+}
+#if 0
+glm::ivec2 hb_cx::draw_to_image(const std::string& str, font_t* ttf, double fontheight, hz::Image* img, glm::ivec3 dstpos)
+{
+	hb_buffer_t* buf = _buffer;
+	unsigned int count = hb_buffer_get_length(buf);
+	hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buf, nullptr);
+	hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, nullptr);
+	auto scale_h = ttf->get_scale_height(fontheight);
+
+	auto bl = ttf->get_base_line(fontheight);
+	double base_line = dstpos.z < 0 ? bl : dstpos.z;			// 基线
+	//ttf ->get_VMetrics(&finfo[0], &finfo[1], &finfo[2]);
+	int x = dstpos.x, y = dstpos.y;
+	auto dir = hb_buffer_get_direction(buf);
+	glm::ivec2 ret;
+	glm::ivec2 dpos;
+	auto u8p = str.c_str();
+	//printf("%f\n", scale_h);
+	for (unsigned int i = 0; i < count; i++)
+	{
+		hb_glyph_info_t* info = &infos[i];
+		hb_glyph_position_t* pos = &positions[i];
+		int adv = pos->x_advance * scale_h;
+		int advy = pos->y_advance * scale_h;
+		//printf("cluster %d	glyph 0x%x at	(%d,%d)+(%d,%d) %d\n",
+		//	info->cluster,
+		//	info->codepoint,
+		//	pos->x_offset,
+		//	pos->y_offset,
+		//	pos->x_advance,
+		//	pos->y_advance, adv);
+
+		dpos.x = x + (pos->x_offset * scale_h);
+		dpos.y = y - (pos->y_offset * scale_h) + base_line;
+		unsigned int cp = 0;
+		u8p = md::get_u8_last(u8p, &cp);
+		//auto git = ttf->mk_glyph(info->codepoint, cp, fontheight);
+		glm::vec2 size = {};// md::mk_fontbitmap(ttf, info->codepoint, cp, fontheight, dpos, -1, img);
+		//printf("%d\t", dpos.x);
+		x += adv;
+		//x += size.z;
+		if (dir == HB_DIRECTION_TTB && abs(advy) < size.y)
+			advy = -size.y;
+		y -= advy;
+		ret.x += adv;
+		if (size.y > ret.y)
+		{
+			ret.y = size.y;
+		}
+	}
+	//printf("\n");
+	return ret;
+}
+#endif
+void hb_cx::free_font()
+{
+	for (auto& [k, v] : _font)
+	{
+		auto face = hb_font_get_face(v);
+		hb_face_destroy(face);
+		hb_font_destroy(v);
+	}
+	//hb_font_funcs_destroy(fcb);
+	_font.clear();
+
+}
+#endif
 void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 {
 	//print_time ftpt("ubidi");

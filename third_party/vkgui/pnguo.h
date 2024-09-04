@@ -493,8 +493,10 @@ class font_t
 {
 public:
 	font_impl* font = 0;
+	uint32_t dataSize = 0;
 	std::string _name, fullname;
 	std::string _style;
+	std::wstring _namew;
 	// 支持的语言
 	std::string _slng;
 	int64_t num_glyphs = 0;
