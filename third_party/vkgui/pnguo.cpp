@@ -9471,6 +9471,7 @@ namespace gp {
 
 		for (auto& it : ms3)
 			ms.push_back(it);
+		return 0;
 	}
 
 	void triangle_to_mesh(const mesh3_mt& src_mesh, mesh_mt& dstMesh, const glm::mat4& src_nm = glm::identity<glm::mat4>())
@@ -9599,6 +9600,7 @@ namespace gp {
 			}
 		}
 		triangle_to_mesh(m3, *opt);
+		return 0;
 	}
 }
 //!gp
