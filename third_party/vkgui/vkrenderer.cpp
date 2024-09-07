@@ -895,7 +895,7 @@ namespace vkr {
 		DefineList m_defines;
 		PBRMaterialParametersConstantBuffer m_params = {};
 	};
-
+	struct morph_t;
 
 	// Material, primitive and mesh structs specific for the PBR pass (you might want to compare these structs with the ones used for the depth pass in GltfDepthPass.h)
 
@@ -921,7 +921,7 @@ namespace vkr {
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 
-		void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, bool bWireframe);
+		void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
 	};
 
 	struct PBRMesh
@@ -1806,6 +1806,7 @@ namespace vkr {
 		uint32_t m_memAllocatedInFrame;
 		uint32_t m_allocatedMemPerBackBuffer[4];
 	};
+	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
 	class DynamicBufferRing
 	{
 	public:
@@ -2391,7 +2392,7 @@ namespace vkr {
 		std::vector<char*> m_buffersData;
 
 		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
-		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
+		std::map<std::string, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 
@@ -2431,6 +2432,13 @@ namespace vkr {
 		void load_animations();
 
 	};
+	struct morph_t
+	{
+		std::map<std::string, size_t> defs;
+		VkDescriptorBufferInfo mdb = {};
+		VkDescriptorBufferInfo morphWeights = {};
+		size_t targetCount = 0;
+	};
 	class GLTFTexturesAndBuffers
 	{
 		Device* m_pDevice;
@@ -2445,10 +2453,11 @@ namespace vkr {
 
 		StaticBufferPool* m_pStaticBufferPool;
 		DynamicBufferRing* m_pDynamicBufferRing;
-
+	public:
 		// maps GLTF ids into views
 		std::map<int, VkDescriptorBufferInfo> m_vertexBufferMap;
 		std::map<int, VkDescriptorBufferInfo> m_IndexBufferMap;
+		std::map<std::string, morph_t> m_targetsBufferMap;
 		int indextype = 0;
 	public:
 		GLTFCommon* m_pGLTFCommon;
@@ -2467,6 +2476,7 @@ namespace vkr {
 		VkImageView GetTextureViewByID(int id);
 
 		VkDescriptorBufferInfo* GetSkinningMatricesBuffer(int skinIndex);
+		morph_t* get_mb(const std::string& meshname);
 		void SetSkinningMatricesForSkeletons();
 		void SetPerFrameConstants();
 	};
@@ -2949,6 +2959,7 @@ namespace vkr {
 			VkDescriptorBufferInfo m_perFrameDesc;
 			VkDescriptorBufferInfo m_perObjectDesc;
 			VkDescriptorBufferInfo* m_pPerSkeleton;
+			morph_t* morph = 0;
 			operator float() { return -m_depth; }
 		};
 
@@ -2994,7 +3005,7 @@ namespace vkr {
 		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
 
 		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, VkImageView>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
-		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, int morphing_size, bool bUseSSAOMask);
+		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, morph_t* morphing, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
@@ -3090,7 +3101,7 @@ namespace vkr {
 		VkSampler m_sampler = VK_NULL_HANDLE;
 		VkDescriptorBufferInfo m_perFrameDesc;
 
-		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, int morphing_size);
+		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, DepthPrimitives* pPrimitive);
 	};
 
@@ -3937,10 +3948,16 @@ namespace vkr
 							// Create Pipeline
 							//
 							{
+								morph_t* morphing = 0;
+								auto tsa = primitive.targets.size();// todo 变形
+								if (tsa > 0) {
+									auto mk = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->meshes[i].name;
+									morphing = &m_pGLTFTexturesAndBuffers->m_targetsBufferMap[mk];
+								}
 								int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-								auto ts = primitive.targets.size() * 0;// todo 变形
-								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, ts);
+
+								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing);
 								CreatePipeline(inputLayout, defines, pPrimitive);
 							}
 						});
@@ -4040,7 +4057,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, int morphing_size)
+	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layout_bindings(2);
 		layout_bindings[0].binding = 0;
@@ -4057,6 +4074,7 @@ namespace vkr
 		layout_bindings[1].pImmutableSamplers = NULL;
 		(*pAttributeDefines)["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
 		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		auto dt1 = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		if (inverseMatrixBufferSize > 0)
 		{
 			VkDescriptorSetLayoutBinding b;
@@ -4071,17 +4089,28 @@ namespace vkr
 
 			layout_bindings.push_back(b);
 		}
-		if (morphing_size > 0)
+		if (morphing)
 		{
+			auto& df = (*pAttributeDefines);
 			VkDescriptorSetLayoutBinding b;
 			// 变形动画
+			b.binding = 4;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			b.descriptorType = dt1;
+			df["ID_TARGET_DATA"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
 			b.binding = 3;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt;
-			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
+			df["ID_MORPHING_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
+			for (auto& [k, v] : morphing->defs) {
+				df[k] = std::to_string(v);
+			}
 		}
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_descriptorSetLayout, &pPrimitive->m_descriptorSet);
 
@@ -4094,9 +4123,10 @@ namespace vkr
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet, dt);
 		}
-		if (morphing_size > 0)
+		if (morphing)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_descriptorSet, dt);
+			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, 4, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
 		}
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pPrimitive->m_descriptorSetLayout };
@@ -4328,6 +4358,7 @@ namespace vkr
 
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
+			auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->m_name);
 
 			DepthMesh* pMesh = &m_meshes[pNode->meshIndex];
 			for (int p = 0; p < pMesh->m_pPrimitives.size(); p++)
@@ -4903,24 +4934,7 @@ namespace vkr
 			{
 				for (auto& primitive : mesh.primitives)
 				{
-					for (auto& it : primitive.targets)
-					{
-						for (auto& [k, id] : it)
-						{
-							// todo 变形数据，数量和顶点数量相同
-							tfAccessor vertexBufferAcc = {};
-							m_pGLTFCommon->GetBufferDetails(id, &vertexBufferAcc);
-							VkDescriptorBufferInfo vbv = {};
-							//glm::vec3[targets][vcount];
-							// Pos=vec3
-							// Normal=vec3
-							// Tangent=vec3
-							// UV=vec2
-							// COLOR=vec4
-							//m_pStaticBufferPool->AllocBuffer(vertexBufferAcc.m_count, vertexBufferAcc.m_stride, vertexBufferAcc.m_data, &vbv);
-							//m_vertexBufferMap[id] = vbv;
-						}
-					}
+					std::map<std::string, size_t> vss;
 					//
 					//  Load vertex buffers
 					//
@@ -4931,10 +4945,109 @@ namespace vkr
 
 						VkDescriptorBufferInfo vbv;
 						m_pStaticBufferPool->AllocBuffer(vertexBufferAcc.m_count, vertexBufferAcc.m_stride, vertexBufferAcc.m_data, &vbv);
-
+						vss[attributeId.first] = vertexBufferAcc.m_count;
 						m_vertexBufferMap[attributeId.second] = vbv;
 					}
 
+					// 变形动画数据
+					std::vector<VkDescriptorBufferInfo> tas;
+					std::map<std::string, std::vector<tfAccessor>> attributes;
+					auto targetCount = primitive.targets.size();
+					for (auto& it : primitive.targets)
+					{
+						// 类型、数据id
+						for (auto& [k, id] : it)
+						{
+							tfAccessor acc = {};
+							m_pGLTFCommon->GetBufferDetails(id, &acc);
+							attributes[k].push_back(acc);
+						}
+					}
+					morph_t* mp = 0;
+					std::vector<glm::vec4> tv;// 临时缓存
+					if (attributes.size() > 0)
+					{
+						mp = &m_targetsBufferMap[mesh.name];
+						auto ss = vss.begin()->second;// 顶点数量
+						tv.reserve(attributes.size() * ss * targetCount);
+						mp->defs["vertex_count"] = ss;
+						mp->defs["WEIGHT_COUNT"] = targetCount;
+						mp->targetCount = targetCount;
+						// Pos=vec3
+						// Normal=vec3
+						// Tangent=vec3
+						// UV=vec2
+						// COLOR=vec4
+						//MORPH_TARGET_${ attribute }
+						size_t ct = 0;
+						for (auto& [k, v] : attributes) {
+							auto kn = "MORPH_TARGET_" + k + "_OFFSET";
+							mp->defs[kn] = ct;
+							if (k == "TEXCOORD_1" && v[0].m_stride == 8) {
+								auto nt = mp->defs["MORPH_TARGET_TEXCOORD_0_OFFSET"];
+								mp->defs[kn] = nt;
+								auto tt = tv.data() + nt;
+								for (auto& acc : v) {
+									auto vd = (char*)acc.m_data;
+									for (size_t i = 0; i < acc.m_count; i++)
+									{
+										auto vf = (glm::vec2*)vd;
+										tt->z = vf->x; tt->w = vf->y; tt++; vd += acc.m_stride;
+									}
+								}
+								continue;
+							}
+							for (auto& acc : v) {
+								auto vd = (char*)acc.m_data;
+								ct += acc.m_count;
+								switch (acc.m_stride)
+								{
+								case 8:
+								{
+									for (size_t i = 0; i < acc.m_count; i++)
+									{
+										glm::vec4 v4 = {};
+										auto vf = (glm::vec2*)vd;
+										v4.x = vf->x;
+										v4.y = vf->y;
+										vd += acc.m_stride;
+										tv.push_back(v4);
+									}
+								}
+								break;
+								case 12:
+								{
+									for (size_t i = 0; i < acc.m_count; i++)
+									{
+										auto vf = (glm::vec3*)vd;
+										glm::vec4 v4(*vf, 0.0f);
+										vd += acc.m_stride;
+										tv.push_back(v4);
+									}
+								}
+								break;
+								case 16:
+								{
+									for (size_t i = 0; i < acc.m_count; i++)
+									{
+										auto vf = (glm::vec4*)vd;
+										vd += acc.m_stride;
+										tv.push_back(*vf);
+									}
+								}
+								break;
+								default:
+									break;
+								}
+							}
+						}
+						if (tv.size()) {
+							VkDescriptorBufferInfo& vbv = mp->mdb;
+							m_pStaticBufferPool->AllocBuffer(tv.size(), sizeof(glm::vec4), tv.data(), &vbv);
+							tas.push_back(vbv);
+						}
+
+					}
 					//
 					//  Load index buffers
 					//
@@ -4946,14 +5059,10 @@ namespace vkr
 
 						VkDescriptorBufferInfo ibv;
 
+						std::vector<uint32_t> v;
 						// Some exporters use 1-byte indices, need to convert them to shorts since the GPU doesn't support 1-byte indices
 						if (indexBufferAcc.m_stride < 4)
 						{
-							std::vector<uint32_t> v;
-							//v.resize(indexBufferAcc.m_count);
-							//unsigned int* pIndices = v.data();// (unsigned int*)malloc(indexBufferAcc.m_count * (2 * indexBufferAcc.m_stride));
-							//for (int i = 0; i < indexBufferAcc.m_count; i++)
-							//pIndices[i] = ((unsigned char*)indexBufferAcc.m_data)[i];	
 							switch (indexBufferAcc.m_stride)
 							{
 							case 1:
@@ -4968,7 +5077,6 @@ namespace vkr
 							unsigned int* pIndices = v.data();
 							indextype = 4;
 							m_pStaticBufferPool->AllocBuffer(indexBufferAcc.m_count, sizeof(uint32_t) /*2 * indexBufferAcc.m_stride*/, pIndices, &ibv);
-							//free(pIndices);
 						}
 						else
 						{
@@ -5160,6 +5268,18 @@ namespace vkr
 			memcpy(cbPerSkeleton, matrices->data(), size);
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
 		}
+		// 设置变形插值数据到ubo
+		for (auto& t : m_pGLTFCommon->m_animated_morphWeights)
+		{
+			auto d = &t.second;
+			VkDescriptorBufferInfo per = {};
+			float* cbd = 0;
+			uint32_t size = (uint32_t)(d->size() * sizeof(float));
+			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
+			memcpy(cbd, d->data(), size);
+			m_targetsBufferMap[t.first].morphWeights = per;
+		}
+
 	}
 
 	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::GetSkinningMatricesBuffer(int skinIndex)
@@ -5170,6 +5290,11 @@ namespace vkr
 			return NULL;
 
 		return &it->second;
+	}
+	morph_t* GLTFTexturesAndBuffers::get_mb(const std::string& meshname)
+	{
+		auto it = m_targetsBufferMap.find(meshname);
+		return  (it != m_targetsBufferMap.end()) ? &it->second : nullptr;
 	}
 	//
 	// Set some default parameters 
@@ -5643,11 +5768,17 @@ namespace vkr
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
 							m_pGLTFTexturesAndBuffers->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 
+							morph_t* morphing = 0;
+							auto tsa = primitive.targets.size();// todo 变形判断
+							if (tsa > 0) {
+								auto mk = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->meshes[i].name;
+								morphing = &m_pGLTFTexturesAndBuffers->m_targetsBufferMap[mk];
+							}
 							// Create descriptors and pipelines
 							//
 							int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 							int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, ts * 0, bUseSSAOMask);
+							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing, bUseSSAOMask);
 							CreatePipeline(inputLayout, defines, pPrimitive);
 						});
 				}
@@ -5824,7 +5955,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, int morphing_size, bool bUseSSAOMask)
+	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, morph_t* morphing, bool bUseSSAOMask)
 	{
 		// Creates descriptor set layout binding for the constant buffers
 		//
@@ -5847,6 +5978,7 @@ namespace vkr
 		(*pAttributeDefines)["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
 
 		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		auto dt1 = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		// Constant buffer holding the skinning matrices
 		if (inverseMatrixBufferSize > 0)
 		{
@@ -5862,25 +5994,28 @@ namespace vkr
 
 			layout_bindings.push_back(b);
 		}
-		if (morphing_size > 0)
+		if (morphing)
 		{
+			auto& df = (*pAttributeDefines);
 			VkDescriptorSetLayoutBinding b;
-			// 变形动画
-			b.binding = 3;
-			b.descriptorCount = 1;
-			b.pImmutableSamplers = NULL;
-			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = dt;
-			(*pAttributeDefines)["ID_MORPHING_DATA"] = std::to_string(b.binding);
-			layout_bindings.push_back(b);
 			// 变形动画
 			b.binding = 4;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = dt;
-			(*pAttributeDefines)["ID_TARGET_DATA"] = std::to_string(b.binding);
+			b.descriptorType = dt1;
+			df["ID_TARGET_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
+			b.binding = 3;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			b.descriptorType = dt;
+			df["ID_MORPHING_DATA"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
+			for (auto& [k, v] : morphing->defs) {
+				df[k] = std::to_string(v);
+			}
 		}
 		// todo pbr buffer初始化
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
@@ -5894,10 +6029,10 @@ namespace vkr
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
-		if (morphing_size > 0)
+		if (morphing)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing_size, pPrimitive->m_uniformsDescriptorSet, dt);
+			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, 4, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
+			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 
 		// Create the pipeline layout
@@ -6206,6 +6341,7 @@ namespace vkr
 
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
+			auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->m_name);
 
 			glm::mat4 mModelViewProj = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
 
@@ -6248,6 +6384,7 @@ namespace vkr
 				t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants;
 				t.m_perObjectDesc = perObjectDesc;
 				t.m_pPerSkeleton = pPerSkeleton;
+				t.morph = morph;
 
 				// append primitive to list 
 				//
@@ -6269,13 +6406,13 @@ namespace vkr
 
 		for (auto& t : *pBatchList)
 		{
-			t.m_pPrimitive->DrawPrimitive(commandBuffer, t.m_perFrameDesc, t.m_perObjectDesc, t.m_pPerSkeleton, bWireframe);
+			t.m_pPrimitive->DrawPrimitive(commandBuffer, t.m_perFrameDesc, t.m_perObjectDesc, t.m_pPerSkeleton, t.morph, bWireframe);
 		}
 
 		SetPerfMarkerEnd(commandBuffer);
 	}
-
-	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perFrameDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, bool bWireframe)
+	// todo pbr变形渲染
+	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perFrameDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe)
 	{
 		// Bind indices and vertices using the right offsets into the buffer
 		//
@@ -6290,7 +6427,7 @@ namespace vkr
 		//
 		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
-
+		if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;
 		uint32_t uniformOffsets[3] = { (uint32_t)perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
 		uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
 
@@ -8585,6 +8722,27 @@ namespace vkr
 		write.dstBinding = index;
 
 		vkUpdateDescriptorSets(m_pDevice->GetDevice(), 1, &write, 0, NULL);
+	}
+	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
+	{
+		VkDescriptorBufferInfo out = {};
+		out.buffer = buffer;
+		out.offset = pos;
+		out.range = size;
+
+		VkWriteDescriptorSet write;
+		write = {};
+		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		write.pNext = NULL;
+		write.dstSet = descriptorSet;
+		write.descriptorCount = 1;
+		int dk = dt;
+		write.descriptorType = (VkDescriptorType)(dk > 0 ? dt : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+		write.pBufferInfo = &out;
+		write.dstArrayElement = 0;
+		write.dstBinding = index;
+
+		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
 	}
 
 
@@ -12356,7 +12514,7 @@ namespace vkr {
 				params = pParams;
 			auto pv = md::split(params, " ");
 			for (auto& it : pv) {
-				auto w = md::u8_u16(it.c_str() );
+				auto w = md::u8_u16(it.c_str());
 				auto pos = twstr.size();
 				w.push_back(0);
 				twstr.append(w);
@@ -13943,6 +14101,7 @@ namespace vkr {
 			time = fmod(time, anim->m_duration);
 			for (auto it = anim->m_channels.begin(); it != anim->m_channels.end(); it++)
 			{
+				auto np = &m_nodes[it->first];
 				Transform* pSourceTrans = &m_nodes[it->first].m_tranform;
 				Transform animated = {};
 				float frac, * pCurr, * pNext;
@@ -13967,7 +14126,9 @@ namespace vkr {
 				}
 				if (it->second.sampler[3])
 				{
-					acv[3];	// todo 变形动画
+					auto& va = m_animated_morphWeights[np->m_name];
+					va.clear();
+					va.swap(acv[3]);  
 				}
 				// it->first是节点idx
 				m_animatedMats[it->first] = animated.GetWorldMat();
@@ -17923,7 +18084,7 @@ namespace vkr {
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
 				l.m_intensity = 50.0 * 0.5;//scene.value("intensity", 1.0f);
-				l.m_color = glm::vec4(1.0f, 0.10f, 0.10f, 0.0f);
+				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;

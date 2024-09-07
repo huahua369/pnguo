@@ -70,7 +70,7 @@ void gltfVertexFactory()
 	mat4 transMatrix = GetWorldMatrix() * skinningMatrix;
 	vec4 pos = vec4(a_Position,1);
 #ifdef ID_MORPHING_DATA
-	pos += getTargetPosition(a_Targets);
+	pos += getTargetPosition(gl_VertexIndex);
 #endif
     pos = transMatrix * pos;
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
@@ -87,7 +87,7 @@ void gltfVertexFactory()
 #ifdef ID_NORMAL
     vec3 normal = a_Normal;
 #ifdef HAS_MORPH_TARGETS
-    normal += getTargetNormal(gl_VertexID);
+    normal += getTargetNormal(gl_VertexIndex);
 #endif
 	Output.Normal = normalize(vec3(transMatrix * vec4(normal.xyz, 0.0)));
 #endif
@@ -95,7 +95,7 @@ void gltfVertexFactory()
 #ifdef ID_TANGENT
     vec3 tangent = a_Tangent.xyz;
 #ifdef HAS_MORPH_TARGETS
-    tangent += getTargetTangent(gl_VertexID);
+    tangent += getTargetTangent(gl_VertexIndex);
 #endif
 	Output.Tangent = normalize(vec3(transMatrix * vec4(tangent.xyz, 0.0)));
 	Output.Binormal = cross(Output.Normal, Output.Tangent) * a_Tangent.w;
@@ -105,14 +105,14 @@ void gltfVertexFactory()
 #ifdef ID_COLOR_0
 	Output.Color0 = a_Color0; 
 #ifdef HAS_MORPH_TARGETS
-    Output.Color0 = clamp(Output.Color0 + getTargetColor0(gl_VertexID), 0.0f, 1.0f);
+    Output.Color0 = clamp(Output.Color0 + getTargetColor0(gl_VertexIndex), 0.0f, 1.0f);
 #endif 
 #endif
 
 #ifdef ID_TEXCOORD_0
 	Output.UV0 = a_UV0;
 #ifdef HAS_MORPH_TARGETS
-    Output.UV0 += getTargetTexCoord0(gl_VertexID); 
+    Output.UV0 += getTargetTexCoord0(gl_VertexIndex); 
 #endif
 
 #endif
@@ -120,7 +120,7 @@ void gltfVertexFactory()
 #ifdef ID_TEXCOORD_1
 	Output.UV1 = a_UV1;
 #ifdef HAS_MORPH_TARGETS 
-    Output.UV1 += getTargetTexCoord1(gl_VertexID);
+    Output.UV1 += getTargetTexCoord1(gl_VertexIndex);
 #endif
 
 #endif  

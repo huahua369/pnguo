@@ -20,15 +20,15 @@
 
 #ifdef ID_MORPHING_DATA
 // 插值数据
-layout(std140, binding = ID_MORPHING_DATA) buffer per_morphing_mw
+layout(set = 0, binding = ID_MORPHING_DATA) buffer per_morphing_mw
 {
 	float u_morphWeights[];
-} md;
+};
 // 目标数据：每个顶点有插值数据数量的vec3
-layout(std140, binding = ID_TARGET_DATA) buffer per_morphing
+layout(set = 0, binding = ID_TARGET_DATA) buffer per_morphing
 {
-	vec4 d[];
-} per_target_data;
+	vec4 per_target_data[];
+};
 #endif
 
 #ifdef ID_SKINNING_MATRICES
@@ -37,7 +37,7 @@ struct Matrix2
 {
 	mat4 m_current;
 	mat4 m_previous;
-}; 
+};
 
 layout(set = 0, binding = ID_SKINNING_MATRICES) buffer perSkeleton
 {
@@ -57,13 +57,11 @@ mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 
 #ifdef ID_MORPHING_DATA 
 
-#ifdef HAS_MORPH_TARGETS
 // 获取目标数据
 vec4 getDisplacement(int vertexID, int targetIndex)
 {
-	return per_target_data.d[vertexID + targetIndex];
+	return per_target_data[vertexID + targetIndex];
 }
-#endif
 
 
 vec4 getTargetPosition(int vertexID)
@@ -73,7 +71,7 @@ vec4 getTargetPosition(int vertexID)
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);
-		pos += md.u_morphWeights[i] * displacement;
+		pos += u_morphWeights[i] * displacement;
 	}
 #endif
 
@@ -88,7 +86,7 @@ vec3 getTargetNormal(int vertexID)
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_NORMAL_OFFSET + i * vertex_count).xyz;
-		normal += md.u_morphWeights[i] * displacement;
+		normal += u_morphWeights[i] * displacement;
 	}
 #endif
 
@@ -104,7 +102,7 @@ vec3 getTargetTangent(int vertexID)
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i * vertex_count).xyz;
-		tangent += md.u_morphWeights[i] * displacement;
+		tangent += u_morphWeights[i] * displacement;
 	}
 #endif
 
@@ -115,11 +113,11 @@ vec2 getTargetTexCoord0(int vertexID)
 {
 	vec2 uv = vec2(0);
 
-#ifdef MORPH_TARGET_TEXCOORD_OFFSET 
+#ifdef MORPH_TARGET_TEXCOORD_0_OFFSET 
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
-		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_OFFSET + i * vertex_count).xy;
-		uv += md.u_morphWeights[i] * displacement;
+		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_0_OFFSET + i * vertex_count).xy;
+		uv += u_morphWeights[i] * displacement;
 	}
 #endif
 
@@ -134,7 +132,7 @@ vec2 getTargetTexCoord1(int vertexID)
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_1_OFFSET + i * vertex_count).zw;
-		uv += md.u_morphWeights[i] * displacement;
+		uv += u_morphWeights[i] * displacement;
 	}
 #endif
 
@@ -149,7 +147,7 @@ vec4 getTargetColor0(int vertexID)
 	for (int i = 0; i < WEIGHT_COUNT; i++)
 	{
 		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_COLOR_0_OFFSET + i * vertex_count);
-		color += md.u_morphWeights[i] * displacement;
+		color += u_morphWeights[i] * displacement;
 	}
 #endif
 
