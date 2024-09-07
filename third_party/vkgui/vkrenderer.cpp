@@ -30,20 +30,21 @@ vk渲染流程:
 	float u_morphWeights[WEIGHT_COUNT];//插值权重数据
 	for(int i = 0; i < WEIGHT_COUNT; i++)
 	{
-		vec4 displacement = getDisplacement(vertexID, i);// 顶点目标坐标：使用顶点id获取
+		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);// 顶点目标坐标：使用顶点id获取
 		pos += u_morphWeights[i] * displacement;
 	}
 定义常量
-HAS_MORPH_TARGETS是否开启morph
 ID_MORPHING_DATA 绑定binding
 ID_TARGET_DATA绑定ssbo的binding，统一转换成vec4数组
 vertex_count顶点数量
-MORPH_TARGET_POSITION_OFFSET
-MORPH_TARGET_NORMAL_OFFSET
-MORPH_TARGET_TANGENT_OFFSET
-MORPH_TARGET_TEXCOORD_OFFSET
-MORPH_TARGET_TEXCOORD1_OFFSET
-MORPH_TARGET_COLOR_0_OFFSET
+WEIGHT_COUNT变形插值数量
+MORPH_TARGET_POSITION_OFFSET	坐标变形
+MORPH_TARGET_NORMAL_OFFSET		法线变形
+MORPH_TARGET_TANGENT_OFFSET		切线变形
+MORPH_TARGET_TEXCOORD_0_OFFSET	UV变形
+MORPH_TARGET_TEXCOORD_1_OFFSET	UV变形同上
+MORPH_TARGET_COLOR_0_OFFSET		颜色变形
+MORPH_TARGET_COLOR_1_OFFSET		颜色变形
 
 */
 #include "pch1.h"
@@ -4390,6 +4391,7 @@ namespace vkr
 				VkDescriptorSet descriptorSets[2] = { pPrimitive->m_descriptorSet, pPrimitive->m_pMaterial->m_descriptorSet };
 				uint32_t descritorSetCount = 1 + (pPrimitive->m_pMaterial->m_textureCount > 0 ? 1 : 0);
 
+				if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;// 变形动画和骨骼动画二选一
 				uint32_t uniformOffsets[3] = { (uint32_t)m_perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
 				uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
 
@@ -18083,7 +18085,7 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 50.0 * 0.5;//scene.value("intensity", 1.0f);
+				l.m_intensity = 0.28;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;

@@ -66,6 +66,10 @@ vkvg
 - [ ] 对话框
 - [ ] 文本编辑、16进制文件编辑
 - [x] gltf
+	- [x] 动画
+		- [x] Articulated (translate, rotate, scale)
+		- [x] Skinned
+		- [x] Morph targets
 - [x] PBR管线
 - [ ] 通用无光照管线
 - [ ] 地形管线（光照）
