@@ -119,7 +119,16 @@ namespace md {
 		}
 		return vs;
 	}
-
+	void get_lines(const std::string& str, std::function<void(const char* str)> cb)
+	{
+		auto lss = split_m(str, "\r\n", false);
+		if (cb)
+		{
+			for (auto& it : lss) {
+				cb(it.c_str());
+			}
+		}
+	}
 	bool validate_u8(const char* str, int len)
 	{
 		if (len < 0)len = strlen(str);
@@ -480,8 +489,8 @@ namespace hz
 #endif
 			if (t)
 				*t = chr;
+			}
 		}
-	}
 	void check_make_path(const std::wstring& filename, unsigned int mod/* = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH*/)
 	{
 		wchar_t* file_name = (wchar_t*)filename.c_str();
@@ -520,8 +529,8 @@ namespace hz
 #endif
 			if (t)
 				*t = chr;
+			}
 		}
-	}
 	std::string genfn(std::string fn)
 	{
 #ifdef _WIN32
@@ -720,7 +729,7 @@ namespace hz
 			GetFileSizeEx(hFile, &ds);
 			ret = ds.QuadPart;
 #endif // 0
-		}
+}
 		return ret;
 	}
 

@@ -83,6 +83,13 @@ struct PBRFactors
     vec4 u_DiffuseFactor;
     vec3 u_SpecularFactor;
     float u_GlossinessFactor;
+
+    // Transmission
+    float u_TransmissionFactor;
+    // Volume
+    float u_ThicknessFactor;
+    vec3 u_AttenuationColor;
+    float u_AttenuationDistance;
 };
 
 vec4 getBaseColor(VS2PS Input)
@@ -130,7 +137,7 @@ void discardPixelIfAlphaCutOff(VS2PS Input)
 #endif
 }
 
-void getPBRParams(VS2PS Input, PBRFactors params, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha)
+void getPBRParams(VS2PS Input, PBRFactors params, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha, out vec4 baseColor)
 {
     // Metallic and Roughness material properties are packed together
     // In glTF, these factors can be specified by fixed scalar values
@@ -142,7 +149,7 @@ void getPBRParams(VS2PS Input, PBRFactors params, out vec3 diffuseColor, out vec
     float metallic = 0.0;
     vec3 f0 = vec3(0.04, 0.04, 0.04);
 
-    vec4 baseColor = getBaseColor(Input, params);
+    baseColor = getBaseColor(Input, params);
 
 #ifdef MATERIAL_SPECULARGLOSSINESS
     vec4 sgSample = getSpecularGlossinessTexture(Input);
@@ -171,6 +178,7 @@ void getPBRParams(VS2PS Input, PBRFactors params, out vec3 diffuseColor, out vec
     specularColor = mix(f0, baseColor.rgb, metallic);
 #endif // ! MATERIAL_METALLICROUGHNESS
 
+ 
     perceptualRoughness = clamp(perceptualRoughness, 0.0, 1.0);
 
     alpha = baseColor.a;

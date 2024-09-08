@@ -886,6 +886,12 @@ namespace vkr {
 		// KHR_materials_pbrSpecularGlossiness
 		glm::vec4 m_DiffuseFactor;
 		glm::vec4 m_specularGlossinessFactor;
+		// Transmission
+		float u_TransmissionFactor;
+		// Volume
+		float u_ThicknessFactor;
+		glm::vec3 u_AttenuationColor;
+		float u_AttenuationDistance;
 	};
 
 	struct PBRMaterialParameters
@@ -5347,6 +5353,28 @@ namespace vkr
 		return glm::vec4(v[0], v[1], v[2], v.size() > 3 ? v[3] : 0);
 	}
 
+	void itcb(tinygltf::Value ns, const std::string& k, const std::string& kd, DefineList& m_defines, std::map<std::string, int>& textureIds)
+	{
+		if (ns.Has(k))
+		{
+			auto t = ns.Get(k);
+			int index = -1;
+			int texCoord = 0;
+			if (t.Has("index"))
+			{
+				index = t.Get("index").GetNumberAsInt();
+				if (index != -1)
+				{
+					textureIds[k] = index;
+					if (t.Has("texCoord"))
+					{
+						texCoord = t.Get("texCoord").GetNumberAsInt();
+					}
+					m_defines[kd] = std::to_string(texCoord);
+				}
+			}
+		}
+	}
 	void ProcessMaterials(tinygltf::Material* pm, PBRMaterialParameters* tfmat, std::map<std::string, int>& textureIds)
 	{
 		//njson material;
@@ -5414,31 +5442,26 @@ namespace vkr
 							specularFactor = pbrSpecularGlossiness.Get("specularFactor").Get<glm::vec4>();
 						specularFactor.w = glossiness;
 
-						auto itcb = [=, &textureIds](const std::string& k, const std::string& kd) {
-							if (pbrSpecularGlossiness.Has(k))
-							{
-								auto t = pbrSpecularGlossiness.Get(k);
-								int index = -1;
-								int texCoord = 0;
-								if (t.Has("index"))
-								{
-									index = t.Get("index").GetNumberAsInt();
-									if (index != -1)
-									{
-										textureIds[k] = index;
-										if (t.Has("texCoord"))
-										{
-											texCoord = t.Get("texCoord").GetNumberAsInt();
-										}
-										tfmat->m_defines[kd] = std::to_string(texCoord);
-									}
-								}
-							}
-							};
-
-						itcb("diffuseTexture", "ID_diffuseTexCoord");
-						itcb("specularGlossinessTexture", "ID_specularGlossinessTexCoord");
+						itcb(pbrSpecularGlossiness, "diffuseTexture", "ID_diffuseTexCoord", tfmat->m_defines, textureIds);
+						itcb(pbrSpecularGlossiness, "specularGlossinessTexture", "ID_specularGlossinessTexCoord", tfmat->m_defines, textureIds);
 						break;
+					}
+
+					auto mt = extensions.find("KHR_materials_transmission");
+					auto mv = extensions.find("KHR_materials_volume");
+					if (mt != extensions.end()) {
+						auto tr = mt->second;
+						double transmissionFactor = tr.Get("transmissionFactor").GetNumberAsDouble();
+						tfmat->m_params.u_TransmissionFactor = transmissionFactor;
+						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
+					}
+					if (mv != extensions.end()) {
+						auto vo = mv->second;
+						tfmat->m_params.u_AttenuationColor = vo.Get("attenuationColor").Get<glm::vec4>();
+						tfmat->m_params.u_AttenuationDistance = vo.Get("attenuationDistance").GetNumberAsDouble();
+						tfmat->m_params.u_ThicknessFactor = vo.Get("thicknessFactor").GetNumberAsDouble();
+						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
+						itcb(vo, "thicknessTexture", "ID_thicknessTexCoord", tfmat->m_defines, textureIds); 
 					}
 				}
 			}
@@ -5705,7 +5728,7 @@ namespace vkr
 			for (uint32_t i = 0; i < materials.size(); i++)
 			{
 				PBRMaterial* tfmat = &m_materialsData[i];
-
+				//tfmat->m_pbrMaterialParameters.m_defines["MATERIAL_UNLIT"] = "1";//无光照
 				// Get PBR material parameters and texture IDs
 				//
 				std::map<std::string, int> textureIds;
@@ -10842,8 +10865,8 @@ namespace vkr {
 				ColorSpace_Display,
 				&m_colorConversionConsts.m_contentToMonitorRecMatrix);
 #endif
-		}
 	}
+}
 
 	void ColorConversionPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
 	{
@@ -11101,7 +11124,7 @@ namespace vkr {
 
 
 
-}
+	}
 //!vkr
 
 // todo 通用函数 
@@ -11209,7 +11232,7 @@ namespace vkr {
 #endif
 
 		return true;
-	}
+}
 
 	void WICLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
 	{
@@ -12239,9 +12262,9 @@ namespace vkr {
 					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
 					m_database[hash].m_Sync.Inc();
 					return true;
-				}
-				kt = &it->second;
 			}
+				kt = &it->second;
+		}
 
 			// If we have seen these shaders before then:
 			{
@@ -12252,7 +12275,7 @@ namespace vkr {
 					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
 #endif
 					Async::Wait(&kt->m_Sync);
-				}
+			}
 
 				// if the shader was compiled then return it
 				*pOut = kt->m_data;
@@ -12261,7 +12284,7 @@ namespace vkr {
 				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
 #endif
 				return false;
-			}
+	}
 #endif
 			return true;
 		}
@@ -12288,7 +12311,7 @@ namespace vkr {
 			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
 			kt->m_Sync.Dec();
 #endif
-		}
+			}
 
 		template<typename Func>
 		void ForEach(Func func)
@@ -12299,7 +12322,7 @@ namespace vkr {
 				func(it);
 			}
 		}
-	};
+		};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -13551,7 +13574,7 @@ namespace vkr {
 		}
 		return fp;// hz::File::read_binary_file(filepath.c_str(), *out);
 #endif
-	}
+			}
 	void Transform::LookAt(glm::vec4 source, glm::vec4 target, bool flipY)
 	{
 		//auto p3 = math::Point3(source.x, source.y, source.z);
@@ -14130,7 +14153,7 @@ namespace vkr {
 				{
 					auto& va = m_animated_morphWeights[np->m_name];
 					va.clear();
-					va.swap(acv[3]);  
+					va.swap(acv[3]);
 				}
 				// it->first是节点idx
 				m_animatedMats[it->first] = animated.GetWorldMat();
@@ -14574,7 +14597,7 @@ namespace vkr {
 
 
 
-}
+	}
 //! vkr 
 // todo renderer
 namespace vkr {
@@ -15105,7 +15128,7 @@ namespace vkr {
 		vkc::flushCommandBuffer(device, copyCmd, cp->command_pool, copyQueue, true);
 		qctx->free_cmd_pool(cp);
 #endif
-	}
+}
 	void dvk_buffer::setDesType(uint32_t dt)
 	{
 		dtype = (VkDescriptorType)dt;
@@ -15674,7 +15697,7 @@ namespace vkr {
 				}
 
 			} while (0);
-		}
+	}
 #else
 		{
 			// 等待GPU返回
@@ -16065,7 +16088,7 @@ namespace vkr {
 		q->add_copy2img(_image, cr, subresourceRange, aspectMask, il, img);
 		q->flushAndFinish();
 	}
-}
+		}
 
 
 namespace vkr {
@@ -17305,7 +17328,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-			}
+				}
 
 			// Render skydome
 			{
@@ -17383,7 +17406,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-		}
+			}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -17597,8 +17620,8 @@ namespace vkr {
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
-			}
 		}
+	}
 
 		// submit command buffer
 		{
@@ -17727,7 +17750,7 @@ namespace vkr {
 		}
 #endif
 
-	}
+}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
 		_fbo.fence = p->_fence;
@@ -18085,7 +18108,7 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 0.28;//scene.value("intensity", 1.0f);
+				l.m_intensity = 0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
@@ -18676,7 +18699,7 @@ namespace vkr {
 	}
 
 
-}
+		}
 //!vkr
 
 

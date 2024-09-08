@@ -122,7 +122,8 @@ void main()
     float perceptualRoughness;
     vec3 diffuseColor;
     vec3 specularColor;
-	getPBRParams(Input, u_pbrParams, diffuseColor, specularColor, perceptualRoughness, alpha);
+    vec4 baseColor;
+	getPBRParams(Input, u_pbrParams, diffuseColor, specularColor, perceptualRoughness, alpha, baseColor);
 
     // Roughness is authored as perceptual roughness; as is convention,
     // convert to material roughness by squaring the perceptual roughness [2].
@@ -146,7 +147,7 @@ void main()
 #endif
 
 #ifdef HAS_FORWARD_RT
-	Output_finalColor = vec4(doPbrLighting(Input, myPerFrame, diffuseColor, specularColor, perceptualRoughness), alpha);
+	Output_finalColor = vec4(doPbrLighting(Input, myPerFrame, diffuseColor, specularColor, perceptualRoughness,baseColor), alpha);
     Output_finalColor = mix(Output_finalColor, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #endif
 }

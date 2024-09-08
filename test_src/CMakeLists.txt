@@ -13,7 +13,7 @@ list(APPEND src_cmp
 
 
 # 将源代码添加到此项目的可执行文件。
-add_executable (tcmp ${src_cmp}  ) 
+add_executable (tcmp ${src_cmp}   "ecc_sv.cpp") 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")

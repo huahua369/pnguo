@@ -677,8 +677,82 @@ struct curl_data_t
 #include <vector>
 void test_rect();
 void test_vkvg(const char* fn);
-double fmod1(double x, double y) {
-	return x - trunc(x / y) * y;
+
+#include "ecc_sv.h"
+#include <io.h>
+std::vector<std::string> efile(const std::string& kf)
+{
+	std::vector<std::string> ret;
+	_finddata_t fd;
+	intptr_t pf = _findfirst(kf.c_str(), &fd);// "e:/*.*"
+	while (!_findnext(pf, &fd))
+	{
+		printf("%s\n", fd.name);
+		ret.push_back(fd.name);
+	}
+	_findclose(pf);
+	return ret;
+}
+std::vector<std::string> efile2(const std::string& kf)
+{
+	std::vector<std::string> ret;
+	hz::mfile_t k;
+	auto d = k.open_d(kf, true);
+	if (d) {
+		md::get_lines(d, [&](const char* str) {
+			auto nstr = md::trim_ch(str, "file"); nstr = md::trim_ch(nstr, " ");
+			if (nstr.size())
+			{
+				ret.push_back(nstr);
+			}
+			});
+	}
+	return ret;
+}
+// 解密视频
+void ents(const std::string& path, const std::string& key, const std::string& iv, const std::string& detype, const std::string& outfn)
+{
+	static auto cctx = new_ciphers_ctx();
+	cipher_pt kecp = get_ciphers_str(cctx, "aes-128-cbc");
+	auto up = get_ciphers_str(cctx, detype.c_str());
+	if (up.ecp)
+		kecp = up;
+	if (!kecp.ecp)return;
+	auto vf = efile2(path);
+	std::string pws = key;
+	std::vector<char> mm;
+	for (auto& it : vf)
+	{
+		hz::mfile_t mp;
+		auto md = mp.open_d(it, true);
+		if (!md)continue;
+		//auto ps = mm.size();
+		//mm.resize(ps + mp.get_size());
+		//memcpy(mm.data() + ps, (char*)md, mp.get_size());
+		auto ped = decrypt_iv00(kecp.ecp, md, mp.get_size(), pws.data(), -1);
+		if (ped)
+		{
+			if (ped->data && ped->size)
+			{
+				auto ps = mm.size();
+				mm.resize(ps + ped->size);
+				memcpy(mm.data() + ps, (char*)ped->data, ped->size);
+			}
+			free_dt(ped);
+		}
+	}
+	{
+		hz::mfile_t wp;
+		if (wp.open_m(outfn, false)) {
+			wp.ftruncate_m(mm.size());
+			auto td = wp.map(mm.size(), 0);
+			if (td)
+			{
+				memcpy(td, mm.data(), mm.size());
+				wp.flush();
+			}
+		}
+	}
 }
 
 int main()
@@ -689,6 +763,9 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
+
+	//ents("E:\\m\\mf.txt", "9FiCxHYH4SYhVQu3", "", "", "E:\\m\\n69.ts");
+
 	auto app = new_app();
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
@@ -707,9 +784,10 @@ int main()
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\BrainStem\glTF-Binary\BrainStem.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Bee.glb)");
 		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
+		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+	//	load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+		load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 
 		//load_gltf(vkd, R"(E:\model\cube18.glb)");
 		vkd->resize(800, 600);
@@ -741,10 +819,6 @@ int main()
 	auto ftc = app->font_ctx;
 
 	do_text(sss, 0, strlen(sss));
-	double f0 = fmod(-2.5, 2);
-	double f1 = fmod1(-2.5, 2);
-	double f2 = fmod1(-0.5, 0.5);
-
 
 	static std::atomic_bool kinit = false;
 	std::thread attt([=]() {
