@@ -265,7 +265,7 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 	return color;
 }
 
-vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness,vec4 baseColor)
+vec3 doPbrLighting(VS2PS Input, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness,vec4 baseColor)
 {
 #ifdef MATERIAL_UNLIT
 	vec3 outColor = vec4((baseColor.rgb), baseColor.a);
@@ -291,7 +291,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	materialInfo.reflectance90 = specularEnvironmentR90;
 	materialInfo.specularColor = specularColor;
 	materialInfo.baseColor = baseColor.rgba;
-	materialInfo.u_ModelMatrix = perFrame.u_mCameraCurrViewProjInverse; 
+	materialInfo.u_ModelMatrix = myPerFrame.u_mCameraCurrViewProjInverse;
 
 	// LIGHTING
 
@@ -332,7 +332,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 
 	// Calculate lighting contribution from image based lighting source (IBL)
 #ifdef USE_IBL
-	color += getIBLContribution(materialInfo, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * perFrame.u_invScreenResolution);
+	color += getIBLContribution(materialInfo, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
 #endif
 
 	float ao = 1.0;
@@ -346,7 +346,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 #ifdef ID_emissiveTexture
 	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.myPerObject_u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
 #else
-	emissive = u_pbrParams.myPerObject_u_EmissiveFactor.rgb * perFrame.u_EmissiveFactor;
+	emissive = u_pbrParams.myPerObject_u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
 #endif
 	color += emissive;
 
