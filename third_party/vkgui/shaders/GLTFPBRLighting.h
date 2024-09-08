@@ -265,7 +265,7 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 	return color;
 }
 
-vec3 doPbrLighting(VS2PS Input, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness,vec4 baseColor)
+vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
 #ifdef MATERIAL_UNLIT
 	vec3 outColor = vec4((baseColor.rgb), baseColor.a);
@@ -327,7 +327,7 @@ vec3 doPbrLighting(VS2PS Input, vec3 diffuseColor, vec3 specularColor, float per
 
 			color += applySpotLight(light, materialInfo, normal, worldPos, view) * shadowFactor;
 		}
-}
+	}
 #endif
 
 	// Calculate lighting contribution from image based lighting source (IBL)

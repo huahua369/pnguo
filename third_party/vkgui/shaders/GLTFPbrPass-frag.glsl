@@ -147,7 +147,7 @@ void main()
 #endif
 
 #ifdef HAS_FORWARD_RT
-	Output_finalColor = vec4(doPbrLighting(Input, diffuseColor, specularColor, perceptualRoughness,baseColor), alpha);
+	Output_finalColor = vec4(doPbrLighting(Input, myPerFrame,diffuseColor, specularColor, perceptualRoughness,baseColor), alpha);
     Output_finalColor = mix(Output_finalColor, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #endif
 }
