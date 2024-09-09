@@ -41,8 +41,8 @@ struct MaterialInfo
 
 	vec3 reflectance90;           // reflectance color at grazing angle
 	vec3 specularColor;           // color contribution from specular lighting
-	vec4 baseColor;
-	mat4 u_ModelMatrix;
+
+	vec4 baseColor; 
 };
 
 //
@@ -301,7 +301,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	materialInfo.reflectance90 = specularEnvironmentR90;
 	materialInfo.specularColor = specularColor;
 	materialInfo.baseColor = baseColor;
-	materialInfo.u_ModelMatrix = myPerFrame.u_mCameraCurrViewProjInverse;
+	//materialInfo.u_ModelMatrix = myPerFrame.u_mCameraCurrViewProjInverse;
 
 	// LIGHTING
 
