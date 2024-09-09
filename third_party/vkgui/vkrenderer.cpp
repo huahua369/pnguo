@@ -3107,6 +3107,8 @@ namespace vkr {
 		VkRenderPass m_renderPass = VK_NULL_HANDLE;
 		VkSampler m_sampler = VK_NULL_HANDLE;
 		VkDescriptorBufferInfo m_perFrameDesc;
+	public:
+		bool m_bInvertedDepth = false;
 
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, DepthPrimitives* pPrimitive);
@@ -4275,7 +4277,9 @@ namespace vkr
 		ds.flags = 0;
 		ds.depthTestEnable = true;
 		ds.depthWriteEnable = true;
-		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL; 
+		ds.depthCompareOp = m_bInvertedDepth ? VK_COMPARE_OP_GREATER_OR_EQUAL : VK_COMPARE_OP_LESS_OR_EQUAL;
+
 		ds.back.failOp = VK_STENCIL_OP_KEEP;
 		ds.back.passOp = VK_STENCIL_OP_KEEP;
 		ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
@@ -5461,7 +5465,7 @@ namespace vkr
 						tfmat->m_params.u_AttenuationDistance = vo.Get("attenuationDistance").GetNumberAsDouble();
 						tfmat->m_params.u_ThicknessFactor = vo.Get("thicknessFactor").GetNumberAsDouble();
 						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
-						itcb(vo, "thicknessTexture", "ID_thicknessTexCoord", tfmat->m_defines, textureIds); 
+						itcb(vo, "thicknessTexture", "ID_thicknessTexCoord", tfmat->m_defines, textureIds);
 					}
 				}
 			}
@@ -10865,8 +10869,8 @@ namespace vkr {
 				ColorSpace_Display,
 				&m_colorConversionConsts.m_contentToMonitorRecMatrix);
 #endif
+		}
 	}
-}
 
 	void ColorConversionPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
 	{
@@ -11124,7 +11128,7 @@ namespace vkr {
 
 
 
-	}
+}
 //!vkr
 
 // todo 通用函数 
@@ -11232,7 +11236,7 @@ namespace vkr {
 #endif
 
 		return true;
-}
+	}
 
 	void WICLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
 	{
@@ -12262,9 +12266,9 @@ namespace vkr {
 					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
 					m_database[hash].m_Sync.Inc();
 					return true;
-			}
+				}
 				kt = &it->second;
-		}
+			}
 
 			// If we have seen these shaders before then:
 			{
@@ -12275,7 +12279,7 @@ namespace vkr {
 					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
 #endif
 					Async::Wait(&kt->m_Sync);
-			}
+				}
 
 				// if the shader was compiled then return it
 				*pOut = kt->m_data;
@@ -12284,7 +12288,7 @@ namespace vkr {
 				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
 #endif
 				return false;
-	}
+			}
 #endif
 			return true;
 		}
@@ -12311,7 +12315,7 @@ namespace vkr {
 			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
 			kt->m_Sync.Dec();
 #endif
-			}
+		}
 
 		template<typename Func>
 		void ForEach(Func func)
@@ -12322,7 +12326,7 @@ namespace vkr {
 				func(it);
 			}
 		}
-		};
+	};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -13574,7 +13578,7 @@ namespace vkr {
 		}
 		return fp;// hz::File::read_binary_file(filepath.c_str(), *out);
 #endif
-			}
+	}
 	void Transform::LookAt(glm::vec4 source, glm::vec4 target, bool flipY)
 	{
 		//auto p3 = math::Point3(source.x, source.y, source.z);
@@ -14597,7 +14601,7 @@ namespace vkr {
 
 
 
-	}
+}
 //! vkr 
 // todo renderer
 namespace vkr {
@@ -15128,7 +15132,7 @@ namespace vkr {
 		vkc::flushCommandBuffer(device, copyCmd, cp->command_pool, copyQueue, true);
 		qctx->free_cmd_pool(cp);
 #endif
-}
+	}
 	void dvk_buffer::setDesType(uint32_t dt)
 	{
 		dtype = (VkDescriptorType)dt;
@@ -15697,7 +15701,7 @@ namespace vkr {
 				}
 
 			} while (0);
-	}
+		}
 #else
 		{
 			// 等待GPU返回
@@ -16088,7 +16092,7 @@ namespace vkr {
 		q->add_copy2img(_image, cr, subresourceRange, aspectMask, il, img);
 		q->flushAndFinish();
 	}
-		}
+}
 
 
 namespace vkr {
@@ -17328,7 +17332,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-				}
+			}
 
 			// Render skydome
 			{
@@ -17406,7 +17410,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-			}
+		}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -17620,8 +17624,8 @@ namespace vkr {
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
+			}
 		}
-	}
 
 		// submit command buffer
 		{
@@ -17750,7 +17754,7 @@ namespace vkr {
 		}
 #endif
 
-}
+	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
 		_fbo.fence = p->_fence;
@@ -18699,7 +18703,7 @@ namespace vkr {
 	}
 
 
-		}
+}
 //!vkr
 
 

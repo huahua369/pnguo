@@ -193,7 +193,7 @@ float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeC
 	return 0.0;
 }
 
-// Compute attenuated light as it travels through a volume.
+// 计算穿过体积的衰减光 Compute attenuated light as it travels through a volume.
 vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 attenuationColor, float attenuationDistance)
 {
 	if (attenuationDistance == 0.0)

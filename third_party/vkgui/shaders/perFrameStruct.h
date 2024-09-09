@@ -19,8 +19,9 @@
 
 // KHR_lights_punctual extension.
 // see https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual
-
+#ifndef MAX_LIGHT_INSTANCES
 #define MAX_LIGHT_INSTANCES  80
+#endif
 #define MAX_SHADOW_INSTANCES 32
 
 struct Light
@@ -33,10 +34,9 @@ struct Light
 
     vec3          color;
     float         intensity;
-
     vec3          position;
+    // spot
     float         innerConeCos;
-
     float         outerConeCos;
     int           type;
     float         depthBias;
