@@ -151,7 +151,13 @@ vec3 getPointShade(vec3 pointToLight, MaterialInfo materialInfo, vec3 normal, ve
 		float D = microfacetDistribution(materialInfo, angularInfo);
 
 		// Calculation of analytical lighting contribution
+#ifndef PT_CPP
 		vec3 diffuseContrib = (1.0 - F) * diffuse(materialInfo);
+#else
+		vec3 f1 = vec3(1, 1, 1) - F;
+		vec3 diffuseContrib = f1 * diffuse(materialInfo);
+#endif // PT_CPP
+
 		vec3 specContrib = F * Vis * D;
 
 		// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
@@ -192,7 +198,7 @@ vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 atte
 {
 	if (attenuationDistance == 0.0)
 	{
-		// Attenuation distance is +∞ (which we indicate by zero), i.e. the transmitted color is not attenuated at all.
+		// Attenuation distance is +鈭?(which we indicate by zero), i.e. the transmitted color is not attenuated at all.
 		return radiance;
 	}
 	else
@@ -207,13 +213,13 @@ vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 atte
 vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix)
 {
 	// Direction of refracted light.
-	vec3 refractionVector = refract(-v, normalize(n), 1.0 / ior);
+	vec3 refractionVector = refract(-v, normalize(n), 1.0f / ior);
 
 	// Compute rotation-independant scaling of the model matrix.
 	vec3 modelScale;
-	modelScale.x = length(vec3(modelMatrix[0].xyz));
-	modelScale.y = length(vec3(modelMatrix[1].xyz));
-	modelScale.z = length(vec3(modelMatrix[2].xyz));
+	modelScale.x = length(vec3(modelMatrix[0]));
+	modelScale.y = length(vec3(modelMatrix[1]));
+	modelScale.z = length(vec3(modelMatrix[2]));
 
 	// The thickness is specified in local space.
 	return normalize(refractionVector) * thickness * modelScale;
@@ -267,6 +273,10 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
+#ifdef PT_CPP
+	PBRFactors u_pbrParams = {};
+	auto myPerFrame = perFrame;
+#endif
 #ifdef MATERIAL_UNLIT
 	vec3 outColor = vec4((baseColor.rgb), baseColor.a);
 	return outColor;
@@ -279,7 +289,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	// Compute reflectance.
 	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
 
-	vec3 specularEnvironmentR0 = specularColor.rgb;
+	vec3 specularEnvironmentR0 = specularColor;
 	// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
 	vec3 specularEnvironmentR90 = vec3(clamp(reflectance * 50.0, 0.0, 1.0));
 
@@ -290,7 +300,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	materialInfo.diffuseColor = diffuseColor;
 	materialInfo.reflectance90 = specularEnvironmentR90;
 	materialInfo.specularColor = specularColor;
-	materialInfo.baseColor = baseColor.rgba;
+	materialInfo.baseColor = baseColor;
 	materialInfo.u_ModelMatrix = myPerFrame.u_mCameraCurrViewProjInverse;
 
 	// LIGHTING
@@ -298,13 +308,18 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	vec3 color = vec3(0.0, 0.0, 0.0);
 	vec3 normal = getPixelNormal(Input);
 	vec3 worldPos = Input.WorldPos;
-	vec3 view = normalize(myPerFrame.u_CameraPos.xyz - Input.WorldPos);
+#ifdef PT_CPP
+	vec3 cpos = myPerFrame.u_CameraPos;
+	vec3 view = normalize(cpos - worldPos);
+#else
+	vec3 view = normalize(myPerFrame.u_CameraPos.xyz - worldPos);
+#endif
 
 #if (DEF_doubleSided == 1)
 	if (dot(normal, view) < 0)
 	{
 		normal = -normal;
-	}
+}
 #endif
 
 #ifdef USE_PUNCTUAL
@@ -346,7 +361,12 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 #ifdef ID_emissiveTexture
 	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.myPerObject_u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
 #else
-	emissive = u_pbrParams.myPerObject_u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
+#ifdef PT_CPP
+	emissive = u_pbrParams.myPerObject_u_EmissiveFactor;
+#else
+	emissive = u_pbrParams.myPerObject_u_EmissiveFactor.xyz;
+#endif
+	emissive *= myPerFrame.u_EmissiveFactor;
 #endif
 	color += emissive;
 

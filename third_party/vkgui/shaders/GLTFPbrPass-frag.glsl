@@ -110,7 +110,7 @@ layout (scalar, set=0, binding = 1) uniform perObject
 // mainPS
 //--------------------------------------------------------------------------------------
 
-#include "functions.glsl"
+#include "functions.h"
 #include "shadowFiltering.h"
 #include "GLTFPBRLighting.h"
 

@@ -99,7 +99,11 @@ vec2 getNormalUV(VS2PS Input)
     uv *= u_NormalUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec2 getEmissiveUV(VS2PS Input)
@@ -111,8 +115,11 @@ vec2 getEmissiveUV(VS2PS Input)
     uv *= u_EmissiveUVTransform;
     #endif
 #endif
-
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec2 getOcclusionUV(VS2PS Input)
@@ -124,7 +131,11 @@ vec2 getOcclusionUV(VS2PS Input)
     uv *= u_OcclusionUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec2 getBaseColorUV(VS2PS Input)
@@ -136,7 +147,11 @@ vec2 getBaseColorUV(VS2PS Input)
     uv *= u_BaseColorUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec2 getMetallicRoughnessUV(VS2PS Input)
@@ -148,7 +163,11 @@ vec2 getMetallicRoughnessUV(VS2PS Input)
     uv *= u_MetallicRoughnessUVTransform;
     #endif
 #endif
-    return uv.xy;    
+#ifdef PT_CPP
+    return uv;
+#else
+    return uv.xy;
+#endif 
 }
 
 vec2 getSpecularGlossinessUV(VS2PS Input)
@@ -160,7 +179,11 @@ vec2 getSpecularGlossinessUV(VS2PS Input)
     uv *= u_SpecularGlossinessUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec2 getDiffuseUV(VS2PS Input)
@@ -172,7 +195,11 @@ vec2 getDiffuseUV(VS2PS Input)
     uv *= u_DiffuseUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec2 getTransmissionUV(VS2PS Input)
@@ -184,7 +211,11 @@ vec2 getTransmissionUV(VS2PS Input)
     uv *= u_transmissionUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 vec2 getThicknessUV(VS2PS Input)
 {
@@ -195,7 +226,11 @@ vec2 getThicknessUV(VS2PS Input)
     uv *= u_volumeUVTransform;
     #endif
 #endif
+#ifdef PT_CPP
+    return uv;
+#else
     return uv.xy;
+#endif
 }
 
 vec4 getBaseColorTexture(VS2PS Input)

@@ -59,7 +59,8 @@ vec3 getPixelNormal(VS2PS Input)
     n = normalize(tbn * (n /* * vec3(u_NormalScale, u_NormalScale, 1.0) */));
 #else
     // The tbn matrix is linearly interpolated, so we need to re-normalize
-    vec3 n = normalize(tbn[2].xyz);
+    vec3 n =tbn[2];
+    n = normalize(n);
 #endif
     
     return n;
@@ -179,7 +180,7 @@ void getPBRParams(VS2PS Input, PBRFactors params, out vec3 diffuseColor, out vec
 #endif // ! MATERIAL_METALLICROUGHNESS
 
  
-    perceptualRoughness = clamp(perceptualRoughness, 0.0, 1.0);
+    perceptualRoughness = clamp(perceptualRoughness, 0.0f, 1.0f);
 
     alpha = baseColor.a;
 }

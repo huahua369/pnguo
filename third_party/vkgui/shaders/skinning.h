@@ -1,4 +1,3 @@
-// å˜å½¢ã€éª¨éª¼
 // AMD Cauldron code
 // 
 // Copyright(c) 2018 Advanced Micro Devices, Inc.All rights reserved.
@@ -19,12 +18,12 @@
 // THE SOFTWARE.
 
 #ifdef ID_MORPHING_DATA
-// æ’å€¼æ•°æ®
+// ²åÖµÊı¾İ
 layout(set = 0, binding = ID_MORPHING_DATA) buffer per_morphing_mw
 {
 	float u_morphWeights[];
 };
-// ç›®æ ‡æ•°æ®ï¼šæ¯ä¸ªé¡¶ç‚¹æœ‰æ’å€¼æ•°æ®æ•°é‡çš„vec3
+// Ä¿±êÊı¾İ£ºÃ¿¸ö¶¥µãÓĞ²åÖµÊı¾İÊıÁ¿µÄvec3
 layout(set = 0, binding = ID_TARGET_DATA) buffer per_morphing
 {
 	vec4 per_target_data[];
@@ -57,7 +56,7 @@ mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 
 #ifdef ID_MORPHING_DATA 
 
-// è·å–ç›®æ ‡æ•°æ®
+// »ñÈ¡Ä¿±êÊı¾İ
 vec4 getDisplacement(int vertexID, int targetIndex)
 {
 	return per_target_data[vertexID + targetIndex];

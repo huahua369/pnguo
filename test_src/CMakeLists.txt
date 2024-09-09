@@ -7,7 +7,7 @@ project ("tcmp")
 #测试
 list(APPEND src_cmp  
     "charts.cpp"
-    "main.cpp"
+    "main.cpp" 
     "../rc/resource1.rc"
 ) 
 

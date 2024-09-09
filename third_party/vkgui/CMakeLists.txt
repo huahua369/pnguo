@@ -8,6 +8,7 @@ set(vkgui_src
 "win_core.cpp" 
 "page.cpp"  
 "vkrenderer.cpp"  
+"testshader.cpp"  
 )
  
 set(Shaders_PostProc_src
@@ -38,7 +39,7 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDome.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.hlsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/functions.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/functions.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PBRTextures.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shadowFiltering.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PixelParams.glsl
