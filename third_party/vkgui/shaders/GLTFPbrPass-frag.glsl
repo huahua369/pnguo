@@ -118,38 +118,46 @@ layout (scalar, set=0, binding = 1) uniform perObject
 
 void main()
 {
-    discardPixelIfAlphaCutOff(Input);
-
-    float alpha;
-    float perceptualRoughness;
-    vec3 diffuseColor;
-    vec3 specularColor;
-    vec4 baseColor;
-	getPBRParams(Input, u_pbrParams, diffuseColor, specularColor, perceptualRoughness, alpha, baseColor);
-
-    // Roughness is authored as perceptual roughness; as is convention,
-    // convert to material roughness by squaring the perceptual roughness [2].
-    float alphaRoughness = perceptualRoughness * perceptualRoughness;
+	discardPixelIfAlphaCutOff(Input);
+	gpuMaterial m = defaultPbrMaterial();
+#ifdef ID_TEXCOORD_0
+	vec2 uv = Input.UV0;
+#else
+	vec2 uv = vec2(0.0, 0.0);
+#endif
+#if 0
+	getPBRParams(Input, u_pbrParams, uv, m);
+#else
+	float alpha;
+	float perceptualRoughness;
+	vec3 diffuseColor;
+	vec3 specularColor;
+	getPBRParams_old(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness, alpha);
+	
+#endif
+	// Roughness is authored as perceptual roughness; as is convention,
+	// convert to material roughness by squaring the perceptual roughness [2].
 
 #ifdef HAS_MOTION_VECTORS_RT
-    Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w -
-                        Input.PrevPosition.xy / Input.PrevPosition.w;
+	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w -
+		Input.PrevPosition.xy / Input.PrevPosition.w;
 #endif
 
 #ifdef HAS_SPECULAR_ROUGHNESS_RT
-    Output_specularRoughness = vec4(specularColor, alphaRoughness);
+	Output_specularRoughness = vec4(m.specularColor, m.alphaRoughness);
 #endif
 
 #ifdef HAS_DIFFUSE_RT
-    Output_diffuseColor = vec4(diffuseColor, 0);
+	Output_diffuseColor = vec4(m.diffuseColor, 0);
 #endif
 
 #ifdef HAS_NORMALS_RT
-    Output_normal = vec4((getPixelNormal(Input) + 1) / 2, 0);
+	Output_normal = vec4((getPixelNormal(Input) + 1) / 2, 0);
 #endif
 
 #ifdef HAS_FORWARD_RT
-	Output_finalColor = vec4(doPbrLighting(Input, myPerFrame,diffuseColor, specularColor, perceptualRoughness,baseColor), alpha);
-    Output_finalColor = mix(Output_finalColor, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
+	Output_finalColor = vec4(doPbrLighting(Input, myPerFrame, m), m.alpha);
+	Output_finalColor = vec4(doPbrLighting_old(Input, myPerFrame,uv, diffuseColor, specularColor, perceptualRoughness), alpha);
+	Output_finalColor = mix(Output_finalColor, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #endif
 }

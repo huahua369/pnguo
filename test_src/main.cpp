@@ -786,8 +786,8 @@ int main()
 		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
 		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-	//	load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
-		load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
+		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 
 		//load_gltf(vkd, R"(E:\model\cube18.glb)");
 		vkd->resize(800, 600);
@@ -982,7 +982,7 @@ int main()
 		Sleep(1);
 	}
 	menu_cx* mc = new menu_cx();	// 菜单管理
-	mc->set_main(form0);
+	//mc->set_main(form0);
 	mc->add_familys(fontn);
 
 

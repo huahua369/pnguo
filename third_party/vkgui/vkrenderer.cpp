@@ -5406,13 +5406,14 @@ namespace vkr
 	{
 		pPbrMaterialParameters->m_doubleSided = false;
 		pPbrMaterialParameters->m_blending = false;
-
-		pPbrMaterialParameters->m_params.emissiveFactor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		pPbrMaterialParameters->m_params.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-		pPbrMaterialParameters->m_params.metallicFactor = 0.0f;
-		pPbrMaterialParameters->m_params.roughnessFactor = 0.0f;
-		pPbrMaterialParameters->m_params.glossinessFactor = 0.0f;
-		pPbrMaterialParameters->m_params.pbrSpecularFactor = glm::vec3(0.0f, 0.0f, 0.0f);
+		auto& pbrm = pPbrMaterialParameters->m_params;
+		pbrm.uvTransform = glm::mat3x4(1.0);
+		pbrm.emissiveFactor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+		pbrm.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+		pbrm.metallicFactor = 0.0f;
+		pbrm.roughnessFactor = 0.0f;
+		pbrm.glossinessFactor = 0.0f;
+		pbrm.pbrSpecularFactor = glm::vec3(0.0f, 0.0f, 0.0f);
 	}
 
 	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName)
@@ -5476,7 +5477,7 @@ namespace vkr
 		return it != extensions.end();
 	}
 	const tinygltf::Value* get_ext(const tinygltf::ExtensionMap& extensions, const char* k) {
-		auto it = extensions.find(k); 
+		auto it = extensions.find(k);
 		return (it != extensions.end()) ? &it->second : nullptr;
 	}
 	glm::mat3x4 get_mat3x4(glm::vec2 offset, float rotation, glm::vec2 scale = { 1.0f, 1.0f })
@@ -5577,9 +5578,12 @@ namespace vkr
 				// KHR_texture_transform
 				{
 					auto tt = get_ext(extensions, "KHR_materials_unlit");
-					if (tt) {
+					if (tt) 
+					{
 						tfmat->m_params.unlit = 1;
 					}
+					if (tfmat->m_params.unlit)
+						tfmat->m_defines["MATERIAL_UNLIT"] = "1";
 				}
 				{
 					auto tt = get_ext(extensions, "KHR_materials_ior");
@@ -11062,8 +11066,8 @@ namespace vkr {
 				ColorSpace_Display,
 				&m_colorConversionConsts.m_contentToMonitorRecMatrix);
 #endif
-		}
 	}
+}
 
 	void ColorConversionPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
 	{
@@ -11429,7 +11433,7 @@ namespace vkr {
 #endif
 
 		return true;
-	}
+}
 
 	void WICLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
 	{
@@ -12459,9 +12463,9 @@ namespace vkr {
 					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
 					m_database[hash].m_Sync.Inc();
 					return true;
-				}
-				kt = &it->second;
 			}
+				kt = &it->second;
+		}
 
 			// If we have seen these shaders before then:
 			{
@@ -12472,7 +12476,7 @@ namespace vkr {
 					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
 #endif
 					Async::Wait(&kt->m_Sync);
-				}
+			}
 
 				// if the shader was compiled then return it
 				*pOut = kt->m_data;
@@ -12481,7 +12485,7 @@ namespace vkr {
 				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
 #endif
 				return false;
-			}
+	}
 #endif
 			return true;
 		}
@@ -12508,7 +12512,7 @@ namespace vkr {
 			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
 			kt->m_Sync.Dec();
 #endif
-		}
+			}
 
 		template<typename Func>
 		void ForEach(Func func)
@@ -12519,7 +12523,7 @@ namespace vkr {
 				func(it);
 			}
 		}
-	};
+		};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -15325,7 +15329,7 @@ namespace vkr {
 		vkc::flushCommandBuffer(device, copyCmd, cp->command_pool, copyQueue, true);
 		qctx->free_cmd_pool(cp);
 #endif
-	}
+}
 	void dvk_buffer::setDesType(uint32_t dt)
 	{
 		dtype = (VkDescriptorType)dt;
@@ -15894,7 +15898,7 @@ namespace vkr {
 				}
 
 			} while (0);
-		}
+	}
 #else
 		{
 			// 等待GPU返回
@@ -17525,7 +17529,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-			}
+				}
 
 			// Render skydome
 			{
@@ -17603,7 +17607,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-		}
+			}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -17817,8 +17821,8 @@ namespace vkr {
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
-			}
 		}
+	}
 
 		// submit command buffer
 		{
@@ -17947,7 +17951,7 @@ namespace vkr {
 		}
 #endif
 
-	}
+}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
 		_fbo.fence = p->_fence;
@@ -18305,7 +18309,7 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 0;//scene.value("intensity", 1.0f);
+				l.m_intensity = 10.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;

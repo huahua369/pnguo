@@ -133,10 +133,8 @@ vec4 getPixelColor(VS2PS Input)
 
 // Find the normal for this fragment, pulling either from a predefined normal map
 // or from the interpolated mesh normal and tangent attributes.
-vec3 getPixelNormal(VS2PS Input)
+vec3 getPixelNormal(VS2PS Input, vec2 UV)
 {
-	vec2 UV = getNormalUV(Input);
-
 	// Retrieve the tangent space matrix
 #ifndef ID_TANGENT
 	vec3 pos_dx = dFdx(Input.WorldPos);
@@ -171,13 +169,66 @@ vec3 getPixelNormal(VS2PS Input)
 
 	return n;
 }
+vec3 getPixelNormal(VS2PS Input)
+{
+	vec2 UV = getNormalUV(Input);
+	return getPixelNormal(Input, UV);
+}
+void get_tangent(VS2PS Input, vec2 uv, out vec3 tangent, out vec3 binormal)
+{
+#ifndef ID_TANGENT
+	vec3 pos_dx = dFdx(Input.WorldPos);
+	vec3 pos_dy = dFdy(Input.WorldPos);
+	vec3 tex_dx = dFdx(vec3(uv, 0.0));
+	vec3 tex_dy = dFdy(vec3(uv, 0.0));
+	vec3 t = (tex_dy.y * pos_dx - tex_dx.y * pos_dy) / (tex_dx.x * tex_dy.y - tex_dy.x * tex_dx.y);
+
+#ifdef ID_NORMAL
+	vec3 ng = normalize(Input.Normal);
+#else
+	vec3 ng = cross(pos_dx, pos_dy);
+#endif
+
+	t = normalize(t - ng * dot(ng, t));
+	vec3 b = normalize(cross(ng, t));
+	//mat3 tbn = mat3(t, b, ng);
+	tangent = t; binormal = b;
+#else  
+	tangent = Input.Tangent;
+	binormal = Input.Binormal;
+#endif
+}
 
 // 内部pbr用
 
-struct gPbrMaterial
+struct MaterialInfo
 {
-	vec3  baseColor;  // base color
-	float opacity;    // 1 = opaque, 0 = fully transparent
+	vec4 baseColor;
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+	float alpha;
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	vec3 specularColor;           // color contribution from specular lighting
+
+};
+struct gpuMaterial
+{
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+	float alpha;
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	//vec3 specularColor;           // color contribution from specular lighting
+
+
+	vec4  baseColor;  // base color 
 	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
 	float metallic;   // 0 = dielectric, 1 = metallic
 	vec3  emissive;   // emissive color
@@ -209,6 +260,7 @@ struct gPbrMaterial
 
 	vec3  sheenColor;
 	float sheenRoughness;
+	float ao;
 };
 #ifdef __cplusplus
 #ifndef OUT_TYPE
@@ -230,11 +282,10 @@ void orthonormalBasis(vec3 normal, OUT_TYPE(vec3) tangent, OUT_TYPE(vec3) bitang
 	tangent = vec3(1.0F - normal.x * normal.x * a, b, -normal.x);
 	bitangent = vec3(b, 1.0f - normal.y * normal.y * a, -normal.y);
 }
-gPbrMaterial defaultPbrMaterial()
+gpuMaterial defaultPbrMaterial()
 {
-	gPbrMaterial mat;
-	mat.baseColor = vec3(1.0F);
-	mat.opacity = 1.0F;
+	gpuMaterial mat;
+	mat.baseColor = vec4(1.0F);
 	mat.roughness = vec2(1.0F);
 	mat.metallic = 1.0F;
 	mat.emissive = vec3(0.0F);
@@ -265,14 +316,14 @@ gPbrMaterial defaultPbrMaterial()
 
 	mat.sheenColor = vec3(0.0F);
 	mat.sheenRoughness = 0.0F;
-
+	mat.ao = 0;
 	return mat;
 }
 
-gPbrMaterial defaultPbrMaterial(vec3 baseColor, float metallic, float roughness, vec3 N, vec3 Ng)
+gpuMaterial defaultPbrMaterial(vec3 baseColor, float metallic, float roughness, vec3 N, vec3 Ng)
 {
-	gPbrMaterial mat = defaultPbrMaterial();
-	mat.baseColor = baseColor;
+	gpuMaterial mat = defaultPbrMaterial();
+	mat.baseColor = vec4(baseColor, 1.0f);
 	mat.metallic = metallic;
 	mat.roughness = vec2(roughness * roughness);
 	mat.Ng = Ng;
@@ -380,7 +431,7 @@ struct pbrMaterial
 	//int   specularColorTexture;  
 
 	// KHR_materials_iridescence
-	float iridescenceFactor;            
+	float iridescenceFactor;
 	//int   iridescenceTexture;         
 	float iridescenceThicknessMinimum;  // 100
 	float iridescenceThicknessMaximum;  // 400
@@ -405,23 +456,23 @@ struct pbrMaterial
 
 
 
-vec4 getBaseColor(VS2PS Input)
+vec4 getBaseColor(VS2PS Input, vec2 uv)
 {
 	vec4 baseColor = vec4(0.0, 0.0, 0.0, 1.0);
 #ifdef MATERIAL_SPECULARGLOSSINESS
-	baseColor = getDiffuseTexture(Input);
+	baseColor = getDiffuseTexture(Input, uv);
 #endif
 
 #ifdef MATERIAL_METALLICROUGHNESS
 	// The albedo may be defined from a base texture or a flat color
-	baseColor = getBaseColorTexture(Input);
+	baseColor = getBaseColorTexture(Input, uv);
 #endif
 	return baseColor;
 }
 
-vec4 getBaseColor(VS2PS Input, pbrMaterial params)
+vec4 getBaseColor2(VS2PS Input, pbrMaterial params, vec2 uv)
 {
-	vec4 baseColor = getBaseColor(Input);
+	vec4 baseColor = getBaseColor(Input, uv);
 
 #ifdef MATERIAL_SPECULARGLOSSINESS
 	baseColor *= params.pbrDiffuseFactor;
@@ -437,7 +488,12 @@ vec4 getBaseColor(VS2PS Input, pbrMaterial params)
 
 void discardPixelIfAlphaCutOff(VS2PS Input)
 {
-	vec4 baseColor = getBaseColor(Input);
+#ifdef ID_TEXCOORD_0
+	vec2 uv = Input.UV0;
+#else
+	vec2 uv = vec2(0.0, 0.0);
+#endif
+	vec4 baseColor = getBaseColor(Input, uv);
 
 #if defined(DEF_alphaMode_BLEND)
 	if (baseColor.a == 0)
@@ -450,7 +506,239 @@ void discardPixelIfAlphaCutOff(VS2PS Input)
 #endif
 }
 
-void getPBRParams(VS2PS Input, pbrMaterial params, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha, out vec4 baseColor)
+struct MeshState
+{
+	vec3 N;   // Normal
+	vec3 T;   // Tangent
+	vec3 B;   // Bitangent
+	vec3 Ng;  // Geometric normal
+	vec2 tc;  // Texture coordinates
+	float emissiveFactor;
+	bool isInside;
+};
+#define MICROFACET_MIN_ROUGHNESS 0.0014142f
+
+//-----------------------------------------------------------------------
+
+//void getPBRParams(VS2PS Input, pbrMaterial params, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha, out vec4 baseColor)
+void getPBRParams(VS2PS Input, pbrMaterial material, vec2 uv, out gpuMaterial m)
+{
+
+	MeshState mesh;
+	mesh.N = getPixelNormal(Input, uv);
+	mesh.Ng = mesh.N;
+	get_tangent(Input, uv, mesh.T, mesh.B);
+	mesh.tc = uv;
+	mesh.isInside = false;
+	mesh.emissiveFactor = myPerFrame.u_EmissiveFactor;
+	// KHR_texture_transform
+#ifdef __cplusplus
+	vec2 texCoord = vec2(vec4(mesh.tc, 1, 1) * material.uvTransform);
+#else
+	vec2 texCoord = vec2(vec3(mesh.tc, 1) * material.uvTransform);
+#endif 
+	uv = texCoord;
+	// Metallic and Roughness material properties are packed together
+	// In glTF, these factors can be specified by fixed scalar values
+	// or from a metallic-roughness map
+	m.alpha = 0.0;
+	m.perceptualRoughness = 0.0;
+	m.diffuseColor = vec3(0.0, 0.0, 0.0);
+	m.specularColor = vec3(0.0, 0.0, 0.0);
+	float metallic = 0.0;
+	vec3 f0 = vec3(0.04, 0.04, 0.04);
+
+	m.baseColor = getBaseColor2(Input, material, texCoord);
+	m.alpha = m.baseColor.a;
+
+#ifdef MATERIAL_SPECULARGLOSSINESS
+	vec4 sgSample = getSpecularGlossinessTexture(Input, texCoord);
+	m.perceptualRoughness = (1.0 - sgSample.a * material.glossinessFactor); // glossiness to roughness
+	f0 = sgSample.rgb * material.pbrSpecularFactor; // specular
+
+	// f0 = specular
+	m.specularColor = f0;
+	float oneMinusSpecularStrength = 1.0 - max(max(f0.r, f0.g), f0.b);
+	m.diffuseColor = m.baseColor.rgb * oneMinusSpecularStrength;
+
+#ifdef DEBUG_METALLIC
+	// do conversion between metallic M-R and S-G metallic
+	metallic = solveMetallic(m.baseColor.rgb, m.specularColor, oneMinusSpecularStrength);
+#endif // ! DEBUG_METALLIC
+#endif // ! MATERIAL_SPECULARGLOSSINESS
+
+#ifdef MATERIAL_METALLICROUGHNESS
+	// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
+	// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
+	vec4 mrSample = getMetallicRoughnessTexture(Input, texCoord);
+	m.perceptualRoughness = mrSample.g * material.roughnessFactor;
+	metallic = mrSample.b * material.metallicFactor;
+
+	m.diffuseColor = m.baseColor.rgb * (vec3(1.0, 1.0, 1.0) - f0) * (1.0 - metallic);
+	m.specularColor = mix(f0, m.baseColor.rgb, metallic);
+#endif // ! MATERIAL_METALLICROUGHNESS
+
+	m.perceptualRoughness = clamp(m.perceptualRoughness, 0.0f, 1.0f);
+	// Metallic-Roughness
+	float roughness = material.roughnessFactor;
+	roughness = max(m.perceptualRoughness, MICROFACET_MIN_ROUGHNESS);
+	m.roughness = vec2(roughness * roughness);  // Square roughness for the microfacet model
+	m.metallic = clamp(metallic, 0.0F, 1.0F);
+
+	// Normal Map
+	vec3 normal = mesh.N;
+	vec3 tangent = mesh.T;
+	vec3 bitangent = mesh.B;
+#ifdef ID_normalTexture
+	//if (material.normalTexture > -1)
+	{
+		mat3 tbn = mat3(mesh.T, mesh.B, mesh.N);
+		vec3 normal_vector = getPixelNormal(Input, texCoord);
+		normal_vector = normal_vector * 2.0F - 1.0F;
+		normal_vector *= vec3(material.normalTextureScale, material.normalTextureScale, 1.0F);
+		normal = normalize(tbn * normal_vector);
+	}
+#endif // ID_normalTexture
+	// We should always have B = cross(N, T) * bitangentSign. Orthonormalize,
+	// in case the normal was changed or the input wasn't orthonormal:
+	m.N = normal;
+	m.B = cross(m.N, tangent);
+	float bitangentSign = sign(dot(bitangent, m.B));
+	m.B = normalize(m.B) * bitangentSign;
+	m.T = normalize(cross(m.B, m.N)) * bitangentSign;
+	m.Ng = mesh.Ng;
+
+	// Emissive term
+	vec3 emissive = material.emissiveFactor * mesh.emissiveFactor;
+#ifdef ID_emissiveTexture
+	emissive *= texture(u_EmissiveSampler, texCoord).rgb;
+#endif 
+	m.emissive = max(vec3(0.0F), emissive);
+
+	// KHR_materials_specular
+	// https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_specular
+	m.specularColor = material.specularColorFactor;
+#ifdef ID_specularColorTexture  
+	m.specularColor *= texture(u_specularColorTexture, texCoord).rgb;
+#endif 
+	m.specular = material.specularFactor;
+#ifdef ID_specularTexture  
+	m.specular *= texture(u_specularTexture, texCoord).a;
+#endif
+
+	// Dielectric Specular
+	float ior1 = 1.0F;                                   // IOR of the current medium (e.g., air)
+	float ior2 = material.ior;                           // IOR of the material
+	if (mesh.isInside && (material.thicknessFactor > 0))  // If the material is thin-walled, we don't need to consider the inside IOR.
+	{
+		ior1 = material.ior;
+		ior2 = 1.0F;
+	}
+	m.ior1 = ior1;
+	m.ior2 = ior2;
+
+
+	// KHR_materials_transmission
+	m.transmission = material.transmissionFactor;
+#ifdef ID_transmissionTexture  
+	m.transmission *= texture(u_transmissionTexture, texCoord).r;
+#endif
+	// KHR_materials_volume
+	m.attenuationColor = material.attenuationColor;
+	m.attenuationDistance = material.attenuationDistance;
+	m.thickness = material.thicknessFactor;
+#ifdef ID_thicknessTexture  
+	m.thickness *= texture(u_thicknessTexture, texCoord).r;
+#endif
+
+	// KHR_materials_clearcoat
+	m.clearcoat = material.clearcoatFactor;
+	m.clearcoatRoughness = material.clearcoatRoughness;
+	m.Nc = m.N;
+#ifdef ID_clearcoatTexture
+	m.clearcoat *= texture(u_clearcoatTexture, texCoord).r;
+#endif
+
+#ifdef ID_clearcoatRoughnessTexture
+	m.clearcoatRoughness *= texture(u_clearcoatRoughnessTexture, texCoord).g;
+#endif
+	m.clearcoatRoughness = max(m.clearcoatRoughness, 0.001F);
+
+#ifdef ID_clearcoatNormalTexture 
+	mat3 tbn = mat3(m.T, m.B, m.Nc);
+	vec3 normal_vector = texture(u_clearcoatNormalTexture, texCoord).xyz;
+	normal_vector = normal_vector * 2.0F - 1.0F;
+	m.Nc = normalize(tbn * normal_vector);
+#endif
+
+	// Iridescence
+	float iridescence = material.iridescenceFactor;
+#ifdef ID_iridescenceTexture 
+	iridescence *= texture(u_iridescenceTexture, texCoord).x;
+#endif
+	float iridescenceThickness = material.iridescenceThicknessMaximum;
+#ifdef ID_iridescenceThicknessTexture
+	const float t = texture(u_iridescenceThicknessTexture, texCoord).y;
+	iridescenceThickness = mix(material.iridescenceThicknessMinimum, material.iridescenceThicknessMaximum, t);
+#endif
+	m.iridescence = (iridescenceThickness > 0.0f) ? iridescence : 0.0f;  // No iridescence when the thickness is zero.
+	m.iridescenceIor = material.iridescenceIor;
+	m.iridescenceThickness = iridescenceThickness;
+
+	// KHR_materials_anisotropy
+	float anisotropyStrength = material.anisotropyStrength;
+	vec2  anisotropyDirection = vec2(1.0f, 0.0f);  // By default the anisotropy strength is along the tangent.
+#ifdef ID_anisotropyTexture 
+	const vec4 anisotropyTex = texture(u_anisotropyTexture, texCoord);
+	// .xy encodes the direction in (tangent, bitangent) space. Remap from [0, 1] to [-1, 1].
+	anisotropyDirection = normalize(vec2(anisotropyTex) * 2.0f - 1.0f);
+	// .z encodes the strength in range [0, 1].
+	anisotropyStrength *= anisotropyTex.z;
+#endif
+
+	// If the anisotropyStrength == 0.0f (default), the roughness is isotropic.
+	// No need to rotate the anisotropyDirection or tangent space.
+	if (anisotropyStrength > 0.0F)
+	{
+		m.roughness.x = mix(m.roughness.y, 1.0f, anisotropyStrength * anisotropyStrength);
+
+		const float s = sin(material.anisotropyRotation);  // FIXME PERF Precalculate sin, cos on host.
+		const float c = cos(material.anisotropyRotation);
+
+		anisotropyDirection =
+			vec2(c * anisotropyDirection.x + s * anisotropyDirection.y, c * anisotropyDirection.y - s * anisotropyDirection.x);
+
+		const vec3 T_aniso = m.T * anisotropyDirection.x + m.B * anisotropyDirection.y;
+
+		m.B = normalize(cross(m.N, T_aniso));
+		m.T = cross(m.B, m.N);
+	}
+
+
+	// KHR_materials_sheen
+	vec3 sheenColor = material.sheenColorFactor;
+#ifdef ID_sheenColorTexture 
+	sheenColor *= vec3(texture(u_sheenColorTexture, texCoord));  // sRGB
+#endif
+	m.sheenColor = sheenColor;  // No sheen if this is black.
+
+	float sheenRoughness = material.sheenRoughnessFactor;
+#ifdef ID_sheenRoughnessTexture 
+	sheenRoughness *= texture(u_sheenRoughnessTexture, texCoord).w;
+#endif
+	sheenRoughness = max(MICROFACET_MIN_ROUGHNESS, sheenRoughness);
+	m.sheenRoughness = sheenRoughness;
+
+#ifdef ID_occlusionTexture
+	m.ao = texture(u_OcclusionSampler, texCoord).r;
+#else
+	m.ao = 1;
+#endif
+
+}
+
+//PBRFactors
+void getPBRParams_old(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha)
 {
 	// Metallic and Roughness material properties are packed together
 	// In glTF, these factors can be specified by fixed scalar values
@@ -462,10 +750,10 @@ void getPBRParams(VS2PS Input, pbrMaterial params, out vec3 diffuseColor, out ve
 	float metallic = 0.0;
 	vec3 f0 = vec3(0.04, 0.04, 0.04);
 
-	baseColor = getBaseColor(Input, params);
+	vec4 baseColor = getBaseColor2(Input, params, uv);
 
 #ifdef MATERIAL_SPECULARGLOSSINESS
-	vec4 sgSample = getSpecularGlossinessTexture(Input);
+	vec4 sgSample = getSpecularGlossinessTexture(Input, uv);
 	perceptualRoughness = (1.0 - sgSample.a * params.glossinessFactor); // glossiness to roughness
 	f0 = sgSample.rgb * params.pbrSpecularFactor; // specular
 
@@ -483,14 +771,13 @@ void getPBRParams(VS2PS Input, pbrMaterial params, out vec3 diffuseColor, out ve
 #ifdef MATERIAL_METALLICROUGHNESS
 	// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
 	// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
-	vec4 mrSample = getMetallicRoughnessTexture(Input);
+	vec4 mrSample = getMetallicRoughnessTexture(Input, uv);
 	perceptualRoughness = mrSample.g * params.roughnessFactor;
 	metallic = mrSample.b * params.metallicFactor;
 
 	diffuseColor = baseColor.rgb * (vec3(1.0, 1.0, 1.0) - f0) * (1.0 - metallic);
 	specularColor = mix(f0, baseColor.rgb, metallic);
 #endif // ! MATERIAL_METALLICROUGHNESS
-
 
 	perceptualRoughness = clamp(perceptualRoughness, 0.0f, 1.0f);
 
