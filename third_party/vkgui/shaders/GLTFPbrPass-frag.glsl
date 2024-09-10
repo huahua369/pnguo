@@ -95,7 +95,7 @@ layout (scalar, set=0, binding = 0) uniform perFrame
 // PerFrame structure, must match the one in GltfPbrPass.h
 //--------------------------------------------------------------------------------------
 
-#include "PixelParams.glsl"
+#include "PixelParams.h"
 
 layout (scalar, set=0, binding = 1) uniform perObject 
 {

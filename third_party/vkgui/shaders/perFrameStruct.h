@@ -30,10 +30,10 @@ struct Light
     mat4          mLightView;
 
     vec3          direction;
-    float         range;
+    float         range;            // 方向光的角度大小，聚光灯和点光源为 1/范围
 
     vec3          color;
-    float         intensity;
+    float         intensity;        // 光照度
     vec3          position;
     // spot
     float         innerConeCos;

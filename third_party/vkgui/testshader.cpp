@@ -8,7 +8,7 @@ KHR_materials_volume ：体积扩展使网格表面能够充当体积之间的�
 KHR_materials_specular ：镜面属性是一个对象的类似镜子的属性：它有规律地反射光线的能力，创建其他对象的相干反射。
 						与其前身 KHR_materials_pbrSpecularGlossiness 不同，这个新的镜面反射扩展在 glTF 的 PBR 材料模型核心的现代金属/粗糙度工作流程中运行，使彩色镜面高光与高级 PBR 材料扩展阵列兼容。
 */
-#define PT_CPP
+
 using namespace glm;
 
 #ifndef M_PI
@@ -42,7 +42,7 @@ inline T fwidth(const T& x)
 #include "shaders/GLTF_VS2PS_IO.glsl"
 #include "shaders/perFrameStruct.h"
 #include "shaders/shadowFiltering.h"
-#include "shaders/PixelParams.glsl"
+#include "shaders/PixelParams.h"
 #include "shaders/GLTFPBRLighting.h"
 #include "shaders/skinning.h"
 

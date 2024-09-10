@@ -151,12 +151,12 @@ vec3 getPointShade(vec3 pointToLight, MaterialInfo materialInfo, vec3 normal, ve
 		float D = microfacetDistribution(materialInfo, angularInfo);
 
 		// Calculation of analytical lighting contribution
-#ifndef PT_CPP
+#ifndef __cplusplus
 		vec3 diffuseContrib = (1.0 - F) * diffuse(materialInfo);
 #else
 		vec3 f1 = vec3(1, 1, 1) - F;
 		vec3 diffuseContrib = f1 * diffuse(materialInfo);
-#endif // PT_CPP
+#endif // __cplusplus
 
 		vec3 specContrib = F * Vis * D;
 
@@ -273,7 +273,7 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
-#ifdef PT_CPP
+#ifdef __cplusplus
 	PBRFactors u_pbrParams = {};
 	auto myPerFrame = perFrame;
 #endif
@@ -308,7 +308,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	vec3 color = vec3(0.0, 0.0, 0.0);
 	vec3 normal = getPixelNormal(Input);
 	vec3 worldPos = Input.WorldPos;
-#ifdef PT_CPP
+#ifdef __cplusplus
 	vec3 cpos = myPerFrame.u_CameraPos;
 	vec3 view = normalize(cpos - worldPos);
 #else
@@ -359,12 +359,12 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 
 	vec3 emissive = vec3(0);
 #ifdef ID_emissiveTexture
-	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.myPerObject_u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
+	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
 #else
-#ifdef PT_CPP
-	emissive = u_pbrParams.myPerObject_u_EmissiveFactor;
+#ifdef __cplusplus
+	emissive = u_pbrParams.u_EmissiveFactor;
 #else
-	emissive = u_pbrParams.myPerObject_u_EmissiveFactor.xyz;
+	emissive = u_pbrParams.u_EmissiveFactor.xyz;
 #endif
 	emissive *= myPerFrame.u_EmissiveFactor;
 #endif
