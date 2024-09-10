@@ -29,7 +29,7 @@ set(Shaders_PostProc_src
 set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-frag.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-vert.glsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTF_VS2PS_IO.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTF_VS2PS_IO.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPBRLighting.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFDepthPass-frag.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFDepthPass-vert.glsl

@@ -11,12 +11,18 @@ KHR_materials_specular ：镜面属性是一个对象的类似镜子的属性：
 
 using namespace glm;
 
+using glm::vec2;
+using glm::vec3;
+using glm::vec4;
+using glm::mat3x4;
+
 #ifndef M_PI
 #define M_PI00 3.14159265358979323846
 #endif // !M_PI
 #define out
 #define MAX_LIGHT_INSTANCES  32
 #define ID_TEXCOORD_0  1
+#define ID_TEXCOORD_1  2
 #define ID_baseTexCoord  0
 
 glm::vec3 px(const glm::vec2& pss) {
@@ -41,7 +47,7 @@ inline T fwidth(const T& x)
 }
 
 #include "shaders/functions.h"
-#include "shaders/GLTF_VS2PS_IO.glsl"
+#include "shaders/GLTF_VS2PS_IO.h"
 #include "shaders/perFrameStruct.h"
 #include "shaders/shadowFiltering.h"
 #include "shaders/PixelParams.h"

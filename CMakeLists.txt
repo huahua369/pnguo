@@ -70,7 +70,6 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 #设置库文件输出目录
 set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
    
-
 #set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
 #set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
 #message("sdl ${SDL3_DIR}")
