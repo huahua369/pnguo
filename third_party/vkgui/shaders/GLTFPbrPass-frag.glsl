@@ -102,7 +102,8 @@ layout (scalar, set=0, binding = 1) uniform perObject
     mat4 myPerObject_u_mCurrWorld;
     mat4 myPerObject_u_mPrevWorld;
 
-	PBRFactors u_pbrParams;
+	//PBRFactors u_pbrParams;
+	pbrMaterial u_pbrParams;
 };
 
 

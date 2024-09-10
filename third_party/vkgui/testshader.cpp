@@ -16,6 +16,8 @@ using namespace glm;
 #endif // !M_PI
 #define out
 #define MAX_LIGHT_INSTANCES  32
+#define ID_TEXCOORD_0  1
+#define ID_baseTexCoord  0
 
 glm::vec3 px(const glm::vec2& pss) {
 	return vec3(pss, 0.0);// 读坐标像素
@@ -50,4 +52,4 @@ vec2 testshader() {
 	vec2 k = {};
 
 	return k;
-}
+} 

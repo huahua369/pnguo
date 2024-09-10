@@ -141,15 +141,15 @@ vec2 getOcclusionUV(VS2PS Input)
 vec2 getBaseColorUV(VS2PS Input)
 {
     vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+    return uv;
+#else
 #ifdef ID_baseTexCoord
     uv.xy = TEXCOORD(ID_baseTexCoord);
     #ifdef HAS_BASECOLOR_UV_TRANSFORM
     uv *= u_BaseColorUVTransform;
     #endif
 #endif
-#ifdef __cplusplus
-    return uv;
-#else
     return uv.xy;
 #endif
 }
@@ -157,15 +157,15 @@ vec2 getBaseColorUV(VS2PS Input)
 vec2 getMetallicRoughnessUV(VS2PS Input)
 {
     vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+    return uv;
+#else
 #ifdef ID_metallicRoughnessTexCoord
     uv.xy = TEXCOORD(ID_metallicRoughnessTexCoord);
     #ifdef HAS_METALLICROUGHNESS_UV_TRANSFORM
     uv *= u_MetallicRoughnessUVTransform;
     #endif
 #endif
-#ifdef __cplusplus
-    return uv;
-#else
     return uv.xy;
 #endif 
 }
@@ -173,15 +173,15 @@ vec2 getMetallicRoughnessUV(VS2PS Input)
 vec2 getSpecularGlossinessUV(VS2PS Input)
 {
     vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+    return uv;
+#else
 #ifdef ID_specularGlossinessTexture
     uv.xy = TEXCOORD(ID_specularGlossinessTexCoord);
     #ifdef HAS_SPECULARGLOSSINESS_UV_TRANSFORM
     uv *= u_SpecularGlossinessUVTransform;
     #endif
 #endif
-#ifdef __cplusplus
-    return uv;
-#else
     return uv.xy;
 #endif
 }
@@ -189,15 +189,15 @@ vec2 getSpecularGlossinessUV(VS2PS Input)
 vec2 getDiffuseUV(VS2PS Input)
 {
     vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+    return uv;
+#else
 #ifdef ID_diffuseTexture
     uv.xy = TEXCOORD(ID_diffuseTexCoord);
     #ifdef HAS_DIFFUSE_UV_TRANSFORM
     uv *= u_DiffuseUVTransform;
     #endif
 #endif
-#ifdef __cplusplus
-    return uv;
-#else
     return uv.xy;
 #endif
 }
@@ -205,30 +205,30 @@ vec2 getDiffuseUV(VS2PS Input)
 vec2 getTransmissionUV(VS2PS Input)
 {
     vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+    return uv;
+#else
 #ifdef ID_transmissionTexture
     uv.xy = TEXCOORD(ID_transmissionTexCoord);
     #ifdef HAS_TRANSMISSION_UV_TRANSFORM
     uv *= u_transmissionUVTransform;
     #endif
 #endif
-#ifdef __cplusplus
-    return uv;
-#else
     return uv.xy;
 #endif
 }
 vec2 getThicknessUV(VS2PS Input)
 {
     vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+    return uv;
+#else
 #ifdef ID_thicknessTexture
     uv.xy = TEXCOORD(ID_thicknessTexCoord);
     #ifdef HAS_VOLUME_UV_TRANSFORM
     uv *= u_volumeUVTransform;
     #endif
 #endif
-#ifdef __cplusplus
-    return uv;
-#else
     return uv.xy;
 #endif
 }

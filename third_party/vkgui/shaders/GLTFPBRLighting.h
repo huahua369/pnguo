@@ -42,7 +42,7 @@ struct MaterialInfo
 	vec3 reflectance90;           // reflectance color at grazing angle
 	vec3 specularColor;           // color contribution from specular lighting
 
-	vec4 baseColor; 
+	vec4 baseColor;
 };
 
 //
@@ -274,7 +274,7 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
 #ifdef __cplusplus
-	PBRFactors u_pbrParams = {};
+	pbrMaterial u_pbrParams = {};
 	auto myPerFrame = perFrame;
 #endif
 #ifdef MATERIAL_UNLIT
@@ -319,9 +319,20 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	if (dot(normal, view) < 0)
 	{
 		normal = -normal;
-}
+	}
 #endif
 
+	// Calculate lighting contribution from image based lighting source (IBL)
+#ifdef USE_IBL
+	color += getIBLContribution(materialInfo, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
+#endif
+
+	float ao = 1.0;
+	// Apply optional PBR terms for additional (optional) shading
+#ifdef ID_occlusionTexture
+	ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
+	color = color * ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
+#endif
 #ifdef USE_PUNCTUAL
 	for (int i = 0; i < myPerFrame.u_lightCount; ++i)
 	{
@@ -345,28 +356,12 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, vec3 diffuseColor, vec3 specu
 	}
 #endif
 
-	// Calculate lighting contribution from image based lighting source (IBL)
-#ifdef USE_IBL
-	color += getIBLContribution(materialInfo, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
-#endif
-
-	float ao = 1.0;
-	// Apply optional PBR terms for additional (optional) shading
-#ifdef ID_occlusionTexture
-	ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
-	color = color * ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
-#endif
 
 	vec3 emissive = vec3(0);
 #ifdef ID_emissiveTexture
-	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.u_EmissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
-#else
-#ifdef __cplusplus
-	emissive = u_pbrParams.u_EmissiveFactor;
-#else
-	emissive = u_pbrParams.u_EmissiveFactor.xyz;
-#endif
-	emissive *= myPerFrame.u_EmissiveFactor;
+	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.u_EmissiveFactor * myPerFrame.u_EmissiveFactor;
+#else 
+	emissive = u_pbrParams.emissiveFactor * myPerFrame.u_EmissiveFactor;
 #endif
 	color += emissive;
 
