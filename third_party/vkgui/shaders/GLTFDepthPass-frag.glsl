@@ -28,7 +28,7 @@ precision highp float;
 // I/O Structures
 //--------------------------------------------------------------------------------------
 
-#include "GLTF_VS2PS_IO.glsl"
+#include "GLTF_VS2PS_IO.h"
 layout (location = 0) in VS2PS Input;
 
 #include "perFrameStruct.h"
@@ -39,7 +39,8 @@ PerFrame myPerFrame;
 // Texture definitions
 //--------------------------------------------------------------------------------------
 
-#include "PixelParams.glsl"
+#include "PBRTextures.h" 
+#include "PixelParams.h"
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader

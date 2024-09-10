@@ -47,7 +47,7 @@ precision highp float;
 //  PS Inputs
 //--------------------------------------------------------------------------------------
 
-#include "GLTF_VS2PS_IO.glsl"
+#include "GLTF_VS2PS_IO.h"
 layout (location = 0) in VS2PS Input;
 
 //--------------------------------------------------------------------------------------
@@ -94,7 +94,8 @@ layout (scalar, set=0, binding = 0) uniform perFrame
 //--------------------------------------------------------------------------------------
 // PerFrame structure, must match the one in GltfPbrPass.h
 //--------------------------------------------------------------------------------------
-
+ 
+#include "PBRTextures.h" 
 #include "PixelParams.h"
 
 layout (scalar, set=0, binding = 1) uniform perObject 

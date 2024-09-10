@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "PBRTextures.h"
 
 #ifdef MATERIAL_IRIDESCENCE
 // XYZ to sRGB color space
@@ -175,7 +174,7 @@ vec3 getPixelNormal(VS2PS Input)
 
 // 内部pbr用
 
-struct PbrMaterial
+struct gPbrMaterial
 {
 	vec3  baseColor;  // base color
 	float opacity;    // 1 = opaque, 0 = fully transparent
@@ -231,9 +230,9 @@ void orthonormalBasis(vec3 normal, OUT_TYPE(vec3) tangent, OUT_TYPE(vec3) bitang
 	tangent = vec3(1.0F - normal.x * normal.x * a, b, -normal.x);
 	bitangent = vec3(b, 1.0f - normal.y * normal.y * a, -normal.y);
 }
-PbrMaterial defaultPbrMaterial()
+gPbrMaterial defaultPbrMaterial()
 {
-	PbrMaterial mat;
+	gPbrMaterial mat;
 	mat.baseColor = vec3(1.0F);
 	mat.opacity = 1.0F;
 	mat.roughness = vec2(1.0F);
@@ -270,9 +269,9 @@ PbrMaterial defaultPbrMaterial()
 	return mat;
 }
 
-PbrMaterial defaultPbrMaterial(vec3 baseColor, float metallic, float roughness, vec3 N, vec3 Ng)
+gPbrMaterial defaultPbrMaterial(vec3 baseColor, float metallic, float roughness, vec3 N, vec3 Ng)
 {
-	PbrMaterial mat = defaultPbrMaterial();
+	gPbrMaterial mat = defaultPbrMaterial();
 	mat.baseColor = baseColor;
 	mat.metallic = metallic;
 	mat.roughness = vec2(roughness * roughness);

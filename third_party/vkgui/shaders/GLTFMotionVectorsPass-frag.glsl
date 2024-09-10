@@ -29,14 +29,15 @@ precision highp float;
 // I/O Structures
 //--------------------------------------------------------------------------------------
 
-#include "GLTF_VS2PS_IO.glsl"
+#include "GLTF_VS2PS_IO.h"
 layout (location = 0) in VS2PS Input;
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-
-#include "PixelParams.glsl"
+ 
+#include "PBRTextures.h" 
+#include "PixelParams.h"
 
 #ifdef HAS_MOTION_VECTORS
     layout (location = HAS_MOTION_VECTORS) out vec2 motionVect;

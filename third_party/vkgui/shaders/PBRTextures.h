@@ -98,15 +98,15 @@ layout(set = 1, binding = ID_thicknessTexture) uniform sampler2D u_thicknessSamp
 vec2 getNormalUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+	return uv;
+#else
 #ifdef ID_normalTexCoord
 	uv.xy = TEXCOORD(ID_normalTexCoord);
 #ifdef HAS_NORMAL_UV_TRANSFORM
 	uv *= u_NormalUVTransform;
 #endif
 #endif
-#ifdef __cplusplus
-	return uv;
-#else
 	return uv.xy;
 #endif
 }
@@ -114,15 +114,15 @@ vec2 getNormalUV(VS2PS Input)
 vec2 getEmissiveUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+	return uv;
+#else
 #ifdef ID_emissiveTexCoord
 	uv.xy = TEXCOORD(ID_emissiveTexCoord);
 #ifdef HAS_EMISSIVE_UV_TRANSFORM
 	uv *= u_EmissiveUVTransform;
 #endif
 #endif
-#ifdef __cplusplus
-	return uv;
-#else
 	return uv.xy;
 #endif
 }
@@ -130,15 +130,15 @@ vec2 getEmissiveUV(VS2PS Input)
 vec2 getOcclusionUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+	return uv;
+#else
 #ifdef ID_occlusionTexCoord
 	uv.xy = TEXCOORD(ID_occlusionTexCoord);
 #ifdef HAS_OCCLSION_UV_TRANSFORM
 	uv *= u_OcclusionUVTransform;
 #endif
 #endif
-#ifdef __cplusplus
-	return uv;
-#else
 	return uv.xy;
 #endif
 }

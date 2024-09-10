@@ -23,7 +23,7 @@ using glm::mat3x4;
 #define MAX_LIGHT_INSTANCES  32
 #define ID_TEXCOORD_0  1
 #define ID_TEXCOORD_1  2
-#define ID_baseTexCoord  0
+//#define ID_baseTexCoord  0
 
 glm::vec3 px(const glm::vec2& pss) {
 	return vec3(pss, 0.0);// 读坐标像素
@@ -50,6 +50,7 @@ inline T fwidth(const T& x)
 #include "shaders/GLTF_VS2PS_IO.h"
 #include "shaders/perFrameStruct.h"
 #include "shaders/shadowFiltering.h"
+#include "shaders/PBRTextures.h"
 #include "shaders/PixelParams.h"
 #include "shaders/GLTFPBRLighting.h"
 #include "shaders/skinning.h"
