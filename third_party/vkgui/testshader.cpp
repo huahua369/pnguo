@@ -9,7 +9,7 @@ KHR_materials_specular ：镜面属性是一个对象的类似镜子的属性：
 						与其前身 KHR_materials_pbrSpecularGlossiness 不同，这个新的镜面反射扩展在 glTF 的 PBR 材料模型核心的现代金属/粗糙度工作流程中运行，使彩色镜面高光与高级 PBR 材料扩展阵列兼容。
 */
 
-using namespace glm; 
+using namespace glm;
 
 using glm::vec2;
 using glm::vec3;
@@ -102,7 +102,7 @@ vec2 testshader() {
 #define MATERIAL_TRANSMISSION 1
 #define MATERIAL_METALLICROUGHNESS 1
 #define MATERIAL_SPECULARGLOSSINESS 1
-#define USE_IBL 1
+#define US0E_IBL 1
 
 
 #define USE_PUNCTUAL
@@ -132,7 +132,7 @@ PerFrame myPerFrame;
 
 	//PBRFactors u_pbrParams;
 pbrMaterial u_pbrParams;
-
+mat4 myPerObject_u_mCurrWorld;
 
 //--------------------------------------------------------------------------------------
 // mainPS
@@ -153,7 +153,7 @@ void amain()
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif
-	getPBRParams(Input, u_pbrParams, uv, m);
+	getPBRParams(Input, u_pbrParams, m);
 	//getPBRParams(Input, u_pbrParams, diffuseColor, specularColor, perceptualRoughness, alpha, baseColor);
 
 // Roughness is authored as perceptual roughness; as is convention,

@@ -134,14 +134,14 @@ void main()
 			discard;
 	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
-	vec4 color = vec4(c3, m.alpha);
-#if 0
+	vec4 color = vec4(c3, m.baseColor.a);
+#if 1
 	float perceptualRoughness;
 	vec3 diffuseColor;
 	vec3 specularColor;
-	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness);
+	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness); 
 	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame, uv, diffuseColor, specularColor, perceptualRoughness, baseColor), baseColor.a);
-	color.rgb = vec3(color1);
+	color = color1;
 #endif 
 
 

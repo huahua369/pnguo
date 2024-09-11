@@ -372,7 +372,7 @@ vec3 getPunctualRadianceTransmission(vec3 normal, vec3 view, vec3 pointToLight, 
 	return (vec3(1.0) - F) * baseColor * D * Vis;
 }
 
-vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
+vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 {
 	vec3 outColor = vec3(m.baseColor);
 #ifdef __cplusplus
@@ -442,7 +442,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
 		{
 			lc = applySpotLight(light, m, normal, worldPos, view); lc.intensity *= shadowFactor;
 		}
-		c += lc.intensity;
+		color += lc.intensity;
 		//BsdfEvaluateData evalData;
 		//evalData.xi = vec3(0, 0, 0);
 		//evalData.k1 = view;
@@ -482,7 +482,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
 
 #ifndef DEBUG_OUTPUT // no debug 
 	// regular shading
-	outColor = color + c;
+	outColor = color;
 #else // debug output
 
 #ifdef DEBUG_METALLIC

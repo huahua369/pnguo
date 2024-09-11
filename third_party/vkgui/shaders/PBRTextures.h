@@ -75,13 +75,20 @@ layout(set = 1, binding = ID_specularGlossinessTexture) uniform sampler2D u_spec
 #endif
 
 #ifdef USE_IBL
+#ifdef ID_diffuseCube
 layout(set = 1, binding = ID_diffuseCube) uniform samplerCube u_DiffuseEnvSampler;
+#endif
+#ifdef ID_specularCube
 layout(set = 1, binding = ID_specularCube) uniform samplerCube u_SpecularEnvSampler;
+#endif
 #define USE_TEX_LOD
 #endif
 
 #ifdef ID_brdfTexture
 layout(set = 1, binding = ID_brdfTexture) uniform sampler2D u_brdfLUT;
+#endif
+#ifdef ID_CharlieTexture
+layout(set = 1, binding = ID_CharlieTexture) uniform sampler2D u_CharlieLUT;
 #endif
  
 #ifdef ID_specularTexture
@@ -115,12 +122,17 @@ layout(set = 1, binding = ID_anisotropyTexture) uniform sampler2D u_anisotropyTe
 #ifdef ID_sheenColorTexture
 layout(set = 1, binding = ID_sheenColorTexture) uniform sampler2D u_sheenColorTexture;
 #endif
+#ifdef ID_CharlieEnvSampler
+layout(set = 1, binding = ID_CharlieEnvSampler) uniform samplerCube u_CharlieEnvSampler;
+#endif
 #ifdef ID_sheenRoughnessTexture
 layout(set = 1, binding = ID_sheenRoughnessTexture) uniform sampler2D u_sheenRoughnessTexture;
 #endif
 
-  
 
+#ifdef ID_transmissionFramebufferTexture
+layout(set = 1, binding = ID_transmissionFramebufferTexture) uniform sampler2D u_TransmissionFramebufferSampler;
+#endif
 //------------------------------------------------------------
 // UV getters
 //------------------------------------------------------------

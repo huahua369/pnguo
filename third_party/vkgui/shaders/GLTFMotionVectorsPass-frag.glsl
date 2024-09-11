@@ -36,6 +36,9 @@ layout (location = 0) in VS2PS Input;
 // Pixel Shader
 //--------------------------------------------------------------------------------------
  
+#include "perFrameStruct.h"
+ 
+
 #include "PBRTextures.h" 
 #include "functions.h"
 #include "bsdf_functions.h"

@@ -84,16 +84,16 @@ struct MaterialInfo
 };
 struct gpuMaterial
 {
-	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
-	float alpha;
 	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
 
 	vec3 diffuseColor;            // color contribution from diffuse lighting
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
 
 	vec3 reflectance90;           // reflectance color at grazing angle
+	float alpha;
 	vec3 specularColorlight;           // color contribution from specular lighting
-
+	float dispersion;
 
 	vec4  baseColor;  // base color 
 	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
@@ -115,7 +115,6 @@ struct gpuMaterial
 	float ior2;  // index of refraction : the other side (i.e. glass)
 
 	float ior;
-	float perceptualRoughness;      // roughness value, as authored by the model creator (input to shader)
 	vec3 f0_dielectric;
 
 	float specularWeight; // product of specularFactor and specularTexture.a
@@ -143,7 +142,6 @@ struct gpuMaterial
 	float sheenRoughness;
 	float ao;
 
-	float dispersion = 0.0;
 };
 
 //------------------------------------------------------------
@@ -258,10 +256,9 @@ struct pbrMaterial
 	//int   sheenColorTexture;     
 	//int   sheenRoughnessTexture;  
 	//KHR_materials_dispersion
-	float dispersion = 0.0;
+	float dispersion;
 	float p0;
-	float p2;
-	float p1;
+	vec2 transmissionFramebufferSize;
 
 	// KHR_texture_transform
 #ifdef m34

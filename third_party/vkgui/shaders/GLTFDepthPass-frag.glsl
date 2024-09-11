@@ -34,7 +34,7 @@ layout (location = 0) in VS2PS Input;
 #include "perFrameStruct.h"
 
 PerFrame myPerFrame;
-
+ 
 //--------------------------------------------------------------------------------------
 // Texture definitions
 //--------------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ PerFrame myPerFrame;
 //--------------------------------------------------------------------------------------
 
 void main()
-{
+{ 
 	myPerFrame.u_LodBias = 0.0;
 	discardPixelIfAlphaCutOff(Input);
 }
