@@ -975,7 +975,11 @@ namespace vkr {
 		float sheenRoughnessFactor;
 		//int   sheenColorTexture;     
 		//int   sheenRoughnessTexture;  
-
+		//KHR_materials_dispersion
+		float dispersion = 0.0;
+		float p0;
+		float p2;
+		float p1;
 		// KHR_texture_transform 
 		mat3 uvTransform = mat3(1.0);
 
@@ -1077,7 +1081,8 @@ namespace vkr {
 
 		glm::vec4 wireframeOptions;
 		float     lodBias = 0.0f;
-		uint32_t  padding[2];
+		int           useSky = 0;
+		float		  envRotation = 0.0f;
 		uint32_t  lightCount;
 		Light     lights[MaxLightInstances];
 	};
@@ -5590,6 +5595,12 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_ior");
 					if (tt) {
 						tfmat->m_params.ior = tt->Get("ior").GetNumberAsDouble();
+					}
+				}
+				{
+					auto tt = get_ext(extensions, "KHR_materials_dispersion");
+					if (tt) {
+						tfmat->m_params.dispersion = tt->Get("dispersion").GetNumberAsDouble();
 					}
 				}
 				{
@@ -18132,7 +18143,7 @@ namespace vkr {
 		this->SelectedSkydomeTypeIndex = 0;
 		this->Exposure = 1.0f;
 		this->IBLFactor = 1.0f;//3
-		this->EmissiveFactor = 10.0f;//30
+		this->EmissiveFactor = 30.0f;//30
 		this->bDrawLightFrustum = false;
 		this->bDrawBoundingBoxes = false;
 		this->WireframeMode = WireframeMode::WIREFRAME_MODE_OFF;
@@ -18311,9 +18322,9 @@ namespace vkr {
 
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 10.0;//scene.value("intensity", 1.0f);
+				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 15;
+				l.m_range = 150;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
 				l.m_shadowResolution = 1024;

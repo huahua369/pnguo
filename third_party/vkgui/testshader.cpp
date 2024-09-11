@@ -99,6 +99,10 @@ vec2 testshader() {
 
 #endif
 #define MATERIAL_TRANSMISSION 1
+#define MATERIAL_TRANSMISSION 1
+#define MATERIAL_METALLICROUGHNESS 1
+#define MATERIAL_SPECULARGLOSSINESS 1
+#define USE_IBL 1
 
 
 #define USE_PUNCTUAL
@@ -106,7 +110,7 @@ struct FragCoord {
 	glm::vec2 xy;
 };
 FragCoord gl_FragCoord;
-
+bool gl_FrontFacing = 1;
 //--------------------------------------------------------------------------------------
 //  PS Inputs
 //--------------------------------------------------------------------------------------
@@ -140,7 +144,7 @@ pbrMaterial u_pbrParams;
 #include "shaders/PixelParams.h"
 #include "shaders/GLTFPBRLighting.h"
 
-void main()
+void amain()
 {
 	discardPixelIfAlphaCutOff(Input);
 	gpuMaterial m = defaultPbrMaterial();

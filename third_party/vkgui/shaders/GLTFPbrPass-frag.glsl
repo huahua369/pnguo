@@ -126,7 +126,8 @@ void main()
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif
-	getPBRParams(Input, u_pbrParams, uv, m);
+	m.uv = uv;
+	getPBRParams(Input, u_pbrParams, m);
 	if (u_pbrParams.alphaMode == ALPHA_MASK)
 	{
 		if (m.alpha < u_pbrParams.alphaCutoff)
@@ -135,19 +136,17 @@ void main()
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
 	vec4 color = vec4(c3, m.alpha);
 #if 0
-	float alpha;
 	float perceptualRoughness;
 	vec3 diffuseColor;
 	vec3 specularColor;
-	vec4 baseColor = getPBRParams_old(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness, alpha);	
-	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame,uv, diffuseColor, specularColor, perceptualRoughness, baseColor), alpha);	
-#endif
-	// Roughness is authored as perceptual roughness; as is convention,
-	// convert to material roughness by squaring the perceptual roughness [2].
+	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness);
+	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame, uv, diffuseColor, specularColor, perceptualRoughness, baseColor), baseColor.a);
+	color.rgb = vec3(color1);
+#endif 
+
 
 #ifdef HAS_MOTION_VECTORS_RT
-	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w -
-		Input.PrevPosition.xy / Input.PrevPosition.w;
+	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w - Input.PrevPosition.xy / Input.PrevPosition.w;
 #endif
 
 #ifdef HAS_SPECULAR_ROUGHNESS_RT
@@ -163,7 +162,6 @@ void main()
 #endif
 
 #ifdef HAS_FORWARD_RT 
-	Output_finalColor = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w); 
-	//Output_finalColor = color;
+	Output_finalColor = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);  
 #endif
 }

@@ -26,21 +26,21 @@
 
 struct Light
 {
-    mat4          mLightViewProj;
-    mat4          mLightView;
+	mat4          mLightViewProj;
+	mat4          mLightView;
 
-    vec3          direction;
-    float         range;            // 方向光的角度大小，聚光灯和点光源为 1/范围
+	vec3          direction;
+	float         range;            // 方向光的角度大小，聚光灯和点光源为 1/范围
 
-    vec3          color;
-    float         intensity;        // 光照度
-    vec3          position;
-    // spot
-    float         innerConeCos;
-    float         outerConeCos;
-    int           type;
-    float         depthBias;
-    int           shadowMapIndex;
+	vec3          color;
+	float         intensity;        // 光照度
+	vec3          position;
+	// spot
+	float         innerConeCos;
+	float         outerConeCos;
+	int           type;
+	float         depthBias;
+	int           shadowMapIndex;
 };
 
 const int LightType_Directional = 0;
@@ -49,20 +49,21 @@ const int LightType_Spot = 2;
 
 struct PerFrame
 {
-    mat4          u_mCameraCurrViewProj;
-    mat4          u_mCameraPrevViewProj;
-    mat4          u_mCameraCurrViewProjInverse;
+	mat4          u_mCameraCurrViewProj;
+	mat4          u_mCameraPrevViewProj;
+	mat4          u_mCameraCurrViewProjInverse;
 
-    vec4          u_CameraPos;
-    float         u_iblFactor;
-    float         u_EmissiveFactor;
-    vec2          u_invScreenResolution;
+	vec4          u_CameraPos;
+	float         u_iblFactor;
+	float         u_EmissiveFactor;
+	vec2          u_invScreenResolution;
 
-    vec4          u_WireframeOptions;
-    float         u_LodBias;
-    vec2          u_padding;
-    int           u_lightCount;
-    Light         u_lights[MAX_LIGHT_INSTANCES];
+	vec4          u_WireframeOptions;
+	float         u_LodBias;
+	int           useSky;  // 0: hdr, 1: sky 
+	float		  envRotation;
+	int           u_lightCount;
+	Light         u_lights[MAX_LIGHT_INSTANCES];
 };
 
 
@@ -91,11 +92,15 @@ struct gpuMaterial
 	vec3 diffuseColor;            // color contribution from diffuse lighting
 
 	vec3 reflectance90;           // reflectance color at grazing angle
-	//vec3 specularColor;           // color contribution from specular lighting
+	vec3 specularColorlight;           // color contribution from specular lighting
 
 
 	vec4  baseColor;  // base color 
 	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
+
+	vec3 f90;                       // reflectance color at grazing angle
+	vec3 f90_dielectric;
+
 	float metallic;   // 0 = dielectric, 1 = metallic
 	vec3  emissive;   // emissive color
 
@@ -104,9 +109,16 @@ struct gpuMaterial
 	vec3 B;   // shading normal
 	vec3 Ng;  // geometric normal
 
+	vec2 uv;
 
 	float ior1;  // index of refraction : current medium (i.e. air)
 	float ior2;  // index of refraction : the other side (i.e. glass)
+
+	float ior;
+	float perceptualRoughness;      // roughness value, as authored by the model creator (input to shader)
+	vec3 f0_dielectric;
+
+	float specularWeight; // product of specularFactor and specularTexture.a
 
 	float specular;       // weight of the dielectric specular layer
 	vec3  specularColor;  // color of the dielectric specular layer
@@ -116,7 +128,7 @@ struct gpuMaterial
 	float attenuationDistance;  //
 	float thickness;            // Replace for isThinWalled?
 
-    // KHR_materials_clearcoat
+	// KHR_materials_clearcoat
 	vec3 clearcoatF0;
 	vec3 clearcoatF90;
 	float clearcoatFactor;
@@ -130,6 +142,8 @@ struct gpuMaterial
 	vec3  sheenColor;
 	float sheenRoughness;
 	float ao;
+
+	float dispersion = 0.0;
 };
 
 //------------------------------------------------------------
@@ -243,6 +257,11 @@ struct pbrMaterial
 	float sheenRoughnessFactor;
 	//int   sheenColorTexture;     
 	//int   sheenRoughnessTexture;  
+	//KHR_materials_dispersion
+	float dispersion = 0.0;
+	float p0;
+	float p2;
+	float p1;
 
 	// KHR_texture_transform
 #ifdef m34
@@ -264,3 +283,11 @@ struct MeshState
 	bool isInside;
 };
 #define MICROFACET_MIN_ROUGHNESS 0.0014142f
+
+struct NormalInfo {
+	vec3 ng;   // Geometry normal
+	vec3 t;    // Geometry tangent
+	vec3 b;    // Geometry bitangent
+	vec3 n;    // Shading normal
+	vec3 ntex; // Normal from texture, scaling is accounted for.
+};

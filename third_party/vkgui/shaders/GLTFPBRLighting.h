@@ -74,7 +74,7 @@ vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 #endif
 
 	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
-	vec3 specular = specularLight * (materialInfo.specularColor * brdf.x + brdf.y);
+	vec3 specular = specularLight * (materialInfo.specularColorlight * brdf.x + brdf.y);
 
 	return diffuse + specular;
 }
@@ -273,12 +273,12 @@ LightContrib applySpotLight(Light light, gpuMaterial materialInfo, vec3 normal, 
 	return contrib;
 }
 
-#if 0
+#if 1 
 vec3 getDiffuseLight(vec3 n)
 {
 #ifndef __cplusplus  
-	vec3 dir = rotate(n, vec3(0, 1, 0), -frameInfo.envRotation);
-	return texture(u_LambertianEnvSampler, dir).rgb * frameInfo.envIntensity.rgb;
+	vec3 dir = rotate(n, vec3(0, 1, 0), -myPerFrame.envRotation);
+	return texture(u_DiffuseEnvSampler, dir).rgb * myPerFrame.u_iblFactor;
 #else
 	return {};
 #endif
@@ -287,49 +287,42 @@ vec3 getDiffuseLight(vec3 n)
 vec4 getSpecularSample(vec3 reflection, float lod)
 {
 #ifndef __cplusplus  
-	vec3 dir = rotate(reflection, vec3(0, 1, 0), -frameInfo.envRotation);
-	return textureLod(u_SpecularEnvSampler, dir, lod) * frameInfo.envIntensity;
+	vec3 dir = rotate(reflection, vec3(0, 1, 0), -myPerFrame.envRotation);
+	return textureLod(u_SpecularEnvSampler, dir, lod) * myPerFrame.u_iblFactor;
 #else
 	return {};
 #endif
 }
+#if __cplusplus
+#define textureQueryLevels(s) (0)
+#define u_SpecularEnvSampler
+#ifndef texture
+#define texture()
+#endif
+#endif // __cplusplus
 
-vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness, vec3 F0)
+vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 {
-#if 0
-	ndef __cplusplus
-		int   u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_GGXEnvSampler);
+	int   u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_GGXEnvSampler);
 	float NdotV = clampedDot(n, v);
 	float lod = roughness * float(u_MipCount - 1);
-	vec3  reflection = normalize(reflect(-v, n));
-
-	vec2 brdfSamplePoint = clamp(vec2(NdotV, roughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	vec2 f_ab = texture(u_brdfLUT, brdfSamplePoint).rg;
+	vec3 reflection = normalize(reflect(-v, n));
 	vec4 specularSample = getSpecularSample(reflection, lod);
 
-	vec3 specularLight = specularSample.rgb;
+	vec3 specularLight = vec3(specularSample);
 
-	// see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
-	// Roughness dependent fresnel, from Fdez-Aguera
-	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
-	vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
-	vec3 FssEss = k_S * f_ab.x + f_ab.y;
-
-	return specularLight * FssEss;
-#else
-#endif
-	return {};
+	return specularLight;
 }
 
 // specularWeight is introduced with KHR_materials_specular
 vec3 getIBLRadianceLambertian(vec3 n, vec3 v, float roughness, vec3 diffuseColor, vec3 F0)
 {
-#if 0
-	ndef __cplusplus
-		float NdotV = clampedDot(n, v);
+#if 1
+	//ndef __cplusplus
+	float NdotV = clampedDot(n, v);
 	vec2  brdfSamplePoint = clamp(vec2(NdotV, roughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
 
-	vec2  f_ab = texture(u_brdfLUT, brdfSamplePoint).rg;
+	vec2  f_ab = vec2(texture(u_brdfLUT, brdfSamplePoint));// .rg;
 
 	vec3 irradiance = getDiffuseLight(n);
 
@@ -342,48 +335,15 @@ vec3 getIBLRadianceLambertian(vec3 n, vec3 v, float roughness, vec3 diffuseColor
 
 	// Multiple scattering, from Fdez-Aguera
 	float Ems = (1.0 - (f_ab.x + f_ab.y));
-	vec3  F_avg = (F0 + (1.0 - F0) / 21.0);
-	vec3  FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
-	vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms);  // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
+	vec3  F_avg = (F0 + (vec3(1.0) - F0) / vec3(21.0));
+	vec3  FmsEms = Ems * FssEss * F_avg / (vec3(1.0) - F_avg * Ems);
+	vec3 k_D = diffuseColor * (vec3(1.0) - FssEss + FmsEms);  // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
 
 	return (FmsEms + k_D) * irradiance;
 #else
-#endif
-	return {};
+#endif 
 }
 
-vec3 get_ibl(gpuMaterial pbrMat, vec3 rd)
-{
-	vec3 contribution = vec3(0);
-
-	vec3  f0 = mix(vec3(0.04), vec3(pbrMat.baseColor), pbrMat.metallic);
-	float ambientFactor = 0.3;
-#ifndef USE_IBL
-	const int useSky = 0;
-#else
-	const int useSky = 1;
-#endif
-	if (useSky != 0)
-	{
-		vec3 ambientColor = mix(vec3(0.4F), vec3(0.17F, 0.37F, 0.65F), pbrMat.N.y * 0.5 + 0.5) * ambientFactor;
-		contribution += ambientColor * vec3(pbrMat.baseColor) * f0;
-	}
-	else
-	{
-		// Calculate lighting contribution from image based lighting source (IBL)
-		float perceptualRoughness = mix(pbrMat.roughness.r, pbrMat.roughness.g, 0.5);  // Ad-hoc anisotropic -> isotropic
-		vec3  c_diff = mix(vec3(pbrMat.baseColor), vec3(0), pbrMat.metallic);
-
-		vec3 f_specular = getIBLRadianceGGX(pbrMat.N, -rd, perceptualRoughness, f0);
-		vec3 f_diffuse = getIBLRadianceLambertian(pbrMat.N, -rd, perceptualRoughness, c_diff, f0);
-
-		contribution += f_specular + f_diffuse;
-	}
-
-
-	contribution += pbrMat.emissive;  // emissive
-	return contribution;
-}
 #endif
 
 float applyIorToRoughness(float roughness, float ior)
@@ -414,12 +374,10 @@ vec3 getPunctualRadianceTransmission(vec3 normal, vec3 view, vec3 pointToLight, 
 
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
 {
+	vec3 outColor = vec3(m.baseColor);
 #ifdef __cplusplus
 	pbrMaterial u_pbrParams = {};
 	auto myPerFrame = perFrame;
-	vec3 outColor = m.baseColor;
-#else
-	vec3 outColor = m.baseColor.rgb;
 #endif
 #ifdef MATERIAL_UNLIT
 	return outColor;
@@ -428,11 +386,11 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
 	// Roughness is authored as perceptual roughness; as is convention,
 	// convert to material roughness by squaring the perceptual roughness [2].
 	float alphaRoughness = m.perceptualRoughness * m.perceptualRoughness;
-
+	vec3 specularColor = m.specularColorlight;
 	// Compute reflectance.
-	float reflectance = max(max(m.specularColor.r, m.specularColor.g), m.specularColor.b);
+	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
 
-	vec3 specularEnvironmentR0 = m.specularColor;
+	vec3 specularEnvironmentR0 = specularColor;
 	// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
 	vec3 specularEnvironmentR90 = vec3(clamp(reflectance * 50.0, 0.0, 1.0));
 
@@ -463,37 +421,6 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
 		normal = -normal;
 	}
 #endif
-#if 0
-	color += get_ibl(m, view);
-#else
-	// Calculate lighting contribution from image based lighting source (IBL)
-#ifdef USE_IBL
-	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
-#endif
-
-#ifdef MATERIAL_CLEARCOAT
-	clearcoatFactor = m.clearcoatFactor;
-	clearcoatFresnel = F_Schlick(materialInfo.clearcoatF0, materialInfo.clearcoatF90, clampedDot(materialInfo.clearcoatNormal, v));
-#endif
-
-	// Apply optional PBR terms for additional (optional) shading
-#ifdef ID_occlusionTexture 
-	color = color * m.ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
-#endif
-	color += m.emissive * (vec3(1.0) - clearcoatFactor * clearcoatFresnel);
-#endif
-
-
-#if MATERIAL_TRANSMISSION0
-	f_specular_transmission = getIBLVolumeRefraction(
-		n, v,
-		materialInfo.perceptualRoughness,
-		baseColor.rgb, materialInfo.f0_dielectric, materialInfo.f90,
-		v_Position, u_ModelMatrix, u_ViewMatrix, u_ProjectionMatrix,
-		materialInfo.ior, materialInfo.thickness, materialInfo.attenuationColor, materialInfo.attenuationDistance, materialInfo.dispersion);
-	f_diffuse = mix(f_diffuse, f_specular_transmission, materialInfo.transmissionFactor);
-#endif
-
 
 #ifdef USE_PUNCTUAL
 	vec3 c = vec3(0.0, 0.0, 0.0);
@@ -533,17 +460,29 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, inout gpuMaterial m)
 	}
 #endif
 
+#if 1
+	// Calculate lighting contribution from image based lighting source (IBL)
+#ifdef USE_IBL
+	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
+#endif
 
-#ifndef DEBUG_OUTPUT // no debug
+#ifdef MATERIAL_CLEARCOAT
+	clearcoatFactor = m.clearcoatFactor;
+	clearcoatFresnel = F_Schlick(materialInfo.clearcoatF0, materialInfo.clearcoatF90, clampedDot(materialInfo.clearcoatNormal, v));
+#endif
 
+	// Apply optional PBR terms for additional (optional) shading
+#ifdef ID_occlusionTexture 
+	color = color * m.ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
+#endif
+	color += m.emissive * (vec3(1.0) - clearcoatFactor * clearcoatFresnel);
+#endif
+
+
+
+#ifndef DEBUG_OUTPUT // no debug 
 	// regular shading
 	outColor = color + c;
-
-	//outColor = vec3(m.attenuationColor);
-	//m.alpha = m.transmission * m.attenuationDistance;
-	//outColor = vec3(m.thickness);
-
-
 #else // debug output
 
 #ifdef DEBUG_METALLIC
@@ -707,6 +646,7 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 	vec3 shade = getPointShade(pointToLight, materialInfo, normal, view);
 	return rangeAttenuation * spotAttenuation * light.intensity * light.color * shade;
 }
+
 vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
 #ifdef __cplusplus
@@ -714,7 +654,7 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 #else
 	vec3 outColor = baseColor.rgb;
 #endif
-#ifndef MATERIAL_UNLIT 
+#ifdef MATERIAL_UNLIT 
 	return outColor;
 #endif
 
@@ -760,22 +700,21 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	for (int i = 0; i < myPerFrame.u_lightCount; ++i)
 	{
 		Light light = myPerFrame.u_lights[i];
-
+		vec3 c = vec3(0);
 		float shadowFactor = DoSpotShadow(worldPos, light);
-
 		if (light.type == LightType_Directional)
 		{
-			color += applyDirectionalLight(light, materialInfo, normal, view) * shadowFactor;
+			c = applyDirectionalLight(light, materialInfo, normal, view);
 		}
 		else if (light.type == LightType_Point)
 		{
-			color += applyPointLight(light, materialInfo, normal, worldPos, view);
+			c = applyPointLight(light, materialInfo, normal, worldPos, view);
 		}
 		else if (light.type == LightType_Spot)
 		{
-
-			color += applySpotLight(light, materialInfo, normal, worldPos, view) * shadowFactor;
+			c = applySpotLight(light, materialInfo, normal, worldPos, view);
 		}
+		color += c * shadowFactor;
 	}
 #endif
 
@@ -846,3 +785,6 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 
 	return outColor;
 }
+
+
+
