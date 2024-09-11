@@ -40,6 +40,8 @@ PerFrame myPerFrame;
 //--------------------------------------------------------------------------------------
 
 #include "PBRTextures.h" 
+#include "functions.h"
+#include "bsdf_functions.h"
 #include "PixelParams.h"
 
 //--------------------------------------------------------------------------------------

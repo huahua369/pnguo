@@ -199,89 +199,6 @@ void get_tangent(VS2PS Input, vec2 uv, out vec3 tangent, out vec3 binormal)
 #endif
 }
 
-// 内部pbr用
-
-struct MaterialInfo
-{
-	vec4 baseColor;
-	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
-	float alpha;
-	vec3 reflectance0;            // full reflectance color (normal incidence angle)
-
-	vec3 diffuseColor;            // color contribution from diffuse lighting
-
-	vec3 reflectance90;           // reflectance color at grazing angle
-	vec3 specularColor;           // color contribution from specular lighting
-
-};
-struct gpuMaterial
-{
-	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
-	float alpha;
-	vec3 reflectance0;            // full reflectance color (normal incidence angle)
-
-	vec3 diffuseColor;            // color contribution from diffuse lighting
-
-	vec3 reflectance90;           // reflectance color at grazing angle
-	//vec3 specularColor;           // color contribution from specular lighting
-
-
-	vec4  baseColor;  // base color 
-	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
-	float metallic;   // 0 = dielectric, 1 = metallic
-	vec3  emissive;   // emissive color
-
-	vec3 N;   // shading normal
-	vec3 T;   // shading normal
-	vec3 B;   // shading normal
-	vec3 Ng;  // geometric normal
-
-
-	float ior1;  // index of refraction : current medium (i.e. air)
-	float ior2;  // index of refraction : the other side (i.e. glass)
-
-	float specular;       // weight of the dielectric specular layer
-	vec3  specularColor;  // color of the dielectric specular layer
-	float transmission;   // KHR_materials_transmission
-
-	vec3  attenuationColor;     // KHR_materials_volume
-	float attenuationDistance;  //
-	float thickness;            // Replace for isThinWalled?
-
-	float clearcoat;           // KHR_materials_clearcoat
-	float clearcoatRoughness;  //
-	vec3  Nc;                  // clearcoat normal
-
-	float iridescence;
-	float iridescenceIor;
-	float iridescenceThickness;
-
-	vec3  sheenColor;
-	float sheenRoughness;
-	float ao;
-};
-#ifdef __cplusplus
-#ifndef OUT_TYPE
-#define OUT_TYPE(T) T&
-#endif
-#else
-#define OUT_TYPE(T) out T
-#endif
-void orthonormalBasis(vec3 normal, OUT_TYPE(vec3) tangent, OUT_TYPE(vec3) bitangent)
-{
-	if (normal.z < -0.99998796F)  // Handle the singularity
-	{
-		tangent = vec3(0.0F, -1.0F, 0.0F);
-		bitangent = vec3(-1.0F, 0.0F, 0.0F);
-		return;
-	}
-	float a = 1.0F / (1.0F + normal.z);
-	float b = -normal.x * normal.y * a;
-	tangent = vec3(1.0F - normal.x * normal.x * a, b, -normal.x);
-	bitangent = vec3(b, 1.0f - normal.y * normal.y * a, -normal.y);
-}
 gpuMaterial defaultPbrMaterial()
 {
 	gpuMaterial mat;
@@ -306,9 +223,9 @@ gpuMaterial defaultPbrMaterial()
 	mat.attenuationDistance = 1.0F;
 	mat.thickness = 0.0F;
 
-	mat.clearcoat = 0.0F;
+	mat.clearcoatFactor = 0.0F;
 	mat.clearcoatRoughness = 0.01F;
-	mat.Nc = vec3(0.0F, 0.0F, 1.0F);
+	mat.clearcoatNormal = vec3(0.0F, 0.0F, 1.0F);
 
 	mat.iridescence = 0.0F;
 	mat.iridescenceIor = 1.5F;
@@ -332,126 +249,6 @@ gpuMaterial defaultPbrMaterial(vec3 baseColor, float metallic, float roughness, 
 
 	return mat;
 }
-//------------------------------------------------------------
-// PBR getters
-//------------------------------------------------------------
-
-struct PBRFactors
-{
-	// pbrMetallicRoughness
-	vec4 u_BaseColorFactor;
-	float u_MetallicFactor;
-	float u_RoughnessFactor;
-
-	float u_AttenuationDistance;//KHR_materials_volume
-	float u_ThicknessFactor;
-	vec3 u_AttenuationColor;
-
-	float u_TransmissionFactor;	//KHR_materials_transmission
-	vec3 u_EmissiveFactor;
-	float pad0;
-	// KHR_materials_pbrSpecularGlossiness
-	vec4 diffuseFactor;
-	vec3 specularFactor;
-	float glossinessFactor;
-
-};
-
-// alphaMode
-#define ALPHA_OPAQUE 0
-#define ALPHA_MASK 1
-#define ALPHA_BLEND 2
-
-// KHR_materials_pbrSpecularGlossiness
-// KHR_materials_unlit
-// KHR_materials_ior
-// KHR_materials_transmission
-// KHR_materials_volume 
-// KHR_materials_anisotropy
-// KHR_materials_clearcoat
-// KHR_materials_specular
-// KHR_materials_iridescence
-// KHR_materials_sheen 
-// KHR_texture_transform
-
-struct pbrMaterial
-{
-	// pbrMetallicRoughness
-	vec4  baseColorFactor;
-	vec3  emissiveFactor;
-	float metallicFactor;
-
-	float roughnessFactor;
-	float normalTextureScale;
-	int   alphaMode;
-	float alphaCutoff;
-	// int   pbrBaseColorTexture;   
-	// int   normalTexture;           
-	// int   pbrMetallicRoughnessTexture;  
-	// int   emissiveTexture;      
-
-
-	// KHR_materials_pbrSpecularGlossiness
-	vec4 pbrDiffuseFactor;
-	vec3 pbrSpecularFactor;
-	float glossinessFactor;
-
-	// KHR_materials_unlit
-	int unlit;
-
-	// KHR_materials_ior
-	float ior;
-
-	// KHR_materials_transmission
-	float transmissionFactor;
-	//int   transmissionTexture;   
-
-	// KHR_materials_volume 
-	float attenuationDistance;
-	vec3  attenuationColor;
-	float thicknessFactor;
-	//int   thicknessTexture;   
-
-	// KHR_materials_anisotropy
-	float anisotropyStrength;
-	//int   anisotropyTexture; 
-	float anisotropyRotation;
-
-	// KHR_materials_clearcoat
-	float clearcoatFactor;
-	float clearcoatRoughness;
-	//int   clearcoatTexture;            
-	//int   clearcoatRoughnessTexture;  
-	//int   clearcoatNormalTexture;     
-
-	// KHR_materials_specular
-	vec3  specularColorFactor;
-	float specularFactor;
-	//int   specularTexture;        
-	//int   specularColorTexture;  
-
-	// KHR_materials_iridescence
-	float iridescenceFactor;
-	//int   iridescenceTexture;         
-	float iridescenceThicknessMinimum;  // 100
-	float iridescenceThicknessMaximum;  // 400
-	//int   iridescenceThicknessTexture;   
-	float iridescenceIor;               // 1.3
-
-	// KHR_materials_sheen 
-	vec3  sheenColorFactor;
-	float sheenRoughnessFactor;
-	//int   sheenColorTexture;     
-	//int   sheenRoughnessTexture;  
-
-	// KHR_texture_transform
-#ifdef __cplusplus
-	mat3x4 uvTransform;
-#else
-	mat3 uvTransform;
-#endif
-
-};
 
 
 
@@ -506,24 +303,11 @@ void discardPixelIfAlphaCutOff(VS2PS Input)
 #endif
 }
 
-struct MeshState
-{
-	vec3 N;   // Normal
-	vec3 T;   // Tangent
-	vec3 B;   // Bitangent
-	vec3 Ng;  // Geometric normal
-	vec2 tc;  // Texture coordinates
-	float emissiveFactor;
-	bool isInside;
-};
-#define MICROFACET_MIN_ROUGHNESS 0.0014142f
 
 //-----------------------------------------------------------------------
 
-//void getPBRParams(VS2PS Input, pbrMaterial params, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha, out vec4 baseColor)
 void getPBRParams(VS2PS Input, pbrMaterial material, vec2 uv, out gpuMaterial m)
 {
-
 	MeshState mesh;
 	mesh.N = getPixelNormal(Input, uv);
 	mesh.Ng = mesh.N;
@@ -531,11 +315,15 @@ void getPBRParams(VS2PS Input, pbrMaterial material, vec2 uv, out gpuMaterial m)
 	mesh.tc = uv;
 	mesh.isInside = false;
 	mesh.emissiveFactor = myPerFrame.u_EmissiveFactor;
+	vec3 uv3 = vec3(mesh.tc, 1);
 	// KHR_texture_transform
 #ifdef __cplusplus
-	vec2 texCoord = vec2(vec4(mesh.tc, 1, 1) * material.uvTransform);
+	vec2 texCoord = uv3 * material.uvTransform;
 #else
-	vec2 texCoord = vec2(vec3(mesh.tc, 1) * material.uvTransform);
+#ifdef MATERIAL_TEXTURE_TRANSFORM
+	uv3 *= material.uvTransform;
+#endif
+	vec2 texCoord = uv3.xy;
 #endif 
 	uv = texCoord;
 	// Metallic and Roughness material properties are packed together
@@ -550,7 +338,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, vec2 uv, out gpuMaterial m)
 
 	m.baseColor = getBaseColor2(Input, material, texCoord);
 	m.alpha = m.baseColor.a;
-
+#if 1
 #ifdef MATERIAL_SPECULARGLOSSINESS
 	vec4 sgSample = getSpecularGlossinessTexture(Input, texCoord);
 	m.perceptualRoughness = (1.0 - sgSample.a * material.glossinessFactor); // glossiness to roughness
@@ -650,19 +438,24 @@ void getPBRParams(VS2PS Input, pbrMaterial material, vec2 uv, out gpuMaterial m)
 #ifdef ID_thicknessTexture  
 	m.thickness *= texture(u_thicknessTexture, texCoord).r;
 #endif
-
+#if MATERIAL_CLEARCOAT
 	// KHR_materials_clearcoat
-	m.clearcoat = material.clearcoatFactor;
-	m.clearcoatRoughness = material.clearcoatRoughness;
-	m.Nc = m.N;
+	m.clearcoatFactor = material.clearcoatFactor;
+	m.clearcoatRoughness = material.clearcoatRoughness; 
+	m.clearcoatF0 = vec3(pow((m.ior - 1.0) / (m.ior + 1.0), 2.0));
+	m.clearcoatF90 = vec3(1.0);	 
+	m.clearcoatNormal = m.N;
+#endif
+
 #ifdef ID_clearcoatTexture
-	m.clearcoat *= texture(u_clearcoatTexture, texCoord).r;
+	m.clearcoatFactor *= texture(u_clearcoatTexture, texCoord).r;
 #endif
 
 #ifdef ID_clearcoatRoughnessTexture
 	m.clearcoatRoughness *= texture(u_clearcoatRoughnessTexture, texCoord).g;
 #endif
-	m.clearcoatRoughness = max(m.clearcoatRoughness, 0.001F);
+	//m.clearcoatRoughness = max(m.clearcoatRoughness, 0.001F);
+	m.clearcoatRoughness = clamp(m.clearcoatRoughness, 0.0f, 1.0f);
 
 #ifdef ID_clearcoatNormalTexture 
 	mat3 tbn = mat3(m.T, m.B, m.Nc);
@@ -734,11 +527,11 @@ void getPBRParams(VS2PS Input, pbrMaterial material, vec2 uv, out gpuMaterial m)
 #else
 	m.ao = 1;
 #endif
-
+#endif
 }
 
 //PBRFactors
-void getPBRParams_old(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha)
+vec4 getPBRParams_old(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float alpha)
 {
 	// Metallic and Roughness material properties are packed together
 	// In glTF, these factors can be specified by fixed scalar values
@@ -782,4 +575,5 @@ void getPBRParams_old(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuse
 	perceptualRoughness = clamp(perceptualRoughness, 0.0f, 1.0f);
 
 	alpha = baseColor.a;
+	return baseColor;
 }

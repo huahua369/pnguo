@@ -64,3 +64,203 @@ struct PerFrame
     int           u_lightCount;
     Light         u_lights[MAX_LIGHT_INSTANCES];
 };
+
+
+// 内部pbr用
+struct MaterialInfo
+{
+	vec4 baseColor;
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+	float alpha;
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	vec3 specularColor;           // color contribution from specular lighting
+
+};
+struct gpuMaterial
+{
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+	float alpha;
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	//vec3 specularColor;           // color contribution from specular lighting
+
+
+	vec4  baseColor;  // base color 
+	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
+	float metallic;   // 0 = dielectric, 1 = metallic
+	vec3  emissive;   // emissive color
+
+	vec3 N;   // shading normal
+	vec3 T;   // shading normal
+	vec3 B;   // shading normal
+	vec3 Ng;  // geometric normal
+
+
+	float ior1;  // index of refraction : current medium (i.e. air)
+	float ior2;  // index of refraction : the other side (i.e. glass)
+
+	float specular;       // weight of the dielectric specular layer
+	vec3  specularColor;  // color of the dielectric specular layer
+	float transmission;   // KHR_materials_transmission
+
+	vec3  attenuationColor;     // KHR_materials_volume
+	float attenuationDistance;  //
+	float thickness;            // Replace for isThinWalled?
+
+    // KHR_materials_clearcoat
+	vec3 clearcoatF0;
+	vec3 clearcoatF90;
+	float clearcoatFactor;
+	vec3 clearcoatNormal;
+	float clearcoatRoughness;
+
+	float iridescence;
+	float iridescenceIor;
+	float iridescenceThickness;
+
+	vec3  sheenColor;
+	float sheenRoughness;
+	float ao;
+};
+
+//------------------------------------------------------------
+// PBR getters
+//------------------------------------------------------------
+
+struct PBRFactors
+{
+	// pbrMetallicRoughness
+	vec4 u_BaseColorFactor;
+	float u_MetallicFactor;
+	float u_RoughnessFactor;
+
+	float u_AttenuationDistance;//KHR_materials_volume
+	float u_ThicknessFactor;
+	vec3 u_AttenuationColor;
+
+	float u_TransmissionFactor;	//KHR_materials_transmission
+	vec3 u_EmissiveFactor;
+	float pad0;
+	// KHR_materials_pbrSpecularGlossiness
+	vec4 diffuseFactor;
+	vec3 specularFactor;
+	float glossinessFactor;
+
+};
+
+// alphaMode
+#define ALPHA_OPAQUE 0
+#define ALPHA_MASK 1
+#define ALPHA_BLEND 2
+
+// KHR_materials_pbrSpecularGlossiness
+// KHR_materials_unlit
+// KHR_materials_ior
+// KHR_materials_transmission
+// KHR_materials_volume 
+// KHR_materials_anisotropy
+// KHR_materials_clearcoat
+// KHR_materials_specular
+// KHR_materials_iridescence
+// KHR_materials_sheen 
+// KHR_texture_transform
+
+struct pbrMaterial
+{
+	// pbrMetallicRoughness
+	vec4  baseColorFactor;
+	vec3  emissiveFactor;
+	float metallicFactor;
+
+	float roughnessFactor;
+	float normalTextureScale;
+	int   alphaMode;
+	float alphaCutoff;
+	// int   pbrBaseColorTexture;   
+	// int   normalTexture;           
+	// int   pbrMetallicRoughnessTexture;  
+	// int   emissiveTexture;      
+
+
+	// KHR_materials_pbrSpecularGlossiness
+	vec4 pbrDiffuseFactor;
+	vec3 pbrSpecularFactor;
+	float glossinessFactor;
+
+	// KHR_materials_unlit
+	int unlit;
+
+	// KHR_materials_ior
+	float ior;
+
+	// KHR_materials_transmission
+	float transmissionFactor;
+	//int   transmissionTexture;   
+
+	// KHR_materials_volume 
+	float attenuationDistance;
+	vec3  attenuationColor;
+	float thicknessFactor;
+	//int   thicknessTexture;   
+
+	// KHR_materials_anisotropy
+	float anisotropyStrength;
+	//int   anisotropyTexture; 
+	float anisotropyRotation;
+
+	// KHR_materials_clearcoat
+	float clearcoatFactor;
+	float clearcoatRoughness;
+	//int   clearcoatTexture;            
+	//int   clearcoatRoughnessTexture;  
+	//int   clearcoatNormalTexture;     
+
+	// KHR_materials_specular
+	vec3  specularColorFactor;
+	float specularFactor;
+	//int   specularTexture;        
+	//int   specularColorTexture;  
+
+	// KHR_materials_iridescence
+	float iridescenceFactor;
+	//int   iridescenceTexture;         
+	float iridescenceThicknessMinimum;  // 100
+	float iridescenceThicknessMaximum;  // 400
+	//int   iridescenceThicknessTexture;   
+	float iridescenceIor;               // 1.3
+
+	// KHR_materials_sheen 
+	vec3  sheenColorFactor;
+	float sheenRoughnessFactor;
+	//int   sheenColorTexture;     
+	//int   sheenRoughnessTexture;  
+
+	// KHR_texture_transform
+#ifdef m34
+	mat3x4 uvTransform;
+#else
+	mat3 uvTransform;
+#endif
+
+};
+
+struct MeshState
+{
+	vec3 N;   // Normal
+	vec3 T;   // Tangent
+	vec3 B;   // Bitangent
+	vec3 Ng;  // Geometric normal
+	vec2 tc;  // Texture coordinates
+	float emissiveFactor;
+	bool isInside;
+};
+#define MICROFACET_MIN_ROUGHNESS 0.0014142f

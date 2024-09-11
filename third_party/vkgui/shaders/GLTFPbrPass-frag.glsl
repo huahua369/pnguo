@@ -96,7 +96,6 @@ layout (scalar, set=0, binding = 0) uniform perFrame
 //--------------------------------------------------------------------------------------
  
 #include "PBRTextures.h" 
-#include "PixelParams.h"
 
 layout (scalar, set=0, binding = 1) uniform perObject 
 {
@@ -114,6 +113,8 @@ layout (scalar, set=0, binding = 1) uniform perObject
 
 #include "functions.h"
 #include "shadowFiltering.h"
+#include "bsdf_functions.h"
+#include "PixelParams.h"
 #include "GLTFPBRLighting.h"
 
 void main()
@@ -125,15 +126,21 @@ void main()
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif
-#if 0
 	getPBRParams(Input, u_pbrParams, uv, m);
-#else
+	if (u_pbrParams.alphaMode == ALPHA_MASK)
+	{
+		if (m.alpha < u_pbrParams.alphaCutoff)
+			discard;
+	}
+	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
+	vec4 color = vec4(c3, m.alpha);
+#if 0
 	float alpha;
 	float perceptualRoughness;
 	vec3 diffuseColor;
 	vec3 specularColor;
-	getPBRParams_old(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness, alpha);
-	
+	vec4 baseColor = getPBRParams_old(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness, alpha);	
+	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame,uv, diffuseColor, specularColor, perceptualRoughness, baseColor), alpha);	
 #endif
 	// Roughness is authored as perceptual roughness; as is convention,
 	// convert to material roughness by squaring the perceptual roughness [2].
@@ -155,9 +162,8 @@ void main()
 	Output_normal = vec4((getPixelNormal(Input) + 1) / 2, 0);
 #endif
 
-#ifdef HAS_FORWARD_RT
-	Output_finalColor = vec4(doPbrLighting(Input, myPerFrame, m), m.alpha);
-	Output_finalColor = vec4(doPbrLighting_old(Input, myPerFrame,uv, diffuseColor, specularColor, perceptualRoughness), alpha);
-	Output_finalColor = mix(Output_finalColor, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
+#ifdef HAS_FORWARD_RT 
+	Output_finalColor = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w); 
+	//Output_finalColor = color;
 #endif
 }

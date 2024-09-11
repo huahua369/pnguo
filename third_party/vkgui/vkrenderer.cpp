@@ -878,7 +878,9 @@ namespace vkr {
 	using glm::vec2;
 	using glm::vec3;
 	using glm::vec4;
+	using glm::mat3;
 	using glm::mat3x4;
+	using glm::mat4;
 
 	// https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
 #define KHR_TEXTURE_TRANSFORM_EXTENSION_NAME "KHR_texture_transform"
@@ -974,12 +976,8 @@ namespace vkr {
 		//int   sheenColorTexture;     
 		//int   sheenRoughnessTexture;  
 
-		// KHR_texture_transform
-#ifdef __cplusplus
-		mat3x4 uvTransform;
-#else
-		mat3 uvTransform;
-#endif
+		// KHR_texture_transform 
+		mat3 uvTransform = mat3(1.0);
 
 	};
 	struct PBRMaterialParameters
@@ -3522,11 +3520,13 @@ namespace vkr {
 
 template <typename T>
 const T& tinygltf::Value::Get() const {
-	bool sav = std::is_same<T, glm::vec4>::value;
+	int c = std::is_same<T, glm::vec2>::value ? 2 : 0;
+	c = std::is_same<T, glm::vec3>::value ? 3 : c;
+	c = std::is_same<T, glm::vec4>::value ? 4 : c;
 	static T r = {};
-	if (sav)
+	if (c > 0)
 	{
-		for (int i = 0; i < array_value_.size() && i < 4; i++)
+		for (int i = 0; i < array_value_.size() && i < c; i++)
 		{
 			r[i] = array_value_[i].GetNumberAsDouble();
 		}
@@ -5539,6 +5539,7 @@ namespace vkr
 					glm::vec2 s = tt->Get("scale").Get<glm::vec2>();
 					float r = tt->Get("rotation").GetNumberAsDouble();
 					int tcid = tt->Get("texCoord").GetNumberAsDouble();
+					tfmat->m_defines["MATERIAL_TEXTURE_TRANSFORM"] = "1";
 					tfmat->m_params.uvTransform = get_mat3x4(o, r, s);
 				}
 				auto sg = get_ext(extensions, "KHR_materials_pbrSpecularGlossiness");
@@ -5578,7 +5579,7 @@ namespace vkr
 				// KHR_texture_transform
 				{
 					auto tt = get_ext(extensions, "KHR_materials_unlit");
-					if (tt) 
+					if (tt)
 					{
 						tfmat->m_params.unlit = 1;
 					}
@@ -5603,6 +5604,7 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_volume");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
+						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
 						tfmat->m_params.attenuationColor = tt->Get("attenuationColor").Get<glm::vec3>();
 						tfmat->m_params.attenuationDistance = tt->Get("attenuationDistance").GetNumberAsDouble();
 						tfmat->m_params.thicknessFactor = tt->Get("thicknessFactor").GetNumberAsDouble();
@@ -6475,7 +6477,7 @@ namespace vkr
 		vp.pScissors = NULL;
 		vp.pViewports = NULL;
 
-		// depth stencil state
+		// todo depth stencil state
 
 		VkPipelineDepthStencilStateCreateInfo ds;
 		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -11066,8 +11068,8 @@ namespace vkr {
 				ColorSpace_Display,
 				&m_colorConversionConsts.m_contentToMonitorRecMatrix);
 #endif
+		}
 	}
-}
 
 	void ColorConversionPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
 	{
@@ -11433,7 +11435,7 @@ namespace vkr {
 #endif
 
 		return true;
-}
+	}
 
 	void WICLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
 	{
@@ -12463,9 +12465,9 @@ namespace vkr {
 					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
 					m_database[hash].m_Sync.Inc();
 					return true;
-			}
+				}
 				kt = &it->second;
-		}
+			}
 
 			// If we have seen these shaders before then:
 			{
@@ -12476,7 +12478,7 @@ namespace vkr {
 					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
 #endif
 					Async::Wait(&kt->m_Sync);
-			}
+				}
 
 				// if the shader was compiled then return it
 				*pOut = kt->m_data;
@@ -12485,7 +12487,7 @@ namespace vkr {
 				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
 #endif
 				return false;
-	}
+			}
 #endif
 			return true;
 		}
@@ -12512,7 +12514,7 @@ namespace vkr {
 			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
 			kt->m_Sync.Dec();
 #endif
-			}
+		}
 
 		template<typename Func>
 		void ForEach(Func func)
@@ -12523,7 +12525,7 @@ namespace vkr {
 				func(it);
 			}
 		}
-		};
+	};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -15329,7 +15331,7 @@ namespace vkr {
 		vkc::flushCommandBuffer(device, copyCmd, cp->command_pool, copyQueue, true);
 		qctx->free_cmd_pool(cp);
 #endif
-}
+	}
 	void dvk_buffer::setDesType(uint32_t dt)
 	{
 		dtype = (VkDescriptorType)dt;
@@ -15898,7 +15900,7 @@ namespace vkr {
 				}
 
 			} while (0);
-	}
+		}
 #else
 		{
 			// 等待GPU返回
@@ -17529,7 +17531,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-				}
+			}
 
 			// Render skydome
 			{
@@ -17607,7 +17609,7 @@ namespace vkr {
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-			}
+		}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
@@ -17821,8 +17823,8 @@ namespace vkr {
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
 #endif
+			}
 		}
-	}
 
 		// submit command buffer
 		{
@@ -17951,7 +17953,7 @@ namespace vkr {
 		}
 #endif
 
-}
+	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
 		_fbo.fence = p->_fence;

@@ -787,8 +787,9 @@ int main()
 		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
-		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 
+		load_gltf(vkd, R"(E:\model\sharp2.glb)");
+		load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 		//load_gltf(vkd, R"(E:\model\cube18.glb)");
 		vkd->resize(800, 600);
 		auto vr = vkd->get_vkimage(0);

@@ -37,6 +37,8 @@ layout (location = 0) in VS2PS Input;
 //--------------------------------------------------------------------------------------
  
 #include "PBRTextures.h" 
+#include "functions.h"
+#include "bsdf_functions.h"
 #include "PixelParams.h"
 
 #ifdef HAS_MOTION_VECTORS
