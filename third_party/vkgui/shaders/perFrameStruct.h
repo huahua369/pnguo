@@ -66,113 +66,9 @@ struct PerFrame
 	Light         u_lights[MAX_LIGHT_INSTANCES];
 };
 
-
-// 内部pbr用
-struct MaterialInfo
-{
-	vec4 baseColor;
-	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
-	float alpha;
-	vec3 reflectance0;            // full reflectance color (normal incidence angle)
-
-	vec3 diffuseColor;            // color contribution from diffuse lighting
-
-	vec3 reflectance90;           // reflectance color at grazing angle
-	vec3 specularColor;           // color contribution from specular lighting
-
-};
-struct gpuMaterial
-{
-	vec3 reflectance0;            // full reflectance color (normal incidence angle)
-	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-
-	vec3 diffuseColor;            // color contribution from diffuse lighting
-	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
-
-	vec3 reflectance90;           // reflectance color at grazing angle
-	float alpha;
-	vec3 specularColorlight;           // color contribution from specular lighting
-	float dispersion;
-
-	vec4  baseColor;  // base color 
-	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
-
-	vec3 f90;                       // reflectance color at grazing angle
-	vec3 f90_dielectric;
-
-	float metallic;   // 0 = dielectric, 1 = metallic
-	vec3  emissive;   // emissive color
-
-	vec3 N;   // shading normal
-	vec3 T;   // shading normal
-	vec3 B;   // shading normal
-	vec3 Ng;  // geometric normal
-
-	vec2 uv;
-
-	float ior1;  // index of refraction : current medium (i.e. air)
-	float ior2;  // index of refraction : the other side (i.e. glass)
-
-	float ior;
-	vec3 f0_dielectric;
-
-	float specularWeight; // product of specularFactor and specularTexture.a
-
-	float specular;       // weight of the dielectric specular layer
-	vec3  specularColor;  // color of the dielectric specular layer
-	float transmission;   // KHR_materials_transmission
-
-	vec3  attenuationColor;     // KHR_materials_volume
-	float attenuationDistance;  //
-	float thickness;            // Replace for isThinWalled?
-
-	// KHR_materials_clearcoat
-	vec3 clearcoatF0;
-	vec3 clearcoatF90;
-	float clearcoatFactor;
-	vec3 clearcoatNormal;
-	float clearcoatRoughness;
-
-	float iridescence;
-	float iridescenceIor;
-	float iridescenceThickness;
-
-	vec3  sheenColor;
-	float sheenRoughness;
-	float ao;
-
-};
-
 //------------------------------------------------------------
 // PBR getters
 //------------------------------------------------------------
-
-struct PBRFactors
-{
-	// pbrMetallicRoughness
-	vec4 u_BaseColorFactor;
-	float u_MetallicFactor;
-	float u_RoughnessFactor;
-
-	float u_AttenuationDistance;//KHR_materials_volume
-	float u_ThicknessFactor;
-	vec3 u_AttenuationColor;
-
-	float u_TransmissionFactor;	//KHR_materials_transmission
-	vec3 u_EmissiveFactor;
-	float pad0;
-	// KHR_materials_pbrSpecularGlossiness
-	vec4 diffuseFactor;
-	vec3 specularFactor;
-	float glossinessFactor;
-
-};
-
-// alphaMode
-#define ALPHA_OPAQUE 0
-#define ALPHA_MASK 1
-#define ALPHA_BLEND 2
 
 // KHR_materials_pbrSpecularGlossiness
 // KHR_materials_unlit
@@ -268,6 +164,111 @@ struct pbrMaterial
 #endif
 
 };
+
+struct PBRFactors
+{
+	// pbrMetallicRoughness
+	vec4 u_BaseColorFactor;
+	float u_MetallicFactor;
+	float u_RoughnessFactor;
+
+	float u_AttenuationDistance;//KHR_materials_volume
+	float u_ThicknessFactor;
+	vec3 u_AttenuationColor;
+
+	float u_TransmissionFactor;	//KHR_materials_transmission
+	vec3 u_EmissiveFactor;
+	float pad0;
+	// KHR_materials_pbrSpecularGlossiness
+	vec4 diffuseFactor;
+	vec3 specularFactor;
+	float glossinessFactor;
+
+};
+
+
+
+// 内部pbr用
+struct MaterialInfo
+{
+	vec4 baseColor;
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+	float alpha;
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	vec3 specularColor;           // color contribution from specular lighting
+
+};
+struct gpuMaterial
+{
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	float alpha;
+	vec3 specularColorlight;           // color contribution from specular lighting
+	float dispersion;
+
+	vec4  baseColor;  // base color 
+	vec2  roughness;  // 0 = smooth, 1 = rough (anisotropic: x = U, y = V)
+
+	vec3 f90;                       // reflectance color at grazing angle
+	vec3 f90_dielectric;
+
+	float metallic;   // 0 = dielectric, 1 = metallic
+	vec3  emissive;   // emissive color
+
+	vec3 N;   // shading normal
+	vec3 T;   // shading normal
+	vec3 B;   // shading normal
+	vec3 Ng;  // geometric normal
+
+	vec2 uv;
+
+	float ior1;  // index of refraction : current medium (i.e. air)
+	float ior2;  // index of refraction : the other side (i.e. glass)
+
+	float ior;
+	vec3 f0_dielectric;
+
+	float specularWeight; // product of specularFactor and specularTexture.a
+
+	float specular;       // weight of the dielectric specular layer
+	vec3  specularColor;  // color of the dielectric specular layer
+	float transmission;   // KHR_materials_transmission
+
+	vec3  attenuationColor;     // KHR_materials_volume
+	float attenuationDistance;  //
+	float thickness;            // Replace for isThinWalled?
+
+	// KHR_materials_clearcoat
+	vec3 clearcoatF0;
+	vec3 clearcoatF90;
+	float clearcoatFactor;
+	vec3 clearcoatNormal;
+	float clearcoatRoughness;
+
+	float iridescence;
+	float iridescenceIor;
+	float iridescenceThickness;
+
+	vec3  sheenColor;
+	float sheenRoughness;
+	float ao;
+
+};
+
+// alphaMode
+#define ALPHA_OPAQUE 0
+#define ALPHA_MASK 1
+#define ALPHA_BLEND 2
 
 struct MeshState
 {

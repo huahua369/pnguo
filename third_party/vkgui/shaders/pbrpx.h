@@ -25,167 +25,183 @@ const int LightType_Spot = 2;
 #define LIGHT_COUNT 80
 #endif
 
-
-
-struct pbr_material_tex
-{
-uniform int u_MipCount;
-uniform mat3 u_EnvRotation;
-
-// General Material
-
-uniform float u_NormalScale;
-uniform int u_NormalUVSet;
-uniform mat3 u_NormalUVTransform;
-
-uniform vec3 u_EmissiveFactor;
-uniform int u_EmissiveUVSet;
-uniform mat3 u_EmissiveUVTransform;
-
-uniform int u_OcclusionUVSet;
-uniform float u_OcclusionStrength;
-uniform mat3 u_OcclusionUVTransform;
-
-uniform int u_BaseColorUVSet;
-uniform mat3 u_BaseColorUVTransform;
-
-uniform int u_MetallicRoughnessUVSet;
-uniform mat3 u_MetallicRoughnessUVTransform;
-
-uniform int u_DiffuseUVSet;
-uniform mat3 u_DiffuseUVTransform;
-
-uniform int u_SpecularGlossinessUVSet;
-uniform mat3 u_SpecularGlossinessUVTransform;
-
-uniform int u_ClearcoatUVSet;
-uniform mat3 u_ClearcoatUVTransform;
-
-uniform int u_ClearcoatRoughnessUVSet;
-uniform mat3 u_ClearcoatRoughnessUVTransform;
-
-uniform int u_ClearcoatNormalUVSet;
-uniform mat3 u_ClearcoatNormalUVTransform;
-uniform float u_ClearcoatNormalScale;
-
-uniform int u_SheenColorUVSet;
-uniform mat3 u_SheenColorUVTransform;
-uniform int u_SheenRoughnessUVSet;
-uniform mat3 u_SheenRoughnessUVTransform;
-
-uniform int u_SpecularUVSet;
-uniform mat3 u_SpecularUVTransform;
-uniform int u_SpecularColorUVSet;
-uniform mat3 u_SpecularColorUVTransform;
-
-uniform int u_TransmissionUVSet;
-uniform mat3 u_TransmissionUVTransform;
-uniform ivec2 u_TransmissionFramebufferSize;
-
-uniform int u_ThicknessUVSet;
-uniform mat3 u_ThicknessUVTransform;
-
-uniform int u_IridescenceUVSet;
-uniform mat3 u_IridescenceUVTransform;
-
-uniform int u_IridescenceThicknessUVSet;
-uniform mat3 u_IridescenceThicknessUVTransform;
-
-uniform int u_DiffuseTransmissionUVSet;
-uniform mat3 u_DiffuseTransmissionUVTransform;
-
-uniform int u_DiffuseTransmissionColorUVSet;
-uniform mat3 u_DiffuseTransmissionColorUVTransform;
-
-uniform int u_AnisotropyUVSet;
-uniform mat3 u_AnisotropyUVTransform;
-};
-
-#ifdef USE_PUNCTUAL
-uniform Light u_Lights[LIGHT_COUNT + 1]; //Array [0] is not allowed
+#ifdef ID_u_LambertianEnvSampler
+layout(set = 1, binding = ID_u_LambertianEnvSampler) uniform samplerCube u_LambertianEnvSampler;//*u_EnvRotation
 #endif
-
-uniform samplerCube u_LambertianEnvSampler;//*u_EnvRotation
-uniform samplerCube u_GGXEnvSampler;//*u_EnvRotation
-uniform sampler2D u_GGXLUT;
-uniform samplerCube u_CharlieEnvSampler;//*u_EnvRotation
-uniform sampler2D u_CharlieLUT;
-uniform sampler2D u_SheenELUT;
-
-uniform sampler2D u_NormalSampler;
-
-uniform sampler2D u_EmissiveSampler;
-
-uniform sampler2D u_OcclusionSampler;
+#ifdef ID_u_GGXEnvSampler
+layout(set = 1, binding = ID_u_GGXEnvSampler) uniform samplerCube u_GGXEnvSampler;//*u_EnvRotation
+#endif
+#ifdef ID_u_GGXLUT
+layout(set = 1, binding = ID_u_GGXLUT) uniform sampler2D u_GGXLUT;
+#endif
+#ifdef ID_u_CharlieEnvSampler
+layout(set = 1, binding = ID_u_CharlieEnvSampler) uniform samplerCube u_CharlieEnvSampler;//*u_EnvRotation
+#endif
+#ifdef ID_u_CharlieLUT
+layout(set = 1, binding = ID_u_CharlieLUT) uniform sampler2D u_CharlieLUT;
+#endif
+#ifdef ID_u_SheenELUT
+layout(set = 1, binding = ID_u_SheenELUT) uniform sampler2D u_SheenELUT;
+#endif
+#ifdef ID_u_NormalSampler
+layout(set = 1, binding = ID_u_NormalSampler) uniform sampler2D u_NormalSampler;
+#endif
+#ifdef ID_u_EmissiveSampler
+layout(set = 1, binding = ID_u_EmissiveSampler) uniform sampler2D u_EmissiveSampler;
+#endif
+#ifdef ID_u_OcclusionSampler
+layout(set = 1, binding = ID_u_OcclusionSampler) uniform sampler2D u_OcclusionSampler;
+#endif 
 
 #ifdef ID_SSAO
 layout(set = 1, binding = ID_SSAO) uniform sampler2D ssaoSampler;
 #endif
 
 #ifdef MATERIAL_METALLICROUGHNESS
-uniform sampler2D u_BaseColorSampler;
-uniform sampler2D u_MetallicRoughnessSampler;
+#ifdef ID_ID_u_BaseColorSampler
+layout(set = 1, binding = ID_u_BaseColorSampler) uniform sampler2D u_BaseColorSampler;
+#endif
+#ifdef ID_ID_u_MetallicRoughnessSampler
+layout(set = 1, binding = ID_u_MetallicRoughnessSampler) uniform sampler2D u_MetallicRoughnessSampler;
+#endif
 #endif
 
 #ifdef MATERIAL_SPECULARGLOSSINESS
-
-uniform sampler2D u_DiffuseSampler;
-uniform sampler2D u_SpecularGlossinessSampler;
+#ifdef ID_ID_u_DiffuseSampler
+layout(set = 1, binding = ID_u_DiffuseSampler) uniform sampler2D u_DiffuseSampler;
+#endif
+#ifdef ID_ID_u_SpecularGlossinessSampler
+layout(set = 1, binding = ID_u_SpecularGlossinessSampler) uniform sampler2D u_SpecularGlossinessSampler;
+#endif
 #endif
 
 #ifdef MATERIAL_CLEARCOAT
-
-uniform sampler2D u_ClearcoatSampler;
-uniform sampler2D u_ClearcoatRoughnessSampler;
-uniform sampler2D u_ClearcoatNormalSampler;
+layout(set = 1, binding = ID_u_ClearcoatSampler) uniform sampler2D u_ClearcoatSampler;
+layout(set = 1, binding = ID_u_ClearcoatRoughnessSampler) uniform sampler2D u_ClearcoatRoughnessSampler;
+layout(set = 1, binding = ID_u_ClearcoatNormalSampler) uniform sampler2D u_ClearcoatNormalSampler;
 #endif
 #ifdef MATERIAL_SHEEN
-
-uniform sampler2D u_SheenColorSampler;
-uniform sampler2D u_SheenRoughnessSampler;
+layout(set = 1, binding = ID_u_SheenColorSampler) uniform sampler2D u_SheenColorSampler;
+layout(set = 1, binding = ID_u_SheenRoughnessSampler) uniform sampler2D u_SheenRoughnessSampler;
 #endif
 #ifdef MATERIAL_SPECULAR
-
-uniform sampler2D u_SpecularSampler;
-uniform sampler2D u_SpecularColorSampler;
+layout(set = 1, binding = ID_u_SpecularSampler) uniform sampler2D u_SpecularSampler;
+layout(set = 1, binding = ID_u_SpecularColorSampler) uniform sampler2D u_SpecularColorSampler;
 #endif
 
 #ifdef MATERIAL_TRANSMISSION
-
-uniform sampler2D u_TransmissionSampler;
-uniform sampler2D u_TransmissionFramebufferSampler;
-
-
+#ifdef ID_ID_u_TransmissionSampler
+layout(set = 1, binding = ID_u_TransmissionSampler) uniform sampler2D u_TransmissionSampler;
+#endif
+#ifdef ID_ID_u_TransmissionFramebufferSampler
+layout(set = 1, binding = ID_u_TransmissionFramebufferSampler) uniform sampler2D u_TransmissionFramebufferSampler;
+#endif
 #endif
 
 
 // Volume Material 
 #ifdef MATERIAL_VOLUME
-
-uniform sampler2D u_ThicknessSampler;
+layout(set = 1, binding = ID_u_ThicknessSampler) uniform sampler2D u_ThicknessSampler;
 #endif 
 // Iridescence 
 #ifdef MATERIAL_IRIDESCENCE
-
-uniform sampler2D u_IridescenceSampler;
-uniform sampler2D u_IridescenceThicknessSampler;
+layout(set = 1, binding = ID_u_IridescenceSampler) uniform sampler2D u_IridescenceSampler;
+layout(set = 1, binding = ID_u_IridescenceThicknessSampler) uniform sampler2D u_IridescenceThicknessSampler;
 #endif
 
 
 // Diffuse Transmission
 
 #ifdef MATERIAL_DIFFUSE_TRANSMISSION
-
-uniform sampler2D u_DiffuseTransmissionSampler;
-uniform sampler2D u_DiffuseTransmissionColorSampler;
+layout(set = 1, binding = ID_u_DiffuseTransmissionSampler) uniform sampler2D u_DiffuseTransmissionSampler;
+layout(set = 1, binding = ID_u_DiffuseTransmissionColorSampler) uniform sampler2D u_DiffuseTransmissionColorSampler;
 #endif
 
 // Anisotropy
 
 #ifdef MATERIAL_ANISOTROPY
-uniform sampler2D u_AnisotropySampler;
+layout(set = 1, binding = ID_u_AnisotropySampler) uniform sampler2D u_AnisotropySampler;
 #endif
 
+
+
+struct pbr_material_tex
+{
+	uniform int u_MipCount;
+	uniform mat3 u_EnvRotation;
+
+	// General Material
+
+	uniform float u_NormalScale;
+	uniform int u_NormalUVSet;
+	uniform mat3 u_NormalUVTransform;
+
+	uniform vec3 u_EmissiveFactor;
+	uniform int u_EmissiveUVSet;
+	uniform mat3 u_EmissiveUVTransform;
+
+	uniform int u_OcclusionUVSet;
+	uniform float u_OcclusionStrength;
+	uniform mat3 u_OcclusionUVTransform;
+
+	uniform int u_BaseColorUVSet;
+	uniform mat3 u_BaseColorUVTransform;
+
+	uniform int u_MetallicRoughnessUVSet;
+	uniform mat3 u_MetallicRoughnessUVTransform;
+
+	uniform int u_DiffuseUVSet;
+	uniform mat3 u_DiffuseUVTransform;
+
+	uniform int u_SpecularGlossinessUVSet;
+	uniform mat3 u_SpecularGlossinessUVTransform;
+
+	uniform int u_ClearcoatUVSet;
+	uniform mat3 u_ClearcoatUVTransform;
+
+	uniform int u_ClearcoatRoughnessUVSet;
+	uniform mat3 u_ClearcoatRoughnessUVTransform;
+
+	uniform int u_ClearcoatNormalUVSet;
+	uniform mat3 u_ClearcoatNormalUVTransform;
+	uniform float u_ClearcoatNormalScale;
+
+	uniform int u_SheenColorUVSet;
+	uniform mat3 u_SheenColorUVTransform;
+	uniform int u_SheenRoughnessUVSet;
+	uniform mat3 u_SheenRoughnessUVTransform;
+
+	uniform int u_SpecularUVSet;
+	uniform mat3 u_SpecularUVTransform;
+	uniform int u_SpecularColorUVSet;
+	uniform mat3 u_SpecularColorUVTransform;
+
+	uniform int u_TransmissionUVSet;
+	uniform mat3 u_TransmissionUVTransform;
+	uniform ivec2 u_TransmissionFramebufferSize;
+
+	uniform int u_ThicknessUVSet;
+	uniform mat3 u_ThicknessUVTransform;
+
+	uniform int u_IridescenceUVSet;
+	uniform mat3 u_IridescenceUVTransform;
+
+	uniform int u_IridescenceThicknessUVSet;
+	uniform mat3 u_IridescenceThicknessUVTransform;
+
+	uniform int u_DiffuseTransmissionUVSet;
+	uniform mat3 u_DiffuseTransmissionUVTransform;
+
+	uniform int u_DiffuseTransmissionColorUVSet;
+	uniform mat3 u_DiffuseTransmissionColorUVTransform;
+
+	uniform int u_AnisotropyUVSet;
+	uniform mat3 u_AnisotropyUVTransform;
+};
+
+#ifdef USE_PUNCTUAL
+uniform Light u_Lights[LIGHT_COUNT + 1]; //Array [0] is not allowed
+#endif
 
 struct pbr_param
 {

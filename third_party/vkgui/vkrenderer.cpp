@@ -14948,7 +14948,7 @@ namespace vkr {
 	};
 
 	class fbo_info_cx;
-	// todo renderer
+	// todo renderer 渲染器
 	class Renderer_cx
 	{
 	public:
