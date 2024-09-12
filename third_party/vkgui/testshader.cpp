@@ -157,7 +157,6 @@ bool gl_FrontFacing = 1;
 
 #include "shaders/GLTF_VS2PS_IO.h"
 VS2PS Input;
-vec3 v_Position;
 
 namespace pbr
 {
