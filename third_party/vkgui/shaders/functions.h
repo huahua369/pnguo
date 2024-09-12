@@ -15,8 +15,9 @@
 // textures.glsl needs to be included
 
 const float c_MinReflectance = 0.04;
-
+#ifndef M_PI
 const float M_PI = 3.141592653589793F;  // PI
+#endif
 const float M_TWO_PI = 6.2831853071795F;  // 2*PI
 const float M_PI_2 = 1.5707963267948F;  // PI/2
 const float M_PI_4 = 0.7853981633974F;  // PI/4

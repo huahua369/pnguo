@@ -11,24 +11,32 @@ KHR_materials_specular ：镜面属性是一个对象的类似镜子的属性：
 
 using namespace glm;
 
-using glm::vec2;
-using glm::vec3;
-using glm::vec4;
-using glm::mat3x4;
+//using glm::vec2;
+//using glm::vec3;
+//using glm::vec4;
+//using glm::mat3x4;
+//using glm::mat3;
+//using glm::mat4;
 
 #ifndef M_PI
-#define M_PI00 3.14159265358979323846
+#define M_PI 3.14159265358979323846f
 #endif // !M_PI
+
 #define out
 #define in
 #define inout
+#define uniform
+#define sampler2D void*
+#define samplerCube void*
+
+
 #define MAX_LIGHT_INSTANCES  32
 #define ID_TEXCOORD_0  1
 #define ID_TEXCOORD_1  2
 //#define ID_baseTexCoord  0
 
 glm::vec3 px(const glm::vec2& pss) {
-	return vec3(pss, 0.0);// 读坐标像素
+	return glm::vec3(pss, 0.0f);// 读坐标像素
 }
 template <typename T>
 inline T dFdx(const T& x)
@@ -47,6 +55,38 @@ inline T fwidth(const T& x)
 {
 	return dFdx(x) + dFdy(x);
 }
+float clamp(float x, double c0, double c1)
+{
+	return glm::clamp((double)x, c0, c1);
+}
+vec2 clamp(const vec2& x, double c0, double c1)
+{
+	return glm::clamp((glm::dvec2)x, c0, c1);
+}
+vec3 clamp(const vec3& x, double c0, double c1)
+{
+	return glm::clamp((glm::dvec3)x, c0, c1);
+}
+vec4 clamp(const vec4& x, double c0, double c1)
+{
+	return glm::clamp((glm::dvec4)x, c0, c1);
+}
+
+float max(float x, double y)
+{
+	return glm::max(x, (float)y);
+}
+vec3 refract(vec3 l, vec3 n, double t) {
+	return glm::refract(l, n, (float)t);
+}
+vec4 texture(void*, const vec2& uv) {
+	return vec4(uv, 0.0f, 0.0f);
+}
+vec4 textureLod(void*, const vec2& uv, float lod) {
+	return vec4(uv, lod, 0.0);
+}
+
+
 #if 0
 #include "shaders/functions.h"
 #include "shaders/GLTF_VS2PS_IO.h"
@@ -117,7 +157,17 @@ bool gl_FrontFacing = 1;
 
 #include "shaders/GLTF_VS2PS_IO.h"
 VS2PS Input;
+vec3 v_Position;
 
+namespace pbr
+{
+
+#include "shaders/pbrpx.h"
+
+}
+
+
+#if 0
 
 #include "shaders/perFrameStruct.h"
 
@@ -132,7 +182,7 @@ PerFrame myPerFrame;
 
 	//PBRFactors u_pbrParams;
 pbrMaterial u_pbrParams;
-mat4 myPerObject_u_mCurrWorld;
+//mat4 myPerObject_u_mCurrWorld;
 
 //--------------------------------------------------------------------------------------
 // mainPS
@@ -182,3 +232,6 @@ void amain()
 	Output_finalColor = mix(Output_finalColor, wfo, myPerFrame.u_WireframeOptions.w);
 #endif
 }
+#endif
+
+
