@@ -9,8 +9,8 @@ KHR_materials_specular ：镜面属性是一个对象的类似镜子的属性：
 						与其前身 KHR_materials_pbrSpecularGlossiness 不同，这个新的镜面反射扩展在 glTF 的 PBR 材料模型核心的现代金属/粗糙度工作流程中运行，使彩色镜面高光与高级 PBR 材料扩展阵列兼容。
 */
 
-using namespace glm;
 
+using namespace glm;
 //using glm::vec2;
 //using glm::vec3;
 //using glm::vec4;
@@ -25,6 +25,7 @@ using namespace glm;
 #define out
 #define in
 #define inout
+#define discard
 #define uniform
 #define sampler2D void*
 #define samplerCube void*
@@ -138,11 +139,23 @@ vec2 testshader() {
 #define USE_IBL 1
 
 #endif
-#define MATERIAL_TRANSMISSION 1
-#define MATERIAL_TRANSMISSION 1
+//#define MATERIAL_TRANSMISSION 1 
 #define MATERIAL_METALLICROUGHNESS 1
 #define MATERIAL_SPECULARGLOSSINESS 1
-#define US0E_IBL 1
+#define MATERIAL_ANISOTROPY 1
+#define MATERIAL_VOLUME
+#define MATERIAL_IRIDESCENCE
+#define MATERIAL_DIFFUSE_TRANSMISSION
+#define MATERIAL_SHEEN 
+#define MATERIAL_CLEARCOAT 
+#define MATERIAL_SPECULAR
+#define MATERIAL_IRIDESCENCE 
+#define MATERIAL_IOR
+
+#define pbr_glsl 1
+#define pbr_iridescence 1
+#define pbr_ibl 1
+#define USE_IBL0 1
 
 
 #define USE_PUNCTUAL
