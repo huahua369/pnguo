@@ -18012,7 +18012,7 @@ namespace vkr {
 		Device* m_device = 0;
 		int m_Width = 1280;  // application window dimensions
 		int m_Height = 800;  // application window dimensions
-
+		int shadowResolution = 1024;
 		// Simulation management
 		double  m_lastFrameTime = 0.0;
 		double  m_deltaTime = 0.0;
@@ -18327,7 +18327,7 @@ namespace vkr {
 				l.m_range = 150;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
-				l.m_shadowResolution = 1024;
+				l.m_shadowResolution = shadowResolution;
 
 				pgc->AddLight(n, l);
 			}

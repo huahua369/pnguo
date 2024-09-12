@@ -786,10 +786,11 @@ int main()
 		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
 		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
 
 		load_gltf(vkd, R"(E:\model\sharp2.glb)");
-		load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
+		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
+		load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\FlightHelmet\glTF\FlightHelmet.gltf)");
 		//load_gltf(vkd, R"(E:\model\cube18.glb)");
 		vkd->resize(800, 600);
@@ -1115,7 +1116,7 @@ int main()
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		p->fontsize = 26;
 		p->set_size({ 500,600 });
-		p->set_pos({ 200,10 });
+		p->set_pos({ 2000,10 });
 		auto pss = p->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -1201,7 +1202,7 @@ int main()
 				{
 					//form1->bind(listp);	// 绑定到新窗口	
 					listp->draggable = true;
-					listp->set_pos({});
+					listp->set_pos({2000,0});
 					//form1->raise();
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
@@ -1362,7 +1363,7 @@ int main()
 	{
 		listp->draggable = true; //可拖动
 		listp->set_size({ 1600,800 });
-		listp->set_pos({ 10,10 });
+		listp->set_pos({ 1000,10 });
 		auto pss = listp->get_size();
 		int width = 10;
 		int rcw = 8;
@@ -1555,7 +1556,7 @@ int main()
 	{
 		pl1->draggable = true; //可拖动
 		pl1->set_size({ 530,600 });
-		pl1->set_pos({ 100,100 });
+		pl1->set_pos({ 1000,100 });
 		//pl1->set_clear_color(pbc);
 		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
 		pl1->fontsize = 16;
