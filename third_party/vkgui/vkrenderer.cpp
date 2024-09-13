@@ -4494,9 +4494,9 @@ namespace vkr
 				//
 				VkDescriptorSet descriptorSets[2] = { pPrimitive->m_descriptorSet, pPrimitive->m_pMaterial->m_descriptorSet };
 				uint32_t descritorSetCount = 1 + (pPrimitive->m_pMaterial->m_textureCount > 0 ? 1 : 0);
-
-				if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;// 变形动画和骨骼动画二选一
 				assert(!(pPerSkeleton && morph));
+				if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;// 变形动画和骨骼动画二选一
+
 				uint32_t uniformOffsets[3] = { (uint32_t)m_perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
 				uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
 
@@ -5607,6 +5607,7 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_transmission");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
+						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
 						tfmat->m_params.transmissionFactor = tt->Get("transmissionFactor").GetNumberAsDouble();
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
 					}
@@ -6381,12 +6382,13 @@ namespace vkr
 		rs.depthBiasSlopeFactor = 0;
 		rs.lineWidth = 2.0f;
 
-
+		bool depthwrite = true;
 		std::vector<VkPipelineColorBlendAttachmentState> att_states;
 		if (defines.Has("HAS_FORWARD_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			get_blend((defines.Has("DEF_alphaMode_BLEND")), att_state);
+			depthwrite = !(defines.Has("DEF_alphaMode_BLEND"));
+			get_blend(!depthwrite, att_state);
 #if 0
 			att_state.colorWriteMask = 0xf;
 			att_state.blendEnable = (defines.Has("DEF_alphaMode_BLEND"));
@@ -6495,7 +6497,7 @@ namespace vkr
 		ds.pNext = NULL;
 		ds.flags = 0;
 		ds.depthTestEnable = true;
-		ds.depthWriteEnable = true;
+		ds.depthWriteEnable = depthwrite;
 		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		ds.back.failOp = VK_STENCIL_OP_KEEP;
 		ds.back.passOp = VK_STENCIL_OP_KEEP;
@@ -6665,8 +6667,8 @@ namespace vkr
 		//
 		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
-		if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;
 		assert(!(pPerSkeleton && morph));
+		if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;
 		uint32_t uniformOffsets[3] = { (uint32_t)perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
 		uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
 
@@ -14514,10 +14516,14 @@ namespace vkr {
 			auto& inAccessor = pm->accessors[accessor];
 
 			int32_t bufferViewIdx = inAccessor.bufferView;// .value("bufferView", -1);
+			if (bufferViewIdx < 0)
+				return;
 			assert(bufferViewIdx >= 0);
 			auto& bufferView = pm->bufferViews[bufferViewIdx];
 
 			int32_t bufferIdx = bufferView.buffer;// .value("buffer", -1);
+			if (bufferIdx < 0)
+				return;
 			assert(bufferIdx >= 0);
 
 			char* buffer = m_buffersData[bufferIdx];
@@ -18324,11 +18330,11 @@ namespace vkr {
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
 				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 150;
+				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
 				l.m_shadowResolution = shadowResolution;
-
+				//l.m_bias = 0.00005;
 				pgc->AddLight(n, l);
 			}
 

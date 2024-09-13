@@ -33,7 +33,7 @@
 #define STB_RECT_PACK_IMPLEMENTATION
 #define STB_ONLY
 #include "stb_image.h"
-#include "stb_image_resize.h"
+//#include "stb_image_resize.h"
 #include "stb_image_write.h"
 #include "stb_rect_pack.h"
 #include "stb_truetype.h"

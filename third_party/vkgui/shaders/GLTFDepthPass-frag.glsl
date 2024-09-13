@@ -51,5 +51,18 @@ PerFrame myPerFrame;
 void main()
 { 
 	myPerFrame.u_LodBias = 0.0;
-	discardPixelIfAlphaCutOff(Input);
+#ifdef ID_TEXCOORD_0
+	vec2 uv = Input.UV0;
+#else
+	vec2 uv = vec2(0.0, 0.0);
+#endif
+	vec4 baseColor = getBaseColor(Input, uv);
+	 
+	if (baseColor.a < 0.1)
+		discard;
+#if DEF_alphaCutoff
+	if (baseColor.a < DEF_alphaCutoff)
+		discard;
+#endif
+	//discardPixelIfAlphaCutOff(Input);
 }

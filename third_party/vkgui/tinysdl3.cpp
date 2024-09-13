@@ -795,11 +795,12 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 		if (slot->color.w == 0 || !slot->bone->count || !attachment || attachment->color.w == 0) { continue; }
 		texture = (SDL_Texture*)attachment->tex;
 		auto c = skeleton->color * slot->color * attachment->color;
-		c *= 255;
-		vertex.color.r = std::min(255.0f, c.x);
-		vertex.color.g = std::min(255.0f, c.y);
-		vertex.color.b = std::min(255.0f, c.z);
-		vertex.color.a = std::min(255.0f, c.w);
+		*(glm::vec4*)(&vertex.color) = glm::clamp(c, 0.0f, 1.0f);
+		//c *= 255;
+		//vertex.color.r = std::min(255.0f, c.x);
+		//vertex.color.g = std::min(255.0f, c.y);
+		//vertex.color.b = std::min(255.0f, c.z);
+		//vertex.color.a = std::min(255.0f, c.w);
 		auto blend = get_blend((BlendMode_e)slot->blend_mode, skeleton->usePremultipliedAlpha);
 		//if (states.texture == 0) states.texture = texture;
 		if (states.blendMode != blend || states.texture != texture) {
