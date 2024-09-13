@@ -45,6 +45,7 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shadowFiltering.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PixelParams.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinning.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pbrpx.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/perFrameStruct.h
 )

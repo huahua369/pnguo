@@ -80,6 +80,9 @@ layout(location = HAS_MOTION_VECTORS_RT) out vec2 Output_motionVect;
 //
 //--------------------------------------------------------------------------------------
 
+#ifdef pbr_glsl
+#include "pbrpx.h"
+#else
 //--------------------------------------------------------------------------------------
 // Per Frame structure, must match the one in GlTFCommon.h
 //--------------------------------------------------------------------------------------
@@ -107,18 +110,38 @@ layout (scalar, set=0, binding = 1) uniform perObject
 };
 
 
-//--------------------------------------------------------------------------------------
-// mainPS
-//--------------------------------------------------------------------------------------
-
 #include "functions.h"
 #include "shadowFiltering.h"
 #include "bsdf_functions.h"
 #include "PixelParams.h"
 #include "GLTFPBRLighting.h"
+#endif
 
+//--------------------------------------------------------------------------------------
+// mainPS
+//--------------------------------------------------------------------------------------
 void main()
 {
+
+#ifdef pbr_glsl 
+	vsio_ps ipt;
+#ifdef ID_COLOR_0
+	ipt.v_Color0 = Input.Color0;
+#endif
+#ifdef ID_TEXCOORD_0
+	ipt.v_texcoord[0] = Input.UV0;
+#else
+	ipt.v_texcoord[0] = vec2(0.0, 0.0);
+#endif 
+#ifdef ID_TEXCOORD_1
+	ipt.v_texcoord[1] = Input.UV1;
+#else
+	ipt.v_texcoord[1] = vec2(0.0, 0.0);
+#endif 
+	ipt.v_Position = Input.WorldPos;
+
+	vec4 color = pbr_main(ipt);
+#else
 	discardPixelIfAlphaCutOff(Input);
 	gpuMaterial m = defaultPbrMaterial();
 #ifdef ID_TEXCOORD_0
@@ -135,7 +158,13 @@ void main()
 	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
 	vec4 color = vec4(c3, m.baseColor.a);
-#if 1
+//	if (u_pbrParams.alphaMode == ALPHA_OPAQUE)
+//	{
+//		color *= m.baseColor.a;
+//	}
+
+#endif
+#if 0
 	float perceptualRoughness;
 	vec3 diffuseColor;
 	vec3 specularColor;

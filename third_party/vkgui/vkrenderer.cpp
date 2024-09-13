@@ -906,7 +906,9 @@ namespace vkr {
 		float glossinessFactor;
 	};
 
-	struct pbrMaterial
+	using glm::ivec2;
+
+	struct old_pbrMaterial
 	{
 		// pbrMetallicRoughness
 		vec4  baseColorFactor;
@@ -944,6 +946,9 @@ namespace vkr {
 		float thicknessFactor;
 		//int   thicknessTexture;   
 
+		float diffuseTransmissionFactor;
+		vec3 diffuseTransmissionColorFactor;
+
 		// KHR_materials_anisotropy
 		float anisotropyStrength;
 		//int   anisotropyTexture; 
@@ -977,19 +982,78 @@ namespace vkr {
 		//int   sheenRoughnessTexture;  
 		//KHR_materials_dispersion
 		float dispersion = 0.0;
-		float p0;
-		float p2;
-		float p1;
 		// KHR_texture_transform 
-		mat3 uvTransform = mat3(1.0);
+		//mat3 uvTransform = mat3(1.0);
 
+		ivec2 transmissionFramebufferSize;
 	};
+
+
+	struct pbr_factors_t
+	{
+		// pbrMetallicRoughness
+		vec4 baseColorFactor;
+		float metallicFactor;
+		float roughnessFactor;
+		float normalScale;
+		// KHR_materials_emissive_strength
+		float emissiveStrength;
+		vec3 emissiveFactor;
+		int   alphaMode;
+		float alphaCutoff;
+		// KHR_materials_pbrSpecularGlossiness
+		vec4 pbrDiffuseFactor;
+		vec3 pbrSpecularFactor;
+		float glossinessFactor;
+
+		float envIntensity;
+
+		float occlusionStrength;
+		float ior;
+		int mipCount;
+		// Specular KHR_materials_specular
+		float specularFactor;
+		vec3  specularColorFactor;
+		// KHR_materials_sheen 
+		float sheenRoughnessFactor;
+		vec3 sheenColorFactor;
+		// KHR_materials_transmission
+		float transmissionFactor;
+
+		ivec2 transmissionFramebufferSize;
+		float thicknessFactor;
+		float diffuseTransmissionFactor;
+
+		vec3 diffuseTransmissionColorFactor;
+		//KHR_materials_dispersion
+		float dispersion;
+
+		vec3 attenuationColor;
+		float attenuationDistance;
+
+		// Iridescence
+		float iridescenceFactor;
+		float iridescenceIor;
+		float iridescenceThicknessMinimum;
+		float iridescenceThicknessMaximum;
+
+		float clearcoatFactor;
+		float clearcoatRoughness;
+		float clearcoatNormalScale;
+		int unlit;
+		vec3 anisotropy;
+	};
+
+
+#define pbrMaterial pbr_factors_t
+
 	struct PBRMaterialParameters
 	{
 		bool     m_doubleSided = false;
 		bool     m_blending = false;
 
 		DefineList m_defines;
+
 		pbrMaterial m_params = {};
 	};
 	struct morph_t;
@@ -2493,6 +2557,7 @@ namespace vkr {
 		std::map<std::string, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
+		std::map<int, std::vector<glm::mat3>> m_uv_mats; // UVmat
 
 		per_frame m_perFrameData;
 		std::map<int, std::vector<glm::vec3>> targets_data;
@@ -3104,7 +3169,7 @@ namespace vkr {
 		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
 
 		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, VkImageView>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
-		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, morph_t* morphing, bool bUseSSAOMask);
+		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, morph_t* morphing, int muvt_size, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
@@ -3528,12 +3593,21 @@ const T& tinygltf::Value::Get() const {
 	int c = std::is_same<T, glm::vec2>::value ? 2 : 0;
 	c = std::is_same<T, glm::vec3>::value ? 3 : c;
 	c = std::is_same<T, glm::vec4>::value ? 4 : c;
+	c = std::is_same<T, double>::value ? 1 : c;
+	c = std::is_same<T, float>::value ? 1 : c;
 	static T r = {};
 	if (c > 0)
 	{
-		for (int i = 0; i < array_value_.size() && i < c; i++)
+		if (IsNumber() && c == 1)
 		{
-			r[i] = array_value_[i].GetNumberAsDouble();
+			r = (T)GetNumberAsDouble();
+		}
+		else
+		{
+			for (int i = 0; i < array_value_.size() && i < c; i++)
+			{
+				r[i] = array_value_[i].GetNumberAsDouble();
+			}
 		}
 	}
 	return r;
@@ -4160,7 +4234,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing)
+	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing )
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layout_bindings(2);
 		layout_bindings[0].binding = 0;
@@ -4178,38 +4252,44 @@ namespace vkr
 		(*pAttributeDefines)["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
 		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		auto dt1 = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		int binc = 2;
+		int skb = 2;
+		int muvt = 2;
+		int td = 2;
+		int md = 2;
+
 		if (inverseMatrixBufferSize > 0)
 		{
 			VkDescriptorSetLayoutBinding b;
 
 			// skinning matrices
-			b.binding = 2;
+			b.binding = binc++;
 			b.descriptorType = dt;// VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;// ;// |
 			b.descriptorCount = 1;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.pImmutableSamplers = NULL;
 			(*pAttributeDefines)["ID_SKINNING_MATRICES"] = std::to_string(b.binding);
-
+			skb = b.binding;
 			layout_bindings.push_back(b);
-		}
+		} 
 		if (morphing)
 		{
 			auto& df = (*pAttributeDefines);
 			VkDescriptorSetLayoutBinding b;
 			// 变形动画
-			b.binding = 4;
+			b.binding = binc++;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt1;
-			df["ID_TARGET_DATA"] = std::to_string(b.binding);
+			df["ID_TARGET_DATA"] = std::to_string(b.binding);	td = b.binding;
 			layout_bindings.push_back(b);
-			b.binding = 3;
+			b.binding = binc++;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt;
-			df["ID_MORPHING_DATA"] = std::to_string(b.binding);
+			df["ID_MORPHING_DATA"] = std::to_string(b.binding);	dd = b.binding;
 			layout_bindings.push_back(b);
 			for (auto& [k, v] : morphing->defs) {
 				df[k] = std::to_string(v);
@@ -4224,12 +4304,13 @@ namespace vkr
 
 		if (inverseMatrixBufferSize > 0)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet, dt);
+			m_pDynamicBufferRing->SetDescriptorSet(skb, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet, dt);
 		}
+ 
 		if (morphing)
 		{
-			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, 4, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
+			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, md, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
+			m_pDynamicBufferRing->SetDescriptorSet(td, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
 		}
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pPrimitive->m_descriptorSetLayout };
@@ -5412,7 +5493,6 @@ namespace vkr
 		pPbrMaterialParameters->m_doubleSided = false;
 		pPbrMaterialParameters->m_blending = false;
 		auto& pbrm = pPbrMaterialParameters->m_params;
-		pbrm.uvTransform = glm::mat3x4(1.0);
 		pbrm.emissiveFactor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 		pbrm.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 		pbrm.metallicFactor = 0.0f;
@@ -5450,9 +5530,9 @@ namespace vkr
 	}
 
 	template<class T>
-	glm::vec4 tov4(const T& v)
+	glm::vec4 tov4(const T& v, const vec4& d)
 	{
-		return glm::vec4(v[0], v[1], v[2], v.size() > 3 ? v[3] : 0);
+		return v.size() > 0 ? glm::vec4(v[0], v[1], v[2], v.size() > 3 ? v[3] : 0) : d;
 	}
 
 	void itcb(tinygltf::Value ns, const std::string& k, const std::string& kd, DefineList& m_defines, std::map<std::string, int>& textureIds)
@@ -5485,7 +5565,7 @@ namespace vkr
 		auto it = extensions.find(k);
 		return (it != extensions.end()) ? &it->second : nullptr;
 	}
-	glm::mat3x4 get_mat3x4(glm::vec2 offset, float rotation, glm::vec2 scale = { 1.0f, 1.0f })
+	glm::mat3 get_mat3(glm::vec2 offset, float rotation, glm::vec2 scale = { 1.0f, 1.0f })
 	{
 		// Compute combined transformation matrix
 		float cosR = cos(rotation);
@@ -5494,7 +5574,44 @@ namespace vkr
 		float ty = offset.y;
 		float sx = scale.x;
 		float sy = scale.y;
-		return glm::mat3x4(sx * cosR, sx * sinR, tx, 0.0f, -sy * sinR, sy * cosR, ty, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+		return glm::mat3(sx * cosR, sx * sinR, tx, -sy * sinR, sy * cosR, ty, 0.0f, 0.0f, 1.0f);
+	}
+	template<class T>
+	T get_v(const tinygltf::Value* v, const char* k, T rdef)
+	{
+		if (v && v->Has(k)) {
+			rdef = v->Get(k).Get<T>();
+		}
+		return rdef;
+	}
+	template<class T>
+	T get_v(const tinygltf::Value* v, T rdef)
+	{
+		if (v) {
+			rdef = v->Get<T>();
+		}
+		return rdef;
+	}
+	template<class T>
+	T get_v(const tinygltf::Value& v, T rdef)
+	{
+		if (v) {
+			rdef = v.Get<T>();
+		}
+		return rdef;
+	}
+	bool get_KHR_texture_transform(tinygltf::ExtensionMap& extensions, glm::mat3* m)
+	{
+		auto tt = get_ext(extensions, "KHR_texture_transform");
+		if (tt) {
+			int tc = get_v(tt, "texCoord", -1);
+			double r = get_v(tt, "rotation", 0.0);
+			glm::vec2 o = get_v(tt, "offset", glm::vec2(0, 0));
+			glm::vec2 s = get_v(tt, "scale", glm::vec2(1, 1));
+			auto m1 = get_mat3(o, r, s);
+			if (m)*m = m1;
+		}
+		return tt;
 	}
 	void ProcessMaterials(tinygltf::Material* pm, PBRMaterialParameters* tfmat, std::map<std::string, int>& textureIds)
 	{
@@ -5505,27 +5622,41 @@ namespace vkr
 		glm::vec4 zeroes = { 0.0, 0.0, 0.0, 0.0 };
 		tfmat->m_doubleSided = material.doubleSided;
 		tfmat->m_blending = material.alphaMode == "BLEND";
-		tfmat->m_params.emissiveFactor = (material.emissiveFactor.size()) ? tov4(material.emissiveFactor) : zeroes;
+		tfmat->m_params.emissiveFactor = tov4(material.emissiveFactor, zeroes);
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
 		tfmat->m_defines["DEF_alphaCutoff"] = std::to_string(material.alphaCutoff);
 		tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
-
+		int uvc = 1;
 		// look for textures and store their IDs in a map 
 		//
 		if (material.normalTexture.index != -1)
 		{
 			textureIds["normalTexture"] = material.normalTexture.index;
+
 			tfmat->m_defines["ID_normalTexCoord"] = std::to_string(material.normalTexture.texCoord);
+			glm::mat3 m3 = glm::mat3(1.0);
+			if (get_KHR_texture_transform(material.normalTexture.extensions, &m3)) {
+				tfmat->m_defines["UVT_emissiveTexture"] = std::to_string(uvc++);
+			}
 		}
 		if (material.emissiveTexture.index != -1)
 		{
 			textureIds["emissiveTexture"] = material.emissiveTexture.index;
 			tfmat->m_defines["ID_emissiveTexCoord"] = std::to_string(material.emissiveTexture.texCoord);
+			glm::mat3 m3 = glm::mat3(1.0);
+			if (get_KHR_texture_transform(material.emissiveTexture.extensions, &m3)) {
+				tfmat->m_defines["UVT_emissiveTexture"] = std::to_string(uvc++);
+			}
 		}
 		if (material.occlusionTexture.index != -1)
 		{
 			textureIds["occlusionTexture"] = material.occlusionTexture.index;
+			tfmat->m_params.occlusionStrength = material.occlusionTexture.strength;
 			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord);
+			glm::mat3 m3 = glm::mat3(1.0);
+			if (get_KHR_texture_transform(material.occlusionTexture.extensions, &m3)) {
+				tfmat->m_defines["UVT_occlusionTexture"] = std::to_string(uvc++);
+			}
 		}
 
 
@@ -5538,34 +5669,15 @@ namespace vkr
 			if (material.extensions.size())
 			{
 				auto extensions = material.extensions;
-				auto tt = get_ext(extensions, KHR_TEXTURE_TRANSFORM_EXTENSION_NAME);
-				if (tt) {
-					glm::vec2 o = tt->Get("offset").Get<glm::vec2>();
-					glm::vec2 s = tt->Get("scale").Get<glm::vec2>();
-					float r = tt->Get("rotation").GetNumberAsDouble();
-					int tcid = tt->Get("texCoord").GetNumberAsDouble();
-					tfmat->m_defines["MATERIAL_TEXTURE_TRANSFORM"] = "1";
-					tfmat->m_params.uvTransform = get_mat3x4(o, r, s);
-				}
+
 				auto sg = get_ext(extensions, "KHR_materials_pbrSpecularGlossiness");
 				if (sg && (pbrMetallicRoughness.baseColorTexture.index == -1))
 				{
 					auto pbrSpecularGlossiness = *sg;
 					tfmat->m_defines["MATERIAL_SPECULARGLOSSINESS"] = "1";
-					float glossiness = 1.0;
-					if (pbrSpecularGlossiness.Has("glossinessFactor"))
-					{
-						glossiness = pbrSpecularGlossiness.Get("glossinessFactor").GetNumberAsDouble();
-					}
-					if (pbrSpecularGlossiness.Has("diffuseFactor"))
-						tfmat->m_params.pbrDiffuseFactor = pbrSpecularGlossiness.Get("diffuseFactor").Get<glm::vec4>();
-					else
-						tfmat->m_params.pbrDiffuseFactor = ones;
-					glm::vec3 specularFactor = ones;
-					if (pbrSpecularGlossiness.Has("specularFactor"))
-						specularFactor = pbrSpecularGlossiness.Get("specularFactor").Get<glm::vec3>();
-					tfmat->m_params.pbrSpecularFactor = specularFactor;
-					tfmat->m_params.glossinessFactor = glossiness;
+					tfmat->m_params.pbrDiffuseFactor = get_v(&pbrSpecularGlossiness, "diffuseFactor", glm::vec4(1.0));
+					tfmat->m_params.pbrSpecularFactor = get_v(&pbrSpecularGlossiness, "specularFactor", glm::vec3(1.0));
+					tfmat->m_params.glossinessFactor = get_v(&pbrSpecularGlossiness, "glossinessFactor", 1.0);
 					itcb(pbrSpecularGlossiness, "diffuseTexture", "ID_diffuseTexCoord", tfmat->m_defines, textureIds);
 					itcb(pbrSpecularGlossiness, "specularGlossinessTexture", "ID_specularGlossinessTexCoord", tfmat->m_defines, textureIds);
 					break;
@@ -5594,13 +5706,20 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_ior");
 					if (tt) {
-						tfmat->m_params.ior = tt->Get("ior").GetNumberAsDouble();
+						tfmat->m_params.ior = get_v(tt, "ior", 1.5);
+					}
+				}
+				{
+					auto tt = get_ext(extensions, "KHR_materials_emissive_strength");
+					if (tt) {
+						tfmat->m_params.ior = get_v(tt, "emissiveStrength", 1.0);
+						tfmat->m_defines["MATERIAL_EMISSIVE_STRENGTH"] = "1";
 					}
 				}
 				{
 					auto tt = get_ext(extensions, "KHR_materials_dispersion");
 					if (tt) {
-						tfmat->m_params.dispersion = tt->Get("dispersion").GetNumberAsDouble();
+						tfmat->m_params.dispersion = get_v(tt, "dispersion", 0);
 					}
 				}
 				{
@@ -5608,18 +5727,25 @@ namespace vkr
 					if (tt) {
 						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
 						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
-						tfmat->m_params.transmissionFactor = tt->Get("transmissionFactor").GetNumberAsDouble();
+						tfmat->m_params.transmissionFactor = get_v(tt, "transmissionFactor", 0.0);
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
 					}
 				}
+				//this.shader.updateUniform("transmissionFactor", material.extensions ? .KHR_materials_transmission ? .transmissionFactor);
+				//this.shader.updateUniform("transmissionUVSet", material.extensions ? .KHR_materials_transmission ? .transmissionTexture ? .texCoord);
+
+				//this.shader.updateUniform("diffuseTransmissionFactor", material.extensions ? .KHR_materials_diffuse_transmission ? .diffuseTransmissionFactor);
+				//this.shader.updateUniform("diffuseTransmissionColorFactor", jsToGl(material.extensions ? .KHR_materials_diffuse_transmission ? .diffuseTransmissionColorFactor));
+				//this.shader.updateUniform("diffuseTransmissionUVSet", material.extensions ? .KHR_materials_diffuse_transmission ? .diffuseTransmissionTexture ? .texCoord);
+				//this.shader.updateUniform("diffuseTransmissionColorUVSet", material.extensions ? .KHR_materials_diffuse_transmission ? .diffuseTransmissionColorTexture ? .texCoord);
 				{
 					auto tt = get_ext(extensions, "KHR_materials_volume");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
 						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
-						tfmat->m_params.attenuationColor = tt->Get("attenuationColor").Get<glm::vec3>();
-						tfmat->m_params.attenuationDistance = tt->Get("attenuationDistance").GetNumberAsDouble();
-						tfmat->m_params.thicknessFactor = tt->Get("thicknessFactor").GetNumberAsDouble();
+						tfmat->m_params.attenuationColor = get_v(tt, "attenuationColor", glm::vec3(1.0));
+						tfmat->m_params.attenuationDistance = get_v(tt, "attenuationDistance", 10240);
+						tfmat->m_params.thicknessFactor = get_v(tt, "thicknessFactor", 0.0);
 						itcb(*tt, "thicknessTexture", "ID_thicknessTexCoord", tfmat->m_defines, textureIds);
 					}
 				}
@@ -5627,8 +5753,11 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_anisotropy");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_ANISOTROPY"] = "1";
-						tfmat->m_params.anisotropyStrength = tt->Get("anisotropyStrength").GetNumberAsDouble();
-						tfmat->m_params.anisotropyRotation = tt->Get("anisotropyRotation").GetNumberAsDouble();
+						auto anisotropyStrength = get_v(tt, "anisotropyStrength", 0.0);
+						auto anisotropyRotation = get_v(tt, "anisotropyRotation", 0.0);
+
+						tfmat->m_params.anisotropy = vec3(cos(anisotropyRotation), sin(anisotropyRotation), anisotropyStrength);
+
 						itcb(*tt, "anisotropyTexture", "ID_anisotropyTexCoord", tfmat->m_defines, textureIds);
 					}
 				}
@@ -5636,8 +5765,8 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_clearcoat");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_CLEARCOAT"] = "1";
-						tfmat->m_params.clearcoatFactor = tt->Get("clearcoatFactor").GetNumberAsDouble();
-						tfmat->m_params.clearcoatRoughness = tt->Get("clearcoatRoughness").GetNumberAsDouble();
+						tfmat->m_params.clearcoatFactor = get_v(tt, "clearcoatFactor", 0.0);
+						tfmat->m_params.clearcoatRoughness = get_v(tt, "clearcoatRoughness", 0.0);
 						itcb(*tt, "clearcoatTexture", "ID_clearcoatTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "clearcoatRoughnessTexture", "ID_clearcoatRoughnessTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "clearcoatNormalTexture", "ID_clearcoatNormalTexCoord", tfmat->m_defines, textureIds);
@@ -5647,8 +5776,8 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_specular");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_SPECULAR"] = "1";
-						tfmat->m_params.specularColorFactor = tt->Get("specularColorFactor").Get<glm::vec3>();
-						tfmat->m_params.specularFactor = tt->Get("specularFactor").GetNumberAsDouble();
+						tfmat->m_params.specularColorFactor = get_v(tt, "specularColorFactor", glm::vec3(1.0));
+						tfmat->m_params.specularFactor = get_v(tt, "specularFactor", 1.0);
 						itcb(*tt, "specularTexture", "ID_specularTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "specularColorTexture", "ID_specularColorTexCoord", tfmat->m_defines, textureIds);
 					}
@@ -5657,10 +5786,10 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_iridescence");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_IRIDESCENCE"] = "1";
-						tfmat->m_params.iridescenceFactor = tt->Get("iridescenceFactor").GetNumberAsDouble();
-						tfmat->m_params.iridescenceThicknessMinimum = tt->Get("iridescenceThicknessMinimum").GetNumberAsDouble();
-						tfmat->m_params.iridescenceThicknessMaximum = tt->Get("iridescenceThicknessMaximum").GetNumberAsDouble();
-						tfmat->m_params.iridescenceIor = tt->Get("iridescenceIor").GetNumberAsDouble();
+						tfmat->m_params.iridescenceFactor = get_v(tt, "iridescenceFactor", 0.0);
+						tfmat->m_params.iridescenceThicknessMinimum = get_v(tt, "iridescenceThicknessMinimum", 100);
+						tfmat->m_params.iridescenceThicknessMaximum = get_v(tt, "iridescenceThicknessMaximum", 400);
+						tfmat->m_params.iridescenceIor = get_v(tt, "iridescenceIor", 1.3);
 						itcb(*tt, "iridescenceTexture", "ID_iridescenceTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "iridescenceThicknessTexture", "ID_iridescenceThicknessTexCoord", tfmat->m_defines, textureIds);
 					}
@@ -5669,8 +5798,8 @@ namespace vkr
 					auto tt = get_ext(extensions, "KHR_materials_sheen");
 					if (tt) {
 						tfmat->m_defines["MATERIAL_SHEEN"] = "1";
-						tfmat->m_params.sheenColorFactor = tt->Get("sheenColorFactor").Get<glm::vec3>();
-						tfmat->m_params.sheenRoughnessFactor = tt->Get("sheenRoughnessFactor").GetNumberAsDouble();
+						tfmat->m_params.sheenColorFactor = get_v(tt, "sheenColorFactor", glm::vec3());
+						tfmat->m_params.sheenRoughnessFactor = get_v(tt, "sheenRoughnessFactor", 0.0);
 						itcb(*tt, "sheenColorTexture", "ID_sheenColorTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "sheenRoughnessTexture", "ID_sheenRoughnessTexCoord", tfmat->m_defines, textureIds);
 					}
@@ -5685,16 +5814,24 @@ namespace vkr
 				float roughnessFactor = pbrMetallicRoughness.roughnessFactor;
 				tfmat->m_params.metallicFactor = metallicFactor;
 				tfmat->m_params.roughnessFactor = roughnessFactor;
-				tfmat->m_params.baseColorFactor = pbrMetallicRoughness.baseColorFactor.size() ? tov4(pbrMetallicRoughness.baseColorFactor) : ones;
+				tfmat->m_params.baseColorFactor = tov4(pbrMetallicRoughness.baseColorFactor, ones);
 				tfmat->m_defines["MATERIAL_METALLICROUGHNESS"] = "1";
 				if (pbrMetallicRoughness.baseColorTexture.index != -1)
 				{
 					textureIds["baseColorTexture"] = pbrMetallicRoughness.baseColorTexture.index;
 					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughness.baseColorTexture.texCoord);
+					glm::mat3 m3 = glm::mat3(1.0);
+					if (get_KHR_texture_transform(pbrMetallicRoughness.baseColorTexture.extensions, &m3)) {
+						tfmat->m_defines["UVT_baseColorTexture"] = std::to_string(uvc++);
+					}
 				}
 				if (pbrMetallicRoughness.metallicRoughnessTexture.index != -1) {
 					textureIds["metallicRoughnessTexture"] = pbrMetallicRoughness.metallicRoughnessTexture.index;
 					tfmat->m_defines["ID_metallicRoughnessTexCoord"] = std::to_string(pbrMetallicRoughness.metallicRoughnessTexture.texCoord);
+					glm::mat3 m3 = glm::mat3(1.0);
+					if (get_KHR_texture_transform(pbrMetallicRoughness.metallicRoughnessTexture.extensions, &m3)) {
+						tfmat->m_defines["UVT_metallicRoughnessTexture"] = std::to_string(uvc++);
+					}
 				}
 			}
 
@@ -6092,6 +6229,7 @@ namespace vkr
 			if (pSkyDome)
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
+				tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
 				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, &m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
 
@@ -6194,7 +6332,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, morph_t* morphing, bool bUseSSAOMask)
+	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, morph_t* morphing, int muvt_size, bool bUseSSAOMask)
 	{
 		// Creates descriptor set layout binding for the constant buffers
 		//
@@ -6218,18 +6356,38 @@ namespace vkr
 
 		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		auto dt1 = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		int binc = 2;
+		int skb = 2;
+		int muvt = 2;
+		int td = 2;
+		int md = 2;
 		// Constant buffer holding the skinning matrices
 		if (inverseMatrixBufferSize > 0)
 		{
 			VkDescriptorSetLayoutBinding b;
 
 			// skinning matrices
-			b.binding = 2;
+			b.binding = binc++;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt;
+			skb = b.binding;
 			(*pAttributeDefines)["ID_SKINNING_MATRICES"] = std::to_string(b.binding);
+
+			layout_bindings.push_back(b);
+		}
+		if (muvt_size)
+		{
+			// UV矩阵
+			VkDescriptorSetLayoutBinding b;
+			b.binding = binc++;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			b.descriptorType = dt;
+			muvt = b.binding;
+			(*pAttributeDefines)["ID_MATUV_DATA"] = std::to_string(b.binding);
 
 			layout_bindings.push_back(b);
 		}
@@ -6238,18 +6396,20 @@ namespace vkr
 			auto& df = (*pAttributeDefines);
 			VkDescriptorSetLayoutBinding b;
 			// 变形动画
-			b.binding = 4;
+			b.binding = binc++;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt1;
+			td = b.binding;
 			df["ID_TARGET_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
-			b.binding = 3;
+			b.binding = binc++;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt;
+			md = b.binding;
 			df["ID_MORPHING_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
 			for (auto& [k, v] : morphing->defs) {
@@ -6266,12 +6426,16 @@ namespace vkr
 
 		if (inverseMatrixBufferSize > 0)
 		{
-			m_pDynamicBufferRing->SetDescriptorSet(2, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet, dt);
+			m_pDynamicBufferRing->SetDescriptorSet(skb, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet, dt);
+		}
+		if (muvt_size > 0)
+		{
+			m_pDynamicBufferRing->SetDescriptorSet(muvt, (uint32_t)muvt_size, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 		if (morphing)
 		{
-			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, 4, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
-			m_pDynamicBufferRing->SetDescriptorSet(3, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
+			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, md, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
+			m_pDynamicBufferRing->SetDescriptorSet(td, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 
 		// Create the pipeline layout
@@ -6324,10 +6488,11 @@ namespace vkr
 	// CreatePipeline
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive)
+	void GltfPbrPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines0, PBRPrimitives* pPrimitive)
 	{
 		// Compile and create shaders
-		//
+		auto defines = defines0;
+		defines["pbr_glsl"] = "1";
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
@@ -6382,12 +6547,11 @@ namespace vkr
 		rs.depthBiasSlopeFactor = 0;
 		rs.lineWidth = 2.0f;
 
-		bool depthwrite = true;
+		bool depthwrite = !(pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_blending || (defines.Has("DEF_alphaMode_BLEND")));
 		std::vector<VkPipelineColorBlendAttachmentState> att_states;
 		if (defines.Has("HAS_FORWARD_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			depthwrite = !(defines.Has("DEF_alphaMode_BLEND"));
 			get_blend(!depthwrite, att_state);
 #if 0
 			att_state.colorWriteMask = 0xf;
