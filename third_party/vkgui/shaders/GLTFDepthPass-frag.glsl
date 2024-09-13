@@ -60,7 +60,7 @@ void main()
 	 
 	if (baseColor.a < 0.1)
 		discard;
-#if DEF_alphaCutoff
+#ifdef DEF_alphaCutoff
 	if (baseColor.a < DEF_alphaCutoff)
 		discard;
 #endif

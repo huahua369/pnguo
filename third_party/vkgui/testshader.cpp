@@ -31,7 +31,7 @@ using namespace glm;
 #define samplerCube void*
 
 
-#define MAX_LIGHT_INSTANCES  32
+#define MAX_LIGHT_INSTANCES  80
 #define ID_TEXCOORD_0  1
 #define ID_TEXCOORD_1  2
 //#define ID_baseTexCoord  0

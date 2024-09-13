@@ -158,11 +158,6 @@ void main()
 	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
 	vec4 color = vec4(c3, m.baseColor.a);
-//	if (u_pbrParams.alphaMode == ALPHA_OPAQUE)
-//	{
-//		color *= m.baseColor.a;
-//	}
-
 #endif
 #if 0
 	float perceptualRoughness;

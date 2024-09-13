@@ -12,6 +12,11 @@ const int LightType_Spot = 2;
 #define MAX_SHADOW_INSTANCES 32
 #endif
 
+// alphaMode
+#define ALPHA_OPAQUE 0
+#define ALPHA_MASK 1
+#define ALPHA_BLEND 2
+
 struct Light
 {
 	mat4          mLightViewProj; // 阴影用
@@ -183,7 +188,7 @@ layout(set = 1, binding = ID_clearcoatNormalTexture) uniform sampler2D u_Clearco
 #ifdef ID_sheenColorTexture
 layout(set = 1, binding = ID_sheenColorTexture) uniform sampler2D u_SheenColorSampler;
 #endif
-#if ID_sheenRoughnessTexture
+#ifdef ID_sheenRoughnessTexture
 layout(set = 1, binding = ID_sheenRoughnessTexture) uniform sampler2D u_SheenRoughnessSampler;
 #endif
 #ifdef ID_specularTexture
@@ -221,7 +226,7 @@ layout(set = 1, binding = ID_iridescenceThicknessTexture) uniform sampler2D u_Ir
 #ifdef ID_diffuseTransmissionTexture
 layout(set = 1, binding = ID_diffuseTransmissionTexture) uniform sampler2D u_DiffuseTransmissionSampler;
 #endif
-#if ID_diffuseTransmissionColorTexture
+#ifdef  ID_diffuseTransmissionColorTexture
 layout(set = 1, binding = ID_diffuseTransmissionColorTexture) uniform sampler2D u_DiffuseTransmissionColorSampler;
 #endif
 
@@ -238,30 +243,37 @@ layout(set = 1, binding = ID_shadowMap) uniform sampler2DShadow u_shadowMap[MAX_
 #endif
 
 
-
 struct pbr_factors_t
 {
+	// pbrMetallicRoughness
 	vec4 baseColorFactor;
-	vec4 pbrDiffuseFactor;
-	vec3 pbrSpecularFactor;
-	int mipCount;
-
-	float envIntensity;
-	// General Material 
-	// Metallic Roughness
 	float metallicFactor;
 	float roughnessFactor;
 	float normalScale;
+	// KHR_materials_emissive_strength
+	float emissiveStrength;
+	vec3 emissiveFactor;
+	int   alphaMode;
 
+	float alphaCutoff;
 	float occlusionStrength;
 	float ior;
+	int mipCount;
+	// KHR_materials_pbrSpecularGlossiness
+	vec4 pbrDiffuseFactor;
+	vec3 pbrSpecularFactor;
 	float glossinessFactor;
-	// Specular KHR_materials_specular
-	float specularFactor;
 
+
+	// Specular KHR_materials_specular
 	vec3  specularColorFactor;
-	float sheenRoughnessFactor;
+	float specularFactor;
+	// KHR_materials_sheen 
 	vec3 sheenColorFactor;
+	float sheenRoughnessFactor;
+
+	vec3 anisotropy;
+	// KHR_materials_transmission
 	float transmissionFactor;
 
 	ivec2 transmissionFramebufferSize;
@@ -269,6 +281,7 @@ struct pbr_factors_t
 	float diffuseTransmissionFactor;
 
 	vec3 diffuseTransmissionColorFactor;
+	//KHR_materials_dispersion
 	float dispersion;
 
 	vec3 attenuationColor;
@@ -283,13 +296,13 @@ struct pbr_factors_t
 	float clearcoatFactor;
 	float clearcoatRoughness;
 	float clearcoatNormalScale;
-	float emissiveStrength;
-	vec3 emissiveFactor;
+	float envIntensity;
+
 	int unlit;
-	vec3 anisotropy;
-	int   alphaMode;
-	float alphaCutoff;
+	vec3 padd0;
 };
+
+
 
 #ifndef __cplusplus
 layout(scalar, set = 0, binding = 0) uniform perFrame
@@ -304,7 +317,7 @@ layout(scalar, set = 0, binding = 1) uniform perObject
 	//PBRFactors u_pbrParams;
 	pbr_factors_t u_pbrParams;
 };
-#if ID_MATUV_DATA
+#ifdef  ID_MATUV_DATA
 layout(set = 0, binding = ID_MATUV_DATA) buffer per_matuv
 {
 	mat3 u_matuv[];
@@ -1161,8 +1174,11 @@ vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 m
 //pbr_ibl
 vec3 getDiffuseLight(vec3 n)
 {
-#if ID_diffuseCube
-	vec4 textureSample = texture(u_DiffuseEnvSampler, u_matuv[0] * n);// u_pbrParams.envRotation* n);
+#ifdef  ID_diffuseCube
+#ifdef ID_MATUV_DATA
+	n = u_matuv[0] * n;
+#endif // ID_MATUV_DATA
+	vec4 textureSample = texture(u_DiffuseEnvSampler, n);// u_pbrParams.envRotation* n);
 #else
 	vec4 textureSample = vec4(1.0);
 #endif
@@ -1175,8 +1191,11 @@ vec3 getDiffuseLight(vec3 n)
 
 vec4 getSpecularSample(vec3 reflection, float lod)
 {
-#if ID_specularCube
-	vec4 textureSample = textureLod(u_specularEnvSampler, u_matuv[0] * reflection, lod);//u_pbrParams.envRotation * reflection, lod);
+#ifdef  ID_specularCube
+#ifdef ID_MATUV_DATA
+	reflection = u_matuv[0] * reflection;
+#endif // ID_MATUV_DATA
+	vec4 textureSample = textureLod(u_specularEnvSampler, reflection, lod);//u_pbrParams.envRotation * reflection, lod);
 #else
 	vec4 textureSample = vec4(1.0);
 #endif
@@ -1189,8 +1208,11 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 
 vec4 getSheenSample(vec3 reflection, float lod)
 {
-#if ID_charlieEnvTexture
-	vec4 textureSample = textureLod(u_CharlieEnvSampler, u_matuv[0] * reflection, lod);//u_pbrParams.envRotation * reflection, lod);
+#ifdef  ID_charlieEnvTexture
+#ifdef ID_MATUV_DATA
+	reflection = u_matuv[0] * reflection;
+#endif // ID_MATUV_DATA
+	vec4 textureSample = textureLod(u_CharlieEnvSampler, reflection, lod);//u_pbrParams.envRotation * reflection, lod);
 #else
 	vec4 textureSample = vec4(1.0);
 #endif
@@ -1199,7 +1221,7 @@ vec4 getSheenSample(vec3 reflection, float lod)
 #endif // __cplusplus
 	return textureSample;
 }
-#if ID_GGXLUT
+#ifdef  ID_GGXLUT
 vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWeight)
 {
 	// see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
@@ -1236,9 +1258,12 @@ vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
 {
 	float framebufferLod = log2(float(u_pbrParams.transmissionFramebufferSize.x)) * applyIorToRoughness(roughness, ior);
+#ifdef ID_transmissionFramebufferTexture
 	vec3 transmittedLight = vec3(textureLod(u_TransmissionFramebufferSampler, fragCoord, framebufferLod));
-
 	return transmittedLight;
+#else
+	return vec3(0);
+#endif
 }
 #endif
 
@@ -1320,7 +1345,7 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
 	return specularLight;
 }
 #endif
-#if ID_charlieLUT
+#ifdef  ID_charlieLUT
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
 {
 	float NdotV = clampedDot(n, v);
@@ -1548,7 +1573,7 @@ NormalInfo getNormalInfo(vec3 v, vsio_ps vp)
 	// Compute normals:
 	NormalInfo info;
 	info.ng = ng;
-#ifdef HAS_NORMAL_MAP
+#ifdef ID_normalTexture
 	info.ntex = texture(u_NormalSampler, UV).rgb * 2.0 - vec3(1.0);
 	info.ntex *= vec3(u_NormalScale, u_NormalScale, 1.0);
 	info.ntex = normalize(info.ntex);
@@ -1565,7 +1590,7 @@ NormalInfo getNormalInfo(vec3 v, vsio_ps vp)
 #ifdef MATERIAL_CLEARCOAT
 vec3 getClearcoatNormal(NormalInfo normalInfo, vsio_ps vp)
 {
-#ifdef HAS_CLEARCOAT_NORMAL_MAP
+#ifdef ID_clearcoatNormalTexture
 	vec3 n = texture(u_ClearcoatNormalSampler, getClearcoatNormalUV(vp)).rgb * 2.0 - vec3(1.0);
 	n *= vec3(u_ClearcoatNormalScale, u_ClearcoatNormalScale, 1.0);
 	n = mat3(normalInfo.t, normalInfo.b, normalInfo.ng) * normalize(n);
@@ -1595,9 +1620,9 @@ vec4 getBaseColor()
 	baseColor = u_pbrParams.baseColorFactor;
 #endif
 
-#if defined(MATERIAL_SPECULARGLOSSINESS) && defined(HAS_DIFFUSE_MAP)
+#if defined(MATERIAL_SPECULARGLOSSINESS) && defined(ID_diffuseTexture)
 	baseColor *= texture(u_DiffuseSampler, getDiffuseUV(vp));
-#elif defined(MATERIAL_METALLICROUGHNESS) && defined(HAS_BASE_COLOR_MAP)
+#elif defined(MATERIAL_METALLICROUGHNESS) && defined(ID_baseColorTexture)
 	baseColor *= texture(u_BaseColorSampler, getBaseColorUV(vp));
 #endif
 
@@ -1611,11 +1636,11 @@ MaterialInfo getSpecularGlossinessInfo(MaterialInfo info)
 	info.f0_dielectric = u_pbrParams.pbrSpecularFactor;
 	info.perceptualRoughness = u_pbrParams.glossinessFactor;
 
-#ifdef HAS_SPECULAR_GLOSSINESS_MAP
+#ifdef ID_specularGlossinessTexture
 	vec4 sgSample = texture(u_SpecularGlossinessSampler, getSpecularGlossinessUV(vp));
 	info.perceptualRoughness *= sgSample.a; // glossiness to roughness
 	info.f0_dielectric *= sgSample.rgb; // specular
-#endif // ! HAS_SPECULAR_GLOSSINESS_MAP
+#endif 
 
 	info.perceptualRoughness = 1.0 - info.perceptualRoughness; // 1 - glossiness
 	return info;
@@ -1629,7 +1654,7 @@ MaterialInfo getMetallicRoughnessInfo(MaterialInfo info)
 	info.metallic = u_pbrParams.metallicFactor;
 	info.perceptualRoughness = u_pbrParams.roughnessFactor;
 
-#ifdef HAS_METALLIC_ROUGHNESS_MAP
+#ifdef ID_metallicRoughnessTexture
 	// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
 	// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
 	vec4 mrSample = texture(u_MetallicRoughnessSampler, getMetallicRoughnessUV(vp));
@@ -1648,12 +1673,12 @@ MaterialInfo getSheenInfo(MaterialInfo info)
 	info.sheenColorFactor = u_pbrParams.sheenColorFactor;
 	info.sheenRoughnessFactor = u_pbrParams.sheenRoughnessFactor;
 
-#ifdef HAS_SHEEN_COLOR_MAP
+#ifdef ID_sheenColorTexture
 	vec4 sheenColorSample = texture(u_SheenColorSampler, getSheenColorUV(info.vp));
 	info.sheenColorFactor *= sheenColorSample.rgb;
 #endif
 
-#ifdef HAS_SHEEN_ROUGHNESS_MAP
+#ifdef ID_sheenRoughnessTexture
 	vec4 sheenRoughnessSample = texture(u_SheenRoughnessSampler, getSheenRoughnessUV(info.vp));
 	info.sheenRoughnessFactor *= sheenRoughnessSample.a;
 #endif
@@ -1666,10 +1691,10 @@ MaterialInfo getSheenInfo(MaterialInfo info)
 MaterialInfo getSpecularInfo(MaterialInfo info)
 {
 	vec4 specularTexture = vec4(1.0);
-#ifdef HAS_SPECULAR_MAP
+#ifdef ID_specularTexture
 	specularTexture.a = texture(u_SpecularSampler, getSpecularUV(info.vp)).a;
 #endif
-#ifdef HAS_SPECULAR_COLOR_MAP
+#ifdef ID_specularColorTexture
 	specularTexture.rgb = texture(u_SpecularColorSampler, getSpecularColorUV(info.vp)).rgb;
 #endif
 
@@ -1686,7 +1711,7 @@ MaterialInfo getTransmissionInfo(MaterialInfo info)
 {
 	info.transmissionFactor = u_pbrParams.transmissionFactor;
 
-#ifdef HAS_TRANSMISSION_MAP
+#ifdef ID_transmissionTexture
 	vec4 transmissionSample = texture(u_TransmissionSampler, getTransmissionUV(info.vp));
 	info.transmissionFactor *= transmissionSample.r;
 #endif
@@ -1707,7 +1732,7 @@ MaterialInfo getVolumeInfo(MaterialInfo info)
 	info.attenuationColor = u_pbrParams.attenuationColor;
 	info.attenuationDistance = u_pbrParams.attenuationDistance;
 
-#ifdef HAS_THICKNESS_MAP
+#ifdef ID_thicknessTexture
 	vec4 thicknessSample = texture(u_ThicknessSampler, getThicknessUV(info.vp));
 	info.thickness *= thicknessSample.g;
 #endif
@@ -1723,11 +1748,11 @@ MaterialInfo getIridescenceInfo(MaterialInfo info)
 	info.iridescenceIor = u_pbrParams.iridescenceIor;
 	info.iridescenceThickness = u_pbrParams.iridescenceThicknessMaximum;
 
-#ifdef HAS_IRIDESCENCE_MAP
+#ifdef ID_iridescenceTexture
 	info.iridescenceFactor *= texture(u_IridescenceSampler, getIridescenceUV(info.vp)).r;
 #endif
 
-#ifdef HAS_IRIDESCENCE_THICKNESS_MAP
+#ifdef ID_iridescenceThicknessTexture
 	float thicknessSampled = texture(u_IridescenceThicknessSampler, getIridescenceThicknessUV(info.vp)).g;
 	float thickness = mix(u_pbrParams.iridescenceThicknessMinimum, u_pbrParams.iridescenceThicknessMaximum, thicknessSampled);
 	info.iridescenceThickness = thickness;
@@ -1744,11 +1769,11 @@ MaterialInfo getDiffuseTransmissionInfo(MaterialInfo info)
 	info.diffuseTransmissionFactor = u_pbrParams.diffuseTransmissionFactor;
 	info.diffuseTransmissionColorFactor = u_pbrParams.diffuseTransmissionColorFactor;
 
-#ifdef HAS_DIFFUSE_TRANSMISSION_MAP
+#ifdef ID_diffuseTransmissionTexture
 	info.diffuseTransmissionFactor *= texture(u_DiffuseTransmissionSampler, getDiffuseTransmissionUV(info.vp)).a;
 #endif
 
-#ifdef HAS_DIFFUSE_TRANSMISSION_COLOR_MAP
+#ifdef ID_diffuseTransmissionColorTexture
 	info.diffuseTransmissionColorFactor *= texture(u_DiffuseTransmissionColorSampler, getDiffuseTransmissionColorUV(info.vp)).rgb;
 #endif
 
@@ -1765,12 +1790,12 @@ MaterialInfo getClearCoatInfo(MaterialInfo info, NormalInfo normalInfo)
 	info.clearcoatF0 = vec3(pow((info.ior - 1.0) / (info.ior + 1.0), 2.0));
 	info.clearcoatF90 = vec3(1.0);
 
-#ifdef HAS_CLEARCOAT_MAP
+#ifdef ID_clearcoatTexture
 	vec4 clearcoatSample = texture(u_ClearcoatSampler, getClearcoatUV(info.vp));
 	info.clearcoatFactor *= clearcoatSample.r;
 #endif
 
-#ifdef HAS_CLEARCOAT_ROUGHNESS_MAP
+#ifdef ID_clearcoatRoughnessTexture
 	vec4 clearcoatSampleRoughness = texture(u_ClearcoatRoughnessSampler, getClearcoatRoughnessUV(info.vp));
 	info.clearcoatRoughness *= clearcoatSampleRoughness.g;
 #endif
@@ -2075,7 +2100,7 @@ vec4 pbr_main(vsio_ps vp)
 #endif
 
 	// Calculate fresnel mix for IBL  
-#if ID_GGXLUT
+#ifdef ID_GGXLUT
 	vec3 f_metal_fresnel_ibl = getIBLGGXFresnel(n, v, materialInfo.perceptualRoughness, baseColor.rgb, 1.0);
 	f_metal_brdf_ibl = f_metal_fresnel_ibl * f_specular_metal;
 
@@ -2096,7 +2121,7 @@ vec4 pbr_main(vsio_ps vp)
 #ifdef ID_charlieLUT
 	f_sheen = getIBLRadianceCharlie(n, v, materialInfo.sheenRoughnessFactor, materialInfo.sheenColorFactor);
 #endif
-#if ID_sheenELUT
+#ifdef ID_sheenELUT
 	albedoSheenScaling = 1.0 - max3(materialInfo.sheenColorFactor) * albedoSheenScalingLUT(NdotV, materialInfo.sheenRoughnessFactor);
 #endif
 
@@ -2240,13 +2265,7 @@ vec4 pbr_main(vsio_ps vp)
 #else
 	color = f_emissive * (1.0f - clearcoatFactor * clearcoatFresnel) + color;
 #endif
-#if defined(ALPHAMODE)  
-#if ALPHAMODE == ALPHAMODE_OPAQUE
-	color.rgb *= baseColor.a;
-	baseColor.a = 1.0;
-#endif
-#endif
-
+ 
 #ifndef DEBUG_NONE
 #define DEBUG_NONE 0
 #endif // !DEBUG_NONE
@@ -2254,26 +2273,25 @@ vec4 pbr_main(vsio_ps vp)
 #define DEBUG DEBUG_NONE
 #endif // !DEBUG
 
-#ifndef __cplusplus
-#ifndef PXOUT_rcd
-
-#if ALPHAMODE == ALPHAMODE_MASK
+#if 1
+	//ALPHAMODE == ALPHA_MASK
 	// Late discard to avoid sampling artifacts. See https://github.com/KhronosGroup/glTF-Sample-Viewer/issues/267
-	if (baseColor.a < u_pbrParams.alphaCutoff)
+	if (u_pbrParams.alphaMode == ALPHA_MASK)
 	{
-		discard;
+		if (baseColor.a < u_pbrParams.alphaCutoff)
+		{
+			discard;
+		}
+		baseColor.a = 1.0;
 	}
-	baseColor.a = 1.0;
-#endif
-
+#endif 
+	finalColor = vec4(color, baseColor.a); 
 #ifdef TONEMAP_OPT
 	finalColor = vec4(toneMap(color), baseColor.a);
-#else
-	//LINEAR_OUTPUT
-	finalColor = vec4(color.rgb, baseColor.a);
 #endif
-
-#else
+#ifdef DB_PX
+	def __cplusplus
+#ifdef PXOUT_rcd	 
 	// In case of missing data for a debug view, render a checkerboard.
 	finalColor = vec4(1.0);
 	{
@@ -2364,7 +2382,7 @@ vec4 pbr_main(vsio_ps vp)
 
 #if DEBUG == DEBUG_SPECULAR_COLOR
 	vec3 specularTexture = vec3(1.0);
-#ifdef HAS_SPECULAR_COLOR_MAP
+#ifdef ID_specularColorTexture
 	specularTexture.rgb = texture(u_SpecularColorSampler, getSpecularColorUV(vp)).rgb;
 #endif
 	finalColor.rgb = u_pbrParams.specularColorFactor * specularTexture.rgb;

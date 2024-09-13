@@ -1000,23 +1000,25 @@ namespace vkr {
 		float emissiveStrength;
 		vec3 emissiveFactor;
 		int   alphaMode;
+
 		float alphaCutoff;
+		float occlusionStrength;
+		float ior;
+		int mipCount;
 		// KHR_materials_pbrSpecularGlossiness
 		vec4 pbrDiffuseFactor;
 		vec3 pbrSpecularFactor;
 		float glossinessFactor;
 
-		float envIntensity;
 
-		float occlusionStrength;
-		float ior;
-		int mipCount;
 		// Specular KHR_materials_specular
-		float specularFactor;
 		vec3  specularColorFactor;
+		float specularFactor;
 		// KHR_materials_sheen 
-		float sheenRoughnessFactor;
 		vec3 sheenColorFactor;
+		float sheenRoughnessFactor;
+
+		vec3 anisotropy;
 		// KHR_materials_transmission
 		float transmissionFactor;
 
@@ -1040,8 +1042,10 @@ namespace vkr {
 		float clearcoatFactor;
 		float clearcoatRoughness;
 		float clearcoatNormalScale;
+		float envIntensity;
+
 		int unlit;
-		vec3 anisotropy;
+		vec3 padd0;
 	};
 
 
@@ -1082,7 +1086,8 @@ namespace vkr {
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 
-		void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
+		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
+		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe);
 	};
 
 	struct PBRMesh
@@ -1133,7 +1138,7 @@ namespace vkr {
 	const uint32_t LightType_Point = 1;
 	const uint32_t LightType_Spot = 2;
 
-	struct per_frame
+	struct PerFrame_t
 	{
 		glm::mat4 mCameraCurrViewProj;
 		glm::mat4 mCameraPrevViewProj;
@@ -2559,7 +2564,7 @@ namespace vkr {
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 		std::map<int, std::vector<glm::mat3>> m_uv_mats; // UVmat
 
-		per_frame m_perFrameData;
+		PerFrame_t m_perFrameData;
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
 	public:
@@ -2576,7 +2581,7 @@ namespace vkr {
 		void SetAnimationTime(uint32_t animationIndex, float time);
 		void TransformScene(int sceneIndex, const glm::mat4& world);
 		// 运行中使用
-		per_frame* SetPerFrameData(const Camera& cam);
+		PerFrame_t* SetPerFrameData(const Camera& cam);
 		bool GetCamera(uint32_t cameraIdx, Camera* pCam) const;
 		tfNodeIdx AddNode(const tfNode& node);
 		int AddLight(const tfNode& node, const tfLight& light);
@@ -2620,6 +2625,7 @@ namespace vkr {
 		// maps GLTF ids into views
 		std::map<int, VkDescriptorBufferInfo> m_vertexBufferMap;
 		std::map<int, VkDescriptorBufferInfo> m_IndexBufferMap;
+		std::map<int, VkDescriptorBufferInfo> m_uvMap;
 		std::map<std::string, morph_t> m_targetsBufferMap;
 		int indextype = 0;
 	public:
@@ -3122,7 +3128,8 @@ namespace vkr {
 			PBRPrimitives* m_pPrimitive;
 			VkDescriptorBufferInfo m_perFrameDesc;
 			VkDescriptorBufferInfo m_perObjectDesc;
-			VkDescriptorBufferInfo* m_pPerSkeleton;
+			VkDescriptorBufferInfo* m_uvtDesc = 0;
+			VkDescriptorBufferInfo* m_pPerSkeleton = 0;
 			morph_t* morph = 0;
 			operator float() { return -m_depth; }
 		};
@@ -3155,7 +3162,7 @@ namespace vkr {
 		std::vector<PBRMesh> m_meshes;
 		std::vector<PBRMaterial> m_materialsData;
 
-		per_frame m_cbPerFrame;
+		PerFrame_t m_cbPerFrame;
 
 		PBRMaterial m_defaultMaterial;
 
@@ -3224,7 +3231,7 @@ namespace vkr {
 	class GltfDepthPass
 	{
 	public:
-		struct per_frame
+		struct PerFrame_t
 		{
 			glm::mat4 mViewProj;
 		};
@@ -3247,7 +3254,7 @@ namespace vkr {
 		void load(VkDevice dev, AsyncPool* pAsyncPool);
 
 		void OnDestroy();
-		GltfDepthPass::per_frame* SetPerFrameConstants();
+		GltfDepthPass::PerFrame_t* SetPerFrameConstants();
 		void Draw(VkCommandBuffer cmd_buf);
 	private:
 		ResourceViewHeaps* m_pResourceViewHeaps;
@@ -4042,7 +4049,6 @@ namespace vkr
 			tfmat->m_doubleSided = material.doubleSided;
 			std::string alphaMode = material.alphaMode;// ", "OPAQUE");
 			tfmat->m_defines["DEF_alphaMode_" + alphaMode] = std::to_string(1);
-
 			// If transparent use the baseColorTexture for alpha
 			//
 			if (alphaMode == "MASK")
@@ -4234,7 +4240,7 @@ namespace vkr
 	// CreateDescriptors for a combination of material and geometry
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing )
+	void GltfDepthPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layout_bindings(2);
 		layout_bindings[0].binding = 0;
@@ -4271,7 +4277,7 @@ namespace vkr
 			(*pAttributeDefines)["ID_SKINNING_MATRICES"] = std::to_string(b.binding);
 			skb = b.binding;
 			layout_bindings.push_back(b);
-		} 
+		}
 		if (morphing)
 		{
 			auto& df = (*pAttributeDefines);
@@ -4289,7 +4295,7 @@ namespace vkr
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			b.descriptorType = dt;
-			df["ID_MORPHING_DATA"] = std::to_string(b.binding);	dd = b.binding;
+			df["ID_MORPHING_DATA"] = std::to_string(b.binding);	md = b.binding;
 			layout_bindings.push_back(b);
 			for (auto& [k, v] : morphing->defs) {
 				df[k] = std::to_string(v);
@@ -4299,18 +4305,18 @@ namespace vkr
 
 		// set descriptors entries
 
-		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(per_frame), pPrimitive->m_descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(PerFrame_t), pPrimitive->m_descriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(per_object), pPrimitive->m_descriptorSet);
 
 		if (inverseMatrixBufferSize > 0)
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(skb, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_descriptorSet, dt);
 		}
- 
+
 		if (morphing)
 		{
-			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, md, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
-			m_pDynamicBufferRing->SetDescriptorSet(td, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
+			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
+			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
 		}
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pPrimitive->m_descriptorSetLayout };
@@ -4514,10 +4520,10 @@ namespace vkr
 	// SetPerFrameConstants
 	//
 	//--------------------------------------------------------------------------------------
-	GltfDepthPass::per_frame* GltfDepthPass::SetPerFrameConstants()
+	GltfDepthPass::PerFrame_t* GltfDepthPass::SetPerFrameConstants()
 	{
-		GltfDepthPass::per_frame* cbPerFrame;
-		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(GltfDepthPass::per_frame), (void**)&cbPerFrame, &m_perFrameDesc);
+		GltfDepthPass::PerFrame_t* cbPerFrame;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(GltfDepthPass::PerFrame_t), (void**)&cbPerFrame, &m_perFrameDesc);
 
 		return cbPerFrame;
 	}
@@ -5438,8 +5444,8 @@ namespace vkr
 	}
 	void GLTFTexturesAndBuffers::SetPerFrameConstants()
 	{
-		per_frame* cbPerFrame;
-		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(per_frame), (void**)&cbPerFrame, &m_perFrameConstants);
+		PerFrame_t* cbPerFrame;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
 		*cbPerFrame = m_pGLTFCommon->m_perFrameData;
 	}
 
@@ -5456,7 +5462,7 @@ namespace vkr
 			memcpy(cbPerSkeleton, matrices->data(), size);
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
 		}
-		// 设置变形插值数据到ubo
+		// todo 设置变形插值数据到ubo
 		for (auto& t : m_pGLTFCommon->m_animated_morphWeights)
 		{
 			auto d = &t.second;
@@ -5467,7 +5473,15 @@ namespace vkr
 			memcpy(cbd, d->data(), size);
 			m_targetsBufferMap[t.first].morphWeights = per;
 		}
-
+		// todo uv矩阵
+		for (auto& [k, v] : m_pGLTFCommon->m_uv_mats) {
+			VkDescriptorBufferInfo db = {};
+			float* cbd = 0;
+			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3));
+			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &db);
+			memcpy(cbd, v.data(), size);
+			m_uvMap[k] = db;
+		}
 	}
 
 	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::GetSkinningMatricesBuffer(int skinIndex)
@@ -5626,6 +5640,18 @@ namespace vkr
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
 		tfmat->m_defines["DEF_alphaCutoff"] = std::to_string(material.alphaCutoff);
 		tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
+		// ALPHA_OPAQUE 0
+		// ALPHA_MASK 1
+		// ALPHA_BLEND 2 
+		tfmat->m_params.alphaMode = 0;
+		if (material.alphaMode == "MASK")
+		{
+			tfmat->m_params.alphaMode = 1;
+		}
+		if (material.alphaMode == "BLEND")
+		{
+			tfmat->m_params.alphaMode = 2;
+		}
 		int uvc = 1;
 		// look for textures and store their IDs in a map 
 		//
@@ -5836,6 +5862,8 @@ namespace vkr
 			}
 
 		} while (0);
+		if (uvc > 1)
+			tfmat->m_defines["UVT_count"] = std::to_string(uvc);
 	}
 
 	int get_vint(tinygltf::Value& t, const char* k)
@@ -6151,10 +6179,15 @@ namespace vkr
 								morphing = &m_pGLTFTexturesAndBuffers->m_targetsBufferMap[mk];
 							}
 							// Create descriptors and pipelines
-							//
+							auto uc = defines["UVT_count"];
+							int muvt_size = std::atoi(uc.c_str());
 							int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 							int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing, bUseSSAOMask);
+							if (muvt_size)
+							{
+								m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_uv_mats[i].resize(muvt_size);
+							}
+							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing, sizeof(glm::mat3) * muvt_size, bUseSSAOMask);
 							CreatePipeline(inputLayout, defines, pPrimitive);
 						});
 				}
@@ -6377,20 +6410,6 @@ namespace vkr
 
 			layout_bindings.push_back(b);
 		}
-		if (muvt_size)
-		{
-			// UV矩阵
-			VkDescriptorSetLayoutBinding b;
-			b.binding = binc++;
-			b.descriptorCount = 1;
-			b.pImmutableSamplers = NULL;
-			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			b.descriptorType = dt;
-			muvt = b.binding;
-			(*pAttributeDefines)["ID_MATUV_DATA"] = std::to_string(b.binding);
-
-			layout_bindings.push_back(b);
-		}
 		if (morphing)
 		{
 			auto& df = (*pAttributeDefines);
@@ -6416,26 +6435,42 @@ namespace vkr
 				df[k] = std::to_string(v);
 			}
 		}
+		if (muvt_size)
+		{
+			// UV矩阵
+			VkDescriptorSetLayoutBinding b;
+			b.binding = binc++;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			b.descriptorType = dt;
+			muvt = b.binding;
+			(*pAttributeDefines)["ID_MATUV_DATA"] = std::to_string(b.binding);
+
+			layout_bindings.push_back(b);
+		}
 		// todo pbr buffer初始化
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
 
 		// Init descriptors sets for the constant buffers
 		//
-		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(per_frame), pPrimitive->m_uniformsDescriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(PerFrame_t), pPrimitive->m_uniformsDescriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(per_object), pPrimitive->m_uniformsDescriptorSet);
 
 		if (inverseMatrixBufferSize > 0)
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(skb, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
+		if (morphing)
+		{
+			//vec4 per_target_data[];
+			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
+			//float u_morphWeights[];
+			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
+		}
 		if (muvt_size > 0)
 		{
 			m_pDynamicBufferRing->SetDescriptorSet(muvt, (uint32_t)muvt_size, pPrimitive->m_uniformsDescriptorSet, dt);
-		}
-		if (morphing)
-		{
-			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, md, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
-			m_pDynamicBufferRing->SetDescriptorSet(td, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 
 		// Create the pipeline layout
@@ -6807,16 +6842,30 @@ namespace vkr
 	void GltfPbrPass::DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe/*=false*/)
 	{
 		SetPerfMarkerBegin(commandBuffer, "gltfPBR");
-
+		uint32_t uniformOffsets[6] = {};
 		for (auto& t : *pBatchList)
 		{
-			t.m_pPrimitive->DrawPrimitive(commandBuffer, t.m_perFrameDesc, t.m_perObjectDesc, t.m_pPerSkeleton, t.morph, bWireframe);
+			uint32_t c = 2;
+			uniformOffsets[0] = t.m_perFrameDesc.offset;
+			uniformOffsets[1] = t.m_perObjectDesc.offset;
+			if (t.m_pPerSkeleton) {
+
+				uniformOffsets[c++] = t.m_pPerSkeleton->offset;
+			}
+			if (t.morph) {
+				uniformOffsets[c++] = t.morph->morphWeights.offset;
+			}
+			if (t.m_uvtDesc) {
+				uniformOffsets[c++] = t.m_uvtDesc->offset;
+			}
+			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe);
 		}
 
 		SetPerfMarkerEnd(commandBuffer);
 	}
 	// todo pbr变形渲染
-	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perFrameDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe)
+	//void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perFrameDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe)
+	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe)
 	{
 		// Bind indices and vertices using the right offsets into the buffer
 		//
@@ -6831,11 +6880,19 @@ namespace vkr
 		//
 		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
-		assert(!(pPerSkeleton && morph));
-		if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;
-		uint32_t uniformOffsets[3] = { (uint32_t)perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
-		uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
+		//assert(!(pPerSkeleton && morph));
+		//if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;
 
+		//uint32_t uniformOffsets[3] = { (uint32_t)perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
+		//uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
+		if (!uniformOffsets)
+		{
+			uniformOffsetsCount = 0;
+		}
+		if (!uniformOffsetsCount)
+		{
+			uniformOffsets = 0;
+		}
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 
 		// Bind Pipeline
@@ -14835,9 +14892,9 @@ namespace vkr {
 
 	//
 	// Sets the per frame data from the GLTF, returns a pointer to it in case the user wants to override some values
-	// The scene needs to be animated and transformed before we can set the per_frame data. We need those final matrices for the lights and the camera.
+	// The scene needs to be animated and transformed before we can set the PerFrame_t data. We need those final matrices for the lights and the camera.
 	//
-	per_frame* GLTFCommon::SetPerFrameData(const Camera& cam)
+	PerFrame_t* GLTFCommon::SetPerFrameData(const Camera& cam)
 	{
 		Matrix2* pMats = m_worldSpaceMats.data();
 
@@ -17568,7 +17625,7 @@ namespace vkr {
 		Light* lights = 0;
 		int lightCount = 0;
 		{
-			per_frame* pPerFrame = NULL;
+			PerFrame_t* pPerFrame = NULL;
 			for (auto it : _robject)
 			{
 				if (it->m_pGLTFTexturesAndBuffers)
@@ -17631,7 +17688,7 @@ namespace vkr {
 				for (auto it : _depthpass)
 				{
 					// Set per frame constant buffer values
-					GltfDepthPass::per_frame* cbPerFrame = it->SetPerFrameConstants();
+					GltfDepthPass::PerFrame_t* cbPerFrame = it->SetPerFrameConstants();
 					cbPerFrame->mViewProj = lights[ShadowMap->LightIndex].mLightViewProj;
 					it->Draw(cmdBuf1);
 				}
@@ -17663,7 +17720,7 @@ namespace vkr {
 			}
 			if (bWireframe)// pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 			{
-				per_frame* pPerFrame = NULL;
+				PerFrame_t* pPerFrame = NULL;
 				for (auto it : _robject)
 				{
 					if (it->m_pGLTFTexturesAndBuffers)
