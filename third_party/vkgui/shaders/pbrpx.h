@@ -2460,6 +2460,7 @@ vec3 get_ibl(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoatFre
 
 	// Calculate fresnel mix for IBL  
 #ifdef ID_GGXLUT
+	// todo lut有问题？
 	vec3 f_metal_fresnel_ibl = getIBLGGXFresnel(n, v, materialInfo.perceptualRoughness, vec3(materialInfo.baseColor), 1.0);
 	f_metal_brdf_ibl = f_metal_fresnel_ibl * f_specular_metal;
 
@@ -2470,8 +2471,7 @@ vec3 get_ibl(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoatFre
 	f_metal_brdf_ibl = mix(f_metal_brdf_ibl, f_specular_metal * iridescenceFresnel_metallic, materialInfo.iridescenceFactor);
 	f_dielectric_brdf_ibl = mix(f_dielectric_brdf_ibl, rgb_mix(f_diffuse, f_specular_dielectric, iridescenceFresnel_dielectric), materialInfo.iridescenceFactor);
 #endif
-#endif
-
+#endif 
 
 #ifdef MATERIAL_CLEARCOAT
 	clearcoat_brdf = getIBLRadianceGGX(materialInfo.clearcoatNormal, v, materialInfo.clearcoatRoughness);
@@ -2484,11 +2484,12 @@ vec3 get_ibl(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoatFre
 	albedoSheenScaling = 1.0 - max3(materialInfo.sheenColorFactor) * albedoSheenScalingLUT(NdotV, materialInfo.sheenRoughnessFactor);
 #endif
 
-	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, materialInfo.metallic);
-	color = f_sheen + color * albedoSheenScaling;
-	color = mix(color, clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
+	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, materialInfo.metallic); 
+	color = f_sheen + color * albedoSheenScaling; //光泽度
+	color = mix(color, clearcoat_brdf, clearcoatFactor * clearcoatFresnel);//清漆
 	// 测试vec3(albedoSheenScaling);
-	color = f_specular_metal;
+	//color = f_dielectric_brdf_ibl;
+	//color = vec3(materialInfo.metallic);//正常
 	color *= myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
 	float ao = 1.0;
 #ifdef ID_occlusionTexture
@@ -2642,7 +2643,7 @@ vec4 pbr_main(vsio_ps vp)
 	clearcoatFactor = materialInfo.clearcoatFactor;
 	clearcoatFresnel = F_Schlick(materialInfo.clearcoatF0, materialInfo.clearcoatF90, clampedDot(materialInfo.clearcoatNormal, v));
 #endif
-	color = get_ibl(materialInfo, clearcoatFactor, clearcoatFresnel, v, n, diffuseTransmissionThickness);
+	//color = get_ibl(materialInfo, clearcoatFactor, clearcoatFresnel, v, n, diffuseTransmissionThickness);
 
 	f_emissive = u_pbrParams.emissiveFactor; // 自发光
 #ifdef MATERIAL_EMISSIVE_STRENGTH

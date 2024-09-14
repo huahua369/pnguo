@@ -1047,8 +1047,7 @@ namespace vkr {
 		float clearcoatNormalScale = 1;
 		float envIntensity = 1;
 
-		int unlit = 0;
-		vec3 padd0;
+		int unlit = 0; 
 	};
 
 
@@ -5648,6 +5647,7 @@ namespace vkr
 		// ALPHA_MASK 1
 		// ALPHA_BLEND 2 
 		tfmat->m_params.alphaMode = 0;
+		tfmat->m_params.alphaCutoff = material.alphaCutoff;
 		if (material.alphaMode == "MASK")
 		{
 			tfmat->m_params.alphaMode = 1;
