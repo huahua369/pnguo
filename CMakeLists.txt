@@ -99,7 +99,7 @@ add_definitions(-DVKVG_RECORDING)
 add_definitions(-DVKH_USE_VMA)
 add_definitions(-DXATLAS_C_API=1)
 
-find_package(mimalloc CONFIG REQUIRED)
+#find_package(mimalloc CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED) 
 find_package(nlohmann_json REQUIRED)
@@ -162,7 +162,7 @@ add_library (tpv STATIC ${tpv_src})
 target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
 PkgConfig::GTHREAD
-mimalloc-static 
+#mimalloc-static 
 PkgConfig::LIBGIT2
 )
 

@@ -20,8 +20,8 @@
 #include <vkgui/vkrenderer.h>
 #include <stb_image_write.h>
 
-#include <mimalloc.h>
-#include <mimalloc-new-delete.h>
+//#include <mimalloc.h>
+//#include <mimalloc-new-delete.h>
 
 /*
 	todo
@@ -754,19 +754,19 @@ void ents(const std::string& path, const std::string& key, const std::string& iv
 		}
 	}
 }
-
+#include <windows.h>
 int main()
 {
 	//test_rect();
-#ifdef _DEBUG
-	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-#endif 
+//#ifdef _DEBUG
+//	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+//	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+//	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
+//#endif 
 
 	//ents("E:\\m\\mf.txt", "9FiCxHYH4SYhVQu3", "", "", "E:\\m\\n69.ts");
-
 	auto app = new_app();
+	//LoadLibraryA("E:\\Program Files\\RenderDoc\\renderdoc.dll");
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
 	njson v = 0;

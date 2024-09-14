@@ -29,11 +29,10 @@ using namespace glm;
 #define uniform
 #define sampler2D void*
 #define samplerCube void*
+#define sampler2DShadow void*
 
 
-#define MAX_LIGHT_INSTANCES  80
-#define ID_TEXCOORD_0  1
-#define ID_TEXCOORD_1  2
+#define MAX_LIGHT_INSTANCES  80 
 //#define ID_baseTexCoord  0
 
 glm::vec3 px(const glm::vec2& pss) {
@@ -82,6 +81,9 @@ vec3 refract(vec3 l, vec3 n, double t) {
 }
 vec4 texture(void*, const vec2& uv) {
 	return vec4(uv, 0.0f, 0.0f);
+}
+vec2 textureSize(void*, int lod) {
+	return vec2(0.0f, 0.0f);
 }
 vec4 textureLod(void*, const vec2& uv, float lod) {
 	return vec4(uv, lod, 0.0);
@@ -138,27 +140,7 @@ vec2 testshader() {
 #define MATERIAL_VOLUME 1
 #define USE_IBL 1
 
-#endif
-//#define MATERIAL_TRANSMISSION 1 
-#define MATERIAL_METALLICROUGHNESS 1
-#define MATERIAL_SPECULARGLOSSINESS 1
-#define MATERIAL_ANISOTROPY 1
-#define MATERIAL_VOLUME
-#define MATERIAL_IRIDESCENCE
-#define MATERIAL_DIFFUSE_TRANSMISSION
-#define MATERIAL_SHEEN 
-#define MATERIAL_CLEARCOAT 
-#define MATERIAL_SPECULAR
-#define MATERIAL_IRIDESCENCE 
-#define MATERIAL_IOR
-
-#define pbr_glsl 1
-#define pbr_iridescence 1
-#define pbr_ibl 1
-#define USE_IBL0 1
-
-
-#define USE_PUNCTUAL
+#endif 
 struct FragCoord {
 	glm::vec2 xy;
 };
@@ -168,13 +150,13 @@ bool gl_FrontFacing = 1;
 //  PS Inputs
 //--------------------------------------------------------------------------------------
 
-#include "shaders/GLTF_VS2PS_IO.h"
-VS2PS Input;
+#include "shaders/1199AD40D8600E6F.h"
+
 
 namespace pbr
 {
 
-#include "shaders/pbrpx.h"
+	//#include "shaders/pbrpx.h"
 
 }
 

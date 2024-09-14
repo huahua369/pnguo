@@ -992,35 +992,38 @@ namespace vkr {
 	struct pbr_factors_t
 	{
 		// pbrMetallicRoughness
-		vec4 baseColorFactor;
-		float metallicFactor;
-		float roughnessFactor;
-		float normalScale;
+		vec4 baseColorFactor = vec4(1.0);
+		float metallicFactor = 0;
+		float roughnessFactor = 0;
+		float normalScale = 1.0;
 		// KHR_materials_emissive_strength
-		float emissiveStrength;
-		vec3 emissiveFactor;
+		float emissiveStrength = 1.0;
+
+		vec3 emissiveFactor = vec3(1.0);
 		int   alphaMode;
 
 		float alphaCutoff;
 		float occlusionStrength;
-		float ior;
-		int mipCount;
+		//KHR_materials_ior
+		float ior = 1.5;
+		int mipCount = 10;
+
 		// KHR_materials_pbrSpecularGlossiness
-		vec4 pbrDiffuseFactor;
-		vec3 pbrSpecularFactor;
-		float glossinessFactor;
+		vec4 pbrDiffuseFactor = vec4(1.0);
+		vec3 pbrSpecularFactor = vec3(1.0);
+		float glossinessFactor = 1.0;
 
 
 		// Specular KHR_materials_specular
-		vec3  specularColorFactor;
-		float specularFactor;
+		vec3  specularColorFactor = vec3(1.0);
+		float specularFactor = 1.0;
 		// KHR_materials_sheen 
-		vec3 sheenColorFactor;
-		float sheenRoughnessFactor;
+		vec3 sheenColorFactor = {};
+		float sheenRoughnessFactor = 0;
 
-		vec3 anisotropy;
+		vec3 anisotropy = {};
 		// KHR_materials_transmission
-		float transmissionFactor;
+		float transmissionFactor = 0;
 
 		ivec2 transmissionFramebufferSize;
 		float thicknessFactor;
@@ -1028,23 +1031,23 @@ namespace vkr {
 
 		vec3 diffuseTransmissionColorFactor;
 		//KHR_materials_dispersion
-		float dispersion;
+		float dispersion = 0;
 
-		vec3 attenuationColor;
-		float attenuationDistance;
+		vec3 attenuationColor = vec3(1.0);
+		float attenuationDistance = 0;
 
 		// Iridescence
-		float iridescenceFactor;
-		float iridescenceIor;
-		float iridescenceThicknessMinimum;
-		float iridescenceThicknessMaximum;
+		float iridescenceFactor = 0;
+		float iridescenceIor = 1.3;
+		float iridescenceThicknessMinimum = 100;
+		float iridescenceThicknessMaximum = 400;
 
-		float clearcoatFactor;
-		float clearcoatRoughness;
-		float clearcoatNormalScale;
-		float envIntensity;
+		float clearcoatFactor = 0;
+		float clearcoatRoughness = 0;
+		float clearcoatNormalScale = 1;
+		float envIntensity = 1;
 
-		int unlit;
+		int unlit = 0;
 		vec3 padd0;
 	};
 
@@ -4064,7 +4067,7 @@ namespace vkr
 					// allocate descriptor table for the texture
 					tfmat->m_textureCount = 1;
 					tfmat->m_defines["ID_baseColorTexture"] = "0";
-					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughnessIt.baseColorTexture.texCoord);// std::to_string(GetElementInt(pbrMetallicRoughness, "baseColorTexture/texCoord", 0));
+					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughnessIt.baseColorTexture.texCoord);
 					m_pResourceViewHeaps->AllocDescriptor(tfmat->m_textureCount, sampler, &tfmat->m_descriptorSetLayout, &tfmat->m_descriptorSet);
 					VkImageView textureView = m_pGLTFTexturesAndBuffers->GetTextureViewByID(id);
 					SetDescriptorSet(dev, 0, textureView, sampler, tfmat->m_descriptorSet);
@@ -5507,12 +5510,13 @@ namespace vkr
 		pPbrMaterialParameters->m_doubleSided = false;
 		pPbrMaterialParameters->m_blending = false;
 		auto& pbrm = pPbrMaterialParameters->m_params;
-		pbrm.emissiveFactor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		pbrm.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-		pbrm.metallicFactor = 0.0f;
-		pbrm.roughnessFactor = 0.0f;
-		pbrm.glossinessFactor = 0.0f;
-		pbrm.pbrSpecularFactor = glm::vec3(0.0f, 0.0f, 0.0f);
+		pbrm = pbr_factors_t();
+		//pbrm.emissiveFactor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+		//pbrm.baseColorFactor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+		//pbrm.metallicFactor = 0.0f;
+		//pbrm.roughnessFactor = 0.0f;
+		//pbrm.glossinessFactor = 0.0f;
+		//pbrm.pbrSpecularFactor = glm::vec3(0.0f, 0.0f, 0.0f);
 	}
 
 	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName)
@@ -5697,7 +5701,7 @@ namespace vkr
 				auto extensions = material.extensions;
 
 				auto sg = get_ext(extensions, "KHR_materials_pbrSpecularGlossiness");
-				if (sg && (pbrMetallicRoughness.baseColorTexture.index == -1))
+				if (sg /*&& (pbrMetallicRoughness.baseColorTexture.index == -1)*/)
 				{
 					auto pbrSpecularGlossiness = *sg;
 					tfmat->m_defines["MATERIAL_SPECULARGLOSSINESS"] = "1";
@@ -5706,7 +5710,7 @@ namespace vkr
 					tfmat->m_params.glossinessFactor = get_v(&pbrSpecularGlossiness, "glossinessFactor", 1.0);
 					itcb(pbrSpecularGlossiness, "diffuseTexture", "ID_diffuseTexCoord", tfmat->m_defines, textureIds);
 					itcb(pbrSpecularGlossiness, "specularGlossinessTexture", "ID_specularGlossinessTexCoord", tfmat->m_defines, textureIds);
-					break;
+					pbrMetallicRoughness.baseColorFactor.clear();
 				}
 #if 1 
 				// KHR_materials_pbrSpecularGlossiness
@@ -18551,7 +18555,7 @@ namespace vkr {
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
 				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 15;
+				l.m_range = 150;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
 				l.m_shadowResolution = shadowResolution;

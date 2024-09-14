@@ -1,4 +1,25 @@
-#version 450
+//#version 450
+#define DEF_alphaCutoff 0.500000
+#define DEF_alphaMode_OPAQUE 1
+#define DEF_doubleSided 1
+#define HAS_FORWARD_RT 0
+#define HAS_MOTION_VECTORS 1
+#define HAS_MOTION_VECTORS_RT 1
+#define ID_GGXLUT 0
+#define ID_NORMAL 0
+#define ID_PER_FRAME 0
+#define ID_PER_OBJECT 1
+#define ID_POSITION 1
+#define ID_TEXCOORD_0 2
+#define ID_brdfTexture 0
+#define ID_diffuseCube 1
+#define ID_shadowMap 3
+#define ID_specularCube 2
+#define MATERIAL_METALLICROUGHNESS 1
+#define USE_IBL 1
+#define UVT_count 
+#define pbr_glsl 1
+
 
 // Portions Copyright 2019 Advanced Micro Devices, Inc.All rights reserved.
 //
@@ -33,13 +54,7 @@
 
 //#extension GL_OES_standard_derivatives : enable
 
-#extension GL_EXT_shader_texture_lod: enable
-#extension GL_ARB_separate_shader_objects : enable
-#extension GL_ARB_shading_language_420pack : enable
-// this makes the structures declared with a scalar layout match the c structures
-#extension GL_EXT_scalar_block_layout : enable
-
-precision highp float;
+ 
 
 #define USE_PUNCTUAL
 
@@ -48,18 +63,18 @@ precision highp float;
 //--------------------------------------------------------------------------------------
 
 #include "GLTF_VS2PS_IO.h"
-layout (location = 0) in VS2PS Input;
+  VS2PS Input;
 
 //--------------------------------------------------------------------------------------
 // PS Outputs
 //--------------------------------------------------------------------------------------
 
 #ifdef HAS_MOTION_VECTORS_RT
-layout(location = HAS_MOTION_VECTORS_RT) out vec2 Output_motionVect;
+  out vec2 Output_motionVect;
 #endif
 
 #ifdef HAS_FORWARD_RT
-layout (location = HAS_FORWARD_RT) out vec4 Output_finalColor;
+  out vec4 Output_finalColor;
 #endif
 
 #ifdef HAS_SPECULAR_ROUGHNESS_RT
@@ -173,7 +188,7 @@ void main()
 
 
 #ifdef HAS_MOTION_VECTORS_RT
-	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w - Input.PrevPosition.xy / Input.PrevPosition.w;
+//	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w - Input.PrevPosition.xy / Input.PrevPosition.w;
 #endif
 
 #ifdef HAS_SPECULAR_ROUGHNESS_RT
@@ -189,6 +204,6 @@ void main()
 #endif
 
 #ifdef HAS_FORWARD_RT 
-	Output_finalColor = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);  
+	//Output_finalColor = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);  
 #endif
 }

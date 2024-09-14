@@ -301,7 +301,7 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 #endif
 #endif // __cplusplus
 
-vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
+vec3 getIBLRadianceGGXa(vec3 n, vec3 v, float roughness)
 {
 	int   u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_GGXEnvSampler);
 	float NdotV = clampedDot(n, v);
@@ -315,7 +315,7 @@ vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 }
 
 // specularWeight is introduced with KHR_materials_specular
-vec3 getIBLRadianceLambertian(vec3 n, vec3 v, float roughness, vec3 diffuseColor, vec3 F0)
+vec3 getIBLRadianceLambertiana(vec3 n, vec3 v, float roughness, vec3 diffuseColor, vec3 F0)
 {
 #if 1
 	//ndef __cplusplus
