@@ -291,7 +291,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 		mat3 tbn = mat3(mesh.T, mesh.B, mesh.N);
 		vec3 normal_vector = getPixelNormal(Input, texCoord);
 		normal_vector = normal_vector * 2.0F - 1.0F;
-		normal_vector *= vec3(material.normalTextureScale, material.normalTextureScale, 1.0F);
+		normal_vector *= vec3(material.normalScale, material.normalScale, 1.0F);
 		normal = normalize(tbn * normal_vector);
 }
 #endif // ID_normalTexture
@@ -386,6 +386,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.iridescenceIor = material.iridescenceIor;
 	m.iridescenceThickness = iridescenceThickness;
 
+#if 0
 	// KHR_materials_anisotropy
 	float anisotropyStrength = material.anisotropyStrength;
 	vec2  anisotropyDirection = vec2(1.0f, 0.0f);  // By default the anisotropy strength is along the tangent.
@@ -414,7 +415,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 		m.B = normalize(cross(m.N, T_aniso));
 		m.T = cross(m.B, m.N);
 	}
-
+#endif
 
 	// KHR_materials_sheen
 	vec3 sheenColor = material.sheenColorFactor;

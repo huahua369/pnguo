@@ -82,7 +82,7 @@ struct PerFrame
 // KHR_materials_sheen 
 // KHR_texture_transform
 
-struct pbrMaterial
+struct pbr0Material
 {
 	// pbrMetallicRoughness
 	vec4  baseColorFactor;
@@ -90,7 +90,7 @@ struct pbrMaterial
 	float metallicFactor;
 
 	float roughnessFactor;
-	float normalTextureScale;
+	float normalScale;// normalTextureScale;
 	int   alphaMode;
 	float alphaCutoff;
 	// int   pbrBaseColorTexture;   
@@ -163,6 +163,69 @@ struct pbrMaterial
 	mat3 uvTransform;
 #endif
 
+};
+
+struct pbrMaterial
+{
+	// pbrMetallicRoughness
+	vec4 baseColorFactor;
+	float metallicFactor;
+	float roughnessFactor;
+	float normalScale;
+	// KHR_materials_emissive_strength
+	float emissiveStrength;
+
+	vec3 emissiveFactor;
+	int   alphaMode;
+
+	float alphaCutoff;
+	float occlusionStrength;
+	//KHR_materials_ior
+	float ior;
+	int mipCount;
+
+	// KHR_materials_pbrSpecularGlossiness
+	vec4 pbrDiffuseFactor;
+	vec3 pbrSpecularFactor;
+	float glossinessFactor;
+
+
+	// Specular KHR_materials_specular
+	vec3  specularColorFactor;
+	float specularFactor;
+	// KHR_materials_sheen 
+	vec3 sheenColorFactor;
+	float sheenRoughnessFactor;
+
+	vec3 anisotropy;
+	// KHR_materials_transmission
+	float transmissionFactor;
+
+	ivec2 transmissionFramebufferSize;
+	float thicknessFactor;
+	float diffuseTransmissionFactor;
+
+	vec3 diffuseTransmissionColorFactor;
+	//KHR_materials_dispersion
+	float dispersion;
+
+	vec3 attenuationColor;
+	float attenuationDistance;
+
+	// Iridescence
+	float iridescenceFactor;
+	float iridescenceIor;
+	float iridescenceThicknessMinimum;
+	float iridescenceThicknessMaximum;
+
+	float clearcoatFactor;
+	float clearcoatRoughness;
+	float clearcoatNormalScale;
+	float envIntensity;
+
+	int unlit;
+	float pad[3];
+	mat3 uvTransform;
 };
 
 struct PBRFactors

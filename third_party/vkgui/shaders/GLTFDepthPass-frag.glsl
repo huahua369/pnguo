@@ -58,7 +58,7 @@ void main()
 #endif
 	vec4 baseColor = getBaseColor(Input, uv);
 	 
-	if (baseColor.a < 0.1)
+	if (baseColor.a < 0.01)
 		discard;
 #ifdef DEF_alphaCutoff
 	if (baseColor.a < DEF_alphaCutoff)

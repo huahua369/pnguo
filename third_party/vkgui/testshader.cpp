@@ -90,9 +90,9 @@ vec4 textureLod(void*, const vec2& uv, float lod) {
 }
 
 
+#include "shaders/GLTF_VS2PS_IO.h"
 #if 0
 #include "shaders/functions.h"
-#include "shaders/GLTF_VS2PS_IO.h"
 #include "shaders/perFrameStruct.h"
 #include "shaders/shadowFiltering.h"
 #include "shaders/PBRTextures.h"
@@ -150,7 +150,7 @@ bool gl_FrontFacing = 1;
 //  PS Inputs
 //--------------------------------------------------------------------------------------
 
-#include "shaders/1199AD40D8600E6F.h"
+//#include "shaders/1199AD40D8600E6F.h"
 
 
 namespace pbr
@@ -161,7 +161,7 @@ namespace pbr
 }
 
 
-#if 0
+#if 1
 
 #include "shaders/perFrameStruct.h"
 
@@ -177,7 +177,7 @@ PerFrame myPerFrame;
 	//PBRFactors u_pbrParams;
 pbrMaterial u_pbrParams;
 //mat4 myPerObject_u_mCurrWorld;
-
+VS2PS Input;
 //--------------------------------------------------------------------------------------
 // mainPS
 //--------------------------------------------------------------------------------------
@@ -190,7 +190,7 @@ pbrMaterial u_pbrParams;
 
 void amain()
 {
-	discardPixelIfAlphaCutOff(Input);
+	//discardPixelIfAlphaCutOff(Input);
 	gpuMaterial m = defaultPbrMaterial();
 #ifdef ID_TEXCOORD_0
 	vec2 uv = Input.UV0;

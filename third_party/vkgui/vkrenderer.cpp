@@ -1047,7 +1047,9 @@ namespace vkr {
 		float clearcoatNormalScale = 1;
 		float envIntensity = 1;
 
-		int unlit = 0; 
+		int unlit = 0;
+		float pad[3];
+		mat3 uvTransform;
 	};
 
 
@@ -6531,7 +6533,7 @@ namespace vkr
 	{
 		// Compile and create shaders
 		auto defines = defines0;
-		defines["pbr_glsl"] = "1";
+		//defines["pbr_glsl"] = "1";
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
@@ -6700,7 +6702,7 @@ namespace vkr
 		ds.pNext = NULL;
 		ds.flags = 0;
 		ds.depthTestEnable = true;
-		ds.depthWriteEnable = depthwrite;
+		ds.depthWriteEnable = true;/// depthwrite;
 		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		ds.back.failOp = VK_STENCIL_OP_KEEP;
 		ds.back.passOp = VK_STENCIL_OP_KEEP;
@@ -9173,7 +9175,7 @@ namespace vkr
 		VkDescriptorBufferInfo out = {};
 		out.buffer = m_buffer;
 		out.offset = 0;
-		out.range = size;
+		out.range = size;// alignUp(size, (uint32_t)256);
 
 		VkWriteDescriptorSet write;
 		write = {};
@@ -9194,7 +9196,7 @@ namespace vkr
 		VkDescriptorBufferInfo out = {};
 		out.buffer = buffer;
 		out.offset = pos;
-		out.range = size;
+		out.range = size;// alignUp(size, (uint32_t)256);
 
 		VkWriteDescriptorSet write;
 		write = {};
@@ -18545,7 +18547,7 @@ namespace vkr {
 			//LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
 			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
 
-			// Add a default light in case there are none
+			// todo 添加默认灯光Add a default light in case there are none
 			if (pgc->m_lights.size() == 0)
 			{
 				tfNode n;
@@ -18555,10 +18557,10 @@ namespace vkr {
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
 				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 150;
+				l.m_range = 15;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
-				l.m_shadowResolution = shadowResolution;
+				l.m_shadowResolution = 1024;
 				//l.m_bias = 0.00005;
 				pgc->AddLight(n, l);
 			}
@@ -18836,7 +18838,7 @@ namespace vkr {
 		//	std::string Filename;
 		//	m_time = BenchmarkLoop(timeStamps, &m_camera, Filename);
 		//}
-		else
+		//else
 		{
 			//BuildUI();  // UI logic. Note that the rendering of the UI happens later.
 			OnUpdate(); // Update camera, handle keyboard/mouse input

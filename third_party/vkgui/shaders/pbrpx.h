@@ -116,7 +116,9 @@ struct pbr_factors_t
 	float clearcoatNormalScale;
 	float envIntensity;
 
-	int unlit; 
+	int unlit;
+	float pad[3];
+	mat3 uvTransform;
 };
 
 
@@ -2260,21 +2262,20 @@ vec3 doPbrLighting(MaterialInfo m, vec2 uv, vec3 diffuseColor, vec3 specularColo
 	for (int i = 0; i < myPerFrame.u_lightCount; ++i)
 	{
 		Light light = myPerFrame.u_lights[i];
-		vec3 c = vec3(0);
 		float shadowFactor = DoSpotShadow(worldPos, light);
+		color = light.color;
 		if (light.type == LightType_Directional)
 		{
-			c = applyDirectionalLight(light, materialInfo, normal, view);
+			color = applyDirectionalLight(light, materialInfo, normal, view) * shadowFactor;
 		}
 		else if (light.type == LightType_Point)
 		{
-			c = applyPointLight(light, materialInfo, normal, worldPos, view);
+			color = applyPointLight(light, materialInfo, normal, worldPos, view);
 		}
 		else if (light.type == LightType_Spot)
 		{
-			c = applySpotLight(light, materialInfo, normal, worldPos, view);
+			color = applySpotLight(light, materialInfo, normal, worldPos, view) * shadowFactor;
 		}
-		color += c * shadowFactor;
 	}
 #endif
 
@@ -2320,7 +2321,6 @@ vec3 do_punctual(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoa
 		}
 
 		float shadowFactor = DoSpotShadow(materialInfo.vp.v_Position, light);
-
 		// BSTF
 		vec3 l = normalize(pointToLight);   // Direction from surface point to light
 		vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
@@ -2333,7 +2333,7 @@ vec3 do_punctual(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoa
 		vec3 dielectric_fresnel = F_Schlick(materialInfo.f0_dielectric * materialInfo.specularWeight, materialInfo.f90_dielectric, abs(VdotH));
 		vec3 metal_fresnel = F_Schlick(vec3(materialInfo.baseColor), vec3(1.0), abs(VdotH));
 
-		vec3 lightIntensity = getLighIntensity(light, pointToLight)  ;
+		vec3 lightIntensity = getLighIntensity(light, pointToLight);
 
 		vec3 l_diffuse = lightIntensity * NdotL * BRDF_lambertian(vec3(materialInfo.baseColor));
 		vec3 l_specular_dielectric = vec3(0.0);
@@ -2371,7 +2371,7 @@ vec3 do_punctual(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoa
 
 		// Calculation of analytical light
 		// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-		vec3 intensity = getLighIntensity(light, pointToLight) ;
+		vec3 intensity = getLighIntensity(light, pointToLight);
 
 #ifdef MATERIAL_ANISOTROPY
 		l_specular_metal = intensity * NdotL * BRDF_specularGGXAnisotropy(materialInfo.alphaRoughness, materialInfo.anisotropyStrength, n, v, l, h, materialInfo.anisotropicT, materialInfo.anisotropicB);
@@ -2406,7 +2406,7 @@ vec3 do_punctual(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoa
 		l_color = l_sheen + l_color * l_albedoSheenScaling;
 		l_color = mix(l_color, l_clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
 
-		color += l_color * shadowFactor; 
+		color += l_color * shadowFactor;
 	}
 #endif // USE_PUNCTUAL
 	return color;
@@ -2484,7 +2484,7 @@ vec3 get_ibl(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoatFre
 	albedoSheenScaling = 1.0 - max3(materialInfo.sheenColorFactor) * albedoSheenScalingLUT(NdotV, materialInfo.sheenRoughnessFactor);
 #endif
 
-	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, materialInfo.metallic); 
+	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, materialInfo.metallic);
 	color = f_sheen + color * albedoSheenScaling; //光泽度
 	color = mix(color, clearcoat_brdf, clearcoatFactor * clearcoatFresnel);//清漆
 	// 测试vec3(albedoSheenScaling);
@@ -2643,7 +2643,7 @@ vec4 pbr_main(vsio_ps vp)
 	clearcoatFactor = materialInfo.clearcoatFactor;
 	clearcoatFresnel = F_Schlick(materialInfo.clearcoatF0, materialInfo.clearcoatF90, clampedDot(materialInfo.clearcoatNormal, v));
 #endif
-	//color = get_ibl(materialInfo, clearcoatFactor, clearcoatFresnel, v, n, diffuseTransmissionThickness);
+	color = get_ibl(materialInfo, clearcoatFactor, clearcoatFresnel, v, n, diffuseTransmissionThickness);
 
 	f_emissive = u_pbrParams.emissiveFactor; // 自发光
 #ifdef MATERIAL_EMISSIVE_STRENGTH

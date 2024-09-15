@@ -790,7 +790,7 @@ int main()
 		load_gltf(vkd, R"(E:\model\sharp2.glb)");
 		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 		load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-		load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
+		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\FlightHelmet\glTF\FlightHelmet.gltf)");
 		//load_gltf(vkd, R"(E:\model\cube18.glb)");
 		vkd->resize(800, 600);
