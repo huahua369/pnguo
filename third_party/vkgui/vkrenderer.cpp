@@ -48,7 +48,6 @@ MORPH_TARGET_COLOR_1_OFFSET		颜色变形
 
 */
 #include "pch1.h"
-#include "vkrenderer.h"
 
 #define USE_VMA
 
@@ -72,13 +71,27 @@ MORPH_TARGET_COLOR_1_OFFSET		颜色变形
 #ifndef DXGI_FORMAT_DEFINED
 typedef uint32_t DXGI_FORMAT;
 #endif
-#include <tinysdl3.h>
+//#include <tinysdl3.h>
 #include <event.h>
 #include <print_time.h>
 #include <mapView.h>
 #define TINYGLTF_IMPLEMENTATION 
 #include <tiny_gltf.h>
 #include <zlib.h>
+#include <queue>
+#include "vkrenderer.h"
+
+#ifndef DEV_INFO_CXH
+#define DEV_INFO_CXH
+struct dev_info_cx
+{
+	void* inst;
+	void* phy;
+	void* vkdev;
+	uint32_t qFamIdx;		// familyIndex
+	uint32_t qIndex = 0;
+};
+#endif // !DEV_INFO_CXH
 
 namespace vkr
 {

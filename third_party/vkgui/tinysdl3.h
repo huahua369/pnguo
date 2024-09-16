@@ -44,7 +44,8 @@ public:
 private:
 
 };
-
+#ifndef DEV_INFO_CXH
+#define DEV_INFO_CXH
 struct dev_info_cx
 {
 	void* inst;
@@ -53,6 +54,7 @@ struct dev_info_cx
 	uint32_t qFamIdx;		// familyIndex
 	uint32_t qIndex = 0;
 };
+#endif // !DEV_INFO_CXH
 struct et_un_t;
 class font_rctx;
 class render_2d;

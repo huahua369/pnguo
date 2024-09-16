@@ -32,8 +32,8 @@ namespace vkr {
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
 		uint32_t uploadHeapMemSize = 500 * 1024 * 1024;
 	};
-}
-struct dev_info_cx;
+} 
+struct dev_info_cx; 
 struct image_vkr
 {
 	glm::ivec2 size = {};
