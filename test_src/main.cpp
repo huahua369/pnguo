@@ -789,7 +789,8 @@ int main()
 
 		load_gltf(vkd, R"(E:\model\sharp2.glb)");
 		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
-		load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
+		//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
+		load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
 		//load_gltf(vkd, R"(E:\model\pale_radiance_tree.glb)");
 		//load_gltf(vkd, R"(E:\code\nv\donut_examples\media\glTF-Sample-Assets\Models\FlightHelmet\glTF\FlightHelmet.gltf)");
 		//load_gltf(vkd, R"(E:\model\cube18.glb)");
@@ -820,7 +821,7 @@ int main()
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto sss = (char*)u8" جيد 新宋体 ,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	auto ftc = app->font_ctx;
-
+#if 0
 	do_text(sss, 0, strlen(sss));
 
 	static std::atomic_bool kinit = false;
@@ -984,10 +985,10 @@ int main()
 	while (!kinit) {
 		Sleep(1);
 	}
+#endif
 	menu_cx* mc = new menu_cx();	// 菜单管理
 	//mc->set_main(form0);
 	mc->add_familys(fontn);
-
 
 	std::vector<std::string> mvs = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
 	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
@@ -1106,7 +1107,7 @@ int main()
 				};
 		}
 	}
-
+#if 0
 	{
 		auto p = pl4;
 		p->draggable = true; //可拖动
@@ -1975,6 +1976,7 @@ int main()
 		pl2->move2end(et2);
 		pl2->mk_layout();
 	}
+#endif
 #endif
 	run_app(app, 0);
 	free_app(app);
