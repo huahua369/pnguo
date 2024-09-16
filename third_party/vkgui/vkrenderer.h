@@ -92,10 +92,13 @@ private:
 };
 
 
-// 创建渲染器
+// todo 创建渲染器
 vkdg_cx* new_vkdg(dev_info_cx* c = 0);
 void free_vkdg(vkdg_cx* p);
 void load_gltf(vkdg_cx* p, const char* fn);
+
+
+
 
 namespace vkr {
 	// 顶点数据、纹理、矩阵、灯光、渲染命令

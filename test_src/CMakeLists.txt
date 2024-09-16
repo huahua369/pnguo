@@ -6,14 +6,24 @@ project ("tcmp")
   
 #测试
 list(APPEND src_cmp  
-    "charts.cpp"
+    "charts.cpp"  "ecc_sv.cpp"
     "main.cpp" 
     "../rc/resource1.rc"
 ) 
 
 
 # 将源代码添加到此项目的可执行文件。
-add_executable (tcmp ${src_cmp}   "ecc_sv.cpp") 
+add_executable (tcmp ${src_cmp} ) 
+
+list(APPEND src_vkcmp   
+    "main_vk.cpp" 
+    "ecc_sv.cpp"
+    "../rc/resource1.rc"
+) 
+
+
+# 将源代码添加到此项目的可执行文件。
+add_executable (vkcmp ${src_vkcmp} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
@@ -50,6 +60,9 @@ list(APPEND lklib
 )
 target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
+
+target_include_directories(vkcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
+target_link_libraries(vkcmp PRIVATE ${lklib})
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
