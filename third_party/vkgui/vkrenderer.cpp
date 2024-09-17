@@ -1001,7 +1001,7 @@ namespace vkr {
 		ivec2 transmissionFramebufferSize;
 	};
 
-
+	// todo pbr UBO用结构体
 	struct pbr_factors_t
 	{
 		// pbrMetallicRoughness

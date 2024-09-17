@@ -14,17 +14,19 @@ int main()
 	SDL_Texture* d3tex = 0;
 	if (vkd) {
 		load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
-		load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
+		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
+		load_gltf(vkd, R"(E:\model\spaceship.glb)");
 		vkd->resize(800, 600);						// 设置缓冲区大小
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)
 		{
-			auto tex = form0->new_texture(vr.size.x, vr.size.y, vr.vkimageptr, 1);// bgra纹理
+			auto tex = form0->new_texture(vr.size.x, vr.size.y, vr.vkimageptr, 1);// 创建SDL的bgra纹理
 			if (tex)
 			{
 				// 添加纹理到SDL窗口渲染 
 				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
 				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 100,100,vr.size.x,vr.size.y }, 0);
+				d3tex = tex;
 			}
 		}
 	}
