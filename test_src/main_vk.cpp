@@ -17,6 +17,8 @@ int main()
 		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
 		//load_gltf(vkd, R"(E:\model\spaceship.glb)");
 		load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)");
+		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+		load_gltf(vkd, R"(E:\model\mclaren_f1.glb)");
 		vkd->resize(800, 600);						// 设置缓冲区大小
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)

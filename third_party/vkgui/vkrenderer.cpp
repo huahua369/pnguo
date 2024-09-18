@@ -6281,7 +6281,7 @@ namespace vkr
 			if (pSkyDome)
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
-				tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
+				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
 				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, &m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
 
@@ -6546,7 +6546,7 @@ namespace vkr
 	{
 		// Compile and create shaders
 		auto defines = defines0;
-		//defines["pbr_glsl"] = "1";
+		defines["pbr_glsl"] = "1";
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
@@ -18551,14 +18551,15 @@ namespace vkr {
 			if (pgc->m_lights.size() == 0)
 			{
 				tfNode n = {};
-				n.m_tranform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f , glm::vec4(0, 0, 0, 0), false);
-				n.m_tranform.m_translation = { 0,20,0,0 };
+				glm::vec4 src = PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f;
+				src = { 0.1,20,0.1,0 };
+				n.m_tranform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
 				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 152;
-				l.m_outerConeAngle = AMD_PI_OVER_4;
+				l.m_range = 52;
+				l.m_outerConeAngle = AMD_PI_OVER_4*0.55;
 				l.m_innerConeAngle = l.m_outerConeAngle * 0.9f;
 				l.m_shadowResolution = 1024;
 				//l.m_bias = 0.00005;

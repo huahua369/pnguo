@@ -164,7 +164,7 @@ struct pbr0Material
 #endif
 
 };
-
+ 
 struct pbrMaterial
 {
 	// pbrMetallicRoughness

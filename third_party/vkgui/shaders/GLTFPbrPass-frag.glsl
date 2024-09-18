@@ -80,8 +80,32 @@ layout (location = HAS_NORMALS_RT) out vec4 Output_normal;
 //
 //--------------------------------------------------------------------------------------
 
+
 #ifdef pbr_glsl
 #include "pbrpx.h"
+vec4 pbr_n(){
+
+	vsio_ps ipt;
+#ifdef ID_COLOR_0
+	ipt.v_Color0 = Input.Color0;
+#else
+	ipt.v_Color0 = vec4(0);
+#endif
+#ifdef ID_TEXCOORD_0
+	ipt.v_texcoord[0] = Input.UV0;
+#else
+	ipt.v_texcoord[0] = vec2(0.0, 0.0);
+#endif 
+#ifdef ID_TEXCOORD_1
+	ipt.v_texcoord[1] = Input.UV1;
+#else
+	ipt.v_texcoord[1] = vec2(0.0, 0.0);
+#endif 
+	ipt.v_Position = Input.WorldPos;	
+	ipt.u_ModelMatrix = myPerObject_u_mCurrWorld;
+	ipt.u_ViewMatrix = myPerFrame.u_mCameraCurrViewProj;
+	return pbr_main(ipt);
+}
 #else
 //--------------------------------------------------------------------------------------
 // Per Frame structure, must match the one in GlTFCommon.h
@@ -105,7 +129,6 @@ layout (scalar, set=0, binding = 1) uniform perObject
     mat4 myPerObject_u_mCurrWorld;
     mat4 myPerObject_u_mPrevWorld;
 
-	//PBRFactors u_pbrParams;
 	pbrMaterial u_pbrParams;
 };
 
@@ -124,26 +147,7 @@ void main()
 {
 
 #ifdef pbr_glsl 
-	vsio_ps ipt;
-#ifdef ID_COLOR_0
-	ipt.v_Color0 = Input.Color0;
-#else
-	ipt.v_Color0 = vec4(0);
-#endif
-#ifdef ID_TEXCOORD_0
-	ipt.v_texcoord[0] = Input.UV0;
-#else
-	ipt.v_texcoord[0] = vec2(0.0, 0.0);
-#endif 
-#ifdef ID_TEXCOORD_1
-	ipt.v_texcoord[1] = Input.UV1;
-#else
-	ipt.v_texcoord[1] = vec2(0.0, 0.0);
-#endif 
-	ipt.v_Position = Input.WorldPos;	
-	ipt.u_ModelMatrix = myPerObject_u_mCurrWorld;
-	ipt.u_ViewMatrix = myPerFrame.u_mCameraCurrViewProj;
-	vec4 color = pbr_main(ipt);
+	vec4 color = pbr_n();
 #else
 	discardPixelIfAlphaCutOff(Input);
 	gpuMaterial m = defaultPbrMaterial();
@@ -160,7 +164,7 @@ void main()
 			discard;
 	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
-	vec4 color = vec4(c3, m.baseColor.a);
+	vec4 color = vec4(c3, m.baseColor.a); 
 #endif
 #if 0
 	float perceptualRoughness;

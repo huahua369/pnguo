@@ -177,7 +177,7 @@ void main()
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
 	vec4 color = vec4(c3, m.baseColor.a);
 #endif
-#if 0
+#if 1
 	float perceptualRoughness;
 	vec3 diffuseColor;
 	vec3 specularColor;
