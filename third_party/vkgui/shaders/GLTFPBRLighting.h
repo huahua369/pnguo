@@ -468,7 +468,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 #ifdef MATERIAL_CLEARCOAT
 	clearcoatFactor = m.clearcoatFactor;
-	clearcoatFresnel = F_Schlick(materialInfo.clearcoatF0, materialInfo.clearcoatF90, clampedDot(materialInfo.clearcoatNormal, v));
+	clearcoatFresnel = F_Schlick(m.clearcoatF0, m.clearcoatF90, clampedDot(m.clearcoatNormal, view));
 #endif
 
 	// Apply optional PBR terms for additional (optional) shading

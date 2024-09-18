@@ -1033,7 +1033,7 @@ namespace vkr {
 		// KHR_materials_sheen 
 		vec3 sheenColorFactor = {};
 		float sheenRoughnessFactor = 0;
-
+		// KHR_materials_anisotropy
 		vec3 anisotropy = {};
 		// KHR_materials_transmission
 		float transmissionFactor = 0;
@@ -1049,12 +1049,12 @@ namespace vkr {
 		vec3 attenuationColor = vec3(1.0);
 		float attenuationDistance = 0;
 
-		// Iridescence
+		// KHR_materials_iridescence
 		float iridescenceFactor = 0;
 		float iridescenceIor = 1.3;
 		float iridescenceThicknessMinimum = 100;
 		float iridescenceThicknessMaximum = 400;
-
+		// KHR_materials_clearcoat
 		float clearcoatFactor = 0;
 		float clearcoatRoughness = 0;
 		float clearcoatNormalScale = 1;
@@ -14033,20 +14033,7 @@ namespace vkr {
 	}
 	void Transform::LookAt(glm::vec4 source, glm::vec4 target, bool flipY)
 	{
-		//auto p3 = math::Point3(source.x, source.y, source.z);
-		//auto r = math::Matrix4::lookAt(p3
-		//	, math::Point3(target.x, target.y, target.z), math::Vector3(0, 1, 0));
-		//r = math::inverse(r);
-		//auto t = r.getCol(3);  r.setCol(3, math::Vector4(0, 0, 0, 1));
-
 		auto mat = m_rotation = glm::inverse(glm::lookAt(glm::vec3(source), glm::vec3(target), glm::vec3(0, flipY ? -1 : 1, 0)));
-		//glm::vec3 scale;
-		//glm::quat& rotation = m_rotation;
-		//glm::vec3 translation;
-		//glm::vec3 skew;
-		//glm::vec4 perspective;
-		//glm::decompose(mat, scale, rotation, translation, skew, perspective);
-		//m_scale = glm::vec4(scale, 0);
 		m_translation = mat[3];  m_rotation[3] = glm::vec4(0, 0, 0, 1);
 
 	}
@@ -18563,16 +18550,16 @@ namespace vkr {
 			// todo 添加默认灯光Add a default light in case there are none
 			if (pgc->m_lights.size() == 0)
 			{
-				tfNode n;
-				n.m_tranform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
-
+				tfNode n = {};
+				n.m_tranform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f , glm::vec4(0, 0, 0, 0), false);
+				n.m_tranform.m_translation = { 0,20,0,0 };
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
 				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 15;
+				l.m_range = 152;
 				l.m_outerConeAngle = AMD_PI_OVER_4;
-				l.m_innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+				l.m_innerConeAngle = l.m_outerConeAngle * 0.9f;
 				l.m_shadowResolution = 1024;
 				//l.m_bias = 0.00005;
 				pgc->AddLight(n, l);
@@ -18781,7 +18768,7 @@ namespace vkr {
 			}
 
 			//  Orbiting
-			distance -= (float)io.wheel.y / 3.0f;
+			distance -= (float)io.wheel.y;// / 3.0f;
 			distance = std::max<float>(distance, 0.1f);
 
 			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);

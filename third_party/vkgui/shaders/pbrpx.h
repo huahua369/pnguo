@@ -89,7 +89,7 @@ struct pbr_factors_t
 	// KHR_materials_sheen 
 	vec3 sheenColorFactor;
 	float sheenRoughnessFactor;
-
+	// KHR_materials_anisotropy
 	vec3 anisotropy;
 	// KHR_materials_transmission
 	float transmissionFactor;
@@ -105,12 +105,12 @@ struct pbr_factors_t
 	vec3 attenuationColor;
 	float attenuationDistance;
 
-	// Iridescence
+	// KHR_materials_iridescence
 	float iridescenceFactor;
 	float iridescenceIor;
 	float iridescenceThicknessMinimum;
 	float iridescenceThicknessMaximum;
-
+	// KHR_materials_clearcoat
 	float clearcoatFactor;
 	float clearcoatRoughness;
 	float clearcoatNormalScale;
@@ -2406,7 +2406,9 @@ vec3 do_punctual(MaterialInfo materialInfo, float clearcoatFactor, vec3 clearcoa
 		l_color = l_sheen + l_color * l_albedoSheenScaling;
 		l_color = mix(l_color, l_clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
 
-		color += l_color * shadowFactor;
+		//color += l_color * shadowFactor;
+		color += intensity * shadowFactor;
+		//color = vec3(shadowFactor); //阴影正常
 	}
 #endif // USE_PUNCTUAL
 	return color;
@@ -2643,8 +2645,7 @@ vec4 pbr_main(vsio_ps vp)
 	clearcoatFactor = materialInfo.clearcoatFactor;
 	clearcoatFresnel = F_Schlick(materialInfo.clearcoatF0, materialInfo.clearcoatF90, clampedDot(materialInfo.clearcoatNormal, v));
 #endif
-	color = get_ibl(materialInfo, clearcoatFactor, clearcoatFresnel, v, n, diffuseTransmissionThickness);
-
+	//color = get_ibl(materialInfo, clearcoatFactor, clearcoatFresnel, v, n, diffuseTransmissionThickness);
 	f_emissive = u_pbrParams.emissiveFactor; // 自发光
 #ifdef MATERIAL_EMISSIVE_STRENGTH
 	f_emissive *= u_pbrParams.emissiveStrength;

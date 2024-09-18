@@ -15,7 +15,8 @@ int main()
 	if (vkd) {
 		load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
 		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
-		load_gltf(vkd, R"(E:\model\spaceship.glb)");
+		//load_gltf(vkd, R"(E:\model\spaceship.glb)");
+		load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)");
 		vkd->resize(800, 600);						// 设置缓冲区大小
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)
