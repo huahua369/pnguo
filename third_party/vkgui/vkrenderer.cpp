@@ -5681,7 +5681,7 @@ namespace vkr
 			tfmat->m_defines["ID_normalTexCoord"] = std::to_string(material.normalTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.normalTexture.extensions, &m3)) {
-				tfmat->m_defines["UVT_emissiveTexture"] = std::to_string(uvc++);
+				tfmat->m_defines["UVT_normalTexture"] = std::to_string(uvc++);
 			}
 		}
 		if (material.emissiveTexture.index != -1)
@@ -5757,7 +5757,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_emissive_strength");
 					if (tt) {
-						tfmat->m_params.ior = get_v(tt, "emissiveStrength", 1.0);
+						tfmat->m_params.emissiveStrength = get_v(tt, "emissiveStrength", 1.0);
 						tfmat->m_defines["MATERIAL_EMISSIVE_STRENGTH"] = "1";
 					}
 				}
