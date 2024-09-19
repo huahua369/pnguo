@@ -252,7 +252,7 @@ struct PBRFactors
 
 
 // 内部pbr用
-struct MaterialInfo
+struct MaterialInfo1aa
 {
 	vec4 baseColor;
 	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
@@ -265,6 +265,18 @@ struct MaterialInfo
 	vec3 reflectance90;           // reflectance color at grazing angle
 	vec3 specularColor;           // color contribution from specular lighting
 
+};
+
+struct MaterialInfo
+{
+	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
+	vec3 reflectance0;            // full reflectance color (normal incidence angle)
+
+	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
+	vec3 diffuseColor;            // color contribution from diffuse lighting
+
+	vec3 reflectance90;           // reflectance color at grazing angle
+	vec3 specularColor;           // color contribution from specular lighting
 };
 struct gpuMaterial
 {

@@ -5811,7 +5811,7 @@ namespace vkr
 					if (tt) {
 						tfmat->m_defines["MATERIAL_CLEARCOAT"] = "1";
 						tfmat->m_params.clearcoatFactor = get_v(tt, "clearcoatFactor", 0.0);
-						tfmat->m_params.clearcoatRoughness = get_v(tt, "clearcoatRoughness", 0.0);
+						tfmat->m_params.clearcoatRoughness = get_v(tt, "clearcoatRoughnessFactor", 0.0);
 						itcb(*tt, "clearcoatTexture", "ID_clearcoatTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "clearcoatRoughnessTexture", "ID_clearcoatRoughnessTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "clearcoatNormalTexture", "ID_clearcoatNormalTexCoord", tfmat->m_defines, textureIds);
@@ -6546,7 +6546,7 @@ namespace vkr
 	{
 		// Compile and create shaders
 		auto defines = defines0;
-		defines["pbr_glsl"] = "1";
+		//defines["pbr_glsl"] = "1";
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
 		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
@@ -18559,7 +18559,7 @@ namespace vkr {
 				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 52;
-				l.m_outerConeAngle = AMD_PI_OVER_4*0.55;
+				l.m_outerConeAngle = AMD_PI_OVER_4;
 				l.m_innerConeAngle = l.m_outerConeAngle * 0.9f;
 				l.m_shadowResolution = 1024;
 				//l.m_bias = 0.00005;

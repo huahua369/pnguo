@@ -352,25 +352,7 @@ float applyIorToRoughness(float roughness, float ior)
 	// an IOR of 1.5 results in the default amount of microfacet refraction.
 	return roughness * clamp(ior * 2.0 - 2.0, 0.0, 1.0);
 }
-
-vec3 getPunctualRadianceTransmission(vec3 normal, vec3 view, vec3 pointToLight, float alphaRoughness,
-	vec3 f0, vec3 f90, vec3 baseColor, float ior)
-{
-	float transmissionRougness = applyIorToRoughness(alphaRoughness, ior);
-
-	vec3 n = normalize(normal);           // Outward direction of surface point
-	vec3 v = normalize(view);             // Direction from surface point to view
-	vec3 l = normalize(pointToLight);
-	vec3 l_mirror = normalize(l + vec3(2.0f) * n * dot(-l, n));     // Mirror light reflection vector on surface
-	vec3 h = normalize(l_mirror + v);            // Halfway vector between transmission light vector and v
-
-	float D = D_GGX(clamp(dot(n, h), 0.0f, 1.0f), transmissionRougness);
-	vec3 F = F_Schlick(f0, f90, clamp(dot(v, h), 0.0f, 1.0f));
-	float Vis = V_GGX(clamp(dot(n, l_mirror), 0.0f, 1.0f), clamp(dot(n, v), 0.0f, 1.0f), transmissionRougness);
-
-	// Transmission BTDF
-	return (vec3(1.0) - F) * baseColor * D * Vis;
-}
+ 
 
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 {
@@ -465,11 +447,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #ifdef USE_IBL
 	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
 #endif
-
-#ifdef MATERIAL_CLEARCOAT
-	clearcoatFactor = m.clearcoatFactor;
-	clearcoatFresnel = F_Schlick(m.clearcoatF0, m.clearcoatF90, clampedDot(m.clearcoatNormal, view));
-#endif
+	 
 
 	// Apply optional PBR terms for additional (optional) shading
 #ifdef ID_occlusionTexture 

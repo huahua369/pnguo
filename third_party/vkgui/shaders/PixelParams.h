@@ -364,13 +364,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 #endif
 	//m.clearcoatRoughness = max(m.clearcoatRoughness, 0.001F);
 	m.clearcoatRoughness = clamp(m.clearcoatRoughness, 0.0f, 1.0f);
-
-#ifdef ID_clearcoatNormalTexture 
-	mat3 tbn = mat3(m.T, m.B, m.Nc);
-	vec3 normal_vector = texture(u_clearcoatNormalTexture, texCoord).xyz;
-	normal_vector = normal_vector * 2.0F - 1.0F;
-	m.Nc = normalize(tbn * normal_vector);
-#endif
+	 
 
 	// Iridescence
 	float iridescence = material.iridescenceFactor;

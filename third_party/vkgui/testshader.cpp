@@ -162,31 +162,22 @@ namespace pbr
 
 
 #if 1
+ 
+#include "shaders/pbrpx1.h"
 
-#include "shaders/perFrameStruct.h"
-
-PerFrame myPerFrame;
 
 //--------------------------------------------------------------------------------------
 // PerFrame structure, must match the one in GltfPbrPass.h
 //--------------------------------------------------------------------------------------
-
-#include "shaders/PBRTextures.h"
-
+ 
 
 	//PBRFactors u_pbrParams;
-pbrMaterial u_pbrParams;
 //mat4 myPerObject_u_mCurrWorld;
 VS2PS Input;
 //--------------------------------------------------------------------------------------
 // mainPS
 //--------------------------------------------------------------------------------------
-
-#include "shaders/functions.h"
-#include "shaders/shadowFiltering.h"
-#include "shaders/bsdf_functions.h"
-#include "shaders/PixelParams.h"
-#include "shaders/GLTFPBRLighting.h"
+ 
 
 void amain()
 {
@@ -198,7 +189,14 @@ void amain()
 	vec2 uv = vec2(0.0, 0.0);
 #endif
 	getPBRParams(Input, u_pbrParams, m);
-	//getPBRParams(Input, u_pbrParams, diffuseColor, specularColor, perceptualRoughness, alpha, baseColor);
+
+	if (u_pbrParams.alphaMode == ALPHA_MASK)
+	{
+		if (m.alpha < u_pbrParams.alphaCutoff)
+			discard;
+	}
+	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
+	vec4 color = vec4(c3, m.baseColor.a);
 
 // Roughness is authored as perceptual roughness; as is convention,
 // convert to material roughness by squaring the perceptual roughness [2].

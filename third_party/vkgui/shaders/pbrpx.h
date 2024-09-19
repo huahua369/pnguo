@@ -1535,7 +1535,7 @@ struct MaterialInfo
 
 
 // Get normal, tangent and bitangent vectors.
-NormalInfo getNormalInfo(vec3 v, vsio_ps vp)
+NormalInfo getNormalInfo1(vec3 v, vsio_ps vp)
 {
 	vec2 UV = getNormalUV(vp);
 	vec2 uv_dx = dFdx(UV);
@@ -1574,6 +1574,67 @@ NormalInfo getNormalInfo(vec3 v, vsio_ps vp)
 	b = cross(ng, t);
 #endif
 
+
+	// For a back-facing surface, the tangential basis vectors are negated.
+	if (gl_FrontFacing == false)
+	{
+		t *= -1.0;
+		b *= -1.0;
+		ng *= -1.0;
+	}
+
+	// Compute normals:
+	NormalInfo info;
+	info.ng = ng;
+#ifdef ID_normalTexture
+	info.ntex = vec3(texture(u_NormalSampler, UV)) * 2.0 - vec3(1.0);
+	info.ntex *= vec3(u_pbrParams.normalScale, u_pbrParams.normalScale, 1.0);
+	info.ntex = normalize(info.ntex);
+	info.n = normalize(mat3(t, b, ng) * info.ntex);
+#else
+	info.n = ng;
+#endif
+	info.t = t;
+	info.b = b;
+	return info;
+}
+NormalInfo getNormalInfo(vsio_ps vp)
+{
+	vec2 UV = getNormalUV(vp);
+	vec3 ng;
+#ifndef ID_TANGENT
+	vec3 pos_dx = dFdx(vp.v_Position);
+	vec3 pos_dy = dFdy(vp.v_Position);
+	vec3 tex_dx = dFdx(vec3(UV, 0.0));
+	vec3 tex_dy = dFdy(vec3(UV, 0.0));
+	vec3 t = (tex_dy.y * pos_dx - tex_dx.y * pos_dy) / (tex_dx.x * tex_dy.y - tex_dy.x * tex_dx.y);
+
+#ifdef ID_NORMAL
+	ng = normalize(Input.Normal);
+#else
+	ng = cross(pos_dx, pos_dy);
+#endif
+
+	t = normalize(t - ng * dot(ng, t));
+	vec3 b = normalize(cross(ng, t));
+	mat3 tbn = mat3(t, b, ng);
+#else // HAS_TANGENTS
+	mat3 tbn = mat3(Input.Tangent, Input.Binormal, Input.Normal);
+	vec3 t = Input.Tangent;
+	vec3 b = Input.Binormal;
+	ng = normalize(Input.Normal);
+#endif
+
+#ifdef ID_normalTexture
+	vec2 xy = 2.0 * texture(u_NormalSampler, UV, myPerFrame.u_LodBias).rg - 1.0;
+	float z = sqrt(1.0 - dot(xy, xy));
+	vec3 n = vec3(xy, z);
+	n = normalize(tbn * (n /* * vec3(u_NormalScale, u_NormalScale, 1.0) */));
+#else
+	// The tbn matrix is linearly interpolated, so we need to re-normalize
+	vec3 n = tbn[2];
+	n = normalize(n);
+#endif
 
 	// For a back-facing surface, the tangential basis vectors are negated.
 	if (gl_FrontFacing == false)
@@ -2596,12 +2657,12 @@ vec4 pbr_main(vsio_ps vp)
 #else
 	//OPAQUE
 #endif
-	vec3 color = vec3(0);
+	vec3 color = vec3(0.0);
 
 	vec3 v = normalize(vec3(myPerFrame.u_CameraPos) - vp.v_Position);
-	NormalInfo normalInfo = getNormalInfo(v, vp);
-	vec3 normal = getPixelNormal(vp);
-	vec3 n = normal;// normalInfo.n;
+	NormalInfo normalInfo = getNormalInfo(vp);
+	vec3 normal = getPixelNormal(vp); 
+	vec3 n = normalInfo.n;
 	vec3 t = normalInfo.t;
 	vec3 b = normalInfo.b;
 	float NdotV = clampedDot(n, v);
@@ -2783,7 +2844,9 @@ vec4 pbr_main(vsio_ps vp)
 		vec3 metal_fresnel = F_Schlick(vec3(materialInfo.baseColor), vec3(1.0), abs(VdotH));
 
 		vec3 lightIntensity = getLighIntensity(light, pointToLight);
-		vec3 lightIntensity1 = get_light_intensity(light, mo, n, v, materialInfo.vp.v_Position) * shadowFactor;
+		vec3 lightIntensity1 = get_light_intensity(light, mo, n, v, materialInfo.vp.v_Position);// *shadowFactor;
+		color += vec3(lightIntensity);
+		break;
 		vec3 l_diffuse = lightIntensity1 * NdotL * BRDF_lambertian(vec3(materialInfo.baseColor));
 		vec3 l_specular_dielectric = vec3(0.0);
 		vec3 l_specular_metal = vec3(0.0);
@@ -2792,9 +2855,9 @@ vec4 pbr_main(vsio_ps vp)
 		vec3 l_clearcoat_brdf = vec3(0.0);
 		vec3 l_sheen = vec3(0.0);
 		float l_albedoSheenScaling = 1.0;
-		color = diffuse(mo) + lightIntensity1;
+		//color += lightIntensity1;
 		//color += lightIntensity1 * NdotL * BRDF_lambertian(vec3(materialInfo.baseColor));
-		break;
+
 #ifdef MATERIAL_DIFFUSE_TRANSMISSION
 		vec3 diffuse_btdf = lightIntensity * clampedDot(-n, l) * BRDF_lambertian(materialInfo.diffuseTransmissionColorFactor);
 
@@ -2857,8 +2920,8 @@ vec4 pbr_main(vsio_ps vp)
 		l_color = l_sheen + l_color * l_albedoSheenScaling;
 		l_color = mix(l_color, l_clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
 
-		//color += l_color;
-		color += vec3(lightIntensity);
+		color += l_color;
+		//color += vec3(lightIntensity);
 		//color = vec3(shadowFactor); //阴影正常
 	}
 #endif // USE_PUNCTUAL

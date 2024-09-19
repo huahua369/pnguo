@@ -111,33 +111,21 @@ vec4 pbr_n(){
 // Per Frame structure, must match the one in GlTFCommon.h
 //--------------------------------------------------------------------------------------
 
-#include "perFrameStruct.h"
-
-layout (scalar, set=0, binding = 0) uniform perFrame 
-{
-	PerFrame myPerFrame; 
-};
+#include "pbrpx1.h"
 
 //--------------------------------------------------------------------------------------
 // PerFrame structure, must match the one in GltfPbrPass.h
 //--------------------------------------------------------------------------------------
  
-#include "PBRTextures.h" 
-
-layout (scalar, set=0, binding = 1) uniform perObject 
-{
-    mat4 myPerObject_u_mCurrWorld;
-    mat4 myPerObject_u_mPrevWorld;
-
-	pbrMaterial u_pbrParams;
-};
+//#include "PBRTextures.h" 
 
 
-#include "functions.h"
-#include "shadowFiltering.h"
-#include "bsdf_functions.h"
-#include "PixelParams.h"
-#include "GLTFPBRLighting.h"
+
+//#include "functions.h"
+//#include "shadowFiltering.h"
+//#include "bsdf_functions.h"
+//#include "PixelParams.h"
+//#include "GLTFPBRLighting.h"
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -164,15 +152,14 @@ void main()
 			discard;
 	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
-	vec4 color = vec4(c3, m.baseColor.a); 
-#endif
-#if 0
-	float perceptualRoughness;
-	vec3 diffuseColor;
-	vec3 specularColor;
-	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness); 
-	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame, uv, diffuseColor, specularColor, perceptualRoughness, baseColor), baseColor.a);
-	color = color1;
+	vec4 color = vec4(c3, m.baseColor.a);  
+
+//	float perceptualRoughness;
+//	vec3 diffuseColor;
+//	vec3 specularColor;
+//	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness); 
+//	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame, uv, diffuseColor, specularColor, perceptualRoughness ,baseColor) , baseColor.a);
+//	color = color1;
 #endif 
 
 
