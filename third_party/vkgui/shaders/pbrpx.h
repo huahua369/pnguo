@@ -1956,7 +1956,7 @@ MaterialInfo getClearCoatInfo(MaterialInfo info, NormalInfo normalInfo)
 {
 	info.clearcoatFactor = u_pbrParams.clearcoatFactor;
 	info.clearcoatRoughness = u_pbrParams.clearcoatRoughness;
-	info.clearcoatF0 = vec3(pow((info.ior - 1.0) / (info.ior + 1.0), 2.0));
+	info.clearcoatF0 = vec3(min(0.04,pow((info.ior - 1.0) / (info.ior + 1.0), 2.0)));
 	info.clearcoatF90 = vec3(1.0);
 
 #ifdef ID_clearcoatTexture
@@ -2844,9 +2844,7 @@ vec4 pbr_main(vsio_ps vp)
 		vec3 metal_fresnel = F_Schlick(vec3(materialInfo.baseColor), vec3(1.0), abs(VdotH));
 
 		vec3 lightIntensity = getLighIntensity(light, pointToLight);
-		vec3 lightIntensity1 = get_light_intensity(light, mo, n, v, materialInfo.vp.v_Position);// *shadowFactor;
-		color += vec3(lightIntensity);
-		break;
+		vec3 lightIntensity1 = get_light_intensity(light, mo, n, v, materialInfo.vp.v_Position)  *shadowFactor; 
 		vec3 l_diffuse = lightIntensity1 * NdotL * BRDF_lambertian(vec3(materialInfo.baseColor));
 		vec3 l_specular_dielectric = vec3(0.0);
 		vec3 l_specular_metal = vec3(0.0);

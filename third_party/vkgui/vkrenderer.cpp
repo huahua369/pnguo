@@ -18556,7 +18556,7 @@ namespace vkr {
 				n.m_tranform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 50.0;//scene.value("intensity", 1.0f);
+				l.m_intensity = 1.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 52;
 				l.m_outerConeAngle = AMD_PI_OVER_4;

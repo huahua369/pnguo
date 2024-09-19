@@ -781,6 +781,7 @@ gpuMaterial defaultPbrMaterial()
 
 	mat.ior1 = 1.0F;
 	mat.ior2 = 1.5F;
+	mat.ior = 1.5F;
 
 	mat.specular = 1.0F;
 	mat.specularColor = vec3(1.0F);
@@ -1017,7 +1018,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	}
 	m.ior1 = ior1;
 	m.ior2 = ior2;
-
+	m.ior = ior2;
 
 	// KHR_materials_transmission
 	m.transmission = material.transmissionFactor;
@@ -1035,7 +1036,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// KHR_materials_clearcoat
 	m.clearcoatFactor = material.clearcoatFactor;
 	m.clearcoatRoughness = material.clearcoatRoughness;
-	m.clearcoatF0 = vec3(pow((m.ior - 1.0) / (m.ior + 1.0), 2.0));
+	m.clearcoatF0 = vec3(max(0.04, pow((m.ior - 1.0) / (m.ior + 1.0), 2.0)));
 	m.clearcoatF90 = vec3(1.0);
 	m.clearcoatNormal = m.N;
 #endif
@@ -1160,7 +1161,7 @@ vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 #else
 	vec3 specularLight = texture(u_SpecularEnvSampler, reflection).rgb;
 #endif
-
+	specularLight = vec3(1.0);
 	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
 	vec3 specular = specularLight * (materialInfo.specularColorlight * brdf.x + brdf.y);
 
@@ -1400,6 +1401,7 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 #ifndef __cplusplus
 	textureSample.rgb *= u_pbrParams.envIntensity;
 #endif // __cplusplus
+	 
 	return textureSample;
 }
 
@@ -1566,6 +1568,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #ifdef MATERIAL_CLEARCOAT
 	clearcoat_brdf = getIBLRadianceGGX(m.clearcoatNormal, view, m.clearcoatRoughness);
 	clearcoatFactor = m.clearcoatFactor;
+	float clearcoat_NdotV = clampedDot(m.clearcoatNormal, view);
 	clearcoatFresnel = F_Schlick(m.clearcoatF0, m.clearcoatF90, clampedDot(m.clearcoatNormal, view));
 
 #endif 
@@ -1599,13 +1602,13 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
 #endif
 
-	//color = mix(color, clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
+	color = mix(color, clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
 	//color = vec3(clearcoat_brdf);
 	// Apply optional PBR terms for additional (optional) shading
 #ifdef ID_occlusionTexture 
 	color = color * m.ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
 #endif
-	color += m.emissive;// *(vec3(1.0) - m.clearcoatFactor * clearcoatFresnel);
+	color += m.emissive * (vec3(1.0) - m.clearcoatFactor * clearcoatFresnel);
 
 	color = clamp(color, vec3(0.0), vec3(1.0));
 
@@ -1676,6 +1679,7 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 v)
 	vec3 specularLight = texture(u_SpecularEnvSampler, reflection).rgb;
 #endif
 
+	specularLight = vec3(1.0);
 	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
 	vec3 specular = specularLight * (materialInfo.specularColor * brdf.x + brdf.y);
 

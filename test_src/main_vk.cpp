@@ -15,7 +15,7 @@ int main()
 	if (vkd) {
 		load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
 		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
-		//load_gltf(vkd, R"(E:\model\spaceship.glb)");
+		load_gltf(vkd, R"(E:\model\spaceship.glb)");
 		load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)");
 		load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
 		load_gltf(vkd, R"(E:\model\mclaren_f1.glb)");
@@ -28,7 +28,7 @@ int main()
 			{
 				// 添加纹理到SDL窗口渲染 
 				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
-				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 100,100,vr.size.x,vr.size.y }, 0);
+				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 20,50,vr.size.x,vr.size.y }, 0);
 				d3tex = tex;
 			}
 		}
