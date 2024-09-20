@@ -17760,7 +17760,7 @@ namespace vkr {
 				}
 			}
 
-			// Render opaque 
+			// Render opaque 渲染不透明物体
 			{
 				m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
 #if 1
@@ -17804,7 +17804,7 @@ namespace vkr {
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
 
-			// draw transparent geometry
+			// draw transparent geometry 渲染透明物体
 			{
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 
@@ -17814,6 +17814,9 @@ namespace vkr {
 
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
+			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
+			
+
 
 			// draw object's bounding boxes
 			{

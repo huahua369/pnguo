@@ -1918,7 +1918,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	if (dot(normal, view) < 0)
 	{
 		normal = -normal;
-}
+	}
 #endif
 	vec3 v = view;
 	vec3 n = normal;
@@ -2045,7 +2045,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		vec3 dielectric_fresnel = F_Schlick(m.f0_dielectric * m.specularWeight, m.f90_dielectric, abs(VdotH));
 		vec3 metal_fresnel = F_Schlick(baseColor.rgb, vec3(1.0), abs(VdotH));
 
-		vec3 lightIntensity = getLighIntensity(light, pointToLight, m, n, v, 1.0);
+		vec3 lightIntensity = getLighIntensity(light, pointToLight, m, n, v, 1.0) * shadowFactor;
 
 		vec3 l_diffuse = lightIntensity * NdotL * BRDF_lambertian(baseColor.rgb);
 		vec3 l_specular_dielectric = vec3(0.0);
@@ -2083,7 +2083,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 		// Calculation of analytical light
 		// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-		vec3 intensity = getLighIntensity(light, pointToLight, m, n, v, 1.0);
+		vec3 intensity = getLighIntensity(light, pointToLight, m, n, v, 1.0) * shadowFactor;
 
 #ifdef MATERIAL_ANISOTROPY
 		l_specular_metal = intensity * NdotL * BRDF_specularGGXAnisotropy(m.alphaRoughness, m.anisotropyStrength, n, v, l, h, m.anisotropicT, m.anisotropicB);
@@ -2116,8 +2116,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		l_color = l_sheen + l_color * l_albedoSheenScaling;
 		l_color = mix(l_color, l_clearcoat_brdf, cxf);
 		l_color = max(l_color, vec3(0.0));
-		color += l_color;
-		color += intensity * shadowFactor;
+		color += l_color + intensity;
 
 	}
 #endif
@@ -2348,7 +2347,7 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	if (dot(normal, view) < 0)
 	{
 		normal = -normal;
-}
+	}
 #endif
 
 #ifdef USE_PUNCTUAL
