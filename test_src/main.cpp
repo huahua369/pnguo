@@ -758,11 +758,11 @@ void ents(const std::string& path, const std::string& key, const std::string& iv
 int main()
 {
 	//test_rect();
-//#ifdef _DEBUG
-//	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-//	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-//	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-//#endif 
+#ifdef _DEBUG
+	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
+#endif 
 
 	//ents("E:\\m\\mf.txt", "9FiCxHYH4SYhVQu3", "", "", "E:\\m\\n69.ts");
 	auto app = new_app();

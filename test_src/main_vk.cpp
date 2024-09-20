@@ -5,9 +5,16 @@
 #include <vkgui/vkrenderer.h>
 int main()
 {
+#ifdef _DEBUG
+	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
+#endif 
 	auto app = new_app();
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
+
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
