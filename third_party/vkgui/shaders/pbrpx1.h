@@ -1024,7 +1024,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.ior1 = ior1;
 	m.ior2 = ior2;
 	m.ior = ior2;
-	m.f90 = vec3(0.0);                       // reflectance color at grazing angle
+	m.f90 = vec3(1.0);                       // reflectance color at grazing angle
 	m.f90_dielectric = vec3(1.0);
 	// KHR_materials_transmission
 	m.transmissionFactor = material.transmissionFactor;

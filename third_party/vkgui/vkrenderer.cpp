@@ -3196,6 +3196,11 @@ namespace vkr {
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
+	bool bcmp(const GltfPbrPass::BatchList& l, const GltfPbrPass::BatchList& r)
+	{
+		return -l.m_depth < -r.m_depth;
+	}
+
 	class pbr_pass
 	{
 	public:
@@ -17803,7 +17808,7 @@ namespace vkr {
 			{
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 
-				std::sort(transparent.begin(), transparent.end());
+				std::stable_sort(transparent.begin(), transparent.end(), bcmp);
 				GltfPbrPass::DrawBatchList(cmdBuf1, &transparent, bWireframe);
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 
