@@ -33,7 +33,7 @@
 
 //#extension GL_OES_standard_derivatives : enable
 
-#extension GL_EXT_shader_texture_lod: enable
+#extension GL_EXT_shader_texture_lod: enable 
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 // this makes the structures declared with a scalar layout match the c structures

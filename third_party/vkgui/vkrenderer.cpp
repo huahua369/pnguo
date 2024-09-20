@@ -1167,8 +1167,7 @@ namespace vkr {
 
 		glm::vec4 wireframeOptions;
 		float     lodBias = 0.0f;
-		int           useSky = 0;
-		float		  envRotation = 0.0f;
+		float		  pad1 = 0.0f; float		  pad2 = 0.0f;
 		uint32_t  lightCount;
 		Light     lights[MaxLightInstances];
 	};
@@ -17196,7 +17195,7 @@ namespace vkr {
 			skyDomeConstants.mieDirectionalG = 0.8f;
 			skyDomeConstants.luminance = 1.0f;
 		}
-		auto specular = /*"images\\default_specular.dds";*/ "images\\specular.dds";
+		auto specular = "images\\specular.dds"; "images\\default_specular.dds";
 		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps
 			, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
@@ -18556,7 +18555,7 @@ namespace vkr {
 				n.m_tranform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
 				tfLight l;
 				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 1.0;//scene.value("intensity", 1.0f);
+				l.m_intensity = 10.0;//scene.value("intensity", 1.0f);
 				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l.m_range = 52;
 				l.m_outerConeAngle = AMD_PI_OVER_4;

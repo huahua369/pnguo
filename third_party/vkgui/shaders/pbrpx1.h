@@ -163,7 +163,7 @@ struct gpuMaterial
 
 	float specular;       // weight of the dielectric specular layer
 	vec3  specularColor;  // color of the dielectric specular layer
-	float transmission;   // KHR_materials_transmission
+	float transmissionFactor;   // KHR_materials_transmission
 
 	vec3  attenuationColor;     // KHR_materials_volume
 	float attenuationDistance;  //
@@ -214,6 +214,7 @@ struct NormalInfo {
 #ifdef __cplusplus
 
 PerFrame myPerFrame;
+mat4 myPerObject_u_mCurrWorld;
 pbrMaterial u_pbrParams;
 #else
 
@@ -281,7 +282,9 @@ layout(set = 1, binding = ID_metallicRoughnessTexture) uniform sampler2D u_Metal
 
 #ifdef ID_occlusionTexture
 layout(set = 1, binding = ID_occlusionTexture) uniform sampler2D u_OcclusionSampler;
+#ifndef u_OcclusionStrength
 float u_OcclusionStrength = 1.0;
+#endif
 #endif
 
 #ifdef ID_diffuseTexture
@@ -771,7 +774,7 @@ gpuMaterial defaultPbrMaterial()
 	gpuMaterial mat;
 	mat.baseColor = vec4(1.0F);
 	mat.roughness = vec2(1.0F);
-	mat.metallic = 1.0F;
+	mat.metallic = 0.0F;
 	mat.emissive = vec3(0.0F);
 
 	mat.N = vec3(0.0F, 0.0F, 1.0F);
@@ -782,10 +785,12 @@ gpuMaterial defaultPbrMaterial()
 	mat.ior1 = 1.0F;
 	mat.ior2 = 1.5F;
 	mat.ior = 1.5F;
+	mat.f0_dielectric = vec3(0.04);
+	mat.specularWeight = 1.0;
 
 	mat.specular = 1.0F;
 	mat.specularColor = vec3(1.0F);
-	mat.transmission = 0.0F;
+	mat.transmissionFactor = 0.0F;
 
 	mat.attenuationColor = vec3(1.0F);
 	mat.attenuationDistance = 1.0F;
@@ -888,7 +893,7 @@ vec4 get_roughness(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseCol
 	perceptualRoughness = 0.0;
 	diffuseColor = vec3(0.0, 0.0, 0.0);
 	specularColor = vec3(0.0, 0.0, 0.0);
-	metallic = 0.0;
+	metallic = params.metallicFactor;
 	vec3 f0 = vec3(0.04, 0.04, 0.04);
 	vec4 baseColor = getBaseColor2(Input, params, uv);
 	// Metallic and Roughness material properties are packed together
@@ -915,7 +920,7 @@ vec4 get_roughness(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseCol
 	// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
 	vec4 mrSample = getMetallicRoughnessTexture(Input, uv);
 	perceptualRoughness = mrSample.g * params.roughnessFactor;
-	metallic = mrSample.b * params.metallicFactor;
+	metallic *= mrSample.b;
 	diffuseColor = vec3(baseColor) * (vec3(1.0, 1.0, 1.0) - f0) * (1.0 - metallic);
 	specularColor = mix(f0, vec3(baseColor), metallic);
 #endif // ! MATERIAL_METALLICROUGHNESS
@@ -1019,11 +1024,12 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.ior1 = ior1;
 	m.ior2 = ior2;
 	m.ior = ior2;
-
+	m.f90 = vec3(0.0);                       // reflectance color at grazing angle
+	m.f90_dielectric = vec3(1.0);
 	// KHR_materials_transmission
-	m.transmission = material.transmissionFactor;
+	m.transmissionFactor = material.transmissionFactor;
 #ifdef ID_transmissionTexture  
-	m.transmission *= texture(u_transmissionTexture, texCoord).r;
+	m.transmissionFactor *= texture(u_transmissionTexture, texCoord).r;
 #endif
 	// KHR_materials_volume
 	m.attenuationColor = material.attenuationColor;
@@ -1072,9 +1078,9 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.iridescenceIor = material.iridescenceIor;
 	m.iridescenceThickness = iridescenceThickness;
 
-#if 0
+#if 1
 	// KHR_materials_anisotropy
-	float anisotropyStrength = material.anisotropyStrength;
+	float anisotropyStrength = material.anisotropy.z;// anisotropyStrength;
 	vec2  anisotropyDirection = vec2(1.0f, 0.0f);  // By default the anisotropy strength is along the tangent.
 #ifdef ID_anisotropyTexture 
 	const vec4 anisotropyTex = texture(u_anisotropyTexture, texCoord);
@@ -1090,8 +1096,8 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	{
 		m.roughness.x = mix(m.roughness.y, 1.0f, anisotropyStrength * anisotropyStrength);
 
-		const float s = sin(material.anisotropyRotation);  // FIXME PERF Precalculate sin, cos on host.
-		const float c = cos(material.anisotropyRotation);
+		const float s = material.anisotropy.y;// sin(material.anisotropyRotation);  // FIXME PERF Precalculate sin, cos on host.
+		const float c = material.anisotropy.x;// cos(material.anisotropyRotation);
 
 		anisotropyDirection =
 			vec2(c * anisotropyDirection.x + s * anisotropyDirection.y, c * anisotropyDirection.y - s * anisotropyDirection.x);
@@ -1118,7 +1124,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.sheenRoughness = sheenRoughness;
 
 #ifdef ID_occlusionTexture
-	m.ao = texture(u_OcclusionSampler, texCoord).r;
+	m.ao = texture(u_OcclusionSampler, texCoord).r * u_OcclusionStrength;
 #else
 	m.ao = 1;
 #endif
@@ -1142,11 +1148,12 @@ float GetSSAO(vec2 coords)
 // 灯光
 #if 1
 #ifdef USE_IBL
+#ifdef ID_specularCube
 vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 {
 	float NdotV = clamp(dot(n, v), 0.0f, 1.0f);
 
-	float u_MipCount = 9.0; // resolution of 512x512 of the IBL
+	float u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_pbrParams.mipCount - 1.0;// 9.0; // resolution of 512x512 of the IBL
 	float lod = clamp(materialInfo.perceptualRoughness * float(u_MipCount), 0.0f, float(u_MipCount));
 	vec3 reflection = normalize(reflect(-v, n));
 
@@ -1160,13 +1167,13 @@ vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 	vec3 specularLight = textureLod(u_SpecularEnvSampler, reflection, lod).rgb;
 #else
 	vec3 specularLight = texture(u_SpecularEnvSampler, reflection).rgb;
-#endif
-	specularLight = vec3(1.0);
+#endif 
 	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
 	vec3 specular = specularLight * (materialInfo.specularColorlight * brdf.x + brdf.y);
 
 	return diffuse + specular;
 }
+#endif
 #endif
 
 // Lambert lighting
@@ -1269,37 +1276,8 @@ float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeC
 	return 0.0;
 }
 
-// 计算穿过体积的衰减光 Compute attenuated light as it travels through a volume.
-vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 attenuationColor, float attenuationDistance)
-{
-	if (attenuationDistance == 0.0)
-	{
-		// Attenuation distance is +鈭?(which we indicate by zero), i.e. the transmitted color is not attenuated at all.
-		return radiance;
-	}
-	else
-	{
-		// Compute light attenuation using Beer's law.
-		vec3 transmittance = pow(attenuationColor, vec3(transmissionDistance / attenuationDistance));
-		return transmittance * radiance;
-	}
-}
 
 
-vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix)
-{
-	// Direction of refracted light.
-	vec3 refractionVector = refract(-v, normalize(n), 1.0f / ior);
-
-	// Compute rotation-independant scaling of the model matrix.
-	vec3 modelScale;
-	modelScale.x = length(vec3(modelMatrix[0]));
-	modelScale.y = length(vec3(modelMatrix[1]));
-	modelScale.z = length(vec3(modelMatrix[2]));
-
-	// The thickness is specified in local space.
-	return normalize(refractionVector) * thickness * modelScale;
-}
 
 
 struct LightContrib
@@ -1401,7 +1379,7 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 #ifndef __cplusplus
 	textureSample.rgb *= u_pbrParams.envIntensity;
 #endif // __cplusplus
-	 
+
 	return textureSample;
 }
 
@@ -1427,6 +1405,30 @@ float clampedDot(vec3 x, vec3 y)
 {
 	return clamp(dot(x, y), 0.0, 1.0);
 }
+float max3(vec3 v)
+{
+	return max(max(v.x, v.y), v.z);
+}
+float sq(float t)
+{
+	return t * t;
+}
+
+vec2 sq(vec2 t)
+{
+	return t * t;
+}
+
+vec3 sq(vec3 t)
+{
+	return t * t;
+}
+
+vec4 sq(vec4 t)
+{
+	return t * t;
+}
+
 vec3 F_Schlick(vec3 f0, vec3 f90, float VdotH)
 {
 	return f0 + (f90 - f0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
@@ -1483,11 +1485,256 @@ vec3 Schlick_to_F0(vec3 f, float VdotH) {
 float Schlick_to_F0(float f, float VdotH) {
 	return Schlick_to_F0(f, 1.0, VdotH);
 }
+
+
+// Smith Joint GGX
+// Note: Vis = G / (4 * NdotL * NdotV)
+// see Eric Heitz. 2014. Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs. Journal of Computer Graphics Techniques, 3
+// see Real-Time Rendering. Page 331 to 336.
+// see https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
+float V_GGX(float NdotL, float NdotV, float alphaRoughness)
+{
+	float alphaRoughnessSq = alphaRoughness * alphaRoughness;
+
+	float GGXV = NdotL * sqrt(NdotV * NdotV * (1.0 - alphaRoughnessSq) + alphaRoughnessSq);
+	float GGXL = NdotV * sqrt(NdotL * NdotL * (1.0 - alphaRoughnessSq) + alphaRoughnessSq);
+
+	float GGX = GGXV + GGXL;
+	if (GGX > 0.0)
+	{
+		return 0.5 / GGX;
+	}
+	return 0.0;
+}
+
+
+// The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
+// Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
+// Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
+float D_GGX(float NdotH, float alphaRoughness)
+{
+	float alphaRoughnessSq = alphaRoughness * alphaRoughness;
+	float f = (NdotH * NdotH) * (alphaRoughnessSq - 1.0) + 1.0;
+	return alphaRoughnessSq / (M_PI * f * f);
+}
+
+
+float lambdaSheenNumericHelper(float x, float alphaG)
+{
+	float oneMinusAlphaSq = (1.0 - alphaG) * (1.0 - alphaG);
+	float a = mix(21.5473, 25.3245, oneMinusAlphaSq);
+	float b = mix(3.82987, 3.32435, oneMinusAlphaSq);
+	float c = mix(0.19823, 0.16801, oneMinusAlphaSq);
+	float d = mix(-1.97760, -1.27393, oneMinusAlphaSq);
+	float e = mix(-4.32054, -4.85967, oneMinusAlphaSq);
+	return a / (1.0 + b * pow(x, c)) + d * x + e;
+}
+
+
+float lambdaSheen(float cosTheta, float alphaG)
+{
+	if (abs(cosTheta) < 0.5)
+	{
+		return exp(lambdaSheenNumericHelper(cosTheta, alphaG));
+	}
+	else
+	{
+		return exp(2.0 * lambdaSheenNumericHelper(0.5, alphaG) - lambdaSheenNumericHelper(1.0 - cosTheta, alphaG));
+	}
+}
+
+
+float V_Sheen(float NdotL, float NdotV, float sheenRoughness)
+{
+	sheenRoughness = max(sheenRoughness, 0.000001); //clamp (0,1]
+	float alphaG = sheenRoughness * sheenRoughness;
+
+	return clamp(1.0 / ((1.0 + lambdaSheen(NdotV, alphaG) + lambdaSheen(NdotL, alphaG)) *
+		(4.0 * NdotV * NdotL)), 0.0, 1.0);
+}
+
+
+//Sheen implementation-------------------------------------------------------------------------------------
+// See  https://github.com/sebavan/glTF/tree/KHR_materials_sheen/extensions/2.0/Khronos/KHR_materials_sheen
+
+// Estevez and Kulla http://www.aconty.com/pdf/s2017_pbs_imageworks_sheen.pdf
+float D_Charlie(float sheenRoughness, float NdotH)
+{
+	sheenRoughness = max(sheenRoughness, 0.000001f); //clamp (0,1]
+	float alphaG = sheenRoughness * sheenRoughness;
+	float invR = 1.0 / alphaG;
+	float cos2h = NdotH * NdotH;
+	float sin2h = 1.0 - cos2h;
+	return (2.0 + invR) * pow(sin2h, invR * 0.5) / (2.0 * M_PI);
+}
+
+
+//https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+vec3 BRDF_lambertian(vec3 diffuseColor)
+{
+	// see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
+	diffuseColor /= M_PI; return diffuseColor;
+}
+
+//  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+vec3 BRDF_specularGGX(float alphaRoughness, float NdotL, float NdotV, float NdotH)
+{
+	float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
+	float D = D_GGX(NdotH, alphaRoughness);
+
+	return vec3(Vis * D);
+}
+
+
+#ifdef MATERIAL_ANISOTROPY
+// GGX Distribution Anisotropic (Same as Babylon.js)
+// https://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf Addenda
+float D_GGX_anisotropic(float NdotH, float TdotH, float BdotH, float anisotropy, float at, float ab)
+{
+	float a2 = at * ab;
+	vec3 f = vec3(ab * TdotH, at * BdotH, a2 * NdotH);
+	float w2 = a2 / dot(f, f);
+	return a2 * w2 * w2 / M_PI;
+}
+
+// GGX Mask/Shadowing Anisotropic (Same as Babylon.js - smithVisibility_GGXCorrelated_Anisotropic)
+// Heitz http://jcgt.org/published/0003/02/03/paper.pdf
+float V_GGX_anisotropic(float NdotL, float NdotV, float BdotV, float TdotV, float TdotL, float BdotL, float at, float ab)
+{
+	float GGXV = NdotL * length(vec3(at * TdotV, ab * BdotV, NdotV));
+	float GGXL = NdotV * length(vec3(at * TdotL, ab * BdotL, NdotL));
+	float v = 0.5 / (GGXV + GGXL);
+	return clamp(v, 0.0, 1.0);
+}
+
+vec3 BRDF_specularGGXAnisotropy(float alphaRoughness, float anisotropy, vec3 n, vec3 v, vec3 l, vec3 h, vec3 t, vec3 b)
+{
+	// Roughness along the anisotropy bitangent is the material roughness, while the tangent roughness increases with anisotropy.
+	float at = mix(alphaRoughness, 1.0f, anisotropy * anisotropy);
+	float ab = clamp(alphaRoughness, 0.001, 1.0);
+
+	float NdotL = clamp(dot(n, l), 0.0, 1.0);
+	float NdotH = clamp(dot(n, h), 0.001, 1.0);
+	float NdotV = dot(n, v);
+
+	float V = V_GGX_anisotropic(NdotL, NdotV, dot(b, v), dot(t, v), dot(t, l), dot(b, l), at, ab);
+	float D = D_GGX_anisotropic(NdotH, dot(t, h), dot(b, h), anisotropy, at, ab);
+
+	return vec3(V * D);
+}
+#endif
+
+
+// f_sheen
+vec3 BRDF_specularSheen(vec3 sheenColor, float sheenRoughness, float NdotL, float NdotV, float NdotH)
+{
+	float sheenDistribution = D_Charlie(sheenRoughness, NdotH);
+	float sheenVisibility = V_Sheen(NdotL, NdotV, sheenRoughness);
+	return sheenColor * sheenDistribution * sheenVisibility;
+}
+
+
+
+#ifdef MATERIAL_TRANSMISSION
+vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
+{
+	float framebufferLod = log2(float(u_pbrParams.transmissionFramebufferSize.x)) * applyIorToRoughness(roughness, ior);
+#ifdef ID_transmissionFramebufferTexture
+	vec3 transmittedLight = vec3(textureLod(u_TransmissionFramebufferSampler, fragCoord, framebufferLod));
+	return transmittedLight;
+#else
+	return vec3(0);
+#endif
+}
+#endif
+
+
+#ifdef MATERIAL_TRANSMISSION
+vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 baseColor, vec3 f0, vec3 f90,
+	vec3 position, mat4 modelMatrix, mat4 viewMatrix,/* mat4 projMatrix,*/ float ior, float thickness, vec3 attenuationColor, float attenuationDistance, float dispersion)
+{
+#ifdef MATERIAL_DISPERSION
+	// Dispersion will spread out the ior values for each r,g,b channel
+	float halfSpread = (ior - 1.0) * 0.025 * dispersion;
+	vec3 iors = vec3(ior - halfSpread, ior, ior + halfSpread);
+
+	vec3 transmittedLight;
+	float transmissionRayLength;
+	for (int i = 0; i < 3; i++)
+	{
+		vec3 transmissionRay = getVolumeTransmissionRay(n, v, thickness, iors[i], modelMatrix);
+		// TODO: taking length of blue ray, ideally we would take the length of the green ray. For now overwriting seems ok
+		transmissionRayLength = length(transmissionRay);
+		vec3 refractedRayExit = position + transmissionRay;
+
+		// Project refracted vector on the framebuffer, while mapping to normalized device coordinates.
+		vec4 ndcPos = /*projMatrix **/ viewMatrix * vec4(refractedRayExit, 1.0);
+		vec2 refractionCoords = ndcPos.xy / ndcPos.w;
+		refractionCoords += 1.0;
+		refractionCoords /= 2.0;
+
+		// Sample framebuffer to get pixel the refracted ray hits for this color channel.
+		transmittedLight[i] = getTransmissionSample(refractionCoords, perceptualRoughness, iors[i])[i];
+	}
+#else
+	vec3 transmissionRay = getVolumeTransmissionRay(n, v, thickness, ior, modelMatrix);
+	float transmissionRayLength = length(transmissionRay);
+	vec3 refractedRayExit = position + transmissionRay;
+
+	// Project refracted vector on the framebuffer, while mapping to normalized device coordinates.
+	vec4 ndcPos = /*projMatrix **/ viewMatrix * vec4(refractedRayExit, 1.0);
+	vec2 refractionCoords = vec2(ndcPos) / ndcPos.w;
+	refractionCoords += 1.0;
+	refractionCoords /= 2.0;
+
+	// Sample framebuffer to get pixel the refracted ray hits.
+	vec3 transmittedLight = getTransmissionSample(refractionCoords, perceptualRoughness, ior);
+
+#endif // MATERIAL_DISPERSION
+	vec3 attenuatedColor = applyVolumeAttenuation(transmittedLight, transmissionRayLength, attenuationColor, attenuationDistance);
+
+	// Sample GGX LUT to get the specular component.
+	float NdotV = clampedDot(n, v);
+	vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+	vec2 brdf = vec2(texture(u_brdfLUT, brdfSamplePoint));// .rg;
+	vec3 specularColor = f0 * brdf.x + f90 * brdf.y;
+
+	return (1.0f - specularColor) * attenuatedColor * baseColor;
+}
+#endif
+
+
+#ifdef MATERIAL_ANISOTROPY
+vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy, vec3 anisotropyDirection)
+{
+	int   mipCount = textureQueryLevels(u_SpecularEnvSampler);
+	float NdotV = clampedDot(n, v);
+
+	float tangentRoughness = mix(roughness, 1.0f, anisotropy * anisotropy);
+	vec3  anisotropicTangent = cross(anisotropyDirection, v);
+	vec3  anisotropicNormal = cross(anisotropicTangent, anisotropyDirection);
+	float bendFactor = 1.0 - anisotropy * (1.0 - roughness);
+	float bendFactorPow4 = bendFactor * bendFactor * bendFactor * bendFactor;
+	vec3  bentNormal = normalize(mix(anisotropicNormal, n, bendFactorPow4));
+
+	float lod = roughness * float(mipCount - 1);
+	vec3 reflection = normalize(reflect(-v, bentNormal));
+
+	vec4 specularSample = getSpecularSample(reflection, lod);
+
+	vec3 specularLight = vec3(specularSample);
+
+	return specularLight;
+}
+#endif
+
+
 #ifdef  ID_charlieLUT
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
 {
+	int   mipCount = textureQueryLevels(u_CharlieEnvSampler);
 	float NdotV = clampedDot(n, v);
-	float lod = sheenRoughness * float(u_pbrParams.mipCount - 1);
+	float lod = sheenRoughness * float(mipCount - 1);
 	vec3 reflection = normalize(reflect(-v, n));
 
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, sheenRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
@@ -1501,22 +1748,133 @@ vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor
 
 vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 {
+#ifdef ID_specularCube
+
+	int   mipCount = textureQueryLevels(u_SpecularEnvSampler);
 	float NdotV = clampedDot(n, v);
-	float lod = roughness * float(u_pbrParams.mipCount - 1);
-	lod = clamp(lod, 0.0f, float(u_pbrParams.mipCount - 1));
+	float lod = roughness * float(mipCount - 1);
+	lod = clamp(lod, 0.0f, float(mipCount - 1));
 	vec3 reflection = normalize(reflect(-v, n));
 	vec4 specularSample = getSpecularSample(reflection, lod);
 
 	//vec3 specularLight = specularSample.rgb;
 
 	return vec3(specularSample);
+#else
+	return vec3(1.0);
+#endif // ID_specularCube
+}
+
+vec3 getLighIntensity(Light light, vec3 pointToLight, gpuMaterial m, vec3 n, vec3 v, float shadowFactor)
+{
+	vec3 color = vec3(0.0);
+	vec3 shade = getPointShade(pointToLight, m, n, v);
+	color = light.intensity * light.color * shade;
+	if (light.type != LightType_Directional)
+	{
+		float distance = length(pointToLight);
+		float attenuation = getRangeAttenuation(light.range, distance);
+		color *= attenuation;
+	}
+	if (light.type == LightType_Spot)
+	{
+		float spotAttenuation = getSpotAttenuation(pointToLight, -light.direction, light.outerConeCos, light.innerConeCos);
+		color *= spotAttenuation;
+	}
+	return color * shadowFactor;
+}
+
+vec3 getPunctualRadianceTransmission(vec3 normal, vec3 view, vec3 pointToLight, float alphaRoughness,
+	vec3 f0, vec3 f90, vec3 baseColor, float ior)
+{
+	float transmissionRougness = applyIorToRoughness(alphaRoughness, ior);
+
+	vec3 n = normalize(normal);           // Outward direction of surface point
+	vec3 v = normalize(view);             // Direction from surface point to view
+	vec3 l = normalize(pointToLight);
+	vec3 l_mirror = normalize(l + vec3(2.0) * n * dot(-l, n));     // Mirror light reflection vector on surface
+	vec3 h = normalize(l_mirror + v);            // Halfway vector between transmission light vector and v
+
+	float D = D_GGX(clamp(dot(n, h), 0.0, 1.0), transmissionRougness);
+	vec3 F = F_Schlick(f0, f90, clamp(dot(v, h), 0.0, 1.0));
+	float Vis = V_GGX(clamp(dot(n, l_mirror), 0.0, 1.0), clamp(dot(n, v), 0.0, 1.0), transmissionRougness);
+
+	// Transmission BTDF
+	return (vec3(1.0) - F) * baseColor * D * Vis;
 }
 
 
+vec3 getPunctualRadianceClearCoat(vec3 clearcoatNormal, vec3 v, vec3 l, vec3 h, float VdotH, vec3 f0, vec3 f90, float clearcoatRoughness)
+{
+	float NdotL = clampedDot(clearcoatNormal, l);
+	float NdotV = clampedDot(clearcoatNormal, v);
+	float NdotH = clampedDot(clearcoatNormal, h);
+	return NdotL * BRDF_specularGGX(clearcoatRoughness * clearcoatRoughness, NdotL, NdotV, NdotH);
+}
+
+
+vec3 getPunctualRadianceSheen(vec3 sheenColor, float sheenRoughness, float NdotL, float NdotV, float NdotH)
+{
+	return NdotL * BRDF_specularSheen(sheenColor, sheenRoughness, NdotL, NdotV, NdotH);
+}
+
+vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix)
+{
+	// Direction of refracted light.
+	vec3 refractionVector = refract(-v, normalize(n), 1.0 / ior);
+
+	// Compute rotation-independant scaling of the model matrix.
+	vec3 modelScale;
+	modelScale.x = length(vec3(modelMatrix[0]));
+	modelScale.y = length(vec3(modelMatrix[1]));
+	modelScale.z = length(vec3(modelMatrix[2]));
+
+	// The thickness is specified in local space.
+	return normalize(refractionVector) * thickness * modelScale;
+}
+
+// 计算穿过体积的衰减光 Compute attenuated light as it travels through a volume.
+vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 attenuationColor, float attenuationDistance)
+{
+	if (attenuationDistance == 0.0)
+	{
+		// Attenuation distance is +鈭?(which we indicate by zero), i.e. the transmitted color is not attenuated at all.
+		return radiance;
+	}
+	else
+	{
+		// Compute light attenuation using Beer's law.
+		vec3 transmittance = pow(attenuationColor, vec3(transmissionDistance / attenuationDistance));
+		return transmittance * radiance;
+	}
+}
+vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWeight)
+{
+#ifdef  ID_brdfTexture
+	// see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
+	// Roughness dependent fresnel, from Fdez-Aguera
+	float NdotV = clampedDot(n, v);
+	vec2 brdfSamplePoint = clamp(vec2(NdotV, roughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+	vec2 f_ab = vec2(texture(u_brdfLUT, brdfSamplePoint));// .rg;
+	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
+	vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
+	vec3 FssEss = specularWeight * (k_S * f_ab.x + f_ab.y);
+
+	// Multiple scattering, from Fdez-Aguera
+	float Ems = (1.0 - (f_ab.x + f_ab.y));
+	vec3 F_avg = specularWeight * (F0 + (vec3(1.0) - F0) / 21.0f);
+	vec3 FmsEms = Ems * FssEss * F_avg / (1.0f - F_avg * Ems);
+
+	return FssEss + FmsEms;
+#else
+	return vec3(0.0);
+#endif
+}
 
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 {
 	vec3 outColor = vec3(m.baseColor);
+	vec3 baseColor = vec3(m.baseColor);
 #ifdef __cplusplus
 	pbrMaterial u_pbrParams = {};
 	auto myPerFrame = perFrame;
@@ -1541,6 +1899,8 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	m.reflectance90 = specularEnvironmentR90;
 	//materialInfo.u_ModelMatrix = myPerFrame.u_mCameraCurrViewProjInverse;
 
+	mat4 u_ModelMatrix = myPerObject_u_mCurrWorld;
+	mat4 u_ViewMatrix = myPerFrame.u_mCameraCurrViewProj;
 	// LIGHTING
 
 	vec3 color = vec3(0.0, 0.0, 0.0);
@@ -1558,20 +1918,103 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	if (dot(normal, view) < 0)
 	{
 		normal = -normal;
-	}
+}
 #endif
-
+	vec3 v = view;
+	vec3 n = normal;
+	vec3 f_diffuse = getDiffuseLight(n) * vec3(baseColor);
+	vec3 f_specular_metal = vec3(0.0);
+	vec3 f_specular_dielectric = vec3(0.0);
+	vec3 f_metal_brdf_ibl = vec3(0.0);
+	vec3 f_dielectric_brdf_ibl = vec3(0.0);
+	vec3 f_sheen = vec3(0.0);
+	float albedoSheenScaling = 1.0;
+	float diffuseTransmissionThickness = 1.0;
 	vec3 clearcoat_brdf = vec3(0.0);
 	float clearcoatFactor = 0.0;
 	vec3 clearcoatFresnel = vec3(0);
+	vec3 cxf = vec3(0.0);
 
 #ifdef MATERIAL_CLEARCOAT
 	clearcoat_brdf = getIBLRadianceGGX(m.clearcoatNormal, view, m.clearcoatRoughness);
 	clearcoatFactor = m.clearcoatFactor;
 	float clearcoat_NdotV = clampedDot(m.clearcoatNormal, view);
 	clearcoatFresnel = F_Schlick(m.clearcoatF0, m.clearcoatF90, clampedDot(m.clearcoatNormal, view));
-
+	cxf = clamp(clearcoatFactor * clearcoatFresnel, 0.0, 1.0);
 #endif 
+
+#ifdef MATERIAL_DIFFUSE_TRANSMISSION
+#ifdef MATERIAL_VOLUME
+	diffuseTransmissionThickness = m.thickness *
+		(length(vec3(u_ModelMatrix[0].xyz)) + length(vec3(u_ModelMatrix[1].xyz)) + length(vec3(u_ModelMatrix[2].xyz))) / 3.0;
+#endif
+#endif
+
+#ifdef USE_IBL
+	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
+
+#ifdef EXT_IBL
+#ifdef MATERIAL_DIFFUSE_TRANSMISSION
+	vec3 diffuseTransmissionIBL = getDiffuseLight(-n) * m.diffuseTransmissionColorFactor;
+#ifdef MATERIAL_VOLUME
+	diffuseTransmissionIBL = applyVolumeAttenuation(diffuseTransmissionIBL, diffuseTransmissionThickness, m.attenuationColor, m.attenuationDistance);
+#endif
+	f_diffuse = mix(f_diffuse, diffuseTransmissionIBL, m.diffuseTransmissionFactor);
+#endif
+
+
+#if defined(MATERIAL_TRANSMISSION)
+	f_specular_transmission = getIBLVolumeRefraction(
+		n, v,
+		m.perceptualRoughness,
+		baseColor.rgb, m.f0_dielectric, m.f90,
+		v_Position, u_ModelMatrix, u_ViewMatrix, u_ProjectionMatrix,
+		m.ior, m.thickness, m.attenuationColor, m.attenuationDistance, m.dispersion);
+	f_diffuse = mix(f_diffuse, f_specular_transmission, m.transmissionFactor);
+#endif
+
+#ifdef MATERIAL_ANISOTROPY
+	f_specular_metal = getIBLRadianceAnisotropy(n, v, m.perceptualRoughness, m.anisotropyStrength, m.anisotropicB);
+	f_specular_dielectric = f_specular_metal;
+#else
+	f_specular_metal = getIBLRadianceGGX(n, v, m.perceptualRoughness);
+	f_specular_dielectric = f_specular_metal;
+#endif
+
+	// Calculate fresnel mix for IBL  
+
+	vec3 f_metal_fresnel_ibl = getIBLGGXFresnel(n, v, m.perceptualRoughness, vec3(baseColor), 1.0);
+	f_metal_brdf_ibl = f_metal_fresnel_ibl * f_specular_metal;
+
+	vec3 f_dielectric_fresnel_ibl = getIBLGGXFresnel(n, v, m.perceptualRoughness, m.f0_dielectric, m.specularWeight);
+	f_dielectric_brdf_ibl = mix(f_diffuse, f_specular_dielectric, f_dielectric_fresnel_ibl);
+
+#ifdef MATERIAL_IRIDESCENCE
+	f_metal_brdf_ibl = mix(f_metal_brdf_ibl, f_specular_metal * iridescenceFresnel_metallic, m.iridescenceFactor);
+	f_dielectric_brdf_ibl = mix(f_dielectric_brdf_ibl, rgb_mix(f_diffuse, f_specular_dielectric, iridescenceFresnel_dielectric), m.iridescenceFactor);
+#endif
+
+
+#ifdef MATERIAL_SHEEN
+	f_sheen = getIBLRadianceCharlie(n, v, m.sheenRoughnessFactor, m.sheenColorFactor);
+	albedoSheenScaling = 1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotV, m.sheenRoughnessFactor);
+#endif
+
+	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, m.metallic);
+	color = max(vec3(0.0), f_sheen + color * albedoSheenScaling);
+#endif
+	vec3 xxc = clamp(clearcoatFactor * clearcoatFresnel, 0.0, 1.0);
+	//color = mix(color, clearcoat_brdf, xxc);
+#ifdef ID_occlusionTexture
+	float ao = m.ao;
+	color = color * (1.0 + u_OcclusionStrength * (ao - 1.0));
+#endif
+
+#endif //end USE_IBL 
+
+	f_diffuse = vec3(0.0);
+	f_specular_dielectric = vec3(0.0);
+	f_specular_metal = vec3(0.0);
 
 #ifdef USE_PUNCTUAL
 	vec3 c = vec3(0.0, 0.0, 0.0);
@@ -1580,37 +2023,115 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		Light light = myPerFrame.u_lights[i];
 
 		float shadowFactor = DoSpotShadow(worldPos, light);
-		LightContrib lc;
-		if (light.type == LightType_Directional)
+		vec3 pointToLight;
+		if (light.type != LightType_Directional)
 		{
-			lc = applyDirectionalLight(light, m, normal, view); lc.intensity *= shadowFactor;
+			pointToLight = light.position - worldPos;
 		}
-		else if (light.type == LightType_Point)
+		else
 		{
-			lc = applyPointLight(light, m, normal, worldPos, view);
+			pointToLight = -light.direction;
 		}
-		else if (light.type == LightType_Spot)
-		{
-			lc = applySpotLight(light, m, normal, worldPos, view); lc.intensity *= shadowFactor;
-		}
-		color += lc.intensity;
+
+		// BSTF
+		vec3 l = normalize(pointToLight);   // Direction from surface point to light
+		vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
+		float NdotL = clampedDot(n, l);
+		float NdotV = clampedDot(n, v);
+		float NdotH = clampedDot(n, h);
+		float LdotH = clampedDot(l, h);
+		float VdotH = clampedDot(v, h);
+
+		vec3 dielectric_fresnel = F_Schlick(m.f0_dielectric * m.specularWeight, m.f90_dielectric, abs(VdotH));
+		vec3 metal_fresnel = F_Schlick(baseColor.rgb, vec3(1.0), abs(VdotH));
+
+		vec3 lightIntensity = getLighIntensity(light, pointToLight, m, n, v, 1.0);
+
+		vec3 l_diffuse = lightIntensity * NdotL * BRDF_lambertian(baseColor.rgb);
+		vec3 l_specular_dielectric = vec3(0.0);
+		vec3 l_specular_metal = vec3(0.0);
+		vec3 l_dielectric_brdf = vec3(0.0);
+		vec3 l_metal_brdf = vec3(0.0);
+		vec3 l_clearcoat_brdf = vec3(0.0);
+		vec3 l_sheen = vec3(0.0);
+		float l_albedoSheenScaling = 1.0;
+
+#ifdef MATERIAL_DIFFUSE_TRANSMISSION
+		vec3 diffuse_btdf = lightIntensity * clampedDot(-n, l) * BRDF_lambertian(m.diffuseTransmissionColorFactor);
+
+#ifdef MATERIAL_VOLUME
+		diffuse_btdf = applyVolumeAttenuation(diffuse_btdf, diffuseTransmissionThickness, m.attenuationColor, m.attenuationDistance);
+#endif
+		l_diffuse = mix(l_diffuse, diffuse_btdf, m.diffuseTransmissionFactor);
+#endif // MATERIAL_DIFFUSE_TRANSMISSION
+
+		// BTDF (Bidirectional Transmittance Distribution Function)
+#ifdef MATERIAL_TRANSMISSION
+		// If the light ray travels through the geometry, use the point it exits the geometry again.
+		// That will change the angle to the light source, if the material refracts the light ray.
+		vec3 transmissionRay = getVolumeTransmissionRay(n, v, m.thickness, m.ior, u_ModelMatrix);
+		pointToLight -= transmissionRay;
+		l = normalize(pointToLight);
+
+		vec3 transmittedLight = lightIntensity * getPunctualRadianceTransmission(n, v, l, m.alphaRoughness, m.f0_dielectric, m.f90, baseColor.rgb, m.ior);
+
+#ifdef MATERIAL_VOLUME
+		transmittedLight = applyVolumeAttenuation(transmittedLight, length(transmissionRay), m.attenuationColor, m.attenuationDistance);
+#endif
+		l_diffuse = mix(l_diffuse, transmittedLight, m.transmissionFactor);
+#endif
+
+		// Calculation of analytical light
+		// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+		vec3 intensity = getLighIntensity(light, pointToLight, m, n, v, 1.0);
+
+#ifdef MATERIAL_ANISOTROPY
+		l_specular_metal = intensity * NdotL * BRDF_specularGGXAnisotropy(m.alphaRoughness, m.anisotropyStrength, n, v, l, h, m.anisotropicT, m.anisotropicB);
+		l_specular_dielectric = l_specular_metal;
+#else
+		l_specular_metal = intensity * NdotL * BRDF_specularGGX(m.alphaRoughness, NdotL, NdotV, NdotH);
+		l_specular_dielectric = l_specular_metal;
+#endif
+
+		l_metal_brdf = metal_fresnel * l_specular_metal;
+		l_dielectric_brdf = mix(l_diffuse, l_specular_dielectric, dielectric_fresnel); // Do we need to handle vec3 fresnel here?
+
+#ifdef MATERIAL_IRIDESCENCE
+		l_metal_brdf = mix(l_metal_brdf, l_specular_metal * iridescenceFresnel_metallic, m.iridescenceFactor);
+		l_dielectric_brdf = mix(l_dielectric_brdf, rgb_mix(l_diffuse, l_specular_dielectric, iridescenceFresnel_dielectric), m.iridescenceFactor);
+#endif
+
+#ifdef MATERIAL_CLEARCOAT
+		l_clearcoat_brdf = intensity * getPunctualRadianceClearCoat(m.clearcoatNormal, v, l, h, VdotH,
+			m.clearcoatF0, m.clearcoatF90, m.clearcoatRoughness);
+#endif
+
+#ifdef MATERIAL_SHEEN
+		l_sheen = intensity * getPunctualRadianceSheen(m.sheenColorFactor, m.sheenRoughnessFactor, NdotL, NdotV, NdotH);
+		l_albedoSheenScaling = min(1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotV, m.sheenRoughnessFactor),
+			1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotL, m.sheenRoughnessFactor));
+#endif
+
+		vec3 l_color = mix(l_dielectric_brdf, l_metal_brdf, m.metallic);
+		l_color = l_sheen + l_color * l_albedoSheenScaling;
+		l_color = mix(l_color, l_clearcoat_brdf, cxf);
+		l_color = max(l_color, vec3(0.0));
+		color += l_color;
+		color += intensity * shadowFactor;
+
 	}
 #endif
-
+	//!USE_PUNCTUAL
+	//! 
 	// Calculate lighting contribution from image based lighting source (IBL)
-#ifdef USE_IBL
-	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
-#endif
 
-	color = mix(color, clearcoat_brdf, clearcoatFactor * clearcoatFresnel);
-	//color = vec3(clearcoat_brdf);
 	// Apply optional PBR terms for additional (optional) shading
 #ifdef ID_occlusionTexture 
-	color = color * m.ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
+	//color = color * m.ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
 #endif
-	color += m.emissive * (vec3(1.0) - m.clearcoatFactor * clearcoatFresnel);
+	color += m.emissive * (vec3(1.0) - cxf);
 
-	color = clamp(color, vec3(0.0), vec3(1.0));
+	color = max(color, vec3(0.0));
 
 
 #ifndef DEBUG_OUTPUT // no debug 
@@ -1663,7 +2184,7 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 v)
 {
 	float NdotV = clamp(dot(n, v), 0.0, 1.0);
 
-	float u_MipCount = 9.0; // resolution of 512x512 of the IBL
+	float u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_pbrParams.mipCount - 1.0;// 9.0; // resolution of 512x512 of the IBL
 	float lod = clamp(materialInfo.perceptualRoughness * float(u_MipCount), 0.0, float(u_MipCount));
 	vec3 reflection = normalize(reflect(-v, n));
 
@@ -1827,7 +2348,7 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	if (dot(normal, view) < 0)
 	{
 		normal = -normal;
-	}
+}
 #endif
 
 #ifdef USE_PUNCTUAL

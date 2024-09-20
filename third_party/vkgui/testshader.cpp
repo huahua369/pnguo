@@ -162,7 +162,7 @@ namespace pbr
 
 
 #if 1
- 
+#define USE_dIBL
 #include "shaders/pbrpx1.h"
 
 

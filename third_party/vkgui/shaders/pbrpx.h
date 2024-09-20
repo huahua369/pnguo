@@ -1256,9 +1256,10 @@ vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWe
 #endif
 vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 {
+	int   u_MipCount = textureQueryLevels(u_SpecularEnvSampler);
 	float NdotV = clampedDot(n, v);
-	float lod = roughness * float(u_pbrParams.mipCount - 1);
-	lod = clamp(lod, 0.0f, float(u_pbrParams.mipCount - 1));
+	float lod = roughness * float(u_MipCount - 1);
+	lod = clamp(lod, 0.0f, float(u_MipCount - 1));
 	vec3 reflection = normalize(reflect(-v, n));
 	vec4 specularSample = getSpecularSample(reflection, lod);
 
@@ -1340,6 +1341,7 @@ vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 base
 #ifdef MATERIAL_ANISOTROPY
 vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy, vec3 anisotropyDirection)
 {
+	int   mipCount = textureQueryLevels(u_SpecularEnvSampler);
 	float NdotV = clampedDot(n, v);
 
 	float tangentRoughness = mix(roughness, 1.0f, anisotropy * anisotropy);
@@ -1349,7 +1351,7 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
 	float bendFactorPow4 = bendFactor * bendFactor * bendFactor * bendFactor;
 	vec3  bentNormal = normalize(mix(anisotropicNormal, n, bendFactorPow4));
 
-	float lod = roughness * float(u_pbrParams.mipCount - 1);
+	float lod = roughness * float(mipCount - 1);
 	vec3 reflection = normalize(reflect(-v, bentNormal));
 
 	vec4 specularSample = getSpecularSample(reflection, lod);
@@ -1361,9 +1363,10 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
 #endif
 #ifdef  ID_charlieLUT
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
-{
+{ 
+	int   mipCount = textureQueryLevels(u_CharlieEnvSampler);
 	float NdotV = clampedDot(n, v);
-	float lod = sheenRoughness * float(u_pbrParams.mipCount - 1);
+	float lod = sheenRoughness * float(mipCount - 1);
 	vec3 reflection = normalize(reflect(-v, n));
 
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, sheenRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
@@ -1956,7 +1959,7 @@ MaterialInfo getClearCoatInfo(MaterialInfo info, NormalInfo normalInfo)
 {
 	info.clearcoatFactor = u_pbrParams.clearcoatFactor;
 	info.clearcoatRoughness = u_pbrParams.clearcoatRoughness;
-	info.clearcoatF0 = vec3(min(0.04,pow((info.ior - 1.0) / (info.ior + 1.0), 2.0)));
+	info.clearcoatF0 = vec3(max(0.04,pow((info.ior - 1.0) / (info.ior + 1.0), 2.0)));
 	info.clearcoatF90 = vec3(1.0);
 
 #ifdef ID_clearcoatTexture
