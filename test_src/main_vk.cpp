@@ -7,6 +7,9 @@
 
 int main()
 {
+	struct kfa {
+		std::function<void()>afun;
+	};
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
