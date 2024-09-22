@@ -32,12 +32,35 @@ namespace vkr {
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
 		uint32_t uploadHeapMemSize = 500 * 1024 * 1024;
 	};
-} 
-struct dev_info_cx; 
+}
+struct dev_info_cx;
 struct image_vkr
 {
 	glm::ivec2 size = {};
 	void* vkimageptr = 0;
+};
+
+struct scene_state {
+	// POST PROCESS CONTROLS 
+	int   SelectedTonemapperIndex = 0;// 0-5
+	float Exposure = 1.0;
+	// APP/SCENE CONTROLS 
+	float IBLFactor = 1.0;
+	float EmissiveFactor = 50.0;
+	int   SelectedSkydomeTypeIndex = 0; // 0-1 
+
+	enum class WireframeMode : int
+	{
+		WIREFRAME_MODE_OFF = 0,
+		WIREFRAME_MODE_SHADED = 1,
+		WIREFRAME_MODE_SOLID_COLOR = 2,
+	};
+	int WireframeMode = 0;
+	float WireframeColor[3] = { 1.0,1.0,1.0 };
+	bool  bUseTAA = true;
+	bool  bDrawLightFrustum = false;
+	bool  bDrawBoundingBoxes = false;
+	bool  bShowMilliseconds = true;
 };
 
 struct mouse_state_t;
@@ -49,6 +72,7 @@ public:
 	void* qupload = 0;
 	std::vector<uint32_t> dt;
 	int width = 0, height = 0;
+	scene_state state = {};
 public:
 	vkdg_cx();
 	~vkdg_cx();

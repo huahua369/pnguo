@@ -15124,65 +15124,6 @@ namespace vkr {
 		float       fMagnifierScreenRadius;  // [0-1]
 		mutable int iMagnifierOffset[2];     // in pixels
 	};
-	struct UIState
-	{
-		//
-		// WINDOW MANAGEMENT
-		//
-		bool bShowControlsWindow;
-		bool bShowProfilerWindow;
-
-
-		//
-		// POST PROCESS CONTROLS
-		//
-		int   SelectedTonemapperIndex;
-		float Exposure;
-
-		bool  bUseTAA;
-
-		bool  bUseMagnifier;
-		bool  bLockMagnifierPosition;
-		bool  bLockMagnifierPositionHistory;
-		int   LockedMagnifiedScreenPositionX;
-		int   LockedMagnifiedScreenPositionY;
-		PassParameters MagnifierParams;
-		//MagnifierPS::PassParameters MagnifierParams;
-
-
-		//
-		// APP/SCENE CONTROLS
-		//
-		float IBLFactor;
-		float EmissiveFactor;
-		int   SelectedSkydomeTypeIndex;
-
-		bool  bDrawLightFrustum;
-		bool  bDrawBoundingBoxes;
-
-		enum class WireframeMode : int
-		{
-			WIREFRAME_MODE_OFF = 0,
-			WIREFRAME_MODE_SHADED = 1,
-			WIREFRAME_MODE_SOLID_COLOR = 2,
-		};
-
-		WireframeMode WireframeMode;
-		float         WireframeColor[3];
-
-		//
-		// PROFILER CONTROLS
-		//
-		bool  bShowMilliseconds;
-
-		// -----------------------------------------------
-
-		void Initialize();
-
-		void ToggleMagnifierLock();
-		void AdjustMagnifierSize(float increment = 0.05f);
-		void AdjustMagnifierMagnification(float increment = 1.00f);
-	};
 
 	class fbo_info_cx;
 	// todo renderer 渲染器
@@ -15207,7 +15148,7 @@ namespace vkr {
 
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
-		void OnRender(const UIState* pState, const Camera& Cam);
+		void OnRender(const scene_state* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p, int idx);
 		void freeVidMBP();
 	private:
@@ -17610,7 +17551,7 @@ namespace vkr {
 	// todo OnRender
 	//
 	//--------------------------------------------------------------------------------------
-	void Renderer_cx::OnRender(const UIState* pState, const Camera& Cam)
+	void Renderer_cx::OnRender(const scene_state* pState, const Camera& Cam)
 	{
 		// Let our resource managers do some house keeping 
 		m_ConstantBufferRing.OnBeginFrame();
@@ -17654,7 +17595,7 @@ namespace vkr {
 					pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
 					pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
 					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 					pPerFrame->lodBias = 0.0f;
 					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
 					// 更新骨骼矩阵到ubo
@@ -17720,7 +17661,7 @@ namespace vkr {
 
 		if (_robject.size() > 0)
 		{
-			const bool bWireframe = pState->WireframeMode != UIState::WireframeMode::WIREFRAME_MODE_OFF;
+			const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
 
 			std::vector<GltfPbrPass::BatchList> opaque, transparent;
 			std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
@@ -17728,7 +17669,7 @@ namespace vkr {
 			for (auto it : _robject) {
 				it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
 			}
-			if (bWireframe)// pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+			if (bWireframe)// pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 			{
 				PerFrame_t* pPerFrame = NULL;
 				for (auto it : _robject)
@@ -17749,7 +17690,7 @@ namespace vkr {
 						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
 						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
 						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-						pPerFrame->wireframeOptions.w = (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+						pPerFrame->wireframeOptions.w = (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 						pPerFrame->lodBias = 0.0f;
 						it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
 						it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
@@ -17764,7 +17705,7 @@ namespace vkr {
 			{
 				m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
 #if 1
-				if (pState->WireframeMode == UIState::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+				if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 				{
 					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
 					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);
@@ -17815,7 +17756,7 @@ namespace vkr {
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
-			
+
 
 
 			// draw object's bounding boxes
@@ -18267,7 +18208,7 @@ namespace vkr {
 		Renderer_cx* m_pRenderer = NULL;
 		VkRenderPass _rp = 0;
 		DisplayMode _dm = DISPLAYMODE_SDR;
-		UIState                     m_UIState;
+		scene_state                     m_UIState;
 		Camera                      m_camera;
 		mouse_state_t io = {};
 		float                       m_time = 0; // Time accumulator in seconds, used for animation.
@@ -18370,29 +18311,6 @@ namespace vkr {
 		}
 	}
 
-	void UIState::Initialize()
-	{
-		// init magnifier params
-		//for (int ch = 0; ch < 3; ++ch) this->MagnifierParams.fBorderColorRGB[ch] = MAGNIFIER_BORDER_COLOR__FREE[ch]; // start at 'free' state
-
-		// init GUI state
-		this->SelectedTonemapperIndex = 0;
-		this->bUseTAA = true;
-		this->bUseMagnifier = false;
-		this->bLockMagnifierPosition = this->bLockMagnifierPositionHistory = false;
-		this->SelectedSkydomeTypeIndex = 0;
-		this->Exposure = 1.0f;
-		this->IBLFactor = 1.0f;//3
-		this->EmissiveFactor = 30.0f;//30
-		this->bDrawLightFrustum = false;
-		this->bDrawBoundingBoxes = false;
-		this->WireframeMode = WireframeMode::WIREFRAME_MODE_OFF;
-		this->WireframeColor[0] = 0.0f;
-		this->WireframeColor[1] = 1.0f;
-		this->WireframeColor[2] = 0.0f;
-		this->bShowControlsWindow = true;
-		this->bShowProfilerWindow = true;
-	}
 
 	//--------------------------------------------------------------------------------------
 	//
@@ -18416,7 +18334,6 @@ namespace vkr {
 		m_pRenderer->set_fbo(f, 0);
 		m_pRenderer->OnCreate(m_device, _rp);
 		_fbo = f;
-		m_UIState.Initialize();
 		OnResize(true);
 		OnUpdateDisplay();
 
@@ -18471,8 +18388,8 @@ namespace vkr {
 		case WM_KEYUP:
 		case WM_SYSKEYUP:
 			/* WINDOW TOGGLES */
-			if (KeyPressed == VK_F1) m_UIState.bShowControlsWindow ^= 1;
-			if (KeyPressed == VK_F2) m_UIState.bShowProfilerWindow ^= 1;
+			//if (KeyPressed == VK_F1) m_UIState.bShowControlsWindow ^= 1;
+			//if (KeyPressed == VK_F2) m_UIState.bShowProfilerWindow ^= 1;
 			break;
 		}
 
@@ -18508,7 +18425,7 @@ namespace vkr {
 		// Destroy resources (if we are not minimized)
 		if (m_pRenderer)
 		{
-			m_pRenderer->OnUpdateDisplayDependentResources(_rp, _dm, m_UIState.bUseMagnifier);
+			m_pRenderer->OnUpdateDisplayDependentResources(_rp, _dm, false);// m_UIState.bUseMagnifier);
 		}
 	}
 
@@ -19176,6 +19093,7 @@ void vkdg_cx::update(mouse_state_t* io)
 			io->MouseDelta.y = 0;
 			io->wheel.y = 0;
 		}
+		tx->m_UIState = state;
 	}
 }
 

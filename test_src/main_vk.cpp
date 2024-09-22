@@ -31,7 +31,7 @@ int main()
 		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
 		//load_gltf(vkd, R"(E:\model\mclaren_f1.glb)");
-		vkd->resize(800, 600);						// 设置缓冲区大小
+		vkd->resize(800, 600);						// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);
 		if (vr.vkimageptr)
 		{
@@ -47,8 +47,11 @@ int main()
 	}
 	form0->up_cb = [=](float delta, int* ret)
 		{
-			vkd->update(form0->io);
-			vkd->on_render();
+			vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+			vkd->state.Exposure;				// 曝光度：默认1.0
+			vkd->state.bUseTAA;
+			vkd->update(form0->io);	// 更新事件
+			vkd->on_render();		// 执行渲染
 		};
 
 	run_app(app, 0);
