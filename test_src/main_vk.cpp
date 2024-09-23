@@ -4,7 +4,57 @@
 #include <vkgui/tinysdl3.h>
 #include <vkgui/vkrenderer.h>
 
+void new_ui(form_x* form0, vkdg_cx* vkd) {
 
+	auto pl1 = new plane_cx();
+
+	uint32_t pbc = 0x80ffffff;
+	pl1->set_border({ 0x80ff802C,1,5,pbc });
+	form0->bind(pl1);	// 绑定到窗口  
+	pl1->set_rss(5);
+
+	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+	pl1->add_familys(fontn, 0);
+	pl1->draggable = true; //可拖动
+	pl1->set_size({ 320,600 });
+	pl1->set_pos({ 1000,100 });
+	//pl1->set_clear_color(pbc);
+	pl1->on_click = [](plane_cx* p, int state, int clicks) {};
+	pl1->fontsize = 16;
+	glm::vec2 bs = { 150,22 };
+	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
+	std::vector<bool*> bps = { &vkd->state.bUseTAA, &vkd->state.bDrawLightFrustum, &vkd->state.bDrawBoundingBoxes, &vkd->state.bShowMilliseconds };
+	for (size_t i = 0; i < boolstr.size(); i++)
+	{
+		auto& it = boolstr[i];
+		auto kcb = pl1->add_label(it.c_str(), bs, 0);
+		{
+			auto sw1 = (switch_tl*)pl1->add_switch(bs, it.c_str(), *(bps[i]));
+			sw1->get_pos();
+			//kcb->click_cb = [=](void* ptr, int clicks) { sw1->set_value(); };
+			sw1->bind_ptr(bps[i]);
+		}
+	}
+	static std::vector<color_btn*> lbs;
+	bs.x = 300;
+	for (size_t i = 0; i < 18; i++)
+	{
+		auto kcb = pl1->add_label("", bs, 0);
+		lbs.push_back(kcb);
+	}
+	vkd->set_label_cb([=](int count, int idx, const char* str)
+		{
+			if (idx < 0) {
+				for (size_t i = 0; i < 18; i++)
+					lbs[i]->str.clear();
+			}
+			else
+			{
+				lbs[idx]->str = str;
+			}
+		});
+
+}
 int main()
 {
 	struct kfa {
@@ -31,7 +81,7 @@ int main()
 		//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
 		////load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		load_gltf(vkd, R"(E:\model\bc22.glb)"); 
+		load_gltf(vkd, R"(E:\model\bc22.glb)");
 		//load_gltf(vkd, R"(E:\model\space_station_4.glb)");
 		//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
 		//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
@@ -51,18 +101,21 @@ int main()
 				d3tex = tex;
 			}
 		}
-	}
-	vkd->state.SelectedTonemapperIndex = 1;
-	vkd->state.Exposure = 0.1;
-	form0->up_cb = [=](float delta, int* ret)
-		{
-			vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-			vkd->state.Exposure;				// 曝光度：默认1.0
-			vkd->state.bUseTAA;
-			vkd->update(form0->io);	// 更新事件
-			vkd->on_render();		// 执行渲染
-		};
+		vkd->state.SelectedTonemapperIndex = 1;
+		vkd->state.Exposure = 0.1;
 
+		new_ui(form0, vkd);
+
+		form0->up_cb = [=](float delta, int* ret)
+			{
+				vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+				vkd->state.Exposure;				// 曝光度：默认1.0
+				vkd->state.bUseTAA;
+				vkd->update(form0->io);	// 更新事件
+				vkd->on_render();		// 执行渲染
+			};
+
+	}
 	run_app(app, 0);
 	free_app(app);
 	return 0;

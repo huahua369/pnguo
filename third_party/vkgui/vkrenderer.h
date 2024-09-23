@@ -76,6 +76,7 @@ public:
 public:
 	vkdg_cx();
 	~vkdg_cx();
+	void set_label_cb(std::function<void(int count, int idx, const char* str)> cb);
 	void update(mouse_state_t* io);
 	void on_render();
 	image_vkr get_vkimage(int idx);

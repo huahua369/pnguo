@@ -95,6 +95,9 @@ struct dev_info_cx
 
 namespace vkr
 {
+	std::string format(const char* format, ...);
+
+
 #if 1
 
 	struct inspd_t {
@@ -681,7 +684,7 @@ namespace vkr
 	{
 #define EXTRACT(v,offset, length) ((v>>offset) & ((1<<length)-1))
 		* deviceName = m_deviceProperties.deviceName;
-		*driverVersion = std::format("%i.%i.%i", EXTRACT(m_deviceProperties.driverVersion, 22, 10), EXTRACT(m_deviceProperties.driverVersion, 14, 8), EXTRACT(m_deviceProperties.driverVersion, 0, 16));
+		*driverVersion = vkr::format("%i.%i.%i", EXTRACT(m_deviceProperties.driverVersion, 22, 10), EXTRACT(m_deviceProperties.driverVersion, 14, 8), EXTRACT(m_deviceProperties.driverVersion, 0, 16));
 	}
 
 	void Device::CreatePipelineCache()
@@ -3466,7 +3469,6 @@ namespace vkr {
 	static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
 
 	double MillisecondsNow();
-	std::string format(const char* format, ...);
 	bool readfile(const char* name, char** data, size_t* size, bool isbinary);
 	bool savefile(const char* name, void const* data, size_t size, bool isbinary);
 	void Trace(const std::string& str);
@@ -18216,6 +18218,8 @@ namespace vkr {
 		std::vector<std::string>    m_sceneNames;
 		int                         m_activeScene = 0;
 		int                         m_activeCamera = 0;
+		std::function<void(int count, int idx, const char* str)> cb_showtxt;
+		std::vector<std::string>    _tlabs;
 		bool                        m_bPlay = 0;
 		bool bShowProfilerWindow = true;
 	};
@@ -18549,13 +18553,17 @@ namespace vkr {
 
 			// UI  
 			//ImGui::Begin("PROFILER (F2)", &m_UIState.bShowProfilerWindow);
-
-			std::string txtrs = std::format("Resolution : %ix%i", m_Width, m_Height);
-			std::string txtAPI = std::format("API        : %s", systemi.mGfxAPI.c_str());
-			std::string txtGPU = std::format("GPU        : %s", systemi.mGPUName.c_str());
-			std::string txtCPU = std::format("CPU        : %s", systemi.mCPUName.c_str());
-			std::string txtFPS = std::format("FPS        : %d (%.2f ms)", fps, frameTime_ms);
-
+			_tlabs.clear();
+			std::string txtrs = format("Resolution : %ix%i", m_Width, m_Height);
+			std::string txtAPI = format("API        : %s", systemi.mGfxAPI.c_str());
+			std::string txtGPU = format("GPU        : %s", systemi.mGPUName.c_str());
+			std::string txtCPU = format("CPU        : %s", systemi.mCPUName.c_str());
+			std::string txtFPS = format("FPS        : %d (%.2f ms)", fps, frameTime_ms);
+			_tlabs.push_back(txtrs);
+			_tlabs.push_back(txtAPI);
+			_tlabs.push_back(txtGPU);
+			_tlabs.push_back(txtCPU);
+			_tlabs.push_back(txtFPS);
 			//if (ImGui::CollapsingHeader("GPU Timings", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				//std::string msOrUsButtonText = m_UIState.bShowMilliseconds ? "Switch to microseconds(us)" : "Switch to milliseconds(ms)";
@@ -18567,7 +18575,7 @@ namespace vkr {
 				//if (m_isCpuValidationLayerEnabled || m_isGpuValidationLayerEnabled)
 				//{
 					//std::string txt=std::formatColored(ImVec4(1, 1, 0, 1), "WARNING: Validation layer is switched on");
-					//std::string txt=std::format("Performance numbers may be inaccurate!");
+					//std::string txt=format("Performance numbers may be inaccurate!");
 				//}
 
 				// find the index of the FrameTimeGraphMaxValue as the next higher-than-recent-highest-frame-time in the pre-determined value list
@@ -18582,11 +18590,21 @@ namespace vkr {
 				}
 				//ImGui::PlotLines("", FRAME_TIME_ARRAY, NUM_FRAMES, 0, "GPU frame time (us)", 0.0f, FRAME_TIME_GRAPH_MAX_VALUES[iFrameTimeGraphMaxValue], ImVec2(0, 80));
 
+				_tlabs.push_back("GPU Timings");
 				for (uint32_t i = 0; i < timeStamps.size(); i++)
 				{
 					float value = m_UIState.bShowMilliseconds ? timeStamps[i].m_microseconds / 1000.0f : timeStamps[i].m_microseconds;
 					const char* pStrUnit = m_UIState.bShowMilliseconds ? "ms" : "us";
-					std::string txt = std::format("%-18s: %7.2f %s", timeStamps[i].m_label.c_str(), value, pStrUnit);
+					std::string txt = format("%-18s: %7.2f %s", timeStamps[i].m_label.c_str(), value, pStrUnit);
+					_tlabs.push_back(txt);
+				}
+				if (cb_showtxt) {
+					cb_showtxt(_tlabs.size(), -1, 0);
+					for (size_t i = 0; i < _tlabs.size(); i++)
+					{
+						auto& it = _tlabs[i];
+						cb_showtxt(_tlabs.size(), i, it.c_str());
+					}
 				}
 			}
 		}
@@ -19079,7 +19097,14 @@ vkdg_cx::vkdg_cx()
 vkdg_cx::~vkdg_cx()
 {
 }
-
+void vkdg_cx::set_label_cb(std::function<void(int count, int idx, const char* str)> cb)
+{
+	if (ctx)
+	{
+		auto tx = (vkr::sample_cx*)ctx;
+		tx->cb_showtxt = cb;
+	}
+}
 void vkdg_cx::update(mouse_state_t* io)
 {
 	if (ctx) {

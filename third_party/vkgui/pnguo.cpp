@@ -23903,6 +23903,7 @@ void checkbox_tl::draw(cairo_t* cr)
 
 void switch_tl::bind_ptr(bool* p)
 {
+	v.pv = p;
 }
 
 void switch_tl::set_value(bool b)
@@ -23944,6 +23945,9 @@ bool switch_tl::update(float delta)
 				it.value1 = it.value; it.dt = 0;
 				dt = 1.0;
 				_old_bst = bst;
+				if (v.pv) {
+					*v.pv = it.value;
+				}
 			}
 			else
 			{
