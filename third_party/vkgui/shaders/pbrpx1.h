@@ -1634,6 +1634,37 @@ vec3 BRDF_specularSheen(vec3 sheenColor, float sheenRoughness, float NdotL, floa
 }
 
 
+vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix)
+{
+	// Direction of refracted light.
+	vec3 refractionVector = refract(-v, normalize(n), 1.0 / ior);
+
+	// Compute rotation-independant scaling of the model matrix.
+	vec3 modelScale;
+	modelScale.x = length(vec3(modelMatrix[0]));
+	modelScale.y = length(vec3(modelMatrix[1]));
+	modelScale.z = length(vec3(modelMatrix[2]));
+
+	// The thickness is specified in local space.
+	return normalize(refractionVector) * thickness * modelScale;
+}
+
+// 计算穿过体积的衰减光 Compute attenuated light as it travels through a volume.
+vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 attenuationColor, float attenuationDistance)
+{
+	if (attenuationDistance == 0.0)
+	{
+		// Attenuation distance is +鈭?(which we indicate by zero), i.e. the transmitted color is not attenuated at all.
+		return radiance;
+	}
+	else
+	{
+		// Compute light attenuation using Beer's law.
+		vec3 transmittance = pow(attenuationColor, vec3(transmissionDistance / attenuationDistance));
+		return transmittance * radiance;
+	}
+}
+
 
 #ifdef MATERIAL_TRANSMISSION
 vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
@@ -1646,10 +1677,6 @@ vec3 getTransmissionSample(vec2 fragCoord, float roughness, float ior)
 	return vec3(0);
 #endif
 }
-#endif
-
-
-#ifdef MATERIAL_TRANSMISSION
 vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 baseColor, vec3 f0, vec3 f90,
 	vec3 position, mat4 modelMatrix, mat4 viewMatrix,/* mat4 projMatrix,*/ float ior, float thickness, vec3 attenuationColor, float attenuationDistance, float dispersion)
 {
@@ -1818,36 +1845,6 @@ vec3 getPunctualRadianceSheen(vec3 sheenColor, float sheenRoughness, float NdotL
 	return NdotL * BRDF_specularSheen(sheenColor, sheenRoughness, NdotL, NdotV, NdotH);
 }
 
-vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 modelMatrix)
-{
-	// Direction of refracted light.
-	vec3 refractionVector = refract(-v, normalize(n), 1.0 / ior);
-
-	// Compute rotation-independant scaling of the model matrix.
-	vec3 modelScale;
-	modelScale.x = length(vec3(modelMatrix[0]));
-	modelScale.y = length(vec3(modelMatrix[1]));
-	modelScale.z = length(vec3(modelMatrix[2]));
-
-	// The thickness is specified in local space.
-	return normalize(refractionVector) * thickness * modelScale;
-}
-
-// 计算穿过体积的衰减光 Compute attenuated light as it travels through a volume.
-vec3 applyVolumeAttenuation(vec3 radiance, float transmissionDistance, vec3 attenuationColor, float attenuationDistance)
-{
-	if (attenuationDistance == 0.0)
-	{
-		// Attenuation distance is +鈭?(which we indicate by zero), i.e. the transmitted color is not attenuated at all.
-		return radiance;
-	}
-	else
-	{
-		// Compute light attenuation using Beer's law.
-		vec3 transmittance = pow(attenuationColor, vec3(transmissionDistance / attenuationDistance));
-		return transmittance * radiance;
-	}
-}
 vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWeight)
 {
 #ifdef  ID_brdfTexture

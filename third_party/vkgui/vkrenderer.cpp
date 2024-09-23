@@ -2126,7 +2126,7 @@ namespace vkr {
 
 		glm::mat4 GetWorldMat() const
 		{
-			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * (m_rotation)*glm::scale(glm::mat4(1), glm::vec3(m_scale));
+			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * m_rotation * glm::scale(glm::mat4(1), glm::vec3(m_scale));
 		}
 
 	};
@@ -2443,13 +2443,13 @@ namespace vkr {
 
 		//tfNodeIdx m_nodeIndex = -1;
 
-		glm::vec4 m_color;
-		float       m_range;
-		float       m_intensity = 0.0f;
-		float       m_innerConeAngle = 0.0f;
-		float       m_outerConeAngle = 0.0f;
-		uint32_t    m_shadowResolution = 1024;
-		float       m_bias = 70.0f / 100000.0f;
+		glm::vec4 m_color = glm::vec4(1.0);
+		float	m_range = 50;
+		float	m_intensity = 0.0f;
+		float	m_innerConeAngle = 0.0f;
+		float	m_outerConeAngle = 0.0f;
+		uint32_t m_shadowResolution = 1024;
+		float	m_bias = 70.0f / 100000.0f;
 	};
 
 	struct LightInstance
@@ -18618,7 +18618,7 @@ namespace vkr {
 		// Animation Update
 		if (m_bPlay)
 			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
-
+		// todo 变换
 		auto m = glm::mat4(1.0f);// glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
 		static float scc = 1.0;
 		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(scc));

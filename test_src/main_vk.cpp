@@ -25,13 +25,15 @@ int main()
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
 	if (vkd) {
-		load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
+		//load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
 		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
-		load_gltf(vkd, R"(E:\model\spaceship.glb)");
+		//load_gltf(vkd, R"(E:\model\spaceship.glb)");
 		//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
 		////load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-		load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		load_gltf(vkd, R"(E:\model\bc22.glb)");
+		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
+		//load_gltf(vkd, R"(E:\model\bc22.glb)"); 
+		load_gltf(vkd, R"(E:\model\space_station_4.glb)");
+		//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
 		//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
 		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
@@ -50,6 +52,8 @@ int main()
 			}
 		}
 	}
+	vkd->state.SelectedTonemapperIndex = 1;
+	vkd->state.Exposure = 0.1;
 	form0->up_cb = [=](float delta, int* ret)
 		{
 			vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
