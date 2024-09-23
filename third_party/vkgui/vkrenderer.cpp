@@ -2439,17 +2439,14 @@ namespace vkr {
 	{
 		enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
 
-		LightType m_type = LIGHT_DIRECTIONAL;
-
-		//tfNodeIdx m_nodeIndex = -1;
-
 		glm::vec4 m_color = glm::vec4(1.0);
+		int m_type = LIGHT_DIRECTIONAL;
 		float	m_range = 50;
 		float	m_intensity = 0.0f;
 		float	m_innerConeAngle = 0.0f;
 		float	m_outerConeAngle = 0.0f;
 		uint32_t m_shadowResolution = 1024;
-		float	m_bias = 70.0f / 100000.0f;
+		float	m_bias = 70.0f / 100000.0f;//0-2
 	};
 
 	struct LightInstance
@@ -14349,7 +14346,7 @@ namespace vkr {
 							{
 								// Try to grab the value
 								std::string BiasString = lightName.substr(offset, endOffset - offset);
-								float Bias = (m_lights[i].m_type == LightType_Spot) ? (70.0f / 100000.0f) : (1000.0f / 100000.0f);
+								float Bias = (m_lights[i].m_type == tfLight::LIGHT_SPOTLIGHT) ? (70.0f / 100000.0f) : (1000.0f / 100000.0f);
 
 								try {
 									Bias = std::stof(BiasString);
@@ -18432,7 +18429,7 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	//
 	// LoadScene
-	// 拆分灯光
+	// TODO 拆分灯光
 	//--------------------------------------------------------------------------------------
 	void sample_cx::LoadScene(const char* fn)
 	{
