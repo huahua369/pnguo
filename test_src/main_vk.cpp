@@ -7,21 +7,20 @@
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 
 	auto pl1 = new plane_cx();
-
-	uint32_t pbc = 0x80ffffff;
+	uint32_t pbc = 0x80cccccc;
 	pl1->set_border({ 0x80ff802C,1,5,pbc });
 	form0->bind(pl1);	// 绑定到窗口  
 	pl1->set_rss(5);
-
+	pl1->_lms = { 6,6 };
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	pl1->add_familys(fontn, 0);
 	pl1->draggable = true; //可拖动
 	pl1->set_size({ 320,600 });
 	pl1->set_pos({ 1000,100 });
-	//pl1->set_clear_color(pbc);
 	pl1->on_click = [](plane_cx* p, int state, int clicks) {};
 	pl1->fontsize = 16;
 	glm::vec2 bs = { 150,22 };
+	glm::vec2 bs1 = { 50,22 };
 	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
 	std::vector<bool*> bps = { &vkd->state.bUseTAA, &vkd->state.bDrawLightFrustum, &vkd->state.bDrawBoundingBoxes, &vkd->state.bShowMilliseconds };
 	for (size_t i = 0; i < boolstr.size(); i++)
@@ -29,9 +28,10 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		auto& it = boolstr[i];
 		auto kcb = pl1->add_label(it.c_str(), bs, 0);
 		{
-			auto sw1 = (switch_tl*)pl1->add_switch(bs, it.c_str(), *(bps[i]));
+			kcb->_disabled_events = true;
+			kcb->text_color = 0xff7373ff;
+			auto sw1 = (switch_tl*)pl1->add_switch(bs1, it.c_str(), *(bps[i]));
 			sw1->get_pos();
-			//kcb->click_cb = [=](void* ptr, int clicks) { sw1->set_value(); };
 			sw1->bind_ptr(bps[i]);
 		}
 	}
@@ -40,6 +40,8 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	for (size_t i = 0; i < 18; i++)
 	{
 		auto kcb = pl1->add_label("", bs, 0);
+		kcb->text_color = 0xff80F61F;
+		kcb->_disabled_events = true;
 		lbs.push_back(kcb);
 	}
 	vkd->set_label_cb([=](int count, int idx, const char* str)

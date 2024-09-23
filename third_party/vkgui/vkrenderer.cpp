@@ -18551,6 +18551,7 @@ namespace vkr {
 			const float  frameTime_ms = frameTime_us * 0.001f;
 			const int fps = bTimeStampsAvailable ? static_cast<int>(1000000.0f / frameTime_us) : 0;
 
+			const char* pStrUnit = m_UIState.bShowMilliseconds ? "ms" : "us";
 			// UI  
 			//ImGui::Begin("PROFILER (F2)", &m_UIState.bShowProfilerWindow);
 			_tlabs.clear();
@@ -18558,7 +18559,7 @@ namespace vkr {
 			std::string txtAPI = format("API        : %s", systemi.mGfxAPI.c_str());
 			std::string txtGPU = format("GPU        : %s", systemi.mGPUName.c_str());
 			std::string txtCPU = format("CPU        : %s", systemi.mCPUName.c_str());
-			std::string txtFPS = format("FPS        : %d (%.2f ms)", fps, frameTime_ms);
+			std::string txtFPS = format("FPS        : %d (%.2f %s)", fps, m_UIState.bShowMilliseconds ? frameTime_ms : frameTime_us, pStrUnit);
 			_tlabs.push_back(txtrs);
 			_tlabs.push_back(txtAPI);
 			_tlabs.push_back(txtGPU);
@@ -18594,7 +18595,6 @@ namespace vkr {
 				for (uint32_t i = 0; i < timeStamps.size(); i++)
 				{
 					float value = m_UIState.bShowMilliseconds ? timeStamps[i].m_microseconds / 1000.0f : timeStamps[i].m_microseconds;
-					const char* pStrUnit = m_UIState.bShowMilliseconds ? "ms" : "us";
 					std::string txt = format("%-18s: %7.2f %s", timeStamps[i].m_label.c_str(), value, pStrUnit);
 					_tlabs.push_back(txt);
 				}
