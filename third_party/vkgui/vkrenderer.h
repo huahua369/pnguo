@@ -34,7 +34,7 @@ namespace vkr {
 	};
 	struct gtime_t
 	{
-	public: 
+	public:
 		// 只读
 		uint64_t frameCount = 0.0;			//*The total number of frames that have passed(Read Only).
 		double time = 0.0;					//*The time at the beginning of this frame(Read Only).This is the time in seconds since the start of the game.
@@ -45,7 +45,7 @@ namespace vkr {
 		float deltaTime = 0.0;				//*The completion time in seconds since the last frame. (Read Only).
 		float fixedUnscaledDeltaTime = 0.0; //The timeScale - independent interval in seconds from the last fixed frame to the current one(Read Only).
 		float fixedUnscaledTime = 0.0;		//The TimeScale - independant time the latest FixedUpdate has started(Read Only).This is the time in seconds since the start of the game.
-		
+
 		float smoothDeltaTime = 0.0;		//*A smoothed out Time.deltaTime(Read Only).
 		float timeSinceLevelLoad = 0.0;		//*The time this frame has started(Read Only).This is the time in seconds since the last level has been loaded.
 		float unscaledDeltaTime = 0.0;		//*The timeScale - independent interval in seconds from the last frame to the current one(Read Only).
@@ -60,8 +60,23 @@ namespace vkr {
 		bool inFixedTimeStep = true;		//Returns true if called inside a fixed time step callback(like MonoBehaviour's FixedUpdate), otherwise returns false.
 	};
 
+	struct light_t
+	{
+		// 平行光、点光源、聚光灯
+		enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
+		glm::vec4	_color = glm::vec4(1.0);					// 颜色
+		LightType	_type = LIGHT_DIRECTIONAL;
+		float		_range = 50;					// 范围
+		float       _intensity = 0.0f;			// 强度
+		float       _innerConeAngle = 0.0f;	// 内锥角
+		float       _outerConeAngle = 0.0f;	// 外锥角
+		uint32_t    _shadowResolution = 1024;	// 阴影分辨率
+		float       _bias = 70.0f / 100000.0f;	// 偏差0-2 
+	};
+
 
 }
+
 struct dev_info_cx;
 struct image_vkr
 {
@@ -156,21 +171,6 @@ void load_gltf(vkdg_cx* p, const char* fn);
 
 namespace vkr {
 	// 顶点数据、纹理、矩阵、灯光、渲染命令
-	struct light_info_t
-	{
-		// 平行光、点光源、聚光灯
-		enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
-		LightType	_type = LIGHT_DIRECTIONAL;
-		glm::vec4	_color;					// 颜色
-		float		_range;					// 范围
-		float       _intensity = 0.0f;			// 强度
-		float       _innerConeAngle = 0.0f;	// 内锥角
-		float       _outerConeAngle = 0.0f;	// 外锥角
-		uint32_t    _shadowResolution = 1024;	// 阴影分辨率
-		float       _bias = 70.0f / 100000.0f;	// 偏差
-		glm::vec3	_position;
-	};
-
 	// 多边形
 	struct mesh_mt
 	{
