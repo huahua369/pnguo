@@ -32,6 +32,35 @@ namespace vkr {
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
 		uint32_t uploadHeapMemSize = 500 * 1024 * 1024;
 	};
+	struct gtime_t
+	{
+	public: 
+		// 只读
+		uint64_t frameCount = 0.0;			//*The total number of frames that have passed(Read Only).
+		double time = 0.0;					//*The time at the beginning of this frame(Read Only).This is the time in seconds since the start of the game.
+		double fixedTime = 0.0;				//The time the latest FixedUpdate has started(Read Only).This is the time in seconds since the start of the game.
+		double realtimeSinceStartup = 0.0;	//*The real time in seconds since the game started(Read Only).
+		double unscaledTime = 0.0;			//*The timeScale - independant time for this frame(Read Only).This is the time in seconds since the start of the game.
+
+		float deltaTime = 0.0;				//*The completion time in seconds since the last frame. (Read Only).
+		float fixedUnscaledDeltaTime = 0.0; //The timeScale - independent interval in seconds from the last fixed frame to the current one(Read Only).
+		float fixedUnscaledTime = 0.0;		//The TimeScale - independant time the latest FixedUpdate has started(Read Only).This is the time in seconds since the start of the game.
+		
+		float smoothDeltaTime = 0.0;		//*A smoothed out Time.deltaTime(Read Only).
+		float timeSinceLevelLoad = 0.0;		//*The time this frame has started(Read Only).This is the time in seconds since the last level has been loaded.
+		float unscaledDeltaTime = 0.0;		//*The timeScale - independent interval in seconds from the last frame to the current one(Read Only).
+		float fps = 0.0f;
+		// 可写
+		float captureFramerate = 0.0;		//Slows game playback time to allow screenshots to be saved between frames.
+		float timeScale = 1.0;				//The scale at which the time is passing.This can be used for slow motion effects.
+		float fixedDeltaTime = 0.02;		//The interval in seconds at which physicsand other fixed frame rate updates(like MonoBehaviour's FixedUpdate) are performed.
+
+		float maximumDeltaTime = 1.0 / 3.0;		//The maximum time a frame can take.Physics and other fixed frame rate updates(like MonoBehaviour's FixedUpdate) will be performed only for this duration of time per frame.
+		float maximumParticleDeltaTime = 1.0 / 3.0;//The maximum time a frame can spend on particle updates.If the frame takes longer than this, then updates are split into multiple smaller updates.
+		bool inFixedTimeStep = true;		//Returns true if called inside a fixed time step callback(like MonoBehaviour's FixedUpdate), otherwise returns false.
+	};
+
+
 }
 struct dev_info_cx;
 struct image_vkr
