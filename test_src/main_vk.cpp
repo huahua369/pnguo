@@ -59,9 +59,6 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 }
 int main()
 {
-	struct kfa {
-		std::function<void()>afun;
-	};
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
@@ -76,13 +73,15 @@ int main()
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
 	if (vkd) {
-		load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
+		//load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
 		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
 		//load_gltf(vkd, R"(E:\model\spaceship.glb)");
 		//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
 		load_gltf(vkd, R"(E:\model\bc22.glb)");
+		//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
+		//load_gltf(vkd, R"(E:\model\psx_old_house.glb)");
 		load_gltf(vkd, R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)");
 		//load_gltf(vkd, R"(E:\model\space_station_4.glb)");
 		//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
