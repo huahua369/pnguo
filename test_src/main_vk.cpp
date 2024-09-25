@@ -82,27 +82,17 @@ int main()
 		//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		load_gltf(vkd, R"(E:\model\bc22.glb)"); 
+		load_gltf(vkd, R"(E:\model\bc22.glb)");
 		load_gltf(vkd, R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)");
 		//load_gltf(vkd, R"(E:\model\space_station_4.glb)");
 		//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
 		//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
 		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
-		 
+
 		vkd->resize(1024, 800);						// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);// 添加纹理到窗口显示
-		if (vr.vkimageptr)
-		{
-			auto tex = form0->new_texture(vr.size.x, vr.size.y, vr.vkimageptr, 1);// 创建SDL的bgra纹理
-			if (tex)
-			{
-				// 添加纹理到SDL窗口渲染 
-				form0->set_texture_blend(tex, (int)BlendMode_e::normal, 0);
-				form0->push_texture(tex, { 0,0,vr.size.x,vr.size.y }, { 20,20,vr.size.x,vr.size.y }, 0);
-				d3tex = tex;
-			}
-		}
+		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,20 }, 1);// 创建SDL的bgra纹理 
 		vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.1;
 		vkd->state.EmissiveFactor = 250;

@@ -78,12 +78,14 @@ namespace vkr {
 
 }
 
-struct dev_info_cx;
+struct dev_info_cx; 
+#ifndef image_vkr
 struct image_vkr
 {
 	glm::ivec2 size = {};
 	void* vkimageptr = 0;
 };
+#endif
 
 struct scene_state {
 	// POST PROCESS CONTROLS 

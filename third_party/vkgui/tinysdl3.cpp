@@ -795,7 +795,7 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 		if (slot->color.w == 0 || !slot->bone->count || !attachment || attachment->color.w == 0) { continue; }
 		texture = (SDL_Texture*)attachment->tex;
 		auto c = skeleton->color * slot->color * attachment->color;
-		*(glm::vec4*)(&vertex.color) = glm::clamp(c, 0.0f, 1.0f); 
+		*(glm::vec4*)(&vertex.color) = glm::clamp(c, 0.0f, 1.0f);
 		auto blend = get_blend((BlendMode_e)slot->blend_mode, skeleton->usePremultipliedAlpha);
 		//if (states.texture == 0) states.texture = texture;
 		if (states.blendMode != blend || states.texture != texture) {
@@ -1137,7 +1137,7 @@ void form_x::trigger(uint32_t etype, void* e)
 		{
 			break;
 		}
-		if (cbs0.size()) 
+		if (cbs0.size())
 		{
 			for (auto it = cbs0.rbegin(); it != cbs0.rend(); it++)
 			{
@@ -2162,6 +2162,24 @@ void* form_x::get_texture_vk(SDL_Texture* p)
 	if (r1)ra = r1;
 	return ra;
 }
+
+int form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
+{
+	int ret = -1;
+	if (vkimageptr)
+	{
+		auto tex = new_texture(size.x, size.y, vkimageptr, type);// 创建SDL的bgra纹理
+		if (tex)
+		{
+			// 添加纹理到SDL窗口渲染 
+			set_texture_blend(tex, (int)BlendMode_e::normal, 0);
+			push_texture(tex, { 0,0,size.x,size.y }, { pos,size }, 0);
+			ret = 0;
+		}
+	}
+	return ret;
+}
+
 void form_x::start_text_input()
 {
 	if (!SDL_TextInputActive(_ptr))
@@ -2201,7 +2219,7 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
@@ -2293,7 +2311,7 @@ void form_x::bind(plane_cx* p, int level)
 		p->form_move2end = form_move2end;
 		p->form_set_input_ptr = form_set_input_ptr;
 		p->dragdrop_begin = dragdrop_begin;
-		_planes[level].push_back(p); 
+		_planes[level].push_back(p);
 		add_canvas_atlas(p, level);
 	}
 }
