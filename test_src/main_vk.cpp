@@ -71,7 +71,6 @@ int main()
 	auto app = new_app();
 	glm::ivec2 ws = { 1280,800 };
 	const char* wtitle = (char*)u8"窗口1";
-
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
@@ -92,7 +91,7 @@ int main()
 		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
 		//load_gltf(vkd, R"(E:\model\mclaren_f1.glb)");
 		vkd->resize(800, 600);						// 设置fbo缓冲区大小
-		auto vr = vkd->get_vkimage(0);
+		auto vr = vkd->get_vkimage(0);// 添加纹理到窗口显示
 		if (vr.vkimageptr)
 		{
 			auto tex = form0->new_texture(vr.size.x, vr.size.y, vr.vkimageptr, 1);// 创建SDL的bgra纹理
@@ -107,11 +106,10 @@ int main()
 		vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.1;
 		vkd->state.EmissiveFactor = 250;
-
 		new_ui(form0, vkd);
-
 		form0->up_cb = [=](float delta, int* ret)
 			{
+				auto light = vkd->get_light(0);
 				vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 				vkd->state.Exposure;				// 曝光度：默认1.0
 				vkd->state.bUseTAA;
