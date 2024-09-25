@@ -83,7 +83,7 @@ int main()
 		//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
 		////load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 		//load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		//load_gltf(vkd, R"(E:\model\bc22.glb)");
+		load_gltf(vkd, R"(E:\model\bc22.glb)");
 		load_gltf(vkd, R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)");
 		//load_gltf(vkd, R"(E:\model\space_station_4.glb)");
 		//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
@@ -106,6 +106,7 @@ int main()
 		}
 		vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.1;
+		vkd->state.EmissiveFactor = 250;
 
 		new_ui(form0, vkd);
 

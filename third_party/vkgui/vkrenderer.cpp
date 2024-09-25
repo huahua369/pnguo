@@ -70,8 +70,7 @@ MORPH_TARGET_COLOR_1_OFFSET		颜色变形
 #endif
 #ifndef DXGI_FORMAT_DEFINED
 typedef uint32_t DXGI_FORMAT;
-#endif
-//#include <tinysdl3.h>
+#endif 
 #include <event.h>
 #include <print_time.h>
 #include <mapView.h>
@@ -2171,7 +2170,7 @@ namespace vkr {
 	class tfSampler;
 
 	// 插值器
-	class gltfInterpolator
+	class tfInterpolator
 	{
 	public:
 		size_t prevKey = 0;
@@ -2271,7 +2270,7 @@ namespace vkr {
 	public:
 		tfAccessor m_time;
 		tfAccessor m_value;
-		gltfInterpolator interpolator = {};
+		tfInterpolator interpolator = {};
 		std::vector<float>* weights = 0;
 		int mstride = 0;
 		int interpolation = 0;	// linear=0，step=1，cubicspline=2
@@ -2335,7 +2334,7 @@ namespace vkr {
 
 	};
 
-	glm::vec4 gltfInterpolator::interpolate(tfChannel* channel, tfSampler* sampler, float t, float maxTime, std::vector<float>* rb)
+	glm::vec4 tfInterpolator::interpolate(tfChannel* channel, tfSampler* sampler, float t, float maxTime, std::vector<float>* rb)
 	{
 		if (!(t > 0) || !sampler)
 		{
@@ -2554,6 +2553,21 @@ namespace vkr {
 
 	glm::vec4 get_row(const glm::mat4& m, int n);
 
+	struct AxisAlignedBoundingBox
+	{
+		glm::vec4 m_min;
+		glm::vec4 m_max;
+		bool m_isEmpty;
+
+		AxisAlignedBoundingBox();
+
+		void Merge(const AxisAlignedBoundingBox& bb);
+		void Grow(const glm::vec4 v);
+
+		bool HasNoVolume() const;
+	};
+
+
 	class GLTFCommon
 	{
 	public:
@@ -2564,7 +2578,7 @@ namespace vkr {
 		std::vector<tfScene> m_scenes;
 		std::vector<tfMesh> m_meshes;
 		std::vector<tfSkins> m_skins;
-		std::vector<tfLight> m_lights;
+		//std::vector<tfLight> m_lights;
 		std::vector<LightInstance> m_lightInstances;
 		std::vector<tfCamera> m_cameras;
 
@@ -2597,11 +2611,12 @@ namespace vkr {
 		void SetAnimationTime(uint32_t animationIndex, float time);
 		void TransformScene(int sceneIndex, const glm::mat4& world);
 		// 运行中使用
-		PerFrame_t* SetPerFrameData(const Camera& cam);
+		PerFrame_t* SetPerFrameData(PerFrame_t* pfd);// const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats);
 		bool GetCamera(uint32_t cameraIdx, Camera* pCam) const;
 		tfNodeIdx AddNode(const tfNode& node);
 		int AddLight(const tfNode& node, const tfLight& light);
 		int get_animation_count();
+		AxisAlignedBoundingBox get_BoundingBox(const glm::mat4& mLightView);
 	private:
 		void InitTransformedData(); //this is called after loading the data from the GLTF
 		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes);
@@ -3485,19 +3500,6 @@ namespace vkr {
 	bool CameraFrustumToBoxCollision(const glm::mat4& mCameraViewProj, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
 
 
-	struct AxisAlignedBoundingBox
-	{
-		glm::vec4 m_min;
-		glm::vec4 m_max;
-		bool m_isEmpty;
-
-		AxisAlignedBoundingBox();
-
-		void Merge(const AxisAlignedBoundingBox& bb);
-		void Grow(const glm::vec4 v);
-
-		bool HasNoVolume() const;
-	};
 
 	AxisAlignedBoundingBox GetAABBInGivenSpace(const glm::mat4& mTransform, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
 
@@ -14119,7 +14121,7 @@ namespace vkr {
 		m_animations.clear();
 		m_nodes.clear();
 		m_scenes.clear();
-		m_lights.clear();
+		//m_lights.clear();
 		m_lightInstances.clear();
 
 	}
@@ -14273,6 +14275,8 @@ namespace vkr {
 	}
 	void GLTFCommon::load_lights()
 	{
+		m_lightInstances.push_back({ 0, 0 });// 默认灯光
+#if 0
 		if (pm)
 		{
 			m_lights.resize(pm->lights.size());
@@ -14309,7 +14313,6 @@ namespace vkr {
 						{
 							// Update offset to start from after "_"
 							offset += 11;
-
 							// Look for the end separator
 							size_t endOffset = lightName.find("_", offset, 1);
 							if (endOffset != std::string::npos)
@@ -14370,6 +14373,7 @@ namespace vkr {
 				}
 			}
 		}
+#endif
 	}
 	void GLTFCommon::load_cameras()
 	{
@@ -14903,8 +14907,21 @@ namespace vkr {
 	// Sets the per frame data from the GLTF, returns a pointer to it in case the user wants to override some values
 	// The scene needs to be animated and transformed before we can set the PerFrame_t data. We need those final matrices for the lights and the camera.
 	//
-	PerFrame_t* GLTFCommon::SetPerFrameData(const Camera& cam)
+	PerFrame_t* GLTFCommon::SetPerFrameData(PerFrame_t* pfd) // const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
 	{
+#if 1
+		if (pfd)
+		{
+			m_perFrameData = *pfd;
+			m_perFrameData.lightCount = (int32_t)m_lightInstances.size();
+			int32_t ShadowMapIndex = 0;
+			for (int i = 0; i < m_lightInstances.size(); i++)
+			{
+				Light* pSL = &m_perFrameData.lights[i];
+				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
+			}
+		}
+#else
 		Matrix2* pMats = m_worldSpaceMats.data();
 
 		//Sets the camera
@@ -14924,35 +14941,36 @@ namespace vkr {
 			Light* pSL = &m_perFrameData.lights[i];
 
 			// get light data and node trans
-			const tfLight& lightData = m_lights[m_lightInstances[i].m_lightId];
-			glm::mat4 lightMat = pMats[m_lightInstances[i].m_nodeIndex].GetCurrent();
+			auto& lightData = lights[m_lightInstances[i].m_lightId];
+			glm::mat4 lightMat = lightMats[lightData._nodeid];// pMats[m_lightInstances[i].m_nodeIndex].GetCurrent();
 
 			glm::mat4 lightView = glm::affineInverse(lightMat);
-			glm::mat4 per = glm::perspective(lightData.m_outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
+			glm::mat4 per = glm::perspective(lightData._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
 			pSL->mLightView = lightView;
-			if (lightData.m_type == LightType_Spot)
+			if (lightData._type == LightType_Spot)
 				pSL->mLightViewProj = per * lightView;
-			else if (lightData.m_type == LightType_Directional)
+			else if (lightData._type == LightType_Directional)
 				pSL->mLightViewProj = ComputeDirectionalLightOrthographicMatrix(lightView) * lightView;
 			//transpose
 			GetXYZ(pSL->direction, glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
-			GetXYZ(pSL->color, lightData.m_color);
-			pSL->range = lightData.m_range;
-			pSL->intensity = lightData.m_intensity;
+			GetXYZ(pSL->color, lightData._color);
+			pSL->range = lightData._range;
+			pSL->intensity = lightData._intensity;
 			GetXYZ(pSL->position, lightMat[3]);
-			pSL->outerConeCos = cosf(lightData.m_outerConeAngle);
-			pSL->innerConeCos = cosf(lightData.m_innerConeAngle);
-			pSL->type = lightData.m_type;
+			pSL->outerConeCos = cosf(lightData._outerConeAngle);
+			pSL->innerConeCos = cosf(lightData._innerConeAngle);
+			pSL->type = lightData._type;
 
 			// Setup shadow information for light (if it has any)
-			if (lightData.m_shadowResolution && lightData.m_type != LightType_Point)
+			if (lightData._shadowResolution && lightData._type != LightType_Point)
 			{
 				pSL->shadowMapIndex = ShadowMapIndex++;
-				pSL->depthBias = lightData.m_bias;
+				pSL->depthBias = lightData._bias;
 			}
 			else
 				pSL->shadowMapIndex = -1;
 		}
+#endif
 
 		return &m_perFrameData;
 	}
@@ -14971,6 +14989,9 @@ namespace vkr {
 
 	int GLTFCommon::AddLight(const tfNode& node, const tfLight& light)
 	{
+#if 1
+		return 0;
+#else
 		int nodeID = AddNode(node);
 		m_lights.push_back(light);
 
@@ -14978,8 +14999,29 @@ namespace vkr {
 		m_lightInstances.push_back({ lightInstanceID, (tfNodeIdx)nodeID });
 
 		return lightInstanceID;
+#endif
 	}
+	AxisAlignedBoundingBox GLTFCommon::get_BoundingBox(const glm::mat4& mLightView)
+	{
+		AxisAlignedBoundingBox projectedBoundingBox = {};
+		// NOTE: we consider all objects here, but the scene might not display all of them.
+		for (uint32_t i = 0; i < m_nodes.size(); ++i)
+		{
+			tfNode* pNode = &m_nodes.at(i);
+			if ((pNode == NULL) || (pNode->meshIndex < 0))
+				continue;
 
+			std::vector<tfPrimitives>& primitives = m_meshes[pNode->meshIndex].m_pPrimitives;
+			// loop through primitives
+			//
+			for (size_t p = 0; p < primitives.size(); ++p)
+			{
+				tfPrimitives boundingBox = m_meshes[pNode->meshIndex].m_pPrimitives[p];
+				projectedBoundingBox.Merge(GetAABBInGivenSpace(mLightView * m_worldSpaceMats[i].GetCurrent(), boundingBox.m_center, boundingBox.m_radius));
+			}
+		}
+		return projectedBoundingBox;
+	}
 	//
 	// Computes the orthographic matrix for a directional light in order to cover the whole scene
 	//
@@ -15143,13 +15185,20 @@ namespace vkr {
 		void UnloadScene();
 		void unloadgltf(robj_info* p);
 
-		void AllocateShadowMaps(GLTFCommon* pGLTFCommon);
-
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
+		glm::mat4 ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView);
+		PerFrame_t* SetPerFrameData(const Camera& cam);
 		void OnRender(const scene_state* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p, int idx);
 		void freeVidMBP();
+
+
+		size_t AddLight(const Transform& tf, const light_t& light);
+		light_t* get_light(size_t idx);
+		size_t get_light_size();
+		void AllocateShadowMaps();
+
 	private:
 		Device* m_pDevice = 0;
 		const_vk ct = {};
@@ -15206,6 +15255,12 @@ namespace vkr {
 		std::vector<SceneShadowInfo>    m_shadowMapPool = {};
 		std::vector<VkImageView>        m_ShadowSRVPool = {};
 		std::vector<GltfDepthPass*>     _depthpass = {};
+		// 灯光管理
+		std::vector<light_t> _lights;
+		std::queue<light_t> _lights_q;
+		std::vector<glm::mat4> lightMats;
+
+		PerFrame_t _perFrameData;
 
 		VkFence pass_fence = {};
 		fbo_cxt _fbo = {};
@@ -17259,6 +17314,9 @@ namespace vkr {
 		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer.m_HDR);
 		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer);
 		//m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer.m_HDR);
+
+
+
 		m_bMagResourceReInit = true;
 	}
 
@@ -17484,65 +17542,183 @@ namespace vkr {
 			unloadgltf(it);
 		_robject.clear();
 	}
-
-	void Renderer_cx::AllocateShadowMaps(GLTFCommon* pGLTFCommon)
+	size_t Renderer_cx::AddLight(const Transform& tf, const light_t& light)
 	{
-		if (m_shadowMapPool.size())return;
-		// Go through the lights and allocate shadow information
-		uint32_t NumShadows = 0;
-		for (int i = 0; i < pGLTFCommon->m_lightInstances.size(); ++i)
+		auto ps = lightMats.size();
+		lightMats.push_back(tf.GetWorldMat());
+		auto q = light;
+		q._nodeid = ps;
+		_lights_q.push(q);
+		return ps;
+	}
+	light_t* Renderer_cx::get_light(size_t idx)
+	{
+		if (idx < _lights.size())
+			return &_lights[idx];
+		return nullptr;
+	}
+	size_t Renderer_cx::get_light_size()
+	{
+		return _lights.size();
+	}
+	void Renderer_cx::AllocateShadowMaps()
+	{
+		auto NumShadows = m_shadowMapPool.size();
+		if (_lights_q.size())
 		{
-			const tfLight& lightData = pGLTFCommon->m_lights[pGLTFCommon->m_lightInstances[i].m_lightId];
-			if (lightData.m_shadowResolution)
-			{
-				SceneShadowInfo ShadowInfo;
-				ShadowInfo.ShadowResolution = lightData.m_shadowResolution;
-				ShadowInfo.ShadowIndex = NumShadows++;
-				ShadowInfo.LightIndex = i;
-				m_shadowMapPool.push_back(ShadowInfo);
+			auto i = _lights.size();
+			for (; _lights_q.size();) {
+				auto q = _lights_q.front(); _lights_q.pop();
+				if (q._shadowResolution)
+				{
+					SceneShadowInfo ShadowInfo;
+					ShadowInfo.ShadowResolution = q._shadowResolution;
+					ShadowInfo.ShadowIndex = NumShadows++;
+					ShadowInfo.LightIndex = i;
+
+					{
+						auto CurrentShadow = &ShadowInfo;
+						CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
+						CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
+
+						// Create render pass shadow, will clear contents
+						{
+							VkAttachmentDescription depthAttachments;
+							AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+
+							// Create frame buffer
+							VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+							VkFramebufferCreateInfo fb_info = {};
+							fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+							fb_info.pNext = NULL;
+							fb_info.renderPass = m_Render_pass_shadow;
+							fb_info.attachmentCount = 1;
+							fb_info.pAttachments = attachmentViews;
+							fb_info.width = CurrentShadow->ShadowResolution;
+							fb_info.height = CurrentShadow->ShadowResolution;
+							fb_info.layers = 1;
+							VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
+							assert(res == VK_SUCCESS);
+						}
+
+						VkImageView ShadowSRV;
+						CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
+						m_ShadowSRVPool.push_back(ShadowSRV);
+					}
+					m_shadowMapPool.push_back(ShadowInfo);
+				}
+				_lights.push_back(q); i++;
 			}
 		}
-
 		if (NumShadows > MaxShadowInstances)
 		{
 			Trace("Number of shadows has exceeded maximum supported. Please grow value in gltfCommon.h/perFrameStruct.h");
 			throw;
 		}
 
-		// If we had shadow information, allocate all required maps and bindings
-		if (!m_shadowMapPool.empty())
+	}
+
+	glm::mat4 Renderer_cx::ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView)
+	{
+		AxisAlignedBoundingBox projectedBoundingBox = {};
+		for (auto it : _robject)
 		{
-			std::vector<SceneShadowInfo>::iterator CurrentShadow = m_shadowMapPool.begin();
-			for (uint32_t i = 0; CurrentShadow < m_shadowMapPool.end(); ++i, ++CurrentShadow)
+			if (it->m_pGLTFTexturesAndBuffers)
 			{
-				CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
-				CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
-
-				// Create render pass shadow, will clear contents
-				{
-					VkAttachmentDescription depthAttachments;
-					AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
-
-					// Create frame buffer
-					VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
-					VkFramebufferCreateInfo fb_info = {};
-					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-					fb_info.pNext = NULL;
-					fb_info.renderPass = m_Render_pass_shadow;
-					fb_info.attachmentCount = 1;
-					fb_info.pAttachments = attachmentViews;
-					fb_info.width = CurrentShadow->ShadowResolution;
-					fb_info.height = CurrentShadow->ShadowResolution;
-					fb_info.layers = 1;
-					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
-					assert(res == VK_SUCCESS);
-				}
-
-				VkImageView ShadowSRV;
-				CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
-				m_ShadowSRVPool.push_back(ShadowSRV);
+				projectedBoundingBox.Merge(it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->get_BoundingBox(mLightView));
 			}
 		}
+		if (projectedBoundingBox.HasNoVolume())
+		{
+			// default ortho matrix that won't work in most cases
+			return glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
+		}
+
+		// we now have the final bounding box
+		tfPrimitives finalBoundingBox;
+		finalBoundingBox.m_center = 0.5f * (projectedBoundingBox.m_max + projectedBoundingBox.m_min);
+		finalBoundingBox.m_radius = 0.5f * (projectedBoundingBox.m_max - projectedBoundingBox.m_min);
+
+		finalBoundingBox.m_center.w = (1.0f);
+		finalBoundingBox.m_radius.w = (0.0f);
+
+		// we want a square aspect ratio
+		float spanX = finalBoundingBox.m_radius.x;
+		float spanY = finalBoundingBox.m_radius.y;
+		float maxSpan = spanX > spanY ? spanX : spanY;
+
+		// manually create the orthographic matrix
+		glm::mat4 projectionMatrix = {};//glm::mat4::identity();
+		projectionMatrix[0] = (glm::vec4(
+			1.0f / maxSpan, 0.0f, 0.0f, 0.0f
+		));
+		projectionMatrix[1] = (glm::vec4(
+			0.0f, 1.0f / maxSpan, 0.0f, 0.0f
+		));
+		projectionMatrix[2] = (glm::vec4(
+			0.0f, 0.0f, -0.5f / finalBoundingBox.m_radius.z, 0.0f
+		));
+		projectionMatrix[3] = (glm::vec4(
+			-finalBoundingBox.m_center.x / maxSpan,
+			-finalBoundingBox.m_center.y / maxSpan,
+			0.5f * (finalBoundingBox.m_center.z + finalBoundingBox.m_radius.z) / finalBoundingBox.m_radius.z,
+			1.0f
+		));
+		return projectionMatrix;
+	}
+
+	PerFrame_t* Renderer_cx::SetPerFrameData(const Camera& cam)
+	{
+		auto pMats = lightMats.data();
+
+		//Sets the camera
+		_perFrameData.mCameraCurrViewProj = cam.GetProjection() * cam.GetView();
+		_perFrameData.mCameraPrevViewProj = cam.GetProjection() * cam.GetPrevView();
+		// more accurate calculation
+		_perFrameData.mInverseCameraCurrViewProj = glm::affineInverse(cam.GetView()) * glm::inverse(cam.GetProjection());
+		_perFrameData.cameraPos = cam.GetPosition();
+
+		_perFrameData.wireframeOptions = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+
+		// Process lights
+		_perFrameData.lightCount = (int32_t)_lights.size();
+		int32_t ShadowMapIndex = 0;
+		for (int i = 0; i < _perFrameData.lightCount; i++)
+		{
+			Light* pSL = &_perFrameData.lights[i];
+
+			// get light data and node trans
+			auto& lightData = _lights[i];
+			glm::mat4 lightMat = pMats[lightData._nodeid];
+
+			glm::mat4 lightView = glm::affineInverse(lightMat);
+			glm::mat4 per = glm::perspective(lightData._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
+			pSL->mLightView = lightView;
+			if (lightData._type == LightType_Spot)
+				pSL->mLightViewProj = per * lightView;
+			else if (lightData._type == LightType_Directional)
+				pSL->mLightViewProj = ComputeDirectionalLightOrthographicMatrix(lightView) * lightView;
+			//transpose
+			GetXYZ(pSL->direction, glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
+			GetXYZ(pSL->color, lightData._color);
+			pSL->range = lightData._range;
+			pSL->intensity = lightData._intensity;
+			GetXYZ(pSL->position, lightMat[3]);
+			pSL->outerConeCos = cosf(lightData._outerConeAngle);
+			pSL->innerConeCos = cosf(lightData._innerConeAngle);
+			pSL->type = lightData._type;
+
+			// Setup shadow information for light (if it has any)
+			if (lightData._shadowResolution && lightData._type != LightType_Point)
+			{
+				pSL->shadowMapIndex = ShadowMapIndex++;
+				pSL->depthBias = lightData._bias;
+			}
+			else
+				pSL->shadowMapIndex = -1;
+		}
+
+		return &_perFrameData;
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -17572,8 +17748,9 @@ namespace vkr {
 
 		// Sets the perFrame data 
 		glm::mat4 mCameraCurrViewProj = {};
-		Light* lights = 0;
-		int lightCount = 0;
+		auto pfd = SetPerFrameData(Cam);
+		Light* lights = pfd->lights;
+		int lightCount = pfd->lightCount;
 		{
 			PerFrame_t* pPerFrame = NULL;
 			for (auto it : _robject)
@@ -17581,10 +17758,8 @@ namespace vkr {
 				if (it->m_pGLTFTexturesAndBuffers)
 				{
 					// fill as much as possible using the GLTF (camera, lights, ...)
-					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(Cam);
+					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd);
 					mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
-					lights = pPerFrame->lights;
-					lightCount = pPerFrame->lightCount;
 					// Set some lighting factors
 					pPerFrame->iblFactor = pState->IBLFactor;
 					pPerFrame->emmisiveFactor = pState->EmissiveFactor;
@@ -17676,10 +17851,8 @@ namespace vkr {
 					if (it->m_pGLTFTexturesAndBuffers)
 					{
 						// fill as much as possible using the GLTF (camera, lights, ...)
-						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(Cam);
+						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd);// Cam, _lights, lightMats);
 						mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
-						lights = pPerFrame->lights;
-						lightCount = pPerFrame->lightCount;
 						// Set some lighting factors
 						pPerFrame->iblFactor = pState->IBLFactor;
 						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
@@ -18342,6 +18515,25 @@ namespace vkr {
 		m_camera.LookAt(glm::vec4(0, 0, 5, 0), glm::vec4(0, 0, 0, 0));
 		// todo set camera
 		m_camera.is_eulerAngles = false;
+
+		// todo 添加默认灯光Add a default light in case there are none
+		{
+			glm::vec4 src = PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f;
+			src = { 0.1,20,0.1,0 };
+			Transform transform = {};
+			transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
+			light_t l = {};
+			l._type = light_t::LIGHT_SPOTLIGHT;
+			l._intensity = 10.0;
+			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+			l._range = 52;
+			l._outerConeAngle = AMD_PI_OVER_4;
+			l._innerConeAngle = l._outerConeAngle * 0.9f;
+			l._shadowResolution = 1024;
+			m_pRenderer->AddLight(transform, l);
+		}
+		// Allocate shadow information (if any)
+		m_pRenderer->AllocateShadowMaps();
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -18472,28 +18664,29 @@ namespace vkr {
 			//LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
 			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
 
-			// todo 添加默认灯光Add a default light in case there are none
-			if (pgc->m_lights.size() == 0)
+#if 0
+		// todo 添加默认灯光Add a default light in case there are none
 			{
-				tfNode n = {};
 				glm::vec4 src = PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f;
 				src = { 0.1,20,0.1,0 };
-				n.m_tranform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
-				tfLight l;
-				l.m_type = tfLight::LIGHT_SPOTLIGHT;
-				l.m_intensity = 10.0;//scene.value("intensity", 1.0f);
-				l.m_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l.m_range = 52;
-				l.m_outerConeAngle = AMD_PI_OVER_4;
-				l.m_innerConeAngle = l.m_outerConeAngle * 0.9f;
-				l.m_shadowResolution = 1024;
+				Transform transform = {};
+				transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
+				light_t l = {};
+				l._type = light_t::LIGHT_SPOTLIGHT;
+				l._intensity = 10.0;//scene.value("intensity", 1.0f);
+				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				l._range = 52;
+				l._outerConeAngle = AMD_PI_OVER_4;
+				l._innerConeAngle = l._outerConeAngle * 0.9f;
+				l._shadowResolution = 1024;
 				//l.m_bias = 0.00005;
-				pgc->AddLight(n, l);
+				//pgc->AddLight(n, l);
+				m_pRenderer->AddLight(transform, l);
 			}
 
 			// Allocate shadow information (if any)
-			m_pRenderer->AllocateShadowMaps(pgc);
-
+			m_pRenderer->AllocateShadowMaps();
+#endif
 			// set default camera
 			njson camera = scene["camera"];
 			m_activeCamera = 0;// scene.value("activeCamera", m_activeCamera);
@@ -18742,6 +18935,8 @@ namespace vkr {
 		m_deltaTime = (float)(timeNow - m_lastFrameTime);
 		m_lastFrameTime = timeNow;
 		io.DeltaTime;// = m_deltaTime;
+
+
 	}
 	//--------------------------------------------------------------------------------------
 	//
@@ -19215,6 +19410,26 @@ void* vkdg_cx::new_pipe(const char* vertexShader, const char* pixelShader)
 		//vkr::new_pipe(vertexShader, pixelShader, tx->m_device);
 	}
 	return p;
+}
+vkr::light_t* vkdg_cx::get_light(size_t idx)
+{
+	vkr::light_t* p = 0;
+	if (ctx) {
+		auto tx = (vkr::sample_cx*)ctx;
+		if (tx->m_pRenderer)
+			p = tx->m_pRenderer->get_light(idx);
+	}
+	return p;
+}
+size_t vkdg_cx::get_light_size()
+{
+	size_t c = 0;
+	if (ctx) {
+		auto tx = (vkr::sample_cx*)ctx;
+		if (tx->m_pRenderer)
+			c = tx->m_pRenderer->get_light_size();
+	}
+	return c;
 }
 
 BBoxPass::BBoxPass()

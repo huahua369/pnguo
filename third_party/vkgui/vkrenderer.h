@@ -72,6 +72,7 @@ namespace vkr {
 		float       _outerConeAngle = 0.0f;	// 外锥角
 		uint32_t    _shadowResolution = 1024;	// 阴影分辨率
 		float       _bias = 70.0f / 100000.0f;	// 偏差0-2 
+		size_t		_nodeid = 0;
 	};
 
 
@@ -130,7 +131,11 @@ public:
 	void resize(int w, int h);
 	void save_fbo(int idx);
 	void copy2(int idx, void* vkptr);
-	void* new_pipe(const char* vertexShader, const char* pixelShader);
+	void* new_pipe(const char* vertexShader, const char* pixelShader);	
+
+
+	vkr::light_t* get_light(size_t idx);
+	size_t get_light_size();
 private:
 
 };
