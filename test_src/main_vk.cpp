@@ -73,21 +73,21 @@ int main()
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
 	if (vkd) {
-		//load_gltf(vkd, R"(E:\model\sharp2.glb)");// 加载gltf
+		vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 		//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
 		//load_gltf(vkd, R"(E:\model\spaceship.glb)");
 		//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
 		//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-		load_gltf(vkd, R"(E:\model\realistic_palm_tree_10_free.glb)");
-		load_gltf(vkd, R"(E:\model\bc22.glb)");
+		vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 0,0,0 }, 1.0);
+		vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
 		//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
 		//load_gltf(vkd, R"(E:\model\psx_old_house.glb)");
-		load_gltf(vkd, R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)");
+		vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 20,0,30 }, 1.0);
 		//load_gltf(vkd, R"(E:\model\space_station_4.glb)");
 		//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
 		//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
 		//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
-		//load_gltf(vkd, R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)");
+		vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 2,1,10 }, 1.0);
 
 		vkd->resize(1024, 800);						// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);// 添加纹理到窗口显示

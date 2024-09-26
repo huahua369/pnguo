@@ -2594,9 +2594,11 @@ namespace vkr {
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 		std::map<int, std::vector<glm::mat3>> m_uv_mats; // UVmat
 
-		PerFrame_t m_perFrameData;
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
+		PerFrame_t m_perFrameData;
+		glm::vec3 _pos = {};
+		float _scale = 1.0;
 	public:
 		bool Load(const std::string& path, const std::string& filename);
 		void Unload();
@@ -18354,7 +18356,7 @@ namespace vkr {
 
 		void BeginFrame();
 		void BuildUI();
-		void LoadScene(const char* fn);
+		void LoadScene(const char* fn, const glm::vec3& pos, float scale);
 
 		void OnUpdate();
 
@@ -18627,7 +18629,7 @@ namespace vkr {
 	// LoadScene
 	// TODO 拆分灯光
 	//--------------------------------------------------------------------------------------
-	void sample_cx::LoadScene(const char* fn)
+	void sample_cx::LoadScene(const char* fn, const glm::vec3& pos, float scale)
 	{
 		njson scene;// = m_jsonConfigFile["scenes"][sceneIndex];
 		// release everything and load the GLTF, just the light json data, the rest (textures and geometry) will be done in the main loop
@@ -18643,6 +18645,8 @@ namespace vkr {
 
 		//delete(m_pGltfLoader);
 		auto pgc = new GLTFCommon();
+		pgc->_pos = pos;
+		pgc->_scale = scale;
 		_lts.push(pgc);
 		if (pgc->Load(fn, "") == false)
 		{
@@ -18826,12 +18830,7 @@ namespace vkr {
 		// Animation Update
 		if (m_bPlay)
 			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
-		// todo 变换
-		auto m = glm::mat4(1.0f);// glm::translate(glm::mat4(1.0f), glm::vec3(0, -0.1, 0));
-		static float scc = 1.0;
-		m = m * glm::scale(glm::mat4(1.0f), glm::vec3(scc));
-		//m = m * glm::rotate(glm::radians(10.0f), glm::vec3(1, 0, 0));
-		//m = m * glm::rotate(glm::radians(15.0f), glm::vec3(0, 1, 0));
+
 		static int nn[10] = {};
 		int i = 0;
 		static float speed = 1.0;
@@ -18839,8 +18838,8 @@ namespace vkr {
 		{
 			auto n = it->get_animation_count();
 			it->SetAnimationTime(nn[i++], m_time * speed);
+			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::mat4(1.0f), glm::vec3(it->_scale));
 			it->TransformScene(0, m);
-			//m = glm::mat4(1.0f);
 		}
 	}
 
@@ -19411,6 +19410,13 @@ void* vkdg_cx::new_pipe(const char* vertexShader, const char* pixelShader)
 	}
 	return p;
 }
+void vkdg_cx::load_gltf(const char* fn, const glm::vec3& pos, float scale)
+{
+	if (!ctx || !fn)return;
+	auto tx = (vkr::sample_cx*)ctx;
+	tx->LoadScene(fn, pos, scale);
+}
+
 vkr::light_t* vkdg_cx::get_light(size_t idx)
 {
 	vkr::light_t* p = 0;
@@ -19498,11 +19504,13 @@ void free_vkdg(vkdg_cx* p)
 	}
 }
 
-void load_gltf(vkdg_cx* p, const char* fn)
+void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
 {
 	if (!p || !fn)return;
-	auto tx = (vkr::sample_cx*)p->ctx;
-	tx->LoadScene(fn);
+	glm::vec3 ps = {};
+	if (pos)
+		ps = { pos[0],pos[1],pos[2] };
+	p->load_gltf(fn, ps, scale);
 }
 
 #endif

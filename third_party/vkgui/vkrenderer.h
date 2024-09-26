@@ -78,7 +78,7 @@ namespace vkr {
 
 }
 
-struct dev_info_cx; 
+struct dev_info_cx;
 #ifndef image_vkr
 struct image_vkr
 {
@@ -133,9 +133,10 @@ public:
 	void resize(int w, int h);
 	void save_fbo(int idx);
 	void copy2(int idx, void* vkptr);
-	void* new_pipe(const char* vertexShader, const char* pixelShader);	
+	void* new_pipe(const char* vertexShader, const char* pixelShader);
 
 
+	void load_gltf(const char* fn, const glm::vec3& pos, float scale);
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();
 private:
@@ -171,7 +172,7 @@ private:
 // todo 创建渲染器
 vkdg_cx* new_vkdg(dev_info_cx* c = 0);
 void free_vkdg(vkdg_cx* p);
-void load_gltf(vkdg_cx* p, const char* fn);
+void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale);
 
 
 
