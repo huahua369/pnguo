@@ -2027,7 +2027,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		}
 		else
 		{
-			pointToLight = -light.direction;
+			pointToLight = light.direction;
 		}
 
 		// BSTF
