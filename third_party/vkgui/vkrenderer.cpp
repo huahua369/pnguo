@@ -18212,8 +18212,7 @@ namespace vkr {
 			submit_info.pSignalSemaphores = &_fbo.sem;	// 完成发信号
 			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
 			assert(res == VK_SUCCESS);
-			/*	vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-				vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);*/
+
 		}
 		{
 			// Wait for swapchain (we are going to render to it) -----------------------------------
@@ -18306,7 +18305,7 @@ namespace vkr {
 				submit_info2.commandBufferCount = 1;
 				submit_info2.pCommandBuffers = &cmdBuf2;
 				submit_info2.signalSemaphoreCount = 0;
-				submit_info2.pSignalSemaphores = 0;// todo 渲染完成信号&RenderFinishedSemaphores;
+				submit_info2.pSignalSemaphores = 0;// todo 渲染完成信号，这里直接WaitForFence
 
 				{
 					//print_time a("qsubmit");
