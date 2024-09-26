@@ -79,64 +79,14 @@ layout (location = HAS_NORMALS_RT) out vec4 Output_normal;
 // Constant Buffers 
 //
 //--------------------------------------------------------------------------------------
-
-
-#ifdef pbr_glsl
-#include "pbrpx.h"
-vec4 pbr_n(){
-
-	vsio_ps ipt;
-#ifdef ID_COLOR_0
-	ipt.v_Color0 = Input.Color0;
-#else
-	ipt.v_Color0 = vec4(0);
-#endif
-#ifdef ID_TEXCOORD_0
-	ipt.v_texcoord[0] = Input.UV0;
-#else
-	ipt.v_texcoord[0] = vec2(0.0, 0.0);
-#endif 
-#ifdef ID_TEXCOORD_1
-	ipt.v_texcoord[1] = Input.UV1;
-#else
-	ipt.v_texcoord[1] = vec2(0.0, 0.0);
-#endif 
-	ipt.v_Position = Input.WorldPos;	
-	ipt.u_ModelMatrix = myPerObject_u_mCurrWorld;
-	ipt.u_ViewMatrix = myPerFrame.u_mCameraCurrViewProj;
-	return pbr_main(ipt);
-}
-#else
-//--------------------------------------------------------------------------------------
-// Per Frame structure, must match the one in GlTFCommon.h
-//--------------------------------------------------------------------------------------
-
-#include "pbrpx1.h"
-
-//--------------------------------------------------------------------------------------
-// PerFrame structure, must match the one in GltfPbrPass.h
-//--------------------------------------------------------------------------------------
  
-//#include "PBRTextures.h" 
-
-
-
-//#include "functions.h"
-//#include "shadowFiltering.h"
-//#include "bsdf_functions.h"
-//#include "PixelParams.h"
-//#include "GLTFPBRLighting.h"
-#endif
-
+#include "pbr_px.h"
+ 
 //--------------------------------------------------------------------------------------
 // mainPS
 //--------------------------------------------------------------------------------------
 void main()
-{
-
-#ifdef pbr_glsl 
-	vec4 color = pbr_n();
-#else
+{  
 	discardPixelIfAlphaCutOff(Input);
 	gpuMaterial m = defaultPbrMaterial();
 #ifdef ID_TEXCOORD_0
@@ -159,9 +109,7 @@ void main()
 //	vec3 specularColor;
 //	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness); 
 //	vec4 color1 = vec4(doPbrLighting_old(Input, myPerFrame, uv, diffuseColor, specularColor, perceptualRoughness ,baseColor) , baseColor.a);
-//	color = color1;
-#endif 
-
+//	color = color1; 
 
 #ifdef HAS_MOTION_VECTORS_RT
 	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w - Input.PrevPosition.xy / Input.PrevPosition.w;
