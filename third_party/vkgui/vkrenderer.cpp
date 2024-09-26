@@ -18526,7 +18526,7 @@ namespace vkr {
 			transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
 			light_t l = {};
 			l._type = light_t::LIGHT_SPOTLIGHT;
-			l._intensity = 10.0;
+			l._intensity = 80.0;
 			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 			l._range = 52;
 			l._outerConeAngle = AMD_PI_OVER_4;
