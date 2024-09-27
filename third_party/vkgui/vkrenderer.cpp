@@ -2642,8 +2642,8 @@ namespace vkr {
 	};
 	class GLTFTexturesAndBuffers
 	{
-		Device* m_pDevice;
-		UploadHeap* m_pUploadHeap;
+		Device* m_pDevice = 0;
+		UploadHeap* m_pUploadHeap = 0;
 
 		//const njson* m_pTextureNodes;
 
@@ -5122,7 +5122,8 @@ namespace vkr
 						}
 						//m_pUploadHeap->FlushAndFinish();
 						m_textures[imageIndex].CreateSRV(&m_textureViews[imageIndex]);
-					});
+					}
+				);
 			}
 
 			if (pAsyncPool)
@@ -18376,6 +18377,7 @@ namespace vkr {
 		GLTFCommon* _tmpgc = 0;
 		std::vector<GLTFCommon*>    _loaders;
 		std::queue<GLTFCommon*> _lts;
+		std::mutex m_ltsm;
 		bool                        m_loadingScene = false;
 
 		Renderer_cx* m_pRenderer = NULL;
@@ -18626,89 +18628,28 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	//
 	// LoadScene
-	// TODO 拆分灯光
+	// TODO 加载模型文件
 	//--------------------------------------------------------------------------------------
 	void sample_cx::LoadScene(const char* fn, const glm::vec3& pos, float scale)
 	{
-		njson scene;// = m_jsonConfigFile["scenes"][sceneIndex];
-		// release everything and load the GLTF, just the light json data, the rest (textures and geometry) will be done in the main loop
-		//if (m_pGltfLoader != NULL)
-		{
-			//m_pRenderer->UnloadScene();
-			//m_pRenderer->OnDestroyWindowSizeDependentResources();
-			//m_pRenderer->OnDestroy();
-			//m_pGltfLoader->Unload();
-			//m_pRenderer->OnCreate(m_device, &m_swapChain, m_fontSize);
-			//m_pRenderer->OnCreateWindowSizeDependentResources(&m_swapChain, m_Width, m_Height);
-		}
-
-		//delete(m_pGltfLoader);
-		auto pgc = new GLTFCommon();
-		pgc->_pos = pos;
-		pgc->_scale = scale;
-		_lts.push(pgc);
-		if (pgc->Load(fn, "") == false)
-		{
-			MessageBox(NULL, "The selected model couldn't be found, please check the documentation", "Cauldron Panic!", MB_ICONERROR);
-			return;
-		}
-
-
-		// Load the UI settings, and also some defaults cameras and lights, in case the GLTF has none
-		{
-			//#define LOAD(j, key, val) val = j.value(key, val)
-
-			// global settings
-			//LOAD(scene, "TAA", m_UIState.bUseTAA);
-			//LOAD(scene, "toneMapper", m_UIState.SelectedTonemapperIndex);
-			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
-			//LOAD(scene, "exposure", m_UIState.Exposure);
-			//LOAD(scene, "iblFactor", m_UIState.IBLFactor);
-			//LOAD(scene, "emmisiveFactor", m_UIState.EmissiveFactor);
-			//LOAD(scene, "skyDomeType", m_UIState.SelectedSkydomeTypeIndex);
-
-#if 0
-		// todo 添加默认灯光Add a default light in case there are none
+		print_time Pt("LoadScene", 1);
+		std::thread a([=]()
 			{
-				glm::vec4 src = PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f;
-				src = { 0.1,20,0.1,0 };
-				Transform transform = {};
-				transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
-				light_t l = {};
-				l._type = light_t::LIGHT_SPOTLIGHT;
-				l._intensity = 10.0;//scene.value("intensity", 1.0f);
-				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l._range = 52;
-				l._outerConeAngle = AMD_PI_OVER_4;
-				l._innerConeAngle = l._outerConeAngle * 0.9f;
-				l._shadowResolution = 1024;
-				//l.m_bias = 0.00005;
-				//pgc->AddLight(n, l);
-				m_pRenderer->AddLight(transform, l);
+				print_time Pt("load gltf", 1);
+				auto pgc = new GLTFCommon();
+				pgc->_pos = pos;
+				pgc->_scale = scale;
+				if (pgc->Load(fn, "") == false)
+				{
+					printf("The selected model couldn't be found, please check the documentation!\n");
+					delete pgc;
+					return;
+				}
+				std::unique_lock<std::mutex> lock(m_ltsm);
+				_lts.push(pgc);
 			}
-
-			// Allocate shadow information (if any)
-			m_pRenderer->AllocateShadowMaps();
-#endif
-			// set default camera
-			njson camera = scene["camera"];
-			m_activeCamera = 0;// scene.value("activeCamera", m_activeCamera);
-			//glm::vec4 from = GetVector(GetElementJsonArray(camera, "defaultFrom", { 0.0, 0.0, 10.0 }));
-			//glm::vec4 to = GetVector(GetElementJsonArray(camera, "defaultTo", { 0.0, 0.0, 0.0 }));
-			//m_camera.LookAt(from, to);
-
-			// set benchmarking state if enabled 
-			//if (m_bIsBenchmarking)
-			//{
-			//	std::string deviceName;
-			//	std::string driverVersion;
-			//	m_device.GetDeviceInfo(&deviceName, &driverVersion);
-			//	BenchmarkConfig(scene["BenchmarkSettings"], m_activeCamera, m_pGltfLoader, deviceName, driverVersion);
-			//}
-
-			// indicate the mainloop we started loading a GLTF and it needs to load the rest (textures and geometry)
-			m_loadingScene = true;
-		}
+		);
+		a.detach();
 	}
 
 
@@ -18951,6 +18892,7 @@ namespace vkr {
 			// the scene loads in chuncks, that way we can show a progress bar
 			static int loadingStage = 0;
 			if (!_tmpgc) {
+				std::unique_lock<std::mutex> lock(m_ltsm);
 				_tmpgc = _lts.front(); _lts.pop();
 			}
 			loadingStage = m_pRenderer->LoadScene(_tmpgc, loadingStage);
@@ -18959,9 +18901,11 @@ namespace vkr {
 				_loaders.push_back(_tmpgc);
 				_tmpgc = 0;
 				//m_time = 0;
-				m_loadingScene = false;
-				if (_lts.empty())
-					m_pRenderer->freeVidMBP();
+				//if (_lts.empty())
+				//{
+				//	m_loadingScene = false;
+				//	m_pRenderer->freeVidMBP();
+				//}
 			}
 		}
 		//else if (m_pGltfLoader && m_bIsBenchmarking)
