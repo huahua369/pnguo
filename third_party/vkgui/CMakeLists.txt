@@ -29,9 +29,7 @@ set(Shaders_PostProc_src
 set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-frag.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-vert.glsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTF_VS2PS_IO.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/bsdf_functions.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPBRLighting.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTF_VS2PS_IO.h 
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFDepthPass-frag.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFDepthPass-vert.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFMotionVectorsPass-frag.glsl
@@ -40,14 +38,11 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDome.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.hlsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/functions.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PBRTextures.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shadowFiltering.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PixelParams.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pbr_px.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/perFrameStruct.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PBRTextures.h 
 )
 set(Images_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/brdfLut.dds 

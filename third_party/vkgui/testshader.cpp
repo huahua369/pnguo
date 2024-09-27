@@ -163,6 +163,7 @@ namespace pbr
 
 #if 1
 #define USE_dIBL
+#define S_VERT
 #include "shaders/pbr_px.h"
 
 

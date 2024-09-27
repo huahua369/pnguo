@@ -30,9 +30,9 @@ precision highp float;
 
 #include "GLTF_VS2PS_IO.h"
 layout (location = 0) in VS2PS Input;
-
+#define S_VERT
 #include "perFrameStruct.h"
-
+ 
 PerFrame myPerFrame;
  
 //--------------------------------------------------------------------------------------
@@ -40,9 +40,9 @@ PerFrame myPerFrame;
 //--------------------------------------------------------------------------------------
 
 #include "PBRTextures.h" 
-#include "functions.h"
-#include "bsdf_functions.h"
-#include "PixelParams.h"
+//#include "functions.h"
+//#include "bsdf_functions.h"
+//#include "PixelParams.h"
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader

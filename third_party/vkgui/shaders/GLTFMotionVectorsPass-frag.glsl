@@ -38,11 +38,11 @@ layout (location = 0) in VS2PS Input;
  
 #include "perFrameStruct.h"
  
-
+//
 #include "PBRTextures.h" 
-#include "functions.h"
-#include "bsdf_functions.h"
-#include "PixelParams.h"
+//#include "functions.h"
+//#include "bsdf_functions.h"
+//#include "PixelParams.h"
 
 #ifdef HAS_MOTION_VECTORS
     layout (location = HAS_MOTION_VECTORS) out vec2 motionVect;

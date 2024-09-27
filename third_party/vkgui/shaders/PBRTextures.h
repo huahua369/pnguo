@@ -288,3 +288,119 @@ vec4 getSpecularGlossinessTexture(VS2PS Input, vec2 uv)
   
  
 
+
+vec4 getPixelColor(VS2PS Input)
+{
+	vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+
+#ifdef ID_COLOR_0
+	color.xyz = Input.Color0;
+#endif
+
+	return color;
+}
+
+// Find the normal for this fragment, pulling either from a predefined normal map
+// or from the interpolated mesh normal and tangent attributes.
+vec3 getPixelNormal(VS2PS Input, vec2 UV)
+{
+	// Retrieve the tangent space matrix
+#ifndef ID_TANGENT
+	vec3 pos_dx = dFdx(Input.WorldPos);
+	vec3 pos_dy = dFdy(Input.WorldPos);
+	vec3 tex_dx = dFdx(vec3(UV, 0.0));
+	vec3 tex_dy = dFdy(vec3(UV, 0.0));
+	vec3 t = (tex_dy.y * pos_dx - tex_dx.y * pos_dy) / (tex_dx.x * tex_dy.y - tex_dy.x * tex_dx.y);
+
+#ifdef ID_NORMAL
+	vec3 ng = normalize(Input.Normal);
+#else
+	vec3 ng = cross(pos_dx, pos_dy);
+#endif
+
+	t = normalize(t - ng * dot(ng, t));
+	vec3 b = normalize(cross(ng, t));
+	mat3 tbn = mat3(t, b, ng);
+#else // HAS_TANGENTS
+	mat3 tbn = mat3(Input.Tangent, Input.Binormal, Input.Normal);
+#endif
+
+#ifdef ID_normalTexture
+	vec2 xy = 2.0 * texture(u_NormalSampler, UV, myPerFrame.u_LodBias).rg - 1.0;
+	float z = sqrt(1.0 - dot(xy, xy));
+	vec3 n = vec3(xy, z);
+	n = normalize(tbn * (n /* * vec3(u_NormalScale, u_NormalScale, 1.0) */));
+#else
+	// The tbn matrix is linearly interpolated, so we need to re-normalize
+	vec3 n = tbn[2];
+	n = normalize(n);
+#endif
+
+	return n;
+}
+vec3 getPixelNormal(VS2PS Input)
+{
+	vec2 UV = getNormalUV(Input);
+	return getPixelNormal(Input, UV);
+}
+void get_tangent(VS2PS Input, vec2 uv, out vec3 tangent, out vec3 binormal)
+{
+#ifndef ID_TANGENT
+	vec3 pos_dx = dFdx(Input.WorldPos);
+	vec3 pos_dy = dFdy(Input.WorldPos);
+	vec3 tex_dx = dFdx(vec3(uv, 0.0));
+	vec3 tex_dy = dFdy(vec3(uv, 0.0));
+	vec3 t = (tex_dy.y * pos_dx - tex_dx.y * pos_dy) / (tex_dx.x * tex_dy.y - tex_dy.x * tex_dx.y);
+
+#ifdef ID_NORMAL
+	vec3 ng = normalize(Input.Normal);
+#else
+	vec3 ng = cross(pos_dx, pos_dy);
+#endif
+
+	t = normalize(t - ng * dot(ng, t));
+	vec3 b = normalize(cross(ng, t));
+	//mat3 tbn = mat3(t, b, ng);
+	tangent = t; binormal = b;
+#else  
+	tangent = Input.Tangent;
+	binormal = Input.Binormal;
+#endif
+}
+ 
+
+
+vec4 getBaseColor(VS2PS Input, vec2 uv)
+{
+	vec4 baseColor = vec4(0.0, 0.0, 0.0, 1.0);
+#ifdef MATERIAL_SPECULARGLOSSINESS
+	baseColor = getDiffuseTexture(Input, uv);
+#endif
+
+#ifdef MATERIAL_METALLICROUGHNESS
+	// The albedo may be defined from a base texture or a flat color
+	baseColor = getBaseColorTexture(Input, uv);
+#endif
+	return baseColor;
+}
+ 
+
+void discardPixelIfAlphaCutOff(VS2PS Input)
+{
+#ifdef ID_TEXCOORD_0
+	vec2 uv = Input.UV0;
+#else
+	vec2 uv = vec2(0.0, 0.0);
+#endif
+	vec4 baseColor = getBaseColor(Input, uv);
+
+#if defined(DEF_alphaMode_BLEND)
+	if (baseColor.a == 0)
+		discard;
+#elif defined(DEF_alphaMode_MASK) && defined(DEF_alphaCutoff)
+	if (baseColor.a < DEF_alphaCutoff)
+		discard;
+#else
+	//OPAQUE
+#endif
+}

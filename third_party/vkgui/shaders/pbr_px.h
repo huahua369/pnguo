@@ -210,27 +210,24 @@ struct NormalInfo {
 	vec3 n;    // Shading normal
 	vec3 ntex; // Normal from texture, scaling is accounted for.
 };
-
+ 
 #ifdef __cplusplus
-
 PerFrame myPerFrame;
 mat4 myPerObject_u_mCurrWorld;
-pbrMaterial u_pbrParams;
+pbrMaterial u_pbrParams; 
 #else
-
-layout(scalar, set = 0, binding = 0) uniform perFrame
+layout(set = 0, binding = 0) uniform perFrame
 {
 	PerFrame myPerFrame;
 };
 
-layout(scalar, set = 0, binding = 1) uniform perObject
+layout(set = 0, binding = 1) uniform perObject
 {
 	mat4 myPerObject_u_mCurrWorld;
 	mat4 myPerObject_u_mPrevWorld;
 
 	pbrMaterial u_pbrParams;
 };
-
 #endif // __cplusplus
 
 
@@ -1340,7 +1337,7 @@ LightContrib applySpotLight(Light light, gpuMaterial materialInfo, vec3 normal, 
 	return contrib;
 }
 
-#if 1 
+#if 1
 //vec3 getDiffuseLight(vec3 n)
 //{
 //#ifndef __cplusplus  
