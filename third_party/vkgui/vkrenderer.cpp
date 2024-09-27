@@ -644,9 +644,8 @@ namespace vkr
 		}
 		if (!m_device)return;
 
-		auto cbr = vkGetInstanceProcAddr(m_instance, "vkCmdBeginRenderingKHR");
-		auto cer = vkGetInstanceProcAddr(m_instance, "vkCmdEndRenderingKHR");
-		auto cer1 = vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
+		auto cbr = vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
+		auto cer = vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR"); 
 
 #ifdef USE_VMA
 		VmaAllocatorCreateInfo allocatorInfo = {};
