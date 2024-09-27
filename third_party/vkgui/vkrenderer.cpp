@@ -18362,23 +18362,22 @@ namespace vkr {
 
 		void HandleInput();
 		void UpdateCamera(Camera& cam);
-
+		void set_fboidx(int idx);
 	public:
 		Device* m_device = 0;
 		int m_Width = 1280;  // application window dimensions
 		int m_Height = 800;  // application window dimensions
 		int shadowResolution = 1024;
+		int curridx = 0;
+		int setidx = 0;
+		fbo_info_cx* _fbo = 0;
 		// Simulation management
 		double  m_lastFrameTime = 0.0;
 		double  m_deltaTime = 0.0;
-
-		bool                        m_bIsBenchmarking = false;
-		fbo_info_cx* _fbo = 0;
 		GLTFCommon* _tmpgc = 0;
 		std::vector<GLTFCommon*>    _loaders;
 		std::queue<GLTFCommon*> _lts;
 		std::mutex m_ltsm;
-		bool                        m_loadingScene = false;
 
 		Renderer_cx* m_pRenderer = NULL;
 		VkRenderPass _rp = 0;
@@ -18398,6 +18397,7 @@ namespace vkr {
 		std::vector<std::string>    _tlabs;
 		bool                        m_bPlay = 0;
 		bool bShowProfilerWindow = true;
+		bool                        m_bIsBenchmarking = false;
 	};
 #if 1
 	sample_cx::sample_cx()
@@ -18604,6 +18604,7 @@ namespace vkr {
 		{
 			_fbo->reset_fbo(m_Width, m_Height);
 			m_pRenderer->set_fbo(_fbo, 0);
+			setidx = curridx = 0;
 			m_pRenderer->OnDestroyWindowSizeDependentResources();
 			m_pRenderer->OnCreateWindowSizeDependentResources(m_Width, m_Height);
 		}
@@ -18867,6 +18868,11 @@ namespace vkr {
 		}
 	}
 
+	void sample_cx::set_fboidx(int idx)
+	{
+		setidx = idx;
+	}
+
 	void sample_cx::BeginFrame()
 	{
 		// Get timings
@@ -18923,11 +18929,15 @@ namespace vkr {
 
 		// Do Render frame using AFR
 		m_pRenderer->OnRender(&m_UIState, m_camera);
-
+		if (setidx != curridx) {
+			curridx = setidx;
+			m_pRenderer->set_fbo(_fbo, curridx);
+		}
 		// Framework will handle Present and some other end of frame logic
 		//EndFrame();
 	}
 #endif
+
 	bool has_fh(const char* v, char c) {
 		bool r = false;
 		for (; v && *v; v++)
