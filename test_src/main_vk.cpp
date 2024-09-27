@@ -90,9 +90,8 @@ int main()
 			//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
 			//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
 		}
-
-		vkd->resize(1024, 800);						// 设置fbo缓冲区大小
-		auto vr = vkd->get_vkimage(0);// 添加纹理到窗口显示
+		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
+		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,20 }, 1);// 创建SDL的bgra纹理 
 		vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.1;
