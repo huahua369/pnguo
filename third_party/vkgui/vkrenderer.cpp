@@ -18349,13 +18349,11 @@ namespace vkr {
 		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
 		void OnCreate();
 		void OnDestroy();
-		void OnRender();
-		bool OnEvent(MSG msg);
+		void OnRender(); 
 		void OnResize(bool resizeRender);
 		void OnUpdateDisplay();
 
-		void BeginFrame();
-		void BuildUI();
+		void BeginFrame(); 
 		void LoadScene(const char* fn, const glm::vec3& pos, float scale);
 
 		void OnUpdate();
@@ -18375,29 +18373,29 @@ namespace vkr {
 		double  m_lastFrameTime = 0.0;
 		double  m_deltaTime = 0.0;
 		GLTFCommon* _tmpgc = 0;
-		std::vector<GLTFCommon*>    _loaders;
+		std::vector<GLTFCommon*> _loaders;
 		std::queue<GLTFCommon*> _lts;
 		std::mutex m_ltsm;
 
 		Renderer_cx* m_pRenderer = NULL;
 		VkRenderPass _rp = 0;
 		DisplayMode _dm = DISPLAYMODE_SDR;
-		scene_state                     m_UIState;
-		Camera                      m_camera;
+		scene_state m_UIState;
+		Camera m_camera;
 		mouse_state_t io = {};
-		float                       m_time = 0; // Time accumulator in seconds, used for animation.
+		float m_time = 0; // Time accumulator in seconds, used for animation.
 
 		SystemInfo systemi = {};
 		// njson config file
-		njson                        m_jsonConfigFile;
+		njson m_jsonConfigFile;
 		std::vector<std::string>    m_sceneNames;
-		int                         m_activeScene = 0;
-		int                         m_activeCamera = 0;
+		int	m_activeScene = 0;
+		int	m_activeCamera = 0;
 		std::function<void(int count, int idx, const char* str)> cb_showtxt;
 		std::vector<std::string>    _tlabs;
-		bool                        m_bPlay = 0;
+		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
-		bool                        m_bIsBenchmarking = false;
+		bool m_bIsBenchmarking = false;
 	};
 #if 1
 	sample_cx::sample_cx()
@@ -18566,32 +18564,7 @@ namespace vkr {
 		_loaders.clear();
 	}
 
-	//--------------------------------------------------------------------------------------
-	//
-	// OnEvent, win32 sends us events and we forward them to ImGUI
-	//
-	//--------------------------------------------------------------------------------------
-	bool sample_cx::OnEvent(MSG msg)
-	{
-		//if (ImGUI_WndProcHandler(msg.hwnd, msg.message, msg.wParam, msg.lParam))
-		//	return true;
-
-		// handle function keys (F1, F2...) here, rest of the input is handled
-		// by imGUI later in HandleInput() function
-		const WPARAM& KeyPressed = msg.wParam;
-		switch (msg.message)
-		{
-		case WM_KEYUP:
-		case WM_SYSKEYUP:
-			/* WINDOW TOGGLES */
-			//if (KeyPressed == VK_F1) m_UIState.bShowControlsWindow ^= 1;
-			//if (KeyPressed == VK_F2) m_UIState.bShowProfilerWindow ^= 1;
-			break;
-		}
-
-		return true;
-	}
-
+ 
 	//--------------------------------------------------------------------------------------
 	//
 	// OnResize
