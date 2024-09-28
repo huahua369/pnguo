@@ -645,7 +645,7 @@ namespace vkr
 		if (!m_device)return;
 
 		auto cbr = vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
-		auto cer = vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR"); 
+		auto cer = vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
 
 #ifdef USE_VMA
 		VmaAllocatorCreateInfo allocatorInfo = {};
@@ -17722,7 +17722,147 @@ namespace vkr {
 
 		return &_perFrameData;
 	}
+	void insertImageMemoryBarrier(
+		VkCommandBuffer cmdbuffer,
+		VkImage image,
+		VkAccessFlags srcAccessMask,
+		VkAccessFlags dstAccessMask,
+		VkImageLayout oldImageLayout,
+		VkImageLayout newImageLayout,
+		VkPipelineStageFlags srcStageMask,
+		VkPipelineStageFlags dstStageMask,
+		VkImageSubresourceRange subresourceRange)
+	{
+		VkImageMemoryBarrier imageMemoryBarrier = {};
+		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.srcAccessMask = srcAccessMask;
+		imageMemoryBarrier.dstAccessMask = dstAccessMask;
+		imageMemoryBarrier.oldLayout = oldImageLayout;
+		imageMemoryBarrier.newLayout = newImageLayout;
+		imageMemoryBarrier.image = image;
+		imageMemoryBarrier.subresourceRange = subresourceRange;
 
+		vkCmdPipelineBarrier(
+			cmdbuffer,
+			srcStageMask,
+			dstStageMask,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &imageMemoryBarrier);
+	}
+	struct dynamicrendering_t 
+	{
+		uint32_t width, height;	// 可选
+		VkImageView sc_view;	// 	
+		VkImageView ds_view;
+		VkImage sc_image;
+		VkImage depthStencil_image;
+		VkCommandBuffer _cmd1;
+		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
+		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
+	public:
+		void dr_begin(VkCommandBuffer cmd1);
+		void dr_end();
+	};
+	void dynamicrendering_t::dr_begin(VkCommandBuffer cmd1)
+	{
+		if (!_vkCmdBeginRenderingKHR)return;
+		_cmd1 = cmd1;
+		// With dynamic rendering there are no subpass dependencies, so we need to take care of proper layout transitions by using barriers
+		// This set of barriers prepares the color and depth images for output
+		insertImageMemoryBarrier(
+			cmd1,
+			sc_image,
+			0,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+		insertImageMemoryBarrier(
+			cmd1,
+			depthStencil_image,
+			0,
+			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 });
+
+		// New structures are used to define the attachments used in dynamic rendering
+		VkRenderingAttachmentInfoKHR colorAttachment{};
+		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+		colorAttachment.imageView = sc_view;
+		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachment.clearValue.color = { 0.0f,0.0f,0.0f,0.0f };
+
+		// A single depth stencil attachment info can be used, but they can also be specified separately.
+		// When both are specified separately, the only requirement is that the image view is identical.			
+		VkRenderingAttachmentInfoKHR depthStencilAttachment{};
+		depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+		depthStencilAttachment.imageView = ds_view;// depthStencil.view;
+		depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		depthStencilAttachment.clearValue.depthStencil = { 1.0f,  0 };
+
+		VkRenderingInfoKHR renderingInfo{};
+		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+		renderingInfo.renderArea = { 0, 0, width,height };
+		renderingInfo.layerCount = 1;
+		renderingInfo.colorAttachmentCount = 1;
+		renderingInfo.pColorAttachments = &colorAttachment;
+		renderingInfo.pDepthAttachment = &depthStencilAttachment;
+		renderingInfo.pStencilAttachment = &depthStencilAttachment;
+
+		// Begin dynamic rendering
+		_vkCmdBeginRenderingKHR(cmd1, &renderingInfo);
+
+		if (width > 0 && height > 0) {
+			VkViewport viewport = {}; viewport.width = (float)width; viewport.height = (float)height; viewport.minDepth = 0.0f; viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(cmd1, 0, 1, &viewport);
+
+			VkRect2D scissor = {};
+			scissor.extent.width = width;
+			scissor.extent.height = height;
+			scissor.offset.x = 0;
+			scissor.offset.y = 0;
+			//vks::initializers::rect2D(width, height, 0, 0);
+			vkCmdSetScissor(cmd1, 0, 1, &scissor);
+		}
+
+		//vkCmdBindDescriptorSets(cmd1, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		//vkCmdBindPipeline(cmd1, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		//model.draw(cmd1, vkglTF::RenderFlags::BindImages, pipelineLayout);
+
+		//drawUI(cmd1);
+
+	}
+	void dynamicrendering_t::dr_end() {
+		if (!_vkCmdEndRenderingKHR)return;
+		// End dynamic rendering
+		_vkCmdEndRenderingKHR(_cmd1);
+
+		// This set of barriers prepares the color image for presentation, we don't need to care for the depth image
+		insertImageMemoryBarrier(
+			_cmd1,
+			sc_image,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			0,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// todo OnRender
@@ -18348,11 +18488,11 @@ namespace vkr {
 		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
 		void OnCreate();
 		void OnDestroy();
-		void OnRender(); 
+		void OnRender();
 		void OnResize(bool resizeRender);
 		void OnUpdateDisplay();
 
-		void BeginFrame(); 
+		void BeginFrame();
 		void LoadScene(const char* fn, const glm::vec3& pos, float scale);
 
 		void OnUpdate();
@@ -18563,7 +18703,7 @@ namespace vkr {
 		_loaders.clear();
 	}
 
- 
+
 	//--------------------------------------------------------------------------------------
 	//
 	// OnResize
