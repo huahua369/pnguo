@@ -64,6 +64,8 @@ MORPH_TARGET_COLOR_1_OFFSET		颜色变形
 #endif
 
 #ifndef NOT_VULKAN
+#include <vkh.h>
+
 #ifdef USE_VMA
 //#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -7696,6 +7698,7 @@ namespace vkr
 		uint32_t offset = uint32_t(pixels - uploadHeap->BasePtr());
 		upload_data(pDevice, uploadHeap, header, offset, 0, m_pResource);
 		return true;
+#if 0
 		// Upload Image
 		{
 			VkImageMemoryBarrier copy_barrier = {};
@@ -7759,6 +7762,7 @@ namespace vkr
 		}
 
 		return true;
+#endif
 	}
 
 	VkFormat TranslateDxgiFormatIntoVulkans(DXGI_FORMAT format)
@@ -18070,7 +18074,27 @@ namespace vkr {
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
+			{
+#if 0
+				vkh_image_set_layout(cmdBuf1, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				vkh_image_set_layout(cmdBuf1, savStencil, ctx->dev->stencilAspectFlag,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
+				VkImageCopy cregion = { .srcSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
+										.dstSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
+										.extent = {ctx->pSurf->width,ctx->pSurf->height,1} };
+				vkCmdCopyImage(cmdBuf1,
+					m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					1, &cregion);
+				vkh_image_set_layout(cmdBuf1, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+#endif
+			}
 
 
 			// draw object's bounding boxes
