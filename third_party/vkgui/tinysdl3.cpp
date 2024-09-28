@@ -238,7 +238,10 @@ void sem_s::post()
 
 int sem_s::wait(int ms)
 {
-	return (ms > 0) ? SDL_WaitSemaphoreTimeout(sem, ms) : SDL_WaitSemaphore(sem);
+	if ((ms > 0))
+		return SDL_WaitSemaphoreTimeout(sem, ms) ? 0 : -1;
+	SDL_WaitSemaphore(sem);
+	return 0;
 }
 int sem_s::wait_try()
 {
@@ -249,7 +252,7 @@ int sem_s::wait_try()
 
 #ifdef _WIN32
 
-SDL_bool wMessageHook(void* userdata, MSG* msg) {
+bool wMessageHook(void* userdata, MSG* msg) {
 	auto app = (app_cx*)userdata;
 	if (app && msg)
 	{
@@ -316,8 +319,8 @@ app_cx::app_cx()
 		}
 	}
 #endif // _WIN32
-	system_cursor = (SDL_Cursor**) new size_t[SDL_SystemCursor::SDL_NUM_SYSTEM_CURSORS];
-	memset(system_cursor, 0, sizeof(void*) * SDL_SystemCursor::SDL_NUM_SYSTEM_CURSORS);
+	system_cursor = (SDL_Cursor**) new size_t[SDL_SystemCursor::SDL_SYSTEM_CURSOR_COUNT];
+	memset(system_cursor, 0, sizeof(void*) * SDL_SystemCursor::SDL_SYSTEM_CURSOR_COUNT);
 	set_fps(_fps);
 #if _WIN32
 	auto hr = OleInitialize(NULL);
@@ -338,7 +341,7 @@ app_cx::~app_cx()
 {
 	if (system_cursor)
 	{
-		for (size_t i = 0; i < SDL_SystemCursor::SDL_NUM_SYSTEM_CURSORS; i++)
+		for (size_t i = 0; i < SDL_SystemCursor::SDL_SYSTEM_CURSOR_COUNT; i++)
 		{
 			if (system_cursor[i]) {
 				SDL_DestroyCursor(system_cursor[i]);
@@ -497,7 +500,7 @@ void app_cx::set_fps(int n) {
 void app_cx::set_syscursor(int type)
 {
 	if (type < 0)type = 0;
-	if (type < SDL_NUM_SYSTEM_CURSORS)
+	if (type < SDL_SYSTEM_CURSOR_COUNT)
 	{
 		auto& psc = system_cursor[type];
 		if (!psc)
@@ -1226,7 +1229,7 @@ void et2key(const SDL_Event* e, keyboard_et* ekm)
 	ekm->keycode = SDL_GetKeyFromScancode(e->key.scancode, e->key.mod, 1);
 	ekm->scancode = key;      /**< SDL physical key code - see ::SDL_Scancode for details */
 	ekm->mod = e->key.mod;                 /**< current key modifiers */
-	ekm->state = e->key.state;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
+	ekm->state = e->key.down;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
 	ekm->repeat = e->key.repeat;       /**< Non-zero if this is a key repeat */
 	static int64_t ts = 0, ts1 = 0;
 
@@ -1361,7 +1364,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		mouse_button_et t = {};
 		t.which = e->button.which;
 		t.button = e->button.button;
-		t.state = e->button.state; //SDL_PRESSED; SDL_RELEASED;
+		t.state = e->button.down; //SDL_PRESSED; SDL_RELEASED;
 		t.clicks = e->button.clicks;
 		t.x = e->button.x;
 		t.y = e->button.y;
@@ -2387,7 +2390,7 @@ uint64_t call_data(int type, void* data)
 	switch (e)
 	{
 	case cdtype_e::cpu_count:
-		ret = SDL_GetCPUCount();
+		ret = SDL_GetNumLogicalCPUCores();// SDL_GetCPUCount();
 		break;
 	case cdtype_e::new_app:
 	{

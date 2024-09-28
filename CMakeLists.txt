@@ -177,7 +177,7 @@ add_dependencies(tcmp vkgui)
 # TODO: 如有需要，请添加测试并安装目标。
 
 list(APPEND snake_src     
-"third_lib/SDL/examples/game/01-snake/main.c" 
+#"third_lib/SDL/examples/game/01-snake/main.c" 
 "third_lib/SDL/examples/game/01-snake/snake.c" 
 )
 add_executable (snake ${snake_src}  ) 
