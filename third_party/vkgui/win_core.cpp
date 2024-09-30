@@ -18,13 +18,15 @@
 #include <string> 
 #include <thread>
 
-#include <win_core_dragdrop.h> 
+#include <win_core.h> 
 #include <mapView.h>
 
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.UI.Xaml.Media.Imaging.h>
 
+
+#include <stb_image_write.h>
 
 namespace hz {
 
@@ -891,7 +893,7 @@ namespace hz {
 				Receive_driver();
 
 			}});
-		t.swap(td);
+			t.swap(td);
 	}
 
 	void port_cx::endRead()
@@ -1674,7 +1676,7 @@ namespace hz {
 				sleep(100);
 			}
 			}).detach();
-			return 0;
+		return 0;
 	}
 	void ted()
 	{
@@ -3224,6 +3226,105 @@ namespace hz {
 	{
 		return do_dragdrop_begin(CF_UNICODETEXT, (char*)str.c_str(), str.size() * sizeof(wchar_t));
 	}
+
+
+
+
+	// 全屏截图
+	void get_fullscreen_image(std::vector<uint32_t>* dst, int* width, int* height, const std::string& fn, int quality)
+	{
+		// 窗口 桌面句柄
+		auto hwnd = GetDesktopWindow();
+		// 矩形_桌面
+		RECT grc = {};
+		GetWindowRect(hwnd, &grc);
+		auto gdc = GetDC(hwnd);
+		//位图 句柄
+		auto bitgb = CreateCompatibleBitmap(gdc, grc.right, grc.bottom);
+		auto ij_DC = CreateCompatibleDC(gdc); // 创建兼容的内存DC
+		SelectObject(ij_DC, bitgb);
+		BitBlt(ij_DC, 0, 0, grc.right, grc.bottom, gdc, 0, 0, SRCCOPY);
+		// 位 图
+		BITMAP  bm = { 0 };
+		GetObject(bitgb, sizeof(BITMAP), &bm);
+		// 文件头
+		BITMAPFILEHEADER bm_fnt = { 0 };
+		// 信息头
+		char bmit[256] = {};
+		BITMAPINFO* bmpInfo = (BITMAPINFO*)bmit;
+		int w = 0, h = 0;
+		if (!width)width = &w;
+		if (!height)height = &h;
+		*width = bm.bmWidth;
+		*height = bm.bmHeight;
+		DWORD ds = bm.bmWidth * bm.bmHeight; // 16位 = 8字节
+		std::vector<uint32_t> dst0;
+		if (!dst)dst = &dst0;
+		// 数据指针 
+		dst->resize(ds);
+		auto data = dst->data();
+		int ct = 1;
+		//填充文件 头
+		bm_fnt.bfType = 0x4D42; //'BM' 必须是 没有为什么
+		bm_fnt.bfSize = ds + 54;
+		bm_fnt.bfReserved1 = 0; //保留 没有为什么
+		bm_fnt.bfReserved2 = 0; //同上
+		bm_fnt.bfOffBits = 54;
+		//填充信息头
+		auto& bt = bmpInfo->bmiHeader;
+		bt.biSize = sizeof(BITMAPINFO) + 8; //本结构大小 40直接sizeof
+		bt.biHeight = -bm.bmHeight;
+		bt.biWidth = bm.bmWidth;
+		bt.biPlanes = 1; //必须是1 没有理由
+		bt.biBitCount = 32; //32真彩高清
+		bt.biCompression = BI_RGB;
+		bt.biSizeImage = ds; // = bm数据大小
+		bt.biXPelsPerMeter = 0;
+		bt.biYPelsPerMeter = 0;
+		bt.biClrUsed = 0;
+		bt.biClrImportant = 0;
+
+		bmpInfo->bmiHeader.biCompression = BI_BITFIELDS;
+		int iss = sizeof(bmpInfo);
+		LPRGBQUAD bmic = bmpInfo->bmiColors;
+		if (ct == 0)
+		{
+			//RGB
+			*(UINT*)(bmic + 2) = 0xFF0000;	// red分量
+			*(UINT*)(bmic + 1) = 0x00FF00;	// green分量
+			*(UINT*)(bmic + 0) = 0x0000FF;	// blue分量
+		}
+		else
+		{
+			//BGR
+			*(UINT*)(bmic + 0) = 0xFF0000;	// red分量
+			*(UINT*)(bmic + 1) = 0x00FF00;	// green分量
+			*(UINT*)(bmic + 2) = 0x0000FF;	// blue分量
+		}
+		GetDIBits(gdc, bitgb, 0, bm.bmHeight, data, (LPBITMAPINFO)bmpInfo, DIB_RGB_COLORS);
+		auto length = dst->size();
+		for (size_t i = 0; i < length; i++)
+		{
+			uint8_t* px = (uint8_t*)(&data[i]);
+			std::swap(px[0], px[2]);//bgr转rgb
+		}
+		if (fn.size() > 2)
+		{
+			if (fn.find("png") != std::string::npos)
+				stbi_write_png(fn.c_str(), w, h, 4, data, w * sizeof(int));
+			if (fn.find("jpg") != std::string::npos)
+				stbi_write_jpg(fn.c_str(), w, h, 4, data, quality);
+		}
+		DeleteObject(bitgb);
+		DeleteDC(ij_DC);
+		ReleaseDC(hwnd, gdc);
+	}
+
+
+
+
+
+
 }
 //!hz
 #endif // _WIN32

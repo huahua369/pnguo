@@ -16,7 +16,7 @@
 #pragma comment(lib, "dwmapi")
 #include <commctrl.h>
 #include <ole2.h>
-#include <win_core_dragdrop.h>
+#include <win_core.h>
 #endif  
 #include <pnguo.h>
 #include <tinysdl3.h>

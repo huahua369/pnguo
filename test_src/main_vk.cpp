@@ -56,8 +56,14 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 			}
 		});
 
-} 
+}
+#include <random>
+#include <vkgui/win_core.h>
+void test_img() {
 
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.jpg", 30);
+}
 int main()
 {
 #ifdef _DEBUG
@@ -66,7 +72,8 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
-	auto app = new_app(); 
+	test_img();
+	auto app = new_app();
 	//testnjson();
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口1";
