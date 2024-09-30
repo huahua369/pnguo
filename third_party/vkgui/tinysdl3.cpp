@@ -433,7 +433,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		else if (rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
-		} 
+		}
 		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str());
 	}
 	int vsync = 0;
@@ -1585,6 +1585,14 @@ void form_x::clear_wt()
 		}
 		tt.clear();
 	}
+}
+void* form_x::get_nptr()
+{
+	void* p = 0;
+#ifdef _WIN32
+	p = (HWND)pce::get_windowptr(_ptr);
+#endif
+	return p;
 }
 void form_x::update_w()
 {

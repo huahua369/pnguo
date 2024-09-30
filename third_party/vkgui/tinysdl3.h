@@ -258,6 +258,8 @@ public:
 	void remove_f(form_x* c);
 	// 清空控件
 	void clear_wt();
+	// 获取hwnd
+	void* get_nptr();
 public:
 	void update_w();
 	void update(float delta);

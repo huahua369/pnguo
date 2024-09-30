@@ -62,7 +62,9 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 void test_img() {
 
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.jpg", 30);
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr10.jpg", 10);
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr30.jpg", 30);
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 }
 int main()
 {
@@ -81,6 +83,7 @@ int main()
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
+	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);
 	if (vkd) {
 		{
 			vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
