@@ -18,6 +18,7 @@ add_executable (tcmp ${src_cmp} )
 list(APPEND src_vkcmp   
     "main_vk.cpp" 
     "ecc_sv.cpp"
+    "mshell.cpp"
     "../rc/resource1.rc"
 ) 
 
@@ -31,7 +32,8 @@ add_executable (vkcmp ${src_vkcmp} )
 
 #message("stb路径 ${Stb_INCLUDE_DIR}")
 find_package(OpenSSL REQUIRED)
- 
+
+find_package(Libssh2 CONFIG REQUIRED)
        
 find_package(libuv CONFIG REQUIRED)
  
@@ -62,7 +64,7 @@ target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DI
 target_link_libraries(tcmp PRIVATE ${lklib})
 
 target_include_directories(vkcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(vkcmp PRIVATE ${lklib})
+target_link_libraries(vkcmp PRIVATE ${lklib} $<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>)
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})

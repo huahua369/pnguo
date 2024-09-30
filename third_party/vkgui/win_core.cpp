@@ -146,7 +146,12 @@ namespace hz {
 		return str;
 	}
 
-
+	std::vector<std::string> get_print_devname()
+	{
+		std::vector<std::string> print_name;
+		enumPrinters(print_name);
+		return print_name;
+	}
 
 	class print_dc
 	{
@@ -163,9 +168,9 @@ namespace hz {
 		//尺寸，分辨率
 		std::vector<value_pt> _v;
 		std::vector<glm::ivec2> _ert;
-		glm::ivec2 size;
-		glm::ivec2 sizei;
-		glm::ivec4 hpt;
+		glm::ivec2 size = {};
+		glm::ivec2 sizei = {};
+		glm::ivec4 hpt = {};
 		PRINTER_INFO_2W* pPrinterData = 0;
 		std::vector<BYTE> pbuf;
 	public:
@@ -222,7 +227,7 @@ namespace hz {
 			winrt::hresult hr = ex.code(); // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND).
 			winrt::hstring message = ex.message(); // The system cannot find the file specified.
 			auto c = message.c_str();
-			printf("%s\n", c);
+			printf("%ws\n", c);
 		}
 		StartPage(hdcPrint);
 		//Escape(hdcPrint, STARTDOC, title.size(), (LPSTR)title.c_str(), NULL);		

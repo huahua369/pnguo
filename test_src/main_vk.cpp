@@ -65,6 +65,7 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr10.jpg", 10);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr30.jpg", 30);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 int main()
 {

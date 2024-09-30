@@ -140,6 +140,17 @@ namespace mapbox {
 #endif
 
 
+namespace gp {
+	uint64_t toUInt(const njson& v, uint64_t de = 0);
+	int64_t toInt(const njson& v, const char* k, int64_t de);
+	int64_t toInt(const njson& v, int64_t de = 0);
+	double toDouble(const njson& v, double de = 0);
+	std::string toStr(const njson& v, const char* k, const std::string& des = "");
+	std::string toStr(const njson& v, const std::string& des = "");
+	int64_t str2int(const char* str, int64_t de = 0);
+	njson str2ints(const std::string& s);
+}
+
 namespace pg
 {
 	std::string to_string(double _Val)
@@ -6668,7 +6679,7 @@ namespace gp {
 		opt.swap(bs);
 	}
 
-	static uint64_t toUInt(const njson& v, uint64_t de = 0)
+	uint64_t toUInt(const njson& v, uint64_t de)
 	{
 		uint64_t ret = de;
 		if (v.is_number())
@@ -6681,7 +6692,7 @@ namespace gp {
 		}
 		return ret;
 	}
-	static int64_t toInt(const njson& v, const char* k, int64_t de)
+	int64_t toInt(const njson& v, const char* k, int64_t de)
 	{
 		int64_t ret = de;
 		if (v.find(k) == v.end())
@@ -6698,7 +6709,7 @@ namespace gp {
 		}
 		return ret;
 	}
-	static int64_t toInt(const njson& v, int64_t de = 0)
+	int64_t toInt(const njson& v, int64_t de)
 	{
 		int64_t ret = de;
 		if (v.is_number())
@@ -6711,7 +6722,7 @@ namespace gp {
 		}
 		return ret;
 	}
-	static double toDouble(const njson& v, double de = 0)
+	double toDouble(const njson& v, double de)
 	{
 		double ret = de;
 		if (v.is_number())
@@ -6727,6 +6738,82 @@ namespace gp {
 #ifndef toFloat
 #define toFloat toDouble
 #endif
+
+
+	std::string toStr(const njson& v, const char* k, const std::string& des)
+	{
+		std::string ret = des;
+		if (v.find(k) == v.end())
+		{
+			return ret;
+		}
+		if (v[k].is_string())
+		{
+			ret = v[k].get<std::string>();
+		}
+		else
+		{
+			ret = md::trim(v[k].dump(), "\"");
+		}
+		return ret;
+	}
+	std::string toStr(const njson& v, const std::string& des)
+	{
+		std::string ret = des;
+		if (v.is_null())
+		{
+			//ret = "";
+		}
+		else if (v.is_string())
+		{
+			ret = v.get<std::string>();
+		}
+		else
+		{
+			ret = md::trim(v.dump(), "\"");
+		}
+		return ret;
+	}
+
+	int64_t str2int(const char* str, int64_t de)
+	{
+		int64_t ret = de;
+		if (str)
+		{
+			for (; *str && !(*str == '-' || *str == '+' || *str == '.' || (*str >= '0' && *str <= '9')); str++);
+			if (*str)
+				ret = atoll(str);
+		}
+		return ret;
+	}
+	njson str2ints(const std::string& s)
+	{
+		njson ret;
+		if (s.size())
+		{
+			auto str = s.c_str();
+			for (; *str; str++)
+			{
+				int d = 0;
+				if (*str == '-' || *str == '+' || *str == '.')
+				{
+					d++;
+					str++;
+				}
+				if (!(*str < '0' || *str > '9'))
+				{
+					auto t = str - d;
+					char* et = 0;
+					auto n = std::strtoll(t, &et, 10);//strtod
+					str = et;
+					ret.push_back(n);
+				}
+			}
+		}
+		return ret;
+	}
+
+
 	void gbx(glm::vec2 v, glm::vec2& mmin, glm::vec2& mmax)
 	{
 		mmin.x = std::min(v.x, mmin.x);
@@ -26306,7 +26393,7 @@ void hb_cx::shape(const str_info_t* str, font_t* ttp, hb_dir dir)
 	{
 		hb_buffer_t* buf = _buffer;
 		hb_buffer_clear_contents(buf);
-		hb_buffer_set_direction(buf, (hb_direction_t)dir); 
+		hb_buffer_set_direction(buf, (hb_direction_t)dir);
 		typedef void(*bufadd_func)(hb_buffer_t* buffer, const void* text, int text_length, unsigned int item_offset, int item_length);
 		static bufadd_func cb[3] = { (bufadd_func)hb_buffer_add_utf8, (bufadd_func)hb_buffer_add_utf16, (bufadd_func)hb_buffer_add_utf32 };
 		if (str->type < 3)
@@ -26314,7 +26401,7 @@ void hb_cx::shape(const str_info_t* str, font_t* ttp, hb_dir dir)
 			cb[str->type](buf, str->str.p8, str->text_length, str->item_offset, str->item_length);
 			hb_buffer_guess_segment_properties(buf);
 			hb_shape(font, buf, nullptr, 0);
-		} 
+		}
 
 	}
 }
@@ -26393,7 +26480,7 @@ int hb_cx::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<lt_item
 			{
 				int c = 0;
 				unsigned int cp1 = 0;
-				auto uc =md:: get_utf8_count(pstr + clu[0], clu[1] - clu[0]);
+				auto uc = md::get_utf8_count(pstr + clu[0], clu[1] - clu[0]);
 				if (uc > 1)
 				{
 					laststr = pstr + clu[0];
@@ -26563,7 +26650,7 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 		icub->_ubidi_setPara(bidi, testChars, stringLen, bidiReq, NULL, &status);
 		if (U_SUCCESS(status)) {
 			//int paraDir = ubidi_getParaLevel(bidi);
-			size_t rc = icub->_ubidi_countRuns(bidi, &status); 
+			size_t rc = icub->_ubidi_countRuns(bidi, &status);
 			for (size_t i = 0; i < rc; ++i) {
 				int32_t startRun = 0;
 				int32_t lengthRun = 0;

@@ -2,6 +2,10 @@
 namespace hz {
 	// 获取监视器缩放比例,glm::ivec2*
 	float get_monitor_scale(void* pels);
+	// 获取打印机名称
+	std::vector<std::string> get_print_devname();
+
+
 	/*
 
 		#define CF_PRIVATEFIRST     0x0200

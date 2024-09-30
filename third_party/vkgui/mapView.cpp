@@ -46,8 +46,24 @@
 #include <glib.h>
 
 
+#ifdef _WIN32
+#define fseeki64 _fseeki64
+#define ftelli64 _ftelli64
+#else			
+#define fseeki64 fseeko64
+#define ftelli64 ftello64
+#endif // _WIN32
+
 namespace md {
 
+	int64_t file_size(FILE* fp)
+	{
+		int64_t size = 0;
+		fseeki64(fp, 0L, SEEK_END);
+		size = ftelli64(fp);
+		fseeki64(fp, 0L, SEEK_SET);
+		return size;
+	}
 	bool isNum(const std::string& str)
 	{
 		std::stringstream sin_(str);

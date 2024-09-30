@@ -48,7 +48,7 @@ namespace hz
 		{
 			return _pos;
 		}
-		int seek(int64_t _offset, int _origin = 0)
+		size_t seek(int64_t _offset, int _origin = 0)
 		{
 			switch (_origin)
 			{
@@ -261,4 +261,5 @@ namespace md {
 	const char* get_utf8_prev(const char* str);
 	std::string trim(const std::string& str, const char* pch);
 	std::string trim_ch(const std::string& str, const std::string& pch);
+	int64_t file_size(FILE* fp);
 }

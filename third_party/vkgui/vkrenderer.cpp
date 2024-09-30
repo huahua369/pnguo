@@ -1339,9 +1339,11 @@ namespace vkr {
 		bool InitFromData(Device* pDevice, UploadHeap* uploadHeap, IMG_INFO* header, const void* data, int dsize, const char* name, bool useSRGB);
 
 		VkImage Resource() const { return m_pResource; }
-
+		// Render Target View (RTV) 【渲染目标纹理】
 		void CreateRTV(VkImageView* pRV, int mipLevel = -1, VkFormat format = VK_FORMAT_UNDEFINED);
+		// Shader resource view (SRV) 【用于提交给shader的纹理】
 		void CreateSRV(VkImageView* pImageView, int mipLevel = -1);
+		// Depth Stencil View (DSV) 【渲染目标深度/模板共享纹理】
 		void CreateDSV(VkImageView* pView);
 		void CreateCubeSRV(VkImageView* pImageView);
 
@@ -7269,7 +7271,9 @@ namespace vkr
 
 		return Init(pDevice, &image_info, name);
 	}
-
+	bool is_depth_tex(VkFormat format) {
+		return !(format<VK_FORMAT_D16_UNORM || format>VK_FORMAT_D32_SFLOAT_S8_UINT);//VK_FORMAT_D32_SFLOAT
+	}
 	void Texture::CreateRTV(VkImageView* pImageView, int mipLevel, VkFormat format)
 	{
 		VkImageViewCreateInfo info = {};
@@ -7289,7 +7293,7 @@ namespace vkr
 			info.format = m_format;
 		else
 			info.format = format;
-		if (m_format == VK_FORMAT_D32_SFLOAT)
+		if (is_depth_tex(m_format))
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		else
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -7331,7 +7335,7 @@ namespace vkr
 			info.subresourceRange.layerCount = 1;
 		}
 		info.format = m_format;
-		if (m_format == VK_FORMAT_D32_SFLOAT)
+		if (is_depth_tex(m_format))
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		else
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -17757,7 +17761,7 @@ namespace vkr {
 			0, nullptr,
 			1, &imageMemoryBarrier);
 	}
-	struct dynamicrendering_t 
+	struct dynamicrendering_t
 	{
 		uint32_t width, height;	// 可选
 		VkImageView sc_view;	// 	
