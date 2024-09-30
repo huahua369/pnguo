@@ -422,6 +422,10 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	if (derender) {
 		std::string rn;
 		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
+		//if (rdv.find("gpu") != rdv.end())
+		//{
+		//	rn = "gpu";
+		//}
 		if (rdv.find("vulkan") != rdv.end())
 		{
 			rn = "vulkan";
@@ -429,11 +433,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		else if (rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
-		}
-		else if (rdv.find("opengles2") != rdv.end())
-		{
-			rn = "opengles2";
-		}
+		} 
 		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str());
 	}
 	int vsync = 0;

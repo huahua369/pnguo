@@ -56,7 +56,8 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 			}
 		});
 
-}
+} 
+
 int main()
 {
 #ifdef _DEBUG
@@ -65,7 +66,8 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
-	auto app = new_app();
+	auto app = new_app(); 
+	//testnjson();
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口1";
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
