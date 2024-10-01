@@ -2172,7 +2172,7 @@ namespace vkr {
 	class tfChannel;
 	class tfSampler;
 
-	// 插值器
+	// 插值器，支持多维度linear/cubicSpline，四元数slerp/cubicSpline
 	class tfInterpolator
 	{
 	public:

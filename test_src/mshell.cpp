@@ -321,11 +321,12 @@ namespace hz {
 	{
 		return ((uint16_t)p | (uint16_t)p1);
 	}
+#define LOCK_K(lk) std::unique_lock<std::mutex> _lock_(lk);
 	class ssh2_api //:public Singleton<ssh2_api>
 	{
 	private:
 		int isinit = -1;
-		//LockS _lksi;
+		std::mutex _lksi;
 	public:
 		ssh2_api()
 		{
@@ -338,7 +339,7 @@ namespace hz {
 		}
 		LIBSSH2_SESSION* new_session()
 		{
-			//LOCK_W(_lksi);
+			LOCK_K(_lksi);
 			LIBSSH2_SESSION* p = nullptr;
 			if (isinit == 0)
 			{
@@ -383,7 +384,7 @@ namespace hz {
 			ssh_t* _t = 0;
 			LIBSSH2_CHANNEL* _channel = 0;
 			std::string _data;
-			//LockS _lkd;
+			std::mutex _lkd;
 		public:
 			channel_t(ssh_t* p) :_t(p)
 			{
@@ -410,7 +411,7 @@ namespace hz {
 		private:
 			ssh_t* _ssh = nullptr;
 			LIBSSH2_SFTP* _sftp_session = nullptr;
-			//LockS _lkd;
+			std::mutex _lkd;
 			// 未完成的文件后缀名
 			std::string unfinished_suffix = ".__";
 		public:
@@ -515,7 +516,7 @@ namespace hz {
 		// 命令历史记录
 		std::set<std::string> _cmds;
 
-		//LockS _lkrc;
+		std::mutex _lkrc;
 		std::set<rc_t*> _all_c;
 		ssh2_api* _ctx_api = nullptr;
 		std::thread* _trc = nullptr, * _thrpoll = nullptr;
@@ -524,7 +525,7 @@ namespace hz {
 		std::atomic_int _status = 0;
 		std::atomic_int _stop = 0;
 		// 命令数据锁
-		//LockS _lkcd;
+		std::mutex _lkcd;
 		std::string _cmdstr, _last;
 		std::vector<std::string> _cmdvs;
 		channel_t* _ct = nullptr;
@@ -837,7 +838,7 @@ namespace hz {
 
 	void ssh_t::set_func_auth(std::function<std::string(ssh_t* pt)> func_pw, std::function<std::string(ssh_t* pt)> func_pk)
 	{
-		// LOCK_W(_lkcd);
+		LOCK_K(_lkcd);
 		_func_inputpw = func_pw;
 		_func_loadpk = func_pk;
 	}
@@ -845,7 +846,7 @@ namespace hz {
 	void ssh_t::send_cmd(const std::string& s)
 	{
 		{
-			// LOCK_W(_lkcd);
+			LOCK_K(_lkcd);
 			_cmdstr = s;
 		}
 		_status = 2;
@@ -981,7 +982,7 @@ namespace hz {
 			_thrpoll = nullptr;
 		}
 		{
-			// LOCK_W(_lkrc);
+			LOCK_K(_lkrc);
 			for (auto pt : _all_c)
 			{
 				delete pt;
@@ -1499,7 +1500,7 @@ namespace hz {
 			bool is_read = false;
 			if (fds[0].revents & LIBSSH2_POLLFD_POLLIN)
 			{
-				// LOCK_W(ct->_lkd);
+				LOCK_K(ct->_lkd);
 				ct->_data.clear();
 				// 获取数据
 				int rc = 0;
@@ -1600,7 +1601,7 @@ namespace hz {
 	ssh_t::channel_t* ssh_t::new_channel()
 	{
 		channel_t* p = new channel_t(this);
-		// LOCK_W(_lkrc);
+		LOCK_K(_lkrc);
 		_all_c.insert(p);
 		return p;
 	}
@@ -1608,7 +1609,7 @@ namespace hz {
 	{
 		if (p)
 		{
-			// LOCK_W(_lkrc);
+			LOCK_K(_lkrc);
 			_all_c.erase(p);
 			delete p;
 		}
@@ -1617,7 +1618,7 @@ namespace hz {
 	ssh_t::sftp_t* ssh_t::new_sftp()
 	{
 		auto p = ssh_t::sftp_t::create(this);
-		// LOCK_W(_lkrc);
+		LOCK_K(_lkrc);
 		_all_c.insert(p);
 		return p;
 	}
@@ -1626,7 +1627,7 @@ namespace hz {
 	{
 		if (p)
 		{
-			// LOCK_W(_lkrc);
+			LOCK_K(_lkrc);
 			_all_c.erase(p);
 			delete p;
 		}
@@ -1680,7 +1681,7 @@ namespace hz {
 	}
 	void ssh_t::get_sys_error()
 	{
-		// LOCK_W(_lkrc);
+		LOCK_K(_lkrc);
 		m_errno = errno;
 		//m_errmsg=strerror(m_errno);
 		char buf[512] = {};
@@ -1690,7 +1691,7 @@ namespace hz {
 	}
 	void ssh_t::get_lib_error()
 	{
-		// LOCK_W(_lkrc);
+		LOCK_K(_lkrc);
 		m_errno = libssh2_session_last_errno(_session);
 		char* errmsg = NULL;
 		int errmsg_len = 0;
