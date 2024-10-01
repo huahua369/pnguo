@@ -60,12 +60,15 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 #include <random>
 #include <vkgui/win_core.h>
 void test_img() {
- 
+
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr10.jpg", 10);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr30.jpg", 30);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
+}
+namespace hz {
+	int main_ssh2();
 }
 int main()
 {
@@ -75,6 +78,9 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
+	hz::main_ssh2();
+
+	return 0;
 	test_img();
 	auto app = new_app();
 	//testnjson();

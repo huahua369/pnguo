@@ -491,7 +491,7 @@ namespace hz {
 	protected:
 		unsigned long hostaddr = 0;
 		int _sock = 0, _auth_pw = 0;
-		struct sockaddr_in sin;
+		struct sockaddr_in sin = {};
 		// 指纹
 		std::string _fingerprint;
 		// 私钥文件、私钥数据
@@ -500,7 +500,7 @@ namespace hz {
 		de_pkey_func func_de;
 
 		LIBSSH2_SESSION* _session = 0;
-		int rc;
+		int rc = 0;
 
 		std::string _username, _password;
 		std::string _host;
@@ -829,10 +829,15 @@ namespace hz {
 		{
 			p->set_auth(pkf);
 		}
-		p->init();
-		p->_func_read = func_read;
-		if (oinfo.find("term") != oinfo.end())
-			p->term = gp::toStr(oinfo["term"]);
+		if (0 == p->init())
+		{
+			p->_func_read = func_read;
+			if (oinfo.find("term") != oinfo.end())
+				p->term = gp::toStr(oinfo["term"]);
+		}
+		else {
+			delete p; p = 0;
+		}
 		return p;
 	}
 
@@ -1110,7 +1115,10 @@ namespace hz {
 		* The application code is responsible for creating the socket
 		* and establishing the connection
 		*/
-		_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (_host.find(":") != std::string::npos)
+			_sock = socket(AF_INET6, SOCK_STREAM, 0);
+		else
+			_sock = socket(AF_INET, SOCK_STREAM, 0);
 
 		sin.sin_family = AF_INET;
 		sin.sin_port = htons(_port);
@@ -1711,10 +1719,10 @@ namespace hz {
 		if (getpwuid_r(uid, &pwd, buf, 512, &pret) == 0 && pret == &pwd && pwd.pw_name)
 		{
 			name = pwd.pw_name;
-		}
+	}
 #endif // !_WIN32
 		return name;
-	}
+}
 	std::string ssh_t::gid_to_name(gid_t gid)
 	{
 		std::string name;
@@ -1797,7 +1805,7 @@ namespace hz {
 				tt++;
 			}
 #endif
-		}
+	}
 		return tt;
 	}
 	std::string* ssh_t::channel_t::get_data_ptr()
@@ -2520,7 +2528,7 @@ namespace hz {
 		dir = NULL;
 #endif
 		return ret;
-	}
+		}
 	int ssh_t::sftp_t::sftp_copy(const std::string& local, const std::string& remote)
 	{
 		std::string local_fix = fixpath(local);
@@ -2665,7 +2673,7 @@ namespace hz {
 
 	*/
 
-}
+	}
 // !hz
 //Xterm 256 color dictionary
 struct xterm_colors {
