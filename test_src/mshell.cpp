@@ -55,7 +55,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <inttypes.h>
-#include <cassert>
+#include <cassert> 
 #ifndef _WIN32
 #include <algorithm>
 #include <pwd.h>
@@ -75,6 +75,8 @@
 
 #include <termios.h>
 #else
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <conio.h>
 #include <sys/timeb.h>
 #define strerror_r(e,buf,len) strerror_s(buf,len,e)
@@ -489,9 +491,11 @@ namespace hz {
 		};
 
 	protected:
-		unsigned long hostaddr = 0;
 		int _sock = 0, _auth_pw = 0;
-		struct sockaddr_in sin = {};
+		union {
+			struct sockaddr_in sin;
+			struct sockaddr_in6 sin6 = {};
+		}ipv;
 		// 指纹
 		std::string _fingerprint;
 		// 私钥文件、私钥数据
@@ -1099,35 +1103,48 @@ namespace hz {
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 	}
+
 	int ssh_t::init()
 	{
+		unsigned long hostaddr = 0;
 		if (_sock)
 		{
 			return 0;
-		}
-		if (_host.size()) {
-			hostaddr = inet_addr(_host.c_str());
-		}
-		else {
-			hostaddr = htonl(0x7F000001);
 		}
 		/*
 		* The application code is responsible for creating the socket
 		* and establishing the connection
 		*/
 		if (_host.find(":") != std::string::npos)
+		{ 
 			_sock = socket(AF_INET6, SOCK_STREAM, 0);
+			ipv.sin6.sin6_family = AF_INET6;
+			ipv.sin6.sin6_port = htons(_port);
+			inet_pton(AF_INET6, _host.c_str(), &ipv.sin6.sin6_addr);
+			if (connect(_sock, (struct sockaddr*)(&ipv.sin6), sizeof(struct sockaddr_in6)) != 0) {
+				// get_sys_error();
+				fprintf(stderr, "failed to connect!\n");
+				return -1;
+			}
+		}
 		else
+		{
+			if (_host.size()) {
+				hostaddr = inet_addr(_host.c_str());
+			}
+			else {
+				hostaddr = htonl(0x7F000001);
+			}
 			_sock = socket(AF_INET, SOCK_STREAM, 0);
-
-		sin.sin_family = AF_INET;
-		sin.sin_port = htons(_port);
-		sin.sin_addr.s_addr = hostaddr;
-		if (connect(_sock, (struct sockaddr*)(&sin),
-			sizeof(struct sockaddr_in)) != 0) {
-			// get_sys_error();
-			fprintf(stderr, "failed to connect!\n");
-			return -1;
+			ipv.sin.sin_family = AF_INET;
+			ipv.sin.sin_port = htons(_port);
+			ipv.sin.sin_addr.s_addr = hostaddr;
+			if (connect(_sock, (struct sockaddr*)(&ipv.sin),
+				sizeof(struct sockaddr_in)) != 0) {
+				// get_sys_error();
+				fprintf(stderr, "failed to connect!\n");
+				return -1;
+			}
 		}
 
 
@@ -1719,10 +1736,10 @@ namespace hz {
 		if (getpwuid_r(uid, &pwd, buf, 512, &pret) == 0 && pret == &pwd && pwd.pw_name)
 		{
 			name = pwd.pw_name;
-	}
+		}
 #endif // !_WIN32
 		return name;
-}
+	}
 	std::string ssh_t::gid_to_name(gid_t gid)
 	{
 		std::string name;
@@ -1805,7 +1822,7 @@ namespace hz {
 				tt++;
 			}
 #endif
-	}
+		}
 		return tt;
 	}
 	std::string* ssh_t::channel_t::get_data_ptr()
@@ -2528,7 +2545,7 @@ namespace hz {
 		dir = NULL;
 #endif
 		return ret;
-		}
+	}
 	int ssh_t::sftp_t::sftp_copy(const std::string& local, const std::string& remote)
 	{
 		std::string local_fix = fixpath(local);
@@ -2615,6 +2632,7 @@ namespace hz {
 #ifdef _WIN32
 		system("color 00");
 #endif // _WIN32
+		printf("\x1b]0;h\x07");
 		njson k = { 1,2,3 };
 		njson info = hz::ssh_t::load_info("pgn.json");
 		if (info.empty()) { info = hz::ssh_t::load_info(getbof()); }
@@ -2673,7 +2691,7 @@ namespace hz {
 
 	*/
 
-	}
+}
 // !hz
 //Xterm 256 color dictionary
 struct xterm_colors {
