@@ -233,6 +233,7 @@ namespace hz
 	void save_json(std::string fn, const njson& n, int indent_cbor);
 	std::string get_dir(const char* t);
 
+	bool save_file(const std::string& fn, const char* data, uint64_t size, uint64_t pos, bool is_plus);
 
 }//!hz
 

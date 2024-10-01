@@ -505,8 +505,8 @@ namespace hz
 #endif
 			if (t)
 				*t = chr;
-			}
 		}
+	}
 	void check_make_path(const std::wstring& filename, unsigned int mod/* = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH*/)
 	{
 		wchar_t* file_name = (wchar_t*)filename.c_str();
@@ -545,8 +545,8 @@ namespace hz
 #endif
 			if (t)
 				*t = chr;
-			}
 		}
+	}
 	std::string genfn(std::string fn)
 	{
 #ifdef _WIN32
@@ -745,7 +745,7 @@ namespace hz
 			GetFileSizeEx(hFile, &ds);
 			ret = ds.QuadPart;
 #endif // 0
-}
+		}
 		return ret;
 	}
 
@@ -1783,7 +1783,43 @@ namespace hz
 
 
 
+	bool save_file(const std::string& fn0, const char* data, uint64_t size, uint64_t pos, bool is_plus)
+	{
+		uint64_t  retval;
+		if (!data || !size)
+		{
+			return false;
+		}
+		auto filename = genfn(fn0);
+		//LOGW(("read_binary_file0:" + filename).c_str());
+#if (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
+		filename = [[[NSBundle mainBundle]resourcePath] stringByAppendingPathComponent:@(filename)] .UTF8String;
+#endif 
+		check_make_path(filename.c_str(), pathdrive | pathdir);
+		const char* fn = filename.c_str();
+		FILE* fp = fopen(filename.c_str(), is_plus ? "ab" : "wb");
 
+		if (!fp && !is_plus)
+		{
+			mfile_t mv;
+			bool ret = false;
+			do {
+				auto md = mv.new_m(fn, size);
+				if (md && size > 0)
+				{
+					memcpy(md, data, size);
+					ret = true;
+				}
+			} while (0);
+			return ret;// "fail to open file: " + filename;
+		}
+		if (is_plus)
+			fseeki64(fp, pos, SEEK_SET);
+		retval = fwrite(data, size, 1, fp);
+		assert(retval == 1);
+		fclose(fp);
+		return true;
+	}
 
 
 
