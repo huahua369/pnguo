@@ -2,6 +2,7 @@
 
 #include <pch1.h>
 #include <vkgui/mapView.h>
+#include "mshell.h"
 #if 1
 #if 0
 
@@ -2631,8 +2632,16 @@ namespace hz {
 	{
 #ifdef _WIN32
 		system("color 00");
+		system("CHCP 65001");
 #endif // _WIN32
 		printf("\x1b]0;h\x07");
+
+		uint32_t* cc = get_wcolor();
+		for (size_t i = 0; i < 16; i++)
+		{
+			auto str = get_wcname(i, 0);
+			printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
+		}
 		njson k = { 1,2,3 };
 		njson info = hz::ssh_t::load_info("pgn.json");
 		if (info.empty()) { info = hz::ssh_t::load_info(getbof()); }
@@ -2713,16 +2722,30 @@ namespace hz {
 	"white" : "#CCCCCC",
 	"yellow" : "#C19C00",
 	"brightBlack" : "#767676",
-	"brightBlue" : "#3B78FF",
-	"brightCyan" : "#61D6D6",
-	"brightGreen" : "#16C60C",
-	"brightPurple" : "#B4009E",
 	"brightRed" : "#E74856",
-	"brightWhite" : "#F2F2F2",
+	"brightGreen" : "#16C60C",
 	"brightYellow" : "#F9F1A5"
+	"brightBlue" : "#3B78FF",
+	"brightPurple" : "#B4009E",
+	"brightCyan" : "#61D6D6",
+	"brightWhite" : "#F2F2F2",
 },
 */
- 
+// window配色方案...黑色,红色,绿色,黄色,蓝色,紫色,青色,白色{0-7}、亮{8-15}
+static uint32_t wcolor[] = { 0xff0C0C0C,0xff1F0FC5,0xff0EA113,0xff009CC1,0xffDA3700,0xff981788,0xffdd963a,0xffcccccc,
+0xff767676,0xff5648e7,0xff0cc616,0xffa5f1f9,0xffff783b,0xff9e00b4,0xffd6d661,0xfff2f2f2
+};
+uint32_t* get_wcolor()
+{
+	return wcolor;
+}
+const char* get_wcname(int x, int lang)
+{
+	static const void* cns[] = { u8"黑色",u8"红色",u8"绿色",u8"黄色",u8"蓝色",u8"紫色",u8"青色",u8"白色",
+		u8"亮黑色",u8"亮红色",u8"亮绿色",u8"亮黄色",u8"亮蓝色",u8"亮紫色",u8"亮青色",u8"亮白色" };
+	static const char* ens[] = { "Black","Red","Green","Yellow","Blue","Purple","Cyan","White","BrightBlack","brightRed","brightGreen","brightYellow","brightBlue","brightPurple","brightCyan","brightWhite" };
+	return lang ? ens[x % 16] : (char*)cns[x % 16];
+}
 //Xterm 256 color dictionary 
 // bgra
 static uint32_t xc[256] = {

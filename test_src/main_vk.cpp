@@ -59,6 +59,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 }
 #include <random>
 #include <vkgui/win_core.h>
+#include "mshell.h"
 void test_img() {
 
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
