@@ -68,9 +68,7 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
-namespace hz {
-	int main_ssh2();
-}
+
 int main()
 {
 #ifdef _DEBUG
@@ -79,11 +77,17 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
-	hz::main_ssh2();
+	//hz::main_ssh2();
 
-	return 0;
-	test_img();
+	//return 0;
+	//test_img();
 	auto app = new_app();
+	uint32_t* cc = get_wcolor();
+	for (size_t i = 0; i < 16; i++)
+	{
+		auto str = get_wcname(i, 0);
+		printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
+	}
 	//testnjson();
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口1";
@@ -101,7 +105,7 @@ int main()
 			vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
 			//load_gltf(vkd, R"(E:\model\spaceship.glb)");
-			//load_gltf(vkd, R"(E:\model\helicopter_space_ship.glb)"); 
+			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,6,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 			//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
 			//load_gltf(vkd, R"(E:\model\psx_old_house.glb)");
