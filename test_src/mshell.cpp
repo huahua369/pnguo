@@ -2634,15 +2634,7 @@ namespace hz {
 		system("color 00");
 		system("CHCP 65001");
 #endif // _WIN32
-		printf("\x1b]0;h\x07");
-
-		uint32_t* cc = get_wcolor();
-		for (size_t i = 0; i < 16; i++)
-		{
-			auto str = get_wcname(i, 0);
-			printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
-		}
-		njson k = { 1,2,3 };
+		  
 		njson info = hz::ssh_t::load_info("pgn.json");
 		if (info.empty()) { info = hz::ssh_t::load_info(getbof()); }
 		auto ssh = hz::ssh_t::new_run(info, [](hz::ssh_t* pt, std::string* d) {
