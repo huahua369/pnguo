@@ -64,11 +64,11 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	}
 
 
-	uint32_t* cc = get_wcolor();
-	for (int i = 0; i < 5; i++) {
+	uint32_t* cc = get_wcolor() + 8;
+	for (int i = 0; i < 8; i++) {
 		auto p = new plane_cx();
 		uint32_t tc = cc[i];
-		p->set_border({ 0xffff802C,1,5,0xff2c2c2c });
+		p->set_border({ 0x80ff802C,1,5,0xff2c2c2c });
 		form0->bind(p);	// 绑定到窗口  
 		p->set_rss(5);
 		p->_lms = { 6,6 };
@@ -122,7 +122,7 @@ int main()
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口1";
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
-#if 0
+#if 1
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
