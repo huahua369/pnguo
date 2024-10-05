@@ -4,6 +4,10 @@
 #include <vkgui/tinysdl3.h>
 #include <vkgui/vkrenderer.h>
 
+#include <random>
+#include <vkgui/win_core.h>
+#include "mshell.h"
+
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 
 	auto pl1 = new plane_cx();
@@ -56,10 +60,33 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 			}
 		});
 
+
+	uint32_t* cc = get_wcolor();
+	for (int i = 0; i < 1; i++) {
+		auto p = new plane_cx();
+		uint32_t pbc = cc[i];
+		p->set_border({ 0x80ff802C,1,5,pbc });
+		form0->bind(p);	// 绑定到窗口  
+		p->set_rss(5);
+		p->_lms = { 6,6 }; 
+		p->add_familys(fontn, 0);
+		p->draggable = true; //可拖动
+		p->set_size({ 500,300 });
+		p->set_pos({ 100 + i * 20,100 + i * 20 });
+		for (size_t j = 0; j < boolstr.size(); j++)
+		{
+			auto& it = boolstr[j];
+			auto kcb = p->add_label(it.c_str(), bs, 0);
+			{
+				kcb->_disabled_events = true;
+				kcb->text_color = 0xff7373ff;
+				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[j]));
+				sw1->get_pos();
+				//sw1->bind_ptr(bps[j]);
+			}
+		}
+	}
 }
-#include <random>
-#include <vkgui/win_core.h>
-#include "mshell.h"
 void test_img() {
 
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
