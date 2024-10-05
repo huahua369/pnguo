@@ -26,49 +26,52 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	glm::vec2 bs = { 150,22 };
 	glm::vec2 bs1 = { 50,22 };
 	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
-	std::vector<bool*> bps = { &vkd->state.bUseTAA, &vkd->state.bDrawLightFrustum, &vkd->state.bDrawBoundingBoxes, &vkd->state.bShowMilliseconds };
-	for (size_t i = 0; i < boolstr.size(); i++)
+	if (vkd)
 	{
-		auto& it = boolstr[i];
-		auto kcb = pl1->add_label(it.c_str(), bs, 0);
+		std::vector<bool*> bps = { &vkd->state.bUseTAA, &vkd->state.bDrawLightFrustum, &vkd->state.bDrawBoundingBoxes, &vkd->state.bShowMilliseconds };
+		for (size_t i = 0; i < boolstr.size(); i++)
 		{
-			kcb->_disabled_events = true;
-			kcb->text_color = 0xff7373ff;
-			auto sw1 = (switch_tl*)pl1->add_switch(bs1, it.c_str(), *(bps[i]));
-			sw1->get_pos();
-			sw1->bind_ptr(bps[i]);
-		}
-	}
-	static std::vector<color_btn*> lbs;
-	bs.x = 300;
-	for (size_t i = 0; i < 18; i++)
-	{
-		auto kcb = pl1->add_label("", bs, 0);
-		kcb->text_color = 0xff80F61F;
-		kcb->_disabled_events = true;
-		lbs.push_back(kcb);
-	}
-	vkd->set_label_cb([=](int count, int idx, const char* str)
-		{
-			if (idx < 0) {
-				for (size_t i = 0; i < 18; i++)
-					lbs[i]->str.clear();
-			}
-			else
+			auto& it = boolstr[i];
+			auto kcb = pl1->add_label(it.c_str(), bs, 0);
 			{
-				lbs[idx]->str = str;
+				kcb->_disabled_events = true;
+				kcb->text_color = 0xff7373ff;
+				auto sw1 = (switch_tl*)pl1->add_switch(bs1, it.c_str(), *(bps[i]));
+				sw1->get_pos();
+				sw1->bind_ptr(bps[i]);
 			}
-		});
+		}
+		static std::vector<color_btn*> lbs;
+		bs.x = 300;
+		for (size_t i = 0; i < 18; i++)
+		{
+			auto kcb = pl1->add_label("", bs, 0);
+			kcb->text_color = 0xff80F61F;
+			kcb->_disabled_events = true;
+			lbs.push_back(kcb);
+		}
+		vkd->set_label_cb([=](int count, int idx, const char* str)
+			{
+				if (idx < 0) {
+					for (size_t i = 0; i < 18; i++)
+						lbs[i]->str.clear();
+				}
+				else
+				{
+					lbs[idx]->str = str;
+				}
+			});
+	}
 
 
 	uint32_t* cc = get_wcolor();
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 5; i++) {
 		auto p = new plane_cx();
 		uint32_t pbc = cc[i];
 		p->set_border({ 0x80ff802C,1,5,pbc });
 		form0->bind(p);	// 绑定到窗口  
 		p->set_rss(5);
-		p->_lms = { 6,6 }; 
+		p->_lms = { 6,6 };
 		p->add_familys(fontn, 0);
 		p->draggable = true; //可拖动
 		p->set_size({ 500,300 });
@@ -80,7 +83,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 			{
 				kcb->_disabled_events = true;
 				kcb->text_color = 0xff7373ff;
-				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[j]));
+				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), 0);
 				sw1->get_pos();
 				//sw1->bind_ptr(bps[j]);
 			}
@@ -119,6 +122,7 @@ int main()
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口1";
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
+#if 0
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
@@ -159,6 +163,9 @@ int main()
 			};
 
 	}
+#else
+	new_ui(form0, 0);
+#endif
 	run_app(app, 0);
 	free_app(app);
 	return 0;

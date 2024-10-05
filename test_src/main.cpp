@@ -1020,8 +1020,8 @@ int main()
 	pw->bind(pl2);	// 绑定到窗口
 	pw->bind(pl1);	// 绑定到窗口
 	pw->bind(pl4);
-	pl2->visible = false;
-	pl3->visible = false;
+	//pl2->visible = false;
+	//pl3->visible = false;
 	mainmenu->set_rss(5);
 	pl1->set_rss(5);
 	pl2->set_rss(5);
@@ -1070,7 +1070,7 @@ int main()
 				};
 		}
 	}
-#if 0
+#if 1
 	{
 		auto p = pl4;
 		p->draggable = true; //可拖动
@@ -1300,7 +1300,7 @@ int main()
 				};
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 				{
-					auto v3 = vkd ? vkd->get_value(0) : glm::vec3();
+					auto v3 =/* vkd ? vkd->get_value(0) :*/ glm::vec3();
 					g3->str = (char*)u8" x:" + pg::to_string(v3.x, "%.3f") + " y:" + pg::to_string(v3.y, "%.3f") + "	z:" + pg::to_string(v3.z, "%.3f");
 					g3->str = sss + g3->str;
 					//cairo_as _cas(cr);

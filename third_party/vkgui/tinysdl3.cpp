@@ -434,6 +434,9 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		{
 			rn = "direct3d12";
 		}
+		else {
+			rn = *rdv.begin();
+		}
 		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str());
 	}
 	int vsync = 0;
@@ -1717,9 +1720,15 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 {
 	glm::vec2 clip_off = {};
 	glm::vec2 clip_scale = render_scale;
-
+	SDL_Rect vp = { 0,0,-1,-1 };
 	if (dc->viewport.z > 0 && dc->viewport.w > 0)
-		SDL_SetRenderViewport(renderer, (SDL_Rect*)&dc->viewport);
+	{
+		vp.x = dc->viewport.x;
+		vp.y = dc->viewport.y;
+		vp.w = dc->viewport.z;
+		vp.h = dc->viewport.w;
+		SDL_SetRenderViewport(renderer, &vp);
+	}
 
 	auto av = &dc->_mesh;
 	auto vd = (SDL_Vertex*)av->vtxs.data();
@@ -1744,6 +1753,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 		auto tex = (SDL_Texture*)pcmd.texid;
 		SDL_RenderGeometry(renderer, tex, vd + pcmd.vtxOffset, pcmd.vCount, ibs ? idv + pcmd.idxOffset : nullptr, pcmd.elemCount);
 	}
+	//SDL_SetRenderViewport(renderer, (SDL_Rect*)0);
 }
 void form_x::present()
 {
