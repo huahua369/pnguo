@@ -67,8 +67,8 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	uint32_t* cc = get_wcolor();
 	for (int i = 0; i < 5; i++) {
 		auto p = new plane_cx();
-		uint32_t pbc = cc[i];
-		p->set_border({ 0x80ff802C,1,5,pbc });
+		uint32_t tc = cc[i];
+		p->set_border({ 0xffff802C,1,5,0xff2c2c2c });
 		form0->bind(p);	// 绑定到窗口  
 		p->set_rss(5);
 		p->_lms = { 6,6 };
@@ -82,7 +82,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 			auto kcb = p->add_label(it.c_str(), bs, 0);
 			{
 				kcb->_disabled_events = true;
-				kcb->text_color = 0xff7373ff;
+				kcb->text_color = tc;
 				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), 0);
 				sw1->get_pos();
 				//sw1->bind_ptr(bps[j]);

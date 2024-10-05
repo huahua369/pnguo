@@ -22523,11 +22523,12 @@ void plane_cx::update(float delta)
 	{
 		evupdate = 0;
 		auto ls = get_size(); ls -= 1;
+		bool has_border = (border.y > 0 && border.x != 0);
 		{
 			// 背景 
 			if (border.w) {
 				glm::vec4 rf = { 0.,0.,ls };
-				if (border.x > 0) {
+				if (has_border) {
 					rf.x = rf.y = 0.5;
 				}
 				draw_rectangle(cr, rf, border.z);
@@ -22559,7 +22560,7 @@ void plane_cx::update(float delta)
 			}
 		}
 		// 边框线  
-		if (border.x > 0)
+		if (has_border)
 		{
 			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
 			fill_stroke(cr, 0, border.x, border.y, false);
