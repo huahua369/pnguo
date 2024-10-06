@@ -8205,7 +8205,8 @@ namespace vkr
 			std::unique_lock<std::mutex> lock(m_mutex);
 
 			// make sure resource (and its mips) would fit the upload heap, if not please make the upload heap bigger
-			assert(uSize < (size_t)(m_pDataBegin - m_pDataEnd));
+			auto bca = (m_pDataEnd - m_pDataBegin);
+			assert(uSize < (size_t)bca);
 
 			m_pDataCur = reinterpret_cast<UINT8*>(AlignUp(reinterpret_cast<SIZE_T>(m_pDataCur), uAlign));
 			uSize = AlignUp(uSize, uAlign);

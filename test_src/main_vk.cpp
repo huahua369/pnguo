@@ -65,7 +65,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 
 
 	uint32_t* cc = get_wcolor() + 8;
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 0*8; i++) {
 		auto p = new plane_cx();
 		uint32_t tc = cc[i];
 		p->set_border({ 0x80ff802C,1,5,0xff2c2c2c });
@@ -129,14 +129,15 @@ int main()
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);
 	if (vkd) {
 		{
-			vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
-			vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
-			vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
-			vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
-			//load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
-			//load_gltf(vkd, R"(E:\model\spaceship.glb)");
-			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,6,-8 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
+			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
+			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
+			////load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
+			////load_gltf(vkd, R"(E:\model\spaceship.glb)");
+			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,6,-8 }, 1.0);
+			vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,6,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 			//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
 			//load_gltf(vkd, R"(E:\model\psx_old_house.glb)");
@@ -149,7 +150,7 @@ int main()
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,20 }, 1);// 创建SDL的bgra纹理 
 		vkd->state.SelectedTonemapperIndex = 1;
-		vkd->state.Exposure = 0.1;
+		vkd->state.Exposure = 0.8;
 		vkd->state.EmissiveFactor = 250;
 		new_ui(form0, vkd);
 		form0->up_cb = [=](float delta, int* ret)
