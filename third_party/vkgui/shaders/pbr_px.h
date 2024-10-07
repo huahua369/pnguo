@@ -210,11 +210,11 @@ struct NormalInfo {
 	vec3 n;    // Shading normal
 	vec3 ntex; // Normal from texture, scaling is accounted for.
 };
- 
+
 #ifdef __cplusplus
 PerFrame myPerFrame;
 mat4 myPerObject_u_mCurrWorld;
-pbrMaterial u_pbrParams; 
+pbrMaterial u_pbrParams;
 #else
 layout(set = 0, binding = 0) uniform perFrame
 {
@@ -663,8 +663,8 @@ float DoSpotShadow(vec3 vPosition, Light light)
 	else if (light.type == LightType_Directional)
 	{
 		// This is the sun, so outside of the volume we do have light
-		if ((shadowTexCoord.y < 0) || (shadowTexCoord.y > 1)) return 1.0f;
-		if ((shadowTexCoord.x < 0) || (shadowTexCoord.x > 1)) return 1.0f;
+		if ((shadowTexCoord.y < 0) || (shadowTexCoord.y > 1)) return 1.0f * 0;
+		if ((shadowTexCoord.x < 0) || (shadowTexCoord.x > 1)) return 1.0f * 0;
 		if (shadowTexCoord.z < 0.0f) return 1.0f;
 		if (shadowTexCoord.z > 1.0f) return 1.0f;
 	}
@@ -1255,7 +1255,8 @@ float getRangeAttenuation(float range, float distance)
 		// negative range means unlimited
 		return 1.0;
 	}
-	return max(mix(1, 0, distance / range), 0);//max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
+	return max(mix(1, 0, distance / range), 0);
+	//return max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
 }
 
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#inner-and-outer-cone-angles

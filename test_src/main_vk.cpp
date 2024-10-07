@@ -65,7 +65,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 
 
 	uint32_t* cc = get_wcolor() + 8;
-	for (int i = 0; i < 0*8; i++) {
+	for (int i = 0; i < 0 * 8; i++) {
 		auto p = new plane_cx();
 		uint32_t tc = cc[i];
 		p->set_border({ 0x80ff802C,1,5,0xff2c2c2c });
@@ -134,17 +134,17 @@ int main()
 			//vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
-			////load_gltf(vkd, R"(E:\model\hero_alice_lobby.glb)");
-			////load_gltf(vkd, R"(E:\model\spaceship.glb)");
-			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,6,-8 }, 1.0);
-			vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,6,-8 }, 1.0);
+			////vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
+			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,6,-8 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 			//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
-			//load_gltf(vkd, R"(E:\model\psx_old_house.glb)");
-			//load_gltf(vkd, R"(E:\model\space_station_4.glb)");
-			//load_gltf(vkd, R"(E:\model\sexy_guardian_woman_model_18.glb)");
-			//load_gltf(vkd, R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-			//load_gltf(vkd, R"(E:\model\DragonAttenuation.glb)");
+			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,6,-8 * 0 }, 1.0);
+			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,16,-8 * 0 }, 1.0);
+			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
+			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
+			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
+			//vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)");
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示

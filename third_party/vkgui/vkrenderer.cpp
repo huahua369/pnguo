@@ -18688,12 +18688,12 @@ namespace vkr {
 		// todo 添加默认灯光Add a default light in case there are none
 		{
 			glm::vec4 src = PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f;
-			src = { 0.1,20,0.1,0 };
+			src = { 10.1,20,0.1,0 };
 			Transform transform = {};
 			transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
 			light_t l = {};
-			l._type = light_t::LIGHT_SPOTLIGHT;
-			l._intensity = 80.0;
+			l._type = light_t::LIGHT_DIRECTIONAL;
+			l._intensity = 8.0;
 			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 			l._range = 52;
 			l._outerConeAngle = AMD_PI_OVER_4;
