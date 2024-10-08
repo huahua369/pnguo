@@ -7701,7 +7701,7 @@ namespace vkr
 
 		uint32_t offset = uint32_t(pixels - uploadHeap->BasePtr());
 		upload_data(pDevice, uploadHeap, header, offset, 0, m_pResource);
-		return true; 
+		return true;
 	}
 
 	VkFormat TranslateDxgiFormatIntoVulkans(DXGI_FORMAT format)
@@ -9615,6 +9615,7 @@ namespace vkr {
 	}
 	void Camera::LookAt(const glm::vec4& eyePos, const glm::vec4& lookAt)
 	{
+		atPos = lookAt;
 		m_eyePos = eyePos;
 		m_View = LookAtRH(eyePos, lookAt, flipY);
 		m_distance = glm::length(lookAt - eyePos);
@@ -9740,7 +9741,7 @@ namespace vkr {
 			m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // *相机坐标
 
 			glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
-			m_View = translate * rotate;
+			m_View = translate * rotate; 
 			m_distance = distance;	// 新距离 
 		}
 	}
@@ -18616,7 +18617,7 @@ namespace vkr {
 		OnUpdateDisplay();
 
 		// Init Camera, looking at the origin
-		m_camera.LookAt(glm::vec4(0, 0, 5, 0), glm::vec4(0, 0, 0, 0));
+		m_camera.LookAt(glm::vec4(0, 10, 15, 0), glm::vec4(0, 0, 0, 0));
 		// todo set camera
 		m_camera.is_eulerAngles = false;
 
