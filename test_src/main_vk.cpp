@@ -143,10 +143,11 @@ int main()
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			////vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
-			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,0,-8 }, 1.0);
+			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-			//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
+			vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
