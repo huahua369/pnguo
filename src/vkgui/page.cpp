@@ -900,6 +900,7 @@ static uint64_t toUInt(const njson& v, uint64_t de = 0)
 	return ret;
 }
 
+
 njson& push_button(const void* str, int cidx, int eid, njson& btn)
 {
 	njson it;
@@ -922,32 +923,6 @@ njson& push_button(const void* str, int cidx, int eid, njson& btn, glm::ivec2 si
 }
 
 
-void set_moveto(njson& v, glm::vec2 target, glm::vec2 from, float mt, float wait)
-{
-	njson& t = v;
-	t["mt"] = mt;
-	t["wait"] = wait;
-	t["from"] = { from.x, from.y };
-	t["target"] = { target.x,target.y };
-	t.erase("pad");
-}
-void set_moveto(njson& v, float mt, glm::vec2 target, float wait)
-{
-	njson& t = v;
-	t["mt"] = mt;
-	t["wait"] = wait;
-	t["target"] = { target.x,target.y };
-	t.erase("pad");
-}
-void set_moveto(njson& v, glm::vec2 pad, float mt, float wait)
-{
-	njson& t = v;
-	t["mt"] = mt;
-	t["wait"] = wait;
-	t["pad"] = { pad.x,pad.y };
-	t.erase("target");
-
-}
 void set_ps(njson& v, glm::vec2 size, glm::vec2 pos, bool is)
 {
 	v["pos"] = { pos.x,pos.y };
@@ -970,74 +945,85 @@ void freecb(njson* p)
 		delete p;
 	}
 }
-#if 0
-template<class T>
-T* get_ptr0(world_cx* ctx, const char* gid, int idx, int type)
-{
-	T* p = 0;
-	if (ctx && gid && *gid)
-	{
-		auto u = ctx->get_ptr2(gid, type);
-		if (u.n)
-		{
-			if (idx < 0 || idx > u.n)idx = 0;
-			p = (T*)u.p[idx];
-		}
-	}
-	return p;
-}
-inline ui::scroll_view_u* get_svptr(world_cx* c, const char* gid, int idx)
-{
-	return get_ptr0<ui::scroll_view_u>(c, gid, idx, 1);
-}
-inline ui::div_u* get_divptr(world_cx* c, const char* gid, int idx)
-{
-	return get_ptr0<ui::div_u>(c, gid, idx, 0);
-}
 
-ui::scroll_view_u* world_cx::get_svptr(const char* gid, int idx) {
-	return get_ptr0<ui::scroll_view_u>(this, gid, idx, 1);
-}
-ui::div_u* world_cx::get_divptr(const char* gid, int idx) {
-	return get_ptr0<ui::div_u>(this, gid, idx, 0);
-}
-#endif
-#define merge_j(dst,src) 	do{for (auto& [k, v] : src.items())	{ dst[k] = v;	}}while(0)
+
 /*
 	菜单开关动画实现，通过gid操作坐标，修改g的参数返回到动画处理系统执行
 	idx=操作的index，sp为间隔{x子项，y父级}，mt为移动到目标毫秒数，one=true则关闭所有，只展开一个父项。
 	vsize返回展开后大小，方便设置滚动视图
 */
-bool get_switch(njson& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* vsize)
+struct sw_item_t {
+	glm::vec2 size;
+	// 执行
+	float mt = 0.0;
+	float wait = 0.0;
+	float wait0 = -1.0;
+	glm::vec2 target, from;
+	glm::vec2 pad;
+	uint8_t type = 0;		// 0从from坐标到目标坐标，1当前位置移到目标，2在原坐标为原点增加移动。隐藏wait0>=0，
+	bool visible = true;
+};
+struct swinfo_t
+{
+	glm::vec2 pos;
+	std::vector<sw_item_t> v;
+	bool on = false;
+};
+void set_moveto(sw_item_t& v, glm::vec2 target, glm::vec2 from, float mt, float wait)
+{
+	v.type = 0;
+	v.mt = mt;
+	v.wait = wait;
+	v.target = target;
+	v.from = from;
+	v.pad = {}; 
+}
+void set_moveto(sw_item_t& v, float mt, glm::vec2 target, float wait)
+{
+	v.type = 1;	
+	v.mt = mt;
+	v.wait = wait;
+	v.target = target;
+	v.pad = {}; 
+}
+void set_moveto(sw_item_t& v, glm::vec2 pad, float mt, float wait)
+{
+	v.type = 2;
+	v.mt = mt;
+	v.wait = wait;
+	v.pad = pad; 
+}
+bool get_switch(std::vector<swinfo_t>& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* vsize)
 {
 	bool ret = false;
 	float wait = 0.0, sp3 = sp.z;
 	glm::vec2 t = { sp.x,sp.y }, vsize0 = {};
 	if (!vsize)vsize = &vsize0;
-#if 0
+#if 1
 	do {
 		if (idx >= g.size() && idx >= 0) { break; }
-		glm::vec2 pos = toVec2(g[0]["pos"]);
+		glm::vec2 pos = g[0].pos;
 		for (size_t x = 0; x < g.size(); x++) {
 			auto& vt = g[x];
-			auto& v1 = vt["v"];
-			bool oc = vt.find("on") != vt.end() ? toBool(vt["on"]) : false;
-			if (one && x != idx) { vt["on"] = false; oc = false; }
-			if (x == idx) { oc = !oc; vt["on"] = oc; }
+			auto& v1 = vt.v;
+			bool oc = vt.on;
+			if (one && x != idx) { vt.on = false; oc = false; }
+			if (x == idx) { oc = !oc; vt.on = oc; }
 			for (size_t i = 0; i < v1.size(); i++) {
 				auto& kt = v1[i];
-				glm::vec2 c0 = toVec2(kt["size"]);
+				glm::vec2 c0 = kt.size;
+				kt.wait0 = -1.0;
 				if (i > 0) {
 					if (!oc) {
-						bool visi = toBool(kt["visible"]);
+						bool visi = kt.visible;
 						if (visi) {
-							kt["wait0"] = 0; kt["visible"] = false;	// 隐藏子项
+							kt.wait0 = 0.0; kt.visible = false;	// 隐藏子项
 							glm::vec2 ps1 = { -c0.x * 3, 0 };
 							set_moveto(kt, ps1, mt, wait);	// 移动子项到外面
 						}
 						continue;
 					}
-					if (one || x == idx) { if (oc) { kt["wait0"] = 0; kt["visible"] = true; } }
+					if (one || x == idx) { if (oc) { kt.wait0 = 0.0; kt.visible = true; } }
 				}
 				vsize->y += c0.y + t.x;
 				pos.y += t.x;
@@ -1053,7 +1039,7 @@ bool get_switch(njson& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* 
 		ret = true;
 	} while (0);
 #endif
-	hz::save_json(g, "temp/tr1758.json", 2);
+	//hz::save_json(g, "temp/tr1758.json", 2);
 	return ret;
 }
 
@@ -1161,17 +1147,7 @@ void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<voi
 	njson tr;
 	int y = 0;
 	std::string gid = info->gid;
-	//toiVec2(info["pos"], pos);		// 整体坐标
-	//toiVec2(info["cpos"], ps);		// 坐标
-	//toiVec2(info["size"], size);		// 大小
-	//toiVec2(info["fontheight"], fh);		// 字高
-	//toiVec2(info["space"], space);		// 间隔
-	//toiVec2(info["row_size"], ss);		// 行宽高
-	//toiVec2(info["color_idx"], color_idx);		// 风格颜色
-	//toiVec2(info["effect"], effect);		// 风格
-	//toiVec2(info["scroll"], scroll);		// 滚动量
-	//toiVec2(info["crow_size"], crow_size);		// 子元素大小
-		// 偏移
+
 	uint32_t divc[2] = {};
 	auto& fillc = info->btn_fillcolor;
 	auto& bc = info->btn_bordercolor;
@@ -1193,8 +1169,7 @@ void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<voi
 		auto ps1 = ps;
 		ps1.y += y;
 		t0["pos"] = { ps1.x,  ps1.y };
-		t0["sps"] = { info->ips.x,0.5 };
-		//t0["ips"] = { ips.x, 0 };
+		t0["sps"] = { info->ips.x,0.5 }; 
 		atn["pos"] = { ps1.x,  ps1.y };
 		y += ss.y + space.x;
 		{
@@ -1231,7 +1206,7 @@ void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<voi
 	}
 	njson* od = new njson();
 	(*od)["$count"] = d.size();
-	(*od)["$at"] = tr; 
+	(*od)["$at"] = tr;
 	njson base;
 	base["sp"] = { space.x,space.y,padx,info->mt };
 	base["xtype"] = info->xtype;
