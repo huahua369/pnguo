@@ -1372,6 +1372,18 @@ private:
 };
 
 
+enum class WIDGET_TYPE :uint32_t {
+	WT_NULL,
+	WT_EDIT,
+	WT_COLOR_BTN, WT_IMAGE_BTN, WT_GRADIENT_BTN,
+	WT_RADIO,
+	WT_CHECKBOX,
+	WT_SWITCH,
+	WT_PROGRESS,
+	WT_SLIDER,
+	WT_COLORPICK,
+	WT_SCROLL_BAR,
+};
 
 // 判断拾取
 struct pickup_t
@@ -1383,8 +1395,9 @@ struct pickup_t
 //  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 struct widget_base
 {
+public:
 	int id = 0;
-	int wtype = 0;
+	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
 	int bst = 1;			// 鼠标状态
 	glm::vec2 pos = {};		// 控件坐标
 	glm::vec2 size = {};	// 控件大小
@@ -1414,6 +1427,10 @@ struct widget_base
 	bool has_drag = false;	// 是否有拖动事件
 	bool _autofree = false;
 	bool has_hover_sc = 0;	// 滚动在父级接收
+public:
+	widget_base();
+	widget_base(WIDGET_TYPE wt);
+	virtual ~widget_base();
 	//event_type2
 	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
@@ -1527,6 +1544,8 @@ struct image_btn :public widget_base {
 	std::vector<glm::ivec4> data;
 	int show_idx = 0;	// 参考BTN_STATE
 public:
+	image_btn();
+	~image_btn();
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
@@ -1550,6 +1569,8 @@ struct color_btn :public widget_base
 	bool hover = false;
 	bool bgr = 0;
 public:
+	color_btn();
+	~color_btn();
 	btn_cols_t* set_btn_color_bgr(size_t idx);
 
 	bool update(float delta);
@@ -1580,6 +1601,8 @@ struct gradient_btn :public widget_base
 	bool mEnabled = true;
 	bool is_muilt = true;
 public:
+	gradient_btn();
+	~gradient_btn();
 	const char* c_str();
 	void init(glm::ivec4 rect, const std::string& text, uint32_t back_color = 0, uint32_t text_color = -1);
 
@@ -1662,6 +1685,8 @@ struct checkbox_tl :public widget_base
 	check_style_t style = {};	// 风格id
 	checkbox_info_t v;
 public:
+	checkbox_tl();
+	~checkbox_tl();
 	void bind_ptr(bool* p);
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);
@@ -1685,6 +1710,8 @@ struct switch_tl :public widget_base
 	checkbox_info_t v = {};
 	bool inline_prompt = false;
 public:
+	switch_tl();
+	~switch_tl();
 	void bind_ptr(bool* p);
 	void set_value(bool b);
 	void set_value();
@@ -1705,6 +1732,8 @@ struct progress_tl :public widget_base
 	int right_inside = 0;			// 右对齐
 	bool text_inside = true;
 public:
+	progress_tl();
+	~progress_tl();
 	void set_value(double b);
 	void set_vr(const glm::ivec2& r);
 	double get_v();
@@ -1725,6 +1754,8 @@ struct slider_tl :public widget_base
 	int vertical = 0;				// 垂直模式1
 	bool reverse_color = 0;
 public:
+	slider_tl();
+	~slider_tl();
 	void bind_ptr(double* p);
 	void set_value(double b);
 	void set_vr(const glm::ivec2& r);
@@ -1754,6 +1785,8 @@ struct colorpick_tl :public widget_base
 	std::function<void(colorpick_tl* p, uint32_t col)> on_change_cb;
 	bool alpha = true;				// 显示透明通道
 public:
+	colorpick_tl();
+	~colorpick_tl();
 	void init(uint32_t c, int w, int h, bool alpha);
 	uint32_t get_color();	// 获取颜色
 	void set_color2hsv(uint32_t c);
@@ -1790,6 +1823,8 @@ struct scroll_bar :public widget_base
 private:
 	int _offset = 0;			// 偏移量
 public:
+	scroll_bar();
+	~scroll_bar();
 	void set_viewsize(int vs, int cs, int rcw);
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);

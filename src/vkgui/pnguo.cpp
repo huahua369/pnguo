@@ -19918,8 +19918,12 @@ void flex_item::layout()
 
 #endif // !NO_FLEX_CX
 
-
-
+widget_base::widget_base()
+{}
+widget_base::widget_base(WIDGET_TYPE wt) :wtype(wt)
+{}
+widget_base::~widget_base()
+{}
 bool widget_base::on_mevent(int type, const glm::vec2& mps)
 {
 	return false;
@@ -20054,7 +20058,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-}
+	}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -20794,7 +20798,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-}
+	}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
@@ -20974,6 +20978,7 @@ void text_ctx_cx::up_cursor(bool is)
 }
 edit_tl::edit_tl()
 {
+	widget_base::wtype = WIDGET_TYPE::WT_EDIT;
 	ctx = new text_ctx_cx();
 	set_family("NSimSun", 12);
 	set_align_pos({ 4, 4 });
@@ -23079,6 +23084,49 @@ namespace pn {
 #if 1
 // 默认按钮样式
 
+image_btn::image_btn() :widget_base(WIDGET_TYPE::WT_IMAGE_BTN)
+{
+
+}
+image_btn::~image_btn()
+{}
+color_btn::color_btn() :widget_base(WIDGET_TYPE::WT_COLOR_BTN)
+{}
+color_btn::~color_btn()
+{}
+gradient_btn::gradient_btn() :widget_base(WIDGET_TYPE::WT_GRADIENT_BTN)
+{}
+gradient_btn::~gradient_btn()
+{}
+radio_tl::radio_tl() :widget_base(WIDGET_TYPE::WT_RADIO)
+{
+}
+checkbox_tl::checkbox_tl() :widget_base(WIDGET_TYPE::WT_CHECKBOX)
+{}
+checkbox_tl::~checkbox_tl()
+{}
+switch_tl::switch_tl() :widget_base(WIDGET_TYPE::WT_SWITCH)
+{}
+switch_tl::~switch_tl()
+{}
+progress_tl::progress_tl() :widget_base(WIDGET_TYPE::WT_PROGRESS)
+{}
+progress_tl::~progress_tl()
+{}
+slider_tl::slider_tl() :widget_base(WIDGET_TYPE::WT_SLIDER)
+{}
+slider_tl::~slider_tl()
+{}
+colorpick_tl::colorpick_tl() :widget_base(WIDGET_TYPE::WT_COLORPICK)
+{}
+colorpick_tl::~colorpick_tl()
+{}
+scroll_bar::scroll_bar() :widget_base(WIDGET_TYPE::WT_SCROLL_BAR)
+{}
+scroll_bar::~scroll_bar()
+{}
+
+
 bool image_btn::on_mevent(int type, const glm::vec2& mps)
 {
 	return false;
@@ -23763,9 +23811,6 @@ void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
 }
 
 
-radio_tl::radio_tl()
-{
-}
 
 radio_tl::~radio_tl()
 {
@@ -25252,7 +25297,7 @@ public:
 			ptr = nullptr;
 		}
 		return ptr;
-	}
+}
 	static Shared* loadShared(const std::string& fnstr, std::vector<std::string>* pdir = nullptr)
 	{
 #ifdef NDEBUG
@@ -25291,7 +25336,7 @@ public:
 
 		}
 		return ptr;
-	}
+}
 	static void destroy(Shared* p)
 	{
 		if (p)
@@ -25487,7 +25532,7 @@ public:
 #endif
 #endif // _WIN32
 		return str;
-	}
+		}
 public:
 	Shared()
 	{
@@ -25500,7 +25545,7 @@ public:
 
 private:
 
-};
+	};
 
 struct icu_lib_t
 {
@@ -25611,7 +25656,7 @@ icu_lib_t* get_icu(int v)
 			else {
 				Shared::destroy(so);
 			}
-		}
+			}
 		catch (const std::exception& e)
 		{
 			auto ew = e.what();
@@ -25621,9 +25666,9 @@ icu_lib_t* get_icu(int v)
 				printf("load icu error!\n");
 			}
 		}
-	}
+		}
 	return icub;
-}
+	}
 
 void un_icu()
 {
