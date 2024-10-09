@@ -20058,7 +20058,7 @@ text_ctx_cx::text_ctx_cx()
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -20798,7 +20798,7 @@ bool text_ctx_cx::update(float delta)
 	bool ret = valid;
 	valid = false;
 	return true;
-	}
+}
 uint32_t get_reverse_color(uint32_t color) {
 	uint8_t* c = (uint8_t*)&color;
 	c[0] = 255 - c[0];
@@ -22135,22 +22135,24 @@ size_t plane_cx::add_res(const char* data, int len)
 	return 0;
 }
 
-void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width)
+void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
 {
 	auto pss = get_size();
 	{
-		auto cp = add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true);
+		auto cp = add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
 		bind_scroll_bar(cp, true); // 绑定垂直滚动条
 		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
 		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
 		cp->has_hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
 		cp->hscroll = {};
+		cp->rounding = std::max(2, (int)(width * 0.5));
 	}
 	{
-		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false);
+		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false, hnpos);
 		bind_scroll_bar(cp, false); // 绑定水平滚动条
 		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
 		cp->hscroll = {};
+		cp->rounding = std::max(2, (int)(width * 0.5));
 	}
 }
 
@@ -22233,7 +22235,7 @@ size_t plane_cx::add_familys(const char* familys, const char* style)
 	return ltx ? ltx->add_familys(familys, style) : 0;
 }
 
-scroll_bar* plane_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v)
+scroll_bar* plane_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos)
 {
 	auto p = new scroll_bar();
 	if (p)
@@ -22269,6 +22271,7 @@ scroll_bar* plane_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int
 		}
 		dw *= p->size;
 		p->pos -= dw;
+		p->pos -= npos;
 		p->set_viewsize(vs, cs, rcw);
 	}
 	return p;
@@ -25297,7 +25300,7 @@ public:
 			ptr = nullptr;
 		}
 		return ptr;
-}
+	}
 	static Shared* loadShared(const std::string& fnstr, std::vector<std::string>* pdir = nullptr)
 	{
 #ifdef NDEBUG
@@ -25336,7 +25339,7 @@ public:
 
 		}
 		return ptr;
-}
+	}
 	static void destroy(Shared* p)
 	{
 		if (p)
@@ -25532,7 +25535,7 @@ public:
 #endif
 #endif // _WIN32
 		return str;
-		}
+	}
 public:
 	Shared()
 	{
@@ -25545,7 +25548,7 @@ public:
 
 private:
 
-	};
+};
 
 struct icu_lib_t
 {
@@ -25656,7 +25659,7 @@ icu_lib_t* get_icu(int v)
 			else {
 				Shared::destroy(so);
 			}
-			}
+		}
 		catch (const std::exception& e)
 		{
 			auto ew = e.what();
@@ -25666,9 +25669,9 @@ icu_lib_t* get_icu(int v)
 				printf("load icu error!\n");
 			}
 		}
-		}
-	return icub;
 	}
+	return icub;
+}
 
 void un_icu()
 {

@@ -10,19 +10,27 @@
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 
-	auto pl1 = new plane_cx();
+	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
-	pl1->set_border({ 0x80ff802C,1,5,pbc });
-	form0->bind(pl1);	// 绑定到窗口  
-	pl1->set_rss(5);
-	pl1->_lms = { 6,6 };
+	p->set_border({ 0x80ff802C,1,5,pbc });
+	form0->bind(p);	// 绑定到窗口  
+	p->set_rss(5);
+	p->_lms = { 6,6 };
 	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
-	pl1->add_familys(fontn, 0);
-	pl1->draggable = true; //可拖动
-	pl1->set_size({ 320,600 });
-	pl1->set_pos({ 1000,100 });
-	pl1->on_click = [](plane_cx* p, int state, int clicks) {};
-	pl1->fontsize = 16;
+	p->add_familys(fontn, 0);
+	p->draggable = true; //可拖动
+	p->set_size({ 320,660 });
+	p->set_pos({ 1000,100 });
+	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->fontsize = 16;
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
+		p->set_scroll_hide(1);
+	}
+	p->set_view({ 320,660 }, { 600, 660 });
 	glm::vec2 bs = { 150,22 };
 	glm::vec2 bs1 = { 50,22 };
 	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
@@ -32,11 +40,11 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		for (size_t i = 0; i < boolstr.size(); i++)
 		{
 			auto& it = boolstr[i];
-			auto kcb = pl1->add_label(it.c_str(), bs, 0);
+			auto kcb = p->add_label(it.c_str(), bs, 0);
 			{
 				kcb->_disabled_events = true;
 				kcb->text_color = 0xff7373ff;
-				auto sw1 = (switch_tl*)pl1->add_switch(bs1, it.c_str(), *(bps[i]));
+				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
 				sw1->get_pos();
 				sw1->bind_ptr(bps[i]);
 			}
@@ -45,7 +53,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		bs.x = 300;
 		for (size_t i = 0; i < 18; i++)
 		{
-			auto kcb = pl1->add_label("", bs, 0);
+			auto kcb = p->add_label("", bs, 0);
 			kcb->text_color = 0xff80F61F;
 			kcb->_disabled_events = true;
 			lbs.push_back(kcb);

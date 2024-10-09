@@ -1814,7 +1814,7 @@ struct scroll_bar :public widget_base
 	int t_offset = 0;			// 偏移量
 	float scale_w = 1.0;		// 滚动比例
 	float scale_s = 0.6;		// 显示比例
-	glm::vec2 scale_s0 = { 0.6,0.8 };	// 显示比例，用于鼠标进入变形
+	glm::vec2 scale_s0 = { 0.8,0.8 };	// 显示比例，用于鼠标进入变形
 	bool hover = 0;				// 保存鼠标进入状态
 	bool hover_sc = 0;
 	bool hideble = 0;			// 隐藏滚动条
@@ -1938,7 +1938,7 @@ public:
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条
-	void set_scroll(int width, int rcw, const glm::ivec2& pos_width);
+	void set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
 	void set_scroll_hide(bool is);// 是否隐藏滚动条
 	void set_scroll_pos(const glm::ivec2& ps, bool v);
 	void set_scroll_size(const glm::ivec2& ps, bool v);
@@ -1949,7 +1949,7 @@ public:
 	// 添加字体,返回序号
 	size_t add_familys(const char* familys, const char* style);
 	// 添加滚动条
-	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v);
+	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
 	void add_widget(widget_base* p);
 	void remove_widget(widget_base* p);
 	// 新增控件：开关、复选、单选
