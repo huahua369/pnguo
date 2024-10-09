@@ -11,7 +11,7 @@
 #include "page.h"
 
 #include "buffer.h"
-
+#include <mapView.h>
 #if 1
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc)
 {
@@ -420,68 +420,68 @@ void test()
 }
 #endif // 1
 #if 1
-	enum InterpolationPath_e :uint8_t
+enum InterpolationPath_e :uint8_t
+{
+	TRANSLATION,
+	ROTATION,
+	SCALE,
+	WEIGHTS
+};
+enum InterpolationModes_e :uint8_t
+{
+	LINEAR,
+	STEP,
+	CUBICSPLINE
+};
+struct sampler_t
+{
+	size_t input;
+	size_t output;
+	InterpolationModes_e interpolation;
+};
+struct accessor_t
+{
+	float* _data;	// 数量
+	size_t _stride;	// float=1、vec2、vec3、vec4\quat=4
+	size_t _count;		// 数量
+	size_t size() {
+		return _count;
+	}
+	float* data() {
+		return _data;
+	}
+	const void* get(int i) const
 	{
-		TRANSLATION,
-		ROTATION,
-		SCALE,
-		WEIGHTS
-	};
-	enum InterpolationModes_e :uint8_t
+		if (i >= _count)
+			i = _count - 1;
+
+		return _data + _stride * i;
+	}
+
+	int FindClosestFloatIndex(float val) const
 	{
-		LINEAR,
-		STEP,
-		CUBICSPLINE
-	};
-	struct sampler_t
-	{
-		size_t input;
-		size_t output;
-		InterpolationModes_e interpolation;
-	};
-	struct accessor_t
-	{
-		float* _data;	// 数量
-		size_t _stride;	// float=1、vec2、vec3、vec4\quat=4
-		size_t _count;		// 数量
-		size_t size() {
-			return _count;
-		}
-		float* data() {
-			return _data;
-		}
-		const void* get(int i) const
+		int ini = 0;
+		int fin = _count - 1;
+
+		while (ini <= fin)
 		{
-			if (i >= _count)
-				i = _count - 1;
+			int mid = (ini + fin) / 2;
+			float v = *(const float*)get(mid);
 
-			return _data + _stride * i;
+			if (val < v)
+				fin = mid - 1;
+			else if (val > v)
+				ini = mid + 1;
+			else
+				return mid;
 		}
 
-		int FindClosestFloatIndex(float val) const
-		{
-			int ini = 0;
-			int fin = _count - 1;
-
-			while (ini <= fin)
-			{
-				int mid = (ini + fin) / 2;
-				float v = *(const float*)get(mid);
-
-				if (val < v)
-					fin = mid - 1;
-				else if (val > v)
-					ini = mid + 1;
-				else
-					return mid;
-			}
-
-			return fin;
-		}
-		float operator[](size_t _Pos) {
-			return _data[_Pos];
-		}
-	};
+		return fin;
+	}
+	float operator[](size_t _Pos) {
+		return _data[_Pos];
+	}
+};
 // todo 动画插值算法
 class interpolator_cx
 {
@@ -885,7 +885,7 @@ action_show_t* wait_show(bool visible, float wait)
 #endif // 1
 
 // todo 树
-#if 0
+#if 1
 static uint64_t toUInt(const njson& v, uint64_t de = 0)
 {
 	uint64_t ret = de;
@@ -895,7 +895,7 @@ static uint64_t toUInt(const njson& v, uint64_t de = 0)
 	}
 	else if (!v.is_null())
 	{
-		ret = std::atoll(trim(v.dump(), "\"").c_str());
+		ret = std::atoll(md::trim(v.dump(), "\"").c_str());
 	}
 	return ret;
 }
@@ -970,7 +970,7 @@ void freecb(njson* p)
 		delete p;
 	}
 }
-
+#if 0
 template<class T>
 T* get_ptr0(world_cx* ctx, const char* gid, int idx, int type)
 {
@@ -1001,7 +1001,7 @@ ui::scroll_view_u* world_cx::get_svptr(const char* gid, int idx) {
 ui::div_u* world_cx::get_divptr(const char* gid, int idx) {
 	return get_ptr0<ui::div_u>(this, gid, idx, 0);
 }
-
+#endif
 #define merge_j(dst,src) 	do{for (auto& [k, v] : src.items())	{ dst[k] = v;	}}while(0)
 /*
 	菜单开关动画实现，通过gid操作坐标，修改g的参数返回到动画处理系统执行
@@ -1014,11 +1014,13 @@ bool get_switch(njson& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* 
 	float wait = 0.0, sp3 = sp.z;
 	glm::vec2 t = { sp.x,sp.y }, vsize0 = {};
 	if (!vsize)vsize = &vsize0;
+#if 0
 	do {
 		if (idx >= g.size() && idx >= 0) { break; }
 		glm::vec2 pos = toVec2(g[0]["pos"]);
 		for (size_t x = 0; x < g.size(); x++) {
-			auto& vt = g[x]; auto& v1 = vt["v"];
+			auto& vt = g[x];
+			auto& v1 = vt["v"];
 			bool oc = vt.find("on") != vt.end() ? toBool(vt["on"]) : false;
 			if (one && x != idx) { vt["on"] = false; oc = false; }
 			if (x == idx) { oc = !oc; vt["on"] = oc; }
@@ -1050,12 +1052,14 @@ bool get_switch(njson& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* 
 		}
 		ret = true;
 	} while (0);
-	save_json(g, "temp/tr1758.json", 2);
+#endif
+	hz::save_json(g, "temp/tr1758.json", 2);
 	return ret;
 }
 
 void on_navclick(uint64_t idx, void* p)
 {
+#if 0
 	auto d = (njson*)p;
 	if (d)
 	{
@@ -1106,11 +1110,39 @@ void on_navclick(uint64_t idx, void* p)
 			(*cb)(idx, d);
 		}
 	}
+#endif
 }
 
-
+struct tree2_info_t {
+	float round = 0.1;
+	float mt = 0.2;
+	bool xtype = false;			// 单个展开
+	bool sc_visible = true;		// 是否显示滚动条
+	std::string gid;
+	glm::ivec2 pos = {};		// 整体坐标
+	glm::ivec2 cpos = {};		// 坐标
+	glm::ivec2 size = {};		// 大小
+	glm::ivec2 fontheight = {};		// 字高
+	glm::ivec2 space = {};		// 间隔
+	glm::ivec2 row_size = {};		// 行宽高
+	glm::ivec2 color_idx = {};		// 风格颜色
+	glm::ivec2 effect = {};		// 风格
+	glm::ivec2 scroll = {};		// 滚动量
+	glm::ivec2 crow_size = {};		// 子元素大小
+	glm::vec4 asize = {};
+	float expmt = {};
+	glm::vec2 ips;		// 偏移 
+	uint32_t btn_fillcolor[2] = {};
+	uint32_t btn_bordercolor[2] = { 0xff000000,0xff000000 };
+	float indent = 0.0;
+};
+struct dv_t
+{
+	std::string key;
+	std::vector<std::string> v;
+};
 // 创建导航菜单, cb单击回调
-void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
+void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<void(int, njson*)> cb)
 {
 	glm::ivec2 size = { 220, 680 }, pos = { 10,10 };
 	glm::ivec2 ps = { 10,10 };
@@ -1122,49 +1154,46 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 	glm::ivec2 scroll = { 10, 10 };
 	glm::ivec2 crow_size = { 10, 10 };
 	float padx = 20;
-	float fr = toFloat(info["round"], 0.1);
-	float mt = toFloat(info["mt"], 0.2);
-	bool xtype = toBool(info["xtype"]);
+	float fr = info->round;// toFloat(info["round"], 0.1);
+
 	njson btn, r;
 	int i = 0, i1 = d.size();
 	njson tr;
 	int y = 0;
-	std::string gid = toStr(info["gid"], "list_nav");
-	toiVec2(info["pos"], pos);		// 整体坐标
-	toiVec2(info["cpos"], ps);		// 坐标
-	toiVec2(info["size"], size);		// 大小
-	toiVec2(info["fontheight"], fh);		// 字高
-	toiVec2(info["space"], space);		// 间隔
-	toiVec2(info["row_size"], ss);		// 行宽高
-	toiVec2(info["color_idx"], color_idx);		// 风格颜色
-	toiVec2(info["effect"], effect);		// 风格
-	toiVec2(info["scroll"], scroll);		// 滚动量
-	toiVec2(info["crow_size"], crow_size);		// 子元素大小
-	glm::vec2 ips;
-	toVec2(info["ips"], ips);		// 偏移
+	std::string gid = info->gid;
+	//toiVec2(info["pos"], pos);		// 整体坐标
+	//toiVec2(info["cpos"], ps);		// 坐标
+	//toiVec2(info["size"], size);		// 大小
+	//toiVec2(info["fontheight"], fh);		// 字高
+	//toiVec2(info["space"], space);		// 间隔
+	//toiVec2(info["row_size"], ss);		// 行宽高
+	//toiVec2(info["color_idx"], color_idx);		// 风格颜色
+	//toiVec2(info["effect"], effect);		// 风格
+	//toiVec2(info["scroll"], scroll);		// 滚动量
+	//toiVec2(info["crow_size"], crow_size);		// 子元素大小
+		// 偏移
 	uint32_t divc[2] = {};
-	auto fillc = info["btn_fillcolor"];
-	auto bc = info["btn_bordercolor"];
-	padx = toInt(info["indent"], padx);
+	auto& fillc = info->btn_fillcolor;
+	auto& bc = info->btn_bordercolor;
+	padx = info->indent;
 	njson kstr0;
-	for (auto it : d)
+	for (auto& it : d)
 	{
-		auto s2 = it.begin();
-		auto str = toStr(s2.key());
+		auto str = it.key;
 		auto& t0 = push_button(str.c_str(), color_idx.x, i, btn, ss, fh.x);
-		auto& kt = s2.value();
+		auto& kt = it.v;
 		njson atn;
 		atn["gid"] = gid + "_" + std::to_string(i);
 		t0["gid"] = atn["gid"];
 		t0["effect"] = effect.x;
-		if (bc.size())
+		if (bc[0] != 0)
 			t0["border_color"] = bc[0];//? bc : 0xccff9e40;
-		if (fillc.size())
+		if (fillc[0] != 0)
 			t0["fill_color"] = fillc[0];//? bc : 0xccff9e40;
 		auto ps1 = ps;
 		ps1.y += y;
 		t0["pos"] = { ps1.x,  ps1.y };
-		t0["sps"] = { ips.x,0.5 };
+		t0["sps"] = { info->ips.x,0.5 };
 		//t0["ips"] = { ips.x, 0 };
 		atn["pos"] = { ps1.x,  ps1.y };
 		y += ss.y + space.x;
@@ -1175,7 +1204,7 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 		}
 		for (size_t x = 0; x < kt.size(); x++)
 		{
-			auto nt = toStr(kt[x]);
+			auto nt = kt[x];
 			glm::vec2 c2 = { crow_size.x - padx,crow_size.y };
 			ps1 = ps;
 			ps1.y += y;
@@ -1186,15 +1215,13 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 			auto& c0 = push_button(nt.c_str(), color_idx.y, i1++, btn, c2, fh.y);
 			c0["gid"] = atn["gid"];
 			c0["effect"] = effect.y;
-			//c0["has_drag_pos"] = 1;
 			c0["pos"] = { ps1.x,  ps1.y };
-			if (bc.size() > 1)
+			if (bc[1] != 0)
 				c0["border_color"] = bc[1];
-			if (fillc.size() > 1)
+			if (fillc[1])
 				c0["fill_color"] = fillc[1];
 
-			c0["sps"] = { ips.y,0.5 };
-			//c0["ips"] = { ips.y,0 };
+			c0["sps"] = { info->ips.y,0.5 };
 			y += c2.y + space.x;
 		}
 		y += space.y;
@@ -1204,14 +1231,13 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 	}
 	njson* od = new njson();
 	(*od)["$count"] = d.size();
-	(*od)["$at"] = tr;
-	(*od)["$ctx"] = (uint64_t)this;
+	(*od)["$at"] = tr; 
 	njson base;
-	base["sp"] = { space.x,space.y,padx,mt };
-	base["xtype"] = xtype;
+	base["sp"] = { space.x,space.y,padx,info->mt };
+	base["xtype"] = info->xtype;
 	base["gid"] = gid;
-	base["asize"] = info["asize"];
-	base["expmt"] = info["expmt"];
+	//base["asize"] = info["asize"];
+	//base["expmt"] = info["expmt"];
 	(*od)["$base"] = base;
 	{
 		auto& kn = btn;
@@ -1223,7 +1249,7 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 			b1.clear();
 			auto it = kn[i];
 			b1["t"] = "button";
-			b1["fround"] = fr;
+			b1["fround"] = info->round;
 			b1["abs"] = true;// 使用动画控制坐标，所以设置绝对坐标
 			for (auto& [k, v] : it.items())
 				b1[k] = v;
@@ -1244,11 +1270,11 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 	dv["pid"] = 0;	// pid==0是根节点
 	dv["dragable"] = 0;	// 可拖动
 	dv["front"] = 0 * 1;	// 点击前置显示
-	dv["rounding"] = info["rounding"];	// 圆角
+	//dv["rounding"] = info["rounding"];	// 圆角
 	glm::ivec2 s = { size.x, size.y };
 	dv["size"] = { s.x,s.y };
 	dv["pos"] = { pos.x,pos.y };
-	merge_j(dv, info);
+	//merge_j(dv, info);
 	dv["t"] = "div";
 	dv[".dp"] = (uint64_t)od;
 	dv[".onfree"] = (uint64_t)freecb;
@@ -1256,26 +1282,26 @@ void new_tree2(njson d, njson info, std::function<void(int, njson*)> cb)
 	rv["t"] = "view";
 	dv["fill"] = 0;	dv["border"] = 0; dv.erase("color");
 	//rv["border"] = 0x80a05000;	rv["fill"] = 0xff505050; // 边框背景颜色
-	rv["color"] = info["color"];
-	rv["rounding"] = info["rounding"];	// 圆角
+	//rv["color"] = info["color"];
+	//rv["rounding"] = info["rounding"];	// 圆角
 	// auto_size{xy一般为负数(直接和父级相加)，zw要大于0}
 	rv["auto_size"] = { 0,0,1,1 };
 	rv["abs"] = 1;
 	rv["size"] = { size.x,size.y };
 	rv["vss"] = { size.x - 100,y };
 	rv["step"] = { scroll.x, scroll.y };
-	rv["sc_visible"] = info["sc_visible"];
+	/*rv["sc_visible"] = info["sc_visible"];*/
 	rv["gid"] = gid;
 	rv[".c"] = r;
 	dv[".c"].push_back(rv);
-	new_widget(dv, 0);
-	glm::vec2 vsize;
-	if (get_switch(tr, -1, { space.x,space.y,padx }, 0, xtype, &vsize))
-	{
-		auto sv = get_svptr(gid.c_str(), 0);
-		push_action(tr);
-		if (sv)
-			sv->set_content_size(vsize);
-	}
+	//new_widget(dv, 0);
+	//glm::vec2 vsize;
+	//if (get_switch(tr, -1, { space.x,space.y,padx }, 0, xtype, &vsize))
+	//{
+	//	auto sv = get_svptr(gid.c_str(), 0);
+	//	push_action(tr);
+	//	if (sv)
+	//		sv->set_content_size(vsize);
+	//}
 }
 #endif
