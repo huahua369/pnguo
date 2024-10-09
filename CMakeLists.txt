@@ -139,7 +139,7 @@ list(APPEND tpv_src
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
 "third_party/vkvg/vkvgcx.cpp"  
-"third_party/vkgui/mapView.cpp"  
+"src/vkgui/mapView.cpp"  
 
 "third_party/mcut/bvh.cpp"  
 "third_party/mcut/frontend.cpp"  
@@ -156,7 +156,8 @@ list(APPEND tpv_src
 )
 
 include_directories("third_party") 
-include_directories("third_party/vkgui") 
+include_directories("src") 
+include_directories("src/vkgui") 
 include_directories("third_party/mcut") 
 include_directories("third_party/vkvg")
 include_directories("third_party/vkvg/src")
@@ -174,7 +175,7 @@ PkgConfig::LIBGIT2
 )
 
 #3d渲染器
-add_subdirectory(third_party/vkgui)
+add_subdirectory(src/vkgui)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE)
 

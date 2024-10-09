@@ -140,7 +140,7 @@ int main()
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 			//load_gltf(vkd, R"(E:\model\psx_houses.glb)");
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,16,-8 * 0 }, 1.0);
+			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
 			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
