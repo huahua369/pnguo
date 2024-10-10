@@ -249,7 +249,6 @@ int main()
 	const char* wtitle = (char*)u8"窗口1";
 
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable | ef_transparent | ef_borderless);
-	form0->set_alpha(true);
 #if 1
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
@@ -277,20 +276,23 @@ int main()
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示
-		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		auto texok = nullptr;// form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.9928;
 		vkd->state.EmissiveFactor = 250;
 		new_ui(form0, vkd);
-		form0->up_cb = [=](float delta, int* ret)
-			{
-				auto light = vkd->get_light(0);
-				vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-				vkd->state.Exposure;				// 曝光度：默认1.0
-				vkd->state.bUseTAA;
-				vkd->update(form0->io);	// 更新事件
-				vkd->on_render();		// 执行渲染
-			};
+		if (texok)
+		{
+			form0->up_cb = [=](float delta, int* ret)
+				{
+					auto light = vkd->get_light(0);
+					vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+					vkd->state.Exposure;				// 曝光度：默认1.0
+					vkd->state.bUseTAA;
+					vkd->update(form0->io);	// 更新事件
+					vkd->on_render();		// 执行渲染
+				};
+		}
 
 	}
 #else

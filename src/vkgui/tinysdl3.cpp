@@ -119,14 +119,24 @@ namespace pce {
 		}
 		return hr;
 	}
-	HRESULT EnableBlurBehindWindowMY(HWND window, bool enable = true, HRGN region = 0, bool transitionOnMaximized = false)
+	HRESULT EnableBlurBehindWindowMY(HWND window, bool enable = true, HRGN region = 0, bool transitionOnMaximized = false, const glm::ivec2& size = { -1,-1 })
 	{
 		BOOL pfe = 0;
 		auto hr = DwmIsCompositionEnabled(&pfe);
-		if (!pfe)
+		//if (!pfe)
 		{
 			DwmEnableComposition(enable ? DWM_EC_ENABLECOMPOSITION : DWM_EC_DISABLECOMPOSITION);
 		}
+		DWM_BLURBEHIND bb = { 0 };
+		HRGN hRgn = CreateRectRgn(0, 0, -1, -1); //应用毛玻璃的矩形范围，
+		//参数(0,0,-1,-1)可以让整个窗口客户区变成透明的，而鼠标是可以捕获到透明的区域
+		bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
+		bb.hRgnBlur = hRgn;
+		bb.fEnable = TRUE;
+		hr = DwmEnableBlurBehindWindow(window, &bb);
+		if (hRgn)
+			DeleteObject(hRgn);
+		return hr;
 		BOOL isNCRenderingEnabled{ FALSE };
 		hr = ::DwmGetWindowAttribute(window,
 			DWMWA_NCRENDERING_ENABLED,
@@ -151,7 +161,7 @@ namespace pce {
 		bool isnew = false;
 		if (!region)
 		{
-			region = CreateRectRgn(0, 0, -1, -1);
+			region = CreateRectRgn(0, 0, size.x, size.y);
 			isnew = true;
 		}
 		if (enable && 0 != region)
@@ -419,6 +429,12 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	{
 		return 0;
 	}
+	auto pw = new form_x();
+	pw->app = this;
+	pw->_ptr = window;
+	pw->_size = ws;
+	//if (fgs & ef_transparent)
+	//	pw->set_alpha(true);
 	if (derender) {
 		std::string rn;
 		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
@@ -444,7 +460,6 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		SDL_GetRenderVSync(renderer, &vsync);
 		SDL_SetRenderVSync(renderer, 0);
 	}
-	auto pw = new form_x();
 	if (!pw)
 	{
 		SDL_DestroyWindow(window);
@@ -2018,13 +2033,13 @@ void form_x::set_icon(const uint32_t* d, int w, int h)
 	SDL_DestroySurface(icon);
 }
 
-void form_x::set_alpha(bool is)
-{
-#ifdef _WIN32
-	auto hWnd = (HWND)pce::get_windowptr(_ptr);
-	pce::EnableBlurBehindWindowMY(hWnd, is);
-#endif
-}
+//void form_x::set_alpha(bool is)
+//{
+//#ifdef _WIN32
+//	auto hWnd = (HWND)pce::get_windowptr(_ptr);
+//	pce::EnableBlurBehindWindowMY(hWnd, is, 0, false, _size);
+//#endif
+//}
 
 
 
@@ -2273,13 +2288,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-	}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
@@ -2522,12 +2537,12 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"menu";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_resizable | ef_borderless | ef_popup;
+		ptf.flags = ef_vulkan | ef_resizable | ef_borderless | ef_popup | ef_transparent;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
-			form1->set_alpha(true);
+			//form1->set_alpha(true);
 			form1->mmove_type = 0;
 			form1->_focus_lost_hide = true;
 		}
@@ -2543,12 +2558,12 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_tooltip;//  ef_utility;
+		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
-			form1->set_alpha(true);
+			//form1->set_alpha(true);
 			form1->mmove_type = 0;
 		}
 	}
