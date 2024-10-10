@@ -871,18 +871,31 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 	if (img && img->width > 0 && img->height > 0)
 	{
 		SDL_Texture* ptx = (SDL_Texture*)img->texid;
-		if (renderer && !ptx)
+		if (renderer)
 		{
-			auto ty = img->type;
-			if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
-			if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
-			ptx = SDL_CreateTexture(renderer, (SDL_PixelFormat)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
-			img->texid = ptx;
-			img->valid = true;
-			pr = ptx;
-			// 设置texture 混合模式
-			//SDL_SetTextureBlendMode(p, SDL_BLENDMODE_BLEND);
-			SDL_SetTextureBlendMode(ptx, get_blend((BlendMode_e)img->blendmode, img->multiply));
+			if (ptx)
+			{
+				glm::vec2 oldss = {};
+				if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
+					glm::ivec2 iss = oldss;
+					if (img->width != iss.x || img->height != iss.y) {
+						ptx = nullptr;
+					}
+				}
+			}
+			if (!ptx)
+			{
+				auto ty = img->type;
+				if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
+				if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
+				ptx = SDL_CreateTexture(renderer, (SDL_PixelFormat)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
+				img->texid = ptx; img->stride = 0;
+				img->valid = true;
+				pr = ptx;
+				// 设置texture 混合模式
+				//SDL_SetTextureBlendMode(p, SDL_BLENDMODE_BLEND);
+				SDL_SetTextureBlendMode(ptx, get_blend((BlendMode_e)img->blendmode, img->multiply));
+			}
 		}
 		if (img->data && img->valid)
 		{
@@ -908,6 +921,7 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 				auto& v = p->_texs_t;
 				v.erase(std::remove(v.begin(), v.end(), ptx), v.end());
 				it->img->texid = 0;
+				it->img->stride = 0;
 			}
 		}
 		for (auto it : p->_atlas_cx)
@@ -919,6 +933,7 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 				auto& v = p->_texs_t;
 				v.erase(std::remove(v.begin(), v.end(), ptx), v.end());
 				it->img->texid = 0;
+				it->img->stride = 0;
 			}
 		}
 		p->valid = true;
@@ -927,15 +942,33 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 	}
 	for (auto it : p->_atlas_t)
 	{
+		auto optx = (SDL_Texture*)it->img->texid;
 		auto ptx = newuptex(renderer, it->img);
 		if (ptx)
+		{
+			if (optx && optx != ptx) {
+				auto& v = p->_texs_t;
+				SDL_DestroyTexture(optx);
+				v.erase(std::remove(v.begin(), v.end(), optx), v.end());
+			}
 			p->_texs_t.push_back(ptx);
+			p->valid = true;
+		}
 	}
 	for (auto it : p->_atlas_cx)
 	{
+		auto optx = (SDL_Texture*)it->img->texid;
 		auto ptx = newuptex(renderer, it->img);
 		if (ptx)
+		{
+			if (optx && optx != ptx) {
+				auto& v = p->_texs_t;
+				SDL_DestroyTexture(optx);
+				v.erase(std::remove(v.begin(), v.end(), optx), v.end());
+			}
 			p->_texs_t.push_back(ptx);
+			p->valid = true;
+		}
 	}
 
 	p->apply();
@@ -2240,13 +2273,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+	}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)

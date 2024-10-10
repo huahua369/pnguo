@@ -1934,11 +1934,11 @@ public:
 	glm::vec2 get_size();
 	void set_clear_color(uint32_t c);
 	// 线颜色，线粗，圆角，背景色
-	void set_border(const glm::ivec4& c);
+	void set_color(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条
-	void set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
+	void set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos = {}, const glm::ivec2& hnpos = {});
 	void set_scroll_hide(bool is);// 是否隐藏滚动条
 	void set_scroll_pos(const glm::ivec2& ps, bool v);
 	void set_scroll_size(const glm::ivec2& ps, bool v);

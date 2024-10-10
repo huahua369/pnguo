@@ -8,15 +8,76 @@
 #include <vkgui/win_core.h>
 #include "mshell.h"
 
-void new_ui(form_x* form0, vkdg_cx* vkd) {
 
+auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+
+void menu_m(form_x* form0)
+{
+	auto mainmenu = new plane_cx();
+	form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
+	auto p = mainmenu;
+	//p->set_rss(5);
+	p->add_familys(fontn, 0);
+	//p->draggable = true; //可拖动✔
+	p->set_color({ 0,1,0,0xff000000 });
+	// 主菜单
+	std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
+	p->fontsize = 16;
+
+	{
+		glm::ivec2  fs = form0->get_size();
+		if (fs.x & 1)
+			fs.x++;
+		if (fs.y & 1)
+			fs.y++;
+		p->set_size({ fs.x, p->fontsize * 2 });
+	}
+	p->set_pos({});
+	glm::vec2 cs = { 1500,1600 };
+	auto vs = p->get_size();
+
+	p->set_view(vs, cs);
+	p->update_cb = [=](float dt)
+		{
+			bool r = false;
+			if (form0)
+			{
+				glm::ivec2 ps = p->get_size(), fs = form0->get_size();
+				if (fs.x & 1)
+					fs.x++;
+				if (fs.y & 1)
+					fs.y++;
+				if (ps.x != fs.x)
+				{
+					p->set_size({ fs.x, p->fontsize * 2 });
+					r = true;
+				}
+			}
+			return r;
+		};
+	for (auto& it : mvs)
+	{
+		auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
+		cbt->effect = uTheme::light;
+		cbt->hscroll = {};
+		cbt->rounding = 0;
+		cbt->light = 0.1;
+
+		cbt->click_cb = [=](void* ptr, int clicks)
+			{
+				printf("%s\n", cbt->str.c_str());
+			};
+	}
+
+}
+void new_ui(form_x* form0, vkdg_cx* vkd) {
+	menu_m(form0);
 	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
-	p->set_border({ 0x80ff802C,1,5,pbc });
+	p->set_color({ 0x80ff802C,1,5,pbc });
 	form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
 	p->_lms = { 6,6 };
-	auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	p->add_familys(fontn, 0);
 	p->draggable = true; //可拖动
 	p->set_size({ 320,660 });
@@ -76,7 +137,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	for (int i = 0; i < 0 * 8; i++) {
 		auto p = new plane_cx();
 		uint32_t tc = cc[i];
-		p->set_border({ 0x80ff802C,1,5,0xff2c2c2c });
+		p->set_color({ 0x80ff802C,1,5,0xff2c2c2c });
 		form0->bind(p);	// 绑定到窗口  
 		p->set_rss(5);
 		p->_lms = { 6,6 };
@@ -157,7 +218,7 @@ int main()
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示
-		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,20 }, 1);// 创建SDL的bgra纹理 
+		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.9928;
 		vkd->state.EmissiveFactor = 250;

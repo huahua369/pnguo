@@ -1012,9 +1012,9 @@ int main()
 	pl2->_lms = { 6,6 };
 	uint32_t pbc = 0x80121212;
 
-	pl1->set_border({ 0x80ff802C,1,5,pbc });
-	pl2->set_border({ 0x80ff802C,1,5,pbc });
-	pl3->set_border({ 0x80ff802C,1,5 ,pbc });
+	pl1->set_color({ 0x80ff802C,1,5,pbc });
+	pl2->set_color({ 0x80ff802C,1,5,pbc });
+	pl3->set_color({ 0x80ff802C,1,5 ,pbc });
 	pw->bind(mainmenu, 1);	// 绑定到窗口
 	pw->bind(pl3);	// 绑定到窗口
 	pw->bind(pl2);	// 绑定到窗口
@@ -1045,7 +1045,7 @@ int main()
 	{
 		auto p = mainmenu;
 		//p->draggable = true; //可拖动✔
-		p->set_border({ 0,1,0,0xff000000 });
+		p->set_color({ 0,1,0,0xff000000 });
 		// 主菜单
 		std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
 		p->_lms = { 2,2 };
@@ -1076,7 +1076,7 @@ int main()
 		p->draggable = true; //可拖动
 		p->add_familys(fontn, 0);
 		p->_lms = { 6,6 };
-		p->set_border({ 0x80ff802C,1,5 ,pbc });
+		p->set_color({ 0x80ff802C,1,5 ,pbc });
 		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
 		p->fontsize = 26;
 		p->set_size({ 500,600 });
@@ -1320,7 +1320,7 @@ int main()
 		}
 	}
 	// 创建列表视图
-	listp->set_border({ 0x80ff802C,1,5,0xff333333 });
+	listp->set_color({ 0x80ff802C,1,5,0xff333333 });
 	pw->bind(listp);	// 绑定到窗口	
 	listp->add_familys(fontn, 0);
 	listp->add_familys(fontn2, 0);

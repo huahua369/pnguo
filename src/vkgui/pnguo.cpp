@@ -10190,7 +10190,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		ret.h = lheight;
 		ret.cpos = { 3,3 };
 		glm::ivec2 iss = { width , lheight };
-		p->set_border({ 0xff606060,1,0,0xf0121212 });
+		p->set_color({ 0xff606060,1,0,0xf0121212 });
 		glm::ivec2 ss = { width + p->border.y * 7, v.size() * lheight + p->border.y * 7 };
 
 		auto radius = ltx->sli_radius;
@@ -22217,7 +22217,7 @@ void plane_cx::set_clear_color(uint32_t c)
 {
 	tv->clear_color = rgb2bgr(c);
 }
-void plane_cx::set_border(const glm::ivec4& c) {
+void plane_cx::set_color(const glm::ivec4& c) {
 	border = c;
 }
 void plane_cx::move2end(widget_base* wp)
@@ -22530,7 +22530,7 @@ void plane_cx::update(float delta)
 	if (cr)
 	{
 		evupdate = 0;
-		auto ls = get_size(); ls -= 1;
+		auto ls = get_size();
 		bool has_border = (border.y > 0 && border.x != 0);
 		{
 			// 背景 
@@ -22570,6 +22570,7 @@ void plane_cx::update(float delta)
 		// 边框线  
 		if (has_border)
 		{
+			ls -= 1;
 			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
 			fill_stroke(cr, 0, border.x, border.y, false);
 		}
