@@ -10233,7 +10233,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		ss += radius;
 		ret.fsize = ss;
 		ret.p = p;
-		ret.back = pa;
+		ret.back = pa;  
 	}
 	return ret;
 }

@@ -1,8 +1,10 @@
 ﻿
 #include <pch1.h>
+#include <vkgui/event.h>
 #include <vkgui/pnguo.h>
 #include <vkgui/tinysdl3.h>
 #include <vkgui/vkrenderer.h>
+#include <vkgui/page.h>
 
 #include <random>
 #include <vkgui/win_core.h>
@@ -55,6 +57,45 @@ void menu_m(form_x* form0)
 			}
 			return r;
 		};
+
+	menu_cx* mc = new menu_cx();	// 菜单管理
+	mc->set_main(form0);
+	mc->add_familys(fontn);
+
+	std::vector<std::string> mvs0 = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
+	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
+	int cidx = 1;
+	// 创建菜单
+	auto pm31 = mc->new_menu(-1, 22, mvs1, [=](mitem_t* pm, int type, int idx)
+		{
+			if (type)
+			{
+				pm->hide(true);	// 点击隐藏
+				printf("click:%d\t%d\n", type, idx);
+			}
+			else
+				printf("move:%d\t%d\n", type, idx);
+		});
+	auto pm3 = mc->new_menu(-1, 22, mvs0, [=](mitem_t* pm, int type, int idx)
+		{
+			if (type)
+			{
+				if (idx != cidx)
+					pm->hide(true);	// 点击隐藏
+				printf("click:%d\t%d\n", type, idx);
+			}
+			else
+			{
+				if (idx == cidx)
+					pm31->show(pm->get_idx_pos(idx));// 显示子菜单
+				else
+					pm31->hide(false);
+				printf("move:%d\t%d\n", type, idx);
+			}
+		});
+	pm31->parent = pm3;
+	pm3->show({ 100,100 }); // 显示菜单
+
 	for (auto& it : mvs)
 	{
 		auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
@@ -67,8 +108,24 @@ void menu_m(form_x* form0)
 			{
 				printf("%s\n", cbt->str.c_str());
 			};
+		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
+			{
+				auto cp = (color_btn*)pt;
+				auto t = (event_type2)type;
+				switch (t)
+				{
+				case event_type2::on_down:
+				{
+					auto cps = cp->get_pos();
+					cps.y += cp->size.y + cp->thickness;
+					pm3->show(cps);
+				}
+				break;
+				default:
+					break;
+				}
+			};
 	}
-
 }
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	menu_m(form0);
@@ -190,7 +247,9 @@ int main()
 	//testnjson();
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口1";
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
+
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable | ef_transparent | ef_borderless);
+	form0->set_alpha(true);
 #if 1
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
