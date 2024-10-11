@@ -119,16 +119,18 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 	width = w;
 	height = h;
 	v = mvs;
-	backgs->remove_atlas(pv.back);
+	if (pv.back)
+		backgs->remove_atlas(pv.back);
 	fronts->remove_atlas(pv.front);
 	ltx->free_menu(pv);
 	auto p = this;
-	pv = ltx->new_menu(width, height, mvs, [=](int type, int idx)
+	pv = ltx->new_menu(width, height, mvs, false, [=](int type, int idx)
 		{
 			if (ckm_cb)
 				ckm_cb(p, type, idx);
 		});
-	backgs->add_atlas(pv.back);
+	if (pv.back)
+		backgs->add_atlas(pv.back);
 	fronts->add_atlas(pv.front);
 }
 
@@ -176,12 +178,14 @@ void menu_cx::show_item(mitem_t* it, const glm::vec2& pos)
 	auto mf1 = it->f ? it->f : new_form_popup(form, it->pv.fsize.x, it->pv.fsize.y);
 	if (it->f)
 	{
-		it->f->remove(it->backgs);
+		if (it->backgs->count())
+			it->f->remove(it->backgs);
 		it->f->remove(it->fronts);
 		it->f->unbind(it->pv.p);
 	}
 	it->f = mf1;
-	mf1->add_canvas_atlas(it->backgs);
+	if (it->backgs->count())
+		mf1->add_canvas_atlas(it->backgs);
 	mf1->bind(it->pv.p);
 	mf1->add_canvas_atlas(it->fronts);
 	mf1->set_size(it->pv.fsize);
@@ -976,22 +980,22 @@ void set_moveto(sw_item_t& v, glm::vec2 target, glm::vec2 from, float mt, float 
 	v.wait = wait;
 	v.target = target;
 	v.from = from;
-	v.pad = {}; 
+	v.pad = {};
 }
 void set_moveto(sw_item_t& v, float mt, glm::vec2 target, float wait)
 {
-	v.type = 1;	
+	v.type = 1;
 	v.mt = mt;
 	v.wait = wait;
 	v.target = target;
-	v.pad = {}; 
+	v.pad = {};
 }
 void set_moveto(sw_item_t& v, glm::vec2 pad, float mt, float wait)
 {
 	v.type = 2;
 	v.mt = mt;
 	v.wait = wait;
-	v.pad = pad; 
+	v.pad = pad;
 }
 bool get_switch(std::vector<swinfo_t>& g, int idx, glm::vec3 sp, float mt, bool one, glm::vec2* vsize)
 {
@@ -1169,7 +1173,7 @@ void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<voi
 		auto ps1 = ps;
 		ps1.y += y;
 		t0["pos"] = { ps1.x,  ps1.y };
-		t0["sps"] = { info->ips.x,0.5 }; 
+		t0["sps"] = { info->ips.x,0.5 };
 		atn["pos"] = { ps1.x,  ps1.y };
 		y += ss.y + space.x;
 		{

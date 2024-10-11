@@ -277,6 +277,7 @@ public:
 	void free_image(image_ptr_t* p);
 	// 转换成bgra预乘
 	void convert_bgr_multiply(image_ptr_t* p);
+	size_t count();
 public:
 	// 窗口调用 
 	void apply();	// 创建顶点啥的
@@ -1091,7 +1092,7 @@ public:
 	// 创建阴影
 	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
 	// 创建菜单
-	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, std::function<void(int type, int id)> cb);
+	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb);
 	void free_menu(pvm_t pt);
 private:
 	void c_line_metrics(size_t idx, int fontsize);

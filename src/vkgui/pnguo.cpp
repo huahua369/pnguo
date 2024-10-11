@@ -1235,6 +1235,10 @@ void canvas_atlas::remove_atlas(atlas_t* p) {
 		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
 	}
 }
+size_t canvas_atlas::count()
+{
+	return _atlas_t.size() + _atlas_cx.size();
+}
 image_ptr_t* canvas_atlas::new_image2(const void* file)
 {
 	return stbimage_load::new_load(file, 0);
@@ -10165,7 +10169,7 @@ atlas_cx* layout_text_x::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
 	return a;
 }
 
-pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::string>& v, std::function<void(int type, int id)> cb)
+pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb)
 {
 	pvm_t ret = {};
 	auto ltx = this;
@@ -10194,9 +10198,14 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		glm::ivec2 ss = { width + p->border.y * 7, v.size() * lheight + p->border.y * 7 };
 
 		auto radius = ltx->sli_radius;
-		ss += radius;
-		auto pa = ltx->new_shadow(ss, {});
-		ss -= radius;
+		glm::ivec2 sas = {};
+		if (has_shadow)
+		{
+			sas += radius;
+			auto ass = ss + radius;
+			auto pa = ltx->new_shadow(ass, {});
+			ret.back = pa;
+		}
 		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
 		p->custom_layout = true;
 		p->set_fontctx(ltx->ctx);
@@ -10228,12 +10237,10 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 			}
 			i++;
 		}
-		p->set_size(ss);
+		p->set_size(ss + sas);
 		p->set_pos({ radius * 0,radius * 0 });
-		ss += radius;
 		ret.fsize = ss;
 		ret.p = p;
-		ret.back = pa;  
 	}
 	return ret;
 }
