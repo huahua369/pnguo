@@ -2232,9 +2232,9 @@ void* form_x::get_texture_vk(SDL_Texture* p)
 	return ra;
 }
 
-int form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
+bool form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
 {
-	int ret = -1;
+	bool ret = false;
 	if (vkimageptr)
 	{
 		auto tex = new_texture(size.x, size.y, vkimageptr, type);// 创建SDL的bgra纹理
@@ -2243,7 +2243,7 @@ int form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec
 			// 添加纹理到SDL窗口渲染 
 			set_texture_blend(tex, (int)BlendMode_e::normal, 0);
 			push_texture(tex, { 0,0,size.x,size.y }, { pos,size }, 0);
-			ret = 0;
+			ret = true;
 		}
 	}
 	return ret;

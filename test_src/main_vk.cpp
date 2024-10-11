@@ -110,6 +110,7 @@ void menu_m(form_x* form0)
 			};
 		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 			{
+				static int enterst = 0;
 				auto cp = (color_btn*)pt;
 				auto t = (event_type2)type;
 				switch (t)
@@ -119,9 +120,36 @@ void menu_m(form_x* form0)
 					auto cps = cp->get_pos();
 					cps.y += cp->size.y + cp->thickness;
 					pm3->show(cps);
+					hide_tooltip(form0);
+				}
+				break;
+				case event_type2::on_enter:
+				{
+					enterst++;
+				}
+				break;
+				case event_type2::on_hover:
+				{
+					// 0.5秒触发悬停事件
+					style_tooltip stp = {};
+					stp.family = fontn;
+					stp.fonst_size = 14;
+					glm::vec2 cps = mps;
+					cps.y += 20;
+					if (enterst == 1) {
+						show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+					}
+					enterst++;
+				}
+				break;
+				case event_type2::on_leave:
+				{
+					enterst = 0;
+					hide_tooltip(form0);
 				}
 				break;
 				default:
+					hide_tooltip(form0);
 					break;
 				}
 			};
@@ -253,7 +281,7 @@ int main()
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
-	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);
+	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	if (vkd) {
 		{
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
@@ -275,8 +303,8 @@ int main()
 			//vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)");
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
-		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示
-		auto texok = nullptr;// form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.9928;
 		vkd->state.EmissiveFactor = 250;
