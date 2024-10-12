@@ -279,7 +279,7 @@ int main()
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
 
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
+	vkdg_cx* vkd = 0;// new_vkdg(&sdldev);	// 创建vk渲染器 
 	SDL_Texture* d3tex = 0;
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	if (vkd) {
