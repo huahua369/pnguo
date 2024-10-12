@@ -1824,7 +1824,7 @@ void form_x::present()
 	SDL_SetRenderClipRect(renderer, &viewport);
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 	SDL_RenderClear(renderer);
-
+#if 1
 	{
 		auto ktd = textures[0].data();
 		auto length = textures[0].size();
@@ -1874,6 +1874,7 @@ void form_x::present()
 			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 		}
 	}
+#endif
 	SDL_RenderPresent(renderer);
 }
 
