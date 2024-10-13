@@ -2,8 +2,7 @@
 # 项目特定的逻辑。
 #
 cmake_minimum_required (VERSION 3.8)
-set(CMAKE_TOOLCHAIN_FILE "E:/sdk/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
+ 
 IF(WIN32)
 set(CMAKE_CXX_STANDARD 23)
 else()
