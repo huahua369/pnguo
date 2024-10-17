@@ -437,16 +437,24 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	//	pw->set_alpha(true);
 	if (derender) {
 		std::string rn;
-		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
-		//if (rdv.find("gpu") != rdv.end())
-		//{
-		//	rn = "gpu";
-		//}
-		if (rdv.find("vulkan") != rdv.end())
+		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER); 
+		if (fgs & ef_cpu && (rdv.find("software") != rdv.end()))
+		{
+			rn = "software";
+		}
+		if (fgs & ef_gpu && (rdv.find("gpu") != rdv.end()))
+		{
+			rn = "gpu";
+		}
+		if (fgs & ef_vulkan && rdv.find("vulkan") != rdv.end())
 		{
 			rn = "vulkan";
 		}
-		else if (rdv.find("direct3d12") != rdv.end())
+		else if (fgs & ef_direct3d11 && rdv.find("direct3d11") != rdv.end())
+		{
+			rn = "direct3d11";
+		}
+		else if (fgs & ef_direct3d12 && rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
 		}
@@ -1388,7 +1396,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		t.x = mg.x;
 		t.y = mg.y;
 		pw->trigger(t);
-	}
+		}
 	break;
 #endif
 	case SDL_EVENT_FINGER_DOWN:
@@ -1486,7 +1494,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	break;
 	}
 	return false;
-}
+	}
 int on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
@@ -2289,13 +2297,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
@@ -2538,7 +2546,7 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"menu";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_resizable | ef_borderless | ef_popup | ef_transparent;
+		ptf.flags = ef_cpu | ef_resizable | ef_borderless | ef_popup | ef_transparent;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
@@ -2559,7 +2567,7 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
+		ptf.flags = ef_cpu | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);

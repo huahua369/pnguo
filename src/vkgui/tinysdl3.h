@@ -297,15 +297,20 @@ void set_col_u8();
 // 窗口属性
 enum form_flags_e
 {
-	ef_null = 0,			// ef_default
-	ef_fullscreen = BIT_INC(0),	// 全屏
-	ef_vulkan = BIT_INC(1),		// vk渲染
-	ef_resizable = BIT_INC(2),	// 可以拉伸大小
-	ef_transparent = BIT_INC(3),	// 透明
-	ef_borderless = BIT_INC(4),	// 无系统边框
-	ef_popup = BIT_INC(5),		// 弹出式窗口，需要有父窗口
+	ef_null = 0,					// ef_default
+	ef_fullscreen = BIT_INC(0),		// 全屏
+	ef_utility = BIT_INC(1),		// 不出现在任务栏
+	ef_resizable = BIT_INC(2),		// 可以拉伸大小
+	ef_transparent = BIT_INC(3),	// 透明窗口
+	ef_borderless = BIT_INC(4),		// 无系统边框
+	ef_popup = BIT_INC(5),			// 弹出式窗口，需要有父窗口
 	ef_tooltip = BIT_INC(6),		// 工具提示窗口，需要有父窗口
-	ef_utility = BIT_INC(7),		// 不出现在任务栏
+	ef_cpu = BIT_INC(7),			// cpu software渲染
+	ef_vulkan = BIT_INC(8),			// vk渲染
+	ef_gpu = BIT_INC(9),			// gpu渲染
+	ef_metal = BIT_INC(10),			// mac metal渲染
+	ef_direct3d11 = BIT_INC(11),	 
+	ef_direct3d12 = BIT_INC(12),	 
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息
