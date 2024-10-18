@@ -2452,9 +2452,31 @@ bool form_x::has_variable()
 
 #endif
 
+// cpu信息
 
-
-
+cpuinfo_t get_cpuinfo()
+{
+	cpuinfo_t r = {};
+	r.NumLogicalCPUCores = SDL_GetNumLogicalCPUCores();
+	r.CPUCacheLineSize = SDL_GetCPUCacheLineSize();
+	r.SystemRAM = SDL_GetSystemRAM();
+	r.SIMDAlignment = SDL_GetSIMDAlignment();
+	r.AltiVec = SDL_HasAltiVec();
+	r.MMX = SDL_HasMMX();
+	r.SSE = SDL_HasSSE();
+	r.SSE2 = SDL_HasSSE2();
+	r.SSE3 = SDL_HasSSE3();
+	r.SSE41 = SDL_HasSSE41();
+	r.SSE42 = SDL_HasSSE42();
+	r.AVX = SDL_HasAVX();
+	r.AVX2 = SDL_HasAVX2();
+	r.AVX512F = SDL_HasAVX512F();
+	r.ARMSIMD = SDL_HasARMSIMD();
+	r.NEON = SDL_HasNEON();
+	r.LSX = SDL_HasLSX();
+	r.LASX = SDL_HasLASX();
+	return r;
+}
 
 
 // 导出接口

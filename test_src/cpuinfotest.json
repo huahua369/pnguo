@@ -1,0 +1,20 @@
+[
+  "NumLogicalCPUCores",
+  "CPUCacheLineSize",
+  "SystemRAM",
+  "SIMDAlignment",
+  "AltiVec",
+  "MMX",
+  "SSE",
+  "SSE2",
+  "SSE3",
+  "SSE41",
+  "SSE42",
+  "AVX",
+  "AVX2",
+  "AVX512F",
+  "ARMSIMD",
+  "NEON",
+  "LSX",
+  "LASX"
+]

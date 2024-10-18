@@ -332,6 +332,30 @@ enum class cdtype_e :uint32_t
 	new_app,		//创建应用实例
 	new_form,		//创建窗口
 };
+struct cpuinfo_t
+{
+	int NumLogicalCPUCores;
+	int CPUCacheLineSize;
+	int SystemRAM;
+	size_t SIMDAlignment;
+	bool AltiVec;
+	bool MMX;
+	bool SSE;
+	bool SSE2;
+	bool SSE3;
+	bool SSE41;
+	bool SSE42;
+	bool AVX;
+	bool AVX2;
+	bool AVX512F;
+	bool ARMSIMD;
+	bool NEON;
+	bool LSX;
+	bool LASX;
+};
+// 获取CPU信息
+cpuinfo_t get_cpuinfo();
+
 
 // 导出接口
 uint64_t call_data(int type, void* data);

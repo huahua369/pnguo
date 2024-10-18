@@ -94,7 +94,7 @@ void menu_m(form_x* form0)
 			}
 		});
 	pm31->parent = pm3;
-	pm3->show({ 100,100 }); // 显示菜单
+	//pm3->show({ 100,100 }); // 显示菜单
 
 	for (auto& it : mvs)
 	{
@@ -155,6 +155,7 @@ void menu_m(form_x* form0)
 			};
 	}
 }
+
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	menu_m(form0);
 	auto p = new plane_cx();
@@ -191,6 +192,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 				kcb->_disabled_events = true;
 				kcb->text_color = 0xff7373ff;
 				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
+				sw1->_disabled_events = true;
 				sw1->get_pos();
 				sw1->bind_ptr(bps[i]);
 			}
@@ -244,6 +246,120 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		}
 	}
 }
+
+#ifdef _WIN32
+
+static std::string GetCPUNameString()
+{
+	int nIDs = 0;
+	int nExIDs = 0;
+
+	char strCPUName[0x40] = { };
+
+	std::array<int, 4> cpuInfo;
+	std::vector<std::array<int, 4>> extData;
+
+	__cpuid(cpuInfo.data(), 0);
+
+	// Calling __cpuid with 0x80000000 as the function_id argument
+	// gets the number of the highest valid extended ID.
+	__cpuid(cpuInfo.data(), 0x80000000);
+
+	nExIDs = cpuInfo[0];
+	for (int i = 0x80000000; i <= nExIDs; ++i)
+	{
+		__cpuidex(cpuInfo.data(), i, 0);
+		extData.push_back(cpuInfo);
+	}
+
+	// Interpret CPU strCPUName string if reported
+	if (nExIDs >= 0x80000004)
+	{
+		memcpy(strCPUName, extData[2].data(), sizeof(cpuInfo));
+		memcpy(strCPUName + 16, extData[3].data(), sizeof(cpuInfo));
+		memcpy(strCPUName + 32, extData[4].data(), sizeof(cpuInfo));
+	}
+
+	return strlen(strCPUName) != 0 ? strCPUName : "UNAVAILABLE";
+}
+#else
+static std::string GetCPUNameString()
+{
+	return "UNAVAILABLE";
+}
+
+#endif
+void show_cpuinfo(form_x* form0)
+{
+	cpuinfo_t cpuinfo = get_cpuinfo();
+	if (!form0)return;
+	auto p = new plane_cx();
+	uint32_t pbc = 0xf02c2c2c;
+	p->set_color({ 0x80ff802C,1,5,pbc });
+	form0->bind(p);	// 绑定到窗口  
+	p->set_rss(5);
+	p->_lms = { 8,8 };
+	p->add_familys(fontn, 0);
+	p->draggable = true; //可拖动
+	p->set_size({ 420,660 });
+	p->set_pos({ 100,100 });
+	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->fontsize = 16;
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
+		p->set_scroll_hide(1);
+	}
+	// 视图大小，内容大小
+	p->set_view({ 420,660 }, { 420, 660 });
+	glm::vec2 bs = { 150,22 };
+	glm::vec2 bs1 = { 50,22 };
+	std::vector<std::string> ncsstr = { (char*)u8"CPU信息","NumLogicalCPUCores","CPUCacheLineSize","SystemRAM","SIMDAlignment" };
+	std::vector<std::string> boolstr = { "AltiVec","MMX","SSE","SSE2","SSE3","SSE41","SSE42","AVX","AVX2","AVX512F","ARMSIMD","NEON","LSX","LASX" };
+
+	static std::vector<color_btn*> lbs;
+	bs.x = 300;
+	uint32_t txtcolor = 0xfff2f2f2;// 0xff7373ff;
+	int64_t ds[] = { 0, cpuinfo.NumLogicalCPUCores,cpuinfo.CPUCacheLineSize,cpuinfo.SystemRAM ,cpuinfo.SIMDAlignment };
+	{
+		int i = 0;
+		for (auto& it : ncsstr)
+		{
+			std::string txt = vkr::format("%-20s: %lld", it.c_str(), ds[i]);
+			auto tc = txtcolor;
+			if (i == 0) {
+				txt = it + ": " + GetCPUNameString();
+				tc = 0xffF6801F;
+			}
+			i++;
+			auto kcb = p->add_label(txt, bs, 0);
+			kcb->text_color = tc;
+			kcb->_disabled_events = true;
+			lbs.push_back(kcb);
+		}
+	}
+	bool* bps = &cpuinfo.AltiVec;
+	bs.x = 160;
+	for (size_t i = 0; i < boolstr.size(); i++)
+	{
+		auto& it = boolstr[i];
+		auto kcb = p->add_label(it.c_str(), bs, 0);
+		{
+			kcb->_disabled_events = true;
+			kcb->text_color = txtcolor;
+			auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), bps[i]);
+			sw1->_disabled_events = true;
+			sw1->get_pos();
+			kcb = p->add_label("", bs, 0);
+			kcb->_disabled_events = true; 
+		}
+	}
+}
+
+
+
 void test_img() {
 
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
@@ -327,6 +443,8 @@ int main()
 	{
 		new_ui(form0, 0);
 	}
+	show_cpuinfo(form0);
+	// 运行消息循环
 	run_app(app, 0);
 	free_app(app);
 	return 0;
