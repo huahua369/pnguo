@@ -450,11 +450,11 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		{
 			rn = "vulkan";
 		}
-		else if (fgs & ef_direct3d11 && rdv.find("direct3d11") != rdv.end())
+		else if (fgs & ef_dx11 && rdv.find("direct3d11") != rdv.end())
 		{
 			rn = "direct3d11";
 		}
-		else if (fgs & ef_direct3d12 && rdv.find("direct3d12") != rdv.end())
+		else if (fgs & ef_dx12 && rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
 		}

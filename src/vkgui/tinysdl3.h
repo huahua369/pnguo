@@ -309,8 +309,8 @@ enum form_flags_e
 	ef_vulkan = BIT_INC(8),			// vk渲染
 	ef_gpu = BIT_INC(9),			// gpu渲染
 	ef_metal = BIT_INC(10),			// mac metal渲染
-	ef_direct3d11 = BIT_INC(11),	 
-	ef_direct3d12 = BIT_INC(12),	 
+	ef_dx11 = BIT_INC(11),	 
+	ef_dx12 = BIT_INC(12),	 
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息
