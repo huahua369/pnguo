@@ -197,8 +197,9 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 				sw1->bind_ptr(bps[i]);
 			}
 		}
-		static std::vector<color_btn*> lbs;
+		std::vector<color_btn*>* pbs = new std::vector<color_btn*>();
 		bs.x = 300;
+		auto& lbs = *pbs;
 		for (size_t i = 0; i < 18; i++)
 		{
 			auto kcb = p->add_label("", bs, 0);
@@ -353,7 +354,7 @@ void show_cpuinfo(form_x* form0)
 			sw1->_disabled_events = true;
 			sw1->get_pos();
 			kcb = p->add_label("", bs, 0);
-			kcb->_disabled_events = true; 
+			kcb->_disabled_events = true;
 		}
 	}
 }
@@ -390,14 +391,38 @@ int main()
 	}
 	//testnjson();
 	glm::ivec2 ws = { 1280,860 };
-	const char* wtitle = (char*)u8"窗口1";
+	const char* wtitle = (char*)u8"窗口0";
+	const char* wtitle1 = (char*)u8"窗口1";
 
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
+	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
-	SDL_Texture* d3tex = 0;
+	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
+	//if (vkd1) {
+	//	vkd1->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
+	//	vkd1->resize(1024, 800);				// 设置fbo缓冲区大小
+	//	auto vr = vkd1->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+	//	auto texok = form1->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
+	//	//vkd->state.SelectedTonemapperIndex = 1;
+	//	vkd1->state.Exposure = 0.9928;
+	//	vkd1->state.EmissiveFactor = 250;
+	//	new_ui(form1, vkd1);
+	//	if (texok)
+	//	{
+	//		form1->up_cb = [=](float delta, int* ret)
+	//			{
+	//				auto light = vkd1->get_light(0);
+	//				vkd1->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+	//				vkd1->state.Exposure;				// 曝光度：默认1.0
+	//				vkd1->state.bUseTAA;
+	//				vkd1->update(form1->io);	// 更新事件
+	//				vkd1->on_render();		// 执行渲染
+	//			};
+	//	}
+	//}
 	if (vkd) {
 		{
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
@@ -406,7 +431,6 @@ int main()
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			////vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
-			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
