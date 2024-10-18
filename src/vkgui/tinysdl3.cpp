@@ -395,6 +395,8 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_TRANSPARENT;
 	if (fgs & ef_vulkan)
 		flags |= SDL_WINDOW_VULKAN;
+	if (fgs & ef_metal)
+		flags |= SDL_WINDOW_METAL;
 	if (fgs & ef_tooltip)
 		flags |= SDL_WINDOW_TOOLTIP;
 	if (fgs & ef_popup)
@@ -2569,11 +2571,11 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
 		ptf.flags = ef_resizable | ef_borderless | ef_popup;
-		//ptf.flags |= ef_cpu | ef_transparent;
-		ptf.flags |= ef_gpu | ef_transparent;
-		//ptf.flags |= ef_vulkan| ef_transparent;
-		//ptf.flags |= ef_dx11 | ef_transparent;
-		//ptf.flags |= ef_dx12;
+		//ptf.flags |= ef_cpu | ef_transparent;		// 透明窗口支持有问题
+		//ptf.flags |= ef_gpu | ef_transparent;
+		//ptf.flags |= ef_vulkan| ef_transparent;	
+		ptf.flags |= ef_dx11 | ef_transparent;
+		//ptf.flags |= ef_dx12;						// 不支持透明窗口
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
