@@ -73,8 +73,8 @@ void menu_m(form_x* form0)
 				pm->hide(true);	// 点击隐藏
 				printf("click:%d\t%d\n", type, idx);
 			}
-			else
-				printf("move:%d\t%d\n", type, idx);
+			//else
+			//	printf("move:%d\t%d\n", type, idx);
 		});
 	auto pm3 = mc->new_menu(-1, 22, mvs0, [=](mitem_t* pm, int type, int idx)
 		{
@@ -90,7 +90,7 @@ void menu_m(form_x* form0)
 					pm31->show(pm->get_idx_pos(idx));// 显示子菜单
 				else
 					pm31->hide(false);
-				printf("move:%d\t%d\n", type, idx);
+				//printf("move:%d\t%d\n", type, idx);
 			}
 		});
 	pm31->parent = pm3;
@@ -434,7 +434,7 @@ int main()
 			//vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
-			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,2,8 }, 1.0);
+			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
