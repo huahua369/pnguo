@@ -1055,6 +1055,10 @@ public:
 	image_sliced_t sli = {};
 	int sli_radius = 10;
 	gshadow_cx* gs = 0;
+	// 菜单边框填充：线颜色，线粗，圆角，背景色
+	glm::ivec4 m_color = { 0xff606060,1,0,0xf0121212 };
+	// 菜单项偏移
+	glm::ivec2 m_cpos = { 3, 3 };
 public:
 	layout_text_x();
 	~layout_text_x();

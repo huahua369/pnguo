@@ -124,7 +124,7 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 	fronts->remove_atlas(pv.front);
 	ltx->free_menu(pv);
 	auto p = this;
-	pv = ltx->new_menu(width, height, mvs, false, [=](int type, int idx)
+	pv = ltx->new_menu(width, height, mvs, true, [=](int type, int idx)
 		{
 			if (ckm_cb)
 				ckm_cb(p, type, idx);
