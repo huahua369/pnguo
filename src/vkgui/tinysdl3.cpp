@@ -442,23 +442,23 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		{
 			rn = "software";
 		}
-		if (fgs & ef_gpu && (rdv.find("gpu") != rdv.end()))
+		else if (fgs & ef_gpu && (rdv.find("gpu") != rdv.end()))
 		{
 			rn = "gpu";
 		}
-		if (fgs & ef_vulkan && rdv.find("vulkan") != rdv.end())
+		else if (fgs & ef_vulkan && rdv.find("vulkan") != rdv.end())
 		{
 			rn = "vulkan";
 		}
-		if (fgs & ef_dx11 && rdv.find("direct3d11") != rdv.end())
+		else if (fgs & ef_dx11 && rdv.find("direct3d11") != rdv.end())
 		{
 			rn = "direct3d11";
 		}
-		if (fgs & ef_dx12 && rdv.find("direct3d12") != rdv.end())
+		else if (fgs & ef_dx12 && rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
 		}
-		if (rn.empty()) {
+		else {
 			rn = *rdv.begin();
 		}
 		renderer = SDL_CreateRenderer(window, rn.c_str());
@@ -2547,10 +2547,10 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
 		ptf.flags = ef_resizable | ef_borderless | ef_popup;
-		ptf.flags |= ef_cpu | ef_transparent;
-		//ptf.flags |= ef_gpu | ef_transparent;
+		//ptf.flags |= ef_cpu | ef_transparent;
+		ptf.flags |= ef_gpu | ef_transparent;
 		//ptf.flags |= ef_vulkan| ef_transparent;
-		//ptf.flags |= ef_dx11| ef_transparent;
+		//ptf.flags |= ef_dx11 | ef_transparent;
 		//ptf.flags |= ef_dx12;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
