@@ -95,7 +95,9 @@ struct dev_info_cx
 #endif // !DEV_INFO_CXH
 
 namespace vkr
-{ 
+{
+	std::string format(const char* format, ...);
+
 
 #if 1
 
