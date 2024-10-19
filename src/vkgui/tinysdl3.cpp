@@ -406,7 +406,7 @@ uint32_t get_flags(int fgs)
 	return flags;
 }
 int on_call_we(const SDL_Event* e, form_x* pw);
-form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, bool has_software, form_x* parent)
+form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent)
 {
 	auto ws = ws1;
 #ifdef __ANDROID__
@@ -2506,7 +2506,7 @@ uint64_t call_data(int type, void* data)
 		if (p && p->app)
 		{
 			auto app = (app_cx*)p->app;
-			ret = (uint64_t)app->new_form_renderer(p->title, p->pos, p->size, p->flags, p->has_renderer, p->has_software, p->parent);
+			ret = (uint64_t)app->new_form_renderer(p->title, p->pos, p->size, p->flags, p->has_renderer, p->parent);
 		}
 	}
 	break;
@@ -2580,8 +2580,7 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.flags |= ef_dx11 | ef_transparent;
 		//ptf.flags |= ef_dx12;						// 不支持透明窗口
 		ptf.parent = parent;
-		ptf.pos = { 0,0 };
-		ptf.has_software = 1;// 软渲染
+		ptf.pos = { 0,0 }; 
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
 			/*form1->set_alpha(true);*/
@@ -2600,10 +2599,9 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_cpu | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
+		ptf.flags = ef_dx11 | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
 		ptf.parent = parent;
-		ptf.pos = { 0,0 };
-		ptf.has_software = 1;// 软渲染
+		ptf.pos = { 0,0 }; 
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
 			/*form1->set_alpha(true);*/
