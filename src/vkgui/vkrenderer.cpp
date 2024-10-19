@@ -18497,6 +18497,7 @@ namespace vkr {
 		int	m_activeCamera = 0;
 		std::function<void(int count, int idx, const char* str)> cb_showtxt;
 		std::vector<std::string>    _tlabs;
+		int loadingStage = 0;
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
 		bool m_bIsBenchmarking = false;
@@ -18972,8 +18973,7 @@ namespace vkr {
 
 		if (_lts.size() || _tmpgc)
 		{
-			// the scene loads in chuncks, that way we can show a progress bar
-			static int loadingStage = 0;
+			// the scene loads in chuncks, that way we can show a progress bar 
 			if (!_tmpgc) {
 				std::unique_lock<std::mutex> lock(m_ltsm);
 				_tmpgc = _lts.front(); _lts.pop();
