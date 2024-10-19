@@ -220,7 +220,7 @@ public:
 	// 设置窗口图标
 	void set_icon(const char* fn);
 	void set_icon(const uint32_t* d, int w, int h); 
-
+	void set_alpha(bool is);
 	// type:0==RGBA。 static_tex? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA
@@ -309,8 +309,8 @@ enum form_flags_e
 	ef_vulkan = BIT_INC(8),			// vk渲染
 	ef_gpu = BIT_INC(9),			// gpu渲染
 	ef_metal = BIT_INC(10),			// mac metal渲染
-	ef_direct3d11 = BIT_INC(11),	 
-	ef_direct3d12 = BIT_INC(12),	 
+	ef_dx11 = BIT_INC(11),	 
+	ef_dx12 = BIT_INC(12),	 
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息
@@ -332,6 +332,29 @@ enum class cdtype_e :uint32_t
 	new_app,		//创建应用实例
 	new_form,		//创建窗口
 };
+struct cpuinfo_t
+{
+	int NumLogicalCPUCores;
+	int CPUCacheLineSize;
+	int SystemRAM;
+	size_t SIMDAlignment;
+	bool AltiVec;
+	bool MMX;
+	bool SSE;
+	bool SSE2;
+	bool SSE3;
+	bool SSE41;
+	bool SSE42;
+	bool AVX;
+	bool AVX2;
+	bool AVX512F;
+	bool ARMSIMD;
+	bool NEON;
+	bool LSX;
+	bool LASX;
+};
+// 获取CPU信息
+cpuinfo_t get_cpuinfo();
 
 // 导出接口
 uint64_t call_data(int type, void* data);

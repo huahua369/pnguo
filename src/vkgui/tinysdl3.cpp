@@ -127,16 +127,16 @@ namespace pce {
 		{
 			DwmEnableComposition(enable ? DWM_EC_ENABLECOMPOSITION : DWM_EC_DISABLECOMPOSITION);
 		}
-		DWM_BLURBEHIND bb = { 0 };
-		HRGN hRgn = CreateRectRgn(0, 0, -1, -1); //应用毛玻璃的矩形范围，
-		//参数(0,0,-1,-1)可以让整个窗口客户区变成透明的，而鼠标是可以捕获到透明的区域
-		bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
-		bb.hRgnBlur = hRgn;
-		bb.fEnable = TRUE;
-		hr = DwmEnableBlurBehindWindow(window, &bb);
-		if (hRgn)
-			DeleteObject(hRgn);
-		return hr;
+		//DWM_BLURBEHIND bb = { 0 };
+		//HRGN hRgn = CreateRectRgn(0, 0, -1, -1); //应用毛玻璃的矩形范围，
+		////参数(0,0,-1,-1)可以让整个窗口客户区变成透明的，而鼠标是可以捕获到透明的区域
+		//bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
+		//bb.hRgnBlur = hRgn;
+		//bb.fEnable = TRUE;
+		//hr = DwmEnableBlurBehindWindow(window, &bb);
+		//if (hRgn)
+		//	DeleteObject(hRgn);
+		//return hr;
 		BOOL isNCRenderingEnabled{ FALSE };
 		hr = ::DwmGetWindowAttribute(window,
 			DWMWA_NCRENDERING_ENABLED,
@@ -395,6 +395,8 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_TRANSPARENT;
 	if (fgs & ef_vulkan)
 		flags |= SDL_WINDOW_VULKAN;
+	if (fgs & ef_metal)
+		flags |= SDL_WINDOW_METAL;
 	if (fgs & ef_tooltip)
 		flags |= SDL_WINDOW_TOOLTIP;
 	if (fgs & ef_popup)
@@ -433,35 +435,39 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	pw->app = this;
 	pw->_ptr = window;
 	pw->_size = ws;
-	//if (fgs & ef_transparent)
-	//	pw->set_alpha(true);
+	if (fgs & ef_transparent)
+		pw->set_alpha(true);
 	if (derender) {
 		std::string rn;
-		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER); 
+		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
 		if (fgs & ef_cpu && (rdv.find("software") != rdv.end()))
 		{
 			rn = "software";
 		}
-		if (fgs & ef_gpu && (rdv.find("gpu") != rdv.end()))
+		else if (fgs & ef_gpu && (rdv.find("gpu") != rdv.end()))
 		{
 			rn = "gpu";
 		}
-		if (fgs & ef_vulkan && rdv.find("vulkan") != rdv.end())
+		else if (fgs & ef_vulkan && rdv.find("vulkan") != rdv.end())
 		{
 			rn = "vulkan";
 		}
-		else if (fgs & ef_direct3d11 && rdv.find("direct3d11") != rdv.end())
+		else if (fgs & ef_dx11 && rdv.find("direct3d11") != rdv.end())
 		{
 			rn = "direct3d11";
 		}
-		else if (fgs & ef_direct3d12 && rdv.find("direct3d12") != rdv.end())
+		else if (fgs & ef_dx12 && rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
+		}
+		else if (rdv.find("gpu") != rdv.end())
+		{
+			rn = "gpu";
 		}
 		else {
 			rn = *rdv.begin();
 		}
-		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str());
+		renderer = SDL_CreateRenderer(window, rn.c_str());
 	}
 	int vsync = 0;
 	if (renderer) {
@@ -1396,7 +1402,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		t.x = mg.x;
 		t.y = mg.y;
 		pw->trigger(t);
-		}
+	}
 	break;
 #endif
 	case SDL_EVENT_FINGER_DOWN:
@@ -1494,7 +1500,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	break;
 	}
 	return false;
-	}
+}
 int on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
@@ -2042,13 +2048,13 @@ void form_x::set_icon(const uint32_t* d, int w, int h)
 	SDL_DestroySurface(icon);
 }
 
-//void form_x::set_alpha(bool is)
-//{
-//#ifdef _WIN32
-//	auto hWnd = (HWND)pce::get_windowptr(_ptr);
-//	pce::EnableBlurBehindWindowMY(hWnd, is, 0, false, _size);
-//#endif
-//}
+void form_x::set_alpha(bool is)
+{
+#ifdef _WIN32
+	auto hWnd = (HWND)pce::get_windowptr(_ptr);
+	pce::EnableBlurBehindWindowMY(hWnd, is, 0, false, _size);
+#endif
+}
 
 
 
@@ -2297,13 +2303,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
@@ -2452,10 +2458,31 @@ bool form_x::has_variable()
 
 #endif
 
+// cpu信息
 
-
-
-
+cpuinfo_t get_cpuinfo()
+{
+	cpuinfo_t r = {};
+	r.NumLogicalCPUCores = SDL_GetNumLogicalCPUCores();
+	r.CPUCacheLineSize = SDL_GetCPUCacheLineSize();
+	r.SystemRAM = SDL_GetSystemRAM();
+	r.SIMDAlignment = SDL_GetSIMDAlignment();
+	r.AltiVec = SDL_HasAltiVec();
+	r.MMX = SDL_HasMMX();
+	r.SSE = SDL_HasSSE();
+	r.SSE2 = SDL_HasSSE2();
+	r.SSE3 = SDL_HasSSE3();
+	r.SSE41 = SDL_HasSSE41();
+	r.SSE42 = SDL_HasSSE42();
+	r.AVX = SDL_HasAVX();
+	r.AVX2 = SDL_HasAVX2();
+	r.AVX512F = SDL_HasAVX512F();
+	r.ARMSIMD = SDL_HasARMSIMD();
+	r.NEON = SDL_HasNEON();
+	r.LSX = SDL_HasLSX();
+	r.LASX = SDL_HasLASX();
+	return r;
+}
 
 // 导出接口
 uint64_t call_data(int type, void* data)
@@ -2546,12 +2573,17 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"menu";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_cpu | ef_resizable | ef_borderless | ef_popup | ef_transparent;
+		ptf.flags = ef_resizable | ef_borderless | ef_popup;
+		//ptf.flags |= ef_cpu | ef_transparent;		// 透明窗口支持有问题
+		//ptf.flags |= ef_gpu | ef_transparent;
+		//ptf.flags |= ef_vulkan| ef_transparent;	
+		ptf.flags |= ef_dx11 | ef_transparent;
+		//ptf.flags |= ef_dx12;						// 不支持透明窗口
 		ptf.parent = parent;
-		ptf.pos = { 0,0 };
+		ptf.pos = { 0,0 }; 
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
-			//form1->set_alpha(true);
+			/*form1->set_alpha(true);*/
 			form1->mmove_type = 0;
 			form1->_focus_lost_hide = true;
 		}
@@ -2567,12 +2599,12 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_cpu | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
+		ptf.flags = ef_dx11 | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
 		ptf.parent = parent;
-		ptf.pos = { 0,0 };
+		ptf.pos = { 0,0 }; 
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
-			//form1->set_alpha(true);
+			/*form1->set_alpha(true);*/
 			form1->mmove_type = 0;
 		}
 	}
