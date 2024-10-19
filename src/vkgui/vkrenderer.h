@@ -77,10 +77,7 @@ namespace vkr {
 	};
 
 
-	std::string format(const char* format, ...);
-
 }
-//!vkr
 
 struct dev_info_cx;
 #ifndef image_vkr
