@@ -395,6 +395,8 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_TRANSPARENT;
 	if (fgs & ef_vulkan)
 		flags |= SDL_WINDOW_VULKAN;
+	if (fgs & ef_metal)
+		flags |= SDL_WINDOW_METAL;
 	if (fgs & ef_tooltip)
 		flags |= SDL_WINDOW_TOOLTIP;
 	if (fgs & ef_popup)
@@ -438,16 +440,23 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	if (derender) {
 		std::string rn;
 		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
-
-		if (has_software && rdv.find("software") != rdv.end())
+		if (fgs & ef_cpu && (rdv.find("software") != rdv.end()))
 		{
 			rn = "software";
 		}
-		else		if (rdv.find("vulkan") != rdv.end())
+		else if (fgs & ef_gpu && (rdv.find("gpu") != rdv.end()))
+		{
+			rn = "gpu";
+		}
+		else if (fgs & ef_vulkan && rdv.find("vulkan") != rdv.end())
 		{
 			rn = "vulkan";
 		}
-		else if (rdv.find("direct3d12") != rdv.end())
+		else if (fgs & ef_dx11 && rdv.find("direct3d11") != rdv.end())
+		{
+			rn = "direct3d11";
+		}
+		else if (fgs & ef_dx12 && rdv.find("direct3d12") != rdv.end())
 		{
 			rn = "direct3d12";
 		}
@@ -458,7 +467,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		else {
 			rn = *rdv.begin();
 		}
-		renderer = SDL_CreateRenderer(window, rn.empty() ? 0 : rn.c_str());
+		renderer = SDL_CreateRenderer(window, rn.c_str());
 	}
 	int vsync = 0;
 	if (renderer) {
@@ -2449,9 +2458,31 @@ bool form_x::has_variable()
 
 #endif
 
+// cpu信息
 
-
-
+cpuinfo_t get_cpuinfo()
+{
+	cpuinfo_t r = {};
+	r.NumLogicalCPUCores = SDL_GetNumLogicalCPUCores();
+	r.CPUCacheLineSize = SDL_GetCPUCacheLineSize();
+	r.SystemRAM = SDL_GetSystemRAM();
+	r.SIMDAlignment = SDL_GetSIMDAlignment();
+	r.AltiVec = SDL_HasAltiVec();
+	r.MMX = SDL_HasMMX();
+	r.SSE = SDL_HasSSE();
+	r.SSE2 = SDL_HasSSE2();
+	r.SSE3 = SDL_HasSSE3();
+	r.SSE41 = SDL_HasSSE41();
+	r.SSE42 = SDL_HasSSE42();
+	r.AVX = SDL_HasAVX();
+	r.AVX2 = SDL_HasAVX2();
+	r.AVX512F = SDL_HasAVX512F();
+	r.ARMSIMD = SDL_HasARMSIMD();
+	r.NEON = SDL_HasNEON();
+	r.LSX = SDL_HasLSX();
+	r.LASX = SDL_HasLASX();
+	return r;
+}
 
 
 // 导出接口
@@ -2543,7 +2574,12 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"menu";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_resizable | ef_borderless | ef_popup | ef_transparent;
+		ptf.flags = ef_resizable | ef_borderless | ef_popup;
+		//ptf.flags |= ef_cpu | ef_transparent;		// 透明窗口支持有问题
+		//ptf.flags |= ef_gpu | ef_transparent;
+		//ptf.flags |= ef_vulkan| ef_transparent;	
+		ptf.flags |= ef_dx11 | ef_transparent;
+		//ptf.flags |= ef_dx12;						// 不支持透明窗口
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		ptf.has_software = 1;// 软渲染
@@ -2565,7 +2601,7 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_vulkan | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
+		ptf.flags = ef_cpu | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		ptf.has_software = 1;// 软渲染

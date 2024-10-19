@@ -10192,19 +10192,18 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		}
 		ret.w = width;
 		ret.h = lheight;
-		ret.cpos = { 3,3 };
+		ret.cpos = m_cpos;
 		glm::ivec2 iss = { width , lheight };
-		p->set_color({ 0xff606060,1,0,0xff121212 });
+		p->set_color(m_color);
 		glm::ivec2 ss = { width + p->border.y * 7, v.size() * lheight + p->border.y * 7 };
 
 		auto radius = ltx->sli_radius;
-		glm::ivec2 sas = ss;
+		glm::ivec2 sas = {};
 		if (has_shadow)
 		{
-			ss += radius;
 			sas += radius;
-			auto pa = ltx->new_shadow(ss, {});
-			ss -= radius;
+			auto ass = ss + radius;
+			auto pa = ltx->new_shadow(ass, {});
 			ret.back = pa;
 		}
 		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
@@ -10238,10 +10237,10 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 			}
 			i++;
 		}
-		p->set_size(ss  );
+		p->set_size(ss);
 		p->set_pos({ radius * 0,radius * 0 });
-		ret.fsize = sas;
 		ret.p = p;
+		ret.fsize = ss + sas;
 	}
 	return ret;
 }

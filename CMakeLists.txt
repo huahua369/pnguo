@@ -2,8 +2,7 @@
 # 项目特定的逻辑。
 #
 cmake_minimum_required (VERSION 3.8)
-set(CMAKE_TOOLCHAIN_FILE "E:/sdk/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
+ 
 IF(WIN32)
 set(CMAKE_CXX_STANDARD 23)
 else()
@@ -70,9 +69,6 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 #设置库文件输出目录
 set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
    
-#set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
-#set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
-#message("sdl ${SDL3_DIR}")
 #第三方库
 if(NOT DEFINED SDL3DIR_ROOT)
 set(SDL_STATIC ON)
@@ -83,13 +79,12 @@ set(SDL_DISKAUDIO OFF)
 set(SDL_DUMMYVIDEO OFF)
 set(SDL_LIBC ON)
 set(SDL_WASAPI ON)
-
 set(SDL_RENDER_METAL OFF)
 set(SDL_OPENGL OFF)
 set(SDL_OPENGLES OFF)
 set(SDL_DIRECTX ON)
 set(SDL_RENDER_D3D OFF)
-set(SDL_RENDER_D3D11 OFF)
+set(SDL_RENDER_D3D11 ON)
 set(SDL_RENDER_D3D12 ON)
 set(SDL_RENDER_GPU ON)
 set(SDL_GPU ON)
@@ -97,6 +92,10 @@ set(SDL_RENDER_VULKAN ON)
 
 add_subdirectory(third_lib/SDL)
 else()
+#设置这两个变量或自定义find路径
+#set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
+#set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
+#message("sdl ${SDL3_DIR}")
 find_package(SDL3 REQUIRED) 
 endif()
 
