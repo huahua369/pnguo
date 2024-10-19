@@ -448,7 +448,7 @@ int main()
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 1020,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.9928;
 		vkd->state.EmissiveFactor = 250;
