@@ -192,7 +192,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 				kcb->_disabled_events = true;
 				kcb->text_color = 0xff7373ff;
 				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
-				sw1->_disabled_events = true;
+				//sw1->_disabled_events = true;
 				sw1->get_pos();
 				sw1->bind_ptr(bps[i]);
 			}
@@ -434,10 +434,13 @@ int main()
 			//vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
+
+			vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
 			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
+
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
 			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
