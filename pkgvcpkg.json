@@ -1,0 +1,21 @@
+{
+  "dependencies": [
+    "pkgconf",
+    "openssl",
+    "glm",
+    "stb",
+    "nlohmann-json",
+    "vulkan",
+    "zlib",
+    "pango",
+    "cairo",
+    "fontconfig",
+    "harfbuzz",
+    "exprtk",
+    "clipper2",
+    "libuv",
+    "librsvg",
+    "entt",
+    "opencv"
+  ]
+}

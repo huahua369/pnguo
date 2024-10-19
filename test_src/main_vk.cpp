@@ -73,8 +73,8 @@ void menu_m(form_x* form0)
 				pm->hide(true);	// 点击隐藏
 				printf("click:%d\t%d\n", type, idx);
 			}
-			else
-				printf("move:%d\t%d\n", type, idx);
+			//else
+			//	printf("move:%d\t%d\n", type, idx);
 		});
 	auto pm3 = mc->new_menu(-1, 22, mvs0, [=](mitem_t* pm, int type, int idx)
 		{
@@ -90,7 +90,7 @@ void menu_m(form_x* form0)
 					pm31->show(pm->get_idx_pos(idx));// 显示子菜单
 				else
 					pm31->hide(false);
-				printf("move:%d\t%d\n", type, idx);
+				//printf("move:%d\t%d\n", type, idx);
 			}
 		});
 	pm31->parent = pm3;
@@ -192,7 +192,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 				kcb->_disabled_events = true;
 				kcb->text_color = 0xff7373ff;
 				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
-				sw1->_disabled_events = true;
+				//sw1->_disabled_events = true;
 				sw1->get_pos();
 				sw1->bind_ptr(bps[i]);
 			}
@@ -430,13 +430,17 @@ int main()
 			//vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
-			////vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
+			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			//vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
+
+			vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
+			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
+
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
 			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
@@ -444,7 +448,7 @@ int main()
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 1020,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
 		vkd->state.Exposure = 0.9928;
 		vkd->state.EmissiveFactor = 250;
