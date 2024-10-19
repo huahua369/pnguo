@@ -2480,7 +2480,6 @@ cpuinfo_t get_cpuinfo()
 	return r;
 }
 
-
 // 导出接口
 uint64_t call_data(int type, void* data)
 {

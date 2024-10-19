@@ -356,7 +356,6 @@ struct cpuinfo_t
 // 获取CPU信息
 cpuinfo_t get_cpuinfo();
 
-
 // 导出接口
 uint64_t call_data(int type, void* data);
 // 运行消息循环count==0则死循环, 执行循环次数
