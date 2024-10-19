@@ -83,7 +83,7 @@ public:
 	app_cx();
 	~app_cx();
 
-	form_x* new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, bool has_software, form_x* parent);
+	form_x* new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent);
 public:
 	int run_loop(int t);
 	void call_cb(SDL_Event* e);
@@ -174,7 +174,7 @@ public:
 	bool mmove_type = true;		// 鼠标拖动
 	bool _HitTest = true;
 	bool _ref = false;
-	bool _focus_lost_hide = false;	// 失去焦点隐藏 
+	bool _focus_lost_hide = false;	// 失去焦点隐藏
 private:
 	bool visible = true;
 	bool visible_old = true;
@@ -219,9 +219,8 @@ public:
 
 	// 设置窗口图标
 	void set_icon(const char* fn);
-	void set_icon(const uint32_t* d, int w, int h);
+	void set_icon(const uint32_t* d, int w, int h); 
 	void set_alpha(bool is);
-
 	// type:0==RGBA。 static_tex? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA
@@ -298,15 +297,20 @@ void set_col_u8();
 // 窗口属性
 enum form_flags_e
 {
-	ef_null = 0,			// ef_default
-	ef_fullscreen = BIT_INC(0),	// 全屏
-	ef_vulkan = BIT_INC(1),		// vk渲染
-	ef_resizable = BIT_INC(2),	// 可以拉伸大小
-	ef_transparent = BIT_INC(3),	// 透明
-	ef_borderless = BIT_INC(4),	// 无系统边框
-	ef_popup = BIT_INC(5),		// 弹出式窗口，需要有父窗口
+	ef_null = 0,					// ef_default
+	ef_fullscreen = BIT_INC(0),		// 全屏
+	ef_utility = BIT_INC(1),		// 不出现在任务栏
+	ef_resizable = BIT_INC(2),		// 可以拉伸大小
+	ef_transparent = BIT_INC(3),	// 透明窗口
+	ef_borderless = BIT_INC(4),		// 无系统边框
+	ef_popup = BIT_INC(5),			// 弹出式窗口，需要有父窗口
 	ef_tooltip = BIT_INC(6),		// 工具提示窗口，需要有父窗口
-	ef_utility = BIT_INC(7),		// 不出现在任务栏
+	ef_cpu = BIT_INC(7),			// cpu software渲染
+	ef_vulkan = BIT_INC(8),			// vk渲染
+	ef_gpu = BIT_INC(9),			// gpu渲染
+	ef_metal = BIT_INC(10),			// mac metal渲染
+	ef_dx11 = BIT_INC(11),	 
+	ef_dx12 = BIT_INC(12),	 
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息
@@ -318,7 +322,6 @@ struct form_newinfo_t {
 	glm::ivec2 size;
 	int flags = 0;
 	bool has_renderer = 0;
-	bool has_software = 0;
 };
 
 
@@ -329,6 +332,29 @@ enum class cdtype_e :uint32_t
 	new_app,		//创建应用实例
 	new_form,		//创建窗口
 };
+struct cpuinfo_t
+{
+	int NumLogicalCPUCores;
+	int CPUCacheLineSize;
+	int SystemRAM;
+	size_t SIMDAlignment;
+	bool AltiVec;
+	bool MMX;
+	bool SSE;
+	bool SSE2;
+	bool SSE3;
+	bool SSE41;
+	bool SSE42;
+	bool AVX;
+	bool AVX2;
+	bool AVX512F;
+	bool ARMSIMD;
+	bool NEON;
+	bool LSX;
+	bool LASX;
+};
+// 获取CPU信息
+cpuinfo_t get_cpuinfo();
 
 // 导出接口
 uint64_t call_data(int type, void* data);
