@@ -435,8 +435,8 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	pw->app = this;
 	pw->_ptr = window;
 	pw->_size = ws;
-	if (fgs & ef_transparent)
-		pw->set_alpha(true);
+	//if (fgs & ef_transparent)
+	//	pw->set_alpha(true);
 	if (derender) {
 		std::string rn;
 		auto rdc = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
