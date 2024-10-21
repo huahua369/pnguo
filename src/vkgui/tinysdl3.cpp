@@ -1651,6 +1651,10 @@ void form_x::clear_wt()
 		tt.clear();
 	}
 }
+size_t form_x::count_wt()
+{
+	return _planes[0].size() + _planes[1].size();
+}
 void* form_x::get_nptr()
 {
 	void* p = 0;
@@ -2580,7 +2584,7 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 		ptf.flags |= ef_dx11 | ef_transparent;
 		//ptf.flags |= ef_dx12;						// 不支持透明窗口
 		ptf.parent = parent;
-		ptf.pos = { 0,0 }; 
+		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
 			/*form1->set_alpha(true);*/
@@ -2599,9 +2603,9 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 		ptf.app = parent->app; ptf.title = (char*)u8"tooltip";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_dx11 | ef_transparent | ef_borderless | ef_tooltip | ef_transparent;//  ef_utility;
+		ptf.flags = ef_dx11 | ef_transparent | ef_borderless | ef_tooltip;//  ef_utility;
 		ptf.parent = parent;
-		ptf.pos = { 0,0 }; 
+		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 		if (form1) {
 			/*form1->set_alpha(true);*/

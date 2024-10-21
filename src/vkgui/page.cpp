@@ -48,7 +48,7 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 	form->tooltip->show();
 	form->tooltip->set_pos(pos);
 }
-
+ 
 void hide_tooltip(form_x* form)
 {
 	if (form && form->tooltip)form->tooltip->hide();

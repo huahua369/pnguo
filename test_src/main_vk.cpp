@@ -110,7 +110,7 @@ void menu_m(form_x* form0)
 			};
 		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 			{
-				static int enterst = 0;
+				static void* enterst = 0;
 				auto cp = (color_btn*)pt;
 				auto t = (event_type2)type;
 				switch (t)
@@ -125,7 +125,7 @@ void menu_m(form_x* form0)
 				break;
 				case event_type2::on_enter:
 				{
-					enterst++;
+					enterst = pt; 
 				}
 				break;
 				case event_type2::on_hover:
@@ -135,21 +135,27 @@ void menu_m(form_x* form0)
 					stp.family = fontn;
 					stp.fonst_size = 14;
 					glm::vec2 cps = mps;
-					cps.y += 20;
-					if (enterst == 1) {
-						show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+					cps.y += 20; 
+					if (enterst == pt) {
+						if (form0->uptr != pt)
+						{
+							show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+							form0->uptr = pt;
+						}
 					}
-					enterst++;
 				}
 				break;
 				case event_type2::on_leave:
 				{
-					enterst = 0;
-					hide_tooltip(form0);
+					if (enterst == pt) {
+						hide_tooltip(form0);
+					} 
 				}
 				break;
 				default:
-					hide_tooltip(form0);
+					if (enterst == pt) {
+						//hide_tooltip(form0);
+					}
 					break;
 				}
 			};
