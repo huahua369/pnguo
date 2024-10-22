@@ -1725,6 +1725,7 @@ void form_x::update_w()
 }
 void form_x::update(float delta)
 {
+	if (!visible)return;
 	// Setup display size (every frame to accommodate for window resizing)
 
 	int display_w, display_h;

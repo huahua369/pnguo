@@ -121,11 +121,12 @@ void menu_m(form_x* form0)
 					cps.y += cp->size.y + cp->thickness;
 					pm3->show(cps);
 					hide_tooltip(form0);
+					form0->uptr = 0;
 				}
 				break;
 				case event_type2::on_enter:
 				{
-					enterst = pt; 
+					enterst = pt;
 				}
 				break;
 				case event_type2::on_hover:
@@ -135,7 +136,7 @@ void menu_m(form_x* form0)
 					stp.family = fontn;
 					stp.fonst_size = 14;
 					glm::vec2 cps = mps;
-					cps.y += 20; 
+					cps.y += 20;
 					if (enterst == pt) {
 						if (form0->uptr != pt)
 						{
@@ -149,7 +150,8 @@ void menu_m(form_x* form0)
 				{
 					if (enterst == pt) {
 						hide_tooltip(form0);
-					} 
+						form0->uptr = 0;
+					}
 				}
 				break;
 				default:
@@ -441,7 +443,7 @@ int main()
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 
-			vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
+			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
 			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);

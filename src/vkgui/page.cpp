@@ -25,18 +25,19 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 	div->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
 
 	div->_lpos = { 0,0 }; div->_lms = { 0,0 };
-	//div->_lms = { 6,6 };
 	div->border = { bc->color.y,bc->thickness,bc->radius,bc->color.x };
 	auto ft = div->ltx;
 	auto rc = ft->get_text_rect(0, str.c_str(), str.size(), bc->fonst_size);
 	auto h = ft->get_lineheight(0, bc->fonst_size);
 	div->set_clear_color(0);
 	auto drc = rc;
-
+	rc.y = h;
 	drc += h;
 	div->set_size(drc);
 	drc += h;
 	auto lp1 = div->add_label(str, rc, 0);
+	lp1->id = 1234;
+	lp1->text_align = {};
 	//auto lp = div->add_cbutton(str, rc, 0);
 	if (!form->tooltip)
 		form->tooltip = new_form_tooltip(form, drc.x, drc.y);
@@ -48,7 +49,7 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 	form->tooltip->show();
 	form->tooltip->set_pos(pos);
 }
- 
+
 void hide_tooltip(form_x* form)
 {
 	if (form && form->tooltip)form->tooltip->hide();

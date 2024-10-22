@@ -23490,7 +23490,11 @@ void color_btn::draw(cairo_t* g)
 {
 	auto p = this;
 	auto ns = p->size;
-
+	static int bid = 1234;
+	if (id == bid)
+	{
+		id = id;
+	}
 	cairo_as _as_(g);
 	cairo_translate(g, p->pos.x, p->pos.y);
 	if (p->dfill)
