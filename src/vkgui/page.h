@@ -14,18 +14,23 @@ struct style_tooltip
 	const char* family = 0;
 	int fonst_size = 16;
 	int text_color = -1;	// 文本颜色
-	glm::ivec2 color = {0xf0121212,0xaaffffff};	// 背景色，边框色
+	glm::ivec2 color = { 0xf0121212,0xaaffffff };	// 背景色，边框色
 	float thickness = 1.0;	// 线宽
 	float radius = 0;		// 矩形圆角 
 };
-
+class mitem_t;
 class menu_cx;
 class layout_text_x;
+struct itd_t
+{
+	std::string str;
+	mitem_t* child = 0;
+};
 // 菜单项
 class mitem_t
 {
 public:
-	std::vector<std::string> v;
+	std::vector<itd_t> v;	 
 	std::function<void(mitem_t* p, int type, int id)> ckm_cb;
 	int width = -1;		// 菜单宽度
 	int height = 0;	// 菜单项高
@@ -33,6 +38,7 @@ public:
 	menu_cx* m = 0;
 	form_x* f = 0;
 	mitem_t* parent = 0;	// 父级
+	mitem_t* cct = 0;		// 当前子菜单
 	pvm_t pv = {};
 	canvas_atlas* backgs = 0, * fronts = 0;// 背景和前景
 	layout_text_x* ltx = 0;
@@ -44,6 +50,8 @@ public:
 	void close();
 	void set_data(int width, int height, const std::vector<std::string>& mvs);
 	glm::ivec2 get_idx_pos(int idx);
+	// 设置子菜单
+	void set_child(mitem_t* cp, int idx);
 };
 // 菜单管理器
 class menu_cx

@@ -117,9 +117,15 @@ void mitem_t::close()
 
 void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 {
+	if (mvs.empty())return;
 	width = w;
 	height = h;
-	v = mvs;
+	auto n = mvs.size();
+	v.resize(n);
+	for (size_t i = 0; i < n; i++)
+	{
+		v[i].str = mvs[i];
+	}
 	if (pv.back)
 		backgs->remove_atlas(pv.back);
 	fronts->remove_atlas(pv.front);
@@ -129,6 +135,22 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 		{
 			if (ckm_cb)
 				ckm_cb(p, type, idx);
+			auto pc = v[idx].child;
+			if (type)
+			{
+				if (!pc)
+					hide(true);	// 点击隐藏
+			}
+			else {
+				if (pc) {
+					cct = pc;
+					pc->show(get_idx_pos(idx));// 显示子菜单
+				}
+				else if (cct) {
+					cct->hide(false);
+				}
+			}
+
 		});
 	if (pv.back)
 		backgs->add_atlas(pv.back);
@@ -141,6 +163,12 @@ glm::ivec2 mitem_t::get_idx_pos(int idx)
 	ps.x += pv.w + pv.cpos.x + pv.p->border.y;
 	ps.y += idx * pv.h;
 	return ps;
+}
+
+void mitem_t::set_child(mitem_t* cp, int idx)
+{
+	if (idx < 0 || idx >= v.size())return;
+	v[idx].child = cp; cp->parent = this;
 }
 
 menu_cx::menu_cx()

@@ -70,7 +70,6 @@ void menu_m(form_x* form0)
 		{
 			if (type)
 			{
-				pm->hide(true);	// 点击隐藏
 				printf("click:%d\t%d\n", type, idx);
 			}
 			//else
@@ -80,20 +79,14 @@ void menu_m(form_x* form0)
 		{
 			if (type)
 			{
-				if (idx != cidx)
-					pm->hide(true);	// 点击隐藏
 				printf("click:%d\t%d\n", type, idx);
 			}
 			else
 			{
-				if (idx == cidx)
-					pm31->show(pm->get_idx_pos(idx));// 显示子菜单
-				else
-					pm31->hide(false);
 				//printf("move:%d\t%d\n", type, idx);
 			}
 		});
-	pm31->parent = pm3;
+	pm3->set_child(pm31, 2);
 	//pm3->show({ 100,100 }); // 显示菜单
 
 	for (auto& it : mvs)
