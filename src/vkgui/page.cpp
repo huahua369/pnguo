@@ -101,10 +101,12 @@ void mitem_t::show(const glm::vec2& ps)
 void mitem_t::hide(bool hp)
 {
 	//visible = false;
-	if (f)
+	if (f && f->get_visible())
 		f->hide();
-	else {
-
+	for (auto& it : v) {
+		if (it.child) {
+			it.child->hide(0);
+		}
 	}
 	if (parent && hp)
 		parent->hide(1);
@@ -138,19 +140,31 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 			if (ckm_cb)
 				ckm_cb(p, type, idx);
 			auto pc = v[idx].child;
-			if (type)
+			switch (type)
 			{
-				if (!pc)
-					hide(true);	// 点击隐藏
-			}
-			else {
+			case 0:
+			{
 				if (pc) {
 					cct = pc;
 					pc->show(get_idx_pos(idx));// 显示子菜单
 				}
-				else if (cct) {
-					cct->hide(false);
+			}
+			break;
+			case 1:
+			{
+				if (!pc)
+					hide(true);	// 点击隐藏
+			}
+			break;
+			case 2:
+			{
+				if (!pc && cct) {
+					cct->hide(false); cct = 0;
 				}
+			}
+			break;
+			default:
+				break;
 			}
 
 		});

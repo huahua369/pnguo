@@ -10230,8 +10230,11 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 							pc->bst = (int)BTN_STATE::STATE_NOMAL;
 					};
 				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
-					if (type == (int)event_type2::on_move) {
+					if (type == (int)event_type2::on_hover) {
 						cb(0, i);
+					}
+					if (type == (int)event_type2::on_move) {
+						cb(2, i);
 					}
 					};
 			}

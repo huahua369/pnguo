@@ -124,6 +124,7 @@ void menu_m(form_x* form0)
 					if (pm3->get_visible()) {
 						auto cps = cp->get_pos();
 						cps.y += cp->size.y + cp->thickness;
+						pm3->hide(true);
 						pm3->show(cps);
 					}
 				}
