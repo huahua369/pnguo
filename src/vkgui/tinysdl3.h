@@ -157,6 +157,7 @@ public:
 	std::vector<event_fw>* events_a = 0;
 	std::vector<event_fw> first_cs;	// 优先
 	std::vector<form_x*> childfs;
+	std::vector<menu_cx*> menus;
 	form_x* parent = 0;
 	form_x* tooltip = 0;	// 提示窗口
 	// 接收拖动OLE管理
@@ -220,7 +221,7 @@ public:
 
 	// 设置窗口图标
 	void set_icon(const char* fn);
-	void set_icon(const uint32_t* d, int w, int h); 
+	void set_icon(const uint32_t* d, int w, int h);
 	void set_alpha(bool is);
 	// type:0==RGBA。 static_tex? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
@@ -262,6 +263,8 @@ public:
 	void clear_wt();
 	// 获取hwnd
 	void* get_nptr();
+	// 增加菜单管理器
+	void push_menu(menu_cx* p);
 public:
 	void update_w();
 	void update(float delta);
@@ -312,8 +315,8 @@ enum form_flags_e
 	ef_vulkan = BIT_INC(8),			// vk渲染
 	ef_gpu = BIT_INC(9),			// gpu渲染
 	ef_metal = BIT_INC(10),			// mac metal渲染
-	ef_dx11 = BIT_INC(11),	 
-	ef_dx12 = BIT_INC(12),	 
+	ef_dx11 = BIT_INC(11),
+	ef_dx12 = BIT_INC(12),
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息

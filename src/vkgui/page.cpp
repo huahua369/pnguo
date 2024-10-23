@@ -76,6 +76,7 @@ mitem_t::~mitem_t()
 
 void mitem_t::show(const glm::vec2& ps)
 {
+	//visible = true;
 	if (pv.p) {
 		auto cv = pv.p->widgets;
 		auto length = cv.size();
@@ -99,6 +100,7 @@ void mitem_t::show(const glm::vec2& ps)
 
 void mitem_t::hide(bool hp)
 {
+	//visible = false;
 	if (f)
 		f->hide();
 	else {
@@ -171,6 +173,11 @@ void mitem_t::set_child(mitem_t* cp, int idx)
 	v[idx].child = cp; cp->parent = this;
 }
 
+bool mitem_t::get_visible()
+{
+	return f ? f->get_visible() : false;
+}
+
 menu_cx::menu_cx()
 {
 }
@@ -181,6 +188,7 @@ menu_cx::~menu_cx()
 void menu_cx::set_main(form_x* f)
 {
 	form = f;
+	form->push_menu(this);
 }
 void menu_cx::add_familys(const char* family)
 {

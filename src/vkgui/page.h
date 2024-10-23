@@ -41,7 +41,7 @@ public:
 	mitem_t* cct = 0;		// 当前子菜单
 	pvm_t pv = {};
 	canvas_atlas* backgs = 0, * fronts = 0;// 背景和前景
-	layout_text_x* ltx = 0;
+	layout_text_x* ltx = 0; 
 public:
 	mitem_t();
 	~mitem_t();
@@ -52,6 +52,7 @@ public:
 	glm::ivec2 get_idx_pos(int idx);
 	// 设置子菜单
 	void set_child(mitem_t* cp, int idx);
+	bool get_visible();
 };
 // 菜单管理器
 class menu_cx

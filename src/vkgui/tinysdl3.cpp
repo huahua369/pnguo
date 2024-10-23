@@ -1663,6 +1663,11 @@ void* form_x::get_nptr()
 #endif
 	return p;
 }
+void form_x::push_menu(menu_cx* p)
+{
+	if (p)
+		menus.push_back(p);
+}
 void form_x::update_w()
 {
 	int w, h;
@@ -2308,13 +2313,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-		}
+	}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
-	} while (0);
+} while (0);
 
 }
 void form_x::enable_window(bool bEnable)

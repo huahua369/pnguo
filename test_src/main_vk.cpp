@@ -112,6 +112,7 @@ void menu_m(form_x* form0)
 				{
 					auto cps = cp->get_pos();
 					cps.y += cp->size.y + cp->thickness;
+					pm3->hide(true);
 					pm3->show(cps);
 					hide_tooltip(form0);
 					form0->uptr = 0;
@@ -120,6 +121,11 @@ void menu_m(form_x* form0)
 				case event_type2::on_enter:
 				{
 					enterst = pt;
+					if (pm3->get_visible()) {
+						auto cps = cp->get_pos();
+						cps.y += cp->size.y + cp->thickness;
+						pm3->show(cps);
+					}
 				}
 				break;
 				case event_type2::on_hover:
@@ -133,10 +139,10 @@ void menu_m(form_x* form0)
 					if (enterst == pt) {
 						if (form0->uptr != pt)
 						{
-							show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+							//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
 							form0->uptr = pt;
 						}
-					}
+					}					  
 				}
 				break;
 				case event_type2::on_leave:
