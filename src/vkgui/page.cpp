@@ -937,6 +937,100 @@ action_show_t* wait_show(bool visible, float wait)
 {
 	return 0;
 }
+
+// 更新动画
+void update_ecs(float deltaTime)
+{
+#if 0
+	{
+		auto view = reg->view<action_t>();
+		for (auto e : view) {
+			auto& d = view.get<action_t>(e);
+			float ct = 0;
+			int hr = d.updata_t(deltaTime, ct);
+			auto ptr = d.ptr;
+			if (ptr->aidx.x >= 0)
+			{
+				auto ps = d.get<glm::vec2>(ptr->aidx.x);
+				if (ps)
+					ptr->set_pos(*ps);// 移动
+			}
+			if (ptr->aidx.y >= 0)
+			{
+				auto ss = d.get<glm::vec2>(ptr->aidx.y);
+				if (ss)
+				{
+					ptr->set_size(*ss);//变形
+				}
+			}
+			if (hr == 1) {
+				d.clear();
+				reg->remove<action_t>(e);// 结束动画
+			}
+
+
+		}
+	}
+	{
+		// 显示隐藏
+		auto view = reg->view<ui_show_t>();
+		for (auto e : view) {
+			auto& d = view.get<ui_show_t>(e);
+			if (d.ptr)
+			{
+				if (d.wait > 0)
+				{
+					d.wait -= deltaTime;
+					continue;
+				}
+				else
+				{
+					d.ptr->set_visible(d.v);
+				}
+			}
+			reg->remove<ui_show_t>(e);
+		}
+	}
+	// 更新auto大小
+	//if (isupauto)
+	do {
+		auto view0p = reg->view<csize_empty>();
+		int inc = 0;
+		for (auto e : view0p) {
+			auto& v = view0p.get<csize_empty>(e);
+			reg->remove<csize_empty>(e);
+			inc++;
+		}
+		if (inc == 0)
+		{
+			break;
+		}
+		auto view = reg->view<setsize_t>();
+		for (auto e : view) {
+			auto& v = view.get<setsize_t>(e);
+			auto ns = v.pad;
+			auto pr = v.ptr->parent;
+			if (!pr || v.ptr->aidx.y >= 0)
+			{
+				continue;
+			}
+			auto pss = pr->get_size();
+			auto olds = v.ptr->get_size();
+			auto nx = (ns.x + pss.x) * ns.z;
+			auto ny = (ns.y + pss.y) * ns.w;
+			if (nx > 0 && ns.z > 0)
+			{
+				olds.x = nx;
+			}
+			if (ny > 0 && ns.w > 0)
+			{
+				olds.y = ny;
+			}
+			v.ptr->set_size(olds);
+		}
+	} while (0);
+#endif
+}
 #endif // 1
 
 // todo 树

@@ -1,13 +1,15 @@
 ﻿
 #include <pch1.h>
+
+#include <random>
+#include <vkgui/win_core.h>
+#include "win32msg.h"
 #include <vkgui/event.h>
 #include <vkgui/pnguo.h>
 #include <vkgui/tinysdl3.h>
 #include <vkgui/vkrenderer.h>
 #include <vkgui/page.h>
 
-#include <random>
-#include <vkgui/win_core.h>
 #include "mshell.h"
 
 

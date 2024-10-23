@@ -69,5 +69,8 @@ namespace hz {
 	bool do_dragdrop_begin(const std::wstring& str);
 
 	void get_fullscreen_image(std::vector<uint32_t>* dst, int* width, int* height, const std::string& fn, int quality);
+
+	int vkcode2i(const std::string& vks);
+	std::string vkcode2str(int vk);
 }
 //!hz
