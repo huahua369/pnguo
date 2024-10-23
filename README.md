@@ -21,29 +21,7 @@ git pull --depth 1 --allow-unrelated-histories
 3. vcpkg安装依赖库，根据需求安装，例如```vcpkg install PkgConfig:x64-windows-static```
 4. 渲染器依赖```vcpkg install pkgconf tinygltf glm stb nlohmann-json vulkan```
 5. vcpkg安装示例```vcpkg install pkgconf openssl tinygltf glm stb nlohmann-json vulkan zlib pango cairo fontconfig harfbuzz exprtk clipper2 librsvg entt```
-```
-PkgConfig
-SDL3
-OpenSSL
-tinygltf
-glm
-Stb
-nlohmann_json
-Vulkan
-ZLIB
-pango
-cairo
-fontconfig
-harfbuzz
-EXPRTK
-Clipper2 Clipper2Z
-libuv
-LIBRSVG
-GTHREAD
-EnTT
-OpenCV
-vkvg
-```
+ 
 
 ## To Do 
 
@@ -63,6 +41,7 @@ vkvg
 - [x] 颜色控件
 - [x] 滑块控件
 - [x] 菜单
+- [x] 工具提示窗口
 - [ ] 表格视图
 - [ ] 树形视图
 - [ ] 属性视图

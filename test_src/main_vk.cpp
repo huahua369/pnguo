@@ -68,7 +68,7 @@ void menu_m(form_x* form0)
 	// 创建菜单
 	auto pm31 = mc->new_menu(-1, 22, mvs1, [=](mitem_t* pm, int type, int idx)
 		{
-			if (type)
+			if (type == 1)
 			{
 				printf("click:%d\t%d\n", type, idx);
 			}
@@ -77,7 +77,7 @@ void menu_m(form_x* form0)
 		});
 	auto pm3 = mc->new_menu(-1, 22, mvs0, [=](mitem_t* pm, int type, int idx)
 		{
-			if (type)
+			if (type == 1)
 			{
 				printf("click:%d\t%d\n", type, idx);
 			}
@@ -143,7 +143,7 @@ void menu_m(form_x* form0)
 							//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
 							form0->uptr = pt;
 						}
-					}					  
+					}
 				}
 				break;
 				case event_type2::on_leave:
@@ -155,9 +155,6 @@ void menu_m(form_x* form0)
 				}
 				break;
 				default:
-					if (enterst == pt) {
-						//hide_tooltip(form0);
-					}
 					break;
 				}
 			};
