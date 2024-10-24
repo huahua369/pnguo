@@ -17,8 +17,7 @@
 //include <view/utils_info.h>
 //#include <base/hlUtil.h>
 //#include "base_util.h"
-//#include <view/mem_pe.h>
-#ifdef TYPE_MSVC
+//#include <view/mem_pe.h> 
 //-------------使用系统当前风格---------------------------------------------------------------- 
 #ifdef _WIN32
 #if defined _M_IX86
@@ -30,8 +29,7 @@
 #else
 #pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #endif
-#endif
-#endif
+#endif 
 //----------------------------------------------------------------------------- 
 #ifdef DEBUG
 #define ASSERT_R(e) ASSERT_R(e)
@@ -481,11 +479,12 @@ pw->reg_hot_key("ctrl alt numpad_5", hf);
 	private:
 
 	};
-
+	struct ivec2 { int x, y; };
+	struct ivec3 { int x, y,z; };
 	class pbm :public ctrl_base
 	{
 	private:
-		glm::ivec2 _range;
+		ivec2 _range;
 	public:
 		pbm()
 		{
@@ -519,7 +518,7 @@ pw->reg_hot_key("ctrl alt numpad_5", hf);
 			_range.y = nUpper;
 			ASSERT_R(::IsWindow(m_hWnd)); ::SendMessage(m_hWnd, PBM_SETRANGE32, (WPARAM)nLower, (LPARAM)nUpper);
 		}
-		glm::ivec2 get_range()
+		ivec2 get_range()
 		{
 			return _range;
 		}
@@ -598,9 +597,9 @@ pw->reg_hot_key("ctrl alt numpad_5", hf);
 		{
 			ASSERT_R(::IsWindow(m_hWnd)); ::SendMessage(m_hWnd, EM_GETRECT, 0, (LPARAM)lpRect);
 		}
-		glm::ivec2 GetCharPos(_In_ long lChar) const
+		ivec2 GetCharPos(_In_ long lChar) const
 		{
-			ASSERT_R(::IsWindow(m_hWnd)); glm::ivec2 pt; ::SendMessage(m_hWnd, EM_POSFROMCHAR, (WPARAM)&pt, (LPARAM)lChar); return pt;
+			ASSERT_R(::IsWindow(m_hWnd)); ivec2 pt; ::SendMessage(m_hWnd, EM_POSFROMCHAR, (WPARAM)&pt, (LPARAM)lChar); return pt;
 		}
 		UINT GetOptions() const
 		{
@@ -670,7 +669,7 @@ pw->reg_hot_key("ctrl alt numpad_5", hf);
 		{
 			ASSERT_R(::IsWindow(m_hWnd)); return (BOOL)::SendMessage(m_hWnd, EM_DISPLAYBAND, 0, (LPARAM)pDisplayRect);
 		}
-		glm::ivec3 GetSel() const
+		ivec3 GetSel() const
 		{
 			CHARRANGE cr = { 0 };
 			ASSERT_R(::IsWindow(m_hWnd)); ::SendMessage(m_hWnd, EM_EXGETSEL, 0, (LPARAM)&cr);
@@ -693,15 +692,15 @@ pw->reg_hot_key("ctrl alt numpad_5", hf);
 		{
 			ASSERT_R(::IsWindow(m_hWnd)); return (long)::SendMessage(m_hWnd, EM_EXLINEFROMCHAR, 0, nIndex);
 		}
-		glm::ivec2 PosFromChar(_In_ UINT nChar) const
+		ivec2 PosFromChar(_In_ UINT nChar) const
 		{
 			ASSERT_R(::IsWindow(m_hWnd)); POINTL pt; ::SendMessage(m_hWnd, EM_POSFROMCHAR, (WPARAM)&pt, nChar); return { pt.x, pt.y };
 		}
-		int CharFromPos(_In_ glm::ivec2 pt) const
+		int CharFromPos(_In_ ivec2 pt) const
 		{
 			ASSERT_R(::IsWindow(m_hWnd)); POINTL ptl = { pt.x, pt.y }; return (int)::SendMessage(m_hWnd, EM_CHARFROMPOS, 0, (LPARAM)&ptl);
 		}
-		void SetSel(glm::ivec2 v2)
+		void SetSel(ivec2 v2)
 		{
 			CHARRANGE cr = { v2.x, v2.y };
 			ASSERT_R(::IsWindow(m_hWnd)); ::SendMessage(m_hWnd, EM_EXSETSEL, 0, (LPARAM)&cr);
@@ -823,7 +822,7 @@ pw->reg_hot_key("ctrl alt numpad_5", hf);
 			ReplaceSel(s.c_str(), TRUE);
 		}
 		//设置带格式文本, 范围为字符数量
-		int set_font_info(std::string fontname, UINT fontsize, UINT color, glm::ivec2 cr = { -1, -1 })
+		int set_font_info(std::string fontname, UINT fontsize, UINT color, ivec2 cr = { -1, -1 })
 		{
 			HWND richedit = m_hWnd;
 			if (!IsWindow(m_hWnd))

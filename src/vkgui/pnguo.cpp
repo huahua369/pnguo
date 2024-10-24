@@ -10219,7 +10219,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 			pcb->effect = uTheme::light;
 			pcb->pdc.hover_border_color = pcb->pdc.border_color;
 			pcb->pdc.border_color = 0;
-			pcb->text_align = { 0.1,0.5 };
+			pcb->text_align = { 0.1,0.05 };
 			if (pcb && cb)
 			{
 				pcb->click_cb = [=](void* pr, int)
