@@ -68,7 +68,7 @@ void menu_m(form_x* form0)
 	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
 	int cidx = 1;
 	// 创建菜单
-	auto pm31 = mc->new_menu(-1, 22, mvs1, [=](mitem_t* pm, int type, int idx)
+	auto pm31 = mc->new_menu(-1, 30, mvs1, [=](mitem_t* pm, int type, int idx)
 		{
 			if (type == 1)
 			{
@@ -77,7 +77,7 @@ void menu_m(form_x* form0)
 			//else
 			//	printf("move:%d\t%d\n", type, idx);
 		});
-	auto pm3 = mc->new_menu(-1, 22, mvs0, [=](mitem_t* pm, int type, int idx)
+	auto pm3 = mc->new_menu(-1, 30, mvs0, [=](mitem_t* pm, int type, int idx)
 		{
 			if (type == 1)
 			{
