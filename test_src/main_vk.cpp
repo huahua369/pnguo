@@ -448,6 +448,7 @@ int main()
 			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
+			//vkd->load_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
 
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
@@ -458,7 +459,7 @@ int main()
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
-		vkd->state.Exposure = 0.9928;
+		vkd->state.Exposure = 0.09928;
 		vkd->state.EmissiveFactor = 250;
 		new_ui(form0, vkd);
 		if (texok)
