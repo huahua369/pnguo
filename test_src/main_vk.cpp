@@ -9,6 +9,7 @@
 #include <vkgui/tinysdl3.h>
 #include <vkgui/vkrenderer.h>
 #include <vkgui/page.h>
+#include <vkgui/mapView.h>
 
 #include "mshell.h"
 
@@ -386,10 +387,19 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif 
 	//hz::main_ssh2();
-
 	//return 0;
 	//test_img();
 	auto app = new_app();
+	//{
+	//	hz::mfile_t m;
+	//	auto pd = m.open_d(R"(E:\zt\c00951ea.spr)", 0);
+	//	std::vector<int> fv;
+	//	if (pd)
+	//	{
+	//		fv.resize(20);
+	//		memcpy(fv.data(), pd, 20 * 4);
+	//	}
+	//}
 	uint32_t* cc = get_wcolor();
 	for (size_t i = 0; i < 16; i++)
 	{

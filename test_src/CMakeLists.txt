@@ -21,10 +21,17 @@ list(APPEND src_vkcmp
     "mshell.cpp"
     "../rc/resource1.rc"
 ) 
+list(APPEND src_spr   
+    "main_spr.cpp" 
+    "ecc_sv.cpp"
+    "mshell.cpp"
+    "../rc/resource1.rc"
+) 
 
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (vkcmp ${src_vkcmp} ) 
+add_executable (vkr_spr ${src_spr} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
@@ -39,7 +46,7 @@ find_package(libuv CONFIG REQUIRED)
  
 find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
-
+ find_package(CURL REQUIRED)
 set(lklib)
 list(APPEND lklib  
     ZLIB::ZLIB
@@ -57,6 +64,7 @@ list(APPEND lklib
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     vkgui
     tpv
+    $<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
    # rdx12
    # unofficial::joltphysics::Jolt
 )
@@ -64,7 +72,9 @@ target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DI
 target_link_libraries(tcmp PRIVATE ${lklib})
 
 target_include_directories(vkcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(vkcmp PRIVATE ${lklib} $<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>)
+target_link_libraries(vkcmp PRIVATE ${lklib} )
+target_include_directories(vkr_spr PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
+target_link_libraries(vkr_spr PRIVATE ${lklib} CURL::libcurl)
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
