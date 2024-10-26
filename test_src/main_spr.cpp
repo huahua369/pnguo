@@ -491,11 +491,11 @@ image_ptr_t* spr2png(const std::string& url, const std::string& fn)
 struct imgdepth_t
 {
 	image_ptr_t* dst = 0;
-	std::vector<uint16_t> imgdepth;
+	std::vector<double> imgdepth;
 	int width, height;
-	int dx, dy;
+	int dx, dy, z;
 };
-imgdepth_t pal_img(const std::string& palfn, const std::string& fn, const std::string& ofn, const std::string& gray = "", imgdepth_t* tds = 0) {
+imgdepth_t pal_img(const std::string& palfn, const std::string& fn, const std::string& ofn, const std::string& gray = "", imgdepth_t* tds = 0, float z = 0) {
 
 	auto palp = stbimage_load::new_load(palfn.c_str(), 0);
 	auto img = stbimage_load::new_load(fn.c_str(), 0);
@@ -515,58 +515,59 @@ imgdepth_t pal_img(const std::string& palfn, const std::string& fn, const std::s
 	{
 		ot = tds->dst->data;
 	}
-	for (auto& c : imgdata)
+	for (size_t y = 0; y < img->height; y++)
 	{
-		uint8_t* c8 = (uint8_t*)&c;
-		auto r = c8[0];//g
-		auto a = gd ? ((uint8_t*)gd)[1] : c8[3];//a
-		if (gd)
-			gd++;
-		auto d = c8[1] * 256.0 * 256.0 + c8[2] * 256;
-		//auto d = c8[1] + c8[2];
-		bool dd = true;
-		ret.imgdepth.push_back(d);
-		if (d > 0) {
-			d = d;
-		}
-		int x = ic;
-		int xc = 0;
-		ic++;
-		if (td)
+		for (size_t x = 0; x < img->width; x++)
 		{
-			xc = ((y + tds->dy) * (tds->width)) + x + tds->dx;
-			//if (d > 0 && td[xc] > 0) 
+			auto& c = imgdata[y * img->width + x];
+			uint8_t* c8 = (uint8_t*)&c;
+			auto r = c8[0];//r
+			auto g = c8[1];
+			auto b = c8[2];
+			auto a = gd ? ((uint8_t*)gd)[1] : c8[3];//a
+			if (gd)
+				gd++;
+			auto d = g * 256.0 * 256.0 + b * 256;
+			//auto d = c8[1] + c8[2];
+			bool dd = true;
+			int xc = 0;
+			d += z;
+			if (td)
 			{
-				if (d < td[xc])
-					dd = 0;
+				if (g == 87 && b == 20) {
+					d = d;
+				}
+				xc = ((y + tds->dy) * (tds->width)) + x + tds->dx;
+				if (xc > 0)
+				{
+					if (d < td[xc])
+						dd = 0;
+				}
 			}
-		}
-		if (ic == img->width)
-		{
-			ic = 0; y++;
-		}
-		uint8_t* g8 = (uint8_t*)&pal[r];
-		int trans = 0;
-		if (a > 0 && dd)
-		{
-			c8[0] = (uint8_t)(*g8++);
-			c8[1] = (uint8_t)(*g8++);
-			c8[2] = (uint8_t)(*g8++);
-			c8[3] = (uint8_t)(255 - a);
-			if (ot)
+			ret.imgdepth.push_back(d);
+			uint8_t* g8 = (uint8_t*)&pal[r];
+			int trans = 0;
+			if (a > 0 && dd)
 			{
-				ot[xc] = c;
+				c8[0] = (uint8_t)(*g8++);
+				c8[1] = (uint8_t)(*g8++);
+				c8[2] = (uint8_t)(*g8++);
+				c8[3] = (uint8_t)(255 - a);
+				if (ot)
+				{
+					ot[xc] = c;
+				}
+				//glm::vec4 palColor = { g8[0] / 255.0,g8[1] / 255.0,g8[2] / 255.0,g8[3] / 255.0 };
+				//glm::vec4 cur_color = palColor, color = {};
+				//glm::vec3 color0 = palColor;  cur_color.w *= 0.5; cur_color.w += a * 255.0;
+				//c8[0] = (uint8_t)(cur_color.x * 255.0);
+				//c8[1] = (uint8_t)(cur_color.y * 255.0);
+				//c8[2] = (uint8_t)(cur_color.z * 255.0);
+				//c8[3] = (uint8_t)(cur_color.w * 255.0);
+				as.insert(a);
 			}
-			//glm::vec4 palColor = { g8[0] / 255.0,g8[1] / 255.0,g8[2] / 255.0,g8[3] / 255.0 };
-			//glm::vec4 cur_color = palColor, color = {};
-			//glm::vec3 color0 = palColor;  cur_color.w *= 0.5; cur_color.w += a * 255.0;
-			//c8[0] = (uint8_t)(cur_color.x * 255.0);
-			//c8[1] = (uint8_t)(cur_color.y * 255.0);
-			//c8[2] = (uint8_t)(cur_color.z * 255.0);
-			//c8[3] = (uint8_t)(cur_color.w * 255.0);
-			as.insert(a);
+			else { c = 0; }
 		}
-		else { c = 0; }
 	}
 	memcpy(img->data, imgdata.data(), img->width * img->height * 4);
 	ret.width = img->width;
@@ -631,7 +632,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		fn += ".png";
 		save_img_png(img, fn.c_str());
 		v.push_back(img);
-	}
+}
 #endif
 	std::vector<image_ptr_t*> v;
 	{
@@ -651,11 +652,16 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	//pimg = spr2png("https://xyq.gsf.netease.com/avtres_hd_full_dir/e16416/p2/ca499bbd.spr", "temp/xy1/re16416.spr");
 	//pimg = spr2png("https://xyq.gsf.netease.com/avtres_hd_full_dir/e24608/p2/ca499bbd.spr", "temp/xy1/e24608.spr");
 
+	{
+		std::string fn = "temp/xy1/re1008.spr";
+		auto img = new_image2spr(fn);
+	}
 	std::string fn = "temp/xy1/re1008.spr.png";
 	auto sd = pal_img("temp/xy1/stand.pal.bmp", "temp/xy1/stand_d02.png", "temp/xy1/stand_d0_d.png", "temp/xy1/stand_d0.gray.png");
-	sd.dx = 84;
-	sd.dy = 0;
-	auto sd1 = pal_img("temp/xy1/1008.pal.bmp", "temp/xy1/re1008.spr.png", "temp/xy1/re1008.png", "", &sd);
+	sd.dx = 80 - 3;
+	sd.dy = 22 - 27;
+	sd.z = 3101;
+	auto sd1 = pal_img("temp/xy1/1008.pal.bmp", "temp/xy1/re1008.spr.png", "temp/xy1/re1008.png", "", &sd, sd.z);
 	save_img_png(sd.dst, "temp/xy1/stand_test.png");
 	exit(0);
 	menu_m(form0, [=](int idx) {
