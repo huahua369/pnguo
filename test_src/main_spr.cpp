@@ -11,159 +11,8 @@
 #include <vkgui/page.h>
 #include <vkgui/mapView.h>
 
-#include "mshell.h"
-
-
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 
-void menu_m(form_x* form0, std::function<void(int idx)> cb)
-{
-	auto mainmenu = new plane_cx();
-	form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
-	auto p = mainmenu;
-	//p->set_rss(5);
-	p->add_familys(fontn, 0);
-	//p->draggable = true; //可拖动✔
-	p->set_color({ 0,1,0,0xff000000 });
-	// 主菜单
-	std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
-	p->fontsize = 16;
-
-	{
-		glm::ivec2  fs = form0->get_size();
-		if (fs.x & 1)
-			fs.x++;
-		if (fs.y & 1)
-			fs.y++;
-		p->set_size({ fs.x, p->fontsize * 2 });
-	}
-	p->set_pos({});
-	glm::vec2 cs = { 1500,1600 };
-	auto vs = p->get_size();
-
-	p->set_view(vs, cs);
-	p->update_cb = [=](float dt)
-		{
-			bool r = false;
-			if (form0)
-			{
-				glm::ivec2 ps = p->get_size(), fs = form0->get_size();
-				if (fs.x & 1)
-					fs.x++;
-				if (fs.y & 1)
-					fs.y++;
-				if (ps.x != fs.x)
-				{
-					p->set_size({ fs.x, p->fontsize * 2 });
-					r = true;
-				}
-			}
-			return r;
-		};
-
-	menu_cx* mc = new menu_cx();	// 菜单管理
-	mc->set_main(form0);
-	mc->add_familys(fontn);
-
-	std::vector<std::string> mvs0 = { (char*)u8"🍇打开(O)",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
-	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
-	int cidx = 1;
-	// 创建菜单
-	auto pm31 = mc->new_menu(-1, 30, mvs1, [=](mitem_t* pm, int type, int idx)
-		{
-			if (type == 1)
-			{
-				printf("click:%d\t%d\n", type, idx);
-			}
-			//else
-			//	printf("move:%d\t%d\n", type, idx);
-		});
-	auto pm3 = mc->new_menu(-1, 30, mvs0, [=](mitem_t* pm, int type, int idx)
-		{
-			if (type == 1)
-			{
-				if (cb)cb(idx);
-				printf("click:%d\t%d\n", type, idx);
-			}
-			else
-			{
-				//printf("move:%d\t%d\n", type, idx);
-			}
-		});
-	pm3->set_child(pm31, 2);
-	//pm3->show({ 100,100 }); // 显示菜单
-
-	for (auto& it : mvs)
-	{
-		auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
-		cbt->effect = uTheme::light;
-		cbt->hscroll = {};
-		cbt->rounding = 0;
-		cbt->light = 0.1;
-
-		cbt->click_cb = [=](void* ptr, int clicks)
-			{
-				printf("%s\n", cbt->str.c_str());
-			};
-		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
-			{
-				static void* enterst = 0;
-				auto cp = (color_btn*)pt;
-				auto t = (event_type2)type;
-				switch (t)
-				{
-				case event_type2::on_down:
-				{
-					auto cps = cp->get_pos();
-					cps.y += cp->size.y + cp->thickness;
-					pm3->hide(true);
-					pm3->show(cps);
-					hide_tooltip(form0);
-					form0->uptr = 0;
-				}
-				break;
-				case event_type2::on_enter:
-				{
-					enterst = pt;
-					if (pm3->get_visible()) {
-						auto cps = cp->get_pos();
-						cps.y += cp->size.y + cp->thickness;
-						pm3->hide(true);
-						pm3->show(cps);
-					}
-				}
-				break;
-				case event_type2::on_hover:
-				{
-					// 0.5秒触发悬停事件
-					style_tooltip stp = {};
-					stp.family = fontn;
-					stp.fonst_size = 14;
-					glm::vec2 cps = mps;
-					cps.y += 20;
-					if (enterst == pt) {
-						if (form0->uptr != pt)
-						{
-							//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
-							form0->uptr = pt;
-						}
-					}
-				}
-				break;
-				case event_type2::on_leave:
-				{
-					if (enterst == pt) {
-						hide_tooltip(form0);
-						form0->uptr = 0;
-					}
-				}
-				break;
-				default:
-					break;
-				}
-			};
-	}
-}
 struct spr_info_t
 {
 	char tag[4] = {};
@@ -488,99 +337,104 @@ image_ptr_t* spr2png(const std::string& url, const std::string& fn)
 	}
 	return p;
 }
-struct imgdepth_t
+struct img_rp_t
 {
 	image_ptr_t* dst = 0;
+	image_ptr_t* src = 0;
+	std::string palfn, fn, ofn, gray;
+	std::string depthfn;
 	std::vector<double> imgdepth;
 	int width, height;
-	int dx, dy, z;
+	int dx, dy, z, wa;
 };
-imgdepth_t pal_img(const std::string& palfn, const std::string& fn, const std::string& ofn, const std::string& gray = "", imgdepth_t* tds = 0, float z = 0) {
-
-	auto palp = stbimage_load::new_load(palfn.c_str(), 0);
-	auto img = stbimage_load::new_load(fn.c_str(), 0);
-	auto img_gray = stbimage_load::new_load(gray.c_str(), 0);
+// 获取图像xy坐标深度，aa为替换透明度
+double get_depth(image_ptr_t* p, int x, int y, int aa) {
+	size_t dp = x + y * p->width;
+	int a = 0; double d = 0.0;
+	if (dp < (p->width* p->height))
+	{
+		uint8_t* c8 = (uint8_t*)&p->data[dp];
+		auto r = c8[0];
+		auto g = c8[1];
+		auto b = c8[2];
+		a = aa > 0 ? aa : c8[3];
+		d = g * 256.0 * 256.0 + b * 256;
+	}
+	return a > 0 ? d : 0;
+}
+void set_px(image_ptr_t* p, int x, int y, uint32_t c) {
+	size_t dp = x + y * p->width;
+	if (dp < p->width * p->height)
+	{
+		uint32_t* c2 = (uint32_t*)&p->data[dp];
+		*c2 = c;
+	}
+}
+void pal_img(img_rp_t* rp)
+{
+	auto palp = stbimage_load::new_load(rp->palfn.c_str(), 0);		// 调色板
+	auto img = stbimage_load::new_load(rp->fn.c_str(), 0);			// 待处理的图像
+	auto img_gray = stbimage_load::new_load(rp->gray.c_str(), 0);	// 单独透明度
+	auto idepth = stbimage_load::new_load(rp->depthfn.c_str(), 0);	// 深度图
 	std::vector<uint32_t> imgdata;
-	imgdepth_t ret = {};
 	imgdata.resize(img->width * img->height);
 	memcpy(imgdata.data(), img->data, img->width * img->height * 4);
 	auto pal = (uint32_t*)palp->data;
-	std::set<int> as;
 	size_t i = 0;
 	auto gd = img_gray ? img_gray->data : nullptr;
-	auto td = tds ? tds->imgdepth.data() : nullptr;
+	auto td = idepth ? idepth->data : nullptr;
 	int ic = 0, y = 0;
 	uint32_t* ot = 0;
-	if (tds && tds->dst)
-	{
-		ot = tds->dst->data;
-	}
+	if (rp->dst) { ot = rp->dst->data; }
 	for (size_t y = 0; y < img->height; y++)
 	{
 		for (size_t x = 0; x < img->width; x++)
 		{
 			auto& c = imgdata[y * img->width + x];
 			uint8_t* c8 = (uint8_t*)&c;
-			auto r = c8[0];//r
-			auto g = c8[1];
-			auto b = c8[2];
-			auto a = gd ? ((uint8_t*)gd)[1] : c8[3];//a
-			if (gd)
-				gd++;
-			auto d = g * 256.0 * 256.0 + b * 256;
-			//auto d = c8[1] + c8[2];
+			auto r = c8[0];//r是索引
+			auto a = gd ? ((uint8_t*)gd)[1] : c8[3];//判断是否用单独的透明度比如坐骑
+			if (a > 0 && rp->wa > 0)
+			{
+				a += rp->wa - a;
+			}
+			if (gd) gd++;
+			auto d = get_depth(img, x, y, a);
 			bool dd = true;
 			int xc = 0;
-			d += z;
+			d += rp->z;
 			if (td)
 			{
-				if (g == 87 && b == 20) {
-					d = d;
-				}
-				xc = ((y + tds->dy) * (tds->width)) + x + tds->dx;
-				if (xc > 0)
-				{
-					if (d < td[xc])
-						dd = 0;
-				}
+				auto tdd = get_depth(idepth, x + rp->dx, y + rp->dy, 0);
+				if (d < tdd)//判断深度
+					dd = 0;
 			}
-			ret.imgdepth.push_back(d);
-			uint8_t* g8 = (uint8_t*)&pal[r];
+			rp->imgdepth.push_back(d);
+			auto g8 = *(uint32_t*)&pal[r];
 			int trans = 0;
 			if (a > 0 && dd)
 			{
-				c8[0] = (uint8_t)(*g8++);
-				c8[1] = (uint8_t)(*g8++);
-				c8[2] = (uint8_t)(*g8++);
-				c8[3] = (uint8_t)(255 - a);
-				if (ot)
+				c = g8;					//设置索引色
+				c8[3] = (uint8_t)(a);	// 替换透明度
+				if (rp->dst)
 				{
-					ot[xc] = c;
+					set_px(rp->dst, x + rp->dx, y + rp->dy, c);
 				}
-				//glm::vec4 palColor = { g8[0] / 255.0,g8[1] / 255.0,g8[2] / 255.0,g8[3] / 255.0 };
-				//glm::vec4 cur_color = palColor, color = {};
-				//glm::vec3 color0 = palColor;  cur_color.w *= 0.5; cur_color.w += a * 255.0;
-				//c8[0] = (uint8_t)(cur_color.x * 255.0);
-				//c8[1] = (uint8_t)(cur_color.y * 255.0);
-				//c8[2] = (uint8_t)(cur_color.z * 255.0);
-				//c8[3] = (uint8_t)(cur_color.w * 255.0);
-				as.insert(a);
 			}
 			else { c = 0; }
 		}
 	}
 	memcpy(img->data, imgdata.data(), img->width * img->height * 4);
-	ret.width = img->width;
-	ret.height = img->height;
-	save_img_png(img, ofn.c_str());
+	rp->width = img->width;
+	rp->height = img->height;
+	save_img_png(img, rp->ofn.c_str());
 	stbimage_load::free_img(palp);
 	//stbimage_load::free_img(img);
 	stbimage_load::free_img(img_gray);
-	ret.dst = img;
-	return ret;
+	rp->src = img;
 }
 
-void new_ui(form_x* form0, vkdg_cx* vkd) {
+void test_spr(form_x* form0, vkdg_cx* vkd) {
 #if 0
 	std::vector<const char*> urls = {
 		"https://xyq.res.netease.com/pc/zt/20201104113047/img/f_bg_12_85a17f0c.png",
@@ -632,7 +486,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		fn += ".png";
 		save_img_png(img, fn.c_str());
 		v.push_back(img);
-}
+	}
 #endif
 	std::vector<image_ptr_t*> v;
 	{
@@ -656,191 +510,42 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		std::string fn = "temp/xy1/re1008.spr";
 		auto img = new_image2spr(fn);
 	}
-	std::string fn = "temp/xy1/re1008.spr.png";
-	auto sd = pal_img("temp/xy1/stand.pal.bmp", "temp/xy1/stand_d02.png", "temp/xy1/stand_d0_d.png", "temp/xy1/stand_d0.gray.png");
-	sd.dx = 80 - 3;
-	sd.dy = 22 - 27;
-	sd.z = 3101;
-	auto sd1 = pal_img("temp/xy1/1008.pal.bmp", "temp/xy1/re1008.spr.png", "temp/xy1/re1008.png", "", &sd, sd.z);
-	save_img_png(sd.dst, "temp/xy1/stand_test.png");
-	exit(0);
-	menu_m(form0, [=](int idx) {
-		auto fnv = hz::browse_openfile((char*)u8"打开spr文件", "", "*.spr", form0->get_nptr(), true);
-		for (auto& it : fnv) {
-			load_spr(form0, it);
-		}
-		});
-	auto p = new plane_cx();
-	uint32_t pbc = -1;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
-	p->set_rss(5);
-	p->_lms = { 6,6 };
-	p->add_familys(fontn, 0);
-	p->draggable = true; //可拖动
-	p->set_size({ 1320,1660 });
-	p->set_pos({ 1000,100 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
-	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
+	img_rp_t rw = {}, zq = {};
+	zq.palfn = "temp/xy1/stand.pal.bmp"; zq.fn = "temp/xy1/stand_d0.png"; zq.ofn = "temp/xy1/stand_d0_d.png"; zq.gray = "temp/xy1/stand_d0.gray.png";
 	{
-		// 设置带滚动条
-		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
-	}
-	p->set_view({ 320,660 }, { 600, 660 });
+		image_ptr_t* dst = 0;
+		std::string palfn, fn, ofn, gray;
+		std::string depthfn;
+		std::vector<double> imgdepth;
+		int width, height;
+		int dx, dy, z;
+	};
+	rw.palfn = "temp/xy1/1008.pal.bmp"; rw.fn = "temp/xy1/re1008.spr.png"; rw.ofn = "temp/xy1/re1008.png"; rw.depthfn = "temp/xy1/stand_d0.png";
+	rw.dx = 80 - 3;
+	rw.dy = 26 - 27;
+	rw.wa = 255;
+	pal_img(&zq);	// 处理坐骑
+	rw.dst = zq.src;
+	pal_img(&rw);
+	save_img_png(rw.dst, "temp/xy1/stand_test.png");
+	//menu_m(form0, [=](int idx) {
+	//	auto fnv = hz::browse_openfile((char*)u8"打开spr文件", "", "*.spr", form0->get_nptr(), true);
+	//	for (auto& it : fnv) {
+	//		load_spr(form0, it);
+	//	}
+	//	}); 
 
-}
-
-#ifdef _WIN32
-
-static std::string GetCPUNameString()
-{
-	int nIDs = 0;
-	int nExIDs = 0;
-
-	char strCPUName[0x40] = { };
-
-	std::array<int, 4> cpuInfo;
-	std::vector<std::array<int, 4>> extData;
-
-	__cpuid(cpuInfo.data(), 0);
-
-	// Calling __cpuid with 0x80000000 as the function_id argument
-	// gets the number of the highest valid extended ID.
-	__cpuid(cpuInfo.data(), 0x80000000);
-
-	nExIDs = cpuInfo[0];
-	for (int i = 0x80000000; i <= nExIDs; ++i)
-	{
-		__cpuidex(cpuInfo.data(), i, 0);
-		extData.push_back(cpuInfo);
-	}
-
-	// Interpret CPU strCPUName string if reported
-	if (nExIDs >= 0x80000004)
-	{
-		memcpy(strCPUName, extData[2].data(), sizeof(cpuInfo));
-		memcpy(strCPUName + 16, extData[3].data(), sizeof(cpuInfo));
-		memcpy(strCPUName + 32, extData[4].data(), sizeof(cpuInfo));
-	}
-
-	return strlen(strCPUName) != 0 ? strCPUName : "UNAVAILABLE";
-}
-#else
-static std::string GetCPUNameString()
-{
-	return "UNAVAILABLE";
-}
-
-#endif
-void show_cpuinfo(form_x* form0)
-{
-	cpuinfo_t cpuinfo = get_cpuinfo();
-	if (!form0)return;
-	auto p = new plane_cx();
-	uint32_t pbc = 0xf02c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
-	p->set_rss(5);
-	p->_lms = { 8,8 };
-	p->add_familys(fontn, 0);
-	p->draggable = true; //可拖动
-	p->set_size({ 420,660 });
-	p->set_pos({ 100,100 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
-	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
-	{
-		// 设置带滚动条
-		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
-	}
-	// 视图大小，内容大小
-	p->set_view({ 420,660 }, { 420, 660 });
-	glm::vec2 bs = { 150,22 };
-	glm::vec2 bs1 = { 50,22 };
-	std::vector<std::string> ncsstr = { (char*)u8"CPU信息","NumLogicalCPUCores","CPUCacheLineSize","SystemRAM","SIMDAlignment" };
-	std::vector<std::string> boolstr = { "AltiVec","MMX","SSE","SSE2","SSE3","SSE41","SSE42","AVX","AVX2","AVX512F","ARMSIMD","NEON","LSX","LASX" };
-
-	static std::vector<color_btn*> lbs;
-	bs.x = 300;
-	uint32_t txtcolor = 0xfff2f2f2;// 0xff7373ff;
-	int64_t ds[] = { 0, cpuinfo.NumLogicalCPUCores,cpuinfo.CPUCacheLineSize,cpuinfo.SystemRAM ,cpuinfo.SIMDAlignment };
-	{
-		int i = 0;
-		for (auto& it : ncsstr)
-		{
-			std::string txt = vkr::format("%-20s: %lld", it.c_str(), ds[i]);
-			auto tc = txtcolor;
-			if (i == 0) {
-				txt = it + ": " + GetCPUNameString();
-				tc = 0xffF6801F;
-			}
-			i++;
-			auto kcb = p->add_label(txt, bs, 0);
-			kcb->text_color = tc;
-			kcb->_disabled_events = true;
-			lbs.push_back(kcb);
-		}
-	}
-	bool* bps = &cpuinfo.AltiVec;
-	bs.x = 160;
-	for (size_t i = 0; i < boolstr.size(); i++)
-	{
-		auto& it = boolstr[i];
-		auto kcb = p->add_label(it.c_str(), bs, 0);
-		{
-			kcb->_disabled_events = true;
-			kcb->text_color = txtcolor;
-			auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), bps[i]);
-			sw1->_disabled_events = true;
-			sw1->get_pos();
-			kcb = p->add_label("", bs, 0);
-			kcb->_disabled_events = true;
-		}
-	}
-}
-
-
-
-void test_img() {
-
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr10.jpg", 10);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr30.jpg", 30);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 
 int main()
 {
-#ifdef _DEBUG
-	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-#endif  
 	auto app = new_app();
-
-	uint32_t* cc = get_wcolor();
-	for (size_t i = 0; i < 16; i++)
-	{
-		auto str = get_wcname(i, 0);
-		printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
-	}
-	//testnjson();
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口0";
 	const char* wtitle1 = (char*)u8"窗口1";
-
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
 	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
-
-	new_ui(form0, 0);
-	show_cpuinfo(form0);
+	test_spr(form0, 0);
 	// 运行消息循环
 	run_app(app, 0);
 	free_app(app);
