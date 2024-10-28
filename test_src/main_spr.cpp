@@ -37,6 +37,10 @@ struct header_t
 	frames_t* frames;
 	int sprtype;
 };
+struct iv4
+{
+	int x, y, z, w;
+};
 image_ptr_t* new_image2spr(const std::string& fn) {
 	image_ptr_t* r = 0;
 	hz::mfile_t m;
@@ -45,6 +49,7 @@ image_ptr_t* new_image2spr(const std::string& fn) {
 	{
 		auto sp = (spr_info_t*)pd;
 		std::vector<frames_t> f;
+		std::vector<iv4> f4;
 		header_t h = {};
 		std::vector<int> irn;
 		int c = sp->frame * sp->dir;
@@ -53,6 +58,7 @@ image_ptr_t* new_image2spr(const std::string& fn) {
 		h.frames = fpp;
 		for (size_t i = 0; i < c; i++)
 		{
+			f4.push_back({ fpp->pos_x,fpp->pos_y,fpp->width,fpp->height });
 			f.push_back(*fpp); fpp++;
 		}
 		fp += sizeof(frames_t) * c;
@@ -376,6 +382,11 @@ void pal_img(img_rp_t* rp)
 	auto img = stbimage_load::new_load(rp->fn.c_str(), 0);			// 待处理的图像
 	auto img_gray = stbimage_load::new_load(rp->gray.c_str(), 0);	// 单独透明度
 	auto idepth = stbimage_load::new_load(rp->depthfn.c_str(), 0);	// 深度图
+
+
+	uint32_t rtem1[256] = {};
+	memcpy(rtem1, palp->data, 4 * 256);
+
 	std::vector<uint32_t> imgdata;
 	imgdata.resize(img->width * img->height);
 	memcpy(imgdata.data(), img->data, img->width * img->height * 4);
