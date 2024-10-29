@@ -415,8 +415,8 @@ int main()
 	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
-	sdldev.vkdev = 0;
-	std::vector<device_info_t> devs = get_devices(sdldev.inst);
+	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
+	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 	 
 	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
