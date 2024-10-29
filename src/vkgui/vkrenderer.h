@@ -172,14 +172,17 @@ private:
 
 };
 
-int get_device_count();
-const char* get_device_name(int idx);
 // todo 创建渲染器
 vkdg_cx* new_vkdg(dev_info_cx* c = 0);
 void free_vkdg(vkdg_cx* p);
 void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale);
 
-std::vector<uint64_t> enumeratephysicaldevices(void* inst);
+struct device_info_t
+{
+	char name[256];
+	void* phd;
+};
+std::vector<device_info_t> get_devices(void* inst);
 
 
 

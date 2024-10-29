@@ -19252,16 +19252,33 @@ void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
 	p->load_gltf(fn, ps, scale);
 }
 
-#endif
-std::vector<uint64_t> enumeratephysicaldevices(void* inst)
+#endif 
+
+std::vector<device_info_t> get_devices(void* inst)
 {
-	std::vector<uint64_t> phyDevices;
+	VkPhysicalDeviceProperties dp = {};
+	std::vector<device_info_t> r;
+	std::vector<void*> phyDevices;
 	uint32_t count = 0;
-	auto hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, NULL));
-	if (count > 0)
-	{
-		phyDevices.resize(count);
-		hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, (VkPhysicalDevice*)phyDevices.data()));
+	if (inst) {
+		auto hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, NULL));
+		if (count > 0)
+		{
+			phyDevices.resize(count);
+			hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, (VkPhysicalDevice*)phyDevices.data()));
+		}
+		if (count)
+		{
+			r.reserve(count);
+			for (auto p : phyDevices)
+			{
+				vkGetPhysicalDeviceProperties((VkPhysicalDevice)p, &dp);
+				device_info_t d = {};
+				strcpy(d.name, dp.deviceName);
+				d.phd = p;
+				r.push_back(d);
+			}
+		}
 	}
-	return phyDevices;
+	return r;
 }
