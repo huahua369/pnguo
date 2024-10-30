@@ -22939,6 +22939,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	if (hpw && t == devent_type_e::mouse_move_e)
 	{
+		// 生成鼠标离开消息
 		for (size_t i = 0; i < length; i++) {
 			auto pw = event_wts[i];
 			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue;
@@ -22955,7 +22956,6 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			}
 		}
 	}
-
 	if (!ep->ret)
 		ep->ret = r1;
 	switch (t)
@@ -22966,6 +22966,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		glm::ivec2 mps = { p->x,p->y };
 		on_motion(mps);
 		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
+		if(ckinc > 0)
+		{
+			drop_pos = mps - curpos0 - ppos;
+		}
 	}
 	break;
 	case devent_type_e::mouse_button_e:
@@ -22973,6 +22977,13 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y };
 		on_button(p->button, p->state, mps, p->clicks, ep->ret);
+
+		if (p->button == 1) {
+			if (p->state == 1) {
+				mps -= ppos;
+				curpos0 = mps - (glm::ivec2)drop_pos;
+			}
+		}
 
 		_hover_eq.z = 0;
 		//printf("ck:%d\t%p\n", ckinc, this);

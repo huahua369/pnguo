@@ -1914,7 +1914,7 @@ public:
 	bool (*dragdrop_begin)(const wchar_t* str, size_t size) = 0;
 
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
-
+	glm::ivec2 drop_pos = {}, cdp = {}, curpos0 = {};
 	layout_info_x _css = {};		// 布局样式
 	glm::vec2 _lpos = { 0,0 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "Arial,NSimSun";

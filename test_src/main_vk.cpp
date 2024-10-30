@@ -167,7 +167,6 @@ void menu_m(form_x* form0)
 }
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
-	menu_m(form0);
 	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
@@ -426,54 +425,42 @@ void show_belt(form_x* form0)
 	p->add_familys(fontn, 0);
 	p->draggable = false; //可拖动
 	p->set_size(size);
-	p->set_pos({ 60,60 });
+	p->set_pos({ 30,50 });
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
 	{
 		// 设置带滚动条
-		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
+		//p->set_scroll(width, rcw, { 1, 1 }, { 2,0 }, { 0,2 });
+		//p->set_scroll_hide(1);
 	}
 	// 视图大小，内容大小
-	p->set_view(size, cview);
+	//p->set_view(size, cview);
 	auto sr = p->get_scroll_range();
 	sr /= 2;
-	cview /= 2;
+	size.y -= 50;
+	size.x -= 50 * 10;
+	size /= 2;
 	p->set_scroll_pts(sr, 0);
+
+	p->drop_pos = size;
+
 	auto bp = new belt_cx();
 	p->update_cb = [=](float delta)
 		{
+
 			bp->update(delta);
 			return 1;
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
-			int y1 = 10;
-			cairo_translate(cr, scroll.x, scroll.y);
-			cairo_translate(cr, cview.x, cview.y);
-
+			auto dps = p->drop_pos;
+			cairo_translate(cr, dps.x, dps.y);
 			{
 				cairo_as _ss_(cr);
 				bp->draw(cr);
-				return;
-				cairo_set_line_width(cr, 1.0);
-				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
-				fill_stroke(cr, -1, 0);
-				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1, 1);
-
-				cairo_scale(cr, 5, 5);
-				draw_triangle(cr, { 10.5,12.5 }, { 14.5,19 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1, 2);
-				cairo_set_hairline(cr, 1);// 开启最小宽度线
-				draw_triangle(cr, { 15.5,12.5 }, { 14.5,19 }, { 1,0.5 });
-				fill_stroke(cr, 0, -1, 2);
 			}
-
-
-
 		};
 }
 
@@ -526,6 +513,8 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
+
+	menu_m(form0);
 
 	vkdg_cx* vkd = 0;//new_vkdg(&sdldev);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
@@ -598,10 +587,7 @@ int main()
 		}
 
 	}
-	else
-	{
-		new_ui(form0, 0);
-	}
+
 	show_belt(form0);
 	//show_cpuinfo(form0);
 	// 运行消息循环
