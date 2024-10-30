@@ -384,33 +384,67 @@ class belt_cx
 {
 public:
 	std::vector<belt_t*> lines;
-	int w = 50;
+	glm::vec2 pos = { 0.5,0 };
+	int w = 56;
+	uint32_t linecolor = 0xcc222222;
+	std::vector<glm::vec2> bline;
+	std::vector<int> bline_idx;
+	int dxx = 0;
+	double ts = 0.0;
 public:
 	belt_cx();
 	~belt_cx();
 
-	void update(float delta) {
-
-	}
-	void draw(cairo_t* cr) {
-
-		for (size_t i = 0; i < 10; i++)
-		{
-			draw_rectangle(cr, { i * w,0,w,w }, 2);
-			fill_stroke(cr, 0xf0cccccc, 0xffff802C, 1, false);
-		}
-	}
+	void update(float delta);
+	void draw(cairo_t* cr);
 private:
 
 };
 
 belt_cx::belt_cx()
 {
+	int n = w * 10 / 6.0; size_t nc = 0;
+	int nx = w / 6;
+	int xx = 0;
+
+	{
+		for (size_t i = 0; i < n; i++, nc++)
+		{
+			bline.push_back({ xx + i * nx,1 });
+			bline.push_back({ xx + i * nx,w - 2 });
+			bline_idx.push_back(i + nc);
+			bline_idx.push_back(i + nc + 1);
+			bline_idx.push_back(-1);
+		}
+	}
+
 }
 
 belt_cx::~belt_cx()
 {
 }
+void belt_cx::update(float delta) {
+	ts += delta;
+	if (ts > 0.12)
+	{
+		dxx++;
+		ts = 0;
+	}
+	if (dxx > 7)dxx = 0;
+}
+void belt_cx::draw(cairo_t* cr) {
+
+	for (size_t i = 0; i < 10; i++)
+	{
+		draw_rectangle(cr, { i * w,0,w,w }, 2);
+		fill_stroke(cr, 0xf0cccccc, 0xffff802C, 1, false);
+	}
+	auto ps = pos;
+	ps.x += dxx;
+	draw_polylines(cr, ps, bline.data(), bline.size(), bline_idx.data(), bline_idx.size(), linecolor, 1);
+}
+
+
 void show_belt(form_x* form0)
 {
 	if (!form0)return;
@@ -428,23 +462,12 @@ void show_belt(form_x* form0)
 	p->set_pos({ 30,50 });
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
-	{
-		// 设置带滚动条
-		//p->set_scroll(width, rcw, { 1, 1 }, { 2,0 }, { 0,2 });
-		//p->set_scroll_hide(1);
-	}
-	// 视图大小，内容大小
-	//p->set_view(size, cview);
-	auto sr = p->get_scroll_range();
-	sr /= 2;
+
 	size.y -= 50;
 	size.x -= 50 * 10;
 	size /= 2;
-	p->set_scroll_pts(sr, 0);
 
-	p->drop_pos = size;
+	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
 
 	auto bp = new belt_cx();
 	p->update_cb = [=](float delta)
@@ -455,7 +478,7 @@ void show_belt(form_x* form0)
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
-			auto dps = p->drop_pos;
+			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			cairo_translate(cr, dps.x, dps.y);
 			{
 				cairo_as _ss_(cr);

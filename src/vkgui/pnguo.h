@@ -1913,8 +1913,8 @@ public:
 	// OLO拖放文本
 	bool (*dragdrop_begin)(const wchar_t* str, size_t size) = 0;
 
-	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条
-	glm::ivec2 drop_pos = {}, cdp = {}, curpos0 = {};
+	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
+	std::vector<glm::ivec4> drags;	// 拖动坐标
 	layout_info_x _css = {};		// 布局样式
 	glm::vec2 _lpos = { 0,0 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "Arial,NSimSun";
@@ -1984,6 +1984,8 @@ public:
 	void mk_layout();
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
+	size_t push_dragpos(const glm::ivec2&pos);
+	glm::ivec2 get_dragpos(size_t idx);
 public:
 	gshadow_cx* get_gs();
 	// 设置边框阴影
@@ -2139,6 +2141,8 @@ void draw_ellipse(cairo_t* cr, const glm::vec2& pos, const glm::vec2& r);
 void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
 void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness);
+// 渲染索引多段线，索引-1则跳过
+void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, unsigned int col, float thickness);
 
 cairo_surface_t* new_clip_rect(int r);
 void clip_rect(cairo_t* cr, cairo_surface_t* r);
