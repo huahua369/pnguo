@@ -19258,6 +19258,7 @@ std::vector<device_info_t> get_devices(void* inst)
 {
 	VkPhysicalDeviceProperties dp = {};
 	std::vector<device_info_t> r;
+	std::vector<VkExtensionProperties> dep;
 	std::vector<void*> phyDevices;
 	uint32_t count = 0;
 	if (inst) {
@@ -19272,6 +19273,10 @@ std::vector<device_info_t> get_devices(void* inst)
 			r.reserve(count);
 			for (auto p : phyDevices)
 			{
+				uint32_t extensionCount;
+				VkResult res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, NULL);
+				dep.resize(extensionCount);
+				res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, dep.data());
 				vkGetPhysicalDeviceProperties((VkPhysicalDevice)p, &dp);
 				device_info_t d = {};
 				strcpy(d.name, dp.deviceName);
