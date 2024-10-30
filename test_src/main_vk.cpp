@@ -11,6 +11,8 @@
 #include <vkgui/page.h>
 #include <vkgui/mapView.h>
 
+#include <cairo/cairo.h>
+
 #include "mshell.h"
 
 
@@ -367,6 +369,113 @@ void show_cpuinfo(form_x* form0)
 	}
 }
 
+struct node_t
+{
+	int16_t type, count;//种类、数量
+};
+struct belt_t
+{
+	node_t* p = 0;	// 节点
+	size_t n = 0;	// 节点数量
+	glm::ivec2 pos[3] = {};// 曲线
+	belt_t* link_ptr = 0;	// 尾部连接
+	size_t link_idx = 0;		// 连接位置
+};
+class belt_cx
+{
+public:
+	std::vector<belt_t*> lines;
+	int w = 50;
+public:
+	belt_cx();
+	~belt_cx();
+
+	void update(float delta) {
+
+	}
+	void draw(cairo_t* cr) {
+
+		for (size_t i = 0; i < 10; i++)
+		{
+			draw_rectangle(cr, { i * w,0,w,w }, 2);
+			fill_stroke(cr, 0xf0cccccc, 0xffff802C, 1, false);
+		}
+	}
+private:
+
+};
+
+belt_cx::belt_cx()
+{
+}
+
+belt_cx::~belt_cx()
+{
+}
+void show_belt(form_x* form0)
+{
+	if (!form0)return;
+	glm::ivec2 size = { 1024,800 };
+	glm::ivec2 cview = { 10240,10240 };
+	auto p = new plane_cx();
+	uint32_t pbc = 0xf02c2c2c;
+	p->set_color({ 0x80ff802C,1,5,pbc });
+	form0->bind(p);	// 绑定到窗口  
+	p->set_rss(5);
+	p->_lms = { 8,8 };
+	p->add_familys(fontn, 0);
+	p->draggable = false; //可拖动
+	p->set_size(size);
+	p->set_pos({ 60,60 });
+	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->fontsize = 16;
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
+		p->set_scroll_hide(1);
+	}
+	// 视图大小，内容大小
+	p->set_view(size, cview);
+	auto sr = p->get_scroll_range();
+	sr /= 2;
+	cview /= 2;
+	p->set_scroll_pts(sr, 0);
+	auto bp = new belt_cx();
+	p->update_cb = [=](float delta)
+		{
+			bp->update(delta);
+			return 1;
+		};
+	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
+		{
+			int y1 = 10;
+			cairo_translate(cr, scroll.x, scroll.y);
+			cairo_translate(cr, cview.x, cview.y);
+
+			{
+				cairo_as _ss_(cr);
+				bp->draw(cr);
+				return;
+				cairo_set_line_width(cr, 1.0);
+				draw_triangle(cr, { 100,100 }, { 8,8 }, { 0,1 });
+				fill_stroke(cr, -1, 0);
+				draw_triangle(cr, { 100.5,120.5 }, { 4.5,9 }, { 1,0.5 });
+				fill_stroke(cr, 0, -1, 1);
+
+				cairo_scale(cr, 5, 5);
+				draw_triangle(cr, { 10.5,12.5 }, { 14.5,19 }, { 1,0.5 });
+				fill_stroke(cr, 0, -1, 2);
+				cairo_set_hairline(cr, 1);// 开启最小宽度线
+				draw_triangle(cr, { 15.5,12.5 }, { 14.5,19 }, { 1,0.5 });
+				fill_stroke(cr, 0, -1, 2);
+			}
+
+
+
+		};
+}
 
 
 void test_img() {
@@ -417,8 +526,8 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-	 
-	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
+
+	vkdg_cx* vkd = 0;//new_vkdg(&sdldev);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	//if (vkd1) {
@@ -493,7 +602,8 @@ int main()
 	{
 		new_ui(form0, 0);
 	}
-	show_cpuinfo(form0);
+	show_belt(form0);
+	//show_cpuinfo(form0);
 	// 运行消息循环
 	run_app(app, 0);
 	free_app(app);

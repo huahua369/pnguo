@@ -1836,6 +1836,9 @@ public:
 	bool update(float delta);
 	void draw(cairo_t* cr);
 	int get_offset();			// 获取滚动偏移
+	int get_range();			// 获取滚动偏移最大范围
+	void set_offset(int pts);			// 设置滚动偏移
+	void set_offset_inc(int inc);			// 增加滚动偏移
 	void set_posv(const glm::ivec2& poss);
 };
 #endif // 1
@@ -1900,6 +1903,7 @@ public:
 	std::function<void(cairo_t* cr, const glm::vec2& scroll)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
+	widget_base me = {};// 本体事件处理
 	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
 	glm::ivec2 _move_pos = {};
 	// 移到最后
@@ -1950,6 +1954,9 @@ public:
 	void set_scroll_size(const glm::ivec2& ps, bool v);
 	void set_view(const glm::ivec2& view_size, const glm::ivec2& content_size);
 	void set_scroll_visible(const glm::ivec2& hv);
+	glm::ivec2 get_scroll_range();
+	// 设置位置，t=0设置，1加减
+	void set_scroll_pts(const glm::ivec2& pts, int t);
 	void move2end(widget_base* p);
 	void set_family_size(const std::string& fam, int fs, uint32_t color);
 	// 添加字体,返回序号

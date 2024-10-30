@@ -22110,6 +22110,7 @@ void plane_cx::set_size(const glm::ivec2& ss) {
 		viewport.z = ss.x; viewport.w = ss.y;
 		_clip_rect = { 0,0,ss.x,ss.y };
 		uplayout = true;
+		me.size = ss;
 		if (tv)
 			tv->set_size(ss);
 		else
@@ -22223,6 +22224,41 @@ void plane_cx::set_scroll_visible(const glm::ivec2& hv)
 	}
 }
 
+glm::ivec2 plane_cx::get_scroll_range()
+{
+	glm::ivec2 r = {};
+	if (horizontal)//水平滚动条
+	{
+		r.x = horizontal->get_range();
+	}
+	//垂直滚动条
+	if (vertical)
+	{
+		r.y = vertical->get_range();
+	}
+	return r;
+}
+
+void plane_cx::set_scroll_pts(const glm::ivec2& pts, int t)
+{
+	//水平滚动条
+	if (horizontal)
+	{
+		if (t == 0)
+			horizontal->set_offset(pts.x);
+		else
+			horizontal->set_offset_inc(pts.x);
+
+	}
+	//垂直滚动条
+	if (vertical)
+	{
+		if (t == 0)
+			vertical->set_offset(pts.y);
+		else
+			vertical->set_offset_inc(pts.y);
+	}
+}
 void plane_cx::set_clear_color(uint32_t c)
 {
 	tv->clear_color = rgb2bgr(c);
@@ -22732,9 +22768,12 @@ void plane_cx::set_rss(int r)
 
 void plane_cx::on_motion(const glm::vec2& pos) {
 	glm::ivec2 ps = pos;
-	if (ckinc > 0 && draggable)
+	if (ckinc > 0)
 	{
-		set_pos(ps - curpos);
+		if (draggable)
+			set_pos(ps - curpos);
+		//else
+		//	set_scroll_pts(ps - curpos, 1);
 	}
 
 	tv->on_motion(ps - tpos);
@@ -22847,6 +22886,8 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	event_wts.clear();
 	event_wts1.clear();
+	//if (!draggable)
+	//	event_wts1.push_back(&me);
 	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
 		if ((*it)->bst && (int)BTN_STATE::STATE_HOVER)
 			event_wts.push_back(*it);
@@ -24861,6 +24902,31 @@ void scroll_bar::draw(cairo_t* cr)
 int scroll_bar::get_offset()
 {
 	return scale_w * _offset;
+}
+
+int scroll_bar::get_range()
+{
+	glm::ivec2 ss = size;
+	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
+	auto st = ss[_dir] - tsm;
+	return st;
+}
+
+void scroll_bar::set_offset(int pts)
+{
+	glm::ivec2 ss = size;
+	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
+	auto st = ss[_dir] - tsm;
+	if (limit)
+	{
+		if (pts < 0)pts = 0;
+		if (pts > st)pts = st;
+	}
+	_offset = pts;
+}
+void scroll_bar::set_offset_inc(int inc)
+{
+	set_offset(_offset + inc);
 }
 
 void scroll_bar::set_posv(const glm::ivec2& poss)
