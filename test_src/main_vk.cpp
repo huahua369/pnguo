@@ -367,7 +367,7 @@ void show_cpuinfo(form_x* form0)
 		}
 	}
 }
-
+#include <entt/entt.hpp>
 struct node_t
 {
 	int16_t type, count;//种类、数量
@@ -383,14 +383,14 @@ struct belt_t
 class belt_cx
 {
 public:
-	std::vector<belt_t*> lines;
+	std::vector<entt::entity> lines;
 	glm::vec2 pos = { 0.5,0 };
 	int w = 56;
 	uint32_t linecolor = 0xcc222222;
 	std::vector<glm::vec2> bline;
 	std::vector<int> bline_idx;
 	int dxx = 0;
-	double ts = 0.0;
+	double ts = 0.0;s
 public:
 	belt_cx();
 	~belt_cx();
@@ -425,7 +425,7 @@ belt_cx::~belt_cx()
 }
 void belt_cx::update(float delta) {
 	ts += delta;
-	if (ts > 0.12)
+	if (ts > 0.12 * 0.5)
 	{
 		dxx++;
 		ts = 0;
@@ -485,17 +485,17 @@ void show_belt(form_x* form0)
 				cairo_as _ss_(cr);
 				bp->draw(cr);
 			}
-			std::string str = (char*)u8"🍉🍇";
+			std::string str = (char*)u8"🍉";
 			glm::vec4 rc = { 0,0,200,56 };
 			text_style_t st = {};
 			st.font = 0;
-			st.text_align = { 0.0,0.0050 };
+			st.text_align = { 0.0,0.0 };
 			st.font_size = 39;
 			st.text_color = -1;
 			auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
 			auto rc2 = rc;
-			rc2.z = rc1.x; rc2.w = rc1.y;
-			rc2.y = (rc.w - rc1.y) * st.text_align.y;
+			//rc2.z = rc1.x; rc2.w = rc1.y;
+			//rc2.y = (rc.w - rc1.y) * st.text_align.y;
 			//draw_rect(cr, rc2, 0xf0222222, 0xff802Cff, 2, 1);
 			draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
 		};

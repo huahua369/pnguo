@@ -10060,10 +10060,12 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 		if (rc.z < 1)rc.z = rct.x;
 		if (rc.w < 1)rc.w = h;
 		if (ctrc.y < h)ctrc.y = h;
-
+		auto ta = text_align;
+		if (ta.x < 0)ta.x = 0;
+		if (ta.y < 0)ta.y = 0;
 		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
 		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
-		auto ps = (ss - rct) * text_align + bearing;
+		auto ps = (ss - rct) * ta + bearing;
 		ps.x += rc.x;
 		ps.y += rc.y;
 		glm::vec2 tps = {};
@@ -10744,6 +10746,7 @@ void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, 
 }
 void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth)
 {
+	cairo_as _ss_(cr);
 	draw_rectangle(cr, rc, r);
 	fill_stroke(cr, fill, color, linewidth, false);
 }
