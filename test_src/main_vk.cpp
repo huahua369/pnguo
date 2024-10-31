@@ -390,7 +390,7 @@ public:
 	std::vector<glm::vec2> bline;
 	std::vector<int> bline_idx;
 	int dxx = 0;
-	double ts = 0.0;s
+	double ts = 0.0;
 public:
 	belt_cx();
 	~belt_cx();
