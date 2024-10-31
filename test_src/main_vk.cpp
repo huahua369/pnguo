@@ -436,8 +436,7 @@ void belt_cx::draw(cairo_t* cr) {
 
 	for (size_t i = 0; i < 10; i++)
 	{
-		draw_rectangle(cr, { i * w,0,w,w }, 2);
-		fill_stroke(cr, 0xf0cccccc, 0xffff802C, 1, false);
+		draw_rect(cr, { i * w,0,w,w }, 0xf0cccccc, 0xffff802C, 2, 1);
 	}
 	auto ps = pos;
 	ps.x += dxx;
@@ -446,7 +445,6 @@ void belt_cx::draw(cairo_t* cr) {
 	cairo_clip(cr);
 	draw_polylines(cr, ps, bline.data(), bline.size(), bline_idx.data(), bline_idx.size(), linecolor, 1);
 }
-
 
 void show_belt(form_x* form0)
 {
@@ -487,22 +485,19 @@ void show_belt(form_x* form0)
 				cairo_as _ss_(cr);
 				bp->draw(cr);
 			}
-			auto ltx = p->ltx;
-			glm::vec4 rc = { 0,0, 100,50 };
-			glm::vec2 text_align = { 0.0,0.45 };
-			ltx->tem_rtv.clear();
-			int font_size = 39;
-			std::string str = (char*)u8"🍉";
-			uint32_t text_color_shadow = 0;
-			ltx->build_text(0, rc, text_align, str.c_str(), -1, font_size, ltx->tem_rtv);
-			ltx->update_text();
-			if (text_color_shadow)
-			{
-				cairo_as _aa_(cr);
-				cairo_translate(cr, 1, 1);
-				ltx->draw_text(cr, ltx->tem_rtv, text_color_shadow);
-			}
-			ltx->draw_text(cr, ltx->tem_rtv, p->text_color);
+			std::string str = (char*)u8"🍉🍇";
+			glm::vec4 rc = { 0,0,200,56 };
+			text_style_t st = {};
+			st.font = 0;
+			st.text_align = { 0.0,0.0050 };
+			st.font_size = 39;
+			st.text_color = -1;
+			auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
+			auto rc2 = rc;
+			rc2.z = rc1.x; rc2.w = rc1.y;
+			rc2.y = (rc.w - rc1.y) * st.text_align.y;
+			//draw_rect(cr, rc2, 0xf0222222, 0xff802Cff, 2, 1);
+			draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
 		};
 }
 

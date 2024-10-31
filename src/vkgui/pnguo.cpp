@@ -10742,7 +10742,27 @@ void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, 
 	}
 	cairo_restore(cr);
 }
+void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth)
+{
+	draw_rectangle(cr, rc, r);
+	fill_stroke(cr, fill, color, linewidth, false);
+}
+//glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 
+void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st)
+{
+	glm::vec4 rc = text_rc;
+	ltx->tem_rtv.clear();
+	ltx->build_text(st->font, rc, st->text_align, str, len, st->font_size, ltx->tem_rtv);
+	ltx->update_text();
+	if (st->text_color_shadow)
+	{
+		cairo_as _aa_(cr);
+		cairo_translate(cr, st->shadow_pos.x, st->shadow_pos.y);
+		ltx->draw_text(cr, ltx->tem_rtv, st->text_color_shadow);
+	}
+	ltx->draw_text(cr, ltx->tem_rtv, st->text_color);
+}
 
 cairo_surface_t* new_clip_rect(int r)
 {
@@ -11242,7 +11262,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 #ifdef tsave__test
 				v.push_back(tv16); tv16.clear();
 #endif
-		}
+			}
 			mt = *t;
 			cairo_move_to(cr, t->x, t->y);
 		}break;
@@ -11269,13 +11289,13 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 				auto cy2 = p2.y + 2.0f / 3.0f * (p1.y - p2.y);
 				c1 = { cx1,cy1 }; c2 = { cx2,cy2 };
 #endif
-		}
+			}
 			//	C0 = Q0
 			//	C1 = Q0 + (2 / 3) (Q1 - Q0)
 			//	C2 = Q2 + (2 / 3) (Q1 - Q2)
 			//	C3 = Q2
 			cairo_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->x, t->y);
-	}break;
+		}break;
 		case vte_e::e_vcubic:
 		{
 			cairo_curve_to(cr, t->cx, t->cy, t->cx1, t->cy1, t->x, t->y);
@@ -11288,7 +11308,7 @@ void draw_path0(cairo_t* cr, T* p, style_path_t* st, glm::vec2 pos, glm::vec2 sc
 		tv16.push_back(*t);
 #endif
 		xt = *t;
-}
+	}
 	if (p->count > 2)
 	{
 		if (xt.x == mt.x && xt.y == mt.y)
@@ -11765,7 +11785,7 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 		{
 			glm::vec4 rc0 = { rc.x + vpos[i].x,rc.y + vpos[i].y,v[i].x,v[i].y };
 			draw_image(cr, image, vpos[i] + pos, rc0, color);
-}
+		}
 	}
 #endif
 	return ss;
@@ -13714,7 +13734,7 @@ int get_pat_int(FcPattern* font, const char* o)
 	{
 	}
 	return s;
-	}
+}
 
 #ifdef _WIN32111
 #define get_fmap pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT)
@@ -15887,7 +15907,7 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		{
 			return it->second;
 		}
-}
+	}
 #endif
 	glm::ivec3 ret = {};
 	font_t* rfont = nullptr;
@@ -16407,10 +16427,10 @@ public:
 				_dec_table.erase(p);
 				delete p;
 #endif
-		}
+			}
 
+		}
 	}
-}
 	void destroy_all_dec()
 	{
 		//LOCK_W(_sbit_lock);
@@ -17808,7 +17828,7 @@ int tt_face_colr_blend_layer(font_t* face1,
 
 		src += srcSlot->bitmap.pitch;
 		dst += dstSlot->bitmap.pitch;
-}
+	}
 #endif
 	return error;
 }
@@ -19247,7 +19267,7 @@ void layout_text()
 	cairo_restore(cr);
 	cairo_destroy(cr);
 
-		}
+}
 
 #endif
 
@@ -20095,11 +20115,11 @@ text_ctx_cx::text_ctx_cx()
 	if (cursor.z < 10)
 	{
 		cursor.z = n;
-}
+	}
 #else
 	cursor.z = 500;
 #endif
-	}
+}
 
 text_ctx_cx::~text_ctx_cx()
 {
@@ -23407,6 +23427,27 @@ void gradient_btn::draw(cairo_t* g)
 		ps += thickness;
 	}
 	glm::vec4 rc = { ps, ns };
+
+#if 1
+	text_style_t st = {};
+	st.font = 0;
+	st.text_align = p->text_align;
+	st.font_size = p->font_size;
+	st.text_color = p->text_color;
+	st.shadow_pos = { thickness, thickness };
+	st.text_color_shadow = text_color_shadow;
+	{
+		int font = 0;
+		glm::vec2 text_align = { 0.0,0.5 };
+		glm::vec2 shadow_pos = { 1.0,1.0 };
+		int font_size = 18;
+		uint32_t text_color = 0xffffffff;
+		uint32_t text_color_shadow = 0;
+	};
+	draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
+
+#else
+
 	ltx->tem_rtv.clear();
 	ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
 	ltx->update_text();
@@ -23415,11 +23456,10 @@ void gradient_btn::draw(cairo_t* g)
 		cairo_as _aa_(g);
 		cairo_translate(g, thickness, thickness);
 		ltx->draw_text(g, ltx->tem_rtv, text_color_shadow);
-		//rc = draw_text_align(g, p->str.c_str(), ps + glm::vec2(thickness, thickness), ns, text_align, text_color_shadow, p->family.c_str(), p->font_size);
 	}
 	ltx->draw_text(g, ltx->tem_rtv, p->text_color);
-	//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
 
+#endif // 1
 	// 边框
 	cairo_set_line_width(g, thickness);
 	set_color(g, borderLight);
@@ -23625,11 +23665,20 @@ void color_btn::draw(cairo_t* g)
 	}
 
 	glm::vec4 rc = { ps, ns };
-	ltx->tem_rtv.clear();
-	ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
-	ltx->update_text();
-	ltx->draw_text(g, ltx->tem_rtv, p->text_color);
-	//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
+
+	text_style_t st = {};
+	st.font = 0;
+	st.text_align = p->text_align;
+	st.font_size = p->font_size;
+	st.text_color = p->text_color;
+
+	draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
+
+	/*	ltx->tem_rtv.clear();
+		ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
+		ltx->update_text();
+		ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
+		//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
 
 	if (p->dcol)
 	{
@@ -24329,10 +24378,13 @@ void progress_tl::draw(cairo_t* cr)
 		}
 		glm::vec2 ta = { 1,0.5 };
 		glm::vec4 rc = { 0, 0, ss };
-		ltx->tem_rtv.clear();
-		ltx->build_text(0, rc, ta, text.c_str(), -1, font_size, ltx->tem_rtv);
-		ltx->update_text();
-		ltx->draw_text(cr, ltx->tem_rtv, text_color);
+		text_style_t st = {};
+		st.font = 0;
+		st.text_align = ta;
+		st.font_size = font_size;
+		st.text_color = text_color;
+		draw_text(cr, ltx, text.c_str(), -1, rc, &st);
+
 	}
 }
 
@@ -25534,7 +25586,7 @@ public:
 				errstr = getLastError();
 				printf("Could not load %s dll library!\n", fnstr.c_str());
 			}
-	} while (0);
+		} while (0);
 
 		if (_ptr)
 		{
@@ -25553,7 +25605,7 @@ public:
 			dlclose(_ptr);
 #endif
 			_ptr = 0;
-	}
+		}
 	}
 	void* _dlsym(const char* funcname)
 	{
@@ -25570,7 +25622,7 @@ public:
 		return func;
 #undef __dlsym
 #undef LIBPTR
-}
+	}
 
 	// 批量获取
 	void dllsyms(const char** funs, void** outbuf, int n)
@@ -25749,7 +25801,7 @@ icu_lib_t* get_icu(int v)
 			{
 				dlln = "icuuc";
 				so = loadso(dlln);
-		}
+			}
 #else
 			auto so = loadso(dlln);
 #endif // _WIN32
@@ -25802,7 +25854,7 @@ icu_lib_t* get_icu(int v)
 			else {
 				Shared::destroy(so);
 			}
-	}
+		}
 		catch (const std::exception& e)
 		{
 			auto ew = e.what();
@@ -25812,7 +25864,7 @@ icu_lib_t* get_icu(int v)
 				printf("load icu error!\n");
 			}
 		}
-}
+	}
 	return icub;
 }
 
@@ -26791,7 +26843,7 @@ glm::ivec2 hb_cx::draw_to_image(const std::string& str, font_t* ttf, double font
 		{
 			ret.y = size.y;
 		}
-}
+	}
 	//printf("\n");
 	return ret;
 }
@@ -26894,7 +26946,7 @@ void do_text(const char* str, size_t first, size_t count)
 		std::stable_sort(bidiinfo.begin(), bidiinfo.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 	}
 	return;
-	}
+}
 #else
 void do_text(const char* str, size_t first, size_t count)
 {}

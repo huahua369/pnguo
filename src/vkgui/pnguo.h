@@ -589,6 +589,17 @@ struct text_layout_t
 	bool once = false;
 };
 
+struct text_style_t
+{
+	int font = 0;
+	glm::vec2 text_align = { 0.0,0.5 };
+	glm::vec2 shadow_pos = { 1.0,1.0 };
+	int font_size = 18;
+	uint32_t text_color = 0xffffffff;
+	uint32_t text_color_shadow = 0;
+};
+
+
 class font_rctx
 {
 public:
@@ -1984,7 +1995,7 @@ public:
 	void mk_layout();
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
-	size_t push_dragpos(const glm::ivec2&pos);
+	size_t push_dragpos(const glm::ivec2& pos);
 	glm::ivec2 get_dragpos(size_t idx);
 public:
 	gshadow_cx* get_gs();
@@ -2113,6 +2124,7 @@ private:
 
 
 
+
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap);
 
 #if 1
@@ -2143,6 +2155,11 @@ void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, 
 void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness);
 // 渲染索引多段线，索引-1则跳过
 void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, unsigned int col, float thickness);
+
+void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth);
+//glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
+void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st);
+
 
 cairo_surface_t* new_clip_rect(int r);
 void clip_rect(cairo_t* cr, cairo_surface_t* r);
