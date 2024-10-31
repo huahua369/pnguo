@@ -441,6 +441,9 @@ void belt_cx::draw(cairo_t* cr) {
 	}
 	auto ps = pos;
 	ps.x += dxx;
+	// 裁剪区域
+	cairo_rectangle(cr, 0, 0, 10 * w, w);
+	cairo_clip(cr);
 	draw_polylines(cr, ps, bline.data(), bline.size(), bline_idx.data(), bline_idx.size(), linecolor, 1);
 }
 
@@ -484,6 +487,22 @@ void show_belt(form_x* form0)
 				cairo_as _ss_(cr);
 				bp->draw(cr);
 			}
+			auto ltx = p->ltx;
+			glm::vec4 rc = { 0,0, 100,50 };
+			glm::vec2 text_align = { 0.0,0.45 };
+			ltx->tem_rtv.clear();
+			int font_size = 39;
+			std::string str = (char*)u8"🍉";
+			uint32_t text_color_shadow = 0;
+			ltx->build_text(0, rc, text_align, str.c_str(), -1, font_size, ltx->tem_rtv);
+			ltx->update_text();
+			if (text_color_shadow)
+			{
+				cairo_as _aa_(cr);
+				cairo_translate(cr, 1, 1);
+				ltx->draw_text(cr, ltx->tem_rtv, text_color_shadow);
+			}
+			ltx->draw_text(cr, ltx->tem_rtv, p->text_color);
 		};
 }
 
