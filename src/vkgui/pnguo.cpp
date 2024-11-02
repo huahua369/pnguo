@@ -9994,9 +9994,9 @@ int layout_text_x::get_lineheight(size_t idx, int fontsize)
 	return heightline ? heightline : cfb[idx].y;
 }
 
-glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
+glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 {
-	glm::ivec2 ret = {};
+	glm::ivec3 ret = {};
 	if (familyv.empty())
 		return ret;
 	auto str = (const char*)str8;
@@ -10005,6 +10005,7 @@ glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	int x = 0;
 	int y = 0;
 	int n = 1;
+	auto h = get_lineheight(idx, fontsize);
 	do
 	{
 		if (!str || !(*str)) { break; }
@@ -10017,13 +10018,13 @@ glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 			n++;
 			continue;
 		}
-		auto rc = font->get_char_extent(ch, fontsize, fdpi, &familyv[idx]);
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx]);
 		x += rc.z;
 		y = std::max(rc.y, y);
 		ret.y = std::max(ret.y, y);
+		ret.z = std::max(ret.z, rc.w);
 	} while (str && *str);
 	ret.x = std::max(ret.x, x);
-	auto h = get_lineheight(idx, fontsize);
 	if (n > 1)
 		ret.y = h * n;
 	else
@@ -10053,9 +10054,11 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 	}
 	if (p)
 	{
-		glm::vec2 rct = get_text_rect(idx, str8, len, fontsize);
+		auto rct0 = get_text_rect(idx, str8, len, fontsize);
+		glm::vec2 rct = { rct0.x,rct0.y };
 		auto length = p->tv.size();
-		auto baseline = get_baseline(idx, fontsize);
+		auto baseline = rct0.z;
+		baseline = get_baseline(idx, fontsize);
 		int h = get_lineheight(idx, fontsize);
 		if (rc.z < 1)rc.z = rct.x;
 		if (rc.w < 1)rc.w = h;
@@ -15897,10 +15900,10 @@ tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int
 
 // todo 获取字符大小
 
-glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigned short font_dpi, std::vector<font_t*>* fallbacks)
+glm::ivec4 font_t::get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks)
 {
 	ft_char_s cs;
-	cs.v.font_dpi = font_dpi;
+	cs.v.font_dpi = 0;// font_dpi;
 	cs.v.font_size = font_size;
 	cs.v.unicode_codepoint = ch;
 #if 0
@@ -15912,17 +15915,18 @@ glm::ivec3 font_t::get_char_extent(char32_t ch, unsigned char font_size, unsigne
 		}
 	}
 #endif
-	glm::ivec3 ret = {};
+	glm::ivec4 ret = {};
 	font_t* rfont = nullptr;
 	auto g = get_glyph_index(ch, &rfont, fallbacks);
 	if (g)
 	{
-		double fns = round((double)font_size * font_dpi / 72.0);
+		double fns = font_size;// round((double)font_size * font_dpi / 72.0);
 		double scale = rfont->get_scale(fns);
 		int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
 		stb_font::buildGlyphBitmap(rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
 		double adv = scale * advance;
-		ret = { x1 - x0, y1 - y0, adv };
+		auto bl = rfont->get_base_line(font_size);
+		ret = { x1 - x0, y1 - y0, adv, bl };
 		//_char_lut[cs.u] = ret;
 	}
 	return ret;

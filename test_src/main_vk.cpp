@@ -16,7 +16,7 @@
 #include "mshell.h"
 
 
-auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 void menu_m(form_x* form0)
 {
@@ -489,7 +489,7 @@ void show_belt(form_x* form0)
 			glm::vec4 rc = { 0,0,200,56 };
 			text_style_t st = {};
 			st.font = 0;
-			st.text_align = { 0.0,0.0 };
+			st.text_align = { 0.0,0.5 };
 			st.font_size = 39;
 			st.text_color = -1;
 			auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);

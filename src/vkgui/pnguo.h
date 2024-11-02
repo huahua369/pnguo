@@ -542,7 +542,7 @@ public:
 	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv);
 public:
 	// 获取字符大小
-	glm::ivec3 get_char_extent(char32_t ch, unsigned char font_size, unsigned short font_dpi, std::vector<font_t*>* fallbacks);
+	glm::ivec4 get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks);
 	void clear_char_lut();
 	void clear_gcache();
 	// todo 获取文字渲染信息。glyph_index=-1时则用unicode_codepoint；
@@ -1084,8 +1084,8 @@ public:
 	int get_baseline(size_t idx, int fontsize);
 	// 获取行高
 	int get_lineheight(size_t idx, int fontsize);
-	// 获取文本区域大小
-	glm::ivec2 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	// 获取文本区域大小,z为基线
+	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
 	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
