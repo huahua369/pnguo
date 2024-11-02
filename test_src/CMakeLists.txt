@@ -42,7 +42,7 @@ find_package(OpenSSL REQUIRED)
 
 find_package(Libssh2 CONFIG REQUIRED)
        
-find_package(libuv CONFIG REQUIRED)
+#find_package(libuv CONFIG REQUIRED)
  
 find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
@@ -60,11 +60,12 @@ list(APPEND lklib
     #${SDL3_LIBRARIES}
    
     harfbuzz::harfbuzz 
-    $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
+    #$<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     vkgui
     tpv
-    $<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
+    libssh2::libssh2
+    #$<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
    # rdx12
    # unofficial::joltphysics::Jolt
 )
