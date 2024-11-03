@@ -104,10 +104,9 @@ void menu_m(form_x* form0)
 
 		cbt->click_cb = [=](void* ptr, int clicks)
 			{
-				//auto jstr = hz::cmdexe("vcpkg search --x-full-desc --x-json");
-				auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");
+				auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");	
 				hz::mfile_t mm;
-				auto kd = mm.new_m("temp/vlist.json", jstr.size());
+				auto kd=mm.new_m("temp/vlist.json", jstr.size());
 				if (kd)
 				{
 					memcpy(kd, jstr.c_str(), mm.size());

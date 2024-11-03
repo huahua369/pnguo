@@ -2793,3 +2793,411 @@ static uint32_t xc[256] = {
  0xff8a8a8a, 0xff949494, 0xff9e9e9e, 0xffa8a8a8, 0xffb2b2b2,
  0xffbcbcbc, 0xffc6c6c6, 0xffd0d0d0, 0xffdadada, 0xffe4e4e4,
  0xffeeeeee };
+
+// cmd
+
+class Cmd
+{
+public:
+#define CMD_BUFSIZE 8192
+	class Work
+	{
+	public:
+		Work()
+		{
+			_buffer.resize(CMD_BUFSIZE);
+		}
+
+		~Work()
+		{
+		}
+
+	public:
+		void* hRead = 0;
+		std::function<void(char*, size_t)> func;
+		std::vector<char> _buffer;
+	};
+
+private: 
+	std::thread _thd;
+	bool _run = true;
+	std::map<int64_t, Work> _work;
+	std::list<int64_t> _close;
+public:
+	Cmd()
+	{
+		init();
+	}
+
+	~Cmd()
+	{
+		_run = false;
+		_thd.join();
+	}
+	static Cmd* create()
+	{
+		return new Cmd();
+	}
+
+#ifdef _WIN32
+	bool exec(std::string cmds, int64_t user_data, std::function<void(char*, size_t)> func = nullptr)
+	{
+		SECURITY_ATTRIBUTES sa;
+		HANDLE hRead, hWrite;
+		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sa.lpSecurityDescriptor = NULL;
+		sa.bInheritHandle = TRUE;
+		if (!CreatePipe(&hRead, &hWrite, &sa, 0))
+		{
+			return false;
+		}
+		cmds = "Cmd.exe /C " + cmds;
+		std::vector<char> vcmd;
+		vcmd.resize(cmds.length() * 2, 0);
+		char* command = &vcmd[0];
+		memcpy(command, cmds.c_str(), cmds.length());
+		STARTUPINFO si;
+		PROCESS_INFORMATION pi;
+		si.cb = sizeof(STARTUPINFO);
+		GetStartupInfo(&si);
+		si.hStdError = hWrite;            //把创建进程的标准错误输出重定向到管道输入
+		si.hStdOutput = hWrite;           //把创建进程的标准输出重定向到管道输入
+		si.wShowWindow = SW_HIDE;
+		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+		//关键步骤，CreateProcess函数参数意义请查阅MSDN
+		if (!CreateProcess(NULL, command, NULL, NULL, TRUE, NULL, NULL, NULL, &si, &pi))
+		{
+			CloseHandle(hWrite);
+			CloseHandle(hRead);
+			return false;
+		}
+		CloseHandle(hWrite); 
+		auto& wd = _work[user_data];
+		wd.hRead = hRead;
+		wd.func = func;
+		return true;
+	}
+	void close(int64_t user_data)
+	{ 
+		_close.push_back(user_data);
+	}
+
+#endif // _WIN32
+public:
+#ifndef _WIN32
+	static std::string exe(std::string cmd)
+	{
+		std::string ret;
+		char buf_ps[1024] = { 0 };
+		char ps[1024] = { 0 };
+		FILE* ptr;
+		if (*(cmd.rbegin()) != '\n')
+		{
+			cmd.push_back('\n');
+		}
+		if ((ptr = popen(cmd.c_str(), "r")) != NULL)
+		{
+			while (fgets(buf_ps, 1024, ptr) != NULL)
+			{
+				if (buf_ps[0])
+					ret += buf_ps;
+				if (strlen(buf_ps) > 1024)
+					break;
+			}
+			pclose(ptr);
+			ptr = NULL;
+		}
+		else
+		{
+			ret = "popen error: " + cmd + "\n";
+		}
+		return ret;
+	}
+	static njson mdf(const std::string& str)
+	{
+		char* t = (char*)str.c_str();
+		std::vector<std::string> vs;
+		for (; t && *t;)
+		{
+			char* c = strchr(t, ' ');
+			std::string it;
+			if (c)
+			{
+				it.assign(t, c - t);
+			}
+			else
+			{
+				it = t;
+			}
+			vs.push_back(it);
+			for (; c && *c && *c == ' '; c++);
+			t = c;
+		}
+		njson ret;
+		if (vs.size() > 6)
+		{
+			ret["a"] = vs[0];
+			ret["fc"] = vs[1];
+			ret["pg"] = vs[2] + " " + vs[3];
+			ret["size"] = vs[4];
+			ret["time"] = vs[5] + " " + vs[6];
+			ret["name"] = vs[7];
+		}
+		return ret;
+	}
+	static njson ls(const std::string& path)
+	{
+		std::string lsstr = "ls -alhF --time-style=long-iso " + path;
+		auto llstr = exe(lsstr);
+		auto vs = hz::hstring::split(llstr, "\n");
+		njson ret;
+		for (auto it : vs)
+		{
+			if (it.find("total") != std::string::npos)
+			{
+				char* c = strchr((char*)it.c_str(), ' ');
+				ret["total"] = (c + 1);
+			}
+			else if (it.size())
+			{
+				ret["list"].push_back(mdf(it));
+			}
+		}
+		return ret;
+	}
+	static njson ps(const std::string& pn)
+	{
+		std::string lsstr = "ps -ef|grep " + pn;
+		auto llstr = exe(lsstr);
+		auto vs = hz::hstring::split(llstr, "\n");
+		njson ret = vs;
+		return ret;
+	}
+	// 查看线程数
+	static njson ps_thread_count(const std::string& pn)
+	{
+		std::string lsstr = "ps -eLf | grep " + pn + " |grep -v grep| wc -l";
+		auto llstr = exe(lsstr);
+		auto vs = hz::hstring::split(llstr, "\n");
+		njson ret = vs;
+		return ret;
+	}
+	// 查看进程信息
+	static njson ps_process(const std::string& pn)
+	{
+		std::string lsstr = "ps -aux | grep " + pn + " |grep -v grep| wc -l";
+		auto llstr = exe(lsstr);
+		auto vs = hz::hstring::split(llstr, "\n");
+		njson ret = vs;
+		return ret;
+	}
+#else
+	static std::string exe(std::string cmd) //执行命令行 
+	{
+		std::string ret;
+		SECURITY_ATTRIBUTES sa;
+		HANDLE hRead, hWrite;
+		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sa.lpSecurityDescriptor = NULL;
+		sa.bInheritHandle = TRUE;
+		if (!CreatePipe(&hRead, &hWrite, &sa, 0))
+		{
+			return ret;
+		}
+		cmd = "Cmd.exe /C " + cmd;
+		std::vector<char> vcmd;
+		vcmd.resize(cmd.length() * 2, 0);
+		char* command = &vcmd[0];
+		memcpy(command, cmd.c_str(), cmd.length());
+		STARTUPINFO si;
+		PROCESS_INFORMATION pi;
+		si.cb = sizeof(STARTUPINFO);
+		GetStartupInfo(&si);
+		si.hStdError = hWrite;            //把创建进程的标准错误输出重定向到管道输入
+		si.hStdOutput = hWrite;           //把创建进程的标准输出重定向到管道输入
+		si.wShowWindow = SW_HIDE;
+		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+		//关键步骤，CreateProcess函数参数意义请查阅MSDN
+		if (!CreateProcessA(NULL, command, NULL, NULL, TRUE, NULL, NULL, NULL, &si, &pi))
+		{
+			CloseHandle(hWrite);
+			CloseHandle(hRead);
+			return ret;
+		}
+		CloseHandle(hWrite);
+		std::string kb;
+		kb.resize(10241);
+		//char buffer[4096] = { 0 };          //用4K的空间来存储输出的内容，只要不是显示文件内容，一般情况下是够用了。
+		DWORD bytesRead;
+		while (true)
+		{
+			if (ReadFile(hRead, kb.data(), 10240, &bytesRead, NULL) == NULL)
+				break;
+			kb.resize(bytesRead);
+			ret += kb;
+			kb[0] = 0;
+		}
+		CloseHandle(hRead);
+		return ret;
+	}
+	static bool ExecDosCmd(std::string cmd, bool iscmdexe, bool hide, std::function<void(char*)> fun = nullptr, std::function<void(std::string&)> writefun = nullptr) //执行命令行 
+	{
+		SECURITY_ATTRIBUTES sa;
+		HANDLE hRead, hWrite;
+
+		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sa.lpSecurityDescriptor = NULL;
+		sa.bInheritHandle = TRUE;
+#if 0
+
+
+		if (!CreatePipe(&hRead, &hWrite, &sa, 0))
+		{
+			return false;
+		}
+#else
+		hRead = GetStdHandle(STD_INPUT_HANDLE);
+		hWrite = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif // 0
+		//if (iscmdexe)
+		{
+			cmd = "Cmd.exe /C " + cmd;
+		}
+		std::vector<char> vcmd;
+		vcmd.resize(cmd.length() * 2, 0);
+		char* command = &vcmd[0];
+		memcpy(command, cmd.c_str(), cmd.length());
+		STARTUPINFO si;
+		PROCESS_INFORMATION pi;
+		si.cb = sizeof(STARTUPINFO);
+		GetStartupInfo(&si);
+		si.hStdError = hWrite;            //把创建进程的标准错误输出重定向到管道输入
+		si.hStdOutput = hWrite;           //把创建进程的标准输出重定向到管道输入
+		si.wShowWindow = hide ? SW_HIDE : SW_SHOWNORMAL;
+		si.dwXSize = 900;
+		si.dwYSize = 520;
+		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+		//关键步骤，CreateProcess函数参数意义请查阅MSDN
+		//if (!CreateProcess(NULL, command, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
+		if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
+		{
+			CloseHandle(hWrite);
+			CloseHandle(hRead);
+			return false;
+		}
+
+		char buffer[4096] = { 0 };          //用4K的空间来存储输出的内容，只要不是显示文件内容，一般情况下是够用了。
+		DWORD bytesRead;
+		std::string wstr;
+		while (true)
+		{
+			if (fun)
+			{
+				if (ReadFile(hRead, buffer, 4095, &bytesRead, NULL) == NULL)
+					break;
+				//buffer中就是执行的结果，可以保存到文本，也可以直接输出
+				//这里是弹出对话框显示
+				fun(buffer);
+			}
+			if (writefun)
+			{
+				wstr.clear();
+				writefun(wstr);
+				if (wstr.size())
+				{
+					int64_t s = wstr.size();
+					DWORD n = 0;
+					for (; s > 0;)
+					{
+						WriteFile(hWrite, wstr.c_str(), s, &n, NULL);
+						s -= n;
+					}
+					break;
+				}
+			}
+		}
+		CloseHandle(hWrite);
+		CloseHandle(hRead);
+		return true;
+	}
+
+	static njson ls(const std::string& path)
+	{
+		njson ret;
+		return ret;
+	}
+#endif
+protected:
+	void init()
+	{
+		std::thread thd([=]() {
+			while (_run)
+			{
+				readCmd();
+			}
+			clean();
+			});
+		thd.swap(_thd);
+	}
+	void readCmd()
+	{ 
+		for (auto& it : _work)
+		{
+			auto& nt = it.second;
+			if (nt.hRead)
+			{
+#ifdef _WIN32	
+				DWORD bytesRead = 0;
+				memset(nt._buffer.data(), 0, nt._buffer.size());
+				if (ReadFile(nt.hRead, nt._buffer.data(), nt._buffer.size(), &bytesRead, NULL) != NULL)
+				{
+					if (nt.func)
+					{
+						nt.func(nt._buffer.data(), bytesRead);
+					}
+				}
+				else {
+					if (!nt.func)
+					{
+						_close.push_back(it.first);
+					}
+				}
+#endif // _WIN32
+			}
+		}
+		for (auto it : _close)
+		{
+			auto dt = _work.find(it);
+			if (dt != _work.end())
+			{
+#ifdef _WIN32	
+				CloseHandle(dt->second.hRead);
+#endif // _WIN32
+				_work.erase(it);
+			}
+		}
+		_close.clear();
+	}
+	void clean()
+	{ 
+		for (auto& it : _work)
+		{
+			if (it.second.hRead)
+			{
+#ifdef _WIN32	
+				CloseHandle(it.second.hRead);
+#endif // _WIN32
+			}
+		}
+		_work.clear();
+	}
+private:
+
+};
+
+namespace hz {
+	std::string cmdexe(const std::string& cmdstr)
+	{
+		return Cmd::exe(cmdstr);
+	}
+}
