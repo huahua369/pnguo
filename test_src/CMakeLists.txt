@@ -27,11 +27,18 @@ list(APPEND src_spr
     "mshell.cpp"
     "../rc/resource1.rc"
 ) 
+list(APPEND src_vcpkg_gui   
+    "main_vcpkg.cpp" 
+    "ecc_sv.cpp"
+    "mshell.cpp"
+    "../rc/resource1.rc"
+) 
 
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (vkcmp ${src_vkcmp} ) 
 add_executable (vkr_spr ${src_spr} ) 
+add_executable (vcpkg_gui ${src_vcpkg_gui} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
@@ -65,17 +72,17 @@ list(APPEND lklib
     vkgui
     tpv
     libssh2::libssh2
+    CURL::libcurl
     #$<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
    # rdx12
    # unofficial::joltphysics::Jolt
 )
-target_include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
+include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
-
-target_include_directories(vkcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(vkcmp PRIVATE ${lklib} )
-target_include_directories(vkr_spr PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(vkr_spr PRIVATE ${lklib} CURL::libcurl)
+ 
+target_link_libraries(vkcmp PRIVATE ${lklib} ) 
+target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
+target_link_libraries(vcpkg_gui PRIVATE ${lklib}  )
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})
