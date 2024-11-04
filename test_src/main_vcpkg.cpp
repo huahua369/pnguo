@@ -104,6 +104,7 @@ void menu_m(form_x* form0)
 
 		cbt->click_cb = [=](void* ptr, int clicks)
 			{
+				//auto jstr = hz::cmdexe("vcpkg integrate install");
 				//auto jstr = hz::cmdexe("vcpkg search --x-full-desc --x-json");
 				auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");
 				hz::mfile_t mm;
