@@ -18,6 +18,152 @@
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
+class vcpkg_Cx
+{
+public:
+	std::queue<std::string> cmds;
+	std::mutex _lock;
+	std::string rootdir;// vcpkg根目录
+public:
+	vcpkg_Cx();
+	~vcpkg_Cx();
+	void do_clone(const std::string& dir);
+	void do_bootstrap();
+	// 拉取
+	void do_pull();
+	// 比较更新了哪些库
+	void do_update(const std::string& t);
+	// 搜索库
+	void do_search();
+	// 列出安装库
+	void do_list();
+	// 集成到全局
+	void do_integrate_i();
+	// 移除全局
+	void do_integrate_r();
+	// 查看支持的架构
+	void do_get_triplet();
+	// 安装库
+	void do_install(const std::string& t, const std::string& triplet);
+	// 删除库
+	void do_remove(const std::string& t, const std::string& triplet);
+	// 执行自定义命令
+	void push_cmd(const std::string& c);
+	// 执行命令
+	void do_cmd();
+private:
+
+};
+vcpkg_Cx::vcpkg_Cx(){}
+vcpkg_Cx::~vcpkg_Cx(){}
+void vcpkg_Cx::do_clone(const std::string& dir)
+{
+	if (dir.size() < 2)return;
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push(dir.substr(0, 2));
+	cmds.push("cd \"" + dir + "\"");
+	cmds.push("git clone https://github.com/microsoft/vcpkg.git");
+}
+void vcpkg_Cx::do_bootstrap()
+{
+	if (rootdir.size() < 2)return;
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push(rootdir.substr(0, 2));
+	cmds.push("cd \"" + rootdir + "\"");
+#ifdef _WIN32
+	cmds.push("bootstrap-vcpkg.bat");
+#else
+	cmds.push("bootstrap-vcpkg.sh");
+#endif // _WIN32
+
+}
+void vcpkg_Cx::do_pull()
+{
+	if (rootdir.size() < 2)return;
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push(rootdir.substr(0, 2));
+	cmds.push("cd \"" + rootdir + "\"");
+	cmds.push("git pull");
+}
+void vcpkg_Cx::do_update(const std::string& t)
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push("vcpkg update");
+}
+void vcpkg_Cx::do_search()
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push("vcpkg search --x-full-desc --x-json");
+}
+void vcpkg_Cx::do_list()
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push("vcpkg list --x-full-desc --x-json");
+
+}
+
+void vcpkg_Cx::do_integrate_i()
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push("vcpkg integrate install");
+}
+
+void vcpkg_Cx::do_integrate_r()
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push("vcpkg integrate remove");
+}
+
+void vcpkg_Cx::do_get_triplet()
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push("vcpkg help triplet");
+}
+
+void vcpkg_Cx::do_install(const std::string& t, const std::string& triplet)
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	auto c = "vcpkg install " + t;
+	if (triplet.size())
+	{
+		c += ":" + triplet;
+	}
+	cmds.push(c);
+}
+
+void vcpkg_Cx::do_remove(const std::string& t, const std::string& triplet)
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	auto c = "vcpkg remove " + t;
+	if (triplet.size())
+	{
+		c += ":" + triplet;
+	}
+	cmds.push(c);
+}
+
+void vcpkg_Cx::push_cmd(const std::string& c)
+{
+	std::lock_guard<std::mutex> lock(_lock); 
+	cmds.push(c);
+}
+
+
+
+void vcpkg_Cx::do_cmd()
+{
+	std::string c;
+	for (; cmds.size();) {
+		{
+			std::lock_guard<std::mutex> lock(_lock);
+			c.swap(cmds.front()); cmds.pop();
+		}
+		if (c.empty())continue;
+		auto jstr = hz::cmdexe(c);
+		// todo 处理返回结果
+	}
+}
+
 void menu_m(form_x* form0)
 {
 	auto mainmenu = new plane_cx();
