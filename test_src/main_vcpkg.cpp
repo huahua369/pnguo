@@ -54,8 +54,8 @@ public:
 private:
 
 };
-vcpkg_Cx::vcpkg_Cx(){}
-vcpkg_Cx::~vcpkg_Cx(){}
+vcpkg_Cx::vcpkg_Cx() {}
+vcpkg_Cx::~vcpkg_Cx() {}
 void vcpkg_Cx::do_clone(const std::string& dir)
 {
 	if (dir.size() < 2)return;
@@ -144,7 +144,7 @@ void vcpkg_Cx::do_remove(const std::string& t, const std::string& triplet)
 
 void vcpkg_Cx::push_cmd(const std::string& c)
 {
-	std::lock_guard<std::mutex> lock(_lock); 
+	std::lock_guard<std::mutex> lock(_lock);
 	cmds.push(c);
 }
 
@@ -163,6 +163,8 @@ void vcpkg_Cx::do_cmd()
 		// todo 处理返回结果
 	}
 }
+
+
 
 void menu_m(form_x* form0)
 {
@@ -250,20 +252,25 @@ void menu_m(form_x* form0)
 
 		cbt->click_cb = [=](void* ptr, int clicks)
 			{
+				//auto jstr = hz::cmdexe("vcpkg list");
+				hz::opencmd([](const char* str) {printf(str); }, [](std::string& str) {
+					str = "cd e:\n";
+
+					});
 				//auto jstr = hz::cmdexe("vcpkg integrate install");
 				//auto jstr = hz::cmdexe("vcpkg search --x-full-desc --x-json");
-				auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");
-				hz::mfile_t mm;
-				auto kd = mm.new_m("temp/vlist.json", jstr.size());
-				if (kd)
-				{
-					memcpy(kd, jstr.c_str(), mm.size());
-					return;
-				}
-				jstr.push_back(0);
-				njson nn = njson::parse(jstr.c_str());
-				hz::save_json("temp/vlist.json", nn, 2);
-				printf("%s\n", cbt->str.c_str());
+				//auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");
+				//hz::mfile_t mm;
+				//auto kd = mm.new_m("temp/vlist.json", jstr.size());
+				//if (kd)
+				//{
+				//	memcpy(kd, jstr.c_str(), mm.size());
+				//	return;
+				//}
+				//jstr.push_back(0);
+				//njson nn = njson::parse(jstr.c_str());
+				//hz::save_json("temp/vlist.json", nn, 2);
+				//printf("%s\n", cbt->str.c_str());
 			};
 		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 			{

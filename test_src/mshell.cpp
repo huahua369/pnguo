@@ -2634,7 +2634,7 @@ namespace hz {
 		system("color 00");
 		system("CHCP 65001");
 #endif // _WIN32
-		  
+
 		njson info = hz::ssh_t::load_info("pgn.json");
 		if (info.empty()) { info = hz::ssh_t::load_info(getbof()); }
 		auto ssh = hz::ssh_t::new_run(info, [](hz::ssh_t* pt, std::string* d) {
@@ -2818,7 +2818,7 @@ public:
 		std::vector<char> _buffer;
 	};
 
-private: 
+private:
 	std::thread _thd;
 	bool _run = true;
 	std::map<int64_t, Work> _work;
@@ -2871,14 +2871,14 @@ public:
 			CloseHandle(hRead);
 			return false;
 		}
-		CloseHandle(hWrite); 
+		CloseHandle(hWrite);
 		auto& wd = _work[user_data];
 		wd.hRead = hRead;
 		wd.func = func;
 		return true;
 	}
 	void close(int64_t user_data)
-	{ 
+	{
 		_close.push_back(user_data);
 	}
 
@@ -2992,134 +2992,156 @@ public:
 		return ret;
 	}
 #else
-	static std::string exe(std::string cmd) //执行命令行 
+	struct h2_t
 	{
-		std::string ret;
+		HANDLE hRead = 0, hWrite = 0;
+	};
+	static h2_t get_exeptr(std::string cmd, HANDLE hRead = 0, HANDLE hWrite = 0, bool once = true) //执行命令行 
+	{
+		h2_t ret = {};
 		SECURITY_ATTRIBUTES sa;
-		HANDLE hRead, hWrite;
 		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 		sa.lpSecurityDescriptor = NULL;
 		sa.bInheritHandle = TRUE;
-		if (!CreatePipe(&hRead, &hWrite, &sa, 0))
+		if (hRead && hWrite)
 		{
-			return ret;
+			ret.hRead = hRead;
+			ret.hWrite = hWrite;
 		}
-		cmd = "Cmd.exe /C " + cmd;
-		std::vector<char> vcmd;
-		vcmd.resize(cmd.length() * 2, 0);
-		char* command = &vcmd[0];
-		memcpy(command, cmd.c_str(), cmd.length());
+		else {
+			if (!CreatePipe(&ret.hRead, &ret.hWrite, &sa, 0))
+			{
+				return ret;
+			}
+		}
+		std::string tc = R"(C:\Windows\System32\cmd.exe /)";
+		tc += (once ? "C " : "K ");
+		cmd = tc + cmd;
+
 		STARTUPINFO si;
 		PROCESS_INFORMATION pi;
 		si.cb = sizeof(STARTUPINFO);
 		GetStartupInfo(&si);
-		si.hStdError = hWrite;            //把创建进程的标准错误输出重定向到管道输入
-		si.hStdOutput = hWrite;           //把创建进程的标准输出重定向到管道输入
+		si.hStdError = ret.hWrite;            //把创建进程的标准错误输出重定向到管道输入
+		si.hStdOutput = ret.hWrite;           //把创建进程的标准输出重定向到管道输入
 		si.wShowWindow = SW_HIDE;
 		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 		//关键步骤，CreateProcess函数参数意义请查阅MSDN
-		if (!CreateProcessA(NULL, command, NULL, NULL, TRUE, NULL, NULL, NULL, &si, &pi))
+		if (!CreateProcessA(NULL, (char*)cmd.c_str(), NULL, NULL, TRUE, NULL, NULL, NULL, &si, &pi))
 		{
-			CloseHandle(hWrite);
-			CloseHandle(hRead);
+			CloseHandle(ret.hWrite);
+			CloseHandle(ret.hRead);
+			ret = {};
 			return ret;
 		}
-		CloseHandle(hWrite);
+		return ret;
+	}
+	static std::string exe(std::string cmd) //执行命令行 
+	{
+		std::string ret;
+		auto cp = get_exeptr(cmd);
+		if (cp.hWrite)
+			CloseHandle(cp.hWrite);
 		std::string kb;
 		kb.resize(10241);
 		//char buffer[4096] = { 0 };          //用4K的空间来存储输出的内容，只要不是显示文件内容，一般情况下是够用了。
-		DWORD bytesRead;
+		DWORD bytesRead = 0;
+
+		if (FALSE == PeekNamedPipe(cp.hRead, kb.data(), 4095, &bytesRead, 0, NULL))
+		{
+		}
 		while (true)
 		{
-			if (ReadFile(hRead, kb.data(), 10240, &bytesRead, NULL) == NULL)
+			kb.resize(10241);
+			if (ReadFile(cp.hRead, kb.data(), 10240, &bytesRead, NULL) == NULL)
 				break;
 			kb.resize(bytesRead);
 			ret += kb;
-			kb[0] = 0;
 		}
-		CloseHandle(hRead);
+		CloseHandle(cp.hRead);
 		return ret;
 	}
-	static bool ExecDosCmd(std::string cmd, bool iscmdexe, bool hide, std::function<void(char*)> fun = nullptr, std::function<void(std::string&)> writefun = nullptr) //执行命令行 
+	static bool ExecDosCmd(bool hide, std::function<void(const char*)> fun = nullptr, std::function<void(std::string&)> writefun = nullptr) //执行命令行 
 	{
-		SECURITY_ATTRIBUTES sa;
-		HANDLE hRead, hWrite;
-
-		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-		sa.lpSecurityDescriptor = NULL;
-		sa.bInheritHandle = TRUE;
-#if 0
-
-
-		if (!CreatePipe(&hRead, &hWrite, &sa, 0))
-		{
-			return false;
-		}
+		std::string cmd = R"()";
+		auto cp = get_exeptr(cmd, 0, 0, false);
+		std::thread et([=]()
+			{
+#if 1
 #else
-		hRead = GetStdHandle(STD_INPUT_HANDLE);
-		hWrite = GetStdHandle(STD_OUTPUT_HANDLE);
-#endif // 0
-		//if (iscmdexe)
-		{
-			cmd = "Cmd.exe /C " + cmd;
-		}
-		std::vector<char> vcmd;
-		vcmd.resize(cmd.length() * 2, 0);
-		char* command = &vcmd[0];
-		memcpy(command, cmd.c_str(), cmd.length());
-		STARTUPINFO si;
-		PROCESS_INFORMATION pi;
-		si.cb = sizeof(STARTUPINFO);
-		GetStartupInfo(&si);
-		si.hStdError = hWrite;            //把创建进程的标准错误输出重定向到管道输入
-		si.hStdOutput = hWrite;           //把创建进程的标准输出重定向到管道输入
-		si.wShowWindow = hide ? SW_HIDE : SW_SHOWNORMAL;
-		si.dwXSize = 900;
-		si.dwYSize = 520;
-		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-		//关键步骤，CreateProcess函数参数意义请查阅MSDN
-		//if (!CreateProcess(NULL, command, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
-		if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
-		{
-			CloseHandle(hWrite);
-			CloseHandle(hRead);
-			return false;
-		}
-
-		char buffer[4096] = { 0 };          //用4K的空间来存储输出的内容，只要不是显示文件内容，一般情况下是够用了。
-		DWORD bytesRead;
-		std::string wstr;
-		while (true)
-		{
-			if (fun)
-			{
-				if (ReadFile(hRead, buffer, 4095, &bytesRead, NULL) == NULL)
-					break;
-				//buffer中就是执行的结果，可以保存到文本，也可以直接输出
-				//这里是弹出对话框显示
-				fun(buffer);
-			}
-			if (writefun)
-			{
-				wstr.clear();
-				writefun(wstr);
-				if (wstr.size())
-				{
-					int64_t s = wstr.size();
-					DWORD n = 0;
-					for (; s > 0;)
-					{
-						WriteFile(hWrite, wstr.c_str(), s, &n, NULL);
-						s -= n;
-					}
-					break;
+				hRead = GetStdHandle(STD_INPUT_HANDLE);
+				hWrite = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif // 0 
+				if (!cp.hRead || !cp.hWrite) {
+					if (cp.hRead)
+						CloseHandle(cp.hRead);
+					if (cp.hWrite)
+						CloseHandle(cp.hWrite);
+					return;
 				}
-			}
-		}
-		CloseHandle(hWrite);
-		CloseHandle(hRead);
+
+				std::string buffer;          //用4K的空间来存储输出的内容，只要不是显示文件内容，一般情况下是够用了。
+
+				DWORD bytesRead = 0;
+				while (true)
+				{
+					buffer.resize(4096);
+					if (FALSE == PeekNamedPipe(cp.hRead, buffer.data(), 4095, &bytesRead, 0, NULL))
+					{
+						//break;
+					}
+					if (bytesRead == 0)
+					{
+						Sleep(20);
+						continue;
+					}
+					if (fun && bytesRead > 0)
+					{
+						if (ReadFile(cp.hRead, buffer.data(), 4095, &bytesRead, NULL))
+						{
+							buffer.resize(bytesRead);
+							//buffer中就是执行的结果，可以保存到文本，也可以直接输出
+							//这里是弹出对话框显示
+							fun(buffer.c_str());
+						}
+					}
+				}
+				if (cp.hRead)
+					CloseHandle(cp.hRead);
+				if (cp.hWrite)
+					CloseHandle(cp.hWrite);
+	});
+		std::thread etw([=]()
+			{
+				std::string wstr;
+				while (true)
+				{
+					if (writefun)
+					{
+						wstr.clear();
+						writefun(wstr);
+						if (wstr.size())
+						{
+							int64_t s = wstr.size();
+							DWORD n = 0;
+							auto dp = wstr.c_str();
+							for (; s > 0;)
+							{
+								WriteFile(cp.hWrite, dp, s, &n, NULL);
+								if (n == 0)break;
+								s -= n;
+								dp += n;
+							} 
+						}
+					}
+				}
+				while (1)
+					Sleep(20);
+			});
+		et.detach();
+		etw.detach();
 		return true;
-	}
+}
 
 	static njson ls(const std::string& path)
 	{
@@ -3140,7 +3162,7 @@ protected:
 		thd.swap(_thd);
 	}
 	void readCmd()
-	{ 
+	{
 		for (auto& it : _work)
 		{
 			auto& nt = it.second;
@@ -3179,7 +3201,7 @@ protected:
 		_close.clear();
 	}
 	void clean()
-	{ 
+	{
 		for (auto& it : _work)
 		{
 			if (it.second.hRead)
@@ -3199,5 +3221,9 @@ namespace hz {
 	std::string cmdexe(const std::string& cmdstr)
 	{
 		return Cmd::exe(cmdstr);
+	}
+	void opencmd(std::function<void(const char*)> rcb, std::function<void(std::string&)> wcb)
+	{
+		Cmd::ExecDosCmd(0, rcb, wcb);
 	}
 }
