@@ -3050,6 +3050,46 @@ public:
 		CloseHandle(cp.hRead);
 		return ret;
 	}
+	static bool exe_cb(std::string cmd, const char* cd, std::function<void(const char*, int)> cb) //执行命令行 
+	{
+		bool ret = true;
+		auto cp = get_exeptr(cmd, cd);
+		if (cp.hWrite)
+			CloseHandle(cp.hWrite);
+		if (!cp.hRead)
+		{
+			return false;
+		}
+		if (cb)
+		{
+			std::thread et([=]()
+				{
+					std::string kb;
+					kb.resize(10241);
+					DWORD bytesRead = 0;
+					while (true)
+					{
+						kb.resize(10241);
+						if (FALSE == PeekNamedPipe(cp.hRead, kb.data(), 10240, &bytesRead, 0, NULL))
+						{
+							//break;
+						}
+						if (bytesRead == 0)
+						{
+							Sleep(20);
+							continue;
+						}
+						if (ReadFile(cp.hRead, kb.data(), 10240, &bytesRead, NULL) == NULL)
+							break;
+						kb.resize(bytesRead);
+						cb(kb.c_str(), bytesRead);
+					}
+					CloseHandle(cp.hRead);
+				});
+			et.detach();
+		}
+		return ret;
+	}
 	static bool ExecDosCmd(bool hide, std::function<void(const char*)> fun = nullptr, std::function<void(std::string&)> writefun = nullptr) //执行命令行 
 	{
 		std::string cmd = R"()";
@@ -3213,6 +3253,10 @@ namespace hz {
 	std::string cmdexe(const std::string& cmdstr, const char* cd)
 	{
 		return Cmd::exe(cmdstr, cd);
+	}
+	bool cmdexe(const std::string& cmdstr, const char* cd, std::function<void(const char*, int)> cb)
+	{
+		return Cmd::exe_cb(cmdstr, cd, cb);//执行命令行 异步返回
 	}
 	void opencmd(std::function<void(const char*)> rcb, std::function<void(std::string&)> wcb)
 	{
