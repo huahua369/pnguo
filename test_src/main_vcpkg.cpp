@@ -27,7 +27,7 @@ public:
 public:
 	vcpkg_Cx();
 	~vcpkg_Cx();
-	void do_clone(const std::string& dir);
+	void do_clone(const std::string& dir, int depth);
 	void do_bootstrap();
 	// 拉取
 	void do_pull();
@@ -56,21 +56,22 @@ private:
 };
 vcpkg_Cx::vcpkg_Cx() {}
 vcpkg_Cx::~vcpkg_Cx() {}
-void vcpkg_Cx::do_clone(const std::string& dir)
+void vcpkg_Cx::do_clone(const std::string& dir, int depth)
 {
 	if (dir.size() < 2)return;
 	std::lock_guard<std::mutex> lock(_lock);
-	//cmds.push(dir.substr(0, 2));
-	//cmds.push("cd \"" + dir + "\"");
 	rootdir = dir;
-	cmds.push("git clone https://github.com/microsoft/vcpkg.git");
+	std::string c = "git clone https://github.com/microsoft/vcpkg.git";
+	if (depth > 0)
+	{
+		c += " --depth=" + std::to_string(depth);
+	}
+	cmds.push(c);
 }
 void vcpkg_Cx::do_bootstrap()
 {
 	if (rootdir.size() < 2)return;
 	std::lock_guard<std::mutex> lock(_lock);
-	//cmds.push(rootdir.substr(0, 2));
-	//cmds.push("cd \"" + rootdir + "\"");
 #ifdef _WIN32
 	cmds.push("bootstrap-vcpkg.bat");
 #else
@@ -82,8 +83,6 @@ void vcpkg_Cx::do_pull()
 {
 	if (rootdir.size() < 2)return;
 	std::lock_guard<std::mutex> lock(_lock);
-	//cmds.push(rootdir.substr(0, 2));
-	//cmds.push("cd \"" + rootdir + "\"");
 	cmds.push("git pull");
 }
 void vcpkg_Cx::do_update(const std::string& t)

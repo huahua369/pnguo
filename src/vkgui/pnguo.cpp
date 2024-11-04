@@ -22798,16 +22798,19 @@ bool plane_cx::hittest(const glm::ivec2& p)
 	return r;
 }
 
-size_t plane_cx::push_dragpos(const glm::ivec2& pos)
+size_t plane_cx::push_dragpos(const glm::ivec2& pos, const glm::ivec2& size)
 {
 	auto ps = drags.size();
-	drags.push_back({ pos,0,0 });
+	drag_v6 t = {};
+	t.pos = pos;
+	t.size = size;
+	drags.push_back(t);
 	return ps;
 }
 
 glm::ivec2 plane_cx::get_dragpos(size_t idx)
 {
-	return (idx < drags.size()) ? drags[idx] : glm::ivec2();
+	return (idx < drags.size()) ? drags[idx].pos : glm::ivec2();
 }
 
 gshadow_cx* plane_cx::get_gs()
@@ -23038,10 +23041,16 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
 		if (ckinc > 0)
 		{
-			for (auto& dps : drags)
+			for (auto& it : drags)
 			{
-				auto pt = (glm::ivec2*)&dps;
-				pt[0] = mps - pt[1] - ppos;	// 处理拖动坐标
+				if (it.ck > 0)
+					it.pos = mps - it.tp - ppos;	// 处理拖动坐标
+			}
+		}
+		else {
+			for (auto& it : drags)
+			{
+				it.ck = 0;
 			}
 		}
 	}
@@ -23055,10 +23064,22 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		if (p->button == 1) {
 			if (p->state == 1) {
 				mps -= ppos;
-				for (auto& dps : drags)
+				for (auto& it : drags)
 				{
-					auto pt = (glm::ivec2*)&dps;
-					pt[1] = mps - pt[0];	// 记录当前拖动坐标
+					if (it.size.x > 0 && it.size.y > 0)
+					{
+						glm::vec4 trc = { it.pos,it.size };
+						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+						if (k2.x)
+						{
+							it.tp = mps - it.pos;	// 记录当前拖动坐标
+							it.ck = 1;
+						}
+					}
+					else {
+						it.tp = mps - it.pos;	// 记录当前拖动坐标
+						it.ck = 1;
+					}
 				}
 			}
 		}
