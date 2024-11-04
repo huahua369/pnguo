@@ -2996,23 +2996,16 @@ public:
 	{
 		HANDLE hRead = 0, hWrite = 0;
 	};
-	static h2_t get_exeptr(std::string cmd, HANDLE hRead = 0, HANDLE hWrite = 0, bool once = true) //执行命令行 
+	static h2_t get_exeptr(std::string cmd, const char* cd = 0, bool once = true) //执行命令行 
 	{
 		h2_t ret = {};
 		SECURITY_ATTRIBUTES sa;
 		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 		sa.lpSecurityDescriptor = NULL;
 		sa.bInheritHandle = TRUE;
-		if (hRead && hWrite)
+		if (!CreatePipe(&ret.hRead, &ret.hWrite, &sa, 0))
 		{
-			ret.hRead = hRead;
-			ret.hWrite = hWrite;
-		}
-		else {
-			if (!CreatePipe(&ret.hRead, &ret.hWrite, &sa, 0))
-			{
-				return ret;
-			}
+			return ret;
 		}
 		std::string tc = R"(C:\Windows\System32\cmd.exe /)";
 		tc += (once ? "C " : "K ");
@@ -3027,7 +3020,7 @@ public:
 		si.wShowWindow = SW_HIDE;
 		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 		//关键步骤，CreateProcess函数参数意义请查阅MSDN
-		if (!CreateProcessA(NULL, (char*)cmd.c_str(), NULL, NULL, TRUE, NULL, NULL, NULL, &si, &pi))
+		if (!CreateProcessA(NULL, (char*)cmd.c_str(), NULL, NULL, TRUE, NULL, NULL, cd, &si, &pi))
 		{
 			CloseHandle(ret.hWrite);
 			CloseHandle(ret.hRead);
@@ -3036,20 +3029,16 @@ public:
 		}
 		return ret;
 	}
-	static std::string exe(std::string cmd) //执行命令行 
+	static std::string exe(std::string cmd, const char* cd) //执行命令行 
 	{
 		std::string ret;
-		auto cp = get_exeptr(cmd);
+		auto cp = get_exeptr(cmd, cd);
 		if (cp.hWrite)
 			CloseHandle(cp.hWrite);
 		std::string kb;
 		kb.resize(10241);
-		//char buffer[4096] = { 0 };          //用4K的空间来存储输出的内容，只要不是显示文件内容，一般情况下是够用了。
 		DWORD bytesRead = 0;
 
-		if (FALSE == PeekNamedPipe(cp.hRead, kb.data(), 4095, &bytesRead, 0, NULL))
-		{
-		}
 		while (true)
 		{
 			kb.resize(10241);
@@ -3064,7 +3053,7 @@ public:
 	static bool ExecDosCmd(bool hide, std::function<void(const char*)> fun = nullptr, std::function<void(std::string&)> writefun = nullptr) //执行命令行 
 	{
 		std::string cmd = R"()";
-		auto cp = get_exeptr(cmd, 0, 0, false);
+		auto cp = get_exeptr(cmd, 0, false);
 		std::thread et([=]()
 			{
 #if 1
@@ -3110,28 +3099,31 @@ public:
 					CloseHandle(cp.hRead);
 				if (cp.hWrite)
 					CloseHandle(cp.hWrite);
-	});
+			});
 		std::thread etw([=]()
 			{
-				std::string wstr;
+				std::string wstr = "c:\n";
+				std::string wstr1 = R"(cd c:\sdk)"; wstr1 += "\n";
 				while (true)
 				{
 					if (writefun)
 					{
-						wstr.clear();
-						writefun(wstr);
+						Sleep(1000);
+						//wstr.clear();
+						//writefun(wstr);
 						if (wstr.size())
 						{
 							int64_t s = wstr.size();
 							DWORD n = 0;
 							auto dp = wstr.c_str();
-							for (; s > 0;)
+							//for (; s > 0;)
 							{
+								WriteFile(cp.hWrite, wstr.c_str(), s, &n, NULL);
 								WriteFile(cp.hWrite, dp, s, &n, NULL);
-								if (n == 0)break;
+								break;
 								s -= n;
 								dp += n;
-							} 
+							}
 						}
 					}
 				}
@@ -3141,7 +3133,7 @@ public:
 		et.detach();
 		etw.detach();
 		return true;
-}
+	}
 
 	static njson ls(const std::string& path)
 	{
@@ -3218,9 +3210,9 @@ private:
 };
 
 namespace hz {
-	std::string cmdexe(const std::string& cmdstr)
+	std::string cmdexe(const std::string& cmdstr, const char* cd)
 	{
-		return Cmd::exe(cmdstr);
+		return Cmd::exe(cmdstr, cd);
 	}
 	void opencmd(std::function<void(const char*)> rcb, std::function<void(std::string&)> wcb)
 	{

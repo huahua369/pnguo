@@ -60,16 +60,17 @@ void vcpkg_Cx::do_clone(const std::string& dir)
 {
 	if (dir.size() < 2)return;
 	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push(dir.substr(0, 2));
-	cmds.push("cd \"" + dir + "\"");
+	//cmds.push(dir.substr(0, 2));
+	//cmds.push("cd \"" + dir + "\"");
+	rootdir = dir;
 	cmds.push("git clone https://github.com/microsoft/vcpkg.git");
 }
 void vcpkg_Cx::do_bootstrap()
 {
 	if (rootdir.size() < 2)return;
 	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push(rootdir.substr(0, 2));
-	cmds.push("cd \"" + rootdir + "\"");
+	//cmds.push(rootdir.substr(0, 2));
+	//cmds.push("cd \"" + rootdir + "\"");
 #ifdef _WIN32
 	cmds.push("bootstrap-vcpkg.bat");
 #else
@@ -81,8 +82,8 @@ void vcpkg_Cx::do_pull()
 {
 	if (rootdir.size() < 2)return;
 	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push(rootdir.substr(0, 2));
-	cmds.push("cd \"" + rootdir + "\"");
+	//cmds.push(rootdir.substr(0, 2));
+	//cmds.push("cd \"" + rootdir + "\"");
 	cmds.push("git pull");
 }
 void vcpkg_Cx::do_update(const std::string& t)
@@ -159,7 +160,7 @@ void vcpkg_Cx::do_cmd()
 			c.swap(cmds.front()); cmds.pop();
 		}
 		if (c.empty())continue;
-		auto jstr = hz::cmdexe(c);
+		auto jstr = hz::cmdexe(c, rootdir.empty() ? nullptr : rootdir.c_str());
 		// todo 处理返回结果
 	}
 }
@@ -252,11 +253,14 @@ void menu_m(form_x* form0)
 
 		cbt->click_cb = [=](void* ptr, int clicks)
 			{
-				//auto jstr = hz::cmdexe("vcpkg list");
-				hz::opencmd([](const char* str) {printf(str); }, [](std::string& str) {
-					str = "cd e:\n";
+				//auto jstr = hz::cmdexe("c:");
+				auto jstra = hz::cmdexe("echo %cd%", "c:\\sdk");
+				auto jstraa = hz::cmdexe("echo %cd%", "e:\\sdk");
+				printf("");
+				//hz::opencmd([](const char* str) {printf(str); }, [](std::string& str) {
+				//	str = "cd e:\n";
 
-					});
+				//	});
 				//auto jstr = hz::cmdexe("vcpkg integrate install");
 				//auto jstr = hz::cmdexe("vcpkg search --x-full-desc --x-json");
 				//auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");
