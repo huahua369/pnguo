@@ -79,7 +79,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <conio.h>
-#include <sys/timeb.h>
+#include <sys/timeb.h> 
+#include <dwmapi.h> 
 #define strerror_r(e,buf,len) strerror_s(buf,len,e)
 #endif // _WIN32
 #ifndef INET_ADDRSTRLEN
@@ -3258,8 +3259,25 @@ namespace hz {
 	{
 		return Cmd::exe_cb(cmdstr, cd, cb);//执行命令行 异步返回
 	}
-	void opencmd(std::function<void(const char*)> rcb, std::function<void(std::string&)> wcb)
+
+#if _WIN32
+	uint32_t get_themecolor()
 	{
-		Cmd::ExecDosCmd(0, rcb, wcb);
+		DWORD crColorization = 0;
+		BOOL fOpaqueBlend;
+		uint32_t theme_color = -1;
+		HRESULT result = DwmGetColorizationColor(&crColorization, &fOpaqueBlend);
+		if (result == S_OK)
+		{
+			auto pc = (uint8_t*)&crColorization;
+			std::swap(pc[0], pc[2]);
+			theme_color = crColorization;
+		}
+
+		return theme_color;
 	}
+#else
+	uint32_t get_themecolor() { return -1; }
+#endif // _WIN32
+
 }

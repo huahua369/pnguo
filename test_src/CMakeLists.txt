@@ -77,6 +77,11 @@ list(APPEND lklib
    # rdx12
    # unofficial::joltphysics::Jolt
 )
+if(CMAKE_HOST_WIN32)
+list(APPEND lklib  
+UxTheme
+)
+endif()
 include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
  

@@ -295,7 +295,7 @@ app_cx::app_cx()
 
 	fct = new Timer();
 	r2d = new render_2d();
-	int kr = SDL_Init(0);
+	int kr = SDL_Init(-1);
 	auto ct = SDL_GetNumRenderDrivers();
 	for (size_t i = 0; i < ct; i++)
 	{
@@ -417,6 +417,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	SDL_Renderer* renderer = 0;
 	auto flags = get_flags(fgs);
 	bool setpos = false;
+	auto st = SDL_GetSystemTheme();
 	if (fgs & ef_tooltip || fgs & ef_popup)
 	{
 		window = SDL_CreatePopupWindow(parent->_ptr, pos.x, pos.y, ws.x, ws.y, flags);
@@ -513,6 +514,11 @@ void app_cx::call_cb(SDL_Event* e)
 	auto fwp = SDL_GetWindowFromID(e->window.windowID);
 	auto fw = (form_x*)pce::get_property(fwp, "form_x");
 	int rw = 0;
+
+	if (e->type == SDL_EVENT_SYSTEM_THEME_CHANGED) {
+		auto st = SDL_GetSystemTheme();
+		printf("");
+	}
 	if (fw) {
 		rw = on_call_we(e, fw);
 	}
@@ -1510,7 +1516,8 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 		//switch (e->window.event)
 		switch (e->type)
 		{
-		case SDL_EVENT_WINDOW_DESTROYED: {
+		case SDL_EVENT_WINDOW_DESTROYED:
+		{
 		}break;
 		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 		{
@@ -2313,13 +2320,13 @@ void form_x::set_ime_pos(const glm::ivec4& r)
 			cf.ptCurrentPos.y = rc.top;
 			::ImmSetCompositionWindow(hIMC, &cf);
 			::ImmReleaseContext(hWnd, hIMC);
-	}
+		}
 #else 
 		SDL_Rect rect = { r.x,r.y, r.z, r.w }; //ime_pos;
 		//printf("ime pos: %d,%d\n", r.x, r.y);
 		SDL_SetTextInputArea(_ptr, &rect, 0);
 #endif
-} while (0);
+	} while (0);
 
 }
 void form_x::enable_window(bool bEnable)
