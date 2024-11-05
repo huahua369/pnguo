@@ -15,7 +15,7 @@ namespace gp {
 
 // booleanOps
 enum class flags_b :uint8_t {
-	ALL = 0xff,		// 所有
+	ALL = 0,		// 所有
 	A_NOT_B,		// 差集a-=b
 	B_NOT_A,		// 差集b-=a
 	UNION,			// 并集

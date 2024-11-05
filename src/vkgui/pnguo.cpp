@@ -11013,6 +11013,8 @@ canvas_dev* canvas_dev::new_cdev_dc(void* hdc)
 {
 #ifdef _WIN32
 	auto surface = cairo_win32_surface_create((HDC)hdc);// 根据HDC创建表面
+#else
+	cairo_surface_t* surface = 0;
 #endif 
 	return new_cairo(surface);
 }
