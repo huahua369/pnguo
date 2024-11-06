@@ -10596,6 +10596,10 @@ void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double 
 		cairo_arc(cr, x + r.x, y + r.x, r.x, M_PI, 3 * M_PI / 2.0);
 	cairo_close_path(cr);
 }
+void draw_round_rectangle(cairo_t* cr, const glm::vec4& rc, const glm::vec4& r)
+{
+	draw_round_rectangle(cr, rc.x, rc.y, rc.z, rc.w, r);
+}
 // 圆角矩形
 void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r)
 {
@@ -10703,9 +10707,21 @@ void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, i
 	}
 	if (closed) { cairo_close_path(cr); }
 	cairo_set_line_width(cr, thickness);
-	set_color(cr, col);
-	cairo_stroke(cr);
+	if (col) {
+		set_color(cr, col);
+		cairo_stroke(cr);
+	}
 	cairo_restore(cr);
+}
+void draw_polyline(cairo_t* cr, const glm::vec2* points, int points_count, bool closed)
+{
+	if (!cr || !points || points_count < 2)return;
+	cairo_move_to(cr, points->x, points->y);
+	for (size_t i = 1; i < points_count; i++)
+	{
+		cairo_line_to(cr, points[i].x, points[i].y);
+	}
+	if (closed) { cairo_close_path(cr); }
 }
 
 void draw_polyline(cairo_t* cr, const PathsD* p, bool closed)
@@ -10778,6 +10794,99 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 		ltx->draw_text(cr, ltx->tem_rtv, st->text_color_shadow);
 	}
 	ltx->draw_text(cr, ltx->tem_rtv, st->text_color);
+}
+
+void draw_ge(cairo_t* cr, void* p, int count)
+{
+	auto t = (char*)p;
+	if (!(t && p && cr && count > 0))return;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto type = ((rect_b*)t)->type;
+		switch (type)
+		{
+		case eg_e::e_rect:
+		{
+			auto dp = (rect_b*)t;
+			if (dp->r.x > 0 && dp->r.y < 0)
+			{
+				draw_rect(cr, dp->rc, dp->fill, dp->color, dp->r.x, dp->thickness);
+			}
+			else {
+				draw_round_rectangle(cr, dp->rc, dp->r);
+				fill_stroke(cr, dp->fill, dp->color, dp->thickness);
+			}
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_text:
+		{
+			auto dp = (text_b*)t;
+			draw_text(cr, dp->ltx, dp->str, dp->len, dp->text_rc, dp->st);
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_circle:
+		{
+			auto dp = (circle_b*)t;
+			draw_circle(cr, dp->pos, dp->r);
+			fill_stroke(cr, dp->fill, dp->color, dp->thickness);
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_ellipse:
+		{
+			auto dp = (ellipse_b*)t;
+			draw_ellipse(cr, dp->pos, dp->r);
+			fill_stroke(cr, dp->fill, dp->color, dp->thickness);
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_triangle:
+		{
+			auto dp = (triangle_b*)t;
+			draw_triangle(cr, dp->pos, dp->size, dp->dirspos);
+			fill_stroke(cr, dp->fill, dp->color, dp->thickness);
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_polyline:
+		{
+			auto dp = (polyline_b*)t;
+			{
+				cairo_as _ss_(cr);
+				cairo_translate(cr, dp->pos.x, dp->pos.y);
+				draw_polyline(cr, dp->points, dp->points_count, dp->closed);
+				fill_stroke(cr, dp->fill, dp->color, dp->thickness);
+			}
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_polylines:
+		{
+			auto dp = (polylines_b*)t;
+			draw_polylines(cr, dp->pos, dp->points, dp->points_count, dp->idx, dp->idx_count, dp->color, dp->thickness);
+			t += sizeof(dp[0]);
+		}
+		break;
+		case eg_e::e_image:
+		{
+			auto dp = (image_b*)t;
+			if (dp->sliced.x < 1)
+			{
+				draw_image(cr, (cairo_surface_t*)dp->image, dp->pos, dp->rc, dp->color, dp->dsize);
+			}
+			else
+			{
+				draw_image(cr, (cairo_surface_t*)dp->image, dp->pos, dp->rc, dp->color, dp->dsize, dp->sliced);
+			}
+			t += sizeof(dp[0]);
+		}
+		break;
+		default:
+			break;
+		}
+	}
 }
 
 cairo_surface_t* new_clip_rect(int r)

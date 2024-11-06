@@ -2152,6 +2152,7 @@ void set_color_a(cairo_t* cr, uint32_t rgba, double a);
 void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r);
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, const glm::vec4& r);
+void draw_round_rectangle(cairo_t* cr, const glm::vec4& rc, const glm::vec4& r);
 void draw_circle(cairo_t* cr, const glm::vec2& pos, float r);
 void draw_ellipse(cairo_t* cr, const glm::vec2& pos, const glm::vec2& r);
 // 三角形基于矩形内 
@@ -2166,6 +2167,60 @@ void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, 
 void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth);
 //glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st);
+
+enum class eg_e :uint32_t {
+	enull,
+	e_rect, e_text, e_circle, e_ellipse, e_triangle, e_polyline, e_polylines, e_image
+};
+struct rect_b {
+	eg_e type = eg_e::e_rect;
+	uint32_t fill, color; int thickness;
+	glm::vec4 rc;
+	glm::ivec4 r;
+};
+struct text_b
+{
+	eg_e type = eg_e::e_text;
+	const void* str;
+	int len;
+	glm::vec4 text_rc;
+	text_style_t* st;
+	layout_text_x* ltx;
+};
+struct circle_b {
+	eg_e type = eg_e::e_circle;
+	uint32_t fill, color; int thickness; float r;
+	glm::vec2 pos;
+};
+struct ellipse_b {
+	eg_e type = eg_e::e_ellipse;
+	uint32_t fill, color; int thickness;
+	glm::vec2 pos, r;
+};
+struct triangle_b {
+	eg_e type = eg_e::e_triangle;
+	uint32_t fill, color; int thickness;
+	glm::vec2 pos, size, dirspos;
+};
+struct polyline_b
+{
+	eg_e type = eg_e::e_polyline;
+	glm::vec2& pos; const glm::vec2* points; int points_count; unsigned int color, fill; bool closed; float thickness;
+};
+struct polylines_b
+{
+	eg_e type = eg_e::e_polylines;
+	glm::vec2 pos;
+	const glm::vec2* points; int points_count; int* idx; int idx_count; unsigned int color, fill; float thickness;
+};
+struct image_b {
+	eg_e type = eg_e::e_image;
+	void* image; glm::vec2 pos; glm::vec4 rc; uint32_t color = -1; glm::vec2 dsize = { -1,-1 };
+	// 九宫格图片
+	glm::vec4 sliced = {};
+};
+// 图形通用渲染接口
+void draw_ge(cairo_t* cr, void* p, int count);
 
 
 cairo_surface_t* new_clip_rect(int r);
