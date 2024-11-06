@@ -2219,7 +2219,7 @@ struct image_b {
 	// 九宫格图片
 	glm::vec4 sliced = {};
 };
-// 图形通用渲染接口
+// 图形通用软渲染接口
 void draw_ge(cairo_t* cr, void* p, int count);
 
 
