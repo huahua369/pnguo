@@ -214,33 +214,7 @@ menu_cx* menu_m(form_x* form0)
 	menu_cx* mc = new menu_cx();	// 菜单管理
 	mc->set_main(form0);
 	mc->add_familys(fontn);
-
-	std::vector<std::string> mvs0 = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
-	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
-	int cidx = 1;
-	// 创建菜单
-	auto pm31 = mc->new_menu(-1, 30, mvs1, [=](mitem_t* pm, int type, int idx)
-		{
-			if (type == 1)
-			{
-				printf("click:%d\t%d\n", type, idx);
-			}
-			//else
-			//	printf("move:%d\t%d\n", type, idx);
-		});
-	auto pm3 = mc->new_menu(-1, 30, mvs0, [=](mitem_t* pm, int type, int idx)
-		{
-			if (type == 1)
-			{
-				printf("click:%d\t%d\n", type, idx);
-			}
-			else
-			{
-				//printf("move:%d\t%d\n", type, idx);
-			}
-		});
-	pm3->set_child(pm31, 2);
-	//pm3->show({ 100,100 }); // 显示菜单
+	 
 
 	for (auto& it : mvs)
 	{
@@ -268,8 +242,8 @@ menu_cx* menu_m(form_x* form0)
 				{
 					auto cps = cp->get_pos();
 					cps.y += cp->size.y + cp->thickness;
-					pm3->hide(true);
-					pm3->show(cps);
+					//pm3->hide(true);
+					//pm3->show(cps);
 					hide_tooltip(form0);
 					form0->uptr = 0;
 				}
@@ -277,12 +251,12 @@ menu_cx* menu_m(form_x* form0)
 				case event_type2::on_enter:
 				{
 					enterst = pt;
-					if (pm3->get_visible()) {
-						auto cps = cp->get_pos();
-						cps.y += cp->size.y + cp->thickness;
-						pm3->hide(true);
-						pm3->show(cps);
-					}
+					//if (pm3->get_visible()) {
+					//	auto cps = cp->get_pos();
+					//	cps.y += cp->size.y + cp->thickness;
+					//	pm3->hide(true);
+					//	pm3->show(cps);
+					//}
 				}
 				break;
 				case event_type2::on_hover:

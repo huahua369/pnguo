@@ -58,10 +58,10 @@ public:
 struct menu_info
 {
 	const char** mstr = 0;	// 菜单字符串
-	size_t count = 0;			// 菜单项数量 
+	size_t count = 0;		// 菜单项数量 
 	mitem_t* ptr = 0;		// 返回的菜单指针
 	int parent = -1;		// 父级id
-	int parent_idx = -1;	// 父级idx
+	int parent_idx = -1;	// 父级菜单项索引
 };
 // 菜单组
 struct mitem_g {
@@ -79,14 +79,14 @@ public:
 	~menu_cx();
 	void set_main(form_x* f);
 	void add_familys(const char* family);
-	mitem_t* new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb);
-	void show_item(mitem_t* it, const glm::vec2& pos);
-	void free_item(mitem_t* p);
 	// 创建菜单组
 	mitem_g* new_menu_g(menu_info* p, int count, const glm::vec2& msize, std::function<void(mitem_t* p, int type, int id)> cb);
 	void show_mg(mitem_g* p, int idx, const glm::vec2& pos);
 	void free_menu_g(mitem_g* p);
+	void show_item(mitem_t* it, const glm::vec2& pos);
 private:
+	mitem_t* new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb);
+	void free_item(mitem_t* p);
 
 };
 // 显示工具提示面板 

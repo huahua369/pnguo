@@ -3270,7 +3270,7 @@ namespace hz {
 		if (result == S_OK)
 		{
 			auto pc = (uint8_t*)&crColorization;
-			//std::swap(pc[0], pc[2]);
+			std::swap(pc[0], pc[2]);
 			theme_color = crColorization;
 		}
 
