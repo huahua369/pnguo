@@ -20210,15 +20210,15 @@ void text_ctx_cx::set_family(const char* familys)
 	if (familys && *familys)
 	{
 		family = familys;
-		PangoFontDescription* desc = pango_font_description_new();
-		pango_font_description_set_family(desc, family.c_str());
-		pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
-		pango_layout_set_font_description(layout, desc);
-		pango_layout_set_font_description(layout_editing, desc);
-		pango_font_description_free(desc);
-		upft = true;
-		valid = true;
 	}
+	PangoFontDescription* desc = pango_font_description_new();
+	pango_font_description_set_family(desc, family.c_str());
+	pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+	pango_layout_set_font_description(layout, desc);
+	pango_layout_set_font_description(layout_editing, desc);
+	pango_font_description_free(desc);
+	upft = true;
+	valid = true;
 }
 
 void text_ctx_cx::set_font_size(int fs)

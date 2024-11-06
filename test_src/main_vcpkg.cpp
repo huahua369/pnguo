@@ -185,7 +185,7 @@ menu_cx* menu_m(form_x* form0)
 			fs.x++;
 		if (fs.y & 1)
 			fs.y++;
-		p->set_size({ fs.x, p->fontsize * 2 });
+		p->set_size({ fs.x, 30 });
 	}
 	p->set_pos({});
 	glm::vec2 cs = { 1500,1600 };
@@ -204,7 +204,7 @@ menu_cx* menu_m(form_x* form0)
 					fs.y++;
 				if (ps.x != fs.x)
 				{
-					p->set_size({ fs.x, p->fontsize * 2 });
+					p->set_size({ fs.x, 30 });
 					r = true;
 				}
 			}
@@ -214,7 +214,7 @@ menu_cx* menu_m(form_x* form0)
 	menu_cx* mc = new menu_cx();	// 菜单管理
 	mc->set_main(form0);
 	mc->add_familys(fontn);
-	 
+
 
 	for (auto& it : mvs)
 	{
@@ -398,7 +398,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->add_familys(fontn, 0);
 	p->draggable = false; //可拖动
 	p->set_size(size);
-	p->set_pos({ 30,50 });
+	p->set_pos({ 1,30 });
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
 
@@ -406,20 +406,20 @@ void show_ui(form_x* form0, menu_cx* gm)
 	size.x -= 50 * 10;
 	size /= 2;
 	std::vector<const char*> btnname = {
+	"install",//安装库(const std::string & t, const std::string & triplet); 
+	"remove",//删除库(const std::string & t, const std::string & triplet); 
 	"clone",//(const std::string & dir, int depth); 
 	"bootstrap",// 
 	"update",//比较更新了哪些库(const std::string & t);	 
-	"install",//安装库(const std::string & t, const std::string & triplet); 
-	"remove",//删除库(const std::string & t, const std::string & triplet); 
 	"ecmd",//执行自定义命令(const std::string & c); 
 	};
 	std::vector<const char*> mname = {
-	"pull",//拉取  		 
-	"search",//搜索库 
 	"list",//列出安装库 
+	"search",//搜索库 
+	"pull",//拉取  		 
+	"get_triplet",//查看支持的架构  
 	"integrate_install",//集成到全局 
 	"integrate_remove",//移除全局 
-	"get_triplet",//查看支持的架构  
 	};
 	auto color = 0xcf8000;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
@@ -451,6 +451,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 			};
 	}
+	auto ce = p->add_input("", { 1000,30 }, 1);
+	ce->set_family(0, 12);
 	for (auto& nt : btnname)
 	{
 		auto cp = p->add_gbutton(nt, { 160,30 }, color);

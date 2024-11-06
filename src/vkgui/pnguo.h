@@ -1935,7 +1935,7 @@ public:
 	std::vector<drag_v6> drags;	// 拖动坐标
 	layout_info_x _css = {};		// 布局样式
 	glm::vec2 _lpos = { 0,0 }, _lms = { 2,2 };// 布局偏移，子元素加宽
-	std::string familys = "Arial,NSimSun";
+	std::string familys = "NSimSun";
 	int fontsize = 16;
 	uint32_t text_color = -1;
 	glm::ivec4 border = {};	// 颜色，线粗，圆角，背景色
