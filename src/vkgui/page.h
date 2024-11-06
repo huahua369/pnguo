@@ -30,7 +30,7 @@ struct itd_t
 class mitem_t
 {
 public:
-	std::vector<itd_t> v;	 
+	std::vector<itd_t> v;
 	std::function<void(mitem_t* p, int type, int id)> ckm_cb;
 	int width = -1;		// 菜单宽度
 	int height = 0;	// 菜单项高
@@ -41,7 +41,7 @@ public:
 	mitem_t* cct = 0;		// 当前子菜单
 	pvm_t pv = {};
 	canvas_atlas* backgs = 0, * fronts = 0;// 背景和前景
-	layout_text_x* ltx = 0; 
+	layout_text_x* ltx = 0;
 public:
 	mitem_t();
 	~mitem_t();
@@ -49,10 +49,24 @@ public:
 	void hide(bool hp);
 	void close();
 	void set_data(int width, int height, const std::vector<std::string>& mvs);
+	void set_data(int width, int height, const char** mvs, size_t n);
 	glm::ivec2 get_idx_pos(int idx);
 	// 设置子菜单
 	void set_child(mitem_t* cp, int idx);
 	bool get_visible();
+};
+struct menu_info
+{
+	const char** mstr = 0;	// 菜单字符串
+	size_t count = 0;			// 菜单项数量 
+	mitem_t* ptr = 0;		// 返回的菜单指针
+	int parent = -1;		// 父级id
+	int parent_idx = -1;	// 父级idx
+};
+// 菜单组
+struct mitem_g {
+	mitem_t* ptr = 0;
+	int count = 0;			// 菜单数量
 };
 // 菜单管理器
 class menu_cx
@@ -68,6 +82,10 @@ public:
 	mitem_t* new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb);
 	void show_item(mitem_t* it, const glm::vec2& pos);
 	void free_item(mitem_t* p);
+	// 创建菜单组
+	mitem_g* new_menu_g(menu_info* p, int count, const glm::vec2& msize, std::function<void(mitem_t* p, int type, int id)> cb);
+	void show_mg(mitem_g* p, int idx, const glm::vec2& pos);
+	void free_menu_g(mitem_g* p);
 private:
 
 };

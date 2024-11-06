@@ -119,12 +119,20 @@ void mitem_t::close()
 	f = 0;
 }
 
-void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
+void mitem_t::set_data(int w, int h, const std::vector<std::string>& v) {
+	std::vector<const char*> vs;
+	vs.resize(v.size());
+	for (size_t i = 0; i < v.size(); i++)
+	{
+		vs[i] = v[i].c_str();
+	}
+	set_data(w, h, vs.data(), vs.size());
+}
+void mitem_t::set_data(int w, int h, const char** mvs, size_t n)
 {
-	if (mvs.empty())return;
+	if (!mvs || n < 1)return;
 	width = w;
 	height = h;
-	auto n = mvs.size();
 	v.resize(n);
 	for (size_t i = 0; i < n; i++)
 	{
@@ -135,7 +143,7 @@ void mitem_t::set_data(int w, int h, const std::vector<std::string>& mvs)
 	fronts->remove_atlas(pv.front);
 	ltx->free_menu(pv);
 	auto p = this;
-	pv = ltx->new_menu(width, height, mvs, true, [=](int type, int idx)
+	pv = ltx->new_menu(width, height, mvs, n, true, [=](int type, int idx)
 		{
 			if (ckm_cb)
 				ckm_cb(p, type, idx);
@@ -248,6 +256,54 @@ void menu_cx::free_item(mitem_t* p)
 {
 	if (p)
 		delete p;
+}
+mitem_g* menu_cx::new_menu_g(menu_info* pn, int count, const glm::vec2& msize, std::function<void(mitem_t* p, int type, int id)> cb)
+{
+	mitem_g* r = {};
+	if (pn && count > 0)
+	{
+		auto ptr = new mitem_t[count];
+		auto p = ptr;
+		for (size_t i = 0; i < count; i++, p++)
+		{
+			auto& it = pn[i];
+			if (!it.mstr || it.count < 1)continue;
+			p->m = this;
+			p->ckm_cb = cb;
+			p->ltx->set_ctx(form->app->font_ctx);
+			for (auto it : familys) {
+				p->ltx->add_familys(it.c_str(), 0);
+			}
+			p->set_data(msize.x, msize.y, it.mstr, it.count);
+			pn->ptr = p;
+		}
+		for (size_t i = 0; i < count; i++, p++)
+		{
+			auto& it = pn[i];
+			if (!it.ptr || it.parent < 0 || it.parent == i || it.parent_idx < 0)continue;
+			auto& par = pn[it.parent];
+			par.ptr->set_child(it.ptr, it.parent_idx);
+		}
+		r = new mitem_g();
+		r->ptr = ptr;
+		r->count = count;
+	}
+	return r;
+}
+void menu_cx::show_mg(mitem_g* p, int idx, const glm::vec2& pos)
+{
+	if (p && p->ptr && idx >= 0 && idx < p->count)
+	{
+		(p->ptr + idx)->hide(true);
+		(p->ptr + idx)->show(pos);
+	}
+}
+void menu_cx::free_menu_g(mitem_g* p)
+{
+	if (p && p->ptr) {
+		delete[] p->ptr;
+		delete p;
+	}
 }
 #endif
 

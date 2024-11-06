@@ -166,8 +166,7 @@ void vcpkg_Cx::do_cmd()
 }
 
 
-
-void menu_m(form_x* form0)
+menu_cx* menu_m(form_x* form0)
 {
 	auto mainmenu = new plane_cx();
 	form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
@@ -254,27 +253,9 @@ void menu_m(form_x* form0)
 		cbt->click_cb = [=](void* ptr, int clicks)
 			{
 				//auto jstr = hz::cmdexe("c:");
-				auto jstra = hz::cmdexe("echo %cd%", "c:\\sdk");
-				auto jstraa = hz::cmdexe("echo %cd%", "e:\\sdk");
-				printf("");
-				//hz::opencmd([](const char* str) {printf(str); }, [](std::string& str) {
-				//	str = "cd e:\n";
-
-				//	});
-				//auto jstr = hz::cmdexe("vcpkg integrate install");
-				//auto jstr = hz::cmdexe("vcpkg search --x-full-desc --x-json");
-				//auto jstr = hz::cmdexe("vcpkg list --x-full-desc --x-json");
-				//hz::mfile_t mm;
-				//auto kd = mm.new_m("temp/vlist.json", jstr.size());
-				//if (kd)
-				//{
-				//	memcpy(kd, jstr.c_str(), mm.size());
-				//	return;
-				//}
-				//jstr.push_back(0);
-				//njson nn = njson::parse(jstr.c_str());
-				//hz::save_json("temp/vlist.json", nn, 2);
-				//printf("%s\n", cbt->str.c_str());
+				//auto jstra = hz::cmdexe("echo %cd%", "c:\\sdk");
+				//auto jstraa = hz::cmdexe("echo %cd%", "e:\\sdk");
+				//printf(""); 
 			};
 		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 			{
@@ -334,6 +315,7 @@ void menu_m(form_x* form0)
 				}
 			};
 	}
+	return mc;
 }
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
@@ -427,119 +409,8 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	}
 }
 
-#ifdef _WIN32
 
-static std::string GetCPUNameString()
-{
-	int nIDs = 0;
-	int nExIDs = 0;
-
-	char strCPUName[0x40] = { };
-
-	std::array<int, 4> cpuInfo;
-	std::vector<std::array<int, 4>> extData;
-
-	__cpuid(cpuInfo.data(), 0);
-
-	// Calling __cpuid with 0x80000000 as the function_id argument
-	// gets the number of the highest valid extended ID.
-	__cpuid(cpuInfo.data(), 0x80000000);
-
-	nExIDs = cpuInfo[0];
-	for (int i = 0x80000000; i <= nExIDs; ++i)
-	{
-		__cpuidex(cpuInfo.data(), i, 0);
-		extData.push_back(cpuInfo);
-	}
-
-	// Interpret CPU strCPUName string if reported
-	if (nExIDs >= 0x80000004)
-	{
-		memcpy(strCPUName, extData[2].data(), sizeof(cpuInfo));
-		memcpy(strCPUName + 16, extData[3].data(), sizeof(cpuInfo));
-		memcpy(strCPUName + 32, extData[4].data(), sizeof(cpuInfo));
-	}
-
-	return strlen(strCPUName) != 0 ? strCPUName : "UNAVAILABLE";
-}
-#else
-static std::string GetCPUNameString()
-{
-	return "UNAVAILABLE";
-}
-
-#endif
-void show_cpuinfo(form_x* form0)
-{
-	cpuinfo_t cpuinfo = get_cpuinfo();
-	if (!form0)return;
-	auto p = new plane_cx();
-	uint32_t pbc = 0xf02c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
-	p->set_rss(5);
-	p->_lms = { 8,8 };
-	p->add_familys(fontn, 0);
-	p->draggable = true; //可拖动
-	p->set_size({ 420,660 });
-	p->set_pos({ 100,100 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
-	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
-	{
-		// 设置带滚动条
-		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
-	}
-	// 视图大小，内容大小
-	p->set_view({ 420,660 }, { 420, 660 });
-	glm::vec2 bs = { 150,22 };
-	glm::vec2 bs1 = { 50,22 };
-	std::vector<std::string> ncsstr = { (char*)u8"CPU信息","NumLogicalCPUCores","CPUCacheLineSize","SystemRAM","SIMDAlignment" };
-	std::vector<std::string> boolstr = { "AltiVec","MMX","SSE","SSE2","SSE3","SSE41","SSE42","AVX","AVX2","AVX512F","ARMSIMD","NEON","LSX","LASX" };
-
-	static std::vector<color_btn*> lbs;
-	bs.x = 300;
-	uint32_t txtcolor = 0xfff2f2f2;// 0xff7373ff;
-	int64_t ds[] = { 0, cpuinfo.NumLogicalCPUCores,cpuinfo.CPUCacheLineSize,cpuinfo.SystemRAM ,cpuinfo.SIMDAlignment };
-	{
-		int i = 0;
-		for (auto& it : ncsstr)
-		{
-			std::string txt = vkr::format("%-20s: %lld", it.c_str(), ds[i]);
-			auto tc = txtcolor;
-			if (i == 0) {
-				txt = it + ": " + GetCPUNameString();
-				tc = 0xffF6801F;
-			}
-			i++;
-			auto kcb = p->add_label(txt, bs, 0);
-			kcb->text_color = tc;
-			kcb->_disabled_events = true;
-			lbs.push_back(kcb);
-		}
-	}
-	bool* bps = &cpuinfo.AltiVec;
-	bs.x = 160;
-	for (size_t i = 0; i < boolstr.size(); i++)
-	{
-		auto& it = boolstr[i];
-		auto kcb = p->add_label(it.c_str(), bs, 0);
-		{
-			kcb->_disabled_events = true;
-			kcb->text_color = txtcolor;
-			auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), bps[i]);
-			sw1->_disabled_events = true;
-			sw1->get_pos();
-			kcb = p->add_label("", bs, 0);
-			kcb->_disabled_events = true;
-		}
-	}
-}
-
-
-void show_belt(form_x* form0)
+void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
 	glm::ivec2 size = { 1024,800 };
@@ -560,7 +431,61 @@ void show_belt(form_x* form0)
 	size.y -= 50;
 	size.x -= 50 * 10;
 	size /= 2;
+	std::vector<const char*> btnname = {
+	"clone",//(const std::string & dir, int depth); 
+	"bootstrap",// 
+	"update",//比较更新了哪些库(const std::string & t);	 
+	"install",//安装库(const std::string & t, const std::string & triplet); 
+	"remove",//删除库(const std::string & t, const std::string & triplet); 
+	"ecmd",//执行自定义命令(const std::string & c); 
+	};
+	std::vector<const char*> mname = {
+	"pull",//拉取  		 
+	"search",//搜索库 
+	"list",//列出安装库 
+	"integrate_install",//集成到全局 
+	"integrate_remove",//移除全局 
+	"get_triplet",//查看支持的架构  
+	};
+	auto color = 0xcf8000;// hz::get_themecolor();
+	((uint8_t*)(&color))[3] = 0x80;
+#if 0
+	std::vector<menu_info> vm;
+	vm.push_back({ mname.data(),mname.size() });
+	auto mms = gm->new_menu_g(vm.data(), vm.size(), { 200,30 }, [=](mitem_t* pm, int type, int idx)
+		{
+			if (type == 1)
+			{
+				printf("click:%d\t%d\n", type, idx);
+			}
+		});
+	//for (auto& nt : btnname)
+	{
+		auto cp = p->add_gbutton((char*)u8"功能", { 160,30 }, color);
+		cp->click_cb = [=](void* ptr, int clicks)
+			{
+				auto cps = cp->get_pos();
+				cps.y += cp->size.y + cp->thickness;
+				gm->show_mg(mms, 0, cps);
+			};
+	}
+#else
+	for (auto& nt : mname)
+	{
+		auto cp = p->add_gbutton(nt, { 160,30 }, color);
+		cp->click_cb = [=](void* ptr, int clicks)
+			{
+			};
+	}
+	for (auto& nt : btnname)
+	{
+		auto cp = p->add_gbutton(nt, { 160,30 }, color);
+		cp->click_cb = [=](void* ptr, int clicks)
+			{
+			};
+	}
 
+#endif
 	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
 
 	p->update_cb = [=](float delta)
@@ -621,16 +546,16 @@ int main()
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"vcpkg管理工具";
 
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;								// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 
-	menu_m(form0);
+	auto gm = menu_m(form0);
 
-	show_belt(form0);
+	show_ui(form0, gm);
 	//show_cpuinfo(form0);
 	// 运行消息循环
 	run_app(app, 0);

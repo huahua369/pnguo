@@ -10174,21 +10174,31 @@ atlas_cx* layout_text_x::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
 	return a;
 }
 
-pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb)
+pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb) {
+	std::vector<const char*> vs;
+	vs.resize(v.size());
+	for (size_t i = 0; i < v.size(); i++)
+	{
+		vs[i] = v[i].c_str();
+	}
+	return new_menu(width, height, vs.data(), v.size(), has_shadow, cb);
+}
+pvm_t layout_text_x::new_menu(int width, int height, const char** v, size_t n, bool has_shadow, std::function<void(int type, int id)> cb)
 {
 	pvm_t ret = {};
 	auto ltx = this;
 	auto p = new plane_cx();
-	if (p && v.size())
+	if (p && n > 0)
 	{
 		p->fontsize = 16;
 		int lheight = height > 0 ? height : ltx->get_lineheight(0, p->fontsize) * 1.5;
 		if (width < 0)
 		{
 			int xw = lheight;
-			for (auto& it : v)
+			for (size_t i = 0; i < n; i++)
 			{
-				auto rc = ltx->get_text_rect(0, it.c_str(), it.size(), p->fontsize);
+				auto it = v[i];
+				auto rc = ltx->get_text_rect(0, it, -1, p->fontsize);
 				if (xw < rc.x) {
 					xw = rc.x;
 				}
@@ -10200,7 +10210,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		ret.cpos = m_cpos;
 		glm::ivec2 iss = { width , lheight };
 		p->set_color(m_color);
-		glm::ivec2 ss = { width + p->border.y * 7, v.size() * lheight + p->border.y * 7 };
+		glm::ivec2 ss = { width + p->border.y * 7, n * lheight + p->border.y * 7 };
 
 		auto radius = ltx->sli_radius;
 		glm::ivec2 sas = {};
@@ -10215,8 +10225,9 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 		p->custom_layout = true;
 		p->set_fontctx(ltx->ctx);
 		p->ltx->cpy_familys(ltx);
-		size_t i = 0;
-		for (auto& it : v) {
+		for (size_t i = 0; i < n; i++)
+		{
+			auto it = v[i];
 			auto pcb = p->add_cbutton(it, iss, 2);
 			pcb->pos = { 0, i * lheight };
 			pcb->pos += ret.cpos;
@@ -10224,7 +10235,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 			pcb->effect = uTheme::light;
 			pcb->pdc.hover_border_color = pcb->pdc.border_color;
 			pcb->pdc.border_color = 0;
-			pcb->text_align = { 0.1,0.5 };
+			pcb->text_align = { 0.0,0.5 };
 			if (pcb && cb)
 			{
 				pcb->click_cb = [=](void* pr, int)
@@ -10243,7 +10254,6 @@ pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::stri
 					}
 					};
 			}
-			i++;
 		}
 		p->set_size(ss);
 		p->set_pos({ radius * 0,radius * 0 });
@@ -23452,10 +23462,11 @@ void gradient_btn::draw(cairo_t* g)
 	cairo_restore(g);
 	// 渲染标签
 
-	glm::vec2 ps = {};
+	glm::vec2 ps = { thickness * 2,thickness * 2 };
 	if (p->mPushed) {
 		ps += thickness;
 	}
+	ns -= thickness * 4;
 	glm::vec4 rc = { ps, ns };
 
 #if 1
@@ -23689,10 +23700,12 @@ void color_btn::draw(cairo_t* g)
 		fill_stroke(g, p->dfill, 0, 0, bgr);
 	}
 	// 渲染标签
-	glm::vec2 ps = {};
+	glm::vec2 ps = { thickness * 2, thickness * 2 };
 	if (p->mPushed) {
 		ps += pushedps;
 	}
+
+	ns -= thickness * 4;
 
 	glm::vec4 rc = { ps, ns };
 
