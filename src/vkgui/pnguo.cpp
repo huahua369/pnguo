@@ -11917,13 +11917,21 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 #endif
 	return ss;
 }
-
-int64_t get_rand(int f, int s)
+int64_t get_rdev() {
+	static int64_t r = std::chrono::system_clock::now().time_since_epoch().count();
+	return r;
+}
+int get_rand(int f, int s)
 {
-	static std::random_device rd;  //如果可用的话，从一个随机数发生器上获得一个真正的随机数
-	static std::mt19937 gen(rd()); //gen是一个使用rd()作种子初始化的标准梅森旋转算法的随机数发生器
+	static std::mt19937 gen(get_rdev()); //gen是一个使用rd()作种子初始化的标准梅森旋转算法的随机数发生器
 	std::uniform_int_distribution<> distrib(f, s);
 	return distrib(gen);
+}
+int64_t get_rand64(int64_t f, int64_t s)
+{
+	static std::mt19937_64 gen(get_rdev()); //gen是一个使用rd()作种子初始化的标准梅森旋转算法的随机数发生器
+	auto d = gen();
+	return f + d % (s - f + 1);
 }
 
 void destroy_image_data(void* d) {

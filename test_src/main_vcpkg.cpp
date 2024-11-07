@@ -463,7 +463,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 
 #endif
 	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
-
+	auto rint = get_rand64(0, (uint32_t)-1);
 	p->update_cb = [=](float delta)
 		{
 			static double kt = 0;

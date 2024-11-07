@@ -2263,7 +2263,8 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& size, const glm::vec4& sliced);
 #endif
 
-int64_t get_rand(int f, int s);
+int get_rand(int f, int s);
+int64_t get_rand64(int64_t f, int64_t s);
 
 
 
