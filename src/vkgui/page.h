@@ -67,12 +67,14 @@ struct menu_info
 struct mitem_g {
 	mitem_t* ptr = 0;
 	int count = 0;			// 菜单数量
+	int cx = -1;				// 当前显示
 };
 // 菜单管理器
 class menu_cx
 {
 public:
 	form_x* form = 0;			// 主窗口 
+	plane_cx* u = 0;
 	std::vector<std::string> familys;
 public:
 	menu_cx();
@@ -244,3 +246,17 @@ action_t* move2w(float mt, const glm::vec2& target, glm::vec2* src, float wait);
 action_t* move2inc(const glm::vec2& pad, float mt, float wait);
 action_t* at_size(const glm::vec2& dst, float mt);
 action_show_t* wait_show(bool visible, float wait);
+
+struct menumain_info
+{
+	form_x* form0; const char* fontn;
+	uint32_t bc_color = 0xff000000;
+	std::vector<std::string>* mvs; menu_info* pm; int count;   glm::vec2 msize; std::function<void(mitem_t* p, int type, int id)> cb;
+};
+
+namespace mg {
+	//创建主菜单
+	menu_cx* new_mm(menumain_info* mm);
+	void free_mm(menu_cx*p);
+}
+//!mg
