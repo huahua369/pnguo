@@ -8290,6 +8290,7 @@ namespace vkr
 		std::lock_guard<std::mutex> lock(m_mutex);
 
 		uint32_t size = AlignUp(numbeOfElements * strideInBytes, 256u);
+		auto d = (int64_t)m_totalMemSize - (m_memOffset + size);
 		assert(m_memOffset + size < m_totalMemSize);
 
 		*pData = (void*)(m_pData + m_memOffset);

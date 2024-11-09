@@ -26,7 +26,7 @@ namespace vkr {
 		// Create a 'dynamic' constant buffer动态常量缓冲区大小
 		uint32_t constantBuffersMemSize = 5 * 1024 * 1024;
 		// Create a 'static' pool for vertices and indices 静态顶点/索引缓冲区大小
-		uint32_t staticGeometryMemSize = (1 * 128) * 1024 * 1024;
+		uint32_t staticGeometryMemSize = (10 * 128) * 1024 * 1024;
 		// Create a 'static' pool for vertices and indices in system memory静态几何缓冲区大小
 		uint32_t systemGeometryMemSize = 32 * 1024;
 

@@ -18,154 +18,6 @@
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
-void menu_m(form_x* form0)
-{
-	auto mainmenu = new plane_cx();
-	form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
-	auto p = mainmenu;
-	//p->set_rss(5);
-	p->add_familys(fontn, 0);
-	//p->draggable = true; //可拖动✔
-	p->set_color({ 0,1,0,0xff000000 });
-	// 主菜单
-	std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
-	p->fontsize = 16;
-
-	{
-		glm::ivec2  fs = form0->get_size();
-		if (fs.x & 1)
-			fs.x++;
-		if (fs.y & 1)
-			fs.y++;
-		p->set_size({ fs.x, p->fontsize * 2 });
-	}
-	p->set_pos({});
-	glm::vec2 cs = { 1500,1600 };
-	auto vs = p->get_size();
-
-	p->set_view(vs, cs);
-	p->update_cb = [=](float dt)
-		{
-			bool r = false;
-			if (form0)
-			{
-				glm::ivec2 ps = p->get_size(), fs = form0->get_size();
-				if (fs.x & 1)
-					fs.x++;
-				if (fs.y & 1)
-					fs.y++;
-				if (ps.x != fs.x)
-				{
-					p->set_size({ fs.x, p->fontsize * 2 });
-					r = true;
-				}
-			}
-			return r;
-		};
-
-	menu_cx* mc = new menu_cx();	// 菜单管理
-	mc->set_main(form0);
-	mc->add_familys(fontn);
-
-	std::vector<std::string> mvs0 = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
-	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
-	int cidx = 1;
-	// 创建菜单
-	auto pm31 = mc->new_menu(-1, 30, mvs1, [=](mitem_t* pm, int type, int idx)
-		{
-			if (type == 1)
-			{
-				printf("click:%d\t%d\n", type, idx);
-			}
-			//else
-			//	printf("move:%d\t%d\n", type, idx);
-		});
-	auto pm3 = mc->new_menu(-1, 30, mvs0, [=](mitem_t* pm, int type, int idx)
-		{
-			if (type == 1)
-			{
-				printf("click:%d\t%d\n", type, idx);
-			}
-			else
-			{
-				//printf("move:%d\t%d\n", type, idx);
-			}
-		});
-	pm3->set_child(pm31, 2);
-	//pm3->show({ 100,100 }); // 显示菜单
-
-	for (auto& it : mvs)
-	{
-		auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
-		cbt->effect = uTheme::light;
-		cbt->hscroll = {};
-		cbt->rounding = 0;
-		cbt->light = 0.1;
-
-		cbt->click_cb = [=](void* ptr, int clicks)
-			{
-				printf("%s\n", cbt->str.c_str());
-			};
-		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
-			{
-				static void* enterst = 0;
-				auto cp = (color_btn*)pt;
-				auto t = (event_type2)type;
-				switch (t)
-				{
-				case event_type2::on_down:
-				{
-					auto cps = cp->get_pos();
-					cps.y += cp->size.y + cp->thickness;
-					pm3->hide(true);
-					pm3->show(cps);
-					hide_tooltip(form0);
-					form0->uptr = 0;
-				}
-				break;
-				case event_type2::on_enter:
-				{
-					enterst = pt;
-					if (pm3->get_visible()) {
-						auto cps = cp->get_pos();
-						cps.y += cp->size.y + cp->thickness;
-						pm3->hide(true);
-						pm3->show(cps);
-					}
-				}
-				break;
-				case event_type2::on_hover:
-				{
-					// 0.5秒触发悬停事件
-					style_tooltip stp = {};
-					stp.family = fontn;
-					stp.fonst_size = 14;
-					glm::vec2 cps = mps;
-					cps.y += 20;
-					if (enterst == pt) {
-						if (form0->uptr != pt)
-						{
-							//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
-							form0->uptr = pt;
-						}
-					}
-				}
-				break;
-				case event_type2::on_leave:
-				{
-					if (enterst == pt) {
-						hide_tooltip(form0);
-						form0->uptr = 0;
-					}
-				}
-				break;
-				default:
-					break;
-				}
-			};
-	}
-}
-
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
@@ -551,9 +403,8 @@ int main()
 	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 
-	menu_m(form0);
 
-	vkdg_cx* vkd = 0;//new_vkdg(&sdldev);	// 创建vk渲染器 
+	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	//if (vkd1) {
@@ -591,11 +442,12 @@ int main()
 			//load_gltf(vkd, R"(E:\model\maple_trees.glb)");
 
 			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
-			vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
-			vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
+			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
+			vkd->load_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
 
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
@@ -607,7 +459,7 @@ int main()
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
-		vkd->state.Exposure = 0.09928;
+		vkd->state.Exposure = 0.9928;
 		vkd->state.EmissiveFactor = 250;
 		new_ui(form0, vkd);
 		if (texok)
@@ -625,7 +477,7 @@ int main()
 
 	}
 
-	show_belt(form0);
+	//show_belt(form0);
 	//show_cpuinfo(form0);
 	// 运行消息循环
 	run_app(app, 0);
