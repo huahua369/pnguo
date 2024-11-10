@@ -459,7 +459,7 @@ int main()
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
-		vkd->state.Exposure = 0.9928;
+		vkd->state.Exposure = 0.59928;
 		vkd->state.EmissiveFactor = 250;
 		new_ui(form0, vkd);
 		if (texok)
