@@ -251,7 +251,9 @@ struct menumain_info
 {
 	form_x* form0; const char* fontn;
 	uint32_t bc_color = 0xff000000;
-	std::vector<std::string>* mvs; menu_info* pm; int count;   glm::vec2 msize; std::function<void(mitem_t* p, int type, int id)> cb;
+	std::vector<std::string>* mvs; 
+	menu_info* pm = 0; int count = 0;   glm::vec2 msize = {}; 
+	std::function<void(mitem_t* p, int type, int id)> cb;
 };
 
 namespace mg {

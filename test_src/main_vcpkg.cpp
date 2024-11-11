@@ -168,127 +168,13 @@ void vcpkg_Cx::do_cmd()
 
 menu_cx* menu_m(form_x* form0)
 {
-	auto mainmenu = new plane_cx();
-	form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
-	auto p = mainmenu;
-	//p->set_rss(5);
-	p->add_familys(fontn, 0);
-	//p->draggable = true; //可拖动✔
-	p->set_color({ 0,1,0,0xff000000 });
+	menumain_info m = {};
+	m.form0 = form0;
+	m.fontn = fontn;
 	// 主菜单
 	std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
-	p->fontsize = 16;
-
-	{
-		glm::ivec2  fs = form0->get_size();
-		if (fs.x & 1)
-			fs.x++;
-		if (fs.y & 1)
-			fs.y++;
-		p->set_size({ fs.x, 30 });
-	}
-	p->set_pos({});
-	glm::vec2 cs = { 1500,1600 };
-	auto vs = p->get_size();
-
-	p->set_view(vs, cs);
-	p->update_cb = [=](float dt)
-		{
-			bool r = false;
-			if (form0)
-			{
-				glm::ivec2 ps = p->get_size(), fs = form0->get_size();
-				if (fs.x & 1)
-					fs.x++;
-				if (fs.y & 1)
-					fs.y++;
-				if (ps.x != fs.x)
-				{
-					p->set_size({ fs.x, 30 });
-					r = true;
-				}
-			}
-			return r;
-		};
-
-	menu_cx* mc = new menu_cx();	// 菜单管理
-	mc->set_main(form0);
-	mc->add_familys(fontn);
-
-
-	for (auto& it : mvs)
-	{
-		auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
-		cbt->effect = uTheme::light;
-		cbt->hscroll = {};
-		cbt->rounding = 0;
-		cbt->light = 0.1;
-
-		cbt->click_cb = [=](void* ptr, int clicks)
-			{
-				//auto jstr = hz::cmdexe("c:");
-				//auto jstra = hz::cmdexe("echo %cd%", "c:\\sdk");
-				//auto jstraa = hz::cmdexe("echo %cd%", "e:\\sdk");
-				//printf(""); 
-			};
-		cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
-			{
-				static void* enterst = 0;
-				auto cp = (color_btn*)pt;
-				auto t = (event_type2)type;
-				switch (t)
-				{
-				case event_type2::on_down:
-				{
-					auto cps = cp->get_pos();
-					cps.y += cp->size.y + cp->thickness;
-					//pm3->hide(true);
-					//pm3->show(cps);
-					hide_tooltip(form0);
-					form0->uptr = 0;
-				}
-				break;
-				case event_type2::on_enter:
-				{
-					enterst = pt;
-					//if (pm3->get_visible()) {
-					//	auto cps = cp->get_pos();
-					//	cps.y += cp->size.y + cp->thickness;
-					//	pm3->hide(true);
-					//	pm3->show(cps);
-					//}
-				}
-				break;
-				case event_type2::on_hover:
-				{
-					// 0.5秒触发悬停事件
-					style_tooltip stp = {};
-					stp.family = fontn;
-					stp.fonst_size = 14;
-					glm::vec2 cps = mps;
-					cps.y += 20;
-					if (enterst == pt) {
-						if (form0->uptr != pt)
-						{
-							//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
-							form0->uptr = pt;
-						}
-					}
-				}
-				break;
-				case event_type2::on_leave:
-				{
-					if (enterst == pt) {
-						hide_tooltip(form0);
-						form0->uptr = 0;
-					}
-				}
-				break;
-				default:
-					break;
-				}
-			};
-	}
+	m.mvs = &mvs;
+	auto mc = mg::new_mm(&m);
 	return mc;
 }
 

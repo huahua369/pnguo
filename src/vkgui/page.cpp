@@ -264,6 +264,15 @@ mitem_g* menu_cx::new_menu_g(menu_info* pn, int count, const glm::vec2& msize, s
 	mitem_g* r = {};
 	if (pn && count > 0)
 	{
+		auto mss = msize;
+		if (mss.x < 2)
+		{
+			mss.x = 100;
+		}
+		if (mss.y < 2)
+		{
+			mss.y = 30;
+		}
 		auto ptr = new mitem_t[count];
 		auto p = ptr;
 		for (size_t i = 0; i < count; i++, p++)
@@ -276,7 +285,7 @@ mitem_g* menu_cx::new_menu_g(menu_info* pn, int count, const glm::vec2& msize, s
 			for (auto it : familys) {
 				p->ltx->add_familys(it.c_str(), 0);
 			}
-			p->set_data(msize.x, msize.y, it.mstr, it.count);
+			p->set_data(mss.x, mss.y, it.mstr, it.count);
 			pn->ptr = p;
 		}
 		for (size_t i = 0; i < count; i++, p++)
@@ -1493,7 +1502,7 @@ void new_tree2(const std::vector<dv_t>& d, tree2_info_t* info, std::function<voi
 namespace mg {
 	menu_cx* new_mm(menumain_info* mm)
 	{
-		if (!mm || !mm->form0 || !mm->fontn || !mm->mvs || !mm->pm || mm->count < mm->mvs->size() || mm->msize.x < 2 || mm->msize.y < 2)return 0;
+		if (!mm || !mm->form0 || !mm->fontn || !mm->mvs)return 0;
 		auto mainmenu = new plane_cx();
 		mm->form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
 		auto p = mainmenu;
@@ -1512,14 +1521,14 @@ namespace mg {
 		p->set_pos({});
 		glm::vec2 cs = { 1500,1600 };
 		auto vs = p->get_size();
-
+		auto mmd = *mm;
 		p->set_view(vs, cs);
 		p->update_cb = [=](float dt)
 			{
 				bool r = false;
-				if (mm->form0)
+				if (mmd.form0)
 				{
-					glm::ivec2 ps = p->get_size(), fs = mm->form0->get_size();
+					glm::ivec2 ps = p->get_size(), fs = mmd.form0->get_size();
 					if (fs.x & 1)
 						fs.x++;
 					if (fs.y & 1)
@@ -1534,17 +1543,13 @@ namespace mg {
 			};
 
 		menu_cx* mc = new menu_cx();	// 菜单管理
-		mc->set_main(mm->form0);
-		mc->add_familys(mm->fontn);
-		auto mgp = mc->new_menu_g(mm->pm, mm->count, mm->msize, mm->cb);
-		if (!mgp) {
-			if (mc)delete mc;
-			if (mainmenu)delete mainmenu;
-			return 0;
-		}
+		mc->set_main(mmd.form0);
+		mc->add_familys(mmd.fontn);
+		auto mgp = (mmd.pm && mmd.count && mmd.count == mmd.mvs->size()) ? mc->new_menu_g(mmd.pm, mmd.count, mmd.msize, mmd.cb) : nullptr;
+
 		int xc = 0;
 		mc->u = p;
-		for (auto& it : mm->mvs[0])
+		for (auto& it : mmd.mvs[0])
 		{
 			auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
 			cbt->effect = uTheme::light;
@@ -1566,15 +1571,16 @@ namespace mg {
 					{
 						auto cps = cp->get_pos();
 						cps.y += cp->size.y + cp->thickness;
-						mc->show_mg(mgp, xc, cps);
-						hide_tooltip(mm->form0);
-						mm->form0->uptr = 0;
+						if (mgp)
+							mc->show_mg(mgp, xc, cps);
+						hide_tooltip(mmd.form0);
+						mmd.form0->uptr = 0;
 					}
 					break;
 					case event_type2::on_enter:
 					{
 						enterst = pt;
-						if (mgp->cx >= 0)
+						if (mgp && mgp->cx >= 0)
 						{
 							auto pmx = &mgp->ptr[mgp->cx];
 							if (pmx->get_visible()) {
@@ -1590,15 +1596,15 @@ namespace mg {
 					{
 						// 0.5秒触发悬停事件
 						style_tooltip stp = {};
-						stp.family = mm->fontn;
+						stp.family = mmd.fontn;
 						stp.fonst_size = 14;
 						glm::vec2 cps = mps;
 						cps.y += 20;
 						if (enterst == pt) {
-							if (mm->form0->uptr != pt)
+							if (mmd.form0->uptr != pt)
 							{
 								//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
-								mm->form0->uptr = pt;
+								mmd.form0->uptr = pt;
 							}
 						}
 					}
@@ -1606,8 +1612,8 @@ namespace mg {
 					case event_type2::on_leave:
 					{
 						if (enterst == pt) {
-							hide_tooltip(mm->form0);
-							mm->form0->uptr = 0;
+							hide_tooltip(mmd.form0);
+							mmd.form0->uptr = 0;
 						}
 					}
 					break;
