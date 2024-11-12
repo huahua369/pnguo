@@ -554,8 +554,7 @@ int main()
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口0";
 	const char* wtitle1 = (char*)u8"窗口1";
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
-	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0); 
 	test_spr(form0, 0);
 	// 运行消息循环
 	run_app(app, 0);
