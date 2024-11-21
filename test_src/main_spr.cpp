@@ -548,6 +548,24 @@ void test_spr(form_x* form0, vkdg_cx* vkd) {
 
 }
 
+void show_gui(form_x* form0)
+{
+	if (!form0)return;
+	glm::ivec2 size = { 1024,800 };
+	glm::ivec2 cview = { 10240,10240 };
+	auto p = new plane_cx();
+	uint32_t pbc = 0xf02c2c2c;
+	p->set_color({ 0x80ff802C,1,5,pbc });
+	form0->bind(p);	// 绑定到窗口  
+	p->set_rss(5);
+	p->_lms = { 8,8 };
+	p->add_familys(fontn, 0);
+	p->draggable = false; //可拖动
+	p->set_size(size);
+	p->set_pos({ 30,50 });
+	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->fontsize = 16;
+}
 int main()
 {
 	auto app = new_app();
@@ -555,7 +573,8 @@ int main()
 	const char* wtitle = (char*)u8"窗口0";
 	const char* wtitle1 = (char*)u8"窗口1";
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0); 
-	test_spr(form0, 0);
+	//test_spr(form0, 0);
+	show_gui(form0);
 	// 运行消息循环
 	run_app(app, 0);
 	free_app(app);
