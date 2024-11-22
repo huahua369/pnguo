@@ -181,7 +181,7 @@ menu_cx* menu_m(form_x* form0)
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
+	p->set_color({ 0x802c2c2c,1,5,pbc });
 	form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
 	p->_lms = { 6,6 };

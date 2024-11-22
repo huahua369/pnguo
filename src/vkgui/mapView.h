@@ -247,6 +247,7 @@ namespace md {
 	// 多分割符
 	std::vector<std::string> split_m(const std::string& str, const std::string& pattern, bool is_space);
 	void get_lines(const std::string& str, std::function<void(const char* str)> cb);
+	std::string replace_s(const std::string& str, const std::string& old_value, const std::string& new_value);
 	// 验证是否为ut8编码
 	bool validate_u8(const char* str, int len);
 	int64_t get_utf8_count(const char* buffer, int64_t len);

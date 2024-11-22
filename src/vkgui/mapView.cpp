@@ -145,6 +145,29 @@ namespace md {
 			}
 		}
 	}
+
+	template<typename Str>
+	Str& replace_all(Str& str, const Str& old_value, const Str& new_value)
+	{
+		uint64_t pos(0);
+		while (true) {
+			if ((pos = str.find(old_value, pos)) != Str::npos)
+			{
+				str.replace(pos, old_value.length(), new_value); pos += new_value.length();
+			}
+			else
+				break;
+		}
+		return str;
+	}
+
+	std::string replace_s(const std::string& str, const std::string& old_value, const std::string& new_value)
+	{
+		auto nstr = str;
+		replace_all(nstr, old_value, new_value);
+		return nstr;
+	}
+
 	bool validate_u8(const char* str, int len)
 	{
 		if (len < 0)len = strlen(str);
