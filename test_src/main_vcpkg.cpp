@@ -307,7 +307,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	"integrate_install",//集成到全局 
 	"integrate_remove",//移除全局 
 	};
-	auto color = 0xcf8000;// hz::get_themecolor();
+	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
 #if 0
 	std::vector<menu_info> vm;
@@ -368,7 +368,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 				cairo_as _ss_(cr);
 			}
-			std::string str = (char*)u8"🍉";
+			std::string str = (char*)u8"v好🍉";
 			glm::vec4 rc = { 0,0,200,56 };
 			text_style_t st = {};
 			st.font = 0;
