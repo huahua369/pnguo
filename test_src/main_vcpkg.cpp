@@ -377,8 +377,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 			st.text_color = -1;
 			auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
 			auto rc2 = rc;
-			//rc2.z = rc1.x; rc2.w = rc1.y;
-			//rc2.y = (rc.w - rc1.y) * st.text_align.y;
 			uint32_t color = hz::get_themecolor();
 			draw_rect(cr, { 126,126,360,360 }, color, 0xff802Cff, 2, 1);
 			draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
