@@ -251,14 +251,24 @@ struct menumain_info
 {
 	form_x* form0; const char* fontn;
 	uint32_t bc_color = 0xff000000;
-	std::vector<std::string>* mvs; 
-	menu_info* pm = 0; int count = 0;   glm::vec2 msize = {}; 
+	std::vector<std::string>* mvs;
+	menu_info* pm = 0; int count = 0;   glm::vec2 msize = {};
 	std::function<void(mitem_t* p, int type, int id)> cb;
+};
+class listview_x
+{
+public:
+	listview_x();
+	~listview_x();
+	void set_style(text_style_t* t);
+private:
 };
 
 namespace mg {
 	//创建主菜单
 	menu_cx* new_mm(menumain_info* mm);
-	void free_mm(menu_cx*p);
+	void free_mm(menu_cx* p);
+
+
 }
 //!mg

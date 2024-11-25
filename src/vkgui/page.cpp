@@ -1632,3 +1632,14 @@ namespace mg {
 
 }
 //!mg
+
+listview_x::listview_x()
+{
+}
+
+listview_x::~listview_x()
+{
+}
+void listview_x::set_style(text_style_t* t)
+{
+}
