@@ -448,7 +448,7 @@ int main()
 			//vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
 			//vkd->load_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
-			vkd->load_gltf(R"(E:\zmodel\s023.glb)", { 0,0,0 }, 1.0);
+			vkd->load_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
 
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
