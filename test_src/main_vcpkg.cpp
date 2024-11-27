@@ -400,7 +400,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-#endif  
+#endif   
 	auto app = new_app();
 
 	glm::ivec2 ws = { 1280,860 };
