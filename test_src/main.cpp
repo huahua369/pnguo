@@ -956,6 +956,7 @@ int main()
 	std::vector<std::string> mvs = { (char*)u8"🍇测试菜单1g",(char*)u8"🍑菜单",(char*)u8"🍍菜单1" };
 	std::vector<std::string> mvs1 = { (char*)u8"🍇子菜单",(char*)u8"🍑菜单2",(char*)u8"🍍菜单12" };
 	int cidx = 1;
+#if 0
 	// 创建菜单
 	auto pm31 = mc->new_menu(-1, 22, mvs1, [=](mitem_t* pm, int type, int idx)
 		{
@@ -986,6 +987,7 @@ int main()
 		});
 	pm31->parent = pm3;
 	pm3->show({ 100,100 }); // 显示菜单
+#endif
 	// 提示窗口
 	//form_x* new_form_tooltip(form_x * parent, int width, int height);
 
@@ -1204,7 +1206,7 @@ int main()
 							{
 								auto cps = cp->get_pos();
 								cps.y += cp->size.y + cp->thickness;
-								pm3->show(cps);
+								//pm3->show(cps);
 							}
 							break;
 							case event_type2::on_up:
@@ -1295,7 +1297,7 @@ int main()
 						auto cps = cp->get_pos();
 						cps.y += cp->size.y + cp->thickness;
 						cps.y *= -1;
-						pm3->show(cps);
+						//pm3->show(cps);
 					}
 				};
 			p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
