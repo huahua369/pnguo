@@ -405,8 +405,9 @@ int main()
 	auto app = new_app();
 
 	glm::ivec2 ws = { 1280,860 };
-
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0 * (ef_dx11 | ef_resizable));
+	// ef_vulkan
+	// ef_gpu
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1,  (ef_gpu | ef_resizable));//ef_dx11| ef_vsync
 	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;

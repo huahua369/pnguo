@@ -208,7 +208,8 @@ public:
 	float extra_time = 0.0;
 	Timer()
 		:started_ticks{ SDL_GetPerformanceCounter() }
-	{}
+	{
+	}
 
 	void restart() {
 		started_ticks = SDL_GetPerformanceCounter();
@@ -473,7 +474,11 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	int vsync = 0;
 	if (renderer) {
 		SDL_GetRenderVSync(renderer, &vsync);
-		SDL_SetRenderVSync(renderer, 0);
+		if (fgs & ef_vsync)
+		{
+			SDL_SetRenderVSync(renderer, 1);	
+			set_fps(0);
+		}
 	}
 	if (!pw)
 	{
