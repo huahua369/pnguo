@@ -476,7 +476,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		SDL_GetRenderVSync(renderer, &vsync);
 		if (fgs & ef_vsync)
 		{
-			SDL_SetRenderVSync(renderer, 1);	
+			SDL_SetRenderVSync(renderer, 1);
 			set_fps(0);
 		}
 	}
@@ -1911,7 +1911,7 @@ void form_x::present()
 		}
 	}
 #endif
-	SDL_RenderPresent(renderer);
+	SDL_RenderPresent(renderer); 
 }
 
 
