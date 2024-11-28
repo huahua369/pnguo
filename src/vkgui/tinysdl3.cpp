@@ -345,7 +345,7 @@ app_cx::app_cx()
 		}
 		return 0;
 		}, this);
-#endif
+#endif 
 }
 
 app_cx::~app_cx()
@@ -533,9 +533,10 @@ void app_cx::sleep_ms(int ms)
 	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 void app_cx::set_fps(int n) {
+	_fps = n;
 	if (n > 0)
 	{
-		_fps = n; fms = 1000.0 / n;
+		fms = 1000.0 / n;
 		fct->set_fps(n);
 	}
 }
@@ -671,6 +672,10 @@ int app_cx::get_event()
 		break;
 	}
 #endif
+	if (c_fps != _fps)
+	{
+		set_fps(c_fps);
+	}
 	clearf();
 	if (forms.empty())
 	{
@@ -684,6 +689,14 @@ int app_cx::get_event()
 		}
 	}
 	return ts;
+}
+
+void app_cx::render()
+{
+	for (auto it : forms)
+	{
+		it->present();
+	}
 }
 
 int app_cx::run_loop(int t)
@@ -701,10 +714,7 @@ int app_cx::run_loop(int t)
 				auto it = forms[i];
 				it->update(delta);
 			}
-			for (auto it : forms)
-			{
-				it->present();
-			}
+			render();
 			auto power = get_power_info();
 		}
 		prev_time = curr_time;
@@ -1911,7 +1921,8 @@ void form_x::present()
 		}
 	}
 #endif
-	SDL_RenderPresent(renderer); 
+	SDL_RenderPresent(renderer);
+
 }
 
 

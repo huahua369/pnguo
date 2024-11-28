@@ -77,8 +77,9 @@ public:
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
 	int _fps = 60;
+	int c_fps = 60;
 	int fms = 0;
-	bool nc_down = 0;
+	bool nc_down = 0; 
 public:
 	app_cx();
 	~app_cx();
@@ -99,7 +100,7 @@ public:
 	void kncdown();
 private:
 	int get_event();
-
+	void render();
 };
 
 class skeleton_t;
