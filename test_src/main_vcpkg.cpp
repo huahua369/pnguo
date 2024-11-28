@@ -401,12 +401,12 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif   
+	const char* wtitle = (char*)u8"vcpkg管理工具";
 	auto app = new_app();
 
 	glm::ivec2 ws = { 1280,860 };
-	const char* wtitle = (char*)u8"vcpkg管理工具";
 
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0 * (ef_dx11 | ef_resizable));
 	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
