@@ -386,9 +386,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 
 void test_img() {
 
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr10.jpg", 10);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr30.jpg", 30);
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0); 
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
