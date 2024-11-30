@@ -386,20 +386,21 @@ void show_ui(form_x* form0, menu_cx* gm)
 
 void test_img() {
 
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0); 
+	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 
 int main()
 {
+
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif   
-	const char* wtitle = (char*)u8"vcpkg管理工具";
+	const char* wtitle = (char*)u8"vcpkg管理工具"; 
 	auto app = new_app();
 
 	glm::ivec2 ws = { 1280,860 };
