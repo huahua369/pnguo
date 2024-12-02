@@ -116,7 +116,7 @@ namespace gp {
 
 	}
 
-	void cdt_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>& ms, bool pccw)
+	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>& ms, bool pccw)
 	{
 		if (!pt || !n)return;
 		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
@@ -154,11 +154,11 @@ namespace gp {
 			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[2]]));
 		}
 	}
-	void cdt_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>* ms, bool pccw)
+	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>* ms, bool pccw)
 	{
-		cdt_pt(pt, n, tolerance, *ms, pccw);
+		cdt_pt(pt, n, *ms, pccw);
 	}
-	void cdt_pt(glm::vec2* pt, int n, double tolerance, std::vector<glm::vec3>* msp, bool pccw)
+	void cdt_pt(glm::vec2* pt, int n, std::vector<glm::vec3>* msp, bool pccw)
 	{
 		if (!pt || !n)return;
 		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
@@ -1250,7 +1250,7 @@ void do_boolean(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean_opts)
 	srcMesh = triangle_mesh_to_mcut(all_its);
 }
 
-mesh_triangle_cx::mesh_triangle_cx() {	}
+mesh_triangle_cx::mesh_triangle_cx() {}
 void mesh_triangle_cx::set_data(const glm::vec3* v, size_t n, uint32_t* idx, size_t idxnum)
 {
 	if (v && n && idx && idxnum) {
@@ -1281,9 +1281,9 @@ void mesh_triangle_cx::set_data(const glm::dvec3* v, size_t n, uint32_t* idx, si
 		memcpy(indices.data(), idx, sizeof(int) * xn);
 	}
 }
-mesh_triangle_cx::mesh_triangle_cx(std::vector<glm::ivec3> indices_, std::vector<glm::vec3> vertices_) :indices(indices_), vertices(vertices_) {	}
+mesh_triangle_cx::mesh_triangle_cx(std::vector<glm::ivec3> indices_, std::vector<glm::vec3> vertices_) :indices(indices_), vertices(vertices_) {}
 
-mesh_triangle_cx::mesh_triangle_cx(std::vector<glm::vec3> vertices_, std::vector<glm::ivec3> indices_) : indices(indices_), vertices(vertices_) {	}
+mesh_triangle_cx::mesh_triangle_cx(std::vector<glm::vec3> vertices_, std::vector<glm::ivec3> indices_) : indices(indices_), vertices(vertices_) {}
 
 void mesh_triangle_cx::clear() { indices.clear(); vertices.clear(); properties.clear(); }
 

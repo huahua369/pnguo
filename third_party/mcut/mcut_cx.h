@@ -6,9 +6,9 @@ namespace gp {
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z);
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& vd, std::vector<glm::ivec3>& idxs, bool pccw, double z);
 
-	void cdt_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>& ms, bool pccw);
-	void cdt_pt(glm::vec3* pt, int n, double tolerance, std::vector<glm::vec3>* ms, bool pccw);
-	void cdt_pt(glm::vec2* pt, int n, double tolerance, std::vector<glm::vec3>* msp, bool pccw);
+	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>& ms, bool pccw);
+	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>* ms, bool pccw);
+	void cdt_pt(glm::vec2* pt, int n, std::vector<glm::vec3>* msp, bool pccw);
 
 }
 //!gp

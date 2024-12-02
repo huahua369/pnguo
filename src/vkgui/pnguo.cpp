@@ -627,8 +627,8 @@ public:
 	image_ptr_t img = {};
 	std::vector<stbrp_node> _rpns;
 public:
-	stb_packer() { }
-	~stb_packer() { }
+	stb_packer() {}
+	~stb_packer() {}
 	image_ptr_t* get() {
 		return (image_ptr_t*)&img;
 	}
@@ -1069,7 +1069,7 @@ vertex_v2::vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c) :position(p.x, p.y),
 vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c) :position(p), tex_coord(u) {
 	color = colorv4(c);
 }
-vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4 c) :position(p), tex_coord(u), color(c) { }
+vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4 c) :position(p), tex_coord(u), color(c) {}
 
 // 图集数据
 
@@ -4127,7 +4127,8 @@ namespace gp {
 				Ring& lower,
 				Ring& upper)
 				: pts{ points }, onring{ &upper }, offring{ &lower }
-			{}
+			{
+			}
 		};
 
 		void triangulate_wall(std::vector<Vec>& pts,
@@ -9298,7 +9299,7 @@ int path_v::get_triangulate_center_line(int segments, float ml, float ds, int is
 	}
 	std::vector<glm::vec3> m3;
 	for (auto& it : mtv) {
-		gp::cdt_pt(it.data(), it.size(), 0.0, m3, !is_reverse);
+		gp::cdt_pt(it.data(), it.size(), m3, !is_reverse);
 	}
 	if (ms)
 	{
@@ -20116,11 +20117,14 @@ void flex_item::layout()
 #endif // !NO_FLEX_CX
 
 widget_base::widget_base()
-{}
+{
+}
 widget_base::widget_base(WIDGET_TYPE wt) :wtype(wt)
-{}
+{
+}
 widget_base::~widget_base()
-{}
+{
+}
 bool widget_base::on_mevent(int type, const glm::vec2& mps)
 {
 	return false;
@@ -23383,42 +23387,59 @@ image_btn::image_btn() :widget_base(WIDGET_TYPE::WT_IMAGE_BTN)
 
 }
 image_btn::~image_btn()
-{}
+{
+}
 color_btn::color_btn() :widget_base(WIDGET_TYPE::WT_COLOR_BTN)
-{}
+{
+}
 color_btn::~color_btn()
-{}
+{
+}
 gradient_btn::gradient_btn() :widget_base(WIDGET_TYPE::WT_GRADIENT_BTN)
-{}
+{
+}
 gradient_btn::~gradient_btn()
-{}
+{
+}
 radio_tl::radio_tl() :widget_base(WIDGET_TYPE::WT_RADIO)
 {
 }
 checkbox_tl::checkbox_tl() :widget_base(WIDGET_TYPE::WT_CHECKBOX)
-{}
+{
+}
 checkbox_tl::~checkbox_tl()
-{}
+{
+}
 switch_tl::switch_tl() :widget_base(WIDGET_TYPE::WT_SWITCH)
-{}
+{
+}
 switch_tl::~switch_tl()
-{}
+{
+}
 progress_tl::progress_tl() :widget_base(WIDGET_TYPE::WT_PROGRESS)
-{}
+{
+}
 progress_tl::~progress_tl()
-{}
+{
+}
 slider_tl::slider_tl() :widget_base(WIDGET_TYPE::WT_SLIDER)
-{}
+{
+}
 slider_tl::~slider_tl()
-{}
+{
+}
 colorpick_tl::colorpick_tl() :widget_base(WIDGET_TYPE::WT_COLORPICK)
-{}
+{
+}
 colorpick_tl::~colorpick_tl()
-{}
+{
+}
 scroll_bar::scroll_bar() :widget_base(WIDGET_TYPE::WT_SCROLL_BAR)
-{}
+{
+}
 scroll_bar::~scroll_bar()
-{}
+{
+}
 
 
 bool image_btn::on_mevent(int type, const glm::vec2& mps)
@@ -27109,5 +27130,6 @@ void do_text(const char* str, size_t first, size_t count)
 }
 #else
 void do_text(const char* str, size_t first, size_t count)
-{}
+{
+}
 #endif // 1
