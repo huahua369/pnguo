@@ -376,7 +376,7 @@ struct font_xi {
 
 struct fontns
 {
-	std::string family, fullname;
+	std::string family, fullname, namecn;
 	std::vector<std::string> style, fpath;
 	std::set<std::string> alias;
 	std::vector<void*> vptr;
@@ -597,6 +597,7 @@ struct text_style_t
 	int font_size = 18;
 	uint32_t text_color = 0xffffffff;
 	uint32_t text_color_shadow = 0;
+	bool clip = true;
 };
 
 
@@ -612,6 +613,7 @@ public:
 	};
 	*/
 	std::map<std::string, fontns> fyv;		// 系统字体表
+	std::vector<fontns*> fyvs;				// 系统字体表
 	std::map<std::string, font_t*> fzv;		// 自定义加载字体表
 	font_imp* imp = 0;
 	bitmap_cache_cx bcc = {};				// 纹理缓存
@@ -630,6 +632,8 @@ public:
 	int get_count_style(int idx);			// 获取idx字体风格数量
 	const char* get_family(int idx);		// 获取字体名称
 	const char* get_family_en(const char* family);		// 获取字体名称
+	const char* get_family_cn(int family);		// 获取字体中文名称
+	const char* get_family_alias(int family);		// 获取字体中文名称
 	const char* get_family_full(int idx);	// 获取字体全名
 	const char* get_family_style(int idx, int stidx);	// 获取字体风格名
 	font_t* get_font(int idx, int styleidx);// 通过索引号获取字体对象

@@ -10788,6 +10788,12 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 	ltx->tem_rtv.clear();
 	ltx->build_text(st->font, rc, st->text_align, str, len, st->font_size, ltx->tem_rtv);
 	ltx->update_text();
+
+	cairo_as _ss_(cr);
+	if (st->clip) {
+		draw_rectangle(cr, text_rc, 0);
+		cairo_clip(cr);
+	}
 	if (st->text_color_shadow)
 	{
 		cairo_as _aa_(cr);
@@ -13982,6 +13988,7 @@ std::map<std::string, fontns> get_allfont()
 
 		FcFini();
 	}
+	// 删除空字体
 	auto newfn = fyv;
 	for (auto& [k, v] : fyv) {
 		if (v.family.empty() || v.fpath.empty())
@@ -13989,8 +13996,6 @@ std::map<std::string, fontns> get_allfont()
 			newfn.erase(k); r++;
 		}
 	}
-	fyv.swap(newfn);
-
 	return newfn;
 }
 // 枚举字体名称/路径名
@@ -18950,6 +18955,15 @@ void font_imp::free_ftp(font_t* p)
 font_rctx::font_rctx()
 {
 	fyv = get_allfont();
+	if (fyv.size())
+	{
+		fyvs.resize(fyv.size());
+		size_t i = 0;
+		for (auto& [k, v] : fyv) {
+			fyvs[i] = &v; i++;
+		}
+	}
+
 	imp = new font_imp();
 	PangoFontMap* fontMap = get_fmap;
 	pcontext = pango_font_map_create_context(fontMap);
@@ -18996,29 +19010,39 @@ int font_rctx::get_count()
 int font_rctx::get_count_style(int idx)
 {
 	int r = 0;
-	for (auto& [k, v] : fyv) {
-		if (idx == 0)
-		{
-			r = v.style.size();
-			break;
-		}
-		idx--;
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		r = fyvs[idx]->style.size();
 	}
 	return r;
+	//for (auto& [k, v] : fyv) {
+	//	if (idx == 0)
+	//	{
+	//		r = v.style.size();
+	//		break;
+	//	}
+	//	idx--;
+	//}
+	//return r;
 }
 
 const char* font_rctx::get_family(int idx)
 {
 	std::string* r = 0;
-	for (auto& [k, v] : fyv) {
-		if (idx == 0)
-		{
-			r = &v.family;
-			break;
-		}
-		idx--;
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		return fyvs[idx]->family.c_str();
 	}
-	return r ? r->c_str() : nullptr;
+	return "";
+	//for (auto& [k, v] : fyv) {
+	//	if (idx == 0)
+	//	{
+	//		r = &v.family;
+	//		break;
+	//	}
+	//	idx--;
+	//}
+	//return r ? r->c_str() : nullptr;
 }
 
 const char* font_rctx::get_family_en(const char* family)
@@ -19068,38 +19092,81 @@ const char* font_rctx::get_family_en(const char* family)
 	return r ? r->c_str() : nullptr;
 }
 
+const char* font_rctx::get_family_cn(int idx)
+{
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		auto v = fyvs[idx];
+		auto r = v->family.c_str();
+		if (v->alias.size())
+			r = v->alias.rbegin()->c_str();
+		return r;
+	}
+	return "";
+}
+const char* font_rctx::get_family_alias(int idx)
+{
+	static std::string r;
+	r.clear();
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		auto v = fyvs[idx];
+		for (int i = 0; i < v->alias.size(); i++)
+		{
+			r += v->alias.rbegin()->c_str(); r.push_back(';');
+		}
+	}
+	return r.c_str();
+}
+
 const char* font_rctx::get_family_full(int idx)
 {
 	std::string* r = 0;
-	for (auto& [k, v] : fyv) {
-		if (idx == 0)
-		{
-			r = &v.fullname;
-			break;
-		}
-		idx--;
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		return fyvs[idx]->fullname.c_str();
 	}
-	return r ? r->c_str() : nullptr;
+	return "";
+	//for (auto& [k, v] : fyv) {
+	//	if (idx == 0)
+	//	{
+	//		r = &v.fullname;
+	//		break;
+	//	}
+	//	idx--;
+	//}
+	//return r ? r->c_str() : nullptr;
 }
 
 const char* font_rctx::get_family_style(int idx, int stidx)
 {
 	std::string* r = 0;
 	size_t st = stidx;
-	for (auto& [k, v] : fyv) {
-		if (idx == 0)
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		auto& v = *fyvs[idx];
+		if (v.style.size())
 		{
-			if (v.style.size())
-			{
-				if (st > v.style.size())
-					st = 0;
-				r = &v.style[st];
-			}
-			break;
+			if (st > v.style.size())
+				st = 0;
+			return v.style[st].c_str();
 		}
-		idx--;
 	}
-	return r ? r->c_str() : nullptr;
+	return "";
+	//for (auto& [k, v] : fyv) {
+	//	if (idx == 0)
+	//	{
+	//		if (v.style.size())
+	//		{
+	//			if (st > v.style.size())
+	//				st = 0;
+	//			r = &v.style[st];
+	//		}
+	//		break;
+	//	}
+	//	idx--;
+	//}
+	//return r ? r->c_str() : nullptr;
 }
 font_t* font_rctx::get_mk(fontns& v, size_t st)
 {
@@ -19134,20 +19201,31 @@ font_t* font_rctx::get_font(int idx, int styleidx)
 {
 	font_t* r = 0;
 	size_t st = styleidx;
-	for (auto& [k, v] : fyv) {
-		if (idx == 0)
+	if (idx >= 0 && idx < fyvs.size())
+	{
+		auto& v = *fyvs[idx];
+		if (v.style.size())
 		{
-			if (v.style.size())
-			{
-				if (st > v.style.size())
-					st = 0;
-			}
-			r = get_mk(v, st);
-			break;
+			if (st > v.style.size())
+				st = 0;
 		}
-		idx--;
+		r = get_mk(v, st);
 	}
 	return r;
+	//for (auto& [k, v] : fyv) {
+	//	if (idx == 0)
+	//	{
+	//		if (v.style.size())
+	//		{
+	//			if (st > v.style.size())
+	//				st = 0;
+	//		}
+	//		r = get_mk(v, st);
+	//		break;
+	//	}
+	//	idx--;
+	//}
+	//return r;
 }
 
 font_t* font_rctx::get_font(const char* family, const char* style)
@@ -19244,6 +19322,14 @@ void font_rctx::free_font(const std::string& name)
 				imp->free_ftp((font_t*)it);
 			}
 			v.vptr.clear();
+			auto& v1 = fyvs;
+			for (auto it = v1.begin(); it != v1.end(); it++)
+			{
+				if (*it == &v)
+				{
+					v1.erase(it); break;
+				}
+			}
 			break;
 		}
 	}

@@ -18,6 +18,7 @@
 
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
+auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 
 class vcpkg_Cx
 {
@@ -282,6 +283,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->set_rss(5);
 	p->_lms = { 8,8 };
 	p->add_familys(fontn, 0);
+	p->add_familys(fontn1, 0);
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 1,30 });
@@ -303,9 +305,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 	"list",//列出安装库 
 	"search",//搜索库 
 	"pull",//拉取  		 
-	"get_triplet",//查看支持的架构  
-	"integrate_install",//集成到全局 
-	"integrate_remove",//移除全局 
+	"get triplet",//查看支持的架构  
+	"integrate install",//集成到全局 
+	"integrate remove",//移除全局 
 	};
 	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
@@ -332,7 +334,10 @@ void show_ui(form_x* form0, menu_cx* gm)
 #else
 	for (auto& nt : mname)
 	{
-		auto cp = p->add_gbutton(nt, { 160,30 }, color);
+		//auto cp = p->add_gbutton(nt, { 180,30 }, color);
+		//cp->text_align.x = 0;
+		auto cp = p->add_cbutton(nt, { 180,30 }, 0);
+		cp->effect = uTheme::light;
 		cp->click_cb = [=](void* ptr, int clicks)
 			{
 			};
@@ -361,6 +366,45 @@ void show_ui(form_x* form0, menu_cx* gm)
 			}
 			return 0;
 		};
+	auto ft = p->ltx->ctx;
+	int fc = ft->get_count();						// 获取注册的字体数量
+	const char* get_family(int idx);		// 获取字体名称
+	const char* get_family_en(const char* family);		// 获取字体名称
+	const char* get_family_full(int idx);	// 获取字体全名
+	struct ft_info
+	{
+		std::string name, full, style;
+	};
+	static std::vector<ft_info> fvs;
+	fvs.resize(fc);
+	static std::vector<std::string> ftns;
+	std::string k;
+	for (size_t i = 0; i < fc; i++)
+	{
+		int cs = ft->get_count_style(i);			// 获取idx字体风格数量
+		auto& it = fvs[i];
+		it.name = ft->get_family_cn(i);
+		it.full = ft->get_family_full(i);
+		for (size_t c = 0; c < cs; c++)
+		{
+			auto sty = ft->get_family_style(i, c);
+			it.style += sty; it.style.push_back(';');
+		}
+		{
+			if (i > 0 && (i % 30 == 0))
+			{
+				ftns.push_back(k); k.clear();
+			}
+			k += it.name + "\n";
+			//auto cp = p->add_cbutton(it.full, { 280,30 }, 3);
+			//cp->effect = uTheme::light;
+			//cp->click_cb = [=](void* ptr, int clicks)
+			//	{
+			//	};
+		}
+	}
+	if (k.size())
+		ftns.push_back(k);
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
@@ -368,18 +412,21 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 				cairo_as _ss_(cr);
 			}
-			std::string str = (char*)u8"v好🍉";
-			glm::vec4 rc = { 0,0,200,56 };
+			glm::vec4 rc = { 0,0,300,1000 };
 			text_style_t st = {};
-			st.font = 0;
-			st.text_align = { 0.0,0.5 };
-			st.font_size = 39;
+			st.font = 1;
+			st.text_align = { 0.0,0.0 };
+			st.font_size = 16;
 			st.text_color = -1;
-			auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
+			//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
 			auto rc2 = rc;
 			uint32_t color = hz::get_themecolor();
-			draw_rect(cr, { 126,126,360,360 }, color, 0xff802Cff, 2, 1);
-			draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
+			//draw_rect(cr, rc, color, 0xff802Cff, 2, 1);
+			for (auto& str : ftns)
+			{
+				draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
+				rc.x += 300;
+			}
 		};
 }
 
@@ -393,7 +440,6 @@ void test_img() {
 
 int main()
 {
-
 #ifdef _DEBUG
 	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
