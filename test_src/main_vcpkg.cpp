@@ -289,7 +289,14 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->set_pos({ 1,30 });
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
-
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
+		p->set_scroll_hide(1);
+		p->set_view(size, cview);
+	}
 	size.y -= 50;
 	size.x -= 50 * 10;
 	size /= 2;
@@ -396,8 +403,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				ftns.push_back(k); k.clear();
 			}
 			k += it.name + "\n";
-			//auto cp = p->add_cbutton(it.full, { 280,30 }, 3);
-			//cp->effect = uTheme::light;
+			auto cp = p->add_cbutton(it.name, { 280,30 }, 3);
+			cp->effect = uTheme::light;
 			//cp->click_cb = [=](void* ptr, int clicks)
 			//	{
 			//	};
@@ -424,7 +431,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			//draw_rect(cr, rc, color, 0xff802Cff, 2, 1);
 			for (auto& str : ftns)
 			{
-				draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
+				//draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
 				rc.x += 300;
 			}
 		};
