@@ -5554,7 +5554,7 @@ namespace gp {
 			mx[it.p2]++;
 		}
 		auto rps = rp;
-		std::sort(rps.begin(), rps.end());
+		std::stable_sort(rps.begin(), rps.end());
 		std::vector<std::vector<line1_t*>> nls;
 		std::list<line1_t*> pls, npt;
 		for (size_t i = 0; i < n - 1; i++)
@@ -22422,7 +22422,7 @@ size_t plane_cx::add_res(const char* data, int len)
 
 	return 0;
 }
-
+//pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移
 void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
 {
 	auto pss = get_size();
@@ -23023,13 +23023,22 @@ size_t plane_cx::push_dragpos(const glm::ivec2& pos, const glm::ivec2& size)
 	drag_v6 t = {};
 	t.pos = pos;
 	t.size = size;
+	t.z = 0;
 	drags.push_back(t);
+	dragsp.clear();
+	for (auto& it : drags) { dragsp.push_back(&it); }
+	sortdg();
 	return ps;
 }
 
 glm::ivec2 plane_cx::get_dragpos(size_t idx)
 {
 	return (idx < drags.size()) ? drags[idx].pos : glm::ivec2();
+}
+
+void plane_cx::sortdg()
+{
+	std::stable_sort(dragsp.begin(), dragsp.end(), [](const drag_v6* t1, const drag_v6* t2) { return t1->z < t2->z; });
 }
 
 gshadow_cx* plane_cx::get_gs()
@@ -23283,8 +23292,13 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		if (p->button == 1) {
 			if (p->state == 1) {
 				mps -= ppos;
-				for (auto& it : drags)
+				drag_v6* dp = 0;
+
+				for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
 				{
+					auto dp1 = *vt;
+					auto& it = *dp1;
+					it.z = 0;
 					if (it.size.x > 0 && it.size.y > 0)
 					{
 						glm::vec4 trc = { it.pos,it.size };
@@ -23293,12 +23307,28 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 						{
 							it.tp = mps - it.pos;	// 记录当前拖动坐标
 							it.ck = 1;
+							it.z = 1;
+							dp = dp1;
 						}
 					}
-					else {
-						it.tp = mps - it.pos;	// 记录当前拖动坐标
-						it.ck = 1;
+				}
+				if (!dp)
+				{
+					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+					{
+						auto dp1 = *vt;
+						auto& it = *dp1;
+						it.z = 0;
+						if (it.size.x <= 0 || it.size.y <= 0)
+						{
+							it.tp = mps - it.pos;	// 记录当前拖动坐标
+							it.ck = 1;
+						}
 					}
+				}
+				else
+				{
+					sortdg();
 				}
 			}
 		}

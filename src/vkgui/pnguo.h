@@ -1911,6 +1911,7 @@ struct drag_v6
 	glm::ivec2 size;
 	glm::ivec2 tp;
 	int ck = 0;
+	int z = 0;
 };
 // 面板，继承图集
 class plane_cx :public canvas_atlas
@@ -1937,6 +1938,7 @@ public:
 
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<drag_v6> drags;	// 拖动坐标
+	std::vector<drag_v6*> dragsp;	// 拖动区域
 	layout_info_x _css = {};		// 布局样式
 	glm::vec2 _lpos = { 0,0 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "NSimSun";
@@ -1969,7 +1971,7 @@ public:
 	void set_color(const glm::ivec4& c);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
-	// 设置本面板滚动条
+	// 设置本面板滚动条，pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移
 	void set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos = {}, const glm::ivec2& hnpos = {});
 	void set_scroll_hide(bool is);// 是否隐藏滚动条
 	void set_scroll_pos(const glm::ivec2& ps, bool v);
@@ -2008,6 +2010,7 @@ public:
 	bool hittest(const glm::ivec2& pos);
 	size_t push_dragpos(const glm::ivec2& pos, const glm::ivec2& size = {});
 	glm::ivec2 get_dragpos(size_t idx);
+	void sortdg();
 public:
 	gshadow_cx* get_gs();
 	// 设置边框阴影
