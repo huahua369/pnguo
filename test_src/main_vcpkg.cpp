@@ -187,7 +187,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	glm::ivec2 size = { 1024,800 };
 	glm::ivec2 cview = { 10240,10240 };
 	auto p = new plane_cx();
-	uint32_t pbc = 0xf02c2c2c * 0;
+	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
 	form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
@@ -274,8 +274,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 	}
 
 #endif
-	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
 	auto dpx1 = p->push_dragpos(size, { 300,1000 });// 增加一个拖动坐标
+	size /= 2;
+	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
 	p->update_cb = [=](float delta)
 		{
@@ -331,9 +332,15 @@ void show_ui(form_x* form0, menu_cx* gm)
 		{
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
-			dps += scroll;
-			dps1 += scroll;
+			glm::ivec3 sc = { scroll,0 };
+			dps += sc;
+			dps1 += sc;
 			uint32_t color = hz::get_themecolor();
+			if (dps1.z == 0)
+			{
+				cairo_as _ss_(cr);
+				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,1000 }, color, 0x80ffffff, 2, 1);
+			}
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
@@ -351,9 +358,10 @@ void show_ui(form_x* form0, menu_cx* gm)
 					rc.x += 300;
 				}
 			}
+			if (dps1.z > 0)
 			{
 				cairo_as _ss_(cr);
-				draw_rect(cr, { dps1,300,1000 }, color, 0x80ffffff, 2, 1);
+				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,1000 }, color, 0x80ffffff, 2, 1);
 			}
 		};
 }
@@ -376,7 +384,7 @@ int main()
 #endif   
 	const char* wtitle = (char*)u8"vcpkg管理工具";
 	auto app = new_app();
-	 
+
 	do_text(fontn, 0, strlen(fontn));
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu

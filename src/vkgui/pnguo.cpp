@@ -22605,9 +22605,17 @@ void plane_cx::bind_scroll_bar(scroll_bar* p, bool v)
 	if (p)
 	{
 		if (v)
+		{
+			if (vertical)
+				delete vertical;
 			vertical = p;
+		}
 		else
+		{
+			if (horizontal)
+				delete horizontal;
 			horizontal = p;
+		}
 		remove_widget(p);
 	}
 }
@@ -23031,9 +23039,14 @@ size_t plane_cx::push_dragpos(const glm::ivec2& pos, const glm::ivec2& size)
 	return ps;
 }
 
-glm::ivec2 plane_cx::get_dragpos(size_t idx)
+glm::ivec3 plane_cx::get_dragpos(size_t idx)
 {
-	return (idx < drags.size()) ? drags[idx].pos : glm::ivec2();
+	return (idx < drags.size()) ? glm::ivec3(drags[idx].pos, drags[idx].z) : glm::ivec3();
+}
+
+drag_v6* plane_cx::get_dragv6(size_t idx)
+{
+	return (idx < drags.size()) ? &drags[idx] : nullptr;
 }
 
 void plane_cx::sortdg()

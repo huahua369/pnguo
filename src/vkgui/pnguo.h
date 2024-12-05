@@ -2009,7 +2009,8 @@ public:
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
 	size_t push_dragpos(const glm::ivec2& pos, const glm::ivec2& size = {});
-	glm::ivec2 get_dragpos(size_t idx);
+	glm::ivec3 get_dragpos(size_t idx);
+	drag_v6* get_dragv6(size_t idx);
 	void sortdg();
 public:
 	gshadow_cx* get_gs();
