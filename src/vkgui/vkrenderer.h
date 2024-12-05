@@ -173,7 +173,7 @@ private:
 };
 
 // todo 创建渲染器
-vkdg_cx* new_vkdg(dev_info_cx* c = 0);
+vkdg_cx* new_vkdg(void* inst, void* phy);
 void free_vkdg(vkdg_cx* p);
 void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale);
 

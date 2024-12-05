@@ -404,7 +404,7 @@ int main()
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 
 
-	vkdg_cx* vkd = new_vkdg(&sdldev);	// 创建vk渲染器 
+	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	//if (vkd1) {
@@ -445,10 +445,10 @@ int main()
 			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
+			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
 			//vkd->load_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
-			vkd->load_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
+			//vkd->load_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
 
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");

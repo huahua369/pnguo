@@ -26091,7 +26091,7 @@ icu_lib_t* get_icu(int v)
 			auto so = loadso(dlln);
 			if (!so0)
 			{
-				dlln0 = "icudt";
+				dlln0 = "icu";
 				so0 = loadso(dlln0);
 			}
 			if (!so)
@@ -26185,7 +26185,203 @@ void init_icu()
 		get_icu(U_ICU_VERSION_MAJOR_NUM);
 }
 
+int32_t dl_icuuc_utf82gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen);
+int32_t dl_icuuc_u162gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen);
+//utf-8,gb2312,ucs4
+//utf-8:  一个英文字母或者是数字占用一个字节，汉字占3个字节
+//gb2312: 一个英文字母或者是数字占用一个字节，汉字占2个字节
+int32_t dl_icuuc_gbk2utf8(char* outbuf, int32_t buflen, const char* instring, int32_t inlen)
+{
+	if (!icub)
+		get_icu(U_ICU_VERSION_MAJOR_NUM);
+	int32_t iret = 0;
+	if (icub && outbuf != 0 && instring != 0)
+	{
+		if (icub->_ucnv_convert)
+		{
+			UErrorCode err_code = {};
+			iret = icub->_ucnv_convert("utf-8", "gbk", outbuf, buflen, instring, inlen, &err_code);
+		}
+	}
+	return iret;
+}
+int32_t dl_icuuc_u162gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen)
+{
+	if (!icub)
+		get_icu(U_ICU_VERSION_MAJOR_NUM);
+	int32_t iret = -1;
+	if (icub)
+	{
+		UErrorCode err_code = {};
+		iret = 0;
+		if (outbuf != 0 && instring != 0)
+		{
+			if (icub->_ucnv_convert)
+			{
+				iret = icub->_ucnv_convert("gbk", "utf-16le"
+					, outbuf, buflen
+					, instring, inlen
+					, &err_code);
+			}
+		}
+	}
+	return iret;
+}
+int32_t dl_icuuc_utf82gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen)
+{
+	if (!icub)
+		get_icu(U_ICU_VERSION_MAJOR_NUM);
+	int32_t iret = -1;
+	if (icub)
+	{
+		iret = 0;
+		if (outbuf != 0 && instring != 0)
+		{
+			if (icub->_ucnv_convert)
+			{
+				UErrorCode err_code = {};
+				iret = icub->_ucnv_convert("gbk", "utf-8"
+					, outbuf, buflen
+					, instring, inlen
+					, &err_code);
+			}
+		}
+	}
+	return iret;
+}
+int32_t dl_icuuc_unicode2utf8(char* outbuf, int32_t buflen, const unsigned short* instring, int32_t inlen)
+{
+	if (!icub)
+		get_icu(U_ICU_VERSION_MAJOR_NUM);
+	int32_t iret = -1;
+	if (icub)
+	{
+		iret = 0;
+		UErrorCode err_code = {};
+		if (outbuf != 0 && instring != 0)
+		{
+			if (icub->_ucnv_convert)
+			{
+				iret = icub->_ucnv_convert("utf-8", "utf-16le"
+					, outbuf, buflen
+					, (const char*)instring, inlen * sizeof(unsigned short) / sizeof(char)
+					, &err_code);
+			}
+		}
+	}
+	return iret;
+}
+int32_t dl_icuuc_utf82unicode(unsigned short* outbuf, int32_t buflen, const char* instring, int32_t inlen)
+{
+	if (!icub)
+		get_icu(U_ICU_VERSION_MAJOR_NUM);
+	int32_t iret = -1;
+	if (icub) {
+		iret = 0;
+		UErrorCode err_code = {};
+		if (outbuf != 0 && instring != 0)
+		{
+			if (icub->_ucnv_convert)
+			{
+				iret = icub->_ucnv_convert("utf-16le", "utf-8"
+					, (char*)outbuf, buflen * sizeof(unsigned short) / sizeof(char)
+					, instring, inlen
+					, &err_code);
+			}
+		}
+	}
+	return iret;
+}
 
+std::string icu_gbk_u8(const char* str, size_t size)
+{
+	std::string r;
+	if (str)
+	{
+		if (size == -1)size = strlen(str);
+		if (size > 0)
+		{
+			r.resize(size * 2);
+			auto n = dl_icuuc_gbk2utf8(r.data(), r.size(), str, size);
+			if (n > 0)
+				r.resize(n);
+		}
+	}
+	return r;
+}
+std::string icu_u8_gbk(const char* str, size_t size)
+{
+	std::string r;
+	if (str)
+	{
+		if (size == -1)size = strlen(str);
+		if (size > 0)
+		{
+			r.resize(size);
+			auto n = dl_icuuc_utf82gbk(r.data(), r.size(), str, size);
+			if (n > 0)
+				r.resize(n);
+		}
+	}
+	return r;
+}
+int utf16len(unsigned short* utf16)
+{
+	int utf;
+	int ret = 0;
+	while (utf = *utf16++)
+		ret += ((utf < 0xD800) || (utf > 0xDFFF)) ? 2 : 1;
+	return ret;
+}
+std::string icu_u16_gbk(const void* str, size_t size)
+{
+	std::string r;
+	if (str)
+	{
+		if (size == -1)size = utf16len((uint16_t*)str);
+		if (size > 0)
+		{
+			r.resize(size);
+			auto n = dl_icuuc_u162gbk(r.data(), r.size(), (char*)str, size);
+			if (n > 0)
+				r.resize(n);
+		}
+	}
+	return r;
+}
+std::string icu_u16_u8(const void* str, size_t size)
+{
+	std::string r;
+	if (str)
+	{
+		if (size == -1)size = utf16len((uint16_t*)str);
+		if (size > 0)
+		{
+			r.resize(size);
+			auto n = dl_icuuc_unicode2utf8(r.data(), r.size(), (uint16_t*)str, size);
+			if (n > 0)
+				r.resize(n);
+		}
+	}
+	return r;
+}
+
+std::u16string icu_u8_u16(const char* str, size_t size)
+{
+	std::u16string r;
+	if (str)
+	{
+		if (size == -1)size = strlen(str);
+		if (size > 0)
+		{
+			r.resize(size);
+			auto n = dl_icuuc_utf82unicode((uint16_t*)r.data(), r.size(), str, size);
+			if (n > 0)
+				r.resize(n);
+		}
+	}
+	return r;
+}
 
 
 struct ScriptRecord

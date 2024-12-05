@@ -2437,6 +2437,12 @@ std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::strin
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 
 
+std::string icu_u16_gbk(const void* str, size_t size);
+std::string icu_gbk_u8(const char* str, size_t size);
+std::string icu_u8_gbk(const char* str, size_t size);
+std::string icu_u16_u8(const void* str, size_t size);
+std::u16string icu_u8_u16(const char* str, size_t size);
+
 void do_text(const char* str, size_t first, size_t count);
 
 

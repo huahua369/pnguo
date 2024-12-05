@@ -12530,7 +12530,7 @@ namespace vkr {
 	public:
 		virtual ~Includer() {}
 
-		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* ppData, UINT* pBytes)
+		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID * ppData, UINT * pBytes)
 		{
 			std::string fullpath = GetShaderCompilerLibDir() + pFileName;
 			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
@@ -12544,7 +12544,7 @@ namespace vkr {
 
 	interface IncluderDxc : public IDxcIncludeHandler
 	{
-		IDxcLibrary* m_pLibrary;
+		IDxcLibrary * m_pLibrary;
 	public:
 		IncluderDxc(IDxcLibrary* pLibrary) : m_pLibrary(pLibrary) {}
 		HRESULT QueryInterface(const IID&, void**) { return S_OK; }
@@ -14766,8 +14766,7 @@ namespace vkr {
 		GltfBBoxPass* m_GLTFBBox;
 		GltfDepthPass* m_GLTFDepth;
 		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
-
-
+		bool shadowMap = false;
 	};
 	// todo cmdlr
 	class CommandListRing
@@ -14810,7 +14809,8 @@ namespace vkr {
 			, fMagnificationAmount(6.0f)
 			, fMagnifierScreenRadius(0.35f)
 			, iMagnifierOffset{ 500, -500 }
-		{}
+		{
+		}
 
 		uint32_t    uImageWidth;
 		uint32_t    uImageHeight;
@@ -17568,6 +17568,14 @@ namespace vkr {
 					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
 					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 					pPerFrame->lodBias = 0.0f;
+					if (!it->shadowMap)
+					{
+						for (size_t i = 0; i < pPerFrame->lightCount; i++)
+						{
+							pPerFrame->lights[i].shadowMapIndex = -1;
+						}
+					}
+
 					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
 					// 更新骨骼矩阵到ubo
 					it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
@@ -19202,8 +19210,11 @@ void BBoxPass::clear()
 	boxs.clear();
 	box_ms.clear();
 }
-vkdg_cx* new_vkdg(dev_info_cx* c)
+vkdg_cx* new_vkdg(void* inst, void* phy)
 {
+	dev_info_cx c[1] = {};
+	c->inst = inst;
+	c->phy = phy;
 	auto p = new vkdg_cx();
 	vkr::Log::InitLogSystem();
 	if (c) {
