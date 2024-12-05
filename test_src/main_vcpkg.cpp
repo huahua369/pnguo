@@ -326,10 +326,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 			//	};
 		}
 	}
+	auto ftff = ft->get_font("Source Han Sans SC", 0);
 	if (k.size())
 		ftns.push_back(k);
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
+			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
 			glm::ivec3 sc = { scroll,0 };

@@ -19194,6 +19194,12 @@ font_t* font_rctx::get_mk(fontns& v, size_t st)
 				current = it;
 			}
 		}
+		if (!r && pv.size() && pv[0]->_style == "Regular" && stn == "Normal") {
+			r = pv[0];
+			r->ctx = &bcc;
+			v.vptr[st] = r;
+			current = r;
+		}
 	}
 	return r;
 }
