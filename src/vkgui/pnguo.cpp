@@ -23322,6 +23322,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 					it.z = 0;
 					if (it.size.x > 0 && it.size.y > 0)
 					{
+						if (dp)continue;
 						glm::vec4 trc = { it.pos + sps,it.size };
 						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 						if (k2.x)

@@ -151,7 +151,7 @@ void vcpkg_cx::push_cmd(const std::string& c)
 	std::lock_guard<std::mutex> lock(_lock);
 	cmds.push(c);
 }
- 
+
 
 void vcpkg_cx::do_cmd()
 {
@@ -172,7 +172,7 @@ void vcpkg_cx::do_cmd()
 		catch (const std::exception& e)
 		{
 			printf("json error:\t%s\n", e.what());
-		} 
+		}
 		printf("%s\n", jstr.c_str());
 		// todo 处理返回结果
 	}
@@ -285,9 +285,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 	}
 
 #endif
-	auto dpx1 = p->push_dragpos(size, { 300,1000 });// 增加一个拖动坐标
+	auto dpx1 = p->push_dragpos(size, { 300,600 });// 增加一个拖动坐标
 	size /= 2;
-	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
+	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
 	p->update_cb = [=](float delta)
 		{
@@ -351,7 +351,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			if (dps1.z == 0)
 			{
 				cairo_as _ss_(cr);
-				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,1000 }, color, 0x80ffffff, 2, 1);
+				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
 			}
 			{
 				cairo_as _ss_(cr);
@@ -364,6 +364,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				st.text_color = -1;
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
 				auto rc2 = rc;
+				draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0236F23, 0x80ffffff, 2, 1);
 				for (auto& str : ftns)
 				{
 					draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
@@ -373,7 +374,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			if (dps1.z > 0)
 			{
 				cairo_as _ss_(cr);
-				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,1000 }, color, 0x80ffffff, 2, 1);
+				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
 			}
 		};
 }
