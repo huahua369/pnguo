@@ -26,6 +26,8 @@ public:
 	std::queue<std::string> cmds;
 	std::mutex _lock;
 	std::string rootdir;// vcpkg根目录
+	njson vlist;
+	njson vsearch;
 public:
 	vcpkg_cx();
 	~vcpkg_cx();
@@ -162,6 +164,16 @@ void vcpkg_cx::do_cmd()
 		}
 		if (c.empty())continue;
 		auto jstr = hz::cmdexe(c, rootdir.empty() ? nullptr : rootdir.c_str());
+		try
+		{
+			njson k = njson::parse(jstr);
+			if (k.size())
+				vlist = k;
+		}
+		catch (const std::exception& e)
+		{
+			printf("json error:\t%s\n", e.what());
+		}
 		printf("%s\n", jstr.c_str());
 		// todo 处理返回结果
 	}
@@ -335,9 +347,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
 			glm::ivec3 sc = { scroll,0 };
-			dps += sc;
-			dps1 += sc;
-			uint32_t color = hz::get_themecolor();
+
+			uint32_t color = 0x80FF7373;// hz::get_themecolor();
 			if (dps1.z == 0)
 			{
 				cairo_as _ss_(cr);

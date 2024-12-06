@@ -23047,7 +23047,9 @@ size_t plane_cx::push_dragpos(const glm::ivec2& pos, const glm::ivec2& size)
 
 glm::ivec3 plane_cx::get_dragpos(size_t idx)
 {
-	return (idx < drags.size()) ? glm::ivec3(drags[idx].pos, drags[idx].z) : glm::ivec3();
+	glm::ivec3 r = (idx < drags.size()) ? glm::ivec3(drags[idx].pos, drags[idx].z) : glm::ivec3();
+	r += glm::ivec3(get_spos(), 0);
+	return r;
 }
 
 drag_v6* plane_cx::get_dragv6(size_t idx)
@@ -23320,7 +23322,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 					it.z = 0;
 					if (it.size.x > 0 && it.size.y > 0)
 					{
-						glm::vec4 trc = { it.pos,it.size };
+						glm::vec4 trc = { it.pos + sps,it.size };
 						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 						if (k2.x)
 						{
