@@ -151,8 +151,7 @@ void vcpkg_cx::push_cmd(const std::string& c)
 	std::lock_guard<std::mutex> lock(_lock);
 	cmds.push(c);
 }
-
-
+ 
 
 void vcpkg_cx::do_cmd()
 {
@@ -173,7 +172,7 @@ void vcpkg_cx::do_cmd()
 		catch (const std::exception& e)
 		{
 			printf("json error:\t%s\n", e.what());
-		}
+		} 
 		printf("%s\n", jstr.c_str());
 		// todo 处理返回结果
 	}

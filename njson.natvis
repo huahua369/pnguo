@@ -1,62 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="nlohmann::basic_json&lt;*,*&gt;">
-    <Intrinsic Optional="true" Name="o_size" Expression="m_value.object-&gt;_Mypair._Myval2._Myval2._Mysize"/>
-    <Intrinsic Optional="true" Name="a_size" Expression="m_value.array-&gt;size()"/>
-    <DisplayString Condition="m_type==1">{{ size={o_size()} type={m_type} }}</DisplayString>
-    <DisplayString Condition="m_type==2">{{ size={a_size()} type={m_type} }}</DisplayString>
-    <DisplayString Condition="m_type==3">{*m_value.string}</DisplayString>
-    <DisplayString Condition="m_type==4">{m_value.boolean}</DisplayString>
-    <DisplayString Condition="m_type==5">{m_value.number_integer}</DisplayString>
-    <DisplayString Condition="m_type==6">{m_value.number_unsigned}</DisplayString>
-    <DisplayString Condition="m_type==7">{m_value.number_float}</DisplayString>
-    <Expand>
-      <Item Name="typea">m_type</Item>
-      <Item Name="value" Condition="m_type==3">*m_value.string</Item>
-      <TreeItems Condition="m_type==1">
-        <Size>o_size()</Size>
-        <HeadPointer>m_value.object-&gt;_Mypair._Myval2._Myval2._Myhead-&gt;_Parent</HeadPointer>
-        <LeftPointer>_Left</LeftPointer>
-        <RightPointer>_Right</RightPointer>
-        <ValueNode Condition="_Isnil == 0">_Myval</ValueNode>
-      </TreeItems>
-      <ArrayItems Condition="m_type==2">
-        <Size>a_size()</Size>
-        <ValuePointer>m_value.array-&gt;_Mypair._Myval2._Myfirst</ValuePointer>
-      </ArrayItems>
-    </Expand>
-  </Type>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010"> 
+	<Type Name="nlohmann::json_abi_v3_11_3::basic_json&lt;*&gt;">
+		<Intrinsic Optional="true" Name="o_size" Expression="m_data.m_value.object-&gt;_Mypair._Myval2._Myval2._Mysize"/>
+		<Intrinsic Optional="true" Name="a_size" Expression="m_data.m_value.array-&gt;size()"/>
+		<DisplayString Condition="m_data.m_type==1">{{ size={o_size()} type={m_data.m_type} }}</DisplayString>
+		<DisplayString Condition="m_data.m_type==2">{{ size={a_size()} type={m_data.m_type} }}</DisplayString>
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::null">null</DisplayString> 
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::string">{*(m_data.m_value.string)}</DisplayString>
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::boolean">{m_data.m_value.boolean}</DisplayString>
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::number_integer">{m_data.m_value.number_integer}</DisplayString>
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::number_unsigned">{m_data.m_value.number_unsigned}</DisplayString>
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::number_float">{m_data.m_value.number_float}</DisplayString>
+		<DisplayString Condition="m_data.m_type == nlohmann::json_abi_v3_11_3::detail::value_t::discarded">discarded</DisplayString>
+		<Expand>
+			<Item Name="type">m_data.m_type</Item>
+			<Item Name="value" Condition="m_data.m_type==3">*m_data.m_value.string</Item>
+			<TreeItems Condition="m_data.m_type==1">
+				<Size>o_size()</Size>
+				<HeadPointer>m_data.m_value.object-&gt;_Mypair._Myval2._Myval2._Myhead-&gt;_Parent</HeadPointer>
+				<LeftPointer>_Left</LeftPointer>
+				<RightPointer>_Right</RightPointer>
+				<ValueNode Condition="_Isnil == 0">_Myval</ValueNode>
+			</TreeItems>
+			<ArrayItems Condition="m_data.m_type==2">
+				<Size>a_size()</Size>
+				<ValuePointer>m_data.m_value.array-&gt;_Mypair._Myval2._Myfirst</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type> 
 
-  <Type Name="njson">
-    <DisplayString Condition="m_type==1">{{ size={m_value.object-&gt;_M_t._M_impl._M_node_count} type={m_type} }}</DisplayString>
-    <DisplayString Condition="m_type==3">{*m_value.string}</DisplayString>
-    <DisplayString Condition="m_type==4">{m_value.boolean}</DisplayString>
-    <DisplayString Condition="m_type==5">{m_value.number_integer}</DisplayString>
-    <DisplayString Condition="m_type==6">{m_value.number_unsigned}</DisplayString>
-    <DisplayString Condition="m_type==7">{m_value.number_float}</DisplayString>
-    <Expand>
-      <Item Name="ntype">m_type</Item>
-      <Item Name="value" Condition="m_type==1">*m_value.object</Item>
-      <Item Name="value" Condition="m_type==3">*m_value.string</Item>
-    </Expand>
-  </Type>
+	<Type Name="hz::aqueue&lt;*&gt;">
+		<Intrinsic Optional="true" Name="size" Expression="_size"/>
+		<DisplayString>{{ size={size()} }}</DisplayString>
+		<Expand>
+			<LinkedListItems>
+				<Size>size()</Size>
+				<HeadPointer>_head[0]</HeadPointer>
+				<NextPointer>[1]</NextPointer>
+				<ValueNode>_data</ValueNode>
+			</LinkedListItems>
+		</Expand>
+	</Type>
 
-  <Type Name="hz::aqueue&lt;*&gt;">
-    <Intrinsic Optional="true" Name="size" Expression="_size"/>
-    <DisplayString>{{ size={size()} }}</DisplayString>
-    <Expand>
-      <LinkedListItems>
-        <Size>size()</Size>
-        <HeadPointer>_head[0]</HeadPointer>
-        <NextPointer>[1]</NextPointer>
-        <ValueNode>_data</ValueNode>
-      </LinkedListItems>
-    </Expand>
-  </Type>
-
-  <Type Name="hz::aqueue::node_tf&lt;*&gt;">
-    <AlternativeType Name="std::_List_const_iterator&lt;*&gt;" />
-    <SmartPointer Usage="Minimal">&amp;_Ptr-&gt;_Myval,na</SmartPointer>
-  </Type>
+	<Type Name="hz::aqueue::node_tf&lt;*&gt;">
+		<AlternativeType Name="std::_List_const_iterator&lt;*&gt;" />
+		<SmartPointer Usage="Minimal">&amp;_Ptr-&gt;_Myval,na</SmartPointer>
+	</Type>
 </AutoVisualizer>

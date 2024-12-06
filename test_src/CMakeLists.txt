@@ -32,6 +32,7 @@ list(APPEND src_vcpkg_gui
     "ecc_sv.cpp"
     "mshell.cpp"
     "../rc/resource1.rc"
+    "../njson.natvis"
 ) 
 
 
