@@ -184,6 +184,7 @@ struct device_info_t
 };
 std::vector<device_info_t> get_devices(void* inst);
 
+void get_queue_info(void* physicaldevice);
 
 
 namespace vkr {

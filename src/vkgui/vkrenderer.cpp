@@ -19320,3 +19320,15 @@ std::vector<device_info_t> get_devices(void* inst)
 	}
 	return r;
 }
+
+void get_queue_info(void* physicaldevice)
+{
+	uint32_t queue_family_count = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)physicaldevice, &queue_family_count, NULL);
+	assert(queue_family_count >= 1);
+
+	std::vector<VkQueueFamilyProperties> queue_props;
+	queue_props.resize(queue_family_count);
+	vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)physicaldevice, &queue_family_count, queue_props.data());
+	assert(queue_family_count >= 1);
+}
