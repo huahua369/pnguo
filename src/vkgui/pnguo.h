@@ -542,7 +542,7 @@ public:
 	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv);
 public:
 	// 获取字符大小
-	glm::ivec4 get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks);
+	glm::ivec4 get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks, font_t** oft);
 	void clear_char_lut();
 	void clear_gcache();
 	// todo 获取文字渲染信息。glyph_index=-1时则用unicode_codepoint；

@@ -10006,7 +10006,7 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	int x = 0;
 	int y = 0;
 	int n = 1;
-	auto h = get_lineheight(idx, fontsize);
+	int lineheight = 0;// get_lineheight(idx, fontsize);
 	do
 	{
 		if (!str || !(*str)) { break; }
@@ -10019,7 +10019,10 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 			n++;
 			continue;
 		}
-		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx]);
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
+		lineheight = std::max((int)(oft->ascender * scale), lineheight);
 		x += rc.z;
 		y = std::max(rc.y, y);
 		ret.y = std::max(ret.y, y);
@@ -10027,7 +10030,7 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	} while (str && *str);
 	ret.x = std::max(ret.x, x);
 	if (n > 1)
-		ret.y = h * n;
+		ret.y = lineheight * n;
 	else
 		ret.y = fontsize;
 	return ret;
@@ -12276,9 +12279,9 @@ class layout_px
 {
 public:
 	PangoLayout* layout = 0, * fgp = 0;
-	glm::vec4 extents;
-	PangoRectangle r0, r1;
-	int y;
+	glm::vec4 extents = {};
+	PangoRectangle r0 = {}, r1 = {};
+	int y = 0;
 	layout_px();
 	~layout_px();
 	void draw(cairo_t* cr) {
@@ -16035,7 +16038,7 @@ tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int
 
 // todo 获取字符大小
 
-glm::ivec4 font_t::get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks)
+glm::ivec4 font_t::get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks, font_t** oft)
 {
 	ft_char_s cs;
 	cs.v.font_dpi = 0;// font_dpi;
@@ -16055,6 +16058,7 @@ glm::ivec4 font_t::get_char_extent(char32_t ch, unsigned char font_size, /*unsig
 	auto g = get_glyph_index(ch, &rfont, fallbacks);
 	if (g)
 	{
+		if (oft)*oft = rfont;
 		double fns = font_size;// round((double)font_size * font_dpi / 72.0);
 		double scale = rfont->get_scale(fns);
 		int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
