@@ -541,7 +541,7 @@ public:
 	glm::ivec2 get_shape_box(uint32_t ch, int height);
 	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv);
 public:
-	// 获取字符大小
+	// 获取字符大小{xy大小，z=advance,w=基线}
 	glm::ivec4 get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks, font_t** oft);
 	void clear_char_lut();
 	void clear_gcache();

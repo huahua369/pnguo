@@ -7101,7 +7101,7 @@ namespace vkr
 		view_info.subresourceRange.layerCount = 1;
 		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
-		if (m_format == VK_FORMAT_D16_UNORM_S8_UINT || m_format == VK_FORMAT_D24_UNORM_S8_UINT || m_format == VK_FORMAT_D32_SFLOAT_S8_UINT)
+		if (is_depth_tex(m_format))// == VK_FORMAT_D16_UNORM_S8_UINT || m_format == VK_FORMAT_D24_UNORM_S8_UINT || m_format == VK_FORMAT_D32_SFLOAT_S8_UINT)
 		{
 			view_info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
@@ -16141,7 +16141,7 @@ namespace vkr {
 		size_t as = width * height * 4, align = 512;
 		as = alignUp(as, align);
 		staging.initBuffer(_dev, as ? as : _alloc_size);
-		VkImageAspectFlags    aspectMask = (VkImageAspectFlags)(_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+		VkImageAspectFlags    aspectMask = (VkImageAspectFlags)(is_depth_tex((VkFormat)_format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
 		VkBufferImageCopy bufferCopyRegion = {};
 		bufferCopyRegion.imageSubresource.aspectMask = aspectMask;
 		bufferCopyRegion.imageSubresource.mipLevel = 0;
@@ -16167,7 +16167,7 @@ namespace vkr {
 	{
 		size_t as = width * height * 4, align = 512;
 		as = alignUp(as, align);
-		VkImageAspectFlags    aspectMask = (VkImageAspectFlags)(_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+		VkImageAspectFlags    aspectMask = (VkImageAspectFlags)(is_depth_tex((VkFormat)_format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
 		VkImageCopy cr = {};
 		cr.dstOffset = {};
 		cr.dstSubresource.aspectMask = aspectMask;
@@ -16500,8 +16500,8 @@ namespace vkr {
 
 		Device* _dev = nullptr;
 		VkClearValue clearValues[2] = {};
-		// VK_FORMAT_B8G8R8A8_UNORM, 浮点纹理 VK_FORMAT_R32G32B32A32_SFLOAT;
-		VkFormat depthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT, colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+		// VK_FORMAT_B8G8R8A8_UNORM, 浮点纹理 VK_FORMAT_R32G32B32A32_SFLOAT;//如果要模板则depthFormat用VK_FORMAT_D32_SFLOAT_S8_UINT
+		VkFormat depthFormat = VK_FORMAT_D32_SFLOAT, colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 		bool isColor = false;	//渲染到纹理则为true
 
 		int cmdcount = 0;
@@ -16531,9 +16531,12 @@ namespace vkr {
 			clearValues[0].color = { {color[0], color[1], color[2], color[3]} };
 			clearValues[1].depthStencil = { depth, Stencil };
 		}
-
-
-
+#ifndef VKVG_SURFACE_IMGS_REQUIREMENTS
+#define FB_COLOR_FORMAT VK_FORMAT_B8G8R8A8_UNORM
+#define VKVG_SURFACE_IMGS_REQUIREMENTS (VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT|VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT|\
+	VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_BLIT_SRC_BIT)
+#define VKVG_PNG_WRITE_IMG_REQUIREMENTS (VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_BLIT_DST_BIT)
+#endif
 		//swapchainbuffers交换链
 		void initFBO(int width, int height, int count, VkRenderPass rp)
 		{
@@ -16568,7 +16571,25 @@ namespace vkr {
 			samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 			if (!sampler)
 				createSampler(_dev->GetDevice(), &sampler, &samplerinfo);
-
+			//VkFormatProperties phyStencilProps = { 0 }, phyImgProps[2] = {0};
+			////check png blit format
+			//VkFormat pngBlitFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_R8G8B8A8_UNORM };
+			//for (int i = 0; i < 2; i++)
+			//{
+			//	vkGetPhysicalDeviceFormatProperties(_dev->GetPhysicalDevice(), pngBlitFormats[i], &phyImgProps[i]);	
+			//	if ((phyImgProps[i].linearTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
+			//		//dev->pngStagFormat = pngBlitFormats[i];
+			//		//dev->pngStagTiling = VK_IMAGE_TILING_LINEAR;
+			//		//break;
+			//		printf("");
+			//	}
+			//	else if ((phyImgProps[i].optimalTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
+			//		//dev->pngStagFormat = pngBlitFormats[i];
+			//		//dev->pngStagTiling = VK_IMAGE_TILING_OPTIMAL;
+			//		//break;
+			//		printf("");
+			//	}
+			//}
 			// Create num frame buffers
 			resetFramebuffer(width, height);
 		}
