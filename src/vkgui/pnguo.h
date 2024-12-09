@@ -207,7 +207,7 @@ public:
 	bool autofree = 0;
 public:
 	atlas_cx();
-	~atlas_cx();
+	virtual ~atlas_cx();
 	void add(image_rc_t* d, size_t count);
 	void add(image_sliced_t* d, size_t count);
 	void add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color = -1);
@@ -232,7 +232,7 @@ public:
 	std::vector<int> idxs;				// 索引
 public:
 	mesh2d_cx();
-	~mesh2d_cx();
+	virtual ~mesh2d_cx();
 	// 添加相同纹理/裁剪区域则自动合批
 	void add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip);
 private:
@@ -265,7 +265,7 @@ public:
 	bool autofree = 0;
 public:
 	canvas_atlas();
-	~canvas_atlas();
+	virtual ~canvas_atlas();
 	gshadow_cx* new_gs();
 	void add_atlas(atlas_cx* p);	// 添加显示的图集
 	void remove_atlas(atlas_cx* p);	// 删除显示的图集
