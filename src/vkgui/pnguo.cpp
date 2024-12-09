@@ -10657,6 +10657,50 @@ void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, con
 	cairo_line_to(cr, pos.x + tpos[2].x, pos.y + tpos[2].y);
 	cairo_close_path(cr);
 }
+
+//vg_style_t
+	//float* dash = 0;		// 虚线逗号/空格分隔的数字
+	//int dashOffset = 0;
+
+void fill_stroke(cairo_t* cr, vg_style_t* st) {
+	bool stroke = st && st->thickness > 0 && st->color > 0;
+	if (!cr || !st)return;
+	if (st->fill)
+	{
+		set_color(cr, st->fill);
+		if (stroke)
+			cairo_fill_preserve(cr);
+		else
+			cairo_fill(cr);
+	}
+	if (stroke)
+	{
+		cairo_set_line_width(cr, st->thickness);
+		if (st->cap > 0)
+			cairo_set_line_cap(cr, (cairo_line_cap_t)st->cap);
+		if (st->join > 0)
+			cairo_set_line_join(cr, (cairo_line_join_t)st->join);
+		if (st->dash > 0)
+		{
+			double dashes[64] = {};
+			uint64_t x = 1;
+			auto t = dashes;
+			bool c = x & st->dash ? 1 : 0;
+			for (size_t i = 0; i < 64; i++)
+			{
+				auto b = x & st->dash;
+				if (c != b)
+					t++;
+				(*t)++;
+				x = x << 1;
+			} 
+			if (st->num_dashes > 0)
+				cairo_set_dash(cr, dashes, st->num_dashes, st->dash_offset);
+		}
+		set_color(cr, st->color);
+		cairo_stroke(cr);
+	}
+}
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth, bool isbgr) {
 	bool stroke = linewidth > 0 && color;
 	if (fill)
@@ -11943,7 +11987,6 @@ int64_t get_rand64(int64_t f, int64_t s)
 	auto d = gen();
 	return f + d % (s - f + 1);
 }
-
 void destroy_image_data(void* d) {
 	auto p = (uint32_t*)d;
 	if (d)delete[]p;

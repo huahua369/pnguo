@@ -576,7 +576,24 @@ typedef struct _PangoLayout      PangoLayout;
 
 class font_rctx;
 class font_imp;
-
+/*   
+	CAIRO_LINE_CAP_BUTT,0
+    CAIRO_LINE_CAP_ROUND,1
+    CAIRO_LINE_CAP_SQUARE2
+	CAIRO_LINE_JOIN_MITER,0
+	CAIRO_LINE_JOIN_ROUND,1
+	CAIRO_LINE_JOIN_BEVEL2
+	*/
+struct vg_style_t {
+	uint32_t fill = 0;// 填充颜色
+	uint32_t color = 0;		// 线颜色
+	float thickness = 1;	// 线宽
+	int cap = -1, join = -1;
+	int num_dashes = 0;		// 节数量
+	uint64_t dash = 0;		// 位1实线，位0就是空白
+	//float* dash = 0;		// 虚线逗号/空格分隔的数字
+	int dash_offset = 0;
+};
 struct text_layout_t
 {
 	PangoLayout* layout = 0;
@@ -2167,6 +2184,7 @@ void draw_ellipse(cairo_t* cr, const glm::vec2& pos, const glm::vec2& r);
 //	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 //	 spos = 50;		// 尖角点位置0-1，中间就是0.5
 void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+void fill_stroke(cairo_t* cr, vg_style_t* st);
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
 void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness);
 // 渲染索引多段线，索引-1则跳过
@@ -2183,8 +2201,8 @@ enum class eg_e :uint32_t {
 struct rect_b {
 	eg_e type = eg_e::e_rect;
 	uint32_t fill, color; int thickness;
-	glm::vec4 rc;
-	glm::ivec4 r;
+	glm::vec4 rc;	// 坐标，大小
+	glm::ivec4 r;	// 圆角
 };
 struct text_b
 {
@@ -2284,7 +2302,7 @@ int64_t get_rand64(int64_t f, int64_t s);
 	内容store：	数值、文本、简单公式、图片/SVG
 
 */
-
+//vg_style_t
 struct cell_line_style {
 	uint32_t color = 0xffd4d4d4;
 	float thickness = 1;
@@ -2366,6 +2384,11 @@ struct cell_store_pos64
 	cell_store* value = 0;
 	glm::i64vec2 pos = {};			// 64位坐标
 };
+
+
+
+
+
 
 // 表格填充支持的控件类型
 enum class widget_type :uint32_t {

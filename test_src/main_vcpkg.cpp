@@ -351,7 +351,15 @@ void show_ui(form_x* form0, menu_cx* gm)
 			if (dps1.z == 0)
 			{
 				cairo_as _ss_(cr);
-				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
+				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
+				vg_style_t st[1] = {};
+				st->dash = 0xF83E0;
+				st->num_dashes = 3;
+				st->thickness = 1;
+				st->fill = 0x80FF7373;
+				st->color = 0x80ffffff;
+				draw_rectangle(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, 0);
+				fill_stroke(cr, st);
 			}
 			{
 				cairo_as _ss_(cr);
