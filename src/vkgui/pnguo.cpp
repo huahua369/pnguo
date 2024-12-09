@@ -10686,16 +10686,19 @@ void fill_stroke(cairo_t* cr, vg_style_t* st) {
 			uint64_t x = 1;
 			auto t = dashes;
 			bool c = x & st->dash ? 1 : 0;
-			for (size_t i = 0; i < 64; i++)
+			int num_dashes = 0;
+			for (size_t i = 0; i < st->num_bit; i++)
 			{
-				auto b = x & st->dash;
+				bool b = x & st->dash;
 				if (c != b)
-					t++;
+				{
+					t++; num_dashes++; c = b;
+				}
 				(*t)++;
 				x = x << 1;
-			} 
-			if (st->num_dashes > 0)
-				cairo_set_dash(cr, dashes, st->num_dashes, st->dash_offset);
+			}
+			if (num_dashes > 0)
+				cairo_set_dash(cr, dashes, num_dashes, st->dash_offset);
 		}
 		set_color(cr, st->color);
 		cairo_stroke(cr);

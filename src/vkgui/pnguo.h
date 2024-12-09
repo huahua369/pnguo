@@ -576,10 +576,10 @@ typedef struct _PangoLayout      PangoLayout;
 
 class font_rctx;
 class font_imp;
-/*   
+/*
 	CAIRO_LINE_CAP_BUTT,0
-    CAIRO_LINE_CAP_ROUND,1
-    CAIRO_LINE_CAP_SQUARE2
+	CAIRO_LINE_CAP_ROUND,1
+	CAIRO_LINE_CAP_SQUARE2
 	CAIRO_LINE_JOIN_MITER,0
 	CAIRO_LINE_JOIN_ROUND,1
 	CAIRO_LINE_JOIN_BEVEL2
@@ -589,7 +589,7 @@ struct vg_style_t {
 	uint32_t color = 0;		// 线颜色
 	float thickness = 1;	// 线宽
 	int cap = -1, join = -1;
-	int num_dashes = 0;		// 节数量
+	int num_bit = 0;		// 位数量
 	uint64_t dash = 0;		// 位1实线，位0就是空白
 	//float* dash = 0;		// 虚线逗号/空格分隔的数字
 	int dash_offset = 0;
@@ -2303,13 +2303,7 @@ int64_t get_rand64(int64_t f, int64_t s);
 
 */
 //vg_style_t
-struct cell_line_style {
-	uint32_t color = 0xffd4d4d4;
-	float thickness = 1;
-	uint64_t dash = 0;		// 位1实线，位0就是空白
-	//float* dash = 0;		// 虚线逗号/空格分隔的数字
-	//int dashOffset = 0;
-};
+using cell_line_style = vg_style_t;
 // 文本、填充颜色
 struct cell_color_style {
 	uint32_t text_color = 0xff282828;

@@ -289,17 +289,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	size /= 2;
 	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
-	p->update_cb = [=](float delta)
-		{
-			static double kt = 0;
-			kt += delta;
-			if (kt > 0.5)
-			{
-				kt = 0.0;
-				return 1;
-			}
-			return 0;
-		};
+
 	auto ft = p->ltx->ctx;
 	int fc = ft->get_count();						// 获取注册的字体数量
 	const char* get_family(int idx);		// 获取字体名称
@@ -340,6 +330,20 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto ftff = ft->get_font("Source Han Sans SC", 0);
 	if (k.size())
 		ftns.push_back(k);
+	static int stt = 0;
+	p->update_cb = [=](float delta)
+		{
+			static double kt = 0;
+			kt += delta;
+			if (kt > 0.25)
+			{
+				stt++;
+				if (stt > 9)stt = 0;
+				kt = 0.0;
+				return 1;
+			}
+			return 0;
+		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto f = ft->get_font("a", 0);
@@ -348,17 +352,22 @@ void show_ui(form_x* form0, menu_cx* gm)
 			glm::ivec3 sc = { scroll,0 };
 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
+			vg_style_t st[1] = {};
+			st->dash = 0xF83E0;
+			st->num_bit = 20;
+			st->dash_offset = -stt;
+			st->thickness = 1;
+			st->join = 1;
+			st->cap = 1;
+			st->fill = 0x80FF7373;
+			st->color = 0xffffffff;
+			float pad = st->thickness > 1 ? 0.0 : -0.5;
 			if (dps1.z == 0)
 			{
 				cairo_as _ss_(cr);
 				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
-				vg_style_t st[1] = {};
-				st->dash = 0xF83E0;
-				st->num_dashes = 3;
-				st->thickness = 1;
-				st->fill = 0x80FF7373;
-				st->color = 0x80ffffff;
-				draw_rectangle(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, 0);
+
+				draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
 				fill_stroke(cr, st);
 			}
 			{
@@ -382,7 +391,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 			if (dps1.z > 0)
 			{
 				cairo_as _ss_(cr);
-				draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
+				//draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
+				draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
+				fill_stroke(cr, st);
 			}
 		};
 }
