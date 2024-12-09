@@ -2288,40 +2288,23 @@ int64_t get_rand64(int64_t f, int64_t s);
 struct cell_line_style {
 	uint32_t color = 0xffd4d4d4;
 	float thickness = 1;
-	float* dash = 0;		// 虚线逗号/空格分隔的数字
-	int dashOffset = 0;
+	uint64_t dash = 0;		// 位1实线，位0就是空白
+	//float* dash = 0;		// 虚线逗号/空格分隔的数字
+	//int dashOffset = 0;
 };
-// 线样式
-struct cell_line_pos
-{
-	cell_line_style* style = 0;//引用线风格
-	glm::ivec2 first = {};	// 开始格坐标
-	glm::ivec2 second = {};	// 结束格坐标
-};
-struct cell_line_pos64
-{
-	cell_line_style* style = 0;
-	glm::i64vec2 first = {};
-	glm::i64vec2 second = {};
-};
-// 单元格填充颜色
-struct cell_fill_style {
+// 文本、填充颜色
+struct cell_color_style {
+	uint32_t text_color = 0xff282828;
 	uint32_t color = 0xffffffff;
-	glm::ivec2 first = {};	// 开始格坐标
-	glm::ivec2 second = {};	// 结束格坐标，-1全部
-};
-struct cell_fill_style64 {
-	uint32_t color = 0xffffffff;
-	glm::i64vec2 first = {};
-	glm::i64vec2 second = {};
 };
 // 单元格内容
 struct cell_store
 {
-	int type = 0;		// 0文本，1整数，2浮点数，3公式
+	int type = 0;		// 0文本，1整数，2无符号整数，3浮点数，4公式
 	std::string text;	// 显示文本
 	union {
-		uint64_t iv = 0;
+		int64_t iv;
+		uint64_t uv;
 		double fv;
 		const char* expression;
 	}v = {};
@@ -2334,8 +2317,8 @@ struct format_style {
 };
 // 对齐格式
 struct align_style {
-	glm::vec2 a;	// x水平，y垂直
-	bool autobr = false;// 自动换行
+	glm::vec3 a;	// x水平，y垂直
+	//bool autobr = false;// z自动换行
 };
 //图片/svg
 struct cell_image_store
@@ -2343,6 +2326,32 @@ struct cell_image_store
 	std::string uri;			// uri、base64（图片数据或svg字符串）
 	glm::ivec2 size;			// 指定图片显示大小，0则填充单元格大小，-1则原始大小，其它则缩放数值
 	glm::i64vec2 pos = {};		// 单元格坐标
+};
+
+
+// 线样式
+struct cell_line_pos
+{
+	int style = 0;//线风格
+	glm::ivec2 first = {};	// 开始格坐标
+	glm::ivec2 second = {};	// 结束格坐标
+};
+struct cell_line_pos64
+{
+	int style = 0;
+	glm::i64vec2 first = {};
+	glm::i64vec2 second = {};
+};
+// 单元格 文本、填充颜色
+struct cell_fill_style {
+	int style = 0;
+	glm::ivec2 first = {};	// 开始格坐标
+	glm::ivec2 second = {};	// 结束格坐标，-1全部
+};
+struct cell_fill_style64 {
+	int style = 0;
+	glm::i64vec2 first = {};
+	glm::i64vec2 second = {};
 };
 // 单元格内容坐标
 struct cell_store_pos
