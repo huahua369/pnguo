@@ -1826,6 +1826,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 
 	auto av = &dc->_mesh;
 	auto vd = (SDL_Vertex*)av->vtxs.data();
+	auto vdt = av->vtxs.data();
 	auto idv = av->idxs.data();
 	auto vbs = av->vtxs.size();
 	auto ibs = av->idxs.size();
@@ -1845,7 +1846,20 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 		}
 		//SDL_SetTextureBlendMode(states.texture, states.blendMode);
 		auto tex = (SDL_Texture*)pcmd.texid;
+#if 0
 		SDL_RenderGeometry(renderer, tex, vd + pcmd.vtxOffset, pcmd.vCount, ibs ? idv + pcmd.idxOffset : nullptr, pcmd.elemCount);
+#else
+		auto vertices = vdt + pcmd.vtxOffset;
+		const float* xy = &vertices->position.x;
+		int stride = sizeof(vertex_v2);
+		const SDL_FColor* color = (SDL_FColor*)&vertices->color;
+		const float* uv = &vertices->tex_coord.x;
+		int size_indices = 4;
+		auto indices = ibs ? idv + pcmd.idxOffset : nullptr;
+		auto num_indices = pcmd.elemCount;
+		SDL_RenderGeometryRaw(renderer, tex, xy, stride, color, stride, uv, stride, pcmd.vCount, indices, num_indices, size_indices);
+
+#endif
 	}
 	//SDL_SetRenderViewport(renderer, (SDL_Rect*)0);
 }

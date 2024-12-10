@@ -168,14 +168,15 @@ struct atlas_t
 struct vertex_v2
 {
 	glm::vec2 position = {};		// 坐标	
-	glm::vec4 color = { 1.0,1.0,1.0,1.0 };	// 顶点颜色
 	glm::vec2 tex_coord = {};		// 纹理uv
+	glm::vec4 color = { 1.0,1.0,1.0,1.0 };	// 顶点颜色
 public:
 	vertex_v2();
 	vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c);
 	vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c);
 	vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4  c);
-};
+}; 
+
 
 // 简易stb_image加载
 class stbimage_load :public image_ptr_t

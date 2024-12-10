@@ -15,7 +15,8 @@
 
 #include "mshell.h"
 
-
+#ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#endif
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
@@ -286,12 +287,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 
 #endif
 	int cs[] = { sizeof(glm::vec1),sizeof(glm::vec2),sizeof(glm::vec3),sizeof(glm::ivec3) };
-	//auto a4 = glm::translate(glm::vec3(1.2,0.2,1.3));
-	//auto a40 = glm::translate(glm::vec3(0.2,0.2,1.3));
-	//auto aa = a4 * a40;
-	//glm::vec4 a = glm::vec4(1.0, 2.2, 3.0, 1.0);
-	//auto b = glm::vec4(0.1, .2, .3, 1.0);
-	//auto c = a * b;
+	auto a4 = glm::translate(glm::vec3(1.2,0.2,1.3));
+	auto a40 = glm::translate(glm::vec3(0.2,0.2,1.3));
+	auto aa = a4 * a40;
+	glm::vec4 a = glm::vec4(1.0, 2.2, 3.0, 1.0);
+	auto b = glm::vec4(0.1, .2, .3, 1.0);
+	auto c = a * b;
 	auto dpx1 = p->push_dragpos(size, { 300,600 });// 增加一个拖动坐标
 	size /= 2;
 	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
@@ -342,7 +343,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		{
 			static double kt = 0;
 			kt += delta;
-			if (kt > 0.25)
+			if (kt > 0.2)
 			{
 				stt++;
 				if (stt > 9)stt = 0;

@@ -100,7 +100,7 @@ find_package(SDL3 REQUIRED)
 endif()
 
 add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
-#add_definitions(-DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+add_definitions(-DGLM_FORCE_ALIGNED)
 add_definitions(-DGLM_FORCE_INTRINSICS)
 #add_definitions(-DGLM_FORCE_XYZW_ONLY)
 
