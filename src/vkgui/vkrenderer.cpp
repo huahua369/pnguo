@@ -892,12 +892,21 @@ namespace vkr {
 		std::vector<VkDescriptorBufferInfo> m_VBV;
 	};
 	using glm::vec2;
-	using glm::vec3;
 	using glm::vec4;
 	using glm::mat3;
 	using glm::mat3x4;
 	using glm::mat4;
-
+#ifndef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+	using glm::vec3;
+#else
+	struct vec3 {
+		float x = 0.0f, y = 0.0f, z = 0.0f;
+		vec3() {}
+		vec3(float xx, float yy, float zz) :x(xx), y(yy), z(zz) {}
+		vec3(double xx, double yy, double zz) :x(xx), y(yy), z(zz) {}
+		vec3(const glm::vec3& v) :x(v.x), y(v.y), z(v.z) {}
+	};
+#endif
 	// https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
 #define KHR_TEXTURE_TRANSFORM_EXTENSION_NAME "KHR_texture_transform"
 
@@ -1015,7 +1024,7 @@ namespace vkr {
 		// KHR_materials_emissive_strength
 		float emissiveStrength = 1.0;
 
-		vec3 emissiveFactor = vec3(1.0);
+		vec3 emissiveFactor = glm::vec3(1.0);
 		int   alphaMode;
 
 		float alphaCutoff;
@@ -1026,18 +1035,18 @@ namespace vkr {
 
 		// KHR_materials_pbrSpecularGlossiness
 		vec4 pbrDiffuseFactor = vec4(1.0);
-		vec3 pbrSpecularFactor = vec3(1.0);
+		vec3 pbrSpecularFactor = glm::vec3(1.0);
 		float glossinessFactor = 1.0;
 
 
 		// Specular KHR_materials_specular
-		vec3  specularColorFactor = vec3(1.0);
+		vec3  specularColorFactor = glm::vec3(1.0);
 		float specularFactor = 1.0;
 		// KHR_materials_sheen 
-		vec3 sheenColorFactor = {};
+		vec3 sheenColorFactor = glm::vec3();
 		float sheenRoughnessFactor = 0;
 		// KHR_materials_anisotropy
-		vec3 anisotropy = {};
+		vec3 anisotropy = glm::vec3();
 		// KHR_materials_transmission
 		float transmissionFactor = 0;
 
@@ -1049,7 +1058,7 @@ namespace vkr {
 		//KHR_materials_dispersion
 		float dispersion = 0;
 
-		vec3 attenuationColor = vec3(1.0);
+		vec3 attenuationColor = glm::vec3(1.0);
 		float attenuationDistance = 0;
 
 		// KHR_materials_iridescence
@@ -5286,6 +5295,11 @@ namespace vkr
 	{
 		return v.size() > 0 ? glm::vec4(v[0], v[1], v[2], v.size() > 3 ? v[3] : 0) : d;
 	}
+	template<class T>
+	vec3 tov3(const T& v, const glm::vec3& d)
+	{
+		return v.size() > 0 ? vec3(v[0], v[1], v[2]) : d;
+	}
 
 	void itcb(tinygltf::Value ns, const std::string& k, const std::string& kd, DefineList& m_defines, std::map<std::string, int>& textureIds)
 	{
@@ -5374,7 +5388,7 @@ namespace vkr
 		glm::vec4 zeroes = { 0.0, 0.0, 0.0, 0.0 };
 		tfmat->m_doubleSided = material.doubleSided;
 		tfmat->m_blending = material.alphaMode == "BLEND";
-		tfmat->m_params.emissiveFactor = tov4(material.emissiveFactor, zeroes);
+		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes);
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
 		tfmat->m_defines["DEF_alphaCutoff"] = std::to_string(material.alphaCutoff);
 		tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);

@@ -285,6 +285,13 @@ void show_ui(form_x* form0, menu_cx* gm)
 	}
 
 #endif
+	int cs[] = { sizeof(glm::vec1),sizeof(glm::vec2),sizeof(glm::vec3),sizeof(glm::ivec3)};
+	//auto a4 = glm::translate(glm::vec3(1.2,0.2,1.3));
+	//auto a40 = glm::translate(glm::vec3(0.2,0.2,1.3));
+	//auto aa = a4 * a40;
+	//glm::vec4 a = glm::vec4(1.0, 2.2, 3.0, 1.0);
+	//auto b = glm::vec4(0.1, .2, .3, 1.0);
+	//auto c = a * b;
 	auto dpx1 = p->push_dragpos(size, { 300,600 });// 增加一个拖动坐标
 	size /= 2;
 	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
@@ -349,8 +356,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
-			glm::ivec3 sc = { scroll,0 };
-
+			 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
 			vg_style_t st[1] = {};
 			st->dash = 0xF83E0;
