@@ -285,7 +285,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	}
 
 #endif
-	int cs[] = { sizeof(glm::vec1),sizeof(glm::vec2),sizeof(glm::vec3),sizeof(glm::ivec3)};
+	int cs[] = { sizeof(glm::vec1),sizeof(glm::vec2),sizeof(glm::vec3),sizeof(glm::ivec3) };
 	//auto a4 = glm::translate(glm::vec3(1.2,0.2,1.3));
 	//auto a40 = glm::translate(glm::vec3(0.2,0.2,1.3));
 	//auto aa = a4 * a40;
@@ -351,12 +351,35 @@ void show_ui(form_x* form0, menu_cx* gm)
 			}
 			return 0;
 		};
+	p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
+		{
+			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
+			uint32_t color = 0x80FF7373;// hz::get_themecolor();
+			vg_style_t st[1] = {};
+			st->dash = 0xF83E0;
+			st->num_bit = 20;
+			st->dash_offset = -stt;
+			st->thickness = 1;
+			st->join = 1;
+			st->cap = 1;
+			st->fill = 0x80FF7373;
+			st->color = 0xffffffff;
+			float pad = st->thickness > 1 ? 0.0 : -0.5;
+			//if (dps1.z == 0)
+			{
+				cairo_as _ss_(cr);
+				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
+
+				draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
+				fill_stroke(cr, st);
+			}
+		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
-			 
+
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
 			vg_style_t st[1] = {};
 			st->dash = 0xF83E0;
@@ -373,8 +396,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				cairo_as _ss_(cr);
 				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
 
-				draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
-				fill_stroke(cr, st);
+				//draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
+				//fill_stroke(cr, st);
 			}
 			{
 				cairo_as _ss_(cr);
@@ -398,8 +421,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 				cairo_as _ss_(cr);
 				//draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
-				draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
-				fill_stroke(cr, st);
+				//draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
+				//fill_stroke(cr, st);
 			}
 		};
 }
