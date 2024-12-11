@@ -23343,7 +23343,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			for (auto& it : drags)
 			{
 				if (it.ck > 0)
+				{
 					it.pos = mps - it.tp - ppos;	// 处理拖动坐标
+					it.cp1 = mps - ppos;
+				}
 			}
 		}
 		else {
@@ -23376,9 +23379,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 						glm::vec4 trc = { it.pos + sps,it.size };
 						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 						if (k2.x)
-						{
+						{ 
 							it.tp = mps - it.pos;	// 记录当前拖动坐标
 							it.ck = 1;
+							it.cp1 = it.cp0 = mps;
 							it.z = 1;
 							dp = dp1;
 						}
@@ -23393,6 +23397,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 						it.z = 0;
 						if (it.size.x <= 0 || it.size.y <= 0)
 						{
+							it.cp1 = it.cp0 = mps;
 							it.tp = mps - it.pos;	// 记录当前拖动坐标
 							it.ck = 1;
 						}

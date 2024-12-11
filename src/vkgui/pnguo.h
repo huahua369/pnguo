@@ -175,7 +175,7 @@ public:
 	vertex_v2(glm::vec3 p, glm::vec2 u, uint32_t  c);
 	vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c);
 	vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4  c);
-}; 
+};
 
 
 // 简易stb_image加载
@@ -1927,7 +1927,7 @@ struct drag_v6
 {
 	glm::ivec2 pos;
 	glm::ivec2 size;
-	glm::ivec2 tp;
+	glm::ivec2 tp, cp0, cp1;
 	int ck = 0;
 	int z = 0;
 };

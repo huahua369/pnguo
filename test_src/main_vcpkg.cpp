@@ -287,13 +287,13 @@ void show_ui(form_x* form0, menu_cx* gm)
 
 #endif
 	int cs[] = { sizeof(glm::vec1),sizeof(glm::vec2),sizeof(glm::vec3),sizeof(glm::ivec3) };
-	auto a4 = glm::translate(glm::vec3(1.2,0.2,1.3));
-	auto a40 = glm::translate(glm::vec3(0.2,0.2,1.3));
+	auto a4 = glm::translate(glm::vec3(1.2, 0.2, 1.3));
+	auto a40 = glm::translate(glm::vec3(0.2, 0.2, 1.3));
 	auto aa = a4 * a40;
 	glm::vec4 a = glm::vec4(1.0, 2.2, 3.0, 1.0);
 	auto b = glm::vec4(0.1, .2, .3, 1.0);
 	auto c = a * b;
-	auto dpx1 = p->push_dragpos(size, { 300,600 });// 增加一个拖动坐标
+	auto dpx1 = p->push_dragpos({ 0,0 });// , { 300,600 });// 增加一个拖动坐标
 	size /= 2;
 	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
@@ -343,7 +343,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		{
 			static double kt = 0;
 			kt += delta;
-			if (kt > 0.2)
+			if (kt > 0.052)
 			{
 				stt++;
 				if (stt > 9)stt = 0;
@@ -355,6 +355,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
+			auto v6 = p->get_dragv6(dpx1);
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
 			vg_style_t st[1] = {};
 			st->dash = 0xF83E0;
@@ -371,8 +372,24 @@ void show_ui(form_x* form0, menu_cx* gm)
 				cairo_as _ss_(cr);
 				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
 
-				draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
-				fill_stroke(cr, st);
+				//draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
+				auto pos = v6->cp0;
+				auto pos1 = v6->cp1;
+				auto w = pos1;
+				auto ss = glm::abs(pos - w);
+				if (w.x < pos.x)
+				{
+					pos.x = w.x;
+				}
+				if (w.y < pos.y)
+				{
+					pos.y = w.y;
+				}
+				if (ss.x > 0 && ss.y > 0)
+				{
+					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
+					fill_stroke(cr, st);
+				}
 			}
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
