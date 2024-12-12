@@ -209,6 +209,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 1,30 });
+	p->set_select_box(2, 9, 0.12);
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
 	int width = 16;
@@ -341,56 +342,10 @@ void show_ui(form_x* form0, menu_cx* gm)
 	static int stt = 0;
 	p->update_cb = [=](float delta)
 		{
-			static double kt = 0;
-			kt += delta;
-			if (kt > 0.052)
-			{
-				stt++;
-				if (stt > 9)stt = 0;
-				kt = 0.0;
-				return 1;
-			}
 			return 0;
 		};
 	p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
-			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
-			auto v6 = p->get_dragv6(dpx1);
-			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-			vg_style_t st[1] = {};
-			st->dash = 0xF83E0;
-			st->num_bit = 20;
-			st->dash_offset = -stt;
-			st->thickness = 1;
-			st->join = 1;
-			st->cap = 1;
-			st->fill = 0x80FF7373;
-			st->color = 0xffffffff;
-			float pad = st->thickness > 1 ? 0.0 : -0.5;
-			//if (dps1.z == 0)
-			{
-				cairo_as _ss_(cr);
-				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
-
-				//draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
-				auto pos = v6->cp0;
-				auto pos1 = v6->cp1;
-				auto w = pos1;
-				auto ss = glm::abs(pos - w);
-				if (w.x < pos.x)
-				{
-					pos.x = w.x;
-				}
-				if (w.y < pos.y)
-				{
-					pos.y = w.y;
-				}
-				if (ss.x > 0 && ss.y > 0)
-				{
-					//draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
-					//fill_stroke(cr, st);
-				}
-			}
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{

@@ -22392,11 +22392,12 @@ plane_cx::plane_cx()
 	auto st = &vgs;
 	st->dash = 0xF83E0;
 	st->num_bit = 20;
-	st->thickness = 1;
+	st->thickness = 0;
 	st->join = 1;
 	st->cap = 1;
 	st->fill = 0x80FF7373;
 	st->color = 0xffffffff;
+
 	push_dragpos({ 0,0 });
 }
 
@@ -22411,7 +22412,7 @@ plane_cx::~plane_cx()
 		delete vertical;
 	vertical = 0;
 	for (auto it : widgets) {
-		if (it)delete it;
+		if (it && it->_autofree)delete it;
 	}
 	widgets.clear();
 	if (tv)
@@ -22479,6 +22480,12 @@ void plane_cx::set_size(const glm::ivec2& ss) {
 glm::vec2 plane_cx::get_size()
 {
 	return glm::vec2(tv->size);
+}
+void plane_cx::set_select_box(int w, int c, float s)
+{
+	vgs.thickness = w;
+	vgtms.x = s;
+	vgtms.y = c;
 }
 size_t plane_cx::add_res(const std::string& fn)
 {
@@ -22930,6 +22937,9 @@ void plane_cx::update(float delta)
 			ic++;
 		}
 	}
+	else {
+		vgtms.w = 0;
+	}
 	if (ic > 0 || evupdate > 0)tv->set_draw_update();
 	auto kms = delta * 1000;
 	dms -= kms;
@@ -22969,7 +22979,7 @@ void plane_cx::update(float delta)
 				cairo_as _aa_(cr);
 				draw_front_cb(cr, sps);
 			}
-			{
+			if (vgs.thickness > 0) {
 				auto dps1 = get_dragpos(0);//获取拖动时的坐标
 				auto v6 = get_dragv6(0);
 				auto st = &vgs;

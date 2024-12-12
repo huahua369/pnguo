@@ -1970,7 +1970,7 @@ public:
 	int evupdate = 0;
 	int dms = 16, dmsset = 16;	// 渲染间隔ms
 	vg_style_t vgs = {};
-	glm::vec4 vgtms = { 0.2, 9.0, 0.0, 0.0f };// 间隔时间，最大值，当前时间, 选择框用
+	glm::vec4 vgtms = { 0.2, 0.0, 0.0, 0.0f };// 间隔时间，最大值，当前时间, 选择框用
 	bool _draw_valid = true;
 	bool _hover = false;
 	bool draggable = false;
@@ -1989,6 +1989,8 @@ public:
 	void set_clear_color(uint32_t c);
 	// 线颜色，线粗，圆角，背景色
 	void set_color(const glm::ivec4& c);
+	// 设置选择框范围，时间
+	void set_select_box(int width, int c, float s);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条，pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移
