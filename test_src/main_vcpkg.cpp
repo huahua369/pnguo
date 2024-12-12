@@ -209,7 +209,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 1,30 });
-	p->set_select_box(2, 9, 0.12);
+	p->set_select_box(2, 9, 0.012);
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
 	int width = 16;

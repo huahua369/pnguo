@@ -22925,7 +22925,7 @@ void plane_cx::update(float delta)
 		mk_layout();
 	}
 	ic += ltx->update_text();
-	if (vgtms.x > 0 && vgtms.y > 0)
+	if (_draw_sbox && vgs.thickness > 0 && vgtms.x > 0 && vgtms.y > 0)
 	{
 		auto& kt = vgtms.z;
 		kt += delta;
@@ -22998,7 +22998,8 @@ void plane_cx::update(float delta)
 				{
 					pos.y = w.y;
 				}
-				if (ss.x > 0 && ss.y > 0)
+				_draw_sbox = ss.x > 0 && ss.y > 0;
+				if (_draw_sbox)
 				{
 					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
 					fill_stroke(cr, st);
