@@ -123,7 +123,7 @@ public:
 	void* qupload = 0;
 	std::vector<uint32_t> dt;
 	int width = 0, height = 0;
-	scene_state state = {};
+	scene_state down = {};
 public:
 	vkdg_cx();
 	~vkdg_cx();

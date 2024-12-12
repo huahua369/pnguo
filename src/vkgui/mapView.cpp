@@ -180,7 +180,7 @@ namespace md {
 #define FONS_UTF8_REJECT 12
 #endif // FONS_UTF8_ACCEPT
 
-	uint32_t fons_decutf8(uint32_t* state, uint32_t* codep, uint32_t byte)
+	uint32_t fons_decutf8(uint32_t* down, uint32_t* codep, uint32_t byte)
 	{
 		static const unsigned char utf8d[] = {
 			// The first part of the table maps bytes to character classes that
@@ -205,12 +205,12 @@ namespace md {
 
 		uint32_t type = utf8d[byte];
 
-		*codep = (*state != FONS_UTF8_ACCEPT) ?
+		*codep = (*down != FONS_UTF8_ACCEPT) ?
 			(byte & 0x3fu) | (*codep << 6) :
 			(0xff >> type) & (byte);
 
-		*state = utf8d[256 + *state + type];
-		return *state;
+		*down = utf8d[256 + *down + type];
+		return *down;
 	}
 
 	uint32_t get_u8_idx(const char* str, int64_t idx)

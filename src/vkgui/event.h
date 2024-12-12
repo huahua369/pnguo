@@ -62,7 +62,7 @@ struct mouse_button_et		// 鼠标弹起
 {
 	uint8_t which;
 	uint8_t button;       // The mouse button index 1左，3右，2中
-	uint8_t state;        // ::SDL_PRESSED or ::SDL_RELEASED 
+	uint8_t down;        // ::SDL_PRESSED or ::SDL_RELEASED 
 	uint8_t clicks;       // 1 for single-click, 2 for double-click, etc. 
 	int x, y;
 };
@@ -83,7 +83,7 @@ struct keyboard_et
 	int sym;            // SDL virtual key code - see ::SDL_Keycode for details 
 	int keycode;
 	int16_t kmod;		// Control=1 Shift=2 Alt=4 8Cmd/Super/Windows
-	int8_t state;       // ::SDL_PRESSED or ::SDL_RELEASED 
+	int8_t down;       // ::SDL_PRESSED or ::SDL_RELEASED 
 	int8_t repeat;      // Non-zero if this is a key repeat 
 
 };

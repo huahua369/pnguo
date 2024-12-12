@@ -1268,7 +1268,7 @@ public:
 	void on_event(uint32_t type, et_un_t* ep);
 private:
 	void on_motion(const glm::vec2& pos);
-	void on_button(int idx, int state, const glm::vec2& pos, int clicks);
+	void on_button(int idx, int down, const glm::vec2& pos, int clicks);
 	void on_wheel(double x, double y);
 	void updateRulers();
 	void mkpath();
@@ -1939,8 +1939,8 @@ public:
 	atlas_t* _pat = 0;			// 渲染面板背景
 	form_x* form = 0;			// 绑定的窗口 
 	layout_text_x* ltx = 0;		// 文本渲染管理
-	std::function<void(plane_cx* p, int state, int clicks)> on_click;
-	std::function<void(plane_cx* p, int state, int clicks)> on_click_outer;//模态窗口点中外围时
+	std::function<void(plane_cx* p, int down, int clicks)> on_click;
+	std::function<void(plane_cx* p, int down, int clicks)> on_click_outer;//模态窗口点中外围时
 	std::function<void(cairo_t* cr, const glm::vec2& scroll)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
@@ -2044,7 +2044,7 @@ private:
 	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 	void on_motion(const glm::vec2& pos);
 	// 	idx=1左，3右，2中
-	void on_button(int idx, int state, const glm::vec2& pos, int clicks, int r);
+	void on_button(int idx, int down, const glm::vec2& pos, int clicks, int r);
 	void on_wheel(double x, double y);
 };
 

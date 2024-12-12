@@ -19093,7 +19093,7 @@ void vkdg_cx::update(mouse_state_t* io)
 			io->MouseDelta.y = 0;
 			io->wheel.y = 0;
 		}
-		tx->m_UIState = state;
+		tx->m_UIState = down;
 	}
 }
 

@@ -10540,7 +10540,7 @@ public:
 	void set_view_move(bool is);	// 鼠标移动视图
 	void set_view_scale(bool is);	// 滚轮缩放视图
 	void draw(canvas_dev* c);
-	void on_button(int idx, int state, const glm::vec2& pos, int clicks);
+	void on_button(int idx, int down, const glm::vec2& pos, int clicks);
 	void on_motion(const glm::vec2& ps);
 	void on_wheel(int deltaY);
 	void reset_view();
@@ -12643,26 +12643,26 @@ void tinyviewcanvas_x::draw_back() {
 
 }
 
-void tinyviewcanvas_x::on_button(int idx, int state, const glm::vec2& pos1, int clicks)
+void tinyviewcanvas_x::on_button(int idx, int down, const glm::vec2& pos1, int clicks)
 {
 	auto pos = pos1 - (glm::vec2)vpos;
 	//idx=1左，3右，2中
 	if (idx == 1)
 	{
-		if (state == 1 && ckinc == 0)
+		if (down == 1 && ckinc == 0)
 		{
 			glm::vec2 a3 = mx[2];
 			last_mouse = pos - a3;
 		}
 		ckinc++;
-		if (state == 0)
+		if (down == 0)
 		{
 			ckinc = 0;
 		}
 
 	}
 	else if (idx == 3) {
-		if (state == 0)
+		if (down == 0)
 		{
 			reset_view();
 		}
@@ -13587,9 +13587,9 @@ void view_g::on_motion(const glm::vec2& pos) {
 		update();
 	}
 }
-void view_g::on_button(int idx, int state, const glm::vec2& pos, int clicks) {
+void view_g::on_button(int idx, int down, const glm::vec2& pos, int clicks) {
 	auto ps = pos - rsize;
-	if (state == 0 && is_ck)
+	if (down == 0 && is_ck)
 	{
 		is_ck = false;
 		glm::vec4 trc = { 0,0,rsize };
@@ -13600,11 +13600,11 @@ void view_g::on_button(int idx, int state, const glm::vec2& pos, int clicks) {
 			vcanvas->has_scale = vcanvas->has_move;
 		}
 	}
-	if (state == 1)
+	if (down == 1)
 	{
 		is_ck = true;
 	}
-	vcanvas->on_button(idx, state, pos, clicks);
+	vcanvas->on_button(idx, down, pos, clicks);
 	update();
 	_draw_valid = true;
 }
@@ -13730,7 +13730,7 @@ void view_g::on_event(uint32_t type, et_un_t* ep)
 	{
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y }; mps -= vgpos;
-		on_button(p->button, p->state, mps, p->clicks);
+		on_button(p->button, p->down, mps, p->clicks);
 	}
 	break;
 	case devent_type_e::mouse_wheel_e:
@@ -21567,7 +21567,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			ep->ret = 1;
 			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
 
-			if (p->state == 0 && mdown && isequal && p->button == 1 && p->clicks == 1) //左键单击
+			if (p->down == 0 && mdown && isequal && p->button == 1 && p->clicks == 1) //左键单击
 			{
 				auto bp = ctx->cur_select;
 				if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
@@ -21578,7 +21578,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = cx;
 				ctx->up_cursor(true);
 			}
-			if (p->state)
+			if (p->down)
 			{
 				auto bp = ctx->cur_select;
 				if (ctx->hover_text)
@@ -21607,7 +21607,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			{
 			}
 		}
-		if (!p->state)
+		if (!p->down)
 		{
 			ctx->cur_select = ctx->get_bounds();
 			ctx->ckselect = 1;
@@ -21783,7 +21783,7 @@ int get_cl_count(char* str, int c0, int c1)
 void edit_tl::on_keyboard(et_un_t* ep)
 {
 	auto p = ep->v.k;
-	if (!p->state)
+	if (!p->down)
 	{
 		do {
 			if (!p->kmod & 1)break;
@@ -21834,7 +21834,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 			}
 		} while (0);
 	}
-	if (!p->state || ctx->editingstr.size())
+	if (!p->down || ctx->editingstr.size())
 	{
 		return;
 	}
@@ -22093,7 +22093,7 @@ public:
 	void set_view_move(bool is);	// 鼠标移动视图
 	void set_view_scale(bool is);	// 滚轮缩放视图
 	void set_rss(int r);
-	void on_button(int idx, int state, const glm::vec2& pos, int clicks);
+	void on_button(int idx, int down, const glm::vec2& pos, int clicks);
 	void on_motion(const glm::vec2& ps);
 	void on_wheel(int deltaY);
 	void reset_view();
@@ -22224,26 +22224,26 @@ void tview_x::set_rss(int r)
 
 
 
-void tview_x::on_button(int idx, int state, const glm::vec2& pos1, int clicks)
+void tview_x::on_button(int idx, int down, const glm::vec2& pos1, int clicks)
 {
 	auto pos = pos1 - (glm::vec2)vpos;
 	//idx=1左，3右，2中
 	if (idx == 1)
 	{
-		if (state == 1 && ckinc == 0)
+		if (down == 1 && ckinc == 0)
 		{
 			glm::vec2 a3 = mx[2];
 			last_mouse = pos - a3;
 		}
 		ckinc++;
-		if (state == 0)
+		if (down == 0)
 		{
 			ckinc = 0;
 		}
 
 	}
 	else if (idx == 3) {
-		if (state == 0)
+		if (down == 0)
 		{
 			//reset_view();
 		}
@@ -23210,7 +23210,7 @@ void plane_cx::on_motion(const glm::vec2& pos) {
 	update(0);
 
 }
-void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, int r) {
+void plane_cx::on_button(int idx, int down, const glm::vec2& pos, int clicks, int r) {
 	glm::ivec2 ps = pos;
 	if (idx == 1)
 	{
@@ -23219,17 +23219,17 @@ void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, i
 
 		if (k2.x)
 		{
-			if (draggable && state == 1)
+			if (draggable && down == 1)
 				form_move2end(form, this); // 移动窗口前面
 			if (!r)
 			{
-				if (state == 1 && ckinc == 0)
+				if (down == 1 && ckinc == 0)
 				{
 					curpos = ps - tpos;
 					ckinc++;
 				}
 				if (on_click)
-					on_click(this, state, ckinc);	// 执行单击事件
+					on_click(this, down, ckinc);	// 执行单击事件
 			}
 			ckup = 1;
 		}
@@ -23237,14 +23237,14 @@ void plane_cx::on_button(int idx, int state, const glm::vec2& pos, int clicks, i
 			ckup = 0;
 			_hover = false;
 		}
-		if (state == 0)
+		if (down == 0)
 		{
 			if (ckinc)
 				ckup = 1;
 			ckinc = 0;
 		}
 	}
-	tv->on_button(idx, state, ps - tpos, clicks);
+	tv->on_button(idx, down, ps - tpos, clicks);
 	update(0);
 	_draw_valid = true;
 }
@@ -23265,7 +23265,7 @@ bool on_wpe(widget_base* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
 		if (ep->ret && t == devent_type_e::mouse_button_e)
 		{
 			auto p = e->b;
-			if (p->state == 1)
+			if (p->down == 1)
 				get_input_state(0, 1);
 		}
 	}
@@ -23419,10 +23419,10 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y };
-		on_button(p->button, p->state, mps, p->clicks, ep->ret);
+		on_button(p->button, p->down, mps, p->clicks, ep->ret);
 
 		if (p->button == 1) {
-			if (p->state == 1) {
+			if (p->down == 1) {
 				mps -= ppos;
 				drag_v6* dp = 0;
 
@@ -24231,12 +24231,12 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 		bool isd = wp->cmpos == mps;
 		wp->cmpos = mps;
 		if (wp->bst & (int)BTN_STATE::STATE_HOVER) {
-			if (p->state == 1)
+			if (p->down == 1)
 			{
 				ep->ret = 1;
 			}
 			if (p->button == 1) {
-				if (p->state == 1) {
+				if (p->down == 1) {
 					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
 					wp->curpos = mps - (glm::ivec2)wp->pos;
 					wp->cks = 0;
@@ -24268,7 +24268,7 @@ void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec
 				}
 			}
 		}
-		if (p->state == 0) {
+		if (p->down == 0) {
 			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
 			wp->on_mevent((int)event_type2::mouse_up, mps);

@@ -1315,7 +1315,7 @@ void et2key(const SDL_Event* e, keyboard_et* ekm)
 	ekm->keycode = SDL_GetKeyFromScancode(e->key.scancode, e->key.mod, 1);
 	ekm->scancode = key;      /**< SDL physical key code - see ::SDL_Scancode for details */
 	ekm->mod = e->key.mod;                 /**< current key modifiers */
-	ekm->state = e->key.down;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
+	ekm->down = e->key.down;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
 	ekm->repeat = e->key.repeat;       /**< Non-zero if this is a key repeat */
 	static int64_t ts = 0, ts1 = 0;
 
@@ -1450,17 +1450,17 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		mouse_button_et t = {};
 		t.which = e->button.which;
 		t.button = e->button.button;
-		t.state = e->button.down; //SDL_PRESSED; SDL_RELEASED;
+		t.down = e->button.down; //SDL_PRESSED; SDL_RELEASED;
 		t.clicks = e->button.clicks;
 		t.x = e->button.x;
 		t.y = e->button.y;
-		if (t.state)
+		if (t.down)
 		{
 			pw->hide_child();
 		}
 		//pw->hittest({ t.x,t.y });
 		if (pw->io && !pw->_HitTest) {
-			pw->io->MouseDown[t.button - 1] = t.state;
+			pw->io->MouseDown[t.button - 1] = t.down;
 		}
 		else {
 			pw->io->MouseDown[t.button - 1] = 0;
@@ -1469,7 +1469,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 
 		if (pw && pw->capture_type)
 		{
-			if (t.state)
+			if (t.down)
 			{
 				pw->set_capture();		// 锁定鼠标	
 			}
