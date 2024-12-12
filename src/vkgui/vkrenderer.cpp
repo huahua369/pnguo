@@ -53,9 +53,7 @@ VK_PRESENT_MODE_FIFO_RELAXED_KHR: 该模式与上一个模式略有不同的地�
 VK_PRESENT_MODE_MAILBOX_KHR: 这是第二种模式的变种。当交换链队列满的时候，选择新的替换旧的图像，从而替代阻塞应用程序的情形。这种模式通常用来实现三重缓冲区，与标准的垂直同步双缓冲相比，它可以有效避免延迟带来的撕裂效果。
 */
 #include "pch1.h"
-
 #define USE_VMA
-
 #include <vulkan/vulkan.h>
 #ifdef _WIN32
 #include <vulkan/vulkan_win32.h>
@@ -67,10 +65,8 @@ VK_PRESENT_MODE_MAILBOX_KHR: 这是第二种模式的变种。当交换链队列
 #elif __ANDROID__
 #include <vulkan/vulkan_android.h>
 #endif
-
 #ifndef NOT_VULKAN
 #include <vkh.h>
-
 #ifdef USE_VMA
 //#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>

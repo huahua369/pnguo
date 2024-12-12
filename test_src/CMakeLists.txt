@@ -69,7 +69,7 @@ list(APPEND lklib
    
     harfbuzz::harfbuzz 
     #$<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
-    opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
+    #opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     vkgui
     tpv
     libssh2::libssh2

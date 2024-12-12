@@ -14,6 +14,7 @@
     "exprtk",
     "clipper2",
     "libuv",
+    "libusb",
     "librsvg",
     "entt",
     "opencv"
