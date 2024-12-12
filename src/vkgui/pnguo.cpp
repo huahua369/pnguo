@@ -20779,9 +20779,7 @@ gboolean text_util_get_block_cursor_location(PangoLayout* layout, int index, Pan
 glm::ivec2 get_index2pos(PangoLayout* layout, int idx) {
 	PangoRectangle pos = {};
 	pango_layout_index_to_pos(layout, idx, &pos);
-	auto r = (glm::ivec4*)&pos;
-	*r /= PANGO_SCALE;
-	return *r;
+	return glm::ivec2(pos.x / PANGO_SCALE, pos.y / PANGO_SCALE);
 }
 // 输入行号，索引号，方向，输出行号选择范围
 glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
@@ -20803,21 +20801,18 @@ glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
 		{
 			gboolean rb = text_util_get_block_cursor_location(layout, idx > 0 ? idx : xi, &tpos, &at_line_end);
 			pango_layout_get_cursor_pos(layout, idx > 0 ? idx : xi, &ink_rect, &logical_rect);
-			auto r = (glm::ivec4*)&logical_rect;
-			auto r1 = (glm::ivec4*)&tpos;
-			*r /= PANGO_SCALE;
-			*r1 /= PANGO_SCALE;
-			rt.x = r->x;
-			rt.y = r->y;
+			glm::ivec4 r = { logical_rect.x,logical_rect.y,logical_rect.width,logical_rect.height }, r1 = { tpos.x,tpos.y,tpos.width,tpos.height };
+			r /= PANGO_SCALE;
+			r1 /= PANGO_SCALE;
+			rt.x = r.x;
+			rt.y = r.y;
 			rt.w = h;
 		}
 		if (dir)
 		{
 			pango_layout_get_cursor_pos(layout, xi, &ink_rect, &logical_rect);
-			auto r = (glm::ivec4*)&logical_rect;
-			*r /= PANGO_SCALE;
 			rt.z = rt.x;
-			rt.x = r->x;
+			rt.x = logical_rect.x / PANGO_SCALE;
 		}
 		else {
 			pango_layout_line_get_pixel_extents(line, &ink_rect, &logical_rect);
@@ -20862,10 +20857,11 @@ glm::ivec4 text_ctx_cx::get_cursor_posv(PangoLayout* layout, int idx)
 	std::vector<glm::ivec4> rv;
 	PangoRectangle sw[2] = {};
 	pango_layout_get_cursor_pos(layout, idx, &sw[0], &sw[1]);
-	auto r = (glm::ivec4*)&sw[1];
-	*r /= PANGO_SCALE;
+	auto& w1 = sw[1];
+	glm::ivec4 r = { w1.x,w1.y,w1.width,w1.height };
+	r /= PANGO_SCALE;
 	//r->y = lineheight * ly;
-	return *r;
+	return r;
 }
 
 std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
@@ -20873,8 +20869,12 @@ std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
 	std::vector<glm::ivec4> rv;
 	PangoRectangle sw[2] = {};
 	pango_layout_get_caret_pos(layout, idx, &sw[0], &sw[1]);
-	rv.push_back(*(glm::ivec4*)&sw[0]);
-	rv.push_back(*(glm::ivec4*)&sw[1]);
+	auto& w0 = sw[0];
+	auto& w1 = sw[1];
+	glm::ivec4 r = { w0.x,w0.y,w0.width,w0.height };
+	glm::ivec4 r1 = { w1.x,w1.y,w1.width,w1.height };
+	rv.push_back(r);
+	rv.push_back(r1);
 	for (auto& it : rv) {
 		it /= PANGO_SCALE;
 	}
@@ -20902,10 +20902,13 @@ struct it_rect
 it_rect get_iter(PangoLayoutIter* iter) {
 
 	it_rect ret = {};
-	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&ret.line_rect);
-	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&ret.char_rect);
+	PangoRectangle lr = {}, cr = {};
+	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&lr);
+	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&cr);
 	pango_layout_iter_get_line_yrange(iter, &ret.yr.x, &ret.yr.y);
 	ret.baseline = pango_layout_iter_get_baseline(iter);
+	ret.line_rect = glm::ivec4(lr.x, lr.y, lr.width, lr.height);
+	ret.char_rect = glm::ivec4(cr.x, cr.y, cr.width, cr.height);
 	ret.line_rect /= PANGO_SCALE;
 	ret.char_rect /= PANGO_SCALE;
 	ret.yr /= PANGO_SCALE;
@@ -22386,6 +22389,15 @@ plane_cx::plane_cx()
 {
 	tv = new tview_x();
 	ltx = new layout_text_x();
+	auto st = &vgs;
+	st->dash = 0xF83E0;
+	st->num_bit = 20;
+	st->thickness = 1;
+	st->join = 1;
+	st->cap = 1;
+	st->fill = 0x80FF7373;
+	st->color = 0xffffffff;
+	push_dragpos({ 0,0 });
 }
 
 plane_cx::~plane_cx()
@@ -22906,8 +22918,19 @@ void plane_cx::update(float delta)
 		mk_layout();
 	}
 	ic += ltx->update_text();
+	if (vgtms.x > 0 && vgtms.y > 0)
+	{
+		auto& kt = vgtms.z;
+		kt += delta;
+		if (kt > vgtms.x)
+		{
+			vgtms.w += 1;
+			if (vgtms.w > vgtms.y)vgtms.w = 0;
+			kt = 0.0;
+			ic++;
+		}
+	}
 	if (ic > 0 || evupdate > 0)tv->set_draw_update();
-
 	auto kms = delta * 1000;
 	dms -= kms;
 	if (dms > 0 || kms <= 0)
@@ -22945,6 +22968,31 @@ void plane_cx::update(float delta)
 			{
 				cairo_as _aa_(cr);
 				draw_front_cb(cr, sps);
+			}
+			{
+				auto dps1 = get_dragpos(0);//获取拖动时的坐标
+				auto v6 = get_dragv6(0);
+				auto st = &vgs;
+				st->dash_offset = -vgtms.w;
+				float pad = st->thickness > 1 ? 0.0 : -0.5;
+				cairo_as _ss_(cr);
+				auto pos = v6->cp0;
+				auto pos1 = v6->cp1;
+				auto w = pos1;
+				auto ss = glm::abs(pos - w);
+				if (w.x < pos.x)
+				{
+					pos.x = w.x;
+				}
+				if (w.y < pos.y)
+				{
+					pos.y = w.y;
+				}
+				if (ss.x > 0 && ss.y > 0)
+				{
+					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
+					fill_stroke(cr, st);
+				}
 			}
 			if (horizontal)
 			{
@@ -23379,7 +23427,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 						glm::vec4 trc = { it.pos + sps,it.size };
 						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 						if (k2.x)
-						{ 
+						{
 							it.tp = mps - it.pos;	// 记录当前拖动坐标
 							it.ck = 1;
 							it.cp1 = it.cp0 = mps;
@@ -23394,9 +23442,9 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 					{
 						auto dp1 = *vt;
 						auto& it = *dp1;
-						it.z = 0;
 						if (it.size.x <= 0 || it.size.y <= 0)
 						{
+							it.z = 0;
 							it.cp1 = it.cp0 = mps;
 							it.tp = mps - it.pos;	// 记录当前拖动坐标
 							it.ck = 1;
@@ -23405,6 +23453,16 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 				}
 				else
 				{
+					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+					{
+						auto dp1 = *vt;
+						auto& it = *dp1;
+						if (it.size.x <= 0 || it.size.y <= 0)
+						{
+							it.z = 0;
+							it.cp1 = it.cp0 = mps;
+						}
+					}
 					sortdg();
 				}
 			}

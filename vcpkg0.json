@@ -1,21 +1,22 @@
 {
   "dependencies": [
     "pkgconf",
+    "fontconfig",
+    "harfbuzz",
+    "librsvg",
+    "pango",
+    "cairo",
     "openssl",
     "glm",
     "stb",
     "nlohmann-json",
     "vulkan",
+    "vulkan-memory-allocator",
     "zlib",
-    "pango",
-    "cairo",
-    "fontconfig",
-    "harfbuzz",
     "exprtk",
     "clipper2",
     "libuv",
     "libusb",
-    "librsvg",
     "entt",
     "opencv"
   ]

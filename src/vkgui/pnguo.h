@@ -1969,6 +1969,8 @@ public:
 	int _bst = {};
 	int evupdate = 0;
 	int dms = 16, dmsset = 16;	// 渲染间隔ms
+	vg_style_t vgs = {};
+	glm::vec4 vgtms = { 0.2, 9.0, 0.0, 0.0f };// 间隔时间，最大值，当前时间, 选择框用
 	bool _draw_valid = true;
 	bool _hover = false;
 	bool draggable = false;

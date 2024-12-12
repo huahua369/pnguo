@@ -387,8 +387,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				}
 				if (ss.x > 0 && ss.y > 0)
 				{
-					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
-					fill_stroke(cr, st);
+					//draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
+					//fill_stroke(cr, st);
 				}
 			}
 		};
@@ -463,7 +463,6 @@ int main()
 #endif   
 	const char* wtitle = (char*)u8"vcpkg管理工具";
 	auto app = new_app();
-
 	do_text(fontn, 0, strlen(fontn));
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu
