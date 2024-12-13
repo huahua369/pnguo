@@ -209,7 +209,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 1,30 });
-	p->set_select_box(2, 9, 0.012);
+	p->set_select_box(2, 0.012);
 	p->on_click = [](plane_cx* p, int state, int clicks) {};
 	p->fontsize = 16;
 	int width = 16;
@@ -354,16 +354,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-			vg_style_t st[1] = {};
-			st->dash = 0xF83E0;
-			st->num_bit = 20;
-			st->dash_offset = -stt;
-			st->thickness = 1;
-			st->join = 1;
-			st->cap = 1;
-			st->fill = 0x80FF7373;
-			st->color = 0xffffffff;
-			float pad = st->thickness > 1 ? 0.0 : -0.5;
+
 			if (dps1.z == 0)
 			{
 				cairo_as _ss_(cr);

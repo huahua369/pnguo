@@ -590,11 +590,23 @@ struct vg_style_t {
 	uint32_t color = 0;		// 线颜色
 	float thickness = 1;	// 线宽
 	int cap = -1, join = -1;
-	int num_bit = 0;		// 位数量
-	uint64_t dash = 0;		// 位1实线，位0就是空白
-	//float* dash = 0;		// 虚线逗号/空格分隔的数字
 	int dash_offset = 0;
+	int dash_num = 0;		// 虚线计数 dash最大8、dash_p最大64
+	union {
+		uint64_t v = 0;
+		uint8_t v8[8];
+	}dash = {};		// ink  skip  ink  skip
+	float* dash_p = 0;		// 虚线逗号/空格分隔的数字
 };
+/*	vg_style_t st[1] = {};
+	st->dash = 0xF83E0;//0b11111000001111100000
+	st->dash_num = 20;
+	st->thickness = 1;
+	st->join = 1;
+	st->cap = 1;
+	st->fill = 0x80FF7373;
+	st->color = 0xffffffff;
+	*/
 struct text_layout_t
 {
 	PangoLayout* layout = 0;
@@ -1992,7 +2004,7 @@ public:
 	// 线颜色，线粗，圆角，背景色
 	void set_color(const glm::ivec4& c);
 	// 设置选择框范围，时间
-	void set_select_box(int width, int c, float s);
+	void set_select_box(int width, float s);
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条，pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移

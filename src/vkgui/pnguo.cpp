@@ -10680,22 +10680,27 @@ void fill_stroke(cairo_t* cr, vg_style_t* st) {
 			cairo_set_line_cap(cr, (cairo_line_cap_t)st->cap);
 		if (st->join > 0)
 			cairo_set_line_join(cr, (cairo_line_join_t)st->join);
-		if (st->dash > 0)
+		if (st->dash.v > 0 || st->dash_p)
 		{
 			double dashes[64] = {};
 			uint64_t x = 1;
 			auto t = dashes;
-			bool c = x & st->dash ? 1 : 0;
-			int num_dashes = 0;
-			for (size_t i = 0; i < st->num_bit; i++)
+			int num_dashes = st->dash_num;
+			if (num_dashes > 64)num_dashes = 64;
+			if (st->dash_p)
 			{
-				bool b = x & st->dash;
-				if (c != b)
+				for (size_t i = 0; i < num_dashes; i++)
 				{
-					t++; num_dashes++; c = b;
+					*t = st->dash_p[i]; t++;
 				}
-				(*t)++;
-				x = x << 1;
+			}
+			else
+			{
+				if (num_dashes > 8)num_dashes = 8;
+				for (size_t i = 0; i < num_dashes; i++)
+				{
+					*t = st->dash.v8[i]; t++;
+				}
 			}
 			if (num_dashes > 0)
 				cairo_set_dash(cr, dashes, num_dashes, st->dash_offset);
@@ -22390,13 +22395,14 @@ plane_cx::plane_cx()
 	tv = new tview_x();
 	ltx = new layout_text_x();
 	auto st = &vgs;
-	st->dash = 0xF83E0;
-	st->num_bit = 20;
+	st->dash.v = 0x05050505;
+	st->dash_num = 4;
 	st->thickness = 0;
 	st->join = 1;
 	st->cap = 1;
 	st->fill = 0x80FF7373;
 	st->color = 0xffffffff;
+	vgtms.y = 20;
 
 	push_dragpos({ 0,0 });
 }
@@ -22481,11 +22487,10 @@ glm::vec2 plane_cx::get_size()
 {
 	return glm::vec2(tv->size);
 }
-void plane_cx::set_select_box(int w, int c, float s)
+void plane_cx::set_select_box(int w,  float s)
 {
 	vgs.thickness = w;
 	vgtms.x = s;
-	vgtms.y = c;
 }
 size_t plane_cx::add_res(const std::string& fn)
 {
