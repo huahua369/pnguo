@@ -10857,7 +10857,33 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 	}
 	ltx->draw_text(cr, ltx->tem_rtv, st->text_color);
 }
-
+void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_style_tx* stv, int st_count, glm::ivec4* clip)
+{
+	if (!stv || st_count < 1 || !cr || !ltx || !p || count < 1)return;
+	cairo_as _ss_(cr);
+	if (clip) {
+		glm::vec4 cliprc = *clip;
+		draw_rectangle(cr, cliprc, 0);
+		cairo_clip(cr);
+	}
+	for (size_t i = 0; i < count; i++)
+	{
+		auto& it = p[i];
+		auto idx = it.st_index < st_count ? it.st_index : 0;
+		auto& st = stv[idx];
+		float pad = st.rcst.thickness > 1 ? 0.0 : -0.5;
+		auto ss = it.rc;
+		auto draw_sbox = ss.z > 0 && ss.w > 0;
+		if (draw_sbox)
+		{
+			ss.x += pad; ss.y += pad;
+			auto r = ss.z < st.rcst.round * 2 || ss.w < st.rcst.round * 2 ? 0 : st.rcst.round;
+			draw_rectangle(cr, ss, r);
+			fill_stroke(cr, &st.rcst);
+		}
+		draw_text(cr, ltx, it.txt, it.len, it.trc, &st.st);
+	}
+}
 void draw_ge(cairo_t* cr, void* p, int count)
 {
 	auto t = (char*)p;
@@ -22402,6 +22428,7 @@ plane_cx::plane_cx()
 	st->cap = 1;
 	st->fill = 0x80FF7373;
 	st->color = 0xffffffff;
+	st->round = 6;
 	vgtms.y = 20;
 
 	push_dragpos({ 0,0 });
@@ -22487,7 +22514,7 @@ glm::vec2 plane_cx::get_size()
 {
 	return glm::vec2(tv->size);
 }
-void plane_cx::set_select_box(int w,  float s)
+void plane_cx::set_select_box(int w, float s)
 {
 	vgs.thickness = w;
 	vgtms.x = s;
@@ -23006,7 +23033,7 @@ void plane_cx::update(float delta)
 				_draw_sbox = ss.x > 0 && ss.y > 0;
 				if (_draw_sbox)
 				{
-					auto r = ss.x < vg_round * 2 || ss.y < vg_round * 2 ? 0 : vg_round;
+					auto r = ss.x < st->round * 2 || ss.y < st->round * 2 ? 0 : st->round;
 					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, r);
 					fill_stroke(cr, st);
 				}

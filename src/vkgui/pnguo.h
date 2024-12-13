@@ -589,6 +589,7 @@ struct vg_style_t {
 	uint32_t fill = 0;// 填充颜色
 	uint32_t color = 0;		// 线颜色
 	float thickness = 1;	// 线宽
+	int round = 0;			// 圆角
 	int cap = -1, join = -1;
 	int dash_offset = 0;
 	int dash_num = 0;		// 虚线计数 dash最大8、dash_p最大64
@@ -622,14 +623,26 @@ struct text_layout_t
 struct text_style_t
 {
 	int font = 0;
+	int font_size = 18;
 	glm::vec2 text_align = { 0.0,0.5 };
 	glm::vec2 shadow_pos = { 1.0,1.0 };
-	int font_size = 18;
 	uint32_t text_color = 0xffffffff;
 	uint32_t text_color_shadow = 0;
 	bool clip = true;
 };
 
+struct text_style_tx
+{
+	text_style_t st = {};	// 文本样式
+	vg_style_t rcst = {};	// 背景矩形样式
+};
+struct text_tx
+{
+	glm::ivec4 rc = {}, trc = {};// 背景矩形，文本矩形
+	const char* txt = 0;
+	int len = 0;
+	int st_index = 0;
+};
 
 class font_rctx
 {
@@ -1982,8 +1995,7 @@ public:
 	int evupdate = 0;
 	int dms = 16, dmsset = 16;	// 渲染间隔ms
 	vg_style_t vgs = {};
-	glm::vec4 vgtms = { 0.2, 0.0, 0.0, 0.0f };// 间隔时间，最大值，当前时间, 选择框用
-	int vg_round = 6;
+	glm::vec4 vgtms = { 0.2, 0.0, 0.0, 0.0f };// 间隔时间，最大值，当前时间, 选择框用 
 	bool _draw_sbox = false;
 	bool _draw_valid = true;
 	bool _hover = false;
@@ -2266,6 +2278,8 @@ struct image_b {
 };
 // 图形通用软渲染接口
 void draw_ge(cairo_t* cr, void* p, int count);
+// 批量渲染文本+矩形背景
+void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_style_tx* stv, int st_count, glm::ivec4* clip);
 
 
 cairo_surface_t* new_clip_rect(int r);
