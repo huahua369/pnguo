@@ -1971,6 +1971,7 @@ public:
 	int dms = 16, dmsset = 16;	// 渲染间隔ms
 	vg_style_t vgs = {};
 	glm::vec4 vgtms = { 0.2, 0.0, 0.0, 0.0f };// 间隔时间，最大值，当前时间, 选择框用
+	int vg_round = 6;
 	bool _draw_sbox = false;
 	bool _draw_valid = true;
 	bool _hover = false;

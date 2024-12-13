@@ -23001,7 +23001,8 @@ void plane_cx::update(float delta)
 				_draw_sbox = ss.x > 0 && ss.y > 0;
 				if (_draw_sbox)
 				{
-					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, 0);
+					auto r = ss.x < vg_round * 2 || ss.y < vg_round * 2 ? 0 : vg_round;
+					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, r);
 					fill_stroke(cr, st);
 				}
 			}
