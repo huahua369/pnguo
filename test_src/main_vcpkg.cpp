@@ -210,7 +210,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->set_size(size);
 	p->set_pos({ 1,30 });
 	p->set_select_box(2, 0.012);
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -354,15 +354,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-
-			if (dps1.z == 0)
-			{
-				cairo_as _ss_(cr);
-				//	draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1); 
-
-				//draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
-				//fill_stroke(cr, st);
-			}
+			 
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
@@ -380,14 +372,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 					draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
 					rc.x += 300;
 				}
-			}
-			if (dps1.z > 0)
-			{
-				cairo_as _ss_(cr);
-				//draw_rect(cr, { dps1.x + 0.5,dps1.y + 0.5,300,600 }, color, 0x80ffffff, 2, 1);
-				//draw_rectangle(cr, { dps1.x + pad ,dps1.y + pad ,300,600 }, 0);
-				//fill_stroke(cr, st);
-			}
+			} 
 		};
 }
 

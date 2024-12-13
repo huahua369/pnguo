@@ -1964,8 +1964,8 @@ public:
 	atlas_t* _pat = 0;			// 渲染面板背景
 	form_x* form = 0;			// 绑定的窗口 
 	layout_text_x* ltx = 0;		// 文本渲染管理
-	std::function<void(plane_cx* p, int down, int clicks)> on_click;
-	std::function<void(plane_cx* p, int down, int clicks)> on_click_outer;//模态窗口点中外围时
+	std::function<void(plane_cx* p, int down, int clicks, const glm::ivec2& mpos)> on_click;
+	std::function<void(plane_cx* p, int down, int clicks, const glm::ivec2& mpos)> on_click_outer;//模态窗口点中外围时
 	std::function<void(cairo_t* cr, const glm::vec2& scroll)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;
