@@ -328,12 +328,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 				ftns.push_back(k); k.clear();
 			}
-			k += it.name + "\n";
-			//auto cp = p->add_cbutton(it.name, { 280,30 }, 3);
-			//cp->effect = uTheme::light;
-			//cp->click_cb = [=](void* ptr, int clicks)
-			//	{
-			//	};
+			k += it.name + "\n"; 
 		}
 	}
 	auto ftff = ft->get_font("Source Han Sans SC", 0);
