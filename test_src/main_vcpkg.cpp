@@ -264,9 +264,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	}
 #else
 	for (auto& nt : mname)
-	{
-		//auto cp = p->add_gbutton(nt, { 180,30 }, color);
-		//cp->text_align.x = 0;
+	{ 
 		auto cp = p->add_cbutton(nt, { 180,30 }, 0);
 		cp->effect = uTheme::light;
 		cp->click_cb = [=](void* ptr, int clicks)
