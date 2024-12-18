@@ -17,7 +17,9 @@
 
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #endif
-
+/*
+容器控件：子项渲染、事件处理、数据结构
+*/
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 
@@ -264,7 +266,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	}
 #else
 	for (auto& nt : mname)
-	{ 
+	{
 		auto cp = p->add_cbutton(nt, { 180,30 }, 0);
 		cp->effect = uTheme::light;
 		cp->click_cb = [=](void* ptr, int clicks)
@@ -326,7 +328,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 				ftns.push_back(k); k.clear();
 			}
-			k += it.name + "\n"; 
+			k += it.name + "\n";
 		}
 	}
 	auto ftff = ft->get_font("Source Han Sans SC", 0);
@@ -347,7 +349,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-			 
+
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
@@ -365,10 +367,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 					draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
 					rc.x += 300;
 				}
-			} 
+			}
 		};
 }
-
 
 void test_img() {
 
@@ -396,9 +397,7 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;								// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-
 	auto gm = menu_m(form0);
-
 	show_ui(form0, gm);
 	//show_cpuinfo(form0);
 	// 运行消息循环
