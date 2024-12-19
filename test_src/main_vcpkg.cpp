@@ -14,7 +14,6 @@
 #include <cairo/cairo.h>
 
 #include "mshell.h"
-
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #endif
 /*
