@@ -3385,6 +3385,309 @@ namespace hz {
 		return it != vk_codei.end() ? it->second : "";
 	}
 
+	// DLL动态加载
+	class Shared
+	{
+	private:
+		void* _ptr = 0;
+		std::once_flag oc;
+		bool isinit = false;
+	public:
+		static std::string toLower(const std::string& s)
+		{
+			std::string str;
+			std::transform(s.begin(), s.end(), str.begin(), ::tolower);
+			return str;
+		}
+		static Shared* loadShared1(Shared* ptr, const std::string& fnstr, std::vector<std::string>* pdir = nullptr)
+		{
+#ifdef NDEBUG
+			auto nd = "debug";
+#else
+			auto nd = "release";
+#endif // NDEBUG
+			bool is = ptr->loadFile(fnstr);
+			if (!is && pdir)
+			{
+				for (auto it : *pdir)
+				{
+					auto str = toLower(it);
+					if (str.find(nd) != std::string::npos)
+					{
+						continue;
+					}
+					if ('/' != *it.rbegin() && '\\' != *it.rbegin())
+					{
+						it.push_back('/');
+					}
+					is = ptr->loadFile(it + fnstr);
+					if (is)
+					{
+						break;
+					}
+				}
+			}
+			if (!is)
+			{
+				ptr = nullptr;
+			}
+			return ptr;
+		}
+		static Shared* loadShared(const std::string& fnstr, std::vector<std::string>* pdir = nullptr)
+		{
+#ifdef NDEBUG
+			auto nd = "debug";
+#else
+			auto nd = "release";
+#endif // NDEBUG
+			Shared* ptr = new Shared();
+			bool is = ptr->loadFile(fnstr);
+			if (!is && pdir)
+			{
+				for (auto it : *pdir)
+				{
+					auto nit = toLower(it);
+					if (nit.find(nd) != std::string::npos)
+					{
+						continue;
+					}
+					if ('/' != *it.rbegin() && '\\' != *it.rbegin())
+					{
+						it.push_back('/');
+					}
+					is = ptr->loadFile(it + fnstr);
+					if (is)
+					{
+						break;
+					}
+				}
+			}
+			if (!is)
+			{
+				delete ptr;
+				ptr = nullptr;
+			}
+			if (ptr) {
+
+			}
+			return ptr;
+		}
+		static void destroy(Shared* p)
+		{
+			if (p)
+				delete p;
+		}
+	public:
+		bool loadFile(const std::string& fnstr)
+		{
+#ifdef _WIN32
+#define _DL_OPEN(d) LoadLibraryExA(d,0,LOAD_WITH_ALTERED_SEARCH_PATH)
+			const char* sysdirstr = nullptr;
+			const char* sys64 = nullptr;
+#else
+#define _DL_OPEN(d) dlopen(d,RTLD_NOW)
+			const char* sysdirstr = "/usr/local/lib/";
+			const char* sys64 = "/system/lib64/";
+#endif
+			//std::call_once(oc, [=]() {
+			int inc = 0;
+			std::string dfn = fnstr;
+			std::string errstr;
+			isinit = false;
+			do
+			{
+				_ptr = _DL_OPEN(dfn.c_str());
+				if (_ptr)break;
+#ifndef _WIN32
+				auto er = dlerror();
+				if (er)
+					errstr = er;
+#endif // !_WIN32
+#ifdef __FILE__h__
+				dfn = File::getAP(dfn);
+#endif
+				_ptr = _DL_OPEN(dfn.c_str());
+				if (_ptr)break;
+				if (sysdirstr)
+				{
+					dfn = sysdirstr + fnstr;
+					_ptr = _DL_OPEN(dfn.c_str());
+				}
+				if (_ptr)break;
+				if (sys64)
+				{
+					dfn = sys64 + fnstr;
+					_ptr = _DL_OPEN(dfn.c_str());
+				}
+				if (!_ptr) {
+					errstr = getLastError();
+					printf("Could not load %s dll library!\n", fnstr.c_str());
+				}
+			} while (0);
+
+			if (_ptr)
+			{
+				isinit = true;
+			}
+			return isinit;
+		}
+		void dll_close()
+		{
+			if (_ptr)
+			{
+
+#ifdef _WIN32
+				FreeLibrary((HMODULE)_ptr);
+#else
+				dlclose(_ptr);
+#endif
+				_ptr = 0;
+			}
+		}
+		void* _dlsym(const char* funcname)
+		{
+#if defined(_WIN32)
+#define __dlsym GetProcAddress
+#define LIBPTR HMODULE
+#else
+#define __dlsym dlsym
+#define LIBPTR void*
+#endif
+			void* func = (void*)__dlsym((LIBPTR)_ptr, funcname);
+			if (!func)
+				func = (void*)__dlsym((LIBPTR)_ptr, funcname);
+			return func;
+#undef __dlsym
+#undef LIBPTR
+		}
+
+		// 批量获取
+		void dllsyms(const char** funs, void** outbuf, int n)
+		{
+			for (int i = 0; i < n; i++)
+			{
+				auto fcn = funs[i];
+				if (fcn)
+				{
+					auto it = _dlsym(fcn);
+					if (it)
+					{
+						outbuf[i] = it;
+					}
+				}
+			}
+		}
+		// 批量获取
+
+		void dlsyms(const std::vector<std::string>& funs, void** outbuf)
+		{
+			auto n = funs.size();
+			for (size_t i = 0; i < n; i++)
+			{
+				auto fcn = funs[i];
+				if (fcn.size())
+				{
+					auto it = _dlsym(fcn.c_str());
+					if (it)
+					{
+						outbuf[i] = it;
+					}
+				}
+			}
+		}
+		void dlsyms(const std::vector<const char*>& funs, void** outbuf)
+		{
+			auto n = funs.size();
+			for (size_t i = 0; i < n; i++)
+			{
+				auto fcn = funs[i];
+				if (fcn && *fcn)
+				{
+					auto it = _dlsym(fcn);
+					if (it)
+					{
+						outbuf[i] = it;
+					}
+				}
+			}
+		}
+		template<class T>
+		T get_cb(const std::string& str, T& ot)
+		{
+			T ret = (T)_dlsym(str.c_str());
+			ot = ret;
+			return ret;
+		}
+		template<class T>
+		T get_cb(const std::string& str, T* ot)
+		{
+			T ret = (T)_dlsym(str.c_str());
+			if (ot)
+				*ot = ret;
+			return ret;
+		}
+		template<class T>
+		T get_cb(const std::string& str)
+		{
+			T ret = (T)_dlsym(str.c_str());
+			return ret;
+		}
+		static void* dllsym(void* ptr, const char* fn)
+		{
+			Shared* ctx = (Shared*)ptr;
+			void* ret = nullptr;
+			if (ctx)
+			{
+				ret = ctx->_dlsym(fn);
+			}
+			return ret;
+		}
+		std::string getLastError()
+		{
+			std::string str;
+#ifdef _WIN32
+
+			char* buf = 0;
+			FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buf, 0, NULL);
+			if (buf)
+			{
+				str = buf;
+				LocalFree(buf);
+			}
+#else
+#ifdef errno
+			str = strerror(errno);
+#endif
+#endif // _WIN32
+			return str;
+		}
+	public:
+		Shared()
+		{
+		}
+
+		~Shared()
+		{
+			dll_close();
+		}
+
+	private:
+
+	};
+	void* shared_load(const void* dllpath)
+	{
+		return dllpath ? Shared::loadShared((char*)dllpath, 0) : nullptr;
+	}
+	void shared_destroy(void* p)
+	{
+		Shared::destroy((Shared*)p);
+	}
+
+	void shared_get(void* ptr, const char** funs, void** outbuf, int n) {
+		auto d = (Shared*)ptr;
+		if (d)
+			d->dllsyms(funs, outbuf, n);
+	}
 }
 //!hz
 #endif // _WIN32

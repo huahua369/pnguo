@@ -16,6 +16,63 @@
 #include "mshell.h"
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #endif
+
+extern "C" {
+
+	struct librpspr_lib
+	{
+		void* ptr = 0;
+		// 创建渲染器，类型是rgba，可以提前设置data做缓冲区，uint32数组或uint8
+		int (*new_rp)(int w, int h, int64_t* ret, int bgrtex);
+		// 删除渲染器
+		void (*free_rp)(int64_t p);
+		// 渲染完可以获取渲染的数据，ret的大小要跟渲染器一样
+		int (*get_image)(void* p, uint8_t* ret);
+		int (*rp_clear)(void* p, uint32_t c, double depth);
+		// 新api。以下文件名支持网址、本地文件
+		// 添加spr和对应的调色板文件名，调色板偏移(有的可能要负数)。返回序号draw_spr用
+		int (*add_spr)(void* p, const char* fn, const char* palfn, int pal_pos);
+		// 获取spr帧数
+		int (*get_spr_frame_count)(void* p, int idx);
+		// 保存spr的图片到png文件
+		int (*save_spr2png)(void* p, int idx, const char* fn);
+		// 加载坐骑/附件/足迹光环等，文件名用分号分隔json;png;graypng;pal.bmp顺序不限。坐骑深度信息没有.pal.bmp就拼三种文件名即可
+		int (*add_part)(void* p, const char* uris);
+		int (*set_ride)(void* p, const char* fly, int d, const char* fnm, const char* fntcp);
+		int (*set_addon)(void* p, const char* addons);
+
+		// 渲染顺序排序ride\spr\part\addon
+		int (*draw_ride)(void* p, int frame, int* pos);
+		int (*draw_spr)(void* p, int idx, int frame, int* pos, int z);
+		int (*draw_part)(void* p, int idx, int frame, int* pos, int z);
+		int (*draw_addon_flr)(void* p, int frame, int* pos);
+	};
+}
+void free_rpspr(librpspr_lib* p)
+{
+	if (p)
+	{
+		if (p->ptr)hz::shared_destroy(p->ptr);
+		delete p;
+	}
+}
+librpspr_lib* init_rpsprdll()
+{
+	auto kcdr = hz::shared_load(R"(rpspr.dll)");
+	static const char* ccfn[] = {
+	"new_rp","free_rp","get_image","rp_clear","add_spr","get_spr_frame_count","save_spr2png"
+	,"add_part","set_ride","set_addon","draw_ride","draw_spr","draw_part","draw_addon_flr"
+	};
+	if (kcdr)
+	{
+		auto d = new librpspr_lib();
+		d->ptr = kcdr;
+		hz::shared_get(kcdr, ccfn, (void**)&d->new_rp, sizeof(ccfn) / sizeof(char*));
+		return d;
+	}
+	else { return nullptr; }
+}
+
 /*
 容器控件：子项渲染、事件处理、数据结构
 */
@@ -201,6 +258,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto p = new plane_cx();
 	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
+
+	init_rpsprdll();
+
 	form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
 	p->_lms = { 8,8 };

@@ -72,5 +72,8 @@ namespace hz {
 
 	int vkcode2i(const std::string& vks);
 	std::string vkcode2str(int vk);
+	void* shared_load(const void* dllpath);
+	void shared_destroy(void* p);
+	void shared_get(void* ptr, const char** funs, void** outbuf, int n);
 }
 //!hz
