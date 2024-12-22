@@ -18,59 +18,61 @@
 #endif
 
 extern "C" {
-
-	struct librpspr_lib
-	{
-		void* ptr = 0;
-		// 创建渲染器，类型是rgba，可以提前设置data做缓冲区，uint32数组或uint8
-		int (*new_rp)(int w, int h, int64_t* ret, int bgrtex);
-		// 删除渲染器
-		void (*free_rp)(int64_t p);
-		// 渲染完可以获取渲染的数据，ret的大小要跟渲染器一样
-		int (*get_image)(void* p, uint8_t* ret);
-		int (*rp_clear)(void* p, uint32_t c, double depth);
-		// 新api。以下文件名支持网址、本地文件
-		// 添加spr和对应的调色板文件名，调色板偏移(有的可能要负数)。返回序号draw_spr用
-		int (*add_spr)(void* p, const char* fn, const char* palfn, int pal_pos);
-		// 获取spr帧数
-		int (*get_spr_frame_count)(void* p, int idx);
-		// 保存spr的图片到png文件
-		int (*save_spr2png)(void* p, int idx, const char* fn);
-		// 加载坐骑/附件/足迹光环等，文件名用分号分隔json;png;graypng;pal.bmp顺序不限。坐骑深度信息没有.pal.bmp就拼三种文件名即可
-		int (*add_part)(void* p, const char* uris);
-		int (*set_ride)(void* p, const char* fly, int d, const char* fnm, const char* fntcp);
-		int (*set_addon)(void* p, const char* addons);
-
-		// 渲染顺序排序ride\spr\part\addon
-		int (*draw_ride)(void* p, int frame, int* pos);
-		int (*draw_spr)(void* p, int idx, int frame, int* pos, int z);
-		int (*draw_part)(void* p, int idx, int frame, int* pos, int z);
-		int (*draw_addon_flr)(void* p, int frame, int* pos);
-	};
 }
-void free_rpspr(librpspr_lib* p)
+
+struct librpspr_lib
 {
-	if (p)
-	{
-		if (p->ptr)hz::shared_destroy(p->ptr);
-		delete p;
-	}
+	void* ptr = 0;
+	// 创建渲染器，类型是rgba，可以提前设置data做缓冲区，uint32数组或uint8
+	int (*new_rp)(int w, int h, int64_t* ret, int bgrtex) = 0;
+	// 删除渲染器
+	void (*free_rp)(int64_t p) = 0;
+	// 渲染完可以获取渲染的数据，ret的大小要跟渲染器一样
+	int (*get_image)(void* p, uint8_t* ret) = 0;
+	int (*rp_clear)(void* p, uint32_t c, double depth) = 0;
+	// 新api。以下文件名支持网址、本地文件
+	// 添加spr和对应的调色板文件名，调色板偏移(有的可能要负数)。返回序号draw_spr用
+	int (*add_spr)(void* p, const char* fn, const char* palfn, int pal_pos) = 0;
+	// 获取spr帧数
+	int (*get_spr_frame_count)(void* p, int idx) = 0;
+	// 保存spr的图片到png文件
+	int (*save_spr2png)(void* p, int idx, const char* fn) = 0;
+	// 加载坐骑/附件/足迹光环等，文件名用分号分隔json;png;graypng;pal.bmp顺序不限。坐骑深度信息没有.pal.bmp就拼三种文件名即可
+	int (*add_part)(void* p, const char* uris) = 0;
+	int (*set_ride)(void* p, const char* fly, int d, const char* fnm, const char* fntcp) = 0;
+	int (*set_addon)(void* p, const char* addons) = 0;
+
+	// 渲染顺序排序ride\spr\part\addon
+	int (*draw_ride)(void* p, int frame, int* pos) = 0;
+	int (*draw_spr)(void* p, int idx, int frame, int* pos, int z) = 0;
+	int (*draw_part)(void* p, int idx, int frame, int* pos, int z) = 0;
+	int (*draw_addon_flr)(void* p, int frame, int* pos) = 0;
+public:
+	librpspr_lib();
+	~librpspr_lib();
+	bool load();
+};
+librpspr_lib::librpspr_lib() {
+	load();
 }
-librpspr_lib* init_rpsprdll()
+librpspr_lib::~librpspr_lib() {
+	if (ptr)hz::shared_destroy(ptr);
+	delete ptr; ptr = 0;
+}
+bool librpspr_lib::load()
 {
-	auto kcdr = hz::shared_load(R"(rpspr.dll)");
-	static const char* ccfn[] = {
+	if (ptr)return true;
+	auto k = hz::shared_load(R"(rpspr.dll)");
+	static const char* ccfn[] = { "ptr_null",
 	"new_rp","free_rp","get_image","rp_clear","add_spr","get_spr_frame_count","save_spr2png"
 	,"add_part","set_ride","set_addon","draw_ride","draw_spr","draw_part","draw_addon_flr"
 	};
-	if (kcdr)
+	if (k)
 	{
-		auto d = new librpspr_lib();
-		d->ptr = kcdr;
-		hz::shared_get(kcdr, ccfn, (void**)&d->new_rp, sizeof(ccfn) / sizeof(char*));
-		return d;
+		ptr = k;
+		hz::shared_get(k, ccfn, (void**)&ptr, sizeof(ccfn) / sizeof(char*));
 	}
-	else { return nullptr; }
+	return ptr && new_rp && free_rp;
 }
 
 /*
@@ -259,7 +261,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
 
-	init_rpsprdll();
+	auto sprso = new librpspr_lib();
 
 	form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
