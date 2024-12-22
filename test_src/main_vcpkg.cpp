@@ -17,6 +17,9 @@
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #endif
 
+auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
+auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+
 extern "C" {
 }
 
@@ -47,6 +50,8 @@ struct librpspr_lib
 	int (*draw_spr)(void* p, int idx, int frame, int* pos, int z) = 0;
 	int (*draw_part)(void* p, int idx, int frame, int* pos, int z) = 0;
 	int (*draw_addon_flr)(void* p, int frame, int* pos) = 0;
+	double (*get_max_depth)(void* p) = 0;
+	int (*draw_spr_ps)(void* p, int idx, int frame, int* dst, int z, int ps) = 0;
 public:
 	librpspr_lib();
 	~librpspr_lib();
@@ -65,7 +70,7 @@ bool librpspr_lib::load()
 	auto k = hz::shared_load(R"(rpspr.dll)");
 	static const char* ccfn[] = { "ptr_null",
 	"new_rp","free_rp","get_image","rp_clear","add_spr","get_spr_frame_count","save_spr2png"
-	,"add_part","set_ride","set_addon","draw_ride","draw_spr","draw_part","draw_addon_flr"
+	,"add_part","set_ride","set_addon","draw_ride","draw_spr","draw_part","draw_addon_flr","get_max_depth","draw_spr_ps"
 	};
 	if (k)
 	{
@@ -74,12 +79,205 @@ bool librpspr_lib::load()
 	}
 	return ptr && new_rp && free_rp;
 }
+class dspr_cx
+{
+public:
+	librpspr_lib* so = 0;
+	void* ctx = 0;
+	std::vector<glm::ivec4> sprv;
+	std::vector<uint32_t> imgdata;
+	cairo_surface_t* img = 0;
+
+	// 坐骑的渲染坐标
+	glm::ivec2 ride_pos = {};
+public:
+	dspr_cx();
+	~dspr_cx();
+
+	void init(int w, int h);
+	void add_spr(const std::string& sprfn, const std::string& palbmp, int pal_pos);
+	//不同坐骑可能要设置不同值
+	void set_spr_pos(uint32_t idx, int x, int y, int z = 950000);
+	void set_ride(const std::string& fly, int d, const std::string& addon, const std::string& fnm_dir, const std::string& fntcp_dir);
+	void draw(int i, int x, int y);
+private:
+
+};
+
+dspr_cx::dspr_cx()
+{
+	so = new librpspr_lib();
+}
+
+dspr_cx::~dspr_cx()
+{
+
+}
+
+void dspr_cx::init(int w, int h)
+{
+	bool tex_bgr = 1;
+	so->new_rp(w, h, (int64_t*)&ctx, tex_bgr);
+	glm::ivec2 csize = { w,h };
+	imgdata.resize(w * h);
+	img = new_image_cr(csize, imgdata.data());
+}
+
+//在__init__函数调用 add_spr\set_ride
+void dspr_cx::add_spr(const std::string& sprfn, const std::string& palbmp, int pal_pos)
+{
+	auto w = so->add_spr(ctx, sprfn.c_str(), palbmp.c_str(), pal_pos);
+	sprv.push_back({ 0,0,0,w });
+}
+
+void dspr_cx::set_ride(const std::string& fly, int d, const std::string& addon, const std::string& fnm_dir, const std::string& fntcp_dir)
+{
+	// 动作类型，方向，坐骑深度目录(需要有这三种文件json;png;graypng)，坐骑tcp目录（json;png;graypng;pal.bmp）
+	//so->set_ride(ctx, "stand", 0, R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)", R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)");
+	so->set_ride(ctx, fly.c_str(), d, fnm_dir.c_str(), fntcp_dir.c_str());
+	// 附件，路径和坐骑tcp一样，（json;png;graypng;pal.bmp）保存在addon_f之类文件夹。支持fblr四种要有相应文件夹
+	so->set_addon(ctx, addon.c_str());
+}
+
+void dspr_cx::set_spr_pos(uint32_t idx, int x, int y, int z)
+{
+	if (idx < sprv.size())
+	{
+		sprv[idx].x = x;
+		sprv[idx].y = y;
+		sprv[idx].z = z;
+	}
+}
+
+void dspr_cx::draw(int i, int x, int y)
+{
+	glm::ivec2 pos = { x,y };
+	auto rpos = pos + ride_pos;
+	//渲染调用 
+	so->rp_clear(ctx, 0xff000000, 0.0);
+	so->draw_ride(ctx, i, (int*)&rpos);//写入坐骑原始深度\渲染坐骑和附件b
+	auto maxd = so->get_max_depth(ctx);
+	//渲染角色/装备等
+	static int ps[10] = {};
+	int q = 0;
+	for (auto& it : sprv)
+	{
+		glm::ivec2 sp = it;
+		sp += pos;
+		if (it.w > 0)
+			so->draw_spr_ps(ctx, it.w, i, (int*)&sp, it.z, ps[q]);
+		q++;
+	}
+	auto maxd0 = so->get_max_depth(ctx);
+	// 渲染坐骑挂件
+	so->draw_addon_flr(ctx, i, (int*)&rpos);
+	so->get_image(ctx, (uint8_t*)imgdata.data());
+}
+
+std::string get_temp_path() {
+	std::string str; str.resize(MAX_PATH * 2);
+	auto n = GetTempPathA(str.size(), str.data());
+	if (n > 0)
+		str.resize(n);
+	else
+		str.clear();
+	return str;
+}
+void build_spr_ui(form_x* form0)
+{
+	std::string tp = get_temp_path();
+	auto sp = new dspr_cx();
+	glm::ivec2 csize = { 800,600 };
+	sp->init(csize.x, csize.y);
+
+	//sp->add_spr(R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F3d%2F39086dd49b5305dd3fe299cb7b0977%22%2C%22dir%22%3A0%2C%22eid%22%3A1008%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	//	, R"(https://xyq.gsf.netease.com/static_h5/pal/equip/1008.pal.bmp)", 0);
+	//sp->add_spr(R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F45%2Fbde2321b431fc85f59b0c6170a424d%22%2C%22dir%22%3A0%2C%22eid%22%3A24608%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	//	, R"(https://xyq.gsf.netease.com/static_h5/pal/equip/24608.pal.bmp)", 192);
+	//sp->add_spr(R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F82%2F330a98b0d60d4846a16125d7cdb691%22%2C%22dir%22%3A0%2C%22eid%22%3A16416%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	//	, R"(https://xyq.gsf.netease.com/static_h5/pal/equip/16416.pal.bmp)", 192);
+
+	const void* sprs[] = { R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F45%2Fbde2321b431fc85f59b0c6170a424d%22%2C%22dir%22%3A0%2C%22eid%22%3A24608%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	,R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F82%2F330a98b0d60d4846a16125d7cdb691%22%2C%22dir%22%3A0%2C%22eid%22%3A16416%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	,R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F3d%2F39086dd49b5305dd3fe299cb7b0977%22%2C%22dir%22%3A0%2C%22eid%22%3A1008%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	,R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2Fb1%2F535bc51083a99bc5b936132c6be5f5%22%2C%22dir%22%3A0%2C%22eid%22%3A0%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
+	,R"()"
+	};
+	int palv[] = { 24608, 16416,1008,2, };
+	int palpos[] = { 192, 0,0,0 };
+	for (int i = 0; i < 4; i++) {
+		std::string palurl = R"(https://xyq.gsf.netease.com/static_h5/pal/equip/)";
+		sp->add_spr((char*)sprs[i], palurl + std::to_string(palv[i]) + ".pal.bmp", palpos[i]);
+		sp->set_spr_pos(i, 230, 210, 950000);
+	}
+
+	//sp->add_spr(R"(https://xyq.gsf.netease.com/cloud_hash/ed/f01d07161ea7701046c8a8a7d40ef3.spr)", R"(https://xyq.gsf.netease.com/static_h5/pal/hero/2.pal.bmp)", 0);
+	//sp->add_spr(R"(https://xyq.gsf.netease.com/cloud_hash/fd/d7ea390e1462b6a096cd67b04a0c28.spr)", R"(https://xyq.gsf.netease.com/static_h5/pal/equip/16416.pal.bmp)", 192);
+
+	sp->ride_pos = { 250,280 };
+	sp->set_ride("stand", 0, "flr", R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)", R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)");
+
+	glm::ivec2 size = { 1024,800 };
+	glm::ivec2 cview = { 10240,10240 };
+	auto p = new plane_cx();
+	uint32_t pbc = 0xff2c2c2c;// 背景色
+	p->set_color({ 0x80ff802C,1,5,pbc });
+	p->set_rss(5);
+	p->_lms = { 8,8 };
+	p->add_familys(fontn, 0);
+	p->add_familys(fontn1, 0);
+	p->draggable = false; //可拖动
+	p->fontsize = 16;
+	p->set_size(size);
+	p->set_pos({ 1,30 });
+	//p->set_select_box(2, 0.012);
+	form0->bind(p);	// 绑定到窗口  
+	auto dpx1 = p->push_dragpos({ 0,0 });// , { 300,600 });// 增加一个拖动坐标
+	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
+	p->update_cb = [=](float delta)
+		{
+			static double xt = 0;
+			xt += delta;
+			if (xt > 0.1) { xt = 0; return 1; }
+			return 0;
+		};
+	p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
+		{
+		};
+	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
+		{
+			auto dps = p->get_dragpos(dpx1);//获取拖动时的坐标
+
+			uint32_t color = 0x80FF7373;// hz::get_themecolor();
+
+			{
+				static int ix = 0;
+				sp->draw(ix, 0, 0);
+				ix++;
+				if (ix > 100000)ix = 0;
+				cairo_as _ss_(cr);
+				cairo_translate(cr, dps.x, dps.y);
+				image_b pimg = {};
+				pimg.image = sp->img;
+				pimg.rc = { 0,0,csize };
+				//struct image_b {
+				//	eg_e type = eg_e::e_image;
+				//	void* image; glm::vec2 pos; glm::vec4 rc; uint32_t color = -1; glm::vec2 dsize = { -1,-1 };
+				//	// 九宫格图片
+				//	glm::vec4 sliced = {};
+				//};
+				// 图形通用软渲染接口
+				draw_ge(cr, &pimg, 1);
+
+				//draw_rect(cr, { -2.5,  -2.5,200 + 6,300 + 6 }, 0xf0236F23, 0x80ffffff, 2, 1);
+			}
+		};
+}
+
 
 /*
 容器控件：子项渲染、事件处理、数据结构
 */
-auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
-auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 class vcpkg_cx
 {
 public:
@@ -255,15 +453,15 @@ menu_cx* menu_m(form_x* form0)
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
+
 	glm::ivec2 size = { 1024,800 };
 	glm::ivec2 cview = { 10240,10240 };
 	auto p = new plane_cx();
 	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
-
-	auto sprso = new librpspr_lib();
-
 	form0->bind(p);	// 绑定到窗口  
+
+	build_spr_ui(form0);
 	p->set_rss(5);
 	p->_lms = { 8,8 };
 	p->add_familys(fontn, 0);
