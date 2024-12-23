@@ -1513,7 +1513,9 @@ class edit_tl :public widget_base
 public:
 	text_ctx_cx* ctx = 0;							// 布局/渲染/事件处理
 	std::string _text;								// 保存行文本
+	std::string ipt_text;								// 输入缓存文件
 	std::function<void(edit_tl* ptr)> changed_cb;	// 文本改变时执行回调函数 
+	std::function<void(edit_tl* ptr, std::string& str)> input_cb;	// 文本输入时执行回调函数，可修改此字符串返回
 	bool single_line = false;
 	bool mdown = false;
 	bool _read_only = false;

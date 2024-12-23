@@ -21394,7 +21394,8 @@ void edit_tl::inputchar(const char* str)
 	{
 		return;
 	}
-	std::string sstr = str;
+	ipt_text = str;
+	std::string& sstr = ipt_text;
 	ctx->single_line = single_line;
 	if (single_line)
 	{
@@ -21402,11 +21403,16 @@ void edit_tl::inputchar(const char* str)
 		v.erase(std::remove(v.begin(), v.end(), '\r'), v.end());
 		v.erase(std::remove(v.begin(), v.end(), '\n'), v.end());
 	}
+	if (input_cb)
+		input_cb(this, sstr);
 	_text.insert(ctx->ccursor, sstr);
+	sn = sstr.size();
 	ctx->ccursor += sn;
 	ctx->set_text(_text);
 	ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor;
 	ctx->up_cursor(true);
+	if (changed_cb)
+		changed_cb(this);
 }
 bool edit_tl::remove_bounds()
 {

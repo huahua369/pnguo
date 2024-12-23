@@ -23,6 +23,666 @@ auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 extern "C" {
 }
 
+#if 1
+#include <regex>
+namespace hz {
+	inline bool isse(int ch)
+	{
+		return ch == 0 || (ch > 0 && isspace(ch));
+	}
+	inline static bool is_json(const char* str, size_t len)
+	{
+		bool ret = false;
+		char* te = (char*)str + len - 1;
+		char* t = (char*)str;
+		if (str && len > 1)
+		{
+			do
+			{
+				while (isse(*t))
+				{
+					t++;
+				}
+				if (*t != '[' && *t != '{')
+				{
+					break;
+				}
+				while (isse(*te))
+				{
+					te--;
+				}
+				if ((*t == '[' && *te == ']') || (*t == '{' && *te == '}'))
+				{
+					ret = true;
+				}
+			} while (0);
+		}
+		return ret;
+	}
+#ifndef FCV
+	union u_col
+	{
+		unsigned int uc;
+		unsigned char u[4];
+		struct urgba
+		{
+			unsigned char r, g, b, a;
+		}c;
+	};
+#define FCV 255.0
+#define FCV1 256.0
+	// rgba
+	inline unsigned int to_uint(glm::vec4 col)
+	{
+		u_col t;
+		t.u[0] = col.x * FCV + 0.5;
+		t.u[1] = col.y * FCV + 0.5;
+		t.u[2] = col.z * FCV + 0.5;
+		t.u[3] = col.w * FCV + 0.5;
+		return t.uc;
+	}
+#endif
+	// 去掉头尾空格
+	std::string trim(const std::string& str, const char* pch)
+	{
+		auto s = str;
+		if (s.empty())
+		{
+			return s;
+		}
+		s.erase(0, s.find_first_not_of(pch));
+		s.erase(s.find_last_not_of(pch) + 1);
+		return s;
+	}
+	std::string trim_ch(const std::string& str, const std::string& pch)
+	{
+		std::string r = str;
+		if (pch.size() && str.size())
+		{
+			size_t p1 = 0, p2 = str.size();
+			for (int i = 0; i < str.size(); i++)
+			{
+				auto ch = str[i];
+				if (pch.find(ch) == std::string::npos)
+				{
+					p1 = i;
+					break;
+				}
+			}
+			for (int i = str.size() - 1; i > 0; i--)
+			{
+				auto ch = str[i];
+				if (pch.find(ch) == std::string::npos)
+				{
+					p2 = i + 1;
+					break;
+				}
+			}
+			r = str.substr(p1, (p2 - p1));
+		}
+		return r;
+	}
+	static uint64_t toUInt(const njson& v, uint64_t de = 0)
+	{
+		uint64_t ret = de;
+		if (v.is_number())
+		{
+			ret = v.get<uint64_t>();
+		}
+		else if (!v.is_null())
+		{
+			ret = std::atoll(trim(v.dump(), "\"").c_str());
+		}
+		return ret;
+	}
+	static int64_t toInt(const njson& v, const char* k, int64_t de)
+	{
+		int64_t ret = de;
+		if (v.find(k) == v.end())
+		{
+			return ret;
+		}
+		if (v[k].is_number())
+		{
+			ret = v[k].get<int64_t>();
+		}
+		else if (!v[k].is_null())
+		{
+			ret = std::atoll(trim(v[k].dump(), "\"").c_str());
+		}
+		return ret;
+	}
+	static int64_t toInt(const njson& v, int64_t de = 0)
+	{
+		int64_t ret = de;
+		if (v.is_number())
+		{
+			ret = v.get<int64_t>();
+		}
+		else if (!v.is_null())
+		{
+			ret = std::atoll(trim(v.dump(), "\"").c_str());
+		}
+		return ret;
+	}
+	static double toDouble(const njson& v, double de = 0)
+	{
+		double ret = de;
+		if (v.is_number())
+		{
+			ret = v.get<double>();
+		}
+		else if (!v.is_null())
+		{
+			ret = std::atof(trim(v.dump(), "\"").c_str());
+		}
+		return ret;
+	}
+#define toFloat toDouble
+
+	static bool toBool(const njson& v, bool def = false)
+	{
+		bool ret = def;
+		if (v.is_boolean())
+		{
+			ret = v.get<bool>();
+		}
+		else if (v.is_number())
+		{
+			ret = v.get<int>();
+		}
+		//else
+		//{
+		//	ret = trim(v.dump(), "\"") != "null";
+		//}
+		return ret;
+	}
+	static bool toBool(const njson& v, const char* k, bool def)
+	{
+		bool ret = def;
+		if (v.find(k) != v.end())
+		{
+			auto& t = v[k];
+			if (t.is_boolean())
+			{
+				ret = t.get<bool>();
+			}
+			else if (t.is_number())
+			{
+				ret = t.get<int>();
+			}
+		}
+		//else
+		//{
+		//	ret = trim(v.dump(), "\"") != "null";
+		//}
+		return ret;
+	}
+	static std::string toStr(const njson& v, const char* k, const std::string& des)
+	{
+		std::string ret = des;
+		if (v.find(k) == v.end())
+		{
+			return ret;
+		}
+		if (v[k].is_string())
+		{
+			ret = v[k].get<std::string>();
+		}
+		else
+		{
+			ret = trim(v[k].dump(), "\"");
+		}
+		return ret;
+	}
+	static std::string toStr(const njson& v, const std::string& des = "")
+	{
+		std::string ret = des;
+		if (v.is_null())
+		{
+			//ret = "";
+		}
+		else if (v.is_string())
+		{
+			ret = v.get<std::string>();
+		}
+		else
+		{
+			ret = trim(v.dump(), "\"");
+		}
+		return ret;
+	}
+	static std::string getStr(const njson& v, const std::string& key)
+	{
+		std::string ret;
+		if (v.is_null())
+		{
+			//ret = "";
+		}
+		else if (v.is_string())
+		{
+			ret = v.get<std::string>();
+		}
+		else if (v.is_object() && key != "" && v.find(key) != v.end())
+		{
+			ret = v[key].get<std::string>();
+		}
+		else
+		{
+			ret = trim(v.dump(), "\"");
+		}
+		return ret;
+	}
+	template<class T>
+	static std::vector<T> toVector(const njson& n)
+	{
+		std::vector<T> ret;
+		if (n.is_array())
+		{
+			ret = n.get<std::vector<T>>();
+		}
+		return ret;
+	}
+
+	static std::string toStr(double price)
+	{
+		auto res = /*n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) :*/ std::to_string(price);
+		const std::string format("$1");
+		try {
+			std::regex r("(\\d*)\\.0{6}|");
+			std::regex r2("(\\d*\\.{1}0*[^0]+)0*");
+			res = std::regex_replace(res, r2, format);
+			res = std::regex_replace(res, r, format);
+		}
+		catch (const std::exception& e) {
+			return res;
+		}
+		return res;
+	}
+	static std::string toStr(double price, int n)
+	{
+		auto ret = std::to_string(price);
+		//return n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) : std::to_string(price);
+		if (n > 0)
+		{
+			auto pos = ret.find('.');
+			if (pos != std::string::npos)
+			{
+				auto c = pos + n + 1;
+				if (c < ret.size())
+				{
+					ret.resize(c);
+				}
+			}
+		}
+		return ret;
+	}
+	static std::string toStr(int64_t n)
+	{
+		return std::to_string(n);
+	}
+	static uint64_t toHex(const njson& v, uint64_t d = 0)
+	{
+		uint64_t ret = d;
+		do {
+			if (v.is_string())
+			{
+				std::string buf = md::replace_s(toStr(v), " ", "");
+
+				char* str = 0;
+				//buf.resize(10);
+				if (buf[0] == '#')
+				{
+					buf.erase(buf.begin());
+					int k = buf.size();
+					if (k > 8)
+					{
+						buf.resize(8);
+					}
+					if (k >= 6)
+					{
+						std::swap(*((short*)&buf[0]), *((short*)&buf[4]));
+					}
+					else if (k == 3)
+					{
+						std::string nc;
+						for (auto it : buf)
+						{
+							nc.insert(nc.begin(), { it, it });
+						}
+						buf = nc;
+					}
+					if (buf.size() == 8)
+					{
+						buf = buf.substr(6, 2) + buf.substr(0, 6);
+					}
+					else if (buf.size() == 6)
+					{
+						buf.insert(buf.begin(), { 'f','f' });
+					}
+					buf.insert(buf.begin(), { '0','x' });
+				}
+				int cs = 10;
+				if (buf.find("0x") == 0)
+				{
+					cs = 16;
+				}
+				ret = std::strtoll(buf.c_str(), &str, cs);
+			}
+			else if (v.is_number())
+			{
+				ret = toUInt(v);
+			}
+			else if (v.is_array())
+			{
+				bool isr = false;
+				for (auto& it : v)
+				{
+					if (!it.is_number())
+					{
+						isr = true;
+						break;
+						assert(0);
+					}
+				}
+				if (isr)break;
+				// 1 3 4数量
+				std::vector<double> trv = v;
+				trv.resize(4);
+				if (v.size() < 4)
+				{
+					trv[3] = 1.0;
+					if (v.size() == 1)
+					{
+						trv[1] = trv[2] = trv[0];
+					}
+				}
+				glm::vec4 v1;
+				for (int i = 0; i < 4; i++) v1[i] = trv[i];
+				ret = to_uint(v1);
+			}
+		} while (0);
+		return ret;
+	}
+	static unsigned int toColor(const njson& v, unsigned int d = 0)
+	{
+		return toHex(v, d);
+	}
+	static std::string ptHex(const std::string& str, char ch = 'x', char step = '\0')
+	{
+		char spch[8] = { '%', '0', '2', ch, step, 0 };
+		std::string chBuffer;
+		char chEach[10];
+		int nCount;
+		memset(chEach, 0, 10);
+		unsigned char* d = (unsigned char*)str.c_str();
+		auto len = str.size();
+		for (nCount = 0; nCount < len /*&& d[nCount]>0*/; nCount++)
+		{
+			sprintf(chEach, spch, d[nCount]);
+			chBuffer += chEach;
+		}
+		return chBuffer;
+	}
+
+	static std::string toColor2(unsigned int d)
+	{
+		std::string t;
+		t.resize(sizeof(unsigned int));
+		memcpy((void*)t.data(), &d, t.size());
+		std::reverse(t.begin(), t.end());
+		t = t.empty() ? "0x00" : "0x" + ptHex(t);
+		return t;
+	}
+
+#if (defined(GLM_VERSION))
+	static glm::ivec2 toiVec2(const njson& v, int d = -1)
+	{
+		glm::ivec2 rv = { d, d };
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	static glm::ivec2 toiVec2(const njson& v, glm::ivec2& ot)
+	{
+		glm::ivec2& rv = ot;
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	static glm::vec2 toVec2(const njson& v, double d = 0)
+	{
+		glm::vec2 rv = { d, d };
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	static glm::vec2 toVec2(const njson& v, glm::vec2& ot)
+	{
+		glm::vec2& rv = ot;
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	static glm::vec3 toVec3(const njson& v, double d = 0)
+	{
+		glm::vec3 rv = { d, d, d };
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 3 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	static glm::vec4 toVec4(const std::vector<double>& v, bool one1 = false)
+	{
+		glm::vec4 rv;
+		{
+			std::vector<double> trv = v;
+			if (one1 && trv.size() == 1) {
+				rv[0] = rv[1] = rv[2] = rv[3] = trv[0];
+			}
+			else {
+				for (size_t i = 0; i < v.size() && i < 4; i++)
+				{
+					rv[i] = v[i];
+				}
+			}
+		}
+		return rv;
+	}
+	static glm::vec4 toVec4(const njson& v, double d = 0)
+	{
+		glm::vec4 rv = { d, d, d, d };
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 4 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	static glm::ivec4 toiVec4(const njson& v, int d = 0)
+	{
+		glm::ivec4 rv = { d, d, d, d };
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 4 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	static glm::ivec3 toiVec3(const njson& v, int d = 0)
+	{
+		glm::ivec3 rv = { d, d, d };
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 3 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	static njson v2to(const glm::vec2& v)
+	{
+		std::vector<double> rv = { v.x, v.y };
+		return rv;
+	}
+	static njson v3to(const glm::vec3& v)
+	{
+		std::vector<double> rv = { v.x, v.y, v.z };
+		return rv;
+	}
+	static njson v4to(const glm::vec4& v)
+	{
+		std::vector<double> rv = { v.x, v.y, v.z, v.w };
+		return rv;
+	}
+
+	template <typename T>
+	static void v2to_a(const T& v, njson& a)
+	{
+		a.push_back(v.x);
+		a.push_back(v.y);
+	}
+	template <typename T>
+	static void v3to_a(const T& v, njson& a)
+	{
+		a.push_back(v.x);
+		a.push_back(v.y);
+		a.push_back(v.z);
+	}
+	template <typename T>
+	static void v4to_a(const T& v, njson& a)
+	{
+		a.push_back(v.x);
+		a.push_back(v.y);
+		a.push_back(v.z);
+		a.push_back(v.w);
+	}
+#endif
+	template <typename T>
+	static T* toPtr(const njson& v)
+	{
+#if 0
+		std::string buf = toStr(v);
+		unsigned long long ret = 0;
+		char* str = 0;
+		buf.resize(18);
+		ret = std::strtoll(buf.c_str(), &str, buf.find("0x") == 0 ? 16 : 10);
+		return (T*)ret;
+#else
+		return (T*)toHex(v);
+#endif
+	}
+#ifndef _ui64toa_s
+	static char* _ui64toa_s(uint64_t num, char* str, int size, int radix)
+	{/*索引表*/
+		char index[] = "0123456789ABCDEF";
+		uint64_t unum = 0;/*中间变量*/
+		int i = 0, j, k;
+		/*确定unum的值*/
+		if (radix == 10 && num < 0)/*十进制负数*/
+		{
+			unum = (uint64_t)-num;
+			str[i++] = '-';
+		}
+		else unum = (uint64_t)num;/*其他情况*/
+		/*转换*/
+		do {
+			str[i++] = index[unum % (uint64_t)radix];
+			unum /= radix;
+		} while (unum);
+		str[i] = '\0';
+		/*逆序*/
+		if (str[0] == '-')
+			k = 1;/*十进制负数*/
+		else
+			k = 0;
+
+		for (j = k; j <= (i - 1) / 2; j++)
+		{
+			char temp;
+			temp = str[j];
+			str[j] = str[i - 1 + k - j];
+			str[i - 1 + k - j] = temp;
+		}
+		return str;
+	}
+#endif // !_ui64toa_s
+	//template <typename T>
+	static std::string fromPtr(void* pv)
+	{
+		std::string buf = "0x";
+		buf.resize(sizeof(void*) * 4);
+		_ui64toa_s((uint64_t)pv, (char*)(buf.data() + 2), buf.size() - 2, 16);
+		return buf.c_str();
+	}
+}
+#endif
 struct librpspr_lib
 {
 	void* ptr = 0;
@@ -90,11 +750,13 @@ public:
 
 	// 坐骑的渲染坐标
 	glm::ivec2 ride_pos = {};
+	glm::ivec2 csize = {};
 public:
 	dspr_cx();
 	~dspr_cx();
 
 	void init(int w, int h);
+	void clear();
 	void add_spr(const std::string& sprfn, const std::string& palbmp, int pal_pos);
 	//不同坐骑可能要设置不同值
 	void set_spr_pos(uint32_t idx, int x, int y, int z = 950000);
@@ -111,17 +773,33 @@ dspr_cx::dspr_cx()
 
 dspr_cx::~dspr_cx()
 {
-
+	if (img)
+		free_image_cr(img);
+	img = 0;
+	if (so)
+	{
+		if (ctx)
+			so->free_rp((int64_t)ctx);
+		delete so; so = 0;
+	}
 }
 
 void dspr_cx::init(int w, int h)
 {
 	bool tex_bgr = 1;
+	csize = { w,h };
+	if (ctx)
+		so->free_rp((int64_t)ctx);
 	so->new_rp(w, h, (int64_t*)&ctx, tex_bgr);
 	glm::ivec2 csize = { w,h };
 	imgdata.resize(w * h);
+	if (img)
+		free_image_cr(img);
+	img = 0;
 	img = new_image_cr(csize, imgdata.data());
+	sprv.clear();
 }
+
 
 //在__init__函数调用 add_spr\set_ride
 void dspr_cx::add_spr(const std::string& sprfn, const std::string& palbmp, int pal_pos)
@@ -183,40 +861,112 @@ std::string get_temp_path() {
 		str.clear();
 	return str;
 }
+
+class spr_dev
+{
+public:
+	dspr_cx* sp = 0;
+	std::string cstr;
+	int fp = 0;
+public:
+	spr_dev();
+	~spr_dev();
+	void set_text(const std::string& str);
+
+	void draw(cairo_t* cr, const glm::vec2& dps);
+private:
+
+};
+
+spr_dev::spr_dev()
+{
+	sp = new dspr_cx();
+}
+
+spr_dev::~spr_dev()
+{
+}
+
+void spr_dev::set_text(const std::string& str)
+{
+	try
+	{
+		njson nc = njson::parse(str);
+		auto kstr = nc.dump(2);
+		if (kstr != cstr && sp)
+		{
+			cstr = kstr;
+
+			glm::ivec2 csize = hz::toiVec2(nc["csize"]);
+			auto ride_pos = hz::toiVec2(nc["ride_pos"]);
+			auto fly = hz::toStr(nc["fly"]);
+			auto dir = hz::toInt(nc["dir"]);
+			auto addon = hz::toStr(nc["addon"]);
+			auto ride_dir = hz::toStr(nc["ride_dir"]);
+			auto ride_tcp_dir = hz::toStr(nc["ride_tcp_dir"]);
+			auto spr_dir = hz::toStr(nc["spr_dir"]);
+			auto& cspr = nc["spr"];
+			sp->init(csize.x, csize.y);
+			sp->ride_pos = ride_pos;
+			sp->set_ride(fly, dir, addon, ride_dir, ride_tcp_dir);
+			int i = 0;
+			for (auto& c0 : cspr)
+			{
+				std::string palurl = R"(https://xyq.gsf.netease.com/static_h5/pal/equip/)";
+				auto pos = hz::toiVec3(c0["pos"]);
+				auto pal = hz::toiVec2(c0["pal"]);
+				auto uri = spr_dir + hz::toStr(c0["name"]);
+				sp->add_spr((char*)uri.c_str(), palurl + std::to_string(pal.x) + ".pal.bmp", pal.y);
+				sp->set_spr_pos(i, pos.x, pos.y, pos.z);
+				i++;
+			}
+		}
+	}
+	catch (const std::exception& e)
+	{
+		printf("json error:\t%s", e.what());
+	}
+}
+
+void spr_dev::draw(cairo_t* cr, const glm::vec2& dps)
+{
+	if (sp) {
+		sp->draw(fp, 0, 0);
+		fp++;
+		if (fp > 100000)fp = 0;
+		cairo_as _ss_(cr);
+		cairo_translate(cr, dps.x, dps.y);
+		image_b pimg = {};
+		pimg.image = sp->img;
+		pimg.rc = { 0,0,sp->csize };
+		// 图形通用软渲染接口
+		draw_ge(cr, &pimg, 1);
+	}
+}
+
+
 void build_spr_ui(form_x* form0)
 {
 	std::string tp = get_temp_path();
-	auto sp = new dspr_cx();
 	glm::ivec2 csize = { 800,600 };
-	sp->init(csize.x, csize.y);
-
-	//sp->add_spr(R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F3d%2F39086dd49b5305dd3fe299cb7b0977%22%2C%22dir%22%3A0%2C%22eid%22%3A1008%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	//	, R"(https://xyq.gsf.netease.com/static_h5/pal/equip/1008.pal.bmp)", 0);
-	//sp->add_spr(R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F45%2Fbde2321b431fc85f59b0c6170a424d%22%2C%22dir%22%3A0%2C%22eid%22%3A24608%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	//	, R"(https://xyq.gsf.netease.com/static_h5/pal/equip/24608.pal.bmp)", 192);
-	//sp->add_spr(R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F82%2F330a98b0d60d4846a16125d7cdb691%22%2C%22dir%22%3A0%2C%22eid%22%3A16416%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	//	, R"(https://xyq.gsf.netease.com/static_h5/pal/equip/16416.pal.bmp)", 192);
-
-	const void* sprs[] = { R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F45%2Fbde2321b431fc85f59b0c6170a424d%22%2C%22dir%22%3A0%2C%22eid%22%3A24608%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	,R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F82%2F330a98b0d60d4846a16125d7cdb691%22%2C%22dir%22%3A0%2C%22eid%22%3A16416%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	,R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2F3d%2F39086dd49b5305dd3fe299cb7b0977%22%2C%22dir%22%3A0%2C%22eid%22%3A1008%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	,R"(https://cloudrender-test.nie.netease.com/clouderrender/render/?q=%7B%22act%22%3A%22ride_usual_3%22%2C%22cdnpath%22%3A%22h5sdk_hash%2Fb1%2F535bc51083a99bc5b936132c6be5f5%22%2C%22dir%22%3A0%2C%22eid%22%3A0%2C%22pid%22%3A2%2C%22render_type%22%3A%22h5sdk_dynamic%22%2C%22restype%22%3A%22json%22%2C%22scale%22%3A1.25%2C%22ver%22%3A%22shapeact21%22%7D)"
-	,R"()"
-	};
-	int palv[] = { 24608, 16416,1008,2, };
-	int palpos[] = { 192, 0,0,0 };
-	for (int i = 0; i < 4; i++) {
-		std::string palurl = R"(https://xyq.gsf.netease.com/static_h5/pal/equip/)";
-		sp->add_spr((char*)sprs[i], palurl + std::to_string(palv[i]) + ".pal.bmp", palpos[i]);
-		sp->set_spr_pos(i, 230, 210, 950000);
+	njson c;
+	c["csize"] = { 800,600 };
+	c["fly"] = "stand";
+	c["dir"] = 0;
+	c["addon"] = "flr";
+	c["ride_dir"] = R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)";
+	c["ride_tcp_dir"] = R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)";
+	c["spr_dir"] = R"(https://xyq.gsf.netease.com/avtres_hd_full_dir/)";
+	c["ride_pos"] = { 250,280 };
+	auto& cspr = c["spr"];
+	for (size_t i = 0; i < 1; i++)
+	{
+		njson c0;
+		c0["pos"] = { 230,210,950000 };
+		c0["pal"] = { 24608,192 };
+		c0["name"] = R"(e24608/p2/8379f964.spr)";
+		cspr.push_back(c0);
 	}
-
-	//sp->add_spr(R"(https://xyq.gsf.netease.com/cloud_hash/ed/f01d07161ea7701046c8a8a7d40ef3.spr)", R"(https://xyq.gsf.netease.com/static_h5/pal/hero/2.pal.bmp)", 0);
-	//sp->add_spr(R"(https://xyq.gsf.netease.com/cloud_hash/fd/d7ea390e1462b6a096cd67b04a0c28.spr)", R"(https://xyq.gsf.netease.com/static_h5/pal/equip/16416.pal.bmp)", 192);
-
-	sp->ride_pos = { 250,280 };
-	sp->set_ride("stand", 0, "flr", R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)", R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)");
-
 	glm::ivec2 size = { 1024,800 };
 	glm::ivec2 cview = { 10240,10240 };
 	auto p = new plane_cx();
@@ -224,15 +974,37 @@ void build_spr_ui(form_x* form0)
 	p->set_color({ 0x80ff802C,1,5,pbc });
 	p->set_rss(5);
 	p->_lms = { 8,8 };
+	form0->bind(p);	// 绑定到窗口  
 	p->add_familys(fontn, 0);
 	p->add_familys(fontn1, 0);
 	p->draggable = false; //可拖动
-	p->fontsize = 16;
+	p->fontsize = 12;
 	p->set_size(size);
 	p->set_pos({ 1,30 });
 	//p->set_select_box(2, 0.012);
-	form0->bind(p);	// 绑定到窗口  
-	auto dpx1 = p->push_dragpos({ 0,0 });// , { 300,600 });// 增加一个拖动坐标
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		//p->set_scroll(width, rcw, { 4, 4 }, { 2,0 }, { 0,2 });
+		//p->set_scroll_hide(1);
+		//p->set_view(size, cview);
+	}
+	auto spredit = p->add_input("", { 1000,300 }, 0);
+	auto cstr = c.dump(2);
+	static spr_dev* sp = new spr_dev();
+	sp->set_text(cstr);
+	spredit->set_text(cstr.c_str(), cstr.size());
+	spredit->changed_cb = [=](edit_tl* ptr) {
+		};
+	auto btn0 = p->add_cbutton((char*)u8"修改", { 100,30 }, 0);
+	btn0->click_cb = [=](void* p, int css) {
+		auto str = spredit->_text;
+		sp->set_text(str);
+		spredit->set_text(sp->cstr.c_str(), sp->cstr.size());
+		};
+
+	auto dpx1 = p->push_dragpos({ 140,360 });// , { 300,600 });// 增加一个拖动坐标
 	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
 	p->update_cb = [=](float delta)
 		{
@@ -247,30 +1019,8 @@ void build_spr_ui(form_x* form0)
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto dps = p->get_dragpos(dpx1);//获取拖动时的坐标
+			sp->draw(cr, dps);
 
-			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-
-			{
-				static int ix = 0;
-				sp->draw(ix, 0, 0);
-				ix++;
-				if (ix > 100000)ix = 0;
-				cairo_as _ss_(cr);
-				cairo_translate(cr, dps.x, dps.y);
-				image_b pimg = {};
-				pimg.image = sp->img;
-				pimg.rc = { 0,0,csize };
-				//struct image_b {
-				//	eg_e type = eg_e::e_image;
-				//	void* image; glm::vec2 pos; glm::vec4 rc; uint32_t color = -1; glm::vec2 dsize = { -1,-1 };
-				//	// 九宫格图片
-				//	glm::vec4 sliced = {};
-				//};
-				// 图形通用软渲染接口
-				draw_ge(cr, &pimg, 1);
-
-				//draw_rect(cr, { -2.5,  -2.5,200 + 6,300 + 6 }, 0xf0236F23, 0x80ffffff, 2, 1);
-			}
 		};
 }
 
