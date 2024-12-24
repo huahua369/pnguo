@@ -957,14 +957,16 @@ void build_spr_ui(form_x* form0)
 	c["ride_dir"] = R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)";
 	c["ride_tcp_dir"] = R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)";
 	c["spr_dir"] = R"(https://xyq.gsf.netease.com/avtres_hd_full_dir/)";
+	c["spr_dir"] = (char*)u8R"(E:\d3m\rpspr\rpspr\out\xybin\肤色\飞燕女\站立\)";
 	c["ride_pos"] = { 250,280 };
 	auto& cspr = c["spr"];
 	for (size_t i = 0; i < 1; i++)
 	{
 		njson c0;
 		c0["pos"] = { 230,210,950000 };
-		c0["pal"] = { 24608,192 };
+		c0["pal"] = { 24608,192 };//下衣64 头饰128 特殊192 其他0
 		c0["name"] = R"(e24608/p2/8379f964.spr)";
+		c0["name"] = R"(7(196201c2).spr)";
 		cspr.push_back(c0);
 	}
 	glm::ivec2 size = { 1024,800 };
