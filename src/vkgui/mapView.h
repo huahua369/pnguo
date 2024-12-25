@@ -208,6 +208,8 @@ namespace hz
 
 	};
 
+	// 获取可创建临时文件的目录
+	std::string get_temp_path();
 	std::string genfn(std::string fn);
 
 	int browse_openfile(const std::string& title, const std::string& strCurrentPath, std::string filter, HWND hWnd
@@ -242,6 +244,7 @@ namespace hz
 
 
 namespace md {
+
 	void split(std::string str, const std::string& pattern, std::vector<std::string>& result);
 	std::vector<std::string> split(const std::string& str, const std::string& pattern);
 	// 多分割符

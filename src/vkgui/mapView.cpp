@@ -453,6 +453,22 @@ guiSetStr(_edit_cmdout, buf);
 #ifndef NO_MAPFILE
 namespace hz
 {
+	std::string get_temp_path()
+	{
+		std::string str;
+#ifdef _WIN32
+		str.resize(MAX_PATH * 2);
+		auto n = GetTempPathA(str.size(), str.data());
+		if (n > 0)
+			str.resize(n);
+		else
+			str.clear();
+#else
+		char* path = getenv("HOME");
+		if (path)str = path;
+#endif
+		return str;
+	}
 	std::string replace(std::string strBase, const std::string& strSrc, const std::string& strDes)
 	{
 		std::string::size_type pos = 0;
