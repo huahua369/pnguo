@@ -297,6 +297,8 @@ app_cx::app_cx()
 	fct = new Timer();
 	r2d = new render_2d();
 	int kr = SDL_Init(-1);
+	//SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, false);
+	//SDL_SetEventEnabled(SDL_EVENT_DROP_TEXT, false);
 	auto ct = SDL_GetNumRenderDrivers();
 	for (size_t i = 0; i < ct; i++)
 	{
@@ -1517,6 +1519,23 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 			//printf("shift\n");
 		}
 		pw->trigger((uint32_t)devent_type_e::keyboard_e, &t);
+	}
+	break;
+	case SDL_EVENT_DROP_POSITION:
+	{
+		ole_drop_et t = {};
+		t.x = e->drop.x;
+		t.y = e->drop.y;
+		//pw->trigger((uint32_t)devent_type_e::ole_drop_e, &t);
+	}break;
+	case SDL_EVENT_DROP_TEXT:
+	{
+		ole_drop_et t = {};
+		t.x = e->drop.x;
+		t.y = e->drop.y;
+		t.str = (const char**)&(e->drop.data);
+		t.count = 1;
+		pw->trigger((uint32_t)devent_type_e::ole_drop_e, &t);
 	}
 	break;
 	}
