@@ -868,11 +868,14 @@ public:
 	dspr_cx* sp = 0;
 	std::string cstr;
 	int fp = 0;
+	double dt = 0.0;
+	double dt0 = 0.125;
 public:
 	spr_dev();
 	~spr_dev();
 	void set_text(const std::string& str);
 
+	bool update(float t);
 	void draw(cairo_t* cr, const glm::vec2& dps);
 private:
 
@@ -928,20 +931,31 @@ void spr_dev::set_text(const std::string& str)
 	}
 }
 
+bool spr_dev::update(float t)
+{
+	dt += t;
+	bool r = false;
+	if (dt > dt0) {
+		dt = 0;
+		if (sp) {
+			sp->draw(fp, 0, 0);
+			fp++;
+			if (fp > 100000)fp = 0;
+			r = true;
+		}
+	}
+	return r;
+}
+
 void spr_dev::draw(cairo_t* cr, const glm::vec2& dps)
 {
-	if (sp) {
-		sp->draw(fp, 0, 0);
-		fp++;
-		if (fp > 100000)fp = 0;
-		cairo_as _ss_(cr);
-		cairo_translate(cr, dps.x, dps.y);
-		image_b pimg = {};
-		pimg.image = sp->img;
-		pimg.rc = { 0,0,sp->csize };
-		// 图形通用软渲染接口
-		draw_ge(cr, &pimg, 1);
-	}
+	cairo_as _ss_(cr);
+	cairo_translate(cr, dps.x, dps.y);
+	image_b pimg = {};
+	pimg.image = sp->img;
+	pimg.rc = { 0,0,sp->csize };
+	// 图形通用软渲染接口
+	draw_ge(cr, &pimg, 1);
 }
 
 
@@ -1010,10 +1024,7 @@ void build_spr_ui(form_x* form0)
 	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
 	p->update_cb = [=](float delta)
 		{
-			static double xt = 0;
-			xt += delta;
-			if (xt > 0.1) { xt = 0; return 1; }
-			return 0;
+			return sp->update(delta);
 		};
 	p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
