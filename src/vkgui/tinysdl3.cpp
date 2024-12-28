@@ -671,7 +671,7 @@ int app_cx::get_event()
 #ifndef EVWATCH
 		call_cb(&e);
 #endif
-		break;
+		//break;
 	}
 #endif
 	if (c_fps != _fps)
@@ -1526,7 +1526,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		ole_drop_et t = {};
 		t.x = e->drop.x;
 		t.y = e->drop.y;
-		//pw->trigger((uint32_t)devent_type_e::ole_drop_e, &t);
+		pw->trigger((uint32_t)devent_type_e::ole_drop_e, &t);
 	}break;
 	case SDL_EVENT_DROP_TEXT:
 	{
