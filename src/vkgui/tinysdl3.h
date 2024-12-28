@@ -165,6 +165,7 @@ public:
 	hz::drop_regs* dragdrop = 0;
 	// 默认接收ole
 	hz::drop_info_cx* _oledrop = 0;
+	std::string drop_text;
 	int _dx = -1, _dy = -1;
 	void* uptr = 0;						// 用户设置指针
 	std::queue<glm::ivec4> qcmd_value;	// 操作列表
