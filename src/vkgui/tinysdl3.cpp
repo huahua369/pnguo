@@ -951,7 +951,6 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 		}
 		if (img->data && img->valid)
 		{
-			//print_time a("SDL_UpdateTexture");
 			img->valid = false;
 			if (img->stride < 1)img->stride = img->width * 4;
 			SDL_UpdateTexture(ptx, 0, img->data, img->stride);
