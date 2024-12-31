@@ -20962,23 +20962,12 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	auto vp2 = get_index2pos(layout, v.y);
 
 	auto nk = get_line_length(v.x);
-	auto nk1 = get_line_length(v.y);
-	//pango_layout_move_cursor_visually()
-	//auto text = pango_layout_get_text(layout);
-	//std::string str;
-	//if (text)
-	//{
-	//	str = text;
-	//}
+	auto nk1 = get_line_length(v.y); 
 	auto ss = get_layout_size(layout);
 	auto sw0 = get_cursor_posv(layout, v.x);
-	auto sw1 = get_cursor_posv(layout, v.y);
-	//sw0.w = get_line_height(layout, v1.y);
+	auto sw1 = get_cursor_posv(layout, v.y); 
 	std::vector<glm::ivec4> rs, rss;
-	int line_no = pango_layout_get_line_count(layout);
-	//pango_layout_line_index_to_x(layout, p - text, FALSE, &left);
-	//pango_layout_line_index_to_x(layout, p - text, TRUE, &right);
-	//pos->x = MIN(left, right);
+	int line_no = pango_layout_get_line_count(layout); 
 	auto iter = pango_layout_get_iter(layout);
 	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
 	for (int i = 0; i < line_no; i++)
