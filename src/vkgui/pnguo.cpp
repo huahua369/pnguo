@@ -12351,7 +12351,6 @@ struct pl {
 
 #endif
 
-
 class layout_px
 {
 public:
@@ -20333,9 +20332,11 @@ class text_ctx_cx
 {
 public:
 	glm::ivec2 pos = {}, size = {};
+#ifdef PANGO_EDIT
 	PangoContext* context = 0;
 	PangoLayout* layout = 0;
 	PangoLayout* layout_editing = 0;
+#endif
 	image_ptr_t cacheimg = {};
 	cairo_surface_t* sur = 0;
 	std::string editingstr;
@@ -20386,14 +20387,13 @@ public:
 	~text_ctx_cx();
 
 	void set_autobr(bool is);
-	void set_size(const glm::ivec2& ss);
-	void set_desc(const char* str);
+	void set_size(const glm::ivec2& ss); 
 	void set_family(const char* family);
 	void set_font_size(int fs);
 
 	void set_text(const std::string& str);
 	void set_editing(const std::string& str);
-	void set_markup(const std::string& str);
+	//void set_markup(const std::string& str);
 	void set_cursor(const glm::ivec3& c);
 	glm::ivec4 get_extents();
 	glm::ivec2 get_pixel_size();
@@ -20410,10 +20410,724 @@ public:
 	bool hit_test(const glm::ivec2& ps);
 	void up_cursor(bool is);
 	void set_single(bool is);
-	glm::ivec4 get_cursor_posv(PangoLayout* layout, int idx);
-	glm::ivec2 get_layout_position(PangoLayout* layout);
+	glm::ivec4 get_cursor_posv(int idx);
 private:
 };
+#if 1
+text_ctx_cx::text_ctx_cx()
+{
+ #ifdef _WIN32
+	auto n = GetCaretBlinkTime();
+	if (cursor.z < 10)
+	{
+		cursor.z = n;
+	}
+#else
+	cursor.z = 500;
+#endif
+}
+
+text_ctx_cx::~text_ctx_cx()
+{ 
+	if (sur)
+	{
+		cairo_surface_destroy(sur); sur = 0;
+	}
+}
+
+void text_ctx_cx::set_autobr(bool is)
+{
+	//pango_layout_set_width(layout, is ? size.x * PANGO_SCALE : -1);
+}
+void text_ctx_cx::set_single(bool is) {
+	single_line = is;
+	//if (size.y > 0 && single_line)
+	//	pango_layout_set_height(layout, size.y * PANGO_SCALE);
+	//else
+	//	pango_layout_set_height(layout, -1);
+	//pango_layout_set_single_paragraph_mode(layout, is);
+}
+void text_ctx_cx::set_size(const glm::ivec2& ss)
+{
+	if (size != ss)
+	{
+		size = ss;
+		if (sur)
+		{
+			cairo_surface_destroy(sur);
+		}
+		dtimg.resize(size.x * size.y);
+		sur = cairo_image_surface_create_for_data((unsigned char*)dtimg.data(), CAIRO_FORMAT_ARGB32, size.x, size.y, size.x * sizeof(int));
+		cacheimg = {};
+		cacheimg.data = dtimg.data();
+		cacheimg.width = size.x;
+		cacheimg.height = size.y;
+		cacheimg.type = 1;
+		cacheimg.valid = 1;
+		valid = true;
+	}
+}
+ 
+
+void text_ctx_cx::set_family(const char* familys)
+{
+	if (familys && *familys)
+	{
+		family = familys;
+	}
+	//PangoFontDescription* desc = pango_font_description_new();
+	//pango_font_description_set_family(desc, family.c_str());
+	//pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+	//pango_layout_set_font_description(layout, desc);
+	//pango_layout_set_font_description(layout_editing, desc);
+	//pango_font_description_free(desc);
+	upft = true;
+	valid = true;
+}
+
+void text_ctx_cx::set_font_size(int fs)
+{
+	if (fs > 2)
+	{
+		fontsize = fs;
+		//PangoFontDescription* desc = pango_font_description_new();
+		//pango_font_description_set_family(desc, family.c_str());
+		//pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+		//pango_layout_set_font_description(layout, desc);
+		//pango_layout_set_font_description(layout_editing, desc);
+		//pango_font_description_free(desc);
+		//pango_layout_set_line_spacing(layout, 1.2);
+		//auto kf = pango_layout_get_line_spacing(layout) / PANGO_SCALE * 1.0;
+		valid = true;
+	}
+}
+
+void text_ctx_cx::set_text(const std::string& str)
+{
+	std::string pws;
+	auto length = str.size();
+	if (length && pwd)
+	{
+		pws.resize(length);
+		for (size_t i = 0; i < length; i++)
+		{
+			pws[i] = pwd;
+		}
+		//pango_layout_set_text(layout, pws.c_str(), pws.size());
+	}
+	else
+	{
+		//pango_layout_set_text(layout, str.c_str(), str.size());
+	} 
+	// todo 获取行高lineheight = h / PANGO_SCALE;
+	get_bounds_px();
+	valid = true;
+}
+
+void text_ctx_cx::set_editing(const std::string& str)
+{
+	editingstr = str;
+	//pango_layout_set_text(layout_editing, str.c_str(), str.size());
+	//pango_layout_set_markup(layout_editing, str.c_str(), str.size());
+	valid = true;
+}
+ 
+
+void text_ctx_cx::set_cursor(const glm::ivec3& c)
+{
+	cursor = c;
+}
+
+glm::ivec4 text_ctx_cx::get_extents()
+{
+	// todo 获取像素大小区域
+	return {}; 
+}
+
+glm::ivec2 text_ctx_cx::get_pixel_size()
+{
+	int w = 0, h = 0;
+	//pango_layout_get_pixel_size(layout, &w, &h);
+	return glm::ivec2(w, h);
+}
+
+int text_ctx_cx::get_baseline()
+{
+	return 0;//glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
+}
+size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
+{
+	x += scroll_pos.x - _align_pos.x;
+	y += scroll_pos.y - _align_pos.y;
+
+	if (x < 0)
+	{
+		x = 0;
+	}
+	if (y < 0)
+	{
+		y = 0;
+	}
+	auto cc = pango_layout_get_character_count(layout);
+	int lc = pango_layout_get_line_count(layout);
+	glm::ivec2 lps = {};
+	pango_layout_get_pixel_size(layout, &lps.x, &lps.y);
+	if (y > lps.y)
+		y = lps.y - 1;
+	int index = 0, trailing = 0;
+	auto ls = pango_layout_get_lines_readonly(layout);
+	bool k = pango_layout_xy_to_index(layout, x * PANGO_SCALE, y * PANGO_SCALE, &index, &trailing);
+	int x_pos = 0;
+	int lidx = 0;
+	pango_layout_index_to_line_x(layout, index, 0, &lidx, &x_pos);
+
+
+	x_pos /= PANGO_SCALE;
+	auto cursor = index + trailing;
+	if (!k)
+	{
+		auto nk = get_line_length(cursor);
+		cursor = nk.x;
+	}
+	auto cp = str + cursor;
+	auto chp = md::get_utf8_first(cp);
+	int ps = chp - cp;
+	cursor += ps;
+	cursor;
+	clineidx = lidx;
+	//printf("%d\t%d\n", ccursor, ps);
+	PangoRectangle ink_rect = {};
+	PangoRectangle logical_rect = {};
+	pango_layout_get_pixel_extents(layout, &ink_rect, &logical_rect);	//cairo_move_to(cr, 0 /*extents.x*/, ink_rect.y - (logical_rect.height - ink_rect.height) * 0.5);
+	// 获取基线位置
+	int y_pos = pango_layout_get_baseline(layout);
+	int h = 0;
+	auto line = pango_layout_get_line(layout, lidx);
+	pango_layout_line_get_height(line, &h);
+	lineheight = h / PANGO_SCALE;
+	return cursor;
+}
+ 
+gboolean text_util_get_block_cursor_location(PangoLayout* layout, int index, PangoRectangle* pos, gboolean* at_line_end)
+{
+	PangoRectangle strong_pos, weak_pos;
+	PangoLayoutLine* layout_line;
+	gboolean rtl;
+	int line_no;
+	const char* text;
+
+	g_return_val_if_fail(layout != NULL, FALSE);
+	g_return_val_if_fail(index >= 0, FALSE);
+	g_return_val_if_fail(pos != NULL, FALSE);
+
+	pango_layout_index_to_pos(layout, index, pos);
+
+	if (pos->width != 0)
+	{
+		/* cursor is at some visible character, good */
+		if (at_line_end)
+			*at_line_end = FALSE;
+		if (pos->width < 0)
+		{
+			pos->x += pos->width;
+			pos->width = -pos->width;
+		}
+		return TRUE;
+	}
+
+	pango_layout_index_to_line_x(layout, index, FALSE, &line_no, NULL);
+	layout_line = pango_layout_get_line_readonly(layout, line_no);
+	g_return_val_if_fail(layout_line != NULL, FALSE);
+
+	text = pango_layout_get_text(layout);
+
+	if (index < pango_layout_line_get_start_index(layout_line) + pango_layout_line_get_length(layout_line))
+	{
+		/* this may be a zero-width character in the middle of the line,
+		 * or it could be a character where line is wrapped, we do want
+		 * block cursor in latter case */
+		if (g_utf8_next_char(text + index) - text !=
+			pango_layout_line_get_start_index(layout_line) + pango_layout_line_get_length(layout_line))
+		{
+			/* zero-width character in the middle of the line, do not
+			 * bother with block cursor */
+			return FALSE;
+		}
+	}
+
+	/* Cursor is at the line end. It may be an empty line, or it could
+	 * be on the left or on the right depending on text direction, or it
+	 * even could be in the middle of visual layout in bidi text. */
+
+	pango_layout_get_cursor_pos(layout, index, &strong_pos, &weak_pos);
+
+	if (strong_pos.x != weak_pos.x)
+	{
+		/* do not show block cursor in this case, since the character typed
+		 * in may or may not appear at the cursor position */
+		return FALSE;
+	}
+
+	/* In case when index points to the end of line, pos->x is always most right
+	 * pixel of the layout line, so we need to correct it for RTL text. */
+	if (pango_layout_line_get_length(layout_line))
+	{
+		if (pango_layout_line_get_resolved_direction(layout_line) == PANGO_DIRECTION_RTL)
+		{
+			PangoLayoutIter* iter;
+			PangoRectangle line_rect;
+			int i;
+			int left, right;
+			const char* p;
+
+			p = g_utf8_prev_char(text + index);
+
+			pango_layout_line_index_to_x(layout_line, p - text, FALSE, &left);
+			pango_layout_line_index_to_x(layout_line, p - text, TRUE, &right);
+			pos->x = MIN(left, right);
+
+			iter = pango_layout_get_iter(layout);
+			for (i = 0; i < line_no; i++)
+				pango_layout_iter_next_line(iter);
+			pango_layout_iter_get_line_extents(iter, NULL, &line_rect);
+			pango_layout_iter_free(iter);
+
+			rtl = TRUE;
+			pos->x += line_rect.x;
+		}
+		else
+			rtl = FALSE;
+	}
+	else
+	{
+		PangoContext* context = pango_layout_get_context(layout);
+		rtl = pango_context_get_base_dir(context) == PANGO_DIRECTION_RTL;
+	}
+
+	pos->width = layout_get_char_width(layout);
+
+	if (rtl)
+		pos->x -= pos->width - 1;
+
+	if (at_line_end)
+		*at_line_end = TRUE;
+
+	return pos->width != 0;
+}
+
+glm::ivec2 get_index2pos(PangoLayout* layout, int idx) {
+	PangoRectangle pos = {};
+	pango_layout_index_to_pos(layout, idx, &pos);
+	return glm::ivec2(pos.x / PANGO_SCALE, pos.y / PANGO_SCALE);
+}
+// 输入行号，索引号，方向，输出行号选择范围
+glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
+{
+	//pango_layout_get_line_count
+	auto line = pango_layout_get_line(layout, lidx);
+	auto lst = pango_layout_get_lines(layout);
+	PangoRectangle ink_rect = {};
+	PangoRectangle logical_rect = {};
+	glm::ivec4 rt = {};
+	gboolean at_line_end = 0;
+	PangoRectangle tpos = {};
+	if (line)
+	{
+		int h = 0;
+		pango_layout_line_get_height(line, &h);
+		h = h / PANGO_SCALE;
+		auto xi = pango_layout_line_get_start_index(line);
+		{
+			gboolean rb = text_util_get_block_cursor_location(layout, idx > 0 ? idx : xi, &tpos, &at_line_end);
+			pango_layout_get_cursor_pos(layout, idx > 0 ? idx : xi, &ink_rect, &logical_rect);
+			glm::ivec4 r = { logical_rect.x,logical_rect.y,logical_rect.width,logical_rect.height }, r1 = { tpos.x,tpos.y,tpos.width,tpos.height };
+			r /= PANGO_SCALE;
+			r1 /= PANGO_SCALE;
+			rt.x = r.x;
+			rt.y = r.y;
+			rt.w = h;
+		}
+		if (dir)
+		{
+			pango_layout_get_cursor_pos(layout, xi, &ink_rect, &logical_rect);
+			rt.z = rt.x;
+			rt.x = logical_rect.x / PANGO_SCALE;
+		}
+		else {
+			pango_layout_line_get_pixel_extents(line, &ink_rect, &logical_rect);
+			rt.z = logical_rect.width - rt.x;
+		}
+		int lh = 0;
+		pango_layout_line_get_height(line, &lh);
+		lh /= PANGO_SCALE;
+	}
+	return rt;
+}
+glm::ivec2 text_ctx_cx::get_line_length(int index)
+{
+	int x_pos = 0;
+	int lidx = 0;
+	//pango_layout_index_to_line_x(layout, index, 0, &lidx, &x_pos); 
+	glm::ivec2 ret = {/* line->start_index + len, x_pos / PANGO_SCALE*/ };
+	return ret;
+}
+
+glm::i64vec2 text_ctx_cx::get_bounds()
+{
+	glm::i64vec2 v = { bounds[0] , bounds[1] };
+	if (v.x > v.y) { std::swap(v.x, v.y); }
+	return v;
+}
+glm::ivec2 geti2x(PangoLayout* layout, int x)
+{
+	int x_pos = 0;
+	int lidx = 0;
+	pango_layout_index_to_line_x(layout, x, 0, &lidx, &x_pos);
+	x_pos /= PANGO_SCALE;
+	return glm::ivec2(x_pos, lidx);
+}
+
+glm::ivec4 text_ctx_cx::get_cursor_posv( int idx)
+{
+	PangoLayout* layout = 0;
+	std::vector<glm::ivec4> rv;
+	PangoRectangle sw[2] = {};
+	pango_layout_get_cursor_pos(layout, idx, &sw[0], &sw[1]);
+	auto& w1 = sw[1];
+	glm::ivec4 r = { w1.x,w1.y,w1.width,w1.height };
+	r /= PANGO_SCALE;
+	//r->y = lineheight * ly;
+	return r;
+}
+
+std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
+{
+	std::vector<glm::ivec4> rv;
+	PangoRectangle sw[2] = {};
+	pango_layout_get_caret_pos(layout, idx, &sw[0], &sw[1]);
+	auto& w0 = sw[0];
+	auto& w1 = sw[1];
+	glm::ivec4 r = { w0.x,w0.y,w0.width,w0.height };
+	glm::ivec4 r1 = { w1.x,w1.y,w1.width,w1.height };
+	rv.push_back(r);
+	rv.push_back(r1);
+	for (auto& it : rv) {
+		it /= PANGO_SCALE;
+	}
+	return rv;
+}
+int get_line_height(PangoLayout* layout, int idx) {
+	auto line = pango_layout_get_line(layout, idx);
+	int h = 0;
+	pango_layout_line_get_height(line, &h);
+	h = h / PANGO_SCALE;
+	return h;
+}
+glm::ivec2 get_layout_size(PangoLayout* layout)
+{
+	PangoRectangle ink, logical;
+	pango_layout_get_extents(layout, &ink, &logical);
+	return { logical.width / PANGO_SCALE,logical.height / PANGO_SCALE };
+}
+struct it_rect
+{
+	glm::ivec4 line_rect = {}, char_rect = {};
+	glm::ivec2 yr = {};
+	int baseline = 0;
+};
+it_rect get_iter(PangoLayoutIter* iter) {
+
+	it_rect ret = {};
+	PangoRectangle lr = {}, cr = {};
+	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&lr);
+	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&cr);
+	pango_layout_iter_get_line_yrange(iter, &ret.yr.x, &ret.yr.y);
+	ret.baseline = pango_layout_iter_get_baseline(iter);
+	ret.line_rect = glm::ivec4(lr.x, lr.y, lr.width, lr.height);
+	ret.char_rect = glm::ivec4(cr.x, cr.y, cr.width, cr.height);
+	ret.line_rect /= PANGO_SCALE;
+	ret.char_rect /= PANGO_SCALE;
+	ret.yr /= PANGO_SCALE;
+	ret.baseline /= PANGO_SCALE;
+	return ret;
+}
+std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
+{
+	std::vector<glm::ivec4> r;
+	int x_pos = 0;
+	int lidx = 0;
+	auto v = get_bounds();
+	auto v1 = geti2x(layout, v.x);
+	auto v2 = geti2x(layout, v.y);
+	if (v.x != v.y)
+	{
+		v = v;
+	}
+	auto vp1 = get_index2pos(layout, v.x);
+	auto vp2 = get_index2pos(layout, v.y);
+
+	auto nk = get_line_length(v.x);
+	auto nk1 = get_line_length(v.y);
+	auto ss = get_layout_size(layout);
+	auto sw0 = get_cursor_posv(layout, v.x);
+	auto sw1 = get_cursor_posv(layout, v.y);
+	std::vector<glm::ivec4> rs, rss;
+	int line_no = pango_layout_get_line_count(layout);
+	auto iter = pango_layout_get_iter(layout);
+	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
+	for (int i = 0; i < line_no; i++)
+	{
+		auto rc = get_iter(iter);
+		if (i != v1.y)
+		{
+			pango_layout_iter_next_line(iter); continue;
+		}
+		if (v1.y == v2.y)
+		{
+			rss.push_back({ rc.line_rect.x + sw0.x,rc.yr.x,sw1.x - sw0.x,rc.yr.y - rc.yr.x });
+			break;
+		}
+		else
+		{
+			glm::ivec4 f = { rc.line_rect.x + sw0.x,rc.yr.x,(rc.line_rect.z - sw0.x) + pwidth,rc.yr.y - rc.yr.x };
+			rss.push_back(f);
+			pango_layout_iter_next_line(iter);
+			for (size_t x = v1.y + 1; x < v2.y; x++)
+			{
+				rc = get_iter(iter);
+				glm::ivec4 c = { rc.line_rect.x,rc.yr.x,rc.line_rect.z + pwidth,rc.yr.y - rc.yr.x };
+				rss.push_back(c);
+				pango_layout_iter_next_line(iter);
+			}
+			rc = get_iter(iter);
+			f = { rc.line_rect.x ,rc.yr.x, sw1.x ,rc.yr.y - rc.yr.x };
+			rss.push_back(f);
+			break;
+		}
+	}
+
+	pango_layout_iter_free(iter);
+	if (roundselect)
+	{
+		PathsD subjects;
+		PathD a;
+		for (size_t i = 0; i < rss.size(); i++)
+		{
+			auto& it = rss[i];
+			if (it.z < 1)
+				it.z = pwidth;
+			a.push_back({ it.x,it.y });
+			a.push_back({ it.x + it.z,it.y });
+			a.push_back({ it.x + it.z,it.y + it.w });
+			a.push_back({ it.x,it.y + it.w });
+			subjects.push_back(a);
+			a.clear();
+		}
+		subjects = Union(subjects, FillRule::NonZero, 6);
+		//range_path = InflatePaths(subjects, 0.5, JoinType::Round, EndType::Polygon);
+		auto sn = subjects.size();
+		if (sn > 0)
+		{
+			path_v& ptr = ptr_path;
+			ptr._data.clear();
+			for (size_t i = 0; i < sn; i++)
+			{
+				auto& it = subjects[i];
+				ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
+			}
+			range_path = gp::path_round(&ptr, -1, fontsize * round_path, 16, 0, 0);
+		}
+		else { range_path.clear(); }
+	}
+	rangerc = rss;
+	return r;
+}
+
+void text_ctx_cx::up_caret()
+{
+	auto kc = pango_layout_get_line_count(layout);
+	PangoRectangle sw[4] = {};
+	auto v1 = geti2x(layout, ccursor);
+	auto f = get_line_extents(v1.y, ccursor, 0);
+
+	pango_layout_get_cursor_pos(layout, ccursor, &sw[0], &sw[1]);
+	pango_layout_get_caret_pos(layout, ccursor, &sw[2], &sw[3]);
+	glm::ivec4 caret = { sw->x,sw->y,sw[2].x,sw[2].y };
+	caret /= PANGO_SCALE;
+	int h = sw->height;
+	h /= PANGO_SCALE;
+	cursor_pos = caret; cursor_pos.z = h;
+}
+glm::ivec2 get_line_info(PangoLayout* layout, int line)
+{
+	glm::ivec2 ret = {};
+	int ct = pango_layout_get_line_count(layout);
+	if (line >= ct)line = ct - 1;
+	if (line < 0)line = 0;
+	PangoLayoutLine* pl = pango_layout_get_line(layout, line);
+	if (pl)
+	{
+		ret = { pl->start_index , pl->length };
+	}
+	return ret;
+}
+void renderer_draw_layout(cairo_t* cr, PangoLayout* layout, int x, int y, int baseline)
+{
+	PangoLayoutIter* iter;
+	g_return_if_fail(PANGO_IS_LAYOUT(layout));
+	iter = pango_layout_get_iter(layout);
+	do
+	{
+		PangoRectangle   logical_rect;
+		PangoLayoutLine* line;
+		//int              baseline;
+
+		line = pango_layout_iter_get_line_readonly(iter);
+		glm::ivec2 yy = {};
+		pango_layout_iter_get_line_yrange(iter, &yy.x, &yy.y);
+		pango_layout_iter_get_line_extents(iter, NULL, &logical_rect);
+		if (baseline == 0)
+			baseline = pango_layout_iter_get_baseline(iter);
+		cairo_save(cr);
+		yy /= PANGO_SCALE;
+		cairo_translate(cr, x + logical_rect.x, y + baseline + yy.x);
+		pango_cairo_show_layout_line(cr, line);
+		cairo_restore(cr);
+	} while (pango_layout_iter_next_line(iter));
+
+	pango_layout_iter_free(iter);
+
+}
+bool text_ctx_cx::update(float delta)
+{
+	c_ct += delta * 1000.0 * c_d;
+	if (c_ct > cursor.z)
+	{
+		c_d = -1;
+		c_ct = cursor.z;
+		valid = true;
+	}
+	if (c_ct < 0)
+	{
+		c_d = 1; c_ct = 0;
+		valid = true;
+	}
+	if (!valid)return false;
+	auto cr = cairo_create(sur);
+#if 1 
+	size_t length = dtimg.size();
+	auto dt = dtimg.data();
+	for (size_t i = 0; i < length; i++)
+	{
+		*dt = back_color; dt++;
+	}
+#else
+	set_color(cr, back_color);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_paint(cr);
+#endif
+	cairo_save(cr);
+	pango_cairo_update_layout(cr, layout);
+
+	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
+	if (upft)
+	{
+		_baseline = get_baseline();
+		upft = false;
+	}
+	if (single_line) {
+		glm::vec2 ext = { 0,lineheight }, ss = size;
+		auto ps = ss * text_align - (ext * text_align);
+		_align_pos.y = ps.y;
+	}
+	cairo_translate(cr, -scroll_pos.x + _align_pos.x, -scroll_pos.y + _align_pos.y);
+
+	auto v = get_bounds();
+	if (v.x != v.y && rangerc.size()) {
+		set_color(cr, select_color);
+		if (roundselect)
+		{
+			if (range_path.size() && range_path[0].size() > 3) {
+				draw_polyline(cr, &range_path, true);
+				cairo_fill(cr);
+			}
+		}
+		else {
+			for (auto& it : rangerc)
+			{
+				draw_rectangle(cr, it, std::min(it.z, it.w) * 0.18);
+				cairo_fill(cr);
+			}
+		}
+	}
+	set_color(cr, text_color);
+	auto b = pango_layout_get_ellipsize(layout);
+	pango_cairo_show_layout(cr, layout);
+	cairo_restore(cr);
+	cairo_destroy(cr);
+	bool ret = valid;
+	valid = false;
+	return true;
+}
+uint32_t get_reverse_color(uint32_t color) {
+	uint8_t* c = (uint8_t*)&color;
+	c[0] = 255 - c[0];
+	c[1] = 255 - c[1];
+	c[2] = 255 - c[2];
+	return color;
+}
+void text_ctx_cx::draw(cairo_t* cr)
+{
+	//printf("text_ctx_cx::draw\t%s\n",);
+	cairo_save(cr);
+	// 裁剪区域
+	cairo_rectangle(cr, pos.x, pos.y, size.x, size.y);
+	cairo_clip(cr);
+	auto ps = pos - scroll_pos + _align_pos;
+	auto oldop = cairo_get_operator(cr);
+	cairo_set_source_surface(cr, sur, pos.x, pos.y);
+	cairo_paint(cr);
+	double x = ps.x + cursor_pos.x, y = ps.y + cursor_pos.y;
+	if (show_input_cursor && c_d == 1 && cursor.x > 0 && cursor_pos.z > 0)
+	{
+		set_color(cr, cursor.y);
+		cairo_rectangle(cr, x, y, cursor.x, cursor_pos.z);
+		cairo_fill(cr);
+	}
+	cairo_restore(cr);
+	auto bbc = box_color;
+	set_source_rgba(cr, bbc);
+	cairo_rectangle(cr, pos.x - 0.5, pos.y - 0.5, size.x + 1, size.y + 1);
+	cairo_set_line_width(cr, 1);
+	cairo_stroke(cr);
+	// 编辑中的文本
+	if (editingstr.size())
+	{
+		cairo_save(cr);
+		cairo_translate(cr, x, y);
+
+		pango_cairo_update_layout(cr, layout_editing);
+		glm::ivec2 lps = {};
+		pango_layout_get_pixel_size(layout_editing, &lps.x, &lps.y);
+		if (lps.y < lineheight)
+			lps.y = lineheight;
+		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
+
+		set_color(cr, get_reverse_color(editing_text_color));
+		cairo_rectangle(cr, 0, 0, lps.x, lps.y + 2);
+		cairo_fill(cr);
+		set_color(cr, editing_text_color);
+		pango_cairo_show_layout(cr, layout_editing);
+
+		cairo_move_to(cr, lss.x, lss.y);
+		cairo_line_to(cr, lss.z, lss.w);
+		cairo_set_line_width(cr, 1);
+		cairo_stroke(cr);
+		cairo_restore(cr);
+	}
+}
+#else
+
 text_ctx_cx::text_ctx_cx()
 {
 	PangoFontMap* fontMap = get_fmap;
@@ -20961,12 +21675,12 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	auto vp2 = get_index2pos(layout, v.y);
 
 	auto nk = get_line_length(v.x);
-	auto nk1 = get_line_length(v.y); 
+	auto nk1 = get_line_length(v.y);
 	auto ss = get_layout_size(layout);
 	auto sw0 = get_cursor_posv(layout, v.x);
-	auto sw1 = get_cursor_posv(layout, v.y); 
+	auto sw1 = get_cursor_posv(layout, v.y);
 	std::vector<glm::ivec4> rs, rss;
-	int line_no = pango_layout_get_line_count(layout); 
+	int line_no = pango_layout_get_line_count(layout);
 	auto iter = pango_layout_get_iter(layout);
 	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
 	for (int i = 0; i < line_no; i++)
@@ -21221,7 +21935,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 		cairo_restore(cr);
 	}
 }
-
+#endif
 bool text_ctx_cx::hit_test(const glm::ivec2& ps)
 {
 	auto p2 = ps;
@@ -21317,8 +22031,6 @@ void text_ctx_cx::up_cursor(bool is)
 	{
 		up_caret();
 		glm::ivec2 cs = cursor_pos;
-		//cs.y += cursor_pos.z;
-		//pango_layout_get_pixel_size(layout, &cs.x, &cs.y);//content_size
 		auto evs = size;		// 视图大小
 		auto h = cursor_pos.z;	// 行高
 		if (h < 1)h = 1;

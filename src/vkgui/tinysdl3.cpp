@@ -2518,7 +2518,7 @@ dev_info_cx form_x::get_dev()
 		c.inst = (void*)SDL_GetPointerProperty(pid, SDL_PROP_RENDERER_VULKAN_INSTANCE_POINTER, 0);
 		c.phy = (void*)SDL_GetPointerProperty(pid, SDL_PROP_RENDERER_VULKAN_PHYSICAL_DEVICE_POINTER, 0);
 		c.vkdev = (void*)SDL_GetPointerProperty(pid, SDL_PROP_RENDERER_VULKAN_DEVICE_POINTER, 0);
-		c.qFamIdx = SDL_GetNumberProperty(pid, SDL_PROP_RENDERER_VULKAN_GRAPHICS_QUEUE_FAMILY_INDEX_NUMBER, 0);
+		c.qFamIdx = (uint32_t)SDL_GetNumberProperty(pid, SDL_PROP_RENDERER_VULKAN_GRAPHICS_QUEUE_FAMILY_INDEX_NUMBER, 0);
 		//c.qFamIdx = SDL_GetNumberProperty(pid, SDL_PROP_RENDERER_VULKAN_PRESENT_QUEUE_FAMILY_INDEX_NUMBER, 0);
 	}
 	return c;
