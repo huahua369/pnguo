@@ -20782,21 +20782,14 @@ glm::ivec2 geti2x(PangoLayout* layout, int x)
 {
 	int x_pos = 0;
 	int lidx = 0;
-	pango_layout_index_to_line_x(layout, x, 0, &lidx, &x_pos);
-	x_pos /= PANGO_SCALE;
+	//pango_layout_index_to_line_x(layout, x, 0, &lidx, &x_pos);
+	//x_pos /= PANGO_SCALE;
 	return glm::ivec2(x_pos, lidx);
 }
 
 glm::ivec4 text_ctx_cx::get_cursor_posv( int idx)
-{
-	PangoLayout* layout = 0;
-	std::vector<glm::ivec4> rv;
-	PangoRectangle sw[2] = {};
-	pango_layout_get_cursor_pos(layout, idx, &sw[0], &sw[1]);
-	auto& w1 = sw[1];
-	glm::ivec4 r = { w1.x,w1.y,w1.width,w1.height };
-	r /= PANGO_SCALE;
-	//r->y = lineheight * ly;
+{ 
+	glm::ivec4 r = { /*w1.x,w1.y,w1.width,w1.height*/ }; 
 	return r;
 }
 
@@ -20815,42 +20808,30 @@ std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
 		it /= PANGO_SCALE;
 	}
 	return rv;
-}
-int get_line_height(PangoLayout* layout, int idx) {
-	auto line = pango_layout_get_line(layout, idx);
-	int h = 0;
-	pango_layout_line_get_height(line, &h);
-	h = h / PANGO_SCALE;
-	return h;
-}
-glm::ivec2 get_layout_size(PangoLayout* layout)
-{
-	PangoRectangle ink, logical;
-	pango_layout_get_extents(layout, &ink, &logical);
-	return { logical.width / PANGO_SCALE,logical.height / PANGO_SCALE };
-}
+} 
+ 
 struct it_rect
 {
 	glm::ivec4 line_rect = {}, char_rect = {};
 	glm::ivec2 yr = {};
 	int baseline = 0;
 };
-it_rect get_iter(PangoLayoutIter* iter) {
-
-	it_rect ret = {};
-	PangoRectangle lr = {}, cr = {};
-	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&lr);
-	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&cr);
-	pango_layout_iter_get_line_yrange(iter, &ret.yr.x, &ret.yr.y);
-	ret.baseline = pango_layout_iter_get_baseline(iter);
-	ret.line_rect = glm::ivec4(lr.x, lr.y, lr.width, lr.height);
-	ret.char_rect = glm::ivec4(cr.x, cr.y, cr.width, cr.height);
-	ret.line_rect /= PANGO_SCALE;
-	ret.char_rect /= PANGO_SCALE;
-	ret.yr /= PANGO_SCALE;
-	ret.baseline /= PANGO_SCALE;
-	return ret;
-}
+//it_rect get_iter(PangoLayoutIter* iter) {
+//
+//	it_rect ret = {};
+//	PangoRectangle lr = {}, cr = {};
+//	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&lr);
+//	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&cr);
+//	pango_layout_iter_get_line_yrange(iter, &ret.yr.x, &ret.yr.y);
+//	ret.baseline = pango_layout_iter_get_baseline(iter);
+//	ret.line_rect = glm::ivec4(lr.x, lr.y, lr.width, lr.height);
+//	ret.char_rect = glm::ivec4(cr.x, cr.y, cr.width, cr.height);
+//	ret.line_rect /= PANGO_SCALE;
+//	ret.char_rect /= PANGO_SCALE;
+//	ret.yr /= PANGO_SCALE;
+//	ret.baseline /= PANGO_SCALE;
+//	return ret;
+//}
 std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 {
 	std::vector<glm::ivec4> r;
