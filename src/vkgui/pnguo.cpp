@@ -20324,7 +20324,7 @@ glm::ivec2 widget_base::get_pos(bool has_parent)
 	return ps;
 }
 
-
+#define PANGO_EDIT
 // todo 编辑框实现
 #ifndef NO_EDIT
 
@@ -20387,13 +20387,12 @@ public:
 	~text_ctx_cx();
 
 	void set_autobr(bool is);
-	void set_size(const glm::ivec2& ss); 
+	void set_size(const glm::ivec2& ss);
 	void set_family(const char* family);
 	void set_font_size(int fs);
 
 	void set_text(const std::string& str);
 	void set_editing(const std::string& str);
-	//void set_markup(const std::string& str);
 	void set_cursor(const glm::ivec3& c);
 	glm::ivec4 get_extents();
 	glm::ivec2 get_pixel_size();
@@ -20411,12 +20410,18 @@ public:
 	void up_cursor(bool is);
 	void set_single(bool is);
 	glm::ivec4 get_cursor_posv(int idx);
+#ifdef PANGO_EDIT
+	void set_desc(const char* str);
+	void set_markup(const std::string& str);
+	glm::ivec2 get_layout_position(PangoLayout* layout);
+	glm::ivec4 get_cursor_posv(PangoLayout* layout, int idx);
+#endif
 private:
 };
-#if 1
+#ifndef PANGO_EDIT 
 text_ctx_cx::text_ctx_cx()
 {
- #ifdef _WIN32
+#ifdef _WIN32
 	auto n = GetCaretBlinkTime();
 	if (cursor.z < 10)
 	{
@@ -20428,7 +20433,7 @@ text_ctx_cx::text_ctx_cx()
 }
 
 text_ctx_cx::~text_ctx_cx()
-{ 
+{
 	if (sur)
 	{
 		cairo_surface_destroy(sur); sur = 0;
@@ -20467,7 +20472,7 @@ void text_ctx_cx::set_size(const glm::ivec2& ss)
 		valid = true;
 	}
 }
- 
+
 
 void text_ctx_cx::set_family(const char* familys)
 {
@@ -20518,7 +20523,7 @@ void text_ctx_cx::set_text(const std::string& str)
 	else
 	{
 		//pango_layout_set_text(layout, str.c_str(), str.size());
-	} 
+	}
 	// todo 获取行高lineheight = h / PANGO_SCALE;
 	get_bounds_px();
 	valid = true;
@@ -20531,7 +20536,7 @@ void text_ctx_cx::set_editing(const std::string& str)
 	//pango_layout_set_markup(layout_editing, str.c_str(), str.size());
 	valid = true;
 }
- 
+
 
 void text_ctx_cx::set_cursor(const glm::ivec3& c)
 {
@@ -20541,7 +20546,7 @@ void text_ctx_cx::set_cursor(const glm::ivec3& c)
 glm::ivec4 text_ctx_cx::get_extents()
 {
 	// todo 获取像素大小区域
-	return {}; 
+	return {};
 }
 
 glm::ivec2 text_ctx_cx::get_pixel_size()
@@ -20559,7 +20564,7 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 {
 	x += scroll_pos.x - _align_pos.x;
 	y += scroll_pos.y - _align_pos.y;
-
+	int index = 0, trailing = 0;
 	if (x < 0)
 	{
 		x = 0;
@@ -20568,23 +20573,11 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	{
 		y = 0;
 	}
-	auto cc = pango_layout_get_character_count(layout);
-	int lc = pango_layout_get_line_count(layout);
 	glm::ivec2 lps = {};
-	pango_layout_get_pixel_size(layout, &lps.x, &lps.y);
 	if (y > lps.y)
 		y = lps.y - 1;
-	int index = 0, trailing = 0;
-	auto ls = pango_layout_get_lines_readonly(layout);
-	bool k = pango_layout_xy_to_index(layout, x * PANGO_SCALE, y * PANGO_SCALE, &index, &trailing);
-	int x_pos = 0;
-	int lidx = 0;
-	pango_layout_index_to_line_x(layout, index, 0, &lidx, &x_pos);
-
-
-	x_pos /= PANGO_SCALE;
 	auto cursor = index + trailing;
-	if (!k)
+	//if (!k)
 	{
 		auto nk = get_line_length(cursor);
 		cursor = nk.x;
@@ -20594,174 +20587,16 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	int ps = chp - cp;
 	cursor += ps;
 	cursor;
-	clineidx = lidx;
-	//printf("%d\t%d\n", ccursor, ps);
-	PangoRectangle ink_rect = {};
-	PangoRectangle logical_rect = {};
-	pango_layout_get_pixel_extents(layout, &ink_rect, &logical_rect);	//cairo_move_to(cr, 0 /*extents.x*/, ink_rect.y - (logical_rect.height - ink_rect.height) * 0.5);
-	// 获取基线位置
-	int y_pos = pango_layout_get_baseline(layout);
-	int h = 0;
-	auto line = pango_layout_get_line(layout, lidx);
-	pango_layout_line_get_height(line, &h);
-	lineheight = h / PANGO_SCALE;
+	//clineidx = lidx; 
+	//lineheight = h / PANGO_SCALE;
 	return cursor;
 }
- 
-gboolean text_util_get_block_cursor_location(PangoLayout* layout, int index, PangoRectangle* pos, gboolean* at_line_end)
-{
-	PangoRectangle strong_pos, weak_pos;
-	PangoLayoutLine* layout_line;
-	gboolean rtl;
-	int line_no;
-	const char* text;
 
-	g_return_val_if_fail(layout != NULL, FALSE);
-	g_return_val_if_fail(index >= 0, FALSE);
-	g_return_val_if_fail(pos != NULL, FALSE);
-
-	pango_layout_index_to_pos(layout, index, pos);
-
-	if (pos->width != 0)
-	{
-		/* cursor is at some visible character, good */
-		if (at_line_end)
-			*at_line_end = FALSE;
-		if (pos->width < 0)
-		{
-			pos->x += pos->width;
-			pos->width = -pos->width;
-		}
-		return TRUE;
-	}
-
-	pango_layout_index_to_line_x(layout, index, FALSE, &line_no, NULL);
-	layout_line = pango_layout_get_line_readonly(layout, line_no);
-	g_return_val_if_fail(layout_line != NULL, FALSE);
-
-	text = pango_layout_get_text(layout);
-
-	if (index < pango_layout_line_get_start_index(layout_line) + pango_layout_line_get_length(layout_line))
-	{
-		/* this may be a zero-width character in the middle of the line,
-		 * or it could be a character where line is wrapped, we do want
-		 * block cursor in latter case */
-		if (g_utf8_next_char(text + index) - text !=
-			pango_layout_line_get_start_index(layout_line) + pango_layout_line_get_length(layout_line))
-		{
-			/* zero-width character in the middle of the line, do not
-			 * bother with block cursor */
-			return FALSE;
-		}
-	}
-
-	/* Cursor is at the line end. It may be an empty line, or it could
-	 * be on the left or on the right depending on text direction, or it
-	 * even could be in the middle of visual layout in bidi text. */
-
-	pango_layout_get_cursor_pos(layout, index, &strong_pos, &weak_pos);
-
-	if (strong_pos.x != weak_pos.x)
-	{
-		/* do not show block cursor in this case, since the character typed
-		 * in may or may not appear at the cursor position */
-		return FALSE;
-	}
-
-	/* In case when index points to the end of line, pos->x is always most right
-	 * pixel of the layout line, so we need to correct it for RTL text. */
-	if (pango_layout_line_get_length(layout_line))
-	{
-		if (pango_layout_line_get_resolved_direction(layout_line) == PANGO_DIRECTION_RTL)
-		{
-			PangoLayoutIter* iter;
-			PangoRectangle line_rect;
-			int i;
-			int left, right;
-			const char* p;
-
-			p = g_utf8_prev_char(text + index);
-
-			pango_layout_line_index_to_x(layout_line, p - text, FALSE, &left);
-			pango_layout_line_index_to_x(layout_line, p - text, TRUE, &right);
-			pos->x = MIN(left, right);
-
-			iter = pango_layout_get_iter(layout);
-			for (i = 0; i < line_no; i++)
-				pango_layout_iter_next_line(iter);
-			pango_layout_iter_get_line_extents(iter, NULL, &line_rect);
-			pango_layout_iter_free(iter);
-
-			rtl = TRUE;
-			pos->x += line_rect.x;
-		}
-		else
-			rtl = FALSE;
-	}
-	else
-	{
-		PangoContext* context = pango_layout_get_context(layout);
-		rtl = pango_context_get_base_dir(context) == PANGO_DIRECTION_RTL;
-	}
-
-	pos->width = layout_get_char_width(layout);
-
-	if (rtl)
-		pos->x -= pos->width - 1;
-
-	if (at_line_end)
-		*at_line_end = TRUE;
-
-	return pos->width != 0;
-}
-
-glm::ivec2 get_index2pos(PangoLayout* layout, int idx) {
-	PangoRectangle pos = {};
-	pango_layout_index_to_pos(layout, idx, &pos);
-	return glm::ivec2(pos.x / PANGO_SCALE, pos.y / PANGO_SCALE);
-}
 // 输入行号，索引号，方向，输出行号选择范围
 glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
 {
 	//pango_layout_get_line_count
-	auto line = pango_layout_get_line(layout, lidx);
-	auto lst = pango_layout_get_lines(layout);
-	PangoRectangle ink_rect = {};
-	PangoRectangle logical_rect = {};
-	glm::ivec4 rt = {};
-	gboolean at_line_end = 0;
-	PangoRectangle tpos = {};
-	if (line)
-	{
-		int h = 0;
-		pango_layout_line_get_height(line, &h);
-		h = h / PANGO_SCALE;
-		auto xi = pango_layout_line_get_start_index(line);
-		{
-			gboolean rb = text_util_get_block_cursor_location(layout, idx > 0 ? idx : xi, &tpos, &at_line_end);
-			pango_layout_get_cursor_pos(layout, idx > 0 ? idx : xi, &ink_rect, &logical_rect);
-			glm::ivec4 r = { logical_rect.x,logical_rect.y,logical_rect.width,logical_rect.height }, r1 = { tpos.x,tpos.y,tpos.width,tpos.height };
-			r /= PANGO_SCALE;
-			r1 /= PANGO_SCALE;
-			rt.x = r.x;
-			rt.y = r.y;
-			rt.w = h;
-		}
-		if (dir)
-		{
-			pango_layout_get_cursor_pos(layout, xi, &ink_rect, &logical_rect);
-			rt.z = rt.x;
-			rt.x = logical_rect.x / PANGO_SCALE;
-		}
-		else {
-			pango_layout_line_get_pixel_extents(line, &ink_rect, &logical_rect);
-			rt.z = logical_rect.width - rt.x;
-		}
-		int lh = 0;
-		pango_layout_line_get_height(line, &lh);
-		lh /= PANGO_SCALE;
-	}
-	return rt;
+	return {};
 }
 glm::ivec2 text_ctx_cx::get_line_length(int index)
 {
@@ -20787,29 +20622,22 @@ glm::ivec2 geti2x(PangoLayout* layout, int x)
 	return glm::ivec2(x_pos, lidx);
 }
 
-glm::ivec4 text_ctx_cx::get_cursor_posv( int idx)
-{ 
-	glm::ivec4 r = { /*w1.x,w1.y,w1.width,w1.height*/ }; 
+glm::ivec4 text_ctx_cx::get_cursor_posv(int idx)
+{
+	glm::ivec4 r = { /*w1.x,w1.y,w1.width,w1.height*/ };
 	return r;
 }
 
 std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
 {
 	std::vector<glm::ivec4> rv;
-	PangoRectangle sw[2] = {};
-	pango_layout_get_caret_pos(layout, idx, &sw[0], &sw[1]);
-	auto& w0 = sw[0];
-	auto& w1 = sw[1];
-	glm::ivec4 r = { w0.x,w0.y,w0.width,w0.height };
-	glm::ivec4 r1 = { w1.x,w1.y,w1.width,w1.height };
-	rv.push_back(r);
-	rv.push_back(r1);
-	for (auto& it : rv) {
-		it /= PANGO_SCALE;
-	}
+	//glm::ivec4 r = { w0.x,w0.y,w0.width,w0.height };
+	//glm::ivec4 r1 = { w1.x,w1.y,w1.width,w1.height };
+	//rv.push_back(r);
+	//rv.push_back(r1); 
 	return rv;
-} 
- 
+}
+
 struct it_rect
 {
 	glm::ivec4 line_rect = {}, char_rect = {};
@@ -20835,59 +20663,7 @@ struct it_rect
 std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 {
 	std::vector<glm::ivec4> r;
-	int x_pos = 0;
-	int lidx = 0;
-	auto v = get_bounds();
-	auto v1 = geti2x(layout, v.x);
-	auto v2 = geti2x(layout, v.y);
-	if (v.x != v.y)
-	{
-		v = v;
-	}
-	auto vp1 = get_index2pos(layout, v.x);
-	auto vp2 = get_index2pos(layout, v.y);
-
-	auto nk = get_line_length(v.x);
-	auto nk1 = get_line_length(v.y);
-	auto ss = get_layout_size(layout);
-	auto sw0 = get_cursor_posv(layout, v.x);
-	auto sw1 = get_cursor_posv(layout, v.y);
 	std::vector<glm::ivec4> rs, rss;
-	int line_no = pango_layout_get_line_count(layout);
-	auto iter = pango_layout_get_iter(layout);
-	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
-	for (int i = 0; i < line_no; i++)
-	{
-		auto rc = get_iter(iter);
-		if (i != v1.y)
-		{
-			pango_layout_iter_next_line(iter); continue;
-		}
-		if (v1.y == v2.y)
-		{
-			rss.push_back({ rc.line_rect.x + sw0.x,rc.yr.x,sw1.x - sw0.x,rc.yr.y - rc.yr.x });
-			break;
-		}
-		else
-		{
-			glm::ivec4 f = { rc.line_rect.x + sw0.x,rc.yr.x,(rc.line_rect.z - sw0.x) + pwidth,rc.yr.y - rc.yr.x };
-			rss.push_back(f);
-			pango_layout_iter_next_line(iter);
-			for (size_t x = v1.y + 1; x < v2.y; x++)
-			{
-				rc = get_iter(iter);
-				glm::ivec4 c = { rc.line_rect.x,rc.yr.x,rc.line_rect.z + pwidth,rc.yr.y - rc.yr.x };
-				rss.push_back(c);
-				pango_layout_iter_next_line(iter);
-			}
-			rc = get_iter(iter);
-			f = { rc.line_rect.x ,rc.yr.x, sw1.x ,rc.yr.y - rc.yr.x };
-			rss.push_back(f);
-			break;
-		}
-	}
-
-	pango_layout_iter_free(iter);
 	if (roundselect)
 	{
 		PathsD subjects;
@@ -20926,58 +20702,15 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 
 void text_ctx_cx::up_caret()
 {
-	auto kc = pango_layout_get_line_count(layout);
-	PangoRectangle sw[4] = {};
-	auto v1 = geti2x(layout, ccursor);
-	auto f = get_line_extents(v1.y, ccursor, 0);
-
-	pango_layout_get_cursor_pos(layout, ccursor, &sw[0], &sw[1]);
-	pango_layout_get_caret_pos(layout, ccursor, &sw[2], &sw[3]);
-	glm::ivec4 caret = { sw->x,sw->y,sw[2].x,sw[2].y };
-	caret /= PANGO_SCALE;
-	int h = sw->height;
-	h /= PANGO_SCALE;
-	cursor_pos = caret; cursor_pos.z = h;
+	//cursor_pos = caret; cursor_pos.z = h;
 }
 glm::ivec2 get_line_info(PangoLayout* layout, int line)
 {
 	glm::ivec2 ret = {};
-	int ct = pango_layout_get_line_count(layout);
-	if (line >= ct)line = ct - 1;
-	if (line < 0)line = 0;
-	PangoLayoutLine* pl = pango_layout_get_line(layout, line);
-	if (pl)
 	{
-		ret = { pl->start_index , pl->length };
+		//ret = { pl->start_index , pl->length };
 	}
 	return ret;
-}
-void renderer_draw_layout(cairo_t* cr, PangoLayout* layout, int x, int y, int baseline)
-{
-	PangoLayoutIter* iter;
-	g_return_if_fail(PANGO_IS_LAYOUT(layout));
-	iter = pango_layout_get_iter(layout);
-	do
-	{
-		PangoRectangle   logical_rect;
-		PangoLayoutLine* line;
-		//int              baseline;
-
-		line = pango_layout_iter_get_line_readonly(iter);
-		glm::ivec2 yy = {};
-		pango_layout_iter_get_line_yrange(iter, &yy.x, &yy.y);
-		pango_layout_iter_get_line_extents(iter, NULL, &logical_rect);
-		if (baseline == 0)
-			baseline = pango_layout_iter_get_baseline(iter);
-		cairo_save(cr);
-		yy /= PANGO_SCALE;
-		cairo_translate(cr, x + logical_rect.x, y + baseline + yy.x);
-		pango_cairo_show_layout_line(cr, line);
-		cairo_restore(cr);
-	} while (pango_layout_iter_next_line(iter));
-
-	pango_layout_iter_free(iter);
-
 }
 bool text_ctx_cx::update(float delta)
 {
