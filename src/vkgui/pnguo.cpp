@@ -20441,8 +20441,7 @@ text_ctx_cx::~text_ctx_cx()
 }
 
 void text_ctx_cx::set_autobr(bool is)
-{
-	//pango_layout_set_width(layout, is ? size.x * PANGO_SCALE : -1);
+{ 
 }
 void text_ctx_cx::set_single(bool is) {
 	single_line = is;
