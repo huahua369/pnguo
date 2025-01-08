@@ -19611,6 +19611,53 @@ void flex_item::update_should_order_children()
 }
 
 
+void flex_item::set_base(float* size, float* offset4, float* padding4, float* margin4, float* gsb, int order1, uint8_t* align_pdw7)
+{
+	if (size) {
+		width = size[0];
+		height = size[1];
+	}
+	if (offset4) {
+		left = offset4[0];
+		right = offset4[1];
+		top = offset4[2];
+		bottom = offset4[3];
+	}
+	if (padding4)
+	{
+		padding_left = padding4[0];
+		padding_right = padding4[1];
+		padding_top = padding4[2];
+		padding_bottom = padding4[3];
+	}
+	if (margin4)
+	{
+		margin_left = margin4[0];
+		margin_right = margin4[1];
+		margin_top = margin4[2];
+		margin_bottom = margin4[3];
+	}
+	auto p7 = align_pdw7;
+	if (p7)
+	{
+		justify_content = (flex_align)p7[0];
+		align_content = (flex_align)p7[1];
+		align_items = (flex_align)p7[2];
+		align_self = (flex_align)p7[3];
+
+		position = (flex_position)p7[4];
+		direction = (flex_direction)p7[5];
+		wrap = (flex_wrap)p7[6];
+		//bool should_order_children = false;
+	}
+	if (gsb) {
+		grow = gsb[0];
+		shrink = gsb[1];
+		basis = gsb[2];
+	}
+	order = order1;
+}
+
 flex_item* flex_item::init()
 {
 	flex_item* item = this;
@@ -19841,11 +19888,7 @@ void layout_cleanup(struct flex_layout* layout)
     while (0)
 
 #define LAYOUT_CHILD_AT(item, i) ((*item->children)[(layout->ordered_indices.size() ? layout->ordered_indices[i] : i)])
-//flex_item* LAYOUT_CHILD_AT(flex_item* item, int i, struct flex_layout* layout) {
-//	auto x=(layout->ordered_indices.size() ? layout->ordered_indices[i] : i);
-//	((*item->children)[x]);
-//}
-
+//#define LAYOUT_CHILD_AT(item, i) (item->children.ary[(layout->ordered_indices != NULL ? layout->ordered_indices[i] : i)])  
 
 #define _LAYOUT_FRAME(child, name) child->frame[layout->frame_##name##_i]
 
@@ -20441,7 +20484,7 @@ text_ctx_cx::~text_ctx_cx()
 }
 
 void text_ctx_cx::set_autobr(bool is)
-{ 
+{
 }
 void text_ctx_cx::set_single(bool is) {
 	single_line = is;

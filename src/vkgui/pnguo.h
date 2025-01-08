@@ -1345,8 +1345,8 @@ public:
 	};
 
 	// size[0] == width, size[1] == height
-	typedef void (*flex_self_sizing)(flex_item* item, float size[2]);
-	float	width = NAN;
+	typedef void (*flex_self_sizing)(flex_item* item, float* size);
+	float width = NAN;
 	float height = NAN;
 
 	float left = NAN;			// 左偏移坐标
@@ -1379,16 +1379,17 @@ public:
 	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
 	float basis = NAN;	// 子元素:定义最小空间
 
-	void* managed_ptr = NULL;
-	flex_self_sizing self_sizing = NULL;
+	void* managed_ptr = NULL;	// 用户数据指针
+	flex_self_sizing self_sizing = NULL; // 运行时计算大小
 
 	float frame[4] = {};	// 输出坐标、大小
-	flex_item* parent = 0;
-	std::vector<flex_item*>* children = 0;
+	flex_item* parent = 0;	// 父级
+	std::vector<flex_item*>* children = 0;	// 子级
 public:
 	flex_item();
 	~flex_item();
-
+	// 指针为空就默认值，80字节
+	void set_base(float* size, float* offset4, float* padding4, float* margin4, float* gsb, int order, uint8_t* align_pdw7);
 	flex_item* init();
 	void update_should_order_children();	// 子元素属性改变时执行
 
@@ -1404,6 +1405,7 @@ private:
 	void layout_items(uint32_t child_begin, uint32_t child_end, uint32_t children_count, struct flex_layout* layout, uint32_t last_count);
 	void layout_item(float width, float height);
 };
+
 
 #endif // NO_FLEX_CX
 
