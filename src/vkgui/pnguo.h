@@ -1364,6 +1364,11 @@ public:
 	float margin_top = 0;
 	float margin_bottom = 0;
 
+	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
+	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
+	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
+	float basis = NAN;	// 子元素:定义最小空间
+
 	flex_align justify_content = flex_align::ALIGN_START;	// 父元素:主轴上的元素的排列方式 start\end\center\space-between\space-around
 	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\stretch 
 	flex_align align_items = flex_align::ALIGN_STRETCH;		// 父元素:副轴上的元素的排列方式 start\end\center\stretch 
@@ -1373,11 +1378,6 @@ public:
 	flex_direction direction = flex_direction::ROW;			// 父元素:
 	flex_wrap wrap = flex_wrap::WRAP;						// 父元素:是否换行，超出宽度自动换行
 	bool should_order_children = false;
-
-	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
-	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
-	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
-	float basis = NAN;	// 子元素:定义最小空间
 
 	void* managed_ptr = NULL;	// 用户数据指针
 	flex_self_sizing self_sizing = NULL; // 运行时计算大小
@@ -1390,6 +1390,8 @@ public:
 	~flex_item();
 	// 指针为空就默认值，80字节
 	void set_base(float* size, float* offset4, float* padding4, float* margin4, float* gsb, int order, uint8_t* align_pdw7);
+	// 复制除宽高外的属性
+	void copy_a(flex_item* p);
 	flex_item* init();
 	void update_should_order_children();	// 子元素属性改变时执行
 

@@ -19658,6 +19658,14 @@ void flex_item::set_base(float* size, float* offset4, float* padding4, float* ma
 	order = order1;
 }
 
+void flex_item::copy_a(flex_item* p)
+{
+	auto d0 = (char*)&left;
+	auto d1 = (char*)&managed_ptr;
+	auto d2 = (char*)&p->left;
+	memcpy(d0, d2, d1 - d0);
+}
+
 flex_item* flex_item::init()
 {
 	flex_item* item = this;
