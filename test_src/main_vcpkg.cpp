@@ -34,6 +34,7 @@ extern "C" {
 */
 #if 1
 #include <regex>
+
 namespace hz {
 	inline bool isse(int ch)
 	{
@@ -1005,7 +1006,7 @@ void build_spr_ui(form_x* form0)
 	p->draggable = false; //可拖动
 	p->fontsize = 12;
 	p->set_size(size);
-	p->set_pos({ 1,30 }); 
+	p->set_pos({ 1,30 });
 	int width = 16;
 	int rcw = 14;
 	{
