@@ -36,6 +36,56 @@ extern "C" {
 #include <regex>
 
 namespace hz {
+	// LinearRGB转换为sRGB：0-1的数值
+	float rgb2srgbf(float linear)
+	{
+		float s;
+		if (linear <= 0.0031308) {
+			s = linear * 12.92;
+		}
+		else {
+			s = 1.055 * pow(linear, 1.0 / 2.4) - 0.055;
+		}
+		return s;
+	}
+	//	sRGB转换为LinearRGB 
+	float srgb2rgbf(float s)
+	{
+		float linear;
+		if (s <= 0.04045) {
+			linear = s / 12.92;
+		}
+		else {
+			linear = pow((s + 0.055) / 1.055, 2.4);
+		}
+		return linear;
+	}
+	uint32_t rgb2srgb(uint32_t rgb) {
+		uint32_t& c = rgb;
+		auto p = (uint8_t*)&rgb;
+		for (size_t i = 0; i < 3; i++)
+		{
+			float k = p[i];
+			k /= 255.0;
+			k = rgb2srgbf(k);
+			k *= 255.0;
+			p[i] = k;
+		}
+		return c;
+	}
+	uint32_t srgb2rgb(uint32_t s) {
+		uint32_t& c = s;
+		auto p = (uint8_t*)&s;
+		for (size_t i = 0; i < 3; i++)
+		{
+			float k = p[i];
+			k /= 255.0;
+			k = rgb2srgbf(k);
+			k *= 255.0;
+			p[i] = k;
+		}
+		return c;
+	}
 	inline bool isse(int ch)
 	{
 		return ch == 0 || (ch > 0 && isspace(ch));
