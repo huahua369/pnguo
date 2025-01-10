@@ -10007,6 +10007,8 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	int y = 0;
 	int n = 1;
 	int lineheight = 0;// get_lineheight(idx, fontsize);
+
+	font_t* oft0 = 0;
 	do
 	{
 		if (!str || !(*str)) { break; }
@@ -10021,8 +10023,13 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 		}
 		font_t* oft = 0;
 		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
-		double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
-		lineheight = std::max((int)(oft->ascender * scale), lineheight);
+		if (oft != oft0) {
+			oft0 = oft;
+			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
+			//lineheight = std::max((int)(oft->ascender * scale), lineheight);
+			lineheight = std::max((int)((oft->ascender - oft->descender + oft->lineGap) * scale), lineheight);
+		}
+
 		x += rc.z;
 		y = std::max(rc.y, y);
 		ret.y = std::max(ret.y, y);
@@ -10035,6 +10042,89 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 		ret.y = fontsize;
 	return ret;
 }
+
+int layout_text_x::get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos)
+{
+	int ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	double ktt = 0.6;
+	tem_pv.clear();
+	do
+	{
+		if (!str || !(*str)) { break; }
+		uint32_t ch = 0;
+		auto pstr = str;
+		str = md::get_u8_last(str, &ch);
+		if (ch == '\n')
+		{
+			break;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		x += rc.z;
+		tem_pv.push_back(x);
+	} while (str && *str);
+	if (tem_pv.size()) {
+		auto rt = std::lower_bound(tem_pv.begin(), tem_pv.end(), xpos);
+		ret = (rt != tem_pv.end()) ? *rt : *tem_pv.rbegin();
+		if (xpos < tem_pv[0])
+		{
+			ret = tem_pv[0];
+		}
+		for (size_t i = 0; i < tem_pv.size(); i++)
+		{
+			if (ret == tem_pv[i])
+			{
+				ret = i; break;
+			}
+		}
+		if (ret > tem_pv.size() || xpos > *tem_pv.rbegin())
+		{
+			ret = tem_pv.size();
+		}
+	}
+	return ret;
+}
+int layout_text_x::get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow)
+{
+	int ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	double ktt = 0.6;
+	ow.clear();
+	std::vector<int> w0;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		uint32_t ch = 0;
+		auto pstr = str;
+		str = md::get_u8_last(str, &ch);
+		if (ch == '\n')
+		{
+			ow.push_back(w0);
+			w0.clear();
+			continue;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		x += rc.z;
+		w0.push_back(x);
+	} while (str && *str);
+	if (w0.size())ow.push_back(w0);
+	return ret;
+}
+
 glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
 {
 	return build_text(idx, rc, text_align, str8, len, fontsize, tv);
@@ -20375,7 +20465,7 @@ glm::ivec2 widget_base::get_pos(bool has_parent)
 	return ps;
 }
 
-#define PANGO_EDIT
+#define PANGO_EDIT0
 // todo 编辑框实现
 #ifndef NO_EDIT
 
@@ -20387,11 +20477,17 @@ public:
 	PangoContext* context = 0;
 	PangoLayout* layout = 0;
 	PangoLayout* layout_editing = 0;
+	std::string family = {};
 #endif
 	image_ptr_t cacheimg = {};
 	cairo_surface_t* sur = 0;
+	layout_text_x* ltx = 0;
+	std::string text;			// 原文本
+	std::string stext;			// 显示的文本
 	std::string editingstr;
-	std::string family = {};
+	std::vector<glm::ivec2> lvs;// 行开始结束
+	std::vector<std::vector<int>> widths;// 字符偏移
+	int fontid = 0;
 	int fontsize = 8;
 	uint32_t back_color = 0x06001020;		//背景色
 	uint32_t text_color = 0xffffffff;
@@ -20446,11 +20542,15 @@ public:
 	void set_editing(const std::string& str);
 	void set_cursor(const glm::ivec3& c);
 	glm::ivec4 get_extents();
-	glm::ivec2 get_pixel_size();
+	glm::ivec2 get_pixel_size(const char* str, int len);
 	int get_baseline();
+	int get_lineheight();
 	size_t get_xy_to_index(int x, int y, const char* str);
 	glm::ivec4 get_line_extents(int lidx, int idx, int dir);
-	glm::ivec2 get_line_length(int idx);
+	//glm::ivec2 get_line_length(int idx);
+	glm::ivec3 get_line_length(int idx);
+	glm::ivec2 get_layout_size();
+	glm::ivec2 get_line_info(int y);
 	glm::i64vec2 get_bounds();
 	std::vector<glm::ivec4> get_bounds_px();
 	void up_caret();
@@ -20528,7 +20628,7 @@ void text_ctx_cx::set_family(const char* familys)
 {
 	if (familys && *familys)
 	{
-		family = familys;
+		//family = familys;
 	}
 	//PangoFontDescription* desc = pango_font_description_new();
 	//pango_font_description_set_family(desc, family.c_str());
@@ -20568,15 +20668,34 @@ void text_ctx_cx::set_text(const std::string& str)
 		{
 			pws[i] = pwd;
 		}
+		stext = pws;
 		//pango_layout_set_text(layout, pws.c_str(), pws.size());
 	}
 	else
 	{
+		stext = str;
 		//pango_layout_set_text(layout, str.c_str(), str.size());
 	}
+
+	{
+		lvs.clear();
+		auto length = stext.size();
+		auto p = stext.c_str();
+		size_t f = 0, s = 0;
+		for (size_t i = 0; i < length; i++)
+		{
+			if (p[i] == '\n' || i == length - 1)
+			{
+				lvs.push_back({ f,i - f });
+				f = i + 1;
+			}
+		}
+	}
+
 	// todo 获取行高lineheight = h / PANGO_SCALE;
-	get_bounds_px();
+	//get_bounds_px();
 	valid = true;
+	upft = true;
 }
 
 void text_ctx_cx::set_editing(const std::string& str)
@@ -20599,17 +20718,28 @@ glm::ivec4 text_ctx_cx::get_extents()
 	return {};
 }
 
-glm::ivec2 text_ctx_cx::get_pixel_size()
+glm::ivec2 text_ctx_cx::get_pixel_size(const char* str, int len)
 {
 	int w = 0, h = 0;
-	//pango_layout_get_pixel_size(layout, &w, &h);
+	if (ltx && str && *str)
+	{
+		auto rc = ltx->get_text_rect(fontid, str, len, fontsize);
+		w = rc.x; h = rc.y;
+	}
 	return glm::ivec2(w, h);
 }
 
 int text_ctx_cx::get_baseline()
 {
-	return 0;//glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
+	return ltx ? ltx->get_baseline(fontid, fontsize) : 0;
+	//glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
 }
+int text_ctx_cx::get_lineheight()
+{
+	return ltx ? ltx->get_lineheight(fontid, fontsize) : 0;
+	//glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
+}
+// 获取鼠标坐标的光标位置
 size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 {
 	x += scroll_pos.x - _align_pos.x;
@@ -20623,15 +20753,20 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	{
 		y = 0;
 	}
-	glm::ivec2 lps = {};
+	auto pstr = stext.c_str();
+	glm::ivec2 lps = get_pixel_size(pstr, stext.size());
 	if (y > lps.y)
 		y = lps.y - 1;
+	y /= get_lineheight();
+	auto ky = lvs[y];
+	index = ltx->get_text_pos(fontid, fontsize, pstr + ky.x, ky.y, x);
+
 	auto cursor = index + trailing;
 	//if (!k)
-	{
-		auto nk = get_line_length(cursor);
-		cursor = nk.x;
-	}
+	//{
+	//	auto nk = get_line_length(cursor);
+	//	cursor = nk.x;
+	//}
 	auto cp = str + cursor;
 	auto chp = md::get_utf8_first(cp);
 	int ps = chp - cp;
@@ -20648,13 +20783,35 @@ glm::ivec4 text_ctx_cx::get_line_extents(int lidx, int idx, int dir)
 	//pango_layout_get_line_count
 	return {};
 }
-glm::ivec2 text_ctx_cx::get_line_length(int index)
+glm::ivec3 text_ctx_cx::get_line_length(int index)
 {
 	int x_pos = 0;
 	int lidx = 0;
-	//pango_layout_index_to_line_x(layout, index, 0, &lidx, &x_pos); 
-	glm::ivec2 ret = {/* line->start_index + len, x_pos / PANGO_SCALE*/ };
+	int cu = 0;
+	for (size_t i = 0; i < lvs.size(); i++)
+	{
+		auto c = lvs[i];
+		auto cx = index - c.x;
+		if (cx < c.y + 1)//因为有换行+1
+		{
+			x_pos = cx;
+			lidx = c.x;
+			cu = i;// 行号
+			break;
+		}
+	}
+	glm::ivec3 ret = { lidx,cu, x_pos };
 	return ret;
+}
+
+glm::ivec2 text_ctx_cx::get_layout_size()
+{
+	return size;
+}
+// todo line
+glm::ivec2 text_ctx_cx::get_line_info(int y)
+{
+	return y > 0 && y < lvs.size() ? lvs[y] : glm::ivec2();
 }
 
 glm::i64vec2 text_ctx_cx::get_bounds()
@@ -20710,10 +20867,36 @@ struct it_rect
 //	ret.baseline /= PANGO_SCALE;
 //	return ret;
 //}
+
+// todo 获取范围的像素大小
 std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 {
 	std::vector<glm::ivec4> r;
 	std::vector<glm::ivec4> rs, rss;
+	auto pstr = stext.c_str();
+	if (ltx)ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
+
+	float pwidth = fontsize;
+	auto v = get_bounds();
+	if (v.x == v.y) { rangerc = rss; return rs; }
+	auto v1 = get_line_length(v.x);
+	auto v2 = get_line_length(v.y);
+	auto line_no = lvs.size();
+	auto h = get_lineheight();
+	// 计算选中范围的每行的坐标宽高
+	if (v1.y == v2.y)
+	{
+		auto ks = lvs[v1.y];
+		auto rc1 = ltx->get_text_rect(fontid, pstr + ks.x, v1.x + v1.z, fontsize);
+		auto rc2 = ltx->get_text_rect(fontid, pstr + ks.x, v.y - v.x, fontsize);
+		rss.push_back({ rc1.x,v1.y * h,rc2.x,rc1.y });
+	}
+	for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
+	{
+		auto ks = lvs[i];
+		auto rc = ltx->get_text_rect(fontid, pstr + ks.x, ks.y, fontsize);
+		rss.push_back({ 0,i * h,rc.x,rc.y });
+	}
 	if (roundselect)
 	{
 		PathsD subjects;
@@ -20754,14 +20937,6 @@ void text_ctx_cx::up_caret()
 {
 	//cursor_pos = caret; cursor_pos.z = h;
 }
-glm::ivec2 get_line_info(PangoLayout* layout, int line)
-{
-	glm::ivec2 ret = {};
-	{
-		//ret = { pl->start_index , pl->length };
-	}
-	return ret;
-}
 bool text_ctx_cx::update(float delta)
 {
 	c_ct += delta * 1000.0 * c_d;
@@ -20790,13 +20965,14 @@ bool text_ctx_cx::update(float delta)
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_paint(cr);
 #endif
-	cairo_save(cr);
-	pango_cairo_update_layout(cr, layout);
 
-	auto pwidth = layout_get_char_width(layout) / PANGO_SCALE;
+	cairo_as _ss_(cr);
+
+
 	if (upft)
 	{
-		_baseline = get_baseline();
+		get_bounds_px();
+		_baseline = get_baseline(); lineheight = get_lineheight();
 		upft = false;
 	}
 	if (single_line) {
@@ -20825,8 +21001,17 @@ bool text_ctx_cx::update(float delta)
 		}
 	}
 	set_color(cr, text_color);
-	auto b = pango_layout_get_ellipsize(layout);
-	pango_cairo_show_layout(cr, layout);
+	auto lhh = get_pixel_size(stext.c_str(), stext.size());
+	// 渲染文本
+	glm::vec4 rc = { 0,0,  lhh };
+	text_style_t st = {};
+	st.font = 0;
+	st.text_align = { 0.0,0.0 };
+	st.font_size = fontsize;
+	st.text_color = text_color;
+	if (ltx)
+		draw_text(cr, ltx, stext.c_str(), -1, rc, &st);
+
 	cairo_restore(cr);
 	cairo_destroy(cr);
 	bool ret = valid;
@@ -20842,11 +21027,11 @@ uint32_t get_reverse_color(uint32_t color) {
 }
 void text_ctx_cx::draw(cairo_t* cr)
 {
-	//printf("text_ctx_cx::draw\t%s\n",);
-	cairo_save(cr);
+	cairo_as _ss_(cr);
 	// 裁剪区域
 	cairo_rectangle(cr, pos.x, pos.y, size.x, size.y);
 	cairo_clip(cr);
+
 	auto ps = pos - scroll_pos + _align_pos;
 	auto oldop = cairo_get_operator(cr);
 	cairo_set_source_surface(cr, sur, pos.x, pos.y);
@@ -20869,10 +21054,18 @@ void text_ctx_cx::draw(cairo_t* cr)
 	{
 		cairo_save(cr);
 		cairo_translate(cr, x, y);
+		// 渲染文本
+		text_style_t st = {};
+		st.font = 0;
+		st.text_align = { 0.0,0.0 };
+		st.font_size = fontsize;
+		st.text_color = editing_text_color;
 
-		pango_cairo_update_layout(cr, layout_editing);
 		glm::ivec2 lps = {};
-		pango_layout_get_pixel_size(layout_editing, &lps.x, &lps.y);
+		glm::vec4 rc = { 0,0,lps.x, lps.y };
+		// todo 获取输入中的文本大小
+		//pango_layout_get_pixel_size(layout_editing, &lps.x, &lps.y);
+		lps = get_pixel_size(editingstr.c_str(), editingstr.size());
 		if (lps.y < lineheight)
 			lps.y = lineheight;
 		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
@@ -20881,7 +21074,10 @@ void text_ctx_cx::draw(cairo_t* cr)
 		cairo_rectangle(cr, 0, 0, lps.x, lps.y + 2);
 		cairo_fill(cr);
 		set_color(cr, editing_text_color);
-		pango_cairo_show_layout(cr, layout_editing);
+
+		if (ltx)
+			draw_text(cr, ltx, editingstr.c_str(), -1, rc, &st);
+
 
 		cairo_move_to(cr, lss.x, lss.y);
 		cairo_line_to(cr, lss.z, lss.w);
@@ -21821,7 +22017,8 @@ edit_tl::edit_tl()
 {
 	widget_base::wtype = WIDGET_TYPE::WT_EDIT;
 	ctx = new text_ctx_cx();
-	set_family("NSimSun", 12);
+	//set_family("NSimSun", 12);
+	set_family(0, 12);
 	set_align_pos({ 4, 4 });
 	set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
 }
@@ -21838,10 +22035,11 @@ void edit_tl::set_pwd(char ch)
 {
 	if (ctx)ctx->pwd = ch;
 }
-void edit_tl::set_family(const char* familys, int fontsize) {
+void edit_tl::set_family(int fontid, int fontsize) {
 	if (fontsize > 0)
 		ctx->fontsize = fontsize;
-	ctx->set_family(familys);
+	ctx->fontid = fontid;
+	//ctx->set_family(f);
 }
 void edit_tl::set_show_input_cursor(bool ab)
 {
@@ -21986,6 +22184,8 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 
 	auto e = &ep->v;
 	auto t = (devent_type_e)type;
+	if (!ctx->ltx)ctx->ltx = ltx;
+	if (!ltx)return;
 	switch (t)
 	{
 	case devent_type_e::mouse_move_e:
@@ -22042,13 +22242,14 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				}
 				if (ctx->ckselect == 0)
 					ctx->bounds[1] = ctx->ccursor = cx;
+				if (ctx->bounds[0] != ctx->bounds[1])
+					cx = cx;
 				ctx->get_bounds_px();
 				if (ctx->c_d != 0)
 				{
 					ctx->c_d = -1; ctx->c_ct = -1;// 更新光标
 				}
 				ctx->up_cursor(true);
-
 			}
 		}
 		else if (ctx->is_hover) {
@@ -22124,7 +22325,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			glm::ivec2 mps = { p->x,p->y };
 			auto& sp = ctx->scroll_pos;
 			sp.y -= mps.y * ctx->lineheight;
-			auto lss = get_layout_size(ctx->layout);
+			auto lss = ctx->get_layout_size();
 			lss.y -= ctx->lineheight;
 			if (sp.y < 0)
 			{
@@ -22401,7 +22602,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 	{
 		auto ts = _text.size();
 		auto c = get_cl(_text.data(), ctx->ccursor);
-		auto lp2 = get_line_info(ctx->layout, c.y);
+		auto lp2 = ctx->get_line_info(c.y);
 		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = lp2.x;
 		ctx->up_cursor(true);
 	}
@@ -22410,7 +22611,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 	{
 		auto ts = _text.size();
 		auto c = get_cl(_text.data(), ctx->ccursor);
-		auto lp2 = get_line_info(ctx->layout, c.y);
+		auto lp2 = ctx->get_line_info(c.y);
 		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = lp2.x + lp2.y;
 		ctx->up_cursor(true);
 	}
@@ -22456,8 +22657,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		auto ts = _text.size();
 		auto c = get_cl(_text.data(), ctx->ccursor);
 		auto& idx = c.y;
-		auto lpo2 = get_line_info(ctx->layout, idx);
-		auto lp2 = get_line_info(ctx->layout, ++idx);
+		auto lpo2 = ctx->get_line_info(idx);
+		auto lp2 = ctx->get_line_info(++idx);
 		auto x = get_cl_count(_text.data(), lpo2.x, ctx->ccursor);
 		if (x >= lp2.y)
 		{
@@ -22478,8 +22679,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		auto ts = _text.size();
 		auto c = get_cl(_text.data(), ctx->ccursor);
 		auto& idx = c.y;
-		auto lpo2 = get_line_info(ctx->layout, idx);
-		auto lp2 = get_line_info(ctx->layout, --idx);
+		auto lpo2 = ctx->get_line_info(idx);
+		auto lp2 = ctx->get_line_info(--idx);
 		auto x = get_cl_count(_text.data(), lpo2.x, ctx->ccursor);
 		if (x >= lp2.y)
 		{
@@ -22512,6 +22713,10 @@ void edit_tl::on_keyboard(et_un_t* ep)
 
 // 更新渲染啥的
 bool edit_tl::update(float delta) {
+	if (!ctx->ltx)
+	{
+		ctx->ltx = ltx;
+	}
 	if (!is_input)
 	{
 		ctx->c_d = 0;
@@ -23281,7 +23486,8 @@ edit_tl* plane_cx::add_input(const std::string& label, const glm::ivec2& size, b
 		auto ss = size;
 		edit1->set_size(ss);
 		edit1->set_single(single_line);
-		edit1->set_family(familys.c_str(), fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同		 
+		//edit1->set_family(familys.c_str(), fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同		 
+		edit1->set_family(0, fontsize); // 多字体混合无法对齐高度。英文行和中文行高度不同		 
 		edit1->ppos = get_pos();
 		add_widget(edit1);
 		edit1->_autofree = true;

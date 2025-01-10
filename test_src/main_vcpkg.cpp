@@ -1054,7 +1054,7 @@ void build_spr_ui(form_x* form0)
 	p->add_familys(fontn, 0);
 	p->add_familys(fontn1, 0);
 	p->draggable = false; //可拖动
-	p->fontsize = 12;
+	p->fontsize = 16;
 	p->set_size(size);
 	p->set_pos({ 1,30 });
 	int width = 16;
@@ -1357,7 +1357,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			};
 	}
 	auto ce = p->add_input("", { 1000,30 }, 1);
-	ce->set_family(0, 12);
+	//ce->set_family(0, 12);
 	for (auto& nt : btnname)
 	{
 		auto cp = p->add_gbutton(nt, { 160,30 }, color);

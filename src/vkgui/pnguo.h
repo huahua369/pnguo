@@ -1108,6 +1108,7 @@ public:
 	std::vector<font_item_t> tem_rtv;	// 临时缓存用
 	// todo
 	std::vector<atlas_cx> tem_iptr;
+	std::vector<float> tem_pv;
 	glm::ivec2 ctrc = {}, oldrc = {};
 
 	image_sliced_t sli = {};
@@ -1133,6 +1134,8 @@ public:
 	int get_lineheight(size_t idx, int fontsize);
 	// 获取文本区域大小,z为基线
 	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
+	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
 	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
@@ -1543,7 +1546,7 @@ public:
 	void set_cursor(const glm::ivec3& c);
 	// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
 	void set_color(const glm::ivec4& c);
-	void set_family(const char* familys, int fontsize);
+	void set_family(int fontid, int fontsize);
 	// 设置是否显示输入光标
 	void set_show_input_cursor(bool ab);
 	// 设置自动换行
