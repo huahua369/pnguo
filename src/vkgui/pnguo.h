@@ -1135,6 +1135,7 @@ public:
 	// 获取文本区域大小,z为基线
 	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
 	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
+	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
 	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);

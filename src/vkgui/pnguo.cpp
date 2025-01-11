@@ -10091,6 +10091,34 @@ int layout_text_x::get_text_pos(size_t idx, int fontsize, const void* str8, int 
 	}
 	return ret;
 }
+int layout_text_x::get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos)
+{
+	int ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = str + ipos;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	double ktt = 0.6;
+	do
+	{
+		if (!str || !(*str) || str >= str0) { break; }
+		uint32_t ch = 0;
+		auto pstr = str;
+		str = md::get_u8_last(str, &ch);
+		if (ch == '\n')
+		{
+			x = 0;
+			break;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		x += rc.z;
+	} while (str && *str);
+	return x;
+}
 int layout_text_x::get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow)
 {
 	int ret = {};
@@ -20521,6 +20549,7 @@ public:
 	int c_d = 0;
 	int _baseline = 0;
 	int ascent = 0, descent = 0;
+	int curx = 0;
 	char pwd = 0;
 	bool valid = true;
 	bool autobr = false;
@@ -20760,30 +20789,41 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	if (y > lps.y)
 		y = lps.y - 1;
 	y /= get_lineheight();
+	if (y >= lvs.size())y = lvs.size() - 1;
 	auto ky = lvs[y];
 	auto& ws = widths[y];
+	int cw = 0;
 	for (size_t i = 0; i < ws.size(); i++)
 	{
 		if (x < ws[i]) {
-			index = i; break;
+			index = i;  break;
 		}
 	}
 	if (index > 0) {
 		int tr = (ws[index] - ws[index - 1]) * 0.5;
 		int xx = x - ws[index - 1];
 		if (xx >= tr)
+		{
+			cw = ws[index];
 			index++;
+		}
+		else {
+			cw = ws[index - 1];
+		}
 	}
 	if (x > *(ws.rbegin()))index = ws.size();
 	if (index > 0)
 		index--;
 	index += ky.x;
-	printf("gxy:%d\n", index);
 	auto cursor = index + trailing;
 	auto cp = str + cursor;
 	auto chp = md::get_utf8_first(cp);
 	int ps = chp - cp;
-	cursor += ps;
+	//if (ps > 0) 
+	{
+		printf("gxy:%d\n", index);
+	}
+	cursor += ps; curx = cw;
 	return cursor;
 }
 
@@ -20884,8 +20924,6 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	std::vector<glm::ivec4> r;
 	std::vector<glm::ivec4> rs, rss;
 	auto pstr = stext.c_str();
-	if (ltx)ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
-
 	float pwidth = fontsize;
 	auto v = get_bounds();
 	if (v.x == v.y) { rangerc = rss; return rs; }
@@ -20960,6 +20998,16 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 
 void text_ctx_cx::up_caret()
 {
+	if (upft)
+	{
+		if (ltx) {
+			auto pstr = stext.c_str();
+			ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
+			get_bounds_px();
+			_baseline = get_baseline(); lineheight = get_lineheight();
+			upft = false;
+		}
+	}
 	glm::ivec4 caret = {   };
 	auto v1 = get_line_length((int)ccursor);
 	auto line_no = lvs.size();
@@ -20969,9 +21017,12 @@ void text_ctx_cx::up_caret()
 	{
 		auto ks = lvs[v1.y];
 		auto w1 = widths[v1.y];
-		int w = w1[ccursor - ks.x];
 		auto h = get_lineheight();
-		caret.x = w; caret.y = cursor_pos.z * v1.y;
+		if (ltx) {
+			auto pstr = stext.c_str();
+			caret.x = ltx->get_text_ipos(fontid, fontsize, pstr + ks.x, ks.y, ccursor - ks.x);
+		}
+		caret.y = cursor_pos.z * v1.y;
 		cursor_pos = caret; cursor_pos.z = h;
 	}
 }
@@ -21009,9 +21060,13 @@ bool text_ctx_cx::update(float delta)
 
 	if (upft)
 	{
-		get_bounds_px();
-		_baseline = get_baseline(); lineheight = get_lineheight();
-		upft = false;
+		if (ltx) {
+			auto pstr = stext.c_str();
+			ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
+			get_bounds_px();
+			_baseline = get_baseline(); lineheight = get_lineheight();
+			upft = false;
+		}
 	}
 	if (single_line) {
 		glm::vec2 ext = { 0,lineheight }, ss = size;
