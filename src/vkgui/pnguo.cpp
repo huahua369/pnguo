@@ -20773,6 +20773,11 @@ int text_ctx_cx::get_lineheight()
 // 获取鼠标坐标的光标位置
 size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 {
+	if (ltx && widths.empty())
+	{
+		auto pstr = stext.c_str();
+		ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
+	}
 	x += scroll_pos.x - _align_pos.x;
 	y += scroll_pos.y - _align_pos.y;
 	int index = 0, trailing = 0;
@@ -20799,7 +20804,10 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 			index = i;  break;
 		}
 	}
-	if (index > 0) {
+	if (x > *(ws.rbegin())) {
+		index = ws.size() - 1;
+	}
+	else if (index > 0) {
 		int tr = (ws[index] - ws[index - 1]) * 0.5;
 		int xx = x - ws[index - 1];
 		if (xx >= tr)
@@ -20810,20 +20818,20 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 		else {
 			cw = ws[index - 1];
 		}
-	}
-	if (x > *(ws.rbegin()))index = ws.size();
-	if (index > 0)
 		index--;
-	index += ky.x;
+	}
+	auto newx = md::utf8_char_pos(str + ky.x, index, -1);
+	newx -= (uint64_t)str;
+	index = (uint64_t)newx;
+	//index += ky.x;
+	curx = cw;
+	printf("gxy:%d\n", (int)index);
+	return (size_t)index;
 	auto cursor = index + trailing;
 	auto cp = str + cursor;
 	auto chp = md::get_utf8_first(cp);
 	int ps = chp - cp;
-	//if (ps > 0) 
-	{
-		printf("gxy:%d\n", index);
-	}
-	cursor += ps; curx = cw;
+	cursor += ps;
 	return cursor;
 }
 
@@ -20837,7 +20845,7 @@ glm::ivec3 text_ctx_cx::get_line_length(int index)
 {
 	int x_pos = 0;
 	int lidx = 0;
-	int cu = 0;
+	int cu = -1;
 	int cx = 0;
 	for (size_t i = 0; i < lvs.size(); i++)
 	{
@@ -20849,6 +20857,12 @@ glm::ivec3 text_ctx_cx::get_line_length(int index)
 			cu = i;// 行号
 			break;
 		}
+	}
+	if (cu < 0 && lvs.size()) {
+		cu = lvs.size() - 1;
+		auto c = lvs[cu];
+		x_pos = index - c.x;
+		lidx = c.x;
 	}
 	glm::ivec3 ret = { lidx,cu, x_pos };
 	return ret;
@@ -20895,29 +20909,9 @@ std::vector<glm::ivec4> get_caret_posv(PangoLayout* layout, int idx)
 	return rv;
 }
 
-struct it_rect
-{
-	glm::ivec4 line_rect = {}, char_rect = {};
-	glm::ivec2 yr = {};
-	int baseline = 0;
-};
-//it_rect get_iter(PangoLayoutIter* iter) {
-//
-//	it_rect ret = {};
-//	PangoRectangle lr = {}, cr = {};
-//	pango_layout_iter_get_line_extents(iter, NULL, (PangoRectangle*)&lr);
-//	pango_layout_iter_get_char_extents(iter, (PangoRectangle*)&cr);
-//	pango_layout_iter_get_line_yrange(iter, &ret.yr.x, &ret.yr.y);
-//	ret.baseline = pango_layout_iter_get_baseline(iter);
-//	ret.line_rect = glm::ivec4(lr.x, lr.y, lr.width, lr.height);
-//	ret.char_rect = glm::ivec4(cr.x, cr.y, cr.width, cr.height);
-//	ret.line_rect /= PANGO_SCALE;
-//	ret.char_rect /= PANGO_SCALE;
-//	ret.yr /= PANGO_SCALE;
-//	ret.baseline /= PANGO_SCALE;
-//	return ret;
-//}
-
+size_t char2pos(size_t ps, const char* str) {
+	return md::get_utf8_count(str, ps);
+}
 // todo 获取范围的像素大小
 std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 {
@@ -20937,14 +20931,16 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	{
 		auto ks = lvs[v1.y];
 		auto w1 = widths[v1.y];
-		int w = w1[v.x - ks.x];
-		int ww = w1[v.y - ks.x] - w;
+		auto xc = char2pos(v.x - ks.x, pstr + ks.x);
+		auto yc = char2pos(v.y - ks.x, pstr + ks.x);
+		int w = w1[xc];
+		int ww = w1[yc] - w;
 		rss.push_back({ w ,v1.y * h,ww,h });
 	}
 	else {
 		auto ks = lvs[v1.y];
 		auto w1 = widths[v1.y];
-		auto w = w1[v.x - ks.x];
+		auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
 		auto wd = *w1.rbegin() - w;
 		rss.push_back({ w,v1.y * h,wd,h });
 	}
@@ -20958,7 +20954,7 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	{
 		auto ks = lvs[v2.y];
 		auto w1 = widths[v2.y];
-		rss.push_back({ 0,v2.y * h,w1[v.y - ks.x],h });
+		rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });
 	}
 	if (roundselect)
 	{

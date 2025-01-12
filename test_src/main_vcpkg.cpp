@@ -1068,6 +1068,7 @@ void build_spr_ui(form_x* form0)
 	auto spredit = p->add_input("", { 1000,300 }, 0);
 	auto cstr = c.dump(2);
 	static spr_dev* sp = new spr_dev();
+	cstr = (char*)u8"abc设置\n123\n发的发awdf";
 	sp->set_text(cstr);
 	spredit->set_text(cstr.c_str(), cstr.size());
 	spredit->changed_cb = [=](edit_tl* ptr) {
