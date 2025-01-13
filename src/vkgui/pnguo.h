@@ -38,6 +38,10 @@ struct input_state_t;
 namespace md {
 	int64_t get_utf8_count(const char* buffer, int64_t len);
 	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
+	const char* utf8_prev_char(const char* str);
+	const char* utf8_next_char(const char* p);
+	int utf8_pointer_to_offset(const char* str, const char* pos);
+	char* utf8_offset_to_pointer(const char* str, int offset);
 	uint32_t get_u8_idx(const char* str, int64_t idx);
 	const char* get_u8_last(const char* str, uint32_t* codepoint);
 	std::string u16to_u8(uint16_t* str, size_t len);
@@ -1134,6 +1138,7 @@ public:
 	int get_lineheight(size_t idx, int fontsize);
 	// 获取文本区域大小,z为基线
 	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	glm::ivec3 get_text_rect1(size_t idx, int fontsize, const void* str8);
 	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
 	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
 	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);

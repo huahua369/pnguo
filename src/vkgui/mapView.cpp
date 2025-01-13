@@ -391,6 +391,77 @@ namespace md {
 		}
 		return p;
 	}
+	const char* utf8_prev_char(const char* p)
+	{
+		auto p1 = get_utf8_prev(p);
+		while (p && *p)
+		{
+			p--;
+			if ((*p & 0xc0) != 0x80)
+				break;
+		}
+		return p;
+	}
+#define mUNICODE_VALID(Char) ((Char) < 0x110000 && (((Char) & 0xFFFFF800) != 0xD800))
+
+	static const char utf8_skip_data[256] = {
+	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+	  3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,6,6,1,1
+	}; 
+	const char* utf8_next_char(const char* p) {
+		return (char*)((p)+utf8_skip_data[*(const unsigned char*)(p)]);
+	}
+	int utf8_pointer_to_offset(const char* str, const char* pos)
+	{
+		const char* s = str;
+		int offset = 0;
+
+		if (pos < str)
+			offset = -utf8_pointer_to_offset(pos, str);
+		else
+			while (s < pos)
+			{
+				s = md::utf8_next_char(s);
+				offset++;
+			}
+
+		return offset;
+	}
+	char* utf8_offset_to_pointer(const char* str, int offset)
+	{
+		const char* s = str;
+
+		if (offset > 0)
+			while (offset--)
+				s = md::utf8_next_char(s);
+		else
+		{
+			const char* s1;
+
+			/* This nice technique for fast backwards stepping
+			 * through a UTF-8 string was dubbed "stutter stepping"
+			 * by its inventor, Larry Ewing.
+			 */
+			while (offset)
+			{
+				s1 = s;
+				s += offset;
+				while ((*s & 0xc0) == 0x80)
+					s--;
+
+				offset += utf8_pointer_to_offset(s, s1);
+			}
+		}
+
+		return (char*)s;
+	}
+
 #endif // 1
 
 	// 去掉头尾空格
