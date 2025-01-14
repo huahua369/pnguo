@@ -20788,6 +20788,7 @@ void text_ctx_cx::set_text(const std::string& str)
 		stext = str;
 		//pango_layout_set_text(layout, str.c_str(), str.size());
 	}
+	text = str;
 
 	{
 		lvs.clear();
@@ -20802,6 +20803,8 @@ void text_ctx_cx::set_text(const std::string& str)
 				f = i + 1;
 			}
 		}
+		log_attrs.clear();
+		log_attrs.resize(text.size());
 	}
 	widths.clear();
 	// todo 获取行高lineheight = h / PANGO_SCALE;
@@ -20850,6 +20853,152 @@ int text_ctx_cx::get_lineheight()
 {
 	return ltx ? ltx->get_lineheight(fontid, fontsize) : 0;
 	//glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
+}
+void glyph_string_x_to_index(PangoGlyphString* glyphs, const char* text, int length, PangoAnalysis* analysis, int x_pos, int* index, bool* trailing)
+{
+	int i;
+	int start_xpos = 0;
+	int end_xpos = 0;
+	int width = 0;
+
+	int start_index = -1;
+	int end_index = -1;
+
+	int cluster_chars = 0;
+	const char* p;
+
+	bool found = false;
+
+	/* Find the cluster containing the position */
+
+	width = 0;
+
+	if (analysis->level % 2) /* Right to left */
+	{
+		for (i = glyphs->num_glyphs - 1; i >= 0; i--)
+			width += glyphs->glyphs[i].geometry.width;
+
+		for (i = glyphs->num_glyphs - 1; i >= 0; i--)
+		{
+			if (glyphs->log_clusters[i] != start_index)
+			{
+				if (found)
+				{
+					end_index = glyphs->log_clusters[i];
+					end_xpos = width;
+					break;
+				}
+				else
+				{
+					start_index = glyphs->log_clusters[i];
+					start_xpos = width;
+				}
+			}
+
+			width -= glyphs->glyphs[i].geometry.width;
+
+			if (width <= x_pos && x_pos < width + glyphs->glyphs[i].geometry.width)
+				found = true;
+		}
+	}
+	else /* Left to right */
+	{
+		for (i = 0; i < glyphs->num_glyphs; i++)
+		{
+			if (glyphs->log_clusters[i] != start_index)
+			{
+				if (found)
+				{
+					end_index = glyphs->log_clusters[i];
+					end_xpos = width;
+					break;
+				}
+				else
+				{
+					start_index = glyphs->log_clusters[i];
+					start_xpos = width;
+				}
+			}
+
+			if (width <= x_pos && x_pos < width + glyphs->glyphs[i].geometry.width)
+				found = true;
+
+			width += glyphs->glyphs[i].geometry.width;
+		}
+	}
+
+	if (end_index == -1)
+	{
+		end_index = length;
+		end_xpos = (analysis->level % 2) ? 0 : width;
+	}
+
+	/* Calculate number of chars within cluster */
+	p = text + start_index;
+	while (p < text + end_index)
+	{
+		p = md::utf8_next_char(p);
+		cluster_chars++;
+	}
+
+	if (start_xpos == end_xpos)
+	{
+		if (index)
+			*index = start_index;
+		if (trailing)
+			*trailing = false;
+	}
+	else
+	{
+		double cp = ((double)(x_pos - start_xpos) * cluster_chars) / (end_xpos - start_xpos);
+
+		/* LTR and right-to-left have to be handled separately
+		 * here because of the edge condition when we are exactly
+		 * at a pixel boundary; end_xpos goes with the next
+		 * character for LTR, with the previous character for RTL.
+		 */
+		if (start_xpos < end_xpos) /* Left-to-right */
+		{
+			if (index)
+			{
+				const char* p = text + start_index;
+				int i = 0;
+
+				while (i + 1 <= cp)
+				{
+					p = md::utf8_next_char(p);
+					i++;
+				}
+
+				*index = (p - text);
+			}
+
+			if (trailing)
+				*trailing = (cp - (int)cp >= 0.5);
+		}
+		else /* Right-to-left */
+		{
+			if (index)
+			{
+				const char* p = text + start_index;
+				int i = 0;
+
+				while (i + 1 < cp)
+				{
+					p = md::utf8_next_char(p);
+					i++;
+				}
+
+				*index = (p - text);
+			}
+
+			if (trailing)
+			{
+				double cp_flip = cluster_chars - cp;
+				*trailing = (cp_flip - (int)cp_flip >= 0.5);
+			}
+		}
+	}
 }
 
 bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trailing)
@@ -20948,7 +21097,7 @@ bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trail
 	auto ltx = layout->ltx;
 	auto strc = text + tmp_list->start_index;
 	while (tmp_list)
-	{  
+	{
 		auto cw = ltx->get_text_rect1(layout->fontid, layout->fontsize, strc);
 		int logical_width = cw.x;// pango_glyph_string_get_width(run->glyphs);
 
@@ -20962,24 +21111,19 @@ bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trail
 			int pos;
 			int char_index;
 
-			pango_glyph_string_x_to_index(run->glyphs,
-				text + run->item->offset, run->item->length,
-				&run->item->analysis,
-				x_pos - start_pos,
-				&pos, &char_trailing);
+			glyph_string_x_to_index(run->glyphs, text + run->item->offset, run->item->length, &run->item->analysis, x_pos - start_pos, &pos, &char_trailing);
 
 			char_index = run->item->offset + pos;
 
 			/* Convert from characters to graphemes */
-
-			offset = g_utf8_pointer_to_offset(text, text + char_index);
+			// 返回字符偏移
+			offset = md::utf8_pointer_to_offset(text, text + char_index);
 
 			grapheme_start_offset = offset;
 			grapheme_start_index = char_index;
-			while (grapheme_start_offset > first_offset &&
-				!layout->log_attrs[grapheme_start_offset].is_cursor_position)
+			while (grapheme_start_offset > first_offset && !layout->log_attrs[grapheme_start_offset].is_cursor_position)
 			{
-				grapheme_start_index = g_utf8_prev_char(text + grapheme_start_index) - text;
+				grapheme_start_index = md::utf8_prev_char(text + grapheme_start_index) - text;
 				grapheme_start_offset--;
 			}
 
@@ -20987,16 +21131,14 @@ bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trail
 			do
 			{
 				grapheme_end_offset++;
-			} while (grapheme_end_offset < end_offset &&
-				!layout->log_attrs[grapheme_end_offset].is_cursor_position);
+			} while (grapheme_end_offset < end_offset && !layout->log_attrs[grapheme_end_offset].is_cursor_position);
 
 			if (index)
 				*index = grapheme_start_index;
 
 			if (trailing)
 			{
-				if ((grapheme_end_offset == end_offset && suppress_last_trailing) ||
-					offset + char_trailing <= (grapheme_start_offset + grapheme_end_offset) / 2)
+				if ((grapheme_end_offset == end_offset && suppress_last_trailing) || offset + char_trailing <= (grapheme_start_offset + grapheme_end_offset) / 2)
 					*trailing = 0;
 				else
 					*trailing = grapheme_end_offset - grapheme_start_offset;
@@ -21020,30 +21162,22 @@ bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trail
 	return false;
 }
 
-bool layout_xy_to_index(text_ctx_cx* layout,
-	int          x,
-	int          y,
-	int* index,
-	int* trailing)
-{
-	PLayoutLine* prev_line = NULL;
-	PLayoutLine* found = NULL;
+bool layout_xy_to_index(text_ctx_cx* layout, int x, int y, int* index, int* trailing) {
+	PLayoutLine* prev_line = 0;
+	PLayoutLine* found = 0;
 	int found_line_x = 0;
 	int prev_last = 0;
 	int prev_line_x = 0;
 	bool retval = false;
 	bool outside = false;
-
-	do
+	auto iter = layout->lines.data();
+	auto h = layout->get_lineheight();
+	for (size_t i = 0; i < layout->lines.size(); i++, iter++)
 	{
-		PangoRectangle line_logical;
-		int first_y, last_y;
-
-		//g_assert(!ITER_IS_INVALID(&iter));
-
-		pango_layout_iter_get_line_extents(&iter, NULL, &line_logical);
-		pango_layout_iter_get_line_yrange(&iter, &first_y, &last_y);
-
+		glm::ivec4 line_logical = {};
+		int first_y = i * h, last_y = h * (i + 1);
+		//pango_layout_iter_get_line_extents(&iter, NULL, &line_logical);
+		//pango_layout_iter_get_line_yrange(&iter, &first_y, &last_y);
 		if (y < first_y)
 		{
 			if (prev_line && y < (prev_last + (first_y - prev_last) / 2))
@@ -21053,45 +21187,33 @@ bool layout_xy_to_index(text_ctx_cx* layout,
 			}
 			else
 			{
-				if (prev_line == NULL)
-					outside = TRUE; /* off the top */
-
-				found = _pango_layout_iter_get_line(&iter);
+				if (prev_line == 0)
+					outside = true; /* off the top */
+				found = iter;
 				found_line_x = x - line_logical.x;
 			}
 		}
-		else if (y >= first_y &&
-			y < last_y)
+		else if (y >= first_y && y < last_y)
 		{
-			found = _pango_layout_iter_get_line(&iter);
+			found = iter;
 			found_line_x = x - line_logical.x;
 		}
-
-		prev_line = _pango_layout_iter_get_line(&iter);
+		prev_line = iter;
 		prev_last = last_y;
 		prev_line_x = x - line_logical.x;
-
-		if (found != NULL)
+		if (found != 0)
 			break;
-	} while (pango_layout_iter_next_line(&iter));
-
-
-	if (found == NULL)
+	}
+	if (found == 0)
 	{
 		/* Off the bottom of the layout */
 		outside = true;
-
 		found = prev_line;
 		found_line_x = prev_line_x;
 	}
-
-	retval = layout_line_x_to_index(found,
-		found_line_x,
-		index, trailing);
-
+	retval = layout_line_x_to_index(found, found_line_x, index, trailing);
 	if (outside)
 		retval = false;
-
 	return retval;
 }
 size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
@@ -21117,14 +21239,14 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	//pango_layout_get_pixel_size(layout, &lps.x, &lps.y);
 	if (y > lps.y)
 		y = lps.y - 1;
+	y /= get_lineheight();
+	if (y >= lvs.size())y = lvs.size() - 1;
+
 	int index = 0, trailing = 0;
-	bool k = layout_xy_to_index(this, x * PANGO_SCALE, y * PANGO_SCALE, &index, &trailing);
-	int x_pos = 0;
-	int lidx = 0;
-	layout_index_to_line_x(layout, index, 0, &lidx, &x_pos);
+	bool k = layout_xy_to_index(this, x, y, &index, &trailing);
 
-
-	x_pos /= PANGO_SCALE;
+	clineidx = y;// 当前行号
+	lineheight = get_lineheight();
 	auto cursor = index + trailing;
 	if (!k)
 	{
@@ -21135,18 +21257,6 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	auto chp = md::get_utf8_first(cp);
 	int ps = chp - cp;
 	cursor += ps;
-	cursor;
-	clineidx = lidx;
-	//printf("%d\t%d\n", ccursor, ps);
-	PangoRectangle ink_rect = {};
-	PangoRectangle logical_rect = {};
-	pango_layout_get_pixel_extents(layout, &ink_rect, &logical_rect);	//cairo_move_to(cr, 0 /*extents.x*/, ink_rect.y - (logical_rect.height - ink_rect.height) * 0.5);
-	// 获取基线位置
-	int y_pos = pango_layout_get_baseline(layout);
-	int h = 0;
-	auto line = pango_layout_get_line(layout, lidx);
-	pango_layout_line_get_height(line, &h);
-	lineheight = h / PANGO_SCALE;
 	return cursor;
 }
 

@@ -417,6 +417,7 @@ namespace md {
 	const char* utf8_next_char(const char* p) {
 		return (char*)((p)+utf8_skip_data[*(const unsigned char*)(p)]);
 	}
+	// 返回字符偏移
 	int utf8_pointer_to_offset(const char* str, const char* pos)
 	{
 		const char* s = str;
@@ -433,6 +434,7 @@ namespace md {
 
 		return offset;
 	}
+	// 返回字节偏移
 	char* utf8_offset_to_pointer(const char* str, int offset)
 	{
 		const char* s = str;
