@@ -20807,8 +20807,6 @@ void text_ctx_cx::set_text(const std::string& str)
 		log_attrs.resize(text.size());
 	}
 	widths.clear();
-	// todo 获取行高lineheight = h / PANGO_SCALE;
-	//get_bounds_px();
 	valid = true;
 	upft = true;
 }
