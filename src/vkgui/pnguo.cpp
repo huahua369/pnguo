@@ -20573,6 +20573,38 @@ struct PLayoutLine {
 	int length = 0;
 	int resolved_dir = DIRECTION_LTR;
 };
+struct GlyphInfoLC {
+	uint32_t glyph;
+	uint32_t width;
+	uint32_t x_offset;
+	uint32_t y_offset;
+	int log_clusters;
+	bool is_cluster_start;
+	bool is_color;
+};
+struct PGlyphString {
+	int num_glyphs;
+	std::vector<GlyphInfoLC> glyphs;
+	//int* log_clusters;
+	void init(const char* text, int n_chars, int shape_width);
+};
+
+void PGlyphString::init(const char* text, int n_chars, int shape_width)
+{
+	const char* p = text;
+	if (n_chars < 0)n_chars = strlen(text);
+	glyphs.resize(n_chars);
+	for (int i = 0; i < n_chars; i++, p = md::utf8_next_char(p))
+	{
+		glyphs[i].glyph = -1;// PANGO_GLYPH_EMPTY;
+		glyphs[i].x_offset = 0;//geometry.
+		glyphs[i].y_offset = 0;//geometry.
+		glyphs[i].width = shape_width;//geometry.
+		glyphs[i].is_cluster_start = 1;//attr.
+		glyphs[i].log_clusters = p - text;
+	}
+}
+
 
 class text_ctx_cx
 {
@@ -20852,7 +20884,7 @@ int text_ctx_cx::get_lineheight()
 	return ltx ? ltx->get_lineheight(fontid, fontsize) : 0;
 	//glm::ceil((double)pango_layout_get_baseline(layout) / PANGO_SCALE);
 }
-void glyph_string_x_to_index(PangoGlyphString* glyphs, const char* text, int length, PangoAnalysis* analysis, int x_pos, int* index, bool* trailing)
+void glyph_string_x_to_index(PGlyphString* glyphs, const char* text, int length, bool r2l, int x_pos, int* index, bool* trailing)
 {
 	int i;
 	int start_xpos = 0;
@@ -20871,31 +20903,31 @@ void glyph_string_x_to_index(PangoGlyphString* glyphs, const char* text, int len
 
 	width = 0;
 
-	if (analysis->level % 2) /* Right to left */
+	if (r2l)//analysis->level % 2) /* Right to left */
 	{
 		for (i = glyphs->num_glyphs - 1; i >= 0; i--)
-			width += glyphs->glyphs[i].geometry.width;
+			width += glyphs->glyphs[i].width;
 
 		for (i = glyphs->num_glyphs - 1; i >= 0; i--)
 		{
-			if (glyphs->log_clusters[i] != start_index)
+			if (glyphs->glyphs[i].log_clusters != start_index)
 			{
 				if (found)
 				{
-					end_index = glyphs->log_clusters[i];
+					end_index = glyphs->glyphs[i].log_clusters;
 					end_xpos = width;
 					break;
 				}
 				else
 				{
-					start_index = glyphs->log_clusters[i];
+					start_index = glyphs->glyphs[i].log_clusters;
 					start_xpos = width;
 				}
 			}
 
-			width -= glyphs->glyphs[i].geometry.width;
+			width -= glyphs->glyphs[i].width;
 
-			if (width <= x_pos && x_pos < width + glyphs->glyphs[i].geometry.width)
+			if (width <= x_pos && x_pos < width + glyphs->glyphs[i].width)
 				found = true;
 		}
 	}
@@ -20903,32 +20935,32 @@ void glyph_string_x_to_index(PangoGlyphString* glyphs, const char* text, int len
 	{
 		for (i = 0; i < glyphs->num_glyphs; i++)
 		{
-			if (glyphs->log_clusters[i] != start_index)
+			if (glyphs->glyphs[i].log_clusters != start_index)
 			{
 				if (found)
 				{
-					end_index = glyphs->log_clusters[i];
+					end_index = glyphs->glyphs[i].log_clusters;
 					end_xpos = width;
 					break;
 				}
 				else
 				{
-					start_index = glyphs->log_clusters[i];
+					start_index = glyphs->glyphs[i].log_clusters;
 					start_xpos = width;
 				}
 			}
 
-			if (width <= x_pos && x_pos < width + glyphs->glyphs[i].geometry.width)
+			if (width <= x_pos && x_pos < width + glyphs->glyphs[i].width)
 				found = true;
 
-			width += glyphs->glyphs[i].geometry.width;
+			width += glyphs->glyphs[i].width;
 		}
 	}
 
 	if (end_index == -1)
 	{
 		end_index = length;
-		end_xpos = (analysis->level % 2) ? 0 : width;
+		end_xpos = (r2l) ? 0 : width;
 	}
 
 	/* Calculate number of chars within cluster */
@@ -21107,11 +21139,11 @@ bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trail
 			int grapheme_start_offset;
 			int grapheme_end_offset;
 			int pos;
-			int char_index;
+			int char_index = tmp_list->start_index;
 
-			glyph_string_x_to_index(run->glyphs, text + run->item->offset, run->item->length, &run->item->analysis, x_pos - start_pos, &pos, &char_trailing);
+			//glyph_string_x_to_index(run->glyphs, text + run->item->offset, run->item->length, &run->item->analysis, x_pos - start_pos, &pos, &char_trailing);
 
-			char_index = run->item->offset + pos;
+			//char_index = run->item->offset + pos;
 
 			/* Convert from characters to graphemes */
 			// 返回字符偏移
@@ -21214,6 +21246,7 @@ bool layout_xy_to_index(text_ctx_cx* layout, int x, int y, int* index, int* trai
 		retval = false;
 	return retval;
 }
+#if 0
 size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 {
 	if (ltx && widths.empty())
@@ -21257,14 +21290,14 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	cursor += ps;
 	return cursor;
 }
-
+#endif
 // 获取鼠标坐标的光标位置
 size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 {
+	auto pstr = text.c_str();
 	if (ltx && widths.empty())
 	{
-		auto pstr = stext.c_str();
-		ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
+		ltx->get_text_posv(fontid, fontsize, pstr, text.size(), widths);
 	}
 	x += scroll_pos.x - _align_pos.x;
 	y += scroll_pos.y - _align_pos.y;
@@ -21277,8 +21310,7 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	{
 		y = 0;
 	}
-	auto pstr = stext.c_str();
-	glm::ivec2 lps = get_pixel_size(pstr, stext.size());
+	glm::ivec2 lps = get_pixel_size(pstr, text.size());
 	if (y > lps.y)
 		y = lps.y - 1;
 	y /= get_lineheight();
@@ -21403,9 +21435,14 @@ size_t char2pos(size_t ps, const char* str) {
 // todo 获取范围的像素大小
 std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 {
+	if (ltx && widths.empty())
+	{
+		auto pstr = text.c_str();
+		ltx->get_text_posv(fontid, fontsize, pstr, text.size(), widths);
+	}
 	std::vector<glm::ivec4> r;
 	std::vector<glm::ivec4> rs, rss;
-	auto pstr = stext.c_str();
+	auto pstr = text.c_str();
 	float pwidth = fontsize;
 	auto v = get_bounds();
 	if (v.x == v.y) { rangerc = rss; return rs; }
@@ -21485,8 +21522,6 @@ void text_ctx_cx::up_caret()
 	if (upft)
 	{
 		if (ltx) {
-			auto pstr = stext.c_str();
-			ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
 			get_bounds_px();
 			_baseline = get_baseline(); lineheight = get_lineheight();
 			upft = false;
@@ -21503,7 +21538,7 @@ void text_ctx_cx::up_caret()
 		auto w1 = widths[v1.y];
 		auto h = get_lineheight();
 		if (ltx) {
-			auto pstr = stext.c_str();
+			auto pstr = text.c_str();
 			caret.x = ltx->get_text_ipos(fontid, fontsize, pstr + ks.x, ks.y, ccursor - ks.x);
 		}
 		caret.y = cursor_pos.z * v1.y;
@@ -21545,8 +21580,6 @@ bool text_ctx_cx::update(float delta)
 	if (upft)
 	{
 		if (ltx) {
-			auto pstr = stext.c_str();
-			ltx->get_text_posv(fontid, fontsize, pstr, stext.size(), widths);
 			get_bounds_px();
 			_baseline = get_baseline(); lineheight = get_lineheight();
 			upft = false;
