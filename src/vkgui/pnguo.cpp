@@ -20536,7 +20536,7 @@ glm::ivec2 widget_base::get_pos(bool has_parent)
 	return ps;
 }
 
-#define PANGO_EDIT0
+#define PANGO_EDIT
 // todo 编辑框实现
 #ifndef NO_EDIT
 
@@ -20619,6 +20619,8 @@ public:
 
 	std::vector<PLayoutLine> lines;
 	std::vector<PLogAttr> log_attrs;
+	std::vector<glm::ivec2> lvs;// 行开始结束
+	std::vector<std::vector<int>> widths;// 字符偏移
 
 #endif
 	image_ptr_t cacheimg = {};
@@ -20627,8 +20629,6 @@ public:
 	std::string text;			// 原文本
 	std::string stext;			// 显示的文本
 	std::string editingstr;
-	std::vector<glm::ivec2> lvs;// 行开始结束
-	std::vector<std::vector<int>> widths;// 字符偏移
 
 	int fontid = 0;
 	int fontsize = 8;
@@ -20686,13 +20686,10 @@ public:
 	void set_editing(const std::string& str);
 	void set_cursor(const glm::ivec3& c);
 	glm::ivec4 get_extents();
-	glm::ivec2 get_pixel_size(const char* str, int len);
 	int get_baseline();
 	int get_lineheight();
 	size_t get_xy_to_index(int x, int y, const char* str);
 	glm::ivec4 get_line_extents(int lidx, int idx, int dir);
-	//glm::ivec2 get_line_length(int idx);
-	glm::ivec3 get_line_length(int idx);
 	glm::ivec2 get_layout_size();
 	glm::ivec2 get_line_info(int y);
 	glm::i64vec2 get_bounds();
@@ -20706,10 +20703,15 @@ public:
 	void set_single(bool is);
 	glm::ivec4 get_cursor_posv(int idx);
 #ifdef PANGO_EDIT
+	glm::ivec2 get_pixel_size();
 	void set_desc(const char* str);
 	void set_markup(const std::string& str);
 	glm::ivec2 get_layout_position(PangoLayout* layout);
 	glm::ivec4 get_cursor_posv(PangoLayout* layout, int idx);
+	glm::ivec2 get_line_length(int idx);
+#else
+	glm::ivec3 get_line_length(int idx);
+	glm::ivec2 get_pixel_size(const char* str, int len);
 #endif
 private:
 };
@@ -21443,43 +21445,47 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	std::vector<glm::ivec4> r;
 	std::vector<glm::ivec4> rs, rss;
 	auto pstr = text.c_str();
+	auto tsize = text.size();
 	float pwidth = fontsize;
 	auto v = get_bounds();
-	if (v.x == v.y) { rangerc = rss; return rs; }
+	if (v.x == v.y || (v.x >= tsize || v.y >= tsize)) { rangerc = rss; return rs; }
 	auto v1 = get_line_length(v.x);
 	auto v2 = get_line_length(v.y);
 	auto line_no = lvs.size();
 	auto h = get_lineheight();
 	// 计算选中范围的每行的坐标宽高
 	printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
-	if (v1.y == v2.y)
-	{
-		auto ks = lvs[v1.y];
-		auto w1 = widths[v1.y];
-		auto xc = char2pos(v.x - ks.x, pstr + ks.x);
-		auto yc = char2pos(v.y - ks.x, pstr + ks.x);
-		int w = w1[xc];
-		int ww = w1[yc] - w;
-		rss.push_back({ w ,v1.y * h,ww,h });
-	}
+	if (v1 == v2) {}
 	else {
-		auto ks = lvs[v1.y];
-		auto w1 = widths[v1.y];
-		auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
-		auto wd = *w1.rbegin() - w;
-		rss.push_back({ w,v1.y * h,wd,h });
-	}
-	for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
-	{
-		auto ks = lvs[i];
-		auto w1 = widths[i];
-		rss.push_back({ 0,i * h,*w1.rbegin(), h });
-	}
-	if (v1.y < v2.y)
-	{
-		auto ks = lvs[v2.y];
-		auto w1 = widths[v2.y];
-		rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });
+		if (v1.y == v2.y)
+		{
+			auto ks = lvs[v1.y];
+			auto w1 = widths[v1.y];
+			auto xc = char2pos(v.x - ks.x, pstr + ks.x);
+			auto yc = char2pos(v.y - ks.x, pstr + ks.x);
+			int w = w1[xc];
+			int ww = w1[yc] - w;
+			rss.push_back({ w ,v1.y * h,ww,h });
+		}
+		else {
+			auto ks = lvs[v1.y];
+			auto w1 = widths[v1.y];
+			auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
+			auto wd = *w1.rbegin() - w;
+			rss.push_back({ w,v1.y * h,wd,h });
+		}
+		for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
+		{
+			auto ks = lvs[i];
+			auto w1 = widths[i];
+			rss.push_back({ 0,i * h,*w1.rbegin(), h });
+		}
+		if (v1.y < v2.y)
+		{
+			auto ks = lvs[v2.y];
+			auto w1 = widths[v2.y];
+			rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });
+		}
 	}
 	if (roundselect)
 	{
@@ -22201,11 +22207,16 @@ int get_line_height(PangoLayout* layout, int idx) {
 	h = h / PANGO_SCALE;
 	return h;
 }
-glm::ivec2 get_layout_size(PangoLayout* layout)
+
+glm::ivec2 get_layout_size_(PangoLayout* layout)
 {
 	PangoRectangle ink, logical;
 	pango_layout_get_extents(layout, &ink, &logical);
 	return { logical.width / PANGO_SCALE,logical.height / PANGO_SCALE };
+}
+glm::ivec2 text_ctx_cx::get_layout_size()
+{
+	return get_layout_size_(layout);
 }
 struct it_rect
 {
@@ -22246,7 +22257,7 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 
 	auto nk = get_line_length(v.x);
 	auto nk1 = get_line_length(v.y);
-	auto ss = get_layout_size(layout);
+	auto ss = get_layout_size();
 	auto sw0 = get_cursor_posv(layout, v.x);
 	auto sw1 = get_cursor_posv(layout, v.y);
 	std::vector<glm::ivec4> rs, rss;
@@ -22337,7 +22348,7 @@ void text_ctx_cx::up_caret()
 	h /= PANGO_SCALE;
 	cursor_pos = caret; cursor_pos.z = h;
 }
-glm::ivec2 get_line_info(PangoLayout* layout, int line)
+glm::ivec2 get_line_info_(PangoLayout* layout, int line)
 {
 	glm::ivec2 ret = {};
 	int ct = pango_layout_get_line_count(layout);
@@ -22350,6 +22361,12 @@ glm::ivec2 get_line_info(PangoLayout* layout, int line)
 	}
 	return ret;
 }
+
+glm::ivec2 text_ctx_cx::get_line_info(int y)
+{
+	return get_line_info_(layout, y);
+}
+
 void renderer_draw_layout(cairo_t* cr, PangoLayout* layout, int x, int y, int baseline)
 {
 	PangoLayoutIter* iter;

@@ -1099,6 +1099,7 @@ void form_x::init_dragdrop()
 				ole_drop_et t = {};
 				t.x = _dx; t.y = _dy;
 				t.fmt = _oledrop->_type;
+				//printf("drag ole :%d\t%d\n", t.x, t.y);
 				if (type == 0)
 				{
 					_oledrop->_tmp.resize(1);
@@ -1127,6 +1128,7 @@ void form_x::init_dragdrop()
 		{
 			POINT pt = { x, y };
 			ScreenToClient((HWND)pce::get_windowptr(_ptr), &pt);
+			//printf("on drag ole :%d\t%d\tpos:%d\t%d\n", pt.x, pt.y, x, y);
 			if (_dx != pt.x || _dy != pt.y)
 			{
 				_dx = pt.x;
