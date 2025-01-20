@@ -10023,7 +10023,7 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 		}
 		font_t* oft = 0;
 		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
-		if (oft != oft0) {
+		if (oft != oft0 && oft) {
 			oft0 = oft;
 			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
 			lineheight = std::max((int)((oft->ascender - oft->descender + oft->lineGap) * scale), lineheight);
@@ -20536,7 +20536,7 @@ glm::ivec2 widget_base::get_pos(bool has_parent)
 	return ps;
 }
 
-#define PANGO_EDIT
+#define PANGO_EDIT0
 // todo 编辑框实现
 #ifndef NO_EDIT
 
@@ -21301,6 +21301,8 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	{
 		ltx->get_text_posv(fontid, fontsize, pstr, text.size(), widths);
 	}
+	if (widths.size() != lvs.size())
+		return -1;
 	x += scroll_pos.x - _align_pos.x;
 	y += scroll_pos.y - _align_pos.y;
 	int index = 0, trailing = 0;
@@ -21437,18 +21439,22 @@ size_t char2pos(size_t ps, const char* str) {
 // todo 获取范围的像素大小
 std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 {
+	float pwidth = fontsize * 0.5;// 补行尾宽度
 	if (ltx && widths.empty())
 	{
 		auto pstr = text.c_str();
 		ltx->get_text_posv(fontid, fontsize, pstr, text.size(), widths);
+		pwidth = ltx->get_text_rect1(fontid, fontsize, "1").x;
 	}
 	std::vector<glm::ivec4> r;
 	std::vector<glm::ivec4> rs, rss;
 	auto pstr = text.c_str();
 	auto tsize = text.size();
-	float pwidth = fontsize;
 	auto v = get_bounds();
-	if (v.x == v.y || (v.x >= tsize || v.y >= tsize)) { rangerc = rss; return rs; }
+	if (v.x == v.y) { rangerc = rss; return rs; }
+	if ((v.x >= tsize || v.y > tsize)) {
+		rangerc = rss; return rs;
+	}
 	auto v1 = get_line_length(v.x);
 	auto v2 = get_line_length(v.y);
 	auto line_no = lvs.size();
@@ -21465,26 +21471,26 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 			auto yc = char2pos(v.y - ks.x, pstr + ks.x);
 			int w = w1[xc];
 			int ww = w1[yc] - w;
-			rss.push_back({ w ,v1.y * h,ww,h });
+			rss.push_back({ w ,v1.y * h,ww,h });// 同一行时
 		}
 		else {
 			auto ks = lvs[v1.y];
 			auto w1 = widths[v1.y];
 			auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
 			auto wd = *w1.rbegin() - w;
-			rss.push_back({ w,v1.y * h,wd,h });
+			rss.push_back({ w,v1.y * h,wd + pwidth,h });// 第一行
 		}
 		for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
 		{
 			auto ks = lvs[i];
 			auto w1 = widths[i];
-			rss.push_back({ 0,i * h,*w1.rbegin(), h });
+			rss.push_back({ 0,i * h,*w1.rbegin() + pwidth, h });// 中间全行
 		}
 		if (v1.y < v2.y)
 		{
 			auto ks = lvs[v2.y];
 			auto w1 = widths[v2.y];
-			rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });
+			rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });//最后一行
 		}
 	}
 	if (roundselect)
@@ -21538,7 +21544,7 @@ void text_ctx_cx::up_caret()
 	auto line_no = lvs.size();
 	auto h = get_lineheight();
 	// 计算选中范围的每行的坐标宽高 
-	if (line_no > 0 && widths.size() > 0)
+	if (line_no > 0 && widths.size() > v1.y)
 	{
 		auto ks = lvs[v1.y];
 		auto w1 = widths[v1.y];
