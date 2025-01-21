@@ -22717,6 +22717,7 @@ bool edit_tl::remove_bounds()
 		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.x;
 		remove_char(v.x, v.y - v.x);//删除选择的字符	 
 		r = true;
+		ctx->widths.clear();
 	}
 	return r;
 }
@@ -23092,7 +23093,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				}
 				auto cc = ctx->ccursor;
 				c1 = cc - c1;//输入的长度
-				cc -= (b.y - b.x) + dc;
+				cc -= (b.y - b.x);
 				//if (dc > 0) { c1 *= -1; }//光标在后时
 				if (r1) {
 					ctx->bounds[0] = b.x; ctx->bounds[1] = b.y;
@@ -23102,14 +23103,29 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = cc;
 				ctx->ckselect = 1;
 				if (b.x != b.y) {
-					if (dc > 0)
-						ctx->bounds[1] += c1;
+					if (r1)//后删除
+					{
+						if (dc == 0) {
+							ctx->bounds[0] -= c1;//后光标
+						}
+						else {
+							ctx->bounds[1] -= c1;//前光标
+						}
+					}
 					else
-						ctx->bounds[1] -= c1;
+					{
+						// 前删除
+						if (dc == 0) {
+							ctx->bounds[0] += c1;//后光标
+						}
+						else {
+							ctx->bounds[1] += c1;//前光标
+						}
+					}
 				}
 				ctx->ccursor = ctx->bounds[1];
 				b0 = { ctx->bounds[0], ctx->bounds[1] };
-				printf("dc0:\t%d\txy%d %d %d\n", dc, b0.x, b0.y, cc);
+				printf("dc0:\t%d\txy%d %d %d\n", dc, b0.x, b0.y, (int)cc);
 				ctx->get_bounds_px();
 				//printf("ole %p\t%d %d \n", this, cx, ctx->ccursor);
 				ctx->cur_select = ctx->get_bounds();
