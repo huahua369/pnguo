@@ -21349,7 +21349,7 @@ size_t text_ctx_cx::get_xy_to_index(int x, int y, const char* str)
 	index = (uint64_t)newx;
 	//index += ky.x;
 	curx = cw;
-	printf("gxy:%d\n", (int)index);
+	//printf("gxy:%d\n", (int)index);
 	return (size_t)index;
 	auto cursor = index + trailing;
 	auto cp = str + cursor;
@@ -21460,7 +21460,7 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	auto line_no = lvs.size();
 	auto h = get_lineheight();
 	// 计算选中范围的每行的坐标宽高
-	printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
+	//printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
 	if (v1 == v2) {}
 	else {
 		if (v1.y == v2.y)
@@ -22848,8 +22848,13 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					ctx->ckselect = 3;
 					std::wstring ws = get_select_wstr();
 					ws.push_back(0);
+					_istate = 0;
+
+					printf("drag begin:%p\n", this);
 					bool ok = parent && parent->dragdrop_begin ? parent->dragdrop_begin(ws.c_str(), ws.size()) : false;
-					if (ok && !_read_only) {
+					printf("drag end:%p\n", this);
+					if (ok && !_read_only && !_istate) {
+
 						auto ccr = ctx->get_bounds();
 						auto d = bp.y - bp.x;
 
@@ -22860,7 +22865,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 						else { ccr += d; }
 						ctx->bounds[0] = bp.x;
 						ctx->bounds[1] = bp.y;
-						remove_bounds();
+						//remove_bounds();
 						//printf("%p\t%d\t%d\n", this, ccr.x, bp.x);
 						if (ctx->ckselect != 3)
 						{
@@ -23050,14 +23055,33 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			}
 			if (p->has) { *(p->has) = 1; }
 			if (ep->form && parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); }
+			auto lastc = ctx->ccursor;
 			ctx->ccursor = cx;
-
 			is_input = true;
 			if (ctx->c_d != 0)
 			{
 				ctx->c_d = -1; ctx->c_ct = -1;// 更新光标
 			}
 			if (p->count && p->str) {
+				printf("drag input:%p\n", this);
+				/*
+				输入光标c、选区xy
+
+				*/
+				auto b = ctx->get_bounds();
+				glm::ivec2 b0 = { ctx->bounds[0], ctx->bounds[1] };
+				int kb = b0.y - cx;
+				bool r1 = false;
+				if (b.x != b.y) {
+					if (b0.y > cx) {
+						_istate = remove_bounds();// 选区大于输入位置直接删除
+						ctx->ccursor = cx;
+					}
+					else { r1 = true; }
+				}
+				int dc = (b0.x > b0.y) ? b.y - b.x : 0;//0是后
+
+				auto c1 = ctx->ccursor;
 				for (size_t i = 0; i < p->count; i++)
 				{
 					if (p->fmt == 1 && i) // 1是文件添加分隔符
@@ -23066,9 +23090,26 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					}
 					inputchar(p->str[i]);
 				}
+				auto cc = ctx->ccursor;
+				c1 = cc - c1;//输入的长度
+				cc -= (b.y - b.x) + dc;
+				//if (dc > 0) { c1 *= -1; }//光标在后时
+				if (r1) {
+					ctx->bounds[0] = b.x; ctx->bounds[1] = b.y;
+					_istate = remove_bounds();// 选区小于输入位置后删除 
+				}
+				printf("dc:\t%d\txy%d %d kb %d\n", dc, b0.x, b0.y, kb);
+				ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = cc;
 				ctx->ckselect = 1;
-				ctx->bounds[0] = cx;
-				ctx->bounds[1] = ctx->ccursor;
+				if (b.x != b.y) {
+					if (dc > 0)
+						ctx->bounds[1] += c1;
+					else
+						ctx->bounds[1] -= c1;
+				}
+				ctx->ccursor = ctx->bounds[1];
+				b0 = { ctx->bounds[0], ctx->bounds[1] };
+				printf("dc0:\t%d\txy%d %d %d\n", dc, b0.x, b0.y, cc);
 				ctx->get_bounds_px();
 				//printf("ole %p\t%d %d \n", this, cx, ctx->ccursor);
 				ctx->cur_select = ctx->get_bounds();
@@ -23155,6 +23196,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 			case SDLK_V:
 			{
 				auto str = get_clipboard();
+				remove_bounds();
 				inputchar(str.c_str());
 			}
 			break;
