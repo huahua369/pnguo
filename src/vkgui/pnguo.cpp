@@ -20651,7 +20651,6 @@ public:
 	glm::vec4 box_color = { 0.2,0.2,0.2,0.5 };
 	int64_t ccursor = 0;	//当前光标
 	int64_t ccursor8 = 0;	//当前光标字符
-	int64_t bounds[2] = {};	//当前选择
 	int64_t caret_old = {};		//保存输入光标
 	glm::ivec3 cursor_pos = {};
 	glm::i64vec2 cur_select = {};
@@ -20673,6 +20672,8 @@ public:
 	bool hover_text = false;
 	bool upft = true;
 	bool roundselect = true;	// 圆角选区
+private:
+	int64_t bounds[2] = {};	//当前选择
 public:
 	text_ctx_cx();
 	~text_ctx_cx();
@@ -20693,6 +20694,8 @@ public:
 	glm::ivec2 get_layout_size();
 	glm::ivec2 get_line_info(int y);
 	glm::i64vec2 get_bounds();
+	glm::i64vec2 get_bounds0();
+	void set_bounds0(const glm::i64vec2& v);
 	std::vector<glm::ivec4> get_bounds_px();
 	void up_caret();
 	bool update(float delta);
@@ -21408,6 +21411,19 @@ glm::i64vec2 text_ctx_cx::get_bounds()
 	if (v.x > v.y) { std::swap(v.x, v.y); }
 	return v;
 }
+glm::i64vec2 text_ctx_cx::get_bounds0()
+{
+	glm::i64vec2 v = { bounds[0] , bounds[1] };
+	return v;
+}
+void text_ctx_cx::set_bounds0(const glm::i64vec2& v)
+{
+	bounds[0] = v.x; bounds[1] = v.y;
+	printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
+	if (v.x == v.y && v.x == 0) {
+		printf(" \n");
+	}
+}
 glm::ivec2 geti2x(PangoLayout* layout, int x)
 {
 	int x_pos = 0;
@@ -21460,7 +21476,6 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	auto line_no = lvs.size();
 	auto h = get_lineheight();
 	// 计算选中范围的每行的坐标宽高
-	//printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
 	if (v1 == v2) {}
 	else {
 		if (v1.y == v2.y)
@@ -22704,7 +22719,7 @@ void edit_tl::inputchar(const char* str)
 	sn = sstr.size();
 	ctx->ccursor += sn;
 	ctx->set_text(_text);
-	ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor;
+	ctx->set_bounds0({ ctx->ccursor ,ctx->ccursor });
 	ctx->up_cursor(true);
 	if (changed_cb)
 		changed_cb(this);
@@ -22714,10 +22729,11 @@ bool edit_tl::remove_bounds()
 	bool r = 0;
 	auto v = ctx->get_bounds();
 	if (v.x != v.y) {
-		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.x;
+		ctx->ccursor = v.x;
 		remove_char(v.x, v.y - v.x);//删除选择的字符	 
 		r = true;
 		ctx->widths.clear();
+		ctx->set_bounds0({ -1,-1 });
 	}
 	return r;
 }
@@ -22763,7 +22779,7 @@ void edit_tl::set_text(const void* str0, int len)
 		_text.clear();
 		ctx->set_text(_text);
 	}
-	ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = _text.size();
+	ctx->set_bounds0({ -1,-1 });  ctx->ccursor = _text.size();
 }
 void edit_tl::add_text(const void* str0, int len)
 {
@@ -22775,7 +22791,8 @@ void edit_tl::add_text(const void* str0, int len)
 		auto ps = _text.size();
 		_text += (nstr);
 		ctx->set_text(_text);
-		ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = ps + len;
+		ctx->set_bounds0({ -1,-1 });
+		ctx->ccursor = ps + len;
 	}
 }
 void edit_tl::set_size(const glm::ivec2& ss)
@@ -22864,14 +22881,14 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 							bp += d;
 						}
 						else { ccr += d; }
-						ctx->bounds[0] = bp.x;
-						ctx->bounds[1] = bp.y;
-						//remove_bounds();
+
+						ctx->set_bounds0(bp);
+						remove_bounds();
 						//printf("%p\t%d\t%d\n", this, ccr.x, bp.x);
 						if (ctx->ckselect != 3)
 						{
-							ctx->bounds[0] = ccr.x;
-							ctx->ccursor = ctx->bounds[1] = ccr.y;
+							ctx->set_bounds0(ccr);
+							ctx->ccursor = ccr.y;
 						}
 						ctx->cur_select = ctx->get_bounds();
 						ctx->get_bounds_px();
@@ -22880,7 +22897,11 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					break;
 				}
 				if (ctx->ckselect == 0)
-					ctx->bounds[1] = ctx->ccursor = cx;
+				{
+					auto ob = ctx->get_bounds0();
+					ctx->set_bounds0({ ob.x,cx });
+					ctx->ccursor = cx;
+				}
 				ctx->get_bounds_px();
 				if (ctx->c_d != 0)
 				{
@@ -22905,45 +22926,45 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 		{
 			ep->ret = 1;
 			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
-
-			if (p->down == 0 && mdown && isequal && p->button == 1 && p->clicks == 1) //左键单击
+			if (p->button == 1)
 			{
-				auto bp = ctx->cur_select;
-				if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
+				if (p->down == 0 && mdown && isequal && p->clicks == 1) //左键单击
 				{
-					ctx->hover_text = false;
-				}
-				ctx->ckselect = 0;
-				ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = cx;
-				ctx->up_cursor(true);
-			}
-			if (p->down)
-			{
-				auto bp = ctx->cur_select;
-				if (ctx->hover_text)
-				{
-					ctx->ckselect = 2;
-				}
-				else
-				{
+					auto bp = ctx->cur_select;
+					auto ckse = ctx->ckselect;
+					if (bp.x != bp.y && (cx >= bp.x && cx < bp.y))
+					{
+						ctx->hover_text = false;
+					}
 					ctx->ckselect = 0;
-					ctx->bounds[0] = ctx->bounds[1] = ctx->ccursor = cx;
+					ctx->ccursor = cx;
+					ctx->set_bounds0({});
 					ctx->up_cursor(true);
 				}
-				if (ep->form)
+				if (p->down)
 				{
-					if (parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); };
-					ctx->c_d = -1; is_input = true;
+					auto bp = ctx->cur_select;
+					if (ctx->hover_text)
+					{
+						ctx->ckselect = 2;
+					}
+					else
+					{
+						ctx->ckselect = 0;
+						ctx->ccursor = cx;
+						ctx->set_bounds0({ cx,cx });
+						ctx->up_cursor(true);
+					}
+					if (ep->form)
+					{
+						if (parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); };
+						ctx->c_d = -1; is_input = true;
+					}
+					else {
+						ctx->c_d = 0; is_input = false;
+					}
+					mdown = true;
 				}
-				else {
-					ctx->c_d = 0; is_input = false;
-				}
-				mdown = true;
-			}
-		}
-		else {
-			if (!mdown)
-			{
 			}
 		}
 		if (!p->down)
@@ -23059,6 +23080,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 			auto lastc = ctx->ccursor;
 			ctx->ccursor = cx;
 			is_input = true;
+			mdown = false;
 			if (ctx->c_d != 0)
 			{
 				ctx->c_d = -1; ctx->c_ct = -1;// 更新光标
@@ -23070,7 +23092,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 
 				*/
 				auto b = ctx->get_bounds();
-				glm::ivec2 b0 = { ctx->bounds[0], ctx->bounds[1] };
+				glm::ivec2 b0 = ctx->get_bounds0();
 				int kb = b0.y - cx;
 				bool r1 = false;
 				if (b.x != b.y) {
@@ -23093,39 +23115,40 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				}
 				auto cc = ctx->ccursor;
 				c1 = cc - c1;//输入的长度
-				cc -= (b.y - b.x);
+				//cc -= (b.y - b.x);
 				//if (dc > 0) { c1 *= -1; }//光标在后时
 				if (r1) {
-					ctx->bounds[0] = b.x; ctx->bounds[1] = b.y;
+					ctx->set_bounds0(b);
 					_istate = remove_bounds();// 选区小于输入位置后删除 
 				}
 				printf("dc:\t%d\txy%d %d kb %d\n", dc, b0.x, b0.y, kb);
-				ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = cc;
+				ctx->ccursor = cc;
+				glm::ivec2 nb = { cc,cc };
 				ctx->ckselect = 1;
 				if (b.x != b.y) {
 					if (r1)//后删除
 					{
+						nb.x = nb.y = cc - (b.y - b.x);
 						if (dc == 0) {
-							ctx->bounds[0] -= c1;//后光标
+							nb.x -= c1;//后光标
 						}
 						else {
-							ctx->bounds[1] -= c1;//前光标
+							nb.y -= c1;//前光标
 						}
 					}
 					else
 					{
 						// 前删除
 						if (dc == 0) {
-							ctx->bounds[0] += c1;//后光标
+							nb.x -= c1;//后光标
 						}
 						else {
-							ctx->bounds[1] += c1;//前光标
+							nb.y -= c1;//前光标
 						}
 					}
 				}
-				ctx->ccursor = ctx->bounds[1];
-				b0 = { ctx->bounds[0], ctx->bounds[1] };
-				printf("dc0:\t%d\txy%d %d %d\n", dc, b0.x, b0.y, (int)cc);
+				ctx->set_bounds0(nb);
+				ctx->ccursor = nb.y;
 				ctx->get_bounds_px();
 				//printf("ole %p\t%d %d \n", this, cx, ctx->ccursor);
 				ctx->cur_select = ctx->get_bounds();
@@ -23181,8 +23204,7 @@ void edit_tl::on_keyboard(et_un_t* ep)
 			case SDLK_A:
 			{
 				ctx->ccursor = _text.size();
-				ctx->bounds[0] = 0;
-				ctx->bounds[1] = ctx->ccursor;
+				ctx->set_bounds0({ 0,ctx->ccursor });
 				ctx->get_bounds_px();
 				ctx->up_cursor(true);
 			}
@@ -23292,7 +23314,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		auto ts = _text.size();
 		auto c = get_cl(_text.data(), ctx->ccursor);
 		auto lp2 = ctx->get_line_info(c.y);
-		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = lp2.x;
+		ctx->ccursor = lp2.x;
+		ctx->set_bounds0({});
 		ctx->up_cursor(true);
 	}
 	break;
@@ -23301,7 +23324,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		auto ts = _text.size();
 		auto c = get_cl(_text.data(), ctx->ccursor);
 		auto lp2 = ctx->get_line_info(c.y);
-		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = lp2.x + lp2.y;
+		ctx->ccursor = lp2.x + lp2.y;
+		ctx->set_bounds0({});
 		ctx->up_cursor(true);
 	}
 	break;
@@ -23310,7 +23334,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 		auto v = ctx->get_bounds();
 		auto ts = _text.size();
 		if (v.x != v.y) {
-			ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.y;
+			ctx->ccursor = v.y;
+			ctx->set_bounds0({});
 		}
 		else
 		{
@@ -23327,7 +23352,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 	{
 		auto v = ctx->get_bounds();
 		if (v.x != v.y) {
-			ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = v.x;
+			ctx->ccursor = v.x;
+			ctx->set_bounds0({});
 			break;
 		}
 		else
@@ -23359,7 +23385,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 			auto p = md::utf8_char_pos(str, x, -1);
 			x = p - _text.c_str();
 		}
-		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = x;
+		ctx->ccursor = x;
+		ctx->set_bounds0({});
 		ctx->up_cursor(true);
 	}
 	break;
@@ -23381,7 +23408,8 @@ void edit_tl::on_keyboard(et_un_t* ep)
 			auto p = md::utf8_char_pos(str, x, -1);
 			x = p - _text.c_str();
 		}
-		ctx->ccursor = ctx->bounds[0] = ctx->bounds[1] = x;
+		ctx->ccursor = x;
+		ctx->set_bounds0({});
 		ctx->up_cursor(true);
 	}
 	break;
