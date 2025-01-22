@@ -1558,6 +1558,7 @@ public:
 	void set_show_input_cursor(bool ab);
 	// 设置自动换行
 	void set_autobr(bool ab);
+	void set_round_path(float v);
 	// 删除位置，字符数量
 	void remove_char(size_t idx, int count);
 	// 删除选择的文本

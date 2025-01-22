@@ -20639,6 +20639,7 @@ public:
 	PathsD range_path;						// 圆角选区缓存
 	path_v ptr_path;
 	float round_path = 0.28;				// 圆角比例
+	float _posy = -1;
 	glm::ivec2 cpos = {};					// 当前鼠标坐标
 	glm::ivec2 scroll_pos = {};				// 滚动坐标
 	glm::ivec2 _align_pos = {};				// 对齐偏移坐标
@@ -21512,15 +21513,16 @@ std::vector<glm::ivec4> text_ctx_cx::get_bounds_px()
 	{
 		PathsD subjects;
 		PathD a;
+		int py = _posy;
 		for (size_t i = 0; i < rss.size(); i++)
 		{
 			auto& it = rss[i];
 			if (it.z < 1)
 				it.z = pwidth;
-			a.push_back({ it.x,it.y });
-			a.push_back({ it.x + it.z,it.y });
-			a.push_back({ it.x + it.z,it.y + it.w });
-			a.push_back({ it.x,it.y + it.w });
+			a.push_back({ it.x,it.y + py });
+			a.push_back({ it.x + it.z,it.y + py });
+			a.push_back({ it.x + it.z,it.y + it.w + py });
+			a.push_back({ it.x,it.y + it.w + py });
 			subjects.push_back(a);
 			a.clear();
 		}
@@ -21570,6 +21572,7 @@ void text_ctx_cx::up_caret()
 		}
 		caret.y = cursor_pos.z * v1.y;
 		cursor_pos = caret; cursor_pos.z = h;
+		printf("cursor:\t%d\n", cursor_pos.x);
 	}
 }
 bool text_ctx_cx::update(float delta)
@@ -22697,6 +22700,10 @@ void edit_tl::set_autobr(bool ab)
 {
 	ctx->set_autobr(ab);
 }
+void edit_tl::set_round_path(float v)
+{
+	ctx->round_path = std::max(0.0f, std::min(1.0f, v));
+}
 void edit_tl::inputchar(const char* str)
 {
 	int sn = strlen(str);
@@ -23114,14 +23121,12 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					inputchar(p->str[i]);
 				}
 				auto cc = ctx->ccursor;
-				c1 = cc - c1;//输入的长度
-				//cc -= (b.y - b.x);
-				//if (dc > 0) { c1 *= -1; }//光标在后时
+				c1 = cc - c1;//输入的长度 
 				if (r1) {
 					ctx->set_bounds0(b);
 					_istate = remove_bounds();// 选区小于输入位置后删除 
 				}
-				printf("dc:\t%d\txy%d %d kb %d\n", dc, b0.x, b0.y, kb);
+				//printf("dc:\t%d\txy%d %d kb %d\n", dc, b0.x, b0.y, kb);
 				ctx->ccursor = cc;
 				glm::ivec2 nb = { cc,cc };
 				ctx->ckselect = 1;
@@ -23149,17 +23154,19 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				}
 				ctx->set_bounds0(nb);
 				ctx->ccursor = nb.y;
-				ctx->get_bounds_px();
-				//printf("ole %p\t%d %d \n", this, cx, ctx->ccursor);
-				ctx->cur_select = ctx->get_bounds();
-				ctx->up_cursor(true);
+				//printf("ole %p\t%d %d \n", this, cx, ctx->ccursor); 
 			}
-			else { ctx->up_cursor(true); }
+			else
+			{
+				//ctx->set_bounds0({ cx,cx });
+			}
 		}
 		else {
 			ctx->c_d = 0; is_input = false;
-			ctx->up_cursor(true);
 		}
+		ctx->get_bounds_px();
+		ctx->cur_select = ctx->get_bounds();
+		ctx->up_cursor(true);
 	}
 	break;
 	default:
