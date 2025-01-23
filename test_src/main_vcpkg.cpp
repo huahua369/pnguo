@@ -1096,6 +1096,7 @@ void build_spr_ui(form_x* form0)
 			sp->draw(cr, dps);
 
 		};
+
 }
 
 
