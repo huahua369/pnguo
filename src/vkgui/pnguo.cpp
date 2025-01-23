@@ -22740,7 +22740,7 @@ bool edit_tl::remove_bounds()
 		remove_char(v.x, v.y - v.x);//删除选择的字符	 
 		r = true;
 		ctx->widths.clear();
-		ctx->set_bounds0({ -1,-1 });
+		ctx->set_bounds0({ 0,0 });
 	}
 	return r;
 }
@@ -22786,7 +22786,7 @@ void edit_tl::set_text(const void* str0, int len)
 		_text.clear();
 		ctx->set_text(_text);
 	}
-	ctx->set_bounds0({ -1,-1 });  ctx->ccursor = _text.size();
+	ctx->set_bounds0({ 0,0 });  ctx->ccursor = _text.size();
 }
 void edit_tl::add_text(const void* str0, int len)
 {
@@ -22798,7 +22798,7 @@ void edit_tl::add_text(const void* str0, int len)
 		auto ps = _text.size();
 		_text += (nstr);
 		ctx->set_text(_text);
-		ctx->set_bounds0({ -1,-1 });
+		ctx->set_bounds0({ 0,0 });
 		ctx->ccursor = ps + len;
 	}
 }
@@ -22933,6 +22933,8 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 		{
 			ep->ret = 1;
 			auto cx = ctx->get_xy_to_index(mps.x, mps.y, _text.c_str());
+			if (cx < 0)cx = 0;
+			if (cx > _text.size())cx = _text.size();
 			if (p->button == 1)
 			{
 				if (p->down == 0 && mdown && isequal && p->clicks == 1) //左键单击
