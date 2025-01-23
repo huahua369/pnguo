@@ -35,6 +35,13 @@ struct input_state_t;
 #define BIT_INC(x) (1<<x)
 #endif
 
+struct font_config_t {
+	int id = 0, size = 16;
+	uint32_t color = 0xffffffff;
+	uint32_t back_color = 0xff000000;
+};
+
+
 namespace md {
 	int64_t get_utf8_count(const char* buffer, int64_t len);
 	const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len);
