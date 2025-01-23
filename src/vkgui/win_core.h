@@ -5,6 +5,7 @@ namespace hz {
 	// 获取打印机名称
 	std::vector<std::string> get_print_devname();
 
+	std::string get_temp_path();
 
 	/*
 

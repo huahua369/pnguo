@@ -525,7 +525,7 @@ guiSetStr(_edit_cmdout, buf);
 //---------------------------------------------------------------------------------------------
 #ifndef NO_MAPFILE
 namespace hz
-{
+{ 
 	std::string get_temp_path()
 	{
 		std::string str;

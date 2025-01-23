@@ -29,7 +29,7 @@
 #include <stb_image_write.h>
 
 namespace hz {
-
+	 
 	HMONITOR GetPrimaryMonitor()
 	{
 		POINT ptZero = { 0, 0 };

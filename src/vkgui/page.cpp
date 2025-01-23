@@ -1103,20 +1103,6 @@ void update_ecs(float deltaTime)
 
 // todo 树
 #if 1
-static uint64_t toUInt(const njson& v, uint64_t de = 0)
-{
-	uint64_t ret = de;
-	if (v.is_number())
-	{
-		ret = v.get<uint64_t>();
-	}
-	else if (!v.is_null())
-	{
-		ret = std::atoll(md::trim(v.dump(), "\"").c_str());
-	}
-	return ret;
-}
-
 
 njson& push_button(const void* str, int cidx, int eid, njson& btn)
 {
@@ -1154,7 +1140,7 @@ void freecb(njson* p)
 	if (p)
 	{
 		njson& c = *p;
-		auto cb = (std::function<void(int, njson*)>*)toUInt(c[".click"]);
+		auto cb = (std::function<void(int, njson*)>*)hz::toUInt(c[".click"]);
 		if (cb)
 		{
 			delete cb;
@@ -1643,3 +1629,730 @@ listview_x::~listview_x()
 void listview_x::set_style(text_style_t* t)
 {
 }
+
+#if 1
+#include <regex>
+
+namespace hz {
+	// LinearRGB转换为sRGB：0-1的数值
+	float rgb2srgbf(float linear)
+	{
+		float s;
+		if (linear <= 0.0031308) {
+			s = linear * 12.92;
+		}
+		else {
+			s = 1.055 * pow(linear, 1.0 / 2.4) - 0.055;
+		}
+		return s;
+	}
+	//	sRGB转换为LinearRGB 
+	float srgb2rgbf(float s)
+	{
+		float linear;
+		if (s <= 0.04045) {
+			linear = s / 12.92;
+		}
+		else {
+			linear = pow((s + 0.055) / 1.055, 2.4);
+		}
+		return linear;
+	}
+	uint32_t rgb2srgb(uint32_t rgb) {
+		uint32_t& c = rgb;
+		auto p = (uint8_t*)&rgb;
+		for (size_t i = 0; i < 3; i++)
+		{
+			float k = p[i];
+			k /= 255.0;
+			k = rgb2srgbf(k);
+			k *= 255.0;
+			p[i] = k;
+		}
+		return c;
+	}
+	uint32_t srgb2rgb(uint32_t s) {
+		uint32_t& c = s;
+		auto p = (uint8_t*)&s;
+		for (size_t i = 0; i < 3; i++)
+		{
+			float k = p[i];
+			k /= 255.0;
+			k = rgb2srgbf(k);
+			k *= 255.0;
+			p[i] = k;
+		}
+		return c;
+	}
+	inline bool isse(int ch)
+	{
+		return ch == 0 || (ch > 0 && isspace(ch));
+	}
+	inline bool is_json(const char* str, size_t len)
+	{
+		bool ret = false;
+		char* te = (char*)str + len - 1;
+		char* t = (char*)str;
+		if (str && len > 1)
+		{
+			do
+			{
+				while (isse(*t))
+				{
+					t++;
+				}
+				if (*t != '[' && *t != '{')
+				{
+					break;
+				}
+				while (isse(*te))
+				{
+					te--;
+				}
+				if ((*t == '[' && *te == ']') || (*t == '{' && *te == '}'))
+				{
+					ret = true;
+				}
+			} while (0);
+		}
+		return ret;
+	}
+#ifndef FCV
+	union u_col
+	{
+		unsigned int uc;
+		unsigned char u[4];
+		struct urgba
+		{
+			unsigned char r, g, b, a;
+		}c;
+	};
+#define FCV 255.0
+#define FCV1 256.0
+	// rgba
+	inline unsigned int to_uint(glm::vec4 col)
+	{
+		u_col t;
+		t.u[0] = col.x * FCV + 0.5;
+		t.u[1] = col.y * FCV + 0.5;
+		t.u[2] = col.z * FCV + 0.5;
+		t.u[3] = col.w * FCV + 0.5;
+		return t.uc;
+	}
+#endif
+	// 去掉头尾空格
+	std::string trim(const std::string& str, const char* pch)
+	{
+		auto s = str;
+		if (s.empty())
+		{
+			return s;
+		}
+		s.erase(0, s.find_first_not_of(pch));
+		s.erase(s.find_last_not_of(pch) + 1);
+		return s;
+	}
+	std::string trim_ch(const std::string& str, const std::string& pch)
+	{
+		std::string r = str;
+		if (pch.size() && str.size())
+		{
+			size_t p1 = 0, p2 = str.size();
+			for (int i = 0; i < str.size(); i++)
+			{
+				auto ch = str[i];
+				if (pch.find(ch) == std::string::npos)
+				{
+					p1 = i;
+					break;
+				}
+			}
+			for (int i = str.size() - 1; i > 0; i--)
+			{
+				auto ch = str[i];
+				if (pch.find(ch) == std::string::npos)
+				{
+					p2 = i + 1;
+					break;
+				}
+			}
+			r = str.substr(p1, (p2 - p1));
+		}
+		return r;
+	}
+
+	//uint64_t toUInt(const njson& v, uint64_t de)
+	//{
+	//	uint64_t ret = de;
+	//	if (v.is_number())
+	//	{
+	//		ret = v.get<uint64_t>();
+	//	}
+	//	else if (!v.is_null())
+	//	{
+	//		ret = std::atoll(md::trim(v.dump(), "\"").c_str());
+	//	}
+	//	return ret;
+	//}
+
+	uint64_t toUInt(const njson& v, uint64_t de)
+	{
+		uint64_t ret = de;
+		if (v.is_number())
+		{
+			ret = v.get<uint64_t>();
+		}
+		else if (!v.is_null())
+		{
+			ret = std::atoll(trim(v.dump(), "\"").c_str());
+		}
+		return ret;
+	}
+	int64_t toInt(const njson& v, const char* k, int64_t de)
+	{
+		int64_t ret = de;
+		if (v.find(k) == v.end())
+		{
+			return ret;
+		}
+		if (v[k].is_number())
+		{
+			ret = v[k].get<int64_t>();
+		}
+		else if (!v[k].is_null())
+		{
+			ret = std::atoll(trim(v[k].dump(), "\"").c_str());
+		}
+		return ret;
+	}
+	int64_t toInt(const njson& v, int64_t de)
+	{
+		int64_t ret = de;
+		if (v.is_number())
+		{
+			ret = v.get<int64_t>();
+		}
+		else if (!v.is_null())
+		{
+			ret = std::atoll(trim(v.dump(), "\"").c_str());
+		}
+		return ret;
+	}
+	double toDouble(const njson& v, double de)
+	{
+		double ret = de;
+		if (v.is_number())
+		{
+			ret = v.get<double>();
+		}
+		else if (!v.is_null())
+		{
+			ret = std::atof(trim(v.dump(), "\"").c_str());
+		}
+		return ret;
+	}
+#define toFloat toDouble
+
+	bool toBool(const njson& v, bool def)
+	{
+		bool ret = def;
+		if (v.is_boolean())
+		{
+			ret = v.get<bool>();
+		}
+		else if (v.is_number())
+		{
+			ret = v.get<int>();
+		}
+		//else
+		//{
+		//	ret = trim(v.dump(), "\"") != "null";
+		//}
+		return ret;
+	}
+	bool toBool(const njson& v, const char* k, bool def)
+	{
+		bool ret = def;
+		if (v.find(k) != v.end())
+		{
+			auto& t = v[k];
+			if (t.is_boolean())
+			{
+				ret = t.get<bool>();
+			}
+			else if (t.is_number())
+			{
+				ret = t.get<int>();
+			}
+		}
+		//else
+		//{
+		//	ret = trim(v.dump(), "\"") != "null";
+		//}
+		return ret;
+	}
+	std::string toStr(const njson& v, const char* k, const std::string& des)
+	{
+		std::string ret = des;
+		if (v.find(k) == v.end())
+		{
+			return ret;
+		}
+		if (v[k].is_string())
+		{
+			ret = v[k].get<std::string>();
+		}
+		else
+		{
+			ret = trim(v[k].dump(), "\"");
+		}
+		return ret;
+	}
+	std::string toStr(const njson& v, const std::string& des)
+	{
+		std::string ret = des;
+		if (v.is_null())
+		{
+			//ret = "";
+		}
+		else if (v.is_string())
+		{
+			ret = v.get<std::string>();
+		}
+		else
+		{
+			ret = trim(v.dump(), "\"");
+		}
+		return ret;
+	}
+	std::string getStr(const njson& v, const std::string& key)
+	{
+		std::string ret;
+		if (v.is_null())
+		{
+			//ret = "";
+		}
+		else if (v.is_string())
+		{
+			ret = v.get<std::string>();
+		}
+		else if (v.is_object() && key != "" && v.find(key) != v.end())
+		{
+			ret = v[key].get<std::string>();
+		}
+		else
+		{
+			ret = trim(v.dump(), "\"");
+		}
+		return ret;
+	}
+	template<class T>
+	std::vector<T> toVector(const njson& n)
+	{
+		std::vector<T> ret;
+		if (n.is_array())
+		{
+			ret = n.get<std::vector<T>>();
+		}
+		return ret;
+	}
+
+	std::string toStr(double price)
+	{
+		auto res = /*n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) :*/ std::to_string(price);
+		const std::string format("$1");
+		try {
+			std::regex r("(\\d*)\\.0{6}|");
+			std::regex r2("(\\d*\\.{1}0*[^0]+)0*");
+			res = std::regex_replace(res, r2, format);
+			res = std::regex_replace(res, r, format);
+		}
+		catch (const std::exception& e) {
+			return res;
+		}
+		return res;
+	}
+	std::string toStr(double price, int n)
+	{
+		auto ret = std::to_string(price);
+		//return n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) : std::to_string(price);
+		if (n > 0)
+		{
+			auto pos = ret.find('.');
+			if (pos != std::string::npos)
+			{
+				auto c = pos + n + 1;
+				if (c < ret.size())
+				{
+					ret.resize(c);
+				}
+			}
+		}
+		return ret;
+	}
+	std::string toStr(int64_t n)
+	{
+		return std::to_string(n);
+	}
+	uint64_t toHex(const njson& v, uint64_t d)
+	{
+		uint64_t ret = d;
+		do {
+			if (v.is_string())
+			{
+				std::string buf = md::replace_s(toStr(v), " ", "");
+
+				char* str = 0;
+				//buf.resize(10);
+				if (buf[0] == '#')
+				{
+					buf.erase(buf.begin());
+					int k = buf.size();
+					if (k > 8)
+					{
+						buf.resize(8);
+					}
+					if (k >= 6)
+					{
+						std::swap(*((short*)&buf[0]), *((short*)&buf[4]));
+					}
+					else if (k == 3)
+					{
+						std::string nc;
+						for (auto it : buf)
+						{
+							nc.insert(nc.begin(), { it, it });
+						}
+						buf = nc;
+					}
+					if (buf.size() == 8)
+					{
+						buf = buf.substr(6, 2) + buf.substr(0, 6);
+					}
+					else if (buf.size() == 6)
+					{
+						buf.insert(buf.begin(), { 'f','f' });
+					}
+					buf.insert(buf.begin(), { '0','x' });
+				}
+				int cs = 10;
+				if (buf.find("0x") == 0)
+				{
+					cs = 16;
+				}
+				ret = std::strtoll(buf.c_str(), &str, cs);
+			}
+			else if (v.is_number())
+			{
+				ret = toUInt(v);
+			}
+			else if (v.is_array())
+			{
+				bool isr = false;
+				for (auto& it : v)
+				{
+					if (!it.is_number())
+					{
+						isr = true;
+						break;
+						assert(0);
+					}
+				}
+				if (isr)break;
+				// 1 3 4数量
+				std::vector<double> trv = v;
+				trv.resize(4);
+				if (v.size() < 4)
+				{
+					trv[3] = 1.0;
+					if (v.size() == 1)
+					{
+						trv[1] = trv[2] = trv[0];
+					}
+				}
+				glm::vec4 v1;
+				for (int i = 0; i < 4; i++) v1[i] = trv[i];
+				ret = to_uint(v1);
+			}
+		} while (0);
+		return ret;
+	}
+	unsigned int toColor(const njson& v, unsigned int d)
+	{
+		return toHex(v, d);
+	}
+	std::string ptHex(const std::string& str, char ch = 'x', char step = '\0')
+	{
+		char spch[8] = { '%', '0', '2', ch, step, 0 };
+		std::string chBuffer;
+		char chEach[10];
+		int nCount;
+		memset(chEach, 0, 10);
+		unsigned char* d = (unsigned char*)str.c_str();
+		auto len = str.size();
+		for (nCount = 0; nCount < len /*&& d[nCount]>0*/; nCount++)
+		{
+			sprintf(chEach, spch, d[nCount]);
+			chBuffer += chEach;
+		}
+		return chBuffer;
+	}
+
+	std::string toColor2(unsigned int d)
+	{
+		std::string t;
+		t.resize(sizeof(unsigned int));
+		memcpy((void*)t.data(), &d, t.size());
+		std::reverse(t.begin(), t.end());
+		t = t.empty() ? "0x00" : "0x" + ptHex(t);
+		return t;
+	}
+
+#if (defined(GLM_VERSION))
+	glm::ivec2 toiVec2(const njson& v, int d /*= -1*/)
+	{
+		glm::ivec2 rv = { d, d };
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	glm::ivec2 toiVec2(const njson& v, glm::ivec2& ot)
+	{
+		glm::ivec2& rv = ot;
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	glm::vec2 toVec2(const njson& v, double d)
+	{
+		glm::vec2 rv = { d, d };
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	glm::vec2 toVec2(const njson& v, glm::vec2& ot)
+	{
+		glm::vec2& rv = ot;
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 2 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	glm::vec3 toVec3(const njson& v, double d)
+	{
+		glm::vec3 rv = { d, d, d };
+
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 3 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	glm::vec4 toVec4(const std::vector<double>& v, bool one1)
+	{
+		glm::vec4 rv;
+		{
+			std::vector<double> trv = v;
+			if (one1 && trv.size() == 1) {
+				rv[0] = rv[1] = rv[2] = rv[3] = trv[0];
+			}
+			else {
+				for (size_t i = 0; i < v.size() && i < 4; i++)
+				{
+					rv[i] = v[i];
+				}
+			}
+		}
+		return rv;
+	}
+	glm::vec4 toVec4(const njson& v, double d)
+	{
+		glm::vec4 rv = { d, d, d, d };
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<double>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 4 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<double>();
+			}
+		}
+		return rv;
+	}
+	glm::ivec4 toiVec4(const njson& v, int d)
+	{
+		glm::ivec4 rv = { d, d, d, d };
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = rv[3] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 4 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	glm::ivec3 toiVec3(const njson& v, int d)
+	{
+		glm::ivec3 rv = { d, d, d };
+		if (v.is_number())
+		{
+			rv[0] = rv[1] = rv[2] = v.get<int64_t>();
+		}
+		else if (v.is_array() && v.size() > 0)
+		{
+			for (size_t i = 0; i < 3 && i < v.size(); i++)
+			{
+				rv[i] = v[i].get<int64_t>();
+			}
+		}
+		return rv;
+	}
+	njson v2to(const glm::vec2& v)
+	{
+		std::vector<double> rv = { v.x, v.y };
+		return rv;
+	}
+	njson v3to(const glm::vec3& v)
+	{
+		std::vector<double> rv = { v.x, v.y, v.z };
+		return rv;
+	}
+	njson v4to(const glm::vec4& v)
+	{
+		std::vector<double> rv = { v.x, v.y, v.z, v.w };
+		return rv;
+	}
+
+	template <typename T>
+	void v2to_a(const T& v, njson& a)
+	{
+		a.push_back(v.x);
+		a.push_back(v.y);
+	}
+	template <typename T>
+	void v3to_a(const T& v, njson& a)
+	{
+		a.push_back(v.x);
+		a.push_back(v.y);
+		a.push_back(v.z);
+	}
+	template <typename T>
+	void v4to_a(const T& v, njson& a)
+	{
+		a.push_back(v.x);
+		a.push_back(v.y);
+		a.push_back(v.z);
+		a.push_back(v.w);
+	}
+#endif
+	template <typename T>
+	T* toPtr(const njson& v)
+	{
+#if 0
+		std::string buf = toStr(v);
+		unsigned long long ret = 0;
+		char* str = 0;
+		buf.resize(18);
+		ret = std::strtoll(buf.c_str(), &str, buf.find("0x") == 0 ? 16 : 10);
+		return (T*)ret;
+#else
+		return (T*)toHex(v);
+#endif
+	}
+#ifndef _ui64toa_s
+	char* _ui64toa_s(uint64_t num, char* str, int size, int radix)
+	{/*索引表*/
+		char index[] = "0123456789ABCDEF";
+		uint64_t unum = 0;/*中间变量*/
+		int i = 0, j, k;
+		/*确定unum的值*/
+		if (radix == 10 && num < 0)/*十进制负数*/
+		{
+			unum = (uint64_t)-num;
+			str[i++] = '-';
+		}
+		else unum = (uint64_t)num;/*其他情况*/
+		/*转换*/
+		do {
+			str[i++] = index[unum % (uint64_t)radix];
+			unum /= radix;
+		} while (unum);
+		str[i] = '\0';
+		/*逆序*/
+		if (str[0] == '-')
+			k = 1;/*十进制负数*/
+		else
+			k = 0;
+
+		for (j = k; j <= (i - 1) / 2; j++)
+		{
+			char temp;
+			temp = str[j];
+			str[j] = str[i - 1 + k - j];
+			str[i - 1 + k - j] = temp;
+		}
+		return str;
+	}
+#endif // !_ui64toa_s
+	//template <typename T>
+	std::string fromPtr(void* pv)
+	{
+		std::string buf = "0x";
+		buf.resize(sizeof(void*) * 4);
+		_ui64toa_s((uint64_t)pv, (char*)(buf.data() + 2), buf.size() - 2, 16);
+		return buf.c_str();
+	}
+}
+#endif

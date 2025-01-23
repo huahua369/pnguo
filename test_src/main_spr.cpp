@@ -9,7 +9,8 @@
 #include <vkgui/tinysdl3.h>
 #include <vkgui/vkrenderer.h>
 #include <vkgui/page.h>
-#include <vkgui/mapView.h>
+#include <vkgui/mapView.h> 
+#include <cairo/cairo.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 
@@ -445,6 +446,350 @@ void pal_img(img_rp_t* rp)
 	rp->src = img;
 }
 
+struct librpspr_lib
+{
+	void* ptr = 0;
+	// 创建渲染器，类型是rgba，可以提前设置data做缓冲区，uint32数组或uint8
+	int (*new_rp)(int w, int h, int64_t* ret, int bgrtex) = 0;
+	// 删除渲染器
+	void (*free_rp)(int64_t p) = 0;
+	// 渲染完可以获取渲染的数据，ret的大小要跟渲染器一样
+	int (*get_image)(void* p, uint8_t* ret) = 0;
+	int (*rp_clear)(void* p, uint32_t c, double depth) = 0;
+	// 新api。以下文件名支持网址、本地文件
+	// 添加spr和对应的调色板文件名，调色板偏移(有的可能要负数)。返回序号draw_spr用
+	int (*add_spr)(void* p, const char* fn, const char* palfn, int pal_pos) = 0;
+	// 获取spr帧数
+	int (*get_spr_frame_count)(void* p, int idx) = 0;
+	// 保存spr的图片到png文件
+	int (*save_spr2png)(void* p, int idx, const char* fn) = 0;
+	// 加载坐骑/附件/足迹光环等，文件名用分号分隔json;png;graypng;pal.bmp顺序不限。坐骑深度信息没有.pal.bmp就拼三种文件名即可
+	int (*add_part)(void* p, const char* uris) = 0;
+	int (*set_ride)(void* p, const char* fly, int d, const char* fnm, const char* fntcp) = 0;
+	int (*set_addon)(void* p, const char* addons) = 0;
+
+	// 渲染顺序排序ride\spr\part\addon
+	int (*draw_ride)(void* p, int frame, int* pos) = 0;
+	int (*draw_spr)(void* p, int idx, int frame, int* pos, int z) = 0;
+	int (*draw_part)(void* p, int idx, int frame, int* pos, int z) = 0;
+	int (*draw_addon_flr)(void* p, int frame, int* pos) = 0;
+	double (*get_max_depth)(void* p) = 0;
+	int (*draw_spr_ps)(void* p, int idx, int frame, int* dst, int z, int ps) = 0;
+public:
+	librpspr_lib();
+	~librpspr_lib();
+	bool load();
+};
+librpspr_lib::librpspr_lib() {
+	load();
+}
+librpspr_lib::~librpspr_lib() {
+	if (ptr)hz::shared_destroy(ptr);
+	delete ptr; ptr = 0;
+}
+bool librpspr_lib::load()
+{
+	if (ptr)return true;
+	auto k = hz::shared_load(R"(rpspr.dll)");
+	static const char* ccfn[] = { "ptr_null",
+	"new_rp","free_rp","get_image","rp_clear","add_spr","get_spr_frame_count","save_spr2png"
+	,"add_part","set_ride","set_addon","draw_ride","draw_spr","draw_part","draw_addon_flr","get_max_depth","draw_spr_ps"
+	};
+	if (k)
+	{
+		ptr = k;
+		hz::shared_get(k, ccfn, (void**)&ptr, sizeof(ccfn) / sizeof(char*));
+	}
+	return ptr && new_rp && free_rp;
+}
+class dspr_cx
+{
+public:
+	librpspr_lib* so = 0;
+	void* ctx = 0;
+	std::vector<glm::ivec4> sprv;
+	std::vector<uint32_t> imgdata;
+	cairo_surface_t* img = 0;
+
+	// 坐骑的渲染坐标
+	glm::ivec2 ride_pos = {};
+	glm::ivec2 csize = {};
+public:
+	dspr_cx();
+	~dspr_cx();
+
+	void init(int w, int h);
+	void clear();
+	void add_spr(const std::string& sprfn, const std::string& palbmp, int pal_pos);
+	//不同坐骑可能要设置不同值
+	void set_spr_pos(uint32_t idx, int x, int y, int z = 950000);
+	void set_ride(const std::string& fly, int d, const std::string& addon, const std::string& fnm_dir, const std::string& fntcp_dir);
+	void draw(int i, int x, int y);
+private:
+
+};
+
+dspr_cx::dspr_cx()
+{
+	so = new librpspr_lib();
+}
+
+dspr_cx::~dspr_cx()
+{
+	if (img)
+		free_image_cr(img);
+	img = 0;
+	if (so)
+	{
+		if (ctx)
+			so->free_rp((int64_t)ctx);
+		delete so; so = 0;
+	}
+}
+
+void dspr_cx::init(int w, int h)
+{
+	bool tex_bgr = 1;
+	csize = { w,h };
+	if (ctx)
+		so->free_rp((int64_t)ctx);
+	so->new_rp(w, h, (int64_t*)&ctx, tex_bgr);
+	glm::ivec2 csize = { w,h };
+	imgdata.resize(w * h);
+	if (img)
+		free_image_cr(img);
+	img = 0;
+	img = new_image_cr(csize, imgdata.data());
+	sprv.clear();
+}
+
+
+//在__init__函数调用 add_spr\set_ride
+void dspr_cx::add_spr(const std::string& sprfn, const std::string& palbmp, int pal_pos)
+{
+	auto w = so->add_spr(ctx, sprfn.c_str(), palbmp.c_str(), pal_pos);
+	sprv.push_back({ 0,0,0,w });
+}
+
+void dspr_cx::set_ride(const std::string& fly, int d, const std::string& addon, const std::string& fnm_dir, const std::string& fntcp_dir)
+{
+	// 动作类型，方向，坐骑深度目录(需要有这三种文件json;png;graypng)，坐骑tcp目录（json;png;graypng;pal.bmp）
+	//so->set_ride(ctx, "stand", 0, R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)", R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)");
+	so->set_ride(ctx, fly.c_str(), d, fnm_dir.c_str(), fntcp_dir.c_str());
+	// 附件，路径和坐骑tcp一样，（json;png;graypng;pal.bmp）保存在addon_f之类文件夹。支持fblr四种要有相应文件夹
+	so->set_addon(ctx, addon.c_str());
+}
+
+void dspr_cx::set_spr_pos(uint32_t idx, int x, int y, int z)
+{
+	if (idx < sprv.size())
+	{
+		sprv[idx].x = x;
+		sprv[idx].y = y;
+		sprv[idx].z = z;
+	}
+}
+
+void dspr_cx::draw(int i, int x, int y)
+{
+	glm::ivec2 pos = { x,y };
+	auto rpos = pos + ride_pos;
+	//渲染调用 
+	so->rp_clear(ctx, 0xff000000, 0.0);
+	so->draw_ride(ctx, i, (int*)&rpos);//写入坐骑原始深度\渲染坐骑和附件b
+	auto maxd = so->get_max_depth(ctx);
+	//渲染角色/装备等
+	static int ps[10] = {};
+	int q = 0;
+	for (auto& it : sprv)
+	{
+		glm::ivec2 sp = it;
+		sp += pos;
+		if (it.w > 0)
+			so->draw_spr_ps(ctx, it.w, i, (int*)&sp, it.z, ps[q]);
+		q++;
+	}
+	auto maxd0 = so->get_max_depth(ctx);
+	// 渲染坐骑挂件
+	so->draw_addon_flr(ctx, i, (int*)&rpos);
+	so->get_image(ctx, (uint8_t*)imgdata.data());
+}
+class spr_dev
+{
+public:
+	dspr_cx* sp = 0;
+	std::string cstr;
+	int fp = 0;
+	double dt = 0.0;
+	double dt0 = 0.125;
+public:
+	spr_dev();
+	~spr_dev();
+	void set_text(const std::string& str);
+
+	bool update(float t);
+	void draw(cairo_t* cr, const glm::vec2& dps);
+private:
+
+};
+
+spr_dev::spr_dev()
+{
+	sp = new dspr_cx();
+}
+
+spr_dev::~spr_dev()
+{
+}
+
+void spr_dev::set_text(const std::string& str)
+{
+	try
+	{
+		njson nc = njson::parse(str);
+		auto kstr = nc.dump(2);
+		if (kstr != cstr && sp)
+		{
+			cstr = kstr;
+
+			glm::ivec2 csize = hz::toiVec2(nc["csize"]);
+			auto ride_pos = hz::toiVec2(nc["ride_pos"]);
+			auto fly = hz::toStr(nc["fly"]);
+			auto dir = hz::toInt(nc["dir"]);
+			auto addon = hz::toStr(nc["addon"]);
+			auto ride_dir = hz::toStr(nc["ride_dir"]);
+			auto ride_tcp_dir = hz::toStr(nc["ride_tcp_dir"]);
+			auto spr_dir = hz::toStr(nc["spr_dir"]);
+			auto& cspr = nc["spr"];
+			sp->init(csize.x, csize.y);
+			sp->ride_pos = ride_pos;
+			sp->set_ride(fly, dir, addon, ride_dir, ride_tcp_dir);
+			int i = 0;
+			for (auto& c0 : cspr)
+			{
+				std::string palurl = R"(https://xyq.gsf.netease.com/static_h5/pal/equip/)";
+				auto pos = hz::toiVec3(c0["pos"]);
+				auto pal = hz::toiVec2(c0["pal"]);
+				auto uri = spr_dir + hz::toStr(c0["name"]);
+				sp->add_spr((char*)uri.c_str(), palurl + std::to_string(pal.x) + ".pal.bmp", pal.y);
+				sp->set_spr_pos(i, pos.x, pos.y, pos.z);
+				i++;
+			}
+		}
+	}
+	catch (const std::exception& e)
+	{
+		printf("json error:\t%s", e.what());
+	}
+}
+
+bool spr_dev::update(float t)
+{
+	dt += t;
+	bool r = false;
+	if (dt > dt0) {
+		dt = 0;
+		if (sp) {
+			sp->draw(fp, 0, 0);
+			fp++;
+			if (fp > 100000)fp = 0;
+			r = true;
+		}
+	}
+	return r;
+}
+
+void spr_dev::draw(cairo_t* cr, const glm::vec2& dps)
+{
+	cairo_as _ss_(cr);
+	cairo_translate(cr, dps.x, dps.y);
+	image_b pimg = {};
+	pimg.image = sp->img;
+	pimg.rc = { 0,0,sp->csize };
+	// 图形通用软渲染接口
+	draw_ge(cr, &pimg, 1);
+}
+
+void build_spr_ui(form_x* form0)
+{
+	std::string tp = hz::get_temp_path();
+	glm::ivec2 csize = { 800,600 };
+	njson c;
+	c["csize"] = { 800,600 };
+	c["fly"] = "stand";
+	c["dir"] = 0;
+	c["addon"] = "flr";
+	c["ride_dir"] = R"(https://xyq.gsf.netease.com/h5avtres/1.25/e135776/p722/)";
+	c["ride_tcp_dir"] = R"(https://xyq.gsf.netease.com/static_h5/shape/char/0722/)";
+	c["spr_dir"] = R"(https://xyq.gsf.netease.com/avtres_hd_full_dir/)";
+	c["spr_dir"] = (char*)u8R"(E:\d3m\rpspr\rpspr\out\xybin\肤色\飞燕女\站立\)";
+	c["ride_pos"] = { 250,280 };
+	auto& cspr = c["spr"];
+	for (size_t i = 0; i < 1; i++)
+	{
+		njson c0;
+		c0["pos"] = { 230,210,950000 };
+		c0["pal"] = { 24608,192 };//下衣64 头饰128 特殊192 其他0
+		c0["name"] = R"(e24608/p2/8379f964.spr)";
+		c0["name"] = R"(7(196201c2).spr)";
+		cspr.push_back(c0);
+	}
+	glm::ivec2 size = { 1024,800 };
+	glm::ivec2 cview = { 10240,10240 };
+	auto p = new plane_cx();
+	uint32_t pbc = 0xff2c2c2c;// 背景色
+	p->set_color({ 0x80ff802C,1,5,pbc });
+	p->set_rss(5);
+	p->_lms = { 8,8 };
+	form0->bind(p);	// 绑定到窗口  
+	p->add_familys(fontn, 0);
+	//p->add_familys(fontn1, 0);
+	p->draggable = false; //可拖动
+	p->fontsize = 16;
+	p->set_size(size);
+	p->set_pos({ 1,30 });
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		//p->set_scroll(width, rcw, { 4, 4 }, { 2,0 }, { 0,2 });
+		//p->set_scroll_hide(1);
+		//p->set_view(size, cview);
+	}
+	auto spredit = p->add_input("", { 1000,300 }, 0);
+	auto cstr = c.dump(2);
+	static spr_dev* sp = new spr_dev();
+	cstr = (char*)u8"abc设置\n123\n发的发awdf";
+	sp->set_text(cstr);
+	spredit->set_round_path(0.2);
+	spredit->set_text(cstr.c_str(), cstr.size());
+	spredit->changed_cb = [=](edit_tl* ptr) {
+		};
+	auto btn0 = p->add_cbutton((char*)u8"修改", { 100,30 }, 0);
+	btn0->click_cb = [=](void* p, int css) {
+		auto str = spredit->_text;
+		sp->set_text(str);
+		spredit->set_text(sp->cstr.c_str(), sp->cstr.size());
+		};
+
+	auto dpx1 = p->push_dragpos({ 140,360 });// , { 300,600 });// 增加一个拖动坐标
+	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
+	p->update_cb = [=](float delta)
+		{
+			return sp->update(delta);
+		};
+	p->draw_front_cb = [=](cairo_t* cr, const glm::vec2& scroll)
+		{
+		};
+	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
+		{
+			auto dps = p->get_dragpos(dpx1);//获取拖动时的坐标
+			sp->draw(cr, dps);
+
+		};
+
+}
+
 void test_spr(form_x* form0, vkdg_cx* vkd) {
 #if 0
 	std::vector<const char*> urls = {
@@ -563,7 +908,7 @@ void show_gui(form_x* form0)
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 30,50 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
 	p->fontsize = 16;
 }
 int main()
@@ -572,7 +917,7 @@ int main()
 	glm::ivec2 ws = { 1280,860 };
 	const char* wtitle = (char*)u8"窗口0";
 	const char* wtitle1 = (char*)u8"窗口1";
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0); 
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, 0);
 	//test_spr(form0, 0);
 	show_gui(form0);
 	// 运行消息循环

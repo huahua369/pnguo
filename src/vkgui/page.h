@@ -272,3 +272,41 @@ namespace mg {
 
 }
 //!mg
+namespace hz {
+	// LinearRGB转换为sRGB：0-1的数值
+	float rgb2srgbf(float linear);
+	//	sRGB转换为LinearRGB 
+	float srgb2rgbf(float s);
+	uint32_t rgb2srgb(uint32_t rgb);
+	uint32_t srgb2rgb(uint32_t s);
+	bool is_json(const char* str, size_t len);
+	// 去掉头尾空格
+	std::string trim(const std::string& str, const char* pch);
+	std::string trim_ch(const std::string& str, const std::string& pch);
+	uint64_t toUInt(const njson& v, uint64_t de = 0);
+	int64_t toInt(const njson& v, const char* k, int64_t de);
+	int64_t toInt(const njson& v, int64_t de = 0);
+	double toDouble(const njson& v, double de = 0);
+
+	static bool toBool(const njson& v, bool def = false);
+	bool toBool(const njson& v, const char* k, bool def);
+	std::string toStr(const njson& v, const char* k, const std::string& des);
+	std::string toStr(const njson& v, const std::string& des = "");
+	std::string getStr(const njson& v, const std::string& key);
+	std::string toStr(double price);
+	std::string toStr(double price, int n);
+	std::string toStr(int64_t n);
+	uint64_t toHex(const njson& v, uint64_t d = 0);
+	unsigned int toColor(const njson& v, unsigned int d = 0);
+	std::string toColor2(unsigned int d);
+	glm::ivec2 toiVec2(const njson& v, int d = -1);
+	glm::ivec2 toiVec2(const njson& v, glm::ivec2& ot);
+	glm::vec2 toVec2(const njson& v, double d = 0);
+	glm::vec2 toVec2(const njson& v, glm::vec2& ot);
+	glm::vec3 toVec3(const njson& v, double d = 0);
+	glm::vec4 toVec4(const std::vector<double>& v, bool one1 = false);
+	glm::vec4 toVec4(const njson& v, double d = 0);
+	glm::ivec4 toiVec4(const njson& v, int d = 0);
+	glm::ivec3 toiVec3(const njson& v, int d = 0);
+}
+//!HZ
