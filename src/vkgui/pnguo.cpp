@@ -21559,12 +21559,12 @@ void text_ctx_cx::up_caret()
 	glm::ivec4 caret = {   };
 	auto v1 = get_line_length((int)ccursor);
 	auto line_no = lvs.size();
-	auto h = lineheight;// get_lineheight();
+	auto h = lineheight;
 	// 计算选中范围的每行的坐标宽高 
 	if (line_no > 0 && widths.size() > v1.y)
 	{
 		auto ks = lvs[v1.y];
-		auto w1 = widths[v1.y]; 
+		auto w1 = widths[v1.y];
 		if (ltx) {
 			auto pstr = text.c_str();
 			caret.x = ltx->get_text_ipos(fontid, fontsize, pstr + ks.x, ks.y, ccursor - ks.x);
