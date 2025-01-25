@@ -21556,7 +21556,7 @@ void text_ctx_cx::up_caret()
 			upft = false;
 		}
 	}
-	glm::ivec4 caret = {   };
+	glm::ivec4 caret = {};
 	auto v1 = get_line_length((int)ccursor);
 	auto line_no = lvs.size();
 	auto h = lineheight;
@@ -21570,9 +21570,9 @@ void text_ctx_cx::up_caret()
 			caret.x = ltx->get_text_ipos(fontid, fontsize, pstr + ks.x, ks.y, ccursor - ks.x);
 		}
 		caret.y = cursor_pos.z * v1.y;
-		cursor_pos = caret; cursor_pos.z = h;
 		printf("cursor:\t%d\n", cursor_pos.x);
 	}
+	cursor_pos = caret; cursor_pos.z = h;
 }
 bool text_ctx_cx::update(float delta)
 {
