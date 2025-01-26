@@ -1622,7 +1622,7 @@ int on_call_we(const SDL_Event* e, form_x* pw)
 		}break;
 		case SDL_EVENT_WINDOW_RESTORED:
 		{
-			pw->on_size(pw->save_size);
+			pw->on_size(pw->save_size); pw->present_e();
 		}break;
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
@@ -1981,6 +1981,16 @@ void form_x::present()
 #endif
 	SDL_RenderPresent(renderer);
 
+}
+
+void form_x::present_e()
+{
+	if (renderer)
+	{
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+		SDL_RenderClear(renderer);
+		SDL_RenderPresent(renderer);
+	}
 }
 
 

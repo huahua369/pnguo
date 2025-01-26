@@ -271,6 +271,7 @@ public:
 	void update_w();
 	void update(float delta);
 	void present();
+	void present_e();
 
 	// 获取粘贴板文本
 	char* get_clipboard0();
