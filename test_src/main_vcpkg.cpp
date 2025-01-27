@@ -295,8 +295,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				vx->do_cmd();
 			};
 	}
-	auto ce = p->add_input("", { 1000,30 }, 1);
-	//ce->set_family(0, 12);
+	auto ce = p->add_input("", { 1000,30 }, 1); 
 	for (auto& nt : btnname)
 	{
 		auto cp = p->add_gbutton(nt, { 160,30 }, color);
