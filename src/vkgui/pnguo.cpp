@@ -21420,10 +21420,10 @@ glm::i64vec2 text_ctx_cx::get_bounds0()
 void text_ctx_cx::set_bounds0(const glm::i64vec2& v)
 {
 	bounds[0] = v.x; bounds[1] = v.y;
-	printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
-	if (v.x == v.y && v.x == 0) {
-		printf(" \n");
-	}
+	//printf("bounds:%d\t%d\n", (int)v.x, (int)v.y);
+	//if (v.x == v.y && v.x == 0) {
+	//	printf(" \n");
+	//}
 }
 glm::ivec2 geti2x(PangoLayout* layout, int x)
 {
