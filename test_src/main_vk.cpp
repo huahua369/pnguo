@@ -29,7 +29,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	p->draggable = true; //可拖动
 	p->set_size({ 320,660 });
 	p->set_pos({ 1000,100 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& pos) {};
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;

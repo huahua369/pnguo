@@ -10,6 +10,7 @@
 #include <vkgui/vkrenderer.h>
 #include <vkgui/page.h>
 #include <vkgui/mapView.h>
+#include <vkgui/print_time.h>
 
 #include <cairo/cairo.h>
 
@@ -290,7 +291,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 		cp->effect = uTheme::light;
 		cp->click_cb = [=](void* ptr, int clicks)
 			{
+				auto pb = (color_btn*)ptr;
 				printf("%d\n", clicks);
+				print_time aa("list");
 				vx->do_list();
 				vx->do_cmd();
 			};
@@ -377,9 +380,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 				st.text_align = { 0.0,0.0 };
 				st.font_size = 16;
 				st.text_color = -1;
-				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
+				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
 				auto rc2 = rc;
-				draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0236F23, 0x80ffffff, 2, 1);
+				draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
 				for (auto& str : ftns)
 				{
 					draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
