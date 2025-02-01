@@ -310,6 +310,7 @@ app_cx::app_cx()
 	}
 	// Enable native IME.
 	SDL_SetHintWithPriority(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1", SDL_HINT_OVERRIDE);
+	SDL_SetHintWithPriority(SDL_HINT_IME_IMPLEMENTED_UI, "composition", SDL_HINT_OVERRIDE);
 	//SDL_SetHintWithPriority(SDL_HINT_IME_INTERNAL_EDITING, "1", SDL_HINT_OVERRIDE);
 	//SDL_SetHintWithPriority(SDL_HINT_IME_SHOW_UI, "1", SDL_HINT_OVERRIDE);
 #ifdef __ANDROID__
@@ -521,7 +522,7 @@ void app_cx::call_cb(SDL_Event* e)
 	auto fwp = SDL_GetWindowFromID(e->window.windowID);
 	auto fw = (form_x*)pce::get_property(fwp, "form_x");
 	int rw = 0;
-
+ 
 	if (e->type == SDL_EVENT_SYSTEM_THEME_CHANGED) {
 		auto st = SDL_GetSystemTheme();
 		printf("");

@@ -21701,24 +21701,21 @@ void text_ctx_cx::draw(cairo_t* cr)
 		st.text_color = editing_text_color;
 
 		glm::ivec2 lps = {};
-		glm::vec4 rc = { 0,0,lps.x, lps.y };
 		// todo 获取输入中的文本大小
 		//pango_layout_get_pixel_size(layout_editing, &lps.x, &lps.y);
 		lps = get_pixel_size(editingstr.c_str(), editingstr.size());
 		if (lps.y < lineheight)
 			lps.y = lineheight;
 		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
+		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };
 
 		set_color(cr, get_reverse_color(editing_text_color));
-		cairo_rectangle(cr, 0, 0, lps.x, lps.y + 2);
+		cairo_rectangle(cr, 0, 0, lps.x + 2, lps.y + 2);
 		cairo_fill(cr);
 		set_color(cr, editing_text_color);
-
 		if (ltx)
-			draw_text(cr, ltx, editingstr.c_str(), -1, rc, &st);
-
-
-		cairo_move_to(cr, lss.x, lss.y);
+			draw_text(cr, ltx, editingstr.c_str(), -1, rc, &st); 
+		cairo_move_to(cr, lss.x + 1, lss.y);
 		cairo_line_to(cr, lss.z, lss.w);
 		cairo_set_line_width(cr, 1);
 		cairo_stroke(cr);
@@ -22670,7 +22667,7 @@ edit_tl::edit_tl()
 	//set_family("NSimSun", 12);
 	set_family(0, 12);
 	set_align_pos({ 4, 4 });
-	set_color({ 0xff353535,-1,0xa0ff8000 ,0xff000000 });
+	set_color({ 0xff353535,-1,0xa0ff8000 ,0xff020202 });
 }
 
 edit_tl::~edit_tl()
