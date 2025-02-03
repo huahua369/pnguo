@@ -21701,8 +21701,6 @@ void text_ctx_cx::draw(cairo_t* cr)
 		st.text_color = editing_text_color;
 
 		glm::ivec2 lps = {};
-		// todo 获取输入中的文本大小
-		//pango_layout_get_pixel_size(layout_editing, &lps.x, &lps.y);
 		lps = get_pixel_size(editingstr.c_str(), editingstr.size());
 		if (lps.y < lineheight)
 			lps.y = lineheight;
