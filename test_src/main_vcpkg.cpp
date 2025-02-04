@@ -222,7 +222,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
 	form0->bind(p);	// 绑定到窗口  
-
 	//build_spr_ui(form0);
 	p->set_rss(5);
 	p->_lms = { 8,8 };
@@ -298,7 +297,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				vx->do_cmd();
 			};
 	}
-	auto ce = p->add_input("", { 1000,30 }, 1); 
+	auto ce = p->add_input("", { 1000,30 }, 1);
 	for (auto& nt : btnname)
 	{
 		auto cp = p->add_gbutton(nt, { 160,30 }, color);
@@ -368,9 +367,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
 			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
-
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
