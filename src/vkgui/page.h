@@ -299,6 +299,8 @@ namespace hz {
 	uint64_t toHex(const njson& v, uint64_t d = 0);
 	unsigned int toColor(const njson& v, unsigned int d = 0);
 	std::string toColor2(unsigned int d);
+	std::string ptHex(const std::string& str, char ch = 'x', char step = '\0');
+	std::string ptHex(const void* data, size_t size, char ch = 'x', char step = '\0');
 	glm::ivec2 toiVec2(const njson& v, int d = -1);
 	glm::ivec2 toiVec2(const njson& v, glm::ivec2& ot);
 	glm::vec2 toVec2(const njson& v, double d = 0);

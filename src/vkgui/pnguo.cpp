@@ -21570,7 +21570,7 @@ void text_ctx_cx::up_caret()
 			caret.x = ltx->get_text_ipos(fontid, fontsize, pstr + ks.x, ks.y, ccursor - ks.x);
 		}
 		caret.y = cursor_pos.z * v1.y;
-		printf("cursor:\t%d\n", cursor_pos.x);
+		//printf("cursor:\t%d\n", cursor_pos.x);
 	}
 	cursor_pos = caret; cursor_pos.z = h;
 }

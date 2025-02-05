@@ -2081,7 +2081,7 @@ namespace hz {
 	{
 		return toHex(v, d);
 	}
-	std::string ptHex(const std::string& str, char ch = 'x', char step = '\0')
+	std::string ptHex(const std::string& str, char ch, char step)
 	{
 		char spch[8] = { '%', '0', '2', ch, step, 0 };
 		std::string chBuffer;
@@ -2090,6 +2090,22 @@ namespace hz {
 		memset(chEach, 0, 10);
 		unsigned char* d = (unsigned char*)str.c_str();
 		auto len = str.size();
+		for (nCount = 0; nCount < len /*&& d[nCount]>0*/; nCount++)
+		{
+			sprintf(chEach, spch, d[nCount]);
+			chBuffer += chEach;
+		}
+		return chBuffer;
+	}
+	std::string ptHex(const void* data, size_t size, char ch, char step)
+	{
+		char spch[8] = { '%', '0', '2', ch, step, 0 };
+		std::string chBuffer;
+		char chEach[10];
+		int nCount;
+		memset(chEach, 0, 10);
+		unsigned char* d = (unsigned char*)data;
+		auto len = size;
 		for (nCount = 0; nCount < len /*&& d[nCount]>0*/; nCount++)
 		{
 			sprintf(chEach, spch, d[nCount]);

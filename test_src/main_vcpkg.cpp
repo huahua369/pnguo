@@ -20,7 +20,20 @@
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+text_style_t* get_defst(int idx)
+{
+	static text_style_t st[5] = {};
+	st[0].font = 0;
+	st[0].text_align = { 0.0,0.0 };
+	st[0].font_size = 16;
+	st[0].text_color = -1;
 
+	st[1].font = 1;
+	st[1].text_align = { 0.0,0.0 };
+	st[1].font_size = 16;
+	st[1].text_color = -1;
+	return &st[idx];
+}
 extern "C" {
 }
 /*
@@ -210,7 +223,24 @@ menu_cx* menu_m(form_x* form0)
 	auto mc = mg::new_mm(&m);
 	return mc;
 }
-
+void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, size_t offset)
+{
+	auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
+	uint32_t color = 0x80FF7373;// hz::get_themecolor();
+	auto st = get_defst(1);
+	cairo_as _ss_(cr);
+	cairo_translate(cr, dps.x, dps.y);
+	glm::vec4 rc = { 0,0,600,1000 };
+	draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
+	if (size > 0 && offset < size) {
+		std::string hexstr;
+		hexstr.resize(16 * 2);
+		auto pt = (char*)data + offset;
+		auto length = size - offset;
+		auto hs = hz::ptHex(pt, 16, 'X',' ');
+		draw_text(cr, p->ltx, hs.c_str(), hs.size(), rc, st);
+	}
+}
 
 void show_ui(form_x* form0, menu_cx* gm)
 {
@@ -314,7 +344,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 	glm::vec4 a = glm::vec4(1.0, 2.2, 3.0, 1.0);
 	auto b = glm::vec4(0.1, .2, .3, 1.0);
 	auto c = a * b;
-	auto dpx1 = p->push_dragpos({ 0,0 });// , { 300,600 });// 增加一个拖动坐标
 	size /= 2;
 	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
@@ -365,26 +394,23 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto f = ft->get_font("a", 0);
-			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
-			auto dps1 = p->get_dragpos(dpx1);//获取拖动时的坐标
+			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
+			auto st = get_defst(1);
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
 				glm::vec4 rc = { 0,0,300,1000 };
-				text_style_t st = {};
-				st.font = 1;
-				st.text_align = { 0.0,0.0 };
-				st.font_size = 16;
-				st.text_color = -1;
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
 				auto rc2 = rc;
 				draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
 				for (auto& str : ftns)
 				{
-					draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
+					//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
 					rc.x += 300;
 				}
+				auto str = ftns[0];
+				draw_hex(p, cr, dpx, str.data(), str.size(), 0);
 			}
 		};
 }
