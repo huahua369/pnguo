@@ -20,6 +20,7 @@
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+auto fontn2 = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 text_style_t* get_defst(int idx)
 {
 	static text_style_t st[5] = {};
@@ -32,6 +33,10 @@ text_style_t* get_defst(int idx)
 	st[1].text_align = { 0.0,0.0 };
 	st[1].font_size = 16;
 	st[1].text_color = -1;
+	st[2].font = 2;
+	st[2].text_align = { 0.0,0.0 };
+	st[2].font_size = 16;
+	st[2].text_color = -1;
 	return &st[idx];
 }
 extern "C" {
@@ -223,21 +228,44 @@ menu_cx* menu_m(form_x* form0)
 	auto mc = mg::new_mm(&m);
 	return mc;
 }
+void tohexstr(std::string& ot, const char* d, int len, uint64_t line, bool n16) {
+	auto hs = hz::ptHex(&line, n16 ? 8 : 4, 'x');
+	std::reverse(hs.begin(), hs.end());
+	hs += "h: ";
+	auto aa = std::string(d, len);
+	for (auto& it : aa) {
+		if (!isprint(it))
+		{
+			it = '.';
+		}
+	}
+	hs += hz::ptHex(d, len < 16 ? len : 16, 'X', ' ') + "; " + aa;
+	ot.swap(hs);
+}
 void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, size_t offset)
 {
 	auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 	uint32_t color = 0x80FF7373;// hz::get_themecolor();
-	auto st = get_defst(1);
+	auto st = get_defst(2);
 	cairo_as _ss_(cr);
 	cairo_translate(cr, dps.x, dps.y);
-	glm::vec4 rc = { 0,0,600,1000 };
+	glm::vec4 rc = { 0,0,800,1000 };
 	draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
+	std::string hstr = "0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f";
+	bool n16 = size > UINT_MAX;
+	double xf = st->font_size * (0.75 + (n16 ? 8 : 4) + 1);
+	cairo_translate(cr, xf, 0);
+	draw_text(cr, p->ltx, hstr.c_str(), hstr.size(), rc, st);
+	cairo_translate(cr, -xf, 0);
 	if (size > 0 && offset < size) {
 		std::string hexstr;
+		std::string hs;
 		hexstr.resize(16 * 2);
+		rc.y += 20;
 		auto pt = (char*)data + offset;
 		auto length = size - offset;
-		auto hs = hz::ptHex(pt, 16, 'X', ' ');
+		tohexstr(hs, pt, 16, 1, n16);
+		//auto hs = hz::ptHex(pt, 16, 'X', ' ');
 		draw_text(cr, p->ltx, hs.c_str(), hs.size(), rc, st);
 	}
 }
@@ -257,6 +285,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->_lms = { 8,8 };
 	p->add_familys(fontn, 0);
 	p->add_familys(fontn1, 0);
+	p->add_familys(fontn2, 0);
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 1,30 });
@@ -267,7 +296,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	int rcw = 14;
 	{
 		// 设置带滚动条
-		p->set_scroll(width, rcw, { 4, 4 }, { 2*0,0 }, { 0,2*0 });
+		p->set_scroll(width, rcw, { 4, 4 }, { 2 * 0,0 }, { 0,2 * 0 });
 		//p->set_scroll_hide(0);
 		p->set_view(size, cview);
 	}
@@ -328,7 +357,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			};
 	}
 	auto ce = p->add_input("", { 1000,30 }, 1);
-	
+
 	for (auto& nt : btnname)
 	{
 		auto cp = p->add_gbutton(nt, { 160,30 }, color);
@@ -393,7 +422,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		{
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
-		{ 
+		{
 			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
@@ -473,6 +502,7 @@ int main()
 	sdldev.vkdev = 0;								// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 	auto gm = menu_m(form0);
+	printf("%p\n", form0);
 	show_ui(form0, gm);
 	//show_ui2(form0, gm);
 	//show_cpuinfo(form0);
