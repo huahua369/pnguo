@@ -237,7 +237,7 @@ void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, 
 		hexstr.resize(16 * 2);
 		auto pt = (char*)data + offset;
 		auto length = size - offset;
-		auto hs = hz::ptHex(pt, 16, 'X',' ');
+		auto hs = hz::ptHex(pt, 16, 'X', ' ');
 		draw_text(cr, p->ltx, hs.c_str(), hs.size(), rc, st);
 	}
 }
@@ -247,9 +247,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 	if (!form0)return;
 
 	glm::ivec2 size = { 1024,800 };
-	glm::ivec2 cview = { 10240,10240 };
+	glm::ivec2 cview = { 1580,1580 };
 	auto p = new plane_cx();
-	uint32_t pbc = 0xf02c2c2c;
+	uint32_t pbc = 0xff2c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
 	form0->bind(p);	// 绑定到窗口  
 	//build_spr_ui(form0);
@@ -267,8 +267,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 	int rcw = 14;
 	{
 		// 设置带滚动条
-		p->set_scroll(width, rcw, { 4, 4 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
+		p->set_scroll(width, rcw, { 4, 4 }, { 2*0,0 }, { 0,2*0 });
+		//p->set_scroll_hide(0);
 		p->set_view(size, cview);
 	}
 	size.y -= 50;
@@ -328,6 +328,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			};
 	}
 	auto ce = p->add_input("", { 1000,30 }, 1);
+	
 	for (auto& nt : btnname)
 	{
 		auto cp = p->add_gbutton(nt, { 160,30 }, color);
@@ -392,7 +393,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		{
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
-		{
+		{ 
 			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
@@ -403,18 +404,48 @@ void show_ui(form_x* form0, menu_cx* gm)
 				glm::vec4 rc = { 0,0,300,1000 };
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
 				auto rc2 = rc;
-				draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
+				//draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
 				for (auto& str : ftns)
 				{
 					//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
 					rc.x += 300;
 				}
-				auto str = ftns[0];
-				draw_hex(p, cr, dpx, str.data(), str.size(), 0);
 			}
+			auto str = ftns[0];
+			draw_hex(p, cr, dpx, str.data(), str.size(), 0);
 		};
 }
 
+void show_ui2(form_x* form0, menu_cx* gm)
+{
+	if (!form0)return;
+
+	glm::ivec2 size = { 1024,800 };
+	glm::ivec2 cview = { 1580,1580 };
+	auto p = new plane_cx();
+	uint32_t pbc = 0xff2c2c2c;
+	p->set_color({ 0x80ff802C,1,5,pbc });
+	form0->bind(p);	// 绑定到窗口  
+	//build_spr_ui(form0);
+	p->set_rss(5);
+	p->_lms = { 8,8 };
+	p->add_familys(fontn, 0);
+	p->add_familys(fontn1, 0);
+	p->draggable = true; //可拖动
+	p->set_size(size);
+	p->set_pos({ 190,30 });
+	p->set_select_box(2, 0.012);
+	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
+	p->fontsize = 16;
+	int width = 16;
+	int rcw = 14;
+	{
+		// 设置带滚动条
+		p->set_scroll(width, rcw, { 4, 4 }, { 2,0 }, { 0,2 });
+		//p->set_scroll_hide(0);
+		p->set_view(size, cview);
+	}
+}
 void test_img() {
 
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
@@ -443,6 +474,7 @@ int main()
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 	auto gm = menu_m(form0);
 	show_ui(form0, gm);
+	//show_ui2(form0, gm);
 	//show_cpuinfo(form0);
 	// 运行消息循环
 	run_app(app, 0);

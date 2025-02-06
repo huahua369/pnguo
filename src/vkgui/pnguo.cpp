@@ -21681,8 +21681,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 		set_color(cr, cursor.y);
 		cairo_rectangle(cr, x, y, cursor.x, cursor_pos.z);
 		cairo_fill(cr);
-	}
-	cairo_restore(cr);
+	} 
 	auto bbc = box_color;
 	set_source_rgba(cr, bbc);
 	cairo_rectangle(cr, pos.x - 0.5, pos.y - 0.5, size.x + 1, size.y + 1);
@@ -21690,8 +21689,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 	cairo_stroke(cr);
 	// 编辑中的文本
 	if (editingstr.size())
-	{
-		cairo_save(cr);
+	{ 
 		cairo_translate(cr, x, y);
 		// 渲染文本
 		text_style_t st = {};
@@ -21712,12 +21710,11 @@ void text_ctx_cx::draw(cairo_t* cr)
 		cairo_fill(cr);
 		set_color(cr, editing_text_color);
 		if (ltx)
-			draw_text(cr, ltx, editingstr.c_str(), -1, rc, &st); 
+			draw_text(cr, ltx, editingstr.c_str(), -1, rc, &st);
 		cairo_move_to(cr, lss.x + 1, lss.y);
 		cairo_line_to(cr, lss.z, lss.w);
 		cairo_set_line_width(cr, 1);
-		cairo_stroke(cr);
-		cairo_restore(cr);
+		cairo_stroke(cr); 
 	}
 }
 #else
@@ -24396,11 +24393,14 @@ void plane_cx::update(float delta)
 				draw_back_cb(cr, sps);
 			}
 			for (auto& it : widgets) {
-				cairo_as __cas_(cr);
-				auto scp = sps * it->hscroll;
-				if (scp.x != 0 || scp.y != 0)
-					cairo_translate(cr, scp.x, scp.y);// 滚动条影响
-				it->draw(cr);
+				if (it->visible)
+				{
+					cairo_as __cas_(cr);
+					auto scp = sps * it->hscroll;
+					if (scp.x != 0 || scp.y != 0)
+						cairo_translate(cr, scp.x, scp.y);// 滚动条影响
+					it->draw(cr);
+				}
 			}
 			if (draw_front_cb)
 			{
