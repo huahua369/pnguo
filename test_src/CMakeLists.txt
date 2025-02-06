@@ -35,11 +35,20 @@ list(APPEND src_vcpkg_gui
     "../njson.natvis"
 ) 
 
+list(APPEND src_hex   
+    "main_hex.cpp" 
+    "ecc_sv.cpp"
+    "mshell.cpp"
+    "../rc/resource1.rc"
+    "../njson.natvis"
+) 
+
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (vkcmp ${src_vkcmp} ) 
 add_executable (vkr_spr ${src_spr} ) 
 add_executable (vcpkg_gui ${src_vcpkg_gui} ) 
+add_executable (hex ${src_hex} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
@@ -89,6 +98,7 @@ target_link_libraries(tcmp PRIVATE ${lklib})
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(vcpkg_gui PRIVATE ${lklib}  )
+target_link_libraries(hex PRIVATE ${lklib}  )
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})

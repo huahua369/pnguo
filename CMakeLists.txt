@@ -89,7 +89,7 @@ set(SDL_RENDER_GPU ON)
 set(SDL_GPU ON)
 set(SDL_RENDER_VULKAN ON)  
 
-add_subdirectory(third_lib/SDL)
+add_subdirectory(third_lib/SDL) 
 else()
 #设置这两个变量或自定义find路径
 #set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
