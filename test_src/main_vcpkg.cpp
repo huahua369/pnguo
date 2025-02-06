@@ -228,21 +228,55 @@ menu_cx* menu_m(form_x* form0)
 	auto mc = mg::new_mm(&m);
 	return mc;
 }
-void tohexstr(std::string& ot, const char* d, int len, uint64_t line, bool n16) {
-	auto hs = hz::ptHex(&line, n16 ? 8 : 4, 'x');
-	std::reverse(hs.begin(), hs.end());
+void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, bool n16) {
+	auto hs = pg::to_string_hex(line, n16 ? 16 : 8, "x");
 	hs += "h: ";
 	auto aa = std::string(d, len);
 	for (auto& it : aa) {
-		if (!isprint(it))
+		if (it > 0 && !isprint(it))
 		{
 			it = '.';
 		}
 	}
-	hs += hz::ptHex(d, len < 16 ? len : 16, 'X', ' ') + "; " + aa;
-	ot.swap(hs);
+	hs += hz::ptHex(d, len < xlen ? len : xlen, 'X', ' ');
+	if (len < xlen) {
+		xlen -= len;
+		for (size_t i = 0; i < xlen; i++)
+		{
+			hs += "   ";
+		}
+	}
+	hs += "; " + aa + "\n";
+	ot += hs;
 }
-void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, size_t offset)
+/*
+todo Data Inspector
+binary(1)读一个字节
+cotal(1)
+uint8(1)
+int8(1)
+uint16(2)
+int16(2)
+uint24(3)
+int24(3)
+uint32(4)
+int32
+uint64
+int64
+ULEB128?
+SLEB128?
+float16
+bfloat16
+float32
+float64
+ASCII(1)
+UTF-8读整个字符
+UTF-16读整个字符
+GBK(2)
+BIG5
+SHIFT-JIS
+*/
+void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, size_t offset, size_t n)
 {
 	auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 	uint32_t color = 0x80FF7373;// hz::get_themecolor();
@@ -251,12 +285,30 @@ void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, 
 	cairo_translate(cr, dps.x, dps.y);
 	glm::vec4 rc = { 0,0,800,1000 };
 	draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
-	std::string hstr = "0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f";
+	if (n < 16)n = 16;
+	std::string hstr;
 	bool n16 = size > UINT_MAX;
-	double xf = st->font_size * (0.75 + (n16 ? 8 : 4) + 1);
-	cairo_translate(cr, xf, 0);
-	draw_text(cr, p->ltx, hstr.c_str(), hstr.size(), rc, st);
-	cairo_translate(cr, -xf, 0);
+	double xf = st->font_size * ((n16 ? 8 : 4) + 2);
+	int bn = st->font_size * 0.5;
+	int l16 = n16 ? 16 : 8;
+	l16 += 3;
+	for (size_t i = 0; i < l16; i++)
+	{
+		hstr.push_back(' ');
+	}
+	auto c = st->text_color;
+	st->text_color = 0xffEC967E;
+	auto nrc = rc;
+	for (size_t i = 0; i < n; i++)
+	{
+		auto bt = pg::to_string_hex(i) + " ";
+		nrc.x = (l16 + i * 3) * bn;
+		if (i < 16)nrc.x += 0.5 * bn;
+		draw_text(cr, p->ltx, bt.c_str(), bt.size(), nrc, st);
+	}
+	//cairo_translate(cr, xf, 0);
+	st->text_color = c;
+	//cairo_translate(cr, -xf, 0);
 	if (size > 0 && offset < size) {
 		std::string hexstr;
 		std::string hs;
@@ -264,7 +316,13 @@ void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, 
 		rc.y += 20;
 		auto pt = (char*)data + offset;
 		auto length = size - offset;
-		tohexstr(hs, pt, 16, 1, n16);
+		auto last = length % n;
+		length /= n;
+		for (size_t i = 0; i < length; i++)
+		{
+			tohexstr(hs, pt, n, n, i * n, n16); pt += n;
+		}
+		tohexstr(hs, pt, last, n, length * n, n16);
 		//auto hs = hz::ptHex(pt, 16, 'X', ' ');
 		draw_text(cr, p->ltx, hs.c_str(), hs.size(), rc, st);
 	}
@@ -390,6 +448,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	static std::vector<ft_info> fvs;
 	fvs.resize(fc);
 	static std::vector<std::string> ftns;
+	static std::string kc = (char*)u8"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
 	std::string k;
 	for (size_t i = 0; i < fc; i++)
 	{
@@ -440,8 +499,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 					rc.x += 300;
 				}
 			}
-			auto str = ftns[0];
-			draw_hex(p, cr, dpx, str.data(), str.size(), 0);
+			auto str = kc;
+			draw_hex(p, cr, dpx, str.data(), str.size(), 0, 16);
 		};
 }
 

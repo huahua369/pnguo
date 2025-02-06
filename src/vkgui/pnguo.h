@@ -58,6 +58,11 @@ namespace pg
 {
 	std::string to_string(double _Val);
 	std::string to_string(double _Val, const char* fmt);
+	std::string to_string_p(uint32_t _Val);
+	std::string to_string_p(uint64_t _Val);
+	std::string to_string_hex(uint32_t _Val);
+	std::string to_string_hex(uint64_t _Val, int n, const char* x);
+	std::string to_string_hex2(uint32_t _Val);
 }
 /*
 图集画布

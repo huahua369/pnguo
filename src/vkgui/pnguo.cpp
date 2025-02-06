@@ -160,6 +160,47 @@ namespace pg
 		sprintf_s(&_Str[0], _Len + 1, "%.16g", _Val);
 		return _Str;
 	}
+	std::string to_string_p(uint32_t _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%p", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%p", _Val);
+		return _Str;
+	}
+	std::string to_string_p(uint64_t _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%p", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%p", _Val);
+		return _Str;
+	}
+	std::string to_string_hex(uint32_t _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%x", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%x", _Val);
+		return _Str;
+	}
+	std::string to_string_hex(uint64_t _Val, int n, const char* x)
+	{
+		std::string fmt = "%";
+		if (n > 0)
+		{
+			fmt += "0" + std::to_string(n);
+		}
+		fmt += x ? x : "x";
+		const auto _Len = static_cast<size_t>(_scprintf(fmt.c_str(), _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, fmt.c_str(), _Val);
+		return _Str;
+	}
+	std::string to_string_hex2(uint32_t _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%02x", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%02x", _Val);
+		return _Str;
+	}
 	std::string to_string(double _Val, const char* fmt)
 	{
 		if (!fmt || !*fmt)fmt = "%.16g";
@@ -21681,7 +21722,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 		set_color(cr, cursor.y);
 		cairo_rectangle(cr, x, y, cursor.x, cursor_pos.z);
 		cairo_fill(cr);
-	} 
+	}
 	auto bbc = box_color;
 	set_source_rgba(cr, bbc);
 	cairo_rectangle(cr, pos.x - 0.5, pos.y - 0.5, size.x + 1, size.y + 1);
@@ -21689,7 +21730,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 	cairo_stroke(cr);
 	// 编辑中的文本
 	if (editingstr.size())
-	{ 
+	{
 		cairo_translate(cr, x, y);
 		// 渲染文本
 		text_style_t st = {};
@@ -21714,7 +21755,7 @@ void text_ctx_cx::draw(cairo_t* cr)
 		cairo_move_to(cr, lss.x + 1, lss.y);
 		cairo_line_to(cr, lss.z, lss.w);
 		cairo_set_line_width(cr, 1);
-		cairo_stroke(cr); 
+		cairo_stroke(cr);
 	}
 }
 #else
