@@ -9,7 +9,12 @@
 #define WINDOW_HEIGHT 600
 #define FONT_SIZE 16
 #define BYTES_PER_LINE 16
-
+/*
+二进制文件编辑器
+1.打开保存文件、备份文件
+2.滚动偏移、解析出16进制字符串、同步修改、显示整数字符串编码等
+3.渲染解码部分信息
+*/
 typedef struct {
 	unsigned char* data;
 	size_t size;
@@ -43,12 +48,13 @@ FileData load_file(const char* filename) {
 
 void render_hex_editor(SDL_Renderer* renderer, TTF_Font* font, FileData* file_data) {
 	char line[128];
-	SDL_Color text_color = { 255, 255, 255, 255 };
+	SDL_Color text_color = { 158, 158, 255, 255 };
 	int x = 10, y = 10;
 	SDL_Rect rect = {};
 	SDL_GetRenderViewport(renderer, &rect);
 	int nc = rect.h / FONT_SIZE;
 	int dnc = file_data->size / BYTES_PER_LINE;
+	dnc += file_data->size % BYTES_PER_LINE > 0 ? 1 : 0;
 	int newnc = std::min(nc + 1, dnc);
 	if (!file_data->dt)
 	{
@@ -63,11 +69,12 @@ void render_hex_editor(SDL_Renderer* renderer, TTF_Font* font, FileData* file_da
 	}
 	if (file_data->dt->empty())
 	{
+		auto data = file_data->data;
 		for (size_t i = 0; i < file_data->size && newnc > 0; i += BYTES_PER_LINE, newnc--) {
 			snprintf(line, sizeof(line), "%08zx: ", i);
 			for (int j = 0; j < BYTES_PER_LINE; j++) {
 				if (i + j < file_data->size) {
-					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%02x ", file_data->data[i + j]);
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%02x ", data[i + j]);
 				}
 				else {
 					snprintf(line + strlen(line), sizeof(line) - strlen(line), "   ");
@@ -76,7 +83,7 @@ void render_hex_editor(SDL_Renderer* renderer, TTF_Font* font, FileData* file_da
 			snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
 			for (int j = 0; j < BYTES_PER_LINE; j++) {
 				if (i + j < file_data->size) {
-					char c = file_data->data[i + j];
+					char c = data[i + j];
 					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%c", (c >= 32 && c <= 126) ? c : '.');
 				}
 				else {
