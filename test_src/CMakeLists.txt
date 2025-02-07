@@ -35,10 +35,13 @@ list(APPEND src_vcpkg_gui
     "../njson.natvis"
 ) 
 
+
 list(APPEND src_hex   
     "main_hex.cpp" 
     "ecc_sv.cpp"
     "mshell.cpp"
+    "SDL3_ttf/src/SDL_ttf.c"
+    "SDL3_ttf/src/SDL_hashtable.c"
     "../rc/resource1.rc"
     "../njson.natvis"
 ) 

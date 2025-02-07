@@ -548,7 +548,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-#endif   
+#endif    
 	const char* wtitle = (char*)u8"vcpkg管理工具";
 	auto app = new_app();
 	do_text(fontn, 0, strlen(fontn));

@@ -166,6 +166,7 @@ include_directories("third_party/vkvg/src")
 include_directories("third_party/vkvg/src/recording")
 include_directories("third_party/vkh/include")
 include_directories("third_party/vkh/src")
+include_directories("test_src")
 
 add_library (tpv STATIC ${tpv_src})
 #add_library (tpv SHARED ${tpv_src})
