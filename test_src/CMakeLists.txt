@@ -42,6 +42,10 @@ list(APPEND src_hex
     "mshell.cpp"
     "SDL3_ttf/src/SDL_ttf.c"
     "SDL3_ttf/src/SDL_hashtable.c"
+    "SDL3_ttf/src/SDL_hashtable_ttf.c"
+    "SDL3_ttf/src/SDL_renderer_textengine.c"
+    "SDL3_ttf/src/SDL_surface_textengine.c"
+    "SDL3_ttf/src/SDL_gpu_textengine.c"
     "../rc/resource1.rc"
     "../njson.natvis"
 ) 

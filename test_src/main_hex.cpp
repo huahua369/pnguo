@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
+#include <vector>
+#include <string>
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define FONT_SIZE 16
@@ -11,6 +13,8 @@
 typedef struct {
 	unsigned char* data;
 	size_t size;
+	TTF_TextEngine* engine;
+	std::vector<TTF_Text*>* dt;
 } FileData;
 
 FileData load_file(const char* filename) {
@@ -41,40 +45,57 @@ void render_hex_editor(SDL_Renderer* renderer, TTF_Font* font, FileData* file_da
 	char line[128];
 	SDL_Color text_color = { 255, 255, 255, 255 };
 	int x = 10, y = 10;
-
-	for (size_t i = 0; i < file_data->size; i += BYTES_PER_LINE) {
-		snprintf(line, sizeof(line), "%08zx: ", i);
-		for (int j = 0; j < BYTES_PER_LINE; j++) {
-			if (i + j < file_data->size) {
-				snprintf(line + strlen(line), sizeof(line) - strlen(line), "%02x ", file_data->data[i + j]);
-			}
-			else {
-				snprintf(line + strlen(line), sizeof(line) - strlen(line), "   ");
-			}
+	SDL_Rect rect = {};
+	SDL_GetRenderViewport(renderer, &rect);
+	int nc = rect.h / FONT_SIZE;
+	int dnc = file_data->size / BYTES_PER_LINE;
+	int newnc = std::min(nc + 1, dnc);
+	if (!file_data->dt)
+	{
+		file_data->dt = new std::vector<TTF_Text*>();
+	}
+	if (file_data->dt->size() != newnc)
+	{
+		for (auto it : *(file_data->dt)) {
+			TTF_DestroyText(it);
 		}
-		snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
-		for (int j = 0; j < BYTES_PER_LINE; j++) {
-			if (i + j < file_data->size) {
-				char c = file_data->data[i + j];
-				snprintf(line + strlen(line), sizeof(line) - strlen(line), "%c", (c >= 32 && c <= 126) ? c : '.');
+		file_data->dt->clear();
+	}
+	if (file_data->dt->empty())
+	{
+		for (size_t i = 0; i < file_data->size && newnc > 0; i += BYTES_PER_LINE, newnc--) {
+			snprintf(line, sizeof(line), "%08zx: ", i);
+			for (int j = 0; j < BYTES_PER_LINE; j++) {
+				if (i + j < file_data->size) {
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%02x ", file_data->data[i + j]);
+				}
+				else {
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "   ");
+				}
 			}
-			else {
-				snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+			snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+			for (int j = 0; j < BYTES_PER_LINE; j++) {
+				if (i + j < file_data->size) {
+					char c = file_data->data[i + j];
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%c", (c >= 32 && c <= 126) ? c : '.');
+				}
+				else {
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+				}
 			}
+			auto dt = TTF_CreateText(file_data->engine, font, line, strlen(line));
+			TTF_SetTextColor(dt, text_color.r, text_color.g, text_color.b, text_color.a);
+			if (dt)
+				file_data->dt->push_back(dt);
 		}
-
-		SDL_Surface* text_surface = TTF_RenderText_Solid(font, line, strlen(line), text_color);
-		SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-		SDL_FRect dest_rect = { x, y, text_surface->w, text_surface->h };
-		SDL_RenderTexture(renderer, text_texture, NULL, &dest_rect);
-
-		SDL_DestroyTexture(text_texture);
-		SDL_DestroySurface(text_surface);
-
+	}
+	for (auto dt : *file_data->dt)
+	{
+		TTF_DrawRendererText(dt, x, y);
 		y += FONT_SIZE;
 	}
 }
-int sdlm(const char*fn)
+int sdlm(const char* fn)
 {
 
 	FileData file_data = load_file(fn);
@@ -119,7 +140,7 @@ int sdlm(const char*fn)
 		SDL_Quit();
 		return 1;
 	}
-
+	file_data.engine = TTF_CreateRendererTextEngine(renderer);
 	int running = 1;
 	while (running) {
 		SDL_Event event;
@@ -135,6 +156,7 @@ int sdlm(const char*fn)
 		render_hex_editor(renderer, font, &file_data);
 
 		SDL_RenderPresent(renderer);
+		SDL_Delay(10);
 	}
 
 	free(file_data.data);
@@ -151,6 +173,7 @@ int main(int argc, char* argv[]) {
 	if (argc < 2) {
 		printf("Usage: %s <filename>\n", argv[0]);
 		fn = "dxcompiler.dll";
+		fn = "b2";
 	}
 	return sdlm(fn);
 }
