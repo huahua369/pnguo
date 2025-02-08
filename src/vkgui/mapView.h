@@ -237,6 +237,8 @@ namespace hz
 
 	bool save_file(const std::string& fn, const char* data, uint64_t size, uint64_t pos, bool is_plus);
 
+	bool is_utf8(const char* str, int len);
+
 }//!hz
 
 #endif

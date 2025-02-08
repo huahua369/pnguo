@@ -413,7 +413,7 @@ namespace md {
 	  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
 	  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
 	  3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,6,6,1,1
-	}; 
+	};
 	const char* utf8_next_char(const char* p) {
 		return (char*)((p)+utf8_skip_data[*(const unsigned char*)(p)]);
 	}
@@ -525,7 +525,7 @@ guiSetStr(_edit_cmdout, buf);
 //---------------------------------------------------------------------------------------------
 #ifndef NO_MAPFILE
 namespace hz
-{ 
+{
 	std::string get_temp_path()
 	{
 		std::string str;
@@ -1763,7 +1763,31 @@ namespace hz
 		}
 		return ret;
 	}
-
+	bool is_utf8(const char* str, int len)
+	{
+		while (*str && (len > 0 || len < 0)) {
+			len--;
+			if ((*str & 0x80) == 0x00) {
+				str++; // 1-byte character, skip this byte
+			}
+			else if ((*str & 0xe0) == 0xc0) {
+				if ((*(str + 1) & 0xc0) != 0x80) return false;
+				str += 2; // 2-byte character, skip these two bytes
+			}
+			else if ((*str & 0xf0) == 0xe0) {
+				if ((*(str + 1) & 0xc0) != 0x80 || (*(str + 2) & 0xc0) != 0x80) return false;
+				str += 3; // 3-byte character, skip these three bytes
+			}
+			else if ((*str & 0xf8) == 0xf0) {
+				if ((*(str + 1) & 0xc0) != 0x80 || (*(str + 2) & 0xc0) != 0x80 || (*(str + 3) & 0xc0) != 0x80) return false;
+				str += 4; // 4-byte character, skip these four bytes
+			}
+			else {
+				return false;   // invalid start byte
+			}
+		}
+		return true;
+	}
 	inline bool isse(int ch)
 	{
 		return ch == 0 || (ch > 0 && isspace(ch));

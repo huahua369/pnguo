@@ -232,8 +232,13 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 	auto hs = pg::to_string_hex(line, n16 ? 16 : 8, "x");
 	hs += "h: ";
 	auto aa = std::string(d, len);
+	bool isu8 = hz::is_utf8(d, len);
+	if (!isu8)
+	{
+		aa = hz::gbk_to_u8(aa);
+	}
 	for (auto& it : aa) {
-		if (it > 0 && !isprint(it))
+		if ((it > 0 && !isprint(it)))
 		{
 			it = '.';
 		}
@@ -449,6 +454,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 	fvs.resize(fc);
 	static std::vector<std::string> ftns;
 	static std::string kc = (char*)u8"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
+	{
+		hz::mfile_t bk;
+		auto bkt = bk.open_d("bk.txt", true);
+		if (bkt)
+			kc.assign(bkt, bk.size());
+	}
 	std::string k;
 	for (size_t i = 0; i < fc; i++)
 	{
