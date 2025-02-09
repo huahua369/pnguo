@@ -26510,13 +26510,15 @@ void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
 	set_color2hsv(c);
 	width = w;
 	height = h;
-	if (width < 1)
-		width = 100;
 	if (height < font_size)
 		height = ltx->get_lineheight(0, font_size);
 	h = height + step;
-	size.x = width;
 	cpx = height * 2.5;
+	int minw = cpx + step * 2;
+	if (width < minw) {
+		width = minw + h;
+	}
+	size.x = width;
 	int hn = 4;
 	if (alpha)hn++;
 	size.y = h * hn;
@@ -26555,17 +26557,15 @@ void colorpick_tl::set_hsv(const glm::vec4& c)
 void colorpick_tl::set_posv(const glm::ivec2& poss)
 {
 	double htp = height + step;
-	double cw0 = cw - step;
-	if (poss.x >= 0 && poss.y >= 0)
+	double cw0 = cw - step, x = poss.x;
+	if (x < 0) { x = 0; }
+	double xf = (double)poss.x / cw0;
+	if (xf > 1)xf = 1;
+	if (xf < 0)xf = 0;
+	int x4 = alpha ? 4 : 3;
+	if (dx >= 0 && dx < x4)
 	{
-		double xf = (double)poss.x / cw0;
-		if (xf > 1)xf = 1;
-		if (xf < 0)xf = 0;
-		int x4 = alpha ? 4 : 3;
-		if (dx >= 0 && dx < x4)
-		{
-			hsv[dx] = xf;
-		}
+		hsv[dx] = xf;
 	}
 }
 bool colorpick_tl::on_mevent(int type, const glm::vec2& mps)
@@ -26576,6 +26576,7 @@ bool colorpick_tl::on_mevent(int type, const glm::vec2& mps)
 	poss.x -= cpx;
 	poss.y -= height + step;
 	double htp = height + step;
+	if (poss.y < 0)poss.y = 0;
 	if (et == event_type2::on_down) {
 		dx = poss.y / htp;
 	}
@@ -26620,8 +26621,9 @@ bool colorpick_tl::update(float delta)
 		if (ltx)
 		{
 			glm::ivec2 ss = size;
-			glm::vec2 ta = { 0, 0.5 };
+			glm::vec2 ta = { 0, 0.1 };
 			glm::vec4 rc = { 0, height + step, ss };
+			cw = ss.x - cpx - step * 2;
 			rc.w -= rc.y;
 			tem_rtv.clear();
 			//auto rk = ltx->get_text_rect(1, "H:00%%"/* hsvstr.c_str()*/, -1, font_size);
@@ -26629,13 +26631,11 @@ bool colorpick_tl::update(float delta)
 			ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, tem_rtv);
 
 			rc.y = 0; rc.x += cpx;
-			rc.z = ss.x - cpx - step * 2;
-			rc.w = height; ta.x = 0.5;
+			rc.z = cw;
+			rc.w = height; ta.y = 0.5;
 			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
-			ltx->heightline = 0;
-			//ltx->update_text();
-			//cpx = rk.x + step;
-			cw = (ss.x - cpx - step * 2);
+			ltx->heightline = 0; 
+			assert(cw > 0);
 		}
 		if (on_change_cb) {
 			on_change_cb(this, get_color());

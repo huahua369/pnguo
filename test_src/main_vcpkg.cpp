@@ -483,6 +483,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto ftff = ft->get_font("Source Han Sans SC", 0);
 	if (k.size())
 		ftns.push_back(k);
+	p->add_colorpick(0, 280, 30, true);
 	static int stt = 0;
 	p->update_cb = [=](float delta)
 		{
