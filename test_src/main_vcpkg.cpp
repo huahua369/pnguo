@@ -230,19 +230,44 @@ menu_cx* menu_m(form_x* form0)
 }
 void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, bool n16) {
 	auto hs = pg::to_string_hex(line, n16 ? 16 : 8, "x");
-	hs += "h: ";
+	hs += ": ";
 	auto aa = std::string(d, len);
 	bool isu8 = hz::is_utf8(d, len);
 	if (!isu8)
 	{
-		aa = hz::gbk_to_u8(aa);
+		auto u = hz::gbk_to_u8(aa);
+		if (u.size())aa = u;
 	}
 	for (auto& it : aa) {
-		if ((it > 0 && !isprint(it)))
+		if (it == 0)
 		{
 			it = '.';
 		}
 	}
+
+	{
+		unsigned int cp1 = 0;
+		auto uc = md::get_utf8_count(aa.c_str(), aa.size());
+		if (uc > 1)
+		{
+			auto laststr = aa.c_str();
+			std::string c, c0;
+			for (int k = 0; k < uc; k++)
+			{
+				auto t = laststr;
+				laststr = md::utf8_next_char(laststr);
+				c.assign(t, laststr);
+				if (c.size() == 1)
+				{
+					if ((*t > 0 && !isprint(*t)) || *t < 0)
+						c = ".";
+				}
+				c0 += c;
+			}
+			aa.swap(c0);
+		}
+	}
+
 	hs += hz::ptHex(d, len < xlen ? len : xlen, 'X', ' ');
 	if (len < xlen) {
 		xlen -= len;
@@ -321,13 +346,15 @@ void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, 
 		rc.y += 20;
 		auto pt = (char*)data + offset;
 		auto length = size - offset;
+		if (length > 2000)length = 2000;
 		auto last = length % n;
 		length /= n;
 		for (size_t i = 0; i < length; i++)
 		{
 			tohexstr(hs, pt, n, n, i * n, n16); pt += n;
 		}
-		tohexstr(hs, pt, last, n, length * n, n16);
+		if (last > 0)
+			tohexstr(hs, pt, last, n, length * n, n16);
 		//auto hs = hz::ptHex(pt, 16, 'X', ' ');
 		draw_text(cr, p->ltx, hs.c_str(), hs.size(), rc, st);
 	}
@@ -456,7 +483,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	static std::string kc = (char*)u8"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
 	{
 		hz::mfile_t bk;
-		auto bkt = bk.open_d("bk.txt", true);
+		auto bkt = bk.open_d("dxcompiler.dll", true);
 		if (bkt)
 			kc.assign(bkt, bk.size());
 	}
@@ -511,7 +538,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 					rc.x += 300;
 				}
 			}
-			auto str = kc;
+			auto& str = kc;
 			draw_hex(p, cr, dpx, str.data(), str.size(), 0, 16);
 		};
 }

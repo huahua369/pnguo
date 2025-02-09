@@ -229,12 +229,13 @@ namespace md {
 	const char* get_u8_last(const char* str, uint32_t* codepoint)
 	{
 		uint32_t utf8state = 0;
+		auto t = str;
 		for (; str && *str; ) {
 			if (fons_decutf8(&utf8state, codepoint, *((const unsigned char*)str++)))
 				continue;
 			break;
 		}
-		return str;
+		return utf8_next_char(t);
 	}
 	// 将Unicode字符转换为UTF-8字节序列
 	void unicode_to_utf8(char* utf8, uint32_t unicode) {
@@ -261,6 +262,52 @@ namespace md {
 			utf8[4] = 0;
 		}
 	}
+	// 将UTF - 8编码转换为Unicode码点 
+	int utf8_to_unicode(const unsigned char* utf8, int* unicode) {
+		if (*utf8 == '\0') return 0;
+
+		if ((*utf8 & 0x80) == 0) {
+			// 单字节UTF - 8字符 
+			*unicode = *utf8;
+			return 1;
+		}
+		else if ((*utf8 & 0xE0) == 0xC0) {
+			// 双字节UTF - 8字符 
+			if ((*(utf8 + 1) & 0xC0) != 0x80) return -1;
+			*unicode = ((utf8[0] & 0x1F) << 6) | (utf8[1] & 0x3F);
+			return 2;
+		}
+		else if ((*utf8 & 0xF0) == 0xE0) {
+			// 三字节UTF - 8字符 
+			if ((*(utf8 + 1) & 0xC0) != 0x80 || (*(utf8 + 2) & 0xC0) != 0x80) return -1;
+			*unicode = ((utf8[0] & 0x0F) << 12) | ((utf8[1] & 0x3F) << 6) | (utf8[2] & 0x3F);
+			return 3;
+		}
+		else if ((*utf8 & 0xF8) == 0xF0) {
+			// 四字节UTF - 8字符 
+			if ((*(utf8 + 1) & 0xC0) != 0x80 || (*(utf8 + 2) & 0xC0) != 0x80 || (*(utf8 + 3) & 0xC0) != 0x80) return -1;
+			*unicode = ((utf8[0] & 0x07) << 18) | ((utf8[1] & 0x3F) << 12) | ((utf8[2] & 0x3F) << 6) | (utf8[3] & 0x3F);
+			return 4;
+		}
+
+		return -1;
+	}
+
+	// 处理UTF - 8字符串转换为Unicode数组 
+	int utf8_string_to_unicode(const unsigned char* utf8, int* unicode_array, int max_count) {
+		int count = 0;
+		while (*utf8 != '\0' && count < max_count) {
+			int unicode;
+			int bytes = utf8_to_unicode(utf8, &unicode);
+			if (bytes < 0) {
+				return -1;
+			}
+			unicode_array[count++] = unicode;
+			utf8 += bytes;
+		}
+		return count;
+	}
+
 	std::wstring u8_u16(const std::string& str)
 	{
 		return u8_w(str.c_str(), str.size());
@@ -268,14 +315,19 @@ namespace md {
 	std::wstring u8_w(const char* str, size_t len)
 	{
 		std::wstring wt;
-		uint32_t codepoint = 0;
 		auto t = str;
 		for (; t && *t && len > 0; len--)
 		{
-			t = md::get_u8_last(t, &codepoint);
-			if (codepoint)
+			int unicode = 0;
+			int bytes = utf8_to_unicode((const unsigned char*)t, &unicode);
+			if (bytes > 0)
+				t += bytes;
+			else
+				break;
+			//t = md::get_u8_last(t, &codepoint);
+			if (unicode)
 			{
-				wt.push_back(codepoint);
+				wt.push_back(unicode);
 			}
 			else { break; }
 		}
@@ -1583,7 +1635,7 @@ namespace hz
 		// 将GBK转换为UTF-8
 		utf8_string = g_convert(fstr, -1, "UTF-8", "GBK", 0, NULL, &error);
 		if (error) {
-			g_warning((char*)"转换出错: %s", error->message);
+			//g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
@@ -1605,7 +1657,7 @@ namespace hz
 		gsize cs = str.size() * 2;
 		utf8_string = g_convert(fstr, cs, "UTF-8", "UTF-16LE", 0, NULL, &error);
 		if (error) {
-			g_warning((char*)"转换出错: %s", error->message);
+			//g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {
@@ -1627,7 +1679,7 @@ namespace hz
 		gsize cs = str.size() * 2;
 		utf8_string = g_convert(fstr, cs, "GBK", "UTF-16LE", 0, NULL, &error);
 		if (error) {
-			g_warning((char*)"转换出错: %s", error->message);
+			//g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);
 		}
 		else {

@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
 	if (argc < 2) {
 		printf("Usage: %s <filename>\n", argv[0]);
 		fn = "dxcompiler.dll";
-		fn = "b2";
+		//fn = "b2";
 	}
 	return sdlm(fn);
 }

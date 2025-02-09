@@ -26621,7 +26621,7 @@ bool colorpick_tl::update(float delta)
 		if (ltx)
 		{
 			glm::ivec2 ss = size;
-			glm::vec2 ta = { 0, 0.1 };
+			glm::vec2 ta = { 0.1, 0.1 };
 			glm::vec4 rc = { 0, height + step, ss };
 			cw = ss.x - cpx - step * 2;
 			rc.w -= rc.y;
@@ -26632,7 +26632,7 @@ bool colorpick_tl::update(float delta)
 
 			rc.y = 0; rc.x += cpx;
 			rc.z = cw;
-			rc.w = height; ta.y = 0.5;
+			rc.w = height; ta.y = 0.95;
 			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
 			ltx->heightline = 0; 
 			assert(cw > 0);
