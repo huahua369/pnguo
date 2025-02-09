@@ -10076,6 +10076,8 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 		ret.z = std::max(ret.z, rc.w);
 	} while (str && *str);
 	ret.x = std::max(ret.x, x);
+	if (heightline > 0)
+		lineheight = heightline;
 	if (n > 1)
 		ret.y = lineheight * n;
 	else
@@ -26621,20 +26623,21 @@ bool colorpick_tl::update(float delta)
 		if (ltx)
 		{
 			glm::ivec2 ss = size;
-			glm::vec2 ta = { 0.1, 0.1 };
-			glm::vec4 rc = { 0, height + step, ss };
+			glm::vec2 ta = { 0.0, 0.0 };
+			glm::vec4 rc = { step, height + step, ss };
 			cw = ss.x - cpx - step * 2;
 			rc.w -= rc.y;
 			tem_rtv.clear();
 			//auto rk = ltx->get_text_rect(1, "H:00%%"/* hsvstr.c_str()*/, -1, font_size);
-			ltx->heightline = rc.y;
+			ltx->heightline = rc.y;//设置固定行高
+			rc.y += step;
 			ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, tem_rtv);
-
 			rc.y = 0; rc.x += cpx;
 			rc.z = cw;
-			rc.w = height; ta.y = 0.95;
+			rc.w = height; ta.y = 0.5;
+			ltx->heightline = 0; // 使用默认行高
 			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
-			ltx->heightline = 0; 
+			ltx->heightline = 0;
 			assert(cw > 0);
 		}
 		if (on_change_cb) {

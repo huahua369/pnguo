@@ -321,7 +321,7 @@ void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, 
 	double xf = st->font_size * ((n16 ? 8 : 4) + 2);
 	int bn = st->font_size * 0.5;
 	int l16 = n16 ? 16 : 8;
-	l16 += 3;
+	l16 += 2;
 	for (size_t i = 0; i < l16; i++)
 	{
 		hstr.push_back(' ');
@@ -546,32 +546,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 void show_ui2(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
-
-	glm::ivec2 size = { 1024,800 };
-	glm::ivec2 cview = { 1580,1580 };
-	auto p = new plane_cx();
-	uint32_t pbc = 0xff2c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
-	//build_spr_ui(form0);
-	p->set_rss(5);
-	p->_lms = { 8,8 };
-	p->add_familys(fontn, 0);
-	p->add_familys(fontn1, 0);
-	p->draggable = true; //可拖动
-	p->set_size(size);
-	p->set_pos({ 190,30 });
-	p->set_select_box(2, 0.012);
-	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
-	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
-	{
-		// 设置带滚动条
-		p->set_scroll(width, rcw, { 4, 4 }, { 2,0 }, { 0,2 });
-		//p->set_scroll_hide(0);
-		p->set_view(size, cview);
-	}
 }
 void test_img() {
 
@@ -602,7 +576,7 @@ int main()
 	auto gm = menu_m(form0);
 	printf("%p\n", form0);
 	show_ui(form0, gm);
-	//show_ui2(form0, gm);
+	show_ui2(form0, gm);
 	//show_cpuinfo(form0);
 	// 运行消息循环
 	run_app(app, 0);

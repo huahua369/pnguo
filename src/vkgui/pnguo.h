@@ -1866,7 +1866,7 @@ struct colorpick_tl :public widget_base
 {
 	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
 	glm::vec4 hsv = {}, oldhsv = {};	// 0-1保存hsv
-	uint32_t text_color = 0xffaaaaaa;//文本颜色 
+	uint32_t text_color = 0xffeeeeee;//文本颜色 
 	uint32_t bc_color = 0xff232323;//边框 
 	int width = 0;					// 宽度
 	int height = 0;					// 单行高度 
