@@ -1929,6 +1929,74 @@ public:
 	void set_offset_inc(int inc);			// 增加滚动偏移
 	void set_posv(const glm::ivec2& poss);
 };
+// 16进制编辑
+struct hex_editor
+{
+private:
+	unsigned char* _data = 0;
+	size_t _size = 0;
+	uint32_t text_color = 0xffffffff;
+	int font_size = 16;
+	int bytes_per_line = 16;		// 第行显示字节数4-256
+	int count = 0;					// 当前显示行数量
+	size_t line_offset = 0;			// 当前行偏移
+	glm::ivec4 view_size = {};		// 视图高 
+
+	std::string line_number, ruler;	// 行号，标尺
+	std::string data_hex;			// 数据hex
+	std::string decoded_text;		// 解码文本
+	std::string data_inspector;		// 数据检查
+
+	std::string bpline;				// 缓存用
+	std::vector<char> tempstr;		// 缓存用
+	void* mapfile = 0;				// 映射文件
+	bool is_update = true;
+	bool _rdonly = false;
+public:
+	hex_editor();
+	~hex_editor();
+	// 设置数据只显示
+	bool set_data(const char* d, size_t len, bool is_copy);
+	// 设置文件，是否只读打开
+	bool set_file(const char* fn, bool is_rdonly);
+	void save_data(size_t pos, size_t len);
+	size_t write_data(const void* d, size_t len, size_t pos, bool save);	// 写入数据，是否保存到文件
+	// 设置当前光标，计算data_inspector
+	void set_pos(size_t pos);
+	std::string get_ruler_di();
+	char* data();
+	size_t size();
+	void update_hex_editor();
+};
+/*
+todo Data Inspector
+binary(1)读一个字节
+octal(1)
+uint8(1)
+int8(1)
+uint16(2)
+int16(2)
+uint24(3)
+int24(3)
+uint32(4)
+int32
+uint64
+int64
+ULEB128?
+SLEB128?
+float16
+bfloat16
+float32
+float64
+ASCII(1)
+UTF-8读整个字符
+UTF-16读整个字符
+GB(2)
+BIG5
+SHIFT-JIS?
+*/
+
+
 #endif // 1
 
 class form_x;

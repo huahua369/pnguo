@@ -29064,3 +29064,319 @@ void do_text(const char* str, size_t first, size_t count)
 {
 }
 #endif // 1
+
+// 16进制编辑
+hex_editor::hex_editor()
+{
+}
+
+hex_editor::~hex_editor()
+{
+	auto p = (hz::mfile_t*)mapfile;
+	if (p)delete p;
+	mapfile = 0;
+	_data = 0;
+	_size = 0;
+}
+
+bool hex_editor::set_data(const char* d, size_t len, bool is_copy)
+{
+	if (d && len > 0)
+	{
+		if (is_copy) {
+			tempstr.resize(len);
+			memcpy(tempstr.data(), d, len);
+			_data = (unsigned char*)tempstr.data();
+		}
+		else {
+			_data = (unsigned char*)d;
+		}
+		_size = len;
+		return true;
+	}
+	return false;
+}
+
+bool hex_editor::set_file(const char* fn, bool is_rdonly)
+{
+	_rdonly = is_rdonly;
+	auto p = (hz::mfile_t*)mapfile;
+	if (fn && *fn) {
+		hz::mfile_t bk;
+		auto bkt = bk.open_d(fn, is_rdonly);
+		if (bkt) {
+
+			if (p) {
+				p->unmap();
+				p->close_m();
+			}
+			else {
+				p = new hz::mfile_t();
+			}
+			*p = bk;
+			_data = (unsigned char*)bkt;
+			_size = p->size();
+			return true;
+		}
+	}
+	return false;
+}
+
+void hex_editor::save_data(size_t pos, size_t len)
+{
+	auto p = (hz::mfile_t*)mapfile;
+	if (!_rdonly && p) {
+		p->flush(pos, len);
+	}
+}
+
+size_t hex_editor::write_data(const void* d, size_t len, size_t pos, bool save)
+{
+	size_t r = 0;
+	auto p = (hz::mfile_t*)mapfile;
+	if (p && !_rdonly)
+	{
+		p->seek(pos);
+		r = p->write_m((char*)d, len, save);
+	}
+	else if (_data && _size > 0) {
+		r = std::min(_size - pos, len);
+		memcpy(_data + pos, d, r);
+	}
+	return r;
+}
+
+
+/*
+todo Data Inspector
+binary(1)读一个字节
+octal(1)
+uint8(1)
+int8(1)
+uint16(2)
+int16(2)
+uint24(3)
+int24(3)
+uint32(4)
+int32
+uint64
+int64
+ULEB128?
+SLEB128?
+float16
+bfloat16
+float32
+float64
+ASCII(1)
+UTF-8读整个字符
+UTF-16读整个字符
+GBK(2)
+BIG5
+SHIFT-JIS
+*/
+void printBinary(uint8_t num, std::string* t)
+{
+	char buf[16] = {};
+	auto tt = buf;
+	for (int i = sizeof(num) * 8 - 1; i >= 0; i--, tt++) {
+		sprintf(tt, "%d", (num >> i) & 1);
+	}
+	if (t)
+	{
+		t->append(buf); t->push_back('\n');
+	}
+}
+float bfloat16_to_float(uint16_t val)
+{
+	union {
+		float f;
+		unsigned int u;
+	} result;
+
+	// 将bfloat16扩展为float 
+	result.u = ((unsigned int)val) << 16;
+	return result.f;
+}
+void print_data_de(const void* p, std::string* t)
+{
+	std::string str;
+	char buf[256] = {};
+
+	// binary
+	printBinary(*(uint8_t*)p, t);
+	// 8进制octal(1) uint8(1) int8(1)
+	uint8_t num8 = *(uint8_t*)p;
+	uint16_t num16u = *(uint16_t*)p;
+	int16_t num16 = *(int16_t*)p;
+	uint32_t num32u = *(uint32_t*)p;
+	int32_t num32 = *(int32_t*)p;
+	uint64_t num64u = *(uint64_t*)p;
+	int64_t num64 = *(int64_t*)p;
+	sprintf(buf, "%o\n%u\n%d\n", num8, num8, (int8_t)num8);
+	str += buf;
+	sprintf(buf, "%u\n%d\n", num16u, num16);
+	str += buf;
+
+	uint32_t num24 = 0;
+	memcpy(&num24, p, 3);
+	sprintf(buf, "%u\n%d\n", num24, (int32_t)num24);
+	str += buf;
+
+	sprintf(buf, "%u\n%d\n", num32u, num32);
+	str += buf;
+	sprintf(buf, "%llu\n%lld\n", num64u, num64);
+	str += buf;
+	//float16
+	auto f16 = glm::detail::toFloat32(num16u);
+	auto bf16 = bfloat16_to_float(num16u);
+	sprintf(buf, "%g\n%g\n", f16, bf16);
+	str += buf;
+	auto f32 = (float*)p;
+	auto f64 = (double*)p;
+	sprintf(buf, "%g\n%g\n", *f32, *f64);
+	str += buf;
+	// ascii
+	char c = num8;
+	sprintf(buf, "%c\n", (c >= 32 && c <= 126) ? c : '.');
+	str += buf;
+	// 获取utf8
+	auto s = (const char*)p;
+	auto ss = md::utf8_next_char(s);
+	str.append(s, ss); str.push_back('\n');
+	// utf16
+	{
+		auto us16 = md::u16_u8((uint16_t*)p, 2);
+		if (us16.size())
+		{
+			str += us16 + "\n";
+		}
+		else { str += ".\n"; }
+	}
+	//gb
+	{
+		auto g = md::gb_u8((char*)p, 2);
+		if (g.size())
+		{
+			str += g + "\n";
+		}
+		else { str += ".\n"; }
+	}
+	//big5
+	{
+		auto g = hz::big5_to_u8((char*)p, 2);
+		if (g.size())
+		{
+			str += g + "\n";
+		}
+		else { str += ".\n"; }
+	}
+
+
+	if (t)
+	{
+		t->append(str);
+	}
+}
+void hex_editor::set_pos(size_t pos)
+{
+	if (pos < _size) {
+		auto p = _data + pos;
+		data_inspector.clear();
+		auto di = &data_inspector;
+		print_data_de(p, di);
+	}
+}
+
+std::string hex_editor::get_ruler_di()
+{
+	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGBK\nBIG5\n";
+	return s;
+}
+
+char* hex_editor::data()
+{
+	return (char*)_data;
+}
+
+size_t hex_editor::size()
+{
+	return _size;
+}
+
+void hex_editor::update_hex_editor()
+{
+	int64_t nsize = _size - line_offset;
+	if (nsize > 0 && _data && _size > 0)
+	{
+
+	}
+	else {
+		return;
+	}
+	auto file_data = this;
+	if (file_data->bytes_per_line < 4)
+		file_data->bytes_per_line = 4;
+	if (file_data->bytes_per_line > 256)
+		file_data->bytes_per_line = 256;
+	int bps = file_data->bytes_per_line * 5 + 16;
+	if (bps < 128)bps = 128;
+	if (file_data->bpline.size() != bps)
+		file_data->bpline.resize(bps);
+	char* line = file_data->bpline.data();
+	int nc = view_size.y / file_data->font_size;
+	int dnc = nsize / file_data->bytes_per_line;
+	dnc += nsize % file_data->bytes_per_line > 0 ? 1 : 0;
+	int newnc = std::min(nc + 1, dnc);
+	int idx = _size > UINT32_MAX ? 1 : 0;// 大于4G则用16位数
+
+	if (count != newnc || file_data->is_update)
+	{
+		count = newnc;
+		is_update = true;
+	}
+	if (is_update)
+	{
+		is_update = false;
+		line_number.clear();
+		data_hex.clear();
+		decoded_text.clear();
+		if (bytes_per_line * 3 != ruler.size())
+		{
+			ruler.clear();
+			for (size_t j = 0; j < file_data->bytes_per_line; j++) {
+				snprintf(line, sizeof(line), "%02zx ", j);
+				ruler += line;
+			}
+		}
+		const char* fmt[2] = { "%08zx: \n" ,"%016zx: \n" };
+		auto data = file_data->_data;
+		for (size_t i = 0; i < nsize && newnc > 0; i += file_data->bytes_per_line, newnc--) {
+			snprintf(line, sizeof(line), fmt[idx], i);
+			line_number += line;
+			line[0] = 0;
+			for (int j = 0; j < file_data->bytes_per_line; j++) {
+				if (i + j < nsize) {
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%02x ", data[i + j]);
+				}
+				else {
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "   ");
+				}
+			}
+			snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+			data_hex += line;
+			data_hex.push_back('\n');
+			line[0] = 0;
+			for (int j = 0; j < file_data->bytes_per_line; j++) {
+				if (i + j < nsize) {
+					char c = data[i + j];
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%c", (c >= 32 && c <= 126) ? c : '.');
+				}
+				else {
+					snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+				}
+			}
+			decoded_text += line;
+			decoded_text.push_back('\n');
+		}
+	}
+}

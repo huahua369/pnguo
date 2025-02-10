@@ -333,6 +333,10 @@ namespace md {
 		}
 		return wt;
 	}
+	std::string gb_u8(const char* str, size_t len)
+	{
+		return hz::gb_to_u8(str, len); 
+	}
 	std::string u16_u8(uint16_t* str, size_t len)
 	{
 		char utf8_str[8] = {};
@@ -1634,6 +1638,53 @@ namespace hz
 		//g_type_init();
 		// 将GBK转换为UTF-8
 		utf8_string = g_convert(fstr, -1, "UTF-8", "GBK", 0, NULL, &error);
+		if (error) {
+			//g_warning((char*)"转换出错: %s", error->message);
+			g_error_free(error);
+		}
+		else {
+			//g_print("转换成功: %s\n", utf8_string);
+			ret = utf8_string;
+			g_free(utf8_string);
+		}
+		return ret;
+	}
+	std::string gb_to_u8(const char* str, size_t len)
+	{
+		std::string ret;
+		GError* error = NULL;
+		gchar* utf8_string = 0;
+		gchar* fstr = (gchar*)str;
+		// 初始化GLib
+		//g_type_init();
+		// 将GBK转换为UTF-8
+		utf8_string = g_convert(fstr, len, "UTF-8", "GB18030", 0, NULL, &error);
+		if (error)
+		{
+			g_error_free(error); error = 0;
+			utf8_string = g_convert(fstr, -1, "UTF-8", "GBK", 0, NULL, &error);
+		}
+		if (error) {
+			//g_warning((char*)"转换出错: %s", error->message);
+			g_error_free(error);
+		}
+		else {
+			//g_print("转换成功: %s\n", utf8_string);
+			ret = utf8_string;
+			g_free(utf8_string);
+		}
+		return ret;
+	}
+	std::string big5_to_u8(const char* str, size_t len)
+	{
+		std::string ret;
+		GError* error = NULL;
+		gchar* utf8_string = 0;
+		gchar* fstr = (gchar*)str;
+		// 初始化GLib
+		//g_type_init();
+		// 将GBK转换为UTF-8
+		utf8_string = g_convert(fstr, len, "UTF-8", "BIG5", 0, NULL, &error); 
 		if (error) {
 			//g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);

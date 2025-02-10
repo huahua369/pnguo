@@ -57,7 +57,7 @@ void render_hex_editor(SDL_Renderer* renderer, TTF_Font* font, FileData* file_da
 	dnc += file_data->size % BYTES_PER_LINE > 0 ? 1 : 0;
 	int newnc = std::min(nc + 1, dnc);
 	if (!file_data->dt)
-	{
+	{ 
 		file_data->dt = new std::vector<TTF_Text*>();
 	}
 	if (file_data->dt->size() != newnc)

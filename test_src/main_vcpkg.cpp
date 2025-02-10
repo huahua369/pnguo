@@ -279,33 +279,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 	hs += "; " + aa + "\n";
 	ot += hs;
 }
-/*
-todo Data Inspector
-binary(1)读一个字节
-cotal(1)
-uint8(1)
-int8(1)
-uint16(2)
-int16(2)
-uint24(3)
-int24(3)
-uint32(4)
-int32
-uint64
-int64
-ULEB128?
-SLEB128?
-float16
-bfloat16
-float32
-float64
-ASCII(1)
-UTF-8读整个字符
-UTF-16读整个字符
-GBK(2)
-BIG5
-SHIFT-JIS
-*/
+
 void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, size_t offset, size_t n)
 {
 	auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
@@ -481,11 +455,11 @@ void show_ui(form_x* form0, menu_cx* gm)
 	fvs.resize(fc);
 	static std::vector<std::string> ftns;
 	static std::string kc = (char*)u8"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
+	hex_editor hex;
+	if (hex.set_file("dxcompiler.dll", true))
 	{
-		hz::mfile_t bk;
-		auto bkt = bk.open_d("dxcompiler.dll", true);
-		if (bkt)
-			kc.assign(bkt, bk.size());
+		hex.update_hex_editor();
+		kc.assign((char*)hex.data(), hex.size());
 	}
 	std::string k;
 	for (size_t i = 0; i < fc; i++)

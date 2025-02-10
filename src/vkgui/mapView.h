@@ -231,6 +231,8 @@ namespace hz
 	std::string u8_to_gbk(const std::string& str);
 	std::wstring u8_to_u16(const std::string& str);
 	std::wstring gbk_to_u16(const std::string& str);
+	std::string gb_to_u8(const char* str, size_t len);
+	std::string big5_to_u8(const char* str, size_t len);
 	njson read_json(std::string fn);
 	void save_json(std::string fn, const njson& n, int indent_cbor);
 	std::string get_dir(const char* t);
@@ -262,6 +264,7 @@ namespace md {
 	std::string u16_u8(uint16_t* str, size_t len);
 	std::wstring u8_u16(const std::string& str);
 	std::wstring u8_w(const char* str, size_t len);
+	std::string gb_u8(const char* str, size_t len);
 
 	uint32_t fons_decutf8(uint32_t* down, uint32_t* codep, uint32_t byte);
 	const char* utf8_next_char(const char* p);
