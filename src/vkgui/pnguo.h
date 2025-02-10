@@ -1932,21 +1932,21 @@ public:
 // 16进制编辑
 struct hex_editor
 {
-private:
-	unsigned char* _data = 0;
-	size_t _size = 0;
-	uint32_t text_color = 0xffffffff;
-	int font_size = 16;
-	int bytes_per_line = 16;		// 第行显示字节数4-256
-	int count = 0;					// 当前显示行数量
-	size_t line_offset = 0;			// 当前行偏移
-	glm::ivec4 view_size = {};		// 视图高 
-
+public:
 	std::string line_number, ruler;	// 行号，标尺
 	std::string data_hex;			// 数据hex
 	std::string decoded_text;		// 解码文本
 	std::string data_inspector;		// 数据检查
+private:
+	unsigned char* _data = 0;
+	size_t _size = 0; 
+	int font_size = 16;
+	int bytes_per_line = 16;		// 第行显示字节数4-256
+	int count = 0;					// 当前显示行数量
+	size_t line_offset = 0;			// 当前行偏移
+	glm::ivec2 view_size = { 600,1080 };		// 视图高 
 
+private:
 	std::string bpline;				// 缓存用
 	std::vector<char> tempstr;		// 缓存用
 	void* mapfile = 0;				// 映射文件
@@ -1993,7 +1993,7 @@ UTF-8读整个字符
 UTF-16读整个字符
 GB(2)
 BIG5
-SHIFT-JIS?
+SHIFT-JIS
 */
 
 

@@ -335,7 +335,7 @@ namespace md {
 	}
 	std::string gb_u8(const char* str, size_t len)
 	{
-		return hz::gb_to_u8(str, len); 
+		return hz::gb_to_u8(str, len);
 	}
 	std::string u16_u8(uint16_t* str, size_t len)
 	{
@@ -890,7 +890,7 @@ namespace hz
 		{
 			_errstr = "CloseMapping error: " + getLastError();
 		}
-		if (!CloseHandle(hFile))
+		if (hFile && !CloseHandle(hFile))
 		{
 			_errstr = "CloseFile error: " + getLastError();
 		}
@@ -1071,6 +1071,17 @@ namespace hz
 		else
 			ftruncate_m(size1);
 		return map(size1, 0);
+	}
+
+	void mfile_t::clear_ptr()
+	{
+#ifdef _WIN32
+		hFile = nullptr; // 文件的句柄 
+		hMapFile = nullptr; // 文件内存映射区域的句柄 
+#else
+		_fd = 0;
+#endif // _WIN32
+		_pm = 0;
 	}
 
 	std::string mfile_t::getLastError()
@@ -1684,7 +1695,27 @@ namespace hz
 		// 初始化GLib
 		//g_type_init();
 		// 将GBK转换为UTF-8
-		utf8_string = g_convert(fstr, len, "UTF-8", "BIG5", 0, NULL, &error); 
+		utf8_string = g_convert(fstr, len, "UTF-8", "BIG5", 0, NULL, &error);
+		if (error) {
+			//g_warning((char*)"转换出错: %s", error->message);
+			g_error_free(error);
+		}
+		else {
+			//g_print("转换成功: %s\n", utf8_string);
+			ret = utf8_string;
+			g_free(utf8_string);
+		}
+		return ret;
+	}
+	std::string shift_jis_to_u8(const char* str, size_t len)
+	{
+		std::string ret;
+		GError* error = NULL;
+		gchar* utf8_string = 0;
+		gchar* fstr = (gchar*)str;
+		// 初始化GLib
+		//g_type_init(); 
+		utf8_string = g_convert(fstr, len, "UTF-8", "SHIFT-JIS", 0, NULL, &error);
 		if (error) {
 			//g_warning((char*)"转换出错: %s", error->message);
 			g_error_free(error);

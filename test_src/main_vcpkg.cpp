@@ -454,11 +454,13 @@ void show_ui(form_x* form0, menu_cx* gm)
 	static std::vector<ft_info> fvs;
 	fvs.resize(fc);
 	static std::vector<std::string> ftns;
-	static std::string kc = (char*)u8"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
-	hex_editor hex;
+	static std::string kc = (char*)"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
+	static hex_editor hex;
+	auto g = md::gb_u8((char*)kc.c_str(), -1);
 	if (hex.set_file("dxcompiler.dll", true))
 	{
 		hex.update_hex_editor();
+		hex.set_pos(0);
 		kc.assign((char*)hex.data(), hex.size());
 	}
 	std::string k;
@@ -511,9 +513,37 @@ void show_ui(form_x* form0, menu_cx* gm)
 					//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
 					rc.x += 300;
 				}
+				//std::string line_number, ruler;	// 行号，标尺
+				//std::string data_hex;			// 数据hex
+				//std::string decoded_text;		// 解码文本
+				//std::string data_inspector;		// 数据检查
+				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
+				rc = { 10 + 90,10,500,1080 };
+				st->text_color = 0xfffb8f71; //#718FFB
+				draw_text(cr, p->ltx, hex.ruler.c_str(), -1, rc, st);
+				rc = { 10,10 + fl,100,1080 };
+				st->text_color = 0xff999999;
+				draw_text(cr, p->ltx, hex.line_number.c_str(), -1, rc, st);
+
+				rc = { 10 + 90,10 + fl,500,1080 };
+				st->text_color = -1;
+				draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
+				rc = { 10 + 490,10 + fl,150,1080 };
+				draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
+				rc = { 10 + 650,10 + fl,200,1080 };
+				auto dit = hex.get_ruler_di();
+				st->text_color = 0xff999999;
+				draw_text(cr, p->ltx, dit.c_str(), -1, rc, st);
+				rc = { 10 + 650 ,10 ,200,1080 };
+				std::string dititle = (char*)u8"数据检查器";
+				st->text_color = -1;
+				draw_text(cr, p->ltx, dititle.c_str(), -1, rc, st);
+				rc = { 10 + 650 + 80,10 + fl,200,1080 };
+				st->text_color = 0xff999999;
+				draw_text(cr, p->ltx, hex.data_inspector.c_str(), -1, rc, st);
 			}
 			auto& str = kc;
-			draw_hex(p, cr, dpx, str.data(), str.size(), 0, 16);
+			//draw_hex(p, cr, dpx, str.data(), str.size(), 0, 16);
 		};
 }
 

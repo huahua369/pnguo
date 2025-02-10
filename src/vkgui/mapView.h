@@ -203,6 +203,7 @@ namespace hz
 		char* open_d(const std::string& fn, bool is_rdonly);
 		// 打开或创建修改大小，0则不改变大小可能返回0
 		char* new_m(const std::string& fn, size_t size);
+		void clear_ptr();
 		static std::string getLastError();
 	private:
 
@@ -233,6 +234,7 @@ namespace hz
 	std::wstring gbk_to_u16(const std::string& str);
 	std::string gb_to_u8(const char* str, size_t len);
 	std::string big5_to_u8(const char* str, size_t len);
+	std::string shift_jis_to_u8(const char* str, size_t len);
 	njson read_json(std::string fn);
 	void save_json(std::string fn, const njson& n, int indent_cbor);
 	std::string get_dir(const char* t);

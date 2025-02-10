@@ -29114,8 +29114,10 @@ bool hex_editor::set_file(const char* fn, bool is_rdonly)
 				p = new hz::mfile_t();
 			}
 			*p = bk;
+			bk.clear_ptr(); // 转移句柄
 			_data = (unsigned char*)bkt;
 			_size = p->size();
+			mapfile = p;
 			return true;
 		}
 	}
@@ -29206,6 +29208,7 @@ void print_data_de(const void* p, std::string* t)
 	printBinary(*(uint8_t*)p, t);
 	// 8进制octal(1) uint8(1) int8(1)
 	uint8_t num8 = *(uint8_t*)p;
+	int8_t num8i = *(int8_t*)p;
 	uint16_t num16u = *(uint16_t*)p;
 	int16_t num16 = *(int16_t*)p;
 	uint32_t num32u = *(uint32_t*)p;
@@ -29227,13 +29230,14 @@ void print_data_de(const void* p, std::string* t)
 	sprintf(buf, "%llu\n%lld\n", num64u, num64);
 	str += buf;
 	//float16
-	auto f16 = glm::detail::toFloat32(num16u);
-	auto bf16 = bfloat16_to_float(num16u);
-	sprintf(buf, "%g\n%g\n", f16, bf16);
+	double f16 = glm::detail::toFloat32(num16u);
+	double bf16 = bfloat16_to_float(num16u);
+	sprintf(buf, "%lg\n%lg\n", f16, bf16);
 	str += buf;
-	auto f32 = (float*)p;
-	auto f64 = (double*)p;
-	sprintf(buf, "%g\n%g\n", *f32, *f64);
+	double f32 = *(float*)p;
+	double f64 = *(double*)p;
+
+	sprintf(buf, "%lg\n%lg\n", f32, f64);
 	str += buf;
 	// ascii
 	char c = num8;
@@ -29255,7 +29259,7 @@ void print_data_de(const void* p, std::string* t)
 	//gb
 	{
 		auto g = md::gb_u8((char*)p, 2);
-		if (g.size())
+		if (g.size() > 2)
 		{
 			str += g + "\n";
 		}
@@ -29264,12 +29268,21 @@ void print_data_de(const void* p, std::string* t)
 	//big5
 	{
 		auto g = hz::big5_to_u8((char*)p, 2);
-		if (g.size())
+		if (g.size() > 2)
 		{
 			str += g + "\n";
 		}
 		else { str += ".\n"; }
 	}
+	//shift_jis
+	//{
+	//	auto g = hz::shift_jis_to_u8((char*)p, 2);
+	//	if (g.size() > 2)
+	//	{
+	//		str += g + "\n";
+	//	}
+	//	else { str += ".\n"; }
+	//}
 
 
 	if (t)
@@ -29289,7 +29302,7 @@ void hex_editor::set_pos(size_t pos)
 
 std::string hex_editor::get_ruler_di()
 {
-	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGBK\nBIG5\n";
+	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGBK\nBIG5\n";// SHIFT - JIS\n";
 	return s;
 }
 
@@ -29344,35 +29357,35 @@ void hex_editor::update_hex_editor()
 		{
 			ruler.clear();
 			for (size_t j = 0; j < file_data->bytes_per_line; j++) {
-				snprintf(line, sizeof(line), "%02zx ", j);
+				snprintf(line, bps, "%02zx ", j);
 				ruler += line;
 			}
 		}
 		const char* fmt[2] = { "%08zx: \n" ,"%016zx: \n" };
 		auto data = file_data->_data;
 		for (size_t i = 0; i < nsize && newnc > 0; i += file_data->bytes_per_line, newnc--) {
-			snprintf(line, sizeof(line), fmt[idx], i);
+			snprintf(line, bps, fmt[idx], i);
 			line_number += line;
 			line[0] = 0;
 			for (int j = 0; j < file_data->bytes_per_line; j++) {
 				if (i + j < nsize) {
-					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%02x ", data[i + j]);
+					snprintf(line + strlen(line), bps - strlen(line), "%02x ", data[i + j]);
 				}
 				else {
-					snprintf(line + strlen(line), sizeof(line) - strlen(line), "   ");
+					snprintf(line + strlen(line), bps - strlen(line), "   ");
 				}
 			}
-			snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+			snprintf(line + strlen(line), bps - strlen(line), " ");
 			data_hex += line;
 			data_hex.push_back('\n');
 			line[0] = 0;
 			for (int j = 0; j < file_data->bytes_per_line; j++) {
 				if (i + j < nsize) {
 					char c = data[i + j];
-					snprintf(line + strlen(line), sizeof(line) - strlen(line), "%c", (c >= 32 && c <= 126) ? c : '.');
+					snprintf(line + strlen(line), bps - strlen(line), "%c", (c >= 32 && c <= 126) ? c : '.');
 				}
 				else {
-					snprintf(line + strlen(line), sizeof(line) - strlen(line), " ");
+					snprintf(line + strlen(line), bps - strlen(line), " ");
 				}
 			}
 			decoded_text += line;
