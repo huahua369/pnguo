@@ -29066,6 +29066,7 @@ void do_text(const char* str, size_t first, size_t count)
 #endif // 1
 
 // 16进制编辑
+#if 1
 hex_editor::hex_editor()
 {
 }
@@ -29147,35 +29148,6 @@ size_t hex_editor::write_data(const void* d, size_t len, size_t pos, bool save)
 	}
 	return r;
 }
-
-
-/*
-todo Data Inspector
-binary(1)读一个字节
-octal(1)
-uint8(1)
-int8(1)
-uint16(2)
-int16(2)
-uint24(3)
-int24(3)
-uint32(4)
-int32
-uint64
-int64
-ULEB128?
-SLEB128?
-float16
-bfloat16
-float32
-float64
-ASCII(1)
-UTF-8读整个字符
-UTF-16读整个字符
-GBK(2)
-BIG5
-SHIFT-JIS
-*/
 void printBinary(uint8_t num, std::string* t)
 {
 	char buf[16] = {};
@@ -29198,6 +29170,42 @@ float bfloat16_to_float(uint16_t val)
 	// 将bfloat16扩展为float 
 	result.u = ((unsigned int)val) << 16;
 	return result.f;
+}
+// 读取 ULEB128 编码的无符号整数 
+uint64_t read_uleb128(const char* data) {
+	uint64_t value = 0;
+	int shift = 0;
+	unsigned char byte;
+
+	do {
+		byte = (unsigned char)*data;
+		value |= (uint64_t)(byte & 0x7F) << shift;
+		shift += 7;
+		data++;
+	} while (byte & 0x80);
+
+	return value;
+}
+
+// 读取 SLEB128 编码的有符号整数 
+int64_t read_sleb128(const char* data) {
+	long long value = 0;
+	int shift = 0;
+	unsigned char byte;
+
+	do {
+		byte = (unsigned char)*data;
+		value |= (int64_t)(byte & 0x7F) << shift;
+		shift += 7;
+		data++;
+	} while (byte & 0x80);
+
+	// 如果符号扩展需要 
+	if ((shift < 64) && (byte & 0x40)) {
+		value |= ((int64_t)(-1) << shift);
+	}
+
+	return value;
 }
 void print_data_de(const void* p, std::string* t)
 {
@@ -29229,6 +29237,12 @@ void print_data_de(const void* p, std::string* t)
 	str += buf;
 	sprintf(buf, "%llu\n%lld\n", num64u, num64);
 	str += buf;
+
+	auto ul = read_uleb128((char*)p);
+	auto sl = read_sleb128((char*)p);
+	sprintf(buf, "%llu\n%lld\n", ul, sl);
+	str += buf;
+
 	//float16
 	double f16 = glm::detail::toFloat32(num16u);
 	double bf16 = bfloat16_to_float(num16u);
@@ -29302,7 +29316,7 @@ void hex_editor::set_pos(size_t pos)
 
 std::string hex_editor::get_ruler_di()
 {
-	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGBK\nBIG5\n";// SHIFT - JIS\n";
+	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nULEB128\nSLEB128\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGB18030\nBIG5\n";// SHIFT - JIS\n";
 	return s;
 }
 
@@ -29393,3 +29407,4 @@ void hex_editor::update_hex_editor()
 		}
 	}
 }
+#endif

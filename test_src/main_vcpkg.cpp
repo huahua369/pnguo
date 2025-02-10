@@ -486,7 +486,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto ftff = ft->get_font("Source Han Sans SC", 0);
 	if (k.size())
 		ftns.push_back(k);
-	p->add_colorpick(0, 280, 30, true);
+	//p->add_colorpick(0, 280, 30, true);
+
+	auto st = get_defst(1);
+	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
+	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
+	hex_edit->_absolute = true;
 	static int stt = 0;
 	p->update_cb = [=](float delta)
 		{
@@ -500,7 +505,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto f = ft->get_font("a", 0);
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-			auto st = get_defst(1);
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
@@ -528,6 +532,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				rc = { 10 + 90,10 + fl,500,1080 };
 				st->text_color = -1;
 				draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
+				hex_edit->set_pos({rc.x,rc.y});
+
 				rc = { 10 + 490,10 + fl,150,1080 };
 				draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
 				rc = { 10 + 650,10 + fl,200,1080 };
@@ -566,7 +572,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 #endif    
-	const char* wtitle = (char*)u8"vcpkg管理工具";
+	const char* wtitle = (char*)u8"多功能管理工具";
 	auto app = new_app();
 	do_text(fontn, 0, strlen(fontn));
 	glm::ivec2 ws = { 1280,860 };
