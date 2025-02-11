@@ -11088,6 +11088,12 @@ void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_st
 		draw_text(cr, ltx, it.txt, it.len, it.trc, &st.st);
 	}
 }
+void clip_cr(cairo_t* cr, const glm::ivec4& clip)
+{
+	glm::vec4 cliprc = clip;
+	draw_rectangle(cr, cliprc, 0);
+	cairo_clip(cr);
+}
 void draw_ge(cairo_t* cr, void* p, int count)
 {
 	auto t = (char*)p;
@@ -23975,6 +23981,7 @@ void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const
 		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
 		cp->has_hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
 		cp->hscroll = {};
+		cp->_absolute = true;
 		cp->rounding = std::max(2, (int)(width * 0.5));
 	}
 	{
@@ -23982,8 +23989,31 @@ void plane_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const
 		bind_scroll_bar(cp, false); // 绑定水平滚动条
 		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
 		cp->hscroll = {};
+		cp->_absolute = true;
 		cp->rounding = std::max(2, (int)(width * 0.5));
 	}
+}
+scroll2_t plane_cx::add_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
+{
+	scroll2_t r = {};
+	auto pss = viewsize;
+	{
+		auto cp = add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
+		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
+		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->has_hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->hscroll = {};
+		cp->rounding = std::max(2, (int)(width * 0.5));
+		r.v = cp;
+	}
+	{
+		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false, hnpos);
+		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
+		cp->hscroll = {};
+		cp->rounding = std::max(2, (int)(width * 0.5));
+		r.h = cp;
+	}
+	return r;
 }
 
 void plane_cx::set_scroll_hide(bool is)
@@ -24759,6 +24789,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	auto ppos = get_pos();
 	auto sps = get_spos();
 	_hover_eq.w = type;
+	widget_base* hpw = 0;
 	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
@@ -24786,76 +24817,83 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 				_hover = false;
 			//printf("on_leave\n");
 		}
-	}
-	event_wts.clear();
-	event_wts1.clear();
-	//if (!draggable)
-	//	event_wts1.push_back(&me);
-	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
-		if ((*it)->bst && (int)BTN_STATE::STATE_HOVER)
-			event_wts.push_back(*it);
-		else
-			event_wts1.push_back(*it);
-	}
+		if (horizontal)
+		{
+			widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
+		}
+		if (vertical) {
+			widget_on_event(vertical, type, ep, ppos);// 垂直滚动条 
+		}
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			auto pw = *it;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			auto vpos = sps * pw->hscroll;
+			on_wpe(pw, type, ep, ppos + vpos);
+		}
 
-	do {
-		bool isv = devent_type_e::mouse_wheel_e == t;
-		if (isv) {
-			if (!_hover)
-			{
+		event_wts.clear();
+		event_wts1.clear();
+		if (horizontal) {
+			horizontal->bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(horizontal) : event_wts1.push_back(horizontal);//水平滚动条
+		}
+		if (vertical) {
+			vertical->bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(vertical) : event_wts1.push_back(vertical);//垂直滚动条
+		}
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			if ((*it)->bst & (int)BTN_STATE::STATE_HOVER)
+				event_wts.push_back(*it);
+			else
+				event_wts1.push_back(*it);
+		}
+		auto length = event_wts.size();
+		{
+			// 生成鼠标离开消息
+			for (size_t i = 1; i < length; i++) {
+				auto pw = event_wts[i];
+				if (!pw || !pw->visible || pw->_disabled_events)continue;
+				auto vpos = sps * pw->hscroll;
+				auto p = e->m;
+				glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
+				bool isd = pw->cmpos == mps;
+				pw->cmpos = mps;
+				pw->bst &= ~(int)BTN_STATE::STATE_HOVER;
+				// 鼠标离开
+				pw->on_mevent((int)event_type2::on_leave, mps);
+				if (pw->mevent_cb) {
+					pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
+				}
+			}
+		}
+
+	}
+	else
+	{
+		int icc = 0;
+		auto length = event_wts.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto pw = event_wts[i];
+			icc++;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			auto vpos = sps * pw->hscroll;
+			on_wpe(pw, type, ep, ppos + vpos);
+			if (ep->ret) {
+				hpw = pw;
 				break;
 			}
 		}
-		if (horizontal) {
-			widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
-		}
-		if (vertical && (!ep->ret)) {
-			widget_on_event(vertical, type, ep, ppos);// 垂直滚动条 
-		}
-	} while (0);
-	widget_base* hpw = 0;
-	int icc = 0;
-	auto length = event_wts.size();
-	for (size_t i = 0; i < length; i++)
-	{
-		//for (auto it = event_wts.begin(); it != event_wts.end(); it++) {
-		auto pw = event_wts[i];
-		icc++;
-		if (!pw || !pw->visible || pw->_disabled_events)continue;
-		auto vpos = sps * pw->hscroll;
-		on_wpe(pw, type, ep, ppos + vpos);
-		if (ep->ret) {
-			hpw = pw;
-			break;
-		}
-	}
-	auto ln = event_wts1.size();
-	for (size_t i = 0; i < ln; i++)
-	{
-		auto pw = event_wts1[i];
-		if (!pw || !pw->visible || pw->_disabled_events)continue;
-		auto vpos = sps * pw->hscroll;
-		on_wpe(pw, type, ep, ppos + vpos);
-		if (ep->ret) {
-			hpw = pw; break;
-		}
-	}
-	if (hpw && t == devent_type_e::mouse_move_e)
-	{
-		// 生成鼠标离开消息
-		for (size_t i = 0; i < length; i++) {
-			auto pw = event_wts[i];
-			if (!pw || !pw->visible || pw->_disabled_events || pw == hpw)continue;
-			auto vpos = sps * pw->hscroll;
-			auto p = e->m;
-			glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
-			bool isd = pw->cmpos == mps;
-			pw->cmpos = mps;
-			pw->bst &= ~(int)BTN_STATE::STATE_HOVER;
-			// 鼠标离开
-			pw->on_mevent((int)event_type2::on_leave, mps);
-			if (pw->mevent_cb) {
-				pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
+		if (!hpw)
+		{
+			auto ln = event_wts1.size();
+			for (size_t i = 0; i < ln; i++)
+			{
+				auto pw = event_wts1[i];
+				if (!pw || !pw->visible || pw->_disabled_events)continue;
+				auto vpos = sps * pw->hscroll;
+				on_wpe(pw, type, ep, ppos + vpos);
+				if (ep->ret) {
+					hpw = pw; break;
+				}
 			}
 		}
 	}
@@ -24865,6 +24903,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 	case devent_type_e::mouse_move_e:
 	{
+		auto length = event_wts.size();
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y };
 		on_motion(mps);
@@ -26758,7 +26797,7 @@ void colorpick_tl::draw(cairo_t* cr)
 
 }
 #if 1
-void scroll_bar::set_viewsize(int vs, int cs, int rcw)
+void scroll_bar::set_viewsize(int64_t vs, int64_t cs, int rcw)
 {
 	_view_size = vs;
 	_content_size = cs;
@@ -26821,18 +26860,24 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	break;
 	case event_type2::on_scroll:
 	{
-		//printf("scroll\t%p\n", this);
 		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
 		{
-			//printf("on_scroll\t%p\n", this);
-			auto pts = (-mps.y * _pos_width) + _offset;
 			auto st = ss[_dir] - tsm;
+#if 0
+			auto pts = (-mps.y * _pos_width) + _offset;
+#else
+			int64_t pw = (-mps.y * _pos_width);
+			c_offset += pw;//内容偏移
+			int64_t mxst = st * scale_w;
+			c_offset = std::max((int64_t)0, std::min(c_offset, mxst));
+			pts = c_offset / scale_w;
+#endif
 			if (limit)
 			{
 				if (pts < 0)pts = 0;
 				if (pts > st)pts = st;
 			}
-			_offset = pts;
+			_offset = pts;// 滚动滑块偏移
 			return true;
 		}
 	}
@@ -26882,7 +26927,7 @@ bool scroll_bar::update(float delta)
 			}
 		}
 		else {
-			_offset = 0;
+			_offset = 0; c_offset = scale_w * _offset;
 		}
 		thumb_size_m = sbs;
 		valid = false;
@@ -26929,9 +26974,13 @@ void scroll_bar::draw(cairo_t* cr)
 	}
 }
 
-int scroll_bar::get_offset()
+int64_t scroll_bar::get_offset()
 {
 	return scale_w * _offset;
+}
+int64_t scroll_bar::get_offset_ns()
+{
+	return c_offset;
 }
 
 int scroll_bar::get_range()
@@ -26953,6 +27002,7 @@ void scroll_bar::set_offset(int pts)
 		if (pts > st)pts = st;
 	}
 	_offset = pts;
+	c_offset = scale_w * _offset;
 }
 void scroll_bar::set_offset_inc(int inc)
 {
@@ -26974,6 +27024,7 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 		if (pts > mx)pts = mx;
 	}
 	_offset = pts;
+	c_offset = scale_w * _offset;
 }
 #endif
 
@@ -29080,6 +29131,12 @@ hex_editor::~hex_editor()
 	_size = 0;
 }
 
+void hex_editor::set_size(const glm::ivec2& s)
+{
+	if (s.x > 0 && s.y > 0)
+		view_size = s;
+}
+
 bool hex_editor::set_data(const char* d, size_t len, bool is_copy)
 {
 	if (d && len > 0)
@@ -29314,6 +29371,13 @@ void hex_editor::set_pos(size_t pos)
 	}
 }
 
+void hex_editor::set_linepos(size_t pos)
+{
+	if (pos < _size && line_offset != pos * bytes_per_line) {
+		line_offset = pos * bytes_per_line; is_update = true;
+	}
+}
+
 std::string hex_editor::get_ruler_di()
 {
 	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nULEB128\nSLEB128\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGB18030\nBIG5\n";// SHIFT - JIS\n";
@@ -29351,6 +29415,9 @@ void hex_editor::update_hex_editor()
 		file_data->bpline.resize(bps);
 	char* line = file_data->bpline.data();
 	int nc = view_size.y / file_data->font_size;
+	int anc = _size / file_data->bytes_per_line;
+	anc += _size % file_data->bytes_per_line > 0 ? 1 : 0;
+	acount = anc;
 	int dnc = nsize / file_data->bytes_per_line;
 	dnc += nsize % file_data->bytes_per_line > 0 ? 1 : 0;
 	int newnc = std::min(nc + 1, dnc);
@@ -29375,10 +29442,11 @@ void hex_editor::update_hex_editor()
 				ruler += line;
 			}
 		}
+		auto lpos = line_offset;
 		const char* fmt[2] = { "%08zx: \n" ,"%016zx: \n" };
-		auto data = file_data->_data;
+		auto data = file_data->_data + line_offset;
 		for (size_t i = 0; i < nsize && newnc > 0; i += file_data->bytes_per_line, newnc--) {
-			snprintf(line, bps, fmt[idx], i);
+			snprintf(line, bps, fmt[idx], i + lpos);
 			line_number += line;
 			line[0] = 0;
 			for (int j = 0; j < file_data->bytes_per_line; j++) {

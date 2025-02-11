@@ -1896,15 +1896,15 @@ public:
 // 滚动条
 struct scroll_bar :public widget_base
 {
-	int _view_size = 0;			// 视图大小
-	int _content_size = 0;		// 内容大小 
+	int64_t _view_size = 0;			// 视图大小
+	int64_t _content_size = 0;		// 内容大小 
 	int _rc_width = 0;			// 滑块宽度
 	int _dir = 0;				// 方向，0=水平，1=垂直
 	glm::ivec3 thumb_size_m = {};// 滚动范围
 	glm::vec2 tps = {};
 	glm::ivec4 _color = { 0xff363636,0xffcccccc,0xffffffff,0xffC8641E };		// 背景色，滑块颜色，滑块高亮颜色，激活颜色
 	uint32_t _tcc = 0;			// 滑块当前颜色
-	int _pos_width = 1;			// 滚动宽度
+	float _pos_width = 1;		// 滚动宽度
 	int t_offset = 0;			// 偏移量
 	float scale_w = 1.0;		// 滚动比例
 	float scale_s = 0.6;		// 显示比例
@@ -1915,15 +1915,17 @@ struct scroll_bar :public widget_base
 	bool limit = 1;				// 是否限制在滚动范围
 	bool valid = 1;				// 是否重新渲染
 private:
-	int _offset = 0;			// 偏移量
+	int64_t _offset = 0;			// 偏移量
+	int64_t c_offset = 0;			// 内容偏移量
 public:
 	scroll_bar();
 	~scroll_bar();
-	void set_viewsize(int vs, int cs, int rcw);
+	void set_viewsize(int64_t vs, int64_t cs, int rcw);
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	void draw(cairo_t* cr);
-	int get_offset();			// 获取滚动偏移
+	int64_t get_offset();			// 获取滚动偏移
+	int64_t get_offset_ns();			// 获取滚动偏移
 	int get_range();			// 获取滚动偏移最大范围
 	void set_offset(int pts);			// 设置滚动偏移
 	void set_offset_inc(int inc);			// 增加滚动偏移
@@ -1937,12 +1939,13 @@ public:
 	std::string data_hex;			// 数据hex
 	std::string decoded_text;		// 解码文本
 	std::string data_inspector;		// 数据检查
+	int font_size = 16;
+	int64_t acount = 0;					// 行数量
 private:
 	unsigned char* _data = 0;
-	size_t _size = 0; 
-	int font_size = 16;
+	size_t _size = 0;
 	int bytes_per_line = 16;		// 第行显示字节数4-256
-	int count = 0;					// 当前显示行数量
+	int64_t count = 0;					// 当前显示行数量
 	size_t line_offset = 0;			// 当前行偏移
 	glm::ivec2 view_size = { 600,1080 };		// 视图高 
 
@@ -1955,6 +1958,7 @@ private:
 public:
 	hex_editor();
 	~hex_editor();
+	void set_size(const glm::ivec2& s);
 	// 设置数据只显示
 	bool set_data(const char* d, size_t len, bool is_copy);
 	// 设置文件，是否只读打开
@@ -1963,6 +1967,7 @@ public:
 	size_t write_data(const void* d, size_t len, size_t pos, bool save);	// 写入数据，是否保存到文件
 	// 设置当前光标，计算data_inspector
 	void set_pos(size_t pos);
+	void set_linepos(size_t pos);
 	std::string get_ruler_di();
 	char* data();
 	size_t size();
@@ -2053,6 +2058,11 @@ struct drag_v6
 	int ck = 0;
 	int z = 0;
 };
+struct scroll2_t
+{
+	scroll_bar* h = 0,	// 水平
+		* v = 0;			// 垂直
+};
 // 面板，继承图集
 class plane_cx :public canvas_atlas
 {
@@ -2132,6 +2142,7 @@ public:
 	size_t add_familys(const char* familys, const char* style);
 	// 添加滚动条
 	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
+	scroll2_t add_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
 	void add_widget(widget_base* p);
 	void remove_widget(widget_base* p);
 	// 新增控件：开关、复选、单选
@@ -2377,6 +2388,8 @@ struct image_b {
 void draw_ge(cairo_t* cr, void* p, int count);
 // 批量渲染文本+矩形背景
 void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_style_tx* stv, int st_count, glm::ivec4* clip);
+
+void clip_cr(cairo_t* cr, const glm::ivec4& clip);
 
 
 cairo_surface_t* new_clip_rect(int r);

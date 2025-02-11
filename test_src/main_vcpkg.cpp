@@ -439,7 +439,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto b = glm::vec4(0.1, .2, .3, 1.0);
 	auto c = a * b;
 	size /= 2;
-	auto dpx = p->push_dragpos(size, { 900 ,630 });// 增加一个拖动坐标
+	glm::vec2 hex_size = { 900,600 };
+	auto dpx = p->push_dragpos({ 50,160 }, hex_size);// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
 
 	auto ft = p->ltx->ctx;
@@ -457,7 +458,13 @@ void show_ui(form_x* form0, menu_cx* gm)
 	static std::string kc = (char*)"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
 	static hex_editor hex;
 	auto g = md::gb_u8((char*)kc.c_str(), -1);
-	if (hex.set_file("dxcompiler.dll", true))
+	auto nhs = hex_size;
+	nhs.y -= width;
+	auto st = get_defst(1);
+	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
+	hex.font_size = fl;
+	hex.set_size(nhs);
+	if (hex.set_file(R"(E:\code\cpp\vk\b\blender.zip)", true))
 	{
 		hex.update_hex_editor();
 		hex.set_pos(0);
@@ -488,11 +495,25 @@ void show_ui(form_x* form0, menu_cx* gm)
 		ftns.push_back(k);
 	//p->add_colorpick(0, 280, 30, true);
 
-	auto st = get_defst(1);
-	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
 	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
 	hex_edit->_absolute = true;
+
+	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
+	hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
 	static int stt = 0;
+	p->on_click = [=](plane_cx* p, int down, int clicks, const glm::ivec2& mpos)
+		{
+			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
+			glm::ivec2 scpos = mpos;
+			scpos -= (glm::ivec2)dps;
+			printf("old click:%d\t%d\n", scpos.x, scpos.y);
+			auto vps = hex_scroll.v->get_offset_ns();
+			auto hps = hex_scroll.h->get_offset_ns();
+			scpos.x -= hps;
+			scpos.y -= vps;
+			printf("click:%d\t%d\n", scpos.x, scpos.y);
+
+		};
 	p->update_cb = [=](float delta)
 		{
 			return 0;
@@ -508,10 +529,17 @@ void show_ui(form_x* form0, menu_cx* gm)
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
+				glm::ivec2 hps = dps;
+				glm::vec4 chs = { 0,0,hex_size };
+				hps.y += hex_size.y - width;
+				hex_scroll.h->pos = hps;
+				dps.x += hex_size.x - width;
+				hex_scroll.v->pos = dps;
+				draw_rect(cr, { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 }, 0xf0121212, 0x80ffffff, 2, 1);
+				clip_cr(cr, chs);
 				glm::vec4 rc = { 0,0,300,1000 };
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
 				auto rc2 = rc;
-				//draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
 				for (auto& str : ftns)
 				{
 					//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
@@ -525,17 +553,25 @@ void show_ui(form_x* form0, menu_cx* gm)
 				rc = { 10 + 90,10,500,1080 };
 				st->text_color = 0xfffb8f71; //#718FFB
 				draw_text(cr, p->ltx, hex.ruler.c_str(), -1, rc, st);
-				rc = { 10,10 + fl,100,1080 };
-				st->text_color = 0xff999999;
-				draw_text(cr, p->ltx, hex.line_number.c_str(), -1, rc, st);
 
-				rc = { 10 + 90,10 + fl,500,1080 };
-				st->text_color = -1;
-				draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
-				hex_edit->set_pos({rc.x,rc.y});
+				{
+					cairo_as _ss_(cr);
+					auto vps = hex_scroll.v->get_offset_ns() / fl;
+					hex.set_linepos(vps);
+					hex.update_hex_editor();
+					rc = { 10,10 + fl,100,1080 };
+					st->text_color = 0xff999999;
+					draw_text(cr, p->ltx, hex.line_number.c_str(), -1, rc, st);
 
-				rc = { 10 + 490,10 + fl,150,1080 };
-				draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
+					rc = { 10 + 90,10 + fl,500,1080 };
+					st->text_color = -1;
+					draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
+					hex_edit->set_pos({ rc.x,rc.y });
+
+					rc = { 10 + 490,10 + fl,150,1080 };
+					draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
+				}
+
 				rc = { 10 + 650,10 + fl,200,1080 };
 				auto dit = hex.get_ruler_di();
 				st->text_color = 0xff999999;
