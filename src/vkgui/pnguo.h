@@ -1940,14 +1940,17 @@ public:
 	std::string decoded_text;		// 解码文本
 	std::string data_inspector;		// 数据检查
 	int font_size = 16;
-	int64_t acount = 0;					// 行数量
+	int line_number_n = 0;
+	int bytes_per_line = 16;		// 第行显示字节数4-256
+	int64_t acount = 0;				// 行数量
+
+	glm::i64vec2 dpos[8] = {};		// 渲染坐标
 private:
 	unsigned char* _data = 0;
 	size_t _size = 0;
-	int bytes_per_line = 16;		// 第行显示字节数4-256
-	int64_t count = 0;					// 当前显示行数量
+	int64_t count = 0;				// 当前显示行数量
 	size_t line_offset = 0;			// 当前行偏移
-	glm::ivec2 view_size = { 600,1080 };		// 视图高 
+	glm::ivec2 view_size = { 600,1080 }; // 视图高 
 
 private:
 	std::string bpline;				// 缓存用

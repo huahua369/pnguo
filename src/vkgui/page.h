@@ -254,6 +254,7 @@ struct menumain_info
 	std::vector<std::string>* mvs;
 	menu_info* pm = 0; int count = 0;   glm::vec2 msize = {};
 	std::function<void(mitem_t* p, int type, int id)> cb;
+	std::function<void(void* p, int clicks, int id)> mcb;
 };
 class listview_x
 {

@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt: CMake 项目，在此处包括源代码并定义
 # 项目特定的逻辑。
 #
-cmake_minimum_required (VERSION 3.8) 
+cmake_minimum_required (VERSION 3.20) 
 project ("tcmp")
   
 #测试
@@ -27,8 +27,8 @@ list(APPEND src_spr
     "mshell.cpp"
     "../rc/resource1.rc"
 ) 
-list(APPEND src_vcpkg_gui   
-    "main_vcpkg.cpp" 
+list(APPEND src_mtl   
+    "main_tl.cpp" 
     "ecc_sv.cpp"
     "mshell.cpp"
     "../rc/resource1.rc"
@@ -54,7 +54,7 @@ list(APPEND src_hex
 # 将源代码添加到此项目的可执行文件。
 add_executable (vkcmp ${src_vkcmp} ) 
 add_executable (vkr_spr ${src_spr} ) 
-add_executable (vcpkg_gui ${src_vcpkg_gui} ) 
+add_executable (mtl ${src_mtl} ) 
 add_executable (hex ${src_hex} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
@@ -98,13 +98,13 @@ if(CMAKE_HOST_WIN32)
 list(APPEND lklib  
 UxTheme
 )
-endif()
+endif() 
 include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
  
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
-target_link_libraries(vcpkg_gui PRIVATE ${lklib}  )
+target_link_libraries(mtl PRIVATE ${lklib}  )
 target_link_libraries(hex PRIVATE ${lklib}  )
  
 #复制测试文本

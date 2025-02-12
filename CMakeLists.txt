@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt: CMake 项目，在此处包括源代码并定义
 # 项目特定的逻辑。
 #
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.20)
  
 IF(WIN32)
 set(CMAKE_CXX_STANDARD 23)
@@ -47,6 +47,7 @@ endif()
 
 message("stb路径 ${Stb_DIR}")
 message("type--${CMAKE_BUILD_TYPE}")
+message("type  --${VCPKG_TARGET_TRIPLET}")
 
 if(CMAKE_HOST_WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
@@ -67,6 +68,7 @@ endif()
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 #设置库文件输出目录
 set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
    
 #第三方库
 if(NOT DEFINED SDL3DIR_ROOT)

@@ -215,7 +215,11 @@ void vcpkg_cx::do_cmd()
 		// todo 处理返回结果
 	}
 }
-
+std::function<void(void* p, int type, int id)> mmcb;
+void mcb(void* p, int type, int id) {
+	if (mmcb)
+		mmcb(p, type, id);
+}
 
 menu_cx* menu_m(form_x* form0)
 {
@@ -225,6 +229,12 @@ menu_cx* menu_m(form_x* form0)
 	// 主菜单
 	std::vector<std::string> mvs = { (char*)u8"文件",(char*)u8"编辑",(char*)u8"视图",(char*)u8"工具",(char*)u8"帮助" };
 	m.mvs = &mvs;
+	m.cb = [=](mitem_t* p, int type, int id) {
+		//mcb(p, type, id);
+		};
+	m.mcb = [=](void* p, int clicks, int id) {
+		mcb(p, clicks, id);
+		};
 	auto mc = mg::new_mm(&m);
 	return mc;
 }
@@ -337,7 +347,6 @@ void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, 
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
-
 	glm::ivec2 size = { 1024,800 };
 	glm::ivec2 cview = { 1580,1580 };
 	auto p = new plane_cx();
@@ -407,28 +416,28 @@ void show_ui(form_x* form0, menu_cx* gm)
 			};
 	}
 #else
-	for (auto& nt : mname)
-	{
-		auto cp = p->add_cbutton(nt, { 180,30 }, 0);
-		cp->effect = uTheme::light;
-		cp->click_cb = [=](void* ptr, int clicks)
-			{
-				auto pb = (color_btn*)ptr;
-				printf("%d\n", clicks);
-				print_time aa("list");
-				vx->do_list();
-				vx->do_cmd();
-			};
-	}
-	auto ce = p->add_input("", { 1000,30 }, 1);
+	//for (auto& nt : mname)
+	//{
+	//	auto cp = p->add_cbutton(nt, { 180,30 }, 0);
+	//	cp->effect = uTheme::light;
+	//	cp->click_cb = [=](void* ptr, int clicks)
+	//		{
+	//			auto pb = (color_btn*)ptr;
+	//			printf("%d\n", clicks);
+	//			print_time aa("list");
+	//			vx->do_list();
+	//			vx->do_cmd();
+	//		};
+	//}
+	//auto ce = p->add_input("", { 1000,30 }, 1);
 
-	for (auto& nt : btnname)
-	{
-		auto cp = p->add_gbutton(nt, { 160,30 }, color);
-		cp->click_cb = [=](void* ptr, int clicks)
-			{
-			};
-	}
+	//for (auto& nt : btnname)
+	//{
+	//	auto cp = p->add_gbutton(nt, { 160,30 }, color);
+	//	cp->click_cb = [=](void* ptr, int clicks)
+	//		{
+	//		};
+	//}
 
 #endif
 	int cs[] = { sizeof(glm::vec1),sizeof(glm::vec2),sizeof(glm::vec3),sizeof(glm::ivec3) };
@@ -464,12 +473,15 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
 	hex.font_size = fl;
 	hex.set_size(nhs);
-	if (hex.set_file(R"(E:\code\cpp\vk\b\blender.zip)", true))
-	{
-		hex.update_hex_editor();
-		hex.set_pos(0);
-		kc.assign((char*)hex.data(), hex.size());
-	}
+	//{
+	//	print_time aak("load file");
+	//	if (hex.set_file(R"(E:\迅雷下载\g\tenoke-romance.of.the.three.kingdoms.8.remake.iso)", true))
+	//	{
+	//		hex.update_hex_editor();
+	//		hex.set_pos(0);
+	//		//kc.assign((char*)hex.data(), hex.size());
+	//	}
+	//}
 	std::string k;
 	for (size_t i = 0; i < fc; i++)
 	{
@@ -497,20 +509,39 @@ void show_ui(form_x* form0, menu_cx* gm)
 
 	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
 	hex_edit->_absolute = true;
-
+	hex_edit->visible = false;
 	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
 	hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
+	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x * 2, 0);
 	static int stt = 0;
+	mmcb = [=](void* p, int type, int id) {
+		if (id > 0)return;
+		auto fn = hz::browse_openfile("选择文件", "", "所有文件\t*.*\tPNG格式(*.png)\t*.png\tJPEG(*.jpg)\t*.jpg\t", form0->get_nptr(), 0);
+		if (fn.size()) {
+			std::string str = fn[0];
+
+			{
+				print_time aak("load file");
+				if (hex.set_file(str.c_str(), true))
+				{
+					hex.update_hex_editor();
+					hex.set_pos(0);
+					hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
+					//kc.assign((char*)hex.data(), hex.size());
+				}
+			}
+		}
+		};
 	p->on_click = [=](plane_cx* p, int down, int clicks, const glm::ivec2& mpos)
 		{
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
-			glm::ivec2 scpos = mpos;
+			glm::ivec2 scpos = mpos - p->tpos;// 减去本面板坐标
 			scpos -= (glm::ivec2)dps;
 			printf("old click:%d\t%d\n", scpos.x, scpos.y);
 			auto vps = hex_scroll.v->get_offset_ns();
 			auto hps = hex_scroll.h->get_offset_ns();
-			scpos.x -= hps;
-			scpos.y -= vps;
+			scpos.x += hps;
+			scpos.y += vps;
 			printf("click:%d\t%d\n", scpos.x, scpos.y);
 
 		};
@@ -536,6 +567,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				dps.x += hex_size.x - width;
 				hex_scroll.v->pos = dps;
 				draw_rect(cr, { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 }, 0xf0121212, 0x80ffffff, 2, 1);
+				if (hex.acount == 0)return;
 				clip_cr(cr, chs);
 				glm::vec4 rc = { 0,0,300,1000 };
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
@@ -550,37 +582,52 @@ void show_ui(form_x* form0, menu_cx* gm)
 				//std::string decoded_text;		// 解码文本
 				//std::string data_inspector;		// 数据检查
 				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
-				rc = { 10 + 90,10,500,1080 };
+				auto vps = hex_scroll.v->get_offset_ns() / fl;
+				hex.set_linepos(vps);
+				hex.update_hex_editor();
+				auto phex = &hex;
+				auto nn = hex.line_number_n;
+				int cw = st->font_size * 0.5;
+				int line_number_width = nn * cw;
+				int data_width = hex.bytes_per_line * cw * 3;
+				auto height = hex_scroll.v->_view_size;
+				hex.dpos[0] = { 10 + line_number_width,10 };//ruler
+				hex.dpos[1] = { 10,10 + fl };//line_number
+				hex.dpos[2] = { 10 + line_number_width,10 + fl };//data_hex
+				int dataps = 10 + line_number_width + data_width + fl;
+				hex.dpos[3] = { dataps,10 + fl };//decoded_text
+				dataps += hex.bytes_per_line * cw + fl;
+				hex.dpos[4] = { dataps,10 + fl };//ruler_di
+				hex.dpos[5] = { dataps,10 };//dititle
+				dataps += 80;
+				hex.dpos[6] = { dataps,10 + fl };//data_inspector
+				int ruler_w = phex->ruler.size() * cw;
+				rc = { hex.dpos[0],ruler_w,height };
 				st->text_color = 0xfffb8f71; //#718FFB
 				draw_text(cr, p->ltx, hex.ruler.c_str(), -1, rc, st);
-
 				{
-					cairo_as _ss_(cr);
-					auto vps = hex_scroll.v->get_offset_ns() / fl;
-					hex.set_linepos(vps);
-					hex.update_hex_editor();
-					rc = { 10,10 + fl,100,1080 };
+					rc = { hex.dpos[1],line_number_width,height };
 					st->text_color = 0xff999999;
 					draw_text(cr, p->ltx, hex.line_number.c_str(), -1, rc, st);
 
-					rc = { 10 + 90,10 + fl,500,1080 };
+					rc = { hex.dpos[2],data_width,height };
 					st->text_color = -1;
 					draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
 					hex_edit->set_pos({ rc.x,rc.y });
 
-					rc = { 10 + 490,10 + fl,150,1080 };
+					rc = { hex.dpos[3],150,height };
 					draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
 				}
 
-				rc = { 10 + 650,10 + fl,200,1080 };
+				rc = { hex.dpos[4],200,height };
 				auto dit = hex.get_ruler_di();
 				st->text_color = 0xff999999;
 				draw_text(cr, p->ltx, dit.c_str(), -1, rc, st);
-				rc = { 10 + 650 ,10 ,200,1080 };
+				rc = { hex.dpos[5] ,200,height };
 				std::string dititle = (char*)u8"数据检查器";
 				st->text_color = -1;
 				draw_text(cr, p->ltx, dititle.c_str(), -1, rc, st);
-				rc = { 10 + 650 + 80,10 + fl,200,1080 };
+				rc = { hex.dpos[6] ,200,height };
 				st->text_color = 0xff999999;
 				draw_text(cr, p->ltx, hex.data_inspector.c_str(), -1, rc, st);
 			}

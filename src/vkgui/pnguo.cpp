@@ -24614,7 +24614,8 @@ bool vht(const std::vector<widget_base*>& widgets, const glm::ivec2& p, glm::ive
 		glm::vec2 mps = p; mps -= ips;
 		mps -= pw->hscroll * scroll_pos;
 		// 判断是否鼠标在控件上
-		auto k = check_box_cr1(mps, (glm::vec4*)&(pw->pos), 1, 0);
+		glm::vec4 ppos = { pw->pos,pw->size };
+		auto k = check_box_cr1(mps, &ppos, 1, sizeof(glm::vec4));
 		if (k.x) { r = true; }
 	}
 	return r;
@@ -24795,7 +24796,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y };
 		glm::vec4 trc = viewport;
-		auto k2 = check_box_cr1(mps, &trc, 1, 0);
+		auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 
 		if (k2.x) {
 			_bst |= (int)BTN_STATE::STATE_HOVER;
@@ -25677,8 +25678,9 @@ bool widget_on_move(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
 		wp->mmpos = mps;
-		// 判断是否鼠标进入
-		auto k = check_box_cr1(mps, (glm::vec4*)&wp->pos, 1, 0);
+		// 判断是否鼠标进入 
+		glm::vec4 trc = { wp->pos  ,wp->size };
+		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 		if (k.x) {
 			bool hoverold = wp->bst & (int)BTN_STATE::STATE_HOVER;
 			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
@@ -29176,6 +29178,7 @@ bool hex_editor::set_file(const char* fn, bool is_rdonly)
 			_data = (unsigned char*)bkt;
 			_size = p->size();
 			mapfile = p;
+			is_update = true;
 			return true;
 		}
 	}
@@ -29445,9 +29448,12 @@ void hex_editor::update_hex_editor()
 		auto lpos = line_offset;
 		const char* fmt[2] = { "%08zx: \n" ,"%016zx: \n" };
 		auto data = file_data->_data + line_offset;
+		int lnw = 0;
 		for (size_t i = 0; i < nsize && newnc > 0; i += file_data->bytes_per_line, newnc--) {
 			snprintf(line, bps, fmt[idx], i + lpos);
 			line_number += line;
+			if (lnw == 0)
+				lnw = line_number.size();
 			line[0] = 0;
 			for (int j = 0; j < file_data->bytes_per_line; j++) {
 				if (i + j < nsize) {
@@ -29473,6 +29479,7 @@ void hex_editor::update_hex_editor()
 			decoded_text += line;
 			decoded_text.push_back('\n');
 		}
+		line_number_n = lnw;
 	}
 }
 #endif

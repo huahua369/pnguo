@@ -1535,6 +1535,7 @@ namespace mg {
 
 		int xc = 0;
 		mc->u = p;
+		int ix = 0;
 		for (auto& it : mmd.mvs[0])
 		{
 			auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
@@ -1545,7 +1546,9 @@ namespace mg {
 
 			cbt->click_cb = [=](void* ptr, int clicks)
 				{
+					if (mmd.mcb)mmd.mcb(ptr, clicks, ix);
 				};
+			ix++;
 			cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
 				{
 					static void* enterst = 0;
