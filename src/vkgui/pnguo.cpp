@@ -10519,6 +10519,17 @@ void layout_text_x::draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, 
 		}
 	}
 }
+void layout_text_x::draw_rect_rc(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color)
+{
+	auto mx = rtv.size();
+	for (size_t i = 0; i < mx; i++)
+	{
+		auto& it = rtv[i];
+		auto pos = it._dwpos + it._apos;
+		glm::ivec4 rc = { pos.x,pos.y,it._rect.z,it._rect.w };
+		draw_rect(cr, rc, color, 0, 0, 0);
+	}
+}
 void layout_text_x::draw_text(cairo_t* cr, uint32_t color)
 {
 	update_text();
@@ -11049,7 +11060,7 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 	ltx->update_text();
 
 	cairo_as _ss_(cr);
-	if (st->clip) {
+	if (st->clip && text_rc.z > 0 && text_rc.w > 0) {
 		draw_rectangle(cr, text_rc, 0);
 		cairo_clip(cr);
 	}
@@ -11059,13 +11070,14 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 		cairo_translate(cr, st->shadow_pos.x, st->shadow_pos.y);
 		ltx->draw_text(cr, ltx->tem_rtv, st->text_color_shadow);
 	}
+	//ltx->draw_rect_rc(cr, ltx->tem_rtv, 0xffff8000);
 	ltx->draw_text(cr, ltx->tem_rtv, st->text_color);
 }
 void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_style_tx* stv, int st_count, glm::ivec4* clip)
 {
 	if (!stv || st_count < 1 || !cr || !ltx || !p || count < 1)return;
 	cairo_as _ss_(cr);
-	if (clip) {
+	if (clip && clip->z > 0 && clip->w > 0) {
 		glm::vec4 cliprc = *clip;
 		draw_rectangle(cr, cliprc, 0);
 		cairo_clip(cr);
@@ -11091,8 +11103,10 @@ void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_st
 void clip_cr(cairo_t* cr, const glm::ivec4& clip)
 {
 	glm::vec4 cliprc = clip;
-	draw_rectangle(cr, cliprc, 0);
-	cairo_clip(cr);
+	if (clip.z > 0 && clip.w > 0) {
+		draw_rectangle(cr, cliprc, 0);
+		cairo_clip(cr);
+	}
 }
 void draw_ge(cairo_t* cr, void* p, int count)
 {
@@ -24965,7 +24979,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 					{
 						auto dp1 = *vt;
 						auto& it = *dp1;
-						if (it.size.x <= 0 || it.size.y <= 0)
+						if (it.size.x == 0 || it.size.y == 0)
 						{
 							it.z = 0;
 							it.cp1 = it.cp0 = mps;
@@ -24980,7 +24994,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 					{
 						auto dp1 = *vt;
 						auto& it = *dp1;
-						if (it.size.x <= 0 || it.size.y <= 0)
+						if (it.size.x == 0 && it.size.y == 0)
 						{
 							it.z = 0;
 							it.cp1 = it.cp0 = mps;

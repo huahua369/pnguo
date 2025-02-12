@@ -1167,6 +1167,7 @@ public:
 	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
 	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
 
+	void draw_rect_rc(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color);
 	// 渲染全部文本
 	void draw_text(cairo_t* cr, uint32_t color);
 	// todo获取图集

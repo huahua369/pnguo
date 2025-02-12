@@ -512,7 +512,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	hex_edit->visible = false;
 	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
 	hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
-	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x * 2, 0);
+	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x * 1.5, 0);
 	static int stt = 0;
 	mmcb = [=](void* p, int type, int id) {
 		if (id > 0)return;
@@ -535,6 +535,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->on_click = [=](plane_cx* p, int down, int clicks, const glm::ivec2& mpos)
 		{
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
+			auto dgp = p->get_dragv6(dpx);
+			dgp->size.x = -1;
 			glm::ivec2 scpos = mpos - p->tpos;// 减去本面板坐标
 			scpos -= (glm::ivec2)dps;
 			printf("old click:%d\t%d\n", scpos.x, scpos.y);
@@ -542,6 +544,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto hps = hex_scroll.h->get_offset_ns();
 			scpos.x += hps;
 			scpos.y += vps;
+			scpos -= hex.dpos[2];
 			printf("click:%d\t%d\n", scpos.x, scpos.y);
 
 		};
@@ -583,6 +586,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				//std::string data_inspector;		// 数据检查
 				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
 				auto vps = hex_scroll.v->get_offset_ns() / fl;
+				auto xx = hex_scroll.h->get_offset_ns();
+				cairo_translate(cr, -xx, 0);
 				hex.set_linepos(vps);
 				hex.update_hex_editor();
 				auto phex = &hex;
