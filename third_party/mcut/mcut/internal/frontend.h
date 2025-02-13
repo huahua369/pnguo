@@ -51,6 +51,7 @@
 
 #include "mcut/mcut.h"
 
+#include <chrono>
 #include <future>
 #include <map>
 #include <memory>
