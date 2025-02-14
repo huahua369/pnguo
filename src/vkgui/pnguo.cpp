@@ -19805,6 +19805,15 @@ void layout_text()
 #endif
 
 
+internal_text_cx::internal_text_cx()
+{
+}
+
+internal_text_cx::~internal_text_cx()
+{
+}
+
+
 
 #endif
 // !NO_FONT_CX

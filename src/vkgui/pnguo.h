@@ -660,6 +660,57 @@ struct text_tx
 	int st_index = 0;
 };
 
+//typedef enum TTF_Direction
+//{
+//	TTF_DIRECTION_INVALID = 0,
+//	TTF_DIRECTION_LTR = 4,        /**< Left to Right */
+//	TTF_DIRECTION_RTL,            /**< Right to Left */
+//	TTF_DIRECTION_TTB,            /**< Top to Bottom */
+//	TTF_DIRECTION_BTT             /**< Bottom to Top */
+//} TTF_Direction;
+
+struct text_ayout_t
+{
+	int direction;
+	uint32_t script;
+	int font_height;
+	int* lines;
+	int wrap_length;
+	bool wrap_whitespace_visible;
+};
+struct text_data
+{
+	font_t* font = 0;
+	text_style_t st = {};
+	text_ayout_t *layout;
+	int x, y, w, h;
+	uint32_t props = 0;
+	bool needs_engine_update;
+	bool needs_layout_update;
+};
+// 文件对象
+struct text_t
+{
+	char* text = 0;
+	int num_lines = 0;
+	text_data* internal = 0;
+};
+
+class internal_text_cx
+{
+public:
+	text_t text = {};
+	text_data internal = {};
+	text_ayout_t layout = {};
+public:
+	internal_text_cx();
+	~internal_text_cx();
+
+private:
+
+};
+
+
 class font_rctx
 {
 public:
@@ -2336,6 +2387,7 @@ void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, 
 void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth);
 //glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st);
+
 
 enum class eg_e :uint32_t {
 	enull,
