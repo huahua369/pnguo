@@ -268,6 +268,7 @@ namespace md {
 	std::wstring u8_w(const char* str, size_t len);
 	std::string gb_u8(const char* str, size_t len);
 
+	int utf8_to_unicode(const char* utf8, int* unicode);
 	uint32_t fons_decutf8(uint32_t* down, uint32_t* codep, uint32_t byte);
 	const char* utf8_next_char(const char* p);
 	const char* get_utf8_first(const char* str);

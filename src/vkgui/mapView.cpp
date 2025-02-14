@@ -263,7 +263,9 @@ namespace md {
 		}
 	}
 	// 将UTF - 8编码转换为Unicode码点 
-	int utf8_to_unicode(const unsigned char* utf8, int* unicode) {
+	int utf8_to_unicode(const char* str, int* unicode)
+	{
+		auto utf8 = (const unsigned char*)str;
 		if (*utf8 == '\0') return 0;
 
 		if ((*utf8 & 0x80) == 0) {
@@ -294,7 +296,7 @@ namespace md {
 	}
 
 	// 处理UTF - 8字符串转换为Unicode数组 
-	int utf8_string_to_unicode(const unsigned char* utf8, int* unicode_array, int max_count) {
+	int utf8_string_to_unicode(const char* utf8, int* unicode_array, int max_count) {
 		int count = 0;
 		while (*utf8 != '\0' && count < max_count) {
 			int unicode;
@@ -319,7 +321,7 @@ namespace md {
 		for (; t && *t && len > 0; len--)
 		{
 			int unicode = 0;
-			int bytes = utf8_to_unicode((const unsigned char*)t, &unicode);
+			int bytes = utf8_to_unicode(t, &unicode);
 			if (bytes > 0)
 				t += bytes;
 			else

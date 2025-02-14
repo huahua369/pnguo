@@ -162,16 +162,18 @@ namespace pg
 	}
 	std::string to_string_p(uint32_t _Val)
 	{
-		const auto _Len = static_cast<size_t>(_scprintf("%p", _Val));
+		void* p = (void*)_Val;
+		const auto _Len = static_cast<size_t>(_scprintf("%p", p));
 		std::string _Str(_Len, '\0');
-		sprintf_s(&_Str[0], _Len + 1, "%p", _Val);
+		sprintf_s(&_Str[0], _Len + 1, "%p", p);
 		return _Str;
 	}
 	std::string to_string_p(uint64_t _Val)
 	{
-		const auto _Len = static_cast<size_t>(_scprintf("%p", _Val));
+		void* p = (void*)_Val;
+		const auto _Len = static_cast<size_t>(_scprintf("%p", p));
 		std::string _Str(_Len, '\0');
-		sprintf_s(&_Str[0], _Len + 1, "%p", _Val);
+		sprintf_s(&_Str[0], _Len + 1, "%p", p);
 		return _Str;
 	}
 	std::string to_string_hex(uint32_t _Val)
@@ -10053,8 +10055,11 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, i
 	do
 	{
 		if (!str || !(*str)) { break; }
-		uint32_t ch = 0;
-		str = md::get_u8_last(str, &ch);
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		//str = md::get_u8_last(str, &ch);
 		if (ch == '\n')
 		{
 			ret.x = std::max(ret.x, x);
@@ -10101,8 +10106,10 @@ glm::ivec3 layout_text_x::get_text_rect1(size_t idx, int fontsize, const void* s
 	do
 	{
 		if (!str || !(*str)) { break; }
-		uint32_t ch = 0;
-		str = md::get_u8_last(str, &ch);
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
 		if (ch == '\n')
 		{
 			ret.x = std::max(ret.x, x);
@@ -10142,9 +10149,11 @@ int layout_text_x::get_text_pos(size_t idx, int fontsize, const void* str8, int 
 	do
 	{
 		if (!str || !(*str)) { break; }
-		uint32_t ch = 0;
 		auto pstr = str;
-		str = md::get_u8_last(str, &ch);
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
 		if (ch == '\n')
 		{
 			break;
@@ -10189,9 +10198,11 @@ int layout_text_x::get_text_ipos(size_t idx, int fontsize, const void* str8, int
 	do
 	{
 		if (!str || !(*str) || str >= str0) { break; }
-		uint32_t ch = 0;
-		auto pstr = str;
-		str = md::get_u8_last(str, &ch);
+
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
 		if (ch == '\n')
 		{
 			x = 0;
@@ -10220,9 +10231,11 @@ int layout_text_x::get_text_posv(size_t idx, int fontsize, const void* str8, int
 	do
 	{
 		if (!str || !(*str)) { break; }
-		uint32_t ch = 0;
-		auto pstr = str;
-		str = md::get_u8_last(str, &ch);
+
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
 		if (ch == '\n')
 		{
 			ow.push_back(w0);
@@ -10624,9 +10637,12 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fo
 		int gidx = 0;
 		if (*str == '\n')
 			gidx = 0;
-		uint32_t ch = 0;
 		auto ostr = str;
-		str = md::get_u8_last(str, &ch);
+
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
 		font_t::get_glyph_index_u8(ostr, &gidx, &r, &familyv[idx]);
 		if (r && gidx >= 0)
 		{
@@ -28886,7 +28902,12 @@ int hb_cx::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<lt_item
 		glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
 		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 		unsigned int cp = 0;
-		laststr = md::get_u8_last(pstr + info->cluster, &cp);
+		//laststr = md::get_u8_last(pstr + info->cluster, &cp);
+		int ch = 0;
+		auto nstr = pstr + info->cluster;
+		auto kk = md::utf8_to_unicode(nstr, &ch);
+		if (kk < 1)break;
+		cp = ch;
 		cp32 = cp;
 		auto git = ttf->get_glyph_item(info->codepoint, cp, fontheight);
 
@@ -28918,9 +28939,14 @@ int hb_cx::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<lt_item
 					laststr = pstr + clu[0];
 					for (int k = 0; k < uc; k++)
 					{
-						laststr = md::get_u8_last(laststr, &cp1);
-						assert(c < 8);
-						lti.ch[c++] = cp1;
+						//laststr = md::get_u8_last(laststr, &cp1);
+						auto kk = md::utf8_to_unicode(laststr, (int*)&cp1);
+						assert(c < 8 && kk>0);
+						if (kk > 0)
+						{
+							laststr += kk;
+							lti.ch[c++] = cp1;
+						}
 					}
 				}
 				lti.chlen = uc;
