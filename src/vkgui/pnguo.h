@@ -624,17 +624,17 @@ struct vg_style_t {
 	st->fill = 0x80FF7373;
 	st->color = 0xffffffff;
 	*/
-//struct text_layout_t
-//{
-//	PangoLayout* layout = 0;
-//	font_rctx* ctx = 0;
-//	glm::ivec2 pos = {};
-//	glm::ivec2 rc = {};
-//	int lineheight = 0;
-//	int baseline = 0;
-//	int text_color = -1;
-//	bool once = false;
-//};
+	//struct text_layout_t
+	//{
+	//	PangoLayout* layout = 0;
+	//	font_rctx* ctx = 0;
+	//	glm::ivec2 pos = {};
+	//	glm::ivec2 rc = {};
+	//	int lineheight = 0;
+	//	int baseline = 0;
+	//	int text_color = -1;
+	//	bool once = false;
+	//};
 
 struct text_style_t
 {
@@ -682,7 +682,7 @@ struct text_data
 {
 	font_t* font = 0;
 	text_style_t st = {};
-	text_ayout_t *layout;
+	text_ayout_t* layout;
 	int x, y, w, h;
 	uint32_t props = 0;
 	bool needs_engine_update;
@@ -1984,27 +1984,41 @@ public:
 	void set_offset_inc(int inc);			// 增加滚动偏移
 	void set_posv(const glm::ivec2& poss);
 };
+
+struct text_draw_t
+{
+	cairo_t* cr; layout_text_x* ltx;
+	std::string* text = 0;
+	glm::vec4* text_rc;
+	uint32_t* color;
+	int count = 0;
+	text_style_t* st;
+};
+
 // 16进制编辑
 struct hex_editor
 {
 public:
-	std::string line_number, ruler;	// 行号，标尺
+	std::string ruler, line_number;	// 行号，标尺
 	std::string data_hex;			// 数据hex
 	std::string decoded_text;		// 解码文本
+	std::string ruler_di;			// 数据检查器头
+	std::string dititle;			// 数据检查器标题
 	std::string data_inspector;		// 数据检查
 	int font_size = 16;
 	int line_number_n = 0;
 	int bytes_per_line = 16;		// 第行显示字节数4-256
 	int64_t acount = 0;				// 行数量
 
-	glm::i64vec2 dpos[8] = {};		// 渲染坐标
+	glm::vec4 text_rc[7] = {};		// 渲染区域
+	uint32_t color[7] = {};			// 渲染颜色
 private:
 	unsigned char* _data = 0;
 	size_t _size = 0;
 	int64_t count = 0;				// 当前显示行数量
 	size_t line_offset = 0;			// 当前行偏移
 	glm::ivec2 view_size = { 600,1080 }; // 视图高 
-
+	text_draw_t tdt = {};
 private:
 	std::string bpline;				// 缓存用
 	std::vector<char> tempstr;		// 缓存用
@@ -2028,7 +2042,9 @@ public:
 	char* data();
 	size_t size();
 	bool update_hex_editor();
+	text_draw_t* get_drawt();
 };
+void draw_draw_texts(text_draw_t* p);
 /*
 todo Data Inspector
 binary(1)读一个字节

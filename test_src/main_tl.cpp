@@ -544,7 +544,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			auto hps = hex_scroll.h->get_offset_ns();
 			scpos.x += hps;
 			scpos.y += vps;
-			scpos -= hex.dpos[2];
+			scpos -= (glm::ivec2)hex.text_rc[2];
 			printf("click:%d\t%d\n", scpos.x, scpos.y);
 
 		};
@@ -580,17 +580,17 @@ void show_ui(form_x* form0, menu_cx* gm)
 					//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
 					rc.x += 300;
 				}
-				//std::string line_number, ruler;	// 行号，标尺
-				//std::string data_hex;			// 数据hex
-				//std::string decoded_text;		// 解码文本
-				//std::string data_inspector;		// 数据检查
+				//std::string line_number, ruler;	
+				//std::string data_hex;			
+				//std::string decoded_text;		
+				//std::string data_inspector;		
 				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
 				auto vps = hex_scroll.v->get_offset_ns() / fl;
 				auto xx = hex_scroll.h->get_offset_ns();
 				cairo_translate(cr, -xx, 0);
 				hex.set_linepos(vps);
-				if (!hex.update_hex_editor()) {
-				}
+				hex.update_hex_editor();
+#if 0
 				auto phex = &hex;
 				auto nn = hex.line_number_n;
 				int cw = st->font_size * 0.5;
@@ -613,15 +613,15 @@ void show_ui(form_x* form0, menu_cx* gm)
 				draw_text(cr, p->ltx, hex.ruler.c_str(), -1, rc, st);
 				{
 					rc = { hex.dpos[1],line_number_width,height };
-					st->text_color = 0xff999999;
+					st->text_color = 0xff999999;// 行号，标尺
 					draw_text(cr, p->ltx, hex.line_number.c_str(), -1, rc, st);
 
 					rc = { hex.dpos[2],data_width,height };
-					st->text_color = -1;
+					st->text_color = -1;// 数据hex
 					draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
 					hex_edit->set_pos({ rc.x,rc.y });
 
-					rc = { hex.dpos[3],150,height };
+					rc = { hex.dpos[3],150,height };// 解码文本
 					draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
 				}
 
@@ -634,8 +634,46 @@ void show_ui(form_x* form0, menu_cx* gm)
 				st->text_color = -1;
 				draw_text(cr, p->ltx, dititle.c_str(), -1, rc, st);
 				rc = { hex.dpos[6] ,200,height };
-				st->text_color = 0xff999999;
+				st->text_color = 0xff999999;// 数据检查
 				draw_text(cr, p->ltx, hex.data_inspector.c_str(), -1, rc, st);
+#endif
+				text_draw_t* dt = hex.get_drawt();
+				dt->cr = cr; dt->ltx = p->ltx;
+				dt->st = st;
+				// 定义常量 
+				const int MARGIN = 10;
+				const int DATA_INSPECTOR_TITLE_WIDTH = 80;
+				const int DECODED_TEXT_WIDTH = 150;
+				const int RULER_DI_WIDTH = 200;
+				// 主绘制代码 
+				auto phex = &hex;
+				auto nn = hex.line_number_n;
+				int cw = st->font_size * 0.5;
+				int line_number_width = nn * cw;
+				int data_width = hex.bytes_per_line * cw * 3;
+				auto height = hex_scroll.v->_view_size;
+				hex.dititle = (char*)u8"数据检查器";
+				// 设置各个区域的绘制位置 
+				int ruler_w = phex->ruler.size() * cw;
+				hex.text_rc[0] = { MARGIN + line_number_width, MARGIN, ruler_w, height }; // ruler 
+				hex.text_rc[1] = { MARGIN, MARGIN + fl ,line_number_width, height }; // line_number 
+				hex.text_rc[2] = { MARGIN + line_number_width, MARGIN + fl, data_width, height }; // data_hex 
+				int dataps = MARGIN + line_number_width + data_width + fl;
+				hex.text_rc[3] = { dataps, MARGIN + fl ,DECODED_TEXT_WIDTH, height }; // decoded_text 
+				dataps += hex.bytes_per_line * cw + fl;
+				hex.text_rc[4] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // ruler_di 
+				hex.text_rc[5] = { dataps, MARGIN ,RULER_DI_WIDTH, height }; // dititle 
+				dataps += DATA_INSPECTOR_TITLE_WIDTH;
+				hex.text_rc[6] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // data_inspector 
+				phex->color[0] = 0xfffb8f71;	// 标尺
+				phex->color[1] = 0xff999999;	// 行号
+				phex->color[2] = 0xffeeeeee;	// 16进制数据
+				phex->color[3] = 0xffeeeeee;	// 解码文件
+				phex->color[4] = 0xff999999;	// 数据检查器字段头
+				phex->color[5] = -1;			// 数据检查器标题
+				phex->color[6] = 0xff107c10;	// 数据检查器相关信息
+				//hex_edit->set_pos({ { hex.text_rc[2].x,  hex.text_rc[2].y  } }); 
+				draw_draw_texts(dt);
 			}
 			auto& str = kc;
 			//draw_hex(p, cr, dpx, str.data(), str.size(), 0, 16);

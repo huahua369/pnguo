@@ -11116,6 +11116,18 @@ void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_st
 		draw_text(cr, ltx, it.txt, it.len, it.trc, &st.st);
 	}
 }
+
+
+void draw_draw_texts(text_draw_t* p)
+{
+	if (!p || !p->cr || !p->st || !p->ltx || !p->color || !p->text || !p->text_rc || p->count < 1)return;
+	for (size_t i = 0; i < p->count; i++)
+	{
+		p->st->text_color = p->color[i];
+		draw_text(p->cr, p->ltx, p->text[i].c_str(), -1, p->text_rc[i], p->st);
+	}
+}
+
 void clip_cr(cairo_t* cr, const glm::ivec4& clip)
 {
 	glm::vec4 cliprc = clip;
@@ -24574,6 +24586,7 @@ void plane_cx::update(float delta)
 	}
 }
 
+
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap)
 {
 	flex_item* p = 0;
@@ -29530,5 +29543,15 @@ bool hex_editor::update_hex_editor()
 		line_number_n = lnw;
 	}
 	return true;
+}
+text_draw_t* hex_editor::get_drawt()
+{
+	if (ruler_di.empty())
+		ruler_di = get_ruler_di();
+	tdt.text = &ruler;
+	tdt.text_rc = text_rc;
+	tdt.color = color;
+	tdt.count = 7;
+	return &tdt;
 }
 #endif
