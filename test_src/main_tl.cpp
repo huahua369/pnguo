@@ -589,7 +589,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				auto xx = hex_scroll.h->get_offset_ns();
 				cairo_translate(cr, -xx, 0);
 				hex.set_linepos(vps);
-				hex.update_hex_editor();
+				if (!hex.update_hex_editor()) {
+				}
 				auto phex = &hex;
 				auto nn = hex.line_number_n;
 				int cw = st->font_size * 0.5;

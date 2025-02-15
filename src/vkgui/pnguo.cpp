@@ -19285,40 +19285,38 @@ font_rctx::font_rctx()
 	}
 
 	imp = new font_imp();
-	PangoFontMap* fontMap = get_fmap;
-	pcontext = pango_font_map_create_context(fontMap);
-	layout = pango_layout_new(pcontext);
-	gclt.insert(layout);
-	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
-	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
+	//PangoFontMap* fontMap = get_fmap;
+	//pcontext = pango_font_map_create_context(fontMap);
+	//layout = pango_layout_new(pcontext);
+	//gclt.insert(layout); 
 }
 
 font_rctx::~font_rctx()
 {
 	if (imp)delete imp;
 	imp = 0;
-	for (auto& [k, v] : fyv) {
-		for (auto it : v.vptr)
-		{
-			auto p = (font_t*)it;
-			if (p)
-			{
-				//delete p;
+	//for (auto& [k, v] : fyv) {
+	//	for (auto it : v.vptr)
+	//	{
+	//		auto p = (font_t*)it;
+	//		if (p)
+	//		{
+	//			//delete p;
 
-			}
-		}
-	}
-	for (auto it : gclt)
-	{
-		if (it)
-		{
-			g_object_unref(it); it = 0;
-		}
-	}
-	if (pcontext)
-	{
-		g_object_unref(pcontext); pcontext = 0;
-	}
+	//		}
+	//	}
+	//}
+	//for (auto it : gclt)
+	//{
+	//	if (it)
+	//	{
+	//		g_object_unref(it); it = 0;
+	//	}
+	//}
+	//if (pcontext)
+	//{
+	//	g_object_unref(pcontext); pcontext = 0;
+	//}
 	fyv.clear();
 }
 
@@ -19672,104 +19670,104 @@ void free_fonts_ctx(font_rctx* p)
 }
 
 
-void font_rctx::set_family_size(const std::string& fam, int fs)
-{
-	auto en = get_family_en(fam.c_str());
-	if (en)
-	{
-		family = en;
-	}
-	else {
-		family = fam;
-	}
-	fontsize = fs > 5 ? fs : 12;
-	if (!layout)
-	{
-		layout = pango_layout_new(pcontext);
-		gclt.insert(layout);
-	}
-	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
-	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
-
-	PangoFontDescription* desc = pango_font_description_new();
-	pango_font_description_set_family(desc, family.c_str());
-	pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
-	pango_layout_set_font_description(layout, desc);
-	pango_font_description_free(desc);
-
-}
-text_layout_t font_rctx::get_text_layout(const std::string& str, text_layout_t* lt)
-{
-	text_layout_t ret = {};
-	auto lay = lt && lt->layout ? lt->layout : pango_layout_copy(layout);
-	gclt.insert(lay);
-	pango_layout_set_text(lay, str.c_str(), str.size());
-	int h = 0;
-	auto line = pango_layout_get_line(lay, 0);
-	pango_layout_line_get_height(line, &h);
-	ret.lineheight = h / PANGO_SCALE;
-	pango_layout_get_pixel_size(lay, &ret.rc.x, &ret.rc.y);
-	ret.baseline = pango_layout_get_baseline(lay) / PANGO_SCALE;
-	ret.ctx = this;
-	ret.layout = lay;
-	if (lt)*lt = ret;
-	return ret;
-}
-void font_rctx::draw_text(cairo_t* cr, text_layout_t* lt)
-{
-	if (!cr || !lt || !lt->layout || !lt->text_color)return;
-	cairo_save(cr);
-	pango_cairo_update_layout(cr, lt->layout);
-	set_color(cr, lt->text_color);
-	cairo_translate(cr, lt->pos.x, lt->pos.y);
-	auto fcp = cairo_get_scaled_font(cr);
-	pango_cairo_show_layout(cr, lt->layout);
-#if 0
-	//cairo_scaled_font_t* csf = pango_cairo_font_get_scaled_font(font);
-	std::vector<PangoGlyphString*> vpgs;
-	std::vector<PangoLayoutLine*> lvs;
-	PangoLayoutIter* it = pango_layout_get_iter(lt->layout);
-	for (;;) {
-		auto lv = pango_layout_iter_get_line(it);
-		if (!lv)break;
-		for (;;) {
-			auto r = pango_layout_iter_get_run(it);
-			if (r)
-			{
-				r->item->analysis.font;
-				vpgs.push_back(r->glyphs);
-			}
-			if (!pango_layout_iter_next_run(it))break;
-		}
-		lvs.push_back(lv);
-		if (!pango_layout_iter_next_line(it))break;
-	}
-	pango_layout_iter_free(it);
-
-	//pango_cairo_show_glyph_item(cr, "", r);
-	//pango_cairo_layout_path(cr, lt->layout);
-#endif
-	cairo_restore(cr);
-	if (lt->once)
-	{
-		if (lt->layout)
-		{
-			gclt.erase(lt->layout);
-			g_object_unref(lt->layout); lt->layout = 0;
-		}
-	}
-}
-void font_rctx::free_textlayout(text_layout_t* lt)
-{
-	if (lt)
-	{
-		if (lt->layout)
-		{
-			gclt.erase(lt->layout);
-			g_object_unref(lt->layout); lt->layout = 0;
-		}
-	}
-}
+//void font_rctx::set_family_size(const std::string& fam, int fs)
+//{
+//	auto en = get_family_en(fam.c_str());
+//	if (en)
+//	{
+//		family = en;
+//	}
+//	else {
+//		family = fam;
+//	}
+//	fontsize = fs > 5 ? fs : 12;
+//	if (!layout)
+//	{
+//		layout = pango_layout_new(pcontext);
+//		gclt.insert(layout);
+//	}
+//	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
+//	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
+//
+//	PangoFontDescription* desc = pango_font_description_new();
+//	pango_font_description_set_family(desc, family.c_str());
+//	pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
+//	pango_layout_set_font_description(layout, desc);
+//	pango_font_description_free(desc);
+//
+//}
+//text_layout_t font_rctx::get_text_layout(const std::string& str, text_layout_t* lt)
+//{
+//	text_layout_t ret = {};
+//	auto lay = lt && lt->layout ? lt->layout : pango_layout_copy(layout);
+//	gclt.insert(lay);
+//	pango_layout_set_text(lay, str.c_str(), str.size());
+//	int h = 0;
+//	auto line = pango_layout_get_line(lay, 0);
+//	pango_layout_line_get_height(line, &h);
+//	ret.lineheight = h / PANGO_SCALE;
+//	pango_layout_get_pixel_size(lay, &ret.rc.x, &ret.rc.y);
+//	ret.baseline = pango_layout_get_baseline(lay) / PANGO_SCALE;
+//	ret.ctx = this;
+//	ret.layout = lay;
+//	if (lt)*lt = ret;
+//	return ret;
+//}
+//void font_rctx::draw_text(cairo_t* cr, text_layout_t* lt)
+//{
+//	if (!cr || !lt || !lt->layout || !lt->text_color)return;
+//	cairo_save(cr);
+//	pango_cairo_update_layout(cr, lt->layout);
+//	set_color(cr, lt->text_color);
+//	cairo_translate(cr, lt->pos.x, lt->pos.y);
+//	auto fcp = cairo_get_scaled_font(cr);
+//	pango_cairo_show_layout(cr, lt->layout);
+//#if 0
+//	//cairo_scaled_font_t* csf = pango_cairo_font_get_scaled_font(font);
+//	std::vector<PangoGlyphString*> vpgs;
+//	std::vector<PangoLayoutLine*> lvs;
+//	PangoLayoutIter* it = pango_layout_get_iter(lt->layout);
+//	for (;;) {
+//		auto lv = pango_layout_iter_get_line(it);
+//		if (!lv)break;
+//		for (;;) {
+//			auto r = pango_layout_iter_get_run(it);
+//			if (r)
+//			{
+//				r->item->analysis.font;
+//				vpgs.push_back(r->glyphs);
+//			}
+//			if (!pango_layout_iter_next_run(it))break;
+//		}
+//		lvs.push_back(lv);
+//		if (!pango_layout_iter_next_line(it))break;
+//	}
+//	pango_layout_iter_free(it);
+//
+//	//pango_cairo_show_glyph_item(cr, "", r);
+//	//pango_cairo_layout_path(cr, lt->layout);
+//#endif
+//	cairo_restore(cr);
+//	if (lt->once)
+//	{
+//		if (lt->layout)
+//		{
+//			gclt.erase(lt->layout);
+//			g_object_unref(lt->layout); lt->layout = 0;
+//		}
+//	}
+//}
+//void font_rctx::free_textlayout(text_layout_t* lt)
+//{
+//	if (lt)
+//	{
+//		if (lt->layout)
+//		{
+//			gclt.erase(lt->layout);
+//			g_object_unref(lt->layout); lt->layout = 0;
+//		}
+//	}
+//}
 
 #if 0
 void layout_text()
@@ -29226,6 +29224,7 @@ bool hex_editor::set_file(const char* fn, bool is_rdonly)
 			bk.clear_ptr(); // 转移句柄
 			_data = (unsigned char*)bkt;
 			_size = p->size();
+			line_offset = 0;
 			mapfile = p;
 			is_update = true;
 			return true;
@@ -29446,7 +29445,7 @@ size_t hex_editor::size()
 	return _size;
 }
 
-void hex_editor::update_hex_editor()
+bool hex_editor::update_hex_editor()
 {
 	int64_t nsize = _size - line_offset;
 	if (nsize > 0 && _data && _size > 0)
@@ -29454,7 +29453,7 @@ void hex_editor::update_hex_editor()
 
 	}
 	else {
-		return;
+		return false;
 	}
 	auto file_data = this;
 	if (file_data->bytes_per_line < 4)
@@ -29530,5 +29529,6 @@ void hex_editor::update_hex_editor()
 		}
 		line_number_n = lnw;
 	}
+	return true;
 }
 #endif

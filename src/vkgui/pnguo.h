@@ -729,12 +729,13 @@ public:
 	bitmap_cache_cx bcc = {};				// 纹理缓存
 	font_t* current = 0;
 
-	PangoContext* pcontext = 0;
-	PangoLayout* layout = 0;
-	std::set<PangoLayout*> gclt;
+	//PangoContext* pcontext = 0;
+	//PangoLayout* layout = 0;
+	//std::set<PangoLayout*> gclt;
 	std::string temfamily = "";
-	std::string family = "NSimSun";
-	int fontsize = 12;
+	//std::string family = "NSimSun";
+	//int fontsize = 12;
+
 public:
 	font_rctx();
 	~font_rctx();
@@ -750,10 +751,10 @@ public:
 	font_t* get_font(const char* family, const char* style);//通过字符串名获取
 	font_t* get_font_cur();					//获取当前字体对象
 
-	void set_family_size(const std::string& fam, int fs);
-	text_layout_t get_text_layout(const std::string& str, text_layout_t* lt);
-	void draw_text(cairo_t* cr, text_layout_t* lt);
-	void free_textlayout(text_layout_t* lt);
+	//void set_family_size(const std::string& fam, int fs);
+	//text_layout_t get_text_layout(const std::string& str, text_layout_t* lt);
+	//void draw_text(cairo_t* cr, text_layout_t* lt);
+	//void free_textlayout(text_layout_t* lt);
 public:
 	font_t* get_mfont(const std::string& name);
 	// 手动添加字体使用。纹理缓存同一个，但不能用上面函数查询
@@ -2026,7 +2027,7 @@ public:
 	std::string get_ruler_di();
 	char* data();
 	size_t size();
-	void update_hex_editor();
+	bool update_hex_editor();
 };
 /*
 todo Data Inspector
