@@ -570,74 +570,30 @@ void show_ui(form_x* form0, menu_cx* gm)
 				dps.x += hex_size.x - width;
 				hex_scroll.v->pos = dps;
 				draw_rect(cr, { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 }, 0xf0121212, 0x80ffffff, 2, 1);
-				if (hex.acount == 0)return;
-				clip_cr(cr, chs);
+				auto pf = &ftns;
+				auto phex = &hex;
 				glm::vec4 rc = { 0,0,300,1000 };
+				if (phex->acount == 0)
+				{
+					for (auto& str : ftns)
+					{
+						draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
+						rc.x += 300;
+					}
+					return;
+				}
+				clip_cr(cr, chs);
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
 				auto rc2 = rc;
-				for (auto& str : ftns)
-				{
-					//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
-					rc.x += 300;
-				}
-				//std::string line_number, ruler;	
-				//std::string data_hex;			
-				//std::string decoded_text;		
-				//std::string data_inspector;		
+
 				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
 				auto vps = hex_scroll.v->get_offset_ns() / fl;
 				auto xx = hex_scroll.h->get_offset_ns();
 				cairo_translate(cr, -xx, 0);
-				hex.set_linepos(vps);
-				hex.update_hex_editor();
-#if 0
-				auto phex = &hex;
-				auto nn = hex.line_number_n;
-				int cw = st->font_size * 0.5;
-				int line_number_width = nn * cw;
-				int data_width = hex.bytes_per_line * cw * 3;
-				auto height = hex_scroll.v->_view_size;
-				hex.dpos[0] = { 10 + line_number_width,10 };//ruler
-				hex.dpos[1] = { 10,10 + fl };//line_number
-				hex.dpos[2] = { 10 + line_number_width,10 + fl };//data_hex
-				int dataps = 10 + line_number_width + data_width + fl;
-				hex.dpos[3] = { dataps,10 + fl };//decoded_text
-				dataps += hex.bytes_per_line * cw + fl;
-				hex.dpos[4] = { dataps,10 + fl };//ruler_di
-				hex.dpos[5] = { dataps,10 };//dititle
-				dataps += 80;
-				hex.dpos[6] = { dataps,10 + fl };//data_inspector
-				int ruler_w = phex->ruler.size() * cw;
-				rc = { hex.dpos[0],ruler_w,height };
-				st->text_color = 0xfffb8f71; //#718FFB
-				draw_text(cr, p->ltx, hex.ruler.c_str(), -1, rc, st);
-				{
-					rc = { hex.dpos[1],line_number_width,height };
-					st->text_color = 0xff999999;// 行号，标尺
-					draw_text(cr, p->ltx, hex.line_number.c_str(), -1, rc, st);
+				phex->set_linepos(vps);
+				phex->update_hex_editor();
 
-					rc = { hex.dpos[2],data_width,height };
-					st->text_color = -1;// 数据hex
-					draw_text(cr, p->ltx, hex.data_hex.c_str(), -1, rc, st);
-					hex_edit->set_pos({ rc.x,rc.y });
-
-					rc = { hex.dpos[3],150,height };// 解码文本
-					draw_text(cr, p->ltx, hex.decoded_text.c_str(), -1, rc, st);
-				}
-
-				rc = { hex.dpos[4],200,height };
-				auto dit = hex.get_ruler_di();
-				st->text_color = 0xff999999;
-				draw_text(cr, p->ltx, dit.c_str(), -1, rc, st);
-				rc = { hex.dpos[5] ,200,height };
-				std::string dititle = (char*)u8"数据检查器";
-				st->text_color = -1;
-				draw_text(cr, p->ltx, dititle.c_str(), -1, rc, st);
-				rc = { hex.dpos[6] ,200,height };
-				st->text_color = 0xff999999;// 数据检查
-				draw_text(cr, p->ltx, hex.data_inspector.c_str(), -1, rc, st);
-#endif
-				text_draw_t* dt = hex.get_drawt();
+				text_draw_t* dt = phex->get_drawt();
 				dt->cr = cr; dt->ltx = p->ltx;
 				dt->st = st;
 				// 定义常量 
@@ -646,25 +602,24 @@ void show_ui(form_x* form0, menu_cx* gm)
 				const int DECODED_TEXT_WIDTH = 150;
 				const int RULER_DI_WIDTH = 200;
 				// 主绘制代码 
-				auto phex = &hex;
-				auto nn = hex.line_number_n;
+				auto nn = phex->line_number_n;
 				int cw = st->font_size * 0.5;
 				int line_number_width = nn * cw;
-				int data_width = hex.bytes_per_line * cw * 3;
+				int data_width = phex->bytes_per_line * cw * 3;
 				auto height = hex_scroll.v->_view_size;
-				hex.dititle = (char*)u8"数据检查器";
+				phex->dititle = (char*)u8"数据检查器";
 				// 设置各个区域的绘制位置 
 				int ruler_w = phex->ruler.size() * cw;
-				hex.text_rc[0] = { MARGIN + line_number_width, MARGIN, ruler_w, height }; // ruler 
-				hex.text_rc[1] = { MARGIN, MARGIN + fl ,line_number_width, height }; // line_number 
-				hex.text_rc[2] = { MARGIN + line_number_width, MARGIN + fl, data_width, height }; // data_hex 
+				phex->text_rc[0] = { MARGIN + line_number_width, MARGIN, ruler_w, height }; // ruler 
+				phex->text_rc[1] = { MARGIN, MARGIN + fl ,line_number_width, height }; // line_number 
+				phex->text_rc[2] = { MARGIN + line_number_width, MARGIN + fl, data_width, height }; // data_hex 
 				int dataps = MARGIN + line_number_width + data_width + fl;
-				hex.text_rc[3] = { dataps, MARGIN + fl ,DECODED_TEXT_WIDTH, height }; // decoded_text 
-				dataps += hex.bytes_per_line * cw + fl;
-				hex.text_rc[4] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // ruler_di 
-				hex.text_rc[5] = { dataps, MARGIN ,RULER_DI_WIDTH, height }; // dititle 
+				phex->text_rc[3] = { dataps, MARGIN + fl ,DECODED_TEXT_WIDTH, height }; // decoded_text 
+				dataps += phex->bytes_per_line * cw + fl;
+				phex->text_rc[4] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // ruler_di 
+				phex->text_rc[5] = { dataps, MARGIN ,RULER_DI_WIDTH, height }; // dititle 
 				dataps += DATA_INSPECTOR_TITLE_WIDTH;
-				hex.text_rc[6] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // data_inspector 
+				phex->text_rc[6] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // data_inspector 
 				phex->color[0] = 0xfffb8f71;	// 标尺
 				phex->color[1] = 0xff999999;	// 行号
 				phex->color[2] = 0xffeeeeee;	// 16进制数据
@@ -672,7 +627,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[4] = 0xff999999;	// 数据检查器字段头
 				phex->color[5] = -1;			// 数据检查器标题
 				phex->color[6] = 0xff107c10;	// 数据检查器相关信息
-				//hex_edit->set_pos({ { hex.text_rc[2].x,  hex.text_rc[2].y  } }); 
+				//hex_edit->set_pos({ { phex->text_rc[2].x,  phex->text_rc[2].y  } }); 
 				draw_draw_texts(dt);
 			}
 			auto& str = kc;
