@@ -624,17 +624,17 @@ struct vg_style_t {
 	st->fill = 0x80FF7373;
 	st->color = 0xffffffff;
 	*/
-struct text_layout_t
-{
-	PangoLayout* layout = 0;
-	font_rctx* ctx = 0;
-	glm::ivec2 pos = {};
-	glm::ivec2 rc = {};
-	int lineheight = 0;
-	int baseline = 0;
-	int text_color = -1;
-	bool once = false;
-};
+//struct text_layout_t
+//{
+//	PangoLayout* layout = 0;
+//	font_rctx* ctx = 0;
+//	glm::ivec2 pos = {};
+//	glm::ivec2 rc = {};
+//	int lineheight = 0;
+//	int baseline = 0;
+//	int text_color = -1;
+//	bool once = false;
+//};
 
 struct text_style_t
 {
@@ -2062,14 +2062,14 @@ SHIFT-JIS
 
 class form_x;
 class tview_x;
-struct text_item_t
-{
-	std::string familys, text;
-	int fontsize;
-	uint32_t color;
-	text_layout_t layout;
-	bool bd_valid = true;
-};
+//struct text_item_t
+//{
+//	std::string familys, text;
+//	int fontsize;
+//	uint32_t color;
+//	text_layout_t layout;
+//	bool bd_valid = true;
+//};
 // 容器用
 struct layout_info_x {
 	glm::vec2 pos_align = { 0.5,0.5 };	// 默认的子元素偏移对齐。左中右上下布局计算auto ps = size * align - (ext * align + bearing);

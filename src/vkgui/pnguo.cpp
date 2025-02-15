@@ -162,10 +162,10 @@ namespace pg
 	}
 	std::string to_string_p(uint32_t _Val)
 	{
-		void* p = (void*)_Val;
-		const auto _Len = static_cast<size_t>(_scprintf("%p", p));
+		uint64_t p = 0; p = _Val;
+		const auto _Len = static_cast<size_t>(_scprintf("%p", (void*)p));
 		std::string _Str(_Len, '\0');
-		sprintf_s(&_Str[0], _Len + 1, "%p", p);
+		sprintf_s(&_Str[0], _Len + 1, "%p", (void*)p);
 		return _Str;
 	}
 	std::string to_string_p(uint64_t _Val)
