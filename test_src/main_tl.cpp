@@ -277,73 +277,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 			aa.swap(c0);
 		}
 	}
-
-	hs += hz::ptHex(d, len < xlen ? len : xlen, 'X', ' ');
-	if (len < xlen) {
-		xlen -= len;
-		for (size_t i = 0; i < xlen; i++)
-		{
-			hs += "   ";
-		}
-	}
-	hs += "; " + aa + "\n";
-	ot += hs;
 }
-
-void draw_hex(plane_cx* p, cairo_t* cr, int dpx, const void* data, size_t size, size_t offset, size_t n)
-{
-	auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
-	uint32_t color = 0x80FF7373;// hz::get_themecolor();
-	auto st = get_defst(2);
-	cairo_as _ss_(cr);
-	cairo_translate(cr, dps.x, dps.y);
-	glm::vec4 rc = { 0,0,800,1000 };
-	draw_rect(cr, { -2.5,  -2.5,900 + 6,630 + 6 }, 0xf0121212, 0x80ffffff, 2, 1);
-	if (n < 16)n = 16;
-	std::string hstr;
-	bool n16 = size > UINT_MAX;
-	double xf = st->font_size * ((n16 ? 8 : 4) + 2);
-	int bn = st->font_size * 0.5;
-	int l16 = n16 ? 16 : 8;
-	l16 += 2;
-	for (size_t i = 0; i < l16; i++)
-	{
-		hstr.push_back(' ');
-	}
-	auto c = st->text_color;
-	st->text_color = 0xffEC967E;
-	auto nrc = rc;
-	for (size_t i = 0; i < n; i++)
-	{
-		auto bt = pg::to_string_hex(i) + " ";
-		nrc.x = (l16 + i * 3) * bn;
-		if (i < 16)nrc.x += 0.5 * bn;
-		draw_text(cr, p->ltx, bt.c_str(), bt.size(), nrc, st);
-	}
-	//cairo_translate(cr, xf, 0);
-	st->text_color = c;
-	//cairo_translate(cr, -xf, 0);
-	if (size > 0 && offset < size) {
-		std::string hexstr;
-		std::string hs;
-		hexstr.resize(16 * 2);
-		rc.y += 20;
-		auto pt = (char*)data + offset;
-		auto length = size - offset;
-		if (length > 2000)length = 2000;
-		auto last = length % n;
-		length /= n;
-		for (size_t i = 0; i < length; i++)
-		{
-			tohexstr(hs, pt, n, n, i * n, n16); pt += n;
-		}
-		if (last > 0)
-			tohexstr(hs, pt, last, n, length * n, n16);
-		//auto hs = hz::ptHex(pt, 16, 'X', ' ');
-		draw_text(cr, p->ltx, hs.c_str(), hs.size(), rc, st);
-	}
-}
-
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
@@ -630,8 +564,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				//hex_edit->set_pos({ { phex->text_rc[2].x,  phex->text_rc[2].y  } }); 
 				draw_draw_texts(dt);
 			}
-			auto& str = kc;
-			//draw_hex(p, cr, dpx, str.data(), str.size(), 0, 16);
+
 		};
 }
 
