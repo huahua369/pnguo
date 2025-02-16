@@ -11068,13 +11068,19 @@ void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, 
 }
 //glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 
-void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st)
+void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st, glm::ivec2* orc)
 {
 	glm::vec4 rc = text_rc;
 	ltx->tem_rtv.clear();
 	ltx->build_text(st->font, rc, st->text_align, str, len, st->font_size, ltx->tem_rtv);
 	ltx->update_text();
-
+	if (orc)
+	{
+		//if (orc->x > rc.z)
+		orc->x = rc.z;
+		//if (orc->y > rc.w)
+		orc->y = rc.w;
+	}
 	cairo_as _ss_(cr);
 	if (st->clip && text_rc.z > 0 && text_rc.w > 0) {
 		draw_rectangle(cr, text_rc, 0);
@@ -11120,12 +11126,29 @@ void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_st
 
 void draw_draw_texts(text_draw_t* p)
 {
+	glm::ivec2 r = {}, r0 = {};
 	if (!p || !p->cr || !p->st || !p->ltx || !p->color || !p->text || !p->text_rc || p->count < 1)return;
+	p->box_rc.x = p->text_rc[0].x;
+	p->box_rc.y = p->text_rc[0].y;
 	for (size_t i = 0; i < p->count; i++)
 	{
 		p->st->text_color = p->color[i];
-		draw_text(p->cr, p->ltx, p->text[i].c_str(), -1, p->text_rc[i], p->st);
+		draw_text(p->cr, p->ltx, p->text[i].c_str(), -1, p->text_rc[i], p->st, &r0);
+		auto x = p->text_rc[i].x;
+		auto y = p->text_rc[i].y;
+		if (x < p->box_rc.x)
+			p->box_rc.x = x;
+		if (y < p->box_rc.y)
+			p->box_rc.y = y;
+		r0.x += x;
+		r0.y += y;
+		if (p->box_rc.z < r0.x)
+			p->box_rc.z = r0.x;
+		if (p->box_rc.w < r0.y)
+			p->box_rc.w = r0.y;
+
 	}
+	return;
 }
 
 void clip_cr(cairo_t* cr, const glm::ivec4& clip)
@@ -24919,6 +24942,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	else
 	{
+		bool btn = !(t == devent_type_e::mouse_button_e && e->b->down == 0);// 弹起判断
 		int icc = 0;
 		auto length = event_wts.size();
 		for (size_t i = 0; i < length; i++)
@@ -24928,7 +24952,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 			if (!pw || !pw->visible || pw->_disabled_events)continue;
 			auto vpos = sps * pw->hscroll;
 			on_wpe(pw, type, ep, ppos + vpos);
-			if (ep->ret) {
+			if (ep->ret && btn) {
 				hpw = pw;
 				break;
 			}
@@ -24942,7 +24966,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 				if (!pw || !pw->visible || pw->_disabled_events)continue;
 				auto vpos = sps * pw->hscroll;
 				on_wpe(pw, type, ep, ppos + vpos);
-				if (ep->ret) {
+				if (ep->ret && btn) {
 					hpw = pw; break;
 				}
 			}
@@ -26872,16 +26896,19 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	{
 	case event_type2::on_click:
 	{
-		hover = true;
-		if (pts < 0) {
-			t_offset = 0;
+		if (!d_drag)
+		{
+			hover = true;
+			if (pts < 0) {
+				t_offset = 0;
+			}
+			if (pts > thumb_size_m.x) {
+				t_offset = thumb_size_m.x;
+			}
+			t_offset = thumb_size_m.x * 0.5;
+			set_posv(poss);
+			hover = false;
 		}
-		if (pts > thumb_size_m.x) {
-			t_offset = thumb_size_m.x;
-		}
-		t_offset = thumb_size_m.x * 0.5;
-		set_posv(poss);
-		hover = false;
 	}
 	break;
 	case event_type2::on_move:
@@ -26898,8 +26925,12 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 		scale_s = scale_s0.y;
 	}
 	break;
+	case event_type2::mouse_up:
+		hover = false;
+		break;
 	case event_type2::on_down:
 	{
+		d_drag = false;
 		t_offset = pts;
 		if (pts < 0 || pts > thumb_size_m.x)
 		{
@@ -26937,7 +26968,11 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	case event_type2::on_drag:
 	{
 		poss += curpos;
-		set_posv(poss);
+		if (hover)
+		{
+			set_posv(poss);
+			d_drag = true;
+		}
 	}
 	break;
 	default:

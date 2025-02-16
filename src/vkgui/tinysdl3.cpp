@@ -296,7 +296,9 @@ app_cx::app_cx()
 
 	fct = new Timer();
 	r2d = new render_2d();
-	int kr = SDL_Init(-1);
+	uint32_t f = -1;
+	f &= ~SDL_INIT_CAMERA; // 相机退出有bug
+	int kr = SDL_Init(f);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, false);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_TEXT, false);
 	auto ct = SDL_GetNumRenderDrivers();
@@ -522,7 +524,7 @@ void app_cx::call_cb(SDL_Event* e)
 	auto fwp = SDL_GetWindowFromID(e->window.windowID);
 	auto fw = (form_x*)pce::get_property(fwp, "form_x");
 	int rw = 0;
- 
+
 	if (e->type == SDL_EVENT_SYSTEM_THEME_CHANGED) {
 		auto st = SDL_GetSystemTheme();
 		printf("");
@@ -1214,10 +1216,11 @@ void form_x::trigger(uint32_t etype, void* e)
 	auto iptr = input_ptr;
 	lkecb.unlock();
 	et_un_t et = {};
+	et.form = this;
+	et.v.b = (mouse_button_et*)e;
+	bool btn = !(type == devent_type_e::mouse_button_e && et.v.b->down == 0);
 	do
 	{
-		et.form = this;
-		et.v.b = (mouse_button_et*)e;
 		if (type == devent_type_e::text_input_e || devent_type_e::text_editing_e == type)
 		{
 			if (iptr)
@@ -1236,13 +1239,13 @@ void form_x::trigger(uint32_t etype, void* e)
 			{
 				if (it->cb) {
 					it->cb((uint32_t)type, &et, it->ptr);
-					if (et.ret)
+					if (et.ret && btn)
 					{
 						break;
 					}
 				}
 			}
-			if (et.ret)
+			if (et.ret && btn)
 			{
 				break;
 			}
@@ -1252,12 +1255,12 @@ void form_x::trigger(uint32_t etype, void* e)
 			for (auto it = pt.rbegin(); it != pt.rend(); it++)
 			{
 				(*it)->on_event((uint32_t)type, &et);
-				if (et.ret)
+				if (et.ret && btn)
 				{
 					break;
 				}
 			}
-			if (et.ret)
+			if (et.ret && btn)
 			{
 				break;
 			}

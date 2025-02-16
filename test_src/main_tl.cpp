@@ -446,7 +446,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	hex_edit->visible = false;
 	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
 	hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
-	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x * 1.5, 0);
+	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x, 0);
 	static int stt = 0;
 	mmcb = [=](void* p, int type, int id) {
 		if (id > 0)return;
@@ -511,7 +511,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				{
 					for (auto& str : ftns)
 					{
-						draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
+						//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
 						rc.x += 300;
 					}
 					return;
@@ -563,6 +563,9 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[6] = 0xff107c10;	// 数据检查器相关信息
 				//hex_edit->set_pos({ { phex->text_rc[2].x,  phex->text_rc[2].y  } }); 
 				draw_draw_texts(dt);
+
+				if (dt->box_rc.z != hex_scroll.h->_content_size)
+					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);
 			}
 
 		};

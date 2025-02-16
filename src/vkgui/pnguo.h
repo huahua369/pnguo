@@ -1967,6 +1967,7 @@ struct scroll_bar :public widget_base
 	bool hideble = 0;			// 隐藏滚动条
 	bool limit = 1;				// 是否限制在滚动范围
 	bool valid = 1;				// 是否重新渲染
+	bool d_drag = 0;
 private:
 	int64_t _offset = 0;			// 偏移量
 	int64_t c_offset = 0;			// 内容偏移量
@@ -1993,6 +1994,7 @@ struct text_draw_t
 	uint32_t* color;
 	int count = 0;
 	text_style_t* st;
+	glm::vec4 box_rc;
 };
 
 // 16进制编辑
@@ -2403,7 +2405,7 @@ void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, 
 
 void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth);
 //glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
-void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st);
+void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st, glm::ivec2* orc = 0);
 
 
 enum class eg_e :uint32_t {
