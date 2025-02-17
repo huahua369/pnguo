@@ -192,6 +192,11 @@ public:
 	vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c);
 	vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4  c);
 };
+struct tex9Grid {
+	glm::vec4 srcrect, dstrect; 
+	float left_width,  right_width,  top_height,  bottom_height,  scale;
+};
+
 
 
 // 简易stb_image加载
@@ -2134,7 +2139,7 @@ struct drag_v6
 };
 struct scroll2_t
 {
-	scroll_bar* h = 0,	// 水平
+	scroll_bar* h = 0,		// 水平
 		* v = 0;			// 垂直
 };
 // 面板，继承图集

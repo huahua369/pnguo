@@ -306,6 +306,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 		p->set_scroll(width, rcw, { 4, 4 }, { 2 * 0,0 }, { 0,2 * 0 });
 		//p->set_scroll_hide(0);
 		p->set_view(size, cview);
+		p->vertical->hover_sc = false;
+		p->vertical->has_hover_sc = false;
 	}
 	size.y -= 50;
 	size.x -= 50 * 10;
@@ -447,6 +449,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
 	hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
 	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x, 0);
+	hex_scroll.v->has_hover_sc = true;
+	hex_scroll.v->hover_sc = true;
 	static int stt = 0;
 	mmcb = [=](void* p, int type, int id) {
 		if (id > 0)return;

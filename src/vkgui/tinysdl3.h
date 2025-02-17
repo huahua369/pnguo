@@ -143,7 +143,9 @@ public:
 	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
 	struct tex_rs {
 		SDL_Texture* tex = 0;
-		glm::vec4 src = {}, dst = {};
+		glm::vec4 src = {}, dst = {}; 
+		float scale = 0.0f;					// Tiled、9Grid
+		float left_width, right_width, top_height, bottom_height; 
 	};
 	std::vector<tex_rs> textures[2];		// 纹理渲染列表,0是背景，1是前景
 	glm::ivec4 skelet_viewport = {};

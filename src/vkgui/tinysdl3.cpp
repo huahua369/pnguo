@@ -1945,7 +1945,7 @@ void form_x::present()
 			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 		}
 	}
-	{
+	if (!skeletons.empty()) {
 
 		if (skelet_viewport.z > 0 && skelet_viewport.w > 0)
 			SDL_SetRenderViewport(renderer, (SDL_Rect*)&skelet_viewport);
@@ -1979,7 +1979,19 @@ void form_x::present()
 			auto& it = ktd[i];
 			auto src = it.src.w > 0 && it.src.z > 0 ? &it.src : nullptr;
 			auto dst = it.dst.w > 0 && it.dst.z > 0 ? &it.dst : nullptr;
-			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
+			if (it.scale > 0)
+			{
+				if (it.left_width > 0 && it.right_width > 0 && it.top_height > 0 && it.bottom_height)
+				{
+					SDL_RenderTexture9Grid(renderer, it.tex, (SDL_FRect*)src, it.left_width, it.right_width, it.top_height, it.bottom_height, it.scale, (SDL_FRect*)dst);
+				}
+				else {
+					SDL_RenderTextureTiled(renderer, it.tex, (SDL_FRect*)src, it.scale, (SDL_FRect*)dst);
+				}
+			}
+			else {
+				SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
+			}
 		}
 	}
 #endif
