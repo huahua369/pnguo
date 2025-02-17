@@ -297,7 +297,7 @@ app_cx::app_cx()
 	fct = new Timer();
 	r2d = new render_2d();
 	uint32_t f = -1;
-	f &= ~SDL_INIT_CAMERA; // 相机退出有bug
+	//f &= ~SDL_INIT_CAMERA; // 相机退出有bug
 	int kr = SDL_Init(f);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, false);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_TEXT, false);
