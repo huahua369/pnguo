@@ -597,6 +597,8 @@ int main()
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto app = new_app();
 	do_text(fontn, 0, strlen(fontn));
+	 
+
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu
 	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan | ef_resizable));//ef_gpuef_dx11| ef_vsync

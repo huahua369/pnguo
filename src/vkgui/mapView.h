@@ -213,7 +213,7 @@ namespace hz
 	std::string get_temp_path();
 	std::string genfn(std::string fn);
 
-	int browse_openfile(const std::string& title, const std::string& strCurrentPath, std::string filter, HWND hWnd
+	int browse_openfile(const std::string& title, const std::string& strCurrentPath, std::string filter, void* hWnd
 		, std::function<void(const std::vector<std::string>&)> rfunc, int n = 10);
 	int browse_folder(const std::string& strCurrentPath, std::function<void(const std::string&)> rfunc, const std::string& title = "");
 	int browse_folder(const std::string& strCurrentPath, const std::string& title, std::function<void(const std::string&)> rfunc);

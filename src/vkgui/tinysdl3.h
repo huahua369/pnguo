@@ -9,6 +9,7 @@
 #include <set>
 #include <mutex>
 #include <queue>
+#ifndef SDL_render_h_
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -23,6 +24,8 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+#endif
+
 #ifndef BIT_INC
 #define BIT_INC(x) (1<<x)
 #endif
@@ -79,7 +82,7 @@ public:
 	int _fps = 60;
 	int c_fps = 60;
 	int fms = 0;
-	bool nc_down = 0; 
+	bool nc_down = 0;
 public:
 	app_cx();
 	~app_cx();
@@ -143,9 +146,9 @@ public:
 	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
 	struct tex_rs {
 		SDL_Texture* tex = 0;
-		glm::vec4 src = {}, dst = {}; 
+		glm::vec4 src = {}, dst = {};
 		float scale = 0.0f;					// Tiled、9Grid
-		float left_width, right_width, top_height, bottom_height; 
+		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
 	};
 	std::vector<tex_rs> textures[2];		// 纹理渲染列表,0是背景，1是前景
 	glm::ivec4 skelet_viewport = {};

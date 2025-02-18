@@ -4,6 +4,7 @@ set(vkgui_src
 "mapView.cpp"
 "tinysdl3.cpp"
 "pnguo.cpp"
+"mnet.cpp"
 "buffer.cpp"
 "win_core.cpp" 
 "page.cpp"  

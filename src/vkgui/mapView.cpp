@@ -1576,7 +1576,7 @@ namespace hz
 	}
 #define BrowseForFolder browse_folder
 
-	int browse_openfile(const std::string& title, const std::string& strCurrentPath, std::string filter, HWND hWnd
+	int browse_openfile(const std::string& title, const std::string& strCurrentPath, std::string filter, void* hWnd
 		, std::function<void(const std::vector<std::string>&)> rfunc, int n)
 	{
 #ifdef _WIN32
@@ -1593,7 +1593,7 @@ namespace hz
 		//初始化  
 		ZeroMemory(&opfn, sizeof(OPENFILENAME));
 		opfn.lStructSize = sizeof(OPENFILENAME);//结构体大小  
-		opfn.hwndOwner = hWnd;
+		opfn.hwndOwner = (HWND)hWnd;
 
 		//设置过滤  
 		opfn.lpstrFilter = filter.size() ? filter.c_str() : "所有文件\0*.*\0\0文本文件\0*.txt\0";
