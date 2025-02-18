@@ -170,7 +170,6 @@ namespace hz {
 
 	net_cache_cx::net_cache_cx()
 	{
-		set_dir("mtl");
 	}
 
 	net_cache_cx::~net_cache_cx()
@@ -212,7 +211,8 @@ namespace hz {
 				}
 			}
 			mcurl_cx fbg;
-			fbg.downLoad(1, fn);
+			if (mcount < 1)mcount = 1;
+			fbg.downLoad(mcount, fn);
 			if (cb && fbg.data.size() > 2)
 			{
 				if (cb(fbg.data.data(), fbg.data.size(), ptr))

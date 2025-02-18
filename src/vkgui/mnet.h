@@ -36,9 +36,12 @@ namespace hz {
 	private:
 		std::string tp;
 		std::map<std::string, std::string> mu;
+		// 分段数量
+		int mcount = 1;
 	public:
 		net_cache_cx();
 		~net_cache_cx();
+		// 设置缓存目录
 		void set_dir(const std::string& name);
 		// cb返回true则缓存到临时文件
 		void load_uri_file(const std::string& fn, void* ptr, bool(*cb)(char* data, int len, void* ptr));
