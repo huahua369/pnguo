@@ -19504,22 +19504,12 @@ const char* font_rctx::get_family_alias(int idx)
 }
 
 const char* font_rctx::get_family_full(int idx)
-{
-	std::string* r = 0;
+{ 
 	if (idx >= 0 && idx < fyvs.size())
 	{
 		return fyvs[idx]->fullname.c_str();
 	}
-	return "";
-	//for (auto& [k, v] : fyv) {
-	//	if (idx == 0)
-	//	{
-	//		r = &v.fullname;
-	//		break;
-	//	}
-	//	idx--;
-	//}
-	//return r ? r->c_str() : nullptr;
+	return ""; 
 }
 
 const char* font_rctx::get_family_style(int idx, int stidx)
