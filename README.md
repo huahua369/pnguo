@@ -20,7 +20,7 @@ git pull --depth 1 --allow-unrelated-histories
 2. CMakeLists.txt可修改编译SDL3参数，SDL目录的vcxproj、sln建议删掉，本代码依赖库为静态库，如要改成引用动态库则改txt前面set(VCPKG_TARGET_TRIPLET x64-windows)
 3. vcpkg安装依赖库，根据错误提示安装需要的库
 4. 渲染器依赖```vcpkg install pkgconf tinygltf glm stb nlohmann-json vulkan```
-5. 可选参考```vcpkg install pkgconf openssl tinygltf glm stb nlohmann-json vulkan zlib pango cairo fontconfig harfbuzz exprtk clipper2 librsvg entt```
+5. 可选参考```vcpkg install pkgconf openssl tinygltf glm stb nlohmann-json vulkan zlib cairo fontconfig harfbuzz exprtk clipper2 librsvg entt```
  
 
 ## To Do 

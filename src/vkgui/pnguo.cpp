@@ -71,8 +71,8 @@ extern "C" {
 #ifndef NO_SVG
 #include <librsvg/rsvg.h>
 #endif
-#include <pango/pango-layout.h>
-#include <pango/pangocairo.h>
+	//#include <pango/pango-layout.h>
+	//#include <pango/pangocairo.h>
 
 #ifdef __cplusplus
 }
@@ -12625,7 +12625,7 @@ struct pl {
 };
 
 #endif
-
+#if 0
 class layout_px
 {
 public:
@@ -12697,6 +12697,7 @@ layout_px create_pango_layout(const char* str, int fs)
 	r.layout = layout;
 	return r;
 }
+#endif
 void draw_text(cairo_t* cr, const void* str, const glm::vec2& pos, font_xi* fx)
 {
 	cairo_save(cr);
@@ -13482,6 +13483,7 @@ cairo_surface_t* Ruler::draw_label(cairo_t* cr_in, const std::string& label_valu
 	bool rotate = _orientation != orientation_horizontal;
 	//Glib::RefPtr<Pango::Layout> layout = create_pango_layout(std::to_string(label_value));
 	auto surface_in = cairo_get_target(cr_in);
+#if 0
 	auto ly = create_pango_layout(/*cr_in,*/ label_value.c_str(), _font_size);
 	auto layout = &ly;
 	int text_width = ts.x;
@@ -13509,6 +13511,8 @@ cairo_surface_t* Ruler::draw_label(cairo_t* cr_in, const std::string& label_valu
 	cairo_surface_write_to_png(surface, "surface_label.png");
 	cairo_destroy(cr);
 	return surface;
+#endif
+	return 0;
 }
 void Ruler::draw_marker(cairo_t* cr)
 {
@@ -14154,7 +14158,7 @@ void view_g::update(float)
 #if 1
 
 
-
+#if 0
 char const* sp_font_description_get_family(PangoFontDescription const* fontDescr)
 {
 	static auto const fontNameMap = std::map<std::string, std::string>{
@@ -14174,7 +14178,7 @@ char const* sp_font_description_get_family(PangoFontDescription const* fontDescr
 	return pangoFamily;
 }
 
-
+#endif
 
 
 #ifndef NO_FONT_CX 
@@ -14210,11 +14214,11 @@ std::vector<std::string> get_name_idx(hb_face_t* face, int idx, const std::strin
 	}
 	return r;
 }
-std::string get_pat_str(FcPattern* font, const char* o)
+std::string get_pat_str(FcPattern* font, const char* o, int n)
 {
 	FcChar8* s = nullptr;
 	std::string r;
-	if (o && ::FcPatternGetString(font, o, 0, &s) == FcResultMatch)
+	if (o && ::FcPatternGetString(font, o, n, &s) == FcResultMatch)
 	{
 		if (s)
 		{
@@ -14222,6 +14226,24 @@ std::string get_pat_str(FcPattern* font, const char* o)
 		}
 	}
 	return r;
+}
+std::vector<std::string> get_pat_strs(FcPattern* font, const char* o)
+{
+	std::vector<std::string> rv;
+	FcChar8* s = nullptr;
+	int n = 0;
+	do {
+		if (o && ::FcPatternGetString(font, o, n, &s) == FcResultMatch)
+		{
+			if (s)
+			{
+				rv.push_back((char*)s);
+			}
+		}
+		else { break; }
+		n++;
+	} while (1);
+	return rv;
 }
 int get_pat_int(FcPattern* font, const char* o)
 {
@@ -14243,8 +14265,9 @@ std::map<std::string, fontns> get_allfont()
 {
 	int r = 0;
 	std::map<std::string, fontns> fyv;
-	PangoFontFamily** families = 0;
 	int nfamilies = 0;
+#if 0
+	PangoFontFamily** families = 0;
 	PangoFontMap* fontmap = get_fmap;
 	pango_font_map_list_families(fontmap, &families, &nfamilies);
 
@@ -14284,11 +14307,11 @@ std::map<std::string, fontns> get_allfont()
 		if (name4.size())
 			kt.fullname = name4[0];
 	}
-
 	if (context)
 	{
 		g_object_unref(context); context = 0;
 	}
+#endif
 	if (FcInit()) {
 		{
 			//std::string yourFontFilePath = "seguiemj.ttf";
@@ -14302,7 +14325,7 @@ std::map<std::string, fontns> get_allfont()
 		//	FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
 		//}
 		FcPattern* pat = ::FcPatternCreate();
-		FcObjectSet* os = ::FcObjectSetBuild(FC_FILE, FC_FULLNAME, FC_FAMILY, FC_STYLE, FC_CHARSET, FC_WIDTH, (char*)0);
+		FcObjectSet* os = ::FcObjectSetBuild(FC_FILE, FC_FULLNAME, FC_FAMILY, FC_STYLE, FC_CHARSET, FC_WIDTH, FC_LANG, (char*)0);
 		FcFontSet* fs = ::FcFontList(0, pat, os);
 		for (size_t i = 0; i < fs->nfont; ++i) {
 			FcPattern* font = fs->fonts[i];
@@ -14310,10 +14333,12 @@ std::map<std::string, fontns> get_allfont()
 			FcChar8* family0 = nullptr;
 			FcChar8* fp = nullptr;
 			FcChar8* style = nullptr;
+			auto lang = get_pat_int(font, FC_LANG);
 			auto w = get_pat_int(font, FC_WIDTH);
-			auto ct = get_pat_str(font, FC_CHARSET);
-			auto fullname = get_pat_str(font, FC_FULLNAME);
-			auto fph = get_pat_str(font, FC_FILE);
+			auto ct = get_pat_str(font, FC_CHARSET, 0);
+			auto fullname = get_pat_str(font, FC_FULLNAME, 0);
+			auto fph = get_pat_str(font, FC_FILE, 0);
+
 			if (fph.size())
 			{
 				auto ttf = fph.rfind(".ttf");
@@ -14321,13 +14346,19 @@ std::map<std::string, fontns> get_allfont()
 				auto otf = fph.rfind(".otf");
 				if (ttf != std::string::npos || ttc != std::string::npos || otf != std::string::npos) {
 
-					auto family = get_pat_str(font, FC_FAMILY);
-					auto style = get_pat_str(font, FC_STYLE);
+					auto family = get_pat_str(font, FC_FAMILY, 0);
+					auto familys = get_pat_strs(font, FC_FAMILY);
+					auto fullnames = get_pat_strs(font, FC_FULLNAME);
+					auto style = get_pat_str(font, FC_STYLE, 0);
 					if (family.size() && style.size())
 					{
 						auto& kt = fyv[family];
 						kt.fpath.push_back(fph);
 						kt.family = family;
+						for (auto it : familys)
+							kt.alias.insert(it);
+						if (family == "NSimSun")
+							family = family;
 						if (kt.fullname.empty())
 							kt.fullname = fullname;
 						kt.style.push_back(style);
@@ -19539,7 +19570,8 @@ font_t* font_rctx::get_mk(fontns& v, size_t st)
 		auto pv = imp->add_font_file(v.fpath[st], 0);
 		for (auto it : pv)
 		{
-			if ((vn == it->_name || v.fullname == it->fullname) && it->_style.find(stn) != std::string::npos)
+			bool hasa = v.alias.find(it->_name) != v.alias.end();
+			if ((hasa || vn == it->_name || v.fullname == it->fullname) && it->_style.find(stn) != std::string::npos)
 			{
 				r = it;
 				r->ctx = &bcc;

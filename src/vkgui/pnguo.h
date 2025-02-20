@@ -28,7 +28,7 @@ todo 基础组件
 #include <string>
 #include <functional>
 
-typedef struct _PangoContext PangoContext;
+//typedef struct _PangoContext PangoContext;
 struct input_state_t;
 
 #ifndef BIT_INC
