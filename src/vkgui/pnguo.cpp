@@ -24806,7 +24806,11 @@ void plane_cx::on_button(int idx, int down, const glm::vec2& pos, int clicks, in
 					ckinc++;
 				}
 				if (on_click)
-					on_click(this, down, ckinc, ps);	// 执行单击事件
+				{
+					plane_ev e = {};
+					e.p = this; e.down = down; e.clicks = clicks; e.mpos = ps;
+					on_click(&e);	// 执行单击事件
+				}
 			}
 			ckup = 1;
 		}

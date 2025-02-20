@@ -29,7 +29,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	p->draggable = true; //可拖动
 	p->set_size({ 320,660 });
 	p->set_pos({ 1000,100 });
-	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& pos) {};
+	p->on_click = [](plane_ev* e) {};
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -44,7 +44,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
 	if (vkd)
 	{
-		std::vector<bool*> bps = { &vkd->state.bUseTAA, &vkd->state.bDrawLightFrustum, &vkd->state.bDrawBoundingBoxes, &vkd->state.bShowMilliseconds };
+		std::vector<bool*> bps = { &vkd->_state.bUseTAA, &vkd->_state.bDrawLightFrustum, &vkd->_state.bDrawBoundingBoxes, &vkd->_state.bShowMilliseconds };
 		for (size_t i = 0; i < boolstr.size(); i++)
 		{
 			auto& it = boolstr[i];
@@ -165,7 +165,7 @@ void show_cpuinfo(form_x* form0)
 	p->draggable = true; //可拖动
 	p->set_size({ 420,660 });
 	p->set_pos({ 100,100 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->on_click = [](plane_ev* e) {};
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -232,6 +232,7 @@ struct belt_t
 	belt_t* link_ptr = 0;	// 尾部连接
 	size_t link_idx = 0;		// 连接位置
 };
+// 传送带
 class belt_cx
 {
 public:
@@ -313,7 +314,7 @@ void show_belt(form_x* form0)
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 30,50 });
-	p->on_click = [](plane_cx* p, int state, int clicks) {};
+	p->on_click = [](plane_ev* e) {};
 	p->fontsize = 16;
 
 	size.y -= 50;
@@ -460,17 +461,17 @@ int main()
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
 		//vkd->state.SelectedTonemapperIndex = 1;
-		vkd->state.Exposure = 0.59928;
-		vkd->state.EmissiveFactor = 250;
+		vkd->_state.Exposure = 0.59928;
+		vkd->_state.EmissiveFactor = 250;
 		new_ui(form0, vkd);
 		if (texok)
 		{
 			form0->up_cb = [=](float delta, int* ret)
 				{
 					auto light = vkd->get_light(0);
-					vkd->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-					vkd->state.Exposure;				// 曝光度：默认1.0
-					vkd->state.bUseTAA;
+					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+					vkd->_state.Exposure;				// 曝光度：默认1.0
+					vkd->_state.bUseTAA;
 					vkd->update(form0->io);	// 更新事件
 					vkd->on_render();		// 执行渲染
 				};

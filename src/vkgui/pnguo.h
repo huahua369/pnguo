@@ -193,8 +193,8 @@ public:
 	vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4  c);
 };
 struct tex9Grid {
-	glm::vec4 srcrect, dstrect; 
-	float left_width,  right_width,  top_height,  bottom_height,  scale;
+	glm::vec4 srcrect, dstrect;
+	float left_width, right_width, top_height, bottom_height, scale;
 };
 
 
@@ -2142,6 +2142,13 @@ struct scroll2_t
 	scroll_bar* h = 0,		// 水平
 		* v = 0;			// 垂直
 };
+struct plane_ev
+{
+	plane_cx* p;
+	int down;		// 是否按下
+	int clicks;		// 单击次数
+	glm::ivec2 mpos;// 鼠标坐标
+};
 // 面板，继承图集
 class plane_cx :public canvas_atlas
 {
@@ -2150,8 +2157,8 @@ public:
 	atlas_t* _pat = 0;			// 渲染面板背景
 	form_x* form = 0;			// 绑定的窗口 
 	layout_text_x* ltx = 0;		// 文本渲染管理
-	std::function<void(plane_cx* p, int down, int clicks, const glm::ivec2& mpos)> on_click;
-	std::function<void(plane_cx* p, int down, int clicks, const glm::ivec2& mpos)> on_click_outer;//模态窗口点中外围时
+	std::function<void(plane_ev* e)> on_click;
+	std::function<void(plane_ev* e)> on_click_outer;//模态窗口点中外围时
 	std::function<void(cairo_t* cr, const glm::vec2& scroll)> draw_back_cb, draw_front_cb;
 	std::function<bool(float delta)> update_cb;
 	std::vector<widget_base*> widgets, event_wts, event_wts1;

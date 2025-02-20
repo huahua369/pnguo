@@ -297,7 +297,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->set_size(size);
 	p->set_pos({ 1,30 });
 	p->set_select_box(2, 0.012);
-	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
+	p->on_click = [](plane_ev* e) {};
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -470,12 +470,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 			}
 		}
 		};
-	p->on_click = [=](plane_cx* p, int down, int clicks, const glm::ivec2& mpos)
+	p->on_click = [=](plane_ev* e)
 		{
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
 			auto dgp = p->get_dragv6(dpx);
 			dgp->size.x = -1;
-			glm::ivec2 scpos = mpos - p->tpos;// 减去本面板坐标
+			glm::ivec2 scpos = e->mpos - p->tpos;// 减去本面板坐标
 			scpos -= (glm::ivec2)dps;
 			printf("old click:%d\t%d\n", scpos.x, scpos.y);
 			auto vps = hex_scroll.v->get_offset_ns();
