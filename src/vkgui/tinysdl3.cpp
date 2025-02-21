@@ -2576,10 +2576,162 @@ bool form_x::has_variable()
 #endif
 
 // cpu信息
+#include <hwloc.h>
 
+#ifdef _WIN32
+typedef BOOL(WINAPI* LPFN_GLPI)(
+	PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
+	PDWORD);
+
+
+// Helper function to count set bits in the processor mask.
+DWORD CountSetBits(ULONG_PTR bitMask)
+{
+	DWORD LSHIFT = sizeof(ULONG_PTR) * 8 - 1;
+	DWORD bitSetCount = 0;
+	ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
+	DWORD i;
+
+	for (i = 0; i <= LSHIFT; ++i)
+	{
+		bitSetCount += ((bitMask & bitTest) ? 1 : 0);
+		bitTest /= 2;
+	}
+
+	return bitSetCount;
+}
+#endif
+
+
+int get_cpus(cpuinfo_t* lct) {
+
+#ifdef _WIN32
+	LPFN_GLPI glpi;
+	BOOL done = FALSE;
+	PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
+	PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = NULL;
+	DWORD returnLength = 0;
+	DWORD logicalProcessorCount = 0;
+	DWORD numaNodeCount = 0;
+	DWORD processorCoreCount = 0;
+	DWORD processorPackageCount = 0;
+	DWORD byteOffset = 0;
+	PCACHE_DESCRIPTOR Cache;
+	std::vector<char> dt;
+	glpi = (LPFN_GLPI)GetProcAddress(
+		GetModuleHandle(TEXT("kernel32")),
+		"GetLogicalProcessorInformation");
+	if (NULL == glpi)
+	{
+		printf(TEXT("\nGetLogicalProcessorInformation is not supported.\n"));
+		return -1;
+	}
+	while (!done)
+	{
+		DWORD rc = glpi(buffer, &returnLength);
+		if (FALSE == rc)
+		{
+			if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+			{
+				dt.resize(returnLength);
+				buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)dt.data();
+				if (NULL == buffer)
+				{
+					printf(TEXT("\nError: Allocation failure\n"));
+					return (2);
+				}
+			}
+			else
+			{
+				printf(TEXT("\nError %d\n"), GetLastError());
+				return (3);
+			}
+		}
+		else
+		{
+			done = TRUE;
+		}
+	}
+
+	ptr = buffer;
+	glm::ivec3 lc[6] = {};
+	while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength && ptr)
+	{
+		switch (ptr->Relationship)
+		{
+		case RelationProcessorCore:
+		{
+			processorCoreCount++;
+			// A hyperthreaded core supplies more than one logical processor.
+			logicalProcessorCount += CountSetBits(ptr->ProcessorMask);
+		}
+		break;
+		case RelationNumaNode:
+			// Non-NUMA systems report a single record of this type.
+			numaNodeCount++;
+			break;
+		case RelationCache:
+			// Cache data is in ptr->Cache, one CACHE_DESCRIPTOR structure for each cache. 
+			Cache = &ptr->Cache;
+			lc[Cache->Level].x += Cache->Size;
+			lc[Cache->Level].y++;
+			lc[Cache->Level].z = Cache->Size;
+			break;
+		case RelationProcessorPackage:
+			// Logical processors share a physical package.
+			processorPackageCount++;
+			break;
+		default:
+			printf(TEXT("\nError: Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.\n"));
+			break;
+		}
+		byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+		ptr++;
+	}
+
+	int r = 0;
+	if (lct)
+	{
+		lct->numaNodeCount = numaNodeCount;
+		lct->processorPackageCount = processorPackageCount;
+		lct->processorCoreCount = processorCoreCount;
+		lct->NumLogicalCPUCores = logicalProcessorCount;
+		auto pt = lct->cache;
+		for (size_t i = 0; i < 6; i++)
+		{
+			if (lc[i].z > 0) {
+				*pt = lc[i]; r++; pt++;
+			}
+		}
+		lct->count = r;
+	}
+#endif
+	return 0;
+
+}
 cpuinfo_t get_cpuinfo()
 {
 	cpuinfo_t r = {};
+	hwloc_topology_t topology = {};
+	hwloc_topology_init(&topology);      // 初始化拓扑结构 
+	hwloc_topology_load(topology);       // 加载硬件信息 
+
+	// 遍历所有缓存对象 
+	hwloc_obj_t cache, obj;
+	int levels = 0;
+	std::vector<glm::i64vec2> lc;
+	for (obj = hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, 0); obj; obj = obj->parent)
+	{
+		int size = 0;
+		if (hwloc_obj_type_is_cache(obj->type)) {
+			levels++;
+			lc.push_back({ obj->attr->cache.size, obj->attr->cache.linesize });
+			printf("*** L%d caches %lluKB\n", levels, obj->attr->cache.size / 1024);
+		}
+	}
+	hwloc_topology_destroy(topology);    // 释放资源 
+
+	auto nn = get_cpus(&r);
 	r.NumLogicalCPUCores = SDL_GetNumLogicalCPUCores();
 	r.CPUCacheLineSize = SDL_GetCPUCacheLineSize();
 	r.SystemRAM = SDL_GetSystemRAM();

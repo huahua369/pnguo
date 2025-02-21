@@ -596,6 +596,7 @@ int main()
 #endif    
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto app = new_app();
+	cpuinfo_t cpuinfo = get_cpuinfo();
 	//do_text(fontn, 0, strlen(fontn)); 
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu

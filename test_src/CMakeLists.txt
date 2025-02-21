@@ -70,13 +70,15 @@ find_package(Libssh2 CONFIG REQUIRED)
  
 find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
- find_package(CURL REQUIRED)
+find_package(CURL REQUIRED)
+pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
 set(lklib)
 list(APPEND lklib  
     ZLIB::ZLIB
     Vulkan::Vulkan 
     Vulkan::Headers GPUOpen::VulkanMemoryAllocator
     PkgConfig::LIBRSVG
+    PkgConfig::hwloc
     glm::glm-header-only
     nlohmann_json::nlohmann_json
     OpenSSL::SSL OpenSSL::Crypto
@@ -90,6 +92,7 @@ list(APPEND lklib
     tpv
     libssh2::libssh2
     CURL::libcurl
+    
     #$<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
    # rdx12
    # unofficial::joltphysics::Jolt

@@ -347,9 +347,16 @@ enum class cdtype_e :uint32_t
 	new_app,		//创建应用实例
 	new_form,		//创建窗口
 };
+
+
 struct cpuinfo_t
 {
-	int NumLogicalCPUCores;
+	glm::ivec3 cache[6];		// x缓存总字节、y缓存数量、z单个缓存字节
+	int count;					// L缓存数
+	int numaNodeCount;			// NUMA节点数
+	int processorPackageCount;	// 物理处理器封装数量
+	int processorCoreCount;		// 内核
+	int NumLogicalCPUCores;		// 逻辑处理器
 	int CPUCacheLineSize;
 	int SystemRAM;
 	size_t SIMDAlignment;
@@ -368,6 +375,7 @@ struct cpuinfo_t
 	bool LSX;
 	bool LASX;
 };
+
 // 获取CPU信息
 cpuinfo_t get_cpuinfo();
 
