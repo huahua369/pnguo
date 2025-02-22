@@ -558,13 +558,13 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->text_rc[5] = { dataps, MARGIN ,RULER_DI_WIDTH, height }; // dititle 
 				dataps += DATA_INSPECTOR_TITLE_WIDTH;
 				phex->text_rc[6] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // data_inspector 
-				phex->color[0] = 0xfffb8f71;	// 标尺
+				phex->color[0] = 0xffff783b;	//0xfffb8f71;	// 标尺
 				phex->color[1] = 0xff999999;	// 行号
 				phex->color[2] = 0xffeeeeee;	// 16进制数据
 				phex->color[3] = 0xffeeeeee;	// 解码文件
 				phex->color[4] = 0xff999999;	// 数据检查器字段头
 				phex->color[5] = -1;			// 数据检查器标题
-				phex->color[6] = 0xff107c10;	// 数据检查器相关信息
+				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息
 				//hex_edit->set_pos({ { phex->text_rc[2].x,  phex->text_rc[2].y  } }); 
 				draw_draw_texts(dt);
 
