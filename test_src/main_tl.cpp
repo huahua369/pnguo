@@ -564,10 +564,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[3] = 0xffeeeeee;	// 解码文件
 				phex->color[4] = 0xff999999;	// 数据检查器字段头
 				phex->color[5] = -1;			// 数据检查器标题
-				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息
-				//hex_edit->set_pos({ { phex->text_rc[2].x,  phex->text_rc[2].y  } }); 
-				draw_draw_texts(dt);
-
+				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
+				draw_draw_texts(dt); 
 				if (dt->box_rc.z != hex_scroll.h->_content_size)
 					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);
 			}
