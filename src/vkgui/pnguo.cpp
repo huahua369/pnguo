@@ -29548,7 +29548,7 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 			std::swap(range2.x, range2.y);
 		}
 	}
-	printf("onm\t%d\n", ost);
+	//printf("onm\t%d\n", ost);
 	return;
 }
 
@@ -29651,6 +29651,10 @@ bool hex_editor::update_hex_editor()
 			decoded_text.push_back('\n');
 		}
 		line_number_n = lnw;
+		// 生成选中背景矩形
+		if (range2.x != range2.y && line_height > 0 && char_width > 0) {
+
+		}
 	}
 	return true;
 }

@@ -2019,13 +2019,14 @@ public:
 	int64_t acount = 0;				// 行数量
 	glm::i64vec2 range = {};		// 选中范围
 	glm::i64vec2 range2 = {};		// 选中范围,从小到大
+	glm::ivec2 range_c1 = {};		// 选中范围,从小到大,当前视图位置
 	glm::vec4 text_rc[7] = {};		// 渲染区域
 	uint32_t color[7] = {};			// 渲染颜色
 private:
 	unsigned char* _data = 0;
 	size_t _size = 0;
 	int64_t count = 0;				// 当前显示行数量
-	size_t line_offset = 0;			// 当前行偏移
+	size_t line_offset = 0;			// 当前行的偏移
 	glm::ivec2 view_size = { 600,1080 }; // 视图高 
 	text_draw_t tdt = {};
 private:
