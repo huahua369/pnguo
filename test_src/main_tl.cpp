@@ -407,8 +407,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 	nhs.y -= width;
 	auto st = get_defst(1);
 	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
-	hex.font_size = fl;
-	hex.set_size(nhs);
+	hex.set_linechar(fl, p->ltx->get_text_rect1(st->font, st->font_size, "x").x);
+	hex.set_view_size(nhs);
 	//{
 	//	print_time aak("load file");
 	//	if (hex.set_file(R"(E:\迅雷下载\g\tenoke-romance.of.the.three.kingdoms.8.remake.iso)", true))
@@ -472,18 +472,23 @@ void show_ui(form_x* form0, menu_cx* gm)
 		};
 	p->on_click = [=](plane_ev* e)
 		{
-			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
-			auto dgp = p->get_dragv6(dpx);
-			dgp->size.x = -1;
-			glm::ivec2 scpos = e->mpos - p->tpos;// 减去本面板坐标
-			scpos -= (glm::ivec2)dps;
-			printf("old click:%d\t%d\n", scpos.x, scpos.y);
-			auto vps = hex_scroll.v->get_offset_ns();
-			auto hps = hex_scroll.h->get_offset_ns();
-			scpos.x += hps;
-			scpos.y += vps;
-			scpos -= (glm::ivec2)hex.text_rc[2];
-			printf("click:%d\t%d\n", scpos.x, scpos.y);
+			if (e->down)
+			{
+				auto phex = &hex;
+				auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
+				auto dgp = p->get_dragv6(dpx);
+				dgp->size.x = -1;
+				glm::ivec2 scpos = e->mpos - p->tpos;// 减去本面板坐标
+				scpos -= (glm::ivec2)dps;
+				printf("old click:%d\t%d\n", scpos.x, scpos.y);
+				auto vps = hex_scroll.v->get_offset_ns();
+				auto hps = hex_scroll.h->get_offset_ns();
+				scpos -= (glm::ivec2)phex->text_rc[2];
+				phex->on_mouse(e->clicks, scpos, hps, vps);
+				scpos.x += hps;
+				scpos.y += vps;
+				printf("click:%d\t%d\n", scpos.x, scpos.y);
+			}
 
 		};
 	p->update_cb = [=](float delta)
@@ -565,7 +570,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[4] = 0xff999999;	// 数据检查器字段头
 				phex->color[5] = -1;			// 数据检查器标题
 				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
-				draw_draw_texts(dt); 
+				draw_draw_texts(dt);
 				if (dt->box_rc.z != hex_scroll.h->_content_size)
 					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);
 			}

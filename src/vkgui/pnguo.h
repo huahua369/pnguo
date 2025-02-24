@@ -2012,11 +2012,13 @@ public:
 	std::string ruler_di;			// 数据检查器头
 	std::string dititle;			// 数据检查器标题
 	std::string data_inspector;		// 数据检查
-	int font_size = 16;
+	int line_height = 20;
+	int char_width = 10;
 	int line_number_n = 0;
 	int bytes_per_line = 16;		// 第行显示字节数4-256
 	int64_t acount = 0;				// 行数量
-
+	glm::i64vec2 range = {};		// 选中范围
+	glm::i64vec2 range2 = {};		// 选中范围,从小到大
 	glm::vec4 text_rc[7] = {};		// 渲染区域
 	uint32_t color[7] = {};			// 渲染颜色
 private:
@@ -2035,7 +2037,11 @@ private:
 public:
 	hex_editor();
 	~hex_editor();
-	void set_size(const glm::ivec2& s);
+	// 设置行高、字宽
+	void set_linechar(int height, int charwidth);
+	// 设置范围计算选中矩形
+	void set_range(int64_t r, int64_t r1);
+	void set_view_size(const glm::ivec2& s);
 	// 设置数据只显示
 	bool set_data(const char* d, size_t len, bool is_copy);
 	// 设置文件，是否只读打开
@@ -2044,12 +2050,18 @@ public:
 	size_t write_data(const void* d, size_t len, size_t pos, bool save);	// 写入数据，是否保存到文件
 	// 设置当前光标，计算data_inspector
 	void set_pos(size_t pos);
+	// 设置显示偏移
 	void set_linepos(size_t pos);
+	// 鼠标事件，0鼠标移动
+	void on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int64_t vpos);
 	std::string get_ruler_di();
 	char* data();
 	size_t size();
 	bool update_hex_editor();
 	text_draw_t* get_drawt();
+private:
+	// 鼠标坐标转偏移
+	int64_t get_mpos2offset(const glm::i64vec2& mpos);
 };
 void draw_draw_texts(text_draw_t* p);
 /*
@@ -2148,6 +2160,7 @@ struct plane_ev
 	int down;		// 是否按下
 	int clicks;		// 单击次数
 	glm::ivec2 mpos;// 鼠标坐标
+	bool drag;		// 是否拖动
 };
 // 面板，继承图集
 class plane_cx :public canvas_atlas

@@ -19504,12 +19504,12 @@ const char* font_rctx::get_family_alias(int idx)
 }
 
 const char* font_rctx::get_family_full(int idx)
-{ 
+{
 	if (idx >= 0 && idx < fyvs.size())
 	{
 		return fyvs[idx]->fullname.c_str();
 	}
-	return ""; 
+	return "";
 }
 
 const char* font_rctx::get_family_style(int idx, int stidx)
@@ -24803,6 +24803,14 @@ void plane_cx::on_motion(const glm::vec2& pos) {
 			set_pos(ps - curpos);
 		//else
 		//	set_scroll_pts(ps - curpos, 1);
+
+		if (on_click)
+		{
+			plane_ev e = {};
+			e.p = this; e.down = 1; e.clicks = 0; e.mpos = ps;
+			e.drag = true;
+			on_click(&e);	// 执行拖动事件
+		}
 	}
 
 	tv->on_motion(ps - tpos);
@@ -29254,7 +29262,25 @@ hex_editor::~hex_editor()
 	_size = 0;
 }
 
-void hex_editor::set_size(const glm::ivec2& s)
+void hex_editor::set_linechar(int height, int charwidth)
+{
+	if (height > 0)
+		line_height = height;
+	if (charwidth > 0)
+		char_width = charwidth;
+}
+
+void hex_editor::set_range(int64_t r, int64_t r1)
+{
+	range.x = r; range.y = r1;
+	range2 = range;
+	if (range.x > range.y)
+	{
+		std::swap(range2.x, range2.y);
+	}
+}
+
+void hex_editor::set_view_size(const glm::ivec2& s)
 {
 	if (s.x > 0 && s.y > 0)
 		view_size = s;
@@ -29503,6 +29529,29 @@ void hex_editor::set_linepos(size_t pos)
 	}
 }
 
+void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int64_t vpos)
+{
+	if (!_data || !_size)return;
+	glm::i64vec2 nmpos = mpos;
+	nmpos.x += hpos;
+	nmpos.y += vpos;
+	auto ost = get_mpos2offset(nmpos);
+	if (clicks > 0)
+	{
+		range.x = ost;
+	}
+	else {
+		range.y = ost;
+		range2 = range;
+		if (range.x > range.y)
+		{
+			std::swap(range2.x, range2.y);
+		}
+	}
+	printf("onm\t%d\n", ost);
+	return;
+}
+
 std::string hex_editor::get_ruler_di()
 {
 	static std::string s = "binary\noctal\nuint8\nint8\nuint16\nint16\nuint24\nint24\nuint32\nint32\nuint64\nint64\nULEB128\nSLEB128\nfloat16\nbfloat16\nfloat32\nfloat64\nASCII\nUTF-8\nUTF-16\nGB18030\nBIG5\n";// SHIFT - JIS\n";
@@ -29539,7 +29588,7 @@ bool hex_editor::update_hex_editor()
 	if (file_data->bpline.size() != bps)
 		file_data->bpline.resize(bps);
 	char* line = file_data->bpline.data();
-	int nc = view_size.y / file_data->font_size;
+	int nc = view_size.y / file_data->line_height;
 	int anc = _size / file_data->bytes_per_line;
 	anc += _size % file_data->bytes_per_line > 0 ? 1 : 0;
 	acount = anc;
@@ -29615,4 +29664,20 @@ text_draw_t* hex_editor::get_drawt()
 	tdt.count = 7;
 	return &tdt;
 }
+
+int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
+{
+	auto x = (mpos.x / char_width);
+	auto y = (mpos.y / line_height);
+	x /= 3;					// 3个字符
+	y *= bytes_per_line;
+	return x + y;
+}
+#undef DIVP
+
+
+
+
+
 #endif
+//!hex_editor
