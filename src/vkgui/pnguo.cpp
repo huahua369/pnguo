@@ -29529,6 +29529,15 @@ void hex_editor::set_linepos(size_t pos)
 	}
 }
 
+glm::i64vec2 get_dv2(int64_t x, int64_t y)
+{
+	int remainder = x % y;
+	if (remainder < 0) remainder += y;
+	int prev = x - remainder;
+	int next = prev + y;
+	return { prev, next };
+}
+
 void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int64_t vpos)
 {
 	if (!_data || !_size)return;
@@ -29547,8 +29556,54 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 		{
 			std::swap(range2.x, range2.y);
 		}
+		auto f = get_dv2(range2.x, bytes_per_line).x;
+		auto s = get_dv2(range2.y, bytes_per_line).y;
+			std::vector<glm::ivec4> rangerc;
+			PathsD range_path;						// 圆角选区缓存
+			path_v ptr_path;
+		// 生成选中背景矩形
+		if (range2.x != range2.y && line_height > 0 && char_width > 0) {
+			int cw = char_width * 3;
+			if (roundselect)
+			{
+				PathsD subjects;
+				PathD a;
+
+				std::vector<glm::vec4> rss;
+				int py = 0;
+				for (size_t i = 0; i < rss.size(); i++)
+				{
+					auto& it = rss[i];
+					if (it.z < 1)
+						it.z = cw;
+					a.push_back({ it.x,it.y + py });
+					a.push_back({ it.x + it.z,it.y + py });
+					a.push_back({ it.x + it.z,it.y + it.w + py });
+					a.push_back({ it.x,it.y + it.w + py });
+					subjects.push_back(a);
+					a.clear();
+				}
+				subjects = Union(subjects, FillRule::NonZero, 6);
+				//range_path = InflatePaths(subjects, 0.5, JoinType::Round, EndType::Polygon);
+				auto sn = subjects.size();
+				if (sn > 0)
+				{
+					path_v& ptr = ptr_path;
+					ptr._data.clear();
+					for (size_t i = 0; i < sn; i++)
+					{
+						auto& it = subjects[i];
+						ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
+					}
+					int round_path = 4;
+					range_path = gp::path_round(&ptr, -1, line_height * round_path, 16, 0, 0);
+				}
+				else { range_path.clear(); }
+			}
+
+		}
+		printf("fs\t%lld\t%lld\n", f, s);
 	}
-	//printf("onm\t%d\n", ost);
 	return;
 }
 
@@ -29567,7 +29622,6 @@ size_t hex_editor::size()
 {
 	return _size;
 }
-
 bool hex_editor::update_hex_editor()
 {
 	int64_t nsize = _size - line_offset;
@@ -29651,10 +29705,6 @@ bool hex_editor::update_hex_editor()
 			decoded_text.push_back('\n');
 		}
 		line_number_n = lnw;
-		// 生成选中背景矩形
-		if (range2.x != range2.y && line_height > 0 && char_width > 0) {
-
-		}
 	}
 	return true;
 }

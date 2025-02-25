@@ -2035,6 +2035,7 @@ private:
 	void* mapfile = 0;				// 映射文件
 	bool is_update = true;
 	bool _rdonly = false;
+	bool roundselect = true;
 public:
 	hex_editor();
 	~hex_editor();

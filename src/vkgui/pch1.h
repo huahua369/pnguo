@@ -67,6 +67,7 @@
 
 #if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)
 using njson = nlohmann::json;
+using njson0 = nlohmann::ordered_json;
 #define NJSON_H
 #endif
 

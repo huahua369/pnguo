@@ -38,6 +38,15 @@ namespace hz {
 		}
 		return written;
 	}
+	
+	static size_t post_writeFunc(void* data, size_t size, size_t nmemb, void* userdata)
+	{
+		std::vector<char>* buf = (std::vector<char>*)userdata;
+		size_t realsize = size * nmemb;
+		char* bytes = static_cast<char*>(data);
+		buf->insert(buf->end(), bytes, bytes + realsize);
+		return realsize;
+	}
 
 	int progressFunc(void* ptr, double totalToDownload, double nowDownloaded, double totalToUpLoad, double nowUpLoaded)
 	{
@@ -87,7 +96,7 @@ namespace hz {
 			printf("get the file length error...");
 			return false;
 		}
-		data.resize(fileLength);
+		_data.resize(fileLength);
 
 		long partSize = fileLength / threadNum;
 
@@ -114,7 +123,7 @@ namespace hz {
 			CURL* curl = curl_easy_init();
 
 			pNode->curl = curl;
-			pNode->fpd = data.data();
+			pNode->fpd = _data.data();
 
 			char range[64] = { 0 };
 			snprintf(range, sizeof(range), "%lld-%lld", pNode->startPos, pNode->endPos);
@@ -153,6 +162,73 @@ namespace hz {
 
 		printf("download succed......\n");
 		return true;
+	}
+	void mcurl_cx::set_httpheader(const char* k, const char* d)
+	{
+		if (k && *k)
+		{
+			if (!d || !*d)
+				hn.erase(k);
+			else
+				hn[k] = d;
+		}
+	}
+	void mcurl_cx::post(const std::string& url, void* data, int len, bool copyd)
+	{
+		CURLcode res;
+
+		auto curl = curl_easy_init();
+
+		if (curl) {
+			_url = url;
+#ifdef _DEBUG
+			// 临时关闭验证（生产环境不推荐）
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+#endif
+			// 设置基本参数 
+			curl_easy_setopt(curl, CURLOPT_URL, _url.c_str());
+			curl_easy_setopt(curl, CURLOPT_POST, 1L);
+			// 构造JSON数据  
+			if (copyd)
+			{
+				w_data.resize(len);
+				memcpy(w_data.data(), data, len);
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, w_data.data());
+			}
+			else {
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+			}
+			curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, len);
+
+			struct curl_slist* headers = 0;
+			// 设置HTTP头
+			if (headers)
+			{
+				curl_slist_free_all(headers);
+				headers = NULL;
+			}
+			if (hn.find("Content-Type") == hn.end())
+				headers = curl_slist_append(headers, "Content-Type: application/json"); 
+			for (auto& [k, v] : hn.items())
+			{
+				std::string it = k; it += ": " + v.get<std::string>();
+				headers = curl_slist_append(headers, it.c_str());
+			}
+			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post_writeFunc);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&_data);
+			// 执行请求 
+			res = curl_easy_perform(curl);
+
+			// 错误处理 
+			if (res != CURLE_OK)
+				fprintf(stderr, "Error: %s\n", curl_easy_strerror(res));
+
+			// 清理资源 
+			curl_slist_free_all(headers); headers = 0;
+			curl_easy_cleanup(curl);
+		}
 	}
 #endif // !NO_CURL
 
@@ -213,19 +289,19 @@ namespace hz {
 			mcurl_cx fbg;
 			if (mcount < 1)mcount = 1;
 			fbg.downLoad(mcount, fn);
-			if (cb && fbg.data.size() > 2)
+			if (cb && fbg._data.size() > 2)
 			{
-				if (cb(fbg.data.data(), fbg.data.size(), ptr))
+				if (cb(fbg._data.data(), fbg._data.size(), ptr))
 				{
 					if (npath.size())
 					{
 						hz::mfile_t m;
 						auto pd = m.new_m(npath, 0);
-						m.ftruncate_m(fbg.data.size());
-						auto wd = m.map(fbg.data.size(), 0);
+						m.ftruncate_m(fbg._data.size());
+						auto wd = m.map(fbg._data.size(), 0);
 						if (wd)
 						{
-							memcpy(wd, fbg.data.data(), fbg.data.size());
+							memcpy(wd, fbg._data.data(), fbg._data.size());
 							m.flush();
 						}
 					}

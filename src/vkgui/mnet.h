@@ -21,12 +21,17 @@ namespace hz {
 		};
 		std::vector<std::thread> tv;
 		std::atomic_int cnt = 0;
-		std::vector<char> data;
+		std::vector<char> _data;
+		std::vector<char> w_data;
+		std::string _url;
+		njson0 hn; 
 	public:
 		mcurl_cx();
 		~mcurl_cx();
 
 		bool downLoad(int threadNum, const std::string& Url);
+		void set_httpheader(const char* k, const char* d);
+		void post(const std::string& url, void* data, int len, bool copyd = false);
 	private:
 		int64_t getDownloadFileLenth(const char* url);
 

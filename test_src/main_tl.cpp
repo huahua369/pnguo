@@ -11,6 +11,7 @@
 #include <vkgui/page.h>
 #include <vkgui/mapView.h>
 #include <vkgui/print_time.h>
+#include <vkgui/mnet.h>
 
 #include <cairo/cairo.h>
 
@@ -442,7 +443,24 @@ void show_ui(form_x* form0, menu_cx* gm)
 	if (k.size())
 		ftns.push_back(k);
 	//p->add_colorpick(0, 280, 30, true);
-
+	{
+		std::string ct = (char*)u8"你是谁";
+		hz::mcurl_cx mc;
+		njson0 aa;
+		aa["model"] = "deepseek-chat";
+		aa["stream"] = false;
+		aa["temperature"] = 0.7;
+		aa["messages"] = { {{"role", "user"}, {"content",ct.c_str()}} };
+		auto aad = aa.dump();
+		mc.post("https://api.deepseek.com/chat/completions", aad.data(), aad.size());
+		if (mc._data.size())
+		{
+			auto dd = (char*)mc._data.data();
+			auto n = njson::parse(dd, dd + mc._data.size());
+			hz::save_json("temp/ai.json", n, 2);
+		}
+		printf("%s\n", aad.c_str());
+	}
 	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
 	hex_edit->_absolute = true;
 	hex_edit->visible = false;
@@ -480,14 +498,14 @@ void show_ui(form_x* form0, menu_cx* gm)
 				dgp->size.x = -1;
 				glm::ivec2 scpos = e->mpos - p->tpos;// 减去本面板坐标
 				scpos -= (glm::ivec2)dps;
-				printf("old click:%d\t%d\n", scpos.x, scpos.y);
+				//printf("old click:%d\t%d\n", scpos.x, scpos.y);
 				auto vps = hex_scroll.v->get_offset_ns();
 				auto hps = hex_scroll.h->get_offset_ns();
 				scpos -= (glm::ivec2)phex->text_rc[2];
 				phex->on_mouse(e->clicks, scpos, hps, vps);
 				scpos.x += hps;
 				scpos.y += vps;
-				printf("click:%d\t%d\n", scpos.x, scpos.y);
+				//printf("click:%d\t%d\n", scpos.x, scpos.y);
 			}
 
 		};
