@@ -2016,7 +2016,7 @@ public:
 	int char_width = 10;
 	int line_number_n = 0;
 	int bytes_per_line = 16;		// 第行显示字节数4-256
-	int64_t acount = 0;				// 行数量
+	int64_t acount = 0;				// 行数量 
 	glm::i64vec2 range = {};		// 选中范围
 	glm::i64vec2 range2 = {};		// 选中范围,从小到大
 	glm::ivec2 range_c1 = {};		// 选中范围,从小到大,当前视图位置

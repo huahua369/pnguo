@@ -21283,7 +21283,7 @@ bool layout_line_x_to_index(PLayoutLine* line, int x_pos, int* index, int* trail
 		if (x_pos >= start_pos && x_pos < start_pos + logical_width)
 		{
 			int offset;
-			bool char_trailing;
+			bool char_trailing = false;
 			int grapheme_start_index;
 			int grapheme_start_offset;
 			int grapheme_end_offset;
@@ -29415,6 +29415,30 @@ int64_t read_sleb128(const char* data) {
 
 	return value;
 }
+int is_gb18030_char(const uint8_t* data, size_t len) {
+	if (data == NULL || len < 1) return -1; // 无效输入 
+	// 单字节检查 
+	if (data[0] <= 0x7F) {
+		return 1; // 合法ASCII字符 
+	}
+
+	// 双字节检查 
+	if (data[0] >= 0x81 && data[0] <= 0xFE) {
+		if (len < 2) return -1; // 长度不足 
+		uint8_t b2 = data[1];
+		if ((b2 >= 0x40 && b2 <= 0x7E) || (b2 >= 0x80 && b2 <= 0xFE)) {
+			return 2; // 合法双字节 
+		}
+	}
+	// 四字节检查（需至少4字节长度）
+	if (len >= 4 && data[1] >= 0x30 && data[1] <= 0x39) {
+		if (data[2] >= 0x81 && data[2] <= 0xFE &&
+			data[3] >= 0x30 && data[3] <= 0x39) {
+			return 4; // 合法四字节 
+		}
+	}
+	return -2; // 非法编码 
+}
 void print_data_de(const void* p, std::string* t)
 {
 	std::string str;
@@ -29463,7 +29487,7 @@ void print_data_de(const void* p, std::string* t)
 	str += buf;
 	// ascii
 	char c = num8;
-	sprintf(buf, "%c\n", (c >= 32 && c <= 126) ? c : '.');
+	sprintf(buf, "%c\n", (c >= 32 && c <= 126) ? c : ' ');
 	str += buf;
 	// 获取utf8
 	auto s = (const char*)p;
@@ -29476,16 +29500,22 @@ void print_data_de(const void* p, std::string* t)
 		{
 			str += us16 + "\n";
 		}
-		else { str += ".\n"; }
+		else { str += " \n"; }
 	}
 	//gb
 	{
-		auto g = md::gb_u8((char*)p, 2);
-		if (g.size() > 2)
+		auto nc = is_gb18030_char((uint8_t*)p, 4);
+		if (nc > 0)
 		{
-			str += g + "\n";
+			auto g = md::gb_u8((char*)p, nc);
+			if (g.size() > 2)
+			{
+				str += g + "\n";
+			}
 		}
-		else { str += ".\n"; }
+		else {
+			str += " \n";
+		}
 	}
 	//big5
 	{
@@ -29494,7 +29524,7 @@ void print_data_de(const void* p, std::string* t)
 		{
 			str += g + "\n";
 		}
-		else { str += ".\n"; }
+		else { str += " \n"; }
 	}
 	//shift_jis
 	//{
@@ -29548,6 +29578,7 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 	if (clicks > 0)
 	{
 		range.x = ost;
+		set_pos(ost);
 	}
 	else {
 		range.y = ost;
@@ -29558,9 +29589,9 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 		}
 		auto f = get_dv2(range2.x, bytes_per_line).x;
 		auto s = get_dv2(range2.y, bytes_per_line).y;
-			std::vector<glm::ivec4> rangerc;
-			PathsD range_path;						// 圆角选区缓存
-			path_v ptr_path;
+		std::vector<glm::ivec4> rangerc;
+		PathsD range_path;						// 圆角选区缓存
+		path_v ptr_path;
 		// 生成选中背景矩形
 		if (range2.x != range2.y && line_height > 0 && char_width > 0) {
 			int cw = char_width * 3;
@@ -29758,7 +29789,7 @@ int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 	x /= 3;					// 3个字符
 	y *= bytes_per_line;
 	return x + y;
-} 
+}
 
 
 
