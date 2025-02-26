@@ -443,24 +443,29 @@ void show_ui(form_x* form0, menu_cx* gm)
 	if (k.size())
 		ftns.push_back(k);
 	//p->add_colorpick(0, 280, 30, true);
+#if 0
+	hz::mcurl_cx mc;
 	{
-		std::string ct = (char*)u8"你是谁";
-		hz::mcurl_cx mc;
+		auto kv = hz::read_json("temp/aiv.json");
+		mc.set_httpheader("Authorization", "Bearer " + kv["v"][0].get<std::string>());
 		njson0 aa;
 		aa["model"] = "deepseek-chat";
 		aa["stream"] = false;
 		aa["temperature"] = 0.7;
+		std::string ct = (char*)u8"你是谁";
 		aa["messages"] = { {{"role", "user"}, {"content",ct.c_str()}} };
 		auto aad = aa.dump();
 		mc.post("https://api.deepseek.com/chat/completions", aad.data(), aad.size());
+		//mc.get("https://api.deepseek.com/user/balance");//查余额
 		if (mc._data.size())
 		{
 			auto dd = (char*)mc._data.data();
 			auto n = njson::parse(dd, dd + mc._data.size());
-			hz::save_json("temp/ai.json", n, 2);
+			//hz::save_json("temp/ai_get.json", n, 2);
 		}
-		printf("%s\n", aad.c_str());
+		printf("%s\n", mc._data.data());
 	}
+#endif
 	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
 	hex_edit->_absolute = true;
 	hex_edit->visible = false;

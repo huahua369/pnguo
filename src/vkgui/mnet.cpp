@@ -38,10 +38,10 @@ namespace hz {
 		}
 		return written;
 	}
-	
+
 	static size_t post_writeFunc(void* data, size_t size, size_t nmemb, void* userdata)
 	{
-		std::vector<char>* buf = (std::vector<char>*)userdata;
+		std::string* buf = (std::string*)userdata;
 		size_t realsize = size * nmemb;
 		char* bytes = static_cast<char*>(data);
 		buf->insert(buf->end(), bytes, bytes + realsize);
@@ -163,11 +163,11 @@ namespace hz {
 		printf("download succed......\n");
 		return true;
 	}
-	void mcurl_cx::set_httpheader(const char* k, const char* d)
+	void mcurl_cx::set_httpheader(const std::string& k, const std::string& d)
 	{
-		if (k && *k)
+		if (k.size() && k[0] > 0)
 		{
-			if (!d || !*d)
+			if (d.empty() || !d[0])
 				hn.erase(k);
 			else
 				hn[k] = d;
@@ -175,10 +175,8 @@ namespace hz {
 	}
 	void mcurl_cx::post(const std::string& url, void* data, int len, bool copyd)
 	{
-		CURLcode res;
-
-		auto curl = curl_easy_init();
-
+		CURLcode res; 
+		auto curl = curl_easy_init(); 
 		if (curl) {
 			_url = url;
 #ifdef _DEBUG
@@ -209,7 +207,51 @@ namespace hz {
 				headers = NULL;
 			}
 			if (hn.find("Content-Type") == hn.end())
-				headers = curl_slist_append(headers, "Content-Type: application/json"); 
+				headers = curl_slist_append(headers, "Content-Type: application/json");
+			for (auto& [k, v] : hn.items())
+			{
+				std::string it = k; it += ": " + v.get<std::string>();
+				headers = curl_slist_append(headers, it.c_str());
+			}
+			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post_writeFunc);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&_data);
+			// 执行请求 
+			res = curl_easy_perform(curl);
+
+			// 错误处理 
+			if (res != CURLE_OK)
+				fprintf(stderr, "Error: %s\n", curl_easy_strerror(res));
+
+			// 清理资源 
+			curl_slist_free_all(headers); headers = 0;
+			curl_easy_cleanup(curl);
+		}
+	}
+	void mcurl_cx::get(const std::string& url)
+	{
+
+		CURLcode res;
+		auto curl = curl_easy_init();
+		if (curl) {
+			_url = url;
+#ifdef _DEBUG
+			// 临时关闭验证（生产环境不推荐）
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+#endif
+			// 设置基本参数 
+			curl_easy_setopt(curl, CURLOPT_URL, _url.c_str());  
+
+			struct curl_slist* headers = 0;
+			// 设置HTTP头
+			if (headers)
+			{
+				curl_slist_free_all(headers);
+				headers = NULL;
+			}
+			if (hn.find("Content-Type") == hn.end())
+				headers = curl_slist_append(headers, "Content-Type: application/json");
 			for (auto& [k, v] : hn.items())
 			{
 				std::string it = k; it += ": " + v.get<std::string>();
