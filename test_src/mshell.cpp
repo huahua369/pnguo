@@ -2997,6 +2997,7 @@ public:
 	{
 		HANDLE hRead = 0, hWrite = 0;
 	};
+
 	static h2_t get_exeptr(std::string cmd, const char* cd = 0, bool once = true) //执行命令行 
 	{
 		h2_t ret = {};
@@ -3051,21 +3052,20 @@ public:
 		CloseHandle(cp.hRead);
 		return ret;
 	}
-	static bool exe_cb(std::string cmd, const char* cd, std::function<void(const char*, int)> cb) //执行命令行 
+	static bool exe_cb(std::string cmd, const char* cd, std::function<void(const char*, int)> rcb, std::function<bool(std::string* str)> wcb) //执行命令行 
 	{
 		bool ret = true;
 		auto cp = get_exeptr(cmd, cd);
-		if (cp.hWrite)
-			CloseHandle(cp.hWrite);
 		if (!cp.hRead)
 		{
 			return false;
 		}
-		if (cb)
+		if (rcb)
 		{
 			std::thread et([=]()
 				{
 					std::string kb;
+					std::string wkb;
 					kb.resize(10241);
 					DWORD bytesRead = 0;
 					while (true)
@@ -3073,26 +3073,41 @@ public:
 						kb.resize(10241);
 						if (FALSE == PeekNamedPipe(cp.hRead, kb.data(), 10240, &bytesRead, 0, NULL))
 						{
-							//break;
 						}
 						if (bytesRead == 0)
 						{
+							wkb.clear();
+							if (wcb(&wkb))break;
+							if (wkb.size())
+							{
+								WriteFile(cp.hWrite, wkb.data(), wkb.size(), &bytesRead, NULL);
+							}
 							Sleep(20);
 							continue;
 						}
-						if (ReadFile(cp.hRead, kb.data(), 10240, &bytesRead, NULL) == NULL)
-							break;
-						kb.resize(bytesRead);
-						cb(kb.c_str(), bytesRead);
+						if (ReadFile(cp.hRead, kb.data(), 10240, &bytesRead, NULL))
+						{
+							kb.resize(bytesRead);
+							rcb(kb.c_str(), bytesRead);
+						}
 					}
 					CloseHandle(cp.hRead);
+					if (cp.hWrite)
+						CloseHandle(cp.hWrite);
 				});
 			et.detach();
 		}
+		else {
+			if (cp.hWrite)
+			{
+				CloseHandle(cp.hWrite);
+				CloseHandle(cp.hRead);
+			}
+		}
 		return ret;
 	}
- 
-	 
+
+
 #endif
 protected:
 	void init()
@@ -3162,14 +3177,107 @@ private:
 
 };
 
+//linux执行/bin/bash
+cmde_cx::cmde_cx(std::function<void(const char*, int)> rcb)
+{
+#ifdef _WIN32
+	std::thread aa([=]() {
+		SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+		// 创建管道 
+		CreatePipe(&hInputRead, &hInputWrite, &sa, 0);
+		CreatePipe(&hOutputRead, &hOutputWrite, &sa, 0);
+		// 配置进程参数 
+		STARTUPINFO si = { sizeof(si) };
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.hStdInput = hInputRead;
+		si.hStdOutput = hOutputWrite;
+		si.hStdError = hOutputWrite;
+		PROCESS_INFORMATION pi;
+		buf.resize(4096); 
+		// 创建进程 
+		if (CreateProcessA(NULL, (char*)"cmd.exe", NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+		{
+			//write_str("chcp 65001\r\n"); // UTF-8模式 
+			while (rune) {
+				DWORD dwRead = 0;
+				{
+					std::lock_guard<std::mutex> lk(lkm);
+					if (wbuf.size())
+					{
+						// 发送命令  
+						WriteFile(hInputWrite, wbuf.c_str(), wbuf.size(), NULL, NULL);
+						wbuf.clear();
+					}
+				}
+				if (FALSE == PeekNamedPipe(hOutputRead, buf.data(), 4095, &dwRead, 0, NULL))
+				{
+
+				}
+				auto so = WaitForSingleObject(pi.hProcess, 10);
+				if (so == 0) {
+					DWORD exitCode = 0;
+					if (GetExitCodeProcess(pi.hProcess, &exitCode)) {
+						if (exitCode == STILL_ACTIVE) {
+							//std::cout << "进程仍在运行" << std::endl;
+						}
+						else {
+							break;
+							//std::cout << "进程已终止，退出代码：" << exitCode << std::endl;
+						}
+					}
+					else {
+						//std::cerr << "无法获取退出代码" << std::endl;
+					}
+				}
+				if (dwRead == 0) {
+					Sleep(20);
+					continue;
+				}
+				// 读取输出 
+				char* buffer = buf.data();
+				auto hr = ReadFile(hOutputRead, buffer, buf.size() - 1, &dwRead, NULL);
+				if (dwRead > 0) {
+					buffer[dwRead] = 0;
+					if (rcb) {
+						rcb(buffer, dwRead);
+					}
+				}
+			}
+			// 清理资源 
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+		}
+		// 关闭管道句柄 
+		CloseHandle(hInputRead);
+		CloseHandle(hInputWrite);
+		CloseHandle(hOutputRead);
+		CloseHandle(hOutputWrite);
+		}
+	);
+	aa.swap(aat);
+#endif
+}
+
+cmde_cx::~cmde_cx()
+{
+	write_str("exit\n");
+	aat.join();
+}
+
+void cmde_cx::write_str(const std::string& str)
+{
+	std::lock_guard<std::mutex> lk(lkm);
+	wbuf = str;
+}
+
 namespace hz {
 	std::string cmdexe(const std::string& cmdstr, const char* cd)
 	{
 		return Cmd::exe(cmdstr, cd);
 	}
-	bool cmdexe(const std::string& cmdstr, const char* cd, std::function<void(const char*, int)> cb)
+	bool cmdexe(const std::string& cmdstr, const char* cd, std::function<void(const char*, int)> rcb, std::function<bool(std::string* str)> wcb)
 	{
-		return Cmd::exe_cb(cmdstr, cd, cb);//执行命令行 异步返回
+		return Cmd::exe_cb(cmdstr, cd, rcb, wcb);//执行命令行 异步返回
 	}
 
 #if _WIN32

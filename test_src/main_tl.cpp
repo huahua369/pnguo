@@ -443,12 +443,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 	if (k.size())
 		ftns.push_back(k);
 	//p->add_colorpick(0, 280, 30, true);
-#if 0
+#if 1
 	hz::mcurl_cx mc;
 	{
 		auto kv = hz::read_json("temp/aiv.json");
 		mc.set_httpheader("Authorization", "Bearer " + kv["v"][0].get<std::string>());
-		njson0 aa;
+		njson aa;
 		aa["model"] = "deepseek-chat";
 		aa["stream"] = false;
 		aa["temperature"] = 0.7;
@@ -464,6 +464,28 @@ void show_ui(form_x* form0, menu_cx* gm)
 			//hz::save_json("temp/ai_get.json", n, 2);
 		}
 		printf("%s\n", mc._data.data());
+	}
+	{
+		cmde_cx cmdx([](const char* str, int len)
+			{
+				auto s = md::gb_u8(str, len);
+				printf("%s", s.c_str());
+			});
+		while (1) {
+			static bool k = false;
+			static bool c = false;
+			if (k)
+			{
+				cmdx.write_str("cd E:\\aicpp\n"); k = false;
+			}
+			if (c)
+			{
+				//cmdx.write_str("exit\n");//退出cmd
+				c = false;
+				break;
+			}
+			Sleep(100);
+		}
 	}
 #endif
 	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
