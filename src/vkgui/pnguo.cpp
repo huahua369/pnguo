@@ -29564,12 +29564,44 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 		// 生成选中背景矩形
 		if (range2.x != range2.y && line_height > 0 && char_width > 0) {
 			int cw = char_width * 3;
+
+			std::vector<glm::vec4> rss;
+			//if (v1.y == v2.y)
+			//{
+			//	auto ks = lvs[v1.y];
+			//	auto w1 = widths[v1.y];
+			//	auto xc = char2pos(v.x - ks.x, pstr + ks.x);
+			//	auto yc = char2pos(v.y - ks.x, pstr + ks.x);
+			//	int w = w1[xc];
+			//	int ww = w1[yc] - w;
+			//	rss.push_back({ w ,v1.y * h,ww,h });// 同一行时
+			//}
+			//else {
+			//	auto ks = lvs[v1.y];
+			//	auto w1 = widths[v1.y];
+			//	auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
+			//	auto wd = *w1.rbegin() - w;
+			//	rss.push_back({ w,v1.y * h,wd + pwidth,h });// 第一行
+			//}
+			//for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
+			//{
+			//	auto ks = lvs[i];
+			//	auto w1 = widths[i];
+			//	rss.push_back({ 0,i * h,*w1.rbegin() + pwidth, h });// 中间全行
+			//}
+			//if (v1.y < v2.y)
+			//{
+			//	auto ks = lvs[v2.y];
+			//	auto w1 = widths[v2.y];
+			//	rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });//最后一行
+			//}
+
+
 			if (roundselect)
 			{
 				PathsD subjects;
 				PathD a;
 
-				std::vector<glm::vec4> rss;
 				int py = 0;
 				for (size_t i = 0; i < rss.size(); i++)
 				{
@@ -29726,8 +29758,7 @@ int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 	x /= 3;					// 3个字符
 	y *= bytes_per_line;
 	return x + y;
-}
-#undef DIVP
+} 
 
 
 
