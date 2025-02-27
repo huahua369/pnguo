@@ -2709,6 +2709,20 @@ int get_cpus(cpuinfo_t* lct) {
 	return 0;
 
 }
+std::string formatBytes(uint64_t bytes) 
+{
+	const std::vector<std::string> units = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB","YB", "BB" };
+	double size = static_cast<double>(bytes);
+	int unitIndex = 0;
+	while (size >= 1024 && unitIndex < units.size() - 1) {
+		size /= 1024;
+		unitIndex++;
+	}
+	std::ostringstream oss;
+	oss << std::fixed << std::setprecision(2) << size << " " << units[unitIndex];
+	return oss.str();
+}
+
 cpuinfo_t get_cpuinfo()
 {
 	cpuinfo_t r = {};
@@ -2726,12 +2740,23 @@ cpuinfo_t get_cpuinfo()
 		if (hwloc_obj_type_is_cache(obj->type)) {
 			levels++;
 			lc.push_back({ obj->attr->cache.size, obj->attr->cache.linesize });
-			printf("*** L%d caches %lluKB\n", levels, obj->attr->cache.size / 1024);
+			//printf("*** L%d caches %lluKB\n", levels, obj->attr->cache.size / 1024);
 		}
 	}
 	hwloc_topology_destroy(topology);    // 释放资源 
-
+	levels = 0;
 	auto nn = get_cpus(&r);
+	for (size_t i = 0; i < 6; i++)
+	{
+		auto kt = r.cache[i];
+		if (kt.y > 0)
+		{
+			levels++;
+			auto a = formatBytes(kt.x);
+			auto z = formatBytes(kt.z);
+			printf("*** L%d caches %s\tcount %02d\tsingle %s\n", levels, a.c_str(), kt.y, z.c_str());
+		}
+	}
 	r.NumLogicalCPUCores = SDL_GetNumLogicalCPUCores();
 	r.CPUCacheLineSize = SDL_GetCPUCacheLineSize();
 	r.SystemRAM = SDL_GetSystemRAM();

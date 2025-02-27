@@ -378,6 +378,7 @@ struct cpuinfo_t
 
 // 获取CPU信息
 cpuinfo_t get_cpuinfo();
+std::string formatBytes(uint64_t bytes);
 
 // 导出接口
 uint64_t call_data(int type, void* data);

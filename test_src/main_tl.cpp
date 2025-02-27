@@ -440,7 +440,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	if (k.size())
 		ftns.push_back(k);
 	//p->add_colorpick(0, 280, 30, true);
-#if 1
+#if 0
 	hz::mcurl_cx mc;
 	{
 		auto kv = hz::read_json("temp/aiv.json");
