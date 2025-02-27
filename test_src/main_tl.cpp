@@ -11,8 +11,7 @@
 #include <vkgui/page.h>
 #include <vkgui/mapView.h>
 #include <vkgui/print_time.h>
-#include <vkgui/mnet.h>
-
+#include <vkgui/mnet.h> 
 #include <cairo/cairo.h>
 
 #include "mshell.h"
@@ -52,8 +51,6 @@ extern "C" {
 	CLAY_RENDER_COMMAND_TYPE_SCISSOR_END,
 	CLAY_RENDER_COMMAND_TYPE_CUSTOM,
 */
-
-
 
 
 /*
@@ -465,7 +462,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		}
 		printf("%s\n", mc._data.data());
 	}
-	{
+	if (0) {
 		cmde_cx cmdx([](const char* str, int len)
 			{
 				auto s = md::gb_u8(str, len);

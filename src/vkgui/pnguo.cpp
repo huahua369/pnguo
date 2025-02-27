@@ -29787,6 +29787,7 @@ int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 	auto x = (mpos.x / char_width);
 	auto y = (mpos.y / line_height);
 	x /= 3;					// 3个字符
+	x = std::max(std::min(x, (int64_t)bytes_per_line - 1), (int64_t)0);// >= bytes_per_line)x =;
 	y *= bytes_per_line;
 	return x + y;
 }
