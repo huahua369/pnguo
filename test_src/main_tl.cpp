@@ -576,6 +576,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				auto pxx = hex_scroll.h->get_offset_ns();
 				auto pyy = hex_scroll.v->get_offset_ns();
 				auto vps = pyy / fl;
+				pyy = vps * fl;
 				cairo_translate(cr, -pxx, 0);
 				phex->set_linepos(vps);
 				phex->update_hex_editor();

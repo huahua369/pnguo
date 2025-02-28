@@ -48,7 +48,9 @@
 #include <functional>
 #include <thread>
 #include <mutex>
-
+ 
+#define GLM_ENABLE_EXPERIMENTAL
+//#define GLM_FORCE_ALIGNED
 //#define GLM_FORCE_INTRINSICS
 // 定义glm启用simd
 //#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES

@@ -3424,8 +3424,9 @@ namespace gp {
 	{
 		if (t)
 		{
-			auto p = (glm::vec4*)t;
-			delete[] p;
+			free(t);
+			//auto p = (glm::vec4*)t;
+			//delete[] p;
 		}
 	}
 	path_node_t* new_node0(path_v* sp, size_t sn)
@@ -3436,9 +3437,6 @@ namespace gp {
 		{
 			if (!sp || sp->size() < 2 /*|| sp->n < 1 || !sp->s || !sp->lengths*/)break;
 			int64_t ac = sizeof(path_node_t);
-
-			ac += sn * sizeof(glm::vec2);
-
 			std::vector<int> ls;
 			int64_t x = -1;
 			size_t spn = 0;
@@ -3454,12 +3452,11 @@ namespace gp {
 					ls[x]++;
 				}
 			}
-			ac += spn * sizeof(int);
-
-			auto acount = ac / sizeof(glm::vec4);
-			acount++;
-			auto mem0 = new glm::vec4[acount];
+			ac += sn;
+			auto mem0 = malloc(ac);
+			if (!mem0) { p = 0; break; }
 			p = (path_node_t*)mem0;
+			*p = {};
 			auto cp = (char*)mem0;
 			cp += sizeof(path_node_t);
 			//cp += sn * sizeof(glm::vec2);
@@ -3467,17 +3464,11 @@ namespace gp {
 			cp += spn * sizeof(int);
 			p->pos = (glm::vec2*)cp;
 			p->cap = sn;
-			p->count = sp->size();	// 顶点数量
 			for (size_t i = 0; i < spn; i++)
 			{
 				p->lengths[i] = ls[i];
 			}
 			p->caplen = spn;
-			auto pt = p->pos;		// 顶点坐标
-			pt += p->count;
-			//p->angle = pt;			// 2切线点角弧度
-			pt += p->count;
-			//p->center = (glm::vec3*)pt;				// 圆心坐标xy/半径z，半径小于等于0则不圆角 
 		} while (0);
 
 		return p;
@@ -3623,6 +3614,7 @@ namespace gp {
 		}
 
 		size_t act = posv.size() * 4;
+		act = sizeof(glm::vec2) * posv.size() + sizeof(glm::vec2) * anglev.size() * sizeof(glm::vec3) * centerv.size() + sizeof(int) * lengths.size();
 		path_node_t* pn = new_node0(sp, act);
 
 		pn->n = length;
@@ -3876,11 +3868,11 @@ namespace gp {
 	}
 
 	// 旧函数
-	int get_fv_old(fv_it& fv, int i, size_t num_segments, float z, std::vector<glm::vec3>& tv)
+	int get_fv_old(fv_it* fv, int i, size_t num_segments, float z, std::vector<glm::vec3>& tv)
 	{
-		auto ps = fv.pos[i];
-		auto a = fv.angle[i];
-		auto c = fv.center[i];
+		auto ps = fv->pos[i];
+		auto a = fv->angle[i];
+		auto c = fv->center[i];
 		return get_fv(ps, a, c, num_segments, z, tv);
 	}
 	path_v pd2pv(PathsD* p)
@@ -3910,7 +3902,7 @@ namespace gp {
 			for (int i = 0; i < nn; i++)
 			{
 				tv1.clear();
-				get_fv_old(fv, i, num_segments, z, tv1);
+				get_fv_old(&fv, i, num_segments, z, tv1);
 				for (auto& it : tv1)
 				{
 					v0.push_back({ it.x,it.y });
@@ -3922,7 +3914,6 @@ namespace gp {
 		}
 		return r;
 	}
-
 
 	void mkivec(std::vector<glm::vec3>& tv1, int d)
 	{
@@ -4015,9 +4006,9 @@ namespace gp {
 
 	}
 	// 从两个路径创建面
-	int for_cvertex_old(fv_it& fv, fv_it& fv1, size_t num_segments, std::vector<glm::vec3>& opt, glm::vec2 z)
+	int for_cvertex_old(fv_it* fv, fv_it* fv1, size_t num_segments, std::vector<glm::vec3>& opt, glm::vec2 z)
 	{
-		auto nn = *fv.lengths;
+		auto nn = *(fv->lengths);
 		std::vector<glm::vec3> tv1[2], tv2[2], t[2];
 		get_fv_old(fv, 0, num_segments, z.x, t[0]);
 		get_fv_old(fv1, 0, num_segments, z.y, t[1]);
@@ -4025,7 +4016,7 @@ namespace gp {
 		tv2[0] = t[1];
 		nn--;
 		std::vector<glm::vec3> tv;
-		tv.reserve(tv.size() + fv.count * 3);
+		tv.reserve(tv.size() + fv->count * 3);
 
 		//auto a2 = gs::area_ofRingSigned(tv2.data(), tv2.size());
 		for (int i = 1; i < nn; i++)
@@ -4052,10 +4043,10 @@ namespace gp {
 
 		//mkivec(tv, 100);
 		opt.insert(opt.begin(), tv.begin(), tv.end());
-		fv.inc(*fv.lengths);
-		fv1.inc(*fv1.lengths);
-		fv.lengths++;
-		fv1.lengths++;
+		fv->inc(*fv->lengths);
+		fv1->inc(*fv1->lengths);
+		fv->lengths++;
+		fv1->lengths++;
 		return 0;
 	}
 
@@ -4269,12 +4260,12 @@ namespace gp {
 		std::vector<glm::vec3> tv1, tv2;
 		for (int i = 0; i < nn; i++)
 		{
-			get_fv_old(fv, i, num_segments, z.x, tv1);
+			get_fv_old(&fv, i, num_segments, z.x, tv1);
 		}
 		auto nn1 = *fv1.lengths;
 		for (int i = 0; i < nn1; i++)
 		{
-			get_fv_old(fv1, i, num_segments, z.y, tv2);
+			get_fv_old(&fv1, i, num_segments, z.y, tv2);
 		}
 
 		auto a1 = area_ofRingSigned(tv1.data(), tv1.size());
@@ -4362,7 +4353,7 @@ namespace gp {
 	// ccw=0,1,全部角度-1
 	PathsD path_round(path_v* ptr, int ccw, float radius, int num_segments, int ml, int ds)
 	{
-		PathsD r;
+		PathsD r = {};
 		glm::vec3 k = { 0,radius, ccw };
 
 		auto pt = gp::new_path_node(ptr, k.x, k.y, ptr->angle, ccw, num_segments, ml, ds);
@@ -4669,14 +4660,14 @@ namespace gp {
 		auto pt1 = gp::new_path_node_exp(&pv, 0, 0, c->radius, c->radius_a, c->type, c->rccw.x, c->segments, c->segments_len, c->segments_len, is_round);
 		if (!pt1)return cn;
 
-		gp::fv_it fv = { pt1 };
-		gp::fv_it fv1 = { pt1 };
+		gp::fv_it fv(pt1);
+		gp::fv_it fv1(pt1);
 		std::vector<glm::vec3> opt;
 		for (size_t x = 0; x < fv.count; x++)
 		{
 			if (*fv.lengths == *fv1.lengths)
 			{
-				for_cvertex_old(fv, fv1, c->segments, opt, dz);
+				for_cvertex_old(&fv, &fv1, c->segments, opt, dz);
 			}
 		}
 		cn = opt.size();
@@ -4701,14 +4692,14 @@ namespace gp {
 	{
 		size_t cn = 0;
 		if (!pt1)return cn;
-		gp::fv_it fv = { pt1 };
-		gp::fv_it fv1 = { pt1 };
+		gp::fv_it fv(pt1);
+		gp::fv_it fv1(pt1);
 		std::vector<glm::vec3> opt;
 		for (size_t x = 0; x < fv.count; x++)
 		{
 			if (*fv.lengths == *fv1.lengths)
 			{
-				for_cvertex_old(fv, fv1, c->segments, opt, dz);
+				for_cvertex_old(&fv, &fv1, c->segments, opt, dz);
 			}
 		}
 		cn = opt.size();
@@ -4827,8 +4818,8 @@ namespace gp {
 			auto pos = c->opt->size();
 			std::vector<std::vector<glm::vec2>>  tr;
 			std::vector<glm::vec3>  tv;
-			gp::fv_it fv = { pt };
-			gp::fv_it fv1 = { pt1 };
+			gp::fv_it fv(pt);
+			gp::fv_it fv1(pt1);
 			tv.clear();
 			auto n = tv.size();
 
@@ -4836,7 +4827,7 @@ namespace gp {
 			{
 				for (size_t x = 0; x < fv.count; x++)
 				{
-					gp::for_cvertex_old(fv, fv1, c->segments, tv, z);
+					gp::for_cvertex_old(&fv, &fv1, c->segments, tv, z);
 				}
 			}
 			else
@@ -4904,14 +4895,14 @@ namespace gp {
 			auto pos = c->opt->size();
 			std::vector<std::vector<glm::vec2>>  tr;
 			std::vector<glm::vec3>  tv;
-			gp::fv_it fv = { pt };
-			gp::fv_it fv1 = { pt1 };
+			gp::fv_it fv(pt);
+			gp::fv_it fv1(pt1);
 			tv.clear();
 			auto n = tv.size();
 			for (size_t x = 0; x < fv.count && x < fv1.count; x++)
 			{
 #if 1
-				gp::for_cvertex_old(fv, fv1, c->segments, tv, z);
+				gp::for_cvertex_old(&fv, &fv1, c->segments, tv, z);
 #else
 				gp::for_cvertex_wall(fv, fv1, c->segments, tv, z);
 #endif
@@ -5020,7 +5011,7 @@ namespace gp {
 	{
 		auto nn = *fv.lengths;
 		std::vector<glm::vec3> tv1[2], tv2[2], t;
-		gp::get_fv_old(fv, 0, num_segments, z, t);
+		gp::get_fv_old(&fv, 0, num_segments, z, t);
 		//nn--;
 		std::vector<glm::vec3> tv;
 		tv.reserve(tv.size() + fv.count * 3);
@@ -5032,7 +5023,7 @@ namespace gp {
 		for (int x = 1; x < nn; x++)
 		{
 			t.clear();
-			gp::get_fv_old(fv, x, num_segments, z, t);
+			gp::get_fv_old(&fv, x, num_segments, z, t);
 			for (size_t i = 0; i < t.size(); i++)
 			{
 				opt.lineTo(t[i]);
@@ -5067,7 +5058,7 @@ namespace gp {
 			std::vector<std::vector<glm::vec2>>  tr;
 			std::vector<glm::vec3>  tv;
 			gp::fv_it fv = { pt };
-			gp::fv_it fv1 = { pt1 };
+			gp::fv_it fv1(pt1);
 			tv.clear();
 			auto n = tv.size();
 			std::vector<glm::vec3> t[2];
@@ -29555,9 +29546,10 @@ void print_data_de(const void* p, std::string* t)
 void hex_editor::set_pos(size_t pos)
 {
 	if (pos < _size) {
+		bool isr = ctpos == pos;
 		ctpos = pos;
 		range.x = range.y = pos;
-		if (ctpos == pos)return;
+		if (isr)return;
 		auto p = _data + pos;
 		data_inspector.clear();
 		auto di = &data_inspector;

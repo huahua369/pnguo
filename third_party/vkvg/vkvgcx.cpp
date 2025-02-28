@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 // 实现
-#define GLM_FORCE_XYZW_ONLY
+#define GLM_ENABLE_EXPERIMENTAL 
 #include <glm/glm.hpp>
 #include <glm/gtx/vector_angle.hpp>
 #include <glm/gtx/closest_point.hpp>

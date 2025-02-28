@@ -5908,7 +5908,7 @@ namespace vkr
 
 							auto ts = primitive.targets.size();// todo 变形
 							if (ts > 0) {
-								printf("targets %ulld\n", ts);
+								printf("targets %zu\n", ts);
 							}
 							// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
 							//
