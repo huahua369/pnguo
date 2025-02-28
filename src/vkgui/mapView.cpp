@@ -667,7 +667,7 @@ namespace hz
 				continue;
 			}
 #ifdef _WIN32
-			mkdir(file_name);
+			mkdir(file_name, mod);
 #else
 #ifndef __ANDROID__
 			mkdir(file_name, mod);

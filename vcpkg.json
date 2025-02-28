@@ -3,6 +3,7 @@
     "pkgconf",
     "fontconfig",
     "harfbuzz",
+    "icu",
     "librsvg", 
     "cairo",
     "openssl",
@@ -17,6 +18,10 @@
     "libuv",
     "libusb",
     "entt",
-    "opencv"
+    "opencv",
+    "libssh2",
+    "curl",
+    "tinygltf",
+    "hwloc"
   ]
 }

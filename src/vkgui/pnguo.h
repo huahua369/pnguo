@@ -2001,6 +2001,7 @@ struct text_draw_t
 	text_style_t* st;
 	glm::vec4 box_rc;
 };
+struct rect_select_x;
 
 // 16进制编辑
 struct hex_editor
@@ -2018,10 +2019,11 @@ public:
 	int bytes_per_line = 16;		// 第行显示字节数4-256
 	int64_t acount = 0;				// 行数量 
 	glm::i64vec2 range = {};		// 选中范围
-	glm::i64vec2 range2 = {};		// 选中范围,从小到大
-	glm::ivec2 range_c1 = {};		// 选中范围,从小到大,当前视图位置
 	glm::vec4 text_rc[7] = {};		// 渲染区域
 	uint32_t color[7] = {};			// 渲染颜色
+	uint32_t select_color = 0xfff77d5a;
+	float round_path = 0.2;			// 圆角选区
+
 private:
 	unsigned char* _data = 0;
 	size_t _size = 0;
@@ -2030,12 +2032,15 @@ private:
 	glm::ivec2 view_size = { 600,1080 }; // 视图高 
 	text_draw_t tdt = {};
 private:
+	glm::i64vec2 range2 = {};		// 选中范围,从小到大
+	glm::i64vec2 range_c1 = {};		// 选中范围c
+	int64_t ctpos = -1;
+	rect_select_x* rsx = 0;
 	std::string bpline;				// 缓存用
 	std::vector<char> tempstr;		// 缓存用
 	void* mapfile = 0;				// 映射文件
 	bool is_update = true;
 	bool _rdonly = false;
-	bool roundselect = true;
 public:
 	hex_editor();
 	~hex_editor();
@@ -2061,9 +2066,12 @@ public:
 	size_t size();
 	bool update_hex_editor();
 	text_draw_t* get_drawt();
+	glm::i64vec2 get_range2();
+	void draw_rc(cairo_t* cr);
 private:
 	// 鼠标坐标转偏移
 	int64_t get_mpos2offset(const glm::i64vec2& mpos);
+	void make_rc();
 };
 void draw_draw_texts(text_draw_t* p);
 /*

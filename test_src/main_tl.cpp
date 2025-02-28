@@ -276,6 +276,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 		}
 	}
 }
+
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
@@ -294,7 +295,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->draggable = false; //可拖动
 	p->set_size(size);
 	p->set_pos({ 1,30 });
-	p->set_select_box(2, 0.012);
+	p->set_select_box(2 * 0, 0.012);	// 设置是否显示选择框
 	p->on_click = [](plane_ev* e) {};
 	p->fontsize = 16;
 	int width = 16;
@@ -383,7 +384,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto c = a * b;
 	size /= 2;
 	glm::vec2 hex_size = { 900,600 };
-	auto dpx = p->push_dragpos({ 50,160 }, hex_size);// 增加一个拖动坐标
+	auto dpx = p->push_dragpos({ 20,60 }, hex_size);// 增加一个拖动坐标
 	auto rint = get_rand64(0, (uint32_t)-1);
 
 	auto ft = p->ltx->ctx;
@@ -523,8 +524,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 				glm::ivec2 scpos = e->mpos - p->tpos;// 减去本面板坐标
 				scpos -= (glm::ivec2)dps;
 				//printf("old click:%d\t%d\n", scpos.x, scpos.y);
-				auto vps = hex_scroll.v->get_offset_ns();
 				auto hps = hex_scroll.h->get_offset_ns();
+				auto vps = hex_scroll.v->get_offset_ns();
 				scpos -= (glm::ivec2)phex->text_rc[2];
 				phex->on_mouse(e->clicks, scpos, hps, vps);
 				scpos.x += hps;
@@ -572,9 +573,10 @@ void show_ui(form_x* form0, menu_cx* gm)
 				auto rc2 = rc;
 
 				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
-				auto vps = hex_scroll.v->get_offset_ns() / fl;
-				auto xx = hex_scroll.h->get_offset_ns();
-				cairo_translate(cr, -xx, 0);
+				auto pxx = hex_scroll.h->get_offset_ns();
+				auto pyy = hex_scroll.v->get_offset_ns();
+				auto vps = pyy / fl;
+				cairo_translate(cr, -pxx, 0);
 				phex->set_linepos(vps);
 				phex->update_hex_editor();
 
@@ -612,6 +614,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[4] = 0xff999999;	// 数据检查器字段头
 				phex->color[5] = -1;			// 数据检查器标题
 				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
+				{
+					cairo_as _ss_(cr);
+					clip_cr(cr, phex->text_rc[2]);
+					cairo_translate(cr, phex->text_rc[2].x, phex->text_rc[2].y - pyy);
+					phex->draw_rc(cr);
+				}
 				draw_draw_texts(dt);
 				if (dt->box_rc.z != hex_scroll.h->_content_size)
 					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);

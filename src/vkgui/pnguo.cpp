@@ -3752,7 +3752,7 @@ namespace gp {
 		return nSize;
 	}
 	// 坐标，角度，圆，段数，高度，输出圆角点或单点
-	int get_fv(glm::vec2 ps, glm::vec2 a, glm::vec3 c, size_t num_segments, float z, std::vector<glm::vec3>& tv)
+	int get_fv(const glm::vec2& ps, const glm::vec2& a, const glm::vec3& c, size_t num_segments, float z, std::vector<glm::vec3>& tv)
 	{
 		if (c.z > 0)
 		{
@@ -3876,7 +3876,7 @@ namespace gp {
 	}
 
 	// 旧函数
-	int get_fv(fv_it& fv, int i, size_t num_segments, float z, std::vector<glm::vec3>& tv)
+	int get_fv_old(fv_it& fv, int i, size_t num_segments, float z, std::vector<glm::vec3>& tv)
 	{
 		auto ps = fv.pos[i];
 		auto a = fv.angle[i];
@@ -3899,18 +3899,18 @@ namespace gp {
 	}
 	PathsD fv2pathsd(fv_it* p, int num_segments)
 	{
-		PathsD r;
+		PathsD r = {};
 		auto fv = *p;
 		float z = 0;
 		for (size_t x = 0; x < p->count; x++)
 		{
 			auto nn = *fv.lengths;
 			std::vector<glm::vec3> tv1;
-			PathD v0;
+			PathD v0 = {};
 			for (int i = 0; i < nn; i++)
 			{
 				tv1.clear();
-				get_fv(fv, i, num_segments, z, tv1);
+				get_fv_old(fv, i, num_segments, z, tv1);
 				for (auto& it : tv1)
 				{
 					v0.push_back({ it.x,it.y });
@@ -4019,8 +4019,8 @@ namespace gp {
 	{
 		auto nn = *fv.lengths;
 		std::vector<glm::vec3> tv1[2], tv2[2], t[2];
-		get_fv(fv, 0, num_segments, z.x, t[0]);
-		get_fv(fv1, 0, num_segments, z.y, t[1]);
+		get_fv_old(fv, 0, num_segments, z.x, t[0]);
+		get_fv_old(fv1, 0, num_segments, z.y, t[1]);
 		tv1[0] = t[0];
 		tv2[0] = t[1];
 		nn--;
@@ -4035,8 +4035,8 @@ namespace gp {
 			n1[0] = tv2[0].size();
 			tv1[1].clear();
 			tv2[1].clear();
-			get_fv(fv, i, num_segments, z.x, tv1[1]);
-			get_fv(fv1, i, num_segments, z.y, tv2[1]);
+			get_fv_old(fv, i, num_segments, z.x, tv1[1]);
+			get_fv_old(fv1, i, num_segments, z.y, tv2[1]);
 
 			n0[1] = tv1[1].size();
 			n1[1] = tv2[1].size();
@@ -4269,12 +4269,12 @@ namespace gp {
 		std::vector<glm::vec3> tv1, tv2;
 		for (int i = 0; i < nn; i++)
 		{
-			get_fv(fv, i, num_segments, z.x, tv1);
+			get_fv_old(fv, i, num_segments, z.x, tv1);
 		}
 		auto nn1 = *fv1.lengths;
 		for (int i = 0; i < nn1; i++)
 		{
-			get_fv(fv1, i, num_segments, z.y, tv2);
+			get_fv_old(fv1, i, num_segments, z.y, tv2);
 		}
 
 		auto a1 = area_ofRingSigned(tv1.data(), tv1.size());
@@ -5020,7 +5020,7 @@ namespace gp {
 	{
 		auto nn = *fv.lengths;
 		std::vector<glm::vec3> tv1[2], tv2[2], t;
-		gp::get_fv(fv, 0, num_segments, z, t);
+		gp::get_fv_old(fv, 0, num_segments, z, t);
 		//nn--;
 		std::vector<glm::vec3> tv;
 		tv.reserve(tv.size() + fv.count * 3);
@@ -5032,7 +5032,7 @@ namespace gp {
 		for (int x = 1; x < nn; x++)
 		{
 			t.clear();
-			gp::get_fv(fv, x, num_segments, z, t);
+			gp::get_fv_old(fv, x, num_segments, z, t);
 			for (size_t i = 0; i < t.size(); i++)
 			{
 				opt.lineTo(t[i]);
@@ -29249,6 +29249,15 @@ void do_text(const char* str, size_t first, size_t count)
 
 // 16进制编辑
 #if 1
+
+struct rect_select_x
+{
+	std::vector<glm::ivec4> rangerc;
+	PathsD range_path = {};						// 圆角选区缓存
+	path_v ptr_path = {};
+};
+
+
 hex_editor::hex_editor()
 {
 }
@@ -29260,6 +29269,7 @@ hex_editor::~hex_editor()
 	mapfile = 0;
 	_data = 0;
 	_size = 0;
+	if (rsx)delete rsx; rsx = 0;
 }
 
 void hex_editor::set_linechar(int height, int charwidth)
@@ -29545,6 +29555,9 @@ void print_data_de(const void* p, std::string* t)
 void hex_editor::set_pos(size_t pos)
 {
 	if (pos < _size) {
+		ctpos = pos;
+		range.x = range.y = pos;
+		if (ctpos == pos)return;
 		auto p = _data + pos;
 		data_inspector.clear();
 		auto di = &data_inspector;
@@ -29567,7 +29580,6 @@ glm::i64vec2 get_dv2(int64_t x, int64_t y)
 	int next = prev + y;
 	return { prev, next };
 }
-
 void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int64_t vpos)
 {
 	if (!_data || !_size)return;
@@ -29577,96 +29589,13 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 	auto ost = get_mpos2offset(nmpos);
 	if (clicks > 0)
 	{
-		range.x = ost;
 		set_pos(ost);
+		printf("%lld\n", ost);
 	}
 	else {
 		range.y = ost;
-		range2 = range;
-		if (range.x > range.y)
-		{
-			std::swap(range2.x, range2.y);
-		}
-		auto f = get_dv2(range2.x, bytes_per_line).x;
-		auto s = get_dv2(range2.y, bytes_per_line).y;
-		std::vector<glm::ivec4> rangerc;
-		PathsD range_path;						// 圆角选区缓存
-		path_v ptr_path;
-		// 生成选中背景矩形
-		if (range2.x != range2.y && line_height > 0 && char_width > 0) {
-			int cw = char_width * 3;
-
-			std::vector<glm::vec4> rss;
-			//if (v1.y == v2.y)
-			//{
-			//	auto ks = lvs[v1.y];
-			//	auto w1 = widths[v1.y];
-			//	auto xc = char2pos(v.x - ks.x, pstr + ks.x);
-			//	auto yc = char2pos(v.y - ks.x, pstr + ks.x);
-			//	int w = w1[xc];
-			//	int ww = w1[yc] - w;
-			//	rss.push_back({ w ,v1.y * h,ww,h });// 同一行时
-			//}
-			//else {
-			//	auto ks = lvs[v1.y];
-			//	auto w1 = widths[v1.y];
-			//	auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
-			//	auto wd = *w1.rbegin() - w;
-			//	rss.push_back({ w,v1.y * h,wd + pwidth,h });// 第一行
-			//}
-			//for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
-			//{
-			//	auto ks = lvs[i];
-			//	auto w1 = widths[i];
-			//	rss.push_back({ 0,i * h,*w1.rbegin() + pwidth, h });// 中间全行
-			//}
-			//if (v1.y < v2.y)
-			//{
-			//	auto ks = lvs[v2.y];
-			//	auto w1 = widths[v2.y];
-			//	rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });//最后一行
-			//}
-
-
-			if (roundselect)
-			{
-				PathsD subjects;
-				PathD a;
-
-				int py = 0;
-				for (size_t i = 0; i < rss.size(); i++)
-				{
-					auto& it = rss[i];
-					if (it.z < 1)
-						it.z = cw;
-					a.push_back({ it.x,it.y + py });
-					a.push_back({ it.x + it.z,it.y + py });
-					a.push_back({ it.x + it.z,it.y + it.w + py });
-					a.push_back({ it.x,it.y + it.w + py });
-					subjects.push_back(a);
-					a.clear();
-				}
-				subjects = Union(subjects, FillRule::NonZero, 6);
-				//range_path = InflatePaths(subjects, 0.5, JoinType::Round, EndType::Polygon);
-				auto sn = subjects.size();
-				if (sn > 0)
-				{
-					path_v& ptr = ptr_path;
-					ptr._data.clear();
-					for (size_t i = 0; i < sn; i++)
-					{
-						auto& it = subjects[i];
-						ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
-					}
-					int round_path = 4;
-					range_path = gp::path_round(&ptr, -1, line_height * round_path, 16, 0, 0);
-				}
-				else { range_path.clear(); }
-			}
-
-		}
-		printf("fs\t%lld\t%lld\n", f, s);
 	}
+	make_rc();
 	return;
 }
 
@@ -29782,6 +29711,36 @@ text_draw_t* hex_editor::get_drawt()
 	return &tdt;
 }
 
+glm::i64vec2 hex_editor::get_range2()
+{
+	range2 = range;
+	if (range.x > range.y)
+	{
+		std::swap(range2.x, range2.y);
+	}
+	return range2;
+}
+
+void hex_editor::draw_rc(cairo_t* cr)
+{
+	if (!rsx || rsx->rangerc.empty())return;
+	set_color(cr, select_color);
+	if (round_path > 0)
+	{
+		if (rsx->range_path.size() && rsx->range_path[0].size() > 3) {
+			draw_polyline(cr, &rsx->range_path, true);
+			cairo_fill(cr);
+		}
+	}
+	else {
+		for (auto& it : rsx->rangerc)
+		{
+			draw_rectangle(cr, it, std::min(it.z, it.w) * 0.18);
+			cairo_fill(cr);
+		}
+	}
+}
+
 int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 {
 	auto x = (mpos.x / char_width);
@@ -29791,6 +29750,88 @@ int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 	x = glm::clamp(x, (int64_t)0, (int64_t)bytes_per_line - 1);
 	y *= bytes_per_line;
 	return x + y;
+}
+
+void hex_editor::make_rc()
+{
+	int64_t x = 0; int64_t y = 0;
+	get_range2();
+	if (range_c1 == range2)return;
+	range_c1 = range2;
+	auto f = get_dv2(range2.x, bytes_per_line);
+	auto s = get_dv2(range2.y, bytes_per_line);
+	// 生成选中背景矩形
+	if (line_height > 0 && char_width > 0) {
+		if (!rsx)
+		{
+			rsx = new rect_select_x();
+		}
+		std::vector<glm::ivec4> rss;
+		auto hf = f.x / bytes_per_line;
+		auto hs = s.x / bytes_per_line;
+		auto line_no = _size / bytes_per_line;
+		int64_t cw = char_width * 3;
+		if (range2.x == range2.y) {
+			rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, char_width * 2, line_height });
+		}
+		else
+		{
+			int y2 = range2.y + 1;	// 补一格
+			if (f.y == s.y)
+			{
+				rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, (y2 - range2.x) * cw, line_height });// 同一行时
+			}
+			else {
+				rss.push_back({ x + (range2.x - f.x) * cw, y + hf * line_height, (bytes_per_line - (range2.x - f.x)) * cw, line_height });// 第一行
+			}
+			for (int i = hf + 1; i < line_no && i < hs; i++)
+			{
+				rss.push_back({ x + 0, y + i * line_height, bytes_per_line * cw, line_height });// 中间全行
+			}
+			if (hf < hs)
+			{
+				rss.push_back({ x + 0, y + hs * line_height, (y2 - s.x) * cw, line_height });//最后一行
+			}
+		}
+		rsx->rangerc = rss;
+		if (round_path > 0)
+		{
+			PathsD subjects;
+			PathD a;
+
+			int py = 0;
+			for (size_t i = 0; i < rss.size(); i++)
+			{
+				auto& it = rss[i];
+				if (it.z < 1)
+					it.z = cw;
+				a.push_back({ it.x,it.y + py });
+				a.push_back({ it.x + it.z,it.y + py });
+				a.push_back({ it.x + it.z,it.y + it.w + py });
+				a.push_back({ it.x,it.y + it.w + py });
+				subjects.push_back(a);
+				a.clear();
+			}
+			subjects = Union(subjects, FillRule::NonZero, 6);
+			//range_path = InflatePaths(subjects, 0.5, JoinType::Round, EndType::Polygon);
+			auto sn = subjects.size();
+			if (sn > 0)
+			{
+				path_v& ptr = rsx->ptr_path;
+				ptr._data.clear();
+				for (size_t i = 0; i < sn; i++)
+				{
+					auto& it = subjects[i];
+					ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
+				}
+				round_path = glm::clamp(round_path, 0.0f, 0.5f);
+				rsx->range_path = gp::path_round(&ptr, -1, char_width * round_path, 16, 0, 0);
+			}
+			else { rsx->range_path.clear(); }
+		}
+
+	}
+	//printf("fs\t%lld\t%lld\n", f, s);
 }
 
 
