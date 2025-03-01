@@ -277,6 +277,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 	}
 }
 
+#include <cmark.h> 
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
@@ -330,6 +331,42 @@ void show_ui(form_x* form0, menu_cx* gm)
 	};
 	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
+
+
+	hz::mfile_t mfile;
+	auto markdown_text = mfile.open_d("E:\\d3m\\pnguo\\README.md", true);
+	cmark_node* doc = cmark_parse_document(markdown_text, strlen(markdown_text), CMARK_OPT_DEFAULT);
+	cmark_iter* iter = cmark_iter_new(doc);
+	while (cmark_iter_next(iter) != CMARK_EVENT_DONE) {
+		cmark_node* node = cmark_iter_get_node(iter);
+		auto type = cmark_node_get_type(node);
+		switch (type) {
+		case CMARK_NODE_HEADING:
+		{
+			// 标题渲染（调整字体大小）
+			auto hl = cmark_node_get_heading_level(node);
+			printf("heading %d\n", hl);
+			//cairo_set_font_size(cr, 24 - 2 * cmark_node_get_heading_level(node));
+		}
+		break;
+		case CMARK_NODE_CODE:
+		case CMARK_NODE_TEXT:
+		{
+			// 文本渲染 
+			auto str = cmark_node_get_literal(node);
+			printf("%s\n", str);
+			//cairo_show_text(cr, cmark_node_get_literal(node));
+		}
+		break;
+		case CMARK_NODE_CODE_BLOCK:
+			// 代码块背景色填充 
+			//cairo_rectangle(cr, x, y, block_width, block_height);
+			//cairo_set_source_rgb(cr, 0.9, 0.9, 0.9);
+			//cairo_fill(cr);
+			break;
+		}
+	}
+	cmark_node_free(doc);
 #if 0
 	std::vector<menu_info> vm;
 	vm.push_back({ mname.data(),mname.size() });

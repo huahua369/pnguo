@@ -115,7 +115,8 @@ find_package(ZLIB REQUIRED)
 find_package(harfbuzz CONFIG REQUIRED)
 find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h") 
-find_package(EnTT CONFIG REQUIRED)  
+find_package(EnTT CONFIG REQUIRED)
+find_package(cmark CONFIG REQUIRED)
 
 
 find_package(PkgConfig REQUIRED)
@@ -169,7 +170,7 @@ add_library (tpv STATIC ${tpv_src})
 #add_library (tpv SHARED ${tpv_src})
 target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
-PkgConfig::GTHREAD
+PkgConfig::GTHREAD cmark::cmark
 #mimalloc-static 
 #PkgConfig::LIBGIT2
 )
