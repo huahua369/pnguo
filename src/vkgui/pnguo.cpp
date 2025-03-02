@@ -29771,18 +29771,18 @@ void hex_editor::make_rc()
 			int y2 = range2.y + 1;	// 补一格
 			if (f.y == s.y)
 			{
-				rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, (y2 - range2.x) * cw, line_height });// 同一行时
+				rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, (y2 - range2.x) * cw - char_width, line_height });// 同一行时
 			}
 			else {
-				rss.push_back({ x + (range2.x - f.x) * cw, y + hf * line_height, (bytes_per_line - (range2.x - f.x)) * cw, line_height });// 第一行
+				rss.push_back({ x + (range2.x - f.x) * cw, y + hf * line_height, (bytes_per_line - (range2.x - f.x)) * cw - char_width, line_height });// 第一行
 			}
 			for (int i = hf + 1; i < line_no && i < hs; i++)
 			{
-				rss.push_back({ x + 0, y + i * line_height, bytes_per_line * cw, line_height });// 中间全行
+				rss.push_back({ x + 0, y + i * line_height, bytes_per_line * cw - char_width, line_height });// 中间全行
 			}
 			if (hf < hs)
 			{
-				rss.push_back({ x + 0, y + hs * line_height, (y2 - s.x) * cw, line_height });//最后一行
+				rss.push_back({ x + 0, y + hs * line_height, (y2 - s.x) * cw - char_width, line_height });//最后一行
 			}
 		}
 		rsx->rangerc = rss;

@@ -1879,6 +1879,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 	auto vbs = av->vtxs.size();
 	auto ibs = av->idxs.size();
 	std::vector<int> idxs;
+	struct { SDL_Texture* texture; SDL_BlendMode blendMode; } states = {};
 	for (auto& pcmd : av->cmd_data)
 	{
 		glm::vec2 clip_min((pcmd.clip_rect.x - clip_off.x) * clip_scale.x, (pcmd.clip_rect.y - clip_off.y) * clip_scale.y);
@@ -1893,7 +1894,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 			SDL_SetRenderClipRect(renderer, &r);
 		}
 		//SDL_SetTextureBlendMode(states.texture, states.blendMode);
-		auto tex = (SDL_Texture*)pcmd.texid;
+		auto texture = (SDL_Texture*)pcmd.texid;
 #if 0
 		SDL_RenderGeometry(renderer, tex, vd + pcmd.vtxOffset, pcmd.vCount, ibs ? idv + pcmd.idxOffset : nullptr, pcmd.elemCount);
 #else
@@ -1905,7 +1906,14 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 		int size_indices = 4;
 		auto indices = ibs ? idv + pcmd.idxOffset : nullptr;
 		auto num_indices = pcmd.elemCount;
-		SDL_RenderGeometryRaw(renderer, tex, xy, stride, color, stride, uv, stride, pcmd.vCount, indices, num_indices, size_indices);
+		if ((BlendMode_e)pcmd.blend_mode != BlendMode_e::none) {
+			auto blend = get_blend((BlendMode_e)pcmd.blend_mode, false);
+			if (states.blendMode != blend || states.texture != texture) {
+				states.texture = texture; states.blendMode = blend;
+				SDL_SetTextureBlendMode(states.texture, states.blendMode);
+			}
+		}
+		SDL_RenderGeometryRaw(renderer, texture, xy, stride, color, stride, uv, stride, pcmd.vCount, indices, num_indices, size_indices);
 
 #endif
 	}
@@ -2709,7 +2717,7 @@ int get_cpus(cpuinfo_t* lct) {
 	return 0;
 
 }
-std::string formatBytes(uint64_t bytes) 
+std::string formatBytes(uint64_t bytes)
 {
 	const std::vector<std::string> units = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB","YB", "BB" };
 	double size = static_cast<double>(bytes);

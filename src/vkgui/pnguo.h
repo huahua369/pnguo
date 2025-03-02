@@ -248,6 +248,7 @@ public:
 		uint32_t idxOffset = 0;
 		uint32_t elemCount = 0;
 		uint32_t vCount = 0;
+		int blend_mode = 0;				// 混合模式	
 	};
 	std::vector<draw_cmd_c> cmd_data;	// 渲染命令
 	std::vector<vertex_v2> vtxs;		// 顶点数据

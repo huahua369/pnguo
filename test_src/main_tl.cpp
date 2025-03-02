@@ -284,6 +284,58 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 }
 #include <md4c.h>
 #include <cmark.h> 
+
+// 自定义回调函数定义 
+static int enter_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata);
+static int leave_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata);
+static int enter_span_callback(MD_SPANTYPE type, void* detail, void* userdata);
+static int leave_span_callback(MD_SPANTYPE type, void* detail, void* userdata);
+static int text_callback(MD_TEXTTYPE type, const MD_CHAR* text, MD_SIZE size, void* userdata);
+// 处理块级元素（如段落、标题）
+int enter_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata) {
+	switch (type) {
+	case MD_BLOCK_H: printf("# "); break;
+	case MD_BLOCK_P: printf("\n"); break;
+		// 支持列表、代码块等类型判断 [2]()
+	}
+	return 0;
+}
+int leave_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata) {
+	switch (type) {
+	case MD_BLOCK_H: printf("# "); break;
+	case MD_BLOCK_P: printf("\n"); break;
+		// 支持列表、代码块等类型判断 [2]()
+	}
+	return 0;
+}
+
+// 处理行内元素（如加粗、链接）
+int enter_span_callback(MD_SPANTYPE type, void* detail, void* userdata) {
+	switch (type) {
+	case MD_SPAN_STRONG: printf("**"); break;
+	case MD_SPAN_A: {
+		MD_SPAN_A_DETAIL* link = (MD_SPAN_A_DETAIL*)detail;
+		printf("[");
+	} break;
+	}
+	return 0;
+}
+int leave_span_callback(MD_SPANTYPE type, void* detail, void* userdata) {
+	switch (type) {
+	case MD_SPAN_STRONG: printf("**"); break;
+	case MD_SPAN_A: {
+		MD_SPAN_A_DETAIL* link = (MD_SPAN_A_DETAIL*)detail;
+		printf("[");
+	} break;
+	}
+	return 0;
+}
+
+// 处理文本内容 
+int text_callback(MD_TEXTTYPE type, const MD_CHAR* text, MD_SIZE size, void* userdata) {
+	printf("%.*s", (int)size, text);
+	return 0;
+}
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
@@ -342,141 +394,154 @@ void show_ui(form_x* form0, menu_cx* gm)
 	hz::mfile_t mfile;
 	auto markdown_text = mfile.open_d("E:\\d3m\\pnguo\\README.md", true);
 	cmark_node* doc = cmark_parse_document(markdown_text, strlen(markdown_text), CMARK_OPT_DEFAULT);
-	cmark_iter* iter = cmark_iter_new(doc);
-	while (cmark_iter_next(iter) != CMARK_EVENT_DONE) {
-		cmark_node* node = cmark_iter_get_node(iter);
-		auto type = cmark_node_get_type(node);
-		switch (type) {
+	if (1) {
+		cmark_iter* iter = cmark_iter_new(doc);
+		while (cmark_iter_next(iter) != CMARK_EVENT_DONE) {
+			cmark_node* node = cmark_iter_get_node(iter);
+			auto type = cmark_node_get_type(node);
+			switch (type) {
 
-			/* Block */
-		case CMARK_NODE_DOCUMENT:
-		{
-			// 文档渲染
-			printf("document\n");
-		}
-		break;
-		case CMARK_NODE_BLOCK_QUOTE:
-		{
-			// 块引用渲染
-			printf("block quote\n");
-		}
-		break;
-		case CMARK_NODE_LIST:
-		{
-			// 列表渲染
-			auto list_type = cmark_node_get_list_type(node);
-			auto list_start = cmark_node_get_list_start(node);
-			printf("list %d %d\n", list_type, list_start);
-		}break;
-		case CMARK_NODE_ITEM:
-		{
-			// 列表项渲染
-			auto list_type = cmark_node_get_list_type(node);
-			auto list_start = cmark_node_get_list_start(node);
-			printf("item %d %d\n", list_type, list_start);
-		}break;
-		case CMARK_NODE_CODE_BLOCK:
-		{
-			// 代码块渲染
-			auto str = cmark_node_get_literal(node);
-			printf("code block\t%s\n", str);
-		}break;
-		case CMARK_NODE_HTML_BLOCK:
-		{
-			// 块级HTML渲染
-			auto str = cmark_node_get_literal(node);
-			printf("html block\t%s\n", str);
-		}break;
-		case CMARK_NODE_CUSTOM_BLOCK:
-		{
-			// 自定义块渲染
-			auto str = cmark_node_get_literal(node);
-			printf("custom block\t%s\n", str);
-		}break;
-		case CMARK_NODE_PARAGRAPH:
-		{
-			// 段落渲染
-			auto str = cmark_node_get_literal(node);
-			printf("paragraph\t%s\n", str);
-		}break;
-		case CMARK_NODE_HEADING:
-		{
-			// 标题渲染（调整字体大小）
-			auto hl = cmark_node_get_heading_level(node);
-			printf("heading %d\n", hl);
-			//cairo_set_font_size(cr, 24 - 2 * cmark_node_get_heading_level(node));
-		}
-		break;
-		case CMARK_NODE_THEMATIC_BREAK:
-		{
-			// 分割线渲染
-			printf("thematic break\n");
-		}break;
-		/* Inline */
-		case CMARK_NODE_TEXT:
-		{
-			// 文本渲染 
-			auto str = cmark_node_get_literal(node);
-			printf("text\t%s\n", str);
-		}
-		break;
-		case CMARK_NODE_SOFTBREAK:
-		{
-			// 软换行渲染
-			printf("soft break\n");
-		}break;
-		case CMARK_NODE_LINEBREAK:
-		{
-			// 换行渲染
-			printf("line break\n");
-		}break;
-		case CMARK_NODE_CODE:
-		{
-			// 代码渲染
-			auto str = cmark_node_get_literal(node);
-			printf("code\t%s\n", str);
-		}break;
-		case CMARK_NODE_HTML_INLINE:
-		{
-			// 内联HTML渲染
-			auto str = cmark_node_get_literal(node);
-			printf("html\t%s\n", str);
-		}break;
-		case CMARK_NODE_CUSTOM_INLINE:
-		{
-			// 自定义内联渲染
-			auto str = cmark_node_get_literal(node);
-			printf("custom\t%s\n", str);
-		}break;
-		case CMARK_NODE_EMPH:
-		{
-			// 强调渲染
-			auto str = cmark_node_get_literal(node);
-			printf("emph\t%s\n", str);
-		}break;
-		case CMARK_NODE_STRONG:
-		{
-			// 加粗渲染
-			auto str = cmark_node_get_literal(node);
-			printf("strong\t%s\n", str);
-		}break;
-		case CMARK_NODE_LINK:
-		{
-			// 链接渲染
-			auto str = cmark_node_get_literal(node);
-			printf("link\t%s\n", str);
-		}break;
-		case CMARK_NODE_IMAGE:
-		{
-			// 图片渲染
-			auto str = cmark_node_get_literal(node);
-			printf("image\t%s\n", str);
-		}break;
-		default:
+				/* Block */
+			case CMARK_NODE_DOCUMENT:
+			{
+				// 文档渲染
+				printf("document\n");
+			}
 			break;
+			case CMARK_NODE_BLOCK_QUOTE:
+			{
+				// 块引用渲染
+				printf("block quote\n");
+			}
+			break;
+			case CMARK_NODE_LIST:
+			{
+				// 列表渲染
+				auto list_type = cmark_node_get_list_type(node);
+				auto list_start = cmark_node_get_list_start(node);
+				printf("list %d %d\n", list_type, list_start);
+			}break;
+			case CMARK_NODE_ITEM:
+			{
+				// 列表项渲染
+				auto list_type = cmark_node_get_list_type(node);
+				auto list_start = cmark_node_get_list_start(node);
+				printf("item %d %d\n", list_type, list_start);
+			}break;
+			case CMARK_NODE_CODE_BLOCK:
+			{
+				// 代码块渲染
+				auto str = cmark_node_get_literal(node);
+				printf("code block\t%s\n", str);
+			}break;
+			case CMARK_NODE_HTML_BLOCK:
+			{
+				// 块级HTML渲染
+				auto str = cmark_node_get_literal(node);
+				printf("html block\t%s\n", str);
+			}break;
+			case CMARK_NODE_CUSTOM_BLOCK:
+			{
+				// 自定义块渲染
+				auto str = cmark_node_get_literal(node);
+				printf("custom block\t%s\n", str);
+			}break;
+			case CMARK_NODE_PARAGRAPH:
+			{
+				// 段落渲染
+				auto str = cmark_node_get_literal(node);
+				printf("paragraph\t%s\n", str);
+			}break;
+			case CMARK_NODE_HEADING:
+			{
+				// 标题渲染（调整字体大小）
+				auto hl = cmark_node_get_heading_level(node);
+				printf("heading %d\n", hl);
+				//cairo_set_font_size(cr, 24 - 2 * cmark_node_get_heading_level(node));
+			}
+			break;
+			case CMARK_NODE_THEMATIC_BREAK:
+			{
+				// 分割线渲染
+				printf("thematic break\n");
+			}break;
+			/* Inline */
+			case CMARK_NODE_TEXT:
+			{
+				// 文本渲染 
+				auto str = cmark_node_get_literal(node);
+				printf("text\t%s\n", str);
+			}
+			break;
+			case CMARK_NODE_SOFTBREAK:
+			{
+				// 软换行渲染
+				printf("soft break\n");
+			}break;
+			case CMARK_NODE_LINEBREAK:
+			{
+				// 换行渲染
+				printf("line break\n");
+			}break;
+			case CMARK_NODE_CODE:
+			{
+				// 代码渲染
+				auto str = cmark_node_get_literal(node);
+				printf("code\t%s\n", str);
+			}break;
+			case CMARK_NODE_HTML_INLINE:
+			{
+				// 内联HTML渲染
+				auto str = cmark_node_get_literal(node);
+				printf("html\t%s\n", str);
+			}break;
+			case CMARK_NODE_CUSTOM_INLINE:
+			{
+				// 自定义内联渲染
+				auto str = cmark_node_get_literal(node);
+				printf("custom\t%s\n", str);
+			}break;
+			case CMARK_NODE_EMPH:
+			{
+				// 强调渲染
+				auto str = cmark_node_get_literal(node);
+				printf("emph\t%s\n", str);
+			}break;
+			case CMARK_NODE_STRONG:
+			{
+				// 加粗渲染
+				auto str = cmark_node_get_literal(node);
+				printf("strong\t%s\n", str);
+			}break;
+			case CMARK_NODE_LINK:
+			{
+				// 链接渲染
+				auto str = cmark_node_get_literal(node);
+				printf("link\t%s\n", str);
+			}break;
+			case CMARK_NODE_IMAGE:
+			{
+				// 图片渲染
+				auto str = cmark_node_get_literal(node);
+				printf("image\t%s\n", str);
+			}break;
+			default:
+				break;
+			}
 		}
+		cmark_node_free(doc);
 	}
-	cmark_node_free(doc);
+	MD_PARSER parser = {
+		.abi_version = 0,
+		.flags = MD_FLAG_COLLAPSEWHITESPACE,
+		.enter_block = enter_block_callback,
+		.leave_block = leave_block_callback,
+		.enter_span = enter_span_callback,
+		.leave_span = leave_span_callback,
+		.text = text_callback,
+	};
+	printf("\n\n");
+	md_parse(markdown_text, strlen(markdown_text), &parser, NULL);
 #if 0
 	std::vector<menu_info> vm;
 	vm.push_back({ mname.data(),mname.size() });
