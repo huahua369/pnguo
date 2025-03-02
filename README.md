@@ -21,7 +21,10 @@ git pull --depth 1 --allow-unrelated-histories
 3. vcpkg安装依赖库，根据错误提示安装需要的库
 4. 渲染器依赖```vcpkg install pkgconf tinygltf glm stb nlohmann-json vulkan```
 5. 可选参考```vcpkg install pkgconf openssl tinygltf glm stb nlohmann-json vulkan zlib cairo fontconfig harfbuzz exprtk clipper2 librsvg entt```
- 
+
+| Column 1 | Column 2 | Column 3 |
+|:--------| :---------:|--------:|
+| centered 文本居左 | right-aligned 文本居中 |right-aligned 文本居右|
 
 ## To Do 
 
