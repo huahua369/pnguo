@@ -56,49 +56,57 @@ extern "C" {
 /*
 容器控件：子项渲染、事件处理、数据结构
 */
+#include <memory>
+#include <filesystem>
+
 class vcpkg_cx
 {
 public:
 	std::queue<std::string> cmds;
 	std::mutex _lock;
-	std::string rootdir;// vcpkg根目录
+	std::string rootdir; // vcpkg根目录
 	njson vlist;
 	njson vsearch;
+
 public:
 	vcpkg_cx();
 	~vcpkg_cx();
 	void do_clone(const std::string& dir, int depth);
 	void do_bootstrap();
-	// 拉取
 	void do_pull();
-	// 比较更新了哪些库
 	void do_update(const std::string& t);
-	// 搜索库
 	void do_search();
-	// 列出安装库
 	void do_list();
-	// 集成到全局
 	void do_integrate_i();
-	// 移除全局
 	void do_integrate_r();
-	// 查看支持的架构
 	void do_get_triplet();
-	// 安装库
 	void do_install(const std::string& t, const std::string& triplet);
-	// 删除库
 	void do_remove(const std::string& t, const std::string& triplet);
-	// 执行自定义命令
 	void push_cmd(const std::string& c);
-	// 执行命令
 	void do_cmd();
-private:
 
+private:
+	bool is_valid_rootdir() const;
+	void add_cmd(const std::string& cmd);
 };
+
 vcpkg_cx::vcpkg_cx() {}
 vcpkg_cx::~vcpkg_cx() {}
+
+bool vcpkg_cx::is_valid_rootdir() const
+{
+	return rootdir.size() >= 2;
+}
+
+void vcpkg_cx::add_cmd(const std::string& cmd)
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	cmds.push(cmd);
+}
+
 void vcpkg_cx::do_clone(const std::string& dir, int depth)
 {
-	if (dir.size() < 2)return;
+	if (dir.size() < 2) return;
 	std::lock_guard<std::mutex> lock(_lock);
 	rootdir = dir;
 	std::string c = "git clone https://github.com/microsoft/vcpkg.git";
@@ -108,101 +116,96 @@ void vcpkg_cx::do_clone(const std::string& dir, int depth)
 	}
 	cmds.push(c);
 }
+
 void vcpkg_cx::do_bootstrap()
 {
-	if (rootdir.size() < 2)return;
-	std::lock_guard<std::mutex> lock(_lock);
+	if (!is_valid_rootdir()) return;
+	add_cmd(
 #ifdef _WIN32
-	cmds.push("bootstrap-vcpkg.bat");
+		"bootstrap-vcpkg.bat"
 #else
-	cmds.push("bootstrap-vcpkg.sh");
-#endif // _WIN32
-
+		"bootstrap-vcpkg.sh"
+#endif
+	);
 }
+
 void vcpkg_cx::do_pull()
 {
-	if (rootdir.size() < 2)return;
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("git pull");
+	if (!is_valid_rootdir()) return;
+	add_cmd("git pull");
 }
+
 void vcpkg_cx::do_update(const std::string& t)
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("vcpkg update");
+	add_cmd("vcpkg update");
 }
+
 void vcpkg_cx::do_search()
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("vcpkg search --x-full-desc --x-json");
+	add_cmd("vcpkg search --x-full-desc --x-json");
 }
+
 void vcpkg_cx::do_list()
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("vcpkg list --x-full-desc --x-json");
-
+	add_cmd("vcpkg list --x-full-desc --x-json");
 }
 
 void vcpkg_cx::do_integrate_i()
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("vcpkg integrate install");
+	add_cmd("vcpkg integrate install");
 }
 
 void vcpkg_cx::do_integrate_r()
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("vcpkg integrate remove");
+	add_cmd("vcpkg integrate remove");
 }
 
 void vcpkg_cx::do_get_triplet()
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push("vcpkg help triplet");
+	add_cmd("vcpkg help triplet");
 }
 
 void vcpkg_cx::do_install(const std::string& t, const std::string& triplet)
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	auto c = "vcpkg install " + t;
-	if (triplet.size())
+	std::string c = "vcpkg install " + t;
+	if (!triplet.empty())
 	{
 		c += ":" + triplet;
 	}
-	cmds.push(c);
+	add_cmd(c);
 }
 
 void vcpkg_cx::do_remove(const std::string& t, const std::string& triplet)
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	auto c = "vcpkg remove " + t;
-	if (triplet.size())
+	std::string c = "vcpkg remove " + t;
+	if (!triplet.empty())
 	{
 		c += ":" + triplet;
 	}
-	cmds.push(c);
+	add_cmd(c);
 }
 
 void vcpkg_cx::push_cmd(const std::string& c)
 {
-	std::lock_guard<std::mutex> lock(_lock);
-	cmds.push(c);
+	add_cmd(c);
 }
-
 
 void vcpkg_cx::do_cmd()
 {
 	std::string c;
-	for (; cmds.size();) {
+	while (!cmds.empty())
+	{
 		{
 			std::lock_guard<std::mutex> lock(_lock);
-			c.swap(cmds.front()); cmds.pop();
+			c.swap(cmds.front());
+			cmds.pop();
 		}
-		if (c.empty())continue;
+		if (c.empty()) continue;
 		auto jstr = hz::cmdexe(c, rootdir.empty() ? nullptr : rootdir.c_str());
 		try
 		{
 			njson k = njson::parse(jstr);
-			if (k.size())
+			if (!k.empty())
 				vlist = k;
 		}
 		catch (const std::exception& e)
@@ -210,9 +213,12 @@ void vcpkg_cx::do_cmd()
 			printf("json error:\t%s\n", e.what());
 		}
 		printf("%s\n", jstr.c_str());
-		// todo 处理返回结果
 	}
 }
+
+
+
+
 std::function<void(void* p, int type, int id)> mmcb;
 void mcb(void* p, int type, int id) {
 	if (mmcb)
@@ -276,7 +282,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 		}
 	}
 }
-
+#include <md4c.h>
 #include <cmark.h> 
 void show_ui(form_x* form0, menu_cx* gm)
 {
@@ -324,7 +330,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	std::vector<const char*> mname = {
 	"list",//列出安装库 
 	"search",//搜索库 
-	"pull",//拉取  		 
+	"pull",//拉取  	 
 	"get triplet",//查看支持的架构  
 	"integrate install",//集成到全局 
 	"integrate remove",//移除全局 
@@ -341,6 +347,58 @@ void show_ui(form_x* form0, menu_cx* gm)
 		cmark_node* node = cmark_iter_get_node(iter);
 		auto type = cmark_node_get_type(node);
 		switch (type) {
+
+			/* Block */
+		case CMARK_NODE_DOCUMENT:
+		{
+			// 文档渲染
+			printf("document\n");
+		}
+		break;
+		case CMARK_NODE_BLOCK_QUOTE:
+		{
+			// 块引用渲染
+			printf("block quote\n");
+		}
+		break;
+		case CMARK_NODE_LIST:
+		{
+			// 列表渲染
+			auto list_type = cmark_node_get_list_type(node);
+			auto list_start = cmark_node_get_list_start(node);
+			printf("list %d %d\n", list_type, list_start);
+		}break;
+		case CMARK_NODE_ITEM:
+		{
+			// 列表项渲染
+			auto list_type = cmark_node_get_list_type(node);
+			auto list_start = cmark_node_get_list_start(node);
+			printf("item %d %d\n", list_type, list_start);
+		}break;
+		case CMARK_NODE_CODE_BLOCK:
+		{
+			// 代码块渲染
+			auto str = cmark_node_get_literal(node);
+			printf("code block\t%s\n", str);
+		}break;
+		case CMARK_NODE_HTML_BLOCK:
+		{
+			// 块级HTML渲染
+			auto str = cmark_node_get_literal(node);
+			printf("html block\t%s\n", str);
+		}break;
+		case CMARK_NODE_CUSTOM_BLOCK:
+		{
+			// 自定义块渲染
+			auto str = cmark_node_get_literal(node);
+			printf("custom block\t%s\n", str);
+		}break;
+		case CMARK_NODE_PARAGRAPH:
+		{
+			// 段落渲染
+			auto str = cmark_node_get_literal(node);
+			printf("paragraph\t%s\n", str);
+		}break;
 		case CMARK_NODE_HEADING:
 		{
 			// 标题渲染（调整字体大小）
@@ -349,20 +407,72 @@ void show_ui(form_x* form0, menu_cx* gm)
 			//cairo_set_font_size(cr, 24 - 2 * cmark_node_get_heading_level(node));
 		}
 		break;
-		case CMARK_NODE_CODE:
+		case CMARK_NODE_THEMATIC_BREAK:
+		{
+			// 分割线渲染
+			printf("thematic break\n");
+		}break;
+		/* Inline */
 		case CMARK_NODE_TEXT:
 		{
 			// 文本渲染 
 			auto str = cmark_node_get_literal(node);
-			printf("%s\n", str);
-			//cairo_show_text(cr, cmark_node_get_literal(node));
+			printf("text\t%s\n", str);
 		}
 		break;
-		case CMARK_NODE_CODE_BLOCK:
-			// 代码块背景色填充 
-			//cairo_rectangle(cr, x, y, block_width, block_height);
-			//cairo_set_source_rgb(cr, 0.9, 0.9, 0.9);
-			//cairo_fill(cr);
+		case CMARK_NODE_SOFTBREAK:
+		{
+			// 软换行渲染
+			printf("soft break\n");
+		}break;
+		case CMARK_NODE_LINEBREAK:
+		{
+			// 换行渲染
+			printf("line break\n");
+		}break;
+		case CMARK_NODE_CODE:
+		{
+			// 代码渲染
+			auto str = cmark_node_get_literal(node);
+			printf("code\t%s\n", str);
+		}break;
+		case CMARK_NODE_HTML_INLINE:
+		{
+			// 内联HTML渲染
+			auto str = cmark_node_get_literal(node);
+			printf("html\t%s\n", str);
+		}break;
+		case CMARK_NODE_CUSTOM_INLINE:
+		{
+			// 自定义内联渲染
+			auto str = cmark_node_get_literal(node);
+			printf("custom\t%s\n", str);
+		}break;
+		case CMARK_NODE_EMPH:
+		{
+			// 强调渲染
+			auto str = cmark_node_get_literal(node);
+			printf("emph\t%s\n", str);
+		}break;
+		case CMARK_NODE_STRONG:
+		{
+			// 加粗渲染
+			auto str = cmark_node_get_literal(node);
+			printf("strong\t%s\n", str);
+		}break;
+		case CMARK_NODE_LINK:
+		{
+			// 链接渲染
+			auto str = cmark_node_get_literal(node);
+			printf("link\t%s\n", str);
+		}break;
+		case CMARK_NODE_IMAGE:
+		{
+			// 图片渲染
+			auto str = cmark_node_get_literal(node);
+			printf("image\t%s\n", str);
+		}break;
+		default:
 			break;
 		}
 	}
