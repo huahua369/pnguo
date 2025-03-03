@@ -237,6 +237,24 @@ public:
 private:
 
 };
+struct image_rect {
+	void* tex = 0;
+	glm::vec4 src = {}, dst = {}; 
+	int blend_mode = 0;					// 混合模式	
+};
+struct image_tiled {
+	void* tex = 0;
+	glm::vec4 src = {}, dst = {};
+	int blend_mode = 0;					// 混合模式	
+	float scale = 0.0f;					// Tiled 
+};
+struct image_9grid {
+	void* tex = 0;
+	glm::vec4 src = {}, dst = {};
+	int blend_mode = 0;					// 混合模式	
+	float scale = 0.0f;					// 9Grid
+	float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
+};
 class mesh2d_cx
 {
 public:

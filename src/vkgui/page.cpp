@@ -517,7 +517,7 @@ void test()
 			// 插入文本
 			if (single_line)
 			{
-				std::remove(it.str.begin(), it.str.end(), '\n');
+				auto rt = std::remove(it.str.begin(), it.str.end(), '\n');
 			}
 			//if (tvt && tvt->on_input)
 			//	tvt->on_input(&it.str);// 执行回调函数
