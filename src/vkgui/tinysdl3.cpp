@@ -535,7 +535,12 @@ void app_cx::call_cb(SDL_Event* e)
 }
 void app_cx::sleep_ms(int ms)
 {
-	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+	SDL_Delay(ms);
+	//std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+void app_cx::sleep_ns(int ns)
+{
+	SDL_DelayNS(ns);
 }
 void app_cx::set_fps(int n) {
 	_fps = n;
@@ -1854,8 +1859,7 @@ void form_x::update(float delta)
 	for (auto kt : skeletons) {
 		kt->update(delta);
 	}
-	app_cx::sleep_ms(dwt);
-	//SDL_Delay(dwt);
+	app_cx::sleep_ms(dwt); 
 }
 // todo 图集渲染
 void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)

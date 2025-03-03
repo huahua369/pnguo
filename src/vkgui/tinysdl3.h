@@ -91,7 +91,10 @@ public:
 public:
 	int run_loop(int t);
 	void call_cb(SDL_Event* e);
+	// 睡眠毫秒
 	static void sleep_ms(int ms);
+	// 睡眠纳秒
+	static void sleep_ns(int ns);
 	void set_fps(int n);
 	void set_syscursor(int type);
 	void set_defcursor(uint32_t t);

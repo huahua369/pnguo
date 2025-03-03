@@ -240,6 +240,13 @@ private:
 class mesh2d_cx
 {
 public:
+	struct tex_rs {
+		void* tex = 0;
+		glm::vec4 src = {}, dst = {};
+		float scale = 0.0f;					// Tiled、9Grid
+		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
+		int blend_mode = 0;					// 混合模式	
+	};
 	struct draw_cmd_c
 	{
 		glm::ivec4 clip_rect = {};
