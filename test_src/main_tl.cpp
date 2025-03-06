@@ -827,6 +827,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[5] = -1;			// 数据检查器标题
 				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
 
+				draw_rect(cr, bgrc, 0xff121212, 0x80ffffff, 2, 1);
 				clip_cr(cr, chs);
 				cairo_translate(cr, -pxx, 0);
 				{
@@ -836,14 +837,12 @@ void show_ui(form_x* form0, menu_cx* gm)
 					if (phex->get_draw_update()) {
 						phex->dtc.clear_color(0);
 						auto ncr = phex->dtc.cr;
-						draw_rect(ncr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
 						{
 							cairo_as _ss_(ncr);
 							clip_cr(ncr, phex->text_rc[2]);
 							cairo_translate(ncr, phex->text_rc[2].x, phex->text_rc[2].y - pyy);
 							phex->draw_rc(ncr);
 						}
-
 						draw_draw_texts(dt);
 					}
 					glm::vec4 nnrc = { 0,0,nrc };
