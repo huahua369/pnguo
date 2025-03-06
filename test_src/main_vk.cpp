@@ -434,7 +434,7 @@ int main()
 		{
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
+			vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
@@ -446,7 +446,7 @@ int main()
 			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
+			//vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
 			//vkd->load_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
@@ -460,7 +460,7 @@ int main()
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
-		//vkd->state.SelectedTonemapperIndex = 1;
+		vkd->_state.SelectedTonemapperIndex = 1;
 		vkd->_state.Exposure = 0.59928;
 		vkd->_state.EmissiveFactor = 250;
 		new_ui(form0, vkd);

@@ -2015,6 +2015,7 @@ void form_x::present_e()
 {
 	if (renderer)
 	{
+		printf("reset form\n");
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 		SDL_RenderClear(renderer);
 		SDL_RenderPresent(renderer);

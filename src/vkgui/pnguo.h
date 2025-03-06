@@ -239,7 +239,7 @@ private:
 };
 struct image_rect {
 	void* tex = 0;
-	glm::vec4 src = {}, dst = {}; 
+	glm::vec4 src = {}, dst = {};
 	int blend_mode = 0;					// 混合模式	
 };
 struct image_tiled {
@@ -2029,6 +2029,24 @@ struct text_draw_t
 };
 struct rect_select_x;
 
+class dtext_cache
+{
+public:
+	cairo_t* cr = 0;
+	cairo_surface_t* surface = 0; 
+	cairo_t* cr_in = 0;
+	glm::ivec2 size = {};
+public:
+	dtext_cache();
+	~dtext_cache();
+	void reset(cairo_t* cr_in, const glm::ivec2& vsize);
+	void free_surface();
+	void save2png(const char* name);
+	void clear_color(uint32_t color);
+private:
+
+};
+
 // 16进制编辑
 struct hex_editor
 {
@@ -2049,7 +2067,7 @@ public:
 	uint32_t color[7] = {};			// 渲染颜色
 	uint32_t select_color = 0xfff77d5a;
 	float round_path = 0.2;			// 圆角选区
-
+	dtext_cache dtc = {};
 private:
 	unsigned char* _data = 0;
 	size_t _size = 0;
@@ -2067,6 +2085,7 @@ private:
 	void* mapfile = 0;				// 映射文件
 	bool is_update = true;
 	bool _rdonly = false;
+	bool d_update = false;
 public:
 	hex_editor();
 	~hex_editor();
@@ -2093,7 +2112,10 @@ public:
 	bool update_hex_editor();
 	text_draw_t* get_drawt();
 	glm::i64vec2 get_range2();
+	// 获取渲染大小
+	glm::ivec2 get_draw_rect();
 	void draw_rc(cairo_t* cr);
+	bool get_draw_update();
 private:
 	// 鼠标坐标转偏移
 	int64_t get_mpos2offset(const glm::i64vec2& mpos);

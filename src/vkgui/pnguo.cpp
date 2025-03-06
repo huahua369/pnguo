@@ -11115,12 +11115,74 @@ void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_st
 }
 
 
+dtext_cache::dtext_cache()
+{
+}
+void dtext_cache::reset(cairo_t* crin, const glm::ivec2& vsize)
+{
+	if (vsize.x < 1 || vsize.y < 1)return;
+	if (vsize != size || cr_in != crin || !cr || !surface)
+	{
+		cr_in = crin; size = vsize;
+		free_surface();
+	}
+	else {
+		return;
+	}
+	auto surface_in = cairo_get_target(cr_in);
+	surface = cairo_surface_create_similar_image(surface_in, CAIRO_FORMAT_ARGB32, vsize.x, vsize.y);
+	cr = cairo_create(surface);
+}
+
+dtext_cache::~dtext_cache()
+{
+	free_surface();
+}
+void dtext_cache::free_surface()
+{
+	if (cr) {
+		cairo_destroy(cr);
+	}
+	if (surface)
+		cairo_surface_destroy(surface);
+	cr = 0;
+	surface = 0;
+}
+
+void dtext_cache::save2png(const char* name)
+{
+	if (surface)
+		cairo_surface_write_to_png(surface, name && *name ? name : "surface_label.png");
+}
+
+void dtext_cache::clear_color(uint32_t color)
+{
+	if (cr)
+	{
+		//set_color(cr, color);	// 设置蓝色 
+		//cairo_paint(cr);		// 填充整个Surface 
+		auto p = (uint32_t*)cairo_image_surface_get_data(surface);
+		size_t n = size.x * size.y;
+		if (color == 0) {
+			memset(p, 0, n * sizeof(int));
+		}
+		else {
+			for (size_t i = 0; i < n; i++)
+			{
+				p[i] = color;
+			}
+		}
+	}
+}
+
+
 void draw_draw_texts(text_draw_t* p)
 {
 	glm::ivec2 r = {}, r0 = {};
 	if (!p || !p->cr || !p->st || !p->ltx || !p->color || !p->text || !p->text_rc || p->count < 1)return;
 	p->box_rc.x = p->text_rc[0].x;
 	p->box_rc.y = p->text_rc[0].y;
+	cairo_as _ss_(p->cr);
 	for (size_t i = 0; i < p->count; i++)
 	{
 		p->st->text_color = p->color[i];
@@ -29553,7 +29615,8 @@ void hex_editor::set_pos(size_t pos)
 		auto p = _data + pos;
 		data_inspector.clear();
 		auto di = &data_inspector;
-		print_data_de(p, di);
+		print_data_de(p, di); 
+		d_update = true;
 	}
 }
 
@@ -29642,6 +29705,7 @@ bool hex_editor::update_hex_editor()
 	}
 	if (is_update)
 	{
+		d_update = true;
 		is_update = false;
 		line_number.clear();
 		data_hex.clear();
@@ -29713,6 +29777,25 @@ glm::i64vec2 hex_editor::get_range2()
 	return range2;
 }
 
+glm::ivec2 hex_editor::get_draw_rect()
+{
+	glm::ivec2 r = {};//最大坐标
+	glm::ivec2 pos = {};// 最小坐标
+	for (size_t i = 0; i < 7; i++)
+	{
+		glm::ivec4 it = text_rc[i];
+	}
+	for (size_t i = 0; i < 7; i++)
+	{
+		glm::ivec4 it = text_rc[i];
+		pos.x = std::min(pos.x, it.x);
+		pos.y = std::min(pos.y, it.y);
+		r.x = std::max(r.x, it.z + it.x);
+		r.y = std::max(r.y, it.w + it.y);
+	}
+	return r - pos;
+}
+
 void hex_editor::draw_rc(cairo_t* cr)
 {
 	if (!rsx || rsx->rangerc.empty())return;
@@ -29733,6 +29816,13 @@ void hex_editor::draw_rc(cairo_t* cr)
 	}
 }
 
+bool hex_editor::get_draw_update()
+{
+	bool r = d_update;
+	d_update = false;
+	return r;
+}
+
 int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 {
 	auto x = (mpos.x / char_width);
@@ -29748,7 +29838,8 @@ void hex_editor::make_rc()
 {
 	int64_t x = 0; int64_t y = 0;
 	get_range2();
-	if (range_c1 == range2)return;
+	if (range_c1 == range2)return; 
+	d_update = true;
 	range_c1 = range2;
 	auto f = get_dv2(range2.x, bytes_per_line);
 	auto s = get_dv2(range2.y, bytes_per_line);

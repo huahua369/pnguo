@@ -767,12 +767,13 @@ void show_ui(form_x* form0, menu_cx* gm)
 				hex_scroll.h->pos = hps;
 				dps.x += hex_size.x - width;
 				hex_scroll.v->pos = dps;
-				draw_rect(cr, { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 }, 0xf0121212, 0x80ffffff, 2, 1);
+				glm::vec4 bgrc = { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 };
 				auto pf = &ftns;
 				auto phex = &hex;
 				glm::vec4 rc = { 0,0,300,1000 };
 				if (phex->acount == 0)
 				{
+					draw_rect(cr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
 					for (auto& str : ftns)
 					{
 						//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
@@ -780,7 +781,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 					}
 					return;
 				}
-				clip_cr(cr, chs);
 				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
 				auto rc2 = rc;
 
@@ -789,7 +789,6 @@ void show_ui(form_x* form0, menu_cx* gm)
 				auto pyy = hex_scroll.v->get_offset_ns();
 				auto vps = pyy / fl;
 				pyy = vps * fl;
-				cairo_translate(cr, -pxx, 0);
 				phex->set_linepos(vps);
 				phex->update_hex_editor();
 
@@ -827,13 +826,30 @@ void show_ui(form_x* form0, menu_cx* gm)
 				phex->color[4] = 0xff999999;	// 数据检查器字段头
 				phex->color[5] = -1;			// 数据检查器标题
 				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
+
+				clip_cr(cr, chs);
+				cairo_translate(cr, -pxx, 0);
 				{
-					cairo_as _ss_(cr);
-					clip_cr(cr, phex->text_rc[2]);
-					cairo_translate(cr, phex->text_rc[2].x, phex->text_rc[2].y - pyy);
-					phex->draw_rc(cr);
+					auto nrc = phex->get_draw_rect();
+					phex->dtc.reset(cr, nrc);
+					dt->cr = phex->dtc.cr;
+					if (phex->get_draw_update()) {
+						phex->dtc.clear_color(0);
+						auto ncr = phex->dtc.cr;
+						draw_rect(ncr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
+						{
+							cairo_as _ss_(ncr);
+							clip_cr(ncr, phex->text_rc[2]);
+							cairo_translate(ncr, phex->text_rc[2].x, phex->text_rc[2].y - pyy);
+							phex->draw_rc(ncr);
+						}
+
+						draw_draw_texts(dt);
+					}
+					glm::vec4 nnrc = { 0,0,nrc };
+					if (phex->dtc.surface)
+						draw_image(cr, phex->dtc.surface, {}, nnrc);
 				}
-				draw_draw_texts(dt);
 				if (dt->box_rc.z != hex_scroll.h->_content_size)
 					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);
 			}
