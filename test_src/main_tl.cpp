@@ -774,10 +774,10 @@ void show_ui(form_x* form0, menu_cx* gm)
 				if (phex->acount == 0)
 				{
 					draw_rect(cr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
-					for (auto& str : ftns)
+					//for (auto& str : ftns)
 					{
 						//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
-						rc.x += 300;
+						//rc.x += 300;
 					}
 					return;
 				}
