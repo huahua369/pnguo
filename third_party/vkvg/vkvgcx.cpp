@@ -1,12 +1,13 @@
 ﻿
+#include <pch1.h>
 #include <stdint.h>
 #include <stdio.h>
 // 实现
-#define GLM_ENABLE_EXPERIMENTAL 
-#include <glm/glm.hpp>
-#include <glm/gtx/vector_angle.hpp>
-#include <glm/gtx/closest_point.hpp>
-#include <glm/gtc/type_ptr.hpp>
+//#define GLM_ENABLE_EXPERIMENTAL 
+//#include <glm/glm.hpp>
+//#include <glm/gtx/vector_angle.hpp>
+//#include <glm/gtx/closest_point.hpp>
+//#include <glm/gtc/type_ptr.hpp>
 
 #include <pnguo.h>
 #include <vkvg/vkvg.h> 
