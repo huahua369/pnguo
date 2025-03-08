@@ -26,14 +26,15 @@ git pull --depth 1 --allow-unrelated-histories
 |:--------| :---------:|--------:|
 | centered 文本居左 | right-aligned 文本居中 |right-aligned 文本居右|
 
-```mermaid
-graph LR
-A[方形] -->B(圆角)
-    B --> C{条件a}
-    C -->|a=1| D[结果1]
-    C -->|a=2| E[结果2]
-    F[横向流程图]
-```
+## Test latex 
+$1 + 1 = 2$
+$$
+x + y = 10 \\
+x - y = 6 \\
+2x = 16 \\
+x = 8 \\
+y = 2
+$$
 ## To Do 
 
 - [x] 2d骨骼动画渲染

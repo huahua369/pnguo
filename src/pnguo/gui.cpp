@@ -5284,29 +5284,7 @@ void send_hover(widget_base* wp, const glm::vec2& mps) {
 #endif // 1
 
 
-
-
-render_lv::render_lv()
-{
-}
-
-render_lv::~render_lv()
-{
-}
-
-void render_lv::set_style(const std::string& family, int fs, uint32_t tcolor)
-{
-	familys = family;
-	if (fs > 0)
-		fontsize = fs;
-	text_color = tcolor;
-}
-
-void render_lv::binding(plane_cx* p)
-{
-	plane = p;
-}
-
+ 
 
 #endif // 1
 

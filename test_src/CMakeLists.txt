@@ -72,6 +72,10 @@ find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
+
+find_package(cmark CONFIG REQUIRED)
+find_package(md4c CONFIG REQUIRED)
+
 set(lklib)
 list(APPEND lklib  
     ZLIB::ZLIB
@@ -93,6 +97,7 @@ list(APPEND lklib
     libssh2::libssh2
     CURL::libcurl
     
+    cmark::cmark md4c::md4c
     #$<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
    # rdx12
    # unofficial::joltphysics::Jolt

@@ -1894,54 +1894,9 @@ enum class widget_type :uint32_t {
 	wt_switch_btn,
 	wt_progress,
 	wt_slider
-};
-// 列表渲染
-class rlistview_cx
-{
-public:
-	glm::ivec2 pos = {}, size = { -1,-1 };	// 坐标、视图大小
+}; 
 
-	grid_view gv;							// 网格
-	std::vector<cairo_surface_t*> imagelist;// 图标列表
-	void* _data = 0;						// 渲染数据 
-	layout_text_x* ltx = 0;					// 文本渲染管理
-public:
-	rlistview_cx();
-	~rlistview_cx();
-	void set_data(void* d);
-	// 图片/svg
-	size_t add_image(const std::string& fn);
-	// 渲染输入滚动条坐标
-	void draw(cairo_t* cr, const glm::ivec2& scroll_pos);
-	// 清空图片
-	void clear_image();
-private:
-
-};
-
-
-// 列表渲染
-class render_lv
-{
-public:
-	std::string familys;
-	int fontsize = 12;
-	float thickness = 1.0;	// 线粗
-	uint32_t text_color = -1;//z文本颜色
-	glm::ivec3 back_color = { 0,0,0x50ff8000 };//xy背景色（偶奇数），z鼠标经过增加颜色背景，
-	glm::ivec4 title_color = {};// 背景色，鼠标经过时颜色,按下颜色。边框颜色
-	glm::ivec2 line_color = { 0,0x80ff808080 };//x横，y竖
-	plane_cx* plane = 0;
-public:
-	render_lv();
-	~render_lv();
-
-	void set_style(const std::string& family, int fs, uint32_t tcolor);
-	// 绑定到面板
-	void binding(plane_cx* p);
-private:
-
-};
+ 
 
 
 

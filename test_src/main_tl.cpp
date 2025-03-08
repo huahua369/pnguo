@@ -284,61 +284,9 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 		}
 	}
 }
-#if 0
-#include <md4c.h>
+#if 1 
 #include <cmark.h> 
-
-// 自定义回调函数定义 
-static int enter_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata);
-static int leave_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata);
-static int enter_span_callback(MD_SPANTYPE type, void* detail, void* userdata);
-static int leave_span_callback(MD_SPANTYPE type, void* detail, void* userdata);
-static int text_callback(MD_TEXTTYPE type, const MD_CHAR* text, MD_SIZE size, void* userdata);
-// 处理块级元素（如段落、标题）
-int enter_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata) {
-	switch (type) {
-	case MD_BLOCK_H: printf("# "); break;
-	case MD_BLOCK_P: printf("\n"); break;
-		// 支持列表、代码块等类型判断 [2]()
-	}
-	return 0;
-}
-int leave_block_callback(MD_BLOCKTYPE type, void* detail, void* userdata) {
-	switch (type) {
-	case MD_BLOCK_H: printf("# "); break;
-	case MD_BLOCK_P: printf("\n"); break;
-		// 支持列表、代码块等类型判断 [2]()
-	}
-	return 0;
-}
-
-// 处理行内元素（如加粗、链接）
-int enter_span_callback(MD_SPANTYPE type, void* detail, void* userdata) {
-	switch (type) {
-	case MD_SPAN_STRONG: printf("**"); break;
-	case MD_SPAN_A: {
-		MD_SPAN_A_DETAIL* link = (MD_SPAN_A_DETAIL*)detail;
-		printf("[");
-	} break;
-	}
-	return 0;
-}
-int leave_span_callback(MD_SPANTYPE type, void* detail, void* userdata) {
-	switch (type) {
-	case MD_SPAN_STRONG: printf("**"); break;
-	case MD_SPAN_A: {
-		MD_SPAN_A_DETAIL* link = (MD_SPAN_A_DETAIL*)detail;
-		printf("[");
-	} break;
-	}
-	return 0;
-}
-
-// 处理文本内容 
-int text_callback(MD_TEXTTYPE type, const MD_CHAR* text, MD_SIZE size, void* userdata) {
-	printf("%.*s", (int)size, text);
-	return 0;
-}
+ 
 #endif
 void show_ui(form_x* form0, menu_cx* gm)
 {
@@ -394,7 +342,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
 
-#if 0
+#if 1
 	hz::mfile_t mfile;
 	auto markdown_text = mfile.open_d("E:\\d3m\\pnguo\\README.md", true);
 	cmark_node* doc = cmark_parse_document(markdown_text, strlen(markdown_text), CMARK_OPT_DEFAULT);
@@ -535,17 +483,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		}
 		cmark_node_free(doc);
 	}
-	MD_PARSER parser = {
-		.abi_version = 0,
-		.flags = MD_FLAG_COLLAPSEWHITESPACE,
-		.enter_block = enter_block_callback,
-		.leave_block = leave_block_callback,
-		.enter_span = enter_span_callback,
-		.leave_span = leave_span_callback,
-		.text = text_callback,
-	};
-	printf("\n\n");
-	md_parse(markdown_text, strlen(markdown_text), &parser, NULL);
+ 
 #endif
 #if 0
 	std::vector<menu_info> vm;

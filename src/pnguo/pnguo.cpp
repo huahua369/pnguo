@@ -54,9 +54,7 @@ extern "C" {
 
 #ifndef NO_SVG
 #include <librsvg/rsvg.h>
-#endif
-	//#include <pango/pango-layout.h>
-	//#include <pango/pangocairo.h>
+#endif 
 
 #ifdef __cplusplus
 }
@@ -12440,301 +12438,7 @@ void image_save_png(cairo_surface_t* surface, const char* fn)
 	if (surface && fn && *fn)
 		cairo_surface_write_to_png(surface, fn);
 }
-
-
-
-
-#if 0
-
-static
-struct pl {
-	void fo() {
-		pango_layout_new();
-		//Create a new PangoLayout object with attributes initialized to default values for a particular PangoContext.
-
-		pango_layout_deserialize();
-		//Loads data previously created via pango_layout_serialize().
-
-		//Instance methods
-		pango_layout_context_changed();
-		//Forces recomputation of any state in the PangoLayout that might depend on the layout’s context.
-
-		pango_layout_copy();
-		//Creates a deep copy - by - value of the layout.
-
-		pango_layout_get_alignment();
-		//Gets the alignment for the layout : how partial lines are positioned within the horizontal space available.
-
-		pango_layout_get_attributes();
-		//Gets the attribute list for the layout, if any.
-
-		pango_layout_get_auto_dir();
-		//Gets whether to calculate the base direction for the layout according to its contents.
-
-		//since: 1.4
-
-		pango_layout_get_baseline();
-		//Gets the Y position of baseline of the first line in layout.
-
-		pango_layout_get_caret_pos();
-		//Given an index within a layout, determines the positions that of the strong and weak cursors if the insertion point is at that index.
-
-		pango_layout_get_character_count();
-		//Returns the number of Unicode characters in the the text of layout.
-
-		pango_layout_get_context();
-		//Retrieves the PangoContext used for this layout.
-
-		pango_layout_get_cursor_pos();
-		//Given an index within a layout, determines the positions that of the strong and weak cursors if the insertion point is at that index.
-
-		pango_layout_get_direction();
-		//Gets the text direction at the given character position in layout.
-
-		pango_layout_get_ellipsize();
-		//Gets the type of ellipsization being performed for layout.
-
-		pango_layout_get_extents();
-		//Computes the logical and ink extents of layout.
-
-		pango_layout_get_font_description();
-		//Gets the font description for the layout, if any.
-
-		pango_layout_get_height();
-		//Gets the height of layout used for ellipsization.
-
-		pango_layout_get_indent();
-		//Gets the paragraph indent width in Pango units.
-
-		pango_layout_get_iter();
-		//Returns an iterator to iterate over the visual extents of the layout.
-
-		pango_layout_get_justify();
-		//Gets whether each complete line should be stretched to fill the entire width of the layout.
-
-		pango_layout_get_justify_last_line();
-		//Gets whether the last line should be stretched to fill the entire width of the layout.
-
-		pango_layout_get_line();
-		//Retrieves a particular line from a PangoLayout.
-
-		pango_layout_get_line_count();
-		//Retrieves the count of lines for the layout.
-
-		pango_layout_get_line_readonly();
-		//Retrieves a particular line from a PangoLayout.
-
-		pango_layout_get_line_spacing();
-		//Gets the line spacing factor of layout.
-
-		pango_layout_get_lines();
-		//Returns the lines of the layout as a list.
-
-		pango_layout_get_lines_readonly();
-		//Returns the lines of the layout as a list.
-
-		pango_layout_get_log_attrs();
-		//Retrieves an array of logical attributes for each character in the layout.
-
-		pango_layout_get_log_attrs_readonly();
-		//Retrieves an array of logical attributes for each character in the layout.
-
-		pango_layout_get_pixel_extents();
-		//Computes the logical and ink extents of layout in device units.
-
-		pango_layout_get_pixel_size();
-		//Determines the logical width and height of a PangoLayout in device units.
-
-		pango_layout_get_serial();
-		//Returns the current serial number of layout.
-
-		pango_layout_get_single_paragraph_mode();
-		//Obtains whether layout is in single paragraph mode.
-
-		pango_layout_get_size();
-		//Determines the logical width and height of a PangoLayout in Pango units.
-
-		pango_layout_get_spacing();
-		//Gets the amount of spacing between the lines of the layout.
-
-		pango_layout_get_tabs();
-		//Gets the current PangoTabArray used by this layout.
-
-		pango_layout_get_text();
-		//Gets the text in the layout.
-
-		pango_layout_get_unknown_glyphs_count();
-		//Counts the number of unknown glyphs in layout.
-
-		pango_layout_get_width();
-		//Gets the width to which the lines of the PangoLayout should wrap.
-
-		pango_layout_get_wrap();
-		//Gets the wrap mode for the layout.
-
-		pango_layout_index_to_line_x();
-		//Converts from byte index_ within the layout to line and X position.
-
-		pango_layout_index_to_pos();
-		//Converts from an index within a PangoLayout to the onscreen position corresponding to the grapheme at that index.
-
-		pango_layout_is_ellipsized();
-		//Queries whether the layout had to ellipsize any paragraphs.
-
-		pango_layout_is_wrapped();
-		//Queries whether the layout had to wrap any paragraphs.
-
-		pango_layout_move_cursor_visually();
-		//Computes a new cursor position from an old position and a direction.
-
-		pango_layout_serialize();
-		//Serializes the layout for later deserialization via pango_layout_deserialize().
-
-		pango_layout_set_alignment();
-		//Sets the alignment for the layout : how partial lines are positioned within the horizontal space available.
-
-		pango_layout_set_attributes();
-		//Sets the text attributes for a layout object.
-
-		pango_layout_set_auto_dir();
-		//Sets whether to calculate the base direction for the layout according to its contents.
-
-
-		pango_layout_set_ellipsize();
-		//Sets the type of ellipsization being performed for layout.
-
-
-		pango_layout_set_font_description();
-		//Sets the default font description for the layout.
-
-		pango_layout_set_height();
-		//Sets the height to which the PangoLayout should be ellipsized at.
-
-
-		pango_layout_set_indent();
-		//Sets the width in Pango units to indent each paragraph.
-
-		pango_layout_set_justify();
-		//Sets whether each complete line should be stretched to fill the entire width of the layout.
-
-		pango_layout_set_justify_last_line();
-		//Sets whether the last line should be stretched to fill the entire width of the layout.
-
-
-		pango_layout_set_line_spacing();
-		//Sets a factor for line spacing.
-
-
-		pango_layout_set_markup();
-		//Sets the layout text and attribute list from marked - up text.
-
-		pango_layout_set_markup_with_accel();
-		//Sets the layout text and attribute list from marked - up text.
-
-		pango_layout_set_single_paragraph_mode();
-		//Sets the single paragraph mode of layout.
-
-		pango_layout_set_spacing();
-		//Sets the amount of spacing in Pango units between the lines of the layout.
-
-		pango_layout_set_tabs();
-		//Sets the tabs to use for layout, overriding the default tabs.
-
-		pango_layout_set_text();
-		//Sets the text of the layout.
-
-		pango_layout_set_width();
-		//Sets the width to which the lines of the PangoLayout should wrap or ellipsized.
-
-		//@PANGO_WRAP_WORD: wrap lines at word boundaries.
-		//* @PANGO_WRAP_CHAR : wrap lines at character boundaries.
-		//* @PANGO_WRAP_WORD_CHAR : wrap lines at word boundaries, but fall back to  character boundaries if there is not enough space for a full word.
-		pango_layout_set_wrap();
-		//Sets the wrap mode.
-
-		pango_layout_write_to_file();
-		//A convenience method to serialize a layout to a file.
-
-
-		pango_layout_xy_to_index();
-		//Converts from X and Y position within a layout to the byte index to the character at that logical position.
-	}
-};
-
-#endif
-#if 0
-class layout_px
-{
-public:
-	PangoLayout* layout = 0, * fgp = 0;
-	glm::vec4 extents = {};
-	PangoRectangle r0 = {}, r1 = {};
-	int y = 0;
-	layout_px();
-	~layout_px();
-	void draw(cairo_t* cr) {
-		pango_cairo_update_layout(cr, layout);
-		//cairo_move_to(cr, 0 /*extents.x*/, r0.y - (r1.height - r0.height) * 0.5);
-		cairo_move_to(cr, 0, 0);
-		pango_cairo_show_layout(cr, layout);
-	}
-	void get_pixel_size(int& w, int& h)
-	{
-		w = extents.z;
-		h = extents.w;
-	}
-private:
-
-};
-
-layout_px::layout_px()
-{
-}
-
-layout_px::~layout_px()
-{
-	if (fgp)
-		g_object_unref(fgp);
-}
-
-layout_px create_pango_layout(const char* str, int fs)
-{
-
-	PangoFontMap* fontMap = pango_cairo_font_map_get_default();
-	//PangoFontMap* fontMap = pango_cairo_font_map_new();
-	PangoContext* context = pango_font_map_create_context(fontMap);
-	PangoLayout* layout = pango_layout_new(context);
-	//PangoLayout* layout = pango_cairo_create_layout(cr);
-	PangoFontDescription* desc;
-	desc = pango_font_description_new();
-	pango_font_description_set_family(desc, "Arial,NSimSun");
-	//pango_font_description_set_family(desc, "NSimSun");
-	pango_font_description_set_size(desc, fs * PANGO_SCALE);
-	//desc = pango_font_description_from_string(FONT);
-	pango_layout_set_font_description(layout, desc);
-	pango_font_description_free(desc);
-	//pango_layout_set_markup(layout, str, strlen(str));
-	//str = (char*)u8"😀工affab\na寺214668\n965";
-	int sizeX = (strlen(str) + 6) * fs;
-	//pango_layout_set_width(layout, sizeX * PANGO_SCALE);
-	pango_layout_set_text(layout, str, -1);
-	/* Draw the layout N_WORDS times in a circle */
-	//pango_cairo_update_layout(cr, layout);
-	layout_px r = {};
-	pango_layout_get_pixel_extents(layout, &r.r0, &r.r1);
-	int w = 0, h = 0;
-	pango_layout_get_pixel_size(layout, &w, &h);
-	int bl = (double)pango_layout_get_baseline(layout) / PANGO_SCALE;
-
-
-	g_object_unref(context);
-
-	r.y = bl;
-	r.extents = { r.r0.x,r.r0.y,r.r1.width,r.r1.height };
-	r.layout = layout;
-	return r;
-}
-#endif
+  
 void draw_text(cairo_t* cr, const void* str, const glm::vec2& pos, font_xi* fx)
 {
 	cairo_save(cr);
@@ -13517,8 +13221,7 @@ bool Ruler::draw_scale(cairo_t* cr_in)
 #endif
 cairo_surface_t* Ruler::draw_label(cairo_t* cr_in, const std::string& label_value, const glm::ivec2& ts)
 {
-	bool rotate = _orientation != orientation_horizontal;
-	//Glib::RefPtr<Pango::Layout> layout = create_pango_layout(std::to_string(label_value));
+	bool rotate = _orientation != orientation_horizontal; 
 	auto surface_in = cairo_get_target(cr_in);
 #if 0
 	auto ly = create_pango_layout(/*cr_in,*/ label_value.c_str(), _font_size);
@@ -14194,28 +13897,7 @@ void view_g::update(float)
 // todo font
 #if 1
 
-
-#if 0
-char const* sp_font_description_get_family(PangoFontDescription const* fontDescr)
-{
-	static auto const fontNameMap = std::map<std::string, std::string>{
-		{ "Sans", "sans-serif" },
-		{ "Serif", "serif" },
-		{ "Monospace", "monospace" }
-	};
-
-	char const* pangoFamily = pango_font_description_get_family(fontDescr);
-
-	if (pangoFamily) {
-		if (auto it = fontNameMap.find(pangoFamily); it != fontNameMap.end()) {
-			return it->second.c_str();
-		}
-	}
-
-	return pangoFamily;
-}
-
-#endif
+ 
 
 
 #ifndef NO_FONT_CX 
@@ -14290,65 +13972,12 @@ int get_pat_int(FcPattern* font, const char* o)
 	}
 	return s;
 }
-
-#ifdef _WIN32111
-#define get_fmap pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT)
-#else
-#define get_fmap pango_cairo_font_map_get_default()
-#endif // _WIN32
-//pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT);
-
+ 
 std::map<std::string, fontns> get_allfont()
 {
 	int r = 0;
 	std::map<std::string, fontns> fyv;
-	int nfamilies = 0;
-#if 0
-	PangoFontFamily** families = 0;
-	PangoFontMap* fontmap = get_fmap;
-	pango_font_map_list_families(fontmap, &families, &nfamilies);
-
-	std::set<std::string> nns;
-	auto context = pango_font_map_create_context(fontmap);
-	for (int i = 0; i < nfamilies; i++) {
-		PangoFontFamily* family = families[i];
-		const char* family_name = pango_font_family_get_name(family);
-		auto descr = pango_font_description_new();
-		pango_font_description_set_family(descr, family_name);// (char*)u8"仿宋");
-		auto font = pango_font_map_load_font(fontmap, context, descr);
-
-		auto lang = pango_font_get_languages(font);//2052
-		auto hbfont = pango_font_get_hb_font(font);
-		hb_face_t* face = hb_font_get_face(hbfont);
-		uint32_t ss = 8;
-		wchar_t buf[8] = {};
-		char buf8[32] = {};
-		std::wstring namew;
-		auto name = get_name_idx(face, 1, family_name);
-		//auto st2 = get_name_idx(face, 2, family_name);
-		auto name4 = get_name_idx(face, 4, family_name);
-		nns.clear();
-		for (auto it : name)
-		{
-			nns.insert(it);
-		}
-		for (auto it : name4)
-		{
-			nns.insert(it);
-		}
-		//if (name.size())
-		//	printf("%s\n", name.size() > 1 ? name[1].c_str() : name[0].c_str());
-		pango_font_description_free(descr);
-		auto& kt = fyv[family_name];
-		kt.alias.swap(nns);
-		if (name4.size())
-			kt.fullname = name4[0];
-	}
-	if (context)
-	{
-		g_object_unref(context); context = 0;
-	}
-#endif
+	int nfamilies = 0; 
 	if (FcInit()) {
 		{
 			//std::string yourFontFilePath = "seguiemj.ttf";
@@ -19387,39 +19016,13 @@ font_rctx::font_rctx()
 		}
 	}
 
-	imp = new font_imp();
-	//PangoFontMap* fontMap = get_fmap;
-	//pcontext = pango_font_map_create_context(fontMap);
-	//layout = pango_layout_new(pcontext);
-	//gclt.insert(layout); 
+	imp = new font_imp(); 
 }
 
 font_rctx::~font_rctx()
 {
 	if (imp)delete imp;
-	imp = 0;
-	//for (auto& [k, v] : fyv) {
-	//	for (auto it : v.vptr)
-	//	{
-	//		auto p = (font_t*)it;
-	//		if (p)
-	//		{
-	//			//delete p;
-
-	//		}
-	//	}
-	//}
-	//for (auto it : gclt)
-	//{
-	//	if (it)
-	//	{
-	//		g_object_unref(it); it = 0;
-	//	}
-	//}
-	//if (pcontext)
-	//{
-	//	g_object_unref(pcontext); pcontext = 0;
-	//}
+	imp = 0; 
 	fyv.clear();
 }
 
@@ -19435,16 +19038,7 @@ int font_rctx::get_count_style(int idx)
 	{
 		r = fyvs[idx]->style.size();
 	}
-	return r;
-	//for (auto& [k, v] : fyv) {
-	//	if (idx == 0)
-	//	{
-	//		r = v.style.size();
-	//		break;
-	//	}
-	//	idx--;
-	//}
-	//return r;
+	return r; 
 }
 
 const char* font_rctx::get_family(int idx)
@@ -19454,16 +19048,7 @@ const char* font_rctx::get_family(int idx)
 	{
 		return fyvs[idx]->family.c_str();
 	}
-	return "";
-	//for (auto& [k, v] : fyv) {
-	//	if (idx == 0)
-	//	{
-	//		r = &v.family;
-	//		break;
-	//	}
-	//	idx--;
-	//}
-	//return r ? r->c_str() : nullptr;
+	return ""; 
 }
 
 const char* font_rctx::get_family_en(const char* family)
@@ -19763,154 +19348,8 @@ void free_fonts_ctx(font_rctx* p)
 	if (p)delete p;
 }
 
-
-//void font_rctx::set_family_size(const std::string& fam, int fs)
-//{
-//	auto en = get_family_en(fam.c_str());
-//	if (en)
-//	{
-//		family = en;
-//	}
-//	else {
-//		family = fam;
-//	}
-//	fontsize = fs > 5 ? fs : 12;
-//	if (!layout)
-//	{
-//		layout = pango_layout_new(pcontext);
-//		gclt.insert(layout);
-//	}
-//	pango_layout_set_wrap(layout, PANGO_WRAP_CHAR);
-//	pango_layout_set_alignment(layout, PANGO_ALIGN_LEFT);
-//
-//	PangoFontDescription* desc = pango_font_description_new();
-//	pango_font_description_set_family(desc, family.c_str());
-//	pango_font_description_set_size(desc, fontsize * PANGO_SCALE);
-//	pango_layout_set_font_description(layout, desc);
-//	pango_font_description_free(desc);
-//
-//}
-//text_layout_t font_rctx::get_text_layout(const std::string& str, text_layout_t* lt)
-//{
-//	text_layout_t ret = {};
-//	auto lay = lt && lt->layout ? lt->layout : pango_layout_copy(layout);
-//	gclt.insert(lay);
-//	pango_layout_set_text(lay, str.c_str(), str.size());
-//	int h = 0;
-//	auto line = pango_layout_get_line(lay, 0);
-//	pango_layout_line_get_height(line, &h);
-//	ret.lineheight = h / PANGO_SCALE;
-//	pango_layout_get_pixel_size(lay, &ret.rc.x, &ret.rc.y);
-//	ret.baseline = pango_layout_get_baseline(lay) / PANGO_SCALE;
-//	ret.ctx = this;
-//	ret.layout = lay;
-//	if (lt)*lt = ret;
-//	return ret;
-//}
-//void font_rctx::draw_text(cairo_t* cr, text_layout_t* lt)
-//{
-//	if (!cr || !lt || !lt->layout || !lt->text_color)return;
-//	cairo_save(cr);
-//	pango_cairo_update_layout(cr, lt->layout);
-//	set_color(cr, lt->text_color);
-//	cairo_translate(cr, lt->pos.x, lt->pos.y);
-//	auto fcp = cairo_get_scaled_font(cr);
-//	pango_cairo_show_layout(cr, lt->layout);
-//#if 0
-//	//cairo_scaled_font_t* csf = pango_cairo_font_get_scaled_font(font);
-//	std::vector<PangoGlyphString*> vpgs;
-//	std::vector<PangoLayoutLine*> lvs;
-//	PangoLayoutIter* it = pango_layout_get_iter(lt->layout);
-//	for (;;) {
-//		auto lv = pango_layout_iter_get_line(it);
-//		if (!lv)break;
-//		for (;;) {
-//			auto r = pango_layout_iter_get_run(it);
-//			if (r)
-//			{
-//				r->item->analysis.font;
-//				vpgs.push_back(r->glyphs);
-//			}
-//			if (!pango_layout_iter_next_run(it))break;
-//		}
-//		lvs.push_back(lv);
-//		if (!pango_layout_iter_next_line(it))break;
-//	}
-//	pango_layout_iter_free(it);
-//
-//	//pango_cairo_show_glyph_item(cr, "", r);
-//	//pango_cairo_layout_path(cr, lt->layout);
-//#endif
-//	cairo_restore(cr);
-//	if (lt->once)
-//	{
-//		if (lt->layout)
-//		{
-//			gclt.erase(lt->layout);
-//			g_object_unref(lt->layout); lt->layout = 0;
-//		}
-//	}
-//}
-//void font_rctx::free_textlayout(text_layout_t* lt)
-//{
-//	if (lt)
-//	{
-//		if (lt->layout)
-//		{
-//			gclt.erase(lt->layout);
-//			g_object_unref(lt->layout); lt->layout = 0;
-//		}
-//	}
-//}
-
-#if 0
-void layout_text()
-{
-
-	auto cr = cairo_create(sur);
-	size_t length = dtimg.size();
-	auto dt = dtimg.data();
-	for (size_t i = 0; i < length; i++)
-	{
-		*dt = back_color; dt++;
-	}
-
-
-	cairo_save(cr);
-#if 0
-	int gradient_size = 6;
-
-	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 0);// 垂直方向 
-	cairo_save(cr);
-	cairo_translate(cr, 0, size.y - gradient_size);
-	paint_shadow(cr, 0, gradient_size, size.x, gradient_size, _shadow, 1);// 垂直方向,下
-	cairo_restore(cr);
-	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 0);// 水平方向 
-	cairo_save(cr);
-	cairo_translate(cr, size.x - gradient_size, 0);
-	paint_shadow(cr, gradient_size, 0, gradient_size, size.y, _shadow, 1);// 水平方向，右
-	cairo_restore(cr);
-#endif
-
-	cairo_translate(cr, -scroll_pos.x + align_pos.x, -scroll_pos.y + align_pos.y);
-
-	auto v = get_bounds();
-	if (v.x != v.y && rangerc.size()) {
-		set_color(cr, select_color);
-		for (auto& it : rangerc)
-		{
-			cairo_rectangle(cr, it.x, it.y, it.z, it.w);
-			cairo_fill(cr);
-		}
-	}
-	set_color(cr, text_color);
-	pango_cairo_show_layout(cr, layout);
-	cairo_restore(cr);
-	cairo_destroy(cr);
-
-}
-
-#endif
+ 
+ 
 
 
 internal_text_cx::internal_text_cx()
@@ -20860,44 +20299,7 @@ cairo_surface_t* load_imagesvg(const std::string& fn, float scale)
 	}
 	return p;
 }
-
-rlistview_cx::rlistview_cx()
-{
-}
-
-rlistview_cx::~rlistview_cx()
-{
-	clear_image();
-}
-
-void rlistview_cx::set_data(void* d)
-{
-	_data = d;
-}
-
-size_t rlistview_cx::add_image(const std::string& fn)
-{
-	size_t r = imagelist.size();
-	auto sur = load_imagesvg(fn, 1);
-	if (sur)
-		imagelist.push_back(sur);
-	return r;
-}
-
-void rlistview_cx::draw(cairo_t* cr, const glm::ivec2& scroll_pos)
-{
-
-}
-
-void rlistview_cx::clear_image()
-{
-	for (auto it : imagelist) {
-		if (it)
-			cairo_surface_destroy(it);
-	}
-}
-
-
+ 
 
 #endif // 1
 
