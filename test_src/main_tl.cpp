@@ -282,6 +282,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 		}
 	}
 }
+#if 0
 #include <md4c.h>
 #include <cmark.h> 
 
@@ -336,6 +337,7 @@ int text_callback(MD_TEXTTYPE type, const MD_CHAR* text, MD_SIZE size, void* use
 	printf("%.*s", (int)size, text);
 	return 0;
 }
+#endif
 void show_ui(form_x* form0, menu_cx* gm)
 {
 	if (!form0)return;
@@ -390,7 +392,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
 
-
+#if 0
 	hz::mfile_t mfile;
 	auto markdown_text = mfile.open_d("E:\\d3m\\pnguo\\README.md", true);
 	cmark_node* doc = cmark_parse_document(markdown_text, strlen(markdown_text), CMARK_OPT_DEFAULT);
@@ -542,6 +544,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	};
 	printf("\n\n");
 	md_parse(markdown_text, strlen(markdown_text), &parser, NULL);
+#endif
 #if 0
 	std::vector<menu_info> vm;
 	vm.push_back({ mname.data(),mname.size() });
