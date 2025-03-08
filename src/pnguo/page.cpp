@@ -476,14 +476,7 @@ struct text_render_t
 	bool clip = true;		// 启用裁剪
 };
 
-struct node_ts
-{
-	std::string str;
-	tree_node_t* parent = 0;				// 父级
-	std::vector<tree_node_t*>* child = 0;	// 孩子 
-	int _level = 0;
-	bool _expand = 0;
-};
+
 struct input_info_t
 {
 	glm::ivec2 pos;

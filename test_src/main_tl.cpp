@@ -5,6 +5,7 @@
 #include <pnguo/win_core.h>
 #include "win32msg.h"
 #include <pnguo/event.h>
+#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
 #include <pnguo/vkrenderer.h>
@@ -13,6 +14,7 @@
 #include <pnguo/print_time.h>
 #include <pnguo/mnet.h> 
 #include <cairo/cairo.h>
+#define HEX_EDITOR_STATIC_LIB
 #include <hex_editor.h>
 #include "mshell.h"
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES

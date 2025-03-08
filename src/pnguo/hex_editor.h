@@ -100,8 +100,36 @@ private:
 	void make_rc();
 };
 
+/*
+todo Data Inspector
+binary(1)读一个字节
+octal(1)
+uint8(1)
+int8(1)
+uint16(2)
+int16(2)
+uint24(3)
+int24(3)
+uint32(4)
+int32
+uint64
+int64
+ULEB128
+SLEB128
+float16
+bfloat16
+float32
+float64
+ASCII
+UTF-8读整个字符
+UTF-16读整个字符
+GB18030
+BIG5
+SHIFT-JIS
+*/
 
-#ifndef  PNGUO_STATIC_LIB
+
+#ifdef HEX_EDITOR_STATIC_LIB
 #include "hex_editor.cpp"
 #endif
 #endif // !HEX_EDITOR_H
