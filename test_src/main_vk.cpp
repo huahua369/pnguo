@@ -2,14 +2,14 @@
 #include <pch1.h>
 
 #include <random>
-#include <vkgui/win_core.h>
+#include <panguo/win_core.h>
 #include "win32msg.h"
-#include <vkgui/event.h>
-#include <vkgui/pnguo.h>
-#include <vkgui/tinysdl3.h>
-#include <vkgui/vkrenderer.h>
-#include <vkgui/page.h>
-#include <vkgui/mapView.h>
+#include <panguo/event.h>
+#include <panguo/pnguo.h>
+#include <panguo/tinysdl3.h>
+#include <panguo/vkrenderer.h>
+#include <panguo/page.h>
+#include <panguo/mapView.h>
 
 #include <cairo/cairo.h>
 

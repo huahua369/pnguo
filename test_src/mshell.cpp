@@ -1,7 +1,7 @@
 ﻿
 
 #include <pch1.h>
-#include <vkgui/mapView.h>
+#include <mapView.h>
 #include "mshell.h"
 #if 1
 #if 0

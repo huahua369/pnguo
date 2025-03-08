@@ -2033,7 +2033,7 @@ class dtext_cache
 {
 public:
 	cairo_t* cr = 0;
-	cairo_surface_t* surface = 0; 
+	cairo_surface_t* surface = 0;
 	cairo_t* cr_in = 0;
 	glm::ivec2 size = {};
 public:
@@ -2047,6 +2047,23 @@ private:
 
 };
 
+struct hex_style_t {
+	cairo_t* cr = 0;		// 0不渲染
+	text_style_t* st = 0;
+	layout_text_x* ltx = 0;
+	int64_t fl = 0;		// 行高
+	int64_t pxx = 0;
+	int64_t pyy = 0;
+	glm::vec2 hex_size = { 900,600 };
+	glm::ivec2 view_size = {};
+	glm::vec4 bgrc = {};
+	// 定义常量 
+	const int MARGIN = 10;
+	const int DATA_INSPECTOR_TITLE_WIDTH = 80;
+	const int DECODED_TEXT_WIDTH = 150;
+	const int RULER_DI_WIDTH = 200;
+	uint32_t bg_fill = 0xff121212, bg_color = 0x80ffffff; double bg_r = 2; int bg_linewidth = 1;
+};
 // 16进制编辑
 struct hex_editor
 {
@@ -2061,6 +2078,7 @@ public:
 	int char_width = 10;
 	int line_number_n = 0;
 	int bytes_per_line = 16;		// 第行显示字节数4-256
+	int select_border = 2;			// 选中边框宽度
 	int64_t acount = 0;				// 行数量 
 	glm::i64vec2 range = {};		// 选中范围
 	glm::vec4 text_rc[7] = {};		// 渲染区域
@@ -2114,8 +2132,10 @@ public:
 	glm::i64vec2 get_range2();
 	// 获取渲染大小
 	glm::ivec2 get_draw_rect();
-	void draw_rc(cairo_t* cr);
 	bool get_draw_update();
+	void draw_rc(cairo_t* cr);
+	// 更新、使用cairo渲染
+	void update_draw(hex_style_t* hst);
 private:
 	// 鼠标坐标转偏移
 	int64_t get_mpos2offset(const glm::i64vec2& mpos);

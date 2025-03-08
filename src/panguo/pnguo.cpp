@@ -29313,6 +29313,15 @@ struct rect_select_x
 
 hex_editor::hex_editor()
 {
+	auto phex = this;
+	dititle = (char*)u8"数据检查器";
+	phex->color[0] = 0xffff783b;	//0xfffb8f71;	// 标尺
+	phex->color[1] = 0xff999999;	// 行号
+	phex->color[2] = 0xffeeeeee;	// 16进制数据
+	phex->color[3] = 0xffeeeeee;	// 解码文件
+	phex->color[4] = 0xff999999;	// 数据检查器字段头
+	phex->color[5] = -1;			// 数据检查器标题
+	phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
 }
 
 hex_editor::~hex_editor()
@@ -29615,7 +29624,7 @@ void hex_editor::set_pos(size_t pos)
 		auto p = _data + pos;
 		data_inspector.clear();
 		auto di = &data_inspector;
-		print_data_de(p, di); 
+		print_data_de(p, di);
 		d_update = true;
 	}
 }
@@ -29836,9 +29845,12 @@ int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 
 void hex_editor::make_rc()
 {
-	int64_t x = 0; int64_t y = 0;
+	int64_t x = -select_border;
+	int64_t y = 0;
+	int64_t w2 = select_border * 2;
+
 	get_range2();
-	if (range_c1 == range2)return; 
+	if (range_c1 == range2)return;
 	d_update = true;
 	range_c1 = range2;
 	auto f = get_dv2(range2.x, bytes_per_line);
@@ -29855,25 +29867,25 @@ void hex_editor::make_rc()
 		auto line_no = _size / bytes_per_line;
 		int64_t cw = char_width * 3;
 		if (range2.x == range2.y) {
-			rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, char_width * 2, line_height });
+			rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height,w2 + char_width * 2, line_height });
 		}
 		else
 		{
 			int y2 = range2.y + 1;	// 补一格
 			if (f.y == s.y)
 			{
-				rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, (y2 - range2.x) * cw - char_width, line_height });// 同一行时
+				rss.push_back({ x + (range2.x - f.x) * cw , y + hf * line_height, w2 + (y2 - range2.x) * cw - char_width, line_height });// 同一行时
 			}
 			else {
-				rss.push_back({ x + (range2.x - f.x) * cw, y + hf * line_height, (bytes_per_line - (range2.x - f.x)) * cw - char_width, line_height });// 第一行
+				rss.push_back({ x + (range2.x - f.x) * cw, y + hf * line_height, w2 + (bytes_per_line - (range2.x - f.x)) * cw - char_width, line_height });// 第一行
 			}
 			for (int i = hf + 1; i < line_no && i < hs; i++)
 			{
-				rss.push_back({ x + 0, y + i * line_height, bytes_per_line * cw - char_width, line_height });// 中间全行
+				rss.push_back({ x + 0, y + i * line_height, w2 + bytes_per_line * cw - char_width, line_height });// 中间全行
 			}
 			if (hf < hs)
 			{
-				rss.push_back({ x + 0, y + hs * line_height, (y2 - s.x) * cw - char_width, line_height });//最后一行
+				rss.push_back({ x + 0, y + hs * line_height, w2 + (y2 - s.x) * cw - char_width, line_height });//最后一行
 			}
 		}
 		rsx->rangerc = rss;
@@ -29917,8 +29929,67 @@ void hex_editor::make_rc()
 	//printf("fs\t%lld\t%lld\n", f, s);
 }
 
-
-
+void hex_editor::update_draw( hex_style_t* hst)
+{
+	if (!hst || !hst->st || !hst->ltx)return;
+	cairo_t* cr = hst->cr;
+	auto fl = hst->fl;
+	auto pxx = hst->pxx;
+	auto pyy = hst->pyy;
+	auto vps = pyy / fl;
+	pyy = vps * fl;
+	set_linepos(vps);
+	update_hex_editor();
+	// 主绘制代码 
+	auto nn = line_number_n;
+	int cw = hst->st->font_size * 0.5;
+	int line_number_width = nn * cw;
+	int data_width = bytes_per_line * cw * 3;
+	auto height = hst->view_size.y;
+	// 设置各个区域的绘制位置 
+	int ruler_w = ruler.size() * cw;
+	text_rc[0] = { hst->MARGIN + line_number_width, hst->MARGIN, ruler_w, height }; // ruler 
+	text_rc[1] = { hst->MARGIN, hst->MARGIN + fl ,line_number_width, height }; // line_number 
+	text_rc[2] = { hst->MARGIN + line_number_width,hst->MARGIN + fl, data_width, height }; // data_hex 
+	int dataps = hst->MARGIN + line_number_width + data_width + fl;
+	text_rc[3] = { dataps,hst->MARGIN + fl ,hst->DECODED_TEXT_WIDTH, height }; // decoded_text 
+	dataps += bytes_per_line * cw + fl;
+	text_rc[4] = { dataps,hst->MARGIN + fl,hst->RULER_DI_WIDTH, height }; // ruler_di 
+	text_rc[5] = { dataps,hst->MARGIN ,hst->RULER_DI_WIDTH, height }; // dititle 
+	dataps += hst->DATA_INSPECTOR_TITLE_WIDTH;
+	text_rc[6] = { dataps, hst->MARGIN + fl, hst->RULER_DI_WIDTH, height }; // data_inspector 
+	if (!cr)return;
+	text_draw_t* dt = get_drawt();
+	dt->cr = cr; dt->ltx = hst->ltx;
+	dt->st = hst->st;
+	glm::vec4 chs = { 0,0,hst->hex_size };
+	draw_rect(cr, hst->bgrc, hst->bg_fill, hst->bg_color, hst->bg_r, hst->bg_linewidth);
+	clip_cr(cr, chs);
+	cairo_translate(cr, -pxx, 0);
+	{
+		auto nrc = get_draw_rect();
+		dtc.reset(cr, nrc);
+		dt->cr = dtc.cr;
+		if (get_draw_update()) {
+			dtc.clear_color(0);
+			auto ncr = dtc.cr;
+			{
+				cairo_as _ss_(ncr);
+				auto clip4 = text_rc[2];
+				auto sbx = select_border * 2;
+				clip4.x -= sbx;
+				clip4.z += sbx * 2;
+				clip_cr(ncr, clip4);
+				cairo_translate(ncr, text_rc[2].x, text_rc[2].y - pyy);
+				draw_rc(ncr);
+			}
+			draw_draw_texts(dt);
+		}
+		glm::vec4 nnrc = { 0,0,nrc };
+		if (dtc.surface)
+			draw_image(cr, dtc.surface, {}, nnrc);
+	}
+}
 
 
 #endif

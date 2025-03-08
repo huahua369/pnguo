@@ -1,6 +1,6 @@
 ﻿include(${CMAKE_CURRENT_SOURCE_DIR}/common.cmake)
 
-set(vkgui_src
+set(panguo_src
 "mapView.cpp"
 "tinysdl3.cpp"
 "pnguo.cpp"
@@ -52,19 +52,19 @@ set(Images_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/default_specular.dds 
 )
 
-add_library (vkgui STATIC ${vkgui_src})
-#add_library (vkgui SHARED ${vkgui_src})
+add_library (panguo STATIC ${panguo_src})
+#add_library (panguo SHARED ${panguo_src})
 
-target_link_libraries (vkgui PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json 
+target_link_libraries (panguo PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json 
     PkgConfig::Clipper2  PkgConfig::Clipper2Z 
     tpv
     SDL3::SDL3
     dxcompiler
 )
-target_include_directories (vkgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
+target_include_directories (panguo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)
 copyTargetCommand("${Shaders_PostProc_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_postproc_src)
 copyTargetCommand("${Images_src}" ${EXECUTABLE_OUTPUT_PATH}/images copied_Images_src)
-add_dependencies(vkgui copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src copied_Images_src)
+add_dependencies(panguo copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src copied_Images_src)
 
  

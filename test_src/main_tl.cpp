@@ -2,16 +2,16 @@
 #include <pch1.h>
 
 #include <random>
-#include <vkgui/win_core.h>
+#include <panguo/win_core.h>
 #include "win32msg.h"
-#include <vkgui/event.h>
-#include <vkgui/pnguo.h>
-#include <vkgui/tinysdl3.h>
-#include <vkgui/vkrenderer.h>
-#include <vkgui/page.h>
-#include <vkgui/mapView.h>
-#include <vkgui/print_time.h>
-#include <vkgui/mnet.h> 
+#include <panguo/event.h>
+#include <panguo/pnguo.h>
+#include <panguo/tinysdl3.h>
+#include <panguo/vkrenderer.h>
+#include <panguo/page.h>
+#include <panguo/mapView.h>
+#include <panguo/print_time.h>
+#include <panguo/mnet.h> 
 #include <cairo/cairo.h>
 
 #include "mshell.h"
@@ -768,87 +768,36 @@ void show_ui(form_x* form0, menu_cx* gm)
 				dps.x += hex_size.x - width;
 				hex_scroll.v->pos = dps;
 				glm::vec4 bgrc = { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 };
-				auto pf = &ftns;
 				auto phex = &hex;
 				glm::vec4 rc = { 0,0,300,1000 };
 				if (phex->acount == 0)
 				{
 					draw_rect(cr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
+					//auto pf = &ftns;
 					//for (auto& str : ftns)
-					{
+					//{
 						//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
 						//rc.x += 300;
-					}
+					//}
 					return;
 				}
-				//auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);0xf0236F23
-				auto rc2 = rc;
-
 				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
 				auto pxx = hex_scroll.h->get_offset_ns();
 				auto pyy = hex_scroll.v->get_offset_ns();
 				auto vps = pyy / fl;
 				pyy = vps * fl;
-				phex->set_linepos(vps);
-				phex->update_hex_editor();
-
-				text_draw_t* dt = phex->get_drawt();
-				dt->cr = cr; dt->ltx = p->ltx;
-				dt->st = st;
-				// 定义常量 
-				const int MARGIN = 10;
-				const int DATA_INSPECTOR_TITLE_WIDTH = 80;
-				const int DECODED_TEXT_WIDTH = 150;
-				const int RULER_DI_WIDTH = 200;
-				// 主绘制代码 
-				auto nn = phex->line_number_n;
-				int cw = st->font_size * 0.5;
-				int line_number_width = nn * cw;
-				int data_width = phex->bytes_per_line * cw * 3;
-				auto height = hex_scroll.v->_view_size;
-				phex->dititle = (char*)u8"数据检查器";
-				// 设置各个区域的绘制位置 
-				int ruler_w = phex->ruler.size() * cw;
-				phex->text_rc[0] = { MARGIN + line_number_width, MARGIN, ruler_w, height }; // ruler 
-				phex->text_rc[1] = { MARGIN, MARGIN + fl ,line_number_width, height }; // line_number 
-				phex->text_rc[2] = { MARGIN + line_number_width, MARGIN + fl, data_width, height }; // data_hex 
-				int dataps = MARGIN + line_number_width + data_width + fl;
-				phex->text_rc[3] = { dataps, MARGIN + fl ,DECODED_TEXT_WIDTH, height }; // decoded_text 
-				dataps += phex->bytes_per_line * cw + fl;
-				phex->text_rc[4] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // ruler_di 
-				phex->text_rc[5] = { dataps, MARGIN ,RULER_DI_WIDTH, height }; // dititle 
-				dataps += DATA_INSPECTOR_TITLE_WIDTH;
-				phex->text_rc[6] = { dataps, MARGIN + fl, RULER_DI_WIDTH, height }; // data_inspector 
-				phex->color[0] = 0xffff783b;	//0xfffb8f71;	// 标尺
-				phex->color[1] = 0xff999999;	// 行号
-				phex->color[2] = 0xffeeeeee;	// 16进制数据
-				phex->color[3] = 0xffeeeeee;	// 解码文件
-				phex->color[4] = 0xff999999;	// 数据检查器字段头
-				phex->color[5] = -1;			// 数据检查器标题
-				phex->color[6] = 0xff0cc616;	// 0xff107c10;	// 数据检查器相关信息 
-
-				draw_rect(cr, bgrc, 0xff121212, 0x80ffffff, 2, 1);
-				clip_cr(cr, chs);
-				cairo_translate(cr, -pxx, 0);
-				{
-					auto nrc = phex->get_draw_rect();
-					phex->dtc.reset(cr, nrc);
-					dt->cr = phex->dtc.cr;
-					if (phex->get_draw_update()) {
-						phex->dtc.clear_color(0);
-						auto ncr = phex->dtc.cr;
-						{
-							cairo_as _ss_(ncr);
-							clip_cr(ncr, phex->text_rc[2]);
-							cairo_translate(ncr, phex->text_rc[2].x, phex->text_rc[2].y - pyy);
-							phex->draw_rc(ncr);
-						}
-						draw_draw_texts(dt);
-					}
-					glm::vec4 nnrc = { 0,0,nrc };
-					if (phex->dtc.surface)
-						draw_image(cr, phex->dtc.surface, {}, nnrc);
-				}
+				hex_style_t hst = {};
+				hst.st = st;
+				hst.ltx = p->ltx;
+				hst.pxx = pxx;
+				hst.pyy = pyy;
+				hst.fl = fl;
+				hst.hex_size = hex_size;
+				hst.bgrc = bgrc;
+				hst.view_size = { hex_scroll.h->_view_size,hex_scroll.v->_view_size };
+				hst.cr = cr;
+				phex->update_draw(&hst);
+				auto dt = phex->get_drawt();
 				if (dt->box_rc.z != hex_scroll.h->_content_size)
 					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);
 			}
