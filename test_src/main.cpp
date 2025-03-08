@@ -1,10 +1,10 @@
 ﻿
 //#define MC_IMPORT
 #include <pch1.h>
-#include <vkgui/pnguo.h>
-#include <vkgui/tinysdl3.h>
-#include <vkgui/mapView.h>
-#include <vkgui/print_time.h>
+#include <pnguo/pnguo.h>
+#include <pnguo/tinysdl3.h>
+#include <pnguo/mapView.h>
+#include <pnguo/print_time.h>
 #include <mcut/stlrw.h>
 
 #include <iostream>
@@ -15,9 +15,9 @@
 #include <vulkan/vulkan.h>
 #include <vkvg/vkvgcx.h>
 
-#include <vkgui/event.h>
-#include <vkgui/page.h>
-#include <vkgui/vkrenderer.h>
+#include <pnguo/event.h>
+#include <pnguo/page.h>
+#include <pnguo/vkrenderer.h>
 #include <stb_image_write.h>
 
 //#include <mimalloc.h>
@@ -1079,7 +1079,7 @@ int main()
 		p->add_familys(fontn, 0);
 		p->_lms = { 6,6 };
 		p->set_color({ 0x80ff802C,1,5 ,pbc });
-		p->on_click_outer = [=](plane_cx* p, int state, int clicks) {p->visible = false; };
+		p->on_click_outer = [=](plane_ev* e) {e->p->visible = false; };
 		p->fontsize = 26;
 		p->set_size({ 500,600 });
 		p->set_pos({ 2000,10 });
@@ -1524,7 +1524,7 @@ int main()
 		pl1->set_size({ 530,600 });
 		pl1->set_pos({ 1000,100 });
 		//pl1->set_clear_color(pbc);
-		pl1->on_click = [](plane_cx* p, int state, int clicks) {};
+		pl1->on_click = [](plane_ev* e) {};
 		pl1->fontsize = 16;
 		int fontsize = 26;
 		glm::vec2 text_align = { 0.1,0.1 };
@@ -1759,7 +1759,7 @@ int main()
 		pl3->set_size({ 1400,600 });
 		pl3->set_pos({ 10,10 });
 		//pl3->set_clear_color(0xff000000);
-		pl3->on_click = [](plane_cx* p, int state, int clicks) {};
+		pl3->on_click = [](plane_ev* e) {};
 		pl3->update_cb = [=](float delta)
 			{
 
@@ -1809,7 +1809,7 @@ int main()
 		pl2->set_size({ 830,600 });
 		pl2->set_pos({ 10,10 });
 		//pl2->set_clear_color(pbc);
-		pl2->on_click = [](plane_cx* p, int state, int clicks) {};
+		pl2->on_click = [](plane_ev* p) {};
 		pl2->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 			{
 			};

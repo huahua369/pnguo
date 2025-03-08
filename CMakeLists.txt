@@ -140,7 +140,7 @@ list(APPEND tpv_src
 "third_party/tinyspline/tinyspline.c"
 "third_party/tinyspline/tinysplinecxx.cpp" 
 "third_party/vkvg/vkvgcx.cpp"  
-"src/panguo/mapView.cpp"  
+"src/pnguo/mapView.cpp"  
 
 "third_party/mcut/bvh.cpp"  
 "third_party/mcut/frontend.cpp"  
@@ -158,7 +158,7 @@ list(APPEND tpv_src
 
 include_directories("third_party") 
 include_directories("src") 
-include_directories("src/panguo") 
+include_directories("src/pnguo") 
 include_directories("third_party/mcut") 
 include_directories("third_party/vkvg")
 include_directories("third_party/vkvg/src")
@@ -178,13 +178,13 @@ PkgConfig::GTHREAD
 )
 
 #3d渲染器
-add_subdirectory(src/panguo)
+add_subdirectory(src/pnguo)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE)
 
 add_subdirectory(test_src)
-add_dependencies(panguo tpv)
-add_dependencies(tcmp panguo)
+add_dependencies(pnguo tpv)
+add_dependencies(tcmp pnguo)
 # TODO: 如有需要，请添加测试并安装目标。
 
 list(APPEND snake_src     
