@@ -76,6 +76,7 @@ struct bone_t {
 	glm::mat3* m = 0;			// 计算好的动画矩阵animated_mats
 	int count = 0;
 };
+//todo data: Channel/Node/Animation
 struct attachment_t
 {
 	void* tex = 0;			// 纹理，无纹理则显示纯色
@@ -102,15 +103,17 @@ struct skeleton_t
 {
 	glm::vec4 color = {};
 	slot_t* solt_data = 0;
-	size_t slots_size = 0;
-	component2d_t* anim = 0;			// 组件，私有数据结构
-	uint32_t active_idx = 0;		// 当前执行的动画
-	uint32_t active_aidx = 0;		// 当前执行的动画
+	size_t slots_count = 0;
+	attachment_t* att_data = 0;
+	size_t att_count = 0;
+	component2d_t* anim = 0;		// 动画组件，私有数据结构
 	bool usePremultipliedAlpha = false;//纹理预乘
 	bool visible = 0;				// 是否可见
+	void update(float delta);
+	uint32_t active_idx = 0;		// 当前执行的动画
+	uint32_t active_aidx = 0;		// 当前执行的动画
 	// 切换动画id,或附件号
 	void set_active(uint32_t idx, uint32_t aidx);
-	void update(float delta);
 };
 // todo 未实现
 skeleton_t* load_skeleton_file(const void* filepath);
@@ -863,9 +866,9 @@ namespace gp {
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z);
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& vd, std::vector<glm::ivec3>& idxs, bool pccw, double z);
 
-	void cdt_pt(glm::vec3* pt, int n, /*double tolerance,*/ std::vector<glm::vec3>& ms, bool pccw);
-	void cdt_pt(glm::vec3* pt, int n,/* double tolerance,*/ std::vector<glm::vec3>* ms, bool pccw);
-	void cdt_pt(glm::vec2* pt, int n, /*double tolerance,*/ std::vector<glm::vec3>* msp, bool pccw);
+	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>& ms, bool pccw); /*double tolerance,*/
+	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>* ms, bool pccw);
+	void cdt_pt(glm::vec2* pt, int n, std::vector<glm::vec3>* msp, bool pccw);
 
 	// 单线面，先扩展后比例
 	int build_plane1(cmd_plane_t* c, float expand, float scale, float z);

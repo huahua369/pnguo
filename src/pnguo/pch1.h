@@ -78,10 +78,9 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 
 #include <nlohmann/json.hpp>
-
 #if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)
-using njson = nlohmann::json;
-using njson0 = nlohmann::ordered_json;
+using njson = nlohmann::json;			// key有序
+using njson0 = nlohmann::ordered_json;	// key无序
 #define NJSON_H
 #endif
 

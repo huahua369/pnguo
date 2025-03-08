@@ -854,13 +854,14 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 	int offsetidx = 0;
 	SDL_Vertex vertex = {};
 	SDL_Texture* texture = NULL;
-	for (size_t i = 0; i < skeleton->slots_size; ++i) {
+	for (size_t i = 0; i < skeleton->slots_count; ++i) {
 		slot_t* slot = skeleton->solt_data + i;
 		auto attachment = slot->attachment;
 		// 如果附件插槽颜色为0或骨骼未处于活动状态，则提前退出
-		if (slot->color.w == 0 || !slot->bone->count || !attachment || attachment->color.w == 0) { continue; }
+		if (slot->color.w == 0 || !slot->bone->count || !attachment || !attachment->isActive || attachment->color.w == 0) { continue; }
 		texture = (SDL_Texture*)attachment->tex;
-		auto c = skeleton->color * slot->color * attachment->color;
+		auto ssc = skeleton->color * slot->color;
+		auto c = ssc * attachment->color;
 		*(glm::vec4*)(&vertex.color) = glm::clamp(c, 0.0f, 1.0f);
 		auto blend = get_blend((BlendMode_e)slot->blend_mode, skeleton->usePremultipliedAlpha);
 		//if (states.texture == 0) states.texture = texture;
@@ -882,7 +883,8 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 			{
 				vertex.position = get_v2(slot, attachment->pos[i]);
 				vertex.tex_coord = *((SDL_FPoint*)&attachment->uvs[i]);
-				vertex.color = *((SDL_FColor*)&attachment->colors[i]);
+				auto c0 = ssc * attachment->colors[i];
+				vertex.color = *((SDL_FColor*)&c0);
 				vertexs.push_back(vertex);
 			}
 		}
@@ -1859,7 +1861,7 @@ void form_x::update(float delta)
 	for (auto kt : skeletons) {
 		kt->update(delta);
 	}
-	app_cx::sleep_ms(dwt); 
+	app_cx::sleep_ms(dwt);
 }
 // todo 图集渲染
 void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
