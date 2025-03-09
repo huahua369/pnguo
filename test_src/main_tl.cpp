@@ -18,7 +18,9 @@
 #include <hex_editor.h>
 #include "mshell.h"
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
-#endif
+#endif 
+
+#include <spine/spine-sdl3/spinesdl3.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
@@ -286,7 +288,7 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 }
 #if 1 
 #include <cmark.h> 
- 
+
 #endif
 void show_ui(form_x* form0, menu_cx* gm)
 {
@@ -483,7 +485,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 		}
 		cmark_node_free(doc);
 	}
- 
+
 #endif
 #if 0
 	std::vector<menu_info> vm;
@@ -784,8 +786,30 @@ int main()
 	show_ui(form0, gm);
 	show_ui2(form0, gm);
 	//show_cpuinfo(form0);
+	auto d2 = new sp_drawable();
+	d2->set_renderer(form0->renderer);
+	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
+		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.5, 0.2);
+	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
+		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.5, 0.2);
+	d2->set_pos(0, 390, 300);
+	d2->set_pos(1, 390, 600);
+	std::vector<char*> nv;
+	d2->get_anim_name(0, &nv);
+	d2->animationstate_set_animationbyname(0, 0, "portal", 0);
+	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
+	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
+	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
+
+	{
+		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
+			{
+				d2->update_draw(delta);
+			};
+	}
 	// 运行消息循环
 	run_app(app, 0);
+	delete d2;
 	free_app(app);
 	return 0;
 }

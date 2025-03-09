@@ -31,6 +31,7 @@ list(APPEND src_mtl
     "main_tl.cpp" 
     "ecc_sv.cpp"
     "mshell.cpp"
+    "../third_party/spine/spine-sdl3/spinesdl3.cpp"
     "../rc/resource1.rc"
     "../njson.natvis"
 ) 
@@ -73,9 +74,8 @@ find_package(OpenCV CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
 
-find_package(cmark CONFIG REQUIRED)
-find_package(md4c CONFIG REQUIRED)
-
+find_package(cmark CONFIG REQUIRED)  
+#git submodule add https://github.com/EsotericSoftware/spine-runtimes third_lib/spine
 set(lklib)
 list(APPEND lklib  
     ZLIB::ZLIB
@@ -96,8 +96,9 @@ list(APPEND lklib
     tpv
     libssh2::libssh2
     CURL::libcurl
-    
-    cmark::cmark md4c::md4c
+    spine-c
+    cmark::cmark 
+    #md4c::md4c
     #$<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
    # rdx12
    # unofficial::joltphysics::Jolt

@@ -174,7 +174,8 @@ PkgConfig::GTHREAD
 #mimalloc-static 
 #PkgConfig::LIBGIT2
 )
-
+#2d渲染器
+add_subdirectory(third_party/spine/spine-c ${CMAKE_BINARY_DIR}/spine-c)
 #3d渲染器
 add_subdirectory(src/pnguo)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)

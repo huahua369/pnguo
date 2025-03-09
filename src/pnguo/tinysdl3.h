@@ -106,7 +106,7 @@ public:
 	void kncdown();
 private:
 	int get_event();
-	void render();
+	void render(double delta);
 };
 
 class skeleton_t;
@@ -142,6 +142,7 @@ public:
 	glm::vec2 display_framebuffer_scale = {};
 	SDL_Renderer* renderer = 0;
 	std::function<void(float delta, int* ret)> up_cb;	// 更新动画等
+	std::function<void(SDL_Renderer* renderer, double delta)> render_cb;	// 更新和渲染
 	std::function<int()> on_close_cb;		// 关闭事件
 
 	std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
@@ -278,7 +279,7 @@ public:
 public:
 	void update_w();
 	void update(float delta);
-	void present();
+	void present(double delta);
 	void present_e();
 
 	// 获取粘贴板文本

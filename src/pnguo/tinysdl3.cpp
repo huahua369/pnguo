@@ -701,11 +701,11 @@ int app_cx::get_event()
 	return ts;
 }
 
-void app_cx::render()
+void app_cx::render(double delta)
 {
 	for (auto it : forms)
 	{
-		it->present();
+		it->present(delta);
 	}
 }
 
@@ -717,14 +717,14 @@ int app_cx::run_loop(int t)
 		uint32_t curr_time = SDL_GetTicks();
 		if (prev_time > 0)
 		{
-			float delta = (float)(curr_time - prev_time) / 1000.0f;
+			double delta = (float)(curr_time - prev_time) / 1000.0f;
 			auto length = forms.size();
 			for (size_t i = 0; i < length; i++)
 			{
 				auto it = forms[i];
 				it->update(delta);
 			}
-			render();
+			render(delta);
 			auto power = get_power_info();
 		}
 		prev_time = curr_time;
@@ -1925,7 +1925,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 	}
 	//SDL_SetRenderViewport(renderer, (SDL_Rect*)0);
 }
-void form_x::present()
+void form_x::present(double delta)
 {
 	if (!visible || !renderer || !app || !app->r2d || display_size.x < 1 || display_size.y < 1)return;
 	float rsx = 1.0f;
@@ -1985,6 +1985,10 @@ void form_x::present()
 	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
 	SDL_SetRenderClipRect(renderer, &viewport);
 	{
+		if (render_cb)
+		{
+			render_cb(renderer, delta);
+		}
 		auto ktd = textures[1].data();
 		auto length = textures[1].size();
 		for (size_t i = 0; i < length; i++)
