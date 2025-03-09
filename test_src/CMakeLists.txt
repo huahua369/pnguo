@@ -35,6 +35,13 @@ list(APPEND src_mtl
     "../rc/resource1.rc"
     "../njson.natvis"
 ) 
+list(APPEND src_mmd   
+    "main_markdown.cpp" 
+    "ecc_sv.cpp"
+    "mshell.cpp" 
+    "../rc/resource1.rc"
+    "../njson.natvis"
+) 
 
 
 list(APPEND src_hex   
@@ -56,6 +63,7 @@ list(APPEND src_hex
 add_executable (vkcmp ${src_vkcmp} ) 
 add_executable (vkr_spr ${src_spr} ) 
 add_executable (mtl ${src_mtl} ) 
+add_executable (mmd ${src_mmd} ) 
 add_executable (hex ${src_hex} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
@@ -114,6 +122,7 @@ target_link_libraries(tcmp PRIVATE ${lklib})
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(mtl PRIVATE ${lklib}  )
+target_link_libraries(mmd PRIVATE ${lklib}  )
 target_link_libraries(hex PRIVATE ${lklib}  )
  
 #复制测试文本
