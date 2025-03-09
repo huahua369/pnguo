@@ -459,6 +459,7 @@ void component2d_t::update(float delta)
 {
 	SetAnimationTime(idx, delta);
 }
+
 /*
 * https://github.khronos.org/glTF-Tutorials/gltfTutorial/gltfTutorial_007_Animations.html
 *  deltaTime = nextTime - previousTime
@@ -585,6 +586,18 @@ void skeleton_t::set_active(uint32_t idx, uint32_t aidx)
 	anim->idx = active_idx;
 
 }
+
+
+skeleton_data::skeleton_data()
+{
+}
+
+skeleton_data::~skeleton_data()
+{
+}
+
+
+
 class packget2d_t :public skeleton_t
 {
 public:

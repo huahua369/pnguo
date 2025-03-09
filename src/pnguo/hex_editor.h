@@ -74,6 +74,7 @@ public:
 	bool set_data(const char* d, size_t len, bool is_copy);
 	// 设置文件，是否只读打开
 	bool set_file(const char* fn, bool is_rdonly);
+	// 保存坐标长度的数据到文件
 	void save_data(size_t pos, size_t len);
 	size_t write_data(const void* d, size_t len, size_t pos, bool save);	// 写入数据，是否保存到文件
 	// 设置当前光标，计算data_inspector

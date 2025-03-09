@@ -68,8 +68,51 @@ namespace pg
 图集画布
 class canvas_atlas
 2D骨骼动画
-struct skeleton_t
+	数据
+		skeleton
+		bones
+		slots
+		ik
+		transform
+		skins:attachments
+		animations
+		events
 */
+class skeleton_data
+{
+public:
+	struct skeleton_t
+	{
+		char* hash; char* spine;
+		float x, y, width, height;
+	};
+	typedef enum {
+		SP_INHERIT_NORMAL,
+		SP_INHERIT_ONLYTRANSLATION,
+		SP_INHERIT_NOROTATIONORREFLECTION,
+		SP_INHERIT_NOSCALE,
+		SP_INHERIT_NOSCALEORREFLECTION
+	} spInherit;
+	struct BoneData
+	{
+		int index;
+		char* name;
+		BoneData* parent;
+		float length;
+		float x = 0, y = 0, rotation = 0, scaleX = 1, scaleY = 1, shearX = 0, shearY = 0;
+		spInherit inherit;//transform该属性决定子骨骼以何种方式继承父骨骼的变换
+		int/*bool*/ skinRequired = 0;//skin若为true, 则只有当活动皮肤包含该骨骼时该骨骼才算活动. 若省略则默认为false.
+		uint32_t color = 0xFF989898;
+		const char* icon;
+		int/*bool*/ visible = 1;
+	};
+public:
+	skeleton_data();
+	~skeleton_data();
+
+private:
+
+};
 
 // 骨骼动画矩阵
 struct bone_t {
@@ -1897,9 +1940,9 @@ enum class widget_type :uint32_t {
 	wt_switch_btn,
 	wt_progress,
 	wt_slider
-}; 
+};
 
- 
+
 
 
 
