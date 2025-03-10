@@ -3384,7 +3384,7 @@ namespace hz {
 		auto it = vk_codei.find(vk);
 		return it != vk_codei.end() ? it->second : "";
 	}
-
+#if 0
 	// DLL动态加载
 	class Shared
 	{
@@ -3674,17 +3674,18 @@ namespace hz {
 	private:
 
 	};
+#endif
 	void* shared_load(const void* dllpath)
 	{
-		return dllpath ? Shared::loadShared((char*)dllpath, 0) : nullptr;
+		return dllpath ? hz::Shared::loadShared((char*)dllpath, 0) : nullptr;
 	}
 	void shared_destroy(void* p)
 	{
-		Shared::destroy((Shared*)p);
+		hz::Shared::destroy((hz::Shared*)p);
 	}
 
 	void shared_get(void* ptr, const char** funs, void** outbuf, int n) {
-		auto d = (Shared*)ptr;
+		auto d = (hz::Shared*)ptr;
 		if (d)
 			d->dllsyms(funs, outbuf, n);
 	}

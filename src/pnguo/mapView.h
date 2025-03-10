@@ -2,7 +2,9 @@
 #define __MAPVIEW__H__
 #include <string> 
 #include <functional> 
-#include <vector> 
+#include <vector>  
+#include <thread>  
+#include <mutex>
 //---------------------------------------------------------------------------------------------
 /*
 使用方法
@@ -208,6 +210,62 @@ namespace hz
 	private:
 
 	};
+
+
+	// DLL动态加载
+	class Shared
+	{
+	private:
+		void* _ptr = 0;
+		std::once_flag oc;
+		bool isinit = false;
+	public:
+		static std::string toLower(const std::string& s);
+		static Shared* loadShared1(Shared* ptr, const std::string& fnstr, std::vector<std::string>* pdir = nullptr);
+		static Shared* loadShared(const std::string& fnstr, std::vector<std::string>* pdir = nullptr);
+		static void destroy(Shared* p);
+	public:
+		bool loadFile(const std::string& fnstr);
+		void dll_close();
+		void* _dlsym(const char* funcname);
+
+		// 批量获取
+		void dllsyms(const char** funs, void** outbuf, int n);
+		// 批量获取
+		void dlsyms(const std::vector<std::string>& funs, void** outbuf);
+		void dlsyms(const std::vector<const char*>& funs, void** outbuf);
+		template<class T>
+		T get_cb(const std::string& str, T& ot)
+		{
+			T ret = (T)_dlsym(str.c_str());
+			ot = ret;
+			return ret;
+		}
+		template<class T>
+		T get_cb(const std::string& str, T* ot)
+		{
+			T ret = (T)_dlsym(str.c_str());
+			if (ot)
+				*ot = ret;
+			return ret;
+		}
+		template<class T>
+		T get_cb(const std::string& str)
+		{
+			T ret = (T)_dlsym(str.c_str());
+			return ret;
+		}
+		static void* dllsym(void* ptr, const char* fn);
+		std::string getLastError();
+	public:
+		Shared();
+		~Shared();
+
+	private:
+
+	};
+
+
 
 	// 获取可创建临时文件的目录
 	std::string get_temp_path();

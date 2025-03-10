@@ -7,6 +7,15 @@
 cairo_t* new_cr(cairo_surface_t* sur);
 void free_cr(cairo_t* cr);
 
+
+struct font_xi {
+	const char* family = 0;
+	float font_size = 16;
+	uint32_t color = 0xffffffff;
+	uint8_t slant = 0;//NORMAL=0，ITALIC=1，OBLIQUE=2
+	bool weight_bold = false;
+};
+
 // auto save 
 class cairo_as
 {

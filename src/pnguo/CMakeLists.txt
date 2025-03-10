@@ -5,6 +5,7 @@ set(pnguo_src
 "tinysdl3.cpp"
 "pnguo.cpp"
 "backend_2d.cpp"
+"font_core.cpp"
 "mnet.cpp"
 "buffer.cpp"
 "win_core.cpp" 

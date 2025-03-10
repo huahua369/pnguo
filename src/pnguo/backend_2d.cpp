@@ -934,8 +934,9 @@ X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点）
 Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
 */
 
-void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shadow_t& rs)
+void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shadow_t* pr)
 {
+	auto& rs = *pr;
 	std::vector<stops_t> color_stops;
 	float radius = rs.radius;
 	if (radius < 1 || width < 2 || height < 2)
