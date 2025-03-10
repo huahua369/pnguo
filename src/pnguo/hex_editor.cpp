@@ -331,7 +331,12 @@ void hex_editor::set_pos(size_t pos)
 		d_update = true;
 	}
 }
-
+void hex_editor::input_data(void* data, size_t len)
+{
+	len = std::min(len, _size - ctpos);
+	memcpy(_data + ctpos, data, len);
+	set_pos(ctpos + len);
+}
 void hex_editor::set_linepos(size_t pos)
 {
 	if (pos < _size && line_offset != pos * bytes_per_line) {

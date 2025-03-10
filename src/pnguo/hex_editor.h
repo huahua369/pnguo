@@ -79,6 +79,8 @@ public:
 	size_t write_data(const void* d, size_t len, size_t pos, bool save);	// 写入数据，是否保存到文件
 	// 设置当前光标，计算data_inspector
 	void set_pos(size_t pos);
+	// 当前光标输入数据，会覆盖后面
+	void input_data(void* data, size_t len);
 	// 设置显示偏移
 	void set_linepos(size_t pos);
 	// 鼠标事件，0鼠标移动
