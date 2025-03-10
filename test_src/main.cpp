@@ -1,6 +1,7 @@
 ﻿
 //#define MC_IMPORT
 #include <pch1.h>
+#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
 #include <pnguo/mapView.h>
@@ -1009,8 +1010,7 @@ int main()
 	auto pl1 = new plane_cx();
 	auto pl2 = new plane_cx();
 	auto pl3 = new plane_cx();
-	auto pl4 = new plane_cx();
-	auto listp = new listview_cx();
+	auto pl4 = new plane_cx(); 
 	pl2->_lms = { 6,6 };
 	uint32_t pbc = 0x80121212;
 
@@ -1028,8 +1028,7 @@ int main()
 	pl1->set_rss(5);
 	pl2->set_rss(5);
 	pl3->set_rss(5);
-	pl4->set_rss(5);
-	listp->set_rss(5);
+	pl4->set_rss(5); 
 	auto fontn2 = (char*)u8"Consolas,新宋体,Times New Roman";
 	//fontn = (char*)u8"黑体,Segoe UI Emoji";
 	//size_t add_familys(const char* familys, const char* style)
@@ -1166,9 +1165,7 @@ int main()
 			glm::vec2 text_aligns[7] = { {0,0},{0.5,0},{0.0,0.5},{0.5,0.5},{1,0},{0.0,1},{1,1} };
 			gb2->click_cb = [=](void* ptr, int clicks)
 				{
-					//form1->bind(listp);	// 绑定到新窗口	
-					listp->draggable = true;
-					listp->set_pos({2000,0});
+					//form1->bind(listp);	// 绑定到新窗口	 
 					//form1->raise();
 					auto btn = (color_btn*)ptr;
 					auto pos = (glm::ivec2)btn->pos + btn->parent->get_pos();
@@ -1223,8 +1220,7 @@ int main()
 						};
 					cbt->click_cb = [=](void* ptr, int clicks)
 						{
-							//form0->bind(listp);	// 绑定到新窗口	
-							listp->draggable = true;
+							//form0->bind(listp);	// 绑定到新窗口	 
 							static int kc = 0;
 							if (kc != 0)return;
 							kc++;
@@ -1320,34 +1316,10 @@ int main()
 					return;
 				};
 		}
-	}
-	// 创建列表视图
-	listp->set_color({ 0x80ff802C,1,5,0xff333333 });
-	pw->bind(listp);	// 绑定到窗口	
-	listp->add_familys(fontn, 0);
-	listp->add_familys(fontn2, 0);
-	{
-		listp->draggable = true; //可拖动
-		listp->set_size({ 1600,800 });
-		listp->set_pos({ 1000,10 });
-		auto pss = listp->get_size();
-		int width = 10;
-		int rcw = 8;
-		{
-			// 设置带滚动条
-			listp->set_scroll(width, rcw, { 0,0 });
-			listp->set_scroll_hide(1);
-		}
-		column_lv c = {};
-		c.width = 100;
-		c.title = (char*)u8"名称";
-		listp->add_title(c);
-		c.title = (char*)u8"状态";
-		listp->add_title(c);
-		c.title = (char*)u8"描述";
-		listp->add_title(c);
+	} 
+	{ 
 
-		plane_cx* p = listp;
+		plane_cx* p = 0;
 		p->custom_layout = true;
 		p->fontsize = 16;
 
@@ -1359,7 +1331,7 @@ int main()
 		std::vector<std::string> cstr = { (char*)u8"名称" ,(char*)u8"状\t态",(char*)u8"描述" };
 		std::vector<std::string> cstr1 = { (char*)u8"checkbox 🍇测试1" ,(char*)u8"checkbox ✅测试2",(char*)u8"" };
 		std::vector<std::string> cstr2 = { (char*)u8"radio 🍍测试1" ,(char*)u8"radio 测试2",(char*)u8"radio 测试3" };
-		width = 150;
+		int width = 150;
 		std::vector<color_btn*> cbv = new_label(p, cstr, width, [](void* ptr, int clicks)
 			{
 				auto pr = (color_btn*)ptr;

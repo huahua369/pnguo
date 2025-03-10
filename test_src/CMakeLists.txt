@@ -44,27 +44,12 @@ list(APPEND src_mmd
 ) 
 
 
-list(APPEND src_hex   
-    "main_hex.cpp" 
-    "ecc_sv.cpp"
-    "mshell.cpp"
-    "SDL3_ttf/src/SDL_ttf.c"
-    "SDL3_ttf/src/SDL_hashtable.c"
-    "SDL3_ttf/src/SDL_hashtable_ttf.c"
-    "SDL3_ttf/src/SDL_renderer_textengine.c"
-    "SDL3_ttf/src/SDL_surface_textengine.c"
-    "SDL3_ttf/src/SDL_gpu_textengine.c"
-    "../rc/resource1.rc"
-    "../njson.natvis"
-) 
-
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (vkcmp ${src_vkcmp} ) 
 add_executable (vkr_spr ${src_spr} ) 
 add_executable (mtl ${src_mtl} ) 
 add_executable (mmd ${src_mmd} ) 
-add_executable (hex ${src_hex} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
@@ -83,9 +68,12 @@ find_package(CURL REQUIRED)
 pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
 
 find_package(cmark CONFIG REQUIRED)  
+
 #git submodule add https://github.com/EsotericSoftware/spine-runtimes third_lib/spine
+
 set(lklib)
 list(APPEND lklib  
+    Dwmapi
     ZLIB::ZLIB
     Vulkan::Vulkan 
     Vulkan::Headers GPUOpen::VulkanMemoryAllocator
@@ -122,8 +110,7 @@ target_link_libraries(tcmp PRIVATE ${lklib})
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(mtl PRIVATE ${lklib}  )
-target_link_libraries(mmd PRIVATE ${lklib}  )
-target_link_libraries(hex PRIVATE ${lklib}  )
+target_link_libraries(mmd PRIVATE ${lklib}  )  
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})

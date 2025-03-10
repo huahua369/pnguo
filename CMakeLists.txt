@@ -191,5 +191,5 @@ list(APPEND snake_src
 "third_lib/SDL/examples/demo/01-snake/snake.c" 
 )
 add_executable (snake ${snake_src}  ) 
-target_link_libraries(snake PRIVATE SDL3::SDL3 mimalloc-static
+target_link_libraries(snake PRIVATE SDL3::SDL3# mimalloc-static
 )

@@ -5,6 +5,7 @@
 #include <pnguo/win_core.h>
 #include "win32msg.h"
 #include <pnguo/event.h>
+#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
 #include <pnguo/vkrenderer.h>
@@ -28,8 +29,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	p->add_familys(fontn, 0);
 	p->draggable = true; //可拖动
 	p->set_size({ 320,660 });
-	p->set_pos({ 1000,100 });
-	p->on_click = [](plane_ev* e) {};
+	p->set_pos({ 1000,100 }); 
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -164,8 +164,7 @@ void show_cpuinfo(form_x* form0)
 	p->add_familys(fontn, 0);
 	p->draggable = true; //可拖动
 	p->set_size({ 420,660 });
-	p->set_pos({ 100,100 });
-	p->on_click = [](plane_ev* e) {};
+	p->set_pos({ 100,100 }); 
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;

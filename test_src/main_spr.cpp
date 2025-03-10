@@ -5,6 +5,7 @@
 #include <pnguo/win_core.h>
 #include "win32msg.h"
 #include <pnguo/event.h>
+#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
 #include <pnguo/vkrenderer.h>
@@ -772,8 +773,7 @@ void build_spr_ui(form_x* form0)
 		spredit->set_text(sp->cstr.c_str(), sp->cstr.size());
 		};
 
-	auto dpx1 = p->push_dragpos({ 140,360 });// , { 300,600 });// 增加一个拖动坐标
-	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
+	auto dpx1 = p->push_dragpos({ 140,360 });// , { 300,600 });// 增加一个拖动坐标 
 	p->update_cb = [=](float delta)
 		{
 			return sp->update(delta);
@@ -907,8 +907,7 @@ void show_gui(form_x* form0)
 	p->add_familys(fontn, 0);
 	p->draggable = false; //可拖动
 	p->set_size(size);
-	p->set_pos({ 30,50 });
-	p->on_click = [](plane_cx* p, int state, int clicks, const glm::ivec2& mpos) {};
+	p->set_pos({ 30,50 }); 
 	p->fontsize = 16;
 }
 int main()

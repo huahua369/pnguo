@@ -1,6 +1,6 @@
 ﻿
 #include <pch1.h>
- 
+
 #include <pnguo/win_core.h>
 #include "win32msg.h"
 #include <pnguo/event.h>
@@ -304,7 +304,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->set_size(size);
 	p->set_pos({ 1,30 });
 	p->set_select_box(2 * 0, 0.012);	// 设置是否显示选择框
-	p->on_click = [](plane_ev* e) {};
+ 
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -522,7 +522,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 			}
 		}
 		};
-	p->on_click = [=](plane_ev* e)
+	p->add_mouse_cb([=](plane_ev* e)
 		{
 			if (e->down)
 			{
@@ -542,7 +542,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 				//printf("click:%d\t%d\n", scpos.x, scpos.y);
 			}
 
-		};
+		});
 	p->update_cb = [=](float delta)
 		{
 			return 0;
@@ -641,11 +641,11 @@ int main()
 	auto d2 = new sp_drawable();
 	d2->set_renderer(form0->renderer);
 	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
-		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.5, 0.2);
+		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2);
 	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
-		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.5, 0.2);
-	d2->set_pos(0, 390, 300);
-	d2->set_pos(1, 390, 600);
+		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2);
+	d2->set_pos(0, 390, 350);
+	d2->set_pos(1, 390, 650);
 	std::vector<char*> nv;
 	d2->get_anim_name(0, &nv);
 	d2->animationstate_set_animationbyname(0, 0, "portal", 0);

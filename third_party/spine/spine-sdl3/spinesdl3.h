@@ -1,7 +1,10 @@
-/*
+﻿/*
 	2d渲染器
 
 */
+#ifndef SPSDL3_H
+#define SPSDL3_H
+
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -32,3 +35,5 @@ public:
 private:
 
 };
+
+#endif // !SPSDL3_H

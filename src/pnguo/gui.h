@@ -544,6 +544,8 @@ public:
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<drag_v6> drags;	// 拖动坐标
 	std::vector<drag_v6*> dragsp;	// 拖动区域
+	std::vector<std::function<void(plane_ev* e)>> on_mouses;
+
 	layout_info_x _css = {};		// 布局样式
 	glm::vec2 _lpos = { 0,0 }, _lms = { 2,2 };// 布局偏移，子元素加宽
 	std::string familys = "NSimSun";
@@ -579,6 +581,9 @@ public:
 	void set_color(const glm::ivec4& c);
 	// 设置选择框范围，时间
 	void set_select_box(int width, float s);
+	// 添加单击事件处理
+	void add_mouse_cb(std::function<void(plane_ev* e)> cb);
+public:
 	size_t add_res(const std::string& fn);
 	size_t add_res(const char* data, int len);
 	// 设置本面板滚动条，pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移

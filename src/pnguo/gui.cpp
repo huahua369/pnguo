@@ -3401,6 +3401,13 @@ void plane_cx::set_select_box(int w, float s)
 	vgs.thickness = w;
 	vgtms.x = s;
 }
+void plane_cx::add_mouse_cb(std::function<void(plane_ev* e)> cb)
+{
+	if (cb) {
+		on_mouses.push_back(cb);
+	}
+}
+
 size_t plane_cx::add_res(const std::string& fn)
 {
 
@@ -4151,12 +4158,16 @@ void plane_cx::on_motion(const glm::vec2& pos) {
 		//else
 		//	set_scroll_pts(ps - curpos, 1);
 
+		plane_ev e = {};
+		e.p = this; e.down = 1; e.clicks = 0; e.mpos = ps;
+		e.drag = true;
 		if (on_click)
 		{
-			plane_ev e = {};
-			e.p = this; e.down = 1; e.clicks = 0; e.mpos = ps;
-			e.drag = true;
 			on_click(&e);	// 执行拖动事件
+		}
+		for (auto& c : on_mouses)
+		{
+			c(&e);
 		}
 	}
 
@@ -4182,11 +4193,15 @@ void plane_cx::on_button(int idx, int down, const glm::vec2& pos, int clicks, in
 					curpos = ps - tpos;
 					ckinc++;
 				}
+				plane_ev e = {};
+				e.p = this; e.down = down; e.clicks = clicks; e.mpos = ps;
 				if (on_click)
 				{
-					plane_ev e = {};
-					e.p = this; e.down = down; e.clicks = clicks; e.mpos = ps;
 					on_click(&e);	// 执行单击事件
+				}
+				for (auto& c : on_mouses)
+				{
+					c(&e);
 				}
 			}
 			ckup = 1;
@@ -5284,7 +5299,7 @@ void send_hover(widget_base* wp, const glm::vec2& mps) {
 #endif // 1
 
 
- 
+
 
 #endif // 1
 
@@ -6539,4 +6554,4 @@ std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t,
 	}
 	return rv;
 }
- 
+
