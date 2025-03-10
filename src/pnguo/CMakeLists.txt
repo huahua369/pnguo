@@ -4,6 +4,7 @@ set(pnguo_src
 "mapView.cpp"
 "tinysdl3.cpp"
 "pnguo.cpp"
+"backend_2d.cpp"
 "mnet.cpp"
 "buffer.cpp"
 "win_core.cpp" 
