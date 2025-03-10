@@ -624,14 +624,12 @@ int main()
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto app = new_app();
 	cpuinfo_t cpuinfo = get_cpuinfo();
-	//do_text(fontn, 0, strlen(fontn)); 
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan | ef_resizable));//ef_gpuef_dx11| ef_vsync
-	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan | ef_resizable));
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
-	sdldev.vkdev = 0;								// 清空使用独立创建逻辑设备
+	sdldev.vkdev = 0;					// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 	auto gm = menu_m(form0);
 	printf("%p\n", form0);
@@ -644,15 +642,14 @@ int main()
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2);
 	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2);
-	d2->set_pos(0, 390, 350);
-	d2->set_pos(1, 390, 650);
+	d2->set_pos(0, 300, 350);
+	d2->set_pos(1, 300, 650);
 	std::vector<char*> nv;
 	d2->get_anim_name(0, &nv);
 	d2->animationstate_set_animationbyname(0, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
-
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
