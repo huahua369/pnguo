@@ -232,9 +232,7 @@ struct tex9Grid {
 };
 
 
-
-void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool b);
-void save_img_png(image_ptr_t* p, const char* str);
+ 
 
 struct image_rect {
 	void* tex = 0;

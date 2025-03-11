@@ -411,7 +411,8 @@ struct text_atlas_t
 	image_ptr_t ipt = {};
 };
 
- 
+
+void save_img_png(image_ptr_t* p, const char* str);
 // 灰度图转rgba
 void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
 //单色位图1位
