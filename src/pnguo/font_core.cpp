@@ -1589,9 +1589,11 @@ font_t::~font_t()
 	}
 	if (font)delete font; font = 0;
 #if TTF_USE_HARFBUZZ
-	hb_face_t* face = hb_font_get_face(hp->hb_font);
-	if (face)hb_face_destroy(face);
-	hb_font_destroy(hp->hb_font);
+	if (hp->hb_font) {
+		hb_face_t* face = hb_font_get_face(hp->hb_font);
+		if (face)hb_face_destroy(face);
+		hb_font_destroy(hp->hb_font);
+	}
 #endif
 	if (hp)delete hp; hp = 0;
 }
