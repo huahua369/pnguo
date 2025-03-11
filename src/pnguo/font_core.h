@@ -135,6 +135,53 @@ public:
 	bitmap_cache_cx* ctx = 0;  //纹理缓存，多个字体共用
 
 	bool first_bitmap = false;
+	// Whether kerning is desired
+	bool enable_kerning = false;
+
+	struct c_glyph {
+		int stored;
+		uint32_t index;
+		//TTF_Image bitmap;
+		//TTF_Image pixmap;
+		int sz_left;
+		int sz_top;
+		int sz_width;
+		int sz_rows;
+		int advance;
+		union {
+			// TTF_HINTING_LIGHT_SUBPIXEL (only pixmap)
+			struct {
+				int lsb_minus_rsb;
+				int translation;
+			} subpixel;
+			// Other hinting
+			struct {
+				int rsb_delta;
+				int lsb_delta;
+			} kerning_smart;
+		};
+	};
+	struct GlyphPosition {
+		font_t* font;
+		uint32_t index;
+		uint32_t codepoint;
+		c_glyph* glyph;
+		int x_offset;
+		int y_offset;
+		int x_advance;
+		int y_advance;
+		int x;
+		int y;
+		int offset;
+	};
+	struct GlyphPositions {
+		GlyphPosition* pos;
+		int len;
+		int width26dot6;
+		int height26dot6;
+		int num_clusters;
+		int maxlen;
+	};
 public:
 	font_t();
 	~font_t();
@@ -161,6 +208,8 @@ public:
 	int get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector<font_t*>* fallbacks);
 
 	std::map<int, std::vector<info_one>> get_detail();
+
+	bool CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions);
 public:
 	void init_post_table();
 	int init_color();

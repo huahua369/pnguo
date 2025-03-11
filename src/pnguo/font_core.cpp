@@ -8,6 +8,9 @@
 //#include "print_time.h"
 //#include "event.h"
 
+#ifndef TTF_USE_HARFBUZZ
+#define TTF_USE_HARFBUZZ 1
+#endif
 
 #ifndef NO_FONT_CX 
 
@@ -106,7 +109,7 @@ std::map<std::string, fontns> get_allfont()
 {
 	int r = 0;
 	std::map<std::string, fontns> fyv;
-	int nfamilies = 0;  
+	int nfamilies = 0;
 	if (FcInit()) {
 #ifdef WIN32
 		{
@@ -851,6 +854,10 @@ struct hps_t {
 	head_table head;
 	hheaTbl hhea;
 	post_header post;
+#if TTF_USE_HARFBUZZ
+	hb_font_t* hb_font;
+	hb_language_t hb_language;
+#endif
 };
 class stb_font
 {
@@ -1581,6 +1588,11 @@ font_t::~font_t()
 		delete colorinfo; colorinfo = 0;
 	}
 	if (font)delete font; font = 0;
+#if TTF_USE_HARFBUZZ
+	hb_face_t* face = hb_font_get_face(hp->hb_font);
+	if (face)hb_face_destroy(face);
+	hb_font_destroy(hp->hb_font);
+#endif
 	if (hp)delete hp; hp = 0;
 }
 float font_t::get_scale(int px)
@@ -1594,6 +1606,97 @@ void font_t::init_post_table()
 	stb_font::get_head(font, p);
 	xMaxExtent = hhea->xMaxExtent;
 	lineGap = hhea->lineGap;
+
+
+#if TTF_USE_HARFBUZZ
+
+	hb_blob_t* blob = hb_blob_create((char*)font->data, dataSize, HB_MEMORY_MODE_READONLY, 0, 0); //HB_MEMORY_MODE_WRITABLEhb_blob_create_from_file(ttfn);
+	if (hb_blob_get_length(blob) > 0)
+	{
+		hb_face_t* face = hb_face_create(blob, _index);
+		hp->hb_font = hb_font_create(face);
+		if (hp->hb_font == NULL) {
+			if (face)hb_face_destroy(face);
+		}
+		//hb_ft_font_set_load_flags(font->hb_font, FT_LOAD_DEFAULT | font->ft_load_target); 
+		hp->hb_language = hb_language_from_string("", -1);
+	}
+	if (blob)hb_blob_destroy(blob);
+#endif
+
+}
+
+bool font_t::CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions)
+{
+#if TTF_USE_HARFBUZZ
+	// Create a buffer for harfbuzz to use
+	hb_buffer_t* hb_buffer = hb_buffer_create();
+	if (!hb_buffer) {
+		//SDL_SetError("Cannot create harfbuzz buffer");
+		return false;
+	}
+	// Set global configuration
+	hb_buffer_set_language(hb_buffer, hp->hb_language);
+	hb_buffer_set_direction(hb_buffer, (hb_direction_t)direction);
+	hb_buffer_set_script(hb_buffer, (hb_script_t)script);
+
+	// Layout the text
+	hb_buffer_add_utf8(hb_buffer, text, (int)length, 0, -1);
+	hb_buffer_guess_segment_properties(hb_buffer);
+
+	hb_feature_t userfeatures[1];
+	userfeatures[0].tag = HB_TAG('k', 'e', 'r', 'n');
+	userfeatures[0].value = enable_kerning;
+	userfeatures[0].start = HB_FEATURE_GLOBAL_START;
+	userfeatures[0].end = HB_FEATURE_GLOBAL_END;
+
+	hb_shape(hp->hb_font, hb_buffer, userfeatures, 1);
+
+	// Get the result
+	unsigned int glyph_count_u = 0;
+	hb_glyph_info_t* hb_glyph_info = hb_buffer_get_glyph_infos(hb_buffer, &glyph_count_u);
+	hb_glyph_position_t* hb_glyph_position = hb_buffer_get_glyph_positions(hb_buffer, &glyph_count_u);
+
+	// Adjust for bold text
+	int advance_if_bold = 0;
+	//if (TTF_HANDLE_STYLE_BOLD(font)) {
+	//	advance_if_bold = F26Dot6(font->glyph_overhang);
+	//}
+
+	// Realloc, if needed
+	int glyph_count = (int)glyph_count_u;
+	if (glyph_count > positions->maxlen) {
+		GlyphPosition* saved = positions->pos;
+		positions->pos = (GlyphPosition*)realloc(positions->pos, glyph_count * sizeof(*positions->pos));
+		if (positions->pos) {
+			positions->maxlen = glyph_count;
+		}
+		else {
+			positions->pos = saved;
+			hb_buffer_destroy(hb_buffer);
+			return false;
+		}
+	}
+	positions->len = glyph_count;
+
+	for (int i = 0; i < glyph_count; ++i) {
+		GlyphPosition* pos = &positions->pos[i];
+		pos->font = this;
+		pos->codepoint = hb_glyph_info[i].codepoint;
+		pos->x_advance = hb_glyph_position[i].x_advance + advance_if_bold;
+		pos->y_advance = hb_glyph_position[i].y_advance;
+		pos->x_offset = hb_glyph_position[i].x_offset;
+		pos->y_offset = hb_glyph_position[i].y_offset;
+		pos->offset = (int)hb_glyph_info[i].cluster;
+
+		pos->index = stb_font::getGlyphIndex(font, pos->codepoint);
+		//if (!Find_GlyphByIndex(font, pos->index, 0, 0, 0, 0, 0, 0, &pos->glyph, NULL)) 
+		if (pos->index <= 0)continue;
+	}
+
+	hb_buffer_destroy(hb_buffer);
+#endif
+	return true;
 }
 
 #ifndef TAGS_H_
@@ -6377,19 +6480,6 @@ public:
 private:
 
 };
-struct dlinfo_t
-{
-	font_t* font;
-	double font_height;
-	lt_dir dir;
-	//Image* img;
-	// x,y ,z=baseline
-	//glm::ivec3 pos;
-	bool is_word1;
-	word_key* wks = 0;
-	// out
-	glm::ivec2 rc;
-};
 struct lt_item_t
 {
 	unsigned int _glyph_index = 0;
@@ -6426,7 +6516,6 @@ public:
 		ttb,		// 竖
 		btt			// 倒竖
 	};
-private:
 	std::map<font_t*, hb_font_t*> _font;
 	hb_buffer_t* _buffer = 0;
 public:
@@ -6435,15 +6524,309 @@ public:
 	font_t* push_font(font_t* p);
 	void shape(const str_info_t& str, font_t* ttp, hb_dir dir);
 	void shape(const str_info_t* str, font_t* ttp, hb_dir dir);
-	//int tolayout(const std::string& str, font_t* ttf, double fontheight, bool is_word1, word_key& wks, std::vector<lt_item_t>& outlt);
-	int tolayout(const std::string& str, dlinfo_t* info, std::vector<lt_item_t>& outlt);
-	glm::ivec2 draw_to_image(const std::string& str, font_t* ttf, double fontheight, image_ptr_t* img, glm::ivec3 dstpos);
+	//glm::ivec2 draw_to_image(const std::string& str, font_t* ttf, double fontheight, image_ptr_t* img, glm::ivec3 dstpos);
 public:
 
 private:
 	void free_font();
 };
- 
+
+// 文本布局
+class layout_text
+{
+public:
+	enum class lt_dir
+	{
+		invalid = 0,
+		ltr = 4,	// 左-右
+		rtl,		// 右-左
+		ttb,		// 竖
+		btt			// 倒竖
+	};
+	struct dlinfo_t
+	{
+		font_t* font;
+		double font_height;
+		lt_dir dir;
+		//Image* img;
+		// x,y ,z=baseline
+		//glm::ivec3 pos;
+		bool is_word1;
+		word_key* wks = 0;
+		// out
+		glm::ivec2 rc;
+	};
+	std::vector<font_t*> _familys;
+private:
+	hb_cx* _hb = 0;
+	//auto_destroy_cx dc;
+	word_key wks;
+public:
+	layout_text();
+	~layout_text();
+	// 设置字体集合
+	void set_font_family(font_t** font_family, int count);
+	void cpy(layout_text* p);
+	void get_familys(font_t** bufptr, int first, int count);
+	font_t* get_familys(const std::string& name, const std::string& style);
+	size_t size();
+	//double get_base_line(double height); 
+	//void do_text(item_box_info* info);
+	// familys要在set_font_family里先设置
+	//void do_text(item_box_info* info, hz::familys_t* familys);
+
+private:
+	void do_layout(const std::string& u8str, dlinfo_t* info, std::vector<lt_item_t>& outlt);
+	int tolayout(const std::string& str, dlinfo_t* info, std::vector<lt_item_t>& outlt);
+	//void make_extent(item_box_info& info);
+
+};
+/*
+		layout_text lt;
+	std::vector<font_t*> familys = { SourceHanSans,nsimsun,Consolas, Majalla, Uighur,  seguiemj, utsaah };
+	lt.set_font_family(familys.data(), familys.size());	// 设置字体集
+
+	item_box_info res;
+	res.s.str = str.c_str();
+	res.s.count = get_utf8_count(res.s.str, str.size());
+	res.s.first = 0;
+	res.fontheight = 16;
+	hz::text_extent str_rc;
+	// 设置视图宽度
+	str_rc.set_view_width(520);
+	{
+		print_time ftpt("do_text");
+		lt.do_text(res);
+	}
+	{
+		print_time ftpt("layout computing");
+		lt.make_extent(res, &str_rc);
+	}
+
+
+*/
+layout_text::layout_text()
+{
+	_hb = new hb_cx();
+}
+
+layout_text::~layout_text()
+{
+	delete _hb;
+}
+void layout_text::set_font_family(font_t** font_family, int count)
+{
+	assert(_hb);
+	if (font_family)
+	{
+		for (int i = 0; i < count; i++)
+		{
+			auto it = font_family[i];
+			if (it)
+			{
+				auto p = _hb->push_font(it);
+				if (p)
+					_familys.push_back(p);
+			}
+		}
+	}
+}
+void layout_text::cpy(layout_text* p)
+{
+	set_font_family(p->_familys.data(), p->_familys.size());
+}
+void layout_text::get_familys(font_t** bufptr, int first, int count)
+{
+	do
+	{
+		if (count < 0)
+			count = _familys.size() - first;
+		if (!bufptr || (first + count > _familys.size()) || first < 0)
+			break;
+		std::copy_n(_familys.data() + first, count, bufptr);
+	} while (0);
+}
+font_t* layout_text::get_familys(const std::string& name, const std::string& style)
+{
+	font_t* ret = 0;
+	font_t* ret1 = 0;
+	for (auto it : _familys)
+	{
+		if (style.size() && it->_style != style)
+		{
+			continue;
+		}
+		if (it->_name == name || it->fullname == name)
+		{
+			ret = it;
+			break;
+		}
+		if (it->_name.find(name) || it->fullname.find(name))
+		{
+			ret1 = it;
+		}
+	}
+	return ret;
+}
+size_t layout_text::size()
+{
+	return _familys.size();
+}
+void layout_text::do_layout(const std::string& u8str, dlinfo_t* info, std::vector<lt_item_t>& outlt)
+{
+	// 整形
+	_hb->shape({ u8str.c_str(), (int)u8str.size(), 0, -1 }, info->font, (hb_cx::hb_dir)info->dir);
+	// 获取坐标信息
+	tolayout(u8str, info, outlt);
+	//info->rc = _hb->draw_to_image(u8str, info->font, info->font_height, info->img, info->pos);
+}
+
+int layout_text::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<lt_item_t>& outlt)
+{
+	hb_buffer_t* buf = _hb->_buffer;
+	unsigned int count = hb_buffer_get_length(buf);
+	if (count == 0)
+	{
+		return 0;
+	}
+	font_t* ttf = dinfo->font;
+	double fontheight = dinfo->font_height;
+	bool is_word1 = dinfo->is_word1;
+	word_key& wks = *dinfo->wks;
+	hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buf, nullptr);
+	hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, nullptr);
+	auto scale_h = ttf->get_scale(fontheight);
+	auto pstr = str.c_str();
+	outlt.reserve(outlt.size() + count);
+	size_t bidx = outlt.size();
+	size_t n = 0;
+	size_t sc = str.size();
+	const char* laststr = 0;
+	int64_t last_cluster = infos[0].cluster; char32_t cp32;
+	bool isn = sc != count;
+	std::vector<int64_t> cluster;
+	int ic = 1;
+	bool isback = (dinfo->dir == lt_dir::ltr) || (dinfo->dir == lt_dir::ttb);
+	if (!isback)
+		cluster.push_back(sc);
+	// 收集cluster判断是否连写
+	for (unsigned int i = 0; i < count; i++)
+	{
+		cluster.push_back(infos[i].cluster);
+	}
+	if (isback) { cluster.push_back(sc); }
+	else {
+		ic = 0;
+	}
+
+	for (unsigned int i = 0; i < count; i++)
+	{
+		hb_glyph_info_t* info = &infos[i];
+		hb_glyph_position_t* pos = &positions[i];
+		glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
+		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+		unsigned int cp = 0;
+		//laststr = md::get_u8_last(pstr + info->cluster, &cp);
+		int ch = 0;
+		auto nstr = pstr + info->cluster;
+		auto kk = md::utf8_to_unicode(nstr, &ch);
+		if (kk < 1)break;
+		cp = ch;
+		cp32 = cp;
+		auto git = ttf->get_glyph_item(info->codepoint, cp, fontheight);
+
+		lt_item_t lti = {};
+		//memcpy(&lti, &git, sizeof(ftg_item));
+		lti._image = git._image;
+		lti.color = git.color;
+		lti._glyph_index = git._glyph_index;
+		lti._rect = git._rect;
+		lti._dwpos = git._dwpos;
+		lti.advance = git.advance;
+		lti.rtl = !isback;
+		lti.adv = adv;
+		lti._offset = offset;
+		lti.ch[0] = cp;
+		lti.chlen = 1;
+		if (isn)
+		{
+			int64_t clu[2] = { info->cluster, cluster[i + ic] };
+			if (clu[0] > clu[1]) { std::swap(clu[0], clu[1]); }
+			int64_t dif = clu[1];
+			if (clu[0] != clu[1])
+			{
+				int c = 0;
+				unsigned int cp1 = 0;
+				auto uc = md::get_utf8_count(pstr + clu[0], clu[1] - clu[0]);
+				if (uc > 1)
+				{
+					laststr = pstr + clu[0];
+					for (int k = 0; k < uc; k++)
+					{
+						//laststr = md::get_u8_last(laststr, &cp1);
+						auto kk = md::utf8_to_unicode(laststr, (int*)&cp1);
+						assert(c < 8 && kk>0);
+						if (kk > 0)
+						{
+							laststr += kk;
+							lti.ch[c++] = cp1;
+						}
+					}
+				}
+				lti.chlen = uc;
+			}
+			if (dif == 1)
+			{
+				cp32 = 0;
+			}
+		}
+		bool isctr = false;
+		{
+
+			static std::string ctn = R"(~!@#$%^&*()-+/\|/;'',.<>?`)";
+			static std::u16string cn = uR"(【】、；‘：“’”，。、《》？（）——！￥)";
+			if (cn.find(cp) != std::u16string::npos)
+				isctr = true;
+			if (cp < 255 && ctn.find(cp) != std::string::npos)
+				isctr = false;
+			if (cp < 255 && iscntrl(cp))
+			{
+				do
+				{
+					isctr = true;
+				} while (0);
+				if (cp != '\t')
+					lti.adv.x = 0;
+			}
+		}
+		lti.last_n = 0;
+		lti.cluster = info->cluster;
+		bool issplit = (cp < 255 && wks.get_split(cp));
+		bool ispush = (is_word1 && cp > 255) || count - i == 1;
+		last_cluster = info->cluster;
+		if (issplit || isctr)
+		{
+			if (n > 0)
+			{
+				outlt[bidx].last_n = n;
+				bidx += n; n = 0;
+			}
+			ispush = true;
+		}
+		n++;
+		outlt.push_back(lti);
+		// 分割
+		if (ispush)
+		{
+			outlt[bidx].last_n = n;
+			bidx += n; n = 0;
+		}
+	}
+	return count;
+}
+
+
+
 
 struct BidiScriptRunRecords {
 	bool isRtl;
@@ -6562,160 +6945,6 @@ void hb_cx::shape(const str_info_t* str, font_t* ttp, hb_dir dir)
 	}
 }
 
-int hb_cx::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<lt_item_t>& outlt)
-//int hb_cx::tolayout(const std::string& str, font_t* ttf, double fontheight, bool is_word1, word_key& wks, std::vector<lt_item_t>& outlt)
-{
-	hb_buffer_t* buf = _buffer;
-	unsigned int count = hb_buffer_get_length(buf);
-	if (count == 0)
-	{
-		return 0;
-	}
-	font_t* ttf = dinfo->font;
-	double fontheight = dinfo->font_height;
-	bool is_word1 = dinfo->is_word1;
-	word_key& wks = *dinfo->wks;
-	hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buf, nullptr);
-	hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, nullptr);
-	auto scale_h = ttf->get_scale(fontheight);
-	//auto dir = hb_buffer_get_direction(buf);
-	auto pstr = str.c_str();
-	//auto uc = hz::get_utf8_count(u8p, str.size());
-	outlt.reserve(outlt.size() + count);
-	size_t bidx = outlt.size();
-	size_t n = 0;
-	size_t sc = str.size();
-	const char* laststr = 0;
-	int64_t last_cluster = infos[0].cluster; char32_t cp32;
-	bool isn = sc != count;
-	std::vector<int64_t> cluster;
-	int ic = 1;
-	bool isback = (dinfo->dir == lt_dir::ltr) || (dinfo->dir == lt_dir::ttb);
-	if (!isback)
-		cluster.push_back(sc);
-	// 收集cluster判断是否连写
-	for (unsigned int i = 0; i < count; i++)
-	{
-		cluster.push_back(infos[i].cluster);
-	}
-	if (isback) { cluster.push_back(sc); }
-	else {
-		ic = 0;	//std::reverse(cluster.begin(), cluster.end());
-	}
-
-	for (unsigned int i = 0; i < count; i++)
-	{
-		hb_glyph_info_t* info = &infos[i];
-		hb_glyph_position_t* pos = &positions[i];
-		glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
-		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-		unsigned int cp = 0;
-		//laststr = md::get_u8_last(pstr + info->cluster, &cp);
-		int ch = 0;
-		auto nstr = pstr + info->cluster;
-		auto kk = md::utf8_to_unicode(nstr, &ch);
-		if (kk < 1)break;
-		cp = ch;
-		cp32 = cp;
-		auto git = ttf->get_glyph_item(info->codepoint, cp, fontheight);
-
-		lt_item_t lti = {};
-		//memcpy(&lti, &git, sizeof(ftg_item));
-		lti._image = git._image;
-		lti.color = git.color;
-		lti._glyph_index = git._glyph_index;
-		lti._rect = git._rect;
-		lti._dwpos = git._dwpos;
-		lti.advance = git.advance;
-		lti.rtl = !isback;
-		lti.adv = adv;
-		lti._offset = offset;
-		lti.ch[0] = cp;
-		lti.chlen = 1;
-		if (isn)
-		{
-			int64_t clu[2] = { info->cluster, cluster[i + ic] };
-			if (clu[0] > clu[1]) { std::swap(clu[0], clu[1]); }
-			int64_t dif = clu[1];
-			if (clu[0] != clu[1])
-			{
-				int c = 0;
-				unsigned int cp1 = 0;
-				auto uc = md::get_utf8_count(pstr + clu[0], clu[1] - clu[0]);
-				if (uc > 1)
-				{
-					laststr = pstr + clu[0];
-					for (int k = 0; k < uc; k++)
-					{
-						//laststr = md::get_u8_last(laststr, &cp1);
-						auto kk = md::utf8_to_unicode(laststr, (int*)&cp1);
-						assert(c < 8 && kk>0);
-						if (kk > 0)
-						{
-							laststr += kk;
-							lti.ch[c++] = cp1;
-						}
-					}
-				}
-				lti.chlen = uc;
-			}
-			if (dif == 1)
-			{
-				cp32 = 0;
-			}
-		}
-		bool isctr = false;
-		{
-
-			static std::string ctn = R"(~!@#$%^&*()-+/\|/;'',.<>?`)";
-			static std::u16string cn = uR"(【】、；‘：“’”，。、《》？（）——！￥)";
-			if (cn.find(cp) != std::u16string::npos)
-				isctr = true;
-			if (cp < 255 && ctn.find(cp) != std::string::npos)
-				isctr = false;
-			if (cp < 255 && iscntrl(cp))
-			{
-				do
-				{
-					isctr = true;
-				} while (0);
-				if (cp != '\t')
-					lti.adv.x = 0;
-			}
-		}
-		lti.last_n = 0;
-		lti.cluster = info->cluster;
-		bool issplit = (cp < 255 && wks.get_split(cp));
-		bool ispush = (is_word1 && cp > 255) || count - i == 1;
-		//if (abs(info->cluster - last_cluster) > 2)
-		//{
-		//	issplit = true;
-		//}
-		last_cluster = info->cluster;
-		//ispush = true;
-		if (issplit || isctr)
-		{
-			if (n > 0)
-			{
-				outlt[bidx].last_n = n;
-				bidx += n; n = 0;
-			}
-			ispush = true;
-		}
-		n++;
-		outlt.push_back(lti);
-		// 分割
-		if (ispush)
-		{
-			outlt[bidx].last_n = n;
-			bidx += n; n = 0;
-		}
-		//printf("%d\t", (int)adv.x);
-	}
-
-	//printf("\n");
-	return count;
-}
 #if 0
 glm::ivec2 hb_cx::draw_to_image(const std::string& str, font_t* ttf, double fontheight, hz::Image* img, glm::ivec3 dstpos)
 {
