@@ -190,20 +190,7 @@ enum class BlendMode_e :int {
 //uint32_t color = col_white;			// 混合颜色，默认白色不混合
 #endif
 
-struct image_ptr_t
-{
-	int width = 0, height = 0;
-	int type = 0;				// 0=rgba，1=bgra
-	int stride = 0;
-	uint32_t* data = 0;			// 像素数据
-	void* texid = 0;			// 纹理指针，由调用方自动生成管理
-	void* ptr = 0;				// 用户数据
-	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
-	int  blendmode = 0;			// 混合模式
-	bool static_tex = false;	// 静态纹理
-	bool multiply = false;		// 预乘的纹理
-	bool valid = false;			// 是否更新到纹理
-};
+struct image_ptr_t;
 struct image_rc_t
 {
 	glm::ivec4 img_rc = {};	// 显示坐标、大小
@@ -217,15 +204,15 @@ struct image_sliced_t
 	glm::ivec4 sliced = {};	// 九宫格渲染0则不启用 
 	uint32_t color = 0;	// 颜色混合/透明度
 };
-struct atlas_t
+struct atlas_t;
+
+struct quadratic_v
 {
-	image_ptr_t* img = 0;
-	glm::ivec4* img_rc = 0;	// 显示坐标、大小
-	glm::ivec4* tex_rc = 0;	// 纹理区域
-	glm::ivec4* sliced = 0;	// 九宫格渲染
-	uint32_t* colors = 0;	// 颜色混合/透明度
-	size_t count = 0;		// 数量
-	glm::ivec4 clip = {};	// 裁剪区域
+	glm::vec2 p0, p1, p2;
+};
+struct cubic_v
+{
+	glm::vec2 p0, p1, p2, p3;	// p1 p2是控制点
 };
 
 struct vertex_v2
@@ -245,24 +232,6 @@ struct tex9Grid {
 };
 
 
-
-// 简易stb_image加载
-class stbimage_load :public image_ptr_t
-{
-public:
-	int rcomp = 4;	// 目标通道
-public:
-	stbimage_load();
-	stbimage_load(const char* fn);
-
-	~stbimage_load();
-	bool load(const char* fn);
-
-	bool load_mem(const char* d, size_t s);
-	void tobgr();
-	static stbimage_load* new_load(const void* fnd, size_t len);
-	static void free_img(stbimage_load* p);
-};
 
 void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool b);
 void save_img_png(image_ptr_t* p, const char* str);
@@ -488,48 +457,6 @@ typedef struct _PangoLayout      PangoLayout;
 class font_t;
 class font_rctx;
 class font_imp;
-/*
-	CAIRO_LINE_CAP_BUTT,0
-	CAIRO_LINE_CAP_ROUND,1
-	CAIRO_LINE_CAP_SQUARE2
-	CAIRO_LINE_JOIN_MITER,0
-	CAIRO_LINE_JOIN_ROUND,1
-	CAIRO_LINE_JOIN_BEVEL2
-	*/
-struct vg_style_t {
-	uint32_t fill = 0;// 填充颜色
-	uint32_t color = 0;		// 线颜色
-	float thickness = 1;	// 线宽
-	int round = 0;			// 圆角
-	int cap = -1, join = -1;
-	int dash_offset = 0;
-	int dash_num = 0;		// 虚线计数 dash最大8、dash_p最大64
-	union {
-		uint64_t v = 0;
-		uint8_t v8[8];
-	}dash = {};		// ink  skip  ink  skip
-	float* dash_p = 0;		// 虚线逗号/空格分隔的数字
-};
-/*	vg_style_t st[1] = {};
-	st->dash = 0xF83E0;//0b11111000001111100000
-	st->dash_num = 20;
-	st->thickness = 1;
-	st->join = 1;
-	st->cap = 1;
-	st->fill = 0x80FF7373;
-	st->color = 0xffffffff;
-	*/
-	//struct text_layout_t
-	//{
-	//	PangoLayout* layout = 0;
-	//	font_rctx* ctx = 0;
-	//	glm::ivec2 pos = {};
-	//	glm::ivec2 rc = {};
-	//	int lineheight = 0;
-	//	int baseline = 0;
-	//	int text_color = -1;
-	//	bool once = false;
-	//};
 
 
 struct text_tx
@@ -546,19 +473,12 @@ std::string get_clipboard();
 // 设置粘贴板文本
 void set_clipboard(const char* str);
 
-struct quadratic_v
-{
-	glm::vec2 p0, p1, p2;
-};
-struct cubic_v
-{
-	glm::vec2 p0, p1, p2, p3;	// p1 p2是控制点
-};
 #ifndef path_v_dh
 #define path_v_dh
 #endif // !path_v_dh
 
 struct tinypath_t;
+struct cubic_v;
 class path_v;
 
 namespace gpv {
@@ -918,6 +838,7 @@ class plane_cx;
 class layout_text_x;
 struct text_style_t;
 struct text_style_tx;
+struct vg_style_t;
 
 #ifndef NO_FLEX_CX
 /*
@@ -1244,7 +1165,17 @@ glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio);
 X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
 Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
 */
-struct rect_shadow_t;
+struct rect_shadow_t
+{
+	float radius = 4;	// 半径
+	int segment = 6;	// 细分段
+	glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
+	/*	cubic
+		X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+		Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+	*/
+	cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
+};
 void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shadow_t* rs);
 
 // 获取对齐坐标
@@ -1274,7 +1205,6 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 
 int get_rand(int f, int s);
 int64_t get_rand64(int64_t f, int64_t s);
-
 
 
 /*

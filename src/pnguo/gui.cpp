@@ -29,6 +29,826 @@ extern "C" {
 #include "pnguo.h"
 #include "gui.h" 
 
+#if 1
+
+// 图集数据
+
+atlas_cx::atlas_cx()
+{
+}
+
+atlas_cx::~atlas_cx()
+{
+}
+void atlas_cx::add(image_rc_t* d, size_t count)
+{
+	if (d && count > 0)
+	{
+		_imgv.reserve(_imgv.size() + count);
+		for (size_t i = 0; i < count; i++)
+		{
+			auto it = d[i];
+			image_sliced_t dt = {};
+			dt.img_rc = it.img_rc;
+			dt.tex_rc = it.tex_rc;
+			dt.color = it.color;
+			_imgv.push_back(dt);
+		}
+	}
+}
+void atlas_cx::add(image_sliced_t* d, size_t count) {
+
+	if (d && count > 0)
+	{
+		_imgv.reserve(_imgv.size() + count);
+		for (size_t i = 0; i < count; i++)
+		{
+			auto dt = d[i];
+			_imgv.push_back(dt);
+		}
+	}
+}
+void atlas_cx::add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color) {
+
+	image_sliced_t dt = {};
+	dt.img_rc = rc;
+	dt.tex_rc = texrc;
+	dt.color = color;
+	dt.sliced = sliced;
+	_imgv.push_back(dt);
+}
+void atlas_cx::clear() {
+	_imgv.clear();
+}
+
+#if 1
+gshadow_cx::gshadow_cx()
+{
+}
+
+gshadow_cx::~gshadow_cx()
+{
+}
+
+image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
+{
+	image_sliced_t r = {};
+	glm::ivec2 ss = { rs.radius * 3, rs.radius * 3 };
+	timg.resize(ss.x * ss.y);
+	auto sur = new_image_cr(ss, timg.data());
+	cairo_t* cr = new_cr(sur);
+	// 边框阴影
+	draw_rectangle_gradient(cr, ss.x, ss.y, &rs);
+
+	image_ptr_t px = {};
+	px.width = ss.x;
+	px.height = ss.y;
+	px.type = 1;
+	px.stride = ss.x * sizeof(int);
+	px.data = timg.data();
+	px.comp = 4;
+	glm::ivec2 ps = {};
+	auto px0 = bcc.push_cache_bitmap(&px, &ps);
+	if (px0) {
+		r.img_rc = { 0,0,ss.x,ss.y };
+		r.tex_rc = { ps.x,ps.y,ss.x,ss.y };
+		r.sliced.x = r.sliced.y = r.sliced.z = r.sliced.w = rs.radius + 1;
+		r.color = -1;
+		img = px0;
+	}
+#ifdef _DEBUG
+	image_save_png(sur, "temp/gshadow.png");
+#endif
+	free_image_cr(sur);
+	free_cr(cr);
+	return r;
+}
+
+
+#endif
+layout_text_x::layout_text_x()
+{
+	gs = new gshadow_cx();
+}
+
+layout_text_x::~layout_text_x()
+{
+	if (gs)delete gs; gs = 0;
+	for (auto it : msu) {
+		free_image_cr(it);
+	}
+}
+
+void layout_text_x::set_ctx(font_rctx* p)
+{
+	if (p)
+	{
+		ctx = p;
+	}
+}
+
+size_t layout_text_x::add_familys(const char* familys, const char* style) {
+	if (!ctx)return 0;
+	assert(ctx);
+	size_t rs = 0;
+	if (ctx && familys && *familys)
+	{
+		std::vector<std::string> result;
+		split_v(familys, ",", result);
+		std::vector<font_t*> v;
+		for (auto& it : result)
+		{
+			auto ft = ctx->get_font(it.c_str(), style);
+			if (ft)
+			{
+				v.push_back(ft);
+			}
+		}
+		if (v.size())
+		{
+			rs = familyv.size();
+			familyv.push_back(v);
+			cfb.push_back({});
+		}
+	}
+	return rs;
+}
+void layout_text_x::cpy_familys(layout_text_x* p)
+{
+	if (p)
+	{
+		familyv = p->familyv;
+		cfb = p->cfb;
+	}
+}
+void layout_text_x::clear_family()
+{
+	familyv.clear();
+	cfb.clear();
+}
+void layout_text_x::clear_text()
+{
+	tv.clear();
+}
+
+void layout_text_x::c_line_metrics(size_t idx, int fontsize) {
+	if (idx >= familyv.size())idx = 0;
+	if (fontsize == 0 || idx >= cfb.size() || familyv.empty())return;
+	if (cfb[idx].z != fontsize)
+	{
+		glm::dvec2 r = {};
+		auto& v = familyv[idx];
+		for (auto it : v)
+		{
+			double scale = fontsize == 0 ? 1.0 : it->get_scale(fontsize);
+			r.x = std::max(it->ascender * scale, r.x);
+			r.y = std::max((it->ascender - it->descender + it->lineGap) * scale, r.y);
+		}
+		glm::ivec3 c = { r,fontsize };
+		cfb[idx] = c;
+	}
+}
+int layout_text_x::get_baseline(size_t idx, int fontsize)
+{
+	if (familyv.empty())return 0;
+	if (idx >= familyv.size())idx = 0;
+	c_line_metrics(idx, fontsize);
+	return cfb[idx].x;
+}
+
+int layout_text_x::get_lineheight(size_t idx, int fontsize)
+{
+	if (familyv.empty())return 0;
+	if (idx >= familyv.size())idx = 0;
+	c_line_metrics(idx, fontsize);
+	return heightline ? heightline : cfb[idx].y;
+}
+
+glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
+{
+	glm::ivec3 ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	int y = 0;
+	int n = 1;
+	int lineheight = 0;// get_lineheight(idx, fontsize);
+
+	font_t* oft0 = 0;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		//str = md::get_u8_last(str, &ch);
+		if (ch == '\n')
+		{
+			ret.x = std::max(ret.x, x);
+			x = 0;
+			n++;
+			continue;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		if (oft != oft0 && oft) {
+			oft0 = oft;
+			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
+			lineheight = std::max((int)((oft->ascender - oft->descender + oft->lineGap) * scale), lineheight);
+		}
+
+		x += rc.z;
+		y = std::max(rc.y, y);
+		ret.y = std::max(ret.y, y);
+		ret.z = std::max(ret.z, rc.w);
+	} while (str && *str);
+	ret.x = std::max(ret.x, x);
+	if (heightline > 0)
+		lineheight = heightline;
+	if (n > 1)
+		ret.y = lineheight * n;
+	else
+		ret.y = get_lineheight(idx, fontsize);
+	return ret;
+}
+glm::ivec3 layout_text_x::get_text_rect1(size_t idx, int fontsize, const void* str8)
+{
+	glm::ivec3 ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	int y = 0;
+	int n = 1;
+	int lineheight = 0;// get_lineheight(idx, fontsize);
+
+	font_t* oft0 = 0;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		if (ch == '\n')
+		{
+			ret.x = std::max(ret.x, x);
+			x = 0;
+			n++;
+			break;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		if (oft != oft0) {
+			oft0 = oft;
+			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
+			//lineheight = std::max((int)(oft->ascender * scale), lineheight);
+			lineheight = std::max((int)((oft->ascender - oft->descender + oft->lineGap) * scale), lineheight);
+			ret.z = oft->ascender * scale;
+		}
+		x = rc.x;
+		ret.y = rc.y;
+		break;
+	} while (str && *str);
+	ret.x = x;
+	return ret;
+}
+
+int layout_text_x::get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos)
+{
+	int ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	double ktt = 0.6;
+	tem_pv.clear();
+	do
+	{
+		if (!str || !(*str)) { break; }
+		auto pstr = str;
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		if (ch == '\n')
+		{
+			break;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		x += rc.z;
+		tem_pv.push_back(x);
+	} while (str && *str);
+	if (tem_pv.size()) {
+		auto rt = std::lower_bound(tem_pv.begin(), tem_pv.end(), xpos);
+		ret = (rt != tem_pv.end()) ? *rt : *tem_pv.rbegin();
+		if (xpos < tem_pv[0])
+		{
+			ret = tem_pv[0];
+		}
+		for (size_t i = 0; i < tem_pv.size(); i++)
+		{
+			if (ret == tem_pv[i])
+			{
+				ret = i; break;
+			}
+		}
+		if (ret > tem_pv.size() || xpos > *tem_pv.rbegin())
+		{
+			ret = tem_pv.size();
+		}
+	}
+	return ret;
+}
+int layout_text_x::get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos)
+{
+	int ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = str + ipos;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	double ktt = 0.6;
+	do
+	{
+		if (!str || !(*str) || str >= str0) { break; }
+
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		if (ch == '\n')
+		{
+			x = 0;
+			break;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		x += rc.z;
+	} while (str && *str);
+	return x;
+}
+int layout_text_x::get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow)
+{
+	int ret = {};
+	if (familyv.empty())
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	auto font = familyv[idx][0];
+	int x = 0;
+	double ktt = 0.6;
+	ow.clear();
+	std::vector<int> w0;
+	w0.push_back(0);
+	do
+	{
+		if (!str || !(*str)) { break; }
+
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		if (ch == '\n')
+		{
+			ow.push_back(w0);
+			w0.clear();
+			w0.push_back(0); x = 0;
+			continue;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+		x += rc.z;
+		w0.push_back(x);
+	} while (str && *str);
+	if (w0.size())ow.push_back(w0);
+	return ret;
+}
+
+glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
+{
+	return build_text(idx, rc, text_align, str8, len, fontsize, tv);
+}
+glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv)
+{
+	assert(fontsize < 800);
+	glm::ivec2 ret = { rtv.size(), 0 };
+	if (!ctx) { return ret; }
+	text_image_t* p = 0;
+	cti.tv.clear();
+	if (idx >= familyv.size())idx = 0;
+	if (len > 0)
+	{
+		std::string str((char*)str8, len);
+		p = get_glyph_item(idx, str.c_str(), fontsize, &cti);
+	}
+	else
+	{
+		p = get_glyph_item(idx, str8, fontsize, &cti);
+	}
+	if (p)
+	{
+		auto rct0 = get_text_rect(idx, str8, len, fontsize);
+		glm::vec2 rct = { rct0.x,rct0.y };
+		auto length = p->tv.size();
+		auto baseline = rct0.z;
+		baseline = get_baseline(idx, fontsize);
+		int h = get_lineheight(idx, fontsize);
+		if (rc.z < 1)rc.z = rct.x;
+		if (rc.w < 1)rc.w = h;
+		if (ctrc.y < h)ctrc.y = h;
+		auto ta = text_align;
+		if (ta.x < 0)ta.x = 0;
+		if (ta.y < 0)ta.y = 0;
+		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
+		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
+		auto ps = (ss - rct) * ta + bearing;
+		ps.x += rc.x;
+		ps.y += rc.y;
+		glm::vec2 tps = {};
+		rtv.reserve(rtv.size() + length);
+		for (size_t i = 0; i < length; i++)
+		{
+			auto& it = p->tv[i];
+			if (it.cpt == '\n')
+			{
+				tps.y += h;
+				tps.x = 0;
+			}
+			if (it.cpt == '\t')
+			{
+				it.advance = fontsize;
+			}
+			it._apos = ps + tps;
+			tps.x += it.advance;
+			if (ctrc.x < it.advance)ctrc.x = it.advance;
+			rtv.push_back(it);
+		}
+		ret.y = p->tv.size();
+	}
+	return ret;
+}
+
+atlas_t* layout_text_x::get_atlas()
+{
+	auto ft = ctx->bcc._data.data();
+	auto n = ctx->bcc._data.size();
+	tem_iptr.clear();
+	tem_iptr.resize(n);
+	for (size_t i = 0; i < n; i++)
+	{
+		auto& rt = tem_iptr[i];
+		auto p = ft[i];
+		rt.img = p;
+	}
+	for (auto& it : tv) {
+		it._image;
+	}
+	{
+
+		image_ptr_t* img = 0;
+		glm::ivec4* img_rc = 0;	// 显示坐标、大小
+		glm::ivec4* tex_rc = 0;	// 纹理区域
+		glm::ivec4* sliced = 0;	// 九宫格渲染
+		uint32_t* colors = 0;	// 颜色混合/透明度
+		size_t count = 0;		// 数量
+		glm::ivec4 clip = {};	// 裁剪区域
+	};
+	return nullptr;
+}
+bool layout_text_x::update_text()
+{
+	bool r = false;
+	if (!ctx)return r;
+	auto ft = ctx->bcc._data.data();
+	auto n = ctx->bcc._data.size();
+	for (size_t i = 0; i < n; i++)
+	{
+		auto p = ft[i];
+		if (p->ptr)
+		{
+			if (p->valid)
+			{
+				update_image_cr((cairo_surface_t*)p->ptr, p);
+				p->valid = 0; r = true;
+			}
+		}
+		else {
+			cairo_surface_t* su = new_image_cr(p);
+			if (su)
+			{
+				msu.push_back(su);
+				p->valid = 0; r = true;
+				p->ptr = su;
+			}
+		}
+	}
+	return r;
+}
+atlas_cx* layout_text_x::new_shadow(const glm::ivec2& ss, const glm::ivec2& pos)
+{
+	if (sli.tex_rc.x < sli_radius)
+	{
+		rect_shadow_t rs = {};
+		rs.cfrom = { 0.00,0.00,0.0,1 }, rs.cto = { 0.9,0.9,0.9,1 };
+		rs.radius = sli_radius;
+		rs.segment = 8;
+		rs.cubic = { {0.0,0.66},{0.5,0.39},{0.4,0.1},{1.0,0.01 } };
+		sli = gs->new_rect(rs);
+	}
+	auto rcs = sli;
+	auto a = new atlas_cx();
+	a->img = gs->img;
+	a->img->type = 1;
+	a->autofree = true;
+	rcs.img_rc = { pos.x,pos.y,ss.x,ss.y };
+	rcs.img_rc.x = rcs.img_rc.y = 0;
+	a->add(&rcs, 1);
+	//can->add_atlas(a);
+	return a;
+}
+
+pvm_t layout_text_x::new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb) {
+	std::vector<const char*> vs;
+	vs.resize(v.size());
+	for (size_t i = 0; i < v.size(); i++)
+	{
+		vs[i] = v[i].c_str();
+	}
+	return new_menu(width, height, vs.data(), v.size(), has_shadow, cb);
+}
+pvm_t layout_text_x::new_menu(int width, int height, const char** v, size_t n, bool has_shadow, std::function<void(int type, int id)> cb)
+{
+	pvm_t ret = {};
+	auto ltx = this;
+	auto p = new plane_cx();
+	if (p && n > 0)
+	{
+		p->fontsize = 16;
+		int lheight = height > 0 ? height : ltx->get_lineheight(0, p->fontsize) * 1.5;
+		if (width < 0)
+		{
+			int xw = lheight;
+			for (size_t i = 0; i < n; i++)
+			{
+				auto it = v[i];
+				auto rc = ltx->get_text_rect(0, it, -1, p->fontsize);
+				if (xw < rc.x) {
+					xw = rc.x;
+				}
+			}
+			width = xw + lheight;
+		}
+		ret.w = width;
+		ret.h = lheight;
+		ret.cpos = m_cpos;
+		glm::ivec2 iss = { width , lheight };
+		p->set_color(m_color);
+		glm::ivec2 ss = { width + p->border.y * 7, n * lheight + p->border.y * 7 };
+
+		auto radius = ltx->sli_radius;
+		glm::ivec2 sas = {};
+		if (has_shadow)
+		{
+			sas += radius;
+			auto ass = ss + radius;
+			auto pa = ltx->new_shadow(ass, {});
+			ret.back = pa;
+		}
+		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
+		p->custom_layout = true;
+		p->set_fontctx(ltx->ctx);
+		p->ltx->cpy_familys(ltx);
+		for (size_t i = 0; i < n; i++)
+		{
+			auto it = v[i];
+			auto pcb = p->add_cbutton(it, iss, 2);
+			pcb->pos = { 0, i * lheight };
+			pcb->pos += ret.cpos;
+			pcb->light = 0.051;
+			pcb->effect = uTheme::light;
+			pcb->pdc.hover_border_color = pcb->pdc.border_color;
+			pcb->pdc.border_color = 0;
+			pcb->text_align = { 0.0,0.5 };
+			if (pcb && cb)
+			{
+				pcb->click_cb = [=](void* pr, int)
+					{
+						cb(1, i);
+						auto pc = (color_btn*)pr;
+						if (pc)
+							pc->bst = (int)BTN_STATE::STATE_NOMAL;
+					};
+				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
+					if (type == (int)event_type2::on_hover) {
+						cb(0, i);
+					}
+					if (type == (int)event_type2::on_move) {
+						cb(2, i);
+					}
+					};
+			}
+		}
+		p->set_size(ss);
+		p->set_pos({ radius * 0,radius * 0 });
+		ret.p = p;
+		ret.fsize = ss + sas;
+	}
+	return ret;
+}
+
+void layout_text_x::free_menu(pvm_t pt)
+{
+	if (pt.p)
+		delete pt.p;
+	if (pt.back)
+		delete pt.back;
+}
+
+
+
+
+
+
+
+
+
+void layout_text_x::draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color)
+{
+	int mx = r.y + r.x;
+	for (size_t i = r.x; i < mx; i++)
+	{
+		auto& it = tv[i];
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (ft)
+			{
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color);
+			}
+		}
+	}
+}
+void layout_text_x::draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color)
+{
+	auto mx = rtv.size();
+	for (size_t i = 0; i < mx; i++)
+	{
+		auto& it = rtv[i];
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (ft)
+			{
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color);
+			}
+		}
+	}
+}
+void layout_text_x::draw_rect_rc(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color)
+{
+	auto mx = rtv.size();
+	for (size_t i = 0; i < mx; i++)
+	{
+		auto& it = rtv[i];
+		auto pos = it._dwpos + it._apos;
+		glm::ivec4 rc = { pos.x,pos.y,it._rect.z,it._rect.w };
+		draw_rect(cr, rc, color, 0, 0, 0);
+	}
+}
+void layout_text_x::draw_text(cairo_t* cr, uint32_t color)
+{
+	update_text();
+	for (auto& it : tv)
+	{
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (ft)
+			{
+				draw_image(cr, ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color);
+			}
+		}
+	}
+}
+
+void layout_text_x::text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt)
+{
+	if (opt && tv.size())
+	{
+		int mx = r.y + r.x;
+		atlas_cx ac = {};
+		ac.img = tv[r.x]._image;
+		for (size_t i = r.x; i < mx; i++)
+		{
+			auto& it = tv[i];
+			if (it._image == ac.img)
+			{
+				ac.add({ it._dwpos,it._rect.z,it._rect.w }, it._rect, {}, it.color ? it.color : color);
+			}
+			else {
+				if (ac._imgv.size())
+				{
+					opt->push_back(ac);
+					ac.clear();
+				}
+				ac.img = it._image;
+				ac.add({ it._dwpos,it._rect.z,it._rect.w }, it._rect, {}, it.color ? it.color : color);
+			}
+		}
+		if (ac._imgv.size())
+		{
+			opt->push_back(ac);
+			ac.clear();
+		}
+	}
+
+}
+
+text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt)
+{
+	auto str = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	int adv = 0;
+	do
+	{
+		if (!str || !(*str) || !opt) { opt = 0; break; }
+		font_t* r = 0;
+		int gidx = 0;
+		auto ts = str;
+		str = font_t::get_glyph_index_u8(str, &gidx, &r, &familyv[idx]);
+		if (r && gidx >= 0)
+		{
+			auto k = r->get_shape(ts, fontsize, &opt->data, adv);
+			adv += k.advance;
+			if (k.count)
+			{
+				opt->tv.push_back(k);
+			}
+		}
+	} while (str && *str);
+	if (opt) {
+		auto pd = opt->data.data();
+		for (size_t i = 0; i < opt->tv.size(); i++)
+		{
+			auto& it = opt->tv[i];
+			it.v = pd + it.first;
+		}
+	}
+	return opt;
+}
+// todo get_glyph_item
+
+text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt)
+{
+	auto str = (const char*)str8;
+	if (idx >= familyv.size())idx = 0;
+	do
+	{
+		if (!str || !(*str) || !opt) { opt = 0; break; }
+		font_t* r = 0;
+		int gidx = 0;
+		if (*str == '\n')
+			gidx = 0;
+		auto ostr = str;
+
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		font_t::get_glyph_index_u8(ostr, &gidx, &r, &familyv[idx]);
+		if (r && gidx >= 0)
+		{
+			auto k = r->get_glyph_item(gidx, ch, fontsize);
+			if (k._glyph_index)
+			{
+				k.cpt = ch;
+				opt->tv.push_back(k);
+			}
+		}
+		else {
+			font_item_t k = {};
+			k.cpt = ch;
+			k.advance = 0;
+			opt->tv.push_back(k);
+		}
+	} while (str && *str);
+	return opt;
+}
+#endif // 1
 
 widget_base::widget_base()
 {

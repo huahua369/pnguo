@@ -35,6 +35,8 @@ struct tinypath_t
 struct image_ptr_t;
 struct hps_t;
 struct font_impl;
+struct font_item_t;
+class font_imp;
 class fd_info0;
 union ft_key_s;
 struct gcolors_t;
@@ -42,6 +44,50 @@ struct bitmap_ttinfo;
 struct Bitmap_p;
 class stb_packer;
 class bitmap_cache_cx;
+
+struct image_ptr_t
+{
+	int width = 0, height = 0;
+	int type = 0;				// 0=rgba，1=bgra
+	int stride = 0;
+	uint32_t* data = 0;			// 像素数据
+	void* texid = 0;			// 纹理指针，由调用方自动生成管理
+	void* ptr = 0;				// 用户数据
+	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
+	int  blendmode = 0;			// 混合模式
+	bool static_tex = false;	// 静态纹理
+	bool multiply = false;		// 预乘的纹理
+	bool valid = false;			// 是否更新到纹理
+};
+struct atlas_t
+{
+	image_ptr_t* img = 0;
+	glm::ivec4* img_rc = 0;	// 显示坐标、大小
+	glm::ivec4* tex_rc = 0;	// 纹理区域
+	glm::ivec4* sliced = 0;	// 九宫格渲染
+	uint32_t* colors = 0;	// 颜色混合/透明度
+	size_t count = 0;		// 数量
+	glm::ivec4 clip = {};	// 裁剪区域
+};
+
+
+// 简易stb_image加载
+class stbimage_load :public image_ptr_t
+{
+public:
+	int rcomp = 4;	// 目标通道
+public:
+	stbimage_load();
+	stbimage_load(const char* fn);
+
+	~stbimage_load();
+	bool load(const char* fn);
+
+	bool load_mem(const char* d, size_t s);
+	void tobgr();
+	static stbimage_load* new_load(const void* fnd, size_t len);
+	static void free_img(stbimage_load* p);
+};
 
 class info_one
 {
@@ -240,6 +286,48 @@ public:
 	uint32_t color = 0;
 	int cpt = 0;
 };
+/*
+	LINE_CAP_BUTT,0
+	LINE_CAP_ROUND,1
+	LINE_CAP_SQUARE2
+	LINE_JOIN_MITER,0
+	LINE_JOIN_ROUND,1
+	LINE_JOIN_BEVEL2
+	*/
+struct vg_style_t {
+	uint32_t fill = 0;// 填充颜色
+	uint32_t color = 0;		// 线颜色
+	float thickness = 1;	// 线宽
+	int round = 0;			// 圆角
+	int cap = -1, join = -1;
+	int dash_offset = 0;
+	int dash_num = 0;		// 虚线计数 dash最大8、dash_p最大64
+	union {
+		uint64_t v = 0;
+		uint8_t v8[8];
+	}dash = {};		// ink  skip  ink  skip
+	float* dash_p = 0;		// 虚线逗号/空格分隔的数字
+};
+/*	vg_style_t st[1] = {};
+	st->dash = 0xF83E0;//0b11111000001111100000
+	st->dash_num = 20;
+	st->thickness = 1;
+	st->join = 1;
+	st->cap = 1;
+	st->fill = 0x80FF7373;
+	st->color = 0xffffffff;
+	*/
+	//struct text_layout_t
+	//{
+	//	PangoLayout* layout = 0;
+	//	font_rctx* ctx = 0;
+	//	glm::ivec2 pos = {};
+	//	glm::ivec2 rc = {};
+	//	int lineheight = 0;
+	//	int baseline = 0;
+	//	int text_color = -1;
+	//	bool once = false;
+	//};
 
 struct text_style_t
 {
@@ -323,138 +411,15 @@ struct text_atlas_t
 	image_ptr_t ipt = {};
 };
 
-struct rect_shadow_t
-{
-	float radius = 4;	// 半径
-	int segment = 6;	// 细分段
-	glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
-	/*	cubic
-		X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
-		Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
-	*/
-	cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
-};
+ 
+// 灰度图转rgba
+void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
+//单色位图1位
+void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color);
 
-class plane_cx;
+void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, bool isblend);
 
-class atlas_cx
-{
-public:
-	image_ptr_t* img = 0;
-	glm::ivec4 clip = {};	// 裁剪区域
-	std::vector<image_sliced_t> _imgv;
-	bool autofree = 0;
-public:
-	atlas_cx();
-	virtual ~atlas_cx();
-	void add(image_rc_t* d, size_t count);
-	void add(image_sliced_t* d, size_t count);
-	void add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color = -1);
-	void clear();
-private:
-
-};
-
-// 阴影管理
-class gshadow_cx
-{
-public:
-	bitmap_cache_cx bcc = {};				// 纹理缓存
-	atlas_cx atc = {};
-	std::vector<uint32_t> timg;
-	image_ptr_t* img = 0;
-	bool autofree = 0;
-public:
-	gshadow_cx();
-	~gshadow_cx();
-	image_sliced_t new_rect(const rect_shadow_t& rs);
-private:
-
-};
-
-struct pvm_t
-{
-	atlas_cx* back = 0;	// 背景
-	atlas_cx* front = 0;	// 前景
-	plane_cx* p = 0;		// 控件
-	glm::vec2 fsize = {};
-	glm::vec2 cpos = {};
-	int w, h;
-};
-// todo 字体纹理缓存管理
-class layout_text_x
-{
-public:
-	font_rctx* ctx = 0;
-	std::vector<std::vector<font_t*>> familyv;
-	std::vector<glm::ivec3> cfb;
-	int fdpi = 72;
-	int heightline = 0;		// 固定行高
-	text_path_t ctp = {};	// 临时缓存
-	text_image_t cti = {};
-	std::vector<cairo_surface_t*> msu;
-	std::vector<font_item_t> tv;
-	std::vector<font_item_t> tem_rtv;	// 临时缓存用
-	// todo
-	std::vector<atlas_cx> tem_iptr;
-	std::vector<float> tem_pv;
-	glm::ivec2 ctrc = {}, oldrc = {};
-
-	image_sliced_t sli = {};
-	int sli_radius = 10;
-	gshadow_cx* gs = 0;
-	// 菜单边框填充：线颜色，线粗，圆角，背景色
-	glm::ivec4 m_color = { 0xff606060,1,0,0xf0121212 };
-	// 菜单项偏移
-	glm::ivec2 m_cpos = { 3, 3 };
-public:
-	layout_text_x();
-	~layout_text_x();
-	void set_ctx(font_rctx* p);
-	// 添加字体,返回序号
-	size_t add_familys(const char* familys, const char* style);
-	void cpy_familys(layout_text_x* p);
-	void clear_family();
-	void clear_text();
-
-	// 获取基线
-	int get_baseline(size_t idx, int fontsize);
-	// 获取行高
-	int get_lineheight(size_t idx, int fontsize);
-	// 获取文本区域大小,z为基线
-	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
-	glm::ivec3 get_text_rect1(size_t idx, int fontsize, const void* str8);
-	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
-	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
-	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
-	// 添加文本到渲染
-	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
-	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
-	// 输出到图集
-	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
-	// 获取路径数据
-	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);
-	// 获取渲染数据
-	text_image_t* get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt);
-	// 渲染部分文本
-	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
-	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
-
-	void draw_rect_rc(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color);
-	// 渲染全部文本
-	void draw_text(cairo_t* cr, uint32_t color);
-	// todo获取图集
-	atlas_t* get_atlas();
-	bool update_text();
-	// 创建阴影
-	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
-	// 创建菜单
-	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb);
-	pvm_t new_menu(int width, int height, const char** v, size_t n, bool has_shadow, std::function<void(int type, int id)> cb);
-	void free_menu(pvm_t pt);
-private:
-	void c_line_metrics(size_t idx, int fontsize);
-};
+void split_v(std::string str, const std::string& pattern, std::vector<std::string>& result);
 
 
 #endif // !FONT_CORE_H

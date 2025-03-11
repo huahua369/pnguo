@@ -48,6 +48,7 @@
 #include <stack>
 #include <vector>
 #include <list>
+#include <queue>
 #include <functional>
 #include <thread>
 #include <mutex> 

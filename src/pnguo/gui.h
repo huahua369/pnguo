@@ -2,6 +2,126 @@
 #define GUI_H
 
 
+class atlas_cx
+{
+public:
+	image_ptr_t* img = 0;
+	glm::ivec4 clip = {};	// 裁剪区域
+	std::vector<image_sliced_t> _imgv;
+	bool autofree = 0;
+public:
+	atlas_cx();
+	virtual ~atlas_cx();
+	void add(image_rc_t* d, size_t count);
+	void add(image_sliced_t* d, size_t count);
+	void add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color = -1);
+	void clear();
+private:
+
+};
+
+// 阴影管理
+class gshadow_cx
+{
+public:
+	bitmap_cache_cx bcc = {};				// 纹理缓存
+	atlas_cx atc = {};
+	std::vector<uint32_t> timg;
+	image_ptr_t* img = 0;
+	bool autofree = 0;
+public:
+	gshadow_cx();
+	~gshadow_cx();
+	image_sliced_t new_rect(const rect_shadow_t& rs);
+private:
+
+};
+
+struct pvm_t
+{
+	atlas_cx* back = 0;	// 背景
+	atlas_cx* front = 0;	// 前景
+	plane_cx* p = 0;		// 控件
+	glm::vec2 fsize = {};
+	glm::vec2 cpos = {};
+	int w, h;
+};
+// todo 字体纹理缓存管理
+class layout_text_x
+{
+public:
+	font_rctx* ctx = 0;
+	std::vector<std::vector<font_t*>> familyv;
+	std::vector<glm::ivec3> cfb;
+	int fdpi = 72;
+	int heightline = 0;		// 固定行高
+	text_path_t ctp = {};	// 临时缓存
+	text_image_t cti = {};
+	std::vector<cairo_surface_t*> msu;
+	std::vector<font_item_t> tv;
+	std::vector<font_item_t> tem_rtv;	// 临时缓存用
+	// todo
+	std::vector<atlas_cx> tem_iptr;
+	std::vector<float> tem_pv;
+	glm::ivec2 ctrc = {}, oldrc = {};
+
+	image_sliced_t sli = {};
+	int sli_radius = 10;
+	gshadow_cx* gs = 0;
+	// 菜单边框填充：线颜色，线粗，圆角，背景色
+	glm::ivec4 m_color = { 0xff606060,1,0,0xf0121212 };
+	// 菜单项偏移
+	glm::ivec2 m_cpos = { 3, 3 };
+public:
+	layout_text_x();
+	~layout_text_x();
+	void set_ctx(font_rctx* p);
+	// 添加字体,返回序号
+	size_t add_familys(const char* familys, const char* style);
+	void cpy_familys(layout_text_x* p);
+	void clear_family();
+	void clear_text();
+
+	// 获取基线
+	int get_baseline(size_t idx, int fontsize);
+	// 获取行高
+	int get_lineheight(size_t idx, int fontsize);
+	// 获取文本区域大小,z为基线
+	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	glm::ivec3 get_text_rect1(size_t idx, int fontsize, const void* str8);
+	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
+	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
+	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
+	// 添加文本到渲染
+	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
+	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
+	// 输出到图集
+	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
+	// 获取路径数据
+	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);
+	// 获取渲染数据
+	text_image_t* get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt);
+	// 渲染部分文本
+	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
+	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
+
+	void draw_rect_rc(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color);
+	// 渲染全部文本
+	void draw_text(cairo_t* cr, uint32_t color);
+	// todo获取图集
+	atlas_t* get_atlas();
+	bool update_text();
+	// 创建阴影
+	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
+	// 创建菜单
+	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb);
+	pvm_t new_menu(int width, int height, const char** v, size_t n, bool has_shadow, std::function<void(int type, int id)> cb);
+	void free_menu(pvm_t pt);
+private:
+	void c_line_metrics(size_t idx, int fontsize);
+};
+ 
+
 #if 1
 enum class WIDGET_TYPE :uint32_t {
 	WT_NULL,
