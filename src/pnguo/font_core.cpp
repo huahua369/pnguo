@@ -106,8 +106,9 @@ std::map<std::string, fontns> get_allfont()
 {
 	int r = 0;
 	std::map<std::string, fontns> fyv;
-	int nfamilies = 0;
+	int nfamilies = 0;  
 	if (FcInit()) {
+#ifdef WIN32
 		{
 			//std::string yourFontFilePath = "seguiemj.ttf";
 			std::string yourFontFilePath = "C:\\Windows\\Fonts\\seguiemj.ttf";
@@ -119,6 +120,7 @@ std::map<std::string, fontns> get_allfont()
 		//	const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();
 		//	FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
 		//}
+#endif
 		FcPattern* pat = ::FcPatternCreate();
 		FcObjectSet* os = ::FcObjectSetBuild(FC_FILE, FC_FULLNAME, FC_FAMILY, FC_STYLE, FC_CHARSET, FC_WIDTH, FC_LANG, (char*)0);
 		FcFontSet* fs = ::FcFontList(0, pat, os);
