@@ -304,7 +304,7 @@ void show_ui(form_x* form0, menu_cx* gm)
 	p->set_size(size);
 	p->set_pos({ 1,30 });
 	p->set_select_box(2 * 0, 0.012);	// 设置是否显示选择框
- 
+
 	p->fontsize = 16;
 	int width = 16;
 	int rcw = 14;
@@ -625,8 +625,8 @@ int main()
 	auto app = new_app();
 	cpuinfo_t cpuinfo = get_cpuinfo();
 	glm::ivec2 ws = { 1280,860 };
-	// ef_vulkan ef_gpu
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan | ef_resizable));
+	// ef_vulkan ef_gpu|ef_resizable
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan));
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;					// 清空使用独立创建逻辑设备
