@@ -1,4 +1,4 @@
-/*
+﻿/*
  2d编辑器
  创建时间2025-3-8
 */
@@ -38,7 +38,7 @@ void generate_atlas(const char* output_path, atlas_t* atlas)
 	fprintf(fp, "\tpma: %s\n\n", atlas->pma ? "true" : "false");
 
 	// 写入每个子图信息 
-	for (int i = 0; i < atlas->region_count; i++) {
+	for (int i = 0; i < atlas->region.size(); i++) {
 		auto& it = atlas->region[i];
 		fprintf(fp, "%s\n", it.name.c_str());
 		if (it.rotate > 0)
@@ -56,18 +56,18 @@ atlas_t* json2atlas(njson0& n)
 	auto ss = gp::get_iv2(n, "size");
 	auto filter2 = gp::get_iv2(n, "filter");
 	auto repeat2 = gp::get_iv2(n, "repeat");
-	glm::ivec2 size = ss.size() ? ss[0] : {};
+	glm::ivec2 size = ss.size() ? ss[0] : glm::ivec2();
 	int format = gp::toInt(n["format"]);
-	glm::ivec2 filter = filter2.size() ? filter2[0] : {};
-	glm::ivec2 repeat repeat2.size() ? repeat2[0] : {};
+	glm::ivec2 filter = filter2.size() ? filter2[0] : glm::ivec2();
+	glm::ivec2 repeat = repeat2.size() ? repeat2[0] : glm::ivec2();
 	bool pma = gp::toInt(n["pma"]) == 0 ? false : true;
 
+	auto ap = new atlas_t{ name, size, format, filter, repeat, pma };
 	auto region2 = n["region"];
-	subimage_t* region = 0;
-	int region_count = region2.size();
+	int region_count = region2.size(); ap->region.resize(region_count);
+	subimage_t* region = ap->region.data();
 	if (region2.is_array() && region_count > 0)
 	{
-		region = (subimage_t*)realloc(region, sizeof(subimage_t) * (region_count));
 		auto pr = region;
 		for (auto& it : region2.items()) {
 			auto& nt = it.value();
@@ -80,18 +80,39 @@ atlas_t* json2atlas(njson0& n)
 			pr++;
 		}
 	}
-	auto ap = new atlas_t{ name, size, format, filter, repeat, pma, region, region_count };
 	return ap;
+}
+
+void atlas2json(atlas_t* a, njson0& n)
+{
+	if (!a)
+	{
+		return;
+	}
+	n["name"] = a->name;
+	n["size"] = { a->size.x, a->size.y };
+	n["format"] = a->format;
+	n["filter"] = { a->filter.x ,  a->filter.y };
+	n["repeat"] = "none";
+	n["pma"] = a->pma;
+	auto region2 = njson0::array();
+	for (int i = 0; i < a->region.size(); i++) {
+		auto& it = a->region[i];
+		njson0 nt;
+		nt["name"] = it.name;
+		nt["index"] = it.index;
+		nt["rotate"] = it.rotate;
+		nt["bounds"] = { it.bounds.x, it.bounds.y, it.bounds.z, it.bounds.w };
+		nt["offsets"] = { it.offsets.x, it.offsets.y, it.offsets.z, it.offsets.w };
+		region2.push_back(nt);
+	}
+	n["region"] = region2;
 }
 
 void free_atlas(atlas_t* atlas)
 {
 	if (atlas)
 	{
-		if (atlas->region)
-		{
-			free(atlas->region);
-		}
 		delete atlas;
 	}
 }

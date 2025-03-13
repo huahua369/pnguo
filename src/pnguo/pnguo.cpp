@@ -6410,6 +6410,73 @@ namespace gp {
 		}
 		return v;
 	}
+	std::vector<glm::vec2> get_v2(njson0& n, const char* k)
+	{
+		std::vector<glm::vec2> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 2)
+		{
+			glm::ivec2 vt = { toFloat(ns[i]),toFloat(ns[i + 1]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
+	std::vector<glm::ivec2> get_iv2(njson0& n, const char* k)
+	{
+		std::vector<glm::ivec2> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 2)
+		{
+			glm::ivec2 vt = { toInt(ns[i]),toInt(ns[i + 1]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
+	std::vector<glm::vec3> get_v3(njson0& n, const char* k)
+	{
+		std::vector<glm::vec3> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 3) { return v; }
+
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 3)
+		{
+			glm::vec3 vt = { toFloat(ns[i]),toFloat(ns[i + 1]), toFloat(ns[i + 2]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
+	std::vector<glm::vec4> get_v4(njson0& n, const char* k)
+	{
+		std::vector<glm::vec4> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 3) { return v; }
+
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 3)
+		{
+			glm::vec4 vt = { toFloat(ns[i]),toFloat(ns[i + 1]), toFloat(ns[i + 2]), toFloat(ns[i + 3]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
+	std::vector<glm::ivec4> get_iv4(njson0& n, const char* k)
+	{
+		std::vector<glm::ivec4> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 4) { return v; }
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 4)
+		{
+			glm::ivec4 vt = { toInt(ns[i]),toInt(ns[i + 1]), toInt(ns[i + 2]), toInt(ns[i + 3]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
 
 	// 命令
 
