@@ -92,16 +92,6 @@ namespace mapbox {
 #endif
 
 
-namespace gp {
-	uint64_t toUInt(const njson& v, uint64_t de = 0);
-	int64_t toInt(const njson& v, const char* k, int64_t de);
-	int64_t toInt(const njson& v, int64_t de = 0);
-	double toDouble(const njson& v, double de = 0);
-	std::string toStr(const njson& v, const char* k, const std::string& des = "");
-	std::string toStr(const njson& v, const std::string& des = "");
-	int64_t str2int(const char* str, int64_t de = 0);
-	njson str2ints(const std::string& s);
-}
 
 namespace pg
 {
@@ -6339,7 +6329,8 @@ namespace gp {
 			else { f = it; }
 		}
 	}
-	std::vector<float> get_vs(njson& n, const char* k) {
+	std::vector<float> get_vs(njson& n, const char* k)
+	{
 		std::vector<float> v;
 		if (n.find(k) == n.end() || n[k].empty()) { return v; }
 		auto ns = n[k];
@@ -6356,18 +6347,12 @@ namespace gp {
 	{
 		std::vector<glm::vec2> v;
 		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
-		float f = 0;
-		int x = 0;
 		auto ns = n[k];
-		for (auto& it : ns) {
-			x++;
-			if (x == 2)
-			{
-				int f1 = toFloat(it);
-				v.push_back({ f,f1 });
-				x = 0;
-			}
-			else { f = toFloat(it); }
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 2)
+		{
+			glm::ivec2 vt = { toFloat(ns[i]),toFloat(ns[i + 1]) };
+			v.push_back(vt);
 		}
 		return v;
 	}
@@ -6375,18 +6360,12 @@ namespace gp {
 	{
 		std::vector<glm::ivec2> v;
 		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
-		int f = 0;
-		int x = 0;
 		auto ns = n[k];
-		for (auto& it : ns) {
-			x++;
-			if (x == 2)
-			{
-				int f1 = toInt(it);
-				v.push_back({ f,f1 });
-				x = 0;
-			}
-			else { f = toInt(it); }
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 2)
+		{
+			glm::ivec2 vt = { toInt(ns[i]),toInt(ns[i + 1]) };
+			v.push_back(vt);
 		}
 		return v;
 	}
@@ -6400,6 +6379,33 @@ namespace gp {
 		for (size_t i = 0; i < c; i += 3)
 		{
 			glm::vec3 vt = { toFloat(ns[i]),toFloat(ns[i + 1]), toFloat(ns[i + 2]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
+	std::vector<glm::vec4> get_v4(njson& n, const char* k)
+	{
+		std::vector<glm::vec4> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 3) { return v; }
+
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 3)
+		{
+			glm::vec4 vt = { toFloat(ns[i]),toFloat(ns[i + 1]), toFloat(ns[i + 2]), toFloat(ns[i + 3]) };
+			v.push_back(vt);
+		}
+		return v;
+	}
+	std::vector<glm::ivec4> get_iv4(njson& n, const char* k)
+	{
+		std::vector<glm::ivec4> v;
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 4) { return v; }
+		auto ns = n[k];
+		auto c = ns.size();
+		for (size_t i = 0; i < c; i += 4)
+		{
+			glm::ivec4 vt = { toInt(ns[i]),toInt(ns[i + 1]), toInt(ns[i + 2]), toInt(ns[i + 3]) };
 			v.push_back(vt);
 		}
 		return v;
@@ -9221,7 +9227,7 @@ void split_v(std::string str, const std::string& pattern, std::vector<std::strin
 #endif // 1
 
 
- 
+
 
 
 #ifndef NO_FLEX_CX 
@@ -10064,5 +10070,5 @@ glm::vec4 grid_view::get(const glm::ivec2& pos)
 	return r;
 }
 
- 
+
 

@@ -65,6 +65,8 @@ namespace pg
 	std::string to_string_hex(uint64_t _Val, int n, const char* x);
 	std::string to_string_hex2(uint32_t _Val);
 }
+ 
+
 /*
 图集画布
 class canvas_atlas

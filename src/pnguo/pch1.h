@@ -230,4 +230,23 @@ namespace glm
 	}
 
 };
+
+namespace gp {
+	uint64_t toUInt(const njson& v, uint64_t de = 0);
+	int64_t toInt(const njson& v, const char* k, int64_t de);
+	int64_t toInt(const njson& v, int64_t de = 0);
+	double toDouble(const njson& v, double de = 0);
+	std::string toStr(const njson& v, const char* k, const std::string& des = "");
+	std::string toStr(const njson& v, const std::string& des = "");
+	int64_t str2int(const char* str, int64_t de = 0);
+	njson str2ints(const std::string& s);
+
+	std::vector<float> get_vs(njson& n, const char* k);
+	std::vector<glm::vec2> get_v2(njson& n, const char* k);
+	std::vector<glm::ivec2> get_iv2(njson& n, const char* k);
+	std::vector<glm::vec3> get_v3(njson& n, const char* k);
+	std::vector<glm::vec4> get_v4(njson& n, const char* k);
+	std::vector<glm::ivec4> get_iv4(njson& n, const char* k);
+}
+
 #endif // !GLM_OPERATOR
