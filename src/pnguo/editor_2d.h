@@ -14,7 +14,7 @@ struct subimage_t
 	//glm::ivec4 pad = {};//废弃
 };
 // 图集信息
-struct atlas_t
+struct atlas_xt
 {
 	std::string name;//: 首行为该页中的图像名称.图片位置由atlas加载器来查找, 通常是再atlas文件的同目录下.
 	glm::ivec2 size = {};//: 页中图像的宽度和高度.在加载图像之前告知atlas加载器是非常有必要的, 例如, 可以提前为其分配缓冲区.若省略则默认为0, 0.
@@ -32,12 +32,12 @@ struct atlas_strinfo
 // 获取图集格式信息
 atlas_strinfo get_atlas_strinfo();
 // 图集导出spine格式
-void generate_atlas(const char* output_path, atlas_t* atlas);
+void generate_atlas(const char* output_path, atlas_xt* atlas);
 // 从json数据创建图集
-atlas_t* json2atlas(njson0& n);
+atlas_xt* json2atlas(njson0& n);
 // 从图集创建json数据
-void atlas2json(atlas_t* a, njson0& n);
+void atlas2json(atlas_xt* a, njson0& n);
 // 释放图集
-void free_atlas(atlas_t* atlas);
+void free_atlas(atlas_xt* atlas);
 
 #endif // !EDITOR_2D

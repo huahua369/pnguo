@@ -16,7 +16,7 @@ atlas_strinfo get_atlas_strinfo()
 	static const char* textureFilterNames[] = { "", "Nearest", "Linear", "MipMap", "MipMapNearestNearest", "MipMapLinearNearest", "MipMapNearestLinear", "MipMapLinearLinear" };
 	return { formatNames, textureFilterNames };
 }
-void generate_atlas(const char* output_path, atlas_t* atlas)
+void generate_atlas(const char* output_path, atlas_xt* atlas)
 {
 	if (!atlas || !output_path)
 	{
@@ -50,7 +50,7 @@ void generate_atlas(const char* output_path, atlas_t* atlas)
 
 	fclose(fp);
 }
-atlas_t* json2atlas(njson0& n)
+atlas_xt* json2atlas(njson0& n)
 {
 	std::string name = n["name"].get<std::string>();
 	auto ss = gp::get_iv2(n, "size");
@@ -62,7 +62,7 @@ atlas_t* json2atlas(njson0& n)
 	glm::ivec2 repeat = repeat2.size() ? repeat2[0] : glm::ivec2();
 	bool pma = gp::toInt(n["pma"]) == 0 ? false : true;
 
-	auto ap = new atlas_t{ name, size, format, filter, repeat, pma };
+	auto ap = new atlas_xt{ name, size, format, filter, repeat, pma };
 	auto region2 = n["region"];
 	int region_count = region2.size(); ap->region.resize(region_count);
 	subimage_t* region = ap->region.data();
@@ -83,7 +83,7 @@ atlas_t* json2atlas(njson0& n)
 	return ap;
 }
 
-void atlas2json(atlas_t* a, njson0& n)
+void atlas2json(atlas_xt* a, njson0& n)
 {
 	if (!a)
 	{
@@ -109,7 +109,7 @@ void atlas2json(atlas_t* a, njson0& n)
 	n["region"] = region2;
 }
 
-void free_atlas(atlas_t* atlas)
+void free_atlas(atlas_xt* atlas)
 {
 	if (atlas)
 	{
