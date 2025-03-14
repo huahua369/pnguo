@@ -21,8 +21,7 @@
     "opencv",
     "libssh2",
     "curl",
-    "tinygltf",
-    "cmark", 
+    "tinygltf", 
     "hwloc"
   ]
 }

@@ -644,7 +644,6 @@ int main()
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2);
 	d2->set_pos(0, 300, 350);
 	d2->set_pos(1, 300, 650);
-
 	atlas_strinfo ass = get_atlas_strinfo();
 	std::vector<char*> nv;
 	d2->get_anim_name(0, &nv);
