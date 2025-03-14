@@ -40,4 +40,21 @@ void atlas2json(atlas_xt* a, njson0& n);
 // 释放图集
 void free_atlas(atlas_xt* atlas);
 
+// 2d编辑器类
+class editor2d_cx
+{
+private:
+
+public:
+	editor2d_cx();
+	~editor2d_cx();
+	// 导入图片，支持stb能导入的格式
+	bool import_image(const char* fn);
+	// 导出图集
+	bool export_atlas(const char* dir, const char* name);
+private:
+
+};
+
+
 #endif // !EDITOR_2D

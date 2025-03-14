@@ -163,3 +163,11 @@ void free_atlas(atlas_xt* atlas)
 		delete atlas;
 	}
 }
+
+editor2d_cx::editor2d_cx()
+{
+}
+
+editor2d_cx::~editor2d_cx()
+{
+}
