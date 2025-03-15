@@ -2264,14 +2264,14 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 	return ret;
 }
 
-SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply)
+void* new_texture_r(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply)
 {
 	SDL_Texture* p = 0;
 	if (renderer && width > 0 && height > 0)
 	{
 		if (type == 0)type = SDL_PIXELFORMAT_ABGR8888;//rgba
 		if (type == 1)type = SDL_PIXELFORMAT_ARGB8888;//bgra
-		p = SDL_CreateTexture(renderer, (SDL_PixelFormat)type, static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, width, height);
+		p = SDL_CreateTexture((SDL_Renderer*)renderer, (SDL_PixelFormat)type, static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, width, height);
 		if (p && data)
 		{
 			if (stride < 1)stride = width * 4;
@@ -2281,6 +2281,34 @@ SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, in
 		SDL_SetTextureBlendMode(p, get_blend((BlendMode_e)bm, multiply));
 	}
 	return p;
+}
+void update_texture_r(void* texture, const glm::ivec4* rect, const void* pixels, int pitch)
+{
+	if (texture && pixels)
+	{
+		if (pitch < 1)pitch = ((SDL_Texture*)texture)->w * 4;
+		SDL_UpdateTexture(((SDL_Texture*)texture), (SDL_Rect*)rect, pixels, pitch);
+	}
+}
+void set_texture_blend_r(void* texture, uint32_t b, bool multiply)
+{
+	if (texture)
+		SDL_SetTextureBlendMode(((SDL_Texture*)texture), get_blend((BlendMode_e)b, multiply));
+}
+void free_texture_r(void* texture)
+{
+	if (texture)
+		SDL_DestroyTexture(((SDL_Texture*)texture));
+}
+
+texture_cb get_texture_cb() {
+	texture_cb cb = { new_texture_r, update_texture_r, set_texture_blend_r, free_texture_r };
+	return cb;
+}
+
+SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply)
+{
+	return (SDL_Texture*)new_texture_r(renderer, width, height, type, data, stride, bm, static_tex, multiply);
 }
 glm::ivec2 form_x::get_size()
 {

@@ -298,6 +298,20 @@ public:
 private:
 };
 
+#ifndef TEX_CB
+#define TEX_CB
+struct texture_cb
+{
+	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
+	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
+	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
+	void (*free_texture)(void* texture);
+};
+#else
+typedef struct texture_cb texture_cb;
+#endif
+
+texture_cb get_texture_cb();
 
 void form_move2end(form_x* f, plane_cx* ud);
 // 设置接收输入的控件

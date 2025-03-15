@@ -40,15 +40,40 @@ void atlas2json(atlas_xt* a, njson0& n);
 // 释放图集
 void free_atlas(atlas_xt* atlas);
 
+#ifndef TEX_CB
+#define TEX_CB
+struct texture_cb
+{
+	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
+	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
+	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
+	void (*free_texture)(void* texture);
+};
+#else
+typedef struct texture_cb texture_cb;
+#endif
 // 2d编辑器类
 class editor2d_cx
 {
 private:
+	struct texture_t
+	{
+		uint32_t format;     /**< The format of the texture, read-only */
+		int w;                      /**< The width of the texture, read-only. */
+		int h;                      /**< The height of the texture, read-only. */
 
+		int refcount;               /**< Application reference count, used when freeing texture */
+	};
+	std::string configdir;
+	std::string config_name;
+
+	void* renderer = 0;			// 渲染器绑定
+	// 设置纹理创建
+	texture_cb tex_cb = {};
 public:
 	editor2d_cx();
 	~editor2d_cx();
-	// 设置自动目录等配置
+	// 设置自动保存目录等配置
 	void set_config(const char* fn);
 	// 导入图片，支持stb能导入的格式
 	bool import_image(const char* fn);
