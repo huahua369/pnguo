@@ -171,3 +171,22 @@ editor2d_cx::editor2d_cx()
 editor2d_cx::~editor2d_cx()
 {
 }
+
+void editor2d_cx::set_config(const char* fn)
+{
+}
+
+bool editor2d_cx::import_image(const char* fn)
+{
+	return false;
+}
+
+bool editor2d_cx::export_atlas(const char* dir, const char* name)
+{
+	return false;
+}
+
+bool editor2d_cx::save(const char* fn)
+{
+	return false;
+}

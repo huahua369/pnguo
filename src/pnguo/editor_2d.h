@@ -48,10 +48,14 @@ private:
 public:
 	editor2d_cx();
 	~editor2d_cx();
+	// 设置自动目录等配置
+	void set_config(const char* fn);
 	// 导入图片，支持stb能导入的格式
 	bool import_image(const char* fn);
 	// 导出图集
 	bool export_atlas(const char* dir, const char* name);
+	// 保存
+	bool save(const char* fn);
 private:
 
 };
