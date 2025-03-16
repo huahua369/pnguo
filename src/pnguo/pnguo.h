@@ -1050,10 +1050,10 @@ void draw_ellipse(cairo_t* cr, const glm::vec2& pos, const glm::vec2& r);
 void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 void fill_stroke(cairo_t* cr, vg_style_t* st);
 void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
-void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness);
+void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
 void draw_polyline(cairo_t* cr, const PathsD* p, bool closed);
 // 渲染索引多段线，索引-1则跳过
-void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, unsigned int col, float thickness);
+void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 
 void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth);
 //glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
@@ -1097,13 +1097,13 @@ struct triangle_b {
 struct polyline_b
 {
 	eg_e type = eg_e::e_polyline;
-	glm::vec2& pos; const glm::vec2* points; int points_count; unsigned int color, fill; bool closed; float thickness;
+	glm::vec2& pos; const glm::vec2* points; int points_count; uint32_t color, fill; bool closed; float thickness;
 };
 struct polylines_b
 {
 	eg_e type = eg_e::e_polylines;
 	glm::vec2 pos;
-	const glm::vec2* points; int points_count; int* idx; int idx_count; unsigned int color, fill; float thickness;
+	const glm::vec2* points; int points_count; int* idx; int idx_count; uint32_t color, fill; float thickness;
 };
 struct image_b {
 	eg_e type = eg_e::e_image;
@@ -1341,17 +1341,17 @@ uint64_t divideroundingup(uint64_t a, uint64_t b);
 enum GRID_ATTR
 {
 	OK = 0,
-	UNKNOWN = 0,
-	CHECK,
-	CLOSE
+	G_UNKNOWN = 0,
+	G_CHECK,
+	G_CLOSE
 };
 
 struct grid_node
 {
-	unsigned char	state;		//状态
-	unsigned int	total;		//总距离
-	unsigned int	start;		//距起点
-	unsigned int	end;		//距终点
+	uint8_t	state;		//状态
+	size_t	total;		//总距离
+	size_t	start;		//距起点
+	size_t	end;		//距终点
 	glm::ivec2		parent;		//父坐标
 };
 
@@ -1365,7 +1365,9 @@ public:
 			return n1->total > n2->total;
 		}
 	};
-	unsigned char* data = 0;	//数据
+	uint8_t* data = 0;	//数据
+	int wall = 0;		// 高度大于wall为墙
+	glm::ivec2 gdist = { 10,14 };	//直线、斜线距离
 	grid_node* _node = 0;		//节点
 	uint32_t width = 0;		//宽度
 	uint32_t height = 0;	//高度
@@ -1373,15 +1375,18 @@ public:
 	uint32_t cap_size = 0;	//分配大小
 	void* m = 0;
 	std::priority_queue<grid_node*, std::vector<grid_node*>, grid_node_cmp> _open;//最小堆(开放列表)
+	std::vector<glm::ivec2> path;
 public:
 	astar_search();
 	~astar_search();
-	void init(uint32_t w, uint32_t h, unsigned char* d, bool copydata);
+	void init(uint32_t w, uint32_t h, uint8_t* d, bool copydata);
+	void set_wallheight(int h);
+	// 设置起点、终点、0为支持斜角，1不支持斜角
 	bool FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode);
 	bool NextPath(glm::ivec2* pos);
 
 	grid_node* pop_g();
-private: 
+private:
 };
 
 

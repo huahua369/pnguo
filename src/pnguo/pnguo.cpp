@@ -10165,7 +10165,7 @@ astar_search::~astar_search()
 	}
 	if (m)free(m); m = 0;
 }
-void astar_search::init(uint32_t w, uint32_t h, unsigned char* d, bool copydata)
+void astar_search::init(uint32_t w, uint32_t h, uint8_t* d, bool copydata)
 {
 	if (w < 2 || h < 2 || !d)
 	{
@@ -10190,8 +10190,11 @@ void astar_search::init(uint32_t w, uint32_t h, unsigned char* d, bool copydata)
 		if (m)free(m); m = 0;
 		m = malloc(size);
 		memccpy(m, d, size, 1);
-		data = (unsigned char*)m;
+		data = (uint8_t*)m;
 	}
+}
+void astar_search::set_wallheight(int h) {
+	wall = h;
 }
 //CalcDistance
 unsigned int CalcDistance(glm::ivec2 p1, glm::ivec2 p2)
@@ -10229,7 +10232,7 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 		return false;
 	while (_open.size())
 		_open.pop();
-	node[index].start = CHECK;
+	node[index].start = G_CHECK;
 	node[index].end = CalcDistance(start, end);
 	node[index].total = node[index].end;
 	node[index].parent;
@@ -10240,7 +10243,7 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 		/* 在待检链表中取出 F(总距离) 最小的节点, 并将其选为当前点 */
 		auto np = pop_g();
 		size_t now_index = np - node;
-		np->state = CLOSE;
+		np->state = G_CLOSE;
 		glm::ivec2 cur_pos =
 		{
 			(int)(now_index % width),
@@ -10264,23 +10267,22 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 				continue;
 
 			size_t beside_index = width * beside_pos.y + beside_pos.x;
-
-			if (data[beside_index] != OK || beside_index + 1 >= size ||
-				beside_index + width >= size || beside_index - 1 < 0 || beside_index - width < 0)
+			auto kd = data[beside_index];
+			if (beside_index < 1 || beside_index < width || data[beside_index] > wall || beside_index + 1 >= size || beside_index + width >= size)
 				continue;
 			switch (i)
 			{
 			case 1:
-				if (data[beside_index + 1] != OK || data[beside_index + width] != OK)
+				if (data[beside_index + 1] > wall || data[beside_index + width] > wall)
 					continue;
 			case 3:
-				if (data[beside_index - 1] != OK || data[beside_index + width] != OK)
+				if (data[beside_index - 1] > wall || data[beside_index + width] > wall)
 					continue;
 			case 5:
-				if (data[beside_index - 1] != OK || data[beside_index - width] != OK)
+				if (data[beside_index - 1] > wall || data[beside_index - width] > wall)
 					continue;
 			case 7:
-				if (data[beside_index + 1] != OK || data[beside_index - width] != OK)
+				if (data[beside_index + 1] > wall || data[beside_index - width] > wall)
 					continue;
 			}
 
@@ -10292,13 +10294,13 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 				break;
 			}
 
-			size_t g = ((i % 2) ? 14 : 10) + abs(data[now_index] - data[beside_index]);
+			size_t g = ((i % 2) ? gdist.y : gdist.x) + abs(data[now_index] - data[beside_index]);
 
 
-			if (node[beside_index].state == UNKNOWN)
+			if (node[beside_index].state == G_UNKNOWN)
 			{
 				/* 放入待检链表中 */
-				node[beside_index].state = CHECK;
+				node[beside_index].state = G_CHECK;
 				node[beside_index].start = node[now_index].start + g;
 				node[beside_index].end = CalcDistance(beside_pos, end);
 				node[beside_index].total = node[beside_index].start + node[beside_index].end;
@@ -10307,7 +10309,7 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 				size_t total = node[beside_index].total;
 				_open.push(&node[beside_index]); //将当前点放入开放列表 
 			}
-			else if (node[beside_index].state == CHECK)
+			else if (node[beside_index].state == G_CHECK)
 			{
 				/* 如果将当前点设为父 G(距起点) 值是否更小 */
 				if (node[beside_index].start > node[now_index].start + g)
@@ -10319,7 +10321,18 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 			}
 		}
 	}
-
+	if (isOK) {
+		glm::ivec2 current = end;
+		path.clear();
+		while (current != start) {
+			path.push_back(current);
+			size_t idx = width * current.y + current.x;
+			current = node[idx].parent;
+		}
+		path.push_back(start);
+		std::reverse(path.begin(), path.end());
+		// 此时path存储了从起点到终点的坐标序列 
+	}
 	return isOK;
 }
 

@@ -613,12 +613,14 @@ void test_img() {
 }
 
 #define WAY 0
-#define WALL  1
+#define WALL 1
 #define TRAP 2
 #define M_EXIT 3
 
 class maze_cx
 {
+public:
+	glm::ivec2 start, dest;
 private:
 	std::vector<uint8_t> _map_way;
 	int width = 0, height = 0;
@@ -650,7 +652,7 @@ void maze_cx::init(int w, int h)
 	//_map_way.resize(w * h, WALL);
 	_map_way.resize(w * h, WAY);
 	//generateMaze(0, 0);
-	//generateMazeD(_map_way.data(), width, height);
+	generateMazeD(_map_way.data(), width, height);
 }
 
 uint8_t* maze_cx::data()
@@ -696,7 +698,8 @@ void maze_cx::generateMazeD(uint8_t* maze, int rows, int cols)
 	visiteds.resize(rows * cols, 0);//全部初始为墙
 	int* visited = visiteds.data();// [rows] [cols] ;
 	std::stack<glm::ivec2> stack_x;
-
+	start = { start_x , start_y };
+	dest = { dest_x , dest_y };
 	int dx[4] = { -1, 0, 1, 0 };            // 向四个方向移动
 	int dy[4] = { 0, 1, 0, -1 };
 	//int stack_x[rows * cols], stack_y[rows * cols];  // 模拟栈，用于回溯
@@ -704,7 +707,7 @@ void maze_cx::generateMazeD(uint8_t* maze, int rows, int cols)
 	stack_x.push({ start_x,start_y });
 	visited[start_x + start_y * rows] = 1;
 	while (stack_x.size()) {
-		auto ps = stack_x.top(); 
+		auto ps = stack_x.top();
 		int x = ps.x;
 		int y = ps.y;
 		int flag = 0;
@@ -807,21 +810,28 @@ int main()
 	}
 	maze_cx maze;
 	astar_search as;
-	int ww = 20;
+	int ww = 100;
 	maze.init(ww, ww);
-	as.init(ww, ww, (unsigned char*)maze.data(), false);
-	glm::ivec2 pStart = { 2, 2 }, pEnd = { 18, 15 };
+	as.init(ww, ww, (uint8_t*)maze.data(), false);
+	// 大于0则是不通
+	as.set_wallheight(0);
+	glm::ivec2 pStart = maze.start, pEnd = maze.dest;//随机开始、结束坐标
 	bool hok = as.FindPath(&pStart, &pEnd, 0);
-	stbi_write_png("temp/maze.png", ww, ww, 1, maze.data(), ww);
-	std::vector<char> mg;
+	std::vector<uint32_t> mg;
 	mg.resize(ww * ww, 0);
-	while (as._open.size())
+	auto nma = maze.data();
+	for (size_t i = 0; i < mg.size(); i++)
 	{
-		/* 在待检链表中取出 F(总距离) 最小的节点, 并将其选为当前点 */
-		auto np = as.pop_g();
-		mg[np->parent.x + np->parent.y * ww] = 255;
+		mg[i] = nma[i] == 0 ? 0 : 0xff000000;
 	}
-	stbi_write_png("temp/maze2.png", ww, ww, 1, mg.data(), ww);
+	stbi_write_png("temp/maze.png", ww, ww, 4, mg.data(), 0);
+	for (auto& it : as.path)
+	{
+		mg[it.x + it.y * ww] = 0xff0020ff;
+	}
+	mg[pStart.x + pStart.y * ww] = 0xff00ff00;
+	mg[pEnd.x + pEnd.y * ww] = 0xffff0000;
+	stbi_write_png("temp/maze2.png", ww, ww, 4, mg.data(), 0);
 	// 运行消息循环
 	run_app(app, 0);
 	delete d2;
