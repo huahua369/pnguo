@@ -65,7 +65,7 @@ namespace pg
 	std::string to_string_hex(uint64_t _Val, int n, const char* x);
 	std::string to_string_hex2(uint32_t _Val);
 }
- 
+
 
 /*
 图集画布
@@ -234,7 +234,7 @@ struct tex9Grid {
 };
 
 
- 
+
 
 struct image_rect {
 	void* tex = 0;
@@ -1331,6 +1331,60 @@ std::string icu_u16_u8(const void* str, size_t size);
 std::u16string icu_u8_u16(const char* str, size_t size);
 
 void do_text(const char* str, size_t first, size_t count);
+
+// align val to the next multiple of alignment
+uint64_t align_up(uint64_t val, uint64_t alignment);
+// align val to the previous multiple of alignment
+uint64_t align_down(uint64_t val, uint64_t alignment);
+uint64_t divideroundingup(uint64_t a, uint64_t b);
+
+enum GRID_ATTR
+{
+	OK = 0,
+	UNKNOWN = 0,
+	CHECK,
+	CLOSE
+};
+
+struct grid_node
+{
+	unsigned char	state;		//状态
+	unsigned int	total;		//总距离
+	unsigned int	start;		//距起点
+	unsigned int	end;		//距终点
+	glm::ivec2		parent;		//父坐标
+};
+
+class astar_search
+{
+public:
+	struct grid_node_cmp
+	{
+		bool operator()(grid_node* n1, grid_node* n2)
+		{
+			return n1->total > n2->total;
+		}
+	};
+	unsigned char* data = 0;	//数据
+	grid_node* _node = 0;		//节点
+	uint32_t width = 0;		//宽度
+	uint32_t height = 0;	//高度
+	uint32_t size = 0;		//大小
+	uint32_t cap_size = 0;	//分配大小
+	void* m = 0;
+	std::priority_queue<grid_node*, std::vector<grid_node*>, grid_node_cmp> _open;//最小堆(开放列表)
+public:
+	astar_search();
+	~astar_search();
+	void init(uint32_t w, uint32_t h, unsigned char* d, bool copydata);
+	bool FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode);
+	bool NextPath(glm::ivec2* pos);
+
+	grid_node* pop_g();
+private: 
+};
+
+
 
 
 #include "font_core.h"

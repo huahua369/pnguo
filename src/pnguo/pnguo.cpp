@@ -10137,5 +10137,200 @@ glm::vec4 grid_view::get(const glm::ivec2& pos)
 	return r;
 }
 
+// align val to the next multiple of alignment
+uint64_t align_up(uint64_t val, uint64_t alignment)
+{
+	return (val + alignment - (uint64_t)1) & ~(alignment - (uint64_t)1);
+}
+// align val to the previous multiple of alignment
+uint64_t align_down(uint64_t val, uint64_t alignment)
+{
+	return val & ~(alignment - (uint64_t)1);
+}
+uint64_t divideroundingup(uint64_t a, uint64_t b)
+{
+	return (a + b - (uint64_t)1) / b;
+}
 
+
+astar_search::astar_search()
+{
+}
+
+astar_search::~astar_search()
+{
+	if (_node)
+	{
+		delete[]_node; _node = 0;
+	}
+	if (m)free(m); m = 0;
+}
+void astar_search::init(uint32_t w, uint32_t h, unsigned char* d, bool copydata)
+{
+	if (w < 2 || h < 2 || !d)
+	{
+		return;
+	}
+	width = w;
+	height = h;
+	data = d;
+	size = w * h;
+	if (cap_size < size)
+	{
+		cap_size = align_up(size, 64);
+		if (_node)
+		{
+			delete[]_node; _node = 0;
+		}
+	}
+	_node = new grid_node[size];
+	memset(_node, 0, size * sizeof(grid_node));
+	if (copydata)
+	{
+		if (m)free(m); m = 0;
+		m = malloc(size);
+		memccpy(m, d, size, 1);
+		data = (unsigned char*)m;
+	}
+}
+//CalcDistance
+unsigned int CalcDistance(glm::ivec2 p1, glm::ivec2 p2)
+{
+	unsigned int x, y;
+	x = (p1.x > p2.x) ? p1.x - p2.x : p2.x - p1.x;
+	y = (p1.y > p2.y) ? p1.y - p2.y : p2.y - p1.y;
+
+	return (x + y) * 10;
+}
+
+grid_node* astar_search::pop_g()
+{
+	grid_node* node = 0;
+	node = _open.top();
+	_open.pop();
+	return node;
+}
+
+bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
+{
+	/* 终点开始查找 */
+	glm::ivec2 start = *pEnd;
+	glm::ivec2 end = *pStart;
+
+	bool isOK = false;
+	static int x[] = { -1,-1,0,1,1,1,0,-1 };
+	static int y[] = { 0,-1,-1,-1,0,1,1,1 };
+
+	grid_node* node = _node;
+	memset(node, 0, size * sizeof(grid_node));
+
+	size_t index = width * start.y + start.x;
+	if (index >= size)
+		return false;
+	while (_open.size())
+		_open.pop();
+	node[index].start = CHECK;
+	node[index].end = CalcDistance(start, end);
+	node[index].total = node[index].end;
+	node[index].parent;
+	_open.push(&node[index]); //将起点放入开放列表
+
+	while (_open.size() != 0 && isOK == false)
+	{
+		/* 在待检链表中取出 F(总距离) 最小的节点, 并将其选为当前点 */
+		auto np = pop_g();
+		size_t now_index = np - node;
+		np->state = CLOSE;
+		glm::ivec2 cur_pos =
+		{
+			(int)(now_index % width),
+			(int)(now_index / width)
+		};
+
+		/* 遍历当前坐标的八个相邻坐标 */
+		for (int i = 0; i < 8; i++)
+		{
+			if (mode && i % 2)
+				continue;
+			glm::ivec2 beside_pos =
+			{
+				cur_pos.x + x[i],
+				cur_pos.y + y[i]
+			};
+
+			/* 检查坐标有效性 */
+			if (beside_pos.x < 0 || (size_t)beside_pos.x >= width
+				|| beside_pos.y < 0 || (size_t)beside_pos.y >= height)
+				continue;
+
+			size_t beside_index = width * beside_pos.y + beside_pos.x;
+
+			if (data[beside_index] != OK || beside_index + 1 >= size ||
+				beside_index + width >= size || beside_index - 1 < 0 || beside_index - width < 0)
+				continue;
+			switch (i)
+			{
+			case 1:
+				if (data[beside_index + 1] != OK || data[beside_index + width] != OK)
+					continue;
+			case 3:
+				if (data[beside_index - 1] != OK || data[beside_index + width] != OK)
+					continue;
+			case 5:
+				if (data[beside_index - 1] != OK || data[beside_index - width] != OK)
+					continue;
+			case 7:
+				if (data[beside_index + 1] != OK || data[beside_index - width] != OK)
+					continue;
+			}
+
+			/* 检查是否已到达终点 */
+			if (beside_pos.x == end.x && beside_pos.y == end.y)
+			{
+				isOK = true;
+				node[beside_index].parent = cur_pos;
+				break;
+			}
+
+			size_t g = ((i % 2) ? 14 : 10) + abs(data[now_index] - data[beside_index]);
+
+
+			if (node[beside_index].state == UNKNOWN)
+			{
+				/* 放入待检链表中 */
+				node[beside_index].state = CHECK;
+				node[beside_index].start = node[now_index].start + g;
+				node[beside_index].end = CalcDistance(beside_pos, end);
+				node[beside_index].total = node[beside_index].start + node[beside_index].end;
+				node[beside_index].parent = cur_pos;
+
+				size_t total = node[beside_index].total;
+				_open.push(&node[beside_index]); //将当前点放入开放列表 
+			}
+			else if (node[beside_index].state == CHECK)
+			{
+				/* 如果将当前点设为父 G(距起点) 值是否更小 */
+				if (node[beside_index].start > node[now_index].start + g)
+				{
+					node[beside_index].parent = cur_pos;
+					node[beside_index].start = node[now_index].start + g;
+					node[beside_index].total = node[beside_index].start + node[beside_index].end;
+				}
+			}
+		}
+	}
+
+	return isOK;
+}
+
+bool astar_search::NextPath(glm::ivec2* pos)
+{
+	size_t index = pos->y * width + pos->x;
+	if (index >= 0 && index < size)
+	{
+		*pos = _node[index].parent;
+		return true;
+	}
+	return false;
+}
 

@@ -58,11 +58,11 @@ class editor2d_cx
 private:
 	struct texture_t
 	{
-		uint32_t format;     /**< The format of the texture, read-only */
-		int w;                      /**< The width of the texture, read-only. */
-		int h;                      /**< The height of the texture, read-only. */
+		uint32_t format;
+		int w;
+		int h;
 
-		int refcount;               /**< Application reference count, used when freeing texture */
+		int refcount;
 	};
 	std::string configdir;
 	std::string config_name;
