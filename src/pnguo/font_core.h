@@ -526,6 +526,8 @@ void get_path_bitmap(vertex_32f* vertices, size_t num_verts, image_gray* bmp, gl
 // 模糊灰度图
 void blur2gray(unsigned char* dst, int w, int h, int dstStride, float blur, int n, int mode = 0x01 | 0x02);
 
+void px_blend2c(uint32_t* pDstBmp, uint32_t src, uint32_t col);
+
 void save_img_png(image_ptr_t* p, const char* str);
 // 灰度图转rgba
 void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);

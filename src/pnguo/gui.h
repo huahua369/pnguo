@@ -123,6 +123,19 @@ private:
 
 // 文字路径转path_v对象
 void text_path2path_v(text_path_t* t, path_v* opt);
+struct text_image_pt
+{
+	path_v* src = 0;
+	path_v* dst = 0;
+	int width = 0, height = 0;
+	uint32_t* img = 0;
+};
+// 文字加blur
+text_image_pt* text_blur(text_path_t* p, float blur, int n, uint32_t color, uint32_t blur_color);
+void free_textimage(text_image_pt* p);
+// 保存到png\jpg
+void textimage_file(text_image_pt* p, const std::string& fn, int quality = 90);
+
 
 #if 1
 enum class WIDGET_TYPE :uint32_t {

@@ -9100,6 +9100,7 @@ int inflate2flatten(path_v* p, path_v* dst, inflate_t* t)
 		}
 		dst->add_lines(flatten.data(), flatten.size(), t->is_close);
 	}
+	return 0;
 }
 
 

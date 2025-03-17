@@ -26,6 +26,8 @@ extern "C" {
 #include <mapView.h>
 #include <event.h>
 
+#include <stb_image_write.h>
+
 #include "pnguo.h"
 #include "gui.h" 
 
@@ -856,6 +858,153 @@ void text_path2path_v(text_path_t* t, path_v* opt)
 	for (auto& it : t->tv)
 	{
 		opt->_data.insert(opt->_data.end(), (path_v::vertex_t*)it.v, (path_v::vertex_t*)it.v + it.count);
+	}
+}
+text_image_pt* text_inflate(text_path_t* p, inflate_t* t)
+{
+	if (!p || !t)return 0;
+	auto src = new path_v();
+	auto dst = new path_v();
+	text_path2path_v(p, src);
+	inflate2flatten(src, dst, t);
+	image_gray bmp = {};
+	auto k = dst->get_size();
+	bmp.width = k.x * 1.5;
+	bmp.height = k.y * 1.5;
+	auto ps = p->tv[0].bearing;
+	ps.x -= t->width * 2;
+	ps.y -= t->width * 2;
+	ps.y -= p->tv[0].baseline;
+	auto bmp1 = bmp;
+	get_path_bitmap((vertex_32f*)src->data(), src->size(), &bmp1, { 1.0,1.0 }, ps, 1);
+	get_path_bitmap((vertex_32f*)dst->data(), dst->size(), &bmp, { 1.0,1.0 }, ps, 1);
+	text_image_pt* r = 0;
+	do {
+		if (bmp.width > 0)
+			r = (text_image_pt*)malloc(sizeof(text_image_pt) + bmp.width * bmp.height * sizeof(uint32_t));
+		if (!r)break;
+		auto r1 = r + 1;
+		r->img = (uint32_t*)r1;
+		r->width = bmp.width;
+		r->height = bmp.height;
+		r->src = src;
+		r->dst = dst;
+		auto length = bmp._data.size();
+		auto dt = bmp.data();
+		uint32_t c = 0x00555555;
+		for (size_t i = 0; i < length; i++)
+		{
+			//if (dt[i] > 0)
+			//{
+			//	auto c1 = c | (dt[i] << 24);
+			//	r->img[i] = c1;
+			//}
+			//else 
+			{
+				r->img[i] = 0;
+			}
+		}
+		dt = bmp1.data();
+		float blur = t->width;
+		auto bmp2 = bmp1;
+		blur2gray((unsigned char*)dt, bmp.width, bmp.height, bmp.width, blur, 1);
+		c = 0x0020ff20;
+		for (size_t i = 0; i < length; i++)
+		{
+			if (dt[i] > 0)
+			{
+				auto c1 = c | (dt[i] << 24);
+				r->img[i] = c1;
+			}
+		}
+		c = 0x00ff8000; dt = bmp2.data();
+		for (size_t i = 0; i < length; i++)
+		{
+			if (dt[i] > 0)
+			{
+				auto c1 = c | (dt[i] << 24);
+				px_blend2c(&r->img[i], c1, -1);
+			}
+		}
+	} while (0);
+	return r;
+}
+text_image_pt* text_blur(text_path_t* p, float blur, int n, uint32_t color, uint32_t blur_color)
+{
+	if (!p || p->tv.empty())return 0;
+	auto src = new path_v();
+	text_path2path_v(p, src);
+	image_gray bmp = {};
+	auto k = src->get_size();
+	bmp.width = k.x * 1.5;
+	bmp.height = k.y * 1.5;
+	auto ps = p->tv[0].bearing;
+	ps.x -= blur * 2;
+	ps.y -= blur * 2;
+	ps.y -= p->tv[0].baseline;
+	auto bmp1 = bmp;
+	get_path_bitmap((vertex_32f*)src->data(), src->size(), &bmp, { 1.0,1.0 }, ps, 1);
+	text_image_pt* r = 0;
+	do {
+		if (bmp.width > 0)
+			r = (text_image_pt*)malloc(sizeof(text_image_pt) + bmp.width * bmp.height * sizeof(uint32_t));
+		if (!r)break;
+		auto r1 = r + 1;
+		*r = {};
+		r->img = (uint32_t*)r1;
+		r->width = bmp.width;
+		r->height = bmp.height;
+		r->src = src;
+		auto length = bmp._data.size();
+		auto dt = bmp.data();
+		uint32_t c = 0x00555555;
+		memset(r->img, 0, sizeof(uint32_t) * length);
+		dt = bmp.data();
+		auto bmp2 = bmp;
+		blur2gray((unsigned char*)dt, bmp.width, bmp.height, bmp.width, blur, n);
+		c = blur_color;
+		c &= 0x00ffffff;
+		for (size_t i = 0; i < length; i++)
+		{
+			if (dt[i] > 0)
+			{
+				auto c1 = c | (dt[i] << 24);
+				r->img[i] = c1;
+			}
+		}
+		c = color;
+		c &= 0x00ffffff; dt = bmp2.data();
+		for (size_t i = 0; i < length; i++)
+		{
+			if (dt[i] > 0)
+			{
+				auto c1 = c | (dt[i] << 24);
+				px_blend2c(&r->img[i], c1, -1);
+			}
+		}
+	} while (0);
+	return r;
+}
+void free_textimage(text_image_pt* p)
+{
+	if (p)
+	{
+		if (p->src)delete p->src;
+		if (p->dst)delete p->dst;
+		free(p);
+	}
+}
+// 保存到png\jpg
+void textimage_file(text_image_pt* p, const std::string& fn, int quality)
+{
+	if (p && p->img && fn.size())
+	{
+		if (fn.find(".png") != std::string::npos) {
+			stbi_write_png(fn.c_str(), p->width, p->height, 4, p->img, 0);
+		}
+		else if (fn.find(".jpg") != std::string::npos) {
+			stbi_write_jpg(fn.c_str(), p->width, p->height, 4, p->img, quality);
+		}
 	}
 }
 

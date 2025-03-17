@@ -285,9 +285,9 @@ void tohexstr(std::string& ot, const char* d, int len, int xlen, uint64_t line, 
 		}
 	}
 }
-void show_ui(form_x* form0, menu_cx* gm)
+plane_cx* show_ui(form_x* form0, menu_cx* gm)
 {
-	if (!form0)return;
+	if (!form0)return 0;
 	glm::ivec2 size = { 1024,800 };
 	glm::ivec2 cview = { 1580,1580 };
 	auto p = new plane_cx();
@@ -599,6 +599,8 @@ void show_ui(form_x* form0, menu_cx* gm)
 			}
 
 		};
+
+	return p;
 }
 
 void show_ui2(form_x* form0, menu_cx* gm)
@@ -635,7 +637,7 @@ int main()
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 	auto gm = menu_m(form0);
 	printf("%p\n", form0);
-	show_ui(form0, gm);
+	auto pl = show_ui(form0, gm);
 	show_ui2(form0, gm);
 	//show_cpuinfo(form0);
 	auto d2 = new sp_drawable();
@@ -659,6 +661,14 @@ int main()
 				d2->update_draw(delta);
 			};
 	}
+	auto lt = pl->ltx;
+	text_path_t opt = {};
+	auto tp = lt->get_shape(0, u8"富强", 50, &opt);
+	text_image_pt* tip = text_blur(&opt, 4, 2, 0xff111111, 0xff0000ff);
+	// 保存到png\jpg
+	textimage_file(tip, "temp/text_inflate.png");
+	free_textimage(tip);
+
 	maze_cx maze;
 	astar_search as;
 	int ww = 100;

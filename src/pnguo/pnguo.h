@@ -834,8 +834,8 @@ struct inflate_t
 	float mlen = 0;
 	float ds = 0;
 	int angle = 100;
-	int type; //(JoinType)  Square=0, Bevel, Round, Miter
-	int etype; //(EndType) Polygon=0, Joined, Butt, Square, Round
+	int type = 2; //(JoinType)  Square=0, Bevel, Round, Miter
+	int etype = 0; //(EndType) Polygon=0, Joined, Butt, Square, Round
 	bool is_reverse = false;	// 是否反转
 	bool is_close = false;		// 自动闭合
 };
