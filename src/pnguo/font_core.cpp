@@ -1437,8 +1437,150 @@ public:
 
 		return 1;
 	}
+
 private:
-};//！stb_font
+};
+//！stb_font
+#ifndef NO_STBR
+
+/*
+todo 路径填充光栅化-function
+输入路径path，缩放比例scale、bpm_size{宽高xy,每行步长z}、invert 1倒置, 0正常，
+xy_off偏移默认0
+输出灰度图
+支持移动、直线、2/3次贝塞尔曲线，构成的路径。
+*/
+unsigned char* get_glyph_bitmap_subpixel(stbtt_vertex* vertices, int num_verts, glm::vec2 scale, glm::vec2 shift, glm::vec2 xy_off
+	, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert)
+{
+	stbtt__bitmap gbm;
+	if ((int)scale.x == 0 || (int)scale.y == 0)
+	{
+		scale.x = scale.y = std::max(std::max(scale.x, scale.y), 1.0f);
+	}
+	// now we get the size
+	gbm.w = bpm_size.x;
+	gbm.h = bpm_size.y;
+	gbm.pixels = NULL; // in case we error
+	int bms = gbm.w * gbm.h;
+	if (bpm_size.z < 1) bpm_size.z = gbm.w;
+	if (bms > 0)
+	{
+		if (out->empty())
+			out->resize(bms);
+		gbm.pixels = (unsigned char*)out->data();
+		if (gbm.pixels)
+		{
+			gbm.stride = bpm_size.z;
+			stbtt_Rasterize(&gbm, 0.35f, vertices, num_verts, scale.x, scale.y, shift.x, shift.y, xy_off.x, xy_off.y, invert, 0);
+		}
+	}
+	return gbm.pixels;
+}
+
+void get_path_bitmap(vertex_32f* vertices, size_t num_verts, image_gray* bmp, glm::vec2 scale, glm::vec2 xy_off, int invert)
+{
+	std::vector<stbtt_vertex> v;
+	v.resize(num_verts);
+	for (size_t i = 0; i < num_verts; i++)
+	{
+		auto& it = v[i];
+		auto& v2 = vertices[i];
+		it.type = v2.type;
+		it.x = v2.p.x; it.y = v2.p.y;
+		it.cx = v2.c.x; it.cy = v2.c.y;
+		it.cx1 = v2.c1.x; it.cy1 = v2.c1.y;
+	}
+	get_glyph_bitmap_subpixel((stbtt_vertex*)v.data(), num_verts, scale, { 0, 0 }, xy_off, &bmp->_data, { bmp->width, bmp->height, 0 }, invert);
+}
+
+
+#define APREC 16
+#define ZPREC 7 
+void blurCols(unsigned char* dst, int w, int h, int dstStride, int alpha)
+{
+	int x, y;
+	for (y = 0; y < h; y++) {
+		int z = 0; // force zero border
+		for (x = 1; x < w; x++) {
+			z += (alpha * (((int)(dst[x]) << ZPREC) - z)) >> APREC;
+			dst[x] = (unsigned char)(z >> ZPREC);
+		}
+		dst[w - 1] = 0; // force zero border
+		z = 0;
+		for (x = w - 2; x >= 0; x--) {
+			z += (alpha * (((int)(dst[x]) << ZPREC) - z)) >> APREC;
+			dst[x] = (unsigned char)(z >> ZPREC);
+		}
+		dst[0] = 0; // force zero border
+		dst += dstStride;
+	}
+}
+
+void blurRows(unsigned char* dst, int w, int h, int dstStride, int alpha)
+{
+	int x, y;
+	for (x = 0; x < w; x++) {
+		int z = 0; // force zero border
+		for (y = dstStride; y < h * dstStride; y += dstStride) {
+			z += (alpha * (((int)(dst[y]) << ZPREC) - z)) >> APREC;
+			dst[y] = (unsigned char)(z >> ZPREC);
+		}
+		dst[(h - 1) * dstStride] = 0; // force zero border
+		z = 0;
+		for (y = (h - 2) * dstStride; y >= 0; y -= dstStride) {
+			z += (alpha * (((int)(dst[y]) << ZPREC) - z)) >> APREC;
+			dst[y] = (unsigned char)(z >> ZPREC);
+		}
+		dst[0] = 0; // force zero border
+		dst++;
+	}
+}
+
+void blur2gray(unsigned char* dst, int w, int h, int dstStride, float blur, int n, int mode)
+{
+	int alpha;
+	float sigma;
+	if (blur < 1)
+		return;
+	// Calculate the alpha such that 90% of the kernel is within the radius. (Kernel extends to infinity)
+	sigma = (float)blur * 0.57735f; // 1 / sqrt(3)
+	alpha = (int)((1 << APREC) * (1.0f - expf(-2.3f / (sigma + 1.0f))));
+	for (int i = 0; i < n; i++)
+	{
+		if (mode & 0x01)
+			blurRows(dst, w, h, dstStride, alpha);
+		if (mode & 0x02)
+			blurCols(dst, w, h, dstStride, alpha);
+	}
+}
+#if 0
+void build_blur(image_gray* grayblur, float blur, unsigned int fill, int blurcount, Image* dst, glm::ivec2 pos, bool iscp)
+{
+
+	std::vector<unsigned char> rbd;
+	unsigned char* bdata = grayblur->data();
+	glm::ivec2 rbs = { grayblur->width, grayblur->height };
+	if (iscp)
+	{
+		rbd.resize((int64_t)rbs.x * rbs.y);
+		auto cpd = rbd.data();
+		memcpy(cpd, bdata, rbd.size());
+		bdata = cpd;
+		grayblur->ud = cpd;
+	}
+	// 模糊
+	blur2gray(bdata, rbs.x, rbs.y, rbs.x, blur, blurcount);
+	// 转成rgba
+	if (dst)
+	{
+		glm::ivec4 src4 = { 0, 0, rbs.x, rbs.y };
+		dst->copy2(grayblur, pos, src4, fill);
+		//dst->copy_to_image(bdata, rbs.x, src4, fill, 2);
+	}
+}
+#endif
+#endif // !NO_STBR
 
 
 void test_stbfont()
@@ -7607,3 +7749,273 @@ void save_img_png(image_ptr_t* p, const char* str)
 }
 
 #endif
+
+#if 1
+
+image_gray::image_gray()
+{
+}
+
+image_gray::~image_gray()
+{
+}
+
+unsigned char* image_gray::data()
+{
+	return _data.data();
+}
+size_t image_gray::size()
+{
+	return _data.size();
+}
+void image_gray::resize(size_t w, size_t h)
+{
+	if (w * h != width * height)
+	{
+		_data.resize(w * h);
+		width = w;
+		height = h;
+	}
+}
+void image_gray::clear_color(unsigned char fill)
+{
+	memset(_data.data(), fill, _data.size());
+}
+int distance(const glm::vec2& s, const glm::vec2& p)
+{
+	int dis = (s.x - p.x) * (s.x - p.x) + (s.y - p.y) * (s.y - p.y);
+	return dis;
+}
+//{c.xy = pos, c.z = radius}
+bool inCircle(const glm::vec3& c, const glm::vec2& p)
+{
+	//计算点p和 当前圆圆心c 的距离
+	int dis = distance(p, glm::vec2(c.x, c.y));
+	//和半径比较
+	return (dis <= c.z * c.z);
+}
+
+bool inRect(const glm::vec4& r, const glm::vec2& p)
+{
+	return !(p.x < r.x || p.y < r.y || p.x > r.x + r.z || p.y > r.y + r.w);
+}
+
+template<class T>
+void draw_line2(const glm::ivec4& p, T color, T* dst, size_t w, size_t dst_as)
+{
+	int StartX = p.x, StartY = p.y, EndX = p.z, EndY = p.w;
+	//////////////////////////////////////////////////////
+	// Draws a line using the Bresenham line algorithm
+	// Thanks to Jordan DeLozier <JDL>
+	//////////////////////////////////////////////////////
+	int jlen = 2;
+
+	int x1 = StartX;
+	int y1 = StartY;
+	int x = x1;                       // Start x off at the first pixel
+	int y = y1;                       // Start y off at the first pixel
+	int x2 = EndX;
+	int y2 = EndY;
+	int xinc1, xinc2, yinc1, yinc2;      // Increasing values
+	int den, num, numadd, numpixels;
+	int deltax = abs(x2 - x1);        // The difference between the x's
+	int deltay = abs(y2 - y1);        // The difference between the y's
+	// Get Increasing Values
+	if (x2 >= x1) {                // The x-values are increasing
+		xinc1 = 1; xinc2 = 1;
+	}
+	else {                         // The x-values are decreasing
+		xinc1 = -1; xinc2 = -1;
+	}
+
+	if (y2 >= y1) {                // The y-values are increasing
+		yinc1 = 1; yinc2 = 1;
+	}
+	else {                         // The y-values are decreasing
+		yinc1 = -1; yinc2 = -1;
+	}
+
+	// Actually draw the line
+	if (deltax >= deltay)         // There is at least one x-value for every y-value
+	{
+		xinc1 = 0;                  // Don't change the x when numerator >= denominator
+		yinc2 = 0;                  // Don't change the y for every iteration
+		den = deltax;
+		num = deltax / jlen;
+		numadd = deltay;
+		numpixels = deltax;         // There are more x-values than y-values
+	}
+	else                          // There is at least one y-value for every x-value
+	{
+		xinc2 = 0;                  // Don't change the x for every iteration
+		yinc1 = 0;                  // Don't change the y when numerator >= denominator
+		den = deltay;
+		num = deltay / jlen;
+		numadd = deltax;
+		numpixels = deltay;         // There are more y-values than x-values
+	}
+
+	for (int curpixel = 0; curpixel <= numpixels; curpixel++)
+	{
+		// Draw the current pixel
+		size_t xx = x + y * w;
+		if (xx < dst_as)
+			dst[xx] = color;
+
+		num += numadd;              // Increase the numerator by the top of the fraction
+		if (num >= den)             // Check if numerator >= denominator
+		{
+			num -= den;               // Calculate the new numerator value
+			x += xinc1;               // Change the x as appropriate
+			y += yinc1;               // Change the y as appropriate
+		}
+		x += xinc2;                 // Change the x as appropriate
+		y += yinc2;                 // Change the y as appropriate
+	}
+
+}
+void image_gray::draw_rect(const glm::ivec4& rect, unsigned char col, unsigned char fill, glm::ivec4 rounding)
+{
+	auto r = rect;
+	glm::vec2 a = { r.x, r.y }; glm::vec2 b = { r.x + r.z,r.y + r.w };
+	auto ds = _data.size();
+	auto bdata = _data.data();
+	//if (fill)
+	{
+		glm::vec3 c[4] = {};
+		glm::vec4 rt[4] = {};
+		int hr = std::min(r.w * 0.5, r.z * 0.5);
+		if (rounding.x > 0)
+		{
+			c[0].z = std::min(rounding.x, hr);
+			c[0].x = r.x + c[0].z;
+			c[0].y = r.y + c[0].z;
+			rt[0] = { r.x , r.y, c[0].z ,c[0].z };
+		}
+		if (rounding.y > 0)
+		{
+			c[1].z = std::min(rounding.y, hr);
+			c[1].x = b.x - c[1].z - 1;
+			c[1].y = r.y + c[1].z;
+			rt[1] = { b.x - c[1].z , r.y, c[1].z ,c[1].z };
+		}
+		if (rounding.z > 0)
+		{
+			c[2].z = std::min(rounding.z, hr);
+			c[2].x = b.x - c[2].z - 1;
+			c[2].y = b.y - c[2].z - 1;
+			rt[2] = { b.x - c[2].z ,b.y - c[2].z, c[2].z ,c[2].z };
+		}
+		if (rounding.w > 0)
+		{
+			c[3].z = std::min(rounding.w, hr);
+			c[3].x = r.x + c[3].z;
+			c[3].y = b.y - c[3].z - 1;
+			rt[3] = { r.x , b.y - c[3].z, c[3].z ,c[3].z };
+		}
+
+		for (size_t y = a.y; y < b.y; y++)
+		{
+			for (size_t x = a.x; x < b.x; x++)
+			{
+				size_t idx = x + y * width;
+				if (idx < ds)
+				{
+					bool isfill = true;
+					for (int i = 0; i < 4; i++)
+					{
+						if (c[i].z <= 0)continue;
+						glm::ivec2 pos = { x,y };
+						bool ir = inRect(rt[i], pos);
+						if (ir)
+						{
+							bool ic = inCircle(c[i], pos);
+							if (!ic)
+							{
+								isfill = false;
+							}
+							break;
+						}
+					}
+					if (isfill)
+						bdata[idx] = fill;
+				}
+			}
+		}
+	}
+	if (col)
+	{
+		draw_line2({ a.x, a.y, b.x, a.y }, col, bdata, width, ds);
+		draw_line2({ b.x, a.y, b.x, b.y }, col, bdata, width, ds);
+		draw_line2({ b.x, b.y, a.x, b.y }, col, bdata, width, ds);
+		draw_line2({ a.x, a.y, a.x, b.y }, col, bdata, width, ds);
+	}
+}
+void image_gray::draw_circle_fill(const glm::vec3& c, unsigned char fill)
+{
+	double r2 = c.z;
+	glm::vec2 a = { c.x - r2, c.y - r2 }; glm::vec2 b = { c.x + r2,c.y + r2 };
+	auto ds = _data.size();
+	auto bdata = _data.data();
+	for (size_t y = a.y; y < b.y; y++)
+	{
+		for (size_t x = a.x; x < b.x; x++)
+		{
+			size_t idx = x + y * width;
+			if (idx < ds)
+			{
+				glm::ivec2 pos = { x,y };
+				bool ir = inCircle(c, pos);
+				if (ir)
+					bdata[idx] = fill;
+			}
+		}
+	}
+}
+
+//比较两个直方图
+
+void yHist::init(int c)
+{
+	hists.resize(c);
+	memset(hists.data(), 0, sizeof(int) * c);
+}
+
+void yHist::Hist(unsigned char c)
+{
+	hists[c]++;
+}
+
+bool yHist::diff(yHist* p, int dmin, int dmax)
+{
+	mset.clear();
+	for (size_t i = 0; i < 256; i++)
+	{
+		mset.insert(hists[i] - p->hists[i]);
+	}
+	hmin = abs(*mset.begin());
+	hmax = abs(*mset.rbegin());
+	bool ret = (hmin > dmin) || (hmax > dmax);
+	if (ret)
+	{
+		ret = true;
+	}
+	return ret;
+}
+double yHist::calculate_relation(yHist* p)
+{
+	assert(p && hists.size() == p->hists.size());
+	// 计算内积
+	double innerMul = 0.0;
+	double amp1 = 0.0;
+	double amp2 = 0.0;
+	for (int i = 0; i < hists.size(); i++)
+	{
+		innerMul += hists[i] * p->hists[i];
+		amp1 += pow(hists[i], 2);
+		amp2 += pow(p->hists[i], 2);
+	}
+	double correlation = innerMul / (sqrt(amp1) * sqrt(amp2));
+	return correlation;
+}
+#endif // 1

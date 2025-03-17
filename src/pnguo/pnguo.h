@@ -690,7 +690,7 @@ class path_v
 {
 public:
 	// 线，二阶曲线，三阶曲线
-	enum class vtype_e :uint8_t
+	enum class vtype_e :uint32_t
 	{
 		e_vmove = 1,
 		e_vline,
@@ -702,18 +702,14 @@ public:
 		// 24字节
 		glm::vec2 p, c, c1;
 		// 4字节
-		vtype_e type;
-		uint8_t padding;
-		uint16_t padding1;
+		vtype_e type; 
 	};
 	struct vertex_tf
 	{
 		// 24字节
 		float x, y, cx, cy, cx1, cy1;
 		// 4字节
-		vtype_e type;
-		uint8_t padding;
-		uint16_t padding1;
+		vtype_e type; 
 	};
 	struct flatten_t
 	{
@@ -1365,9 +1361,10 @@ public:
 			return n1->total > n2->total;
 		}
 	};
-	uint8_t* data = 0;	//数据
+	uint8_t* data = 0;	// 地图数据
 	int wall = 0;		// 高度大于wall为墙
-	glm::ivec2 gdist = { 10,14 };	//直线、斜线距离
+	std::vector<float> speeds;	// 加速表，data为索引
+	glm::ivec2 gdist = { 10,14 };	//直线、斜线距离1.414
 	grid_node* _node = 0;		//节点
 	uint32_t width = 0;		//宽度
 	uint32_t height = 0;	//高度
@@ -1381,11 +1378,12 @@ public:
 	~astar_search();
 	void init(uint32_t w, uint32_t h, uint8_t* d, bool copydata);
 	void set_wallheight(int h);
+	void set_speed(float* d, int n);
 	// 设置起点、终点、0为支持斜角，1不支持斜角
 	bool FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode);
 	bool NextPath(glm::ivec2* pos);
 
-	grid_node* pop_g();
+	grid_node* pop_n();
 private:
 };
 

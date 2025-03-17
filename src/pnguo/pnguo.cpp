@@ -10196,17 +10196,22 @@ void astar_search::init(uint32_t w, uint32_t h, uint8_t* d, bool copydata)
 void astar_search::set_wallheight(int h) {
 	wall = h;
 }
-//CalcDistance
-unsigned int CalcDistance(glm::ivec2 p1, glm::ivec2 p2)
+void astar_search::set_speed(float* d, int n)
 {
-	unsigned int x, y;
-	x = (p1.x > p2.x) ? p1.x - p2.x : p2.x - p1.x;
-	y = (p1.y > p2.y) ? p1.y - p2.y : p2.y - p1.y;
-
-	return (x + y) * 10;
+	if (d && n > 0)
+	{
+		speeds.resize(n, 1.0);
+		memcpy(speeds.data(), d, n * sizeof(float));
+	}
+}
+// 计算距离
+size_t CalcDistance(glm::ivec2 p1, glm::ivec2 p2, double speed)
+{
+	auto d = glm::abs(p1 - p2);
+	return (d.x + d.y) * speed;
 }
 
-grid_node* astar_search::pop_g()
+grid_node* astar_search::pop_n()
 {
 	grid_node* node = 0;
 	node = _open.top();
@@ -10233,15 +10238,20 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 	while (_open.size())
 		_open.pop();
 	node[index].start = G_CHECK;
-	node[index].end = CalcDistance(start, end);
+	node[index].end = CalcDistance(start, end, 1.0);
 	node[index].total = node[index].end;
 	node[index].parent;
 	_open.push(&node[index]); //将起点放入开放列表
-
+	auto sp = speeds.data();
+	uint8_t spn = speeds.size();
+	if (speeds.empty())
+	{
+		sp = nullptr;
+	}
 	while (_open.size() != 0 && isOK == false)
 	{
 		/* 在待检链表中取出 F(总距离) 最小的节点, 并将其选为当前点 */
-		auto np = pop_g();
+		auto np = pop_n();
 		size_t now_index = np - node;
 		np->state = G_CLOSE;
 		glm::ivec2 cur_pos =
@@ -10294,15 +10304,16 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 				break;
 			}
 
-			size_t g = ((i % 2) ? gdist.y : gdist.x) + abs(data[now_index] - data[beside_index]);
-
-
+			size_t g = ((i % 2) ? gdist.y : gdist.x);// +abs(data[now_index] - data[beside_index]);
+			double speed = 1.0;
+			auto idx = std::min(data[beside_index], spn);
+			if (sp)speed = sp[idx];
 			if (node[beside_index].state == G_UNKNOWN)
 			{
 				/* 放入待检链表中 */
 				node[beside_index].state = G_CHECK;
 				node[beside_index].start = node[now_index].start + g;
-				node[beside_index].end = CalcDistance(beside_pos, end);
+				node[beside_index].end = CalcDistance(beside_pos, end, speed);
 				node[beside_index].total = node[beside_index].start + node[beside_index].end;
 				node[beside_index].parent = cur_pos;
 

@@ -460,6 +460,65 @@ struct text_atlas_t
 	image_ptr_t ipt = {};
 };
 
+// Histogram
+class yHist
+{
+public:
+	yHist()
+	{
+	}
+
+	~yHist()
+	{
+	}
+	void init(int c = 256);
+	void Hist(unsigned char c);
+
+	//比较两个直方图
+	bool diff(yHist* p, int dmin = 1500, int dmax = 2000);
+	double calculate_relation(yHist* p);
+public:
+	//创建直方图
+	std::vector<int> hists;
+	std::set<int> mset;
+	int hmin = 0, hmax = 0;
+};
+// 灰度图
+class image_gray
+{
+public:
+	int width = 0, height = 0;
+	unsigned char* ud = 0;
+	std::vector<unsigned char> _data;
+private:
+public:
+	image_gray();
+	~image_gray();
+
+public:
+	unsigned char* data();
+	size_t size();
+	void resize(size_t w, size_t h);
+	void clear_color(unsigned char fill);
+	void draw_rect(const glm::ivec4& rect, unsigned char col, unsigned char fill, glm::ivec4 rounding = {});
+	void draw_circle_fill(const glm::vec3& c, unsigned char fill);
+private:
+
+};
+struct vertex_32f
+{
+	// 24字节
+	glm::vec2 p, c, c1;
+	// 4字节
+	uint32_t type;
+};
+#ifdef stbtt_vertex_type
+unsigned char* get_glyph_bitmap_subpixel(stbtt_vertex* vertices, int num_verts, glm::vec2 scale, glm::vec2 shift, glm::vec2 xy_off, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert);
+#endif
+// 路径填充光栅化
+void get_path_bitmap(vertex_32f* vertices, size_t num_verts, image_gray* bmp, glm::vec2 scale, glm::vec2 xy_off, int invert);
+// 模糊灰度图
+void blur2gray(unsigned char* dst, int w, int h, int dstStride, float blur, int n, int mode = 0x01 | 0x02);
 
 void save_img_png(image_ptr_t* p, const char* str);
 // 灰度图转rgba
