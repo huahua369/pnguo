@@ -848,6 +848,18 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fo
 	} while (str && *str);
 	return opt;
 }
+
+
+void text_path2path_v(text_path_t* t, path_v* opt)
+{
+	if (!t || !opt || t->tv.empty() || t->data.empty())return;
+	for (auto& it : t->tv)
+	{
+		opt->_data.insert(opt->_data.end(), (path_v::vertex_t*)it.v, (path_v::vertex_t*)it.v + it.count);
+	}
+}
+
+
 #endif // 1
 
 widget_base::widget_base()
@@ -4804,6 +4816,7 @@ void plane_cx::update(float delta)
 		}
 	}
 }
+
 
 
 flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap)

@@ -9033,6 +9033,76 @@ bool path_v::is_ccw(int idx)
 	bool ccw = IsPositive(pv);
 	return ccw;
 }
+
+
+int inflate2flatten(path_v* p, path_v* dst, inflate_t* t)
+{
+	if (!p || !dst || !t || p->size() == 0 || !(t->width > 0) || t->segments < 1)
+		return -1;
+	auto ct = p->mcount();
+	if (ct < 1)return -1;
+	PathsD pd;
+	std::vector<PointD> pv;
+	std::vector<glm::vec2> flatten;
+	for (size_t x = 0; x < ct; x++)
+	{
+		pv.clear();
+		flatten.clear();
+		auto vt = get_idxlines(p->_data, x, 1);
+		path_v::flatten_t fp = {};
+		fp.flatten = &flatten;
+		fp.mc = t->segments;
+		fp.mlen = t->mlen;
+		fp.n = vt.n;
+		fp.first = vt.first;
+		fp.dist = t->ds;
+		fp.angle = t->angle;
+		doflatten(&fp);//细分曲线
+		{
+			pv.resize(flatten.size());
+			for (size_t i = 0; i < flatten.size(); i++)
+			{
+				pv[i] = { flatten[i].x, flatten[i].y };
+			}
+			// 判断是逆时针
+			bool ccw = IsPositive(pv);
+			pd.push_back(std::move(pv));
+		}
+	}
+	if (t->width != 0 && pd.size())
+	{
+		auto type = t->type;
+		//Square=0, Round=1, Miter=2
+		if (type > (int)JoinType::Miter || type < 0)
+		{
+			type = (int)JoinType::Round;
+		}
+		auto etype = std::clamp(t->etype, (int)EndType::Polygon, (int)EndType::Round);
+		// 扩展线段
+		auto rv = InflatePaths(pd, t->width, (JoinType)type, (EndType)etype);
+		if (rv.size() && rv[0].size())
+		{
+			pd.swap(rv);
+		}
+	}
+
+	for (const auto& path : pd) {
+		flatten.clear();
+		flatten.reserve(path.size());
+		for (auto& it : path)
+		{
+			glm::vec2 pt = { it.x ,it.y };
+			flatten.push_back(pt);
+		}
+		if (t->is_reverse)
+		{
+			std::reverse(flatten.begin(), flatten.end());
+		}
+		dst->add_lines(flatten.data(), flatten.size(), t->is_close);
+	}
+}
+
+
 #endif
 
 namespace gp {
@@ -10358,3 +10428,142 @@ bool astar_search::NextPath(glm::ivec2* pos)
 	return false;
 }
 
+
+maze_cx::maze_cx()
+{
+}
+
+maze_cx::~maze_cx()
+{
+}
+void maze_cx::init(int w, int h)
+{
+	width = w;
+	height = h;
+	gen.seed(std::chrono::system_clock::now().time_since_epoch().count());
+	//_map_way.resize(w * h, WALL);
+	_map_way.resize(w * h, WAY);
+	generateMazeD(_map_way.data(), width, height);
+}
+
+uint8_t* maze_cx::data()
+{
+	return _map_way.data();
+}
+
+void maze_cx::set_seed(uint64_t c)
+{
+	seed = c;
+	gen_map.seed(c);
+}
+
+int64_t maze_cx::get_rand(int64_t f, int64_t s)
+{
+	auto d = gen();
+	return f + d % (s - f + 1);
+}
+int64_t maze_cx::get_rand_m(int64_t f, int64_t s)
+{
+	auto d = gen_map();
+	return f + d % (s - f + 1);
+}
+
+#if 0
+// 打乱方向数组 
+void shuffle(int* array, int n) {
+	for (int i = n - 1; i > 0; i--) {
+		int j = rand() % (i + 1);
+		int temp = array[i];
+		array[i] = array[j];
+		array[j] = temp;
+	}
+}
+// 生成迷宫的递归函数 
+void maze_cx::generateMaze(int x, int y) {
+	int directions[] = { 0, 1, 2, 3 };
+	shuffle(directions, 4);
+	auto maze = (uint8_t*)_map_way.data();
+	for (int i = 0; i < 4; i++) {
+		int dx = 0, dy = 0;
+		switch (directions[i]) {
+		case 0: dx = 1; break;
+		case 1: dx = -1; break;
+		case 2: dy = 1; break;
+		case 3: dy = -1; break;
+		}
+		int nx = x + 2 * dx, ny = y + 2 * dy;
+		if (nx >= 0 && nx < width && ny >= 0 && ny < height && maze[nx + ny * width] == WALL) {
+			maze[nx + ny * width] = WAY;
+			maze[(x + dx) + (y + dy) * width] = WAY;
+			generateMaze(nx, ny);
+		}
+	}
+}
+#endif
+void maze_cx::generateMazeD(uint8_t* maze, int rows, int cols)
+{
+	// 初始化迷宫地图为全部为 '#'
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			maze[i + j * rows] = WALL;
+		}
+	}
+
+	// 随机选择起点和终点（位置不能在边界上）
+	//srand((unsigned int)time(NULL));
+	int start_x, start_y, dest_x, dest_y;
+	do {
+		start_x = get_rand_m(1, rows - 1);// rand() % (rows - 2) + 1;
+		start_y = get_rand_m(1, cols - 1);// rand() % (cols - 2) + 1;
+		dest_x = get_rand_m(1, rows - 1);// rand() % (rows - 2) + 1;
+		dest_y = get_rand_m(1, cols - 1); //rand() % (cols - 2) + 1;
+	} while (start_x == dest_x && start_y == dest_y);
+
+	// 生成迷宫
+	maze[start_x + start_y * rows] = WAY;         // 起点设为可走
+	maze[dest_x + dest_y * rows] = WAY;           // 终点设为可走
+	std::vector<int> visiteds;
+	visiteds.resize(rows * cols, 0);//全部初始为墙
+	int* visited = visiteds.data();// [rows] [cols] ;
+	// 向四个方向移动 
+	glm::ivec2 d[4] = { {-1,0},{0,1},{1,0},{0,-1} };
+	std::stack<glm::ivec2> stack_x; // 模拟栈，用于回溯
+	start = { start_x , start_y };
+	dest = { dest_x , dest_y };
+	int top = 0;
+	stack_x.push({ start_x,start_y });
+	visited[start_x + start_y * rows] = 1;
+	while (stack_x.size()) {
+		auto ps = stack_x.top();
+		int x = ps.x;
+		int y = ps.y;
+		int flag = 0;
+		for (int i = 0; i < 4; i++) {
+			int new_x = x + d[i].x;
+			int new_y = y + d[i].y;
+			auto md = maze[new_x + new_y * rows];
+			if (new_x >= 1 && new_x < rows - 1 && new_y >= 1 && new_y < cols - 1 && md == WALL && visited[new_x + new_y * rows] == 0)
+			{
+				flag = 1;
+				break;
+			}
+		}
+		if (flag) {
+			int r = get_rand_m(0, 3);// rand() % 4;
+			int new_x = x + d[r].x;
+			int new_y = y + d[r].y;
+			if (new_x >= 1 && new_x < rows - 1 && new_y >= 1 && new_y < cols - 1 && maze[new_x + new_y * rows] == WALL && visited[new_x + new_y * rows] == 0)
+			{
+				maze[(x + new_x) / 2 + ((y + new_y) / 2 * rows)] = WAY;  // 打通两个相邻格子之间的墙
+				visited[new_x + new_y * rows] = 1;
+				stack_x.push({ new_x,new_y });
+				top++;
+			}
+		}
+		else {
+			top--;
+			stack_x.pop();
+		}
+	}
+	return;
+}

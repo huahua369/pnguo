@@ -1895,8 +1895,7 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	return ss;
 }
 int64_t get_rdev() {
-	static int64_t r = std::chrono::system_clock::now().time_since_epoch().count();
-	return r;
+	return std::chrono::system_clock::now().time_since_epoch().count(); 
 }
 int get_rand(int f, int s)
 {

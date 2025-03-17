@@ -612,157 +612,8 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 
-#define WAY 0
-#define WALL 1
-#define TRAP 2
-#define M_EXIT 3
-
-class maze_cx
-{
-public:
-	glm::ivec2 start, dest;
-private:
-	std::vector<uint8_t> _map_way;
-	int width = 0, height = 0;
-	int Rank = 0;
-	std::stack<glm::ivec2> _stack;
-public:
-	maze_cx();
-	~maze_cx();
-	void init(int w, int h);
-	uint8_t* data();
-	void generateMaze(int x, int y);
-
-	void generateMazeD(uint8_t* maze, int rows, int cols);
-private:
-
-};
-
-maze_cx::maze_cx()
-{
-}
-
-maze_cx::~maze_cx()
-{
-}
-void maze_cx::init(int w, int h)
-{
-	width = w;
-	height = h;
-	//_map_way.resize(w * h, WALL);
-	_map_way.resize(w * h, WAY);
-	//generateMaze(0, 0);
-	generateMazeD(_map_way.data(), width, height);
-}
-
-uint8_t* maze_cx::data()
-{
-	return _map_way.data();
-}
 
 
-
-// 打乱方向数组 
-void shuffle(int* array, int n) {
-	for (int i = n - 1; i > 0; i--) {
-		int j = rand() % (i + 1);
-		int temp = array[i];
-		array[i] = array[j];
-		array[j] = temp;
-	}
-}
-
-void maze_cx::generateMazeD(uint8_t* maze, int rows, int cols)
-{
-	// 初始化迷宫地图为全部为 '#'
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			maze[i + j * rows] = WALL;
-		}
-	}
-
-	// 随机选择起点和终点（位置不能在边界上）
-	srand((unsigned int)time(NULL));
-	int start_x, start_y, dest_x, dest_y;
-	do {
-		start_x = rand() % (rows - 2) + 1;
-		start_y = rand() % (cols - 2) + 1;
-		dest_x = rand() % (rows - 2) + 1;
-		dest_y = rand() % (cols - 2) + 1;
-	} while (start_x == dest_x && start_y == dest_y);
-
-	// 生成迷宫
-	maze[start_x + start_y * rows] = WAY;         // 起点设为可走
-	maze[dest_x + dest_y * rows] = WAY;           // 终点设为可走
-	std::vector<int> visiteds;
-	visiteds.resize(rows * cols, 0);//全部初始为墙
-	int* visited = visiteds.data();// [rows] [cols] ;
-	std::stack<glm::ivec2> stack_x;
-	start = { start_x , start_y };
-	dest = { dest_x , dest_y };
-	int dx[4] = { -1, 0, 1, 0 };            // 向四个方向移动
-	int dy[4] = { 0, 1, 0, -1 };
-	//int stack_x[rows * cols], stack_y[rows * cols];  // 模拟栈，用于回溯
-	int top = 0;
-	stack_x.push({ start_x,start_y });
-	visited[start_x + start_y * rows] = 1;
-	while (stack_x.size()) {
-		auto ps = stack_x.top();
-		int x = ps.x;
-		int y = ps.y;
-		int flag = 0;
-		for (int i = 0; i < 4; i++) {
-			int new_x = x + dx[i];
-			int new_y = y + dy[i];
-			auto md = maze[new_x + new_y * rows];
-			if (new_x >= 1 && new_x < rows - 1 && new_y >= 1 && new_y < cols - 1 &&
-				md == WALL && visited[new_x + new_y * rows] == 0) {
-				flag = 1;
-				break;
-			}
-		}
-		if (flag) {
-			int r = rand() % 4;
-			int new_x = x + dx[r];
-			int new_y = y + dy[r];
-			if (new_x >= 1 && new_x < rows - 1 && new_y >= 1 && new_y < cols - 1 &&
-				maze[new_x + new_y * rows] == WALL && visited[new_x + new_y * rows] == 0) {
-				maze[(x + new_x) / 2 + ((y + new_y) / 2 * rows)] = WAY;  // 打通两个相邻格子之间的墙
-				visited[new_x + new_y * rows] = 1;
-				stack_x.push({ new_x,new_y });
-				top++;
-			}
-		}
-		else {
-			top--;
-			stack_x.pop();
-		}
-	}
-	return;
-}
-
-
-// 生成迷宫的递归函数 
-void maze_cx::generateMaze(int x, int y) {
-	int directions[] = { 0, 1, 2, 3 };
-	shuffle(directions, 4);
-	auto maze = (uint8_t*)_map_way.data();
-	for (int i = 0; i < 4; i++) {
-		int dx = 0, dy = 0;
-		switch (directions[i]) {
-		case 0: dx = 1; break;
-		case 1: dx = -1; break;
-		case 2: dy = 1; break;
-		case 3: dy = -1; break;
-		}
-		int nx = x + 2 * dx, ny = y + 2 * dy;
-		if (nx >= 0 && nx < width && ny >= 0 && ny < height && maze[nx + ny * width] == WALL) {
-			maze[nx + ny * width] = WAY;
-			maze[(x + dx) + (y + dy) * width] = WAY;
-			generateMaze(nx, ny);
-		}
-	}
-}
 
 int main()
 {
@@ -811,6 +662,7 @@ int main()
 	maze_cx maze;
 	astar_search as;
 	int ww = 100;
+	maze.set_seed(15687951215562);
 	maze.init(ww, ww);
 	as.init(ww, ww, (uint8_t*)maze.data(), false);
 	// 大于0则是不通

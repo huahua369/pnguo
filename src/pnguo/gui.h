@@ -120,7 +120,9 @@ public:
 private:
 	void c_line_metrics(size_t idx, int fontsize);
 };
- 
+
+// 文字路径转path_v对象
+void text_path2path_v(text_path_t* t, path_v* opt);
 
 #if 1
 enum class WIDGET_TYPE :uint32_t {

@@ -7,18 +7,18 @@
 
 struct vertex_f
 {
-	int type;
 	float x, y, cx, cy, cx1, cy1;
+	int type;
 };
 struct vertex_v2f
 {
-	int type;
 	glm::vec2 p, c, c1;
+	int type;
 };
 struct vertex_d
 {
-	int64_t type;
 	double x, y, cx, cy, cx1, cy1;
+	int64_t type;
 };
 
 struct tinypath_t
@@ -488,9 +488,7 @@ class image_gray
 {
 public:
 	int width = 0, height = 0;
-	unsigned char* ud = 0;
 	std::vector<unsigned char> _data;
-private:
 public:
 	image_gray();
 	~image_gray();
@@ -515,6 +513,14 @@ struct vertex_32f
 #ifdef stbtt_vertex_type
 unsigned char* get_glyph_bitmap_subpixel(stbtt_vertex* vertices, int num_verts, glm::vec2 scale, glm::vec2 shift, glm::vec2 xy_off, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert);
 #endif
+/*
+todo 路径填充光栅化-function
+输入路径path，缩放比例scale、bpm_size{宽高xy,每行步长z}、invert 1倒置, 0正常，
+xy_off偏移默认0
+输出灰度图
+支持移动、直线、2/3次贝塞尔曲线，构成的路径。
+   vmove=1, vline=2, vcurve=3, vcubic=4
+*/
 // 路径填充光栅化
 void get_path_bitmap(vertex_32f* vertices, size_t num_verts, image_gray* bmp, glm::vec2 scale, glm::vec2 xy_off, int invert);
 // 模糊灰度图

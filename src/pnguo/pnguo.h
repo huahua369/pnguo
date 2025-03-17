@@ -702,14 +702,14 @@ public:
 		// 24字节
 		glm::vec2 p, c, c1;
 		// 4字节
-		vtype_e type; 
+		vtype_e type;
 	};
 	struct vertex_tf
 	{
 		// 24字节
 		float x, y, cx, cy, cx1, cy1;
 		// 4字节
-		vtype_e type; 
+		vtype_e type;
 	};
 	struct flatten_t
 	{
@@ -827,6 +827,20 @@ public:
 private:
 
 };
+struct inflate_t
+{
+	int width = 0;	// 
+	int segments = 8;
+	float mlen = 0;
+	float ds = 0;
+	int angle = 100;
+	int type; //(JoinType)  Square=0, Bevel, Round, Miter
+	int etype; //(EndType) Polygon=0, Joined, Butt, Square, Round
+	bool is_reverse = false;	// 是否反转
+	bool is_close = false;		// 自动闭合
+};
+int inflate2flatten(path_v* p, path_v* dst, inflate_t* t);
+
 void save_png_v(path_v* pv, int count, const std::string& fn, bool fy, float sc);
 
 class gshadow_cx;
@@ -1387,6 +1401,34 @@ public:
 private:
 };
 
+#define WAY 0
+#define WALL 1
+#define TRAP 2
+#define M_EXIT 3
+
+class maze_cx
+{
+public:
+	glm::ivec2 start = {}, dest = {};
+private:
+	std::vector<uint8_t> _map_way;
+	int width = 0, height = 0;
+	int Rank = 0;
+	uint64_t seed = 0;
+	std::stack<glm::ivec2> _stack;
+	std::mt19937_64 gen_map, gen;	// 地图随机种子、普通随机种子
+public:
+	maze_cx();
+	~maze_cx();
+	void init(int w, int h);
+	uint8_t* data();
+	void set_seed(uint64_t c);
+	int64_t get_rand(int64_t f, int64_t s);
+	int64_t get_rand_m(int64_t f, int64_t s);
+	void generateMazeD(uint8_t* maze, int rows, int cols);
+private:
+
+};
 
 
 
