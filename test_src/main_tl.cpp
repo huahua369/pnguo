@@ -663,12 +663,22 @@ int main()
 	}
 	auto lt = pl->ltx;
 	text_path_t opt = {};
+	text_image_t opti = {};
 	auto tp = lt->get_shape(0, u8"富强", 50, &opt);
+	auto tpi = lt->get_glyph_item(0, u8"富强", 50, &opti);
 	text_image_pt* tip = text_blur(&opt, 4, 2, 0xff111111, 0xff0000ff);
+	uint32_t color = -1;
+	auto image = opti.tv[0]._image;
+	for (auto& it : opti.tv) {
+		//ft, it._dwpos + it._apos, it._rect, it.color ? it.color : color
+
+	}
+	save_img_png(image, "temp/font_fw.png");
 	// 保存到png\jpg
 	textimage_file(tip, "temp/text_inflate.png");
 	free_textimage(tip);
-
+	getchar();
+	return 0;
 	maze_cx maze;
 	astar_search as;
 	int ww = 100;

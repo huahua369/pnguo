@@ -5047,9 +5047,9 @@ bitmap_cache_cx::bitmap_cache_cx()
 	auto ptr = pt->get();
 	auto px = ((uint32_t*)ptr->data) + pos.x;
 	px += pos.y * width;
-	for (size_t i = 0; i < 20; i++)
+	for (size_t i = 0; i < 10; i++)
 	{
-		memset(px, -1, 20 * sizeof(int));
+		memset(px, -1, 10 * sizeof(int));
 		px += width;
 	}
 }

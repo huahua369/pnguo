@@ -1007,8 +1007,65 @@ void textimage_file(text_image_pt* p, const std::string& fn, int quality)
 		}
 	}
 }
-
-
+tiny_image_t* new_tiny_image(int width, int height, uint32_t* data)
+{
+	if (width < 2 || height < 2)return 0;
+	tiny_image_t* p = (tiny_image_t*)malloc(width * height * sizeof(uint32_t) + sizeof(tiny_image_t));
+	p->width = width;
+	p->height = height;
+	auto p1 = p + 1;
+	p->img = (uint32_t*)(p + 1);
+	if (data)
+		memcpy(p->img, data, width * height * sizeof(uint32_t));
+	else
+		memset(p->img, 0, width * height * sizeof(uint32_t));
+	return p;
+}
+tiny_image_t* gray2rgba(image_gray* g, uint32_t c)
+{
+	if (!g || g->width < 2 || g->_data.empty())return 0;
+	auto p = new_tiny_image(g->width, g->height, 0);
+	c &= 0x00ffffff;
+	auto length = g->width * g->height;
+	auto dt = g->data();
+	for (size_t i = 0; i < length; i++)
+	{
+		if (dt[i] > 0)
+		{
+			auto c1 = c | (dt[i] << 24);
+			p->img[i] = c1;
+		}
+	}
+	return p;
+}
+void gray2rgba_blend(tiny_image_t* dst, const glm::ivec2& pos, image_gray* g, const glm::ivec4& rect, uint32_t c)
+{
+	if (!dst || !g || !dst->img)return;
+	auto ps = pos.y * dst->width;
+	auto data = dst->img + ps;
+	int xx = rect.x + rect.z;
+	xx = std::min(xx, g->width);
+	c &= 0x00ffffff;
+	auto dt = g->data() + rect.y * g->width;
+	for (int y = 0; y < rect.w; y++)
+	{
+		for (int x = std::max(0, rect.x); x < xx; x++)
+		{
+			if (dt[x] > 0)
+			{
+				auto c1 = c | (dt[x] << 24);
+				px_blend2c(&data[x], c1, -1);
+			}
+		}
+		dt += g->width;
+		data += dst->width;
+	}
+}
+void free_tiny_image(tiny_image_t* p)
+{
+	if (p)
+		free(p);
+}
 #endif // 1
 
 widget_base::widget_base()
