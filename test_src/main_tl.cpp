@@ -677,8 +677,7 @@ int main()
 	// 保存到png\jpg
 	textimage_file(tip, "temp/text_inflate.png");
 	free_textimage(tip);
-	getchar();
-	return 0;
+	//getchar(); 
 	maze_cx maze;
 	astar_search as;
 	int ww = 100;
@@ -704,6 +703,7 @@ int main()
 	mg[pStart.x + pStart.y * ww] = 0xff00ff00;
 	mg[pEnd.x + pEnd.y * ww] = 0xffff0000;
 	stbi_write_png("temp/maze2.png", ww, ww, 4, mg.data(), 0);
+	return 0;
 	// 运行消息循环
 	run_app(app, 0);
 	delete d2;

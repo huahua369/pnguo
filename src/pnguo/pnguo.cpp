@@ -10289,6 +10289,13 @@ grid_node* astar_search::pop_n()
 	_open.pop();
 	return node;
 }
+uint8_t* astar_search::Get(uint8_t* d, size_t i)
+{
+	if (i >= size)
+		i = size - 1;
+
+	return (d + stride * i);
+}
 
 bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 {
@@ -10348,22 +10355,22 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 				continue;
 
 			size_t beside_index = width * beside_pos.y + beside_pos.x;
-			auto kd = data[beside_index];
-			if (beside_index < 1 || beside_index < width || data[beside_index] > wall || beside_index + 1 >= size || beside_index + width >= size)
+			auto kd = Get(data, beside_index);
+			if (beside_index < 1 || beside_index < width || *kd > wall || beside_index + 1 >= size || beside_index + width >= size)
 				continue;
 			switch (i)
 			{
 			case 1:
-				if (data[beside_index + 1] > wall || data[beside_index + width] > wall)
+				if (*Get(data, beside_index + 1) > wall || *Get(data, beside_index + width) > wall)
 					continue;
 			case 3:
-				if (data[beside_index - 1] > wall || data[beside_index + width] > wall)
+				if (*Get(data, beside_index - 1) > wall || *Get(data, beside_index + width) > wall)
 					continue;
 			case 5:
-				if (data[beside_index - 1] > wall || data[beside_index - width] > wall)
+				if (*Get(data, beside_index - 1) > wall || *Get(data, beside_index - width) > wall)
 					continue;
 			case 7:
-				if (data[beside_index + 1] > wall || data[beside_index - width] > wall)
+				if (*Get(data, beside_index + 1) > wall || *Get(data, beside_index - width) > wall)
 					continue;
 			}
 
@@ -10377,7 +10384,7 @@ bool astar_search::FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode)
 
 			size_t g = ((i % 2) ? gdist.y : gdist.x);// +abs(data[now_index] - data[beside_index]);
 			double speed = 1.0;
-			auto idx = std::min(data[beside_index], spn);
+			auto idx = std::min(*kd, spn);
 			if (sp)speed = sp[idx];
 			if (node[beside_index].state == G_UNKNOWN)
 			{

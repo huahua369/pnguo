@@ -123,8 +123,10 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
 pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)
 pkg_check_modules(LIBRSVG librsvg-2.0 IMPORTED_TARGET REQUIRED)
-pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)  
-#pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2) 
+#pkg_check_modules(GTHREAD gthread-2.0 IMPORTED_TARGET REQUIRED)  
+pkg_check_modules(GLIB glib-2.0 IMPORTED_TARGET REQUIRED)  
+message("--glib  ${GLIB_LIBRARIES}")
+#pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)  
 #vkvg 
 FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c
   third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp 
@@ -170,7 +172,8 @@ add_library (tpv STATIC ${tpv_src})
 #add_library (tpv SHARED ${tpv_src})
 target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
-PkgConfig::GTHREAD 
+#PkgConfig::GTHREAD 
+PkgConfig::GLIB  
 #mimalloc-static 
 #PkgConfig::LIBGIT2
 )

@@ -1376,6 +1376,7 @@ public:
 		}
 	};
 	uint8_t* data = 0;	// 地图数据
+	int stride = 1;		// 默认步长
 	int wall = 0;		// 高度大于wall为墙
 	std::vector<float> speeds;	// 加速表，data为索引
 	glm::ivec2 gdist = { 10,14 };	//直线、斜线距离1.414
@@ -1397,6 +1398,7 @@ public:
 	bool FindPath(glm::ivec2* pStart, glm::ivec2* pEnd, bool mode);
 	bool NextPath(glm::ivec2* pos);
 
+	uint8_t* Get(uint8_t* d, size_t i);
 	grid_node* pop_n();
 private:
 };
@@ -1429,7 +1431,43 @@ public:
 private:
 
 };
+/*
+a	b	y
+与
+0	0	0
+0	1	0
+1	0	0
+1	1	1
+或
+0	0	0
+0	1	1
+1	0	1
+1	1	1
+异或
+0	0	0
+0	1	1
+1	0	1
+1	1	0
+非
+0		1
+1		0
+与非
+0	0	1
+0	1	1
+1	0	1
+1	1	0
+或非
+0	0	1
+0	1	0
+1	0	0
+1	1	0
+异或非
+0	0	1
+0	1	0
+1	0	0
+1	1	1
 
+*/
 
 
 #include "font_core.h"
