@@ -82,6 +82,9 @@ public:
 	int _fps = 60;
 	int c_fps = 60;
 	int fms = 0;
+
+	uint32_t audio_device = 0;
+
 	bool nc_down = 0;
 public:
 	app_cx();
@@ -104,6 +107,15 @@ public:
 	glm::vec3 get_power_info();
 	const char* get_power_str();
 	void kncdown();
+	uint32_t open_audio(int format, int channels, int freq);
+	void close_audio(uint32_t dev);
+	// 音频	format	0=S16, 1=S32, 2=F32
+	void* new_audio_stream(int format, int channels, int freq);
+	void free_audio_stream(void* st);
+	void unbindaudio(void* st);
+	int get_audio_stream_queued(void* st);
+	void put_audio(void* stream, void* data, int len);
+	void clear_audio(void* st);
 private:
 	int get_event();
 	void render(double delta);

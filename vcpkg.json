@@ -22,6 +22,8 @@
     "libssh2",
     "curl",
     "tinygltf", 
+    "libogg",
+    "libflac",
     "hwloc"
   ]
 }

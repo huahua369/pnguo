@@ -614,8 +614,48 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 
-
-
+void build_audio_test(int seconds, std::vector<float>& data)
+{
+#define SAMPLE_RATE 48000
+#define FREQUENCY   440
+#define FRAME_SIZE  1024
+	int channels = 2;
+	int framenum = seconds * SAMPLE_RATE;// ((SAMPLE_RATE + FRAME_SIZE - 1) / FRAME_SIZE);
+	auto M_PI = glm::pi<double>();
+	data.resize(framenum * channels);
+	auto dtt = data.data();
+	float zeta = 0; //每一个frame 的初始角度
+	int amp = 10000; //幅度
+	for (int i = 0; i < channels; ++i) {
+		auto dst = dtt + i;
+		for (int j = 0; j < framenum; ++j) {
+			*dst = amp * sin(2 * M_PI * FREQUENCY / SAMPLE_RATE * j + zeta); //每一个数据递进一个角度2*PI*FREQUENCY/SAMPLE_RATE,此值为角速度
+			*dst *= 0.0001;
+			dst += channels;
+		}
+	}
+}
+template<class T>
+void build_audio_test(int seconds, std::vector<T>& data)
+{
+#define SAMPLE_RATE 48000
+#define FREQUENCY   440
+#define FRAME_SIZE  1024
+	int channels = 2;
+	int framenum = seconds * SAMPLE_RATE;// ((SAMPLE_RATE + FRAME_SIZE - 1) / FRAME_SIZE);
+	auto M_PI = glm::pi<double>();
+	data.resize(framenum * channels);
+	auto dtt = data.data();
+	float zeta = 0; //每一个frame 的初始角度
+	int amp = 10000; //幅度
+	for (int i = 0; i < channels; ++i) {
+		auto dst = dtt + i;
+		for (int j = 0; j < framenum; ++j) {
+			*dst = amp * sin(2 * M_PI * FREQUENCY / SAMPLE_RATE * j + zeta); //每一个数据递进一个角度2*PI*FREQUENCY/SAMPLE_RATE,此值为角速度 
+			dst += channels;
+		}
+	}
+}
 
 int main()
 {
@@ -655,9 +695,45 @@ int main()
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
+	std::vector<float>* adata = new std::vector<float>();
+	std::vector<int32_t>* adata32 = new std::vector<int32_t>();
+	std::vector<int16_t>* adata16 = new std::vector<int16_t>();
+	build_audio_test(5, *adata);
+	build_audio_test(5, *adata32);
+	build_audio_test(5, *adata16);
+	coders_t* cp = new_coders();
+	audio_data_t* mad = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
+	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
+	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
+	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
+	auto st32f = app->new_audio_stream(2, 2, 48000);
+	auto st32 = app->new_audio_stream(1, 2, 48000);
+	auto st16 = app->new_audio_stream(0, 2, 48000);
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
+				auto dt = (char*)mad->data + mad->desize;
+				auto dt1 = (char*)mad1->data + mad1->desize;
+				int rc = decoder_data(mad);
+				auto qn = app->get_audio_stream_queued(st);
+				//if (rc > 0)
+				//	app->put_audio(st, dt, rc);
+				static double deltas = 0;
+				deltas += delta;
+				if (deltas > 0)
+				{
+					int rc1 = decoder_data(mad1);
+					/*if (rc1 > 0)
+						app->put_audio(st1, dt1, rc1);*/
+				}
+				if (adata->size())
+				{
+					//app->put_audio(st16, adata16->data(), adata16->size() * sizeof(int16_t));
+					//app->put_audio(st32, adata32->data(), adata32->size() * sizeof(int32_t));//无法播放
+					//app->put_audio(st32f, adata->data(), adata->size() * sizeof(float));
+					adata->clear();
+				}
+				else {}
 				d2->update_draw(delta);
 			};
 	}
@@ -703,10 +779,11 @@ int main()
 	mg[pStart.x + pStart.y * ww] = 0xff00ff00;
 	mg[pEnd.x + pEnd.y * ww] = 0xffff0000;
 	stbi_write_png("temp/maze2.png", ww, ww, 4, mg.data(), 0);
-	return 0;
+
 	// 运行消息循环
 	run_app(app, 0);
 	delete d2;
+	free_coders(cp);
 	free_app(app);
 	return 0;
 }

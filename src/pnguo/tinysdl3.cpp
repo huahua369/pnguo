@@ -351,10 +351,12 @@ app_cx::app_cx()
 		return 0;
 		}, this);
 #endif 
+	audio_device = open_audio(0, 0, 0);
 }
 
 app_cx::~app_cx()
 {
+	close_audio(audio_device);
 	if (system_cursor)
 	{
 		for (size_t i = 0; i < SDL_SystemCursor::SDL_SYSTEM_CURSOR_COUNT; i++)
@@ -661,6 +663,73 @@ void app_cx::kncdown()
 		nc_down = false;
 	}
 }
+
+SDL_AudioSpec get_spec(int format_idx, int channels, int freq) {
+
+	SDL_AudioSpec spec = {};
+	SDL_AudioFormat format[] = { SDL_AUDIO_S16, SDL_AUDIO_S32, SDL_AUDIO_F32 };
+	format_idx = std::clamp(format_idx, 0, 2);
+	spec.format = format[format_idx];
+	spec.channels = channels;
+	spec.freq = freq;
+	return spec;
+}
+// 音频
+uint32_t app_cx::open_audio(int format, int channels, int freq)
+{
+	auto spec = get_spec(format, channels, freq);
+	auto audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, freq && channels ? &spec : NULL);
+	if (audio_device == 0) {
+		SDL_Log("error\tCouldn't open audio device: %s", SDL_GetError());
+	}
+	return audio_device;
+}
+void app_cx::close_audio(uint32_t dev)
+{
+	if (dev)
+		SDL_CloseAudioDevice(dev);
+}
+
+
+// 类型、通道数、采样数
+void* app_cx::new_audio_stream(int format_idx, int channels, int freq)
+{
+	auto spec = get_spec(format_idx, channels, freq);
+	auto stream = SDL_CreateAudioStream(&spec, 0);
+	if (!SDL_BindAudioStream(audio_device, stream)) {  /* once bound, it'll start playing when there is data available! */
+		SDL_Log("Failed to bind stream to device: %s", SDL_GetError());
+	}
+	return stream;
+}
+void app_cx::unbindaudio(void* st) {
+	SDL_AudioStream* as[] = { (SDL_AudioStream*)st };
+	if (st)
+		SDL_UnbindAudioStreams(as, 1);
+}
+void app_cx::free_audio_stream(void* st) {
+	if (st)
+	{
+		unbindaudio(st);
+		SDL_DestroyAudioStream((SDL_AudioStream*)st);
+	}
+}
+int app_cx::get_audio_stream_queued(void* st)
+{
+	return st ? SDL_GetAudioStreamQueued((SDL_AudioStream*)st) : 0;
+}
+void app_cx::put_audio(void* stream, void* data, int len)
+{
+	if (stream && data && len > 0) {
+		auto n = SDL_GetAudioStreamQueued((SDL_AudioStream*)stream);
+		SDL_PutAudioStreamData((SDL_AudioStream*)stream, data, (int)len);
+	}
+}
+void app_cx::clear_audio(void* st)
+{
+	if (st)
+		SDL_ClearAudioStream((SDL_AudioStream*)st);
+}
+
 int app_cx::get_event()
 {
 	int64_t ts = 0;
