@@ -12,15 +12,15 @@ add_subdirectory(third_lib/libsoundio)
 #include <stdint.h>
 #include <stdlib.h>
 #include <cmath>
+#include <vector>
 #ifdef  __cplusplus
 extern "C" {
 #endif
-
 #include <soundio/soundio.h> 
-
 #ifdef  __cplusplus
 }
 #endif
+
 
 static const float nPI = 3.1415926535f;
 static float seconds_offset = 0.0f;
@@ -140,7 +140,198 @@ int test_create_outstream(void) {
 }
 
 
-int main()
+#include "stb_src/stb_vorbis.h"
+#include <pnguo/mapView.h>
+
+struct AudioSpec_t
 {
+	int freq;                   /**< DSP frequency -- samples per second */
+	int format;     /**< Audio data format */
+	uint8_t channels;             /**< Number of channels: 1 mono, 2 stereo */
+	uint8_t silence;              /**< Audio buffer silence value (calculated) */
+	uint16_t samples;             /**< Audio buffer size in sample FRAMES (total samples divided by channel count) */
+	uint16_t padding;             /**< Necessary for some compile environments */
+	uint32_t size;                /**< Audio buffer size in bytes (calculated) */
+	void* callback;				/**< Callback that feeds the audio device (NULL to use SDL_QueueAudio()). */
+	void* userdata;             /**< Userdata passed to callback (ignored for NULL callbacks). */
+};
+
+class audio_data_t :public hz::rw_t
+{
+public:
+	audio_data_t()
+	{
+	}
+
+	~audio_data_t()
+	{
+	}
+	int put(const void* buf, int len)
+	{
+		char* d = (char*)buf;
+		auto it = _data.insert(_data.begin() + _data.size(), d, d + len);
+		set(_data.data(), _data.size());
+		return it != _data.end() ? 0 : -1;
+	}
+	int get(void* buf, int len)
+	{
+		auto s = len - len % blockalign;
+		return read(buf, s);
+	}
+	int flush()
+	{
+		is_flush = true;
+		return 0;
+	}
+	bool is_done()
+	{
+		return is_flush;
+	}
+	void clear()
+	{
+		_data.clear();
+		set(0, 0);
+		seek(0);
+		is_flush = false;
+	}
+private:
+	std::vector<uint8_t> _data;
+	// 对齐字节
+	int blockalign = 4;
+	bool is_flush = false;
+};
+class music_de_t
+{
+public:
+	music_de_t()
+	{
+	}
+
+	~music_de_t()
+	{
+		//if (stream)
+		//{
+		//	delete stream;
+		//}
+		if (src)
+		{
+			delete src;
+		}
+	}
+	void set_spec(int freq_rate, int channels, int format)
+	{
+		spec.freq = freq_rate;
+		spec.channels = channels;
+		spec.format = format;
+	}
+	int get_rate()
+	{
+		return spec.freq;
+	}
+	int get_channels()
+	{
+		return spec.channels;
+	}
+	int get_bits_per()
+	{
+		return bits_per_sample;
+	}
+	bool is_done() { return isdone; }
+	static void get_info(void* music, int* total_samples, int* channels, int* sample_rate, int* bits_per_sample)
+	{
+		if (music)
+		{
+			music_de_t* pw = (music_de_t*)music;
+			if (total_samples)
+			{
+				*total_samples = pw->total_samples;
+			}
+			if (channels)
+			{
+				*channels = pw->spec.channels;
+			}
+			if (sample_rate)
+			{
+				*sample_rate = pw->spec.freq;
+			}
+			if (bits_per_sample)
+			{
+				*bits_per_sample = pw->bits_per_sample;
+			}
+		}
+	}
+public:
+	hz::rw_t* src = nullptr;
+
+	AudioSpec_t spec = {};
+	// 总样本数，位
+	int64_t total_samples = 0, bits_per_sample = 0;
+	int64_t de_samples = 0;
+	// 解码器
+	void* _decoder = 0;
+	//audio_data_t* stream = 0;
+	int samples = 8192;
+	double seconds = 0.0;
+	double divby = 0.0;// 0.000030518509476;//DIVBY32767
+	int current_min = INT_MAX, current_max = INT_MIN;
+	int current_min0 = INT_MAX, current_max0 = INT_MIN;
+	std::vector<unsigned char> _buffer;
+	// 是否全部解码完成
+	bool isdone = false;
+	// dll 对象
+	void* ctx = nullptr;
+};
+
+
+/*
+ogg解码器
+*/ 
+class ogg_decoder
+{
+public:
+	std::vector<float> _data;
+	stb_vorbis* v = 0;
+	int64_t desize = 0;
+	int error_r = 0;
+public:
+	ogg_decoder();
+	~ogg_decoder();
+	void open_data(char* data, int len);
+	int get_data();
+private:
+
+};
+
+ogg_decoder::ogg_decoder()
+{
+}
+
+ogg_decoder::~ogg_decoder()
+{
+	if (v)
+		stb_vorbis_close(v);
+	v = 0;
+}
+
+void ogg_decoder::open_data(char* data, int len)
+{
+	v = stb_vorbis_open_memory((unsigned char*)data, len, &error_r, NULL);
+	if (v)
+	{
+		//stb_vorbis_stream_length_in_samples(v);
+		_data.resize(v->total_samples * v->channels);
+	}
+}
+
+int ogg_decoder::get_data()
+{
+	auto data = _data.data() + desize;
+	int n = v->sample_rate;
+	auto rs = stb_vorbis_get_samples_float_interleaved((stb_vorbis*)v, v->channels, data, n) * v->channels;
+	return rs;
+}
+
+int main()
+{ 
 	return test_create_outstream();
 }

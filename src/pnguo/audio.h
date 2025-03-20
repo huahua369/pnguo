@@ -38,6 +38,7 @@ typedef size_t(*encoder_func)(encoder_info_t* p);
 struct coder_t
 {
 	const char* tag;
+	char tag2[8] = {};
 	void* handle;
 	// Load the library 可选
 	void* (*load)(void);
@@ -71,11 +72,12 @@ struct coder_t
 struct audio_data_t
 {
 	int format = 0, channels = 0, freq = 0;
-	int len = 0;
-	void* data = 0;
+	int len = 0;		// 总长度，解码完成前等于0
+	void* data = 0;		// 解码数据
 	void* ptr = 0;
+	char* dataold = 0;
 	coder_t* code = 0;
-	size_t desize = 0;
+	size_t desize = 0;	// 当前解码字节数
 	void* mf = 0;
 	int cap = 0;
 	int total_samples = 0;
@@ -87,6 +89,8 @@ struct coders_t
 coders_t* new_coders();
 void free_coders(coders_t* p);
 audio_data_t* new_audio_data(coders_t* pc, const std::string& fn);
+// 输入数据data，iscopy是否复制数据到新内存
+audio_data_t* new_audio_data(coders_t* pc, const char* data, int len, bool iscopy);
 int decoder_data(audio_data_t* p);
 void free_audio_data(audio_data_t* p);
 

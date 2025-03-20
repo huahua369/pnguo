@@ -704,7 +704,8 @@ int main()
 	build_audio_test(5, *adata16);
 	coders_t* cp = new_coders();
 	audio_data_t* mad = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
-	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
+	//audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
+	audio_data_t* mad1 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
 	auto st32f = app->new_audio_stream(2, 2, 48000);
@@ -717,8 +718,7 @@ int main()
 		put_audio推送数据
 		free_audio_stream
 	close_audio
-	*/
-
+	*/ 
 
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
@@ -734,8 +734,8 @@ int main()
 				if (deltas > 0)
 				{
 					int rc1 = decoder_data(mad1);
-					//if (rc1 > 0)
-					//	app->put_audio(st1, dt1, rc1);
+					if (rc1 > 0)
+						app->put_audio(st1, dt1, rc1);
 				}
 				if (adata->size())
 				{
