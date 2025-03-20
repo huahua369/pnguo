@@ -144,6 +144,9 @@ namespace hz {
 		//audio_data_t* stream = 0;
 		int samples = 8192;
 		double seconds = 0.0;
+		double divby = 0.0;// 0.000030518509476;//DIVBY32767
+		int current_min = INT_MAX, current_max = INT_MIN;
+		int current_min0 = INT_MAX, current_max0 = INT_MIN;
 		std::vector<unsigned char> _buffer;
 		// 是否全部解码完成
 		bool isdone = false;
@@ -567,6 +570,29 @@ namespace hz {
 			return mv->iseof();
 		}
 
+		static void Convert_S32_to_F32_Scalar(float* dst, const int32_t* src, int num_samples, double divby)
+		{
+#ifndef DIVBY2147483648
+#define DIVBY2147483648 0.0000000004656612873077392578125
+#define DIVBY32768 0.000030517578125 
+#endif
+			//int x = INT_MIN;
+			//int n = INT_MAX;
+			//for (size_t i = 0; i < num_samples; i++)
+			//{
+			//	if (src[i] > x)
+			//	{
+			//		x = src[i];
+			//	}
+			//	if (src[i] < n)
+			//	{
+			//		n = src[i];
+			//	} 
+			//}
+			for (int i = 0; i < num_samples; i++) {
+				dst[i] = (float)src[i] * divby;
+			}
+		}
 		static FLAC__StreamDecoderWriteStatus flac_write_music_cb(
 			const FLAC__StreamDecoder* decoder,
 			const FLAC__Frame* frame,
@@ -655,7 +681,8 @@ namespace hz {
 					}
 				}
 				else {
-					//if (bp == 16)
+					bool cvf = music->divby > 0 && bp > 16;
+					if (!cvf)
 					{
 						auto dtt = (int16_t*)music->_buffer.data();
 						for (i = 0; i < channels; ++i) {
@@ -667,38 +694,45 @@ namespace hz {
 							}
 						}
 					}
-					//else
-					//{
-					//	auto dtt = (int32_t*)music->_buffer.data();
-					//	for (i = 0; i < channels; ++i) {
-					//		int32_t* dst = dtt + i;
-					//		for (j = 0; j < frame->header.blocksize; ++j) {
-					//			auto k = buffer[i][j];
-					//			*dst = (k >> shift_amount);
-					//			dst += channels;
-					//		}
-					//	}
-					//}
-				}
-			}
-			else {
-				std::vector<int32_t> data32;
-				data32.resize(dl);
-				dl *= sizeof(int32_t);
-				for (i = 0; i < channels; ++i) {
-					auto dst = data32.data() + i;
-					for (j = 0; j < frame->header.blocksize; ++j) {
-						auto s = buffer[i][j];
-						*dst = s >> shift_amount;
-						dst += channels;
+#if 1
+					else
+					{
+						std::vector<int32_t> data32;
+						auto ndl = frame->header.blocksize * channels;
+						data32.resize(ndl);
+						ndl *= sizeof(int32_t);
+						for (i = 0; i < channels; ++i) {
+							auto dst = data32.data() + i;
+							for (j = 0; j < frame->header.blocksize; ++j) {
+								auto s = buffer[i][j];
+								if (s > music->current_max0)
+								{
+									music->current_max0 = s;
+								}
+								if (s < music->current_min0)
+								{
+									music->current_min0 = s;
+								}
+								s = s >> shift_amount;
+								if (s > music->current_max)
+								{
+									music->current_max = s;
+								}
+								if (s < music->current_min)
+								{
+									music->current_min = s;
+								}
+								*dst = s;
+								dst += channels;
+							}
+						}
+						if (music->_buffer.size() != ndl)
+							music->_buffer.resize(ndl);
+						Convert_S32_to_F32_Scalar((float*)music->_buffer.data(), data32.data(), data32.size(), music->divby);
 					}
+#endif
 				}
-				if (music->_buffer.size() != dl)
-					music->_buffer.resize(dl);
-				memcpy(music->_buffer.data(), data32.data(), dl);
 			}
-
-			//music->stream->put(data.data(), dl);
 			return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 		}
 
@@ -723,11 +757,17 @@ namespace hz {
 				format = 0;
 				break;
 			case 24:
+				format = 2;
+				// todo flac24解码转换到16
+				music->divby = DIVBY32768;
+				break;
 			case 32:
-				format = 1;
+				format = 2;
+				music->divby = DIVBY2147483648;
 				break;
 			}
-			format = 1;
+			if (metadata->data.stream_info.channels == 3)
+				format = 0;
 			music->set_spec(metadata->data.stream_info.sample_rate, metadata->data.stream_info.channels, format);// SDL_AUDIO_S16);
 			music->total_samples = metadata->data.stream_info.total_samples;
 			double t = music->total_samples; t /= music->spec.freq;
@@ -744,14 +784,6 @@ namespace hz {
 				channels = music->get_channels();
 			}
 
-			//music->stream = new audio_data_t();
-			//if (!music->stream) {
-			//	return;
-			//}
-			/* We check for NULL stream later when we get data */
-			//SDL_assert(!music->stream);
-			//music->stream = new audio_stream_t(music->get_format(), channels, music->get_rate(), music->bits_per_sample, music->total_samples);
-			//music->stream = SDL_NewAudioStream(SDL_AUDIO_S16, channels, music->sample_rate, music_spec.format, music_spec.channels, music_spec.freq);
 		}
 
 		static void flac_error_music_cb(
@@ -810,6 +842,8 @@ namespace hz {
 				if (flac->FLAC__stream_decoder_get_state((FLAC__StreamDecoder*)music->_decoder) == FLAC__STREAM_DECODER_END_OF_STREAM) {
 					//music->stream->flush();
 					music->_buffer.clear();
+					if (done)
+						*done = true;
 				}
 				filled = music->_buffer.size();
 				if (filled)
@@ -1184,7 +1218,6 @@ namespace hz {
 
 		int convertWavToFlac(const char* wave_file, const char* flac_file, int split_interval_seconds, char** out_flac_files) {
 			FILE* fin;
-#define READSIZE 1024
 
 			static FLAC__byte buffer[READSIZE/*samples*/ * 2/*bytes_per_sample*/ * 2/*channels*/];
 			static FLAC__int32 pcm[READSIZE/*samples*/ * 2/*channels*/];
@@ -1357,7 +1390,6 @@ namespace hz {
 		ct->encoder = (encoder_func)flac_en_t::encoder;
 		return ct;
 	}
-
 }
 //!hz
 
@@ -1380,12 +1412,17 @@ void free_coders(coders_t* p)
 int decoder_data(audio_data_t* p)
 {
 	int rc = 0;
-	if (p && p->data && p->len > 0 && p->code && p->desize < p->len)
+	if (p && p->data && p->cap > 0 && p->code && p->desize <= p->cap && (!p->desize || p->desize != p->len))
 	{
-		rc = p->code->get_audio(p->ptr, (char*)p->data + p->desize, p->len - p->desize);
+		auto mf = (hz::mfile_t*)p->mf;
+		auto ptr = (hz::music_de_t*)p->ptr;
+		rc = p->code->get_audio(p->ptr, (char*)p->data + p->desize, p->freq * 4);
 		if (rc > 0)
 		{
 			p->desize += rc;
+		}
+		else {
+			p->len = p->desize;
 		}
 	}
 	return rc;
@@ -1425,27 +1462,17 @@ audio_data_t* new_audio_data(coders_t* pc, const std::string& fn)
 		}
 		if (m)
 		{
+			auto mp = (hz::music_de_t*)m;
 			c->get_info(m, &total_samples, &channels, &sample_rate, &bits_per_sample);
-			r->channels = channels;
+			r->channels = 2;
 			r->code = c;
+			r->format = mp->spec.format;
 			r->freq = sample_rate;
-			int bs = 2;// bits_per_sample == 16 ? 2 : 4;
-			r->len = bs * total_samples * channels;
-			int format = 0;
-			switch (bits_per_sample)
-			{
-			case 16:
-				format = 0;
-				break;
-				//case 24:
-				//	format = 1;
-				//	break;
-				//case 32:
-				//	format = 1;
-				//	break;
-			}
-			r->data = malloc(r->len);
-			r->format = format; // 32位播放失败
+			int bs = 2 * (r->format == 0 ? sizeof(int16_t) : sizeof(int32_t));
+			auto cap = bs * total_samples;
+			r->cap = align_up(cap, 8192);
+			r->total_samples = total_samples;
+			r->data = malloc(r->cap);
 			r->ptr = m;
 		}
 	}

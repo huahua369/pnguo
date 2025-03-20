@@ -32,9 +32,12 @@ list(APPEND src_mtl
     "ecc_sv.cpp"
     "mshell.cpp"
     "../src/pnguo/editor_2d.cpp"
-    "../third_party/spine/spine-sdl3/spinesdl3.cpp"
+    "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
     "../rc/resource1.rc"
     "../njson.natvis"
+) 
+list(APPEND src_audios 
+    "main_testaudiio.cpp"  
 ) 
 list(APPEND src_mmd   
     "main_markdown.cpp" 
@@ -50,6 +53,7 @@ list(APPEND src_mmd
 add_executable (vkcmp ${src_vkcmp} ) 
 add_executable (vkr_spr ${src_spr} ) 
 add_executable (mtl ${src_mtl} ) 
+add_executable (audios ${src_audios} ) 
 add_executable (mmd ${src_mmd} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
@@ -71,7 +75,7 @@ pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
 #find_package(cmark CONFIG REQUIRED)  
 
 #git submodule add https://github.com/EsotericSoftware/spine-runtimes third_lib/spine
-
+ 
 set(lklib)
 list(APPEND lklib  
     Dwmapi
@@ -93,7 +97,8 @@ list(APPEND lklib
     tpv
     libssh2::libssh2
     CURL::libcurl
-    spine-c
+    spine-c  
+    #libsoundio_static
     #cmark::cmark 
     #md4c::md4c
     #$<IF:$<TARGET_EXISTS:Libssh2::libssh2_shared>,Libssh2::libssh2_shared,Libssh2::libssh2_static>
@@ -105,12 +110,18 @@ list(APPEND lklib
 UxTheme
 )
 endif() 
+add_definitions(-DSOUNDIO_STATIC_LIBRARY=1)
+find_package(libsoundio CONFIG REQUIRED)
+list(APPEND lkalib  
+libsoundio::libsoundio 
+)
 include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
  
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(mtl PRIVATE ${lklib}  )
+target_link_libraries(audios PRIVATE ${lkalib})
 target_link_libraries(mmd PRIVATE ${lklib}  )  
  
 #复制测试文本

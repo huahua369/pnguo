@@ -74,7 +74,11 @@ namespace hz
 		}
 		bool iseof()
 		{
-			return _pos >= _end;
+			bool r = (_pos >= _end);
+			if (r) {
+				r = r;
+			}
+			return r;
 		}
 		virtual int64_t read(void* buf, int64_t len)
 		{
@@ -335,3 +339,5 @@ namespace md {
 	std::string trim_ch(const std::string& str, const std::string& pch);
 	int64_t file_size(FILE* fp);
 }
+
+uint64_t align_up(uint64_t val, uint64_t alignment);

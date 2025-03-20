@@ -9,6 +9,8 @@ else()
 set(CMAKE_CXX_STANDARD 17)
 endif()
 set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_C_EXTENSIONS ON)
+set(CMAKE_C_STANDARD 11)
 
 project ("pnguo")
 
@@ -55,9 +57,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
 if(VCPKG_TARGET_TRIPLET STREQUAL "x64-windows-static")
     #set(VCPKG_CRT_LINKAGE static)
     #set(VCPKG_LIBRARY_LINKAGE static)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd /Wall")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd") 
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT /Wall")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT") 
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MT") 
 endif()
@@ -69,7 +71,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/out/bin/${platform_dir})
 #设置库文件输出目录
 set(LIBRARY_OUTPUT_PATH ${EXECUTABLE_OUTPUT_PATH})
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-   
+LINK_DIRECTORIES(${EXECUTABLE_OUTPUT_PATH})
 #第三方库
 if(NOT DEFINED SDL3DIR_ROOT)
 set(SDL_STATIC ON)
@@ -157,7 +159,8 @@ list(APPEND tpv_src
 "third_party/xatlas/xatlas.cpp"
 )
 
-include_directories("third_party") 
+include_directories("third_lib/libsoundio")  
+include_directories("third_party")  
 include_directories("src") 
 include_directories("src/pnguo") 
 include_directories("third_party/mcut") 
@@ -177,6 +180,8 @@ PkgConfig::GLIB
 #mimalloc-static 
 #PkgConfig::LIBGIT2
 )
+
+
 #2d渲染器
 add_subdirectory(third_party/spine/spine-c ${CMAKE_BINARY_DIR}/spine-c)
 #3d渲染器

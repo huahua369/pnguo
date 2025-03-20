@@ -651,11 +651,12 @@ void build_audio_test(int seconds, std::vector<T>& data)
 	for (int i = 0; i < channels; ++i) {
 		auto dst = dtt + i;
 		for (int j = 0; j < framenum; ++j) {
-			*dst = amp * sin(2 * M_PI * FREQUENCY / SAMPLE_RATE * j + zeta); //每一个数据递进一个角度2*PI*FREQUENCY/SAMPLE_RATE,此值为角速度 
+			*dst = amp * sinf(2 * M_PI * FREQUENCY / SAMPLE_RATE * j + zeta); //每一个数据递进一个角度2*PI*FREQUENCY/SAMPLE_RATE,此值为角速度 
 			dst += channels;
 		}
 	}
 }
+
 
 int main()
 {
@@ -664,7 +665,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-#endif    
+#endif     
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto app = new_app();
 	cpuinfo_t cpuinfo = get_cpuinfo();
@@ -709,6 +710,16 @@ int main()
 	auto st32f = app->new_audio_stream(2, 2, 48000);
 	auto st32 = app->new_audio_stream(1, 2, 48000);
 	auto st16 = app->new_audio_stream(0, 2, 48000);
+	/*
+	open_audio
+		new_audio_stream创建流
+		decoder_data解码数据
+		put_audio推送数据
+		free_audio_stream
+	close_audio
+	*/
+
+
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
@@ -723,15 +734,15 @@ int main()
 				if (deltas > 0)
 				{
 					int rc1 = decoder_data(mad1);
-					/*if (rc1 > 0)
-						app->put_audio(st1, dt1, rc1);*/
+					//if (rc1 > 0)
+					//	app->put_audio(st1, dt1, rc1);
 				}
 				if (adata->size())
 				{
 					//app->put_audio(st16, adata16->data(), adata16->size() * sizeof(int16_t));
 					//app->put_audio(st32, adata32->data(), adata32->size() * sizeof(int32_t));//无法播放
 					//app->put_audio(st32f, adata->data(), adata->size() * sizeof(float));
-					adata->clear();
+					//adata->clear();
 				}
 				else {}
 				d2->update_draw(delta);

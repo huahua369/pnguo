@@ -77,6 +77,8 @@ struct audio_data_t
 	coder_t* code = 0;
 	size_t desize = 0;
 	void* mf = 0;
+	int cap = 0;
+	int total_samples = 0;
 };
 struct coders_t
 {
