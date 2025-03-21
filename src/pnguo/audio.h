@@ -68,7 +68,7 @@ struct coder_t
 	encoder_func encoder;
 
 };
-
+/*format int16=0,int=1,float=2,double=3*/
 struct audio_data_t
 {
 	int format = 0, channels = 0, freq = 0;

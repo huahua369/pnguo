@@ -8,6 +8,7 @@
 
 #include <stb_src/stb_vorbis.h>
 #include <FLAC/all.h>
+#include <mpg123.h>
 
 namespace hz {
 
@@ -136,9 +137,14 @@ namespace hz {
 		int64_t de_samples = 0;
 		// 解码器
 		void* _decoder = 0;
-		//audio_data_t* stream = 0;
-		std::vector<char> stream;
+		//audio_data_t* stream = 0; 
+
 		int samples = 8192;
+		int pcmtype = 0;
+		uint32_t pos = 0, len = 0, remain = 0;
+		size_t bufferpos;
+		char* ptr = 0;
+		size_t wlen = 0;
 		double seconds = 0.0;
 		double divby = 0.0;// 0.000030518509476;//DIVBY32767
 		int current_min = INT_MAX, current_max = INT_MIN;
@@ -589,6 +595,163 @@ namespace hz {
 				dst[i] = (float)src[i] * divby;
 			}
 		}
+
+		typedef enum
+		{
+			PFLAC_PCM_SHORT,
+			PFLAC_PCM_INT,
+			PFLAC_PCM_FLOAT,
+			PFLAC_PCM_DOUBLE
+		} PFLAC_PCM;
+		struct flac_buf_t
+		{
+			const FLAC__StreamDecoder* decoder;
+			const FLAC__Frame* frame;
+			const FLAC__int32** wbuffer;
+			music_de_t* music = 0;
+			int norm_double = 1;
+			int norm_float = 1;
+		};
+		static size_t flac_buffer_copy(flac_buf_t* psf)
+		{
+			const FLAC__Frame* frame = psf->frame;
+			const int32_t* const* buffer = psf->wbuffer;
+			size_t i = 0, j = 0, offset = 0, channels = 0, len = 0;
+			auto pflac = psf->music;
+			if (psf->music->spec.channels != (int)frame->header.channels)
+			{
+				// 通道数错误
+				return 0;
+			}
+			if (frame->header.blocksize > FLAC__MAX_BLOCK_SIZE)
+			{
+				printf("Ooops : frame->header.blocksize (%d) > FLAC__MAX_BLOCK_SIZE (%d)\n", __func__, __LINE__, frame->header.blocksize, FLAC__MAX_BLOCK_SIZE);
+				return 0;
+			}
+			if (frame->header.channels > FLAC__MAX_CHANNELS)
+				printf("Ooops : frame->header.channels (%d) > FLAC__MAX_BLOCK_SIZE (%d)\n", __func__, __LINE__, frame->header.channels, FLAC__MAX_CHANNELS);
+
+			channels = glm::min(frame->header.channels, FLAC__MAX_CHANNELS);
+			len = glm::min(pflac->len, frame->header.blocksize);
+			if (pflac->remain % channels != 0)
+			{
+				printf("Error: pflac->remain %u    channels %u\n", pflac->remain, channels);
+				return 0;
+			}
+			if (!pflac->ptr || pflac->_buffer.size() < len * sizeof(double))
+			{
+				pflac->_buffer.resize(len * sizeof(double));
+				pflac->ptr = (char*)pflac->_buffer.data();
+			}
+			switch (pflac->pcmtype)
+			{
+			case PFLAC_PCM_SHORT:
+			{
+				short* retpcm = (short*)pflac->ptr;
+				int shift = 16 - frame->header.bits_per_sample;
+				pflac->wlen = sizeof(short);
+				if (shift < 0)
+				{
+					shift = abs(shift);
+					for (i = 0; i < len && pflac->remain > 0; i++)
+					{
+						offset = pflac->pos + i * channels;
+						if (pflac->bufferpos >= frame->header.blocksize)
+							break;
+						if (offset + channels > pflac->len)
+							break;
+						for (j = 0; j < channels; j++)
+							retpcm[offset + j] = buffer[j][pflac->bufferpos] >> shift;
+						pflac->remain -= channels;
+						pflac->bufferpos++;
+					}
+				}
+				else
+				{
+					for (i = 0; i < len && pflac->remain > 0; i++)
+					{
+						offset = pflac->pos + i * channels;
+						if (pflac->bufferpos >= frame->header.blocksize)
+							break;
+						if (offset + channels > pflac->len)
+							break;
+						for (j = 0; j < channels; j++)
+							retpcm[offset + j] = ((uint16_t)buffer[j][pflac->bufferpos]) << shift;
+						pflac->remain -= channels;
+						pflac->bufferpos++;
+					}
+				}
+			}
+			break;
+			case PFLAC_PCM_INT:
+			{
+				int* retpcm = (int*)pflac->ptr;
+				int shift = 32 - frame->header.bits_per_sample;
+				pflac->wlen = sizeof(int);
+				for (i = 0; i < len && pflac->remain > 0; i++)
+				{
+					offset = pflac->pos + i * channels;
+					if (pflac->bufferpos >= frame->header.blocksize)
+						break;
+					if (offset + channels > pflac->len)
+						break;
+					for (j = 0; j < channels; j++)
+						retpcm[offset + j] = ((uint32_t)buffer[j][pflac->bufferpos]) << shift;
+					pflac->remain -= channels;
+					pflac->bufferpos++;
+				}
+			}
+			break;
+			case PFLAC_PCM_FLOAT:
+			{
+				float* retpcm = (float*)pflac->ptr;
+				uint32_t bps = (1 << (frame->header.bits_per_sample - 1));
+				float norm = (psf->norm_float) ? 1.0 / bps : 1.0;
+				pflac->wlen = sizeof(float);
+				for (i = 0; i < len && pflac->remain > 0; i++)
+				{
+					offset = pflac->pos + i * channels;
+					if (pflac->bufferpos >= frame->header.blocksize)
+						break;
+					if (offset + channels > pflac->len)
+						break;
+					for (j = 0; j < channels; j++)
+						retpcm[offset + j] = buffer[j][pflac->bufferpos] * norm;
+					pflac->remain -= channels;
+					pflac->bufferpos++;
+				}
+			}
+			break;
+			case PFLAC_PCM_DOUBLE:
+			{
+				double* retpcm = (double*)pflac->ptr;
+				uint32_t bps = (1 << (frame->header.bits_per_sample - 1));
+				double norm = (psf->norm_double) ? 1.0 / bps : 1.0;
+				pflac->wlen = sizeof(double);
+				for (i = 0; i < len && pflac->remain > 0; i++)
+				{
+					offset = pflac->pos + i * channels;
+					if (pflac->bufferpos >= frame->header.blocksize)
+						break;
+					if (offset + channels > pflac->len)
+						break;
+					for (j = 0; j < channels; j++)
+						retpcm[offset + j] = buffer[j][pflac->bufferpos] * norm;
+					pflac->remain -= channels;
+					pflac->bufferpos++;
+				}
+			}
+			break;
+			default:
+				return 0;
+			};
+			pflac->wlen *= offset;
+			offset = i * channels;
+			pflac->pos += i * channels;
+
+			return offset;
+		}
+
 		static FLAC__StreamDecoderWriteStatus flac_write_music_cb(
 			const FLAC__StreamDecoder* decoder,
 			const FLAC__Frame* frame,
@@ -596,139 +759,9 @@ namespace hz {
 			void* client_data)
 		{
 			music_de_t* music = (music_de_t*)client_data;
-			rw_t* mv = (rw_t*)music->src;
-			std::vector<int16_t> data;
-			unsigned int i, j, channels;
-			int shift_amount = 0;
-
-			//if (!music->stream) {
-			//	return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-			//}
-			auto bp = music->get_bits_per();
-			switch (bp) {
-			case 16:
-				shift_amount = 0;
-				break;
-			case 20:
-				shift_amount = 4;
-				break;
-			case 24:
-				shift_amount = 8;
-				break;
-			default:
-				printf("FLAC decoder doesn't support %d bits_per_sample", music->get_bits_per());
-				return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-			}
-
-			if (music->get_channels() == 3) {
-				/* We'll just drop the center channel for now */
-				channels = 2;
-			}
-			else {
-				channels = music->get_channels();
-			}
-			int64_t dl = frame->header.blocksize * channels;
-			if (bp > 0)
-			{
-				data.resize(dl);
-				//if (bp == 16)
-				dl *= sizeof(int16_t);
-				//else
-				//	dl *= sizeof(int32_t);
-				if (music->_buffer.size() != dl)
-					music->_buffer.resize(dl);
-				if (data.empty()) {
-					printf("Couldn't allocate %d bytes stack memory", (int)dl);
-					return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-				}
-
-				if (music->get_channels() == 3) {
-					//int16_t* dst = data.data();
-					int16_t* dst = (int16_t*)music->_buffer.data();
-					for (i = 0; i < frame->header.blocksize; ++i) {
-						int16_t FL = (buffer[0][i] >> shift_amount);
-						int16_t FR = (buffer[1][i] >> shift_amount);
-						int16_t FCmix = (int16_t)((buffer[2][i] >> shift_amount) * 0.5f);
-						int sample;
-
-						sample = (FL + FCmix);
-						if (sample > SHRT_MAX) {
-							*dst = SHRT_MAX;
-						}
-						else if (sample < SHRT_MIN) {
-							*dst = SHRT_MIN;
-						}
-						else {
-							*dst = sample;
-						}
-						++dst;
-
-						sample = (FR + FCmix);
-						if (sample > SHRT_MAX) {
-							*dst = SHRT_MAX;
-						}
-						else if (sample < SHRT_MIN) {
-							*dst = SHRT_MIN;
-						}
-						else {
-							*dst = sample;
-						}
-						++dst;
-					}
-				}
-				else {
-					bool cvf = music->divby > 0 && bp > 16;
-					if (!cvf)
-					{
-						auto dtt = (int16_t*)music->_buffer.data();
-						for (i = 0; i < channels; ++i) {
-							int16_t* dst = dtt + i;
-							for (j = 0; j < frame->header.blocksize; ++j) {
-								auto k = buffer[i][j];
-								*dst = (k >> shift_amount);
-								dst += channels;
-							}
-						}
-					}
-#if 1
-					else
-					{
-						std::vector<int32_t> data32;
-						auto ndl = frame->header.blocksize * channels;
-						data32.resize(ndl);
-						ndl *= sizeof(int32_t);
-						for (i = 0; i < channels; ++i) {
-							auto dst = data32.data() + i;
-							for (j = 0; j < frame->header.blocksize; ++j) {
-								auto s = buffer[i][j];
-								if (s > music->current_max0)
-								{
-									music->current_max0 = s;
-								}
-								if (s < music->current_min0)
-								{
-									music->current_min0 = s;
-								}
-								s = s >> shift_amount;
-								if (s > music->current_max)
-								{
-									music->current_max = s;
-								}
-								if (s < music->current_min)
-								{
-									music->current_min = s;
-								}
-								*dst = s;
-								dst += channels;
-							}
-						}
-						if (music->_buffer.size() != ndl)
-							music->_buffer.resize(ndl);
-						Convert_S32_to_F32_Scalar((float*)music->_buffer.data(), data32.data(), data32.size(), music->divby);
-					}
-#endif
-				}
-			}
+			flac_buf_t pfb = { decoder, frame, (const FLAC__int32**)buffer, music };
+			music->bufferpos = 0;
+			flac_buffer_copy(&pfb);
 			return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 		}
 
@@ -747,40 +780,34 @@ namespace hz {
 			int ns = sizeof(short);
 			music->bits_per_sample = metadata->data.stream_info.bits_per_sample;
 			int format = 0;
+			//  PFLAC_PCM_SHORT,
+			//	PFLAC_PCM_INT,
+			//	PFLAC_PCM_FLOAT,
+			//	PFLAC_PCM_DOUBLE
+			// todo 输出格式pcmtype
 			switch (music->bits_per_sample)
 			{
 			case 16:
-				format = 0;
-				break;
-			case 24:
-				format = 2;
-				// todo flac24解码转换到16
-				music->divby = DIVBY32768;
-				break;
-			case 32:
-				format = 2;
-				music->divby = DIVBY2147483648;
-				break;
+			{
+				music->pcmtype = 0; format = 0;
 			}
-			if (metadata->data.stream_info.channels == 3)
-				format = 0;
+			break;
+			case 24:
+			{
+				music->pcmtype = 1; format = 1;
+			}
+			break;
+			case 32:
+			{
+				music->pcmtype = 2; format = 2;
+			}
+			break;
+			}
 			music->set_spec(metadata->data.stream_info.sample_rate, metadata->data.stream_info.channels, format);// SDL_AUDIO_S16);
 			music->total_samples = metadata->data.stream_info.total_samples;
 			double t = music->total_samples; t /= music->spec.freq;
 			music->seconds = t;
-			music->stream.resize(music->total_samples * metadata->data.stream_info.channels * sizeof(float));
-			/*printf("FLAC: Sample rate = %d, channels = %d, bits_per_sample = %d\n", music->sample_rate, music->channels, music->bits_per_sample);*/
-
-				/* SDL's channel mapping and FLAC channel mapping are the same,
-				   except for 3 channels: SDL is FL FR LFE and FLAC is FL FR FC
-				 */
-			if (music->get_channels() == 3) {
-				channels = 2;
-			}
-			else {
-				channels = music->get_channels();
-			}
-
+			//music->stream.resize(music->total_samples * metadata->data.stream_info.channels * sizeof(float));
 		}
 
 		static void flac_error_music_cb(
@@ -818,31 +845,22 @@ namespace hz {
 			int filled = 0;
 			do
 			{
-				//filled = music->stream->get(data, bytes);
-				//if (filled != 0) {
-				//	return filled;
-				//}
-
-				//if (music->stream->is_done()) {
-				//	/* All done */
-				//	if (done)
-				//		*done = true;
-				//	return 0;
-				//}
+				music->pos = 0;
+				music->len = bytes;
+				music->remain = bytes;
 				music->_buffer.clear();
 				auto flac = (flac_loader*)music->ctx;
 				if (!flac->FLAC__stream_decoder_process_single((FLAC__StreamDecoder*)music->_decoder)) {
 					printf("FLAC__stream_decoder_process_single() failed");
 					return -1;
 				}
-
 				if (flac->FLAC__stream_decoder_get_state((FLAC__StreamDecoder*)music->_decoder) == FLAC__STREAM_DECODER_END_OF_STREAM) {
-					//music->stream->flush();
 					music->_buffer.clear();
+					music->wlen = 0;
 					if (done)
 						*done = true;
 				}
-				filled = music->_buffer.size();
+				filled = music->wlen;
 				if (filled)
 				{
 					memcpy(data, music->_buffer.data(), filled);
@@ -1538,6 +1556,471 @@ namespace hz {
 
 #endif // !NO_OGGS
 
+#ifndef NO_MP3_MPG123
+
+	//#include <stdio.h>      // For SEEK_SET
+	//#include <assert.h>
+
+#ifndef ssize_t
+#define ssize_t size_t
+#endif
+	typedef struct {
+
+		void* handle;
+
+		int (*mpg123_close)(mpg123_handle* mh);
+		void (*mpg123_delete)(mpg123_handle* mh);
+		void (*mpg123_exit)(void);
+		int (*mpg123_format)(mpg123_handle* mh, long rate, int channels, int encodings);
+		int (*mpg123_format_none)(mpg123_handle* mh);
+		int (*mpg123_getformat)(mpg123_handle* mh, long* rate, int* channels, int* encoding);
+		int (*mpg123_init)(void);
+		mpg123_handle* (*mpg123_new)(const char* decoder, int* error);
+		int (*mpg123_open_handle)(mpg123_handle* mh, void* iohandle);
+		const char* (*mpg123_plain_strerror)(int errcode);
+		void (*mpg123_rates)(const long** list, size_t* number);
+		int (*mpg123_read)(mpg123_handle* mh, void* outmemory, size_t outmemsize, size_t* done);
+		int (*mpg123_replace_reader_handle)(mpg123_handle* mh, mpg123_ssize_t(*r_read) (void*, void*, size_t), off_t(*r_lseek)(void*, off_t, int), void (*cleanup)(void*));
+		off_t(*mpg123_seek)(mpg123_handle* mh, off_t sampleoff, int whence);
+		const char* (*mpg123_strerror)(mpg123_handle* mh);
+		int (*mpg123_info2)(mpg123_handle* mh, struct mpg123_frameinfo2* mi);
+		off_t(*mpg123_length)(mpg123_handle* mh);
+		double (*mpg123_tpf)(mpg123_handle* mh);
+	} mpg123_loader;
+
+	class mpg123_t
+	{
+	private:
+
+		mpg123_loader mpg123 = {
+		   0, nullptr
+		};
+
+	public:
+		mpg123_t()
+		{
+			loadlib();
+		}
+
+		~mpg123_t()
+		{
+			MPG123_Close();
+		}
+
+		void MPG123_Close(void)
+		{
+			if (mpg123.mpg123_exit)
+				mpg123.mpg123_exit();
+		}
+
+	private:
+		int loadlib()
+		{
+			static const char* ccfn[] = {
+				"mpg123_close",
+				"mpg123_delete",
+				"mpg123_exit",
+				"mpg123_format",
+				"mpg123_format_none",
+				"mpg123_getformat",
+				"mpg123_init",
+				"mpg123_new",
+				"mpg123_open_handle",
+				"mpg123_plain_strerror",
+				"mpg123_rates",
+				"mpg123_read",
+				"mpg123_replace_reader_handle",
+				"mpg123_seek",
+				"mpg123_strerror",
+				"mpg123_info2",
+				"mpg123_length",
+				"mpg123_tpf",
+			};
+			if (mpg123.handle)
+			{
+				return 0;
+			}
+
+#ifndef MPG_GETCB
+#define MPG_GETCB(n) mpg123. n=n
+#endif // !MPG_GETCB
+			MPG_GETCB(mpg123_close);
+			MPG_GETCB(mpg123_delete);
+			MPG_GETCB(mpg123_exit);
+			MPG_GETCB(mpg123_format);
+			MPG_GETCB(mpg123_format_none);
+			MPG_GETCB(mpg123_getformat);
+			MPG_GETCB(mpg123_init);
+			MPG_GETCB(mpg123_new);
+			MPG_GETCB(mpg123_open_handle);
+			MPG_GETCB(mpg123_plain_strerror);
+			MPG_GETCB(mpg123_rates);
+			MPG_GETCB(mpg123_read);
+			MPG_GETCB(mpg123_replace_reader_handle);
+			MPG_GETCB(mpg123_seek);
+			MPG_GETCB(mpg123_strerror);
+			MPG_GETCB(mpg123_info2);
+			MPG_GETCB(mpg123_length);
+			MPG_GETCB(mpg123_tpf);
+			mpg123.handle = (void*)1;
+			return MPG123_Open();
+		}
+
+	private:
+
+		static int mpg123_format_to_sdl(int fmt)
+		{
+			switch (fmt)
+			{
+			case MPG123_ENC_SIGNED_8:       return 0;// SDL_AUDIO_S8;
+			case MPG123_ENC_UNSIGNED_8:     return 0;// SDL_AUDIO_U8;
+			case MPG123_ENC_SIGNED_16:      return 0;// SDL_AUDIO_S16;
+			case MPG123_ENC_UNSIGNED_16:    return 0;// SDL_AUDIO_S16;
+			case MPG123_ENC_SIGNED_32:      return 1;// SDL_AUDIO_S32;
+			case MPG123_ENC_FLOAT_32:       return 2;// SDL_AUDIO_F32;
+			default:                        return 0;
+			}
+		}
+		static int mpg123_format_to_bit(int fmt)
+		{
+			switch (fmt)
+			{
+			case MPG123_ENC_SIGNED_8:       return 8;
+			case MPG123_ENC_UNSIGNED_8:     return 8;
+			case MPG123_ENC_SIGNED_16:      return 16;
+			case MPG123_ENC_UNSIGNED_16:    return 16;
+			case MPG123_ENC_SIGNED_32:      return 32;
+			case MPG123_ENC_FLOAT_32:       return 32;
+			default:                        return 0;
+			}
+		}
+
+		/*
+		static const char *mpg123_format_str(int fmt)
+		{
+			switch (fmt)
+			{
+		#define f(x) case x: return #x;
+				f(MPG123_ENC_UNSIGNED_8)
+				f(MPG123_ENC_UNSIGNED_16)
+				f(MPG123_ENC_SIGNED_8)
+				f(MPG123_ENC_SIGNED_16)
+				f(MPG123_ENC_SIGNED_32)
+				f(MPG123_ENC_FLOAT_32)
+		#undef f
+			}
+			return "unknown";
+		}
+		*/
+
+		char const* mpg_err(mpg123_handle* mpg, int result)
+		{
+			char const* err = "unknown error";
+
+			if (mpg && result == MPG123_ERR) {
+				err = mpg123.mpg123_strerror(mpg);
+			}
+			else {
+				err = mpg123.mpg123_plain_strerror(result);
+			}
+			return err;
+		}
+
+		/* we're gonna override mpg123's I/O with these wrappers for RWops */
+		static mpg123_ssize_t rwops_read(void* p, void* dst, size_t n)
+		{
+			return (mpg123_ssize_t)RWread((rw_t*)p, dst, 1, n);
+		}
+
+		static off_t rwops_seek(void* p, off_t offset, int whence)
+		{
+			return (off_t)RWseek((rw_t*)p, (int64_t)offset, whence);
+		}
+
+		static void rwops_cleanup(void* p)
+		{
+			(void)p;
+			/* do nothing, we will free the file later */
+		}
+
+
+		int MPG123_Open()
+		{
+			if (mpg123.mpg123_init() != MPG123_OK) {
+				printf("mpg123_init() failed");
+				return -1;
+			}
+			return 0;
+		}
+
+		void* MPG123_CreateFromRW(rw_t* src)
+		{
+			music_de_t* music;
+			int result;
+			const long* rates;
+			size_t i, num_rates;
+
+			music = new music_de_t();
+			if (!music) {
+				return NULL;
+			}
+			music->src = src;
+			music->ctx = this;
+			music->_decoder = mpg123.mpg123_new(0, &result);
+			if (result != MPG123_OK) {
+				free_m(music);
+				printf("mpg123_new failed");
+				return NULL;
+			}
+
+			result = mpg123.mpg123_replace_reader_handle(
+				(mpg123_handle*)music->_decoder,
+				rwops_read, rwops_seek, rwops_cleanup
+			);
+			if (result != MPG123_OK) {
+				free_m(music);
+				printf("mpg123_replace_reader_handle: %s", mpg_err((mpg123_handle*)music->_decoder, result));
+				return NULL;
+			}
+
+			result = mpg123.mpg123_format_none((mpg123_handle*)music->_decoder);
+			if (result != MPG123_OK) {
+				free_m(music);
+				printf("mpg123_format_none: %s", mpg_err((mpg123_handle*)music->_decoder, result));
+				return NULL;
+			}
+
+			mpg123.mpg123_rates(&rates, &num_rates);
+			for (i = 0; i < num_rates; ++i) {
+				const int channels = (MPG123_MONO | MPG123_STEREO);
+				const int formats = (MPG123_ENC_SIGNED_8 |
+					MPG123_ENC_UNSIGNED_8 |
+					MPG123_ENC_SIGNED_16 |
+					MPG123_ENC_UNSIGNED_16 |
+					MPG123_ENC_SIGNED_32 |
+					MPG123_ENC_FLOAT_32);
+
+				mpg123.mpg123_format((mpg123_handle*)music->_decoder, rates[i], channels, formats);
+			}
+
+			result = mpg123.mpg123_open_handle((mpg123_handle*)music->_decoder, music->src);
+			if (result != MPG123_OK) {
+				free_m(music);
+				printf("mpg123_open_handle: %s", mpg_err((mpg123_handle*)music->_decoder, result));
+				return NULL;
+			}
+			MPG123_getinfo(music);
+			return music;
+		}
+		int MPG123_getinfo(music_de_t* music)
+		{
+			long rate;
+			int channels, encoding, format;
+			off_t offset = 0;
+			size_t amount = 0;
+			unsigned char buf[8192] = {};
+			int result;// = mpg123.mpg123_read((mpg123_handle*)music->_decoder, buf, 8192, &amount);
+			result = mpg123.mpg123_getformat((mpg123_handle*)music->_decoder, &rate, &channels, &encoding);
+			if (result != MPG123_OK) {
+				printf("mpg123_getformat: %s", mpg_err((mpg123_handle*)music->_decoder, result));
+				return -1;
+			}
+			/*printf("MPG123 format: %s, channels = %d, rate = %ld\n", mpg123_format_str(encoding), channels, rate);*/
+
+			format = mpg123_format_to_sdl(encoding);
+			assert(format != -1);
+			music->set_spec(rate, channels, format);
+			struct mpg123_frameinfo2 mi[1] = {};
+			if (mpg123.mpg123_info2)
+				result = mpg123.mpg123_info2((mpg123_handle*)music->_decoder, mi);
+			offset = mpg123.mpg123_length((mpg123_handle*)music->_decoder);
+			if (offset < 0)
+			{
+				offset = mpg123.mpg123_seek((mpg123_handle*)music->_decoder, 0, SEEK_END);
+				mpg123.mpg123_seek((mpg123_handle*)music->_decoder, 0, SEEK_SET);
+			}
+			if (!music->total_samples)
+			{
+				music->total_samples = offset;// music->samples;
+			}
+			double t = music->total_samples; t /= music->spec.freq;
+			music->seconds = t;
+			music->bits_per_sample = mpg123_format_to_bit(encoding);
+
+			/* Just assume 16-bit 2 channel audio for now */
+			auto buffer_size = music->samples * music->bits_per_sample * 0.5 * channels;
+			music->_buffer.resize(buffer_size);
+			//music->stream.resize(buffer_size);
+			return 0;
+		}
+
+		/* read some mp3 stream data and convert it for output */
+		int MPG123_GetSome(void* context, void* data, int bytes, bool* done)
+		{
+			music_de_t* music = (music_de_t*)context;
+			int filled, result;
+			size_t amount = 0;
+			auto len = glm::clamp(bytes, 0, (int)music->_buffer.size());
+			do
+			{
+				if (len <= 0)
+					break;
+				if (music->isdone) {
+					/* All done */
+					if (done)
+						*done = true;
+					return amount;
+				}
+				result = mpg123.mpg123_read((mpg123_handle*)music->_decoder, music->_buffer.data(), len, &amount);
+				switch (result) {
+				case MPG123_OK:
+					memcpy(data, music->_buffer.data(), amount);
+					break;
+				case MPG123_NEW_FORMAT:
+					//MPG123_getinfo(music);
+					printf("MPG123_NEW_FORMAT\n");
+					break;
+				case MPG123_DONE:
+					music->isdone = true;
+					break;
+				default:
+					printf("mpg123_read: %s", mpg_err((mpg123_handle*)music->_decoder, result));
+					return amount;
+				}
+			} while (0);
+			return amount;
+		}
+		int MPG123_GetAudio(void* context, void* data, int bytes)
+		{
+			music_de_t* music = (music_de_t*)context;
+			return MPG123_GetSome(context, data, bytes, nullptr);
+		}
+
+		int MPG123_Seek(void* context, double secs)
+		{
+			music_de_t* music = (music_de_t*)context;
+
+			off_t offset = (off_t)(music->spec.freq * secs);
+			if ((offset = mpg123.mpg123_seek((mpg123_handle*)music->_decoder, offset, SEEK_SET)) < 0) {
+				return printf("mpg123_seek: %s", mpg_err((mpg123_handle*)music->_decoder, (int)-offset));
+			}
+			music->isdone = false;
+			return 0;
+		}
+		void MPG123_free(mpg123_handle* _decoder)
+		{
+			if (_decoder) {
+				mpg123.mpg123_close(_decoder);
+				mpg123.mpg123_delete(_decoder);
+			}
+		}
+	public:
+		// 导出接口
+
+		static void* load()
+		{
+			return new mpg123_t();
+		}
+		static void unload(void* ph)
+		{
+			mpg123_t* p = (mpg123_t*)ph;
+			if (p)
+			{
+				delete p;
+			}
+		}
+		static void* open_memory(const void* data, int len, void* handle)
+		{
+			mpg123_t* ctx = (mpg123_t*)handle;
+			if (!len || !data || !ctx)
+			{
+				return nullptr;
+			}
+			rw_t* src = new rw_t((char*)data, len);
+			auto p = ctx->MPG123_CreateFromRW(src);
+			return p;
+		}
+		static int get_audio(void* music, void* data, int bytes)
+		{
+			int ret = 0;
+
+			music_de_t* mp = (music_de_t*)music;
+			mpg123_t* ctx = nullptr;
+			if (mp && (ctx = (mpg123_t*)mp->ctx))
+			{
+				ret = ctx->MPG123_GetAudio(mp, data, bytes);
+			}
+			return ret;
+		}
+
+		/* Seek to a play position (in seconds) */
+		static int seek(void* music, double position)
+		{
+			int ret = 0;
+			music_de_t* mp = (music_de_t*)music;
+			mpg123_t* ctx = nullptr;
+			if (mp && (ctx = (mpg123_t*)mp->ctx))
+			{
+				ret = ctx->MPG123_Seek(music, position);
+			}
+			return ret;
+		}
+		static void free_m(void* context)
+		{
+			music_de_t* music = (music_de_t*)context;
+			mpg123_t* ctx = nullptr;
+			if (music && (ctx = (mpg123_t*)music->ctx))
+			{
+				ctx->MPG123_free((mpg123_handle*)music->_decoder);
+				delete music;
+			}
+		}
+
+	};
+
+	coder_t* create_mpg123()
+	{
+		coder_t* ct = new coder_t();
+		ct->tag = "mp3";
+		memcpy(ct->tag2, "ID3", 3);
+		ct->open_memory = mpg123_t::open_memory;
+		ct->get_audio = mpg123_t::get_audio;
+		ct->seek = mpg123_t::seek;
+		ct->free_m = mpg123_t::free_m;
+		ct->get_info = music_de_t::get_info;
+		ct->load = mpg123_t::load;
+		ct->unload = mpg123_t::unload;
+		ct->handle = ct->load();
+		return ct;
+	}
+
+	//Mix_MusicInterface Mix_MusicInterface_MPG123 =
+	//{
+	//	"MPG123",
+	//	MIX_MUSIC_MPG123,
+	//	MUS_MP3,
+	//	SDL_FALSE,
+	//	SDL_FALSE,
+	//
+	//	MPG123_Load,
+	//	MPG123_Open,
+	//	MPG123_CreateFromRW,
+	//	NULL,   /* CreateFromFile */
+	//	MPG123_SetVolume,
+	//	MPG123_Play,
+	//	NULL,   /* IsPlaying */
+	//	MPG123_GetAudio,
+	//	MPG123_Seek,
+	//	NULL,   /* Pause */
+	//	NULL,   /* Resume */
+	//	NULL,   /* Stop */
+	//	MPG123_Delete,
+	//	MPG123_Close,
+	//	MPG123_Unload
+	//};
+
+#endif /* NO_MP3_MPG123 */
+
 	coder_t* create_flac_de()
 	{
 		coder_t* ct = new coder_t();
@@ -1572,12 +2055,15 @@ coders_t* new_coders()
 {
 	coder_t* flac = hz::create_flac_de();
 	coder_t* ogg = hz::create_ogg_de();
+	coder_t* mp3 = hz::create_mpg123();
 	auto p = new coders_t();
 	if (p) {
 		if (flac)
 			p->codes.push_back(flac);
 		if (ogg)
 			p->codes.push_back(ogg);
+		if (mp3)
+			p->codes.push_back(mp3);
 	}
 	return p;
 }
@@ -1675,13 +2161,17 @@ audio_data_t* new_audio_data(coders_t* pc, const char* data, int len, bool iscop
 		{
 			auto mp = (hz::music_de_t*)m;
 			c->get_info(m, &total_samples, &channels, &sample_rate, &format);
-			r->channels = 2;
+			r->channels = channels;
 			r->code = c;
 			r->format = format;
 			r->freq = sample_rate;
-			int bs = 2 * (r->format == 0 ? sizeof(int16_t) : sizeof(int32_t));
+			int bs = channels * (r->format == 0 ? sizeof(int16_t) : sizeof(int32_t));
+			if (r->format == 3)
+			{
+				bs = channels * sizeof(double);
+			}
 			auto cap = bs * total_samples;
-			r->cap = align_up(cap, 8192);
+			r->cap = align_up(cap, 512);
 			r->total_samples = total_samples;
 			r->data = malloc(r->cap);
 			r->ptr = m;

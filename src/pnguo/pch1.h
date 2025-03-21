@@ -57,9 +57,10 @@
 #include <array>
 #include <fstream> 
 #include <memory>
-#include <numeric> // iota
-#include <stdio.h>
+#include <numeric> // iota 
 #include <string.h>
+#include <stdio.h>      // For SEEK_SET
+#include <assert.h>
 #include <unordered_map>
  
 #define GLM_ENABLE_EXPERIMENTAL
