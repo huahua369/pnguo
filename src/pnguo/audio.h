@@ -14,24 +14,15 @@ struct encoder_info_t
 	char channels;
 	char bits_per_sample;
 	// 压缩层 flac 0-8 ，小于0默认6，大
-	char compression_level;
+	char compression_level = 6;
 	char unknown_;
-	int blocksize;		//4096
+	int blocksize = 4096;		//4096
 	// 总样本
 	uint64_t total_samples;
-	// read_func/write_func用到，可以空
-	void* userdata;
-	// data和read_func二选一，优先data
-	const char* data;
+	const char* data;	// pcm数据
 	int data_size;
-	// 读数据回调，返回nullptr退出输入，int*len返回长度
-	const char* (*read_func)(int* len, void* userdata);
-
 	// 文件名路径file_path和write_func二选一
 	const char* file_path;
-	const char* file_src;
-	// 输出数据回调
-	int(*write_func)(const char* data, size_t bytes, uint32_t samples, uint32_t current_frame, void* userdata);
 };
 typedef size_t(*encoder_func)(encoder_info_t* p);
 // 音乐解码API
@@ -57,7 +48,7 @@ struct coder_t
 	int (*get_audio_float)(void* music, float* data, int n);
 
 	// 定位播放位置 (单位秒 seconds)
-	int (*seek)(void* music, double position); 
+	int (*seek)(void* music, double position);
 
 	// 释放音频对象
 	void (*free_m)(void* music); //	*
@@ -74,7 +65,7 @@ struct audio_data_t
 	int format = 0, channels = 0, freq = 0;
 	int len = 0;		// 总长度，解码完成前等于0
 	void* data = 0;		// 解码数据
-	void* ptr = 0; 
+	void* ptr = 0;
 	char* dataold = 0;
 	coder_t* code = 0;
 	size_t desize = 0;	// 当前解码字节数

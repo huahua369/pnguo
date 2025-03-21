@@ -816,8 +816,19 @@ namespace hz
 			LARGE_INTEGER ds;
 			ds.QuadPart = rs;
 			ret = SetFilePointerEx(hFile, ds, NULL, FILE_BEGIN);
-			//ret = SetFilePointerEx(hFile, (LARGE_INTEGER)rs, NULL, FILE_BEGIN);
-			SetEndOfFile(hFile);
+			if (ret)
+			{
+				ret = SetEndOfFile(hFile);
+			}
+			if (!ret)
+				_errstr = "ftruncate_m error: " + getLastError();
+
+			auto m = map(rs, 0);
+			if (m)
+			{
+				set(_pm, rs);
+				seek(0, SEEK_SET);
+			}
 		}
 		return ret;
 	}

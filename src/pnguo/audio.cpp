@@ -8,7 +8,12 @@
 
 #include <stb_src/stb_vorbis.h>
 #include <FLAC/all.h>
+// 解码mp3
 #include <mpg123.h>
+// 编码mp3
+#include <out123.h>
+//syn123：一些音频信号合成和格式转换
+#include <syn123.h>
 
 namespace hz {
 
@@ -954,15 +959,25 @@ namespace hz {
 			en_data_t* t = (en_data_t*)client_data;
 			return;
 		}
+		struct enflac_t
+		{
+			flac_loader* flac;
+			FLAC__StreamEncoder* _encoder;
+			FLAC__int32* pcm;
+			int pcmsize;
+			int channels;
+			int ENC_BUFFER_SIZE;
+		};
 		// func返回nullptr或长度小于0则跳出编码
 		static size_t encoder(encoder_info_t* ep)
 		{
-			flac_loader* flac = ((flac_de_t*)ep->handle)->lib();
-			if (!flac || !ep || (!ep->file_path && !ep->write_func))
+			if (!ep->handle || !ep || (!ep->file_path) || !ep->data || !ep->data_size)
 			{
 				return -1;
 			}
-			return wav2flac(ep, ep->file_src, ep->file_path, flac);
+			flac_loader* flac = ((flac_de_t*)ep->handle)->lib();
+			if (!flac)return -2;
+			//return wav2flac(ep, ep->file_src, ep->file_path, flac);
 			en_data_t out_stream;
 			//create the flac encoder
 			FLAC__StreamEncoder* _encoder = flac->FLAC__stream_encoder_new();
@@ -974,57 +989,50 @@ namespace hz {
 			//unknown total samples
 			flac->FLAC__stream_encoder_set_total_samples_estimate(_encoder, ep->total_samples);
 
-			mfile_t fmv;
-			if (ep->file_path)// && fmv.createfile(ep->file_path))
-			{
-				//auto ks = flac->FLAC__stream_encoder_get_total_samples_estimate(_encoder);
-				//out_stream.write_func = fwrite_func;
-				//out_stream.seek_func = fseek_func;
-				//out_stream.tell_func = ftell_func;
-				//out_stream.ud = &fmv;
-			}
-			else
-			{
-				out_stream.ud = ep->userdata;
-				out_stream.write_func = ep->write_func;
-			}
-			if (ep->file_path)
-			{
-
-				flac->FLAC__stream_encoder_init_file(_encoder, ep->file_path, progress_callback, NULL);
-
-			}
-			else {
-				flac->FLAC__stream_encoder_init_stream(_encoder, enWriteCallback, enSeekCallback, enTellCallback, enMetadataCallback, &out_stream);
-			}
 			int64_t total_bytes_read = 0;
-
-			int bytes_read = 0;
-			const int pcmsize = flac->FLAC__stream_encoder_get_blocksize(_encoder);
-			std::vector<FLAC__int32> pcmv(pcmsize);
-			auto pcm = pcmv.data();
-			if (ep->data && ep->data_size > 0)
 			{
-				encoder_process_interleaved(flac, _encoder, ep->data, ep->data_size, ep->channels, pcm, pcmsize);
-				total_bytes_read += bytes_read;
-			}
-			else
-			{
-				do
+				mfile_t fmv;
+				if (ep->file_path && fmv.open_m(ep->file_path, false))// && fmv.createfile(ep->file_path))
 				{
-					auto data = ep->read_func(&bytes_read, ep->userdata);
-					if (!data || bytes_read < 2)
-					{
-						break;
-					}
-					encoder_process_interleaved(flac, _encoder, data, bytes_read, ep->channels, pcm, pcmsize);
-					total_bytes_read += bytes_read;
-				} while (true);
-			}
-			//finish encoding the current flac file
-			flac->FLAC__stream_encoder_finish(_encoder);
-			flac->FLAC__stream_encoder_delete(_encoder);
+					auto md = fmv.map(ep->data_size, 0);
+					auto ks = flac->FLAC__stream_encoder_get_total_samples_estimate(_encoder);
+					out_stream.write_func = fwrite_func;
+					out_stream.seek_func = fseek_func;
+					out_stream.tell_func = ftell_func;
+					out_stream.ud = &fmv;
 
+					flac->FLAC__stream_encoder_init_stream(_encoder, enWriteCallback, enSeekCallback, enTellCallback, enMetadataCallback, &out_stream);
+				}
+				else if (ep->file_path)
+				{
+					flac->FLAC__stream_encoder_init_file(_encoder, ep->file_path, progress_callback, NULL);
+				}
+
+				int bytes_read = 0;
+				const int pcmsize = flac->FLAC__stream_encoder_get_blocksize(_encoder);
+				std::vector<FLAC__int32> pcmv(pcmsize * 2);
+				auto pcm = pcmv.data();
+				if (ep->data && ep->data_size > 0)
+				{
+					//encoder_process_interleaved(flac, _encoder, ep->data, ep->data_size, ep->channels, pcm, pcmsize);
+					enflac_t et = { flac, _encoder, pcm, pcmsize * sizeof(int), ep->channels,pcmsize };
+					if (ep->bits_per_sample == 24)
+					{
+						bytes_read = flac_write_i2flac(&et, (int*)ep->data, ep->data_size / sizeof(int));
+					}
+					else {
+						bytes_read = flac_write_s2flac(&et, (short*)ep->data, ep->data_size / sizeof(short));
+					}
+					total_bytes_read += bytes_read;
+				}
+				//finish encoding the current flac file
+				flac->FLAC__stream_encoder_finish(_encoder);
+				flac->FLAC__stream_encoder_delete(_encoder);
+				auto e = fmv.last_size();
+				fmv.flush(0, e);
+				fmv.unmap(true);	// 关闭映射才能重新设置大小
+				fmv.ftruncate_m(e);
+			}
 			return total_bytes_read > 0 ? total_bytes_read : 0;
 		}
 		static bool encoder_process_interleaved(flac_loader* flac, FLAC__StreamEncoder* _encoder, const char* data, size_t bytes_read, int channels, FLAC__int32* pcm, int pcmsize)
@@ -1056,6 +1064,91 @@ namespace hz {
 				flacBytes += cs;
 			}
 			return ret;
+		}
+
+		static void s2flac8_array(const short* src, int32_t* dest, int count)
+		{
+			for (int i = 0; i < count; i++)
+				dest[i] = src[i] >> 8;
+		} /* s2flac8_array */
+
+		static void s2flac16_array(const short* src, int32_t* dest, int count)
+		{
+			for (int i = 0; i < count; i++)
+				dest[i] = src[i];
+		} /* s2flac16_array */
+
+		static void s2flac24_array(const short* src, int32_t* dest, int count)
+		{
+			for (int i = 0; i < count; i++)
+				dest[i] = src[i] << 8;
+		} /* s2flac24_array */
+
+		static void i2flac8_array(const int* src, int32_t* dest, int count)
+		{
+			for (int i = 0; i < count; i++)
+				dest[i] = src[i] >> 24;
+		} /* i2flac8_array */
+
+		static void i2flac16_array(const int* src, int32_t* dest, int count)
+		{
+			for (int i = 0; i < count; i++)
+				dest[i] = src[i] >> 16;
+		} /* i2flac16_array */
+
+		static void i2flac24_array(const int* src, int32_t* dest, int count)
+		{
+			for (int i = 0; i < count; i++)
+				dest[i] = src[i] >> 8;
+		} /* i2flac24_array */
+
+		static size_t flac_write_s2flac(enflac_t* e, const short* ptr, size_t len)
+		{
+			void (*convert) (const short*, int32_t*, int);
+			int bufferlen, writecount, thiswrite;
+			size_t	total = 0;
+			int32_t* buffer = e->pcm;
+			convert = s2flac16_array;
+			bufferlen = e->pcmsize / (sizeof(int32_t) * e->channels);
+			bufferlen *= e->channels;
+			while (len > 0)
+			{
+				writecount = (len >= bufferlen) ? bufferlen : (int)len;
+				convert(ptr + total, buffer, writecount);
+				if (FLAC__stream_encoder_process_interleaved(e->_encoder, buffer, writecount / e->channels))
+					thiswrite = writecount;
+				else
+					break;
+				total += thiswrite;
+				if (thiswrite < writecount)
+					break;
+				len -= thiswrite;
+			}
+			return total;
+		}
+		static size_t flac_write_i2flac(enflac_t* e, const int* ptr, size_t len)
+		{
+			void (*convert) (const int*, int32_t*, int);
+			int bufferlen, writecount, thiswrite;
+			size_t	total = 0;
+			int32_t* buffer = e->pcm;
+			convert = i2flac24_array;
+			bufferlen = e->pcmsize / (sizeof(int32_t) * e->channels);
+			bufferlen *= e->channels;
+			while (len > 0)
+			{
+				writecount = (len >= bufferlen) ? bufferlen : (int)len;
+				convert(ptr + total, buffer, writecount);
+				if (FLAC__stream_encoder_process_interleaved(e->_encoder, buffer, writecount / e->channels))
+					thiswrite = writecount;
+				else
+					break;
+				total += thiswrite;
+				if (thiswrite < writecount)
+					break;
+				len -= thiswrite;
+			}
+			return total;
 		}
 	private:
 		static int fwrite_func(const char* data, size_t bytes, uint32_t samples, uint32_t current_frame, void* ud)

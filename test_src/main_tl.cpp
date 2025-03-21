@@ -704,17 +704,41 @@ int main()
 	build_audio_test(5, *adata32);
 	build_audio_test(5, *adata16);
 	coders_t* cp = new_coders();
-	audio_data_t* mad01 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
+	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad21 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
 	audio_data_t* madogg = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
-	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song2\程响-是否.mp3)");
+	audio_data_t* mad2 = new_audio_data(cp, R"(E:\song2\程响-是否.mp3)");
 	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
 	auto st32f = app->new_audio_stream(2, 2, 48000);
 	auto st32 = app->new_audio_stream(1, 2, 48000);
 	auto st16 = app->new_audio_stream(0, 2, 48000);
+
+	{
+		encoder_info_t e = {};
+		while (1)
+		{
+			int rc1 = decoder_data(mad2);
+			if (rc1 <= 0)
+			{
+				break;
+			}
+		}
+		e.bits_per_sample = 16;
+		e.channels = mad2->channels;
+		e.sample_rate = mad2->freq;
+		e.total_samples = mad2->total_samples;
+		e.data = (char*)mad2->data;
+		e.data_size = mad2->len;
+		e.file_path = R"(E:\song2\程响-是否cf.flac)";
+		auto pe = cp->codes[0];
+		e.handle = pe->handle;
+		int ret = pe->encoder(&e);
+		printf("%d\n", ret);
+	}
+
 	/*
 	open_audio
 		new_audio_stream创建流（支持flac、ogg、mp3）

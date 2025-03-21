@@ -50,6 +50,10 @@ namespace hz
 		{
 			return _pos;
 		}
+		int64_t last_size()
+		{
+			return _last_size;
+		}
 		size_t seek(int64_t _offset, int _origin = 0)
 		{
 			switch (_origin)
@@ -110,7 +114,7 @@ namespace hz
 			{
 				//resize(_last_size);
 			}
-			if (_end > 0 && buf)
+			if (_end > 0 && buf && _data)
 			{
 				char* d = (char*)_data;
 				auto s = _end - _pos;
