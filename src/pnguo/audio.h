@@ -57,7 +57,7 @@ struct coder_t
 	int (*get_audio_float)(void* music, float* data, int n);
 
 	// 定位播放位置 (单位秒 seconds)
-	int (*seek)(void* music, double position);
+	int (*seek)(void* music, double position); 
 
 	// 释放音频对象
 	void (*free_m)(void* music); //	*
@@ -74,7 +74,7 @@ struct audio_data_t
 	int format = 0, channels = 0, freq = 0;
 	int len = 0;		// 总长度，解码完成前等于0
 	void* data = 0;		// 解码数据
-	void* ptr = 0;
+	void* ptr = 0; 
 	char* dataold = 0;
 	coder_t* code = 0;
 	size_t desize = 0;	// 当前解码字节数
@@ -82,10 +82,19 @@ struct audio_data_t
 	int cap = 0;
 	int total_samples = 0;
 };
-struct coders_t
+class coders_t
 {
+public:
 	std::vector<coder_t*> codes;
+public:
+	coders_t();
+	~coders_t();
+
+private:
+
 };
+
+
 coders_t* new_coders();
 void free_coders(coders_t* p);
 audio_data_t* new_audio_data(coders_t* pc, const std::string& fn);

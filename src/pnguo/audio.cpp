@@ -6,7 +6,6 @@
 #include "audio.h"
 #include "mapView.h"
 
-#if 1
 #include <stb_src/stb_vorbis.h>
 #include <FLAC/all.h>
 
@@ -80,13 +79,10 @@ namespace hz {
 
 		~music_de_t()
 		{
-			//if (stream)
-			//{
-			//	delete stream;
-			//}
 			if (src)
 			{
 				delete src;
+				src = 0;
 			}
 		}
 		void set_spec(int freq_rate, int channels, int format)
@@ -141,6 +137,7 @@ namespace hz {
 		// 解码器
 		void* _decoder = 0;
 		//audio_data_t* stream = 0;
+		std::vector<char> stream;
 		int samples = 8192;
 		double seconds = 0.0;
 		double divby = 0.0;// 0.000030518509476;//DIVBY32767
@@ -771,6 +768,7 @@ namespace hz {
 			music->total_samples = metadata->data.stream_info.total_samples;
 			double t = music->total_samples; t /= music->spec.freq;
 			music->seconds = t;
+			music->stream.resize(music->total_samples * metadata->data.stream_info.channels * sizeof(float));
 			/*printf("FLAC: Sample rate = %d, channels = %d, bits_per_sample = %d\n", music->sample_rate, music->channels, music->bits_per_sample);*/
 
 				/* SDL's channel mapping and FLAC channel mapping are the same,
@@ -1374,22 +1372,6 @@ namespace hz {
 		}
 	}
 
-	coder_t* create_flac_de()
-	{
-		coder_t* ct = new coder_t();
-		ct->tag = "flac";
-		memcpy(ct->tag2, "fLaC", 4);
-		ct->open_memory = flac_de_t::open_memory;
-		ct->get_audio = flac_de_t::get_audio;
-		ct->seek = flac_de_t::seek;
-		ct->free_m = flac_de_t::free_m;
-		ct->load = flac_de_t::load;
-		ct->unload = flac_de_t::unload;
-		ct->handle = ct->load();
-		ct->get_info = get_info_ty;
-		ct->encoder = (encoder_func)flac_en_t::encoder;
-		return ct;
-	}
 #ifndef NO_OGGS
 
 
@@ -1402,18 +1384,16 @@ namespace hz {
 		std::vector<float> _data;
 		std::vector<int16_t> _data16;
 		stb_vorbis* v = 0;
-		int64_t desize = 0;
-		int64_t pos = 0;
 		int64_t size = 0;
 		int error_r = 0;
+		bool gtype = 0;// 0获取float
 	public:
 		ogg_decoder();
 		~ogg_decoder();
 		void open_data(char* data, int len);
-		int get_data();
-		int get_data_s();
 		int get_data(void* data, int bytes);
 		int get_data16(void* data, int bytes);
+		int seek_start();
 	private:
 
 	};
@@ -1436,75 +1416,70 @@ namespace hz {
 		{
 			stb_vorbis_stream_length_in_samples(v);
 			size = v->total_samples * v->channels;
-			_data.resize(v->total_samples * v->channels);
-			_data16.resize(v->total_samples * v->channels);
 		}
 	}
 
-	int ogg_decoder::get_data()
-	{
-		auto data = _data.data() + desize;
-		int n = v->sample_rate;
-		auto rs = stb_vorbis_get_samples_float_interleaved((stb_vorbis*)v, v->channels, (float*)data, n * 2) * v->channels;
-		desize += rs;
-		return rs;
-	}
-	int ogg_decoder::get_data_s()
-	{
-		auto data = _data16.data() + desize;
-		int n = v->sample_rate;
-		auto rs = stb_vorbis_get_frame_short_interleaved( (stb_vorbis*)v, v->channels, data, n * 2) * v->channels;
-		desize += rs;
-		return rs;
-	}
 	int ogg_decoder::get_data(void* data, int bytes)
 	{
-		bytes /= sizeof(float); 
-		bytes = std::clamp((int64_t)bytes, (int64_t)0, size - pos);
+		if (!data || !v)return 0;
+		bytes /= sizeof(float);
+		int dn = 0;
+		if (_data.size() < bytes)
+		{
+			_data.resize(bytes);
+		}
+		auto buf = _data.data();
 		do {
-			if (desize - pos < bytes)
+			if (dn < bytes)
 			{
-				get_data();
+				auto kr = stb_vorbis_get_samples_float_interleaved((stb_vorbis*)v, v->channels, buf, bytes - dn) * v->channels;
+				dn += kr;
+				buf += kr;
+				if (kr == 0)break;
 			}
 			else { break; }
 		} while (1);
-		if (data && bytes > 0 && pos < size)
+		if (dn > 0)
 		{
-			auto nc = bytes;
-			if (nc > 0) {
-				memcpy(data, _data.data() + pos, nc * sizeof(float)); 
-				pos += nc;
-			}
-			return nc * sizeof(float);
+			memcpy(data, _data.data(), dn * sizeof(float));
 		}
-		return 0;
+		return dn * sizeof(float);
 	}
 	int ogg_decoder::get_data16(void* data, int bytes)
-	{ 
+	{
+		if (!data || !v)return 0;
 		bytes /= sizeof(int16_t);
-		bytes = std::clamp((int64_t)bytes, (int64_t)0, size - pos);
+		int dn = 0;
+		if (_data16.size() < bytes)
+		{
+			_data16.resize(bytes);
+		}
+		auto buf = _data16.data();
 		do {
-			if (desize - pos < bytes)
+			if (dn < bytes)
 			{
-				get_data_s();
+				auto kr = stb_vorbis_get_frame_short_interleaved((stb_vorbis*)v, v->channels, buf, bytes - dn) * v->channels;
+				dn += kr;
+				buf += kr;
+				if (kr == 0)break;
 			}
 			else { break; }
 		} while (1);
-		if (data && bytes > 0 && pos < size)
+		if (dn > 0)
 		{
-			auto nc = bytes;
-			if (nc > 0) { 
-				memcpy(data, _data16.data() + pos, nc * sizeof(int16_t));
-				pos += nc;
-			}
-			return nc * sizeof(int16_t);
+			memcpy(data, _data16.data(), dn * sizeof(int16_t));
 		}
-		return 0;
+		return dn * sizeof(int16_t);
+	}
+	int ogg_decoder::seek_start()
+	{
+		return stb_vorbis_seek_start(v);
 	}
 	void* ogg_open_memory(const void* data, int len, void* handle) {
 		ogg_decoder* p = 0;
 		if (data && len > 0) {
 			p = new ogg_decoder();
+			p->gtype = 0;
 			p->open_data((char*)data, len);
 			if (!p->v)
 			{
@@ -1532,16 +1507,25 @@ namespace hz {
 			}
 			if (format)
 			{
-				*format = 0;
+				*format = pw->gtype ? 0 : 2;
 			}
 		}
+	}
+	char* ogg_get_buffer(void* ptr) {
+		auto p = (ogg_decoder*)ptr;
+		char* r = 0;
+		if (p)
+		{
+			r = p->gtype ? (char*)p->_data16.data() : (char*)p->_data.data();
+		}
+		return r;
 	}
 	int ogg_get_audio(void* ptr, void* data, int bytes) {
 		auto p = (ogg_decoder*)ptr;
 		int r = 0;
 		if (p)
 		{
-			r = p->get_data16(data, bytes);
+			r = p->gtype ? p->get_data16(data, bytes) : p->get_data(data, bytes);
 		}
 		return r;
 	}
@@ -1549,6 +1533,26 @@ namespace hz {
 		if (p) {
 			delete (ogg_decoder*)p;
 		}
+	}
+
+
+#endif // !NO_OGGS
+
+	coder_t* create_flac_de()
+	{
+		coder_t* ct = new coder_t();
+		ct->tag = "flac";
+		memcpy(ct->tag2, "fLaC", 4);
+		ct->open_memory = flac_de_t::open_memory;
+		ct->get_audio = flac_de_t::get_audio;
+		ct->seek = flac_de_t::seek;
+		ct->free_m = flac_de_t::free_m;
+		ct->load = flac_de_t::load;
+		ct->unload = flac_de_t::unload;
+		ct->handle = ct->load();
+		ct->get_info = get_info_ty;
+		ct->encoder = (encoder_func)flac_en_t::encoder;
+		return ct;
 	}
 	coder_t* create_ogg_de()
 	{
@@ -1561,14 +1565,8 @@ namespace hz {
 		ct->get_info = get_info_ogg;
 		return ct;
 	}
-
-
-#endif // !NO_OGGS
-
 }
 //!hz
-
-#endif // 1
 
 coders_t* new_coders()
 {
@@ -1586,6 +1584,21 @@ coders_t* new_coders()
 void free_coders(coders_t* p)
 {
 	if (p)delete p;
+}
+
+coders_t::coders_t()
+{
+}
+
+coders_t::~coders_t()
+{
+	for (auto p : codes) {
+		if (p->unload)
+		{
+			p->unload(p->handle);
+		}
+	}
+	codes.clear();
 }
 int decoder_data(audio_data_t* p)
 {
@@ -1693,6 +1706,7 @@ void free_audio_data(audio_data_t* p)
 		p->dataold = 0;
 		if (p->data)
 			free(p->data);
+
 		delete p;
 	}
 }

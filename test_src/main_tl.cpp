@@ -705,7 +705,9 @@ int main()
 	coders_t* cp = new_coders();
 	audio_data_t* mad = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
 	//audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
-	audio_data_t* mad1 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
+	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
+	audio_data_t* mad21 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
+	audio_data_t* mad1 = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
 	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
 	auto st32f = app->new_audio_stream(2, 2, 48000);
