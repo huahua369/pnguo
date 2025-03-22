@@ -813,6 +813,8 @@ namespace hz
 		int ret = 0;
 		if (hFile && rs > 0)
 		{
+			auto oldpm = _pm;
+			unmap(true);	// 关闭映射才能重新设置大小
 			LARGE_INTEGER ds;
 			ds.QuadPart = rs;
 			ret = SetFilePointerEx(hFile, ds, NULL, FILE_BEGIN);
@@ -983,7 +985,21 @@ namespace hz
 	{
 		int ret = 0;
 		if (_fd && rs > 0)
+		{
+			bool ismap = _pm;
+			unmap(true);
 			ret = ftruncate64(_fd, rs);
+			lseek(_fd, 0L, SEEK_SET);
+			if (ismap)
+			{
+				auto m = map(rs, 0);
+				if (m)
+				{
+					set(_pm, rs);
+					seek(0, SEEK_SET);
+				}
+			}
+		}
 		return ret;
 	}
 	char* mfile_t::map(uint64_t ms, int64_t pos)
@@ -1009,6 +1025,7 @@ namespace hz
 			{
 				size = _msize;
 			}
+			_msize = pos + size;
 			ret = msync(p, size, _flags_fl);
 		}
 		return ret;

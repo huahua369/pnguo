@@ -9,22 +9,34 @@
 struct encoder_info_t
 {
 	// coder_t->load返回的句柄
-	void* handle;
-	int sample_rate;
-	char channels;
-	char bits_per_sample;
+	void* handle = 0;
+	int sample_rate = 0;
+	char channels = 2;
+	char bits_per_sample = 0;	// 支持数据位宽16 24 32 64。浮点数32/64，整数24就是int32
 	// 压缩层 flac 0-8 ，小于0默认6，大
 	char compression_level = 6;
-	char unknown_;
+	char src_format = 0;	// 源格式，0整数，1浮点数
 	int blocksize = 4096;		//4096
 	// 总样本
-	uint64_t total_samples;
-	const char* data;	// pcm数据
-	int data_size;
-	// 文件名路径file_path和write_func二选一
-	const char* file_path;
+	uint64_t total_samples = 0;
+	const char* data = 0;	// pcm数据
+	int data_size = 0;
+	int dst_format = 0;		// 目标格式1=s8、2=s16、3=s24。如果0则根据源格式自动匹配
+
+	// 文件名路径 
+	const char* file_path = 0;
 };
 typedef size_t(*encoder_func)(encoder_info_t* p);
+
+struct audio_spec_t
+{
+	int format;
+	int channels;
+	int sample_rate;// freq;
+	int total_samples;
+	int bits_per_sample;
+};
+
 // 音乐解码API
 struct coder_t
 {
@@ -53,7 +65,7 @@ struct coder_t
 	// 释放音频对象
 	void (*free_m)(void* music); //	*
 	// 获取音频对象信息
-	void (*get_info)(void* music, int* total_samples, int* channels, int* sample_rate, int* bits_per_sample);
+	void (*get_info)(void* music, audio_spec_t* p);
 
 	// 编码器（可选）,返回0则跳出编码
 	encoder_func encoder;
@@ -63,6 +75,8 @@ struct coder_t
 struct audio_data_t
 {
 	int format = 0, channels = 0, freq = 0;
+	int sample_rate;
+	int bits_per_sample = 0;
 	int len = 0;		// 总长度，解码完成前等于0
 	void* data = 0;		// 解码数据
 	void* ptr = 0;
@@ -96,3 +110,66 @@ void free_audio_data(audio_data_t* p);
 
 
 #endif // !AUDIO_H_V1_
+
+#if 0
+void testaudioencoder()
+{
+	encoder_info_t e = {};
+	while (1)
+	{
+		int rc1 = decoder_data(mad2);
+		if (rc1 <= 0)
+		{
+			break;
+		}
+	}
+	int bits[] = { 16,24,32 };
+	e.bits_per_sample = bits[mad2->format];
+	e.src_format = mad2->format == 2 ? 1 : 0;
+	e.channels = mad2->channels;
+	e.sample_rate = mad2->freq;
+	e.total_samples = mad2->total_samples;
+	e.data = (char*)mad2->data;
+	e.data_size = mad2->len;
+	e.file_path = R"(E:\song2\abc.flac)";
+	auto pe = cp->codes[0];
+	e.handle = pe->handle;
+	int ret = pe->encoder(&e);
+}
+#endif // 0
+
+class fft_cx
+{
+public:
+	double* real = 0;
+	void* _complex = 0;
+	int count = 0;
+	float sample_rate = 0.0f; float freq_start = 0.0f; float freq_end = 0.0f;
+	int FRAME_SIZE = 0;
+	int bits_per_sample = 0;
+	int draw_height = 100;
+	float bar_width = 6;
+	float bar_step = 4;
+	int taps = 16;
+	float smoothConstantDown = 0.08;
+	float smoothConstantUp = 0.8;
+	glm::vec2 draw_pos = { 60,800 };
+	std::vector<float> outdata;
+	std::vector<float> heights;
+	std::vector<float> lastY;
+	std::vector<float> oy;
+	std::vector<double> magnitudesv;
+	std::vector<float> vd;
+	std::vector<float> sample_tem;
+	std::vector<glm::vec4> rects;
+public:
+	fft_cx();
+	~fft_cx();
+	void init(float sample_rate, int bits, float freq_start, float freq_end);
+	float* calculate_heights(float* audio_frame, int frame_size, int dcount);
+	float* calculate_heights(short* audio_frame, int frame_size, int dcount);
+private:
+	float* fft(float* data, int n);
+	void calculate_heights(int dcount);
+
+};

@@ -58,7 +58,9 @@ set(Images_src
 
 find_package(FLAC CONFIG REQUIRED)
 find_package(mpg123 CONFIG REQUIRED)
-
+find_package(FFTW3 CONFIG REQUIRED)
+find_package(FFTW3f CONFIG REQUIRED)
+find_package(FFTW3l CONFIG REQUIRED)
 
 add_library (pnguo STATIC ${pnguo_src})
 #add_library (pnguo SHARED ${pnguo_src})
@@ -69,6 +71,7 @@ target_link_libraries (pnguo PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers G
     SDL3::SDL3
     dxcompiler
     FLAC::FLAC MPG123::libmpg123
+    FFTW3::fftw3 FFTW3::fftw3f FFTW3::fftw3l
 )
 target_include_directories (pnguo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)

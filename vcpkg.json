@@ -26,6 +26,7 @@
     "libflac",
     "libsoundio",
     "mpg123",
+    "fftw3",
     "hwloc"
   ]
 }

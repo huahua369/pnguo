@@ -15,6 +15,12 @@
 //syn123：一些音频信号合成和格式转换
 #include <syn123.h>
 
+#include <fftw3.h>
+#include <cmath> 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif // !M_PI
+
 namespace hz {
 
 	struct AudioSpec_t
@@ -110,27 +116,16 @@ namespace hz {
 			return bits_per_sample;
 		}
 		bool is_done() { return isdone; }
-		static void get_info(void* music, int* total_samples, int* channels, int* sample_rate, int* format)
+		static void get_info(void* music, audio_spec_t* p)
 		{
-			if (music)
+			if (music && p)
 			{
 				music_de_t* pw = (music_de_t*)music;
-				if (total_samples)
-				{
-					*total_samples = pw->total_samples;
-				}
-				if (channels)
-				{
-					*channels = pw->spec.channels;
-				}
-				if (sample_rate)
-				{
-					*sample_rate = pw->spec.freq;
-				}
-				if (format)
-				{
-					*format = pw->spec.format;
-				}
+				p->total_samples = pw->total_samples;
+				p->channels = pw->spec.channels;
+				p->sample_rate = pw->spec.freq;
+				p->format = pw->spec.format;
+				p->bits_per_sample = pw->bits_per_sample;
 			}
 		}
 	public:
@@ -812,6 +807,7 @@ namespace hz {
 			music->total_samples = metadata->data.stream_info.total_samples;
 			double t = music->total_samples; t /= music->spec.freq;
 			music->seconds = t;
+
 			//music->stream.resize(music->total_samples * metadata->data.stream_info.channels * sizeof(float));
 		}
 
@@ -966,7 +962,10 @@ namespace hz {
 			FLAC__int32* pcm;
 			int pcmsize;
 			int channels;
-			int ENC_BUFFER_SIZE;
+			int format;
+			int norm_double = 1;
+			int norm_float = 1;
+			bool add_clipping = true;
 		};
 		// func返回nullptr或长度小于0则跳出编码
 		static size_t encoder(encoder_info_t* ep)
@@ -1010,18 +1009,32 @@ namespace hz {
 
 				int bytes_read = 0;
 				const int pcmsize = flac->FLAC__stream_encoder_get_blocksize(_encoder);
-				std::vector<FLAC__int32> pcmv(pcmsize * 2);
+				std::vector<FLAC__int32> pcmv(pcmsize);
 				auto pcm = pcmv.data();
+				// { flac_write_i2flac,flac_write_s2flac,flac_write_f2flac,flac_write_d2flac };
 				if (ep->data && ep->data_size > 0)
 				{
-					//encoder_process_interleaved(flac, _encoder, ep->data, ep->data_size, ep->channels, pcm, pcmsize);
-					enflac_t et = { flac, _encoder, pcm, pcmsize * sizeof(int), ep->channels,pcmsize };
-					if (ep->bits_per_sample == 24)
+					// dst_format支持8 16 24三种
+					enflac_t et = { flac, _encoder, pcm, pcmsize * sizeof(int), ep->channels, ep->dst_format };
+					if (ep->src_format)
 					{
-						bytes_read = flac_write_i2flac(&et, (int*)ep->data, ep->data_size / sizeof(int));
+						if (ep->bits_per_sample == 32)
+						{
+							bytes_read = flac_write_f2flac(&et, (float*)ep->data, ep->data_size / sizeof(float));
+						}
+						else {
+							bytes_read = flac_write_d2flac(&et, (double*)ep->data, ep->data_size / sizeof(double));
+						}
 					}
-					else {
-						bytes_read = flac_write_s2flac(&et, (short*)ep->data, ep->data_size / sizeof(short));
+					else
+					{
+						if (ep->bits_per_sample == 16)
+						{
+							bytes_read = flac_write_s2flac(&et, (short*)ep->data, ep->data_size / sizeof(short));
+						}
+						else {
+							bytes_read = flac_write_i2flac(&et, (int*)ep->data, ep->data_size / sizeof(int));
+						}
 					}
 					total_bytes_read += bytes_read;
 				}
@@ -1030,40 +1043,9 @@ namespace hz {
 				flac->FLAC__stream_encoder_delete(_encoder);
 				auto e = fmv.last_size();
 				fmv.flush(0, e);
-				fmv.unmap(true);	// 关闭映射才能重新设置大小
 				fmv.ftruncate_m(e);
 			}
 			return total_bytes_read > 0 ? total_bytes_read : 0;
-		}
-		static bool encoder_process_interleaved(flac_loader* flac, FLAC__StreamEncoder* _encoder, const char* data, size_t bytes_read, int channels, FLAC__int32* pcm, int pcmsize)
-		{
-			bool ret = false;
-			short* flacBytes = (short*)data;
-			size_t need = (size_t)bytes_read / 2;
-			int64_t as = need * channels;
-			int ads = pcmsize * 2 / channels;
-			int ic = 0;
-			for (; as > 0;)
-			{
-				ic++;
-				int64_t cs = as, inc = 0;
-				if (cs > pcmsize)
-				{
-					cs = pcmsize;
-					inc = ads;
-				}
-				else
-				{
-					inc = cs * 2 / channels;
-				}
-				for (int64_t i = 0; i < cs; i++) {
-					pcm[i] = flacBytes[i];
-				}
-				ret = flac->FLAC__stream_encoder_process_interleaved(_encoder, pcm, cs);
-				as -= cs;
-				flacBytes += cs;
-			}
-			return ret;
 		}
 
 		static void s2flac8_array(const short* src, int32_t* dest, int count)
@@ -1108,7 +1090,18 @@ namespace hz {
 			int bufferlen, writecount, thiswrite;
 			size_t	total = 0;
 			int32_t* buffer = e->pcm;
-			convert = s2flac16_array;
+			switch (e->format)
+			{
+			case 1:
+				convert = s2flac8_array;
+				break;
+			case 3:
+				convert = s2flac24_array;
+				break;
+			default:
+				convert = s2flac16_array;
+				break;
+			};
 			bufferlen = e->pcmsize / (sizeof(int32_t) * e->channels);
 			bufferlen *= e->channels;
 			while (len > 0)
@@ -1132,7 +1125,18 @@ namespace hz {
 			int bufferlen, writecount, thiswrite;
 			size_t	total = 0;
 			int32_t* buffer = e->pcm;
-			convert = i2flac24_array;
+			switch (e->format)
+			{
+			case 1:
+				convert = i2flac8_array;
+				break;
+			case 2:
+				convert = i2flac16_array;
+				break;
+			default:
+				convert = i2flac24_array;
+				break;
+			};
 			bufferlen = e->pcmsize / (sizeof(int32_t) * e->channels);
 			bufferlen *= e->channels;
 			while (len > 0)
@@ -1150,6 +1154,303 @@ namespace hz {
 			}
 			return total;
 		}
+
+		static size_t flac_write_f2flac(enflac_t* e, const float* ptr, size_t len)
+		{
+			void (*convert) (const float*, int32_t*, int, int);
+			int bufferlen, writecount, thiswrite;
+			size_t	total = 0;
+			int32_t* buffer = e->pcm;
+
+			switch (e->format)
+			{
+			case 1:
+				convert = (e->add_clipping) ? f2flac8_clip_array : f2flac8_array;
+				break;
+			case 2:
+				convert = (e->add_clipping) ? f2flac16_clip_array : f2flac16_array;
+				break;
+			default:
+				convert = (e->add_clipping) ? f2flac24_clip_array : f2flac24_array;
+				break;
+			};
+
+			bufferlen = e->pcmsize / (sizeof(int32_t) * e->channels);
+			bufferlen *= e->channels;
+
+			while (len > 0)
+			{
+				writecount = (len >= bufferlen) ? bufferlen : (int)len;
+				convert(ptr + total, buffer, writecount, e->norm_float);
+				if (FLAC__stream_encoder_process_interleaved(e->_encoder, buffer, writecount / e->channels))
+					thiswrite = writecount;
+				else
+					break;
+				total += thiswrite;
+				if (thiswrite < writecount)
+					break;
+
+				len -= thiswrite;
+			};
+
+			return total;
+		} /* flac_write_f2flac */
+
+		static void f2flac8_clip_array(const float* src, int32_t* dest, int count, int normalize)
+		{
+			float normfact, scaled_value;
+
+			normfact = normalize ? (8.0 * 0x10) : 1.0;
+
+			for (int i = 0; i < count; i++)
+			{
+				scaled_value = src[i] * normfact;
+				if (scaled_value >= (1.0 * 0x7F))
+				{
+					dest[i] = 0x7F;
+					continue;
+				};
+				if (scaled_value <= (-8.0 * 0x10))
+				{
+					dest[i] = -0x80;
+					continue;
+				};
+				dest[i] = psf_lrintf(scaled_value);
+			};
+
+			return;
+		} /* f2flac8_clip_array */
+
+		static void f2flac16_clip_array(const float* src, int32_t* dest, int count, int normalize)
+		{
+			float normfact, scaled_value;
+
+			normfact = normalize ? (8.0 * 0x1000) : 1.0;
+
+			for (int i = 0; i < count; i++)
+			{
+				scaled_value = src[i] * normfact;
+				if (scaled_value >= (1.0 * 0x7FFF))
+				{
+					dest[i] = 0x7FFF;
+					continue;
+				};
+				if (scaled_value <= (-8.0 * 0x1000))
+				{
+					dest[i] = -0x8000;
+					continue;
+				};
+				dest[i] = psf_lrintf(scaled_value);
+			};
+		} /* f2flac16_clip_array */
+
+		static void f2flac24_clip_array(const float* src, int32_t* dest, int count, int normalize)
+		{
+			float normfact, scaled_value;
+
+			normfact = normalize ? (8.0 * 0x100000) : 1.0;
+
+			for (int i = 0; i < count; i++)
+			{
+				scaled_value = src[i] * normfact;
+				if (scaled_value >= (1.0 * 0x7FFFFF))
+				{
+					dest[i] = 0x7FFFFF;
+					continue;
+				};
+
+				if (scaled_value <= (-8.0 * 0x100000))
+				{
+					dest[i] = -0x800000;
+					continue;
+				}
+				dest[i] = psf_lrintf(scaled_value);
+			};
+
+			return;
+		} /* f2flac24_clip_array */
+
+		static void f2flac8_array(const float* src, int32_t* dest, int count, int normalize)
+		{
+			float normfact = normalize ? (1.0 * 0x7F) : 1.0;
+
+			for (int i = 0; i < count; i++)
+				dest[i] = psf_lrintf(src[i] * normfact);
+		} /* f2flac8_array */
+
+		static void f2flac16_array(const float* src, int32_t* dest, int count, int normalize)
+		{
+			float normfact = normalize ? (1.0 * 0x7FFF) : 1.0;
+
+			for (int i = 0; i < count; i++)
+				dest[i] = psf_lrintf(src[i] * normfact);
+		} /* f2flac16_array */
+
+		static void f2flac24_array(const float* src, int32_t* dest, int count, int normalize)
+		{
+			float normfact = normalize ? (1.0 * 0x7FFFFF) : 1.0;
+
+			for (int i = 0; i < count; i++)
+				dest[i] = psf_lrintf(src[i] * normfact);
+		} /* f2flac24_array */
+
+		static size_t flac_write_d2flac(enflac_t* e, const double* ptr, size_t len)
+		{
+			void (*convert) (const double*, int32_t*, int, int);
+			int bufferlen, writecount, thiswrite;
+			size_t	total = 0;
+			int32_t* buffer = e->pcm;
+
+			switch (e->format)
+			{
+			case 1:
+				convert = (e->add_clipping) ? d2flac8_clip_array : d2flac8_array;
+				break;
+			case 2:
+				convert = (e->add_clipping) ? d2flac16_clip_array : d2flac16_array;
+				break;
+			default:
+				convert = (e->add_clipping) ? d2flac24_clip_array : d2flac24_array;
+				break;
+			};
+
+			bufferlen = e->pcmsize / (sizeof(int32_t) * e->channels);
+			bufferlen *= e->channels;
+
+			while (len > 0)
+			{
+				writecount = (len >= bufferlen) ? bufferlen : (int)len;
+				convert(ptr + total, buffer, writecount, e->norm_double);
+				if (FLAC__stream_encoder_process_interleaved(e->_encoder, buffer, writecount / e->channels))
+					thiswrite = writecount;
+				else
+					break;
+				total += thiswrite;
+				if (thiswrite < writecount)
+					break;
+
+				len -= thiswrite;
+			};
+
+			return total;
+		} /* flac_write_d2flac */
+
+		static void d2flac8_clip_array(const double* src, int32_t* dest, int count, int normalize)
+		{
+			double normfact, scaled_value;
+
+			normfact = normalize ? (8.0 * 0x10) : 1.0;
+
+			for (int i = 0; i < count; i++)
+			{
+				scaled_value = src[i] * normfact;
+				if (scaled_value >= (1.0 * 0x7F))
+				{
+					dest[i] = 0x7F;
+					continue;
+				};
+				if (scaled_value <= (-8.0 * 0x10))
+				{
+					dest[i] = -0x80;
+					continue;
+				};
+				dest[i] = psf_lrint(scaled_value);
+			};
+
+			return;
+		} /* d2flac8_clip_array */
+
+		static void d2flac16_clip_array(const double* src, int32_t* dest, int count, int normalize)
+		{
+			double normfact, scaled_value;
+
+			normfact = normalize ? (8.0 * 0x1000) : 1.0;
+
+			for (int i = 0; i < count; i++)
+			{
+				scaled_value = src[i] * normfact;
+				if (scaled_value >= (1.0 * 0x7FFF))
+				{
+					dest[i] = 0x7FFF;
+					continue;
+				};
+				if (scaled_value <= (-8.0 * 0x1000))
+				{
+					dest[i] = -0x8000;
+					continue;
+				};
+				dest[i] = psf_lrint(scaled_value);
+			};
+
+			return;
+		} /* d2flac16_clip_array */
+
+		static void d2flac24_clip_array(const double* src, int32_t* dest, int count, int normalize)
+		{
+			double normfact, scaled_value;
+
+			normfact = normalize ? (8.0 * 0x100000) : 1.0;
+
+			for (int i = 0; i < count; i++)
+			{
+				scaled_value = src[i] * normfact;
+				if (scaled_value >= (1.0 * 0x7FFFFF))
+				{
+					dest[i] = 0x7FFFFF;
+					continue;
+				};
+				if (scaled_value <= (-8.0 * 0x100000))
+				{
+					dest[i] = -0x800000;
+					continue;
+				};
+				dest[i] = psf_lrint(scaled_value);
+			};
+
+			return;
+		} /* d2flac24_clip_array */
+
+		static void d2flac8_array(const double* src, int32_t* dest, int count, int normalize)
+		{
+			double normfact = normalize ? (1.0 * 0x7F) : 1.0;
+
+			for (int i = 0; i < count; i++)
+				dest[i] = psf_lrint(src[i] * normfact);
+		} /* d2flac8_array */
+
+		static void d2flac16_array(const double* src, int32_t* dest, int count, int normalize)
+		{
+			double normfact = normalize ? (1.0 * 0x7FFF) : 1.0;
+
+			for (int i = 0; i < count; i++)
+				dest[i] = psf_lrint(src[i] * normfact);
+		} /* d2flac16_array */
+
+		static void d2flac24_array(const double* src, int32_t* dest, int count, int normalize)
+		{
+			double normfact = normalize ? (1.0 * 0x7FFFFF) : 1.0;
+
+			for (int i = 0; i < count; i++)
+				dest[i] = psf_lrint(src[i] * normfact);
+		} /* d2flac24_array */
+
+		static inline int psf_lrintf(float x)
+		{
+#ifndef NO_SSE2
+			return _mm_cvtss_si32(_mm_load_ss(&x));
+#else
+			return lrintf(x);
+#endif 
+		} /* psf_lrintf */
+
+		static inline int psf_lrint(double x)
+		{
+#ifndef NO_SSE2
+			return _mm_cvtsd_si32(_mm_load_sd(&x));
+#else
+			return lrint(x);
+#endif
+		} /* psf_lrintf */
 	private:
 		static int fwrite_func(const char* data, size_t bytes, uint32_t samples, uint32_t current_frame, void* ud)
 		{
@@ -1459,27 +1760,16 @@ namespace hz {
 
 #endif // !_NO_FLAC_EN_
 
-	void get_info_ty(void* music, int* total_samples, int* channels, int* sample_rate, int* format)
+	void get_info_ty(void* music, audio_spec_t* p)
 	{
 		if (music)
 		{
 			music_de_t* pw = (music_de_t*)music;
-			if (total_samples)
-			{
-				*total_samples = pw->total_samples;
-			}
-			if (channels)
-			{
-				*channels = pw->spec.channels;
-			}
-			if (sample_rate)
-			{
-				*sample_rate = pw->spec.freq;
-			}
-			if (format)
-			{
-				*format = pw->spec.format;
-			}
+			p->total_samples = pw->total_samples;
+			p->channels = pw->spec.channels;
+			p->sample_rate = pw->spec.freq;
+			p->format = pw->spec.format;
+			p->bits_per_sample = pw->bits_per_sample;
 		}
 	}
 
@@ -1599,27 +1889,16 @@ namespace hz {
 		}
 		return p;
 	}
-	void get_info_ogg(void* music, int* total_samples, int* channels, int* sample_rate, int* format)
+	void get_info_ogg(void* music, audio_spec_t* p)
 	{
-		if (music)
+		if (music && p)
 		{
 			ogg_decoder* pw = (ogg_decoder*)music;
-			if (total_samples)
-			{
-				*total_samples = pw->v->total_samples;
-			}
-			if (channels)
-			{
-				*channels = pw->v->channels;
-			}
-			if (sample_rate)
-			{
-				*sample_rate = pw->v->sample_rate;
-			}
-			if (format)
-			{
-				*format = pw->gtype ? 0 : 2;
-			}
+			p->total_samples = pw->v->total_samples;
+			p->channels = pw->v->channels;
+			p->sample_rate = pw->v->sample_rate;
+			p->format = pw->gtype ? 0 : 2;
+			p->bits_per_sample = pw->gtype ? 16 : 32;// ogg解码只有int16或float
 		}
 	}
 	char* ogg_get_buffer(void* ptr) {
@@ -2219,7 +2498,6 @@ audio_data_t* new_audio_data(coders_t* pc, const char* data, int len, bool iscop
 	audio_data_t* r = 0;
 	if (!pc || !data || len < 10)return r;
 	coder_t* c = 0;
-	int total_samples = 0, channels = 0, sample_rate = 0, format = 0;
 	std::string exfn;
 	for (auto it : pc->codes)
 	{
@@ -2253,19 +2531,22 @@ audio_data_t* new_audio_data(coders_t* pc, const char* data, int len, bool iscop
 		if (m)
 		{
 			auto mp = (hz::music_de_t*)m;
-			c->get_info(m, &total_samples, &channels, &sample_rate, &format);
-			r->channels = channels;
+			audio_spec_t as = {};
+			c->get_info(m, &as);
+			r->channels = as.channels;
 			r->code = c;
-			r->format = format;
-			r->freq = sample_rate;
-			int bs = channels * (r->format == 0 ? sizeof(int16_t) : sizeof(int32_t));
+			r->format = as.format;
+			r->freq = as.sample_rate;
+			r->sample_rate = as.sample_rate;
+			r->bits_per_sample = as.bits_per_sample;
+			int bs = as.channels * (r->format == 0 ? sizeof(int16_t) : sizeof(int32_t));
 			if (r->format == 3)
 			{
-				bs = channels * sizeof(double);
+				bs = as.channels * sizeof(double);
 			}
-			auto cap = bs * total_samples;
+			auto cap = bs * as.total_samples;
 			r->cap = align_up(cap, 512);
-			r->total_samples = total_samples;
+			r->total_samples = as.total_samples;
 			r->data = malloc(r->cap);
 			r->ptr = m;
 		}
@@ -2292,4 +2573,435 @@ void free_audio_data(audio_data_t* p)
 
 		delete p;
 	}
+}
+
+/**
+ * @Description : 使用FFT进行滤波
+ *                使用示例：
+ *                  原始采样频率为100kHz，采集了10000个点，保存为单精度浮点数。滤除其中20kHz~30kHz的频率
+ *                  fft_filter_f(10000, in, out, 100e3, 20e3, 30e3)
+ * @Input       : n             输入数据个数
+ *                in            输入数据
+ *                              in和out指向不同位置，不改变输入
+ *                              in和out指向相同位置，输出将覆盖输入
+ *                sample_rate   原始数据采样频率 Hz
+ *                freq_start    需过滤的起始频率 Hz
+ *                freq_end      需过滤的截止频率 Hz
+ *                              若freq_end大于采样频率的50%，则将滤除大于freq_start的所有高频信号
+ * @Output      : out           输出数据
+ *                              in和out指向不同位置，不改变输入
+ *                              in和out指向相同位置，输出将覆盖输入
+ * @Return      : 无
+*/
+void fft_filter_f(int n, const float* in, float* out, float sample_rate, float freq_start, float freq_end)
+{
+	int i, begin, end;
+	double* real;
+	fftw_complex* complex;
+	fftw_plan plan;
+
+	// fftw的内存分配方式和mallco类似，但使用SIMD（单指令多数据流）时，fftw_alloc会将数组以更高效的方式对齐
+	real = fftw_alloc_real(n);
+	complex = fftw_alloc_complex(n / 2 + 1);    // 实际只会用到(n/2)+1个complex对象
+
+	// Step1：FFT实现时域到频域的转换
+	plan = fftw_plan_dft_r2c_1d(n, real, complex, FFTW_ESTIMATE);
+	for (i = 0; i < n; i++)
+	{
+		real[i] = in[i];
+	}
+
+	// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
+	fftw_execute(plan);
+	fftw_destroy_plan(plan);
+
+	// Step2：计算需滤波的频率在频域数组中的下标
+	begin = (int)((freq_start / sample_rate) * n);
+	end = (int)((freq_end / sample_rate) * n);
+	end = end < (n / 2 + 1) ? end : (n / 2 + 1);
+	for (i = begin; i < end; i++)
+	{
+		// 对应的频率分量置为0，即去除该频率
+		complex[i][0] = 0;
+		complex[i][1] = 0;
+	}
+
+	// Step3：IFFT实现频域到时域的转换
+	// 使用FFTW_ESTIMATE构建plan不会破坏输入数据
+	plan = fftw_plan_dft_c2r_1d(n, complex, real, FFTW_ESTIMATE);
+
+	fftw_execute(plan);
+	fftw_destroy_plan(plan);
+
+	// Step4：计算滤波后的时域值
+	for (i = 0; i < n; i++)
+	{
+		// 需除以数据个数，得到滤波后的实数
+		out[i] = real[i] / n;
+	}
+
+	fftw_free(real);
+	fftw_free(complex);
+}
+
+
+fft_cx::fft_cx()
+{
+}
+
+fft_cx::~fft_cx()
+{
+	auto complex = (fftw_complex*)_complex;
+	if (real)
+		fftw_free(real);
+	if (complex)
+		fftw_free(complex);
+	_complex = 0;
+	real = 0;
+}
+void fft_cx::init(float sample_rate0, int bits, float freq_start0, float freq_end0)
+{
+	bits_per_sample = bits;
+	sample_rate = sample_rate0;
+	freq_start = freq_start0;
+	freq_end = freq_end0;
+}
+double hanning_window(int i, int n) {
+	return 0.5 * (1 - cos(i * M_PI / n));
+}
+float* fft_cx::fft(float* data, int n)
+{
+	if (n < 2)return 0;
+	if (count != n)
+	{
+		auto complex = (fftw_complex*)_complex;
+		if (real)
+			fftw_free(real);
+		if (complex)
+			fftw_free(complex);
+		real = 0;
+		_complex = 0;
+		FRAME_SIZE = count = n;
+		// fftw的内存分配方式和mallco类似，但使用SIMD（单指令多数据流）时，fftw_alloc会将数组以更高效的方式对齐
+		real = fftw_alloc_real(n);
+		_complex = fftw_alloc_complex(n / 2 + 1);    // 实际只会用到(n/2)+1个complex对象
+		outdata.resize(n);
+		magnitudesv.resize(FRAME_SIZE / 2);
+		heights.resize(FRAME_SIZE / 2);
+		rects.resize(FRAME_SIZE / 2);
+	}
+	auto complex = (fftw_complex*)_complex;
+	int begin = 0, end = 0;
+	// Step1：FFT实现时域到频域的转换 
+	fftw_plan   plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
+	for (int i = 0; i < count; i++)
+	{
+		real[i] = data[i] * hanning_window(i, FRAME_SIZE);
+	}
+	// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
+	fftw_execute(plan);
+	fftw_destroy_plan(plan);
+	// Step2：计算需滤波的频率在频域数组中的下标
+	begin = (int)((freq_start / sample_rate) * count);
+	end = (int)((freq_end / sample_rate) * count);
+	end = end < (count / 2 + 1) ? end : (count / 2 + 1);
+	if (begin != end)
+	{
+		for (int i = begin; i < end; i++)
+		{
+			// 对应的频率分量置为0，即去除该频率
+			complex[i][0] = 0;
+			complex[i][1] = 0;
+		}
+		// Step3：IFFT实现频域到时域的转换
+		// 使用FFTW_ESTIMATE构建plan不会破坏输入数据
+		plan = fftw_plan_dft_c2r_1d(count, complex, real, FFTW_ESTIMATE);
+		fftw_execute(plan);
+		fftw_destroy_plan(plan);
+	}
+	auto outd = outdata.data();
+	// Step4：计算滤波后的时域值
+	for (int i = 0; i < count; i++)
+	{
+		// 需除以数据个数，得到滤波后的实数
+		outd[i] = real[i];// / count;
+	}
+	return outd;
+}
+//升采样（低→高）
+float* upsample(float* input, int in_len, int factor, float* output) {
+	int out_len = in_len * factor;
+	//float* output = calloc(out_len, sizeof(float)); 
+	double maxf = 0.0;
+	// 线性插值实现 
+	for (int i = 0; i < in_len - 1; i++) {
+		float delta = (input[i + 1] - input[i]) / factor;
+		for (int j = 0; j < factor; j++) {
+			output[i * factor + j] = input[i] + delta * j;
+			if (output[i * factor + j] > maxf)
+			{
+				maxf = output[i * factor + j];
+			}
+		}
+	}
+	for (size_t i = 0; i < out_len; i++)
+	{
+		output[i] /= maxf;
+	}
+	return output;
+}
+//降采样（高→低）
+float* downsample(float* input, int in_len, int factor, float* output) {
+	int out_len = in_len / factor;
+	//float* output = malloc(out_len * sizeof(float));
+	double maxf = 0.0;
+	// 均值降采样 
+	for (int i = 0; i < out_len; i++) {
+		float sum = 0;
+		for (int j = 0; j < factor; j++) {
+			sum += input[i * factor + j];
+		}
+		output[i] = sum / factor;
+		if (output[i] > maxf)
+		{
+			maxf = output[i];
+		}
+	}
+	for (size_t i = 0; i < out_len; i++)
+	{
+		output[i] /= maxf;
+	}
+	return output;
+}
+// 简易FIR低通滤波器（截止频率=目标采样率/2）
+void apply_lpf(float* data, int len, int taps, float* coeff, float* filtered) {
+	//float* coeff = malloc(taps * sizeof(float));
+	// 生成窗函数系数（示例使用汉明窗）
+	for (int i = 0; i < taps; i++) {
+		coeff[i] = 0.54 - 0.46 * cos(2 * M_PI * i / (taps - 1));
+	}
+
+	// 实现卷积运算 
+	//float* filtered = malloc(len * sizeof(float));
+	for (int n = 0; n < len; n++) {
+		filtered[n] = 0;
+		for (int k = 0; k < taps; k++) {
+			int idx = n - k;
+			if (idx >= 0) filtered[n] += data[idx] * coeff[k];
+		}
+	}
+	memcpy(data, filtered, len * sizeof(float));
+	//free(coeff);
+	//free(filtered);
+}
+void fft_cx::calculate_heights(int dcount)
+{
+	// 计算幅度谱
+	double max_mag = 0.0;
+	double* magnitudes = magnitudesv.data();
+	auto _out = (fftw_complex*)_complex;
+	for (int k = 0; k < FRAME_SIZE / 2; k++) {
+		magnitudes[k] = sqrt(abs(_out[k][0] * _out[k][0] + _out[k][1] * _out[k][1]));
+		magnitudes[k] = abs(log10(magnitudes[k]));// 20 * log10(magnitudes[k])); // 转分贝 
+		if (magnitudes[k] > max_mag) max_mag = magnitudes[k];
+	}
+
+	// 3. Cairo绘制频谱条
+	//cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // 设置频谱颜色 
+	// 800.0 / (FRAME_SIZE / 2);
+	for (int k = 0; k < FRAME_SIZE / 2; k++) {
+		heights[k] = (magnitudes[k] / max_mag); // 归一化高度  
+	}
+	if (dcount > 2)
+	{
+		int dst_rate = dcount, src_rate = FRAME_SIZE / 2;
+		// 计算采样率转换因子 
+		int factor = (dst_rate > src_rate) ?
+			dst_rate / src_rate :
+			src_rate / dst_rate;
+		int len = heights.size();// , taps = 64;
+		int ass = taps + len + len * factor;
+		if (sample_tem.size() != ass)
+		{
+			sample_tem.resize(ass);
+		}
+		auto t = sample_tem.data();
+		float* output = 0;
+		size_t length = 0;
+		if (dst_rate == src_rate)
+		{
+			output = heights.data();
+		}
+		else {
+			if (dst_rate > src_rate) { // 升采样 
+				apply_lpf(heights.data(), len, taps, t, t + taps); // 预滤波 
+				output = upsample(heights.data(), len, factor, t + taps + len);
+				length = len * factor;
+			}
+			else { // 降采样 
+				apply_lpf(heights.data(), len, taps, t, t + taps); // 抗混叠滤波 
+				output = downsample(heights.data(), len, factor, t + taps + len);
+				length = len / factor;
+			}
+		}
+		if (rects.size() != length)
+			rects.resize(length);
+		if (oy.size() != length)
+			oy.resize(length);
+		for (size_t i = 0; i < length; i++)
+		{
+			auto height = output[i];
+			if (isnan(height))
+				height = 0;
+			oy[i] = height * draw_height;
+		}
+		auto& y = oy;
+		if (lastY.size()) {
+			if (length != lastY.size())
+				lastY.resize(length);
+			for (int i = 0; i < length; i++) {
+				if (y[i] < lastY[i]) {
+					lastY[i] = y[i] * smoothConstantDown + lastY[i] * (1 - smoothConstantDown);
+				}
+				else {
+					lastY[i] = y[i] * smoothConstantUp + lastY[i] * (1 - smoothConstantUp);
+				}
+			}
+		}
+		else {
+			lastY = y;
+		}
+		for (size_t i = 0; i < length; i++)
+		{
+			auto height = lastY[i];
+			rects[i] = { draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
+		}
+	}
+}
+float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
+{
+	float* a = fft(audio_frame, frame_size);
+	calculate_heights(dcount);
+	return heights.data();
+}
+float* fft_cx::calculate_heights(short* audio_frame, int frame_size, int dcount)
+{
+	vd.resize(frame_size);
+	auto df = vd.data();
+	uint32_t bps = (1 << (bits_per_sample - 1));
+	float norm = 1.0 / bps;
+	for (size_t i = 0; i < frame_size; i++)
+	{
+		auto b = audio_frame[i];
+		df[i] = b * norm;
+	}
+#if 1
+	float* a = fft(df, frame_size);
+	calculate_heights(dcount);
+#else	
+	outdata.resize(frame_size);
+	magnitudesv.resize(frame_size / 2);
+	heights.resize(frame_size / 2);
+	rects.resize(frame_size / 2);
+	// 计算幅度谱
+	double max_mag = 0.0;
+	double* magnitudes = magnitudesv.data();
+	auto _out = (fftw_complex*)_complex;
+	for (int k = 0; k < frame_size / 2; k++) {
+		magnitudes[k] = sqrt(abs(df[0] * df[0] + df[1] * df[1]));
+		df += 2;
+		magnitudes[k] = abs(20 * log10(magnitudes[k]));// 20 * log10(magnitudes[k])); // 转分贝 
+		if (magnitudes[k] > max_mag) max_mag = magnitudes[k];
+	}
+
+	// 3. Cairo绘制频谱条
+	//cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // 设置频谱颜色 
+	// 800.0 / (FRAME_SIZE / 2);
+	for (int k = 0; k < frame_size / 2; k++) {
+		heights[k] = (magnitudes[k] / max_mag); // 归一化高度  
+	}
+	if (dcount > 10)
+	{
+		int dst_rate = dcount, src_rate = frame_size;
+		// 计算采样率转换因子 
+		int factor = (dst_rate > src_rate) ?
+			dst_rate / src_rate :
+			src_rate / dst_rate;
+		int len = heights.size();// , taps = 64;
+		int ass = taps + len + len * factor;
+		if (sample_tem.size() != ass)
+		{
+			sample_tem.resize(ass);
+		}
+		auto t = sample_tem.data();
+		float* output = 0;
+		size_t length = 0;
+		if (dst_rate > src_rate) { // 升采样 
+			apply_lpf(heights.data(), len, taps, t, t + taps); // 预滤波 
+			output = upsample(heights.data(), len, factor, t + taps + len);
+			length = len * factor;
+		}
+		else { // 降采样 
+			apply_lpf(heights.data(), len, taps, t, t + taps); // 抗混叠滤波 
+			output = downsample(heights.data(), len, factor, t + taps + len);
+			length = len / factor;
+		}
+		if (rects.size() != length)
+			rects.resize(length);
+		for (size_t i = 0; i < length; i++)
+		{
+			auto height = output[i];
+			heights[i] = height;
+			height *= draw_height;
+			rects[i] = { draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
+		}
+	}
+#endif // 0
+	return heights.data();
+}
+
+
+void fftch(short* pcm_data, int FRAME_SIZE)
+{
+	// 1. FFT初始化 
+	double* _in = fftw_alloc_real(FRAME_SIZE);
+	fftw_complex* _out = fftw_alloc_complex(FRAME_SIZE / 2 + 1);
+	fftw_plan plan = fftw_plan_dft_r2c_1d(FRAME_SIZE, _in, _out, FFTW_ESTIMATE);
+	std::vector<double> magnitudesv;
+	magnitudesv.resize(FRAME_SIZE / 2);
+	// 2. 处理每帧音频 
+	int total_frames = 1;
+	for (int i = 0; i < total_frames; i++) {
+		// 填充当前帧数据并加窗
+		for (int j = 0; j < FRAME_SIZE; j++) {
+			_in[j] = pcm_data[i * FRAME_SIZE + j] * hanning_window(j, FRAME_SIZE);
+		}
+
+		// 执行FFT
+		fftw_execute(plan);
+
+		// 计算幅度谱
+		double max_mag = 0.0;
+		double* magnitudes = magnitudesv.data();
+		for (int k = 0; k < FRAME_SIZE / 2; k++) {
+			magnitudes[k] = sqrt(_out[k][0] * _out[k][0] + _out[k][1] * _out[k][1]);
+			magnitudes[k] = 20 * log10(magnitudes[k]); // 转分贝 
+			if (magnitudes[k] > max_mag) max_mag = magnitudes[k];
+		}
+
+		// 3. Cairo绘制频谱条
+		//cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // 设置频谱颜色 
+		float bar_width = 800.0 / (FRAME_SIZE / 2);
+		for (int k = 0; k < FRAME_SIZE / 2; k++) {
+			float height = (magnitudes[k] / max_mag) * 400; // 归一化高度 
+			//cairo_rectangle(cr, k * bar_width, 400 - height, bar_width - 1, height);
+			//cairo_fill(cr);
+		}
+
+	}
+
+	// 4. 资源释放 
+	fftw_destroy_plan(plan);
+	fftw_free(_in);
+	fftw_free(_out);
 }

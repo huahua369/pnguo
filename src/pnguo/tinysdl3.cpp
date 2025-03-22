@@ -1932,6 +1932,15 @@ void form_x::update(float delta)
 	}
 	app_cx::sleep_ms(dwt);
 }
+void form_x::draw_rects(const glm::vec4* rects, int n, const glm::vec4& color)
+{
+	assert(renderer);
+	if (renderer && rects && n > 0)
+	{
+		SDL_SetRenderDrawColorFloat(renderer, color.x, color.y, color.z, color.w);  /* white, full alpha */
+		SDL_RenderFillRects(renderer, (SDL_FRect*)rects, n);
+	}
+}
 // todo 图集渲染
 void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
 {

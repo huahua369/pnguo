@@ -706,9 +706,9 @@ int main()
 	coders_t* cp = new_coders();
 	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
-	audio_data_t* mad21 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
+	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
 	audio_data_t* madogg = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
-	audio_data_t* mad = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
+	audio_data_t* mad121 = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
 	audio_data_t* mad2 = new_audio_data(cp, R"(E:\song2\程响-是否.mp3)");
 	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
@@ -716,27 +716,32 @@ int main()
 	auto st32 = app->new_audio_stream(1, 2, 48000);
 	auto st16 = app->new_audio_stream(0, 2, 48000);
 
+	fft_cx* fft = new fft_cx();
 	{
 		encoder_info_t e = {};
 		while (1)
 		{
-			int rc1 = decoder_data(mad2);
+			int rc1 = decoder_data(mad1);
 			if (rc1 <= 0)
 			{
 				break;
 			}
 		}
-		e.bits_per_sample = 16;
-		e.channels = mad2->channels;
-		e.sample_rate = mad2->freq;
-		e.total_samples = mad2->total_samples;
-		e.data = (char*)mad2->data;
-		e.data_size = mad2->len;
+		fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
+
+		int bits[] = { 16,24,32 };
+		e.bits_per_sample = bits[mad1->format];
+		e.src_format = mad1->format == 2 ? 1 : 0;
+		e.channels = mad1->channels;
+		e.sample_rate = mad1->freq;
+		e.total_samples = mad1->total_samples;
+		e.data = (char*)mad1->data;
+		e.data_size = mad1->len;
 		e.file_path = R"(E:\song2\程响-是否cf.flac)";
 		auto pe = cp->codes[0];
 		e.handle = pe->handle;
-		int ret = pe->encoder(&e);
-		printf("%d\n", ret);
+		//int ret = pe->encoder(&e);
+		//printf("%d\n", ret);
 	}
 
 	/*
@@ -747,7 +752,12 @@ int main()
 		free_audio_stream
 	close_audio
 	*/
-
+	double dtime = 0.06;
+	int fs = mad1->sample_rate * dtime;
+	{
+		auto dt1 = (char*)mad1->data;
+		app->put_audio(st1, dt1, mad1->len);
+	}
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
@@ -759,12 +769,6 @@ int main()
 				//	app->put_audio(st, dt, rc);
 				static double deltas = 0;
 				deltas += delta;
-				if (deltas > 0)
-				{
-					int rc1 = decoder_data(mad1);
-					if (rc1 > 0)
-						app->put_audio(st1, dt1, rc1);
-				}
 				if (adata->size())
 				{
 					//app->put_audio(st16, adata16->data(), adata16->size() * sizeof(int16_t));
@@ -774,6 +778,20 @@ int main()
 				}
 				else {}
 				d2->update_draw(delta);
+				if (deltas > dtime)
+				{
+					static int64_t kn = 0;
+					static int64_t sn = 1024;
+					deltas = 0;
+					fft->calculate_heights((short*)mad1->data + kn, sn, 100);
+					kn += fs;
+					if (kn >= mad1->total_samples)
+					{
+						kn = 0;
+					}
+				}
+				glm::vec4 color = { 0,0.5,1.0,0.8 };
+				form0->draw_rects(fft->rects.data(), fft->rects.size(), color);
 			};
 	}
 	auto lt = pl->ltx;

@@ -288,6 +288,7 @@ public:
 	void* get_nptr();
 	// 增加菜单管理器
 	void push_menu(menu_cx* p);
+	void draw_rects(const glm::vec4* rects, int n, const glm::vec4& color);
 public:
 	void update_w();
 	void update(float delta);
