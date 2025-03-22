@@ -2672,6 +2672,7 @@ double hanning_window(int i, int n) {
 float* fft_cx::fft(float* data, int n)
 {
 	if (n < 2)return 0;
+	int rcount = FRAME_SIZE / 2;
 	if (count != n)
 	{
 		auto complex = (fftw_complex*)_complex;
@@ -2682,13 +2683,14 @@ float* fft_cx::fft(float* data, int n)
 		real = 0;
 		_complex = 0;
 		FRAME_SIZE = count = n;
+		rcount = FRAME_SIZE / 2;
 		// fftw的内存分配方式和mallco类似，但使用SIMD（单指令多数据流）时，fftw_alloc会将数组以更高效的方式对齐
 		real = fftw_alloc_real(n);
-		_complex = fftw_alloc_complex(n / 2 + 1);    // 实际只会用到(n/2)+1个complex对象
+		_complex = fftw_alloc_complex(rcount + 1);    // 实际只会用到(n/2)+1个complex对象
 		outdata.resize(n);
-		magnitudesv.resize(FRAME_SIZE / 2);
-		heights.resize(FRAME_SIZE / 2);
-		rects.resize(FRAME_SIZE / 2);
+		magnitudesv.resize(rcount);
+		heights.resize(rcount);
+		rects.resize(rcount);
 	}
 	auto complex = (fftw_complex*)_complex;
 	int begin = 0, end = 0;
@@ -2696,7 +2698,7 @@ float* fft_cx::fft(float* data, int n)
 	fftw_plan   plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
 	for (int i = 0; i < count; i++)
 	{
-		real[i] = data[i] * hanning_window(i, FRAME_SIZE);
+		real[i] = data[i] * hanning_window(i, FRAME_SIZE); 
 	}
 	// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
 	fftw_execute(plan);
@@ -2711,7 +2713,7 @@ float* fft_cx::fft(float* data, int n)
 		{
 			// 对应的频率分量置为0，即去除该频率
 			complex[i][0] = 0;
-			complex[i][1] = 0;
+			complex[i][1] = 0;   // 虚部设置为零
 		}
 		// Step3：IFFT实现频域到时域的转换
 		// 使用FFTW_ESTIMATE构建plan不会破坏输入数据
@@ -2798,23 +2800,27 @@ void fft_cx::calculate_heights(int dcount)
 {
 	// 计算幅度谱
 	double max_mag = 0.0;
+	double min_mag = 0.0;
 	double* magnitudes = magnitudesv.data();
 	auto _out = (fftw_complex*)_complex;
-	for (int k = 0; k < FRAME_SIZE / 2; k++) {
-		magnitudes[k] = sqrt(abs(_out[k][0] * _out[k][0] + _out[k][1] * _out[k][1]));
-		magnitudes[k] = abs(log10(magnitudes[k]));// 20 * log10(magnitudes[k])); // 转分贝 
-		if (magnitudes[k] > max_mag) max_mag = magnitudes[k];
+	int rcount = FRAME_SIZE / 2;
+	for (int k = 0; k < rcount; k++) {
+		auto& it = magnitudes[k];
+		it = sqrt(pow(_out[k][0], 2) + pow(_out[k][1], 2));
+		double power = pow(it, 2);
+		it = 20 * log10(it); // 转分贝 
+		if (std::isnan(it))
+			it = 0.0;
+		if (it > max_mag) max_mag = it;
+		if (it < min_mag) min_mag = it;
 	}
-
-	// 3. Cairo绘制频谱条
-	//cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // 设置频谱颜色 
-	// 800.0 / (FRAME_SIZE / 2);
-	for (int k = 0; k < FRAME_SIZE / 2; k++) {
-		heights[k] = (magnitudes[k] / max_mag); // 归一化高度  
+	max_mag -= min_mag;
+	for (int k = 0; k < rcount; k++) {
+		heights[k] = ((magnitudes[k] - min_mag) / max_mag); // 归一化高度  
 	}
 	if (dcount > 2)
 	{
-		int dst_rate = dcount, src_rate = FRAME_SIZE / 2;
+		int dst_rate = dcount, src_rate = rcount;
 		// 计算采样率转换因子 
 		int factor = (dst_rate > src_rate) ?
 			dst_rate / src_rate :
@@ -2856,7 +2862,7 @@ void fft_cx::calculate_heights(int dcount)
 			oy[i] = height * draw_height;
 		}
 		auto& y = oy;
-		if (lastY.size()) {
+		if (lastY.size() && is_smooth) {
 			if (length != lastY.size())
 				lastY.resize(length);
 			for (int i = 0; i < length; i++) {
@@ -2895,113 +2901,8 @@ float* fft_cx::calculate_heights(short* audio_frame, int frame_size, int dcount)
 		auto b = audio_frame[i];
 		df[i] = b * norm;
 	}
-#if 1
 	float* a = fft(df, frame_size);
 	calculate_heights(dcount);
-#else	
-	outdata.resize(frame_size);
-	magnitudesv.resize(frame_size / 2);
-	heights.resize(frame_size / 2);
-	rects.resize(frame_size / 2);
-	// 计算幅度谱
-	double max_mag = 0.0;
-	double* magnitudes = magnitudesv.data();
-	auto _out = (fftw_complex*)_complex;
-	for (int k = 0; k < frame_size / 2; k++) {
-		magnitudes[k] = sqrt(abs(df[0] * df[0] + df[1] * df[1]));
-		df += 2;
-		magnitudes[k] = abs(20 * log10(magnitudes[k]));// 20 * log10(magnitudes[k])); // 转分贝 
-		if (magnitudes[k] > max_mag) max_mag = magnitudes[k];
-	}
-
-	// 3. Cairo绘制频谱条
-	//cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // 设置频谱颜色 
-	// 800.0 / (FRAME_SIZE / 2);
-	for (int k = 0; k < frame_size / 2; k++) {
-		heights[k] = (magnitudes[k] / max_mag); // 归一化高度  
-	}
-	if (dcount > 10)
-	{
-		int dst_rate = dcount, src_rate = frame_size;
-		// 计算采样率转换因子 
-		int factor = (dst_rate > src_rate) ?
-			dst_rate / src_rate :
-			src_rate / dst_rate;
-		int len = heights.size();// , taps = 64;
-		int ass = taps + len + len * factor;
-		if (sample_tem.size() != ass)
-		{
-			sample_tem.resize(ass);
-		}
-		auto t = sample_tem.data();
-		float* output = 0;
-		size_t length = 0;
-		if (dst_rate > src_rate) { // 升采样 
-			apply_lpf(heights.data(), len, taps, t, t + taps); // 预滤波 
-			output = upsample(heights.data(), len, factor, t + taps + len);
-			length = len * factor;
-		}
-		else { // 降采样 
-			apply_lpf(heights.data(), len, taps, t, t + taps); // 抗混叠滤波 
-			output = downsample(heights.data(), len, factor, t + taps + len);
-			length = len / factor;
-		}
-		if (rects.size() != length)
-			rects.resize(length);
-		for (size_t i = 0; i < length; i++)
-		{
-			auto height = output[i];
-			heights[i] = height;
-			height *= draw_height;
-			rects[i] = { draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
-		}
-	}
-#endif // 0
 	return heights.data();
 }
 
-
-void fftch(short* pcm_data, int FRAME_SIZE)
-{
-	// 1. FFT初始化 
-	double* _in = fftw_alloc_real(FRAME_SIZE);
-	fftw_complex* _out = fftw_alloc_complex(FRAME_SIZE / 2 + 1);
-	fftw_plan plan = fftw_plan_dft_r2c_1d(FRAME_SIZE, _in, _out, FFTW_ESTIMATE);
-	std::vector<double> magnitudesv;
-	magnitudesv.resize(FRAME_SIZE / 2);
-	// 2. 处理每帧音频 
-	int total_frames = 1;
-	for (int i = 0; i < total_frames; i++) {
-		// 填充当前帧数据并加窗
-		for (int j = 0; j < FRAME_SIZE; j++) {
-			_in[j] = pcm_data[i * FRAME_SIZE + j] * hanning_window(j, FRAME_SIZE);
-		}
-
-		// 执行FFT
-		fftw_execute(plan);
-
-		// 计算幅度谱
-		double max_mag = 0.0;
-		double* magnitudes = magnitudesv.data();
-		for (int k = 0; k < FRAME_SIZE / 2; k++) {
-			magnitudes[k] = sqrt(_out[k][0] * _out[k][0] + _out[k][1] * _out[k][1]);
-			magnitudes[k] = 20 * log10(magnitudes[k]); // 转分贝 
-			if (magnitudes[k] > max_mag) max_mag = magnitudes[k];
-		}
-
-		// 3. Cairo绘制频谱条
-		//cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // 设置频谱颜色 
-		float bar_width = 800.0 / (FRAME_SIZE / 2);
-		for (int k = 0; k < FRAME_SIZE / 2; k++) {
-			float height = (magnitudes[k] / max_mag) * 400; // 归一化高度 
-			//cairo_rectangle(cr, k * bar_width, 400 - height, bar_width - 1, height);
-			//cairo_fill(cr);
-		}
-
-	}
-
-	// 4. 资源释放 
-	fftw_destroy_plan(plan);
-	fftw_free(_in);
-	fftw_free(_out);
-}

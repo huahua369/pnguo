@@ -150,10 +150,11 @@ public:
 	int draw_height = 100;
 	float bar_width = 6;
 	float bar_step = 4;
-	int taps = 16;
+	int taps = 64;
 	float smoothConstantDown = 0.08;
 	float smoothConstantUp = 0.8;
-	glm::vec2 draw_pos = { 60,800 };
+	bool is_smooth = true;			// 是否平滑
+	glm::vec2 draw_pos = { 60,160 };
 	std::vector<float> outdata;
 	std::vector<float> heights;
 	std::vector<float> lastY;

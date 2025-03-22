@@ -704,12 +704,12 @@ int main()
 	build_audio_test(5, *adata32);
 	build_audio_test(5, *adata16);
 	coders_t* cp = new_coders();
-	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
 	audio_data_t* madogg = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
-	audio_data_t* mad121 = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
-	audio_data_t* mad2 = new_audio_data(cp, R"(E:\song2\程响-是否.mp3)");
+	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
+	audio_data_t* mad1h = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
+	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song1\程响-人间烟火(DJ版).flac)");
 	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
 	auto st32f = app->new_audio_stream(2, 2, 48000);
@@ -756,7 +756,7 @@ int main()
 	int fs = mad1->sample_rate * dtime;
 	{
 		auto dt1 = (char*)mad1->data;
-		app->put_audio(st1, dt1, mad1->len);
+		//app->put_audio(st1, dt1, mad1->len);
 	}
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
@@ -781,7 +781,7 @@ int main()
 				if (deltas > dtime)
 				{
 					static int64_t kn = 0;
-					static int64_t sn = 1024;
+					static int64_t sn = fs > 2048 ? 2048 : fs;
 					deltas = 0;
 					fft->calculate_heights((short*)mad1->data + kn, sn, 100);
 					kn += fs;
