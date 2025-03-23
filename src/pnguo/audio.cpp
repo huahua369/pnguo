@@ -23,6 +23,260 @@
 
 namespace hz {
 
+	inline int psf_lrintf(float x)
+	{
+#ifndef NO_SSE2
+		return _mm_cvtss_si32(_mm_load_ss(&x));
+#else
+		return lrintf(x);
+#endif 
+	} /* psf_lrintf */
+
+	inline int psf_lrint(double x)
+	{
+#ifndef NO_SSE2
+		return _mm_cvtsd_si32(_mm_load_sd(&x));
+#else
+		return lrint(x);
+#endif
+	} /* psf_lrintf */
+
+	void s2flac8_array(const short* src, int32_t* dest, int count)
+	{
+		for (int i = 0; i < count; i++)
+			dest[i] = src[i] >> 8;
+	} /* s2flac8_array */
+
+	void s2flac16_array(const short* src, int32_t* dest, int count)
+	{
+		for (int i = 0; i < count; i++)
+			dest[i] = src[i];
+	} /* s2flac16_array */
+
+	void s2flac24_array(const short* src, int32_t* dest, int count)
+	{
+		for (int i = 0; i < count; i++)
+			dest[i] = src[i] << 8;
+	} /* s2flac24_array */
+
+	void i2flac8_array(const int* src, int32_t* dest, int count)
+	{
+		for (int i = 0; i < count; i++)
+			dest[i] = src[i] >> 24;
+	} /* i2flac8_array */
+
+	void i2flac16_array(const int* src, int32_t* dest, int count)
+	{
+		for (int i = 0; i < count; i++)
+			dest[i] = src[i] >> 16;
+	} /* i2flac16_array */
+
+	void i2flac24_array(const int* src, int32_t* dest, int count)
+	{
+		for (int i = 0; i < count; i++)
+			dest[i] = src[i] >> 8;
+	} /* i2flac24_array */
+
+	void f2flac8_clip_array(const float* src, int32_t* dest, int count, int normalize)
+	{
+		float normfact, scaled_value;
+
+		normfact = normalize ? (8.0 * 0x10) : 1.0;
+
+		for (int i = 0; i < count; i++)
+		{
+			scaled_value = src[i] * normfact;
+			if (scaled_value >= (1.0 * 0x7F))
+			{
+				dest[i] = 0x7F;
+				continue;
+			};
+			if (scaled_value <= (-8.0 * 0x10))
+			{
+				dest[i] = -0x80;
+				continue;
+			};
+			dest[i] = psf_lrintf(scaled_value);
+		};
+
+		return;
+	} /* f2flac8_clip_array */
+
+	void f2flac16_clip_array(const float* src, int32_t* dest, int count, int normalize)
+	{
+		float normfact, scaled_value;
+
+		normfact = normalize ? (8.0 * 0x1000) : 1.0;
+
+		for (int i = 0; i < count; i++)
+		{
+			scaled_value = src[i] * normfact;
+			if (scaled_value >= (1.0 * 0x7FFF))
+			{
+				dest[i] = 0x7FFF;
+				continue;
+			};
+			if (scaled_value <= (-8.0 * 0x1000))
+			{
+				dest[i] = -0x8000;
+				continue;
+			};
+			dest[i] = psf_lrintf(scaled_value);
+		};
+	} /* f2flac16_clip_array */
+
+	void f2flac24_clip_array(const float* src, int32_t* dest, int count, int normalize)
+	{
+		float normfact, scaled_value;
+
+		normfact = normalize ? (8.0 * 0x100000) : 1.0;
+
+		for (int i = 0; i < count; i++)
+		{
+			scaled_value = src[i] * normfact;
+			if (scaled_value >= (1.0 * 0x7FFFFF))
+			{
+				dest[i] = 0x7FFFFF;
+				continue;
+			};
+
+			if (scaled_value <= (-8.0 * 0x100000))
+			{
+				dest[i] = -0x800000;
+				continue;
+			}
+			dest[i] = psf_lrintf(scaled_value);
+		};
+
+		return;
+	} /* f2flac24_clip_array */
+
+	void f2flac8_array(const float* src, int32_t* dest, int count, int normalize)
+	{
+		float normfact = normalize ? (1.0 * 0x7F) : 1.0;
+
+		for (int i = 0; i < count; i++)
+			dest[i] = psf_lrintf(src[i] * normfact);
+	} /* f2flac8_array */
+
+	void f2flac16_array(const float* src, int32_t* dest, int count, int normalize)
+	{
+		float normfact = normalize ? (1.0 * 0x7FFF) : 1.0;
+
+		for (int i = 0; i < count; i++)
+			dest[i] = psf_lrintf(src[i] * normfact);
+	} /* f2flac16_array */
+
+	void f2flac24_array(const float* src, int32_t* dest, int count, int normalize)
+	{
+		float normfact = normalize ? (1.0 * 0x7FFFFF) : 1.0;
+
+		for (int i = 0; i < count; i++)
+			dest[i] = psf_lrintf(src[i] * normfact);
+	} /* f2flac24_array */
+
+	void d2flac8_clip_array(const double* src, int32_t* dest, int count, int normalize)
+	{
+		double normfact, scaled_value;
+
+		normfact = normalize ? (8.0 * 0x10) : 1.0;
+
+		for (int i = 0; i < count; i++)
+		{
+			scaled_value = src[i] * normfact;
+			if (scaled_value >= (1.0 * 0x7F))
+			{
+				dest[i] = 0x7F;
+				continue;
+			};
+			if (scaled_value <= (-8.0 * 0x10))
+			{
+				dest[i] = -0x80;
+				continue;
+			};
+			dest[i] = psf_lrint(scaled_value);
+		};
+
+		return;
+	} /* d2flac8_clip_array */
+
+	void d2flac16_clip_array(const double* src, int32_t* dest, int count, int normalize)
+	{
+		double normfact, scaled_value;
+
+		normfact = normalize ? (8.0 * 0x1000) : 1.0;
+
+		for (int i = 0; i < count; i++)
+		{
+			scaled_value = src[i] * normfact;
+			if (scaled_value >= (1.0 * 0x7FFF))
+			{
+				dest[i] = 0x7FFF;
+				continue;
+			};
+			if (scaled_value <= (-8.0 * 0x1000))
+			{
+				dest[i] = -0x8000;
+				continue;
+			};
+			dest[i] = psf_lrint(scaled_value);
+		};
+
+		return;
+	} /* d2flac16_clip_array */
+
+	void d2flac24_clip_array(const double* src, int32_t* dest, int count, int normalize)
+	{
+		double normfact, scaled_value;
+
+		normfact = normalize ? (8.0 * 0x100000) : 1.0;
+
+		for (int i = 0; i < count; i++)
+		{
+			scaled_value = src[i] * normfact;
+			if (scaled_value >= (1.0 * 0x7FFFFF))
+			{
+				dest[i] = 0x7FFFFF;
+				continue;
+			};
+			if (scaled_value <= (-8.0 * 0x100000))
+			{
+				dest[i] = -0x800000;
+				continue;
+			};
+			dest[i] = psf_lrint(scaled_value);
+		};
+
+		return;
+	} /* d2flac24_clip_array */
+
+	void d2flac8_array(const double* src, int32_t* dest, int count, int normalize)
+	{
+		double normfact = normalize ? (1.0 * 0x7F) : 1.0;
+
+		for (int i = 0; i < count; i++)
+			dest[i] = psf_lrint(src[i] * normfact);
+	} /* d2flac8_array */
+
+	void d2flac16_array(const double* src, int32_t* dest, int count, int normalize)
+	{
+		double normfact = normalize ? (1.0 * 0x7FFF) : 1.0;
+
+		for (int i = 0; i < count; i++)
+			dest[i] = psf_lrint(src[i] * normfact);
+	} /* d2flac16_array */
+
+	void d2flac24_array(const double* src, int32_t* dest, int count, int normalize)
+	{
+		double normfact = normalize ? (1.0 * 0x7FFFFF) : 1.0;
+
+		for (int i = 0; i < count; i++)
+			dest[i] = psf_lrint(src[i] * normfact);
+	} /* d2flac24_array */
+
+
+
+
 	struct AudioSpec_t
 	{
 		int freq;                   /**< DSP frequency -- samples per second */
@@ -1048,41 +1302,6 @@ namespace hz {
 			return total_bytes_read > 0 ? total_bytes_read : 0;
 		}
 
-		static void s2flac8_array(const short* src, int32_t* dest, int count)
-		{
-			for (int i = 0; i < count; i++)
-				dest[i] = src[i] >> 8;
-		} /* s2flac8_array */
-
-		static void s2flac16_array(const short* src, int32_t* dest, int count)
-		{
-			for (int i = 0; i < count; i++)
-				dest[i] = src[i];
-		} /* s2flac16_array */
-
-		static void s2flac24_array(const short* src, int32_t* dest, int count)
-		{
-			for (int i = 0; i < count; i++)
-				dest[i] = src[i] << 8;
-		} /* s2flac24_array */
-
-		static void i2flac8_array(const int* src, int32_t* dest, int count)
-		{
-			for (int i = 0; i < count; i++)
-				dest[i] = src[i] >> 24;
-		} /* i2flac8_array */
-
-		static void i2flac16_array(const int* src, int32_t* dest, int count)
-		{
-			for (int i = 0; i < count; i++)
-				dest[i] = src[i] >> 16;
-		} /* i2flac16_array */
-
-		static void i2flac24_array(const int* src, int32_t* dest, int count)
-		{
-			for (int i = 0; i < count; i++)
-				dest[i] = src[i] >> 8;
-		} /* i2flac24_array */
 
 		static size_t flac_write_s2flac(enflac_t* e, const short* ptr, size_t len)
 		{
@@ -1196,103 +1415,6 @@ namespace hz {
 			return total;
 		} /* flac_write_f2flac */
 
-		static void f2flac8_clip_array(const float* src, int32_t* dest, int count, int normalize)
-		{
-			float normfact, scaled_value;
-
-			normfact = normalize ? (8.0 * 0x10) : 1.0;
-
-			for (int i = 0; i < count; i++)
-			{
-				scaled_value = src[i] * normfact;
-				if (scaled_value >= (1.0 * 0x7F))
-				{
-					dest[i] = 0x7F;
-					continue;
-				};
-				if (scaled_value <= (-8.0 * 0x10))
-				{
-					dest[i] = -0x80;
-					continue;
-				};
-				dest[i] = psf_lrintf(scaled_value);
-			};
-
-			return;
-		} /* f2flac8_clip_array */
-
-		static void f2flac16_clip_array(const float* src, int32_t* dest, int count, int normalize)
-		{
-			float normfact, scaled_value;
-
-			normfact = normalize ? (8.0 * 0x1000) : 1.0;
-
-			for (int i = 0; i < count; i++)
-			{
-				scaled_value = src[i] * normfact;
-				if (scaled_value >= (1.0 * 0x7FFF))
-				{
-					dest[i] = 0x7FFF;
-					continue;
-				};
-				if (scaled_value <= (-8.0 * 0x1000))
-				{
-					dest[i] = -0x8000;
-					continue;
-				};
-				dest[i] = psf_lrintf(scaled_value);
-			};
-		} /* f2flac16_clip_array */
-
-		static void f2flac24_clip_array(const float* src, int32_t* dest, int count, int normalize)
-		{
-			float normfact, scaled_value;
-
-			normfact = normalize ? (8.0 * 0x100000) : 1.0;
-
-			for (int i = 0; i < count; i++)
-			{
-				scaled_value = src[i] * normfact;
-				if (scaled_value >= (1.0 * 0x7FFFFF))
-				{
-					dest[i] = 0x7FFFFF;
-					continue;
-				};
-
-				if (scaled_value <= (-8.0 * 0x100000))
-				{
-					dest[i] = -0x800000;
-					continue;
-				}
-				dest[i] = psf_lrintf(scaled_value);
-			};
-
-			return;
-		} /* f2flac24_clip_array */
-
-		static void f2flac8_array(const float* src, int32_t* dest, int count, int normalize)
-		{
-			float normfact = normalize ? (1.0 * 0x7F) : 1.0;
-
-			for (int i = 0; i < count; i++)
-				dest[i] = psf_lrintf(src[i] * normfact);
-		} /* f2flac8_array */
-
-		static void f2flac16_array(const float* src, int32_t* dest, int count, int normalize)
-		{
-			float normfact = normalize ? (1.0 * 0x7FFF) : 1.0;
-
-			for (int i = 0; i < count; i++)
-				dest[i] = psf_lrintf(src[i] * normfact);
-		} /* f2flac16_array */
-
-		static void f2flac24_array(const float* src, int32_t* dest, int count, int normalize)
-		{
-			float normfact = normalize ? (1.0 * 0x7FFFFF) : 1.0;
-
-			for (int i = 0; i < count; i++)
-				dest[i] = psf_lrintf(src[i] * normfact);
-		} /* f2flac24_array */
 
 		static size_t flac_write_d2flac(enflac_t* e, const double* ptr, size_t len)
 		{
@@ -1335,122 +1457,6 @@ namespace hz {
 			return total;
 		} /* flac_write_d2flac */
 
-		static void d2flac8_clip_array(const double* src, int32_t* dest, int count, int normalize)
-		{
-			double normfact, scaled_value;
-
-			normfact = normalize ? (8.0 * 0x10) : 1.0;
-
-			for (int i = 0; i < count; i++)
-			{
-				scaled_value = src[i] * normfact;
-				if (scaled_value >= (1.0 * 0x7F))
-				{
-					dest[i] = 0x7F;
-					continue;
-				};
-				if (scaled_value <= (-8.0 * 0x10))
-				{
-					dest[i] = -0x80;
-					continue;
-				};
-				dest[i] = psf_lrint(scaled_value);
-			};
-
-			return;
-		} /* d2flac8_clip_array */
-
-		static void d2flac16_clip_array(const double* src, int32_t* dest, int count, int normalize)
-		{
-			double normfact, scaled_value;
-
-			normfact = normalize ? (8.0 * 0x1000) : 1.0;
-
-			for (int i = 0; i < count; i++)
-			{
-				scaled_value = src[i] * normfact;
-				if (scaled_value >= (1.0 * 0x7FFF))
-				{
-					dest[i] = 0x7FFF;
-					continue;
-				};
-				if (scaled_value <= (-8.0 * 0x1000))
-				{
-					dest[i] = -0x8000;
-					continue;
-				};
-				dest[i] = psf_lrint(scaled_value);
-			};
-
-			return;
-		} /* d2flac16_clip_array */
-
-		static void d2flac24_clip_array(const double* src, int32_t* dest, int count, int normalize)
-		{
-			double normfact, scaled_value;
-
-			normfact = normalize ? (8.0 * 0x100000) : 1.0;
-
-			for (int i = 0; i < count; i++)
-			{
-				scaled_value = src[i] * normfact;
-				if (scaled_value >= (1.0 * 0x7FFFFF))
-				{
-					dest[i] = 0x7FFFFF;
-					continue;
-				};
-				if (scaled_value <= (-8.0 * 0x100000))
-				{
-					dest[i] = -0x800000;
-					continue;
-				};
-				dest[i] = psf_lrint(scaled_value);
-			};
-
-			return;
-		} /* d2flac24_clip_array */
-
-		static void d2flac8_array(const double* src, int32_t* dest, int count, int normalize)
-		{
-			double normfact = normalize ? (1.0 * 0x7F) : 1.0;
-
-			for (int i = 0; i < count; i++)
-				dest[i] = psf_lrint(src[i] * normfact);
-		} /* d2flac8_array */
-
-		static void d2flac16_array(const double* src, int32_t* dest, int count, int normalize)
-		{
-			double normfact = normalize ? (1.0 * 0x7FFF) : 1.0;
-
-			for (int i = 0; i < count; i++)
-				dest[i] = psf_lrint(src[i] * normfact);
-		} /* d2flac16_array */
-
-		static void d2flac24_array(const double* src, int32_t* dest, int count, int normalize)
-		{
-			double normfact = normalize ? (1.0 * 0x7FFFFF) : 1.0;
-
-			for (int i = 0; i < count; i++)
-				dest[i] = psf_lrint(src[i] * normfact);
-		} /* d2flac24_array */
-
-		static inline int psf_lrintf(float x)
-		{
-#ifndef NO_SSE2
-			return _mm_cvtss_si32(_mm_load_ss(&x));
-#else
-			return lrintf(x);
-#endif 
-		} /* psf_lrintf */
-
-		static inline int psf_lrint(double x)
-		{
-#ifndef NO_SSE2
-			return _mm_cvtsd_si32(_mm_load_sd(&x));
-#else
-			return lrint(x);
-#endif
-		} /* psf_lrintf */
 	private:
 		static int fwrite_func(const char* data, size_t bytes, uint32_t samples, uint32_t current_frame, void* ud)
 		{
@@ -2669,6 +2675,31 @@ void fft_cx::init(float sample_rate0, int bits, float freq_start0, float freq_en
 double hanning_window(int i, int n) {
 	return 0.5 * (1 - cos(i * M_PI / n));
 }
+// 一维fftshift（以偶数长度为例）
+void fftshift_1d(fftw_complex* data, size_t n, double f) {
+	int half = n * f;
+	std::rotate(data, data + half, data + n);
+}
+
+// 二维矩阵fftshift（以行优先处理）
+void fftshift_2d(fftw_complex* matrix, int rows, int cols) {
+	// 行交换 
+	for (int i = 0; i < rows; ++i) {
+		auto row_start = matrix + i * cols;
+		std::rotate(row_start, row_start + cols / 2, row_start + cols);
+	}
+	//// 列交换 
+	//std::vector<fftw_complex> temp(rows);
+	//int half_col = cols / 2;
+	//for (int j = 0; j < half_col; ++j) {
+	//	for (int i = 0; i < rows; ++i)
+	//		temp[i] = matrix[i * cols + j];
+	//	for (int i = 0; i < rows; ++i)
+	//		matrix[i * cols + j] = matrix[i * cols + j + half_col];
+	//	for (int i = 0; i < rows; ++i)
+	//		matrix[i * cols + j + half_col] = temp[i];
+	//}
+}
 float* fft_cx::fft(float* data, int n)
 {
 	if (n < 2)return 0;
@@ -2698,11 +2729,12 @@ float* fft_cx::fft(float* data, int n)
 	fftw_plan   plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
 	for (int i = 0; i < count; i++)
 	{
-		real[i] = data[i] * hanning_window(i, FRAME_SIZE); 
+		real[i] = data[i] * hanning_window(i, FRAME_SIZE);
 	}
 	// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
 	fftw_execute(plan);
 	fftw_destroy_plan(plan);
+	fftshift_1d(complex, rcount, 0.6);
 	// Step2：计算需滤波的频率在频域数组中的下标
 	begin = (int)((freq_start / sample_rate) * count);
 	end = (int)((freq_end / sample_rate) * count);
@@ -2808,12 +2840,29 @@ void fft_cx::calculate_heights(int dcount)
 		auto& it = magnitudes[k];
 		it = sqrt(pow(_out[k][0], 2) + pow(_out[k][1], 2));
 		double power = pow(it, 2);
+		double phase = atan2(_out[k][1], _out[k][0]);
 		it = 20 * log10(it); // 转分贝 
-		if (std::isnan(it))
+		//it *= phase;
+		if (std::isnan(it) || isinf(it))
 			it = 0.0;
 		if (it > max_mag) max_mag = it;
 		if (it < min_mag) min_mag = it;
 	}
+
+
+	//double observation_matrix[N][4]; // 观察矩阵：实部、虚部、幅度、相位 
+	//for (int k = 0; k < N; k++) {
+	//	double real = out[k][0];
+	//	double imag = out[k][1];
+	//	double magnitude = sqrt(real * real + imag * imag);
+	//	double phase = atan2(imag, real);
+
+	//	observation_matrix[k][0] = real;
+	//	observation_matrix[k][1] = imag;
+	//	observation_matrix[k][2] = magnitude;
+	//	observation_matrix[k][3] = phase;
+	//}
+
 	max_mag -= min_mag;
 	for (int k = 0; k < rcount; k++) {
 		heights[k] = ((magnitudes[k] - min_mag) / max_mag); // 归一化高度  
@@ -2892,17 +2941,17 @@ float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
 }
 float* fft_cx::calculate_heights(short* audio_frame, int frame_size, int dcount)
 {
+	frame_size /= 2;
 	vd.resize(frame_size);
 	auto df = vd.data();
 	uint32_t bps = (1 << (bits_per_sample - 1));
 	float norm = 1.0 / bps;
 	for (size_t i = 0; i < frame_size; i++)
 	{
-		auto b = audio_frame[i];
+		auto b = *audio_frame; audio_frame += 2;
 		df[i] = b * norm;
 	}
 	float* a = fft(df, frame_size);
 	calculate_heights(dcount);
 	return heights.data();
 }
-

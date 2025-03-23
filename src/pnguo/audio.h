@@ -109,7 +109,6 @@ int decoder_data(audio_data_t* p);
 void free_audio_data(audio_data_t* p);
 
 
-#endif // !AUDIO_H_V1_
 
 #if 0
 void testaudioencoder()
@@ -174,3 +173,29 @@ private:
 	void calculate_heights(int dcount);
 
 };
+namespace hz {
+
+	void s2flac8_array(const short* src, int32_t* dest, int count);
+	void s2flac16_array(const short* src, int32_t* dest, int count);
+	void s2flac24_array(const short* src, int32_t* dest, int count);
+	void i2flac8_array(const int* src, int32_t* dest, int count);
+	void i2flac16_array(const int* src, int32_t* dest, int count);
+	void i2flac24_array(const int* src, int32_t* dest, int count);
+	void f2flac8_clip_array(const float* src, int32_t* dest, int count, int normalize);
+	void f2flac16_clip_array(const float* src, int32_t* dest, int count, int normalize);
+	void f2flac24_clip_array(const float* src, int32_t* dest, int count, int normalize);
+	void f2flac8_array(const float* src, int32_t* dest, int count, int normalize);
+	void f2flac16_array(const float* src, int32_t* dest, int count, int normalize);
+	void f2flac24_array(const float* src, int32_t* dest, int count, int normalize);
+	void d2flac8_clip_array(const double* src, int32_t* dest, int count, int normalize);
+	void d2flac16_clip_array(const double* src, int32_t* dest, int count, int normalize);
+	void d2flac24_clip_array(const double* src, int32_t* dest, int count, int normalize);
+	void d2flac8_array(const double* src, int32_t* dest, int count, int normalize);
+	void d2flac16_array(const double* src, int32_t* dest, int count, int normalize);
+	void d2flac24_array(const double* src, int32_t* dest, int count, int normalize);
+	//inline int psf_lrintf(float x);
+	//inline int psf_lrint(double x);
+}
+//!hz
+
+#endif // !AUDIO_H_V1_

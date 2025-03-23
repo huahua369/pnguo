@@ -709,13 +709,13 @@ int main()
 	audio_data_t* madogg = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
 	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
 	audio_data_t* mad1h = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
-	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song1\程响-人间烟火(DJ版).flac)");
+	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song\云朵-我的楼兰.flac)");
+	//std::swap(mad1h, mad1);
 	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
 	auto st32f = app->new_audio_stream(2, 2, 48000);
 	auto st32 = app->new_audio_stream(1, 2, 48000);
 	auto st16 = app->new_audio_stream(0, 2, 48000);
-
 	fft_cx* fft = new fft_cx();
 	{
 		encoder_info_t e = {};
@@ -781,9 +781,9 @@ int main()
 				if (deltas > dtime)
 				{
 					static int64_t kn = 0;
-					static int64_t sn = fs > 2048 ? 2048 : fs;
+					static int64_t sn = fs;
 					deltas = 0;
-					fft->calculate_heights((short*)mad1->data + kn, sn, 100);
+					fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
 					kn += fs;
 					if (kn >= mad1->total_samples)
 					{
