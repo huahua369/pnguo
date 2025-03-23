@@ -215,10 +215,11 @@ namespace hz {
 		std::vector<audio_list*> _lists;
 		// 配置信息	{自定义设置、歌单配置等}
 		njson config;
+		std::string _confn;
 	public:
 		audio_cx();
 		~audio_cx();
-		void init(audio_backend_t* p);
+		void init(audio_backend_t* p, const std::string& confn);
 	private:
 
 	};

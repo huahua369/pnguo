@@ -706,6 +706,9 @@ int main()
 	build_audio_test(5, *adata16);
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::unbindaudio,app_cx::unbindaudios
 		,app_cx::get_audio_stream_queued,app_cx::put_audio,app_cx::clear_audio };
+	auto audio_ctx = new hz::audio_cx();
+	audio_ctx->init(&abc, "data/music.json");
+
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
@@ -740,7 +743,7 @@ int main()
 		e.total_samples = mad1->total_samples;
 		e.data = (char*)mad1->data;
 		e.data_size = mad1->len;
-		e.file_path = R"(E:\song2\程响-是否cf.flac)";
+		e.file_path = R"(E:\song2\cf.flac)";
 		auto pe = cp->codes[0];
 		e.handle = pe->handle;
 		//int ret = pe->encoder(&e);

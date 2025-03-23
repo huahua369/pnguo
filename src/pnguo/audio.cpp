@@ -2966,6 +2966,17 @@ namespace hz {
 		free_coders(coders); coders = 0;
 	}
 
+	void audio_cx::init(audio_backend_t* p, const std::string& confn) {
+		if (p && p->dev && p->new_audio_stream && p->free_audio_stream && p->unbindaudio && p->unbindaudios && p->get_audio_stream_queued && p->put_audio && p->clear_audio)
+		{
+			bk = *p;
+		}
+		if (confn.size())
+		{
+			_confn = confn;
+			config = read_json(config);
+		}
+	}
 
 
 

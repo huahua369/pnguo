@@ -1989,7 +1989,7 @@ namespace hz
 		return ret;
 	}
 
-	njson read_json(std::string fn)
+	njson read_json(const std::string& fn)
 	{
 #ifdef _WIN32
 		if (fn[1] != ':' && fn[0] != '/')
@@ -2024,7 +2024,7 @@ namespace hz
 		return ret;
 	}
 	// 保存json到文件，-1则保存成cbor
-	void save_json(std::string fn, const njson& n, int indent_cbor)
+	void save_json(const std::string& fn, const njson& n, int indent_cbor)
 	{
 #ifdef _WIN32
 		if (fn[1] != ':' && fn[0] != '/')
