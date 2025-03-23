@@ -2650,308 +2650,324 @@ void fft_filter_f(int n, const float* in, float* out, float sample_rate, float f
 	fftw_free(complex);
 }
 
-
-fft_cx::fft_cx()
-{
-}
-
-fft_cx::~fft_cx()
-{
-	auto complex = (fftw_complex*)_complex;
-	if (real)
-		fftw_free(real);
-	if (complex)
-		fftw_free(complex);
-	_complex = 0;
-	real = 0;
-}
-void fft_cx::init(float sample_rate0, int bits, float freq_start0, float freq_end0)
-{
-	bits_per_sample = bits;
-	sample_rate = sample_rate0;
-	freq_start = freq_start0;
-	freq_end = freq_end0;
-}
-double hanning_window(int i, int n) {
-	return 0.5 * (1 - cos(i * M_PI / n));
-}
-// 一维fftshift（以偶数长度为例）
-void fftshift_1d(fftw_complex* data, size_t n, double f) {
-	int half = n * f;
-	std::rotate(data, data + half, data + n);
-}
-
-// 二维矩阵fftshift（以行优先处理）
-void fftshift_2d(fftw_complex* matrix, int rows, int cols) {
-	// 行交换 
-	for (int i = 0; i < rows; ++i) {
-		auto row_start = matrix + i * cols;
-		std::rotate(row_start, row_start + cols / 2, row_start + cols);
+namespace hz {
+	fft_cx::fft_cx()
+	{
 	}
-	//// 列交换 
-	//std::vector<fftw_complex> temp(rows);
-	//int half_col = cols / 2;
-	//for (int j = 0; j < half_col; ++j) {
-	//	for (int i = 0; i < rows; ++i)
-	//		temp[i] = matrix[i * cols + j];
-	//	for (int i = 0; i < rows; ++i)
-	//		matrix[i * cols + j] = matrix[i * cols + j + half_col];
-	//	for (int i = 0; i < rows; ++i)
-	//		matrix[i * cols + j + half_col] = temp[i];
-	//}
-}
-float* fft_cx::fft(float* data, int n)
-{
-	if (n < 2)return 0;
-	int rcount = FRAME_SIZE / 2;
-	if (count != n)
+
+	fft_cx::~fft_cx()
 	{
 		auto complex = (fftw_complex*)_complex;
 		if (real)
 			fftw_free(real);
 		if (complex)
 			fftw_free(complex);
-		real = 0;
 		_complex = 0;
-		FRAME_SIZE = count = n;
-		rcount = FRAME_SIZE / 2;
-		// fftw的内存分配方式和mallco类似，但使用SIMD（单指令多数据流）时，fftw_alloc会将数组以更高效的方式对齐
-		real = fftw_alloc_real(n);
-		_complex = fftw_alloc_complex(rcount + 1);    // 实际只会用到(n/2)+1个complex对象
-		outdata.resize(n);
-		magnitudesv.resize(rcount);
-		heights.resize(rcount);
-		rects.resize(rcount);
+		real = 0;
 	}
-	auto complex = (fftw_complex*)_complex;
-	int begin = 0, end = 0;
-	// Step1：FFT实现时域到频域的转换 
-	fftw_plan   plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
-	for (int i = 0; i < count; i++)
+	void fft_cx::init(float sample_rate0, int bits, float freq_start0, float freq_end0)
 	{
-		real[i] = data[i] * hanning_window(i, FRAME_SIZE);
+		bits_per_sample = bits;
+		sample_rate = sample_rate0;
+		freq_start = freq_start0;
+		freq_end = freq_end0;
 	}
-	// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
-	fftw_execute(plan);
-	fftw_destroy_plan(plan);
-	fftshift_1d(complex, rcount, 0.6);
-	// Step2：计算需滤波的频率在频域数组中的下标
-	begin = (int)((freq_start / sample_rate) * count);
-	end = (int)((freq_end / sample_rate) * count);
-	end = end < (count / 2 + 1) ? end : (count / 2 + 1);
-	if (begin != end)
-	{
-		for (int i = begin; i < end; i++)
-		{
-			// 对应的频率分量置为0，即去除该频率
-			complex[i][0] = 0;
-			complex[i][1] = 0;   // 虚部设置为零
+	double hanning_window(int i, int n) {
+		return 0.5 * (1 - cos(i * M_PI / n));
+	}
+	// 一维fftshift（以偶数长度为例）
+	void fftshift_1d(fftw_complex* data, size_t n, double f) {
+		int half = n * f;
+		std::rotate(data, data + half, data + n);
+	}
+
+	// 二维矩阵fftshift（以行优先处理）
+	void fftshift_2d(fftw_complex* matrix, int rows, int cols) {
+		// 行交换 
+		for (int i = 0; i < rows; ++i) {
+			auto row_start = matrix + i * cols;
+			std::rotate(row_start, row_start + cols / 2, row_start + cols);
 		}
-		// Step3：IFFT实现频域到时域的转换
-		// 使用FFTW_ESTIMATE构建plan不会破坏输入数据
-		plan = fftw_plan_dft_c2r_1d(count, complex, real, FFTW_ESTIMATE);
+		//// 列交换 
+		//std::vector<fftw_complex> temp(rows);
+		//int half_col = cols / 2;
+		//for (int j = 0; j < half_col; ++j) {
+		//	for (int i = 0; i < rows; ++i)
+		//		temp[i] = matrix[i * cols + j];
+		//	for (int i = 0; i < rows; ++i)
+		//		matrix[i * cols + j] = matrix[i * cols + j + half_col];
+		//	for (int i = 0; i < rows; ++i)
+		//		matrix[i * cols + j + half_col] = temp[i];
+		//}
+	}
+	float* fft_cx::fft(float* data, int n)
+	{
+		if (n < 2)return 0;
+		int rcount = FRAME_SIZE / 2;
+		if (count != n)
+		{
+			auto complex = (fftw_complex*)_complex;
+			if (real)
+				fftw_free(real);
+			if (complex)
+				fftw_free(complex);
+			real = 0;
+			_complex = 0;
+			FRAME_SIZE = count = n;
+			rcount = FRAME_SIZE / 2;
+			// fftw的内存分配方式和mallco类似，但使用SIMD（单指令多数据流）时，fftw_alloc会将数组以更高效的方式对齐
+			real = fftw_alloc_real(n);
+			_complex = fftw_alloc_complex(rcount + 1);    // 实际只会用到(n/2)+1个complex对象
+			outdata.resize(n);
+			magnitudesv.resize(rcount);
+			heights.resize(rcount);
+			rects.resize(rcount);
+		}
+		auto complex = (fftw_complex*)_complex;
+		int begin = 0, end = 0;
+		// Step1：FFT实现时域到频域的转换 
+		fftw_plan   plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
+		for (int i = 0; i < count; i++)
+		{
+			real[i] = data[i] * hanning_window(i, FRAME_SIZE);
+		}
+		// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
 		fftw_execute(plan);
 		fftw_destroy_plan(plan);
-	}
-	auto outd = outdata.data();
-	// Step4：计算滤波后的时域值
-	for (int i = 0; i < count; i++)
-	{
-		// 需除以数据个数，得到滤波后的实数
-		outd[i] = real[i];// / count;
-	}
-	return outd;
-}
-//升采样（低→高）
-float* upsample(float* input, int in_len, int factor, float* output) {
-	int out_len = in_len * factor;
-	//float* output = calloc(out_len, sizeof(float)); 
-	double maxf = 0.0;
-	// 线性插值实现 
-	for (int i = 0; i < in_len - 1; i++) {
-		float delta = (input[i + 1] - input[i]) / factor;
-		for (int j = 0; j < factor; j++) {
-			output[i * factor + j] = input[i] + delta * j;
-			if (output[i * factor + j] > maxf)
+		fftshift_1d(complex, rcount, 0.6);
+		// Step2：计算需滤波的频率在频域数组中的下标
+		begin = (int)((freq_start / sample_rate) * count);
+		end = (int)((freq_end / sample_rate) * count);
+		end = end < (count / 2 + 1) ? end : (count / 2 + 1);
+		if (begin != end)
+		{
+			for (int i = begin; i < end; i++)
 			{
-				maxf = output[i * factor + j];
+				// 对应的频率分量置为0，即去除该频率
+				complex[i][0] = 0;
+				complex[i][1] = 0;   // 虚部设置为零
 			}
+			// Step3：IFFT实现频域到时域的转换
+			// 使用FFTW_ESTIMATE构建plan不会破坏输入数据
+			plan = fftw_plan_dft_c2r_1d(count, complex, real, FFTW_ESTIMATE);
+			fftw_execute(plan);
+			fftw_destroy_plan(plan);
 		}
-	}
-	for (size_t i = 0; i < out_len; i++)
-	{
-		output[i] /= maxf;
-	}
-	return output;
-}
-//降采样（高→低）
-float* downsample(float* input, int in_len, int factor, float* output) {
-	int out_len = in_len / factor;
-	//float* output = malloc(out_len * sizeof(float));
-	double maxf = 0.0;
-	// 均值降采样 
-	for (int i = 0; i < out_len; i++) {
-		float sum = 0;
-		for (int j = 0; j < factor; j++) {
-			sum += input[i * factor + j];
-		}
-		output[i] = sum / factor;
-		if (output[i] > maxf)
+		auto outd = outdata.data();
+		// Step4：计算滤波后的时域值
+		for (int i = 0; i < count; i++)
 		{
-			maxf = output[i];
+			// 需除以数据个数，得到滤波后的实数
+			outd[i] = real[i];// / count;
 		}
+		return outd;
 	}
-	for (size_t i = 0; i < out_len; i++)
-	{
-		output[i] /= maxf;
-	}
-	return output;
-}
-// 简易FIR低通滤波器（截止频率=目标采样率/2）
-void apply_lpf(float* data, int len, int taps, float* coeff, float* filtered) {
-	//float* coeff = malloc(taps * sizeof(float));
-	// 生成窗函数系数（示例使用汉明窗）
-	for (int i = 0; i < taps; i++) {
-		coeff[i] = 0.54 - 0.46 * cos(2 * M_PI * i / (taps - 1));
-	}
-
-	// 实现卷积运算 
-	//float* filtered = malloc(len * sizeof(float));
-	for (int n = 0; n < len; n++) {
-		filtered[n] = 0;
-		for (int k = 0; k < taps; k++) {
-			int idx = n - k;
-			if (idx >= 0) filtered[n] += data[idx] * coeff[k];
-		}
-	}
-	memcpy(data, filtered, len * sizeof(float));
-	//free(coeff);
-	//free(filtered);
-}
-void fft_cx::calculate_heights(int dcount)
-{
-	// 计算幅度谱
-	double max_mag = 0.0;
-	double min_mag = 0.0;
-	double* magnitudes = magnitudesv.data();
-	auto _out = (fftw_complex*)_complex;
-	int rcount = FRAME_SIZE / 2;
-	for (int k = 0; k < rcount; k++) {
-		auto& it = magnitudes[k];
-		it = sqrt(pow(_out[k][0], 2) + pow(_out[k][1], 2));
-		double power = pow(it, 2);
-		double phase = atan2(_out[k][1], _out[k][0]);
-		it = 20 * log10(it); // 转分贝 
-		//it *= phase;
-		if (std::isnan(it) || isinf(it))
-			it = 0.0;
-		if (it > max_mag) max_mag = it;
-		if (it < min_mag) min_mag = it;
-	}
-
-
-	//double observation_matrix[N][4]; // 观察矩阵：实部、虚部、幅度、相位 
-	//for (int k = 0; k < N; k++) {
-	//	double real = out[k][0];
-	//	double imag = out[k][1];
-	//	double magnitude = sqrt(real * real + imag * imag);
-	//	double phase = atan2(imag, real);
-
-	//	observation_matrix[k][0] = real;
-	//	observation_matrix[k][1] = imag;
-	//	observation_matrix[k][2] = magnitude;
-	//	observation_matrix[k][3] = phase;
-	//}
-
-	max_mag -= min_mag;
-	for (int k = 0; k < rcount; k++) {
-		heights[k] = ((magnitudes[k] - min_mag) / max_mag); // 归一化高度  
-	}
-	if (dcount > 2)
-	{
-		int dst_rate = dcount, src_rate = rcount;
-		// 计算采样率转换因子 
-		int factor = (dst_rate > src_rate) ?
-			dst_rate / src_rate :
-			src_rate / dst_rate;
-		int len = heights.size();// , taps = 64;
-		int ass = taps + len + len * factor;
-		if (sample_tem.size() != ass)
-		{
-			sample_tem.resize(ass);
-		}
-		auto t = sample_tem.data();
-		float* output = 0;
-		size_t length = 0;
-		if (dst_rate == src_rate)
-		{
-			output = heights.data();
-		}
-		else {
-			if (dst_rate > src_rate) { // 升采样 
-				apply_lpf(heights.data(), len, taps, t, t + taps); // 预滤波 
-				output = upsample(heights.data(), len, factor, t + taps + len);
-				length = len * factor;
-			}
-			else { // 降采样 
-				apply_lpf(heights.data(), len, taps, t, t + taps); // 抗混叠滤波 
-				output = downsample(heights.data(), len, factor, t + taps + len);
-				length = len / factor;
-			}
-		}
-		if (rects.size() != length)
-			rects.resize(length);
-		if (oy.size() != length)
-			oy.resize(length);
-		for (size_t i = 0; i < length; i++)
-		{
-			auto height = output[i];
-			if (isnan(height))
-				height = 0;
-			oy[i] = height * draw_height;
-		}
-		auto& y = oy;
-		if (lastY.size() && is_smooth) {
-			if (length != lastY.size())
-				lastY.resize(length);
-			for (int i = 0; i < length; i++) {
-				if (y[i] < lastY[i]) {
-					lastY[i] = y[i] * smoothConstantDown + lastY[i] * (1 - smoothConstantDown);
-				}
-				else {
-					lastY[i] = y[i] * smoothConstantUp + lastY[i] * (1 - smoothConstantUp);
+	//升采样（低→高）
+	float* upsample(float* input, int in_len, int factor, float* output) {
+		int out_len = in_len * factor;
+		//float* output = calloc(out_len, sizeof(float)); 
+		double maxf = 0.0;
+		// 线性插值实现 
+		for (int i = 0; i < in_len - 1; i++) {
+			float delta = (input[i + 1] - input[i]) / factor;
+			for (int j = 0; j < factor; j++) {
+				output[i * factor + j] = input[i] + delta * j;
+				if (output[i * factor + j] > maxf)
+				{
+					maxf = output[i * factor + j];
 				}
 			}
 		}
-		else {
-			lastY = y;
-		}
-		for (size_t i = 0; i < length; i++)
+		for (size_t i = 0; i < out_len; i++)
 		{
-			auto height = lastY[i];
-			rects[i] = { draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
+			output[i] /= maxf;
+		}
+		return output;
+	}
+	//降采样（高→低）
+	float* downsample(float* input, int in_len, int factor, float* output) {
+		int out_len = in_len / factor;
+		//float* output = malloc(out_len * sizeof(float));
+		double maxf = 0.0;
+		// 均值降采样 
+		for (int i = 0; i < out_len; i++) {
+			float sum = 0;
+			for (int j = 0; j < factor; j++) {
+				sum += input[i * factor + j];
+			}
+			output[i] = sum / factor;
+			if (output[i] > maxf)
+			{
+				maxf = output[i];
+			}
+		}
+		for (size_t i = 0; i < out_len; i++)
+		{
+			output[i] /= maxf;
+		}
+		return output;
+	}
+	// 简易FIR低通滤波器（截止频率=目标采样率/2）
+	void apply_lpf(float* data, int len, int taps, float* coeff, float* filtered) {
+		//float* coeff = malloc(taps * sizeof(float));
+		// 生成窗函数系数（示例使用汉明窗）
+		for (int i = 0; i < taps; i++) {
+			coeff[i] = 0.54 - 0.46 * cos(2 * M_PI * i / (taps - 1));
+		}
+
+		// 实现卷积运算 
+		//float* filtered = malloc(len * sizeof(float));
+		for (int n = 0; n < len; n++) {
+			filtered[n] = 0;
+			for (int k = 0; k < taps; k++) {
+				int idx = n - k;
+				if (idx >= 0) filtered[n] += data[idx] * coeff[k];
+			}
+		}
+		memcpy(data, filtered, len * sizeof(float));
+		//free(coeff);
+		//free(filtered);
+	}
+	void fft_cx::calculate_heights(int dcount)
+	{
+		// 计算幅度谱
+		double max_mag = 0.0;
+		double min_mag = 0.0;
+		double* magnitudes = magnitudesv.data();
+		auto _out = (fftw_complex*)_complex;
+		int rcount = FRAME_SIZE / 2;
+		for (int k = 0; k < rcount; k++) {
+			auto& it = magnitudes[k];
+			it = sqrt(pow(_out[k][0], 2) + pow(_out[k][1], 2));
+			double power = pow(it, 2);
+			double phase = atan2(_out[k][1], _out[k][0]);
+			it = 20 * log10(it); // 转分贝 
+			//it *= phase;
+			if (std::isnan(it) || isinf(it))
+				it = 0.0;
+			if (it > max_mag) max_mag = it;
+			if (it < min_mag) min_mag = it;
+		}
+
+
+		//double observation_matrix[N][4]; // 观察矩阵：实部、虚部、幅度、相位 
+		//for (int k = 0; k < N; k++) {
+		//	double real = out[k][0];
+		//	double imag = out[k][1];
+		//	double magnitude = sqrt(real * real + imag * imag);
+		//	double phase = atan2(imag, real);
+
+		//	observation_matrix[k][0] = real;
+		//	observation_matrix[k][1] = imag;
+		//	observation_matrix[k][2] = magnitude;
+		//	observation_matrix[k][3] = phase;
+		//}
+
+		max_mag -= min_mag;
+		for (int k = 0; k < rcount; k++) {
+			heights[k] = ((magnitudes[k] - min_mag) / max_mag); // 归一化高度  
+		}
+		if (dcount > 2)
+		{
+			int dst_rate = dcount, src_rate = rcount;
+			// 计算采样率转换因子 
+			int factor = (dst_rate > src_rate) ?
+				dst_rate / src_rate :
+				src_rate / dst_rate;
+			int len = heights.size();// , taps = 64;
+			int ass = taps + len + len * factor;
+			if (sample_tem.size() != ass)
+			{
+				sample_tem.resize(ass);
+			}
+			auto t = sample_tem.data();
+			float* output = 0;
+			size_t length = 0;
+			if (dst_rate == src_rate)
+			{
+				output = heights.data();
+			}
+			else {
+				if (dst_rate > src_rate) { // 升采样 
+					apply_lpf(heights.data(), len, taps, t, t + taps); // 预滤波 
+					output = upsample(heights.data(), len, factor, t + taps + len);
+					length = len * factor;
+				}
+				else { // 降采样 
+					apply_lpf(heights.data(), len, taps, t, t + taps); // 抗混叠滤波 
+					output = downsample(heights.data(), len, factor, t + taps + len);
+					length = len / factor;
+				}
+			}
+			if (rects.size() != length)
+				rects.resize(length);
+			if (oy.size() != length)
+				oy.resize(length);
+			for (size_t i = 0; i < length; i++)
+			{
+				auto height = output[i];
+				if (isnan(height))
+					height = 0;
+				oy[i] = height * draw_height;
+			}
+			auto& y = oy;
+			if (lastY.size() && is_smooth) {
+				if (length != lastY.size())
+					lastY.resize(length);
+				for (int i = 0; i < length; i++) {
+					if (y[i] < lastY[i]) {
+						lastY[i] = y[i] * smoothConstantDown + lastY[i] * (1 - smoothConstantDown);
+					}
+					else {
+						lastY[i] = y[i] * smoothConstantUp + lastY[i] * (1 - smoothConstantUp);
+					}
+				}
+			}
+			else {
+				lastY = y;
+			}
+			for (size_t i = 0; i < length; i++)
+			{
+				auto height = lastY[i];
+				rects[i] = { draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
+			}
 		}
 	}
-}
-float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
-{
-	float* a = fft(audio_frame, frame_size);
-	calculate_heights(dcount);
-	return heights.data();
-}
-float* fft_cx::calculate_heights(short* audio_frame, int frame_size, int dcount)
-{
-	frame_size /= 2;
-	vd.resize(frame_size);
-	auto df = vd.data();
-	uint32_t bps = (1 << (bits_per_sample - 1));
-	float norm = 1.0 / bps;
-	for (size_t i = 0; i < frame_size; i++)
+	float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
 	{
-		auto b = *audio_frame; audio_frame += 2;
-		df[i] = b * norm;
+		float* a = fft(audio_frame, frame_size);
+		calculate_heights(dcount);
+		return heights.data();
 	}
-	float* a = fft(df, frame_size);
-	calculate_heights(dcount);
-	return heights.data();
+	float* fft_cx::calculate_heights(short* audio_frame, int frame_size, int dcount)
+	{
+		frame_size /= 2;
+		vd.resize(frame_size);
+		auto df = vd.data();
+		uint32_t bps = (1 << (bits_per_sample - 1));
+		float norm = 1.0 / bps;
+		for (size_t i = 0; i < frame_size; i++)
+		{
+			auto b = *audio_frame; audio_frame += 2;
+			df[i] = b * norm;
+		}
+		float* a = fft(df, frame_size);
+		calculate_heights(dcount);
+		return heights.data();
+	}
+
+	audio_cx::audio_cx()
+	{
+		coders = new_coders();
+	}
+
+	audio_cx::~audio_cx()
+	{
+		free_coders(coders); coders = 0;
+	}
+
+
+
+
 }
+//!hz

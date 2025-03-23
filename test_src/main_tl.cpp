@@ -666,6 +666,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\mtl.pdb");
 #endif     
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto app = new_app();
@@ -703,6 +704,8 @@ int main()
 	build_audio_test(5, *adata);
 	build_audio_test(5, *adata32);
 	build_audio_test(5, *adata16);
+	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::unbindaudio,app_cx::unbindaudios
+		,app_cx::get_audio_stream_queued,app_cx::put_audio,app_cx::clear_audio };
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
@@ -711,12 +714,12 @@ int main()
 	audio_data_t* mad1h = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
 	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song\云朵-我的楼兰.flac)");
 	//std::swap(mad1h, mad1);
-	auto st = app->new_audio_stream(mad->format, mad->channels, mad->freq);
-	auto st1 = app->new_audio_stream(mad1->format, mad1->channels, mad1->freq);
-	auto st32f = app->new_audio_stream(2, 2, 48000);
-	auto st32 = app->new_audio_stream(1, 2, 48000);
-	auto st16 = app->new_audio_stream(0, 2, 48000);
-	fft_cx* fft = new fft_cx();
+	auto st = app->new_audio_stream0(mad->format, mad->channels, mad->freq);
+	auto st1 = app->new_audio_stream0(mad1->format, mad1->channels, mad1->freq);
+	auto st32f = app->new_audio_stream0(2, 2, 48000);
+	auto st32 = app->new_audio_stream0(1, 2, 48000);
+	auto st16 = app->new_audio_stream0(0, 2, 48000);
+	hz::fft_cx* fft = new hz::fft_cx();
 	{
 		encoder_info_t e = {};
 		while (1)
@@ -756,7 +759,7 @@ int main()
 	int fs = mad1->sample_rate * dtime;
 	{
 		auto dt1 = (char*)mad1->data;
-		//app->put_audio(st1, dt1, mad1->len);
+		app->put_audio(st1, dt1, mad1->len);
 	}
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)

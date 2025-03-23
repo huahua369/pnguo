@@ -137,44 +137,94 @@ void testaudioencoder()
 }
 #endif // 0
 
-class fft_cx
-{
-public:
-	double* real = 0;
-	void* _complex = 0;
-	int count = 0;
-	float sample_rate = 0.0f; float freq_start = 0.0f; float freq_end = 0.0f;
-	int FRAME_SIZE = 0;
-	int bits_per_sample = 0;
-	int draw_height = 100;
-	float bar_width = 6;
-	float bar_step = 4;
-	int taps = 64;
-	float smoothConstantDown = 0.08;
-	float smoothConstantUp = 0.8;
-	bool is_smooth = true;			// 是否平滑
-	glm::vec2 draw_pos = { 60,160 };
-	std::vector<float> outdata;
-	std::vector<float> heights;
-	std::vector<float> lastY;
-	std::vector<float> oy;
-	std::vector<double> magnitudesv;
-	std::vector<float> vd;
-	std::vector<float> sample_tem;
-	std::vector<glm::vec4> rects;
-public:
-	fft_cx();
-	~fft_cx();
-	void init(float sample_rate, int bits, float freq_start, float freq_end);
-	float* calculate_heights(float* audio_frame, int frame_size, int dcount);
-	float* calculate_heights(short* audio_frame, int frame_size, int dcount);
-private:
-	float* fft(float* data, int n);
-	void calculate_heights(int dcount);
-
-};
 namespace hz {
+	class fft_cx
+	{
+	public:
+		double* real = 0;
+		void* _complex = 0;
+		int count = 0;
+		float sample_rate = 0.0f; float freq_start = 0.0f; float freq_end = 0.0f;
+		int FRAME_SIZE = 0;
+		int bits_per_sample = 0;
+		int draw_height = 100;
+		float bar_width = 6;
+		float bar_step = 4;
+		int taps = 64;
+		float smoothConstantDown = 0.08;
+		float smoothConstantUp = 0.8;
+		bool is_smooth = true;			// 是否平滑
+		glm::vec2 draw_pos = { 60,160 };
+		std::vector<float> outdata;
+		std::vector<float> heights;
+		std::vector<float> lastY;
+		std::vector<float> oy;
+		std::vector<double> magnitudesv;
+		std::vector<float> vd;
+		std::vector<float> sample_tem;
+		std::vector<glm::vec4> rects;
+	public:
+		fft_cx();
+		~fft_cx();
+		void init(float sample_rate, int bits, float freq_start, float freq_end);
+		float* calculate_heights(float* audio_frame, int frame_size, int dcount);
+		float* calculate_heights(short* audio_frame, int frame_size, int dcount);
+	private:
+		float* fft(float* data, int n);
+		void calculate_heights(int dcount);
 
+	};
+	struct audio_backend_t
+	{
+		uint32_t dev = 0;
+		void* (*new_audio_stream)(uint32_t dev, int format, int channels, int freq) = 0;
+		void (*free_audio_stream)(void* st) = 0;
+		void (*unbindaudio)(void* st) = 0;
+		void (*unbindaudios)(void** st, int count) = 0;
+		int (*get_audio_stream_queued)(void* st) = 0;
+		void (*put_audio)(void* stream, void* data, int len) = 0;
+		void (*clear_audio)(void* st) = 0;
+	};
+	struct audio_item
+	{
+		std::string name, path;		// 歌名、路径
+		audio_data_t* data = 0;
+	};
+	struct audio_list
+	{
+		std::string name;			// 歌单名
+		std::vector<audio_item> v;
+	};
+	/*
+	音频管理类
+		todo 按时间轴推送音频、异步解码音频
+	*/
+	class audio_cx
+	{
+	public:
+		// 当前播放时间/进度
+		double ct = 0.0;
+		// 当前播放的歌曲
+		audio_data_t* adt = 0;
+		// 解码器
+		coders_t* coders = 0;
+		fft_cx* fft = 0;
+		// 设置播放后端
+		audio_backend_t bk = {};
+		// 歌单列表
+		std::vector<audio_list*> _lists;
+		// 配置信息	{自定义设置、歌单配置等}
+		njson config;
+	public:
+		audio_cx();
+		~audio_cx();
+		void init(audio_backend_t* p);
+	private:
+
+	};
+
+
+	// 常用函数
 	void s2flac8_array(const short* src, int32_t* dest, int count);
 	void s2flac16_array(const short* src, int32_t* dest, int count);
 	void s2flac24_array(const short* src, int32_t* dest, int count);

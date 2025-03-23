@@ -689,22 +689,33 @@ void app_cx::close_audio(uint32_t dev)
 	if (dev)
 		SDL_CloseAudioDevice(dev);
 }
-
+uint32_t app_cx::get_audio_device() {
+	return audio_device;
+}
 
 // 类型、通道数、采样数
-void* app_cx::new_audio_stream(int format_idx, int channels, int freq)
+void* app_cx::new_audio_stream0(int format_idx, int channels, int freq)
+{
+	return new_audio_stream(audio_device, format_idx, channels, freq);
+}
+void* app_cx::new_audio_stream(uint32_t dev, int format_idx, int channels, int freq)
 {
 	auto spec = get_spec(format_idx, channels, freq);
 	auto stream = SDL_CreateAudioStream(&spec, 0);
-	if (!SDL_BindAudioStream(audio_device, stream)) {  /* once bound, it'll start playing when there is data available! */
+	if (!SDL_BindAudioStream(dev, stream)) {  /* once bound, it'll start playing when there is data available! */
 		SDL_Log("Failed to bind stream to device: %s", SDL_GetError());
 	}
 	return stream;
 }
 void app_cx::unbindaudio(void* st) {
-	SDL_AudioStream* as[] = { (SDL_AudioStream*)st };
+	SDL_AudioStream* as = (SDL_AudioStream*)st;
 	if (st)
-		SDL_UnbindAudioStreams(as, 1);
+		SDL_UnbindAudioStream(as);
+}
+void app_cx::unbindaudios(void** st, int count) {
+	SDL_AudioStream** as = (SDL_AudioStream**)st;
+	if (st && *as && count > 0)
+		SDL_UnbindAudioStreams(as, count);
 }
 void app_cx::free_audio_stream(void* st) {
 	if (st)
@@ -720,7 +731,6 @@ int app_cx::get_audio_stream_queued(void* st)
 void app_cx::put_audio(void* stream, void* data, int len)
 {
 	if (stream && data && len > 0) {
-		auto n = SDL_GetAudioStreamQueued((SDL_AudioStream*)stream);
 		SDL_PutAudioStreamData((SDL_AudioStream*)stream, data, (int)len);
 	}
 }

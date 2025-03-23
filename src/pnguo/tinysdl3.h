@@ -109,13 +109,16 @@ public:
 	void kncdown();
 	uint32_t open_audio(int format, int channels, int freq);
 	void close_audio(uint32_t dev);
+	uint32_t get_audio_device();
 	// 音频	format	0=S16, 1=S32, 2=F32
-	void* new_audio_stream(int format, int channels, int freq);
-	void free_audio_stream(void* st);
-	void unbindaudio(void* st);
-	int get_audio_stream_queued(void* st);
-	void put_audio(void* stream, void* data, int len);
-	void clear_audio(void* st);
+	void* new_audio_stream0(int format, int channels, int freq);
+	static void* new_audio_stream(uint32_t dev, int format, int channels, int freq);
+	static void free_audio_stream(void* st);
+	static void unbindaudio(void* st);
+	static void unbindaudios(void** st, int count);
+	static int get_audio_stream_queued(void* st);
+	static void put_audio(void* stream, void* data, int len);
+	static void clear_audio(void* st);
 private:
 	int get_event();
 	void render(double delta);
