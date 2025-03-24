@@ -2986,6 +2986,20 @@ namespace hz {
 			int half = n * f;
 			auto rd = oy.data();
 			//std::rotate(rd, rd + half, rd + n);
+			double mn = 0.0;
+			double mx = 0.0;
+			for (auto& it : oy) {
+				if (it < mn)
+					mn = it;
+				if (it > mx)
+					mx = it;
+			}
+			mx -= mn;
+			for (auto& it : oy) {
+				it -= mn; 
+				it /= mx;
+				it *= draw_height;
+			}
 
 			auto& y = oy;
 			if (lastY.size() && is_smooth) {
@@ -3012,8 +3026,27 @@ namespace hz {
 			}
 		}
 	}
-	void h2r() {
-
+	void calculate_spectrum(float* audio_frame, int frame_size, std::vector<float>& spectrum) {
+		// 初始化输入/输出数组和FFT计划 
+		double* in = fftw_alloc_real(frame_size);
+		fftw_complex* out = fftw_alloc_complex(frame_size / 2 + 1);
+		fftw_plan plan = fftw_plan_dft_r2c_1d(frame_size, in, out, FFTW_MEASURE);
+		// 应用汉明窗减少频谱泄漏 
+		for (int i = 0; i < frame_size; i++) {
+			in[i] = audio_frame[i] * (0.54 - 0.46 * cos(2 * M_PI * i / (frame_size - 1)));
+		}
+		fftw_execute(plan);  // 执行FFT
+		;
+		// 计算幅度并归一化
+		if (spectrum.size() != frame_size / 2 + 1)
+			spectrum.resize(frame_size / 2 + 1);
+		for (int i = 0; i <= frame_size / 2; i++) {
+			spectrum[i] = sqrt(out[i][0] * out[i][0] + out[i][1] * out[i][1]);
+			spectrum[i] /= frame_size;  // 归一化处理 
+		}
+		fftw_free(in);
+		fftw_free(out);
+		fftw_destroy_plan(plan);
 	}
 	float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
 	{
@@ -3041,9 +3074,27 @@ namespace hz {
 			float* a = fft(vd2.data(), frame_size);
 			//calculate_heights(tn._data, dcount, _oy, _lastY[0], _rects.data(), 0);
 			std::reverse(heights.data(), heights.data() + heights.size());
+			auto h2 = heights;
+			//calculate_spectrum(vd2.data(), frame_size, h2);
+			//calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
 			calculate_heights(heights, dct, _oy, _lastY[0], _rects.data(), 0);
 			a = fft(vd2.data() + frame_size, frame_size);
+			//calculate_spectrum(vd2.data() + frame_size, frame_size, h2);
+			//calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);
 			calculate_heights(heights, dct, _oy, _lastY[1], _rects.data() + dct, dct);
+	/*		auto nd = vd2.data();
+			h2.resize(frame_size);
+			for (size_t i = 0; i < frame_size; i++)
+			{
+				h2[i] = nd[i];
+			}
+			calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
+			nd += frame_size;
+			for (size_t i = 0; i < frame_size; i++)
+			{
+				h2[i] = nd[i];
+			}
+			calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);*/
 		}
 		return heights.data();
 	}

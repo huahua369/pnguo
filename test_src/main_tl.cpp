@@ -734,7 +734,7 @@ int main()
 			}
 		}
 		fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
-
+		fft->draw_pos;
 		int bits[] = { 16,24,32 };
 		e.bits_per_sample = bits[mad1->format];
 		e.src_format = mad1->format == 2 ? 1 : 0;
