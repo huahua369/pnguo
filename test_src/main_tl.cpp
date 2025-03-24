@@ -797,7 +797,7 @@ int main()
 					}
 				}
 				glm::vec4 color = { 0,0.5,1.0,0.8 };
-				form0->draw_rects(fft->rects.data(), fft->rects.size(), color);
+				form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
 			};
 	}
 	auto lt = pl->ltx;

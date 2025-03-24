@@ -2721,7 +2721,6 @@ namespace hz {
 			outdata.resize(n);
 			magnitudesv.resize(rcount);
 			heights.resize(rcount);
-			rects.resize(rcount);
 		}
 		auto complex = (fftw_complex*)_complex;
 		int begin = 0, end = 0;
@@ -2734,7 +2733,7 @@ namespace hz {
 		// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
 		fftw_execute(plan);
 		fftw_destroy_plan(plan);
-		fftshift_1d(complex, rcount, 0.6);
+		//fftshift_1d(complex, rcount, 0.8);
 		// Step2：计算需滤波的频率在频域数组中的下标
 		begin = (int)((freq_start / sample_rate) * count);
 		end = (int)((freq_end / sample_rate) * count);
@@ -2828,7 +2827,7 @@ namespace hz {
 		//free(coeff);
 		//free(filtered);
 	}
-	void fft_cx::calculate_heights(int dcount)
+	void fft_cx::calculate_heights(int dcount, std::vector<float>& oy, glm::vec4* rects, int x)
 	{
 		// 计算幅度谱
 		double max_mag = 0.0;
@@ -2899,8 +2898,6 @@ namespace hz {
 					length = len / factor;
 				}
 			}
-			if (rects.size() != length)
-				rects.resize(length);
 			if (oy.size() != length)
 				oy.resize(length);
 			for (size_t i = 0; i < length; i++)
@@ -2910,6 +2907,13 @@ namespace hz {
 					height = 0;
 				oy[i] = height * draw_height;
 			}
+
+			int n = oy.size();
+			double f = 0.5;
+			int half = n * f;
+			auto rd = oy.data();
+			std::rotate(rd, rd + half, rd + n);
+
 			auto& y = oy;
 			if (lastY.size() && is_smooth) {
 				if (length != lastY.size())
@@ -2926,33 +2930,44 @@ namespace hz {
 			else {
 				lastY = y;
 			}
+
+
+			x *= bar_width;
+			length = glm::clamp((int)length, 0, dcount);
 			for (size_t i = 0; i < length; i++)
 			{
 				auto height = lastY[i];
-				rects[i] = { draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
+				rects[i] = { x + draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
 			}
 		}
 	}
 	float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
 	{
-		float* a = fft(audio_frame, frame_size);
-		calculate_heights(dcount);
+		{
+			int dct = dcount / 2;
+			dcount = dct * 2;
+			if (_rects.size() != dcount)
+				_rects.resize(dcount);
+			float* a = fft(audio_frame, frame_size);
+			calculate_heights(dcount, _oy[0], _rects.data(), 0);
+		}
 		return heights.data();
 	}
 	float* fft_cx::calculate_heights(short* audio_frame, int frame_size, int dcount)
 	{
-		frame_size /= 2;
 		vd.resize(frame_size);
 		auto df = vd.data();
 		uint32_t bps = (1 << (bits_per_sample - 1));
 		float norm = 1.0 / bps;
-		for (size_t i = 0; i < frame_size; i++)
 		{
-			auto b = *audio_frame; audio_frame += 2;
-			df[i] = b * norm;
+			auto oldt = audio_frame;
+			for (size_t i = 0; i < frame_size; i++)
+			{
+				auto b = *audio_frame; audio_frame++;
+				*df = b * norm; df++;
+			}
+			calculate_heights(vd.data(), frame_size, dcount);
 		}
-		float* a = fft(df, frame_size);
-		calculate_heights(dcount);
 		return heights.data();
 	}
 
@@ -2974,7 +2989,7 @@ namespace hz {
 		if (confn.size())
 		{
 			_confn = confn;
-			config = read_json(config);
+			config = read_json(confn);
 		}
 	}
 

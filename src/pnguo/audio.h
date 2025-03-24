@@ -158,11 +158,11 @@ namespace hz {
 		std::vector<float> outdata;
 		std::vector<float> heights;
 		std::vector<float> lastY;
-		std::vector<float> oy;
+		std::vector<float> _oy[2];
 		std::vector<double> magnitudesv;
-		std::vector<float> vd;
+		std::vector<float> vd, vd2;
 		std::vector<float> sample_tem;
-		std::vector<glm::vec4> rects;
+		std::vector<glm::vec4> _rects;
 	public:
 		fft_cx();
 		~fft_cx();
@@ -171,7 +171,7 @@ namespace hz {
 		float* calculate_heights(short* audio_frame, int frame_size, int dcount);
 	private:
 		float* fft(float* data, int n);
-		void calculate_heights(int dcount);
+		void calculate_heights(int dcount, std::vector<float>& oy, glm::vec4* rects, int x);
 
 	};
 	struct audio_backend_t
