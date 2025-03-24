@@ -2725,15 +2725,17 @@ namespace hz {
 		auto complex = (fftw_complex*)_complex;
 		int begin = 0, end = 0;
 		// Step1：FFT实现时域到频域的转换 
-		fftw_plan   plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
+
 		for (int i = 0; i < count; i++)
 		{
 			real[i] = data[i] * hanning_window(i, FRAME_SIZE);
 		}
+		//fftw_plan plan = fftw_plan_dft_1d(count, (fftw_complex*)real, complex, FFTW_FORWARD, FFTW_ESTIMATE);
+		fftw_plan plan = fftw_plan_dft_r2c_1d(count, real, complex, FFTW_ESTIMATE);
 		// 对长度为n的实数进行FFT，输出的长度为(n/2)-1的复数
 		fftw_execute(plan);
 		fftw_destroy_plan(plan);
-		//fftshift_1d(complex, rcount, 0.8);
+		//fftshift_1d(complex, rcount, 0.5);
 		// Step2：计算需滤波的频率在频域数组中的下标
 		begin = (int)((freq_start / sample_rate) * count);
 		end = (int)((freq_end / sample_rate) * count);
@@ -2748,7 +2750,7 @@ namespace hz {
 			}
 			// Step3：IFFT实现频域到时域的转换
 			// 使用FFTW_ESTIMATE构建plan不会破坏输入数据
-			plan = fftw_plan_dft_c2r_1d(count, complex, real, FFTW_ESTIMATE);
+			auto plan = fftw_plan_dft_c2r_1d(count, complex, real, FFTW_ESTIMATE);
 			fftw_execute(plan);
 			fftw_destroy_plan(plan);
 		}
@@ -2757,7 +2759,7 @@ namespace hz {
 		for (int i = 0; i < count; i++)
 		{
 			// 需除以数据个数，得到滤波后的实数
-			outd[i] = real[i];// / count;
+			outd[i] = real[i] / count;
 		}
 		return outd;
 	}
@@ -2827,6 +2829,78 @@ namespace hz {
 		//free(coeff);
 		//free(filtered);
 	}
+
+	class fft_tiny
+	{
+	public:
+		fft_tiny();
+		~fft_tiny();
+		void fft(float* data, int count, int sample_rate);
+	private:
+
+		// 定义输入音频缓冲区
+		std::vector<double> input_buffer;
+		// 创建 FFTW 输入和输出数组
+		fftw_complex* fft_input = 0;
+		fftw_complex* fft_output = 0;
+	};
+
+	fft_tiny::fft_tiny()
+	{
+	}
+
+	fft_tiny::~fft_tiny()
+	{
+		if (fft_input)
+			fftw_free(fft_input);
+		if (fft_output)
+			fftw_free(fft_output);
+		fft_input = 0;
+		fft_output = 0;
+	}
+
+	void fft_tiny::fft(float* data, int count, int sample_rate)
+	{
+		// 定义输入音频缓冲区
+		if (input_buffer.size() != count)
+		{
+			input_buffer.resize(count);
+			if (fft_input)
+				fftw_free(fft_input);
+			if (fft_output)
+				fftw_free(fft_output);
+			// 创建 FFTW 输入和输出数组
+			fft_input = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * count);
+			fft_output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * count);
+		}
+
+		// 创建 FFTW 3.0 的计划
+		fftw_plan plan = fftw_plan_dft_1d(count, fft_input, fft_output, FFTW_FORWARD, FFTW_ESTIMATE);
+
+		// 读取音频数据并进行频谱计算
+		{
+			// 将输入音频数据复制到 FFTW 输入数组
+			for (int i = 0; i < count; i++) {
+				fft_input[i][0] = input_buffer[i];
+				fft_input[i][1] = 0.0;  // 虚部设置为零
+			}
+
+			// 执行 FFT 变换
+			fftw_execute(plan);
+
+			// 计算频谱
+			for (int i = 0; i < count; i++) {
+				double magnitude = sqrt(fft_output[i][0] * fft_output[i][0] + fft_output[i][1] * fft_output[i][1]);
+				double frequency = ((double)i / count) * sample_rate;
+
+				// 在这里可以对频谱数据做进一步处理，例如绘图、输出等
+				//printf("Frequency: %.2f Hz, Magnitude: %.4f\n", frequency, magnitude);
+			}
+		}
+		// 销毁 FFTW 相关资源
+		fftw_destroy_plan(plan);
+	}
+
 	void fft_cx::calculate_heights(int dcount, std::vector<float>& oy, glm::vec4* rects, int x)
 	{
 		// 计算幅度谱
@@ -2847,20 +2921,6 @@ namespace hz {
 			if (it > max_mag) max_mag = it;
 			if (it < min_mag) min_mag = it;
 		}
-
-
-		//double observation_matrix[N][4]; // 观察矩阵：实部、虚部、幅度、相位 
-		//for (int k = 0; k < N; k++) {
-		//	double real = out[k][0];
-		//	double imag = out[k][1];
-		//	double magnitude = sqrt(real * real + imag * imag);
-		//	double phase = atan2(imag, real);
-
-		//	observation_matrix[k][0] = real;
-		//	observation_matrix[k][1] = imag;
-		//	observation_matrix[k][2] = magnitude;
-		//	observation_matrix[k][3] = phase;
-		//}
 
 		max_mag -= min_mag;
 		for (int k = 0; k < rcount; k++) {
@@ -2912,7 +2972,7 @@ namespace hz {
 			double f = 0.5;
 			int half = n * f;
 			auto rd = oy.data();
-			std::rotate(rd, rd + half, rd + n);
+			//std::rotate(rd, rd + half, rd + n);
 
 			auto& y = oy;
 			if (lastY.size() && is_smooth) {
@@ -2943,12 +3003,27 @@ namespace hz {
 	}
 	float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
 	{
+		if (vd2.size() != frame_size)
+		{
+			vd2.resize(frame_size);
+		}
+		frame_size /= 2;
+		auto t = vd2.data();
+		auto t1 = vd2.data() + frame_size;
+		auto s = audio_frame;
+		auto s1 = audio_frame + 1;
+		for (size_t i = 0; i < frame_size; i++)
+		{
+			t[i] = *s; s += 2;
+			t1[i] = *s1; s1 += 2;
+		}
+
 		{
 			int dct = dcount / 2;
 			dcount = dct * 2;
 			if (_rects.size() != dcount)
 				_rects.resize(dcount);
-			float* a = fft(audio_frame, frame_size);
+			float* a = fft(vd2.data(), frame_size * 2);
 			calculate_heights(dcount, _oy[0], _rects.data(), 0);
 		}
 		return heights.data();
