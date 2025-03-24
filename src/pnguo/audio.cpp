@@ -2761,6 +2761,29 @@ namespace hz {
 			// 需除以数据个数，得到滤波后的实数
 			outd[i] = real[i] / count;
 		}
+		// 计算幅度谱
+		double max_mag = 0.0;
+		double min_mag = 0.0;
+		double* magnitudes = magnitudesv.data();
+		auto _out = (fftw_complex*)_complex;
+		//int rcount = FRAME_SIZE / 2;
+		for (int k = 0; k < rcount; k++) {
+			auto& it = magnitudes[k];
+			it = sqrt(pow(_out[k][0], 2) + pow(_out[k][1], 2));
+			double power = pow(it, 2);
+			double phase = atan2(_out[k][1], _out[k][0]);
+			it = 20 * log10(it); // 转分贝 
+			//it *= phase;
+			if (std::isnan(it) || isinf(it))
+				it = 0.0;
+			if (it > max_mag) max_mag = it;
+			if (it < min_mag) min_mag = it;
+		}
+
+		max_mag -= min_mag;
+		for (int k = 0; k < rcount; k++) {
+			heights[k] = ((magnitudes[k] - min_mag) / max_mag); // 归一化高度  
+		}
 		return outd;
 	}
 	//升采样（低→高）
@@ -2833,6 +2856,8 @@ namespace hz {
 	class fft_tiny
 	{
 	public:
+		std::vector<float> _data;
+	public:
 		fft_tiny();
 		~fft_tiny();
 		void fft(float* data, int count, int sample_rate);
@@ -2864,6 +2889,7 @@ namespace hz {
 		// 定义输入音频缓冲区
 		if (input_buffer.size() != count)
 		{
+			_data.resize(count);
 			input_buffer.resize(count);
 			if (fft_input)
 				fftw_free(fft_input);
@@ -2874,66 +2900,53 @@ namespace hz {
 			fft_output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * count);
 		}
 
-		// 创建 FFTW 3.0 的计划
-		fftw_plan plan = fftw_plan_dft_1d(count, fft_input, fft_output, FFTW_FORWARD, FFTW_ESTIMATE);
-
 		// 读取音频数据并进行频谱计算
 		{
+			// 创建 FFTW 3.0 的计划
+			fftw_plan plan = fftw_plan_dft_1d(count, fft_input, fft_output, FFTW_FORWARD, FFTW_ESTIMATE);
+
 			// 将输入音频数据复制到 FFTW 输入数组
 			for (int i = 0; i < count; i++) {
-				fft_input[i][0] = input_buffer[i];
+				fft_input[i][0] = data[i];
 				fft_input[i][1] = 0.0;  // 虚部设置为零
 			}
 
 			// 执行 FFT 变换
 			fftw_execute(plan);
 
+			double max_mag = 0.0;
+			double min_mag = 0.0;
 			// 计算频谱
 			for (int i = 0; i < count; i++) {
 				double magnitude = sqrt(fft_output[i][0] * fft_output[i][0] + fft_output[i][1] * fft_output[i][1]);
 				double frequency = ((double)i / count) * sample_rate;
-
+				_data[i] = magnitude;
+				if (std::isnan(magnitude) || isinf(magnitude))
+					magnitude = 0.0;
+				if (magnitude > max_mag) max_mag = magnitude;
+				if (magnitude < min_mag) min_mag = magnitude;
 				// 在这里可以对频谱数据做进一步处理，例如绘图、输出等
 				//printf("Frequency: %.2f Hz, Magnitude: %.4f\n", frequency, magnitude);
 			}
+			max_mag -= min_mag;
+			for (int k = 0; k < count; k++) {
+				_data[k] = ((_data[k] - min_mag) / max_mag); // 归一化高度  
+			}
+			// 销毁 FFTW 相关资源
+			fftw_destroy_plan(plan);
 		}
-		// 销毁 FFTW 相关资源
-		fftw_destroy_plan(plan);
 	}
 
-	void fft_cx::calculate_heights(int dcount, std::vector<float>& oy, glm::vec4* rects, int x)
+	void fft_cx::calculate_heights(std::vector<float>& dh, int dcount, std::vector<float>& oy, std::vector<float>& lastY, glm::vec4* rects, int x)
 	{
-		// 计算幅度谱
-		double max_mag = 0.0;
-		double min_mag = 0.0;
-		double* magnitudes = magnitudesv.data();
-		auto _out = (fftw_complex*)_complex;
-		int rcount = FRAME_SIZE / 2;
-		for (int k = 0; k < rcount; k++) {
-			auto& it = magnitudes[k];
-			it = sqrt(pow(_out[k][0], 2) + pow(_out[k][1], 2));
-			double power = pow(it, 2);
-			double phase = atan2(_out[k][1], _out[k][0]);
-			it = 20 * log10(it); // 转分贝 
-			//it *= phase;
-			if (std::isnan(it) || isinf(it))
-				it = 0.0;
-			if (it > max_mag) max_mag = it;
-			if (it < min_mag) min_mag = it;
-		}
-
-		max_mag -= min_mag;
-		for (int k = 0; k < rcount; k++) {
-			heights[k] = ((magnitudes[k] - min_mag) / max_mag); // 归一化高度  
-		}
 		if (dcount > 2)
 		{
-			int dst_rate = dcount, src_rate = rcount;
+			int len = dh.size();
+			int dst_rate = dcount, src_rate = len;
 			// 计算采样率转换因子 
 			int factor = (dst_rate > src_rate) ?
 				dst_rate / src_rate :
 				src_rate / dst_rate;
-			int len = heights.size();// , taps = 64;
 			int ass = taps + len + len * factor;
 			if (sample_tem.size() != ass)
 			{
@@ -2944,17 +2957,17 @@ namespace hz {
 			size_t length = 0;
 			if (dst_rate == src_rate)
 			{
-				output = heights.data();
+				output = dh.data();
 			}
 			else {
 				if (dst_rate > src_rate) { // 升采样 
-					apply_lpf(heights.data(), len, taps, t, t + taps); // 预滤波 
-					output = upsample(heights.data(), len, factor, t + taps + len);
+					apply_lpf(dh.data(), len, taps, t, t + taps); // 预滤波 
+					output = upsample(dh.data(), len, factor, t + taps + len);
 					length = len * factor;
 				}
 				else { // 降采样 
-					apply_lpf(heights.data(), len, taps, t, t + taps); // 抗混叠滤波 
-					output = downsample(heights.data(), len, factor, t + taps + len);
+					apply_lpf(dh.data(), len, taps, t, t + taps); // 抗混叠滤波 
+					output = downsample(dh.data(), len, factor, t + taps + len);
 					length = len / factor;
 				}
 			}
@@ -2990,8 +3003,6 @@ namespace hz {
 			else {
 				lastY = y;
 			}
-
-
 			x *= bar_width;
 			length = glm::clamp((int)length, 0, dcount);
 			for (size_t i = 0; i < length; i++)
@@ -3000,6 +3011,9 @@ namespace hz {
 				rects[i] = { x + draw_pos.x + i * bar_width, draw_pos.y - height, bar_width - bar_step, height };
 			}
 		}
+	}
+	void h2r() {
+
 	}
 	float* fft_cx::calculate_heights(float* audio_frame, int frame_size, int dcount)
 	{
@@ -3017,14 +3031,19 @@ namespace hz {
 			t[i] = *s; s += 2;
 			t1[i] = *s1; s1 += 2;
 		}
-
+		//fft_tiny tn;
+		//tn.fft(vd2.data(), frame_size * 2, 44100);
 		{
 			int dct = dcount / 2;
 			dcount = dct * 2;
 			if (_rects.size() != dcount)
 				_rects.resize(dcount);
-			float* a = fft(vd2.data(), frame_size * 2);
-			calculate_heights(dcount, _oy[0], _rects.data(), 0);
+			float* a = fft(vd2.data(), frame_size);
+			//calculate_heights(tn._data, dcount, _oy, _lastY[0], _rects.data(), 0);
+			std::reverse(heights.data(), heights.data() + heights.size());
+			calculate_heights(heights, dct, _oy, _lastY[0], _rects.data(), 0);
+			a = fft(vd2.data() + frame_size, frame_size);
+			calculate_heights(heights, dct, _oy, _lastY[1], _rects.data() + dct, dct);
 		}
 		return heights.data();
 	}

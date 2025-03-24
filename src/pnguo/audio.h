@@ -157,8 +157,8 @@ namespace hz {
 		glm::vec2 draw_pos = { 60,160 };
 		std::vector<float> outdata;
 		std::vector<float> heights;
-		std::vector<float> lastY;
-		std::vector<float> _oy[2];
+		std::vector<float> _lastY[2];
+		std::vector<float> _oy;
 		std::vector<double> magnitudesv;
 		std::vector<float> vd, vd2;
 		std::vector<float> sample_tem;
@@ -171,7 +171,7 @@ namespace hz {
 		float* calculate_heights(short* audio_frame, int frame_size, int dcount);
 	private:
 		float* fft(float* data, int n);
-		void calculate_heights(int dcount, std::vector<float>& oy, glm::vec4* rects, int x);
+		void calculate_heights(std::vector<float>& dh, int dcount, std::vector<float>& oy, std::vector<float>& lastY, glm::vec4* rects, int x);
 
 	};
 	struct audio_backend_t

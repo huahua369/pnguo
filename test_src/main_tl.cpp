@@ -716,7 +716,7 @@ int main()
 	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
 	audio_data_t* mad1h = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
 	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song\云朵-我的楼兰.flac)");
-	//std::swap(mad1h, mad1);
+	std::swap(mad1h, mad1);
 	auto st = app->new_audio_stream0(mad->format, mad->channels, mad->freq);
 	auto st1 = app->new_audio_stream0(mad1->format, mad1->channels, mad1->freq);
 	auto st32f = app->new_audio_stream0(2, 2, 48000);
