@@ -3099,7 +3099,7 @@ namespace hz {
 				{
 					h2[i] = nd[i];
 				}
-				calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0, false);
+				calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0, true);
 				nd += frame_size;
 				for (size_t i = 0; i < frame_size; i++)
 				{
@@ -3143,7 +3143,6 @@ namespace hz {
 	audio_cx::~audio_cx()
 	{
 		_run = false;
-		rj.join();
 		save_config();
 		free_coders(coders); coders = 0;
 	}
@@ -3169,9 +3168,7 @@ namespace hz {
 	uint64_t a_get_ticks() {
 		auto now = std::chrono::high_resolution_clock::now();
 		// 转换为毫秒级时间戳
-		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-			now.time_since_epoch()
-		).count();
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 		return ms;
 	}
 	void a_sleep_ms(int ms)
@@ -3183,22 +3180,35 @@ namespace hz {
 		if (!bk.sleep_ms)bk.sleep_ms = a_sleep_ms;
 		if (!bk.get_ticks)bk.get_ticks = a_get_ticks;
 		if (!bk.put_audio)return;
-		std::thread j([=]()
-			{
-				while (_run) {
+		if (!put_jt.native_handle()) {
+			std::jthread j([=](std::stop_token st)
+				{
+					while (!st.stop_requested()) {
 
-					auto curr_time = bk.get_ticks();
-					if (prev_time > 0)
-					{
-						auto ctp = curr_time - prev_time;
-						double delta = (float)(ctp) / 1000.0f;
-						bk.put_audio(0, 0, 0);
+						auto curr_time = bk.get_ticks();
+						if (prev_time > 0)
+						{
+							auto ctp = curr_time - prev_time;
+							double delta = (float)(ctp) / 1000.0f;
+							// todo put data
+							bk.put_audio(0, 0, 0);
+						}
+						prev_time = curr_time;
+						bk.sleep_ms(waitms);
 					}
-					prev_time = curr_time; 
-					bk.sleep_ms(waitms);
-				}
-			});
-		rj.swap(j);
+				});
+			put_jt.swap(j);// 音频推送播放线程
+		}
+		if (!de_jt.native_handle()) {
+			std::jthread dj([=](std::stop_token st)
+				{
+					while (!st.stop_requested()) {
+						// todo audio decoder
+						bk.sleep_ms(waitms);
+					}
+				});
+			de_jt.swap(dj);// 音频解码线程
+		}
 	}
 
 }

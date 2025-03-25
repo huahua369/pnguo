@@ -2022,6 +2022,7 @@ void form_x::present(double delta)
 	float rsx = 1.0f;
 	float rsy = 1.0f;
 	SDL_GetRenderScale(renderer, &rsx, &rsy);
+	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	glm::vec2 render_scale;
 	render_scale.x = (rsx == 1.0f) ? display_framebuffer_scale.x : 1.0f;
 	render_scale.y = (rsy == 1.0f) ? display_framebuffer_scale.y : 1.0f;

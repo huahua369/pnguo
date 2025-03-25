@@ -223,7 +223,7 @@ namespace hz {
 		int indent_cbor = 0;
 		int waitms = 20;		// 延迟毫秒
 		double prev_time = 0.0;
-		std::thread rj;
+		std::jthread put_jt, de_jt;
 		bool _run = true;
 	public:
 		audio_cx();

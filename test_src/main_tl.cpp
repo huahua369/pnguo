@@ -1,6 +1,7 @@
 ﻿
 #include <pch1.h>
-
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
 #include <pnguo/win_core.h>
 #include "win32msg.h"
 #include <pnguo/event.h>
@@ -658,7 +659,66 @@ void build_audio_test(int seconds, std::vector<T>& data)
 	}
 }
 
+// 生成单个矩形的顶点数据（6个顶点）
+std::vector<SDL_Vertex> GenerateRectangleVertices(
+	float x, float y,     // 左上角坐标 
+	float width,          // 矩形宽度 
+	float height,         // 矩形高度 
+	SDL_FColor colorTL,    // 左上颜色 
+	SDL_FColor colorTR,    // 右上颜色 
+	SDL_FColor colorBL,    // 左下颜色 
+	SDL_FColor colorBR)    // 右下颜色 
+{
+	// 定义顶点数组（6个顶点，两个三角形）
+	std::vector<SDL_Vertex> vertices(6);
 
+	// 顶点坐标计算 
+	const float x1 = x;
+	const float y1 = y;
+	const float x2 = x + width;
+	const float y2 = y + height;
+
+	// 第一个三角形（左上、右上、左下）
+	vertices[0] = { {x1, y1}, colorTL, {0} };
+	vertices[1] = { {x2, y1}, colorTR, {0} };
+	vertices[2] = { {x1, y2}, colorBL, {0} };
+
+	// 第二个三角形（右上、左下、右下）
+	vertices[3] = { {x2, y1}, colorTR, {0} };
+	vertices[4] = { {x1, y2}, colorBL, {0} };
+	vertices[5] = { {x2, y2}, colorBR, {0} };
+
+	return vertices;
+}
+
+// 示例：生成多个矩形数据 
+std::vector<SDL_Vertex> GenerateBatchRectangles() {
+	std::vector<SDL_Vertex> batch;
+
+	// 生成红色渐变矩形（位置：100,100 尺寸：200x150）
+	SDL_FColor red = { 1, 0, 0, 1 };
+	SDL_FColor red1 = { 0.1, 0, 0, 0.2 };
+	auto rect1 = GenerateRectangleVertices(100, 100, 200, 150, red, red, red1, red1);
+	batch.insert(batch.end(), rect1.begin(), rect1.end());
+
+	// 生成蓝绿渐变矩形（位置：350,200 尺寸：150x200）
+	SDL_FColor blue = { 0, 0, 1, 0.9 };
+	SDL_FColor green = { 0, 1, 0, 0.5 };
+	auto rect2 = GenerateRectangleVertices(350, 200, 150, 200, blue, green, blue, red);
+	batch.insert(batch.end(), rect2.begin(), rect2.end());
+
+	return batch;
+}
+void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt)
+{
+	opt.clear();
+	for (auto& it : _rect) {
+		SDL_FColor b = { 0, 0.5, 1, 1 };
+		SDL_FColor j = { 1, 0.15, 0, 0.9 }; 
+		auto rect2 = GenerateRectangleVertices(it.x, it.y, it.z, it.w, j, j, b, b);
+		opt.insert(opt.end(), rect2.begin(), rect2.end());
+	}
+}
 int main()
 {
 #ifdef _DEBUG
@@ -740,7 +800,10 @@ int main()
 		fft->is_raw = true;
 		fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
 		fft1->draw_pos.y += 110;
-
+		fft1->bar_width = 6;
+		fft1->bar_step = 1;
+		fft->bar_width = 6;
+		fft->bar_step = 3;
 		int bits[] = { 16,24,32 };
 		e.bits_per_sample = bits[mad1->format];
 		e.src_format = mad1->format == 2 ? 1 : 0;
@@ -793,20 +856,31 @@ int main()
 				if (deltas > dtime)
 				{
 					static int64_t kn = 0;
+					static int64_t kn1 = 0;
 					static int64_t sn = 256;
 					static int64_t sn1 = 2048;
 					deltas = 0;
 					fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
-					fft1->calculate_heights((short*)mad1->data + kn, sn1 * 2, 100);
+					fft1->calculate_heights((short*)mad1->data + kn1, sn1 * 2, 100);
 					kn += fs;
+					kn1 += fs;
 					if (kn >= mad1->total_samples)
 					{
 						kn = 0;
+					}
+					if (kn1 >= mad1->total_samples)
+					{
+						kn1 = 0;
 					}
 				}
 				glm::vec4 color = { 0,0.5,1.0,0.8 };
 				form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
 				form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
+				static std::vector<SDL_Vertex> vertices = GenerateBatchRectangles();
+				gen_rects(fft1->_rects, vertices);
+				SDL_RenderGeometry(renderer, nullptr,
+					vertices.data(), vertices.size(),
+					nullptr, 0);
 			};
 	}
 	auto lt = pl->ltx;
