@@ -154,6 +154,7 @@ namespace hz {
 		float smoothConstantDown = 0.08;
 		float smoothConstantUp = 0.8;
 		bool is_smooth = true;			// 是否平滑
+		bool is_raw = false;
 		glm::vec2 draw_pos = { 60,160 };
 		std::vector<float> outdata;
 		std::vector<float> heights;

@@ -2978,6 +2978,8 @@ namespace hz {
 				auto height = output[i];
 				if (isnan(height))
 					height = 0;
+				if (isinf(height))
+					height = 1.0;
 				oy[i] = height * draw_height;
 			}
 
@@ -2996,9 +2998,15 @@ namespace hz {
 			}
 			mx -= mn;
 			for (auto& it : oy) {
-				it -= mn; 
-				it /= mx;
+				it -= mn;
+				if (mx > 0) {
+					it /= mx;
+				}
+				if (isnan(it)) {
+					it = 0;
+				}
 				it *= draw_height;
+
 			}
 
 			auto& y = oy;
@@ -3071,30 +3079,36 @@ namespace hz {
 			dcount = dct * 2;
 			if (_rects.size() != dcount)
 				_rects.resize(dcount);
-			float* a = fft(vd2.data(), frame_size);
-			//calculate_heights(tn._data, dcount, _oy, _lastY[0], _rects.data(), 0);
-			std::reverse(heights.data(), heights.data() + heights.size());
+
 			auto h2 = heights;
-			//calculate_spectrum(vd2.data(), frame_size, h2);
-			//calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
-			calculate_heights(heights, dct, _oy, _lastY[0], _rects.data(), 0);
-			a = fft(vd2.data() + frame_size, frame_size);
-			//calculate_spectrum(vd2.data() + frame_size, frame_size, h2);
-			//calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);
-			calculate_heights(heights, dct, _oy, _lastY[1], _rects.data() + dct, dct);
-	/*		auto nd = vd2.data();
-			h2.resize(frame_size);
-			for (size_t i = 0; i < frame_size; i++)
+			if (is_raw)
 			{
-				h2[i] = nd[i];
+				auto nd = vd2.data();
+				h2.resize(frame_size);
+				for (size_t i = 0; i < frame_size; i++)
+				{
+					h2[i] = nd[i];
+				}
+				calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
+				nd += frame_size;
+				for (size_t i = 0; i < frame_size; i++)
+				{
+					h2[i] = nd[i];
+				}
+				calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);
 			}
-			calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
-			nd += frame_size;
-			for (size_t i = 0; i < frame_size; i++)
-			{
-				h2[i] = nd[i];
+			else {
+				float* a = fft(vd2.data(), frame_size);
+				//calculate_heights(tn._data, dcount, _oy, _lastY[0], _rects.data(), 0);
+				std::reverse(heights.data(), heights.data() + heights.size());
+				//calculate_spectrum(vd2.data(), frame_size, h2);
+				//calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
+				calculate_heights(heights, dct, _oy, _lastY[0], _rects.data(), 0);
+				a = fft(vd2.data() + frame_size, frame_size);
+				//calculate_spectrum(vd2.data() + frame_size, frame_size, h2);
+				//calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);
+				calculate_heights(heights, dct, _oy, _lastY[1], _rects.data() + dct, dct);
 			}
-			calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);*/
 		}
 		return heights.data();
 	}
