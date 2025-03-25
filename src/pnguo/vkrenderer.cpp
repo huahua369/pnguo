@@ -6753,8 +6753,8 @@ namespace vkr
 			for (uint32_t j = 0; j < mapDim; ++j) {
 				for (uint32_t i = 0; i < mapDim; ++i) {
 					glm::vec2 v2 = integrateBRDF((static_cast<float>(j) + .5f) / static_cast<float>(mapDim), ((static_cast<float>(i) + .5f) / static_cast<float>(mapDim)));
-					uint16_t halfR = glm::detail::toFloat16(v2.r);
-					uint16_t halfG = glm::detail::toFloat16(v2.g);
+					uint16_t halfR = glm::detail::toFloat16(v2.x);
+					uint16_t halfG = glm::detail::toFloat16(v2.y);
 					auto pt = d + offset;
 					auto t = (glm::u16vec2*)pt;
 					t->x = halfR;
@@ -6767,14 +6767,14 @@ namespace vkr
 			for (uint32_t j = 0; j < mapDim; ++j) {
 				for (uint32_t i = 0; i < mapDim; ++i) {
 					glm::vec2 v2 = integrateBRDF((static_cast<float>(j) + .5f) / static_cast<float>(mapDim), ((static_cast<float>(i) + .5f) / static_cast<float>(mapDim)));
-					uint8_t halfR = v2.r * 255.0;
-					uint8_t halfG = v2.g * 255.0;
+					uint8_t halfR = v2.x * 255.0;
+					uint8_t halfG = v2.y * 255.0;
 					auto pt = d + offset;
 					auto t = (glm::u8vec4*)pt;
-					t->r = halfR;
-					t->g = halfG;
-					t->b = 0;
-					t->a = 0xff;
+					t->x = halfR;
+					t->y = halfG;
+					t->z = 0;
+					t->w = 0xff;
 					offset++;
 				}
 			}

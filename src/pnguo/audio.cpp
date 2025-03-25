@@ -2832,7 +2832,7 @@ namespace hz {
 		return output;
 	}
 	// 简易FIR低通滤波器（截止频率=目标采样率/2）
-	void apply_lpf(float* data, int len, int taps, float* coeff, float* filtered) {
+	void apply_lpf(float* data, int len, int taps, float* coeff, float* filtered, float* dst) {
 		//float* coeff = malloc(taps * sizeof(float));
 		// 生成窗函数系数（示例使用汉明窗）
 		for (int i = 0; i < taps; i++) {
@@ -2848,6 +2848,8 @@ namespace hz {
 				if (idx >= 0) filtered[n] += data[idx] * coeff[k];
 			}
 		}
+		if (dst)
+			data = dst;
 		memcpy(data, filtered, len * sizeof(float));
 		//free(coeff);
 		//free(filtered);
@@ -2937,7 +2939,7 @@ namespace hz {
 		}
 	}
 
-	void fft_cx::calculate_heights(std::vector<float>& dh, int dcount, std::vector<float>& oy, std::vector<float>& lastY, glm::vec4* rects, int x)
+	void fft_cx::calculate_heights(std::vector<float>& dh, int dcount, std::vector<float>& oy, std::vector<float>& lastY, glm::vec4* rects, int x, bool is_reverse)
 	{
 		if (dcount > 2)
 		{
@@ -2947,7 +2949,7 @@ namespace hz {
 			int factor = (dst_rate > src_rate) ?
 				dst_rate / src_rate :
 				src_rate / dst_rate;
-			int ass = taps + len + len * factor;
+			int ass = taps + len * (factor + 2);
 			if (sample_tem.size() != ass)
 			{
 				sample_tem.resize(ass);
@@ -2960,19 +2962,27 @@ namespace hz {
 				output = dh.data();
 			}
 			else {
+				output = t + taps + len * 2;
 				if (dst_rate > src_rate) { // 升采样 
-					apply_lpf(dh.data(), len, taps, t, t + taps); // 预滤波 
-					output = upsample(dh.data(), len, factor, t + taps + len);
+					apply_lpf(dh.data(), len, taps, t, t + taps, output); // 预滤波 
+					output = upsample(output, len, factor, t + taps + len);
 					length = len * factor;
 				}
 				else { // 降采样 
-					apply_lpf(dh.data(), len, taps, t, t + taps); // 抗混叠滤波 
-					output = downsample(dh.data(), len, factor, t + taps + len);
+					apply_lpf(dh.data(), len, taps, t, t + taps, output); // 抗混叠滤波 
+					output = downsample(output, len, factor, t + taps + len);
 					length = len / factor;
 				}
 			}
+			length = length > dcount ? dcount : length;
 			if (oy.size() != length)
 				oy.resize(length);
+			int inc = is_reverse ? -1 : 1;
+			auto doy = oy.data();
+			if (inc < 0)
+			{
+				doy += length - 1;
+			}
 			for (size_t i = 0; i < length; i++)
 			{
 				auto height = output[i];
@@ -2980,14 +2990,14 @@ namespace hz {
 					height = 0;
 				if (isinf(height))
 					height = 1.0;
-				oy[i] = height * draw_height;
+				*doy = height * draw_height;
+				doy += inc;
 			}
 
 			int n = oy.size();
 			double f = 0.5;
 			int half = n * f;
 			auto rd = oy.data();
-			//std::rotate(rd, rd + half, rd + n);
 			double mn = 0.0;
 			double mx = 0.0;
 			for (auto& it : oy) {
@@ -3080,34 +3090,28 @@ namespace hz {
 			if (_rects.size() != dcount)
 				_rects.resize(dcount);
 
-			auto h2 = heights;
 			if (is_raw)
 			{
+				auto& h2 = heights;
 				auto nd = vd2.data();
 				h2.resize(frame_size);
 				for (size_t i = 0; i < frame_size; i++)
 				{
 					h2[i] = nd[i];
 				}
-				calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
+				calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0, false);
 				nd += frame_size;
 				for (size_t i = 0; i < frame_size; i++)
 				{
 					h2[i] = nd[i];
 				}
-				calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);
+				calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct, false);
 			}
 			else {
 				float* a = fft(vd2.data(), frame_size);
-				//calculate_heights(tn._data, dcount, _oy, _lastY[0], _rects.data(), 0);
-				std::reverse(heights.data(), heights.data() + heights.size());
-				//calculate_spectrum(vd2.data(), frame_size, h2);
-				//calculate_heights(h2, dct, _oy, _lastY[0], _rects.data(), 0);
-				calculate_heights(heights, dct, _oy, _lastY[0], _rects.data(), 0);
+				calculate_heights(heights, dct, _oy, _lastY[0], _rects.data(), 0, true);
 				a = fft(vd2.data() + frame_size, frame_size);
-				//calculate_spectrum(vd2.data() + frame_size, frame_size, h2);
-				//calculate_heights(h2, dct, _oy, _lastY[1], _rects.data() + dct, dct);
-				calculate_heights(heights, dct, _oy, _lastY[1], _rects.data() + dct, dct);
+				calculate_heights(heights, dct, _oy, _lastY[1], _rects.data() + dct, dct, false);
 			}
 		}
 		return heights.data();
@@ -3132,11 +3136,15 @@ namespace hz {
 
 	audio_cx::audio_cx()
 	{
+		config = njson::object();
 		coders = new_coders();
 	}
 
 	audio_cx::~audio_cx()
 	{
+		_run = false;
+		rj.join();
+		save_config();
 		free_coders(coders); coders = 0;
 	}
 
@@ -3151,8 +3159,47 @@ namespace hz {
 			config = read_json(confn);
 		}
 	}
+	void audio_cx::save_config()
+	{
+		if (_confn.size())
+		{
+			save_json(_confn, config, indent_cbor);
+		}
+	}
+	uint64_t a_get_ticks() {
+		auto now = std::chrono::high_resolution_clock::now();
+		// 转换为毫秒级时间戳
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			now.time_since_epoch()
+		).count();
+		return ms;
+	}
+	void a_sleep_ms(int ms)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+	}
+	void audio_cx::run_thread()
+	{
+		if (!bk.sleep_ms)bk.sleep_ms = a_sleep_ms;
+		if (!bk.get_ticks)bk.get_ticks = a_get_ticks;
+		if (!bk.put_audio)return;
+		std::thread j([=]()
+			{
+				while (_run) {
 
-
+					auto curr_time = bk.get_ticks();
+					if (prev_time > 0)
+					{
+						auto ctp = curr_time - prev_time;
+						double delta = (float)(ctp) / 1000.0f;
+						bk.put_audio(0, 0, 0);
+					}
+					prev_time = curr_time; 
+					bk.sleep_ms(waitms);
+				}
+			});
+		rj.swap(j);
+	}
 
 }
 //!hz

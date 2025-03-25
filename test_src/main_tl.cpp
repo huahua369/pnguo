@@ -689,7 +689,7 @@ int main()
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2);
 	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2);
-	d2->set_pos(0, 300, 350);
+	d2->set_pos(0, 600, 650);
 	d2->set_pos(1, 300, 650);
 	atlas_strinfo ass = get_atlas_strinfo();
 	std::vector<char*> nv;
@@ -705,10 +705,10 @@ int main()
 	build_audio_test(5, *adata32);
 	build_audio_test(5, *adata16);
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::unbindaudio,app_cx::unbindaudios
-		,app_cx::get_audio_stream_queued,app_cx::put_audio,app_cx::clear_audio };
+		,app_cx::get_audio_stream_queued,app_cx::put_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
 	auto audio_ctx = new hz::audio_cx();
-	audio_ctx->init(&abc, "data/music.json");
-
+	audio_ctx->init(&abc, "data/config_music.json");
+	audio_ctx->run_thread();
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
@@ -724,6 +724,7 @@ int main()
 	auto st32 = app->new_audio_stream0(1, 2, 48000);
 	auto st16 = app->new_audio_stream0(0, 2, 48000);
 	hz::fft_cx* fft = new hz::fft_cx();
+	hz::fft_cx* fft1 = new hz::fft_cx();
 	{
 		encoder_info_t e = {};
 		while (1)
@@ -737,6 +738,8 @@ int main()
 		fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
 		fft->draw_pos;
 		fft->is_raw = true;
+		fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
+		fft1->draw_pos.y += 110;
 
 		int bits[] = { 16,24,32 };
 		e.bits_per_sample = bits[mad1->format];
@@ -765,7 +768,7 @@ int main()
 	int fs = mad1->sample_rate * dtime;
 	{
 		auto dt1 = (char*)mad1->data;
-		app->put_audio(st1, dt1, mad1->len);
+		//app->put_audio(st1, dt1, mad1->len);
 	}
 	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
@@ -790,9 +793,11 @@ int main()
 				if (deltas > dtime)
 				{
 					static int64_t kn = 0;
-					static int64_t sn = fs;
+					static int64_t sn = 256;
+					static int64_t sn1 = 2048;
 					deltas = 0;
 					fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
+					fft1->calculate_heights((short*)mad1->data + kn, sn1 * 2, 100);
 					kn += fs;
 					if (kn >= mad1->total_samples)
 					{
@@ -801,6 +806,7 @@ int main()
 				}
 				glm::vec4 color = { 0,0.5,1.0,0.8 };
 				form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
+				form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
 			};
 	}
 	auto lt = pl->ltx;
@@ -849,6 +855,7 @@ int main()
 	// 运行消息循环
 	run_app(app, 0);
 	delete d2;
+	delete audio_ctx;
 	free_coders(cp);
 	free_app(app);
 	return 0;

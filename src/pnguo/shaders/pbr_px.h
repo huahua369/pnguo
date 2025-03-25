@@ -558,7 +558,8 @@ vec4 getVertexColor()
 
 float getPerceivedBrightness(vec3 vector)
 {
-	return sqrt(0.299 * vector.r * vector.r + 0.587 * vector.g * vector.g + 0.114 * vector.b * vector.b);
+	//return sqrt(0.299 * vector.r * vector.r + 0.587 * vector.g * vector.g + 0.114 * vector.b * vector.b);
+	return sqrt(0.299 * vector.x * vector.x + 0.587 * vector.y * vector.y + 0.114 * vector.z * vector.z);
 }
 
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_pbrSpecularGlossiness/examples/convert-between-workflows/js/three.pbrUtilities.js#L34
@@ -961,7 +962,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// Roughness is authored as perceptual roughness; as is convention,
 	// convert to material roughness by squaring the perceptual roughness.
 	m.alphaRoughness = m.perceptualRoughness * m.perceptualRoughness;
-	m.alpha = m.baseColor.a;
+	m.alpha = m.baseColor.w;
 
 #if 1
 	// Metallic-Roughness
@@ -1883,7 +1884,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	float alphaRoughness = m.perceptualRoughness * m.perceptualRoughness;
 	vec3 specularColor = m.specularColorlight;
 	// Compute reflectance.
-	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
+	float reflectance = max(max(specularColor.x, specularColor.y), specularColor.z);
 
 	vec3 specularEnvironmentR0 = specularColor;
 	// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
@@ -2312,7 +2313,7 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
 	// Compute reflectance.
-	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
+	float reflectance = max(max(specularColor.x, specularColor.y), specularColor.z);
 
 	vec3 specularEnvironmentR0 = specularColor;
 	// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.

@@ -68,7 +68,7 @@
 //#define GLM_FORCE_INTRINSICS
 // 定义glm启用simd
 //#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
-//#define GLM_FORCE_XYZW_ONLY
+#define GLM_FORCE_XYZW_ONLY
 #include <glm/glm.hpp>  
 
 #include <glm/gtx/intersect.hpp>

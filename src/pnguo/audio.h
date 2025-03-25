@@ -172,7 +172,7 @@ namespace hz {
 		float* calculate_heights(short* audio_frame, int frame_size, int dcount);
 	private:
 		float* fft(float* data, int n);
-		void calculate_heights(std::vector<float>& dh, int dcount, std::vector<float>& oy, std::vector<float>& lastY, glm::vec4* rects, int x);
+		void calculate_heights(std::vector<float>& dh, int dcount, std::vector<float>& oy, std::vector<float>& lastY, glm::vec4* rects, int x, bool is_reverse);
 
 	};
 	struct audio_backend_t
@@ -185,6 +185,8 @@ namespace hz {
 		int (*get_audio_stream_queued)(void* st) = 0;
 		void (*put_audio)(void* stream, void* data, int len) = 0;
 		void (*clear_audio)(void* st) = 0;
+		void(*sleep_ms)(int ms) = 0;
+		uint64_t(*get_ticks)() = 0;
 	};
 	struct audio_item
 	{
@@ -217,10 +219,19 @@ namespace hz {
 		// 配置信息	{自定义设置、歌单配置等}
 		njson config;
 		std::string _confn;
+		// -1则保存成cbor
+		int indent_cbor = 0;
+		int waitms = 20;		// 延迟毫秒
+		double prev_time = 0.0;
+		std::thread rj;
+		bool _run = true;
 	public:
 		audio_cx();
 		~audio_cx();
 		void init(audio_backend_t* p, const std::string& confn);
+		void save_config();
+		// 创建线程运行
+		void run_thread();
 	private:
 
 	};

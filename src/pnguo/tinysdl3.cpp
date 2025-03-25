@@ -544,6 +544,9 @@ void app_cx::sleep_ns(int ns)
 {
 	SDL_DelayNS(ns);
 }
+uint64_t app_cx::get_ticks() {
+	return SDL_GetTicks();
+}
 void app_cx::set_fps(int n) {
 	_fps = n;
 	if (n > 0)

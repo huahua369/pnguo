@@ -197,7 +197,7 @@ void amain()
 			discard;
 	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
-	vec4 color = vec4(c3, m.baseColor.a);
+	vec4 color = vec4(c3, m.baseColor.w);
 
 // Roughness is authored as perceptual roughness; as is convention,
 // convert to material roughness by squaring the perceptual roughness [2].

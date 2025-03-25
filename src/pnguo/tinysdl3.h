@@ -98,6 +98,7 @@ public:
 	static void sleep_ms(int ms);
 	// 睡眠纳秒
 	static void sleep_ns(int ns);
+	static uint64_t get_ticks();
 	void set_fps(int n);
 	void set_syscursor(int type);
 	void set_defcursor(uint32_t t);
