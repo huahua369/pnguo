@@ -721,8 +721,7 @@ void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt)
 }
 int main()
 {
-#ifdef _DEBUG
-	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+#ifdef _DEBUG 
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
