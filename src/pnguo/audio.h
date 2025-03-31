@@ -232,6 +232,7 @@ namespace hz {
 		void save_config();
 		// 创建线程运行
 		void run_thread();
+
 	private:
 
 	};
