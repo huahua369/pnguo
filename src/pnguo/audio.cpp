@@ -3175,6 +3175,133 @@ namespace hz {
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 	}
+	void audio_cx::add_song(size_t idx, const std::string& uri)
+	{
+		if (_lists.empty())
+		{
+			audio_list* st = new audio_list();
+			_lists.push_back(st);
+		}
+		if (idx < _lists.size())
+		{
+			auto* it = new audio_item();
+			it->path = uri; it->data = new_audio_data(coders, uri);
+			if (it->data)
+			{
+
+			}
+			_lists[idx]->v.push_back(it);
+		}
+	}
+	std::mt19937* get_mtr() {
+		static std::random_device rd;
+		static std::mt19937 mt(rd());
+		return &mt;
+	}
+	// 设置播放歌单
+	void audio_cx::set_gd(size_t idx) {
+		if (idx != gd_idx)
+		{
+			if (idx < _lists.size())
+			{
+				gd_idx = idx;
+				_playlist.clear();
+				auto* it = _lists[idx];
+				for (size_t i = 0; i < it->v.size(); i++)
+				{
+					_playlist.push_back(i);
+				}
+				if (ge_type == 4)
+				{
+					// 随机数生成器 
+					std::mt19937& g = *get_mtr();
+					std::shuffle(_playlist.begin(), _playlist.end(), g);
+				}
+			}
+		}
+	}
+	// 播放当前歌单指定索引
+	void audio_cx::play(size_t idx) {
+		int pidx = -1;
+		{
+			std::lock_guard <std::mutex> lock(_gd_mutex);
+			if (idx < _playlist.size() && idx >= 0 && _playlist.size())
+			{
+				pidx = _playlist[idx];
+				gd_sidx = idx;
+			}
+		}
+		play(gd_idx, pidx);
+	}
+	// 设置播放类型
+	void audio_cx::set_type(int type) {
+		std::lock_guard <std::mutex> lock(_gd_mutex);
+		if (ge_type == 4 && type != 4)
+		{
+			_playlist.clear();
+			if (gd_idx < _lists.size())
+			{
+				auto* it = _lists[gd_idx];
+				for (size_t i = 0; i < it->v.size(); i++)
+				{
+					_playlist.push_back(i);
+				}
+			}
+		}
+		ge_type = type;
+		if (ge_type == 4 && _playlist.size())
+		{
+			// 随机数生成器 
+			std::mt19937& g = *get_mtr();
+			std::shuffle(_playlist.begin(), _playlist.end(), g);
+		}
+	}
+	void audio_cx::play(size_t idx, size_t i)
+	{
+		if (idx < _lists.size() && i >= 0)
+		{
+			std::lock_guard <std::mutex> lock(_gd_mutex);
+			auto* it = _lists[idx];
+			if (i < it->v.size())
+			{
+				auto* pt = it->v[i];
+				if (pt && pt->data)
+				{
+					if (_current)
+					{
+						bk.clear_audio(_current->st);
+						_current = 0;
+					}
+					auto p = pt->data;
+					push_decoder(pt);
+					glm::ivec2 sz = { p->format, p->freq };
+					auto mt = _streams.find(sz);
+					void* st = 0;
+					if (mt == _streams.end())
+					{
+						st = bk.new_audio_stream(bk.dev, p->format, p->channels, p->sample_rate);
+						_streams[sz] = st;
+					}
+					else
+					{
+						st = mt->second;
+					}
+					if (st)
+					{
+						pt->st = st;
+						_current = pt;
+					}
+				}
+			}
+		}
+	}
+	void audio_cx::push_decoder(audio_item* p) {
+		if (p && p->data)
+		{
+			std::lock_guard <std::mutex> lock(_de_mutex);
+			_de_list.push(p);
+		}
+	}
 	void audio_cx::run_thread()
 	{
 		if (!bk.sleep_ms)bk.sleep_ms = a_sleep_ms;
@@ -3191,7 +3318,90 @@ namespace hz {
 							auto ctp = curr_time - prev_time;
 							double delta = (float)(ctp) / 1000.0f;
 							// todo put data
-							bk.put_audio(0, 0, 0);
+							do {
+								if (_current && _current->data)
+								{
+									auto pt = _current->data;
+									auto psq = bk.get_audio_stream_queued(_current->st);
+									if (frame_size == 0) {
+										frame_size = bk.get_audio_dst_framesize(_current->st);
+									}
+									auto psa = bk.get_audio_stream_available(_current->st) / frame_size;
+									if (psa == 0 && _current->cpos > 0) {
+										// 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
+										switch (ge_type)
+										{
+										case 0:
+											gd_sidx = -1;
+											break;
+										case 1:
+											gd_sidx;
+											break;
+										case 2:
+											gd_sidx++;
+											break;
+										case 3:
+											gd_sidx++;
+											if (gd_sidx > _playlist.size())
+											{
+												gd_sidx = 0;
+											}
+											break;
+										case 4:
+											gd_sidx++;
+											if (gd_sidx > _playlist.size())
+											{
+												gd_sidx = 0;
+												// 重置随机播放
+												set_type(4);
+											}
+											break;
+										default:
+											break;
+										}
+										play(gd_sidx);
+										ct = 0;
+									}
+									int psa1 = 0;
+									int psq1 = 0;
+									auto len = pt->desize;
+									auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
+									if (_current->cpos > psq)
+									{
+										cti = _current->cpos - psq;
+									}
+									if (_current->cpos == len)
+									{
+										break;
+									}
+									if (psa > 0) {
+										ct += delta;
+									}
+									if (_current->cpos < len)
+									{
+										if (len == pt->len)
+										{
+											auto kl = len - _current->cpos;
+											if (kl < plen)
+											{
+												plen = kl;
+											}
+										}
+										if (plen <= len - _current->cpos) {
+											bk.put_audio(_current->st, (char*)(pt->data) + _current->cpos, plen);
+											_current->cpos += plen;
+											psq1 = bk.get_audio_stream_queued(_current->st);
+											psa1 = bk.get_audio_stream_available(_current->st) / frame_size;
+
+											printf("push %d\n", plen);
+										}
+									}
+									else
+									{
+										printf("no de\n");
+									}
+								}
+							} while (0);
 						}
 						prev_time = curr_time;
 						bk.sleep_ms(waitms);
@@ -3203,7 +3413,22 @@ namespace hz {
 			std::jthread dj([=](std::stop_token st)
 				{
 					while (!st.stop_requested()) {
-						// todo audio decoder
+						audio_item* pt = 0;
+						if (_de_list.size()) {
+							std::lock_guard <std::mutex> lock(_de_mutex);
+							pt = _de_list.front();
+							_de_list.pop();
+						}
+						if (pt && pt->data)
+						{
+							while (1) {
+								int rc1 = decoder_data(pt->data);
+								if (rc1 <= 0)
+								{
+									break;
+								}
+							}
+						}
 						bk.sleep_ms(waitms);
 					}
 				});

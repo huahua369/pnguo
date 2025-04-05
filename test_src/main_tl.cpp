@@ -714,7 +714,7 @@ void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt)
 	opt.clear();
 	for (auto& it : _rect) {
 		SDL_FColor b = { 0, 0.5, 1, 1 };
-		SDL_FColor j = { 1, 0.15, 0, 0.9 }; 
+		SDL_FColor j = { 1, 0.15, 0, 0.9 };
 		auto rect2 = GenerateRectangleVertices(it.x, it.y, it.z, it.w, j, j, b, b);
 		opt.insert(opt.end(), rect2.begin(), rect2.end());
 	}
@@ -764,16 +764,27 @@ int main()
 	build_audio_test(5, *adata32);
 	build_audio_test(5, *adata16);
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::unbindaudio,app_cx::unbindaudios
-		,app_cx::get_audio_stream_queued,app_cx::put_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
+		,app_cx::put_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
 	auto audio_ctx = new hz::audio_cx();
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->run_thread();
+	audio_ctx->add_song(0, R"(E:\song\陈奕迅-好久不见.flac)");
+	audio_ctx->add_song(0, R"(E:\song\平生不晚-难却.flac)");
+	audio_ctx->add_song(0, R"(E:\song\云朵-我的楼兰.flac)");
+	audio_ctx->add_song(0, R"(E:\song\阿YueYue-云与海.flac)"); 
+	// 设置播放歌单，只有一个歌单，所以设置0
+	audio_ctx->set_gd(0);
+	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
+	audio_ctx->set_type(4);
+	// 播放当前歌单指定索引开始播放
+	audio_ctx->play(0);
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
 	audio_data_t* madogg = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
-	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\陈奕迅-好久不见.flac)");
-	audio_data_t* mad1h = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
+
+	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
 	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song\云朵-我的楼兰.flac)");
 	audio_data_t* mad1y = new_audio_data(cp, R"(E:\song\阿YueYue-云与海.flac)");
 	std::swap(mad1y, mad1);

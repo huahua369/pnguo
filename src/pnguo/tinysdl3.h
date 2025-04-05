@@ -118,6 +118,8 @@ public:
 	static void unbindaudio(void* st);
 	static void unbindaudios(void** st, int count);
 	static int get_audio_stream_queued(void* st);
+	static int get_audio_dst_framesize(void* st);
+	static int get_audio_stream_available(void* st);
 	static void put_audio(void* stream, void* data, int len);
 	static void clear_audio(void* st);
 private:

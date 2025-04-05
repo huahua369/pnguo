@@ -156,14 +156,14 @@ struct AudioSpec_t
 	void* userdata;             /**< Userdata passed to callback (ignored for NULL callbacks). */
 };
 
-class audio_data_t :public hz::rw_t
+class audio_data_cx :public hz::rw_t
 {
 public:
-	audio_data_t()
+	audio_data_cx()
 	{
 	}
 
-	~audio_data_t()
+	~audio_data_cx()
 	{
 	}
 	int put(const void* buf, int len)
@@ -269,7 +269,7 @@ public:
 	int64_t de_samples = 0;
 	// 解码器
 	void* _decoder = 0;
-	//audio_data_t* stream = 0;
+	//audio_data_cx* stream = 0;
 	int samples = 8192;
 	double seconds = 0.0;
 	double divby = 0.0;// 0.000030518509476;//DIVBY32767

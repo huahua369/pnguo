@@ -99,6 +99,15 @@ private:
 
 };
 
+struct audio_item
+{
+	std::string name, path;		// 歌名、路径
+	audio_data_t* data = 0;
+	void* st = 0;
+	size_t cpos = 0;	// 当前播放位置
+	double ctime = 0.0;	// 当前播放时间
+
+};
 
 coders_t* new_coders();
 void free_coders(coders_t* p);
@@ -183,20 +192,17 @@ namespace hz {
 		void (*unbindaudio)(void* st) = 0;
 		void (*unbindaudios)(void** st, int count) = 0;
 		int (*get_audio_stream_queued)(void* st) = 0;
+		int (*get_audio_stream_available)(void* st) = 0;
+		int (*get_audio_dst_framesize)(void* st) = 0;
 		void (*put_audio)(void* stream, void* data, int len) = 0;
 		void (*clear_audio)(void* st) = 0;
 		void(*sleep_ms)(int ms) = 0;
 		uint64_t(*get_ticks)() = 0;
 	};
-	struct audio_item
-	{
-		std::string name, path;		// 歌名、路径
-		audio_data_t* data = 0;
-	};
 	struct audio_list
 	{
 		std::string name;			// 歌单名
-		std::vector<audio_item> v;
+		std::vector<audio_item*> v;
 	};
 	/*
 	音频管理类
@@ -207,8 +213,6 @@ namespace hz {
 	public:
 		// 当前播放时间/进度
 		double ct = 0.0;
-		// 当前播放的歌曲
-		audio_data_t* adt = 0;
 		// 解码器
 		coders_t* coders = 0;
 		fft_cx* fft = 0;
@@ -216,6 +220,16 @@ namespace hz {
 		audio_backend_t bk = {};
 		// 歌单列表
 		std::vector<audio_list*> _lists;
+		std::queue<audio_item*> _de_list;
+		std::vector<int> _playlist;		// 播放列表
+		size_t gd_idx = -1;					// 当前播放的歌单
+		size_t gd_sidx = -1;				// 当前播放的歌单索引
+		int ge_type = 0;				// 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
+		std::mutex _gd_mutex;
+		std::mutex _de_mutex;
+		audio_item* _current = 0;	// 当前播放的音频
+		// 流
+		std::map<glm::ivec2, void*> _streams;
 		// 配置信息	{自定义设置、歌单配置等}
 		njson config;
 		std::string _confn;
@@ -223,6 +237,8 @@ namespace hz {
 		int indent_cbor = 0;
 		int waitms = 20;		// 延迟毫秒
 		double prev_time = 0.0;
+		int64_t cti = 0;
+		int frame_size = 0;
 		std::jthread put_jt, de_jt;
 		bool _run = true;
 	public:
@@ -230,10 +246,19 @@ namespace hz {
 		~audio_cx();
 		void init(audio_backend_t* p, const std::string& confn);
 		void save_config();
+
+		void add_song(size_t idx, const std::string& uri);
+		// 设置播放歌单
+		void set_gd(size_t idx);
+		// 设置播放类型
+		void set_type(int type = 4);
+		// 播放当前歌单指定索引
+		void play(size_t idx);
 		// 创建线程运行
 		void run_thread();
-
+		void push_decoder(audio_item* p);
 	private:
+		void play(size_t idx, size_t i);
 
 	};
 

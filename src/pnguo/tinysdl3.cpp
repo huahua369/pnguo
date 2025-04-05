@@ -727,9 +727,20 @@ void app_cx::free_audio_stream(void* st) {
 		SDL_DestroyAudioStream((SDL_AudioStream*)st);
 	}
 }
+int app_cx::get_audio_dst_framesize(void* st)
+{
+	auto stream = (SDL_AudioStream*)st;
+	SDL_AudioSpec dst_spec = {};
+	SDL_GetAudioStreamFormat(stream, 0, &dst_spec);
+	return SDL_AUDIO_FRAMESIZE(dst_spec);
+}
 int app_cx::get_audio_stream_queued(void* st)
 {
 	return st ? SDL_GetAudioStreamQueued((SDL_AudioStream*)st) : 0;
+}
+int app_cx::get_audio_stream_available(void* st)
+{
+	return st ? SDL_GetAudioStreamAvailable((SDL_AudioStream*)st) : 0;
 }
 void app_cx::put_audio(void* stream, void* data, int len)
 {
