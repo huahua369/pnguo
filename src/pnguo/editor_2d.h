@@ -73,6 +73,7 @@ private:
 public:
 	editor2d_cx();
 	~editor2d_cx();
+	void init(void* renderer, const texture_cb& cb);
 	// 设置自动保存目录等配置
 	void set_config(const char* fn);
 	// 导入图片，支持stb能导入的格式

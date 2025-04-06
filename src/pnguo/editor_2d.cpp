@@ -172,6 +172,12 @@ editor2d_cx::~editor2d_cx()
 {
 }
 
+void editor2d_cx::init(void* p, const texture_cb& cb)
+{
+	renderer = p;
+	tex_cb = cb;
+}
+
 void editor2d_cx::set_config(const char* fn)
 {
 }
