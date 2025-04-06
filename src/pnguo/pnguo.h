@@ -527,9 +527,11 @@ namespace gp {
 	};
 
 	int get_flatten(tinypath_t* p, int m, float ml, float ds, std::vector<glm::vec2>* flatten);
+	// 多孔多边形，输出到ms保存三角形每个点坐标
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z);
+	// 多孔多边形，输出到vd、idxs索引三角形
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& vd, std::vector<glm::ivec3>& idxs, bool pccw, double z);
-
+	// 单线多边形
 	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>& ms, bool pccw); /*double tolerance,*/
 	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>* ms, bool pccw);
 	void cdt_pt(glm::vec2* pt, int n, std::vector<glm::vec3>* msp, bool pccw);
