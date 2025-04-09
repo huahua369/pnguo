@@ -43,8 +43,9 @@
 #include <sys/stat.h>
 #include <sys/inotify.h>
 #endif
+#if __has_include(<glib.h>)
 #include <glib.h>
-
+#endif
 
 #include <pch1.h>
 #include <mapView.h>
@@ -174,7 +175,10 @@ namespace md {
 	bool validate_u8(const char* str, int len)
 	{
 		if (len < 0)len = strlen(str);
+#ifdef __G_LIB_H__
 		return len > 0 ? g_utf8_validate(str, len, 0) : false;
+#endif
+		return false;
 	}
 	// Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 	// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
@@ -1675,6 +1679,7 @@ namespace hz
 	std::string gbk_to_u8(const std::string& str)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str.c_str();
@@ -1691,11 +1696,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::string gb_to_u8(const char* str, size_t len)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str;
@@ -1717,11 +1724,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::string big5_to_u8(const char* str, size_t len)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str;
@@ -1738,11 +1747,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::string shift_jis_to_u8(const char* str, size_t len)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str;
@@ -1758,11 +1769,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::string u16_to_u8(const std::wstring& str)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str.c_str();
@@ -1780,11 +1793,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::string u16_to_gbk(const std::wstring& str)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str.c_str();
@@ -1802,11 +1817,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::string u8_to_gbk(const std::string& str)
 	{
 		std::string ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* utf8_string = 0;
 		gchar* fstr = (gchar*)str.c_str();
@@ -1823,11 +1840,13 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#endif
 		return ret;
 	}
 	std::wstring u8_to_u16(const std::string& str)
 	{
 		std::wstring ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* tstr = 0;
 		gchar* fstr = (gchar*)str.c_str();
@@ -1842,11 +1861,13 @@ namespace hz
 			ret = (wchar_t*)tstr;
 			g_free(tstr);
 		}
+#endif
 		return ret;
 	}
 	std::wstring gbk_to_u16(const std::string& str)
 	{
 		std::wstring ret;
+#ifdef __G_LIB_H__
 		GError* error = NULL;
 		gchar* tstr = 0;
 		gchar* fstr = (gchar*)str.c_str();
@@ -1861,6 +1882,7 @@ namespace hz
 			ret = (wchar_t*)tstr;
 			g_free(tstr);
 		}
+#endif
 		return ret;
 	}
 	// 跳过bom

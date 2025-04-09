@@ -121,6 +121,10 @@ public:
 	static int get_audio_dst_framesize(void* st);
 	static int get_audio_stream_available(void* st);
 	static void put_audio(void* stream, void* data, int len);
+	// v=0播放、1暂停
+	static void pause_audio(void* st_, int v);
+	// format：0=S16 , 1=S32 ,2=F32，volume取0-1
+	static bool mix_audio(uint8_t* dst, uint8_t* src, int format, size_t len, float volume);
 	static void clear_audio(void* st);
 private:
 	int get_event();

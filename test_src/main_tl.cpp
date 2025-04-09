@@ -728,6 +728,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\mtl.pdb");
 #endif     
 	const char* wtitle = (char*)u8"多功能管理工具";
+	auto tstr = hz::u8_to_gbk(wtitle);
 	auto app = new_app();
 	cpuinfo_t cpuinfo = get_cpuinfo();
 	glm::ivec2 ws = { 1280,860 };
@@ -765,14 +766,14 @@ int main()
 	build_audio_test(5, *adata16);
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::unbindaudio,app_cx::unbindaudios
 		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
-		,app_cx::put_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
 	auto audio_ctx = new hz::audio_cx();
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->run_thread();
 	audio_ctx->add_song(0, R"(E:\song\陈奕迅-好久不见.flac)");
 	audio_ctx->add_song(0, R"(E:\song\平生不晚-难却.flac)");
 	audio_ctx->add_song(0, R"(E:\song\云朵-我的楼兰.flac)");
-	audio_ctx->add_song(0, R"(E:\song\阿YueYue-云与海.flac)"); 
+	audio_ctx->add_song(0, R"(E:\song\阿YueYue-云与海.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放

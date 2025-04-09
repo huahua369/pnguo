@@ -744,14 +744,35 @@ int app_cx::get_audio_stream_available(void* st)
 }
 void app_cx::put_audio(void* stream, void* data, int len)
 {
+	auto st = (SDL_AudioStream*)stream;
 	if (stream && data && len > 0) {
-		SDL_PutAudioStreamData((SDL_AudioStream*)stream, data, (int)len);
+		SDL_PutAudioStreamData((SDL_AudioStream*)st, data, (int)len);
 	}
 }
-void app_cx::clear_audio(void* st)
+void app_cx::pause_audio(void* st_, int v)
 {
+	auto st = (SDL_AudioStream*)st_;
 	if (st)
-		SDL_ClearAudioStream((SDL_AudioStream*)st);
+	{
+		if (v)
+			SDL_PauseAudioStreamDevice(st);
+		else
+			SDL_ResumeAudioStreamDevice(st);
+	}
+}
+bool app_cx::mix_audio(uint8_t* dst, uint8_t* src, int format, size_t len, float volume)
+{
+	SDL_AudioFormat fmt[] = { SDL_AUDIO_S16 , SDL_AUDIO_S32 , SDL_AUDIO_F32 };
+	format = glm::clamp(format, 0, 2);
+	return SDL_MixAudio(dst, src, fmt[format], len, volume);
+}
+void app_cx::clear_audio(void* st_)
+{
+	auto st = (SDL_AudioStream*)st_;
+	if (st)
+	{
+		SDL_ClearAudioStream(st);
+	}
 }
 
 int app_cx::get_event()

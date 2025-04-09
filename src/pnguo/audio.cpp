@@ -3223,7 +3223,7 @@ namespace hz {
 	// 播放当前歌单指定索引
 	void audio_cx::play(size_t idx) {
 		int pidx = -1;
-		{
+		if (idx != -1) {
 			std::lock_guard <std::mutex> lock(_gd_mutex);
 			if (idx < _playlist.size() && idx >= 0 && _playlist.size())
 			{
@@ -3241,7 +3241,7 @@ namespace hz {
 			_playlist.clear();
 			if (gd_idx < _lists.size())
 			{
-				auto* it = _lists[gd_idx];
+				auto it = _lists[gd_idx];
 				for (size_t i = 0; i < it->v.size(); i++)
 				{
 					_playlist.push_back(i);
@@ -3256,20 +3256,45 @@ namespace hz {
 			std::shuffle(_playlist.begin(), _playlist.end(), g);
 		}
 	}
+	audio_list* audio_cx::get_list_it(size_t i)
+	{
+		if (_lists.empty() || i > _lists.size())
+		{
+			return 0;
+		}
+		std::lock_guard <std::mutex> lock(_gd_mutex);
+		return _lists[i];
+	}
 	void audio_cx::play(size_t idx, size_t i)
 	{
 		if (idx < _lists.size() && i >= 0)
 		{
-			std::lock_guard <std::mutex> lock(_gd_mutex);
-			auto* it = _lists[idx];
-			if (i < it->v.size())
+			auto it = get_list_it(idx);
+			if (it && i < it->v.size())
 			{
 				auto* pt = it->v[i];
 				if (pt && pt->data)
 				{
 					if (_current)
 					{
+						auto psq = bk.get_audio_stream_queued(_current->st);
+						auto psa = bk.get_audio_stream_available(_current->st);
+
+						//auto pt = _current->data;
+						//if (pt)
+						//{
+						//	auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
+						//	if (tem_buf.size() != plen) {
+						//		tem_buf.resize(plen);
+						//		memset(tem_buf.data(), 0, plen);
+						//	}
+						//	if (plen > 0)
+						//		bk.put_audio(_current->st, tem_buf.data(), plen);
+						//}
 						bk.clear_audio(_current->st);
+						auto psq1 = bk.get_audio_stream_queued(_current->st);
+						auto psa1 = bk.get_audio_stream_available(_current->st);
+						bk.pause_audio(_current->st, 1);
 						_current = 0;
 					}
 					auto p = pt->data;
@@ -3288,12 +3313,21 @@ namespace hz {
 					}
 					if (st)
 					{
+						pt->cpos = 0;	// 当前播放位置
+						pt->ctime = 0.0;	// 当前播放时间
 						pt->st = st;
 						_current = pt;
+						auto psq1 = bk.get_audio_stream_queued(st);
+						auto psa1 = bk.get_audio_stream_available(st);
+						bk.clear_audio(st);
+						auto psq = bk.get_audio_stream_queued(st);
+						auto psa = bk.get_audio_stream_available(st);
+						bk.pause_audio(st, 0);
 					}
 				}
 			}
 		}
+		else { _current = nullptr; }
 	}
 	void audio_cx::push_decoder(audio_item* p) {
 		if (p && p->data)
@@ -3301,6 +3335,120 @@ namespace hz {
 			std::lock_guard <std::mutex> lock(_de_mutex);
 			_de_list.push(p);
 		}
+	}
+	void audio_cx::play_thr()
+	{
+		auto curr_time = bk.get_ticks();
+		if (prev_time > 0)
+		{
+			auto ctp = curr_time - prev_time;
+			double delta = (float)(ctp) / 1000.0f;
+			// todo put data
+			do {
+				if (!_current || !_current->data)break;
+				auto pt = _current->data;
+				auto psq = bk.get_audio_stream_queued(_current->st);
+				if (frame_size == 0) {
+					frame_size = bk.get_audio_dst_framesize(_current->st);
+				}
+				auto psa = bk.get_audio_stream_available(_current->st) / frame_size;
+				if (psa == 0 && _current->cpos > 0)
+				{
+					// 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
+					switch (ge_type)
+					{
+					case 0:
+						gd_sidx = -1;
+						break;
+					case 1:
+						gd_sidx;
+						break;
+					case 2:
+						gd_sidx++;
+						if (gd_sidx >= _playlist.size())
+						{
+							gd_sidx = -1;
+						}
+						break;
+					case 3:
+						gd_sidx++;
+						if (gd_sidx >= _playlist.size())
+						{
+							gd_sidx = 0;
+						}
+						break;
+					case 4:
+						gd_sidx++;
+						if (gd_sidx >= _playlist.size())
+						{
+							gd_sidx = 0;
+							// 重置随机播放
+							set_type(4);
+						}
+						break;
+					default:
+						break;
+					}
+					play(gd_sidx);
+					ct = 0;
+				}
+				if (!_current)
+				{
+					break;
+				}
+				int psa1 = 0;
+				int psq1 = 0;
+				auto len = pt->desize;
+				auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
+				if (_current->cpos > psq)
+				{
+					cti = _current->cpos - psq;
+				}
+				if (_current->cpos == len)
+				{
+					break;
+				}
+				if (psa > 0) {
+					ct += delta;
+				}
+				if (_current->cpos < len)
+				{
+					char* putd = (char*)(pt->data) + _current->cpos;
+					if (len == pt->len)
+					{
+						auto kl = len - _current->cpos;
+						if (kl < plen)
+							plen = kl;
+#if 0
+						if (tem_buf.size() != plen) {
+							tem_buf.resize(plen);
+							memset(tem_buf.data(), 0, plen);
+						}
+						if (kl < plen)
+						{
+							if (kl > 0) {
+								memcpy(tem_buf.data(), (char*)(pt->data) + _current->cpos, kl);
+								putd = tem_buf.data();
+							}
+						}
+#endif
+					}
+					if (plen <= len - _current->cpos) {
+						bk.put_audio(_current->st, putd, plen);
+						_current->cpos += plen;
+						psq1 = bk.get_audio_stream_queued(_current->st);
+						psa1 = bk.get_audio_stream_available(_current->st) / frame_size;
+						printf("push %d\n", plen);
+					}
+				}
+				else
+				{
+					printf("no de\n");
+				}
+			} while (0);
+		}
+		prev_time = curr_time;
+		bk.sleep_ms(waitms);
 	}
 	void audio_cx::run_thread()
 	{
@@ -3310,102 +3458,7 @@ namespace hz {
 		if (!put_jt.native_handle()) {
 			std::jthread j([=](std::stop_token st)
 				{
-					while (!st.stop_requested()) {
-
-						auto curr_time = bk.get_ticks();
-						if (prev_time > 0)
-						{
-							auto ctp = curr_time - prev_time;
-							double delta = (float)(ctp) / 1000.0f;
-							// todo put data
-							do {
-								if (_current && _current->data)
-								{
-									auto pt = _current->data;
-									auto psq = bk.get_audio_stream_queued(_current->st);
-									if (frame_size == 0) {
-										frame_size = bk.get_audio_dst_framesize(_current->st);
-									}
-									auto psa = bk.get_audio_stream_available(_current->st) / frame_size;
-									if (psa == 0 && _current->cpos > 0) {
-										// 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
-										switch (ge_type)
-										{
-										case 0:
-											gd_sidx = -1;
-											break;
-										case 1:
-											gd_sidx;
-											break;
-										case 2:
-											gd_sidx++;
-											break;
-										case 3:
-											gd_sidx++;
-											if (gd_sidx > _playlist.size())
-											{
-												gd_sidx = 0;
-											}
-											break;
-										case 4:
-											gd_sidx++;
-											if (gd_sidx > _playlist.size())
-											{
-												gd_sidx = 0;
-												// 重置随机播放
-												set_type(4);
-											}
-											break;
-										default:
-											break;
-										}
-										play(gd_sidx);
-										ct = 0;
-									}
-									int psa1 = 0;
-									int psq1 = 0;
-									auto len = pt->desize;
-									auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
-									if (_current->cpos > psq)
-									{
-										cti = _current->cpos - psq;
-									}
-									if (_current->cpos == len)
-									{
-										break;
-									}
-									if (psa > 0) {
-										ct += delta;
-									}
-									if (_current->cpos < len)
-									{
-										if (len == pt->len)
-										{
-											auto kl = len - _current->cpos;
-											if (kl < plen)
-											{
-												plen = kl;
-											}
-										}
-										if (plen <= len - _current->cpos) {
-											bk.put_audio(_current->st, (char*)(pt->data) + _current->cpos, plen);
-											_current->cpos += plen;
-											psq1 = bk.get_audio_stream_queued(_current->st);
-											psa1 = bk.get_audio_stream_available(_current->st) / frame_size;
-
-											printf("push %d\n", plen);
-										}
-									}
-									else
-									{
-										printf("no de\n");
-									}
-								}
-							} while (0);
-						}
-						prev_time = curr_time;
-						bk.sleep_ms(waitms);
-					}
+					while (!st.stop_requested()) { play_thr(); }
 				});
 			put_jt.swap(j);// 音频推送播放线程
 		}

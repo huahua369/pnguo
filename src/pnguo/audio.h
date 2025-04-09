@@ -195,6 +195,10 @@ namespace hz {
 		int (*get_audio_stream_available)(void* st) = 0;
 		int (*get_audio_dst_framesize)(void* st) = 0;
 		void (*put_audio)(void* stream, void* data, int len) = 0;
+		// v=0播放、1暂停
+		void (*pause_audio)(void* st_, int v) = 0;
+		// format：0=S16 , 1=S32 ,2=F32，volume取0-1
+		bool (*mix_audio)(uint8_t* dst, uint8_t* src, int format, size_t len, float volume) = 0;
 		void (*clear_audio)(void* st) = 0;
 		void(*sleep_ms)(int ms) = 0;
 		uint64_t(*get_ticks)() = 0;
@@ -230,6 +234,8 @@ namespace hz {
 		audio_item* _current = 0;	// 当前播放的音频
 		// 流
 		std::map<glm::ivec2, void*> _streams;
+		//
+		std::vector<char> tem_buf;
 		// 配置信息	{自定义设置、歌单配置等}
 		njson config;
 		std::string _confn;
@@ -252,6 +258,7 @@ namespace hz {
 		void set_gd(size_t idx);
 		// 设置播放类型
 		void set_type(int type = 4);
+		audio_list* get_list_it(size_t i);
 		// 播放当前歌单指定索引
 		void play(size_t idx);
 		// 创建线程运行
@@ -259,7 +266,7 @@ namespace hz {
 		void push_decoder(audio_item* p);
 	private:
 		void play(size_t idx, size_t i);
-
+		void play_thr();
 	};
 
 
