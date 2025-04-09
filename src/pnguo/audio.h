@@ -235,7 +235,7 @@ namespace hz {
 		std::mutex _de_mutex;
 		audio_item* _current = 0;	// 当前播放的音频
 		// 流
-		std::map<glm::ivec2, void*> _streams;
+		std::map<glm::ivec3, void*> _streams;
 		//
 		std::vector<char> tem_buf;
 		// 配置信息	{自定义设置、歌单配置等}

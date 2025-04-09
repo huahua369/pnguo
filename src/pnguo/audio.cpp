@@ -3285,7 +3285,7 @@ namespace hz {
 					}
 					auto p = pt->data;
 					push_decoder(pt);
-					glm::ivec2 sz = { p->format, p->freq };
+					glm::ivec3 sz = { p->format,p->channels, p->sample_rate };
 					auto mt = _streams.find(sz);
 					void* st = 0;
 					if (mt == _streams.end())
