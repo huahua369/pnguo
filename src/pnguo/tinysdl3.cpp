@@ -710,6 +710,13 @@ void* app_cx::new_audio_stream(uint32_t dev, int format_idx, int channels, int f
 	}
 	return stream;
 }
+void app_cx::bindaudio(uint32_t dev, void* st) {
+	SDL_AudioStream* as = (SDL_AudioStream*)st;
+	auto d = SDL_GetAudioStreamDevice(as);
+	if (d == 0 && !SDL_BindAudioStream(dev, as)) {  /* once bound, it'll start playing when there is data available! */
+		SDL_Log("Failed to bind stream to device: %s", SDL_GetError());
+	}
+}
 void app_cx::unbindaudio(void* st) {
 	SDL_AudioStream* as = (SDL_AudioStream*)st;
 	if (st)

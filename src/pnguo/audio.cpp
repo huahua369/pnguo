@@ -6,6 +6,9 @@
 #include "audio.h"
 #include "mapView.h"
 
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+
 #include <stb_src/stb_vorbis.h>
 #include <FLAC/all.h>
 // 解码mp3
@@ -3275,26 +3278,9 @@ namespace hz {
 				auto* pt = it->v[i];
 				if (pt && pt->data)
 				{
-					if (_current)
+					if (_current && _current->st)
 					{
-						auto psq = bk.get_audio_stream_queued(_current->st);
-						auto psa = bk.get_audio_stream_available(_current->st);
-
-						//auto pt = _current->data;
-						//if (pt)
-						//{
-						//	auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
-						//	if (tem_buf.size() != plen) {
-						//		tem_buf.resize(plen);
-						//		memset(tem_buf.data(), 0, plen);
-						//	}
-						//	if (plen > 0)
-						//		bk.put_audio(_current->st, tem_buf.data(), plen);
-						//}
-						bk.clear_audio(_current->st);
-						auto psq1 = bk.get_audio_stream_queued(_current->st);
-						auto psa1 = bk.get_audio_stream_available(_current->st);
-						bk.pause_audio(_current->st, 1);
+						bk.unbindaudio(_current->st);
 						_current = 0;
 					}
 					auto p = pt->data;
@@ -3316,7 +3302,9 @@ namespace hz {
 						pt->cpos = 0;	// 当前播放位置
 						pt->ctime = 0.0;	// 当前播放时间
 						pt->st = st;
+						pt->atime = p->total_samples / p->sample_rate;
 						_current = pt;
+						bk.bindaudio(bk.dev, _current->st);
 						auto psq1 = bk.get_audio_stream_queued(st);
 						auto psa1 = bk.get_audio_stream_available(st);
 						bk.clear_audio(st);
@@ -3351,9 +3339,13 @@ namespace hz {
 				if (frame_size == 0) {
 					frame_size = bk.get_audio_dst_framesize(_current->st);
 				}
-				auto psa = bk.get_audio_stream_available(_current->st) / frame_size;
-				if (psa == 0 && _current->cpos > 0)
+				auto psa = bk.get_audio_stream_available(_current->st);// / frame_size;
+				if ((psa == 0 || psq == 0)/*||_current->ctime >= _current->atime*/ && _current->cpos > 0)
 				{
+					if (tem_buf.size() < 10240)
+						tem_buf.resize(10240);
+					int r = SDL_GetAudioStreamData((SDL_AudioStream*)_current->st, tem_buf.data(), tem_buf.size());
+					printf((char*)u8"剩下:%d\t%d\t%d\n", psq, psa, r);
 					// 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
 					switch (ge_type)
 					{
@@ -3391,25 +3383,25 @@ namespace hz {
 					}
 					play(gd_sidx);
 					ct = 0;
-				}
-				if (!_current)
-				{
 					break;
 				}
 				int psa1 = 0;
 				int psq1 = 0;
 				auto len = pt->desize;
 				auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
+				const int large_input_thresh = 64 * 1024 - 536;
+				plen = large_input_thresh;
 				if (_current->cpos > psq)
 				{
 					cti = _current->cpos - psq;
 				}
+				if (psq > 0) {
+					ct += delta;
+					_current->ctime += delta;
+				}
 				if (_current->cpos == len)
 				{
 					break;
-				}
-				if (psa > 0) {
-					ct += delta;
 				}
 				if (_current->cpos < len)
 				{
@@ -3417,8 +3409,6 @@ namespace hz {
 					if (len == pt->len)
 					{
 						auto kl = len - _current->cpos;
-						if (kl < plen)
-							plen = kl;
 #if 0
 						if (tem_buf.size() != plen) {
 							tem_buf.resize(plen);
@@ -3431,19 +3421,18 @@ namespace hz {
 								putd = tem_buf.data();
 							}
 						}
+#else
+						if (kl < plen)
+							plen = kl;
 #endif
 					}
-					if (plen <= len - _current->cpos) {
+					if (plen > 0) {
 						bk.put_audio(_current->st, putd, plen);
 						_current->cpos += plen;
 						psq1 = bk.get_audio_stream_queued(_current->st);
 						psa1 = bk.get_audio_stream_available(_current->st) / frame_size;
-						printf("push %d\n", plen);
+						//printf("push %d\n", plen);
 					}
-				}
-				else
-				{
-					printf("no de\n");
 				}
 			} while (0);
 		}

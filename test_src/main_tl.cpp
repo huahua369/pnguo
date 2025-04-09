@@ -764,7 +764,7 @@ int main()
 	build_audio_test(5, *adata);
 	build_audio_test(5, *adata32);
 	build_audio_test(5, *adata16);
-	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::unbindaudio,app_cx::unbindaudios
+	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
 		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
 		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
 	auto audio_ctx = new hz::audio_cx();
@@ -777,9 +777,9 @@ int main()
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
-	audio_ctx->set_type(4);
+	audio_ctx->set_type(3);
 	// 播放当前歌单指定索引开始播放
-	audio_ctx->play(0);
+	audio_ctx->play(1);
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");

@@ -115,6 +115,7 @@ public:
 	void* new_audio_stream0(int format, int channels, int freq);
 	static void* new_audio_stream(uint32_t dev, int format, int channels, int freq);
 	static void free_audio_stream(void* st);
+	static void bindaudio(uint32_t dev, void* st);
 	static void unbindaudio(void* st);
 	static void unbindaudios(void** st, int count);
 	static int get_audio_stream_queued(void* st);

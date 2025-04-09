@@ -106,6 +106,7 @@ struct audio_item
 	void* st = 0;
 	size_t cpos = 0;	// 当前播放位置
 	double ctime = 0.0;	// 当前播放时间
+	double atime = 0.0;	// 总播放时间
 
 };
 
@@ -189,6 +190,7 @@ namespace hz {
 		uint32_t dev = 0;
 		void* (*new_audio_stream)(uint32_t dev, int format, int channels, int freq) = 0;
 		void (*free_audio_stream)(void* st) = 0;
+		void (*bindaudio)(uint32_t dev, void* st) = 0;
 		void (*unbindaudio)(void* st) = 0;
 		void (*unbindaudios)(void** st, int count) = 0;
 		int (*get_audio_stream_queued)(void* st) = 0;
