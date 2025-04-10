@@ -3280,7 +3280,6 @@ namespace hz {
 				{
 					if (_current && _current->st)
 					{
-						bk.unbindaudio(_current->st);
 						_current = 0;
 					}
 					auto p = pt->data;
@@ -3304,13 +3303,6 @@ namespace hz {
 						pt->st = st;
 						pt->atime = p->total_samples / p->sample_rate;
 						_current = pt;
-						bk.bindaudio(bk.dev, _current->st);
-						auto psq1 = bk.get_audio_stream_queued(st);
-						auto psa1 = bk.get_audio_stream_available(st);
-						bk.clear_audio(st);
-						auto psq = bk.get_audio_stream_queued(st);
-						auto psa = bk.get_audio_stream_available(st);
-						bk.pause_audio(st, 0);
 					}
 				}
 			}
@@ -3339,13 +3331,14 @@ namespace hz {
 				if (frame_size == 0) {
 					frame_size = bk.get_audio_dst_framesize(_current->st);
 				}
-				auto psa = bk.get_audio_stream_available(_current->st);// / frame_size;
+				auto psa = bk.get_audio_stream_available(_current->st);
+				int psa0 = psa / frame_size;
 				if ((psa == 0 || psq == 0)/*||_current->ctime >= _current->atime*/ && _current->cpos > 0)
 				{
-					if (tem_buf.size() < 10240)
-						tem_buf.resize(10240);
-					int r = SDL_GetAudioStreamData((SDL_AudioStream*)_current->st, tem_buf.data(), tem_buf.size());
-					printf((char*)u8"剩下:%d\t%d\t%d\n", psq, psa, r);
+					//if (tem_buf.size() < 10240)
+					//	tem_buf.resize(10240);
+					//int r = SDL_GetAudioStreamData((SDL_AudioStream*)_current->st, tem_buf.data(), tem_buf.size());
+					printf((char*)u8"剩下:%d\t%d\t%d\n", psq, psa, psa0);
 					// 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
 					switch (ge_type)
 					{
@@ -3399,7 +3392,7 @@ namespace hz {
 					ct += delta;
 					_current->ctime += delta;
 				}
-				if (_current->cpos == len)
+				if (_current->cpos >= len)
 				{
 					break;
 				}
@@ -3409,22 +3402,8 @@ namespace hz {
 					if (len == pt->len)
 					{
 						auto kl = len - _current->cpos;
-#if 0
-						if (tem_buf.size() != plen) {
-							tem_buf.resize(plen);
-							memset(tem_buf.data(), 0, plen);
-						}
-						if (kl < plen)
-						{
-							if (kl > 0) {
-								memcpy(tem_buf.data(), (char*)(pt->data) + _current->cpos, kl);
-								putd = tem_buf.data();
-							}
-						}
-#else
 						if (kl < plen)
 							plen = kl;
-#endif
 					}
 					if (plen > 0) {
 						bk.put_audio(_current->st, putd, plen);

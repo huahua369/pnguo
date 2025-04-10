@@ -209,7 +209,7 @@ namespace vkr
 		uint32_t graphics_queue_family_index = 0;
 		VkQueue compute_queue = 0;
 		uint32_t compute_queue_family_index = 0;
-
+		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
 		bool m_usingValidationLayer = false;
 		bool m_usingFp16 = false;
 		bool m_rt10Supported = false;
@@ -473,7 +473,17 @@ namespace vkr
 		} while (0);
 		return ret;
 	}
-
+	// 获取表面支持的格式
+	void get_surface_formats(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, std::vector<VkSurfaceFormatKHR>& rs)
+	{
+		uint32_t surfaceFormatCount = 0;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, NULL);
+		if (surfaceFormatCount > 0)
+		{
+			rs.resize(surfaceFormatCount);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, rs.data());
+		}
+	}
 	void Device::OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp)
 	{
 		VkResult res;
@@ -529,7 +539,7 @@ namespace vkr
 #error platform not supported
 #endif
 		}
-
+		get_surface_formats(m_physicaldevice, m_surface, _surfaceFormats);
 		auto qfp = get_queue_fp(queue_props.data(), queue_family_count, VK_QUEUE_GRAPHICS_BIT);
 		// Find a graphics device and a queue that can present to the above surface
 		//

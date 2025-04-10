@@ -738,6 +738,9 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;					// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
+	 
+	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
+
 	auto gm = menu_m(form0);
 	printf("%p\n", form0);
 	auto pl = show_ui(form0, gm);
