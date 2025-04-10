@@ -659,66 +659,6 @@ void build_audio_test(int seconds, std::vector<T>& data)
 	}
 }
 
-// 生成单个矩形的顶点数据（6个顶点）
-std::vector<SDL_Vertex> GenerateRectangleVertices(
-	float x, float y,     // 左上角坐标 
-	float width,          // 矩形宽度 
-	float height,         // 矩形高度 
-	SDL_FColor colorTL,    // 左上颜色 
-	SDL_FColor colorTR,    // 右上颜色 
-	SDL_FColor colorBL,    // 左下颜色 
-	SDL_FColor colorBR)    // 右下颜色 
-{
-	// 定义顶点数组（6个顶点，两个三角形）
-	std::vector<SDL_Vertex> vertices(6);
-
-	// 顶点坐标计算 
-	const float x1 = x;
-	const float y1 = y;
-	const float x2 = x + width;
-	const float y2 = y + height;
-
-	// 第一个三角形（左上、右上、左下）
-	vertices[0] = { {x1, y1}, colorTL, {0} };
-	vertices[1] = { {x2, y1}, colorTR, {0} };
-	vertices[2] = { {x1, y2}, colorBL, {0} };
-
-	// 第二个三角形（右上、左下、右下）
-	vertices[3] = { {x2, y1}, colorTR, {0} };
-	vertices[4] = { {x1, y2}, colorBL, {0} };
-	vertices[5] = { {x2, y2}, colorBR, {0} };
-
-	return vertices;
-}
-
-// 示例：生成多个矩形数据 
-std::vector<SDL_Vertex> GenerateBatchRectangles() {
-	std::vector<SDL_Vertex> batch;
-
-	// 生成红色渐变矩形（位置：100,100 尺寸：200x150）
-	SDL_FColor red = { 1, 0, 0, 1 };
-	SDL_FColor red1 = { 0.1, 0, 0, 0.2 };
-	auto rect1 = GenerateRectangleVertices(100, 100, 200, 150, red, red, red1, red1);
-	batch.insert(batch.end(), rect1.begin(), rect1.end());
-
-	// 生成蓝绿渐变矩形（位置：350,200 尺寸：150x200）
-	SDL_FColor blue = { 0, 0, 1, 0.9 };
-	SDL_FColor green = { 0, 1, 0, 0.5 };
-	auto rect2 = GenerateRectangleVertices(350, 200, 150, 200, blue, green, blue, red);
-	batch.insert(batch.end(), rect2.begin(), rect2.end());
-
-	return batch;
-}
-void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt)
-{
-	opt.clear();
-	for (auto& it : _rect) {
-		SDL_FColor b = { 0, 0.5, 1, 1 };
-		SDL_FColor j = { 1, 0.15, 0, 0.9 };
-		auto rect2 = GenerateRectangleVertices(it.x, it.y, it.z, it.w, j, j, b, b);
-		opt.insert(opt.end(), rect2.begin(), rect2.end());
-	}
-}
 int main()
 {
 #ifdef _DEBUG 
@@ -738,7 +678,7 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;					// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-	 
+
 	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
 
 	auto gm = menu_m(form0);
@@ -782,7 +722,7 @@ int main()
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
 	audio_ctx->set_type(3);
 	// 播放当前歌单指定索引开始播放
-	audio_ctx->play(1);
+	//audio_ctx->play(1);
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
@@ -890,11 +830,11 @@ int main()
 				glm::vec4 color = { 0,0.5,1.0,0.8 };
 				form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
 				form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
-				static std::vector<SDL_Vertex> vertices = GenerateBatchRectangles();
-				gen_rects(fft1->_rects, vertices);
-				SDL_RenderGeometry(renderer, nullptr,
-					vertices.data(), vertices.size(),
-					nullptr, 0);
+				static std::vector<SDL_Vertex> vertices;
+				gen_rects(fft->_rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+				SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+				gen_rects(fft1->_rects, vertices, { 0, 0.5, 1, 1 }, { 1, 0.15, 0, 0.9 });
+				SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
 			};
 	}
 	auto lt = pl->ltx;

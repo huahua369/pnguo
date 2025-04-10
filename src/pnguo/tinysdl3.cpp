@@ -3082,3 +3082,64 @@ form_x* new_form_tooltip(form_x* parent, int width, int height)
 	}
 	return form1;
 }
+
+// 生成单个矩形的顶点数据（6个顶点）
+std::vector<SDL_Vertex> GenerateRectangleVertices(
+	float x, float y,     // 左上角坐标 
+	float width,          // 矩形宽度 
+	float height,         // 矩形高度 
+	SDL_FColor colorTL,    // 左上颜色 
+	SDL_FColor colorTR,    // 右上颜色 
+	SDL_FColor colorBL,    // 左下颜色 
+	SDL_FColor colorBR)    // 右下颜色 
+{
+	// 定义顶点数组（6个顶点，两个三角形）
+	std::vector<SDL_Vertex> vertices(6);
+
+	// 顶点坐标计算 
+	const float x1 = x;
+	const float y1 = y;
+	const float x2 = x + width;
+	const float y2 = y + height;
+
+	// 第一个三角形（左上、右上、左下）
+	vertices[0] = { {x1, y1}, colorTL, {0} };
+	vertices[1] = { {x2, y1}, colorTR, {0} };
+	vertices[2] = { {x1, y2}, colorBL, {0} };
+
+	// 第二个三角形（右上、左下、右下）
+	vertices[3] = { {x2, y1}, colorTR, {0} };
+	vertices[4] = { {x1, y2}, colorBL, {0} };
+	vertices[5] = { {x2, y2}, colorBR, {0} };
+
+	return vertices;
+}
+
+// 示例：生成多个矩形数据 
+std::vector<SDL_Vertex> GenerateBatchRectangles() {
+	std::vector<SDL_Vertex> batch;
+
+	// 生成红色渐变矩形（位置：100,100 尺寸：200x150）
+	SDL_FColor red = { 1, 0, 0, 1 };
+	SDL_FColor red1 = { 0.1, 0, 0, 0.2 };
+	auto rect1 = GenerateRectangleVertices(100, 100, 200, 150, red, red, red1, red1);
+	batch.insert(batch.end(), rect1.begin(), rect1.end());
+
+	// 生成蓝绿渐变矩形（位置：350,200 尺寸：150x200）
+	SDL_FColor blue = { 0, 0, 1, 0.9 };
+	SDL_FColor green = { 0, 1, 0, 0.5 };
+	auto rect2 = GenerateRectangleVertices(350, 200, 150, 200, blue, green, blue, red);
+	batch.insert(batch.end(), rect2.begin(), rect2.end());
+
+	return batch;
+}
+void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1)
+{
+	opt.clear();
+	for (auto& it : _rect) {
+		SDL_FColor* j = (SDL_FColor*)&color;
+		SDL_FColor* b = (SDL_FColor*)&color1;
+		auto rect2 = GenerateRectangleVertices(it.x, it.y, it.z, it.w, *j, *j, *b, *b);
+		opt.insert(opt.end(), rect2.begin(), rect2.end());
+	}
+}

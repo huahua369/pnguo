@@ -20,7 +20,13 @@ extern "C" {
 	typedef struct SDL_Cursor SDL_Cursor;
 #ifndef SDL_events_h_
 	typedef union SDL_Event SDL_Event;
-#endif // !SDL_events_h_ 
+#endif // !SDL_events_h_  
+	typedef struct SDL_Vertex
+	{
+		glm::vec2 position;        /**< Vertex position, in SDL_Renderer coordinates  */
+		glm::vec4 color;           /**< Vertex color */
+		glm::vec2 tex_coord;       /**< Normalized texture coordinates, if needed */
+	} SDL_Vertex;
 #ifdef __cplusplus
 }
 #endif
@@ -435,3 +441,5 @@ form_x* new_form(void* app, const char* title, int width, int height, int x, int
 form_x* new_form_popup(form_x* parent, int width, int height);
 // 提示窗口
 form_x* new_form_tooltip(form_x* parent, int width, int height);
+
+void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1);
