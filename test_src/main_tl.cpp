@@ -740,7 +740,6 @@ int main()
 	hz::fft_cx* fft = new hz::fft_cx();
 	hz::fft_cx* fft1 = new hz::fft_cx();
 	{
-		encoder_info_t e = {};
 		while (1)
 		{
 			int rc1 = decoder_data(mad1);
@@ -758,7 +757,9 @@ int main()
 		fft1->bar_step = 1;
 		fft->bar_width = 6;
 		fft->bar_step = 3;
+#if 0
 		int bits[] = { 16,24,32 };
+		encoder_info_t e = {};
 		e.bits_per_sample = bits[mad1->format];
 		e.src_format = mad1->format == 2 ? 1 : 0;
 		e.channels = mad1->channels;
@@ -769,8 +770,9 @@ int main()
 		e.file_path = R"(E:\song2\cf.flac)";
 		auto pe = cp->codes[0];
 		e.handle = pe->handle;
-		//int ret = pe->encoder(&e);
-		//printf("%d\n", ret);
+		int ret = pe->encoder(&e);
+		printf("%d\n", ret);
+#endif
 	}
 
 	/*
@@ -784,28 +786,10 @@ int main()
 	double dtime = 0.06;
 	int fs = mad1->sample_rate * dtime;
 	{
-		auto dt1 = (char*)mad1->data;
-		//app->put_audio(st1, dt1, mad1->len);
-	}
-	{
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
-				auto dt = (char*)mad->data + mad->desize;
-				auto dt1 = (char*)mad1->data + mad1->desize;
-				int rc = decoder_data(mad);
-				auto qn = app->get_audio_stream_queued(st);
-				//if (rc > 0)
-				//	app->put_audio(st, dt, rc);
 				static double deltas = 0;
 				deltas += delta;
-				if (adata->size())
-				{
-					//app->put_audio(st16, adata16->data(), adata16->size() * sizeof(int16_t));
-					//app->put_audio(st32, adata32->data(), adata32->size() * sizeof(int32_t));//无法播放
-					//app->put_audio(st32f, adata->data(), adata->size() * sizeof(float));
-					//adata->clear();
-				}
-				else {}
 				d2->update_draw(delta);
 				if (deltas > dtime)
 				{
