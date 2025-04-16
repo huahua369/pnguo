@@ -29,6 +29,10 @@ guiSetStr(_edit_cmdout, buf);
 #endif // !RWread
 
 #ifndef NO_MAPFILE
+#ifndef _MFILE_
+#define _MFILE_
+#endif // !_MFILE_
+
 namespace hz
 {
 	class rw_t

@@ -679,7 +679,7 @@ int main()
 	sdldev.vkdev = 0;					// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 
-	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
+	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
 
 	auto gm = menu_m(form0);
 	printf("%p\n", form0);
@@ -688,12 +688,65 @@ int main()
 	//show_cpuinfo(form0);
 	auto d2 = new sp_drawable();
 	d2->set_renderer(form0->renderer);
-	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
-		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2);
-	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
-		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2);
+	//d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
+	//	, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2, "temp/spineboy-j.spt");
+	//d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
+	//	, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2, "temp/spineboy-skel.spt");
+
+	d2->add_pkg("temp/spineboy-j.spt", 0.25, 0.2);
+	d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
 	d2->set_pos(0, 600, 650);
 	d2->set_pos(1, 300, 650);
+
+
+
+
+
+
+
+	{
+		njson j = hz::read_json(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)");
+		const char* kname[] = { "skeleton","bones","slots","ik","skins","transform","animations","events" };
+		auto& skeleton = j["skeleton"];
+		auto& bones = j["bones"];
+		auto& slots = j["slots"];
+		auto& ik = j["ik"];
+		auto& skins = j["skins"];
+		auto& transform = j["transform"];
+		auto& animations = j["animations"];
+		auto& events = j["events"];
+		glm::vec4 size = { hz::toDouble(skeleton["x"]),hz::toDouble(skeleton["y"]),hz::toDouble(skeleton["width"]),hz::toDouble(skeleton["height"]), };
+		std::string hash = hz::toStr(skeleton["hash"]);
+		std::set<std::string> names;
+		std::map<std::string, std::set<std::string>> mm;
+		for (size_t i = 0; i < sizeof(kname) / sizeof(char*); i++)
+		{
+			auto& kk = j[kname[i]];
+			if (kk.is_object())
+			{
+				for (auto& [k, v] : kk.items())
+				{
+					names.insert(k);
+				}
+			}
+			else if (kk.is_array())
+			{
+				for (auto& it : kk)
+				{
+					for (auto& [k, v] : it.items())
+					{
+						names.insert(k);
+					}
+				}
+			}
+			mm[kname[i]] = (std::move(names));
+			names.clear();
+		}
+		if (mm.size())
+		{
+			printf("\n");
+		}
+	}
 	atlas_strinfo ass = get_atlas_strinfo();
 	std::vector<char*> nv;
 	d2->get_anim_name(0, &nv);
@@ -722,7 +775,7 @@ int main()
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
 	audio_ctx->set_type(3);
 	// 播放当前歌单指定索引开始播放
-	//audio_ctx->play(1);
+	audio_ctx->play(0);
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
@@ -754,7 +807,7 @@ int main()
 		fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
 		fft1->draw_pos.y += 110;
 		fft1->bar_width = 6;
-		fft1->bar_step = 1;
+		fft1->bar_step = 0;
 		fft->bar_width = 6;
 		fft->bar_step = 3;
 #if 0
@@ -777,8 +830,8 @@ int main()
 
 	/*
 	open_audio
-		new_audio_stream创建流（支持flac、ogg、mp3）
-		decoder_data解码数据
+		new_audio_stream创建流
+		decoder_data解码数据（支持flac、ogg、mp3）
 		put_audio推送数据
 		free_audio_stream
 	close_audio
@@ -812,12 +865,12 @@ int main()
 					}
 				}
 				glm::vec4 color = { 0,0.5,1.0,0.8 };
-				form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
-				form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
+				//form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
+				//form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
 				static std::vector<SDL_Vertex> vertices;
 				gen_rects(fft->_rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
 				SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
-				gen_rects(fft1->_rects, vertices, { 0, 0.5, 1, 1 }, { 1, 0.15, 0, 0.9 });
+				gen_rects(fft1->_rects, vertices, { 0.5, 0.0, 0, 0.00 }, { 1, 0.15, 0, 0.9 });
 				SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
 			};
 	}

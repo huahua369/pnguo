@@ -3,6 +3,17 @@
 
 #include <SDL3/SDL.h>
 #include "spinesdl3.h"
+
+#include <nlohmann/json.hpp>
+#if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)
+using njson = nlohmann::json;			// key有序
+using njson0 = nlohmann::ordered_json;	// key无序
+#define NJSON_H
+#endif
+#if __has_include( <mapView.h>)
+#include <mapView.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -217,11 +228,40 @@ void spSkeletonDrawable_draw(spSkeletonDrawable* self, struct SDL_Renderer* rend
 	spSkeletonClipping_clipEnd2(clipper);
 }
 
-void _spAtlasPage_createTexture(spAtlasPage* self, const char* path) {
+struct page_obj_t
+{
+	void* renderer = 0;
+	std::map<void*, std::string> _texs;
+	njson0 img;
+	char* data;
+	int len;
+};
+
+void _spAtlasPage_createTexture(spAtlasPage* self, const char* path)
+{
 	int width, height, components;
-	stbi_uc* imageData = stbi_load(path, &width, &height, &components, 4);
+	auto p = (page_obj_t*)self->atlas->rendererObject;
+	int len = 0;
+	uint8_t* data = 0;
+	if (p->img.size() && p->data)
+	{
+		for (auto& it : p->img)
+		{
+			std::string name = it["name"];
+			if (path == name)
+			{
+				len = it["length"];
+				int ps = it["offset"];
+				data = (uint8_t*)p->data + ps;
+				break;
+			}
+		}
+	}
+
+	stbi_uc* imageData = data && len > 0 ? stbi_load_from_memory(data, len, &width, &height, &components, 4)
+		: stbi_load(path, &width, &height, &components, 4);
 	if (!imageData) return;
-	SDL_Texture* texture = SDL_CreateTexture((SDL_Renderer*)self->atlas->rendererObject, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width,
+	SDL_Texture* texture = SDL_CreateTexture((SDL_Renderer*)p->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width,
 		height);
 	if (!texture) {
 		stbi_image_free(imageData);
@@ -231,6 +271,7 @@ void _spAtlasPage_createTexture(spAtlasPage* self, const char* path) {
 		stbi_image_free(imageData);
 		return;
 	}
+	p->_texs[texture] = path;
 	stbi_image_free(imageData);
 	self->rendererObject = texture;
 	return;
@@ -273,25 +314,173 @@ void sp_drawable::set_renderer(void* p)
 {
 	renderer = p;
 }
-void sp_drawable::add(const std::string& atlasf, const std::string& ske, float scale, float defaultMix)
+
+void packages_b(const std::string& package_file, std::map<void*, std::string>& texs, int atlas_length, int ske_length, const char* atlas_data, const char* ske_data, bool isbin)
+{
+	std::vector<std::pair<char*, int>> imgd;
+	do {
+		if (package_file.empty())break;
+		njson0 pk;
+		pk["atlas_offset"] = 0;
+		pk["atlas_length"] = atlas_length;
+		pk["ske_offset"] = atlas_length;
+		pk["ske_length"] = ske_length;
+		pk["is_binary"] = isbin;
+		auto& img = pk["images"];
+		int ilen = 0;
+		int imgpos = atlas_length + ske_length;
+		int64_t imgalen = 0;
+		for (auto& [k, v] : texs) {
+			njson it;
+			it["offset"] = ilen + imgpos;
+			auto idata = _spUtil_readFile(v.c_str(), &ilen);
+			if (idata)
+			{
+				std::string pathstr;
+				auto cc = strrchr(v.c_str(), '/');
+				auto cc1 = strrchr(v.c_str(), '\\');
+				if (cc > cc1)
+					pathstr = cc + 1;
+				else
+					pathstr = cc1 + 1;
+				if (pathstr.empty())
+					pathstr = v.c_str();
+				imgalen += ilen;
+				it["name"] = pathstr;
+				it["length"] = ilen;
+				img.push_back(it);
+				imgd.push_back({ idata ,ilen });
+			}
+		}
+		int64_t datalen = atlas_length + ske_length + imgalen;
+		pk["data_length"] = datalen;
+#ifdef _MFILE_
+		{
+			hz::mfile_t m;
+			if (!m.open_m(package_file, false))break;
+			auto pkb = njson0::to_cbor(pk);
+			int64_t alen = pkb.size() + sizeof(size_t) + datalen;
+			m.ftruncate_m(alen);
+			auto mpd = m.map(alen, 0);
+			if (!mpd)break;
+			auto pkbs = (size_t*)mpd;
+			*pkbs = pkb.size();
+			mpd += sizeof(size_t);
+			memcpy(mpd, pkb.data(), *pkbs);
+			mpd += *pkbs;
+			memcpy(mpd, atlas_data, atlas_length);
+			mpd += atlas_length;
+			memcpy(mpd, ske_data, ske_length);
+			mpd += ske_length;
+			for (auto& [k, v] : imgd) {
+				memcpy(mpd, k, v);
+				mpd += v;
+			}
+			m.flush();
+		}
+#endif // !_MFILE_
+	} while (0);
+}
+
+void sp_drawable::add(const std::string& atlasf, const std::string& ske, float scale, float defaultMix, const std::string& package_file)
 {
 	if (!renderer)return;
 	sp_obj c = {};
-	c.atlas = spAtlas_createFromFile(atlasf.c_str(), renderer);
-	if (ske.find(".json") != std::string::npos)
-	{
-		spSkeletonJson* json = spSkeletonJson_create(c.atlas);
-		json->scale = scale;
-		c.skeletonData = spSkeletonJson_readSkeletonDataFile(json, ske.c_str());
-		spSkeletonJson_dispose(json);
+	int atlas_length = 0;
+	int ske_length = 0;
+	auto atlas_data = _spUtil_readFile(atlasf.c_str(), &atlas_length);
+	auto ske_data = _spUtil_readFile(ske.c_str(), &ske_length);
+	if (!atlas_data || !ske_data) {
+		if (atlas_data)
+			_spFree(atlas_data);
+		if (ske_data)
+			_spFree(ske_data);
+		return;
 	}
-	else
+	page_obj_t pot = { renderer };
+
+	c.atlas = spAtlas_createFromFile(atlasf.c_str(), &pot);
+	bool isbin = false;
+	std::string jd;
+	if (ske_data[0] == '{')
+	{
+		jd.assign(ske_data, ske_length); ske_length++;
+		_spFree(ske_data); ske_data = 0;
+		spSkeletonJson* json = spSkeletonJson_create(c.atlas);
+		if (json) {
+			json->scale = scale;
+			c.skeletonData = spSkeletonJson_readSkeletonData(json, jd.c_str());
+			spSkeletonJson_dispose(json);
+		}
+	}
+	if (!c.skeletonData)
+	{
+		auto sb = spSkeletonBinary_create(c.atlas);
+		if (sb) {
+			sb->scale = scale;
+			c.skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske_data, ske_length);
+			spSkeletonBinary_dispose(sb);
+			isbin = true;
+		}
+	}
+	spAnimationStateData* animationStateData = spAnimationStateData_create(c.skeletonData);
+	if (animationStateData) {
+		c.animationStateData = animationStateData;
+		animationStateData->defaultMix = defaultMix;
+		c.drawable = spSkeletonDrawable_create(c.skeletonData, animationStateData);
+		if (c.drawable)
+		{
+			c.drawable->usePremultipliedAlpha = -1;
+			spSkeleton_setToSetupPose(c.drawable->skeleton);
+			spSkeletonDrawable_update(c.drawable, 0, SP_PHYSICS_UPDATE);
+			drawables.push_back(*((sp_obj_c*)&c));
+			if (package_file.size())
+			{
+				// 打包
+				packages_b(package_file, pot._texs, atlas_length, ske_length, atlas_data, ske_data ? ske_data : jd.c_str(), isbin);
+			}
+		}
+		else {
+			spAnimationStateData_dispose(animationStateData);
+		}
+	}
+	if (atlas_data)
+		_spFree(atlas_data);
+	if (ske_data)
+		_spFree(ske_data);
+}
+void sp_drawable::add_pkg_data(const char* data, int len, float scale, float defaultMix)
+{
+	if (!renderer || (sizeof(size_t) + 16) > len)return;
+	sp_obj c = {};
+	auto pkbs = (size_t*)data;
+	njson0 pk = njson0::from_cbor(data + sizeof(size_t), *pkbs);
+	if (!(pk.is_object() && pk.size()))return;
+	int atlas_offset = pk["atlas_offset"];
+	int atlas_len = pk["atlas_length"];
+	int ske_offset = pk["ske_offset"];
+	int ske_length = pk["ske_length"];
+	bool is_binary = pk["is_binary"];
+	data += *pkbs + sizeof(size_t);
+	page_obj_t pot = { renderer };
+	pot.img = pk["images"];
+	pot.data = (char*)data;
+	pot.len = pk["data_length"];
+	c.atlas = spAtlas_create(data + atlas_offset, atlas_len, "", &pot);
+	const char* ske = data + ske_offset;
+	if (is_binary)
 	{
 		auto sb = spSkeletonBinary_create(c.atlas);
 		sb->scale = scale;
-		//spSkeletonData* spSkeletonBinary_readSkeletonData(spSkeletonBinary * self, const unsigned char* binary, const int length);
-		c.skeletonData = spSkeletonBinary_readSkeletonDataFile(sb, ske.c_str());
+		c.skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske, ske_length);
 		spSkeletonBinary_dispose(sb);
+	}
+	else
+	{
+		spSkeletonJson* json = spSkeletonJson_create(c.atlas);
+		json->scale = scale;
+		c.skeletonData = spSkeletonJson_readSkeletonData(json, ske);
+		spSkeletonJson_dispose(json);
 	}
 	spAnimationStateData* animationStateData = spAnimationStateData_create(c.skeletonData);
 	if (animationStateData) {
@@ -306,6 +495,28 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 			drawables.push_back(*((sp_obj_c*)&c));
 		}
 	}
+}
+
+void sp_drawable::add_pkg(const std::string& pkgfn, float scale, float defaultMix)
+{
+#ifdef _MFILE_
+	{
+		hz::mfile_t m;
+		auto d = m.open_d(pkgfn, true);
+		if (d)
+		{
+			add_pkg_data(d, m.size(), scale, defaultMix);
+		}
+	}
+#else
+	int length = 0;
+	auto data = _spUtil_readFile(pkgfn.c_str(), &length);
+	if (data)
+	{
+		add_pkg(d, length, scale, defaultMix);
+		_spFree(data);
+	}
+#endif
 }
 
 void sp_drawable::dispose_sp(size_t idx)

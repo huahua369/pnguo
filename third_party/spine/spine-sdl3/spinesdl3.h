@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <algorithm>
 
 class sp_drawable
@@ -18,14 +19,17 @@ public:
 		void* skeletonData = 0;
 		void* animationStateData = 0;
 	};
- 
-	void* renderer = 0;
+	void* renderer = 0; 
 	std::vector<sp_obj_c> drawables;
 public:
 	sp_drawable();
 	~sp_drawable();
 	void set_renderer(void* p);
-	void add(const std::string& atlas, const std::string& ske, float scale = 0.5f, float defaultMix = 0.2f);
+	// package_file可用于输出到打包
+	void add(const std::string& atlas, const std::string& ske, float scale = 0.5f, float defaultMix = 0.2f, const std::string& package_file = "");
+	// 从打包文件加载
+	void add_pkg_data(const char* data, int len, float scale = 0.5f, float defaultMix = 0.2f);
+	void add_pkg(const std::string& pkgfn, float scale = 0.5f, float defaultMix = 0.2f);
 	void dispose_sp(size_t idx);
 	void animationstate_set_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop);
 	void animationstate_add_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop, float delay);
