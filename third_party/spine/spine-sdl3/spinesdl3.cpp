@@ -291,6 +291,7 @@ struct sp_obj {
 	spAtlas* atlas = 0;
 	spSkeletonData* skeletonData = 0;
 	spAnimationStateData* animationStateData = 0;
+	bool visible = true;
 };
 void dispose_spobj(sp_obj* p) {
 	spAtlas_dispose(p->atlas);
@@ -566,12 +567,13 @@ void sp_drawable::get_anim_name(size_t idx, std::vector<char*>* v)
 void sp_drawable::update_draw(double deltaTime)
 {
 	if (!renderer || deltaTime < 0)return;
-	auto length = drawables.size();
-	for (size_t i = 0; i < length; i++)
+	for (auto& it : drawables)
 	{
-		auto drawable = (spSkeletonDrawable*)drawables[i].drawable;
-		spSkeletonDrawable_update(drawable, deltaTime, SP_PHYSICS_UPDATE);
-		spSkeletonDrawable_draw(drawable, (SDL_Renderer*)renderer);
+		auto drawable = (spSkeletonDrawable*)it.drawable;
+		if (it.visible && drawable) {
+			spSkeletonDrawable_update(drawable, deltaTime, SP_PHYSICS_UPDATE);
+			spSkeletonDrawable_draw(drawable, (SDL_Renderer*)renderer);
+		}
 	}
 }
 

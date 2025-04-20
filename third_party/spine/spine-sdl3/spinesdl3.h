@@ -18,6 +18,7 @@ public:
 		void* atlas = 0;
 		void* skeletonData = 0;
 		void* animationStateData = 0;
+		bool visible = true;
 	};
 	void* renderer = 0; 
 	std::vector<sp_obj_c> drawables;

@@ -6,7 +6,7 @@ project ("tcmp")
   
 #测试
 list(APPEND src_cmp  
-    "charts.cpp"  "ecc_sv.cpp"
+    "charts.cpp"  "../src/pnguo/ecc_sv.cpp"
     "main.cpp" 
     "../rc/resource1.rc"
 ) 
@@ -17,19 +17,19 @@ add_executable (tcmp ${src_cmp} )
 
 list(APPEND src_vkcmp   
     "main_vk.cpp" 
-    "ecc_sv.cpp"
+    "../src/pnguo/ecc_sv.cpp"
     "mshell.cpp"
     "../rc/resource1.rc"
 ) 
 list(APPEND src_spr   
     "main_spr.cpp" 
-    "ecc_sv.cpp"
+    "../src/pnguo/ecc_sv.cpp"
     "mshell.cpp"
     "../rc/resource1.rc"
 ) 
 list(APPEND src_mtl   
     "main_tl.cpp" 
-    "ecc_sv.cpp"
+    "../src/pnguo/ecc_sv.cpp"
     "mshell.cpp"
     "../src/pnguo/editor_2d.cpp"
     "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
@@ -41,7 +41,7 @@ list(APPEND src_audios
 ) 
 list(APPEND src_mmd   
     "main_markdown.cpp" 
-    "ecc_sv.cpp"
+    "../src/pnguo/ecc_sv.cpp"
     "mshell.cpp" 
     "../rc/resource1.rc"
     "../njson.natvis"
