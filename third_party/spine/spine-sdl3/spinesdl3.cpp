@@ -450,7 +450,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 	if (ske_data)
 		_spFree(ske_data);
 }
-void sp_drawable::add_pkg_data(const char* data, int len, float scale, float defaultMix)
+void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float defaultMix)
 {
 	if (!renderer || (sizeof(size_t) + 16) > len)return;
 	sp_obj c = {};

@@ -698,7 +698,11 @@ int main()
 	d2->set_pos(0, 600, 650);
 	d2->set_pos(1, 300, 650);
 
-
+	uint64_t ka = -1;
+	njson kab = ka;
+	njson kaba = 0xfff;
+	auto pkb = njson::to_cbor(kab);
+	auto pkb2 = njson::to_cbor(kaba);
 
 
 
