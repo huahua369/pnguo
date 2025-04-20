@@ -873,7 +873,7 @@ namespace hz {
 		{
 			const FLAC__Frame* frame = psf->frame;
 			const int32_t* const* buffer = psf->wbuffer;
-			size_t i = 0, j = 0, offset = 0, channels = 0, len = 0;
+			size_t i = 0, j = 0, offset = 0, len = 0;
 			auto pflac = psf->music;
 			if (psf->music->spec.channels != (int)frame->header.channels)
 			{
@@ -882,13 +882,13 @@ namespace hz {
 			}
 			if (frame->header.blocksize > FLAC__MAX_BLOCK_SIZE)
 			{
-				printf("Ooops : frame->header.blocksize (%d) > FLAC__MAX_BLOCK_SIZE (%d)\n", __func__, __LINE__, frame->header.blocksize, FLAC__MAX_BLOCK_SIZE);
+				printf("%s\t%d\t: frame->header.blocksize (%u) > FLAC__MAX_BLOCK_SIZE (%u)\n", __func__, __LINE__, frame->header.blocksize, FLAC__MAX_BLOCK_SIZE);
 				return 0;
 			}
 			if (frame->header.channels > FLAC__MAX_CHANNELS)
-				printf("Ooops : frame->header.channels (%d) > FLAC__MAX_BLOCK_SIZE (%d)\n", __func__, __LINE__, frame->header.channels, FLAC__MAX_CHANNELS);
+				printf("%s\t%d\t: frame->header.channels (%u) > FLAC__MAX_BLOCK_SIZE (%u)\n", __func__, __LINE__, frame->header.channels, FLAC__MAX_CHANNELS);
 
-			channels = glm::min(frame->header.channels, FLAC__MAX_CHANNELS);
+			uint32_t channels = glm::min(frame->header.channels, FLAC__MAX_CHANNELS);
 			len = glm::min(pflac->len, frame->header.blocksize);
 			if (pflac->remain % channels != 0)
 			{

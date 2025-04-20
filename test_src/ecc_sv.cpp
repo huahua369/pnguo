@@ -1480,13 +1480,12 @@ namespace hz
 		}
 		return ret;
 	}
-	std::string digest_cb(EVP_MD_CTX* c, EVP_MD* md, const unsigned char* salt, int saltlen
-		, const unsigned char* data, int datal, int count, int out_size)
+	std::string digest_cb(EVP_MD_CTX* c, EVP_MD* md, const unsigned char* salt, size_t saltlen, const unsigned char* data, size_t datal, int count, size_t out_size)
 	{
 		std::string ret;
 		int addmd = 0;
 		int64_t n = out_size;
-		unsigned int mds = 0;
+		uint32_t mds = 0;
 		unsigned char md_buf[EVP_MAX_MD_SIZE] = {};
 		do
 		{
@@ -1515,10 +1514,10 @@ namespace hz
 			n -= mds;
 		} while (n > 0);
 		if (out_size > 0 && ret.size() > out_size)
-			ret.resize(std::max(out_size, (int)mds));
+			ret.resize(std::max(out_size, (size_t)mds));
 		return ret;
 	}
-	std::string ecc_c::do_md(const void* vmd, const char* data, int len)
+	std::string ecc_c::do_md(const void* vmd, const char* data, size_t len)
 	{
 		return do_dgst(vmd, data, len, "", 1, 0);
 	}
@@ -1527,7 +1526,7 @@ namespace hz
 		return do_dgst(vmd, data.data(), data.size(), "", 1, 0);
 	}
 
-	std::string ecc_c::do_dgst(const void* vmd, const char* data, int len, const std::string& salt, int count, int out_size)
+	std::string ecc_c::do_dgst(const void* vmd, const char* data, size_t len, const std::string& salt, int count, int out_size)
 	{
 		std::string ret;
 		auto ctx = EVP_MD_CTX_new();
@@ -1542,13 +1541,13 @@ namespace hz
 		}
 		return ret;
 	}
-	std::string ecc_c::crc32s(const void* data, int len)
+	std::string ecc_c::crc32s(const void* data, size_t len)
 	{
 		char bufer[32] = { 0 };
 		sprintf(bufer, "%8X", crc32(0, (Bytef*)data, len));
 		return bufer;
 	}
-	uint32_t ecc_c::crc32u(const void* data, int len)
+	uint32_t ecc_c::crc32u(const void* data, size_t len)
 	{
 		return crc32(0, (Bytef*)data, len);
 	}
@@ -1751,7 +1750,7 @@ namespace hz
 
 	// 计算摘要
 
-	std::string ecc_c::sha256(const void* data, int len)
+	std::string ecc_c::sha256(const void* data, size_t len)
 	{
 		std::string ret;
 		auto ctx = EVP_MD_CTX_new();
@@ -2208,7 +2207,7 @@ struct ciphers_c
 	std::map<std::string, const void*> _ciphers;
 	std::vector<std::string> _ciphers_n;
 };
-void* new_ciphers_ctx() {
+void* ciphers_new_ctx() {
 	auto p = new ciphers_c();
 	if (p) {
 		p->_ciphers = hz::ecc_c::get_ciphers();
@@ -2220,8 +2219,13 @@ void* new_ciphers_ctx() {
 	}
 	return p;
 }
+void ciphers_free_ctx(void* ctx) {
+	if (ctx) {
+		delete (ciphers_c*)ctx;
+	}
+}
 // 获取支持的加密算法数量
-int get_ciphers_count(void* ctx)
+int ciphers_get_count(void* ctx)
 {
 	auto p = (ciphers_c*)ctx;
 	if (!p)return 0;
@@ -2237,13 +2241,13 @@ int get_ciphers_count(void* ctx)
 	}
 	return sctx._ciphers.size();
 }
-cipher_pt get_ciphers_idx(void* ctx, int idx)
+cipher_pt ciphers_get_idx(void* ctx, int idx)
 {
 	cipher_pt r = {};
 	auto p = (ciphers_c*)ctx;
 	if (!p)return r;
 	auto& sctx = *p;
-	auto n = get_ciphers_count(ctx);
+	auto n = ciphers_get_count(ctx);
 	size_t x = idx;
 	if (x < n)
 	{
@@ -2254,13 +2258,16 @@ cipher_pt get_ciphers_idx(void* ctx, int idx)
 	}
 	return r;
 }
-cipher_pt get_ciphers_str(void* ctx, const char* str)
+const char* ciphers_get_stri(void* ctx, int idx) {
+	return ciphers_get_idx(ctx, idx).n;
+}
+cipher_pt ciphers_get_str(void* ctx, const char* str)
 {
 	cipher_pt r = {};
 	auto p = (ciphers_c*)ctx;
 	if (!p)return r;
 	auto& sctx = *p;
-	auto n = get_ciphers_count(ctx);
+	auto n = ciphers_get_count(ctx);
 	if (str && *str > 0)
 	{
 		auto it = sctx._ciphers.find(str);
@@ -2272,31 +2279,62 @@ cipher_pt get_ciphers_str(void* ctx, const char* str)
 	}
 	return r;
 }
-void* get_ciphers_ptri(void* ctx, int idx)
+void* ciphers_get_ptri(void* ctx, int idx)
 {
-	auto p = get_ciphers_idx(ctx, idx);
+	auto p = ciphers_get_idx(ctx, idx);
 	return (void*)p.ecp;
 }
-void* get_ciphers_ptr(void* ctx, const char* str)
+void* ciphers_get_ptr(void* ctx, const char* str)
 {
-	auto p = get_ciphers_str(ctx, str);
+	auto p = ciphers_get_str(ctx, str);
 	return (void*)p.ecp;
+}
+char* cpstr(const char* data, size_t n)
+{
+	auto cn = align_up(n + 1, 16);
+	auto buf = (char*)malloc(cn);
+	if (buf)
+	{
+		memcpy(buf, (char*)data, n);
+		buf[n] = 0;
+	}
+	return buf;
 }
 //SSL_CBD(EVP_md5);
 //SSL_CBD(EVP_sha256);
 //SSL_CBD(EVP_aes_256_cbc);
 // buf要至少32字节
-int ext_sha256(const void* data, int64_t n, char* buf) {
+char* ecc_sha256(const void* data, size_t n) {
+	std::string b; 
+	if (data && n > 0)
+	{
+		b = hz::ecc_c::sha256(data, n);
+	} 
+	return cpstr(b.data(), b.size());
+}
+char* ecc_md5(const void* data, size_t n) {
+	std::string b; 
+	if (data && n > 0)
+	{
+		auto md = EVP_md5();
+		b = hz::c2md(data, n, md);
+	} 
+	return cpstr(b.data(), b.size());
+}
+
+int ecc_sha256_buf(const void* data, size_t n, char* buf) {
 	std::string b;
 	if (data && n > 0)
+	{
 		b = hz::ecc_c::sha256(data, n);
+	}
 	if (buf && b.size())
 	{
 		memcpy(buf, b.data(), b.size());
 	}
 	return b.size();
 }
-int ext_md5(const void* data, int64_t n, char* buf) {
+int ecc_md5_buf(const void* data, size_t n, char* buf) {
 	std::string b;
 	if (data && n > 0)
 	{
@@ -2309,7 +2347,8 @@ int ext_md5(const void* data, int64_t n, char* buf) {
 	}
 	return b.size();
 }
-uint32_t ext_crc32u(const void* data, int len)
+
+uint32_t ecc_crc32u(const void* data, size_t len)
 {
 	return data && len > 0 ? hz::ecc_c::crc32u(data, len) : 0;
 }
@@ -2319,6 +2358,10 @@ data_pt* encrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 	std::string b, key;
 	int ns = sizeof(data_pt);
 	data_pt* r = 0;
+	if (!ecp)
+	{
+		ecp = EVP_aes_256_cbc();
+	}
 	if (sharedkey)
 	{
 		if (ksize < 0)
@@ -2331,7 +2374,7 @@ data_pt* encrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 			if (b.size())
 			{
 				ns = align_up(ns + 1, 16);
-				auto p = new char[ns];
+				auto p = (char*)malloc(ns);
 				r = (data_pt*)p;
 				r->size = b.size();
 				r->data = p + sizeof(data_pt);
@@ -2346,6 +2389,10 @@ data_pt* decrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 	std::string b, key;
 	int ns = sizeof(data_pt);
 	data_pt* r = 0;
+	if (!ecp)
+	{
+		ecp = EVP_aes_256_cbc();
+	}
 	if (sharedkey)
 	{
 		if (ksize < 0)
@@ -2358,7 +2405,7 @@ data_pt* decrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 			if (b.size())
 			{
 				ns = align_up(ns + 1, 16);
-				auto p = new char[ns];
+				auto p = (char*)malloc(ns);
 				r = (data_pt*)p;
 				r->size = b.size();
 				r->data = p + sizeof(data_pt);
@@ -2376,6 +2423,10 @@ data_pt* decrypt_iv00(const void* ecp, const char* data, size_t size, const char
 	data_pt* r = 0;
 	std::string iv;
 	std::string key;
+	if (!ecp)
+	{
+		ecp = EVP_aes_256_cbc();
+	}
 	if (sharedkey)
 	{
 		if (ksize < 0)
@@ -2418,7 +2469,7 @@ data_pt* decrypt_iv00(const void* ecp, const char* data, size_t size, const char
 			if (b.size())
 			{
 				ns = align_up(ns + 1, 16);
-				auto p = new char[ns];
+				auto p = (char*)malloc(ns);
 				r = (data_pt*)p;
 				r->size = b.size();
 				r->data = p + sizeof(data_pt);
@@ -2428,13 +2479,12 @@ data_pt* decrypt_iv00(const void* ecp, const char* data, size_t size, const char
 	}
 	return r;
 }
-// 释放加密解密的内存
-void free_dt(data_pt* p)
+// 释放内存
+void ecc_free(const void* p)
 {
 	if (p)
 	{
-		auto ptr = (char*)p;
-		delete[]ptr;
+		free((void*)p);
 	}
 }
 data_pt* easy_en(const void* ecp, const void* data, size_t len, const char* keystr, int keylen)
@@ -2483,7 +2533,108 @@ data_pt* easy_de(const void* ecp, const void* data, size_t len, const char* keys
 	}
 	return decrypt_iv1(ecp, (char*)data, len, key.c_str(), key.size());
 }
+size_t ecc_get_curve_count() 
+{
+	return EC_get_builtin_curves(0, 0);
+}
+// ecc非对称加密。需要用ecc_free释放内存
+ecc_curve_t* ecc_get_curve_names()
+{
+	auto n = EC_get_builtin_curves(0, 0);
+	ecc_curve_t* ret = 0;
+	if (n > 0)
+	{
+		std::vector<EC_builtin_curve> r;
+		r.resize(n);
+		EC_get_builtin_curves(r.data(), n);
+		ret = (ecc_curve_t*)malloc(sizeof(ecc_curve_t) * n);
+		int i = 0;
+		for (auto& it : r)
+		{
+			auto& kt = ret[i];
+			kt.name = OBJ_nid2sn(it.nid); kt.nid = it.nid;
+			i++;
+		}
+	}
+	return ret;
+}
+// 用nid创建一个新的ecckey 
+void* ecc_new_key_nid(int nid)
+{
+	EC_KEY* eckey = 0;
+	if (!(nid > 0))nid = NID_secp256k1;
+	eckey = EC_KEY_new_by_curve_name(nid);
+	int erc = EC_KEY_generate_key((EC_KEY*)eckey);
+	return eckey;
+}
 
+// 用于创建私钥或公钥，从pem数据创建ecckey。支持从get_ecckey_pem获取的数据创建。私钥pem或公钥pem数据 。ecc_get_pem设置密码时必需输入正确密码
+void* ecc_new_key_pem(const char* pem, const char* pass)
+{
+	EC_KEY* p = 0;
+	if (pem && *pem)
+		p = hz::pem2ptr(pem, pass && *pass ? pass : "");
+	return p;
+}
+//释放ecc key ptr
+void ecc_free_key(void* ecckey)
+{
+	if (ecckey)
+		EC_KEY_free((EC_KEY*)ecckey);
+}
+
+// 获取pem数据方便保存。可以设置密码
+char* ecc_get_pem(void* prikey, const char* pass)
+{
+	auto str = hz::get_pem0((EC_KEY*)prikey, 0, pass && *pass ? pass : "");
+	return cpstr(str.c_str(), str.size());
+}
+// 获取公钥，用于密钥交换
+char* ecc_get_pem_public(void* prikey)
+{
+	auto str = hz::get_pem0((EC_KEY*)prikey, 1, "");
+	return cpstr(str.c_str(), str.size());
+}
+// 获取共享密钥。输入我方的私钥，对方的公钥，参数使用new_ecckey_pem返回的指针，私钥也可以用new_ecckey_nid返回的指针
+char* ecc_get_compute_key(void* prikey, void* pubkey)
+{
+	int erc = 0;
+	std::string _shared;
+	auto pointc = (struct ec_point_st*)EC_KEY_get0_public_key((EC_KEY*)pubkey);
+	//auto group = (struct ec_group_st*)EC_KEY_get0_group((EC_KEY*)pubkey); 
+	_shared.resize(64);
+	unsigned char* shared = (unsigned char*)_shared.data();
+	size_t slen = 0;
+	if (0 == (slen = ECDH_compute_key(shared, 64, pointc, (EC_KEY*)prikey, NULL))) erc = -3;
+	_shared.resize(slen);
+	return cpstr(_shared.c_str(), slen);
+}
+
+// 私钥签名
+char* ecc_privatekey_sign(void* prikey, const char* dgst, size_t dgst_size)
+{
+	char* buf = 0;
+	ECDSA_SIG* sig = ECDSA_do_sign((unsigned char*)dgst, dgst_size, (EC_KEY*)prikey);
+	if (sig)
+	{
+		unsigned char sigbuf[1024] = {};
+		unsigned char* sb = sigbuf;
+		auto n = i2d_ECDSA_SIG(sig, &sb);
+		if (n > 0)
+		{
+			buf = cpstr((char*)sigbuf, n);
+		}
+		ECDSA_SIG_free(sig);
+	}
+	return buf;
+}
+// 用公钥验证： 返回1成功，其他值失败
+int ecc_public_verify(void* pubkey, const char* dgst, size_t dgst_size, const char* sig, size_t sig_size)
+{
+	EC_KEY* eckey = (EC_KEY*)pubkey;
+	int ret = ECDSA_verify(0, (unsigned char*)dgst, dgst_size, (unsigned char*)sig, sig_size, eckey);
+	return ret;
+}
 #if 0
 
 std::vector<char> dpt2v(data_pt* p) {
@@ -2495,18 +2646,20 @@ std::vector<char> dpt2v(data_pt* p) {
 	}
 	return v;
 }
+
 int main()
 {
-	void* ctx = new_ciphers_ctx();
+	void* ctx = ciphers_new_ctx();
 	// 获取支持的加密算法数量
-	int n = get_ciphers_count(ctx);
-	cipher_pt kecp128 = get_ciphers_str(ctx, "aes-128-cbc");
-	cipher_pt kecp256 = get_ciphers_str(ctx, "aes-256-cbc");
+	int n = ciphers_get_count(ctx);
+	cipher_pt kecp128 = ciphers_get_str(ctx, "aes-128-cbc");
+	cipher_pt kecp256 = ciphers_get_str(ctx, "aes-256-cbc");
 	for (size_t i = 0; i < n; i++)
 	{
-		auto cp = get_ciphers_idx(ctx, i);
+		auto cp = ciphers_get_idx(ctx, i);
 		printf("%s\n", cp.n);
 	}
+	ciphers_free_ctx(ctx);
 	std::string str = "abc12345646523";
 	std::string key = "hgfhfy1564512qqqqq";
 	data_pt* ot = easy_en(kecp256.ecp, str.c_str(), str.size(), key.c_str(), key.size());
@@ -2568,4 +2721,5 @@ int main()
 	free_dt(otd0);
 	return 0;
 }
+
 #endif // 0

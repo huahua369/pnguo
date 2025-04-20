@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#ifndef MC_EXPORT
 #ifdef MC_STATIC
 #  define MC_EXPORT extern
 #else
@@ -29,7 +30,7 @@
 #endif
 #endif // _WIN32
 #endif
-
+#endif
 #ifndef MC_API
 #ifdef _WIN32
 #define MC_API __cdecl
@@ -41,7 +42,7 @@
 #include <cstdint>
 #include <stdint.h>
 #include <stdbool.h>
- 
+
 #include <map>
 #include <set> 
 #include <string> 
@@ -62,7 +63,7 @@
 #include <stdio.h>      // For SEEK_SET
 #include <assert.h>
 #include <unordered_map>
- 
+
 #define GLM_ENABLE_EXPERIMENTAL
 //#define GLM_FORCE_ALIGNED
 //#define GLM_FORCE_INTRINSICS
