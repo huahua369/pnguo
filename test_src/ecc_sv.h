@@ -13,7 +13,8 @@ extern "C" {
 #else
 #define max_iv_len EVP_MAX_IV_LENGTH
 #endif // !EVP_MAX_IV_LENGTH
-
+#ifndef _ES_
+#define _ES_
 	typedef struct cipher_pt {
 		const char* n;
 		const void* ecp;
@@ -22,7 +23,7 @@ extern "C" {
 		size_t size;
 		char* data;
 	}data_pt;
-
+#endif
 	struct cipher_data_t {
 		// *加密解密的数据
 		void* data;
@@ -60,6 +61,8 @@ extern "C" {
 	EXPORT_SV int get_ciphers_count(void* ctx);
 	EXPORT_SV cipher_pt get_ciphers_idx(void* ctx, int idx);
 	EXPORT_SV cipher_pt get_ciphers_str(void* ctx, const char* str);
+	EXPORT_SV void* get_ciphers_ptri(void* ctx, int idx);
+	EXPORT_SV void* get_ciphers_ptr(void* ctx, const char* str);
 	// buf要至少32字节
 	EXPORT_SV int ext_sha256(const void* data, int64_t n, char* buf);
 	EXPORT_SV int ext_md5(const void* data, int64_t n, char* buf);
@@ -70,6 +73,9 @@ extern "C" {
 	EXPORT_SV data_pt* decrypt_iv00(const void* ecp, const char* data, size_t size, const char* sharedkey, int ksize);
 	// 释放加密解密的内存
 	EXPORT_SV void free_dt(data_pt* p);
+	// 密码如果是32字节则不计算sha256
+	EXPORT_SV data_pt* easy_en(const void* ecp, const void* data, size_t len, const char* keystr, int keylen);
+	EXPORT_SV data_pt* easy_de(const void* ecp, const void* data, size_t len, const char* keystr, int keylen);
 
 #ifdef  __cplusplus
 }
@@ -193,6 +199,23 @@ namespace hz
 	// 解码base85
 	void decode85(const unsigned char* src, unsigned char* dst);
 	std::string c2md(const void* data, int len, const void* md);
+
+
+	// 用nid创建一个新的ecckey 
+	void* new_ecckey_nid(int nid);
+	// 从pem数据创建ecckey。支持从get_ecckey_pem获取的数据创建。私钥pem或公钥pem数据 。密码可选
+	void* new_ecckey_pem(const char* pem, const char* pass);
+	// 获取pem数据方便保存。
+	std::string get_ecckey_pem(void* ecckey, const std::string& kstr);
+	// 获取公钥
+	std::string get_ecckey_pem_public(void* ecckey);
+	// 获取共享密钥。输入我方的私钥，对方的公钥，参数使用new_ecckey_pem返回的指针，私钥也可以用new_ecckey_nid返回的指针
+	std::string get_compute_key(void* ecckey, void* pubkey);
+	// 私钥签名
+	std::string ecprivatekey_sign(void* prikey, const std::string& dgst, std::string* pubkey = nullptr);
+	// 用公钥验证
+	bool public_verify(void* pubkey, const std::string& dgst, const std::string& sig);
+
 }// !hz
 
 #endif

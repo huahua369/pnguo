@@ -1,5 +1,28 @@
 ﻿// 3D布尔运算
-#include <pch1.h>
+
+
+
+#include <vector>
+#include <map>
+#include <array>
+#include <format>
+
+#define GLM_ENABLE_EXPERIMENTAL
+//#define GLM_FORCE_ALIGNED
+//#define GLM_FORCE_INTRINSICS
+// 定义glm启用simd
+//#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_FORCE_XYZW_ONLY
+#include <glm/glm.hpp>  
+
+#include <glm/gtx/intersect.hpp>
+#include <glm/gtx/vector_angle.hpp>
+#include <glm/gtx/closest_point.hpp>
+#include <glm/gtc/type_ptr.hpp> 
+#include <glm/gtc/matrix_transform.hpp> 
+#include <glm/gtc/matrix_inverse.hpp> 
+#include <glm/gtx/matrix_transform_2d.hpp>
+
 #include "mcut_cx.h"
 
 #include "mcut/mcut.h"
@@ -10,108 +33,122 @@
 #ifdef IGNORE
 #undef IGNORE
 #endif
-#include <mcut/internal/cdt/cdt.h>
+#include "mcut/internal/cdt/cdt.h"
 
 namespace gp {
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& ms, bool pccw, double z)
 	{
 		if (!paths || paths->empty())return;
-		// allocate triangulator
-		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
-		std::vector<vec2> v3;
-		std::vector<cdt::edge_t> cc_face_edges;
-		for (auto& it : *paths)
+		try
 		{
-			int cct = it.size();
-			cc_face_edges.reserve(cct + cc_face_edges.size());
-			auto ss = v3.size();
-			for (uint32_t i = 0; i < cct; ++i) {
-				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
-			}
-			auto& ps = it;
-			v3.reserve(cct + v3.size());
-			for (size_t i = 0; i < ps.size(); i++)
+			// allocate triangulator
+			cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+			std::vector<vec2> v3;
+			std::vector<cdt::edge_t> cc_face_edges;
+			for (auto& it : *paths)
 			{
-				v3.push_back({ ps[i].x, ps[i].y });
+				int cct = it.size();
+				cc_face_edges.reserve(cct + cc_face_edges.size());
+				auto ss = v3.size();
+				for (uint32_t i = 0; i < cct; ++i) {
+					cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+				}
+				auto& ps = it;
+				v3.reserve(cct + v3.size());
+				for (size_t i = 0; i < ps.size(); i++)
+				{
+					v3.push_back({ ps[i].x, ps[i].y });
+				}
+			}
+			cdt.insert_vertices(v3); // potentially perturbed (if duplicates exist)
+			cdt.insert_edges(cc_face_edges);
+			cdt.erase_outer_triangles_and_holes(); // do the constrained delaunay triangulation
+			if (!cdt::check_topology(cdt)) { return; }
+			if (cdt.triangles.empty()) { return; }
+			ms.reserve(ms.size() + cdt.triangles.size() * 3);
+			if (pccw)
+			{
+				for (auto& it : cdt.triangles) {
+					auto& t = it.vertices;
+					auto t2 = cdt.vertices[t[2]];
+					ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+					t2 = cdt.vertices[t[1]];
+					ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+					t2 = cdt.vertices[t[0]];
+					ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+				}
+			}
+			else
+			{
+				for (auto& it : cdt.triangles) {
+					auto& t = it.vertices;
+					auto t2 = cdt.vertices[t[0]];
+					ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+					t2 = cdt.vertices[t[1]];
+					ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+					t2 = cdt.vertices[t[2]];
+					ms.push_back(glm::vec3(t2.x(), t2.y(), z));
+				}
 			}
 		}
-		cdt.insert_vertices(v3); // potentially perturbed (if duplicates exist)
-		cdt.insert_edges(cc_face_edges);
-		cdt.erase_outer_triangles_and_holes(); // do the constrained delaunay triangulation
-		if (!cdt::check_topology(cdt)) { return; }
-		if (cdt.triangles.empty()) { return; }
-		ms.reserve(ms.size() + cdt.triangles.size() * 3);
-		if (pccw)
+		catch (const std::exception& e)
 		{
-			for (auto& it : cdt.triangles) {
-				auto& t = it.vertices;
-				auto t2 = cdt.vertices[t[2]];
-				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-				t2 = cdt.vertices[t[1]];
-				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-				t2 = cdt.vertices[t[0]];
-				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-			}
-		}
-		else
-		{
-			for (auto& it : cdt.triangles) {
-				auto& t = it.vertices;
-				auto t2 = cdt.vertices[t[0]];
-				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-				t2 = cdt.vertices[t[1]];
-				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-				t2 = cdt.vertices[t[2]];
-				ms.push_back(glm::vec3(t2.x(), t2.y(), z));
-			}
+			printf("%s\n", e.what());
 		}
 	}
 	void constrained_delaunay_triangulation_v(std::vector<std::vector<glm::vec2>>* paths, std::vector<glm::vec3>& vd, std::vector<glm::ivec3>& idxs, bool pccw, double z)
 	{
 		if (!paths || paths->empty())return;
-		// allocate triangulator
-		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
-		std::vector<vec2> v3;
-		std::vector<cdt::edge_t> cc_face_edges;
-		for (auto& it : *paths)
+		try
 		{
-			int cct = it.size();
-			cc_face_edges.reserve(cct + cc_face_edges.size());
-			auto ss = v3.size();
-			for (uint32_t i = 0; i < cct; ++i) {
-				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
-			}
-			auto& ps = it;
-			v3.reserve(cct + v3.size());
-			for (size_t i = 0; i < ps.size(); i++)
+			// allocate triangulator
+			cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+			std::vector<vec2> v3;
+			std::vector<cdt::edge_t> cc_face_edges;
+			for (auto& it : *paths)
 			{
-				v3.push_back({ ps[i].x, ps[i].y });
+				int cct = it.size();
+				cc_face_edges.reserve(cct + cc_face_edges.size());
+				auto ss = v3.size();
+				for (uint32_t i = 0; i < cct; ++i) {
+					cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+				}
+				auto& ps = it;
+				v3.reserve(cct + v3.size());
+				for (size_t i = 0; i < ps.size(); i++)
+				{
+					v3.push_back({ ps[i].x, ps[i].y });
+				}
+			}
+			cdt.insert_vertices(v3);
+			cdt.insert_edges(cc_face_edges);
+			cdt.erase_outer_triangles_and_holes();
+			if (!cdt::check_topology(cdt)) { return; }
+			if (cdt.triangles.empty()) { return; }
+			auto n = vd.size();
+			vd.reserve(n + cdt.vertices.size());
+			size_t x = 0;
+			for (auto& it : cdt.vertices) {
+				vd.push_back({ it.x(),it.y(),z });
+			}
+			idxs.reserve(cdt.triangles.size());
+			x = 0;
+			if (pccw)
+			{
+				for (auto& it : cdt.triangles) {
+					idxs.push_back({ n + it.vertices[2],n + it.vertices[1],n + it.vertices[0] });
+				}
+			}
+			else
+			{
+				for (auto& it : cdt.triangles) {
+					idxs.push_back({ n + it.vertices[0],n + it.vertices[1],n + it.vertices[2] });
+				}
 			}
 		}
-		cdt.insert_vertices(v3);
-		cdt.insert_edges(cc_face_edges);
-		cdt.erase_outer_triangles_and_holes();
-		if (!cdt::check_topology(cdt)) { return; }
-		if (cdt.triangles.empty()) { return; }
-		auto n = vd.size();
-		vd.reserve(n + cdt.vertices.size());
-		size_t x = 0;
-		for (auto& it : cdt.vertices) {
-			vd.push_back({ it.x(),it.y(),z });
-		}
-		idxs.reserve(cdt.triangles.size());
-		x = 0;
-		if (pccw)
+		catch (const std::exception& e)
 		{
-			for (auto& it : cdt.triangles) {
-				idxs.push_back({ n + it.vertices[2],n + it.vertices[1],n + it.vertices[0] });
-			}
-		}
-		else
-		{
-			for (auto& it : cdt.triangles) {
-				idxs.push_back({ n + it.vertices[0],n + it.vertices[1],n + it.vertices[2] });
-			}
+			printf("%s\n", e.what());
 		}
 
 	}
@@ -119,39 +156,46 @@ namespace gp {
 	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>& ms, bool pccw)
 	{
 		if (!pt || !n)return;
-		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
-		std::vector<vec2> v3;
-		std::vector<cdt::edge_t> cc_face_edges;
-		std::vector<float> z;
-		{
-			int cct = n;
-			cc_face_edges.reserve(cct + cc_face_edges.size());
-			auto ss = v3.size();
-			for (uint32_t i = 0; i < cct; ++i) {
-				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
-			}
-			auto& ps = pt;
-			v3.reserve(cct + v3.size());
-			for (size_t i = 0; i < n; i++)
+		try
+		{ 
+			cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+			std::vector<vec2> v3;
+			std::vector<cdt::edge_t> cc_face_edges;
+			std::vector<float> z;
 			{
-				v3.push_back({ ps[i].x, ps[i].y });
-				z.push_back(ps[i].z);
+				int cct = n;
+				cc_face_edges.reserve(cct + cc_face_edges.size());
+				auto ss = v3.size();
+				for (uint32_t i = 0; i < cct; ++i) {
+					cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+				}
+				auto& ps = pt;
+				v3.reserve(cct + v3.size());
+				for (size_t i = 0; i < n; i++)
+				{
+					v3.push_back({ ps[i].x, ps[i].y });
+					z.push_back(ps[i].z);
+				}
+			}
+			cdt.insert_vertices(v3);
+			cdt.insert_edges(cc_face_edges);
+			cdt.erase_outer_triangles_and_holes();
+			if (!cdt::check_topology(cdt)) { return; }
+			if (cdt.triangles.empty()) { return; }
+			ms.reserve(ms.size() + cdt.triangles.size() * 3);
+			for (auto& it : cdt.triangles) {
+				auto& t = it.vertices;
+				auto t2 = cdt.vertices[t[0]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[0]]));
+				t2 = cdt.vertices[t[1]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[1]]));
+				t2 = cdt.vertices[t[2]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[2]]));
 			}
 		}
-		cdt.insert_vertices(v3);
-		cdt.insert_edges(cc_face_edges);
-		cdt.erase_outer_triangles_and_holes();
-		if (!cdt::check_topology(cdt)) { return; }
-		if (cdt.triangles.empty()) { return; }
-		ms.reserve(ms.size() + cdt.triangles.size() * 3);
-		for (auto& it : cdt.triangles) {
-			auto& t = it.vertices;
-			auto t2 = cdt.vertices[t[0]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[0]]));
-			t2 = cdt.vertices[t[1]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[1]]));
-			t2 = cdt.vertices[t[2]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), z[t[2]]));
+		catch (const std::exception& e)
+		{
+			printf("%s\n", e.what());
 		}
 	}
 	void cdt_pt(glm::vec3* pt, int n, std::vector<glm::vec3>* ms, bool pccw)
@@ -161,42 +205,50 @@ namespace gp {
 	void cdt_pt(glm::vec2* pt, int n, std::vector<glm::vec3>* msp, bool pccw)
 	{
 		if (!pt || !n)return;
-		cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
-		std::vector<vec2> v3;
-		std::vector<cdt::edge_t> cc_face_edges;
+		try
 		{
-			int cct = n;
-			cc_face_edges.reserve(cct + cc_face_edges.size());
-			auto ss = v3.size();
-			for (uint32_t i = 0; i < cct; ++i) {
-				cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
-			}
-			auto& ps = pt;
-			v3.reserve(cct + v3.size());
-			for (size_t i = 0; i < n; i++)
+			cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+			std::vector<vec2> v3;
+			std::vector<cdt::edge_t> cc_face_edges;
 			{
-				v3.push_back({ ps[i].x, ps[i].y });
+				int cct = n;
+				cc_face_edges.reserve(cct + cc_face_edges.size());
+				auto ss = v3.size();
+				for (uint32_t i = 0; i < cct; ++i) {
+					cc_face_edges.push_back(cdt::edge_t(ss + i, ss + ((i + 1) % cct)));
+				}
+				auto& ps = pt;
+				v3.reserve(cct + v3.size());
+				for (size_t i = 0; i < n; i++)
+				{
+					v3.push_back({ ps[i].x, ps[i].y });
+				}
+			}
+			cdt.insert_vertices(v3);
+			cdt.insert_edges(cc_face_edges);
+			cdt.erase_outer_triangles_and_holes();
+			if (!cdt::check_topology(cdt)) { return; }
+			if (cdt.triangles.empty()) { return; }
+			auto& ms = *msp;
+			ms.reserve(ms.size() + cdt.triangles.size() * 3);
+			for (auto& it : cdt.triangles) {
+				auto& t = it.vertices;
+				auto t2 = cdt.vertices[t[0]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
+				t2 = cdt.vertices[t[1]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
+				t2 = cdt.vertices[t[2]];
+				ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
 			}
 		}
-		cdt.insert_vertices(v3);
-		cdt.insert_edges(cc_face_edges);
-		cdt.erase_outer_triangles_and_holes();
-		if (!cdt::check_topology(cdt)) { return; }
-		if (cdt.triangles.empty()) { return; }
-		auto& ms = *msp;
-		ms.reserve(ms.size() + cdt.triangles.size() * 3);
-		for (auto& it : cdt.triangles) {
-			auto& t = it.vertices;
-			auto t2 = cdt.vertices[t[0]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
-			t2 = cdt.vertices[t[1]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
-			t2 = cdt.vertices[t[2]];
-			ms.push_back(glm::vec3(t2.x(), t2.y(), 0));
+		catch (const std::exception& e)
+		{
+			printf("%s\n", e.what());
 		}
 	}
 
 }
+
 bool empty(const mmesh_t& mesh) { return mesh.vertexCoordsArray.empty() || mesh.faceIndicesArray.empty(); }
 void triangle_mesh_to_mcut(const mesh_triangle_cx& src_mesh, mmesh_t& srcMesh, const glm::mat4& src_nm = glm::identity<glm::mat4>())
 {

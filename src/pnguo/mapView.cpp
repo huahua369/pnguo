@@ -2415,4 +2415,20 @@ namespace hz
 
 }//!hz
 
+// align val to the next multiple of alignment
+uint64_t align_up(uint64_t val, uint64_t alignment)
+{
+	return (val + alignment - (uint64_t)1) & ~(alignment - (uint64_t)1);
+}
+// align val to the previous multiple of alignment
+uint64_t align_down(uint64_t val, uint64_t alignment)
+{
+	return val & ~(alignment - (uint64_t)1);
+}
+
+uint64_t divideroundingup(uint64_t a, uint64_t b)
+{
+	return (a + b - (uint64_t)1) / b;
+}
+
 #endif //!NO_MAPFILE

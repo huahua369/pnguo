@@ -1718,8 +1718,9 @@ void triangulator_t<T, TNearPointLocator>::enforce_delaunay_property_using_edge_
         triStack.pop();
 
         const triangle_t& t = triangles[iT];
-        const std::uint32_t iTopo = get_opposite_triangle_index(t, iVert);
-
+        std::uint32_t iTopo = get_opposite_triangle_index(t, iVert);
+        if (t.vertices[0] == t.vertices[1] || t.vertices[0] == t.vertices[2] || t.vertices[1] == t.vertices[2])
+            iTopo = null_neighbour;
         if (iTopo == null_neighbour) {
             continue;
         }

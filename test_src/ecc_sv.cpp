@@ -16,18 +16,20 @@
 #include <stdio.h>
 #include <set>
 
+#include <pch1.h>
 
 #include "ecc_sv.h"
 
 //#include <mem_pe.h>
 
-#include <nlohmann/json.hpp>
+//#include <nlohmann/json.hpp>
+//
+//#if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)
+//using njson = nlohmann::json;
+//#define NJSON_H
+//#endif
 
-#if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)
-using njson = nlohmann::json;
-#define NJSON_H
-#endif
-
+#include "mapView.h"
 
 #ifdef max
 #undef max
@@ -567,7 +569,7 @@ namespace hz
 		*binszp += zerocount;
 
 		return true;
-}
+	}
 #endif
 	class base
 	{
@@ -1846,6 +1848,145 @@ namespace hz
 		}
 		return ret;
 	}
+
+	EC_KEY* pem2ptr(const std::string& pemdata, const std::string& pass)
+	{
+		auto biop = BIO_new_mem_buf(pemdata.data(), pemdata.size());
+		EC_KEY* (*pem_func[2])(BIO * bp, EC_KEY * *x, pem_password_cb * cb, void* u) = { PEM_read_bio_ECPrivateKey,  PEM_read_bio_EC_PUBKEY };
+		EC_KEY* ek = 0;
+		int idx = -1;
+		int pos = pemdata.find(PEM_STRING_ECPRIVATEKEY);
+		if (pos > 0)
+		{
+			idx = 0;
+		}
+		else
+		{
+			pos = pemdata.find(PEM_STRING_PUBLIC);
+			if (pos > 0)
+			{
+				idx = 1;
+			}
+		}
+		if (!(idx < 0 || idx>1))
+			ek = pem_func[idx](biop, 0, 0, (char*)pass.c_str());
+		BIO_free(biop);
+		return ek;
+	}
+
+	void* new_ecckey_nid(int nid)
+	{
+		EC_KEY* eckey = 0;
+		if (!(nid > 0))nid = NID_secp256k1;
+		eckey = EC_KEY_new_by_curve_name(nid);
+		int erc = EC_KEY_generate_key((EC_KEY*)eckey);
+		return eckey;
+	}
+
+	void* new_ecckey_pem(const char* pem, const char* pass)
+	{
+		EC_KEY* p = 0;
+		if (pem && *pem)
+			p = pem2ptr(pem, pass && *pass ? pass : "");
+		return p;
+	}
+
+	std::string get_pem0(EC_KEY* eckey, int t, const std::string& kstr)
+	{
+		std::string ret;
+		if (eckey)
+		{
+			auto biop = BIO_new(BIO_s_mem());
+			int er = -1;
+			switch (t)
+			{
+			case 0:
+			{
+				auto cipher = EVP_aes_256_cbc();
+				if (kstr.empty())cipher = nullptr;
+				er = PEM_write_bio_ECPrivateKey(biop, (EC_KEY*)eckey, cipher, (unsigned char*)kstr.c_str(), kstr.size(), 0, 0);
+			}
+			break;
+			case 1:
+				er = PEM_write_bio_EC_PUBKEY(biop, (EC_KEY*)eckey);
+				break;
+			case 2:
+				er = PEM_write_bio_ECPKParameters(biop, EC_KEY_get0_group((EC_KEY*)eckey));
+				break;
+			default:
+				break;
+			}
+
+			int64_t dlen = BIO_number_written(biop);
+			if (dlen > 0)
+			{
+				ret.resize(dlen);
+				int kkk = BIO_read(biop, (void*)ret.data(), dlen);
+			}
+			BIO_free(biop);
+		}
+		return ret;
+	}
+	std::string get_ecckey_pem(void* ecckey, const std::string& kstr)
+	{
+		return get_pem0((EC_KEY*)ecckey, 0, kstr);
+	}
+
+	std::string get_ecckey_pem_public(void* ecckey)
+	{
+		return get_pem0((EC_KEY*)ecckey, 1, "");
+	}
+
+	std::string get_compute_key(void* ecckey, void* pubkey)
+	{
+		int erc = 0;
+		std::string _shared;
+		auto pointc = (struct ec_point_st*)EC_KEY_get0_public_key((EC_KEY*)pubkey);
+		//auto group = (struct ec_group_st*)EC_KEY_get0_group((EC_KEY*)pubkey); 
+		_shared.resize(64);
+		unsigned char* shared = (unsigned char*)_shared.data();
+		size_t slen = 0;
+		if (0 == (slen = ECDH_compute_key(shared, 64, pointc, (EC_KEY*)ecckey, NULL))) erc = -3;
+		_shared.resize(slen);
+		return _shared;
+	}
+
+	/*
+		参数一般用md5或sha之类，
+		返回签名二进制数据
+	*/
+	std::string ecprivatekey_sign(void* prikey, const std::string& dgst, std::string* pubkey)
+	{
+		std::string ret;
+		ECDSA_SIG* sig = ECDSA_do_sign((unsigned char*)dgst.data(), dgst.size(), (EC_KEY*)prikey);
+		if (sig)
+		{
+			unsigned char sigbuf[1024] = {};
+			unsigned char* sb = sigbuf;
+			auto n = i2d_ECDSA_SIG(sig, &sb);
+			if (n > 0)
+				ret.assign((char*)sigbuf, n);
+			ECDSA_SIG_free(sig);
+			if (pubkey)
+			{
+				*pubkey = get_pem0((EC_KEY*)prikey, 1, "");
+			}
+		}
+		return ret;
+	}
+
+	bool public_verify(void* pubkey, const std::string& dgst, const std::string& sig)
+	{
+		EC_KEY* eckey = (EC_KEY*)pubkey;
+		int ret = ECDSA_verify(0, (unsigned char*)dgst.data(), dgst.size(), (unsigned char*)sig.data(), sig.size(), eckey);
+		return ret == 1;
+	}
+
+
+
+
+
+
 #if 1
 
 	rsa_c::rsa_c()
@@ -1948,6 +2089,10 @@ namespace hz
 		std::string ret;
 		static const char* cts[] = { "0123456789ABCDEF", "0123456789abcdef" };
 		auto ct = cts[is_lower ? 1 : 0];
+		if (size < 0)
+		{
+			size = strlen(str);
+		}
 		if (size > 0 && str)
 		{
 			ret.reserve((size_t)size * 2);
@@ -2067,7 +2212,7 @@ void* new_ciphers_ctx() {
 	auto p = new ciphers_c();
 	if (p) {
 		p->_ciphers = hz::ecc_c::get_ciphers();
-		p->_ciphers_n.resize(p->_ciphers.size());
+		p->_ciphers_n.reserve(p->_ciphers.size());
 		for (auto& it : p->_ciphers)
 		{
 			p->_ciphers_n.push_back(it.first);
@@ -2084,7 +2229,7 @@ int get_ciphers_count(void* ctx)
 	if (sctx._ciphers.empty())
 	{
 		sctx._ciphers = hz::ecc_c::get_ciphers();
-		sctx._ciphers_n.resize(sctx._ciphers.size());
+		sctx._ciphers_n.reserve(sctx._ciphers.size());
 		for (auto& it : sctx._ciphers)
 		{
 			sctx._ciphers_n.push_back(it.first);
@@ -2099,9 +2244,10 @@ cipher_pt get_ciphers_idx(void* ctx, int idx)
 	if (!p)return r;
 	auto& sctx = *p;
 	auto n = get_ciphers_count(ctx);
-	if (idx > 0 && idx < n)
+	size_t x = idx;
+	if (x < n)
 	{
-		auto& k = sctx._ciphers_n[idx];
+		auto& k = sctx._ciphers_n[x];
 		auto& it = sctx._ciphers[k];
 		r.n = k.c_str();
 		r.ecp = it;
@@ -2125,6 +2271,16 @@ cipher_pt get_ciphers_str(void* ctx, const char* str)
 		}
 	}
 	return r;
+}
+void* get_ciphers_ptri(void* ctx, int idx)
+{
+	auto p = get_ciphers_idx(ctx, idx);
+	return (void*)p.ecp;
+}
+void* get_ciphers_ptr(void* ctx, const char* str)
+{
+	auto p = get_ciphers_str(ctx, str);
+	return (void*)p.ecp;
 }
 //SSL_CBD(EVP_md5);
 //SSL_CBD(EVP_sha256);
@@ -2174,10 +2330,12 @@ data_pt* encrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 			ns += b.size();
 			if (b.size())
 			{
+				ns = align_up(ns + 1, 16);
 				auto p = new char[ns];
 				r = (data_pt*)p;
 				r->size = b.size();
 				r->data = p + sizeof(data_pt);
+				r->data[r->size] = 0;
 				memcpy(r->data, b.data(), r->size);
 			}
 		}
@@ -2199,10 +2357,12 @@ data_pt* decrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 			ns += b.size();
 			if (b.size())
 			{
+				ns = align_up(ns + 1, 16);
 				auto p = new char[ns];
 				r = (data_pt*)p;
 				r->size = b.size();
 				r->data = p + sizeof(data_pt);
+				r->data[r->size] = 0;
 				memcpy(r->data, b.data(), r->size);
 			}
 		}
@@ -2257,6 +2417,7 @@ data_pt* decrypt_iv00(const void* ecp, const char* data, size_t size, const char
 			ns += b.size();
 			if (b.size())
 			{
+				ns = align_up(ns + 1, 16);
 				auto p = new char[ns];
 				r = (data_pt*)p;
 				r->size = b.size();
@@ -2276,3 +2437,135 @@ void free_dt(data_pt* p)
 		delete[]ptr;
 	}
 }
+data_pt* easy_en(const void* ecp, const void* data, size_t len, const char* keystr, int keylen)
+{
+	int ret = 0;
+	if (!keystr)return 0;
+	std::string key;
+	keylen = keylen < 1 ? strlen(keystr) : keylen;
+	if (keylen != 32)
+	{
+		key = hz::ecc_c::sha256(keystr, keylen);
+		while (key.size() < EVP_MAX_KEY_LENGTH) {
+			key += hz::ecc_c::sha256(key.c_str(), key.size());
+		}
+	}
+	else {
+		key.resize(keylen);
+		memcpy(key.data(), keystr, keylen);
+	}
+	if (!ecp)
+	{
+		ecp = EVP_aes_256_cbc();
+	}
+	return encrypt_iv1(ecp, (char*)data, len, key.c_str(), key.size());
+}
+data_pt* easy_de(const void* ecp, const void* data, size_t len, const char* keystr, int keylen)
+{
+	int ret = 0;
+	if (!keystr)return 0;
+	std::string key;
+	keylen = keylen < 1 ? strlen(keystr) : keylen;
+	if (keylen != 32)
+	{
+		key = hz::ecc_c::sha256(keystr, keylen);
+		while (key.size() < EVP_MAX_KEY_LENGTH) {
+			key += hz::ecc_c::sha256(key.c_str(), key.size());
+		}
+	}
+	else {
+		key.resize(keylen);
+		memcpy(key.data(), keystr, keylen);
+	}
+	if (!ecp)
+	{
+		ecp = EVP_aes_256_cbc();
+	}
+	return decrypt_iv1(ecp, (char*)data, len, key.c_str(), key.size());
+}
+
+#if 0
+
+std::vector<char> dpt2v(data_pt* p) {
+	std::vector<char> v;
+	if (p && p->size && p->data)
+	{
+		v.resize(p->size);
+		memcpy(v.data(), p->data, p->size);
+	}
+	return v;
+}
+int main()
+{
+	void* ctx = new_ciphers_ctx();
+	// 获取支持的加密算法数量
+	int n = get_ciphers_count(ctx);
+	cipher_pt kecp128 = get_ciphers_str(ctx, "aes-128-cbc");
+	cipher_pt kecp256 = get_ciphers_str(ctx, "aes-256-cbc");
+	for (size_t i = 0; i < n; i++)
+	{
+		auto cp = get_ciphers_idx(ctx, i);
+		printf("%s\n", cp.n);
+	}
+	std::string str = "abc12345646523";
+	std::string key = "hgfhfy1564512qqqqq";
+	data_pt* ot = easy_en(kecp256.ecp, str.c_str(), str.size(), key.c_str(), key.size());
+	data_pt* otd = easy_de(kecp256.ecp, ot->data, ot->size, key.c_str(), key.size());
+	data_pt* ot1 = easy_en(0, str.c_str(), str.size(), key.c_str(), key.size());
+	data_pt* otd1 = easy_de(0, ot1->data, ot1->size, key.c_str(), key.size());
+
+	data_pt* ot0 = easy_en(kecp128.ecp, str.c_str(), str.size(), key.c_str(), key.size());
+	data_pt* otd0 = easy_de(kecp128.ecp, ot0->data, ot0->size, key.c_str(), key.size());
+
+	auto otv = dpt2v(ot);
+	auto otv1 = dpt2v(ot1);
+	auto otv0 = dpt2v(ot0);
+
+
+	// 用nid创建一个新的ecckey 
+	void* mekey = hz::new_ecckey_nid(0);
+	void* mekey1 = hz::new_ecckey_nid(0);
+	// 从pem数据创建ecckey。支持从get_ecckey_pem获取的数据创建。私钥pem或公钥pem数据 。密码可选
+	//void* new_ecckey_pem(const char* pem, const char* pass);
+	// 获取pem数据方便保存。
+	std::string mepem = hz::get_ecckey_pem(mekey, "");
+	std::string mepem_key = hz::get_ecckey_pem(mekey, "abc");// 私钥加密码
+	std::string mepem1 = hz::get_ecckey_pem(mekey1, "");
+	// 获取公钥
+	std::string mekey_pub = hz::get_ecckey_pem_public(mekey);
+	std::string mekey_pub1 = hz::get_ecckey_pem_public(mekey1);
+
+	void* tkey0 = hz::new_ecckey_pem(mepem.c_str(), "");
+	void* tkey = hz::new_ecckey_pem(mepem_key.c_str(), "abc");
+	void* tkey1 = hz::new_ecckey_pem(mepem_key.c_str(), "");  //密码错误则创建失败
+
+	void* pubkey = hz::new_ecckey_pem(mekey_pub.c_str(), "");
+	void* pubkey1 = hz::new_ecckey_pem(mekey_pub1.c_str(), "");
+
+	// 获取共享密钥。输入我方的私钥，对方的公钥，参数使用new_ecckey_pem返回的指针，私钥也可以用new_ecckey_nid返回的指针
+	std::string k0 = hz::get_compute_key(mekey, pubkey1);
+	std::string k1 = hz::get_compute_key(mekey1, pubkey);
+	// 可以看出用对方公钥和自己私钥创建的共享密钥是一样的，可直接用来当aes密码
+	std::string k[] = { hz::ecc_c::bin2hex(k0.c_str(),-1,true),hz::ecc_c::bin2hex(k1.c_str(),-1,true) };
+	std::string dgst = hz::ecc_c::sha256(str.c_str(), str.size());
+	// 私钥签名
+	std::string pubkey0;
+	std::string sign = hz::ecprivatekey_sign(mekey, dgst, &pubkey0);
+	// 用公钥验证
+	bool hr = hz::public_verify(pubkey, dgst, sign);
+
+	// 私钥1签名。
+	std::string sign1 = hz::ecprivatekey_sign(mekey1, dgst, 0);
+	// 用公钥1验证
+	bool hr1 = hz::public_verify(pubkey1, dgst, sign1);
+
+
+	free_dt(ot);
+	free_dt(ot1);
+	free_dt(ot0);
+	free_dt(otd);
+	free_dt(otd1);
+	free_dt(otd0);
+	return 0;
+}
+#endif // 0

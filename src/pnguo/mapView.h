@@ -350,3 +350,5 @@ namespace md {
 
 uint64_t align_up(uint64_t val, uint64_t alignment);
 uint64_t align_down(uint64_t val, uint64_t alignment);
+uint64_t divideroundingup(uint64_t a, uint64_t b);
+
