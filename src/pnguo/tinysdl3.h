@@ -113,7 +113,9 @@ public:
 
 	glm::vec3 get_power_info();
 	const char* get_power_str();
+	// 隐藏子窗口
 	void kncdown();
+	// 音频播放
 	uint32_t open_audio(int format, int channels, int freq);
 	void close_audio(uint32_t dev);
 	uint32_t get_audio_device();

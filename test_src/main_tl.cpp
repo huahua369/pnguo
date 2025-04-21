@@ -659,6 +659,127 @@ void build_audio_test(int seconds, std::vector<T>& data)
 	}
 }
 
+struct i2_t
+{
+	uint64_t u = 0;
+	int8_t size = 0;
+};
+template<class T>
+void w2t(i2_t& r, uint8_t* d) {
+	r.u = *(T*)d;
+	r.size += sizeof(T);
+}
+i2_t cbor_read_int(uint8_t* d) {
+	i2_t r = {};
+	uint8_t& c = *d;
+	r.size = 1;
+	switch (c)
+	{
+		// Integer 0x00..0x17 (0..23)
+	case 0x00:
+	case 0x01:
+	case 0x02:
+	case 0x03:
+	case 0x04:
+	case 0x05:
+	case 0x06:
+	case 0x07:
+	case 0x08:
+	case 0x09:
+	case 0x0A:
+	case 0x0B:
+	case 0x0C:
+	case 0x0D:
+	case 0x0E:
+	case 0x0F:
+	case 0x10:
+	case 0x11:
+	case 0x12:
+	case 0x13:
+	case 0x14:
+	case 0x15:
+	case 0x16:
+	case 0x17:
+		r.u = c;
+		break;
+	case 0x18: // Unsigned integer (one-byte uint8_t follows)
+	{ 
+		w2t<uint8_t>(r, d + 1);
+	}
+	break;
+
+	case 0x19: // Unsigned integer (two-byte uint16_t follows)
+	{ 
+		w2t<uint16_t>(r, d + 1);
+	}
+	break;
+
+	case 0x1A: // Unsigned integer (four-byte uint32_t follows)
+	{ 
+		w2t<uint32_t>(r, d + 1);
+	}
+	break;
+
+	case 0x1B: // Unsigned integer (eight-byte uint64_t follows)
+	{ 
+		w2t<uint64_t>(r, d + 1);
+	}
+	break;
+
+	//// Negative integer -1-0x00..-1-0x17 (-1..-24)
+	//case 0x20:
+	//case 0x21:
+	//case 0x22:
+	//case 0x23:
+	//case 0x24:
+	//case 0x25:
+	//case 0x26:
+	//case 0x27:
+	//case 0x28:
+	//case 0x29:
+	//case 0x2A:
+	//case 0x2B:
+	//case 0x2C:
+	//case 0x2D:
+	//case 0x2E:
+	//case 0x2F:
+	//case 0x30:
+	//case 0x31:
+	//case 0x32:
+	//case 0x33:
+	//case 0x34:
+	//case 0x35:
+	//case 0x36:
+	//case 0x37:
+	//	r.i = c;
+	//	break;
+	//case 0x38: // Negative integer (one-byte uint8_t follows)
+	//{
+	//	r.i = *(std::uint8_t*)d;
+	//}
+	//break;
+
+	//case 0x39: // Negative integer -1-n (two-byte uint16_t follows)
+	//{
+	//	r.i = *(std::uint16_t*)d;
+	//}
+	//break;
+
+	//case 0x3A: // Negative integer -1-n (four-byte uint32_t follows)
+	//{
+	//	r.i = *(std::uint32_t*)d;
+	//}
+	//break;
+
+	//case 0x3B: // Negative integer -1-n (eight-byte uint64_t follows)
+	//{
+	//	r.i = *(std::uint64_t*)d;
+	//}
+	//break;
+	};
+	return r;
+}
+
 int main()
 {
 #ifdef _DEBUG 
@@ -698,13 +819,19 @@ int main()
 	d2->set_pos(0, 600, 650);
 	d2->set_pos(1, 300, 650);
 
-	uint64_t ka = -1;
+	int64_t ka = -9223372036854775807;
+	uint64_t kau = 0x16;
 	njson kab = ka;
+	njson kabu = kau;
 	njson kaba = 0xfff;
 	auto pkb = njson::to_cbor(kab);
+	auto pkbu = njson::to_cbor(kabu);
 	auto pkb2 = njson::to_cbor(kaba);
-
-
+	char c[10] = { 0,-1,2,3,4,5,6,7,8,9 };
+	c[0] = 25;
+	njson kkk = njson::from_cbor(pkbu);
+	//njson kkk1 = njson::from_cbor((uint8_t*)c, 1);
+	auto c1 = cbor_read_int((uint8_t*)c);
 
 
 

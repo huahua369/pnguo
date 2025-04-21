@@ -315,7 +315,11 @@ void sp_drawable::set_renderer(void* p)
 {
 	renderer = p;
 }
-
+struct spe_ht
+{
+	char n[4] = {};
+	uint64_t datalen;
+};
 void packages_b(const std::string& package_file, std::map<void*, std::string>& texs, int atlas_length, int ske_length, const char* atlas_data, const char* ske_data, bool isbin)
 {
 	std::vector<std::pair<char*, int>> imgd;
@@ -360,15 +364,17 @@ void packages_b(const std::string& package_file, std::map<void*, std::string>& t
 			hz::mfile_t m;
 			if (!m.open_m(package_file, false))break;
 			auto pkb = njson0::to_cbor(pk);
-			int64_t alen = pkb.size() + sizeof(size_t) + datalen;
+			int64_t alen = pkb.size() + sizeof(spe_ht) + datalen;
 			m.ftruncate_m(alen);
 			auto mpd = m.map(alen, 0);
 			if (!mpd)break;
-			auto pkbs = (size_t*)mpd;
-			*pkbs = pkb.size();
-			mpd += sizeof(size_t);
-			memcpy(mpd, pkb.data(), *pkbs);
-			mpd += *pkbs;
+			auto pkbs = (spe_ht*)mpd;
+			*pkbs = {};
+			strcpy(pkbs->n, "spe");
+			pkbs->datalen = pkb.size();
+			mpd += sizeof(spe_ht);
+			memcpy(mpd, pkb.data(), pkb.size());
+			mpd += pkbs->datalen;
 			memcpy(mpd, atlas_data, atlas_length);
 			mpd += atlas_length;
 			memcpy(mpd, ske_data, ske_length);
@@ -452,17 +458,19 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 }
 void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float defaultMix)
 {
-	if (!renderer || (sizeof(size_t) + 16) > len)return;
+	if (!renderer || (sizeof(spe_ht) + 16) > len)return;
 	sp_obj c = {};
-	auto pkbs = (size_t*)data;
-	njson0 pk = njson0::from_cbor(data + sizeof(size_t), *pkbs);
+	auto pkbs = (spe_ht*)data;
+	std::string pkbn = "spe";
+	if (pkbs->n != pkbn)return;
+	njson0 pk = njson0::from_cbor(data + sizeof(spe_ht), pkbs->datalen);
 	if (!(pk.is_object() && pk.size()))return;
 	int atlas_offset = pk["atlas_offset"];
 	int atlas_len = pk["atlas_length"];
 	int ske_offset = pk["ske_offset"];
 	int ske_length = pk["ske_length"];
 	bool is_binary = pk["is_binary"];
-	data += *pkbs + sizeof(size_t);
+	data += pkbs->datalen + sizeof(spe_ht);
 	page_obj_t pot = { renderer };
 	pot.img = pk["images"];
 	pot.data = (char*)data;

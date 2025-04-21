@@ -188,14 +188,18 @@ namespace hz {
 	struct audio_backend_t
 	{
 		uint32_t dev = 0;
+		// 创建流
 		void* (*new_audio_stream)(uint32_t dev, int format, int channels, int freq) = 0;
 		void (*free_audio_stream)(void* st) = 0;
+		// 绑定/解绑到播放设备
 		void (*bindaudio)(uint32_t dev, void* st) = 0;
 		void (*unbindaudio)(void* st) = 0;
 		void (*unbindaudios)(void** st, int count) = 0;
+		// 获取流st的剩余播放量
 		int (*get_audio_stream_queued)(void* st) = 0;
 		int (*get_audio_stream_available)(void* st) = 0;
 		int (*get_audio_dst_framesize)(void* st) = 0;
+		// 推送音频数据
 		void (*put_audio)(void* stream, void* data, int len) = 0;
 		// v=0播放、1暂停
 		void (*pause_audio)(void* st_, int v) = 0;
@@ -203,6 +207,7 @@ namespace hz {
 		bool (*mix_audio)(uint8_t* dst, uint8_t* src, int format, size_t len, float volume) = 0;
 		void (*clear_audio)(void* st) = 0;
 		void(*sleep_ms)(int ms) = 0;
+		// 返回当前毫秒用
 		uint64_t(*get_ticks)() = 0;
 	};
 	struct audio_list
