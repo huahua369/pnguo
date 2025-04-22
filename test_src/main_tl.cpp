@@ -616,169 +616,7 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 
-void build_audio_test(int seconds, std::vector<float>& data)
-{
-#define SAMPLE_RATE 48000
-#define FREQUENCY   440
-#define FRAME_SIZE  1024
-	int channels = 2;
-	int framenum = seconds * SAMPLE_RATE;// ((SAMPLE_RATE + FRAME_SIZE - 1) / FRAME_SIZE);
-	auto M_PI = glm::pi<double>();
-	data.resize(framenum * channels);
-	auto dtt = data.data();
-	float zeta = 0; //每一个frame 的初始角度
-	int amp = 10000; //幅度
-	for (int i = 0; i < channels; ++i) {
-		auto dst = dtt + i;
-		for (int j = 0; j < framenum; ++j) {
-			*dst = amp * sin(2 * M_PI * FREQUENCY / SAMPLE_RATE * j + zeta); //每一个数据递进一个角度2*PI*FREQUENCY/SAMPLE_RATE,此值为角速度
-			*dst *= 0.0001;
-			dst += channels;
-		}
-	}
-}
-template<class T>
-void build_audio_test(int seconds, std::vector<T>& data)
-{
-#define SAMPLE_RATE 48000
-#define FREQUENCY   440
-#define FRAME_SIZE  1024
-	int channels = 2;
-	int framenum = seconds * SAMPLE_RATE;// ((SAMPLE_RATE + FRAME_SIZE - 1) / FRAME_SIZE);
-	auto M_PI = glm::pi<double>();
-	data.resize(framenum * channels);
-	auto dtt = data.data();
-	float zeta = 0; //每一个frame 的初始角度
-	int amp = 10000; //幅度
-	for (int i = 0; i < channels; ++i) {
-		auto dst = dtt + i;
-		for (int j = 0; j < framenum; ++j) {
-			*dst = amp * sinf(2 * M_PI * FREQUENCY / SAMPLE_RATE * j + zeta); //每一个数据递进一个角度2*PI*FREQUENCY/SAMPLE_RATE,此值为角速度 
-			dst += channels;
-		}
-	}
-}
 
-struct i2_t
-{
-	uint64_t u = 0;
-	int8_t size = 0;
-};
-template<class T>
-void w2t(i2_t& r, uint8_t* d) {
-	r.u = *(T*)d;
-	r.size += sizeof(T);
-}
-i2_t cbor_read_int(uint8_t* d) {
-	i2_t r = {};
-	uint8_t& c = *d;
-	r.size = 1;
-	switch (c)
-	{
-		// Integer 0x00..0x17 (0..23)
-	case 0x00:
-	case 0x01:
-	case 0x02:
-	case 0x03:
-	case 0x04:
-	case 0x05:
-	case 0x06:
-	case 0x07:
-	case 0x08:
-	case 0x09:
-	case 0x0A:
-	case 0x0B:
-	case 0x0C:
-	case 0x0D:
-	case 0x0E:
-	case 0x0F:
-	case 0x10:
-	case 0x11:
-	case 0x12:
-	case 0x13:
-	case 0x14:
-	case 0x15:
-	case 0x16:
-	case 0x17:
-		r.u = c;
-		break;
-	case 0x18: // Unsigned integer (one-byte uint8_t follows)
-	{ 
-		w2t<uint8_t>(r, d + 1);
-	}
-	break;
-
-	case 0x19: // Unsigned integer (two-byte uint16_t follows)
-	{ 
-		w2t<uint16_t>(r, d + 1);
-	}
-	break;
-
-	case 0x1A: // Unsigned integer (four-byte uint32_t follows)
-	{ 
-		w2t<uint32_t>(r, d + 1);
-	}
-	break;
-
-	case 0x1B: // Unsigned integer (eight-byte uint64_t follows)
-	{ 
-		w2t<uint64_t>(r, d + 1);
-	}
-	break;
-
-	//// Negative integer -1-0x00..-1-0x17 (-1..-24)
-	//case 0x20:
-	//case 0x21:
-	//case 0x22:
-	//case 0x23:
-	//case 0x24:
-	//case 0x25:
-	//case 0x26:
-	//case 0x27:
-	//case 0x28:
-	//case 0x29:
-	//case 0x2A:
-	//case 0x2B:
-	//case 0x2C:
-	//case 0x2D:
-	//case 0x2E:
-	//case 0x2F:
-	//case 0x30:
-	//case 0x31:
-	//case 0x32:
-	//case 0x33:
-	//case 0x34:
-	//case 0x35:
-	//case 0x36:
-	//case 0x37:
-	//	r.i = c;
-	//	break;
-	//case 0x38: // Negative integer (one-byte uint8_t follows)
-	//{
-	//	r.i = *(std::uint8_t*)d;
-	//}
-	//break;
-
-	//case 0x39: // Negative integer -1-n (two-byte uint16_t follows)
-	//{
-	//	r.i = *(std::uint16_t*)d;
-	//}
-	//break;
-
-	//case 0x3A: // Negative integer -1-n (four-byte uint32_t follows)
-	//{
-	//	r.i = *(std::uint32_t*)d;
-	//}
-	//break;
-
-	//case 0x3B: // Negative integer -1-n (eight-byte uint64_t follows)
-	//{
-	//	r.i = *(std::uint64_t*)d;
-	//}
-	//break;
-	};
-	return r;
-}
 
 int main()
 {
@@ -818,23 +656,7 @@ int main()
 	d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
 	d2->set_pos(0, 600, 650);
 	d2->set_pos(1, 300, 650);
-
-	int64_t ka = -9223372036854775807;
-	uint64_t kau = 0x16;
-	njson kab = ka;
-	njson kabu = kau;
-	njson kaba = 0xfff;
-	auto pkb = njson::to_cbor(kab);
-	auto pkbu = njson::to_cbor(kabu);
-	auto pkb2 = njson::to_cbor(kaba);
-	char c[10] = { 0,-1,2,3,4,5,6,7,8,9 };
-	c[0] = 25;
-	njson kkk = njson::from_cbor(pkbu);
-	//njson kkk1 = njson::from_cbor((uint8_t*)c, 1);
-	auto c1 = cbor_read_int((uint8_t*)c);
-
-
-
+	  
 	{
 		njson j = hz::read_json(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)");
 		const char* kname[] = { "skeleton","bones","slots","ik","skins","transform","animations","events" };
@@ -885,12 +707,7 @@ int main()
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
-	std::vector<float>* adata = new std::vector<float>();
-	std::vector<int32_t>* adata32 = new std::vector<int32_t>();
-	std::vector<int16_t>* adata16 = new std::vector<int16_t>();
-	build_audio_test(5, *adata);
-	build_audio_test(5, *adata32);
-	build_audio_test(5, *adata16);
+ 
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
 		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
 		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
@@ -906,7 +723,7 @@ int main()
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
 	audio_ctx->set_type(3);
 	// 播放当前歌单指定索引开始播放
-	audio_ctx->play(0);
+	//audio_ctx->play(0);
 	coders_t* cp = new_coders();
 	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
 	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
