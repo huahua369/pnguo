@@ -365,8 +365,8 @@ void packages_b(const std::string& package_file, std::map<void*, std::string>& t
 			if (!m.open_m(package_file, false))break;
 			auto pkb = njson0::to_cbor(pk);
 			int64_t alen = pkb.size() + sizeof(spe_ht) + datalen;
-			m.ftruncate_m(alen);
-			auto mpd = m.map(alen, 0);
+			m.ftruncate_m(alen);//重置文件大小
+			auto mpd = m.map(alen, 0);//映射文件
 			if (!mpd)break;
 			auto pkbs = (spe_ht*)mpd;
 			*pkbs = {};
@@ -383,7 +383,7 @@ void packages_b(const std::string& package_file, std::map<void*, std::string>& t
 				memcpy(mpd, k, v);
 				mpd += v;
 			}
-			m.flush();
+			m.flush();//刷新数据到磁盘
 		}
 #endif // !_MFILE_
 	} while (0);
