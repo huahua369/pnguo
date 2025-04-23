@@ -340,11 +340,12 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
 
-	auto cp = p->add_gbutton((char*)u8"功能", { 160,30 }, color);
-	cp->click_cb = [=](void* ptr, int clicks)
-		{
-			form0->flash_window(2);
-		};
+	//form_x* form1 = (form_x*)new_form(form0->app, "", 600,500, -1, -1, ef_vulkan);
+	//auto cp = p->add_gbutton((char*)u8"功能", { 160,30 }, color);
+	//cp->click_cb = [=](void* ptr, int clicks)
+	//	{
+	//		form1->flash_window(2);
+	//	};
 #if 0
 	std::vector<menu_info> vm;
 	vm.push_back({ mname.data(),mname.size() });
