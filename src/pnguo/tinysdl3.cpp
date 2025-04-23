@@ -2630,6 +2630,12 @@ void form_x::hide_cursor()
 {
 	SDL_HideCursor();
 }
+void form_x::flash_window(int opera)
+{
+	auto o = std::clamp((SDL_FlashOperation)opera, SDL_FlashOperation::SDL_FLASH_CANCEL, SDL_FlashOperation::SDL_FLASH_UNTIL_FOCUSED);
+	if (_ptr)
+		SDL_FlashWindow(_ptr, o);
+}
 void form_x::push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target)
 {
 	if (!p)

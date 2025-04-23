@@ -260,7 +260,7 @@ public:
 	// 显示/隐藏鼠标
 	void show_cursor();
 	void hide_cursor();
-
+	void flash_window(int opera);
 	// 设置窗口图标
 	void set_icon(const char* fn);
 	void set_icon(const uint32_t* d, int w, int h);

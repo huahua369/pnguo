@@ -340,6 +340,11 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 	auto color = 0x2c2c2c;// hz::get_themecolor();
 	((uint8_t*)(&color))[3] = 0x80;
 
+	auto cp = p->add_gbutton((char*)u8"功能", { 160,30 }, color);
+	cp->click_cb = [=](void* ptr, int clicks)
+		{
+			form0->flash_window(2);
+		};
 #if 0
 	std::vector<menu_info> vm;
 	vm.push_back({ mname.data(),mname.size() });
@@ -645,6 +650,8 @@ int main()
 	auto pl = show_ui(form0, gm);
 	show_ui2(form0, gm);
 	//show_cpuinfo(form0);
+
+
 	auto d2 = new sp_drawable();
 	d2->set_renderer(form0->renderer);
 	//d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
