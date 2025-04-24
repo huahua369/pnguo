@@ -6,6 +6,9 @@
 #ifndef MAX_LIGHT_INSTANCES
 #define MAX_LIGHT_INSTANCES  80
 #endif
+#ifndef UVT_COUNT
+#define UVT_COUNT  1
+#endif
 #define MAX_SHADOW_INSTANCES 32
 
 struct Light
@@ -110,7 +113,7 @@ struct pbrMaterial
 
 	int unlit;
 	float pad[3];
-	mat3 uvTransform;
+	mat3 uvTransform[UVT_COUNT];
 };
 
 struct MaterialInfo
@@ -430,6 +433,7 @@ vec2 getBaseColorUV(VS2PS Input)
 	uv.xy = TEXCOORD(ID_baseTexCoord);
 #ifdef UVT_baseColorTexture
 	uv = u_matuv[UVT_baseColorTexture] * uv;
+	//uv = u_pbrParams.uvTransform[UVT_baseColorTexture] * uv;
 #endif
 #endif
 	return uv.xy;
@@ -486,9 +490,10 @@ vec2 getDiffuseUV(VS2PS Input)
 #endif
 vec4 getBaseColorTexture(VS2PS Input, vec2 uv)
 {
+	vec2 uv1 = uv;
 #ifdef ID_baseColorTexture
-	uv = getBaseColorUV(Input);  
-	return texture(u_BaseColorSampler, uv);// , myPerFrame.u_LodBias);
+	uv1 = getBaseColorUV(Input);
+	return texture(u_BaseColorSampler, uv1);// , myPerFrame.u_LodBias);
 #else
 	return vec4(1, 1, 1, 1); //OPAQUE
 #endif
@@ -866,7 +871,7 @@ vec4 getBaseColor(VS2PS Input, vec2 uv)
 
 vec4 getBaseColor2(VS2PS Input, pbrMaterial params, vec2 uv)
 {
-	vec4 baseColor = vec4(1.0, 1.0, 1.0, 1.0); 
+	vec4 baseColor = vec4(1.0, 1.0, 1.0, 1.0);
 
 #ifdef MATERIAL_SPECULARGLOSSINESS
 	baseColor = params.pbrDiffuseFactor;

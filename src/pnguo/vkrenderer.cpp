@@ -1023,7 +1023,32 @@ namespace vkr {
 
 		ivec2 transmissionFramebufferSize;
 	};
-
+	enum class UVT_E
+	{
+		e_EnvRotation,
+		e_NormalUVTransform,
+		e_EmissiveUVTransform,
+		e_OcclusionUVTransform,
+		e_BaseColorUVTransform,
+		e_MetallicRoughnessUVTransform,
+		e_DiffuseUVTransform,
+		e_SpecularGlossinessUVTransform,
+		e_ClearcoatUVTransform,
+		e_ClearcoatRoughnessUVTransform,
+		e_ClearcoatNormalUVTransform,
+		e_SheenColorUVTransform,
+		e_SheenRoughnessUVTransform,
+		e_SpecularUVTransform,
+		e_SpecularColorUVTransform,
+		e_TransmissionUVTransform,
+		e_ThicknessUVTransform,
+		e_IridescenceUVTransform,
+		e_IridescenceThicknessUVTransform,
+		e_DiffuseTransmissionUVTransform,
+		e_DiffuseTransmissionColorUVTransform,
+		e_AnisotropyUVTransform,
+		e_COUNT
+	};
 	// todo pbr UBO用结构体
 	struct pbr_factors_t
 	{
@@ -1085,34 +1110,10 @@ namespace vkr {
 
 		int unlit = 0;
 		float pad[3];
-		mat3 uvTransform = mat3(1.0);
+		mat3x4 uvTransform = mat3x4(1.0);
+		//glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
 	};
-	enum class UVT_E
-	{
-		e_EnvRotation,
-		e_NormalUVTransform,
-		e_EmissiveUVTransform,
-		e_OcclusionUVTransform,
-		e_BaseColorUVTransform,
-		e_MetallicRoughnessUVTransform,
-		e_DiffuseUVTransform,
-		e_SpecularGlossinessUVTransform,
-		e_ClearcoatUVTransform,
-		e_ClearcoatRoughnessUVTransform,
-		e_ClearcoatNormalUVTransform,
-		e_SheenColorUVTransform,
-		e_SheenRoughnessUVTransform,
-		e_SpecularUVTransform,
-		e_SpecularColorUVTransform,
-		e_TransmissionUVTransform,
-		e_ThicknessUVTransform,
-		e_IridescenceUVTransform,
-		e_IridescenceThicknessUVTransform,
-		e_DiffuseTransmissionUVTransform,
-		e_DiffuseTransmissionColorUVTransform,
-		e_AnisotropyUVTransform,
-		e_COUNT
-	};
+
 
 #define pbrMaterial pbr_factors_t
 
@@ -1124,7 +1125,8 @@ namespace vkr {
 		DefineList m_defines;
 
 		pbrMaterial m_params = {};
-		glm::mat3 m_uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
+		glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
+		int mid = 0;
 	};
 	struct morph_t;
 
@@ -2642,7 +2644,7 @@ namespace vkr {
 		std::map<std::string, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
-		std::map<int, std::vector<glm::mat3>> m_uv_mats; // UVmat
+		std::map<int, std::vector<glm::mat3x4>> m_uv_mats; // UVmat
 
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
@@ -5271,8 +5273,8 @@ namespace vkr
 		for (auto& [k, v] : m_pGLTFCommon->m_uv_mats) {
 			VkDescriptorBufferInfo db = {};
 			float* cbd = 0;
-			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3));
-			m_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
+			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3x4));
+			m_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 32);
 			memcpy(cbd, v.data(), size);
 			m_uvmMap[k] = db;
 		}
@@ -5388,22 +5390,11 @@ namespace vkr
 	}
 	glm::mat3 get_mat3(glm::vec2 offset, float rotation, glm::vec2 scale = { 1.0f, 1.0f })
 	{
-#if 0
-		// Compute combined transformation matrix
-		float cosR = cos(rotation);
-		float sinR = sin(rotation);
-		float tx = offset.x;
-		float ty = offset.y;
-		float sx = scale.x;
-		float sy = scale.y;
-		auto m3 = glm::mat3(sx * cosR, sx * sinR, tx, -sy * sinR, sy * cosR, ty, 0.0f, 0.0f, 1.0f);
-#else
 		glm::mat3 translation = glm::translate(glm::mat3(1.0), offset);
-		auto mrotation = glm::rotate(glm::mat3(1.0), rotation);
+		auto mrotation = glm::rotate(glm::mat3(1.0), -rotation);
 		glm::mat3 mscale = glm::scale(glm::mat3(1.0), scale);
 		glm::mat3 matrix = translation * mrotation * mscale;
 		return matrix;
-#endif
 	}
 	template<class T>
 	T get_v(const tinygltf::Value* v, const char* k, T rdef)
@@ -5470,7 +5461,11 @@ namespace vkr
 		}
 		int uvc = 1;
 		// look for textures and store their IDs in a map 
-		tfmat->m_uvTransform[0] = glm::mat3(1.0);
+		for (size_t i = 0; i < (int)UVT_E::e_COUNT; i++)
+		{
+			tfmat->uvTransform[i] = glm::mat3(1.0);
+		}
+		auto& uvtm = tfmat->uvTransform;
 		if (material.normalTexture.index != -1)
 		{
 			textureIds["normalTexture"] = material.normalTexture.index;
@@ -5478,7 +5473,7 @@ namespace vkr
 			tfmat->m_defines["ID_normalTexCoord"] = std::to_string(material.normalTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.normalTexture.extensions, &m3)) {
-				memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
+				uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3x4));
 				tfmat->m_defines["UVT_normalTexture"] = std::to_string(uvc++);
 			}
 		}
@@ -5488,7 +5483,7 @@ namespace vkr
 			tfmat->m_defines["ID_emissiveTexCoord"] = std::to_string(material.emissiveTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.emissiveTexture.extensions, &m3)) {
-				memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
+				uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));
 				tfmat->m_defines["UVT_emissiveTexture"] = std::to_string(uvc++);
 			}
 		}
@@ -5499,7 +5494,7 @@ namespace vkr
 			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.occlusionTexture.extensions, &m3)) {
-				memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
+				uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));
 				tfmat->m_defines["UVT_occlusionTexture"] = std::to_string(uvc++);
 			}
 		}
@@ -5667,7 +5662,7 @@ namespace vkr
 					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughness.baseColorTexture.texCoord);
 					glm::mat3 m3 = glm::mat3(1.0);
 					if (get_KHR_texture_transform(pbrMetallicRoughness.baseColorTexture.extensions, &m3)) {
-						memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
+						uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));						
 						tfmat->m_defines["UVT_baseColorTexture"] = std::to_string(uvc++);
 					}
 				}
@@ -5676,7 +5671,7 @@ namespace vkr
 					tfmat->m_defines["ID_metallicRoughnessTexCoord"] = std::to_string(pbrMetallicRoughness.metallicRoughnessTexture.texCoord);
 					glm::mat3 m3 = glm::mat3(1.0);
 					if (get_KHR_texture_transform(pbrMetallicRoughness.metallicRoughnessTexture.extensions, &m3)) {
-						memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
+						uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));
 						tfmat->m_defines["UVT_metallicRoughnessTexture"] = std::to_string(uvc++);
 					}
 				}
@@ -5863,9 +5858,9 @@ namespace vkr
 			info.magFilter = VK_FILTER_LINEAR;
 			info.minFilter = VK_FILTER_LINEAR;
 			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;// VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			info.minLod = 0;
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
@@ -5933,6 +5928,7 @@ namespace vkr
 				//
 				std::map<std::string, int> textureIds;
 				ProcessMaterials(&pm->materials[i], &tfmat->m_pbrMaterialParameters, textureIds);
+				tfmat->m_pbrMaterialParameters.mid = i;
 				// translate texture IDs into textureViews
 				//
 				std::map<std::string, VkImageView> texturesBase;
@@ -5980,7 +5976,7 @@ namespace vkr
 							// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
 							//
 							DefineList defines = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_defines + rtDefines;
-							auto& mde = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_uvTransform;
+							auto& mde = pPrimitive->m_pMaterial->m_pbrMaterialParameters.uvTransform;
 							// make a list of all the attribute names our pass requires, in the case of PBR we need them all
 							//
 							std::vector<std::string> requiredAttributes;
@@ -6016,7 +6012,7 @@ namespace vkr
 									uvm[j] = mde[j];
 								}
 							}
-							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, &mm, sizeof(glm::mat3) * muvt_size, bUseSSAOMask);
+							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, &mm, sizeof(glm::mat3x4) * muvt_size, bUseSSAOMask);
 							CreatePipeline(inputLayout, defines, pPrimitive);
 						});
 				}
@@ -6711,11 +6707,6 @@ namespace vkr
 		//
 		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
-		//assert(!(pPerSkeleton && morph));
-		//if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;
-
-		//uint32_t uniformOffsets[3] = { (uint32_t)perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
-		//uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
 		if (!uniformOffsets)
 		{
 			uniformOffsetsCount = 0;
@@ -6893,9 +6884,7 @@ namespace vkr
 			info.magFilter = VK_FILTER_LINEAR;
 			info.minFilter = VK_FILTER_LINEAR;
 			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeU = info.addressModeV = info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			info.minLod = 0;
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
