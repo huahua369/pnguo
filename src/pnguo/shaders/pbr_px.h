@@ -487,8 +487,8 @@ vec2 getDiffuseUV(VS2PS Input)
 vec4 getBaseColorTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_baseColorTexture
-	uv = getBaseColorUV(Input);
-	return texture(u_BaseColorSampler, uv, myPerFrame.u_LodBias);
+	uv = getBaseColorUV(Input);  
+	return texture(u_BaseColorSampler, uv);// , myPerFrame.u_LodBias);
 #else
 	return vec4(1, 1, 1, 1); //OPAQUE
 #endif
@@ -498,7 +498,7 @@ vec4 getDiffuseTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_diffuseTexture
 	uv = getDiffuseUV(Input);
-	return texture(u_diffuseSampler, uv, myPerFrame.u_LodBias);
+	return texture(u_diffuseSampler, uv);//, myPerFrame.u_LodBias);
 #else
 	return vec4(1, 1, 1, 1);
 #endif 
@@ -508,7 +508,7 @@ vec4 getMetallicRoughnessTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_metallicRoughnessTexture
 	uv = getMetallicRoughnessUV(Input);
-	return texture(u_MetallicRoughnessSampler, uv, myPerFrame.u_LodBias);
+	return texture(u_MetallicRoughnessSampler, uv);//, myPerFrame.u_LodBias);
 #else 
 	return vec4(1, 1, 1, 1);
 #endif   
@@ -518,7 +518,7 @@ vec4 getSpecularGlossinessTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_specularGlossinessTexture  
 	uv = getSpecularGlossinessUV(Input);
-	return texture(u_specularGlossinessSampler, uv, myPerFrame.u_LodBias);
+	return texture(u_specularGlossinessSampler, uv);//, myPerFrame.u_LodBias);
 #else 
 	return vec4(1, 1, 1, 1);
 #endif   
@@ -739,7 +739,7 @@ vec3 getPixelNormal(VS2PS Input, vec2 UV)
 #endif
 
 #ifdef ID_normalTexture
-	vec2 xy = 2.0 * texture(u_NormalSampler, UV, myPerFrame.u_LodBias).rg - 1.0;
+	vec2 xy = 2.0 * texture(u_NormalSampler, UV/*, myPerFrame.u_LodBias*/).rg - 1.0;
 	float z = sqrt(1.0 - dot(xy, xy));
 	vec3 n = vec3(xy, z);
 	n = normalize(tbn * (n /* * vec3(u_NormalScale, u_NormalScale, 1.0) */));
@@ -866,16 +866,16 @@ vec4 getBaseColor(VS2PS Input, vec2 uv)
 
 vec4 getBaseColor2(VS2PS Input, pbrMaterial params, vec2 uv)
 {
-	vec4 baseColor = getBaseColor(Input, uv);
+	vec4 baseColor = vec4(1.0, 1.0, 1.0, 1.0); 
 
 #ifdef MATERIAL_SPECULARGLOSSINESS
-	baseColor *= params.pbrDiffuseFactor;
+	baseColor = params.pbrDiffuseFactor;
 #endif
 
 #ifdef MATERIAL_METALLICROUGHNESS
-	baseColor *= params.baseColorFactor;
+	baseColor = params.baseColorFactor;
 #endif
-
+	baseColor *= getBaseColor(Input, uv);
 	baseColor *= getPixelColor(Input);
 	return baseColor;
 }

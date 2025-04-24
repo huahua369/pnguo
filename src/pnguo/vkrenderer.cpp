@@ -1151,7 +1151,7 @@ namespace vkr {
 
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
-
+		int mid = 0;
 		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe);
 	};
@@ -2047,6 +2047,7 @@ namespace vkr {
 		VkResult OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t memTotalSize, char* name = NULL);
 		void OnDestroy();
 		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
+		bool AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin);
 		VkDescriptorBufferInfo AllocConstantBuffer(uint32_t size, void* pData);
 		bool AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
 		bool AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
@@ -2641,7 +2642,7 @@ namespace vkr {
 		std::map<std::string, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
-		std::map<std::string, std::vector<glm::mat3>> m_uv_mats; // UVmat
+		std::map<int, std::vector<glm::mat3>> m_uv_mats; // UVmat
 
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
@@ -2716,7 +2717,8 @@ namespace vkr {
 		// maps GLTF ids into views
 		std::map<int, VkDescriptorBufferInfo> m_vertexBufferMap;
 		std::map<int, VkDescriptorBufferInfo> m_IndexBufferMap;
-		std::map<std::string, mesh_mapd> m_BufferMap;
+		std::map<std::string, morph_t> m_BufferMap;
+		std::map<int, VkDescriptorBufferInfo> m_uvmMap;
 		int indextype = 0;
 	public:
 		GLTFCommon* m_pGLTFCommon;
@@ -2736,7 +2738,7 @@ namespace vkr {
 
 		VkDescriptorBufferInfo* GetSkinningMatricesBuffer(int skinIndex);
 		morph_t* get_mb(const std::string& meshname);
-		VkDescriptorBufferInfo* get_uvm(const std::string& meshname);
+		VkDescriptorBufferInfo* get_uvm(int idx);
 		void SetSkinningMatricesForSkeletons();
 		void SetPerFrameConstants();
 	};
@@ -4217,7 +4219,7 @@ namespace vkr
 								auto tsa = primitive.targets.size();// todo 变形
 								if (tsa > 0) {
 									auto mk = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->meshes[i].name;
-									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mk].m;
+									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mk];
 								}
 								int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
@@ -4953,7 +4955,7 @@ namespace vkr
 					std::vector<glm::vec4> tv;// 临时缓存
 					if (attributes.size() > 0)
 					{
-						mp = &m_BufferMap[mesh.name].m;
+						mp = &m_BufferMap[mesh.name];
 						auto ss = vss.begin()->second;// 顶点数量
 						tv.reserve(attributes.size() * ss * targetCount);
 						mp->defs["vertex_count"] = ss;
@@ -5263,16 +5265,16 @@ namespace vkr
 			uint32_t size = (uint32_t)(d->size() * sizeof(float));
 			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
 			memcpy(cbd, d->data(), size);
-			m_BufferMap[t.first].m.morphWeights = per;
+			m_BufferMap[t.first].morphWeights = per;
 		}
 		// todo uv矩阵
 		for (auto& [k, v] : m_pGLTFCommon->m_uv_mats) {
 			VkDescriptorBufferInfo db = {};
 			float* cbd = 0;
 			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3));
-			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &db);
+			m_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
 			memcpy(cbd, v.data(), size);
-			m_BufferMap[k].uvtdata = db;
+			m_uvmMap[k] = db;
 		}
 	}
 
@@ -5288,13 +5290,13 @@ namespace vkr
 	morph_t* GLTFTexturesAndBuffers::get_mb(const std::string& meshname)
 	{
 		auto it = m_BufferMap.find(meshname);
-		auto m = (it != m_BufferMap.end()) ? &it->second.m : nullptr;
+		auto m = (it != m_BufferMap.end()) ? &it->second : nullptr;
 		return m && m->targetCount ? m : nullptr;
 	}
-	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::get_uvm(const std::string& meshname)
+	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::get_uvm(int idx)
 	{
-		auto it = m_BufferMap.find(meshname);
-		auto db = (it != m_BufferMap.end()) ? &it->second.uvtdata : nullptr;
+		auto it = m_uvmMap.find(idx);
+		auto db = (it != m_uvmMap.end()) ? &it->second : nullptr;
 		return db && db->buffer ? db : nullptr;
 	}
 	//
@@ -5435,7 +5437,7 @@ namespace vkr
 			double r = get_v(tt, "rotation", 0.0);
 			glm::vec2 o = get_v(tt, "offset", glm::vec2(0, 0));
 			glm::vec2 s = get_v(tt, "scale", glm::vec2(1.0, 1.0));
-			auto m1 = get_mat3(o, r, s); 
+			auto m1 = get_mat3(o, r, s);
 			if (m)*m = m1;
 		}
 		return tt;
@@ -5476,7 +5478,7 @@ namespace vkr
 			tfmat->m_defines["ID_normalTexCoord"] = std::to_string(material.normalTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.normalTexture.extensions, &m3)) {
-				tfmat->m_uvTransform[uvc] = m3;
+				memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
 				tfmat->m_defines["UVT_normalTexture"] = std::to_string(uvc++);
 			}
 		}
@@ -5486,7 +5488,7 @@ namespace vkr
 			tfmat->m_defines["ID_emissiveTexCoord"] = std::to_string(material.emissiveTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.emissiveTexture.extensions, &m3)) {
-				tfmat->m_uvTransform[uvc] = m3;
+				memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
 				tfmat->m_defines["UVT_emissiveTexture"] = std::to_string(uvc++);
 			}
 		}
@@ -5497,7 +5499,7 @@ namespace vkr
 			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.occlusionTexture.extensions, &m3)) {
-				tfmat->m_uvTransform[uvc] = m3;
+				memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
 				tfmat->m_defines["UVT_occlusionTexture"] = std::to_string(uvc++);
 			}
 		}
@@ -5665,7 +5667,7 @@ namespace vkr
 					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughness.baseColorTexture.texCoord);
 					glm::mat3 m3 = glm::mat3(1.0);
 					if (get_KHR_texture_transform(pbrMetallicRoughness.baseColorTexture.extensions, &m3)) {
-						tfmat->m_uvTransform[uvc] = m3;
+						memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
 						tfmat->m_defines["UVT_baseColorTexture"] = std::to_string(uvc++);
 					}
 				}
@@ -5674,7 +5676,7 @@ namespace vkr
 					tfmat->m_defines["ID_metallicRoughnessTexCoord"] = std::to_string(pbrMetallicRoughness.metallicRoughnessTexture.texCoord);
 					glm::mat3 m3 = glm::mat3(1.0);
 					if (get_KHR_texture_transform(pbrMetallicRoughness.metallicRoughnessTexture.extensions, &m3)) {
-						tfmat->m_uvTransform[uvc] = m3;
+						memcpy(&tfmat->m_uvTransform[uvc], &m3, sizeof(glm::mat3));
 						tfmat->m_defines["UVT_metallicRoughnessTexture"] = std::to_string(uvc++);
 					}
 				}
@@ -5970,7 +5972,7 @@ namespace vkr
 							//
 							auto mat = primitive.material;// .find("material");
 							pPrimitive->m_pMaterial = (mat != -1) ? &m_materialsData[mat] : &m_defaultMaterial;
-
+							pPrimitive->mid = mat;
 							auto ts = primitive.targets.size();// todo 变形
 							if (ts > 0) {
 								printf("targets %zu\n", ts);
@@ -5996,7 +5998,7 @@ namespace vkr
 							auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mk];
 							auto tsa = primitive.targets.size();// todo 变形判断
 							if (tsa > 0) {
-								morphing = &(bm->m);
+								morphing = bm;
 								mm.m = morphing;
 							}
 							// Create descriptors and pipelines
@@ -6006,8 +6008,8 @@ namespace vkr
 							int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
 							if (muvt_size)
 							{
-								auto& uvm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_uv_mats[mk];
-								mm.uvtdata = &bm->uvtdata;
+								auto& uvm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_uv_mats[primitive.material];
+								mm.uvtdata = &m_pGLTFTexturesAndBuffers->m_uvmMap[primitive.material];
 								uvm.resize(muvt_size);
 								for (int j = 0; j < muvt_size; j++)
 								{
@@ -6610,7 +6612,6 @@ namespace vkr
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
 			auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->m_name);
-			auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pNode->m_name);
 
 			glm::mat4 mModelViewProj = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
 
@@ -6620,11 +6621,11 @@ namespace vkr
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
 				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
-
 				if ((bWireframe && pPrimitive->m_pipelineWireframe == VK_NULL_HANDLE)
 					|| (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
 					continue;
 
+				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
 				// do frustrum culling
 				//
 				tfPrimitives boundingBox = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
@@ -8873,9 +8874,9 @@ namespace vkr
 	// AllocConstantBuffer
 	//
 	//--------------------------------------------------------------------------------------
-	bool DynamicBufferRing::AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut)
+	bool DynamicBufferRing::AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin)
 	{
-		size = AlignUp(size, 256u);
+		size = AlignUp(size, algin);
 
 		uint32_t memOffset;
 		if (m_mem.Alloc(size, &memOffset) == false)
@@ -8891,6 +8892,10 @@ namespace vkr
 		pOut->range = size;
 
 		return true;
+	}
+	bool DynamicBufferRing::AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut)
+	{
+		return AllocConstantBuffer1(size, pData, pOut, 256u);
 	}
 
 	//--------------------------------------------------------------------------------------

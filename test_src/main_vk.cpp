@@ -430,7 +430,7 @@ int main()
 	//	}
 	//}
 	if (vkd) {
-		{
+		{ 
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\bc22.glb)", { 10,0,50 }, 1.0);
