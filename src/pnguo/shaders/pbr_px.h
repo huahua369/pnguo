@@ -214,6 +214,7 @@ struct NormalInfo {
 #ifdef __cplusplus
 PerFrame myPerFrame;
 mat4 myPerObject_u_mCurrWorld;
+mat3 u_matuv[1];
 pbrMaterial u_pbrParams;
 #else
 layout(set = 0, binding = 0) uniform perFrame
@@ -228,6 +229,15 @@ layout(set = 0, binding = 1) uniform perObject
 
 	pbrMaterial u_pbrParams;
 };
+
+
+#ifdef ID_MATUV_DATA
+// UV矩阵的数据
+layout(set = 0, binding = ID_MATUV_DATA) buffer per_u_matuv
+{
+	mat3 u_matuv[];
+};
+#endif
 #endif // __cplusplus
 
 
@@ -368,16 +378,16 @@ vec2 getNormalUV(VS2PS Input)
 #else
 #ifdef ID_normalTexCoord
 	uv.xy = TEXCOORD(ID_normalTexCoord);
-#ifdef HAS_NORMAL_UV_TRANSFORM
-	uv *= u_pbrParams.uvTransform;
+#ifdef UVT_normalTexture
+	uv = u_matuv[UVT_normalTexture] * uv;//u_pbrParams.uvTransform;
 #endif
 #endif
 	return uv.xy;
 #endif
 }
 
-#if 0
-
+#if 1
+//.
 vec2 getEmissiveUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
@@ -386,14 +396,14 @@ vec2 getEmissiveUV(VS2PS Input)
 #else
 #ifdef ID_emissiveTexCoord
 	uv.xy = TEXCOORD(ID_emissiveTexCoord);
-#ifdef HAS_EMISSIVE_UV_TRANSFORM
-	uv *= u_EmissiveUVTransform;
+#ifdef UVT_emissiveTexture
+	uv = u_matuv[UVT_emissiveTexture] * uv;//u_EmissiveUVTransform;
 #endif
 #endif
 	return uv.xy;
 #endif
 }
-
+//.
 vec2 getOcclusionUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
@@ -402,14 +412,14 @@ vec2 getOcclusionUV(VS2PS Input)
 #else
 #ifdef ID_occlusionTexCoord
 	uv.xy = TEXCOORD(ID_occlusionTexCoord);
-#ifdef HAS_OCCLSION_UV_TRANSFORM
-	uv *= u_OcclusionUVTransform;
+#ifdef UVT_occlusionTexture
+	uv = u_matuv[UVT_occlusionTexture] * uv;// u_OcclusionUVTransform;
 #endif
 #endif
 	return uv.xy;
 #endif
 }
-
+//.
 vec2 getBaseColorUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
@@ -418,14 +428,14 @@ vec2 getBaseColorUV(VS2PS Input)
 #else
 #ifdef ID_baseTexCoord
 	uv.xy = TEXCOORD(ID_baseTexCoord);
-#ifdef HAS_BASECOLOR_UV_TRANSFORM
-	uv *= u_BaseColorUVTransform;
+#ifdef UVT_baseColorTexture
+	uv = u_matuv[UVT_baseColorTexture] * uv;
 #endif
 #endif
 	return uv.xy;
 #endif
 }
-
+//.
 vec2 getMetallicRoughnessUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
@@ -434,14 +444,14 @@ vec2 getMetallicRoughnessUV(VS2PS Input)
 #else
 #ifdef ID_metallicRoughnessTexCoord
 	uv.xy = TEXCOORD(ID_metallicRoughnessTexCoord);
-#ifdef HAS_METALLICROUGHNESS_UV_TRANSFORM
-	uv *= u_MetallicRoughnessUVTransform;
+#ifdef UVT_metallicRoughnessTexture
+	uv = u_matuv[UVT_metallicRoughnessTexture] * uv;
 #endif
 #endif
 	return uv.xy;
 #endif 
 }
-
+//.
 vec2 getSpecularGlossinessUV(VS2PS Input)
 {
 	vec3 uv = vec3(0.0, 0.0, 1.0);
@@ -451,7 +461,7 @@ vec2 getSpecularGlossinessUV(VS2PS Input)
 #ifdef ID_specularGlossinessTexture
 	uv.xy = TEXCOORD(ID_specularGlossinessTexCoord);
 #ifdef HAS_SPECULARGLOSSINESS_UV_TRANSFORM
-	uv *= u_SpecularGlossinessUVTransform;
+	uv = u_SpecularGlossinessUVTransform * uv;
 #endif
 #endif
 	return uv.xy;
@@ -467,7 +477,7 @@ vec2 getDiffuseUV(VS2PS Input)
 #ifdef ID_diffuseTexture
 	uv.xy = TEXCOORD(ID_diffuseTexCoord);
 #ifdef HAS_DIFFUSE_UV_TRANSFORM
-	uv *= u_DiffuseUVTransform;
+	uv = u_DiffuseUVTransform * uv;
 #endif
 #endif
 	return uv.xy;
@@ -477,6 +487,7 @@ vec2 getDiffuseUV(VS2PS Input)
 vec4 getBaseColorTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_baseColorTexture
+	uv = getBaseColorUV(Input);
 	return texture(u_BaseColorSampler, uv, myPerFrame.u_LodBias);
 #else
 	return vec4(1, 1, 1, 1); //OPAQUE
@@ -486,6 +497,7 @@ vec4 getBaseColorTexture(VS2PS Input, vec2 uv)
 vec4 getDiffuseTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_diffuseTexture
+	uv = getDiffuseUV(Input);
 	return texture(u_diffuseSampler, uv, myPerFrame.u_LodBias);
 #else
 	return vec4(1, 1, 1, 1);
@@ -495,6 +507,7 @@ vec4 getDiffuseTexture(VS2PS Input, vec2 uv)
 vec4 getMetallicRoughnessTexture(VS2PS Input, vec2 uv)
 {
 #ifdef ID_metallicRoughnessTexture
+	uv = getMetallicRoughnessUV(Input);
 	return texture(u_MetallicRoughnessSampler, uv, myPerFrame.u_LodBias);
 #else 
 	return vec4(1, 1, 1, 1);
@@ -503,7 +516,8 @@ vec4 getMetallicRoughnessTexture(VS2PS Input, vec2 uv)
 
 vec4 getSpecularGlossinessTexture(VS2PS Input, vec2 uv)
 {
-#ifdef ID_specularGlossinessTexture    
+#ifdef ID_specularGlossinessTexture  
+	uv = getSpecularGlossinessUV(Input);
 	return texture(u_specularGlossinessSampler, uv, myPerFrame.u_LodBias);
 #else 
 	return vec4(1, 1, 1, 1);
@@ -1371,9 +1385,26 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 	vec4 textureSample = vec4(1.0);
 #ifdef  ID_specularCube
 #ifdef ID_MATUV_DATA
+	// todo ID_specularCube
 	reflection = u_matuv[0] * reflection;
 #endif // ID_MATUV_DATA
 	textureSample = textureLod(u_SpecularEnvSampler, reflection, lod);//u_pbrParams.envRotation * reflection, lod);
+#endif
+#ifndef __cplusplus
+	textureSample.rgb *= u_pbrParams.envIntensity;
+#endif // __cplusplus
+
+	return textureSample;
+}
+vec4 getSheenSample(vec3 reflection, float lod)
+{
+	vec4 textureSample = vec4(1.0);
+#ifdef  ID_CharlieEnvSampler
+#ifdef ID_MATUV_DATA
+	// todo ID_specularCube
+	reflection = u_matuv[0] * reflection;
+#endif // ID_MATUV_DATA
+	textureSample = textureLod(u_CharlieEnvSampler, reflection, lod);//u_pbrParams.envRotation * reflection, lod);
 #endif
 #ifndef __cplusplus
 	textureSample.rgb *= u_pbrParams.envIntensity;
@@ -2376,13 +2407,13 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	float ao = 1.0;
 	// Apply optional PBR terms for additional (optional) shading
 #ifdef ID_occlusionTexture
-	ao = texture(u_OcclusionSampler, uv).r;// getOcclusionUV(Input)).r;
+	ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
 	color = color * ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
 #endif
 
 	vec3 emissive = vec3(0);
 #ifdef ID_emissiveTexture
-	emissive = (texture(u_EmissiveSampler, uv)).rgb * u_pbrParams.emissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
+	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.emissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
 #else
 	emissive = u_pbrParams.emissiveFactor * perFrame.u_EmissiveFactor;
 #endif
