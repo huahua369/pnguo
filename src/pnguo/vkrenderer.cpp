@@ -12992,6 +12992,7 @@ namespace vkr {
 		//compute hash
 		// 
 		size_t hash;
+		size_t pslen = strlen(pshader);
 		auto sf = (GetShaderCompilerLibDir() + "\\");
 		hash = HashShaderString(sf.c_str(), pshader);
 		hash = Hash(pShaderEntryPoint, strlen(pShaderEntryPoint), hash);

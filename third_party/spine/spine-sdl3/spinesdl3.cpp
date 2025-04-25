@@ -1,4 +1,6 @@
-
+﻿/*
+2D动画后端
+*/
 #include <spine/spine.h>
 
 #include <SDL3/SDL.h>
@@ -616,5 +618,236 @@ void testdraw(void* renderer)
 
 	}
 }
+
+
+enum INHERIT {
+	E_INHERIT_NORMAL,
+	E_INHERIT_ONLYTRANSLATION,
+	E_INHERIT_NOROTATIONORREFLECTION,
+	E_INHERIT_NOSCALE,
+	E_INHERIT_NOSCALEORREFLECTION
+};
+
+struct BoneData {
+	char* name = 0;
+	BoneData* parent = 0;
+	const char* icon = 0;
+	int index = 0;
+	float length = 0;
+	float x, y, rotation, scaleX, scaleY, shearX, shearY;
+	uint32_t color;
+	uint8_t inherit;
+	bool skinRequired;
+	bool visible;
+};
+enum sBlendMode {
+	E_BLEND_MODE_NORMAL, E_BLEND_MODE_ADDITIVE, E_BLEND_MODE_MULTIPLY, E_BLEND_MODE_SCREEN
+};
+// 可选
+struct SlotData {
+	int index;
+	char* name;
+	BoneData* boneData;
+	char* attachmentName;
+	uint32_t color;
+	uint32_t* darkColor;
+	int8_t blendMode;
+	bool visible;
+};
+struct IkConstraintData {
+	char* name;
+	int order;
+	int bonesCount;
+	BoneData** bones;
+	BoneData* target;
+	int bendDirection;
+	float mix;
+	float softness;
+	bool skinRequired;
+	bool compress;
+	bool stretch;
+	bool uniform;
+};
+struct TransformConstraintData {
+	char* name;
+	int order;
+	int bonesCount;
+	BoneData** bones;
+	BoneData* target;
+	float mixRotate, mixX, mixY, mixScaleX, mixScaleY, mixShearY;
+	float offsetRotation, offsetX, offsetY, offsetScaleX, offsetScaleY, offsetShearY;
+	bool skinRequired;
+	bool relative;
+	bool local;
+};
+
+//typedef enum {
+//	E_POSITION_MODE_FIXED, E_POSITION_MODE_PERCENT
+//} spPositionMode;
+//
+//typedef enum {
+//	E_SPACING_MODE_LENGTH, E_SPACING_MODE_FIXED, E_SPACING_MODE_PERCENT, E_SPACING_MODE_PROPORTIONAL
+//} spSpacingMode;
+//
+//typedef enum {
+//	E_ROTATE_MODE_TANGENT, E_ROTATE_MODE_CHAIN, E_ROTATE_MODE_CHAIN_SCALE
+//} spRotateMode;
+
+struct PathConstraintData {
+	char* name;
+	int order;
+	int bonesCount;
+	BoneData** bones;
+	SlotData* target;
+	bool skinRequired;
+	int8_t positionMode;
+	int8_t spacingMode;
+	int8_t rotateMode;
+	float offsetRotation;
+	float position, spacing;
+	float mixRotate, mixX, mixY;
+};
+
+struct Skin {
+	char* name;
+	spBoneDataArray* bones;
+	spIkConstraintDataArray* ikConstraints;
+	spTransformConstraintDataArray* transformConstraints;
+	spPathConstraintDataArray* pathConstraints;
+	spPhysicsConstraintDataArray* physicsConstraints;
+	uint32_t color;
+};
+
+enum AttachmentType {
+	E_ATTACHMENT_REGION,//
+	E_ATTACHMENT_BOUNDING_BOX,//
+	E_ATTACHMENT_MESH,//
+	E_ATTACHMENT_LINKED_MESH,
+	E_ATTACHMENT_PATH,//
+	E_ATTACHMENT_POINT,//
+	E_ATTACHMENT_CLIPPING//
+};
+
+struct Attachment {
+	char* name;
+	int type;
+	const void* vtable;
+	int refCount;
+	struct spAttachmentLoader* attachmentLoader;
+};
+struct RegionAttachment {
+	Attachment super;
+	char* path;
+	float x, y, scaleX, scaleY, rotation, width, height;
+	uint32_t color;
+
+	void* rendererObject;
+	spTextureRegion* region;
+	spSequence* sequence;
+
+	float offset[8];
+	float uvs[8];
+};
+struct VertexAttachment {
+	Attachment super;
+	int bonesCount;
+	int* bones;
+	int verticesCount;
+	float* vertices;
+	int worldVerticesLength;
+	Attachment* timelineAttachment;
+	int id;
+};
+struct BoundingBoxAttachment {
+	VertexAttachment super;
+	uint32_t color;
+};
+struct MeshAttachment {
+	VertexAttachment super;
+
+	void* rendererObject;
+	spTextureRegion* region;
+	spSequence* sequence;
+
+	char* path;
+
+	float* regionUVs;
+	float* uvs;
+
+	int trianglesCount;
+	unsigned short* triangles;
+
+	uint32_t color;
+
+	int hullLength;
+
+	MeshAttachment* parentMesh;
+
+	/* Nonessential. */
+	int edgesCount;
+	unsigned short* edges;
+	float width, height;
+};
+struct PathAttachment {
+	VertexAttachment super;
+	int lengthsLength;
+	float* lengths;
+	int/*bool*/ closed, constantSpeed;
+	uint32_t color;
+};
+struct PointAttachment {
+	Attachment super;
+	float x, y, rotation;
+	uint32_t color;
+};
+struct ClippingAttachment {
+	VertexAttachment super;
+	SlotData* endSlot;
+	uint32_t color;
+};
+
+
+// 皮肤可选
+
+struct SkeletonData {
+	char* version;
+	char* hash;
+	float x, y, width, height;
+	float referenceScale;
+	float fps;
+	const char* imagesPath;
+	const char* audioPath;
+
+	int stringsCount;
+	char** strings;
+
+	int bonesCount;
+	BoneData** bones;
+
+	int slotsCount;
+	SlotData** slots;
+
+	int skinsCount;
+	Skin** skins;
+	Skin* defaultSkin;
+
+	int eventsCount;
+	spEventData** events;
+
+	int animationsCount;
+	spAnimation** animations;
+
+	int ikConstraintsCount;
+	spIkConstraintData** ikConstraints;
+
+	int transformConstraintsCount;
+	spTransformConstraintData** transformConstraints;
+
+	int pathConstraintsCount;
+	spPathConstraintData** pathConstraints;
+
+	int physicsConstraintsCount;
+	spPhysicsConstraintData** physicsConstraints;
+};
 
 #endif // !SRC_LIBSRC

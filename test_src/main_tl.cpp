@@ -664,7 +664,7 @@ int main()
 	d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
 	d2->set_pos(0, 600, 650);
 	d2->set_pos(1, 300, 650);
-	  
+
 	{
 		njson j = hz::read_json(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)");
 		const char* kname[] = { "skeleton","bones","slots","ik","skins","transform","animations","events" };
@@ -715,7 +715,7 @@ int main()
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
- 
+
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
 		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
 		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
