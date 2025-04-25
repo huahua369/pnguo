@@ -807,7 +807,7 @@ struct ClippingAttachment {
 };
 
 
-// 皮肤可选
+// 皮肤数据
 
 struct SkeletonData {
 	char* version;
