@@ -3,7 +3,18 @@
 */
 #include <spine/spine.h>
 
+//#define MAPVIEW
+#ifndef _WIN32 
+#include <unistd.h>  
+#include <sys/mman.h>
+#include <sys/types.h>  
+#include <sys/stat.h> 
+#include <fcntl.h>
+#endif
+#include <io.h>
+ 
 #include <SDL3/SDL.h>
+#include <set>
 #include "spinesdl3.h"
 
 #include <nlohmann/json.hpp>
@@ -585,6 +596,116 @@ void sp_drawable::update_draw(double deltaTime)
 			spSkeletonDrawable_draw(drawable, (SDL_Renderer*)renderer);
 		}
 	}
+}
+
+void sp_drawable::add_pre(const std::string& atlas, const std::string& ske, float scale, float defaultMix)
+{
+	able_t a = { atlas, ske, scale, defaultMix };
+	if (access(atlas.c_str(), 4) + access(ske.c_str(), 4) == 0)
+	{
+		vable.push_back(a);
+	}
+}
+
+void sp_drawable::add_pre_pkg(const std::string& pkgfn)
+{
+#ifdef _MFILE_
+	{
+		hz::mfile_t m;
+		auto d = m.open_d(pkgfn, true);
+		if (d)
+		{
+			add_pre_pkg_data(d, m.size());
+		}
+	}
+#endif
+}
+
+void sp_drawable::add_pre_pkg_data(const char* data, size_t len)
+{
+
+}
+
+void sp_drawable::build_pre()
+{
+	if (vable.empty())return;
+	std::map<std::string, spAtlas*> ats;
+
+	spSkeletonDrawable* drawable = 0;
+	spAtlas* atlas = 0;
+	spSkeletonData* skeletonData = 0;
+	spAnimationStateData* animationStateData = 0;
+
+	for (auto& it : vable)
+	{
+		if (access(it.atlas.c_str(), 4) == 0)
+		{
+			auto& kt = ats[it.atlas];
+			if (!kt)
+			{
+				page_obj_t pot = { renderer };
+				atlas = spAtlas_createFromFile(it.atlas.c_str(), &pot);
+				if (atlas)
+				{
+					kt = atlas;
+				}
+			}
+		}
+	}
+	for (auto& it : vable)
+	{
+		skeletonData = 0;
+		auto& kt = ats[it.atlas];
+		if (access(it.ske.c_str(), 4) == 0 && kt)
+		{
+			bool isbin = false;
+			std::string jd;
+			int ske_length = 0;
+			auto ske_data = _spUtil_readFile(it.ske.c_str(), &ske_length);
+			if (ske_data[0] == '{')
+			{
+				jd.assign(ske_data, ske_length); ske_length++;
+				_spFree(ske_data); ske_data = 0;
+				spSkeletonJson* json = spSkeletonJson_create(kt);
+				if (json) {
+					json->scale = it.scale;
+					skeletonData = spSkeletonJson_readSkeletonData(json, jd.c_str());
+					spSkeletonJson_dispose(json);
+				}
+			}
+			if (!skeletonData)
+			{
+				auto sb = spSkeletonBinary_create(kt);
+				if (sb) {
+					sb->scale = it.scale;
+					skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske_data, ske_length);
+					spSkeletonBinary_dispose(sb);
+					isbin = true;
+				}
+			}
+			if (!skeletonData)continue;
+			spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
+			if (animationStateData) {
+				animationStateData->defaultMix = it.defaultMix;
+				auto drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
+				if (drawable)
+				{
+					drawable->usePremultipliedAlpha = -1;
+					spSkeleton_setToSetupPose(drawable->skeleton);
+					spSkeletonDrawable_update(drawable, 0, SP_PHYSICS_UPDATE);
+					// 创建成功
+				}
+				else {
+					spSkeletonData_dispose(skeletonData);
+					spAnimationStateData_dispose(animationStateData);
+				}
+			}
+			else {
+				spSkeletonData_dispose(skeletonData);
+			}
+		}
+	}
+	vable.clear();
 }
 
 void testdraw(void* renderer)

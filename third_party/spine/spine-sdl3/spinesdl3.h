@@ -20,8 +20,16 @@ public:
 		void* animationStateData = 0;
 		bool visible = true;
 	};
-	void* renderer = 0; 
+	void* renderer = 0;
 	std::vector<sp_obj_c> drawables;
+	struct able_t
+	{
+		std::string atlas;
+		std::string ske;
+		float scale = 0.5f;
+		float defaultMix = 0.2f;
+	};
+	std::vector<able_t> vable;
 public:
 	sp_drawable();
 	~sp_drawable();
@@ -37,6 +45,11 @@ public:
 	void set_pos(size_t idx, int x, int y);
 	void get_anim_name(size_t idx, std::vector<char*>* v);
 	void update_draw(double deltaTime);
+
+	void add_pre(const std::string& atlas, const std::string& ske, float scale = 0.5f, float defaultMix = 0.2f);
+	void add_pre_pkg(const std::string& pkgfn);
+	void add_pre_pkg_data(const char* data, size_t len);
+	void build_pre();
 private:
 
 };
