@@ -15,9 +15,7 @@ class sp_drawable
 public:
 	struct sp_obj_c {
 		void* drawable = 0;
-		void* atlas = 0;
-		void* skeletonData = 0;
-		void* animationStateData = 0;
+		void* atlas = 0; 
 		bool visible = true;
 	};
 	void* renderer = 0;
@@ -45,13 +43,31 @@ public:
 	void set_pos(size_t idx, int x, int y);
 	void get_anim_name(size_t idx, std::vector<char*>* v);
 	void update_draw(double deltaTime);
-
-	void add_pre(const std::string& atlas, const std::string& ske, float scale = 0.5f, float defaultMix = 0.2f);
-	void add_pre_pkg(const std::string& pkgfn);
-	void add_pre_pkg_data(const char* data, size_t len);
-	void build_pre();
+	 
 private:
 
 };
+
+class drawable2d_cx
+{
+public: 
+	struct obj_c {
+		void* drawable = 0;
+		void* skeletonData = 0;
+		void* animationStateData = 0;
+		bool visible = true;
+	};
+	void* atlas = 0;
+	void* renderer = 0;
+	std::vector<obj_c> vable;
+public:
+	drawable2d_cx();
+	~drawable2d_cx();
+
+private:
+
+};
+
+
 
 #endif // !SPSDL3_H

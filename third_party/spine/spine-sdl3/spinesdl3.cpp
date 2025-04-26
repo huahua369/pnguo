@@ -12,7 +12,7 @@
 #include <fcntl.h>
 #endif
 #include <io.h>
- 
+
 #include <SDL3/SDL.h>
 #include <set>
 #include "spinesdl3.h"
@@ -37,7 +37,6 @@ extern "C" {
 		spSkeleton* skeleton;
 		spAnimationState* animationState;
 		int usePremultipliedAlpha;
-
 		spSkeletonClipping* clipper;
 		spFloatArray* worldVertices;
 		spSdlVertexArray* sdlVertices;
@@ -80,6 +79,8 @@ spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAn
 }
 
 void spSkeletonDrawable_dispose(spSkeletonDrawable* self) {
+	spSkeletonData_dispose(self->skeleton->data); //self->animationState->data->skeletonData;
+	spAnimationStateData_dispose(self->animationState->data);
 	spSkeleton_dispose(self->skeleton);
 	spAnimationState_dispose(self->animationState);
 	spIntArray_dispose(self->sdlIndices);
@@ -298,18 +299,13 @@ char* _spUtil_readFile(const char* path, int* length) {
 	return _spReadFile(path, length);
 }
 
-
 struct sp_obj {
 	spSkeletonDrawable* drawable = 0;
 	spAtlas* atlas = 0;
-	spSkeletonData* skeletonData = 0;
-	spAnimationStateData* animationStateData = 0;
 	bool visible = true;
 };
 void dispose_spobj(sp_obj* p) {
 	spAtlas_dispose(p->atlas);
-	spAnimationStateData_dispose(p->animationStateData);
-	spSkeletonData_dispose(p->skeletonData);
 	spSkeletonDrawable_dispose(p->drawable);
 }
 
@@ -422,6 +418,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 	c.atlas = spAtlas_createFromFile(atlasf.c_str(), &pot);
 	bool isbin = false;
 	std::string jd;
+	spSkeletonData* skeletonData = 0;
 	if (ske_data[0] == '{')
 	{
 		jd.assign(ske_data, ske_length); ske_length++;
@@ -429,25 +426,24 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 		spSkeletonJson* json = spSkeletonJson_create(c.atlas);
 		if (json) {
 			json->scale = scale;
-			c.skeletonData = spSkeletonJson_readSkeletonData(json, jd.c_str());
+			skeletonData = spSkeletonJson_readSkeletonData(json, jd.c_str());
 			spSkeletonJson_dispose(json);
 		}
 	}
-	if (!c.skeletonData)
+	if (!skeletonData)
 	{
 		auto sb = spSkeletonBinary_create(c.atlas);
 		if (sb) {
 			sb->scale = scale;
-			c.skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske_data, ske_length);
+			skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske_data, ske_length);
 			spSkeletonBinary_dispose(sb);
 			isbin = true;
 		}
 	}
-	spAnimationStateData* animationStateData = spAnimationStateData_create(c.skeletonData);
+	spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
 	if (animationStateData) {
-		c.animationStateData = animationStateData;
 		animationStateData->defaultMix = defaultMix;
-		c.drawable = spSkeletonDrawable_create(c.skeletonData, animationStateData);
+		c.drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
 		if (c.drawable)
 		{
 			c.drawable->usePremultipliedAlpha = -1;
@@ -490,25 +486,25 @@ void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float 
 	pot.len = pk["data_length"];
 	c.atlas = spAtlas_create(data + atlas_offset, atlas_len, "", &pot);
 	const char* ske = data + ske_offset;
+	spSkeletonData* skeletonData = 0;
 	if (is_binary)
 	{
 		auto sb = spSkeletonBinary_create(c.atlas);
 		sb->scale = scale;
-		c.skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske, ske_length);
+		skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske, ske_length);
 		spSkeletonBinary_dispose(sb);
 	}
 	else
 	{
 		spSkeletonJson* json = spSkeletonJson_create(c.atlas);
 		json->scale = scale;
-		c.skeletonData = spSkeletonJson_readSkeletonData(json, ske);
+		skeletonData = spSkeletonJson_readSkeletonData(json, ske);
 		spSkeletonJson_dispose(json);
 	}
-	spAnimationStateData* animationStateData = spAnimationStateData_create(c.skeletonData);
+	spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
 	if (animationStateData) {
-		c.animationStateData = animationStateData;
 		animationStateData->defaultMix = defaultMix;
-		c.drawable = spSkeletonDrawable_create(c.skeletonData, animationStateData);
+		c.drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
 		if (c.drawable)
 		{
 			c.drawable->usePremultipliedAlpha = -1;
@@ -598,115 +594,24 @@ void sp_drawable::update_draw(double deltaTime)
 	}
 }
 
-void sp_drawable::add_pre(const std::string& atlas, const std::string& ske, float scale, float defaultMix)
+//void sp_drawable::add_pre(const std::string& atlas, const std::string& ske, float scale, float defaultMix)
+//{
+//	able_t a = { atlas, ske, scale, defaultMix };
+//	if (access(atlas.c_str(), 4) + access(ske.c_str(), 4) == 0)
+//	{
+//		vable.push_back(a);
+//	}
+//}
+// 
+
+drawable2d_cx::drawable2d_cx()
 {
-	able_t a = { atlas, ske, scale, defaultMix };
-	if (access(atlas.c_str(), 4) + access(ske.c_str(), 4) == 0)
-	{
-		vable.push_back(a);
-	}
 }
 
-void sp_drawable::add_pre_pkg(const std::string& pkgfn)
+drawable2d_cx::~drawable2d_cx()
 {
-#ifdef _MFILE_
-	{
-		hz::mfile_t m;
-		auto d = m.open_d(pkgfn, true);
-		if (d)
-		{
-			add_pre_pkg_data(d, m.size());
-		}
-	}
-#endif
 }
 
-void sp_drawable::add_pre_pkg_data(const char* data, size_t len)
-{
-
-}
-
-void sp_drawable::build_pre()
-{
-	if (vable.empty())return;
-	std::map<std::string, spAtlas*> ats;
-
-	spSkeletonDrawable* drawable = 0;
-	spAtlas* atlas = 0;
-	spSkeletonData* skeletonData = 0;
-	spAnimationStateData* animationStateData = 0;
-
-	for (auto& it : vable)
-	{
-		if (access(it.atlas.c_str(), 4) == 0)
-		{
-			auto& kt = ats[it.atlas];
-			if (!kt)
-			{
-				page_obj_t pot = { renderer };
-				atlas = spAtlas_createFromFile(it.atlas.c_str(), &pot);
-				if (atlas)
-				{
-					kt = atlas;
-				}
-			}
-		}
-	}
-	for (auto& it : vable)
-	{
-		skeletonData = 0;
-		auto& kt = ats[it.atlas];
-		if (access(it.ske.c_str(), 4) == 0 && kt)
-		{
-			bool isbin = false;
-			std::string jd;
-			int ske_length = 0;
-			auto ske_data = _spUtil_readFile(it.ske.c_str(), &ske_length);
-			if (ske_data[0] == '{')
-			{
-				jd.assign(ske_data, ske_length); ske_length++;
-				_spFree(ske_data); ske_data = 0;
-				spSkeletonJson* json = spSkeletonJson_create(kt);
-				if (json) {
-					json->scale = it.scale;
-					skeletonData = spSkeletonJson_readSkeletonData(json, jd.c_str());
-					spSkeletonJson_dispose(json);
-				}
-			}
-			if (!skeletonData)
-			{
-				auto sb = spSkeletonBinary_create(kt);
-				if (sb) {
-					sb->scale = it.scale;
-					skeletonData = spSkeletonBinary_readSkeletonData(sb, (uint8_t*)ske_data, ske_length);
-					spSkeletonBinary_dispose(sb);
-					isbin = true;
-				}
-			}
-			if (!skeletonData)continue;
-			spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
-			if (animationStateData) {
-				animationStateData->defaultMix = it.defaultMix;
-				auto drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
-				if (drawable)
-				{
-					drawable->usePremultipliedAlpha = -1;
-					spSkeleton_setToSetupPose(drawable->skeleton);
-					spSkeletonDrawable_update(drawable, 0, SP_PHYSICS_UPDATE);
-					// 创建成功
-				}
-				else {
-					spSkeletonData_dispose(skeletonData);
-					spAnimationStateData_dispose(animationStateData);
-				}
-			}
-			else {
-				spSkeletonData_dispose(skeletonData);
-			}
-		}
-	}
-	vable.clear();
-}
 
 void testdraw(void* renderer)
 {
