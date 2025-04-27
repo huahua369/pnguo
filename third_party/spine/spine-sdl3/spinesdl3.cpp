@@ -30,20 +30,20 @@ using njson0 = nlohmann::ordered_json;	// key无序
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-	_SP_ARRAY_DECLARE_TYPE(spSdlVertexArray, struct SDL_Vertex)
-
-		typedef struct spSkeletonDrawable {
+	struct spSdlVertexArray;
+	typedef struct spSkeletonDrawable {
 		spSkeleton* skeleton;
 		spAnimationState* animationState;
-		int usePremultipliedAlpha;
 		spSkeletonClipping* clipper;
 		spFloatArray* worldVertices;
 		spSdlVertexArray* sdlVertices;
 		spIntArray* sdlIndices;
+		int8_t usePremultipliedAlpha;
+		int8_t ownsAnimationStateData;
+		int8_t ownsSkeletonData;
 	} spSkeletonDrawable;
 
-	SP_API spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAnimationStateData* animationStateData);
+	SP_API spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAnimationStateData* animationStateData, int ownsSkeletonData, float defaultMix);
 
 	SP_API void spSkeletonDrawable_dispose(spSkeletonDrawable* self);
 
@@ -51,6 +51,7 @@ extern "C" {
 
 	SP_API void spSkeletonDrawable_draw(spSkeletonDrawable* self, struct SDL_Renderer* renderer);
 
+	_SP_ARRAY_DECLARE_TYPE(spSdlVertexArray, struct SDL_Vertex)
 #ifdef __cplusplus
 }
 #endif
@@ -65,10 +66,23 @@ extern "C" {
 
 _SP_ARRAY_IMPLEMENT_TYPE_NO_CONTAINS(spSdlVertexArray, SDL_Vertex)
 
-spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAnimationStateData* animationStateData) {
+spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAnimationStateData* animationStateData, int ownsSkeletonData, float defaultMix) {
 	spBone_setYDown(-1);
 	spSkeletonDrawable* self = NEW(spSkeletonDrawable);
 	self->skeleton = spSkeleton_create(skeletonData);
+	self->ownsAnimationStateData = animationStateData ? 0 : 1;
+	if (self->ownsAnimationStateData)
+	{
+		animationStateData = spAnimationStateData_create(skeletonData);
+	}
+	if (!animationStateData)
+	{
+		spSkeleton_dispose(self->skeleton);
+		FREE(self);
+		return 0;
+	}
+	animationStateData->defaultMix = defaultMix;
+	self->ownsSkeletonData = ownsSkeletonData;
 	self->animationState = spAnimationState_create(animationStateData);
 	self->usePremultipliedAlpha = 0;
 	self->sdlIndices = spIntArray_create(12);
@@ -79,8 +93,14 @@ spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAn
 }
 
 void spSkeletonDrawable_dispose(spSkeletonDrawable* self) {
-	spSkeletonData_dispose(self->skeleton->data); //self->animationState->data->skeletonData;
-	spAnimationStateData_dispose(self->animationState->data);
+	if (self->ownsAnimationStateData)
+	{
+		spAnimationStateData_dispose(self->animationState->data);
+	}
+	if (self->ownsSkeletonData)
+	{
+		spSkeletonData_dispose(self->skeleton->data);
+	}
 	spSkeleton_dispose(self->skeleton);
 	spAnimationState_dispose(self->animationState);
 	spIntArray_dispose(self->sdlIndices);
@@ -197,42 +217,31 @@ void spSkeletonDrawable_draw(spSkeletonDrawable* self, struct SDL_Renderer* rend
 		spIntArray_clear(self->sdlIndices);
 		for (int ii = 0; ii < (int)indicesCount; ii++)
 			spIntArray_add(self->sdlIndices, indices[ii]);
-
-		if (!self->usePremultipliedAlpha) {
-			switch (slot->data->blendMode) {
-			case SP_BLEND_MODE_NORMAL:
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-				break;
-			case SP_BLEND_MODE_MULTIPLY:
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_MOD);
-				break;
-			case SP_BLEND_MODE_ADDITIVE:
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_ADD);
-				break;
-			case SP_BLEND_MODE_SCREEN:
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-				break;
-			}
-		}
-		else {
-			SDL_BlendMode target;
-			switch (slot->data->blendMode) {
-			case SP_BLEND_MODE_NORMAL:
-				target = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD);
-				SDL_SetTextureBlendMode(texture, target);
-				break;
-			case SP_BLEND_MODE_MULTIPLY:
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_MOD);
-				break;
-			case SP_BLEND_MODE_ADDITIVE:
-				target = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD);
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_ADD);
-				break;
-			case SP_BLEND_MODE_SCREEN:
-				target = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD);
-				SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-				break;
-			}
+#if 0
+#define SDL_BLENDMODE_NONE                  0x00000000u /**< no blending: dstRGBA = srcRGBA */
+#define SDL_BLENDMODE_BLEND                 0x00000001u /**< alpha blending: dstRGB = (srcRGB * srcA) + (dstRGB * (1-srcA)), dstA = srcA + (dstA * (1-srcA)) */
+#define SDL_BLENDMODE_BLEND_PREMULTIPLIED   0x00000010u /**< pre-multiplied alpha blending: dstRGBA = srcRGBA + (dstRGBA * (1-srcA)) */
+#define SDL_BLENDMODE_ADD                   0x00000002u /**< additive blending: dstRGB = (srcRGB * srcA) + dstRGB, dstA = dstA */
+#define SDL_BLENDMODE_ADD_PREMULTIPLIED     0x00000020u /**< pre-multiplied additive blending: dstRGB = srcRGB + dstRGB, dstA = dstA */
+#define SDL_BLENDMODE_MOD                   0x00000004u /**< color modulate: dstRGB = srcRGB * dstRGB, dstA = dstA */
+#define SDL_BLENDMODE_MUL                   0x00000008u /**< color multiply: dstRGB = (srcRGB * dstRGB) + (dstRGB * (1-srcA)), dstA = dstA */
+#define SDL_BLENDMODE_INVALID               0x7FFFFFFFu
+#endif
+		static SDL_BlendMode screen = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD);
+		bool pma0 = self->usePremultipliedAlpha == 0;
+		switch (slot->data->blendMode) {
+		case SP_BLEND_MODE_NORMAL:
+			SDL_SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED);
+			break;
+		case SP_BLEND_MODE_MULTIPLY:
+			SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_MOD);
+			break;
+		case SP_BLEND_MODE_ADDITIVE:
+			SDL_SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_ADD_PREMULTIPLIED);
+			break;
+		case SP_BLEND_MODE_SCREEN:
+			SDL_SetTextureBlendMode(texture, screen);// SDL_BLENDMODE_BLEND);
+			break;
 		}
 
 		SDL_RenderGeometry(renderer, texture, self->sdlVertices->items, self->sdlVertices->size, self->sdlIndices->items,
@@ -440,13 +449,11 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 			isbin = true;
 		}
 	}
-	spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
-	if (animationStateData) {
-		animationStateData->defaultMix = defaultMix;
-		c.drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
+	{
+		c.drawable = spSkeletonDrawable_create(skeletonData, 0, 1, defaultMix);
 		if (c.drawable)
 		{
-			c.drawable->usePremultipliedAlpha = -1;
+			c.drawable->usePremultipliedAlpha = 0;
 			spSkeleton_setToSetupPose(c.drawable->skeleton);
 			spSkeletonDrawable_update(c.drawable, 0, SP_PHYSICS_UPDATE);
 			drawables.push_back(*((sp_obj_c*)&c));
@@ -455,9 +462,6 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 				// 打包
 				packages_b(package_file, pot._texs, atlas_length, ske_length, atlas_data, ske_data ? ske_data : jd.c_str(), isbin);
 			}
-		}
-		else {
-			spAnimationStateData_dispose(animationStateData);
 		}
 	}
 	if (atlas_data)
@@ -501,17 +505,13 @@ void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float 
 		skeletonData = spSkeletonJson_readSkeletonData(json, ske);
 		spSkeletonJson_dispose(json);
 	}
-	spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
-	if (animationStateData) {
-		animationStateData->defaultMix = defaultMix;
-		c.drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
-		if (c.drawable)
-		{
-			c.drawable->usePremultipliedAlpha = -1;
-			spSkeleton_setToSetupPose(c.drawable->skeleton);
-			spSkeletonDrawable_update(c.drawable, 0, SP_PHYSICS_UPDATE);
-			drawables.push_back(*((sp_obj_c*)&c));
-		}
+	c.drawable = spSkeletonDrawable_create(skeletonData, 0, true, defaultMix);
+	if (c.drawable)
+	{
+		c.drawable->usePremultipliedAlpha = 0;
+		spSkeleton_setToSetupPose(c.drawable->skeleton);
+		spSkeletonDrawable_update(c.drawable, 0, SP_PHYSICS_UPDATE);
+		drawables.push_back(*((sp_obj_c*)&c));
 	}
 }
 
@@ -622,7 +622,7 @@ void testdraw(void* renderer)
 	spSkeletonData* skeletonData = spSkeletonJson_readSkeletonDataFile(json, "data/spineboy-pro.json");
 	spAnimationStateData* animationStateData = spAnimationStateData_create(skeletonData);
 	animationStateData->defaultMix = 0.2f;
-	spSkeletonDrawable* drawable = spSkeletonDrawable_create(skeletonData, animationStateData);
+	spSkeletonDrawable* drawable = spSkeletonDrawable_create(skeletonData, animationStateData, 1, 0.2f);
 	drawable->skeleton->x = 400;
 	drawable->skeleton->y = 500;
 	spSkeleton_setToSetupPose(drawable->skeleton);

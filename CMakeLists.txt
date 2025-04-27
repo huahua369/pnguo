@@ -48,8 +48,13 @@ set(CBT "Release")
 endif() 
 
 message("stb路径 ${Stb_DIR}")
-message("type--${CMAKE_BUILD_TYPE}")
-message("type  --${VCPKG_TARGET_TRIPLET}")
+message("b_type--${CMAKE_BUILD_TYPE}")
+message("tt_type  --${VCPKG_TARGET_TRIPLET}") 
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) 
+endif()
+message("ab_type--${CMAKE_INTERPROCEDURAL_OPTIMIZATION}")
 
 if(CMAKE_HOST_WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")

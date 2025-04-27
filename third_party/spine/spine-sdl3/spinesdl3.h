@@ -1,6 +1,11 @@
 ﻿/*
 	2d渲染器
-
+	{
+		"atlas":[数据索引],
+		"ske":[数据索引],
+		"drawable":[{"atlas","ske",scale,mix}],
+		"data_view":[{"offset","length","type可选0二进制1字符串"}]
+	}
 */
 #ifndef SPSDL3_H
 #define SPSDL3_H
@@ -15,7 +20,7 @@ class sp_drawable
 public:
 	struct sp_obj_c {
 		void* drawable = 0;
-		void* atlas = 0; 
+		void* atlas = 0;
 		bool visible = true;
 	};
 	void* renderer = 0;
@@ -43,14 +48,14 @@ public:
 	void set_pos(size_t idx, int x, int y);
 	void get_anim_name(size_t idx, std::vector<char*>* v);
 	void update_draw(double deltaTime);
-	 
+
 private:
 
 };
 
 class drawable2d_cx
 {
-public: 
+public:
 	struct obj_c {
 		void* drawable = 0;
 		void* skeletonData = 0;

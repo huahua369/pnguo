@@ -1256,14 +1256,12 @@ namespace hz {
 					out_stream.seek_func = fseek_func;
 					out_stream.tell_func = ftell_func;
 					out_stream.ud = &fmv;
-
 					flac->FLAC__stream_encoder_init_stream(_encoder, enWriteCallback, enSeekCallback, enTellCallback, enMetadataCallback, &out_stream);
 				}
 				else if (ep->file_path)
 				{
 					flac->FLAC__stream_encoder_init_file(_encoder, ep->file_path, progress_callback, NULL);
 				}
-
 				int bytes_read = 0;
 				const int pcmsize = flac->FLAC__stream_encoder_get_blocksize(_encoder);
 				std::vector<FLAC__int32> pcmv(pcmsize);
