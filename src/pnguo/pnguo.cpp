@@ -8689,7 +8689,7 @@ int path_v::get_expand_flatten(float width, int segments, int type, std::vector<
 	return 0;
 }
 // 判断点是否在多边形内
-int pnpoly_aos(int nvert, const float* verts, float testx, float testy) {
+int pnpoly_aos0(int nvert, const float* verts, float testx, float testy) {
 	int i, j;
 	bool c = 0;
 	for (i = 0, j = nvert - 1; i < nvert; j = i++) {
@@ -8700,7 +8700,7 @@ int pnpoly_aos(int nvert, const float* verts, float testx, float testy) {
 	}
 	return c;
 }
-glm::vec2 pnpoly_aos(int nvert, const glm::vec2* verts, const glm::vec2& test) {
+glm::vec2 pnpoly_aos0(int nvert, const glm::vec2* verts, const glm::vec2& test) {
 	int i, j;
 	bool c = 0;
 	float d = glm::distance2(test, verts[0]);
@@ -8765,7 +8765,7 @@ int path_v::triangulate(int segments, float ml, float ds, bool pccw, std::vector
 			auto& st = tr[i];
 			glm::vec2 ps = it[0];
 			float dis1 = 0;
-			auto bd = pnpoly_aos(n, st.data(), ps);// 返回是否在多边形内、最短距离
+			auto bd = pnpoly_aos0(n, st.data(), ps);// 返回是否在多边形内、最短距离
 			disv.push_back(bd);
 			if (bd.x > 0)
 			{
@@ -9150,7 +9150,7 @@ namespace gp {
 				auto& st = tr[i];
 				glm::vec2 ps = it[0];
 				float dis1 = 0;
-				auto bd = pnpoly_aos(n, st.data(), ps);// 返回是否在多边形内、最短距离
+				auto bd = pnpoly_aos0(n, st.data(), ps);// 返回是否在多边形内、最短距离
 				disv.push_back(bd);
 				if (bd.x > 0)
 				{
@@ -9281,7 +9281,7 @@ namespace gp {
 				auto& st = tr[i];
 				glm::vec2 ps = it[0];
 				float dis1 = 0;
-				auto bd = pnpoly_aos(n, st.data(), ps);// 返回是否在多边形内、最短距离
+				auto bd = pnpoly_aos0(n, st.data(), ps);// 返回是否在多边形内、最短距离
 				disv.push_back(bd);
 				if (bd.x > 0)
 				{
