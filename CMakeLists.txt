@@ -97,10 +97,9 @@ set(SDL_RENDER_D3D12 ON)
 set(SDL_RENDER_GPU ON)
 set(SDL_GPU ON)
 set(SDL_RENDER_VULKAN ON)  
-
 add_subdirectory(third_lib/SDL) 
 else()
-#设置这两个变量或自定义find路径
+#vcpkg安装，或者设置这两个变量或自定义find路径
 #set(SDL3DIR_ROOT "E:/sdk/SDL3/out/install/x64-${CBT}")
 #set(SDL3_DIR "${SDL3DIR_ROOT}/cmake")
 #message("sdl ${SDL3_DIR}")
