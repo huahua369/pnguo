@@ -250,6 +250,7 @@ public:
 	// 支持凹凸多边形、带孔洞
 	void ConcavePolyFilled(const glm::vec2* points, const int* points_count, int count, draw_path_info_t* dp);
 	void PrimReserve(int idx_count, int vtx_count);
+	void add_cmd(void* tex, const glm::ivec4& clip_rect, bool clipintersect_with_current_clip_rect);
 private:
 	float _FringeScale = 1.0;
 	glm::vec2 TexUvWhitePixel = {};
@@ -263,7 +264,15 @@ private:
 	Vertex_d* _VtxWritePtr = 0;       // [Internal] point within VtxBuffer.data() after each add command (to avoid using the ImVector<> operators too much)
 	uint32_t* _IdxWritePtr = 0;       // [Internal] point within IdxBuffer.data() after each add command (to avoid using the ImVector<> operators too much)
 	const int tex_lines_width_max = 32;
-	glm::vec4 TexUvLines[32 + 1];  // UVs for baked anti-aliased lines 
+	glm::vec4 TexUvLines[32 + 1] = {};  // UVs for baked anti-aliased lines 
+	struct DrawCmdHeader
+	{
+		glm::ivec4 ClipRect;
+		void* TextureId;
+		size_t VtxOffset;
+	};
+	DrawCmdHeader _CmdHeader = {};
+
 };
 
 #if 1
@@ -390,14 +399,6 @@ void draw_list_cx::strokePolyline(const glm::vec2* points, const int points_coun
 			{
 				// If we're using textures we only need to emit the left/right edge vertices
 				glm::vec4 tex_uvs = TexUvLines[integer_thickness];
-				/*if (fractional_thickness != 0.0f) // Currently always zero when use_texture==false!
-				{
-					const glm::vec4 tex_uvs_1 = _Data->TexUvLines[integer_thickness + 1];
-					tex_uvs.x = tex_uvs.x + (tex_uvs_1.x - tex_uvs.x) * fractional_thickness; // inlined ImLerp()
-					tex_uvs.y = tex_uvs.y + (tex_uvs_1.y - tex_uvs.y) * fractional_thickness;
-					tex_uvs.z = tex_uvs.z + (tex_uvs_1.z - tex_uvs.z) * fractional_thickness;
-					tex_uvs.w = tex_uvs.w + (tex_uvs_1.w - tex_uvs.w) * fractional_thickness;
-				}*/
 				glm::vec2 tex_uv0(tex_uvs.x, tex_uvs.y);
 				glm::vec2 tex_uv1(tex_uvs.z, tex_uvs.w);
 				for (int i = 0; i < points_count; i++)
@@ -720,9 +721,35 @@ void draw_list_cx::PrimReserve(int idx_count, int vtx_count)
 	size_t vs = VtxBuffer.size() + vtx_count;
 	//ns = align_up(ns, 12);
 	//vs = align_up(vs, 12);
+	assert(CmdBuffer.size());
+	auto draw_cmd = CmdBuffer.rbegin();
+	draw_cmd->ElemCount += idx_count;
+
 	IdxBuffer.resize(IdxBuffer.size() + idx_count);
 	VtxBuffer.resize(VtxBuffer.size() + vtx_count);
 	_VtxWritePtr = VtxBuffer.data();
 	_IdxWritePtr = IdxBuffer.data();
+}
+
+glm::ivec4 clipintersect_clip_rect(const glm::ivec4& clip_rect, const glm::ivec4& current)
+{
+	glm::ivec4 cr = clip_rect;
+	if (cr.x < current.x) cr.x = current.x;
+	if (cr.y < current.y) cr.y = current.y;
+	if (cr.z > current.z) cr.z = current.z;
+	if (cr.w > current.w) cr.w = current.w;
+	cr.z = glm::max(cr.x, cr.z);
+	cr.w = glm::max(cr.y, cr.w);
+	return cr;
+}
+void draw_list_cx::add_cmd(void* tex, const glm::ivec4& clip_rect, bool clipintersect_with_current_clip_rect)
+{
+	DrawCmd_t draw_cmd = {};
+	draw_cmd.ClipRect = clipintersect_with_current_clip_rect ? clipintersect_clip_rect(clip_rect, _CmdHeader.ClipRect) : clip_rect;
+	draw_cmd.TextureId = tex;
+	draw_cmd.VtxOffset = VtxBuffer.size();
+	draw_cmd.IdxOffset = IdxBuffer.size();
+	assert(draw_cmd.ClipRect.x <= draw_cmd.ClipRect.z && draw_cmd.ClipRect.y <= draw_cmd.ClipRect.w);
+	CmdBuffer.push_back(draw_cmd);
 }
 #endif
