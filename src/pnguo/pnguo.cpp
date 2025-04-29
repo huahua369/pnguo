@@ -535,6 +535,149 @@ void component2d_t::SetAnimationTime(uint32_t animationIndex, float dtime)
 		}
 	}
 }
+#if 0
+
+"translate":
+{
+	"time": 1.9,
+		"x" : 0.83,
+		"y" : -30.29,
+		// 没有curve时则线性插值
+		"curve" : [2.078, 1.43, 2.274, 2.88, 2.071, -30.29, 2.289, 4.48]
+		"curve" : "stepped"//直接跳到
+},
+
+class tfAccessor
+{
+	const void* _data = NULL;
+	int _count = 0;
+	int _stride = 0;
+	int _dimension = 0;
+	int _type = 0;
+	glm::vec4 _min = {};
+	glm::vec4 _max = {};
+};
+class tfSampler
+{
+	tfAccessor _time;	// input
+	tfAccessor _value;	// output 
+};
+class tfChannel
+{
+	tfSampler* sampler = 0;
+	enum { TRANSLATION, ROTATION, SCALE, SHEAR/*, WEIGHTS*/ } transformType = {};
+	enum { LINEAR, STEP, CUBIC/*, BEZIER, BSPLINE*/ } interpolation = LINEAR;
+};
+struct tfAnimation
+{
+	float duration;//动画持续时间
+	std::map<int, tfChannel> _channels;//节点id, 通道
+	std::string name;
+};
+struct tfNode
+{
+	std::vector<int> _children;
+	int skinIndex = -1;
+	int meshIndex = -1;
+	int channel = -1;			// 一节点只有一个通道
+	bool bIsJoint = false;
+	std::string _name;
+	transform2d_t _tranform;
+};
+#endif
+void SetAnimationTime(uint32_t animationIndex, float dtime)
+{
+	std::vector<tfSampler> samplers;		// 动画采样列表
+	std::vector<tfAnimation> animations;	// 动画列表
+	std::vector<tfNode> nodes;				// 节点列表
+	std::vector<glm::mat3> animatedMats;	// 缓存矩阵
+
+	if (animationIndex < animations.size())
+	{
+		tfAnimation* anim = &animations[animationIndex];
+		//loop animation
+		dtime = fmod(dtime, anim->duration);
+		for (auto it = anim->_channels.begin(); it != anim->_channels.end(); it++)
+		{
+			transform2d_t* pSourceTrans = &nodes[it->first]._tranform;
+			transform2d_t animated = *pSourceTrans;
+			float frac = 0.0, * pCurr = 0, * pNext = 0;
+			auto itn = it->second.interpolation;
+			if (it->second.interpolation == tfChannel::STEP) {
+				dtime = 0.0f;
+			}
+			it->second.sampler->SampleLinear(dtime, &frac, &pCurr, &pNext);
+			auto prev = (glm::vec2*)pCurr;
+			auto next = (glm::vec2*)pNext;
+			switch (it->second.transformType)
+			{
+			case tfChannel::TRANSLATION: {
+				// Animate translation
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					animated.pos = cubicSpline(*vert0, *tang0, *vert1, *tang1, frac);
+				}
+				else {
+					animated.pos = glm::mix(*prev, *next, frac); //linear((1.0f - frac) * prevpoint) + ((frac)*nextpoint);
+				}
+			}break;
+			case tfChannel::ROTATION: {
+				// Animate rotation 
+				auto prev = pCurr;
+				auto next = pNext;
+				glm::quat q;
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					q = glm::normalize(glm::quat(1.0, 0.0, 0.0, cubicSpline(*vert0, *tang0, *vert1, *tang1, frac)));
+				}
+				else {
+					glm::quat q1(1.0f, 0.0, 0.0, *prev);
+					glm::quat q2(1.0f, 0.0, 0.0, *next);
+					q = glm::slerp(q1, q2, frac);
+				}
+				animated.rotation = std::atan2(q.z, q.w);
+			}break;
+			case tfChannel::SCALE: {
+				// Animate scale 
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					animated.pos = cubicSpline(*vert0, *tang0, *vert1, *tang1, frac);
+				}
+				else {
+					animated.pos = glm::mix(*prev, *next, frac); //linear((1.0f - frac) * prevpoint) + ((frac)*nextpoint);
+				}
+			}break;
+			case tfChannel::SHEAR: {
+				// 斜切动画
+				if (it->second.interpolation == tfChannel::CUBIC) {
+					auto vert0 = prev + 1;
+					auto tang0 = prev + 2;
+					auto tang1 = next;
+					auto vert1 = next + 1;
+					animated.pos = cubicSpline(*vert0, *tang0, *vert1, *tang1, frac);
+				}
+				else {
+					animated.pos = glm::mix(*prev, *next, frac); //linear((1.0f - frac) * prevpoint) + ((frac)*nextpoint);
+				}
+			}break;
+			default:
+				break;
+			}
+			animatedMats[it->first] = animated.get();
+		}
+	}
+}
+
+
 void skeleton_t::update(float delta)
 {
 	anim->update(delta);
@@ -2327,6 +2470,188 @@ namespace bs {
 		return;
 	}
 
+
+#define EPSILON 1e-6  // 积分精度阈值 
+#define MAX_ITER 100  // 二分法最大迭代次数 
+
+	// 贝塞尔曲线控制点结构体
+	typedef struct {
+		double x0, y0;    // P0
+		double x1, y1;    // P1
+		double x2, y2;    // P2
+		double x3, y3;    // P3
+	} BezierControlPoints;
+
+	// 计算贝塞尔曲线点坐标 
+	void bezier_point(double t, BezierControlPoints* ctrl, double* x, double* y) {
+		double u = 1 - t;
+		*x = pow(u, 3) * ctrl->x0 + 3 * t * pow(u, 2) * ctrl->x1 + 3 * pow(t, 2) * u * ctrl->x2 + pow(t, 3) * ctrl->x3;
+		*y = pow(u, 3) * ctrl->y0 + 3 * t * pow(u, 2) * ctrl->y1 + 3 * pow(t, 2) * u * ctrl->y2 + pow(t, 3) * ctrl->y3;
+	}
+
+	// 计算贝塞尔曲线导数 
+	void bezier_derivative(double t, BezierControlPoints* ctrl, double* dx, double* dy) {
+		double u = 1 - t;
+		*dx = 3 * pow(u, 2) * (ctrl->x1 - ctrl->x0) + 6 * t * u * (ctrl->x2 - ctrl->x1) + 3 * pow(t, 2) * (ctrl->x3 - ctrl->x2);
+		*dy = 3 * pow(u, 2) * (ctrl->y1 - ctrl->y0) + 6 * t * u * (ctrl->y2 - ctrl->y1) + 3 * pow(t, 2) * (ctrl->y3 - ctrl->y2);
+	}
+
+	// 自适应辛普森积分计算弧长 
+	double adaptive_simpson(double a, double b, BezierControlPoints* ctrl) {
+		double c = (a + b) / 2;
+		double h = b - a;
+		double fa, fb, fc, x1, y1, x2, y2;
+
+		bezier_derivative(a, ctrl, &fa, &x1);
+		bezier_derivative(b, ctrl, &fb, &x2);
+		bezier_derivative(c, ctrl, &fc, &y1);
+
+		double s = (h / 6) * (sqrt(fa * fa + x1 * x1) + 4 * sqrt(fc * fc + y1 * y1) + sqrt(fb * fb + x2 * x2));
+		bezier_derivative((a + c) / 2, ctrl, &fa, &x1);
+		bezier_derivative((c + b) / 2, ctrl, &fb, &x2);
+
+		double left = (c - a) / 6 * (sqrt(fa * fa + x1 * x1) + 4 * sqrt(fc * fc + y1 * y1) + sqrt(fb * fb + x2 * x2));
+		double right = (b - c) / 6 * (sqrt(fc * fc + y1 * y1) + 4 * sqrt(fb * fb + x2 * x2) + sqrt(fb * fb + x2 * x2));
+
+		if (fabs(s - (left + right)) <= 15 * EPSILON) {
+			return left + right + (left + right - s) / 15;
+		}
+		return adaptive_simpson(a, c, ctrl) + adaptive_simpson(c, b, ctrl);
+	}
+
+	// 二分法查找满足弧长条件的t值
+	double find_t(double target_length, double a, double b, BezierControlPoints* ctrl) {
+		double current_length, mid;
+		for (int i = 0; i < MAX_ITER; i++) {
+			mid = (a + b) / 2;
+			current_length = adaptive_simpson(0, mid, ctrl);
+			if (current_length < target_length - EPSILON) {
+				a = mid;
+			}
+			else if (current_length > target_length + EPSILON) {
+				b = mid;
+			}
+			else {
+				return mid;
+			}
+		}
+		return (a + b) / 2;
+	}
+
+	// 等距采样主函数 
+	void equidistant_sample(BezierControlPoints* ctrl, int num_points, std::vector<double>* points) {
+		// 计算总长度 
+		double total_length = adaptive_simpson(0, 1, ctrl);
+		double step = total_length / (num_points - 1);
+
+		points->resize(num_points * 2);
+
+		for (int i = 0; i < num_points; i++) {
+			double t = (i == 0) ? 0 : find_t(i * step, 0, 1, ctrl);
+			double x, y;
+			bezier_point(t, ctrl, &x, &y);
+			(*points)[2 * i] = x;
+			(*points)[2 * i + 1] = y;
+		}
+	}
+
+
+#define CURVE_LINEAR 0
+#define CURVE_STEPPED 1
+#define CURVE_BEZIER 2
+#define BEZIER_SIZE 18
+	struct Timeline_t
+	{
+		std::vector<float> curves;
+		std::vector<float> curves1;
+		int frameCount = 0;
+		int frameEntries = 0;
+		int type = 0;				//TimelineType
+	};
+	void CurveTimeline_setBezier(Timeline_t* timeline, int bezier, int frame, float value, float time1, float value1,
+		float cx1, float cy1, float cx2, float cy2, float time2, float value2)
+	{
+		auto self = timeline;
+		float tmpx, tmpy, dddx, dddy, ddx, ddy, dx, dy, x, y;
+		int i = self->frameCount + bezier * BEZIER_SIZE, n;
+		float* curves = self->curves.data();
+		float* curves1 = self->curves1.data();
+		if (value == 0) curves[frame] = CURVE_BEZIER + i;
+		tmpx = (time1 - cx1 * 2 + cx2) * 0.03;
+		tmpy = (value1 - cy1 * 2 + cy2) * 0.03;
+		dddx = ((cx1 - cx2) * 3 - time1 + time2) * 0.006;
+		dddy = ((cy1 - cy2) * 3 - value1 + value2) * 0.006;
+		ddx = tmpx * 2 + dddx;
+		ddy = tmpy * 2 + dddy;
+		dx = (cx1 - time1) * 0.3 + tmpx + dddx * 0.16666667;
+		dy = (cy1 - value1) * 0.3 + tmpy + dddy * 0.16666667;
+		x = time1 + dx, y = value1 + dy;
+		int ct = BEZIER_SIZE / 2;
+		for (n = i + ct; i < n; i++) {
+			curves[i] = x;
+			curves1[i] = y;//+ 1
+			dx += ddx;
+			dy += ddy;
+			ddx += dddx;
+			ddy += dddy;
+			x += dx;
+			y += dy;
+		}
+		//for (n = i + BEZIER_SIZE; i < n; i += 2) {
+		//	curves[i] = x;
+		//	curves[i + 1] = y;
+		//	dx += ddx;
+		//	dy += ddy;
+		//	ddx += dddx;
+		//	ddy += dddy;
+		//	x += dx;
+		//	y += dy;
+		//}
+	}
+	struct rtline_t {
+		float time;
+		float value;
+		glm::vec2 c1;
+		glm::vec2 c2;
+	};
+	void test_timeline()
+	{
+		rtline_t t[2] = {};
+		t[0].time = 0.0;
+		t[0].value = -44.7;
+		t[0].c1 = { 0.033, -44.7 };
+		t[0].c2 = { 0.12, 54.89 };
+		t[1].time = 0.1333;
+		t[1].value = 64.62;
+		t[1].c1 = { 0.154, 79.18 };
+		t[1].c2 = { 0.214, 79.42 };
+		Timeline_t tt = {};
+		tt.curves.resize(BEZIER_SIZE * 2);
+		tt.curves1.resize(BEZIER_SIZE * 2);
+		std::vector<glm::vec2> r = { {t[0].time, t[0].value}, t[0].c1, t[0].c2, {t[1].time, t[1].value } };
+		std::vector<glm::vec2> r2 = { };
+		get_bezier(r.data(), r.size(), BEZIER_SIZE, 1, r2);
+		std::vector<float> v2;
+		for (auto& it : r2) {
+			v2.push_back(it.x);
+		}
+		auto kk = cubicAt1(t[0].value, t[0].c1.y, t[0].c2.y, t[1].value, 0.5f);
+
+		BezierControlPoints ctrl = { 0, 0, 1, 3, 2, -1, 3, 0 };
+		int num_points = BEZIER_SIZE;
+		std::vector<double> points;
+
+		equidistant_sample(&ctrl, num_points, &points);
+		v2.clear();
+		for (int i = 0; i < num_points; i++) {
+			v2.push_back(points[2 * i + 1]);
+			printf("Point %d: (%f, %f)\n", i, points[2 * i], points[2 * i + 1]);
+		}
+
+
+		CurveTimeline_setBezier(&tt, 0, 0, t[0].value, t[0].time, t[0].value, t[0].c1.x, t[0].c1.y, t[0].c2.x, t[0].c2.y, t[1].time, t[1].value);
+		printf("");
+	}
 }
 //!bs
 

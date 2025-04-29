@@ -1041,7 +1041,114 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 		indexs.clear();
 	}
 }
+SDL_BlendMode get_blend_x(BlendMode_e blendMode, bool pma)
+{
+	SDL_BlendMode b = SDL_BLENDMODE_BLEND;
+	static SDL_BlendMode screen = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD);
+	switch (blendMode)
+	{
+	case BlendMode_e::none:
+		break;
+	case BlendMode_e::normal:
+		b = pma ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED;
+		break;
+	case BlendMode_e::additive:
+		b = pma ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_ADD_PREMULTIPLIED;
+		break;
+	case BlendMode_e::multiply:
+		b = SDL_BLENDMODE_MUL;
+		break;
+	case BlendMode_e::modulate:
+		b = SDL_BLENDMODE_MOD;
+		break;
+	case BlendMode_e::screen:
+		b = screen;
+		break;
+	default:
+		break;
+	}
 
+	return b;
+}
+#if 0
+void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
+{
+	// 如果骨骼不可见，则提前退出
+	if (!skeleton || skeleton->color.w == 0 || !skeleton->visible) return;
+	unsigned short quadIndices[] = { 0,1,2,2,3,0 };
+	struct { SDL_Texture* texture; SDL_BlendMode blendMode; } states = {};
+	vertexs.clear();
+	states.texture = NULL;
+	int offsetidx = 0;
+	SDL_Vertex vertex = {};
+	SDL_Texture* texture = NULL;
+	for (size_t i = 0; i < skeleton->slots_count; ++i) {
+		slot_t* slot = skeleton->solt_data + i;
+		auto attachment = slot->attachment;
+		// 如果附件插槽颜色为0或骨骼未处于活动状态，则提前退出
+		if (slot->color.w == 0 || !slot->bone->count || !attachment || !attachment->isActive || attachment->color.w == 0) { continue; }
+		texture = (SDL_Texture*)attachment->tex;
+		auto ssc = skeleton->color * slot->color;
+		auto c = ssc * attachment->color;
+		*(glm::vec4*)(&vertex.color) = glm::clamp(c, 0.0f, 1.0f);
+		auto blend = get_blend_x((BlendMode_e)slot->blend_mode, skeleton->usePremultipliedAlpha);
+		//if (states.texture == 0) states.texture = texture;
+		if (states.blendMode != blend || states.texture != texture) {
+			if (vertexs.size() > 0) {
+				auto count = indexs.size() ? indexs.size() : vertexs.size();
+				assert(count % 3 == 0);	// 渲染合批数据
+				SDL_SetTextureBlendMode(states.texture, states.blendMode);
+				SDL_RenderGeometry(renderer, states.texture, vertexs.data(), vertexs.size(), indexs.size() ? indexs.data() : nullptr, indexs.size());
+				vertexs.clear(); indexs.clear();
+			}
+			states.blendMode = blend;
+			states.texture = texture;
+		}
+		// 顶点数据添加到合批
+		offsetidx = vertexs.size();
+		if (attachment->colors) {
+			for (size_t i = 0; i < attachment->vs; i++)
+			{
+				vertex.position = get_v2(slot, attachment->pos[i]);
+				vertex.tex_coord = *((SDL_FPoint*)&attachment->uvs[i]);
+				auto c0 = ssc * attachment->colors[i];
+				vertex.color = *((SDL_FColor*)&c0);
+				vertexs.push_back(vertex);
+			}
+		}
+		else {
+			for (size_t i = 0; i < attachment->vs; i++)
+			{
+				vertex.position = get_v2(slot, attachment->pos[i]);
+				vertex.tex_coord = *((SDL_FPoint*)&attachment->uvs[i]);
+				vertexs.push_back(vertex);
+			}
+		}
+		if (attachment->is > 0) {
+			auto pss = indexs.size();
+			indexs.resize(pss + attachment->is);
+			auto dst = indexs.data() + pss;
+			memcpy(dst, attachment->idxs, attachment->is * sizeof(int));
+			auto t = dst;
+			if (offsetidx > 0)
+			{
+				for (size_t i = 0; i < attachment->is; i++, t++)
+				{
+					*t += offsetidx;
+				}
+			}
+		}
+	}
+	if (vertexs.size() > 0) {
+		auto count = indexs.size() ? indexs.size() : vertexs.size();
+		assert(count % 3 == 0); // 渲染合批数据
+		SDL_SetTextureBlendMode(states.texture, states.blendMode);
+		SDL_RenderGeometry(renderer, states.texture, vertexs.data(), vertexs.size(), indexs.size() ? indexs.data() : nullptr, indexs.size());
+		vertexs.clear();
+		indexs.clear();
+	}
+}
+#endif
 
 SDL_PixelFormat get_rgbafe() {
 	uint32_t rmask, gmask, bmask, amask;

@@ -182,6 +182,7 @@ enum class BlendMode_e :int {
 	normal = 0,	// 普通混合
 	additive,
 	multiply,
+	modulate,
 	screen
 };
 
@@ -1481,6 +1482,9 @@ a	b	y
 
 
 
+namespace bs {
 
+	void test_timeline();
+}
 
 #endif // !PNGUO_H

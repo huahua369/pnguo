@@ -645,14 +645,20 @@ int main()
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 
 	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
-
+	bs::test_timeline();
 	auto gm = menu_m(form0);
 	printf("%p\n", form0);
 	auto pl = show_ui(form0, gm);
 	show_ui2(form0, gm);
 	//show_cpuinfo(form0);
-
-
+	glm::mat3 m3x = glm::shearX(glm::mat3(1), 0.5f);
+	glm::mat3 m3y = glm::shearY(glm::mat3(1), 0.5f);
+	glm::vec3 v3 = { 1,2,3 };
+	auto v3x = m3x * v3;
+	auto v3x0 = v3 * m3x;
+	float x = 0.2;
+	auto v3y = m3y * x;
+	auto v3y0 = x * m3y;
 	auto d2 = new sp_drawable();
 	d2->set_renderer(form0->renderer);
 	//d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
