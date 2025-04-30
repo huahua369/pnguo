@@ -329,74 +329,7 @@ struct spe_ht
 	char n[4] = {};
 	uint64_t datalen;
 };
-void packages_b(const std::string& package_file, std::map<void*, std::string>& texs, int atlas_length, int ske_length, const char* atlas_data, const char* ske_data, bool isbin)
-{
-	std::vector<std::pair<char*, int>> imgd;
-	do {
-		if (package_file.empty())break;
-		njson0 pk;
-		pk["atlas_offset"] = 0;
-		pk["atlas_length"] = atlas_length;
-		pk["ske_offset"] = atlas_length;
-		pk["ske_length"] = ske_length;
-		pk["is_binary"] = isbin;
-		auto& img = pk["images"];
-		int ilen = 0;
-		int imgpos = atlas_length + ske_length;
-		int64_t imgalen = 0;
-		for (auto& [k, v] : texs) {
-			njson it;
-			it["offset"] = ilen + imgpos;
-			auto idata = _spUtil_readFile(v.c_str(), &ilen);
-			if (idata)
-			{
-				std::string pathstr;
-				auto cc = strrchr(v.c_str(), '/');
-				auto cc1 = strrchr(v.c_str(), '\\');
-				if (cc > cc1)
-					pathstr = cc + 1;
-				else
-					pathstr = cc1 + 1;
-				if (pathstr.empty())
-					pathstr = v.c_str();
-				imgalen += ilen;
-				it["name"] = pathstr;
-				it["length"] = ilen;
-				img.push_back(it);
-				imgd.push_back({ idata ,ilen });
-			}
-		}
-		int64_t datalen = atlas_length + ske_length + imgalen;
-		pk["data_length"] = datalen;
-#ifdef _MFILE_
-		{
-			hz::mfile_t m;
-			if (!m.open_m(package_file, false))break;
-			auto pkb = njson0::to_cbor(pk);
-			int64_t alen = pkb.size() + sizeof(spe_ht) + datalen;
-			m.ftruncate_m(alen);//重置文件大小
-			auto mpd = m.map(alen, 0);//映射文件
-			if (!mpd)break;
-			auto pkbs = (spe_ht*)mpd;
-			*pkbs = {};
-			strcpy(pkbs->n, "spe");
-			pkbs->datalen = pkb.size();
-			mpd += sizeof(spe_ht);
-			memcpy(mpd, pkb.data(), pkb.size());
-			mpd += pkbs->datalen;
-			memcpy(mpd, atlas_data, atlas_length);
-			mpd += atlas_length;
-			memcpy(mpd, ske_data, ske_length);
-			mpd += ske_length;
-			for (auto& [k, v] : imgd) {
-				memcpy(mpd, k, v);
-				mpd += v;
-			}
-			m.flush();//刷新数据到磁盘
-		}
-#endif // !_MFILE_
-	} while (0);
-}
+void packages_b(const std::string& package_file, std::map<void*, std::string>& texs, int atlas_length, int ske_length, const char* atlas_data, const char* ske_data, bool isbin);
 
 void sp_drawable::add(const std::string& atlasf, const std::string& ske, float scale, float defaultMix, const std::string& package_file)
 {
@@ -594,6 +527,75 @@ void sp_drawable::update_draw(double deltaTime)
 //	}
 //}
 // 
+
+void packages_b(const std::string& package_file, std::map<void*, std::string>& texs, int atlas_length, int ske_length, const char* atlas_data, const char* ske_data, bool isbin)
+{
+	std::vector<std::pair<char*, int>> imgd;
+	do {
+		if (package_file.empty())break;
+		njson0 pk;
+		pk["atlas_offset"] = 0;
+		pk["atlas_length"] = atlas_length;
+		pk["ske_offset"] = atlas_length;
+		pk["ske_length"] = ske_length;
+		pk["is_binary"] = isbin;
+		auto& img = pk["images"];
+		int ilen = 0;
+		int imgpos = atlas_length + ske_length;
+		int64_t imgalen = 0;
+		for (auto& [k, v] : texs) {
+			njson it;
+			it["offset"] = ilen + imgpos;
+			auto idata = _spUtil_readFile(v.c_str(), &ilen);
+			if (idata)
+			{
+				std::string pathstr;
+				auto cc = strrchr(v.c_str(), '/');
+				auto cc1 = strrchr(v.c_str(), '\\');
+				if (cc > cc1)
+					pathstr = cc + 1;
+				else
+					pathstr = cc1 + 1;
+				if (pathstr.empty())
+					pathstr = v.c_str();
+				imgalen += ilen;
+				it["name"] = pathstr;
+				it["length"] = ilen;
+				img.push_back(it);
+				imgd.push_back({ idata ,ilen });
+			}
+		}
+		int64_t datalen = atlas_length + ske_length + imgalen;
+		pk["data_length"] = datalen;
+#ifdef _MFILE_
+		{
+			hz::mfile_t m;
+			if (!m.open_m(package_file, false))break;
+			auto pkb = njson0::to_cbor(pk);
+			int64_t alen = pkb.size() + sizeof(spe_ht) + datalen;
+			m.ftruncate_m(alen);//重置文件大小
+			auto mpd = m.map(alen, 0);//映射文件
+			if (!mpd)break;
+			auto pkbs = (spe_ht*)mpd;
+			*pkbs = {};
+			strcpy(pkbs->n, "spe");
+			pkbs->datalen = pkb.size();
+			mpd += sizeof(spe_ht);
+			memcpy(mpd, pkb.data(), pkb.size());
+			mpd += pkbs->datalen;
+			memcpy(mpd, atlas_data, atlas_length);
+			mpd += atlas_length;
+			memcpy(mpd, ske_data, ske_length);
+			mpd += ske_length;
+			for (auto& [k, v] : imgd) {
+				memcpy(mpd, k, v);
+				mpd += v;
+			}
+			m.flush();//刷新数据到磁盘
+		}
+#endif // !_MFILE_
+	} while (0);
+}
 
 drawable2d_cx::drawable2d_cx()
 {

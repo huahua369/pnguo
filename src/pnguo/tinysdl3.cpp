@@ -2597,6 +2597,17 @@ SDL_Texture* form_x::new_texture(int width, int height, void* vkptr, int format)
 	}
 	return texture;
 }
+SDL_Texture* form_x::new_texture(const char* fn)
+{
+	SDL_Texture* p = nullptr;
+	stbimage_load img(fn);
+	int depth = 32, pitch = img.width * 4;
+	if (img.data)
+	{
+		p = (SDL_Texture*)new_texture_r(renderer, img.width, img.height, 0, img.data, pitch, 0, true, false);
+	}
+	return p;
+}
 void form_x::update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride)
 {
 	if (p && data)

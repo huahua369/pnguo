@@ -801,11 +801,24 @@ int main()
 	double dtime = 0.06;
 	int fs = mad1->sample_rate * dtime;
 	{
+		auto minesweeper_tex = form0->new_texture("mw2.png");
+
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
 				static double deltas = 0;
 				deltas += delta;
-				d2->update_draw(delta);
+				SDL_FRect rc = { 30,360, minesweeper_tex->w, minesweeper_tex->h };
+				SDL_RenderTexture(renderer, minesweeper_tex, 0, &rc);
+				SDL_FRect borderrc1 = { 9,49,32,32 };
+				SDL_FRect borderrc2 = { 289,49,32,32 };
+				int w = 6;
+				float scale = 1.0;
+				SDL_FRect dstrect1 = { 30,100,320,220 };
+				SDL_FRect dstrect2 = { 40,110,300,200 };
+				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc1, w, w, w, w, scale, &dstrect1);
+				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc2, w, w, w, w, scale, &dstrect2);
+				return;
+				//d2->update_draw(delta);
 				if (deltas > dtime)
 				{
 					static int64_t kn = 0;

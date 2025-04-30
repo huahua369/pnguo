@@ -269,6 +269,7 @@ public:
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA
 	SDL_Texture* new_texture(int width, int height, void* vkptr, int format);
+	SDL_Texture* new_texture(const char* fn);
 	bool add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type);
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
 	void set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply = false);
