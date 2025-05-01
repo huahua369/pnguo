@@ -132,11 +132,12 @@ public:
 
 	bitmap_ttinfo* bitinfo = 0;
 	gcolors_t* colorinfo = 0;
-	bitmap_cache_cx* ctx = 0;  //纹理缓存，多个字体共用
+	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存，多个字体共用 
 
 	bool first_bitmap = false;
 	// Whether kerning is desired
 	bool enable_kerning = false;
+	bool use_no_color = false;
 
 	struct c_glyph {
 		int stored;
@@ -201,7 +202,7 @@ public:
 	void clear_char_lut();
 	void clear_gcache();
 	// todo 获取文字渲染信息。glyph_index=-1时则用unicode_codepoint；
-	font_item_t get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepoint, int fontsize);
+	font_item_t get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepoint, int fontsize, bitmap_cache_cx* use_ctx = nullptr);
 
 	// 获取文字在哪个字体
 	static const char* get_glyph_index_u8(const char* u8str, int* oidx, font_t** renderFont, std::vector<font_t*>* fallbacks);
@@ -245,9 +246,12 @@ public:
 	std::vector<stb_packer*> _packer;
 	std::vector<image_ptr_t*> _data;
 	int width = 1024;					// 纹理宽高
+	int height = 1024;
 public:
 	bitmap_cache_cx();
 	~bitmap_cache_cx();
+	void resize(int w, int h);
+	glm::ivec2 fill_color(int w, int h, uint32_t color);
 	// 复制像素到装箱，从pos返回坐标
 	image_ptr_t* push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
 	image_ptr_t* push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);

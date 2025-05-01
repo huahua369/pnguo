@@ -128,6 +128,18 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 
 
 #endif
+
+
+text_dta::text_dta()
+{
+}
+
+text_dta::~text_dta()
+{
+}
+
+
+
 layout_text_x::layout_text_x()
 {
 	gs = new gshadow_cx();
@@ -139,6 +151,7 @@ layout_text_x::~layout_text_x()
 	for (auto it : msu) {
 		free_image_cr(it);
 	}
+	free_cache(bc_ctx);
 }
 
 void layout_text_x::set_ctx(font_rctx* p)
@@ -191,6 +204,50 @@ void layout_text_x::clear_family()
 void layout_text_x::clear_text()
 {
 	tv.clear();
+}
+
+bitmap_cache_cx* layout_text_x::new_cache(const glm::ivec2& vsize)
+{
+	auto p = new bitmap_cache_cx();
+	if (p)
+	{
+		p->resize(vsize.x, vsize.y);
+		if (!bc_ctx)
+			bc_ctx = p;
+	}
+	return p;
+}
+
+void layout_text_x::free_cache(bitmap_cache_cx* p)
+{
+	if (p)
+	{
+		delete p;
+	}
+}
+
+text_dta* layout_text_x::new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old)
+{
+	if (!old)
+	{
+		old = new text_dta();
+	}
+	old->ltx = this;
+	auto str = (const char*)str8;
+	if (str8)
+	{
+		if (idx != old->idx)
+		{
+			old->idx = idx;
+		}
+		if (fontsize != old->fontsize)
+		{
+			old->fontsize = fontsize;
+		}
+		old->tv.clear();
+		auto nrc = build_text(idx, old->rc, old->text_align, str8, len, fontsize, old->tv);
+	}
+	return old;
 }
 
 void layout_text_x::c_line_metrics(size_t idx, int fontsize) {
@@ -834,7 +891,7 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fo
 		font_t::get_glyph_index_u8(ostr, &gidx, &r, &familyv[idx]);
 		if (r && gidx >= 0)
 		{
-			auto k = r->get_glyph_item(gidx, ch, fontsize);
+			auto k = r->get_glyph_item(gidx, ch, fontsize, bc_ctx);
 			if (k._glyph_index)
 			{
 				k.cpt = ch;

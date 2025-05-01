@@ -46,6 +46,23 @@ struct pvm_t
 	glm::vec2 cpos = {};
 	int w, h;
 };
+class text_dta
+{
+public:
+	std::vector<font_item_t> tv;
+	glm::vec4 rc = {};
+	glm::vec2 text_align = {};
+	size_t idx = 0;
+	int fontsize = 16;
+	layout_text_x* ltx = 0;
+public:
+	text_dta();
+	~text_dta();
+
+private:
+
+};
+
 // todo 字体纹理缓存管理
 class layout_text_x
 {
@@ -72,6 +89,8 @@ public:
 	glm::ivec4 m_color = { 0xff606060,1,0,0xf0121212 };
 	// 菜单项偏移
 	glm::ivec2 m_cpos = { 3, 3 };
+
+	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存
 public:
 	layout_text_x();
 	~layout_text_x();
@@ -81,7 +100,10 @@ public:
 	void cpy_familys(layout_text_x* p);
 	void clear_family();
 	void clear_text();
-
+	// 创建新缓存
+	bitmap_cache_cx* new_cache(const glm::ivec2& vsize);
+	void free_cache(bitmap_cache_cx* p);
+	text_dta* new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old = 0);
 	// 获取基线
 	int get_baseline(size_t idx, int fontsize);
 	// 获取行高

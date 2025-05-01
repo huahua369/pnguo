@@ -222,7 +222,7 @@ void save_png_v(path_v* pv, int count, const std::string& fn, bool fy, float sc1
 	cairo_surface_write_to_png(sur, fn.c_str());
 	cairo_surface_destroy(sur);
 }
- 
+
 glm::ivec4 get_text_extents(cairo_t* cr, const void* str, int len, font_xi* fx);
 class Ruler
 {
@@ -735,6 +735,34 @@ void dtext_cache::clear_color(uint32_t color)
 	}
 }
 
+
+text_draw_t* new_text_drawable(const char* str, int len, layout_text_x* ltx, const glm::vec4& box_rc, text_style_t* st, glm::ivec2* orc)
+{
+	if (!str || len < 1 || !*str || !ltx || !st)return nullptr;
+	glm::vec4 rc = box_rc;
+	ltx->tem_rtv.clear();
+	ltx->build_text(st->font, rc, st->text_align, str, len, st->font_size, ltx->tem_rtv);
+	ltx->update_text();
+	if (orc)
+	{ 
+		orc->x = rc.z; 
+		orc->y = rc.w;
+	}
+	//cairo_as _ss_(cr);
+	//if (st->clip && text_rc.z > 0 && text_rc.w > 0) {
+	//	draw_rectangle(cr, text_rc, 0);
+	//	cairo_clip(cr);
+	//}
+	//if (st->text_color_shadow)
+	//{
+	//	cairo_as _aa_(cr);
+	//	cairo_translate(cr, st->shadow_pos.x, st->shadow_pos.y);
+	//	ltx->draw_text(cr, ltx->tem_rtv, st->text_color_shadow);
+	//}
+	////ltx->draw_rect_rc(cr, ltx->tem_rtv, 0xffff8000);
+	//ltx->draw_text(cr, ltx->tem_rtv, st->text_color);
+	return nullptr;
+}
 
 void draw_draw_texts(text_draw_t* p)
 {
@@ -1895,7 +1923,7 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 	return ss;
 }
 int64_t get_rdev() {
-	return std::chrono::system_clock::now().time_since_epoch().count(); 
+	return std::chrono::system_clock::now().time_since_epoch().count();
 }
 int get_rand(int f, int s)
 {
@@ -3467,10 +3495,10 @@ void view_g::update(float)
 	if (!vcanvas->_backing_store_valid || !_hruler->_backing_store_valid || !_vruler->_backing_store_valid)
 		_draw_valid = true;
 
-} 
+}
 
 cairo_t* new_cr(cairo_surface_t* sur) {
-	return sur?cairo_create(sur):nullptr;
+	return sur ? cairo_create(sur) : nullptr;
 }
 void free_cr(cairo_t* cr) {
 	if (cr)cairo_destroy(cr);

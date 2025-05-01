@@ -31,6 +31,7 @@ list(APPEND src_mtl
     "main_tl.cpp" 
     "../src/pnguo/ecc_sv.cpp"
     "mshell.cpp"
+    "minesweeper.cpp"
     "../src/pnguo/editor_2d.cpp"
     "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
     "../rc/resource1.rc"

@@ -22,6 +22,9 @@
 #include <pnguo/editor_2d.h>
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <stb_image_write.h>
+
+#include "minesweeper.h"
+
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 auto fontn2 = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
@@ -565,6 +568,7 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 			{
 				cairo_as _ss_(cr);
 				cairo_translate(cr, dps.x, dps.y);
+
 				glm::ivec2 hps = dps;
 				glm::vec4 chs = { 0,0,hex_size };
 				hps.y += hex_size.y - width;
@@ -801,12 +805,59 @@ int main()
 	double dtime = 0.06;
 	int fs = mad1->sample_rate * dtime;
 	{
+		texture_cb tex_cb = get_texture_cb();
+		auto ltx = new layout_text_x();
+		ltx->set_ctx(app->font_ctx);
+		std::vector<std::string> efn;
+		//auto fpv = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\Noto-COLRv1.ttf)", &efn);
+		//auto fpv1 = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\NotoColorEmoji.ttf)", &efn);
+		std::string familys = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+		//std::string familys = (char*)u8"Consolas,新宋体,Noto Color Emoji,Times New Roman,Malgun Gothic";
+		ltx->add_familys(familys.c_str(), "");
+		auto cache_tex = ltx->new_cache({ 1024,1024 });
 		auto minesweeper_tex = form0->new_texture("mw2.png");
-
+		char* tb = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
+		auto tbt = ltx->new_text_dta(0, 39, tb, -1, 0);
+		{
+			auto ft = cache_tex->_data.data();
+			auto n = cache_tex->_data.size();
+			for (size_t i = 0; i < n; i++)
+			{
+				auto p = ft[i];
+				save_img_png(p, "font_test51.png");
+				auto tex = tex_cb.make_tex(form0->renderer, p);
+			}
+		}
+		minesweeper_cx* mscx = new minesweeper_cx();
+		mscx->set_texture(minesweeper_tex);
+		mscx->resize(9, 9, 10);
+		mscx->clear_map();
+		mscx->init_map({ 5,5 });
+		//draw_draw_texts();
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
 				static double deltas = 0;
 				deltas += delta;
+
+				glm::vec2 pos = { 370,100 };
+				mscx->update(pos, delta);
+				auto d = mscx->data();
+				auto cnt = mscx->count();
+				for (size_t i = 0; i < cnt; i++)
+				{
+					auto it = d[i];
+					if (it.w9 > 0)
+					{
+						SDL_FRect* dstrect1 = ((SDL_FRect*)&it.dst);
+						auto w = it.w9;
+						SDL_RenderTexture9Grid(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, w, w, w, w, it.scale, dstrect1);
+					}
+					else {
+						SDL_FRect* dstrect1 = ((SDL_FRect*)&it.dst);
+						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, dstrect1);
+					}
+				}
+				return;
 				SDL_FRect rc = { 30,360, minesweeper_tex->w, minesweeper_tex->h };
 				SDL_RenderTexture(renderer, minesweeper_tex, 0, &rc);
 				SDL_FRect borderrc1 = { 9,49,32,32 };
@@ -817,6 +868,15 @@ int main()
 				SDL_FRect dstrect2 = { 40,110,300,200 };
 				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc1, w, w, w, w, scale, &dstrect1);
 				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc2, w, w, w, w, scale, &dstrect2);
+
+				for (auto it : tbt->tv)
+				{
+					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
+					SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
+					SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
+				}
+
+
 				return;
 				//d2->update_draw(delta);
 				if (deltas > dtime)

@@ -2597,7 +2597,7 @@ int font_t::get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector
 	return g;
 }
 
-font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepoint, int fontsize)
+font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepoint, int fontsize, bitmap_cache_cx* use_ctx)
 {
 	uint32_t col = -1;
 	int lcd_type = 0;
@@ -2609,6 +2609,10 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 	std::vector<font_item_t>  ps;
 	glm::ivec3 rets;
 	font_item_t ret = {};
+	if (!use_ctx)
+	{
+		use_ctx = bc_ctx;
+	}
 	if (-1 == glyph_index)
 		glyph_index = get_glyph_index(unicode_codepoint, &rfont, 0);
 	if (rfont && glyph_index)
@@ -2618,7 +2622,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 			if (rp)break;
 
 			auto bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, 0, lcd_type, unicode_codepoint);
-			if (colorinfo && bit)
+			if (colorinfo && bit && !use_no_color)
 			{
 				glm::ivec4 bs = { rc.x, rc.y, bitmap->width, bitmap->rows };
 				std::vector<uint32_t> ag;
@@ -2627,7 +2631,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 				{
 					glm::ivec2 pos;
 					image_ptr_t* img = 0;
-					img = ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, 0);
+					img = use_ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, 0);
 					for (size_t i = 0; i < ag.size(); i++)
 					{
 						bitbuf->clear();
@@ -2638,7 +2642,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 						{
 							auto ps1 = pos;
 							ps1.x += bitmap->x - bs.x, ps1.y += bitmap->y + abs(bs.y);
-							img = ctx->push_cache_bitmap_old(bitmap, &ps1, cols[i], img, 0);
+							img = use_ctx->push_cache_bitmap_old(bitmap, &ps1, cols[i], img, 0);
 						}
 					}
 					glm::ivec4 rc4 = { pos.x, pos.y, bs.z,bs.w };
@@ -2658,7 +2662,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 			if (bit)
 			{
 				glm::ivec2 pos;
-				auto img = ctx->push_cache_bitmap(bitmap, &pos, linegap, col);
+				auto img = use_ctx->push_cache_bitmap(bitmap, &pos, linegap, col);
 				glm::ivec4 rc4 = { pos.x, pos.y, bitmap->width, bitmap->rows };
 				if (img)
 				{
@@ -4901,31 +4905,68 @@ class stb_packer
 {
 public:
 	stbrp_context _ctx = {};
-	std::vector<uint32_t> ptr;
 	image_ptr_t img = {};
+#ifdef STL_VU
+	std::vector<uint32_t> ptr;
 	std::vector<stbrp_node> _rpns;
+#else
+	uint32_t* _ptr = nullptr;
+	stbrp_node* _rpns_ptr = nullptr;
+	size_t cap = 0;
+#endif
 public:
 	stb_packer() {}
-	~stb_packer() {}
+	~stb_packer() {
+#ifndef STL_VU 
+		if (_ptr)
+		{
+			free(_ptr);
+		}
+#endif
+	}
 	image_ptr_t* get() {
 		return (image_ptr_t*)&img;
 	}
-	void init_target(int width, int height, bool newptr = true) {
+	void init_target(int width, int height) {
 		assert(!(width < 10 || height < 10));
 		if (width < 10 || height < 10)return;
+#ifdef STL_VU
 		if (newptr) { ptr.resize(width * height); }
+#else
+		size_t ac = width * height * sizeof(uint32_t);
+		ac += sizeof(stbrp_node) * width;
+		if (cap != ac) {
+			auto nptr = (uint32_t*)realloc(_ptr, ac);
+			if (nptr)
+			{
+				cap = ac;
+				_ptr = nptr;
+			}
+			else {
+				assert(nptr);
+				return;
+			}
+		}
+#endif // STL_VU 
 		auto img = get();
 		img->width = width;
 		img->height = height;
 		img->valid = 1;
+#ifdef STL_VU
 		img->data = ptr.data();
 		_rpns.resize(width);
 		memset(_rpns.data(), 0, _rpns.size() * sizeof(stbrp_node));
 		stbrp_init_target(&_ctx, width, height, _rpns.data(), _rpns.size());
+#else
+		img->data = _ptr;
+		_rpns_ptr = (stbrp_node*)(_ptr + width * height);
+		memset(_rpns_ptr, 0, width * sizeof(stbrp_node));
+		stbrp_init_target(&_ctx, width, height, _rpns_ptr, width);
+#endif
+		memset(_ptr, 0, width * height * sizeof(uint32_t));
 		stbrp_setup_allow_out_of_mem(&_ctx, 0);
 	}
 	void clear() {
-		memset(_rpns.data(), 0, _rpns.size() * sizeof(stbrp_node));
 		init_target(_ctx.width, _ctx.height);
 	}
 	int push_rect(glm::ivec4* rc, int n)
@@ -5039,23 +5080,41 @@ void test_rect()
 
 bitmap_cache_cx::bitmap_cache_cx()
 {
+	resize(width, height);
 	// 填充20x20白色
-	auto pt = get_last_packer(false);
-	if (!pt)return;
-	glm::ivec2 pos = {};
-	auto ret = pt->push_rect({ 20, 20 }, &pos);
-	auto ptr = pt->get();
-	auto px = ((uint32_t*)ptr->data) + pos.x;
-	px += pos.y * width;
-	for (size_t i = 0; i < 10; i++)
-	{
-		memset(px, -1, 10 * sizeof(int));
-		px += width;
-	}
+	fill_color(20, 20, -1);
 }
 
 bitmap_cache_cx::~bitmap_cache_cx()
 {
+}
+
+void bitmap_cache_cx::resize(int w, int h)
+{
+	if (w < 10 || h < 10 || (w == width && h == height))return;
+	clear();
+	width = w;
+	height = h;
+}
+
+glm::ivec2 bitmap_cache_cx::fill_color(int w, int h, uint32_t color)
+{
+	glm::ivec2 pos = {};
+	auto pt = get_last_packer(false);
+	if (!pt || w < 1 || h < 1)return pos;
+	auto ret = pt->push_rect({ w, h }, &pos);
+	auto ptr = pt->get();
+	auto px = ((uint32_t*)ptr->data) + pos.x;
+	px += pos.y * width;
+	for (size_t i = 0; i < h; i++)
+	{
+		for (size_t x = 0; x < w; x++)
+		{
+			px[x] = color;
+		}
+		px += width;
+	}
+	return pos;
 }
 
 void bitmap_cache_cx::clear()
@@ -5074,7 +5133,7 @@ stb_packer* bitmap_cache_cx::get_last_packer(bool isnew)
 		auto p = new stb_packer();
 		if (!p)return 0;
 		_packer.push_back(p);
-		p->init_target(width, width);
+		p->init_target(width, height);
 		_data.push_back(p->get());
 	}
 	return *_packer.rbegin();
@@ -5722,14 +5781,14 @@ font_t* font_rctx::get_mk(fontns& v, size_t st)
 			if ((hasa || vn == it->_name || v.fullname == it->fullname) && it->_style.find(stn) != std::string::npos)
 			{
 				r = it;
-				r->ctx = &bcc;
+				r->bc_ctx = &bcc;
 				v.vptr[st] = it;
 				current = it;
 			}
 		}
 		if (!r && pv.size() && pv[0]->_style == "Regular" && stn == "Normal") {
 			r = pv[0];
-			r->ctx = &bcc;
+			r->bc_ctx = &bcc;
 			v.vptr[st] = r;
 			current = r;
 		}
@@ -5825,7 +5884,7 @@ std::vector<font_t*> font_rctx::add2file(const std::string& fn, std::vector<std:
 	auto r = imp->add_font_file(fn, pname);
 	for (auto it : r)
 	{
-		it->ctx = &bcc;
+		it->bc_ctx = &bcc;
 		auto& oldp = fzv[it->_name];
 		if (oldp)
 		{
@@ -5840,7 +5899,7 @@ std::vector<font_t*> font_rctx::add2mem(const char* data, size_t len, bool iscp,
 	auto r = imp->add_font_mem(data, len, true, pname, 0);
 	for (auto it : r)
 	{
-		it->ctx = &bcc;
+		it->bc_ctx = &bcc;
 		auto& oldp = fzv[it->_name];
 		if (oldp)
 		{

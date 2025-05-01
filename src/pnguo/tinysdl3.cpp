@@ -1169,6 +1169,7 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 				if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
 					glm::ivec2 iss = oldss;
 					if (img->width != iss.x || img->height != iss.y) {
+						SDL_DestroyTexture(ptx);
 						ptx = nullptr;
 					}
 				}
@@ -2541,6 +2542,7 @@ void free_texture_r(void* texture)
 
 texture_cb get_texture_cb() {
 	texture_cb cb = { new_texture_r, update_texture_r, set_texture_blend_r, free_texture_r };
+	cb.make_tex = (void* (*)(void*, image_ptr_t*))newuptex;
 	return cb;
 }
 
@@ -2620,7 +2622,7 @@ void form_x::update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int strid
 			rect.w = ss.x;
 			rect.h = ss.y;
 		}
-		if (stride < 1)stride = rc.z * 4;
+		if (stride < 1)stride = rect.w * 4;
 		SDL_UpdateTexture(p, rect.h > 1 && rect.w > 1 ? &rect : nullptr, data, stride);
 	}
 }

@@ -1154,7 +1154,7 @@ private:
 
 };
 
-
+text_draw_t* new_text_drawable(layout_text_x* ltx, const glm::vec4& box_rc, text_style_t* st);
 void draw_draw_texts(text_draw_t* p);
 
 // 图形通用软渲染接口
