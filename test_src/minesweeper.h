@@ -6,7 +6,7 @@ public:
 	struct node_t
 	{
 		char type = 0;		 // 0-8数字，-1雷
-		char status = 0;	 // 状态，0未翻开、1已翻开、2叉、3爆
+		char status = 0;	 // 状态，0未翻开、1已翻开、2爆、3叉
 		char mark = 0;		 // 0无，1旗帜、2问号、3叹号
 		bool search = false; // 是否搜索过
 	};
@@ -22,11 +22,12 @@ public:
 	int mine_count = 10;		// 雷数
 	int flag_count = 0;		    // 标记的旗帜数
 	double tick = 0;			// 计时器
-	char g_result = 0;			// 游戏结果，0未结束、1胜利、2失败
+	char g_result = -1;			// 游戏结果，0未结束、1胜利、2失败
 	std::vector<node_t> _map;	// 地图数据
 	void* texture = 0;			// 纹理
 	std::vector<draw_data_t> _draw_data;	// 渲染数据
-	std::stack<glm::ivec3> _stack_e;
+	std::stack<glm::ivec2> _stack_e;
+	glm::ivec2 _pos = { };	// 渲染坐标
 	res_a* res = 0;	// 资源管理器
 public:
 	minesweeper_cx();
@@ -48,5 +49,7 @@ public:
 	draw_data_t* data();
 	size_t count();
 private:
+	bool expand_blank(int x, int y);
+
 
 };

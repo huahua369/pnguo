@@ -832,14 +832,29 @@ int main()
 		mscx->set_texture(minesweeper_tex);
 		mscx->resize(9, 9, 10);
 		mscx->clear_map();
-		mscx->init_map({ 5,5 });
-		//draw_draw_texts();
+		{
+			form0->add_event(mscx, [](uint32_t type, et_un_t* e, void* ud) {
+				auto ptr = (minesweeper_cx*)ud;
+				auto btn = e->v.b;
+				if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
+				static int bns[] = { 0,0,3,1 };
+				if (btn->button > 3)
+				{
+					return;
+				}
+				int bn = bns[btn->button];
+				if (btn->clicks == 2) {
+					bn = 2;
+				}
+				ptr->send_event({ btn->x,btn->y }, bn);
+				});
+		}
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
 				static double deltas = 0;
 				deltas += delta;
 
-				glm::vec2 pos = { 370,100 };
+				glm::vec2 pos = { 50,100 };
 				mscx->update(pos, delta);
 				auto d = mscx->data();
 				auto cnt = mscx->count();
@@ -848,13 +863,15 @@ int main()
 					auto it = d[i];
 					if (it.w9 > 0)
 					{
-						SDL_FRect* dstrect1 = ((SDL_FRect*)&it.dst);
 						auto w = it.w9;
-						SDL_RenderTexture9Grid(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, w, w, w, w, it.scale, dstrect1);
+						SDL_RenderTexture9Grid(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, w, w, w, w, it.scale, (SDL_FRect*)&it.dst);
+					}
+					else if (it.scale > 1.0 || it.scale < 1.0)
+					{
+						SDL_RenderTextureTiled(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, it.scale, (SDL_FRect*)&it.dst);
 					}
 					else {
-						SDL_FRect* dstrect1 = ((SDL_FRect*)&it.dst);
-						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, dstrect1);
+						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, (SDL_FRect*)&it.dst);
 					}
 				}
 				return;
