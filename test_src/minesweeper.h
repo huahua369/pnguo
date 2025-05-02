@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 struct res_a;
 class minesweeper_cx
 {
@@ -28,7 +28,9 @@ public:
 	std::vector<draw_data_t> _draw_data;	// 渲染数据
 	std::stack<glm::ivec2> _stack_e;
 	glm::ivec2 _pos = { };	// 渲染坐标
+	glm::ivec2 btn_pos = { };	// 表情按钮坐标
 	res_a* res = 0;	// 资源管理器
+	std::string savedir = "/temp/";
 public:
 	minesweeper_cx();
 	~minesweeper_cx();
@@ -36,6 +38,8 @@ public:
 	void set_texture(void* tex);
 	// 设置地图大小、雷数
 	void resize(int w, int h, int mc);
+	// 指定雷坐标初始
+	void resize(int w, int h, int mc, glm::ivec2* mc_pos);
 	// 清除地图
 	void clear_map();
 	// 设置地图数据，输入鼠标坐标，保证第一次点击为空
@@ -48,8 +52,16 @@ public:
 
 	draw_data_t* data();
 	size_t count();
+	// 列出存档
+	void load_list();
+	// 加载列表指定的存档
+	void load(int idx);
+	// 暂停保存
+	void pause_save();
 private:
+	// 计算雷数量
+	void get_mine_count();
 	bool expand_blank(int x, int y);
-
-
+	void over_mark_map(int type);
+	void make_num(const glm::ivec2& pos, int num, int maxcount);
 };

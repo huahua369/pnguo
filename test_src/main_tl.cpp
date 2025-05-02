@@ -815,8 +815,8 @@ int main()
 		//std::string familys = (char*)u8"Consolas,新宋体,Noto Color Emoji,Times New Roman,Malgun Gothic";
 		ltx->add_familys(familys.c_str(), "");
 		auto cache_tex = ltx->new_cache({ 1024,1024 });
-		auto minesweeper_tex = form0->new_texture("mw2.png");
-		char* tb = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
+		char* tb1 = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
+		char* tb = (char*)u8"➗";
 		auto tbt = ltx->new_text_dta(0, 39, tb, -1, 0);
 		{
 			auto ft = cache_tex->_data.data();
@@ -828,10 +828,13 @@ int main()
 				auto tex = tex_cb.make_tex(form0->renderer, p);
 			}
 		}
+
+		auto minesweeper_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "mw2.png");
 		minesweeper_cx* mscx = new minesweeper_cx();
 		mscx->set_texture(minesweeper_tex);
-		mscx->resize(9, 9, 10);
-		mscx->clear_map();
+		glm::ivec2 mcpos[] = { {6,0},{5,1},{3,2},{7,2},{8,2},{8,3},{0,4},{7,4},{5,5},{8,6} };
+		mscx->resize(9, 9, 10, mcpos);
+		//mscx->clear_map();
 		{
 			form0->add_event(mscx, [](uint32_t type, et_un_t* e, void* ud) {
 				auto ptr = (minesweeper_cx*)ud;
@@ -885,7 +888,7 @@ int main()
 				SDL_FRect dstrect2 = { 40,110,300,200 };
 				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc1, w, w, w, w, scale, &dstrect1);
 				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc2, w, w, w, w, scale, &dstrect2);
-
+				// 渲染文本
 				for (auto it : tbt->tv)
 				{
 					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };

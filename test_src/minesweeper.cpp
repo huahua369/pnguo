@@ -1,8 +1,10 @@
-#include <pch1.h>
+﻿#include <pch1.h>
 #include "minesweeper.h"
+#include <mapView.h>
 struct res_a
 {
 	int mwidth = 32;
+	int title_height = 60;
 	int step = 2;
 	glm::ivec4 mnum = { 10,10,32,32 };		// 9个，0-8*
 	glm::ivec4 block_0 = { 10,50,32,32 };	// 3个，凸、凹、红*、叉
@@ -45,8 +47,28 @@ void minesweeper_cx::resize(int w, int h, int mc)
 	size.x = w;
 	size.y = h;
 	mine_count = mc;
-	flag_count = 0;
-	tick = 0;
+}
+
+void minesweeper_cx::resize(int w, int h, int mc, glm::ivec2* mc_pos)
+{
+	resize(w, h, mc);
+	// 清除地图
+	clear_map();
+	auto t = mc_pos;
+	for (int i = 0; i < mine_count; i++)
+	{
+		int idx = t->x + t->y * w;
+		t++;
+		if (idx < 0 || _map[idx].type == -1)
+		{
+			i--;
+			continue;
+		}
+		_map[idx].type = -1;
+	}
+	// 计算周围雷数
+	get_mine_count();
+	g_result = 0;
 }
 
 void minesweeper_cx::clear_map()
@@ -57,6 +79,8 @@ void minesweeper_cx::clear_map()
 	{
 		_map[i] = {};
 	}
+	flag_count = 0;
+	tick = 0;
 }
 
 void minesweeper_cx::init_map(const glm::ivec2& pos)
@@ -95,8 +119,16 @@ void minesweeper_cx::init_map(const glm::ivec2& pos)
 		}
 		_map[idx].type = -1;
 	}
-	// 计算周围雷数
+	get_mine_count();
+	g_result = 0;
+	return;
+}
 
+void minesweeper_cx::get_mine_count()
+{
+	// 计算周围雷数
+	int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+	int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 	for (size_t y = 0; y < size.y; y++)
 	{
 		auto yh = y * size.x;
@@ -119,7 +151,6 @@ void minesweeper_cx::init_map(const glm::ivec2& pos)
 			}
 		}
 	}
-	return;
 }
 
 bool minesweeper_cx::expand_blank(int x, int y)
@@ -161,12 +192,21 @@ bool minesweeper_cx::expand_blank(int x, int y)
 	return ret;
 }
 
-void minesweeper_cx::update(const glm::ivec2& pos, double delta)
+
+void minesweeper_cx::update(const glm::ivec2& pos0, double delta)
 {
+	auto pos1 = pos0;
+	auto pos = pos0;
+	pos.y += res->title_height;
 	_pos = pos;
 	if (/*g_result != 0 ||*/ texture == 0)return;
+	if (g_result == 0)
+		tick += delta;
 	_draw_data.clear();
 	_draw_data.reserve(size.x * size.y * 2);
+	// 背景
+
+	// 遍历地图生成
 	for (size_t y = 0; y < size.y; y++)
 	{
 		auto yh = y * size.x;
@@ -191,12 +231,6 @@ void minesweeper_cx::update(const glm::ivec2& pos, double delta)
 				{
 					dd.src = res->mine;// 显示雷
 					dd.dst = { pos.x + x * res->mwidth,  pos.y + y * res->mwidth, dd.src.z,dd.src.w };
-					dd.scale = 0.86;
-					auto d2 = res->mwidth * (1.0 - dd.scale);
-					dd.dst.z -= d2;
-					dd.dst.w -= d2;
-					dd.dst.x += d2 * 0.5;
-					dd.dst.y += d2 * 0.5;
 					dd.scale = 1.0;
 					_draw_data.push_back(dd);
 				}
@@ -234,12 +268,6 @@ void minesweeper_cx::update(const glm::ivec2& pos, double delta)
 				{
 					dd.src = res->mine;// 显示雷
 					dd.dst = { pos.x + x * res->mwidth,  pos.y + y * res->mwidth, dd.src.z,dd.src.w };
-					dd.scale = 0.86;
-					auto d2 = res->mwidth * (1.0 - dd.scale);
-					dd.dst.z -= d2;
-					dd.dst.w -= d2;
-					dd.dst.x += d2 * 0.5;
-					dd.dst.y += d2 * 0.5;
 					dd.scale = 1.0;
 					_draw_data.push_back(dd);
 				}
@@ -250,20 +278,68 @@ void minesweeper_cx::update(const glm::ivec2& pos, double delta)
 			}
 		}
 	}
+
+	// 生成计数表情渲染数据
+	{
+		auto ct = std::to_string(mine_count);
+		auto ct0 = std::to_string((int64_t)tick);
+		auto n = ct.size();
+		auto nt = mine_count - flag_count;
+		// 旗子剩余数量 
+		make_num(pos0, nt, glm::clamp((int)n, 3, mine_count));
+		auto maxw = res->mwidth * size.x;
+		auto ct00 = glm::clamp((int)ct0.size(), 3, 6);
+		auto jsw = ct00 * res->num.z;
+		auto qw = n * res->num.z;
+
+		draw_data_t dd = {};
+		dd.src = res->bq;
+		dd.src.x += glm::clamp((int)g_result, 0, 2) * (res->mwidth + res->step);
+		// 居中
+		auto ce = (maxw - (res->mwidth + jsw + qw)) * 0.5;
+		if (ce < qw)
+		{
+			ce = qw;
+		}
+		btn_pos = { pos1.x + ce + qw, pos1.y + (res->title_height - dd.src.w) * 0.5 };
+
+		dd.dst = { btn_pos , dd.src.z,dd.src.w };
+		dd.scale = 1.0f;
+		// 表情
+		_draw_data.push_back(dd);
+		jsw = maxw - jsw;
+		if (jsw < ce + res->mwidth)
+		{
+			jsw = ce + res->mwidth;
+		}
+		pos1.x += jsw;
+		// 计时器
+		make_num(pos1, tick, ct00);
+	}
 }
 
 void minesweeper_cx::send_event(const glm::ivec2& opos, int btn)
 {
 	auto pos = opos - _pos;
+	glm::vec2 ps1 = opos, bps = btn_pos;
+	if (glm::distance(ps1, bps) < res->mwidth && btn == 0)
+	{
+		// 点中表情
+		if (g_result != 0)
+		{
+			clear_map();
+			g_result = -1;
+		}
+		return;
+	}
 	pos /= res->mwidth;
+	if (pos.x < 0 || pos.x >= size.x || pos.y < 0 || pos.y >= size.y)
+		return;
 	if (g_result < 0)
 	{
 		init_map(pos);
-		g_result = 0;
 	}
 	if (g_result != 0)return;
-	if (pos.x < 0 || pos.x >= size.x || pos.y < 0 || pos.y >= size.y)
-		return;
 	int idx = pos.x + pos.y * size.x;
 	auto& pt = _map[idx];
 	if (pt.status == 1)
@@ -276,14 +352,7 @@ void minesweeper_cx::send_event(const glm::ivec2& opos, int btn)
 		}
 		if (pt.type == -1)
 		{
-			g_result = 2;
-			for (auto& it : _map) {
-				it.status = 1;
-				if (it.mark == 1 && it.type != -1)
-				{
-					it.status = 3;
-				}
-			}
+			over_mark_map(2);
 			pt.status = 2;
 			return;
 		}
@@ -294,38 +363,35 @@ void minesweeper_cx::send_event(const glm::ivec2& opos, int btn)
 			{
 				expand_blank(pos.x, pos.y);
 			}
+			int count = 0;
+			for (auto& it : _map) {
+				if (it.type >= 0 && it.status == 0)
+				{
+					count++;
+					break;
+				}
+			}
+			if (count == 0)
+			{
+				over_mark_map(1);
+			}
 		}
 	}
 	else if (btn == 1)//右
 	{
 		if (pt.mark == 0)
 		{
-			flag_count++; pt.mark = 1;
-			if (flag_count == mine_count)
+			if (flag_count < mine_count)
 			{
-				int count = 0;
-				for (auto& it : _map) {
-					if (it.type == -1 && it.mark == 1)
-					{
-						count++;
-					}
-				}
-				if (count == flag_count)
-				{
-					g_result = 1; 
-					for (auto& it : _map) {
-						if (it.status == 0)
-						{
-							it.status = 1;
-						}
-					}
-				}
+				flag_count++;
+				pt.mark = 1;
 			}
 		}
 		else
 		{
 			flag_count--; pt.mark = 0;
 		}
+		flag_count = glm::clamp(flag_count, 0, mine_count);
 	}
 	else if (btn == 2)// 双击
 	{
@@ -342,4 +408,60 @@ minesweeper_cx::draw_data_t* minesweeper_cx::data()
 size_t minesweeper_cx::count()
 {
 	return _draw_data.size();
+}
+
+void minesweeper_cx::load_list()
+{
+	auto r = hz::read_json(savedir + "save_mw.json");
+	if (r.is_object() && r.size() > 0)
+	{
+
+	}
+}
+
+void minesweeper_cx::load(int idx)
+{
+}
+
+void minesweeper_cx::pause_save()
+{
+}
+
+void minesweeper_cx::over_mark_map(int type)
+{
+	g_result = type;
+	for (auto& it : _map) {
+		auto cs = it.status;
+		it.status = 1;
+		if (cs == 0 && it.type == -1 && type == 1)
+		{
+			it.status = 0;
+			it.mark = 1;
+		}
+		if (it.mark == 1 && it.type != -1)
+		{
+			it.status = 3;
+		}
+	}
+}
+
+void minesweeper_cx::make_num(const glm::ivec2& pos, int num, int maxcount)
+{
+	if (num < 0)num = 0;
+	auto ctn = std::to_string(num);
+	if (ctn.size() < maxcount && maxcount > 0)
+	{
+		auto nn = maxcount - ctn.size();
+		ctn.insert(ctn.begin(), nn, '0');
+	}
+	for (size_t i = 0; i < maxcount; i++)
+	{
+		draw_data_t dd = {};
+		dd.src = res->num;
+		dd.src.x += (ctn[i] - '0') * (dd.src.z + res->step);
+		dd.dst = { pos.x + i * dd.src.z, pos.y, dd.src.z,dd.src.w };
+		dd.scale = 1.0f;
+		_draw_data.push_back(dd);
+	}
+
 }

@@ -2539,10 +2539,20 @@ void free_texture_r(void* texture)
 	if (texture)
 		SDL_DestroyTexture(((SDL_Texture*)texture));
 }
-
+void* new_tex2file(void* renderer, const char* fn) {
+	SDL_Texture* p = nullptr;
+	stbimage_load img(fn);
+	int depth = 32, pitch = img.width * 4;
+	if (img.data)
+	{
+		p = (SDL_Texture*)new_texture_r(renderer, img.width, img.height, 0, img.data, pitch, 0, true, false);
+	}
+	return p;
+}
 texture_cb get_texture_cb() {
 	texture_cb cb = { new_texture_r, update_texture_r, set_texture_blend_r, free_texture_r };
 	cb.make_tex = (void* (*)(void*, image_ptr_t*))newuptex;
+	cb.new_texture_file = new_tex2file;
 	return cb;
 }
 

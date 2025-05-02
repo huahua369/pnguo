@@ -341,6 +341,7 @@ struct texture_cb
 	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
 	void (*free_texture)(void* texture);
 	void* (*make_tex)(void* renderer, image_ptr_t* img);
+	void* (*new_texture_file)(void* renderer, const char* fn);
 };
 #else
 typedef struct texture_cb texture_cb;
