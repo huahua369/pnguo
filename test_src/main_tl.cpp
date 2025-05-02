@@ -635,6 +635,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\mtl.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\mw.pdb");
 #endif     
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);
@@ -833,8 +834,9 @@ int main()
 		minesweeper_cx* mscx = new minesweeper_cx();
 		mscx->set_texture(minesweeper_tex);
 		glm::ivec2 mcpos[] = { {6,0},{5,1},{3,2},{7,2},{8,2},{8,3},{0,4},{7,4},{5,5},{8,6} };
-		mscx->resize(9, 9, 10, mcpos);
-		//mscx->clear_map();
+		//mscx->resize(9, 9, 10, mcpos);
+		mscx->resize(26, 15, 0.3);
+		mscx->clear_map();
 		{
 			form0->add_event(mscx, [](uint32_t type, et_un_t* e, void* ud) {
 				auto ptr = (minesweeper_cx*)ud;

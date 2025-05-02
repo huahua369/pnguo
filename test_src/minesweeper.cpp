@@ -36,12 +36,19 @@ void minesweeper_cx::set_texture(void* tex)
 	texture = tex;
 }
 
-void minesweeper_cx::resize(int w, int h, int mc)
+void minesweeper_cx::resize(int w, int h, float mc)
 {
 	if (w < 6)
 		w = 6;
 	if (h < 6)
 		h = 6;
+	if (mc < 0.9)
+	{
+		mc = w * h * mc;
+		int nc = mc;
+		if (nc & 1)nc++;
+		mc = nc;
+	}
 	if (mc < 6)
 		mc = 6;
 	size.x = w;
@@ -49,7 +56,7 @@ void minesweeper_cx::resize(int w, int h, int mc)
 	mine_count = mc;
 }
 
-void minesweeper_cx::resize(int w, int h, int mc, glm::ivec2* mc_pos)
+void minesweeper_cx::resize(int w, int h, float mc, glm::ivec2* mc_pos)
 {
 	resize(w, h, mc);
 	// 清除地图
@@ -119,6 +126,10 @@ void minesweeper_cx::init_map(const glm::ivec2& pos)
 		}
 		_map[idx].type = -1;
 	}
+	if (_map[empty_pos].type != 0)
+	{
+
+	}
 	get_mine_count();
 	g_result = 0;
 	return;
@@ -178,8 +189,8 @@ bool minesweeper_cx::expand_blank(int x, int y)
 			int ny = cy + dy[i];
 			if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
 			auto& pt = mine[nx + ny * w];
-			// 若未处理且为空白或数字 
-			if (!pt.search && pt.type != -1) {
+			// 若未处理且为空白或数字,未标旗的 
+			if (!pt.search && pt.type != -1 && pt.mark == 0) {
 				pt.status = 1;  // 显示数字或空白 
 				pt.search = 1;  // 标记为已处理
 				if (pt.type == 0) {  // 仅将空白格子加入队列 
@@ -464,4 +475,133 @@ void minesweeper_cx::make_num(const glm::ivec2& pos, int num, int maxcount)
 		_draw_data.push_back(dd);
 	}
 
+}
+
+
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+#include <pnguo/win_core.h>
+#include "win32msg.h"
+#include <pnguo/event.h>
+#define GUI_STATIC_LIB
+#include <pnguo/pnguo.h>
+#include <tinysdl3.h>
+#include <pnguo/editor_2d.h>
+#include <spine/spine-sdl3/spinesdl3.h>
+#include <stb_image_write.h>
+int main()
+{
+	const char* wtitle = (char*)u8"多功能管理工具";
+	auto tstr = hz::u8_to_gbk(wtitle);
+	auto app = new_app();
+	cpuinfo_t cpuinfo = get_cpuinfo();
+	glm::ivec2 ws = { 1280,860 };
+	// ef_vulkan ef_gpu|ef_resizable
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan));
+	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
+		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
+		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+	auto audio_ctx = new hz::audio_cx();
+	audio_ctx->init(&abc, "data/config_music.json");
+	audio_ctx->run_thread();
+	coders_t* cp = new_coders();
+	auto d2 = new sp_drawable();
+	d2->set_renderer(form0->renderer);
+	//d2->add_pkg("temp/spineboy-j.spt", 0.25, 0.2);
+	//d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
+	//d2->set_pos(0, 600, 650);
+	//d2->set_pos(1, 300, 650); 
+	texture_cb tex_cb = get_texture_cb();
+	auto ltx = new layout_text_x();
+	ltx->set_ctx(app->font_ctx);
+	std::vector<std::string> efn;
+	//auto fpv = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\Noto-COLRv1.ttf)", &efn);
+	//auto fpv1 = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\NotoColorEmoji.ttf)", &efn);
+	std::string familys = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
+	//std::string familys = (char*)u8"Consolas,新宋体,Noto Color Emoji,Times New Roman,Malgun Gothic";
+	ltx->add_familys(familys.c_str(), "");
+	auto cache_tex = ltx->new_cache({ 1024,1024 });
+	char* tb1 = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
+	char* tb = (char*)u8"➗";
+	auto tbt = ltx->new_text_dta(0, 39, tb, -1, 0);
+	{
+		auto ft = cache_tex->_data.data();
+		auto n = cache_tex->_data.size();
+		for (size_t i = 0; i < n; i++)
+		{
+			auto p = ft[i];
+			//save_img_png(p, "font_test51.png");
+			auto tex = tex_cb.make_tex(form0->renderer, p);
+		}
+		tbt->tv.clear();
+	}
+
+	auto minesweeper_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "mw2.png");
+	if (minesweeper_tex)
+	{
+		minesweeper_cx* mscx = new minesweeper_cx();
+		mscx->set_texture(minesweeper_tex);
+		glm::ivec2 mcpos[] = { {6,0},{5,1},{3,2},{7,2},{8,2},{8,3},{0,4},{7,4},{5,5},{8,6} };
+		//mscx->resize(9, 9, 10, mcpos);
+		mscx->resize(26, 15, 0.3);
+		mscx->clear_map();
+		form0->add_event(mscx, [](uint32_t type, et_un_t* e, void* ud) {
+			auto ptr = (minesweeper_cx*)ud;
+			auto btn = e->v.b;
+			if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
+			static int bns[] = { 0,0,3,1 };
+			if (btn->button > 3)
+			{
+				return;
+			}
+			int bn = bns[btn->button];
+			if (btn->clicks == 2) {
+				bn = 2;
+			}
+			ptr->send_event({ btn->x,btn->y }, bn);
+			});
+		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
+			{
+				static double deltas = 0;
+				deltas += delta;
+
+				glm::vec2 pos = { 50,100 };
+				mscx->update(pos, delta);
+				auto d = mscx->data();
+				auto cnt = mscx->count();
+				for (size_t i = 0; i < cnt; i++)
+				{
+					auto it = d[i];
+					if (it.w9 > 0)
+					{
+						auto w = it.w9;
+						SDL_RenderTexture9Grid(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, w, w, w, w, it.scale, (SDL_FRect*)&it.dst);
+					}
+					else if (it.scale > 1.0 || it.scale < 1.0)
+					{
+						SDL_RenderTextureTiled(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, it.scale, (SDL_FRect*)&it.dst);
+					}
+					else {
+						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, (SDL_FRect*)&it.dst);
+					}
+				}
+				// 渲染文本
+				for (auto it : tbt->tv)
+				{
+					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
+					SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
+					SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
+				}
+				return;
+			};
+	}
+
+
+	// 运行消息循环
+	run_app(app, 0);
+	delete d2;
+	delete audio_ctx;
+	free_coders(cp);
+	free_app(app);
+	return 0;
 }

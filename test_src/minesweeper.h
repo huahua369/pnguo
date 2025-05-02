@@ -37,9 +37,9 @@ public:
 	// 设置纹理
 	void set_texture(void* tex);
 	// 设置地图大小、雷数
-	void resize(int w, int h, int mc);
+	void resize(int w, int h, float mc);
 	// 指定雷坐标初始
-	void resize(int w, int h, int mc, glm::ivec2* mc_pos);
+	void resize(int w, int h, float mc, glm::ivec2* mc_pos);
 	// 清除地图
 	void clear_map();
 	// 设置地图数据，输入鼠标坐标，保证第一次点击为空

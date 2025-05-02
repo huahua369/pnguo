@@ -30,7 +30,14 @@ list(APPEND src_spr
 list(APPEND src_mtl   
     "main_tl.cpp" 
     "../src/pnguo/ecc_sv.cpp"
-    "mshell.cpp"
+    "mshell.cpp" 
+    "../src/pnguo/editor_2d.cpp"
+    "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
+    "../rc/resource1.rc"
+    "../njson.natvis"
+) 
+list(APPEND src_mw
+    "../src/pnguo/ecc_sv.cpp"
     "minesweeper.cpp"
     "../src/pnguo/editor_2d.cpp"
     "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
@@ -56,6 +63,7 @@ add_executable (vkr_spr ${src_spr} )
 add_executable (mtl ${src_mtl} ) 
 add_executable (audios ${src_audios} ) 
 add_executable (mmd ${src_mmd} ) 
+add_executable (mw ${src_mw} ) 
 
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
@@ -123,6 +131,7 @@ target_link_libraries(tcmp PRIVATE ${lklib})
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(mtl PRIVATE ${lklib}  )
+target_link_libraries(mw PRIVATE ${lklib} )
 target_link_libraries(audios PRIVATE ${lkalib})
 target_link_libraries(mmd PRIVATE ${lklib}  )  
  
