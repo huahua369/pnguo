@@ -1,6 +1,19 @@
 ﻿#include <pch1.h>
 #include "minesweeper.h"
 #include <mapView.h>
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+#include <pnguo/win_core.h>
+#include "win32msg.h"
+#include <pnguo/event.h>
+#define GUI_STATIC_LIB
+#include <pnguo/pnguo.h>
+#include <tinysdl3.h>
+#include <pnguo/editor_2d.h>
+#include <spine/spine-sdl3/spinesdl3.h>
+#include <stb_image_write.h>
+
+
 struct res_a
 {
 	int mwidth = 32;
@@ -23,7 +36,7 @@ struct res_a
 
 minesweeper_cx::minesweeper_cx()
 {
-	res = new res_a(); 
+	res = new res_a();
 	load_list();
 }
 
@@ -55,7 +68,7 @@ void minesweeper_cx::resize(int w, int h, float mc)
 		mc = 6;
 	size.x = w;
 	size.y = h;
-	mine_count = mc; 
+	mine_count = mc;
 	save();
 }
 
@@ -214,7 +227,7 @@ void minesweeper_cx::update(const glm::ivec2& pos0, double delta)
 	auto pos = pos0;
 	pos.y += res->title_height;
 	_pos = pos;
-	if (/*g_result != 0 ||*/ texture == 0)return;
+	if (/*g_result != 0 ||*/ texture == 0 || _map.empty())return;
 	if (g_result == 0)
 		tick += delta;
 	_draw_data.clear();
@@ -357,9 +370,9 @@ void minesweeper_cx::send_event(const glm::ivec2& opos, int btn)
 	if (g_result != 0)return;
 	int idx = pos.x + pos.y * size.x;
 	auto& pt = _map[idx];
-	if (pt.status == 1)
+	if (pt.status == 1 && btn != 2)
 		return;
-	if (btn == 0)//左
+	if (btn == 0)//左打开
 	{
 		if (pt.mark > 0) {
 			flag_count--; pt.mark = 0;
@@ -378,21 +391,10 @@ void minesweeper_cx::send_event(const glm::ivec2& opos, int btn)
 			{
 				expand_blank(pos.x, pos.y);
 			}
-			int count = 0;
-			for (auto& it : _map) {
-				if (it.type >= 0 && it.status == 0)
-				{
-					count++;
-					break;
-				}
-			}
-			if (count == 0)
-			{
-				over_mark_map(1);
-			}
+			over_mark_map(1);
 		}
 	}
-	else if (btn == 1)//右
+	else if (btn == 1)//右插旗
 	{
 		if (pt.mark == 0)
 		{
@@ -408,9 +410,63 @@ void minesweeper_cx::send_event(const glm::ivec2& opos, int btn)
 		}
 		flag_count = glm::clamp(flag_count, 0, mine_count);
 	}
-	else if (btn == 2)// 双击
+	else if (btn == 2)// 打开8格
 	{
+		if (pt.status != 1 || pt.type < 1)return;
+		int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+		int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 
+		std::stack<glm::ivec2>& q = _stack_e;  // 队列存储待处理坐标 
+		auto mine = _map.data();
+		while (q.size()) {
+			q.pop();
+		}
+
+		int cx = pos.x, cy = pos.y;
+		// 遍历8个方向 
+		int cc = 0;
+		for (int i = 0; i < 8; i++) {
+			int nx = cx + dx[i];
+			int ny = cy + dy[i];
+			if (nx < 0 || nx >= size.x || ny < 0 || ny >= size.y) continue;
+			auto& p = mine[nx + ny * size.x];
+			// 若未处理且为空白或数字,未标旗的 
+			if (p.mark == 1 && p.status == 0) {
+				cc++;
+			}
+		}
+		if (cc < pt.type)
+		{
+			return;
+		}
+		for (int i = 0; i < 8; i++) {
+			int nx = cx + dx[i];
+			int ny = cy + dy[i];
+			if (nx < 0 || nx >= size.x || ny < 0 || ny >= size.y) continue;
+			auto& p = mine[nx + ny * size.x];
+			// 若未处理且为空白或数字,未标旗的 
+			if (p.mark == 0 && p.status == 0) {
+				if (p.type == -1)
+				{
+					over_mark_map(2);
+					p.status = 2;
+					return;
+				}
+				p.status = 1;  // 显示数字或空白  
+				if (p.type == 0) {  // 仅将空白格子加入队列 
+					q.push({ nx, ny });
+				}
+			}
+		}
+		while (q.size()) {
+			auto n = q.top(); q.pop();
+			auto& p = mine[n.x + n.y * size.x];
+			if (p.type == 0)
+			{
+				expand_blank(n.x, n.y);
+			}
+		}
+		over_mark_map(1);
 	}
 
 }
@@ -436,6 +492,10 @@ void minesweeper_cx::load_list()
 		resize(w, h, mc);
 		clear_map();
 	}
+	else {
+		resize(size.x, size.y, mcc);
+		clear_map();
+	}
 }
 
 void minesweeper_cx::load(int idx)
@@ -453,6 +513,21 @@ void minesweeper_cx::save()
 
 void minesweeper_cx::over_mark_map(int type)
 {
+	if (type == 1)
+	{
+		int count = 0;
+		for (auto& it : _map) {
+			if (it.type >= 0 && it.status == 0)
+			{
+				count++;
+				break;
+			}
+		}
+		if (count != 0)
+		{
+			return;
+		}
+	}
 	g_result = type;
 	for (auto& it : _map) {
 		auto cs = it.status;
@@ -491,17 +566,6 @@ void minesweeper_cx::make_num(const glm::ivec2& pos, int num, int maxcount)
 }
 
 
-#define SDL_MAIN_HANDLED
-#include <SDL3/SDL.h>
-#include <pnguo/win_core.h>
-#include "win32msg.h"
-#include <pnguo/event.h>
-#define GUI_STATIC_LIB
-#include <pnguo/pnguo.h>
-#include <tinysdl3.h>
-#include <pnguo/editor_2d.h>
-#include <spine/spine-sdl3/spinesdl3.h>
-#include <stb_image_write.h>
 int main()
 {
 	const char* wtitle = (char*)u8"多功能管理工具";
@@ -562,7 +626,7 @@ int main()
 			auto ptr = (minesweeper_cx*)ud;
 			auto btn = e->v.b;
 			if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
-			static int bns[] = { 0,0,3,1 };
+			static int bns[] = { 0,0,2,1 };
 			if (btn->button > 3)
 			{
 				return;

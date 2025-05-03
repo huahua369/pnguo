@@ -48,7 +48,7 @@ public:
 
 	// 更新渲染
 	void update(const glm::ivec2& pos, double delta);
-	// 发送事件，btn=0左键、1右键、2双击
+	// 发送事件，btn=0打开、1插旗、2打开周围8格
 	void send_event(const glm::ivec2& pos, int btn);
 
 	draw_data_t* data();
