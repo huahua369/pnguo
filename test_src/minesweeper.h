@@ -18,8 +18,9 @@ public:
 	};
 	// 9*9、16*16、16*30、
 	// 10、40、99
-	glm::ivec2 size = { 9,9 };	// 地图大小
+	glm::ivec2 size = { 39,24 };	// 地图大小
 	int mine_count = 10;		// 雷数
+	float mcc = 0.25;
 	int flag_count = 0;		    // 标记的旗帜数
 	double tick = 0;			// 计时器
 	char g_result = -1;			// 游戏结果，0未结束、1胜利、2失败
@@ -30,7 +31,7 @@ public:
 	glm::ivec2 _pos = { };	// 渲染坐标
 	glm::ivec2 btn_pos = { };	// 表情按钮坐标
 	res_a* res = 0;	// 资源管理器
-	std::string savedir = "/temp/";
+	std::string savedir = "data/";
 public:
 	minesweeper_cx();
 	~minesweeper_cx();
@@ -56,8 +57,8 @@ public:
 	void load_list();
 	// 加载列表指定的存档
 	void load(int idx);
-	// 暂停保存
-	void pause_save();
+	// 保存
+	void save();
 private:
 	// 计算雷数量
 	void get_mine_count();

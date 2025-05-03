@@ -23,7 +23,8 @@ struct res_a
 
 minesweeper_cx::minesweeper_cx()
 {
-	res = new res_a();
+	res = new res_a(); 
+	load_list();
 }
 
 minesweeper_cx::~minesweeper_cx()
@@ -42,6 +43,7 @@ void minesweeper_cx::resize(int w, int h, float mc)
 		w = 6;
 	if (h < 6)
 		h = 6;
+	mcc = mc;
 	if (mc < 0.9)
 	{
 		mc = w * h * mc;
@@ -53,7 +55,8 @@ void minesweeper_cx::resize(int w, int h, float mc)
 		mc = 6;
 	size.x = w;
 	size.y = h;
-	mine_count = mc;
+	mine_count = mc; 
+	save();
 }
 
 void minesweeper_cx::resize(int w, int h, float mc, glm::ivec2* mc_pos)
@@ -76,6 +79,7 @@ void minesweeper_cx::resize(int w, int h, float mc, glm::ivec2* mc_pos)
 	// 计算周围雷数
 	get_mine_count();
 	g_result = 0;
+	save();
 }
 
 void minesweeper_cx::clear_map()
@@ -426,7 +430,11 @@ void minesweeper_cx::load_list()
 	auto r = hz::read_json(savedir + "save_mw.json");
 	if (r.is_object() && r.size() > 0)
 	{
-
+		int w = r["width"];
+		int h = r["height"];
+		float mc = r["mine_count"];
+		resize(w, h, mc);
+		clear_map();
 	}
 }
 
@@ -434,8 +442,13 @@ void minesweeper_cx::load(int idx)
 {
 }
 
-void minesweeper_cx::pause_save()
+void minesweeper_cx::save()
 {
+	njson0 j;
+	j["width"] = size.x;
+	j["height"] = size.y;
+	j["mine_count"] = mcc;
+	hz::save_json(savedir + "save_mw.json", j, 2);
 }
 
 void minesweeper_cx::over_mark_map(int type)
@@ -536,15 +549,15 @@ int main()
 		tbt->tv.clear();
 	}
 
-	auto minesweeper_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "mw2.png");
+	auto minesweeper_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/mw2.png");
 	if (minesweeper_tex)
 	{
 		minesweeper_cx* mscx = new minesweeper_cx();
 		mscx->set_texture(minesweeper_tex);
 		glm::ivec2 mcpos[] = { {6,0},{5,1},{3,2},{7,2},{8,2},{8,3},{0,4},{7,4},{5,5},{8,6} };
 		//mscx->resize(9, 9, 10, mcpos);
-		mscx->resize(26, 15, 0.3);
-		mscx->clear_map();
+		//mscx->resize(39, 24, 0.3);
+		//mscx->clear_map();
 		form0->add_event(mscx, [](uint32_t type, et_un_t* e, void* ud) {
 			auto ptr = (minesweeper_cx*)ud;
 			auto btn = e->v.b;
@@ -565,7 +578,7 @@ int main()
 				static double deltas = 0;
 				deltas += delta;
 
-				glm::vec2 pos = { 50,100 };
+				glm::vec2 pos = { 20,20 };
 				mscx->update(pos, delta);
 				auto d = mscx->data();
 				auto cnt = mscx->count();
