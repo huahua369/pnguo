@@ -2285,6 +2285,64 @@ double font_t::get_base_line(double height)
 	//return ceil(f * scale);
 	return floor(f * scale); // 向下取整
 }
+
+double font_t::get_line_height(double height)
+{
+	float scale = get_scale(height);
+	double f = ascender - descender + lineGap;
+	return ceil(f * scale);// 向上取整
+}
+
+
+glm::ivec3 font_t::get_text_rect(int fontsize, const void* str8, int len)
+{
+	glm::ivec3 ret = {};
+	if (fontsize < 5 || !str8 || !len)
+		return ret;
+	auto str = (const char*)str8;
+	auto font = this;
+	int x = 0;
+	int y = 0;
+	int n = 1;
+	int lineheight = 0;// get_lineheight(idx, fontsize);
+
+	font_t* oft0 = 0;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		//str = md::get_u8_last(str, &ch);
+		if (ch == '\n')
+		{
+			ret.x = std::max(ret.x, x);
+			x = 0;
+			n++;
+			continue;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent(ch, fontsize, 0, &oft);
+		if (oft != oft0 && oft) {
+			oft0 = oft;
+			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
+			lineheight = std::max((int)((oft->ascender - oft->descender + oft->lineGap) * scale), lineheight);
+		}
+
+		x += rc.z;
+		y = std::max(rc.y, y);
+		ret.y = std::max(ret.y, y);
+		ret.z = std::max(ret.z, rc.w);
+	} while (str && *str);
+	ret.x = std::max(ret.x, x);
+	if (n > 1)
+		ret.y = lineheight * n;
+	else
+		ret.y = get_line_height(fontsize);
+	return ret;
+}
+
 int font_t::get_xmax_extent(double height, int* line_gap)
 {
 	float scale = get_scale(height);

@@ -250,6 +250,26 @@ text_dta* layout_text_x::new_text_dta(size_t idx, int fontsize, const void* str8
 	return old;
 }
 
+text_dta* layout_text_x::new_text_dta1(font_t* p, int fontsize, const void* str8, int len, text_dta* old)
+{
+	if (!old)
+	{
+		old = new text_dta();
+	}
+	old->ltx = this;
+	auto str = (const char*)str8;
+	if (str8)
+	{
+		if (fontsize != old->fontsize)
+		{
+			old->fontsize = fontsize;
+		}
+		old->tv.clear();
+		auto nrc = build_text1(p, fontsize, old->rc, old->text_align, str8, len, old->tv);
+	}
+	return old;
+}
+
 void layout_text_x::c_line_metrics(size_t idx, int fontsize) {
 	if (idx >= familyv.size())idx = 0;
 	if (fontsize == 0 || idx >= cfb.size() || familyv.empty())return;
@@ -526,6 +546,64 @@ glm::ivec2 layout_text_x::build_text(size_t idx, int fontsize, glm::vec4& rc, co
 		auto baseline = rct0.z;
 		baseline = get_baseline(idx, fontsize);
 		int h = get_lineheight(idx, fontsize);
+		if (rc.z < 1)rc.z = rct.x;
+		if (rc.w < 1)rc.w = h;
+		if (ctrc.y < h)ctrc.y = h;
+		auto ta = text_align;
+		if (ta.x < 0)ta.x = 0;
+		if (ta.y < 0)ta.y = 0;
+		glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
+		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
+		auto ps = (ss - rct) * ta + bearing;
+		ps.x += rc.x;
+		ps.y += rc.y;
+		glm::vec2 tps = {};
+		rtv.reserve(rtv.size() + length);
+		for (size_t i = 0; i < length; i++)
+		{
+			auto& it = p->tv[i];
+			if (it.cpt == '\n')
+			{
+				tps.y += h;
+				tps.x = 0;
+			}
+			if (it.cpt == '\t')
+			{
+				it.advance = fontsize;
+			}
+			it._apos = ps + tps;
+			tps.x += it.advance;
+			if (ctrc.x < it.advance)ctrc.x = it.advance;
+			rtv.push_back(it);
+		}
+		ret.y = p->tv.size();
+	}
+	return ret;
+}
+glm::ivec2 layout_text_x::build_text1(font_t* fp, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv)
+{
+	assert(fontsize < 800);
+	glm::ivec2 ret = { rtv.size(), 0 };
+	if (!ctx) { return ret; }
+	text_image_t* p = 0;
+	cti.tv.clear();
+	if (len > 0)
+	{
+		std::string str((char*)str8, len);
+		p = get_glyph_item1(fp, fontsize, str.c_str(), &cti);
+	}
+	else
+	{
+		p = get_glyph_item1(fp, fontsize, str8, &cti);
+	}
+	if (p)
+	{
+		auto rct0 = fp->get_text_rect(fontsize, str8, len);
+		glm::vec2 rct = { rct0.x,rct0.y };
+		auto length = p->tv.size();
+		auto baseline = rct0.z;
+		baseline = fp->get_base_line(fontsize);// get_baseline(idx, fontsize);
+		int h = fp->get_line_height(fontsize);
 		if (rc.z < 1)rc.z = rct.x;
 		if (rc.w < 1)rc.w = h;
 		if (ctrc.y < h)ctrc.y = h;
@@ -890,6 +968,42 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, int fontsize, const void
 		if (kk < 1)break;
 		str += kk;
 		font_t::get_glyph_index_u8(ostr, &gidx, &r, &familyv[idx]);
+		if (r && gidx >= 0)
+		{
+			auto k = r->get_glyph_item(gidx, ch, fontsize, bc_ctx);
+			if (k._glyph_index)
+			{
+				k.cpt = ch;
+				opt->tv.push_back(k);
+			}
+		}
+		else {
+			font_item_t k = {};
+			k.cpt = ch;
+			k.advance = 0;
+			opt->tv.push_back(k);
+		}
+	} while (str && *str);
+	return opt;
+}
+
+text_image_t* layout_text_x::get_glyph_item1(font_t* p, int fontsize, const void* str8, text_image_t* opt)
+{
+	auto str = (const char*)str8;
+	do
+	{
+		if (!str || !(*str) || !opt || !p) { opt = 0; break; }
+		_t1.clear(); _t1.push_back(p);
+		font_t* r = 0;
+		int gidx = 0;
+		if (*str == '\n')
+			gidx = 0;
+		auto ostr = str;
+		int ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		font_t::get_glyph_index_u8(ostr, &gidx, &r, &_t1);
 		if (r && gidx >= 0)
 		{
 			auto k = r->get_glyph_item(gidx, ch, fontsize, bc_ctx);

@@ -188,7 +188,9 @@ public:
 	~font_t();
 	float get_scale(int px);
 	double get_base_line(double height);
+	double get_line_height(double height);
 	int get_xmax_extent(double height, int* line_gap);
+	glm::ivec3 get_text_rect(int fontsize, const void* str8, int len);
 	// 获取字体最大box
 	glm::ivec4 get_bounding_box(double scale, bool is_align0);
 	// 输入utf8获取轮廓，height=0则获取原始大小。提供opt

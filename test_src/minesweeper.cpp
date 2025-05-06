@@ -590,22 +590,23 @@ int main()
 	//d2->set_pos(0, 600, 650);
 	//d2->set_pos(1, 300, 650); 
 	texture_cb tex_cb = get_texture_cb();
+#ifdef _DEBUG
 	auto ltx = new layout_text_x();
 	ltx->set_ctx(app->font_ctx);
 	std::vector<std::string> efn;
 	//auto fpv = app->font_ctx->add2file(R"(data\seguiemj.ttf)", &efn);
-	//auto fpv1 = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\NotoColorEmoji.ttf)", &efn);
 	std::string familys = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
-	//std::string familys = (char*)u8"Consolas,新宋体,Noto Color Emoji,Times New Roman,Malgun Gothic";
 	ltx->add_familys(familys.c_str(), "");
 	auto cache_tex = ltx->new_cache({ 1024,1024 });
 	char* tb1 = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
 	char* tb = (char*)u8"❓\0➗";
 	auto tbt = ltx->new_text_dta(0, 100, tb, -1, 0);
-	{
+	//auto tbt = ltx->new_text_dta1(fpv[0], 100, tb, -1, 0);// 使用单个字体
+	if (tbt) {
 		text_path_t op;
 		auto pd = ltx->get_shape(0, 39, tb, &op, 0);
 		path_v opt;
+		opt._pos = { 0,200 };
 		text_path2path_v(pd, &opt);
 		auto rc = opt.mkbox();
 		opt._baseline = op.baseline;
@@ -621,7 +622,7 @@ int main()
 		}
 		tbt->tv.clear();
 	}
-
+#endif
 	auto minesweeper_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/mw2.png");
 	if (minesweeper_tex)
 	{
@@ -641,7 +642,7 @@ int main()
 				return;
 			}
 			int bn = bns[btn->button];
-			if (btn->clicks == 2) {
+			if (btn->clicks > 1) {
 				bn = 2;
 			}
 			ptr->send_event({ btn->x,btn->y }, bn);
@@ -672,12 +673,12 @@ int main()
 					}
 				}
 				// 渲染文本
-				for (auto it : tbt->tv)
-				{
-					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
-					SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
-					SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
-				}
+				//for (auto it : tbt->tv)
+				//{
+				//	SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
+				//	SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
+				//	SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
+				//}
 				return;
 			};
 	}

@@ -91,6 +91,7 @@ public:
 	glm::ivec2 m_cpos = { 3, 3 };
 
 	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存
+	std::vector<font_t*> _t1;
 public:
 	layout_text_x();
 	~layout_text_x();
@@ -104,6 +105,7 @@ public:
 	bitmap_cache_cx* new_cache(const glm::ivec2& vsize);
 	void free_cache(bitmap_cache_cx* p);
 	text_dta* new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old = 0);
+	text_dta* new_text_dta1(font_t* p, int fontsize, const void* str8, int len, text_dta* old = 0);
 	// 获取基线
 	int get_baseline(size_t idx, int fontsize);
 	// 获取行高
@@ -117,12 +119,14 @@ public:
 	// 添加文本到渲染
 	glm::ivec2 add_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len);
 	glm::ivec2 build_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
+	glm::ivec2 build_text1(font_t* p, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
 	// 输出到图集
 	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
 	// 获取路径数据
 	text_path_t* get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale1);
 	// 获取渲染数据
 	text_image_t* get_glyph_item(size_t idx, int fontsize, const void* str8, text_image_t* opt);
+	text_image_t* get_glyph_item1(font_t* p, int fontsize, const void* str8, text_image_t* opt);
 	// 渲染部分文本
 	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
 	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
