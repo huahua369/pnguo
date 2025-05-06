@@ -109,20 +109,20 @@ public:
 	// 获取行高
 	int get_lineheight(size_t idx, int fontsize);
 	// 获取文本区域大小,z为基线
-	glm::ivec3 get_text_rect(size_t idx, const void* str8, int len, int fontsize);
+	glm::ivec3 get_text_rect(size_t idx, int fontsize, const void* str8, int len);
 	glm::ivec3 get_text_rect1(size_t idx, int fontsize, const void* str8);
 	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
 	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
 	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
 	// 添加文本到渲染
-	glm::ivec2 add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize);
-	glm::ivec2 build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv);
+	glm::ivec2 add_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len);
+	glm::ivec2 build_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
 	// 输出到图集
 	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
 	// 获取路径数据
-	text_path_t* get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt);
+	text_path_t* get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale1);
 	// 获取渲染数据
-	text_image_t* get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt);
+	text_image_t* get_glyph_item(size_t idx, int fontsize, const void* str8, text_image_t* opt);
 	// 渲染部分文本
 	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
 	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);

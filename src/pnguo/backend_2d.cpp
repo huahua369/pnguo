@@ -623,7 +623,7 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 {
 	glm::vec4 rc = text_rc;
 	ltx->tem_rtv.clear();
-	ltx->build_text(st->font, rc, st->text_align, str, len, st->font_size, ltx->tem_rtv);
+	ltx->build_text(st->font, st->font_size, rc, st->text_align, str, len, ltx->tem_rtv);
 	ltx->update_text();
 	if (orc)
 	{
@@ -741,11 +741,11 @@ text_draw_t* new_text_drawable(const char* str, int len, layout_text_x* ltx, con
 	if (!str || len < 1 || !*str || !ltx || !st)return nullptr;
 	glm::vec4 rc = box_rc;
 	ltx->tem_rtv.clear();
-	ltx->build_text(st->font, rc, st->text_align, str, len, st->font_size, ltx->tem_rtv);
+	ltx->build_text(st->font, st->font_size, rc, st->text_align, str, len, ltx->tem_rtv);
 	ltx->update_text();
 	if (orc)
-	{ 
-		orc->x = rc.z; 
+	{
+		orc->x = rc.z;
 		orc->y = rc.w;
 	}
 	//cairo_as _ss_(cr);

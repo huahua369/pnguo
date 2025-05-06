@@ -245,7 +245,7 @@ text_dta* layout_text_x::new_text_dta(size_t idx, int fontsize, const void* str8
 			old->fontsize = fontsize;
 		}
 		old->tv.clear();
-		auto nrc = build_text(idx, old->rc, old->text_align, str8, len, fontsize, old->tv);
+		auto nrc = build_text(idx, fontsize, old->rc, old->text_align, str8, len, old->tv);
 	}
 	return old;
 }
@@ -283,7 +283,7 @@ int layout_text_x::get_lineheight(size_t idx, int fontsize)
 	return heightline ? heightline : cfb[idx].y;
 }
 
-glm::ivec3 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
+glm::ivec3 layout_text_x::get_text_rect(size_t idx, int fontsize, const void* str8, int len)
 {
 	glm::ivec3 ret = {};
 	if (familyv.empty())
@@ -497,11 +497,11 @@ int layout_text_x::get_text_posv(size_t idx, int fontsize, const void* str8, int
 	return ret;
 }
 
-glm::ivec2 layout_text_x::add_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize)
+glm::ivec2 layout_text_x::add_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len)
 {
-	return build_text(idx, rc, text_align, str8, len, fontsize, tv);
+	return build_text(idx, fontsize, rc, text_align, str8, len, tv);
 }
-glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, int fontsize, std::vector<font_item_t>& rtv)
+glm::ivec2 layout_text_x::build_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv)
 {
 	assert(fontsize < 800);
 	glm::ivec2 ret = { rtv.size(), 0 };
@@ -512,15 +512,15 @@ glm::ivec2 layout_text_x::build_text(size_t idx, glm::vec4& rc, const glm::vec2&
 	if (len > 0)
 	{
 		std::string str((char*)str8, len);
-		p = get_glyph_item(idx, str.c_str(), fontsize, &cti);
+		p = get_glyph_item(idx, fontsize, str.c_str(), &cti);
 	}
 	else
 	{
-		p = get_glyph_item(idx, str8, fontsize, &cti);
+		p = get_glyph_item(idx, fontsize, str8, &cti);
 	}
 	if (p)
 	{
-		auto rct0 = get_text_rect(idx, str8, len, fontsize);
+		auto rct0 = get_text_rect(idx, fontsize, str8, len);
 		glm::vec2 rct = { rct0.x,rct0.y };
 		auto length = p->tv.size();
 		auto baseline = rct0.z;
@@ -664,7 +664,7 @@ pvm_t layout_text_x::new_menu(int width, int height, const char** v, size_t n, b
 			for (size_t i = 0; i < n; i++)
 			{
 				auto it = v[i];
-				auto rc = ltx->get_text_rect(0, it, -1, p->fontsize);
+				auto rc = ltx->get_text_rect(0, p->fontsize, it, -1);
 				if (xw < rc.x) {
 					xw = rc.x;
 				}
@@ -837,7 +837,7 @@ void layout_text_x::text2atlas(const glm::ivec2& r, uint32_t color, std::vector<
 
 }
 
-text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize, text_path_t* opt)
+text_path_t* layout_text_x::get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale1)
 {
 	auto str = (const char*)str8;
 	if (idx >= familyv.size())idx = 0;
@@ -851,11 +851,12 @@ text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize
 		str = font_t::get_glyph_index_u8(str, &gidx, &r, &familyv[idx]);
 		if (r && gidx >= 0)
 		{
-			auto k = r->get_shape(ts, fontsize, &opt->data, adv);
+			auto k = r->get_shape(ts, fontsize, &opt->data, adv, scale1);
 			adv += k.advance;
 			if (k.count)
 			{
 				opt->tv.push_back(k);
+				opt->baseline = k.baseline;
 			}
 		}
 	} while (str && *str);
@@ -871,7 +872,7 @@ text_path_t* layout_text_x::get_shape(size_t idx, const void* str8, int fontsize
 }
 // todo get_glyph_item
 
-text_image_t* layout_text_x::get_glyph_item(size_t idx, const void* str8, int fontsize, text_image_t* opt)
+text_image_t* layout_text_x::get_glyph_item(size_t idx, int fontsize, const void* str8, text_image_t* opt)
 {
 	auto str = (const char*)str8;
 	if (idx >= familyv.size())idx = 0;
@@ -1501,7 +1502,7 @@ glm::ivec2 text_ctx_cx::get_pixel_size(const char* str, int len)
 	int w = 0, h = 0;
 	if (ltx && str && *str)
 	{
-		auto rc = ltx->get_text_rect(fontid, str, len, fontsize);
+		auto rc = ltx->get_text_rect(fontid, fontsize, str, len);
 		w = rc.x; h = rc.y;
 	}
 	return glm::ivec2(w, h);
@@ -6806,7 +6807,7 @@ void progress_tl::set_value(double b)
 		text = pg::to_string(k) + format;
 		width = size.x;
 		if (text.size() && !text_inside) {
-			auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+			auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
 			size.x = width + rk.x + rounding * 0.5;
 			if (parent)parent->uplayout = true;
 		}
@@ -6860,7 +6861,7 @@ void progress_tl::draw(cairo_t* cr)
 		fill_stroke(cr, color.x, 0, 0, 0);
 	}
 	if (text.size()) {
-		auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+		auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
 		if (text_inside) {
 			ss.x = xx;
 			ss.x -= r * 0.5;
@@ -7215,12 +7216,12 @@ bool colorpick_tl::update(float delta)
 			//auto rk = ltx->get_text_rect(1, "H:00%%"/* hsvstr.c_str()*/, -1, font_size);
 			ltx->heightline = rc.y;//设置固定行高
 			rc.y += step;
-			ltx->build_text(1, rc, ta, hsvstr.c_str(), -1, font_size, tem_rtv);
+			ltx->build_text(1, font_size, rc, ta, hsvstr.c_str(), -1, tem_rtv);
 			rc.y = 0; rc.x += cpx;
 			rc.z = cw;
 			rc.w = height; ta.y = 0.5;
 			ltx->heightline = 0; // 使用默认行高
-			ltx->build_text(1, rc, ta, colorstr.c_str(), -1, font_size, tem_rtv);
+			ltx->build_text(1, font_size, rc, ta, colorstr.c_str(), -1, tem_rtv);
 			ltx->heightline = 0;
 			assert(cw > 0);
 		}

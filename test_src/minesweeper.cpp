@@ -114,7 +114,7 @@ void minesweeper_cx::init_map(const glm::ivec2& pos)
 	// 随机数种子
 	static std::random_device rd;
 	static std::mt19937 gen(rd());
-	std::uniform_int_distribution<int> dis(0, _map.size() - 1);
+	std::uniform_int_distribution<int> dis(1, _map.size() - 2);
 	int empty_pos = pos.x + pos.y * size.x;
 	int xx[9] = { 0,0,0,0,0,0,0,0,0 };
 	int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
@@ -124,6 +124,7 @@ void minesweeper_cx::init_map(const glm::ivec2& pos)
 		int ny = pos.y + dy[i];
 		xx[i] = nx + ny * size.x;
 	}
+	auto l2 = _map.size() - size.x;
 	// 随机放置雷 
 	for (int i = 0; i < mine_count; i++)
 	{
@@ -136,7 +137,7 @@ void minesweeper_cx::init_map(const glm::ivec2& pos)
 				break;
 			}
 		}
-		if (idx < 0 || _map[idx].type == -1 || idx == empty_pos)
+		if (idx < 0 || _map[idx].type == -1 || idx == empty_pos || idx == size.x - 1 || idx == l2)
 		{
 			i--;
 			continue;
@@ -592,22 +593,30 @@ int main()
 	auto ltx = new layout_text_x();
 	ltx->set_ctx(app->font_ctx);
 	std::vector<std::string> efn;
-	//auto fpv = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\Noto-COLRv1.ttf)", &efn);
+	//auto fpv = app->font_ctx->add2file(R"(data\seguiemj.ttf)", &efn);
 	//auto fpv1 = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\NotoColorEmoji.ttf)", &efn);
 	std::string familys = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
 	//std::string familys = (char*)u8"Consolas,新宋体,Noto Color Emoji,Times New Roman,Malgun Gothic";
 	ltx->add_familys(familys.c_str(), "");
 	auto cache_tex = ltx->new_cache({ 1024,1024 });
 	char* tb1 = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
-	char* tb = (char*)u8"➗";
-	auto tbt = ltx->new_text_dta(0, 39, tb, -1, 0);
+	char* tb = (char*)u8"❓\0➗";
+	auto tbt = ltx->new_text_dta(0, 100, tb, -1, 0);
 	{
+		text_path_t op;
+		auto pd = ltx->get_shape(0, 39, tb, &op, 0);
+		path_v opt;
+		text_path2path_v(pd, &opt);
+		auto rc = opt.mkbox();
+		opt._baseline = op.baseline;
+		//save_png_v(&opt, 1, "temp/chu.png", 1, 1);
+
 		auto ft = cache_tex->_data.data();
 		auto n = cache_tex->_data.size();
 		for (size_t i = 0; i < n; i++)
 		{
 			auto p = ft[i];
-			//save_img_png(p, "font_test51.png");
+			save_img_png(p, "temp/font_test51.png");
 			auto tex = tex_cb.make_tex(form0->renderer, p);
 		}
 		tbt->tv.clear();

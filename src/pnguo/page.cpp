@@ -28,7 +28,7 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 	div->_lpos = { 0,0 }; div->_lms = { 0,0 };
 	div->border = { bc->color.y,bc->thickness,bc->radius,bc->color.x };
 	auto ft = div->ltx;
-	auto rc = ft->get_text_rect(0, str.c_str(), str.size(), bc->fonst_size);
+	auto rc = ft->get_text_rect(0, bc->fonst_size, str.c_str(), str.size());
 	auto h = ft->get_lineheight(0, bc->fonst_size);
 	div->set_clear_color(0);
 	auto drc = rc;
@@ -455,12 +455,12 @@ void draw_treenode(cairo_t* cr, layout_text_x* ltx)
 	std::string text;
 	int font_size = 16;
 	int text_color = -1;
-	auto rk = ltx->get_text_rect(0, text.c_str(), -1, font_size);
+	auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
 	glm::ivec2 ss = { 100,100 };
 	glm::vec2 align = { 1,0.5 };
 	glm::vec4 rc = { 0, 0, ss };
 	ltx->tem_rtv.clear();
-	ltx->build_text(0, rc, align, text.c_str(), -1, font_size, ltx->tem_rtv);
+	ltx->build_text(0, font_size, rc, align, text.c_str(), -1, ltx->tem_rtv);
 	ltx->update_text();
 	ltx->draw_text(cr, ltx->tem_rtv, text_color);
 }

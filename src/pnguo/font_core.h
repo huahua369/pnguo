@@ -192,10 +192,10 @@ public:
 	// 获取字体最大box
 	glm::ivec4 get_bounding_box(double scale, bool is_align0);
 	// 输入utf8获取轮廓，height=0则获取原始大小。提供opt
-	tinypath_t get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv);
+	tinypath_t get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv, float scale1 = 1);
 	glm::ivec2 get_shape_box(const void* str8, int height);
 	glm::ivec2 get_shape_box(uint32_t ch, int height);
-	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv);
+	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv, float scale1 = 1);
 public:
 	// 获取字符大小{xy大小，z=advance,w=基线}
 	glm::ivec4 get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks, font_t** oft);
@@ -452,6 +452,7 @@ struct text_path_t
 {
 	std::vector<tinypath_t> tv;	// 每个字的路径
 	std::vector<vertex_f> data;	// 所有路径数据
+	int baseline = 0;
 };
 struct text_image_t
 {

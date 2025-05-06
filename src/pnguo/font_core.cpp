@@ -2314,7 +2314,7 @@ glm::ivec4 font_t::get_bounding_box(double scale, bool is_align0)
 	s *= scale;
 	return ceil(s);
 }
-tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv)
+tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv, float scale1)
 {
 	int vc = 0;
 	tinypath_t r = {};
@@ -2328,7 +2328,6 @@ tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>
 			auto bs = get_shape_box(str8, height);
 			r.advance = bs.x;
 			r.bearing = { bs.y,0 };
-			adv += bs.y;
 			auto pss = opt->size();
 			r.first = pss;
 			opt->resize(pss + vc);
@@ -2346,9 +2345,10 @@ tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>
 			}
 			if (height != 0)
 			{
-				float scale = get_scale(height);
+				float scale = get_scale(height) * scale1;
 				if (scale > 0)
 				{
+					adv += bs.y;
 					r.baseline = ascender * scale;
 					auto v1 = r.v;
 					for (size_t i = 0; i < vc; i++)
@@ -2361,6 +2361,9 @@ tinypath_t font_t::get_shape(const void* str8, int height, std::vector<vertex_f>
 						v1->cy1 *= scale;
 						v1++;
 					}
+				}
+				else {
+					r.baseline = ascender;
 				}
 			}
 			{
@@ -2399,7 +2402,7 @@ glm::ivec2 font_t::get_shape_box(uint32_t ch, int height)
 	}
 	return v;
 }
-tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv)
+tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv, float scale1)
 {
 	int vc = 0;
 	tinypath_t r = {};
@@ -2429,7 +2432,7 @@ tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int
 			}
 			if (height != 0)
 			{
-				float scale = get_scale(height);
+				float scale = get_scale(height) * scale1;
 				if (scale > 0)
 				{
 					r.baseline = ascender * scale;

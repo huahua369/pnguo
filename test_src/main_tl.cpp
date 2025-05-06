@@ -22,8 +22,7 @@
 #include <pnguo/editor_2d.h>
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <stb_image_write.h>
-
-#include "minesweeper.h"
+ 
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
@@ -829,29 +828,13 @@ int main()
 				auto tex = tex_cb.make_tex(form0->renderer, p);
 			}
 		}
-
-		auto minesweeper_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "mw2.png");
-		minesweeper_cx* mscx = new minesweeper_cx();
-		mscx->set_texture(minesweeper_tex);
-		glm::ivec2 mcpos[] = { {6,0},{5,1},{3,2},{7,2},{8,2},{8,3},{0,4},{7,4},{5,5},{8,6} };
-		//mscx->resize(9, 9, 10, mcpos);
-		mscx->resize(26, 15, 0.3);
-		mscx->clear_map();
+		 
 		{
-			form0->add_event(mscx, [](uint32_t type, et_un_t* e, void* ud) {
-				auto ptr = (minesweeper_cx*)ud;
+			form0->add_event(0, [](uint32_t type, et_un_t* e, void* ud) { 
 				auto btn = e->v.b;
 				if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
-				static int bns[] = { 0,0,3,1 };
-				if (btn->button > 3)
-				{
-					return;
-				}
-				int bn = bns[btn->button];
-				if (btn->clicks == 2) {
-					bn = 2;
-				}
-				ptr->send_event({ btn->x,btn->y }, bn);
+				
+
 				});
 		}
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
@@ -859,48 +842,7 @@ int main()
 				static double deltas = 0;
 				deltas += delta;
 
-				glm::vec2 pos = { 50,100 };
-				mscx->update(pos, delta);
-				auto d = mscx->data();
-				auto cnt = mscx->count();
-				for (size_t i = 0; i < cnt; i++)
-				{
-					auto it = d[i];
-					if (it.w9 > 0)
-					{
-						auto w = it.w9;
-						SDL_RenderTexture9Grid(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, w, w, w, w, it.scale, (SDL_FRect*)&it.dst);
-					}
-					else if (it.scale > 1.0 || it.scale < 1.0)
-					{
-						SDL_RenderTextureTiled(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, it.scale, (SDL_FRect*)&it.dst);
-					}
-					else {
-						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, (SDL_FRect*)&it.dst);
-					}
-				}
-				return;
-				SDL_FRect rc = { 30,360, minesweeper_tex->w, minesweeper_tex->h };
-				SDL_RenderTexture(renderer, minesweeper_tex, 0, &rc);
-				SDL_FRect borderrc1 = { 9,49,32,32 };
-				SDL_FRect borderrc2 = { 289,49,32,32 };
-				int w = 6;
-				float scale = 1.0;
-				SDL_FRect dstrect1 = { 30,100,320,220 };
-				SDL_FRect dstrect2 = { 40,110,300,200 };
-				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc1, w, w, w, w, scale, &dstrect1);
-				SDL_RenderTexture9Grid(renderer, minesweeper_tex, &borderrc2, w, w, w, w, scale, &dstrect2);
-				// 渲染文本
-				for (auto it : tbt->tv)
-				{
-					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
-					SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
-					SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
-				}
-
-
-				return;
-				//d2->update_draw(delta);
+				d2->update_draw(delta);
 				if (deltas > dtime)
 				{
 					static int64_t kn = 0;
