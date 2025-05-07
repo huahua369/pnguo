@@ -1229,7 +1229,7 @@ public:
 #if 1
 
 	static uint16_t ttUSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
-	static uint16_t ttSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
+	static int16_t ttSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
 	static uint32_t ttULONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
 	static int ttLONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
 #ifndef stbtt_tag4
@@ -1437,9 +1437,329 @@ public:
 
 		return 1;
 	}
+	struct fontinfo_tt
+	{
+		void* userdata;
+		unsigned char* data;              // pointer to .ttf file
+		int              fontstart;         // offset of start of font
+
+		int numGlyphs;                     // number of glyphs, needed for range checking
+
+		int loca, head, glyf, hhea, hmtx, kern, gpos, svg; // table locations as offset from start of .ttf
+		int index_map;                     // a cmap mapping for our chosen character encoding
+		int indexToLocFormat;              // format needed to map from glyph index to glyph
+
+		stbtt__buf cff;                    // cff font data
+		stbtt__buf charstrings;            // the charstring index
+		stbtt__buf gsubrs;                 // global charstring subroutines index
+		stbtt__buf subrs;                  // private charstring subroutines index
+		stbtt__buf fontdicts;              // array of font dicts
+		stbtt__buf fdselect;               // map from glyph to fontdict
+	};
+
+	struct glyph_header_t
+	{
+		int16_t	numberOfContours;//	If the number of contours is greater than or equal to zero, this is a simple glyph.If negative, this is a composite glyph — the value - 1 should be used for composite glyphs.
+		int16_t	xMin;//	Minimum x for coordinate data.
+		int16_t	yMin;//	Minimum y for coordinate data.
+		int16_t	xMax;//	Maximum x for coordinate data.
+		int16_t	yMax;//	Maximum y for coordinate data.
+	};
+	static int GetGlyfOffset(const fontinfo_tt* info, int glyph_index)
+	{
+		int g1, g2;
+
+		assert(!info->cff.size);
+
+		if (glyph_index >= info->numGlyphs) return -1; // glyph index out of range
+		if (info->indexToLocFormat >= 2)    return -1; // unknown index->glyph map format
+
+		if (info->indexToLocFormat == 0) {
+			g1 = info->glyf + ttUSHORT(info->data + info->loca + glyph_index * 2) * 2;
+			g2 = info->glyf + ttUSHORT(info->data + info->loca + glyph_index * 2 + 2) * 2;
+		}
+		else {
+			g1 = info->glyf + ttULONG(info->data + info->loca + glyph_index * 4);
+			g2 = info->glyf + ttULONG(info->data + info->loca + glyph_index * 4 + 4);
+		}
+
+		return g1 == g2 ? -1 : g1; // if length is 0, return -1
+	}
+
+	static void setvertex(vertex_f* v, uint8_t type, int x, int y, int cx, int cy)
+	{
+		v->type = type;
+		v->x = x;
+		v->y = y;
+		v->cx = cx;
+		v->cy = cy;
+	}
+	static int close_shape(vertex_f* vertices, int num_vertices, int was_off, int start_off, int sx, int sy, int scx, int scy, int cx, int cy)
+	{
+		if (start_off) {
+			if (was_off)
+				setvertex(&vertices[num_vertices++], STBTT_vcurve, (cx + scx) >> 1, (cy + scy) >> 1, cx, cy);
+			setvertex(&vertices[num_vertices++], STBTT_vcurve, sx, sy, scx, scy);
+		}
+		else {
+			if (was_off)
+				setvertex(&vertices[num_vertices++], STBTT_vcurve, sx, sy, cx, cy);
+			else
+				setvertex(&vertices[num_vertices++], STBTT_vline, sx, sy, 0, 0);
+		}
+		return num_vertices;
+	}
+
+	static int GetGlyphShapeTT(const fontinfo_tt* info, int glyph_index, std::vector<vertex_f>* vd)
+	{
+		int16_t numberOfContours;
+		uint8_t* endPtsOfContours;
+		uint8_t* data = info->data;
+		vertex_f* vertices = 0;
+		int num_vertices = 0;
+		int g = GetGlyfOffset(info, glyph_index);
+
+
+		if (g < 0) return 0;
+		auto ghp = (glyph_header_t*)(data + g);
+		numberOfContours = ttSHORT(data + g);
+
+		if (numberOfContours > 0) {
+			uint8_t flags = 0, flagcount;
+			int32_t ins, i, j = 0, m, n, next_move, was_off = 0, off, start_off = 0;
+			int32_t x, y, cx, cy, sx, sy, scx, scy;
+			uint8_t* points;
+			endPtsOfContours = (data + g + 10);
+			ins = ttUSHORT(data + g + 10 + numberOfContours * 2);
+			points = data + g + 10 + numberOfContours * 2 + 2 + ins;
+
+			n = 1 + ttUSHORT(endPtsOfContours + numberOfContours * 2 - 2);
+
+			m = n + 2 * numberOfContours;  // a loose bound on how many vertices we might need
+			vd->resize(m);
+			vertices = vd->data();// STBTT_malloc(m * sizeof(vertices[0]), info->userdata);
+			if (vertices == 0)
+				return 0;
+
+			next_move = 0;
+			flagcount = 0;
+
+			// in first pass, we load uninterpreted data into the allocated array
+			// above, shifted to the end of the array so we won't overwrite it when
+			// we create our final data starting from the front
+
+			off = m - n; // starting offset for uninterpreted data, regardless of how m ends up being calculated
+
+			// first load flags
+
+			for (i = 0; i < n; ++i) {
+				if (flagcount == 0) {
+					flags = *points++;
+					if (flags & 8)
+						flagcount = *points++;
+				}
+				else
+					--flagcount;
+				vertices[off + i].type = flags;
+			}
+
+			// now load x coordinates
+			x = 0;
+			for (i = 0; i < n; ++i) {
+				flags = vertices[off + i].type;
+				if (flags & 2) {
+					int16_t dx = *points++;
+					x += (flags & 16) ? dx : -dx; // ???
+				}
+				else {
+					if (!(flags & 16)) {
+						x = x + (int16_t)(points[0] * 256 + points[1]);
+						points += 2;
+					}
+				}
+				vertices[off + i].x = (int16_t)x;
+			}
+
+			// now load y coordinates
+			y = 0;
+			for (i = 0; i < n; ++i) {
+				flags = vertices[off + i].type;
+				if (flags & 4) {
+					int16_t dy = *points++;
+					y += (flags & 32) ? dy : -dy; // ???
+				}
+				else {
+					if (!(flags & 32)) {
+						y = y + (int16_t)(points[0] * 256 + points[1]);
+						points += 2;
+					}
+				}
+				vertices[off + i].y = (int16_t)y;
+			}
+
+			// now convert them to our format
+			num_vertices = 0;
+			sx = sy = cx = cy = scx = scy = 0;
+			for (i = 0; i < n; ++i) {
+				flags = vertices[off + i].type;
+				x = (int16_t)vertices[off + i].x;
+				y = (int16_t)vertices[off + i].y;
+
+				if (next_move == i) {
+					if (i != 0)
+						num_vertices = close_shape(vertices, num_vertices, was_off, start_off, sx, sy, scx, scy, cx, cy);
+
+					// now start the new one
+					start_off = !(flags & 1);
+					if (start_off) {
+						// if we start off with an off-curve point, then when we need to find a point on the curve
+						// where we can start, and we need to save some state for when we wraparound.
+						scx = x;
+						scy = y;
+						if (!(vertices[off + i + 1].type & 1)) {
+							// next point is also a curve point, so interpolate an on-point curve
+							sx = (x + (int32_t)vertices[off + i + 1].x) >> 1;
+							sy = (y + (int32_t)vertices[off + i + 1].y) >> 1;
+						}
+						else {
+							// otherwise just use the next point as our start point
+							sx = (int32_t)vertices[off + i + 1].x;
+							sy = (int32_t)vertices[off + i + 1].y;
+							++i; // we're using point i+1 as the starting point, so skip it
+						}
+					}
+					else {
+						sx = x;
+						sy = y;
+					}
+					setvertex(&vertices[num_vertices++], STBTT_vmove, sx, sy, 0, 0);
+					was_off = 0;
+					next_move = 1 + ttUSHORT(endPtsOfContours + j * 2);
+					++j;
+				}
+				else {
+					if (!(flags & 1)) { // if it's a curve
+						if (was_off) // two off-curve control points in a row means interpolate an on-curve midpoint
+							setvertex(&vertices[num_vertices++], STBTT_vcurve, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
+						cx = x;
+						cy = y;
+						was_off = 1;
+					}
+					else {
+						if (was_off)
+							setvertex(&vertices[num_vertices++], STBTT_vcurve, x, y, cx, cy);
+						else
+							setvertex(&vertices[num_vertices++], STBTT_vline, x, y, 0, 0);
+						was_off = 0;
+					}
+				}
+			}
+			num_vertices = close_shape(vertices, num_vertices, was_off, start_off, sx, sy, scx, scy, cx, cy);
+		}
+		else if (numberOfContours < 0) {
+			// Compound shapes.
+			int more = 1;
+			uint8_t* comp = data + g + 10;
+			num_vertices = 0;
+			vertices = 0;
+			std::vector<vertex_f> cvd;
+			while (more) {
+				uint16_t flags, gidx;
+				int comp_num_verts = 0, i;
+				vertex_f* comp_verts = 0, * tmp = 0;
+				float mtx[6] = { 1,0,0,1,0,0 }, m, n;
+
+				glm::mat3 mx = glm::mat3(1.0);
+				flags = ttSHORT(comp); comp += 2;
+				gidx = ttSHORT(comp); comp += 2;
+
+				if (flags & 2) { // XY values
+					if (flags & 1) { // shorts
+						mtx[4] = ttSHORT(comp); comp += 2;
+						mtx[5] = ttSHORT(comp); comp += 2;
+					}
+					else {
+						mtx[4] = *((int8_t*)comp); comp += 1;
+						mtx[5] = *((int8_t*)comp); comp += 1;
+					}
+				}
+				else {
+					// @TODO handle matching point
+					assert(0);
+				}
+				mx[1].y = mtx[4];
+				mx[1].z = mtx[5];
+				if (flags & (1 << 3)) { // WE_HAVE_A_SCALE
+					auto c16 = ttSHORT(comp);
+					mtx[0] = mtx[3] = c16 / 16384.0f; comp += 2;
+					mtx[1] = mtx[2] = 0;
+				}
+				else if (flags & (1 << 6)) { // WE_HAVE_AN_X_AND_YSCALE
+					mtx[0] = ttSHORT(comp) / 16384.0f; comp += 2;
+					mtx[1] = mtx[2] = 0;
+					mtx[3] = ttSHORT(comp) / 16384.0f; comp += 2;
+				}
+				else if (flags & (1 << 7)) { // WE_HAVE_A_TWO_BY_TWO
+					mtx[0] = ttSHORT(comp) / 16384.0f; comp += 2;
+					mtx[1] = ttSHORT(comp) / 16384.0f; comp += 2;
+					mtx[2] = ttSHORT(comp) / 16384.0f; comp += 2;
+					mtx[3] = ttSHORT(comp) / 16384.0f; comp += 2;
+
+				}
+				mx = glm::mat3(mtx[0], mtx[1], 0.0f, mtx[2], mtx[3], 0.0f, mtx[4], mtx[5], 1.0);
+				// Find transformation scales.
+				m = 1;// (float)sqrt(mtx[0] * mtx[0] + mtx[1] * mtx[1]);
+				n = 1;// (float)sqrt(mtx[2] * mtx[2] + mtx[3] * mtx[3]);
+				// Get indexed glyph.
+				comp_num_verts = GetGlyphShapeTT(info, gidx, &cvd);
+				comp_verts = cvd.data();
+				if (comp_num_verts > 0) {
+					// Transform vertices.
+					for (i = 0; i < comp_num_verts; ++i) {
+						vertex_f* v = &comp_verts[i];
+						glm::vec3 v2 = glm::vec3(*(glm::vec2*)v, 1.0);
+						v2 = mx * v2;
+						v->x = v2.x;
+						v->y = v2.y;
+						v2 = glm::vec3(v->cx, v->cy, 1.0);
+						v2 = mx * v2;
+						v->cx = v2.x;
+						v->cy = v2.y;
+						//v2 = glm::vec3(v->cx1, v->cy1, 1.0);
+						//v2 = mx * v2;
+						//v->cx1 = v2.x;
+						//v->cy1 = v2.y;
+					}
+					// Append vertices.
+					vd->resize(num_vertices + comp_num_verts);
+					if (vd->size() == num_vertices + comp_num_verts)
+					{
+						tmp = vd->data();
+						memcpy(tmp + num_vertices, comp_verts, comp_num_verts * sizeof(cvd[0]));
+					}
+					else { return 0; }
+					num_vertices += comp_num_verts;
+				}
+				// More components ?
+				more = flags & (1 << 5);
+			}
+		}
+		else {
+			// numberOfCounters == 0, do nothing
+		}
+
+		//*pvertices = vertices;
+		return num_vertices;
+	}
+
+
 
 private:
 };
+
+
+
+
 //！stb_font
 #ifndef NO_STBR
 
@@ -1841,6 +2161,11 @@ bool font_t::CollectGlyphsFromFont(const char* text, size_t length, int directio
 	hb_buffer_destroy(hb_buffer);
 #endif
 	return true;
+}
+
+int font_t::GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd)
+{
+	return stb_font::GetGlyphShapeTT((stb_font::fontinfo_tt*)font, glyph_index, vd);
 }
 
 #ifndef TAGS_H_
@@ -2645,7 +2970,8 @@ int font_t::get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector
 				int fallbackIndex = stb_font::getGlyphIndex(it->font, codepoint);
 				if (fallbackIndex != 0) {
 					g = fallbackIndex;
-					*renderFont = it;
+					if (renderFont)
+						*renderFont = it;
 					break;
 				}
 			}
@@ -2653,7 +2979,8 @@ int font_t::get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector
 	}
 	else
 	{
-		*renderFont = this;
+		if (renderFont)
+			*renderFont = this;
 	}
 	return g;
 }
@@ -7865,6 +8192,13 @@ void save_img_png(image_ptr_t* p, const char* str)
 {
 	if (p && str && *str) {
 		stbi_write_png(str, p->width, p->height, p->comp, p->data, p->stride);
+	}
+}
+
+void save_img_png(image_gray* p, const char* str)
+{
+	if (p && str && *str) {
+		stbi_write_png(str, p->width, p->height, 1, p->data(), p->width);
 	}
 }
 

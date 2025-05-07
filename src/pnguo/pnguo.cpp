@@ -8051,6 +8051,21 @@ path_v::vertex_t* path_v::getline2(int x, size_t* px)
 	return r;
 }
 
+size_t path_v::get_line_count()
+{
+	auto n = _data.size();
+	auto p = _data.data();
+	size_t xx = 0;
+	for (size_t i = 0; i < n; i++, p++)
+	{
+		if (p->type == vtype_e::e_vmove)
+		{
+			xx++;
+		}
+	}
+	return xx;
+}
+
 struct pvt_t
 {
 	path_v::vertex_t* first = 0, * second = 0;

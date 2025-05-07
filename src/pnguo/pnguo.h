@@ -784,6 +784,7 @@ public:
 	void cubicBezTo(double cpx1, double cpy1, double cpx2, double cpy2, double x, double y);
 	// 获取指定idx的一条线首指针
 	vertex_t* getline2(int x, size_t* px);
+	size_t get_line_count();
 	// 反转指定一条线
 	void reverse1(int idx);
 	void reverse_all();

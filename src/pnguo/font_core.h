@@ -213,6 +213,7 @@ public:
 	std::map<int, std::vector<info_one>> get_detail();
 
 	bool CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions);
+	int GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd);
 public:
 	void init_post_table();
 	int init_color();
@@ -536,6 +537,7 @@ void blur2gray(unsigned char* dst, int w, int h, int dstStride, float blur, int 
 void px_blend2c(uint32_t* pDstBmp, uint32_t src, uint32_t col);
 
 void save_img_png(image_ptr_t* p, const char* str);
+void save_img_png(image_gray* p, const char* str);
 // 灰度图转rgba
 void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
 //单色位图1位
