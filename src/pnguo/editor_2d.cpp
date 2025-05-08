@@ -753,3 +753,54 @@ void draw_list_cx::add_cmd(void* tex, const glm::ivec4& clip_rect, bool clipinte
 	CmdBuffer.push_back(draw_cmd);
 }
 #endif
+
+/**
+ * 与门
+ */
+bool and_gate(bool in_1, bool in_2)
+{
+	return in_1 && in_2;
+}
+
+/**
+ * 或门
+ */
+bool or_gate(bool in_1, bool in_2)
+{
+	return in_1 || in_2;
+}
+
+/**
+ * 非门
+ */
+bool not_gate(bool in_1)
+{
+	return !in_1;
+}
+
+/**
+ * 或非门
+ */
+bool not_or_gate(bool in_1, bool in_2)
+{
+	return !(in_1 || in_2);
+}
+
+/**
+ * 与非门
+ */
+bool not_and_gate(bool in_1, bool in_2)
+{
+	return !(in_1 && in_2);
+}
+
+/**
+ * 异或门
+ */
+bool xor_gate(bool in_1, bool in_2)
+{
+	return in_1 ^ in_2;
+	//bool or_val = or_gate(in_1, in_2);
+	//bool not_and_val = not_and_gate(in_1, in_2);
+	//return or_val && not_and_val;
+}

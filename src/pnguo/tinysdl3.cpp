@@ -2555,7 +2555,7 @@ void* new_tex2file(void* renderer, const char* fn) {
 // 纹理渲染
 int render_texture(void* renderer, texture_dt* p)
 {
-	if (!renderer || !p || !p->texture || !p->count)return;
+	if (!renderer || !p || !p->texture || !p->count)return 0;
 	auto srcrect = p->src_rect;
 	auto dstrect = p->dst_rect;
 	int ern = 0;
@@ -2569,36 +2569,36 @@ int render_texture(void* renderer, texture_dt* p)
 	}
 	return ern;
 }
-void render_texture_rotated(void* renderer, texture_angle_dt* p)
+bool render_texture_rotated(void* renderer, texture_angle_dt* p)
 {
-	if (!renderer || !p || !p->texture)return;
+	if (!renderer || !p || !p->texture)return false;
 	// 源区域、目标区域、旋转角度、旋转中心、翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
 	bool r = SDL_RenderTextureRotated((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
 		(const SDL_FRect*)&p->src_rect, (const SDL_FRect*)&p->dst_rect, p->angle, (const SDL_FPoint*)&p->center, (SDL_FlipMode)p->flip);
-
+	return r;
 }
-void render_texture_tiled(void* renderer, texture_tiled_dt* p)
+bool render_texture_tiled(void* renderer, texture_tiled_dt* p)
 {
-	if (!renderer || !p || !p->texture)return;
+	if (!renderer || !p || !p->texture)return false;
 	// 渲染重复平铺
 	bool r = SDL_RenderTextureTiled((SDL_Renderer*)renderer, (SDL_Texture*)p->texture, (const SDL_FRect*)&p->src_rect, p->scale, (const SDL_FRect*)&p->dst_rect);
-
+	return r;
 }
-void render_texture_9grid(void* renderer, texture_9grid_dt* p)
+bool render_texture_9grid(void* renderer, texture_9grid_dt* p)
 {
-	if (!renderer || !p || !p->texture)return;
+	if (!renderer || !p || !p->texture)return false;
 	// 九宫格渲染
 	bool r = p->tileScale > 0.0 ? SDL_RenderTexture9GridTiled((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
 		(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect, p->tileScale)
 		: SDL_RenderTexture9Grid((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
 			(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect);
 
-	return;
+	return r;
 
 }
-void render_geometryraw(void* renderer, geometryraw_dt* p)
+bool render_geometryraw(void* renderer, geometryraw_dt* p)
 {
-	if (!renderer || !p || !p->texture || !p->xy)return;
+	if (!renderer || !p || !p->texture || !p->xy)return false;
 	// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
 	bool r = SDL_RenderGeometryRaw((SDL_Renderer*)renderer,
 		(SDL_Texture*)p->texture,
@@ -2607,6 +2607,7 @@ void render_geometryraw(void* renderer, geometryraw_dt* p)
 		p->uv, p->uv_stride,
 		p->num_vertices,
 		p->indices, p->num_indices, p->size_indices);
+	return r;
 }
 
 

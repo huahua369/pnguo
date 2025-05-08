@@ -344,7 +344,7 @@ void show_belt(form_x* form0)
 			st.text_align = { 0.0,0.5 };
 			st.font_size = 39;
 			st.text_color = -1;
-			auto rc1 = p->ltx->get_text_rect(st.font, str.c_str(), -1, st.font_size);
+			auto rc1 = p->ltx->get_text_rect(st.font, st.font_size, str.c_str(), -1);
 			auto rc2 = rc;
 			//rc2.z = rc1.x; rc2.w = rc1.y;
 			//rc2.y = (rc.w - rc1.y) * st.text_align.y;
@@ -434,7 +434,8 @@ int main()
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.2);
-			vkd->load_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
+			vkd->load_gltf(R"(C:\Users\hua\Downloads\dinner_-_stylized_modular_low_poly_asset_pack.glb)", { 0,0,0 }, 1.0);
+			//vkd->load_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");

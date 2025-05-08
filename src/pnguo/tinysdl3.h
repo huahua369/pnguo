@@ -383,19 +383,28 @@ struct geometryraw_dt
 #define TEX_CB
 struct texture_cb
 {
+	// 创建纹理
 	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
+	// 更新纹理数据
 	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
+	// 设置纹理混合模式
 	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
+	// 删除纹理
 	void (*free_texture)(void* texture);
+	// 创建或更新纹理
 	void* (*make_tex)(void* renderer, image_ptr_t* img);
+	// 从图片文件创建纹理
 	void* (*new_texture_file)(void* renderer, const char* fn);
-
 	// 纹理渲染
+	// 批量区域渲染
 	int (*render_texture)(void* renderer, texture_dt* p);
-	void (*render_texture_rotated)(void* renderer, texture_angle_dt* p);
-	void (*render_texture_tiled)(void* renderer, texture_tiled_dt* p);
-	void (*render_texture_9grid)(void* renderer, texture_9grid_dt* p);
-	void (*render_geometryraw)(void* renderer, geometryraw_dt* p);
+	// 单个区域支持旋转
+	bool (*render_texture_rotated)(void* renderer, texture_angle_dt* p);
+	// 平铺渲染
+	bool (*render_texture_tiled)(void* renderer, texture_tiled_dt* p);
+	// 九宫格渲染
+	bool (*render_texture_9grid)(void* renderer, texture_9grid_dt* p);
+	bool (*render_geometryraw)(void* renderer, geometryraw_dt* p);
 };
 #else
 typedef struct texture_cb texture_cb;
