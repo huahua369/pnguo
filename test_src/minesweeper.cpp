@@ -698,7 +698,7 @@ public:
 	void renderGlyphBitmap(font_impl* font, image_ptr_t* outptr, float scaleX, float scaleY, int glyph)
 	{
 		FT_GlyphSlot ftGlyph = font->font->glyph;
-		int ftGlyphOffset = 0; 
+		int ftGlyphOffset = 0;
 		FONS_NOTUSED(outptr);
 		FONS_NOTUSED(scaleX);
 		FONS_NOTUSED(scaleY);
@@ -707,14 +707,14 @@ public:
 		switch (pm)
 		{
 		case FT_PIXEL_MODE_MONO:
-			for (size_t j = 0; j < ftGlyph->bitmap.rows  ; j++)
+			for (size_t j = 0; j < ftGlyph->bitmap.rows; j++)
 			{
 				auto dst = outptr->data + (j * outptr->width);
 				auto pj = ftGlyph->bitmap.pitch * j;
-				unsigned char* pixel = (uint8_t*)(ftGlyph->bitmap.buffer  + pj); 
-				for (int i = 0; i < ftGlyph->bitmap.width  ; i++)
+				unsigned char* pixel = (uint8_t*)(ftGlyph->bitmap.buffer + pj);
+				for (int i = 0; i < ftGlyph->bitmap.width; i++)
 				{
-					unsigned char c0 = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0; 
+					unsigned char c0 = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0;
 					uint32_t c1 = c0;
 					uint32_t c = (c1 << 24) | 0x00ffffff;
 					if (c1 > 0)
@@ -814,6 +814,7 @@ int main()
 	char* tb = (char*)u8"好";
 	auto tbt = ltx->new_text_dta(0, 100, tb1, -1, 0);
 	//auto tbt = ltx->new_text_dta1(fpv[0], 100, tb, -1, 0);// 使用单个字体
+	SDL_Texture* text_tex = 0;
 	if (tbt) {
 		hz::mfile_t seguiemj = {};
 		//auto sjd = seguiemj.open_d(R"(C:\Windows\Fonts\seguiemj.ttf)", true);
@@ -868,6 +869,7 @@ int main()
 			save_img_png(p, "temp/font_test51.png");
 			auto tex = tex_cb.make_tex(form0->renderer, p);
 		}
+		text_tex = (SDL_Texture*)ft0[0]->texid;
 		//tbt->tv.clear();
 	}
 #endif
@@ -920,20 +922,76 @@ int main()
 						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, (SDL_FRect*)&it.dst);
 					}
 				}
+
+#if 0
+				// 源区域、目标区域
+				bool SDL_RenderTexture(SDL_Renderer * renderer, SDL_Texture * texture,
+					const SDL_FRect * srcrect, const SDL_FRect * dstrect);
+				// 源区域、目标区域、旋转角度、旋转中心、翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
+				bool SDL_RenderTextureRotated(SDL_Renderer * renderer, SDL_Texture * texture,
+					const SDL_FRect * srcrect, const SDL_FRect * dstrect, double angle, const SDL_FPoint * center, SDL_FlipMode flip);
+				// 渲染重复平铺
+				bool SDL_RenderTextureTiled(SDL_Renderer * renderer, SDL_Texture * texture,
+					const SDL_FRect * srcrect, float scale, const SDL_FRect * dstrect);
+				// 九宫格渲染
+				bool SDL_RenderTexture9Grid(SDL_Renderer * renderer, SDL_Texture * texture,
+					const SDL_FRect * srcrect, float left_width, float right_width, float top_height, float bottom_height, float scale, const SDL_FRect * dstrect);
+				// 九宫格中间平铺
+				bool SDL_RenderTexture9GridTiled(SDL_Renderer * renderer, SDL_Texture * texture,
+					const SDL_FRect * srcrect, float left_width, float right_width, float top_height, float bottom_height, float scale, const SDL_FRect * dstrect, float tileScale);
+				// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
+				bool SDL_RenderGeometryRaw(SDL_Renderer * renderer,
+					SDL_Texture * texture,
+					const float* xy, int xy_stride,
+					const SDL_FColor * color, int color_stride,
+					const float* uv, int uv_stride,
+					int num_vertices,
+					const void* indices, int num_indices, int size_indices);
+
+#endif
+
+
+
+				SDL_SetRenderDrawColor(renderer, 0x42, 0x87, 0xf5, SDL_ALPHA_OPAQUE);  // light blue background.
+				SDL_RenderClear(renderer);
+				{
+					pos.y += 100;
+					static float angle = 0;
+					angle += delta;
+					if (angle > 1)
+					{
+						angle = 0;
+					}
+					auto it = tbt->tv[6];
+					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
+					SDL_FRect rc = { pos.x + it._dwpos.x,pos.y + it._dwpos.y, it._rect.z, it._rect.w };
+					SDL_FPoint center = { rc.w * 0.5,  rc.h * 0.5 };
+					SDL_RenderTextureRotated(renderer, text_tex, &src, &rc, angle * 360, &center, SDL_FLIP_NONE);
+					rc.w *= 3.9;
+					rc.h *= 3.0;
+					SDL_RenderTextureTiled(renderer, text_tex, &src, 1.0, &rc);
+
+					auto it1 = tbt->tv[6];
+					SDL_FRect src1 = { it1._rect.x, it1._rect.y, it1._rect.z, it1._rect.w };
+					SDL_FRect rc1 = { pos.x + it._dwpos.x + 500,pos.y + it._dwpos.y, 550, 150 };
+					int w = src1.w * 0.2;
+					SDL_RenderTexture9GridTiled(renderer, text_tex, (SDL_FRect*)&src1, w, w, w, w, 1.0, (SDL_FRect*)&rc1, 1.0);
+					rc1.y += 200;
+					SDL_RenderTexture9Grid(renderer, text_tex, (SDL_FRect*)&src1, w, w, w, w, 1.0, (SDL_FRect*)&rc1);
+				}
 				// 渲染文本
-				pos.y += 100;
-				//for (auto it : tbt->tv)
-				//{
-				//	if (!it._image || !it._image->texid)continue;
-				//	SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
-				//	SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
-				//	SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
-				//}
+				pos.y += 300;
+				for (auto it : tbt->tv)
+				{
+					if (!it._image || !it._image->texid)continue;
+					SDL_FRect src = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
+					SDL_FRect rc = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
+					SDL_RenderTexture(renderer, (SDL_Texture*)it._image->texid, &src, &rc);
+				}
+
 				return;
 			};
 	}
-
-
 	// 运行消息循环
 	run_app(app, 0);
 	delete d2;

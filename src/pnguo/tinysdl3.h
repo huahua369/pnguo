@@ -332,6 +332,53 @@ public:
 private:
 };
 
+struct texture_dt
+{
+	void* texture = 0;
+	// 源区域、目标区域 
+	const glm::vec4* src_rect = 0;
+	const glm::vec4* dst_rect = 0;
+	int count = 0;
+};
+struct texture_angle_dt
+{
+	void* texture = 0;
+	// 源区域、目标区域 
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+	glm::vec2 center = {};//旋转中心
+	double angle = 0;//旋转角度
+	int flip = 0;			//翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
+};
+// 渲染重复平铺
+struct texture_tiled_dt
+{
+	void* texture = 0;
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+	float scale = 1.0;
+};
+// 九宫格渲染
+struct texture_9grid_dt
+{
+	void* texture = 0;
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+	float scale = 1.0;
+	float left_width = 1.0, right_width = 1.0, top_height = 1.0, bottom_height = 1.0;
+	float tileScale = -1; // 大于0则是9gridtiled中间平铺
+};
+
+// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
+struct geometryraw_dt
+{
+	void* texture;
+	const float* xy; int xy_stride;
+	const glm::vec4* color; int color_stride;// color_stride等于0时，用一个颜色
+	const float* uv; int uv_stride;
+	int num_vertices;
+	const void* indices; int num_indices; int size_indices;
+};
 #ifndef TEX_CB
 #define TEX_CB
 struct texture_cb
@@ -342,6 +389,13 @@ struct texture_cb
 	void (*free_texture)(void* texture);
 	void* (*make_tex)(void* renderer, image_ptr_t* img);
 	void* (*new_texture_file)(void* renderer, const char* fn);
+
+	// 纹理渲染
+	int (*render_texture)(void* renderer, texture_dt* p);
+	void (*render_texture_rotated)(void* renderer, texture_angle_dt* p);
+	void (*render_texture_tiled)(void* renderer, texture_tiled_dt* p);
+	void (*render_texture_9grid)(void* renderer, texture_9grid_dt* p);
+	void (*render_geometryraw)(void* renderer, geometryraw_dt* p);
 };
 #else
 typedef struct texture_cb texture_cb;
@@ -449,3 +503,4 @@ form_x* new_form_popup(form_x* parent, int width, int height);
 form_x* new_form_tooltip(form_x* parent, int width, int height);
 
 void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1);
+

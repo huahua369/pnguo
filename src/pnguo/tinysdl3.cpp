@@ -2549,10 +2549,77 @@ void* new_tex2file(void* renderer, const char* fn) {
 	}
 	return p;
 }
+
+
+
+// 纹理渲染
+int render_texture(void* renderer, texture_dt* p)
+{
+	if (!renderer || !p || !p->texture || !p->count)return;
+	auto srcrect = p->src_rect;
+	auto dstrect = p->dst_rect;
+	int ern = 0;
+	for (size_t i = 0; i < p->count; i++, srcrect++, dstrect++)
+	{
+		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)p->texture, (const SDL_FRect*)srcrect, (const SDL_FRect*)dstrect);
+		if (r)
+		{
+			ern++;
+		}
+	}
+	return ern;
+}
+void render_texture_rotated(void* renderer, texture_angle_dt* p)
+{
+	if (!renderer || !p || !p->texture)return;
+	// 源区域、目标区域、旋转角度、旋转中心、翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
+	bool r = SDL_RenderTextureRotated((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
+		(const SDL_FRect*)&p->src_rect, (const SDL_FRect*)&p->dst_rect, p->angle, (const SDL_FPoint*)&p->center, (SDL_FlipMode)p->flip);
+
+}
+void render_texture_tiled(void* renderer, texture_tiled_dt* p)
+{
+	if (!renderer || !p || !p->texture)return;
+	// 渲染重复平铺
+	bool r = SDL_RenderTextureTiled((SDL_Renderer*)renderer, (SDL_Texture*)p->texture, (const SDL_FRect*)&p->src_rect, p->scale, (const SDL_FRect*)&p->dst_rect);
+
+}
+void render_texture_9grid(void* renderer, texture_9grid_dt* p)
+{
+	if (!renderer || !p || !p->texture)return;
+	// 九宫格渲染
+	bool r = p->tileScale > 0.0 ? SDL_RenderTexture9GridTiled((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
+		(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect, p->tileScale)
+		: SDL_RenderTexture9Grid((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
+			(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect);
+
+	return;
+
+}
+void render_geometryraw(void* renderer, geometryraw_dt* p)
+{
+	if (!renderer || !p || !p->texture || !p->xy)return;
+	// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
+	bool r = SDL_RenderGeometryRaw((SDL_Renderer*)renderer,
+		(SDL_Texture*)p->texture,
+		p->xy, p->xy_stride,
+		(SDL_FColor*)p->color, p->color_stride,
+		p->uv, p->uv_stride,
+		p->num_vertices,
+		p->indices, p->num_indices, p->size_indices);
+}
+
+
+
 texture_cb get_texture_cb() {
 	texture_cb cb = { new_texture_r, update_texture_r, set_texture_blend_r, free_texture_r };
 	cb.make_tex = (void* (*)(void*, image_ptr_t*))newuptex;
 	cb.new_texture_file = new_tex2file;
+	cb.render_texture = render_texture;
+	cb.render_texture_rotated = render_texture_rotated;
+	cb.render_texture_tiled = render_texture_tiled;
+	cb.render_texture_9grid = render_texture_9grid;
+	cb.render_geometryraw = render_geometryraw;
 	return cb;
 }
 
@@ -3281,3 +3348,53 @@ void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, cons
 		opt.insert(opt.end(), rect2.begin(), rect2.end());
 	}
 }
+
+#if 0
+
+bool result, use_rendergeometry = true;
+struct text_vertex_t
+{
+	glm::vec2 pos, uv;
+	glm::vec4 color;
+};
+std::vector<int> _indices;
+std::vector<text_vertex_t> _vertexs;
+SDL_Texture* texture = 0;
+for (auto it : tbt->tv)
+{
+	if (!it._image || !it._image->texid)continue;
+	auto epos = _vertexs.size();
+	_vertexs.resize(epos + 4);
+	auto dd = _vertexs.data() + epos;
+	float minu, minv, maxu, maxv;
+	float minx, miny, maxx, maxy;
+	SDL_FRect srcrect = { it._rect.x, it._rect.y, it._rect.z, it._rect.w };
+	SDL_FRect dstrect = { pos.x + it._apos.x + it._dwpos.x,pos.y + it._apos.y + it._dwpos.y, it._rect.z, it._rect.w };
+	minu = srcrect.x / text_tex->w;
+	minv = srcrect.y / text_tex->h;
+	maxu = (srcrect.x + srcrect.w) / text_tex->w;
+	maxv = (srcrect.y + srcrect.h) / text_tex->h;
+	minx = dstrect.x;
+	miny = dstrect.y;
+	maxx = dstrect.x + dstrect.w;
+	maxy = dstrect.y + dstrect.h;
+	dd[0].pos = { minx,miny };
+	dd[1].pos = { maxx ,maxy };
+	dd[2].pos = { maxx ,maxy };
+	dd[3].pos = { minx ,maxy };
+	dd[0].uv = { minu  ,minv };
+	dd[1].uv = { maxu  ,minv };
+	dd[2].uv = { maxu ,maxv };
+	dd[3].uv = { minu , maxv };
+}
+auto v = _vertexs.data();
+const float* posxy = &v->pos.x;
+const SDL_FColor* color = (SDL_FColor*)&v->color;
+const float* uv = &v->uv.x;
+int size_indices = 4;
+int stride = sizeof(text_vertex_t);
+auto num_vertices = _vertexs.size();
+SDL_RenderGeometryRaw(renderer, text_tex, posxy, stride, color, stride, uv, stride, num_vertices, _indices.data(), _indices.size(), size_indices);
+
+
+#endif // 0

@@ -123,7 +123,7 @@ public:
 	// 输出到图集
 	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
 	// 获取路径数据
-	text_path_t* get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale1);
+	text_path_t* get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale = 1);
 	// 获取渲染数据
 	text_image_t* get_glyph_item(size_t idx, int fontsize, const void* str8, text_image_t* opt);
 	text_image_t* get_glyph_item1(font_t* p, int fontsize, const void* str8, text_image_t* opt);

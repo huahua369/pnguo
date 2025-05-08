@@ -876,8 +876,8 @@ int main()
 	auto lt = pl->ltx;
 	text_path_t opt = {};
 	text_image_t opti = {};
-	auto tp = lt->get_shape(0, u8"富强", 50, &opt);
-	auto tpi = lt->get_glyph_item(0, u8"富强", 50, &opti);
+	auto tp = lt->get_shape(0, 50,u8"富强",  &opt);
+	auto tpi = lt->get_glyph_item(0, 50,u8"富强",  &opti);
 	text_image_pt* tip = text_blur(&opt, 4, 2, 0xff111111, 0xff0000ff);
 	uint32_t color = -1;
 	auto image = opti.tv[0]._image;

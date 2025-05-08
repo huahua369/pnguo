@@ -156,5 +156,4 @@ private:
 	void draw_grid_back(const glm::ivec2& vss);
 };
 
-
 #endif // !BACKEND_2D_H
