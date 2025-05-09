@@ -727,8 +727,10 @@ int main()
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
-  
+
+	texture_cb tex_cb = get_texture_cb();
 	{
+		auto xh_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/xh1.png");
 		form0->add_event(0, [](uint32_t type, et_un_t* e, void* ud)
 			{
 				auto btn = e->v.b;
@@ -740,7 +742,22 @@ int main()
 			{
 				static double deltas = 0;
 				deltas += delta;
-
+				if (xh_tex) { 
+					texture_tiled_dt tex_dt = {xh_tex};
+					tex_dt.src_rect = { 10,10,12,110 };
+					tex_dt.dst_rect = { 160,100,12,330 };
+					tex_dt.scale = 1.0;
+					tex_cb.render_texture_tiled(renderer, &tex_dt); 
+					texture_angle_dt adt = { xh_tex };
+					adt.src_rect = { 30,10,60,60 };
+					adt.dst_rect = { 280,100,60,60 };
+					adt.angle = 90;
+					tex_cb.render_texture_rotated(renderer, &adt);
+					adt.src_rect = { 10,10,12,110 };
+					adt.dst_rect = { 300,200,12,110 };
+					adt.angle = 90;
+					tex_cb.render_texture_rotated(renderer, &adt);
+				}
 				d2->update_draw(delta);
 			};
 	}

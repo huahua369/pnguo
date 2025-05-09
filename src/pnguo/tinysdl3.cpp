@@ -1052,10 +1052,10 @@ SDL_BlendMode get_blend_x(BlendMode_e blendMode, bool pma)
 	case BlendMode_e::none:
 		break;
 	case BlendMode_e::normal:
-		b = pma ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED;
+		b = !pma ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED;
 		break;
 	case BlendMode_e::additive:
-		b = pma ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_ADD_PREMULTIPLIED;
+		b = !pma ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_ADD_PREMULTIPLIED;
 		break;
 	case BlendMode_e::multiply:
 		b = SDL_BLENDMODE_MUL;
