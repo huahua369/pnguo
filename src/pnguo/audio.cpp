@@ -293,14 +293,14 @@ namespace hz {
 		void* userdata;             /**< Userdata passed to callback (ignored for NULL callbacks). */
 	};
 
-	class audio_data_t :public rw_t
+	class audio_data_cx :public rw_t
 	{
 	public:
-		audio_data_t()
+		audio_data_cx()
 		{
 		}
 
-		~audio_data_t()
+		~audio_data_cx()
 		{
 		}
 		int put(const void* buf, int len)
@@ -3454,6 +3454,79 @@ namespace hz {
 			de_jt.swap(dj);// 音频解码线程
 		}
 	}
-
+	void test_audiofft(audio_data_t* mad1) {
+#if 0
+		hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
+	,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
+	,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+		auto audio_ctx = new hz::audio_cx();
+		audio_ctx->init(&abc, "data/config_music.json");
+		audio_ctx->run_thread();
+		audio_ctx->add_song(0, R"(E:\song\陈奕迅-好久不见.flac)");
+		// 设置播放歌单，只有一个歌单，所以设置0
+		audio_ctx->set_gd(0);
+		// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
+		audio_ctx->set_type(3);
+		// 播放当前歌单指定索引开始播放
+		audio_ctx->play(0);
+#endif
+		hz::fft_cx* fft = new hz::fft_cx();
+		hz::fft_cx* fft1 = new hz::fft_cx();
+		double dtime = 0.06;
+		int fs = mad1->sample_rate * dtime;
+		{
+			while (1)
+			{
+				int rc1 = decoder_data(mad1);
+				if (rc1 <= 0)
+				{
+					break;
+				}
+			}
+			fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
+			fft->draw_pos;
+			fft->is_raw = true;
+			fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
+			fft1->draw_pos.y += 110;
+			fft1->bar_width = 6;
+			fft1->bar_step = 0;
+			fft->bar_width = 6;
+			fft->bar_step = 3;
+		}
+		{
+			// 渲染回调
+			SDL_Renderer* renderer; double delta;
+			static double deltas = 0;
+			deltas += delta;
+			if (deltas > dtime)
+			{
+				static int64_t kn = 0;
+				static int64_t kn1 = 0;
+				static int64_t sn = 256;
+				static int64_t sn1 = 2048;
+				deltas = 0;
+				fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
+				fft1->calculate_heights((short*)mad1->data + kn1, sn1 * 2, 100);
+				kn += fs;
+				kn1 += fs;
+				if (kn >= mad1->total_samples)
+				{
+					kn = 0;
+				}
+				if (kn1 >= mad1->total_samples)
+				{
+					kn1 = 0;
+				}
+			}
+			glm::vec4 color = { 0,0.5,1.0,0.8 };
+			//form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
+			//form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
+			static std::vector<SDL_Vertex> vertices;
+			//gen_rects(fft->_rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+			SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+			//gen_rects(fft1->_rects, vertices, { 0.5, 0.0, 0, 0.00 }, { 1, 0.15, 0, 0.9 });
+			SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+		}
+	}
 }
 //!hz

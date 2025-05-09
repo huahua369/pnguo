@@ -22,7 +22,7 @@
 #include <pnguo/editor_2d.h>
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <stb_image_write.h>
- 
+
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
@@ -624,25 +624,27 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
-
-
-
-int main()
-{
+void clearpdb()
+{ 
 #ifdef _DEBUG 
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\mtl.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\mw.pdb");
-#endif     
+#endif 
+}
+
+int main()
+{
+	clearpdb();
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);
 	auto app = new_app();
 	cpuinfo_t cpuinfo = get_cpuinfo();
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu|ef_resizable
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan));
+	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, (ef_vulkan | ef_resizable));
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;					// 清空使用独立创建逻辑设备
@@ -725,159 +727,39 @@ int main()
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
-
-	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
-		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
-		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
-	auto audio_ctx = new hz::audio_cx();
-	audio_ctx->init(&abc, "data/config_music.json");
-	audio_ctx->run_thread();
-	audio_ctx->add_song(0, R"(E:\song\陈奕迅-好久不见.flac)");
-	audio_ctx->add_song(0, R"(E:\song\平生不晚-难却.flac)");
-	audio_ctx->add_song(0, R"(E:\song\云朵-我的楼兰.flac)");
-	audio_ctx->add_song(0, R"(E:\song\阿YueYue-云与海.flac)");
-	// 设置播放歌单，只有一个歌单，所以设置0
-	audio_ctx->set_gd(0);
-	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
-	audio_ctx->set_type(3);
-	// 播放当前歌单指定索引开始播放
-	//audio_ctx->play(0);
-	coders_t* cp = new_coders();
-	audio_data_t* mad12 = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Jump.ogg)");
-	audio_data_t* mad = new_audio_data(cp, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-unity\Assets\Spine Examples\Sound\Spineboygun.ogg)");
-	audio_data_t* madogg = new_audio_data(cp, R"(E:\SteamLibrary\steamapps\common\Cities_Skylines\Files\Radio\Music\Cities\Europa Universalis IV - Battle of Lepanto.ogg)");
-
-	audio_data_t* mad1 = new_audio_data(cp, R"(E:\song\平生不晚-难却.flac)");
-	audio_data_t* mad1r = new_audio_data(cp, R"(E:\song\云朵-我的楼兰.flac)");
-	audio_data_t* mad1y = new_audio_data(cp, R"(E:\song\阿YueYue-云与海.flac)");
-	std::swap(mad1y, mad1);
-	auto st = app->new_audio_stream0(mad->format, mad->channels, mad->freq);
-	auto st1 = app->new_audio_stream0(mad1->format, mad1->channels, mad1->freq);
-	auto st32f = app->new_audio_stream0(2, 2, 48000);
-	auto st32 = app->new_audio_stream0(1, 2, 48000);
-	auto st16 = app->new_audio_stream0(0, 2, 48000);
-	hz::fft_cx* fft = new hz::fft_cx();
-	hz::fft_cx* fft1 = new hz::fft_cx();
+  
 	{
-		while (1)
-		{
-			int rc1 = decoder_data(mad1);
-			if (rc1 <= 0)
+		form0->add_event(0, [](uint32_t type, et_un_t* e, void* ud)
 			{
-				break;
-			}
-		}
-		fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
-		fft->draw_pos;
-		fft->is_raw = true;
-		fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
-		fft1->draw_pos.y += 110;
-		fft1->bar_width = 6;
-		fft1->bar_step = 0;
-		fft->bar_width = 6;
-		fft->bar_step = 3;
-#if 0
-		int bits[] = { 16,24,32 };
-		encoder_info_t e = {};
-		e.bits_per_sample = bits[mad1->format];
-		e.src_format = mad1->format == 2 ? 1 : 0;
-		e.channels = mad1->channels;
-		e.sample_rate = mad1->freq;
-		e.total_samples = mad1->total_samples;
-		e.data = (char*)mad1->data;
-		e.data_size = mad1->len;
-		e.file_path = R"(E:\song2\cf.flac)";
-		auto pe = cp->codes[0];
-		e.handle = pe->handle;
-		int ret = pe->encoder(&e);
-		printf("%d\n", ret);
-#endif
-	}
-
-	/*
-	open_audio
-		new_audio_stream创建流
-		decoder_data解码数据（支持flac、ogg、mp3）
-		put_audio推送数据
-		free_audio_stream
-	close_audio
-	*/
-	double dtime = 0.06;
-	int fs = mad1->sample_rate * dtime;
-	{
-		texture_cb tex_cb = get_texture_cb();
-		auto ltx = new layout_text_x();
-		ltx->set_ctx(app->font_ctx);
-		std::vector<std::string> efn;
-		//auto fpv = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\Noto-COLRv1.ttf)", &efn);
-		//auto fpv1 = app->font_ctx->add2file(R"(E:\za\noto-emoji-2.042\fonts\NotoColorEmoji.ttf)", &efn);
-		std::string familys = (char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
-		//std::string familys = (char*)u8"Consolas,新宋体,Noto Color Emoji,Times New Roman,Malgun Gothic";
-		ltx->add_familys(familys.c_str(), "");
-		auto cache_tex = ltx->new_cache({ 1024,1024 });
-		char* tb1 = (char*)u8"😊😎😭💣🚩❓❌🟦⬜❓➗❔‼️❕";
-		char* tb = (char*)u8"➗";
-		auto tbt = ltx->new_text_dta(0, 39, tb, -1, 0);
-		{
-			auto ft = cache_tex->_data.data();
-			auto n = cache_tex->_data.size();
-			for (size_t i = 0; i < n; i++)
-			{
-				auto p = ft[i];
-				save_img_png(p, "font_test51.png");
-				auto tex = tex_cb.make_tex(form0->renderer, p);
-			}
-		}
-		 
-		{
-			form0->add_event(0, [](uint32_t type, et_un_t* e, void* ud) { 
 				auto btn = e->v.b;
 				if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
-				
 
-				});
-		}
+
+			});
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
 				static double deltas = 0;
 				deltas += delta;
 
 				d2->update_draw(delta);
-				if (deltas > dtime)
-				{
-					static int64_t kn = 0;
-					static int64_t kn1 = 0;
-					static int64_t sn = 256;
-					static int64_t sn1 = 2048;
-					deltas = 0;
-					fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
-					fft1->calculate_heights((short*)mad1->data + kn1, sn1 * 2, 100);
-					kn += fs;
-					kn1 += fs;
-					if (kn >= mad1->total_samples)
-					{
-						kn = 0;
-					}
-					if (kn1 >= mad1->total_samples)
-					{
-						kn1 = 0;
-					}
-				}
-				glm::vec4 color = { 0,0.5,1.0,0.8 };
-				//form0->draw_rects(fft->_rects.data(), fft->_rects.size(), color);
-				//form0->draw_rects(fft1->_rects.data(), fft1->_rects.size(), color);
-				static std::vector<SDL_Vertex> vertices;
-				gen_rects(fft->_rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
-				SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
-				gen_rects(fft1->_rects, vertices, { 0.5, 0.0, 0, 0.00 }, { 1, 0.15, 0, 0.9 });
-				SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
 			};
 	}
-	auto lt = pl->ltx;
+
+
+	// 运行消息循环
+	run_app(app, 0);
+	delete d2;
+	free_app(app);
+	return 0;
+}
+
+void test_m(layout_text_x* ltx)
+{
+	auto lt = ltx;
 	text_path_t opt = {};
 	text_image_t opti = {};
-	auto tp = lt->get_shape(0, 50,u8"富强",  &opt);
-	auto tpi = lt->get_glyph_item(0, 50,u8"富强",  &opti);
+	auto tp = lt->get_shape(0, 50, u8"富强", &opt);
+	auto tpi = lt->get_glyph_item(0, 50, u8"富强", &opti);
 	text_image_pt* tip = text_blur(&opt, 4, 2, 0xff111111, 0xff0000ff);
 	uint32_t color = -1;
 	auto image = opti.tv[0]._image;
@@ -889,7 +771,7 @@ int main()
 	// 保存到png\jpg
 	textimage_file(tip, "temp/text_inflate.png");
 	free_textimage(tip);
-	//getchar(); 
+
 	maze_cx maze;
 	astar_search as;
 	int ww = 100;
@@ -915,12 +797,4 @@ int main()
 	mg[pStart.x + pStart.y * ww] = 0xff00ff00;
 	mg[pEnd.x + pEnd.y * ww] = 0xffff0000;
 	stbi_write_png("temp/maze2.png", ww, ww, 4, mg.data(), 0);
-
-	// 运行消息循环
-	run_app(app, 0);
-	delete d2;
-	delete audio_ctx;
-	free_coders(cp);
-	free_app(app);
-	return 0;
 }

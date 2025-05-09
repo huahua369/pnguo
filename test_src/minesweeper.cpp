@@ -923,32 +923,6 @@ int main()
 					}
 				}
 
-#if 0
-				// 源区域、目标区域
-				bool SDL_RenderTexture(SDL_Renderer * renderer, SDL_Texture * texture,
-					const SDL_FRect * srcrect, const SDL_FRect * dstrect);
-				// 源区域、目标区域、旋转角度、旋转中心、翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
-				bool SDL_RenderTextureRotated(SDL_Renderer * renderer, SDL_Texture * texture,
-					const SDL_FRect * srcrect, const SDL_FRect * dstrect, double angle, const SDL_FPoint * center, SDL_FlipMode flip);
-				// 渲染重复平铺
-				bool SDL_RenderTextureTiled(SDL_Renderer * renderer, SDL_Texture * texture,
-					const SDL_FRect * srcrect, float scale, const SDL_FRect * dstrect);
-				// 九宫格渲染
-				bool SDL_RenderTexture9Grid(SDL_Renderer * renderer, SDL_Texture * texture,
-					const SDL_FRect * srcrect, float left_width, float right_width, float top_height, float bottom_height, float scale, const SDL_FRect * dstrect);
-				// 九宫格中间平铺
-				bool SDL_RenderTexture9GridTiled(SDL_Renderer * renderer, SDL_Texture * texture,
-					const SDL_FRect * srcrect, float left_width, float right_width, float top_height, float bottom_height, float scale, const SDL_FRect * dstrect, float tileScale);
-				// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
-				bool SDL_RenderGeometryRaw(SDL_Renderer * renderer,
-					SDL_Texture * texture,
-					const float* xy, int xy_stride,
-					const SDL_FColor * color, int color_stride,
-					const float* uv, int uv_stride,
-					int num_vertices,
-					const void* indices, int num_indices, int size_indices);
-
-#endif
 
 
 

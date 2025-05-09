@@ -918,6 +918,8 @@ render_2d::render_2d()
 render_2d::~render_2d()
 {
 }
+
+SDL_BlendMode get_blend_x(BlendMode_e blendMode, bool pma);
 SDL_BlendMode get_blend(BlendMode_e blend_mode, bool usePremultipliedAlpha)
 {
 	static struct bmt {
@@ -984,7 +986,7 @@ void render_2d::draw_data(SDL_Renderer* renderer, skeleton_t* skeleton)
 		auto ssc = skeleton->color * slot->color;
 		auto c = ssc * attachment->color;
 		*(glm::vec4*)(&vertex.color) = glm::clamp(c, 0.0f, 1.0f);
-		auto blend = get_blend((BlendMode_e)slot->blend_mode, skeleton->usePremultipliedAlpha);
+		auto blend = get_blend_x((BlendMode_e)slot->blend_mode, skeleton->usePremultipliedAlpha);
 		//if (states.texture == 0) states.texture = texture;
 		if (states.blendMode != blend || states.texture != texture) {
 			if (vertexs.size() > 0) {
@@ -1185,7 +1187,7 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 				pr = ptx;
 				// 设置texture 混合模式
 				//SDL_SetTextureBlendMode(p, SDL_BLENDMODE_BLEND);
-				SDL_SetTextureBlendMode(ptx, get_blend((BlendMode_e)img->blendmode, img->multiply));
+				SDL_SetTextureBlendMode(ptx, get_blend_x((BlendMode_e)img->blendmode, img->multiply));
 			}
 		}
 		if (img->data && img->valid)
@@ -2151,7 +2153,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 		auto indices = ibs ? idv + pcmd.idxOffset : nullptr;
 		auto num_indices = pcmd.elemCount;
 		if ((BlendMode_e)pcmd.blend_mode != BlendMode_e::none) {
-			auto blend = get_blend((BlendMode_e)pcmd.blend_mode, false);
+			auto blend = get_blend_x((BlendMode_e)pcmd.blend_mode, false);
 			if (states.blendMode != blend || states.texture != texture) {
 				states.texture = texture; states.blendMode = blend;
 				SDL_SetTextureBlendMode(states.texture, states.blendMode);
@@ -2517,7 +2519,7 @@ void* new_texture_r(void* renderer, int width, int height, int type, void* data,
 			SDL_UpdateTexture(p, 0, data, stride);
 		}
 		// 设置texture 混合模式 
-		SDL_SetTextureBlendMode(p, get_blend((BlendMode_e)bm, multiply));
+		SDL_SetTextureBlendMode(p, get_blend_x((BlendMode_e)bm, multiply));
 	}
 	return p;
 }
@@ -2532,7 +2534,7 @@ void update_texture_r(void* texture, const glm::ivec4* rect, const void* pixels,
 void set_texture_blend_r(void* texture, uint32_t b, bool multiply)
 {
 	if (texture)
-		SDL_SetTextureBlendMode(((SDL_Texture*)texture), get_blend((BlendMode_e)b, multiply));
+		SDL_SetTextureBlendMode(((SDL_Texture*)texture), get_blend_x((BlendMode_e)b, multiply));
 }
 void free_texture_r(void* texture)
 {
@@ -2707,7 +2709,7 @@ void form_x::update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int strid
 void form_x::set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply)
 {
 	if (p)
-		SDL_SetTextureBlendMode(p, get_blend((BlendMode_e)b, multiply));
+		SDL_SetTextureBlendMode(p, get_blend_x((BlendMode_e)b, multiply));
 }
 void* form_x::get_texture_data(SDL_Texture* p, int* ss)
 {
@@ -3351,7 +3353,31 @@ void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, cons
 }
 
 #if 0
-
+ 
+// 源区域、目标区域
+bool SDL_RenderTexture(SDL_Renderer* renderer, SDL_Texture* texture,
+	const SDL_FRect* srcrect, const SDL_FRect* dstrect);
+// 源区域、目标区域、旋转角度、旋转中心、翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
+bool SDL_RenderTextureRotated(SDL_Renderer* renderer, SDL_Texture* texture,
+	const SDL_FRect* srcrect, const SDL_FRect* dstrect, double angle, const SDL_FPoint* center, SDL_FlipMode flip);
+// 渲染重复平铺
+bool SDL_RenderTextureTiled(SDL_Renderer* renderer, SDL_Texture* texture,
+	const SDL_FRect* srcrect, float scale, const SDL_FRect* dstrect);
+// 九宫格渲染
+bool SDL_RenderTexture9Grid(SDL_Renderer* renderer, SDL_Texture* texture,
+	const SDL_FRect* srcrect, float left_width, float right_width, float top_height, float bottom_height, float scale, const SDL_FRect* dstrect);
+// 九宫格中间平铺
+bool SDL_RenderTexture9GridTiled(SDL_Renderer* renderer, SDL_Texture* texture,
+	const SDL_FRect* srcrect, float left_width, float right_width, float top_height, float bottom_height, float scale, const SDL_FRect* dstrect, float tileScale);
+// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
+bool SDL_RenderGeometryRaw(SDL_Renderer* renderer,
+	SDL_Texture* texture,
+	const float* xy, int xy_stride,
+	const SDL_FColor* color, int color_stride,
+	const float* uv, int uv_stride,
+	int num_vertices,
+	const void* indices, int num_indices, int size_indices);
+ 
 bool result, use_rendergeometry = true;
 struct text_vertex_t
 {

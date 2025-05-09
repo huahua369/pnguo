@@ -3,6 +3,13 @@
 
 /*
 音频
+
+	open_audio
+		new_audio_stream创建流
+		decoder_data解码数据（支持flac、ogg、mp3）
+		put_audio推送数据
+		free_audio_stream
+	close_audio
 */
 
 /*编码信息*/
