@@ -1919,3 +1919,247 @@ int main()
 	free_app(app);
 	return 0;
 }
+
+
+#ifndef NO_FONS_USE_FREETYPE
+#ifndef FT_CONFIG_OPTION_SUBPIXEL_RENDERING
+#define FT_CONFIG_OPTION_SUBPIXEL_RENDERING
+#endif
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_GLYPH_H
+#include FT_OUTLINE_H
+#include FT_TRIGONOMETRY_H
+#include FT_SFNT_NAMES_H
+#include FT_LCD_FILTER_H
+//#include <ft2build.h>
+//#include FT_FREETYPE_H
+#include FT_ADVANCES_H
+
+
+#define FONS_NOTUSED(v)  (void)sizeof(v) 
+class ft_font
+{
+public:
+	ft_font()
+	{
+	}
+
+	~ft_font()
+	{
+	}
+
+public:
+
+	typedef struct {
+		FT_Face font;
+	}font_impl;
+
+	FT_Library ftLibrary = {};
+
+	bool init()
+	{
+		FT_Error ftError;
+		ftError = FT_Init_FreeType(&ftLibrary);
+		return ftError == 0;
+	}
+
+	bool done()
+	{
+		FT_Error ftError;
+		ftError = FT_Done_FreeType(ftLibrary);
+		return ftError == 0;
+	}
+
+	bool loadFont(font_impl* font, unsigned char* data, int dataSize)
+	{
+		FT_Error ftError;
+		//font->font.userdata = stash;
+		ftError = FT_New_Memory_Face(ftLibrary, (const uint8_t*)data, dataSize, 0, &font->font);
+		return ftError == 0;
+	}
+
+	void getFontVMetrics(font_impl* font, int* ascent, int* descent, int* lineGap)
+	{
+		*ascent = font->font->ascender;
+		*descent = font->font->descender;
+		*lineGap = font->font->height - (*ascent - *descent);
+	}
+
+	float getPixelHeightScale(font_impl* font, float size)
+	{
+		return size / (font->font->ascender - font->font->descender);
+	}
+
+	uint32_t getGlyphIndex(font_impl* font, int codepoint)
+	{
+		return FT_Get_Char_Index(font->font, codepoint);
+	}
+
+	bool buildGlyphBitmap(font_impl* font, int glyph, float size, float scale,
+		int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1, bool use_color = false)
+	{
+		FT_Error ftError;
+		FT_GlyphSlot ftGlyph;
+		FT_Fixed advFixed;
+		uint32_t flags = FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT;
+		FONS_NOTUSED(scale);
+
+		ftError = FT_Set_Pixel_Sizes(font->font, 0, (unsigned int)(size * (float)font->font->units_per_EM / (float)(font->font->ascender - font->font->descender)));
+		if (ftError) return 0;
+		if (FT_HAS_COLOR(font->font) && use_color)
+			flags |= FT_LOAD_COLOR;
+		ftError = FT_Load_Glyph(font->font, glyph, flags);
+		if (ftError) return 0;
+		ftError = FT_Get_Advance(font->font, glyph, FT_LOAD_NO_SCALE, &advFixed);
+		if (ftError) return 0;
+		ftGlyph = font->font->glyph;
+		*advance = (int)advFixed;
+		*lsb = (int)ftGlyph->metrics.horiBearingX;
+		*x0 = ftGlyph->bitmap_left;
+		*x1 = *x0 + ftGlyph->bitmap.width;
+		*y0 = -ftGlyph->bitmap_top;
+		*y1 = *y0 + ftGlyph->bitmap.rows;
+		return 1;
+	}
+
+	unsigned int to_uint(glm::vec4 col)
+	{
+		u_col t;
+		t.u[0] = col.x * FCV + 0.5;
+		t.u[1] = col.y * FCV + 0.5;
+		t.u[2] = col.z * FCV + 0.5;
+		t.u[3] = col.w * FCV + 0.5;
+		return t.uc;
+	}
+	void un_premultiply(unsigned int* ct)
+	{
+		uint8_t* c = (uint8_t*)ct;
+		if (c[3])
+		{
+			glm::vec4 v = { c[0], c[1], c[2], c[3] };
+			v.w /= 255.0;
+			auto a = v.w;
+			v /= a;
+			v /= 255.0;
+			v.w = a;
+			*ct = to_uint(v);
+		}
+	}
+#ifndef RGBA2BGRA
+#define RGBA2BGRA( c ) ((c &0xff000000) | (c&0x0000ff00) | (c >> 16 & 0x000000ff) | (c<<16 & 0x00ff0000))
+#endif
+	void renderGlyphBitmap(font_impl* font, image_ptr_t* outptr, float scaleX, float scaleY, int glyph)
+	{
+		FT_GlyphSlot ftGlyph = font->font->glyph;
+		int ftGlyphOffset = 0;
+		FONS_NOTUSED(outptr);
+		FONS_NOTUSED(scaleX);
+		FONS_NOTUSED(scaleY);
+		FONS_NOTUSED(glyph);	// glyph has already been loaded by buildGlyphBitmap
+		auto pm = (FT_Pixel_Mode)ftGlyph->bitmap.pixel_mode;
+		switch (pm)
+		{
+		case FT_PIXEL_MODE_MONO:
+			for (size_t j = 0; j < ftGlyph->bitmap.rows; j++)
+			{
+				auto dst = outptr->data + (j * outptr->width);
+				auto pj = ftGlyph->bitmap.pitch * j;
+				unsigned char* pixel = (uint8_t*)(ftGlyph->bitmap.buffer + pj);
+				for (int i = 0; i < ftGlyph->bitmap.width; i++)
+				{
+					unsigned char c0 = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0;
+					uint32_t c1 = c0;
+					uint32_t c = (c1 << 24) | 0x00ffffff;
+					if (c1 > 0)
+					{
+						px_blend2c(&dst[i], c, -1);
+					}
+				}
+			}
+			break;
+		case FT_PIXEL_MODE_GRAY:
+			for (int y = 0; y < ftGlyph->bitmap.rows; y++) {
+				auto pxc = (uint8_t*)(ftGlyph->bitmap.buffer + ftGlyph->bitmap.pitch * y);
+				auto dst = outptr->data + (y * outptr->width);
+				for (int x = 0; x < ftGlyph->bitmap.width; x++) {
+					uint32_t c1 = pxc[x];
+					uint32_t c = (c1 << 24) | 0x00ffffff;
+					if (c1 > 0)
+					{
+						px_blend2c(&dst[x], c, -1);
+					}
+				}
+			}
+			break;
+		case FT_PIXEL_MODE_GRAY2:
+			break;
+		case FT_PIXEL_MODE_GRAY4:
+			break;
+		case FT_PIXEL_MODE_LCD:
+			break;
+		case FT_PIXEL_MODE_LCD_V:
+			break;
+		case FT_PIXEL_MODE_BGRA:
+			for (int y = 0; y < ftGlyph->bitmap.rows; y++) {
+				auto pxc = (uint32_t*)(ftGlyph->bitmap.buffer + ftGlyph->bitmap.pitch * y);
+				auto dst = outptr->data + (y * outptr->width);
+				for (int x = 0; x < ftGlyph->bitmap.width; x++) {
+					auto c = pxc[x];
+					uint8_t alpha = (c & 0xff000000) >> 24;
+					if (alpha > 0) {
+						c = RGBA2BGRA(c);
+						un_premultiply(&c);
+						px_blend2c(&dst[x], c, -1);
+					}
+				}
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	int getGlyphKernAdvance(font_impl* font, int glyph1, int glyph2)
+	{
+		FT_Vector ftKerning;
+		FT_Get_Kerning(font->font, glyph1, glyph2, FT_KERNING_DEFAULT, &ftKerning);
+		return (int)((ftKerning.x + 32) >> 6);  // Round up and convert to integer
+	}
+
+};
+#define font_dev ft_font 
+
+void test_ft() {
+	char* tb1 = (char*)u8"😊😎😭💣🚩❓❌🟦⬜➗";
+	char* tb = (char*)u8"好";
+	hz::mfile_t seguiemj = {};
+	//auto sjd = seguiemj.open_d(R"(C:\Windows\Fonts\seguiemj.ttf)", true);
+	auto sjd = seguiemj.open_d(R"(C:\Windows\Fonts\simsun.ttc)", true);
+	ft_font::font_impl face = {};
+	ft_font ft = {};
+	ft.init();
+	ft.loadFont(&face, (uint8_t*)sjd, seguiemj.size());
+	uint32_t kw = md::get_u8_idx(tb, 0);
+	auto gi = ft.getGlyphIndex(&face, kw);
+	int advance, lsb, x0, y0, x1, y1;
+	ft.buildGlyphBitmap(&face, gi, 16, 1.0f, &advance, &lsb, &x0, &y0, &x1, &y1);
+	image_gray gr = {};
+	gr.resize(512, 512);
+	std::vector<uint32_t> idata;
+	idata.resize(512 * 512);
+	image_ptr_t rgba = {};
+	rgba.data = idata.data();
+	rgba.width = 512;
+	rgba.height = 512;
+	rgba.stride = 512 * 4;
+	rgba.comp = 4;
+	ft.renderGlyphBitmap(&face, &rgba, 1, 1, gi);
+	save_img_png(&rgba, "temp/fttestchu4.png");
+	ft.buildGlyphBitmap(&face, gi, 100, 1.0f, &advance, &lsb, &x0, &y0, &x1, &y1, true);
+	ft.renderGlyphBitmap(&face, &rgba, 1, 1, gi);
+	save_img_png(&rgba, "temp/fttestchu4c.png");
+	ft.done();
+}
+
+#endif
