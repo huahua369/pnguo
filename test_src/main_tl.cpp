@@ -23,6 +23,7 @@
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <stb_image_write.h>
 
+#include "logic_gates.h"
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 auto fontn1 = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic";
@@ -625,7 +626,7 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
 void clearpdb()
-{ 
+{
 #ifdef _DEBUG 
 	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
@@ -742,20 +743,27 @@ int main()
 			{
 				static double deltas = 0;
 				deltas += delta;
-				if (xh_tex) { 
-					texture_tiled_dt tex_dt = {xh_tex};
-					tex_dt.src_rect = { 10,10,12,110 };
-					tex_dt.dst_rect = { 160,100,12,330 };
-					tex_dt.scale = 1.0;
-					tex_cb.render_texture_tiled(renderer, &tex_dt); 
+				if (xh_tex) {
+					glm::ivec4 notm = get_lgates_rc(2);
+					glm::ivec4 andm = get_lgates_rc(3);
+					glm::ivec4 orm = get_lgates_rc(4);
+					glm::ivec4 xorm = get_lgates_rc(5); 
 					texture_angle_dt adt = { xh_tex };
-					adt.src_rect = { 30,10,60,60 };
-					adt.dst_rect = { 280,100,60,60 };
-					adt.angle = 90;
+					adt.src_rect = notm;
+					adt.dst_rect = { 100,100,adt.src_rect.z,adt.src_rect.w };
+					adt.angle = 0;
 					tex_cb.render_texture_rotated(renderer, &adt);
-					adt.src_rect = { 10,10,12,110 };
-					adt.dst_rect = { 300,200,12,110 };
-					adt.angle = 90;
+					adt.src_rect = andm;
+					adt.dst_rect = { 100,200,adt.src_rect.z,adt.src_rect.w };
+					adt.angle = 0;
+					tex_cb.render_texture_rotated(renderer, &adt);
+					adt.src_rect = orm;
+					adt.dst_rect = { 260,100,adt.src_rect.z,adt.src_rect.w };
+					adt.angle = 0;
+					tex_cb.render_texture_rotated(renderer, &adt);
+					adt.src_rect = xorm;
+					adt.dst_rect = { 260,200,adt.src_rect.z,adt.src_rect.w };
+					adt.angle = 0;
 					tex_cb.render_texture_rotated(renderer, &adt);
 				}
 				d2->update_draw(delta);

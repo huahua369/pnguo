@@ -30,10 +30,16 @@ enum class dType :uint8_t {
 /*
 信号飞线,
 信号线组，4位
-*/
-struct sline_t
+*/ 
+struct gatedata_st
 {
-	int x, y;
-	int x1, y1;
+	uint16_t type = 0;
+	glm::ivec4 pos2 = {};	// 头尾中心位置
+	int8_t input_count;		// 输入引脚数量
+	int8_t output_count;	// 输出引脚数量
+	uint8_t input = 0;		// 输入引脚最大8个
+	uint8_t output = 0;		// 输入引脚
 };
+// 0小圆点，1大圆点，2非，3与，4或，5异或
+glm::ivec4 get_lgates_rc(int i);
 

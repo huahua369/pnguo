@@ -1510,7 +1510,7 @@ int main()
 		text_align = { 0.0,0.1 };
 		auto txt = pl1->ltx;
 		glm::vec4 rcc1 = { 0 + 2,0 + 2,260,90 };
-		txt->add_text(0, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🌶🍆abcg", -1, 60);
+		txt->add_text(0, 60, rcc1, { 0,0.5 }, (char*)u8"🍑🍍🌶🍆abcg", -1);
 		txt->update_text();
 		auto et1 = pl1->add_input("", { 100,22 }, true);
 		glm::vec2 bs = { 50,22 };
