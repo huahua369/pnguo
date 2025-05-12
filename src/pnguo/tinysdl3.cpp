@@ -2555,15 +2555,15 @@ void* new_tex2file(void* renderer, const char* fn) {
 
 
 // 纹理渲染
-int render_texture(void* renderer, void* texture, texture_dt* p)
+int render_texture(void* renderer, void* texture, texture_dt* p, int count)
 {
-	if (!renderer || !p || !texture || !p->count)return 0;
-	auto srcrect = p->src_rect;
-	auto dstrect = p->dst_rect;
+	if (!renderer || !p || !texture || !count)return 0;
 	int ern = 0;
-	for (size_t i = 0; i < p->count; i++, srcrect++, dstrect++)
+	for (size_t i = 0; i < count; i++, p++)
 	{
-		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)texture, (const SDL_FRect*)srcrect, (const SDL_FRect*)dstrect);
+		auto& srcrect = p->src_rect;
+		auto& dstrect = p->dst_rect;
+		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)texture, (const SDL_FRect*)&srcrect, (const SDL_FRect*)&dstrect);
 		if (r)
 		{
 			ern++;

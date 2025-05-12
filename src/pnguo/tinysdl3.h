@@ -335,9 +335,8 @@ private:
 struct texture_dt
 {
 	// 源区域、目标区域 
-	const glm::vec4* src_rect = 0;
-	const glm::vec4* dst_rect = 0;
-	int count = 0;
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
 };
 struct texture_angle_dt
 {
@@ -392,7 +391,7 @@ struct texture_cb
 	void* (*new_texture_file)(void* renderer, const char* fn);
 	// 纹理渲染
 	// 批量区域渲染
-	int (*render_texture)(void* renderer, void* texture, texture_dt* p);
+	int (*render_texture)(void* renderer, void* texture, texture_dt* p, int count);
 	// 单个区域支持旋转
 	bool (*render_texture_rotated)(void* renderer, void* texture, texture_angle_dt* p, int count);
 	// 平铺渲染

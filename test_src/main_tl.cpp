@@ -663,7 +663,7 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
-			auto f = ft->get_font("a", 0); 
+			auto f = ft->get_font("a", 0);
 			uint32_t color = 0x80FF7373;// hz::get_themecolor(); 
 			draw_hex(ph, cr);
 
@@ -691,6 +691,49 @@ void clearpdb()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\mtl.pdb");
 	system("rd /s /q E:\\temcpp\\SymbolCache\\mw.pdb");
 #endif 
+}
+
+// 计算网格点
+SDL_FPoint* generateGridPoints(int gridSize, int canvasSize, std::vector<SDL_FPoint>* opt) {
+	int lines = static_cast<int>(std::ceil(static_cast<float>(canvasSize) / gridSize));
+	int totalPoints = lines * 2 * 2 + 4; // 水平+垂直线，每线2个点
+	if (opt->size() != totalPoints)
+	{
+		opt->resize(totalPoints);
+	}
+	SDL_FPoint* points = opt->data();
+	int index = 0;
+	float a = lines * gridSize;
+	// 水平线 
+	for (int y = 0; y <= canvasSize; y += gridSize) {
+		points[index++] = { 0.0f, static_cast<float>(y) };
+		points[index++] = { a, static_cast<float>(y) };
+	}
+
+	// 垂直线 
+	for (int x = 0; x <= canvasSize; x += gridSize) {
+		points[index++] = { static_cast<float>(x), 0.0f };
+		points[index++] = { static_cast<float>(x), a };
+	}
+
+	return points;
+}
+
+// 绘制网格 
+void genGrid(int gridSize, int canvasSize, std::vector<SDL_FPoint>* opt) {
+	generateGridPoints(gridSize, canvasSize, opt);
+}
+void drawGrid(SDL_Renderer* renderer, int gridSize, int canvasSize, std::vector<SDL_FPoint>* opt) {
+	SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1.0); // 设置线条颜色为黑色 
+	SDL_FPoint* points = opt->data();
+	auto length = opt->size() / 2;
+	for (size_t i = 0; i < length; i++)
+	{
+		auto it = points[0];
+		auto it1 = points[1];
+		SDL_RenderLine(renderer, it.x, it.y, it1.x, it1.y);
+		points += 2;
+	}
 }
 
 int main()
@@ -796,6 +839,23 @@ int main()
 
 
 			});
+
+		// 随机数种子
+		static std::random_device rd;
+		static std::mt19937 gen(rd());
+		std::uniform_int_distribution<int> dis(0, 5);
+		std::vector<int> lines;
+		int lw = 26;
+		int gh = 30;
+		int yps = 0;
+		lines.resize(26 * 16);
+		for (size_t i = 0; i < lines.size(); i++)
+		{
+			int tt = dis(gen);
+			lines[i] = tt;
+		}
+		std::vector<SDL_FPoint>* opt2 = new std::vector<SDL_FPoint>();
+		genGrid(15, 70 * 15, opt2);
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
 				static double deltas = 0;
@@ -805,23 +865,38 @@ int main()
 					glm::ivec4 andm = get_lgates_rc(3);
 					glm::ivec4 orm = get_lgates_rc(4);
 					glm::ivec4 xorm = get_lgates_rc(5);
-					texture_angle_dt adt = {   };
-					adt.src_rect = notm;
-					adt.dst_rect = { 100,100,adt.src_rect.z,adt.src_rect.w };
-					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
-					adt.src_rect = andm;
-					adt.dst_rect = { 100,200,adt.src_rect.z,adt.src_rect.w };
-					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
-					adt.src_rect = orm;
-					adt.dst_rect = { 260,100,adt.src_rect.z,adt.src_rect.w };
-					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
-					adt.src_rect = xorm;
-					adt.dst_rect = { 260,200,adt.src_rect.z,adt.src_rect.w };
-					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
+					glm::ivec4 wline[6] = {};
+					for (size_t i = 0; i < 6; i++)
+					{
+						wline[i] = get_lgates_rc(6 + i);
+					}
+
+					drawGrid(renderer, 15, 70 * 15, opt2);
+
+					texture_dt adt = {   };
+					adt.src_rect = {0,0,460,220};
+					adt.dst_rect = { 106,106,adt.src_rect.z,adt.src_rect.w }; 
+					tex_cb.render_texture(renderer, xh_tex, &adt, 1);
+ 
+
+
+
+
+
+
+
+					auto tl = lines.data();
+					glm::ivec2 npos = { 106,306 };
+					texture_dt nadt = {};
+					for (size_t i = 0; i < lines.size(); i++)
+					{
+						glm::ivec2 ps = { i % lw,i / lw };
+						auto x = *tl;
+						nadt.src_rect = wline[x];
+						nadt.dst_rect = { npos.x + ps.x * gh,yps + npos.y + ps.y * gh,nadt.src_rect.z,nadt.src_rect.w };
+						//tex_cb.render_texture(renderer, xh_tex, &nadt, 1);
+						tl++;
+					}
 				}
 				d2->update_draw(delta);
 			};
