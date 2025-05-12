@@ -17836,7 +17836,6 @@ namespace vkr {
 				std::stable_sort(transparent.begin(), transparent.end(), bcmp);
 				GltfPbrPass::DrawBatchList(cmdBuf1, &transparent, bWireframe);
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
-
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
