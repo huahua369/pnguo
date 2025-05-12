@@ -14,8 +14,6 @@
 #include <pnguo/print_time.h>
 #include <pnguo/mnet.h> 
 #include <cairo/cairo.h>
-#define HEX_EDITOR_STATIC_LIB
-#include <hex_editor.h>
 #include "mshell.h"
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #endif 
@@ -223,6 +221,134 @@ void vcpkg_cx::do_cmd()
 	}
 }
 
+#if 1
+// hexedit
+
+#define HEX_EDITOR_STATIC_LIB
+#include <hex_editor.h>
+
+struct pack_hex_t
+{
+	hex_editor* hex = 0;
+	scroll2_t hex_scroll = {};
+	int fl = 0;
+	glm::vec2 hex_size = { 900,600 };
+	int width = 16;
+	//int rcw = 14;
+	plane_cx* p = 0;
+	size_t dpx = 0;
+};
+void loadfile(pack_hex_t* ph, const std::string& str) {
+
+	if (ph->hex->set_file(str.c_str(), true))
+	{
+		ph->hex->update_hex_editor();
+		ph->hex->set_pos(0);
+		ph->hex_scroll.v->set_viewsize(ph->hex_size.y, (ph->hex->acount + 5) * ph->fl, 0);
+	}
+}
+void downmuose(pack_hex_t* ph, plane_ev* e) {
+	auto dps = ph->p->get_dragpos(ph->dpx);//获取拖动时的坐标 
+	auto dgp = ph->p->get_dragv6(ph->dpx);
+	dgp->size.x = -1;
+	glm::ivec2 scpos = e->mpos - ph->p->tpos;// 减去本面板坐标
+	scpos -= (glm::ivec2)dps;
+	//printf("old click:%d\t%d\n", scpos.x, scpos.y);
+	auto hps = ph->hex_scroll.h->get_offset_ns();
+	auto vps = ph->hex_scroll.v->get_offset_ns();
+	scpos -= (glm::ivec2)ph->hex->text_rc[2];
+	ph->hex->on_mouse(e->clicks, scpos, hps, vps);
+	scpos.x += hps;
+	scpos.y += vps;
+}
+void draw_hex(pack_hex_t* ph, cairo_t* cr)
+{
+	auto dps = ph->p->get_dragpos(ph->dpx);//获取拖动时的坐标 
+	{
+		cairo_as _ss_(cr);
+		cairo_translate(cr, dps.x, dps.y);
+
+		glm::ivec2 hps = dps;
+		glm::vec4 chs = { 0,0,ph->hex_size };
+		hps.y += ph->hex_size.y - ph->width;
+		ph->hex_scroll.h->pos = hps;
+		dps.x += ph->hex_size.x - ph->width;
+		ph->hex_scroll.v->pos = dps;
+		glm::vec4 bgrc = { -2.5,  -2.5,ph->hex_size.x + 3,ph->hex_size.y + 3 };
+		auto phex = ph->hex;
+		glm::vec4 rc = { 0,0,300,1000 };
+		if (phex->acount == 0)
+		{
+			draw_rect(cr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
+			return;
+		}
+		auto st = get_defst(1);
+		auto fl = ph->p->ltx->get_lineheight(st->font, st->font_size);
+		auto pxx = ph->hex_scroll.h->get_offset_ns();
+		auto pyy = ph->hex_scroll.v->get_offset_ns();
+		auto vps = pyy / fl;
+		pyy = vps * fl;
+		hex_style_t hst = {};
+		hst.st = st;
+		hst.ltx = ph->p->ltx;
+		hst.pxx = pxx;
+		hst.pyy = pyy;
+		hst.fl = fl;
+		hst.hex_size = ph->hex_size;
+		hst.bgrc = bgrc;
+		hst.view_size = { ph->hex_scroll.h->_view_size,ph->hex_scroll.v->_view_size };
+		hst.cr = cr;
+		phex->update_draw(&hst);
+		auto dt = phex->get_drawt();
+		if (dt->box_rc.z != ph->hex_scroll.h->_content_size)
+			ph->hex_scroll.h->set_viewsize(ph->hex_size.x, dt->box_rc.z + fl, 0);
+	}
+}
+pack_hex_t* testhex(plane_cx* p) {
+	auto hex = new hex_editor();
+	glm::vec2 hex_size = { 900,600 };
+	int width = 16;
+	int rcw = 14;
+	auto dpx = p->push_dragpos({ 20,60 }, hex_size);// 增加一个拖动坐标
+	auto rint = get_rand64(0, (uint32_t)-1);
+
+	auto ft = p->ltx->ctx;
+	int fc = ft->get_count();						// 获取注册的字体数量
+	const char* get_family(int idx);		// 获取字体名称
+	const char* get_family_en(const char* family);		// 获取字体名称
+	const char* get_family_full(int idx);	// 获取字体全名
+	struct ft_info
+	{
+		std::string name, full, style;
+	};
+	static std::vector<ft_info> fvs;
+	fvs.resize(fc);
+	static std::vector<std::string> ftns;
+	static std::string kc = (char*)"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
+	auto g = md::gb_u8((char*)kc.c_str(), -1);
+	auto nhs = hex_size;
+	nhs.y -= width;
+	auto st = get_defst(1);
+	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
+	hex->set_linechar(fl, p->ltx->get_text_rect1(st->font, st->font_size, "x").x);
+	hex->set_view_size(nhs);
+	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
+	hex_scroll.v->set_viewsize(hex_size.y, (hex->acount + 5) * fl, 0);
+	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x, 0);
+	hex_scroll.v->has_hover_sc = true;
+	hex_scroll.v->hover_sc = true;
+	auto ph = new pack_hex_t();
+	ph->fl = fl;
+	ph->p = p;
+	ph->hex = hex;
+	ph->hex_scroll = hex_scroll;
+	ph->hex_size = hex_size;
+	ph->dpx = dpx;
+	ph->width = width;
+
+	return ph;
+}
+#endif // 0
 
 
 
@@ -420,14 +546,12 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 	fvs.resize(fc);
 	static std::vector<std::string> ftns;
 	static std::string kc = (char*)"ab 串口fad1\r\n231ffwfadfsfgdfgdfhjhg";
-	static hex_editor hex;
 	auto g = md::gb_u8((char*)kc.c_str(), -1);
 	auto nhs = hex_size;
 	nhs.y -= width;
 	auto st = get_defst(1);
 	auto fl = p->ltx->get_lineheight(st->font, st->font_size);
-	hex.set_linechar(fl, p->ltx->get_text_rect1(st->font, st->font_size, "x").x);
-	hex.set_view_size(nhs);
+
 	//{
 	//	print_time aak("load file");
 	//	if (hex.set_file(R"(E:\迅雷下载\g\tenoke-romance.of.the.three.kingdoms.8.remake.iso)", true))
@@ -509,11 +633,7 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 	auto hex_edit = p->add_input("", { fl * 3,fl }, 1);
 	hex_edit->_absolute = true;
 	hex_edit->visible = false;
-	auto hex_scroll = p->add_scroll2(hex_size, width, rcw, { fl, fl }, { 2 * 0,0 }, { 0,2 * 0 });
-	hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
-	hex_scroll.h->set_viewsize(hex_size.x, hex_size.x, 0);
-	hex_scroll.v->has_hover_sc = true;
-	hex_scroll.v->hover_sc = true;
+	pack_hex_t* ph = testhex(p);
 	static int stt = 0;
 	mmcb = [=](void* p, int type, int id) {
 		if (id > 0)return;
@@ -523,13 +643,7 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 
 			{
 				print_time aak("load file");
-				if (hex.set_file(str.c_str(), true))
-				{
-					hex.update_hex_editor();
-					hex.set_pos(0);
-					hex_scroll.v->set_viewsize(hex_size.y, (hex.acount + 5) * fl, 0);
-					//kc.assign((char*)hex.data(), hex.size());
-				}
+				loadfile(ph, str);
 			}
 		}
 		};
@@ -537,20 +651,7 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 		{
 			if (e->down)
 			{
-				auto phex = &hex;
-				auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
-				auto dgp = p->get_dragv6(dpx);
-				dgp->size.x = -1;
-				glm::ivec2 scpos = e->mpos - p->tpos;// 减去本面板坐标
-				scpos -= (glm::ivec2)dps;
-				//printf("old click:%d\t%d\n", scpos.x, scpos.y);
-				auto hps = hex_scroll.h->get_offset_ns();
-				auto vps = hex_scroll.v->get_offset_ns();
-				scpos -= (glm::ivec2)phex->text_rc[2];
-				phex->on_mouse(e->clicks, scpos, hps, vps);
-				scpos.x += hps;
-				scpos.y += vps;
-				//printf("click:%d\t%d\n", scpos.x, scpos.y);
+				downmuose(ph, e);
 			}
 		});
 	p->update_cb = [=](float delta)
@@ -562,53 +663,9 @@ plane_cx* show_ui(form_x* form0, menu_cx* gm)
 		};
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
-			auto f = ft->get_font("a", 0);
-			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标 
-			uint32_t color = 0x80FF7373;// hz::get_themecolor();
-			{
-				cairo_as _ss_(cr);
-				cairo_translate(cr, dps.x, dps.y);
-
-				glm::ivec2 hps = dps;
-				glm::vec4 chs = { 0,0,hex_size };
-				hps.y += hex_size.y - width;
-				hex_scroll.h->pos = hps;
-				dps.x += hex_size.x - width;
-				hex_scroll.v->pos = dps;
-				glm::vec4 bgrc = { -2.5,  -2.5,hex_size.x + 3,hex_size.y + 3 };
-				auto phex = &hex;
-				glm::vec4 rc = { 0,0,300,1000 };
-				if (phex->acount == 0)
-				{
-					draw_rect(cr, bgrc, 0xf0121212, 0x80ffffff, 2, 1);
-					//auto pf = &ftns;
-					//for (auto& str : ftns)
-					//{
-						//draw_text(cr, p->ltx, str.c_str(), -1, rc, st);
-						//rc.x += 300;
-					//}
-					return;
-				}
-				auto fl = p->ltx->get_lineheight(st->font, st->font_size);
-				auto pxx = hex_scroll.h->get_offset_ns();
-				auto pyy = hex_scroll.v->get_offset_ns();
-				auto vps = pyy / fl;
-				pyy = vps * fl;
-				hex_style_t hst = {};
-				hst.st = st;
-				hst.ltx = p->ltx;
-				hst.pxx = pxx;
-				hst.pyy = pyy;
-				hst.fl = fl;
-				hst.hex_size = hex_size;
-				hst.bgrc = bgrc;
-				hst.view_size = { hex_scroll.h->_view_size,hex_scroll.v->_view_size };
-				hst.cr = cr;
-				phex->update_draw(&hst);
-				auto dt = phex->get_drawt();
-				if (dt->box_rc.z != hex_scroll.h->_content_size)
-					hex_scroll.h->set_viewsize(hex_size.x, dt->box_rc.z + fl, 0);
-			}
+			auto f = ft->get_font("a", 0); 
+			uint32_t color = 0x80FF7373;// hz::get_themecolor(); 
+			draw_hex(ph, cr);
 
 		};
 
@@ -747,24 +804,24 @@ int main()
 					glm::ivec4 notm = get_lgates_rc(2);
 					glm::ivec4 andm = get_lgates_rc(3);
 					glm::ivec4 orm = get_lgates_rc(4);
-					glm::ivec4 xorm = get_lgates_rc(5); 
-					texture_angle_dt adt = { xh_tex };
+					glm::ivec4 xorm = get_lgates_rc(5);
+					texture_angle_dt adt = {   };
 					adt.src_rect = notm;
 					adt.dst_rect = { 100,100,adt.src_rect.z,adt.src_rect.w };
 					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, &adt);
+					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
 					adt.src_rect = andm;
 					adt.dst_rect = { 100,200,adt.src_rect.z,adt.src_rect.w };
 					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, &adt);
+					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
 					adt.src_rect = orm;
 					adt.dst_rect = { 260,100,adt.src_rect.z,adt.src_rect.w };
 					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, &adt);
+					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
 					adt.src_rect = xorm;
 					adt.dst_rect = { 260,200,adt.src_rect.z,adt.src_rect.w };
 					adt.angle = 0;
-					tex_cb.render_texture_rotated(renderer, &adt);
+					tex_cb.render_texture_rotated(renderer, xh_tex, &adt, 1);
 				}
 				d2->update_draw(delta);
 			};

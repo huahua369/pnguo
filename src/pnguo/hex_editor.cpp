@@ -319,7 +319,9 @@ void print_data_de(const void* p, std::string* t)
 }
 void hex_editor::set_pos(size_t pos)
 {
-	if (pos < _size) {
+	if (pos > _size)
+		pos = _size - 1;
+	{
 		bool isr = ctpos == pos;
 		ctpos = pos;
 		range.x = range.y = pos;
@@ -362,7 +364,7 @@ void hex_editor::on_mouse(int clicks, const glm::ivec2& mpos, int64_t hpos, int6
 	if (clicks > 0)
 	{
 		set_pos(ost);
-		printf("%lld\n", ost);
+		//printf("%lld\n", ost);
 	}
 	else {
 		range.y = ost;
@@ -547,8 +549,14 @@ int64_t hex_editor::get_mpos2offset(const glm::i64vec2& mpos)
 	x /= 3;					// 3个字符
 	// 裁剪到范围
 	x = glm::clamp(x, (int64_t)0, (int64_t)bytes_per_line - 1);
+	y = glm::clamp(y, (int64_t)0, (int64_t)acount - 1);
 	y *= bytes_per_line;
-	return x + y;
+	auto a = x + y;
+	if (a >= _size)
+	{
+		a = _size - 1;
+	}
+	return a;
 }
 
 void hex_editor::make_rc()
