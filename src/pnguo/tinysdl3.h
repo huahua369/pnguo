@@ -334,7 +334,6 @@ private:
 
 struct texture_dt
 {
-	void* texture = 0;
 	// 源区域、目标区域 
 	const glm::vec4* src_rect = 0;
 	const glm::vec4* dst_rect = 0;
@@ -342,18 +341,16 @@ struct texture_dt
 };
 struct texture_angle_dt
 {
-	void* texture = 0;
 	// 源区域、目标区域 
 	glm::vec4 src_rect = {};
 	glm::vec4 dst_rect = {};
-	glm::vec2 center = {};//旋转中心
-	double angle = 0;//旋转角度
+	glm::vec2 center = {};	//旋转中心
+	double angle = 0;		//旋转角度
 	int flip = 0;			//翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
 };
 // 渲染重复平铺
 struct texture_tiled_dt
 {
-	void* texture = 0;
 	glm::vec4 src_rect = {};
 	glm::vec4 dst_rect = {};
 	float scale = 1.0;
@@ -361,7 +358,6 @@ struct texture_tiled_dt
 // 九宫格渲染
 struct texture_9grid_dt
 {
-	void* texture = 0;
 	glm::vec4 src_rect = {};
 	glm::vec4 dst_rect = {};
 	float scale = 1.0;
@@ -372,7 +368,6 @@ struct texture_9grid_dt
 // 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
 struct geometryraw_dt
 {
-	void* texture;
 	const float* xy; int xy_stride;
 	const glm::vec4* color; int color_stride;// color_stride等于0时，用一个颜色
 	const float* uv; int uv_stride;
@@ -397,14 +392,15 @@ struct texture_cb
 	void* (*new_texture_file)(void* renderer, const char* fn);
 	// 纹理渲染
 	// 批量区域渲染
-	int (*render_texture)(void* renderer, texture_dt* p);
+	int (*render_texture)(void* renderer, void* texture, texture_dt* p);
 	// 单个区域支持旋转
-	bool (*render_texture_rotated)(void* renderer, texture_angle_dt* p);
+	bool (*render_texture_rotated)(void* renderer, void* texture, texture_angle_dt* p, int count);
 	// 平铺渲染
-	bool (*render_texture_tiled)(void* renderer, texture_tiled_dt* p);
+	bool (*render_texture_tiled)(void* renderer, void* texture, texture_tiled_dt* p, int count);
 	// 九宫格渲染
-	bool (*render_texture_9grid)(void* renderer, texture_9grid_dt* p);
-	bool (*render_geometryraw)(void* renderer, geometryraw_dt* p);
+	bool (*render_texture_9grid)(void* renderer, void* texture, texture_9grid_dt* p, int count);
+	// 渲染2d三角网,支持顶点色、纹理
+	bool (*render_geometryraw)(void* renderer, void* texture, geometryraw_dt* p, int count);
 };
 #else
 typedef struct texture_cb texture_cb;
@@ -497,11 +493,11 @@ struct cpuinfo_t
 cpuinfo_t get_cpuinfo();
 std::string formatBytes(uint64_t bytes);
 
-// 导出接口
-uint64_t call_data(int type, void* data);
+app_cx* new_app();
+
+// 导出接口 
 // 运行消息循环count==0则死循环, 执行循环次数
 MC_EXPORT int run_app(void* app, int count);
-app_cx* new_app();
 MC_EXPORT void* new_app0();
 MC_EXPORT void free_app(void* app);
 // 创建主窗口，-1默认坐标

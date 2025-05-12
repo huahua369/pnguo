@@ -684,7 +684,7 @@ int main()
 						SDL_RenderTexture(renderer, (SDL_Texture*)mscx->texture, (SDL_FRect*)&it.src, (SDL_FRect*)&it.dst);
 					}
 				}
-
+				return;
 
 
 

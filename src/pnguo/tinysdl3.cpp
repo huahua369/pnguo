@@ -2555,15 +2555,15 @@ void* new_tex2file(void* renderer, const char* fn) {
 
 
 // 纹理渲染
-int render_texture(void* renderer, texture_dt* p)
+int render_texture(void* renderer, void* texture, texture_dt* p)
 {
-	if (!renderer || !p || !p->texture || !p->count)return 0;
+	if (!renderer || !p || !texture || !p->count)return 0;
 	auto srcrect = p->src_rect;
 	auto dstrect = p->dst_rect;
 	int ern = 0;
 	for (size_t i = 0; i < p->count; i++, srcrect++, dstrect++)
 	{
-		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)p->texture, (const SDL_FRect*)srcrect, (const SDL_FRect*)dstrect);
+		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)texture, (const SDL_FRect*)srcrect, (const SDL_FRect*)dstrect);
 		if (r)
 		{
 			ern++;
@@ -2571,44 +2571,60 @@ int render_texture(void* renderer, texture_dt* p)
 	}
 	return ern;
 }
-bool render_texture_rotated(void* renderer, texture_angle_dt* p)
+bool render_texture_rotated(void* renderer, void* texture, texture_angle_dt* p, int count)
 {
-	if (!renderer || !p || !p->texture)return false;
+	if (!renderer || !p || !texture || count < 1)return false;
 	// 源区域、目标区域、旋转角度、旋转中心、翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
-	bool r = SDL_RenderTextureRotated((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
-		(const SDL_FRect*)&p->src_rect, (const SDL_FRect*)&p->dst_rect, p->angle, (const SDL_FPoint*)&p->center, (SDL_FlipMode)p->flip);
+	int r = 0;
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		r += SDL_RenderTextureRotated((SDL_Renderer*)renderer, (SDL_Texture*)texture,
+			(const SDL_FRect*)&p->src_rect, (const SDL_FRect*)&p->dst_rect, p->angle, (const SDL_FPoint*)&p->center, (SDL_FlipMode)p->flip);
+	}
 	return r;
 }
-bool render_texture_tiled(void* renderer, texture_tiled_dt* p)
+bool render_texture_tiled(void* renderer, void* texture, texture_tiled_dt* p, int count)
 {
-	if (!renderer || !p || !p->texture)return false;
+	if (!renderer || !p || !texture || count < 1)return false;
+	int r = 0;
 	// 渲染重复平铺
-	bool r = SDL_RenderTextureTiled((SDL_Renderer*)renderer, (SDL_Texture*)p->texture, (const SDL_FRect*)&p->src_rect, p->scale, (const SDL_FRect*)&p->dst_rect);
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		r += SDL_RenderTextureTiled((SDL_Renderer*)renderer, (SDL_Texture*)texture, (const SDL_FRect*)&p->src_rect, p->scale, (const SDL_FRect*)&p->dst_rect);
+	}
 	return r;
 }
-bool render_texture_9grid(void* renderer, texture_9grid_dt* p)
+bool render_texture_9grid(void* renderer, void* texture, texture_9grid_dt* p, int count)
 {
-	if (!renderer || !p || !p->texture)return false;
+	if (!renderer || !p || !texture || count < 1)return false;
 	// 九宫格渲染
-	bool r = p->tileScale > 0.0 ? SDL_RenderTexture9GridTiled((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
-		(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect, p->tileScale)
-		: SDL_RenderTexture9Grid((SDL_Renderer*)renderer, (SDL_Texture*)p->texture,
-			(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect);
-
+	int r = 0;
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		r += p->tileScale > 0.0 ? SDL_RenderTexture9GridTiled((SDL_Renderer*)renderer, (SDL_Texture*)texture,
+			(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect, p->tileScale)
+			: SDL_RenderTexture9Grid((SDL_Renderer*)renderer, (SDL_Texture*)texture,
+				(const SDL_FRect*)&p->src_rect, p->left_width, p->right_width, p->top_height, p->bottom_height, p->scale, (const SDL_FRect*)&p->dst_rect);
+	}
 	return r;
 
 }
-bool render_geometryraw(void* renderer, geometryraw_dt* p)
+bool render_geometryraw(void* renderer, void* texture, geometryraw_dt* p, int count)
 {
-	if (!renderer || !p || !p->texture || !p->xy)return false;
+	if (!renderer || !p || !texture || !p->xy || count < 1)return false;
 	// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
-	bool r = SDL_RenderGeometryRaw((SDL_Renderer*)renderer,
-		(SDL_Texture*)p->texture,
-		p->xy, p->xy_stride,
-		(SDL_FColor*)p->color, p->color_stride,
-		p->uv, p->uv_stride,
-		p->num_vertices,
-		p->indices, p->num_indices, p->size_indices);
+
+	int r = 0;
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		r += SDL_RenderGeometryRaw((SDL_Renderer*)renderer,
+			(SDL_Texture*)texture,
+			p->xy, p->xy_stride,
+			(SDL_FColor*)p->color, p->color_stride,
+			p->uv, p->uv_stride,
+			p->num_vertices,
+			p->indices, p->num_indices, p->size_indices);
+	}
 	return r;
 }
 
@@ -3353,7 +3369,7 @@ void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, cons
 }
 
 #if 0
- 
+
 // 源区域、目标区域
 bool SDL_RenderTexture(SDL_Renderer* renderer, SDL_Texture* texture,
 	const SDL_FRect* srcrect, const SDL_FRect* dstrect);
@@ -3377,7 +3393,7 @@ bool SDL_RenderGeometryRaw(SDL_Renderer* renderer,
 	const float* uv, int uv_stride,
 	int num_vertices,
 	const void* indices, int num_indices, int size_indices);
- 
+
 bool result, use_rendergeometry = true;
 struct text_vertex_t
 {
