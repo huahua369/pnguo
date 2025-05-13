@@ -4,6 +4,7 @@
 作者：华仔
 */
 #include <pch1.h>
+#include <tiny2d.h>
 #include "logic_gates.h"
 
 glm::ivec4 get_lgates_rc(int i)
@@ -28,3 +29,5 @@ glm::ivec4 get_lgates_rc(int i)
 	}
 	return rc;
 }
+
+// 信号线，

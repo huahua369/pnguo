@@ -8,8 +8,8 @@ struct subimage_t
 	std::string name;
 	int index = -1;
 	int rotate = false;			// true是90度
-	glm::ivec4 bounds = {};// 519, 223, 17, 38
-	glm::ivec4 offsets = {};//2, 2, 21, 42
+	glm::ivec4 bounds = {};// 519, 223, 17, 38，图片切片大小
+	glm::ivec4 offsets = {};//2, 2, 21, 42，  图片偏移量和原始大小
 	//glm::ivec4 split = {};//废弃
 	//glm::ivec4 pad = {};//废弃
 };

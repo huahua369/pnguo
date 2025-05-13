@@ -723,7 +723,7 @@ SDL_FPoint* generateGridPoints(int gridSize, int canvasSize, std::vector<SDL_FPo
 void genGrid(int gridSize, int canvasSize, std::vector<SDL_FPoint>* opt) {
 	generateGridPoints(gridSize, canvasSize, opt);
 }
-void drawGrid(SDL_Renderer* renderer, int gridSize, int canvasSize, std::vector<SDL_FPoint>* opt) {
+void drawGrid(SDL_Renderer* renderer, const glm::vec2& pos, int gridSize, int canvasSize, std::vector<SDL_FPoint>* opt) {
 	SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1.0); // 设置线条颜色为黑色 
 	SDL_FPoint* points = opt->data();
 	auto length = opt->size() / 2;
@@ -731,7 +731,7 @@ void drawGrid(SDL_Renderer* renderer, int gridSize, int canvasSize, std::vector<
 	{
 		auto it = points[0];
 		auto it1 = points[1];
-		SDL_RenderLine(renderer, it.x, it.y, it1.x, it1.y);
+		SDL_RenderLine(renderer, it.x + pos.x, it.y + pos.y, it1.x + pos.x, it1.y + pos.y);
 		points += 2;
 	}
 }
@@ -768,11 +768,11 @@ int main()
 	auto v3y0 = x * m3y;
 	auto d2 = new sp_drawable();
 	d2->set_renderer(form0->renderer);
-	//d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
-	//	, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2, "temp/spineboy-j.spt");
-	//d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
-	//	, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2, "temp/spineboy-skel.spt");
-
+	/*d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
+		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2, "temp/spineboy-j.spt");
+	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
+		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2, "temp/spineboy-skel.spt");
+	*/
 	d2->add_pkg("temp/spineboy-j.spt", 0.25, 0.2);
 	d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
 	d2->set_pos(0, 600, 650);
@@ -871,13 +871,13 @@ int main()
 						wline[i] = get_lgates_rc(6 + i);
 					}
 
-					drawGrid(renderer, 15, 70 * 15, opt2);
+					drawGrid(renderer, { 20,90 }, 15, 70 * 15, opt2);
 
 					texture_dt adt = {   };
-					adt.src_rect = {0,0,460,220};
-					adt.dst_rect = { 106,106,adt.src_rect.z,adt.src_rect.w }; 
+					adt.src_rect = { 0,0,512,512 };
+					adt.dst_rect = { 106,106,adt.src_rect.z,adt.src_rect.w };
 					tex_cb.render_texture(renderer, xh_tex, &adt, 1);
- 
+
 
 
 
@@ -898,7 +898,7 @@ int main()
 						tl++;
 					}
 				}
-				d2->update_draw(delta);
+			//	d2->update_draw(delta);
 			};
 	}
 
