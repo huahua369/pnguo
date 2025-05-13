@@ -55,6 +55,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <mapView.h>
+#include <stb_image.h>
 #include "tria.h"
 // https://zh.esotericsoftware.com/spine-atlas-format
 atlas_strinfo get_atlas_strinfo()
@@ -88,8 +90,8 @@ void generate_atlas(const char* output_path, atlas_xt* atlas)
 	for (int i = 0; i < atlas->region.size(); i++) {
 		auto& it = atlas->region[i];
 		fprintf(fp, "%s\n", it.name.c_str());
-		if (it.rotate > 0)
-			fprintf(fp, "\trotate: %d\n", it.rotate);
+		if (it.degrees > 0)
+			fprintf(fp, "\trotate: %d\n", it.degrees);
 		fprintf(fp, "\tbounds: %d, %d, %d, %d\n", it.bounds.x, it.bounds.y, it.bounds.z, it.bounds.w);
 		fprintf(fp, "\toffsets: %d, %d, %d, %d\n", it.offsets.x, it.offsets.y, it.offsets.z, it.offsets.w);
 		fprintf(fp, "\tindex: %d\n\n", it.index);
@@ -148,12 +150,420 @@ void atlas2json(atlas_xt* a, njson0& n)
 		njson0 nt;
 		nt["name"] = it.name;
 		nt["index"] = it.index;
-		nt["rotate"] = it.rotate;
+		nt["rotate"] = it.degrees;
 		nt["bounds"] = { it.bounds.x, it.bounds.y, it.bounds.z, it.bounds.w };
 		nt["offsets"] = { it.offsets.x, it.offsets.y, it.offsets.z, it.offsets.w };
 		region2.push_back(nt);
 	}
 	n["region"] = region2;
+}
+namespace e2d {
+
+	typedef struct SimpleString {
+		char* start;
+		char* end;
+		int length;
+	} SimpleString;
+
+	static SimpleString* ss_trim(SimpleString* self) {
+		while (isspace((unsigned char)*self->start) && self->start < self->end)
+			self->start++;
+		if (self->start == self->end) {
+			self->length = self->end - self->start;
+			return self;
+		}
+		self->end--;
+		while (((unsigned char)*self->end == '\r') && self->end >= self->start)
+			self->end--;
+		self->end++;
+		self->length = self->end - self->start;
+		return self;
+	}
+
+	static int ss_indexOf(SimpleString* self, char needle) {
+		char* c = self->start;
+		while (c < self->end) {
+			if (*c == needle) return c - self->start;
+			c++;
+		}
+		return -1;
+	}
+
+	static int ss_indexOf2(SimpleString* self, char needle, int at) {
+		char* c = self->start + at;
+		while (c < self->end) {
+			if (*c == needle) return c - self->start;
+			c++;
+		}
+		return -1;
+	}
+
+	static SimpleString ss_substr(SimpleString* self, int s, int e) {
+		SimpleString result;
+		e = s + e;
+		result.start = self->start + s;
+		result.end = self->start + e;
+		result.length = e - s;
+		return result;
+	}
+
+	static SimpleString ss_substr2(SimpleString* self, int s) {
+		SimpleString result;
+		result.start = self->start + s;
+		result.end = self->end;
+		result.length = result.end - result.start;
+		return result;
+	}
+
+	static int /*boolean*/ ss_equals(SimpleString* self, const char* str) {
+		int i;
+		int otherLen = strlen(str);
+		if (self->length != otherLen) return 0;
+		for (i = 0; i < self->length; i++) {
+			if (self->start[i] != str[i]) return 0;
+		}
+		return -1;
+	}
+
+	static std::string ss_copy(SimpleString* self) {
+		std::string str;
+		str.assign(self->start, self->length);
+		return str;
+	}
+
+	static int ss_toInt(SimpleString* self) {
+		return (int)strtol(self->start, &self->end, 10);
+	}
+
+	typedef struct AtlasInput {
+		const char* start;
+		const char* end;
+		char* index;
+		int length;
+		SimpleString line;
+	} AtlasInput;
+
+	static SimpleString* ai_readLine(AtlasInput* self) {
+		if (self->index >= self->end) return 0;
+		self->line.start = self->index;
+		while (self->index < self->end && *self->index != '\n')
+			self->index++;
+		self->line.end = self->index;
+		if (self->index != self->end) self->index++;
+		self->line = *ss_trim(&self->line);
+		self->line.length = self->line.end - self->line.start;
+		return &self->line;
+	}
+
+	static int ai_readEntry(SimpleString entry[5], SimpleString* line) {
+		int colon, i, lastMatch;
+		SimpleString substr;
+		if (line == NULL) return 0;
+		ss_trim(line);
+		if (line->length == 0) return 0;
+
+		colon = ss_indexOf(line, ':');
+		if (colon == -1) return 0;
+		substr = ss_substr(line, 0, colon);
+		entry[0] = *ss_trim(&substr);
+		for (i = 1, lastMatch = colon + 1;; i++) {
+			int comma = ss_indexOf2(line, ',', lastMatch);
+			if (comma == -1) {
+				substr = ss_substr2(line, lastMatch);
+				entry[i] = *ss_trim(&substr);
+				return i;
+			}
+			substr = ss_substr(line, lastMatch, comma - lastMatch);
+			entry[i] = *ss_trim(&substr);
+			lastMatch = comma + 1;
+			if (i == 4) return 4;
+		}
+	}
+
+	static const char* formatNames[] = { "", "Alpha", "Intensity", "LuminanceAlpha", "RGB565", "RGBA4444", "RGB888",
+										"RGBA8888" };
+	static const char* textureFilterNames[] = { "", "Nearest", "Linear", "MipMap", "MipMapNearestNearest",
+											   "MipMapLinearNearest",
+											   "MipMapNearestLinear", "MipMapLinearLinear" };
+
+	int indexOf(const char** array, int count, SimpleString* str) {
+		int i;
+		for (i = 0; i < count; i++)
+			if (ss_equals(str, array[i])) return i;
+		return 0;
+	}
+	typedef enum {
+		SP_ATLAS_UNKNOWN_FORMAT,
+		SP_ATLAS_ALPHA,
+		SP_ATLAS_INTENSITY,
+		SP_ATLAS_LUMINANCE_ALPHA,
+		SP_ATLAS_RGB565,
+		SP_ATLAS_RGBA4444,
+		SP_ATLAS_RGB888,
+		SP_ATLAS_RGBA8888
+	} AtlasFormat;
+
+	typedef enum {
+		SP_ATLAS_UNKNOWN_FILTER,
+		SP_ATLAS_NEAREST,
+		SP_ATLAS_LINEAR,
+		SP_ATLAS_MIPMAP,
+		SP_ATLAS_MIPMAP_NEAREST_NEAREST,
+		SP_ATLAS_MIPMAP_LINEAR_NEAREST,
+		SP_ATLAS_MIPMAP_NEAREST_LINEAR,
+		SP_ATLAS_MIPMAP_LINEAR_LINEAR
+	} AtlasFilter;
+
+	typedef enum {
+		SP_ATLAS_MIRROREDREPEAT,
+		SP_ATLAS_CLAMPTOEDGE,
+		SP_ATLAS_REPEAT
+	} spAtlasWrap;
+	AtlasPage* AtlasPage_create(atlas_xt* atlas, const char* name) {
+		AtlasPage* self = new AtlasPage();
+		self->atlas = atlas;
+		self->name = name;
+		self->minFilter = SP_ATLAS_NEAREST;
+		self->magFilter = SP_ATLAS_NEAREST;
+		self->format = SP_ATLAS_RGBA8888;
+		self->uWrap = SP_ATLAS_CLAMPTOEDGE;
+		self->vWrap = SP_ATLAS_CLAMPTOEDGE;
+		return self;
+	}
+	struct page_obj_t
+	{
+		void* renderer = 0;
+		std::map<void*, std::string> _texs;
+		njson0 img;
+		char* data;
+		int len;
+	};
+
+	void AtlasPage_createTexture(AtlasPage* self, const char* path)
+	{
+#if 0
+		int width, height, components;
+		auto p = (page_obj_t*)self->atlas->rendererObject;
+		int len = 0;
+		uint8_t* data = 0;
+		if (p->img.size() && p->data)
+		{
+			for (auto& it : p->img)
+			{
+				std::string name = it["name"];
+				if (path == name)
+				{
+					len = it["length"];
+					int ps = it["offset"];
+					data = (uint8_t*)p->data + ps;
+					break;
+				}
+			}
+		}
+
+		stbi_uc* imageData = data && len > 0 ? stbi_load_from_memory(data, len, &width, &height, &components, 4)
+			: stbi_load(path, &width, &height, &components, 4);
+		if (!imageData) return;
+
+		SDL_Texture* texture = SDL_CreateTexture((SDL_Renderer*)p->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
+		if (!texture) {
+			stbi_image_free(imageData);
+			return;
+		}
+		if (!SDL_UpdateTexture(texture, NULL, imageData, width * 4)) {
+			stbi_image_free(imageData);
+			return;
+		}
+
+		p->_texs[texture] = path;
+		stbi_image_free(imageData);
+		self->rendererObject = texture;
+#endif
+		return;
+	}
+	atlas_xt* atlas_create(const char* begin, int length, const char* dir, void* rendererObject) {
+		atlas_xt* self;
+		AtlasInput reader;
+		SimpleString* line;
+		SimpleString entry[5];
+
+		AtlasPage* page = NULL;
+		AtlasPage* lastPage = NULL;
+		subimage_t* lastRegion = NULL;
+
+		int count;
+		int dirLength = (int)strlen(dir);
+		int needsSlash = dirLength > 0 && dir[dirLength - 1] != '/' && dir[dirLength - 1] != '\\';
+
+		self = new atlas_xt();
+		self->rendererObject = rendererObject;
+
+		reader.start = begin;
+		reader.end = begin + length;
+		reader.index = (char*)begin;
+		reader.length = length;
+
+		line = ai_readLine(&reader);
+		while (line != NULL && line->length == 0)
+			line = ai_readLine(&reader);
+
+		while (-1) {
+			if (line == NULL || line->length == 0) break;
+			if (ai_readEntry(entry, line) == 0) break;
+			line = ai_readLine(&reader);
+		}
+
+		while (-1) {
+			if (line == NULL) break;
+			if (ss_trim(line)->length == 0) {
+				page = NULL;
+				line = ai_readLine(&reader);
+			}
+			else if (page == NULL) {
+				std::string name = ss_copy(line);
+				std::string path = dir;
+				if (needsSlash) path[dirLength] = '/';
+				path += name;
+				page = AtlasPage_create(self, name.c_str());
+
+				if (lastPage)
+					lastPage->next = page;
+				else
+					self->pages = page;
+				lastPage = page;
+
+				while (-1) {
+					line = ai_readLine(&reader);
+					if (ai_readEntry(entry, line) == 0) break;
+					if (ss_equals(&entry[0], "size")) {
+						page->width = ss_toInt(&entry[1]);
+						page->height = ss_toInt(&entry[2]);
+					}
+					else if (ss_equals(&entry[0], "format")) {
+						page->format = (AtlasFormat)indexOf(formatNames, 8, &entry[1]);
+					}
+					else if (ss_equals(&entry[0], "filter")) {
+						page->minFilter = (AtlasFilter)indexOf(textureFilterNames, 8, &entry[1]);
+						page->magFilter = (AtlasFilter)indexOf(textureFilterNames, 8, &entry[2]);
+					}
+					else if (ss_equals(&entry[0], "repeat")) {
+						page->uWrap = SP_ATLAS_CLAMPTOEDGE;
+						page->vWrap = SP_ATLAS_CLAMPTOEDGE;
+						if (ss_indexOf(&entry[1], 'x') != -1) page->uWrap = SP_ATLAS_REPEAT;
+						if (ss_indexOf(&entry[1], 'y') != -1) page->vWrap = SP_ATLAS_REPEAT;
+					}
+					else if (ss_equals(&entry[0], "pma")) {
+						page->pma = ss_equals(&entry[1], "true");
+					}
+				}
+				page->path = path;
+				//AtlasPage_createTexture(page, path.c_str());
+			}
+			else {
+				subimage_t region1 = {};
+				subimage_t* region = &region1;
+				lastRegion = region;
+				region->name = ss_copy(line);
+				while (-1) {
+					line = ai_readLine(&reader);
+					count = ai_readEntry(entry, line);
+					if (count == 0) break;
+					if (ss_equals(&entry[0], "xy")) {
+						region->bounds.x = ss_toInt(&entry[1]);
+						region->bounds.y = ss_toInt(&entry[2]);
+					}
+					else if (ss_equals(&entry[0], "size")) {
+						region->bounds.z = ss_toInt(&entry[1]);
+						region->bounds.w = ss_toInt(&entry[2]);
+					}
+					else if (ss_equals(&entry[0], "bounds")) {
+						region->bounds.x = ss_toInt(&entry[1]);
+						region->bounds.y = ss_toInt(&entry[2]);
+						region->bounds.z = ss_toInt(&entry[3]);
+						region->bounds.w = ss_toInt(&entry[4]);
+					}
+					else if (ss_equals(&entry[0], "offset")) {
+						region->offsets.x = ss_toInt(&entry[1]);
+						region->offsets.y = ss_toInt(&entry[2]);
+					}
+					else if (ss_equals(&entry[0], "orig")) {
+						region->offsets.z = ss_toInt(&entry[1]);
+						region->offsets.w = ss_toInt(&entry[2]);
+					}
+					else if (ss_equals(&entry[0], "offsets")) {
+						region->offsets.x = ss_toInt(&entry[1]);
+						region->offsets.y = ss_toInt(&entry[2]);
+						region->offsets.z = ss_toInt(&entry[3]);
+						region->offsets.w = ss_toInt(&entry[4]);
+					}
+					else if (ss_equals(&entry[0], "rotate")) {
+						if (ss_equals(&entry[1], "true")) {
+							region->degrees = 90;
+						}
+						else if (!ss_equals(&entry[1], "false")) {
+							region->degrees = ss_toInt(&entry[1]);
+						}
+					}
+					else if (ss_equals(&entry[0], "index")) {
+						region->index = ss_toInt(&entry[1]);
+					}
+					else {
+						int i = 0;
+						njson keyValue;
+						auto& v = keyValue[ss_copy(&entry[0])];
+						for (i = 0; i < count; i++) {
+							v.push_back(ss_toInt(&entry[i + 1]));
+						}
+						region->keyValues.push_back(keyValue);
+					}
+				}
+				if (region->offsets.z == 0 && region->offsets.w == 0) {
+					region->offsets.z = region->bounds.z;
+					region->offsets.w = region->bounds.w;
+				}
+
+				region->uv.x = (float)region->bounds.x / page->width;
+				region->uv.y = (float)region->bounds.y / page->height;
+				if (region->degrees == 90) {
+					region->uv2.x = (float)(region->bounds.x + region->bounds.w) / page->width;
+					region->uv2.y = (float)(region->bounds.y + region->bounds.z) / page->height;
+				}
+				else {
+					region->uv2.x = (float)(region->bounds.x + region->bounds.z) / page->width;
+					region->uv2.y = (float)(region->bounds.y + region->bounds.w) / page->height;
+				}
+			}
+		}
+
+		return self;
+	}
+
+}
+atlas_xt* spAtlas_createFromFile(const char* path, void* rendererObject) {
+	int dirLength;
+	char* dir;
+	int length;
+	const char* data;
+
+	atlas_xt* atlas = 0;
+
+	/* Get directory from atlas path. */
+	const char* lastForwardSlash = strrchr(path, '/');
+	const char* lastBackwardSlash = strrchr(path, '\\');
+	const char* lastSlash = lastForwardSlash > lastBackwardSlash ? lastForwardSlash : lastBackwardSlash;
+	if (lastSlash == path) lastSlash++; /* Never drop starting slash. */
+	dirLength = (int)(lastSlash ? lastSlash - path : 0);
+	std::string dir2;
+	dir2.assign(path, dirLength);
+	dir = (char*)dir2.c_str();
+	hz::mfile_t mf;
+	data = mf.open_d(path, true);
+	if (data)
+	{
+		length = mf.size();
+		atlas = e2d::atlas_create(data, length, dir, rendererObject);
+	}
+	return atlas;
 }
 
 void free_atlas(atlas_xt* atlas)

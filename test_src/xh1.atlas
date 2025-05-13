@@ -3,9 +3,183 @@ size: 512,512
 format: RGBA8888
 filter: Linear,Linear
 repeat: none
-g0
+yg0
   bounds: 11,11,8,8
   offsets: 0, 0,30,30 
-red0
+yr0
   bounds: 41,11,8,8
   offsets: 0, 0,30,30 
+yw0
+  bounds: 101,251,8,8
+  offsets: 0, 0,30,30 
+yg1
+  bounds: 69,9,12,12
+  offsets: 0, 0,30,30 
+yr1
+  bounds: 99,9,12,12
+  offsets: 0, 0,30,30  
+yw1
+  bounds: 99,279,12,12
+  offsets: 0, 0,30,30 
+line_blue0
+  bounds: 150,0,30,30 
+line_blue1
+  bounds: 180,0,30,30 
+line_blue2
+  bounds: 210,0,30,30 
+line_blue3
+  bounds: 240,0,30,30 
+line_blue4
+  bounds: 210,30,30,30 
+line_blue5
+  bounds: 240,30,30,30 
+line_red0
+  bounds: 300,0,30,30 
+line_red1
+  bounds: 330,0,30,30 
+line_red2
+  bounds: 360,0,30,30 
+line_red3
+  bounds: 390,0,30,30 
+line_red4
+  bounds: 360,30,30,30 
+line_red5
+  bounds: 390,30,30,30 
+
+line_green0
+  bounds: 300,90,30,30 
+line_green1
+  bounds: 330,90,30,30 
+line_green2
+  bounds: 360,90,30,30 
+line_green3
+  bounds: 390,90,30,30 
+line_green4
+  bounds: 360,120,30,30 
+line_green5
+  bounds: 390,120,30,30 
+line_white0
+  bounds: 240,240,30,30 
+line_white1
+  bounds: 270,240,30,30 
+line_white2
+  bounds: 300,240,30,30 
+line_white3
+  bounds: 330,240,30,30 
+line_white4
+  bounds: 300,270,30,30 
+line_white5
+  bounds: 330,270,30,30 
+
+line_bridge0
+  bounds: 240,120,90,30
+line_bridge1
+  bounds: 240,150,90,30
+line_bridge2
+  bounds: 240,180,90,30
+line_bridge3
+  bounds: 240,210,90,30
+
+not_b
+  bounds: 0,30,60,30
+and_b
+  bounds: 0,90,60,60
+or_b
+  bounds: 90,30,60,60
+xor_b
+  bounds: 150,90,60,60
+not_w
+  bounds: 0,180,60,30
+and_w
+  bounds: 0,240,60,60
+or_w
+  bounds: 90,180,60,60
+xor_w
+  bounds: 150,240,60,60
+
+not_gr
+  bounds: 11,345,38,8
+  offsets: 0, 0,60,30
+not_rg 
+  bounds: 11,360,38,8
+  offsets: 0, 0,60,30
+  
+and_g0 
+  bounds: 11,404,15,9
+  offsets: 0, 0,30,30
+and_g01 
+  bounds: 21,421,9,6
+  offsets: 0, 0,9,6
+and_g1 
+  bounds: 11,435,25,10
+  offsets: 0, 0,25,10  
+and_g11 
+  bounds: 30,421,9,6
+  offsets: 0, 0,9,6
+and_g2 
+  bounds: 39,423,10,20
+  offsets: 0, 0,10,20
+and_r0 
+  bounds: 11,464,15,9
+  offsets: 0, 0,30,30
+and_r01 
+  bounds: 21,477,9,6
+  offsets: 0, 0,9,6
+and_r1 
+  bounds: 11,495,25,10
+  offsets: 0, 0,25,10  
+and_r11 
+  bounds: 30,485,9,6
+  offsets: 0, 0,9,6
+and_r2 
+  bounds: 39,483,10,20
+  offsets: 0, 0,10,20
+and_bg 
+  bounds: 72,468,28,32
+  offsets: 0, 0,28,32
+
+or_g0 
+  bounds: 86,330,20,20
+  offsets: 0, 0,30,30
+or_g1 
+  bounds: 86,363,20,20
+  offsets: 0, 0,30,30
+or_g2 
+  bounds: 117,361,22,22
+  offsets: 0, 0,30,30
+or_r0
+  bounds: 146,345,25,13
+  offsets: 0, 0,30,30
+or_r1
+  bounds: 146,370,25,13
+  offsets: 0, 0,30,30
+or_r2 
+  bounds: 177,361,22,22
+  offsets: 0, 0,30,30
+xor_g0 
+  bounds: 131,405,13,13
+  offsets: 0, 0,30,30
+xor_g1
+  bounds: 131,430,13,13
+  offsets: 0, 0,30,30
+xor_r0 
+  bounds: 161,405,13,13
+  offsets: 0, 0,30,30
+xor_r1
+  bounds: 161,430,13,13
+  offsets: 0, 0,30,30
+xor_c
+  bounds: 186,415,18,18
+  offsets: 6, 6,30,30
+xor_g2
+  bounds: 221,420,23,23
+  offsets: 0, 0,30,30
+xor_c0
+  bounds: 161,450,8,12
+  offsets: 0, 0,30,30
+xor_c1
+  bounds: 191,450,12,8
+  offsets: 0, 0,30,30
+xor_c2
+  bounds: 171,160,13，13
+  offsets: 0, 0,30,30

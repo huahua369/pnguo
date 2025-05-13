@@ -2,16 +2,33 @@
 #define EDITOR_2D
 // 2d编辑器
 // 创建时间2025-3-8
+struct atlas_xt;
+struct AtlasPage {
+	atlas_xt* atlas;
+	std::string name;
+	std::string path;
+	int format;
+	int minFilter, magFilter;
+	int uWrap, vWrap;
+
+	void* rendererObject;
+	int width, height;
+	int /*boolean*/ pma;
+
+	AtlasPage* next;
+};
 
 struct subimage_t
 {
 	std::string name;
 	int index = -1;
-	int rotate = false;			// true是90度
+	int degrees = 0;			 
 	glm::ivec4 bounds = {};// 519, 223, 17, 38，图片切片大小
 	glm::ivec4 offsets = {};//2, 2, 21, 42，  图片偏移量和原始大小
 	//glm::ivec4 split = {};//废弃
 	//glm::ivec4 pad = {};//废弃
+	glm::vec2 uv, uv2;
+	njson keyValues;
 };
 // 图集信息
 struct atlas_xt
@@ -23,6 +40,8 @@ struct atlas_xt
 	glm::ivec2 repeat = {}; //: Texture包裹设置.Atlas加载器可忽略该属性.其可用值为 : x, y, xy, 或 none.若省略则默认为none.
 	bool pma = false;//: 若值为true则表示图像使用了premultiplied alpha.若省略则默认为false.
 	std::vector<subimage_t> region;
+	void* rendererObject = 0;
+	AtlasPage* pages;
 };
 struct atlas_strinfo
 {
