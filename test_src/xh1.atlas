@@ -1,0 +1,11 @@
+﻿xh1.png
+size: 512,512
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+g0
+  bounds: 11,11,8,8
+  offsets: 0, 0,30,30 
+red0
+  bounds: 41,11,8,8
+  offsets: 0, 0,30,30 

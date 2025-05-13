@@ -1,5 +1,7 @@
-#pragma once 
-
+﻿#pragma once 
+/*
+简易2d骨骼动画
+*/
 
 // 图集区域
 struct texture_region_t {
@@ -61,6 +63,7 @@ struct mesh_attachment_t {
 	unsigned short* edges;
 	float width, height;
 };
+// 骨骼数据
 struct bone_data_t
 {
 	int index;
@@ -78,10 +81,11 @@ struct bone_t
 	int/*bool*/ sorted;
 	int/*bool*/ active;
 };
+
 struct slot_data_t {
 	int index;
 	char* name;
-	bone_data_t* boneData;
+	bone_data_t* boneData;	
 	char* attachmentName;
 	uint32_t color;
 	uint32_t darkColor;
@@ -112,4 +116,15 @@ struct animation_t
 	glm::vec4* curve = 0;
 	int count;	// 关键帧数量
 	int type;   // 值类型长度：1:旋转，2:平移缩放\斜切，4:颜色
+};
+// 皮肤
+struct skeleton_t
+{
+	char* name;
+	slot_t** slots;
+	attachment_t** attachments; 
+	bone_t** bones;
+	int slotCount;
+	int attachmentCount;
+	int bone_count;
 };

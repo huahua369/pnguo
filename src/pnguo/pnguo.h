@@ -117,8 +117,20 @@ private:
 
 };
 
+// 骨骼数据
+struct bone_data_t
+{
+	int index;
+	char* name;
+	bone_data_t* parent;
+	float length;		// 骨骼长度. 运行时通常不使用骨骼长度属性
+	float x, y, rotation, scaleX, scaleY, shearX, shearY;
+	uint32_t color;
+	int/*bool*/ visible;
+};
 // 骨骼动画矩阵
 struct bone_t {
+	bone_data_t* data = 0;
 	glm::mat3* m = 0;			// 计算好的动画矩阵animated_mats
 	int count = 0;
 };
@@ -137,7 +149,7 @@ struct attachment_t
 };
 struct slot_t
 {
-	glm::vec4 color = {};
+	glm::vec4 color = {};			// 动画计算结果颜色
 	int blend_mode = 0;				// 混合模式
 	attachment_t* attachment = 0;	// 激活的附件 
 	bone_t* bone = 0;				// 骨头

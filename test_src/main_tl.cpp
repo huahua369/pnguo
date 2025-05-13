@@ -822,7 +822,7 @@ int main()
 		}
 	}
 	atlas_strinfo ass = get_atlas_strinfo();
-	std::vector<char*> nv;
+	static std::vector<char*> nv;
 	d2->get_anim_name(0, &nv);
 	d2->animationstate_set_animationbyname(0, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
@@ -832,11 +832,16 @@ int main()
 	texture_cb tex_cb = get_texture_cb();
 	{
 		auto xh_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/xh1.png");
-		form0->add_event(0, [](uint32_t type, et_un_t* e, void* ud)
+		form0->add_event(0, [=](uint32_t type, et_un_t* e, void* ud)
 			{
 				auto btn = e->v.b;
+				static int idx = -1; 
 				if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
-
+				idx++;
+				if (idx < nv.size())
+				{
+					d2->animationstate_add_animationbyname(1, 0, nv[idx], -1, 0);
+				}
 
 			});
 
@@ -898,7 +903,7 @@ int main()
 						tl++;
 					}
 				}
-			//	d2->update_draw(delta);
+				//d2->update_draw(delta);
 			};
 	}
 

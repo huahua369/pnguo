@@ -1772,7 +1772,7 @@ bool check_rc(const glm::vec4& rc, const glm::vec3& c)
 #endif // !M_PI
 
 #ifndef THREE_SQRT
-#define EPSILON 1e-8
+#define EPSILON8 1e-8
 #define EPSILON_NUMERIC 1e-4
 
 #define THREE_SQRT sqrt(3)
@@ -1784,10 +1784,10 @@ bool check_rc(const glm::vec4& rc, const glm::vec3& c)
 
 #if 1 
 bool isAroundZero(float val) {
-	return val > -EPSILON && val < EPSILON;
+	return val > -EPSILON8 && val < EPSILON8;
 }
 bool isNotAroundZero(float val) {
-	return val > EPSILON || val < -EPSILON;
+	return val > EPSILON8 || val < -EPSILON8;
 }
 /**
  * 向量距离平方

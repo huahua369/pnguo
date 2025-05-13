@@ -1411,7 +1411,6 @@ void form_x::set_curr_drop(hz::drop_info_cx* p)
 
 void form_x::add_event(void* ud, std::function<void(uint32_t type, et_un_t* e, void* ud)> cb)
 {
-	if (!ud)return;
 	lock_auto_x lx(&lkecb);
 	events_a->push_back({ ud, cb });
 }
