@@ -146,7 +146,7 @@ or_g1
   offsets: 11, 29,30,30
 or_g2 
   bounds: 117,361,22,22
-  offsets: 42, 27,30,30
+  offsets: 27, 27,30,30
 or_r0
   bounds: 146,345,25,13
   offsets: 11, 11,30,30
@@ -155,7 +155,7 @@ or_r1
   offsets: 11, 36,30,30
 or_r2 
   bounds: 177,361,22,22
-  offsets: 42, 27,30,30
+  offsets: 27, 27,30,30
 xor_g0 
   bounds: 131,405,13,13
   offsets: 11, 11,30,30

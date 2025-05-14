@@ -303,10 +303,10 @@ void logic_cx::draw_not(gatedata_st* p, float scale)
 		else
 		{
 			draw_atlas(axt, gm[0], pos, p->degrees);
-			int x = 2;
+			int x = 3;
 			if (p->input & 1)
 			{
-				x = 1;
+				x = 2;
 			}
 			draw_atlas(axt, gm[x], pos, p->degrees);
 		}

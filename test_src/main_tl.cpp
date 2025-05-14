@@ -840,12 +840,12 @@ int main()
 		auto xha = new_atlas("data/xh1.atlas", &ro);
 
 		logic_cx* logic = new_logic(xha);
-		logic->_pos = { 120,120 };
-		logic->add_gate(dType::AND_GATE, "a", { 60,60 }, 0);
-		logic->add_gate(dType::AND_GATE, "a", { 60 ,150 }, 0);
-		logic->add_gate(dType::AND_GATE, "a", { 150,60 }, 0);
-		logic->add_gate(dType::AND_GATE, "a", { 150,150 }, 0);
-		logic->add_gate(dType::AND_GATE, "a", { 230,60 }, 0);
+		logic->_pos = { 20,90 };
+		logic->add_gate(dType::AND_GATE, "and", { 60,60 }, 0);
+		logic->add_gate(dType::AND_GATE, "and", { 60 ,150 }, 0);
+		logic->add_gate(dType::AND_GATE, "and", { 150,60 }, 0);
+		logic->add_gate(dType::AND_GATE, "and", { 150,150 }, 0);
+		logic->add_gate(dType::AND_GATE, "and", { 230,60 }, 0);
 		logic->gates[0].input = 0x00;
 		logic->gates[1].input = 0x03;
 		logic->gates[2].input = 0x01;
@@ -863,6 +863,27 @@ int main()
 		logic->gates[xx + 2].input = 0x01;
 		logic->gates[xx + 3].input = 0x02;
 		logic->gates[xx + 4].build = 1;
+		nnpos += glm::vec2({ 0,180 });
+		logic->add_gate(dType::OR_GATE, "or0", { nnpos.x + 60,nnpos.y + 60 }, 0);
+		logic->add_gate(dType::OR_GATE, "or3", { nnpos.x + 60 ,nnpos.y + 150 }, 0);
+		logic->add_gate(dType::OR_GATE, "or1", { nnpos.x + 150,nnpos.y + 60 }, 0);
+		logic->add_gate(dType::OR_GATE, "or2", { nnpos.x + 150,nnpos.y + 150 }, 0);
+		logic->add_gate(dType::OR_GATE, "or", { nnpos.x + 230,nnpos.y + 60 }, 0);
+		xx += 5;
+		logic->gates[xx + 0].input = 0x00;
+		logic->gates[xx + 1].input = 0x03;
+		logic->gates[xx + 2].input = 0x01;
+		logic->gates[xx + 3].input = 0x02;
+		logic->gates[xx + 4].build = 1;
+		nnpos += glm::vec2({ -280,0 });
+		logic->add_gate(dType::NOT_GATE, "not1", { nnpos.x + 150,nnpos.y + 60 }, 0);
+		logic->add_gate(dType::NOT_GATE, "not2", { nnpos.x + 150,nnpos.y + 150 }, 0);
+		logic->add_gate(dType::NOT_GATE, "not", { nnpos.x + 230,nnpos.y + 60 }, 0);
+		xx += 5;
+		logic->gates[xx + 0].input = 0x00; 
+		logic->gates[xx + 1].input = 0x01; 
+		logic->gates[xx + 2].build = 1;
+
 		form0->add_event(0, [=](uint32_t type, et_un_t* e, void* ud)
 			{
 				auto btn = e->v.b;
