@@ -65,6 +65,7 @@ struct dev_info_cx
 };
 #endif // !DEV_INFO_CXH
 struct et_un_t;
+struct image_ptr_t;
 class font_rctx;
 class render_2d;
 class plane_cx;

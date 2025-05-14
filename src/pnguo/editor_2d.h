@@ -2,6 +2,39 @@
 #define EDITOR_2D
 // 2d编辑器
 // 创建时间2025-3-8
+
+#ifndef TEX_CB
+#define TEX_CB
+struct texture_cb
+{
+	// 创建纹理
+	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
+	// 更新纹理数据
+	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
+	// 设置纹理混合模式
+	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
+	// 删除纹理
+	void (*free_texture)(void* texture);
+	// 创建或更新纹理
+	void* (*make_tex)(void* renderer, image_ptr_t* img);
+	// 从图片文件创建纹理
+	void* (*new_texture_file)(void* renderer, const char* fn);
+	// 纹理渲染
+	// 批量区域渲染
+	int (*render_texture)(void* renderer, void* texture, texture_dt* p, int count);
+	// 单个区域支持旋转
+	bool (*render_texture_rotated)(void* renderer, void* texture, texture_angle_dt* p, int count);
+	// 平铺渲染
+	bool (*render_texture_tiled)(void* renderer, void* texture, texture_tiled_dt* p, int count);
+	// 九宫格渲染
+	bool (*render_texture_9grid)(void* renderer, void* texture, texture_9grid_dt* p, int count);
+	// 渲染2d三角网,支持顶点色、纹理
+	bool (*render_geometryraw)(void* renderer, void* texture, geometryraw_dt* p, int count);
+};
+#else
+typedef struct texture_cb texture_cb;
+#endif
+
 struct atlas_xt;
 struct AtlasPage {
 	atlas_xt* atlas;
@@ -48,6 +81,17 @@ struct atlas_strinfo
 	const char** formatNames;
 	const char** textureFilterNames;
 };
+
+struct page_obj_t
+{
+	void* renderer = 0;
+	std::map<void*, std::string> _texs;
+	njson0 img;
+	char* data;
+	int len;
+	texture_cb* cb = 0;
+};
+
 // 获取图集格式信息
 atlas_strinfo get_atlas_strinfo();
 // 图集导出spine格式
@@ -59,18 +103,8 @@ void atlas2json(atlas_xt* a, njson0& n);
 // 释放图集
 void free_atlas(atlas_xt* atlas);
 
-#ifndef TEX_CB
-#define TEX_CB
-struct texture_cb
-{
-	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
-	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
-	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
-	void (*free_texture)(void* texture);
-};
-#else
-typedef struct texture_cb texture_cb;
-#endif
+atlas_xt* new_atlas(const char* path, page_obj_t* rendererObject);
+
 // 2d编辑器类
 class editor2d_cx
 {

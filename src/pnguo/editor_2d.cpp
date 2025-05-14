@@ -50,6 +50,7 @@
 
 */
 #include "pch1.h"
+#include "tinysdl3.h"
 #include "editor_2d.h"
 
 #include <stdio.h>
@@ -337,11 +338,12 @@ namespace e2d {
 		njson0 img;
 		char* data;
 		int len;
+		texture_cb* cb = 0;
 	};
 
 	void AtlasPage_createTexture(AtlasPage* self, const char* path)
 	{
-#if 0
+#if 1
 		int width, height, components;
 		auto p = (page_obj_t*)self->atlas->rendererObject;
 		int len = 0;
@@ -364,18 +366,14 @@ namespace e2d {
 		stbi_uc* imageData = data && len > 0 ? stbi_load_from_memory(data, len, &width, &height, &components, 4)
 			: stbi_load(path, &width, &height, &components, 4);
 		if (!imageData) return;
+		void* texture = 0;
+		if (p->cb && p->cb->new_texture)
+		{
+			texture = p->cb->new_texture(p->renderer, width, height, 0, imageData, width * 4, 0, true, 0);
 
-		SDL_Texture* texture = SDL_CreateTexture((SDL_Renderer*)p->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
-		if (!texture) {
-			stbi_image_free(imageData);
-			return;
 		}
-		if (!SDL_UpdateTexture(texture, NULL, imageData, width * 4)) {
-			stbi_image_free(imageData);
-			return;
-		}
-
-		p->_texs[texture] = path;
+		if (texture)
+			p->_texs[texture] = path;
 		stbi_image_free(imageData);
 		self->rendererObject = texture;
 #endif
@@ -425,39 +423,43 @@ namespace e2d {
 				if (needsSlash) path[dirLength] = '/';
 				path += name;
 				page = AtlasPage_create(self, name.c_str());
+				if (page)
+				{
 
-				if (lastPage)
-					lastPage->next = page;
-				else
-					self->pages = page;
-				lastPage = page;
+					if (lastPage)
+						lastPage->next = page;
+					else
+						self->pages = page;
+					lastPage = page;
 
-				while (-1) {
-					line = ai_readLine(&reader);
-					if (ai_readEntry(entry, line) == 0) break;
-					if (ss_equals(&entry[0], "size")) {
-						page->width = ss_toInt(&entry[1]);
-						page->height = ss_toInt(&entry[2]);
+					while (-1) {
+						line = ai_readLine(&reader);
+						if (ai_readEntry(entry, line) == 0) break;
+						if (ss_equals(&entry[0], "size")) {
+							page->width = ss_toInt(&entry[1]);
+							page->height = ss_toInt(&entry[2]);
+						}
+						else if (ss_equals(&entry[0], "format")) {
+							page->format = (AtlasFormat)indexOf(formatNames, 8, &entry[1]);
+						}
+						else if (ss_equals(&entry[0], "filter")) {
+							page->minFilter = (AtlasFilter)indexOf(textureFilterNames, 8, &entry[1]);
+							page->magFilter = (AtlasFilter)indexOf(textureFilterNames, 8, &entry[2]);
+						}
+						else if (ss_equals(&entry[0], "repeat")) {
+							page->uWrap = SP_ATLAS_CLAMPTOEDGE;
+							page->vWrap = SP_ATLAS_CLAMPTOEDGE;
+							if (ss_indexOf(&entry[1], 'x') != -1) page->uWrap = SP_ATLAS_REPEAT;
+							if (ss_indexOf(&entry[1], 'y') != -1) page->vWrap = SP_ATLAS_REPEAT;
+						}
+						else if (ss_equals(&entry[0], "pma")) {
+							page->pma = ss_equals(&entry[1], "true");
+						}
 					}
-					else if (ss_equals(&entry[0], "format")) {
-						page->format = (AtlasFormat)indexOf(formatNames, 8, &entry[1]);
-					}
-					else if (ss_equals(&entry[0], "filter")) {
-						page->minFilter = (AtlasFilter)indexOf(textureFilterNames, 8, &entry[1]);
-						page->magFilter = (AtlasFilter)indexOf(textureFilterNames, 8, &entry[2]);
-					}
-					else if (ss_equals(&entry[0], "repeat")) {
-						page->uWrap = SP_ATLAS_CLAMPTOEDGE;
-						page->vWrap = SP_ATLAS_CLAMPTOEDGE;
-						if (ss_indexOf(&entry[1], 'x') != -1) page->uWrap = SP_ATLAS_REPEAT;
-						if (ss_indexOf(&entry[1], 'y') != -1) page->vWrap = SP_ATLAS_REPEAT;
-					}
-					else if (ss_equals(&entry[0], "pma")) {
-						page->pma = ss_equals(&entry[1], "true");
-					}
+					page->path = path;
+					if (rendererObject)
+						AtlasPage_createTexture(page, path.c_str());
 				}
-				page->path = path;
-				//AtlasPage_createTexture(page, path.c_str());
 			}
 			else {
 				subimage_t region1 = {};
@@ -539,7 +541,8 @@ namespace e2d {
 	}
 
 }
-atlas_xt* spAtlas_createFromFile(const char* path, void* rendererObject) {
+atlas_xt* Atlas_createFromFile(const char* path, void* rendererObject)
+{
 	int dirLength;
 	char* dir;
 	int length;
@@ -572,6 +575,11 @@ void free_atlas(atlas_xt* atlas)
 	{
 		delete atlas;
 	}
+}
+
+atlas_xt* new_atlas(const char* path, page_obj_t* rendererObject)
+{
+	return Atlas_createFromFile(path, rendererObject);
 }
 
 editor2d_cx::editor2d_cx()

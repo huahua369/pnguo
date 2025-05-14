@@ -32,7 +32,6 @@ struct tinypath_t
 };
 
 
-struct image_ptr_t;
 struct hps_t;
 struct font_impl;
 struct font_item_t;
