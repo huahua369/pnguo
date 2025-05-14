@@ -346,8 +346,14 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 			_spFree(ske_data);
 		return;
 	}
+	int xal = 0;
+	auto ad = atlas_data;
+	auto sd = ske_data;
+	atlas_data = hz::tbom(atlas_data, &xal);
+	atlas_length -= xal;
+	ske_data = hz::tbom(ske_data, &xal);
+	ske_length -= xal;
 	page_obj_t pot = { renderer };
-
 	c.atlas = spAtlas_createFromFile(atlasf.c_str(), &pot);
 	bool isbin = false;
 	std::string jd;
@@ -355,7 +361,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 	if (ske_data[0] == '{')
 	{
 		jd.assign(ske_data, ske_length); ske_length++;
-		_spFree(ske_data); ske_data = 0;
+		_spFree(ske_data); ske_data = sd = 0;
 		spSkeletonJson* json = spSkeletonJson_create(c.atlas);
 		if (json) {
 			json->scale = scale;
@@ -363,7 +369,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 			spSkeletonJson_dispose(json);
 		}
 	}
-	if (!skeletonData)
+	else if (!skeletonData)
 	{
 		auto sb = spSkeletonBinary_create(c.atlas);
 		if (sb) {
@@ -373,6 +379,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 			isbin = true;
 		}
 	}
+	if (skeletonData)
 	{
 		c.drawable = spSkeletonDrawable_create(skeletonData, 0, 1, defaultMix);
 		if (c.drawable)
@@ -388,10 +395,10 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 			}
 		}
 	}
-	if (atlas_data)
-		_spFree(atlas_data);
-	if (ske_data)
-		_spFree(ske_data);
+	if (ad)
+		_spFree(ad);
+	if (sd)
+		_spFree(sd);
 }
 void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float defaultMix)
 {

@@ -735,7 +735,6 @@ void drawGrid(SDL_Renderer* renderer, const glm::vec2& pos, int gridSize, int ca
 		points += 2;
 	}
 }
-
 int main()
 {
 	clearpdb();
@@ -773,6 +772,7 @@ int main()
 	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2, "temp/spineboy-skel.spt");
 	*/
+
 	d2->add_pkg("temp/spineboy-j.spt", 0.25, 0.2);
 	d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
 	d2->set_pos(0, 600, 650);
@@ -832,10 +832,41 @@ int main()
 	texture_cb tex_cb = get_texture_cb();
 	{
 		auto xh_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/xh1.png");
+		page_obj_t ro = {};
+		ro.renderer = form0->renderer;
+		auto ptex = new texture_cb();
+		*ptex = tex_cb;
+		ro.cb = ptex;
+		auto xha = new_atlas("data/xh1.atlas", &ro);
+
+		logic_cx* logic = new_logic(xha);
+		logic->_pos = { 120,120 };
+		logic->add_gate(dType::AND_GATE, "a", { 60,60 }, 0);
+		logic->add_gate(dType::AND_GATE, "a", { 60 ,150 }, 0);
+		logic->add_gate(dType::AND_GATE, "a", { 150,60 }, 0);
+		logic->add_gate(dType::AND_GATE, "a", { 150,150 }, 0);
+		logic->add_gate(dType::AND_GATE, "a", { 230,60 }, 0);
+		logic->gates[0].input = 0x00;
+		logic->gates[1].input = 0x03;
+		logic->gates[2].input = 0x01;
+		logic->gates[3].input = 0x02;
+		logic->gates[4].build = 1;
+		glm::vec2 nnpos = { 280,0 };
+		logic->add_gate(dType::XOR_GATE, "xor0", { nnpos.x + 60,nnpos.y + 60 }, 0);
+		logic->add_gate(dType::XOR_GATE, "xor3", { nnpos.x + 60 ,nnpos.y + 150 }, 0);
+		logic->add_gate(dType::XOR_GATE, "xor1", { nnpos.x + 150,nnpos.y + 60 }, 0);
+		logic->add_gate(dType::XOR_GATE, "xor2", { nnpos.x + 150,nnpos.y + 150 }, 0);
+		logic->add_gate(dType::XOR_GATE, "xor", { nnpos.x + 230,nnpos.y + 60 }, 0);
+		int xx = 5;
+		logic->gates[xx + 0].input = 0x00;
+		logic->gates[xx + 1].input = 0x03;
+		logic->gates[xx + 2].input = 0x01;
+		logic->gates[xx + 3].input = 0x02;
+		logic->gates[xx + 4].build = 1;
 		form0->add_event(0, [=](uint32_t type, et_un_t* e, void* ud)
 			{
 				auto btn = e->v.b;
-				static int idx = -1; 
+				static int idx = -1;
 				if (type != (uint32_t)devent_type_e::mouse_button_e || btn->down)return;
 				idx++;
 				if (idx < nv.size())
@@ -881,12 +912,7 @@ int main()
 					texture_dt adt = {   };
 					adt.src_rect = { 0,0,512,512 };
 					adt.dst_rect = { 106,106,adt.src_rect.z,adt.src_rect.w };
-					tex_cb.render_texture(renderer, xh_tex, &adt, 1);
-
-
-
-
-
+					//tex_cb.render_texture(renderer, xh_tex, &adt, 1); 
 
 
 
@@ -903,7 +929,8 @@ int main()
 						tl++;
 					}
 				}
-				//d2->update_draw(delta);
+				d2->update_draw(delta);
+				logic->draw_update(delta);
 			};
 	}
 

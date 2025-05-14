@@ -1,0 +1,56 @@
+{
+  "skeleton": {
+    "hash": "aYTUe6ARY",
+    "spine": "4.2.22",
+    "x": -190.61,
+    "y": -7.99,
+    "width": 512,
+    "height": 512,
+    "images": "./images/",
+    "audio": ""
+  },
+  "bones": [],
+  "slots": [
+    {
+      "name": "andbg",
+      "bone": "root",
+      "attachment": "andw"
+    }
+  ],
+  "ik": [],
+  "transform": [],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "and": {
+          "w": {
+            "path": "and_g0",
+            "x": -31.79,
+            "y": 25.97,
+            "width": 96,
+            "height": 73
+          }
+        }
+      }
+    }
+  ],
+  "events": {
+    "footstep": {}
+  },
+  "animations": {
+    "aim": {
+      "slots": {
+        "andbg": {
+          "attachment": [
+            { "name": "and" }
+          ]
+        }
+      },
+      "bones": {},
+      "ik": {},
+      "transform": {},
+      "attachments": {}
+    }
+  }
+}

@@ -331,15 +331,6 @@ namespace e2d {
 		self->vWrap = SP_ATLAS_CLAMPTOEDGE;
 		return self;
 	}
-	struct page_obj_t
-	{
-		void* renderer = 0;
-		std::map<void*, std::string> _texs;
-		njson0 img;
-		char* data;
-		int len;
-		texture_cb* cb = 0;
-	};
 
 	void AtlasPage_createTexture(AtlasPage* self, const char* path)
 	{
@@ -379,6 +370,16 @@ namespace e2d {
 #endif
 		return;
 	}
+	std::string& trim(std::string& s)
+	{
+		if (s.empty())
+		{
+			return s;
+		}
+		s.erase(0, s.find_first_not_of(" "));
+		s.erase(s.find_last_not_of(" ") + 1);
+		return s;
+	}
 	atlas_xt* atlas_create(const char* begin, int length, const char* dir, void* rendererObject) {
 		atlas_xt* self;
 		AtlasInput reader;
@@ -394,7 +395,7 @@ namespace e2d {
 		int needsSlash = dirLength > 0 && dir[dirLength - 1] != '/' && dir[dirLength - 1] != '\\';
 
 		self = new atlas_xt();
-		self->rendererObject = rendererObject;
+		self->rendererObject = (page_obj_t*)rendererObject;
 
 		reader.start = begin;
 		reader.end = begin + length;
@@ -420,7 +421,7 @@ namespace e2d {
 			else if (page == NULL) {
 				std::string name = ss_copy(line);
 				std::string path = dir;
-				if (needsSlash) path[dirLength] = '/';
+				if (needsSlash) path.push_back('/');
 				path += name;
 				page = AtlasPage_create(self, name.c_str());
 				if (page)
@@ -465,7 +466,8 @@ namespace e2d {
 				subimage_t region1 = {};
 				subimage_t* region = &region1;
 				lastRegion = region;
-				region->name = ss_copy(line);
+				region->name = (ss_copy(line));
+				trim(region->name);
 				while (-1) {
 					line = ai_readLine(&reader);
 					count = ai_readEntry(entry, line);
@@ -534,6 +536,7 @@ namespace e2d {
 					region->uv2.x = (float)(region->bounds.x + region->bounds.z) / page->width;
 					region->uv2.y = (float)(region->bounds.y + region->bounds.w) / page->height;
 				}
+				self->region.push_back(region1);
 			}
 		}
 
@@ -564,6 +567,10 @@ atlas_xt* Atlas_createFromFile(const char* path, void* rendererObject)
 	if (data)
 	{
 		length = mf.size();
+
+		int xal = 0;
+		data = hz::tbom((char*)data, &xal);
+		length -= xal;
 		atlas = e2d::atlas_create(data, length, dir, rendererObject);
 	}
 	return atlas;
@@ -575,6 +582,36 @@ void free_atlas(atlas_xt* atlas)
 	{
 		delete atlas;
 	}
+}
+
+subimage_t* atlas_find(atlas_xt* atlas, const std::string& k)
+{
+	if (!atlas || atlas->region.empty() || k.empty())
+		return nullptr;
+	for (size_t i = 0; i < atlas->region.size(); i++)
+	{
+		auto& it = atlas->region[i];
+		if (k == it.name)
+		{
+			return &it;
+		}
+	}
+	return nullptr;
+}
+
+size_t atlas_findi(atlas_xt* atlas, const std::string& k)
+{
+	if (!atlas || atlas->region.empty() || k.empty())
+		return -1;
+	for (size_t i = 0; i < atlas->region.size(); i++)
+	{
+		auto& it = atlas->region[i];
+		if (k == it.name)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 atlas_xt* new_atlas(const char* path, page_obj_t* rendererObject)

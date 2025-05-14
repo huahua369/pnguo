@@ -55,13 +55,22 @@ struct subimage_t
 {
 	std::string name;
 	int index = -1;
-	int degrees = 0;			 
+	int degrees = 0;
 	glm::ivec4 bounds = {};// 519, 223, 17, 38，图片切片大小
 	glm::ivec4 offsets = {};//2, 2, 21, 42，  图片偏移量和原始大小
 	//glm::ivec4 split = {};//废弃
 	//glm::ivec4 pad = {};//废弃
 	glm::vec2 uv, uv2;
 	njson keyValues;
+};
+struct page_obj_t
+{
+	void* renderer = 0;
+	std::map<void*, std::string> _texs;
+	njson0 img;
+	char* data;
+	int len;
+	texture_cb* cb = 0;
 };
 // 图集信息
 struct atlas_xt
@@ -73,7 +82,7 @@ struct atlas_xt
 	glm::ivec2 repeat = {}; //: Texture包裹设置.Atlas加载器可忽略该属性.其可用值为 : x, y, xy, 或 none.若省略则默认为none.
 	bool pma = false;//: 若值为true则表示图像使用了premultiplied alpha.若省略则默认为false.
 	std::vector<subimage_t> region;
-	void* rendererObject = 0;
+	page_obj_t* rendererObject = 0;
 	AtlasPage* pages;
 };
 struct atlas_strinfo
@@ -82,15 +91,6 @@ struct atlas_strinfo
 	const char** textureFilterNames;
 };
 
-struct page_obj_t
-{
-	void* renderer = 0;
-	std::map<void*, std::string> _texs;
-	njson0 img;
-	char* data;
-	int len;
-	texture_cb* cb = 0;
-};
 
 // 获取图集格式信息
 atlas_strinfo get_atlas_strinfo();
@@ -102,6 +102,9 @@ atlas_xt* json2atlas(njson0& n);
 void atlas2json(atlas_xt* a, njson0& n);
 // 释放图集
 void free_atlas(atlas_xt* atlas);
+
+subimage_t* atlas_find(atlas_xt* atlas, const std::string& k);
+size_t atlas_findi(atlas_xt* atlas, const std::string& k);
 
 atlas_xt* new_atlas(const char* path, page_obj_t* rendererObject);
 

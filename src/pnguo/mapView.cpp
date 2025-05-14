@@ -1914,10 +1914,10 @@ namespace hz
 		{
 			ret = bomlen[u];
 			str += ret;
-			if (outn)
-			{
-				*outn = ret;
-			}
+		}
+		if (outn)
+		{
+			*outn = ret;
 		}
 		return str;
 

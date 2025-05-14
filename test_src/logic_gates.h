@@ -5,7 +5,7 @@
 */
 #pragma once
 
-enum class dType :uint8_t {
+enum class dType :uint16_t {
 	NULL_ST,			// 空
 	SIGNAL_SWITCH,	    // 信号开关，一输出
 	SIGNAL_LINE,		// 信号线，连接到逻辑门的引脚，或者连接到其他信号线
@@ -30,16 +30,46 @@ enum class dType :uint8_t {
 /*
 信号飞线,
 信号线组，4位
-*/ 
+*/
 struct gatedata_st
 {
-	uint16_t type = 0;
 	glm::ivec4 pos2 = {};	// 头尾中心位置
+	std::string name;
+	uint16_t type = 0;
 	int8_t input_count;		// 输入引脚数量
 	int8_t output_count;	// 输出引脚数量
 	uint8_t input = 0;		// 输入引脚最大8个
 	uint8_t output = 0;		// 输入引脚
+	int degrees = 0;		// 旋转角度
+	int8_t build = 0;		// 建造，0-100，等于0时建造完成
+	bool visible = 1;
 };
 // 0小圆点，1大圆点，2非，3与，4或，5异或
 glm::ivec4 get_lgates_rc(int i);
 
+class logic_cx
+{
+public:
+	atlas_xt* axt = 0;
+	njson gat;
+	std::map<std::string, std::vector<int>> gat_map;
+	glm::vec2 _pos = {};
+	float _scale = 1.0;
+	std::vector<gatedata_st> gates;
+public:
+	logic_cx();
+	~logic_cx();
+	void init(atlas_xt* p);
+	void add_gate(dType t, const std::string& name, const glm::ivec2& pos, int degrees);
+	void draw_update(double delta);
+private:
+	void draw_gate(gatedata_st* p, float scale);
+
+	void draw_and(gatedata_st* p, float scale);
+	void draw_or(gatedata_st* p, float scale);
+	void draw_not(gatedata_st* p, float scale);
+	void draw_xor(gatedata_st* p, float scale);
+};
+
+logic_cx* new_logic(atlas_xt* xha);
+void free_logic(logic_cx* p);
