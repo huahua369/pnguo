@@ -109,7 +109,7 @@ void logic_cx::add_gate(dType t, const std::string& name, const glm::ivec2& pos,
 	gates.push_back(st);
 }
 
-void draw_atlas(atlas_xt* xha, size_t idx, const glm::vec2& pos, int degrees)
+void draw_atlas(atlas_xt* xha, size_t idx, const glm::vec2& pos, int degrees, float scale)
 {
 	if (!xha || idx >= xha->region.size())return;
 	auto& xr = xha->region;
@@ -128,6 +128,13 @@ void draw_atlas(atlas_xt* xha, size_t idx, const glm::vec2& pos, int degrees)
 			adt1.center = { adt1.src_rect.z / 2,adt1.src_rect.w / 2 };
 		}
 	}
+	int sc = scale * 100;
+	if (sc > 0 && sc != 100)
+	{
+		scale = sc / 100.0f;
+		adt1.dst_rect *= scale;
+		adt1.center *= scale;
+	}
 	xha->rendererObject->cb->render_texture_rotated(xha->rendererObject->renderer, xha->pages->rendererObject, &adt1, 1);
 }
 void logic_cx::draw_and(gatedata_st* p, float scale)
@@ -144,11 +151,11 @@ void logic_cx::draw_and(gatedata_st* p, float scale)
 		pos += _pos;
 		if (p->build > 0)
 		{
-			draw_atlas(axt, gm[1], pos, p->degrees);
+			draw_atlas(axt, gm[1], pos, p->degrees, scale);
 		}
 		else
 		{
-			draw_atlas(axt, gm[0], pos, p->degrees);
+			draw_atlas(axt, gm[0], pos, p->degrees, scale);
 			glm::ivec2 ipt = { 7,9 };
 			glm::ivec3 ipt1 = { 13,10,11 };
 			if (p->input & 1)
@@ -176,12 +183,12 @@ void logic_cx::draw_and(gatedata_st* p, float scale)
 				ipt1.z = 6;
 			}
 			// bg
-			draw_atlas(axt, gm[12], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.x], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.y], pos, p->degrees);
-			draw_atlas(axt, gm[ipt1.x], pos, p->degrees);
-			draw_atlas(axt, gm[ipt1.y], pos, p->degrees);
-			draw_atlas(axt, gm[ipt1.z], pos, p->degrees);
+			draw_atlas(axt, gm[12], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.x], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.y], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt1.x], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt1.y], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt1.z], pos, p->degrees, scale);
 		}
 	}
 }
@@ -198,11 +205,11 @@ void logic_cx::draw_or(gatedata_st* p, float scale)
 		pos += _pos;
 		if (p->build > 0)
 		{
-			draw_atlas(axt, gm[1], pos, p->degrees);
+			draw_atlas(axt, gm[1], pos, p->degrees, scale);
 		}
 		else
 		{
-			draw_atlas(axt, gm[0], pos, p->degrees);
+			draw_atlas(axt, gm[0], pos, p->degrees, scale);
 			glm::ivec3 ipt = { 5,6,7 };
 			if (p->input & 1)
 			{
@@ -224,9 +231,9 @@ void logic_cx::draw_or(gatedata_st* p, float scale)
 				ipt.z = 4;
 			}
 			// bg 
-			draw_atlas(axt, gm[ipt.x], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.y], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.z], pos, p->degrees);
+			draw_atlas(axt, gm[ipt.x], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.y], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.z], pos, p->degrees, scale);
 		}
 	}
 }
@@ -245,11 +252,11 @@ void logic_cx::draw_xor(gatedata_st* p, float scale)
 		pos += _pos;
 		if (p->build > 0)
 		{
-			draw_atlas(axt, gm[1], pos, p->degrees);//建造中
+			draw_atlas(axt, gm[1], pos, p->degrees, scale);//建造中
 		}
 		else
 		{
-			draw_atlas(axt, gm[0], pos, p->degrees);//背板
+			draw_atlas(axt, gm[0], pos, p->degrees, scale);//背板
 			glm::ivec3 ipt = { 5,6,7 };
 			if (p->input & 1)
 			{
@@ -278,12 +285,12 @@ void logic_cx::draw_xor(gatedata_st* p, float scale)
 			}
 
 			// bg 
-			draw_atlas(axt, gm[8], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.x], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.y], pos, p->degrees);
-			draw_atlas(axt, gm[ipt.z], pos, p->degrees);
+			draw_atlas(axt, gm[8], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.x], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.y], pos, p->degrees, scale);
+			draw_atlas(axt, gm[ipt.z], pos, p->degrees, scale);
 			if (!b)
-				draw_atlas(axt, gm[7], pos, p->degrees);
+				draw_atlas(axt, gm[7], pos, p->degrees, scale);
 		}
 	}
 }
@@ -298,19 +305,19 @@ void logic_cx::draw_not(gatedata_st* p, float scale)
 		pos += _pos;
 		if (p->build > 0)
 		{
-			draw_atlas(axt, gm[1], pos, p->degrees); 
+			draw_atlas(axt, gm[1], pos, p->degrees, scale);
 		}
 		else
 		{
-			draw_atlas(axt, gm[0], pos, p->degrees);
+			draw_atlas(axt, gm[0], pos, p->degrees, scale);
 			int x = 3;
 			if (p->input & 1)
 			{
 				x = 2;
 			}
-			draw_atlas(axt, gm[x], pos, p->degrees);
+			draw_atlas(axt, gm[x], pos, p->degrees, scale);
 			if (p->input & 1)
-				draw_atlas(axt, gm[4], pos, p->degrees);//光晕
+				draw_atlas(axt, gm[4], pos, p->degrees, scale);//光晕
 		}
 	}
 }
