@@ -47,7 +47,7 @@ njson new_lgat()
 {
 	njson gat;
 	// 非门
-	gat["not"]["images"] = { "not_b","not_w","not_gr","not_rg" };
+	gat["not"]["images"] = { "not_b","not_w","not_gr","not_rg","ygs0" };
 	// 与
 	gat["and"]["images"] = { "and_b","and_w","and_g0","and_g01","and_g1","and_g11","and_g2"
 		,"and_r0","and_r01","and_r1","and_r11","and_r2","and_bg","and_rc0","and_rc1" };
@@ -298,7 +298,7 @@ void logic_cx::draw_not(gatedata_st* p, float scale)
 		pos += _pos;
 		if (p->build > 0)
 		{
-			draw_atlas(axt, gm[1], pos, p->degrees);
+			draw_atlas(axt, gm[1], pos, p->degrees); 
 		}
 		else
 		{
@@ -309,6 +309,8 @@ void logic_cx::draw_not(gatedata_st* p, float scale)
 				x = 2;
 			}
 			draw_atlas(axt, gm[x], pos, p->degrees);
+			if (p->input & 1)
+				draw_atlas(axt, gm[4], pos, p->degrees);//光晕
 		}
 	}
 }

@@ -12,6 +12,12 @@ yr0
 yw0
   bounds: 101,251,8,8
   offsets: 11, 11,30,30 
+ygs0
+  bounds: 225,334,30,30
+  offsets: 0, 0,30,30 
+yrs0
+  bounds: 255,334,30,30
+  offsets: 0, 0,30,30 
 yg1
   bounds: 69,9,12,12
   offsets: 9, 9,30,30 
