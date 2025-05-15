@@ -883,7 +883,7 @@ int main()
 		logic->gates[xx + 0].input = 0x00; 
 		logic->gates[xx + 1].input = 0x01; 
 		logic->gates[xx + 2].build = 1;
-		logic->_scale = 0.5;
+		logic->_scale = 1.0;
 		form0->add_event(0, [=](uint32_t type, et_un_t* e, void* ud)
 			{
 				auto btn = e->v.b;

@@ -175,17 +175,17 @@ xor_r1
   bounds: 161,430,13,13
   offsets: 11, 36,30,30
 xor_r2
-  bounds: 171,460,13，13
+  bounds: 216,460,13，13
   offsets: 36, 36,13,13
 xor_c
   bounds: 185,414,20,20
   offsets: 20, 20,30,30
 xor_g2
-  bounds: 221,420,23,23
-  offsets: 26, 26,23,23
+  bounds: 214,413,30,30
+  offsets: 19, 19,30,30
 xor_c0
-  bounds: 161,450,8,12
-  offsets: 26, 26,30,30
+  bounds: 154,458,22,22
+  offsets: 19, 19,30,30
 xor_c1
-  bounds: 191,450,12,8
-  offsets: 26, 26,30,30
+  bounds: 184,458,22,22
+  offsets: 19, 19,30,30
