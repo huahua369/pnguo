@@ -737,6 +737,7 @@ void drawGrid(SDL_Renderer* renderer, const glm::vec2& pos, int gridSize, int ca
 }
 int main()
 {
+	std::stack<int> st;
 	clearpdb();
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);

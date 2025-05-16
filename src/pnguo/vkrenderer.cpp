@@ -3272,7 +3272,7 @@ namespace vkr {
 
 		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, VkImageView>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
-		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, PBRPrimitives* pPrimitive);
+		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
 	bool bcmp(const GltfPbrPass::BatchList& l, const GltfPbrPass::BatchList& r)
@@ -3375,7 +3375,7 @@ namespace vkr {
 		bool m_bInvertedDepth = false;
 
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, DepthPrimitives* pPrimitive, morph_t* morphing);
-		void CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, DepthPrimitives* pPrimitive);
+		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, DepthPrimitives* pPrimitive);
 	};
 
 	class Wireframe
@@ -3416,16 +3416,13 @@ namespace vkr {
 	void GenerateBox(std::vector<unsigned short>& outIndices, std::vector<float>& outVertices);
 	class WireframeBox : public Wireframe
 	{
+	public:
 		// all bounding boxes of all the meshes use the same geometry, shaders and pipelines.
 		uint32_t m_NumIndices;
 		VkDescriptorBufferInfo m_IBV;
 		VkDescriptorBufferInfo m_VBV;
 	public:
-		void OnCreate(
-			Device* pDevice,
-			ResourceViewHeaps* pResourceViewHeaps,
-			DynamicBufferRing* pDynamicBufferRing,
-			StaticBufferPool* pStaticBufferPool)
+		void OnCreate(Device* pDevice, ResourceViewHeaps* pResourceViewHeaps, DynamicBufferRing* pDynamicBufferRing, StaticBufferPool* pStaticBufferPool)
 		{
 			std::vector<unsigned short> indices;
 			std::vector<float> vertices;
@@ -3447,6 +3444,7 @@ namespace vkr {
 	};
 	class WireframeSphere : public Wireframe
 	{
+	public:
 		// all bounding boxes of all the meshes use the same geometry, shaders and pipelines.
 		uint32_t m_NumIndices;
 		VkDescriptorBufferInfo m_IBV;
@@ -4430,7 +4428,7 @@ namespace vkr
 	// CreatePipeline
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfDepthPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines, DepthPrimitives* pPrimitive)
+	void GltfDepthPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, DepthPrimitives* pPrimitive)
 	{
 		/////////////////////////////////////////////
 		// Compile and create shaders
@@ -5154,6 +5152,7 @@ namespace vkr
 			case 5130: return VK_FORMAT_R64_SFLOAT; //(DOUBLE)
 			}
 		}
+		break;
 		case TINYGLTF_TYPE_VEC2://else if (str == "VEC2")
 		{
 			switch (id)
@@ -5168,6 +5167,7 @@ namespace vkr
 			case 5130: return VK_FORMAT_R64G64_SFLOAT; //(DOUBLE)
 			}
 		}
+		break;
 		case TINYGLTF_TYPE_VEC3://else if (str == "VEC3")
 		{
 			switch (id)
@@ -5182,6 +5182,7 @@ namespace vkr
 			case 5130: return VK_FORMAT_R64G64B64_SFLOAT; //(DOUBLE)
 			}
 		}
+		break;
 		case TINYGLTF_TYPE_VEC4://else if (str == "VEC4")
 		{
 			switch (id)
@@ -5196,6 +5197,7 @@ namespace vkr
 			case 5130: return VK_FORMAT_R64G64B64A64_SFLOAT; //(DOUBLE)
 			}
 		}
+		break;
 		}
 		return VK_FORMAT_UNDEFINED;
 	}
@@ -6350,7 +6352,7 @@ namespace vkr
 	// CreatePipeline
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription> layout, const DefineList& defines0, PBRPrimitives* pPrimitive)
+	void GltfPbrPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines0, PBRPrimitives* pPrimitive)
 	{
 		// Compile and create shaders
 		auto defines = defines0;
@@ -6876,7 +6878,7 @@ namespace vkr
 
 		/////////////////////////////////////////////
 		// Create Samplers
-
+		VkResult res = VK_SUCCESS;
 		//for pbr materials
 		{
 			VkSamplerCreateInfo info = {};
@@ -6888,7 +6890,7 @@ namespace vkr
 			info.minLod = 0;
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
+			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
 			assert(res == VK_SUCCESS);
 		}
 
@@ -6905,7 +6907,7 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
+			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
 			assert(res == VK_SUCCESS);
 		}
 
@@ -6924,7 +6926,7 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
+			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
 			assert(res == VK_SUCCESS);
 		}
 
