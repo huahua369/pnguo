@@ -64,6 +64,50 @@ extern "C" {
 #include <memory>
 #include <filesystem>
 
+
+
+// sdl gpu
+#if 1
+SDL_GPUTexture*
+CreateDepthTexture(SDL_GPUDevice* gpu_device, Uint32 drawablew, Uint32 drawableh)
+{
+	SDL_GPUTextureCreateInfo createinfo;
+	SDL_GPUTexture* result;
+
+	createinfo.type = SDL_GPU_TEXTURETYPE_2D;
+	createinfo.format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+	createinfo.width = drawablew;
+	createinfo.height = drawableh;
+	createinfo.layer_count_or_depth = 1;
+	createinfo.num_levels = 1;
+	createinfo.sample_count = SDL_GPU_SAMPLECOUNT_1;// render_state.sample_count;
+	createinfo.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+	createinfo.props = 0;
+
+	result = SDL_CreateGPUTexture(gpu_device, &createinfo);
+
+
+	return result;
+}
+void new_gpu() {
+	auto dev = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_METALLIB, true, 0);
+	SDL_GPUTexture* depth_texture = nullptr;
+	if (dev)
+	{
+		depth_texture = CreateDepthTexture(dev, 1024, 1024);
+	}
+	auto dt = (SDL_GPUTextureCreateInfo*)depth_texture;
+	printf("");
+}
+#endif // 1
+
+
+
+
+
+
+
+
 class vcpkg_cx
 {
 public:
@@ -742,6 +786,7 @@ int main()
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);
 	auto app = new_app();
+	new_gpu();
 	cpuinfo_t cpuinfo = get_cpuinfo();
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu|ef_resizable
@@ -881,8 +926,8 @@ int main()
 		logic->add_gate(dType::NOT_GATE, "not2", { nnpos.x + 150,nnpos.y + 150 }, 0);
 		logic->add_gate(dType::NOT_GATE, "not", { nnpos.x + 230,nnpos.y + 60 }, 0);
 		xx += 5;
-		logic->gates[xx + 0].input = 0x00; 
-		logic->gates[xx + 1].input = 0x01; 
+		logic->gates[xx + 0].input = 0x00;
+		logic->gates[xx + 1].input = 0x01;
 		logic->gates[xx + 2].build = 1;
 		logic->_scale = 1.0;
 		form0->add_event(0, [=](uint32_t type, et_un_t* e, void* ud)
