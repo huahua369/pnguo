@@ -34,6 +34,16 @@ list(APPEND src_mtl
     "logic_gates.cpp" 
     "../src/pnguo/editor_2d.cpp"
     "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
+    "../third_lib/SDL/src/test/SDL_test_common.c"
+    "../third_lib/SDL/src/test/SDL_test_font.c"
+    "../third_lib/SDL/src/test/SDL_test_memory.c"
+    "../third_lib/SDL/src/test/SDL_test_crc32.c"
+    "../third_lib/SDL/src/test/SDL_test_assert.c"
+    "../third_lib/SDL/src/test/SDL_test_fuzzer.c"
+    "../third_lib/SDL/src/test/SDL_test_log.c"
+    "../third_lib/SDL/src/test/SDL_test_md5.c"
+    "../third_lib/SDL/src/test/SDL_test_harness.c"
+    "../third_lib/SDL/src/test/SDL_test_compare.c"
     "../rc/resource1.rc"
     "../njson.natvis"
 ) 
@@ -147,4 +157,5 @@ file(COPY xh1.png DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
 file(COPY xh1.atlas DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
 file(COPY xh1.json DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
 file(COPY seguiemj.ttf DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
+file(COPY mari.png DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
   
