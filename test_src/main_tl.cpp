@@ -629,11 +629,30 @@ init_render_state(int msaa)
 
 	/* Determine which sample count to use */
 	render_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
-	if (msaa && SDL_GPUTextureSupportsSampleCount(
-		gpu_device,
-		SDL_GetGPUSwapchainTextureFormat(gpu_device, state->windows[0]),
-		SDL_GPU_SAMPLECOUNT_4)) {
-		render_state.sample_count = SDL_GPU_SAMPLECOUNT_4;
+	auto tf = SDL_GetGPUSwapchainTextureFormat(gpu_device, state->windows[0]);
+	if (msaa)
+	{
+		SDL_GPUSampleCount k[] = { SDL_GPU_SAMPLECOUNT_2,  /**< MSAA 2x */
+			SDL_GPU_SAMPLECOUNT_4,  /**< MSAA 4x */
+			SDL_GPU_SAMPLECOUNT_8 };   /**< MSAA 8x */
+		bool r[3] = {};
+
+		for (size_t i = 0; i < 3; i++)
+		{
+			r[i] = SDL_GPUTextureSupportsSampleCount(gpu_device, tf, k[i]);
+		}
+		if (r[2])
+		{
+			render_state.sample_count = k[2];
+		}
+		else if (r[1])
+		{
+			render_state.sample_count = k[1];
+		}
+		else if (r[0])
+		{
+			render_state.sample_count = k[0];
+		}
 	}
 
 	/* Set up the graphics pipeline */
