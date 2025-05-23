@@ -77,6 +77,119 @@ extern "C" {
 
 #define CHECK_CREATE(var, thing) { if (!(var)) { SDL_Log("Failed to create %s: %s", thing, SDL_GetError()); quit(2); } }
 
+
+
+
+
+
+#if 1
+
+extern SDL_DECLSPEC bool SDLCALL SDL_GPUSupportsShaderFormats(SDL_GPUShaderFormat format_flags, const char* name);
+extern SDL_DECLSPEC bool SDLCALL SDL_GPUSupportsProperties(SDL_PropertiesID props);
+extern SDL_DECLSPEC SDL_GPUDevice* SDLCALL SDL_CreateGPUDevice(SDL_GPUShaderFormat format_flags, bool debug_mode, const char* name);
+extern SDL_DECLSPEC SDL_GPUDevice* SDLCALL SDL_CreateGPUDeviceWithProperties(SDL_PropertiesID props);
+extern SDL_DECLSPEC void SDLCALL SDL_DestroyGPUDevice(SDL_GPUDevice* device);
+extern SDL_DECLSPEC int SDLCALL SDL_GetNumGPUDrivers(void);
+extern SDL_DECLSPEC const char* SDLCALL SDL_GetGPUDriver(int index);
+extern SDL_DECLSPEC const char* SDLCALL SDL_GetGPUDeviceDriver(SDL_GPUDevice* device);
+extern SDL_DECLSPEC SDL_GPUShaderFormat SDLCALL SDL_GetGPUShaderFormats(SDL_GPUDevice* device);
+extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetGPUDeviceProperties(SDL_GPUDevice* device);
+extern SDL_DECLSPEC SDL_GPUComputePipeline* SDLCALL SDL_CreateGPUComputePipeline(SDL_GPUDevice* device, const SDL_GPUComputePipelineCreateInfo* createinfo);
+extern SDL_DECLSPEC SDL_GPUGraphicsPipeline* SDLCALL SDL_CreateGPUGraphicsPipeline(SDL_GPUDevice* device, const SDL_GPUGraphicsPipelineCreateInfo* createinfo);
+extern SDL_DECLSPEC SDL_GPUSampler* SDLCALL SDL_CreateGPUSampler(SDL_GPUDevice* device, const SDL_GPUSamplerCreateInfo* createinfo);
+extern SDL_DECLSPEC SDL_GPUShader* SDLCALL SDL_CreateGPUShader(SDL_GPUDevice* device, const SDL_GPUShaderCreateInfo* createinfo);
+extern SDL_DECLSPEC SDL_GPUTexture* SDLCALL SDL_CreateGPUTexture(SDL_GPUDevice* device, const SDL_GPUTextureCreateInfo* createinfo);
+extern SDL_DECLSPEC SDL_GPUBuffer* SDLCALL SDL_CreateGPUBuffer(SDL_GPUDevice* device, const SDL_GPUBufferCreateInfo* createinfo);
+extern SDL_DECLSPEC SDL_GPUTransferBuffer* SDLCALL SDL_CreateGPUTransferBuffer(SDL_GPUDevice* device, const SDL_GPUTransferBufferCreateInfo* createinfo);
+extern SDL_DECLSPEC void SDLCALL SDL_SetGPUBufferName(SDL_GPUDevice* device, SDL_GPUBuffer* buffer, const char* text);
+extern SDL_DECLSPEC void SDLCALL SDL_SetGPUTextureName(SDL_GPUDevice* device, SDL_GPUTexture* texture, const char* text);
+extern SDL_DECLSPEC void SDLCALL SDL_InsertGPUDebugLabel(SDL_GPUCommandBuffer* command_buffer, const char* text);
+extern SDL_DECLSPEC void SDLCALL SDL_PushGPUDebugGroup(SDL_GPUCommandBuffer* command_buffer, const char* name);
+extern SDL_DECLSPEC void SDLCALL SDL_PopGPUDebugGroup(SDL_GPUCommandBuffer* command_buffer);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUTexture(SDL_GPUDevice* device, SDL_GPUTexture* texture);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUSampler(SDL_GPUDevice* device, SDL_GPUSampler* sampler);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUBuffer(SDL_GPUDevice* device, SDL_GPUBuffer* buffer);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUTransferBuffer(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transfer_buffer);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUComputePipeline(SDL_GPUDevice* device, SDL_GPUComputePipeline* compute_pipeline);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUShader(SDL_GPUDevice* device, SDL_GPUShader* shader);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUGraphicsPipeline(SDL_GPUDevice* device, SDL_GPUGraphicsPipeline* graphics_pipeline);
+extern SDL_DECLSPEC SDL_GPUCommandBuffer* SDLCALL SDL_AcquireGPUCommandBuffer(SDL_GPUDevice* device);
+extern SDL_DECLSPEC void SDLCALL SDL_PushGPUVertexUniformData(SDL_GPUCommandBuffer* command_buffer, Uint32 slot_index, const void* data, Uint32 length);
+extern SDL_DECLSPEC void SDLCALL SDL_PushGPUFragmentUniformData(SDL_GPUCommandBuffer* command_buffer, Uint32 slot_index, const void* data, Uint32 length);
+extern SDL_DECLSPEC void SDLCALL SDL_PushGPUComputeUniformData(SDL_GPUCommandBuffer* command_buffer, Uint32 slot_index, const void* data, Uint32 length);
+extern SDL_DECLSPEC SDL_GPURenderPass* SDLCALL SDL_BeginGPURenderPass(SDL_GPUCommandBuffer* command_buffer, const SDL_GPUColorTargetInfo* color_target_infos, Uint32 num_color_targets, const SDL_GPUDepthStencilTargetInfo* depth_stencil_target_info);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUGraphicsPipeline(SDL_GPURenderPass* render_pass, SDL_GPUGraphicsPipeline* graphics_pipeline);
+extern SDL_DECLSPEC void SDLCALL SDL_SetGPUViewport(SDL_GPURenderPass* render_pass, const SDL_GPUViewport* viewport);
+extern SDL_DECLSPEC void SDLCALL SDL_SetGPUScissor(SDL_GPURenderPass* render_pass, const SDL_Rect* scissor);
+extern SDL_DECLSPEC void SDLCALL SDL_SetGPUBlendConstants(SDL_GPURenderPass* render_pass, SDL_FColor blend_constants);
+extern SDL_DECLSPEC void SDLCALL SDL_SetGPUStencilReference(SDL_GPURenderPass* render_pass, Uint8 reference);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUVertexBuffers(SDL_GPURenderPass* render_pass, Uint32 first_slot, const SDL_GPUBufferBinding* bindings, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUIndexBuffer(SDL_GPURenderPass* render_pass, const SDL_GPUBufferBinding* binding, SDL_GPUIndexElementSize index_element_size);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUVertexSamplers(SDL_GPURenderPass* render_pass, Uint32 first_slot, const SDL_GPUTextureSamplerBinding* texture_sampler_bindings, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUVertexStorageTextures(SDL_GPURenderPass* render_pass, Uint32 first_slot, SDL_GPUTexture* const* storage_textures, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUVertexStorageBuffers(SDL_GPURenderPass* render_pass, Uint32 first_slot, SDL_GPUBuffer* const* storage_buffers, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUFragmentSamplers(SDL_GPURenderPass* render_pass, Uint32 first_slot, const SDL_GPUTextureSamplerBinding* texture_sampler_bindings, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUFragmentStorageTextures(SDL_GPURenderPass* render_pass, Uint32 first_slot, SDL_GPUTexture* const* storage_textures, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUFragmentStorageBuffers(SDL_GPURenderPass* render_pass, Uint32 first_slot, SDL_GPUBuffer* const* storage_buffers, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_DrawGPUIndexedPrimitives(SDL_GPURenderPass* render_pass, Uint32 num_indices, Uint32 num_instances, Uint32 first_index, Sint32 vertex_offset, Uint32 first_instance);
+extern SDL_DECLSPEC void SDLCALL SDL_DrawGPUPrimitives(SDL_GPURenderPass* render_pass, Uint32 num_vertices, Uint32 num_instances, Uint32 first_vertex, Uint32 first_instance);
+extern SDL_DECLSPEC void SDLCALL SDL_DrawGPUPrimitivesIndirect(SDL_GPURenderPass* render_pass, SDL_GPUBuffer* buffer, Uint32 offset, Uint32 draw_count);
+extern SDL_DECLSPEC void SDLCALL SDL_DrawGPUIndexedPrimitivesIndirect(SDL_GPURenderPass* render_pass, SDL_GPUBuffer* buffer, Uint32 offset, Uint32 draw_count);
+extern SDL_DECLSPEC void SDLCALL SDL_EndGPURenderPass(SDL_GPURenderPass* render_pass);
+extern SDL_DECLSPEC SDL_GPUComputePass* SDLCALL SDL_BeginGPUComputePass(SDL_GPUCommandBuffer* command_buffer, const SDL_GPUStorageTextureReadWriteBinding* storage_texture_bindings, Uint32 num_storage_texture_bindings, const SDL_GPUStorageBufferReadWriteBinding* storage_buffer_bindings, Uint32 num_storage_buffer_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUComputePipeline(SDL_GPUComputePass* compute_pass, SDL_GPUComputePipeline* compute_pipeline);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUComputeSamplers(SDL_GPUComputePass* compute_pass, Uint32 first_slot, const SDL_GPUTextureSamplerBinding* texture_sampler_bindings, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUComputeStorageTextures(SDL_GPUComputePass* compute_pass, Uint32 first_slot, SDL_GPUTexture* const* storage_textures, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_BindGPUComputeStorageBuffers(SDL_GPUComputePass* compute_pass, Uint32 first_slot, SDL_GPUBuffer* const* storage_buffers, Uint32 num_bindings);
+extern SDL_DECLSPEC void SDLCALL SDL_DispatchGPUCompute(SDL_GPUComputePass* compute_pass, Uint32 groupcount_x, Uint32 groupcount_y, Uint32 groupcount_z);
+extern SDL_DECLSPEC void SDLCALL SDL_DispatchGPUComputeIndirect(SDL_GPUComputePass* compute_pass, SDL_GPUBuffer* buffer, Uint32 offset);
+extern SDL_DECLSPEC void SDLCALL SDL_EndGPUComputePass(SDL_GPUComputePass* compute_pass);
+extern SDL_DECLSPEC void* SDLCALL SDL_MapGPUTransferBuffer(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transfer_buffer, bool cycle);
+extern SDL_DECLSPEC void SDLCALL SDL_UnmapGPUTransferBuffer(SDL_GPUDevice* device, SDL_GPUTransferBuffer* transfer_buffer);
+extern SDL_DECLSPEC SDL_GPUCopyPass* SDLCALL SDL_BeginGPUCopyPass(SDL_GPUCommandBuffer* command_buffer);
+extern SDL_DECLSPEC void SDLCALL SDL_UploadToGPUTexture(SDL_GPUCopyPass* copy_pass, const SDL_GPUTextureTransferInfo* source, const SDL_GPUTextureRegion* destination, bool cycle);
+extern SDL_DECLSPEC void SDLCALL SDL_UploadToGPUBuffer(SDL_GPUCopyPass* copy_pass, const SDL_GPUTransferBufferLocation* source, const SDL_GPUBufferRegion* destination, bool cycle);
+extern SDL_DECLSPEC void SDLCALL SDL_CopyGPUTextureToTexture(SDL_GPUCopyPass* copy_pass, const SDL_GPUTextureLocation* source, const SDL_GPUTextureLocation* destination, Uint32 w, Uint32 h, Uint32 d, bool cycle);
+extern SDL_DECLSPEC void SDLCALL SDL_CopyGPUBufferToBuffer(SDL_GPUCopyPass* copy_pass, const SDL_GPUBufferLocation* source, const SDL_GPUBufferLocation* destination, Uint32 size, bool cycle);
+extern SDL_DECLSPEC void SDLCALL SDL_DownloadFromGPUTexture(SDL_GPUCopyPass* copy_pass, const SDL_GPUTextureRegion* source, const SDL_GPUTextureTransferInfo* destination);
+extern SDL_DECLSPEC void SDLCALL SDL_DownloadFromGPUBuffer(SDL_GPUCopyPass* copy_pass, const SDL_GPUBufferRegion* source, const SDL_GPUTransferBufferLocation* destination);
+extern SDL_DECLSPEC void SDLCALL SDL_EndGPUCopyPass(SDL_GPUCopyPass* copy_pass);
+extern SDL_DECLSPEC void SDLCALL SDL_GenerateMipmapsForGPUTexture(SDL_GPUCommandBuffer* command_buffer, SDL_GPUTexture* texture);
+extern SDL_DECLSPEC void SDLCALL SDL_BlitGPUTexture(SDL_GPUCommandBuffer* command_buffer, const SDL_GPUBlitInfo* info);
+extern SDL_DECLSPEC bool SDLCALL SDL_WindowSupportsGPUSwapchainComposition(SDL_GPUDevice* device, SDL_Window* window, SDL_GPUSwapchainComposition swapchain_composition);
+extern SDL_DECLSPEC bool SDLCALL SDL_WindowSupportsGPUPresentMode(SDL_GPUDevice* device, SDL_Window* window, SDL_GPUPresentMode present_mode);
+extern SDL_DECLSPEC bool SDLCALL SDL_ClaimWindowForGPUDevice(SDL_GPUDevice* device, SDL_Window* window);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseWindowFromGPUDevice(SDL_GPUDevice* device, SDL_Window* window);
+extern SDL_DECLSPEC bool SDLCALL SDL_SetGPUSwapchainParameters(SDL_GPUDevice* device, SDL_Window* window, SDL_GPUSwapchainComposition swapchain_composition, SDL_GPUPresentMode present_mode);
+extern SDL_DECLSPEC bool SDLCALL SDL_SetGPUAllowedFramesInFlight(SDL_GPUDevice* device, Uint32 allowed_frames_in_flight);
+extern SDL_DECLSPEC SDL_GPUTextureFormat SDLCALL SDL_GetGPUSwapchainTextureFormat(SDL_GPUDevice* device, SDL_Window* window);
+extern SDL_DECLSPEC bool SDLCALL SDL_AcquireGPUSwapchainTexture(SDL_GPUCommandBuffer* command_buffer, SDL_Window* window, SDL_GPUTexture** swapchain_texture, Uint32* swapchain_texture_width, Uint32* swapchain_texture_height);
+extern SDL_DECLSPEC bool SDLCALL SDL_WaitForGPUSwapchain(SDL_GPUDevice* device, SDL_Window* window);
+extern SDL_DECLSPEC bool SDLCALL SDL_WaitAndAcquireGPUSwapchainTexture(SDL_GPUCommandBuffer* command_buffer, SDL_Window* window, SDL_GPUTexture** swapchain_texture, Uint32* swapchain_texture_width, Uint32* swapchain_texture_height);
+extern SDL_DECLSPEC bool SDLCALL SDL_SubmitGPUCommandBuffer(SDL_GPUCommandBuffer* command_buffer);
+extern SDL_DECLSPEC SDL_GPUFence* SDLCALL SDL_SubmitGPUCommandBufferAndAcquireFence(SDL_GPUCommandBuffer* command_buffer);
+extern SDL_DECLSPEC bool SDLCALL SDL_CancelGPUCommandBuffer(SDL_GPUCommandBuffer* command_buffer);
+extern SDL_DECLSPEC bool SDLCALL SDL_WaitForGPUIdle(SDL_GPUDevice* device);
+extern SDL_DECLSPEC bool SDLCALL SDL_WaitForGPUFences(SDL_GPUDevice* device, bool wait_all, SDL_GPUFence* const* fences, Uint32 num_fences);
+extern SDL_DECLSPEC bool SDLCALL SDL_QueryGPUFence(SDL_GPUDevice* device, SDL_GPUFence* fence);
+extern SDL_DECLSPEC void SDLCALL SDL_ReleaseGPUFence(SDL_GPUDevice* device, SDL_GPUFence* fence);
+extern SDL_DECLSPEC Uint32 SDLCALL SDL_GPUTextureFormatTexelBlockSize(SDL_GPUTextureFormat format);
+extern SDL_DECLSPEC bool SDLCALL SDL_GPUTextureSupportsFormat(SDL_GPUDevice* device, SDL_GPUTextureFormat format, SDL_GPUTextureType type, SDL_GPUTextureUsageFlags usage);
+extern SDL_DECLSPEC bool SDLCALL SDL_GPUTextureSupportsSampleCount(SDL_GPUDevice* device, SDL_GPUTextureFormat format, SDL_GPUSampleCount sample_count);
+extern SDL_DECLSPEC Uint32 SDLCALL SDL_CalculateGPUTextureFormatSize(SDL_GPUTextureFormat format, Uint32 width, Uint32 height, Uint32 depth_or_layer_count);
+
+#ifdef SDL_PLATFORM_GDK 
+extern SDL_DECLSPEC void SDLCALL SDL_GDKSuspendGPU(SDL_GPUDevice* device);
+extern SDL_DECLSPEC void SDLCALL SDL_GDKResumeGPU(SDL_GPUDevice* device);
+
+#endif /* SDL_PLATFORM_GDK */
+#endif // 1
+
+
+
+
+
+
 static Uint32 frames = 0;
 
 typedef struct RenderState
@@ -568,7 +681,15 @@ init_render_state(int msaa)
 		state->gpudriver
 	);
 	CHECK_CREATE(gpu_device, "GPU device");
-
+	int ng = SDL_GetNumGPUDrivers();
+	std::vector<std::string> gpunames;
+	for (size_t i = 0; i < ng; i++)
+	{
+		const char* a = SDL_GetGPUDriver(i);
+		if (a)
+			gpunames.push_back(a);
+	}
+	const char* aa = SDL_GetGPUDeviceDriver(gpu_device);
 	/* Claim the windows */
 
 	for (i = 0; i < state->num_windows; i++) {
