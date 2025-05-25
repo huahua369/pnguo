@@ -424,9 +424,9 @@ CreateDepthTexture(Uint32 drawablew, Uint32 drawableh)
 	createinfo.props = 0;
 
 	result = SDL_CreateGPUTexture(gpu_device, &createinfo);
-	CHECK_CREATE(result, "Depth Texture")
+	CHECK_CREATE(result, "Depth Texture");
 
-		return result;
+	return result;
 }
 
 static SDL_GPUTexture*
@@ -450,9 +450,9 @@ CreateMSAATexture(Uint32 drawablew, Uint32 drawableh)
 	createinfo.props = 0;
 
 	result = SDL_CreateGPUTexture(gpu_device, &createinfo);
-	CHECK_CREATE(result, "MSAA Texture")
+	CHECK_CREATE(result, "MSAA Texture");
 
-		return result;
+	return result;
 }
 
 static SDL_GPUTexture*
@@ -476,9 +476,9 @@ CreateResolveTexture(Uint32 drawablew, Uint32 drawableh)
 	createinfo.props = 0;
 
 	result = SDL_CreateGPUTexture(gpu_device, &createinfo);
-	CHECK_CREATE(result, "Resolve Texture")
+	CHECK_CREATE(result, "Resolve Texture");
 
-		return result;
+	return result;
 }
 
 static void
@@ -654,9 +654,13 @@ load_shader(bool is_vertex)
 	createinfo.stage = is_vertex ? SDL_GPU_SHADERSTAGE_VERTEX : SDL_GPU_SHADERSTAGE_FRAGMENT;
 	return SDL_CreateGPUShader(gpu_device, &createinfo);
 }
-
-static void
-init_render_state(int msaa)
+std::string generateUUID() {
+	std::stringstream ss;
+	auto t = std::chrono::system_clock::now().time_since_epoch().count();
+	ss << std::hex << t;
+	return ss.str();
+}
+static void init_render_state(int msaa)
 {
 	SDL_GPUCommandBuffer* cmd;
 	SDL_GPUTransferBuffer* buf_transfer;
@@ -674,7 +678,9 @@ init_render_state(int msaa)
 	SDL_GPUShader* vertex_shader;
 	SDL_GPUShader* fragment_shader;
 	int i;
-
+	auto kk = generateUUID();
+	auto kk1 = generateUUID();
+	auto kk2 = generateUUID();
 	gpu_device = SDL_CreateGPUDevice(
 		TESTGPU_SUPPORTED_FORMATS,
 		true,
@@ -702,13 +708,15 @@ init_render_state(int msaa)
 	/* Create shaders */
 
 	vertex_shader = load_shader(true);
-	CHECK_CREATE(vertex_shader, "Vertex Shader")
-		fragment_shader = load_shader(false);
-	CHECK_CREATE(fragment_shader, "Fragment Shader")
+	fragment_shader = load_shader(false);
+	{
+		CHECK_CREATE(vertex_shader, "Vertex Shader");
+		CHECK_CREATE(fragment_shader, "Fragment Shader");
+	}
 
-		/* Create buffers */
+	/* Create buffers */
 
-		buffer_desc.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+	buffer_desc.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
 	buffer_desc.size = sizeof(vertex_data);
 	buffer_desc.props = SDL_CreateProperties();
 	SDL_SetStringProperty(buffer_desc.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, "космонавт");
@@ -716,8 +724,8 @@ init_render_state(int msaa)
 		gpu_device,
 		&buffer_desc
 	);
-	CHECK_CREATE(render_state.buf_vertex, "Static vertex buffer")
-		SDL_DestroyProperties(buffer_desc.props);
+	CHECK_CREATE(render_state.buf_vertex, "Static vertex buffer");
+	SDL_DestroyProperties(buffer_desc.props);
 
 	transfer_buffer_desc.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
 	transfer_buffer_desc.size = sizeof(vertex_data);
@@ -727,8 +735,8 @@ init_render_state(int msaa)
 		gpu_device,
 		&transfer_buffer_desc
 	);
-	CHECK_CREATE(buf_transfer, "Vertex transfer buffer")
-		SDL_DestroyProperties(transfer_buffer_desc.props);
+	CHECK_CREATE(buf_transfer, "Vertex transfer buffer");
+	SDL_DestroyProperties(transfer_buffer_desc.props);
 
 	/* We just need to upload the static data once. */
 	map = SDL_MapGPUTransferBuffer(gpu_device, buf_transfer, false);
@@ -822,10 +830,10 @@ init_render_state(int msaa)
 	pipelinedesc.props = 0;
 
 	render_state.pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &pipelinedesc);
-	CHECK_CREATE(render_state.pipeline, "Render Pipeline")
+	CHECK_CREATE(render_state.pipeline, "Render Pipeline");
 
-		/* These are reference-counted; once the pipeline is created, you don't need to keep these. */
-		SDL_ReleaseGPUShader(gpu_device, vertex_shader);
+	/* These are reference-counted; once the pipeline is created, you don't need to keep these. */
+	SDL_ReleaseGPUShader(gpu_device, vertex_shader);
 	SDL_ReleaseGPUShader(gpu_device, fragment_shader);
 
 	/* Set up per-window state */
