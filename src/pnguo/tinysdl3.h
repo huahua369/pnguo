@@ -464,6 +464,8 @@ enum class cdtype_e :uint32_t
 
 struct cpuinfo_t
 {
+	char name[128];
+	uint64_t core_mask[64];
 	glm::ivec3 cache[6];		// x缓存总字节、y缓存数量、z单个缓存字节
 	int count;					// L缓存数
 	int numaNodeCount;			// NUMA节点数

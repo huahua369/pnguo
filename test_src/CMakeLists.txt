@@ -75,7 +75,8 @@ add_executable (mtl ${src_mtl} )
 add_executable (audios ${src_audios} ) 
 add_executable (mmd ${src_mmd} ) 
 add_executable (mw ${src_mw} ) 
-
+#管理员权限
+SET_TARGET_PROPERTIES(mtl PROPERTIES LINK_FLAGS "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"")
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
 #find_package(SDL3 CONFIG REQUIRED)
@@ -84,6 +85,7 @@ add_executable (mw ${src_mw} )
 find_package(OpenSSL REQUIRED)
 
 find_package(Libssh2 CONFIG REQUIRED)
+find_package(cpuid CONFIG REQUIRED)
        
 #find_package(libuv CONFIG REQUIRED)
  
@@ -118,6 +120,7 @@ list(APPEND lklib
     libssh2::libssh2
     CURL::libcurl
     spine-c  
+    cpuid::cpuid
     #libsoundio_static
     #cmark::cmark 
     #md4c::md4c

@@ -65,6 +65,262 @@ extern "C" {
 #include <filesystem>
 
 
+#if 1
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cstdlib>
+#include <sstream>
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#include <comutil.h>
+#include <wbemidl.h>
+#pragma comment(lib, "wbemuuid.lib")
+
+#elif defined(__linux__)
+#include <fstream>
+
+#elif defined(__APPLE__) || defined(__MACH__)
+#include <sys/sysctl.h>
+
+#endif
+
+#include <libcpuid.h>  
+#include <winioctl.h>
+#include <winerror.h>
+
+struct msr_driver_t2 {
+	char driver_path[MAX_PATH + 1];
+	SC_HANDLE scManager;
+	volatile SC_HANDLE scDriver;
+	HANDLE hhDriver;
+	OVERLAPPED ovl;
+	int errorcode;
+};
+
+static BOOL wait_for_service_state2(SC_HANDLE hService, DWORD dwDesiredState, SERVICE_STATUS* lpsrvStatus) {
+	BOOL fOK = FALSE;
+	DWORD dwWaitHint;
+
+	if (hService != NULL) {
+		while (TRUE) {
+			fOK = QueryServiceStatus(hService, lpsrvStatus);
+			if (!fOK)
+				break;
+			if (lpsrvStatus->dwCurrentState == dwDesiredState)
+				break;
+
+			dwWaitHint = lpsrvStatus->dwWaitHint / 10;    // Poll 1/10 of the wait hint
+			if (dwWaitHint < 1000)
+				dwWaitHint = 1000;  // At most once per second
+			if (dwWaitHint > 10000)
+				dwWaitHint = 10000; // At least every 10 seconds
+			Sleep(dwWaitHint);
+		}
+	}
+
+	return fOK;
+}
+static int load_driver(struct msr_driver_t2* drv)
+{
+	LPTSTR		lpszInfo = (char*)("RDMSR Executor Driver");
+	USHORT		uLen = 0;
+	SERVICE_STATUS srvStatus = { 0 };
+	BOOL		fRunning = FALSE;
+	DWORD		dwLastError;
+	LPTSTR		lpszDriverServiceName = (char*)("WinRing0_1_2_0");
+	TCHAR		lpszDriverName[] = __TEXT("\\\\.\\Global\\TmpRdr");
+
+	if ((LPVOID)(drv->scManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS)) != NULL) {
+		drv->scDriver = CreateService(drv->scManager, lpszDriverServiceName, lpszInfo, SERVICE_ALL_ACCESS,
+			SERVICE_KERNEL_DRIVER, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
+			drv->driver_path, NULL, NULL, NULL, NULL, NULL);
+		if (drv->scDriver == NULL) {
+			switch (dwLastError = GetLastError()) {
+			case ERROR_SERVICE_EXISTS:
+			case ERROR_SERVICE_MARKED_FOR_DELETE: {
+				LPQUERY_SERVICE_CONFIG lpqsc;
+				DWORD dwBytesNeeded;
+
+				drv->scDriver = OpenService(drv->scManager, lpszDriverServiceName, SERVICE_ALL_ACCESS);
+				if (drv->scDriver == NULL) {
+					//debugf(1, "Error opening service: %d\n", GetLastError());
+					break;
+				}
+
+				QueryServiceConfig(drv->scDriver, NULL, 0, &dwBytesNeeded);
+				if ((dwLastError = GetLastError()) == ERROR_INSUFFICIENT_BUFFER) {
+					lpqsc = (LPQUERY_SERVICE_CONFIG)calloc(1, dwBytesNeeded);
+					if (!QueryServiceConfig(drv->scDriver, lpqsc, dwBytesNeeded, &dwBytesNeeded)) {
+						free(lpqsc);
+						//debugf(1, "Error query service config(adjusted buffer): %d\n", GetLastError());
+						goto clean_up;
+					}
+					else {
+						free(lpqsc);
+					}
+				}
+				else {
+					//debugf(1, "Error query service config: %d\n", dwLastError);
+					goto clean_up;
+				}
+
+				break;
+			}
+			case ERROR_ACCESS_DENIED:
+				drv->errorcode = ERR_NO_PERMS;
+				break;
+			default:
+				//debugf(1, "Create driver service failed: %d\n", dwLastError);
+				break;
+			}
+		}
+		if (drv->scDriver != NULL) {
+			if (StartService(drv->scDriver, 0, NULL)) {
+				if (!wait_for_service_state2(drv->scDriver, SERVICE_RUNNING, &srvStatus)) {
+					printf("Driver load failed.\n");
+					DeleteService(drv->scDriver);
+					CloseServiceHandle(drv->scManager);
+					drv->scDriver = NULL;
+					goto clean_up;
+				}
+				else {
+					fRunning = TRUE;
+				}
+			}
+			else {
+				if ((dwLastError = GetLastError()) == ERROR_SERVICE_ALREADY_RUNNING)
+					fRunning = TRUE;
+				else {
+					//debugf(1, "Driver start failed.\n");
+					DeleteService(drv->scDriver);
+					CloseServiceHandle(drv->scManager);
+					drv->scDriver = NULL;
+					goto clean_up;
+				}
+
+			}
+			if (fRunning)
+				printf("Driver already running.\n");
+			else
+				printf("Driver loaded.\n");
+			CloseServiceHandle(drv->scManager);
+			drv->hhDriver = CreateFile(lpszDriverName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+			drv->ovl.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+			return 1;
+		}
+	}
+	else {
+		printf("Open SCM failed: %d\n", GetLastError());
+	}
+
+clean_up:
+	if (drv->scManager != NULL) {
+		CloseServiceHandle(drv->scManager);
+		drv->scManager = 0; // pointless
+	}
+	if (drv->scDriver != NULL) {
+		if (!DeleteService(drv->scDriver))
+			printf("Delete driver service failed: %d\n", GetLastError());
+		CloseServiceHandle(drv->scDriver);
+		drv->scDriver = 0;
+	}
+
+	return 0;
+}
+#ifndef _T
+#define _T(x) x
+#endif // !_T
+
+#include "E:\code\cs\WinRing0\dll\OlsDef.h"
+#include "E:\code\cs\WinRing0\dll\OlsApiInit.h"
+void get_cpu_temperature(int* opt, cpuinfo_t& cpuinfo) {
+	DWORD eax = 0, edx = 0;
+	DWORD TjMax = 0;
+	DWORD IAcore = 0;
+	DWORD PKGsts = 0;
+	int Cputemp = 0;
+	Rdmsr(0x1A2, &eax, &edx);
+	TjMax = eax;
+	TjMax &= 0xFF0000;
+	TjMax = TjMax >> 16;
+
+	//Rdmsr(0x19C, &eax, &edx);
+	//IAcore = eax;
+	//IAcore &= 0xFF0000;
+	//IAcore = IAcore >> 16;
+
+	Cputemp = (int)(TjMax - IAcore);
+	PROCESSOR_NUMBER ProcNumber = {};
+	auto n = cpuid_get_total_cpus() + 2;
+	for (size_t i = 0; i < cpuinfo.processorCoreCount; i++)
+	{
+		auto result = SetThreadAffinityMask(GetCurrentThread(), cpuinfo.core_mask[i]);
+		auto n0 = GetCurrentProcessorNumber();
+		GetCurrentProcessorNumberEx(&ProcNumber);
+		Rdmsr(0x19c, &eax, &edx); //read Temperature 
+		*opt = TjMax - ((eax & 0x007f0000) >> 16);
+		opt++;
+	}
+
+	auto result = SetThreadAffinityMask(GetCurrentThread(), cpuinfo.core_mask[0]);
+	auto n0 = GetCurrentProcessorNumber();
+	GetCurrentProcessorNumberEx(&ProcNumber);
+	Rdmsr(0x1B1, &eax, &edx); //read package Temperature
+	*opt = TjMax - ((eax & 0x007f0000) >> 16);
+	opt++;
+}
+int get_cpu_temp() {
+	auto n = cpuid_get_total_cpus();
+	cpu_raw_data_t raw = {};
+	uint32_t msr_temp = 0x1A2; // Intel Thermal Status Register 
+
+	if (cpuid_get_raw_data(&raw) < 0) {
+		fprintf(stderr, "CPUID初始化失败\n");
+		return 1;
+	}
+	uint32_t r[32] = {};
+	cpu_exec_cpuid(msr_temp, r);
+	msr_driver_t2 md = {};
+	strcpy(md.driver_path, R"(E:\code\cs\openhardwaremonitor\Hardware\WinRing0x64.sys)");
+	load_driver(&md);
+
+	HMODULE m_hOpenLibSys;
+	DWORD eax, edx;
+	DWORD TjMax;
+	DWORD IAcore;
+	DWORD PKGsts;
+	int Cputemp = 0;
+
+	m_hOpenLibSys = NULL;
+	if (InitOpenLibSys(&m_hOpenLibSys) != TRUE)
+	{
+		std::cout << "DLL Load Error!\n";
+		return FALSE;
+	}
+	int cpu_temp[32] = { 0 };
+	cpuinfo_t cpuinfo = get_cpuinfo();
+	while (1) {
+		get_cpu_temperature(cpu_temp, cpuinfo);
+		for (size_t i = 0; i < 7; i++)
+		{
+			std::cout << cpu_temp[i] << "\t";
+		}
+		std::cout << "\n";
+		break;
+		Sleep(500);
+	}
+	return 0;
+}
+// 主函数
+int dmain()
+{
+	auto kct = get_cpu_temp();
+
+	return 0;
+}
+#endif // 1
 
 // sdl gpu
 #if 1
@@ -1561,7 +1817,9 @@ int main(int argc, char* argv[])
 {
 	std::stack<int> st;
 	clearpdb();
+	dmain();
 	new_gpu(argc, argv);
+
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);
 	auto app = new_app();

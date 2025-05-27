@@ -27,6 +27,7 @@
     "libsoundio",
     "mpg123",
     "fftw3",
+    "cpuid",
     "hwloc"
   ]
 }

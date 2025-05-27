@@ -3062,6 +3062,7 @@ int get_cpus(cpuinfo_t* lct) {
 		{
 		case RelationProcessorCore:
 		{
+			lct->core_mask[processorCoreCount] = ptr->ProcessorMask;
 			processorCoreCount++;
 			// A hyperthreaded core supplies more than one logical processor.
 			logicalProcessorCount += CountSetBits(ptr->ProcessorMask);
@@ -3093,6 +3094,10 @@ int get_cpus(cpuinfo_t* lct) {
 	int r = 0;
 	if (lct)
 	{
+		//PROCESSOR_ARCHITECTURE_INTEL;
+		//SYSTEM_INFO sinfo = {};
+		//GetSystemInfo(&sinfo);
+		//sinfo.dwProcessorType;
 		lct->numaNodeCount = numaNodeCount;
 		lct->processorPackageCount = processorPackageCount;
 		lct->processorCoreCount = processorCoreCount;
@@ -3110,6 +3115,51 @@ int get_cpus(cpuinfo_t* lct) {
 	return 0;
 
 }
+
+#ifdef _WIN32
+
+static int GetCPUNameString(cpuinfo_t& pt)
+{
+	int nIDs = 0;
+	int nExIDs = 0;
+
+	char strCPUName[128] = { };
+
+	std::array<int, 4> cpuInfo;
+	std::vector<std::array<int, 4>> extData;
+
+	__cpuid(cpuInfo.data(), 0);
+
+	// Calling __cpuid with 0x80000000 as the function_id argument
+	// gets the number of the highest valid extended ID.
+	__cpuid(cpuInfo.data(), 0x80000000);
+
+	nExIDs = cpuInfo[0];
+	for (int i = 0x80000000; i <= nExIDs; ++i)
+	{
+		__cpuidex(cpuInfo.data(), i, 0);
+		extData.push_back(cpuInfo);
+	}
+
+	// Interpret CPU strCPUName string if reported
+	if (nExIDs >= 0x80000004)
+	{
+		memcpy(strCPUName, extData[2].data(), sizeof(cpuInfo));
+		memcpy(strCPUName + 16, extData[3].data(), sizeof(cpuInfo));
+		memcpy(strCPUName + 32, extData[4].data(), sizeof(cpuInfo));
+	}
+
+	strcpy(pt.name, strlen(strCPUName) != 0 ? strCPUName : "UNAVAILABLE");
+	return strlen(pt.name);
+}
+#else
+static int GetCPUNameString(cpuinfo_t& pt)
+{
+	strcpy(pt.name, "UNAVAILABLE");
+	return strlen(pt.name);
+}
+
+#endif
 std::string formatBytes(uint64_t bytes)
 {
 	const std::vector<std::string> units = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB","YB", "BB" };
@@ -3158,6 +3208,7 @@ cpuinfo_t get_cpuinfo()
 			printf("*** L%d caches %s\tcount %02d\tsingle %s\n", levels, a.c_str(), kt.y, z.c_str());
 		}
 	}
+	GetCPUNameString(r);
 	r.NumLogicalCPUCores = SDL_GetNumLogicalCPUCores();
 	r.CPUCacheLineSize = SDL_GetCPUCacheLineSize();
 	r.SystemRAM = SDL_GetSystemRAM();
