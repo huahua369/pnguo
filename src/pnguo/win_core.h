@@ -78,8 +78,8 @@ namespace hz {
 	void shared_get(void* ptr, const char** funs, void** outbuf, int n);
 	// 检测运行权限
 	bool check_useradmin();
-	// 以管理员权限执行程序
-	void admin_exe(const char* path);
+	// admin是否以管理员权限执行程序
+	void shell_exe(const char* path0, bool admin);
 	std::string get_modulefile(void* hModule);
 
 }

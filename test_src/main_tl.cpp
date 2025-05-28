@@ -252,7 +252,7 @@ void get_cpu_temperature(int* opt, cpuinfo_t& cpuinfo) {
 	//IAcore = IAcore >> 16;
 
 	Cputemp = (int)(TjMax - IAcore);
-	PROCESSOR_NUMBER ProcNumber = {}; 
+	PROCESSOR_NUMBER ProcNumber = {};
 	for (size_t i = 0; i < cpuinfo.processorCoreCount; i++)
 	{
 		auto result = SetThreadAffinityMask(GetCurrentThread(), cpuinfo.core_mask[i]);
@@ -1809,7 +1809,7 @@ int main(int argc, char* argv[])
 	clearpdb();
 	if (!hz::check_useradmin())
 	{
-		hz::admin_exe(argv[0]);
+		hz::shell_exe(argv[0], true);
 		return 0;
 	}
 	dmain();

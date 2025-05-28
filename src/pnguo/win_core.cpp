@@ -3693,13 +3693,13 @@ namespace hz {
 		FreeSid(AdministratorsGroup);
 		return (b);
 	}
-	void admin_exe(const char* path0)
+	void shell_exe(const char* path0, bool admin)
 	{
 		std::string path = path0 ? path0 : get_modulefile(0);
 		SHELLEXECUTEINFO execinfo = {};
 		execinfo.lpFile = path.c_str();
 		execinfo.cbSize = sizeof(execinfo);
-		execinfo.lpVerb = "runas";
+		execinfo.lpVerb = admin ? "runas" : 0;
 		execinfo.fMask = SEE_MASK_NOCLOSEPROCESS;
 		execinfo.nShow = SW_SHOWDEFAULT;
 		//execinfo.lpParameters = NULL; 
