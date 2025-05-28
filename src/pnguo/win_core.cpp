@@ -29,7 +29,7 @@
 #include <stb_image_write.h>
 
 namespace hz {
-	 
+
 	HMONITOR GetPrimaryMonitor()
 	{
 		POINT ptZero = { 0, 0 };
@@ -3675,6 +3675,58 @@ namespace hz {
 
 	};
 #endif
+
+	//返回1为管理员权限，0位普通 
+	bool check_useradmin()
+	{
+		BOOL b = 0;
+		SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+		PSID AdministratorsGroup = {};
+		AllocateAndInitializeSid(
+			&NtAuthority,
+			2,
+			SECURITY_BUILTIN_DOMAIN_RID,
+			DOMAIN_ALIAS_RID_ADMINS,
+			0, 0, 0, 0, 0, 0,
+			&AdministratorsGroup);
+		CheckTokenMembership(NULL, AdministratorsGroup, &b);
+		FreeSid(AdministratorsGroup);
+		return (b);
+	}
+	void admin_exe(const char* path0)
+	{
+		std::string path = path0 ? path0 : get_modulefile(0);
+		SHELLEXECUTEINFO execinfo = {};
+		execinfo.lpFile = path.c_str();
+		execinfo.cbSize = sizeof(execinfo);
+		execinfo.lpVerb = "runas";
+		execinfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+		execinfo.nShow = SW_SHOWDEFAULT;
+		//execinfo.lpParameters = NULL; 
+		ShellExecuteExA(&execinfo);
+		if (execinfo.hProcess)
+			CloseHandle(execinfo.hProcess);
+	}
+	std::string get_modulefile(void* hModule)
+	{
+		std::string buf;
+		buf.resize(MAX_PATH);
+		int ker = 10;
+		for (; ker != 0;) {
+			buf.resize(buf.size() * 2);
+			auto n = GetModuleFileNameA((HMODULE)hModule, buf.data(), buf.size());
+			ker = GetLastError();
+			if (!ker)
+			{
+				buf.resize(n);
+			}
+		}
+		return buf;
+	}
+}
+//!hz
+#endif // _WIN32
+namespace hz {
 	void* shared_load(const void* dllpath)
 	{
 		return dllpath ? hz::Shared::loadShared((char*)dllpath, 0) : nullptr;
@@ -3689,6 +3741,6 @@ namespace hz {
 		if (d)
 			d->dllsyms(funs, outbuf, n);
 	}
+
 }
 //!hz
-#endif // _WIN32

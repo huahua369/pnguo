@@ -76,5 +76,11 @@ namespace hz {
 	void* shared_load(const void* dllpath);
 	void shared_destroy(void* p);
 	void shared_get(void* ptr, const char** funs, void** outbuf, int n);
+	// 检测运行权限
+	bool check_useradmin();
+	// 以管理员权限执行程序
+	void admin_exe(const char* path);
+	std::string get_modulefile(void* hModule);
+
 }
 //!hz

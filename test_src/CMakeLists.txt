@@ -76,7 +76,7 @@ add_executable (audios ${src_audios} )
 add_executable (mmd ${src_mmd} ) 
 add_executable (mw ${src_mw} ) 
 #管理员权限
-SET_TARGET_PROPERTIES(mtl PROPERTIES LINK_FLAGS "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"")
+#SET_TARGET_PROPERTIES(mtl PROPERTIES LINK_FLAGS "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"")
 #include_directories("${SDL3DIR_ROOT}/include")
 #list(APPEND CMAKE_PREFIX_PATH "${SDL3DIR_ROOT}/cmake")
 #find_package(SDL3 CONFIG REQUIRED)

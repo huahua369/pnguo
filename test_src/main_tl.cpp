@@ -252,8 +252,7 @@ void get_cpu_temperature(int* opt, cpuinfo_t& cpuinfo) {
 	//IAcore = IAcore >> 16;
 
 	Cputemp = (int)(TjMax - IAcore);
-	PROCESSOR_NUMBER ProcNumber = {};
-	auto n = cpuid_get_total_cpus() + 2;
+	PROCESSOR_NUMBER ProcNumber = {}; 
 	for (size_t i = 0; i < cpuinfo.processorCoreCount; i++)
 	{
 		auto result = SetThreadAffinityMask(GetCurrentThread(), cpuinfo.core_mask[i]);
@@ -271,33 +270,23 @@ void get_cpu_temperature(int* opt, cpuinfo_t& cpuinfo) {
 	*opt = TjMax - ((eax & 0x007f0000) >> 16);
 	opt++;
 }
-int get_cpu_temp() {
-	auto n = cpuid_get_total_cpus();
-	cpu_raw_data_t raw = {};
-	uint32_t msr_temp = 0x1A2; // Intel Thermal Status Register 
-
-	if (cpuid_get_raw_data(&raw) < 0) {
-		fprintf(stderr, "CPUID初始化失败\n");
-		return 1;
+bool get_cpu_temp() {
+	if (hz::check_useradmin())
+	{
+		printf("有管理员权限\n");
 	}
-	uint32_t r[32] = {};
-	cpu_exec_cpuid(msr_temp, r);
-	msr_driver_t2 md = {};
-	strcpy(md.driver_path, R"(E:\code\cs\openhardwaremonitor\Hardware\WinRing0x64.sys)");
-	load_driver(&md);
-
-	HMODULE m_hOpenLibSys;
-	DWORD eax, edx;
-	DWORD TjMax;
-	DWORD IAcore;
-	DWORD PKGsts;
-	int Cputemp = 0;
-
-	m_hOpenLibSys = NULL;
-	if (InitOpenLibSys(&m_hOpenLibSys) != TRUE)
+	else {
+		printf("请以管理员身份运行\n");
+		return false;
+	}
+	//msr_driver_t2 md = {};
+	//strcpy(md.driver_path, R"(E:\code\cs\openhardwaremonitor\Hardware\WinRing0x64.sys)");
+	//load_driver(&md);
+	HMODULE _hOpenLibSys = 0;
+	if (InitOpenLibSys(&_hOpenLibSys) != TRUE)
 	{
 		std::cout << "DLL Load Error!\n";
-		return FALSE;
+		return false;
 	}
 	int cpu_temp[32] = { 0 };
 	cpuinfo_t cpuinfo = get_cpuinfo();
@@ -308,10 +297,11 @@ int get_cpu_temp() {
 			std::cout << cpu_temp[i] << "\t";
 		}
 		std::cout << "\n";
-		break;
 		Sleep(500);
 	}
-	return 0;
+	if (_hOpenLibSys)
+		DeinitOpenLibSys(&_hOpenLibSys);
+	return true;
 }
 // 主函数
 int dmain()
@@ -1817,7 +1807,13 @@ int main(int argc, char* argv[])
 {
 	std::stack<int> st;
 	clearpdb();
+	if (!hz::check_useradmin())
+	{
+		hz::admin_exe(argv[0]);
+		return 0;
+	}
 	dmain();
+
 	new_gpu(argc, argv);
 
 	const char* wtitle = (char*)u8"多功能管理工具";
