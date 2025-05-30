@@ -13,6 +13,7 @@
 #include <pnguo/mapView.h>
 #include <pnguo/print_time.h>
 #include <pnguo/mnet.h> 
+#include <pnguo/ecc_sv.h> 
 #include <cairo/cairo.h>
 #include "mshell.h"
 #ifdef GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
@@ -1803,10 +1804,182 @@ void drawGrid(SDL_Renderer* renderer, const glm::vec2& pos, int gridSize, int ca
 		points += 2;
 	}
 }
+void spriteUnravel(const std::string& cv, std::vector<int>& window_paletteref, int window_digitsize, std::vector<uint32_t>& output)
+{
+	std::vector<int> paletteref;
+	std::string tt;
+	auto t = cv.c_str();
+	int digitsize = window_digitsize;
+	int current = 0;
+	paletteref = window_paletteref;
+	for (; *t; t++)
+	{
+		auto c = *t;
+		switch (c)
+		{
+		case 'x':
+		{
+			// A loop, ordered as 'x char times ,'
+			// Get the location of the ending comma 
+			t++;
+			tt.assign(t, digitsize);
+			auto cc = std::atoi(tt.c_str());
+			t += digitsize;
+			auto t0 = t;
+			for (; *t != ','; t++);
+			tt.assign(t0, t - t0);
+			auto n = std::atoi(tt.c_str());
+			current = paletteref[cc];
+			for (auto k = 0; k < n; k++)
+				output.push_back(current);
+		}
+		break;
+		case 'p':
+		{
+			// A palette changer, in the form 'p[X,Y,Z...]' (or 'p' for default)
+			t++;
+			c = *t;
+			// If the next character is a '[', customize. 
+			if (c == '[')
+			{
+				t++;
+				auto t0 = t;
+				for (; *t != ']'; t++);
+				tt.assign(t0, t - t0);
+				auto locc = md::split(tt, ",");
+				paletteref.clear();
+				paletteref.reserve(locc.size());
+				for (auto& it : locc) {
+					paletteref.push_back(std::atoi(it.c_str()));
+				}
+				//nixloc = colors.indexOf(']');
+				// Isolate and split the new palette's numbers
+				//paletteref = getPaletteReference(colors.slice(loc + 1, nixloc).split(","));
+				//loc = nixloc + 1;
+				digitsize = 1;
+			}
+			// Otherwise go back to default
+			else {
+				paletteref = window_paletteref;
+				digitsize = window_digitsize;
+			}
+		}
+		break;
+		default:
+		{
+			// A typical number 
+			tt.assign(t, digitsize);
+			t += digitsize - 1;
+			auto cc = std::atoi(tt.c_str());
+			output.push_back(paletteref[cc]);
+		}
+		break;
+		}
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	std::stack<int> st;
 	clearpdb();
+	auto md = hz::read_json("temp/mariodata.json");
+	auto rawsprites = md["rawsprites"];
+	std::vector<glm::i8vec4> palette = {
+		{0, 0, 0, 0},
+		// Grayscales (1-4)
+		{255, 255, 255, 255},
+		{0, 0, 0, 255},
+		{188, 188, 188, 255},
+		{116, 116, 116, 255},
+		// Reds & Browns (5-11)
+		{252, 216, 168, 255},
+		{252, 152, 56, 255},
+		{252, 116, 180, 255},
+		{216, 40, 0, 255},
+		{200, 76, 12, 255},
+		{136, 112, 0, 255},
+		{124, 7, 0, 255},
+		// Greens (12-14, and 21)
+		{168, 250, 188, 255},
+		{128, 208, 16, 255},
+		{0, 168, 0, 255},
+		// Blues (15-20)
+		{24, 60, 92, 255},
+		{0, 128, 136, 255},
+		{32, 56, 236, 255},
+		{156, 252, 240, 255},
+		{60, 188, 252, 255},
+		{92, 148, 252, 255},
+		//Greens (21) for Luigi
+		{0, 130, 0, 255}
+	};
+	struct sd_t
+	{
+		njson* p = 0;
+		std::string k;
+	};
+	std::stack<sd_t> sv;
+	for (auto& [k, v] : rawsprites.items()) {
+		if (v.size() && v.is_object())
+		{
+			sv.push({ &v,k });
+		}
+	}
+	int window_digitsize = 2;
+	std::vector<int> window_paletteref;
+	std::vector<int> paletteref;
+	std::vector<uint32_t> output;
+	window_paletteref.resize(palette.size());
+	for (size_t i = 0; i < palette.size(); i++)
+	{
+		window_paletteref[i] = i;
+	}
+	std::map<std::string, std::vector<uint32_t>> mcd;
+	while (sv.size()) {
+		auto pt = sv.top();
+		sv.pop();
+		auto p = pt.p;
+		for (auto& [k, v] : p->items()) {
+			auto nk = pt.k + "_" + k;
+			if (v.is_object())
+			{
+				if (v.size())
+					sv.push({ &v, nk });
+			}
+			else if (v.is_string())
+			{
+				auto vs = v.get<std::string>();
+				spriteUnravel(vs, window_paletteref, window_digitsize, output);
+				if (output.size())
+				{
+					mcd[nk].swap(output);
+					if (mcd.find(nk) != mcd.end())output.clear();
+				}
+			}
+		}
+	}
+	image_ptr_t ipt = {};
+	ipt.comp = 4;
+	ipt.width = 32;
+	ipt.height = 32;
+	std::vector<uint32_t> dimg;
+	dimg.resize(32 * 32);
+	ipt.data = dimg.data();
+	auto mnf = mcd["characters_Bowser_firing_normal"];
+	auto dd = mnf.data();
+	auto pal = palette.data();
+	if (dd) {
+		for (size_t y = 0; y < 32; y++)
+		{
+			for (size_t x = 0; x < 32; x++)
+			{
+				uint32_t* col = (uint32_t*)&pal[*dd];
+				ipt.data[x + y * 32] = *col;
+				dd++;
+			}
+		}
+		save_img_png(&ipt, "temp/Bowser_firing.png");
+	}
 	if (!hz::check_useradmin())
 	{
 		hz::shell_exe(argv[0], true);
@@ -2108,33 +2281,33 @@ void tiled_data(const char* data)
 	// Here you should check that the data has the right size
 	// (map_width * map_height * 4)
 
-	for (int y = 0; y < map_height; ++y) {
-		for (int x = 0; x < map_width; ++x) {
-			uint32_t global_tile_id = data[tile_index] |
-				data[tile_index + 1] << 8 |
-				data[tile_index + 2] << 16 |
-				data[tile_index + 3] << 24;
-			tile_index += 4;
+	//for (int y = 0; y < map_height; ++y) {
+	//	for (int x = 0; x < map_width; ++x) {
+	//		uint32_t global_tile_id = data[tile_index] |
+	//			data[tile_index + 1] << 8 |
+	//			data[tile_index + 2] << 16 |
+	//			data[tile_index + 3] << 24;
+	//		tile_index += 4;
 
-			// Read out the flags
-			bool flipped_horizontally = (global_tile_id & FLIPPED_HORIZONTALLY_FLAG);
-			bool flipped_vertically = (global_tile_id & FLIPPED_VERTICALLY_FLAG);
-			bool flipped_diagonally = (global_tile_id & FLIPPED_DIAGONALLY_FLAG);
+	//		// Read out the flags
+	//		bool flipped_horizontally = (global_tile_id & FLIPPED_HORIZONTALLY_FLAG);
+	//		bool flipped_vertically = (global_tile_id & FLIPPED_VERTICALLY_FLAG);
+	//		bool flipped_diagonally = (global_tile_id & FLIPPED_DIAGONALLY_FLAG);
 
-			// Clear the flags
-			global_tile_id &= ~(FLIPPED_HORIZONTALLY_FLAG |
-				FLIPPED_VERTICALLY_FLAG |
-				FLIPPED_DIAGONALLY_FLAG);
+	//		// Clear the flags
+	//		global_tile_id &= ~(FLIPPED_HORIZONTALLY_FLAG |
+	//			FLIPPED_VERTICALLY_FLAG |
+	//			FLIPPED_DIAGONALLY_FLAG);
 
-			// Resolve the tile
-			for (int i = tileset_count - 1; i >= 0; --i) {
-				Tileset* tileset = tilesets[i];
+	//		// Resolve the tile
+	//		for (int i = tileset_count - 1; i >= 0; --i) {
+	//			Tileset* tileset = tilesets[i];
 
-				if (tileset->first_gid() <= global_tile_id) {
-					tiles[y][x] = tileset->tileAt(global_tile_id - tileset->first_gid());
-					break;
-				}
-			}
-		}
-	}
+	//			if (tileset->first_gid() <= global_tile_id) {
+	//				tiles[y][x] = tileset->tileAt(global_tile_id - tileset->first_gid());
+	//				break;
+	//			}
+	//		}
+	//	}
+	//}
 }
