@@ -105,6 +105,7 @@ int get_pat_int(FcPattern* font, const char* o)
 	return s;
 }
 
+
 std::map<std::string, fontns> get_allfont()
 {
 	int r = 0;
@@ -5271,6 +5272,21 @@ int font_t::get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, gl
 }
 
 
+
+packer_base::packer_base()
+{
+}
+packer_base::~packer_base()
+{
+}
+
+void packer_base::init_target(int width, int height) {}
+void packer_base::clear() {}
+int packer_base::push_rect(glm::ivec4* rc, int n) { return 0; }
+int packer_base::push_rect(glm::ivec2 rc, glm::ivec2* pos) { return 0; }
+
+
+
 #if 0
 ndef STB_RECT_PACK_VERSION
 
@@ -5289,7 +5305,7 @@ struct stbrp_rect
 }; // 16 bytes, nominally
 #endif
 #ifdef STB_RECT_PACK_VERSION
-class stb_packer
+class stb_packer :public packer_base
 {
 public:
 	stbrp_context _ctx = {};
@@ -5340,6 +5356,8 @@ public:
 		img->width = width;
 		img->height = height;
 		img->valid = 1;
+		this->width = width;
+		this->height = height;
 #ifdef STL_VU
 		img->data = ptr.data();
 		_rpns.resize(width);
@@ -5465,6 +5483,24 @@ void test_rect()
 }
 
 #endif // STB_RECT_PACK_VERSION
+
+packer_base* new_packer(int width, int height)
+{
+	auto p = new stb_packer();
+	if (p)
+	{
+		p->init_target(width, height);
+	}
+	return p;
+}
+
+void free_packer(packer_base* p)
+{
+	if (p)
+	{
+		delete p;
+	}
+}
 
 bitmap_cache_cx::bitmap_cache_cx()
 {

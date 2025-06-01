@@ -1809,6 +1809,10 @@ void spriteUnravel(const std::string& cv, std::vector<int>& window_paletteref, i
 	std::vector<int> paletteref;
 	std::string tt;
 	auto t = cv.c_str();
+	tt.assign(t, 2);
+	auto width = std::atoi(tt.c_str());
+	t += 2;
+	output.push_back(width);
 	int digitsize = window_digitsize;
 	int current = 0;
 	paletteref = window_paletteref;
@@ -1877,36 +1881,45 @@ void spriteUnravel(const std::string& cv, std::vector<int>& window_paletteref, i
 		}
 	}
 }
-void copy2image(image_ptr_t& ipt, const glm::ivec2& pos, int width, std::vector<glm::i8vec4>& palette, std::vector<uint32_t>& colors)
+void copy2image(image_ptr_t& ipt, const glm::ivec2& pos, int width, std::vector<glm::i8vec4>& palette, uint32_t* colors, int csize)
 {
 	if (4 != ipt.comp || !ipt.width || !ipt.height || !ipt.data || width >= ipt.width)return;
-	auto dd = colors.data();
+	auto dd = colors;
 	auto pal = palette.data();
 	int stride = ipt.stride ? ipt.stride / sizeof(uint32_t) : ipt.width;
 	if (dd) {
-		int ch = colors.size() / width;
+		int ch = csize / width;
 		auto h = std::min(ch + pos.y, ipt.height);
 		auto w = std::min(width + pos.x, ipt.width);
 		auto img = ipt.data + pos.y * stride;
 		for (size_t y = pos.y; y < h; y++)
 		{
-			img += stride;
 			for (size_t x = pos.x; x < w; x++)
 			{
 				uint32_t* col = (uint32_t*)&pal[*dd];
 				img[x] = *col;
 				dd++;
 			}
+			img += stride;
 		}
 	}
 
 }
-int main(int argc, char* argv[])
+int get_width(const std::string& k, njson& d, int& iw)
 {
-	std::stack<int> st;
-	clearpdb();
-	auto md = hz::read_json("temp/mariodata.json");
-	auto rawsprites = md["rawsprites"];
+	int r = 0;
+	for (auto& [n, v] : d.items()) {
+		if (k.find(n) == 0)
+		{
+			r = v[0].get<int>() * 2;
+			iw = r;
+			break;
+		}
+	}
+	return r;
+}
+void makemjson(const char* fn) {
+
 	std::vector<glm::i8vec4> palette = {
 		{0, 0, 0, 0},
 		// Grayscales (1-4)
@@ -1941,11 +1954,14 @@ int main(int argc, char* argv[])
 		njson* p = 0;
 		std::string k;
 	};
+	auto md = hz::read_json(fn);
+	auto rawsprites = md["rawsprites"];
 	std::stack<sd_t> sv;
+	std::stack<int> st;
 	for (auto& [k, v] : rawsprites.items()) {
 		if (v.size() && v.is_object())
 		{
-			sv.push({ &v,k });
+			sv.push({ &v, k });
 		}
 	}
 	int window_digitsize = 2;
@@ -1957,13 +1973,21 @@ int main(int argc, char* argv[])
 	{
 		window_paletteref[i] = i;
 	}
+	auto Scenery = md["Scenery"]["sprites"];
 	std::map<std::string, std::vector<uint32_t>> mcd;
+	static int sckk = 300;
+	static int minck = 280;
+	int ckk = 0;
 	while (sv.size()) {
 		auto pt = sv.top();
 		sv.pop();
 		auto p = pt.p;
 		for (auto& [k, v] : p->items()) {
-			auto nk = pt.k + "_" + k;
+			auto nk = k;
+			if (pt.k.size())
+			{
+				nk = pt.k + "_" + k;
+			}
 			if (v.is_object())
 			{
 				if (v.size())
@@ -1990,57 +2014,38 @@ int main(int argc, char* argv[])
 	ipt.data = dimg.data();
 	int aw = 0;
 	int ah = 0;
-	std::set<size_t> ss;
+	std::map<size_t, int> ss;
+	packer_base* pack = new_packer(1024, 1024);
+	std::vector<std::string> vname;
+	njson nw;
 	for (auto& [k, v] : mcd) {
+		//if (ckk > sckk)break;
+		//ckk++;
+		//if (ckk < minck)
+		//{
+		//	continue;
+		//}
+		vname.push_back(k);
 		auto& data = v;
-		if (data.size() > 1024 * 1024) {
-			printf("data too large: %s\n", k.c_str());
-			continue;
-		}
-		int iw = 16;
-		switch (data.size())
-		{
-		case 1:iw = 1; break;
-		case 6:iw = 3; break;
-		case 16:iw = 4; break;
-		case 64:iw = 8; break;
-		case 80:iw = 16; break;
-		case 88:iw = 8; break;
-		case 128:iw = 16; break;
-		case 140:iw = 4; break;
-		case 192:iw = 16; break;
-		case 210:iw = 10; break;
-		case 224:iw = 14; break;
-		case 240:iw = 16; break;
-		case 256:iw = 16; break;
-		case 272:iw = 16; break;
-		case 288:iw = 2; break;
-		case 352:iw = 16; break;
-		case 384:iw = 16; break;
-		case 420:iw = 16; break;
-		case 512:iw = 16; break;
-		case 576:iw = 16; break;
-		case 640:iw = 16; break;
-		case 736:iw = 16; break;
-		case 768:iw = 32; break;
-		case 912:iw = 16; break;
-		case 1024:iw = 32; break;
-		case 1152:iw = 32; break;
-		case 1248:iw = 32; break;
-		case 1536:iw = 32; break;
-		case 2800:iw = 32; break;
-		}
-		ss.insert(data.size());
-		copy2image(ipt, { aw, ah }, iw, palette, data);
-		aw += 32 + 4;
-		if (aw > ipt.width)
-		{
-			aw = 0;
-			ah += (data.size() / iw) + 4;
-		}
+		auto ds = data.size() - 1;
+		int iw = data[0];
+		ss[ds]++;
+		glm::ivec2 npos = {};
+		auto ih = (ds / iw) + 4;
+		auto b = pack->push_rect({ iw + 4, ih }, &npos);
+		copy2image(ipt, npos, iw, palette, data.data() + 1, ds);
+		nw[k] = { npos.x,npos.y,iw,ih };
 	}
-
+	hz::save_json("temp/mario2.json", nw, 2);
 	save_img_png(&ipt, "temp/mario2.png");
+	printf("pack size:%d\t%d\n", pack->width, pack->height);
+
+}
+int main(int argc, char* argv[])
+{
+	clearpdb();
+	for (;;)
+		makemjson("temp/mariodata.json");
 #if 0
 	{
 		hz::mfile_t vco;

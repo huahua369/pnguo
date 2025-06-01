@@ -70,6 +70,22 @@ struct atlas_t
 };
 
 
+// 纹理图像打包器接口
+class packer_base
+{
+public:
+	int width = 0, height = 0;
+public:
+	packer_base();
+	virtual ~packer_base();
+	virtual void init_target(int width, int height);
+	virtual void clear();
+	virtual int push_rect(glm::ivec4* rc, int n);
+	virtual int push_rect(glm::ivec2 rc, glm::ivec2* pos);
+};
+packer_base* new_packer(int width, int height);
+void free_packer(packer_base* p);
+
 // 简易stb_image加载
 class stbimage_load :public image_ptr_t
 {
