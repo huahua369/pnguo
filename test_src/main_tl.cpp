@@ -1877,7 +1877,30 @@ void spriteUnravel(const std::string& cv, std::vector<int>& window_paletteref, i
 		}
 	}
 }
+void copy2image(image_ptr_t& ipt, const glm::ivec2& pos, int width, std::vector<glm::i8vec4>& palette, std::vector<uint32_t>& colors)
+{
+	if (4 != ipt.comp || !ipt.width || !ipt.height || !ipt.data || width >= ipt.width)return;
+	auto dd = colors.data();
+	auto pal = palette.data();
+	int stride = ipt.stride ? ipt.stride / sizeof(uint32_t) : ipt.width;
+	if (dd) {
+		int ch = colors.size() / width;
+		auto h = std::min(ch + pos.y, ipt.height);
+		auto w = std::min(width + pos.x, ipt.width);
+		auto img = ipt.data + pos.y * stride;
+		for (size_t y = pos.y; y < h; y++)
+		{
+			img += stride;
+			for (size_t x = pos.x; x < w; x++)
+			{
+				uint32_t* col = (uint32_t*)&pal[*dd];
+				img[x] = *col;
+				dd++;
+			}
+		}
+	}
 
+}
 int main(int argc, char* argv[])
 {
 	std::stack<int> st;
@@ -1960,33 +1983,105 @@ int main(int argc, char* argv[])
 	}
 	image_ptr_t ipt = {};
 	ipt.comp = 4;
-	ipt.width = 32;
-	ipt.height = 32;
+	ipt.width = 1024;
+	ipt.height = 1024;
 	std::vector<uint32_t> dimg;
-	dimg.resize(32 * 32);
+	dimg.resize(1024 * 1024);
 	ipt.data = dimg.data();
-	auto mnf = mcd["characters_Bowser_firing_normal"];
-	auto dd = mnf.data();
-	auto pal = palette.data();
-	if (dd) {
-		for (size_t y = 0; y < 32; y++)
-		{
-			for (size_t x = 0; x < 32; x++)
-			{
-				uint32_t* col = (uint32_t*)&pal[*dd];
-				ipt.data[x + y * 32] = *col;
-				dd++;
-			}
+	int aw = 0;
+	int ah = 0;
+	std::set<size_t> ss;
+	for (auto& [k, v] : mcd) {
+		auto& data = v;
+		if (data.size() > 1024 * 1024) {
+			printf("data too large: %s\n", k.c_str());
+			continue;
 		}
-		save_img_png(&ipt, "temp/Bowser_firing.png");
+		int iw = 16;
+		switch (data.size())
+		{
+		case 1:iw = 1; break;
+		case 6:iw = 3; break;
+		case 16:iw = 4; break;
+		case 64:iw = 8; break;
+		case 80:iw = 16; break;
+		case 88:iw = 8; break;
+		case 128:iw = 16; break;
+		case 140:iw = 4; break;
+		case 192:iw = 16; break;
+		case 210:iw = 10; break;
+		case 224:iw = 14; break;
+		case 240:iw = 16; break;
+		case 256:iw = 16; break;
+		case 272:iw = 16; break;
+		case 288:iw = 2; break;
+		case 352:iw = 16; break;
+		case 384:iw = 16; break;
+		case 420:iw = 16; break;
+		case 512:iw = 16; break;
+		case 576:iw = 16; break;
+		case 640:iw = 16; break;
+		case 736:iw = 16; break;
+		case 768:iw = 32; break;
+		case 912:iw = 16; break;
+		case 1024:iw = 32; break;
+		case 1152:iw = 32; break;
+		case 1248:iw = 32; break;
+		case 1536:iw = 32; break;
+		case 2800:iw = 32; break;
+		}
+		ss.insert(data.size());
+		copy2image(ipt, { aw, ah }, iw, palette, data);
+		aw += 32 + 4;
+		if (aw > ipt.width)
+		{
+			aw = 0;
+			ah += (data.size() / iw) + 4;
+		}
+	}
+
+	save_img_png(&ipt, "temp/mario2.png");
+#if 0
+	{
+		hz::mfile_t vco;
+		//auto vcod = vco.open_d(R"(E:\code\cpp\vk\b\blender\release\datafiles\icons\ops.transform.translate.dat)", true);
+		auto vcod = vco.open_d(R"(E:\code\cpp\vk\b\blender\release\datafiles\icons\ops.transform.rotate.dat)", true);
+		struct vco_dt
+		{
+			char t[3];
+			char v;
+			glm::u8vec2 size;
+			glm::u8vec2 pos;
+		};
+		auto pc = (vco_dt*)vcod;
+		auto n = vco.size() - 8;
+		// 6字节三角形坐标，12字节颜色
+		n /= 6 + 12;
+		auto t = vcod + 8;
+		auto tc = (uint32_t*)(t + n * 6);
+		std::vector<glm::vec2> v3;
+		std::vector<uint32_t> cv;
+		for (size_t i = 0; i < n; i++)
+		{
+			auto t3 = (glm::u8vec2*)t;
+			v3.push_back(t3[0]);
+			v3.push_back(t3[1]);
+			v3.push_back(t3[2]);
+			t += 6;
+			cv.push_back(tc[0]);
+			cv.push_back(tc[1]);
+			cv.push_back(tc[2]);
+			tc += 3;
+		}
+		printf("%d\t%d\n", (int)pc->size.x, (int)pc->size.y);
 	}
 	if (!hz::check_useradmin())
 	{
 		hz::shell_exe(argv[0], true);
 		return 0;
 	}
+#endif
 	dmain();
-
 	new_gpu(argc, argv);
 
 	const char* wtitle = (char*)u8"多功能管理工具";
