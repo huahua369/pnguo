@@ -2017,6 +2017,14 @@ void makemjson(const char* fn) {
 	std::map<size_t, int> ss;
 	packer_base* pack = new_packer(1024, 1024);
 	std::vector<std::string> vname;
+
+	std::vector<glm::ivec4> rcv;
+	struct vnk_t
+	{
+		std::vector<uint32_t>* v;
+		std::string k;
+	};
+	std::vector<vnk_t> rcvd;
 	njson nw;
 	for (auto& [k, v] : mcd) {
 		//if (ckk > sckk)break;
@@ -2032,11 +2040,20 @@ void makemjson(const char* fn) {
 		ss[ds]++;
 		glm::ivec2 npos = {};
 		auto ih = (ds / iw) + 4;
-		auto b = pack->push_rect({ iw + 4, ih }, &npos);
-		copy2image(ipt, npos, iw, palette, data.data() + 1, ds);
-		nw[k] = { npos.x,npos.y,iw,ih };
+		rcv.push_back({ 0,0, iw + 4, ih });
+		rcvd.push_back({ &v ,k });
 	}
-	hz::save_json("temp/mario2.json", nw, 2);
+	pack->push_rect(rcv.data(), rcv.size());
+	auto length = rcv.size();
+	for (size_t i = 0; i < length; i++)
+	{
+		auto rc = rcv[i];
+		auto& v = rcvd[i];
+		auto ds = v.v->size() - 1;
+		copy2image(ipt, rc, rc.z - 4, palette, v.v->data() + 1, ds);
+		nw[v.k] = { rc.x,rc.y,rc.z - 4,rc.w - 4 };
+	}
+	hz::save_json("temp/mario2.json", nw, 1);
 	save_img_png(&ipt, "temp/mario2.png");
 	printf("pack size:%d\t%d\n", pack->width, pack->height);
 
@@ -2044,8 +2061,8 @@ void makemjson(const char* fn) {
 int main(int argc, char* argv[])
 {
 	clearpdb();
-	for (;;)
-		makemjson("temp/mariodata.json");
+	//for (;;)
+	//makemjson("temp/mariodata.json");
 #if 0
 	{
 		hz::mfile_t vco;

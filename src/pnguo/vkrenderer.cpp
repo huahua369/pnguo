@@ -13852,7 +13852,7 @@ namespace vkr {
 			return true;
 		} while (0);
 
-		return true;
+		return false;
 	}
 
 	void GLTFCommon::Unload()
