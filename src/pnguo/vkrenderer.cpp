@@ -1342,6 +1342,8 @@ namespace vkr {
 		UINT8* m_pDataBegin = nullptr;    // starting position of upload heap
 		UINT8* m_pDataCur = nullptr;      // current position of upload heap
 		UINT8* m_pDataEnd = nullptr;      // ending position of upload heap 
+		size_t ac = 0;
+		size_t ac0 = 0;
 	};
 
 	struct IMG_INFO
@@ -7938,6 +7940,8 @@ namespace vkr
 			m_pDataCur = reinterpret_cast<UINT8*>(AlignUp(reinterpret_cast<SIZE_T>(m_pDataCur), uAlign));
 			uSize = AlignUp(uSize, uAlign);
 
+			ac = m_pDataCur - m_pDataBegin;
+			ac0 = m_pDataEnd - m_pDataBegin;
 			// return NULL if we ran out of space in the heap
 			if ((m_pDataCur >= m_pDataEnd) || (m_pDataCur + uSize >= m_pDataEnd))
 			{
