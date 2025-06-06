@@ -14940,6 +14940,7 @@ namespace vkr {
 		PerFrame_t* SetPerFrameData(const Camera& cam);
 		void OnRender(const scene_state* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p, int idx);
+		// 释放上传堆和缓冲区
 		void freeVidMBP();
 
 
@@ -18816,28 +18817,10 @@ namespace vkr {
 			if (loadingStage == 0)
 			{
 				_loaders.push_back(_tmpgc);
-				_tmpgc = 0;
-				//m_time = 0;
-				//if (_lts.empty())
-				//{
-				//	m_loadingScene = false;
-				//	m_pRenderer->freeVidMBP();
-				//}
+				_tmpgc = 0; 
 			}
 		}
-		//else if (m_pGltfLoader && m_bIsBenchmarking)
-		//{
-		//	// Benchmarking takes control of the time, and exits the app when the animation is done
-		//	std::vector<TimeStamp> timeStamps = m_pRenderer->GetTimingValues();
-		//	std::string Filename;
-		//	m_time = BenchmarkLoop(timeStamps, &m_camera, Filename);
-		//}
-		//else
-		{
-			//BuildUI();  // UI logic. Note that the rendering of the UI happens later.
-			OnUpdate(); // Update camera, handle keyboard/mouse input
-		}
-
+		OnUpdate();
 		// Do Render frame using AFR
 		m_pRenderer->OnRender(&m_UIState, m_camera);
 		if (setidx != curridx) {
