@@ -3338,7 +3338,7 @@ namespace vkr {
 			glm::mat4 mViewProj;
 		};
 
-		struct per_object
+		struct depth_object
 		{
 			glm::mat4 mWorld;
 		};
@@ -3406,7 +3406,7 @@ namespace vkr {
 		VkDescriptorSet             m_descriptorSet;
 		VkDescriptorSetLayout       m_descriptorSetLayout;
 
-		struct per_object
+		struct wireframe_object
 		{
 			glm::mat4 m_mWorldViewProj;
 			glm::vec4 m_vCenter;
@@ -3848,7 +3848,7 @@ namespace vkr
 		layoutBindings[0].pImmutableSamplers = NULL;
 
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindings, &m_descriptorSetLayout, &m_descriptorSet);
-		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(per_object), m_descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(wireframe_object), m_descriptorSet);
 
 		/////////////////////////////////////////////
 		// Create the pipeline layout using the descriptoset
@@ -4043,9 +4043,9 @@ namespace vkr
 
 		// Set per Object constants
 		//
-		per_object* cbPerObject;
+		wireframe_object* cbPerObject = 0;
 		VkDescriptorBufferInfo perObjectDesc;
-		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(per_object), (void**)&cbPerObject, &perObjectDesc);
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(wireframe_object), (void**)&cbPerObject, &perObjectDesc);
 		cbPerObject->m_mWorldViewProj = worldMatrix;
 		cbPerObject->m_vCenter = vCenter;
 		cbPerObject->m_vRadius = vRadius;
@@ -4392,7 +4392,7 @@ namespace vkr
 		// set descriptors entries
 
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(PerFrame_t), pPrimitive->m_descriptorSet);
-		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(per_object), pPrimitive->m_descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(depth_object), pPrimitive->m_descriptorSet);
 
 		if (inverseMatrixBufferSize > 0)
 		{
@@ -4648,9 +4648,9 @@ namespace vkr
 
 				// Set per Object constants
 				//
-				per_object* cbPerObject;
+				depth_object* cbPerObject;
 				VkDescriptorBufferInfo perObjectDesc;
-				m_pDynamicBufferRing->AllocConstantBuffer(sizeof(per_object), (void**)&cbPerObject, &perObjectDesc);
+				m_pDynamicBufferRing->AllocConstantBuffer(sizeof(depth_object), (void**)&cbPerObject, &perObjectDesc);
 				cbPerObject->mWorld = pNodesMatrices[i].GetCurrent();
 
 				// Bind indices and vertices using the right offsets into the buffer
@@ -14992,6 +14992,7 @@ namespace vkr {
 		// widgets
 		Wireframe                       m_Wireframe = {};
 		WireframeBox                    m_WireframeBox = {};
+		WireframeSphere					_WireframeSphere = {};
 		//Axis							_axis= {};
 		//CheckerBoardFloor				_cbf = {};
 		std::vector<TimeStamp>          m_TimeStamps = {};
@@ -16971,6 +16972,7 @@ namespace vkr {
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
+		_WireframeSphere.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
 		//_cbf.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 
 		//_axis.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
@@ -17021,6 +17023,7 @@ namespace vkr {
 		//m_MagnifierPS.OnDestroy();
 		m_WireframeBox.OnDestroy();
 		m_Wireframe.OnDestroy();
+		_WireframeSphere.OnDestroy();
 		//_cbf.OnDestroy();
 		//_axis.OnDestroy();
 		m_SkyDomeProc.OnDestroy();
@@ -17897,6 +17900,7 @@ namespace vkr {
 						glm::mat4 spotlightMatrix = glm::inverse(lights[i].mLightViewProj);
 						glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
 						m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+						_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
 					}
 
 					m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
