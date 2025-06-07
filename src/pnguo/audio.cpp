@@ -1270,7 +1270,7 @@ namespace hz {
 				if (ep->data && ep->data_size > 0)
 				{
 					// dst_format支持8 16 24三种
-					enflac_t et = { flac, _encoder, pcm, pcmsize * sizeof(int), ep->channels, ep->dst_format };
+					enflac_t et = { flac, _encoder, pcm, (int)(pcmsize * sizeof(int)), ep->channels, ep->dst_format };
 					if (ep->src_format)
 					{
 						if (ep->bits_per_sample == 32)
@@ -3495,7 +3495,7 @@ namespace hz {
 		}
 		{
 			// 渲染回调
-			SDL_Renderer* renderer; double delta;
+			SDL_Renderer* renderer = 0; double delta = 0.0;
 			static double deltas = 0;
 			deltas += delta;
 			if (deltas > dtime)

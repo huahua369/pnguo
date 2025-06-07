@@ -64,6 +64,8 @@
 #include <assert.h>
 #include <unordered_map>
 
+#ifndef PCH_GLM_H
+#define PCH_GLM_H
 #define GLM_ENABLE_EXPERIMENTAL
 //#define GLM_FORCE_ALIGNED
 //#define GLM_FORCE_INTRINSICS
@@ -79,7 +81,7 @@
 #include <glm/gtc/matrix_transform.hpp> 
 #include <glm/gtc/matrix_inverse.hpp> 
 #include <glm/gtx/matrix_transform_2d.hpp>
-
+#endif
 #include <nlohmann/json.hpp>
 #if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)
 using njson = nlohmann::json;			// key有序
@@ -107,10 +109,10 @@ using njson0 = nlohmann::ordered_json;	// key无序
 
 
 #ifndef GLM_OPERATOR
+#define GLM_OPERATOR
 
 namespace glm
 {
-#define GLM_OPERATOR
 	//vec
 	static bool operator<(glm::ivec4 const& v1, glm::ivec4 const& v2)
 	{

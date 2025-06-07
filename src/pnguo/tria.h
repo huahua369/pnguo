@@ -7,7 +7,8 @@
 #include <vector>
 #include <map>
 #include <array>
-#ifndef GLM_ENABLE_EXPERIMENTAL
+#ifndef PCH_GLM_H
+#define PCH_GLM_H
 #define GLM_ENABLE_EXPERIMENTAL
 //#define GLM_FORCE_ALIGNED
 //#define GLM_FORCE_INTRINSICS

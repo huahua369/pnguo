@@ -1,12 +1,9 @@
 ﻿/*
 字体文本渲染管理实现
 */
-#include "pch1.h"
-//#include "pnguo.h"
+#include "pch1.h" 
 #include "font_core.h"
-#include "mapView.h"
-//#include "print_time.h"
-//#include "event.h"
+#include "mapView.h" 
 
 #ifndef TTF_USE_HARFBUZZ
 #define TTF_USE_HARFBUZZ 1

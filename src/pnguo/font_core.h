@@ -321,11 +321,7 @@ public:
 	font_t* get_font(int idx, int styleidx);// 通过索引号获取字体对象
 	font_t* get_font(const char* family, const char* style);//通过字符串名获取
 	font_t* get_font_cur();					//获取当前字体对象
-
-	//void set_family_size(const std::string& fam, int fs);
-	//text_layout_t get_text_layout(const std::string& str, text_layout_t* lt);
-	//void draw_text(cairo_t* cr, text_layout_t* lt);
-	//void free_textlayout(text_layout_t* lt);
+	 
 public:
 	font_t* get_mfont(const std::string& name);
 	// 手动添加字体使用。纹理缓存同一个，但不能用上面函数查询

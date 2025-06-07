@@ -391,7 +391,7 @@ int main()
 		{
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.2);
+			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
 			vkd->load_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0);
 			//vkd->load_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
@@ -399,7 +399,7 @@ int main()
 			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			//vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
-			vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 0,0,0 }, 0.10);
+			//vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 0,0,0 }, 0.10);
 
 			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
 			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
