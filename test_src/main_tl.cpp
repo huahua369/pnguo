@@ -2103,8 +2103,8 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 #endif
-	dmain();
-	new_gpu(argc, argv);
+	//dmain();
+	//new_gpu(argc, argv);
 
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);
