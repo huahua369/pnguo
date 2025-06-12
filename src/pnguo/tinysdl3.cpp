@@ -480,6 +480,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	}
 	int vsync = 0;
 	if (renderer) {
+		printf("renderer:\t%s\n", SDL_GetRendererName(renderer));
 		SDL_GetRenderVSync(renderer, &vsync);
 		if (fgs & ef_vsync)
 		{

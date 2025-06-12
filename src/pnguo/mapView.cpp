@@ -2024,7 +2024,7 @@ namespace hz
 		std::string v;
 		v.assign(vt, mt.get_size());
 		njson ret;
-		if (v.size())
+		if (v.size() && v != "null")
 		{
 			try
 			{
