@@ -180,7 +180,6 @@ public:
 	struct GlyphPosition {
 		font_t* font;
 		uint32_t index;
-		uint32_t codepoint;
 		c_glyph* glyph;
 		int x_offset;
 		int y_offset;
@@ -198,6 +197,7 @@ public:
 		int num_clusters;
 		int maxlen;
 	};
+	std::vector<GlyphPosition> _tnpos;
 public:
 	font_t();
 	~font_t();
@@ -226,7 +226,7 @@ public:
 	int get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector<font_t*>* fallbacks);
 
 	std::map<int, std::vector<info_one>> get_detail();
-
+	// 返回的positions.pos自动管理内存
 	bool CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions);
 	int GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd);
 public:

@@ -855,6 +855,7 @@ struct hps_t {
 #if TTF_USE_HARFBUZZ
 	hb_font_t* hb_font;
 	hb_language_t hb_language;
+	hb_buffer_t* hb_buffer;
 #endif
 };
 class stb_font
@@ -2054,6 +2055,8 @@ font_t::~font_t()
 		if (face)hb_face_destroy(face);
 		hb_font_destroy(hp->hb_font);
 	}
+	if (hp->hb_buffer)
+		hb_buffer_destroy(hp->hb_buffer);
 #endif
 	if (hp)delete hp; hp = 0;
 }
@@ -2082,6 +2085,8 @@ void font_t::init_post_table()
 		}
 		//hb_ft_font_set_load_flags(font->hb_font, FT_LOAD_DEFAULT | font->ft_load_target); 
 		hp->hb_language = hb_language_from_string("", -1);
+
+		hp->hb_buffer = hb_buffer_create();
 	}
 	if (blob)hb_blob_destroy(blob);
 #endif
@@ -2092,11 +2097,12 @@ bool font_t::CollectGlyphsFromFont(const char* text, size_t length, int directio
 {
 #if TTF_USE_HARFBUZZ
 	// Create a buffer for harfbuzz to use
-	hb_buffer_t* hb_buffer = hb_buffer_create();
+	auto hb_buffer = hp->hb_buffer;
 	if (!hb_buffer) {
 		//SDL_SetError("Cannot create harfbuzz buffer");
 		return false;
 	}
+	hb_buffer_reset(hb_buffer);
 	// Set global configuration
 	hb_buffer_set_language(hb_buffer, hp->hb_language);
 	hb_buffer_set_direction(hb_buffer, (hb_direction_t)direction);
@@ -2127,36 +2133,33 @@ bool font_t::CollectGlyphsFromFont(const char* text, size_t length, int directio
 
 	// Realloc, if needed
 	int glyph_count = (int)glyph_count_u;
-	if (glyph_count > positions->maxlen) {
-		GlyphPosition* saved = positions->pos;
-		positions->pos = (GlyphPosition*)realloc(positions->pos, glyph_count * sizeof(*positions->pos));
-		if (positions->pos) {
-			positions->maxlen = glyph_count;
-		}
-		else {
-			positions->pos = saved;
-			hb_buffer_destroy(hb_buffer);
-			return false;
-		}
-	}
+	_tnpos.resize(glyph_count);
+	positions->pos = _tnpos.data();
+	//if (glyph_count > positions->maxlen) {
+	//	GlyphPosition* saved = positions->pos;
+	//	positions->pos = (GlyphPosition*)realloc(positions->pos, glyph_count * sizeof(*positions->pos));
+	//	if (positions->pos) {
+	//		positions->maxlen = glyph_count;
+	//	}
+	//	else {
+	//		positions->pos = saved;
+	//		return false;
+	//	}
+	//}
 	positions->len = glyph_count;
 
 	for (int i = 0; i < glyph_count; ++i) {
 		GlyphPosition* pos = &positions->pos[i];
 		pos->font = this;
-		pos->codepoint = hb_glyph_info[i].codepoint;
+		pos->index = hb_glyph_info[i].codepoint;
 		pos->x_advance = hb_glyph_position[i].x_advance + advance_if_bold;
 		pos->y_advance = hb_glyph_position[i].y_advance;
 		pos->x_offset = hb_glyph_position[i].x_offset;
 		pos->y_offset = hb_glyph_position[i].y_offset;
 		pos->offset = (int)hb_glyph_info[i].cluster;
-
-		pos->index = stb_font::getGlyphIndex(font, pos->codepoint);
 		//if (!Find_GlyphByIndex(font, pos->index, 0, 0, 0, 0, 0, 0, &pos->glyph, NULL)) 
 		if (pos->index <= 0)continue;
 	}
-
-	hb_buffer_destroy(hb_buffer);
 #endif
 	return true;
 }

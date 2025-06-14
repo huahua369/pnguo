@@ -2199,6 +2199,9 @@ int main(int argc, char* argv[])
 
 	texture_cb tex_cb = get_texture_cb();
 	{
+		auto ft = app->font_ctx->get_font(0, 0);
+		font_t::GlyphPositions gp = {};
+		ft->CollectGlyphsFromFont("123", 3, 0, 0, &gp);
 		auto xh_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/xh1.png");
 		auto mari_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/mari.png");
 		page_obj_t ro = {};
