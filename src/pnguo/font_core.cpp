@@ -2093,21 +2093,24 @@ void font_t::init_post_table()
 
 }
 
-bool font_t::CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions)
+uint32_t font_t::CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions)
 {
 #if TTF_USE_HARFBUZZ
 	// Create a buffer for harfbuzz to use
 	auto hb_buffer = hp->hb_buffer;
-	if (!hb_buffer) {
+	if (!hb_buffer || !text || !*text || length == 0) {
 		//SDL_SetError("Cannot create harfbuzz buffer");
-		return false;
+		return 0;
 	}
 	hb_buffer_reset(hb_buffer);
 	// Set global configuration
 	hb_buffer_set_language(hb_buffer, hp->hb_language);
 	hb_buffer_set_direction(hb_buffer, (hb_direction_t)direction);
 	hb_buffer_set_script(hb_buffer, (hb_script_t)script);
-
+	if (length == -1)
+	{
+		length = strlen(text);
+	}
 	// Layout the text
 	hb_buffer_add_utf8(hb_buffer, text, (int)length, 0, -1);
 	hb_buffer_guess_segment_properties(hb_buffer);
@@ -2132,36 +2135,27 @@ bool font_t::CollectGlyphsFromFont(const char* text, size_t length, int directio
 	//}
 
 	// Realloc, if needed
-	int glyph_count = (int)glyph_count_u;
+	uint32_t glyph_count = (int)glyph_count_u;
 	_tnpos.resize(glyph_count);
-	positions->pos = _tnpos.data();
-	//if (glyph_count > positions->maxlen) {
-	//	GlyphPosition* saved = positions->pos;
-	//	positions->pos = (GlyphPosition*)realloc(positions->pos, glyph_count * sizeof(*positions->pos));
-	//	if (positions->pos) {
-	//		positions->maxlen = glyph_count;
-	//	}
-	//	else {
-	//		positions->pos = saved;
-	//		return false;
-	//	}
-	//}
-	positions->len = glyph_count;
-
-	for (int i = 0; i < glyph_count; ++i) {
-		GlyphPosition* pos = &positions->pos[i];
-		pos->font = this;
-		pos->index = hb_glyph_info[i].codepoint;
-		pos->x_advance = hb_glyph_position[i].x_advance + advance_if_bold;
-		pos->y_advance = hb_glyph_position[i].y_advance;
-		pos->x_offset = hb_glyph_position[i].x_offset;
-		pos->y_offset = hb_glyph_position[i].y_offset;
-		pos->offset = (int)hb_glyph_info[i].cluster;
-		//if (!Find_GlyphByIndex(font, pos->index, 0, 0, 0, 0, 0, 0, &pos->glyph, NULL)) 
-		if (pos->index <= 0)continue;
+	if(positions)
+	{
+		positions->pos = _tnpos.data();
+		positions->len = glyph_count;
+		for (int i = 0; i < glyph_count; ++i) {
+			GlyphPosition* pos = &positions->pos[i];
+			pos->font = this;
+			pos->index = hb_glyph_info[i].codepoint;
+			pos->x_advance = hb_glyph_position[i].x_advance + advance_if_bold;
+			pos->y_advance = hb_glyph_position[i].y_advance;
+			pos->x_offset = hb_glyph_position[i].x_offset;
+			pos->y_offset = hb_glyph_position[i].y_offset;
+			pos->offset = (int)hb_glyph_info[i].cluster;
+			//if (!Find_GlyphByIndex(font, pos->index, 0, 0, 0, 0, 0, 0, &pos->glyph, NULL)) 
+			if (pos->index <= 0)continue;
+		}
 	}
 #endif
-	return true;
+	return glyph_count;
 }
 
 int font_t::GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd)
@@ -6210,7 +6204,8 @@ font_t* font_rctx::get_mk(fontns& v, size_t st)
 				current = it;
 			}
 		}
-		if (!r && pv.size() && pv[0]->_style == "Regular" && stn == "Normal") {
+		if (!r && pv.size())//&& pv[0]->_style == "Regular" && stn == "Normal") 
+		{
 			r = pv[0];
 			r->bc_ctx = &bcc;
 			v.vptr[st] = r;

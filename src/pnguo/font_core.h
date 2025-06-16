@@ -226,8 +226,8 @@ public:
 	int get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector<font_t*>* fallbacks);
 
 	std::map<int, std::vector<info_one>> get_detail();
-	// 返回的positions.pos自动管理内存
-	bool CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions);
+	// 返回的positions.pos自动管理内存,返回字形数量
+	uint32_t CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions);
 	int GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd);
 public:
 	void init_post_table();
