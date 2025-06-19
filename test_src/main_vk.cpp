@@ -391,8 +391,8 @@ int main()
 		{
 			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
-			vkd->load_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0);
+			//vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
+			//vkd->load_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 			//vkd->load_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
@@ -414,7 +414,7 @@ int main()
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
 			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-			//vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)");
+			vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//

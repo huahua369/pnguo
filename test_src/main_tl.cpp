@@ -2058,8 +2058,233 @@ void makemjson(const char* fn) {
 	printf("pack size:%d\t%d\n", pack->width, pack->height);
 
 }
+
+// 计算平面距离 
+double distance2d(const glm::dvec3& a, const glm::dvec3& b)
+{
+	return glm::distance((glm::dvec2)a, (glm::dvec2)b);
+}
+// 3D距离
+double distance3d(const glm::dvec3& a, const glm::dvec3& b)
+{
+	return glm::distance( a,  b);
+}
+// 计算平面欧几里得距离 
+double distance2d2(const glm::dvec3& a, const glm::dvec3& b)
+{
+	return glm::distance2((glm::dvec2)a, (glm::dvec2)b);
+}
+// 3D欧几里得距离
+double distance3d2(const glm::dvec3& a, const glm::dvec3& b)
+{
+	return glm::distance2( a,  b);
+}
+
+
+// 计算区域面积，负数则环是逆时针，首尾坐标必需一样组成多边形环
+template<class T>
+double area_ring(T* xx, T* yy, size_t count)
+{
+	std::size_t rlen = count;
+	if (rlen < 3 || !xx || !yy) { return 0.0; }
+	double sum = 0.0;
+	double x0 = xx[0];
+	for (std::size_t i = 1; i < rlen - 1; i++) {
+		double x = xx[i] - x0;
+		double y1 = yy[i + 1];
+		double y2 = yy[i - 1];
+		sum += x * (y2 - y1);
+	}
+	return sum / 2.0;
+}
+// 输入泄露点坐标，范围，节点坐标。遍历检测受影响要素
+std::vector<glm::dvec3> findAffectedPoints(const glm::dvec3& leak, const std::vector<glm::dvec3>& allPoints, double radius)
+{
+	std::vector<glm::dvec3> results;
+	auto r2 = radius;
+	for (const auto& pt : allPoints) {
+		// 基于欧氏距离计算受影响范围
+		if (glm::distance2(leak, pt) <= r2)
+			results.push_back(pt);
+	}
+	return results;
+}
+struct PipeSegment { glm::dvec3 start, end; }; // 管段数据结构 
+//1判断管线是否连通，连通性修复策略 ：延长孤立管段至最近邻管段（三维空间最近邻搜索）
+
+
+#if 0
+class KDNode {
+public:
+	glm::dvec3 point;
+	std::shared_ptr<KDNode> left, right;
+	int axis; // 分割轴 (0=x,1=y,2=z)
+
+	KDNode(glm::dvec3 p, int a) : point(p), axis(a) {}
+};
+
+std::shared_ptr<KDNode> buildKDTree(std::vector<glm::dvec3>& points, int depth = 0) {
+	if (points.empty())  return nullptr;
+
+	int axis = depth % 3;
+	auto mid = points.begin() + points.size() / 2;
+	std::nth_element(points.begin(), mid, points.end(),
+		[axis](const glm::dvec3& a, const glm::dvec3& b) {
+			return (axis == 0) ? (a.x < b.x) :
+				(axis == 1) ? (a.y < b.y) : (a.z < b.z);
+		});
+
+	auto node = std::make_shared<KDNode>(*mid, axis);
+	node->left = buildKDTree({ points.begin(),  mid }, depth + 1);
+	node->right = buildKDTree({ mid + 1, points.end() }, depth + 1);
+	return node;
+}
+
+void nearestNeighborSearch(const std::shared_ptr<KDNode>& root,
+	const glm::dvec3& target,
+	glm::dvec3& best,
+	double& best_dist) {
+	if (!root) return;
+
+	double dx = target.x - root->point.x;
+	double dy = target.y - root->point.y;
+	double dz = target.z - root->point.z;
+	double dist = dx * dx + dy * dy + dz * dz;
+
+	if (dist < best_dist) {
+		best_dist = dist;
+		best = root->point;
+	}
+
+	int axis = root->axis;
+	double target_val = (axis == 0) ? target.x :
+		(axis == 1) ? target.y : target.z;
+	double node_val = (axis == 0) ? root->point.x :
+		(axis == 1) ? root->point.y : root->point.z;
+
+	auto& first = (target_val <= node_val) ? root->left : root->right;
+	auto& second = (target_val <= node_val) ? root->right : root->left;
+
+	nearestNeighborSearch(first, target, best, best_dist);
+
+	if ((target_val - node_val) * (target_val - node_val) < best_dist) {
+		nearestNeighborSearch(second, target, best, best_dist);
+	}
+}
+
+glm::dvec3 findNearestPointOptimized(const glm::dvec3& target,
+	const std::vector<glm::dvec3>& points) {
+	if (points.empty())  throw std::invalid_argument("Empty collection");
+
+	auto mutable_points = points; // 拷贝以允许修改 
+	auto kd_root = buildKDTree(mutable_points);
+
+	glm::dvec3 best = points[0];
+	double best_dist = std::numeric_limits<double>::max();
+	nearestNeighborSearch(kd_root, target, best, best_dist);
+	return best;
+}
+#endif
+
+//拓扑关系构建
+class PipeNetwork {
+private:
+	std::unordered_map<glm::dvec3*, std::vector<PipeSegment*>> adjacencyList; // 邻接表 
+	std::vector<PipeSegment> _segments;
+public:
+	void buildTopology(const std::vector<PipeSegment>& segments) {
+		_segments = segments;
+		for (auto& seg : _segments) {
+			adjacencyList[&seg.start].push_back(&seg);
+			adjacencyList[&seg.end].push_back(&seg);
+		}
+	}
+	//孤立管段检测 
+	//统计节点连接度：
+	std::vector<PipeSegment> findIsolatedSegments() {
+		std::vector<PipeSegment> isolated;
+		for (auto& node : adjacencyList) {
+			if (node.second.empty())  continue; // 过滤虚拟交点 
+			if (node.second.size() == 1) { // 仅一端连接 
+				isolated.push_back(*(node.second.front()));
+			}
+		}
+		return isolated;
+	}
+	//连通性修复策略 
+	//策略1：延长孤立管段至最近邻管段（三维空间最近邻搜索）
+	//策略2：插入虚拟连接点并生成新管段
+	void repairIsolatedSegment(PipeSegment& seg, double searchRadius) {
+		glm::dvec3 nearest = findNearestPoint(seg.end, searchRadius); // 可用KD或R树加速 
+		seg.end = nearest; // 修改端点坐标 
+	}
+	glm::dvec3 findNearestPoint(const glm::dvec3& target, double searchRadius)
+	{
+		double min_sq_dist = searchRadius;
+		glm::dvec3 nearest_point = {};
+		for (auto& pt : _segments) {
+			auto sq_dist = glm::distance(pt.start, target);
+			if (sq_dist < min_sq_dist)
+			{
+				min_sq_dist = sq_dist;
+				nearest_point = pt.start;
+			}
+		}
+		return nearest_point;
+	}
+};
+
+/*
+graph LR
+A[泄露点检测] --> B[500m缓冲区分析]
+B --> C{受影响要素}
+C --> D[关闭阀门]
+D --> E[拓扑修复]
+E --> F[生成应急方案]
+*/
+
+
 int main(int argc, char* argv[])
 {
+	{
+		auto rd = hz::read_json(R"(E:\3DG\TF\RQGXPT\merge\1\1.json)");
+		std::vector<glm::dvec3> pts;
+		auto& ID = rd["ID"];
+		auto& X = rd["X"];
+		auto& Y = rd["Y"];
+		auto& Z = rd["H"];
+		auto cc = X.size();
+		pts.reserve(cc);
+		std::set<std::string> idn;
+		for (size_t i = 0; i < cc; i++)
+		{
+			auto id = ID[i].get<std::string>();
+			if (idn.insert(id).second)
+			{
+				auto x = X[i].get<std::string>();
+				auto y = Y[i].get<std::string>();
+				auto z = Z[i].get<std::string>();
+				pts.push_back({ std::atof(x.c_str()),std::atof(y.c_str()),std::atof(z.c_str()), });
+			}
+		}
+		double x[] = { 630261.334, 630269.64, 630270.465, 630261.334, };
+		double y[] = { 3352941.215, 3353010.228, 3353056.656, 3352941.215 };
+		PipeNetwork network;
+		network.buildTopology({
+			{ {629998.349, 3353938.047, 0}, {629989.256, 3353955.858, 0} },
+			{ {629989.256, 3353955.858, 0}, {629984.836,3353962.421,0} },
+			});
+		auto lss = network.findIsolatedSegments();
+		auto a = area_ring(x, y, 4);
+		glm::dvec3 target = { 5,3,2.2 };
+		glm::dvec3 pt = { 1,2,2 };
+		glm::dvec3 pt1 = { 10,21,3 };
+		auto d0 = glm::distance2(pt, target);
+		auto d1 = glm::distance2(pt1, target);
+		auto d0x = glm::distance(pt, target);
+		auto d1x = glm::distance(pt1, target);
+		printf("area:%f\n", a);
+	}
 	clearpdb();
 	//for (;;)
 	//makemjson("temp/mariodata.json");
