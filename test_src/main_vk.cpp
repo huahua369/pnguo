@@ -402,7 +402,7 @@ int main()
 			//vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 0,0,0 }, 0.10);
 
 			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 5,5,8 }, 1.0);
+			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", {  }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
@@ -414,7 +414,7 @@ int main()
 			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
 			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-			vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
+			//vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//

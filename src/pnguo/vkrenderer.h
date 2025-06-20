@@ -12,7 +12,12 @@
 // 资源管理：加载、卸载
 // gltf加载渲染
 // todo 提交网格、纹理、材质数据，实现渲染
+/*
 
+ ResourceViewHeaps* pResourceViewHeaps,		//管理set分配
+ DynamicBufferRing* pConstantBufferRing,	// 动态常量缓冲区ubo
+ StaticBufferPool* pStaticBufferPool,		// 静态顶点/索引缓冲区
+*/
 namespace vkr {
 
 	struct const_vk {

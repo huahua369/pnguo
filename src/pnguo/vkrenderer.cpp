@@ -1860,7 +1860,7 @@ namespace vkr {
 		VkFramebuffer                   m_frameBuffer;
 		std::vector<VkClearValue>       m_clearValues;
 	};
-
+	// set管理
 	class ResourceViewHeaps
 	{
 	public:
@@ -2061,6 +2061,7 @@ namespace vkr {
 		uint32_t m_allocatedMemPerBackBuffer[4];
 	};
 	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
+	
 	class DynamicBufferRing
 	{
 	public:
