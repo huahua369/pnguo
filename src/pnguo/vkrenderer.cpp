@@ -55,7 +55,7 @@ VK_PRESENT_MODE_MAILBOX_KHR: 这是第二种模式的变种。当交换链队列
 gltf流程
 // 如果存在任何透射式可绘制对象，则将所有不透明和透明的可绘制对象渲染到单独的帧缓冲区中。opaqueRenderTexture
 if(KHR_materials_transmission透明介质透射材质){
-渲染环境 
+渲染环境
 渲染不透明物体opaqueDrawables
 渲染透明物体transparentDrawables
 }
@@ -63,7 +63,7 @@ if(KHR_materials_transmission透明介质透射材质){
 渲染环境
 渲染不透明物体opaqueDrawables
 渲染透明介质透射transmissionDrawables 需要opaqueRenderTexture纹理
-渲染透明物体transparentDrawables 
+渲染透明物体transparentDrawables
 
 */
 
@@ -2061,7 +2061,7 @@ namespace vkr {
 		uint32_t m_allocatedMemPerBackBuffer[4];
 	};
 	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
-	
+
 	class DynamicBufferRing
 	{
 	public:
@@ -3095,7 +3095,7 @@ namespace vkr {
 	class TAA
 	{
 	public:
-		void OnCreate(Device* pDevice, ResourceViewHeaps* pResourceViewHeaps, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing, bool sharpening = true);
+		void OnCreate(Device* pDevice, ResourceViewHeaps* pResourceViewHeaps, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing, bool sharpening);
 		void OnDestroy();
 
 		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, GBuffer* pGBuffer);
@@ -3133,6 +3133,7 @@ namespace vkr {
 		VkDescriptorSetLayout m_SharpenDescriptorSetLayout;
 		PostProcCS            m_Sharpen;
 		PostProcCS            m_Post;
+	public:
 		bool                  m_bSharpening = true;
 		bool                  m_bFirst = true;
 	};
@@ -10173,7 +10174,8 @@ namespace vkr {
 				barriers[2] = barrier;
 				barriers[2].image = m_pGBuffer->m_HDR.Resource();
 
-				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 3, barriers);
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0
+					, NULL, 0, NULL, 3, barriers);
 			}
 			if (m_bSharpening)
 				m_Sharpen.Draw(cmd_buf, NULL, m_SharpenDescriptorSet, (m_Width + 7) / 8, (m_Height + 7) / 8, 1);
@@ -10205,7 +10207,8 @@ namespace vkr {
 				barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				barriers[1].image = m_pGBuffer->m_HDR.Resource();
 
-				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 2, barriers);
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0
+					, NULL, 0, NULL, 2, barriers);
 			}
 		}
 
@@ -16998,7 +17001,7 @@ namespace vkr {
 
 		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
 		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
-		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
+		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing, false);
 		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
 
 		// Create tonemapping pass
@@ -17980,6 +17983,7 @@ namespace vkr {
 		// Apply TAA & Sharpen to m_HDR
 		if (pState->bUseTAA)
 		{
+			m_TAA.m_bSharpening = pState->bTAAsharpening;
 			{
 				VkImageMemoryBarrier barrier = {};
 				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -18834,7 +18838,7 @@ namespace vkr {
 			if (loadingStage == 0)
 			{
 				_loaders.push_back(_tmpgc);
-				_tmpgc = 0; 
+				_tmpgc = 0;
 			}
 		}
 		OnUpdate();

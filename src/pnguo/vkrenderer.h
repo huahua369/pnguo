@@ -114,6 +114,7 @@ struct scene_state {
 	int WireframeMode = 0;
 	float WireframeColor[3] = { 1.0,1.0,1.0 };
 	bool  bUseTAA = true;
+	bool  bTAAsharpening = true;
 	bool  bDrawLightFrustum = false;
 	bool  bDrawBoundingBoxes = false;
 	bool  bShowMilliseconds = true;
