@@ -361,6 +361,7 @@ int main()
 	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 
+	get_queue_info(sdldev.phy);
 
 	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
@@ -402,7 +403,8 @@ int main()
 			//vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 0,0,0 }, 0.10);
 
 			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", {  }, 1.0);
+			//vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", {  }, 1.0);
+			vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);

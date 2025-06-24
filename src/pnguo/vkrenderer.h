@@ -118,6 +118,7 @@ struct scene_state {
 	bool  bDrawLightFrustum = false;
 	bool  bDrawBoundingBoxes = false;
 	bool  bShowMilliseconds = true;
+	bool  bBloom = true;
 };
 
 struct mouse_state_t;

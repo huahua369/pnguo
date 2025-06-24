@@ -6695,61 +6695,31 @@ namespace vkr
 		for (auto& t : *pBatchList)
 		{
 			uint32_t c = 2;
-			uniformOffsets[0] = t.m_perFrameDesc.offset;
-			uniformOffsets[1] = t.m_perObjectDesc.offset;
-			if (t.m_pPerSkeleton) {
-
-				uniformOffsets[c++] = t.m_pPerSkeleton->offset;
-			}
-			if (t.morph) {
-				uniformOffsets[c++] = t.morph->morphWeights.offset;
-			}
-			if (t.m_uvtDesc) {
-				uniformOffsets[c++] = t.m_uvtDesc->offset;
-			}
+			uniformOffsets[0] = t.m_perFrameDesc.offset;	// 相机、灯光
+			uniformOffsets[1] = t.m_perObjectDesc.offset;	// 材质参数
+			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
+			if (t.morph) { uniformOffsets[c++] = t.morph->morphWeights.offset; }		// 变形动画偏移
+			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
 			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe);
 		}
-
 		SetPerfMarkerEnd(commandBuffer);
 	}
-	// todo pbr变形渲染
-	//void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perFrameDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe)
 	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe)
 	{
-		// Bind indices and vertices using the right offsets into the buffer
-		//
+		// Bind indices and vertices using the right offsets into the buffer 
 		for (uint32_t i = 0; i < m_geometry.m_VBV.size(); i++)
 		{
 			vkCmdBindVertexBuffers(cmd_buf, i, 1, &m_geometry.m_VBV[i].buffer, &m_geometry.m_VBV[i].offset);
 		}
-
 		vkCmdBindIndexBuffer(cmd_buf, m_geometry.m_IBV.buffer, m_geometry.m_IBV.offset, m_geometry.m_indexType);
-
-		// Bind Descriptor sets
-		//
 		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
-		if (!uniformOffsets)
-		{
-			uniformOffsetsCount = 0;
-		}
-		if (!uniformOffsetsCount)
-		{
-			uniformOffsets = 0;
-		}
-		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
-
-		// Bind Pipeline
-		//
-		if (bWireframe)
-			vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineWireframe);
-		else
-			vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-		// Draw
-		//
+		if (!uniformOffsets) { uniformOffsetsCount = 0; }
+		if (!uniformOffsetsCount) { uniformOffsets = 0; }
+		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout
+			, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
+		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? m_pipelineWireframe : m_pipeline);
 		vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
-
 	}
 
 	// todo pbr_pass
@@ -17105,6 +17075,7 @@ namespace vkr {
 		// Update PostProcessing passes
 		//
 		m_DownSample.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer.m_HDR, 6); //downsample the HDR texture 6 times
+		// todo bloom
 		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer.m_HDR);
 		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer);
 		//m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer.m_HDR);
@@ -17966,6 +17937,7 @@ namespace vkr {
 		// Post proc---------------------------------------------------------------------------
 
 		// Bloom, takes HDR as input and applies bloom to it.
+		if(pState->bBloom)
 		{
 			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
 
