@@ -27,6 +27,10 @@ extern "C" {
 #endif
 //!no_cairo_
 
+#ifdef min
+#undef min
+#undef max
+#endif // min
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

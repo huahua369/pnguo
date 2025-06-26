@@ -89,9 +89,9 @@ using njson0 = nlohmann::ordered_json;	// key无序
 #define NJSON_H
 #endif
 
-#include <exprtk.hpp>
 
 #if 0
+#include <exprtk.hpp>
 #include <mapView.h>
 //#include <curve.h>
 #include <file.h>

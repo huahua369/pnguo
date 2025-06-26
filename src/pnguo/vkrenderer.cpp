@@ -69,9 +69,11 @@ if(KHR_materials_transmission透明介质透射材质){
 
 
 #include "pch1.h"
+
 #define USE_VMA
 #include <vulkan/vulkan.h>
 #ifdef _WIN32
+#include <windows.h>
 #include <vulkan/vulkan_win32.h>
 #include <DXGIFormat.h>
 #include <D3DCompiler.h>
@@ -98,6 +100,11 @@ typedef uint32_t DXGI_FORMAT;
 #include <zlib.h>
 #include <queue>
 #include "vkrenderer.h"
+
+#ifdef min
+#undef min
+#undef max
+#endif // min
 
 #ifndef DEV_INFO_CXH
 #define DEV_INFO_CXH

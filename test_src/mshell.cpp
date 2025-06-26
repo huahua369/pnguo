@@ -1,8 +1,6 @@
 ﻿
 
 #include <pch1.h>
-#include <mapView.h>
-#include "mshell.h"
 #if 1
 #if 0
 
@@ -77,6 +75,7 @@
 #include <termios.h>
 #else
 #include <winsock2.h>
+#include <windows.h>
 #include <ws2tcpip.h>
 #include <conio.h>
 #include <sys/timeb.h> 
@@ -125,6 +124,9 @@
 #define fseeki64 fseeko64
 #define ftelli64 ftello64
 #endif // _WIN32
+
+#include "mshell.h"
+#include <mapView.h>
 
 
 #if 1

@@ -31,6 +31,11 @@ extern "C" {
 #include "pnguo.h"
 #include "gui.h" 
 
+#ifdef min
+#undef min
+#undef max
+#endif // min
+
 #if 1
 
 // 图集数据
