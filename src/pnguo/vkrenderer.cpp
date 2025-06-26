@@ -4935,6 +4935,7 @@ namespace vkr
 	}
 	void GLTFTexturesAndBuffers::LoadGeometry()
 	{
+		print_time Pt("load geometry", 1);
 		auto pm = m_pGLTFCommon->pm;
 		if (pm && pm->meshes.size())
 		{
@@ -13726,7 +13727,7 @@ namespace vkr {
 #define ftelli64 ftello64
 #endif // _WIN32
 
-	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void*)
+	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void* ptr)
 	{
 #ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
 		if (asset_manager) {
@@ -13760,6 +13761,7 @@ namespace vkr {
 #else
 		int64_t size = 0;
 		const char* fn = filepath.c_str();
+#if 0
 		FILE* fp = fopen(filepath.c_str(), "rb");
 		if (fp)
 		{
@@ -13772,6 +13774,17 @@ namespace vkr {
 			assert(retval == 1);
 			fclose(fp);
 		}
+#else
+		hz::mfile_t mt;
+		auto fp = mt.open_d(fn, true);
+		if (fp)
+		{
+			size = mt.size();
+			out->resize(size);
+			auto buff = out->data();
+			memcpy(buff, fp, size);
+		}
+#endif
 		return fp;// hz::File::read_binary_file(filepath.c_str(), *out);
 #endif
 	}
@@ -13789,11 +13802,8 @@ namespace vkr {
 
 	bool GLTFCommon::Load(const std::string& path, const std::string& filename)
 	{
-		Profile p("GLTFCommon::Load");
-
+		//Profile p("GLTFCommon::Load");
 		m_path = path;
-
-
 		auto pm1 = new tinygltf::Model();
 		if (!pm1)
 		{
@@ -13803,8 +13813,7 @@ namespace vkr {
 		tinygltf::TinyGLTF loader = {};
 		std::string err;
 		std::string warn;
-		tinygltf::FsCallbacks cb = { &tinygltf::FileExists, &tinygltf::ExpandFilePath,
-		&vkmReadWholeFile, &tinygltf::WriteWholeFile, };
+		tinygltf::FsCallbacks cb = { &tinygltf::FileExists, &tinygltf::ExpandFilePath, &vkmReadWholeFile, &tinygltf::WriteWholeFile, };
 		loader.SetFsCallbacks(cb);
 		char* bytes = 0;// rawdata.data();
 		auto size = 0;// rawdata.size();
@@ -13812,10 +13821,12 @@ namespace vkr {
 		std::string basedir = path;// GetBaseDir(fn); 
 		if (filename.empty() && basedir.find(".glb") != std::string::npos || filename.find(".glb") != std::string::npos)
 		{
+			//print_time Pt("LoadBinaryFromFile", 1);
 			ret = loader.LoadBinaryFromFile(pm, &err, &warn, path + filename);
 		}
 		else
 		{
+			//print_time Pt("LoadASCIIFromFile", 1);
 			ret = loader.LoadASCIIFromFile(pm, &err, &warn, path + filename);
 		}
 		// for binary glTF(.glb)
@@ -13834,6 +13845,7 @@ namespace vkr {
 			}
 			if (warn.size())
 				printf("warn:\t%s\n", warn.c_str());
+
 			load_Buffers();
 			load_Meshes();
 			load_lights();
@@ -14920,7 +14932,7 @@ namespace vkr {
 		void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
 		void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
 
-		int LoadScene(GLTFCommon* pGLTFCommon, int Stage = 0);
+		int add_model(GLTFCommon* pGLTFCommon, int Stage = 0);
 		void UnloadScene();
 		void unloadgltf(robj_info* p);
 
@@ -17125,10 +17137,10 @@ namespace vkr {
 
 	//--------------------------------------------------------------------------------------
 	//
-	// LoadScene
+	// add_model
 	//
 	//--------------------------------------------------------------------------------------
-	int Renderer_cx::LoadScene(GLTFCommon* pGLTFCommon, int Stage)
+	int Renderer_cx::add_model(GLTFCommon* pGLTFCommon, int Stage)
 	{
 		// show loading progress
 		//
@@ -17937,7 +17949,7 @@ namespace vkr {
 		// Post proc---------------------------------------------------------------------------
 
 		// Bloom, takes HDR as input and applies bloom to it.
-		if(pState->bBloom)
+		if (pState->bBloom)
 		{
 			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
 
@@ -18286,7 +18298,7 @@ namespace vkr {
 		void OnUpdateDisplay();
 
 		void BeginFrame();
-		void LoadScene(const char* fn, const glm::vec3& pos, float scale);
+		void add_model(const char* fn, const glm::vec3& pos, float scale);
 
 		void OnUpdate();
 
@@ -18534,12 +18546,12 @@ namespace vkr {
 
 	//--------------------------------------------------------------------------------------
 	//
-	// LoadScene
+	// add_model
 	// TODO 加载模型文件
 	//--------------------------------------------------------------------------------------
-	void sample_cx::LoadScene(const char* fn, const glm::vec3& pos, float scale)
+	void sample_cx::add_model(const char* fn, const glm::vec3& pos, float scale)
 	{
-		print_time Pt("LoadScene", 1);
+		//print_time Pt("push gltf", 1);
 		std::thread a([=]()
 			{
 				print_time Pt("load gltf", 1);
@@ -18806,7 +18818,7 @@ namespace vkr {
 				std::unique_lock<std::mutex> lock(m_ltsm);
 				_tmpgc = _lts.front(); _lts.pop();
 			}
-			loadingStage = m_pRenderer->LoadScene(_tmpgc, loadingStage);
+			loadingStage = m_pRenderer->add_model(_tmpgc, loadingStage);
 			if (loadingStage == 0)
 			{
 				_loaders.push_back(_tmpgc);
@@ -19254,7 +19266,7 @@ void vkdg_cx::load_gltf(const char* fn, const glm::vec3& pos, float scale)
 {
 	if (!ctx || !fn)return;
 	auto tx = (vkr::sample_cx*)ctx;
-	tx->LoadScene(fn, pos, scale);
+	tx->add_model(fn, pos, scale);
 }
 
 vkr::light_t* vkdg_cx::get_light(size_t idx)
