@@ -4866,6 +4866,7 @@ namespace vkr
 						auto& img = pm->images[imageIndex];
 						GetSrgbAndCutOffOfImageGivenItsUse(imageIndex, &pm->materials, &useSRGB, &cutOff);
 						bool isimg = img.image.size();
+						void* sdata = 0;
 						if (isimg)
 						{
 							IMG_INFO header = {};
@@ -4873,26 +4874,41 @@ namespace vkr
 							unsigned char* buffer = nullptr;
 							VkDeviceSize   bufferSize = 0;
 							bool           deleteBuffer = false;
-							// We convert RGB-only images to RGBA, as most devices don't support RGB-formats in Vulkan
-							if (img.component == 3)
-							{
-								bufferSize = img.width * img.height * 4;
-								tidata.resize(bufferSize);
-								buffer = (unsigned char*)tidata.data();
-								unsigned char* rgba = buffer;
-								unsigned char* rgb = &img.image[0];
-								for (size_t i = 0; i < img.width * img.height; ++i)
+
+							if (img.as_is) {
+
+								int w = 0, h = 0, comp = 4, req_comp = 0;
+								auto data = (uint32_t*)stbi_load_from_memory((stbi_uc*)img.image.data(), img.image.size(), &w, &h, &req_comp, comp);
+								if (data)
 								{
-									memcpy(rgba, rgb, sizeof(unsigned char) * 3);
-									rgba += 4;
-									rgb += 3;
+									sdata = data;
+									buffer = (unsigned char*)data;
+									bufferSize = w * h * comp;
 								}
-								deleteBuffer = true;
 							}
 							else
 							{
-								buffer = &img.image[0];
-								bufferSize = img.image.size();
+								// We convert RGB-only images to RGBA, as most devices don't support RGB-formats in Vulkan
+								if (img.component == 3)
+								{
+									bufferSize = img.width * img.height * 4;
+									tidata.resize(bufferSize);
+									buffer = (unsigned char*)tidata.data();
+									unsigned char* rgba = buffer;
+									unsigned char* rgb = &img.image[0];
+									for (size_t i = 0; i < img.width * img.height; ++i)
+									{
+										memcpy(rgba, rgb, sizeof(unsigned char) * 3);
+										rgba += 4;
+										rgb += 3;
+									}
+									deleteBuffer = true;
+								}
+								else
+								{
+									buffer = &img.image[0];
+									bufferSize = img.image.size();
+								}
 							}
 							header.width = img.width;
 							header.height = img.height;
@@ -4909,6 +4925,9 @@ namespace vkr
 							if (img.uri.empty())
 								name += std::to_string(imageIndex);
 							pTex->InitFromData(m_pDevice, m_pUploadHeap, &header, buffer, bufferSize, name.c_str(), useSRGB);
+							if (sdata)
+								stbi_image_free(sdata);
+
 						}
 						else
 						{
@@ -13822,6 +13841,7 @@ namespace vkr {
 		std::string warn;
 		tinygltf::FsCallbacks cb = { &tinygltf::FileExists, &tinygltf::ExpandFilePath, &vkmReadWholeFile, &tinygltf::WriteWholeFile, };
 		loader.SetFsCallbacks(cb);
+		loader.SetImagesAsIs(true); // true: load images as is, false: decode images
 		char* bytes = 0;// rawdata.data();
 		auto size = 0;// rawdata.size();
 		bool ret = false;
