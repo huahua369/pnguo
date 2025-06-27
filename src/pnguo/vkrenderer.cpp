@@ -1177,6 +1177,7 @@ namespace vkr {
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 		int mid = 0;
+		std::string mname;
 		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe);
 	};
@@ -2667,7 +2668,7 @@ namespace vkr {
 		std::vector<char*> m_buffersData;
 
 		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
-		std::map<std::string, std::vector<float>> m_animated_morphWeights;// 变形插值数据
+		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 		std::map<int, std::vector<glm::mat3x4>> m_uv_mats; // UVmat
@@ -2677,6 +2678,7 @@ namespace vkr {
 		PerFrame_t m_perFrameData;
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
+		uint32_t _animationIndex = 0;
 	public:
 		bool Load(const std::string& path, const std::string& filename);
 		void Unload();
@@ -2688,6 +2690,7 @@ namespace vkr {
 		void GetAttributesAccessors(const njson& gltfAttributes, std::vector<char*>* pStreamNames, std::vector<tfAccessor>* pAccessors) const;
 
 		// transformation and animation functions
+		void update(float time);
 		void SetAnimationTime(uint32_t animationIndex, float time);
 		void TransformScene(int sceneIndex, const glm::mat4& world);
 		// 运行中使用
@@ -2745,7 +2748,7 @@ namespace vkr {
 		// maps GLTF ids into views
 		std::map<int, VkDescriptorBufferInfo> m_vertexBufferMap;
 		std::map<int, VkDescriptorBufferInfo> m_IndexBufferMap;
-		std::map<std::string, morph_t> m_BufferMap;
+		std::map<std::string, std::vector<morph_t>> m_BufferMap;//mesh名，材质id
 		std::map<int, VkDescriptorBufferInfo> m_uvmMap;
 		int indextype = 0;
 	public:
@@ -2765,7 +2768,7 @@ namespace vkr {
 		VkImageView GetTextureViewByID(int id);
 
 		VkDescriptorBufferInfo* GetSkinningMatricesBuffer(int skinIndex);
-		morph_t* get_mb(const std::string& meshname);
+		morph_t* get_mb(const std::string& n, int idx);
 		VkDescriptorBufferInfo* get_uvm(int idx);
 		void SetSkinningMatricesForSkeletons();
 		void SetPerFrameConstants();
@@ -3348,6 +3351,8 @@ namespace vkr {
 
 		VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+
+
 	};
 
 	struct DepthMesh
@@ -4184,25 +4189,21 @@ namespace vkr
 			}
 		}
 
-		// Load Meshes
-		//
-		//if (j3.find("meshes") != j3.end())
+		// Load Meshes 
 		{
 			auto& meshes = pm->meshes;
-
 			m_meshes.resize(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
 				DepthMesh* tfmesh = &m_meshes[i];
+				auto& mesh = meshes[i];
 				auto& primitives = meshes[i].primitives;
 				tfmesh->m_pPrimitives.resize(primitives.size());
-
 				for (uint32_t p = 0; p < primitives.size(); p++)
 				{
 					auto& primitive = primitives[p];
 					DepthPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
-
-					ExecAsyncIfThereIsAPool(pAsyncPool, [this, i, &primitive, pPrimitive]()
+					ExecAsyncIfThereIsAPool(pAsyncPool, [this, i, p, mesh, &primitive, pPrimitive]()
 						{
 							// Set Material
 							//
@@ -4245,8 +4246,7 @@ namespace vkr
 								morph_t* morphing = 0;
 								auto tsa = primitive.targets.size();// todo 变形
 								if (tsa > 0) {
-									auto mk = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->meshes[i].name;
-									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mk];
+									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mesh.name][p];
 								}
 								int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
@@ -4652,7 +4652,7 @@ namespace vkr
 		//
 		std::vector<tfNode>* pNodes = &m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_nodes;
 		Matrix2* pNodesMatrices = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_worldSpaceMats.data();
-
+		auto pm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm;
 		for (uint32_t i = 0; i < pNodes->size(); i++)
 		{
 			tfNode* pNode = &pNodes->at(i);
@@ -4661,9 +4661,9 @@ namespace vkr
 
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
-			auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->m_name);
 
 			DepthMesh* pMesh = &m_meshes[pNode->meshIndex];
+			auto mesh = pm->meshes[pNode->meshIndex];
 			for (int p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
 				DepthPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
@@ -4671,6 +4671,7 @@ namespace vkr
 				if (pPrimitive->m_pipeline == VK_NULL_HANDLE)
 					continue;
 
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(mesh.name, p);
 				// Set per Object constants
 				//
 				depth_object* cbPerObject;
@@ -5002,7 +5003,12 @@ namespace vkr
 					std::vector<glm::vec4> tv;// 临时缓存
 					if (attributes.size() > 0)
 					{
-						mp = &m_BufferMap[mesh.name];
+						auto& mn = m_BufferMap[mesh.name];
+						if (mn.empty())
+						{
+							mn.resize(mesh.primitives.size());
+						}
+						mp = &mn[primitive.material];
 						auto ss = vss.begin()->second;// 顶点数量
 						tv.reserve(attributes.size() * ss * targetCount);
 						mp->defs["vertex_count"] = ss;
@@ -5316,7 +5322,15 @@ namespace vkr
 			uint32_t size = (uint32_t)(d->size() * sizeof(float));
 			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
 			memcpy(cbd, d->data(), size);
-			m_BufferMap[t.first].morphWeights = per;
+			auto& node = m_pGLTFCommon->m_nodes[t.first];
+			auto& mesh = m_pGLTFCommon->pm->meshes[node.meshIndex];
+			auto bm = m_BufferMap.find(mesh.name);
+			if (bm != m_BufferMap.end())
+			{
+				for (auto& vt : bm->second) {
+					vt.morphWeights = per;
+				}
+			}
 		}
 		// todo uv矩阵
 		for (auto& [k, v] : m_pGLTFCommon->m_uv_mats) {
@@ -5338,11 +5352,17 @@ namespace vkr
 
 		return &it->second;
 	}
-	morph_t* GLTFTexturesAndBuffers::get_mb(const std::string& meshname)
+	morph_t* GLTFTexturesAndBuffers::get_mb(const std::string& n, int idx)
 	{
-		auto it = m_BufferMap.find(meshname);
-		auto m = (it != m_BufferMap.end()) ? &it->second : nullptr;
-		return m && m->targetCount ? m : nullptr;
+		auto it = m_BufferMap.find(n);
+		if (it != m_BufferMap.end())
+		{
+			if (it->second.size() < idx) {
+				auto m = &it->second[idx];
+				return m->targetCount > 0 ? m : nullptr;
+			}
+		}
+		return nullptr;
 	}
 	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::get_uvm(int idx)
 	{
@@ -6026,6 +6046,7 @@ namespace vkr
 			m_meshes.resize(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
+				auto& mesh = meshes[i];
 				auto& primitives = meshes[i].primitives;
 				auto& weights = meshes[i].weights;
 
@@ -6042,13 +6063,14 @@ namespace vkr
 					auto& primitive = primitives[p];
 					PBRPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 
-					ExecAsyncIfThereIsAPool(pAsyncPool, [this, i, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
+					ExecAsyncIfThereIsAPool(pAsyncPool, [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
 						{
 							// Sets primitive's material, or set a default material if none was specified in the GLTF
 							//
 							auto mat = primitive.material;// .find("material");
 							pPrimitive->m_pMaterial = (mat != -1) ? &m_materialsData[mat] : &m_defaultMaterial;
 							pPrimitive->mid = mat;
+							pPrimitive->mname = mesh.name;
 							auto ts = primitive.targets.size();// todo 变形
 							if (ts > 0) {
 								printf("targets %zu\n", ts);
@@ -6070,8 +6092,7 @@ namespace vkr
 							m_pGLTFTexturesAndBuffers->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 							mesh_mapd_ptr mm = {};
 							morph_t* morphing = 0;
-							auto mk = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->meshes[i].name;
-							auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mk];
+							auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mesh.name][p];
 							auto tsa = primitive.targets.size();// todo 变形判断
 							if (tsa > 0) {
 								morphing = bm;
@@ -6687,7 +6708,6 @@ namespace vkr
 
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
-			auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->m_name);
 
 			glm::mat4 mModelViewProj = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
 
@@ -6701,6 +6721,7 @@ namespace vkr
 					|| (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
 					continue;
 
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(pPrimitive->mname, pPrimitive->mid);
 				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
 				// do frustrum culling
 				//
@@ -14377,6 +14398,9 @@ namespace vkr {
 	// Animates the matrices (they are still in object space)
 	//
 	//loop animation
+	void GLTFCommon::update(float time) {
+		SetAnimationTime(_animationIndex, time);
+	}
 	void GLTFCommon::SetAnimationTime(uint32_t animationIndex, float time)
 	{
 		if (animationIndex < m_animations.size())
@@ -14410,7 +14434,7 @@ namespace vkr {
 				}
 				if (it->second.sampler[3])
 				{
-					auto& va = m_animated_morphWeights[np->m_name];
+					auto& va = m_animated_morphWeights[it->first];
 					va.clear();
 					va.swap(acv[3]);
 				}
@@ -18748,13 +18772,12 @@ namespace vkr {
 		if (m_bPlay)
 			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
 
-		static int nn[10] = {};
 		int i = 0;
 		static float speed = 1.0;
 		for (auto it : _loaders)
 		{
 			auto n = it->get_animation_count();
-			it->SetAnimationTime(nn[i++], m_time * speed);
+			it->update(m_time * speed);
 			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::mat4(1.0f), glm::vec3(it->_scale));
 			it->TransformScene(0, m);
 		}
