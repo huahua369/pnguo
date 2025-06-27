@@ -5541,6 +5541,7 @@ namespace vkr
 			textureIds["occlusionTexture"] = material.occlusionTexture.index;
 			tfmat->m_params.occlusionStrength = material.occlusionTexture.strength;
 			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord);
+			tfmat->m_defines["u_OcclusionStrength"] = std::to_string(material.occlusionTexture.strength);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.occlusionTexture.extensions, &m3)) {
 				uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));
@@ -5842,6 +5843,30 @@ namespace vkr
 
 		return (index > -1);
 	}
+	void set_sampler_info(VkSamplerCreateInfo& info, tinygltf::Sampler* samp) {
+		info.magFilter = samp->magFilter == TINYGLTF_TEXTURE_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+		info.minFilter = samp->minFilter == TINYGLTF_TEXTURE_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+		//info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;// :VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		switch (samp->wrapS) {
+		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+			break;
+		}
+		switch (samp->wrapT) {
+		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+			break;
+		}
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// OnCreate
@@ -5899,7 +5924,12 @@ namespace vkr
 
 		/////////////////////////////////////////////
 		// Create Samplers
-
+		tinygltf::Sampler dsa = {};
+		if (pGLTFTexturesAndBuffers && m_pGLTFTexturesAndBuffers->m_pGLTFCommon
+			&& m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm && m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers.size())
+		{
+			dsa = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers[0];
+		}
 		//for pbr materials
 		{
 			VkSamplerCreateInfo info = {};
@@ -5913,6 +5943,7 @@ namespace vkr
 			info.minLod = 0;
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
+			set_sampler_info(info, &dsa);
 			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
 			assert(res == VK_SUCCESS);
 		}

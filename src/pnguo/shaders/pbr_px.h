@@ -239,7 +239,7 @@ layout(set = 0, binding = 1) uniform perObject
 layout(set = 0, binding = ID_MATUV_DATA) buffer per_u_matuv
 {
 	mat3 u_matuv[];
-};
+}; 
 #endif
 #endif // __cplusplus
 
@@ -248,11 +248,9 @@ layout(set = 0, binding = ID_MATUV_DATA) buffer per_u_matuv
 // 纹理
 #if 1
 
-#ifdef ID_TEXCOORD_1
-#define TEXCOORD(id) vec2(id < 1 ? Input.UV0 : Input.UV1);
-#else
-#define TEXCOORD(id) vec2(Input.UV0);
-#endif
+#define CONCAT(a,b) a ## b
+#define TEXCOORD(id) CONCAT(Input.UV, id)
+
 
 //disable texcoords that are not in the VS2PS structure
 #if defined(ID_TEXCOORD_0)==false
@@ -529,6 +527,20 @@ vec4 getSpecularGlossinessTexture(VS2PS Input, vec2 uv)
 #endif   
 }
 
+
+vec2 getuv(VS2PS Input, vec2 uv2, int uvt)
+{
+	vec3 uv = vec3(0.0, 0.0, 1.0);
+#ifdef __cplusplus
+	return uv;
+#else
+	uv.xy = uv2;// TEXCOORD(id);
+#ifdef ID_MATUV_DATA
+	uv = u_matuv[uvt] * uv;
+#endif
+	return uv.xy;
+#endif
+}
 
 #endif // 1
 
@@ -958,7 +970,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 {
 	MeshState mesh;
 	vec2 uv = m.uv;
-	mesh.N = getPixelNormal(Input, uv);
+	mesh.N = getPixelNormal(Input);
 	mesh.Ng = mesh.N;
 	get_tangent(Input, uv, mesh.T, mesh.B);
 	mesh.tc = uv;
@@ -997,7 +1009,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	//if (material.normalTexture > -1)
 	{
 		mat3 tbn = mat3(mesh.T, mesh.B, mesh.N);
-		vec3 normal_vector = getPixelNormal(Input, texCoord);
+		vec3 normal_vector = getPixelNormal(Input);
 		normal_vector = normal_vector * 2.0F - 1.0F;
 		normal_vector *= vec3(material.normalScale, material.normalScale, 1.0F);
 		normal = normalize(tbn * normal_vector);
@@ -1015,7 +1027,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// Emissive term
 	vec3 emissive = material.emissiveFactor * mesh.emissiveFactor;
 #ifdef ID_emissiveTexture
-	emissive *= texture(u_EmissiveSampler, texCoord).rgb;
+	emissive *= texture(u_EmissiveSampler, getEmissiveUV(Input)).rgb;
 #endif 
 	m.emissive = max(vec3(0.0F), emissive);
 
@@ -1023,11 +1035,11 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_specular
 	m.specularColor = material.specularColorFactor;
 #ifdef ID_specularColorTexture  
-	m.specularColor *= texture(u_specularColorTexture, texCoord).rgb;
+		m.specularColor *= texture(u_specularColorTexture, getuv(Input, TEXCOORD(ID_specularColorTexCoord),0)).rgb;
 #endif 
 	m.specular = material.specularFactor;
 #ifdef ID_specularTexture  
-	m.specular *= texture(u_specularTexture, texCoord).a;
+	m.specular *= texture(u_specularTexture, getuv(Input, TEXCOORD(ID_specularTexCoord), 0)).a;
 #endif
 
 	// Dielectric Specular
@@ -1046,14 +1058,15 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// KHR_materials_transmission
 	m.transmissionFactor = material.transmissionFactor;
 #ifdef ID_transmissionTexture  
-	m.transmissionFactor *= texture(u_transmissionTexture, texCoord).r;
+	// todo uvt
+	m.transmissionFactor *= texture(u_transmissionTexture, getuv(Input, TEXCOORD(ID_transmissionTexCoord), 0)).r;
 #endif
 	// KHR_materials_volume
 	m.attenuationColor = material.attenuationColor;
 	m.attenuationDistance = material.attenuationDistance;
 	m.thickness = material.thicknessFactor;
 #ifdef ID_thicknessTexture  
-	m.thickness *= texture(u_thicknessTexture, texCoord).r;
+	m.thickness *= texture(u_thicknessTexture, getuv(Input, TEXCOORD(ID_thicknessTexCoord), 0)).r;
 #endif
 #if MATERIAL_CLEARCOAT
 	// KHR_materials_clearcoat
@@ -1065,18 +1078,18 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 #endif
 
 #ifdef ID_clearcoatTexture
-	m.clearcoatFactor *= texture(u_clearcoatTexture, texCoord).r;
+	m.clearcoatFactor *= texture(u_clearcoatTexture, getuv(Input, TEXCOORD(ID_clearcoatTexCoord), 0)).r;
 #endif
 
 #ifdef ID_clearcoatRoughnessTexture
-	m.clearcoatRoughness *= texture(u_clearcoatRoughnessTexture, texCoord).g;
+	m.clearcoatRoughness *= texture(u_clearcoatRoughnessTexture, getuv(Input, TEXCOORD(ID_clearcoatRoughnessTexCoord), 0)).g;
 #endif
 	//m.clearcoatRoughness = max(m.clearcoatRoughness, 0.001F);
 	m.clearcoatRoughness = clamp(m.clearcoatRoughness, 0.0f, 1.0f);
 
 #ifdef ID_clearcoatNormalTexture 
 	mat3 tbn = mat3(m.T, m.B, m.clearcoatNormal);
-	vec3 normal_vector = texture(u_clearcoatNormalTexture, texCoord).xyz;
+	vec3 normal_vector = texture(u_clearcoatNormalTexture, getuv(Input, TEXCOORD(ID_clearcoatNormalTexCoord), 0)).xyz;
 	normal_vector = normal_vector * 2.0F - 1.0F;
 	m.clearcoatNormal = normalize(tbn * normal_vector);
 #endif
@@ -1084,11 +1097,11 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// Iridescence
 	float iridescence = material.iridescenceFactor;
 #ifdef ID_iridescenceTexture 
-	iridescence *= texture(u_iridescenceTexture, texCoord).x;
+	iridescence *= texture(u_iridescenceTexture, getuv(Input, TEXCOORD(ID_iridescenceTexCoord), 0)).x;
 #endif
 	float iridescenceThickness = material.iridescenceThicknessMaximum;
 #ifdef ID_iridescenceThicknessTexture
-	const float t = texture(u_iridescenceThicknessTexture, texCoord).y;
+	const float t = texture(u_iridescenceThicknessTexture, getuv(Input, TEXCOORD(ID_iridescenceThicknessTexCoord), 0)).y;
 	iridescenceThickness = mix(material.iridescenceThicknessMinimum, material.iridescenceThicknessMaximum, t);
 #endif
 	m.iridescence = (iridescenceThickness > 0.0f) ? iridescence : 0.0f;  // No iridescence when the thickness is zero.
@@ -1100,7 +1113,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	float anisotropyStrength = material.anisotropy.z;// anisotropyStrength;
 	vec2  anisotropyDirection = vec2(1.0f, 0.0f);  // By default the anisotropy strength is along the tangent.
 #ifdef ID_anisotropyTexture 
-	const vec4 anisotropyTex = texture(u_anisotropyTexture, texCoord);
+	const vec4 anisotropyTex = texture(u_anisotropyTexture, getuv(Input, TEXCOORD(ID_anisotropyTexCoord), 0));
 	// .xy encodes the direction in (tangent, bitangent) space. Remap from [0, 1] to [-1, 1].
 	anisotropyDirection = normalize(vec2(anisotropyTex) * 2.0f - 1.0f);
 	// .z encodes the strength in range [0, 1].
@@ -1129,21 +1142,21 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// KHR_materials_sheen
 	vec3 sheenColor = material.sheenColorFactor;
 #ifdef ID_sheenColorTexture 
-	sheenColor *= vec3(texture(u_sheenColorTexture, texCoord));  // sRGB
+	sheenColor *= vec3(texture(u_sheenColorTexture, getuv(Input, TEXCOORD(ID_sheenColorTexCoord), 0)));  // sRGB
 #endif
 	m.sheenColor = sheenColor;  // No sheen if this is black.
 
 	float sheenRoughness = material.sheenRoughnessFactor;
 #ifdef ID_sheenRoughnessTexture 
-	sheenRoughness *= texture(u_sheenRoughnessTexture, texCoord).w;
+	sheenRoughness *= texture(u_sheenRoughnessTexture, getuv(Input, TEXCOORD(ID_sheenRoughnessTexCoord), 0)).w;
 #endif
 	sheenRoughness = max(MICROFACET_MIN_ROUGHNESS, sheenRoughness);
 	m.sheenRoughness = sheenRoughness;
 
 #ifdef ID_occlusionTexture
-	m.ao = texture(u_OcclusionSampler, texCoord).r * u_OcclusionStrength;
+	m.ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
 #else
-	m.ao = 1;
+	m.ao = 1.0;
 #endif
 #endif 
 
@@ -2037,10 +2050,6 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #endif
 	vec3 xxc = clamp(clearcoatFactor * clearcoatFresnel, 0.0, 1.0);
 	//color = mix(color, clearcoat_brdf, xxc);
-#ifdef ID_occlusionTexture
-	float ao = m.ao;
-	color = color * (1.0 + u_OcclusionStrength * (ao - 1.0));
-#endif
 
 #endif //end USE_IBL 
 
@@ -2156,10 +2165,18 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	//! 
 	// Calculate lighting contribution from image based lighting source (IBL)
 
-	// Apply optional PBR terms for additional (optional) shading
-#ifdef ID_occlusionTexture 
-	//color = color * m.ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
+	// Apply optional PBR terms for additional (optional) shading 
+#ifdef ID_occlusionTexture
+	color = mix(color, color * m.ao, u_OcclusionStrength);
 #endif
+
+	//	vec3 emissive = vec3(0);
+	//#ifdef ID_emissiveTexture
+	//	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.emissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
+	//#else
+	//	emissive = u_pbrParams.emissiveFactor * perFrame.u_EmissiveFactor;
+	//#endif
+	//	color += emissive;
 	color += m.emissive * (vec3(1.0) - cxf);
 
 	color = max(color, vec3(0.0));
@@ -2413,7 +2430,7 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	// Apply optional PBR terms for additional (optional) shading
 #ifdef ID_occlusionTexture
 	ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
-	color = color * ao; //mix(color, color * ao, myPerFrame.u_OcclusionStrength);
+	color = mix(color, color * ao, u_OcclusionStrength);
 #endif
 
 	vec3 emissive = vec3(0);
