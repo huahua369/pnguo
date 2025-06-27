@@ -18,12 +18,12 @@
 // THE SOFTWARE.
 
 #ifdef ID_MORPHING_DATA
-// ²åÖµÊı¾İ
+// æ’å€¼æ•°æ®
 layout(set = 0, binding = ID_MORPHING_DATA) buffer per_morphing_mw
 {
 	float u_morphWeights[];
 };
-// Ä¿±êÊı¾İ£ºÃ¿¸ö¶¥µãÓĞ²åÖµÊı¾İÊıÁ¿µÄvec3
+// ç›®æ ‡æ•°æ®ï¼šæ¯ä¸ªé¡¶ç‚¹æœ‰æ’å€¼æ•°æ®æ•°é‡çš„vec3
 layout(set = 0, binding = ID_TARGET_DATA) buffer per_morphing
 {
 	vec4 per_target_data[];
@@ -56,7 +56,7 @@ mat4 GetSkinningMatrix(vec4 Weights, uvec4 Joints)
 
 #ifdef ID_MORPHING_DATA 
 
-// »ñÈ¡Ä¿±êÊı¾İ
+// è·å–ç›®æ ‡æ•°æ®
 vec4 getDisplacement(int vertexID, int targetIndex)
 {
 	return per_target_data[vertexID + targetIndex];
@@ -72,8 +72,7 @@ vec4 getTargetPosition(int vertexID)
 		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);
 		pos += u_morphWeights[i] * displacement;
 	}
-#endif
-
+#endif 
 	return pos;
 }
 

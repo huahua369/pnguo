@@ -2187,6 +2187,17 @@ namespace vkr {
 	{
 		glm::vec4 m_center;
 		glm::vec4 m_radius;
+		/*
+		x=类型
+		'P':v2.x = 0;
+		'N':v2.x = 1;
+		'T':v2.x = 2;
+		"TEXCOORD_0" = 3;
+		"TEXCOORD_1" = 4;
+		"COLOR_0" = 5;
+		"COLOR_1" = 6;
+		.y=accessors id
+		*/
 		std::vector<glm::ivec2> targets;//[“POSITION”，“NORMAL”，//“TANGENT”]
 		uint32_t vcount = 0;
 	};
@@ -2718,7 +2729,6 @@ namespace vkr {
 	{
 		std::map<std::string, size_t> defs;
 		VkDescriptorBufferInfo mdb = {};
-		VkDescriptorBufferInfo morphWeights = {};
 		size_t targetCount = 0;
 	};
 	struct mesh_mapd {
@@ -2748,7 +2758,8 @@ namespace vkr {
 		// maps GLTF ids into views
 		std::map<int, VkDescriptorBufferInfo> m_vertexBufferMap;
 		std::map<int, VkDescriptorBufferInfo> m_IndexBufferMap;
-		std::map<std::string, std::vector<morph_t>> m_BufferMap;//mesh名，材质id
+		std::map<int, morph_t> m_BufferMap;	// 材质id
+		std::map<int, VkDescriptorBufferInfo> _morphWeights;	// 节点 mesh id访问
 		std::map<int, VkDescriptorBufferInfo> m_uvmMap;
 		int indextype = 0;
 	public:
@@ -2768,7 +2779,8 @@ namespace vkr {
 		VkImageView GetTextureViewByID(int id);
 
 		VkDescriptorBufferInfo* GetSkinningMatricesBuffer(int skinIndex);
-		morph_t* get_mb(const std::string& n, int idx);
+		//morph_t* get_mb(int idx);
+		VkDescriptorBufferInfo* get_mb(int idx);
 		VkDescriptorBufferInfo* get_uvm(int idx);
 		void SetSkinningMatricesForSkeletons();
 		void SetPerFrameConstants();
@@ -3255,7 +3267,7 @@ namespace vkr {
 			VkDescriptorBufferInfo m_perObjectDesc;
 			VkDescriptorBufferInfo* m_uvtDesc = 0;
 			VkDescriptorBufferInfo* m_pPerSkeleton = 0;
-			morph_t* morph = 0;
+			VkDescriptorBufferInfo* morph = 0;
 			operator float() { return -m_depth; }
 		};
 
@@ -4207,11 +4219,11 @@ namespace vkr
 						{
 							// Set Material
 							//
-							auto mat = primitive.material;// .find("material");
-							if (mat < 0)
+							auto mid = primitive.material;// .find("material");
+							if (mid < 0)
 								pPrimitive->m_pMaterial = &m_defaultMaterial;
 							else
-								pPrimitive->m_pMaterial = &m_materialsData[mat];
+								pPrimitive->m_pMaterial = &m_materialsData[mid];
 
 							// make a list of all the attribute names our pass requires, in the case of a depth pass we only need the position and a few other things. 
 							//
@@ -4246,7 +4258,11 @@ namespace vkr
 								morph_t* morphing = 0;
 								auto tsa = primitive.targets.size();// todo 变形
 								if (tsa > 0) {
-									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mesh.name][p];
+									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mid];
+									if (!morphing->mdb.buffer)
+									{
+										morphing = 0;
+									}
 								}
 								int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
@@ -4671,7 +4687,7 @@ namespace vkr
 				if (pPrimitive->m_pipeline == VK_NULL_HANDLE)
 					continue;
 
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(mesh.name, p);
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->meshIndex);
 				// Set per Object constants
 				//
 				depth_object* cbPerObject;
@@ -4693,8 +4709,8 @@ namespace vkr
 				//
 				VkDescriptorSet descriptorSets[2] = { pPrimitive->m_descriptorSet, pPrimitive->m_pMaterial->m_descriptorSet };
 				uint32_t descritorSetCount = 1 + (pPrimitive->m_pMaterial->m_textureCount > 0 ? 1 : 0);
-				assert(!(pPerSkeleton && morph));
-				if (!pPerSkeleton && morph)pPerSkeleton = &morph->morphWeights;// 变形动画和骨骼动画二选一
+
+				if (!pPerSkeleton && morph)pPerSkeleton = morph;// &morph->morphWeights;// 变形动画和骨骼动画二选一
 
 				uint32_t uniformOffsets[3] = { (uint32_t)m_perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
 				uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
@@ -5003,12 +5019,8 @@ namespace vkr
 					std::vector<glm::vec4> tv;// 临时缓存
 					if (attributes.size() > 0)
 					{
-						auto& mn = m_BufferMap[mesh.name];
-						if (mn.empty())
-						{
-							mn.resize(mesh.primitives.size());
-						}
-						mp = &mn[primitive.material];
+						auto& mn = m_BufferMap[primitive.material];
+						mp = &mn;
 						auto ss = vss.begin()->second;// 顶点数量
 						tv.reserve(attributes.size() * ss * targetCount);
 						mp->defs["vertex_count"] = ss;
@@ -5126,6 +5138,7 @@ namespace vkr
 
 						m_IndexBufferMap[indexAcc] = ibv;
 					}
+
 				}
 			}
 		}
@@ -5322,15 +5335,9 @@ namespace vkr
 			uint32_t size = (uint32_t)(d->size() * sizeof(float));
 			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
 			memcpy(cbd, d->data(), size);
-			auto& node = m_pGLTFCommon->m_nodes[t.first];
-			auto& mesh = m_pGLTFCommon->pm->meshes[node.meshIndex];
-			auto bm = m_BufferMap.find(mesh.name);
-			if (bm != m_BufferMap.end())
-			{
-				for (auto& vt : bm->second) {
-					vt.morphWeights = per;
-				}
-			}
+			//auto& node = m_pGLTFCommon->m_nodes[t.first];
+			//auto& mesh = m_pGLTFCommon->pm->meshes[node.meshIndex];
+			_morphWeights[t.first] = per;
 		}
 		// todo uv矩阵
 		for (auto& [k, v] : m_pGLTFCommon->m_uv_mats) {
@@ -5352,17 +5359,21 @@ namespace vkr
 
 		return &it->second;
 	}
-	morph_t* GLTFTexturesAndBuffers::get_mb(const std::string& n, int idx)
+	//morph_t* GLTFTexturesAndBuffers::get_mb(int idx)
+	//{
+	//	auto it = m_BufferMap.find(idx);
+	//	if (it != m_BufferMap.end())
+	//	{
+	//		auto m = &it->second;
+	//		return m->targetCount > 0 ? m : nullptr;
+	//	}
+	//	return nullptr;
+	//}
+	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::get_mb(int idx)
 	{
-		auto it = m_BufferMap.find(n);
-		if (it != m_BufferMap.end())
-		{
-			if (it->second.size() < idx) {
-				auto m = &it->second[idx];
-				return m->targetCount > 0 ? m : nullptr;
-			}
-		}
-		return nullptr;
+		auto it = _morphWeights.find(idx);
+		auto db = (it != _morphWeights.end()) ? &it->second : nullptr;
+		return db && db->buffer ? db : nullptr;
 	}
 	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::get_uvm(int idx)
 	{
@@ -6067,9 +6078,9 @@ namespace vkr
 						{
 							// Sets primitive's material, or set a default material if none was specified in the GLTF
 							//
-							auto mat = primitive.material;// .find("material");
-							pPrimitive->m_pMaterial = (mat != -1) ? &m_materialsData[mat] : &m_defaultMaterial;
-							pPrimitive->mid = mat;
+							auto mid = primitive.material;// .find("material");
+							pPrimitive->m_pMaterial = (mid != -1) ? &m_materialsData[mid] : &m_defaultMaterial;
+							pPrimitive->mid = mid;
 							pPrimitive->mname = mesh.name;
 							auto ts = primitive.targets.size();// todo 变形
 							if (ts > 0) {
@@ -6092,11 +6103,12 @@ namespace vkr
 							m_pGLTFTexturesAndBuffers->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 							mesh_mapd_ptr mm = {};
 							morph_t* morphing = 0;
-							auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mesh.name][p];
 							auto tsa = primitive.targets.size();// todo 变形判断
 							if (tsa > 0) {
+								auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mid];
 								morphing = bm;
-								mm.m = morphing;
+								if (morphing->mdb.buffer)
+									mm.m = morphing;
 							}
 							// Create descriptors and pipelines
 							auto uc = defines["UVT_count"];
@@ -6721,7 +6733,7 @@ namespace vkr
 					|| (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
 					continue;
 
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(pPrimitive->mname, pPrimitive->mid);
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->meshIndex);
 				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
 				// do frustrum culling
 				//
@@ -6777,7 +6789,7 @@ namespace vkr
 			uniformOffsets[0] = t.m_perFrameDesc.offset;	// 相机、灯光
 			uniformOffsets[1] = t.m_perObjectDesc.offset;	// 材质参数
 			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
-			if (t.morph) { uniformOffsets[c++] = t.morph->morphWeights.offset; }		// 变形动画偏移
+			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }		// 变形动画偏移
 			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
 			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe);
 		}
@@ -14434,7 +14446,7 @@ namespace vkr {
 				}
 				if (it->second.sampler[3])
 				{
-					auto& va = m_animated_morphWeights[it->first];
+					auto& va = m_animated_morphWeights[np->meshIndex];
 					va.clear();
 					va.swap(acv[3]);
 				}
