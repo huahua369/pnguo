@@ -1177,7 +1177,6 @@ namespace vkr {
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 		int mid = 0;
-		std::string mname;
 		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe);
 	};
@@ -4258,7 +4257,8 @@ namespace vkr
 								morph_t* morphing = 0;
 								auto tsa = primitive.targets.size();// todo 变形
 								if (tsa > 0) {
-									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[mid];
+									auto moid = primitive.targets[0].begin()->second;
+									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[moid];
 									if (!morphing->mdb.buffer)
 									{
 										morphing = 0;
@@ -4687,7 +4687,7 @@ namespace vkr
 				if (pPrimitive->m_pipeline == VK_NULL_HANDLE)
 					continue;
 
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->meshIndex);
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
 				// Set per Object constants
 				//
 				depth_object* cbPerObject;
@@ -5012,14 +5012,16 @@ namespace vkr
 						{
 							tfAccessor acc = {};
 							m_pGLTFCommon->GetBufferDetails(id, &acc);
-							attributes[k].push_back(acc);
+							if (acc.m_data)
+								attributes[k].push_back(acc);
 						}
 					}
 					morph_t* mp = 0;
 					std::vector<glm::vec4> tv;// 临时缓存
 					if (attributes.size() > 0)
 					{
-						auto& mn = m_BufferMap[primitive.material];
+						auto mid = primitive.targets[0].begin()->second;
+						auto& mn = m_BufferMap[mid];
 						mp = &mn;
 						auto ss = vss.begin()->second;// 顶点数量
 						tv.reserve(attributes.size() * ss * targetCount);
@@ -6081,7 +6083,6 @@ namespace vkr
 							auto mid = primitive.material;// .find("material");
 							pPrimitive->m_pMaterial = (mid != -1) ? &m_materialsData[mid] : &m_defaultMaterial;
 							pPrimitive->mid = mid;
-							pPrimitive->mname = mesh.name;
 							auto ts = primitive.targets.size();// todo 变形
 							if (ts > 0) {
 								printf("targets %zu\n", ts);
@@ -6105,6 +6106,7 @@ namespace vkr
 							morph_t* morphing = 0;
 							auto tsa = primitive.targets.size();// todo 变形判断
 							if (tsa > 0) {
+								auto mid = primitive.targets[0].begin()->second;
 								auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mid];
 								morphing = bm;
 								if (morphing->mdb.buffer)
@@ -6733,7 +6735,7 @@ namespace vkr
 					|| (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
 					continue;
 
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(pNode->meshIndex);
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
 				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
 				// do frustrum culling
 				//
@@ -14446,7 +14448,7 @@ namespace vkr {
 				}
 				if (it->second.sampler[3])
 				{
-					auto& va = m_animated_morphWeights[np->meshIndex];
+					auto& va = m_animated_morphWeights[it->first];
 					va.clear();
 					va.swap(acv[3]);
 				}

@@ -398,7 +398,7 @@ int main()
 			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
-			vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
+			//*vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 0,0,0 }, 0.10);
 
@@ -408,8 +408,8 @@ int main()
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
 			
 			//vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
-			vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
-			//vkd->load_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
+			//vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
+			vkd->load_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			//vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
