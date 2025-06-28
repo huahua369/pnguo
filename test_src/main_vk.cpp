@@ -15,7 +15,7 @@
 #include <cairo/cairo.h>
 
 #include "mshell.h"
-
+#include <cgltf.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 

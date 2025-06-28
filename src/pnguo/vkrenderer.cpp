@@ -2675,7 +2675,8 @@ namespace vkr {
 
 		std::vector<tfAnimation> m_animations;
 		std::vector<float> acv[4];				// 缓存动画结果	
-		std::vector<char*> m_buffersData;
+		std::vector<char*> m_buffersData;		// 原始数据
+		std::vector<float*> _sparseData;		// 解码的稀疏数据
 
 		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
 		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
@@ -2690,15 +2691,17 @@ namespace vkr {
 		float _scale = 1.0;
 		uint32_t _animationIndex = 0;
 	public:
+		~GLTFCommon();
 		bool Load(const std::string& path, const std::string& filename);
 		void Unload();
 
 		// misc functions
 		int FindMeshSkinId(int meshId) const;
 		int GetInverseBindMatricesBufferSizeByID(int id) const;
-		void GetBufferDetails(int accessor, tfAccessor* pAccessor) const;
-		void GetAttributesAccessors(const njson& gltfAttributes, std::vector<char*>* pStreamNames, std::vector<tfAccessor>* pAccessors) const;
+		void GetBufferDetails(int accessor, tfAccessor* pAccessor);
+		void GetAttributesAccessors(const njson& gltfAttributes, std::vector<char*>* pStreamNames, std::vector<tfAccessor>* pAccessors);
 
+		uint8_t* buffer_view_data(size_t bvidx, size_t pos);
 		// transformation and animation functions
 		void update(float time);
 		void SetAnimationTime(uint32_t animationIndex, float time);
@@ -2765,7 +2768,7 @@ namespace vkr {
 		GLTFCommon* m_pGLTFCommon;
 
 		VkDescriptorBufferInfo m_perFrameConstants;
-
+		~GLTFTexturesAndBuffers();
 		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing);
 		void LoadTextures(AsyncPool* pAsyncPool = NULL);
 		void LoadGeometry();
@@ -4838,6 +4841,11 @@ namespace vkr
 		m_frame = (m_frame + 1) % m_NumberOfBackBuffers;
 	}
 
+
+	GLTFTexturesAndBuffers::~GLTFTexturesAndBuffers()
+	{
+
+	}
 
 	// todo t2b
 	bool GLTFTexturesAndBuffers::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing)
@@ -13892,6 +13900,11 @@ namespace vkr {
 	}
 
 
+	GLTFCommon::~GLTFCommon()
+	{
+		Unload();
+	}
+
 	bool GLTFCommon::Load(const std::string& path, const std::string& filename)
 	{
 		//Profile p("GLTFCommon::Load");
@@ -13956,10 +13969,15 @@ namespace vkr {
 
 	void GLTFCommon::Unload()
 	{
+		for (auto p : _sparseData) {
+			if (p)
+				free(p);
+		}
 		for (int i = 0; i < m_buffersData.size(); i++)
 		{
 			delete[] m_buffersData[i];
 		}
+		_sparseData.clear();
 		m_buffersData.clear();
 
 		m_animations.clear();
@@ -13967,7 +13985,8 @@ namespace vkr {
 		m_scenes.clear();
 		//m_lights.clear();
 		m_lightInstances.clear();
-
+		if (pm)delete pm;
+		pm = 0;
 	}
 
 
@@ -14587,37 +14606,210 @@ namespace vkr {
 			return def;
 	}
 
-
-
-	void GLTFCommon::GetBufferDetails(int accessor, tfAccessor* pAccessor) const
+	uint8_t* GLTFCommon::buffer_view_data(size_t bvidx, size_t pos)
 	{
+		int32_t bufferViewIdx = bvidx;
+		if (bufferViewIdx < 0)
+			return 0;
+		assert(bufferViewIdx >= 0);
+		auto& bufferView = pm->bufferViews[bufferViewIdx];
+		int32_t bufferIdx = bufferView.buffer;
+		if (bufferIdx < 0)
+			return 0;
+		assert(bufferIdx >= 0);
+		uint8_t* buffer = (uint8_t*)m_buffersData[bufferIdx];
+		int32_t offset = bufferView.byteOffset;
+		int byteLength = bufferView.byteLength;
+		int32_t byteOffset = pos;
+		offset += byteOffset;
+		byteLength -= byteOffset;
+		return buffer + offset;
+	}
 
+	static size_t component_read_index(const void* in, uint32_t component_type)
+	{
+		switch (component_type)
+		{
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+			return *((const uint16_t*)in);
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+			return *((const uint32_t*)in);
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+			return *((const uint8_t*)in);
+		default:
+			return 0;
+		}
+	}
+
+	static size_t component_read_integer(const void* in, uint32_t component_type)
+	{
+		switch (component_type)
+		{
+		case TINYGLTF_COMPONENT_TYPE_SHORT:
+			return *((const int16_t*)in);
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+			return *((const uint16_t*)in);
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+			return *((const uint32_t*)in);
+		case TINYGLTF_COMPONENT_TYPE_BYTE:
+			return *((const int8_t*)in);
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+			return *((const uint8_t*)in);
+		default:
+			return 0;
+		}
+	}
+	static float component_read_float(const void* in, uint32_t component_type, bool normalized)
+	{
+		if (component_type == TINYGLTF_COMPONENT_TYPE_FLOAT)// component_type_r_32f)
+		{
+			return *((const float*)in);
+		}
+
+		if (normalized)
+		{
+			switch (component_type)
+			{
+				// note: glTF spec doesn't currently define normalized conversions for 32-bit integers
+			case TINYGLTF_COMPONENT_TYPE_SHORT:
+				return *((const int16_t*)in) / (float)32767;
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+				return *((const uint16_t*)in) / (float)65535;
+			case TINYGLTF_COMPONENT_TYPE_BYTE:
+				return *((const int8_t*)in) / (float)127;
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+				return *((const uint8_t*)in) / (float)255;
+			default:
+				return 0;
+			}
+		}
+
+		return (float)component_read_integer(in, component_type);
+	}
+
+	//#define TINYGLTF_TYPE_VEC2 (2)
+	//#define TINYGLTF_TYPE_VEC3 (3)
+	//#define TINYGLTF_TYPE_VEC4 (4)
+	//#define TINYGLTF_TYPE_MAT2 (32 + 2)
+	//#define TINYGLTF_TYPE_MAT3 (32 + 3)
+	//#define TINYGLTF_TYPE_MAT4 (32 + 4)
+	//#define TINYGLTF_TYPE_SCALAR (64 + 1)
+	//#define TINYGLTF_TYPE_VECTOR (64 + 4)
+	//#define TINYGLTF_TYPE_MATRIX (64 + 16)
+	static bool element_read_float(const uint8_t* element, uint32_t type, uint32_t component_type, bool normalized, float* out, size_t element_size)
+	{
+		size_t num_components = tinygltf::GetNumComponentsInType(type);
+
+		if (element_size < num_components) {
+			return 0;
+		}
+
+		// There are three special cases for component extraction, see #data-alignment in the 2.0 spec.
+
+		size_t component_size = GetFormatSize(component_type);
+
+		if (type == TINYGLTF_TYPE_MAT2 && component_size == 1)
+		{
+			out[0] = component_read_float(element, component_type, normalized);
+			out[1] = component_read_float(element + 1, component_type, normalized);
+			out[2] = component_read_float(element + 4, component_type, normalized);
+			out[3] = component_read_float(element + 5, component_type, normalized);
+			return 1;
+		}
+
+		if (type == TINYGLTF_TYPE_MAT4 && component_size == 1)
+		{
+			out[0] = component_read_float(element, component_type, normalized);
+			out[1] = component_read_float(element + 1, component_type, normalized);
+			out[2] = component_read_float(element + 2, component_type, normalized);
+			out[3] = component_read_float(element + 4, component_type, normalized);
+			out[4] = component_read_float(element + 5, component_type, normalized);
+			out[5] = component_read_float(element + 6, component_type, normalized);
+			out[6] = component_read_float(element + 8, component_type, normalized);
+			out[7] = component_read_float(element + 9, component_type, normalized);
+			out[8] = component_read_float(element + 10, component_type, normalized);
+			return 1;
+		}
+
+		if (type == TINYGLTF_TYPE_MAT4 && component_size == 2)
+		{
+			out[0] = component_read_float(element, component_type, normalized);
+			out[1] = component_read_float(element + 2, component_type, normalized);
+			out[2] = component_read_float(element + 4, component_type, normalized);
+			out[3] = component_read_float(element + 8, component_type, normalized);
+			out[4] = component_read_float(element + 10, component_type, normalized);
+			out[5] = component_read_float(element + 12, component_type, normalized);
+			out[6] = component_read_float(element + 16, component_type, normalized);
+			out[7] = component_read_float(element + 18, component_type, normalized);
+			out[8] = component_read_float(element + 20, component_type, normalized);
+			return 1;
+		}
+
+		for (size_t i = 0; i < num_components; ++i)
+		{
+			out[i] = component_read_float(element + component_size * i, component_type, normalized);
+		}
+		return 1;
+	}
+	void GLTFCommon::GetBufferDetails(int accessor_idx, tfAccessor* pAccessor)
+	{
 		if (pm)
 		{
-			auto& inAccessor = pm->accessors[accessor];
+			auto& inAccessor = pm->accessors[accessor_idx];
+			auto accessor = &inAccessor;
+			do {
+				// Second pass: write out each element in the sparse accessor.
+				if (inAccessor.sparse.isSparse)
+				{
+					auto& sparse = inAccessor.sparse;
+					uint8_t* index_data = buffer_view_data(sparse.indices.bufferView, sparse.indices.byteOffset);
+					uint8_t* reader_head = buffer_view_data(sparse.values.bufferView, sparse.values.byteOffset);
 
-			int32_t bufferViewIdx = inAccessor.bufferView;// .value("bufferView", -1);
-			if (bufferViewIdx < 0)
-				return;
-			assert(bufferViewIdx >= 0);
-			auto& bufferView = pm->bufferViews[bufferViewIdx];
-
-			int32_t bufferIdx = bufferView.buffer;// .value("buffer", -1);
-			if (bufferIdx < 0)
-				return;
-			assert(bufferIdx >= 0);
-
-			char* buffer = m_buffersData[bufferIdx];
-
-			int32_t offset = bufferView.byteOffset;// .value("byteOffset", 0);
-
-			int byteLength = bufferView.byteLength;
-
-			int32_t byteOffset = inAccessor.byteOffset;
-			offset += byteOffset;
-			byteLength -= byteOffset;
-
-			pAccessor->m_data = buffer + offset;
+					if (index_data == NULL || reader_head == NULL)
+					{
+						break;
+					}
+					auto dimension = tinygltf::GetNumComponentsInType(accessor->type);
+					size_t floats_per_element = dimension;
+					auto type = GetFormatSize(accessor->componentType);
+					auto stride = dimension * type;
+					size_t index_stride = GetFormatSize(sparse.indices.componentType);
+					float* out = (float*)malloc(accessor->count * stride);
+					if (!out)
+						break;
+					for (size_t i = 0; i < accessor->count * dimension; i++)
+					{
+						out[i] = 0.0f;
+					}
+					_sparseData.push_back(out);
+					float* vd = (float*)reader_head;
+					float* bd = (float*)out;
+					auto values_size = sparse.count * dimension;
+					auto base_data_size = accessor->count * dimension;
+					size_t comp_count = tinygltf::GetNumComponentsInType(accessor->type);
+					for (size_t i = 0; i < sparse.count; ++i) {
+						uint32_t base_idx = component_read_integer(index_data + i * index_stride, sparse.indices.componentType);
+						size_t value_start = i * comp_count;
+						size_t base_start = base_idx * comp_count;
+						if (value_start + comp_count > values_size || base_start + comp_count > base_data_size) {
+							//throw std::runtime_error("稀疏数据越界！");
+							continue;
+						}
+						float* writer_head = bd + base_start;
+						if (!element_read_float(reader_head + i * stride, accessor->type, accessor->componentType, accessor->normalized, writer_head, floats_per_element))
+						{
+							continue;
+						}
+					}
+					pAccessor->m_data = out;
+					pAccessor->m_dimension = tinygltf::GetNumComponentsInType(inAccessor.type);
+					pAccessor->m_type = GetFormatSize(inAccessor.componentType);
+					pAccessor->m_stride = pAccessor->m_dimension * pAccessor->m_type;
+					pAccessor->m_count = inAccessor.count;
+					return;
+				}
+			} while (0); 
+			pAccessor->m_data = buffer_view_data(inAccessor.bufferView, inAccessor.byteOffset);
 			pAccessor->m_dimension = tinygltf::GetNumComponentsInType(inAccessor.type);
 			pAccessor->m_type = GetFormatSize(inAccessor.componentType);
 			pAccessor->m_stride = pAccessor->m_dimension * pAccessor->m_type;
@@ -14627,7 +14819,7 @@ namespace vkr {
 
 	}
 
-	void GLTFCommon::GetAttributesAccessors(const njson& gltfAttributes, std::vector<char*>* pStreamNames, std::vector<tfAccessor>* pAccessors) const
+	void GLTFCommon::GetAttributesAccessors(const njson& gltfAttributes, std::vector<char*>* pStreamNames, std::vector<tfAccessor>* pAccessors)
 	{
 		int streamIndex = 0;
 		for (int s = 0; s < pStreamNames->size(); s++)
@@ -15028,7 +15220,7 @@ namespace vkr {
 		void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
 		void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
 
-		int add_model(GLTFCommon* pGLTFCommon, int Stage = 0);
+		int load_model(GLTFCommon* pGLTFCommon, int Stage = 0);
 		void UnloadScene();
 		void unloadgltf(robj_info* p);
 
@@ -17233,10 +17425,10 @@ namespace vkr {
 
 	//--------------------------------------------------------------------------------------
 	//
-	// add_model
+	// load_model
 	//
 	//--------------------------------------------------------------------------------------
-	int Renderer_cx::add_model(GLTFCommon* pGLTFCommon, int Stage)
+	int Renderer_cx::load_model(GLTFCommon* pGLTFCommon, int Stage)
 	{
 		// show loading progress
 		//
@@ -18913,7 +19105,7 @@ namespace vkr {
 				std::unique_lock<std::mutex> lock(m_ltsm);
 				_tmpgc = _lts.front(); _lts.pop();
 			}
-			loadingStage = m_pRenderer->add_model(_tmpgc, loadingStage);
+			loadingStage = m_pRenderer->load_model(_tmpgc, loadingStage);
 			if (loadingStage == 0)
 			{
 				_loaders.push_back(_tmpgc);
