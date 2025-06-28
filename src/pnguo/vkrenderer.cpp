@@ -14808,7 +14808,7 @@ namespace vkr {
 					pAccessor->m_count = inAccessor.count;
 					return;
 				}
-			} while (0); 
+			} while (0);
 			pAccessor->m_data = buffer_view_data(inAccessor.bufferView, inAccessor.byteOffset);
 			pAccessor->m_dimension = tinygltf::GetNumComponentsInType(inAccessor.type);
 			pAccessor->m_type = GetFormatSize(inAccessor.componentType);
@@ -18614,6 +18614,9 @@ namespace vkr {
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		scene_state m_UIState;
 		Camera m_camera;
+		glm::vec3 eyePos = {}, lookAt = {};
+
+
 		mouse_state_t io = {};
 		float m_time = 0; // Time accumulator in seconds, used for animation.
 
@@ -18629,6 +18632,7 @@ namespace vkr {
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
 		bool m_bIsBenchmarking = false;
+		bool _customize_camera = false;
 	};
 #if 1
 	sample_cx::sample_cx()
@@ -18962,7 +18966,7 @@ namespace vkr {
 		}
 
 		// Update Camera
-		UpdateCamera(m_camera);
+		UpdateCamera(m_camera); 
 		if (m_UIState.bUseTAA)
 		{
 			static uint32_t Seed = 0;
@@ -19032,37 +19036,49 @@ namespace vkr {
 				yaw = yaw;
 			}
 		}
-
-		// Choose camera movement depending on setting
-		if (m_activeCamera == 0)
+		if (_customize_camera)
 		{
-			// If nothing has changed, don't calculate an update (we are getting micro changes in view causing bugs)
-			int wy = io.wheel.y;
-			if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
-			{
-				//pitch = io.DeltaTime * 60;
-				yaw = io.DeltaTime * 60;
-				return;
-			}
-
-			//  Orbiting
-			distance -= (float)io.wheel.y;// / 3.0f;
-			distance = std::max<float>(distance, 0.1f);
-
-			bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
-			if (panning) { yaw = 0; pitch = 0; }
-			//if (yaw < 0)yaw = 0;//偏航角
-			//if (pitch < 0)pitch = 0;//俯仰角
-			cam.UpdateCameraPolar(yaw, pitch,
-				panning ? -io.MouseDelta.x : 0.0f,
-				panning ? io.MouseDelta.y : 0.0f,
-				distance);
-
+			float rotateAngle = glm::radians(45.0f); // 旋转角度（45度→弧度）
+			glm::vec3 cameraPos = glm::vec3(
+				5.0f * cos(rotateAngle),  // X坐标（绕Y轴旋转后的水平位置）
+				0.0f,                     // Y坐标（保持高度不变）
+				5.0f * sin(rotateAngle)   // Z坐标（绕Y轴旋转后的深度位置）
+			);
+			cam.LookAt(eyePos, lookAt);
 		}
-		else if (m_activeCamera == 1)
+		else
 		{
-			//  WASD
-			cam.UpdateCameraWASD(yaw, pitch, io.KeysDown, io.DeltaTime);
+			// Choose camera movement depending on setting
+			if (m_activeCamera == 0)
+			{
+				// If nothing has changed, don't calculate an update (we are getting micro changes in view causing bugs)
+				int wy = io.wheel.y;
+				if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
+				{
+					//pitch = io.DeltaTime * 60;
+					yaw = io.DeltaTime * 60;
+					return;
+				}
+
+				//  Orbiting
+				distance -= (float)io.wheel.y;// / 3.0f;
+				distance = std::max<float>(distance, 0.1f);
+
+				bool panning = (io.KeyCtrl == true) && (io.MouseDown[0] == true);
+				if (panning) { yaw = 0; pitch = 0; }
+				//if (yaw < 0)yaw = 0;//偏航角
+				//if (pitch < 0)pitch = 0;//俯仰角
+				cam.UpdateCameraPolar(yaw, pitch,
+					panning ? -io.MouseDelta.x : 0.0f,
+					panning ? io.MouseDelta.y : 0.0f,
+					distance);
+
+			}
+			else if (m_activeCamera == 1)
+			{
+				//  WASD
+				cam.UpdateCameraWASD(yaw, pitch, io.KeysDown, io.DeltaTime);
+			}
 		}
 
 #endif
