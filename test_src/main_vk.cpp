@@ -449,5 +449,8 @@ int main()
 	// 运行消息循环
 	run_app(app, 0);
 	free_app(app);
+#ifdef _WIN32
+	ExitProcess(0);
+#endif
 	return 0;
 }

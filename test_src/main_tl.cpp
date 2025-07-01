@@ -2067,7 +2067,7 @@ double distance2d(const glm::dvec3& a, const glm::dvec3& b)
 // 3D距离
 double distance3d(const glm::dvec3& a, const glm::dvec3& b)
 {
-	return glm::distance( a,  b);
+	return glm::distance(a, b);
 }
 // 计算平面欧几里得距离 
 double distance2d2(const glm::dvec3& a, const glm::dvec3& b)
@@ -2077,7 +2077,7 @@ double distance2d2(const glm::dvec3& a, const glm::dvec3& b)
 // 3D欧几里得距离
 double distance3d2(const glm::dvec3& a, const glm::dvec3& b)
 {
-	return glm::distance2( a,  b);
+	return glm::distance2(a, b);
 }
 
 
@@ -2422,7 +2422,6 @@ int main(int argc, char* argv[])
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
 
-	texture_cb tex_cb = get_texture_cb();
 	{
 		auto ft = app->font_ctx->get_font("Corbel", 0);
 		font_t::GlyphPositions gp = {};
@@ -2431,15 +2430,15 @@ int main(int argc, char* argv[])
 		auto nn1 = ft->CollectGlyphsFromFont("fttt", -1, 0, 0, &gp1);
 		auto nn2 = ft->CollectGlyphsFromFont("ft", -1, 0, 0, &gp1);
 		auto nn3 = ft->CollectGlyphsFromFont("tt", -1, 0, 0, &gp1);
-		auto xh_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/xh1.png");
+		texture_cb tex_cb = get_texture_cb();
 		auto mari_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/mari.png");
 		page_obj_t ro = {};
 		ro.renderer = form0->renderer;
 		auto ptex = new texture_cb();
 		*ptex = tex_cb;
 		ro.cb = ptex;
+#if 0
 		auto xha = new_atlas("data/xh1.atlas", &ro);
-
 		logic_cx* logic = new_logic(xha);
 		logic->_pos = { 20,90 };
 		logic->add_gate(dType::AND_GATE, "and", { 60,60 }, 0);
@@ -2485,6 +2484,7 @@ int main(int argc, char* argv[])
 		logic->gates[xx + 1].input = 0x01;
 		logic->gates[xx + 2].build = 1;
 		logic->_scale = 1.0;
+#endif
 		form0->add_event(0, [=](uint32_t type, et_un_t* e, void* ud)
 			{
 				auto btn = e->v.b;
@@ -2518,50 +2518,17 @@ int main(int argc, char* argv[])
 			{
 				static double deltas = 0;
 				deltas += delta;
-				if (xh_tex) {
-					glm::ivec4 notm = get_lgates_rc(2);
-					glm::ivec4 andm = get_lgates_rc(3);
-					glm::ivec4 orm = get_lgates_rc(4);
-					glm::ivec4 xorm = get_lgates_rc(5);
-					glm::ivec4 wline[6] = {};
-					for (size_t i = 0; i < 6; i++)
-					{
-						wline[i] = get_lgates_rc(6 + i);
-					}
-
-					drawGrid(renderer, { 20,90 }, 15, 70 * 15, opt2);
-
-					texture_dt adt = {   };
-					adt.src_rect = { 0,0,512,512 };
-					adt.dst_rect = { 106,106,adt.src_rect.z,adt.src_rect.w };
-					//tex_cb.render_texture(renderer, xh_tex, &adt, 1); 
-
-
-
-					auto tl = lines.data();
-					glm::ivec2 npos = { 106,306 };
-					texture_dt nadt = {};
-					for (size_t i = 0; i < lines.size(); i++)
-					{
-						glm::ivec2 ps = { i % lw,i / lw };
-						auto x = *tl;
-						nadt.src_rect = wline[x];
-						nadt.dst_rect = { npos.x + ps.x * gh,yps + npos.y + ps.y * gh,nadt.src_rect.z, nadt.src_rect.w };
-						//tex_cb.render_texture(renderer, xh_tex, &nadt, 1);
-						tl++;
-					}
-				}
 				d2->update_draw(delta);
-				logic->draw_update(delta);
-				if (mari_tex)
-				{
-					texture_dt nadt = {};
-					glm::ivec2 ps = { };
-					glm::ivec2 npos = { 106,306 };
-					nadt.src_rect = { 0,0,16,8 };
-					nadt.dst_rect = { npos.x + ps.x * gh,yps + npos.y + ps.y * gh,nadt.src_rect.z, nadt.src_rect.w };
-					tex_cb.render_texture(renderer, mari_tex, &nadt, 1);
-				}
+				//logic->draw_update(delta);
+				//if (mari_tex)
+				//{
+				//	texture_dt nadt = {};
+				//	glm::ivec2 ps = { };
+				//	glm::ivec2 npos = { 106,306 };
+				//	nadt.src_rect = { 0,0,16,8 };
+				//	nadt.dst_rect = { npos.x + ps.x * gh,yps + npos.y + ps.y * gh,nadt.src_rect.z, nadt.src_rect.w };
+				//	tex_cb.render_texture(renderer, mari_tex, &nadt, 1);
+				//}
 			};
 	}
 
@@ -2570,6 +2537,9 @@ int main(int argc, char* argv[])
 	run_app(app, 0);
 	delete d2;
 	free_app(app);
+#ifdef _WIN32
+	ExitProcess(0);
+#endif
 	return 0;
 }
 

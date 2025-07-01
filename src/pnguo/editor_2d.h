@@ -138,6 +138,10 @@ public:
 	bool export_atlas(const char* dir, const char* name);
 	// 保存
 	bool save(const char* fn);
+	// 更新动画之类 
+	void update(double deltaTime);
+	// 渲染
+	void draw();
 private:
 
 };

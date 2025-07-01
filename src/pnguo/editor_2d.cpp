@@ -651,6 +651,16 @@ bool editor2d_cx::save(const char* fn)
 {
 	return false;
 }
+void editor2d_cx::update(double deltaTime)
+{
+
+}
+void editor2d_cx::draw()
+{
+
+}
+
+
 #define IM_COL32_A_MASK     0xFF000000
 enum ImDrawFlags
 {
@@ -685,12 +695,12 @@ struct DrawCmd_t
 };
 struct draw_path_info_t
 {
-	uint32_t col;
-	float thickness;
-	ImDrawFlags flags;
+	uint32_t col = 0xffffffff;
+	float thickness = 1.0f;
+	//ImDrawFlags flags;
 	bool tex_lines = false;
-	bool anti_aliased;
-	bool closed;
+	bool anti_aliased = true;
+	bool closed = false;
 };
 
 class draw_list_cx
@@ -715,9 +725,9 @@ private:
 	std::vector<Vertex_d> VtxBuffer;
 	mesh3_mt _tem_mesh;
 	std::vector<std::vector<glm::vec2>> _tem_poly;
-	uint32_t _VtxCurrentIdx = 0;     // [Internal] generally == VtxBuffer.Size unless we are past 64K vertices, in which case this gets reset to 0.
-	Vertex_d* _VtxWritePtr = 0;       // [Internal] point within VtxBuffer.data() after each add command (to avoid using the ImVector<> operators too much)
-	uint32_t* _IdxWritePtr = 0;       // [Internal] point within IdxBuffer.data() after each add command (to avoid using the ImVector<> operators too much)
+	uint32_t _VtxCurrentIdx = 0;
+	Vertex_d* _VtxWritePtr = 0;
+	uint32_t* _IdxWritePtr = 0;
 	const int tex_lines_width_max = 32;
 	glm::vec4 TexUvLines[32 + 1] = {};  // UVs for baked anti-aliased lines 
 	struct DrawCmdHeader
