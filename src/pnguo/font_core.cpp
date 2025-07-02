@@ -2137,7 +2137,7 @@ uint32_t font_t::CollectGlyphsFromFont(const char* text, size_t length, int dire
 	// Realloc, if needed
 	uint32_t glyph_count = (int)glyph_count_u;
 	_tnpos.resize(glyph_count);
-	if(positions)
+	if (positions)
 	{
 		positions->pos = _tnpos.data();
 		positions->len = glyph_count;
@@ -5325,7 +5325,9 @@ public:
 	image_ptr_t* get() {
 		return (image_ptr_t*)&img;
 	}
-	void init_target(int width, int height) {
+	// BL = 0 “从下向左塞”（快速降低高度）
+	// BF = 1 “精打细算”（最小化空间浪费）
+	void init_target(int width, int height, int heuristic = 0) {
 		assert(!(width < 10 || height < 10));
 		if (width < 10 || height < 10)return;
 #ifdef STL_VU
@@ -5363,6 +5365,7 @@ public:
 		memset(_rpns_ptr, 0, width * sizeof(stbrp_node));
 		stbrp_init_target(&_ctx, width, height, _rpns_ptr, width);
 #endif
+		stbrp_setup_heuristic(&_ctx, heuristic);
 		memset(_ptr, 0, width * height * sizeof(uint32_t));
 		stbrp_setup_allow_out_of_mem(&_ctx, 0);
 	}

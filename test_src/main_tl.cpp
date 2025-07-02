@@ -2498,22 +2498,6 @@ int main(int argc, char* argv[])
 
 			});
 
-		// 随机数种子
-		static std::random_device rd;
-		static std::mt19937 gen(rd());
-		std::uniform_int_distribution<int> dis(0, 5);
-		std::vector<int> lines;
-		int lw = 26;
-		int gh = 30;
-		int yps = 0;
-		lines.resize(26 * 16);
-		for (size_t i = 0; i < lines.size(); i++)
-		{
-			int tt = dis(gen);
-			lines[i] = tt;
-		}
-		std::vector<SDL_FPoint>* opt2 = new std::vector<SDL_FPoint>();
-		genGrid(15, 70 * 15, opt2);
 		form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 			{
 				static double deltas = 0;
