@@ -92,6 +92,7 @@ public:
 
 	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存
 	std::vector<font_t*> _t1;
+	std::vector<uint32_t> s32;
 public:
 	layout_text_x();
 	~layout_text_x();

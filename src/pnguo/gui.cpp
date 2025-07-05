@@ -959,22 +959,57 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, int fontsize, const void
 {
 	auto str = (const char*)str8;
 	if (idx >= familyv.size())idx = 0;
+	font_t* r = 0;
 	do
 	{
 		if (!str || !(*str) || !opt) { opt = 0; break; }
-		font_t* r = 0;
 		int gidx = 0;
+		r = 0;
 		if (*str == '\n')
 			gidx = 0;
 		auto ostr = str;
 
 		int ch = 0;
+		int ch1 = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
+#if 0
+		auto bstr = str;
+		auto bstr1 = str;
+		bstr1 += kk;
+		int d2 = 0;
+		s32.clear();
+		s32.push_back(ch);
+		for (int zwj = 1; zwj < 2; )
+		{
+			auto nk1 = md::utf8_to_unicode(bstr1, &ch1);
+			bstr1 += nk1;
+			if (ch1 != 0x200d)
+			{
+				zwj++;
+				if (zwj == 2)break;
+				s32.push_back(ch1);
+			}
+			else {
+				zwj = 0; d2++;
+			}
+		}
+#endif
 		font_t::get_glyph_index_u8(ostr, &gidx, &r, &familyv[idx]);
 		if (r && gidx >= 0)
 		{
+#if 0
+			if (d2 > 0)
+			{
+				std::string nstr;
+				font_t::GlyphPositions gp = {};
+				auto nn0 = r->CollectGlyphsFromFont(s32.data(), s32.size(), 32, 0, 0, &gp);
+				if (gp.len > 0) {
+					printf("");
+				}
+			}
+#endif
 			auto k = r->get_glyph_item(gidx, ch, fontsize, bc_ctx);
 			if (k._glyph_index)
 			{

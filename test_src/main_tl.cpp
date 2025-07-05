@@ -2423,13 +2423,40 @@ int main(int argc, char* argv[])
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
 
 	{
+		std::string k8 = (char*)u8"👩‍👩‍👧‍👧";
 		auto ft = app->font_ctx->get_font("Corbel", 0);
+
+
+		uint32_t kw = md::get_u8_idx(k8.c_str(), 0);
+
+		auto sue = app->font_ctx->get_font("Segoe UI Emoji", 0);
+		auto sue1 = sue;
+		auto gis = sue->get_glyph_index(kw, 0, 0);
+		std::vector<vertex_f> vdp;
+		auto vnn = sue->GetGlyphShapeTT(gis, &vdp);
+		auto baseline = sue->ascender;
+		int blur = 2;
+		auto src = new path_v();
+		src->set_data((path_v::vertex_t*)vdp.data(), vdp.size());
+		auto k = src->get_size();
+		//src->incpos({ 0,-src->_box.y * 2 });
+		image_gray bmp = {};
+		bmp.width = k.x * 1.5;
+		bmp.height = k.y * 1.5;
+		glm::vec2 ps = { 0,-200 };
+		ps.x -= blur * 2;
+		ps.y -= blur * 2;
+		ps.y -= baseline;
+		auto bmp1 = bmp;
+		get_path_bitmap((vertex_32f*)src->data(), src->size(), &bmp, { 1,1 }, ps, 1);
+		save_img_png(&bmp, "temp/v4.png");
+
 		font_t::GlyphPositions gp = {};
 		font_t::GlyphPositions gp1 = {};
-		auto nn0 = ft->CollectGlyphsFromFont("fi", -1, 0, 0, &gp);
-		auto nn1 = ft->CollectGlyphsFromFont("fttt", -1, 0, 0, &gp1);
-		auto nn2 = ft->CollectGlyphsFromFont("ft", -1, 0, 0, &gp1);
-		auto nn3 = ft->CollectGlyphsFromFont("tt", -1, 0, 0, &gp1);
+		auto nn0 = ft->CollectGlyphsFromFont("fi", -1, 8, 0, 0, &gp);
+		auto nn1 = ft->CollectGlyphsFromFont("fttt", -1, 8, 0, 0, &gp1);
+		auto nn2 = ft->CollectGlyphsFromFont("ft", -1, 8, 0, 0, &gp1);
+		auto nn3 = ft->CollectGlyphsFromFont("tt", -1, 8, 0, 0, &gp1);
 		texture_cb tex_cb = get_texture_cb();
 		auto mari_tex = (SDL_Texture*)tex_cb.new_texture_file(form0->renderer, "data/mari.png");
 		page_obj_t ro = {};

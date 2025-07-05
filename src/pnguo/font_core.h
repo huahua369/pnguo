@@ -227,7 +227,7 @@ public:
 
 	std::map<int, std::vector<info_one>> get_detail();
 	// 返回的positions.pos自动管理内存,返回字形数量
-	uint32_t CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions);
+	uint32_t CollectGlyphsFromFont(const void* text, size_t length, int type, int direction, uint32_t script, GlyphPositions* positions);
 	int GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd);
 public:
 	void init_post_table();
@@ -321,7 +321,7 @@ public:
 	font_t* get_font(int idx, int styleidx);// 通过索引号获取字体对象
 	font_t* get_font(const char* family, const char* style);//通过字符串名获取
 	font_t* get_font_cur();					//获取当前字体对象
-	 
+
 public:
 	font_t* get_mfont(const std::string& name);
 	// 手动添加字体使用。纹理缓存同一个，但不能用上面函数查询

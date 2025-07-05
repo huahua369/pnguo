@@ -8299,7 +8299,7 @@ void path_v::erase(size_t idx)
 }
 void path_v::set_data(const path_v::vertex_t* d, size_t size)
 {
-	int64_t n = size / sizeof(path_v::vertex_t);
+	int64_t n = size;
 	if (d && n > 0)
 	{
 		_data.resize(n);

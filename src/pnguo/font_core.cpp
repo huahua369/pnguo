@@ -1773,7 +1773,7 @@ unsigned char* get_glyph_bitmap_subpixel(stbtt_vertex* vertices, int num_verts, 
 	, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert)
 {
 	stbtt__bitmap gbm;
-	if ((int)scale.x == 0 || (int)scale.y == 0)
+	if (!(scale.x > 0 && scale.y > 0))
 	{
 		scale.x = scale.y = std::max(std::max(scale.x, scale.y), 1.0f);
 	}
@@ -2093,12 +2093,18 @@ void font_t::init_post_table()
 
 }
 
-uint32_t font_t::CollectGlyphsFromFont(const char* text, size_t length, int direction, uint32_t script, GlyphPositions* positions)
+uint32_t font_t::CollectGlyphsFromFont(const void* text, size_t length, int type, int direction, uint32_t script, GlyphPositions* positions)
 {
 #if TTF_USE_HARFBUZZ
 	// Create a buffer for harfbuzz to use
 	auto hb_buffer = hp->hb_buffer;
-	if (!hb_buffer || !text || !*text || length == 0) {
+	if (type == 8 && length == -1) {
+		if (length == -1)
+		{
+			length = strlen((char*)text);
+		}
+	}
+	if (!hb_buffer || !text || length == 0 || length == -1) {
 		//SDL_SetError("Cannot create harfbuzz buffer");
 		return 0;
 	}
@@ -2107,12 +2113,23 @@ uint32_t font_t::CollectGlyphsFromFont(const char* text, size_t length, int dire
 	hb_buffer_set_language(hb_buffer, hp->hb_language);
 	hb_buffer_set_direction(hb_buffer, (hb_direction_t)direction);
 	hb_buffer_set_script(hb_buffer, (hb_script_t)script);
-	if (length == -1)
+	switch (type) {
+	case 8:
 	{
-		length = strlen(text);
+		hb_buffer_add_utf8(hb_buffer, (char*)text, (int)length, 0, -1);
 	}
-	// Layout the text
-	hb_buffer_add_utf8(hb_buffer, text, (int)length, 0, -1);
+	break;
+	case 16:
+	{
+		hb_buffer_add_utf16(hb_buffer, (uint16_t*)text, (int)length, 0, -1);
+	}
+	break;
+	case 32:
+	{
+		hb_buffer_add_utf32(hb_buffer, (uint32_t*)text, (int)length, 0, -1);
+	}
+	break;
+	}
 	hb_buffer_guess_segment_properties(hb_buffer);
 
 	hb_feature_t userfeatures[1];
