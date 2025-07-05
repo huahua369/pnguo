@@ -30,6 +30,9 @@
 #include <stb_rect_pack.h>
 #include <stb_truetype.h>
 
+typedef uint16_t Offset16;
+typedef uint32_t Offset32;
+
 /*
 * 获取字体信息名
 1 family名
@@ -1363,6 +1366,104 @@ public:
 		}
 		return 0;
 	}
+	struct gsub_h
+	{
+		uint16_t	majorVersion;//	Major version of the GSUB table, = 1.
+		uint16_t	minorVersion;//	Minor version of the GSUB table, = 1.
+		Offset16	scriptListOffset;//	Offset to ScriptList table, from beginning of GSUB table.
+		Offset16	featureListOffset;//	Offset to FeatureList table, from beginning of GSUB table.
+		Offset16	lookupListOffset;//	Offset to LookupList table, from beginning of GSUB table.
+		Offset32	featureVariationsOffset;//	Offset to FeatureVariations table, from beginning of the GSUB table(may be NULL).
+	};
+	struct oth_h {
+		char v[4];
+		uint16_t n;
+	};
+	static int get_gsub_string(const stbtt_fontinfo* font)
+	{
+		int i, count, stringOffset;
+		uint8_t* fc = font->data;
+		uint32_t offset = font->fontstart;
+		auto fcs = (fc + offset);
+		// 获取SFNT版本标识（前4字节）
+		unsigned int sfnt_version = *(unsigned int*)fcs;
+		auto hp = (oth_h*)fcs;
+		// 判断OpenType签名 
+		// OpenType: 0x4F54544F ("OTTO")
+		// TrueType: 0x00010000 ("true")
+		bool ot = (sfnt_version == 0x4F54544F);
+		uint32_t gsub_offset = find_table(fc, offset, "GSUB");
+		uint32_t gpos_offset = find_table(fc, offset, "GPOS");
+		if (gsub_offset > 0)
+		{
+			if (12383584 == gsub_offset)
+				gsub_offset = gsub_offset;
+			gsub_h gsub = {};
+			auto fcn = fc + gsub_offset;
+			auto gsub_table = fcn;
+			gsub.majorVersion = ttUSHORT(fcn);
+			fcn += sizeof(uint16_t);
+			gsub.minorVersion = ttUSHORT(fcn);
+			fcn += sizeof(uint16_t);
+			gsub.scriptListOffset = ttUSHORT(fcn);
+			fcn += sizeof(uint16_t);
+			gsub.featureListOffset = ttUSHORT(fcn);
+			fcn += sizeof(uint16_t);
+			gsub.lookupListOffset = ttUSHORT(fcn);
+			fcn += sizeof(uint16_t);
+			gsub.featureVariationsOffset = ttULONG(fcn);
+			// 获取LookupList 
+			uint16_t lookupCount = ttUSHORT(gsub_table + gsub.lookupListOffset);
+			uint16_t* lookups = (uint16_t*)(gsub_table + gsub.lookupListOffset + 2);
+
+			for (int i = 0; i < lookupCount; ++i) {
+				uint16_t lookupOffset = ttUSHORT((uint8_t*)lookups + i);
+				uint16_t lookupType = ttUSHORT(gsub_table + lookupOffset);
+				/*
+					查找类型 1 子表：单个替换
+					查找类型 2 子表：多重替换
+					查找类型 3 子表：替代替换
+					查找类型 4 子表：连字替换
+					查找类型 5 子表：上下文替换
+					查找类型 6 子表：链式上下文替换
+					查找类型 7 子表：替换子表扩展
+					查找类型 8 子表：反向链接上下文单个替换
+				*/
+				if (lookupType == 4) { // 连字替换 
+					uint16_t subTableCount = ttUSHORT(gsub_table + lookupOffset + 4);
+					uint16_t* subTableOffsets = (uint16_t*)(gsub_table + lookupOffset + 6);
+
+					for (int j = 0; j < subTableCount; ++j) {
+						uint16_t subTableOffset = ttUSHORT((uint8_t*)&subTableOffsets[j]);
+						// 解析连字子表（格式：覆盖范围+连字集）
+						uint16_t coverageOffset = ttUSHORT(gsub_table + subTableOffset);
+						uint16_t ligSetCount = ttUSHORT(gsub_table + subTableOffset + 2);
+						uint16_t* ligSetOffsets = (uint16_t*)(gsub_table + subTableOffset + 4);
+
+						// 遍历连字集
+						for (int k = 0; k < ligSetCount; ++k) {
+							uint16_t ligatureOffset = ttUSHORT((uint8_t*)&ligSetOffsets[k]);
+							uint16_t ligGlyph = ttUSHORT(gsub_table + ligatureOffset);
+							uint16_t compCount = ttUSHORT(gsub_table + ligatureOffset + 2);
+							uint16_t* components = (uint16_t*)(gsub_table + ligatureOffset + 4);
+
+							// 示例：打印连字规则（如 "f" + "i" -> "ﬁ"）
+							printf("Ligature: GlyphID=%d, Components=", ligGlyph);
+							for (int c = 0; c < compCount; c++)
+								printf("%d ", ttUSHORT((uint8_t*)&components[c]));
+							printf("\n");
+						}
+					}
+				}
+			}
+			return 0;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
 	class eblc_h
 	{
 	public:
@@ -4384,7 +4485,6 @@ struct Colr
 	unsigned long  table_size;
 
 };
-typedef uint32_t Offset32;
 struct colr_v0 {
 	uint16_t	version;//	Table version number—set to 0.
 	uint16_t	numBaseGlyphRecords;//	Number of BaseGlyph records.
@@ -5912,6 +6012,7 @@ std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool i
 			auto str61 = get_info_str(1033, 6, detail);
 			font->_style = a_style1;
 			ft.get_meta_string(font->font, _meta);
+			//ft.get_gsub_string(font->font);
 			for (auto& it : _meta)
 			{
 				if (it.tag == "slng")
