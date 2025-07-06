@@ -1366,6 +1366,7 @@ public:
 		}
 		return 0;
 	}
+#if 0
 	struct gsub_h
 	{
 		uint16_t	majorVersion;//	Major version of the GSUB table, = 1.
@@ -1463,7 +1464,7 @@ public:
 			return 0;
 		}
 	}
-
+#endif
 	class eblc_h
 	{
 	public:
@@ -6414,6 +6415,34 @@ font_t* font_rctx::get_font(const char* family, const char* style)
 font_t* font_rctx::get_font_cur()
 {
 	return current;
+}
+
+void font_rctx::set_script(int scriptCode, const char* family)
+{
+	script_family[scriptCode] = family;
+}
+
+void font_rctx::set_script_cn(const char* family)
+{
+	script_family[HB_SCRIPT_HAN] = family;
+}
+
+void font_rctx::set_script_en(const char* family)
+{
+	script_family[HB_SCRIPT_LATIN] = family;
+}
+
+// hb_script_t
+const char* font_rctx::select_font_by_script(int scriptCode)
+{
+	auto h = hb_script_t(scriptCode);
+	auto it = script_family.find(scriptCode);
+	if (it != script_family.end())
+	{
+		return it->second.c_str();
+	}
+	auto default_font = "Microsoft YaHei";
+	return default_font;
 }
 font_t* font_rctx::get_mfont(const std::string& name) {
 	auto it = fzv.find(name);

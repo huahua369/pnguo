@@ -2421,35 +2421,78 @@ int main(int argc, char* argv[])
 	d2->animationstate_add_animationbyname(0, 0, "run", -1, 0);
 	d2->animationstate_set_animationbyname(1, 0, "portal", 0);
 	d2->animationstate_add_animationbyname(1, 0, "shoot", -1, 0);
-
+	auto ft = app->font_ctx->get_font("Corbel", 0);
 	{
-		std::string k8 = (char*)u8"👩‍👩‍👧‍👧";
-		auto ft = app->font_ctx->get_font("Corbel", 0);
-
-
+		std::string k8 = (char*)u8"👩‍👩‍👧‍👧👩";
 		uint32_t kw = md::get_u8_idx(k8.c_str(), 0);
-
-		auto sue = app->font_ctx->get_font("Segoe UI Emoji", 0);
-		auto sue1 = sue;
-		auto gis = sue->get_glyph_index(kw, 0, 0);
-		std::vector<vertex_f> vdp;
-		auto vnn = sue->GetGlyphShapeTT(gis, &vdp);
-		auto baseline = sue->ascender;
-		int blur = 2;
-		auto src = new path_v();
-		src->set_data((path_v::vertex_t*)vdp.data(), vdp.size());
-		auto k = src->get_size();
-		//src->incpos({ 0,-src->_box.y * 2 });
-		image_gray bmp = {};
-		bmp.width = k.x * 1.5;
-		bmp.height = k.y * 1.5;
-		glm::vec2 ps = { 0,-200 };
-		ps.x -= blur * 2;
-		ps.y -= blur * 2;
-		ps.y -= baseline;
-		auto bmp1 = bmp;
-		get_path_bitmap((vertex_32f*)src->data(), src->size(), &bmp, { 1,1 }, ps, 1);
-		save_img_png(&bmp, "temp/v4.png");
+		{
+			cairo_surface_t* sur = new_image_cr({ 1024,1024 }, 0);
+			auto sue = app->font_ctx->get_font("Segoe UI Emoji", 0);
+			//do_text(k8.c_str(), 0, k8.size());
+			font_t::GlyphPositions gp = {};
+			auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
+			double scale_h = sue->get_scale(100);
+			uint32_t color = -1;
+			auto cr = cairo_create(sur);
+			set_color(cr, 0xff000000);
+			cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+			cairo_paint(cr);
+			int xx = 0;
+			int yy = 100;
+			std::vector<font_item_t> tm;
+			for (size_t i = 0; i < gp.len; i++)
+			{
+				auto pos = &gp.pos[i];
+				auto git = sue->get_glyph_item(pos->index, 0, 100);// 光栅化glyph index并缓存
+				glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+				git._apos = offset;
+				tm.push_back(git);
+			}
+			for (size_t i = 0; i < gp.len; i++)
+			{
+				auto pos = &gp.pos[i];
+				glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
+				glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+				auto git = tm[i];
+				if (git._image) {
+					auto ft = (cairo_surface_t*)git._image->ptr;
+					if (!ft) {
+						ft = new_image_cr(git._image);
+						git._image->ptr = ft;
+					}
+					if (ft)
+					{
+						auto ps = git._dwpos;// +git._apos;
+						ps.x += xx;
+						ps += offset;
+						ps.y += yy;
+						draw_image(cr, ft, ps, git._rect, git.color ? git.color : color);
+					}
+				}
+				xx += adv.x;
+			}
+			image_save_png(sur, "temp/v1.png");
+			auto sue1 = sue;
+			auto gis = sue->get_glyph_index(kw, 0, 0);
+			std::vector<vertex_f> vdp;
+			auto vnn = sue->GetGlyphShapeTT(gis, &vdp);
+			auto baseline = sue->ascender;
+			int blur = 2;
+			auto src = new path_v();
+			src->set_data((path_v::vertex_t*)vdp.data(), vdp.size());
+			auto k = src->get_size();
+			//src->incpos({ 0,-src->_box.y * 2 });
+			image_gray bmp = {};
+			bmp.width = k.x * 1.5;
+			bmp.height = k.y * 1.5;
+			glm::vec2 ps = { 0,-200 };
+			ps.x -= blur * 2;
+			ps.y -= blur * 2;
+			ps.y -= baseline;
+			auto bmp1 = bmp;
+			get_path_bitmap((vertex_32f*)src->data(), src->size(), &bmp, { 1,1 }, ps, 1);
+			save_img_png(&bmp, "temp/v4.png");
+		}
 
 		font_t::GlyphPositions gp = {};
 		font_t::GlyphPositions gp1 = {};

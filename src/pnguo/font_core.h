@@ -306,7 +306,7 @@ public:
 	std::string temfamily = "";
 	//std::string family = "NSimSun";
 	//int fontsize = 12;
-
+	std::map<int, std::string> script_family;	// hb_script_t family
 public:
 	font_rctx();
 	~font_rctx();
@@ -321,7 +321,11 @@ public:
 	font_t* get_font(int idx, int styleidx);// 通过索引号获取字体对象
 	font_t* get_font(const char* family, const char* style);//通过字符串名获取
 	font_t* get_font_cur();					//获取当前字体对象
-
+	// hb_script_t
+	void set_script(int scriptCode, const char* family);
+	void set_script_cn(const char* family);
+	void set_script_en(const char* family);
+	const char* select_font_by_script(int scriptCode);
 public:
 	font_t* get_mfont(const std::string& name);
 	// 手动添加字体使用。纹理缓存同一个，但不能用上面函数查询
