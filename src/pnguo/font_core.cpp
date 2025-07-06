@@ -5,6 +5,14 @@
 #include "font_core.h"
 #include "mapView.h" 
 
+#ifdef _WIN32
+#include <dwrite.h>
+#ifdef min
+#undef min
+#undef max
+#endif
+#endif // _WIN32
+
 #ifndef TTF_USE_HARFBUZZ
 #define TTF_USE_HARFBUZZ 1
 #endif
@@ -105,7 +113,61 @@ int get_pat_int(FcPattern* font, const char* o)
 	return s;
 }
 
+// 辅助函数：获取字体文件路径 
+#ifdef _WIN32
+std::wstring GetFontFilePath(IDWriteFont* pFont) {
+	IDWriteFontFace* pFontFace = nullptr;
+	HRESULT hr = pFont->CreateFontFace(&pFontFace);
+	if (FAILED(hr)) return L"";
 
+	UINT32 fileCount = 0;
+	hr = pFontFace->GetFiles(&fileCount, nullptr); // 获取文件数量 
+	if (FAILED(hr) || fileCount == 0) {
+		pFontFace->Release();
+		return L"";
+	}
+
+	std::vector<IDWriteFontFile*> files(fileCount);
+	hr = pFontFace->GetFiles(&fileCount, files.data());
+	if (FAILED(hr)) {
+		pFontFace->Release();
+		return L"";
+	}
+
+	std::wstring filePath;
+	for (UINT32 i = 0; i < fileCount; ++i) {
+		IDWriteFontFileLoader* pLoader = nullptr;
+		hr = files[i]->GetLoader(&pLoader);
+		if (SUCCEEDED(hr)) {
+			const void* refKey;
+			UINT32 refKeySize;
+			hr = files[i]->GetReferenceKey(&refKey, &refKeySize);
+
+			if (SUCCEEDED(hr)) {
+				IDWriteLocalFontFileLoader* pLocalLoader = nullptr;
+				hr = pLoader->QueryInterface(&pLocalLoader);
+				if (SUCCEEDED(hr) && pLocalLoader != nullptr) {
+					UINT32 pathLength = 0;
+					hr = pLocalLoader->GetFilePathLengthFromKey(refKey, refKeySize, &pathLength);
+					if (SUCCEEDED(hr) && pathLength > 0) {
+						std::vector<wchar_t> pathBuffer(pathLength + 1);
+						hr = pLocalLoader->GetFilePathFromKey(refKey, refKeySize, pathBuffer.data(), pathLength + 1);
+						if (SUCCEEDED(hr)) {
+							filePath = std::wstring(pathBuffer.data());
+							break; // 找到路径即退出循环 
+						}
+					}
+					pLocalLoader->Release();
+				}
+			}
+			pLoader->Release();
+		}
+		files[i]->Release();
+	}
+	pFontFace->Release();
+	return filePath;
+}
+#endif
 std::map<std::string, fontns> get_allfont()
 {
 	int r = 0;
@@ -118,6 +180,79 @@ std::map<std::string, fontns> get_allfont()
 			std::string yourFontFilePath = "C:\\Windows\\Fonts\\seguiemj.ttf";
 			const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();
 			FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
+		}
+		if (0)
+		{
+			CoInitialize(nullptr);
+			IDWriteFactory* pDWriteFactory = nullptr;
+			HRESULT hr = DWriteCreateFactory(
+				DWRITE_FACTORY_TYPE_SHARED,
+				__uuidof(IDWriteFactory),
+				reinterpret_cast<IUnknown**>(&pDWriteFactory)
+			);
+			IDWriteFontCollection* pFontCollection = nullptr;
+			hr = pDWriteFactory->GetSystemFontCollection(&pFontCollection);
+			UINT32 familyCount = pFontCollection->GetFontFamilyCount();
+			std::vector<std::wstring> fns;
+			std::map<std::wstring, std::vector<std::wstring>> fpath;
+			std::wstring name;
+			for (UINT32 i = 0; i < familyCount; ++i)
+			{
+				IDWriteFontFamily* pFontFamily = nullptr;
+				hr = pFontCollection->GetFontFamily(i, &pFontFamily);
+				if (SUCCEEDED(hr))
+				{
+					// 获取字体家族名称 
+					IDWriteLocalizedStrings* pFamilyNames = nullptr;
+					hr = pFontFamily->GetFamilyNames(&pFamilyNames);
+					UINT32 fontCount = pFontFamily->GetFontCount();
+					if (SUCCEEDED(hr))
+					{
+						UINT32 index = 0;
+						BOOL exists = FALSE;
+						UINT32 length = 0;
+						if (i == 30)
+							length = 0;
+						hr = pFamilyNames->FindLocaleName(L"zh-cn", &index, &exists); // 查找中文名称
+						if (exists)
+						{
+							pFamilyNames->GetStringLength(index, &length);
+							name.resize(length);
+							length++;
+							pFamilyNames->GetString(index, name.data(), length);
+							//wprintf(L"字体家族名称: %s\n", name);
+						}
+						else
+						{
+							pFamilyNames->GetStringLength(0, &length);
+							name.resize(length);
+							length++;
+							pFamilyNames->GetString(0, name.data(), length); // 默认语言 
+						}
+						fns.push_back(name);
+						pFamilyNames->Release();
+					}
+					for (UINT32 j = 0; j < fontCount; ++j) {
+						IDWriteFont* pFont = nullptr;
+						hr = pFontFamily->GetFont(j, &pFont);
+						if (SUCCEEDED(hr)) {
+							DWRITE_FONT_STYLE style = pFont->GetStyle(); // 获取样式（如Italic）
+							DWRITE_FONT_WEIGHT weight = pFont->GetWeight(); // 获取粗细（如Bold）
+							// 获取字体文件路径 
+							std::wstring filePath = GetFontFilePath(pFont);
+							if (!filePath.empty()) {
+								fpath[name].push_back(filePath);
+							}
+							pFont->Release();
+						}
+					}
+
+					pFontFamily->Release();
+				}
+			}
+			if (pFontCollection) pFontCollection->Release();
+			if (pDWriteFactory) pDWriteFactory->Release();
+			CoUninitialize();
 		}
 		//{
 		//	std::string yourFontFilePath = "Noto-COLRv1-emojicompat.ttf";
@@ -154,15 +289,45 @@ std::map<std::string, fontns> get_allfont()
 					if (family.size() && style.size())
 					{
 						auto& kt = fyv[family];
-						kt.fpath.push_back(fph);
-						kt.family = family;
-						for (auto it : familys)
-							kt.alias.insert(it);
+#ifdef _WIN32
+						fph = md::replace_s(fph, "/", "\\");
+						do
+						{
+							if (fph.find("\\\\") == std::string::npos)break;
+							fph = md::replace_s(fph, "\\\\", "\\");
+						} while (true);
+#else
+						fph = md::replace_s(fph, "\\", "/");
+						do
+						{
+							if (fph.find("//") == std::string::npos)break;
+							fph = md::replace_s(fph, "//", "/");
+						} while (true);
+#endif // _WIN32
+						int ic = 0;
+						for (size_t m = 0; m < kt.style.size(); m++)
+						{
+							auto fpath = kt.fpath[m];
+							auto stt = kt.style[m];
+							if (stt == style && fpath == fph)
+							{
+								ic++;
+							}
+						}
+						if (family == "Segoe UI Emoji")
+							family = family;
 						if (family == "NSimSun")
 							family = family;
-						if (kt.fullname.empty())
-							kt.fullname = fullname;
-						kt.style.push_back(style);
+						if (ic == 0)
+						{
+							kt.fpath.push_back(fph);
+							kt.family = family;
+							for (auto it : familys)
+								kt.alias.insert(it);
+							if (kt.fullname.empty())
+								kt.fullname = fullname;
+							kt.style.push_back(style);
+						}
 					}
 				}
 			}
