@@ -251,7 +251,7 @@ struct fontns
 {
 	std::string family, fullname, namecn;
 	std::vector<std::string> style, fpath;
-	std::set<std::string> alias;
+	std::set<std::string> alias;			// 别名
 	std::vector<void*> vptr;
 };
 

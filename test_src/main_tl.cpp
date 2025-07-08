@@ -2442,7 +2442,7 @@ int main(int argc, char* argv[])
 			cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 			cairo_paint(cr);
 			int xx = 0;
-			int yy = 100;
+			int yy = sue->get_line_height(100);
 			std::vector<font_item_t> tm;
 			for (size_t i = 0; i < gp.len; i++)
 			{
