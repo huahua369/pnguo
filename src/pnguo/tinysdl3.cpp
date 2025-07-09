@@ -3751,3 +3751,154 @@ uint32_t gpu_device_cx::get_shaderformat()
 {
 	return dev ? SDL_GetGPUShaderFormats(dev) : 0;
 }
+
+
+enum TTF_ImageType
+{
+	TTF_IMAGE_INVALID,
+	TTF_IMAGE_ALPHA,    /**< The color channels are white */
+	TTF_IMAGE_COLOR,    /**< The color channels have image data */
+	TTF_IMAGE_SDF,      /**< The alpha channel has signed distance field information */
+};
+struct AtlasDrawSequence
+{
+	SDL_Texture* texture;
+	TTF_ImageType image_type;
+	int num_rects;
+	glm::vec4* rects;
+	glm::vec2* texcoords;
+	glm::vec2* positions;
+	int* indices; 
+};
+enum TTF_Direction
+{
+	TTF_DIRECTION_INVALID = 0,
+	TTF_DIRECTION_LTR = 4,        /**< Left to Right */
+	TTF_DIRECTION_RTL,            /**< Right to Left */
+	TTF_DIRECTION_TTB,            /**< Top to Bottom */
+	TTF_DIRECTION_BTT             /**< Bottom to Top */
+};
+struct TTF_TextLayout
+{
+	int direction;
+	Uint32 script;
+	int font_height;
+	int wrap_length;
+	bool wrap_whitespace_visible;
+	int* lines;
+};
+struct TTF_TextData
+{
+	font_t* font;             /**< The font used by this text, read-only. */
+	glm::vec4 color;           /**< The color of the text, read-only. */
+
+	bool needs_layout_update;   /**< True if the layout needs to be updated */
+	TTF_TextLayout* layout;     /**< Cached layout information, read-only. */
+	int x;                      /**< The x offset of the upper left corner of this text, in pixels, read-only. */
+	int y;                      /**< The y offset of the upper left corner of this text, in pixels, read-only. */
+	int w;                      /**< The width of this text, in pixels, read-only. */
+	int h;                      /**< The height of this text, in pixels, read-only. */
+	int num_ops;                /**< The number of drawing operations to render this text, read-only. */
+	//TTF_DrawOperation* ops;     /**< The drawing operations used to render this text, read-only. */
+	//int num_clusters;           /**< The number of substrings representing clusters of glyphs in the string, read-only */
+	//TTF_SubString* clusters;    /**< Substrings representing clusters of glyphs in the string, read-only */
+
+	//SDL_PropertiesID props;     /**< Custom properties associated with this text, read-only. This field is created as-needed using TTF_GetTextProperties() and the properties may be then set and read normally */
+
+	bool needs_engine_update;   /**< True if the engine text needs to be updated */
+	SDL_Renderer* renderer;
+	AtlasDrawSequence* draw_sequence;
+	int num_sequence;
+};
+struct ttf_text
+{
+	char* text;             /**< A copy of the UTF-8 string that this text object represents, useful for layout, debugging and retrieving substring text. This is updated when the text object is modified and will be freed automatically when the object is destroyed. */
+	int num_lines;          /**< The number of lines in the text, 0 if it's empty */
+
+	int refcount;           /**< Application reference count, used when freeing surface */
+
+	TTF_TextData* internal; /**< Private */
+
+};
+void new_sequence(AtlasDrawSequence * sequence, int count)
+{
+	static const uint8_t rect_index_order[] = { 0, 1, 2, 0, 2, 3 };
+	int vertex_index = 0;
+	int* indices = sequence->indices;
+	for (int i = 0; i < count; ++i) {
+		*indices++ = vertex_index + rect_index_order[0];
+		*indices++ = vertex_index + rect_index_order[1];
+		*indices++ = vertex_index + rect_index_order[2];
+		*indices++ = vertex_index + rect_index_order[3];
+		*indices++ = vertex_index + rect_index_order[4];
+		*indices++ = vertex_index + rect_index_order[5];
+		vertex_index += 4;
+	}
+}
+
+bool TTF_UpdateText(ttf_text * text)
+{
+	if (!text || !text->internal) {
+		return false;
+	}
+	// Update the internal text data
+	TTF_TextData* internal = text->internal;
+	// Check if the text needs to be updated
+	if (internal->needs_engine_update) {
+		// Perform the update logic here, such as updating the layout, drawing operations, etc.
+		internal->needs_engine_update = false; // Reset the flag after updating
+	}
+	return true;
+}
+bool draw_renderer_text(ttf_text * text, float x, float y)
+{
+	if (!text || !text->internal/* || text->internal->engine->CreateText != CreateText*/) {
+		return false;
+	}
+
+	// Make sure the text is up to date
+	if (!TTF_UpdateText(text)) {
+		return false;
+	}
+
+
+	SDL_Renderer* renderer = text->internal->renderer;
+	AtlasDrawSequence* sequence = text->internal->draw_sequence;
+	for (int m = 0; m < text->internal->num_sequence; m++, sequence++)
+	{
+		glm::vec2* position = sequence->positions;
+		for (int i = 0; i < sequence->num_rects; ++i) {
+			auto dst = &sequence->rects[i];
+			float minx = x + dst->x;
+			float maxx = x + dst->x + dst->z;// 宽
+			float miny = y + dst->y;
+			float maxy = y + dst->y + dst->w;// 高
+
+			*position++ = glm::vec2(minx, miny);
+			*position++ = glm::vec2(maxx, miny);
+			*position++ = glm::vec2(maxx, maxy);
+			*position++ = glm::vec2(minx, maxy);
+		}
+
+		SDL_FColor color = {};
+		if (sequence->image_type == TTF_IMAGE_ALPHA) {
+			SDL_copyp(&color, &text->internal->color);
+		}
+		else {
+			// Don't alter the color data in the image
+			color.r = 1.0f;
+			color.g = 1.0f;
+			color.b = 1.0f;
+			color.a = text->internal->color.w;
+		}
+
+		SDL_RenderGeometryRaw(renderer,
+			sequence->texture,
+			(float*)sequence->positions, 2 * sizeof(float),
+			&color, 0,
+			(float*)sequence->texcoords, 2 * sizeof(float),
+			sequence->num_rects * 4,
+			sequence->indices, sequence->num_rects * 6, sizeof(*sequence->indices)); 
+	}
+	return true;
+}
