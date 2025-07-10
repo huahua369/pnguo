@@ -2242,10 +2242,8 @@ C --> D[关闭阀门]
 D --> E[拓扑修复]
 E --> F[生成应急方案]
 */
-
-
 int main(int argc, char* argv[])
-{
+{ 
 	{
 		auto rd = hz::read_json(R"(E:\3DG\TF\RQGXPT\merge\1\1.json)");
 		std::vector<glm::dvec3> pts;
