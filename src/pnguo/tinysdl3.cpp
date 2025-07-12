@@ -3758,6 +3758,8 @@ uint32_t gpu_device_cx::get_shaderformat()
 	return dev ? SDL_GetGPUShaderFormats(dev) : 0;
 }
 
+// todo 测试文本
+#if 1
 
 enum TTF_ImageType
 {
@@ -3842,7 +3844,7 @@ void new_sequence(AtlasDrawSequence * sequence, int count)
 	}
 }
 
-bool TTF_UpdateText(ttf_text * text)
+bool ttf_updatetext(ttf_text * text)
 {
 	if (!text || !text->internal) {
 		return false;
@@ -3863,7 +3865,7 @@ bool draw_renderer_text(ttf_text * text, float x, float y)
 	}
 
 	// Make sure the text is up to date
-	if (!TTF_UpdateText(text)) {
+	if (!ttf_updatetext(text)) {
 		return false;
 	}
 
@@ -3908,3 +3910,6 @@ bool draw_renderer_text(ttf_text * text, float x, float y)
 	}
 	return true;
 }
+#endif
+// !1
+
