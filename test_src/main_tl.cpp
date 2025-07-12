@@ -2363,7 +2363,6 @@ int main(int argc, char* argv[])
 	d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pma.atlas)"
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-glfw\data\spineboy-pro.skel)", 0.25, 0.2, "temp/spineboy-skel.spt");
 	*/
-
 	d2->add_pkg("temp/spineboy-j.spt", 0.25, 0.2);
 	d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
 	d2->set_pos(0, 600, 650);

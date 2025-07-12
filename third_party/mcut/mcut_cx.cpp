@@ -24,7 +24,7 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 
 #include "mcut_cx.h"
-
+//#define MCUT_WITH_COMPUTE_HELPER_THREADPOOL
 #include "mcut/mcut.h"
 #include "stlrw.h"
 #include "obj.h"

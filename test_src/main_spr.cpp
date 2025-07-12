@@ -126,8 +126,8 @@ void load_spr(form_x* form0, const std::string& fn) {
 	if (img)
 	{
 		auto tex = form0->new_texture(img->width, img->height, 0, img->data, img->stride);
-		if (tex)
-			form0->push_texture(tex, { 0,0,img->width,img->height }, { 10,100,img->width,img->height }, 1);
+		//if (tex)
+		//	form0->push_texture(tex, { 0,0,img->width,img->height }, { 10,100,img->width,img->height }, 1);
 	}
 }
 

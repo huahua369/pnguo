@@ -2189,6 +2189,7 @@ void form_x::present(double delta)
 	SDL_RenderClear(renderer);
 #if 1
 	{
+#if 0
 		auto ktd = textures[0].data();
 		auto length = textures[0].size();
 		for (size_t i = 0; i < length; i++)
@@ -2199,6 +2200,7 @@ void form_x::present(double delta)
 			auto dst = it.dst.w > 0 && it.dst.z > 0 ? &it.dst : nullptr;
 			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 		}
+#endif
 	}
 	if (!skeletons.empty()) {
 
@@ -2230,6 +2232,7 @@ void form_x::present(double delta)
 		{
 			render_cb(renderer, delta);
 		}
+#if 0
 		auto ktd = textures[1].data();
 		auto length = textures[1].size();
 		for (size_t i = 0; i < length; i++)
@@ -2252,6 +2255,7 @@ void form_x::present(double delta)
 				SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 			}
 		}
+#endif
 	}
 #endif
 	SDL_RenderPresent(renderer);
@@ -2758,22 +2762,6 @@ void* form_x::get_texture_vk(SDL_Texture* p)
 	return ra;
 }
 
-bool form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
-{
-	bool ret = false;
-	if (vkimageptr)
-	{
-		auto tex = new_texture(size.x, size.y, vkimageptr, type);// 创建SDL的bgra纹理
-		if (tex)
-		{
-			// 添加纹理到SDL窗口渲染 
-			set_texture_blend(tex, (int)BlendMode_e::normal, 0);
-			push_texture(tex, { 0,0,size.x,size.y }, { pos,size }, 0);
-			ret = true;
-		}
-	}
-	return ret;
-}
 
 void form_x::start_text_input()
 {
@@ -2854,6 +2842,23 @@ void form_x::flash_window(int opera)
 		SDL_FlashWindow(_ptr, o);
 	}
 }
+#if 0
+bool form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
+{
+	bool ret = false;
+	if (vkimageptr)
+	{
+		auto tex = new_texture(size.x, size.y, vkimageptr, type);// 创建SDL的bgra纹理
+		if (tex)
+		{
+			// 添加纹理到SDL窗口渲染 
+			set_texture_blend(tex, (int)BlendMode_e::normal, 0);
+			push_texture(tex, { 0,0,size.x,size.y }, { pos,size }, 0);
+			ret = true;
+		}
+	}
+	return ret;
+}
 void form_x::push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target)
 {
 	if (!p)
@@ -2876,6 +2881,7 @@ void form_x::pop_texture(SDL_Texture* p)
 		v.erase(std::remove_if(v.begin(), v.end(), [p](tex_rs& r) {return r.tex == p; }), v.end());
 	}
 }
+#endif
 void form_x::add_skeleton(skeleton_t* p)
 {
 	if (p)
@@ -3768,7 +3774,7 @@ struct AtlasDrawSequence
 	glm::vec4* rects;
 	glm::vec2* texcoords;
 	glm::vec2* positions;
-	int* indices; 
+	int* indices;
 };
 enum TTF_Direction
 {
@@ -3898,7 +3904,7 @@ bool draw_renderer_text(ttf_text * text, float x, float y)
 			&color, 0,
 			(float*)sequence->texcoords, 2 * sizeof(float),
 			sequence->num_rects * 4,
-			sequence->indices, sequence->num_rects * 6, sizeof(*sequence->indices)); 
+			sequence->indices, sequence->num_rects * 6, sizeof(*sequence->indices));
 	}
 	return true;
 }

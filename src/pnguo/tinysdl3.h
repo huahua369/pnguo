@@ -180,6 +180,7 @@ public:
 	std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
 	std::vector<canvas_atlas*> atlas[2];		// 图集渲染列表		简单贴图或ui用
 	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
+#if 0
 	struct tex_rs {
 		SDL_Texture* tex = 0;
 		glm::vec4 src = {}, dst = {};
@@ -187,6 +188,7 @@ public:
 		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
 	};
 	std::vector<tex_rs> textures[2];		// 纹理渲染列表,0是背景，1是前景
+#endif
 	glm::ivec4 skelet_viewport = {};
 	glm::ivec4 skelet_clip = {};
 
@@ -272,18 +274,20 @@ public:
 	SDL_Texture* new_texture(int width, int height, void* vkptr, int format);
 	SDL_Texture* new_texture(const char* fn);
 
-	bool add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type);
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
 	void set_texture_blend(SDL_Texture* p, uint32_t b, bool multiply = false);
 	void* get_texture_data(SDL_Texture* p, int* ss);
 	void free_texture(SDL_Texture* p);
 	// 获取纹理vk image
 	void* get_texture_vk(SDL_Texture* p);
+
+#if 0
 	// 添加纹理渲染。target = 0背景层，1上层
 	void push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target);
 	// 弹出纹理渲染
 	void pop_texture(SDL_Texture* p);
-
+	bool add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type);
+#endif
 	// 添加动画、图集渲染
 	void add_skeleton(skeleton_t* p);
 	void add_canvas_atlas(canvas_atlas* p, int level = 0);
