@@ -6837,7 +6837,7 @@ namespace gp {
 		float expand = 0;		//全局偏移
 		float radius = 0;		//圆角
 		float thickness = 1.0;	// 墙厚
-		float k = 0;			// 补高
+		float bh = 0;			// 补高
 		float expand0 = 0;		//全局内偏移
 		cmd_plane_t* c = 0;		//输出
 	};
@@ -6914,25 +6914,25 @@ namespace gp {
 		float expand = p->expand;
 		float expand0 = p->expand0 + innerexp;
 		int pc = 0;
-		if (p->k < 0)
-			p->k = 0;
+		if (p->bh < 0)
+			p->bh = 0;
 		// 墙面
 		if (ct->step.x > 0)
 		{
 			switch (ct->type)
 			{
 			case 0:
-				pos += v1.y + v1.z + p->k;
-				v2.y = p->pos + p->k;
-				height1.y = p->pos + v1.z + p->k;
-				height2.x = p->pos + p->k;
+				pos += v1.y + v1.z + p->bh;
+				v2.y = p->pos + p->bh;
+				height1.y = p->pos + v1.z + p->bh;
+				height2.x = p->pos + p->bh;
 				height2.y = p->pos;
 				break;
 			case 1:
-				pos -= v1.y + v1.z + p->k;
-				v2.y = p->pos - (p->k + v1.z);
-				height1.y = p->pos - (v1.z + p->k);
-				height2.x = p->pos - p->k;
+				pos -= v1.y + v1.z + p->bh;
+				v2.y = p->pos - (p->bh + v1.z);
+				height1.y = p->pos - (v1.z + p->bh);
+				height2.x = p->pos - p->bh;
 				height2.y = p->pos;
 				break;
 			default:
@@ -6955,15 +6955,15 @@ namespace gp {
 			switch (ct->type)
 			{
 			case 0:
-				pos += ct->thickness + p->k;
+				pos += ct->thickness + p->bh;
 				pos.y -= ct->thickness;
-				height2.x = p->pos + p->k;
+				height2.x = p->pos + p->bh;
 				height2.y = p->pos;
 				break;
 			case 1:
-				pos -= ct->thickness + p->k;
+				pos -= ct->thickness + p->bh;
 				pos.y += ct->thickness;
-				height2.x = p->pos - p->k;
+				height2.x = p->pos - p->bh;
 				height2.y = p->pos;
 				pccw = { 1,0 };
 				pc = 1;
@@ -7026,7 +7026,7 @@ namespace gp {
 		}
 		return rv;
 	}
-	void mkstep(base_mv_t& bmt, mkcustom_dt* n, glm::vec2 pos, glm::vec2 k, cmd_plane_t* c)
+	void mkstep(base_mv_t& bmt, mkcustom_dt* n, const glm::vec2& pos,   cmd_plane_t* c)
 	{
 		closed_t clt = {};
 		auto se2 = n->step_expand;
@@ -7050,7 +7050,7 @@ namespace gp {
 			sp.c = c;
 			sp.radius = bmt.radius;
 			sp.thickness = bmt.thickness;
-			sp.k = k.x;
+			sp.bh = n->step_bh.x;
 			sp.pos = pos.x;
 			sp.expand = se2.x;
 			sp.expand0 = se20.x;
@@ -7074,7 +7074,7 @@ namespace gp {
 			sp.c = c;
 			sp.radius = bmt.radius;
 			sp.thickness = bmt.thickness;
-			sp.k = k.y;
+			sp.bh = n->step_bh.y;
 			sp.pos = pos.y;
 			sp.expand = se2.y;
 			sp.expand0 = se20.y;
@@ -7082,7 +7082,7 @@ namespace gp {
 		}
 	}
 	// 生成B样条线约束的竖三角面
-	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount)
+	glm::vec4 mkcustom(mkcustom_dt* np, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount)
 	{
 		glm::vec4 v4 = {};
 		do {
@@ -7190,7 +7190,7 @@ namespace gp {
 				kc++;
 			}
 			c->thickness = ctk;
-			mkstep(bm, np, sth, k, c);
+			mkstep(bm, np, sth, c);
 		} while (0);
 		return v4;
 	}

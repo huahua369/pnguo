@@ -2243,7 +2243,7 @@ D --> E[拓扑修复]
 E --> F[生成应急方案]
 */
 int main(int argc, char* argv[])
-{ 
+{
 	{
 		auto rd = hz::read_json(R"(E:\3DG\TF\RQGXPT\merge\1\1.json)");
 		std::vector<glm::dvec3> pts;
@@ -2424,9 +2424,9 @@ int main(int argc, char* argv[])
 		uint32_t kw = md::get_u8_idx(k8.c_str(), 0);
 		{
 			/*
-			c:\windows\fonts\seguiemj.ttf
-			c:\windows\fonts\seguiemj.ttf
-*/
+				c:\windows\fonts\seguiemj.ttf
+				c:\windows\fonts\seguiemj.ttf
+			*/
 			cairo_surface_t* sur = new_image_cr({ 1024,1024 }, 0);
 			auto sue = app->font_ctx->get_font("Segoe UI Emoji", 0);
 			do_text(k8.c_str(), 0, k8.size());

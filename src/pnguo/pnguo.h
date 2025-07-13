@@ -615,6 +615,7 @@ namespace gp {
 		glm::vec4 step = {};				// 上台阶, 端面厚度x，-1则无封面。4个参数则台阶
 		glm::vec4 step1 = {};				// 下台阶
 		glm::vec2 step2 = {};
+		glm::vec2 step_bh = {};				// 补高
 	};
 	struct base_mv_t
 	{
@@ -631,7 +632,7 @@ namespace gp {
 		int radius = 0;
 	};
 	// 生成B样条线约束的竖三角面
-	glm::vec4 mkcustom(mkcustom_dt* np, glm::vec2 k, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
+	glm::vec4 mkcustom(mkcustom_dt* np, base_mv_t& bm, cmd_plane_t* c, const glm::uvec2& bcount = { -1,-1 });
 
 	// 多边形
 	struct mesh_mt
