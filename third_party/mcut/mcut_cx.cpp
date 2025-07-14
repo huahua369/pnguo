@@ -157,7 +157,7 @@ namespace gp {
 	{
 		if (!pt || !n)return;
 		try
-		{ 
+		{
 			cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
 			std::vector<vec2> v3;
 			std::vector<cdt::edge_t> cc_face_edges;
@@ -1093,23 +1093,35 @@ uint32_t get_opflags(flags_b f) {
 		break;
 	case flags_b::A_NOT_B:
 		flags |= MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
-		break;
+		break; // 差集a -= b
 	case flags_b::B_NOT_A:
 		flags |= MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW;
-		break;
+		break;	// 差集b-=a
 	case flags_b::UNION:
 		flags |= MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
-		break;
+		break;	// 并集
 	case flags_b::INTERSECTION:
 		flags |= MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW;
-		break;
+		break;	// 交集
 	default:
 		break;
 	}
 	return flags;
 }
 
-
+bool query_com(McContext context, uint32_t type, std::vector<McConnectedComponent>& connectedComponents)
+{
+	// query the number of available connected component
+	uint32_t numConnComps = 0;
+	auto err = mcGetConnectedComponents(context, (McConnectedComponentType)type, 0, NULL, &numConnComps);
+	if (err != MC_NO_ERROR || numConnComps == 0) {
+		std::cout << "MCUT mcGetConnectedComponents fails! err=" << err << ", numConnComps" << numConnComps;
+		return false;
+	}
+	connectedComponents.resize(numConnComps, MC_NULL_HANDLE);
+	err = mcGetConnectedComponents(context, (McConnectedComponentType)type, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
+	return err == MC_NO_ERROR;
+}
 
 bool do_boolean_single(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean_opts)
 {
@@ -1159,22 +1171,18 @@ bool do_boolean_single(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean
 		return false;
 	}
 
-	// query the number of available connected component
-	uint32_t numConnComps;
-	err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_FRAGMENT, 0, NULL, &numConnComps);
-	if (err != MC_NO_ERROR || numConnComps == 0) {
-		std::cout << "MCUT mcGetConnectedComponents fails! err=" << err << ", numConnComps" << numConnComps;
+	// query the number of available connected component 
+	std::vector<McConnectedComponent> connectedComponents;
+	uint32_t qc = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
+	if (!query_com(context, qc, connectedComponents)) {
 		mcReleaseContext(context);
-		if (numConnComps == 0 && boolean_opts == flags_b::UNION) {
+		if (connectedComponents.empty() == 0 && boolean_opts == flags_b::UNION) {
 			merge_mcut_meshes(srcMesh, cutMesh);
 			return true;
 		}
 		return false;
 	}
-
-	std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
-	err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_FRAGMENT, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
-
+	size_t numConnComps = connectedComponents.size();
 	mmesh_t outMesh;
 	int N_vertices = 0;
 	// traversal of all connected components
@@ -1184,8 +1192,19 @@ bool do_boolean_single(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean
 
 		// query the vertices
 		McSize numBytes = 0;
+#if 0
+		McSize fBytes = 0;
+		McSize fsBytes = 0;
+		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &fBytes);
+		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &fsBytes);
+		std::vector<uint32_t> facess(fBytes / sizeof(uint32_t));
+		std::vector<uint32_t> facess_size(fsBytes / sizeof(uint32_t));
+		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, fBytes, facess.data(), 0);
+		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, fsBytes, facess_size.data(), 0);
+
+#endif
 		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
-		uint32_t            ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
+		uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
 		std::vector<double> ccVertices((uint64_t)ccVertexCount * 3u, 0);
 		err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
 
@@ -1216,14 +1235,16 @@ bool do_boolean_single(mmesh_t& srcMesh, const mmesh_t& cutMesh, flags_b boolean
 
 		// for each face in CC
 		std::vector<glm::ivec3> faces(ccFaceCount);
+		std::vector<uint32_t> faceIndex;
 		for (uint32_t f = 0; f < ccFaceCount; ++f) {
 			bool reverseWindingOrder = (fragmentLocation == MC_FRAGMENT_LOCATION_BELOW) && (patchLocation == MC_PATCH_LOCATION_OUTSIDE);
 			int  faceSize = faceSizes.at(f);
 			if (reverseWindingOrder) {
-				std::vector<uint32_t> faceIndex(faceSize);
+				faceIndex.resize(faceSize);
 				// for each vertex in face
 				for (int v = faceSize - 1; v >= 0; v--) { faceIndex[v] = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v]; }
-				std::copy(faceIndex.begin(), faceIndex.end(), ccFaceIndices.begin() + faceVertexOffsetBase);
+				//std::copy(faceIndex.begin(), faceIndex.end(), ccFaceIndices.begin() + faceVertexOffsetBase);
+				memcpy(ccFaceIndices.data() + faceVertexOffsetBase, faceIndex.data(), faceSize * sizeof(uint32_t));
 			}
 			faceVertexOffsetBase += faceSize;
 		}

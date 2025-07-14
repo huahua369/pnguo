@@ -21,6 +21,8 @@
 #include <pnguo/editor_2d.h>
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <stb_image_write.h>
+#include <mcut/mcut_cx.h>
+#include <mcut/stlrw.h>
 
 #include "logic_gates.h"
 
@@ -2242,6 +2244,384 @@ C --> D[关闭阀门]
 D --> E[拓扑修复]
 E --> F[生成应急方案]
 */
+
+
+
+struct he_vert {
+	glm::vec3 v = {};
+	//float x = 0.0f, y = 0.0f, z = 0.0f;		// 顶点坐标
+	int edge = -1;			// 指向以该顶点为起点的任意半边
+};
+struct he_edge {
+	int vert = -1;			// 指向半边的终点顶点 
+	int next = -1;			// 同一面内下一条半边
+	int pair = -1;			// 对应的反向半边（孪生）, 孪生半边索引（-1表示无，即边界边twin
+	int face = -1;			// 所属面
+};
+struct he_face {
+	int edge = 0;			// 指向该面任意一条半边
+	int count = 0;			// 边数
+	int material = 0;		// 材质id
+	// todo 法向等
+};
+struct he_mesh {
+	std::vector<he_vert> _v;
+	std::vector<he_edge> _e;
+	std::vector<he_face> _f;
+	std::vector<int> t_indices;
+public:
+	int add_vert(const glm::vec3& v);
+	int add_vert(const glm::vec3* v, int n);
+	// 添加面（顶点索引按逆时针顺序排列，返回面索引）
+	int add_face(int* vertex_indices, int num_vertices);
+	//遍历面的所有半边
+	void traverse_face_edges(int face);
+	//围绕顶点的半边遍历
+	void traverse_vertex_edges(int v);
+};
+
+int he_mesh::add_vert(const glm::vec3& v)
+{
+	auto r = _v.size();
+	he_vert hv = { v,-1 };
+	_v.push_back(hv);
+	return r;
+}
+
+int he_mesh::add_vert(const glm::vec3* vs, int n)
+{
+	if (vs && n > 0)
+	{
+		_v.reserve(_v.size() + n);
+		auto r = _v.size();
+		for (size_t i = 0; i < n; i++)
+		{
+			he_vert hv = { vs[i],-1 };
+			_v.push_back(hv);
+		}
+		return r;
+	}
+	return 0;
+}
+
+// 添加面（顶点索引按逆时针顺序排列，返回面索引）
+int he_mesh::add_face(int* vertex_indices, int num_vertices) {
+	if (_v.empty() || !vertex_indices || num_vertices < 3) return -1;
+
+	// 1. 创建新面（存入面数组）
+	int face_idx = _f.size();
+	auto face = &_f.emplace_back(he_face());
+	face->edge = -1; // 初始化为-1，后续设置 
+
+	// 2. 为面的每条边创建半边（临时存储半边索引）
+	t_indices.resize(num_vertices);
+	int* he_indices = t_indices.data();
+	if (!he_indices) return -1;
+	auto vertex_count = _v.size();
+	auto half_edge_count = _e.size();
+	_e.resize(half_edge_count + num_vertices * 1);
+	for (int i = 0; i < num_vertices; i++) {
+		int curr_v = vertex_indices[i];       // 当前顶点 
+		int next_v = vertex_indices[(i + 1) % num_vertices]; // 下一个顶点（循环）
+
+		// 检查顶点索引是否有效 
+		if (curr_v < 0 || curr_v >= vertex_count) {
+			return -1;
+		}
+		if (next_v < 0 || next_v >= vertex_count) {
+			return -1;
+		}
+
+		// 创建新半边（存入半边数组） 
+		he_edge* he = &_e[half_edge_count];
+		he->vert = curr_v;       // 原点顶点是当前顶点 
+		he->face = face_idx;       // 所属面是新面 
+		he->next = -1;             // 下一个半边后续设置 
+		he->pair = -1;             // 孪生半边后续查找 
+		int he_idx = half_edge_count++;
+		he_indices[i] = he_idx;
+
+		// 设置顶点的离开半边（任意一个离开该顶点的半边均可）
+		_v[curr_v].edge = he_idx;
+	}
+
+	// 3. 设置每个半边的next指针（形成面的边界循环）
+	for (int i = 0; i < num_vertices; i++) {
+		int curr_he = he_indices[i];
+		int next_he = he_indices[(i + 1) % num_vertices];
+		_e[curr_he].next = next_he;
+	}
+	// 4. 查找每个半边的孪生半边（方向相反的同一条边） 
+	// 注：此处为简化，采用遍历方式查找，实际可优化为哈希表（如用(u, v)作为键） 
+	for (int i = 0; i < num_vertices; i++) {
+		int curr_he = he_indices[i];
+		int curr_v = vertex_indices[i];
+		int next_v = vertex_indices[(i + 1) % num_vertices];
+
+		// 孪生半边的条件：origin是next_v，且其next的origin是curr_v（即方向为next_v→curr_v）
+		for (int j = 0; j < half_edge_count; j++) {
+			if (j == curr_he) continue; // 跳过自身 
+			he_edge* twin_he = &_e[j];
+			if (twin_he->vert != next_v) continue; // 原点必须是next_v 
+			if (twin_he->next == -1) continue;       // 必须有下一个半边 
+			he_edge* twin_next_he = &_e[twin_he->next];
+			if (twin_next_he->vert != curr_v) continue; // 下一个半边的原点必须是curr_v 
+
+			// 找到孪生半边，设置两者的twin指针 
+			_e[curr_he].pair = j;
+			_e[j].pair = curr_he;
+			break; // 找到后退出循环 
+		}
+	}
+
+	// 5. 设置面的起始半边（取第一个半边）
+	face->edge = he_indices[0];
+	return face_idx;
+}
+void he_mesh::traverse_face_edges(int f) {
+	// 打印面的信息（遍历面的边界半边） 
+	int face_idx = f;
+	if (_f.empty() || face_idx < 0 || face_idx >= _f.size()) return;
+	auto face = &_f[face_idx];
+	if (face->edge == -1) {
+		printf((char*)u8"Face %d: 无效（无起始半边）\n", face_idx);
+		return;
+	}
+	printf((char*)u8"Face %d: 起始半边%d\n", face_idx, face->edge);
+	int he_idx = face->edge;
+	do {
+		auto he = &_e[he_idx];
+		auto v = &_v[he->vert].v;
+		printf((char*)u8"  半边%d: 原点(%f, %f, %f)，所属面%d，下一个半边%d，孪生半边%d\n", he_idx, v->x, v->y, v->z, he->face, he->next, he->pair);
+		he_idx = he->next;
+	} while (he_idx != face->edge); // 循环直到回到起始半边  
+}
+void he_mesh::traverse_vertex_edges(int v) {
+	he_vert* vert = &_v[v];
+	int start = vert->edge;
+	int current = vert->edge;
+	do {
+		auto he = &_e[current];
+		auto& v = _v[he->vert].v;
+		// 输出当前半边的终点坐标
+		printf("Adjacent Vertex: (%f, %f, %f)\n", v.x, v.y, v.z);
+		if (he->pair < 0)
+		{
+			break;
+		}
+		if (current < 0)
+		{
+			break;
+		}
+		current = _e[he->pair].next;   // 切换到相邻面的下一条半边
+	} while (current != start);
+}
+int64_t testexp3d()
+{
+	int64_t ret = 0;
+	do {
+		std::string savedt;
+		std::string savefn = "temp/rs.stl";
+		{
+			// 加载源stl
+			mesh_triangle_cx* tc = new_mesh("E:\\tx\\0_straight_0_0.stl");
+			if (!tc) { ret = -4; break; }
+			std::vector<glm::vec3> poss = { { 40,20,0 },{40,-20,0} };
+			if (poss.size() < 2)
+			{
+				ret = -5; break;
+			}
+			printf("bool_lines begin\n");
+			std::vector<mesh_triangle_cx> mv, mv1, mvt;
+			gp::line_style_t et = { 3,6,1,0,{1,1} };
+			gp::mesh_mt ltf = {};			// 四边形网络
+			gp::mesh_mt ltf0 = {};			// 四边形网络
+			et.depth = 3;		// 深度
+			et.count = 6;		// 分辨率
+			et.thickness = 1;	// 厚度
+			et.bottom_thickness = 0;//封底厚度
+			et.type = { 0,1 };// hz::toVec2(n["btype"]);//样式 x.0=v，1=U，2=|_|，y=-1倒过来，
+			glm::vec2 ss = { 6,5 };
+			auto ctt = poss.size();
+			auto tk = 1;
+			for (int i = 0; i < 2; i++)
+			{
+				printf("bool_lines %d\n", i);
+				auto et1 = et;
+				et1.thickness = tk;
+				auto v0 = poss[i];
+				auto v1 = poss[i + 1];
+				v0.z += 0.1;
+				v1.z += 0.1;
+				gp::build_line3d(v0, v1, ss, &et1, &ltf);
+				et.thickness = 0;	// 厚度0为实心。
+				gp::build_line3d(poss[i], poss[i + 1], ss, &et, &ltf0);
+				i++;
+			}
+
+			std::vector<uint32_t> face_size;		// 面的边数3\4、多边形
+			std::vector<uint32_t> face_indice;		// 索引
+			std::vector<double> vertex_coord;		// 顶点坐标
+			if (ltf.vertex_coord.empty() || ltf0.vertex_coord.empty())
+			{
+				ret = -6; break;
+			}
+			auto src_tc = mesh_split(tc);
+			auto cut_ltf = mesh_split(&ltf);	// 切割块
+			auto cut_ltf0 = mesh_split(&ltf0);	// 实心块
+
+			mesh_save_stl(&cut_ltf[0], "temp/cltf.stl");
+			mesh_save_stl(&cut_ltf0[0], "temp/cltf0.stl");
+			std::string fns[] = {
+				"a_not_b",		// 差集a-=b
+				"b_not_a",		// 差集b-=a
+				"union",		// 并集
+				"intersection"	// 交集
+			};
+			{
+				print_time aadk("bool mesh A_NOT_B");
+				make_boolean(tc, &ltf0, mv, flags_b::A_NOT_B);
+				make_boolean(&ltf, tc, mv1, flags_b::A_NOT_B);
+				std::vector<mesh_triangle_cx> vs;
+				printf("bool_lines 5181\n");
+				if (mv1.size())
+				{
+					for (auto& mt : mv1) {
+						mesh_split(&mt, &vs);
+					}
+					if (vs.size())
+					{
+						mv1.clear();
+						for (auto& mt : vs)
+						{
+							make_boolean(&mt, tc, mv1, flags_b::A_NOT_B);
+						}
+						vs.clear();
+						for (auto& mt : mv1) {
+							mesh_split(&mt, &vs);
+						}
+						vs.swap(mv1);
+					}
+					vs.clear();
+					glm::vec2 p2[2] = { poss[0], poss[1] };
+					struct vs2 { float d; size_t i; };
+					std::vector<vs2> ks;
+					auto pd = glm::distance(p2[0], p2[1]);
+					for (size_t i = 0; i < mv1.size(); i++)
+					{
+						auto& it = mv1[i];
+						auto& dv = it.vertices;
+						int icc = 0;
+						float d = pd;
+						for (auto& vt : dv)
+						{
+							glm::vec2 vt0 = vt;
+							d = std::min(d, std::min(glm::distance(p2[0], vt0), glm::distance(p2[1], vt0)));//判断是否是线头尾
+						}
+						ks.push_back({ d,i });
+					}
+					std::sort(ks.begin(), ks.end(), [](const vs2& v1, const vs2& v2) {return v1.d > v2.d; });
+
+					for (auto& it : ks) {
+						if (it.d > 0)
+						{
+							vs.push_back(std::move(mv1[it.i]));
+						}
+					}
+					if (vs.size())
+					{
+						mv1.swap(vs);
+					}
+					for (auto& kt : mv1) {
+						for (auto& xt : kt.vertices) {
+							xt.z -= 0.1;
+						}
+					}
+				}
+			}
+			if (mv.size() && mv1.size())
+			{
+				print_time aadk("bool mesh UNION");
+				printf("bool_lines 5213\n");
+				for (size_t i = 1; i < mv.size(); i++)
+				{
+					its_merge(mv[0], mv[i]);
+				}
+				for (size_t i = 1; i < mv1.size(); i++)
+				{
+					its_merge(mv1[0], mv1[i]);
+				}
+
+				make_boolean(&mv[0], &mv1[0], mvt, flags_b::UNION);
+				printf("bool_lines 5219\n");
+			}
+			else if (mv.size()) {
+
+				print_time aadk("bool mesh UNION");
+				make_boolean(&mv[0], &ltf, mvt, flags_b::UNION);
+				printf("bool_lines 5225\n");
+			}
+			if (mvt.size()) {
+				// 保存结果
+				auto& it = mvt[0];
+				auto fn = savefn;
+				printf("bool_lines save\n");
+				mesh_save_stl(&it, fn.c_str());
+				ret = mvt.size();
+				if (savedt.size())
+				{
+					std::vector<char> btd;
+					auto p = &mvt[0];
+					stl3d_cx sc;
+					auto length = p->indices.size();
+					auto d = p->vertices.data();
+					auto t = p->indices.data();
+					sc.add(0, 0, length * 3);
+					printf("bool_lines save 0\n");
+					for (size_t i = 0; i < length; i++)
+					{
+						auto it = t[i];
+						glm::vec3 v[3] = { d[it.x],d[it.y],d[it.z] };
+						sc.add(v, 3, 0);
+					}
+					printf("bool_lines save 1\n");
+					sc.save_binary(btd);
+					if (btd.size())
+					{
+						//set_data(savedt.c_str(), btd.data(), btd.size());
+
+					}
+					printf("bool_lines save 2\n");
+				}
+			}
+
+			printf("bool_lines end\n");
+		}
+
+	} while (0);
+	return ret;
+}
+
+
+void he_test() {
+	he_mesh m = {};
+	int v0 = m.add_vert(glm::vec3(0.0f, 0.0f, 0.0f)); // (0,0,0) 
+	int v1 = m.add_vert(glm::vec3(1.0f, 0.0f, 0.0f)); // (1,0,0) 
+	int v2 = m.add_vert(glm::vec3(1.0f, 1.0f, 0.0f)); // (1,1,0) 
+	int v3 = m.add_vert(glm::vec3(0.0f, 1.0f, 0.0f)); // (0,1,0) 
+	if (v0 == -1 || v1 == -1 || v2 == -1 || v3 == -1) {
+		printf((char*)u8"添加顶点失败！\n");
+		return;
+	}
+	// 3. 添加面（底面，顶点按逆时针顺序：v0→v1→v2→v3）
+	int face_vertices[] = { v0, v1, v2, v3 };
+	int face_idx = m.add_face(face_vertices, 4);
+	m.traverse_face_edges(0);
+	m.traverse_vertex_edges(1);
+	testexp3d();
+	printf("");
+}
+
 int main(int argc, char* argv[])
 {
 	{
@@ -2332,6 +2712,10 @@ int main(int argc, char* argv[])
 	const char* wtitle = (char*)u8"多功能管理工具";
 	auto tstr = hz::u8_to_gbk(wtitle);
 	auto app = new_app();
+
+
+	he_test();
+
 	cpuinfo_t cpuinfo = get_cpuinfo();
 	glm::ivec2 ws = { 1280,860 };
 	// ef_vulkan ef_gpu|ef_resizable
