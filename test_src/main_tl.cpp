@@ -2624,6 +2624,12 @@ void he_test() {
 
 int main(int argc, char* argv[])
 {
+	auto kss = alloca(1024 * 1024);
+
+	return 0;
+}
+int mm() {
+
 	{
 		auto rd = hz::read_json(R"(E:\3DG\TF\RQGXPT\merge\1\1.json)");
 		std::vector<glm::dvec3> pts;

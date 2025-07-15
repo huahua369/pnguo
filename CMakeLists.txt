@@ -20,6 +20,17 @@ message("msvc: ${CMAKE_SYSTEM_VERSION}")
 message("CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
 message("VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
 
+
+# 计算栈大小（4MB）
+math(EXPR stack_size "128*1024*1024") 
+# 跨平台配置栈容量
+if(MSVC)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:${stack_size}")
+elseif(UNIX AND NOT APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--stack,${stack_size}")
+endif()
+
+
 # 如果支持，请为 MSVC 编译器启用热重载。
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)

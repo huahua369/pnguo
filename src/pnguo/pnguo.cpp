@@ -4145,7 +4145,7 @@ namespace gp {
 		PathsD r;
 		glm::vec3 k = { 0,radius, ccw };
 		auto pt = gp::new_path_node(ptr, k.x, k.y, ptr->angle, ccw, num_segments, ml, ds);
-		if (pt);
+		if (pt)
 		{
 			fv_it fv = { pt };
 			r = fv2pathsd(&fv, num_segments);
