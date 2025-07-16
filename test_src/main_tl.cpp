@@ -2594,7 +2594,7 @@ int64_t testexp3d()
 					printf("bool_lines save 2\n");
 				}
 			}
-
+			free_mesh(tc);
 			printf("bool_lines end\n");
 		}
 
@@ -2619,16 +2619,12 @@ void he_test() {
 	m.traverse_face_edges(0);
 	m.traverse_vertex_edges(1);
 	testexp3d();
+	testexp3d();
 	printf("");
 }
 
 int main(int argc, char* argv[])
 {
-	auto kss = alloca(1024 * 1024);
-
-	return 0;
-}
-int mm() {
 
 	{
 		auto rd = hz::read_json(R"(E:\3DG\TF\RQGXPT\merge\1\1.json)");
