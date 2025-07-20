@@ -2716,7 +2716,7 @@ int main(int argc, char* argv[])
 	auto app = new_app();
 
 
-	he_test();
+	//he_test();
 
 	cpuinfo_t cpuinfo = get_cpuinfo();
 	glm::ivec2 ws = { 1280,860 };
