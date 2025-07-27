@@ -180,7 +180,7 @@ public:
 	std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
 	std::vector<canvas_atlas*> atlas[2];		// 图集渲染列表		简单贴图或ui用
 	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
-#if 0
+#if 1
 	struct tex_rs {
 		SDL_Texture* tex = 0;
 		glm::vec4 src = {}, dst = {};
@@ -281,7 +281,7 @@ public:
 	// 获取纹理vk image
 	void* get_texture_vk(SDL_Texture* p);
 
-#if 0
+#if 1
 	// 添加纹理渲染。target = 0背景层，1上层
 	void push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target);
 	// 弹出纹理渲染

@@ -2189,7 +2189,7 @@ void form_x::present(double delta)
 	SDL_RenderClear(renderer);
 #if 1
 	{
-#if 0
+#if 1
 		auto ktd = textures[0].data();
 		auto length = textures[0].size();
 		for (size_t i = 0; i < length; i++)
@@ -2232,7 +2232,7 @@ void form_x::present(double delta)
 		{
 			render_cb(renderer, delta);
 		}
-#if 0
+#if 1
 		auto ktd = textures[1].data();
 		auto length = textures[1].size();
 		for (size_t i = 0; i < length; i++)
@@ -2842,7 +2842,7 @@ void form_x::flash_window(int opera)
 		SDL_FlashWindow(_ptr, o);
 	}
 }
-#if 0
+#if 1
 bool form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
 {
 	bool ret = false;

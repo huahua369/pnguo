@@ -17927,6 +17927,48 @@ namespace vkr {
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 	}
+
+#if 1
+
+	void cp_barrier(VkCommandBuffer cmdBuf1, GBuffer* gbp)
+	{
+		VkImageMemoryBarrier barrier = {};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.pNext = NULL;
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+
+		VkImageMemoryBarrier barriers[3];
+		barriers[0] = barrier;
+		barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		barriers[0].image = gbp->m_DepthBuffer.Resource();
+
+		barriers[1] = barrier;
+		barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barriers[1].image = gbp->m_MotionVectors.Resource();
+
+		// no layout transition but we still need to wait
+		barriers[2] = barrier;
+		barriers[2].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barriers[2].image = gbp->m_HDR.Resource();
+
+		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+			, 0, 0, NULL, 0, NULL, 3, barriers);
+	}
+#endif // 1
+
 	//--------------------------------------------------------------------------------------
 	//
 	// todo OnRender
@@ -18257,41 +18299,7 @@ namespace vkr {
 		if (pState->bUseTAA)
 		{
 			m_TAA.m_bSharpening = pState->bTAAsharpening;
-			{
-				VkImageMemoryBarrier barrier = {};
-				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-				barrier.pNext = NULL;
-				barrier.srcAccessMask = 0;
-				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				barrier.subresourceRange.baseMipLevel = 0;
-				barrier.subresourceRange.levelCount = 1;
-				barrier.subresourceRange.baseArrayLayer = 0;
-				barrier.subresourceRange.layerCount = 1;
-
-				VkImageMemoryBarrier barriers[3];
-				barriers[0] = barrier;
-				barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-				barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-				barriers[0].image = m_GBuffer.m_DepthBuffer.Resource();
-
-				barriers[1] = barrier;
-				barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-				barriers[1].image = m_GBuffer.m_MotionVectors.Resource();
-
-				// no layout transition but we still need to wait
-				barriers[2] = barrier;
-				barriers[2].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				barriers[2].image = m_GBuffer.m_HDR.Resource();
-
-				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 3, barriers);
-			}
+			cp_barrier(cmdBuf1, &m_GBuffer);
 
 			m_TAA.Draw(cmdBuf1);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
@@ -18967,7 +18975,7 @@ namespace vkr {
 		}
 
 		// Update Camera
-		UpdateCamera(m_camera); 
+		UpdateCamera(m_camera);
 		if (m_UIState.bUseTAA)
 		{
 			static uint32_t Seed = 0;
@@ -19718,3 +19726,140 @@ void get_queue_info(void* physicaldevice)
 	vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)physicaldevice, &queue_family_count, queue_props.data());
 	assert(queue_family_count >= 1);
 }
+
+#if 1
+//第一人称相机
+class Camera
+{
+public:
+	glm::vec3 Position;
+	glm::vec3 Front;
+	glm::vec3 Up;
+	glm::vec3 Right;
+	glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+	float Yaw = -90.0f;  // 偏航角
+	float Pitch = 0.0f;  // 俯仰角
+	float Speed = 2.5f;  // 移动速度
+	float MouseSensitivity = 0.1f;  // 鼠标灵敏度
+
+
+	float lastX = 400, lastY = 300;
+public:
+	Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f))
+		: Position(position), Front(glm::vec3(0.0f, 0.0f, -1.0f)) {
+		UpdateCameraVectors();
+	}
+
+	glm::mat4 GetViewMatrix() {
+		return glm::lookAt(Position, Position + Front, Up);
+	}
+
+	void ProcessKeyboard(int direction, float deltaTime) {
+		float velocity = Speed * deltaTime;
+		if (direction == 8) Position += Front * velocity;
+		if (direction == 2) Position -= Front * velocity;
+		if (direction == 4) Position -= Right * velocity;
+		if (direction == 6) Position += Right * velocity;
+	}
+
+	void ProcessMouseMovement(float xoffset, float yoffset) {
+		xoffset *= MouseSensitivity;
+		yoffset *= MouseSensitivity;
+
+		Yaw += xoffset;
+		Pitch -= yoffset;
+
+		// 限制俯仰角 [-89°, 89°]
+		if (Pitch > 89.0f) Pitch = 89.0f;
+		if (Pitch < -89.0f) Pitch = -89.0f;
+
+		UpdateCameraVectors();
+	}
+	// 鼠标操作
+	void mouse_callback(double xpos, double ypos) {
+		float xoffset = xpos - lastX;
+		float yoffset = lastY - ypos; // 反转Y轴方向
+		lastX = xpos;
+		lastY = ypos;
+
+		ProcessMouseMovement(xoffset, yoffset);
+	}
+	/*
+	* 键盘操作ProcessKeyboard
+	 // 更新视图矩阵
+	glm::mat4 view = camera.GetViewMatrix();
+	*/
+private:
+	void UpdateCameraVectors() {
+		// 通过欧拉角计算方向向量
+		glm::vec3 front;
+		front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+		front.y = sin(glm::radians(Pitch));
+		front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+		Front = glm::normalize(front);
+
+		// 计算右向量和上向量
+		Right = glm::normalize(glm::cross(Front, WorldUp));
+		Up = glm::normalize(glm::cross(Right, Front));
+	}
+};
+//第三人称相机
+class ThirdPersonCamera {
+public:
+	glm::vec3 position;   // 相机位置 
+	glm::vec3 target;     // 观察目标位置 
+	glm::vec3 offset;     // 目标到相机的初始偏移量 
+	glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	float distance;       // 相机与目标的距离 
+	float minDistance = 2.0f; // 最小距离限制 
+	float maxDistance = 15.0f; // 最大距离限制 
+	float horizontalAngle = 0.0f; // 水平旋转角度 
+	float verticalAngle = 0.0f;   // 垂直旋转角度 
+
+	// 更新相机位置 
+	void update() {
+		// 1. 计算旋转后的偏移向量 [3]()
+		glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), horizontalAngle, glm::vec3(0, 1, 0));
+		rotation = glm::rotate(rotation, verticalAngle, glm::vec3(1, 0, 0));
+
+		// 2. 应用旋转并计算新位置 [1]()
+		glm::vec3 rotatedOffset = rotation * glm::vec4(offset, 1.0f);
+		position = target + distance * glm::normalize(rotatedOffset);
+	}
+
+	// 处理鼠标移动输入 
+	void processMouse(float deltaX, float deltaY) {
+		// 3. 更新旋转角度 [2]()
+		horizontalAngle += deltaX * 0.01f; // 灵敏度调整 
+		verticalAngle = glm::clamp(verticalAngle + deltaY * 0.01f,
+			-glm::pi<float>() / 3,
+			glm::pi<float>() / 3); // 限制垂直角度范围 
+	}
+
+	// 处理滚轮缩放 
+	void processScroll(float delta) {
+		// 4. 调整距离并限制范围 [1]()
+		distance = glm::clamp(distance - delta, minDistance, maxDistance);
+	}
+
+	// 获取视图矩阵 
+	glm::mat4 getViewMatrix() {
+		return glm::lookAt(position, target, WorldUp); // 上向量为Y轴 
+	}
+};
+int test_3main() {
+	ThirdPersonCamera camera;
+	camera.target = glm::vec3(0, 0, 0); // 角色位置 
+	camera.offset = glm::vec3(0, 2, 5); // 初始偏移 (高度2，后方5单位)
+	camera.distance = 8.0f;
+
+	// 模拟输入 (实际中从GLFW/SDL获取)
+	camera.processMouse(1.0f, 0.5f);  // 鼠标移动 
+	camera.processScroll(0.5f);         // 滚轮缩放
+
+	camera.update();  // 更新相机位置
+	glm::mat4 view = camera.getViewMatrix();  // 用于渲染 
+	return 0;
+}
+#endif //1
