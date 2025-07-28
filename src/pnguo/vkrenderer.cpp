@@ -18582,6 +18582,139 @@ namespace vkr {
 		std::string mGfxAPI = "UNAVAILABLE";
 	};
 
+#if 1
+	//第一人称相机
+	class Camera13
+	{
+	public:
+		glm::vec3 front = { 0.0f, -1.0f, 0.0f };
+		glm::vec3 up = { 0.0f, -1.0f, 0.0f };
+		glm::vec3 right = { 1.0f, 0.0f, 0.0f };
+		glm::vec3 _rotation = {};
+
+		float Yaw = 0.0f;  // 偏航角
+		float Pitch = 0.0f;  // 俯仰角
+		float Speed = 2.5f;  // 移动速度
+		float MouseSensitivity = 0.1f;  // 鼠标灵敏度
+		float rotationSpeed = 1.0f;
+
+		glm::vec3 position = { 0,0.0,0.0 };   // 相机位置 
+		glm::vec3 target = {};     // 观察目标位置 
+		glm::vec3 offset = { 0, 2, 5 };     // 目标到相机的初始偏移量  
+		float distance = 8.0;       // 相机与目标的距离 
+		float minDistance = 2.0f; // 最小距离限制 
+		float maxDistance = 15.0f; // 最大距离限制 
+		float horizontalAngle = 0.0f; // 水平旋转角度 
+		float verticalAngle = 0.0f;   // 垂直旋转角度 
+
+		glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+		float lastX = 0, lastY = 0;
+		glm::vec2 mousePos = {};
+		int8_t type = 0; // 0:第一人称相机,1:第三人称相机
+	public:
+		Camera13() {
+		}
+
+		glm::mat4 GetViewMatrix() {
+			return type ? glm::lookAt(position, target, WorldUp) : glm::lookAt(position, position + front, up);
+		}
+
+		void ProcessKeyboard(int direction, float deltaTime) {
+			float velocity = Speed * deltaTime;
+
+
+			if (direction == 8) position += front * velocity;
+			if (direction == 2) position -= front * velocity;
+			if (direction == 4) position -= right * velocity;
+			if (direction == 6) position += right * velocity;
+		}
+
+		// 鼠标操作
+		void mouse_callback(double xpos, double ypos) {
+			float xoffset = xpos - lastX;
+			float yoffset = lastY - ypos; // 反转Y轴方向
+			lastX = xpos;
+			lastY = ypos;
+			xoffset *= MouseSensitivity;
+			yoffset *= MouseSensitivity;
+			if (type == 1)
+			{
+				processMouse3(xoffset, yoffset);
+				update3();
+			}
+			else
+			{
+				// 处理第一人称相机的鼠标移动
+				ProcessMouseMovement1(xpos, ypos);
+			}
+		}
+
+		// 处理滚轮缩放 
+		void processScroll(float delta) {
+			// 4. 调整距离并限制范围 [1]()
+			distance = glm::clamp(distance - delta, minDistance, maxDistance);
+		}
+	private:
+		void UpdateCameraVectors1() {
+
+
+			// 通过欧拉角计算方向向量
+			glm::vec3 front1;
+			front1.x = cos(glm::radians(_rotation.x)) * cos(glm::radians(_rotation.y));
+			front1.y = sin(glm::radians(_rotation.y));
+			front1.z = sin(glm::radians(_rotation.x)) * cos(glm::radians(_rotation.y));
+			front1 = glm::normalize(front1);
+			this->front = front;
+			// 计算右向量和上向量
+			//right = glm::normalize(glm::cross(front, WorldUp));
+			//up = glm::normalize(glm::cross(right, front));
+
+
+#if 1  
+			auto yawQuat = glm::angleAxis(glm::radians(_rotation.x), up); 
+			auto pitchQuat = glm::angleAxis(glm::radians(_rotation.y), glm::cross(front, up));
+
+			front = glm::normalize(yawQuat * pitchQuat) * front;
+
+			right = glm::cross(front, up);// glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+#endif
+		}
+		void ProcessMouseMovement1(float posx, float posy) {
+			auto delta = glm::vec3((mousePos.x - (float)posx) * rotationSpeed, (mousePos.y - (float)posy) * rotationSpeed, 0.0f);
+			mousePos = glm::vec2((float)posx, (float)posy);
+			this->_rotation += delta;
+			_rotation = glm::clamp(_rotation, glm::vec3(), glm::vec3(360.0, 360.0, 360.0));
+			// 限制俯仰角 [-89°, 89°]
+			if (Pitch > 89.0f) Pitch = 89.0f;
+			if (Pitch < -89.0f) Pitch = -89.0f;
+
+			UpdateCameraVectors1();
+		}
+		// 3
+
+		// 更新相机位置 
+		void update3() {
+			// 1. 计算旋转后的偏移向量 [3]()
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians(horizontalAngle), glm::vec3(0, 1, 0));
+			rotation = glm::rotate(rotation, verticalAngle, glm::vec3(1, 0, 0));
+
+			// 2. 应用旋转并计算新位置 [1]()
+			glm::vec3 rotatedOffset = rotation * glm::vec4(offset, 1.0f);
+			position = target + distance * glm::normalize(rotatedOffset);
+		}
+
+		// 处理鼠标移动输入 
+		void processMouse3(float deltaX, float deltaY) {
+			// 3. 更新旋转角度 [2]()
+			horizontalAngle += deltaX;
+			verticalAngle = glm::clamp(verticalAngle + deltaY, -glm::pi<float>() / 3, glm::pi<float>() / 3); // 限制垂直角度范围 
+		}
+
+
+	};
+#endif //1
+
 	class sample_cx
 	{
 	public:
@@ -18624,7 +18757,7 @@ namespace vkr {
 		scene_state m_UIState;
 		Camera m_camera;
 		glm::vec3 eyePos = {}, lookAt = {};
-
+		Camera13 tpfc = {};
 
 		mouse_state_t io = {};
 		float m_time = 0; // Time accumulator in seconds, used for animation.
@@ -18643,6 +18776,15 @@ namespace vkr {
 		bool m_bIsBenchmarking = false;
 		bool _customize_camera = false;
 	};
+
+
+
+
+
+
+
+
+
 #if 1
 	sample_cx::sample_cx()
 	{
@@ -19026,11 +19168,49 @@ namespace vkr {
 #endif
 	}
 
+	glm::vec4 onMoveWASD(const bool keyDown[256])
+	{
+		float scale = keyDown[VK_SHIFT] ? 5.0f : 1.0f;
+		float x = 0, y = 0, z = 0;
+		int t = 0;
+		if (keyDown['W'])
+		{
+			t = 8;
+			z = -scale;
+		}
+		if (keyDown['S'])
+		{
+			t = 2;
+			z = scale;
+		}
+		if (keyDown['A'])
+		{
+			t = 4;
+			x = -scale;
+		}
+		if (keyDown['D'])
+		{
+			t = 6;
+			x = scale;
+		}
+		if (keyDown['E'])
+		{
+			t = 9;
+			y = scale;
+		}
+		if (keyDown['Q'])
+		{
+			t = 7;
+			y = -scale;
+		}
+
+		return glm::vec4(x, y, z, t);
+	}
 	void sample_cx::UpdateCamera(Camera& cam)
 	{
 		float yaw = cam.GetYaw();
 		float pitch = cam.GetPitch();
-		float distance = cam.GetDistance();
+		int distance = cam.GetDistance();
 
 		cam.UpdatePreviousMatrices(); // set previous view matrix
 #if 1
@@ -19047,13 +19227,22 @@ namespace vkr {
 		}
 		if (_customize_camera)
 		{
-			float rotateAngle = glm::radians(45.0f); // 旋转角度（45度→弧度）
-			glm::vec3 cameraPos = glm::vec3(
-				5.0f * cos(rotateAngle),  // X坐标（绕Y轴旋转后的水平位置）
-				0.0f,                     // Y坐标（保持高度不变）
-				5.0f * sin(rotateAngle)   // Z坐标（绕Y轴旋转后的深度位置）
-			);
-			cam.LookAt(eyePos, lookAt);
+			// todo 相机
+			int wy = io.wheel.y;
+			if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
+			{
+				//pitch = io.DeltaTime * 60;
+				yaw = io.DeltaTime * 60;
+				auto vw = onMoveWASD(io.KeysDown);
+				if (vw.w > 0)
+					tpfc.ProcessKeyboard(vw.w, io.DeltaTime);
+			}
+			else {
+				tpfc.mouse_callback(io.MousePos.x, io.MousePos.y);
+			}
+			if (wy != 0)
+				tpfc.processScroll(io.wheel.y);
+			cam.SetMatrix(tpfc.GetViewMatrix());
 		}
 		else
 		{
@@ -19726,140 +19915,3 @@ void get_queue_info(void* physicaldevice)
 	vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)physicaldevice, &queue_family_count, queue_props.data());
 	assert(queue_family_count >= 1);
 }
-
-#if 1
-//第一人称相机
-class Camera
-{
-public:
-	glm::vec3 Position;
-	glm::vec3 Front;
-	glm::vec3 Up;
-	glm::vec3 Right;
-	glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-
-	float Yaw = -90.0f;  // 偏航角
-	float Pitch = 0.0f;  // 俯仰角
-	float Speed = 2.5f;  // 移动速度
-	float MouseSensitivity = 0.1f;  // 鼠标灵敏度
-
-
-	float lastX = 400, lastY = 300;
-public:
-	Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f))
-		: Position(position), Front(glm::vec3(0.0f, 0.0f, -1.0f)) {
-		UpdateCameraVectors();
-	}
-
-	glm::mat4 GetViewMatrix() {
-		return glm::lookAt(Position, Position + Front, Up);
-	}
-
-	void ProcessKeyboard(int direction, float deltaTime) {
-		float velocity = Speed * deltaTime;
-		if (direction == 8) Position += Front * velocity;
-		if (direction == 2) Position -= Front * velocity;
-		if (direction == 4) Position -= Right * velocity;
-		if (direction == 6) Position += Right * velocity;
-	}
-
-	void ProcessMouseMovement(float xoffset, float yoffset) {
-		xoffset *= MouseSensitivity;
-		yoffset *= MouseSensitivity;
-
-		Yaw += xoffset;
-		Pitch -= yoffset;
-
-		// 限制俯仰角 [-89°, 89°]
-		if (Pitch > 89.0f) Pitch = 89.0f;
-		if (Pitch < -89.0f) Pitch = -89.0f;
-
-		UpdateCameraVectors();
-	}
-	// 鼠标操作
-	void mouse_callback(double xpos, double ypos) {
-		float xoffset = xpos - lastX;
-		float yoffset = lastY - ypos; // 反转Y轴方向
-		lastX = xpos;
-		lastY = ypos;
-
-		ProcessMouseMovement(xoffset, yoffset);
-	}
-	/*
-	* 键盘操作ProcessKeyboard
-	 // 更新视图矩阵
-	glm::mat4 view = camera.GetViewMatrix();
-	*/
-private:
-	void UpdateCameraVectors() {
-		// 通过欧拉角计算方向向量
-		glm::vec3 front;
-		front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-		front.y = sin(glm::radians(Pitch));
-		front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-		Front = glm::normalize(front);
-
-		// 计算右向量和上向量
-		Right = glm::normalize(glm::cross(Front, WorldUp));
-		Up = glm::normalize(glm::cross(Right, Front));
-	}
-};
-//第三人称相机
-class ThirdPersonCamera {
-public:
-	glm::vec3 position;   // 相机位置 
-	glm::vec3 target;     // 观察目标位置 
-	glm::vec3 offset;     // 目标到相机的初始偏移量 
-	glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-	float distance;       // 相机与目标的距离 
-	float minDistance = 2.0f; // 最小距离限制 
-	float maxDistance = 15.0f; // 最大距离限制 
-	float horizontalAngle = 0.0f; // 水平旋转角度 
-	float verticalAngle = 0.0f;   // 垂直旋转角度 
-
-	// 更新相机位置 
-	void update() {
-		// 1. 计算旋转后的偏移向量 [3]()
-		glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), horizontalAngle, glm::vec3(0, 1, 0));
-		rotation = glm::rotate(rotation, verticalAngle, glm::vec3(1, 0, 0));
-
-		// 2. 应用旋转并计算新位置 [1]()
-		glm::vec3 rotatedOffset = rotation * glm::vec4(offset, 1.0f);
-		position = target + distance * glm::normalize(rotatedOffset);
-	}
-
-	// 处理鼠标移动输入 
-	void processMouse(float deltaX, float deltaY) {
-		// 3. 更新旋转角度 [2]()
-		horizontalAngle += deltaX * 0.01f; // 灵敏度调整 
-		verticalAngle = glm::clamp(verticalAngle + deltaY * 0.01f,
-			-glm::pi<float>() / 3,
-			glm::pi<float>() / 3); // 限制垂直角度范围 
-	}
-
-	// 处理滚轮缩放 
-	void processScroll(float delta) {
-		// 4. 调整距离并限制范围 [1]()
-		distance = glm::clamp(distance - delta, minDistance, maxDistance);
-	}
-
-	// 获取视图矩阵 
-	glm::mat4 getViewMatrix() {
-		return glm::lookAt(position, target, WorldUp); // 上向量为Y轴 
-	}
-};
-int test_3main() {
-	ThirdPersonCamera camera;
-	camera.target = glm::vec3(0, 0, 0); // 角色位置 
-	camera.offset = glm::vec3(0, 2, 5); // 初始偏移 (高度2，后方5单位)
-	camera.distance = 8.0f;
-
-	// 模拟输入 (实际中从GLFW/SDL获取)
-	camera.processMouse(1.0f, 0.5f);  // 鼠标移动 
-	camera.processScroll(0.5f);         // 滚轮缩放
-
-	camera.update();  // 更新相机位置
-	glm::mat4 view = camera.getViewMatrix();  // 用于渲染 
-	return 0;
-}
-#endif //1

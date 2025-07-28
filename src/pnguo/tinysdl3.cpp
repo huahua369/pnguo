@@ -1757,10 +1757,12 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		keyboard_et t = {};
 		et2key(e, &t);
 		auto kn = SDL_GetKeyName(t.keycode);
-		if (t.kmod & KM_SHIFT)
-		{
-			//printf("shift\n");
-		}
+		pw->io->KeysDown[*kn] = t.down; 
+		pw->io->KeysDown[VK_SHIFT] = (t.kmod & KM_SHIFT);
+		pw->io->KeyShift = (t.kmod & KM_SHIFT);
+		pw->io->KeyAlt = (t.kmod & KM_ALT);
+		pw->io->KeyCtrl = (t.kmod & KM_CTRL);
+		pw->io->KeySuper = (t.kmod & KM_GUI);
 		pw->trigger((uint32_t)devent_type_e::keyboard_e, &t);
 	}
 	break;
