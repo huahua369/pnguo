@@ -18590,11 +18590,15 @@ namespace vkr {
 	{
 	public:
 		glm::mat4 view;                         //视图
-		glm::dvec3 pos = {};                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
-		glm::vec3 front = {};                        //前向向量
+		glm::dvec3 pos = { 0,6,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
+		glm::vec3 front = { 0.0, 1.0, 0.0 };                        //前向向量
+		glm::vec3 forward = {};
+		glm::vec3 Right = {}, Up = {};
 		glm::vec3 rota = {};                         //位置角度
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量
-		glm::dvec3 logicOriginPos = {};							//逻辑原点坐标
+		glm::dvec3 logicOriginPos = { 10,10,10 };							//逻辑原点坐标
+
+
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
 			mouseMovement(0, 0);                //不初始化的话，开局不移动没画面
@@ -18603,64 +18607,114 @@ namespace vkr {
 	private:
 		//float keySpeed = 4.0f;    //键盘移动速率,最好不要高过64
 		float keySpeed = 0.20f;
-		float xMouseSpeed = 0.1f;   //鼠标移动X速率
-		float yMouseSpeed = 0.1f;   //鼠标移动Y速率
+		float xMouseSpeed = 0.51f;   //鼠标移动X速率
+		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
 
 	public:
 		//键盘移动处理
-		void keyMovement(glm::vec3 direction) {
-			//将y轴掌管前后的位移，在世界坐标系下转换到摄像机坐标系下
-			glm::vec3 cameraFront;
-			//将x轴掌管左右的位移，在世界坐标系下转换到摄像机坐标系下
-			glm::vec3 cameraRight;
-			//将z轴掌管上下的位移，在世界坐标系下转换到摄像机坐标系下,在此z轴依旧采用世界坐标系
-			//static glm::vec3 cameraUp;
+		void keyMovement(glm::vec3 direction, double deltaTime) {
+			deltaTime = 1.0;
 
-			cameraFront = glm::normalize(glm::vec3(view[0][2], view[1][2], view[2][2]));
-			cameraRight = glm::normalize(glm::cross(cameraFront, worldUp));
-			//cameraUp = glm::normalize(glm::cross(cameraRight, cameraFront));
-			//cameraUp以玩家正前方为法线移动,worldUp以y轴为法线移动
+			float moveSpeed = deltaTime * keySpeed;
+			glm::vec3 tp = front * moveSpeed;
+			if (abs(direction.y) > 0)//WS
+			{
+				pos += forward * (moveSpeed * direction.y);
+			}
+			if (abs(direction.x) > 0)//AD
+			{
+				auto zz = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * (moveSpeed * direction.x);
+				pos += Right * (moveSpeed * direction.x);
+			}
+			if (abs(direction.z) > 0)//ZX
+			{
+				pos.y += moveSpeed * direction.z;
+			}
+			//if (keys[KEY_S])//-S
+			//{
+			//	pos -= moveSpeed * forward;
+			//}
+			//if (keys[KEY_A])//-A
+			//	pos -= glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) * moveSpeed;
+			//if (keys[KEY_D])//D
+			//	pos += glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) * moveSpeed;
 
-			//根据摄像机坐标系下的移动方向进行移动
-			pos += keySpeed * (direction.x * cameraRight + direction.z * worldUp + direction.y * cameraFront);
 			updaView();
 		}
 
 		//鼠标移动处理
 		void mouseMovement(float deltaX, float deltaY) {
 			// 角度配置
-			rota.x += deltaY * xMouseSpeed;
+			rota.x -= deltaY * xMouseSpeed;
 			rota.y += deltaX * yMouseSpeed;
 
 			//角度限制
-			rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
 			rota.y = glm::mod(rota.y, 360.0f);
+			rota.x = glm::clamp(rota.x, -70.0f, 70.0f);
 
 			//计算摄像机的前向向量
-			static glm::vec2 rota_rad;
+			glm::vec2 rota_rad;
 			rota_rad = glm::radians(rota);
 
-			front.x = glm::cos(rota_rad.x) * glm::cos(rota_rad.y);
-			front.y = glm::sin(rota_rad.x);
-			front.z = glm::cos(rota_rad.x) * glm::sin(rota_rad.y);
+			glm::quat q = glm::angleAxis(rota_rad.x, glm::vec3(0, 1, 0)) * glm::angleAxis(rota_rad.y, glm::vec3(1, 0, 0));
+			q = glm::normalize(q);
+			glm::vec3 camFront;
+			camFront.x = -cos(rota_rad.x) * sin(rota_rad.y);
+			camFront.y = sin(rota_rad.x);
+			camFront.z = cos(rota_rad.x) * cos(rota_rad.y);
+			camFront = glm::normalize(camFront);
+			front = camFront;
+
+			glm::vec3 fd;
+			fd.x = -sin(rota_rad.y) * cos(rota_rad.x);
+			fd.y = 0;
+			fd.z = cos(rota_rad.y) * cos(rota_rad.x);
+			auto fd0 = front;
+			fd0.y = 0;
+			forward = glm::normalize(fd);
+
+			//glm::mat4 update_yp(glm::ivec3 r, float radius, glm::vec3 & position, glm::vec3 & target, bool flipY)
+			//{
+			//	float yaw = r.x;
+			//	float pitch = r.y;
+
+			//	glm::vec3 direction;
+			//	direction.x = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
+			//	direction.y = sin(glm::radians(pitch));
+			//	direction.z = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
+
+			//	auto pos = target + direction * radius;
+			//	position = pos;
+			//	auto up = glm::vec3(0, flipY ? -1 : 1, 0);
+			//	return glm::lookAt(position, target, up);
+			//}
+
+
+			Right = glm::normalize(glm::cross(front, worldUp));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
+			Up = glm::normalize(glm::cross(Right, front));
+
+			//glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
+			//glm::quat qy = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * qx;
+			//mqt = glm::normalize(qy);
+			//glm::mat4 rotate = glm::mat4_cast(mqt);
+			//atPos.x += x * distance / 1000.0f;
+			//atPos.y += y * distance / 1000.0f;
+			//glm::vec4 dir = GetDirection();
+			//glm::vec4 at = atPos;	// 观察目标坐标
+			//auto eye = at + glm::vec4(0, 0, distance, 1.0);
+			//m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // *相机坐标
+
+			//glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
+			//m_View = translate * rotate;
+			//m_distance = distance;	// 新距离 
+
 
 			updaView();
 		}
 
 		void updaView() {
-			glm::vec3 cameraFront;
-			glm::vec3 cameraRight;
-			glm::vec3 cameraUp;
-			glm::vec3 tempPos;
-
-			cameraFront = glm::normalize(front);
-			cameraRight = glm::normalize(glm::cross(cameraFront, worldUp));
-			cameraUp = glm::normalize(glm::cross(cameraRight, cameraFront));
-
-			//原点迁移
-			tempPos = glm::vec3(pos - logicOriginPos);
-
-			view = glm::lookAt(tempPos, cameraFront + tempPos, cameraUp);
+			glm::vec3 tpos = pos;
+			view = glm::lookAt(tpos, front + tpos, Up);
 		}
 	};
 
@@ -19124,35 +19178,35 @@ namespace vkr {
 		float scale = keyDown[VK_SHIFT] ? 5.0f : 1.0f;
 		float x = 0, y = 0, z = 0;
 		int t = 0;
+		if (keyDown['A'])
+		{
+			t = 6;
+			x = scale;
+		}
+		else if (keyDown['D'])
+		{
+			t = 4;
+			x = -scale;
+		}
 		if (keyDown['W'])
 		{
 			t = 8;
 			y = -scale;
 		}
-		if (keyDown['S'])
+		else if (keyDown['S'])
 		{
 			t = 2;
 			y = scale;
-		}
-		if (keyDown['A'])
-		{
-			t = 4;
-			x = -scale;
-		}
-		if (keyDown['D'])
-		{
-			t = 6;
-			x = scale;
-		}
-		if (keyDown['X'])
-		{
-			t = 3;
-			z = scale;
 		}
 		if (keyDown['Z'])
 		{
 			t = 1;
 			z = -scale;
+		}
+		else if (keyDown['X'])
+		{
+			t = 3;
+			z = scale;
 		}
 
 		return glm::vec4(x, y, z, t);
@@ -19187,11 +19241,24 @@ namespace vkr {
 				auto vw = onMoveWASD(io.KeysDown);
 				if (vw.w > 0)
 				{
-					tpfc.keyMovement(vw);
+					tpfc.keyMovement(vw, io.DeltaTime);
 				}
 			}
 			else {
-				tpfc.mouseMovement(io.MouseDelta.x, io.MouseDelta.y);
+			}
+			//鼠标移动位置
+			static float lastX = m_Width / 2;
+			static float lastY = m_Height / 2;
+
+			//计算位移
+			static float deltaX;
+			static float deltaY;
+			deltaX = io.MousePos.x - lastX;
+			deltaY = lastY - io.MousePos.y;
+			lastX = io.MousePos.x;
+			lastY = io.MousePos.y;
+			if (deltaX != 0 || deltaY != 0) {
+				tpfc.mouseMovement(deltaX, deltaY);
 			}
 			//if (wy != 0)
 			//	tpfc.processScroll(io.wheel.y);
