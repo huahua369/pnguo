@@ -18590,7 +18590,7 @@ namespace vkr {
 	{
 	public:
 		glm::mat4 view;                         //视图
-		glm::dvec3 pos = { 0,6,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
+		glm::dvec3 pos = { 0,-2,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
 		glm::vec3 front = { 0.0, 1.0, 0.0 };                        //前向向量
 		glm::vec3 forward = {};
 		glm::vec3 Right = {}, Up = {};
@@ -18598,6 +18598,7 @@ namespace vkr {
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量
 		glm::dvec3 logicOriginPos = { 10,10,10 };							//逻辑原点坐标
 
+		glm::quat qt = {};
 
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
@@ -18607,9 +18608,10 @@ namespace vkr {
 	private:
 		//float keySpeed = 4.0f;    //键盘移动速率,最好不要高过64
 		float keySpeed = 0.20f;
-		float xMouseSpeed = 0.51f;   //鼠标移动X速率
+		float xMouseSpeed = 0.1f;   //鼠标移动X速率
 		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
 
+		//		auto zz = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * (moveSpeed * direction.x);
 	public:
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
@@ -18617,28 +18619,18 @@ namespace vkr {
 
 			float moveSpeed = deltaTime * keySpeed;
 			glm::vec3 tp = front * moveSpeed;
-			if (abs(direction.y) > 0)//WS
+			//pos += qt * glm::vec3(direction.x, direction.z, direction.y) * moveSpeed;
+			if (abs(direction.z) > 0)
 			{
-				pos += forward * (moveSpeed * direction.y);
+				pos.y += direction.z * moveSpeed;
 			}
-			if (abs(direction.x) > 0)//AD
+			else
 			{
-				auto zz = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * (moveSpeed * direction.x);
-				pos += Right * (moveSpeed * direction.x);
+				glm::quat q = glm::angleAxis(glm::radians(rota.y), glm::vec3(0, 1, 0));
+				auto nq = glm::normalize(q) * glm::vec3(1, 1, 0) * direction * moveSpeed;
+				std::swap(nq.z, nq.y);
+				pos += nq;
 			}
-			if (abs(direction.z) > 0)//ZX
-			{
-				pos.y += moveSpeed * direction.z;
-			}
-			//if (keys[KEY_S])//-S
-			//{
-			//	pos -= moveSpeed * forward;
-			//}
-			//if (keys[KEY_A])//-A
-			//	pos -= glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) * moveSpeed;
-			//if (keys[KEY_D])//D
-			//	pos += glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) * moveSpeed;
-
 			updaView();
 		}
 
@@ -18649,8 +18641,8 @@ namespace vkr {
 			rota.y += deltaX * yMouseSpeed;
 
 			//角度限制
-			rota.y = glm::mod(rota.y, 360.0f);
-			rota.x = glm::clamp(rota.x, -70.0f, 70.0f);
+			//rota.y = glm::mod(rota.y, 360.0f);
+			//rota.x = glm::clamp(rota.x, -90.0f, 90.0f);
 
 			//计算摄像机的前向向量
 			glm::vec2 rota_rad;
@@ -18663,8 +18655,8 @@ namespace vkr {
 			camFront.y = sin(rota_rad.x);
 			camFront.z = cos(rota_rad.x) * cos(rota_rad.y);
 			camFront = glm::normalize(camFront);
-			front = q * glm::vec3(0.0, 0.0, 1.0);
-
+			front = q * glm::vec3(0.0, 1.0, 0.0);
+			qt = q;
 			glm::vec3 fd;
 			fd.x = -sin(rota_rad.y) * cos(rota_rad.x);
 			fd.y = 0;
@@ -18714,6 +18706,7 @@ namespace vkr {
 
 		void updaView() {
 			glm::vec3 tpos = pos;
+			printf("pos %.2f,%.2f,%.2f\t %.2f,%.2f,%.2f\t %.2f,%.2f\n", pos.x, pos.y, pos.z, front.x, front.y, front.z, rota.x, rota.y);
 			view = glm::lookAt(tpos, front + tpos, Up);
 		}
 	};
@@ -19201,12 +19194,12 @@ namespace vkr {
 		if (keyDown['Z'])
 		{
 			t = 1;
-			z = -scale;
+			z = scale;
 		}
 		else if (keyDown['X'])
 		{
 			t = 3;
-			z = scale;
+			z = -scale;
 		}
 
 		return glm::vec4(x, y, z, t);
