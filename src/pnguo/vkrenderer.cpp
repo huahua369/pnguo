@@ -18656,14 +18656,14 @@ namespace vkr {
 			glm::vec2 rota_rad;
 			rota_rad = glm::radians(rota);
 
-			glm::quat q = glm::angleAxis(rota_rad.x, glm::vec3(0, 1, 0)) * glm::angleAxis(rota_rad.y, glm::vec3(1, 0, 0));
+			glm::quat q = glm::angleAxis(rota_rad.y, glm::vec3(0, 1, 0)) * glm::angleAxis(rota_rad.x, glm::vec3(1, 0, 0));
 			q = glm::normalize(q);
 			glm::vec3 camFront;
 			camFront.x = -cos(rota_rad.x) * sin(rota_rad.y);
 			camFront.y = sin(rota_rad.x);
 			camFront.z = cos(rota_rad.x) * cos(rota_rad.y);
 			camFront = glm::normalize(camFront);
-			front = camFront;
+			front = q * glm::vec3(0.0, 0.0, 1.0);
 
 			glm::vec3 fd;
 			fd.x = -sin(rota_rad.y) * cos(rota_rad.x);
@@ -18671,7 +18671,7 @@ namespace vkr {
 			fd.z = cos(rota_rad.y) * cos(rota_rad.x);
 			auto fd0 = front;
 			fd0.y = 0;
-			forward = glm::normalize(fd);
+			forward = fd0;// glm::normalize(fd);
 
 			//glm::mat4 update_yp(glm::ivec3 r, float radius, glm::vec3 & position, glm::vec3 & target, bool flipY)
 			//{
