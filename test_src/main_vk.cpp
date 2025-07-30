@@ -400,7 +400,7 @@ int main()
 			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
 			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 0,0,0 }, 0.10);
+			vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
 
 			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
 			/*vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", {}, 1.0);
