@@ -18626,6 +18626,7 @@ namespace vkr {
 			yMouseSpeed = w * 0.5 / 360.0;
 		}
 
+		// 输入角度欧拉角，计算四元数向量
 		glm::vec3 cfront(const glm::ivec2& r)
 		{
 			auto rota_rad = glm::radians(glm::vec2(r));
@@ -18635,13 +18636,15 @@ namespace vkr {
 			f.z = glm::cos(rota_rad.x) * glm::sin(rota_rad.y);
 			return f;
 		}
+		// 计算四元数向量
 		glm::vec3 get_front(const glm::quat& q) {
-			auto nq0 = q * glm::vec3(1, 0, 0);
-			auto nq1 = q * glm::vec3(0, 1, 0);
-			auto nq2 = q * glm::vec3(0, 0, 1);
-			glm::vec3 nf = { nq2.z,-nq0.z,nq1.z };
+			auto xx = q * glm::vec3(1, 0, 0);
+			auto yy = q * glm::vec3(0, 1, 0);
+			auto zz = q * glm::vec3(0, 0, 1);
+			glm::vec3 nf = { zz.z,-xx.z,yy.z };
 			return nf;
 		}
+		// 输入角度欧拉角返回四元数
 		glm::vec3 cqfront(const glm::ivec2& r)
 		{
 			auto ry = glm::radians(glm::vec2(r));
@@ -18665,6 +18668,7 @@ namespace vkr {
 			glm::vec3 tp = front * moveSpeed;
 			//pos += qt * glm::vec3(direction.x, direction.z, direction.y) * moveSpeed;
 			auto f1 = -front;// 获取和摄像机前向向量相反的向量
+			auto f10 = -get_front(qt);
 			auto cr1 = glm::normalize(glm::cross(f1, worldUp));
 			//根据摄像机坐标系下的移动方向进行移动
 			auto np = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
