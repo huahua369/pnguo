@@ -18596,8 +18596,7 @@ namespace vkr {
 	public:
 		glm::mat4 view;                         //视图
 		glm::dvec3 pos = { 0,0,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
-		glm::vec3 front = { 1.0, 1.0, 1.0 };                        //前向向量
-		glm::vec3 forward = {};
+		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量 
 		glm::vec3 Right = {}, Up = {};
 		glm::vec3 rota = {};                         //位置角度
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量
@@ -18618,7 +18617,7 @@ namespace vkr {
 
 	private:
 		//float keySpeed = 4.0f;    //键盘移动速率,最好不要高过64
-		float keySpeed = 0.20f;
+		float keySpeed = 10.0f;
 		float xMouseSpeed = 0.51f;   //鼠标移动X速率
 		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
 
@@ -18662,37 +18661,19 @@ namespace vkr {
 			glm::quat q = glm::quat(EulerAngles);
 			return q;
 		}
+		//	正弦函数y=sin(a)和余弦函数x=cos(a)
+		//	正切函数tan(a) = sin(a) / cos(a)
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
-			deltaTime = 1.0;
-
 			float moveSpeed = deltaTime * keySpeed;
 			glm::vec3 tp = front * moveSpeed;
 			//pos += qt * glm::vec3(direction.x, direction.z, direction.y) * moveSpeed;
-
 			auto f1 = -front;// 获取和摄像机前向向量相反的向量
 			auto cr1 = glm::normalize(glm::cross(f1, worldUp));
 			//根据摄像机坐标系下的移动方向进行移动
-			auto np = keySpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
+			auto np = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
 			pos += np;
-			//if (abs(direction.z) > 0)
-			//{
-			//	pos.y += direction.z * moveSpeed;
-			//}
-			//if (abs(direction.x) > 0 || abs(direction.y) > 0)
-			//{
-			//	auto ry = glm::radians(rota.y);
-			//	glm::quat q = -glm::angleAxis(ry, glm::vec3(0, 1, 0));
-			//	/*
-			//	正弦函数y=sin(a)和余弦函数x=cos(a)
-			//	正切函数tan(a) = sin(a) / cos(a)
-			//	*/
-			//	auto nq = q * glm::vec3(1.0, 1.0, 0.0) * direction * moveSpeed;
-			//	std::swap(nq.z, nq.y);
-			//	printf("new pos %.2f,%.2f,%.2f\n", nq.x, nq.y, nq.z);
-			//	pos += nq;
-			//}
-			updaView();
+			updateView();
 		}
 
 		//鼠标移动处理
@@ -18700,91 +18681,34 @@ namespace vkr {
 			// 角度配置
 			rota.x += deltaY * xMouseSpeed;
 			rota.y += deltaX * yMouseSpeed;
-
 			//角度限制
 			//rota.y = glm::mod(rota.y, 360.0f);
 			rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
 			//计算摄像机的前向向量
-			glm::vec2 rota_rad = glm::radians(rota);
 			//pitch()：俯仰，将物体绕X轴旋转
 			//yaw()：航向，将物体绕Y轴旋转
 			//roll()：横滚，将物体绕Z轴旋转 
 			// 计算前向向量 
-			glm::vec3 cpos = pos;
-
 			front = cfront(rota);
 			// 使用 lookAt
 			//view = glm::lookAt(cpos, cpos + f, worldUp);
 			qt = e2q(rota);
-			glm::vec3 fd;
-			fd.x = -sin(rota_rad.y) * cos(rota_rad.x);
-			fd.y = 0;
-			fd.z = cos(rota_rad.y) * cos(rota_rad.x);
-			auto fd0 = front;
-			fd0.y = 0;
-			forward = fd0;// glm::normalize(fd);
-
-			//glm::mat4 update_yp(glm::ivec3 r, float radius, glm::vec3 & position, glm::vec3 & target, bool flipY)
-			//{
-			//	float yaw = r.x;
-			//	float pitch = r.y;
-
-			//	glm::vec3 direction;
-			//	direction.x = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
-			//	direction.y = sin(glm::radians(pitch));
-			//	direction.z = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
-
-			//	auto pos = target + direction * radius;
-			//	position = pos;
-			//	auto up = glm::vec3(0, flipY ? -1 : 1, 0);
-			//	return glm::lookAt(position, target, up);
-			//}
-
-
 			Right = glm::normalize(glm::cross(front, worldUp));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
 			Up = glm::normalize(glm::cross(Right, front));
-
-			//glm::quat qx = glm::angleAxis(pitch, glm::vec3(1, 0, 0)) * mqt;
-			//glm::quat qy = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * qx;
-			//mqt = glm::normalize(qy);
-			//glm::mat4 rotate = glm::mat4_cast(mqt);
-			//atPos.x += x * distance / 1000.0f;
-			//atPos.y += y * distance / 1000.0f;
-			//glm::vec4 dir = GetDirection();
-			//glm::vec4 at = atPos;	// 观察目标坐标
-			//auto eye = at + glm::vec4(0, 0, distance, 1.0);
-			//m_eyePos = glm::inverse(glm::mat4_cast(mqt)) * (eye); // *相机坐标
-
-			//glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(-eye));
-			//m_View = translate * rotate;
-			//m_distance = distance;	// 新距离 
-
-
-			updaView();
+			updateView();
 		}
 
-		void updaView() {
-			auto deltaTime = 1.0f;
+		void updateView() {
 			glm::vec3 tpos = pos;
-			auto nq = glm::conjugate(qt);
+			//auto nq = glm::conjugate(qt);
 			glm::vec3 camera_forward = qt * glm::vec3(1, 0, 1); // +Z is forward direction
 			glm::vec3 camera_right = qt * glm::vec3(1, 0, 0); // +X is right direction
 			glm::vec3 camera_up = qt * glm::vec3(0, 1, 0); // +Y is up direction
-			float cameraSmooth = 2.0f;                               // 平滑因子
-
-			auto eye = tpos;// tpos + glm::vec3(0, -cameraDistance, 0);
-			cameraPos = eye;// glm::inverse(glm::mat4_cast(mqt))* (eye); // *相机坐标
-			//auto view0 = glm::lookAt(tpos, front + tpos, worldUp);
-			auto rotate = glm::mat4_cast(nq);
-			auto translate = glm::translate(glm::mat4(1.0f), -eye);
-			auto rm = glm::translate(glm::mat4(1.0f), eye) * rotate * glm::translate(glm::mat4(1.0f), -eye);
-			//return tm * sm * rm; 
-			//view0 = translate * rm;
-
+			float cameraSmooth = 2.0f;                               // 平滑因子 
+			cameraPos = tpos;
 			camera_forward = glm::normalize(front);
 			camera_right = glm::normalize(glm::cross(camera_forward, worldUp));
 			camera_up = glm::normalize(glm::cross(camera_right, camera_forward));
-
 			auto view0 = glm::lookAt(cameraPos, front + cameraPos, camera_up);
 			view = view0;
 			//cameraPos = view[3];
