@@ -389,7 +389,7 @@ int main()
 	//	}
 	//}
 	if (vkd) {
-		{
+		{ 
 			vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
@@ -406,7 +406,7 @@ int main()
 			/*vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", {}, 1.0);
 			vkd->load_gltf(R"(E:\zmodel\cr123.glb)", { 0,0,10 }, 10.0);
 			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
-			
+
 			//vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
 			//vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
 			vkd->load_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);

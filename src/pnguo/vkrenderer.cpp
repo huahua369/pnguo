@@ -18597,7 +18597,7 @@ namespace vkr {
 		glm::vec3 rota = {};                         //位置角度
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量
 		glm::dvec3 logicOriginPos = { 10,10,10 };							//逻辑原点坐标
-
+		glm::vec2 size = { 1.0f, 1.0f }; //视口大小
 		glm::quat qt = {};
 
 		CameraX() {
@@ -18608,11 +18608,17 @@ namespace vkr {
 	private:
 		//float keySpeed = 4.0f;    //键盘移动速率,最好不要高过64
 		float keySpeed = 0.20f;
-		float xMouseSpeed = 0.1f;   //鼠标移动X速率
+		float xMouseSpeed = 0.51f;   //鼠标移动X速率
 		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
 
 		//		auto zz = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * (moveSpeed * direction.x);
 	public:
+		void set_size(float w, float h) {
+			size.x = w;
+			size.y = h;
+			xMouseSpeed = h * 0.5 / 360.0;
+			yMouseSpeed = w * 0.5 / 360.0;
+		}
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
 			deltaTime = 1.0;
@@ -18624,11 +18630,17 @@ namespace vkr {
 			{
 				pos.y += direction.z * moveSpeed;
 			}
-			else
+			if (abs(direction.x) > 0 || abs(direction.y) > 0)
 			{
-				glm::quat q = glm::angleAxis(glm::radians(rota.y), glm::vec3(0, 1, 0));
-				auto nq = glm::normalize(q) * glm::vec3(1, 1, 0) * direction * moveSpeed;
+				auto ry = glm::radians(rota.y);
+				glm::quat q = glm::angleAxis(ry, glm::vec3(0, 1, 0)); 
+				/*
+				正弦函数y=sin(a)和余弦函数x=cos(a)
+				正切函数tan(a) = sin(a) / cos(a)
+				*/ 
+				auto nq = q * glm::vec3(1.0, 1.0, 0.0) * direction * moveSpeed;
 				std::swap(nq.z, nq.y);
+				printf("new pos %.2f,%.2f,%.2f\n", nq.x, nq.y, nq.z);
 				pos += nq;
 			}
 			updaView();
@@ -18642,7 +18654,7 @@ namespace vkr {
 
 			//角度限制
 			//rota.y = glm::mod(rota.y, 360.0f);
-			//rota.x = glm::clamp(rota.x, -90.0f, 90.0f);
+			rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
 
 			//计算摄像机的前向向量
 			glm::vec2 rota_rad;
@@ -18655,7 +18667,7 @@ namespace vkr {
 			camFront.y = sin(rota_rad.x);
 			camFront.z = cos(rota_rad.x) * cos(rota_rad.y);
 			camFront = glm::normalize(camFront);
-			front = q * glm::vec3(0.0, 1.0, 0.0);
+			front = glm::axis(q);
 			qt = q;
 			glm::vec3 fd;
 			fd.x = -sin(rota_rad.y) * cos(rota_rad.x);
@@ -18706,8 +18718,18 @@ namespace vkr {
 
 		void updaView() {
 			glm::vec3 tpos = pos;
+			auto view1 = glm::lookAt(tpos, glm::conjugate(qt) * tpos, Up);
+			auto view2 = glm::lookAt(tpos, front * tpos, Up);
+			auto view3 = glm::lookAt(tpos, front + tpos, Up);
+			auto rotate = glm::mat4_cast(qt);
+			auto translate = glm::mat4(1.0f);
+			translate = glm::translate(translate, -tpos);
+			auto view4 = translate * rotate;
+			auto view5 = rotate * translate;
+			static int kx = 0;
+			glm::mat4 m[5] = { view5,view2,view4,view1,view3 };
+			view = m[kx];
 			printf("pos %.2f,%.2f,%.2f\t %.2f,%.2f,%.2f\t %.2f,%.2f\n", pos.x, pos.y, pos.z, front.x, front.y, front.z, rota.x, rota.y);
-			view = glm::lookAt(tpos, front + tpos, Up);
 		}
 	};
 
@@ -18968,7 +18990,10 @@ namespace vkr {
 			m_pRenderer->OnCreateWindowSizeDependentResources(m_Width, m_Height);
 		}
 		if (m_Width && m_Height)
+		{
 			m_camera.SetFov(AMD_PI_OVER_4, m_Width, m_Height, 0.1f, 1000.0f);
+			tpfc.set_size((float)m_Width, (float)m_Height);
+		}
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -19171,6 +19196,7 @@ namespace vkr {
 		float scale = keyDown[VK_SHIFT] ? 5.0f : 1.0f;
 		float x = 0, y = 0, z = 0;
 		int t = 0;
+		// x=ad y=ws z=zx
 		if (keyDown['A'])
 		{
 			t = 6;
