@@ -18668,7 +18668,6 @@ namespace vkr {
 			glm::vec3 tp = front * moveSpeed;
 			//pos += qt * glm::vec3(direction.x, direction.z, direction.y) * moveSpeed;
 			auto f1 = -front;// 获取和摄像机前向向量相反的向量
-			auto f10 = -get_front(qt);
 			auto cr1 = glm::normalize(glm::cross(f1, worldUp));
 			//根据摄像机坐标系下的移动方向进行移动
 			auto np = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
@@ -18690,9 +18689,8 @@ namespace vkr {
 			//roll()：横滚，将物体绕Z轴旋转 
 			// 计算前向向量 
 			front = cfront(rota);
-			// 使用 lookAt
-			//view = glm::lookAt(cpos, cpos + f, worldUp);
 			qt = e2q(rota);
+			auto f10 = get_front(qt); 
 			updateView();
 		}
 
