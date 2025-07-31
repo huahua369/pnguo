@@ -18595,7 +18595,7 @@ namespace vkr {
 	{
 	public:
 		glm::mat4 view;                         //视图
-		glm::dvec3 pos = { 0,0,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
+		glm::dvec3 pos = { 0,2.8,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
 		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量  
 		glm::vec3 rota = {};                         //位置角度
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量 
@@ -18605,7 +18605,8 @@ namespace vkr {
 		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
 		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
 		float cameraHeight = 1.5f;                               // 相机垂直高度
-		bool bFirstPerson = true; // 是否第一人称视角
+		bool bFirstPerson = true;	// 是否第一人称视角
+		float fixheight = 0;		// 0就是固定高度
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
 			mouseMovement(0, 0);                //不初始化的话，开局不移动没画面
@@ -18714,6 +18715,8 @@ namespace vkr {
 			//根据摄像机坐标系下的移动方向进行移动
 			auto npos = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
 #endif
+			if (abs(direction.x) > 0 || abs(direction.y) > 0)
+				npos.y *= fixheight;
 			pos += npos;
 			updateView();
 		}
