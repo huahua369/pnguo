@@ -18638,11 +18638,48 @@ namespace vkr {
 		}
 		// 计算四元数向量
 		glm::vec3 get_front(const glm::quat& q) {
-			auto xx = q * glm::vec3(1, 0, 0);
-			auto yy = q * glm::vec3(0, 1, 0);
-			auto zz = q * glm::vec3(0, 0, 1);
-			glm::vec3 nf = { zz.z,-xx.z,yy.z };
-			return nf;
+			auto c = glm::vec3(0, 0, 1) * q;
+			auto c1 = glm::vec3(0, 0, -1) * q;
+			return glm::vec3(c.z, -c.x, c.y);
+		}
+		inline glm::vec3 get_qv(const glm::quat& q, const glm::vec3& d)
+		{
+			auto c = d * q;
+			return glm::vec3(c.z, c.x, c.y);
+		}
+		inline glm::mat3 get_qv3(const glm::quat& q)
+		{
+			auto y = q * glm::vec3(0, 1, 0);
+			auto z = q * glm::vec3(0, 0, 1);
+			auto x = q * glm::vec3(1, 0, 0);
+			return glm::mat3(glm::vec3(y.z, y.x, y.y), glm::vec3(z.z, z.x, z.y), glm::vec3(x.z, x.x, x.y));
+		}
+		glm::vec3 quat_right(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(0, 1, 0);
+#ifndef NO_ZXY
+			return glm::vec3(v.z, v.x, v.y); // ZXY
+#else
+			return v;// XYZ
+#endif // !NO_ZXY
+		}
+		glm::vec3 quat_forward(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(0, 0, 1);
+#ifndef NO_ZXY
+			return glm::vec3(v.z, -v.x, v.y); // ZXY
+#else
+			return v;// XYZ
+#endif // !NO_ZXY
+		}
+		glm::vec3 quat_up(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(1, 0, 0);
+#ifndef NO_ZXY
+			return glm::vec3(v.z, v.x, v.y); // ZXY
+#else
+			return v;// XYZ
+#endif // !NO_ZXY
 		}
 		// 输入角度欧拉角返回四元数
 		glm::vec3 cqfront(const glm::ivec2& r)
@@ -18665,13 +18702,19 @@ namespace vkr {
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
 			float moveSpeed = deltaTime * keySpeed;
-			glm::vec3 tp = front * moveSpeed;
-			//pos += qt * glm::vec3(direction.x, direction.z, direction.y) * moveSpeed;
+			auto qi = glm::inverse(qt);
+			auto x = -quat_right(qi);	// v = qi * glm::vec3(0, 1, 0); glm::vec3(v.z, -v.x, v.y);
+			auto y = -quat_forward(qi);	//  v = qi * glm::vec3(0, 0, 1); glm::vec3(v.z, -v.x, v.y); // ZXY 
+			//auto z0 = quat_up(qi);	// glm::vec3(1, 0, 0);
+			auto z = worldUp * direction.z;
+			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
+#if 0
 			auto f1 = -front;// 获取和摄像机前向向量相反的向量
 			auto cr1 = glm::normalize(glm::cross(f1, worldUp));
 			//根据摄像机坐标系下的移动方向进行移动
-			auto np = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
-			pos += np;
+			auto npos = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
+#endif
+			pos += npos;
 			updateView();
 		}
 
@@ -18690,14 +18733,14 @@ namespace vkr {
 			// 计算前向向量 
 			front = cfront(rota);
 			qt = e2q(rota);
-			auto f10 = get_front(qt); 
+			auto f10 = get_front(qt);
 			updateView();
 		}
 
 		void updateView() {
 			glm::vec3 tpos = pos;
 			//auto nq = glm::conjugate(qt);
-			glm::vec3 camera_forward = qt * glm::vec3(1, 0, 1); // +Z is forward direction
+			glm::vec3 camera_forward = qt * glm::vec3(0, 0, 1); // +Z is forward direction
 			glm::vec3 camera_right = qt * glm::vec3(1, 0, 0); // +X is right direction
 			glm::vec3 camera_up = qt * glm::vec3(0, 1, 0); // +Y is up direction
 			float cameraSmooth = 2.0f;                               // 平滑因子  
