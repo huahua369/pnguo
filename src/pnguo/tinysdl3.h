@@ -210,6 +210,7 @@ public:
 	hz::drop_info_cx* _oledrop = 0;
 	std::string drop_text;
 	int _dx = -1, _dy = -1;
+	glm::ivec2 _last_pos = { -1,-1 };	// 上次鼠标位置
 	void* uptr = 0;						// 用户设置指针
 	std::queue<glm::ivec4> qcmd_value;	// 操作列表
 	std::mutex lkecb, lkqcv;
@@ -225,6 +226,7 @@ public:
 private:
 	bool visible = true;
 	bool visible_old = true;
+	bool _rmode = false;
 public:
 	form_x();
 	~form_x();
@@ -315,6 +317,10 @@ public:
 	// 增加菜单管理器
 	void push_menu(menu_cx* p);
 	void draw_rects(const glm::vec4* rects, int n, const glm::vec4& color);
+	// 鼠标移到窗口坐标-1中心
+	void warp_mouse_in_window(float x, float y);
+	// 限制鼠标在窗口内grab_enable，隐藏鼠标rmode
+	void set_mouse_mode(bool grab_enable, bool rmode);
 public:
 	void update_w();
 	void update(float delta);

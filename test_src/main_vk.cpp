@@ -360,7 +360,8 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-
+	form0->set_mouse_mode(true, true);	// 设置相对鼠标模式
+	form0->warp_mouse_in_window(-1, -1);
 	get_queue_info(sdldev.phy);
 
 	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
@@ -389,7 +390,7 @@ int main()
 	//	}
 	//}
 	if (vkd) {
-		{ 
+		{
 			vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 加载gltf
 			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
 			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);

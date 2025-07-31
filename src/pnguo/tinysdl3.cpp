@@ -1635,7 +1635,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 			pw->io->KeySuper = (ms & SDL_KMOD_LGUI || ms & SDL_KMOD_RGUI);
 		}
 		pw->trigger((uint32_t)devent_type_e::mouse_move_e, &mt);
-
+		pw->_last_pos = { mt.x, mt.y };
 		if (mt.cursor > 0) {
 			pw->app->set_defcursor(mt.cursor);
 		}
@@ -1757,7 +1757,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		keyboard_et t = {};
 		et2key(e, &t);
 		auto kn = SDL_GetKeyName(t.keycode);
-		pw->io->KeysDown[*kn] = t.down; 
+		pw->io->KeysDown[*kn] = t.down;
 		pw->io->KeysDown[VK_SHIFT] = (t.kmod & KM_SHIFT);
 		pw->io->KeyShift = (t.kmod & KM_SHIFT);
 		pw->io->KeyAlt = (t.kmod & KM_ALT);
@@ -1982,12 +1982,12 @@ void form_x::update_w()
 {
 	int w, h;
 	SDL_GetWindowSize(_ptr, &w, &h);
-	if (SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED)
+	auto flags = SDL_GetWindowFlags(_ptr);
+	if (flags & SDL_WINDOW_MINIMIZED)
 		w = h = 0;
 	_size.x = w;
 	_size.y = h;
-	int qc = qcmd_value.size();
-
+	int qc = qcmd_value.size(); 
 	if (qcmd_value.size() && _ptr) {
 		//printf("mm%d\n", qc);
 		lock_auto_x lx(&lkqcv);
@@ -2104,6 +2104,21 @@ void form_x::draw_rects(const glm::vec4* rects, int n, const glm::vec4& color)
 		SDL_SetRenderDrawColorFloat(renderer, color.x, color.y, color.z, color.w);  /* white, full alpha */
 		SDL_RenderFillRects(renderer, (SDL_FRect*)rects, n);
 	}
+}
+void form_x::warp_mouse_in_window(float x, float y)
+{
+	if (x < 0 || y < 0)
+	{
+		x = _size.x / 2;
+		y = _size.y / 2;
+	}
+	SDL_WarpMouseInWindow(_ptr, x, y);
+}
+void form_x::set_mouse_mode(bool grab_enable, bool rmode)
+{
+	_rmode = rmode;
+	SDL_SetWindowRelativeMouseMode(_ptr, rmode);
+	SDL_SetWindowMouseGrab(_ptr, grab_enable);
 }
 // todo 图集渲染
 void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)

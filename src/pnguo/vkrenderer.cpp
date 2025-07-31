@@ -18624,7 +18624,7 @@ namespace vkr {
 			size.x = w;
 			size.y = h;
 			xMouseSpeed = h * 0.15 / 360.0;
-			yMouseSpeed = w * 0.5 / 360.0;
+			yMouseSpeed = w * 0.165 / 360.0;
 		}
 
 		// 输入角度欧拉角，计算四元数向量
@@ -18723,11 +18723,13 @@ namespace vkr {
 
 		//鼠标移动处理
 		void mouseMovement(float deltaX, float deltaY) {
+			if (!(deltaX > 0 || deltaX < 0 || deltaY>0 || deltaY < 0))
+				return;
 			// 角度配置
 			rota.x += deltaY * xMouseSpeed;
 			rota.y += deltaX * yMouseSpeed;
 			//角度限制
-			//rota.y = glm::mod(rota.y, 360.0f);
+			rota.y = glm::mod(rota.y, 360.0f);
 			rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
 			//计算摄像机的前向向量
 			//pitch()：俯仰，将物体绕X轴旋转
@@ -19294,20 +19296,8 @@ namespace vkr {
 			}
 			else {
 			}
-			//鼠标移动位置
-			static float lastX = m_Width / 2;
-			static float lastY = m_Height / 2;
-
-			//计算位移
-			static float deltaX;
-			static float deltaY;
-			deltaX = io.MousePos.x - lastX;
-			deltaY = lastY - io.MousePos.y;
-			lastX = io.MousePos.x;
-			lastY = io.MousePos.y;
-			if (deltaX != 0 || deltaY != 0) {
-				tpfc.mouseMovement(deltaX, deltaY);
-			}
+			//鼠标移动位置 
+			tpfc.mouseMovement(io.MouseDelta.x, -io.MouseDelta.y);
 			//if (wy != 0)
 			//	tpfc.processScroll(io.wheel.y);
 			//cam.SetMatrix(tpfc.view);
