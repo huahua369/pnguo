@@ -18654,33 +18654,6 @@ namespace vkr {
 			auto x = q * glm::vec3(1, 0, 0);
 			return glm::mat3(glm::vec3(y.z, y.x, y.y), glm::vec3(z.z, z.x, z.y), glm::vec3(x.z, x.x, x.y));
 		}
-		glm::vec3 quat_right(const glm::quat& q)
-		{
-			auto v = q * glm::vec3(0, 1, 0);
-#ifndef NO_ZXY
-			return glm::vec3(v.z, v.x, v.y); // ZXY
-#else
-			return v;// XYZ
-#endif // !NO_ZXY
-		}
-		glm::vec3 quat_forward(const glm::quat& q)
-		{
-			auto v = q * glm::vec3(0, 0, 1);
-#ifndef NO_ZXY
-			return glm::vec3(v.z, -v.x, v.y); // ZXY
-#else
-			return v;// XYZ
-#endif // !NO_ZXY
-		}
-		glm::vec3 quat_up(const glm::quat& q)
-		{
-			auto v = q * glm::vec3(1, 0, 0);
-#ifndef NO_ZXY
-			return glm::vec3(v.z, v.x, v.y); // ZXY
-#else
-			return v;// XYZ
-#endif // !NO_ZXY
-		}
 		// 输入角度欧拉角返回四元数
 		glm::vec3 cqfront(const glm::ivec2& r)
 		{
@@ -18699,13 +18672,40 @@ namespace vkr {
 		}
 		//	正弦函数y=sin(a)和余弦函数x=cos(a)
 		//	正切函数tan(a) = sin(a) / cos(a)
+		glm::vec3 quat_up(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(1, 0, 0);
+#ifndef NO_ZXY
+			return glm::vec3(v.z, v.x, v.y); // ZXY
+#else
+			return v;// XYZ
+#endif // !NO_ZXY
+		}
+		glm::vec3 quat_right(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(0, 1, 0);
+#ifndef NO_ZXY
+			return glm::vec3(v.z, v.x, v.y); // ZXY
+#else
+			return v;// XYZ
+#endif // !NO_ZXY
+		}
+		glm::vec3 quat_forward(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(0, 0, 1);
+#ifndef NO_ZXY
+			return glm::vec3(v.z, -v.x, v.y); // ZXY
+#else
+			return v;// XYZ
+#endif // !NO_ZXY
+		}
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
 			float moveSpeed = deltaTime * keySpeed;
 			auto qi = glm::inverse(qt);
-			auto x = -quat_right(qi);	// v = qi * glm::vec3(0, 1, 0); glm::vec3(v.z, -v.x, v.y);
-			auto y = -quat_forward(qi);	//  v = qi * glm::vec3(0, 0, 1); glm::vec3(v.z, -v.x, v.y); // ZXY 
-			//auto z0 = quat_up(qi);	// glm::vec3(1, 0, 0);
+			auto x = -quat_right(qi);
+			auto y = -quat_forward(qi);
+			//auto z0 = quat_up(qi); 
 			auto z = worldUp * direction.z;
 			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
 #if 0
