@@ -1987,7 +1987,11 @@ void form_x::update_w()
 		w = h = 0;
 	_size.x = w;
 	_size.y = h;
-	int qc = qcmd_value.size(); 
+	if (flags & SDL_WINDOW_MOUSE_FOCUS)
+	{
+		// 有鼠标焦点
+	}
+	int qc = qcmd_value.size();
 	if (qcmd_value.size() && _ptr) {
 		//printf("mm%d\n", qc);
 		lock_auto_x lx(&lkqcv);
