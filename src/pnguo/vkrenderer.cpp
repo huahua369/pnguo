@@ -18601,6 +18601,10 @@ namespace vkr {
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量 
 		glm::vec2 size = { 1.0f, 1.0f }; //视口大小
 		glm::quat qt = {};
+		glm::quat src_qt = {};
+		glm::quat dst_qt = {};
+		double qtime = 0;	//插值时间
+		double qmaxtime = 0.1;	//最大插值时间
 		// 相机参数 
 		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
 		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
@@ -18609,7 +18613,8 @@ namespace vkr {
 		float fixheight = 0;		// 0就是固定高度
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
-			mouseMovement(0, 0);                //不初始化的话，开局不移动没画面
+			qt = e2q(rota);
+			mouseMovement(0, 0, 0);                //不初始化的话，开局不移动没画面
 		}
 
 	private:
@@ -18640,7 +18645,6 @@ namespace vkr {
 		// 计算四元数向量
 		glm::vec3 get_front(const glm::quat& q) {
 			auto c = glm::vec3(0, 0, 1) * q;
-			auto c1 = glm::vec3(0, 0, -1) * q;
 			return glm::vec3(c.z, -c.x, c.y);
 		}
 		inline glm::vec3 get_qv(const glm::quat& q, const glm::vec3& d)
@@ -18722,24 +18726,45 @@ namespace vkr {
 		}
 
 		//鼠标移动处理
-		void mouseMovement(float deltaX, float deltaY) {
-			if (!(deltaX > 0 || deltaX < 0 || deltaY>0 || deltaY < 0))
-				return;
-			// 角度配置
-			rota.x += deltaY * xMouseSpeed;
-			rota.y += deltaX * yMouseSpeed;
-			//角度限制
-			rota.y = glm::mod(rota.y, 360.0f);
-			rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
+		void mouseMovement(float deltaX, float deltaY, double deltaTime) {
+
 			//计算摄像机的前向向量
 			//pitch()：俯仰，将物体绕X轴旋转
 			//yaw()：航向，将物体绕Y轴旋转
 			//roll()：横滚，将物体绕Z轴旋转 
 			// 计算前向向量 
-			front = cfront(rota);
-			qt = e2q(rota);
-			auto f10 = get_front(qt);
+			//front = cfront(rota);
+			if (abs(deltaX) > 0 || abs(deltaY) > 0)
+			{
+				auto sr = rota;
+				// 角度配置
+				rota.x += deltaY * xMouseSpeed;
+				rota.y += deltaX * yMouseSpeed;
+				//角度限制
+				rota.y = glm::mod(rota.y, 360.0f);
+				rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
+				src_qt = qt; // 保存当前四元数 
+				dst_qt = e2q(rota);
+				auto qd = glm::distance2(sr, rota);
+				if (qd > 1)
+				{
+					qtime = 0;
+				}
+			}
+
+			//if (qtime <= qmaxtime)
+			//{
+			//	qt = glm::slerp(src_qt, dst_qt, (float)(qtime / qmaxtime)); // 四元数插值 
+			//}
+			//else
+			{
+				qt = dst_qt;
+			}
+			front = quat_forward(glm::inverse(qt));
+			//auto front0 = cfront(rota);
+			//auto front1 = get_front(qt);
 			updateView();
+			qtime += deltaTime;
 		}
 
 		void updateView() {
@@ -18760,7 +18785,7 @@ namespace vkr {
 			auto view0 = glm::lookAt(cameraPos, front + cameraPos, camera_up);
 			view = view0;
 			//cameraPos = view[3];
-			printf("pos %.2f,%.2f,%.2f\t %.2f,%.2f,%.2f\t %.2f,%.2f\n", pos.x, pos.y, pos.z, front.x, front.y, front.z, rota.x, rota.y);
+			//printf("pos %.2f,%.2f,%.2f\t %.2f,%.2f,%.2f\t %.2f,%.2f\n", pos.x, pos.y, pos.z, front.x, front.y, front.z, rota.x, rota.y);
 		}
 	};
 
@@ -19297,7 +19322,7 @@ namespace vkr {
 			else {
 			}
 			//鼠标移动位置 
-			tpfc.mouseMovement(io.MouseDelta.x, -io.MouseDelta.y);
+			tpfc.mouseMovement(io.MouseDelta.x, -io.MouseDelta.y, io.DeltaTime);
 			//if (wy != 0)
 			//	tpfc.processScroll(io.wheel.y);
 			//cam.SetMatrix(tpfc.view);
