@@ -18613,7 +18613,7 @@ namespace vkr {
 		float fixheight = 0;		// 0就是固定高度
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
-			qt = e2q(rota);
+			qt = dst_qt = e2q(rota);
 			mouseMovement(0, 0, 0);                //不初始化的话，开局不移动没画面
 		}
 
@@ -19847,7 +19847,7 @@ void* vkdg_cx::new_pipe(const char* vertexShader, const char* pixelShader)
 	}
 	return p;
 }
-void vkdg_cx::load_gltf(const char* fn, const glm::vec3& pos, float scale)
+void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale)
 {
 	if (!ctx || !fn)return;
 	auto tx = (vkr::sample_cx*)ctx;
@@ -19944,13 +19944,13 @@ void free_vkdg(vkdg_cx* p)
 	}
 }
 
-void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
+void add_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
 {
 	if (!p || !fn)return;
 	glm::vec3 ps = {};
 	if (pos)
 		ps = { pos[0],pos[1],pos[2] };
-	p->load_gltf(fn, ps, scale);
+	p->add_gltf(fn, ps, scale);
 }
 
 #endif 

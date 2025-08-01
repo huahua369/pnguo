@@ -147,7 +147,7 @@ public:
 	void* new_pipe(const char* vertexShader, const char* pixelShader);
 
 
-	void load_gltf(const char* fn, const glm::vec3& pos, float scale);
+	void add_gltf(const char* fn, const glm::vec3& pos, float scale);
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();
 private:
@@ -182,7 +182,7 @@ private:
 // todo 创建渲染器
 vkdg_cx* new_vkdg(void* inst, void* phy);
 void free_vkdg(vkdg_cx* p);
-void load_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale);
+void add_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale);
 
 struct device_info_t
 {

@@ -368,7 +368,7 @@ int main()
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	//if (vkd1) {
-	//	vkd1->load_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
+	//	vkd1->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
 	//	vkd1->resize(1024, 800);				// 设置fbo缓冲区大小
 	//	auto vr = vkd1->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 	//	auto texok = form1->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
@@ -391,38 +391,39 @@ int main()
 	//}
 	if (vkd) {
 		{
-			//vkd->load_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 地板
-			vkd->load_gltf(R"(E:\model\zw\grass.glb)", {}, 1.0);// 加载gltf
-			//vkd->load_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			vkd->load_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
-			//vkd->load_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
-			//vkd->load_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
-			//vkd->load_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
-			//vkd->load_gltf( R"(E:\model\hero_alice_lobby.glb)");
-			vkd->load_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
-			//vkd->load_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
-			vkd->load_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
+			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
+			//vkd->add_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 地板
+			vkd->add_gltf(R"(E:\model\zw\grass_patch_3_lods.glb)", { -5,0,-6 }, 1.0);// 加载gltf
+			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
+			vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
+			//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
+			//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
+			//vkd->add_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
+			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
+			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
+			vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
+			//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
+			vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
 
-			//vkd->load_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			/*vkd->load_gltf(R"(E:\model\helicopter_space_ship.glb)", {}, 1.0);
-			vkd->load_gltf(R"(E:\zmodel\cr123.glb)", { 0,0,10 }, 10.0);
-			vkd->load_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
+			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
+			/*vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", {}, 1.0);
+			vkd->add_gltf(R"(E:\zmodel\cr123.glb)", { 0,0,10 }, 10.0);
+			vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
 
-			//vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
-			//vkd->load_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
-			vkd->load_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
-			//vkd->load_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
-			//vkd->load_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
-			//vkd->load_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
-			//vkd->load_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
+			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
+			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
+			vkd->add_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
+			//vkd->add_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
+			//vkd->add_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
+			//vkd->add_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
+			//vkd->add_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
+			//vkd->add_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
+			//vkd->add_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
 
-			//vkd->load_gltf( R"(E:\model\space_station_4.glb)");
-			//vkd->load_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
-			//vkd->load_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-			//vkd->load_gltf( R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
+			//vkd->add_gltf( R"(E:\model\space_station_4.glb)");
+			//vkd->add_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
+			//vkd->add_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
+			//vkd->add_gltf( R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
