@@ -2717,7 +2717,7 @@ namespace vkr {
 		AxisAlignedBoundingBox get_BoundingBox(const glm::mat4& mLightView);
 	private:
 		void InitTransformedData(); //this is called after loading the data from the GLTF
-		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes); 
+		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes);
 		void load_Buffers();
 		void load_Meshes();
 		void load_lights();
@@ -15065,7 +15065,7 @@ namespace vkr {
 			}
 		}
 		return projectedBoundingBox;
-	} 
+	}
 
 #endif // 1
 
@@ -15076,14 +15076,15 @@ namespace vkr {
 // todo renderer
 namespace vkr {
 
-	typedef struct {
+	struct SceneShadowInfo {
 		Texture         ShadowMap;
 		uint32_t        ShadowIndex;
 		uint32_t        ShadowResolution;
 		uint32_t        LightIndex;
 		VkImageView     ShadowDSV;
 		VkFramebuffer   ShadowFrameBuffer;
-	} SceneShadowInfo;
+		VkImageView		ShadowSRV;
+	};
 
 	struct robj_info {
 		//gltf passes
@@ -15182,6 +15183,7 @@ namespace vkr {
 		size_t get_light_size();
 		void AllocateShadowMaps();
 
+		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
 	private:
 		Device* m_pDevice = 0;
 		const_vk ct = {};
@@ -17569,6 +17571,40 @@ namespace vkr {
 	{
 		return _lights.size();
 	}
+	void Renderer_cx::new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx)
+	{
+		ShadowInfo.ShadowResolution = shadowResolution;
+		ShadowInfo.ShadowIndex = shadows;
+		ShadowInfo.LightIndex = idx;
+
+		{
+			auto CurrentShadow = &ShadowInfo;
+			CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
+			CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
+
+			// Create render pass shadow, will clear contents
+			{
+				VkAttachmentDescription depthAttachments;
+				AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+
+				// Create frame buffer
+				VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_Render_pass_shadow;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachmentViews;
+				fb_info.width = CurrentShadow->ShadowResolution;
+				fb_info.height = CurrentShadow->ShadowResolution;
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
+				assert(res == VK_SUCCESS);
+			}
+			VkImageView ShadowSRV;
+			CurrentShadow->ShadowMap.CreateSRV(&CurrentShadow->ShadowSRV);
+		}
+	}
 	void Renderer_cx::AllocateShadowMaps()
 	{
 		auto NumShadows = m_shadowMapPool.size();
@@ -17580,39 +17616,8 @@ namespace vkr {
 				if (q._shadowResolution)
 				{
 					SceneShadowInfo ShadowInfo;
-					ShadowInfo.ShadowResolution = q._shadowResolution;
-					ShadowInfo.ShadowIndex = NumShadows++;
-					ShadowInfo.LightIndex = i;
-
-					{
-						auto CurrentShadow = &ShadowInfo;
-						CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
-						CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
-
-						// Create render pass shadow, will clear contents
-						{
-							VkAttachmentDescription depthAttachments;
-							AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
-
-							// Create frame buffer
-							VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
-							VkFramebufferCreateInfo fb_info = {};
-							fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-							fb_info.pNext = NULL;
-							fb_info.renderPass = m_Render_pass_shadow;
-							fb_info.attachmentCount = 1;
-							fb_info.pAttachments = attachmentViews;
-							fb_info.width = CurrentShadow->ShadowResolution;
-							fb_info.height = CurrentShadow->ShadowResolution;
-							fb_info.layers = 1;
-							VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
-							assert(res == VK_SUCCESS);
-						}
-
-						VkImageView ShadowSRV;
-						CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
-						m_ShadowSRVPool.push_back(ShadowSRV);
-					}
+					new_shadow(ShadowInfo, q._shadowResolution, NumShadows++, i); // 创建场景阴影信息
+					m_ShadowSRVPool.push_back(ShadowInfo.ShadowSRV);
 					m_shadowMapPool.push_back(ShadowInfo);
 				}
 				_lights.push_back(q); i++;
