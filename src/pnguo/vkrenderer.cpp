@@ -2717,8 +2717,7 @@ namespace vkr {
 		AxisAlignedBoundingBox get_BoundingBox(const glm::mat4& mLightView);
 	private:
 		void InitTransformedData(); //this is called after loading the data from the GLTF
-		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes);
-		glm::mat4 ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView);
+		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes); 
 		void load_Buffers();
 		void load_Meshes();
 		void load_lights();
@@ -15066,69 +15065,7 @@ namespace vkr {
 			}
 		}
 		return projectedBoundingBox;
-	}
-	//
-	// Computes the orthographic matrix for a directional light in order to cover the whole scene
-	//
-	glm::mat4 GLTFCommon::ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView) {
-
-		AxisAlignedBoundingBox projectedBoundingBox;
-
-		// NOTE: we consider all objects here, but the scene might not display all of them.
-		for (uint32_t i = 0; i < m_nodes.size(); ++i)
-		{
-			tfNode* pNode = &m_nodes.at(i);
-			if ((pNode == NULL) || (pNode->meshIndex < 0))
-				continue;
-
-			std::vector<tfPrimitives>& primitives = m_meshes[pNode->meshIndex].m_pPrimitives;
-			// loop through primitives
-			//
-			for (size_t p = 0; p < primitives.size(); ++p)
-			{
-				tfPrimitives boundingBox = m_meshes[pNode->meshIndex].m_pPrimitives[p];
-				projectedBoundingBox.Merge(GetAABBInGivenSpace(mLightView * m_worldSpaceMats[i].GetCurrent(), boundingBox.m_center, boundingBox.m_radius));
-			}
-		}
-
-		if (projectedBoundingBox.HasNoVolume())
-		{
-			// default ortho matrix that won't work in most cases
-			return glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
-		}
-
-		// we now have the final bounding box
-		tfPrimitives finalBoundingBox;
-		finalBoundingBox.m_center = 0.5f * (projectedBoundingBox.m_max + projectedBoundingBox.m_min);
-		finalBoundingBox.m_radius = 0.5f * (projectedBoundingBox.m_max - projectedBoundingBox.m_min);
-
-		finalBoundingBox.m_center.w = (1.0f);
-		finalBoundingBox.m_radius.w = (0.0f);
-
-		// we want a square aspect ratio
-		float spanX = finalBoundingBox.m_radius.x;
-		float spanY = finalBoundingBox.m_radius.y;
-		float maxSpan = spanX > spanY ? spanX : spanY;
-
-		// manually create the orthographic matrix
-		glm::mat4 projectionMatrix = {};//glm::mat4::identity();
-		projectionMatrix[0] = (glm::vec4(
-			1.0f / maxSpan, 0.0f, 0.0f, 0.0f
-		));
-		projectionMatrix[1] = (glm::vec4(
-			0.0f, 1.0f / maxSpan, 0.0f, 0.0f
-		));
-		projectionMatrix[2] = (glm::vec4(
-			0.0f, 0.0f, -0.5f / finalBoundingBox.m_radius.z, 0.0f
-		));
-		projectionMatrix[3] = (glm::vec4(
-			-finalBoundingBox.m_center.x / maxSpan,
-			-finalBoundingBox.m_center.y / maxSpan,
-			0.5f * (finalBoundingBox.m_center.z + finalBoundingBox.m_radius.z) / finalBoundingBox.m_radius.z,
-			1.0f
-		));
-		return projectionMatrix;
-	}
+	} 
 
 #endif // 1
 
