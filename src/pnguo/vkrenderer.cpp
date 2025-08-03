@@ -122,7 +122,12 @@ struct dev_info_cx
 namespace vkr
 {
 	std::string format(const char* format, ...);
-
+	inline std::string to_string_g(double _Val) {
+		const auto _Len = static_cast<size_t>(_scprintf("%g", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%g", _Val);
+		return _Str;
+	}
 
 #if 1
 
@@ -1078,27 +1083,22 @@ namespace vkr {
 	{
 		// pbrMetallicRoughness
 		vec4 baseColorFactor = vec4(1.0);
-		float metallicFactor = 0;
-		float roughnessFactor = 0;
+		float metallicFactor = 0;			// 金属度
+		float roughnessFactor = 0;			// 粗糙度
 		float normalScale = 1.0;
 		// KHR_materials_emissive_strength
 		float emissiveStrength = 1.0;
-
 		vec3 emissiveFactor = glm::vec3(1.0);
 		int   alphaMode;
-
 		float alphaCutoff;
 		float occlusionStrength;
 		//KHR_materials_ior
 		float ior = 1.5;
 		int mipCount = 10;
-
 		// KHR_materials_pbrSpecularGlossiness
 		vec4 pbrDiffuseFactor = vec4(1.0);
 		vec3 pbrSpecularFactor = glm::vec3(1.0);
 		float glossinessFactor = 1.0;
-
-
 		// Specular KHR_materials_specular
 		vec3  specularColorFactor = glm::vec3(1.0);
 		float specularFactor = 1.0;
@@ -1109,18 +1109,14 @@ namespace vkr {
 		vec3 anisotropy = glm::vec3();
 		// KHR_materials_transmission
 		float transmissionFactor = 0;
-
 		ivec2 transmissionFramebufferSize;
 		float thicknessFactor;
 		float diffuseTransmissionFactor;
-
 		vec3 diffuseTransmissionColorFactor;
 		//KHR_materials_dispersion
 		float dispersion = 0;
-
 		vec3 attenuationColor = glm::vec3(1.0);
 		float attenuationDistance = 0;
-
 		// KHR_materials_iridescence
 		float iridescenceFactor = 0;
 		float iridescenceIor = 1.3;
@@ -1131,7 +1127,6 @@ namespace vkr {
 		float clearcoatRoughness = 0;
 		float clearcoatNormalScale = 1;
 		float envIntensity = 1;
-
 		int unlit = 0;
 		float pad[3];
 		mat3x4 uvTransform = mat3x4(1.0);
@@ -4184,7 +4179,7 @@ namespace vkr
 			//
 			if (alphaMode == "MASK")
 			{
-				tfmat->m_defines["DEF_alphaCutoff"] = std::to_string(material.alphaCutoff);//  0.5));
+				tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);//  0.5));
 
 				auto pbrMetallicRoughnessIt = material.pbrMetallicRoughness;// .find("pbrMetallicRoughness");
 				int id = pbrMetallicRoughnessIt.baseColorTexture.index;
@@ -5535,7 +5530,7 @@ namespace vkr
 		tfmat->m_blending = material.alphaMode == "BLEND";
 		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes);
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
-		tfmat->m_defines["DEF_alphaCutoff"] = std::to_string(material.alphaCutoff);
+		tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
 		tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
 		// ALPHA_OPAQUE 0
 		// ALPHA_MASK 1
@@ -5770,8 +5765,9 @@ namespace vkr
 			}
 
 		} while (0);
-		if (uvc > 1)
-			tfmat->m_defines["UVT_count"] = std::to_string(uvc);
+		if (uvc < 1)
+			uvc = 1;
+		tfmat->m_defines["UVT_count"] = std::to_string(uvc);
 	}
 
 	int get_vint(tinygltf::Value& t, const char* k)
