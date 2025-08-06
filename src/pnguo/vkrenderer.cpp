@@ -5942,6 +5942,15 @@ namespace vkr
 			print_time Pt("load BRDFLUT", 1);
 			m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, "images/BrdfLut.dds", false); // LUT images are stored as linear
 		}
+		//int dimm = 256;
+		//{
+		//	print_time Pt("1632f", 1);
+		//	auto bv = generateCookTorranceBRDFLUT1632f(dimm, 0);
+		//}
+		//{
+		//	print_time Pt("fq", 1);
+		//	auto bv = generateCookTorranceBRDFLUT(dimm, 0);
+		//}
 		if (0) {
 			print_time Pt("generate BRDFLUT", 1);
 			const int cs = 256;
@@ -6828,7 +6837,7 @@ namespace vkr
 	pbr_pass::~pbr_pass()
 	{
 	}
-
+#if 1
 	glm::vec2 hammersley(uint32_t i, uint32_t N) {
 		// Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
 		uint32_t bits = (i << 16u) | (i >> 16u);
@@ -6939,6 +6948,146 @@ namespace vkr
 		}
 		return data;
 	}
+#endif // 1
+
+#if 1
+
+	float RadicalInverse_VdC(unsigned int bits)
+	{
+		bits = (bits << 16u) | (bits >> 16u);
+		bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+		bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+		bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+		bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+		return float(bits) * 2.3283064365386963e-10;
+	}
+
+	glm::vec2 Hammersley(unsigned int i, unsigned int N)
+	{
+		return glm::vec2(float(i) / float(N), RadicalInverse_VdC(i));
+	}
+
+	glm::vec3 ImportanceSampleGGX(glm::vec2 Xi, float roughness, glm::vec3 N)
+	{
+		float a = roughness * roughness;
+
+		float phi = 2.0 * glm::pi<double>() * Xi.x;
+		float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+		float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+		// from spherical coordinates to cartesian coordinates
+		glm::vec3 H;
+		H.x = cos(phi) * sinTheta;
+		H.y = sin(phi) * sinTheta;
+		H.z = cosTheta;
+
+		// from tangent-space vector to world-space sample vector
+		glm::vec3 up = abs(N.z) < 0.999 ? glm::vec3(0.0, 0.0, 1.0) : glm::vec3(1.0, 0.0, 0.0);
+		glm::vec3 tangent = normalize(cross(up, N));
+		glm::vec3 bitangent = cross(N, tangent);
+
+		glm::vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+		return normalize(sampleVec);
+	}
+
+	float GeometrySchlickGGX(float NdotV, float roughness)
+	{
+		float a = roughness;
+		float k = (a * a) / 2.0;
+
+		float nom = NdotV;
+		float denom = NdotV * (1.0 - k) + k;
+
+		return nom / denom;
+	}
+
+	float GeometrySmith(float roughness, float NoV, float NoL)
+	{
+		float ggx2 = GeometrySchlickGGX(NoV, roughness);
+		float ggx1 = GeometrySchlickGGX(NoL, roughness);
+
+		return ggx1 * ggx2;
+	}
+
+	glm::vec2 IntegrateBRDF(float NdotV, float roughness, unsigned int samples)
+	{
+		glm::vec3 V;
+		V.x = sqrt(1.0 - NdotV * NdotV);
+		V.y = 0.0;
+		V.z = NdotV;
+
+		float A = 0.0;
+		float B = 0.0;
+
+		glm::vec3 N = glm::vec3(0.0, 0.0, 1.0);
+
+		for (unsigned int i = 0u; i < samples; ++i)
+		{
+			glm::vec2 Xi = Hammersley(i, samples);
+			glm::vec3 H = ImportanceSampleGGX(Xi, roughness, N);
+			glm::vec3 L = normalize(2.0f * dot(V, H) * H - V);
+
+			float NoL = glm::max(L.z, 0.0f);
+			float NoH = glm::max(H.z, 0.0f);
+			float VoH = glm::max(dot(V, H), 0.0f);
+			float NoV = glm::max(dot(N, V), 0.0f);
+
+			if (NoL > 0.0)
+			{
+				float G = GeometrySmith(roughness, NoV, NoL);
+
+				float G_Vis = (G * VoH) / (NoH * NoV);
+				float Fc = pow(1.0 - VoH, 5.0);
+
+				A += (1.0 - Fc) * G_Vis;
+				B += Fc * G_Vis;
+			}
+		}
+
+		return glm::vec2(A / float(samples), B / float(samples));
+	}
+	//0:VK_FORMAT_R16G16_SFLOAT, 1:VK_FORMAT_R32G32_SFLOAT
+	std::vector<uint32_t> generateCookTorranceBRDFLUT1632f(uint32_t mapDim, int type)
+	{
+		std::vector<uint32_t> data;
+		data.resize(mapDim * mapDim * (type ? 2 : 1));
+		auto d = data.data();
+		//Here we set up the default parameters
+		int samples = 1024;
+		int size = mapDim;
+		if (type)
+		{
+			auto pt = (glm::vec2*)d;
+			for (int y = 0; y < size; y++)
+			{
+				for (int x = 0; x < size; x++)
+				{
+					float NoV = (y + 0.5f) * (1.0f / size);
+					float roughness = (x + 0.5f) * (1.0f / size);
+					auto v = IntegrateBRDF(NoV, roughness, samples);
+					pt[size - 1 - x] = v;
+				}
+				pt += size;
+			}
+		}
+		else
+		{
+			auto pt = d;
+			for (int y = 0; y < size; y++)
+			{
+				pt = d + y * size;
+				for (int x = 0; x < size; x++)
+				{
+					float NoV = (y + 0.5f) * (1.0f / size);
+					float roughness = (x + 0.5f) * (1.0f / size);
+					auto v = IntegrateBRDF(NoV, roughness, samples);
+					pt[size - 1 - x] = glm::packHalf2x16(v);
+				}
+			}
+		}
+		return data;
+	}
+#endif // 1
 
 	// 共用资源
 	void pbr_pass::new_pbrts(Device* pDevice, UploadHeap* pUploadHeap, const char* brdflut)
@@ -18528,7 +18677,11 @@ namespace vkr {
 #if 1
 
 
-
+	/* todo 相机
+	  [x]第一人称相机
+	  [ ]第三人称相机
+	  [ ]场景漫游相机
+	*/
 	class CameraX
 	{
 	public:
@@ -18645,17 +18798,19 @@ namespace vkr {
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
 			float moveSpeed = deltaTime * keySpeed;
-			auto qi = glm::inverse(qt);
-			auto x = -quat_right(qi);
-			auto y = -quat_forward(qi);
-			//auto z0 = quat_up(qi); 
 			auto z = worldUp * direction.z;
+			// 第一人称相机计算
+#if 1
+			auto qi = glm::inverse(qt); // 四元数取逆
+			auto x = -quat_right(qi);	// 获取和摄像机右向向量相反的向量
+			auto y = -quat_forward(qi);	// 获取和摄像机前向向量相反的向量
+			//auto z0 = quat_up(qi); 
 			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
-#if 0
-			auto f1 = -front;// 获取和摄像机前向向量相反的向量
-			auto cr1 = glm::normalize(glm::cross(f1, worldUp));
+#else
+			auto front0 = -front;// 获取和摄像机前向向量相反的向量
+			auto right = glm::normalize(glm::cross(front0, worldUp));
 			//根据摄像机坐标系下的移动方向进行移动
-			auto npos = moveSpeed * (direction.x * cr1 + direction.z * worldUp + direction.y * f1);
+			auto npos = moveSpeed * (direction.x * right + z + direction.y * front0);
 #endif
 			if (abs(direction.x) > 0 || abs(direction.y) > 0)
 				npos.y *= fixheight;
@@ -18711,7 +18866,7 @@ namespace vkr {
 			glm::vec3 camera_forward = qt * glm::vec3(0, 0, 1); // +Z is forward direction
 			glm::vec3 camera_right = qt * glm::vec3(1, 0, 0); // +X is right direction
 			glm::vec3 camera_up = qt * glm::vec3(0, 1, 0); // +Y is up direction
-			float cameraSmooth = 2.0f;                               // 平滑因子  
+			float cameraSmooth = 2.0f;	// 平滑因子  
 			cameraPos = tpos;
 			camera_forward = glm::normalize(front);
 			camera_right = glm::normalize(glm::cross(camera_forward, worldUp));

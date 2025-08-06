@@ -360,7 +360,7 @@ int main()
 	auto kd = sdldev.vkdev;
 	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-	//form0->set_mouse_mode(0, true);	// 设置相对鼠标模式
+	form0->set_mouse_mode(0, true);	// 设置相对鼠标模式
 	//form0->warp_mouse_in_window(-1, -1);
 	get_queue_info(sdldev.phy);
 

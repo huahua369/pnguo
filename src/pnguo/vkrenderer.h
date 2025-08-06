@@ -243,8 +243,8 @@ namespace vkr {
 
 	// 创建brdflut纹理数据，大小，类型0=float16，1=rgba
 	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim, int type);
-
-
+	// todo速度比上面函数慢，类型0 = float16，1 = float32
+	std::vector<uint32_t> generateCookTorranceBRDFLUT1632f(uint32_t mapDim, int type);
 
 }
 //!vkr
