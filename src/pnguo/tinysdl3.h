@@ -288,7 +288,7 @@ public:
 	void push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target);
 	// 弹出纹理渲染
 	void pop_texture(SDL_Texture* p);
-	bool add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type);
+	bool add_vkimage(const glm::ivec2& size, void* vkimage, const glm::vec2& pos, int type);
 #endif
 	// 添加动画、图集渲染
 	void add_skeleton(skeleton_t* p);

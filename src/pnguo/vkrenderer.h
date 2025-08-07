@@ -88,13 +88,6 @@ namespace vkr {
 //!vkr
 
 struct dev_info_cx;
-#ifndef image_vkr
-struct image_vkr
-{
-	glm::ivec2 size = {};
-	void* vkimageptr = 0;
-};
-#endif
 
 struct scene_state {
 	// POST PROCESS CONTROLS 
@@ -122,13 +115,20 @@ struct scene_state {
 };
 
 struct mouse_state_t;
+
+struct image_vkr
+{
+	glm::ivec2 size = {};
+	void* vkimage = 0;
+};
+
 class vkdg_cx
 {
 public:
 	void* ctx = 0;
 	void* dev = 0;
 	void* qupload = 0;
-	std::vector<uint32_t> dt;
+	std::vector<uint32_t> dt;  // save_fbo缓存像素时用
 	int width = 0, height = 0;
 	scene_state _state = {};
 public:
@@ -137,6 +137,7 @@ public:
 	void set_label_cb(std::function<void(int count, int idx, const char* str)> cb);
 	void update(mouse_state_t* io);
 	void on_render();
+	// 获取framebuffer image
 	image_vkr get_vkimage(int idx);
 	// 获取内部数据，0相机坐标
 	glm::vec3 get_value(int idx);
@@ -144,45 +145,16 @@ public:
 	void resize(int w, int h);
 	void save_fbo(int idx);
 	void copy2(int idx, void* vkptr);
-	void* new_pipe(const char* vertexShader, const char* pixelShader);
-
-
+	// 添加gltf模型到渲染器
 	void add_gltf(const char* fn, const glm::vec3& pos, float scale);
+	// 获取灯光信息
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();
-private:
-
-};
-
-// 节点包围盒渲染
-class BBoxPass
-{
-public:
-	struct mat_idx
-	{
-		glm::mat4* m = 0;
-		size_t pos = 0, count = 0;
-	};
-	struct box_t
-	{
-		glm::vec4 vCenter, vRadius;
-	};
-	std::vector<mat_idx> box_ms;	// 节点矩阵，box开始\数量
-	std::vector<box_t> boxs;		// box坐标半径
-public:
-	BBoxPass();
-	~BBoxPass();
-	// 收集所有节点包围盒
-	void add(glm::mat4* m, box_t* vcr, size_t count);
-	void clear();
-private:
-
 };
 
 // todo 创建渲染器
 vkdg_cx* new_vkdg(void* inst, void* phy);
 void free_vkdg(vkdg_cx* p);
-void add_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale);
 
 struct device_info_t
 {
@@ -195,6 +167,31 @@ void get_queue_info(void* physicaldevice);
 
 
 namespace vkr {
+	// 节点包围盒渲染
+	class BBoxPass
+	{
+	public:
+		struct mat_idx
+		{
+			glm::mat4* m = 0;
+			size_t pos = 0, count = 0;
+		};
+		struct box_t
+		{
+			glm::vec4 vCenter, vRadius;
+		};
+		std::vector<mat_idx> box_ms;	// 节点矩阵，box开始\数量
+		std::vector<box_t> boxs;		// box坐标半径
+	public:
+		BBoxPass();
+		~BBoxPass();
+		// 收集所有节点包围盒
+		void add(glm::mat4* m, box_t* vcr, size_t count);
+		void clear();
+	private:
+
+	};
+
 	// 顶点数据、纹理、矩阵、灯光、渲染命令
 	// 多边形
 	struct mesh_mt

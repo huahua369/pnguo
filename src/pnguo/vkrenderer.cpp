@@ -19820,7 +19820,7 @@ image_vkr vkdg_cx::get_vkimage(int idx)
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;
 		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
-			r.vkimageptr = tx->_fbo->framebuffers[idx].color._image;
+			r.vkimage = tx->_fbo->framebuffers[idx].color._image;
 			r.size = { tx->_fbo->framebuffers[idx].color.width,tx->_fbo->framebuffers[idx].color.height };
 			width = r.size.x;
 			height = r.size.y;
@@ -19893,15 +19893,15 @@ void vkdg_cx::copy2(int idx, void* vkptr)
 	}
 
 }
-void* vkdg_cx::new_pipe(const char* vertexShader, const char* pixelShader)
-{
-	void* p = 0;
-	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
-		//vkr::new_pipe(vertexShader, pixelShader, tx->m_device);
-	}
-	return p;
-}
+//void* vkdg_cx::new_pipe(const char* vertexShader, const char* pixelShader)
+//{
+//	void* p = 0;
+//	if (ctx) {
+//		auto tx = (vkr::sample_cx*)ctx;
+//		//vkr::new_pipe(vertexShader, pixelShader, tx->m_device);
+//	}
+//	return p;
+//}
 void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale)
 {
 	if (!ctx || !fn)return;
@@ -19930,30 +19930,6 @@ size_t vkdg_cx::get_light_size()
 	return c;
 }
 
-BBoxPass::BBoxPass()
-{
-}
-
-BBoxPass::~BBoxPass()
-{
-}
-
-void BBoxPass::add(glm::mat4* m, BBoxPass::box_t* vcr, size_t count)
-{
-	if (!m || !vcr || !count)return;
-	auto nps = boxs.size();
-	for (size_t i = 0; i < count; i++)
-	{
-		boxs.push_back(vcr[i]);
-	}
-	box_ms.push_back({ m,nps,count });
-}
-
-void BBoxPass::clear()
-{
-	boxs.clear();
-	box_ms.clear();
-}
 vkdg_cx* new_vkdg(void* inst, void* phy)
 {
 	dev_info_cx c[1] = {};
@@ -20009,7 +19985,34 @@ void add_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
 }
 
 #endif 
+namespace vkr {
 
+	BBoxPass::BBoxPass()
+	{
+	}
+
+	BBoxPass::~BBoxPass()
+	{
+	}
+
+	void BBoxPass::add(glm::mat4* m, BBoxPass::box_t* vcr, size_t count)
+	{
+		if (!m || !vcr || !count)return;
+		auto nps = boxs.size();
+		for (size_t i = 0; i < count; i++)
+		{
+			boxs.push_back(vcr[i]);
+		}
+		box_ms.push_back({ m,nps,count });
+	}
+
+	void BBoxPass::clear()
+	{
+		boxs.clear();
+		box_ms.clear();
+	}
+}
+// !vkr
 std::vector<device_info_t> get_devices(void* inst)
 {
 	VkPhysicalDeviceProperties dp = {};

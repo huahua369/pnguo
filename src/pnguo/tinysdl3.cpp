@@ -2864,12 +2864,12 @@ void form_x::flash_window(int opera)
 	}
 }
 #if 1
-bool form_x::add_vkimage(const glm::ivec2& size, void* vkimageptr, const glm::vec2& pos, int type)
+bool form_x::add_vkimage(const glm::ivec2& size, void* vkimage, const glm::vec2& pos, int type)
 {
 	bool ret = false;
-	if (vkimageptr)
+	if (vkimage)
 	{
-		auto tex = new_texture(size.x, size.y, vkimageptr, type);// 创建SDL的bgra纹理
+		auto tex = new_texture(size.x, size.y, vkimage, type);// 创建SDL的bgra纹理
 		if (tex)
 		{
 			// 添加纹理到SDL窗口渲染 
