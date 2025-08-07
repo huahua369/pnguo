@@ -19828,24 +19828,24 @@ image_vkr vkdg_cx::get_vkimage(int idx)
 	}
 	return r;
 }
-glm::vec3 vkdg_cx::get_value(int idx)
-{
-	glm::vec3 r = {};
-	if (!ctx) return r;
-	auto tx = (vkr::sample_cx*)ctx;
-	switch (idx)
-	{
-	case 0:
-		r = tx->m_camera.GetPosition();
-		break;
-	case 1:
-		r = { tx->m_camera.GetYaw(),tx->m_camera.GetPitch(),0 };
-		break;
-	default:
-		break;
-	}
-	return r;
-}
+//glm::vec3 vkdg_cx::get_value(int idx)
+//{
+//	glm::vec3 r = {};
+//	if (!ctx) return r;
+//	auto tx = (vkr::sample_cx*)ctx;
+//	switch (idx)
+//	{
+//	case 0:
+//		r = tx->m_camera.GetPosition();
+//		break;
+//	case 1:
+//		r = { tx->m_camera.GetYaw(),tx->m_camera.GetPitch(),0 };
+//		break;
+//	default:
+//		break;
+//	}
+//	return r;
+//}
 void vkdg_cx::resize(int w, int h) {
 	if (ctx) {
 		auto tx = (vkr::sample_cx*)ctx;

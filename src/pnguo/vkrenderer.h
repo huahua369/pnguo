@@ -138,12 +138,11 @@ public:
 	void update(mouse_state_t* io);
 	void on_render();
 	// 获取framebuffer image
-	image_vkr get_vkimage(int idx);
-	// 获取内部数据，0相机坐标
-	glm::vec3 get_value(int idx);
+	image_vkr get_vkimage(int idx); 
 	// 重置大小
 	void resize(int w, int h);
 	void save_fbo(int idx);
+	// 复制fbo idx到 VkImage vkptr
 	void copy2(int idx, void* vkptr);
 	// 添加gltf模型到渲染器
 	void add_gltf(const char* fn, const glm::vec3& pos, float scale);
