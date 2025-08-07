@@ -18719,8 +18719,8 @@ namespace vkr {
 		void set_size(float w, float h) {
 			size.x = w;
 			size.y = h;
-			xMouseSpeed = h * 0.15 / 360.0;
-			yMouseSpeed = w * 0.165 / 360.0;
+			xMouseSpeed = h / 360.0 * 0.15;
+			yMouseSpeed = w / 360.0 * 0.25;
 		}
 
 		// 输入角度欧拉角，计算四元数向量
@@ -18754,7 +18754,7 @@ namespace vkr {
 		}
 		glm::vec3 quat_forward(const glm::quat& q)
 		{
-			auto v = q * glm::vec3(0, 0, 1); 
+			auto v = q * glm::vec3(0, 0, 1);
 			return glm::vec3(v.z, -v.y, v.x);
 		}
 		//键盘移动处理
