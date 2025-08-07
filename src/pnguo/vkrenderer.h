@@ -115,13 +115,11 @@ struct scene_state {
 };
 
 struct mouse_state_t;
-
 struct image_vkr
 {
 	glm::ivec2 size = {};
 	void* vkimage = 0;
 };
-
 class vkdg_cx
 {
 public:
@@ -134,13 +132,14 @@ public:
 public:
 	vkdg_cx();
 	~vkdg_cx();
-	void set_label_cb(std::function<void(int count, int idx, const char* str)> cb);
-	void update(mouse_state_t* io);
-	void on_render();
+	void set_label_cb(std::function<void(int count, int idx, const char* str)> cb); // 设置标签回调
+	void update(mouse_state_t* io); // 更新事件
+	void on_render();				// 执行渲染
 	// 获取framebuffer image
 	image_vkr get_vkimage(int idx); 
 	// 重置大小
 	void resize(int w, int h);
+	// 保存fbo idx的像素到dt
 	void save_fbo(int idx);
 	// 复制fbo idx到 VkImage vkptr
 	void copy2(int idx, void* vkptr);
