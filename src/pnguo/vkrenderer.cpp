@@ -18733,36 +18733,10 @@ namespace vkr {
 			f.z = glm::cos(rota_rad.x) * glm::sin(rota_rad.y);
 			return f;
 		}
-		// 计算四元数向量
-		glm::vec3 get_front(const glm::quat& q) {
-			auto c = glm::vec3(0, 0, 1) * q;
-			return glm::vec3(c.z, -c.x, c.y);
-		}
-		inline glm::vec3 get_qv(const glm::quat& q, const glm::vec3& d)
-		{
-			auto c = d * q;
-			return glm::vec3(c.z, c.x, c.y);
-		}
-		inline glm::mat3 get_qv3(const glm::quat& q)
-		{
-			auto y = q * glm::vec3(0, 1, 0);
-			auto z = q * glm::vec3(0, 0, 1);
-			auto x = q * glm::vec3(1, 0, 0);
-			return glm::mat3(glm::vec3(y.z, y.x, y.y), glm::vec3(z.z, z.x, z.y), glm::vec3(x.z, x.x, x.y));
-		}
-		// 输入角度欧拉角返回四元数
-		glm::vec3 cqfront(const glm::ivec2& r)
-		{
-			auto ry = glm::radians(glm::vec2(r));
-			glm::vec3 EulerAngles(ry.y, ry.x, 0.0);// x=pitch; y=yaw； roll忽略
-			glm::quat q = glm::quat(EulerAngles);
-			auto  f = get_front(q);
-			return f;
-		}
 		glm::quat e2q(const glm::ivec2& r)
 		{
 			auto ry = glm::radians(glm::vec2(r));
-			glm::vec3 EulerAngles(ry.y, ry.x, 0.0);// x=pitch; y=yaw； roll忽略
+			glm::vec3 EulerAngles(ry.x, ry.y, 0.0);// x=pitch; y=yaw； roll忽略
 			glm::quat q = glm::quat(EulerAngles);
 			return q;
 		}
@@ -18770,47 +18744,35 @@ namespace vkr {
 		//	正切函数tan(a) = sin(a) / cos(a)
 		glm::vec3 quat_up(const glm::quat& q)
 		{
-			auto v = q * glm::vec3(1, 0, 0);
-#ifndef NO_ZXY
-			return glm::vec3(v.z, v.x, v.y); // ZXY
-#else
-			return v;// XYZ
-#endif // !NO_ZXY
+			auto v = q * glm::vec3(0, 1, 0);
+			return glm::vec3(v.z, v.y, v.x);
 		}
 		glm::vec3 quat_right(const glm::quat& q)
 		{
-			auto v = q * glm::vec3(0, 1, 0);
-#ifndef NO_ZXY
-			return glm::vec3(v.z, v.x, v.y); // ZXY
-#else
-			return v;// XYZ
-#endif // !NO_ZXY
+			auto v = q * glm::vec3(1, 0, 0);
+			return glm::vec3(v.z, v.y, v.x);
 		}
 		glm::vec3 quat_forward(const glm::quat& q)
 		{
-			auto v = q * glm::vec3(0, 0, 1);
-#ifndef NO_ZXY
-			return glm::vec3(v.z, -v.x, v.y); // ZXY
-#else
-			return v;// XYZ
-#endif // !NO_ZXY
+			auto v = q * glm::vec3(0, 0, 1); 
+			return glm::vec3(v.z, -v.y, v.x);
 		}
 		//键盘移动处理
 		void keyMovement(glm::vec3 direction, double deltaTime) {
 			float moveSpeed = deltaTime * keySpeed;
 			auto z = worldUp * direction.z;
 			// 第一人称相机计算
-#if 1
-			auto qi = glm::inverse(qt); // 四元数取逆
-			auto x = -quat_right(qi);	// 获取和摄像机右向向量相反的向量
-			auto y = -quat_forward(qi);	// 获取和摄像机前向向量相反的向量
+#if 1 
+			auto x = -quat_right(qt);	// 获取和摄像机右向向量相反的向量
+			auto y = -quat_forward(qt);	// 获取和摄像机前向向量相反的向量
 			//auto z0 = quat_up(qi); 
 			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
 #else
-			auto front0 = -front;// 获取和摄像机前向向量相反的向量
+			auto front1 = cfront(rota);
+			auto front0 = -front1;// 获取和摄像机前向向量相反的向量
 			auto right = glm::normalize(glm::cross(front0, worldUp));
 			//根据摄像机坐标系下的移动方向进行移动
-			auto npos = moveSpeed * (direction.x * right + z + direction.y * front0);
+			auto npos1 = moveSpeed * (direction.x * right + z + direction.y * front0);
 #endif
 			if (abs(direction.x) > 0 || abs(direction.y) > 0)
 				npos.y *= fixheight;
@@ -18853,7 +18815,7 @@ namespace vkr {
 			{
 				qt = dst_qt;
 			}
-			front = quat_forward(glm::inverse(qt));
+			front = quat_forward(qt);
 			//auto front0 = cfront(rota);
 			//auto front1 = get_front(qt);
 			updateView();
