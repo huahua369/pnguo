@@ -15007,24 +15007,49 @@ namespace vkr {
 	{
 		if (id == -1 || (id >= m_skins.size()))
 			return -1;
-
 		//return m_skins[id].m_InverseBindMatrices.m_count * (4 * 4 * sizeof(float));
 		return m_skins[id].m_InverseBindMatrices.m_count * (sizeof(glm::mat4));// Matrix2));
 	}
 
 	//
 	// Transforms a node hierarchy recursively 
-	//
+	struct node_mat
+	{
+		uint32_t idx = 0;
+		uint32_t pidx = -1;
+		glm::mat4 m = glm::mat4(1.0);
+	};
+
 	void GLTFCommon::TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes)
 	{
+		std::stack<node_mat> q;
+		auto p = pNodes->data();
 		for (uint32_t n = 0; n < pNodes->size(); n++)
 		{
-			uint32_t nodeIdx = pNodes->at(n);
-
-			glm::mat4 m = world * m_animatedMats[nodeIdx];
-			m_worldSpaceMats[nodeIdx].Set(m);
-			TransformNodes(m, &m_nodes[nodeIdx].m_children);
+			uint32_t nodeIdx = p[n];
+			if (nodeIdx >= m_nodes.size())
+				continue;
+			node_mat nm = {};
+			nm.idx = nodeIdx;
+			nm.m = world * m_animatedMats[nodeIdx];
+			m_worldSpaceMats[nodeIdx].Set(nm.m);
+			q.push(nm);
 		}
+		while (q.size()) {
+			auto k = q.top(); q.pop();
+			if (m_nodes[k.idx].m_children.size())
+			{
+				for (auto idx : m_nodes[k.idx].m_children)
+				{
+					node_mat nm = {};
+					nm.idx = idx;
+					nm.m = k.m * m_animatedMats[idx];
+					m_worldSpaceMats[idx].Set(nm.m);
+					q.push(nm);
+				}
+			}
+		}
+		return;
 	}
 
 	//
@@ -15055,7 +15080,10 @@ namespace vkr {
 	//
 	void GLTFCommon::TransformScene(int sceneIndex, const glm::mat4& world)
 	{
-		m_worldSpaceMats.resize(m_nodes.size());
+		if (m_worldSpaceMats.size() < m_nodes.size())
+		{
+			m_worldSpaceMats.resize(m_nodes.size());
+		}
 
 		// transform all the nodes of the scene (and make 
 		//           
@@ -15316,7 +15344,7 @@ namespace vkr {
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 		glm::mat4 ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView);
-		PerFrame_t* SetPerFrameData(const Camera& cam);
+		PerFrame_t* mkPerFrameData(const Camera& cam);
 		void OnRender(const scene_state* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p, int idx);
 		// 释放上传堆和缓冲区
@@ -17825,7 +17853,7 @@ namespace vkr {
 		return projectionMatrix;
 	}
 
-	PerFrame_t* Renderer_cx::SetPerFrameData(const Camera& cam)
+	PerFrame_t* Renderer_cx::mkPerFrameData(const Camera& cam)
 	{
 		auto pMats = lightMats.data();
 
@@ -18088,7 +18116,7 @@ namespace vkr {
 
 		// Sets the perFrame data 
 		glm::mat4 mCameraCurrViewProj = {};
-		auto pfd = SetPerFrameData(Cam);
+		auto pfd = mkPerFrameData(Cam);
 		Light* lights = pfd->lights;
 		int lightCount = pfd->lightCount;
 		{
@@ -19043,8 +19071,8 @@ namespace vkr {
 			Transform transform = {};
 			transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
 			light_t l = {};
-			l._type = light_t::LIGHT_DIRECTIONAL;
-			l._intensity = 8.0;
+			l._type = light_t::LIGHT_SPOTLIGHT;
+			l._intensity = 10.0;
 			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 			l._range = 52;
 			l._outerConeAngle = AMD_PI_OVER_4;

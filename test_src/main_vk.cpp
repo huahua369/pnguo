@@ -396,15 +396,15 @@ int main()
 			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
+			//vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
 			//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 			//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
-			//vkd->add_gltf(R"(E:\app\tools\pnguo\out\bin\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
+			vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
-			vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
+			//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
 			//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
-			vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
+			//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
 
 			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
 			/*vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", {}, 1.0);
@@ -413,7 +413,7 @@ int main()
 
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
-			vkd->add_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
+			//vkd->add_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
 			//vkd->add_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
