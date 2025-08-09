@@ -333,6 +333,9 @@ int main()
 	//return 0;
 	//test_img();
 	auto app = new_app();
+
+	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+
 	//{
 	//	hz::mfile_t m;
 	//	auto pd = m.open_d(R"(E:\zt\c00951ea.spr)", 0);
@@ -358,13 +361,13 @@ int main()
 	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto kd = sdldev.vkdev;
-	sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
+	//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
 	form0->set_mouse_mode(0, true);	// 设置相对鼠标模式
 	//form0->warp_mouse_in_window(-1, -1);
 	get_queue_info(sdldev.phy);
 
-	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy);	// 创建vk渲染器 
+	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, kd);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	//if (vkd1) {
@@ -392,14 +395,14 @@ int main()
 	if (vkd) {
 		{
 			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-			vkd->add_gltf(R"(E:\model\sharp2.glb)", {}, 1.0);// 地板
+			vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,-5,0 }, 1.0);// 地板
 			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
 			//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 			//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
-			vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 12,1,1 }, 1.0);
+			vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,0,0 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
@@ -429,9 +432,10 @@ int main()
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimage, { 20,36 }, 1);// 创建SDL的bgra纹理 
-		vkd->_state.SelectedTonemapperIndex = 1;
-		vkd->_state.Exposure = 0.59928;
-		vkd->_state.EmissiveFactor = 250;
+		vkd->_state.SelectedTonemapperIndex = 0;
+		vkd->_state.Exposure = 1.0;
+		vkd->_state.EmissiveFactor = 30;
+		vkd->_state.IBLFactor = 1.0;
 		new_ui(form0, vkd);
 		if (texok)
 		{
@@ -443,6 +447,13 @@ int main()
 					vkd->_state.bUseTAA;
 					vkd->update(form0->io);	// 更新事件
 					vkd->on_render();		// 执行渲染
+					static bool sa = false;
+					if (sa)
+					{
+						auto img = vkd->save_shadow(0);	// 保存阴影贴图
+						stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
+						sa = false;
+					}
 				};
 		}
 

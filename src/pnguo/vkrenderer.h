@@ -114,6 +114,11 @@ struct scene_state {
 	bool  bBloom = true;
 };
 
+struct image_d
+{
+	glm::ivec2 size = {};
+	uint32_t* data = 0;
+};
 struct mouse_state_t;
 struct image_vkr
 {
@@ -141,6 +146,7 @@ public:
 	void resize(int w, int h);
 	// 保存fbo idx的像素到dt
 	void save_fbo(int idx);
+	image_d save_shadow(int idx);
 	// 复制fbo idx到 VkImage vkptr
 	void copy2(int idx, void* vkptr);
 	// 添加gltf模型到渲染器
@@ -151,7 +157,7 @@ public:
 };
 
 // todo 创建渲染器
-vkdg_cx* new_vkdg(void* inst, void* phy);
+vkdg_cx* new_vkdg(void* inst, void* phy, void* dev);
 void free_vkdg(vkdg_cx* p);
 
 struct device_info_t

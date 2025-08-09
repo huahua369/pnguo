@@ -707,10 +707,10 @@ namespace vkr
 		{
 			vkGetDeviceQueue(m_device, present_queue_family_index, 0, &present_queue);
 		}
-		if (compute_queue_family_index != UINT32_MAX)
-		{
-			vkGetDeviceQueue(m_device, compute_queue_family_index, 0, &compute_queue);
-		}
+		//if (compute_queue_family_index != UINT32_MAX)
+		//{
+		//	vkGetDeviceQueue(m_device, compute_queue_family_index, 0, &compute_queue);
+		//}
 
 		// Init the extensions (if they have been enabled successfuly)
 		//
@@ -738,6 +738,7 @@ namespace vkr
 		pipelineCache.pInitialData = NULL;
 		pipelineCache.flags = 0;
 		VkResult res = vkCreatePipelineCache(m_device, &pipelineCache, NULL, &m_pipelineCache);
+		printf("vkCreatePipelineCache %d\n", (int)res);
 		assert(res == VK_SUCCESS);
 	}
 
@@ -6247,6 +6248,9 @@ namespace vkr
 				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, &m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
+			else {
+				cnt = cnt;
+			}
 		}
 	}
 
@@ -7301,7 +7305,7 @@ namespace vkr
 		return Init(pDevice, &image_info, name);
 	}
 	bool is_depth_tex(VkFormat format) {
-		return !(format<VK_FORMAT_D16_UNORM || format>VK_FORMAT_D32_SFLOAT_S8_UINT);//VK_FORMAT_D32_SFLOAT
+		return !(format < VK_FORMAT_D16_UNORM || format > VK_FORMAT_D32_SFLOAT_S8_UINT);//VK_FORMAT_D32_SFLOAT
 	}
 	void Texture::CreateRTV(VkImageView* pImageView, int mipLevel, VkFormat format)
 	{
@@ -7322,7 +7326,8 @@ namespace vkr
 			info.format = m_format;
 		else
 			info.format = format;
-		if (is_depth_tex(m_format))
+		//if (is_depth_tex(m_format))
+		if (m_format == VK_FORMAT_D32_SFLOAT)
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		else
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -7364,7 +7369,7 @@ namespace vkr
 			info.subresourceRange.layerCount = 1;
 		}
 		info.format = m_format;
-		if (is_depth_tex(m_format))
+		if (m_format == VK_FORMAT_D32_SFLOAT)
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		else
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -7421,7 +7426,8 @@ namespace vkr
 		view_info.subresourceRange.layerCount = 1;
 		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
-		if (is_depth_tex(m_format))// == VK_FORMAT_D16_UNORM_S8_UINT || m_format == VK_FORMAT_D24_UNORM_S8_UINT || m_format == VK_FORMAT_D32_SFLOAT_S8_UINT)
+		if (m_format == VK_FORMAT_D16_UNORM_S8_UINT || m_format == VK_FORMAT_D24_UNORM_S8_UINT || m_format == VK_FORMAT_D32_SFLOAT_S8_UINT)
+			//if (is_depth_tex(m_format))
 		{
 			view_info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
@@ -15357,7 +15363,7 @@ namespace vkr {
 		void AllocateShadowMaps();
 
 		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
-	private:
+	public:
 		Device* m_pDevice = 0;
 		const_vk ct = {};
 		uint32_t                        m_Width = {};
@@ -18355,7 +18361,7 @@ namespace vkr {
 						glm::mat4 spotlightMatrix = glm::inverse(lights[i].mLightViewProj);
 						glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
 						m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
-						_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+						//_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
 					}
 
 					m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
@@ -18894,6 +18900,7 @@ namespace vkr {
 		void HandleInput();
 		void UpdateCamera(Camera& cam);
 		void set_fboidx(int idx);
+
 	public:
 		Device* m_device = 0;
 		int m_Width = 1280;  // application window dimensions
@@ -19070,11 +19077,13 @@ namespace vkr {
 			src = { 10.1,20,0.1,0 };
 			Transform transform = {};
 			transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
+			transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+
 			light_t l = {};
 			l._type = light_t::LIGHT_SPOTLIGHT;
-			l._intensity = 10.0;
+			l._intensity = 50.0;
 			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			l._range = 52;
+			l._range = 15.0;
 			l._outerConeAngle = AMD_PI_OVER_4;
 			l._innerConeAngle = l._outerConeAngle * 0.9f;
 			l._shadowResolution = 1024;
@@ -19903,6 +19912,60 @@ void vkdg_cx::save_fbo(int idx)
 	}
 }
 
+void get_tex_buffer(vkr::Texture* tex, char* outbuf, vkr::upload_cx* q)//, dvk_queue* q)
+{
+	vkr::dvk_staging_buffer staging;
+	int width = tex->GetWidth(), height = tex->GetHeight();
+	size_t as = width * height * 4, align = 512;
+	auto image = tex->Resource();
+	as = vkr::alignUp(as, align);
+	staging.initBuffer(q->_dev, as);
+	VkImageAspectFlags aspectMask = (VkImageAspectFlags)(vkr::is_depth_tex((VkFormat)tex->GetFormat()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+	VkBufferImageCopy bufferCopyRegion = {};
+	bufferCopyRegion.imageSubresource.aspectMask = aspectMask;
+	bufferCopyRegion.imageSubresource.mipLevel = 0;
+	bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+	bufferCopyRegion.imageSubresource.layerCount = 1;
+	bufferCopyRegion.imageExtent.width = width;
+	bufferCopyRegion.imageExtent.height = height;
+	bufferCopyRegion.imageExtent.depth = 1;
+	bufferCopyRegion.bufferOffset = 0;
+	bufferCopyRegion.bufferImageHeight = height;
+	bufferCopyRegion.bufferRowLength = width;
+	VkImageSubresourceRange subresourceRange = {};
+	subresourceRange.aspectMask = aspectMask;
+	subresourceRange.baseMipLevel = 0;
+	subresourceRange.levelCount = tex->GetMipCount();// mipLevels;
+	subresourceRange.layerCount = 1;
+	VkImageLayout il = (VkImageLayout)GetImageLayout(vkr::ImageLayoutBarrier::SHADER_READ);
+	q->add_copy2mem(image, bufferCopyRegion, subresourceRange, aspectMask, il, staging.buffer);
+	q->flushAndFinish();
+	staging.getBuffer(outbuf, -1);
+}
+image_d vkdg_cx::save_shadow(int idx)
+{
+	if (!ctx) return {};
+	auto tx = (vkr::sample_cx*)ctx;
+	auto& smp = tx->m_pRenderer->m_shadowMapPool;
+	auto& m = smp[idx];
+
+	auto q = (vkr::upload_cx*)qupload;
+	image_d r = {};
+	if (!q)
+	{
+		q = new vkr::upload_cx();
+		q->init((vkr::Device*)dev, width * height * 6, 0);
+		qupload = q;
+	}
+	if (q) {
+		dt.resize(m.ShadowMap.GetWidth() * m.ShadowMap.GetHeight());
+		get_tex_buffer(&m.ShadowMap, (char*)dt.data(), q);
+		r.data = dt.data();
+		r.size = { m.ShadowMap.GetWidth(),m.ShadowMap.GetHeight() };
+	}
+	return r;
+}
+
 void vkdg_cx::copy2(int idx, void* vkptr)
 {
 	if (ctx && vkptr) {
@@ -19958,11 +20021,12 @@ size_t vkdg_cx::get_light_size()
 	return c;
 }
 
-vkdg_cx* new_vkdg(void* inst, void* phy)
+vkdg_cx* new_vkdg(void* inst, void* phy, void* dev)
 {
 	dev_info_cx c[1] = {};
 	c->inst = inst;
 	c->phy = phy;
+	c->vkdev = dev;
 	auto p = new vkdg_cx();
 	vkr::Log::InitLogSystem();
 	if (c) {
