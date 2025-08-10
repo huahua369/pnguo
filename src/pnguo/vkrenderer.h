@@ -77,7 +77,7 @@ namespace vkr {
 		float       _innerConeAngle = 0.0f;	// 内锥角
 		float       _outerConeAngle = 0.0f;	// 外锥角
 		uint32_t    _shadowResolution = 1024;	// 阴影分辨率
-		float       _bias = 70.0f / 100000.0f;	// 偏差0-2 
+		float       _bias = 0.02;// 70.0f / 100000.0f;	// 偏差0-2 
 		size_t		_nodeid = 0;
 	};
 

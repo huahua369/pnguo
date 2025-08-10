@@ -2534,7 +2534,7 @@ namespace vkr {
 		float	m_innerConeAngle = 0.0f;
 		float	m_outerConeAngle = 0.0f;
 		uint32_t m_shadowResolution = 1024;
-		float	m_bias = 70.0f / 100000.0f;//0-2
+		float	m_bias = 0.01;// 70.0f / 100000.0f;//0-2
 	};
 
 	struct LightInstance
@@ -6182,7 +6182,6 @@ namespace vkr
 				descriptorCounts.push_back(1);
 			}
 
-			//if (ShadowMapView != VK_NULL_HANDLE)
 			if (!ShadowMapViewPool.empty())
 			{
 				assert(ShadowMapViewPool.size() <= MaxShadowInstances);
@@ -6249,9 +6248,6 @@ namespace vkr
 				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// 
 				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, &m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
-			}
-			else {
-				cnt = cnt;
 			}
 		}
 	}
@@ -15273,7 +15269,7 @@ namespace vkr {
 		GltfBBoxPass* m_GLTFBBox;
 		GltfDepthPass* m_GLTFDepth;
 		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
-		bool shadowMap = false;
+		bool shadowMap = true;		// 是否有阴影
 	};
 	// todo cmdlr
 	class CommandListRing
@@ -18265,7 +18261,24 @@ namespace vkr {
 				}
 
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");
+				//VkImageMemoryBarrier barrier = {};
+				//barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				//barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				//barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				//barrier.image = ShadowMap->ShadowMap.Resource();
+				//barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+				//barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				//barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
+				//vkCmdPipelineBarrier(
+				//	cmdBuf1,
+				//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				//	VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				//	0,
+				//	0, nullptr,
+				//	0, nullptr,
+				//	1, &barrier
+				//);
 				vkCmdEndRenderPass(cmdBuf1);
 
 				++ShadowMap;
