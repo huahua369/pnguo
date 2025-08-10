@@ -18915,9 +18915,9 @@ namespace vkr {
 		void updateView() {
 			glm::vec3 tpos = pos;
 			//auto nq = glm::conjugate(qt);
-			glm::vec3 camera_forward = qt * glm::vec3(0, 0, 1); // +Z is forward direction
-			glm::vec3 camera_right = qt * glm::vec3(1, 0, 0); // +X is right direction
-			glm::vec3 camera_up = qt * glm::vec3(0, 1, 0); // +Y is up direction
+			glm::vec3 camera_forward; // +Z is forward direction= qt * glm::vec3(0, 0, 1)
+			glm::vec3 camera_right; // +X is right direction= qt * glm::vec3(1, 0, 0)
+			glm::vec3 camera_up; // +Y is up direction= qt * glm::vec3(0, 1, 0)
 			float cameraSmooth = 2.0f;	// 平滑因子  
 			cameraPos = tpos;
 			camera_forward = glm::normalize(front);
