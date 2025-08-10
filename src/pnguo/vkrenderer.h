@@ -141,7 +141,7 @@ public:
 	void update(mouse_state_t* io); // 更新事件
 	void on_render();				// 执行渲染
 	// 获取framebuffer image
-	image_vkr get_vkimage(int idx); 
+	image_vkr get_vkimage(int idx);
 	// 重置大小
 	void resize(int w, int h);
 	// 保存fbo idx的像素到dt
@@ -249,3 +249,5 @@ namespace vkr {
 
 }
 //!vkr
+
+uint32_t gray_float_to_rgba(float gray);

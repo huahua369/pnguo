@@ -313,6 +313,7 @@ app_cx::app_cx()
 	// Enable native IME.
 	SDL_SetHintWithPriority(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1", SDL_HINT_OVERRIDE);
 	SDL_SetHintWithPriority(SDL_HINT_IME_IMPLEMENTED_UI, "composition", SDL_HINT_OVERRIDE);
+	SDL_SetHint(SDL_HINT_RENDER_VULKAN_DEBUG, "true");
 	//SDL_SetHintWithPriority(SDL_HINT_IME_INTERNAL_EDITING, "1", SDL_HINT_OVERRIDE);
 	//SDL_SetHintWithPriority(SDL_HINT_IME_SHOW_UI, "1", SDL_HINT_OVERRIDE);
 #ifdef __ANDROID__

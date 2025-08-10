@@ -3567,6 +3567,8 @@ namespace vkr {
 	//
 	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkSampler* pSampler, VkDescriptorSet descriptorSet);
 	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler* pSampler, VkDescriptorSet descriptorSet);
+	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler* pSampler, VkDescriptorSet descriptorSet);
+
 	void SetDescriptorSetForDepth(VkDevice device, uint32_t index, VkImageView imageView, VkSampler* pSampler, VkDescriptorSet descriptorSet);
 	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkDescriptorSet descriptorSet);
 
@@ -6244,8 +6246,8 @@ namespace vkr
 			if (!ShadowMapViewPool.empty())
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
-
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, &m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// 
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, &m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 			else {
@@ -17784,6 +17786,7 @@ namespace vkr {
 			CurrentShadow->ShadowMap.CreateSRV(&CurrentShadow->ShadowSRV);
 		}
 	}
+#if 0
 	void Renderer_cx::AllocateShadowMaps()
 	{
 		auto NumShadows = m_shadowMapPool.size();
@@ -17809,7 +17812,68 @@ namespace vkr {
 		}
 
 	}
+#endif
 
+	void Renderer_cx::AllocateShadowMaps()
+	{
+		if (m_shadowMapPool.size())return;
+		// Go through the lights and allocate shadow information
+		uint32_t NumShadows = 0;
+		auto i = _lights.size();
+		for (; _lights_q.size();) {
+			auto lightData = _lights_q.front(); _lights_q.pop();
+			if (lightData._shadowResolution)
+			{
+				SceneShadowInfo ShadowInfo;
+				ShadowInfo.ShadowResolution = lightData._shadowResolution;
+				ShadowInfo.ShadowIndex = NumShadows++;
+				ShadowInfo.LightIndex = i;
+				m_shadowMapPool.push_back(ShadowInfo);
+				i++; _lights.push_back(lightData);
+			}
+		}
+
+		if (NumShadows > MaxShadowInstances)
+		{
+			Trace("Number of shadows has exceeded maximum supported. Please grow value in gltfCommon.h/perFrameStruct.h");
+			throw;
+		}
+
+		// If we had shadow information, allocate all required maps and bindings
+		if (!m_shadowMapPool.empty())
+		{
+			std::vector<SceneShadowInfo>::iterator CurrentShadow = m_shadowMapPool.begin();
+			for (uint32_t i = 0; CurrentShadow < m_shadowMapPool.end(); ++i, ++CurrentShadow)
+			{
+				CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
+				CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
+
+				// Create render pass shadow, will clear contents
+				{
+					VkAttachmentDescription depthAttachments;
+					AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+
+					// Create frame buffer
+					VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+					VkFramebufferCreateInfo fb_info = {};
+					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+					fb_info.pNext = NULL;
+					fb_info.renderPass = m_Render_pass_shadow;
+					fb_info.attachmentCount = 1;
+					fb_info.pAttachments = attachmentViews;
+					fb_info.width = CurrentShadow->ShadowResolution;
+					fb_info.height = CurrentShadow->ShadowResolution;
+					fb_info.layers = 1;
+					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
+					assert(res == VK_SUCCESS);
+				}
+
+				VkImageView ShadowSRV;
+				CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
+				m_ShadowSRVPool.push_back(ShadowSRV);
+			}
+		}
+	}
 	glm::mat4 Renderer_cx::ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView)
 	{
 		AxisAlignedBoundingBox projectedBoundingBox = {};
@@ -20403,4 +20467,18 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	res = vkCreateGraphicsPipelines(pDevice->GetDevice(), pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pipe);
 	assert(res == VK_SUCCESS);
 	vkr::SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipe, "Wireframe P");
+}
+uint32_t gray_float_to_rgba(float gray)
+{
+	// 1. 边界检查与截断
+	gray = (gray < 0.0f) ? 0.0f : (gray > 1.0f) ? 1.0f : gray;
+
+	// 2. 转换为8位整数（四舍五入）
+	uint8_t gray_int = (uint8_t)(gray * 255.0f + 0.5f);
+
+	// 3. 组合为RGBA整数
+	return ((uint32_t)gray_int << 24) |
+		((uint32_t)gray_int << 16) |
+		((uint32_t)gray_int << 8) |
+		gray_int;
 }
