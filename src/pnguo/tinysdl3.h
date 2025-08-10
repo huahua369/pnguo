@@ -319,7 +319,7 @@ public:
 	void draw_rects(const glm::vec4* rects, int n, const glm::vec4& color);
 	// 鼠标移到窗口坐标-1中心
 	void warp_mouse_in_window(float x, float y);
-	// 限制鼠标在窗口内grab_enable，隐藏鼠标rmode
+	// 限制鼠标在窗口内grab_enable，相对窗口隐藏鼠标rmode
 	void set_mouse_mode(bool grab_enable, bool rmode);
 public:
 	void update_w();

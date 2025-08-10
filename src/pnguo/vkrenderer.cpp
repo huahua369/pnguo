@@ -17782,7 +17782,7 @@ namespace vkr {
 			CurrentShadow->ShadowMap.CreateSRV(&CurrentShadow->ShadowSRV);
 		}
 	}
-#if 0
+#if 1
 	void Renderer_cx::AllocateShadowMaps()
 	{
 		auto NumShadows = m_shadowMapPool.size();
@@ -17808,8 +17808,7 @@ namespace vkr {
 		}
 
 	}
-#endif
-
+#else
 	void Renderer_cx::AllocateShadowMaps()
 	{
 		if (m_shadowMapPool.size())return;
@@ -17870,6 +17869,7 @@ namespace vkr {
 			}
 		}
 	}
+#endif
 	glm::mat4 Renderer_cx::ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView)
 	{
 		AxisAlignedBoundingBox projectedBoundingBox = {};
@@ -18181,8 +18181,8 @@ namespace vkr {
 		m_GPUTimer.OnBeginFrame(cmdBuf1, &m_TimeStamps);
 
 		// Sets the perFrame data 
-		glm::mat4 mCameraCurrViewProj = {};
 		auto pfd = mkPerFrameData(Cam);
+		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
 		Light* lights = pfd->lights;
 		int lightCount = pfd->lightCount;
 		{
@@ -18193,7 +18193,6 @@ namespace vkr {
 				{
 					// fill as much as possible using the GLTF (camera, lights, ...)
 					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd);
-					mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
 					// Set some lighting factors
 					pPerFrame->iblFactor = pState->IBLFactor;
 					pPerFrame->emmisiveFactor = pState->EmissiveFactor;
@@ -18246,12 +18245,9 @@ namespace vkr {
 				rp_begin.framebuffer = ShadowMap->ShadowFrameBuffer;
 				rp_begin.renderArea.extent.width = ShadowMap->ShadowResolution;
 				rp_begin.renderArea.extent.height = ShadowMap->ShadowResolution;
-
 				vkCmdBeginRenderPass(cmdBuf1, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-
 				// Render to shadow map
 				SetViewportAndScissor(cmdBuf1, 0, 0, ShadowMap->ShadowResolution, ShadowMap->ShadowResolution);
-
 				for (auto it : _depthpass)
 				{
 					// Set per frame constant buffer values
@@ -18259,31 +18255,10 @@ namespace vkr {
 					cbPerFrame->mViewProj = lights[ShadowMap->LightIndex].mLightViewProj;
 					it->Draw(cmdBuf1);
 				}
-
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");
-				//VkImageMemoryBarrier barrier = {};
-				//barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-				//barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-				//barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				//barrier.image = ShadowMap->ShadowMap.Resource();
-				//barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-				//barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				//barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-				//vkCmdPipelineBarrier(
-				//	cmdBuf1,
-				//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				//	VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				//	0,
-				//	0, nullptr,
-				//	0, nullptr,
-				//	1, &barrier
-				//);
 				vkCmdEndRenderPass(cmdBuf1);
-
 				++ShadowMap;
 			}
-
 			SetPerfMarkerEnd(cmdBuf1);
 		}
 
@@ -18811,17 +18786,17 @@ namespace vkr {
 		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
 		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
 		float cameraHeight = 1.5f;                               // 相机垂直高度
-		bool bFirstPerson = true;	// 是否第一人称视角
+		bool bFirstPerson = false;	// 是否第一人称视角
 		float fixheight = 0;		// 0就是固定高度
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
 			qt = dst_qt = e2q(rota);
-			mouseMovement(0, 0, 0);                //不初始化的话，开局不移动没画面
+			mouseMovement(0, 0, 0, 1);                //不初始化的话，开局不移动没画面
 		}
 
 	private:
-		//float keySpeed = 4.0f;    //键盘移动速率,最好不要高过64
-		float keySpeed = 20.0f;
+		//float keySpeed = 1.0f;    //键盘移动速率,最好不要高过64
+		float keySpeed = 5.0f;
 		float xMouseSpeed = 0.51f;   //鼠标移动X速率
 		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
 
@@ -18892,8 +18867,12 @@ namespace vkr {
 		}
 
 		//鼠标移动处理
-		void mouseMovement(float deltaX, float deltaY, double deltaTime) {
-
+		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown)
+		{
+			if (!bFirstPerson && !mousedown)
+			{
+				return; // 非第一人称视角且鼠标未按下时不处理鼠标移动
+			}
 			//计算摄像机的前向向量
 			//pitch()：俯仰，将物体绕X轴旋转
 			//yaw()：航向，将物体绕Y轴旋转
@@ -19490,8 +19469,8 @@ namespace vkr {
 			}
 			else {
 			}
-			//鼠标移动位置 
-			tpfc.mouseMovement(io.MouseDelta.x, -io.MouseDelta.y, io.DeltaTime);
+			//鼠标移动位置  
+			tpfc.mouseMovement(io.MouseDelta.x, -io.MouseDelta.y, io.DeltaTime, io.MouseDown[0]);
 			//if (wy != 0)
 			//	tpfc.processScroll(io.wheel.y);
 			//cam.SetMatrix(tpfc.view);

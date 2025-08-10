@@ -363,8 +363,9 @@ int main()
 	auto kd = sdldev.vkdev;
 	//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-	form0->set_mouse_mode(0, true);	// 设置相对鼠标模式
-	//form0->warp_mouse_in_window(-1, -1);
+	bool grab_enable = false;	// 设置鼠标范围在窗口内
+	bool rmode = true;			// 设置窗口的相对鼠标模式。
+	//form0->set_mouse_mode(grab_enable, rmode);
 	get_queue_info(sdldev.phy);
 
 	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, kd);	// 创建vk渲染器 
@@ -395,7 +396,7 @@ int main()
 	if (vkd) {
 		{
 			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-			vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
+			//vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
 			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
@@ -432,6 +433,14 @@ int main()
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 		auto texok = form0->add_vkimage(vr.size, vr.vkimage, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		/*
+		case 0: return AMDTonemapper(color);
+		case 1: return DX11DSK(color);
+		case 2: return Reinhard(color);
+		case 3: return Uncharted2Tonemap(color);
+		case 4: return tonemapACES( color );
+		case 5: return color;
+		*/
 		vkd->_state.SelectedTonemapperIndex = 0;
 		vkd->_state.Exposure = 1.0;
 		vkd->_state.EmissiveFactor = 30;

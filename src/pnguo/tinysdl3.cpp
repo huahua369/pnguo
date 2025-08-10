@@ -2122,8 +2122,9 @@ void form_x::warp_mouse_in_window(float x, float y)
 void form_x::set_mouse_mode(bool grab_enable, bool rmode)
 {
 	_rmode = rmode;
-	SDL_SetWindowRelativeMouseMode(_ptr, rmode);
-	SDL_SetWindowMouseGrab(_ptr, grab_enable);
+	SDL_SetWindowRelativeMouseMode(_ptr, rmode);	//设置窗口的相对鼠标模式。
+	SDL_SetWindowMouseGrab(_ptr, grab_enable);		// 设置鼠标范围在窗口内
+	if (rmode)warp_mouse_in_window(-1, -1);
 }
 // todo 图集渲染
 void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
