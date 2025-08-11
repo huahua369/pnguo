@@ -2705,12 +2705,14 @@ namespace vkr {
 		void SetAnimationTime(uint32_t animationIndex, float time);
 		void TransformScene(int sceneIndex, const glm::mat4& world);
 		// 运行中使用
-		PerFrame_t* SetPerFrameData(PerFrame_t* pfd);// const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats);
+		PerFrame_t* SetPerFrameData(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats);
 		bool GetCamera(uint32_t cameraIdx, Camera* pCam) const;
 		tfNodeIdx AddNode(const tfNode& node);
 		int AddLight(const tfNode& node, const tfLight& light);
 		int get_animation_count();
 		AxisAlignedBoundingBox get_BoundingBox(const glm::mat4& mLightView);
+
+		glm::mat4 ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView);
 	private:
 		void InitTransformedData(); //this is called after loading the data from the GLTF
 		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes);
@@ -15128,7 +15130,7 @@ namespace vkr {
 	// Sets the per frame data from the GLTF, returns a pointer to it in case the user wants to override some values
 	// The scene needs to be animated and transformed before we can set the PerFrame_t data. We need those final matrices for the lights and the camera.
 	//
-	PerFrame_t* GLTFCommon::SetPerFrameData(PerFrame_t* pfd) // const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
+	PerFrame_t* GLTFCommon::SetPerFrameData(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
 	{
 #if 1
 		if (pfd)
@@ -15244,6 +15246,53 @@ namespace vkr {
 		return projectedBoundingBox;
 	}
 
+	glm::mat4 ComputeDirectionalLight_mat(const AxisAlignedBoundingBox& projectedBoundingBox)
+	{
+		if (projectedBoundingBox.HasNoVolume())
+		{
+			// default ortho matrix that won't work in most cases
+			return glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
+		}
+
+		// we now have the final bounding box
+		tfPrimitives finalBoundingBox;
+		finalBoundingBox.m_center = 0.5f * (projectedBoundingBox.m_max + projectedBoundingBox.m_min);
+		finalBoundingBox.m_radius = 0.5f * (projectedBoundingBox.m_max - projectedBoundingBox.m_min);
+
+		finalBoundingBox.m_center.w = (1.0f);
+		finalBoundingBox.m_radius.w = (0.0f);
+
+		// we want a square aspect ratio
+		float spanX = finalBoundingBox.m_radius.x;
+		float spanY = finalBoundingBox.m_radius.y;
+		float maxSpan = spanX > spanY ? spanX : spanY;
+
+		// manually create the orthographic matrix
+		glm::mat4 projectionMatrix = {};//glm::mat4::identity();
+		projectionMatrix[0] = (glm::vec4(
+			1.0f / maxSpan, 0.0f, 0.0f, 0.0f
+		));
+		projectionMatrix[1] = (glm::vec4(
+			0.0f, 1.0f / maxSpan, 0.0f, 0.0f
+		));
+		projectionMatrix[2] = (glm::vec4(
+			0.0f, 0.0f, -0.5f / finalBoundingBox.m_radius.z, 0.0f
+		));
+		projectionMatrix[3] = (glm::vec4(
+			-finalBoundingBox.m_center.x / maxSpan,
+			-finalBoundingBox.m_center.y / maxSpan,
+			0.5f * (finalBoundingBox.m_center.z + finalBoundingBox.m_radius.z) / finalBoundingBox.m_radius.z,
+			1.0f
+		));
+		return projectionMatrix;
+	}
+
+	glm::mat4 GLTFCommon::ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView)
+	{
+		AxisAlignedBoundingBox projectedBoundingBox = get_BoundingBox(mLightView);
+		return ComputeDirectionalLight_mat(projectedBoundingBox);
+	}
+
 #endif // 1
 
 
@@ -15347,7 +15396,6 @@ namespace vkr {
 
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
-		glm::mat4 ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView);
 		PerFrame_t* mkPerFrameData(const Camera& cam);
 		void OnRender(const scene_state* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p, int idx);
@@ -17870,54 +17918,6 @@ namespace vkr {
 		}
 	}
 #endif
-	glm::mat4 Renderer_cx::ComputeDirectionalLightOrthographicMatrix(const glm::mat4& mLightView)
-	{
-		AxisAlignedBoundingBox projectedBoundingBox = {};
-		for (auto it : _robject)
-		{
-			if (it->m_pGLTFTexturesAndBuffers)
-			{
-				projectedBoundingBox.Merge(it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->get_BoundingBox(mLightView));
-			}
-		}
-		if (projectedBoundingBox.HasNoVolume())
-		{
-			// default ortho matrix that won't work in most cases
-			return glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
-		}
-
-		// we now have the final bounding box
-		tfPrimitives finalBoundingBox;
-		finalBoundingBox.m_center = 0.5f * (projectedBoundingBox.m_max + projectedBoundingBox.m_min);
-		finalBoundingBox.m_radius = 0.5f * (projectedBoundingBox.m_max - projectedBoundingBox.m_min);
-
-		finalBoundingBox.m_center.w = (1.0f);
-		finalBoundingBox.m_radius.w = (0.0f);
-
-		// we want a square aspect ratio
-		float spanX = finalBoundingBox.m_radius.x;
-		float spanY = finalBoundingBox.m_radius.y;
-		float maxSpan = spanX > spanY ? spanX : spanY;
-
-		// manually create the orthographic matrix
-		glm::mat4 projectionMatrix = {};//glm::mat4::identity();
-		projectionMatrix[0] = (glm::vec4(
-			1.0f / maxSpan, 0.0f, 0.0f, 0.0f
-		));
-		projectionMatrix[1] = (glm::vec4(
-			0.0f, 1.0f / maxSpan, 0.0f, 0.0f
-		));
-		projectionMatrix[2] = (glm::vec4(
-			0.0f, 0.0f, -0.5f / finalBoundingBox.m_radius.z, 0.0f
-		));
-		projectionMatrix[3] = (glm::vec4(
-			-finalBoundingBox.m_center.x / maxSpan,
-			-finalBoundingBox.m_center.y / maxSpan,
-			0.5f * (finalBoundingBox.m_center.z + finalBoundingBox.m_radius.z) / finalBoundingBox.m_radius.z,
-			1.0f
-		));
-		return projectionMatrix;
-	}
 
 	PerFrame_t* Renderer_cx::mkPerFrameData(const Camera& cam)
 	{
@@ -17935,6 +17935,7 @@ namespace vkr {
 		// Process lights
 		_perFrameData.lightCount = (int32_t)_lights.size();
 		int32_t ShadowMapIndex = 0;
+#if 1
 		for (int i = 0; i < _perFrameData.lightCount; i++)
 		{
 			Light* pSL = &_perFrameData.lights[i];
@@ -17949,7 +17950,18 @@ namespace vkr {
 			if (lightData._type == LightType_Spot)
 				pSL->mLightViewProj = per * lightView;
 			else if (lightData._type == LightType_Directional)
-				pSL->mLightViewProj = ComputeDirectionalLightOrthographicMatrix(lightView) * lightView;
+			{
+				AxisAlignedBoundingBox projectedBoundingBox = {};
+				for (auto it : _robject)
+				{
+					if (it->m_pGLTFTexturesAndBuffers)
+					{
+						projectedBoundingBox.Merge(it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->get_BoundingBox(lightView));
+					}
+				}
+				auto dlm = ComputeDirectionalLight_mat(projectedBoundingBox);
+				pSL->mLightViewProj = dlm * lightView;
+			}
 			//transpose
 			GetXYZ(pSL->direction, glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
 			GetXYZ(pSL->color, lightData._color);
@@ -17969,7 +17981,7 @@ namespace vkr {
 			else
 				pSL->shadowMapIndex = -1;
 		}
-
+#endif
 		return &_perFrameData;
 	}
 	void insertImageMemoryBarrier(
@@ -18192,7 +18204,7 @@ namespace vkr {
 				if (it->m_pGLTFTexturesAndBuffers)
 				{
 					// fill as much as possible using the GLTF (camera, lights, ...)
-					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd);
+					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd, Cam, _lights, lightMats);
 					// Set some lighting factors
 					pPerFrame->iblFactor = pState->IBLFactor;
 					pPerFrame->emmisiveFactor = pState->EmissiveFactor;
@@ -18285,8 +18297,8 @@ namespace vkr {
 					if (it->m_pGLTFTexturesAndBuffers)
 					{
 						// fill as much as possible using the GLTF (camera, lights, ...)
-						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd);// Cam, _lights, lightMats);
-						mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
+						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd, Cam, _lights, lightMats);
+						//mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
 						// Set some lighting factors
 						pPerFrame->iblFactor = pState->IBLFactor;
 						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
@@ -18849,8 +18861,8 @@ namespace vkr {
 			auto z = worldUp * direction.z;
 			// 第一人称相机计算
 #if 1 
-			auto x = -quat_right(qt);	// 获取和摄像机右向向量相反的向量
-			auto y = -quat_forward(qt);	// 获取和摄像机前向向量相反的向量
+			auto x = -quat_right(qt);	// 左右移动
+			auto y = -quat_forward(qt);	// 前后移动
 			//auto z0 = quat_up(qi); 
 			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
 #else
