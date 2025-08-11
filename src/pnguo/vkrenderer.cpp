@@ -15277,6 +15277,8 @@ namespace vkr {
 		float spanY = finalBoundingBox.m_radius.y;
 		float maxSpan = spanX > spanY ? spanX : spanY;
 
+		//return glm::ortho(projectedBoundingBox.m_min.x, projectedBoundingBox.m_max.x, projectedBoundingBox.m_min.y, projectedBoundingBox.m_max.y, 0.1f, 100.0f);
+
 		// manually create the orthographic matrix
 		glm::mat4 projectionMatrix = {};//glm::mat4::identity();
 		projectionMatrix[0] = (glm::vec4(
@@ -18209,7 +18211,7 @@ namespace vkr {
 		int lightCount = pfd->lightCount;
 		{
 			PerFrame_t* pPerFrame = NULL;
-			for (auto &it : _robject)
+			for (auto& it : _robject)
 			{
 				if (it->m_pGLTFTexturesAndBuffers)
 				{
@@ -18231,14 +18233,14 @@ namespace vkr {
 					for (size_t i = 0; i < pPerFrame->lightCount; i++)
 					{
 						//pPerFrame->lights[i].shadowMapIndex = -1;
-						auto& ml = pPerFrame->lights[i];
-						auto lvp = ml.mLightViewProj;
-						if (ml.type == LightType_Directional)
-						{
-							auto cp = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon;
-							lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
-						}
-						ml.mLightViewProj = lvp;
+						//auto& ml = pPerFrame->lights[i];
+						//auto lvp = ml.mLightViewProj;
+						//if (ml.type == LightType_Directional)
+						//{
+						//	auto cp = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon;
+						//	lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
+						//}
+						////ml.mLightViewProj = lvp;
 					}
 					//}
 
@@ -18285,11 +18287,11 @@ namespace vkr {
 					GltfDepthPass::PerFrame_t* cbPerFrame = it->SetPerFrameConstants();
 					auto& ml = lights[ShadowMap->LightIndex];
 					auto lvp = ml.mLightViewProj;
-					if (ml.type == LightType_Directional)
-					{
-						auto cp = it->get_cp();
-						lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
-					}
+					//if (ml.type == LightType_Directional)
+					//{
+					//	auto cp = it->get_cp();
+					//	lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
+					//}
 					cbPerFrame->mViewProj = lvp;
 					it->Draw(cmdBuf1);
 				}
@@ -19168,20 +19170,35 @@ namespace vkr {
 		// todo 添加默认灯光Add a default light in case there are none
 		{
 			glm::vec4 src = PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f;
-			src = { 10.1,20,0.1,0 };
+			src = { 50,150,50,0 };
 			Transform transform = {};
-			transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
-			transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+			transform.m_translation = src;
+			//transform.LookAt(src, glm::vec4(0, 0, 0, 0), false);
+			{
+				// todo 平行光
+				light_t l = {};
+				l._type = light_t::LIGHT_DIRECTIONAL;
+				l._intensity = 50.0;
+				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				l._range = 500.0;
+				l._outerConeAngle = 0.0f;
+				l._innerConeAngle = 0.0f;
+				l._shadowResolution = 1024;
+				//m_pRenderer->AddLight(transform, l);
+			}
 
-			light_t l = {};
-			l._type = light_t::LIGHT_SPOTLIGHT;
-			l._intensity = 50.0;
-			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			l._range = 15.0;
-			l._outerConeAngle = AMD_PI_OVER_4;
-			l._innerConeAngle = l._outerConeAngle * 0.9f;
-			l._shadowResolution = 1024;
-			m_pRenderer->AddLight(transform, l);
+			{
+				transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+				light_t l = {};
+				l._type = light_t::LIGHT_SPOTLIGHT;
+				l._intensity = 50.0;
+				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				l._range = 15.0;
+				l._outerConeAngle = AMD_PI_OVER_4;
+				l._innerConeAngle = l._outerConeAngle * 0.9f;
+				l._shadowResolution = 1024;
+				m_pRenderer->AddLight(transform, l);
+			}
 		}
 		// Allocate shadow information (if any)
 		m_pRenderer->AllocateShadowMaps();
