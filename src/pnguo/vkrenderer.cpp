@@ -3290,6 +3290,7 @@ namespace vkr {
 		void BuildBatchLists(std::vector<BatchList>* pSolid, std::vector<BatchList>* pTransparent, bool bWireframe = false);
 		static void DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
+		GLTFCommon* get_cp();
 	private:
 		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
 
@@ -3385,7 +3386,7 @@ namespace vkr {
 		{
 			glm::mat4 mWorld;
 		};
-
+		bool has_shadowMap = true;
 		void OnCreate(
 			Device* pDevice,
 			VkRenderPass renderPass,
@@ -3401,6 +3402,7 @@ namespace vkr {
 		void OnDestroy();
 		GltfDepthPass::PerFrame_t* SetPerFrameConstants();
 		void Draw(VkCommandBuffer cmd_buf);
+		GLTFCommon* get_cp();
 	private:
 		ResourceViewHeaps* m_pResourceViewHeaps;
 		DynamicBufferRing* m_pDynamicBufferRing;
@@ -4732,6 +4734,10 @@ namespace vkr
 		}
 
 		SetPerfMarkerEnd(cmd_buf);
+	}
+	GLTFCommon* GltfDepthPass::get_cp()
+	{
+		return m_pGLTFTexturesAndBuffers ? m_pGLTFTexturesAndBuffers->m_pGLTFCommon : nullptr;
 	}
 }
 
@@ -6276,6 +6282,10 @@ namespace vkr
 		}
 	}
 
+	GLTFCommon* GltfPbrPass::get_cp()
+	{
+		return m_pGLTFTexturesAndBuffers ? m_pGLTFTexturesAndBuffers->m_pGLTFCommon : nullptr;
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// OnDestroy
@@ -17964,10 +17974,10 @@ namespace vkr {
 			}
 			//transpose
 			GetXYZ(pSL->direction, glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
+			GetXYZ(pSL->position, lightMat[3]);
 			GetXYZ(pSL->color, lightData._color);
 			pSL->range = lightData._range;
 			pSL->intensity = lightData._intensity;
-			GetXYZ(pSL->position, lightMat[3]);
 			pSL->outerConeCos = cosf(lightData._outerConeAngle);
 			pSL->innerConeCos = cosf(lightData._innerConeAngle);
 			pSL->type = lightData._type;
@@ -18199,7 +18209,7 @@ namespace vkr {
 		int lightCount = pfd->lightCount;
 		{
 			PerFrame_t* pPerFrame = NULL;
-			for (auto it : _robject)
+			for (auto &it : _robject)
 			{
 				if (it->m_pGLTFTexturesAndBuffers)
 				{
@@ -18216,13 +18226,21 @@ namespace vkr {
 					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
 					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 					pPerFrame->lodBias = 0.0f;
-					if (!it->shadowMap)
+					//if (!it->shadowMap)
+					//{
+					for (size_t i = 0; i < pPerFrame->lightCount; i++)
 					{
-						for (size_t i = 0; i < pPerFrame->lightCount; i++)
+						//pPerFrame->lights[i].shadowMapIndex = -1;
+						auto& ml = pPerFrame->lights[i];
+						auto lvp = ml.mLightViewProj;
+						if (ml.type == LightType_Directional)
 						{
-							pPerFrame->lights[i].shadowMapIndex = -1;
+							auto cp = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon;
+							lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
 						}
+						ml.mLightViewProj = lvp;
 					}
+					//}
 
 					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
 					// 更新骨骼矩阵到ubo
@@ -18260,11 +18278,19 @@ namespace vkr {
 				vkCmdBeginRenderPass(cmdBuf1, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 				// Render to shadow map
 				SetViewportAndScissor(cmdBuf1, 0, 0, ShadowMap->ShadowResolution, ShadowMap->ShadowResolution);
-				for (auto it : _depthpass)
+				for (auto& it : _depthpass)
 				{
+					if (!it->has_shadowMap)continue;
 					// Set per frame constant buffer values
 					GltfDepthPass::PerFrame_t* cbPerFrame = it->SetPerFrameConstants();
-					cbPerFrame->mViewProj = lights[ShadowMap->LightIndex].mLightViewProj;
+					auto& ml = lights[ShadowMap->LightIndex];
+					auto lvp = ml.mLightViewProj;
+					if (ml.type == LightType_Directional)
+					{
+						auto cp = it->get_cp();
+						lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
+					}
+					cbPerFrame->mViewProj = lvp;
 					it->Draw(cmdBuf1);
 				}
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");

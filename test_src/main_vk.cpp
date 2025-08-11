@@ -334,7 +334,7 @@ int main()
 	//test_img();
 	auto app = new_app();
 
-	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
 	//{
 	//	hz::mfile_t m;
