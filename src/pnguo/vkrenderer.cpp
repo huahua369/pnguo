@@ -19188,7 +19188,9 @@ namespace vkr {
 			}
 
 			{
-				transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+				transform = {};
+				transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 8.5f, glm::vec4(0, 0, 0, 0), false);
+				transform.LookAt(glm::vec4(0, 10, 1, 0), glm::vec4(0.1, 0.1, 0.1, 0), false);
 				light_t l = {};
 				l._type = light_t::LIGHT_SPOTLIGHT;
 				l._intensity = 50.0;

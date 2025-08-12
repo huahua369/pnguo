@@ -68,15 +68,19 @@ namespace vkr {
 
 	struct light_t
 	{
-		// 平行光、点光源、聚光灯
+		/* 
+		平行光、只有角度的光源
+		点光源、
+		聚光灯
+		*/
 		enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
-		glm::vec4	_color = glm::vec4(1.0);					// 颜色
+		glm::vec4	_color = glm::vec4(1.0);		// 颜色
 		LightType	_type = LIGHT_DIRECTIONAL;
-		float		_range = 50;					// 范围
-		float       _intensity = 0.0f;			// 强度
-		float       _innerConeAngle = 0.0f;	// 内锥角
-		float       _outerConeAngle = 0.0f;	// 外锥角
-		uint32_t    _shadowResolution = 1024;	// 阴影分辨率
+		float		_range = 50;					// 范围, 点光、聚光灯有效
+		float       _intensity = 1.0f;				// 强度
+		float       _innerConeAngle = 0.0f;			// 内锥角，聚光灯有效
+		float       _outerConeAngle = 0.0f;			// 外锥角，聚光灯有效
+		uint32_t    _shadowResolution = 1024;		// 阴影分辨率
 		float       _bias = 0.02;// 70.0f / 100000.0f;	// 偏差0-2 
 		size_t		_nodeid = 0;
 	};
