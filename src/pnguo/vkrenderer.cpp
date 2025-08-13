@@ -17777,12 +17777,8 @@ namespace vkr {
 	}
 	size_t Renderer_cx::AddLight(const Transform& tf, const light_t& light)
 	{
-		auto ps = lightMats.size();
-		lightMats.push_back(tf.GetWorldMat());
-		auto q = light;
-		q._nodeid = ps;
-		_lights_q.push(q);
-		return ps;
+		_lights_q.push(light);
+		return _lights_q.size();
 	}
 	light_t* Renderer_cx::get_light(size_t idx)
 	{
@@ -17858,8 +17854,6 @@ namespace vkr {
 
 	PerFrame_t* Renderer_cx::mkPerFrameData(const Camera& cam)
 	{
-		auto pMats = lightMats.data();
-
 		//Sets the camera
 		_perFrameData.mCameraCurrViewProj = cam.GetProjection() * cam.GetView();
 		_perFrameData.mCameraPrevViewProj = cam.GetProjection() * cam.GetPrevView();
@@ -17879,10 +17873,12 @@ namespace vkr {
 
 			// get light data and node trans
 			auto& lightData = _lights[i];
-			glm::mat4 lightMat = pMats[lightData._nodeid];
+			auto q = glm::normalize(lightData._rotation);
+			glm::mat4 lightMat = glm::translate(glm::mat4(1.0), lightData._position) * glm::mat4(q);
 
 			glm::mat4 lightView = glm::affineInverse(lightMat);
-			glm::mat4 per = glm::perspective(lightData._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
+			auto a = glm::radians(glm::clamp(lightData._cone_angle, 1.0f, 180.0f) * 0.5f);
+			glm::mat4 per = glm::perspective(a * 2.0f, 1.0f, .1f, 100.0f);
 			pSL->mLightView = lightView;
 			if (lightData._type == LightType_Spot)
 				pSL->mLightViewProj = per * lightView;
@@ -17905,8 +17901,9 @@ namespace vkr {
 			GetXYZ(pSL->color, lightData._color);
 			pSL->range = lightData._range;
 			pSL->intensity = lightData._intensity;
-			pSL->outerConeCos = cosf(lightData._outerConeAngle);
-			pSL->innerConeCos = cosf(lightData._innerConeAngle);
+
+			pSL->outerConeCos = cosf(a);
+			pSL->innerConeCos = cosf(a * (1.0 - glm::clamp(lightData._cone_mix, 0.0f, 1.0f)));
 			pSL->type = lightData._type;
 
 			// Setup shadow information for light (if it has any)
@@ -19106,8 +19103,8 @@ namespace vkr {
 				l._intensity = 50.0;
 				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l._range = 500.0;
-				l._outerConeAngle = 0.0f;
-				l._innerConeAngle = 0.0f;
+				//l._outerConeAngle = 0.0f;
+				//l._innerConeAngle = 0.0f;
 				l._shadowResolution = 1024;
 				//m_pRenderer->AddLight(transform, l);
 			}
@@ -19119,11 +19116,15 @@ namespace vkr {
 				l._type = light_t::LIGHT_SPOTLIGHT;
 				l._intensity = 50.0;
 				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-				l._range = 15.0;
-				l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
-				l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+				l._range = 28.0;
+				//l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
+				//l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+				l._cone_angle = 75;
+				l._cone_mix = 0.2;
 				l._shadowResolution = 1024;
 				l._bias = 0.0007;
+				l._rotation = glm::angleAxis(glm::radians(-90.0f), glm::vec3(1, 0, 0));
+				l._position = glm::vec3(0, 6, 0);
 				m_pRenderer->AddLight(transform, l);
 			}
 		}

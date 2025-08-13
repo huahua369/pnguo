@@ -68,7 +68,7 @@ namespace vkr {
 
 	struct light_t
 	{
-		/* 
+		/*
 		平行光、只有角度的光源
 		点光源、
 		聚光灯
@@ -78,11 +78,12 @@ namespace vkr {
 		LightType	_type = LIGHT_DIRECTIONAL;
 		float		_range = 50;					// 范围, 点光、聚光灯有效
 		float       _intensity = 1.0f;				// 强度
-		float       _innerConeAngle = 0.0f;			// 内锥角，聚光灯有效
-		float       _outerConeAngle = 0.0f;			// 外锥角，聚光灯有效
+		float       _cone_angle = 45.0f;			// 锥角，聚光灯有效,1-180
+		float       _cone_mix = 0.20f;				// 混合，聚光灯有效
 		uint32_t    _shadowResolution = 1024;		// 阴影分辨率
 		float       _bias = 0.0007;// 70.0f / 100000.0f;	// 偏差0-2 
-		size_t		_nodeid = 0;
+		glm::quat	_rotation = glm::quat(1, 0, 0, 0);	// 旋转
+		glm::vec3	_position = glm::vec3(0, 0, 0);			// 位置
 	};
 
 	struct Transform
