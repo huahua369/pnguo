@@ -174,7 +174,7 @@ list(APPEND tpv_src
 "third_party/xatlas/xatlas.cpp"
 )
 
-include_directories("third_lib/libsoundio")  
+#include_directories("third_lib/libsoundio")  
 include_directories("third_party")  
 include_directories("src") 
 include_directories("src/pnguo") 

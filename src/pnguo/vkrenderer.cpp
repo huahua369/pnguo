@@ -15415,7 +15415,7 @@ namespace vkr {
 		void freeVidMBP();
 
 
-		size_t AddLight(const Transform& tf, const light_t& light);
+		size_t AddLight(const light_t& light);
 		light_t* get_light(size_t idx);
 		size_t get_light_size();
 		void AllocateShadowMaps();
@@ -17789,7 +17789,7 @@ namespace vkr {
 			unloadgltf(it);
 		_robject.clear();
 	}
-	size_t Renderer_cx::AddLight(const Transform& tf, const light_t& light)
+	size_t Renderer_cx::AddLight(const light_t& light)
 	{
 		_lights_q.push(light);
 		return _lights_q.size();
@@ -19139,7 +19139,7 @@ namespace vkr {
 				l._bias = 0.0007;
 				l._rotation = glm::angleAxis(glm::radians(-90.0f), glm::vec3(1, 0, 0));
 				l._position = glm::vec3(0, 6, 0);
-				m_pRenderer->AddLight(transform, l);
+				m_pRenderer->AddLight(l);
 			}
 		}
 		// Allocate shadow information (if any)
@@ -20471,3 +20471,58 @@ uint32_t gray_float_to_rgba(float gray)
 		((uint32_t)gray_int << 8) |
 		gray_int;
 }
+namespace vkr
+{
+	/*
+	场景管理
+	*/
+	class scene_manager
+	{
+	public:
+		std::vector<light_t*> lights;
+	public:
+		scene_manager()
+		{
+			// 默认光源
+			default_light();
+		}
+		~scene_manager()
+		{
+			// 清理光源
+			for (auto& light : lights)
+			{
+				delete light;
+			}
+			lights.clear();
+		}
+		void default_light();
+		light_t* add_spotlight(float intensity, const glm::vec4& color, float range, float cone_angle, float cone_mix, int shadow_width);
+	};
+	void scene_manager::default_light()
+	{
+		// 创建默认光源
+		light_t* light = new light_t();
+		light->_type = light_t::LIGHT_DIRECTIONAL;
+		light->_intensity = 50.0f;
+		light->_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		light->_range = 100.0f;
+		light->_rotation = glm::angleAxis(glm::radians(-45.0f), glm::vec3(1, 0, 0));
+		lights.push_back(light);
+	}
+	light_t* scene_manager::add_spotlight(float intensity, const glm::vec4& color, float range, float cone_angle, float cone_mix, int shadow_width)
+	{
+		light_t l = {};
+		l._type = light_t::LIGHT_SPOTLIGHT;
+		l._intensity = glm::max(intensity, 0.0f);
+		l._color = color;
+		l._range = range;
+		l._cone_angle = cone_angle;
+		l._cone_mix = cone_mix;
+		l._shadowResolution = shadow_width;
+		l._bias = 0.0007;
+		l._rotation = glm::angleAxis(glm::radians(0.0f), glm::vec3(1, 0, 0));
+		l._position = glm::vec3(0, 0, 0);
+		return new light_t(l);
+	}
+}
+//!vkr

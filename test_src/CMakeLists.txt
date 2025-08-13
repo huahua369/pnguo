@@ -134,10 +134,11 @@ UxTheme
 )
 endif() 
 add_definitions(-DSOUNDIO_STATIC_LIBRARY=1)
-find_package(libsoundio CONFIG REQUIRED)
+#find_package(libsoundio CONFIG REQUIRED)
 find_package(Ogg CONFIG REQUIRED)
 list(APPEND lkalib  
-libsoundio::libsoundio Ogg::ogg
+#libsoundio::libsoundio
+Ogg::ogg
 )
 include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 target_link_libraries(tcmp PRIVATE ${lklib})
