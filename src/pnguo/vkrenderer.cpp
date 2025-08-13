@@ -2204,20 +2204,6 @@ namespace vkr {
 		std::vector<float> weights;
 	};
 
-	struct Transform
-	{
-		//glm::quat
-		glm::mat4   m_rotation = glm::identity<glm::mat4>();
-		glm::vec4   m_translation = glm::vec4(0, 0, 0, 0);
-		glm::vec4   m_scale = glm::vec4(1, 1, 1, 0);
-		void LookAt(glm::vec4 source, glm::vec4 target, bool flipY);
-
-		glm::mat4 GetWorldMat() const
-		{
-			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * m_rotation * glm::scale(glm::mat4(1), glm::vec3(m_scale));
-		}
-
-	};
 
 	typedef int tfNodeIdx;
 
@@ -18975,7 +18961,7 @@ namespace vkr {
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
 		bool m_bIsBenchmarking = false;
-		bool _customize_camera = true;
+		bool _customize_camera = 0;
 	};
 
 
@@ -19128,16 +19114,16 @@ namespace vkr {
 
 			{
 				transform = {};
-				transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 8.5f, glm::vec4(0, 0, 0, 0), false);
-				transform.LookAt(glm::vec4(5, 6, 1, 0), glm::vec4(0.1, 0.0, 0.1, 0), false);
+				transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
 				light_t l = {};
 				l._type = light_t::LIGHT_SPOTLIGHT;
 				l._intensity = 50.0;
 				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l._range = 15.0;
-				l._outerConeAngle = glm::radians(20.0);
-				l._innerConeAngle = l._outerConeAngle * 0.9f;
+				l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
+				l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
 				l._shadowResolution = 1024;
+				l._bias = 0.0007;
 				m_pRenderer->AddLight(transform, l);
 			}
 		}

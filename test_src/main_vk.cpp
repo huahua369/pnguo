@@ -320,6 +320,10 @@ void test_img() {
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
 	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
 }
+glm::vec4 p2v(float yaw, float pitch)
+{
+	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
+}
 
 int main()
 {
@@ -335,6 +339,43 @@ int main()
 	auto app = new_app();
 
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+
+	{
+		static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
+		static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
+		static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
+
+		vkr::Transform transform = {};
+		transform.LookAt(p2v(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+		vkr::light_t l = {};
+		l._type = vkr::light_t::LIGHT_SPOTLIGHT;
+		l._intensity = 50.0;
+		l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		l._range = 15.0;
+		l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
+		l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+		glm::mat4 lightMat = transform.GetWorldMat();
+		glm::mat4 lightView = glm::affineInverse(lightMat);
+		glm::mat4 mLightViewProj;
+		glm::mat4 per = glm::perspective(l._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
+		auto mLightView = lightView;
+		if (l._type == vkr::light_t::LIGHT_SPOTLIGHT)
+			mLightViewProj = per * lightView;
+		//transpose
+		auto direction = glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+		auto position = lightMat[3];
+		auto outerConeCos = cosf(l._outerConeAngle);
+		auto innerConeCos = cosf(l._innerConeAngle);
+
+		glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
+		glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
+		glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		glm::mat4 spotlightMatrix = glm::inverse(mLightViewProj);
+
+		printf("Spotlight Matrix:\n");
+	}
+
+
 
 	//{
 	//	hz::mfile_t m;
@@ -396,14 +437,14 @@ int main()
 	if (vkd) {
 		{
 			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-			vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
+			//vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
 			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
 			//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 			//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
-			vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,0.8,0 }, 1.0);
+			vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,0.8 * 0,0 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);

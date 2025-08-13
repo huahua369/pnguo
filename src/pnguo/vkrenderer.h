@@ -81,10 +81,24 @@ namespace vkr {
 		float       _innerConeAngle = 0.0f;			// 内锥角，聚光灯有效
 		float       _outerConeAngle = 0.0f;			// 外锥角，聚光灯有效
 		uint32_t    _shadowResolution = 1024;		// 阴影分辨率
-		float       _bias = 0.02;// 70.0f / 100000.0f;	// 偏差0-2 
+		float       _bias = 0.0007;// 70.0f / 100000.0f;	// 偏差0-2 
 		size_t		_nodeid = 0;
 	};
 
+	struct Transform
+	{
+		//glm::quat
+		glm::mat4   m_rotation = glm::identity<glm::mat4>();
+		glm::vec4   m_translation = glm::vec4(0, 0, 0, 0);
+		glm::vec4   m_scale = glm::vec4(1, 1, 1, 0);
+		void LookAt(glm::vec4 source, glm::vec4 target, bool flipY);
+
+		glm::mat4 GetWorldMat() const
+		{
+			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * m_rotation * glm::scale(glm::mat4(1), glm::vec3(m_scale));
+		}
+
+	};
 
 	std::string format(const char* format, ...);
 
