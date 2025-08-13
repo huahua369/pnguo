@@ -81,8 +81,8 @@ namespace vkr {
 		float       _cone_angle = 45.0f;			// 锥角，聚光灯有效,1-180
 		float       _cone_mix = 0.20f;				// 混合，聚光灯有效
 		uint32_t    _shadowResolution = 1024;		// 阴影分辨率
-		float       _bias = 0.0007;// 70.0f / 100000.0f;	// 偏差0-2 
-		glm::quat	_rotation = glm::quat(1, 0, 0, 0);	// 旋转
+		float       _bias = 0.0007;					// 偏差0-2 
+		glm::quat	_rotation = glm::quat(1, 0, 0, 0);		// 旋转\方向
 		glm::vec3	_position = glm::vec3(0, 0, 0);			// 位置
 	};
 
