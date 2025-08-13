@@ -17851,7 +17851,7 @@ namespace vkr {
 			auto i = _lights.size();
 			for (; _lights_q.size();) {
 				auto q = _lights_q.front(); _lights_q.pop();
-				if (q._shadowResolution)
+				if (q._shadowResolution && q._type != light_t::LIGHT_POINTLIGHT)
 				{
 					SceneShadowInfo ShadowInfo;
 					new_shadow(ShadowInfo, q._shadowResolution, NumShadows++, i); // 创建场景阴影信息
@@ -17867,67 +17867,6 @@ namespace vkr {
 			throw;
 		}
 
-	}
-#else
-	void Renderer_cx::AllocateShadowMaps()
-	{
-		if (m_shadowMapPool.size())return;
-		// Go through the lights and allocate shadow information
-		uint32_t NumShadows = 0;
-		auto i = _lights.size();
-		for (; _lights_q.size();) {
-			auto lightData = _lights_q.front(); _lights_q.pop();
-			if (lightData._shadowResolution)
-			{
-				SceneShadowInfo ShadowInfo;
-				ShadowInfo.ShadowResolution = lightData._shadowResolution;
-				ShadowInfo.ShadowIndex = NumShadows++;
-				ShadowInfo.LightIndex = i;
-				m_shadowMapPool.push_back(ShadowInfo);
-				i++; _lights.push_back(lightData);
-			}
-		}
-
-		if (NumShadows > MaxShadowInstances)
-		{
-			Trace("Number of shadows has exceeded maximum supported. Please grow value in gltfCommon.h/perFrameStruct.h");
-			throw;
-		}
-
-		// If we had shadow information, allocate all required maps and bindings
-		if (!m_shadowMapPool.empty())
-		{
-			std::vector<SceneShadowInfo>::iterator CurrentShadow = m_shadowMapPool.begin();
-			for (uint32_t i = 0; CurrentShadow < m_shadowMapPool.end(); ++i, ++CurrentShadow)
-			{
-				CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
-				CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
-
-				// Create render pass shadow, will clear contents
-				{
-					VkAttachmentDescription depthAttachments;
-					AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
-
-					// Create frame buffer
-					VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
-					VkFramebufferCreateInfo fb_info = {};
-					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-					fb_info.pNext = NULL;
-					fb_info.renderPass = m_Render_pass_shadow;
-					fb_info.attachmentCount = 1;
-					fb_info.pAttachments = attachmentViews;
-					fb_info.width = CurrentShadow->ShadowResolution;
-					fb_info.height = CurrentShadow->ShadowResolution;
-					fb_info.layers = 1;
-					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
-					assert(res == VK_SUCCESS);
-				}
-
-				VkImageView ShadowSRV;
-				CurrentShadow->ShadowMap.CreateSRV(&ShadowSRV);
-				m_ShadowSRVPool.push_back(ShadowSRV);
-			}
-		}
 	}
 #endif
 
@@ -19190,13 +19129,13 @@ namespace vkr {
 			{
 				transform = {};
 				transform.LookAt(PolarToVector(AMD_PI_OVER_2, 0.58f) * 8.5f, glm::vec4(0, 0, 0, 0), false);
-				transform.LookAt(glm::vec4(0, 10, 1, 0), glm::vec4(0.1, 0.1, 0.1, 0), false);
+				transform.LookAt(glm::vec4(5, 6, 1, 0), glm::vec4(0.1, 0.0, 0.1, 0), false);
 				light_t l = {};
 				l._type = light_t::LIGHT_SPOTLIGHT;
 				l._intensity = 50.0;
 				l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 				l._range = 15.0;
-				l._outerConeAngle = AMD_PI_OVER_4;
+				l._outerConeAngle = glm::radians(20.0);
 				l._innerConeAngle = l._outerConeAngle * 0.9f;
 				l._shadowResolution = 1024;
 				m_pRenderer->AddLight(transform, l);
