@@ -86,20 +86,6 @@ namespace vkr {
 		glm::vec3	_position = glm::vec3(0, 0, 0);			// 位置
 	};
 
-	struct Transform
-	{
-		//glm::quat
-		glm::mat4   m_rotation = glm::identity<glm::mat4>();
-		glm::vec4   m_translation = glm::vec4(0, 0, 0, 0);
-		glm::vec4   m_scale = glm::vec4(1, 1, 1, 0);
-		void LookAt(glm::vec4 source, glm::vec4 target, bool flipY);
-
-		glm::mat4 GetWorldMat() const
-		{
-			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * m_rotation * glm::scale(glm::mat4(1), glm::vec3(m_scale));
-		}
-
-	};
 
 	std::string format(const char* format, ...);
 
