@@ -1924,12 +1924,6 @@ namespace vkr {
 		// HDR
 		Texture                         m_HDR;
 		VkImageView                     m_HDRSRV;
-		// 积累纹理（Accum Tex）	RGBA32F	累加半透明片段颜色贡献
-		Texture                         m_accum;
-		VkImageView                     m_accumSRV;
-		// 权重纹理（Weight Tex）	R32F	累加半透明片段权重贡献
-		Texture                         m_weight;
-		VkImageView                     m_weightSRV;
 
 	private:
 		Device* m_pDevice;

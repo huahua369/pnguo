@@ -47,7 +47,8 @@ struct PerFrame
 
 	vec4          u_WireframeOptions;
 	float         u_LodBias;
-	vec2		  oit_w; 
+	float  pad1;
+	float  pad2;
 	int           u_lightCount;
 	Light         u_lights[MAX_LIGHT_INSTANCES];
 };
