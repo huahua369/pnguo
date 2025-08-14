@@ -69,13 +69,12 @@ namespace vkr {
 	struct light_t
 	{
 		/*
-		平行光、只有角度的光源
-		点光源、
-		聚光灯
+		平行光：只有角度的光源，无衰减
+		点光源：位置、范围、无阴影、没有旋转缩放
+		聚光灯：有位置、方向、角度
 		*/
 		enum LightType { LIGHT_DIRECTIONAL, LIGHT_POINTLIGHT, LIGHT_SPOTLIGHT };
 		glm::vec4	_color = glm::vec4(1.0);		// 颜色
-		LightType	_type = LIGHT_DIRECTIONAL;
 		float		_range = 50;					// 范围, 点光、聚光灯有效
 		float       _intensity = 1.0f;				// 强度
 		float       _cone_angle = 45.0f;			// 锥角，聚光灯有效,1-180
@@ -84,11 +83,33 @@ namespace vkr {
 		float       _bias = 0.0007;					// 偏差0-2 
 		glm::quat	_rotation = glm::quat(1, 0, 0, 0);		// 旋转\方向
 		glm::vec3	_position = glm::vec3(0, 0, 0);			// 位置
+		int16_t	_type = 0;
+		int16_t	_ac = 0;
 	};
 
 
 	std::string format(const char* format, ...);
 
+	/*
+	场景编辑管理
+	*/
+	class scene_edit
+	{
+	public:
+		std::vector<light_t*> lights;
+		int last_idx = 0;				// 当前分配的索引位置
+		int max_count = 80;				// 每次分配最大数量
+	public:
+		scene_edit();
+		~scene_edit();
+		// 默认光源
+		void default_light();
+		light_t* add_directional_light(float intensity, const glm::vec4& color, int shadow_width);
+		light_t* add_spot_light(float intensity, const glm::vec4& color, float range, float cone_angle, float cone_mix, int shadow_width);
+		light_t* add_point_light(float intensity, const glm::vec4& color, float range);
+		// 添加空类型光源，后面填充数据
+		light_t* add_light();
+	};
 }
 //!vkr
 

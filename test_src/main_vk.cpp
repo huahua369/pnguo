@@ -340,8 +340,11 @@ int main()
 
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
-	{
+	{;
 
+#if 0
+
+		glm::quat qk = glm::quat(1, 0, 0, 0);
 		static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
 		static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
 		static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
@@ -349,10 +352,7 @@ int main()
 		auto ak = AMD_PI_OVER_4;
 		auto ac = cosf(a);
 		auto ac0 = cosf(ak);
-		printf("\n");
-
-#if 0
-
+		printf("\n")
 		vkr::Transform transform = {};
 		transform.LookAt(p2v(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
 		vkr::light_t l = {};

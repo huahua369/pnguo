@@ -17812,9 +17812,9 @@ namespace vkr {
 
 		{
 			auto CurrentShadow = &ShadowInfo;
+			// 初始化阴影深度图
 			CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
 			CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
-
 			// Create render pass shadow, will clear contents
 			{
 				VkAttachmentDescription depthAttachments;
@@ -20474,42 +20474,40 @@ uint32_t gray_float_to_rgba(float gray)
 namespace vkr
 {
 	/*
-	场景管理
+	场景编辑管理
 	*/
-	class scene_manager
+	scene_edit::scene_edit()
 	{
-	public:
-		std::vector<light_t*> lights;
-	public:
-		scene_manager()
+	}
+	scene_edit::~scene_edit()
+	{
+		// 清理光源
+		for (auto& light : lights)
 		{
-			// 默认光源
-			default_light();
+			delete[] light;
 		}
-		~scene_manager()
-		{
-			// 清理光源
-			for (auto& light : lights)
-			{
-				delete light;
-			}
-			lights.clear();
-		}
-		void default_light();
-		light_t* add_spotlight(float intensity, const glm::vec4& color, float range, float cone_angle, float cone_mix, int shadow_width);
-	};
-	void scene_manager::default_light()
+		lights.clear(); last_idx = 0;
+	}
+	void scene_edit::default_light()
 	{
 		// 创建默认光源
-		light_t* light = new light_t();
-		light->_type = light_t::LIGHT_DIRECTIONAL;
-		light->_intensity = 50.0f;
-		light->_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		light->_range = 100.0f;
+		light_t* light = add_directional_light(50.0f, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0);
 		light->_rotation = glm::angleAxis(glm::radians(-45.0f), glm::vec3(1, 0, 0));
-		lights.push_back(light);
 	}
-	light_t* scene_manager::add_spotlight(float intensity, const glm::vec4& color, float range, float cone_angle, float cone_mix, int shadow_width)
+	light_t* scene_edit::add_directional_light(float intensity, const glm::vec4& color, int shadow_width)
+	{
+		light_t l = {};
+		l._type = light_t::LIGHT_DIRECTIONAL;
+		l._intensity = glm::max(intensity, 0.0f);
+		l._color = color;
+		l._shadowResolution = shadow_width;
+		l._bias = 0.0007;
+		l._rotation = glm::quat(1, 0, 0, 0);
+		l._position = glm::vec3(0, 0, 0);
+		auto p = add_light(); *p = l;
+		return p;
+	}
+	light_t* scene_edit::add_spot_light(float intensity, const glm::vec4& color, float range, float cone_angle, float cone_mix, int shadow_width)
 	{
 		light_t l = {};
 		l._type = light_t::LIGHT_SPOTLIGHT;
@@ -20520,9 +20518,47 @@ namespace vkr
 		l._cone_mix = cone_mix;
 		l._shadowResolution = shadow_width;
 		l._bias = 0.0007;
-		l._rotation = glm::angleAxis(glm::radians(0.0f), glm::vec3(1, 0, 0));
+		l._rotation = glm::quat(1, 0, 0, 0);
 		l._position = glm::vec3(0, 0, 0);
-		return new light_t(l);
+		auto p = add_light(); *p = l;
+		return p;
+	}
+	light_t* scene_edit::add_point_light(float intensity, const glm::vec4& color, float range)
+	{
+		light_t l = {};
+		l._type = light_t::LIGHT_POINTLIGHT;
+		l._intensity = glm::max(intensity, 0.0f);
+		l._color = color;
+		l._range = range;
+		l._shadowResolution = 0; // 点光源不需要阴影
+		l._position = glm::vec3(0, 0, 0);
+		auto p = add_light(); *p = l;
+		return p;
+	}
+	light_t* scene_edit::add_light()
+	{
+		bool need_new = lights.empty();
+		if (lights.size() > 0)
+		{
+			auto p = *lights.rbegin();
+			if (p->_ac < 1)p->_ac = max_count;
+			if (last_idx == p->_ac)
+			{
+				need_new = true;
+			}
+		}
+		if (need_new)
+		{
+			auto p1 = new light_t[max_count];
+			p1->_ac = max_count;
+			lights.push_back(p1);
+			last_idx = 0;
+		}
+		auto p = *lights.rbegin();
+		p += last_idx;
+		last_idx++;
+		*p = {};
+		return p;
 	}
 }
 //!vkr
