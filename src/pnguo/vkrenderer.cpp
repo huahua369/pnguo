@@ -1841,7 +1841,7 @@ namespace vkr {
 		GBUFFER_DIFFUSE = 16,
 		GBUFFER_SPECULAR_ROUGHNESS = 32,
 		GBUFFER_OIT_ACCUM = 64,
-		GBUFFER_OIT_WEIGHT = 128,
+		GBUFFER_OIT_WEIGHT = 128, 
 	} GBufferFlagBits;
 
 	typedef uint32_t GBufferFlags;
