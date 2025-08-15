@@ -14,13 +14,14 @@ void main()
 	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
 	vec4 opaqueColor = imageLoad(opaqueTex, coords).rgba;
 	vec4 accum = imageLoad(accumTex, coords).rgba;
-	float weight = imageLoad(weightTex, coords).r;
-	if (weight > 0.0)
+	float reveal = imageLoad(weightTex, coords).r;
+	if (reveal > 0.0&&accum.a>0.0)
 	{
 		// 混合不透明与半透明结果（alpha混合）
 		//vec4 color = opaqueColor  * (1.0 - transparentAlpha) + vec4(transparentColor, 1.0) * transparentAlpha; 
 		vec4 a = opaqueColor;
-		vec4 b = vec4(accum.rgb / weight, accum.a/weight);
+		accum.rgb/=accum.a;
+		vec4 b = vec4(accum.rgb, 1.0)/reveal;
 		vec4 color = a * (1.0 - b.a) + b * (b.a);
 		imageStore(opaqueTex, coords, color);
 	}

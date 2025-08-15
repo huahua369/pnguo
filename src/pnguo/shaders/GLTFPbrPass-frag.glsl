@@ -76,7 +76,7 @@ layout (location = HAS_NORMALS_RT) out vec4 Output_normal;
 
 #ifdef HAS_OIT_ACCUM_RT
 layout (location = HAS_OIT_ACCUM_RT) out vec4 outAccum;	// 积累纹理（RGBA32F）
-layout (location = HAS_OIT_WEIGHT_RT) out float outWeight;	// 权重纹理（R32F）
+layout (location = HAS_OIT_WEIGHT_RT) out float outReveal;	// 权重纹理（R32F）
 #endif
 //--------------------------------------------------------------------------------------
 //
@@ -134,19 +134,18 @@ void main()
 #ifdef HAS_OIT_ACCUM_RT
 	if (color.a < 0.98)
 	{
-		float z = gl_FragCoord.z;	 // 获取片段深度（归一化到[0,1]）
-		float w = 0.0;
-		float k = myPerFrame.oit_k;
-		w = z * z;		// 近片段权重极高，适合强调前景。 
-		//w += exp(-k * z) * myPerFrame.oit_w;			// 指数衰减（k为常数），适合模拟真实透明效果（如玻璃）。
-		color.rgb *= color.a; 
-		float contribution = min(1.0, w * color.a);  // 片段贡献（权重×透明度）    
-		outAccum = vec4(color.xyz*contribution, contribution);  // 颜色贡献（RGBA）
-		outWeight = w;  // 权重贡献（R通道） 
-		float weight = w;//clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 * pow(1.0 - gl_FragCoord.z * 0.9, 3.0), 1e-2, 3e3);
-		outAccum = color*w;
-		outWeight = color.a;
-		color = vec4(0, 0, 0, 0);
+	const float depthPower = 4.0;  // 深度衰减系数
+		float z = gl_FragCoord.z; 
+		color.rgb*=color.a;  
+		float alpha=color.a;
+		// 指数衰减模型：深度值越大（越近），权重越高  
+		const float weight = color.a * min(1.0, max(0.0, pow(1.0 - z, depthPower)));
+		color.rgb*=weight;
+		// GL Blend function: GL_ONE, GL_ONE
+		outAccum = color  ;
+		// GL blend function: GL_ZERO, GL_ONE_MINUS_SRC_ALPHA
+		outReveal = alpha* weight;
+		color*=0.0;  
 	}
 #endif
 #ifdef HAS_FORWARD_RT 

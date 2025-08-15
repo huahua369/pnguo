@@ -6621,35 +6621,35 @@ namespace vkr
 			att_states.push_back(att_state);
 		}
 		/*
-		    case BlendMode::WEIGHTED_COLOR:
-      // Test but don't write to depth
-      depthStencilState.depthWriteEnable = false;
-      blendInfo.attachmentCount          = 2;
-      blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
-                                                                               .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
-                                                                               .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
-                                                                               .colorBlendOp        = VK_BLEND_OP_ADD,
-                                                                               .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-                                                                               .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-                                                                               .colorWriteMask      = allBits};
-      blendAttachments[1]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
-                                                                               .srcColorBlendFactor = VK_BLEND_FACTOR_ZERO,
-                                                                               .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
-                                                                               .colorBlendOp        = VK_BLEND_OP_ADD,
-                                                                               .srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-                                                                               .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                                                                               .colorWriteMask = allBits};
-      break;
-    case BlendMode::WEIGHTED_COMPOSITE:
-      // Test but don't write to depth
-      depthStencilState.depthWriteEnable = false;
-      blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable = VK_TRUE,
-                                                                               .srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                                                                               .dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-                                                                               .colorBlendOp        = VK_BLEND_OP_ADD,
-                                                                               .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                                                                               .dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-		
+			case BlendMode::WEIGHTED_COLOR:
+	  // Test but don't write to depth
+	  depthStencilState.depthWriteEnable = false;
+	  blendInfo.attachmentCount          = 2;
+	  blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
+																			   .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+																			   .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
+																			   .colorBlendOp        = VK_BLEND_OP_ADD,
+																			   .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+																			   .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+																			   .colorWriteMask      = allBits};
+	  blendAttachments[1]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
+																			   .srcColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+																			   .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+																			   .colorBlendOp        = VK_BLEND_OP_ADD,
+																			   .srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+																			   .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+																			   .colorWriteMask = allBits};
+	  break;
+	case BlendMode::WEIGHTED_COMPOSITE:
+	  // Test but don't write to depth
+	  depthStencilState.depthWriteEnable = false;
+	  blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable = VK_TRUE,
+																			   .srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+																			   .dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+																			   .colorBlendOp        = VK_BLEND_OP_ADD,
+																			   .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+																			   .dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+
 		*/
 
 
@@ -8984,7 +8984,7 @@ namespace vkr
 			if (pClearValues)
 			{
 				VkClearValue cv;
-				cv.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+				cv.color = { 1.0f, 0.0f, 0.0f, 0.0f };
 				pClearValues->push_back(cv);
 			}
 		}
@@ -15683,6 +15683,8 @@ namespace vkr {
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		bool bHDR = false;
 		bool m_bMagResourceReInit = false;
+		// 不启用oit
+		bool has_oit = false;
 
 	};
 
@@ -17597,22 +17599,26 @@ namespace vkr {
 		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
 
 		// Create GBuffer and render passes
-		//
+		// todo oit 有问题
 		{
+			std::map<GBufferFlags, VkFormat> formats =
+			{
+				{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
+				{ GBUFFER_FORWARD, VK_FORMAT_R16G16B16A16_SFLOAT},
+				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
+			};
+			if (has_oit) {
+				formats[GBUFFER_OIT_ACCUM] = VK_FORMAT_R32G32B32A32_SFLOAT;
+				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R32_SFLOAT;
+			}
 			m_GBuffer.OnCreate(
 				pDevice,
-				&m_ResourceViewHeaps,
-				{
-					{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
-					{ GBUFFER_FORWARD, VK_FORMAT_R16G16B16A16_SFLOAT},
-					{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
-					{ GBUFFER_OIT_ACCUM, VK_FORMAT_R32G32B32A32_SFLOAT},
-					{ GBUFFER_OIT_WEIGHT, VK_FORMAT_R32_SFLOAT},
-				},
+				&m_ResourceViewHeaps, formats,
 				1
-				);
+			);
 
-			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS | GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
+			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;
+			if (has_oit) fullGBuffer |= GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
 			bool bClear = true;
 			m_RenderPassFullGBufferWithClear.OnCreate(&m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");
 			m_RenderPassFullGBuffer.OnCreate(&m_GBuffer, fullGBuffer, !bClear, "m_RenderPassFullGBuffer");
@@ -18630,6 +18636,7 @@ namespace vkr {
 
 		// Post proc---------------------------------------------------------------------------
 
+		if (has_oit)
 		{
 			VkImageMemoryBarrier barrier = {};
 			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
