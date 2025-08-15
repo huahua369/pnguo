@@ -1421,6 +1421,7 @@ namespace vkr {
 
 		uint32_t GetWidth() const { return m_header.width; }
 		uint32_t GetHeight() const { return m_header.height; }
+		glm::ivec2 get_size() { return glm::ivec2(m_header.width, m_header.height); }
 		uint32_t GetMipCount() const { return m_header.mipMapCount; }
 		uint32_t GetArraySize() const { return m_header.arraySize; }
 		VkFormat GetFormat() const { return m_format; }
@@ -1860,7 +1861,7 @@ namespace vkr {
 		VkRenderPass GetRenderPass() { return m_renderPass; }
 		VkFramebuffer GetFramebuffer() { return m_frameBuffer; }
 		VkSampleCountFlagBits  GetSampleCount();
-	private:
+	public:
 		Device* m_pDevice;
 		GBufferFlags                    m_flags;
 		GBuffer* m_pGBuffer;
@@ -3271,6 +3272,7 @@ namespace vkr {
 		std::vector<TimeStamp> m_cpuTimeStamps[5];
 	};
 
+
 	// todo pbr
 	class GltfPbrPass
 	{
@@ -3295,6 +3297,18 @@ namespace vkr {
 			VkDescriptorBufferInfo* morph = 0;
 			operator float() { return -m_depth; }
 		};
+		struct drawables_t
+		{
+			std::vector<BatchList> opaque, transparent, transmission;
+			std::vector<BatchList> opaque1;
+			void clear()
+			{
+				opaque.clear();
+				transparent.clear();
+				transmission.clear();
+				opaque1.clear();
+			}
+		};
 
 		void OnCreate(
 			Device* pDevice,
@@ -3312,6 +3326,7 @@ namespace vkr {
 
 		void OnDestroy();
 		void BuildBatchLists(std::vector<BatchList>* pSolid, std::vector<BatchList>* pTransparent, bool bWireframe = false);
+		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
 		GLTFCommon* get_cp();
@@ -5691,6 +5706,7 @@ namespace vkr
 					if (tt) {
 						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
 						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
+						tfmat->m_blending = true;
 						tfmat->m_params.transmissionFactor = get_v(tt, "transmissionFactor", 0.0);
 						tfmat->transmission = true;
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
@@ -5708,6 +5724,7 @@ namespace vkr
 					if (tt) {
 						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
 						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
+						tfmat->m_blending = true;
 						tfmat->m_params.attenuationColor = get_v(tt, "attenuationColor", glm::vec3(1.0));
 						tfmat->m_params.attenuationDistance = get_v(tt, "attenuationDistance", 10240);
 						tfmat->m_params.thicknessFactor = get_v(tt, "thicknessFactor", 0.0);
@@ -6216,7 +6233,11 @@ namespace vkr
 				tfmat->m_textureCount += 1;
 				descriptorCounts.push_back(1);
 			}
-
+			if (tfmat->m_pbrMaterialParameters.transmission)
+			{
+				tfmat->m_textureCount += 1;
+				descriptorCounts.push_back(1);
+			}
 			if (!ShadowMapViewPool.empty())
 			{
 				assert(ShadowMapViewPool.size() <= MaxShadowInstances);
@@ -6275,7 +6296,11 @@ namespace vkr
 				tfmat->m_pbrMaterialParameters.m_defines["ID_SSAO"] = std::to_string(cnt);
 				cnt++;
 			}
-
+			if (tfmat->m_pbrMaterialParameters.transmission) {
+				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRV, &m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
 			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
 			if (!ShadowMapViewPool.empty())
 			{
@@ -6887,6 +6912,85 @@ namespace vkr
 					pSolid->push_back(t);
 				}
 				else
+				{
+					pTransparent->push_back(t);
+				}
+			}
+		}
+	}
+
+	void GltfPbrPass::BuildBatchLists(drawables_t* opt, bool bWireframe)
+	{
+		std::vector<tfNode>* pNodes = &m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_nodes;
+		Matrix2* pNodesMatrices = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_worldSpaceMats.data();
+		auto pSolid = &opt->opaque;
+		auto pTransparent = &opt->transparent;
+		glm::ivec2 transmissionFramebufferSize = m_pRenderPass->m_pGBuffer->m_HDR.get_size();
+		for (uint32_t i = 0; i < pNodes->size(); i++)
+		{
+			tfNode* pNode = &pNodes->at(i);
+			if ((pNode == NULL) || (pNode->meshIndex < 0))
+				continue;
+
+			// skinning matrices constant buffer
+			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
+
+			glm::mat4 mModelViewProj = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
+
+			// loop through primitives
+			//
+			PBRMesh* pMesh = &m_meshes[pNode->meshIndex];
+			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
+			{
+				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
+				//if ((bWireframe && pPrimitive->m_pipelineWireframe == VK_NULL_HANDLE) || (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
+				if (!pPrimitive->m_pipeline)
+					continue;
+
+				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
+				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
+				// do frustrum culling
+				//
+				tfPrimitives boundingBox = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
+				if (CameraFrustumToBoxCollision(mModelViewProj, boundingBox.m_center, boundingBox.m_radius))
+					continue;
+
+				PBRMaterialParameters* pPbrParams = &pPrimitive->m_pMaterial->m_pbrMaterialParameters;
+				pPbrParams->m_params.transmissionFramebufferSize = transmissionFramebufferSize;
+				// Set per Object constants from material
+				//
+				per_object* cbPerObject;
+				VkDescriptorBufferInfo perObjectDesc;
+				m_pDynamicBufferRing->AllocConstantBuffer(sizeof(per_object), (void**)&cbPerObject, &perObjectDesc);
+				cbPerObject->mCurrentWorld = pNodesMatrices[i].GetCurrent();
+				cbPerObject->mPreviousWorld = pNodesMatrices[i].GetPrevious();
+				cbPerObject->m_pbrParams = pPbrParams->m_params;
+
+				// compute depth for sorting
+				//
+				glm::vec4 v = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p].m_center;
+				float depth = (mModelViewProj * v).w;
+
+				BatchList t;
+				t.m_depth = depth;
+				t.m_pPrimitive = pPrimitive;
+				t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants;
+				t.m_perObjectDesc = perObjectDesc;
+				t.m_pPerSkeleton = pPerSkeleton;
+				t.morph = morph;
+				t.m_uvtDesc = uvtDesc;
+				// append primitive to list 
+				if (pPbrParams->transmission) {
+					opt->transmission.push_back(t);
+				}
+				else if (pPbrParams->m_blending == false)
+				{
+					pSolid->push_back(t);
+					if (bWireframe && pPrimitive->m_pipelineWireframe) {
+						opt->opaque1.push_back(t);
+					}
+				}
+				else if (pPbrParams->m_blending)
 				{
 					pTransparent->push_back(t);
 				}
@@ -15677,6 +15781,8 @@ namespace vkr {
 		std::vector<light_t> _lights;
 		std::queue<light_t> _lights_q;
 		std::vector<glm::mat4> lightMats;
+		// 渲染对象
+		GltfPbrPass::drawables_t drawables;
 
 		PerFrame_t _perFrameData;
 
@@ -18452,11 +18558,12 @@ namespace vkr {
 		{
 			const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
 
-			std::vector<GltfPbrPass::BatchList> opaque, transparent;
-			std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
-
+			//std::vector<GltfPbrPass::BatchList> opaque, transparent, transmission;
+			//std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
+			drawables.clear();
 			for (auto it : _robject) {
-				it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
+				//it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
+				it->m_GLTFPBR->BuildBatchLists(&drawables, bWireframe);
 			}
 			if (bWireframe)// pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 			{
@@ -18483,9 +18590,9 @@ namespace vkr {
 						it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
 					}
 				}
-				for (auto it : _robject) {
-					it->m_GLTFPBR->BuildBatchLists(&opaque1, &transparent1, bWireframe);
-				}
+				//for (auto it : _robject) {
+				//	it->m_GLTFPBR->BuildBatchLists(&opaque1, &transparent1, bWireframe);
+				//}
 			}
 
 			// Render opaque 渲染不透明物体
@@ -18494,12 +18601,12 @@ namespace vkr {
 #if 1
 				if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 				{
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, false);
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque1, bWireframe);
+					GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, false);
+					GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque1, bWireframe);
 				}
 				else
 				{
-					GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
+					GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, bWireframe);
 				}
 #else
 				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
@@ -18535,14 +18642,19 @@ namespace vkr {
 			// draw transparent geometry 渲染透明物体
 			{
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
-
-				std::stable_sort(transparent.begin(), transparent.end(), bcmp);
-				GltfPbrPass::DrawBatchList(cmdBuf1, &transparent, bWireframe);
+				std::stable_sort(drawables.transparent.begin(), drawables.transparent.end(), bcmp);
+				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transparent, bWireframe);
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
 			{
+				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
+				std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
+				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transmission, bWireframe);
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
+				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
+
 #if 0
 				vkh_image_set_layout(cmdBuf1, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
