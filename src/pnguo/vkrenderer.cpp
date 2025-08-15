@@ -3217,6 +3217,22 @@ namespace vkr {
 
 		struct ToneMappingConsts { float exposure; int toneMapper; };
 	};
+	class oitblendCS
+	{
+	public:
+		void OnCreate(Device* pDevice, ResourceViewHeaps* pResourceViewHeaps, DynamicBufferRing* pDynamicBufferRing);
+		void OnDestroy();
+		void Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, VkImageView accumTex, VkImageView weightTex, int width, int height);
+	private:
+		Device* m_pDevice = 0;
+		ResourceViewHeaps* m_pResourceViewHeaps = 0;
+		PostProcCS oitblend;
+		DynamicBufferRing* m_pDynamicBufferRing = NULL;
+		uint32_t              m_descriptorIndex = 0;
+		static const uint32_t s_descriptorBuffers = 10;
+		VkDescriptorSet       m_descriptorSet[s_descriptorBuffers];
+		VkDescriptorSetLayout m_descriptorSetLayout = {};
+	};
 
 	// todo GPUTimestamps
 	// This class helps insert queries in the command buffer and readback the results.
@@ -3763,6 +3779,8 @@ const T& tinygltf::Value::Get() const {
 
 namespace vkr
 {
+	const VkColorComponentFlags allBits = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
 	constexpr float XM_PI = 3.141592654f;
 	constexpr float XM_2PI = 6.283185307f;
 	constexpr float XM_1DIVPI = 0.318309886f;
@@ -3969,7 +3987,7 @@ namespace vkr
 		rs.lineWidth = 2.0f;
 
 		VkPipelineColorBlendAttachmentState att_state[1];
-		att_state[0].colorWriteMask = 0xf;
+		att_state[0].colorWriteMask = allBits;
 		att_state[0].blendEnable = VK_TRUE;
 		att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
 		att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
@@ -4545,7 +4563,7 @@ namespace vkr
 		rs.lineWidth = 1.0f;
 
 		VkPipelineColorBlendAttachmentState att_state[1];
-		att_state[0].colorWriteMask = 0xf;
+		att_state[0].colorWriteMask = allBits;
 		att_state[0].blendEnable = VK_TRUE;
 		att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
 		att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
@@ -6558,7 +6576,6 @@ namespace vkr
 		rs.depthBiasClamp = 0;
 		rs.depthBiasSlopeFactor = 0;
 		rs.lineWidth = 2.0f;
-
 		bool depthwrite = !(pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_blending || (defines.Has("DEF_alphaMode_BLEND")));
 		std::vector<VkPipelineColorBlendAttachmentState> att_states;
 		if (defines.Has("HAS_FORWARD_RT"))
@@ -6566,7 +6583,7 @@ namespace vkr
 			VkPipelineColorBlendAttachmentState att_state = {};
 			get_blend(!depthwrite, att_state);
 #if 0
-			att_state.colorWriteMask = 0xf;
+			att_state.colorWriteMask = allBits;
 			att_state.blendEnable = (defines.Has("DEF_alphaMode_BLEND"));
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
 			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -6577,36 +6594,69 @@ namespace vkr
 #endif
 			att_states.push_back(att_state);
 		}
-		//if (defines.Has("HAS_OIT_ACCUM_RT"))
-		//{
-		//	VkPipelineColorBlendAttachmentState att_state = {};
-		//	att_state.colorWriteMask = 0xf;
-		//	att_state.blendEnable = VK_TRUE;
-		//	att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-		//	att_state.colorBlendOp = VK_BLEND_OP_ADD;
-		//	att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_states.push_back(att_state);
-		//}
-		//if (defines.Has("HAS_OIT_WEIGHT_RT"))
-		//{
-		//	VkPipelineColorBlendAttachmentState att_state = {};
-		//	att_state.colorWriteMask = 0xf;
-		//	att_state.blendEnable = VK_TRUE;
-		//	att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-		//	att_state.colorBlendOp = VK_BLEND_OP_ADD;
-		//	att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		//	att_states.push_back(att_state);
-		//}
+		if (defines.Has("HAS_OIT_ACCUM_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_TRUE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_OIT_WEIGHT_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_TRUE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_states.push_back(att_state);
+		}
+		/*
+		    case BlendMode::WEIGHTED_COLOR:
+      // Test but don't write to depth
+      depthStencilState.depthWriteEnable = false;
+      blendInfo.attachmentCount          = 2;
+      blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
+                                                                               .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+                                                                               .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
+                                                                               .colorBlendOp        = VK_BLEND_OP_ADD,
+                                                                               .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+                                                                               .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+                                                                               .colorWriteMask      = allBits};
+      blendAttachments[1]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
+                                                                               .srcColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+                                                                               .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+                                                                               .colorBlendOp        = VK_BLEND_OP_ADD,
+                                                                               .srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+                                                                               .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                                                                               .colorWriteMask = allBits};
+      break;
+    case BlendMode::WEIGHTED_COMPOSITE:
+      // Test but don't write to depth
+      depthStencilState.depthWriteEnable = false;
+      blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable = VK_TRUE,
+                                                                               .srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                                                                               .dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+                                                                               .colorBlendOp        = VK_BLEND_OP_ADD,
+                                                                               .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                                                                               .dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+		
+		*/
+
+
 		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = 0xf;
+			att_state.colorWriteMask = allBits;
 			att_state.blendEnable = VK_FALSE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
@@ -6619,7 +6669,7 @@ namespace vkr
 		if (defines.Has("HAS_DIFFUSE_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = 0xf;
+			att_state.colorWriteMask = allBits;
 			att_state.blendEnable = VK_FALSE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
@@ -6632,7 +6682,7 @@ namespace vkr
 		if (defines.Has("HAS_NORMALS_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = 0xf;
+			att_state.colorWriteMask = allBits;
 			att_state.blendEnable = VK_FALSE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
@@ -6645,7 +6695,7 @@ namespace vkr
 		if (defines.Has("HAS_MOTION_VECTORS_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = 0xf;
+			att_state.colorWriteMask = allBits;
 			att_state.blendEnable = VK_FALSE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
@@ -9469,7 +9519,7 @@ namespace vkr {
 		rs.lineWidth = 1.0f;
 
 		VkPipelineColorBlendAttachmentState att_state[1];
-		att_state[0].colorWriteMask = 0xf;
+		att_state[0].colorWriteMask = allBits;
 		att_state[0].blendEnable = VK_FALSE;
 		att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
 		att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
@@ -10700,6 +10750,50 @@ namespace vkr {
 
 		SetPerfMarkerEnd(cmd_buf);
 	}
+	// oit混合cs
+	void oitblendCS::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceViewHeaps, DynamicBufferRing* pDynamicBufferRing)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(3);
+		for (int i = 0; i < 3; i++) {
+			layoutBindings[i].binding = i;
+			layoutBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			layoutBindings[i].descriptorCount = 1;
+			layoutBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			layoutBindings[i].pImmutableSamplers = NULL;
+		}
+		m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
+		oitblend.OnCreate(m_pDevice, "oit_blendCS.glsl", "main", "", m_descriptorSetLayout, 8, 8, 1, NULL);
+		m_descriptorIndex = 0;
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_descriptorSet[i]);
+	}
+	void oitblendCS::OnDestroy()
+	{
+		oitblend.OnDestroy();
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
+		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+	}
+	void oitblendCS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, VkImageView accumTex, VkImageView weightTex, int width, int height)
+	{
+		SetPerfMarkerBegin(cmd_buf, "oitblendCS");
+		VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
+		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
+		// modify Descriptor set
+		SetDescriptorSet(m_pDevice->GetDevice(), 0, HDRSRV, descriptorSet);
+		SetDescriptorSet(m_pDevice->GetDevice(), 1, accumTex, descriptorSet);
+		SetDescriptorSet(m_pDevice->GetDevice(), 2, weightTex, descriptorSet);
+		// Draw!
+		oitblend.Draw(cmd_buf, 0, descriptorSet, (width + 7) / 8, (height + 7) / 8, 1);
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+
+
+
 	// todo bloom
 
 	void Bloom::OnCreate(
@@ -10750,7 +10844,7 @@ namespace vkr {
 		//blending add
 		{
 			VkPipelineColorBlendAttachmentState att_state[1];
-			att_state[0].colorWriteMask = 0xf;
+			att_state[0].colorWriteMask = allBits;
 			att_state[0].blendEnable = VK_TRUE;
 			att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
@@ -15545,6 +15639,7 @@ namespace vkr {
 		SkyDomeProc                     m_SkyDomeProc = {};
 		ToneMapping                     m_ToneMappingPS = {};
 		ToneMappingCS                   m_ToneMappingCS = {};
+		oitblendCS						m_oitblendCS = {};
 		ColorConversionPS               m_ColorConversionPS = {};
 		TAA                             m_TAA = {};
 		//MagnifierPS                     m_MagnifierPS = {};
@@ -17558,6 +17653,7 @@ namespace vkr {
 
 		// Create tonemapping pass
 		m_ToneMappingCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
+		m_oitblendCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
 		m_ToneMappingPS.OnCreate(m_pDevice, rp, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
 		m_ColorConversionPS.OnCreate(pDevice, rp, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
 
@@ -17590,6 +17686,7 @@ namespace vkr {
 		m_ColorConversionPS.OnDestroy();
 		m_ToneMappingPS.OnDestroy();
 		m_ToneMappingCS.OnDestroy();
+		m_oitblendCS.OnDestroy();
 		m_TAA.OnDestroy();
 		m_Bloom.OnDestroy();
 		m_DownSample.OnDestroy();
@@ -18532,6 +18629,35 @@ namespace vkr {
 		SetPerfMarkerEnd(cmdBuf1);
 
 		// Post proc---------------------------------------------------------------------------
+
+		{
+			VkImageMemoryBarrier barrier = {};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.pNext = NULL;
+			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.image = m_GBuffer.m_HDR.Resource();
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+			m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
+
+			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;// VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier.image = m_GBuffer.m_HDR.Resource();
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+		}
 
 		// Bloom, takes HDR as input and applies bloom to it.
 		if (pState->bBloom)
@@ -19844,7 +19970,7 @@ namespace vkr {
 		rs.lineWidth = 2.0f;
 
 		VkPipelineColorBlendAttachmentState att_state[1];
-		att_state[0].colorWriteMask = 0xf;
+		att_state[0].colorWriteMask = allBits;
 		att_state[0].blendEnable = VK_TRUE;
 		att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
 		att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
@@ -20449,7 +20575,7 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	rs.lineWidth = 2.0f;
 
 	VkPipelineColorBlendAttachmentState att_state[1];
-	att_state[0].colorWriteMask = 0xf;
+	att_state[0].colorWriteMask = vkr::allBits;
 	att_state[0].blendEnable = VK_TRUE;
 	att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
 	att_state[0].colorBlendOp = VK_BLEND_OP_ADD;

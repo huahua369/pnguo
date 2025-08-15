@@ -325,6 +325,7 @@ glm::vec4 p2v(float yaw, float pitch)
 	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
 }
 
+
 int main()
 {
 #ifdef _DEBUG
@@ -341,7 +342,7 @@ int main()
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
 	{
-		;
+
 
 #if 0
 
