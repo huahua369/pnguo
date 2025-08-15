@@ -74,6 +74,10 @@ layout (location = HAS_DIFFUSE_RT) out vec4 Output_diffuseColor;
 layout (location = HAS_NORMALS_RT) out vec4 Output_normal;
 #endif
 
+#ifdef HAS_OIT_ACCUM_RT
+layout (location = HAS_OIT_ACCUM_RT) out vec4 outAccum;	// 积累纹理（RGBA32F）
+layout (location = HAS_OIT_WEIGHT_RT) out float outWeight;	// 权重纹理（R32F）
+#endif
 //--------------------------------------------------------------------------------------
 //
 // Constant Buffers 
@@ -125,9 +129,23 @@ void main()
 
 #ifdef HAS_NORMALS_RT
 	Output_normal = vec4((getPixelNormal(Input) + 1) / 2, 0);
+#endif 
+	color = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
+#ifdef HAS_OIT_ACCUM_RT
+	if (color.a < 0.96)
+	{
+		float z = gl_FragCoord.z;	 // 获取片段深度（归一化到[0,1]）
+		float w = 0.0;
+		float k = myPerFrame.oit_k;
+		w = (1.0 / (z * z));		// 近片段权重极高，适合强调前景。 
+		w += exp(-k * z) * myPerFrame.oit_w;			// 指数衰减（k为常数），适合模拟真实透明效果（如玻璃）。
+		float contribution = w * color.a;  // 片段贡献（权重×透明度）    
+		outAccum = vec4(color.xyz * contribution, contribution);  // 颜色贡献（RGBA）
+		outWeight = contribution;  // 权重贡献（R通道） 
+		color = vec4(0,0,0,0);
+	}
 #endif
-
 #ifdef HAS_FORWARD_RT 
-	Output_finalColor = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);  
+	Output_finalColor = color; 
 #endif
 }

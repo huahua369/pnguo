@@ -1238,8 +1238,9 @@ namespace vkr {
 
 		glm::vec4 wireframeOptions;
 		float     lodBias = 0.0f;
-		float		  pad1 = 0.0f; float		  pad2 = 0.0f;
-		uint32_t  lightCount;
+		float	  oit_w = 0.0f;
+		float	  oit_k = 0.0f;
+		int		  lightCount;
 		Light     lights[MaxLightInstances];
 	};
 
@@ -1836,7 +1837,9 @@ namespace vkr {
 		GBUFFER_MOTION_VECTORS = 4,
 		GBUFFER_NORMAL_BUFFER = 8,
 		GBUFFER_DIFFUSE = 16,
-		GBUFFER_SPECULAR_ROUGHNESS = 32
+		GBUFFER_SPECULAR_ROUGHNESS = 32,
+		GBUFFER_OIT_ACCUM = 64,
+		GBUFFER_OIT_WEIGHT = 128,
 	} GBufferFlagBits;
 
 	typedef uint32_t GBufferFlags;
@@ -1925,6 +1928,10 @@ namespace vkr {
 		Texture                         m_HDR;
 		VkImageView                     m_HDRSRV;
 
+		Texture                         m_HDR_oit_accum;
+		VkImageView                     m_HDR_oit_accumSRV;
+		Texture                         m_HDR_oit_weight;
+		VkImageView                     m_HDR_oit_weightSRV;
 	private:
 		Device* m_pDevice;
 
@@ -6570,6 +6577,32 @@ namespace vkr
 #endif
 			att_states.push_back(att_state);
 		}
+		//if (defines.Has("HAS_OIT_ACCUM_RT"))
+		//{
+		//	VkPipelineColorBlendAttachmentState att_state = {};
+		//	att_state.colorWriteMask = 0xf;
+		//	att_state.blendEnable = VK_TRUE;
+		//	att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+		//	att_state.colorBlendOp = VK_BLEND_OP_ADD;
+		//	att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_states.push_back(att_state);
+		//}
+		//if (defines.Has("HAS_OIT_WEIGHT_RT"))
+		//{
+		//	VkPipelineColorBlendAttachmentState att_state = {};
+		//	att_state.colorWriteMask = 0xf;
+		//	att_state.blendEnable = VK_TRUE;
+		//	att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+		//	att_state.colorBlendOp = VK_BLEND_OP_ADD;
+		//	att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		//	att_states.push_back(att_state);
+		//}
 		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
@@ -8740,6 +8773,14 @@ namespace vkr
 		{
 			defines["HAS_FORWARD_RT"] = std::to_string(rtIndex++);
 		}
+		if (m_flags & GBUFFER_OIT_ACCUM)
+		{
+			defines["HAS_OIT_ACCUM_RT"] = std::to_string(rtIndex++);
+		}
+		if (m_flags & GBUFFER_OIT_WEIGHT)
+		{
+			defines["HAS_OIT_WEIGHT_RT"] = std::to_string(rtIndex++);
+		}
 
 		// Motion Vectors
 		//
@@ -8811,6 +8852,18 @@ namespace vkr
 			addAttachment(m_formats[GBUFFER_FORWARD], m_sampleCount, previousColor, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
 			assert(m_GBufferFlags & GBUFFER_FORWARD); // asserts if there if the RT is not present in the GBuffer
 		}
+		// GBUFFER_OIT_ACCUM GBUFFER_OIT_WEIGHT
+		if (flags & GBUFFER_OIT_ACCUM)
+		{
+			addAttachment(m_formats[GBUFFER_OIT_ACCUM], m_sampleCount, previousColor, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
+			assert(m_GBufferFlags & GBUFFER_OIT_ACCUM); // asserts if there if the RT is not present in the GBuffer
+		}
+
+		if (flags & GBUFFER_OIT_WEIGHT)
+		{
+			addAttachment(m_formats[GBUFFER_OIT_WEIGHT], m_sampleCount, previousColor, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
+			assert(m_GBufferFlags & GBUFFER_OIT_WEIGHT); // asserts if there if the RT is not present in the GBuffer
+		}
 
 		if (flags & GBUFFER_MOTION_VECTORS)
 		{
@@ -8854,6 +8907,29 @@ namespace vkr
 		if (flags & GBUFFER_FORWARD)
 		{
 			pAttachments->push_back(m_HDRSRV);
+
+			if (pClearValues)
+			{
+				VkClearValue cv;
+				cv.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+				pClearValues->push_back(cv);
+			}
+		}
+		// GBUFFER_OIT_ACCUM GBUFFER_OIT_WEIGHT
+		if (flags & GBUFFER_OIT_ACCUM)
+		{
+			pAttachments->push_back(m_HDR_oit_accumSRV);
+
+			if (pClearValues)
+			{
+				VkClearValue cv;
+				cv.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+				pClearValues->push_back(cv);
+			}
+		}
+		if (flags & GBUFFER_OIT_WEIGHT)
+		{
+			pAttachments->push_back(m_HDR_oit_weightSRV);
 
 			if (pClearValues)
 			{
@@ -8943,6 +9019,16 @@ namespace vkr
 			m_HDR.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_FORWARD], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HDR");
 			m_HDR.CreateSRV(&m_HDRSRV);
 		}
+		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
+		{
+			m_HDR_oit_accum.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_OIT_ACCUM], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HDR_oit_accum");
+			m_HDR_oit_accum.CreateSRV(&m_HDR_oit_accumSRV);
+		}
+		if (m_GBufferFlags & GBUFFER_OIT_WEIGHT)
+		{
+			m_HDR_oit_weight.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_OIT_WEIGHT], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HDR_oit_weight");
+			m_HDR_oit_weight.CreateSRV(&m_HDR_oit_weightSRV);
+		}
 
 		// Motion Vectors
 		//
@@ -9016,6 +9102,18 @@ namespace vkr
 		{
 			vkDestroyImageView(m_pDevice->GetDevice(), m_HDRSRV, nullptr);
 			m_HDR.OnDestroy();
+		}
+
+		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
+		{
+			vkDestroyImageView(m_pDevice->GetDevice(), m_HDR_oit_accumSRV, nullptr);
+			m_HDR_oit_accum.OnDestroy();
+		}
+
+		if (m_GBufferFlags & GBUFFER_OIT_WEIGHT)
+		{
+			vkDestroyImageView(m_pDevice->GetDevice(), m_HDR_oit_weightSRV, nullptr);
+			m_HDR_oit_weight.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_DEPTH)
@@ -15032,7 +15130,7 @@ namespace vkr {
 	struct node_mat
 	{
 		uint32_t idx = 0;
-		uint32_t pidx = -1;
+		uint32_t pidx = (uint32_t)-1;
 		glm::mat4 m = glm::mat4(1.0);
 	};
 
@@ -17413,11 +17511,13 @@ namespace vkr {
 					{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
 					{ GBUFFER_FORWARD, VK_FORMAT_R16G16B16A16_SFLOAT},
 					{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
+					{ GBUFFER_OIT_ACCUM, VK_FORMAT_R32G32B32A32_SFLOAT},
+					{ GBUFFER_OIT_WEIGHT, VK_FORMAT_R32_SFLOAT},
 				},
 				1
 				);
 
-			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;
+			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS | GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
 			bool bClear = true;
 			m_RenderPassFullGBufferWithClear.OnCreate(&m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");
 			m_RenderPassFullGBuffer.OnCreate(&m_GBuffer, fullGBuffer, !bClear, "m_RenderPassFullGBuffer");
