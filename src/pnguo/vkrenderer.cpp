@@ -1928,7 +1928,7 @@ namespace vkr {
 
 		// HDR
 		Texture                         m_HDR;
-		VkImageView                     m_HDRSRV;
+		VkImageView                     m_HDRSRV; 
 
 		Texture                         m_HDR_oit_accum;
 		VkImageView                     m_HDR_oit_accumSRV;
@@ -18640,7 +18640,7 @@ namespace vkr {
 			}
 
 			// draw transparent geometry 渲染透明物体
-			{
+			if (!drawables.transparent.empty()) {
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 				std::stable_sort(drawables.transparent.begin(), drawables.transparent.end(), bcmp);
 				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transparent, bWireframe);
@@ -18648,32 +18648,12 @@ namespace vkr {
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
-			{
+			if (!drawables.transmission.empty()) {
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 				std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
 				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transmission, bWireframe);
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
-				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
-
-#if 0
-				vkh_image_set_layout(cmdBuf1, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-				vkh_image_set_layout(cmdBuf1, savStencil, ctx->dev->stencilAspectFlag,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-				VkImageCopy cregion = { .srcSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
-										.dstSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
-										.extent = {ctx->pSurf->width,ctx->pSurf->height,1} };
-				vkCmdCopyImage(cmdBuf1,
-					m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					1, &cregion);
-				vkh_image_set_layout(cmdBuf1, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
-#endif
+				m_RenderPassFullGBuffer.EndPass(cmdBuf1);				 
 			}
 
 

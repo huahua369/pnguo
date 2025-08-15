@@ -1973,6 +1973,8 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	vec3 f_metal_brdf_ibl = vec3(0.0);
 	vec3 f_dielectric_brdf_ibl = vec3(0.0);
 	vec3 f_sheen = vec3(0.0);
+	vec3 f_specular_transmission = vec3(0.0);
+	vec3 f_diffuse_transmission = vec3(0.0);
 	float albedoSheenScaling = 1.0;
 	float diffuseTransmissionThickness = 1.0;
 	vec3 clearcoat_brdf = vec3(0.0);
@@ -1998,7 +2000,8 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #ifdef USE_IBL
 	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
 
-#ifdef EXT_IBL
+#if 1
+	//def EXT_IBL
 #ifdef MATERIAL_DIFFUSE_TRANSMISSION
 	vec3 diffuseTransmissionIBL = getDiffuseLight(-n) * m.diffuseTransmissionColorFactor;
 #ifdef MATERIAL_VOLUME
@@ -2008,12 +2011,12 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #endif
 
 
-#if defined(MATERIAL_TRANSMISSION)
+#ifdef MATERIAL_TRANSMISSION 
 	f_specular_transmission = getIBLVolumeRefraction(
 		n, v,
 		m.perceptualRoughness,
 		baseColor.rgb, m.f0_dielectric, m.f90,
-		v_Position, u_ModelMatrix, u_ViewMatrix, u_ProjectionMatrix,
+		worldPos, u_ModelMatrix, u_ViewMatrix,// u_ProjectionMatrix,
 		m.ior, m.thickness, m.attenuationColor, m.attenuationDistance, m.dispersion);
 	f_diffuse = mix(f_diffuse, f_specular_transmission, m.transmissionFactor);
 #endif
