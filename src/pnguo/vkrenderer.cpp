@@ -56,9 +56,9 @@ VK_PRESENT_MODE_MAILBOX_KHR: 这是第二种模式的变种。当交换链队列
 gltf流程
 // 如果存在任何透射式可绘制对象，则将所有不透明和透明的可绘制对象渲染到单独的帧缓冲区中。opaqueRenderTexture
 if(KHR_materials_transmission透明介质透射材质){
-渲染环境
-渲染不透明物体opaqueDrawables
-渲染透明物体transparentDrawables
+	渲染环境
+	渲染不透明物体opaqueDrawables
+	渲染透明物体transparentDrawables
 }
 
 渲染环境
@@ -1141,6 +1141,7 @@ namespace vkr {
 	{
 		bool     m_doubleSided = false;
 		bool     m_blending = false;
+		bool     transmission = false;
 
 		DefineList m_defines;
 
@@ -5691,6 +5692,7 @@ namespace vkr
 						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
 						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
 						tfmat->m_params.transmissionFactor = get_v(tt, "transmissionFactor", 0.0);
+						tfmat->transmission = true;
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
 					}
 				}
