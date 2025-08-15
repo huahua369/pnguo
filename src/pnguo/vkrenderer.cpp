@@ -5698,7 +5698,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_dispersion");
 					if (tt) {
-						tfmat->m_params.dispersion = get_v(tt, "dispersion", 0);
+						tfmat->m_params.dispersion = get_v(tt, "dispersion", 0.0);
 					}
 				}
 				{
@@ -5726,7 +5726,7 @@ namespace vkr
 						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
 						tfmat->m_blending = true;
 						tfmat->m_params.attenuationColor = get_v(tt, "attenuationColor", glm::vec3(1.0));
-						tfmat->m_params.attenuationDistance = get_v(tt, "attenuationDistance", 10240);
+						tfmat->m_params.attenuationDistance = get_v(tt, "attenuationDistance", 10240.0);
 						tfmat->m_params.thicknessFactor = get_v(tt, "thicknessFactor", 0.0);
 						itcb(*tt, "thicknessTexture", "ID_thicknessTexCoord", tfmat->m_defines, textureIds);
 					}
@@ -5769,8 +5769,8 @@ namespace vkr
 					if (tt) {
 						tfmat->m_defines["MATERIAL_IRIDESCENCE"] = "1";
 						tfmat->m_params.iridescenceFactor = get_v(tt, "iridescenceFactor", 0.0);
-						tfmat->m_params.iridescenceThicknessMinimum = get_v(tt, "iridescenceThicknessMinimum", 100);
-						tfmat->m_params.iridescenceThicknessMaximum = get_v(tt, "iridescenceThicknessMaximum", 400);
+						tfmat->m_params.iridescenceThicknessMinimum = get_v(tt, "iridescenceThicknessMinimum", 100.0);
+						tfmat->m_params.iridescenceThicknessMaximum = get_v(tt, "iridescenceThicknessMaximum", 400.0);
 						tfmat->m_params.iridescenceIor = get_v(tt, "iridescenceIor", 1.3);
 						itcb(*tt, "iridescenceTexture", "ID_iridescenceTexCoord", tfmat->m_defines, textureIds);
 						itcb(*tt, "iridescenceThicknessTexture", "ID_iridescenceThicknessTexCoord", tfmat->m_defines, textureIds);
