@@ -18721,7 +18721,6 @@ namespace vkr {
 			// Render opaque 渲染不透明物体
 			{
 				m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
-#if 1
 				if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 				{
 					GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, false);
@@ -18731,15 +18730,10 @@ namespace vkr {
 				{
 					GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, bWireframe);
 				}
-#else
-				GltfPbrPass::DrawBatchList(cmdBuf1, &opaque, bWireframe);
-#endif
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
-
 				m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
 			}
-
-			// Render skydome
+			// Render skydome天空盒
 			{
 				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
 
@@ -18761,7 +18755,6 @@ namespace vkr {
 
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
-
 			// draw transparent geometry 渲染透明物体
 			if (!drawables.transparent.empty()) {
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
@@ -18770,7 +18763,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
-
+			// 复制 HDR 图像到 HDRt给transmission渲染用
 			{
 				//_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 				//_transfer.flush(cmdBuf1);
@@ -18802,18 +18795,14 @@ namespace vkr {
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT); 
 			}
-
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
 			if (!drawables.transmission.empty()) {
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
-
 				std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
 				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transmission, bWireframe);
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
-
-
 			// draw object's bounding boxes
 			bool has_box = (pState->bDrawLightFrustum && lightCount > 0) || (pState->bDrawBoundingBoxes && _robject.size());
 			{
@@ -19574,11 +19563,11 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		_rp = newRenderPass(m_device, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_D32_SFLOAT);// VK_FORMAT_R8G8B8A8_SRGB);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
+		_rp = newRenderPass(m_device, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_D32_SFLOAT);// VK_FORMAT_R8G8B8A8_SRGB);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
 
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
-		f->colorFormat = VK_FORMAT_B8G8R8A8_SRGB;// VK_FORMAT_B8G8R8A8_UNORM;
+		f->colorFormat = VK_FORMAT_R8G8B8A8_UNORM;//VK_FORMAT_B8G8R8A8_SRGB;// 
 		f->initFBO(m_Width, m_Height, 2, _rp);
 		m_pRenderer->set_fbo(f, 0);
 		m_pRenderer->OnCreate(m_device, _rp);

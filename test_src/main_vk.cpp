@@ -484,7 +484,7 @@ int main()
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-		auto texok = form0->add_vkimage(vr.size, vr.vkimage, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		auto texok = form0->add_vkimage(vr.size, vr.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
 		/*
 		case 0: return AMDTonemapper(color);
 		case 1: return DX11DSK(color);

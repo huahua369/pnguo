@@ -236,7 +236,7 @@ layout(set = 0, binding = 1) uniform perObject
 
 #ifdef ID_MATUV_DATA
 // UV矩阵的数据
-layout(set = 0, binding = ID_MATUV_DATA) buffer per_u_matuv
+layout(set = 0, binding = ID_MATUV_DATA) buffer readonly per_u_matuv
 {
 	mat3 u_matuv[];
 }; 
