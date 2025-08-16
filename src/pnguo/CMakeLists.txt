@@ -67,7 +67,9 @@ find_package(FFTW3l CONFIG REQUIRED)
 add_library (pnguo STATIC ${pnguo_src})
 #add_library (pnguo SHARED ${pnguo_src})
 
-target_link_libraries (pnguo PkgConfig::LIBRSVG Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json 
+target_link_libraries (pnguo PkgConfig::LIBRSVG
+#Vulkan::Vulkan Vulkan::Headers
+GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json 
     PkgConfig::Clipper2  PkgConfig::Clipper2Z 
     tpv
     SDL3::SDL3

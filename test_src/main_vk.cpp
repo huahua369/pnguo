@@ -420,7 +420,7 @@ int main()
 	//form0->set_mouse_mode(grab_enable, rmode);
 	get_queue_info(sdldev.phy);
 
-	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, kd);	// 创建vk渲染器 
+	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 创建vk渲染器 
 	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
 	//if (vkd1) {

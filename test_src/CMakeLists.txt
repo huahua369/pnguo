@@ -102,8 +102,9 @@ set(lklib)
 list(APPEND lklib  
     Dwmapi
     ZLIB::ZLIB
-    Vulkan::Vulkan 
-    Vulkan::Headers GPUOpen::VulkanMemoryAllocator
+    #Vulkan::Vulkan 
+    #Vulkan::Headers 
+    GPUOpen::VulkanMemoryAllocator
     PkgConfig::LIBRSVG
     PkgConfig::hwloc
     glm::glm-header-only

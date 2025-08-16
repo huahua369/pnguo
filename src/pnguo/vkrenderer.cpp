@@ -398,9 +398,54 @@ namespace vkr
 	void Device::OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw
 		, const char* spdname, std::vector<std::string>* pdnv)
 	{
+		dev_info_cx nd = {};
 		InstanceProperties ip;
 		ip.Init();
 		SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
+		if (!d || !d->inst || !d->phy || !d->vkdev)
+		{
+
+			std::vector<const char*> instance_layer_names;
+			std::vector<const char*> instance_extension_names;
+
+			ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names);
+
+			VkInstance instance = {};
+			VkApplicationInfo app_info = {};
+			app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+			app_info.pNext = NULL;
+			app_info.pApplicationName = "vkcmp";
+			app_info.applicationVersion = 1;
+			app_info.pEngineName = "pnguo";
+			app_info.engineVersion = 1;
+			app_info.apiVersion = VK_API_VERSION_1_3;
+			VkInstanceCreateInfo inst_info = {};
+			inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+			inst_info.pNext = 0;
+			inst_info.flags = 0;
+			inst_info.pApplicationInfo = &app_info;
+			inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
+			inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
+			inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
+			inst_info.ppEnabledExtensionNames = instance_extension_names.data();
+			VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
+			assert(res == VK_SUCCESS);
+			if (instance)
+			{
+				nd.inst = instance;
+				auto devs = get_devices(instance);
+				if (devs.size() > 0)
+				{
+					nd.phy = devs[0].phd;
+				}
+				d = &nd;
+			}
+		}
+		if(!d || !d->inst || !d->phy)
+		{
+			printf("Failed to create Vulkan instance or physical device.\n");
+			return;
+		}
 
 		DeviceProperties dp;
 		dp.Init((VkPhysicalDevice)d->phy);
@@ -570,7 +615,8 @@ namespace vkr
 #error platform not supported
 #endif
 		}
-		get_surface_formats(m_physicaldevice, m_surface, _surfaceFormats);
+		if (m_physicaldevice && m_surface)
+			get_surface_formats(m_physicaldevice, m_surface, _surfaceFormats);
 		auto qfp = get_queue_fp(queue_props.data(), queue_family_count, VK_QUEUE_GRAPHICS_BIT);
 		// Find a graphics device and a queue that can present to the above surface
 		//
@@ -669,6 +715,9 @@ namespace vkr
 		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		physicalDeviceFeatures2.features = physicalDeviceFeatures;
 		physicalDeviceFeatures2.pNext = &robustness2;
+		VkPhysicalDeviceFeatures2 features = {};
+		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		vkGetPhysicalDeviceFeatures2(m_physicaldevice, &features);
 		if (dev)
 		{
 			m_device = dev;
@@ -18778,7 +18827,7 @@ namespace vkr {
 				cr.extent.height = image->GetHeight();
 				cr.extent.depth = 1;
 				cr.srcOffset = {};
-				cr.srcSubresource = cr.dstSubresource; 
+				cr.srcSubresource = cr.dstSubresource;
 				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
@@ -18793,7 +18842,7 @@ namespace vkr {
 					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT); 
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 			}
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
 			if (!drawables.transmission.empty()) {
@@ -18867,7 +18916,7 @@ namespace vkr {
 		barrier[0].subresourceRange.layerCount = 1;
 		barrier[0].image = m_GBuffer.m_HDR.Resource();
 		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
-		 
+
 		SetPerfMarkerEnd(cmdBuf1);
 
 		// Post proc---------------------------------------------------------------------------
@@ -18905,24 +18954,24 @@ namespace vkr {
 		// Bloom, takes HDR as input and applies bloom to it.
 		if (pState->bBloom)
 		{
-			SetPerfMarkerBegin(cmdBuf1, "PostProcess"); 
+			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
 			// Downsample pass
 			m_DownSample.Draw(cmdBuf1);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "Downsample");
 
 			// Bloom pass (needs the downsampled data)
 			m_Bloom.Draw(cmdBuf1);
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom"); 
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom");
 			SetPerfMarkerEnd(cmdBuf1);
 		}
 
 		// Apply TAA & Sharpen to m_HDR
 		if (pState->bUseTAA)
 		{
-			m_TAA.m_bSharpening = pState->bTAAsharpening; 
+			m_TAA.m_bSharpening = pState->bTAAsharpening;
 			cp_barrier(cmdBuf1, &m_GBuffer);
 
-			m_TAA.Draw(cmdBuf1); 
+			m_TAA.Draw(cmdBuf1);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
 		}
 
@@ -19120,7 +19169,7 @@ namespace vkr {
 
 			vkCmdSetScissor(cmdBuf2, 0, 1, &m_RectScissor);
 			vkCmdSetViewport(cmdBuf2, 0, 1, &m_Viewport);
-			 
+
 			if (bHDR)
 			{
 				m_ColorConversionPS.Draw(cmdBuf2, SRVCurrentInput);
@@ -19142,13 +19191,13 @@ namespace vkr {
 					//m_GPUTimer.GetTimeStamp(cmdBuf2, "ImGUI Rendering");
 				}
 			}
-			 
+
 
 			SetPerfMarkerEnd(cmdBuf2);
 
 			m_GPUTimer.OnEndFrame();
 			vkCmdEndRenderPass(cmdBuf2);
-			 
+
 			// Close & Submit the command list ----------------------------------------------------
 			{
 				VkResult res = vkEndCommandBuffer(cmdBuf2);
@@ -19157,7 +19206,7 @@ namespace vkr {
 				VkSemaphore ImageAvailableSemaphore;
 				VkSemaphore RenderFinishedSemaphores;
 
-				VkPipelineStageFlags submitWaitStage =  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;//
+				VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;//
 				VkSubmitInfo submit_info2;
 				submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 				submit_info2.pNext = NULL;
@@ -19485,7 +19534,7 @@ namespace vkr {
 		VkAttachmentDescription colorAttachments[10];
 		uint32_t colorAttanchmentCount = 0;
 		bool bClear = true; // 是否清除
-		auto addAttachment = bClear ? AttachClearBeforeUse : AttachBlending; 
+		auto addAttachment = bClear ? AttachClearBeforeUse : AttachBlending;
 		// fbo颜色渲染结束转换布局SHADER_READ_ONLY
 		addAttachment(format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
 		if (is_depth_tex(depth_format))
