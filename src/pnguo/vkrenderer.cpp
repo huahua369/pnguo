@@ -5752,7 +5752,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_transmission");
 					if (tt) {
-						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1"; 
+						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
 						tfmat->m_params.transmissionFactor = get_v(tt, "transmissionFactor", 0.0);
 						tfmat->transmission = true;
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
@@ -5768,7 +5768,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_volume");
 					if (tt) {
-						tfmat->m_defines["MATERIAL_VOLUME"] = "1"; 
+						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
 						tfmat->m_params.attenuationColor = get_v(tt, "attenuationColor", glm::vec3(1.0));
 						tfmat->m_params.attenuationDistance = get_v(tt, "attenuationDistance", 10240.0);
 						tfmat->m_params.thicknessFactor = get_v(tt, "thicknessFactor", 0.0);
@@ -15450,7 +15450,7 @@ namespace vkr {
 	// The scene needs to be animated and transformed before we can set the PerFrame_t data. We need those final matrices for the lights and the camera.
 	//
 	PerFrame_t* GLTFCommon::SetPerFrameData(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
-	{ 
+	{
 		if (pfd)
 		{
 			m_perFrameData = *pfd;
@@ -15461,11 +15461,11 @@ namespace vkr {
 				Light* pSL = &m_perFrameData.lights[i];
 				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
 			}
-		} 
+		}
 		return &m_perFrameData;
 	}
 	PerFrame_t* GLTFCommon::SetPerFrameData_w(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
-	{ 
+	{
 		if (pfd)
 		{
 			m_perFrameData_w = *pfd;
@@ -15476,7 +15476,7 @@ namespace vkr {
 				Light* pSL = &m_perFrameData_w.lights[i];
 				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
 			}
-		} 
+		}
 		return &m_perFrameData_w;
 	}
 
@@ -15634,6 +15634,7 @@ namespace vkr {
 		VkFramebuffer framebuffer = 0;
 		VkFence fence = {};
 		VkSemaphore sem = {};
+		VkImage image = 0;
 	};
 	struct PassParameters
 	{
@@ -18571,6 +18572,7 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void Renderer_cx::OnRender(const scene_state* pState, const Camera& Cam)
 	{
+		//printf("OnRender \t\thdr\t%p\n", m_GBuffer.m_HDR.Resource());
 		// Let our resource managers do some house keeping 
 		m_ConstantBufferRing.OnBeginFrame();
 
@@ -18629,7 +18631,7 @@ namespace vkr {
 						////ml.mLightViewProj = lvp;
 					}
 					//}
-					if(bWireframe)
+					if (bWireframe)
 					{
 						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData_w(pfd, Cam, _lights, lightMats);
 						pPerFrame->iblFactor = pState->IBLFactor;
@@ -18714,7 +18716,7 @@ namespace vkr {
 			drawables.clear();
 			for (auto it : _robject) {
 				it->m_GLTFPBR->BuildBatchLists(&drawables, bWireframe);
-			} 
+			}
 
 			// Render opaque 渲染不透明物体
 			{
@@ -18783,7 +18785,7 @@ namespace vkr {
 				cr.extent.height = image->GetHeight();
 				cr.extent.depth = 1;
 				cr.srcOffset = {};
-				cr.srcSubresource = cr.dstSubresource;
+				cr.srcSubresource = cr.dstSubresource; 
 				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
@@ -18798,7 +18800,7 @@ namespace vkr {
 					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT); 
 			}
 
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
@@ -18875,8 +18877,8 @@ namespace vkr {
 		barrier[0].subresourceRange.baseArrayLayer = 0;
 		barrier[0].subresourceRange.layerCount = 1;
 		barrier[0].image = m_GBuffer.m_HDR.Resource();
-		//vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
-
+		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+		 
 		SetPerfMarkerEnd(cmdBuf1);
 
 		// Post proc---------------------------------------------------------------------------
@@ -18914,26 +18916,24 @@ namespace vkr {
 		// Bloom, takes HDR as input and applies bloom to it.
 		if (pState->bBloom)
 		{
-			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
-
+			SetPerfMarkerBegin(cmdBuf1, "PostProcess"); 
 			// Downsample pass
 			m_DownSample.Draw(cmdBuf1);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "Downsample");
 
 			// Bloom pass (needs the downsampled data)
 			m_Bloom.Draw(cmdBuf1);
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom");
-
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom"); 
 			SetPerfMarkerEnd(cmdBuf1);
 		}
 
 		// Apply TAA & Sharpen to m_HDR
 		if (pState->bUseTAA)
 		{
-			m_TAA.m_bSharpening = pState->bTAAsharpening;
+			m_TAA.m_bSharpening = pState->bTAAsharpening; 
 			cp_barrier(cmdBuf1, &m_GBuffer);
 
-			m_TAA.Draw(cmdBuf1);
+			m_TAA.Draw(cmdBuf1); 
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
 		}
 
@@ -19065,11 +19065,8 @@ namespace vkr {
 #endif
 			}
 		}
-
 		// submit command buffer
 		{
-			vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
 			//print_time a("qsubmit 0");
 			VkResult res = vkEndCommandBuffer(cmdBuf1);
 			assert(res == VK_SUCCESS);
@@ -19089,6 +19086,8 @@ namespace vkr {
 
 		}
 		{
+			vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
 			// Wait for swapchain (we are going to render to it) -----------------------------------
 			//int imageIndex = pSwapChain->WaitForSwapChain();
 			// Keep tracking input/output resource views 
@@ -19132,7 +19131,7 @@ namespace vkr {
 
 			vkCmdSetScissor(cmdBuf2, 0, 1, &m_RectScissor);
 			vkCmdSetViewport(cmdBuf2, 0, 1, &m_Viewport);
-
+			 
 			if (bHDR)
 			{
 				m_ColorConversionPS.Draw(cmdBuf2, SRVCurrentInput);
@@ -19154,13 +19153,13 @@ namespace vkr {
 					//m_GPUTimer.GetTimeStamp(cmdBuf2, "ImGUI Rendering");
 				}
 			}
+			 
 
 			SetPerfMarkerEnd(cmdBuf2);
 
 			m_GPUTimer.OnEndFrame();
-
 			vkCmdEndRenderPass(cmdBuf2);
-
+			 
 			// Close & Submit the command list ----------------------------------------------------
 			{
 				VkResult res = vkEndCommandBuffer(cmdBuf2);
@@ -19169,7 +19168,7 @@ namespace vkr {
 				VkSemaphore ImageAvailableSemaphore;
 				VkSemaphore RenderFinishedSemaphores;
 
-				VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				VkPipelineStageFlags submitWaitStage =  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;//
 				VkSubmitInfo submit_info2;
 				submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 				submit_info2.pNext = NULL;
@@ -19191,7 +19190,7 @@ namespace vkr {
 			}
 		}
 #endif
-
+		//printf("OnRender end\t\thdr\t%p\n", m_GBuffer.m_HDR.Resource());
 	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
@@ -19199,6 +19198,7 @@ namespace vkr {
 		_fbo.framebuffer = p->framebuffers[idx].framebuffer;
 		_fbo.sem = p->framebuffers[idx].semaphore;
 		_fbo.renderPass = p->renderPass;
+		_fbo.image = p->framebuffers[idx].color._image;
 	}
 	void Renderer_cx::freeVidMBP()
 	{
@@ -19490,8 +19490,18 @@ namespace vkr {
 
 	}
 
-	VkRenderPass newRenderPass(Device* pDevice, VkFormat format)
+	VkRenderPass newRenderPass(Device* pDevice, VkFormat format, VkFormat depth_format)
 	{
+		VkAttachmentDescription depthAttachment;
+		VkAttachmentDescription colorAttachments[10];
+		uint32_t colorAttanchmentCount = 0;
+		bool bClear = true; // 是否清除
+		auto addAttachment = bClear ? AttachClearBeforeUse : AttachBlending; 
+		// fbo颜色渲染结束转换布局SHADER_READ_ONLY
+		addAttachment(format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
+		if (is_depth_tex(depth_format))
+			addAttachment(depth_format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, &depthAttachment);
+		return CreateRenderPassOptimal(pDevice->GetDevice(), colorAttanchmentCount, colorAttachments, &depthAttachment);
 		// color RT
 		VkAttachmentDescription attachments[1];
 		attachments[0].format = format;
@@ -19564,7 +19574,7 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		_rp = newRenderPass(m_device, VK_FORMAT_B8G8R8A8_SRGB);// VK_FORMAT_R8G8B8A8_SRGB);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
+		_rp = newRenderPass(m_device, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_D32_SFLOAT);// VK_FORMAT_R8G8B8A8_SRGB);// VK_FORMAT_R8G8B8A8_UNORM);// VK_FORMAT_R8G8B8A8_SRGB);
 
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
