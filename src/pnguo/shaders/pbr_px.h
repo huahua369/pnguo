@@ -305,19 +305,31 @@ layout(set = 1, binding = ID_specularGlossinessTexture) uniform sampler2D u_spec
 
 #ifdef USE_IBL
 #ifdef ID_diffuseCube
-layout(set = 1, binding = ID_diffuseCube) uniform samplerCube u_DiffuseEnvSampler;
+layout(set = 1, binding = ID_diffuseCube) uniform samplerCube u_DiffuseEnvSampler;//漫反射u_LambertianEnvSampler
 #endif
 #ifdef ID_specularCube
-layout(set = 1, binding = ID_specularCube) uniform samplerCube u_SpecularEnvSampler;
+layout(set = 1, binding = ID_specularCube) uniform samplerCube u_SpecularEnvSampler;//镜面反射u_GGXEnvSampler
 #endif
 #define USE_TEX_LOD
 #endif
 
 #ifdef ID_brdfTexture
-layout(set = 1, binding = ID_brdfTexture) uniform sampler2D u_brdfLUT;
+layout(set = 1, binding = ID_brdfTexture) uniform sampler2D u_brdfLUT;//u_GGXLUT
 #endif
 #ifdef ID_CharlieTexture
 layout(set = 1, binding = ID_CharlieTexture) uniform sampler2D u_CharlieLUT;
+#endif
+#ifdef ID_CharlieTexture
+layout(set = 1, binding = ID_CharlieTexture) uniform sampler2D u_SheenELUT;
+#endif
+#ifdef ID_sheenColorTexture
+layout(set = 1, binding = ID_sheenColorTexture) uniform sampler2D u_sheenColorTexture;
+#endif
+#ifdef ID_CharlieEnvSampler
+layout(set = 1, binding = ID_CharlieEnvSampler) uniform samplerCube u_CharlieEnvSampler;//光泽环境
+#endif
+#ifdef ID_sheenRoughnessTexture
+layout(set = 1, binding = ID_sheenRoughnessTexture) uniform sampler2D u_sheenRoughnessTexture;
 #endif
 
 #ifdef ID_specularTexture
@@ -347,15 +359,6 @@ layout(set = 1, binding = ID_iridescenceThicknessTexture) uniform sampler2D u_ir
 #endif
 #ifdef ID_anisotropyTexture
 layout(set = 1, binding = ID_anisotropyTexture) uniform sampler2D u_anisotropyTexture;
-#endif
-#ifdef ID_sheenColorTexture
-layout(set = 1, binding = ID_sheenColorTexture) uniform sampler2D u_sheenColorTexture;
-#endif
-#ifdef ID_CharlieEnvSampler
-layout(set = 1, binding = ID_CharlieEnvSampler) uniform samplerCube u_CharlieEnvSampler;
-#endif
-#ifdef ID_sheenRoughnessTexture
-layout(set = 1, binding = ID_sheenRoughnessTexture) uniform sampler2D u_sheenRoughnessTexture;
 #endif
 
 #ifdef ID_shadowMap
@@ -1804,7 +1807,8 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
 #endif
 
 
-#ifdef  ID_charlieLUT
+#ifdef MATERIAL_SHEEN
+//ID_charlieLUT
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
 {
 	int   mipCount = textureQueryLevels(u_CharlieEnvSampler);
@@ -1819,7 +1823,12 @@ vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor
 	vec3 sheenLight = vec3(sheenSample);
 	return sheenLight * sheenColor * brdf;
 }
+float albedoSheenScalingLUT(float NdotV, float sheenRoughnessFactor)
+{
+	return texture(u_SheenELUT, vec2(NdotV, sheenRoughnessFactor)).r;
+}
 #endif
+
 
 vec3 getIBLRadianceGGX(vec3 n, vec3 v, float roughness)
 {

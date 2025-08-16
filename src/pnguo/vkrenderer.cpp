@@ -129,6 +129,8 @@ namespace vkr
 		return _Str;
 	}
 
+	void vkr_image_set_layout(VkCommandBuffer cmdBuff, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout old_image_layout, VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages);
+
 #if 1
 
 	struct inspd_t {
@@ -1161,7 +1163,11 @@ namespace vkr {
 
 		PBRMaterialParameters m_pbrMaterialParameters = {};
 	};
-
+	struct material_v
+	{
+		int mid;
+		std::vector<int> variants;
+	};
 	struct PBRPrimitives
 	{
 		Geometry m_geometry;
@@ -1175,6 +1181,7 @@ namespace vkr {
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 		int mid = 0;
+		std::vector<material_v> material_variants;
 		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe);
 	};
@@ -1829,6 +1836,35 @@ namespace vkr {
 	};
 
 
+	// 传输类
+	class transfer_cx
+	{
+		struct cp2mem_t
+		{
+			VkImage image;
+			VkBufferImageCopy icp;
+			VkImageMemoryBarrier preb, postb;
+			VkBuffer buffer;
+		};
+		struct cp2img_t
+		{
+			VkImage image;
+			VkImageCopy icp;
+			VkImageMemoryBarrier preb, postb;
+			VkImage dst;
+		};
+		t_vector<cp2mem_t> cp2m;
+		t_vector<cp2img_t> cp2img;
+	public:
+		void copy_image(Texture* image, Texture* dst, VkImageLayout dst_layout);
+		void copy_image(VkImage image, VkImage dst, int width, int height, VkImageLayout dst_layout, VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, int mipLevels = 1, int layerCount = 1);
+		// 复制纹理到内存
+		void add_copy2mem(VkImage image, VkBufferImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkBuffer buffer);
+		// 复制纹理到纹理
+		void add_copy2img(VkImage image, VkImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkImage buffer);
+		void flush(VkCommandBuffer cmd1);
+	};
+
 
 
 	typedef enum GBufferFlagBits
@@ -1841,7 +1877,7 @@ namespace vkr {
 		GBUFFER_DIFFUSE = 16,
 		GBUFFER_SPECULAR_ROUGHNESS = 32,
 		GBUFFER_OIT_ACCUM = 64,
-		GBUFFER_OIT_WEIGHT = 128, 
+		GBUFFER_OIT_WEIGHT = 128,
 	} GBufferFlagBits;
 
 	typedef uint32_t GBufferFlags;
@@ -1928,7 +1964,9 @@ namespace vkr {
 
 		// HDR
 		Texture                         m_HDR;
-		VkImageView                     m_HDRSRV; 
+		VkImageView                     m_HDRSRV;
+		Texture                         m_HDRt;
+		VkImageView                     m_HDRSRVt;
 
 		Texture                         m_HDR_oit_accum;
 		VkImageView                     m_HDR_oit_accumSRV;
@@ -6145,6 +6183,42 @@ namespace vkr
 					auto& primitive = primitives[p];
 					PBRPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 
+					if (primitive.extensions.size()) {
+						auto extensions = primitive.extensions;
+						auto tt = get_ext(extensions, "KHR_materials_variants");
+						if (tt)
+						{
+							if (tt->Has("mappings"))
+							{
+								auto& vt = tt->Get("mappings");
+								auto vn = vt.Size();
+								if (vt.IsArray())
+								{
+									for (size_t k = 0; k < vn; k++)
+									{
+										auto& vk = vt.Get(k);
+										int mid = vk.Get("material").GetNumberAsInt();
+										material_v mv = {};
+										mv.mid = mid; 
+										if (vk.Has("variants") && vk.Get("variants").IsArray())
+										{
+											auto& va = vk.Get("variants");
+											auto van = va.Size();
+											mv.variants.reserve(van);
+											for (size_t m = 0; m < van; m++)
+											{
+												int vid = va.Get(m).GetNumberAsInt();
+												mv.variants.push_back(vid);
+											}
+										}
+										pPrimitive->material_variants.push_back(mv);
+									}
+								}
+							}
+						}
+						primitive.material;
+					}
+
 					ExecAsyncIfThereIsAPool(pAsyncPool, [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
 						{
 							// Sets primitive's material, or set a default material if none was specified in the GLTF
@@ -6298,7 +6372,7 @@ namespace vkr
 			}
 			if (tfmat->m_pbrMaterialParameters.transmission) {
 				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRV, &m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, &m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
@@ -9172,8 +9246,10 @@ namespace vkr
 		//
 		if (m_GBufferFlags & GBUFFER_FORWARD)
 		{
-			m_HDR.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_FORWARD], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HDR");
+			m_HDR.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_FORWARD], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT), false, "m_HDR");
 			m_HDR.CreateSRV(&m_HDRSRV);
+			m_HDRt.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_FORWARD], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT), false, "m_HDRt");
+			m_HDRt.CreateSRV(&m_HDRSRVt);
 		}
 		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
 		{
@@ -9258,6 +9334,8 @@ namespace vkr
 		{
 			vkDestroyImageView(m_pDevice->GetDevice(), m_HDRSRV, nullptr);
 			m_HDR.OnDestroy();
+			vkDestroyImageView(m_pDevice->GetDevice(), m_HDRSRVt, nullptr);
+			m_HDRt.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
@@ -15685,6 +15763,7 @@ namespace vkr {
 		mutable int iMagnifierOffset[2];     // in pixels
 	};
 
+
 	class fbo_info_cx;
 	// todo renderer 渲染器
 	class Renderer_cx
@@ -15783,6 +15862,9 @@ namespace vkr {
 		std::vector<glm::mat4> lightMats;
 		// 渲染对象
 		GltfPbrPass::drawables_t drawables;
+
+		transfer_cx _transfer = {};
+
 
 		PerFrame_t _perFrameData;
 
@@ -16906,6 +16988,107 @@ namespace vkr {
 	}
 
 
+	void transfer_cx::copy_image(Texture* image, Texture* dst, VkImageLayout dst_layout)
+	{
+		if (!image || !dst)
+		{
+			assert("copy_image: image or dst is null");
+			return;
+		}
+		copy_image(image->Resource(), dst->Resource(), image->GetWidth(), image->GetHeight()
+			, dst_layout, (VkImageAspectFlags)(is_depth_tex((VkFormat)image->GetFormat()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT)
+			, image->GetMipCount(), image->GetArraySize());
+	}
+
+	void transfer_cx::copy_image(VkImage image, VkImage dst, int width, int height, VkImageLayout dst_layout, VkImageAspectFlags aspectMask, int mipLevels, int layerCount)
+	{
+		if (!aspectMask)aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		VkImageCopy cr = {};
+		cr.dstOffset = {};
+		cr.dstSubresource.aspectMask = aspectMask;
+		cr.dstSubresource.mipLevel = mipLevels;
+		cr.dstSubresource.baseArrayLayer = 0;
+		cr.dstSubresource.layerCount = layerCount;
+
+		cr.extent.width = width;
+		cr.extent.height = height;
+		cr.extent.depth = 1;
+
+		cr.srcOffset = {};
+		cr.srcSubresource = cr.dstSubresource;
+
+		VkImageSubresourceRange subresourceRange = {};
+		subresourceRange.aspectMask = aspectMask;
+		subresourceRange.baseMipLevel = 0;
+		subresourceRange.levelCount = mipLevels;
+		subresourceRange.layerCount = layerCount;
+		add_copy2img(image, cr, subresourceRange, aspectMask, dst_layout, dst);
+	}
+
+	void transfer_cx::add_copy2mem(VkImage image, VkBufferImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkBuffer buffer)
+	{
+		// Image barrier for optimal image (target)
+		// Optimal image will be used as destination for the copy
+		auto preb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+		// Change texture image layout to shader read after all mip levels have been copied
+		auto postb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, il, subresourceRange);
+		cp2m.push_back({ image,  icp,  preb,  postb,  buffer });
+	}
+	void transfer_cx::add_copy2img(VkImage image, VkImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkImage buffer)
+	{
+		// Image barrier for optimal image (target)
+		// Optimal image will be used as destination for the copy
+		auto preb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresourceRange);
+		// Change texture image layout to shader read after all mip levels have been copied
+		auto postb = get_layout(image, aspectMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, il, subresourceRange);
+		cp2img.push_back({ image,  icp,  preb,  postb,  buffer });
+	}
+	void transfer_cx::flush(VkCommandBuffer cmd1)
+	{
+		if (cp2m.empty() && cp2img.empty())return;
+		VkResult res;
+		// 复制纹理到内存
+		VkPipelineStageFlags mask2 = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+		if (cp2m.size())
+		{
+			for (auto& it : cp2m)
+			{
+				vkCmdPipelineBarrier(cmd1, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.preb);
+			}
+			for (auto& it : cp2m)
+			{
+				vkCmdCopyImageToBuffer(cmd1, it.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, it.buffer, 1, &it.icp);
+			}
+			for (auto& it : cp2m)
+			{
+				vkCmdPipelineBarrier(cmd1, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.postb);
+			}
+			cp2m.clear();
+		}
+		// 复制纹理到纹理
+		if (cp2img.size())
+		{
+			for (auto& it : cp2img)
+			{
+				vkCmdPipelineBarrier(cmd1, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.preb);
+			}
+			for (auto& it : cp2img)
+			{
+				vkCmdCopyImage(cmd1, it.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, it.dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &it.icp);
+			}
+			for (auto& it : cp2img)
+			{
+				vkCmdPipelineBarrier(cmd1, mask2, mask2, 0, 0, nullptr, 0, nullptr, 1, &it.postb);
+			}
+			cp2img.clear();
+		}
+	}
+
+
+
+
+
+
 	// todo texture
 
 	dvk_texture::dvk_texture()
@@ -17003,6 +17186,65 @@ namespace vkr {
 
 		return layout;
 	}
+
+	// TODO Barrier
+
+	// This method is based on https://github.com/SaschaWillems/Vulkan/blob/master/base/VulkanTools.h#L88
+	void vkr_image_set_layout_subres(VkCommandBuffer cmdBuff, VkImage image, VkImageSubresourceRange subresourceRange,
+		VkImageLayout old_image_layout, VkImageLayout new_image_layout,
+		VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages) {
+		VkImageMemoryBarrier image_memory_barrier = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+													  .oldLayout = old_image_layout,
+													  .newLayout = new_image_layout,
+													  .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+													  .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+													  .image = image,
+													  .subresourceRange = subresourceRange };
+
+		switch (old_image_layout) {
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+		default:
+			break;
+		}
+
+		switch (new_image_layout) {
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		default:
+			break;
+		}
+
+		vkCmdPipelineBarrier(cmdBuff, src_stages, dest_stages, 0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
+		//image->layout = new_image_layout;
+	}
+
+	void vkr_image_set_layout(VkCommandBuffer cmdBuff, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout old_image_layout, VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages)
+	{
+		VkImageSubresourceRange subres = { aspectMask,0,1,0,1 };
+		vkr_image_set_layout_subres(cmdBuff, image, subres, old_image_layout, new_image_layout, src_stages, dest_stages);
+	}
+
 
 	void dvk_texture::get_buffer(char* outbuf, upload_cx* q)//, dvk_queue* q)
 	{
@@ -18647,17 +18889,52 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
+
+			{
+				//_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_GENERAL);
+				//_transfer.flush(cmdBuf1);
+				auto image = &m_GBuffer.m_HDR;
+				VkImageCopy cr = {};
+				cr.dstOffset = {};
+				cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				cr.dstSubresource.mipLevel = 0;
+				cr.dstSubresource.baseArrayLayer = 0;
+				cr.dstSubresource.layerCount = image->GetArraySize();
+				cr.extent.width = image->GetWidth();
+				cr.extent.height = image->GetHeight();
+				cr.extent.depth = 1;
+				cr.srcOffset = {};
+				cr.srcSubresource = cr.dstSubresource;
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				// copy HDR to HDRt
+				vkCmdCopyImage(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
+
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			}
+
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
 			if (!drawables.transmission.empty()) {
 				m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
+
 				std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
 				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transmission, bWireframe);
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
-				m_RenderPassFullGBuffer.EndPass(cmdBuf1);				 
+				m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 			}
 
 
 			// draw object's bounding boxes
+			bool has_box = (pState->bDrawLightFrustum && lightCount > 0) || (pState->bDrawBoundingBoxes && _robject.size());
 			{
 				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
 				// todo 渲染bounding boxes
@@ -18667,7 +18944,7 @@ namespace vkr {
 					{
 						if (it->m_GLTFBBox)
 						{
-							it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);// pPerFrame->mCameraCurrViewProj);
+							it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);
 						}
 					}
 					m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
@@ -18692,11 +18969,6 @@ namespace vkr {
 					m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
 
 					SetPerfMarkerEnd(cmdBuf1);
-				}
-				{
-					//glm::mat4 worldMatrix = mCameraCurrViewProj;
-					//glm::mat4 amx = worldMatrix, vcolor;
-					//_cbf.Draw(cmdBuf1, &amx, &vcolor);
 				}
 				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 			}
@@ -18724,7 +18996,7 @@ namespace vkr {
 		barrier[0].subresourceRange.baseArrayLayer = 0;
 		barrier[0].subresourceRange.layerCount = 1;
 		barrier[0].image = m_GBuffer.m_HDR.Resource();
-		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+		//vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
 		SetPerfMarkerEnd(cmdBuf1);
 
