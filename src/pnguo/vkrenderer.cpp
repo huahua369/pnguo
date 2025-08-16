@@ -1857,7 +1857,7 @@ namespace vkr {
 		t_vector<cp2img_t> cp2img;
 	public:
 		void copy_image(Texture* image, Texture* dst, VkImageLayout dst_layout);
-		void copy_image(VkImage image, VkImage dst, int width, int height, VkImageLayout dst_layout, VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, int mipLevels = 1, int layerCount = 1);
+		void copy_image(VkImage image, VkImage dst, int width, int height, VkImageLayout dst_layout, VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, int mipLevel = 0, int mipLevels = 1, int layerCount = 1);
 		// 复制纹理到内存
 		void add_copy2mem(VkImage image, VkBufferImageCopy icp, VkImageSubresourceRange subresourceRange, VkImageAspectFlags aspectMask, VkImageLayout il, VkBuffer buffer);
 		// 复制纹理到纹理
@@ -2732,6 +2732,7 @@ namespace vkr {
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
 		PerFrame_t m_perFrameData;
+		PerFrame_t m_perFrameData_w;
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
 		uint32_t _animationIndex = 0;
@@ -2753,6 +2754,7 @@ namespace vkr {
 		void TransformScene(int sceneIndex, const glm::mat4& world);
 		// 运行中使用
 		PerFrame_t* SetPerFrameData(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats);
+		PerFrame_t* SetPerFrameData_w(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats);
 		bool GetCamera(uint32_t cameraIdx, Camera* pCam) const;
 		tfNodeIdx AddNode(const tfNode& node);
 		int AddLight(const tfNode& node, const tfLight& light);
@@ -2813,7 +2815,9 @@ namespace vkr {
 	public:
 		GLTFCommon* m_pGLTFCommon;
 
-		VkDescriptorBufferInfo m_perFrameConstants;
+		VkDescriptorBufferInfo m_perFrameConstants = {};
+		VkDescriptorBufferInfo m_perFrameConstants_w = {}; // 线框
+
 		~GLTFTexturesAndBuffers();
 		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing);
 		void LoadTextures(AsyncPool* pAsyncPool = NULL);
@@ -2831,7 +2835,7 @@ namespace vkr {
 		VkDescriptorBufferInfo* get_mb(int idx);
 		VkDescriptorBufferInfo* get_uvm(int idx);
 		void SetSkinningMatricesForSkeletons();
-		void SetPerFrameConstants();
+		void SetPerFrameConstants(bool bWireframe);
 	};
 	// todo post
 
@@ -3377,8 +3381,6 @@ namespace vkr {
 
 		std::vector<PBRMesh> m_meshes;
 		std::vector<PBRMaterial> m_materialsData;
-
-		PerFrame_t m_cbPerFrame;
 
 		PBRMaterial m_defaultMaterial;
 
@@ -5402,11 +5404,19 @@ namespace vkr
 			cnt++;
 		}
 	}
-	void GLTFTexturesAndBuffers::SetPerFrameConstants()
+	void GLTFTexturesAndBuffers::SetPerFrameConstants(bool bWireframe)
 	{
-		PerFrame_t* cbPerFrame;
-		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
-		*cbPerFrame = m_pGLTFCommon->m_perFrameData;
+		{
+			PerFrame_t* cbPerFrame;
+			m_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
+			*cbPerFrame = m_pGLTFCommon->m_perFrameData;
+		}
+		if (bWireframe)
+		{
+			PerFrame_t* cbPerFrame;
+			m_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
+			*cbPerFrame = m_pGLTFCommon->m_perFrameData_w;
+		}
 	}
 
 	void GLTFTexturesAndBuffers::SetSkinningMatricesForSkeletons()
@@ -6199,7 +6209,7 @@ namespace vkr
 										auto& vk = vt.Get(k);
 										int mid = vk.Get("material").GetNumberAsInt();
 										material_v mv = {};
-										mv.mid = mid; 
+										mv.mid = mid;
 										if (vk.Has("variants") && vk.Get("variants").IsArray())
 										{
 											auto& va = vk.Get("variants");
@@ -6919,80 +6929,6 @@ namespace vkr
 	// BuildLists
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::BuildBatchLists(std::vector<BatchList>* pSolid, std::vector<BatchList>* pTransparent, bool bWireframe/*=false*/)
-	{
-		// loop through nodes
-		//
-		std::vector<tfNode>* pNodes = &m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_nodes;
-		Matrix2* pNodesMatrices = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_worldSpaceMats.data();
-
-		for (uint32_t i = 0; i < pNodes->size(); i++)
-		{
-			tfNode* pNode = &pNodes->at(i);
-			if ((pNode == NULL) || (pNode->meshIndex < 0))
-				continue;
-
-			// skinning matrices constant buffer
-			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
-
-			glm::mat4 mModelViewProj = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
-
-			// loop through primitives
-			//
-			PBRMesh* pMesh = &m_meshes[pNode->meshIndex];
-			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
-			{
-				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
-				if ((bWireframe && pPrimitive->m_pipelineWireframe == VK_NULL_HANDLE)
-					|| (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
-					continue;
-
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
-				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
-				// do frustrum culling
-				//
-				tfPrimitives boundingBox = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
-				if (CameraFrustumToBoxCollision(mModelViewProj, boundingBox.m_center, boundingBox.m_radius))
-					continue;
-
-				PBRMaterialParameters* pPbrParams = &pPrimitive->m_pMaterial->m_pbrMaterialParameters;
-
-				// Set per Object constants from material
-				//
-				per_object* cbPerObject;
-				VkDescriptorBufferInfo perObjectDesc;
-				m_pDynamicBufferRing->AllocConstantBuffer(sizeof(per_object), (void**)&cbPerObject, &perObjectDesc);
-				cbPerObject->mCurrentWorld = pNodesMatrices[i].GetCurrent();
-				cbPerObject->mPreviousWorld = pNodesMatrices[i].GetPrevious();
-				cbPerObject->m_pbrParams = pPbrParams->m_params;
-
-				// compute depth for sorting
-				//
-				glm::vec4 v = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p].m_center;
-				float depth = (mModelViewProj * v).w;
-
-				BatchList t;
-				t.m_depth = depth;
-				t.m_pPrimitive = pPrimitive;
-				t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants;
-				t.m_perObjectDesc = perObjectDesc;
-				t.m_pPerSkeleton = pPerSkeleton;
-				t.morph = morph;
-				t.m_uvtDesc = uvtDesc;
-				// append primitive to list 
-				//
-				if (pPbrParams->m_blending == false)
-				{
-					pSolid->push_back(t);
-				}
-				else
-				{
-					pTransparent->push_back(t);
-				}
-			}
-		}
-	}
-
 	void GltfPbrPass::BuildBatchLists(drawables_t* opt, bool bWireframe)
 	{
 		std::vector<tfNode>* pNodes = &m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_nodes;
@@ -7061,6 +6997,7 @@ namespace vkr
 				{
 					pSolid->push_back(t);
 					if (bWireframe && pPrimitive->m_pipelineWireframe) {
+						t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants_w;
 						opt->opaque1.push_back(t);
 					}
 				}
@@ -15517,8 +15454,7 @@ namespace vkr {
 	// The scene needs to be animated and transformed before we can set the PerFrame_t data. We need those final matrices for the lights and the camera.
 	//
 	PerFrame_t* GLTFCommon::SetPerFrameData(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
-	{
-#if 1
+	{ 
 		if (pfd)
 		{
 			m_perFrameData = *pfd;
@@ -15529,59 +15465,23 @@ namespace vkr {
 				Light* pSL = &m_perFrameData.lights[i];
 				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
 			}
-		}
-#else
-		Matrix2* pMats = m_worldSpaceMats.data();
-
-		//Sets the camera
-		m_perFrameData.mCameraCurrViewProj = cam.GetProjection() * cam.GetView();
-		m_perFrameData.mCameraPrevViewProj = cam.GetProjection() * cam.GetPrevView();
-		// more accurate calculation
-		m_perFrameData.mInverseCameraCurrViewProj = glm::affineInverse(cam.GetView()) * glm::inverse(cam.GetProjection());
-		m_perFrameData.cameraPos = cam.GetPosition();
-
-		m_perFrameData.wireframeOptions = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-
-		// Process lights
-		m_perFrameData.lightCount = (int32_t)m_lightInstances.size();
-		int32_t ShadowMapIndex = 0;
-		for (int i = 0; i < m_lightInstances.size(); i++)
-		{
-			Light* pSL = &m_perFrameData.lights[i];
-
-			// get light data and node trans
-			auto& lightData = lights[m_lightInstances[i].m_lightId];
-			glm::mat4 lightMat = lightMats[lightData._nodeid];// pMats[m_lightInstances[i].m_nodeIndex].GetCurrent();
-
-			glm::mat4 lightView = glm::affineInverse(lightMat);
-			glm::mat4 per = glm::perspective(lightData._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
-			pSL->mLightView = lightView;
-			if (lightData._type == LightType_Spot)
-				pSL->mLightViewProj = per * lightView;
-			else if (lightData._type == LightType_Directional)
-				pSL->mLightViewProj = ComputeDirectionalLightOrthographicMatrix(lightView) * lightView;
-			//transpose
-			GetXYZ(pSL->direction, glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
-			GetXYZ(pSL->color, lightData._color);
-			pSL->range = lightData._range;
-			pSL->intensity = lightData._intensity;
-			GetXYZ(pSL->position, lightMat[3]);
-			pSL->outerConeCos = cosf(lightData._outerConeAngle);
-			pSL->innerConeCos = cosf(lightData._innerConeAngle);
-			pSL->type = lightData._type;
-
-			// Setup shadow information for light (if it has any)
-			if (lightData._shadowResolution && lightData._type != LightType_Point)
-			{
-				pSL->shadowMapIndex = ShadowMapIndex++;
-				pSL->depthBias = lightData._bias;
-			}
-			else
-				pSL->shadowMapIndex = -1;
-		}
-#endif
-
+		} 
 		return &m_perFrameData;
+	}
+	PerFrame_t* GLTFCommon::SetPerFrameData_w(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
+	{ 
+		if (pfd)
+		{
+			m_perFrameData_w = *pfd;
+			m_perFrameData_w.lightCount = (int32_t)m_lightInstances.size();
+			int32_t ShadowMapIndex = 0;
+			for (int i = 0; i < m_lightInstances.size(); i++)
+			{
+				Light* pSL = &m_perFrameData_w.lights[i];
+				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
+			}
+		} 
+		return &m_perFrameData_w;
 	}
 
 
@@ -16997,16 +16897,16 @@ namespace vkr {
 		}
 		copy_image(image->Resource(), dst->Resource(), image->GetWidth(), image->GetHeight()
 			, dst_layout, (VkImageAspectFlags)(is_depth_tex((VkFormat)image->GetFormat()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT)
-			, image->GetMipCount(), image->GetArraySize());
+			, 0, image->GetMipCount(), image->GetArraySize());
 	}
 
-	void transfer_cx::copy_image(VkImage image, VkImage dst, int width, int height, VkImageLayout dst_layout, VkImageAspectFlags aspectMask, int mipLevels, int layerCount)
+	void transfer_cx::copy_image(VkImage image, VkImage dst, int width, int height, VkImageLayout dst_layout, VkImageAspectFlags aspectMask, int mipLevel, int mipLevels, int layerCount)
 	{
 		if (!aspectMask)aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		VkImageCopy cr = {};
 		cr.dstOffset = {};
 		cr.dstSubresource.aspectMask = aspectMask;
-		cr.dstSubresource.mipLevel = mipLevels;
+		cr.dstSubresource.mipLevel = mipLevel;
 		cr.dstSubresource.baseArrayLayer = 0;
 		cr.dstSubresource.layerCount = layerCount;
 
@@ -18696,6 +18596,7 @@ namespace vkr {
 		// Sets the perFrame data 
 		auto pfd = mkPerFrameData(Cam);
 		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
+		const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
 		Light* lights = pfd->lights;
 		int lightCount = pfd->lightCount;
 		{
@@ -18715,7 +18616,7 @@ namespace vkr {
 					pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
 					pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
 					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-					pPerFrame->wireframeOptions.w = 0;// (pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+					pPerFrame->wireframeOptions.w = 0;
 					pPerFrame->lodBias = 0.0f;
 					//if (!it->shadowMap)
 					//{
@@ -18732,8 +18633,21 @@ namespace vkr {
 						////ml.mLightViewProj = lvp;
 					}
 					//}
+					if(bWireframe)
+					{
+						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData_w(pfd, Cam, _lights, lightMats);
+						pPerFrame->iblFactor = pState->IBLFactor;
+						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
+						pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
+						pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
 
-					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
+						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
+						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
+						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
+						pPerFrame->wireframeOptions.w = (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+						pPerFrame->lodBias = 0.0f;
+					}
+					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants(bWireframe);
 					// 更新骨骼矩阵到ubo
 					it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
 				}
@@ -18798,44 +18712,13 @@ namespace vkr {
 
 		if (_robject.size() > 0)
 		{
-			const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
 
 			//std::vector<GltfPbrPass::BatchList> opaque, transparent, transmission;
 			//std::vector<GltfPbrPass::BatchList> opaque1, transparent1;
 			drawables.clear();
 			for (auto it : _robject) {
-				//it->m_GLTFPBR->BuildBatchLists(&opaque, &transparent, false);
 				it->m_GLTFPBR->BuildBatchLists(&drawables, bWireframe);
-			}
-			if (bWireframe)// pState->WireframeMode == scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
-			{
-				PerFrame_t* pPerFrame = NULL;
-				for (auto it : _robject)
-				{
-					if (it->m_pGLTFTexturesAndBuffers)
-					{
-						// fill as much as possible using the GLTF (camera, lights, ...)
-						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd, Cam, _lights, lightMats);
-						//mCameraCurrViewProj = pPerFrame->mCameraCurrViewProj;
-						// Set some lighting factors
-						pPerFrame->iblFactor = pState->IBLFactor;
-						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
-						pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
-						pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
-
-						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
-						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
-						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-						pPerFrame->wireframeOptions.w = (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
-						pPerFrame->lodBias = 0.0f;
-						it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants();
-						it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
-					}
-				}
-				//for (auto it : _robject) {
-				//	it->m_GLTFPBR->BuildBatchLists(&opaque1, &transparent1, bWireframe);
-				//}
-			}
+			} 
 
 			// Render opaque 渲染不透明物体
 			{
@@ -18891,35 +18774,35 @@ namespace vkr {
 			}
 
 			{
-				//_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_GENERAL);
-				//_transfer.flush(cmdBuf1);
-				auto image = &m_GBuffer.m_HDR;
-				VkImageCopy cr = {};
-				cr.dstOffset = {};
-				cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				cr.dstSubresource.mipLevel = 0;
-				cr.dstSubresource.baseArrayLayer = 0;
-				cr.dstSubresource.layerCount = image->GetArraySize();
-				cr.extent.width = image->GetWidth();
-				cr.extent.height = image->GetHeight();
-				cr.extent.depth = 1;
-				cr.srcOffset = {};
-				cr.srcSubresource = cr.dstSubresource;
-				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-					VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-				// copy HDR to HDRt
-				vkCmdCopyImage(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
+				_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_GENERAL);
+				_transfer.flush(cmdBuf1);
+				//auto image = &m_GBuffer.m_HDR;
+				//VkImageCopy cr = {};
+				//cr.dstOffset = {};
+				//cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				//cr.dstSubresource.mipLevel = 0;
+				//cr.dstSubresource.baseArrayLayer = 0;
+				//cr.dstSubresource.layerCount = image->GetArraySize();
+				//cr.extent.width = image->GetWidth();
+				//cr.extent.height = image->GetHeight();
+				//cr.extent.depth = 1;
+				//cr.srcOffset = {};
+				//cr.srcSubresource = cr.dstSubresource;
+				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				//	VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				//	VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				//	VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				//// copy HDR to HDRt
+				//vkCmdCopyImage(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
 
-				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				//	VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+				//	VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				//	VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				//	VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 			}
 
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
