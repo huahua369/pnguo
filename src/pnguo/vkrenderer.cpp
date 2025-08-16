@@ -18770,35 +18770,35 @@ namespace vkr {
 			}
 
 			{
-				_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_GENERAL);
-				_transfer.flush(cmdBuf1);
-				//auto image = &m_GBuffer.m_HDR;
-				//VkImageCopy cr = {};
-				//cr.dstOffset = {};
-				//cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				//cr.dstSubresource.mipLevel = 0;
-				//cr.dstSubresource.baseArrayLayer = 0;
-				//cr.dstSubresource.layerCount = image->GetArraySize();
-				//cr.extent.width = image->GetWidth();
-				//cr.extent.height = image->GetHeight();
-				//cr.extent.depth = 1;
-				//cr.srcOffset = {};
-				//cr.srcSubresource = cr.dstSubresource;
-				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-				//	VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-				//	VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				//	VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-				//// copy HDR to HDRt
-				//vkCmdCopyImage(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
+				//_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				//_transfer.flush(cmdBuf1);
+				auto image = &m_GBuffer.m_HDR;
+				VkImageCopy cr = {};
+				cr.dstOffset = {};
+				cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				cr.dstSubresource.mipLevel = 0;
+				cr.dstSubresource.baseArrayLayer = 0;
+				cr.dstSubresource.layerCount = image->GetArraySize();
+				cr.extent.width = image->GetWidth();
+				cr.extent.height = image->GetHeight();
+				cr.extent.depth = 1;
+				cr.srcOffset = {};
+				cr.srcSubresource = cr.dstSubresource;
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+				// copy HDR to HDRt
+				vkCmdCopyImage(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
 
-				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-				//	VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-				//	VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-				//vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
-				//	VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				//	VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+				vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 			}
 
 			// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)

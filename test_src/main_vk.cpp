@@ -328,21 +328,21 @@ glm::vec4 p2v(float yaw, float pitch)
 
 int main()
 {
-#ifdef _DEBUG
-	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-#endif 
 	//hz::main_ssh2();
 	//return 0;
 	//test_img();
 	auto app = new_app();
 
+#ifdef _DEBUG
+	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+#endif 
 
 	{
-		
+
 
 #if 0
 
@@ -461,10 +461,10 @@ int main()
 			//*vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);//变形树
 			//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
-			
+
 			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			/*vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", {}, 1.0);
-			vkd->add_gltf(R"(E:\zmodel\cr123.glb)", { 0,0,10 }, 10.0);
+			//vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 2,0,5 }, 1.0);// 飞船
+			/*vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
 			vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
 
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
@@ -480,7 +480,7 @@ int main()
 			//vkd->add_gltf( R"(E:\model\space_station_4.glb)");
 			//vkd->add_gltf( R"(E:\model\sexy_guardian_woman_model_18.glb)");
 			//vkd->add_gltf( R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-			vkd->add_gltf( R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
+			vkd->add_gltf(R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
@@ -506,6 +506,7 @@ int main()
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;				// 曝光度：默认1.0
 					vkd->_state.bUseTAA;
+					light->_intensity = 1.0;
 					vkd->update(form0->io);	// 更新事件
 					vkd->on_render();		// 执行渲染
 					static bool sa = false;
