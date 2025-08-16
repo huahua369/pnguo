@@ -5752,9 +5752,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_transmission");
 					if (tt) {
-						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1";
-						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
-						tfmat->m_blending = true;
+						tfmat->m_defines["MATERIAL_TRANSMISSION"] = "1"; 
 						tfmat->m_params.transmissionFactor = get_v(tt, "transmissionFactor", 0.0);
 						tfmat->transmission = true;
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
@@ -5770,9 +5768,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_volume");
 					if (tt) {
-						tfmat->m_defines["MATERIAL_VOLUME"] = "1";
-						tfmat->m_defines["DEF_alphaMode_BLEND"] = "1";
-						tfmat->m_blending = true;
+						tfmat->m_defines["MATERIAL_VOLUME"] = "1"; 
 						tfmat->m_params.attenuationColor = get_v(tt, "attenuationColor", glm::vec3(1.0));
 						tfmat->m_params.attenuationDistance = get_v(tt, "attenuationDistance", 10240.0);
 						tfmat->m_params.thicknessFactor = get_v(tt, "thicknessFactor", 0.0);
