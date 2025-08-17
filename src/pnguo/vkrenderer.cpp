@@ -15750,6 +15750,7 @@ namespace vkr {
 		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, bool bWireframe);
 		void copy_transmission(VkCommandBuffer cmdBuf1);
 		void draw_pbr_transmission(VkCommandBuffer cmdBuf1, bool bWireframe);
+		void draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pf, const scene_state* pState);
 	public:
 		Device* m_pDevice = 0;
 		const_vk ct = {};
@@ -18726,6 +18727,51 @@ namespace vkr {
 		}
 	}
 
+	void Renderer_cx::draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pfd, const scene_state* pState)
+	{
+		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		bool has_box = (pState->bDrawLightFrustum && pfd->lightCount > 0) || (pState->bDrawBoundingBoxes && _robject.size());
+		if (has_box)
+		{
+			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+			// todo 渲染bounding boxes
+			if (pState->bDrawBoundingBoxes && _robject.size())
+			{
+				for (auto it : _robject)
+				{
+					if (it->m_GLTFBBox)
+					{
+						it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);
+					}
+				}
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
+			}
+
+			// draw light's frustums
+			if (pState->bDrawLightFrustum)
+			{
+				SetPerfMarkerBegin(cmdBuf1, "light frustums");
+
+				glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
+				glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
+				glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				for (uint32_t i = 0; i < pfd->lightCount; i++)
+				{
+					glm::mat4 spotlightMatrix = glm::inverse(pfd->lights[i].mLightViewProj);
+					glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
+					m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+					//_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+				}
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
+
+				SetPerfMarkerEnd(cmdBuf1);
+			}
+			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+		}
+	}
+
 	void Renderer_cx::OnRender(const scene_state* pState, const Camera& Cam)
 	{
 		//printf("OnRender \t\thdr\t%p\n", m_GBuffer.m_HDR.Resource());
@@ -18872,52 +18918,25 @@ namespace vkr {
 			}
 			if (!drawables.transmission.empty())
 			{
+				draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 渲染不透明物体、天空盒
+				draw_pbr_transparent(cmdBuf1, bWireframe);							// 渲染透明物体
+				copy_transmission(cmdBuf1);
+				if (!drawables.transparent.empty())
+				{
+					draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 没有透明物体时，不需要渲染第二次
+				}
+				draw_pbr_transmission(cmdBuf1, bWireframe);								// 渲染玻璃材质(KHR_materials_transmission、KHR_materials_volume)
+				if (!drawables.transparent.empty())
+				{
+					draw_pbr_transparent(cmdBuf1, bWireframe);
+				}
+			}
+			else {
 				draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);
 				draw_pbr_transparent(cmdBuf1, bWireframe);
-				copy_transmission(cmdBuf1);
 			}
-			draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);
-			draw_pbr_transmission(cmdBuf1, bWireframe);
-			draw_pbr_transparent(cmdBuf1, bWireframe);
 			// draw object's bounding boxes
-			bool has_box = (pState->bDrawLightFrustum && lightCount > 0) || (pState->bDrawBoundingBoxes && _robject.size());
-			{
-				m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
-				// todo 渲染bounding boxes
-				if (pState->bDrawBoundingBoxes && _robject.size())
-				{
-					for (auto it : _robject)
-					{
-						if (it->m_GLTFBBox)
-						{
-							it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);
-						}
-					}
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
-				}
-
-				// draw light's frustums
-				if (pState->bDrawLightFrustum)
-				{
-					SetPerfMarkerBegin(cmdBuf1, "light frustums");
-
-					glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
-					glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
-					glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-					for (uint32_t i = 0; i < lightCount; i++)
-					{
-						glm::mat4 spotlightMatrix = glm::inverse(lights[i].mLightViewProj);
-						glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
-						m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
-						//_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
-					}
-
-					m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
-
-					SetPerfMarkerEnd(cmdBuf1);
-				}
-				m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
-			}
+			draw_boxes(cmdBuf1, pfd, pState);
 		}
 		else
 		{
