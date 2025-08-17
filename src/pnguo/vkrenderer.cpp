@@ -4230,8 +4230,10 @@ namespace vkr
 
 		uint32_t uniformOffsets[1] = { (uint32_t)perObjectDesc.offset };
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, descritorSets, 1, uniformOffsets);
-
-		vkCmdDrawIndexed(cmd_buf, numIndices, 1, 0, 0, 0);
+		if (IBV.buffer)
+			vkCmdDrawIndexed(cmd_buf, numIndices, 1, 0, 0, 0);
+		else
+			vkCmdDraw(cmd_buf, numIndices, 1, 0, 0);
 	}
 	//--------------------------------------------------------------------------------------
 	//
@@ -4838,8 +4840,8 @@ namespace vkr
 				{
 					vkCmdBindVertexBuffers(cmd_buf, i, 1, &pGeometry->m_VBV[i].buffer, &pGeometry->m_VBV[i].offset);
 				}
-
-				vkCmdBindIndexBuffer(cmd_buf, pGeometry->m_IBV.buffer, pGeometry->m_IBV.offset, pGeometry->m_indexType);
+				if (pGeometry->m_IBV.buffer)
+					vkCmdBindIndexBuffer(cmd_buf, pGeometry->m_IBV.buffer, pGeometry->m_IBV.offset, pGeometry->m_indexType);
 
 				// Bind Descriptor sets
 				//
@@ -4858,8 +4860,10 @@ namespace vkr
 				vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pPrimitive->m_pipeline);
 
 				// Draw
-				//
-				vkCmdDrawIndexed(cmd_buf, pGeometry->m_NumIndices, 1, 0, 0, 0);
+				if (pGeometry->m_IBV.buffer)
+					vkCmdDrawIndexed(cmd_buf, pGeometry->m_NumIndices, 1, 0, 0, 0);
+				else
+					vkCmdDraw(cmd_buf, pGeometry->m_NumIndices, 1, 0, 0);
 			}
 		}
 
@@ -5422,7 +5426,8 @@ namespace vkr
 		//
 		tfAccessor indexBuffer;
 		int indexBufferId = primitive->indices;// .value("indices", -1);
-		CreateIndexBuffer(indexBufferId, &pGeometry->m_NumIndices, &pGeometry->m_indexType, &pGeometry->m_IBV);
+		if (indexBufferId > -1)
+			CreateIndexBuffer(indexBufferId, &pGeometry->m_NumIndices, &pGeometry->m_indexType, &pGeometry->m_IBV);
 
 		// Create vertex buffers and input layout
 		//
@@ -5449,7 +5454,8 @@ namespace vkr
 			l.offset = 0;
 			l.binding = cnt;
 			layout[cnt] = l;
-
+			if (indexBufferId < 0)
+				pGeometry->m_NumIndices = ina.count;
 			cnt++;
 		}
 	}
@@ -7078,7 +7084,8 @@ namespace vkr
 		{
 			vkCmdBindVertexBuffers(cmd_buf, i, 1, &m_geometry.m_VBV[i].buffer, &m_geometry.m_VBV[i].offset);
 		}
-		vkCmdBindIndexBuffer(cmd_buf, m_geometry.m_IBV.buffer, m_geometry.m_IBV.offset, m_geometry.m_indexType);
+		if (m_geometry.m_IBV.buffer)
+			vkCmdBindIndexBuffer(cmd_buf, m_geometry.m_IBV.buffer, m_geometry.m_IBV.offset, m_geometry.m_indexType);
 		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
 		if (!uniformOffsets) { uniformOffsetsCount = 0; }
@@ -7086,7 +7093,10 @@ namespace vkr
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout
 			, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? m_pipelineWireframe : m_pipeline);
-		vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
+		if (m_geometry.m_IBV.buffer)
+			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
+		else
+			vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0);
 	}
 
 	// todo pbr_pass
