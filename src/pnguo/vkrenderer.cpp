@@ -18925,7 +18925,7 @@ namespace vkr {
 				{
 					draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 没有透明物体时，不需要渲染第二次
 				}
-				draw_pbr_transmission(cmdBuf1, bWireframe);								// 渲染玻璃材质(KHR_materials_transmission、KHR_materials_volume)
+				draw_pbr_transmission(cmdBuf1, bWireframe);								// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
 				if (!drawables.transparent.empty())
 				{
 					draw_pbr_transparent(cmdBuf1, bWireframe);
