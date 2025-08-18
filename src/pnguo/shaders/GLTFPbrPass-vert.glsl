@@ -28,12 +28,14 @@
 //--------------------------------------------------------------------------------------
 // Constant buffers
 //--------------------------------------------------------------------------------------
-#include "perFrameStruct.h"
+ 
 
 layout (std140, binding = ID_PER_FRAME) uniform _PerFrame 
 {
-    PerFrame myPerFrame;
-};
+	mat4          u_mCameraCurrViewProj;
+	mat4          u_mCameraPrevViewProj;
+	mat4          u_mCameraCurrViewProjInverse;
+}myPerFrame;
 
 layout (std140, binding = ID_PER_OBJECT) uniform perObject
 {
@@ -49,6 +51,11 @@ mat4 GetWorldMatrix()
 mat4 GetCameraViewProj()
 {
     return myPerFrame.u_mCameraCurrViewProj;
+}
+
+mat4 GetCameraView()
+{
+    return myPerFrame.u_mCameraCurrViewProjInverse;
 }
 
 mat4 GetPrevWorldMatrix()

@@ -46,7 +46,7 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pbr_px.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/perFrameStruct.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PBRTextures.h 
 )

@@ -49,6 +49,18 @@ mat4 GetCameraViewProj()
     return myPerFrame.u_MVPMatrix;
 }
 
+mat4 GetCameraView()
+{    
+    mat4 m =
+    {
+        { 1, 0, 0, 0 },
+        { 0, 1, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 }
+    };
+    return m;
+}
+
 #include "GLTFVertexFactory.glsl"
 
 //--------------------------------------------------------------------------------------

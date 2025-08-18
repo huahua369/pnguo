@@ -137,7 +137,7 @@ void main()
 			const float depthPower = 4.0;  // 深度衰减系数
 			float z = Input.depth;
 			color.rgb *= color.a; 
-			const float depthZ = -z * 10.0f;
+			const float depthZ = -z;//0.1 < z < 500,
 
 			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3);
 

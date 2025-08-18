@@ -15898,7 +15898,7 @@ namespace vkr {
 		bool bHDR = false;
 		bool m_bMagResourceReInit = false;
 		// 不启用oit
-		bool has_oit = false;
+		bool has_oit = true;
 
 	};
 
@@ -18450,7 +18450,7 @@ namespace vkr {
 		_perFrameData.mCameraCurrViewProj = cam.GetProjection() * cam.GetView();
 		_perFrameData.mCameraPrevViewProj = cam.GetProjection() * cam.GetPrevView();
 		// more accurate calculation
-		_perFrameData.mInverseCameraCurrViewProj = glm::affineInverse(cam.GetView()) * glm::inverse(cam.GetProjection());
+		_perFrameData.mInverseCameraCurrViewProj = cam.GetView();// glm::affineInverse(cam.GetView())* glm::inverse(cam.GetProjection());
 		_perFrameData.cameraPos = cam.GetPosition();
 
 		_perFrameData.wireframeOptions = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -19035,18 +19035,15 @@ namespace vkr {
 		//barrier[0].image = m_GBuffer.m_HDR.Resource();
 		//vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
-		SetPerfMarkerEnd(cmdBuf1);
-
-		// Post proc---------------------------------------------------------------------------
-
 		if (has_oit)
 		{
-			VkImageMemoryBarrier barrier = {};
+			VkImageMemoryBarrier barriers[3] = {};
+			VkImageMemoryBarrier& barrier = barriers[0];
 			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			barrier.pNext = NULL;
 			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-			barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -19056,7 +19053,11 @@ namespace vkr {
 			barrier.subresourceRange.baseArrayLayer = 0;
 			barrier.subresourceRange.layerCount = 1;
 			barrier.image = m_GBuffer.m_HDR.Resource();
-			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+			barriers[1] = barriers[2] = barrier;
+			barriers[1].image = m_GBuffer.m_HDR_oit_accum.Resource();
+			barriers[2].image = m_GBuffer.m_HDR_oit_weight.Resource();
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0,
+				NULL, 0, NULL, 3, barriers);
 
 			m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
 
@@ -19064,10 +19065,18 @@ namespace vkr {
 			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;// VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			barrier.image = m_GBuffer.m_HDR.Resource();
-			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+			barriers[1] = barriers[2] = barrier;
+			barriers[1].image = m_GBuffer.m_HDR_oit_accum.Resource();
+			barriers[2].image = m_GBuffer.m_HDR_oit_weight.Resource();
+			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+				NULL, 0, NULL, 3, barriers);
 
 		}
+
+		SetPerfMarkerEnd(cmdBuf1);
+
+		// Post proc---------------------------------------------------------------------------
 
 		// Bloom, takes HDR as input and applies bloom to it.
 		if (pState->bBloom)
