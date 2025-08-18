@@ -1217,6 +1217,7 @@ namespace vkr {
 		int mid;
 		std::vector<int> variants;
 	};
+
 	struct PBRPrimitives
 	{
 		Geometry m_geometry;
@@ -1232,7 +1233,7 @@ namespace vkr {
 		int mid = 0;
 		std::vector<material_v> material_variants;
 		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
-		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe);
+		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t);
 	};
 
 	struct PBRMesh
@@ -2310,7 +2311,11 @@ namespace vkr {
 
 		glm::mat4 GetWorldMat() const
 		{
-			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * m_rotation * glm::scale(glm::mat4(1), glm::vec3(m_scale));
+			auto scale = glm::vec3(m_scale);
+			if (scale.x < 0 || scale.y < 0 || scale.z < 0) {
+				//scale *= -1.0;
+			}
+			return glm::translate(glm::mat4(1), glm::vec3(m_translation)) * m_rotation * glm::scale(glm::mat4(1), glm::vec3(scale));
 		}
 
 	};
@@ -2325,6 +2330,7 @@ namespace vkr {
 		int meshIndex = -1;
 		int channel = -1;
 		bool bIsJoint = false;
+		bool negativescale = false;
 
 		std::string m_name;
 
@@ -3363,6 +3369,10 @@ namespace vkr {
 		std::vector<TimeStamp> m_cpuTimeStamps[5];
 	};
 
+	struct ts_t {
+		VkImageView v;
+		VkSampler s;
+	};
 
 	// todo pbr
 	class GltfPbrPass
@@ -3379,7 +3389,8 @@ namespace vkr {
 
 		struct BatchList
 		{
-			float m_depth;
+			float m_depth = 0;
+			int frontFace = 0;
 			PBRPrimitives* m_pPrimitive;
 			VkDescriptorBufferInfo m_perFrameDesc;
 			VkDescriptorBufferInfo m_perObjectDesc;
@@ -3430,6 +3441,7 @@ namespace vkr {
 
 		std::vector<PBRMesh> m_meshes;
 		std::vector<PBRMaterial> m_materialsData;
+		std::vector<VkSampler> _samplers;
 
 		PBRMaterial m_defaultMaterial;
 
@@ -3441,8 +3453,7 @@ namespace vkr {
 		Texture m_brdfLutTexture;
 		VkImageView m_brdfLutView = VK_NULL_HANDLE;
 		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
-
-		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, VkImageView>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
+		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
@@ -3697,11 +3708,11 @@ namespace vkr {
 
 	// Sets the i-th Descriptor Set entry to use a given image view + sampler. The sampler can be null is a static one is being used.
 	//
-	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkSampler* pSampler, VkDescriptorSet descriptorSet);
-	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler* pSampler, VkDescriptorSet descriptorSet);
-	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler* pSampler, VkDescriptorSet descriptorSet);
+	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet);
+	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler pSampler, VkDescriptorSet descriptorSet);
+	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet);
 
-	void SetDescriptorSetForDepth(VkDevice device, uint32_t index, VkImageView imageView, VkSampler* pSampler, VkDescriptorSet descriptorSet);
+	void SetDescriptorSetForDepth(VkDevice device, uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet);
 	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkDescriptorSet descriptorSet);
 
 	VkFramebuffer CreateFrameBuffer(VkDevice device, VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
@@ -4298,7 +4309,7 @@ namespace vkr
 
 	void GltfDepthPass::load(VkDevice dev, AsyncPool* pAsyncPool)
 	{
-		auto sampler = &m_sampler;
+		auto sampler = m_sampler;
 		auto pm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm;
 		auto& materials = pm->materials;
 
@@ -4330,7 +4341,7 @@ namespace vkr
 					tfmat->m_textureCount = 1;
 					tfmat->m_defines["ID_baseColorTexture"] = "0";
 					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughnessIt.baseColorTexture.texCoord);
-					m_pResourceViewHeaps->AllocDescriptor(tfmat->m_textureCount, sampler, &tfmat->m_descriptorSetLayout, &tfmat->m_descriptorSet);
+					m_pResourceViewHeaps->AllocDescriptor(tfmat->m_textureCount, &sampler, &tfmat->m_descriptorSetLayout, &tfmat->m_descriptorSet);
 					VkImageView textureView = m_pGLTFTexturesAndBuffers->GetTextureViewByID(id);
 					SetDescriptorSet(dev, 0, textureView, sampler, tfmat->m_descriptorSet);
 
@@ -4659,7 +4670,7 @@ namespace vkr
 		rs.pNext = NULL;
 		rs.flags = 0;
 		rs.polygonMode = VK_POLYGON_MODE_FILL;
-		rs.cullMode = pPrimitive->m_pMaterial->m_doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;;
+		rs.cullMode = pPrimitive->m_pMaterial->m_doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
 		rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rs.depthClampEnable = VK_FALSE;
 		rs.rasterizerDiscardEnable = VK_FALSE;
@@ -6058,6 +6069,7 @@ namespace vkr
 			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 			break;
 		}
+
 	}
 	//--------------------------------------------------------------------------------------
 	//
@@ -6126,12 +6138,40 @@ namespace vkr
 		/////////////////////////////////////////////
 		// Create Samplers
 		tinygltf::Sampler dsa = {};
+
 		if (pGLTFTexturesAndBuffers && m_pGLTFTexturesAndBuffers->m_pGLTFCommon
 			&& m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm && m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers.size())
 		{
 			dsa = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers[0];
+			auto& pss = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers;
+			_samplers.reserve(pss.size());
+			for (auto& it : pss) {
+				VkSamplerCreateInfo info = {};
+				info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+				info.magFilter = VK_FILTER_LINEAR;
+				info.minFilter = VK_FILTER_LINEAR;
+				info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+				info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				info.minLod = 0;
+				info.maxLod = 10000;
+				info.maxAnisotropy = 1.0f;
+				set_sampler_info(info, &it);
+				VkSampler r = 0;
+				VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &r);
+				_samplers.push_back(r);
+				assert(res == VK_SUCCESS);
+			}
 		}
 		//for pbr materials
+		for (auto& p : _samplers) {
+			if (p)
+			{
+				m_samplerPbr = p; break;
+			}
+		}
+		if (!m_samplerPbr)
 		{
 			VkSamplerCreateInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -6190,7 +6230,7 @@ namespace vkr
 		{
 			SetDefaultMaterialParamters(&m_defaultMaterial.m_pbrMaterialParameters);
 
-			std::map<std::string, VkImageView> texturesBase;
+			std::map<std::string, ts_t> texturesBase;
 			CreateDescriptorTableForMaterialTextures(&m_defaultMaterial, texturesBase, pSkyDome, ShadowMapViewPool, bUseSSAOMask);
 		}
 
@@ -6212,10 +6252,13 @@ namespace vkr
 				tfmat->m_pbrMaterialParameters.mid = i;
 				// translate texture IDs into textureViews
 				//
-				std::map<std::string, VkImageView> texturesBase;
+				std::map<std::string, ts_t> texturesBase;
 				for (auto const& value : textureIds)
-					texturesBase[value.first] = m_pGLTFTexturesAndBuffers->GetTextureViewByID(value.second);
-
+				{
+					auto tinfo = pm->textures[value.second];
+					texturesBase[value.first].v = m_pGLTFTexturesAndBuffers->GetTextureViewByID(value.second);
+					texturesBase[value.first].s = _samplers[tinfo.sampler];
+				}
 				//tfmat->m_pbrMaterialParameters.m_defines["MAX_LIGHT_INSTANCES"] = "1";
 				CreateDescriptorTableForMaterialTextures(tfmat, texturesBase, pSkyDome, ShadowMapViewPool, bUseSSAOMask);
 			}
@@ -6344,7 +6387,7 @@ namespace vkr
 	// CreateDescriptorTableForMaterialTextures
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, VkImageView>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask)
+	void GltfPbrPass::CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask)
 	{
 		std::vector<uint32_t> descriptorCounts;
 		// count the number of textures to init bindings and descriptor
@@ -6401,7 +6444,8 @@ namespace vkr
 			for (auto const& it : texturesBase)
 			{
 				tfmat->m_pbrMaterialParameters.m_defines[std::string("ID_") + it.first] = std::to_string(cnt);
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, it.second, &m_samplerPbr, tfmat->m_texturesDescriptorSet);
+
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 
@@ -6410,7 +6454,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
 				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, &m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
 
 				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
@@ -6433,7 +6477,7 @@ namespace vkr
 			}
 			if (tfmat->m_pbrMaterialParameters.transmission) {
 				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, &m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
@@ -6441,7 +6485,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
 				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// 
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, &m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 		}
@@ -6464,7 +6508,7 @@ namespace vkr
 			if (id != def.end())
 			{
 				int index = std::stoi(id->second);
-				SetDescriptorSet(m_pDevice->GetDevice(), index, SSAO, &m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), index, SSAO, m_samplerPbr, tfmat->m_texturesDescriptorSet);
 			}
 		}
 	}
@@ -6505,7 +6549,13 @@ namespace vkr
 		//destroy default material
 		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_defaultMaterial.m_texturesDescriptorSetLayout, NULL);
 		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
-
+		for (auto& p : _samplers) {
+			if (p)
+			{
+				vkDestroySampler(m_pDevice->GetDevice(), p, nullptr);
+			}
+		}
+		_samplers.clear();
 		vkDestroySampler(m_pDevice->GetDevice(), m_samplerPbr, nullptr);
 		vkDestroySampler(m_pDevice->GetDevice(), m_samplerShadow, nullptr);
 
@@ -6886,7 +6936,9 @@ namespace vkr
 		std::vector<VkDynamicState> dynamicStateEnables = {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
-			VK_DYNAMIC_STATE_LINE_WIDTH
+			VK_DYNAMIC_STATE_LINE_WIDTH,
+			//VK_DYNAMIC_STATE_CULL_MODE,
+			VK_DYNAMIC_STATE_FRONT_FACE
 		};
 		VkPipelineDynamicStateCreateInfo dynamicState = {};
 		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -7033,8 +7085,12 @@ namespace vkr
 				glm::vec4 v = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p].m_center;
 				float depth = (mModelViewProj * v).w;
 
-				BatchList t;
+				BatchList t = {};
 				t.m_depth = depth;
+				if (pNode->negativescale)
+				{
+					t.frontFace = VK_FRONT_FACE_CLOCKWISE;
+				}
 				t.m_pPrimitive = pPrimitive;
 				t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants;
 				t.m_perObjectDesc = perObjectDesc;
@@ -7073,12 +7129,13 @@ namespace vkr
 			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
 			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }		// 变形动画偏移
 			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
-			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe);
+			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe, &t);
 		}
 		SetPerfMarkerEnd(commandBuffer);
 	}
-	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe)
+	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t0)
 	{
+		GltfPbrPass::BatchList& t = *(GltfPbrPass::BatchList*)t0;
 		// Bind indices and vertices using the right offsets into the buffer 
 		for (uint32_t i = 0; i < m_geometry.m_VBV.size(); i++)
 		{
@@ -7093,6 +7150,7 @@ namespace vkr
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout
 			, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? m_pipelineWireframe : m_pipeline);
+		vkCmdSetFrontFace(cmd_buf, (VkFrontFace)t.frontFace);
 		if (m_geometry.m_IBV.buffer)
 			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
 		else
@@ -10410,12 +10468,12 @@ namespace vkr {
 
 	void SkyDome::SetDescriptorDiff(uint32_t index, VkDescriptorSet descriptorSet)
 	{
-		SetDescriptorSet(m_pDevice->GetDevice(), index, m_CubeDiffuseTextureView, &m_samplerDiffuseCube, descriptorSet);
+		SetDescriptorSet(m_pDevice->GetDevice(), index, m_CubeDiffuseTextureView, m_samplerDiffuseCube, descriptorSet);
 	}
 
 	void SkyDome::SetDescriptorSpec(uint32_t index, VkDescriptorSet descriptorSet)
 	{
-		SetDescriptorSet(m_pDevice->GetDevice(), index, m_CubeSpecularTextureView, &m_samplerSpecularCube, descriptorSet);
+		SetDescriptorSet(m_pDevice->GetDevice(), index, m_CubeSpecularTextureView, m_samplerSpecularCube, descriptorSet);
 	}
 
 	void SkyDome::Draw(VkCommandBuffer cmd_buf, const glm::mat4& invViewProj)
@@ -10856,7 +10914,7 @@ namespace vkr {
 		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
 
 		// modify Descriptor set
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, &m_sampler, descriptorSet);
+		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, m_sampler, descriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ToneMappingConsts), descriptorSet);
 
 		// Draw!
@@ -11112,7 +11170,7 @@ namespace vkr {
 
 			// Set descriptors        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_mip[i].m_descriptorSet);
-			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, &m_sampler, m_mip[i].m_descriptorSet);
+			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, m_sampler, m_mip[i].m_descriptorSet);
 		}
 
 		{
@@ -11141,7 +11199,7 @@ namespace vkr {
 
 			// Set descriptors        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_output.m_descriptorSet);
-			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[1].m_SRV, &m_sampler, m_output.m_descriptorSet);
+			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[1].m_SRV, m_sampler, m_output.m_descriptorSet);
 		}
 
 		// set weights of each mip level
@@ -11451,7 +11509,7 @@ namespace vkr {
 
 				// Create Descriptor sets (all of them use the same Descriptor Layout)            
 				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_horizontalMip[i].m_descriptorSet);
-				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_horizontalMip[i].m_SRV, &m_sampler, m_horizontalMip[i].m_descriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_horizontalMip[i].m_SRV, m_sampler, m_horizontalMip[i].m_descriptorSet);
 			}
 
 			// Vertical pass, from m_tempBlur back to pInput
@@ -11480,7 +11538,7 @@ namespace vkr {
 
 				// create and update descriptor
 				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_verticalMip[i].m_descriptorSet);
-				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_verticalMip[i].m_SRV, &m_sampler, m_verticalMip[i].m_descriptorSet);
+				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_verticalMip[i].m_SRV, m_sampler, m_verticalMip[i].m_descriptorSet);
 			}
 		}
 	}
@@ -11718,7 +11776,7 @@ namespace vkr {
 		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
 
 		// modify Descriptor set
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, &m_sampler, descriptorSet);
+		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, m_sampler, descriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ColorConversionConsts), descriptorSet);
 
 		// Draw!
@@ -11845,7 +11903,7 @@ namespace vkr {
 
 			// Create and initialize the Descriptor Sets (all of them use the same Descriptor Layout)        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(DownSamplePS::cbDownscale), m_mip[i].descriptorSet);
-			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, &m_sampler, m_mip[i].descriptorSet);
+			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, m_sampler, m_mip[i].descriptorSet);
 
 			// destination -----------
 			//
@@ -12755,10 +12813,10 @@ namespace vkr {
 		vkCmdSetScissor(cmd_buf, 0, 1, &scissor);
 	}
 
-	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkImageLayout imageLayout, VkSampler* pSampler, VkDescriptorSet descriptorSet)
+	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet)
 	{
 		VkDescriptorImageInfo desc_image;
-		desc_image.sampler = (pSampler == NULL) ? VK_NULL_HANDLE : *pSampler;
+		desc_image.sampler = pSampler;
 		desc_image.imageView = imageView;
 		desc_image.imageLayout = imageLayout;
 
@@ -12776,13 +12834,13 @@ namespace vkr {
 		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
 	}
 
-	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler* pSampler, VkDescriptorSet descriptorSet)
+	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet)
 	{
 		std::vector<VkDescriptorImageInfo> desc_images(descriptorsCount);
 		uint32_t i = 0;
 		for (; i < imageViews.size(); ++i)
 		{
-			desc_images[i].sampler = (pSampler == NULL) ? VK_NULL_HANDLE : *pSampler;
+			desc_images[i].sampler = pSampler;
 			desc_images[i].imageView = imageViews[i];
 			desc_images[i].imageLayout = imageLayout;
 		}
@@ -12790,7 +12848,7 @@ namespace vkr {
 		// Using the VK_EXT_robustness2 extension, it is possible to assign a NULL one
 		for (; i < descriptorsCount; ++i)
 		{
-			desc_images[i].sampler = (pSampler == NULL) ? VK_NULL_HANDLE : *pSampler;
+			desc_images[i].sampler = pSampler;
 			desc_images[i].imageView = VK_NULL_HANDLE;
 			desc_images[i].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		}
@@ -12801,7 +12859,7 @@ namespace vkr {
 		write.pNext = NULL;
 		write.dstSet = descriptorSet;
 		write.descriptorCount = descriptorsCount;
-		write.descriptorType = (pSampler == NULL) ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		write.descriptorType = pSampler ? VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		write.pImageInfo = desc_images.data();
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
@@ -12809,17 +12867,17 @@ namespace vkr {
 		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
 	}
 
-	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkSampler* pSampler, VkDescriptorSet descriptorSet)
+	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet)
 	{
 		SetDescriptorSet(device, index, imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, pSampler, descriptorSet);
 	}
 
-	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler* pSampler, VkDescriptorSet descriptorSet)
+	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler pSampler, VkDescriptorSet descriptorSet)
 	{
 		SetDescriptorSet(device, index, descriptorsCount, imageViews, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, pSampler, descriptorSet);
 	}
 
-	void SetDescriptorSetForDepth(VkDevice device, uint32_t index, VkImageView imageView, VkSampler* pSampler, VkDescriptorSet descriptorSet)
+	void SetDescriptorSetForDepth(VkDevice device, uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet)
 	{
 		SetDescriptorSet(device, index, imageView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, pSampler, descriptorSet);
 	}
@@ -14829,7 +14887,10 @@ namespace vkr {
 				tfnode->m_tranform.m_translation = glm::vec4(glm::make_vec3(node.translation.data()), 0.0f);// GetElementVector(node, "translation", glm::vec4(0, 0, 0, 0));
 
 			if (node.scale.size() > 2)
+			{
 				tfnode->m_tranform.m_scale = glm::vec4(glm::make_vec3(node.scale.data()), 0.0f);// getv4(node.scale, glm::vec4(1, 1, 1, 0));//GetElementVector(node, "scale", glm::vec4(1, 1, 1, 0));
+				tfnode->negativescale = tfnode->m_tranform.m_scale.x < 0 || tfnode->m_tranform.m_scale.y < 0 || tfnode->m_tranform.m_scale.z < 0;
+			}
 
 			tfnode->m_name = node.name.c_str() ? node.name : "unnamed";// GetElementString(node, "name", "unnamed");
 			tfnode->m_tranform.m_rotation = glm::identity<glm::mat4>();
@@ -20353,7 +20414,9 @@ namespace vkr {
 
 		std::vector<VkDynamicState> dynamicStateEnables = {
 			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR
+			VK_DYNAMIC_STATE_SCISSOR,
+			//VK_DYNAMIC_STATE_CULL_MODE,
+			VK_DYNAMIC_STATE_FRONT_FACE
 		};
 		VkPipelineDynamicStateCreateInfo dynamicState = {};
 		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
