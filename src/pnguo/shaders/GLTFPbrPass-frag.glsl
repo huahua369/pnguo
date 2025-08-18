@@ -132,10 +132,10 @@ void main()
 #endif 
 	color = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #ifdef HAS_OIT_ACCUM_RT
-		if (color.a < 0.1598)
+		if (color.a < 0.01598)
 		{
 			const float depthPower = 4.0;  // 深度衰减系数
-			float z = gl_FragCoord.z;
+			float z = Input.depth;
 			color.rgb *= color.a; 
 			const float depthZ = -z * 10.0f;
 

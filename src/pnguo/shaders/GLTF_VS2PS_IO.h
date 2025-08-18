@@ -49,7 +49,7 @@ struct VS2PS
 	vec4 CurrPosition;
 	vec4 PrevPosition;
 #endif
-
+    float depth;
 };
 
 #endif

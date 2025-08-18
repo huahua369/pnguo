@@ -75,7 +75,7 @@ void gltfVertexFactory()
     pos = transMatrix * pos;
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
 	gl_Position = GetCameraViewProj() * pos; // needs w for proper perspective correction
-
+   Output.depth= (GetCameraViewProj() * vec4(pos.xyz, 1.0)).z;
 #ifdef HAS_MOTION_VECTORS
 	Output.CurrPosition = gl_Position; // current's frame vertex position 
 
