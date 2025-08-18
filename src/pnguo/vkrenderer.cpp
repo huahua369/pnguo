@@ -6826,10 +6826,10 @@ namespace vkr
 			att_state.blendEnable = VK_TRUE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 			att_states.push_back(att_state);
 		}
 		/*
@@ -15910,6 +15910,7 @@ namespace vkr {
 
 	uint32_t getMemoryType(Device* dev, uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound)
 	{
+
 		auto memoryProperties = dev->GetPhysicalDeviceMemoryProperties();
 		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
 		{
@@ -19017,22 +19018,22 @@ namespace vkr {
 			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 		}
 
-		VkImageMemoryBarrier barrier[1] = {};
-		barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		barrier[0].pNext = NULL;
-		barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		barrier[0].subresourceRange.baseMipLevel = 0;
-		barrier[0].subresourceRange.levelCount = 1;
-		barrier[0].subresourceRange.baseArrayLayer = 0;
-		barrier[0].subresourceRange.layerCount = 1;
-		barrier[0].image = m_GBuffer.m_HDR.Resource();
-		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+		//VkImageMemoryBarrier barrier[1] = {};
+		//barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		//barrier[0].pNext = NULL;
+		//barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		//barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		//barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		//barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		//barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		//barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		//barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		//barrier[0].subresourceRange.baseMipLevel = 0;
+		//barrier[0].subresourceRange.levelCount = 1;
+		//barrier[0].subresourceRange.baseArrayLayer = 0;
+		//barrier[0].subresourceRange.layerCount = 1;
+		//barrier[0].image = m_GBuffer.m_HDR.Resource();
+		//vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
 		SetPerfMarkerEnd(cmdBuf1);
 

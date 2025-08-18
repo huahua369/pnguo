@@ -18,10 +18,8 @@ void main()
 	if (reveal > 0.0&&accum.a>0.0)
 	{
 		// 混合不透明与半透明结果（alpha混合）
-		//vec4 color = opaqueColor  * (1.0 - transparentAlpha) + vec4(transparentColor, 1.0) * transparentAlpha; 
-		vec4 a = opaqueColor;
-		accum.rgb/=accum.a;
-		vec4 b = vec4(accum.rgb, 1.0)/reveal;
+		vec4 a = opaqueColor; 
+		vec4 b = vec4(accum.rgb / max(accum.a, 1e-5), reveal);
 		vec4 color = a * (1.0 - b.a) + b * (b.a);
 		imageStore(opaqueTex, coords, color);
 	}

@@ -132,21 +132,23 @@ void main()
 #endif 
 	color = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #ifdef HAS_OIT_ACCUM_RT
-	if (color.a < 0.98)
-	{
-	const float depthPower = 4.0;  // 深度衰减系数
-		float z = gl_FragCoord.z; 
-		color.rgb*=color.a;  
-		float alpha=color.a;
-		// 指数衰减模型：深度值越大（越近），权重越高  
-		const float weight = color.a * min(1.0, max(0.0, pow(1.0 - z, depthPower)));
-		color.rgb*=weight;
-		// GL Blend function: GL_ONE, GL_ONE
-		outAccum = color  ;
-		// GL blend function: GL_ZERO, GL_ONE_MINUS_SRC_ALPHA
-		outReveal = alpha* weight;
-		color*=0.0;  
-	}
+		if (color.a < 0.1598)
+		{
+			const float depthPower = 4.0;  // 深度衰减系数
+			float z = gl_FragCoord.z;
+			color.rgb *= color.a; 
+			const float depthZ = -z * 10.0f;
+
+			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3);
+
+			float alphaWeight = min(1.0, max(max(color.r, color.g), max(color.b, color.a)) * 40.0 + 0.01);
+			alphaWeight *= alphaWeight;
+
+			const float weight = alphaWeight * distWeight;
+			outAccum = color * weight;
+			outReveal = color.a;
+			color *= 0.0;
+		}
 #endif
 #ifdef HAS_FORWARD_RT 
 	Output_finalColor = color; 
