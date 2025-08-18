@@ -139,12 +139,14 @@ void main()
 			color.rgb *= color.a; 
 			const float depthZ = -z;//0.1 < z < 500,
 
-			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3);
+			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3)*0.0;
 
 			float alphaWeight = min(1.0, max(max(color.r, color.g), max(color.b, color.a)) * 40.0 + 0.01);
+			alphaWeight = 1.0+color.a;
 			alphaWeight *= alphaWeight;
 
-			const float weight = alphaWeight * distWeight;
+			float weight = alphaWeight * distWeight;
+			weight = clamp(color.a, 0.0, 1.0);
 			outAccum = color * weight;
 			outReveal = color.a;
 			color *= 0.0;

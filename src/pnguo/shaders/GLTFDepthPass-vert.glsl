@@ -61,7 +61,7 @@ mat4 GetCameraView()
     return m;
 }
 
-#include "GLTFVertexFactory.glsl"
+#include "GLTFVertexFactory.h"
 
 //--------------------------------------------------------------------------------------
 // main

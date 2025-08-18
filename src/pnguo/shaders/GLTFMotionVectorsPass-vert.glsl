@@ -34,6 +34,7 @@ layout (std140, binding = ID_PER_FRAME) uniform myFrame
 {
     mat4        u_mCurrViewProj;
     mat4        u_mPrevViewProj;
+    mat4        u_mCameraCurrView;
 } myPerFrame;
 
 layout(std140, binding = ID_PER_OBJECT) uniform perObject
@@ -61,12 +62,17 @@ mat4 GetPrevWorldMatrix()
     return myPerObject.u_mPrevWorld;
 }
 
+mat4 GetCameraView()
+{
+    return myPerFrame.u_mCameraCurrView;
+}
+
 mat4 GetPrevCameraViewProj()
 {
     return myPerFrame.u_mPrevViewProj;
 }
 
-#include "GLTFVertexFactory.glsl"
+#include "GLTFVertexFactory.h"
 
 //--------------------------------------------------------------------------------------
 // main

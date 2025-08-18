@@ -15898,7 +15898,7 @@ namespace vkr {
 		bool bHDR = false;
 		bool m_bMagResourceReInit = false;
 		// 不启用oit
-		bool has_oit = true;
+		bool has_oit = false;
 
 	};
 
