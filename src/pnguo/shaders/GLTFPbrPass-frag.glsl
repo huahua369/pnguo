@@ -132,25 +132,24 @@ void main()
 #endif 
 	color = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #ifdef HAS_OIT_ACCUM_RT
-		if (color.a < 0.98)
+		if (u_pbrParams.alphaMode == ALPHA_BLEND)
 		{
-			const float depthPower = 4.0;  // 深度衰减系数
+			const float depthPower = 10.0;  // 深度衰减系数
 			float z = Input.depth;
-			//color.rgb *= color.a; 
-			const float depthZ = -z;//0.1 < z < 500,
-
-			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3)*0.0;
-
+			color.rgb *= color.a; 
+			const float depthZ = -z*depthPower;//0.1 < z < 500,
+			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3);
 			float alphaWeight = min(1.0, max(max(color.r, color.g), max(color.b, color.a)) * 40.0 + 0.01);
-			alphaWeight = 1.0+color.a;
 			alphaWeight *= alphaWeight;
-
 			float weight = alphaWeight * distWeight;
+			//weight = clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 * pow(1.0 - gl_FragCoord.z * 0.9, 3.0), 1e-2, 3e3);
 			weight = clamp(color.a, 0.0, 1.0);
-			// color*=weight;
-			outAccum =color;
-			outReveal = 0.0;//*color.a;
+			outAccum = color * weight;
+			outReveal = color.a;
 			color *= 0.0;
+		}else{
+			outAccum =vec4(0);// 分支也要输出默认值
+			outReveal = 0.0; 
 		}
 			
 #endif

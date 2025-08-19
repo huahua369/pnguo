@@ -6825,8 +6825,8 @@ namespace vkr
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
 			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			get_blend(!depthwrite, att_state);
 			att_states.push_back(att_state);
+
 		}
 		if (defines.Has("HAS_OIT_WEIGHT_RT"))
 		{
@@ -6839,7 +6839,7 @@ namespace vkr
 			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
 			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			//att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 			att_states.push_back(att_state);
 		}
 		/*
@@ -12625,8 +12625,8 @@ namespace vkr {
 	{
 		// we need to put all the color and the depth attachments in the same buffer
 		//
-		VkAttachmentDescription attachments[10];
-		assert(colorAttachments < 10); // make sure we don't overflow the scratch buffer above
+		VkAttachmentDescription attachments[16];
+		assert(colorAttachments < 16); // make sure we don't overflow the scratch buffer above
 
 		memcpy(attachments, pColorAttachments, sizeof(VkAttachmentDescription) * colorAttachments);
 		if (pDepthAttachment != NULL)
@@ -17983,7 +17983,6 @@ namespace vkr {
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
 		//const uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
 		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
-
 		// Create GBuffer and render passes
 		// todo oit 有问题
 		{
@@ -17992,6 +17991,7 @@ namespace vkr {
 				{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
 				{ GBUFFER_FORWARD, VK_FORMAT_R16G16B16A16_SFLOAT},
 				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
+				//{ GBUFFER_NORMAL_BUFFER, VK_FORMAT_R16G16B16A16_SFLOAT},
 			};
 			if (has_oit) {
 				formats[GBUFFER_OIT_ACCUM] = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -18003,7 +18003,7 @@ namespace vkr {
 				1
 			);
 
-			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;
+			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;// | GBUFFER_NORMAL_BUFFER;
 			if (has_oit) fullGBuffer |= GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
 			bool bClear = true;
 			m_RenderPassFullGBufferWithClear.OnCreate(&m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");

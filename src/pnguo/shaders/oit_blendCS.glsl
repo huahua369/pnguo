@@ -6,8 +6,8 @@
 
 layout (local_size_x = 8, local_size_y = 8) in; 
 layout(set = 0, binding = 0, rgba16f) uniform image2D opaqueTex;  // 不透明纹理 
-layout(set = 0, binding = 1, rgba32f) uniform image2D accumTex;   // 积累纹理 
-layout(set = 0, binding = 2, r32f) uniform image2D weightTex;  // 权重纹理 
+layout(set = 0, binding = 1, rgba16f) uniform image2D accumTex;   // 积累纹理 
+layout(set = 0, binding = 2, r16f) uniform image2D weightTex;  // 权重纹理 
  
 void main()
 {
@@ -18,9 +18,9 @@ void main()
 	if (reveal > 0.0&&accum.a>0.0)
 	{
 		// 混合不透明与半透明结果（alpha混合）
-		vec4 a = opaqueColor; 
-		vec4 b = vec4(accum.rgb / max(accum.a, 1e-5), reveal);
-		vec4 color = a * (1.0 - b.a) + b * (b.a);
+		vec4 a = opaqueColor;
+		vec4 b = vec4(accum.rgb / accum.a, reveal);
+		vec4 color = a * (1 - b.a) + b * (b.a);
 		imageStore(opaqueTex, coords, color);
 	}
 }
