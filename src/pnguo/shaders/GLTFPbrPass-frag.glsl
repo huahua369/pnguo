@@ -132,11 +132,11 @@ void main()
 #endif 
 	color = mix(color, vec4(myPerFrame.u_WireframeOptions.rgb, 1.0), myPerFrame.u_WireframeOptions.w);
 #ifdef HAS_OIT_ACCUM_RT
-		if (color.a < 0.01598)
+		if (color.a < 0.98)
 		{
 			const float depthPower = 4.0;  // 深度衰减系数
 			float z = Input.depth;
-			color.rgb *= color.a; 
+			//color.rgb *= color.a; 
 			const float depthZ = -z;//0.1 < z < 500,
 
 			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3)*0.0;
@@ -147,12 +147,14 @@ void main()
 
 			float weight = alphaWeight * distWeight;
 			weight = clamp(color.a, 0.0, 1.0);
-			outAccum = color * weight;
-			outReveal = color.a;
+			 color*=weight;
+			 outAccum =color;
+			outReveal = 0.0;//*color.a;
 			color *= 0.0;
 		}
+			
 #endif
 #ifdef HAS_FORWARD_RT 
-	Output_finalColor = color; 
+	Output_finalColor = color;
 #endif
 }

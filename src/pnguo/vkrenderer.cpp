@@ -3491,6 +3491,7 @@ namespace vkr {
 
 		DefineList m_defines;
 		bool m_doubleSided = false;
+		bool m_blending = false;
 	};
 
 	struct DepthPrimitives
@@ -4325,6 +4326,8 @@ namespace vkr
 			tfmat->m_doubleSided = material.doubleSided;
 			std::string alphaMode = material.alphaMode;// ", "OPAQUE");
 			tfmat->m_defines["DEF_alphaMode_" + alphaMode] = std::to_string(1);
+
+			tfmat->m_blending = alphaMode == "BLEND";
 			// If transparent use the baseColorTexture for alpha
 			//
 			if (alphaMode == "MASK")
@@ -4833,7 +4836,7 @@ namespace vkr
 			{
 				DepthPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
 
-				if (pPrimitive->m_pipeline == VK_NULL_HANDLE)
+				if (pPrimitive->m_pipeline == VK_NULL_HANDLE || pPrimitive->m_pMaterial->m_blending)
 					continue;
 
 				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
@@ -6928,10 +6931,10 @@ namespace vkr
 		cb.pAttachments = att_states.data();
 		cb.logicOpEnable = VK_FALSE;
 		cb.logicOp = VK_LOGIC_OP_NO_OP;
-		cb.blendConstants[0] = 1.0f;
-		cb.blendConstants[1] = 1.0f;
-		cb.blendConstants[2] = 1.0f;
-		cb.blendConstants[3] = 1.0f;
+		cb.blendConstants[0] = 0.0f;
+		cb.blendConstants[1] = 0.0f;
+		cb.blendConstants[2] = 0.0f;
+		cb.blendConstants[3] = 0.0f;
 
 		std::vector<VkDynamicState> dynamicStateEnables = {
 			VK_DYNAMIC_STATE_VIEWPORT,
@@ -17983,8 +17986,8 @@ namespace vkr {
 				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
 			};
 			if (has_oit) {
-				formats[GBUFFER_OIT_ACCUM] = VK_FORMAT_R32G32B32A32_SFLOAT;
-				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R32_SFLOAT;
+				formats[GBUFFER_OIT_ACCUM] = VK_FORMAT_R16G16B16A16_SFLOAT;
+				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R16_SFLOAT;
 			}
 			m_GBuffer.OnCreate(
 				pDevice,
@@ -19037,40 +19040,30 @@ namespace vkr {
 
 		if (has_oit)
 		{
-			VkImageMemoryBarrier barriers[3] = {};
-			VkImageMemoryBarrier& barrier = barriers[0];
-			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			barrier.pNext = NULL;
-			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-			barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			barrier.subresourceRange.baseMipLevel = 0;
-			barrier.subresourceRange.levelCount = 1;
-			barrier.subresourceRange.baseArrayLayer = 0;
-			barrier.subresourceRange.layerCount = 1;
-			barrier.image = m_GBuffer.m_HDR.Resource();
-			barriers[1] = barriers[2] = barrier;
-			barriers[1].image = m_GBuffer.m_HDR_oit_accum.Resource();
-			barriers[2].image = m_GBuffer.m_HDR_oit_weight.Resource();
-			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0,
-				NULL, 0, NULL, 3, barriers);
+			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
+			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;// VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			//m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
 
-			barriers[1] = barriers[2] = barrier;
-			barriers[1].image = m_GBuffer.m_HDR_oit_accum.Resource();
-			barriers[2].image = m_GBuffer.m_HDR_oit_weight.Resource();
-			vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
-				NULL, 0, NULL, 3, barriers);
+			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+
 
 		}
 
