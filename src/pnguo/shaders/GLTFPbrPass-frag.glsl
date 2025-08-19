@@ -137,14 +137,14 @@ void main()
 			const float depthPower = 10.0;  // 深度衰减系数
 			float z = Input.depth;
 			color.rgb *= color.a; 
-			const float depthZ = z*depthPower;//0.1 < z < 500,
+			const float depthZ = -z*depthPower;//0.1 < z < 500,
 			const float distWeight = clamp(0.03 / (1e-5 + pow(depthZ / 200, 4.0)), 1e-2, 3e3);
 			float alphaWeight = min(1.0, max(max(color.r, color.g), max(color.b, color.a)) * 40.0 + 0.01);
 			alphaWeight *= alphaWeight;
 			float weight = alphaWeight * distWeight;
-			//weight = clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 * pow(1.0 - gl_FragCoord.z * 0.9, 3.0), 1e-2, 3e3);
+			weight = clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 * pow(1.0 - gl_FragCoord.z * 0.9, 3.0), 1e-2, 3e3);
 			weight = clamp(color.a, 0.0, 1.0);
-			outAccum = vec4(color.rgb*weight, weight);
+			outAccum = vec4(color.rgb*weight, (color.a)*weight);
 			outReveal = 1.0 - color.a;
 			color *= 0.0;
 		}else{

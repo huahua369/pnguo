@@ -6839,7 +6839,7 @@ namespace vkr
 			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			
+
 			att_states.push_back(att_state);
 		}
 		/*
@@ -9226,7 +9226,7 @@ namespace vkr
 			if (pClearValues)
 			{
 				VkClearValue cv;
-				cv.color = { 0.0f };
+				cv.color = { 1.0f };
 				pClearValues->push_back(cv);
 			}
 		}
@@ -15828,6 +15828,8 @@ namespace vkr {
 
 		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
 	private:
+		void draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj);
+
 		void draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj, bool bWireframe);
 		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, bool bWireframe);
 		void copy_transmission(VkCommandBuffer cmdBuf1);
@@ -18709,24 +18711,10 @@ namespace vkr {
 	// todo OnRender
 	//
 	//--------------------------------------------------------------------------------------
-	void Renderer_cx::draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj, bool bWireframe)
+	void Renderer_cx::draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj)
 	{
+
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
-		// Render opaque 渲染不透明物体
-		{
-			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
-			if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
-			{
-				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, false);
-				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque1, bWireframe);
-			}
-			else
-			{
-				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, bWireframe);
-			}
-			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
-			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-		}
 		// Render skydome天空盒
 		{
 			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
@@ -18748,6 +18736,25 @@ namespace vkr {
 			}
 
 			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+		}
+	}
+	void Renderer_cx::draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj, bool bWireframe)
+	{
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// Render opaque 渲染不透明物体
+		{
+			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+			if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+			{
+				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, false);
+				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque1, bWireframe);
+			}
+			else
+			{
+				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, bWireframe);
+			}
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
+			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
 		}
 	}
 	void Renderer_cx::draw_pbr_transparent(VkCommandBuffer cmdBuf1, bool bWireframe)
@@ -19002,11 +19009,13 @@ namespace vkr {
 			if (!drawables.transmission.empty())
 			{
 				draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 渲染不透明物体、天空盒
+				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 				draw_pbr_transparent(cmdBuf1, bWireframe);							// 渲染透明物体
 				copy_transmission(cmdBuf1);
 				if (!drawables.transparent.empty())
 				{
 					draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 没有透明物体时，不需要渲染第二次
+					draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 				}
 				draw_pbr_transmission(cmdBuf1, bWireframe);								// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
 				if (!drawables.transparent.empty())
@@ -19016,6 +19025,7 @@ namespace vkr {
 			}
 			else {
 				draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);
+				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 				draw_pbr_transparent(cmdBuf1, bWireframe);
 			}
 			// draw object's bounding boxes
@@ -19025,8 +19035,7 @@ namespace vkr {
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
-			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+			draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 		}
 
 		//VkImageMemoryBarrier barrier[1] = {};
@@ -19743,7 +19752,7 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		auto format = VK_FORMAT_R8G8B8A8_SRGB;//VK_FORMAT_R8G8B8A8_UNORM，VK_FORMAT_B8G8R8A8_SRGB
+		auto format = VK_FORMAT_R8G8B8A8_SRGB;//VK_FORMAT_R8G8B8A8_UNORM;//  VK_FORMAT_R8G8B8A8_UNORM，VK_FORMAT_B8G8R8A8_SRGB
 		_rp = newRenderPass(m_device, format, VK_FORMAT_D32_SFLOAT);
 
 		auto f = new fbo_info_cx();

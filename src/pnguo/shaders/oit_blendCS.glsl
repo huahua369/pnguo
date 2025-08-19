@@ -17,10 +17,10 @@ void main()
 	float reveal = imageLoad(weightTex, coords).r;
 	if (accum.a>0.0)
 	{
-		//reveal=reveal>1.0?2.0-reveal:reveal;
+		reveal=reveal>1.0?2.0-reveal:reveal;
 		// 混合不透明与半透明结果（alpha混合）
 		vec4 a = opaqueColor;
-		vec4 b = vec4(accum.rgb / accum.a, 1-reveal);
+		vec4 b = vec4(accum.rgb / accum.a, reveal);
 		vec4 color = a * (1 - b.a) + b * (b.a);
 		imageStore(opaqueTex, coords, color);
 	}
