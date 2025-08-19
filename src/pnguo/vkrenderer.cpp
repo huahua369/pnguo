@@ -416,6 +416,9 @@ namespace vkr
 		InstanceProperties ip;
 		ip.Init();
 		SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
+		auto apiVersion3 = VK_API_VERSION_1_3;
+		auto apiVersion4 = VK_API_VERSION_1_4;
+		VkInstanceCreateInfo inst_info = {};
 		if (!d || !d->inst || !d->phy || !d->vkdev)
 		{
 
@@ -433,7 +436,6 @@ namespace vkr
 			app_info.pEngineName = "pnguo";
 			app_info.engineVersion = 1;
 			app_info.apiVersion = VK_API_VERSION_1_3;
-			VkInstanceCreateInfo inst_info = {};
 			inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 			inst_info.pNext = 0;
 			inst_info.flags = 0;
@@ -2076,7 +2078,8 @@ namespace vkr {
 			{
 				if (pOut)
 					*pOut = GetTail();
-
+				if (size % 64)
+					size = size;
 				m_AllocatedSize += size;
 				return true;
 			}
@@ -5524,7 +5527,7 @@ namespace vkr
 			VkDescriptorBufferInfo db = {};
 			float* cbd = 0;
 			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3x4));
-			m_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 32);
+			m_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
 			memcpy(cbd, v.data(), size);
 			m_uvmMap[k] = db;
 		}
