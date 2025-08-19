@@ -147,8 +147,8 @@ void main()
 
 			float weight = alphaWeight * distWeight;
 			weight = clamp(color.a, 0.0, 1.0);
-			 color*=weight;
-			 outAccum =color;
+			// color*=weight;
+			outAccum =color;
 			outReveal = 0.0;//*color.a;
 			color *= 0.0;
 		}

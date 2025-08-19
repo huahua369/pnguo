@@ -131,6 +131,15 @@ namespace vkr
 
 	void vkr_image_set_layout(VkCommandBuffer cmdBuff, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout old_image_layout, VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages);
 
+	// helpers functions to use debug markers
+	void ExtDebugUtilsGetProcAddresses(VkDevice device);
+	void SetResourceName(VkDevice device, VkObjectType objectType, uint64_t handle, const char* name);
+	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name);
+	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
+
+
+	uint32_t SizeOfFormat(VkFormat format);
+
 #if 1
 
 	struct inspd_t {
@@ -157,6 +166,11 @@ namespace vkr
 		bool IsLayerPresent(const char* pExtName);
 		bool IsExtensionPresent(const char* pExtName);
 	};
+
+	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP);
+
+
+
 	class DeviceProperties
 	{
 	public:
@@ -474,9 +488,9 @@ namespace vkr
 		};
 		pIp->AddInstanceExtensionName(exn[0]);
 		pIp->AddInstanceExtensionName(VK_KHR_SURFACE_EXTENSION_NAME);
+		f_ExtDebugUtilsCheckInstanceExtensions(pIp);
 #ifdef ExtCheckHDRInstanceExtensions
 		ExtCheckHDRInstanceExtensions(pIp);
-		ExtDebugUtilsCheckInstanceExtensions(pIp);
 		if (cpuValidationLayerEnabled)
 		{
 			ExtDebugReportCheckInstanceExtensions(pIp, gpuValidationLayerEnabled);
@@ -765,8 +779,8 @@ namespace vkr
 
 		// Init the extensions (if they have been enabled successfuly)
 		//
-#ifdef ExtDebugUtilsGetProcAddresses
 		ExtDebugUtilsGetProcAddresses(m_device);
+#ifdef ExtGetHDRFSEFreesyncHDRProcAddresses
 		ExtGetHDRFSEFreesyncHDRProcAddresses(m_instance, m_device);
 #endif
 	}
@@ -3718,15 +3732,6 @@ namespace vkr {
 
 	VkFramebuffer CreateFrameBuffer(VkDevice device, VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
 
-	// helpers functions to use debug markers
-	void ExtDebugUtilsGetProcAddresses(VkDevice device);
-	bool ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP);
-	void SetResourceName(VkDevice device, VkObjectType objectType, uint64_t handle, const char* name);
-	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name);
-	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
-
-
-	uint32_t SizeOfFormat(VkFormat format);
 
 	// misc
 
@@ -6816,10 +6821,8 @@ namespace vkr
 			att_state.blendEnable = VK_TRUE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			get_blend(!depthwrite, att_state);
 			att_states.push_back(att_state);
 		}
 		if (defines.Has("HAS_OIT_WEIGHT_RT"))
@@ -6833,6 +6836,7 @@ namespace vkr
 			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
 			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 			att_states.push_back(att_state);
 		}
 		/*
@@ -9185,6 +9189,7 @@ namespace vkr
 	void GBuffer::GetAttachmentList(GBufferFlags flags, std::vector<VkImageView>* pAttachments, std::vector<VkClearValue>* pClearValues)
 	{
 		pAttachments->clear();
+		pClearValues->clear();
 
 		// Create Texture + RTV, to hold the resolved scene
 		//
@@ -9218,7 +9223,7 @@ namespace vkr
 			if (pClearValues)
 			{
 				VkClearValue cv;
-				cv.color = { 1.0f, 0.0f, 0.0f, 0.0f };
+				cv.color = { 1.0f };
 				pClearValues->push_back(cv);
 			}
 		}
@@ -12964,7 +12969,7 @@ namespace vkr {
 	static bool s_bCanUseDebugUtils = false;
 	static std::mutex s_mutex;
 
-	bool ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP)
+	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP)
 	{
 		s_bCanUseDebugUtils = pDP->AddInstanceExtensionName("VK_EXT_debug_utils");
 		return s_bCanUseDebugUtils;
@@ -19038,8 +19043,11 @@ namespace vkr {
 		//barrier[0].image = m_GBuffer.m_HDR.Resource();
 		//vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
+		SetPerfMarkerEnd(cmdBuf1);
+
 		if (has_oit)
 		{
+			SetPerfMarkerBegin(cmdBuf1, "oit");
 			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -19051,7 +19059,7 @@ namespace vkr {
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			//m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
+			m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
 
 			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
