@@ -15,11 +15,12 @@ void main()
 	vec4 opaqueColor = imageLoad(opaqueTex, coords).rgba;
 	vec4 accum = imageLoad(accumTex, coords).rgba;
 	float reveal = imageLoad(weightTex, coords).r;
-	if (reveal > 0.0&&accum.a>0.0)
+	if (accum.a>0.0)
 	{
+		//reveal=reveal>1.0?2.0-reveal:reveal;
 		// 混合不透明与半透明结果（alpha混合）
 		vec4 a = opaqueColor;
-		vec4 b = vec4(accum.rgb / accum.a, reveal);
+		vec4 b = vec4(accum.rgb / accum.a, 1-reveal);
 		vec4 color = a * (1 - b.a) + b * (b.a);
 		imageStore(opaqueTex, coords, color);
 	}

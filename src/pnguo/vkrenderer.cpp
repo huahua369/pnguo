@@ -6835,11 +6835,11 @@ namespace vkr
 			att_state.blendEnable = VK_TRUE;
 			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
 			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
 			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			//att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			
 			att_states.push_back(att_state);
 		}
 		/*
@@ -9226,7 +9226,7 @@ namespace vkr
 			if (pClearValues)
 			{
 				VkClearValue cv;
-				cv.color = { 1.0f };
+				cv.color = { 0.0f };
 				pClearValues->push_back(cv);
 			}
 		}
@@ -15850,7 +15850,7 @@ namespace vkr {
 		StaticBufferPool                m_SysMemBufferPool = {};	// 系统静态几何缓冲区
 		CommandListRing                 m_CommandListRing = {};		// 命令管理VkCommandBuffer
 
-		GPUTimestamps                   m_GPUTimer = {};
+		GPUTimestamps                   m_GPUTimer = {};			// 记录GPU执行时间
 
 		// effects
 		Bloom                           m_Bloom = {};
@@ -15865,10 +15865,10 @@ namespace vkr {
 		//MagnifierPS                     m_MagnifierPS = {};
 
 		// GBuffer and render passes
-		GBuffer                         m_GBuffer = {};
-		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};
-		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};
-		GBufferRenderPass               m_RenderPassFullGBuffer = {};
+		GBuffer                         m_GBuffer = {};							// hdr缓冲区
+		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区
+		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框
+		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体
 
 		// shadowmaps
 		VkRenderPass                    m_Render_pass_shadow = {};
