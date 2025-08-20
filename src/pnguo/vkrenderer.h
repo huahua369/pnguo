@@ -4,15 +4,43 @@
 	Copyright (c) 华仔
 	188665600@qq.com
 
-	创建日期：2024-07-15
-*/
+	创建日期：2024-07-15 
+
+	示例：
+
+void vkrender_test()
+{
+	auto inst = new_instance();
+	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表
+	if (devs.empty())return;
+	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 从SDL3获取设备创建vk渲染器
+	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0);			// 创建vk渲染器
+	vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 添加一个地板
+	vkd->resize(1024, 800);				// 设置fbo缓冲区大小
+	auto vki = vkd->get_vkimage(0);	// 获取第一个fbo纹理弄到窗口显示
+	//auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理
+	auto dstate = vkd->_state;	// 渲染状态属性
+	{
+		mouse_state_t mio = {};
+		//mio = *form0->io;
+		// 独立线程或主线程执行渲染
+		while (1) {
+			vkd->update(&mio);		// 更新事件
+			vkd->on_render();		// 执行渲染
+			// todo 提交到窗口渲染
+			Sleep(1);
+		}
+	}
+	free_vkdg(vkd);				// 释放渲染器
+	free_instance(inst);		// 释放实例
+}
 
 
-// 渲染器配置
-// 资源管理：加载、卸载
-// gltf加载渲染
-// todo 提交网格、纹理、材质数据，实现渲染
-/*
+ 渲染器配置
+ 资源管理：加载、卸载
+ gltf加载渲染
+ todo 提交网格、纹理、材质数据，实现渲染 
 
  ResourceViewHeaps* pResourceViewHeaps,		//管理set分配
  DynamicBufferRing* pConstantBufferRing,	// 动态常量缓冲区ubo
@@ -113,7 +141,17 @@ namespace vkr {
 }
 //!vkr
 
-struct dev_info_cx;
+#ifndef DEV_INFO_CXH
+#define DEV_INFO_CXH
+struct dev_info_cx
+{
+	void* inst;
+	void* phy;
+	void* vkdev;
+	uint32_t qFamIdx;		// familyIndex
+	uint32_t qIndex = 0;
+};
+#endif // !DEV_INFO_CXH
 
 struct scene_state {
 	// POST PROCESS CONTROLS 
@@ -154,6 +192,7 @@ struct image_vkr
 class vkdg_cx
 {
 public:
+	dev_info_cx _dev_info = {};
 	void* ctx = 0;
 	void* dev = 0;
 	void* qupload = 0;
@@ -181,6 +220,10 @@ public:
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();
 };
+
+// 创建vk实例,参数可选
+void* new_instance();
+void free_instance(void* inst);
 
 // todo 创建渲染器
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev);

@@ -324,7 +324,72 @@ glm::vec4 p2v(float yaw, float pitch)
 {
 	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
 }
+#if 0
+vec3 AMDTonemapper(vec3 color) {}//太长了0
+vec3 DX11DSK(vec3 color)
+{
+	float  MIDDLE_GRAY = 0.72f;
+	float  LUM_WHITE = 1.5f;
+	// Tone mapping
+	color.rgb *= MIDDLE_GRAY;
+	color.rgb *= (1.0f + color / LUM_WHITE);
+	color.rgb /= (1.0f + color);
+	return color;
+}
+vec3 Reinhard(vec3 color)
+{
+	return color / (1 + color);
+}
+vec3 Uncharted2TonemapOp(vec3 x)
+{
+	float A = 0.15;	float B = 0.50;	float C = 0.10;	float D = 0.20;	float E = 0.02;	float F = 0.30;
+	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+}
+vec3 Uncharted2Tonemap(vec3 color)
+{
+	float W = 11.2;
+	return Uncharted2TonemapOp(2.0 * color) / Uncharted2TonemapOp(vec3(W));
+}
+vec3 tonemapACES(vec3 x)
+{
+	float a = 2.51;	float b = 0.03;	float c = 2.43;	float d = 0.59;	float e = 0.14;
+	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+//case 0: return AMDTonemapper(color);
+//case 1: return DX11DSK(color);
+//case 2: return Reinhard(color);
+//case 3: return Uncharted2Tonemap(color);
+//case 4: return tonemapACES(color);
+//case 5: return color;	// 不做色调映射
+#endif
 
+void vkrender_test()
+{
+	auto inst = new_instance();
+	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表 
+	if (devs.empty())return;
+	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 从SDL3获取设备创建vk渲染器  
+	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0);			// 创建vk渲染器  
+	vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 添加一个地板
+	vkd->resize(1024, 800);				// 设置fbo缓冲区大小
+	auto vki = vkd->get_vkimage(0);	// 获取第一个fbo纹理弄到窗口显示
+	//auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
+	auto dstate = vkd->_state;	// 渲染状态属性
+	{
+		mouse_state_t mio = {};
+		//mio = *form0->io;
+		// 独立线程或主线程执行渲染
+		while (1) {
+			vkd->update(&mio);		// 更新事件
+			vkd->on_render();		// 执行渲染 
+			// todo 提交到窗口渲染
+			Sleep(1);
+		}
+	}
+	free_vkdg(vkd);				// 释放渲染器
+	free_instance(inst);		// 释放实例
+}
 
 int main()
 {
@@ -340,7 +405,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
-
+	vkrender_test();
 	{
 
 
@@ -489,8 +554,8 @@ int main()
 			vkd->add_gltf(R"(E:\model\ca\su7-xiaomini.glb)", { 0,0.1,0 }, 1.0);//
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
-		auto vr = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-		auto texok = form0->add_vkimage(vr.size, vr.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
+		auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+		auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
 		/*
 		case 0: return AMDTonemapper(color);
 		case 1: return DX11DSK(color);
@@ -499,7 +564,7 @@ int main()
 		case 4: return tonemapACES( color );
 		case 5: return color;
 		*/
-		vkd->_state.SelectedTonemapperIndex = 0;
+		vkd->_state.SelectedTonemapperIndex = 4;
 		vkd->_state.Exposure = 1.0;
 		vkd->_state.EmissiveFactor = 30;
 		vkd->_state.IBLFactor = 1.0;

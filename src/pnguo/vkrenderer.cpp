@@ -107,17 +107,6 @@ typedef uint32_t DXGI_FORMAT;
 #undef max
 #endif // min
 
-#ifndef DEV_INFO_CXH
-#define DEV_INFO_CXH
-struct dev_info_cx
-{
-	void* inst;
-	void* phy;
-	void* vkdev;
-	uint32_t qFamIdx;		// familyIndex
-	uint32_t qIndex = 0;
-};
-#endif // !DEV_INFO_CXH
 
 namespace vkr
 {
@@ -200,8 +189,6 @@ namespace vkr
 		~Device();
 		void OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw
 			, const char* spdname, std::vector<std::string>* pdnv);
-		void SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp);
-		void SetEssentialDeviceExtensions(DeviceProperties* pDp);
 		void OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp);
 		void OnDestroy();
 		VkDevice GetDevice() { return m_device; }
@@ -400,6 +387,49 @@ namespace vkr
 	}
 
 
+	void SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp)
+	{
+		const char* exn[] = {
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+			VK_KHR_XLIB_SURFACE_EXTENSION_NAME
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+			VK_KHR_XCB_SURFACE_EXTENSION_NAME
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+			VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
+#elif defined(VK_USE_PLATFORM_MIR_KHR)
+			VK_KHR_MIR_SURFACE_EXTENSION_NAME
+#elif defined(__ANDROID__)
+			VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
+#elif defined(_WIN32)
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+#endif
+		};
+		pIp->AddInstanceExtensionName(exn[0]);
+		pIp->AddInstanceExtensionName(VK_KHR_SURFACE_EXTENSION_NAME);
+		f_ExtDebugUtilsCheckInstanceExtensions(pIp);
+#ifdef ExtCheckHDRInstanceExtensions
+		ExtCheckHDRInstanceExtensions(pIp);
+		if (cpuValidationLayerEnabled)
+		{
+			ExtDebugReportCheckInstanceExtensions(pIp, gpuValidationLayerEnabled);
+		}
+#endif
+	}
+
+	void SetEssentialDeviceExtensions(DeviceProperties* pDp)
+	{
+#ifdef ExtRTCheckExtensions
+		m_usingFp16 = ExtFp16CheckExtensions(pDp);
+		ExtRTCheckExtensions(pDp, m_rt10Supported, m_rt11Supported);
+		ExtVRSCheckExtensions(pDp, m_vrs1Supported, m_vrs2Supported);
+		ExtCheckHDRDeviceExtensions(pDp);
+		ExtCheckFSEDeviceExtensions(pDp);
+		ExtCheckFreeSyncHDRDeviceExtensions(pDp);
+#endif
+		pDp->AddDeviceExtensionName(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+		pDp->AddDeviceExtensionName(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+		pDp->AddDeviceExtensionName(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+	}
 
 	Device::Device()
 	{
@@ -469,51 +499,10 @@ namespace vkr
 
 		// Create device
 		OnCreateEx((VkInstance)d->inst, (VkPhysicalDevice)d->phy, (VkDevice)d->vkdev, pw, &dp);
+		if (!d->vkdev)
+			d->vkdev = m_device;
 	}
 
-	void Device::SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp)
-	{
-		const char* exn[] = {
-#if defined(VK_USE_PLATFORM_XLIB_KHR)
-			VK_KHR_XLIB_SURFACE_EXTENSION_NAME
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-			VK_KHR_XCB_SURFACE_EXTENSION_NAME
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-			VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
-#elif defined(VK_USE_PLATFORM_MIR_KHR)
-			VK_KHR_MIR_SURFACE_EXTENSION_NAME
-#elif defined(__ANDROID__)
-			VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
-#elif defined(_WIN32)
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-#endif
-		};
-		pIp->AddInstanceExtensionName(exn[0]);
-		pIp->AddInstanceExtensionName(VK_KHR_SURFACE_EXTENSION_NAME);
-		f_ExtDebugUtilsCheckInstanceExtensions(pIp);
-#ifdef ExtCheckHDRInstanceExtensions
-		ExtCheckHDRInstanceExtensions(pIp);
-		if (cpuValidationLayerEnabled)
-		{
-			ExtDebugReportCheckInstanceExtensions(pIp, gpuValidationLayerEnabled);
-		}
-#endif
-	}
-
-	void Device::SetEssentialDeviceExtensions(DeviceProperties* pDp)
-	{
-#ifdef ExtRTCheckExtensions
-		m_usingFp16 = ExtFp16CheckExtensions(pDp);
-		ExtRTCheckExtensions(pDp, m_rt10Supported, m_rt11Supported);
-		ExtVRSCheckExtensions(pDp, m_vrs1Supported, m_vrs2Supported);
-		ExtCheckHDRDeviceExtensions(pDp);
-		ExtCheckFSEDeviceExtensions(pDp);
-		ExtCheckFreeSyncHDRDeviceExtensions(pDp);
-#endif
-		pDp->AddDeviceExtensionName(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-		pDp->AddDeviceExtensionName(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-		pDp->AddDeviceExtensionName(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-	}
 
 	VkQueueFamilyProperties* get_queue_fp(VkQueueFamilyProperties* queueFamilyProperties, int c, VkQueueFlagBits queueFlags)
 	{
@@ -20743,6 +20732,45 @@ size_t vkdg_cx::get_light_size()
 	return c;
 }
 
+void* new_instance()
+{
+	vkr::InstanceProperties ip;
+	ip.Init();
+	vkr::SetEssentialInstanceExtensions(1, 1, &ip);
+	auto apiVersion3 = VK_API_VERSION_1_3;
+	auto apiVersion4 = VK_API_VERSION_1_4;
+	VkInstanceCreateInfo inst_info = {};
+	std::vector<const char*> instance_layer_names;
+	std::vector<const char*> instance_extension_names;
+	ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names);
+	VkInstance instance = {};
+	VkApplicationInfo app_info = {};
+	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	app_info.pNext = NULL;
+	app_info.pApplicationName = "vkcmp";
+	app_info.applicationVersion = 1;
+	app_info.pEngineName = "pnguo";
+	app_info.engineVersion = 1;
+	app_info.apiVersion = VK_API_VERSION_1_3;
+	inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	inst_info.pNext = 0;
+	inst_info.flags = 0;
+	inst_info.pApplicationInfo = &app_info;
+	inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
+	inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
+	inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
+	inst_info.ppEnabledExtensionNames = instance_extension_names.data();
+	VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
+	assert(res == VK_SUCCESS);
+	return instance;
+}
+
+void free_instance(void* inst)
+{
+	if (inst)
+		vkDestroyInstance((VkInstance)inst, 0);
+}
+
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev)
 {
 	dev_info_cx c[1] = {};
@@ -20768,7 +20796,7 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev)
 		dev->GetDeviceInfo(&m_systemInfo.mGPUName, &dummyStr); // 2nd parameter is unused
 		m_systemInfo.mCPUName = GetCPUNameString();
 		m_systemInfo.mGfxAPI = "Vulkan";
-
+		p->_dev_info = c[0];
 		p->dev = dev;
 		auto tx = new vkr::sample_cx();
 		tx->m_device = dev;
@@ -20827,6 +20855,9 @@ namespace vkr {
 	}
 }
 // !vkr
+
+
+
 std::vector<device_info_t> get_devices(void* inst)
 {
 	VkPhysicalDeviceProperties dp = {};
