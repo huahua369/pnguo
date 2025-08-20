@@ -420,7 +420,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
-	vkrender_test(0);
+	//vkrender_test(0);
 	{
 
 
@@ -528,7 +528,7 @@ int main()
 	if (vkd) {
 		{
 			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-			//vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
+			vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
 			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
@@ -540,12 +540,12 @@ int main()
 			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			//变形树
-			//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
+			vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
 			//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
 			//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
 
 			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			//vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 2,0,5 }, 1.0);// 飞船
+			vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 2,0,5 }, 1.0);// 飞船
 			/*vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
 			vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
 
@@ -566,7 +566,7 @@ int main()
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\Fox\glTF-Binary\Fox.glb)", { 0,0,0 }, 0.20);//
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\TextureSettingsTest\glTF-Binary\TextureSettingsTest.glb)", { 0,11,0 }, 1.0);//
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\NegativeScaleTest\glTF-Binary\NegativeScaleTest.glb)", { 0,0,0 }, 1.0);//
-			vkd->add_gltf(R"(E:\model\ca\su7-xiaomini.glb)", { 0,0.1,0 }, 1.0);//
+			//vkd->add_gltf(R"(E:\zmodel\NodePerformanceTest.glb)", { 0,0.1,0 }, 1.0);//
 		}
 		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 		auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
@@ -579,7 +579,7 @@ int main()
 		case 4: return tonemapACES( color );
 		case 5: return color;
 		*/
-		vkd->_state.SelectedTonemapperIndex = 4;
+		vkd->_state.SelectedTonemapperIndex = 0;
 		vkd->_state.Exposure = 1.0;
 		vkd->_state.EmissiveFactor = 30;
 		vkd->_state.IBLFactor = 1.0;

@@ -2710,8 +2710,13 @@ SDL_Texture* form_x::new_texture(int width, int height, void* vkptr, int format)
 		if (format == 1)
 		{
 			format = SDL_PIXELFORMAT_ARGB8888; // VK_BGRA
-		}
+		}	
 		SDL_PropertiesID props = SDL_CreateProperties();
+		if (format < 0)
+		{
+			format = SDL_PIXELFORMAT_ABGR8888; // VK_RGBA
+			SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_COLORSPACE_NUMBER, SDL_COLORSPACE_SRGB_LINEAR);
+		}
 		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER, format);
 		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, (int64_t)vkptr);
 		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, access);
