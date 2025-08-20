@@ -363,32 +363,47 @@ vec3 tonemapACES(vec3 x)
 //case 5: return color;	// 不做色调映射
 #endif
 
-void vkrender_test()
+void vkrender_test(form_x* form0)
 {
-	auto inst = new_instance();
-	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+	void* inst0 = 0; void* inst = 0; void* phy = 0;	void* vkdev = 0;
+	if (form0) {
+		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+		inst = sdldev.inst; phy = sdldev.phy; vkdev = sdldev.vkdev;	// 获取vk设备
+	}
+	else {
+		inst0 = new_instance();
+		inst = inst0;
+	}
 	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表 
 	if (devs.empty())return;
-	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 从SDL3获取设备创建vk渲染器  
-	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0);			// 创建vk渲染器  
+	if (!phy) { phy = devs[0].phd; }
+	vkdg_cx* vkd = new_vkdg(inst, phy, vkdev);			// 创建vk渲染器  
 	vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 添加一个地板
-	vkd->resize(1024, 800);				// 设置fbo缓冲区大小
-	auto vki = vkd->get_vkimage(0);	// 获取第一个fbo纹理弄到窗口显示
-	//auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
+	vkd->resize(1024, 800);						// 设置fbo缓冲区大小
+	auto vki = vkd->get_vkimage(0);			// 获取第一个fbo纹理弄到窗口显示
 	auto dstate = vkd->_state;	// 渲染状态属性
-	{
+	if (form0) {
+		auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理  
+		if (texok) {
+			form0->up_cb = [=](float delta, int* ret)
+				{
+					vkd->update(form0->io);	// 更新事件
+					vkd->on_render();		// 执行渲染 
+				};
+		}
+	}
+	else {		// 独立线程或主线程执行渲染
 		mouse_state_t mio = {};
-		//mio = *form0->io;
-		// 独立线程或主线程执行渲染
 		while (1) {
 			vkd->update(&mio);		// 更新事件
 			vkd->on_render();		// 执行渲染 
 			// todo 提交到窗口渲染
 			Sleep(1);
 		}
+		free_vkdg(vkd);			// 释放渲染器
+		free_instance(inst0);		// 释放实例
 	}
-	free_vkdg(vkd);				// 释放渲染器
-	free_instance(inst);		// 释放实例
+	return;
 }
 
 int main()
@@ -405,7 +420,7 @@ int main()
 	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
-	vkrender_test();
+	vkrender_test(0);
 	{
 
 
