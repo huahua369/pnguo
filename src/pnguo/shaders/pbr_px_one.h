@@ -111,9 +111,36 @@ struct pbrMaterial
 	float clearcoatNormalScale;
 	float envIntensity;
 
-	int unlit;
-	float pad[3];
+	int unlit; 
+	float u_OcclusionStrength;
+	float pad[2];
 	mat3 uvTransform[UVT_COUNT];
+	int idx_diffuseCube;
+	int idx_specularCube;
+	int idx_CharlieEnvSamplerCube;
+	int idx_baseColorTexture;
+	int idx_normalTexture;
+	int idx_emissiveTexture;
+	int idx_metallicRoughnessTexture;
+	int idx_occlusionTexture;
+	int idx_diffuseTexture;
+	int idx_specularGlossinessTexture;
+	int idx_brdfTexture;
+	int idx_CharlieLUTTexture;
+	int idx_SheenELUTTexture;
+	int idx_sheenColorTexture;
+	int idx_sheenRoughnessTexture;
+	int idx_specularTexture;
+	int idx_specularColorTexture;
+	int idx_transmissionTexture;
+	int idx_thicknessTexture;
+	int idx_clearcoatRoughnessTexture;
+	int idx_clearcoatNormalTexture;
+	int idx_iridescenceTexture;
+	int idx_iridescenceThicknessTexture;
+	int idx_anisotropyTexture;
+	int idx_SSAO;
+	int idx_transmissionFramebufferTexture;
 };
 
 struct MaterialInfo
@@ -282,7 +309,7 @@ layout(set = 1, binding = ID_diffuseCube) uniform samplerCube u_EnvSampler[3]; /
 layout(set = 1, binding = ID_shadowMap) uniform sampler2DShadow u_shadowMap[MAX_SHADOW_INSTANCES];
 #endif
 /*
-float u_OcclusionStrength = 1.0;
+
 #define USE_TEX_LOD
 
 ID_diffuseCube

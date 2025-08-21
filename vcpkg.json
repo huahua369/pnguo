@@ -26,7 +26,6 @@
     "libflac",
     "mpg123",
     "fftw3",
-    "cpuid",
-    "hwloc"
+    "cpuid"
   ]
 }

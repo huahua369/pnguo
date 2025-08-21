@@ -13,7 +13,7 @@ list(APPEND src_cmp
 
 
 # 将源代码添加到此项目的可执行文件。
-add_executable (tcmp ${src_cmp} ) 
+#add_executable (tcmp ${src_cmp} ) 
 
 list(APPEND src_vkcmp   
     "main_vk.cpp" 
@@ -73,7 +73,7 @@ add_executable (vkcmp ${src_vkcmp} )
 add_executable (vkr_spr ${src_spr} ) 
 add_executable (mtl ${src_mtl} ) 
 add_executable (audios ${src_audios} ) 
-add_executable (mmd ${src_mmd} ) 
+#add_executable (mmd ${src_mmd} ) 
 add_executable (mw ${src_mw} ) 
 #管理员权限
 #SET_TARGET_PROPERTIES(mtl PROPERTIES LINK_FLAGS "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"")
@@ -92,7 +92,7 @@ find_package(cpuid CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
 find_package(CURL REQUIRED)
-pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
+#pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
 
 #find_package(cmark CONFIG REQUIRED)  
 
@@ -106,7 +106,7 @@ list(APPEND lklib
     #Vulkan::Headers 
     GPUOpen::VulkanMemoryAllocator
     PkgConfig::LIBRSVG
-    PkgConfig::hwloc
+   # PkgConfig::hwloc
     glm::glm-header-only
     nlohmann_json::nlohmann_json
     OpenSSL::SSL OpenSSL::Crypto
@@ -141,15 +141,15 @@ list(APPEND lkalib
 #libsoundio::libsoundio
 Ogg::ogg
 )
-include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
-target_link_libraries(tcmp PRIVATE ${lklib})
+#include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
+#target_link_libraries(tcmp PRIVATE ${lklib})
  
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
 target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(mtl PRIVATE ${lklib}  )
 target_link_libraries(mw PRIVATE ${lklib} )
 target_link_libraries(audios PRIVATE ${lkalib})
-target_link_libraries(mmd PRIVATE ${lklib}  )  
+#target_link_libraries(mmd PRIVATE ${lklib}  )  
  
 #复制测试文本
 file(COPY sh938.txt DESTINATION ${EXECUTABLE_OUTPUT_PATH})

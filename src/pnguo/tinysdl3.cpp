@@ -3012,7 +3012,6 @@ bool form_x::has_variable()
 #endif
 
 // cpu信息
-#include <hwloc.h>
 
 #ifdef _WIN32
 typedef BOOL(WINAPI* LPFN_GLPI)(
@@ -3209,16 +3208,19 @@ std::string formatBytes(uint64_t bytes)
 	return oss.str();
 }
 
+//#include <hwloc.h>
+
 cpuinfo_t get_cpuinfo()
 {
 	cpuinfo_t r = {};
+	int levels = 0;
+#if 0
 	hwloc_topology_t topology = {};
 	hwloc_topology_init(&topology);      // 初始化拓扑结构 
 	hwloc_topology_load(topology);       // 加载硬件信息 
 
 	// 遍历所有缓存对象 
 	hwloc_obj_t cache, obj;
-	int levels = 0;
 	std::vector<glm::i64vec2> lc;
 	for (obj = hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, 0); obj; obj = obj->parent)
 	{
@@ -3230,6 +3232,7 @@ cpuinfo_t get_cpuinfo()
 		}
 	}
 	hwloc_topology_destroy(topology);    // 释放资源 
+#endif
 	levels = 0;
 	auto nn = get_cpus(&r);
 	for (size_t i = 0; i < 6; i++)

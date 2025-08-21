@@ -209,7 +209,7 @@ add_subdirectory(src/pnguo)
 
 add_subdirectory(test_src)
 add_dependencies(pnguo tpv)
-add_dependencies(tcmp pnguo)
+#add_dependencies(tcmp pnguo)
 # TODO: 如有需要，请添加测试并安装目标。
 
 list(APPEND snake_src     

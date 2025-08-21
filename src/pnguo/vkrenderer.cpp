@@ -1184,8 +1184,9 @@ namespace vkr {
 		float clearcoatRoughness = 0;
 		float clearcoatNormalScale = 1;
 		float envIntensity = 1;
-		int unlit = 0;
-		float pad[3];
+		int unlit = 0; 
+		float u_OcclusionStrength = 1.0;
+		float pad[2];
 		mat3x4 uvTransform = mat3x4(1.0);
 		//glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
 	};
