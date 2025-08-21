@@ -110,6 +110,11 @@ typedef uint32_t DXGI_FORMAT;
 
 namespace vkr
 {
+	//  VK_KHR_shader_float16_int8
+	//	VK_KHR_16bit_storage
+	//	VK_KHR_8bit_storage
+#define GBFORMAT_E1 VK_FORMAT_R16G16B16A16_SFLOAT
+#define GBFORMAT_E VK_FORMAT_R32G32B32A32_SFLOAT
 	std::string format(const char* format, ...);
 	inline std::string to_string_g(double _Val) {
 		const auto _Len = static_cast<size_t>(_scprintf("%g", _Val));
@@ -3708,11 +3713,11 @@ namespace vkr {
 
 	// Creates a Render pass that will discard the contents of the render target.
 	//
-	VkRenderPass SimpleColorWriteRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout);
+	VkRenderPass SimpleColorWriteRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout, uint32_t format);
 
 	// Creates a Render pass that will use the contents of the render target for blending.
 	//
-	VkRenderPass SimpleColorBlendRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout);
+	VkRenderPass SimpleColorBlendRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout, uint32_t format);
 
 	// Sets the i-th Descriptor Set entry to use a given image view + sampler. The sampler can be null is a static one is being used.
 	//
@@ -10661,11 +10666,11 @@ namespace vkr {
 
 		// TAA buffers
 		//
-		m_TAABuffer.InitRenderTarget(m_pDevice, Width, Height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_TAABuffer");
+		m_TAABuffer.InitRenderTarget(m_pDevice, Width, Height, GBFORMAT_E, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_TAABuffer");
 		m_TAABuffer.CreateSRV(&m_TAABufferSRV);
 		m_TAABuffer.CreateSRV(&m_TAABufferUAV);
 
-		m_HistoryBuffer.InitRenderTarget(m_pDevice, Width, Height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HistoryBuffer");
+		m_HistoryBuffer.InitRenderTarget(m_pDevice, Width, Height, GBFORMAT_E, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HistoryBuffer");
 		m_HistoryBuffer.CreateSRV(&m_HistoryBufferSRV);
 		m_HistoryBuffer.CreateSRV(&m_HistoryBufferUAV);
 
@@ -11081,7 +11086,8 @@ namespace vkr {
 
 		// Create a Render pass that accounts for blending
 		//
-		m_blendPass = SimpleColorBlendRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		m_blendPass = SimpleColorBlendRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
 
 		//blending add
 		{
@@ -11415,7 +11421,8 @@ namespace vkr {
 
 		// Create a Render pass that will discard the contents of the render target.
 		//
-		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, format);
 
 		// The sampler we want to use for downsampling, all linear
 		//
@@ -11835,7 +11842,8 @@ namespace vkr {
 
 		// In Render pass
 		//
-		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
 
 		// The sampler we want to use for downsampling, all linear
 		//
@@ -12688,11 +12696,11 @@ namespace vkr {
 		return render_pass;
 	}
 
-	VkRenderPass SimpleColorWriteRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout)
+	VkRenderPass SimpleColorWriteRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout, uint32_t format)
 	{
 		// color RT
 		VkAttachmentDescription attachments[1];
-		attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		attachments[0].format = (VkFormat)format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // we don't care about the previous contents, this is for a full screen pass with no blending
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -12744,11 +12752,11 @@ namespace vkr {
 		return renderPass;
 	}
 
-	VkRenderPass SimpleColorBlendRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout)
+	VkRenderPass SimpleColorBlendRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout, uint32_t format)
 	{
 		// color RT
 		VkAttachmentDescription attachments[1];
-		attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		attachments[0].format = (VkFormat)format;// 
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -17995,13 +18003,13 @@ namespace vkr {
 			std::map<GBufferFlags, VkFormat> formats =
 			{
 				{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
-				{ GBUFFER_FORWARD, VK_FORMAT_R16G16B16A16_SFLOAT},
-				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
-				//{ GBUFFER_NORMAL_BUFFER, VK_FORMAT_R16G16B16A16_SFLOAT},
+				{ GBUFFER_FORWARD, GBFORMAT_E},
+				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R32G32_SFLOAT},
+				//{ GBUFFER_NORMAL_BUFFER, GBFORMAT_E},
 			};
 			if (has_oit) {
-				formats[GBUFFER_OIT_ACCUM] = VK_FORMAT_R16G16B16A16_SFLOAT;
-				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R16_SFLOAT;
+				formats[GBUFFER_OIT_ACCUM] = GBFORMAT_E;
+				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R32_SFLOAT;
 			}
 			m_GBuffer.OnCreate(
 				pDevice,
@@ -18033,9 +18041,9 @@ namespace vkr {
 			skyDomeConstants.luminance = 1.0f;
 		}
 		auto specular = "images\\specular.dds"; "images\\default_specular.dds";
-		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps
+		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, GBFORMAT_E, &m_ResourceViewHeaps
 			, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
-		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, VK_FORMAT_R16G16B16A16_SFLOAT, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, GBFORMAT_E, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
 		_WireframeSphere.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
@@ -18044,10 +18052,10 @@ namespace vkr {
 		//_axis.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 
 
-		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
-		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
+		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, GBFORMAT_E);
+		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, GBFORMAT_E);
 		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing, false);
-		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_FORMAT_R16G16B16A16_SFLOAT);
+		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, GBFORMAT_E);
 
 		// Create tonemapping pass
 		m_ToneMappingCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);

@@ -5,9 +5,9 @@
 #extension GL_ARB_compute_shader  : enable
 
 layout (local_size_x = 8, local_size_y = 8) in; 
-layout(set = 0, binding = 0, rgba16f) uniform image2D opaqueTex;  // 不透明纹理 
-layout(set = 0, binding = 1, rgba16f) uniform image2D accumTex;   // 积累纹理 
-layout(set = 0, binding = 2, r16f) uniform image2D weightTex;  // 权重纹理 
+layout(set = 0, binding = 0, rgba32f) uniform image2D opaqueTex;  // 不透明纹理 
+layout(set = 0, binding = 1, rgba32f) uniform image2D accumTex;   // 积累纹理 
+layout(set = 0, binding = 2, r32f) uniform image2D weightTex;  // 权重纹理 
  
 void main()
 {

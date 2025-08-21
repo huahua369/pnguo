@@ -16,7 +16,7 @@ layout(set = 0, binding = 0) uniform sampler2D ColorBuffer;
 layout(set = 0, binding = 1) uniform sampler2D DepthBuffer;
 layout(set = 0, binding = 2) uniform sampler2D HistoryBuffer;
 layout(set = 0, binding = 3) uniform sampler2D VelocityBuffer;
-layout(set = 0, binding = 4, rgba16f) writeonly uniform image2D OutputBuffer;  // RWTexture2D 对应 image2D 
+layout(set = 0, binding = 4, rgba32f) writeonly uniform image2D OutputBuffer;  // RWTexture2D 对应 image2D 
 
 // 共享内存（groupshared 对应 shared） 
 shared vec3 Tile[TILE_DIM * TILE_DIM];
