@@ -44,7 +44,7 @@ vec3 Tonemap(vec3 color, float exposure, int tonemapper)
         case 1: return DX11DSK(color);
         case 2: return Reinhard(color);
         case 3: return Uncharted2Tonemap(color);
-        case 4: return tonemapACES( color );
+        case 4: return tonemapACES(color);
         case 5: return color;
         default: return vec3(1, 1, 1);
     } 

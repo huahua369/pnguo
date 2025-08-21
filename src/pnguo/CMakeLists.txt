@@ -24,6 +24,8 @@ set(Shaders_PostProc_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/tonemapping.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/TAASharpenerCS.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/TAA.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/TAASharpenerCS.glsl.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/TAA.glsl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/tonemappingCS.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/ColorConversionPS.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/MagnifierPS.glsl

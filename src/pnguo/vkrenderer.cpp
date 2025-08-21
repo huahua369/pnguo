@@ -1184,7 +1184,7 @@ namespace vkr {
 		float clearcoatRoughness = 0;
 		float clearcoatNormalScale = 1;
 		float envIntensity = 1;
-		int unlit = 0; 
+		int unlit = 0;
 		float u_OcclusionStrength = 1.0;
 		float pad[2];
 		mat3x4 uvTransform = mat3x4(1.0);
@@ -9426,7 +9426,7 @@ namespace vkr
 #ifdef USE_VMA
 		VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 		bufferInfo.size = m_memTotalSize;
-		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
 		VmaAllocationCreateInfo allocInfo = {};
 		allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -10589,9 +10589,15 @@ namespace vkr {
 
 			m_pResourceViewHeaps->CreateDescriptorSetLayout(&m_TAAInputs, &m_TaaDescriptorSetLayout);
 			m_pResourceViewHeaps->AllocDescriptor(m_TaaDescriptorSetLayout, &m_TaaDescriptorSet);
-
+#if 0
 			m_TAA.OnCreate(m_pDevice, "TAA.hlsl", "main", "-T cs_6_0", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
 			m_TAAFirst.OnCreate(m_pDevice, "TAA.hlsl", "first", "-T cs_6_0", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
+#else
+			DefineList defines;
+			defines["FIRST_PASS"] = "1";
+			m_TAA.OnCreate(m_pDevice, "TAA.glsl.h", "main", "", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
+			m_TAAFirst.OnCreate(m_pDevice, "TAA.glsl.h", "main", "", m_TaaDescriptorSetLayout, 16, 16, 1, &defines);
+#endif
 		}
 
 		// Sharpener
@@ -13597,7 +13603,7 @@ namespace vkr {
 		std::string commandLine;
 		if (sourceType == SST_GLSL)
 		{
-			commandLine = format("glslc --target-env=vulkan1.1 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
+			commandLine = format("glslc --target-env=vulkan1.3 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
 
 			std::string filenameErr = format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash);
 
@@ -13610,7 +13616,7 @@ namespace vkr {
 		}
 		else
 		{
-			std::string scp = format("-spirv -fspv-target-env=vulkan1.1 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
+			std::string scp = format("-spirv -fspv-target-env=vulkan1.3 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
 			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData, outSpvSize);
 			assert(*outSpvSize != 0);
 
@@ -13769,12 +13775,20 @@ namespace vkr {
 		size_t size;
 
 		ShaderSourceType sourceType;
-
-		const char* pExtension = pFilename + std::max<size_t>(strlen(pFilename) - 4, 0);
-		if (strcmp(pExtension, "glsl") == 0)
+		std::string pfn = pFilename;
+		if (pfn.find(".glsl") != std::string::npos)
+		{
 			sourceType = SST_GLSL;
-		else if (strcmp(pExtension, "hlsl") == 0)
+		}
+		else if (pfn.find(".hlsl") != std::string::npos)
+		{
 			sourceType = SST_HLSL;
+		}
+		//const char* pExtension = pFilename + std::max<size_t>(strlen(pFilename) - 4, 0);
+		//if (strcmp(pExtension, "glsl") == 0)
+		//	sourceType = SST_GLSL;
+		//else if (strcmp(pExtension, "hlsl") == 0)
+		//	sourceType = SST_HLSL;
 		else
 			assert(!"Can't tell shader type from its extension");
 
