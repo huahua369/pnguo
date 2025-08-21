@@ -12,11 +12,11 @@ layout(local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE, local_size_z = 1) i
 
 
 // 资源绑定（对应 HLSL 的 [[vk::binding]]，GLSL 中使用 layout(binding = ...)） 
-layout(binding = 0) uniform sampler2D ColorBuffer;
-layout(binding = 1) uniform sampler2D DepthBuffer;
-layout(binding = 2) uniform sampler2D HistoryBuffer;
-layout(binding = 3) uniform sampler2D VelocityBuffer;
-layout(binding = 4, rgba32f) writeonly uniform image2D OutputBuffer;  // RWTexture2D 对应 image2D 
+layout(set = 0, binding = 0) uniform sampler2D ColorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D DepthBuffer;
+layout(set = 0, binding = 2) uniform sampler2D HistoryBuffer;
+layout(set = 0, binding = 3) uniform sampler2D VelocityBuffer;
+layout(set = 0, binding = 4, rgba16f) writeonly uniform image2D OutputBuffer;  // RWTexture2D 对应 image2D 
 
 // 共享内存（groupshared 对应 shared） 
 shared vec3 Tile[TILE_DIM * TILE_DIM];

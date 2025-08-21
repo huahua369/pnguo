@@ -18069,6 +18069,8 @@ namespace vkr {
 			auto res = vkCreateFence(m_pDevice->GetDevice(), &fence_ci, NULL, &pass_fence);
 			assert(res == VK_SUCCESS);
 		}
+		m_VidMemBufferPool.FreeUploadHeap();
+
 	}
 
 	//--------------------------------------------------------------------------------------

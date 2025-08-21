@@ -3,9 +3,9 @@
 #extension GL_ARB_compute_shader : enable
 
 layout(local_size_x = 8, local_size_y = 8) in;
-layout(binding = 0, rgba16f) uniform image2D TAABuffer;
-layout(binding = 1, rgba16f) uniform image2D HDR;
-layout(binding = 2, rgba16f) uniform image2D History;
+layout(set = 0, binding = 0, rgba16f) uniform image2D TAABuffer;
+layout(set = 0, binding = 1, rgba16f) uniform image2D HDR;
+layout(set = 0, binding = 2, rgba16f) uniform image2D History;
 //--------------------------------------------------------------------------------------
 // Helper functions
 //--------------------------------------------------------------------------------------
