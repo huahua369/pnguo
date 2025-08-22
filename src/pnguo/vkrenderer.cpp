@@ -8676,7 +8676,9 @@ namespace vkr
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cbvDescriptorCount },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, srvDescriptorCount },
 			{ VK_DESCRIPTOR_TYPE_SAMPLER, samplerDescriptorCount },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, uavDescriptorCount }
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, uavDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, uavDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, samplerDescriptorCount }
 		};
 
 		VkDescriptorPoolCreateInfo descriptor_pool = {};
@@ -10567,11 +10569,11 @@ namespace vkr {
 			// Create VkDescriptor Set Layout Bindings
 			//
 
-			std::vector<VkDescriptorSetLayoutBinding> m_TAAInputs(4 + 1 + 4);
+			std::vector<VkDescriptorSetLayoutBinding> m_TAAInputs(5 + 4);
 			for (int i = 0; i < 4; i++)
 			{
 				m_TAAInputs[i].binding = i;
-				m_TAAInputs[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+				m_TAAInputs[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;//VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;// 
 				m_TAAInputs[i].descriptorCount = 1;
 				m_TAAInputs[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 				m_TAAInputs[i].pImmutableSamplers = NULL;
@@ -10594,7 +10596,7 @@ namespace vkr {
 
 			m_pResourceViewHeaps->CreateDescriptorSetLayout(&m_TAAInputs, &m_TaaDescriptorSetLayout);
 			m_pResourceViewHeaps->AllocDescriptor(m_TaaDescriptorSetLayout, &m_TaaDescriptorSet);
-#if 0
+#if 1
 			m_TAA.OnCreate(m_pDevice, "TAA.hlsl", "main", "-T cs_6_0", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
 			m_TAAFirst.OnCreate(m_pDevice, "TAA.hlsl", "first", "-T cs_6_0", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
 #else
