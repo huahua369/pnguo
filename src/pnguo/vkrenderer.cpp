@@ -97,7 +97,18 @@ typedef uint32_t DXGI_FORMAT;
 #include <print_time.h>
 #include <mapView.h>
 #define TINYGLTF_IMPLEMENTATION 
+#define TINYGLTF_USE_RAPIDJSON
+
+#define TINYGLTF_NO_INCLUDE_RAPIDJSON
+#include <rapidjson/document.h>
+#include <rapidjson/prettywriter.h>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
 #include <tiny_gltf.h>
+
+
 #include <zlib.h>
 #include <queue>
 #include "vkrenderer.h"
@@ -872,6 +883,7 @@ void DeviceShutdown(vkr::Device* dev)
 {
 	if (dev)
 	{
+		dev->GPUFlush();
 		dev->DestroyPipelineCache();
 		dev->OnDestroy();
 	}
@@ -3437,8 +3449,7 @@ namespace vkr {
 			AsyncPool* pAsyncPool = NULL
 		);
 
-		void OnDestroy();
-		void BuildBatchLists(std::vector<BatchList>* pSolid, std::vector<BatchList>* pTransparent, bool bWireframe = false);
+		void OnDestroy(); 
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
@@ -18244,7 +18255,8 @@ namespace vkr {
 			Profile p("m_pGltfLoader->Load");
 
 			currobj->m_pGLTFTexturesAndBuffers = new GLTFTexturesAndBuffers();
-			currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_VidMemBufferPool, &m_ConstantBufferRing);
+			currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, 0, 0, 0);
+			//currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_VidMemBufferPool, &m_ConstantBufferRing);
 		}
 		else if (Stage == 6)
 		{
@@ -18260,19 +18272,15 @@ namespace vkr {
 			Profile p("m_GLTFDepth->OnCreate");
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
-			currobj->m_GLTFDepth->OnCreate(
-				m_pDevice,
-				m_Render_pass_shadow,
-				&m_UploadHeap,
-				&m_ResourceViewHeaps,
-				&m_ConstantBufferRing,
-				&m_VidMemBufferPool,
-				currobj->m_pGLTFTexturesAndBuffers,
-				pAsyncPool
-			);
+			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
+				0, 0, 0, 0,
+				currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
+			/*	currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
+					&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
+					currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);*/
 
-			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
-			m_UploadHeap.FlushAndFinish();
+					//m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+					//m_UploadHeap.FlushAndFinish();
 		}
 		else if (Stage == 8)
 		{
@@ -18282,10 +18290,11 @@ namespace vkr {
 			currobj->m_GLTFPBR = new GltfPbrPass();
 			currobj->m_GLTFPBR->OnCreate(
 				m_pDevice,
-				&m_UploadHeap,
-				&m_ResourceViewHeaps,
-				&m_ConstantBufferRing,
-				&m_VidMemBufferPool,
+				//&m_UploadHeap,
+				//&m_ResourceViewHeaps,
+				//&m_ConstantBufferRing,
+				//&m_VidMemBufferPool,
+				0, 0, 0, 0,
 				currobj->m_pGLTFTexturesAndBuffers,
 				&m_SkyDome,
 				false, // use SSAO mask
@@ -18306,9 +18315,10 @@ namespace vkr {
 			currobj->m_GLTFBBox->OnCreate(
 				m_pDevice,
 				m_RenderPassJustDepthAndHdr.GetRenderPass(),
-				&m_ResourceViewHeaps,
-				&m_ConstantBufferRing,
-				&m_VidMemBufferPool,
+				//&m_ResourceViewHeaps,
+				//&m_ConstantBufferRing,
+				//&m_VidMemBufferPool,
+				0, 0, 0,
 				currobj->m_pGLTFTexturesAndBuffers,
 				&m_Wireframe
 			);
@@ -19904,20 +19914,29 @@ namespace vkr {
 		//print_time Pt("push gltf", 1);
 		std::thread a([=]()
 			{
-				print_time Pt("load gltf", 1);
-				auto pgc = new GLTFCommon();
-				pgc->_pos = pos;
-				pgc->_scale = scale;
-				if (pgc->Load(fn, "") == false)
+				GLTFCommon* pgc = 0;
 				{
-					printf("The selected model couldn't be found, please check the documentation!\n");
-					delete pgc;
-					return;
+					print_time Pt("load gltf", 1);
+					auto pgc = new GLTFCommon();
+					pgc->_pos = pos;
+					pgc->_scale = scale;
+					if (pgc->Load(fn, "") == false)
+					{
+						printf("The selected model couldn't be found, please check the documentation!\n");
+						delete pgc;
+						//exit(1);
+						return;
+					}
 				}
-				std::unique_lock<std::mutex> lock(m_ltsm);
-				_lts.push(pgc);
+				exit(2);
+				if (pgc)
+				{
+					std::unique_lock<std::mutex> lock(m_ltsm);
+					_lts.push(pgc);
+				}
 			}
 		);
+		a.join();
 		a.detach();
 	}
 
@@ -20835,11 +20854,12 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev)
 	return p;
 }
 
-void free_vkdg(vkdg_cx* p)
+void free_vkdg(vkdg_cx* p, bool f)
 {
 	if (p)
 	{
-		DeviceShutdown((vkr::Device*)p->dev);
+		if (f)
+			DeviceShutdown((vkr::Device*)p->dev);
 		delete p;
 	}
 }

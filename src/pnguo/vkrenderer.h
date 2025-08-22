@@ -4,7 +4,7 @@
 	Copyright (c) 华仔
 	188665600@qq.com
 
-	创建日期：2024-07-15 
+	创建日期：2024-07-15
 
 	示例：
 
@@ -40,7 +40,7 @@ void vkrender_test()
  渲染器配置
  资源管理：加载、卸载
  gltf加载渲染
- todo 提交网格、纹理、材质数据，实现渲染 
+ todo 提交网格、纹理、材质数据，实现渲染
 
  ResourceViewHeaps* pResourceViewHeaps,		//管理set分配
  DynamicBufferRing* pConstantBufferRing,	// 动态常量缓冲区ubo
@@ -227,13 +227,15 @@ void free_instance(void* inst);
 
 // todo 创建渲染器
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev);
-void free_vkdg(vkdg_cx* p);
+// f是否需要删除vk资源
+void free_vkdg(vkdg_cx* p, bool f = false);
 
 struct device_info_t
 {
 	char name[256];
 	void* phd;
 };
+// 获取设备名称列表
 std::vector<device_info_t> get_devices(void* inst);
 
 void get_queue_info(void* physicaldevice);

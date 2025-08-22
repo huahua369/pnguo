@@ -10,6 +10,7 @@
     "glm",
     "stb",
     "nlohmann-json",
+    "rapidjson",
     "vulkan",
     "vulkan-memory-allocator",
     "zlib",
