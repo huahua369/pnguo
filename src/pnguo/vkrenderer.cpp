@@ -112,9 +112,8 @@ namespace vkr
 {
 	//  VK_KHR_shader_float16_int8
 	//	VK_KHR_16bit_storage
-	//	VK_KHR_8bit_storage
-#define GBFORMAT_E1 VK_FORMAT_R16G16B16A16_SFLOAT
-#define GBFORMAT_E VK_FORMAT_R32G32B32A32_SFLOAT
+	//	VK_KHR_8bit_storage 
+
 	std::string format(const char* format, ...);
 	inline std::string to_string_g(double _Val) {
 		const auto _Len = static_cast<size_t>(_scprintf("%g", _Val));
@@ -3260,7 +3259,7 @@ namespace vkr {
 
 		Texture               m_HistoryBuffer;
 		VkImageView           m_HistoryBufferSRV;
-		VkImageView           m_HistoryBufferUAV;
+		//VkImageView           m_HistoryBufferUAV;
 
 		VkSampler             m_samplers[4];
 
@@ -10668,13 +10667,13 @@ namespace vkr {
 
 		// TAA buffers
 		//
-		m_TAABuffer.InitRenderTarget(m_pDevice, Width, Height, GBFORMAT_E, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_TAABuffer");
+		m_TAABuffer.InitRenderTarget(m_pDevice, Width, Height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_TAABuffer");
 		m_TAABuffer.CreateSRV(&m_TAABufferSRV);
 		m_TAABuffer.CreateSRV(&m_TAABufferUAV);
 
-		m_HistoryBuffer.InitRenderTarget(m_pDevice, Width, Height, GBFORMAT_E, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HistoryBuffer");
+		m_HistoryBuffer.InitRenderTarget(m_pDevice, Width, Height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HistoryBuffer");
 		m_HistoryBuffer.CreateSRV(&m_HistoryBufferSRV);
-		m_HistoryBuffer.CreateSRV(&m_HistoryBufferUAV);
+		//m_HistoryBuffer.CreateSRV(&m_HistoryBufferUAV);
 
 		m_TexturesInUndefinedLayout = true;
 
@@ -10727,7 +10726,7 @@ namespace vkr {
 		vkDestroyImageView(m_pDevice->GetDevice(), m_TAABufferSRV, nullptr);
 		vkDestroyImageView(m_pDevice->GetDevice(), m_TAABufferUAV, nullptr);
 		vkDestroyImageView(m_pDevice->GetDevice(), m_HistoryBufferSRV, nullptr);
-		vkDestroyImageView(m_pDevice->GetDevice(), m_HistoryBufferUAV, nullptr);
+		//vkDestroyImageView(m_pDevice->GetDevice(), m_HistoryBufferUAV, nullptr);
 	}
 
 	void TAA::Draw(VkCommandBuffer cmd_buf)
@@ -17982,36 +17981,37 @@ namespace vkr {
 		m_CommandListRing.OnCreate(pDevice, backBufferCount, ct.commandListsPerBackBuffer);
 
 		// Create a 'dynamic' constant buffer
-		//const uint32_t constantBuffersMemSize = 200 * 1024 * 1024;
-		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, ct.constantBuffersMemSize, (char*)"Uniforms");
+		const uint32_t constantBuffersMemSize = 64 * 1024;
+		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, constantBuffersMemSize, (char*)"Uniforms");
 
 		// Create a 'static' pool for vertices and indices 
-		//const uint32_t staticGeometryMemSize = (1 * 128) * 1024 * 1024;
-		m_VidMemBufferPool.OnCreate(pDevice, ct.staticGeometryMemSize, true, "StaticGeom");
+		const uint32_t staticGeometryMemSize = (1 * 1) * 1024 * 1024;
+		m_VidMemBufferPool.OnCreate(pDevice, staticGeometryMemSize, true, "StaticGeom");
 
 		// Create a 'static' pool for vertices and indices in system memory
-		//const uint32_t systemGeometryMemSize = 32 * 1024;
-		//m_SysMemBufferPool.OnCreate(pDevice, ct.systemGeometryMemSize, false, "PostProcGeom");
+		const uint32_t systemGeometryMemSize = 32 * 1024;
+		m_SysMemBufferPool.OnCreate(pDevice, systemGeometryMemSize, true, "PostProcGeom");
 
 		// initialize the GPU time stamps module
 		m_GPUTimer.OnCreate(pDevice, backBufferCount);
 
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
 		//const uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
-		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
+		m_UploadHeap.OnCreate(pDevice, 10 * 1024 * 1024);    // initialize an upload heap (uses suballocation for faster results)
 		// Create GBuffer and render passes
+		VkFormat mformat = VK_FORMAT_R16G16B16A16_SFLOAT;
 		// todo oit 有问题
 		{
 			std::map<GBufferFlags, VkFormat> formats =
 			{
 				{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
-				{ GBUFFER_FORWARD, GBFORMAT_E},
-				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R32G32_SFLOAT},
+				{ GBUFFER_FORWARD, mformat},
+				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
 				//{ GBUFFER_NORMAL_BUFFER, GBFORMAT_E},
 			};
 			if (has_oit) {
-				formats[GBUFFER_OIT_ACCUM] = GBFORMAT_E;
-				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R32_SFLOAT;
+				formats[GBUFFER_OIT_ACCUM] = mformat;
+				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R16_SFLOAT;
 			}
 			m_GBuffer.OnCreate(
 				pDevice,
@@ -18043,33 +18043,33 @@ namespace vkr {
 			skyDomeConstants.luminance = 1.0f;
 		}
 		auto specular = "images\\specular.dds"; "images\\default_specular.dds";
-		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, GBFORMAT_E, &m_ResourceViewHeaps
-			, &m_ConstantBufferRing, &m_VidMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
-		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, GBFORMAT_E, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
-		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
-		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
-		_WireframeSphere.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool);
-		//_cbf.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, mformat, &m_ResourceViewHeaps
+			, &m_ConstantBufferRing, &m_SysMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
+		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, mformat, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool);
+		_WireframeSphere.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool);
+		//_cbf.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 
-		//_axis.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		//_axis.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
 
 
-		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, GBFORMAT_E);
-		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, GBFORMAT_E);
-		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing, false);
-		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, GBFORMAT_E);
+		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
+		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
+		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing, false);
+		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
 
 		// Create tonemapping pass
 		m_ToneMappingCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
 		m_oitblendCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
-		m_ToneMappingPS.OnCreate(m_pDevice, rp, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
-		m_ColorConversionPS.OnCreate(pDevice, rp, &m_ResourceViewHeaps, &m_VidMemBufferPool, &m_ConstantBufferRing);
+		m_ToneMappingPS.OnCreate(m_pDevice, rp, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing);
+		m_ColorConversionPS.OnCreate(pDevice, rp, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing);
 
 		// Initialize UI rendering resources
 		//m_ImGUI.OnCreate(m_pDevice, pSwapChain->GetRenderPass(), &m_UploadHeap, &m_ConstantBufferRing, FontSize);
 
 		// Make sure upload heap has finished uploading before continuing
-		m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+		m_SysMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 		m_UploadHeap.FlushAndFinish();
 		// Create fence
 		{
@@ -18079,7 +18079,7 @@ namespace vkr {
 			auto res = vkCreateFence(m_pDevice->GetDevice(), &fence_ci, NULL, &pass_fence);
 			assert(res == VK_SUCCESS);
 		}
-		m_VidMemBufferPool.FreeUploadHeap();
+		m_SysMemBufferPool.FreeUploadHeap();
 
 	}
 
@@ -18119,7 +18119,7 @@ namespace vkr {
 		m_UploadHeap.OnDestroy();
 		m_GPUTimer.OnDestroy();
 		m_VidMemBufferPool.OnDestroy();
-		//m_SysMemBufferPool.OnDestroy();
+		m_SysMemBufferPool.OnDestroy();
 		m_ConstantBufferRing.OnDestroy();
 		m_ResourceViewHeaps.OnDestroy();
 		m_CommandListRing.OnDestroy();

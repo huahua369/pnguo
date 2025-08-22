@@ -20,9 +20,9 @@
 //--------------------------------------------------------------------------------------
 // Texture definitions
 //--------------------------------------------------------------------------------------
-[[vk::binding(0)]] Texture2D<float4> TAABuffer : register(t0);
-[[vk::binding(1)]] RWTexture2D<float4> HDR : register(u0);
-[[vk::binding(2)]] RWTexture2D<float4> History : register(u1);
+[[vk::binding(0)]] Texture2D<half4> TAABuffer : register(t0);
+[[vk::binding(1)]] RWTexture2D<half4> HDR : register(u0);
+[[vk::binding(2)]] RWTexture2D<half4> History : register(u1);
 
 //--------------------------------------------------------------------------------------
 // Helper functions

@@ -26,7 +26,7 @@
 [[vk::binding(2)]] Texture2D HistoryBuffer : register(t2);
 [[vk::binding(3)]] Texture2D VelocityBuffer : register(t3);
 
-[[vk::binding(4)]] RWTexture2D<float4> OutputBuffer : register(u4);
+[[vk::binding(4)]] RWTexture2D<half4> OutputBuffer : register(u4);
 
 [[vk::binding(5)]] SamplerState ColorSampler : register(s0);
 [[vk::binding(6)]] SamplerState DepthSampler : register(s1);
