@@ -2803,6 +2803,8 @@ namespace vkr {
 		std::vector<float> acv[4];				// 缓存动画结果	
 		std::vector<char*> m_buffersData;		// 原始数据
 		std::vector<float*> _sparseData;		// 解码的稀疏数据
+		std::vector<hz::mfile_t*> _fileData;	// 文件数据
+		std::vector<char*> _fileData_f;		// 原始数据
 
 		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
 		glm::mat4* m_animatedMats = 0;       // object space matrices of each node after being animated
@@ -14799,9 +14801,12 @@ namespace vkr {
 			if (p)
 				free(p);
 		}
-		for (int i = 0; i < m_buffersData.size(); i++)
+		for (int i = 0; i < _fileData_f.size(); i++)
 		{
-			delete[] m_buffersData[i];
+			delete[] _fileData_f[i];
+		}
+		for (auto& it : _fileData) {
+			delete it;
 		}
 		_sparseData.clear();
 		m_buffersData.clear();
@@ -14830,18 +14835,34 @@ namespace vkr {
 					continue;
 				}
 				const std::string& name = it.uri;
+#ifdef _MFILE_
+				hz::mfile_t mt;
+				auto fp = mt.open_d(m_path + name, true);
+				if (fp && mt.size() > 0)
+				{
+					auto ptr = new hz::mfile_t();
+					if (ptr) {
+						*ptr = mt;
+						mt.clear_ptr();
+						m_buffersData[i] = ptr->data();
+						_fileData.push_back(ptr);
+					}
+				}
+#else
 				std::ifstream ff(m_path + name, std::ios::in | std::ios::binary);
-
 				ff.seekg(0, ff.end);
 				std::streamoff length = ff.tellg();
 				if (length > 0)
 				{
 					ff.seekg(0, ff.beg);
-
 					char* p = new char[length];
-					ff.read(p, length);
-					m_buffersData[i] = p;
+					if (p) {
+						ff.read(p, length);
+						m_buffersData[i] = p;
+						_fileData_f.push_back(p);
+					}
 				}
+#endif
 			}
 		}
 	}
@@ -20142,17 +20163,18 @@ namespace vkr {
 				GLTFCommon* pgc = 0;
 				{
 					print_time Pt("load gltf", 1);
-					auto pgc = new GLTFCommon();
+					pgc = new GLTFCommon();
 					pgc->_pos = pos;
 					pgc->_scale = scale;
 					if (pgc->Load(fn, "") == false)
 					{
 						printf("The selected model couldn't be found, please check the documentation!\n");
 						delete pgc;
-						//exit(1);
+						exit(1);
 						return;
 					}
 				}
+				delete pgc;
 				exit(2);
 				if (pgc)
 				{

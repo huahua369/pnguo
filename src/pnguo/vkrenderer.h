@@ -39,10 +39,12 @@ void vkrender_test()
 
  渲染器配置
  资源管理：加载、卸载
- gltf加载渲染
- todo 提交网格、纹理、材质数据，实现渲染
 
- ResourceViewHeaps* pResourceViewHeaps,		//管理set分配
+todo gltf格式
+gltf加载：解析gltf文件，提取纹理、材质、网格信息
+提交网格、纹理、材质数据，实现渲染
+
+ ResourceViewHeaps* pResourceViewHeaps,		// 管理set分配
  DynamicBufferRing* pConstantBufferRing,	// 动态常量缓冲区ubo
  StaticBufferPool* pStaticBufferPool,		// 静态顶点/索引缓冲区
 */
