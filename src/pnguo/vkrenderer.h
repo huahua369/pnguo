@@ -47,6 +47,21 @@ void vkrender_test()
  StaticBufferPool* pStaticBufferPool,		// 静态顶点/索引缓冲区
 */
 namespace vkr {
+	struct transform_t
+	{
+		glm::quat rotation;		//  四元数，用于存储变换在世界空间中的旋转。
+		glm::vec3 position;		//	世界空间中的变换位置。
+		glm::vec3 forward;		//	返回一个标准化矢量，它表示世界空间中变换的蓝轴。
+		glm::vec3 right;		//	世界空间中变换的红轴。 
+		glm::vec3 up;			//	世界空间中变换的绿轴。 
+		glm::vec3 scale;		//	缩放。 
+		transform_t* root;		//	返回层级视图中最顶层的变换。
+		transform_t* parent;	//	变换的父级。
+		transform_t** child;	//	子项。 
+		int child_count;		//	子项数量。
+		bool hasChanged;		//	自上次将标志设置为“false”以来，变换是否发生更改  
+	};
+
 
 	struct const_vk {
 		// Create all the heaps for the resources views
