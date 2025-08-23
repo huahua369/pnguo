@@ -93,9 +93,6 @@ if(KHR_materials_transmission透明介质透射材质){
 #ifndef DXGI_FORMAT_DEFINED
 typedef uint32_t DXGI_FORMAT;
 #endif 
-#include <event.h>
-#include <print_time.h>
-#include <mapView.h>
 #define TINYGLTF_IMPLEMENTATION 
 #define TINYGLTF_USE_RAPIDJSON
 
@@ -111,6 +108,11 @@ typedef uint32_t DXGI_FORMAT;
 
 #include <zlib.h>
 #include <queue>
+// 本地头文件
+#include <event.h>
+#include <print_time.h>
+#include <mapView.h>
+
 #include "vkrenderer.h"
 
 #ifdef min
