@@ -1220,6 +1220,7 @@ namespace vkr {
 
 		pbrMaterial m_params = {};
 		glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
+		size_t uvc = 0;
 		int mid = 0;
 	};
 	struct morph_t;
@@ -2801,10 +2802,15 @@ namespace vkr {
 		std::vector<char*> m_buffersData;		// 原始数据
 		std::vector<float*> _sparseData;		// 解码的稀疏数据
 
-		std::vector<glm::mat4> m_animatedMats;       // object space matrices of each node after being animated
+		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
+		glm::mat4* m_animatedMats = 0;       // object space matrices of each node after being animated
 		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
-		std::map<int, std::vector<glm::mat4>> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
+		struct matp2 {
+			glm::mat4* m = 0;
+			size_t count = 0;
+		};
+		std::map<int, matp2> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 		std::map<int, std::vector<glm::mat3x4>> m_uv_mats; // UVmat
 
 		std::map<int, std::vector<glm::vec3>> targets_data;
@@ -2814,6 +2820,8 @@ namespace vkr {
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
 		uint32_t _animationIndex = 0;
+		size_t m_count = 0;	// 矩阵数量
+		size_t ubo_size = 0;
 	public:
 		~GLTFCommon();
 		bool Load(const std::string& path, const std::string& filename);
@@ -3449,7 +3457,7 @@ namespace vkr {
 			AsyncPool* pAsyncPool = NULL
 		);
 
-		void OnDestroy(); 
+		void OnDestroy();
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
@@ -5506,12 +5514,11 @@ namespace vkr
 		for (auto& t : m_pGLTFCommon->m_worldSpaceSkeletonMats)
 		{
 			auto matrices = &t.second;
-
 			VkDescriptorBufferInfo perSkeleton = {};
 			glm::mat4* cbPerSkeleton = 0;
-			uint32_t size = (uint32_t)(matrices->size() * sizeof(glm::mat4));
+			uint32_t size = (uint32_t)(matrices->count * sizeof(glm::mat4));
 			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbPerSkeleton, &perSkeleton);
-			memcpy(cbPerSkeleton, matrices->data(), size);
+			memcpy(cbPerSkeleton, matrices->m, size);
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
 		}
 		// todo 设置变形插值数据到ubo
@@ -5949,6 +5956,7 @@ namespace vkr
 		if (uvc < 1)
 			uvc = 1;
 		tfmat->m_defines["UVT_count"] = std::to_string(uvc);
+		tfmat->uvc = uvc;
 	}
 
 	int get_vint(tinygltf::Value& t, const char* k)
@@ -6087,6 +6095,194 @@ namespace vkr
 		}
 
 	}
+
+	struct ts_t0 {
+		int  v;//VkImageView
+		int s;//VkSampler
+	};
+	void getDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t0>& texturesBase, bool pSkyDome, int Shadow_count, bool bUseSSAOMask)
+	{
+		std::vector<uint32_t> descriptorCounts;
+		// count the number of textures to init bindings and descriptor
+		{
+			tfmat->m_textureCount = (int)texturesBase.size();
+			for (int i = 0; i < texturesBase.size(); ++i)
+			{
+				descriptorCounts.push_back(1);
+			}
+
+			if (pSkyDome)
+			{
+				tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
+				descriptorCounts.push_back(1);
+				descriptorCounts.push_back(1);
+				descriptorCounts.push_back(1);
+			}
+
+			if (bUseSSAOMask)
+			{
+				tfmat->m_textureCount += 1;
+				descriptorCounts.push_back(1);
+			}
+			if (tfmat->m_pbrMaterialParameters.transmission)
+			{
+				tfmat->m_textureCount += 1;
+				descriptorCounts.push_back(1);
+			}
+			if (Shadow_count > 0)
+			{
+				assert(Shadow_count <= MaxShadowInstances);
+				tfmat->m_textureCount += Shadow_count;//1;
+				// this is an array of samplers/textures
+				// We should set the exact number of descriptors to avoid validation errors
+				descriptorCounts.push_back(MaxShadowInstances);
+			}
+		}
+
+		{
+			// allocate descriptor table for the textures
+			//m_pResourceViewHeaps->AllocDescriptor(descriptorCounts, NULL, &tfmat->m_texturesDescriptorSetLayout, &tfmat->m_texturesDescriptorSet);
+
+			uint32_t cnt = 0;
+
+			// 1) create SRV for the PBR materials
+			for (auto const& it : texturesBase)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines[std::string("ID_") + it.first] = std::to_string(cnt);
+
+				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
+
+			// 2) 3 SRVs for the IBL probe
+			if (pSkyDome)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
+				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
+				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
+				cnt++;
+
+				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
+				//pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
+				cnt++;
+
+				tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
+				//pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
+				cnt++;
+
+				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
+			}
+
+			// 3) SSAO mask
+			//
+			if (bUseSSAOMask)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_SSAO"] = std::to_string(cnt);
+				cnt++;
+			}
+			if (tfmat->m_pbrMaterialParameters.transmission) {
+				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
+				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
+			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
+			if (Shadow_count > 0)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
+				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
+		}
+	}
+	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& m_materialsData)
+	{
+		// Load PBR 2.0 Materials 
+		if (pm)
+		{
+			auto& materials = pm->materials;
+			m_materialsData.resize(materials.size());
+			for (uint32_t i = 0; i < materials.size(); i++)
+			{
+				auto tfmat = &m_materialsData[i];
+				//tfmat->m_pbrMaterialParameters.m_defines["MATERIAL_UNLIT"] = "1";//无光照
+				// Get PBR material parameters and texture IDs
+				//
+				std::map<std::string, int> textureIds;
+				ProcessMaterials(&pm->materials[i], &tfmat->m_pbrMaterialParameters, textureIds);
+				tfmat->m_pbrMaterialParameters.mid = i;
+				// translate texture IDs into textureViews
+
+				std::map<std::string, ts_t0> texturesBase;
+				for (auto const& value : textureIds)
+				{
+					auto tinfo = pm->textures[value.second];
+					texturesBase[value.first].v = pm->textures[value.second].source;
+					texturesBase[value.first].s = tinfo.sampler;
+				}
+				getDescriptorTableForMaterialTextures(tfmat, texturesBase, 1, 1, 0);
+			}
+
+			// Load Meshes
+			//
+			auto& meshes = pm->meshes;
+
+			//m_meshes.resize(meshes.size());
+			for (uint32_t i = 0; i < meshes.size(); i++)
+			{
+				auto& mesh = meshes[i];
+				auto& primitives = meshes[i].primitives;
+				auto& weights = meshes[i].weights;
+
+				PBRMesh* tfmesh = 0;// &m_meshes[i];
+				tfmesh->m_pPrimitives.resize(primitives.size());
+
+				for (uint32_t p = 0; p < primitives.size(); p++)
+				{
+					auto& primitive = primitives[p];
+					PBRPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
+
+					if (primitive.extensions.size()) {
+						auto extensions = primitive.extensions;
+						auto tt = get_ext(extensions, "KHR_materials_variants");
+						if (tt)
+						{
+							if (tt->Has("mappings"))
+							{
+								auto& vt = tt->Get("mappings");
+								auto vn = vt.Size();
+								if (vt.IsArray())
+								{
+									for (size_t k = 0; k < vn; k++)
+									{
+										auto& vk = vt.Get(k);
+										int mid = vk.Get("material").GetNumberAsInt();
+										material_v mv = {};
+										mv.mid = mid;
+										if (vk.Has("variants") && vk.Get("variants").IsArray())
+										{
+											auto& va = vk.Get("variants");
+											auto van = va.Size();
+											mv.variants.reserve(van);
+											for (size_t m = 0; m < van; m++)
+											{
+												int vid = va.Get(m).GetNumberAsInt();
+												mv.variants.push_back(vid);
+											}
+										}
+										pPrimitive->material_variants.push_back(mv);
+									}
+								}
+							}
+						}
+						primitive.material;
+					}
+				}
+			}
+		}
+	}
+
+
 	//--------------------------------------------------------------------------------------
 	//
 	// OnCreate
@@ -14884,6 +15080,7 @@ namespace vkr {
 	{
 		auto& nodes = pm->nodes;
 		m_nodes.resize(nodes.size());
+		m_count = nodes.size();
 		for (int i = 0; i < nodes.size(); i++)
 		{
 			tfNode* tfnode = &m_nodes[i];
@@ -14964,7 +15161,7 @@ namespace vkr {
 		for (uint32_t i = 0; i < skins.size(); i++)
 		{
 			GetBufferDetails(skins[i].inverseBindMatrices, &m_skins[i].m_InverseBindMatrices);
-
+			m_count += m_skins[i].m_InverseBindMatrices.m_count;
 			m_skins[i].m_pSkeleton = &m_nodes[skins[i].skeleton];
 
 			auto& joints = skins[i].joints;
@@ -15538,18 +15735,47 @@ namespace vkr {
 	//
 	void GLTFCommon::InitTransformedData()
 	{
+		if (m_nodes.empty() || m_count == 0 || !pm)
+			return;
 		// initializes matrix buffers to have the same dimension as the nodes
 		m_worldSpaceMats.resize(m_nodes.size());
+		_mats.resize(m_count);
 
+
+
+		size_t dysize = sizeof(PerFrame_t) * 2;
+		// todo 设置变形插值数据到ubo
+		for (auto& [k, v] : m_animated_morphWeights)
+		{
+			//dysize += (v.size() * sizeof(float));
+		}
+		for (auto& [k, v] : m_uv_mats) {
+			dysize += (v.size() * sizeof(glm::mat3x4));
+		}
+
+		auto& meshes = pm->meshes;
+		for (uint32_t i = 0; i < meshes.size(); i++)
+		{
+			auto& mesh = meshes[i];
+			auto& primitives = meshes[i].primitives;
+			auto& weights = meshes[i].weights;
+			dysize += weights.size() * sizeof(float);
+		}
+
+		auto ptr = _mats.data();
+		m_animatedMats = ptr;
+		ptr += m_nodes.size();
 		// same thing for the skinning matrices but using the size of the InverseBindMatrices
 		for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
-			m_worldSpaceSkeletonMats[i].resize(m_skins[i].m_InverseBindMatrices.m_count);
+			auto& it = m_worldSpaceSkeletonMats[i]; it.m = ptr; it.count = m_skins[i].m_InverseBindMatrices.m_count; ptr + it.count;
+			dysize += it.count * sizeof(glm::mat4);
 		}
+
 
 		// sets the animated data to the default values of the nodes
 		// later on these values can be updated by the SetAnimationTime function
-		m_animatedMats.resize(m_nodes.size());
+		// .resize(m_nodes.size());
 		for (uint32_t i = 0; i < m_nodes.size(); i++)
 		{
 			m_animatedMats[i] = m_nodes[i].m_tranform.GetWorldMat();
@@ -15583,7 +15809,7 @@ namespace vkr {
 			auto& skinningMats = m_worldSpaceSkeletonMats[i];
 			for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
 			{
-				skinningMats[j] = (m_worldSpaceMats[skin.m_jointsNodeIdx[j]].GetCurrent() * pM[j]);// todo Set
+				skinningMats.m[j] = (m_worldSpaceMats[skin.m_jointsNodeIdx[j]].GetCurrent() * pM[j]);// todo Set
 			}
 		}
 	}
@@ -15639,11 +15865,12 @@ namespace vkr {
 
 	tfNodeIdx GLTFCommon::AddNode(const tfNode& node)
 	{
-		m_nodes.push_back(node);
-		tfNodeIdx idx = (tfNodeIdx)(m_nodes.size() - 1);
-		m_scenes[0].m_nodes.push_back(idx);
-		auto tf = node.m_tranform;
-		m_animatedMats.push_back(tf.GetWorldMat());
+		tfNodeIdx idx = 0;
+		//m_nodes.push_back(node);
+		//tfNodeIdx idx = (tfNodeIdx)(m_nodes.size() - 1);
+		//m_scenes[0].m_nodes.push_back(idx);
+		//auto tf = node.m_tranform;
+		//m_animatedMats.push_back(tf.GetWorldMat());
 
 		return idx;
 	}
@@ -18261,7 +18488,6 @@ namespace vkr {
 		else if (Stage == 6)
 		{
 			Profile p("LoadTextures");
-
 			// here we are loading onto the GPU all the textures and the inverse matrices
 			// this data will be used to create the PBR and Depth passes       
 			currobj->m_pGLTFTexturesAndBuffers->LoadTextures(pAsyncPool);
@@ -18272,13 +18498,10 @@ namespace vkr {
 			Profile p("m_GLTFDepth->OnCreate");
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
-			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
-				0, 0, 0, 0,
-				currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
+			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
 			/*	currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
 					&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
 					currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);*/
-
 					//m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 					//m_UploadHeap.FlushAndFinish();
 		}
