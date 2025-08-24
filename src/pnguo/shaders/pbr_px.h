@@ -1259,8 +1259,7 @@ float microfacetDistribution(gpuMaterial materialInfo, AngularInfo angularInfo)
 
 vec3 getPointShade(vec3 pointToLight, gpuMaterial materialInfo, vec3 normal, vec3 view)
 {
-	AngularInfo angularInfo = getAngularInfo(pointToLight, normal, view);
-
+	AngularInfo angularInfo = getAngularInfo(pointToLight, normal, view); 
 	if (angularInfo.NdotL > 0.0 || angularInfo.NdotV > 0.0)
 	{
 		// Calculate the shading terms for the microfacet specular shading model
@@ -1277,7 +1276,6 @@ vec3 getPointShade(vec3 pointToLight, gpuMaterial materialInfo, vec3 normal, vec
 #endif // __cplusplus
 
 		vec3 specContrib = F * Vis * D;
-
 		// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
 		return angularInfo.NdotL * (diffuseContrib + specContrib);
 	}

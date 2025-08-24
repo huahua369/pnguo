@@ -232,7 +232,7 @@ public:
 	// 复制fbo idx到 VkImage vkptr
 	void copy2(int idx, void* vkptr);
 	// 添加gltf模型到渲染器
-	void add_gltf(const char* fn, const glm::vec3& pos, float scale);
+	void add_gltf(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap = false);
 	// 获取灯光信息
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();

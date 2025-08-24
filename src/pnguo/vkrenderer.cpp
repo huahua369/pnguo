@@ -2864,6 +2864,7 @@ namespace vkr {
 		uint32_t _animationIndex = 0;
 		size_t m_count = 0;	// 矩阵数量
 		size_t ubo_size = 0;
+		bool has_shadowMap = true;
 		std::vector<PBRMaterial> _materialsData;
 		std::vector<PBRMesh> _meshes;
 	public:
@@ -10769,8 +10770,8 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerDiffuseCube = pDevice->newSampler(&info);
-	/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerDiffuseCube);
-			assert(res == VK_SUCCESS);*/
+			/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerDiffuseCube);
+					assert(res == VK_SUCCESS);*/
 		}
 
 		{
@@ -10905,8 +10906,8 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			
-			m_samplers[0] = m_samplers[1]= m_samplers[3] = pDevice->newSampler(&info);
+
+			m_samplers[0] = m_samplers[1] = m_samplers[3] = pDevice->newSampler(&info);
 			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[0]);
 			//assert(res == VK_SUCCESS);
 
@@ -10920,11 +10921,11 @@ namespace vkr {
 			info.minFilter = VK_FILTER_LINEAR;
 			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 			m_samplers[2] = pDevice->newSampler(&info);
-	/*		res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[2]);
-			assert(res == VK_SUCCESS);*/
+			/*		res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[2]);
+					assert(res == VK_SUCCESS);*/
 
-			// Create VkDescriptor Set Layout Bindings
-			//
+					// Create VkDescriptor Set Layout Bindings
+					//
 
 			std::vector<VkDescriptorSetLayoutBinding> m_TAAInputs(5 + 4);
 			for (int i = 0; i < 4; i++)
@@ -11227,8 +11228,8 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-	/*		VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);*/
+			/*		VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+					assert(res == VK_SUCCESS);*/
 		}
 
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
@@ -11490,8 +11491,8 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-	/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);*/
+			/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+					assert(res == VK_SUCCESS);*/
 		}
 
 		// Allocate descriptors for the mip chain
@@ -11800,8 +11801,8 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-	/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);*/
+			/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+					assert(res == VK_SUCCESS);*/
 		}
 
 		// Use helper class to create the fullscreen pass 
@@ -18693,6 +18694,7 @@ namespace vkr {
 			Profile p("m_GLTFDepth->OnCreate");
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
+			currobj->m_GLTFDepth->has_shadowMap = pGLTFCommon->has_shadowMap;
 			//currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
 			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
 				&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
@@ -20024,7 +20026,7 @@ namespace vkr {
 		void OnUpdateDisplay();
 
 		void BeginFrame();
-		void add_model(const char* fn, const glm::vec3& pos, float scale);
+		void add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap);
 
 		void OnUpdate();
 
@@ -20326,7 +20328,7 @@ namespace vkr {
 	// add_model
 	// TODO 加载模型文件
 	//--------------------------------------------------------------------------------------
-	void sample_cx::add_model(const char* fn, const glm::vec3& pos, float scale)
+	void sample_cx::add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
 	{
 		//print_time Pt("push gltf", 1);
 		std::thread a([=]()
@@ -20335,6 +20337,7 @@ namespace vkr {
 				{
 					print_time Pt("load gltf", 1);
 					pgc = new GLTFCommon();
+					pgc->has_shadowMap = has_shadowMap;
 					pgc->_pos = pos;
 					pgc->_scale = scale;
 					if (pgc->Load(fn, "") == false)
@@ -21168,11 +21171,11 @@ void vkdg_cx::copy2(int idx, void* vkptr)
 //	}
 //	return p;
 //}
-void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale)
+void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
 {
 	if (!ctx || !fn)return;
 	auto tx = (vkr::sample_cx*)ctx;
-	tx->add_model(fn, pos, scale);
+	tx->add_model(fn, pos, scale, has_shadowMap);
 }
 
 vkr::light_t* vkdg_cx::get_light(size_t idx)
