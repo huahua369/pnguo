@@ -101,11 +101,6 @@ void main()
 	m.uv = uv;
 #if 1
 	getPBRParams(Input, u_pbrParams, m);
-	if (u_pbrParams.alphaMode == ALPHA_MASK)
-	{
-		if (m.alpha < u_pbrParams.alphaCutoff)
-			discard;
-	}
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
 	vec4 color = vec4(c3, m.baseColor.a);  
 #else

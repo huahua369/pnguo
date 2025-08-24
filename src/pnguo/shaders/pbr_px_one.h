@@ -880,17 +880,19 @@ void discardPixelIfAlphaCutOff(VS2PS Input)
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif
-	vec4 baseColor = getBaseColor(Input, uv);
-
-#if defined(DEF_alphaMode_BLEND)
-	if (baseColor.a == 0)
-		discard;
-#elif defined(DEF_alphaMode_MASK) && defined(DEF_alphaCutoff)
-	if (baseColor.a < DEF_alphaCutoff)
-		discard;
-#else
-	//OPAQUE
-#endif
+	vec4 baseColor = getBaseColor2(Input, uv);
+#ifndef __cplusplus
+	if (u_pbrParams.alphaMode == ALPHA_BLEND)
+	{
+		if (baseColor.a <= 0)
+			discard;
+	}
+	if (u_pbrParams.alphaMode == ALPHA_MASK)
+	{
+		if (baseColor.a < u_pbrParams.alphaCutoff)
+			discard;
+	}
+#endif // !__cplusplus
 }
 
 vec4 get_roughness(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness, out float metallic)

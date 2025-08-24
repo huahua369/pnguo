@@ -2826,6 +2826,8 @@ namespace vkr {
 		uint32_t _animationIndex = 0;
 		size_t m_count = 0;	// 矩阵数量
 		size_t ubo_size = 0;
+		std::vector<PBRMaterial> _materialsData;
+		std::vector<PBRMesh> _meshes;
 	public:
 		~GLTFCommon();
 		bool Load(const std::string& path, const std::string& filename);
@@ -2882,6 +2884,7 @@ namespace vkr {
 
 	class GLTFTexturesAndBuffers
 	{
+	public:
 		Device* m_pDevice = 0;
 		UploadHeap* m_pUploadHeap = 0;
 
@@ -2892,8 +2895,9 @@ namespace vkr {
 
 		std::map<int, VkDescriptorBufferInfo> m_skeletonMatricesBuffer;
 
-		StaticBufferPool* m_pStaticBufferPool;
-		DynamicBufferRing* m_pDynamicBufferRing;
+		ResourceViewHeaps* _pResourceViewHeaps = 0;		// 管理set分配
+		DynamicBufferRing* _pDynamicBufferRing = 0;	// 动态常量缓冲区ubo
+		StaticBufferPool* _pStaticBufferPool = 0;		// 静态顶点/索引缓冲区
 	public:
 		// maps GLTF ids into views
 		std::map<int, VkDescriptorBufferInfo> m_vertexBufferMap;
@@ -2909,7 +2913,7 @@ namespace vkr {
 		VkDescriptorBufferInfo m_perFrameConstants_w = {}; // 线框
 
 		~GLTFTexturesAndBuffers();
-		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing);
+		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, DynamicBufferRing* pd);
 		void LoadTextures(AsyncPool* pAsyncPool = NULL);
 		void LoadGeometry();
 		void OnDestroy();
@@ -3452,7 +3456,7 @@ namespace vkr {
 			UploadHeap* pUploadHeap,
 			ResourceViewHeaps* pHeaps,
 			DynamicBufferRing* pDynamicBufferRing,
-			StaticBufferPool* pStaticBufferPool,
+			//StaticBufferPool* pStaticBufferPool,
 			GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers,
 			SkyDome* pSkyDome,
 			bool bUseSSAOMask,
@@ -3471,7 +3475,7 @@ namespace vkr {
 
 		ResourceViewHeaps* m_pResourceViewHeaps;
 		DynamicBufferRing* m_pDynamicBufferRing;
-		StaticBufferPool* m_pStaticBufferPool;
+		//StaticBufferPool* m_pStaticBufferPool;
 
 		std::vector<PBRMesh> m_meshes;
 		std::vector<PBRMaterial> m_materialsData;
@@ -5028,14 +5032,15 @@ namespace vkr
 	}
 
 	// todo t2b
-	bool GLTFTexturesAndBuffers::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, StaticBufferPool* pStaticBufferPool, DynamicBufferRing* pDynamicBufferRing)
+	bool GLTFTexturesAndBuffers::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, DynamicBufferRing* pd)
 	{
 		m_pDevice = pDevice;
 		m_pGLTFCommon = pGLTFCommon;
 		m_pUploadHeap = pUploadHeap;
-		m_pStaticBufferPool = pStaticBufferPool;
-		m_pDynamicBufferRing = pDynamicBufferRing;
-
+		_pDynamicBufferRing = pd;
+		if (!_pStaticBufferPool)
+			_pStaticBufferPool = new StaticBufferPool();
+		//ResourceViewHeaps* pResourceViewHeaps,		// 管理set分配  
 		return true;
 	}
 	void get_texdata(IMG_INFO& header, tinygltf::Image& img, std::vector<char>& tidata)
@@ -5170,6 +5175,24 @@ namespace vkr
 		auto pm = m_pGLTFCommon->pm;
 		if (pm && pm->meshes.size())
 		{
+			struct vb_t
+			{
+				tfAccessor vertexBufferAcc;
+				int vbmidx = 0;
+			};
+			struct mp_t {
+				morph_t* mp;
+				std::vector<glm::vec4> tv;
+			};
+			struct ib_t {
+				tfAccessor indexBufferAcc = {};
+				int primitive_indices = 0;
+				std::vector<uint32_t> v;
+			};
+			std::vector<vb_t> vbs;
+			std::vector<mp_t> mbs;
+			std::vector<ib_t> ibs;
+			size_t all_size = 0;
 			for (auto& mesh : pm->meshes)
 			{
 				for (auto& primitive : mesh.primitives)
@@ -5180,13 +5203,11 @@ namespace vkr
 					//
 					for (auto& attributeId : primitive.attributes)
 					{
-						tfAccessor vertexBufferAcc;
+						tfAccessor vertexBufferAcc = {};
 						m_pGLTFCommon->GetBufferDetails(attributeId.second, &vertexBufferAcc);
-
-						VkDescriptorBufferInfo vbv;
-						m_pStaticBufferPool->AllocBuffer(vertexBufferAcc.m_count, vertexBufferAcc.m_stride, vertexBufferAcc.m_data, &vbv);
 						vss[attributeId.first] = vertexBufferAcc.m_count;
-						m_vertexBufferMap[attributeId.second] = vbv;
+						vbs.push_back({ vertexBufferAcc, attributeId.second });
+						all_size += AlignUp((vertexBufferAcc.m_count * vertexBufferAcc.m_stride), 64);
 					}
 
 					// 变形动画数据
@@ -5285,9 +5306,10 @@ namespace vkr
 							}
 						}
 						if (tv.size()) {
-							VkDescriptorBufferInfo& vbv = mp->mdb;
-							m_pStaticBufferPool->AllocBuffer(tv.size(), sizeof(glm::vec4), tv.data(), &vbv);
-							tas.push_back(vbv);
+							//VkDescriptorBufferInfo& vbv = mp->mdb;
+							//tas.push_back(vbv);
+							all_size += AlignUp(tv.size() * sizeof(glm::vec4), (size_t)64u);
+							mbs.push_back({ mp, std::move(tv) });
 						}
 
 					}
@@ -5299,9 +5321,6 @@ namespace vkr
 					{
 						tfAccessor indexBufferAcc = {};
 						m_pGLTFCommon->GetBufferDetails(indexAcc, &indexBufferAcc);
-
-						VkDescriptorBufferInfo ibv;
-
 						std::vector<uint32_t> v;
 						// Some exporters use 1-byte indices, need to convert them to shorts since the GPU doesn't support 1-byte indices
 						if (indexBufferAcc.m_stride < 4)
@@ -5317,18 +5336,35 @@ namespace vkr
 							default:
 								break;
 							}
-							unsigned int* pIndices = v.data();
-							indextype = 4;
-							m_pStaticBufferPool->AllocBuffer(indexBufferAcc.m_count, sizeof(uint32_t) /*2 * indexBufferAcc.m_stride*/, pIndices, &ibv);
 						}
-						else
-						{
-							m_pStaticBufferPool->AllocBuffer(indexBufferAcc.m_count, indexBufferAcc.m_stride, indexBufferAcc.m_data, &ibv);
-						}
-
-						m_IndexBufferMap[indexAcc] = ibv;
+						all_size += AlignUp(v.size() * sizeof(uint32_t), (size_t)64u);
+						all_size += AlignUp(indexBufferAcc.m_count * indexBufferAcc.m_stride, 64);
+						ibs.push_back({ indexBufferAcc, primitive.indices, std::move(v) });
 					}
 
+				}
+			}
+			// Create a 'static' pool for vertices and indices  
+			if (all_size > 0)
+			{
+				_pStaticBufferPool->OnCreate(m_pDevice, all_size, true, "StaticGeom");
+				for (auto& it : vbs) {
+					VkDescriptorBufferInfo vbv;
+					_pStaticBufferPool->AllocBuffer(it.vertexBufferAcc.m_count, it.vertexBufferAcc.m_stride, it.vertexBufferAcc.m_data, &vbv);
+					m_vertexBufferMap[it.vbmidx] = vbv;
+				}
+				for (auto& it : mbs) {
+					_pStaticBufferPool->AllocBuffer(it.tv.size(), sizeof(glm::vec4), it.tv.data(), &it.mp->mdb);
+				}
+				for (auto& it : ibs) {
+					VkDescriptorBufferInfo ibv = {};
+					if (it.v.empty()) {
+						_pStaticBufferPool->AllocBuffer(it.indexBufferAcc.m_count, it.indexBufferAcc.m_stride, it.indexBufferAcc.m_data, &ibv);
+					}
+					else {
+						_pStaticBufferPool->AllocBuffer(it.v.size(), sizeof(uint32_t), it.v.data(), &ibv);
+					}
+					m_IndexBufferMap[it.primitive_indices] = ibv;
 				}
 			}
 		}
@@ -5340,6 +5376,18 @@ namespace vkr
 		{
 			vkDestroyImageView(m_pDevice->GetDevice(), m_textureViews[i], NULL);
 			m_textures[i].OnDestroy();
+		}
+		if (_pStaticBufferPool)
+		{
+			_pStaticBufferPool->OnDestroy();
+			delete _pStaticBufferPool;
+			_pStaticBufferPool = 0;
+		}
+		if (_pDynamicBufferRing)
+		{
+			_pDynamicBufferRing->OnDestroy();
+			delete _pDynamicBufferRing;
+			_pDynamicBufferRing = 0;
 		}
 	}
 
@@ -5502,13 +5550,13 @@ namespace vkr
 	{
 		{
 			PerFrame_t* cbPerFrame;
-			m_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
+			_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
 			*cbPerFrame = m_pGLTFCommon->m_perFrameData;
 		}
 		if (bWireframe)
 		{
 			PerFrame_t* cbPerFrame;
-			m_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
+			_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
 			*cbPerFrame = m_pGLTFCommon->m_perFrameData_w;
 		}
 	}
@@ -5521,7 +5569,7 @@ namespace vkr
 			VkDescriptorBufferInfo perSkeleton = {};
 			glm::mat4* cbPerSkeleton = 0;
 			uint32_t size = (uint32_t)(matrices->count * sizeof(glm::mat4));
-			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbPerSkeleton, &perSkeleton);
+			_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbPerSkeleton, &perSkeleton);
 			memcpy(cbPerSkeleton, matrices->m, size);
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
 		}
@@ -5532,7 +5580,7 @@ namespace vkr
 			VkDescriptorBufferInfo per = {};
 			float* cbd = 0;
 			uint32_t size = (uint32_t)(d->size() * sizeof(float));
-			m_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
+			_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
 			memcpy(cbd, d->data(), size);
 			//auto& node = m_pGLTFCommon->m_nodes[t.first];
 			//auto& mesh = m_pGLTFCommon->pm->meshes[node.meshIndex];
@@ -5543,7 +5591,7 @@ namespace vkr
 			VkDescriptorBufferInfo db = {};
 			float* cbd = 0;
 			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3x4));
-			m_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
+			_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
 			memcpy(cbd, v.data(), size);
 			m_uvmMap[k] = db;
 		}
@@ -6199,7 +6247,7 @@ namespace vkr
 			}
 		}
 	}
-	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& m_materialsData)
+	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& m_materialsData, std::vector<PBRMesh>& _meshes)
 	{
 		// Load PBR 2.0 Materials 
 		if (pm)
@@ -6231,14 +6279,14 @@ namespace vkr
 			//
 			auto& meshes = pm->meshes;
 
-			//m_meshes.resize(meshes.size());
+			_meshes.resize(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
 				auto& mesh = meshes[i];
 				auto& primitives = meshes[i].primitives;
 				auto& weights = meshes[i].weights;
 
-				PBRMesh* tfmesh = 0;// &m_meshes[i];
+				PBRMesh* tfmesh = &_meshes[i];
 				tfmesh->m_pPrimitives.resize(primitives.size());
 
 				for (uint32_t p = 0; p < primitives.size(); p++)
@@ -6297,7 +6345,7 @@ namespace vkr
 		UploadHeap* pUploadHeap,
 		ResourceViewHeaps* pHeaps,
 		DynamicBufferRing* pDynamicBufferRing,
-		StaticBufferPool* pStaticBufferPool,
+		//StaticBufferPool* pStaticBufferPool,
 		GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers,
 		SkyDome* pSkyDome,
 		bool bUseSSAOMask,
@@ -6309,7 +6357,7 @@ namespace vkr
 		m_pDevice = pDevice;
 		m_pRenderPass = pRenderPass;
 		m_pResourceViewHeaps = pHeaps;
-		m_pStaticBufferPool = pStaticBufferPool;
+		//m_pStaticBufferPool = pStaticBufferPool;
 		m_pDynamicBufferRing = pDynamicBufferRing;
 		m_pGLTFTexturesAndBuffers = pGLTFTexturesAndBuffers;
 
@@ -9158,9 +9206,9 @@ namespace vkr
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 
-		uint32_t size = AlignUp(numbeOfElements * strideInBytes, 256u);
+		uint32_t size = AlignUp(numbeOfElements * strideInBytes, 64u);
 		auto d = (int64_t)m_totalMemSize - (m_memOffset + size);
-		assert(m_memOffset + size < m_totalMemSize);
+		assert(m_memOffset + size <= m_totalMemSize);
 
 		*pData = (void*)(m_pData + m_memOffset);
 
@@ -9636,7 +9684,7 @@ namespace vkr
 		VkResult res;
 		m_pDevice = pDevice;
 
-		m_memTotalSize = AlignUp(memTotalSize, 256u);
+		m_memTotalSize = AlignUp(memTotalSize, 64u);
 
 		m_mem.OnCreate(numberOfBackBuffers, m_memTotalSize);
 
@@ -9742,7 +9790,7 @@ namespace vkr
 	}
 	bool DynamicBufferRing::AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut)
 	{
-		return AllocConstantBuffer1(size, pData, pOut, 256u);
+		return AllocConstantBuffer1(size, pData, pOut, 64u);
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -15764,7 +15812,7 @@ namespace vkr {
 		m_worldSpaceMats.resize(m_nodes.size());
 		_mats.resize(m_count);
 
-
+		get_model_data(pm, _materialsData, _meshes);
 
 		size_t dysize = sizeof(PerFrame_t) * 2;
 		// todo 设置变形插值数据到ubo
@@ -15772,8 +15820,10 @@ namespace vkr {
 		{
 			//dysize += (v.size() * sizeof(float));
 		}
-		for (auto& [k, v] : m_uv_mats) {
-			dysize += (v.size() * sizeof(glm::mat3x4));
+		for (auto& it : _materialsData)
+		{
+			auto c = it.m_pbrMaterialParameters.uvc;
+			dysize += (c * sizeof(glm::mat3x4));
 		}
 
 		auto& meshes = pm->meshes;
@@ -15795,7 +15845,7 @@ namespace vkr {
 			dysize += it.count * sizeof(glm::mat4);
 		}
 
-
+		ubo_size = dysize;
 		// sets the animated data to the default values of the nodes
 		// later on these values can be updated by the SetAnimationTime function
 		// .resize(m_nodes.size());
@@ -16695,7 +16745,7 @@ namespace vkr {
 
 	bool dynamic_buffer_cx::AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut)
 	{
-		//size = AlignUp(size, 256u);
+		//size = AlignUp(size, 64u);
 
 		uint32_t memOffset = 0;
 		*pData = alloc(size, &memOffset);
@@ -18243,7 +18293,7 @@ namespace vkr {
 
 		// Create a 'dynamic' constant buffer
 		const uint32_t constantBuffersMemSize = 64 * 1024;
-		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, constantBuffersMemSize, (char*)"Uniforms");
+		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, ct.constantBuffersMemSize, (char*)"Uniforms");
 
 		// Create a 'static' pool for vertices and indices 
 		const uint32_t staticGeometryMemSize = (1 * 1) * 1024 * 1024;
@@ -18258,7 +18308,7 @@ namespace vkr {
 
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
 		//const uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
-		m_UploadHeap.OnCreate(pDevice, 10 * 1024 * 1024);    // initialize an upload heap (uses suballocation for faster results)
+		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
 		// Create GBuffer and render passes
 		VkFormat mformat = VK_FORMAT_R16G16B16A16_SFLOAT;
 		// todo oit 有问题
@@ -18505,8 +18555,8 @@ namespace vkr {
 			Profile p("m_pGltfLoader->Load");
 
 			currobj->m_pGLTFTexturesAndBuffers = new GLTFTexturesAndBuffers();
-			currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, 0, 0, 0);
-			//currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_VidMemBufferPool, &m_ConstantBufferRing);
+			currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_ConstantBufferRing);
+			//currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &, &m_VidMemBufferPool, );
 		}
 		else if (Stage == 6)
 		{
@@ -18515,18 +18565,20 @@ namespace vkr {
 			// this data will be used to create the PBR and Depth passes       
 			currobj->m_pGLTFTexturesAndBuffers->LoadTextures(pAsyncPool);
 			currobj->m_pGLTFTexturesAndBuffers->LoadGeometry();
+			currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool->UploadData(m_UploadHeap.GetCommandList());
+			m_UploadHeap.FlushAndFinish();
 		}
 		else if (Stage == 7)
 		{
 			Profile p("m_GLTFDepth->OnCreate");
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
-			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
-			/*	currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
-					&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
-					currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);*/
-					//m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
-					//m_UploadHeap.FlushAndFinish();
+			//currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
+			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
+				&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
+				currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+			m_UploadHeap.FlushAndFinish();
 		}
 		else if (Stage == 8)
 		{
@@ -18536,11 +18588,11 @@ namespace vkr {
 			currobj->m_GLTFPBR = new GltfPbrPass();
 			currobj->m_GLTFPBR->OnCreate(
 				m_pDevice,
-				//&m_UploadHeap,
-				//&m_ResourceViewHeaps,
-				//&m_ConstantBufferRing,
-				//&m_VidMemBufferPool,
-				0, 0, 0, 0,
+				&m_UploadHeap,
+				&m_ResourceViewHeaps,
+				&m_ConstantBufferRing,
+				//currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool,
+				//&m_VidMemBufferPool, 
 				currobj->m_pGLTFTexturesAndBuffers,
 				&m_SkyDome,
 				false, // use SSAO mask
@@ -18561,10 +18613,9 @@ namespace vkr {
 			currobj->m_GLTFBBox->OnCreate(
 				m_pDevice,
 				m_RenderPassJustDepthAndHdr.GetRenderPass(),
-				//&m_ResourceViewHeaps,
-				//&m_ConstantBufferRing,
-				//&m_VidMemBufferPool,
-				0, 0, 0,
+				&m_ResourceViewHeaps,
+				&m_ConstantBufferRing,
+				&m_VidMemBufferPool,
 				currobj->m_pGLTFTexturesAndBuffers,
 				&m_Wireframe
 			);
@@ -20170,12 +20221,12 @@ namespace vkr {
 					{
 						printf("The selected model couldn't be found, please check the documentation!\n");
 						delete pgc;
-						exit(1);
+						//exit(1);
 						return;
 					}
 				}
-				delete pgc;
-				exit(2);
+		/*		delete pgc;
+				exit(2);*/
 				if (pgc)
 				{
 					std::unique_lock<std::mutex> lock(m_ltsm);
@@ -20183,7 +20234,7 @@ namespace vkr {
 				}
 			}
 		);
-		a.join();
+		//a.join();
 		a.detach();
 	}
 
