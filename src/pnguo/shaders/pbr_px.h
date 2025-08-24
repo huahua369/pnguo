@@ -1256,10 +1256,56 @@ float microfacetDistribution(gpuMaterial materialInfo, AngularInfo angularInfo)
 	float f = (angularInfo.NdotH * alphaRoughnessSq - angularInfo.NdotH) * angularInfo.NdotH + 1.0;
 	return alphaRoughnessSq / (M_PI * f * f + 0.000001f);
 }
+#if 0
+#ifndef __cplusplus
+vec3 hash33(vec3 p) {
+	p = fract(p * vec3(443.897, 441.423, 437.195));
+	p += dot(p, p.yxz + 19.19);
+	return fract((p.xxy + p.yxx) * p.zyx);
+}
+vec3 getPointShade(vec3 pointToLight, gpuMaterial materialInfo, vec3 normal, vec3 view) {
+	AngularInfo angularInfo = getAngularInfo(pointToLight, normal, view);
+
+	// 边缘软化：对NdotL进行平滑过渡处理 
+	float NdotL_smooth = smoothstep(0.0, 0.02, angularInfo.NdotL);
+	float NdotV_smooth = smoothstep(0.0, 0.01, angularInfo.NdotV);
+
+	if (NdotL_smooth > 0.001 || NdotV_smooth > 0.001) {
+		// 新增随机抖动偏移（打破规则摩尔纹）
+		vec3 jitteredNormal = normalize(normal + 0.005 * hash33(gl_FragCoord.xyz));
+		angularInfo = getAngularInfo(pointToLight, jitteredNormal, view);
+
+		// 计算BRDF分量（增加粗糙度钳位防止高频闪烁）
+		float clampedRoughness = max(materialInfo.roughness.x, 0.05);
+		materialInfo.roughness = vec2(clampedRoughness);
+
+		vec3 F = specularReflection(materialInfo, angularInfo);
+		float Vis = visibilityOcclusion(materialInfo, angularInfo);
+		float D = microfacetDistribution(materialInfo, angularInfo);
+
+		// 漫反射分量计算（增加能量守恒约束）
+		vec3 diffuseContrib = (1.0 - F) * diffuse(materialInfo) * (1.0 - materialInfo.metallic);
+
+		// 镜面分量（添加微表面滤波）
+		vec3 specContrib = F * Vis * D;
+		specContrib /= (4.0 * max(angularInfo.NdotV, 0.001) * max(angularInfo.NdotL, 0.001) + 0.1);
+
+		// 最终输出（应用平滑过渡因子）
+		return NdotL_smooth * (diffuseContrib + specContrib);
+	}
+	return vec3(0.0);
+}
+#else
+vec3 getPointShade(vec3 pointToLight, gpuMaterial materialInfo, vec3 normal, vec3 view)
+{
+	return vec3(0.0);
+}
+#endif
+#else
 
 vec3 getPointShade(vec3 pointToLight, gpuMaterial materialInfo, vec3 normal, vec3 view)
 {
-	AngularInfo angularInfo = getAngularInfo(pointToLight, normal, view); 
+	AngularInfo angularInfo = getAngularInfo(pointToLight, normal, view);
 	if (angularInfo.NdotL > 0.0 || angularInfo.NdotV > 0.0)
 	{
 		// Calculate the shading terms for the microfacet specular shading model
@@ -1282,7 +1328,7 @@ vec3 getPointShade(vec3 pointToLight, gpuMaterial materialInfo, vec3 normal, vec
 
 	return vec3(0.0, 0.0, 0.0);
 }
-
+#endif
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
 float getRangeAttenuation(float range, float distance)
 {
