@@ -546,8 +546,8 @@ int main()
 
 			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
 			//vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 2,0,5 }, 1.0);// 飞船
-			/*vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
-			vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);*/
+			vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
+			vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
 			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);

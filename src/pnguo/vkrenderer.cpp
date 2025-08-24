@@ -94,15 +94,16 @@ if(KHR_materials_transmission透明介质透射材质){
 typedef uint32_t DXGI_FORMAT;
 #endif 
 #define TINYGLTF_IMPLEMENTATION 
+#if 0
 #define TINYGLTF_USE_RAPIDJSON
-
+// 多线程初始化文档时会崩
 #define TINYGLTF_NO_INCLUDE_RAPIDJSON
 #include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
-
+#endif
 #include <tiny_gltf.h>
 
 
@@ -145,6 +146,18 @@ namespace vkr
 
 
 	uint32_t SizeOfFormat(VkFormat format);
+
+#define HASH_SEED 2166136261
+
+	size_t Hash(const void* ptr, size_t size, size_t result = HASH_SEED);
+	size_t Hash_p(const size_t* ptr, size_t size, size_t result = HASH_SEED);
+	size_t HashString(const char* str, size_t result = HASH_SEED);
+	size_t HashString(const std::string& str, size_t result = HASH_SEED);
+	size_t HashInt(const int type, size_t result = HASH_SEED);
+	size_t HashFloat(const float type, size_t result = HASH_SEED);
+	size_t HashPtr(const void* type, size_t result = HASH_SEED);
+
+	size_t HashShaderString(const char* pRootDir, const char* pShader, size_t result = 2166136261);
 
 #if 1
 
@@ -241,6 +254,7 @@ namespace vkr
 		void DestroyShaderCache() {};
 
 		void GPUFlush();
+		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
 
 	private:
 		VkInstance m_instance = 0;
@@ -259,6 +273,7 @@ namespace vkr
 		VkQueue compute_queue = 0;
 		uint32_t compute_queue_family_index = 0;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
+		std::map<size_t, VkSampler> _samplers;
 		bool m_usingValidationLayer = false;
 		bool m_usingFp16 = false;
 		bool m_rt10Supported = false;
@@ -827,6 +842,14 @@ namespace vkr
 
 	void Device::OnDestroy()
 	{
+		for (auto& it : _samplers)
+		{
+			if (it.second)
+			{
+				vkDestroySampler(m_device, it.second, NULL);
+			}
+		}
+		_samplers.clear();
 		if (m_surface != VK_NULL_HANDLE)
 		{
 			vkDestroySurfaceKHR(m_instance, m_surface, NULL);
@@ -853,6 +876,16 @@ namespace vkr
 	void Device::GPUFlush()
 	{
 		vkDeviceWaitIdle(m_device);
+	}
+
+	VkSampler Device::newSampler(const VkSamplerCreateInfo* pCreateInfo) {
+		auto h = Hash_p((const size_t*)pCreateInfo, sizeof(VkSamplerCreateInfo));
+		auto& sampler = _samplers[h];
+		if (!sampler)
+		{
+			vkCreateSampler(m_device, pCreateInfo, 0, &sampler);
+		}
+		return sampler;
 	}
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex) {
@@ -951,17 +984,6 @@ namespace vkr {
 		DISPLAYMODE_HDR10_2084,
 		DISPLAYMODE_HDR10_SCRGB
 	};
-#define HASH_SEED 2166136261
-
-	size_t Hash(const void* ptr, size_t size, size_t result = HASH_SEED);
-	size_t HashString(const char* str, size_t result = HASH_SEED);
-	size_t HashString(const std::string& str, size_t result = HASH_SEED);
-	size_t HashInt(const int type, size_t result = HASH_SEED);
-	size_t HashFloat(const float type, size_t result = HASH_SEED);
-	size_t HashPtr(const void* type, size_t result = HASH_SEED);
-
-	size_t HashShaderString(const char* pRootDir, const char* pShader, size_t result = 2166136261);
-
 	//
 	// DefineList, holds pairs of key & value that will be used by the compiler as defines
 	//
@@ -4502,8 +4524,7 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);
+			m_sampler = pDevice->newSampler(&info);
 		}
 		if (pGLTFTexturesAndBuffers->m_pGLTFCommon->pm)
 		{
@@ -4540,7 +4561,7 @@ namespace vkr
 			m_pResourceViewHeaps->FreeDescriptor(m_materialsData[i].m_descriptorSet);
 		}
 
-		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -4595,14 +4616,14 @@ namespace vkr
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = dt1;
+			b.descriptorType = dt1;// 静态数据
 			df["ID_TARGET_DATA"] = std::to_string(b.binding);	td = b.binding;
 			layout_bindings.push_back(b);
 			b.binding = binc++;
 			b.descriptorCount = 1;
 			b.pImmutableSamplers = NULL;
 			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			b.descriptorType = dt;
+			b.descriptorType = dt;// 动态数据变形插值
 			df["ID_MORPHING_DATA"] = std::to_string(b.binding);	md = b.binding;
 			layout_bindings.push_back(b);
 			for (auto& [k, v] : morphing->defs) {
@@ -5336,6 +5357,7 @@ namespace vkr
 							default:
 								break;
 							}
+							indextype = 4;
 						}
 						all_size += AlignUp(v.size() * sizeof(uint32_t), (size_t)64u);
 						all_size += AlignUp(indexBufferAcc.m_count * indexBufferAcc.m_stride, 64);
@@ -6422,10 +6444,11 @@ namespace vkr
 				info.maxLod = 10000;
 				info.maxAnisotropy = 1.0f;
 				set_sampler_info(info, &it);
-				VkSampler r = 0;
-				VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &r);
+				VkSampler r = pDevice->newSampler(&info);
+				//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &r);
+
 				_samplers.push_back(r);
-				assert(res == VK_SUCCESS);
+				//assert(res == VK_SUCCESS);
 			}
 		}
 		//for pbr materials
@@ -6449,8 +6472,9 @@ namespace vkr
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
 			set_sampler_info(info, &dsa);
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
-			assert(res == VK_SUCCESS);
+			m_samplerPbr = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
+			//assert(res == VK_SUCCESS);
 		}
 
 		// specular BRDF lut sampler
@@ -6466,8 +6490,9 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
-			assert(res == VK_SUCCESS);
+			m_brdfLutSampler = pDevice->newSampler(&info);
+			/*VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
+			assert(res == VK_SUCCESS);*/
 		}
 
 		// shadowmap sampler
@@ -6485,8 +6510,9 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
-			assert(res == VK_SUCCESS);
+			m_samplerShadow = pDevice->newSampler(&info);
+			/*	VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
+				assert(res == VK_SUCCESS);*/
 		}
 
 		// Create default material, this material will be used if none is assigned
@@ -7718,8 +7744,9 @@ namespace vkr
 			info.minLod = 0;
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
-			assert(res == VK_SUCCESS);
+			m_samplerPbr = pDevice->newSampler(&info);
+			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
+			//assert(res == VK_SUCCESS);
 		}
 
 		// specular BRDF lut sampler
@@ -7735,8 +7762,9 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
-			assert(res == VK_SUCCESS);
+			m_brdfLutSampler = pDevice->newSampler(&info);
+			/*		res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
+					assert(res == VK_SUCCESS);*/
 		}
 
 		// shadowmap sampler
@@ -7754,8 +7782,9 @@ namespace vkr
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
-			assert(res == VK_SUCCESS);
+			m_samplerShadow = pDevice->newSampler(&info);
+			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
+			//assert(res == VK_SUCCESS);
 		}
 
 	}
@@ -10673,8 +10702,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerDiffuseCube);
-			assert(res == VK_SUCCESS);
+			m_samplerDiffuseCube = pDevice->newSampler(&info);
+	/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerDiffuseCube);
+			assert(res == VK_SUCCESS);*/
 		}
 
 		{
@@ -10689,8 +10719,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerSpecularCube);
-			assert(res == VK_SUCCESS);
+			m_samplerSpecularCube = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerSpecularCube);
+			//assert(res == VK_SUCCESS);
 		}
 
 		//create descriptor
@@ -10808,21 +10839,23 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
+			
+			m_samplers[0] = m_samplers[1]= m_samplers[3] = pDevice->newSampler(&info);
+			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[0]);
+			//assert(res == VK_SUCCESS);
 
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[0]);
-			assert(res == VK_SUCCESS);
+			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[1]);
+			//assert(res == VK_SUCCESS);
 
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[1]);
-			assert(res == VK_SUCCESS);
-
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[3]);
-			(res == VK_SUCCESS);
+			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[3]);
+			//(res == VK_SUCCESS);
 
 			info.magFilter = VK_FILTER_LINEAR;
 			info.minFilter = VK_FILTER_LINEAR;
 			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[2]);
-			assert(res == VK_SUCCESS);
+			m_samplers[2] = pDevice->newSampler(&info);
+	/*		res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[2]);
+			assert(res == VK_SUCCESS);*/
 
 			// Create VkDescriptor Set Layout Bindings
 			//
@@ -11127,8 +11160,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);
+			m_sampler = pDevice->newSampler(&info);
+	/*		VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);*/
 		}
 
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
@@ -11389,8 +11423,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);
+			m_sampler = pDevice->newSampler(&info);
+	/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);*/
 		}
 
 		// Allocate descriptors for the mip chain
@@ -11698,8 +11733,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);
+			m_sampler = pDevice->newSampler(&info);
+	/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			assert(res == VK_SUCCESS);*/
 		}
 
 		// Use helper class to create the fullscreen pass 
@@ -11968,8 +12004,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);
+			m_sampler = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+			//assert(res == VK_SUCCESS);
 		}
 
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
@@ -12119,8 +12156,9 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
-			assert(res == VK_SUCCESS);
+			m_sampler = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			//assert(res == VK_SUCCESS);
 		}
 
 		// Use helper class to create the fullscreen pass
@@ -12823,6 +12861,22 @@ namespace vkr {
 			result = (result * 16777619) ^ ((char*)ptr)[i];
 		}
 
+		return result;
+	}
+
+	size_t Hash_p(const size_t* ptr, size_t size, size_t result)
+	{
+		auto n = size / sizeof(size_t);
+		auto m = size % sizeof(size_t);
+		for (size_t i = 0; i < n; ++i)
+		{
+			result = (result * 16777619) ^ ptr[i];
+		}
+		auto p = ptr + n;
+		for (size_t i = 0; i < m; ++i)
+		{
+			result = (result * 16777619) ^ ((char*)p)[i];
+		}
 		return result;
 	}
 
@@ -15815,7 +15869,6 @@ namespace vkr {
 		get_model_data(pm, _materialsData, _meshes);
 
 		size_t dysize = sizeof(PerFrame_t) * 2;
-		// todo 设置变形插值数据到ubo
 		for (auto& [k, v] : m_animated_morphWeights)
 		{
 			//dysize += (v.size() * sizeof(float));
@@ -18567,6 +18620,7 @@ namespace vkr {
 			currobj->m_pGLTFTexturesAndBuffers->LoadGeometry();
 			currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool->UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
+			currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool->FreeUploadHeap();
 		}
 		else if (Stage == 7)
 		{
@@ -20225,8 +20279,8 @@ namespace vkr {
 						return;
 					}
 				}
-		/*		delete pgc;
-				exit(2);*/
+				/*		delete pgc;
+						exit(2);*/
 				if (pgc)
 				{
 					std::unique_lock<std::mutex> lock(m_ltsm);
