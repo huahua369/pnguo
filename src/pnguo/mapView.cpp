@@ -47,8 +47,8 @@
 #include <glib.h>
 #endif
 
-#include <pch1.h>
-#include <mapView.h>
+#include "pch1.h"
+#include "mapView.h"
 
 #ifdef _WIN32
 #define fseeki64 _fseeki64
