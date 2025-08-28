@@ -12245,7 +12245,6 @@ namespace vkr {
 		m_Width = Width;
 		m_Height = Height;
 		m_mipCount = mipCount;
-
 		VkImageCreateInfo image_info = {};
 		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		image_info.pNext = NULL;
@@ -12265,13 +12264,10 @@ namespace vkr {
 		image_info.flags = 0;
 		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
 		m_result.Init(m_pDevice, &image_info, "DownsampleMip");
-
 		// Create views for the mip chain
-		//
 		for (int i = 0; i < m_mipCount; i++)
 		{
 			// source -----------
-			//
 			if (i == 0)
 			{
 				pInput->CreateSRV(&m_mip[i].m_SRV, 0);
@@ -12280,19 +12276,14 @@ namespace vkr {
 			{
 				m_result.CreateSRV(&m_mip[i].m_SRV, i - 1);
 			}
-
 			// Create and initialize the Descriptor Sets (all of them use the same Descriptor Layout)        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(DownSamplePS::cbDownscale), m_mip[i].descriptorSet);
 			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, m_sampler, m_mip[i].descriptorSet);
-
 			// destination -----------
-			//
 			m_result.CreateRTV(&m_mip[i].RTV, i);
-
 			// Create framebuffer 
 			{
 				VkImageView attachments[1] = { m_mip[i].RTV };
-
 				VkFramebufferCreateInfo fb_info = {};
 				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 				fb_info.pNext = NULL;
