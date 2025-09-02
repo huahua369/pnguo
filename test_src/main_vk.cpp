@@ -405,7 +405,320 @@ void vkrender_test(form_x* form0)
 	}
 	return;
 }
+// 定义顶点结构
+struct Vertex_c {
+	glm::vec3 position;
+	glm::vec3 normal;
+	glm::vec2 texCoord;
+};
 
+// 生成圆角立方体的函数
+void GenerateRoundedCube(
+	float size,
+	float radius,
+	int segments,
+	std::vector<Vertex_c>& vertices,
+	std::vector<unsigned int>& indices)
+{
+	vertices.clear();
+	indices.clear();
+
+	// 确保半径不超过立方体大小的一半
+	radius = glm::min(radius, size * 0.5f);
+
+	// 立方体的核心尺寸（减去圆角后的部分）
+	float coreSize = size - 2.0f * radius;
+
+	// 立方体的8个角点（未圆角前的原始角点）
+	glm::vec3 corners[8] = {
+		glm::vec3(-0.5f * coreSize, -0.5f * coreSize, -0.5f * coreSize),
+		glm::vec3(0.5f * coreSize, -0.5f * coreSize, -0.5f * coreSize),
+		glm::vec3(0.5f * coreSize,  0.5f * coreSize, -0.5f * coreSize),
+		glm::vec3(-0.5f * coreSize,  0.5f * coreSize, -0.5f * coreSize),
+		glm::vec3(-0.5f * coreSize, -0.5f * coreSize,  0.5f * coreSize),
+		glm::vec3(0.5f * coreSize, -0.5f * coreSize,  0.5f * coreSize),
+		glm::vec3(0.5f * coreSize,  0.5f * coreSize,  0.5f * coreSize),
+		glm::vec3(-0.5f * coreSize,  0.5f * coreSize,  0.5f * coreSize)
+	};
+
+	// 生成每个角的球面部分
+	for (int corner = 0; corner < 8; ++corner) {
+		// 确定当前角的符号（决定球面部分的方向）
+		glm::vec3 sign(
+			(corner & 1) ? 1.0f : -1.0f,
+			(corner & 2) ? 1.0f : -1.0f,
+			(corner & 4) ? 1.0f : -1.0f
+		);
+
+		// 当前角的中心点
+		glm::vec3 cornerCenter = corners[corner] + sign * radius;
+
+		// 生成球面部分的顶点
+		int baseIndex = vertices.size();
+
+		for (int i = 0; i <= segments; ++i) {
+			float phi = i * glm::pi<float>() / (2.0f * segments);
+
+			for (int j = 0; j <= segments; ++j) {
+				float theta = j * glm::pi<float>() / (2.0f * segments);
+
+				// 计算球面上的点
+				glm::vec3 spherePoint(
+					radius * sin(phi) * cos(theta),
+					radius * sin(phi) * sin(theta),
+					radius * cos(phi)
+				);
+
+				// 根据当前角的方向调整点的位置
+				spherePoint.x *= sign.x;
+				spherePoint.y *= sign.y;
+				spherePoint.z *= sign.z;
+
+				// 计算最终顶点位置
+				Vertex_c vertex;
+				vertex.position = cornerCenter + spherePoint;
+				vertex.normal = glm::normalize(spherePoint);
+
+				// 简单的纹理坐标映射
+				vertex.texCoord = glm::vec2(
+					static_cast<float>(j) / segments,
+					static_cast<float>(i) / segments
+				);
+
+				vertices.push_back(vertex);
+			}
+		}
+
+		// 生成球面部分的索引
+		for (int i = 0; i < segments; ++i) {
+			for (int j = 0; j < segments; ++j) {
+				int idx = baseIndex + i * (segments + 1) + j;
+
+				indices.push_back(idx);
+				indices.push_back(idx + 1);
+				indices.push_back(idx + segments + 1);
+
+				indices.push_back(idx + 1);
+				indices.push_back(idx + segments + 2);
+				indices.push_back(idx + segments + 1);
+			}
+		}
+	}
+
+	// 生成连接角点的平面部分（这里需要为6个面分别生成平面）
+	// 由于实现较为复杂，这里只提供了球面部分的实现
+	// 完整的实现还需要生成连接这些球面部分的平面区域
+
+	// 注意：完整的圆角立方体实现需要生成:
+	// 1. 8个角上的球面部分（已实现）
+	// 2. 12条边上的圆柱面部分
+	// 3. 6个面上的平面部分
+}
+
+// 水管截面参数
+struct PipeProfile {
+	float outerRadius;
+	float innerRadius;
+	int segments; // 截面细分段数
+};
+
+// 水管路径点
+struct PathPoint {
+	glm::vec3 position;
+	glm::vec3 direction; // 归一化的方向向量
+};
+
+// 生成水管网格
+class PipeGenerator {
+public:
+	std::vector<glm::vec3> vertices;
+	std::vector<glm::vec3> normals;
+	std::vector<unsigned int> indices;
+
+	// 生成直线水管
+	void generateStraightPipe(const glm::vec3& start, const glm::vec3& end,
+		const PipeProfile& profile) {
+		glm::vec3 direction = glm::normalize(end - start);
+		float length = glm::distance(start, end);
+
+		generatePipeSegment(start, direction, length, profile);
+	}
+
+	// 生成转角水管（带圆角）
+	void generateBendPipe(const glm::vec3& start, const glm::vec3& bendCenter,
+		const glm::vec3& end, float bendRadius,
+		const PipeProfile& profile, int bendSegments = 8) {
+		// 计算起始方向
+		glm::vec3 startDir = glm::normalize(bendCenter - start);
+		glm::vec3 endDir = glm::normalize(end - bendCenter);
+
+		// 生成直线部分
+		float straightLength = glm::distance(start, bendCenter) - bendRadius;
+		if (straightLength > 0) {
+			generatePipeSegment(start, startDir, straightLength, profile);
+		}
+
+		// 生成弯曲部分
+		// 计算弯曲平面和角度
+		glm::vec3 bendAxis = glm::normalize(glm::cross(startDir, endDir));
+		float bendAngle = acos(glm::dot(startDir, endDir));
+
+		if (bendAngle > 0.01f) { // 避免除零和微小角度
+			// 生成弯曲段
+			for (int i = 0; i <= bendSegments; i++) {
+				float t = static_cast<float>(i) / bendSegments;
+				float angle = t * bendAngle;
+
+				// 旋转方向向量
+				glm::vec3 dir = glm::rotate(startDir, angle, bendAxis);
+
+				// 计算位置
+				glm::vec3 centerOffset = startDir * bendRadius;
+				glm::vec3 pos = bendCenter - centerOffset + glm::rotate(centerOffset, angle, bendAxis);
+
+				// 生成截面
+				generateCrossSection(pos, dir, profile);
+			}
+		}
+
+		// 生成结束直线部分
+		straightLength = glm::distance(bendCenter, end) - bendRadius;
+		if (straightLength > 0) {
+			generatePipeSegment(bendCenter + endDir * bendRadius, endDir, straightLength, profile);
+		}
+	}
+
+private:
+	// 生成管道段
+	void generatePipeSegment(const glm::vec3& start, const glm::vec3& direction,
+		float length, const PipeProfile& profile) {
+		// 开始截面
+		generateCrossSection(start, direction, profile);
+
+		// 结束截面
+		generateCrossSection(start + direction * length, direction, profile);
+
+		// 连接两个截面形成管道
+		connectSections(profile.segments);
+	}
+
+	// 生成管道截面
+	void generateCrossSection(const glm::vec3& center, const glm::vec3& direction,
+		const PipeProfile& profile) {
+		// 计算局部坐标系
+		glm::vec3 up(0.0f, 1.0f, 0.0f);
+		if (glm::abs(glm::dot(direction, up)) > 0.99f) {
+			up = glm::vec3(0.0f, 0.0f, 1.0f);
+		}
+
+		glm::vec3 right = glm::normalize(glm::cross(direction, up));
+		up = glm::normalize(glm::cross(right, direction));
+
+		// 存储当前截面起始索引
+		size_t startIndex = vertices.size();
+
+		// 生成内外圆顶点
+		for (int i = 0; i <= profile.segments; i++) {
+			float angle = static_cast<float>(i) / profile.segments * glm::two_pi<float>();
+
+			// 计算圆上的点
+			glm::vec2 circlePoint(std::cos(angle), std::sin(angle));
+
+			// 外圆顶点
+			glm::vec3 outerPos = center + right * (circlePoint.x * profile.outerRadius)
+				+ up * (circlePoint.y * profile.outerRadius);
+			vertices.push_back(outerPos);
+			normals.push_back(glm::normalize(right * circlePoint.x + up * circlePoint.y));
+
+			// 内圆顶点
+			glm::vec3 innerPos = center + right * (circlePoint.x * profile.innerRadius)
+				+ up * (circlePoint.y * profile.innerRadius);
+			vertices.push_back(innerPos);
+			normals.push_back(glm::normalize(-(right * circlePoint.x + up * circlePoint.y)));
+		}
+
+		// 如果是第一个截面，不需要连接，否则连接前一个截面
+		if (startIndex > 0) {
+			connectSections(profile.segments);
+		}
+	}
+
+	// 连接两个截面
+	void connectSections(int segments) {
+		size_t prevStart = vertices.size() - 2 * (segments + 1);
+		size_t currStart = vertices.size() - (segments + 1) * 2;
+
+		for (int i = 0; i < segments; i++) {
+			// 外表面四边形
+			indices.push_back(prevStart + i * 2);
+			indices.push_back(prevStart + (i + 1) * 2);
+			indices.push_back(currStart + i * 2);
+
+			indices.push_back(prevStart + (i + 1) * 2);
+			indices.push_back(currStart + (i + 1) * 2);
+			indices.push_back(currStart + i * 2);
+
+			// 内表面四边形
+			indices.push_back(prevStart + i * 2 + 1);
+			indices.push_back(currStart + i * 2 + 1);
+			indices.push_back(prevStart + (i + 1) * 2 + 1);
+
+			indices.push_back(prevStart + (i + 1) * 2 + 1);
+			indices.push_back(currStart + i * 2 + 1);
+			indices.push_back(currStart + (i + 1) * 2 + 1);
+
+			// 连接内外圆的侧面（管壁）
+			indices.push_back(prevStart + i * 2);
+			indices.push_back(currStart + i * 2);
+			indices.push_back(prevStart + i * 2 + 1);
+
+			indices.push_back(currStart + i * 2);
+			indices.push_back(currStart + i * 2 + 1);
+			indices.push_back(prevStart + i * 2 + 1);
+		}
+	}
+};
+
+// 示例用法
+int maing() {
+	PipeGenerator generator;
+	PipeProfile profile{ 1.0f, 0.8f, 16 }; // 外径1.0，内径0.8，16段细分
+
+	// 生成直线水管
+	generator.generateStraightPipe(
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(5.0f, 0.0f, 0.0f),
+		profile
+	);
+
+	// 生成带圆角的转角水管
+	generator.generateBendPipe(
+		glm::vec3(5.0f, 0.0f, 0.0f),
+		glm::vec3(7.0f, 0.0f, 0.0f),
+		glm::vec3(7.0f, 3.0f, 0.0f),
+		1.5f, // 弯曲半径
+		profile,
+		12 // 弯曲段细分
+	);
+
+	std::cout << "Generated pipe with " << generator.vertices.size()
+		<< " vertices and " << generator.indices.size() / 3
+		<< " triangles." << std::endl;
+
+	return 0;
+}
+// 示例使用
+int mainc() {
+	std::vector<Vertex_c> vertices;
+	std::vector<unsigned int> indices;
+
+	// 生成立方体，大小为2.0，圆角半径为0.2，分段数为8
+	GenerateRoundedCube(2.0f, 0.2f, 8, vertices, indices);
+
+	// 这里可以添加代码将顶点和索引数据上传到GPU进行渲染
+
+	return 0;
+}
 int main()
 {
 	//hz::main_ssh2();

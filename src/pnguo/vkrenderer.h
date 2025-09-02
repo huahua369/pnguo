@@ -57,13 +57,16 @@ namespace vkr {
 		glm::vec3 right;		//	世界空间中变换的红轴。 
 		glm::vec3 up;			//	世界空间中变换的绿轴。 
 		glm::vec3 scale;		//	缩放。 
-		transform_t* root;		//	返回层级视图中最顶层的变换。
-		transform_t* parent;	//	变换的父级。
-		transform_t** child;	//	子项。 
-		int child_count;		//	子项数量。
 		bool hasChanged;		//	自上次将标志设置为“false”以来，变换是否发生更改  
 	};
-
+	struct node_t
+	{
+		int idx;
+		int root;				//	transform_t*层级视图中最顶层的变换。
+		int parent;				//	变换的父级。
+		int* child;				//	子项。 
+		int child_count;		//	子项数量。
+	};
 
 	struct const_vk {
 		// Create all the heaps for the resources views
@@ -339,3 +342,4 @@ namespace vkr {
 //!vkr
 
 uint32_t gray_float_to_rgba(float gray);
+

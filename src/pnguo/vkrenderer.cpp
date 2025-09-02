@@ -15952,7 +15952,10 @@ namespace vkr {
 		// same thing for the skinning matrices but using the size of the InverseBindMatrices
 		for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
-			auto& it = m_worldSpaceSkeletonMats[i]; it.m = ptr; it.count = m_skins[i].m_InverseBindMatrices.m_count; ptr + it.count;
+			auto& it = m_worldSpaceSkeletonMats[i];
+			it.m = ptr; 
+			it.count = m_skins[i].m_InverseBindMatrices.m_count; 
+			ptr += it.count;
 			dysize += it.count * sizeof(glm::mat4);
 		}
 

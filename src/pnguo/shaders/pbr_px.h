@@ -2228,13 +2228,6 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	color = mix(color, color * m.ao, u_OcclusionStrength);
 #endif
 
-	//	vec3 emissive = vec3(0);
-	//#ifdef ID_emissiveTexture
-	//	emissive = (texture(u_EmissiveSampler, getEmissiveUV(Input))).rgb * u_pbrParams.emissiveFactor.rgb * myPerFrame.u_EmissiveFactor;
-	//#else
-	//	emissive = u_pbrParams.emissiveFactor * perFrame.u_EmissiveFactor;
-	//#endif
-	//	color += emissive;
 	color += m.emissive * (vec3(1.0) - cxf);
 
 	color = max(color, vec3(0.0));
