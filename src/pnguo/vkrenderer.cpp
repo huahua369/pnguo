@@ -20337,13 +20337,10 @@ namespace vkr {
 					if (pgc->Load(fn, "") == false)
 					{
 						printf("The selected model couldn't be found, please check the documentation!\n");
-						delete pgc;
-						//exit(1);
+						delete pgc; 
 						return;
 					}
-				}
-				/*		delete pgc;
-						exit(2);*/
+				} 
 				if (pgc)
 				{
 					std::unique_lock<std::mutex> lock(m_ltsm);
