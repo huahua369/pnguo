@@ -1,5 +1,5 @@
 ﻿# pnguo vkgui
-基于SDL3的简易gui实现。
+基于SDL3的简易gui实现。这个项目主要用来测试验证算法：vulkan渲染2d图形和文字，使用vkvg作为渲染器，vulkan作为渲染后端，SDL3作为窗口和输入管理。项目中还集成了2d骨骼动画渲染库spine-cpp、图集渲染、svg加载库librsvg、字体渲染库fontconfig+harfbuzz、flex布局算法等。
 
 编译说明：
 1. 拉取仓库代码

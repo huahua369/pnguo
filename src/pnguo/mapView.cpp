@@ -1793,6 +1793,8 @@ namespace hz
 			ret = utf8_string;
 			g_free(utf8_string);
 		}
+#else
+		ret = md::u16_u8((uint16_t*)str.c_str(), str.size());
 #endif
 		return ret;
 	}
@@ -1861,6 +1863,8 @@ namespace hz
 			ret = (wchar_t*)tstr;
 			g_free(tstr);
 		}
+#else
+		ret = md::u8_u16(str);
 #endif
 		return ret;
 	}
