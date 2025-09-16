@@ -105,8 +105,6 @@ typedef uint32_t DXGI_FORMAT;
 #include <rapidjson/writer.h>
 #endif
 #include <tiny_gltf.h>
-
-
 #include <zlib.h>
 #include <queue>
 // 本地头文件

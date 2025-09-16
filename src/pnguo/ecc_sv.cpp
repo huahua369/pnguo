@@ -774,6 +774,35 @@ namespace hz
 			return str;
 		}
 
+		std::string encode(const void* source, int len)
+		{
+			if (!source || len < 1) return std::string();
+			std::vector<int> digits;
+			digits.push_back(0);
+			unsigned int carry = 0;
+			const unsigned char* src = (const unsigned char*)source;
+			for (int i = 0; i < len; ++i) {
+				carry = src[i];
+				for (int j = 0; j < digits.size(); ++j) {
+					carry += digits[j] << 8;
+					digits[j] = carry % BASE;
+					carry = (carry / BASE) | 0;
+				}
+				while (carry > 0) {
+					digits.push_back(carry % BASE);
+					carry = (carry / BASE) | 0;
+				}
+			}
+
+			std::string str;
+			str.reserve(len + digits.size());
+			// deal with leading zeros
+			for (int k = 0; src[k] == 0 && k < len - 1; ++k) str.push_back(ALPHABET[0]);
+			// convert digits to a string
+			for (int q = digits.size() - 1; q >= 0; --q) str.push_back(ALPHABET[digits[q]]);
+			return str;
+		}
+
 		std::string decode(const std::string& str) {
 			if (str.empty()) return "";
 
@@ -2444,25 +2473,33 @@ char* cpstr(const char* data, size_t n)
 	}
 	return buf;
 }
+// 释放内存
+void ecc_free(const void* p)
+{
+	if (p)
+	{
+		free((void*)p);
+	}
+}
 //SSL_CBD(EVP_md5);
 //SSL_CBD(EVP_sha256);
 //SSL_CBD(EVP_aes_256_cbc);
 // buf要至少32字节
 char* ecc_sha256(const void* data, size_t n) {
-	std::string b; 
+	std::string b;
 	if (data && n > 0)
 	{
 		b = hz::ecc_c::sha256(data, n);
-	} 
+	}
 	return cpstr(b.data(), b.size());
 }
 char* ecc_md5(const void* data, size_t n) {
-	std::string b; 
+	std::string b;
 	if (data && n > 0)
 	{
 		auto md = EVP_md5();
 		b = hz::c2md(data, n, md);
-	} 
+	}
 	return cpstr(b.data(), b.size());
 }
 
@@ -2519,11 +2556,14 @@ data_pt* encrypt_iv1(const void* ecp, const char* data, size_t size, const char*
 			{
 				ns = align_up(ns + 1, 16);
 				auto p = (char*)malloc(ns);
-				r = (data_pt*)p;
-				r->size = b.size();
-				r->data = p + sizeof(data_pt);
-				r->data[r->size] = 0;
-				memcpy(r->data, b.data(), r->size);
+				if (p)
+				{
+					r = (data_pt*)p;
+					r->size = b.size();
+					r->data = p + sizeof(data_pt);
+					r->data[r->size] = 0;
+					memcpy(r->data, b.data(), r->size);
+				}
 			}
 		}
 	}
@@ -2623,14 +2663,6 @@ data_pt* decrypt_iv00(const void* ecp, const char* data, size_t size, const char
 	}
 	return r;
 }
-// 释放内存
-void ecc_free(const void* p)
-{
-	if (p)
-	{
-		free((void*)p);
-	}
-}
 data_pt* easy_en(const void* ecp, const void* data, size_t len, const char* keystr, int keylen)
 {
 	int ret = 0;
@@ -2677,7 +2709,7 @@ data_pt* easy_de(const void* ecp, const void* data, size_t len, const char* keys
 	}
 	return decrypt_iv1(ecp, (char*)data, len, key.c_str(), key.size());
 }
-size_t ecc_get_curve_count() 
+size_t ecc_get_curve_count()
 {
 	return EC_get_builtin_curves(0, 0);
 }
@@ -2779,6 +2811,66 @@ int ecc_public_verify(void* pubkey, const char* dgst, size_t dgst_size, const ch
 	int ret = ECDSA_verify(0, (unsigned char*)dgst, dgst_size, (unsigned char*)sig, sig_size, eckey);
 	return ret;
 }
+
+char* image2base64(const void* data, int len) {
+	const char* fmt[] = { "data:image/*;base64,",
+	 "data:image/jpeg;base64,",
+	 "data:image/png;base64,",
+	 "data:image/svg;base64,",
+	 "data:image/gif;base64,",
+	 "data:image/bmp;base64," };
+	unsigned short  BMP = 0x4D42,
+		JPG = 0xD8FF,
+		PNG[4] = { 0x5089,0x474E,0x0A0D,0x0A1A },
+		GIF[3] = { 0x4947,0x3846,0x6139 };
+	std::string str = fmt[0];
+	if (len > 2)
+	{
+		unsigned short t = *((unsigned short*)data);
+		if (t == BMP)
+		{
+			str = fmt[5];
+		}
+		else if (t == JPG)
+		{
+			str = fmt[1];
+		}
+		else if (t == PNG[0] && len > 8)
+		{
+			unsigned short t1 = *((unsigned short*)((char*)data + 2));
+			unsigned short t2 = *((unsigned short*)((char*)data + 4));
+			unsigned short t3 = *((unsigned short*)((char*)data + 6));
+			if (t1 == PNG[1] && t2 == PNG[2] && t3 == PNG[3])
+			{
+				str = fmt[2];
+			}
+		}
+		else if (t == GIF[0] && len > 6)
+		{
+			unsigned short t1 = *((unsigned short*)((char*)data + 2));
+			unsigned short t2 = *((unsigned short*)((char*)data + 4));
+			if (t1 == GIF[1] && t2 == GIF[2])
+			{
+				str = fmt[4];
+			}
+		}
+		else {
+			char* p = (char*)data;
+			static std::string ss = "<svg";
+			for (size_t i = 0; i < len - ss.size(); i++, p++)
+			{
+				if (ss == std::string(p, ss.size()))
+				{
+					str = fmt[3];
+					break;
+				}
+			}
+		}
+	}
+	str += hz::b64s.encode(data, len);
+	return cpstr(str.c_str(), str.size());
+}
+
 #if 0
 
 std::vector<char> dpt2v(data_pt* p) {

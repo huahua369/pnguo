@@ -1,8 +1,7 @@
 ﻿#pragma once
 #ifndef ecc_sv_h
 #define ecc_sv_h
-#endif // !ecc_sv_h
- 
+#include <stdint.h>
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -60,7 +59,7 @@ extern "C" {
 //!cpp
 
 #ifndef EXPORT_SV
-#define EXPORT_SV MC_EXPORT
+#define EXPORT_SV 
 #endif
 EXPORT_SV void* ciphers_new_ctx();
 // 下面获取到指定ecp后，如果不调用ctx参数的函数可以释放ctx
@@ -111,3 +110,5 @@ EXPORT_SV char* ecc_get_compute_key(void* prikey, void* pubkey);
 EXPORT_SV char* ecc_privatekey_sign(void* prikey, const char* dgst, size_t dgst_size);
 // 用公钥验证： 返回1成功，其他值失败
 EXPORT_SV int ecc_public_verify(void* pubkey, const char* dgst, size_t dgst_size, const char* sig, size_t sig_size);
+
+#endif // !ecc_sv_h
