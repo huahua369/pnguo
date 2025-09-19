@@ -10032,7 +10032,8 @@ namespace vkr {
 #else
 		std::string CompileFlagsVS("-T vs_6_0");
 #endif // _DEBUG
-		res = VKCompileFromString(m_pDevice->GetDevice(), SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
+		//res = VKCompileFromString(m_pDevice->GetDevice(), SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
+		res = VKCompileFromFile(pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "sky.v.glsl", "main", "", &attributeDefines, &m_vertexShader);
 		assert(res == VK_SUCCESS);
 
 		m_fragmentShaderName = shaderEntryPoint;
@@ -15951,8 +15952,8 @@ namespace vkr {
 		for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
 			auto& it = m_worldSpaceSkeletonMats[i];
-			it.m = ptr; 
-			it.count = m_skins[i].m_InverseBindMatrices.m_count; 
+			it.m = ptr;
+			it.count = m_skins[i].m_InverseBindMatrices.m_count;
 			ptr += it.count;
 			dysize += it.count * sizeof(glm::mat4);
 		}
@@ -20335,10 +20336,10 @@ namespace vkr {
 					if (pgc->Load(fn, "") == false)
 					{
 						printf("The selected model couldn't be found, please check the documentation!\n");
-						delete pgc; 
+						delete pgc;
 						return;
 					}
-				} 
+				}
 				if (pgc)
 				{
 					std::unique_lock<std::mutex> lock(m_ltsm);

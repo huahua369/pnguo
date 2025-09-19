@@ -45,6 +45,7 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDome.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDome.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.glsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky.v.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pbr_px.h
