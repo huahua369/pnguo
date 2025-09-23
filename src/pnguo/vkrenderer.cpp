@@ -2840,10 +2840,10 @@ namespace vkr {
 		std::vector<char*> m_buffersData;		// 原始数据
 		std::vector<float*> _sparseData;		// 解码的稀疏数据
 		std::vector<hz::mfile_t*> _fileData;	// 文件数据
-		std::vector<char*> _fileData_f;		// 原始数据
+		std::vector<char*> _fileData_f;			// 原始数据
 
 		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
-		glm::mat4* m_animatedMats = 0;       // object space matrices of each node after being animated
+		glm::mat4* m_animatedMats = 0;			// _mats的指针。object space matrices of each node after being animated
 		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		struct matp2 {
@@ -18459,7 +18459,7 @@ namespace vkr {
 		}
 
 		{
-			skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, 0.0f);
+			skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, glm::radians(2.0f));
 			skyDomeConstants.turbidity = 10.0f;
 			skyDomeConstants.rayleigh = 2.0f;
 			skyDomeConstants.mieCoefficient = 0.005f;
@@ -21720,3 +21720,50 @@ namespace vkr
 	}
 }
 //!vkr
+
+
+uint64_t vkr_get_ticks() {
+	auto now = std::chrono::high_resolution_clock::now();
+	// 转换为毫秒级时间戳
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+	return ms;
+}
+
+void vkrender_test()
+{
+	auto inst = new_instance();
+	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表
+	if (devs.empty())return;
+	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 从SDL3获取设备创建vk渲染器
+	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0);			// 创建vk渲染器
+	vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 添加一个地板
+	vkd->resize(1024, 800);				// 设置fbo缓冲区大小
+	auto vki = vkd->get_vkimage(0);	// 获取第一个fbo纹理弄到窗口显示
+	//auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理
+	auto dstate = vkd->_state;	// 渲染状态属性
+	{
+		mouse_state_t mio = {};
+		int64_t prev_time = 0;
+		// mio = *form0->io;
+		// 独立线程或主线程执行渲染
+		while (1) {
+			uint64_t curr_time = vkr_get_ticks();
+			if (prev_time > 0)
+			{
+				double delta = (float)(curr_time - prev_time) / 1000.0f;
+				mio.DeltaTime = delta;
+			}
+			vkd->update(&mio);		// 更新事件
+			vkd->on_render();		// 执行渲染
+			// todo 提交到窗口渲染
+			Sleep(1);
+			prev_time = curr_time;
+		}
+	}
+	free_vkdg(vkd);				// 释放渲染器
+	free_instance(inst);		// 释放实例
+}
+
+
+
