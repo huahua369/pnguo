@@ -21745,7 +21745,7 @@ void vkrender_test()
 	{
 		mouse_state_t mio = {};
 		int64_t prev_time = 0;
-		// mio = *form0->io;
+		// mio = *form0->io; // 有form就不需要计算DeltaTime和prev_time
 		// 独立线程或主线程执行渲染
 		while (1) {
 			uint64_t curr_time = vkr_get_ticks();

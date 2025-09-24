@@ -278,6 +278,9 @@ namespace hz
 	};
 
 
+	// type 0全部，1=只有文件file,2=只有文件夹folder
+	std::vector<std::string> listFiles(const std::string& path, bool isRecursive, int type);
+	size_t listFiles(const char* path, bool isRecursive, int type, std::vector<std::string>* p);
 
 	// 获取可创建临时文件的目录
 	std::string get_temp_path();

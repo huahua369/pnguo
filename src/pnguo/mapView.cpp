@@ -37,6 +37,7 @@
 #include <shlwapi.h>
 #include <sys/timeb.h>
 #include <direct.h>
+#include <io.h>
 #define mkdir(a, b) _mkdir(a)
 #define mkdirw(a, b) _wmkdir(a)
 #else
@@ -591,6 +592,68 @@ guiSetStr(_edit_cmdout, buf);
 #ifndef NO_MAPFILE
 namespace hz
 {
+	// type 0全部，1=只有文件file,2=只有文件夹folder
+	std::vector<std::string> listFiles(const std::string& path, bool isRecursive, int type)
+	{
+		std::vector<std::string> r;
+		listFiles(path.c_str(), isRecursive, type, &r);
+		return r;
+	}
+
+	size_t listFiles(const char* path, bool isRecursive, int type, std::vector<std::string>* p)
+	{
+		size_t rs = 0;
+		if (!p)return rs;
+#ifdef _WIN32
+		auto& r = *p;
+		auto ps = r.size();
+		std::stack<std::string> q;
+		char searchPath[1024];
+		q.push(path);
+		for (; q.size();)
+		{
+			struct _finddata_t fileInfo;
+			auto qf = q.top(); q.pop();
+			if (qf.empty())continue;
+			sprintf(searchPath, "%s\\*.*", qf.c_str());  // 构造搜索路径：原路径 + \*.*			
+			auto handle = _findfirst(searchPath, &fileInfo);  // 开始查找
+			if (handle == -1) {
+				perror("Failed to open directory");
+				continue;
+			}
+			do {
+				if (strcmp(fileInfo.name, ".") != 0 && strcmp(fileInfo.name, "..") != 0) {
+					auto nn = qf + "\\" + fileInfo.name;
+					switch (type) {
+					case 0:
+					{
+						r.push_back(nn);
+					}
+					break;
+					case 1:
+					{
+						if (fileInfo.attrib & _A_ARCH)r.push_back(nn);
+					}
+					break;
+					case 2:
+					{
+						if (fileInfo.attrib & _A_SUBDIR)r.push_back(nn);
+					}
+					break;
+					}
+					// 递归遍历子目录（可选）
+					if ((fileInfo.attrib & _A_SUBDIR) && isRecursive) {
+						q.push(nn);
+					}
+				}
+			} while (_findnext(handle, &fileInfo) == 0);  // 继续查找下一个
+			_findclose(handle);  // 关闭搜索 
+		}
+		rs = r.size() - ps;
+#endif
+		return rs;
+	}
+
 	std::string get_temp_path()
 	{
 		std::string str;
