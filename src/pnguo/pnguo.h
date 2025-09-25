@@ -1351,14 +1351,6 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 void split_v(std::string str, const std::string& pattern, std::vector<std::string>& result);
 
 
-std::string icu_u16_gbk(const void* str, size_t size);
-std::string icu_gbk_u8(const char* str, size_t size);
-std::string icu_u8_gbk(const char* str, size_t size);
-std::string icu_u16_u8(const void* str, size_t size);
-std::u16string icu_u8_u16(const char* str, size_t size);
-
-void do_text(const char* str, size_t first, size_t count);
-
 // align val to the next multiple of alignment
 uint64_t align_up(uint64_t val, uint64_t alignment);
 // align val to the previous multiple of alignment

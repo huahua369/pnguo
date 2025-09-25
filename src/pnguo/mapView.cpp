@@ -59,6 +59,20 @@
 #define ftelli64 ftello64
 #endif // _WIN32
 
+
+#ifndef NO_MV_ICU 
+#include <unicode/uchar.h>
+#include <unicode/ucnv.h>
+#include <unicode/utypes.h>
+#include <unicode/ucsdet.h>
+#include <unicode/unistr.h>
+#include <unicode/ustring.h>
+#include <unicode/ubidi.h> 
+#include <unicode/uscript.h>  
+#endif
+
+
+
 namespace md {
 
 	int64_t file_size(FILE* fp)
@@ -1263,7 +1277,15 @@ namespace hz
 		bi.hwndOwner = hWnd;
 		bi.pidlRoot = ppidl;//根目录  
 		bi.pszDisplayName = Buffer;//此参数如为NULL则不能显示对话框  
-		bi.lpszTitle = title.c_str();//\0浏览文件夹";//下标题  
+		std::string dtitle;
+		if (get_text_code(title.c_str(), title.size()) == "UTF-8") {
+			dtitle = icu_u8_gbk(title.c_str(), title.size());
+			bi.lpszTitle = dtitle.c_str();
+		}
+		else
+		{
+			bi.lpszTitle = title.c_str();//\0浏览文件夹";//下标题  
+		}
 		bi.ulFlags = //BIF_DONTGOBELOWDOMAIN | BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
 			BIF_RETURNONLYFSDIRS | BIF_USENEWUI /*包含一个编辑框 用户可以手动填写路径 对话框可以调整大小之类的..*/ |
 			BIF_UAHINT /*带TIPS提示*/
@@ -1271,7 +1293,15 @@ namespace hz
 			;
 		bi.lpfn = _SHBrowseForFolderCallbackProc;
 		//bi.iImage=IDR_MAINFRAME;  
-		bi.lParam = LPARAM(strCurrentPath.c_str());    //设置默认路径  
+		std::string ddir;
+		if (get_text_code(strCurrentPath.c_str(), strCurrentPath.size()) == "UTF-8") {
+			ddir = icu_u8_gbk(strCurrentPath.c_str(), strCurrentPath.size());
+			bi.lParam = LPARAM(ddir.c_str());
+		}
+		else
+		{
+			bi.lParam = LPARAM(strCurrentPath.c_str());    //设置默认路径  
+		}
 
 		//初始化入口参数bi结束  
 		LPITEMIDLIST pIDList = SHBrowseForFolder(&bi);//调用显示选择对话框  
@@ -1295,7 +1325,7 @@ namespace hz
 #endif
 		return ret;
 	}
-	std::string browse_folder_u8(const std::string& strCurrentPath, const std::string& title)
+	std::string browse_folder_w(const std::wstring& strCurrentPath, const std::wstring& title)
 	{
 		std::string ret;
 #ifdef _WIN32
@@ -1311,7 +1341,7 @@ namespace hz
 		auto rh = SHGetSpecialFolderLocation(hWnd, CSIDL_DRIVES, &ppidl);
 		if (ppidl == NULL)
 			MessageBox(hWnd, "启动路径浏览失败", "提示", MB_OK);
-		std::wstring wt = md::u8_u16(title);
+		std::wstring wt = title;
 		//初始化入口参数bi开始  
 		bi.hwndOwner = hWnd;
 		bi.pidlRoot = ppidl;//根目录  
@@ -2477,6 +2507,339 @@ namespace hz
 #endif // 1
 
 
+	// todo icu 
+#ifndef NO_MV_ICU
+	struct icu_lib_t
+	{
+		void (*_ubidi_setPara)(UBiDi* pBiDi, const UChar* text, int32_t length, UBiDiLevel paraLevel, UBiDiLevel* embeddingLevels, UErrorCode* pErrorCode);
+		int32_t(*_ubidi_countRuns) (UBiDi* pBiDi, UErrorCode* pErrorCode);
+		UBiDi* (*_ubidi_open)(void);
+		void (*_ubidi_close)(UBiDi* pBiDi);
+		UBiDiDirection(*_ubidi_getVisualRun)(UBiDi* pBiDi, int32_t runIndex, int32_t* pLogicalStart, int32_t* pLength);
+		int32_t(*_ucnv_convert)(const char* toConverterName, const char* fromConverterName, char* target, int32_t targetCapacity, const char* source, int32_t sourceLength, UErrorCode* pErrorCode);
+		UScriptCode(*_uscript_getScript)(UChar32 codepoint, UErrorCode* err);
+		UBool(*_uscript_hasScript)(UChar32 c, UScriptCode sc);
+		const char* (*_uscript_getName)(UScriptCode scriptCode);
+		const char* (*_uscript_getShortName)(UScriptCode scriptCode);
+
+		UCharsetDetector* (*_ucsdet_open)(UErrorCode* status);
+		void (*_ucsdet_close)(UCharsetDetector* ucsd);
+		void (*_ucsdet_setText)(UCharsetDetector* ucsd, const char* textIn, int32_t len, UErrorCode* status);
+		void (*_ucsdet_setDeclaredEncoding)(UCharsetDetector* ucsd, const char* encoding, int32_t length, UErrorCode* status);
+		const UCharsetMatch* (*_ucsdet_detect)(UCharsetDetector* ucsd, UErrorCode* status);
+		const char* (*_ucsdet_getName)(const UCharsetMatch* ucsm, UErrorCode* status);
+
+		int32_t(*_ucnv_countAvailable)(void);
+		const char* (*_ucnv_getAvailableName)(int32_t n);
+
+		void* _handle;
+	};
+
+	static std::vector<std::string> icu_funstr = { "ubidi_setPara","ubidi_countRuns","ubidi_open","ubidi_close","ubidi_getVisualRun"
+	,"ucnv_convert" , "uscript_getScript","uscript_hasScript","uscript_getName","uscript_getShortName",
+	"ucsdet_open", "ucsdet_close", "ucsdet_setText", "ucsdet_setDeclaredEncoding", "ucsdet_detect", "ucsdet_getName",
+	"ucnv_countAvailable","ucnv_getAvailableName",
+	};
+
+#ifdef _WIN32
+	const char* exts = ".dll";
+#else
+	const char* exts = ".so";
+#endif // _WIN32
+#ifdef EAD_ICONV
+	static iconv_info_t ic = {};
+#endif
+	static std::once_flag icof, icuf;
+	static std::set<std::string> lsic;
+	static icu_lib_t* icub = 0;
+
+	hz::Shared* loadso(const std::string& dlln)
+	{
+		auto so = hz::Shared::loadShared(dlln + exts);
+		return so;
+	}
+	icu_lib_t* get_icu(int v)
+	{
+#define mxv 1000
+		if (!icub)
+		{
+			try {
+				std::string dlln = "libicuuc";
+				std::string dlln0 = "icudt";
+				int v1 = v;
+#ifdef _WIN32
+				//dlln = "icuuc" + std::to_string(v1);
+				//dlln0 = "icudt" + std::to_string(v1);
+				//auto so0 = loadso(dlln0);
+				//auto so = loadso(dlln);
+				//if (!so0)
+				//{
+				//	dlln0 = "icu";
+				//	so0 = loadso(dlln0);
+				//}
+				//if (!so)
+				//{
+				//	dlln = "icuuc";
+				//	so = loadso(dlln);
+				//}
+				auto so = loadso("icu");
+#else
+				auto so = loadso("libicu");
+				if (!so) loadso(dlln);
+#endif // _WIN32
+
+				if (!so) {
+					so = loadso(dlln);
+					if (!so)
+						throw std::runtime_error("-1");
+					return 0;
+				}
+				std::string n;
+				void* uc = 0;
+
+#if 1 
+				int nc = 0;
+				do
+				{
+					for (int i = v1; i > 0; i--)
+					{
+						auto n1 = std::to_string(i);
+						auto k = "ubidi_close_" + n1;
+						auto fb = so->_dlsym(k.c_str());
+						if (fb)
+						{
+							n = n1;
+							uc = fb;
+							break;
+						}
+					}
+					if (n.empty() && nc == 0) { v1 = mxv; nc++; continue; }
+
+				} while (0);
+#endif
+				auto ifun = icu_funstr;
+				if (n.size())
+				{
+					for (auto& it : ifun)
+					{
+						it += "_" + n;
+					}
+				}
+				icu_lib_t tb = {};
+				so->dlsyms(ifun, (void**)&tb);
+				if (tb._ubidi_close)
+				{
+					icub = new icu_lib_t();
+					*icub = tb;
+					icub->_handle = so;
+				}
+				else {
+					hz::Shared::destroy(so);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				auto ew = e.what();
+				if (ew)
+				{
+					printf(ew);
+					printf("load icu error!\n");
+				}
+			}
+		}
+		return icub;
+	}
+
+	void un_icu()
+	{
+		if (icub)
+		{
+
+			if (icub->_handle)
+			{
+				hz::Shared::destroy((hz::Shared*)icub->_handle);
+			}
+			delete icub;
+			icub = 0;
+		}
+	}
+
+	void init_icu()
+	{
+		if (!icub)
+			get_icu(U_ICU_VERSION_MAJOR_NUM);
+	}
+
+
+
+	std::string icu_convert(const char* instring, int32_t inlen, const char* dst_name, const char* src_name)
+	{
+		if (!icub)
+			get_icu(U_ICU_VERSION_MAJOR_NUM);
+		std::string r;
+		int32_t iret = 0;
+		if (inlen < 0)
+			inlen = strlen(instring);
+		do {
+			if (!icub || !instring || inlen == 0 || !src_name || !(*src_name) || !dst_name || !(*dst_name))break;
+			if (icub->_ucnv_convert)
+			{
+				UErrorCode err_code = {};
+				r.resize(align_up(inlen * 4, 16));
+				iret = icub->_ucnv_convert(dst_name, src_name, r.data(), r.size(), instring, inlen, &err_code);
+				if (err_code == U_BUFFER_OVERFLOW_ERROR)
+				{
+					iret = icub->_ucnv_convert(dst_name, src_name, 0, 0, instring, inlen, &err_code);
+					if (iret > 0)
+					{
+						r.resize(align_up(iret, 16));
+						iret = icub->_ucnv_convert(dst_name, src_name, r.data(), r.size(), instring, inlen, &err_code);
+					}
+				}
+				if (err_code == U_ZERO_ERROR)
+				{
+					r.resize(iret);
+					break;
+				}
+				if (err_code == U_STRING_NOT_TERMINATED_WARNING)
+				{
+					break;
+				}
+			}
+		} while (0);
+		return r;
+	}
+
+	//utf-8,gb2312,ucs4
+	//utf-8:  一个英文字母或者是数字占用一个字节，汉字占3个字节
+	//gb2312: 一个英文字母或者是数字占用一个字节，汉字占2个字节  
+
+	std::string icu_gbk_u8(const char* str, size_t size)
+	{
+		std::string r;
+		if (str)
+		{
+			if (size == -1)size = strlen(str);
+			if (size > 0)
+			{
+				r = icu_convert(str, size, "utf-8", "gbk");
+			}
+		}
+		return r;
+	}
+	std::string icu_u8_gbk(const char* str, size_t size)
+	{
+		std::string r;
+		if (str)
+		{
+			if (size == -1)size = strlen(str);
+			if (size > 0)
+			{
+				r = icu_convert(str, size, "gbk", "utf-8");
+			}
+		}
+		return r;
+	}
+	int utf16len(unsigned short* utf16)
+	{
+		int utf;
+		int ret = 0;
+		while (utf = *utf16++)
+			ret += ((utf < 0xD800) || (utf > 0xDFFF)) ? 2 : 1;
+		return ret;
+	}
+	std::string icu_u16_gbk(const void* str, size_t size)
+	{
+		std::string r;
+		if (str)
+		{
+			if (size == -1)size = utf16len((uint16_t*)str);
+			if (size > 0)
+			{
+				r = icu_convert((char*)str, size, "gbk", "utf-16le");
+			}
+		}
+		return r;
+	}
+	std::string icu_u16_u8(const void* str, size_t size)
+	{
+		std::string r;
+		if (str)
+		{
+			if (size == -1)size = utf16len((uint16_t*)str);
+			if (size > 0)
+			{
+				r = icu_convert((char*)str, size, "utf-8", "utf-16le");
+			}
+		}
+		return r;
+	}
+
+	std::u16string icu_u8_u16(const char* str, size_t size)
+	{
+		std::u16string r;
+		if (str)
+		{
+			if (size == -1)size = strlen(str);
+			if (size > 0)
+			{
+				auto kr = icu_convert((char*)str, size, "utf-16le", "utf-8");
+				r.resize(kr.size() / 2);
+				memcpy(r.data(), kr.c_str(), kr.size());
+			}
+		}
+		return r;
+	}
+	std::string get_text_code(const char* data8, size_t size)
+	{
+		if (!icub)
+			get_icu(U_ICU_VERSION_MAJOR_NUM);
+		if (!icub || !icub->_ucsdet_open || !icub->_ucsdet_setText || !icub->_ucsdet_detect || !icub->_ucsdet_getName || !icub->_ucsdet_close)return std::string();
+		UErrorCode status = U_ZERO_ERROR;
+		UCharsetDetector* detector = icub->_ucsdet_open(&status);
+		if (U_FAILURE(status)) return std::string();
+
+		icub->_ucsdet_setText(detector, data8, size, &status);
+		if (U_FAILURE(status)) {
+			icub->_ucsdet_close(detector);
+			return std::string();
+		}
+
+		const UCharsetMatch* match = icub->_ucsdet_detect(detector, &status);
+		if (U_FAILURE(status) || !match) {
+			icub->_ucsdet_close(detector);
+			return std::string();
+		}
+
+		const char* charset = icub->_ucsdet_getName(match, &status);
+		if (U_FAILURE(status)) {
+			icub->_ucsdet_close(detector);
+			return std::string();
+		}
+		icub->_ucsdet_close(detector);
+		return charset;
+	}
+	std::vector<const char*> get_convert_name()
+	{
+		if (!icub)
+			get_icu(U_ICU_VERSION_MAJOR_NUM);
+		std::vector<const char*> r;
+		if (icub)
+		{
+			int32_t n = icub->_ucnv_countAvailable();
+			r.reserve(n);
+			for (size_t i = 0; i < n; i++)
+			{
+				const char* p = icub->_ucnv_getAvailableName(i);
+				if (p)
+				{
+					r.push_back(p);
+				}
+			}
+		}
+		return r;
+	}
+#endif
 
 
 

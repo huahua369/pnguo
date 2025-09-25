@@ -563,4 +563,7 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 void split_v(std::string str, const std::string& pattern, std::vector<std::string>& result);
 
 
+
+void do_text(const char* str, size_t first, size_t count);
+
 #endif // !FONT_CORE_H

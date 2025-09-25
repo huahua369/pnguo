@@ -291,6 +291,7 @@ namespace hz
 	int browse_folder(const std::string& strCurrentPath, std::function<void(const std::string&)> rfunc, const std::string& title = "");
 	int browse_folder(const std::string& strCurrentPath, const std::string& title, std::function<void(const std::string&)> rfunc);
 	std::string browse_folder(const std::string& strCurrentPath, const std::string& title);
+	std::string browse_folder_w(const std::wstring& strCurrentPath, const std::wstring& title);
 
 	std::string browse_save_file(const std::string& title, const std::string& strCurrentPath, std::string filter, void* hWnd);
 
@@ -317,6 +318,15 @@ namespace hz
 	bool is_utf8(const char* str, int len);
 	// 路过bom
 	char* tbom(char* str, int* outn);
+
+	std::string icu_u16_gbk(const void* str, size_t size);
+	std::string icu_gbk_u8(const char* str, size_t size);
+	std::string icu_u8_gbk(const char* str, size_t size);
+	std::string icu_u16_u8(const void* str, size_t size);
+	std::u16string icu_u8_u16(const char* str, size_t size);
+	std::string get_text_code(const char* data8, size_t size);
+	std::vector<const char*> get_convert_name();
+	std::string icu_convert(const char* instring, int32_t inlen, const char* dst_name, const char* src_name);
 
 }//!hz
 

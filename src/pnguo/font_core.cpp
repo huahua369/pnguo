@@ -19,7 +19,7 @@
 
 #ifndef NO_FONT_CX 
 
-#ifndef NO_FONT_CX
+#ifndef NO_FONT_ICU
 #include <hb.h>
 #include <hb-ot.h>
 #include <fontconfig/fontconfig.h> 
@@ -6711,9 +6711,26 @@ struct icu_lib_t
 	UBool(*_uscript_hasScript)(UChar32 c, UScriptCode sc);
 	const char* (*_uscript_getName)(UScriptCode scriptCode);
 	const char* (*_uscript_getShortName)(UScriptCode scriptCode);
+
+	UCharsetDetector* (*_ucsdet_open)(UErrorCode* status);
+	void (*_ucsdet_close)(UCharsetDetector* ucsd);
+	void (*_ucsdet_setText)(UCharsetDetector* ucsd, const char* textIn, int32_t len, UErrorCode* status);
+	void (*_ucsdet_setDeclaredEncoding)(UCharsetDetector* ucsd, const char* encoding, int32_t length, UErrorCode* status);
+	const UCharsetMatch* (*_ucsdet_detect)(UCharsetDetector* ucsd, UErrorCode* status);
+	const char* (*_ucsdet_getName)(const UCharsetMatch* ucsm, UErrorCode* status);
+
 	void* _handle;
 };
 
+static std::vector<std::string> icu_funstr = { "ubidi_setPara","ubidi_countRuns","ubidi_open","ubidi_close","ubidi_getVisualRun"
+,"ucnv_convert" , "uscript_getScript","uscript_hasScript","uscript_getName","uscript_getShortName",
+"ucsdet_open",
+"ucsdet_close",
+"ucsdet_setText",
+"ucsdet_setDeclaredEncoding",
+"ucsdet_detect",
+"ucsdet_getName",
+};
 
 #ifdef _WIN32
 const char* exts = ".dll";
@@ -6788,17 +6805,15 @@ icu_lib_t* get_icu(int v)
 
 			} while (0);
 #endif
-			std::vector<std::string> str = { "ubidi_setPara","ubidi_countRuns","ubidi_open","ubidi_close","ubidi_getVisualRun"
-			,"ucnv_convert" , "uscript_getScript","uscript_hasScript","uscript_getName","uscript_getShortName" };
 			if (n.size())
 			{
-				for (auto& it : str)
+				for (auto& it : icu_funstr)
 				{
 					it += "_" + n;
 				}
 			}
 			icu_lib_t tb = {};
-			so->dlsyms(str, (void**)&tb);
+			so->dlsyms(icu_funstr, (void**)&tb);
 			if (tb._ubidi_close)
 			{
 				icub = new icu_lib_t();
@@ -6841,6 +6856,9 @@ void init_icu()
 	if (!icub)
 		get_icu(U_ICU_VERSION_MAJOR_NUM);
 }
+
+
+
 #endif
 
 struct ScriptRecord
@@ -7950,204 +7968,6 @@ void hb_cx::free_font()
 }
 #endif
 
-
-int32_t dl_icuuc_utf82gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen);
-int32_t dl_icuuc_u162gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen);
-//utf-8,gb2312,ucs4
-//utf-8:  一个英文字母或者是数字占用一个字节，汉字占3个字节
-//gb2312: 一个英文字母或者是数字占用一个字节，汉字占2个字节
-int32_t dl_icuuc_gbk2utf8(char* outbuf, int32_t buflen, const char* instring, int32_t inlen)
-{
-	if (!icub)
-		get_icu(U_ICU_VERSION_MAJOR_NUM);
-	int32_t iret = 0;
-	if (icub && outbuf != 0 && instring != 0)
-	{
-		if (icub->_ucnv_convert)
-		{
-			UErrorCode err_code = {};
-			iret = icub->_ucnv_convert("utf-8", "gbk", outbuf, buflen, instring, inlen, &err_code);
-		}
-	}
-	return iret;
-}
-int32_t dl_icuuc_u162gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen)
-{
-	if (!icub)
-		get_icu(U_ICU_VERSION_MAJOR_NUM);
-	int32_t iret = -1;
-	if (icub)
-	{
-		UErrorCode err_code = {};
-		iret = 0;
-		if (outbuf != 0 && instring != 0)
-		{
-			if (icub->_ucnv_convert)
-			{
-				iret = icub->_ucnv_convert("gbk", "utf-16le"
-					, outbuf, buflen
-					, instring, inlen
-					, &err_code);
-			}
-		}
-	}
-	return iret;
-}
-int32_t dl_icuuc_utf82gbk(char* outbuf, int32_t buflen, const char* instring, int32_t inlen)
-{
-	if (!icub)
-		get_icu(U_ICU_VERSION_MAJOR_NUM);
-	int32_t iret = -1;
-	if (icub)
-	{
-		iret = 0;
-		if (outbuf != 0 && instring != 0)
-		{
-			if (icub->_ucnv_convert)
-			{
-				UErrorCode err_code = {};
-				iret = icub->_ucnv_convert("gbk", "utf-8"
-					, outbuf, buflen
-					, instring, inlen
-					, &err_code);
-			}
-		}
-	}
-	return iret;
-}
-int32_t dl_icuuc_unicode2utf8(char* outbuf, int32_t buflen, const unsigned short* instring, int32_t inlen)
-{
-	if (!icub)
-		get_icu(U_ICU_VERSION_MAJOR_NUM);
-	int32_t iret = -1;
-	if (icub)
-	{
-		iret = 0;
-		UErrorCode err_code = {};
-		if (outbuf != 0 && instring != 0)
-		{
-			if (icub->_ucnv_convert)
-			{
-				iret = icub->_ucnv_convert("utf-8", "utf-16le"
-					, outbuf, buflen
-					, (const char*)instring, inlen * sizeof(unsigned short) / sizeof(char)
-					, &err_code);
-			}
-		}
-	}
-	return iret;
-}
-int32_t dl_icuuc_utf82unicode(unsigned short* outbuf, int32_t buflen, const char* instring, int32_t inlen)
-{
-	if (!icub)
-		get_icu(U_ICU_VERSION_MAJOR_NUM);
-	int32_t iret = -1;
-	if (icub) {
-		iret = 0;
-		UErrorCode err_code = {};
-		if (outbuf != 0 && instring != 0)
-		{
-			if (icub->_ucnv_convert)
-			{
-				iret = icub->_ucnv_convert("utf-16le", "utf-8"
-					, (char*)outbuf, buflen * sizeof(unsigned short) / sizeof(char)
-					, instring, inlen
-					, &err_code);
-			}
-		}
-	}
-	return iret;
-}
-
-std::string icu_gbk_u8(const char* str, size_t size)
-{
-	std::string r;
-	if (str)
-	{
-		if (size == -1)size = strlen(str);
-		if (size > 0)
-		{
-			r.resize(size * 2);
-			auto n = dl_icuuc_gbk2utf8(r.data(), r.size(), str, size);
-			if (n > 0)
-				r.resize(n);
-		}
-	}
-	return r;
-}
-std::string icu_u8_gbk(const char* str, size_t size)
-{
-	std::string r;
-	if (str)
-	{
-		if (size == -1)size = strlen(str);
-		if (size > 0)
-		{
-			r.resize(size);
-			auto n = dl_icuuc_utf82gbk(r.data(), r.size(), str, size);
-			if (n > 0)
-				r.resize(n);
-		}
-	}
-	return r;
-}
-int utf16len(unsigned short* utf16)
-{
-	int utf;
-	int ret = 0;
-	while (utf = *utf16++)
-		ret += ((utf < 0xD800) || (utf > 0xDFFF)) ? 2 : 1;
-	return ret;
-}
-std::string icu_u16_gbk(const void* str, size_t size)
-{
-	std::string r;
-	if (str)
-	{
-		if (size == -1)size = utf16len((uint16_t*)str);
-		if (size > 0)
-		{
-			r.resize(size);
-			auto n = dl_icuuc_u162gbk(r.data(), r.size(), (char*)str, size);
-			if (n > 0)
-				r.resize(n);
-		}
-	}
-	return r;
-}
-std::string icu_u16_u8(const void* str, size_t size)
-{
-	std::string r;
-	if (str)
-	{
-		if (size == -1)size = utf16len((uint16_t*)str);
-		if (size > 0)
-		{
-			r.resize(size);
-			auto n = dl_icuuc_unicode2utf8(r.data(), r.size(), (uint16_t*)str, size);
-			if (n > 0)
-				r.resize(n);
-		}
-	}
-	return r;
-}
-
-std::u16string icu_u8_u16(const char* str, size_t size)
-{
-	std::u16string r;
-	if (str)
-	{
-		if (size == -1)size = strlen(str);
-		if (size > 0)
-		{
-			r.resize(size);
-			auto n = dl_icuuc_utf82unicode((uint16_t*)r.data(), r.size(), str, size);
-			if (n > 0)
-				r.resize(n);
-		}
-	}
-	return r;
-}
 
 
 void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
