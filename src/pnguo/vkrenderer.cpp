@@ -13608,8 +13608,8 @@ namespace vkr {
 
 	bool InitShaderCompilerCache(const std::string shaderLibDir, std::string shaderCacheDir)
 	{
-		s_shaderLibDir = shaderLibDir;
-		s_shaderCacheDir = shaderCacheDir;
+		s_shaderLibDir = hz::genfn(shaderLibDir);
+		s_shaderCacheDir = hz::genfn(shaderCacheDir);
 
 		return true;
 	}
@@ -13693,7 +13693,7 @@ namespace vkr {
 
 		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID * ppData, UINT * pBytes)
 		{
-			std::string fullpath = GetShaderCompilerLibDir() + pFileName;
+			std::string fullpath = hz::genfn(GetShaderCompilerLibDir() + "/" + pFileName);
 			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
 		}
 		HRESULT Close(LPCVOID pData)
@@ -13713,12 +13713,10 @@ namespace vkr {
 		ULONG Release() { return 0; }
 		HRESULT LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource)
 		{
-			char fullpath[1024];
-			sprintf_s<1024>(fullpath, ("%s\\%S"), GetShaderCompilerLibDir().c_str(), pFilename);
-
+			std::string kfp = hz::genfn(GetShaderCompilerLibDir() + "/" + hz::u16_to_gbk(pFilename));
 			LPCVOID pData;
 			size_t bytes;
-			HRESULT hr = readfile(fullpath, (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
+			HRESULT hr = readfile(kfp.c_str(), (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
 
 			if (hr == E_FAIL)
 			{
@@ -13743,9 +13741,9 @@ namespace vkr {
 		{
 			auto found = std::string(pParams).find("-spirv ");
 			if (found == std::string::npos)
-				filenameOut = GetShaderCompilerCacheDir() + format("\\%p.dxo", hash);
+				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.dxo", hash));
 			else
-				filenameOut = GetShaderCompilerCacheDir() + format("\\%p.spv", hash);
+				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.spv", hash));
 		}
 
 #ifdef USE_DXC_SPIRV_FROM_DISK
@@ -13758,12 +13756,12 @@ namespace vkr {
 
 		// create hlsl file for shader compiler to compile
 		//
-		std::string filenameHlsl = GetShaderCompilerCacheDir() + format("\\%p.hlsl", hash);
+		std::string filenameHlsl = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.hlsl", hash));
 		std::ofstream ofs(filenameHlsl, std::ofstream::out);
 		ofs << pSrcCode;
 		ofs.close();
 
-		std::string filenamePdb = GetShaderCompilerCacheDir() + format("\\%p.lld", hash);
+		std::string filenamePdb = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.lld", hash));
 
 		std::wstring twstr;
 		// get defines
@@ -13915,7 +13913,7 @@ namespace vkr {
 
 				Trace("*** Error compiling %p.hlsl ***\n", hash);
 
-				std::string filenameErr = GetShaderCompilerCacheDir() + format("\\%p.err", hash);
+				std::string filenameErr = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.err", hash));
 				savefile(filenameErr.c_str(), pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize(), false);
 
 				std::string errMsg = std::string((char*)pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize());
@@ -13946,13 +13944,13 @@ namespace vkr {
 		std::string filenameGlsl;
 		if (sourceType == SST_GLSL)
 		{
-			filenameSpv = format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash);
-			filenameGlsl = format("%s\\%p.glsl", GetShaderCompilerCacheDir().c_str(), hash);
+			filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
+			filenameGlsl = hz::genfn(format("%s\\%p.glsl", GetShaderCompilerCacheDir().c_str(), hash));
 		}
 		else if (sourceType == SST_HLSL)
 		{
-			filenameSpv = format("%s\\%p.dxo", GetShaderCompilerCacheDir().c_str(), hash);
-			filenameGlsl = format("%s\\%p.hlsl", GetShaderCompilerCacheDir().c_str(), hash);
+			filenameSpv = hz::genfn(format("%s\\%p.dxo", GetShaderCompilerCacheDir().c_str(), hash));
+			filenameGlsl = hz::genfn(format("%s\\%p.hlsl", GetShaderCompilerCacheDir().c_str(), hash));
 		}
 		else
 			assert(!"unknown shader extension");
@@ -13984,7 +13982,7 @@ namespace vkr {
 		{
 			commandLine = format("glslc --target-env=vulkan1.3 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
 
-			std::string filenameErr = format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash);
+			std::string filenameErr = hz::genfn(format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash));
 
 			if (LaunchProcess(commandLine.c_str(), filenameErr.c_str()) == true)
 			{
@@ -14069,7 +14067,7 @@ namespace vkr {
 		// 
 		size_t hash;
 		size_t pslen = strlen(pshader);
-		auto sf = (GetShaderCompilerLibDir() + "\\");
+		auto sf = hz::genfn(GetShaderCompilerLibDir() + "\\");
 		hash = HashShaderString(sf.c_str(), pshader);
 		hash = Hash(pShaderEntryPoint, strlen(pShaderEntryPoint), hash);
 		hash = Hash(shaderCompilerParams, strlen(shaderCompilerParams), hash);
@@ -14093,7 +14091,7 @@ namespace vkr {
 			char* SpvData = NULL;
 			size_t SpvSize = 0;
 #ifdef USE_SPIRV_FROM_DISK
-			std::string filenameSpv = format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash);
+			std::string filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
 			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
 #endif
 			{
@@ -14172,10 +14170,9 @@ namespace vkr {
 			assert(!"Can't tell shader type from its extension");
 
 		//append path
-		char fullpath[1024];
-		sprintf_s(fullpath, "%s\\%s", GetShaderCompilerLibDir().c_str(), pFilename);
+		auto fullpath = hz::genfn(GetShaderCompilerLibDir() + std::string("/") + pFilename);
 
-		if (readfile(fullpath, &pShaderCode, &size, false))
+		if (readfile(fullpath.c_str(), &pShaderCode, &size, false))
 		{
 			VkResult res = VKCompileFromString(device, sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
 			SetResourceName(device, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)pShader->module, pFilename);
@@ -14198,8 +14195,7 @@ namespace vkr {
 		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron").c_str(), 0);
 		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK").c_str(), 0); //std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(sShaderCachePathW)
 #endif
-		std::string scp = hz::genfn("cache/shadervk/");
-		InitShaderCompilerCache("ShaderLibVK", scp);
+
 	}
 
 	//
@@ -21228,7 +21224,7 @@ void free_instance(void* inst)
 		vkDestroyInstance((VkInstance)inst, 0);
 }
 
-vkdg_cx* new_vkdg(void* inst, void* phy, void* dev)
+vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, const char* shaderCacheDir)
 {
 	dev_info_cx c[1] = {};
 	c->inst = inst;
@@ -21259,6 +21255,14 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev)
 		tx->m_device = dev;
 		tx->systemi = m_systemInfo;
 		tx->OnParseCommandLine(0, 0, 0);
+		if (!shaderLibDir || !(*shaderLibDir))
+		{
+			shaderLibDir = "ShaderLibVK";
+		}
+		if (!shaderCacheDir || !(*shaderCacheDir)) {
+			shaderCacheDir = "cache/shadervk/";
+		}
+		vkr::InitShaderCompilerCache(shaderLibDir, shaderCacheDir);
 		tx->OnCreate();
 		p->ctx = tx;
 	}

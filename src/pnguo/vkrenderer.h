@@ -245,8 +245,8 @@ public:
 void* new_instance();
 void free_instance(void* inst);
 
-// todo 创建渲染器
-vkdg_cx* new_vkdg(void* inst, void* phy, void* dev);
+// todo 创建渲染器，shader目录默认"ShaderLibVK", "cache/shadervk"
+vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0);
 // f是否需要删除vk资源
 void free_vkdg(vkdg_cx* p, bool f = false);
 
