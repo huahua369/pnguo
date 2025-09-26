@@ -71,7 +71,9 @@
 #include <unicode/uscript.h>  
 #endif
 
-
+#include <zip.h>
+#include <zlib.h>
+#include <regex>
 
 namespace md {
 
@@ -1216,7 +1218,29 @@ namespace hz
 		return str;
 	}
 
-
+	size_t load_rc(int id, const char* type, std::string* opt)
+	{
+		size_t rt = 0;
+#ifdef _WIN32
+		auto rc = FindResourceA(0, MAKEINTRESOURCE(id), type ? type : "ZIPRC");
+		if (rc)
+		{
+			auto d = LoadResource(0, rc);
+			if (d && opt)
+			{
+				auto dd = LockResource(d);
+				auto size = SizeofResource(0, rc);
+				if (size > 0 && dd)
+				{
+					opt->resize(size);
+					memcpy(opt->data(), dd, size);
+				}
+				rt = size;
+			}
+		}
+#endif
+		return rt;
+	}
 
 #ifndef NO_BF 
 #ifdef _WIN32
@@ -2328,7 +2352,7 @@ namespace hz
 				errstr = er;
 #endif // !_WIN32
 #ifdef __FILE__h__
-			dfn = File::getAP(dfn);
+			//dfn = File::getAP(dfn);
 #endif
 			_ptr = _DL_OPEN(dfn.c_str());
 			if (_ptr)break;
@@ -2841,7 +2865,743 @@ namespace hz
 	}
 #endif
 
+	/*
+	zip
+	*/
+#if 1
 
+	class Zip
+	{
+	public:
+		static Zip* create(const std::string& file = "", bool isRead = true, const std::string& pass = "");
+		static Zip* create_mem(const char* data, size_t dsize, const std::string& pass = "");
+	public:
+		Zip();
+
+		~Zip();
+
+		//关闭文件
+		void closeZip();
+		int setPass(const std::string& password = "");
+		int open_file(std::string zipfile, bool isRdonly = true, const std::string& password = "");
+		int open_buffer(void* data, size_t size, const std::string& password = "");
+		void getfile();
+		//按IDX读文件
+		size_t getFileCount();
+#ifdef NJSON_H
+		njson get_lists();
+		njson get_maps();
+#endif // NJSON_H
+#if 1
+		size_t readfile(zip_uint64_t idx, std::vector<char>& outbuf);
+		bool readfile(zip_uint64_t idx, char* outbuf, int ns);
+		uint64_t getIdx(const std::string& fnstr);
+		//按文件名读
+		bool readfile(const std::string& fnstr, std::vector<char>& outbuf);
+
+		bool read_file(const std::string& fnstr, std::vector<char>& outbuf, std::function<bool(const std::string& fn, uint64_t idx)> func = nullptr);
+		int64_t enum_file(const std::string& fnstr, std::function<int(const std::string& fn, std::vector<char>* data)> func);
+		//修改文件
+		void writefile(zip_uint64_t idx, const char* content, size_t len);
+		// 读取修改文件
+		std::vector<char>* mapFile(const std::string& fnstr);
+		// 刷新修改文件
+		void unmapFile(const std::string& fnstr);
+		//添加一个文件
+		zip_int64_t add(std::string fn, const char* content, size_t len);
+		//添加一个目录
+		zip_int64_t adddir(std::string dirname);
+		// 添加或修改一个文件
+		zip_int64_t make_file(std::string fn, const char* content, size_t len);
+		//文件改名
+		int rezip_rename(zip_uint64_t index, std::string filename);
+		int deleteIndex(zip_uint64_t index);
+		//获取注释
+		std::string getcomment();
+		//修改注释
+		void setcomment(std::string zipcomment);
+		//获取文件编号
+		zip_uint64_t getfile(std::string fn);
+#endif
+
+		// GZIP
+#ifndef GZIP_H
+
+		/* Compress gzip data */
+		/* data 原数据 ndata 原数据长度 zdata 压缩后数据 nzdata 压缩后长度 */
+		static int gzcompress_(Bytef* data, uLong ndata, Bytef* zdata, uLong* nzdata, int memlevel);
+		/* Uncompress gzip data */
+		/* zdata 数据 nzdata 原数据长度 data 解压后数据 ndata 解压后长度 */
+		static int gzdecompress_(Byte* zdata, uLong nzdata,
+			Byte* data, uLong* ndata);
+
+		// 压缩
+		static std::vector<unsigned char>* gzcompress(const void* data, uLong ndata, std::vector<unsigned char>* ret, int mem_level);
+		//解压
+		static std::vector<unsigned char>* gzdecompress(const void* zdata, uLong nzdata, std::vector<unsigned char>* ret);
+		// 压缩
+		static std::vector<unsigned char> gzcompress(const void* data, uLong ndata, int mem_level);
+		//解压
+		static std::vector<unsigned char> gzdecompress(const void* zdata, uLong nzdata);
+#endif // !GZIP_H_
+
+	public:
+		std::map<std::string, zip_uint64_t> fnm;
+		std::map<zip_uint64_t, zip_stat_t> fnv;		//zip文件列表
+	private:
+		zip* fd = nullptr;
+		zip_source_t* src_ = 0;
+		std::map<std::string, std::vector<char>> _f_data;
+	};
+
+
+
+#endif // zip
+#if 1
+
+	Zip* Zip::create(const std::string& file, bool isRead, const std::string& pass)
+	{
+		Zip* p = new Zip();
+		if (!file.empty())
+		{
+			p->open_file(file, isRead, pass);
+		}
+		return p;
+	}
+
+	Zip* Zip::create_mem(const char* data, size_t dsize, const std::string& pass)
+	{
+		Zip* p = new Zip();
+		if (data && dsize > 0)
+		{
+			p->open_buffer((void*)data, dsize, pass);
+		}
+		return p;
+	}
+
+	Zip::Zip()
+	{
+	}
+
+	Zip::~Zip()
+	{
+		closeZip();
+	}
+
+	void Zip::closeZip()
+	{
+		// 			if (src_)
+		// 			{
+		// 				zip_source_free(src_);
+		// 			}
+		// 			src_ = 0;
+		if (!fd)
+		{
+			return;
+		}
+		// close, If any files within were changed, those changes are written to disk first
+
+		int iret = zip_close(fd);
+		if (iret != 0)
+		{
+			printf("zip_close err[%d:%s]\n", errno, strerror(errno));
+		}
+		fd = nullptr;
+		fnm.clear();
+		fnv.clear();
+	}
+
+	int Zip::setPass(const std::string& password)
+	{
+		if (password != "")
+		{
+			if (zip_set_default_password(fd, password.c_str()) < 0)
+			{
+				printf("can't set default password to `0'");
+				return -1;
+			}
+		}
+		return 0;
+	}
+
+	int Zip::open_file(std::string zipfile, bool isRdonly, const std::string& password)
+	{
+		int error = 0;
+#ifdef _WIN32
+		if (zipfile[1] != ':')
+		{
+			//zipfile = File::getAP(zipfile);
+		}
+#endif // _WIN32
+
+		int flag = ZIP_CHECKCONS;
+		if (isRdonly)
+			flag |= ZIP_RDONLY;
+		fd = zip_open(zipfile.c_str(), flag, &error);
+		if (fd == NULL)
+		{
+			if (!isRdonly)
+				fd = zip_open(zipfile.c_str(), ZIP_CREATE, &error);
+			if (fd == NULL)
+			{
+				printf("error Can not open file: [%s]\n", zipfile.c_str());
+				switch (error)
+				{
+				case ZIP_ER_NOENT:
+					printf("The file specified by path does not exist and ZIP_CREATE is not set [%d]\n", error);
+					break;
+				case ZIP_ER_EXISTS:
+					printf("The file specified by path exists and ZIP_EXCL is set [%d]\n", error);
+					break;
+				case ZIP_ER_INVAL:
+					printf("The path argument is NULL [%d]\n", error);
+					break;
+				case ZIP_ER_NOZIP:
+					printf("The file specified by path is not a zip archive [%d]\n", error);
+					break;
+				case ZIP_ER_OPEN:
+					printf("The file specified by path could not be opened [%d]\n", error);
+					break;
+				case ZIP_ER_READ:
+					printf("A read error occurred; see errno for details [%d]\n", error);
+					break;
+				case ZIP_ER_SEEK:
+					printf("The file specified by path does not allow seeks [%d]\n", error);
+					break;
+				default:
+					printf("unknown err [%d]\n", error);
+					break;
+				}
+				return error;
+			}
+		}
+		if (password != "")
+		{
+			if (zip_set_default_password(fd, password.c_str()) < 0)
+			{
+				printf("can't set default password to `0'");
+				return -1;
+			}
+		}
+		getfile();
+		return 0;
+	}
+
+	int Zip::open_buffer(void* data, size_t size, const std::string& password)
+	{
+		if (!zip_error_init)return -1;
+		int err1 = 0;
+		int _flags = ZIP_CHECKCONS; int* zep = &err1;
+		{
+			zip_t* za;
+
+			struct zip_error error = {};
+
+			zip_error_init(&error);
+			if ((src_ = zip_source_buffer_create(data, (zip_uint64_t)size, 0, &error)) == NULL) {
+				//_zip_set_open_error(zep, &error, 0);
+				zip_error_fini(&error);
+				return NULL;
+			}
+
+			if ((za = zip_open_from_source(src_, _flags, &error)) == NULL) {
+				zip_source_free(src_);
+				//_zip_set_open_error(zep, &error, 0);
+				zip_error_fini(&error);
+				return NULL;
+			}
+
+			zip_error_fini(&error);
+			fd = za;
+
+			if (password != "")
+			{
+				if (zip_set_default_password(fd, password.c_str()) < 0)
+				{
+					printf("can't set default password to `0'");
+					return -1;
+				}
+			}
+			getfile();
+
+		}
+		return 0;
+	}
+
+	void Zip::getfile()
+	{
+
+		int64_t n = zip_get_num_entries(fd, 0);
+
+		for (int i = 0; i < n; ++i)
+		{
+			if (i == 5)
+			{
+				i = i;
+			}
+			const char* fstr = zip_get_name(fd, i, 0);
+			if (fstr)
+				fnm[fstr] = i;
+		}
+
+
+		//zip_stat_t st;
+		fnv.clear();
+
+		int i = 0;
+		for (auto it : fnm)
+		{
+			int64_t idx = zip_name_locate(fd, it.first.c_str(), 0);
+			fnv[idx];
+			if (idx >= 0 && zip_stat_index(fd, idx, ZIP_FL_UNCHANGED, &fnv[idx]) >= 0)
+			{
+				//fnm[st.name] = i;
+			}
+		}
+	}
+
+	size_t Zip::getFileCount()
+	{
+		return fnv.size();
+	}
+	njson Zip::get_lists()
+	{
+		zip_uint64_t valid;			/* which fields have valid values */
+		const char* name;			/* name of the file */
+		zip_uint64_t index;			/* index within archive */
+		zip_uint64_t size;			/* size of file (uncompressed) */
+		zip_uint64_t comp_size;		/* size of file (compressed) */
+		time_t mtime;			/* modification time */
+		zip_uint32_t crc;			/* crc of file data */
+		zip_uint16_t comp_method;		/* compression method used */
+		zip_uint16_t encryption_method;	/* encryption method used */
+		zip_uint32_t flags;			/* reserved for future use */
+		njson ret;
+		for (auto& it : fnv)
+		{
+			njson v;
+			auto& s = it.second;
+			v["valid"] = s.valid;
+			v["name"] = s.name;
+			v["index"] = s.index;
+			v["size"] = s.size;
+			v["comp_size"] = s.comp_size;
+			v["mtime"] = s.mtime;
+			v["crc"] = s.crc;
+			v["comp_method"] = s.comp_method;
+			v["encryption_method"] = s.encryption_method;
+			v["flags"] = s.flags;
+			ret.push_back(v);
+		}
+		return ret;
+	}
+
+	njson Zip::get_maps()
+	{
+		njson ret;
+		auto v = get_lists();
+		for (auto& it : v)
+		{
+			ret[it["name"].get<std::string>()] = it;
+		}
+		return ret;
+	}
+
+	size_t Zip::readfile(zip_uint64_t idx, std::vector<char>& outbuf)
+	{
+		auto it = fnv.find(idx);
+		if (it == fnv.end())
+		{
+			return 0;
+		}
+		zip_stat_t& fn = it->second;
+		char buf[1024] = { 0 };
+		zip_file_t* zf = zip_fopen_index(fd, idx, 0);
+		int64_t k = 0;
+		outbuf.resize(align_up((size_t)fn.size + 1, 16));
+		char* t = outbuf.data();
+		if (zf)
+		{
+			while ((k = zip_fread(zf, buf, 1024)) > 0) {
+				memcpy(t, buf, (size_t)k);
+				t += k;
+			}
+			zip_fclose(zf);
+			outbuf[fn.size] = 0;
+		}
+		return fn.size;
+	}
+	bool Zip::readfile(zip_uint64_t idx, char* outbuf, int ns)
+	{
+		auto it = fnv.find(idx);
+		if (it == fnv.end())
+		{
+			return false;
+		}
+		zip_stat_t& fn = it->second;
+		char buf[1024] = { 0 };
+		zip_file_t* zf = zip_fopen_index(fd, idx, 0);
+		int64_t k = 0;
+		//outbuf.resize((size_t)fn.size);
+		char* t = outbuf;
+		if (zf)
+		{
+			while ((k = zip_fread(zf, buf, 1024)) > 0) {
+				memcpy(t, buf, (size_t)k);
+				t += k;
+			}
+			zip_fclose(zf);
+		}
+		return true;
+	}
+
+	uint64_t Zip::getIdx(const std::string& fnstr)
+	{
+		zip_uint64_t idx = -1;
+		auto it = fnm.find(fnstr);
+		if (it != fnm.end())
+		{
+			idx = it->second;
+		}
+		return idx;
+	}
+
+	bool Zip::readfile(const std::string& fnstr, std::vector<char>& outbuf)
+	{
+		zip_uint64_t idx;
+		auto it = fnm.find(fnstr);
+		if (it == fnm.end())
+		{
+			return false;
+		}
+		idx = it->second;
+		return readfile(idx, outbuf);
+	}
+	bool Zip::read_file(const std::string& fnstr, std::vector<char>& outbuf, std::function<bool(const std::string& fn, uint64_t idx)> func)
+	{
+		zip_uint64_t idx = -1;
+		auto it = fnm.find(fnstr);
+		if (it == fnm.end())
+		{
+			std::string s = replace(fnstr, "*", R"([\w|\W]*)");
+			std::regex rg1(s + "$");
+			std::smatch r1;
+			for (auto [k, v] : fnm)
+			{
+				if (std::regex_match(k, r1, rg1))
+				{
+					idx = v;
+					if (func)
+					{
+						if (func(k, v))
+							break;
+					}
+				}
+			}
+			if (idx == -1)
+			{
+				return false;
+			}
+		}
+		else
+		{
+			idx = it->second;
+		}
+		return readfile(idx, outbuf);
+	}
+	int64_t Zip::enum_file(const std::string& fnstr, std::function<int(const std::string& fn, std::vector<char>* data)> func)
+	{
+		int64_t inc = 0;
+		std::vector<char> data;
+		std::string s = replace(fnstr, "*", R"([\w|\W]*)");
+		std::regex rg1(s + "$");
+		std::smatch r1;
+		for (auto [k, v] : fnm)
+		{
+			if (std::regex_match(k, r1, rg1))
+			{
+				auto idx = v;
+				if (func)
+				{
+					data.clear();
+					readfile(idx, data);
+					if (data.size())
+					{
+						inc++;
+						if (func(k, &data))
+							break;
+					}
+				}
+			}
+		}
+		return inc;
+	}
+
+	//修改文件
+
+	void Zip::writefile(zip_uint64_t idx, const char* content, size_t len)
+	{
+		if (idx == -1)
+		{
+			return;
+		}
+		zip* za = fd;
+		zip_source_t* s = zip_source_buffer(za, content, len, 0);
+
+		if (zip_file_replace(za, idx, s, ZIP_STAT_ENCRYPTION_METHOD) < 0)
+		{
+			zip_source_free(s);
+		}
+
+	}
+
+	// 读取修改文件
+
+	std::vector<char>* Zip::mapFile(const std::string& fnstr)
+	{
+		std::vector<char>* ret = &_f_data[fnstr];
+		if (!readfile(fnstr, *ret))
+		{
+			ret = nullptr;
+		}
+		return ret;
+	}
+
+	// 刷新修改文件
+
+	void Zip::unmapFile(const std::string& fnstr)
+	{
+		auto it = _f_data.find(fnstr);
+		if (it != _f_data.end())
+		{
+			auto idx = getIdx(fnstr);
+			writefile(idx, it->second.data(), it->second.size());
+		}
+	}
+
+	//添加一个文件
+
+	zip_int64_t Zip::add(std::string fn, const char* content, size_t len)
+	{
+		zip_int64_t ret = -1;
+		zip_source_t* s = zip_source_buffer(fd, content, len, 0);
+		if (s)
+		{
+			ret = zip_file_add(fd, fn.c_str(), s, 0);
+			if (ret < 0)
+			{
+				zip_source_free(s);
+			}
+		}
+		return ret;
+	}
+
+	//添加一个目录
+
+	zip_int64_t Zip::adddir(std::string dirname)
+	{
+		return zip_dir_add(fd, dirname.c_str(), 0);
+	}
+
+	// 添加或修改一个文件
+
+	zip_int64_t Zip::make_file(std::string fn, const char* content, size_t len)
+	{
+		auto idx = getfile(fn);
+		zip_int64_t ret = -1;
+		if (idx != -1)
+		{
+			ret = idx; writefile(idx, content, len);
+		}
+		else
+		{
+			ret = add(fn, content, len);
+		}
+		return ret;
+	}
+
+	//文件改名
+
+	int Zip::rezip_rename(zip_uint64_t index, std::string filename)
+	{
+		return zip_file_rename(fd, index, filename.c_str(), 0);
+	}
+
+	int Zip::deleteIndex(zip_uint64_t index)
+	{
+		return zip_delete(fd, index);
+	}
+
+	//获取注释
+
+	std::string Zip::getcomment()
+	{
+		//zip_uint64_t ret = zip_dir_add(fd, "abc八");
+		//ret = zip_delete(fd, 4);
+		//获取zip注释
+		int commentlen = 0;
+		const char* comment = zip_get_archive_comment(fd, &commentlen, ZIP_FL_ENC_RAW);
+		return std::string(comment, commentlen);
+	}
+
+	//修改注释
+
+	void Zip::setcomment(std::string zipcomment)
+	{
+		if (0 != zip_set_archive_comment(fd, zipcomment.c_str(), (zip_uint16_t)zipcomment.length()))// err !!!
+		{
+			printf("zip_close err[%d:%s]\n", errno, strerror(errno));
+		}
+	}
+
+	//获取文件编号
+
+	zip_uint64_t Zip::getfile(std::string fn)
+	{
+		auto it = fnm.find(fn);
+		return it != fnm.end() ? it->second : -1;
+	}
+
+	/* Compress gzip data */
+	/* data 原数据 ndata 原数据长度 zdata 压缩后数据 nzdata 压缩后长度 */
+
+	int Zip::gzcompress_(Bytef* data, uLong ndata, Bytef* zdata, uLong* nzdata, int memlevel)
+	{
+		z_stream c_stream;
+		int err = 0;
+
+		if (data && ndata > 0) {
+			c_stream.zalloc = NULL;
+			c_stream.zfree = NULL;
+			c_stream.opaque = NULL;
+			//只有设置为MAX_WBITS + 16才能在在压缩文本中带header和trailer
+			if (deflateInit2(&c_stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+				MAX_WBITS + 16, memlevel, Z_DEFAULT_STRATEGY) != Z_OK) return -1;
+			c_stream.next_in = data;
+			c_stream.avail_in = ndata;
+			c_stream.next_out = zdata;
+			c_stream.avail_out = *nzdata;
+			while (c_stream.avail_in != 0 && c_stream.total_out < *nzdata) {
+				if (deflate(&c_stream, Z_NO_FLUSH) != Z_OK) return -1;
+			}
+			if (c_stream.avail_in != 0) return c_stream.avail_in;
+			for (;;) {
+				if ((err = deflate(&c_stream, Z_FINISH)) == Z_STREAM_END) break;
+				if (err != Z_OK) return -1;
+			}
+			if (deflateEnd(&c_stream) != Z_OK) return -1;
+			*nzdata = c_stream.total_out;
+			return 0;
+		}
+		return -1;
+	}
+
+	/* Uncompress gzip data */
+	/* zdata 数据 nzdata 原数据长度 data 解压后数据 ndata 解压后长度 */
+
+	int Zip::gzdecompress_(Byte* zdata, uLong nzdata, Byte* data, uLong* ndata)
+	{
+		int err = 0;
+		z_stream d_stream = { 0 }; /* decompression stream */
+		static char dummy_head[2] = {
+			0x8 + 0x7 * 0x10,
+			(((0x8 + 0x7 * 0x10) * 0x100 + 30) / 31 * 31) & 0xFF,
+		};
+		d_stream.zalloc = NULL;
+		d_stream.zfree = NULL;
+		d_stream.opaque = NULL;
+		d_stream.next_in = zdata;
+		d_stream.avail_in = 0;
+		d_stream.next_out = data;
+		//只有设置为MAX_WBITS + 16才能在解压带header和trailer的文本
+		if (inflateInit2(&d_stream, MAX_WBITS + 16) != Z_OK) return -1;
+		//if(inflateInit2(&d_stream, 47) != Z_OK) return -1;
+		while (d_stream.total_out < *ndata && d_stream.total_in < nzdata) {
+			d_stream.avail_in = d_stream.avail_out = 1; /* force small buffers */
+			if ((err = inflate(&d_stream, Z_NO_FLUSH)) == Z_STREAM_END) break;
+			if (err != Z_OK) {
+				if (err == Z_DATA_ERROR) {
+					d_stream.next_in = (Bytef*)dummy_head;
+					d_stream.avail_in = sizeof(dummy_head);
+					if ((err = inflate(&d_stream, Z_NO_FLUSH)) != Z_OK) {
+						return -1;
+					}
+				}
+				else return -1;
+			}
+		}
+		if (inflateEnd(&d_stream) != Z_OK) return -1;
+		*ndata = d_stream.total_out;
+		return 0;
+	}
+
+	// 压缩
+
+	std::vector<unsigned char>* Zip::gzcompress(const void* data, uLong ndata, std::vector<unsigned char>* ret, int mem_level)
+	{
+		uLong nzdata = ndata * 2;
+		ret->resize(nzdata);
+		gzcompress_((Byte*)data, ndata, ret->data(), &ndata, mem_level);
+		ret->resize(ndata);
+		return ret;
+	}
+
+	//解压
+
+	std::vector<unsigned char>* Zip::gzdecompress(const void* zdata, uLong nzdata, std::vector<unsigned char>* ret)
+	{
+		uLong ndata = nzdata * 2;
+		ret->resize(nzdata);
+		gzdecompress_((Byte*)zdata, nzdata, ret->data(), &ndata);
+		ret->resize(nzdata);
+		return ret;
+	}
+
+	// 压缩
+
+	std::vector<unsigned char> Zip::gzcompress(const void* data, uLong ndata, int mem_level)
+	{
+		std::vector<unsigned char> ret;
+		uLong nzdata = ndata * 2;
+		ret.resize(nzdata);
+		gzcompress_((Byte*)data, ndata, ret.data(), &ndata, mem_level);
+		ret.resize(ndata);
+		return ret;
+	}
+
+	//解压
+
+	std::vector<unsigned char> Zip::gzdecompress(const void* zdata, uLong nzdata)
+	{
+		std::vector<unsigned char> ret;
+		uLong ndata = nzdata * 2;
+		ret.resize(ndata);
+		gzdecompress_((Byte*)zdata, nzdata, ret.data(), &ndata);
+		ret.resize(ndata);
+		return ret;
+	}
+#endif // zipcpp
+
+	void load_rczip(int id, std::map<std::string, file_zt>* opt)
+	{
+		std::string ss;
+		auto sc = load_rc(id, "ZIPRC", &ss);
+		if (sc > 0 && opt)
+		{
+			auto zp = Zip::create_mem(ss.data(), ss.size());
+			if (zp)
+			{
+				auto& p = *opt;
+				for (auto& [k, v] : zp->fnv)
+				{
+					auto& d = p[v.name];
+					d.size = v.size;
+					zp->readfile(k, d.d);
+				}
+				delete zp;
+			}
+		}
+	}
 
 }//!hz
 

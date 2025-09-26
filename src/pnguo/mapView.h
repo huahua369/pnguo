@@ -328,6 +328,12 @@ namespace hz
 	std::vector<const char*> get_convert_name();
 	std::string icu_convert(const char* instring, int32_t inlen, const char* dst_name, const char* src_name);
 
+	size_t load_rc(int id, const char* type, std::string* opt);
+	struct file_zt
+	{
+		size_t size; std::vector<char> d;
+	};
+	void load_rczip(int id, std::map<std::string, file_zt>* opt);
 }//!hz
 
 #endif

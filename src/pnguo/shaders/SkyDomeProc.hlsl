@@ -92,7 +92,6 @@ static const float mieZenithLength = 1.25E3;
 static const float3 up = float3( 0.0, 1.0, 0.0 );
     // 66 arc seconds -> degrees, and the cosine of that
 static const float sunAngularDiameterCos = 0.999956676946448443553574619906976478926848692873900859324;
-
     // 3.0 / ( 16.0 * pi )
 static const float THREE_OVER_SIXTEENPI = 0.05968310365946075;
     // 1.0 / ( 4.0 * pi )

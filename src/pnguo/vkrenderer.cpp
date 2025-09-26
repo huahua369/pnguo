@@ -21740,7 +21740,7 @@ void vkrender_test()
 	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表
 	if (devs.empty())return;
 	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 从SDL3获取设备创建vk渲染器
-	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0);			// 创建vk渲染器
+	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0, "ShaderLibVK", "cache/shadervk");			// 创建vk渲染器
 	vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 添加一个地板
 	vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 	auto vki = vkd->get_vkimage(0);	// 获取第一个fbo纹理弄到窗口显示
