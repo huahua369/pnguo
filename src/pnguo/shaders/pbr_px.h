@@ -966,7 +966,7 @@ vec4 get_roughness(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseCol
 
 vec4 get_roughness(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseColor, out vec3  specularColor, out float perceptualRoughness)
 {
-	float metallic;
+	float metallic = 0.0f;
 	return get_roughness(Input, params, uv, diffuseColor, specularColor, perceptualRoughness, metallic);
 }
 //-----------------------------------------------------------------------
@@ -977,6 +977,9 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	vec2 uv = m.uv;
 	mesh.N = getPixelNormal(Input);
 	mesh.Ng = mesh.N;
+#ifdef __cplusplus
+	mesh.T = {}, mesh.B = {};
+#endif
 	get_tangent(Input, uv, mesh.T, mesh.B);
 	mesh.tc = uv;
 	mesh.isInside = false;

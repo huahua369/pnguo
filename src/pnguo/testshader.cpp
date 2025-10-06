@@ -1,4 +1,4 @@
-#include "pch1.h"
+
 /*
 pbr材质：金属度metalness、粗糙度roughness、清漆.clearcoat、透光率(透射度).transmission
 KHR_materials_ior ：折射率描述了光在穿过对象时是如何散射的。 通过使艺术家能够控制 IOR 值，
@@ -9,7 +9,7 @@ KHR_materials_specular ：镜面属性是一个对象的类似镜子的属性：
 						与其前身 KHR_materials_pbrSpecularGlossiness 不同，这个新的镜面反射扩展在 glTF 的 PBR 材料模型核心的现代金属/粗糙度工作流程中运行，使彩色镜面高光与高级 PBR 材料扩展阵列兼容。
 */
 
-
+#include "pch1.h"
 using namespace glm;
 //using glm::vec2;
 //using glm::vec3;

@@ -92,6 +92,7 @@ find_package(cpuid CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
 find_package(CURL REQUIRED)
+find_package(libzip CONFIG REQUIRED)
 #pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
 
 #find_package(cmark CONFIG REQUIRED)  
@@ -101,6 +102,7 @@ find_package(CURL REQUIRED)
 set(lklib)
 list(APPEND lklib  
     Dwmapi
+    libzip::zip
     ZLIB::ZLIB
     #Vulkan::Vulkan 
     #Vulkan::Headers 
