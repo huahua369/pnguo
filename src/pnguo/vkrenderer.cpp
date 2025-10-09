@@ -18776,17 +18776,6 @@ namespace vkr {
 			delete p->m_pGLTFTexturesAndBuffers;
 			p->m_pGLTFTexturesAndBuffers = NULL;
 		}
-		// todo 阴影
-		assert(m_shadowMapPool.size() == m_ShadowSRVPool.size());
-		while (!m_shadowMapPool.empty())
-		{
-			m_shadowMapPool.back().ShadowMap.OnDestroy();
-			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
-			m_ShadowSRVPool.pop_back();
-			m_shadowMapPool.pop_back();
-		}
 
 		delete p;
 	}
@@ -18799,6 +18788,18 @@ namespace vkr {
 		for (auto it : _robject)
 			unloadgltf(it);
 		_robject.clear();
+
+		// todo 阴影
+		assert(m_shadowMapPool.size() == m_ShadowSRVPool.size());
+		while (!m_shadowMapPool.empty())
+		{
+			m_shadowMapPool.back().ShadowMap.OnDestroy();
+			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
+			vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
+			m_ShadowSRVPool.pop_back();
+			m_shadowMapPool.pop_back();
+		}
 	}
 	size_t Renderer_cx::AddLight(const light_t& light)
 	{
