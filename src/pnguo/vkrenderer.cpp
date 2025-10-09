@@ -2942,7 +2942,7 @@ namespace vkr {
 		std::map<int, morph_t> m_BufferMap;	// 材质id
 		std::map<int, VkDescriptorBufferInfo> _morphWeights;	// 节点 mesh id访问
 		std::map<int, VkDescriptorBufferInfo> m_uvmMap;
-		int indextype = 0;
+		int _indextype = 0;
 	public:
 		GLTFCommon* m_pGLTFCommon;
 
@@ -5361,23 +5361,12 @@ namespace vkr
 						m_pGLTFCommon->GetBufferDetails(indexAcc, &indexBufferAcc);
 						std::vector<uint32_t> v;
 						// Some exporters use 1-byte indices, need to convert them to shorts since the GPU doesn't support 1-byte indices
-						if (indexBufferAcc.m_stride < 4)
+						if (indexBufferAcc.m_stride == 1)
 						{
-							switch (indexBufferAcc.m_stride)
-							{
-							case 1:
-								push_index(v, (uint8_t*)indexBufferAcc.m_data, indexBufferAcc.m_count, 0);
-								break;
-							case 2:
-								push_index(v, (uint16_t*)indexBufferAcc.m_data, indexBufferAcc.m_count, 0);
-								break;
-							default:
-								break;
-							}
-							indextype = 4;
+							push_index(v, (uint8_t*)indexBufferAcc.m_data, indexBufferAcc.m_count, 0);
+							_indextype = indexBufferAcc.m_stride = sizeof(uint32_t);
 						}
-						all_size += AlignUp(v.size() * sizeof(uint32_t), (size_t)64u);
-						all_size += AlignUp(indexBufferAcc.m_count * indexBufferAcc.m_stride, 64);
+						all_size += AlignUp((size_t)indexBufferAcc.m_count * indexBufferAcc.m_stride, (size_t)64);
 						ibs.push_back({ indexBufferAcc, primitive.indices, std::move(v) });
 					}
 
@@ -5453,12 +5442,10 @@ namespace vkr
 	{
 		tfAccessor indexBuffer;
 		m_pGLTFCommon->GetBufferDetails(indexBufferId, &indexBuffer);
-
 		*pNumIndices = indexBuffer.m_count;
-		if (indextype > 0)
-			indexBuffer.m_stride = indextype;
+		if (_indextype > 0)
+			indexBuffer.m_stride = _indextype;
 		*pIndexType = (indexBuffer.m_stride == 4) ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
-
 		*pIBV = m_IndexBufferMap[indexBufferId];
 	}
 
