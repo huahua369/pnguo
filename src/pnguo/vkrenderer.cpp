@@ -2840,7 +2840,7 @@ namespace vkr {
 		std::vector<char*> m_buffersData;		// 原始数据
 		std::vector<float*> _sparseData;		// 解码的稀疏数据
 		std::vector<hz::mfile_t*> _fileData;	// 文件数据
-		std::vector<char*> _fileData_f;			// 原始数据
+		//std::vector<char*> _fileData_f;			// 原始数据
 
 		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
 		glm::mat4* m_animatedMats = 0;			// _mats的指针。object space matrices of each node after being animated
@@ -14943,10 +14943,10 @@ namespace vkr {
 			if (p)
 				free(p);
 		}
-		for (int i = 0; i < _fileData_f.size(); i++)
-		{
-			delete[] _fileData_f[i];
-		}
+		//for (int i = 0; i < _fileData_f.size(); i++)
+		//{
+		//	delete[] _fileData_f[i];
+		//}
 		for (auto& it : _fileData) {
 			delete it;
 		}
@@ -14984,8 +14984,7 @@ namespace vkr {
 				{
 					auto ptr = new hz::mfile_t();
 					if (ptr) {
-						*ptr = mt;
-						mt.clear_ptr();
+						ptr->swap(mt);
 						m_buffersData[i] = ptr->data();
 						_fileData.push_back(ptr);
 					}

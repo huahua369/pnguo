@@ -1200,6 +1200,18 @@ namespace hz
 		_pm = 0;
 	}
 
+	void mfile_t::swap(mfile_t& m)
+	{
+		*this = m;
+		m.clear_ptr();
+	}
+
+	void mfile_t::swap(mfile_t* m)
+	{
+		*this = *m;
+		m->clear_ptr();
+	}
+
 	std::string mfile_t::getLastError()
 	{
 		std::string str;

@@ -218,6 +218,8 @@ namespace hz
 		// 打开或创建修改大小，0则不改变大小可能返回0
 		char* new_m(const std::string& fn, size_t size);
 		void clear_ptr();
+		void swap(mfile_t& m);
+		void swap(mfile_t* m);
 		static std::string getLastError();
 	private:
 
