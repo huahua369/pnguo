@@ -2942,7 +2942,7 @@ namespace gp {
 		return atan2(v.y, v.x);
 	}
 
-	// 输入三点，角点ptr2，输出圆
+	// 输入三点、目标圆半径。角点为pt2，输出圆心和半径
 	glm::vec3 get_circle3(glm::vec2 pt1, glm::vec2 pt2, glm::vec2 pt3, float radius)
 	{
 		glm::vec3 r = {};

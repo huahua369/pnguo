@@ -3510,7 +3510,7 @@ namespace vkr {
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
 		GLTFCommon* get_cp();
 	private:
-		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
+		GLTFTexturesAndBuffers* _ptb;
 
 		ResourceViewHeaps* m_pResourceViewHeaps;
 		DynamicBufferRing* m_pDynamicBufferRing;
@@ -3630,7 +3630,7 @@ namespace vkr {
 
 		DepthMaterial m_defaultMaterial;
 
-		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
+		GLTFTexturesAndBuffers* _ptb;
 		Device* m_pDevice;
 		VkRenderPass m_renderPass = VK_NULL_HANDLE;
 		VkSampler m_sampler = VK_NULL_HANDLE;
@@ -3754,7 +3754,7 @@ namespace vkr {
 		void Draw(VkCommandBuffer cmd_buf, const glm::mat4& cameraViewProjMatrix, const glm::vec4& color);
 		inline void Draw(VkCommandBuffer cmd_buf, const glm::mat4& cameraViewProjMatrix) { Draw(cmd_buf, cameraViewProjMatrix, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)); }
 	private:
-		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
+		GLTFTexturesAndBuffers* _ptb;
 
 		Wireframe* m_pWireframe;
 		WireframeBox m_wireframeBox;
@@ -4330,7 +4330,7 @@ namespace vkr
 		Wireframe* pWireframe)
 	{
 		m_pWireframe = pWireframe;
-		m_pGLTFTexturesAndBuffers = pGLTFTexturesAndBuffers;
+		_ptb = pGLTFTexturesAndBuffers;
 
 		m_wireframeBox.OnCreate(pDevice, pResourceViewHeaps, pDynamicBufferRing, pStaticBufferPool);
 	}
@@ -4356,7 +4356,7 @@ namespace vkr
 	{
 		SetPerfMarkerBegin(cmd_buf, "bounding boxes");
 
-		GLTFCommon* pC = m_pGLTFTexturesAndBuffers->m_pGLTFCommon;
+		GLTFCommon* pC = _ptb->m_pGLTFCommon;
 
 		for (uint32_t i = 0; i < pC->m_nodes.size(); i++)
 		{
@@ -4379,7 +4379,7 @@ namespace vkr
 	void GltfDepthPass::load(VkDevice dev, AsyncPool* pAsyncPool)
 	{
 		auto sampler = m_sampler;
-		auto pm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm;
+		auto pm = _ptb->m_pGLTFCommon->pm;
 		auto& materials = pm->materials;
 
 		m_materialsData.resize(materials.size());
@@ -4413,7 +4413,7 @@ namespace vkr
 					tfmat->m_defines["ID_baseColorTexture"] = "0";
 					tfmat->m_defines["ID_baseTexCoord"] = std::to_string(pbrMetallicRoughnessIt.baseColorTexture.texCoord);
 					m_pResourceViewHeaps->AllocDescriptor(tfmat->m_textureCount, &sampler, &tfmat->m_descriptorSetLayout, &tfmat->m_descriptorSet);
-					VkImageView textureView = m_pGLTFTexturesAndBuffers->GetTextureViewByID(id);
+					VkImageView textureView = _ptb->GetTextureViewByID(id);
 					SetDescriptorSet(dev, 0, textureView, sampler, tfmat->m_descriptorSet);
 
 				}
@@ -4469,7 +4469,7 @@ namespace vkr
 							// shader's can tell the slots from the #defines
 							//
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							m_pGLTFTexturesAndBuffers->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
+							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 
 							// Create Pipeline
 							//
@@ -4478,14 +4478,14 @@ namespace vkr
 								auto tsa = primitive.targets.size();// todo 变形
 								if (tsa > 0) {
 									auto moid = primitive.targets[0].begin()->second;
-									morphing = &m_pGLTFTexturesAndBuffers->m_BufferMap[moid];
+									morphing = &_ptb->m_BufferMap[moid];
 									if (!morphing->mdb.buffer)
 									{
 										morphing = 0;
 									}
 								}
-								int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
-								int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
+								int skinId = _ptb->m_pGLTFCommon->FindMeshSkinId(i);
+								int inverseMatrixBufferSize = _ptb->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
 
 								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing);
 								CreatePipeline(inputLayout, defines, pPrimitive);
@@ -4516,7 +4516,7 @@ namespace vkr
 		m_pResourceViewHeaps = pHeaps;
 		m_pStaticBufferPool = pStaticBufferPool;
 		m_pDynamicBufferRing = pDynamicBufferRing;
-		m_pGLTFTexturesAndBuffers = pGLTFTexturesAndBuffers;
+		_ptb = pGLTFTexturesAndBuffers;
 
 
 		/////////////////////////////////////////////
@@ -4885,9 +4885,9 @@ namespace vkr
 
 		// loop through nodes
 		//
-		std::vector<tfNode>* pNodes = &m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_nodes;
-		Matrix2* pNodesMatrices = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_worldSpaceMats.data();
-		auto pm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm;
+		std::vector<tfNode>* pNodes = &_ptb->m_pGLTFCommon->m_nodes;
+		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
+		auto pm = _ptb->m_pGLTFCommon->pm;
 		for (uint32_t i = 0; i < pNodes->size(); i++)
 		{
 			tfNode* pNode = &pNodes->at(i);
@@ -4895,7 +4895,7 @@ namespace vkr
 				continue;
 
 			// skinning matrices constant buffer
-			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
+			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(pNode->skinIndex);
 
 			DepthMesh* pMesh = &m_meshes[pNode->meshIndex];
 			auto mesh = pm->meshes[pNode->meshIndex];
@@ -4906,7 +4906,7 @@ namespace vkr
 				if (pPrimitive->m_pipeline == VK_NULL_HANDLE || pPrimitive->m_pMaterial->m_blending)
 					continue;
 
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
+				auto morph = _ptb->get_mb(i);
 				// Set per Object constants
 				//
 				depth_object* cbPerObject;
@@ -4952,7 +4952,7 @@ namespace vkr
 	}
 	GLTFCommon* GltfDepthPass::get_cp()
 	{
-		return m_pGLTFTexturesAndBuffers ? m_pGLTFTexturesAndBuffers->m_pGLTFCommon : nullptr;
+		return _ptb ? _ptb->m_pGLTFCommon : nullptr;
 	}
 }
 
@@ -6385,7 +6385,7 @@ namespace vkr
 		m_pResourceViewHeaps = pHeaps;
 		//m_pStaticBufferPool = pStaticBufferPool;
 		m_pDynamicBufferRing = pDynamicBufferRing;
-		m_pGLTFTexturesAndBuffers = pGLTFTexturesAndBuffers;
+		_ptb = pGLTFTexturesAndBuffers;
 
 		//set bindings for the render targets
 		//
@@ -6429,11 +6429,11 @@ namespace vkr
 		// Create Samplers
 		tinygltf::Sampler dsa = {};
 
-		if (pGLTFTexturesAndBuffers && m_pGLTFTexturesAndBuffers->m_pGLTFCommon
-			&& m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm && m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers.size())
+		if (pGLTFTexturesAndBuffers && _ptb->m_pGLTFCommon
+			&& _ptb->m_pGLTFCommon->pm && _ptb->m_pGLTFCommon->pm->samplers.size())
 		{
-			dsa = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers[0];
-			auto& pss = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->pm->samplers;
+			dsa = _ptb->m_pGLTFCommon->pm->samplers[0];
+			auto& pss = _ptb->m_pGLTFCommon->pm->samplers;
 			_samplers.reserve(pss.size());
 			for (auto& it : pss) {
 				VkSamplerCreateInfo info = {};
@@ -6550,7 +6550,7 @@ namespace vkr
 				for (auto const& value : textureIds)
 				{
 					auto tinfo = pm->textures[value.second];
-					texturesBase[value.first].v = m_pGLTFTexturesAndBuffers->GetTextureViewByID(value.second);
+					texturesBase[value.first].v = _ptb->GetTextureViewByID(value.second);
 					texturesBase[value.first].s = _samplers[tinfo.sampler];
 				}
 				//tfmat->m_pbrMaterialParameters.m_defines["MAX_LIGHT_INSTANCES"] = "1";
@@ -6642,13 +6642,13 @@ namespace vkr
 							// shader's can tell the slots from the #defines
 							// todo 加载顶点数据到显存
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							m_pGLTFTexturesAndBuffers->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
+							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 							mesh_mapd_ptr mm = {};
 							morph_t* morphing = 0;
 							auto tsa = primitive.targets.size();// todo 变形判断
 							if (tsa > 0) {
 								auto mid = primitive.targets[0].begin()->second;
-								auto bm = &m_pGLTFTexturesAndBuffers->m_BufferMap[mid];
+								auto bm = &_ptb->m_BufferMap[mid];
 								morphing = bm;
 								if (morphing->mdb.buffer)
 									mm.m = morphing;
@@ -6656,12 +6656,12 @@ namespace vkr
 							// Create descriptors and pipelines
 							auto uc = defines["UVT_count"];
 							int muvt_size = std::atoi(uc.c_str());
-							int skinId = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->FindMeshSkinId(i);
-							int inverseMatrixBufferSize = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
+							int skinId = _ptb->m_pGLTFCommon->FindMeshSkinId(i);
+							int inverseMatrixBufferSize = _ptb->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
 							if (muvt_size)
 							{
-								auto& uvm = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_uv_mats[primitive.material];
-								mm.uvtdata = &m_pGLTFTexturesAndBuffers->m_uvmMap[primitive.material];
+								auto& uvm = _ptb->m_pGLTFCommon->m_uv_mats[primitive.material];
+								mm.uvtdata = &_ptb->m_uvmMap[primitive.material];
 								uvm.resize(muvt_size);
 								for (int j = 0; j < muvt_size; j++)
 								{
@@ -6809,7 +6809,7 @@ namespace vkr
 
 	GLTFCommon* GltfPbrPass::get_cp()
 	{
-		return m_pGLTFTexturesAndBuffers ? m_pGLTFTexturesAndBuffers->m_pGLTFCommon : nullptr;
+		return _ptb ? _ptb->m_pGLTFCommon : nullptr;
 	}
 	//--------------------------------------------------------------------------------------
 	//
@@ -7376,8 +7376,8 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	void GltfPbrPass::BuildBatchLists(drawables_t* opt, bool bWireframe)
 	{
-		std::vector<tfNode>* pNodes = &m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_nodes;
-		Matrix2* pNodesMatrices = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_worldSpaceMats.data();
+		std::vector<tfNode>* pNodes = &_ptb->m_pGLTFCommon->m_nodes;
+		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
 		auto pSolid = &opt->opaque;
 		auto pTransparent = &opt->transparent;
 		glm::ivec2 transmissionFramebufferSize = m_pRenderPass->m_pGBuffer->m_HDR.get_size();
@@ -7388,9 +7388,9 @@ namespace vkr
 				continue;
 
 			// skinning matrices constant buffer
-			VkDescriptorBufferInfo* pPerSkeleton = m_pGLTFTexturesAndBuffers->GetSkinningMatricesBuffer(pNode->skinIndex);
+			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(pNode->skinIndex);
 
-			glm::mat4 mModelViewProj = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
+			glm::mat4 mModelViewProj = _ptb->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
 
 			// loop through primitives
 			//
@@ -7402,11 +7402,11 @@ namespace vkr
 				if (!pPrimitive->_pipe->m_pipeline)
 					continue;
 
-				auto morph = m_pGLTFTexturesAndBuffers->get_mb(i);
-				auto uvtDesc = m_pGLTFTexturesAndBuffers->get_uvm(pPrimitive->mid);
+				auto morph = _ptb->get_mb(i);
+				auto uvtDesc = _ptb->get_uvm(pPrimitive->mid);
 				// do frustrum culling
 				//
-				tfPrimitives boundingBox = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
+				tfPrimitives boundingBox = _ptb->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
 				if (CameraFrustumToBoxCollision(mModelViewProj, boundingBox.m_center, boundingBox.m_radius))
 					continue;
 
@@ -7423,7 +7423,7 @@ namespace vkr
 
 				// compute depth for sorting
 				//
-				glm::vec4 v = m_pGLTFTexturesAndBuffers->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p].m_center;
+				glm::vec4 v = _ptb->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p].m_center;
 				float depth = (mModelViewProj * v).w;
 
 				BatchList t = {};
@@ -7433,7 +7433,7 @@ namespace vkr
 					t.frontFace = VK_FRONT_FACE_CLOCKWISE;
 				}
 				t.m_pPrimitive = pPrimitive;
-				t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants;
+				t.m_perFrameDesc = _ptb->m_perFrameConstants;
 				t.m_perObjectDesc = perObjectDesc;
 				t.m_pPerSkeleton = pPerSkeleton;
 				t.morph = morph;
@@ -7446,7 +7446,7 @@ namespace vkr
 				{
 					pSolid->push_back(t);
 					if (bWireframe && pPrimitive->_pipe->m_pipelineWireframe) {
-						t.m_perFrameDesc = m_pGLTFTexturesAndBuffers->m_perFrameConstants_w;
+						t.m_perFrameDesc = _ptb->m_perFrameConstants_w;
 						opt->opaque1.push_back(t);
 					}
 				}
@@ -16152,7 +16152,7 @@ namespace vkr {
 		GltfPbrPass* m_GLTFPBR;
 		GltfBBoxPass* m_GLTFBBox;
 		GltfDepthPass* m_GLTFDepth;
-		GLTFTexturesAndBuffers* m_pGLTFTexturesAndBuffers;
+		GLTFTexturesAndBuffers* _ptb;
 		bool shadowMap = true;		// 是否有阴影
 	};
 	// todo cmdlr
@@ -18649,20 +18649,20 @@ namespace vkr {
 		{
 			Profile p("m_pGltfLoader->Load");
 
-			currobj->m_pGLTFTexturesAndBuffers = new GLTFTexturesAndBuffers();
-			currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_ConstantBufferRing);
-			//currobj->m_pGLTFTexturesAndBuffers->OnCreate(m_pDevice, pGLTFCommon, &, &m_VidMemBufferPool, );
+			currobj->_ptb = new GLTFTexturesAndBuffers();
+			currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_ConstantBufferRing);
+			//currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &, &m_VidMemBufferPool, );
 		}
 		else if (Stage == 6)
 		{
 			Profile p("LoadTextures");
 			// here we are loading onto the GPU all the textures and the inverse matrices
 			// this data will be used to create the PBR and Depth passes       
-			currobj->m_pGLTFTexturesAndBuffers->LoadTextures(pAsyncPool);
-			currobj->m_pGLTFTexturesAndBuffers->LoadGeometry();
-			currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool->UploadData(m_UploadHeap.GetCommandList());
+			currobj->_ptb->LoadTextures(pAsyncPool);
+			currobj->_ptb->LoadGeometry();
+			currobj->_ptb->_pStaticBufferPool->UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
-			currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool->FreeUploadHeap();
+			currobj->_ptb->_pStaticBufferPool->FreeUploadHeap();
 		}
 		else if (Stage == 7)
 		{
@@ -18670,10 +18670,10 @@ namespace vkr {
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
 			currobj->m_GLTFDepth->has_shadowMap = pGLTFCommon->has_shadowMap;
-			//currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
+			//currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->_ptb, pAsyncPool);
 			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
 				&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
-				currobj->m_pGLTFTexturesAndBuffers, pAsyncPool);
+				currobj->_ptb, pAsyncPool);
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
 		}
@@ -18688,9 +18688,9 @@ namespace vkr {
 				&m_UploadHeap,
 				&m_ResourceViewHeaps,
 				&m_ConstantBufferRing,
-				//currobj->m_pGLTFTexturesAndBuffers->_pStaticBufferPool,
+				//currobj->_ptb->_pStaticBufferPool,
 				//&m_VidMemBufferPool, 
-				currobj->m_pGLTFTexturesAndBuffers,
+				currobj->_ptb,
 				&m_SkyDome,
 				false, // use SSAO mask
 				m_ShadowSRVPool,
@@ -18713,7 +18713,7 @@ namespace vkr {
 				&m_ResourceViewHeaps,
 				&m_ConstantBufferRing,
 				&m_VidMemBufferPool,
-				currobj->m_pGLTFTexturesAndBuffers,
+				currobj->_ptb,
 				&m_Wireframe
 			);
 
@@ -18770,11 +18770,11 @@ namespace vkr {
 			p->m_GLTFBBox = NULL;
 		}
 
-		if (p->m_pGLTFTexturesAndBuffers)
+		if (p->_ptb)
 		{
-			p->m_pGLTFTexturesAndBuffers->OnDestroy();
-			delete p->m_pGLTFTexturesAndBuffers;
-			p->m_pGLTFTexturesAndBuffers = NULL;
+			p->_ptb->OnDestroy();
+			delete p->_ptb;
+			p->_ptb = NULL;
 		}
 
 		delete p;
@@ -18913,9 +18913,9 @@ namespace vkr {
 				AxisAlignedBoundingBox projectedBoundingBox = {};
 				for (auto it : _robject)
 				{
-					if (it->m_pGLTFTexturesAndBuffers)
+					if (it->_ptb)
 					{
-						projectedBoundingBox.Merge(it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->get_BoundingBox(lightView));
+						projectedBoundingBox.Merge(it->_ptb->m_pGLTFCommon->get_BoundingBox(lightView));
 					}
 				}
 				auto dlm = ComputeDirectionalLight_mat(projectedBoundingBox);
@@ -19314,10 +19314,10 @@ namespace vkr {
 			PerFrame_t* pPerFrame = NULL;
 			for (auto& it : _robject)
 			{
-				if (it->m_pGLTFTexturesAndBuffers)
+				if (it->_ptb)
 				{
 					// fill as much as possible using the GLTF (camera, lights, ...)
-					pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData(pfd, Cam, _lights, lightMats);
+					pPerFrame = it->_ptb->m_pGLTFCommon->SetPerFrameData(pfd, Cam, _lights, lightMats);
 					// Set some lighting factors
 					pPerFrame->iblFactor = pState->IBLFactor;
 					pPerFrame->emmisiveFactor = pState->EmissiveFactor;
@@ -19338,7 +19338,7 @@ namespace vkr {
 						//auto lvp = ml.mLightViewProj;
 						//if (ml.type == LightType_Directional)
 						//{
-						//	auto cp = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon;
+						//	auto cp = it->_ptb->m_pGLTFCommon;
 						//	lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
 						//}
 						////ml.mLightViewProj = lvp;
@@ -19346,7 +19346,7 @@ namespace vkr {
 					//}
 					if (bWireframe)
 					{
-						pPerFrame = it->m_pGLTFTexturesAndBuffers->m_pGLTFCommon->SetPerFrameData_w(pfd, Cam, _lights, lightMats);
+						pPerFrame = it->_ptb->m_pGLTFCommon->SetPerFrameData_w(pfd, Cam, _lights, lightMats);
 						pPerFrame->iblFactor = pState->IBLFactor;
 						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
 						pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
@@ -19358,9 +19358,9 @@ namespace vkr {
 						pPerFrame->wireframeOptions.w = (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 						pPerFrame->lodBias = 0.0f;
 					}
-					it->m_pGLTFTexturesAndBuffers->SetPerFrameConstants(bWireframe);
+					it->_ptb->SetPerFrameConstants(bWireframe);
 					// 更新骨骼矩阵到ubo
-					it->m_pGLTFTexturesAndBuffers->SetSkinningMatricesForSkeletons();
+					it->_ptb->SetSkinningMatricesForSkeletons();
 				}
 			}
 		}
