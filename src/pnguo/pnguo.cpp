@@ -7026,7 +7026,7 @@ namespace gp {
 		}
 		return rv;
 	}
-	void mkstep(base_mv_t& bmt, mkcustom_dt* n, const glm::vec2& pos,   cmd_plane_t* c)
+	void mkstep(base_mv_t& bmt, mkcustom_dt* n, const glm::vec2& pos, cmd_plane_t* c)
 	{
 		closed_t clt = {};
 		auto se2 = n->step_expand;
@@ -9895,7 +9895,7 @@ struct flex_layout {
 	float flex_grows;
 	float flex_shrinks;
 	float pos2;                 // cross axis position
-
+	float baseline;
 	// Calculated layout lines - only tracked when needed:
 	//   - if the root's align_content property isn't set to FLEX_ALIGN_START
 	//   - or if any child item doesn't have a cross-axis size set
@@ -9910,6 +9910,15 @@ struct flex_layout {
 	float lines_sizes;
 	//uint32_t lines_cap;
 };
+
+flex_item::flex_align child_align(flex_item* child, flex_item* parent)
+{
+	auto align = child->align_self;
+	if (align == flex_item::flex_align::ALIGN_AUTO && parent) {
+		align = parent->align_items;
+	}
+	return align;
+}
 
 void layout_init(flex_item* item, float width, float height, struct flex_layout* layout)
 {
@@ -9997,6 +10006,15 @@ void layout_init(flex_item* item, float width, float height, struct flex_layout*
 	layout->need_lines = layout->wrap && item->align_content != flex_item::flex_align::ALIGN_START;
 	layout->lines.clear();
 	layout->lines_sizes = 0;
+	auto align_items = child_align(item, item->parent);
+	if (align_items == flex_item::flex_align::ALIGN_SPACE_BASELINE)
+	{
+		auto& icv = *item->children;
+		layout->baseline = 0;
+		for (auto& it : *item->children) {
+			layout->baseline = std::max(layout->baseline, it->baseline);
+		}
+	}
 }
 
 void layout_cleanup(struct flex_layout* layout)
@@ -10069,6 +10087,7 @@ bool layout_align(flex_item::flex_align align, float flex_dim, uint32_t children
 		}
 		break;
 
+	case flex_item::flex_align::ALIGN_AUTO:
 	case flex_item::flex_align::ALIGN_STRETCH:
 		if (stretch_allowed) {
 			spacing = flex_dim / children_count;
@@ -10083,15 +10102,6 @@ bool layout_align(flex_item::flex_align align, float flex_dim, uint32_t children
 	*pos_p = pos;
 	*spacing_p = spacing;
 	return true;
-}
-
-flex_item::flex_align child_align(flex_item* child, flex_item* parent)
-{
-	auto align = child->align_self;
-	if (align == flex_item::flex_align::ALIGN_AUTO) {
-		align = parent->align_items;
-	}
-	return align;
 }
 
 void flex_item::layout_items(uint32_t child_begin, uint32_t child_end, uint32_t children_count, struct flex_layout* layout, uint32_t last_count)
@@ -10182,11 +10192,17 @@ void flex_item::layout_items(uint32_t child_begin, uint32_t child_end, uint32_t 
 						+ CHILD_MARGIN(child, right, bottom));
 			}
 			// fall through
-
+			align_pos += CHILD_MARGIN(child, left, top);
+			break;
 		case flex_align::ALIGN_START:
 			align_pos += CHILD_MARGIN(child, left, top);
 			break;
-
+		case flex_align::ALIGN_SPACE_BASELINE:
+			align_pos += CHILD_MARGIN(child, left, top);
+			if (child->baseline > 0) {
+				align_pos += layout->baseline - child->baseline;
+			}
+			break;
 		default:
 			assert(false && "incorrect align_self");
 		}

@@ -841,7 +841,7 @@ int main()
 	if (vkd) {
 		{
 			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-			//vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
+			vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
 			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
 			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
@@ -849,7 +849,7 @@ int main()
 			//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 			//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 			// 机器
-			vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, true);
+			//vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, true);
 			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 			//变形树
@@ -858,7 +858,7 @@ int main()
 			//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
 
 			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			//vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 2,0,5 }, 1.0);// 飞船
+			vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 0,0,0 }, 1.0,true);// 飞船
 			//vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
 			//vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 

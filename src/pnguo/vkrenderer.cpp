@@ -16323,8 +16323,7 @@ namespace vkr {
 
 
 		PerFrame_t _perFrameData;
-
-		VkFence pass_fence = {};
+		 
 		fbo_cxt _fbo = {};
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		bool bHDR = false;
@@ -18477,14 +18476,6 @@ namespace vkr {
 		// Make sure upload heap has finished uploading before continuing
 		m_SysMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 		m_UploadHeap.FlushAndFinish();
-		// Create fence
-		{
-			VkFenceCreateInfo fence_ci = {};
-			fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-			auto res = vkCreateFence(m_pDevice->GetDevice(), &fence_ci, NULL, &pass_fence);
-			assert(res == VK_SUCCESS);
-		}
 		m_SysMemBufferPool.FreeUploadHeap();
 
 	}
@@ -18520,8 +18511,7 @@ namespace vkr {
 		m_RenderPassFullGBuffer.OnDestroy();
 		m_GBuffer.OnDestroy();
 
-		vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr);
-		vkDestroyFence(m_pDevice->GetDevice(), pass_fence, 0); pass_fence = 0;
+		vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr); 
 		m_UploadHeap.OnDestroy();
 		m_GPUTimer.OnDestroy();
 		m_VidMemBufferPool.OnDestroy();

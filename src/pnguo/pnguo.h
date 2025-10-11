@@ -890,7 +890,8 @@ public:
 		ALIGN_END,
 		ALIGN_SPACE_BETWEEN,
 		ALIGN_SPACE_AROUND,
-		ALIGN_SPACE_EVENLY
+		ALIGN_SPACE_EVENLY,
+		ALIGN_SPACE_BASELINE
 	};
 
 	enum class flex_position :uint8_t {
@@ -935,10 +936,10 @@ public:
 	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
 	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
 	float basis = NAN;	// 子元素:定义最小空间
-
-	flex_align justify_content = flex_align::ALIGN_START;	// 父元素:主轴上的元素的排列方式 start\end\center\space-between\space-around
-	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\stretch 
-	flex_align align_items = flex_align::ALIGN_STRETCH;		// 父元素:副轴上的元素的排列方式 start\end\center\stretch 
+	float baseline = 0.0; // 基线位置
+	flex_align justify_content = flex_align::ALIGN_START;	// 父元素:主轴上的元素的排列方式 start\end\center\space-between\space-around\space-evenly
+	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\space-evenly\stretch 
+	flex_align align_items = flex_align::ALIGN_STRETCH;		// 父元素:副轴上的元素的排列方式 start\end\center\stretch\baseline
 	flex_align align_self = flex_align::ALIGN_AUTO;			// 子元素:覆盖父容器align-items的设置
 
 	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
