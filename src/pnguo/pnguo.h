@@ -891,7 +891,7 @@ public:
 		ALIGN_SPACE_BETWEEN,
 		ALIGN_SPACE_AROUND,
 		ALIGN_SPACE_EVENLY,
-		ALIGN_SPACE_BASELINE
+		ALIGN_BASELINE
 	};
 
 	enum class flex_position :uint8_t {

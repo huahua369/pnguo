@@ -10007,7 +10007,7 @@ void layout_init(flex_item* item, float width, float height, struct flex_layout*
 	layout->lines.clear();
 	layout->lines_sizes = 0;
 	auto align_items = child_align(item, item->parent);
-	if (align_items == flex_item::flex_align::ALIGN_SPACE_BASELINE)
+	if (align_items == flex_item::flex_align::ALIGN_BASELINE)
 	{
 		auto& icv = *item->children;
 		layout->baseline = 0;
@@ -10197,7 +10197,7 @@ void flex_item::layout_items(uint32_t child_begin, uint32_t child_end, uint32_t 
 		case flex_align::ALIGN_START:
 			align_pos += CHILD_MARGIN(child, left, top);
 			break;
-		case flex_align::ALIGN_SPACE_BASELINE:
+		case flex_align::ALIGN_BASELINE:
 			align_pos += CHILD_MARGIN(child, left, top);
 			if (child->baseline > 0) {
 				align_pos += layout->baseline - child->baseline;
