@@ -979,6 +979,14 @@ private:
 
 #endif // NO_FLEX_CX
 
+struct grid_div
+{
+	float rows = 1, columns = 1;			// 行列数量
+	float rows_per = 0, columns_per = 0;	// 行列每格占百分比
+	float* cellw = 0, * cellh = 0;			// 每格宽高
+};
+void set_grid_repeat(grid_div* p, size_t rows, size_t columns, float w, float h);
+
 class grid_view
 {
 public:

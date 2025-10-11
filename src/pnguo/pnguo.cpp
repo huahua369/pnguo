@@ -10472,7 +10472,13 @@ void flex_item::layout()
 
 #endif // !NO_FLEX_CX
 
-
+void set_grid_repeat(grid_div* p, size_t rows, size_t columns, float w, float h)
+{
+	if (!p)return;
+	p->rows = rows; p->columns = columns;
+	p->rows_per = w; p->columns_per = h;
+	p->cellw = 0; p->cellh = 0;
+}
 
 // 格子布局
 grid_view::grid_view()
