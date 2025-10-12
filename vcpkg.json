@@ -22,6 +22,7 @@
     "entt",
     "opencv",
     "libssh2",
+    "libnoise",
     "curl",
     "tinygltf",
     "libogg",

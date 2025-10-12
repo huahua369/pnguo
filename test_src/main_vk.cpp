@@ -11,9 +11,9 @@
 #include <pnguo/vkrenderer.h>
 #include <pnguo/page.h>
 #include <pnguo/mapView.h>
-
+#include <pnguo/print_time.h>
 #include <cairo/cairo.h>
-
+#include <noise/noise.h>
 #include "mshell.h"
 //#include <cgltf.h>
 
@@ -719,220 +719,734 @@ int mainc() {
 
 	return 0;
 }
+
+
+#define MAX_HEIGHT 255 // 最大高度值
+
+// 地形类型枚举 
+typedef enum {
+	PLAIN,      // 平原 (高度0-50)
+	HILL,       // 丘陵 (高度51-150)
+	MOUNTAIN,   // 山脉 (高度151-200)
+	RIVER       // 河流 (特殊标记)
+} TerrainType;
+
+
+// 初始化随机数生成器
+void initRandom(unsigned int seed) {
+	srand(seed); // 设置随机种子[4]()[11]()
+}
+
+#define OCTAVES 3     // 噪声层数 
+#define PERSISTENCE 0.125 // 噪声衰减系数
+
+// 生成随机梯度向量
+void initGradient(int* p, int w) {
+	for (int i = 0; i < w; i++) {
+		p[i] = rand() % 256;
+	}
+}
+
+// 平滑函数
+double fade(double t) {
+	return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+// 梯度函数
+double grad(int hash, double x, double y, double z) {
+	int h = hash & 15;
+	double u = h < 8 ? x : y;
+	double v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+	return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+}
+
+// 线性插值
+double lerp(double t, double a, double b) {
+	return a + t * (b - a);
+}
+// 计算柏林噪声
+double perlinNoise(double x, double y, double z, int* p) {
+	int X = (int)x & 255;
+	int Y = (int)y & 255;
+	int Z = (int)z & 255;
+
+	x -= (int)x;
+	y -= (int)y;
+	z -= (int)z;
+
+	double u = fade(x);
+	double v = fade(y);
+	double w = fade(z);
+
+	int A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z;
+	int B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
+
+	return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z), grad(p[BA], x - 1, y, z)),
+		lerp(u, grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z))),
+		lerp(v, lerp(u, grad(p[AA + 1], x, y, z - 1), grad(p[BA + 1], x - 1, y, z - 1)),
+			lerp(u, grad(p[AB + 1], x, y - 1, z - 1), grad(p[BB + 1], x - 1, y - 1, z - 1))));
+}
+
+float fractal_noise1(float x, float y, float z, int* p) {
+	float total = 0.0;
+	float frequency = 1.0;
+	float amplitude = 1.0;
+	float max_val = 0.0;
+
+	for (int i = 0; i < OCTAVES; i++) {
+		total += perlinNoise(x * frequency, y * frequency, z, p) * amplitude;
+		max_val += amplitude;
+		amplitude *= PERSISTENCE;
+		frequency *= 2;
+	}
+	return total / max_val; // 归一化
+}
+// 生成基础高程图（使用多频噪声）[3]()[9]()
+void generateBaseTerrain(float* heightMap, int width, int height) {
+	int p[1024] = {};
+	initGradient(p, 1024);
+	double z = 0.5;
+	float xx = 0, ii = 10000;
+	for (int x = 0; x < width; x++) {
+		for (int y = 0; y < height; y++) {
+			double noiseValue = fractal_noise1(x, y, z, p) + 0.5;
+			xx = fmax(noiseValue, xx);
+			ii = fmin(noiseValue, ii);
+			heightMap[x + y * width] = glm::clamp(noiseValue, 0.0, 0.125) * MAX_HEIGHT;
+		}
+	}
+	printf("max=%f min=%f\n", xx, ii);
+}
+
+// 生成河流系统[3]()[6]()
+void generateRivers(float* heightMap, int width, int height) {
+	// 选择3个随机起点（山脉区域）
+	for (int i = 0; i < 3; i++) {
+		int startX = rand() % (width - 10) + 5;
+		int startY = rand() % (height - 10) + 5;
+
+		int x = startX, y = startY;
+
+		// 河流长度（50-150步）
+		int steps = 50 + rand() % 100;
+
+		for (int s = 0; s < steps; s++) {
+			// 寻找最低邻域点（水流方向）[3]()
+			int nextX = x, nextY = y;
+			float minHeight = heightMap[x + y * width];
+			// 标记当前位置为河流 
+			heightMap[x + y * width] = -10; // 特殊低值标记 
+
+
+			// 检查8个相邻方向 
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dy = -1; dy <= 1; dy++) {
+					int nx = x + dx;
+					int ny = y + dy;
+
+					if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+						if (heightMap[nx + ny * width] < minHeight) {
+							minHeight = heightMap[nx + ny * width];
+							nextX = nx;
+							nextY = ny;
+						}
+					}
+				}
+			}
+
+			// 如果到达最低点或边界，停止 
+			if (nextX == x && nextY == y) break;
+
+			x = nextX;
+			y = nextY;
+		}
+	}
+}
+
+// 应用高斯平滑（使地形更自然）[3]()
+void applySmoothing(float* heightMap, int width, int height) {
+	float kernel[3][3] = {
+		{1 / 16.0, 2 / 16.0, 1 / 16.0},
+		{2 / 16.0, 4 / 16.0, 2 / 16.0},
+		{1 / 16.0, 2 / 16.0, 1 / 16.0}
+	};
+	std::vector<float> tt;
+	tt.resize(width * height);
+	float* temp = tt.data();
+
+	for (int x = 1; x < width - 1; x++) {
+		for (int y = 1; y < height - 1; y++) {
+			float sum = 0;
+			for (int i = -1; i <= 1; i++) {
+				for (int j = -1; j <= 1; j++) {
+					sum += heightMap[x + i + (y + j) * width] * kernel[i + 1][j + 1];
+				}
+			}
+			temp[x + y * width] = sum;
+		}
+	}
+
+	// 复制回原数组 
+	for (int x = 1; x < width - 1; x++) {
+		for (int y = 1; y < height - 1; y++) {
+			heightMap[x + y * width] = temp[x + y * width];
+		}
+	}
+}
+
+// 分类地形类型[2]()[7]()
+TerrainType classifyTerrain(float height) {
+	if (height < 0)
+		return RIVER;	// 河流
+	if (height < 50) return PLAIN;	// 平原
+	if (height < 150) return HILL;	// 丘陵
+	return MOUNTAIN;				// 山脉
+}
+
+// 导出高程图为PGM文件（可视化）
+void exportHeightMap(float* heightMap, int width, int height, const char* filename) {
+	std::vector<unsigned char> bit;// [WIDTH * HEIGHT] = {};
+	bit.resize(width * height);
+	auto t = bit.data();
+	int mx = 0, mi = 100000;
+	int f = 0;
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			auto v = heightMap[x + y * width];
+			mi = fmin(v, mi);
+			mx = fmax(v, mx);
+			if (v < 0)
+			{
+				f++;
+			}
+			unsigned char value = v;
+			*t = value; t++;
+		}
+	}
+	stbi_write_png(filename, width, height, 1, bit.data(), width);
+	return;
+	FILE* fp = fopen(filename, "w");
+	fprintf(fp, "P2\n%d %d\n%d\n", width, height, MAX_HEIGHT);
+
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			int value = (int)fmax(0, heightMap[x + y * width]);
+			fprintf(fp, "%d ", value);
+		}
+		fprintf(fp, "\n");
+	}
+	fclose(fp);
+}
+
+// 打印地形统计信息 
+void printTerrainStats(float* heightMap, int width, int height) {
+	int counts[4] = { 0 }; // PLAIN, HILL, MOUNTAIN, RIVER 
+
+	for (int x = 0; x < width; x++) {
+		for (int y = 0; y < height; y++) {
+			TerrainType type = classifyTerrain(heightMap[x + y * width]);
+			counts[type]++;
+		}
+	}
+
+	printf("\n地形统计:\n");
+	printf("平原占比: %.2f%%\n", counts[PLAIN] * 100.0 / (width * height));
+	printf("丘陵占比: %.2f%%\n", counts[HILL] * 100.0 / (width * height));
+	printf("山脉占比: %.2f%%\n", counts[MOUNTAIN] * 100.0 / (width * height));
+	printf("河流占比: %.2f%%\n", counts[RIVER] * 100.0 / (width * height));
+}
+
+// 哈希函数生成固定随机值（基于坐标）
+float noise_(int x, int y) {
+	unsigned int n = x * 157 + y * 113;
+	n = (n << 13) ^ n;
+	n = (n * (n * n * 15731 + 789221) + 1376312589);
+	return (float)(n & 0x7FFFFFFF) / 0x7FFFFFFF; // 归一化到[0,1]
+}
+
+// 双线性插值平滑 
+float interpolate(float a, float b, float t) {
+	return a + t * (b - a);
+}
+
+// 值噪声生成 
+float value_noise(float x, float y) {
+	int ix = (int)x;
+	int iy = (int)y;
+	float fx = x - ix;
+	float fy = y - iy;
+
+	float v1 = noise_(ix, iy);
+	float v2 = noise_(ix + 1, iy);
+	float v3 = noise_(ix, iy + 1);
+	float v4 = noise_(ix + 1, iy + 1);
+
+	float i1 = interpolate(v1, v2, fx);
+	float i2 = interpolate(v3, v4, fx);
+	return interpolate(i1, i2, fy);
+}
+
+// 分形噪声叠加 
+float fractal_noise(float x, float y) {
+	float total = 0.0;
+	float frequency = 1.0;
+	float amplitude = 1.0;
+	float max_val = 0.0;
+
+	for (int i = 0; i < OCTAVES; i++) {
+		total += value_noise(x * frequency, y * frequency) * amplitude;
+		max_val += amplitude;
+		amplitude *= PERSISTENCE;
+		frequency *= 2;
+	}
+	return total / max_val; // 归一化
+}
+int gen_heightmap(uint32_t seed, int width, int height, std::vector<float>* pheight_map, std::vector<int>* priver_path)
+{
+	pheight_map->resize(width * height);
+	priver_path->resize(width * height);
+	auto height_map = pheight_map->data();
+	int* river_path = priver_path->data(); // 河流路径标记
+
+	// 生成基础地形
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			height_map[x + y * width] = fractal_noise(x / 10.0f, y / 10.0f);
+		}
+	}
+
+	// 生成河流（从随机高山点开始）
+	int start_x = -1, start_y = -1;
+	for (int attempt = 0; attempt < 100; attempt++) { // 最多尝试100次找源头 
+		int x = rand() % width;
+		int y = rand() % height;
+		if (height_map[x + y * width] > 0.8f) {
+			start_x = x;
+			start_y = y;
+			break;
+		}
+	}
+
+	if (start_x != -1) { // 找到有效源头
+		int x = start_x, y = start_y;
+		for (int step = 0; step < 1000; step++) { // 最多1000步 
+			river_path[x + y * width] = 1; // 标记河流路径
+			float min_height = height_map[x + y * width];
+			int next_x = x, next_y = y;
+
+			// 检查8邻域最低点 
+			for (int dy = -1; dy <= 1; dy++) {
+				for (int dx = -1; dx <= 1; dx++) {
+					if (dx == 0 && dy == 0) continue;
+					int nx = x + dx, ny = y + dy;
+					if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+						if (height_map[nx + ny * width] < min_height && !river_path[nx + ny * width]) {
+							min_height = height_map[nx + ny * width];
+							next_x = nx;
+							next_y = ny;
+						}
+					}
+				}
+			}
+			if (next_x == x && next_y == y) break; // 无更低点，停止流动 
+			x = next_x;
+			y = next_y;
+		}
+	}
+	return 0;
+}
+
+int generateRivers(int width, int height, std::vector<float>* pheight_map, std::vector<int>* priver_path)
+{
+	auto height_map = pheight_map->data();
+	int* river_path = priver_path->data(); // 河流路径标记
+
+	// 生成河流（从随机高山点开始）
+	int start_x = -1, start_y = -1;
+	for (int attempt = 0; attempt < 100; attempt++) { // 最多尝试100次找源头 
+		int x = rand() % width;
+		int y = rand() % height;
+		if (height_map[x + y * width] > 100) {
+			start_x = x;
+			start_y = y;
+			break;
+		}
+	}
+	int count = 0;
+	if (start_x != -1) { // 找到有效源头
+		int x = start_x, y = start_y;
+		for (int step = 0; step < 1000; step++) { // 最多1000步 
+			river_path[x + y * width] = 1; // 标记河流路径
+			float min_height = height_map[x + y * width];
+			int next_x = x, next_y = y;
+			count++;
+			// 检查8邻域最低点 
+			for (int dy = -1; dy <= 1; dy++) {
+				for (int dx = -1; dx <= 1; dx++) {
+					if (dx == 0 && dy == 0) continue;
+					int nx = x + dx, ny = y + dy;
+					if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+						if (height_map[nx + ny * width] < min_height && !river_path[nx + ny * width]) {
+							min_height = height_map[nx + ny * width];
+							next_x = nx;
+							next_y = ny;
+						}
+					}
+				}
+			}
+			if (next_x == x && next_y == y)
+				break; // 无更低点，停止流动 
+			x = next_x;
+			y = next_y;
+		}
+	}
+	return 0;
+}
+int main_heightmap(uint32_t seed)
+{
+
+	{
+		print_time aa("高度图生成");
+		// 初始化随机数生成器[4]()[11]()
+		initRandom(seed);
+		int w = 50, h = 50;
+		// 全局高度图
+		std::vector<float> hm;
+		std::vector<int> river_path;
+		hm.resize(w * h);
+		river_path.resize(w * h);
+		float* heightMap = hm.data();
+		// 地形生成流程 
+		generateBaseTerrain(heightMap, w, h);   // 步骤1：生成基础地形 
+		applySmoothing(heightMap, w, h);        // 步骤2：平滑处理 
+		generateRivers(w, h, &hm, &river_path);
+		int river_paths[50][50];
+		for (size_t i = 0; i < h; i++)
+		{
+			auto& it = river_paths[i];
+			for (size_t j = 0; j < w; j++)
+			{
+				it[j] = river_path[j + i * w];
+			}
+		}
+		generateRivers(heightMap, w, h);        // 步骤3：生成河流  
+
+
+		applySmoothing(heightMap, w, h);        // 步骤4：再次平滑
+		// 导出和显示结果 
+		exportHeightMap(heightMap, w, h, "terrain.png");
+		printf("高程图已生成到 terrain.png\n种子：%u\n", seed);
+
+		printTerrainStats(heightMap, w, h);
+	}
+	{
+		/*
+		参数项					山地		平原					对地形影响说明
+		噪声幅度					1.0		0.3 ~ 0.5			决定整体起伏强度，越小越平坦
+		八度数（octaves）		6 ~ 8	2 ~ 3				控制细节层次，越少越平滑
+		持久度（persistence）	0.5		0.3 ~ 0.4			高频成分衰减更快，减少小起伏
+		高度映射范围				0 ~ 1	0 ~ 0.4				人为压缩最大高程，突出低地
+		后处理函数				线性		幂函数（如 x².⁵）	使中间值更集中，两端拉伸少
+		*/
+		// 1. 配置噪声模块（生成平原占比高的地形）
+   // ---------------------- 
+		noise::module::Perlin baseNoise;  // 基础噪声（Perlin噪声，平缓起伏）
+		baseNoise.SetFrequency(0.0128);      // 频率（越小，起伏越平缓）
+		baseNoise.SetOctaveCount(2);       // 八度（越少，细节越少）
+		baseNoise.SetPersistence(0.3);     // 持续性（越小，高八度影响越小）
+		baseNoise.SetLacunarity(2.0);      //  Lacunarity（频率倍增系数，默认2.0） 
+		baseNoise.SetSeed(seed);
+		// 可选：添加细节噪声（小幅度起伏，增强真实感） 
+		noise::module::Perlin detailNoise;
+		detailNoise.SetFrequency(0.8);     // 高频率（细节）
+		detailNoise.SetOctaveCount(1);     // 1层细节 
+		noise::module::Multiply detailMod;        // 细节噪声权重（0.1，不影响整体起伏）
+		detailMod.SetSourceModule(0, detailNoise);
+		noise::module::Const ct;
+		ct.SetConstValue(0.1);
+		detailMod.SetSourceModule(1, ct);
+
+		// 组合基础噪声和细节噪声（基础占90%，细节占10%）
+		noise::module::Add finalNoise;
+		finalNoise.SetSourceModule(0, baseNoise);
+		finalNoise.SetSourceModule(1, detailMod);
+
+		// 调整噪声范围到[0, 255]（高程图像素值） 
+		noise::module::ScaleBias scaleBias;
+		scaleBias.SetSourceModule(0, finalNoise);
+		scaleBias.SetScale(127.5);  // (-1到1) * 127.5 → -127.5到127.5
+		scaleBias.SetBias(127.5);   // +127.5 → 0到255 
+
+		// ---------------------- 
+		// 2. 生成高程图数据（2D） 
+		// ---------------------- 
+		const int width = 50;  // 高程图宽度（像素）
+		const int height = 50; // 高程图高度（像素）
+		std::vector<float> heightMap(width * height);  // 存储每个像素的高度（0-255）
+		std::vector<unsigned char> heightMap1(width * height);  // 存储每个像素的高度（0-255）
+
+		for (int y = 0; y < height; ++y) {
+			for (int x = 0; x < width; ++x) {
+				// 将像素坐标映射到噪声空间（扩大范围，让起伏更平缓）
+				double nx = (double)x / width * 200.0;  // x范围：0→200 
+				double ny = (double)y / height * 200.0; // y范围：0→200 
+				double nz = 0.0;                        // 2D高程图，z=0
+
+				// 获取噪声值（已映射到0-255）
+				double noiseValue = scaleBias.GetValue(nx, ny, nz);
+				// 确保值在0-255之间（防止溢出）
+				unsigned char pixelValue = static_cast<unsigned char>(std::clamp(noiseValue, 0.0, 255.0));
+				heightMap[y * width + x] = pixelValue;
+			}
+		}
+		applySmoothing(heightMap.data(), width, height);
+		std::vector<int> river_path;
+		river_path.resize(width * height);
+		generateRivers(width, height, &heightMap, &river_path);
+		for (auto i = 0; i < width * height; i++)
+		{
+			heightMap1[i] = (unsigned char)heightMap[i];
+		}
+		int river_paths[50][50];
+		for (size_t i = 0; i < height; i++)
+		{
+			auto& it = river_paths[i];
+			for (size_t j = 0; j < width; j++)
+			{
+				it[j] = river_path[j + i * width];
+			}
+		}
+		// ---------------------- 
+		// 3. 保存高程图（PNG可视化 + RAW导入3D引擎）
+		// ---------------------- 
+		// 保存为PNG（用图片查看器打开，灰度越浅表示海拔越高）
+		stbi_write_png("heightmap_plains2.png", width, height, 1, heightMap1.data(), width);
+		std::cout << "高程图生成成功！\n- PNG路径：heightmap_plains.png\n-  RAW路径：heightmap_plains.raw" << std::endl;
+	}
+	return 0;
+}
+
+
+
 int main()
 {
-	//hz::main_ssh2();
-	//return 0;
-	//test_img();
-	auto app = new_app();
+	time(0);
+	main_heightmap(1760245150);
+	Sleep(1000);
+	if (0) {
+		//hz::main_ssh2();
+		//return 0;
+		//test_img();
+		auto app = new_app();
 
 #ifdef _DEBUG
-	system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-	system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
+		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
+		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
-	//vkrender_test(0);
-	{
+		//vkrender_test(0);
+		{
 
 
 #if 0
 
-		glm::quat qk = glm::quat(1, 0, 0, 0);
-		static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
-		static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
-		static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
-		auto a = glm::radians(75.0f);
-		auto ak = AMD_PI_OVER_4;
-		auto ac = cosf(a);
-		auto ac0 = cosf(ak);
-		printf("\n")
-			vkr::Transform transform = {};
-		transform.LookAt(p2v(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
-		vkr::light_t l = {};
-		l._type = vkr::light_t::LIGHT_SPOTLIGHT;
-		l._intensity = 50.0;
-		l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		l._range = 15.0;
-		l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
-		l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
-		glm::mat4 lightMat = transform.GetWorldMat();
-		glm::mat4 lightView = glm::affineInverse(lightMat);
-		glm::mat4 mLightViewProj;
-		glm::mat4 per = glm::perspective(l._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
-		auto mLightView = lightView;
-		if (l._type == vkr::light_t::LIGHT_SPOTLIGHT)
-			mLightViewProj = per * lightView;
-		//transpose
-		auto direction = glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-		auto position = lightMat[3];
-		auto outerConeCos = cosf(l._outerConeAngle);
-		auto innerConeCos = cosf(l._innerConeAngle);
+			glm::quat qk = glm::quat(1, 0, 0, 0);
+			static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
+			static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
+			static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
+			auto a = glm::radians(75.0f);
+			auto ak = AMD_PI_OVER_4;
+			auto ac = cosf(a);
+			auto ac0 = cosf(ak);
+			printf("\n")
+				vkr::Transform transform = {};
+			transform.LookAt(p2v(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
+			vkr::light_t l = {};
+			l._type = vkr::light_t::LIGHT_SPOTLIGHT;
+			l._intensity = 50.0;
+			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+			l._range = 15.0;
+			l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
+			l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
+			glm::mat4 lightMat = transform.GetWorldMat();
+			glm::mat4 lightView = glm::affineInverse(lightMat);
+			glm::mat4 mLightViewProj;
+			glm::mat4 per = glm::perspective(l._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
+			auto mLightView = lightView;
+			if (l._type == vkr::light_t::LIGHT_SPOTLIGHT)
+				mLightViewProj = per * lightView;
+			//transpose
+			auto direction = glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+			auto position = lightMat[3];
+			auto outerConeCos = cosf(l._outerConeAngle);
+			auto innerConeCos = cosf(l._innerConeAngle);
 
-		glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
-		glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
-		glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		glm::mat4 spotlightMatrix = glm::inverse(mLightViewProj);
+			glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
+			glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
+			glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+			glm::mat4 spotlightMatrix = glm::inverse(mLightViewProj);
 
-		printf("Spotlight Matrix:\n");
+			printf("Spotlight Matrix:\n");
 #endif
-	}
-
-
-
-	//{
-	//	hz::mfile_t m;
-	//	auto pd = m.open_d(R"(E:\zt\c00951ea.spr)", 0);
-	//	std::vector<int> fv;
-	//	if (pd)
-	//	{
-	//		fv.resize(20);
-	//		memcpy(fv.data(), pd, 20 * 4);
-	//	}
-	//}
-	uint32_t* cc = get_wcolor();
-	for (size_t i = 0; i < 16; i++)
-	{
-		auto str = get_wcname(i, 0);
-		printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
-	}
-	//testnjson();
-	glm::ivec2 ws = { 1280,860 };
-	const char* wtitle = (char*)u8"窗口0";
-	const char* wtitle1 = (char*)u8"窗口1";
-
-	form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
-	//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
-	auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-	auto kd = sdldev.vkdev;
-	//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
-	std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
-	bool grab_enable = false;	// 设置鼠标范围在窗口内
-	bool rmode = true;			// 设置窗口的相对鼠标模式。
-	//form0->set_mouse_mode(grab_enable, rmode);
-	get_queue_info(sdldev.phy);
-
-	vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 创建vk渲染器 
-	//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
-	//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
-	//if (vkd1) {
-	//	vkd1->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
-	//	vkd1->resize(1024, 800);				// 设置fbo缓冲区大小
-	//	auto vr = vkd1->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-	//	auto texok = form1->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
-	//	//vkd->state.SelectedTonemapperIndex = 1;
-	//	vkd1->state.Exposure = 0.9928;
-	//	vkd1->state.EmissiveFactor = 250;
-	//	new_ui(form1, vkd1);
-	//	if (texok)
-	//	{
-	//		form1->up_cb = [=](float delta, int* ret)
-	//			{
-	//				auto light = vkd1->get_light(0);
-	//				vkd1->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-	//				vkd1->state.Exposure;				// 曝光度：默认1.0
-	//				vkd1->state.bUseTAA;
-	//				vkd1->update(form1->io);	// 更新事件
-	//				vkd1->on_render();		// 执行渲染
-	//			};
-	//	}
-	//}
-	if (vkd) {
-		{
-			int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-			vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
-			//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
-			//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
-			//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-			//vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
-			//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
-			//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
-			// 机器
-			//vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, true);
-			//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
-			//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
-			//变形树
-			//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
-			//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
-			//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
-
-			//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-			vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 0,0,0 }, 1.0,true);// 飞船
-			//vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
-			//vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
-
-			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
-			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
-			//vkd->add_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
-			//vkd->add_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
-			//vkd->add_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-			//vkd->add_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
-			//vkd->add_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
-			//vkd->add_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
-			//vkd->add_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
-
-			//vkd->add_gltf(R"(E:\model\space_station_4.glb)");
-			//vkd->add_gltf(R"(E:\model\sexy_guardian_woman_model_18.glb)");
-			//vkd->add_gltf(R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-			//vkd->add_gltf(R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);//玻璃龙
-			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\Fox\glTF-Binary\Fox.glb)", { 0,0,0 }, 0.20);//
-			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\TextureSettingsTest\glTF-Binary\TextureSettingsTest.glb)", { 0,11,0 }, 1.0);//
-			//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\NegativeScaleTest\glTF-Binary\NegativeScaleTest.glb)", { 0,0,0 }, 1.0);//
-			//vkd->add_gltf(R"(E:\zmodel\NodePerformanceTest.glb)", { 0,0.1,0 }, 1.0);//
 		}
-		vkd->resize(1024, 800);				// 设置fbo缓冲区大小
-		auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-		auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
-		/*
-		case 0: return AMDTonemapper(color);
-		case 1: return DX11DSK(color);
-		case 2: return Reinhard(color);
-		case 3: return Uncharted2Tonemap(color);
-		case 4: return tonemapACES( color );
-		case 5: return color;
-		*/
-		vkd->_state.SelectedTonemapperIndex = 0;
-		vkd->_state.Exposure = 1.0;
-		vkd->_state.EmissiveFactor = 30;
-		vkd->_state.IBLFactor = 1.0;
-		new_ui(form0, vkd);
-		if (texok)
+
+
+
+		//{
+		//	hz::mfile_t m;
+		//	auto pd = m.open_d(R"(E:\zt\c00951ea.spr)", 0);
+		//	std::vector<int> fv;
+		//	if (pd)
+		//	{
+		//		fv.resize(20);
+		//		memcpy(fv.data(), pd, 20 * 4);
+		//	}
+		//}
+		uint32_t* cc = get_wcolor();
+		for (size_t i = 0; i < 16; i++)
 		{
-			form0->up_cb = [=](float delta, int* ret)
-				{
-					auto light = vkd->get_light(0);
-					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-					vkd->_state.Exposure;				// 曝光度：默认1.0
-					vkd->_state.bUseTAA;
-					static int ity = 10.5;
-					light->_intensity = ity;
-					vkd->update(form0->io);	// 更新事件
-					vkd->on_render();		// 执行渲染
-					static bool sa = false;
-					if (sa)
+			auto str = get_wcname(i, 0);
+			printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
+		}
+		//testnjson();
+		glm::ivec2 ws = { 1280,860 };
+		const char* wtitle = (char*)u8"窗口0";
+		const char* wtitle1 = (char*)u8"窗口1";
+
+		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
+		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
+		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+		auto kd = sdldev.vkdev;
+		//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
+		std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
+		bool grab_enable = false;	// 设置鼠标范围在窗口内
+		bool rmode = true;			// 设置窗口的相对鼠标模式。
+		//form0->set_mouse_mode(grab_enable, rmode);
+		get_queue_info(sdldev.phy);
+
+		vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 创建vk渲染器 
+		//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
+		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
+		//if (vkd1) {
+		//	vkd1->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
+		//	vkd1->resize(1024, 800);				// 设置fbo缓冲区大小
+		//	auto vr = vkd1->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+		//	auto texok = form1->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
+		//	//vkd->state.SelectedTonemapperIndex = 1;
+		//	vkd1->state.Exposure = 0.9928;
+		//	vkd1->state.EmissiveFactor = 250;
+		//	new_ui(form1, vkd1);
+		//	if (texok)
+		//	{
+		//		form1->up_cb = [=](float delta, int* ret)
+		//			{
+		//				auto light = vkd1->get_light(0);
+		//				vkd1->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+		//				vkd1->state.Exposure;				// 曝光度：默认1.0
+		//				vkd1->state.bUseTAA;
+		//				vkd1->update(form1->io);	// 更新事件
+		//				vkd1->on_render();		// 执行渲染
+		//			};
+		//	}
+		//}
+		if (vkd) {
+			{
+				int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
+				vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
+				//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
+				//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
+				//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
+				//vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
+				//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
+				//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
+				// 机器
+				//vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, true);
+				//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
+				//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
+				//变形树
+				//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
+				//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
+				//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
+
+				//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
+				vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 0,0,0 }, 1.0, true);// 飞船
+				//vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
+				//vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
+
+				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
+				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
+				//vkd->add_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
+				//vkd->add_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
+				//vkd->add_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
+				//vkd->add_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
+				//vkd->add_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
+				//vkd->add_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
+				//vkd->add_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
+
+				//vkd->add_gltf(R"(E:\model\space_station_4.glb)");
+				//vkd->add_gltf(R"(E:\model\sexy_guardian_woman_model_18.glb)");
+				//vkd->add_gltf(R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
+				//vkd->add_gltf(R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);//玻璃龙
+				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\Fox\glTF-Binary\Fox.glb)", { 0,0,0 }, 0.20);//
+				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\TextureSettingsTest\glTF-Binary\TextureSettingsTest.glb)", { 0,11,0 }, 1.0);//
+				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\NegativeScaleTest\glTF-Binary\NegativeScaleTest.glb)", { 0,0,0 }, 1.0);//
+				//vkd->add_gltf(R"(E:\zmodel\NodePerformanceTest.glb)", { 0,0.1,0 }, 1.0);//
+			}
+			vkd->resize(1024, 800);				// 设置fbo缓冲区大小
+			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+			auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
+			/*
+			case 0: return AMDTonemapper(color);
+			case 1: return DX11DSK(color);
+			case 2: return Reinhard(color);
+			case 3: return Uncharted2Tonemap(color);
+			case 4: return tonemapACES( color );
+			case 5: return color;
+			*/
+			vkd->_state.SelectedTonemapperIndex = 0;
+			vkd->_state.Exposure = 1.0;
+			vkd->_state.EmissiveFactor = 30;
+			vkd->_state.IBLFactor = 1.0;
+			new_ui(form0, vkd);
+			if (texok)
+			{
+				form0->up_cb = [=](float delta, int* ret)
 					{
-						auto img = vkd->save_shadow(0);	// 保存阴影贴图
-						auto pf = (float*)img.data;
-						for (size_t i = 0; i < img.size.x * img.size.y; i++)
+						auto light = vkd->get_light(0);
+						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+						vkd->_state.Exposure;				// 曝光度：默认1.0
+						vkd->_state.bUseTAA;
+						static int ity = 10.5;
+						light->_intensity = ity;
+						vkd->update(form0->io);	// 更新事件
+						vkd->on_render();		// 执行渲染
+						static bool sa = false;
+						if (sa)
 						{
-							img.data[i] = gray_float_to_rgba(*pf);
-							pf++;
+							auto img = vkd->save_shadow(0);	// 保存阴影贴图
+							auto pf = (float*)img.data;
+							for (size_t i = 0; i < img.size.x * img.size.y; i++)
+							{
+								img.data[i] = gray_float_to_rgba(*pf);
+								pf++;
+							}
+							stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
+							sa = false;
 						}
-						stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
-						sa = false;
-					}
-				};
+					};
+			}
+
 		}
 
+		//show_belt(form0);
+		//show_cpuinfo(form0);
+		// 运行消息循环
+		run_app(app, 0);
+		free_vkdg(vkd);
+		free_app(app);
 	}
-
-	//show_belt(form0);
-	//show_cpuinfo(form0);
-	// 运行消息循环
-	run_app(app, 0);
-	free_vkdg(vkd);
-	free_app(app);
 #ifdef _WIN32
 	ExitProcess(0);
 #endif

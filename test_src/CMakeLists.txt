@@ -94,7 +94,8 @@ find_package(OpenCV CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(libzip CONFIG REQUIRED)
 #pkg_check_modules(hwloc REQUIRED IMPORTED_TARGET hwloc)
-
+ find_package(unofficial-noise CONFIG REQUIRED)
+ find_package(unofficial-noiseutils CONFIG REQUIRED)
 #find_package(cmark CONFIG REQUIRED)  
 
 #git submodule add https://github.com/EsotericSoftware/spine-runtimes third_lib/spine
@@ -114,7 +115,8 @@ list(APPEND lklib
     OpenSSL::SSL OpenSSL::Crypto
     #${SDL3_STATIC_LIBRARIES}
     #${SDL3_LIBRARIES}
-   
+   unofficial::noise::noise-static
+   unofficial::noiseutils::noiseutils-static
     harfbuzz::harfbuzz 
     #$<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     #opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
