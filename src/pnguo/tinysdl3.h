@@ -91,12 +91,12 @@ public:
 	int fms = 0;
 
 	uint32_t audio_device = 0;
-
+	dev_info_cx _set_dev = {};
 	bool nc_down = 0;
 public:
 	app_cx();
 	~app_cx();
-
+	void set_dev(void* instance, void* physical_device, void* device);
 	form_x* new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent);
 public:
 	int run_loop(int t);

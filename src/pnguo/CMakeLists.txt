@@ -6,6 +6,7 @@ set(pnguo_src
 "pnguo.cpp"
 "tria.cpp"
 "backend_2d.cpp"
+"mesh3d.cpp"
 "font_core.cpp"
 "mnet.cpp"
 "buffer.cpp"

@@ -382,6 +382,12 @@ app_cx::~app_cx()
 	OleUninitialize();
 #endif
 }
+void app_cx::set_dev(void* instance, void* physical_device, void* device)
+{
+	_set_dev.inst = instance;
+	_set_dev.phy = physical_device;
+	_set_dev.vkdev = device;
+}
 uint32_t get_flags(int fgs)
 {
 	uint32_t flags = 0;
@@ -415,6 +421,26 @@ uint32_t get_flags(int fgs)
 	return flags;
 }
 int on_call_we(const SDL_Event* e, form_x* pw);
+
+
+
+SDL_Renderer* newRenderer(SDL_Window* window, const char* name, void* instance, void* physical_device, void* device)
+{
+	SDL_Renderer* renderer;
+	SDL_PropertiesID props = SDL_CreateProperties();
+	SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, window);
+	if (instance)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_INSTANCE_POINTER, instance);
+	if (physical_device)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_PHYSICAL_DEVICE_POINTER, physical_device);
+	if (device)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_DEVICE_POINTER, device);
+	SDL_SetStringProperty(props, SDL_PROP_RENDERER_CREATE_NAME_STRING, name);
+	renderer = SDL_CreateRendererWithProperties(props);
+	SDL_DestroyProperties(props);
+	return renderer;
+}
+
 form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent)
 {
 	auto ws = ws1;
@@ -477,7 +503,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		else {
 			rn = *rdv.begin();
 		}
-		renderer = SDL_CreateRenderer(window, rn.c_str());
+		renderer = newRenderer(window, rn.c_str(), _set_dev.inst, _set_dev.phy, _set_dev.vkdev);
 	}
 	int vsync = 0;
 	if (renderer) {
@@ -2710,7 +2736,7 @@ SDL_Texture* form_x::new_texture(int width, int height, void* vkptr, int format)
 		if (format == 1)
 		{
 			format = SDL_PIXELFORMAT_ARGB8888; // VK_BGRA
-		}	
+		}
 		SDL_PropertiesID props = SDL_CreateProperties();
 		if (format < 0)
 		{
@@ -3662,14 +3688,14 @@ SDL_GPUDevice* new_gpu_device(gpu_propertie_t * pt)
 	}
 	if (pt->format_flags & SDL_GPU_SHADERFORMAT_SPIRV) {
 		SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true);
-		if (!pt->vk_shaderclipdistance)
-			SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_SHADERCLIPDISTANCE_BOOLEAN, false);
-		if (!pt->vk_depthclamp)
-			SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_DEPTHCLAMP_BOOLEAN, false);
-		if (!pt->vk_drawindirectfirstinstance)
-			SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_DRAWINDIRECTFIRST_BOOLEAN, false);
-		if (!pt->vk_sampleranisotropy)
-			SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_SAMPLERANISOTROPY_BOOLEAN, false);
+		//if (!pt->vk_shaderclipdistance)
+		//	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_SHADERCLIPDISTANCE_BOOLEAN, false);
+		//if (!pt->vk_depthclamp)
+		//	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_DEPTHCLAMP_BOOLEAN, false);
+		//if (!pt->vk_drawindirectfirstinstance)
+		//	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_DRAWINDIRECTFIRST_BOOLEAN, false);
+		//if (!pt->vk_sampleranisotropy)
+		//	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_VULKAN_SAMPLERANISOTROPY_BOOLEAN, false);
 	}
 	if (pt->format_flags & SDL_GPU_SHADERFORMAT_DXBC) {
 		SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_DXBC_BOOLEAN, true);

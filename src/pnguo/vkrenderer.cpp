@@ -203,6 +203,7 @@ namespace vkr
 		VkResult Init(VkPhysicalDevice physicaldevice);
 		bool IsExtensionPresent(const char* pExtName);
 		bool AddDeviceExtensionName(const char* deviceExtensionName);
+		int AddDeviceExtensionName(std::vector<const char*> deviceExtensionName);
 		void* GetNext() { return m_pNext; }
 		void SetNewNext(void* pNext) { m_pNext = pNext; }
 
@@ -254,7 +255,7 @@ namespace vkr
 		void GPUFlush();
 		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
 
-	private:
+	public:
 		VkInstance m_instance = 0;
 		VkDevice m_device = 0;
 		VkPhysicalDevice m_physicaldevice = {};
@@ -410,6 +411,20 @@ namespace vkr
 		return false;
 	}
 
+	int DeviceProperties::AddDeviceExtensionName(std::vector<const char*> deviceExtensionName)
+	{
+		int r = 0;
+		for (auto& name : deviceExtensionName)
+		{
+			if (IsExtensionPresent(name))
+			{
+				m_device_extension_names.push_back(name);
+				r++;
+			}
+		}
+		return r;
+	}
+
 	void  DeviceProperties::GetExtensionNamesAndConfigs(std::vector<const char*>* pDevice_extension_names)
 	{
 		for (auto& name : m_device_extension_names)
@@ -436,6 +451,8 @@ namespace vkr
 		};
 		pIp->AddInstanceExtensionName(exn[0]);
 		pIp->AddInstanceExtensionName(VK_KHR_SURFACE_EXTENSION_NAME);
+		pIp->AddInstanceExtensionName(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		pIp->AddInstanceExtensionName(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
 		f_ExtDebugUtilsCheckInstanceExtensions(pIp);
 #ifdef ExtCheckHDRInstanceExtensions
 		ExtCheckHDRInstanceExtensions(pIp);
@@ -456,9 +473,17 @@ namespace vkr
 		ExtCheckFSEDeviceExtensions(pDp);
 		ExtCheckFreeSyncHDRDeviceExtensions(pDp);
 #endif
-		pDp->AddDeviceExtensionName(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 		pDp->AddDeviceExtensionName(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-		pDp->AddDeviceExtensionName(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		pDp->AddDeviceExtensionName(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);	// 动态渲染
+		pDp->AddDeviceExtensionName(VK_EXT_MESH_SHADER_EXTENSION_NAME);			// mesh shader
+		pDp->AddDeviceExtensionName(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+		// Required by VK_KHR_spirv_1_4
+		pDp->AddDeviceExtensionName(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+		pDp->AddDeviceExtensionName({ VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,							// 支持yuv纹理采样
+			VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+			VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
+			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME });
 	}
 
 	Device::Device()
@@ -478,34 +503,34 @@ namespace vkr
 		SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
 		auto apiVersion3 = VK_API_VERSION_1_3;
 		auto apiVersion4 = VK_API_VERSION_1_4;
+		auto apiVersion = apiVersion4;
 		VkInstanceCreateInfo inst_info = {};
-		if (!d || !d->inst || !d->phy || !d->vkdev)
+		if (!d || !d->inst || !d->phy)
 		{
-
 			std::vector<const char*> instance_layer_names;
 			std::vector<const char*> instance_extension_names;
-
 			ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names);
-
-			VkInstance instance = {};
-			VkApplicationInfo app_info = {};
-			app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-			app_info.pNext = NULL;
-			app_info.pApplicationName = "vkcmp";
-			app_info.applicationVersion = 1;
-			app_info.pEngineName = "pnguo";
-			app_info.engineVersion = 1;
-			app_info.apiVersion = VK_API_VERSION_1_3;
-			inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-			inst_info.pNext = 0;
-			inst_info.flags = 0;
-			inst_info.pApplicationInfo = &app_info;
-			inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
-			inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
-			inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
-			inst_info.ppEnabledExtensionNames = instance_extension_names.data();
-			VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
-			assert(res == VK_SUCCESS);
+			VkInstance instance = (VkInstance)d->inst;
+			if (!d->inst) {
+				VkApplicationInfo app_info = {};
+				app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+				app_info.pNext = NULL;
+				app_info.pApplicationName = "vkcmp";
+				app_info.applicationVersion = 1;
+				app_info.pEngineName = "pnguo";
+				app_info.engineVersion = 1;
+				app_info.apiVersion = apiVersion;
+				inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+				inst_info.pNext = 0;
+				inst_info.flags = 0;
+				inst_info.pApplicationInfo = &app_info;
+				inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
+				inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
+				inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
+				inst_info.ppEnabledExtensionNames = instance_extension_names.data();
+				VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
+				assert(res == VK_SUCCESS);
+			}
 			if (instance)
 			{
 				nd.inst = instance;
@@ -753,6 +778,17 @@ namespace vkr
 		VkPhysicalDeviceFeatures2 features = {};
 		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		vkGetPhysicalDeviceFeatures2(m_physicaldevice, &features);
+
+		VkPhysicalDeviceMeshShaderFeaturesEXT enabledMeshShaderFeatures{};
+		bool enabledMS = true;
+		if (enabledMS) {
+			enabledMeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+			enabledMeshShaderFeatures.meshShader = VK_TRUE;
+			enabledMeshShaderFeatures.taskShader = VK_TRUE;
+			enabledMeshShaderFeatures.pNext = physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &enabledMeshShaderFeatures;
+		}
+
 		if (dev)
 		{
 			m_device = dev;
@@ -762,6 +798,16 @@ namespace vkr
 			VkDeviceCreateInfo device_info = {};
 			device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 			device_info.pNext = &physicalDeviceFeatures2;
+			bool supportsKHRSamplerYCbCrConversion = pDp->IsExtensionPresent(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+			VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
+			if (supportsKHRSamplerYCbCrConversion) {
+				deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+				deviceSamplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
+				deviceSamplerYcbcrConversionFeatures.pNext = (void*)device_info.pNext;
+				device_info.pNext = &deviceSamplerYcbcrConversionFeatures;
+			}
+
+
 			device_info.queueCreateInfoCount = 2;
 			device_info.pQueueCreateInfos = queue_info;
 			device_info.enabledExtensionCount = (uint32_t)extension_names.size();
@@ -16323,7 +16369,7 @@ namespace vkr {
 
 
 		PerFrame_t _perFrameData;
-		 
+
 		fbo_cxt _fbo = {};
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		bool bHDR = false;
@@ -18511,7 +18557,7 @@ namespace vkr {
 		m_RenderPassFullGBuffer.OnDestroy();
 		m_GBuffer.OnDestroy();
 
-		vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr); 
+		vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr);
 		m_UploadHeap.OnDestroy();
 		m_GPUTimer.OnDestroy();
 		m_VidMemBufferPool.OnDestroy();
@@ -21241,6 +21287,7 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 		}
 		vkr::InitShaderCompilerCache(shaderLibDir, shaderCacheDir);
 		tx->OnCreate();
+		p->_dev_info = { dev->m_instance,dev->m_physicaldevice,dev->m_device };
 		p->ctx = tx;
 	}
 	return p;
