@@ -273,6 +273,11 @@ namespace vkr
 		uint32_t compute_queue_family_index = 0;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
 		std::map<size_t, VkSampler> _samplers;
+
+
+		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT{ VK_NULL_HANDLE };
+
+
 		bool m_usingValidationLayer = false;
 		bool m_usingFp16 = false;
 		bool m_rt10Supported = false;
@@ -820,6 +825,7 @@ namespace vkr
 
 		auto cbr = vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
 		auto cer = vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
+		_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(m_device, "vkCmdDrawMeshTasksEXT"));
 
 #ifdef USE_VMA
 		VmaAllocatorCreateInfo allocatorInfo = {};
