@@ -193,7 +193,7 @@ namespace vkr
 	public:
 		VkPhysicalDevice m_physicaldevice;
 
-		std::vector<const char*> m_device_extension_names;
+		std::set<const char*> m_device_extension_names;
 
 		std::vector<VkExtensionProperties> m_deviceExtensionProperties;
 
@@ -273,6 +273,12 @@ namespace vkr
 		uint32_t compute_queue_family_index = 0;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
 		std::map<size_t, VkSampler> _samplers;
+
+		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
+		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
+		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = {};
+
+
 		bool m_usingValidationLayer = false;
 		bool m_usingFp16 = false;
 		bool m_rt10Supported = false;
@@ -402,7 +408,7 @@ namespace vkr
 	{
 		if (IsExtensionPresent(deviceExtensionName))
 		{
-			m_device_extension_names.push_back(deviceExtensionName);
+			m_device_extension_names.insert(deviceExtensionName);
 			return true;
 		}
 
@@ -418,7 +424,7 @@ namespace vkr
 		{
 			if (IsExtensionPresent(name))
 			{
-				m_device_extension_names.push_back(name);
+				m_device_extension_names.insert(name);
 				r++;
 			}
 		}
@@ -474,16 +480,24 @@ namespace vkr
 		ExtCheckFreeSyncHDRDeviceExtensions(pDp);
 #endif
 		pDp->AddDeviceExtensionName(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-		pDp->AddDeviceExtensionName(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);	// 动态渲染
-		pDp->AddDeviceExtensionName(VK_EXT_MESH_SHADER_EXTENSION_NAME);			// mesh shader
-		pDp->AddDeviceExtensionName(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
-		// Required by VK_KHR_spirv_1_4
-		pDp->AddDeviceExtensionName(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
 		pDp->AddDeviceExtensionName({ VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,							// 支持yuv纹理采样
+			VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,							// 支持yuv纹理采样
 			VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 			VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
 			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME });
+		pDp->AddDeviceExtensionName({
+			// mesh shader
+			 VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,VK_EXT_MESH_SHADER_EXTENSION_NAME,VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+			 // Required by VK_KHR_spirv_1_4
+			 VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
+			 // dynamic_rendering
+			 // The sample uses the extension (instead of Vulkan 1.2, where dynamic rendering is core)
+			 VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+			 VK_KHR_MAINTENANCE2_EXTENSION_NAME,
+			 VK_KHR_MULTIVIEW_EXTENSION_NAME,
+			 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME
+			});
 	}
 
 	Device::Device()
@@ -780,13 +794,29 @@ namespace vkr
 		vkGetPhysicalDeviceFeatures2(m_physicaldevice, &features);
 
 		VkPhysicalDeviceMeshShaderFeaturesEXT enabledMeshShaderFeatures{};
-		bool enabledMS = true;
+		bool enabledMS = pDp->IsExtensionPresent(VK_EXT_MESH_SHADER_EXTENSION_NAME);
 		if (enabledMS) {
 			enabledMeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
 			enabledMeshShaderFeatures.meshShader = VK_TRUE;
 			enabledMeshShaderFeatures.taskShader = VK_TRUE;
 			enabledMeshShaderFeatures.pNext = physicalDeviceFeatures2.pNext;
 			physicalDeviceFeatures2.pNext = &enabledMeshShaderFeatures;
+		}
+		bool supportsKHRSamplerYCbCrConversion = pDp->IsExtensionPresent(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+		VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
+		if (supportsKHRSamplerYCbCrConversion) {
+			deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+			deviceSamplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
+			deviceSamplerYcbcrConversionFeatures.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &deviceSamplerYcbcrConversionFeatures;
+		}
+		bool dr = pDp->IsExtensionPresent(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		VkPhysicalDeviceDynamicRenderingFeaturesKHR enabledDynamicRenderingFeaturesKHR = {};
+		if (dr) {
+			enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+			enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
+			enabledDynamicRenderingFeaturesKHR.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &enabledDynamicRenderingFeaturesKHR;
 		}
 
 		if (dev)
@@ -798,16 +828,6 @@ namespace vkr
 			VkDeviceCreateInfo device_info = {};
 			device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 			device_info.pNext = &physicalDeviceFeatures2;
-			bool supportsKHRSamplerYCbCrConversion = pDp->IsExtensionPresent(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-			VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
-			if (supportsKHRSamplerYCbCrConversion) {
-				deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
-				deviceSamplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
-				deviceSamplerYcbcrConversionFeatures.pNext = (void*)device_info.pNext;
-				device_info.pNext = &deviceSamplerYcbcrConversionFeatures;
-			}
-
-
 			device_info.queueCreateInfoCount = 2;
 			device_info.pQueueCreateInfos = queue_info;
 			device_info.enabledExtensionCount = (uint32_t)extension_names.size();
@@ -817,9 +837,15 @@ namespace vkr
 			assert(res == VK_SUCCESS);
 		}
 		if (!m_device)return;
-
-		auto cbr = vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
-		auto cer = vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
+		if (dr)
+		{
+			_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
+			_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
+		}
+		if (enabledMS)
+		{
+			_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(m_device, "vkCmdDrawMeshTasksEXT"));
+		}
 
 #ifdef USE_VMA
 		VmaAllocatorCreateInfo allocatorInfo = {};

@@ -188,6 +188,8 @@ include_directories("test_src")
 
 #add_definitions(-DMCUT_WITH_COMPUTE_HELPER_THREADPOOL=1)
 
+#include_directories("$ENV{VULKAN_SDK}/Include")
+#link_directories("$ENV{VULKAN_SDK}/Lib") vulkan-1
 
 add_library (tpv STATIC ${tpv_src})
 #add_library (tpv SHARED ${tpv_src})
