@@ -8071,6 +8071,7 @@ namespace vkr
 		pipeline.pDepthStencilState = &ds;
 		pipeline.pStages = shaderStages.data();
 		pipeline.stageCount = (uint32_t)shaderStages.size();
+		// todo 需要区分透明
 		pipeline.renderPass = m_pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
 
@@ -17008,9 +17009,9 @@ namespace vkr {
 
 		// GBuffer and render passes
 		GBuffer                         m_GBuffer = {};							// hdr缓冲区
-		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区
-		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框
-		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体
+		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区opaque
+		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框justdepth
+		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体transparent
 
 		// shadowmaps
 		VkRenderPass                    m_Render_pass_shadow = {};
@@ -20738,7 +20739,7 @@ namespace vkr {
 		std::mutex m_ltsm;
 
 		Renderer_cx* m_pRenderer = NULL;
-		VkRenderPass _rp = 0;
+		VkRenderPass _fbo_renderpass = 0;				// fbo的VkRenderPass
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		scene_state m_UIState;
 		Camera m_camera;
@@ -20885,14 +20886,14 @@ namespace vkr {
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
 		auto format = VK_FORMAT_R8G8B8A8_SRGB;//VK_FORMAT_R8G8B8A8_UNORM;//  VK_FORMAT_R8G8B8A8_UNORM，VK_FORMAT_B8G8R8A8_SRGB
-		_rp = newRenderPass(m_device, format, VK_FORMAT_D32_SFLOAT);
+		_fbo_renderpass = newRenderPass(m_device, format, VK_FORMAT_D32_SFLOAT);
 
 		auto f = new fbo_info_cx();
 		f->_dev = m_device;
 		f->colorFormat = format;
-		f->initFBO(m_Width, m_Height, 2, _rp);
+		f->initFBO(m_Width, m_Height, 2, _fbo_renderpass);
 		m_pRenderer->set_fbo(f, 0);
-		m_pRenderer->OnCreate(m_device, _rp);
+		m_pRenderer->OnCreate(m_device, _fbo_renderpass);
 		_fbo = f;
 		OnResize(true);
 		OnUpdateDisplay();
@@ -20959,7 +20960,7 @@ namespace vkr {
 		m_pRenderer->UnloadScene();
 		m_pRenderer->OnDestroyWindowSizeDependentResources();
 		m_pRenderer->OnDestroy();
-		DestroyRenderPass(m_device, _rp); _rp = 0;
+		DestroyRenderPass(m_device, _fbo_renderpass); _fbo_renderpass = 0;
 		delete m_pRenderer;
 
 		// shut down the shader compiler 
@@ -21006,7 +21007,7 @@ namespace vkr {
 		// Destroy resources (if we are not minimized)
 		if (m_pRenderer)
 		{
-			m_pRenderer->OnUpdateDisplayDependentResources(_rp, _dm, false);// m_UIState.bUseMagnifier);
+			m_pRenderer->OnUpdateDisplayDependentResources(_fbo_renderpass, _dm, false);// m_UIState.bUseMagnifier);
 		}
 	}
 
@@ -21964,7 +21965,10 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 		tx->OnCreate();
 		p->_dev_info = { dev->m_instance,dev->m_physicaldevice,dev->m_device };
 		p->ctx = tx;
-		p->renderpass = tx->_rp;
+		p->renderpass_opaque = tx->m_pRenderer->m_RenderPassFullGBufferWithClear.m_renderPass;
+		p->renderpass_justdepth = tx->m_pRenderer->m_RenderPassJustDepthAndHdr.m_renderPass;
+		p->renderpass_transparent = tx->m_pRenderer->m_RenderPassFullGBuffer.m_renderPass;
+		p->renderpass_fbo = tx->_fbo_renderpass;
 	}
 	return p;
 }

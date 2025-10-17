@@ -216,7 +216,10 @@ public:
 	void* ctx = 0;
 	void* dev = 0;
 	void* qupload = 0;
-	void* renderpass = 0;
+	void* renderpass_opaque = 0;		// 用于渲染不透明物体及清空缓冲区opaque
+	void* renderpass_justdepth = 0;		// 用于渲染天空盒、线框justdepth
+	void* renderpass_transparent = 0;	// 用于渲染透明物体transparent
+	void* renderpass_fbo = 0;			// 结果缓冲区fbo 
 	std::vector<uint32_t> dt;  // save_fbo缓存像素时用
 	int width = 0, height = 0;
 	scene_state _state = {};

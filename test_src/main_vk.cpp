@@ -811,7 +811,7 @@ int main()
 		vkdg_cx* vkd = new_vkdg(0, 0, 0);	// 创建vk渲染器 
 		// 使用3D渲染器的设备创建渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
-		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass);
+		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
