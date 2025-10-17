@@ -216,6 +216,7 @@ public:
 	void* ctx = 0;
 	void* dev = 0;
 	void* qupload = 0;
+	void* renderpass = 0;
 	std::vector<uint32_t> dt;  // save_fbo缓存像素时用
 	int width = 0, height = 0;
 	scene_state _state = {};
@@ -338,6 +339,7 @@ namespace vkr {
 	// todo速度比上面函数慢，类型0 = float16，1 = float32
 	std::vector<uint32_t> generateCookTorranceBRDFLUT1632f(uint32_t mapDim, int type);
 
+	void* new_ms_pipe(void* device, void* renderPass);
 }
 //!vkr
 
