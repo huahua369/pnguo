@@ -8070,9 +8070,8 @@ namespace vkr
 		pipeline.pViewportState = &vp;
 		pipeline.pDepthStencilState = &ds;
 		pipeline.pStages = shaderStages.data();
-		pipeline.stageCount = (uint32_t)shaderStages.size();
-		// todo 需要区分透明
-		pipeline.renderPass = m_pRenderPass->GetRenderPass();
+		pipeline.stageCount = (uint32_t)shaderStages.size(); 
+		pipeline.renderPass = 0;// m_pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
 
 		VkResult res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipeline);
@@ -22562,7 +22561,7 @@ void main()
 		pipelineCI.pDynamicState = &dynamicState;
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-
+		pipelineCI.renderPass = 0;
 		// Not using a vertex shader, mesh shading doesn't require vertex input state
 		pipelineCI.pInputAssemblyState = nullptr;
 		pipelineCI.pVertexInputState = nullptr;
