@@ -16,6 +16,7 @@
 #include <pnguo/mesh3d.h>
 #include "mshell.h"
 //#include <cgltf.h>
+#include <mcut/stlrw.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
@@ -740,6 +741,18 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
+
+		{
+			step_cx stp;
+			stp.load(R"(E:\code\hub\vk\libredwg\test\test-data\r11\ACEB10.stp)");
+
+		}
+
+
+
+
+
+
 		//vkrender_test(0);
 		{
 

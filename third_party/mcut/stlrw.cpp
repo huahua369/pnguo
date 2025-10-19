@@ -40,6 +40,21 @@ std::string getLine(char*& _pos, int64_t& size)
 	}
 	return line;
 }
+
+std::string_view getLine_v(char*& _pos, int64_t& size)
+{
+	std::string_view line;
+	char* p = _pos;
+	auto p1 = p;
+	for (; size > 0 && (*p1 != '\n'); p1++, size--) {}
+	line = std::string_view(p, *p1 != '\r' ? p1 : p1 - 1);
+	if (size > 0) {
+		size--;
+		_pos = p1 + 1;
+	}
+	return line;
+}
+
 std::string getLine1(char*& _pos, int64_t size)
 {
 	std::string line;
@@ -520,3 +535,39 @@ void stl3d_cx::load_binary(char* d, int64_t cfs)
 	}
 }
 #endif
+// todo step
+#ifndef no_step
+#define DATAB "DATA"
+step_cx::step_cx()
+{
+}
+
+step_cx::~step_cx()
+{
+}
+size_t step_cx::load(const std::string& fn) {
+	hz::mfile_t ad;
+	size_t n = 0;
+	char* d = ad.open_d(fn, true);
+	int64_t cfs = ad.get_size();
+	do {
+		if (!d || cfs < 15)break;
+		auto vs = getLine_v(d, cfs);
+		for (; vs.substr(0, 4) != DATAB;) {
+			vs = getLine_v(d, cfs);
+		}
+		for (; cfs > 0;)
+		{
+			auto vstr = getLine_v(d, cfs);
+			linev.push_back(vstr);
+		}
+	} while (0);
+	if (linev.size())
+	{
+		auto p = new hz::mfile_t();
+		p->swap(ad);
+		mfile = p;
+	}
+	return n;
+}
+#endif // !no_step
