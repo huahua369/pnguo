@@ -86,48 +86,48 @@ public:
 		T_NULL,
 		//1. 几何基础
 		//这些命令用于定义几何的基本元素，如点、方向、坐标系和单位等。
-		CARTESIAN_POINT, // 表示三维空间中的一个点。
-		DIRECTION, // 表示一个方向向量。
-		AXIS2_PLACEMENT_3D, // 表示三维空间中的一个坐标系。
-		VECTOR, // 表示一个向量，包括方向和长度。
-		DIMENSIONAL_EXPONENTS, // 表示物理量的量纲指数。
-		PLANE_ANGLE_MEASURE_WITH_UNIT, // 表示带有单位的平面角度测量值。
-		UNCERTAINTY_MEASURE_WITH_UNIT, // 表示带有单位的不确定性测量值。
+		CARTESIAN_POINT, // 表示三维空间中的一个点。vec3
+		DIRECTION, // 表示一个方向向量。vec3
+		AXIS2_PLACEMENT_3D, // 表示三维空间中的一个坐标系。(原点、Z 轴方向和 X 轴方向)的索引
+		VECTOR, // 表示一个向量，包括方向和长度。(#dir, 5.0)
+		DIMENSIONAL_EXPONENTS, // 表示物理量的量纲指数。(7个数字)
+		PLANE_ANGLE_MEASURE_WITH_UNIT, // 表示带有单位的平面角度测量值。（角度数值，#单位）
+		UNCERTAINTY_MEASURE_WITH_UNIT, // 表示带有单位的不确定性测量值。（不确定性的数值，#单位）
 		// 几何结构
 		//这些命令用于定义几何的拓扑结构，如边、环、壳等。
-		VERTEX_POINT, // 表示一个顶点，由点定义。
-		LINE, // 表示一条直线，由两个点定义。
-		ORIENTED_EDGE, // 表示一个有方向的边。
-		EDGE_LOOP, // 表示由一组有向边组成的闭合环。
-		FACE_OUTER_BOUND, // 表示面的外边界。
-		FACE_BOUND, // 表示面的边界。
-		OPEN_SHELL, // 表示一个开放的壳。
-		CLOSED_SHELL, // 表示一个闭合的壳。
-		EDGE_CURVE, // 表示一条边曲线。
-		TRIMMED_CURVE, // 表示一条修剪曲线。
-		COMPOSITE_CURVE_SEGMENT, // 表示复合曲线的段。
-		COMPOSITE_CURVE, // 表示复合曲线。
+		VERTEX_POINT, // 表示一个顶点，由点定义。(#索引)
+		LINE, // 表示一条直线，由两个点定义。(#StartPoint, #Vector)
+		ORIENTED_EDGE, // 表示一个有方向的边。(#Edge, Orientation)（.T. 表示正向，.F. 表示反向）
+		EDGE_LOOP, // 表示由一组有向边组成的闭合环。((#Edge1, #Edge2, ...))
+		FACE_OUTER_BOUND, // 表示面的外边界。	(#EdgeLoop, Orientation)
+		FACE_BOUND, // 表示面的边界。		(#EdgeLoop, Orientation)
+		OPEN_SHELL, // 表示一个开放的壳。		((#Face1, #Face2, ...))
+		CLOSED_SHELL, // 表示一个闭合的壳。	((#Face1, #Face2, ...))
+		EDGE_CURVE, // 表示一条边曲线。		(#StartVertex, #EndVertex, #Curve, SameSense)
+		TRIMMED_CURVE, // 表示一条修剪曲线。		(#BasisCurve, Trim1, Trim2, SenseAgreement)
+		COMPOSITE_CURVE_SEGMENT, // 表示复合曲线的段。		( #ParentCurve, Transition)
+		COMPOSITE_CURVE, // 表示复合曲线。		((#Segment1, #Segment2, ...), SelfIntersect)
 		//3. 几何面
 		//这些命令用于定义几何面，如平面、圆柱面、球面等。
-		PLANE, // 表示一个无限延伸的平面。
-		CYLINDRICAL_SURFACE, // 表示一个圆柱面。
-		CONICAL_SURFACE, // 表示一个圆锥面。
-		TOROIDAL_SURFACE, // 表示一个圆环面。
-		SPHERICAL_SURFACE, // 表示一个球面。
-		ADVANCED_FACE, // 表示一个复杂的面。
-		FACE_SURFACE, // 表示一个面表面。
-		SURFACE_OF_LINEAR_EXTRUSION, // 表示线性拉伸生成的表面。
-		SURFACE_OF_REVOLUTION, // 表示旋转生成的表面。
+		PLANE, // 表示一个无限延伸的平面。		(#AxisPlacement)
+		CYLINDRICAL_SURFACE, // 表示一个圆柱面。		()
+		CONICAL_SURFACE, // 表示一个圆锥面。		()
+		TOROIDAL_SURFACE, // 表示一个圆环面。		()
+		SPHERICAL_SURFACE, // 表示一个球面。		()
+		ADVANCED_FACE, // 表示一个复杂的面。		()
+		FACE_SURFACE, // 表示一个面表面。		()
+		SURFACE_OF_LINEAR_EXTRUSION, // 表示线性拉伸生成的表面。		()
+		SURFACE_OF_REVOLUTION, // 表示旋转生成的表面。		()
 		//4. 高级几何表示
 		//这些命令用于定义复杂的几何表示，如 B - Rep、B 样条曲线和表面模型等。
-		B_SPLINE_CURVE_WITH_KNOTS, // 表示带节点的 B 样条曲线。
-		B_SPLINE_SURFACE_WITH_KNOTS, // 表示带节点的 B 样条曲面。
-		MANIFOLD_SOLID_BREP, // 表示流形实体边界表示（B - Rep）。
-		BREP_WITH_VOIDS, // 表示带空洞的边界表示（B - Rep）。
-		MANIFOLD_SURFACE_SHAPE_REPRESENTATION, // 表示流形表面的形状表示。
-		GEOMETRICALLY_BOUNDED_SURFACE_SHAPE_REPRESENTATION, // 表示几何有界表面的形状表示。
-		ADVANCED_BREP_SHAPE_REPRESENTATION, // 表示高级边界表示（B - Rep）的形状表示。
-		SHELL_BASED_SURFACE_MODEL, // 表示基于壳的表面模型。
+		B_SPLINE_CURVE_WITH_KNOTS, // 表示带节点的 B 样条曲线。		()
+		B_SPLINE_SURFACE_WITH_KNOTS, // 表示带节点的 B 样条曲面。		()
+		MANIFOLD_SOLID_BREP, // 表示流形实体边界表示（B - Rep）。		()
+		BREP_WITH_VOIDS, // 表示带空洞的边界表示（B - Rep）。		()
+		MANIFOLD_SURFACE_SHAPE_REPRESENTATION, // 表示流形表面的形状表示。		()
+		GEOMETRICALLY_BOUNDED_SURFACE_SHAPE_REPRESENTATION, // 表示几何有界表面的形状表示。		()
+		ADVANCED_BREP_SHAPE_REPRESENTATION, // 表示高级边界表示（B - Rep）的形状表示。		()
+		SHELL_BASED_SURFACE_MODEL, // 表示基于壳的表面模型。		()
 		//5. 样式和显示
 		//这些命令用于定义几何的样式、颜色和显示属性。
 		DRAUGHTING_PRE_DEFINED_CURVE_FONT, // 表示预定义的曲线字体。
