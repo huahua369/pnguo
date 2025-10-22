@@ -409,7 +409,7 @@ int stl3d_cx::save_ascii(const std::string& fn)
 	}
 	return 0;
 }
-int stl3d_cx::save_binary(const std::string& fn)
+int stl3d_cx::save_binary(const std::string& fn, const std::string& wname)
 {
 	hz::mfile_t ad;
 	if (ad.open_m(fn, false, false))
@@ -421,7 +421,11 @@ int stl3d_cx::save_binary(const std::string& fn)
 			auto as = 84 + nb * 50;
 			buf.resize(as);
 			char* t = (char*)buf.data();
-			memset(t, 0x20, 80);
+			memset(t, 0, 80);
+			*t = 0x20;
+			auto wname1 = wname.empty() ? fn : wname;
+			if (wname1.size())
+				memcpy(t, wname1.c_str(), std::min<size_t>(wname1.size(), 79));
 			auto nt = (uint32_t*)(t + 80);
 			*nt = nb;
 			t += 84;
@@ -448,14 +452,17 @@ int stl3d_cx::save_binary(const std::string& fn)
 	}
 	return 0;
 }
-int stl3d_cx::save_binary(std::vector<char>& buf)
+int stl3d_cx::save_binary(std::vector<char>& buf, const std::string& wname)
 {
 	do {
 		auto nb = faces.size();
 		auto as = 84 + nb * 50;
 		buf.resize(as);
 		char* t = (char*)buf.data();
-		memset(t, 0x20, 80);
+		memset(t, 0, 80);
+		*t = 0x20;
+		if (wname.size())
+			memcpy(t, wname.c_str(), std::min<size_t>(wname.size(), 79));
 		auto nt = (uint32_t*)(t + 80);
 		*nt = nb;
 		t += 84;

@@ -68,8 +68,8 @@ public:
 	// 保存 二进制0/字符串1
 	int save(const std::string& fn, int fmt = 0);
 	int save_ascii(const std::string& fn);
-	int save_binary(const std::string& fn);
-	int save_binary(std::vector<char>& opt);
+	int save_binary(const std::string& fn, const std::string& wname = "");
+	int save_binary(std::vector<char>& opt, const std::string& wname = "");
 	void load_ascii(char* data, int64_t cfs);
 	void load_binary(char* d, int64_t cfs);
 };
