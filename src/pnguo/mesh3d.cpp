@@ -303,7 +303,7 @@ int main_heightmap(uint32_t seed)
 		// 3. 保存高程图（PNG可视化 + RAW导入3D引擎）
 		// ---------------------- 
 		// 保存为PNG（用图片查看器打开，灰度越浅表示海拔越高）
-		stbi_write_png("heightmap_plains.png", width, height, 1, heightMap1.data(), width);
+		stbi_write_png("temp/heightmap_plains.png", width, height, 1, heightMap1.data(), width);
 		//std::cout << "高程图生成成功！\n- PNG路径：heightmap_plains.png\n-  RAW路径：heightmap_plains.raw" << std::endl;
 	}
 	return 0;
