@@ -732,6 +732,18 @@ public:
 	struct rect_t {
 		glm::vec4 rc; glm::vec4 r;
 	};
+	struct triangle_t {
+		glm::vec2 pos;  glm::vec2 size; glm::vec2 dirspos;
+	};
+	struct circle_t {
+		glm::vec2 cpos; float r;
+	};
+	struct ellipse_t {
+		glm::vec2 cpos; glm::vec2 r;
+	};
+	struct polyline_t {
+		glm::vec2 pos; glm::vec2* points; int points_count; int* idx; int idx_count;
+	};
 	// 圆角矩形r，左右下左
 	void add_rectangle(const glm::vec4& rc, const glm::vec4& r);
 	void draw_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
