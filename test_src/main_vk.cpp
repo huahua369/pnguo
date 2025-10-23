@@ -723,6 +723,173 @@ int mainc() {
 
 
 
+#if 1
+class draw2d_b
+{
+public:
+	draw2d_b();
+	~draw2d_b();
+	struct rect_t {
+		glm::vec4 rc; glm::vec4 r;
+	};
+	// 圆角矩形r，左右下左
+	void add_rectangle(const glm::vec4& rc, const glm::vec4& r);
+	void draw_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
+	{
+		glm::vec2 tpos[3] = {};
+		float df = dirspos.y;
+		switch ((int)dirspos.x)
+		{
+		case 0:
+		{
+			tpos[0] = { size.x * df, 0 };
+			tpos[1] = { size.x, size.y };
+			tpos[2] = { 0, size.y };
+		}
+		break;
+		case 1:
+		{
+			tpos[0] = { size.x, size.y * df };
+			tpos[1] = { 0, size.y };
+			tpos[2] = { 0, 0 };
+		}
+		break;
+		case 2:
+		{
+			tpos[0] = { size.x * df, size.y };
+			tpos[1] = { 0, 0 };
+			tpos[2] = { size.x, 0 };
+		}
+		break;
+		case 3:
+		{
+			tpos[0] = { 0, size.y * df };
+			tpos[1] = { size.x, 0 };
+			tpos[2] = { size.x, size.y };
+		}
+		break;
+		default:
+			break;
+		}
+		//cairo_move_to(cr, pos.x + tpos[0].x, pos.y + tpos[0].y);
+		//cairo_line_to(cr, pos.x + tpos[1].x, pos.y + tpos[1].y);
+		//cairo_line_to(cr, pos.x + tpos[2].x, pos.y + tpos[2].y);
+		//cairo_close_path(cr);
+	}
+
+	//vg_style_t
+	//float* dash = 0;		// 虚线逗号/空格分隔的数字
+	//int dashOffset = 0;
+
+	void fill_stroke(vg_style_t* st) {
+
+	}
+	void fill_stroke(uint32_t fill, uint32_t color, int linewidth, bool isbgr) {
+
+	}
+	// 画圆
+	void draw_circle(const glm::vec2& pos, float r)
+	{
+	}
+
+	void draw_ellipse(const glm::vec2& c, const glm::vec2& r)
+	{
+		double cx = c.x, cy = c.y, rx = r.x, ry = r.y;
+		if (rx > 0.0f && ry > 0.0f) {
+			//cairo_move_to(cr, cx + rx, cy);
+			//cairo_curve_to(cr, cx + rx, cy + ry * c_KAPPA90, cx + rx * c_KAPPA90, cy + ry, cx, cy + ry);
+			//cairo_curve_to(cr, cx - rx * c_KAPPA90, cy + ry, cx - rx, cy + ry * c_KAPPA90, cx - rx, cy);
+			//cairo_curve_to(cr, cx - rx, cy - ry * c_KAPPA90, cx - rx * c_KAPPA90, cy - ry, cx, cy - ry);
+			//cairo_curve_to(cr, cx + rx * c_KAPPA90, cy - ry, cx + rx, cy - ry * c_KAPPA90, cx + rx, cy);
+			//cairo_close_path(cr);
+		}
+	}
+
+	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, unsigned int col, bool closed, float thickness)
+	{
+		if (!points || points_count < 2 || !col)return;
+
+	}
+	void draw_polyline(const glm::vec2* points, int points_count, bool closed)
+	{
+		if (!points || points_count < 2)return;
+
+	}
+
+	void draw_polyline(const PathsD* p, bool closed)
+	{
+		if (!p || p->size() < 1)return;
+		auto& d = *p;
+		auto length = d.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto points = d[i];
+			//cairo_move_to(cr, points[0].x, points[0].y);
+			auto points_count = points.size();
+			for (size_t i = 1; i < points_count; i++)
+			{
+				//cairo_line_to(cr, points[i].x, points[i].y);
+			}
+			if (closed) {
+				//cairo_close_path(cr);
+			}
+		}
+	}
+
+	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, unsigned int col, float thickness)
+	{
+		if (!points || points_count < 2 || idx_count < 2 || !col)return;
+		//cairo_save(cr);
+		//cairo_translate(cr, pos.x, pos.y);
+		//cairo_set_line_width(cr, thickness);
+		int nc = 0;
+		for (size_t i = 0; i < idx_count; i++)
+		{
+			auto x = idx[i];
+			if (x < 0)
+			{
+				if (nc > 1) {
+					//set_color(cr, col);
+					//cairo_stroke(cr);
+				}
+				nc = 0;
+				continue;
+			}
+			if (nc == 0)
+			{
+				//cairo_move_to(cr, points[x].x, points[x].y);
+			}
+			else
+			{
+				//cairo_line_to(cr, points[x].x, points[x].y);
+			}
+			nc++;
+		}
+		if (nc > 1) {
+			//set_color(cr, col);
+			//cairo_stroke(cr);
+		}
+		//cairo_restore(cr);
+	}
+	void draw_rect(const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth)
+	{
+		//cairo_as _ss_(cr);
+		//draw_rectangle(cr, rc, r);
+		//fill_stroke(cr, fill, color, linewidth, false);
+	}
+private:
+
+};
+
+draw2d_b::draw2d_b()
+{
+}
+
+draw2d_b::~draw2d_b()
+{
+}
+#endif
+
 int main()
 {
 	auto k = time(0);

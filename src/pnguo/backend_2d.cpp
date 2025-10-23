@@ -621,6 +621,9 @@ void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, 
 	draw_rectangle(cr, rc, r);
 	fill_stroke(cr, fill, color, linewidth, false);
 }
+#endif
+
+#if 1
 //glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
 
 void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st, glm::ivec2* orc)
