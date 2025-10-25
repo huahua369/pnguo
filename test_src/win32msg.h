@@ -31,8 +31,8 @@
 #endif
 #endif 
 //----------------------------------------------------------------------------- 
-#ifdef DEBUG
-#define ASSERT_R(e) ASSERT_R(e)
+#ifdef _DEBUG
+#define ASSERT_R(e) assert(e)
 #else
 #define ASSERT_R(e) e
 #endif // DEBUG

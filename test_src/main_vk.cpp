@@ -1257,7 +1257,7 @@ int main()
 			dev_info_c cc = {};
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
 			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
-			test_vkvg(0, &cc);
+			//test_vkvg(0, &cc);
 		}
 		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);

@@ -413,7 +413,7 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 	for (; i < sv.size(); i++)
 	{
 		auto it = sv[i];
-		vkvg_device_create_info_t info = { it, false ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
+		vkvg_device_create_info_t info = { it, true ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
 		dev = vkvg_device_create(&info);
 		if (dev)
 		{
@@ -486,13 +486,13 @@ void vkvgtest(form_x* pw) {
 #if 1
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
-	vkvg_dev* vctx = new_vkvgdev(dc, 1);
+	vkvg_dev* vctx = new_vkvgdev(dc, 8);
 	auto dev = vctx->dev;
 	if (!dev)return;
-	VkvgSurface surf = vkvg_surface_create(dev, 512, 512);
+	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);
 	VkvgContext ctx = vkvg_create(surf);
 	vkvg_clear(ctx);
-	vkvg_save(ctx);
+	//vkvg_save(ctx);
 	vkvg_set_operator(ctx, VKVG_OPERATOR_OVER);
 	vkvg_rectangle(ctx, 10, 10, 250, 200);
 	vkvg_set_source_rgba(ctx, 1, 0, 0, 0.2);
@@ -508,51 +508,74 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	vkvg_set_source_color(ctx, 0xff000000);
 	vkvg_stroke(ctx);
 	vkvg_set_operator(ctx, VKVG_OPERATOR_OVER);
-	vkvg_rectangle(ctx, 100, 100, 25, 20);
-	vkvg_set_source_rgba(ctx, 1, 0.8, 0, 0.2);
+	vkvg_rectangle(ctx, 100, 100, 125, 20);
+	vkvg_set_source_rgba(ctx, 0.1, 0, 0.8, 0.62);
 	vkvg_fill(ctx);
 
 
 	if (1) {
 		print_time ptt("vkvg");
-		//VkvgPattern grad = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-		//vkvg_pattern_add_color_stop(grad, 0, 1, 1, 1, 1);
-		//vkvg_pattern_add_color_stop(grad, 1, 0, 0, 0, 1);
-		//vkvg_set_source(ctx, grad);
-		//vkvg_rectangle(ctx, 10, 10, 256, 256);
-		//vkvg_fill(ctx);
+		float x = 250, y = 150;
 
-		auto pat = vkvg_pattern_create_linear(10, 0, 300, 0);
-		vkvg_pattern_add_color_stop(pat, 0, 0, 0, 1, 0);
-		vkvg_pattern_add_color_stop(pat, 1, 1, 0, 0, 1);
-		// vkvg_pattern_set_extend(pat,VKVG_EXTEND_NONE);
-		vkvg_rectangle(ctx, 10, 10, 300, 50);
-		vkvg_set_source(ctx, pat);
-		vkvg_pattern_destroy(pat);
-		vkvg_fill(ctx);
-		//VkvgPattern radial = vkvg_pattern_create_radial(250.0f, 250.0f, 0, 300, 300, 260.0f);
-		//vkvg_pattern_add_color_stop(radial, 0.0, 1, 0, 0, 1);
-		//vkvg_pattern_add_color_stop(radial, 0.5, 0, 1, 0, 1);
-		//vkvg_pattern_add_color_stop(radial, 1.0, 0, 0, 0, 1);
-		//vkvg_set_source(ctx, radial);
-		//vkvg_paint(ctx);
-		//vkvg_pattern_destroy(radial);
+		// vkvg_scale(ctx,2,2);
 
-		//VkvgPattern rg = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-		//vkvg_pattern_add_color_stop(rg, 0, 1, 1, 0, 1);
-		//vkvg_pattern_add_color_stop(rg, 1, 1, 0, 0, 1); 
-		//vkvg_set_source(ctx, rg);
-		////vkvg_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
-		//vkvg_rectangle(ctx, 0, 0, 256, 256);
-		//vkvg_fill(ctx);
+		vkvg_set_line_width(ctx, 2);
+		vkvg_set_source_rgba(ctx, 0, 1, 0, 1);
+
+		vkvg_set_line_join(ctx, VKVG_LINE_JOIN_ROUND);
+		// vkvg_rectangle(ctx,x,y,dx,dy);
+
+		vkvg_move_to(ctx, x, y);
+		vkvg_rel_line_to(ctx, -50, 30);
+		vkvg_rel_line_to(ctx, 0, 60);
+		vkvg_rel_line_to(ctx, 50, 30);
+		/*
+		vkvg_rel_line_to(ctx,50,-30);
+		vkvg_rel_line_to(ctx,50,0);
+		vkvg_rel_line_to(ctx,50,30);
+		vkvg_rel_line_to(ctx,0,60);
+		vkvg_rel_line_to(ctx,-50,70);
+		vkvg_rel_line_to(ctx,-50,0);
+		vkvg_rel_line_to(ctx,-50,-70);
+		vkvg_close_path(ctx);
+		vkvg_stroke(ctx);
+
+		vkvg_set_source_rgba(ctx,1,0,0,1);
+		vkvg_move_to(ctx,x+200,y);
+		vkvg_rel_line_to(ctx,50,70);
+		vkvg_rel_line_to(ctx,50,0);
+		vkvg_rel_line_to(ctx,50,-70);
+		vkvg_rel_line_to(ctx,0,-60);
+		vkvg_rel_line_to(ctx,-50,-30);
+		vkvg_rel_line_to(ctx,-50,0);
+		vkvg_rel_line_to(ctx,-50,30);*/
+		vkvg_close_path(ctx);
+		vkvg_stroke(ctx);
+
+		vkvg_set_source_rgba(ctx, 0, 0, 1, 1);
+		vkvg_move_to(ctx, x + 250, y);
+		vkvg_rel_line_to(ctx, 50, -30);
+		vkvg_rel_line_to(ctx, 50, 0);
+		vkvg_rel_line_to(ctx, 50, 30);
+		vkvg_rel_line_to(ctx, 0, 60);
+		vkvg_rel_line_to(ctx, -50, 70);
+		vkvg_rel_line_to(ctx, -50, 0);
+		vkvg_rel_line_to(ctx, -50, -70);
+		vkvg_close_path(ctx);
+		vkvg_stroke(ctx);
 		//vkvg_pattern_destroy(grad);
 		//vkvg_pattern_destroy(rg);
 	}
 
-	vkvg_restore(ctx);
-	//vkvg_surface_resolve(surf);//msaa采样转换输出
+	vkvg_flush(ctx);
+	//vkvg_restore(ctx);
 	if (!fn || !*fn)
 		fn = "temp/offscreen_vkvg.png";
+	//for (;;) {
+	//	auto ks = vkvg_device_status(dev);
+	//	if (!ks)break;
+	//}
+	vkvg_surface_resolve(surf);//msaa采样转换输出
 	vkvg_surface_write_to_png(surf, fn);
 	vkvg_destroy(ctx);
 	vkvg_surface_destroy(surf);
@@ -575,6 +598,6 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	//vkvg_select_font_face(ctx, "mono");
 	//print_boxed(ctx, "This is a test string!", 20, 250, 20);
 	//print_boxed(ctx, "ANOTHER ONE TO CHECK..", 20, 350, 20);
-	free_vkvgdev(vctx);
+	//free_vkvgdev(vctx);
 }
 #endif
