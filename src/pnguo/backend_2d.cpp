@@ -6420,16 +6420,18 @@ Invalid_Outline:
 		array.capacity = 0; \
 	} while(0)
 
-#define cg_array_ensure(array, count) \
-	do { \
-		if(array.size + count > array.capacity) { \
-			int capacity = array.size + count; \
-			int newcapacity = (array.capacity == 0) ? 8 : array.capacity; \
-			while(newcapacity < capacity) { newcapacity <<= 1; } \
-			array.capacity = newcapacity; \
-		} \
-	} while(0)
-//		array.data = realloc(array.data, (size_t)newcapacity * sizeof(array.data[0])); \
+template<typename T>
+void cg_array_ensure(T& array, size_t count) {
+	do {
+		if (array.size + count > array.capacity) {
+			int capacity = array.size + count;
+			int newcapacity = (array.capacity == 0) ? 8 : array.capacity;
+			while (newcapacity < capacity) { newcapacity <<= 1; }
+			array.data = (decltype(array.data))realloc(array.data, (size_t)newcapacity * sizeof(array.data[0]));
+			array.capacity = newcapacity;
+		}
+	} while (0);
+}
 
 static inline void cg_color_init_rgba(struct cg_color_t* color, double r, double g, double b, double a)
 {

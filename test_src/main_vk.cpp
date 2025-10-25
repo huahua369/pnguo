@@ -17,7 +17,7 @@
 #include "mshell.h"
 //#include <cgltf.h>
 #include <mcut/stlrw.h>
-
+#include <cairo/cairo.h>
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
@@ -900,6 +900,82 @@ draw2d_b::draw2d_b()
 draw2d_b::~draw2d_b()
 {
 }
+static void png_save(const char* filename, int width, int height, void* pixels)
+{
+	static const unsigned t[] = {
+		0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac, 0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c, 0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+	};
+	FILE* fp = fopen(filename, "wb");
+	if (!fp || !pixels)
+		return;
+	unsigned a = 1, b = 0, c, p = width * 4 + 1, x, y, i;
+	unsigned char* data = (unsigned char*)pixels;
+#define PNG_U8A(ua, l) for (i = 0; i < l; i++) fputc((ua)[i], fp);
+#define PNG_U32(u) do { fputc((u) >> 24, fp); fputc(((u) >> 16) & 255, fp); fputc(((u) >> 8) & 255, fp); fputc((u) & 255, fp); } while(0)
+#define PNG_U8C(u) do { fputc(u, fp); c ^= (u); c = (c >> 4) ^ t[c & 15]; c = (c >> 4) ^ t[c & 15]; } while(0)
+#define PNG_U8AC(ua, l) for (i = 0; i < l; i++) PNG_U8C((ua)[i])
+#define PNG_U16LC(u) do { PNG_U8C((u) & 255); PNG_U8C(((u) >> 8) & 255); } while(0)
+#define PNG_U32C(u) do { PNG_U8C((u) >> 24); PNG_U8C(((u) >> 16) & 255); PNG_U8C(((u) >> 8) & 255); PNG_U8C((u) & 255); } while(0)
+#define PNG_U8ADLER(u) do { PNG_U8C(u); a = (a + (u)) % 65521; b = (b + a) % 65521; } while(0)
+#define PNG_BEGIN(s, l) do { PNG_U32(l); c = ~0U; PNG_U8AC(s, 4); } while(0)
+#define PNG_END() PNG_U32(~c)
+	PNG_U8A("\x89PNG\r\n\32\n", 8);
+	PNG_BEGIN("IHDR", 13);
+	PNG_U32C(width);
+	PNG_U32C(height);
+	PNG_U8C(8);
+	PNG_U8C(6);
+	PNG_U8AC("\0\0\0", 3);
+	PNG_END();
+	PNG_BEGIN("IDAT", 2 + height * (5 + p) + 4);
+	PNG_U8AC("\x78\1", 2);
+	for (y = 0; y < height; y++)
+	{
+		PNG_U8C(y == height - 1);
+		PNG_U16LC(p);
+		PNG_U16LC(~p);
+		PNG_U8ADLER(0);
+		for (x = 0; x < p - 1; x++, data++)
+			PNG_U8ADLER(*data);
+	}
+	PNG_U32C((b << 16) | a);
+	PNG_END();
+	PNG_BEGIN("IEND", 0);
+	PNG_END();
+	fclose(fp);
+}
+
+static void cg_surface_write_to_png(struct cg_surface_t* surface, const char* filename)
+{
+	unsigned char* data = surface->pixels;
+	int width = surface->width;
+	int height = surface->height;
+	int stride = surface->stride;
+	unsigned char* image = (unsigned char*)malloc((size_t)(stride * height));
+	for (int y = 0; y < height; y++)
+	{
+		uint32_t* src = (uint32_t*)(data + stride * y);
+		uint32_t* dst = (uint32_t*)(image + stride * y);
+		for (int x = 0; x < width; x++)
+		{
+			uint32_t a = src[x] >> 24;
+			if (a != 0)
+			{
+				uint32_t r = (((src[x] >> 16) & 0xff) * 255) / a;
+				uint32_t g = (((src[x] >> 8) & 0xff) * 255) / a;
+				uint32_t b = (((src[x] >> 0) & 0xff) * 255) / a;
+				dst[x] = (a << 24) | (b << 16) | (g << 8) | r;
+			}
+			else
+			{
+				dst[x] = 0;
+			}
+		}
+	}
+	png_save(filename, width, height, image);
+	free(image);
+}
 #endif
 
 int main()
@@ -925,9 +1001,180 @@ int main()
 			step_cx stp;
 			stp.load(R"(data\ACEB10.stp)");
 
+			{
+				const char* filename = "temp/dash.png";
+				struct cg_surface_t* surface = cg_surface_create(256, 256);
+				struct cg_ctx_t* ctx = cg_create(surface);
+
+				{
+					print_time ptt(filename);
+					double dashes[] = { 50.0, 10.0, 10.0, 10.0 };
+					int ndash = sizeof(dashes) / sizeof(dashes[0]);
+					double offset = 30.0;
+					cg_set_dash(ctx, dashes, ndash, offset);
+					cg_set_line_width(ctx, 10.0);
+					cg_move_to(ctx, 128.0, 25.6);
+					cg_line_to(ctx, 230.4, 230.4);
+					cg_rel_line_to(ctx, -102.4, 0.0);
+					cg_curve_to(ctx, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
+					cg_stroke(ctx);
+				}
+
+				cg_surface_write_to_png(surface, filename);
+				cg_destroy(ctx);
+				cg_surface_destroy(surface);
+			}
+
+			{
+				const char* filename = "temp/fill_and_stroke.png";
+				struct cg_surface_t* surface = cg_surface_create(256, 256);
+				struct cg_ctx_t* ctx = cg_create(surface);
+
+				{
+					print_time ptt(filename);
+					cg_move_to(ctx, 128.0, 25.6);
+					cg_line_to(ctx, 230.4, 230.4);
+					cg_rel_line_to(ctx, -102.4, 0.0);
+					cg_curve_to(ctx, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
+					cg_close_path(ctx);
+
+					cg_move_to(ctx, 64.0, 25.6);
+					cg_rel_line_to(ctx, 51.2, 51.2);
+					cg_rel_line_to(ctx, -51.2, 51.2);
+					cg_rel_line_to(ctx, -51.2, -51.2);
+					cg_close_path(ctx);
+
+					cg_set_line_width(ctx, 10.0);
+					cg_set_source_rgb(ctx, 0, 0, 1);
+					cg_fill_preserve(ctx);
+					cg_set_source_rgb(ctx, 0, 0, 0);
+					cg_stroke(ctx);
+				}
+
+				cg_surface_write_to_png(surface, filename);
+				cg_destroy(ctx);
+				cg_surface_destroy(surface);
+			}
+
+			{
+				const char* filename = "temp/fill_style.png";
+				struct cg_surface_t* surface = cg_surface_create(256, 256);
+				struct cg_ctx_t* ctx = cg_create(surface);
+
+				{
+					print_time ptt(filename);
+					cg_set_line_width(ctx, 6);
+
+					cg_rectangle(ctx, 12, 12, 232, 70);
+					cg_circle(ctx, 64, 64, 40);
+					cg_circle(ctx, 192, 64, 40);
+					cg_set_fill_rule(ctx, CG_FILL_RULE_EVEN_ODD);
+					cg_set_source_rgb(ctx, 0, 0.7, 0);
+					cg_fill_preserve(ctx);
+					cg_set_source_rgb(ctx, 0, 0, 0);
+					cg_stroke(ctx);
+
+					cg_save(ctx);
+					cg_translate(ctx, 0, 128);
+					cg_rectangle(ctx, 12, 12, 232, 70);
+					cg_circle(ctx, 64, 64, 40);
+					cg_circle(ctx, 192, 64, 40);
+					cg_set_fill_rule(ctx, CG_FILL_RULE_NON_ZERO);
+					cg_set_source_rgb(ctx, 0, 0, 0.9);
+					cg_fill_preserve(ctx);
+					cg_set_source_rgb(ctx, 0, 0, 0);
+					cg_stroke(ctx);
+					cg_restore(ctx);
+				}
+
+				cg_surface_write_to_png(surface, filename);
+				cg_destroy(ctx);
+				cg_surface_destroy(surface);
+			}
+
+			{
+				const char* filename = "temp/cg_gradient.png";
+				struct cg_surface_t* surface = cg_surface_create(256, 256);
+				struct cg_ctx_t* ctx = cg_create(surface);
+				struct cg_gradient_t* grad;
+				{
+					print_time ptt(filename);
+
+					cg_rectangle(ctx, 0, 0, 256, 256);
+					grad = cg_set_source_linear_gradient(ctx, 0.0, 0.0, 0.0, 256.0);
+					cg_gradient_add_stop_rgba(grad, 0, 1, 1, 1, 1);
+					cg_gradient_add_stop_rgba(grad, 1, 0, 0, 0, 1);
+					cg_fill(ctx);
+
+					grad = cg_set_source_radial_gradient(ctx, -10, -10, 25.6, 152.4, 152.4, 128.0);
+					cg_gradient_add_stop_rgba(grad, 0.2, 1, 0, 0, 1);
+					cg_gradient_add_stop_rgba(grad, 1, 1, 1, 0, 1);
+					//cg_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
+					cg_rectangle(ctx, 0, 0, 256, 256);
+					cg_fill(ctx);  
+					//unsigned char* image = surface->pixels; // 存储RGB图像数据
+					//int centerX = surface->width / 2;               // 渐变中心X坐标
+					//int centerY = surface->height / 2;              // 渐变中心Y坐标
+					//int maxRadius = (surface->width > surface->height ? surface->width : surface->height) / 2; // 最大半径
+					//int w = surface->width * sizeof(int);
+					//// 遍历每个像素
+					//for (int y = 0; y < surface->height; y++) {
+					//	auto px = image + y * w;
+					//	for (int x = 0; x < surface->width; x++) {
+					//		// 计算当前像素到中心的距离
+					//		double dx = x - centerX;
+					//		double dy = y - centerY;
+					//		double distance = sqrt(dx * dx + dy * dy);
+
+					//		// 归一化距离到[0, 1]范围
+					//		double t = distance / maxRadius;
+					//		if (t > 1.0) t = 1.0;
+
+					//		// 根据距离生成颜色（从白色到黑色渐变）
+					//		unsigned char color = (unsigned char)((1.0 - t) * 255.0);
+					//		px[0] = color; // R
+					//		px[1] = color; // G
+					//		px[2] = color; // B
+					//		px[3] = color; // A
+					//		px += sizeof(int);
+					//	}
+					//}
+
+				}
+
+				cg_surface_write_to_png(surface, filename);
+				cg_destroy(ctx);
+				cg_surface_destroy(surface);
+			}
+
+			{
+				const char* filename = "temp/cairo_gradient.png";
+				cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 256, 256);
+				cairo_t* ctx = cairo_create(surface);
+				//struct cairo_gradient_t* grad;
+				{
+					print_time ptt(filename);
+					cairo_pattern_t* grad = cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+					cairo_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
+					cairo_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
+					cairo_set_source(ctx, grad);
+					cairo_rectangle(ctx, 0, 0, 256, 256);
+					cairo_fill(ctx);
+					//cairo_pattern_t* rg = cairo_pattern_create_radial(15.2, 12.4, 25.6, 102.4, 102.4, 128.0);
+					cairo_pattern_t* rg = cairo_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+					cairo_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
+					cairo_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
+					cairo_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
+					cairo_set_source(ctx, rg);
+					//cairo_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
+					cairo_rectangle(ctx, 0, 0, 256, 256);
+					cairo_fill(ctx);
+				}
+				cairo_surface_write_to_png(surface, filename);
+			}
 		}
 
-
+		printf("");
 
 
 
