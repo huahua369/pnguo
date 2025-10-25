@@ -118,9 +118,10 @@ find_package(SDL3 REQUIRED)
 endif()
 
 add_definitions(-DVKVG_RECORDING)
-
+add_definitions(-DVKVG_PREMULT_ALPHA)
 add_definitions(-DVKH_USE_VMA)
 add_definitions(-DXATLAS_C_API=1)
+ 
 
 #find_package(mimalloc CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)

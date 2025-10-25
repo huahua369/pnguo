@@ -89,7 +89,7 @@ find_package(cpuid CONFIG REQUIRED)
        
 #find_package(libuv CONFIG REQUIRED)
  
-find_package(OpenCV CONFIG REQUIRED)
+#find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(libzip CONFIG REQUIRED)

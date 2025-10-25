@@ -18,6 +18,9 @@
 //#include <cgltf.h>
 #include <mcut/stlrw.h>
 #include <cairo/cairo.h>
+
+#include <vkvgcx.h>
+
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
@@ -978,6 +981,7 @@ static void cg_surface_write_to_png(struct cg_surface_t* surface, const char* fi
 }
 #endif
 
+void test_vkvg(const char* fn, dev_info_c* dc);
 int main()
 {
 	auto k = time(0);
@@ -1111,7 +1115,7 @@ int main()
 					cg_gradient_add_stop_rgba(grad, 1, 1, 1, 0, 1);
 					//cg_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
 					cg_rectangle(ctx, 0, 0, 256, 256);
-					cg_fill(ctx);  
+					cg_fill(ctx);
 					//unsigned char* image = surface->pixels; // 存储RGB图像数据
 					//int centerX = surface->width / 2;               // 渐变中心X坐标
 					//int centerY = surface->height / 2;              // 渐变中心Y坐标
@@ -1173,7 +1177,6 @@ int main()
 				cairo_surface_write_to_png(surface, filename);
 			}
 		}
-
 		printf("");
 
 
@@ -1250,6 +1253,12 @@ int main()
 		vkdg_cx* vkd = new_vkdg(0, 0, 0);	// 创建vk渲染器 
 		// 使用3D渲染器的设备创建渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
+		{
+			dev_info_c cc = {};
+			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
+			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
+			test_vkvg(0, &cc);
+		}
 		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ | ef_transparent);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
