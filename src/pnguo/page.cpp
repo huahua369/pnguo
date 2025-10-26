@@ -430,7 +430,7 @@ void div2_t::layout()
 
 }
 
-void div2_t::draw(cairo_t* cr)
+void div2_t::draw(void* cr)
 {
 	auto length = rcs.size();
 	for (size_t x = 0; x < length; x++)
@@ -444,26 +444,26 @@ void div2_t::draw(cairo_t* cr)
 		for (size_t i = 0; i < n; i++)
 		{
 			auto vt = v[i];
-			draw_rectangle(cr, { 0.5 + vt.x + it.x,0.5 + vt.y + it.y,vt.px,vt.py }, 4);
-			fill_stroke(cr, 0xff805c42, 0xff2C80ff, 1, false);
+			//draw_rectangle(cr, { 0.5 + vt.x + it.x,0.5 + vt.y + it.y,vt.px,vt.py }, 4);
+			//fill_stroke(cr, 0xff805c42, 0xff2C80ff, 1, false);
 		}
 	}
 }
 // 渲染树节点
-void draw_treenode(cairo_t* cr, layout_text_x* ltx)
-{
-	std::string text;
-	int font_size = 16;
-	int text_color = -1;
-	auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
-	glm::ivec2 ss = { 100,100 };
-	glm::vec2 align = { 1,0.5 };
-	glm::vec4 rc = { 0, 0, ss };
-	ltx->tem_rtv.clear();
-	ltx->build_text(0, font_size, rc, align, text.c_str(), -1, ltx->tem_rtv);
-	ltx->update_text();
-	ltx->draw_text(cr, ltx->tem_rtv, text_color);
-}
+//void draw_treenode(cairo_t* cr, layout_text_x* ltx)
+//{
+//	std::string text;
+//	int font_size = 16;
+//	int text_color = -1;
+//	auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
+//	glm::ivec2 ss = { 100,100 };
+//	glm::vec2 align = { 1,0.5 };
+//	glm::vec4 rc = { 0, 0, ss };
+//	ltx->tem_rtv.clear();
+//	ltx->build_text(0, font_size, rc, align, text.c_str(), -1, ltx->tem_rtv);
+//	ltx->update_text();
+//	ltx->draw_text(cr, ltx->tem_rtv, text_color);
+//}
 struct text_render_t
 {
 	glm::vec4 rc = {};		// 渲染区域

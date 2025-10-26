@@ -49,7 +49,246 @@ extern "C" {
 #endif
 
 
-#ifndef no_cairo_
+#define SP_RGBA32_R_U(v) ((v) & 0xff)
+#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
+#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
+#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
+#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
+#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
+#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
+#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
+#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
+#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+
+glm::vec4 colorv4(uint32_t rgba) {
+	return { SP_RGBA32_R_F(rgba), SP_RGBA32_G_F(rgba), SP_RGBA32_B_F(rgba), SP_RGBA32_A_F(rgba) };
+}
+glm::vec4 colorv4_bgr(uint32_t bgra) {
+	return { SP_RGBA32_B_F(bgra), SP_RGBA32_G_F(bgra),SP_RGBA32_R_F(bgra), SP_RGBA32_A_F(bgra) };
+}
+
+glm::vec2 v2xm3(const glm::vec2& v, const glm::mat3& m) {
+	glm::vec3 ps(v, 1.0);
+	return m * ps;
+}
+
+glm::vec4 get_boxm3(const glm::vec4& v, const glm::mat3& m) {
+	glm::vec3 ps = { v.x,v.y,1.0 };
+	glm::vec3 ps1 = { v.z,v.w ,1.0 };
+	ps = m * ps;
+	ps1 = m * ps1;
+	return glm::vec4(ps.x, ps.y, ps1.x, ps1.y);
+}
+
+inline int multiply_alpha(int alpha, int color)
+{
+	int temp = (alpha * color) + 0x80;
+	return ((temp + (temp >> 8)) >> 8);
+}
+// 预乘输出bgra，type=0为原数据是rgba
+void premultiply_data(int w, unsigned char* data, int type, bool multiply)
+{
+	for (size_t i = 0; i < w; i += 4) {
+		uint8_t* base = &data[i];
+		uint8_t  alpha = base[3];
+		uint32_t p;
+
+		if (alpha == 0) {
+			p = 0;
+		}
+		else {
+			uint8_t  red = base[0];
+			uint8_t  green = base[1];
+			uint8_t  blue = base[2];
+
+			if (alpha != 0xff && multiply) {
+				red = multiply_alpha(alpha, red);
+				green = multiply_alpha(alpha, green);
+				blue = multiply_alpha(alpha, blue);
+			}
+			if (type == 0)
+				p = ((uint32_t)alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
+			else
+				p = ((uint32_t)alpha << 24) | (blue << 16) | (green << 8) | (red << 0);
+		}
+		memcpy(base, &p, sizeof(uint32_t));
+	}
+}
+
+
+#ifdef has_cairo_
+
+
+
+#if 1
+svg_cx* new_svg_file(const void* fn, size_t len, int dpi);
+svg_cx* new_svg_data(const void* str, size_t len, int dpi);
+void free_svg(svg_cx* svg);
+void render_svg(cairo_t* cr, svg_cx* svg);
+void render_svg(cairo_t* cr, svg_cx* svg, const glm::vec2& pos, const glm::vec2& scale, double angle, const char* id = 0);
+
+// 加载svg或图片
+cairo_surface_t* load_imagesvg(const std::string& fn, float scale);
+
+void set_color(cairo_t* cr, uint32_t rgba);
+void set_color_bgr(cairo_t* cr, uint32_t c);
+void set_color_a(cairo_t* cr, uint32_t rgba, double a);
+void set_source_rgba(cairo_t* cr, glm::vec4 rgba);
+void draw_rectangle(cairo_t* cr, const glm::vec4& rc, double r);
+void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r);
+void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, const glm::vec4& r);
+void draw_round_rectangle(cairo_t* cr, const glm::vec4& rc, const glm::vec4& r);
+void draw_circle(cairo_t* cr, const glm::vec2& pos, float r);
+void draw_ellipse(cairo_t* cr, const glm::vec2& pos, const glm::vec2& r);
+// 三角形基于矩形内 
+//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
+//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
+void draw_triangle(cairo_t* cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+void fill_stroke(cairo_t* cr, vg_style_t* st);
+void fill_stroke(cairo_t* cr, uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
+void draw_polyline(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
+void draw_polyline(cairo_t* cr, const PathsD* p, bool closed);
+// 渲染索引多段线，索引-1则跳过
+void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
+
+void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth);
+//glm::ivec2 layout_text_x::get_text_rect(size_t idx, const void* str8, int len, int fontsize)
+void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::vec4 text_rc, text_style_t* st, glm::ivec2* orc = 0);
+
+
+enum class eg_e :uint32_t {
+	enull,
+	e_rect, e_text, e_circle, e_ellipse, e_triangle, e_polyline, e_polylines, e_image
+};
+struct rect_b {
+	eg_e type = eg_e::e_rect;
+	uint32_t fill, color; int thickness;
+	glm::vec4 rc;	// 坐标，大小
+	glm::ivec4 r;	// 圆角
+};
+struct text_b
+{
+	eg_e type = eg_e::e_text;
+	const void* str;
+	int len;
+	glm::vec4 text_rc;
+	text_style_t* st;
+	layout_text_x* ltx;
+};
+struct circle_b {
+	eg_e type = eg_e::e_circle;
+	uint32_t fill, color; int thickness; float r;
+	glm::vec2 pos;
+};
+struct ellipse_b {
+	eg_e type = eg_e::e_ellipse;
+	uint32_t fill, color; int thickness;
+	glm::vec2 pos, r;
+};
+struct triangle_b {
+	eg_e type = eg_e::e_triangle;
+	uint32_t fill, color; int thickness;
+	glm::vec2 pos, size, dirspos;
+};
+struct polyline_b
+{
+	eg_e type = eg_e::e_polyline;
+	glm::vec2& pos; const glm::vec2* points; int points_count; uint32_t color, fill; bool closed; float thickness;
+};
+struct polylines_b
+{
+	eg_e type = eg_e::e_polylines;
+	glm::vec2 pos;
+	const glm::vec2* points; int points_count; int* idx; int idx_count; uint32_t color, fill; float thickness;
+};
+struct image_b {
+	eg_e type = eg_e::e_image;
+	void* image; glm::vec2 pos; glm::vec4 rc; uint32_t color = -1; glm::vec2 dsize = { -1,-1 };
+	// 九宫格图片
+	glm::vec4 sliced = {};
+};
+
+struct text_draw_t
+{
+	cairo_t* cr; layout_text_x* ltx;
+	std::string* text = 0;
+	glm::vec4* text_rc;
+	uint32_t* color;
+	int count = 0;
+	text_style_t* st;
+	glm::vec4 box_rc;
+};
+
+class dtext_cache
+{
+public:
+	cairo_t* cr = 0;
+	cairo_surface_t* surface = 0;
+	cairo_t* cr_in = 0;
+	glm::ivec2 size = {};
+public:
+	dtext_cache();
+	~dtext_cache();
+	void reset(cairo_t* cr_in, const glm::ivec2& vsize);
+	void free_surface();
+	void save2png(const char* name);
+	void clear_color(uint32_t color);
+private:
+
+};
+
+text_draw_t* new_text_drawable(layout_text_x* ltx, const glm::vec4& box_rc, text_style_t* st);
+void draw_draw_texts(text_draw_t* p);
+
+// 图形通用软渲染接口
+void draw_ge(cairo_t* cr, void* p, int count);
+// 批量渲染文本+矩形背景
+void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_style_tx* stv, int st_count, glm::ivec4* clip);
+
+void clip_cr(cairo_t* cr, const glm::ivec4& clip);
+
+
+cairo_surface_t* new_clip_rect(int r);
+void clip_rect(cairo_t* cr, cairo_surface_t* r);
+void paint_shadow(cairo_t* cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, bool rev, float r = 0);//color_to=shadow;shadow.w=0;
+void paint_shadow(cairo_t* cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r = 0);
+
+// 采样颜色
+glm::dvec4 mix_colors(glm::vec4 a, glm::vec4 b, float ratio);
+void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shadow_t* rs);
+
+// 获取对齐坐标
+glm::ivec4 get_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, const char* family, int fontsize);
+void draw_text(cairo_t* cr, const char* str, const glm::ivec4& et, uint32_t text_color);
+// box渲染对齐文本
+glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, const glm::vec2& boxsize, const glm::vec2& text_align, uint32_t text_color, const char* family, int fontsize);
+#ifndef key_def_data
+#define key_def_data 1024
+#define key_def_data_iptr 1025
+#define key_def_data_svgptr 1026
+#define key_def_data_done 1000
+#endif
+cairo_surface_t* new_image_cr(image_ptr_t* img);
+cairo_surface_t* new_image_cr(const glm::ivec2& size, uint32_t* data = 0);
+void update_image_cr(cairo_surface_t* image, image_ptr_t* img);
+void free_image_cr(cairo_surface_t* image);
+void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void (*destroy_func)(void* data));
+void* image_get_ud(cairo_surface_t* p, uint64_t key);
+void image_save_png(cairo_surface_t* cr, const char* fn);
+glm::ivec2 get_surface_size(cairo_surface_t* p);
+// 渲染图片到cr
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color = -1, const glm::vec2& dsize = { -1,-1 });
+// 渲染九宫格图片
+glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& size, const glm::vec4& sliced);
+#endif
+
+
+
+
+
+
+
+
 
 // 画圆
 void draw_circle(cairo_t* cr, const glm::vec2& pos, float r, const glm::ivec2& c)
@@ -313,7 +552,7 @@ public:
 	int oldscale = 0;
 	int minScale = 2, maxScale = 25600;
 	int line_width = 1.0;
-	cairo_surface_t* _backing_store = 0;
+	d2_surface_t* _backing_store = 0;
 
 	bool   _backing_store_valid = false;
 	bool   _mousezoom = true;
@@ -341,7 +580,7 @@ private:
 
 
 
-#if 1
+#if 0
 
 void draw_round_rectangle(cairo_t* cr, double x, double y, double width, double height, double r)
 {
@@ -617,7 +856,7 @@ void draw_polylines(cairo_t* cr, const glm::vec2& pos, const glm::vec2* points, 
 }
 void draw_rect(cairo_t* cr, const glm::vec4& rc, uint32_t fill, uint32_t color, double r, int linewidth)
 {
-	cairo_as _ss_(cr);
+	d2_as _ss_(cr);
 	draw_rectangle(cr, rc, r);
 	fill_stroke(cr, fill, color, linewidth, false);
 }
@@ -639,14 +878,14 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 		//if (orc->y > rc.w)
 		orc->y = rc.w;
 	}
-	cairo_as _ss_(cr);
+	d2_as _ss_(cr);
 	if (st->clip && text_rc.z > 0 && text_rc.w > 0) {
 		draw_rectangle(cr, text_rc, 0);
 		cairo_clip(cr);
 	}
 	if (st->text_color_shadow)
 	{
-		cairo_as _aa_(cr);
+		d2_as _aa_(cr);
 		cairo_translate(cr, st->shadow_pos.x, st->shadow_pos.y);
 		ltx->draw_text(cr, ltx->tem_rtv, st->text_color_shadow);
 	}
@@ -656,7 +895,7 @@ void draw_text(cairo_t* cr, layout_text_x* ltx, const void* str, int len, glm::v
 void draw_rctext(cairo_t* cr, layout_text_x* ltx, text_tx* p, int count, text_style_tx* stv, int st_count, glm::ivec4* clip)
 {
 	if (!stv || st_count < 1 || !cr || !ltx || !p || count < 1)return;
-	cairo_as _ss_(cr);
+	d2_as _ss_(cr);
 	if (clip && clip->z > 0 && clip->w > 0) {
 		glm::vec4 cliprc = *clip;
 		draw_rectangle(cr, cliprc, 0);
@@ -755,14 +994,14 @@ text_draw_t* new_text_drawable(const char* str, int len, layout_text_x* ltx, con
 		orc->x = rc.z;
 		orc->y = rc.w;
 	}
-	//cairo_as _ss_(cr);
+	//d2_as _ss_(cr);
 	//if (st->clip && text_rc.z > 0 && text_rc.w > 0) {
 	//	draw_rectangle(cr, text_rc, 0);
 	//	cairo_clip(cr);
 	//}
 	//if (st->text_color_shadow)
 	//{
-	//	cairo_as _aa_(cr);
+	//	d2_as _aa_(cr);
 	//	cairo_translate(cr, st->shadow_pos.x, st->shadow_pos.y);
 	//	ltx->draw_text(cr, ltx->tem_rtv, st->text_color_shadow);
 	//}
@@ -777,7 +1016,7 @@ void draw_draw_texts(text_draw_t* p)
 	if (!p || !p->cr || !p->st || !p->ltx || !p->color || !p->text || !p->text_rc || p->count < 1)return;
 	p->box_rc.x = p->text_rc[0].x;
 	p->box_rc.y = p->text_rc[0].y;
-	cairo_as _ss_(p->cr);
+	d2_as _ss_(p->cr);
 	for (size_t i = 0; i < p->count; i++)
 	{
 		p->st->text_color = p->color[i];
@@ -865,7 +1104,7 @@ void draw_ge(cairo_t* cr, void* p, int count)
 		{
 			auto dp = (polyline_b*)t;
 			{
-				cairo_as _ss_(cr);
+				d2_as _ss_(cr);
 				cairo_translate(cr, dp->pos.x, dp->pos.y);
 				draw_polyline(cr, dp->points, dp->points_count, dp->closed);
 				fill_stroke(cr, dp->fill, dp->color, dp->thickness);
@@ -1072,13 +1311,13 @@ void draw_rectangle_gradient(cairo_t* cr, int width, int height, const rect_shad
 	cairo_pattern_destroy(lg_right);
 }
 
-cairo_as::cairo_as(cairo_t* p) :cr(p)
+d2_as::d2_as(cairo_t* p) :cr(p)
 {
 	if (cr)
 		cairo_save(cr);
 }
 
-cairo_as::~cairo_as()
+d2_as::~d2_as()
 {
 	if (cr)
 		cairo_restore(cr);
@@ -1165,23 +1404,6 @@ void canvas_dev::save()
 	cairo_save(cr);
 }
 
-#define SP_RGBA32_R_U(v) ((v) & 0xff)
-#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
-#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
-#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
-#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
-#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
-#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
-#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
-#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
-#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
-
-glm::vec4 colorv4(uint32_t rgba) {
-	return { SP_RGBA32_R_F(rgba), SP_RGBA32_G_F(rgba), SP_RGBA32_B_F(rgba), SP_RGBA32_A_F(rgba) };
-}
-glm::vec4 colorv4_bgr(uint32_t bgra) {
-	return { SP_RGBA32_B_F(bgra), SP_RGBA32_G_F(bgra),SP_RGBA32_R_F(bgra), SP_RGBA32_A_F(bgra) };
-}
 void set_color(cairo_t* cr, uint32_t rgba)
 {
 	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
@@ -1219,20 +1441,6 @@ void set_source_rgba_x(cairo_t* cr, glm::vec4 rgba)
 {
 	cairo_set_source_rgba(cr, rgba.x * rgba.w, rgba.y * rgba.w, rgba.z * rgba.w, 1.0);
 }
-
-glm::vec2 v2xm3(const glm::vec2& v, const glm::mat3& m) {
-	glm::vec3 ps(v, 1.0);
-	return m * ps;
-}
-
-glm::vec4 get_boxm3(const glm::vec4& v, const glm::mat3& m) {
-	glm::vec3 ps = { v.x,v.y,1.0 };
-	glm::vec3 ps1 = { v.z,v.w ,1.0 };
-	ps = m * ps;
-	ps1 = m * ps1;
-	return glm::vec4(ps.x, ps.y, ps1.x, ps1.y);
-}
-
 
 glm::ivec4 canvas_dev::get_text_extents(const void* str, int len, font_xi* fx)
 {
@@ -1800,40 +2008,6 @@ glm::ivec4 draw_text_align(cairo_t* cr, const char* str, const glm::vec2& pos, c
 	}
 	return { ps, extents.x_advance, extents.y_advance };
 }
-inline int multiply_alpha(int alpha, int color)
-{
-	int temp = (alpha * color) + 0x80;
-	return ((temp + (temp >> 8)) >> 8);
-}
-// 预乘输出bgra，type=0为原数据是rgba
-void premultiply_data(int w, unsigned char* data, int type, bool multiply)
-{
-	for (size_t i = 0; i < w; i += 4) {
-		uint8_t* base = &data[i];
-		uint8_t  alpha = base[3];
-		uint32_t p;
-
-		if (alpha == 0) {
-			p = 0;
-		}
-		else {
-			uint8_t  red = base[0];
-			uint8_t  green = base[1];
-			uint8_t  blue = base[2];
-
-			if (alpha != 0xff && multiply) {
-				red = multiply_alpha(alpha, red);
-				green = multiply_alpha(alpha, green);
-				blue = multiply_alpha(alpha, blue);
-			}
-			if (type == 0)
-				p = ((uint32_t)alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
-			else
-				p = ((uint32_t)alpha << 24) | (blue << 16) | (green << 8) | (red << 0);
-		}
-		memcpy(base, &p, sizeof(uint32_t));
-	}
-}
 glm::ivec2 get_surface_size(cairo_surface_t* p) {
 	return { cairo_image_surface_get_width(p), cairo_image_surface_get_height(p) };
 }
@@ -1894,7 +2068,7 @@ glm::vec2 draw_image(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, 
 		ss.y = cairo_image_surface_get_height(image);
 	}
 #if 0
-	cairo_as _a(cr);
+	d2_as _a(cr);
 	//cairo_scale(cr, scale.x, scale.y);
 	// 上层
 	{
@@ -3555,7 +3729,6 @@ cairo_surface_t* load_imagesvg(const std::string& fn, float scale)
 
 #endif
 //!no_cairo_
-
 
 #ifndef no_stb2d 
 

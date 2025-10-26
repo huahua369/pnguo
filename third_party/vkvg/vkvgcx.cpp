@@ -493,12 +493,8 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	VkvgContext ctx = vkvg_create(surf);
 	vkvg_clear(ctx);
 	//vkvg_save(ctx);
-
-
 	if (1) {
 		print_time ptt("vkvg");
-		float x = 250, y = 150;
-
 		VkvgPattern pat;
 		VkvgContext  cr = ctx;
 		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
@@ -508,7 +504,6 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		vkvg_set_source(cr, pat);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
-
 		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
 		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
 		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
@@ -522,10 +517,6 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	//vkvg_restore(ctx);
 	if (!fn || !*fn)
 		fn = "temp/offscreen_vkvg.png";
-	//for (;;) {
-	//	auto ks = vkvg_device_status(dev);
-	//	if (!ks)break;
-	//}
 	vkvg_surface_resolve(surf);//msaa采样转换输出
 	vkvg_surface_write_to_png(surf, fn);
 	vkvg_destroy(ctx);

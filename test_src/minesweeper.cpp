@@ -589,7 +589,7 @@ int main()
 	//d2->set_pos(0, 600, 650);
 	//d2->set_pos(1, 300, 650); 
 	texture_cb tex_cb = get_texture_cb();
-#ifdef _DEBUG
+#if 0
 	auto ltx = new layout_text_x();
 	ltx->set_ctx(app->font_ctx);
 	std::vector<std::string> efn;

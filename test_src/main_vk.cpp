@@ -246,6 +246,7 @@ void belt_cx::update(float delta) {
 	}
 	if (dxx > 7)dxx = 0;
 }
+#ifdef _CR__
 void belt_cx::draw(cairo_t* cr) {
 
 	for (size_t i = 0; i < 10; i++)
@@ -259,7 +260,7 @@ void belt_cx::draw(cairo_t* cr) {
 	cairo_clip(cr);
 	draw_polylines(cr, ps, bline.data(), bline.size(), bline_idx.data(), bline_idx.size(), linecolor, 1);
 }
-
+#endif
 void show_belt(form_x* form0)
 {
 	if (!form0)return;
@@ -291,6 +292,7 @@ void show_belt(form_x* form0)
 			bp->update(delta);
 			return 1;
 		};
+#ifdef _CR__
 	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
 		{
 			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
@@ -313,6 +315,7 @@ void show_belt(form_x* form0)
 			//draw_rect(cr, rc2, 0xf0222222, 0xff802Cff, 2, 1);
 			draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
 		};
+#endif
 }
 
 

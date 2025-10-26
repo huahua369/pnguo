@@ -158,7 +158,7 @@ public:
 	void set_root_style(size_t idx, const flex_item& it);
 	void add_child(size_t idx, const glm::vec2& ss);
 	void layout();
-	void draw(cairo_t* cr);
+	void draw(void* cr);
 private:
 
 };

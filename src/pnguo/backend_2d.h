@@ -3,10 +3,32 @@
 */
 #ifndef BACKEND_2D_H
 #define BACKEND_2D_H
+typedef struct d2ctx_t d2ctx_t;
+typedef struct d2_surface_t d2_surface_t;
+d2ctx_t* new_cr(d2_surface_t* sur);
+void free_cr(d2ctx_t* cr);
 
-cairo_t* new_cr(cairo_surface_t* sur);
-void free_cr(cairo_t* cr);
 
+/*
+用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
+这里使用下面的曲线形式，其中
+X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+*/
+struct rect_shadow_t
+{
+	float radius = 4;	// 半径
+	int segment = 6;	// 细分段
+	glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
+	/*	cubic
+		X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+		Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+	*/
+	cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
+};
+
+glm::vec4 colorv4(uint32_t rgba);
+glm::vec4 colorv4_bgr(uint32_t bgra);
 
 struct font_xi {
 	const char* family = 0;
@@ -17,21 +39,21 @@ struct font_xi {
 };
 
 // auto save 
-class cairo_as
+class d2_as
 {
 public:
-	cairo_as(cairo_t* p);
-	~cairo_as();
+	d2_as(d2ctx_t* p);
+	~d2_as();
 
 private:
-	cairo_t* cr = 0;
+	d2ctx_t* cr = 0;
 };
 
 class canvas_dev
 {
 public:
-	cairo_surface_t* surface = 0;
-	cairo_t* cr = 0;
+	d2_surface_t* surface = 0;
+	d2ctx_t* cr = 0;
 	uint32_t* pixel = 0;
 	glm::ivec2 dsize = {};
 	// 全局偏移、缩放
@@ -71,7 +93,7 @@ public:
 	void draw_text(const void* str, const glm::vec2& pos, font_xi* fx);
 	void draw_circle(const glm::vec2& pos, float r, float linewidth, uint32_t color, uint32_t fill);
 
-	void draw_surface(cairo_surface_t* image, const glm::vec2& pos, double alpha);
+	void draw_surface(d2_surface_t* image, const glm::vec2& pos, double alpha);
 
 
 	int get_path(path_v* pt);
@@ -125,8 +147,8 @@ public:
 	glm::ivec2 curpos = {};
 	//btype_e btype = {};		// 按钮状态
 	path_v pvdata[2] = {};
-	cairo_surface_t* _backing_store = 0;
-	cairo_surface_t* rss = 0;
+	d2_surface_t* _backing_store = 0;
+	d2_surface_t* rss = 0;
 	bool _backing_store_valid = false;
 	bool _draw_valid = true;
 	bool is_yaxisdown = 1;		// 1=y向下
