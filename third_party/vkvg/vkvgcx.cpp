@@ -493,78 +493,29 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	VkvgContext ctx = vkvg_create(surf);
 	vkvg_clear(ctx);
 	//vkvg_save(ctx);
-	vkvg_set_operator(ctx, VKVG_OPERATOR_OVER);
-	vkvg_rectangle(ctx, 10, 10, 250, 200);
-	vkvg_set_source_rgba(ctx, 1, 0, 0, 0.2);
-	vkvg_fill(ctx);
-	//vkvg_set_fill_rule(ctx, VKVG_FILL_RULE_EVEN_ODD);
-	vkvg_move_to(ctx, 10.0, 10.0);
-	vkvg_line_to(ctx, 150.0, 120.0);
-	vkvg_line_to(ctx, 120.0, 220.0);
-	vkvg_close_path(ctx);
-	vkvg_set_line_width(ctx, 6.0);
-	vkvg_set_line_cap(ctx, vkvg_line_cap_t::VKVG_LINE_CAP_ROUND);
-	vkvg_set_line_join(ctx, vkvg_line_join_t::VKVG_LINE_JOIN_ROUND);
-	vkvg_set_source_color(ctx, 0xff000000);
-	vkvg_stroke(ctx);
-	vkvg_set_operator(ctx, VKVG_OPERATOR_OVER);
-	vkvg_rectangle(ctx, 100, 100, 125, 20);
-	vkvg_set_source_rgba(ctx, 0.1, 0, 0.8, 0.62);
-	vkvg_fill(ctx);
 
 
 	if (1) {
 		print_time ptt("vkvg");
 		float x = 250, y = 150;
 
-		// vkvg_scale(ctx,2,2);
+		VkvgPattern pat;
+		VkvgContext  cr = ctx;
+		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+		vkvg_rectangle(cr, 0, 0, 256, 256);
+		vkvg_set_source(cr, pat);
+		vkvg_fill(cr);
+		vkvg_pattern_destroy(pat);
 
-		vkvg_set_line_width(ctx, 2);
-		vkvg_set_source_rgba(ctx, 0, 1, 0, 1);
-
-		vkvg_set_line_join(ctx, VKVG_LINE_JOIN_ROUND);
-		// vkvg_rectangle(ctx,x,y,dx,dy);
-
-		vkvg_move_to(ctx, x, y);
-		vkvg_rel_line_to(ctx, -50, 30);
-		vkvg_rel_line_to(ctx, 0, 60);
-		vkvg_rel_line_to(ctx, 50, 30);
-		/*
-		vkvg_rel_line_to(ctx,50,-30);
-		vkvg_rel_line_to(ctx,50,0);
-		vkvg_rel_line_to(ctx,50,30);
-		vkvg_rel_line_to(ctx,0,60);
-		vkvg_rel_line_to(ctx,-50,70);
-		vkvg_rel_line_to(ctx,-50,0);
-		vkvg_rel_line_to(ctx,-50,-70);
-		vkvg_close_path(ctx);
-		vkvg_stroke(ctx);
-
-		vkvg_set_source_rgba(ctx,1,0,0,1);
-		vkvg_move_to(ctx,x+200,y);
-		vkvg_rel_line_to(ctx,50,70);
-		vkvg_rel_line_to(ctx,50,0);
-		vkvg_rel_line_to(ctx,50,-70);
-		vkvg_rel_line_to(ctx,0,-60);
-		vkvg_rel_line_to(ctx,-50,-30);
-		vkvg_rel_line_to(ctx,-50,0);
-		vkvg_rel_line_to(ctx,-50,30);*/
-		vkvg_close_path(ctx);
-		vkvg_stroke(ctx);
-
-		vkvg_set_source_rgba(ctx, 0, 0, 1, 1);
-		vkvg_move_to(ctx, x + 250, y);
-		vkvg_rel_line_to(ctx, 50, -30);
-		vkvg_rel_line_to(ctx, 50, 0);
-		vkvg_rel_line_to(ctx, 50, 30);
-		vkvg_rel_line_to(ctx, 0, 60);
-		vkvg_rel_line_to(ctx, -50, 70);
-		vkvg_rel_line_to(ctx, -50, 0);
-		vkvg_rel_line_to(ctx, -50, -70);
-		vkvg_close_path(ctx);
-		vkvg_stroke(ctx);
-		//vkvg_pattern_destroy(grad);
-		//vkvg_pattern_destroy(rg);
+		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+		vkvg_set_source(cr, pat);
+		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
+		vkvg_fill(cr);
+		vkvg_pattern_destroy(pat);
 	}
 
 	vkvg_flush(ctx);

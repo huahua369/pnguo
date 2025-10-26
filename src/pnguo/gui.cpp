@@ -399,7 +399,7 @@ glm::ivec3 layout_text_x::get_text_rect1(size_t idx, int fontsize, const void* s
 		x = rc.x;
 		ret.y = rc.y;
 		break;
-	} while (str && *str);
+	} while (0);// str&&* str);
 	ret.x = x;
 	return ret;
 }
@@ -7177,7 +7177,7 @@ void slider_tl::draw(cairo_t* cr)
 glm::vec4 convertHSVtoRGB(const glm::vec4& hsv)
 {
 	double H = hsv.x * 360.0, S = hsv.y, V = hsv.z;
-	double R, G, B;
+	double R = 0.0, G = 0.0, B = 0.0;
 	int Hi = int(floor(H / 60.)) % 6;
 	double f = H / 60. - Hi;
 	double p = V * (1 - S);

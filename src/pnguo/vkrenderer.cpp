@@ -634,6 +634,43 @@ namespace vkr
 			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, rs.data());
 		}
 	}
+	void* get_device_requirements(VkPhysicalDeviceFeatures* pEnabledFeatures, void* pNext, bool scalar_block_layout, bool timeline_semaphore)
+	{
+		pEnabledFeatures->fillModeNonSolid = VK_TRUE;
+		pEnabledFeatures->sampleRateShading = VK_TRUE;
+		pEnabledFeatures->logicOp = VK_TRUE;
+#ifdef VK_VERSION_1_2
+		static VkPhysicalDeviceVulkan12Features enabledFeatures12 = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+		if (scalar_block_layout)
+		{
+			enabledFeatures12.scalarBlockLayout = VK_TRUE;
+		}
+		if (timeline_semaphore)
+		{
+			enabledFeatures12.timelineSemaphore = VK_TRUE;
+		}
+		enabledFeatures12.pNext = pNext;
+		pNext = &enabledFeatures12;
+#else
+		if (scalar_block_layout)
+		{
+			static VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalarBlockFeat = {
+				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT, .scalarBlockLayout = VK_TRUE };
+			scalarBlockFeat.pNext = pNext;
+			pNext = &scalarBlockFeat;
+		}
+		if (timeline_semaphore)
+		{
+
+			static VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaFeat = {
+				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR, .timelineSemaphore = VK_TRUE };
+			timelineSemaFeat.pNext = pNext;
+			pNext = &timelineSemaFeat;
+		}
+#endif
+		return pNext;
+	}
+
 	void Device::OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp)
 	{
 		VkResult res;
@@ -783,6 +820,8 @@ namespace vkr
 		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
 		robustness2.pNext = &shaderSubgroupExtendedType;
 		robustness2.nullDescriptor = VK_TRUE;
+		// vkvg需要
+		robustness2.pNext = get_device_requirements(&physicalDeviceFeatures, robustness2.pNext, true, false);
 
 		// to be able to bind NULL views
 		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2 = {};
@@ -8070,7 +8109,7 @@ namespace vkr
 		pipeline.pViewportState = &vp;
 		pipeline.pDepthStencilState = &ds;
 		pipeline.pStages = shaderStages.data();
-		pipeline.stageCount = (uint32_t)shaderStages.size(); 
+		pipeline.stageCount = (uint32_t)shaderStages.size();
 		pipeline.renderPass = 0;// m_pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
 
