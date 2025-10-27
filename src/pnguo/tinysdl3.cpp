@@ -353,6 +353,31 @@ app_cx::app_cx()
 		}, this);
 #endif 
 	audio_device = open_audio(0, 0, 0);
+
+
+#ifdef __ANDROID__
+	auto idp = SDL_GetPrefPath(0, "nluna");
+	if (idp) {
+		internalDataPath = get_dir(idp);
+		SDL_free((char*)idp);
+	}
+	auto edp = SDL_AndroidGetExternalStoragePath();
+	if (edp)
+	{
+		externalDataPath = get_dir(edp);
+		SDL_free((char*)edp);
+	}
+	externalCachePath = externalDataPath + "cache/";
+#else
+	externalDataPath = "ext_data\\";
+	externalCachePath = externalDataPath + "cache\\";
+	auto idp = SDL_GetPrefPath(0, "nluna");
+	if (idp) {
+		internalDataPath = idp;
+		SDL_free(idp);
+	}
+#endif
+
 }
 
 app_cx::~app_cx()

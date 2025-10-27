@@ -28,6 +28,16 @@ guiSetStr(_edit_cmdout, buf);
 
 #endif // !RWread
 
+#ifndef fseeki64
+#ifdef _WIN32
+#define fseeki64 _fseeki64
+#define ftelli64 _ftelli64
+#else			
+#define fseeki64 fseeko64
+#define ftelli64 ftello64
+#endif // _WIN32
+#endif
+
 #ifndef NO_MAPFILE
 #ifndef _MFILE_
 #define _MFILE_
@@ -336,11 +346,25 @@ namespace hz
 		size_t size; std::vector<char> d;
 	};
 	void load_rczip(int id, std::map<std::string, file_zt>* opt);
+
+
+	char* _basename(const char* name);
+	char* get_suffix(const char* name);
+	void check_make_path(const std::string& filename);
+	std::string _dirname(const char* path);
+
 }//!hz
 
 #endif
 #endif /* end __MAPVIEW__H__*/
 
+class app_cx;
+namespace hz {
+
+	size_t read_binary_file(const std::string& filename0, std::string& result);
+	void save_cache(const char* fnstr, void* data, int size, const std::string& externalCachePath); 
+
+}
 
 namespace md {
 

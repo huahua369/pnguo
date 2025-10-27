@@ -827,6 +827,267 @@ namespace hz
 		check_make_path(fn, pathdrive | pathdir);
 		return fn;
 	}
+
+
+#ifndef DIR_SEPARATOR
+#define DIR_SEPARATOR '/'
+#endif
+
+#if defined (_WIN32) || defined (__MSDOS__) || defined (__DJGPP__) || \
+  defined (__OS2__)
+#define HAVE_DOS_BASED_FILE_SYSTEM
+#ifndef DIR_SEPARATOR_2 
+#define DIR_SEPARATOR_2 '\\'
+#endif
+#endif
+
+	/* Define IS_DIR_SEPARATOR.  */
+#ifndef DIR_SEPARATOR_2
+# define IS_DIR_SEPARATOR(ch) ((ch) == DIR_SEPARATOR)
+#else /* DIR_SEPARATOR_2 */
+# define IS_DIR_SEPARATOR(ch) \
+	(((ch) == DIR_SEPARATOR) || ((ch) == DIR_SEPARATOR_2))
+#endif /* DIR_SEPARATOR_2 */
+
+	char* _basename(const char* name)
+	{
+		const char* base;
+
+#if defined (HAVE_DOS_BASED_FILE_SYSTEM)
+		/* Skip over the disk name in MSDOS pathnames. */
+		if (name[0] > 0 && name[0] < 255 && isalpha(name[0]) && name[1] == ':')
+			name += 2;
+#endif
+
+		for (base = name; *name; name++)
+		{
+			if (IS_DIR_SEPARATOR(*name))
+			{
+				base = name + 1;
+			}
+		}
+		return (char*)base;
+	}
+
+	char* get_suffix(const char* name)
+	{
+		const char* base = _basename(name);
+		const char* r = base;
+		for (; *base; base++)
+		{
+			if ((*base) == '.')
+			{
+				r = base;
+			}
+		}
+		return (char*)r;
+	}
+
+	//char*remove_suffix(char* name, const char* suffix)
+	//{
+
+	//	while (np > name && sp > suffix)
+	//		if (*--np != *--sp)
+	//			return;
+	//	
+	//} 
+	std::string _dirname(const char* path)
+	{
+		std::string str;
+		if (path && *path)
+		{
+			str.assign(path);
+			char* t = (char*)str.c_str();
+			do
+			{
+				char* base = strrchr(t, '/');
+				char* base1 = strrchr(t, '\\');
+				if (!base && base1)
+				{
+					*base1 = 0;
+					str = t;
+					break;
+				}
+				if (!base1 && base)
+				{
+					*base = 0;
+					str = t;
+					break;
+				}
+				if (base > base1)
+				{
+					if (base)
+						*base = 0;
+				}
+				else {
+					if (base1)
+						*base1 = 0;
+				}
+				str = t;
+			} while (0);
+		}
+		return str;
+	}
+
+	void check_make_path(const std::string& filename)
+	{
+		char* file_name = (char*)filename.c_str();
+		std::vector<std::string> vs;
+		auto path = filename;
+		std::string sx = get_suffix(filename.c_str());
+		if (sx[0] != '.')
+			vs.push_back(path);
+		auto last = path;
+		for (; path.size() > 2;)
+		{
+			path = _dirname(path.c_str());
+			if (path.size() && path.find(sx) == std::string::npos)
+				vs.push_back(path);
+			if (path == last)break;
+			last = path;
+		}
+
+		for (auto it = vs.rbegin(); it != vs.rend(); it++)
+		{
+			auto c = it->c_str();
+			if (access(c, 0) != -1)
+			{
+				continue;
+			}
+#ifdef _WIN32
+			mkdir(c);
+#else
+			unsigned int mod = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH;
+			mkdir(c, mod);
+#endif
+		}
+
+		return;
+
+	}
+	size_t read_binary_file(const std::string& filename0, std::string& result)
+	{
+		int64_t size = 0;
+		uint64_t  retval;
+		void* buff = 0;
+		result.clear();
+		std::string filename = filename0;
+#if (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
+		filename = [[[NSBundle mainBundle]resourcePath] stringByAppendingPathComponent:@(filename)] .UTF8String;
+#endif
+#if 0 
+		filename = s()->getFn(filename);
+#ifdef _WIN32
+		if (filename.find("/"))
+		{
+			filename = replace(filename, "/", "\\");
+		}
+#endif
+#endif // 0
+		const char* fn = filename.c_str();
+		FILE* fp = fopen(filename.c_str(), "rb");
+		if (!fp)
+		{
+#ifdef __ANDROID__
+			AAssetManager* a_mgr = getAssetManager();
+			//LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
+			//LOGI("a_mgr%p,%s", a_mgr, filename.c_str());
+			do {
+				if (!a_mgr)break;
+				AAsset* asset = AAssetManager_open((AAssetManager*)a_mgr, filename.c_str(), AASSET_MODE_STREAMING);
+				assert(asset);
+				if (!asset)break;
+				size = AAsset_getLength(asset);
+				assert(size > 0);
+				//LOGI("%p", size);
+				result.resize(size);
+				void* rd = result.data();
+				AAsset_read(asset, rd, size);
+				AAsset_close(asset);
+			} while (0);
+			return size;
+#else
+
+			auto mv = new mfile_t();
+			do {
+				auto md = mv->open_d(fn, true);
+				size = mv->get_file_size();
+				if (md && size > 0)
+				{
+					result.resize(size);
+					memcpy(&result[0], md, size);
+				}
+			} while (0);
+			delete mv;
+			return size;
+#endif
+		}
+		fseeki64(fp, 0L, SEEK_END);
+		size = ftelli64(fp);
+		fseeki64(fp, 0L, SEEK_SET);
+		result.resize(size);
+		buff = &result[0];
+		retval = fread(buff, size, 1, fp);
+		assert(retval == 1);
+		fclose(fp);
+		return size;
+	}
+
+
+	void read_file(const char* fn0, std::string* opt)
+	{
+		read_binary_file(fn0 && *fn0 ? fn0 : "", *opt);
+	}
+
+	void save_file0(const char* fn0, const void* data, int64_t size, int64_t pos, bool is_plus)
+	{
+		std::string filename = fn0;
+		auto path = filename;
+		path = hz::_dirname(filename.c_str());
+		hz::check_make_path(filename.c_str());
+		const char* fn = filename.c_str();
+		FILE* fp = fopen(filename.c_str(), is_plus ? "ab" : "wb");
+
+		if (!fp)
+		{
+			//auto er = ferror(fp);
+			return;// "fail to open file: " + filename;
+		}
+		if (is_plus)
+			fseeki64(fp, pos, SEEK_SET);
+		auto retval = fwrite(data, size, 1, fp);
+		assert(retval == 1);
+		fclose(fp);
+	}
+	//void open_dir(const std::string& path, std::vector<std::string>& result, AAssetManager* mgr)
+	//{
+	//	auto d = AAssetManager_openDir(mgr, path.c_str());
+	//	while (d)
+	//	{
+	//		auto fn = AAssetDir_getNextFileName(d);
+	//		if (fn)
+	//		{
+	//			result.push_back(fn);
+	//		}
+	//		else {
+	//			break;
+	//		}
+	//	}
+	//}
+	void save_cache(const char* fnstr, void* data, int size, const std::string& externalCachePath)
+	{
+		do
+		{
+			if (!fnstr)break;
+			std::string fn = fnstr;
+			auto fj = externalCachePath + fn;
+			//if (is_access && access(fj.c_str(), 0) != -1)break;
+			save_file(fj.c_str(), (char*)data, size, 0, false);
+		} while (0);
+	}
+
+
+
 	mfile_t::mfile_t()
 	{
 	}

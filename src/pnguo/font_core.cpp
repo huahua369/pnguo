@@ -8639,3 +8639,126 @@ double yHist::calculate_relation(yHist* p)
 	return correlation;
 }
 #endif // 1
+
+#ifdef __ANDROID__
+
+njson get_sysfont(njson d)
+{
+	njson r;
+	njson first0;
+	std::vector<std::string> fnvs;
+	std::set<std::string> fns;
+	for (auto& [k, v] : d.items()) {
+		if (v.find("[child]") == v.end())continue;
+		auto& vc = v["[child]"];
+		for (auto& ct : vc) {
+			if (ct.find("family") == ct.end())continue;
+			auto lang = toStr(ct["family"]["@lang"], "@undefined");
+			auto& a = r["c"][lang];
+			std::set<std::string> asv;
+			auto& ft = ct["family"]["[child]"];
+			for (auto& font : ft) {
+				auto ft1 = font["font"];
+				ft1["@style"];
+				ft1["@weight"];
+				for (auto& [k1, v1] : ft1.items()) {
+					std::string fn1;
+					if (k1 == "#text")
+					{
+						fn1 = v1;
+					}
+					else
+					{
+						if (!v1.is_array())continue;
+						auto v10 = v1;
+						auto fn = v10[0]["#text"];
+						auto fnn = fn.get<std::string>();
+						for (auto ch : fnn) {
+							if (ch == '\r')
+								break;
+							fn1.push_back((ch));
+						}
+					}
+					if (fn1.size()) {
+						if (asv.insert(fn1).second)
+							a.push_back(fn1);
+						//if (fns.insert(fn1).second)
+						//	fnvs.push_back(fn1);
+					}
+				}
+			}
+			if (first0.empty())
+				first0 = fnvs;
+			//fnvs.push_back("");
+		}
+	}
+	r["a"] = first0;
+	return r;
+}
+
+void ead_font(const std::string& internalDataPath)
+{
+	if (!ctx)return; 
+	std::string ftxml;
+	hz::read_binary_file("/system/etc/fonts.xml", ftxml);
+	do {
+		auto dlt = ctx->get_lt();
+		if (ftxml.empty())
+		{
+			break;
+		}
+		hz::save_cache("fonts.xml", ftxml.data(), ftxml.size(), ctx);
+		auto ftn = xj::xml2pjson(ftxml);
+		if (ftn) {
+			{
+				auto ndd = ftn->dump(2);
+				save_cache("fonts1.json", ndd.data(), ndd.size(), ctx);
+			}
+			auto vsf = get_sysfont(*ftn);
+			{
+				auto& sfn = vsf["c"]["zh"];
+				for (auto& it : sfn) {
+					std::string k = it;
+					k = "/system/fonts/" + hstring::trim_ch(k, "\t\r\n ");
+					add_font(k.c_str(), false);
+				}
+			}
+			{
+				auto& sfn = vsf["c"]["zh-Hans"];
+				for (auto& it : sfn) {
+					std::string k = it;
+					k = "/system/fonts/" + hstring::trim_ch(k, "\t\r\n ");
+					add_font(k.c_str(), false);
+				}
+			}
+#ifdef _WIN32
+#else
+			std::vector<std::string> mss = { "entypo.ttf" };
+			for (auto it : mss)
+			{
+				std::string d;
+				it = "fonts/" + it;
+				hz::read_binary_file(it.c_str(), d);
+				if (d.size())
+				{
+					auto fj = internalDataPath + it;//"entypo.ttf" 
+					save_file(fj.c_str(), d.data(), d.size());
+				}
+
+			}
+
+#endif // _WIN32
+			auto fj = internalDataPath + "fonts/entypo.ttf";
+			add_font(fj.c_str(), false);
+			if (dlt)
+			{
+				dlt->set_font_family(vft.data(), vft.size());
+			}
+			auto ndd = vsf.dump(2);
+			hz::save_cache("fonts2.json", ndd.data(), ndd.size(), ctx);
+			delete ftn;
+		}
+
+	} while (0);
+}
+#endif // __ANDROID__
