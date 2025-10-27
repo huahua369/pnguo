@@ -1182,8 +1182,8 @@ int main()
 		}
 		printf("");
 
-
-
+		auto fctx = app->font_ctx;
+		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
 
 		//vkrender_test(0);
 		{
@@ -1263,7 +1263,7 @@ int main()
 			test_vkvg(0, &cc);
 		}
 		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
-		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/ );
+		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 		auto kd = sdldev.vkdev;
