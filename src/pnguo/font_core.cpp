@@ -6758,6 +6758,7 @@ icu_lib_t* get_icu(int v)
 			std::string dlln = "libicuuc";
 			std::string dlln0 = "icudt";
 			int v1 = v;
+#if 0
 #ifdef _WIN32
 			dlln = "icuuc" + std::to_string(v1);
 			dlln0 = "icudt" + std::to_string(v1);
@@ -6776,9 +6777,10 @@ icu_lib_t* get_icu(int v)
 #else
 			auto so = loadso(dlln);
 #endif // _WIN32
-
+#endif
+			auto so = loadso("icu");
 			if (!so) {
-				so = loadso(dlln);
+				so = loadso("libicu");
 				if (!so)
 					throw std::runtime_error("-1");
 			}
@@ -8698,7 +8700,7 @@ njson get_sysfont(njson d)
 
 void ead_font(const std::string& internalDataPath)
 {
-	if (!ctx)return; 
+	if (!ctx)return;
 	std::string ftxml;
 	hz::read_binary_file("/system/etc/fonts.xml", ftxml);
 	do {
