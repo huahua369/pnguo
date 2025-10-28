@@ -511,6 +511,11 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
+		//vkvg_move_to(cr, 20, 100);
+		//vkvg_set_source_color(cr, 0xff0cC616);
+		//vkvg_select_font_face(ctx, (char*)u8"新宋体");
+		//vkvg_set_font_size(cr, 26);
+		//vkvg_show_text(cr, (char*)u8"abc123g0加0123");
 	}
 
 	vkvg_flush(ctx);

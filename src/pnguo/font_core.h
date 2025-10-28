@@ -210,8 +210,10 @@ public:
 	glm::ivec4 get_bounding_box(double scale, bool is_align0);
 	// 输入utf8获取轮廓，height=0则获取原始大小。提供opt
 	tinypath_t get_shape(const void* str8, int height, std::vector<vertex_f>* opt, int adv, float scale1 = 1);
+	tinypath_t get_shape_gid(int gid, int height, std::vector<vertex_f>* opt, int adv, float scale1);
 	glm::ivec2 get_shape_box(const void* str8, int height);
 	glm::ivec2 get_shape_box(uint32_t ch, int height);
+	glm::ivec2 get_shape_box_glyph(uint32_t gid, int height);
 	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv, float scale1 = 1);
 public:
 	// 获取字符大小{xy大小，z=advance,w=基线}

@@ -440,7 +440,7 @@ _vkvg_font_t *_find_or_create_font_size(VkvgContext ctx) {
     else
         newSize.curLine.height = newSize.face->height >> 6;
 #else
-    int result    = stbtt_InitFont(&font->stbInfo, font->fontBuffer, 0);
+    int result = stbtt_InitFont(&font->stbInfo, font->fontBuffer, stbtt_GetFontOffsetForIndex(font->fontBuffer,0));
     assert(result && "stbtt_initFont failed");
     if (!result) {
         ctx->status = VKVG_STATUS_INVALID_FONT;

@@ -90,6 +90,11 @@ public:
 	int c_fps = 60;
 	int fms = 0;
 
+	// 内部数据路径、外部数据路径、外部缓存路径；
+	std::string internalDataPath;
+	std::string externalDataPath;
+	std::string externalCachePath;
+
 	uint32_t audio_device = 0;
 	dev_info_cx _set_dev = {};
 	bool nc_down = 0;

@@ -1139,7 +1139,8 @@ public:
 #define PEEK_USHORT( p )  uint16_t( BYTE_U16( p, 0, 8 ) | BYTE_U16( p, 1, 0 ) )
 #define PEEK_LONG( p )  int32_t( BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) | BYTE_U32( p, 3,  0 ) )
 #define PEEK_ULONG( p )  uint32_t(BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) | BYTE_U32( p, 3,  0 ) )
-
+#define PEEK_OFF3( p )  ( int32_t( BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) ) >> 8 )
+#define PEEK_UOFF3( p )  uint32_t( BYTE_U32( p, 0, 16 ) | BYTE_U32( p, 1,  8 ) | BYTE_U32( p, 2,  0 ) )
 #define NEXT_CHAR( buffer ) ( (signed char)*buffer++ )
 
 #define NEXT_BYTE( buffer ) ( (unsigned char)*buffer++ )
@@ -1147,8 +1148,20 @@ public:
 #define NEXT_USHORT( b ) ( (unsigned short)( b += 2, PEEK_USHORT( b - 2 ) ) )
 #define NEXT_LONG( buffer ) ( (long)( buffer += 4, PEEK_LONG( buffer - 4 ) ) )
 #define NEXT_ULONG( buffer ) ( (unsigned long)( buffer += 4, PEEK_ULONG( buffer - 4 ) ) )
+#define NEXT_OFF3( buffer ) ( buffer += 3, PEEK_OFF3( buffer - 3 ) )
+#define NEXT_UOFF3( buffer ) ( buffer += 3, PEEK_UOFF3( buffer - 3 ) )
 
+#define INT_TO_F26DOT6( x )    ( (long)(x) * 64  )    /* << 6  */
+#define INT_TO_F2DOT14( x )    ( (long)(x) * 16384 )  /* << 14 */
+#define INT_TO_FIXED( x )      ( (long)(x) * 65536 )  /* << 16 */
+#define F2DOT14_TO_FIXED( x )  ( (long)(x) * 4 )      /* << 2  */
+#define FIXED_TO_INT( x )      ( RoundFix( x ) >> 16 )
+#define ROUND_F26DOT6( x )     ( ( (x) + 32 - ( x < 0 ) ) & -64 )
 
+	int RoundFix(uint32_t a)
+	{
+		return ((a + (0x8000L - (a < 0)))) & ~0xFFFFL;
+	}
 
 	static unsigned char* tt_cmap2_get_subheader(unsigned char* table, uint32_t char_code)
 	{
@@ -1326,6 +1339,14 @@ public:
 		int advance = 0, lsb = 0;
 		stbtt_GetCodepointHMetrics(font, ch, &advance, &lsb);
 		return glm::ivec2(advance, lsb);
+	}
+	static glm::ivec2 get_glyph_hmetrics(font_impl* font, int gidx)
+	{
+		int ascent, descent, linegap;
+		int x0 = 0, y0 = 0, x1, y1;
+		int advancei, lsb;
+		stbtt_GetGlyphHMetrics(font, gidx, &advancei, &lsb);
+		return glm::ivec2(advancei, lsb);
 	}
 	static void stbtt_MakeGlyphBitmapSubpixel0(const stbtt_fontinfo* info, unsigned char* output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, float shift_x, float shift_y, int glyph, int xf)
 	{
@@ -1685,6 +1706,14 @@ public:
 		stbtt_vertex* stbVertex = NULL;
 		verCount = 0;
 		int idx = getGlyphIndex(font, cp);
+		if (!(idx < 0))
+			verCount = stbtt_GetGlyphShape(font, idx, &stbVertex);
+		return stbVertex;
+	}
+	static stbtt_vertex* get_char_shape_idx(font_impl* font, int idx, int& verCount)
+	{
+		stbtt_vertex* stbVertex = NULL;
+		verCount = 0;
 		if (!(idx < 0))
 			verCount = stbtt_GetGlyphShape(font, idx, &stbVertex);
 		return stbVertex;
@@ -2576,7 +2605,7 @@ struct gcolors_t
 	Color_2* palette;
 	Color_2 foreground_color;
 	bool have_foreground_color;
-	char td[80];
+	char td[256];
 };
 struct GlyphSlot;
 
@@ -3064,6 +3093,16 @@ glm::ivec2 font_t::get_shape_box(uint32_t ch, int height)
 	}
 	return v;
 }
+glm::ivec2 font_t::get_shape_box_glyph(uint32_t gid, int height)
+{
+	glm::vec2 v = stb_font::get_glyph_hmetrics(font, gid);
+	if (height != 0)
+	{
+		float scale = get_scale(height);
+		v *= scale;
+	}
+	return v;
+}
 tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv, float scale1)
 {
 	int vc = 0;
@@ -3075,6 +3114,69 @@ tinypath_t font_t::get_shape(int cp, int height, std::vector<vertex_f>* opt, int
 		if (p && vc > 1)
 		{
 			auto bs = get_shape_box(cp, height);
+			r.advance = bs.x;
+			r.bearing = { bs.y,0 };
+			auto pss = opt->size();
+			r.first = pss;
+			opt->resize(pss + vc);
+			r.v = opt->data() + pss;
+			p->count = vc;
+			for (size_t i = 0; i < vc; i++)
+			{
+				r.v[i].type = v[i].type;
+				r.v[i].x = v[i].x;
+				r.v[i].y = v[i].y;
+				r.v[i].cx = v[i].cx;
+				r.v[i].cy = v[i].cy;
+				r.v[i].cx1 = v[i].cx1;
+				r.v[i].cy1 = v[i].cy1;
+			}
+			if (height != 0)
+			{
+				float scale = get_scale(height) * scale1;
+				if (scale > 0)
+				{
+					r.baseline = ascender * scale;
+					auto v1 = r.v;
+					for (size_t i = 0; i < vc; i++)
+					{
+						v1->x *= scale;
+						v1->y *= scale;
+						v1->cx *= scale;
+						v1->cy *= scale;
+						v1->cx1 *= scale;
+						v1->cy1 *= scale;
+						v1++;
+					}
+				}
+			}
+			{
+				auto v1 = r.v;
+				for (size_t i = 0; i < vc; i++)
+				{
+					v1->x += adv;
+					v1->cx += adv;
+					v1->cx1 += adv;
+					v1++;
+				}
+			}
+		}
+		stb_font::free_shape(font, v);
+	}
+	return r;
+}
+
+tinypath_t font_t::get_shape_gid(int gid, int height, std::vector<vertex_f>* opt, int adv, float scale1)
+{
+	int vc = 0;
+	tinypath_t r = {};
+	auto p = &r;
+	stbtt_vertex* v = stb_font::get_char_shape_idx(font, gid, vc);
+	if (v)
+	{
+		if (p && vc > 1)
+		{
+			auto bs = get_shape_box_glyph(gid, height);
 			r.advance = bs.x;
 			r.bearing = { bs.y,0 };
 			auto pss = opt->size();
@@ -3296,19 +3398,37 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 				std::vector<uint32_t> cols;
 				if (get_gcolor(glyph_index, ag, cols))
 				{
-					glm::ivec2 pos;
+					glm::ivec2 pos = {};
 					image_ptr_t* img = 0;
 					img = use_ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, 0);
 					for (size_t i = 0; i < ag.size(); i++)
 					{
 						bitbuf->clear();
 						bitbuf->resize(bitmap->width * bitmap->rows);
+						//std::vector<vertex_f> gpt;
+						//auto gk = rfont->get_shape_gid(ag[i], 0, &gpt, 0, 1.0);
+						//if (i == 5)
+						//{
+						//	float scale = get_scale(fontsize);
+						//	image_gray bmp = {};
+						//	bmp.width = bitmap->width * 1.5;
+						//	bmp.height = bitmap->rows * 1.5;
+						//	glm::vec2 ps = { 0,-100 };
+						//	//ps.x -= blur * 2;
+						//	//ps.y -= blur * 2;
+						//	ps.y -= 0;
+						//	get_path_bitmap((vertex_32f*)gpt.data(), gpt.size(), &bmp, { scale,scale }, ps, 0);
+						//	auto fn = "temp/qi_" + std::to_string(i) + ".png";
+						//	save_img_png(&bmp, fn.c_str());
+						//	i = 5;
+						//}
 						// -4修正填充
 						auto bit = rfont->get_glyph_image(ag[i], fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint, 0);
 						if (bit)
 						{
 							auto ps1 = pos;
 							ps1.x += bitmap->x - bs.x, ps1.y += bitmap->y + abs(bs.y);
+							bitmap->rows;
 							img = use_ctx->push_cache_bitmap_old(bitmap, &ps1, cols[i], img, 0);
 						}
 					}
@@ -4623,9 +4743,21 @@ int font_t::init_sbit()
 
 
  /* NOTE: These are the table sizes calculated through the specs. */
-#define BASE_GLYPH_SIZE            6
-#define LAYER_SIZE                 4
+#define BASE_GLYPH_SIZE0            6
+#define LAYER_SIZE0                 4
 #define COLR_HEADER_SIZE          14
+/* 3 * uint16 + 2 * Offset32 */
+#define COLRV0_HEADER_SIZE               14U
+/* COLRV0_HEADER_SIZE + 5 * Offset32 */
+#define COLRV1_HEADER_SIZE               34U
+
+#define BASE_GLYPH_SIZE                   6U
+#define BASE_GLYPH_PAINT_RECORD_SIZE      6U
+#define LAYER_V1_LIST_PAINT_OFFSET_SIZE   4U
+#define LAYER_V1_LIST_NUM_LAYERS_SIZE     4U
+#define COLOR_STOP_SIZE                   6U
+#define VAR_IDX_BASE_SIZE                 4U
+#define LAYER_SIZE                        4U
 
 
 struct BaseGlyphRecord
@@ -4645,6 +4777,28 @@ struct Colr
 
 	uint8_t* base_glyphs;
 	uint8_t* layers;
+
+	uint32_t  num_base_glyphs_v1;
+	/* Points at beginning of BaseGlyphV1List. */
+	uint8_t* base_glyphs_v1;
+
+	uint32_t  num_layers_v1;
+	uint8_t* layers_v1;
+
+	uint8_t* clip_list;
+
+	/*
+	 * Paint tables start at the minimum of the end of the LayerList and the
+	 * end of the BaseGlyphList.  Record this location in a field here for
+	 * safety checks when accessing paint tables.
+	 */
+	uint8_t* paints_start_v1;
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+	/* Item Variation Store for variable 'COLR' v1. */
+	GX_ItemVarStoreRec    var_store;
+	GX_DeltaSetIdxMapRec  delta_set_idx_map;
+#endif
 
 	/* The memory which backs up the `COLR' table. */
 	void* table;
@@ -4681,10 +4835,17 @@ int	tt_face_load_colr(font_t* face, uint8_t* b, sfnt_header* sp)
 
 	Colr* colr = NULL;
 
-	uint32_t  base_glyph_offset, layer_offset;
+	//uint32_t  base_glyph_offset, layer_offset;
 	uint32_t  table_size = sp->logicalLength;
 	auto cp = face->colorinfo;
 
+	uint8_t* p1 = NULL;
+	uint32_t  base_glyph_offset, layer_offset;
+	uint32_t  base_glyphs_offset_v1, num_base_glyphs_v1;
+	uint32_t  layer_offset_v1, num_layers_v1, clip_list_offset;
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+	uint32_t  colr_offset_in_stream;
+#endif
 	/* `COLR' always needs `CPAL' */
 	//if (!face->cpal)
 	//	return FT_THROW(Invalid_File_Format);
@@ -4736,6 +4897,131 @@ int	tt_face_load_colr(font_t* face, uint8_t* b, sfnt_header* sp)
 		if (colr->num_layers * LAYER_SIZE > table_size - layer_offset)
 		{
 			error = -1; break;
+		}
+		if (colr->version == 1) {
+			if (table_size < COLRV1_HEADER_SIZE)
+			{
+				error = -21; break;
+			}
+
+			base_glyphs_offset_v1 = NEXT_ULONG(p);
+
+			if (base_glyphs_offset_v1 + 4 >= table_size)
+				break;
+
+			p1 = (uint8_t*)(table + base_glyphs_offset_v1);
+			num_base_glyphs_v1 = PEEK_ULONG(p1);
+
+			if (num_base_glyphs_v1 * BASE_GLYPH_PAINT_RECORD_SIZE >
+				table_size - base_glyphs_offset_v1)
+				break;
+
+			colr->num_base_glyphs_v1 = num_base_glyphs_v1;
+			colr->base_glyphs_v1 = p1;
+
+			layer_offset_v1 = NEXT_ULONG(p);
+
+			if (layer_offset_v1 >= table_size)
+				break;
+
+			if (layer_offset_v1)
+			{
+				if (layer_offset_v1 + 4 >= table_size)
+					break;
+
+				p1 = (uint8_t*)(table + layer_offset_v1);
+				num_layers_v1 = PEEK_ULONG(p1);
+
+				if (num_layers_v1 * LAYER_V1_LIST_PAINT_OFFSET_SIZE >
+					table_size - layer_offset_v1)
+					break;
+
+				colr->num_layers_v1 = num_layers_v1;
+				colr->layers_v1 = p1;
+
+				colr->paints_start_v1 =
+					std::min(colr->base_glyphs_v1 +
+						colr->num_base_glyphs_v1 * BASE_GLYPH_PAINT_RECORD_SIZE,
+						colr->layers_v1 +
+						colr->num_layers_v1 * LAYER_V1_LIST_PAINT_OFFSET_SIZE);
+			}
+			else
+			{
+				colr->num_layers_v1 = 0;
+				colr->layers_v1 = 0;
+				colr->paints_start_v1 =
+					colr->base_glyphs_v1 +
+					colr->num_base_glyphs_v1 * BASE_GLYPH_PAINT_RECORD_SIZE;
+			}
+
+			clip_list_offset = NEXT_ULONG(p);
+
+			if (clip_list_offset >= table_size)
+				break;
+
+			if (clip_list_offset)
+				colr->clip_list = (uint8_t*)(table + clip_list_offset);
+			else
+				colr->clip_list = 0;
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+			colr->var_store.dataCount = 0;
+			colr->var_store.varData = NULL;
+			colr->var_store.axisCount = 0;
+			colr->var_store.regionCount = 0;
+			colr->var_store.varRegionList = 0;
+
+			colr->delta_set_idx_map.mapCount = 0;
+			colr->delta_set_idx_map.outerIndex = NULL;
+			colr->delta_set_idx_map.innerIndex = NULL;
+
+			if (face->variation_support & TT_FACE_FLAG_VAR_FVAR)
+			{
+				uint32_t  var_idx_map_offset, var_store_offset;
+
+				FT_Service_MultiMasters  mm = (FT_Service_MultiMasters)face->mm;
+
+
+				var_idx_map_offset = FT_NEXT_ULONG(p);
+
+				if (var_idx_map_offset >= table_size)
+					goto InvalidTable;
+
+				var_store_offset = FT_NEXT_ULONG(p);
+				if (var_store_offset >= table_size)
+					goto InvalidTable;
+
+				if (var_store_offset)
+				{
+					/* If variation info has not been initialized yet, try doing so, */
+					/* otherwise loading the variation store will fail as it         */
+					/* requires access to `blend` for checking the number of axes.   */
+					if (!face->blend)
+						if (mm->get_mm_var(FT_FACE(face), NULL))
+							goto InvalidTable;
+
+					/* Try loading `VarIdxMap` and `VarStore`. */
+					error = mm->load_item_var_store(
+						FT_FACE(face),
+						colr_offset_in_stream + var_store_offset,
+						&colr->var_store);
+					if (error != FT_Err_Ok)
+						goto InvalidTable;
+				}
+
+				if (colr->var_store.axisCount && var_idx_map_offset)
+				{
+					error = mm->load_delta_set_idx_map(
+						FT_FACE(face),
+						colr_offset_in_stream + var_idx_map_offset,
+						&colr->delta_set_idx_map,
+						&colr->var_store,
+						table_size);
+					if (error != FT_Err_Ok)
+						goto InvalidTable;
+				}
+			}
+#endif /* TT_CONFIG_OPTION_GX_VAR_SUPPORT */
 		}
 
 		colr->base_glyphs = (uint8_t*)(table + base_glyph_offset);
@@ -5105,13 +5391,103 @@ struct Cpal
 	uint32_t  table_size;
 
 };
+enum PaintFormat_
+{
+	COLR_PAINTFORMAT_COLR_LAYERS = 1,
+	COLR_PAINTFORMAT_SOLID = 2,
+	COLR_PAINTFORMAT_LINEAR_GRADIENT = 4,
+	COLR_PAINTFORMAT_RADIAL_GRADIENT = 6,
+	COLR_PAINTFORMAT_SWEEP_GRADIENT = 8,
+	COLR_PAINTFORMAT_GLYPH = 10,
+	COLR_PAINTFORMAT_COLR_GLYPH = 11,
+	COLR_PAINTFORMAT_TRANSFORM = 12,
+	COLR_PAINTFORMAT_TRANSLATE = 14,
+	COLR_PAINTFORMAT_SCALE = 16,
+	COLR_PAINTFORMAT_ROTATE = 24,
+	COLR_PAINTFORMAT_SKEW = 28,
+	COLR_PAINTFORMAT_COMPOSITE = 32,
+	COLR_PAINT_FORMAT_MAX = 33,
+	COLR_PAINTFORMAT_UNSUPPORTED = 255
 
+};
+struct  PaintColrLayers
+{
+	uint32_t   num_layers;
+	uint32_t   layer;
+	uint8_t* p;
+};
+
+struct PaintScale
+{
+	uint8_t* p;
+	int32_t  scale_x;
+	int32_t  scale_y;
+
+	int32_t  center_x;
+	int32_t  center_y;
+};
+struct  PaintRotate
+{
+	uint8_t* p;
+	int32_t  angle;
+	int32_t  center_x;
+	int32_t  center_y;
+};
+struct PaintTranslate
+{
+	uint8_t* p;
+	int32_t  dx;
+	int32_t  dy;
+};
+struct  Affine_23
+{
+	int32_t  xx, xy, dx;
+	int32_t  yx, yy, dy;
+};
+struct  PaintTransform
+{
+	uint8_t* p;
+	Affine_23 affine;
+};
+struct PaintColrGlyph
+{
+	uint32_t  glyphID;
+};
+struct PaintGlyph
+{
+	uint8_t* p;
+	uint32_t glyphID;
+
+};
+struct  COLR_Paint_
+{
+	uint8_t format;
+
+	union
+	{
+		PaintColrLayers      colr_layers;
+		PaintGlyph           glyph;
+		//PaintSolid           solid;
+		//PaintLinearGradient  linear_gradient;
+		//PaintRadialGradient  radial_gradient;
+		//PaintSweepGradient   sweep_gradient;
+		PaintTransform       transform;
+		PaintTranslate       translate;
+		PaintScale           scale;
+		PaintRotate          rotate;
+		//PaintSkew            skew;
+		//PaintComposite       composite;
+		PaintColrGlyph       colr_glyph;
+
+	} u;
+
+};
 
 
 int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
 {
 	int   error = 0;
-	//FT_Memory  memory = face->root.memory;
+	//Memory  memory = face->root.memory;
 	auto face = face1->colorinfo;
 	uint8_t* table = b;
 	uint8_t* p = NULL;
@@ -5130,11 +5506,11 @@ int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
 		if (table_size < CPAL_V0_HEADER_BASE_SIZE)
 			break;
 
-		//if (FT_FRAME_EXTRACT(table_size, table))
+		//if (FRAME_EXTRACT(table_size, table))
 		//	goto NoCpal;
 
 		p = table;
-		cpal = (Cpal*)&face->td[40];
+		cpal = (Cpal*)&face->td[sizeof(Colr)];
 		if (!cpal)
 			break;
 
@@ -5233,7 +5609,7 @@ int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
 					error = -1; break;
 				}
 
-				//if (FT_QNEW_ARRAY(array, face->palette_data.num_palettes))
+				//if (QNEW_ARRAY(array, face->palette_data.num_palettes))
 
 				array0 = new uint16_t[face->palette_data.num_palettes];
 				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palettes))
@@ -5303,10 +5679,10 @@ int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
 	if (error < 0)
 	{
 		//InvalidTable:
-		//	error = -1;// FT_THROW(Invalid_Table);
+		//	error = -1;// THROW(Invalid_Table);
 
 		//NoCpal:
-			//FT_FRAME_RELEASE(table);
+			//FRAME_RELEASE(table);
 		//face1->uac.free_mem(cpal, 1);
 
 		face->cpal = NULL;
@@ -5322,15 +5698,15 @@ int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
 void tt_face_free_cpal(font_t* face)
 {
 	//sfnt_header* sp = face->colorinfo.;
-	//FT_Memory  memory = face->root.memory;
+	//Memory  memory = face->root.memory;
 
 	//Cpal* cpal = (Cpal*)face->cpal;
 
 
 	//if (cpal)
 	{
-		//	FT_FRAME_RELEASE(cpal->table);
-		//	FT_FREE(cpal);
+		//	FRAME_RELEASE(cpal->table);
+		//	FREE(cpal);
 	}
 }
 
@@ -5347,14 +5723,14 @@ int tt_face_palette_set(font_t* face, uint32_t  palette_index)
 	uint16_t  color_index;
 
 	if (!cpal || palette_index >= cp->palette_data.num_palettes)
-		return -6;// FT_THROW(Invalid_Argument);
+		return -6;// THROW(Invalid_Argument);
 
 	offset = cpal->color_indices + 2 * palette_index;
 	color_index = PEEK_USHORT(offset);
 
 	if (color_index + cp->palette_data.num_palette_entries >
 		cpal->num_colors)
-		return -7;// FT_THROW(Invalid_Table);
+		return -7;// THROW(Invalid_Table);
 
 	p = cpal->colors + COLOR_SIZE * color_index;
 	q = (Color_2*)cp->palette;
@@ -5370,6 +5746,661 @@ int tt_face_palette_set(font_t* face, uint32_t  palette_index)
 		q++;
 	}
 
+	return 0;
+}
+
+#define ENSURE_READ_BYTES( byte_size )                             \
+  if ( p < colr->paints_start_v1                                || \
+       p > (uint8_t*)colr->table + colr->table_size - byte_size )  \
+    return 0
+
+static bool get_child_table_pointer(Colr* colr,
+	uint8_t* paint_base,
+	uint8_t** p,
+	uint8_t** child_table_pointer)
+{
+	uint32_t  paint_offset;
+	uint8_t* child_table_p;
+
+
+	if (!child_table_pointer)
+		return 0;
+
+	if (*p < colr->paints_start_v1 ||
+		*p >(uint8_t*)colr->table + colr->table_size - 1 - 3)
+		return 0;
+
+	paint_offset = NEXT_UOFF3(*p);
+	if (!paint_offset)
+		return 0;
+
+	child_table_p = (uint8_t*)(paint_base + paint_offset);
+
+	if (child_table_p < colr->paints_start_v1 ||
+		child_table_p >= ((uint8_t*)colr->table + colr->table_size))
+		return 0;
+
+	*child_table_pointer = child_table_p;
+	return 1;
+}
+static bool read_paint(font_t* face, Colr* colr, uint8_t* p, COLR_Paint_* apaint)
+{
+	uint8_t* paint_base = p;
+	uint8_t* child_table_p = NULL;
+	bool   do_read_var = FALSE;
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+	ULong         var_index_base = 0;
+	/* Longest varIndexBase offset is 5 in the spec. */
+	ItemVarDelta  item_deltas[6] = { 0, 0, 0, 0, 0, 0 };
+#else
+	//UNUSED(face);
+#endif
+
+
+	if (!p || !colr || !colr->table)
+		return 0;
+
+	/* The last byte of the 'COLR' table is at 'size-1'; subtract 1 of    */
+	/* that to account for the expected format byte we are going to read. */
+	if (p < colr->paints_start_v1 ||
+		p >(uint8_t*)colr->table + colr->table_size - 2)
+		return 0;
+
+	apaint->format = NEXT_BYTE(p);
+
+	if (apaint->format >= COLR_PAINT_FORMAT_MAX)
+		return 0;
+
+	if (apaint->format == COLR_PAINTFORMAT_COLR_LAYERS)
+	{
+		/* Initialize layer iterator/ */
+		uint8_t    num_layers;
+		uint32_t  first_layer_index;
+
+
+		num_layers = NEXT_BYTE(p);
+		if (num_layers > colr->num_layers_v1)
+			return 0;
+
+		first_layer_index = NEXT_ULONG(p);
+		if (first_layer_index + num_layers > colr->num_layers_v1)
+			return 0;
+
+		apaint->u.colr_layers.num_layers = num_layers;
+		apaint->u.colr_layers.layer = 0;
+		/* TODO: Check whether pointer is outside colr? */
+		apaint->u.colr_layers.p =
+			colr->layers_v1 +
+			LAYER_V1_LIST_NUM_LAYERS_SIZE +
+			LAYER_V1_LIST_PAINT_OFFSET_SIZE * first_layer_index;
+
+		return 1;
+	}
+#if 0
+	else if (apaint->format == COLR_PAINTFORMAT_SOLID)//|| apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_SOLID)
+	{
+		ENSURE_READ_BYTES(4);
+		apaint->u.solid.color.palette_index = NEXT_USHORT(p);
+		apaint->u.solid.color.alpha = NEXT_SHORT(p);
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SOLID)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 1,
+				item_deltas))
+				return 0;
+
+			apaint->u.solid.color.alpha += (F2Dot14)item_deltas[0];
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_SOLID;
+
+		return 1;
+	}
+#endif
+	else if (apaint->format == COLR_PAINTFORMAT_COLR_GLYPH)
+	{
+		ENSURE_READ_BYTES(2);
+		apaint->u.colr_glyph.glyphID = NEXT_USHORT(p);
+
+		return 1;
+	}
+
+	/*
+	 * Grouped below here are all paint formats that have an offset to a
+	 * child paint table as the first entry (for example, a color line or a
+	 * child paint table).  Retrieve that and determine whether that paint
+	 * offset is valid first.
+	 */
+
+	if (!get_child_table_pointer(colr, paint_base, &p, &child_table_p))
+		return 0;
+#if 0
+	if (apaint->format == COLR_PAINTFORMAT_LINEAR_GRADIENT ||
+		(do_read_var =
+			((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_LINEAR_GRADIENT)))
+	{
+		if (!read_color_line(colr,
+			child_table_p,
+			&apaint->u.linear_gradient.colorline,
+			do_read_var))
+			return 0;
+
+		/*
+		 * In order to support variations expose these as Fixed 16.16
+		 * values so that we can support fractional values after
+		 * interpolation.
+		 */
+		ENSURE_READ_BYTES(12);
+		apaint->u.linear_gradient.p0.x = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.linear_gradient.p0.y = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.linear_gradient.p1.x = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.linear_gradient.p1.y = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.linear_gradient.p2.x = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.linear_gradient.p2.y = INT_TO_FIXED(NEXT_SHORT(p));
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if (do_read_var)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 6,
+				item_deltas))
+				return 0;
+
+			apaint->u.linear_gradient.p0.x += INT_TO_FIXED(item_deltas[0]);
+			apaint->u.linear_gradient.p0.y += INT_TO_FIXED(item_deltas[1]);
+			apaint->u.linear_gradient.p1.x += INT_TO_FIXED(item_deltas[2]);
+			apaint->u.linear_gradient.p1.y += INT_TO_FIXED(item_deltas[3]);
+			apaint->u.linear_gradient.p2.x += INT_TO_FIXED(item_deltas[4]);
+			apaint->u.linear_gradient.p2.y += INT_TO_FIXED(item_deltas[5]);
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_LINEAR_GRADIENT;
+
+		return 1;
+	}
+
+	else if (apaint->format == COLR_PAINTFORMAT_RADIAL_GRADIENT ||
+		(do_read_var =
+			((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_RADIAL_GRADIENT)))
+	{
+		Pos  tmp;
+
+
+		if (!read_color_line(colr,
+			child_table_p,
+			&apaint->u.radial_gradient.colorline,
+			do_read_var))
+			return 0;
+
+
+		/* In the OpenType specification, `r0` and `r1` are defined as   */
+		/* `UFWORD`.  Since FreeType doesn't have a corresponding 16.16  */
+		/* format we convert to `FWORD` and replace negative values with */
+		/* (32bit) `INT_MAX`.                                         */
+
+		ENSURE_READ_BYTES(12);
+
+		apaint->u.radial_gradient.c0.x = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.radial_gradient.c0.y = INT_TO_FIXED(NEXT_SHORT(p));
+
+		tmp = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.radial_gradient.r0 = tmp < 0 ? INT_MAX : tmp;
+
+		apaint->u.radial_gradient.c1.x = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.radial_gradient.c1.y = INT_TO_FIXED(NEXT_SHORT(p));
+
+		tmp = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.radial_gradient.r1 = tmp < 0 ? INT_MAX : tmp;
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if (do_read_var)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 6,
+				item_deltas))
+				return 0;
+
+			apaint->u.radial_gradient.c0.x += INT_TO_FIXED(item_deltas[0]);
+			apaint->u.radial_gradient.c0.y += INT_TO_FIXED(item_deltas[1]);
+
+			// TODO: Anything to be done about UFWORD deltas here?
+			apaint->u.radial_gradient.r0 += INT_TO_FIXED(item_deltas[2]);
+
+			apaint->u.radial_gradient.c1.x += INT_TO_FIXED(item_deltas[3]);
+			apaint->u.radial_gradient.c1.y += INT_TO_FIXED(item_deltas[4]);
+
+			apaint->u.radial_gradient.r1 += INT_TO_FIXED(item_deltas[5]);
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_RADIAL_GRADIENT;
+
+		return 1;
+	}
+
+	else if (apaint->format == COLR_PAINTFORMAT_SWEEP_GRADIENT ||
+		(do_read_var =
+			((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SWEEP_GRADIENT)))
+	{
+		if (!read_color_line(colr,
+			child_table_p,
+			&apaint->u.sweep_gradient.colorline,
+			do_read_var))
+			return 0;
+
+		ENSURE_READ_BYTES(8);
+
+		apaint->u.sweep_gradient.center.x =
+			INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.sweep_gradient.center.y =
+			INT_TO_FIXED(NEXT_SHORT(p));
+
+		apaint->u.sweep_gradient.start_angle =
+			F2DOT14_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.sweep_gradient.end_angle =
+			F2DOT14_TO_FIXED(NEXT_SHORT(p));
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if (do_read_var)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 4,
+				item_deltas))
+				return 0;
+
+			// TODO: Handle overflow?
+			apaint->u.sweep_gradient.center.x += INT_TO_FIXED(item_deltas[0]);
+			apaint->u.sweep_gradient.center.y += INT_TO_FIXED(item_deltas[1]);
+
+			apaint->u.sweep_gradient.start_angle +=
+				F2DOT14_TO_FIXED(item_deltas[2]);
+			apaint->u.sweep_gradient.end_angle +=
+				F2DOT14_TO_FIXED(item_deltas[3]);
+		}
+#endif
+		apaint->format = COLR_PAINTFORMAT_SWEEP_GRADIENT;
+
+		return 1;
+	}
+#endif
+	if (apaint->format == COLR_PAINTFORMAT_GLYPH)
+	{
+		ENSURE_READ_BYTES(2);
+		apaint->u.glyph.p = child_table_p;
+		//apaint->u.glyph.paint.insert_root_transform = 0;
+		apaint->u.glyph.glyphID = NEXT_USHORT(p);
+
+		return 1;
+	}
+
+	else if (apaint->format == COLR_PAINTFORMAT_TRANSFORM)//||		(PaintFormat_Internal)apaint->format ==		COLR_PAINTFORMAT_INTERNAL_VAR_TRANSFORM)
+	{
+		apaint->u.transform.p = child_table_p;
+		//apaint->u.transform.paint.insert_root_transform = 0;
+
+		if (!get_child_table_pointer(colr, paint_base, &p, &child_table_p))
+			return 0;
+
+		p = child_table_p;
+
+		/*
+		 * The following matrix coefficients are encoded as
+		 * OpenType 16.16 fixed-point values.
+		 */
+		ENSURE_READ_BYTES(24);
+		apaint->u.transform.affine.xx = NEXT_LONG(p);
+		apaint->u.transform.affine.yx = NEXT_LONG(p);
+		apaint->u.transform.affine.xy = NEXT_LONG(p);
+		apaint->u.transform.affine.yy = NEXT_LONG(p);
+		apaint->u.transform.affine.dx = NEXT_LONG(p);
+		apaint->u.transform.affine.dy = NEXT_LONG(p);
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_TRANSFORM)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 6,
+				item_deltas))
+				return 0;
+
+			apaint->u.transform.affine.xx += (Fixed)item_deltas[0];
+			apaint->u.transform.affine.yx += (Fixed)item_deltas[1];
+			apaint->u.transform.affine.xy += (Fixed)item_deltas[2];
+			apaint->u.transform.affine.yy += (Fixed)item_deltas[3];
+			apaint->u.transform.affine.dx += (Fixed)item_deltas[4];
+			apaint->u.transform.affine.dy += (Fixed)item_deltas[5];
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_TRANSFORM;
+
+		return 1;
+	}
+
+	else if (apaint->format == COLR_PAINTFORMAT_TRANSLATE)// || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_TRANSLATE)
+	{
+		apaint->u.translate.p = child_table_p;
+		//apaint->u.translate.paint.insert_root_transform = 0;
+
+		ENSURE_READ_BYTES(4);
+		apaint->u.translate.dx = INT_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.translate.dy = INT_TO_FIXED(NEXT_SHORT(p));
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_TRANSLATE)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 2,
+				item_deltas))
+				return 0;
+
+			apaint->u.translate.dx += INT_TO_FIXED(item_deltas[0]);
+			apaint->u.translate.dy += INT_TO_FIXED(item_deltas[1]);
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_TRANSLATE;
+
+		return 1;
+	}
+
+	else if (apaint->format >= COLR_PAINTFORMAT_SCALE)// && (PaintFormat_Internal)apaint->format <= COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
+	{
+		apaint->u.scale.p = child_table_p;
+		//apaint->u.scale.paint.insert_root_transform = 0;
+
+		/* All scale paints get at least one scale value. */
+		ENSURE_READ_BYTES(2);
+		apaint->u.scale.scale_x = F2DOT14_TO_FIXED(NEXT_SHORT(p));
+
+		/* Non-uniform ones read an extra y value. */
+		//if (apaint->format == COLR_PAINTFORMAT_SCALE ||
+		//	(PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE ||
+		//	(PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_SCALE_CENTER ||
+		//	(PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER)
+		//{
+		//	ENSURE_READ_BYTES(2);
+		//	apaint->u.scale.scale_y = F2DOT14_TO_FIXED(NEXT_SHORT(p));
+		//}
+		//else
+		apaint->u.scale.scale_y = apaint->u.scale.scale_x;
+
+		/* Scale paints that have a center read center coordinates, */
+		/* otherwise the center is (0,0).                           */
+		//if ((PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_SCALE_CENTER ||
+		//	(PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER ||
+		//	(PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_SCALE_UNIFORM_CENTER ||
+		//	(PaintFormat_Internal)apaint->format ==
+		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
+		//{
+		//	ENSURE_READ_BYTES(4);
+		//	apaint->u.scale.center_x = INT_TO_FIXED(NEXT_SHORT(p));
+		//	apaint->u.scale.center_y = INT_TO_FIXED(NEXT_SHORT(p));
+		//}
+		//else
+		{
+			apaint->u.scale.center_x = 0;
+			apaint->u.scale.center_y = 0;
+		}
+
+		/* Base values set, now handle variations. */
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE ||
+			(PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER ||
+			(PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM ||
+			(PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 2,
+					item_deltas))
+					return 0;
+
+				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[1]);
+			}
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 4,
+					item_deltas))
+					return 0;
+
+				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[1]);
+				apaint->u.scale.center_x += INT_TO_FIXED(item_deltas[2]);
+				apaint->u.scale.center_y += INT_TO_FIXED(item_deltas[3]);
+			}
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 1,
+					item_deltas))
+					return 0;
+
+				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[0]);
+			}
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 3,
+					item_deltas))
+					return 0;
+
+				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.scale.center_x += INT_TO_FIXED(item_deltas[1]);
+				apaint->u.scale.center_y += INT_TO_FIXED(item_deltas[2]);
+			}
+		}
+#endif
+
+		/* FT 'COLR' v1 API output format always returns fully defined */
+		/* structs; we thus set the format to the public API value.    */
+		apaint->format = COLR_PAINTFORMAT_SCALE;
+
+		return 1;
+	}
+
+	else if (apaint->format == COLR_PAINTFORMAT_ROTATE)// || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_ROTATE_CENTER || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
+	{
+		apaint->u.rotate.p = child_table_p;
+		//apaint->u.rotate.paint.insert_root_transform = 0;
+
+		ENSURE_READ_BYTES(2);
+		apaint->u.rotate.angle = F2DOT14_TO_FIXED(NEXT_SHORT(p));
+
+		//if ((PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_ROTATE_CENTER || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
+		//{
+		//	ENSURE_READ_BYTES(4);
+		//	apaint->u.rotate.center_x = INT_TO_FIXED(NEXT_SHORT(p));
+		//	apaint->u.rotate.center_y = INT_TO_FIXED(NEXT_SHORT(p));
+		//}
+		//else
+		{
+			apaint->u.rotate.center_x = 0;
+			apaint->u.rotate.center_y = 0;
+		}
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE ||
+			(PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
+		{
+			uint32_t  num_deltas = 0;
+
+
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
+				num_deltas = 3;
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE)
+				num_deltas = 1;
+
+			if (num_deltas > 0)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base,
+					num_deltas, item_deltas))
+					return 0;
+
+				apaint->u.rotate.angle += F2DOT14_TO_FIXED(item_deltas[0]);
+
+				if (num_deltas == 3)
+				{
+					apaint->u.rotate.center_x += INT_TO_FIXED(item_deltas[1]);
+					apaint->u.rotate.center_y += INT_TO_FIXED(item_deltas[2]);
+				}
+			}
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_ROTATE;
+
+
+		return 1;
+	}
+#if 0
+	else if (apaint->format == COLR_PAINTFORMAT_SKEW ||
+		(PaintFormat_Internal)apaint->format ==
+		COLR_PAINTFORMAT_INTERNAL_VAR_SKEW ||
+		(PaintFormat_Internal)apaint->format ==
+		COLR_PAINTFORMAT_INTERNAL_SKEW_CENTER ||
+		(PaintFormat_Internal)apaint->format ==
+		COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
+	{
+		apaint->u.skew.paint.p = child_table_p;
+		apaint->u.skew.paint.insert_root_transform = 0;
+
+		ENSURE_READ_BYTES(4);
+		apaint->u.skew.x_skew_angle = F2DOT14_TO_FIXED(NEXT_SHORT(p));
+		apaint->u.skew.y_skew_angle = F2DOT14_TO_FIXED(NEXT_SHORT(p));
+
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_SKEW_CENTER ||
+			(PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
+		{
+			ENSURE_READ_BYTES(4);
+			apaint->u.skew.center_x = INT_TO_FIXED(NEXT_SHORT(p));
+			apaint->u.skew.center_y = INT_TO_FIXED(NEXT_SHORT(p));
+		}
+		else
+		{
+			apaint->u.skew.center_x = 0;
+			apaint->u.skew.center_y = 0;
+		}
+
+
+#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
+		if ((PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SKEW ||
+			(PaintFormat_Internal)apaint->format ==
+			COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
+		{
+			ENSURE_READ_BYTES(4);
+			var_index_base = NEXT_ULONG(p);
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SKEW)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 2,
+					item_deltas))
+					return 0;
+
+				apaint->u.skew.x_skew_angle += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.skew.y_skew_angle += F2DOT14_TO_FIXED(item_deltas[1]);
+			}
+
+			if ((PaintFormat_Internal)apaint->format ==
+				COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
+			{
+				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 4,
+					item_deltas))
+					return 0;
+
+				apaint->u.skew.x_skew_angle += F2DOT14_TO_FIXED(item_deltas[0]);
+				apaint->u.skew.y_skew_angle += F2DOT14_TO_FIXED(item_deltas[1]);
+				apaint->u.skew.center_x += INT_TO_FIXED(item_deltas[2]);
+				apaint->u.skew.center_y += INT_TO_FIXED(item_deltas[3]);
+			}
+		}
+#endif
+
+		apaint->format = COLR_PAINTFORMAT_SKEW;
+
+		return 1;
+	}
+
+	else if (apaint->format == COLR_PAINTFORMAT_COMPOSITE)
+	{
+		uint32_t  composite_mode;
+
+
+		apaint->u.composite.source_paint.p = child_table_p;
+		apaint->u.composite.source_paint.insert_root_transform = 0;
+
+		ENSURE_READ_BYTES(1);
+		composite_mode = NEXT_BYTE(p);
+		if (composite_mode >= COLR_COMPOSITE_MAX)
+			return 0;
+
+		apaint->u.composite.composite_mode = (Composite_Mode)composite_mode;
+
+		if (!get_child_table_pointer(colr, paint_base, &p, &child_table_p))
+			return 0;
+
+		apaint->u.composite.backdrop_paint.p = child_table_p;
+		apaint->u.composite.backdrop_paint.insert_root_transform = 0;
+
+		return 1;
+	}
+#endif
 	return 0;
 }
 
@@ -6758,6 +7789,7 @@ icu_lib_t* get_icu(int v)
 			std::string dlln = "libicuuc";
 			std::string dlln0 = "icudt";
 			int v1 = v;
+#if 0
 #ifdef _WIN32
 			dlln = "icuuc" + std::to_string(v1);
 			dlln0 = "icudt" + std::to_string(v1);
@@ -6776,9 +7808,10 @@ icu_lib_t* get_icu(int v)
 #else
 			auto so = loadso(dlln);
 #endif // _WIN32
-
+#endif
+			auto so = loadso("icu");
 			if (!so) {
-				so = loadso(dlln);
+				so = loadso("libicu");
 				if (!so)
 					throw std::runtime_error("-1");
 			}
@@ -8639,3 +9672,126 @@ double yHist::calculate_relation(yHist* p)
 	return correlation;
 }
 #endif // 1
+
+#ifdef __ANDROID__
+
+njson get_sysfont(njson d)
+{
+	njson r;
+	njson first0;
+	std::vector<std::string> fnvs;
+	std::set<std::string> fns;
+	for (auto& [k, v] : d.items()) {
+		if (v.find("[child]") == v.end())continue;
+		auto& vc = v["[child]"];
+		for (auto& ct : vc) {
+			if (ct.find("family") == ct.end())continue;
+			auto lang = toStr(ct["family"]["@lang"], "@undefined");
+			auto& a = r["c"][lang];
+			std::set<std::string> asv;
+			auto& ft = ct["family"]["[child]"];
+			for (auto& font : ft) {
+				auto ft1 = font["font"];
+				ft1["@style"];
+				ft1["@weight"];
+				for (auto& [k1, v1] : ft1.items()) {
+					std::string fn1;
+					if (k1 == "#text")
+					{
+						fn1 = v1;
+					}
+					else
+					{
+						if (!v1.is_array())continue;
+						auto v10 = v1;
+						auto fn = v10[0]["#text"];
+						auto fnn = fn.get<std::string>();
+						for (auto ch : fnn) {
+							if (ch == '\r')
+								break;
+							fn1.push_back((ch));
+						}
+					}
+					if (fn1.size()) {
+						if (asv.insert(fn1).second)
+							a.push_back(fn1);
+						//if (fns.insert(fn1).second)
+						//	fnvs.push_back(fn1);
+					}
+				}
+			}
+			if (first0.empty())
+				first0 = fnvs;
+			//fnvs.push_back("");
+		}
+	}
+	r["a"] = first0;
+	return r;
+}
+
+void ead_font(const std::string& internalDataPath)
+{
+	if (!ctx)return;
+	std::string ftxml;
+	hz::read_binary_file("/system/etc/fonts.xml", ftxml);
+	do {
+		auto dlt = ctx->get_lt();
+		if (ftxml.empty())
+		{
+			break;
+		}
+		hz::save_cache("fonts.xml", ftxml.data(), ftxml.size(), ctx);
+		auto ftn = xj::xml2pjson(ftxml);
+		if (ftn) {
+			{
+				auto ndd = ftn->dump(2);
+				save_cache("fonts1.json", ndd.data(), ndd.size(), ctx);
+			}
+			auto vsf = get_sysfont(*ftn);
+			{
+				auto& sfn = vsf["c"]["zh"];
+				for (auto& it : sfn) {
+					std::string k = it;
+					k = "/system/fonts/" + hstring::trim_ch(k, "\t\r\n ");
+					add_font(k.c_str(), false);
+				}
+			}
+			{
+				auto& sfn = vsf["c"]["zh-Hans"];
+				for (auto& it : sfn) {
+					std::string k = it;
+					k = "/system/fonts/" + hstring::trim_ch(k, "\t\r\n ");
+					add_font(k.c_str(), false);
+				}
+			}
+#ifdef _WIN32
+#else
+			std::vector<std::string> mss = { "entypo.ttf" };
+			for (auto it : mss)
+			{
+				std::string d;
+				it = "fonts/" + it;
+				hz::read_binary_file(it.c_str(), d);
+				if (d.size())
+				{
+					auto fj = internalDataPath + it;//"entypo.ttf" 
+					save_file(fj.c_str(), d.data(), d.size());
+				}
+
+			}
+
+#endif // _WIN32
+			auto fj = internalDataPath + "fonts/entypo.ttf";
+			add_font(fj.c_str(), false);
+			if (dlt)
+			{
+				dlt->set_font_family(vft.data(), vft.size());
+			}
+			auto ndd = vsf.dump(2);
+			hz::save_cache("fonts2.json", ndd.data(), ndd.size(), ctx);
+			delete ftn;
+		}
+
+	} while (0);
+}
+#endif // __ANDROID__

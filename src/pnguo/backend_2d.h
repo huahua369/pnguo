@@ -8,6 +8,9 @@ typedef struct d2_surface_t d2_surface_t;
 d2ctx_t* new_cr(d2_surface_t* sur);
 void free_cr(d2ctx_t* cr);
 
+// 预乘输出bgra，type=0为原数据是rgba
+void premultiply_data(int w, unsigned char* data, int type, bool multiply);
+
 
 /*
 用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
