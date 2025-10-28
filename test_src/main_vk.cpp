@@ -1394,8 +1394,9 @@ int main()
 
 		auto fctx = app->font_ctx;
 		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
+		auto sues = fctx->add2file(R"(data\seguiemj.ttf)", 0);
 		auto seg = fctx->get_font((char*)u8"Segoe UI Emoji", 0);
-		auto sue = seg;
+		auto sue = sues[0];
 		{
 			//纹理缓存
 			auto p = new bitmap_cache_cx();
@@ -1407,7 +1408,9 @@ int main()
 			}
 		}
 		std::vector<font_t*> familys = { ksun ,seg };
-		std::string k8 =(char*) u8"🏳️‍🌈👨‍👨‍👧";
+		std::string k8 = (char*)u8"🏳️‍🌈";
+		std::string k80 = (char*)u8"👨‍👨‍👧";
+		k8 += k80;
 		text_image_t opt = {};
 		//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
 		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 512, 512);
@@ -1416,16 +1419,17 @@ int main()
 
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
 		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
-		double scale_h = sue->get_scale(100);
+		int fontsize = 100;
+		double scale_h = sue->get_scale(fontsize);
 		uint32_t color = -1;
 		int xx = 0;
-		int yy = sue->get_line_height(100);
+		int yy = sue->get_line_height(fontsize);
 		std::vector<font_item_t> tm;
 		// 光栅化glyph index并缓存
 		for (size_t i = 0; i < gp.len; i++)
 		{
 			auto pos = &gp.pos[i];
-			auto git = sue->get_glyph_item(pos->index, 0, 100);
+			auto git = sue->get_glyph_item(pos->index, 0, fontsize);
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._apos = offset;
 			tm.push_back(git);
@@ -1441,6 +1445,7 @@ int main()
 				if (!ft) {
 					ft = new_image_cr(git._image);
 					git._image->ptr = ft;
+					cairo_surface_write_to_png(ft, "temp/cacheemoji.png");
 				}
 				if (ft)
 				{
@@ -1448,7 +1453,7 @@ int main()
 					ps.x += xx;
 					ps += offset;
 					ps.y += yy;
-					draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color,{});
+					draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
 				}
 			}
 			xx += adv.x;
