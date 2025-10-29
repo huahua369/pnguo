@@ -1408,9 +1408,10 @@ int main()
 			}
 		}
 		std::vector<font_t*> familys = { ksun ,seg };
-		std::string k8 = (char*)u8"➗🏳️‍🌈";
+		std::string k8 = (char*)u8"➗";
+		std::string k81 = (char*)u8"🏳️‍🌈";
 		std::string k80 = (char*)u8"👨‍👨‍👧";
-		k8 += k80;
+		k8 += k80 + k81;
 		text_image_t opt = {};
 		//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
 		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
@@ -1419,7 +1420,7 @@ int main()
 
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
 		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
-		int fontsize = 300;
+		int fontsize = 128;
 		double scale_h = sue->get_scale(fontsize);
 		uint32_t color = -1;
 		int xx = 0;
@@ -1497,7 +1498,7 @@ int main()
 				c++;
 			}
 		}
-		std::string fn = "temp/emojitest.png";
+		std::string fn = "temp/emojitest2.png";
 		cairo_surface_write_to_png(img, fn.c_str());
 		cairo_destroy(cr);
 		cairo_surface_destroy(img);

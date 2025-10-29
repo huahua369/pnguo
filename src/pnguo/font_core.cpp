@@ -1348,9 +1348,9 @@ public:
 	}
 	static glm::ivec4 get_glyph_box(font_impl* font, int gidx, double scale, double shift_x = .0, double shift_y = 0.0f)
 	{
-		int x0 = 0, y0 = 0, x1, y1;
+		int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 		stbtt_GetGlyphBitmapBoxSubpixel(font, gidx, scale, scale, shift_x, shift_y, &x0, &y0, &x1, &y1);
-		return glm::ivec4(x0, y0, x1 - x0, y1 - y0);
+		return glm::ivec4(x0, y0, x1, y1);
 	}
 	static void stbtt_MakeGlyphBitmapSubpixel0(const stbtt_fontinfo* info, unsigned char* output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, float shift_x, float shift_y, int glyph, int xf)
 	{
@@ -1388,7 +1388,7 @@ public:
 		adlsb->x = bearing;
 		ot->x = x0;
 		ot->y = y0;
-		if (!out)
+		//if (!out)
 		{
 			ot->z = x1 - x0;
 			ot->w = y1 - y0;
@@ -1967,8 +1967,6 @@ public:
 				int comp_num_verts = 0, i;
 				vertex_f* comp_verts = 0, * tmp = 0;
 				float mtx[6] = { 1,0,0,1,0,0 }, m, n;
-
-				glm::mat3 mx = glm::mat3(1.0);
 				flags = ttSHORT(comp); comp += 2;
 				gidx = ttSHORT(comp); comp += 2;
 
@@ -1986,8 +1984,6 @@ public:
 					// @TODO handle matching point
 					assert(0);
 				}
-				mx[1].y = mtx[4];
-				mx[1].z = mtx[5];
 				if (flags & (1 << 3)) { // WE_HAVE_A_SCALE
 					auto c16 = ttSHORT(comp);
 					mtx[0] = mtx[3] = c16 / 16384.0f; comp += 2;
@@ -2005,10 +2001,7 @@ public:
 					mtx[3] = ttSHORT(comp) / 16384.0f; comp += 2;
 
 				}
-				mx = glm::mat3(mtx[0], mtx[1], 0.0f, mtx[2], mtx[3], 0.0f, mtx[4], mtx[5], 1.0);
-				// Find transformation scales.
-				m = 1;// (float)sqrt(mtx[0] * mtx[0] + mtx[1] * mtx[1]);
-				n = 1;// (float)sqrt(mtx[2] * mtx[2] + mtx[3] * mtx[3]);
+				auto mx23 = glm::mat3x2(mtx[0], mtx[1], mtx[2], mtx[3], mtx[4], mtx[5]);
 				// Get indexed glyph.
 				comp_num_verts = GetGlyphShapeTT(info, gidx, &cvd);
 				comp_verts = cvd.data();
@@ -2017,13 +2010,15 @@ public:
 					for (i = 0; i < comp_num_verts; ++i) {
 						vertex_f* v = &comp_verts[i];
 						glm::vec3 v2 = glm::vec3(*(glm::vec2*)v, 1.0);
-						v2 = mx * v2;
-						v->x = v2.x;
-						v->y = v2.y;
+						// m[0][0] * v.x + m[1][0] * v.y + mtx[4],
+						// m[0][1] * v.x + m[1][1] * v.y + mtx[5]);
+						auto vv2 = mx23 * v2;
+						v->x = vv2.x;
+						v->y = vv2.y;
 						v2 = glm::vec3(v->cx, v->cy, 1.0);
-						v2 = mx * v2;
-						v->cx = v2.x;
-						v->cy = v2.y;
+						vv2 = mx23 * v2;
+						v->cx = vv2.x;
+						v->cy = vv2.y;
 						//v2 = glm::vec3(v->cx1, v->cy1, 1.0);
 						//v2 = mx * v2;
 						//v->cx1 = v2.x;
@@ -2685,7 +2680,7 @@ int font_t::init_color()
 	return 0;
 }
 
-int font_t::get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vector<uint32_t>& col)
+int font_t::get_gcolor(uint32_t base_glyph, std::vector<glm::uvec2>& cols)
 {
 	uint32_t aglyph_index = base_glyph;
 	uint32_t acolor_index = 0;
@@ -2697,9 +2692,7 @@ int font_t::get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vect
 		{
 			break;
 		}
-		//auto vnn = GetGlyphShapeTT(aglyph_index, 0);
-		ag.push_back(aglyph_index);
-		col.push_back(get_c2(this, acolor_index).c);
+		cols.push_back({ aglyph_index, get_c2(this, acolor_index).c });
 	}
 	return it.num_layers;
 }
@@ -3398,53 +3391,52 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 		auto rp = rfont->get_gcache(glyph_index, fontsize);
 		do {
 			if (rp)break;
-
 			auto bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, 0, lcd_type, unicode_codepoint);
 			if (colorinfo && bit && !use_no_color)
 			{
 				glm::ivec4 bs = { rc.x, rc.y, bitmap->width, bitmap->rows };
-				std::vector<uint32_t> ag;
-				std::vector<uint32_t> cols;
-				if (get_gcolor(glyph_index, ag, cols))
+				std::vector<glm::uvec2> cols;	// uvec2.x=glyph_index,.y=color
+				if (get_gcolor(glyph_index, cols))
 				{
 					glm::ivec2 pos = {};
 					image_ptr_t* img = 0;
-					img = use_ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, 0);
-					for (size_t i = 0; i < ag.size(); i++)
+					glm::ivec4 maxbox = { MAXINT,MAXINT,0,0 };
+					for (size_t i = 0; i < cols.size(); i++)
+					{
+						glm::vec4 abox = {};
+						rfont->get_shape_box_glyph(cols[i].x, fontsize, &abox);
+						maxbox.x = std::min(maxbox.x, (int)abox.x);
+						maxbox.y = std::min(maxbox.y, (int)abox.y);
+						maxbox.z = std::max(maxbox.z, (int)(abox.z));
+						maxbox.w = std::max(maxbox.w, (int)(abox.w));
+					}
+					bs = maxbox;
+					bitmap->width = bitmap->pitch = std::max(rc.z, bs.z - bs.x);// 重置组合大小
+					bitmap->rows = std::max(rc.w, bs.w - bs.y);
+					bs.z = bitmap->width;
+					bs.w = bitmap->rows;
+					img = use_ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, linegap); // 申请缓存位置 
+					glm::vec2 dpos = pos;
+					dpos.x += bs.x < 0 ? abs(bs.x) : 0;
+					dpos.y += abs(bs.y);
+					for (auto& ct : cols)
 					{
 						bitbuf->clear();
 						bitbuf->resize(bitmap->width * bitmap->rows);
-						//std::vector<vertex_f> gpt;
-						//auto gk = rfont->get_shape_gid(ag[i], 0, &gpt, 0, 1.0);
-						//if (i == 5)
-						//{
-						//	float scale = get_scale(fontsize);
-						//	image_gray bmp = {};
-						//	bmp.width = bitmap->width * 1.5;
-						//	bmp.height = bitmap->rows * 1.5;
-						//	glm::vec2 ps = { 0,-100 };
-						//	//ps.x -= blur * 2;
-						//	//ps.y -= blur * 2;
-						//	ps.y -= 0;
-						//	get_path_bitmap((vertex_32f*)gpt.data(), gpt.size(), &bmp, { scale,scale }, ps, 0);
-						//	auto fn = "temp/qi_" + std::to_string(i) + ".png";
-						//	save_img_png(&bmp, fn.c_str());
-						//	i = 5;
-						//}
-						// -4修正填充
-						auto bit = rfont->get_glyph_image(ag[i], fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint, 0);
+						// 光栅化单个颜色块
+						auto bit = rfont->get_glyph_image(ct.x, fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint, 0);
 						if (bit)
 						{
-							auto ps1 = pos;
-							ps1.x += bitmap->x - bs.x, ps1.y += bitmap->y + abs(bs.y);
-							bitmap->rows;
-							img = use_ctx->push_cache_bitmap_old(bitmap, &ps1, cols[i], img, 0);
+							glm::ivec2 ps1 = dpos;
+							ps1.x += (bitmap->x) - bs.x, ps1.y += (bitmap->y);
+							img = use_ctx->push_cache_bitmap_old(bitmap, &ps1, ct.y, img, linegap);
 						}
 					}
-					glm::ivec4 rc4 = { pos.x, pos.y, bs.z,bs.w };
+					glm::ivec4 rc4 = { pos.x, pos.y, bs.z, bs.w };
 					if (img)
 					{
-						rp = rfont->push_gcache(glyph_index, fontsize, img, rc4, { bs.x,bs.y });
+						// 提交到查询缓存
+						rp = rfont->push_gcache(glyph_index, fontsize, img, rc4, bs);
 						if (rp)
 						{
 							rp->color = -1;
@@ -3457,8 +3449,8 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 			bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint);
 			if (bit)
 			{
-				glm::ivec2 pos;
-				auto img = use_ctx->push_cache_bitmap(bitmap, &pos, linegap, col);
+				glm::ivec2 pos = {};
+				auto img = use_ctx->push_cache_bitmap(bitmap, &pos, linegap, col);//申请缓存位置
 				glm::ivec4 rc4 = { pos.x, pos.y, bitmap->width, bitmap->rows };
 				if (img)
 				{
@@ -6884,9 +6876,8 @@ stb_packer* bitmap_cache_cx::get_last_packer(bool isnew)
 }
 image_ptr_t* bitmap_cache_cx::push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap, uint32_t col)
 {
-	int width = bitmap->width + linegap, height = bitmap->rows + linegap;
+	int width = align_up(bitmap->width + linegap, 2), height = align_up(bitmap->rows + linegap, 2);
 	glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
-
 	auto pt = get_last_packer(false);
 	if (!pt)return 0;
 	auto ret = pt->push_rect({ width, height }, pos);
@@ -6937,9 +6928,8 @@ image_ptr_t* bitmap_cache_cx::push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* po
 }
 image_ptr_t* bitmap_cache_cx::push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2* pos, int linegap, uint32_t col)
 {
-	int width = bitmap->width + linegap, height = bitmap->height + linegap;
+	int width = align_up(bitmap->width + linegap, 2), height = align_up(bitmap->height + linegap, 2);
 	glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->height };
-
 	auto pt = get_last_packer(false);
 	if (!pt)return 0;
 	auto ret = pt->push_rect({ width, height }, pos);
@@ -6986,14 +6976,12 @@ image_ptr_t* bitmap_cache_cx::push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2*
 }
 image_ptr_t* bitmap_cache_cx::push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2* pos, uint32_t col, image_ptr_t* oldimg, int linegap)
 {
-	int width = bitmap->width + linegap, height = bitmap->rows + linegap;
-	glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
-
 	if (!oldimg)
 	{
 		return push_cache_bitmap(bitmap, pos, linegap, col);
 	}
 	else {
+		glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
 		rc4.x = pos->x;
 		rc4.y = pos->y;
 
@@ -7007,7 +6995,7 @@ image_ptr_t* bitmap_cache_cx::push_cache_bitmap_old(Bitmap_p* bitmap, glm::ivec2
 		src.width = bitmap->width;
 		src.height = bitmap->rows;
 		src.comp = 1;
-		gray_copy2rgba(&dst, &src, { rc4.x - linegap,rc4.y }, { 0,0,rc4.z,rc4.w }, col, true);
+		gray_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, col, true);
 		oldimg->valid = 1;
 	}
 	return oldimg;
