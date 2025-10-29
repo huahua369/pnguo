@@ -1342,11 +1342,15 @@ public:
 	}
 	static glm::ivec2 get_glyph_hmetrics(font_impl* font, int gidx)
 	{
-		int ascent, descent, linegap;
-		int x0 = 0, y0 = 0, x1, y1;
 		int advancei, lsb;
 		stbtt_GetGlyphHMetrics(font, gidx, &advancei, &lsb);
 		return glm::ivec2(advancei, lsb);
+	}
+	static glm::ivec4 get_glyph_box(font_impl* font, int gidx, double scale, double shift_x = .0, double shift_y = 0.0f)
+	{
+		int x0 = 0, y0 = 0, x1, y1;
+		stbtt_GetGlyphBitmapBoxSubpixel(font, gidx, scale, scale, shift_x, shift_y, &x0, &y0, &x1, &y1);
+		return glm::ivec4(x0, y0, x1 - x0, y1 - y0);
 	}
 	static void stbtt_MakeGlyphBitmapSubpixel0(const stbtt_fontinfo* info, unsigned char* output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, float shift_x, float shift_y, int glyph, int xf)
 	{
@@ -1375,7 +1379,7 @@ public:
 		int advancei, lsb;
 		stbtt_GetGlyphHMetrics(font, gidx, &advancei, &lsb);
 		double adv = advancei * scale;
-		double bearing = advancei * scale;
+		double bearing = lsb * scale;
 		float shift_x = .0, shift_y = 0.0f;
 		stbtt_GetGlyphBitmapBoxSubpixel(font, gidx, scale * lcd.x, scale * lcd.y, shift_x, shift_y, &x0, &y0, &x1, &y1);
 		glm::ivec4 ot0 = {};
@@ -2686,12 +2690,14 @@ int font_t::get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vect
 	uint32_t aglyph_index = base_glyph;
 	uint32_t acolor_index = 0;
 	LayerIterator it = {};
+	std::vector<vertex_f> vdp;
 	for (;;)
 	{
 		if (!tt_face_get_colr_layer(this, aglyph_index, &aglyph_index, &acolor_index, &it))
 		{
 			break;
 		}
+		//auto vnn = GetGlyphShapeTT(aglyph_index, 0);
 		ag.push_back(aglyph_index);
 		col.push_back(get_c2(this, acolor_index).c);
 	}
@@ -3093,12 +3099,14 @@ glm::ivec2 font_t::get_shape_box(uint32_t ch, int height)
 	}
 	return v;
 }
-glm::ivec2 font_t::get_shape_box_glyph(uint32_t gid, int height)
+glm::ivec2 font_t::get_shape_box_glyph(uint32_t gid, int height, glm::vec4* pbox)
 {
 	glm::vec2 v = stb_font::get_glyph_hmetrics(font, gid);
 	if (height != 0)
 	{
 		float scale = get_scale(height);
+		if (pbox)
+			*pbox = stb_font::get_glyph_box(font, gid, scale);
 		v *= scale;
 	}
 	return v;
@@ -3176,7 +3184,8 @@ tinypath_t font_t::get_shape_gid(int gid, int height, std::vector<vertex_f>* opt
 	{
 		if (p && vc > 1)
 		{
-			auto bs = get_shape_box_glyph(gid, height);
+			glm::vec4 box = {};
+			auto bs = get_shape_box_glyph(gid, height, &box);
 			r.advance = bs.x;
 			r.bearing = { bs.y,0 };
 			auto pss = opt->size();
@@ -9242,6 +9251,16 @@ void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 		if (ic > 0)
 			dst->valid = true;
 	}
+}
+void gray_copy2rgba(image_ptr_t* dst, image_gray* src1, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend)
+{
+	image_ptr_t src = {};
+	src.data = (uint32_t*)src1->data();
+	src.stride = src1->width;
+	src.width = src1->width;
+	src.height = src1->height;
+	src.comp = 1;
+	gray_copy2rgba(dst, &src, dst_pos, rc, col, true);
 }
 //单色位图1位
 void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color)

@@ -213,7 +213,8 @@ public:
 	tinypath_t get_shape_gid(int gid, int height, std::vector<vertex_f>* opt, int adv, float scale1);
 	glm::ivec2 get_shape_box(const void* str8, int height);
 	glm::ivec2 get_shape_box(uint32_t ch, int height);
-	glm::ivec2 get_shape_box_glyph(uint32_t gid, int height);
+	// 返回advanceWidth, leftSideBearing
+	glm::ivec2 get_shape_box_glyph(uint32_t gid, int height, glm::vec4* pbox);
 	tinypath_t get_shape(int cp, int height, std::vector<vertex_f>* opt, int adv, float scale1 = 1);
 public:
 	// 获取字符大小{xy大小，z=advance,w=基线}
@@ -557,6 +558,7 @@ void save_img_png(image_ptr_t* p, const char* str);
 void save_img_png(image_gray* p, const char* str);
 // 灰度图转rgba
 void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
+void gray_copy2rgba(image_ptr_t* dst, image_gray* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
 //单色位图1位
 void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color);
 

@@ -1167,10 +1167,11 @@ enum class widget_type :uint32_t {
 	wt_slider
 };
 
-
+class image_gray;
 
 // 灰度图转rgba
 void gray_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
+void gray_copy2rgba(image_ptr_t* dst, image_gray* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t col, bool isblend);
 //单色位图1位
 void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color);
 
