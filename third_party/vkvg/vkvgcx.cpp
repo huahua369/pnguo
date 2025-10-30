@@ -1,4 +1,7 @@
-﻿
+﻿/*
+
+vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkPhysicalDeviceScalarBlockLayoutFeaturesEXT
+*/
 #include <pch1.h>
 #include <stdint.h>
 #include <stdio.h>

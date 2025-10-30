@@ -1408,7 +1408,7 @@ int main()
 			}
 		}
 		std::vector<font_t*> familys = { ksun ,seg };
-		std::string k8 = (char*)u8"➗";
+		std::string k8 = (char*)u8"q我的大刀➗";
 		std::string k81 = (char*)u8"🏳️‍🌈";
 		std::string k80 = (char*)u8"👨‍👨‍👧";
 		k8 += k80 + k81;
@@ -1579,6 +1579,7 @@ int main()
 			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
 			test_vkvg(0, &cc);
 		}
+		glm::mat2x2 aaa;
 		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);

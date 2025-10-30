@@ -565,8 +565,37 @@ void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos
 void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, bool isblend);
 
 void split_v(std::string str, const std::string& pattern, std::vector<std::string>& result);
+struct text_extents_t {
+	float x_bearing; /*!< the horizontal distance from the origin to the leftmost part of the glyphs as drawn. Positive
+						if the glyphs lie entirely to the right of the origin. */
+	float y_bearing; /*!< the vertical distance from the origin to the topmost part of the glyphs as drawn. Positive
+						only if the glyphs lie completely below the origin; will usually be negative.*/
+	float width;     /*!< width of the glyphs as drawn*/
+	float height;    /*!< height of the glyphs as drawn*/
+	float x_advance; /*!< distance to advance in the X direction after drawing these glyphs*/
+	float y_advance; /*!< distance to advance in the Y direction after drawing these glyphs. Will typically be zero
+						except for vertical text layout as found in East-Asian languages.*/
+};
+#ifndef HB_BUFFER_H
+typedef struct hb_buffer_t hb_buffer_t;
+typedef struct hb_glyph_position_t hb_glyph_position_t;
+#endif
+struct text_block_t {
+	font_t* font;
+	text_extents_t extents;     /* store computed text extends */
+	const char* text;        /* utf8 char array of text*/
+	unsigned int glyph_count; /* Total glyph count */
+	hb_buffer_t* hbBuf;  /* HarfBuzz buffer of text */
+	hb_glyph_position_t* glyphs; /* HarfBuzz computed glyph positions array */
+};
+struct text_run_t {
+	text_block_t* t;
+	size_t count;
+	void* _private;
+};
+typedef struct text_run_t* text_p;
 
-
+text_p text_run_create(font_rctx* ctx, const char* text, uint32_t length);
 
 void do_text(const char* str, size_t first, size_t count);
 
