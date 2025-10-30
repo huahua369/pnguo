@@ -1416,8 +1416,12 @@ int main()
 		//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
 		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
 		auto cr = cairo_create(img);
-		//draw_text(cr, a->tv, -1, { 100,100 });
 
+		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic"); 
+		text_p text = text_create(k8.c_str(), k8.size(), family);
+
+
+		delete_font_family(family);
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
 		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
 		int fontsize = 128;

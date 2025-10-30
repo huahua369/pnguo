@@ -580,6 +580,11 @@ struct text_extents_t {
 typedef struct hb_buffer_t hb_buffer_t;
 typedef struct hb_glyph_position_t hb_glyph_position_t;
 #endif
+
+struct font_family_t {
+	font_t** familys;
+	int count;
+};
 struct text_block_t {
 	font_t* font;
 	text_extents_t extents;     /* store computed text extends */
@@ -591,12 +596,21 @@ struct text_block_t {
 struct text_run_t {
 	text_block_t* t;
 	size_t count;
+	font_family_t* family;
 	void* _private;
 };
 typedef struct text_run_t* text_p;
+typedef struct font_t* font_p;
+// familys多个字体时用小写逗号分隔，style逗号分隔字体的风格(可空)
+//  new_font_family(font_rctx* ctx,(char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic");
+font_family_t* new_font_family(font_rctx* ctx, const char* familys, const char* style = nullptr);
+void delete_font_family(font_family_t* p);
 
-text_p text_run_create(font_rctx* ctx, const char* text, uint32_t length);
+text_p text_create(const char* text, uint32_t length, font_family_t* family);
+void text_set_family(text_p p, font_family_t* family);
+void text_set(text_p p, const char* str, size_t first, size_t count);
+void text_set_bidi(text_p p, const char* str, size_t first, size_t count);
 
-void do_text(const char* str, size_t first, size_t count);
+
 
 #endif // !FONT_CORE_H

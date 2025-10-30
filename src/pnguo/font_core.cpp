@@ -9071,18 +9071,111 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 }
 
 
-void do_text(const char* str, size_t first, size_t count)
+font_family_t* new_font_family(font_rctx* ctx, const char* family, const char* styles)
 {
+	font_family_t* p = 0;
+	do {
+		if (!ctx || !family || !(*family))break;
+		std::vector<std::string> v, st;
+		split_v(family, ",", v);
+		if (styles && *styles)
+			split_v(styles, ",", st);
+		if (v.empty())
+		{
+			break;
+		}
+		const char* style = st.size() ? st[0].c_str() : nullptr;
+		size_t ix = 1;
+		p = new font_family_t();
+		p->familys = new font_p[v.size()];
+		p->count = 0;
+		auto t = p->familys;
+		for (auto& it : v)
+		{
+			auto font = ctx->get_font(it.c_str(), style);
+			if (ix < st.size())
+			{
+				style = st.size() ? st[ix].c_str() : nullptr;
+			}
+			ix++;
+			if (font)
+			{
+				*t = font; t++; p->count++;
+			}
+		}
+	} while (0);
+	return p;
+}
+
+void delete_font_family(font_family_t* p)
+{
+	if (p) {
+		if (p->familys)
+		{
+			delete[]p->familys;
+		}
+		delete p;
+	}
+}
+
+/*
+	text_block_t* t;
+	size_t count;
+	font_family_t* family;
+*/
+class text_run_cx :public text_run_t
+{
+public:
+	std::vector<bidi_item> bv;
+public:
+	text_run_cx();
+	~text_run_cx();
+
+private:
+
+};
+
+text_run_cx::text_run_cx()
+{
+}
+
+text_run_cx::~text_run_cx()
+{
+}
+text_p text_create(const char* text, uint32_t length, font_family_t* family)
+{
+	auto p = new text_run_cx();
+	text_p pr = p;
+	pr->_private = p;
+	p->family = family;
+	text_set_bidi(p, text, 0, length);
+	return pr;
+}
+
+void text_set_family(text_p p1, font_family_t* family)
+{
+	auto p = (text_run_cx*)p1->_private;
+	if (p)
+	{
+		p->family = family;
+		for (auto& it : p->bv) {
+
+		}
+	}
+}
+
+void text_set_bidi(text_p p1, const char* str, size_t first, size_t count)
+{
+	auto p = (text_run_cx*)p1->_private;
 	auto t = md::utf8_char_pos(str, first, count);
 	auto te = md::utf8_char_pos(t, count, count);
 	auto wk = md::u8_w(t, te - t);
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
-	std::vector<bidi_item> bidiinfo;
 	{
 		//print_time ftpt("bidi a");
-		do_bidi((UChar*)str1, n, bidiinfo);
-		std::stable_sort(bidiinfo.begin(), bidiinfo.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
+		do_bidi((UChar*)str1, n, p->bv);
+		std::stable_sort(p->bv.begin(), p->bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 	}
 	return;
 }
