@@ -81,6 +81,7 @@
 #include <glm/gtc/matrix_transform.hpp> 
 #include <glm/gtc/matrix_inverse.hpp> 
 #include <glm/gtx/matrix_transform_2d.hpp>
+#include <glm/gtx/euler_angles.hpp>
 #endif
 #include <nlohmann/json.hpp>
 #if defined( NLOHMANN_JSON_HPP) || defined(INCLUDE_NLOHMANN_JSON_HPP_)

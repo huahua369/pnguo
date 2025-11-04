@@ -1420,7 +1420,7 @@ int main()
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic"); 
 		text_p text = text_create(k8.c_str(), k8.size(), family);
 
-
+		//glm::extractEulerAngleYXZ();
 		delete_font_family(family);
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
 		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
