@@ -1408,7 +1408,7 @@ int main()
 			}
 		}
 		std::vector<font_t*> familys = { ksun ,seg };
-		std::string k8 = (char*)u8"q我的大刀➗";
+		std::string k8 = (char*)u8"q我的大刀➗😊😎😭💣🚩❓❌🟦⬜";
 		std::string k81 = (char*)u8"🏳️‍🌈";
 		std::string k80 = (char*)u8"👨‍👨‍👧";
 		k8 += k80 + k81;

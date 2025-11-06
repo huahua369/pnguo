@@ -487,6 +487,59 @@ void vkvgtest(form_x* pw) {
 }
 #endif
 #if 1
+
+const float arrow_size = 10;
+const float arrow_hwidth = 4;
+const float point_label_delta = -10;
+
+glm::vec2 avec2_perp(glm::vec2 a) { return  glm::vec2(a.y, -a.x); }
+
+void draw_arrow(VkvgContext ctx, float x, float y)
+{
+	glm::vec2 p0;
+	glm::vec2 p1 = { x, y };
+	vkvg_get_current_point(ctx, &p0.x, &p0.y);
+
+	glm::vec2 dir = (p0 - p1);
+	glm::vec2 n = glm::normalize(dir);
+	glm::vec2 perp = avec2_perp(n) * arrow_hwidth;
+
+	vkvg_line_to(ctx, x, y);
+	vkvg_stroke(ctx);
+	vkvg_move_to(ctx, x, y);
+	glm::vec2 p = (p1 + (n * arrow_size));
+	glm::vec2 a = (p + perp);
+	vkvg_line_to(ctx, a.x, a.y);
+	a = (p + (perp * -1));
+	vkvg_line_to(ctx, a.x, a.y);
+	vkvg_close_path(ctx);
+	vkvg_fill(ctx);
+	vkvg_move_to(ctx, x, y);
+}
+
+void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size)
+{
+	glm::vec2 dir = (p0 - p1);
+	glm::vec2 n = glm::normalize(dir);
+	glm::vec2 perp = avec2_perp(n) * arrow_hwidth;
+	vkvg_move_to(ctx, p0.x, p0.y);
+	vkvg_line_to(ctx, p1.x, p1.y);
+	vkvg_stroke(ctx);
+	vkvg_move_to(ctx, p1.x, p1.y);
+	glm::vec2 p = (p1 + (n * arrow_size));
+	glm::vec2 a = (p + perp);
+	vkvg_line_to(ctx, a.x, a.y);
+	a = (p + (perp * -1));
+	vkvg_line_to(ctx, a.x, a.y);
+	vkvg_close_path(ctx);
+	vkvg_fill(ctx);
+}
+
+#define white 1, 1, 1
+#define red   1, 0, 0
+#define green 0, 1, 0
+#define blue  0, 0, 1
+
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
 	vkvg_dev* vctx = new_vkvgdev(dc, 8);
@@ -519,6 +572,44 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		//vkvg_select_font_face(ctx, (char*)u8"新宋体");
 		//vkvg_set_font_size(cr, 26);
 		//vkvg_show_text(cr, (char*)u8"abc123g0加0123");
+		vkvg_set_line_width(ctx, 2);
+		vkvg_set_source_rgba(ctx, red, 0.8);
+		float scale = 2.0;
+		draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
+
+		vkvg_set_line_width(ctx, 1);
+		vkvg_set_source_rgba(ctx, green, 0.8);
+		double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
+		const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
+		int           contours_size = 3;
+		for (int i = 0; i < contours_size - 1; i++) {
+			auto p = contours_array[i];
+			vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
+			p += 2;
+			while (p < contours_array[i + 1]) {
+				draw_arrow(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
+				p += 2;
+			}
+			vkvg_stroke(ctx);
+		}
+
+		float dashes[] = { 50.0,  /* ink */
+				   10.0,  /* skip */
+				   10.0,  /* ink */
+				   10.0   /* skip*/
+		};
+		int    ndash = sizeof(dashes) / sizeof(dashes[0]);
+		double offset = -50.0;
+
+		vkvg_set_dash(cr, dashes, ndash, offset);
+		vkvg_set_line_width(cr, 10.0);
+
+		vkvg_move_to(cr, 128.0, 25.6);
+		vkvg_line_to(cr, 230.4, 230.4);
+		vkvg_rel_line_to(cr, -102.4, 0.0);
+		vkvg_curve_to(cr, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
+
+		vkvg_stroke(cr);
 	}
 
 	vkvg_flush(ctx);
