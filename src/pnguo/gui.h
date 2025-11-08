@@ -1,4 +1,5 @@
-﻿#ifndef GUI_H
+﻿#pragma once
+#ifndef GUI_H
 #define GUI_H
 
 
@@ -833,10 +834,13 @@ std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::strin
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb);
 
 
-
 #endif
+
 // 定义实现
 #ifdef GUI_STATIC_LIB
 #include "gui.cpp"
 #endif
+
+
+
 #endif // !GUI_H

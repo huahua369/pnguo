@@ -16,7 +16,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include <vkvg/vkvg.h> 
 #include "vkvgcx.h"
 #include <stb_rect_pack.h> 
-#include <print_time.h>
+#include <print_time.h> 
 	// 线，二阶曲线，三阶曲线
 enum class vtype_e1 :uint8_t
 {
@@ -642,3 +642,385 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	//free_vkvgdev(vctx);
 }
 #endif
+// __has_include(<vg.h>)
+
+
+void set_fill_style(VkvgContext cr, fill_style_d* st) {
+	bool stroke = st && st->thickness > 0 && st->color > 0;
+	if (!cr || !st)return;
+	if (st->fill)
+	{
+		vkvg_set_source_color(cr, st->fill);
+		if (stroke)
+			vkvg_fill_preserve(cr);
+		else
+			vkvg_fill(cr);
+	}
+	if (stroke)
+	{
+		vkvg_set_line_width(cr, st->thickness);
+		if (st->cap > 0)
+			vkvg_set_line_cap(cr, (vkvg_line_cap_t)st->cap);
+		if (st->join > 0)
+			vkvg_set_line_join(cr, (vkvg_line_join_t)st->join);
+		if (st->dash.v > 0 || st->dash_p)
+		{
+			float dashes[64] = {};
+			uint64_t x = 1;
+			auto t = dashes;
+			int num_dashes = st->dash_num;
+			if (num_dashes > 64)num_dashes = 64;
+			if (st->dash_p)
+			{
+				vkvg_set_dash(cr, st->dash_p, st->dash_num, st->dash_offset);
+			}
+			else
+			{
+				if (num_dashes > 8)num_dashes = 8;
+				for (size_t i = 0; i < num_dashes; i++)
+				{
+					*t = st->dash.v8[i]; t++;
+				}
+				if (num_dashes > 0)
+					vkvg_set_dash(cr, dashes, num_dashes, st->dash_offset);
+			}
+		}
+		vkvg_set_source_color(cr, st->color);
+		vkvg_stroke(cr);
+	}
+
+}
+
+vg_surface_cx::vg_surface_cx()
+{
+}
+
+vg_surface_cx::~vg_surface_cx()
+{
+	clear_style(0);
+	vkvg_destroy(ctx); ctx = 0;
+	vkvg_surface_destroy(surf); surf = 0;
+}
+
+void vg_surface_cx::set_surface(VkvgSurface s)
+{
+	surf = s;
+	if (s)
+	{
+		ctx = vkvg_create(surf);
+	}
+}
+
+size_t vg_surface_cx::add_style(fill_style_d* st, size_t count)
+{
+	auto cur = fill_styles.size();
+
+	if (st && count)
+	{
+		fill_styles.reserve(cur + count);
+		for (size_t i = 0; i < count; i++, st++)
+		{
+			auto nst = *st;
+			if (st->dash_p)
+			{
+				nst.dash_p = new float[st->dash_num];
+			}
+			fill_styles.push_back(nst);
+		}
+	}
+	return cur;
+}
+
+size_t vg_surface_cx::add_text_style(text_style_d* st, size_t count)
+{
+	auto cur = text_styles.size();
+	if (st && count)
+	{
+		text_styles.reserve(cur + count);
+		for (size_t i = 0; i < count; i++, st++)
+		{
+			text_styles.push_back(*st);
+		}
+	}
+	return cur;
+}
+
+void vg_surface_cx::clear_style(int t)
+{
+	if (t == 1 || t == 0) {
+		for (size_t i = 0; i < fill_styles.size(); i++)
+		{
+			auto& st = fill_styles[i];
+			if (st.dash_p)
+			{
+				delete[] st.dash_p; st.dash_p = 0;
+			}
+		}
+		fill_styles.clear();
+	}
+	if (t == 2 || t == 0)
+	{
+		text_styles.clear();
+	}
+}
+
+// r，左右下左
+void vdraw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r)
+{
+#ifndef M_PI
+	auto M_PI = glm::pi<double>();
+#endif
+	vkvg_move_to(cr, x + r.x, y);
+	vkvg_line_to(cr, x + width - r.y, y);
+	if (r.y)
+		vkvg_arc(cr, x + width - r.y, y + r.y, r.y, 3 * M_PI / 2, 2 * M_PI);
+	vkvg_line_to(cr, x + width, y + height - r.z);
+	if (r.z)
+		vkvg_arc(cr, x + width - r.z, y + height - r.z, r.z, 0, M_PI / 2);
+	vkvg_line_to(cr, x + r.w, y + height);
+	if (r.w)
+		vkvg_arc(cr, x + r.w, y + height - r.w, r.w, M_PI / 2, M_PI);
+	vkvg_line_to(cr, x, y + r.x);
+	if (r.x > 0)
+		vkvg_arc(cr, x + r.x, y + r.x, r.x, M_PI, 3 * M_PI / 2.0);
+	vkvg_close_path(cr);
+}
+void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
+{
+	glm::vec2 tpos[3] = {};
+	float df = dirspos.y;
+	switch ((int)dirspos.x)
+	{
+	case 0:
+	{
+		tpos[0] = { size.x * df, 0 };
+		tpos[1] = { size.x, size.y };
+		tpos[2] = { 0, size.y };
+	}
+	break;
+	case 1:
+	{
+		tpos[0] = { size.x, size.y * df };
+		tpos[1] = { 0, size.y };
+		tpos[2] = { 0, 0 };
+	}
+	break;
+	case 2:
+	{
+		tpos[0] = { size.x * df, size.y };
+		tpos[1] = { 0, 0 };
+		tpos[2] = { size.x, 0 };
+	}
+	break;
+	case 3:
+	{
+		tpos[0] = { 0, size.y * df };
+		tpos[1] = { size.x, 0 };
+		tpos[2] = { size.x, size.y };
+	}
+	break;
+	default:
+		break;
+	}
+	vkvg_move_to(cr, pos.x + tpos[0].x, pos.y + tpos[0].y);
+	vkvg_line_to(cr, pos.x + tpos[1].x, pos.y + tpos[1].y);
+	vkvg_line_to(cr, pos.x + tpos[2].x, pos.y + tpos[2].y);
+	vkvg_close_path(cr);
+}
+
+void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols, int width)
+{
+	int x = fmod(ss.x, width);
+	int y = fmod(ss.y, width);
+	int xn = ss.x / width;
+	int yn = ss.y / width;
+	if (x > 0)xn++;
+	if (y > 0)yn++;
+	vkvg_rectangle(cr, 0, 0, ss.x, ss.y);
+	vkvg_clip(cr);
+	for (size_t i = 0; i < yn; i++)
+	{
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k = (j & 1);
+			if (!(i & 1))
+				k = !k;
+			auto c = cols[k];
+			vkvg_rectangle(cr, j * width, i * width, width, width);
+			vkvg_set_source_color(cr, c);
+			vkvg_fill(cr);
+		}
+	}
+}
+void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count)
+{
+	VkvgPattern gr = vkvg_pattern_create_linear(0, 0, ss.x, ss.y);
+	double n = count - 1;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto color = cols[i];
+		vkvg_pattern_add_color_stop(gr, i / n, color.x, color.y, color.z, color.w);
+	}
+	vkvg_rectangle(cr, 0, 0, ss.x, ss.y);
+	vkvg_set_source(cr, gr);
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(gr);
+}
+
+void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order)
+{
+	if (!ctx || !cmds || count == 0 || !data || !size)return;
+	auto cr = (VkvgContext)ctx;
+	auto pd = (uint8_t*)data;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto t = (VG_DRAW_CMD)cmds[i];
+		switch (t)
+		{
+		case VG_DRAW_CMD::VG_CMD_CLEAR:
+			vkvg_clear(cr);
+			break;
+		case VG_DRAW_CMD::VG_CMD_RECT:
+		{
+			auto p = (rect_d*)pd;
+			if (p->r > 0)
+			{
+				vkvg_rounded_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
+			}
+			else {
+				vkvg_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y);
+			}
+			if (p->st >= 0 && p->st < fill_styles.size())
+				set_fill_style(cr, &fill_styles[p->st]);
+			pd += sizeof(rect_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_RECT4R:
+		{
+			auto p = (rect4r_d*)pd;
+			vdraw_round_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
+			if (p->st >= 0 && p->st < fill_styles.size())
+				set_fill_style(cr, &fill_styles[p->st]);
+			pd += sizeof(rect4r_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_CIRCLE:
+		{
+			auto p = (circle_d*)pd;
+			vkvg_ellipse(cr, p->radius, p->radius, p->pos.x, p->pos.y, 0);
+			if (p->st >= 0 && p->st < fill_styles.size())
+				set_fill_style(cr, &fill_styles[p->st]);
+			pd += sizeof(circle_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_ELLIPSE:
+		{
+			auto p = (ellipse_d*)pd;
+			vkvg_ellipse(cr, p->radius.x, p->radius.y, p->pos.x, p->pos.y, p->rotationAngle);
+			if (p->st >= 0 && p->st < fill_styles.size())
+				set_fill_style(cr, &fill_styles[p->st]);
+			pd += sizeof(ellipse_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_TRIANGLE:
+		{
+			auto p = (triangle_d*)pd;
+			draw_triangle(cr, p->pos, p->size, p->spos);
+			if (p->st >= 0 && p->st < fill_styles.size())
+				set_fill_style(cr, &fill_styles[p->st]);
+			pd += sizeof(triangle_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_FILL_GRID:
+		{
+			auto p = (grid_fill_d*)pd;
+			draw_grid_fill(cr, p->size, p->cols, p->width);
+			pd += sizeof(grid_fill_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_FILL_LINEAR:
+		{
+			auto p = (linear_fill_d*)pd;
+			draw_linear(cr, p->size, p->cols, p->count);
+			pd += sizeof(linear_fill_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_STROKE_LINE:
+		{
+			auto p = (line_d*)pd;
+			vkvg_move_to(cr, p->p1.x, p->p1.y);
+			vkvg_line_to(cr, p->p2.x, p->p2.y);
+			if (p->st >= 0 && p->st < fill_styles.size())
+				set_fill_style(cr, &fill_styles[p->st]);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_STROKE_POLYLINE:
+		{
+			auto p = (polyline_d*)pd;
+			if (p->count > 0)
+			{
+				vkvg_move_to(cr, p->points[0].x, p->points[0].y);
+				for (size_t j = 1; j < p->count; j++)
+				{
+					vkvg_line_to(cr, p->points[j].x, p->points[j].y);
+				}
+				if (p->closed)
+					vkvg_close_path(cr);
+				if (p->st >= 0 && p->st < fill_styles.size())
+					set_fill_style(cr, &fill_styles[p->st]);
+			}
+			pd += sizeof(polyline_d) + sizeof(glm::vec2) * (p->count - 1);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_TEXT:
+		{
+			auto p = (text_d*)pd;
+			if (p->font_st >= 0 && p->font_st < text_styles.size())
+			{
+				auto& ts = text_styles[p->font_st];
+			}
+			pd += sizeof(text_d) + p->len + 1;
+		}
+		break;
+		default:
+			break;
+		}
+	}
+
+}
+
+// 填充风格，返回开始序号
+size_t vgc_add_style(void* ctx, fill_style_d* st, size_t count) {
+	auto s = (vg_surface_cx*)ctx;
+	if (!ctx || !st || count == 0)return 0;
+	return s->add_style(st, count);
+}
+// 文本风格在text_d的font_st用，返回开始序号
+size_t vgc_add_text_style(void* ctx, text_style_d* st, size_t count) {
+	auto s = (vg_surface_cx*)ctx;
+	if (!ctx || !st || count == 0)return 0;
+	return s->add_text_style(st, count);
+}
+// 清除风格数据，0全部，1只清除填充风格，2只清除文本风格
+void vgc_clear_style(void* ctx, int t) {
+	auto s = (vg_surface_cx*)ctx;
+	if (!ctx)return;
+	s->clear_style(t);
+}
+
+/*
+渲染命令函数，
+ctx：渲染上下文指针
+cmds：命令数组
+count：命令数量
+data：命令数据指针
+size：数据大小
+order：渲染顺序，0=默认，数值越小，越靠前
+*/
+void vgc_add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order)
+{
+	auto s = (vg_surface_cx*)ctx;
+	if (!ctx || !cmds || count == 0 || !data || size == 0)return;
+	s->add_draw_cmd(s->ctx, cmds, count, data, size, order);
+}
+
