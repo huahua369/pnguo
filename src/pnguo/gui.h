@@ -1,7 +1,7 @@
 ﻿#pragma once
 #ifndef GUI_H
 #define GUI_H
-
+#include "vg.h"
 
 class atlas_cx
 {

@@ -27,7 +27,7 @@ todo 基础组件
 
 #include <clipper2/clipper.h> 
 using namespace Clipper2Lib;
-
+#include "vg.h"
 //typedef struct _PangoContext PangoContext;
 struct input_state_t;
 struct et_un_t;
@@ -866,118 +866,6 @@ class layout_text_x;
 struct text_style_t;
 struct text_style_tx;
 struct vg_style_t;
-
-#ifndef NO_FLEX_CX
-/*
-	根元素要求
-	assert(parent == NULL);
-	assert(!isnan(width));
-	assert(!isnan(height));
-	assert(self_sizing == NULL);
-
-	FLEX_ALIGN_SPACE_BETWEEN,	//两端对齐，两端间隔0，中间间隔1
-	FLEX_ALIGN_SPACE_AROUND,	//分散居中,两端间隔0.5，中间间隔1
-	FLEX_ALIGN_SPACE_EVENLY,	//分散居中,每个间隔1
-*/
-class flex_item
-{
-public:
-	enum class flex_align :uint8_t {
-		ALIGN_AUTO = 0,
-		ALIGN_STRETCH,
-		ALIGN_CENTER,
-		ALIGN_START,
-		ALIGN_END,
-		ALIGN_SPACE_BETWEEN,
-		ALIGN_SPACE_AROUND,
-		ALIGN_SPACE_EVENLY,
-		ALIGN_BASELINE
-	};
-
-	enum class flex_position :uint8_t {
-		POS_RELATIVE = 0,
-		POS_ABSOLUTE
-	};
-
-	enum flex_direction :uint8_t {
-		ROW = 0,
-		ROW_REVERSE,
-		COLUMN,
-		COLUMN_REVERSE
-	};
-
-	enum class flex_wrap :uint8_t {
-		NO_WRAP = 0,
-		WRAP,
-		WRAP_REVERSE
-	};
-
-	// size[0] == width, size[1] == height
-	typedef void (*flex_self_sizing)(flex_item* item, float* size);
-	float width = NAN;
-	float height = NAN;
-
-	float left = NAN;			// 左偏移坐标
-	float right = NAN;
-	float top = NAN;
-	float bottom = NAN;
-
-	float padding_left = 0;		// 本元素内边距
-	float padding_right = 0;
-	float padding_top = 0;
-	float padding_bottom = 0;
-
-	float margin_left = 0;		// 本元素外边距
-	float margin_right = 0;
-	float margin_top = 0;
-	float margin_bottom = 0;
-
-	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
-	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
-	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
-	float basis = NAN;	// 子元素:定义最小空间
-	float baseline = 0.0; // 基线位置
-	flex_align justify_content = flex_align::ALIGN_START;	// 父元素:主轴上的元素的排列方式 start\end\center\space-between\space-around\space-evenly
-	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\space-evenly\stretch 
-	flex_align align_items = flex_align::ALIGN_STRETCH;		// 父元素:副轴上的元素的排列方式 start\end\center\stretch\baseline
-	flex_align align_self = flex_align::ALIGN_AUTO;			// 子元素:覆盖父容器align-items的设置
-
-	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
-	flex_direction direction = flex_direction::ROW;			// 父元素:
-	flex_wrap wrap = flex_wrap::WRAP;						// 父元素:是否换行，超出宽度自动换行
-	bool should_order_children = false;
-
-	void* managed_ptr = NULL;	// 用户数据指针
-	flex_self_sizing self_sizing = NULL; // 运行时计算大小
-
-	float frame[4] = {};	// 输出坐标、大小
-	flex_item* parent = 0;	// 父级
-	std::vector<flex_item*>* children = 0;	// 子级
-public:
-	flex_item();
-	~flex_item();
-	// 指针为空就默认值，80字节
-	void set_base(float* size, float* offset4, float* padding4, float* margin4, float* gsb, int order, uint8_t* align_pdw7);
-	// 复制除宽高外的属性
-	void copy_a(flex_item* p);
-	flex_item* init();
-	void update_should_order_children();	// 子元素属性改变时执行
-
-	void item_add(flex_item* child);
-	void item_insert(uint32_t index, flex_item* child);
-	flex_item* item_delete(uint32_t index);
-	flex_item* detach(flex_item* child);
-	// 清空子元素
-	void clear();
-	// 执行布局计算
-	void layout();
-private:
-	void layout_items(uint32_t child_begin, uint32_t child_end, uint32_t children_count, struct flex_layout* layout, uint32_t last_count);
-	void layout_item(float width, float height);
-};
-
-
-#endif // NO_FLEX_CX
 
 struct grid_div
 {

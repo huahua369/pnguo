@@ -21843,7 +21843,7 @@ void get_tex_buffer(vkr::Texture* tex, char* outbuf, vkr::upload_cx* q)//, dvk_q
 	q->flushAndFinish();
 	staging.getBuffer(outbuf, -1);
 }
-image_d vkdg_cx::save_shadow(int idx)
+image_dr vkdg_cx::save_shadow(int idx)
 {
 	if (!ctx) return {};
 	auto tx = (vkr::sample_cx*)ctx;
@@ -21851,7 +21851,7 @@ image_d vkdg_cx::save_shadow(int idx)
 	auto& m = smp[idx];
 
 	auto q = (vkr::upload_cx*)qupload;
-	image_d r = {};
+	image_dr r = {};
 	if (!q)
 	{
 		q = new vkr::upload_cx();

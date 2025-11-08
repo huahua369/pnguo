@@ -198,7 +198,7 @@ struct scene_state {
 	bool  bBloom = true;
 };
 
-struct image_d
+struct image_dr
 {
 	glm::ivec2 size = {};
 	uint32_t* data = 0;
@@ -235,7 +235,7 @@ public:
 	void resize(int w, int h);
 	// 保存fbo idx的像素到dt
 	void save_fbo(int idx);
-	image_d save_shadow(int idx);
+	image_dr save_shadow(int idx);
 	// 复制fbo idx到 VkImage vkptr
 	void copy2(int idx, void* vkptr);
 	// 添加gltf模型到渲染器

@@ -13,6 +13,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 //#include <glm/gtc/type_ptr.hpp>
 
 //#include <pnguo.h>
+#define FLEX_IMPLEMENTATION
 #include <vkvg/vkvg.h> 
 #include "vkvgcx.h"
 #include <stb_rect_pack.h> 
@@ -836,6 +837,7 @@ void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols,
 	int yn = ss.y / width;
 	if (x > 0)xn++;
 	if (y > 0)yn++;
+	vkvg_save(cr);
 	vkvg_rectangle(cr, 0, 0, ss.x, ss.y);
 	vkvg_clip(cr);
 	for (size_t i = 0; i < yn; i++)
@@ -851,9 +853,11 @@ void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols,
 			vkvg_fill(cr);
 		}
 	}
+	vkvg_restore(cr);
 }
 void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count)
 {
+	vkvg_save(cr);
 	VkvgPattern gr = vkvg_pattern_create_linear(0, 0, ss.x, ss.y);
 	double n = count - 1;
 	for (size_t i = 0; i < count; i++)
@@ -862,6 +866,118 @@ void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int
 		vkvg_pattern_add_color_stop(gr, i / n, color.x, color.y, color.z, color.w);
 	}
 	vkvg_rectangle(cr, 0, 0, ss.x, ss.y);
+	vkvg_set_source(cr, gr);
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(gr);
+	vkvg_restore(cr);
+}
+
+#define getrgba(a,b,sp) lerp(a.sp,b.sp,ratio)
+
+glm::dvec4 mix_colors0(glm::vec4 a, glm::vec4 b, float ratio)
+{
+	auto lerp = [](double v0, double v1, double t) { return (1.0 - t) * v0 + t * v1; };
+	glm::dvec4 result = {};
+	result.x = getrgba(a, b, x);
+	result.y = getrgba(a, b, y);
+	result.z = getrgba(a, b, z);
+	result.w = getrgba(a, b, w);
+	return result;
+}
+VkvgPattern new_cubic_gradient(
+	glm::vec4 rect,
+	glm::vec4 from,
+	glm::vec4 to,
+	glm::vec2 ctrl1,
+	glm::vec2 ctrl2,
+	glm::vec2 p0 = {},
+	glm::vec2 p1 = { 1,1 },
+	int steps = 8
+);
+VkvgPattern new_cubic_gradient(
+	glm::vec4 rect,
+	glm::vec4 from,
+	glm::vec4 to,
+	glm::vec2 ctrl1,
+	glm::vec2 ctrl2,
+	glm::vec2 p0,
+	glm::vec2 p1,
+	int steps
+) {
+	// validate input points
+	for (auto&& pt : { p0, ctrl1, ctrl2, p1 }) {
+		if (pt.x < 0 || pt.x > 1 ||
+			pt.y < 0 || pt.y > 1) {
+			throw std::invalid_argument("Invalid points for cubic gradient; 0..1 coordinates expected.");
+		}
+	}
+	if (steps < 2 || steps > 999) {
+		throw std::invalid_argument("Invalid number of steps for cubic gradient; 2 to 999 steps expected.");
+	}
+	if (rect.x > rect.z)
+	{
+		std::swap(rect.x, rect.z);
+	}
+	if (rect.y > rect.w)
+	{
+		std::swap(rect.y, rect.w);
+	}
+	VkvgPattern g = vkvg_pattern_create_linear(rect.x, rect.y, rect.z, rect.w);
+	//VkvgPattern vkvg_pattern_create_radial(double cx0, double cy0, double radius0, double cx1, double cy1, double radius1);
+	--steps;
+	for (int step = 0; step <= steps; ++step) {
+		auto t = 1.0 * step / steps;
+		auto s = 1.0 - t;
+		auto p0t = p0;
+		auto p1t = p1;
+		auto c1 = ctrl1;
+		auto c2 = ctrl2;
+		p0t *= (t * t * t);
+		c1 *= (3 * t * t * s);
+		c2 *= (3 * t * s * s);
+		p1t *= (s * s * s);
+		//auto p = (t * t * t) * p0 + (3 * t * t * s) * ctrl1 + (3 * t * s * s) * ctrl2 + (s * s * s) * p1;
+		auto p = p0t + c1 + c2 + p1t;
+		auto offset = p.x;
+		auto ratio = p.y;
+		auto color = mix_colors0(from, to, ratio);
+		vkvg_pattern_add_color_stop(g, offset, color.x, color.y, color.z, color.w);
+	}
+
+	return g;
+}
+void paint_shadow(VkvgContext cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, bool rev, float r)
+{
+	auto trans = shadow;
+	trans.w = 0;
+	auto gr = rev ?
+		new_cubic_gradient(glm::vec4(0, 0, size_x, size_y), trans, shadow, glm::vec2(0.5, 0.0), glm::vec2(1.0, 0.5))
+		: new_cubic_gradient(glm::vec4(0, 0, size_x, size_y), shadow, trans, glm::vec2(0, 0.5), glm::vec2(0.5, 1));
+	if (r > 0)
+	{
+		vkvg_rounded_rectangle(cr, 0, 0, width, height, r);
+	}
+	else
+	{
+		vkvg_rectangle(cr, 0, 0, width, height);
+	}
+	vkvg_set_source(cr, gr);
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(gr);
+}
+void paint_shadow(VkvgContext cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
+{
+	auto gr = rev ?
+		new_cubic_gradient(glm::vec4(0, 0, size_x, size_y), color_to, shadow, glm::vec2(0.5, 0.0), glm::vec2(1.0, 0.5))
+		: new_cubic_gradient(glm::vec4(0, 0, size_x, size_y), shadow, color_to, glm::vec2(0, 0.5), glm::vec2(0.5, 1));
+	if (r > 0)
+	{
+		vkvg_rounded_rectangle(cr, 0, 0, width, height, r);
+	}
+	else
+	{
+		vkvg_rectangle(cr, 0, 0, width, height);
+	}
 	vkvg_set_source(cr, gr);
 	vkvg_fill(cr);
 	vkvg_pattern_destroy(gr);
@@ -879,6 +995,18 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		{
 		case VG_DRAW_CMD::VG_CMD_CLEAR:
 			vkvg_clear(cr);
+			break;
+		case VG_DRAW_CMD::VG_CMD_CLIP_RECT:
+		{
+			auto p = (clip_rect_d*)pd;
+			vkvg_save(cr);
+			vkvg_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y);
+			vkvg_clip(cr);
+			pd += sizeof(clip_rect_d);
+		}
+		break;
+		case VG_DRAW_CMD::VG_CMD_CLIP_RECT_END:
+			vkvg_restore(cr);
 			break;
 		case VG_DRAW_CMD::VG_CMD_RECT:
 		{
