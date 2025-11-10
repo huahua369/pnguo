@@ -163,8 +163,6 @@ struct dev_info_c
 // 64,32,16,8,4,2,1
 vkvg_dev* new_vkvgdev(dev_info_c* c = 0, int sample = 8);
 void free_vkvgdev(vkvg_dev* p);
-struct fill_style_d;
-struct text_style_d;
 
 
 /*
@@ -186,8 +184,8 @@ rc的xy宽高。如果y为0，则表示绘制圆形，x为直径
 */
 struct dblock_d {
 	glm::vec2* points = 0; int count = 0; glm::vec2 rc = {};
-	glm::vec2 pos = {};
-	glm::vec2 view_pos = {};
-	float scale_pos = 0;
+	glm::vec2 pos = {};			// 块偏移
+	glm::vec2 view_pos = {};	// 视图偏移
+	float scale_pos = 0;		// 视图缩放，不缩放线宽
 };
 void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
