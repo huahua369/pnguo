@@ -3,6 +3,26 @@
 #define VG_H
 
 
+// 线，二阶曲线，三阶曲线
+enum class path_type_e :uint32_t
+{
+	e_vmove = 1,// 移动
+	e_vline,	// 直线
+	e_vcurve,	// 二次曲线
+	e_vcubic	// 三次曲线
+};
+struct path_vertex_t
+{
+	// 24字节
+	glm::vec2 p, c, c1;
+	// 4字节
+	path_type_e type;
+};
+struct path_d {
+	path_vertex_t* v;
+	size_t count;
+};
+
 /*
 	LINE_CAP_BUTT,0
 	LINE_CAP_ROUND,1
@@ -118,8 +138,9 @@ struct clip_rect_d {
 };
 enum class VG_DRAW_CMD :uint8_t {
 	VG_CMD_CLEAR = 0,
+	VG_CMD_SAVE,
+	VG_CMD_RESTORE,
 	VG_CMD_CLIP_RECT,
-	VG_CMD_CLIP_RECT_END,
 	VG_CMD_RECT,
 	VG_CMD_RECT4R,
 	VG_CMD_CIRCLE,
@@ -141,13 +162,15 @@ data：命令数据指针
 size：数据大小
 order：渲染顺序，0=默认，数值越小，越靠前
 */
-typedef void (*vg_add_draw_cmd_fun)(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order);
-// 填充风格，返回开始序号
-typedef size_t(*vg_add_style_fun)(void* ctx, fill_style_d* st, size_t count);
-// 文本风格在text_d的font_st用，返回开始序号
-typedef size_t(*vg_add_text_style_fun)(void* ctx, text_style_d* st, size_t count);
-// 清除风格数据，0全部，1只清除填充风格，2只清除文本风格
-typedef void(*vg_clear_style_fun)(void* ctx, int t);
+struct vg_style_data {
+	fill_style_d* fs;
+	size_t fs_count;
+	text_style_d* ts;
+	size_t ts_count;
+};
+typedef void (*vg_draw_cmd_fun)(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style);
+typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
+
 
 #ifdef __cplusplus
 

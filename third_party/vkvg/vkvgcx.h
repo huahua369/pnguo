@@ -167,43 +167,15 @@ void free_vkvgdev(vkvg_dev* p);
 struct fill_style_d;
 struct text_style_d;
 
-class vg_surface_cx
-{
-public:
-	VkvgSurface surf = 0;
-	VkvgContext ctx = 0;
-	std::vector<fill_style_d> fill_styles;
-	std::vector<text_style_d> text_styles;
-public:
-	vg_surface_cx();
-	~vg_surface_cx();
-	void set_surface(VkvgSurface s);
-	// 填充风格，返回开始序号
-	size_t add_style(fill_style_d* st, size_t count);
-	// 文本风格在text_d的font_st用，返回开始序号
-	size_t add_text_style(text_style_d* st, size_t count);
-	// 清除风格数据，0全部，1只清除填充风格，2只清除文本风格
-	void clear_style(int t);
-	void add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order);
-private:
 
-};
-
-
-//	ctx是 vg_surface_cx
-// 填充风格，返回开始序号
-size_t vgc_add_style(void* ctx, fill_style_d* st, size_t count);
-// 文本风格在text_d的font_st用，返回开始序号
-size_t vgc_add_text_style(void* ctx, text_style_d* st, size_t count);
-// 清除风格数据，0全部，1只清除填充风格，2只清除文本风格
-void vgc_clear_style(void* ctx, int t);
 /*
 渲染命令函数，
-ctx：渲染上下文指针
+ctx：渲染上下文指针VkvgContext
 cmds：命令数组
 count：命令数量
 data：命令数据指针
 size：数据大小
 order：渲染顺序，0=默认，数值越小，越靠前
 */
-void vgc_add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order);
+void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style);
+ 

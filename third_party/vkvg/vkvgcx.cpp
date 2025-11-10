@@ -651,14 +651,17 @@ void set_fill_style(VkvgContext cr, fill_style_d* st) {
 	if (!cr || !st)return;
 	if (st->fill)
 	{
+		vkvg_save(cr);
 		vkvg_set_source_color(cr, st->fill);
 		if (stroke)
 			vkvg_fill_preserve(cr);
 		else
 			vkvg_fill(cr);
+		vkvg_restore(cr);
 	}
 	if (stroke)
 	{
+		vkvg_save(cr);
 		vkvg_set_line_width(cr, st->thickness);
 		if (st->cap > 0)
 			vkvg_set_line_cap(cr, (vkvg_line_cap_t)st->cap);
@@ -688,82 +691,11 @@ void set_fill_style(VkvgContext cr, fill_style_d* st) {
 		}
 		vkvg_set_source_color(cr, st->color);
 		vkvg_stroke(cr);
+		vkvg_restore(cr);
 	}
 
 }
 
-vg_surface_cx::vg_surface_cx()
-{
-}
-
-vg_surface_cx::~vg_surface_cx()
-{
-	clear_style(0);
-	vkvg_destroy(ctx); ctx = 0;
-	vkvg_surface_destroy(surf); surf = 0;
-}
-
-void vg_surface_cx::set_surface(VkvgSurface s)
-{
-	surf = s;
-	if (s)
-	{
-		ctx = vkvg_create(surf);
-	}
-}
-
-size_t vg_surface_cx::add_style(fill_style_d* st, size_t count)
-{
-	auto cur = fill_styles.size();
-
-	if (st && count)
-	{
-		fill_styles.reserve(cur + count);
-		for (size_t i = 0; i < count; i++, st++)
-		{
-			auto nst = *st;
-			if (st->dash_p)
-			{
-				nst.dash_p = new float[st->dash_num];
-			}
-			fill_styles.push_back(nst);
-		}
-	}
-	return cur;
-}
-
-size_t vg_surface_cx::add_text_style(text_style_d* st, size_t count)
-{
-	auto cur = text_styles.size();
-	if (st && count)
-	{
-		text_styles.reserve(cur + count);
-		for (size_t i = 0; i < count; i++, st++)
-		{
-			text_styles.push_back(*st);
-		}
-	}
-	return cur;
-}
-
-void vg_surface_cx::clear_style(int t)
-{
-	if (t == 1 || t == 0) {
-		for (size_t i = 0; i < fill_styles.size(); i++)
-		{
-			auto& st = fill_styles[i];
-			if (st.dash_p)
-			{
-				delete[] st.dash_p; st.dash_p = 0;
-			}
-		}
-		fill_styles.clear();
-	}
-	if (t == 2 || t == 0)
-	{
-		text_styles.clear();
-	}
-}
 
 // r，左右下左
 void vdraw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r)
@@ -983,9 +915,9 @@ void paint_shadow(VkvgContext cr, double size_x, double size_y, double width, do
 	vkvg_pattern_destroy(gr);
 }
 
-void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order)
+void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style)
 {
-	if (!ctx || !cmds || count == 0 || !data || !size)return;
+	if (!ctx || !cmds || count == 0 || !data || !size || !style)return;
 	auto cr = (VkvgContext)ctx;
 	auto pd = (uint8_t*)data;
 	for (size_t i = 0; i < count; i++)
@@ -996,18 +928,20 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		case VG_DRAW_CMD::VG_CMD_CLEAR:
 			vkvg_clear(cr);
 			break;
+		case VG_DRAW_CMD::VG_CMD_SAVE:
+			vkvg_save(cr);
+			break;
+		case VG_DRAW_CMD::VG_CMD_RESTORE:
+			vkvg_restore(cr);
+			break;
 		case VG_DRAW_CMD::VG_CMD_CLIP_RECT:
 		{
 			auto p = (clip_rect_d*)pd;
-			vkvg_save(cr);
 			vkvg_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y);
 			vkvg_clip(cr);
 			pd += sizeof(clip_rect_d);
 		}
 		break;
-		case VG_DRAW_CMD::VG_CMD_CLIP_RECT_END:
-			vkvg_restore(cr);
-			break;
 		case VG_DRAW_CMD::VG_CMD_RECT:
 		{
 			auto p = (rect_d*)pd;
@@ -1018,8 +952,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 			else {
 				vkvg_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y);
 			}
-			if (p->st >= 0 && p->st < fill_styles.size())
-				set_fill_style(cr, &fill_styles[p->st]);
+			if (style->fs && p->st >= 0 && p->st < style->fs_count)
+				set_fill_style(cr, style->fs + p->st);
 			pd += sizeof(rect_d);
 		}
 		break;
@@ -1027,8 +961,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		{
 			auto p = (rect4r_d*)pd;
 			vdraw_round_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
-			if (p->st >= 0 && p->st < fill_styles.size())
-				set_fill_style(cr, &fill_styles[p->st]);
+			if (style->fs && p->st >= 0 && p->st < style->fs_count)
+				set_fill_style(cr, style->fs + p->st);
 			pd += sizeof(rect4r_d);
 		}
 		break;
@@ -1036,8 +970,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		{
 			auto p = (circle_d*)pd;
 			vkvg_ellipse(cr, p->radius, p->radius, p->pos.x, p->pos.y, 0);
-			if (p->st >= 0 && p->st < fill_styles.size())
-				set_fill_style(cr, &fill_styles[p->st]);
+			if (style->fs && p->st >= 0 && p->st < style->fs_count)
+				set_fill_style(cr, style->fs + p->st);
 			pd += sizeof(circle_d);
 		}
 		break;
@@ -1045,8 +979,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		{
 			auto p = (ellipse_d*)pd;
 			vkvg_ellipse(cr, p->radius.x, p->radius.y, p->pos.x, p->pos.y, p->rotationAngle);
-			if (p->st >= 0 && p->st < fill_styles.size())
-				set_fill_style(cr, &fill_styles[p->st]);
+			if (style->fs && p->st >= 0 && p->st < style->fs_count)
+				set_fill_style(cr, style->fs + p->st);
 			pd += sizeof(ellipse_d);
 		}
 		break;
@@ -1054,8 +988,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		{
 			auto p = (triangle_d*)pd;
 			draw_triangle(cr, p->pos, p->size, p->spos);
-			if (p->st >= 0 && p->st < fill_styles.size())
-				set_fill_style(cr, &fill_styles[p->st]);
+			if (style->fs && p->st >= 0 && p->st < style->fs_count)
+				set_fill_style(cr, style->fs + p->st);
 			pd += sizeof(triangle_d);
 		}
 		break;
@@ -1078,8 +1012,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 			auto p = (line_d*)pd;
 			vkvg_move_to(cr, p->p1.x, p->p1.y);
 			vkvg_line_to(cr, p->p2.x, p->p2.y);
-			if (p->st >= 0 && p->st < fill_styles.size())
-				set_fill_style(cr, &fill_styles[p->st]);
+			if (style->fs && p->st >= 0 && p->st < style->fs_count)
+				set_fill_style(cr, style->fs + p->st);
 		}
 		break;
 		case VG_DRAW_CMD::VG_CMD_STROKE_POLYLINE:
@@ -1094,8 +1028,8 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 				}
 				if (p->closed)
 					vkvg_close_path(cr);
-				if (p->st >= 0 && p->st < fill_styles.size())
-					set_fill_style(cr, &fill_styles[p->st]);
+				if (style->fs && p->st >= 0 && p->st < style->fs_count)
+					set_fill_style(cr, style->fs + p->st);
 			}
 			pd += sizeof(polyline_d) + sizeof(glm::vec2) * (p->count - 1);
 		}
@@ -1103,9 +1037,9 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		case VG_DRAW_CMD::VG_CMD_TEXT:
 		{
 			auto p = (text_d*)pd;
-			if (p->font_st >= 0 && p->font_st < text_styles.size())
+			if (style->ts && p->font_st >= 0 && p->font_st < style->ts_count)
 			{
-				auto& ts = text_styles[p->font_st];
+				auto& ts = style->ts[p->font_st];
 			}
 			pd += sizeof(text_d) + p->len + 1;
 		}
@@ -1115,40 +1049,5 @@ void vg_surface_cx::add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* d
 		}
 	}
 
-}
-
-// 填充风格，返回开始序号
-size_t vgc_add_style(void* ctx, fill_style_d* st, size_t count) {
-	auto s = (vg_surface_cx*)ctx;
-	if (!ctx || !st || count == 0)return 0;
-	return s->add_style(st, count);
-}
-// 文本风格在text_d的font_st用，返回开始序号
-size_t vgc_add_text_style(void* ctx, text_style_d* st, size_t count) {
-	auto s = (vg_surface_cx*)ctx;
-	if (!ctx || !st || count == 0)return 0;
-	return s->add_text_style(st, count);
-}
-// 清除风格数据，0全部，1只清除填充风格，2只清除文本风格
-void vgc_clear_style(void* ctx, int t) {
-	auto s = (vg_surface_cx*)ctx;
-	if (!ctx)return;
-	s->clear_style(t);
-}
-
-/*
-渲染命令函数，
-ctx：渲染上下文指针
-cmds：命令数组
-count：命令数量
-data：命令数据指针
-size：数据大小
-order：渲染顺序，0=默认，数值越小，越靠前
-*/
-void vgc_add_draw_cmd(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, int order)
-{
-	auto s = (vg_surface_cx*)ctx;
-	if (!ctx || !cmds || count == 0 || !data || size == 0)return;
-	s->add_draw_cmd(s->ctx, cmds, count, data, size, order);
 }
 

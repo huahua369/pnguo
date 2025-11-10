@@ -1676,6 +1676,10 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		mt.yrel = e->motion.yrel;		// The relative motion in the XY direction 
 		mt.which = e->motion.which;		// 鼠标实例 
 
+		int window_x = 0, window_y = 0;
+		SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
+		glm::vec2 pos = { mt.x + window_x,mt.y + window_y };
+
 		pw->hittest({ mt.x, mt.y });
 		if (pw->io) {
 			pw->io->MousePos = { mt.x,mt.y };

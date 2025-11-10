@@ -379,8 +379,11 @@ public:
 	// nurbs
 	void* new_bspline(glm::vec4* cp, int n, size_t degree = 2);
 	void* new_bspline(glm::dvec4* cp, int n, size_t degree = 2);
+	size_t get_num_knots();		// 获取节点数量
+	void set_knot_vector(double* kv, size_t n);
+	void set_knot_vector(float* kv, size_t n);
 	std::vector<glm::vec2> get_cp2();		// 获取控制点
-	std::vector<glm::vec2> sample2(int m);	// 获取细分坐标
+	std::vector<glm::vec2> sample2(int m);	// 获取细分坐标，细分为m个点
 	std::vector<glm::vec3> sample3(int m);
 	std::vector<glm::vec4> sample4(int m);
 private:

@@ -1467,6 +1467,54 @@ void* bspline_ct::new_bspline(glm::dvec4* cp, int n, size_t degree)
 	}
 	return p;
 }
+size_t bspline_ct::get_num_knots()
+{
+	return ptr ? ts_bspline_num_knots((tsBSpline*)ptr) : 0;
+}
+void bspline_ct::set_knot_vector(double* kv, size_t n)
+{
+	if (!kv || n < 1 || !ptr)return;
+	auto t = (tinyspline::BSpline*)ptr;
+	size_t expected = ts_bspline_num_knots((tsBSpline*)t);
+	size_t actual = n;
+	if (expected != actual) {
+		std::ostringstream oss;
+		oss << "Expected size: " << expected
+			<< ", Actual size: " << actual;
+		throw std::runtime_error(oss.str());
+	}
+	else
+	{
+		tsStatus status;
+		if (ts_bspline_set_knots((tsBSpline*)t, kv, &status))
+			throw std::runtime_error(status.message);
+	}
+}
+void bspline_ct::set_knot_vector(float* kv, size_t n)
+{
+	if (!kv || n < 1 || !ptr)return;
+	auto t = (tinyspline::BSpline*)ptr;
+	std::vector<tsReal> tkv;
+	size_t expected = ts_bspline_num_knots((tsBSpline*)t);
+	size_t actual = n;
+	if (expected != actual) {
+		std::ostringstream oss;
+		oss << "Expected size: " << expected
+			<< ", Actual size: " << actual;
+		throw std::runtime_error(oss.str());
+	}
+	else
+	{
+		tkv.resize(n);
+		for (size_t i = 0; i < n; i++)
+		{
+			tkv[i] = kv[i];
+		}
+		tsStatus status;
+		if (ts_bspline_set_knots((tsBSpline*)t, tkv.data(), &status))
+			throw std::runtime_error(status.message);
+	}
+}
 std::vector<glm::vec2> bspline_ct::sample2(int m)
 {
 	std::vector<glm::vec2> ot;
