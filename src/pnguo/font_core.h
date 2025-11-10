@@ -594,10 +594,10 @@ struct text_block_t {
 	hb_glyph_position_t* glyphs; /* HarfBuzz computed glyph positions array */
 };
 struct text_run_t {
-	text_block_t* t;
-	size_t count;
-	font_family_t* family;
-	void* _private;
+	text_block_t* t = 0;
+	size_t count = 0;
+	font_family_t* family = 0;
+	void* _private = 0;
 };
 typedef struct text_run_t* text_p;
 typedef struct font_t* font_p;
@@ -610,7 +610,9 @@ text_p text_create(const char* text, uint32_t length, font_family_t* family);
 void text_set_family(text_p p, font_family_t* family);
 void text_set(text_p p, const char* str, size_t first, size_t count);
 void text_set_bidi(text_p p, const char* str, size_t first, size_t count);
+void text_build(text_p p, float fontheight);
 
+class text_run_cx;
 
 
 #endif // !FONT_CORE_H

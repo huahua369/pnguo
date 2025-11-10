@@ -1408,7 +1408,7 @@ int main()
 			}
 		}
 		std::vector<font_t*> familys = { ksun ,seg };
-		std::string k8 = (char*)u8"q我的大刀➗😊😎😭💣🚩❓❌🟦⬜";
+		std::string k8 = (char*)u8"q我\n的大刀➗😊😎😭\n💣🚩❓❌🟦⬜";
 		std::string k81 = (char*)u8"🏳️‍🌈";
 		std::string k80 = (char*)u8"👨‍👨‍👧";
 		k8 += k80 + k81;
@@ -1417,9 +1417,10 @@ int main()
 		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
 		auto cr = cairo_create(img);
 
-		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic"); 
+		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 		text_p text = text_create(k8.c_str(), k8.size(), family);
-
+		text_build(text, 26);
+		auto ptext = (text_run_cx*)text;
 		//glm::extractEulerAngleYXZ();
 		delete_font_family(family);
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
@@ -1429,6 +1430,7 @@ int main()
 		uint32_t color = -1;
 		int xx = 0;
 		int yy = sue->get_line_height(fontsize);
+		int h = sue->get_line_height(fontsize);
 		std::vector<font_item_t> tm;
 		// 光栅化glyph index并缓存
 		for (size_t i = 0; i < gp.len; i++)
@@ -1462,6 +1464,10 @@ int main()
 				}
 			}
 			xx += adv.x;
+			if (git.cpt == '\n')
+			{
+				yy += h; xx = 0;
+			}
 		}
 
 

@@ -3461,7 +3461,9 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 			}
 		} while (0);
 		if (rp)
+		{
 			ret = *rp;
+		}
 	}
 	return ret;
 }
@@ -7734,6 +7736,12 @@ struct icu_lib_t
 	UBiDi* (*_ubidi_open)(void);
 	void (*_ubidi_close)(UBiDi* pBiDi);
 	UBiDiDirection(*_ubidi_getVisualRun)(UBiDi* pBiDi, int32_t runIndex, int32_t* pLogicalStart, int32_t* pLength);
+	void (*_ubidi_setClassCallback)(UBiDi* pBiDi, UBiDiClassCallback* newFn,
+			const void* newContext, UBiDiClassCallback** oldFn,
+			const void** oldContext, UErrorCode* pErrorCode); 
+	void (*_ubidi_getClassCallback)(UBiDi* pBiDi, UBiDiClassCallback** fn, const void** context);
+
+
 	int32_t(*_ucnv_convert)(const char* toConverterName, const char* fromConverterName, char* target, int32_t targetCapacity, const char* source, int32_t sourceLength, UErrorCode* pErrorCode);
 	UScriptCode(*_uscript_getScript)(UChar32 codepoint, UErrorCode* err);
 	UBool(*_uscript_hasScript)(UChar32 c, UScriptCode sc);
@@ -7750,7 +7758,8 @@ struct icu_lib_t
 	void* _handle;
 };
 
-static std::vector<std::string> icu_funstr = { "ubidi_setPara","ubidi_countRuns","ubidi_open","ubidi_close","ubidi_getVisualRun"
+static std::vector<std::string> icu_funstr = { "ubidi_setPara","ubidi_countRuns","ubidi_open","ubidi_close","ubidi_getVisualRun",
+"ubidi_setClassCallback","ubidi_getClassCallback"
 ,"ucnv_convert" , "uscript_getScript","uscript_hasScript","uscript_getName","uscript_getShortName",
 "ucsdet_open",
 "ucsdet_close",
@@ -8437,8 +8446,10 @@ struct str_info_t
 struct bidi_item
 {
 	hb_script_t sc;
+	std::string hs;
 	std::string s;
 	uint32_t first, second;
+	font_t* font;
 	bool rtl = false;
 };
 enum class lt_dir
@@ -8998,7 +9009,9 @@ void hb_cx::free_font()
 }
 #endif
 
-
+UCharDirection bidiccb(const void* context, UChar32 c) {
+	return U_LEFT_TO_RIGHT;
+}
 
 void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 {
@@ -9030,6 +9043,9 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 			return;
 		}
 		info.reserve(len);
+		UCharDirection U_CALLCONV
+			UBiDiClassCallback(const void* context, UChar32 c);
+		icub->_ubidi_setClassCallback(bidi, bidiccb, NULL, NULL, NULL, &status);
 		icub->_ubidi_setPara(bidi, testChars, stringLen, bidiReq, NULL, &status);
 		if (U_SUCCESS(status)) {
 			//int paraDir = ubidi_getParaLevel(bidi);
@@ -9061,7 +9077,7 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 					auto scrn = icub->_uscript_getName(code);
 					auto sc = get_script(scrn);
 					std::string u8strd = md::u16_u8((uint16_t*)(testChars + start), end - start);
-					info.push_back({ sc, u8strd, start, end, isRTL });
+					info.push_back({ sc,scrn, u8strd, start, end, 0,isRTL });
 					//printf("Script '%s' from %d to %d.\t%d\n", scrn, start, end, sc);
 				}
 			}
@@ -9087,6 +9103,7 @@ font_family_t* new_font_family(font_rctx* ctx, const char* family, const char* s
 		const char* style = st.size() ? st[0].c_str() : nullptr;
 		size_t ix = 1;
 		p = new font_family_t();
+		*p = {};
 		p->familys = new font_p[v.size()];
 		p->count = 0;
 		auto t = p->familys;
@@ -9127,6 +9144,7 @@ class text_run_cx :public text_run_t
 {
 public:
 	std::vector<bidi_item> bv;
+	std::vector<font_item_t> _tm;
 public:
 	text_run_cx();
 	~text_run_cx();
@@ -9158,12 +9176,19 @@ void text_set_family(text_p p1, font_family_t* family)
 	if (p)
 	{
 		p->family = family;
-		for (auto& it : p->bv) {
-
-		}
+		//for (auto& it : p->bv) {
+		//}
 	}
 }
 
+void text_set(text_p p1, const char* str, size_t first, size_t count)
+{
+	auto p = (text_run_cx*)p1->_private;
+	if (p)
+	{
+		text_set_bidi(p, str, first, count);
+	}
+}
 void text_set_bidi(text_p p1, const char* str, size_t first, size_t count)
 {
 	auto p = (text_run_cx*)p1->_private;
@@ -9173,12 +9198,97 @@ void text_set_bidi(text_p p1, const char* str, size_t first, size_t count)
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
 	{
+		p->bv.clear();
 		//print_time ftpt("bidi a");
 		do_bidi((UChar*)str1, n, p->bv);
 		std::stable_sort(p->bv.begin(), p->bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 	}
 	return;
 }
+font_t* get_font(font_family_t* p, const std::string& hs) {
+	if (!p)return 0;
+	font_t* r = p->familys[0];
+	for (size_t i = 0; i < p->count; i++)
+	{
+		auto font = p->familys[i];
+		if (font)
+		{
+			if (std::string::npos != font->_slng.find(hs)) {
+				r = font; break;
+			}
+		}
+	}
+	return r;
+}
+
+void text_build(text_p p1, float fontsize)
+{
+	auto p = (text_run_cx*)p1->_private;
+	p->_tm.clear();
+
+	struct text_block_at {
+		font_t* font;
+		text_extents_t extents;     /* store computed text extends */
+		const char* text;        /* utf8 char array of text*/
+		unsigned int glyph_count; /* Total glyph count */
+		hb_buffer_t* hbBuf;  /* HarfBuzz buffer of text */
+		hb_glyph_position_t* glyphs; /* HarfBuzz computed glyph positions array */
+	};
+	std::vector<hb_tag_t> vv;
+	std::vector<std::string_view> vstr;
+	for (auto& it : p->bv)
+	{
+		vstr.clear();
+		auto font = get_font(p->family, it.hs);
+		it.font = font;
+		font_t::GlyphPositions gp = {};// 执行harfbuzz
+		auto ws = md::u8_u16(it.s);
+		auto pt = it.s.c_str();
+		auto pt0 = pt;
+		for (; *pt; pt++) {
+			if (*pt == '\n')
+			{
+				vstr.push_back(std::string_view(pt0, pt));
+				vstr.push_back(std::string_view());
+				pt0 = pt + 1;
+			}
+		}
+		if (pt0 != pt)
+		{
+			vstr.push_back(std::string_view(pt0, pt));
+		}
+		for (auto& kt : vstr)
+		{
+			if (kt.empty())
+			{
+				font_item_t em = {};
+				em.cpt = '\n';
+				p->_tm.push_back(em);
+				continue;
+			}
+			auto nn0 = font->CollectGlyphsFromFont(kt.data(), kt.size(), 8, 0, 0, &gp);
+			double scale_h = font->get_scale(fontsize);
+			uint32_t color = -1;
+			int xx = 0;
+			int yy = font->get_line_height(fontsize);
+			int h = font->get_line_height(fontsize);
+			// 光栅化glyph index并缓存
+			for (size_t i = 0; i < gp.len; i++)
+			{
+				auto pos = &gp.pos[i];
+				auto git = font->get_glyph_item(pos->index, 0, fontsize);
+				glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+				git._apos = offset;
+				p->_tm.push_back(git);
+			}
+		}
+	}
+	return;
+}
+
+
+
+
 #else
 void do_text(const char* str, size_t first, size_t count)
 {
