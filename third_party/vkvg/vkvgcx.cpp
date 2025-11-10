@@ -12,12 +12,18 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 //#include <glm/gtx/closest_point.hpp>
 //#include <glm/gtc/type_ptr.hpp>
 
-//#include <pnguo.h>
+#include <pnguo.h>
+
 #define FLEX_IMPLEMENTATION
+#include <vg.h>
 #include <vkvg/vkvg.h> 
 #include "vkvgcx.h"
 #include <stb_rect_pack.h> 
 #include <print_time.h> 
+
+
+
+
 	// 线，二阶曲线，三阶曲线
 enum class vtype_e1 :uint8_t
 {
@@ -536,112 +542,6 @@ void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float
 	vkvg_fill(ctx);
 }
 
-#define white 1, 1, 1
-#define red   1, 0, 0
-#define green 0, 1, 0
-#define blue  0, 0, 1
-
-void test_vkvg(const char* fn, dev_info_c* dc)
-{
-	vkvg_dev* vctx = new_vkvgdev(dc, 8);
-	auto dev = vctx->dev;
-	if (!dev)return;
-	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);
-	VkvgContext ctx = vkvg_create(surf);
-	vkvg_clear(ctx);
-	//vkvg_save(ctx);
-	if (1) {
-		print_time ptt("vkvg");
-		VkvgPattern pat;
-		VkvgContext  cr = ctx;
-		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-		vkvg_rectangle(cr, 0, 0, 256, 256);
-		vkvg_set_source(cr, pat);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-		vkvg_set_source(cr, pat);
-		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-		//vkvg_move_to(cr, 20, 100);
-		//vkvg_set_source_color(cr, 0xff0cC616);
-		//vkvg_select_font_face(ctx, (char*)u8"新宋体");
-		//vkvg_set_font_size(cr, 26);
-		//vkvg_show_text(cr, (char*)u8"abc123g0加0123");
-		vkvg_set_line_width(ctx, 2);
-		vkvg_set_source_rgba(ctx, red, 0.8);
-		float scale = 2.0;
-		draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
-
-		vkvg_set_line_width(ctx, 1);
-		vkvg_set_source_rgba(ctx, green, 0.8);
-		double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
-		const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
-		int           contours_size = 3;
-		for (int i = 0; i < contours_size - 1; i++) {
-			auto p = contours_array[i];
-			vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
-			p += 2;
-			while (p < contours_array[i + 1]) {
-				draw_arrow(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
-				p += 2;
-			}
-			vkvg_stroke(ctx);
-		}
-
-		float dashes[] = { 50.0,  /* ink */
-				   10.0,  /* skip */
-				   10.0,  /* ink */
-				   10.0   /* skip*/
-		};
-		int    ndash = sizeof(dashes) / sizeof(dashes[0]);
-		double offset = -50.0;
-
-		vkvg_set_dash(cr, dashes, ndash, offset);
-		vkvg_set_line_width(cr, 10.0);
-
-		vkvg_move_to(cr, 128.0, 25.6);
-		vkvg_line_to(cr, 230.4, 230.4);
-		vkvg_rel_line_to(cr, -102.4, 0.0);
-		vkvg_curve_to(cr, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
-
-		vkvg_stroke(cr);
-	}
-
-	vkvg_flush(ctx);
-	//vkvg_restore(ctx);
-	if (!fn || !*fn)
-		fn = "temp/offscreen_vkvg.png";
-	vkvg_surface_resolve(surf);//msaa采样转换输出
-	vkvg_surface_write_to_png(surf, fn);
-	vkvg_destroy(ctx);
-	vkvg_surface_destroy(surf);
-	//vkvg_set_source_rgb(ctx, 0, 0, 0);
-	//vkvg_paint(ctx);
-	//vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.9);
-
-	//vkvg_load_font_from_path(ctx, "C:\\Windows\\Fonts\\consola.ttf", "consola");
-	//vkvg_set_font_size(ctx, 12);
-	//vkvg_select_font_face(ctx, "consola");
-	//vkvg_set_font_size(ctx, 16);
-
-	//vkvg_move_to(ctx, 100.0, 100.0);
-	//vkvg_show_text(ctx, "vkvg");
-
-	//vkvg_font_extents_t fe;
-	//vkvg_font_extents(ctx, &fe);
-	//print_boxed(ctx, "abcdefghijklmnopqrstuvwxyz", 20, 60, 20);
-	//print_boxed(ctx, "ABC", 20, 160, 60);
-	//vkvg_select_font_face(ctx, "mono");
-	//print_boxed(ctx, "This is a test string!", 20, 250, 20);
-	//print_boxed(ctx, "ANOTHER ONE TO CHECK..", 20, 350, 20);
-	//free_vkvgdev(vctx);
-}
 #endif
 // __has_include(<vg.h>)
 
@@ -1050,4 +950,243 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 	}
 
 }
+void vgc_draw_path(void* ctx, path_d* path, fill_style_d* style)
+{
+	if (!ctx || !path || path->count == 0 || !path->v || !style)return;
+	auto cr = (VkvgContext)ctx;
+	auto t = path->v;
+	bool stroke = false;
+	vkvg_save(cr);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	glm::vec2 pos, scale = {};
+	pos += path->pos;
+	if (path->flip_y)
+	{
+		vkvg_matrix_t flip_y = {};
+		vkvg_matrix_init(&flip_y, 1, 0, 0, -1, 0, 0); // 垂直翻转
+		vkvg_set_matrix(cr, &flip_y);
+		pos.y = -pos.y;
+	}
+	vkvg_translate(cr, pos.x, pos.y);
+	if (path->scale > 0)
+	{
+		vkvg_scale(cr, path->scale, path->scale);
+	}
+	float scale_pos = 1.0;
+	auto mt = *t;
+	auto xt = *t;
+	if (path->scale_pos > 0)
+	{
+		scale_pos = path->scale_pos;
+		for (size_t i = 0; i < path->count; i++, t++)
+		{
+			switch ((vtype_e1)t->type)
+			{
+			case vtype_e1::e_vmove:
+			{
+				if (i > 0)
+				{
+					if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+						vkvg_close_path(cr);
+				}
+				mt = *t;
+				vkvg_move_to(cr, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case vtype_e1::e_vline:
+			{
+				vkvg_line_to(cr, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case vtype_e1::e_vcurve:
+			{
+				vkvg_quadratic_to(cr, t->c.x * scale_pos, t->c.y * scale_pos, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case vtype_e1::e_vcubic:
+			{
+				vkvg_curve_to(cr, t->c.x * scale_pos, t->c.y * scale_pos, t->c1.x * scale_pos, t->c1.y * scale_pos, t->p.x * scale_pos, t->p.y * scale_pos);
 
+			}break;
+			default:
+				break;
+			}
+			xt = *t;
+		}
+	}
+	else
+	{
+		for (size_t i = 0; i < path->count; i++, t++)
+		{
+			switch ((vtype_e1)t->type)
+			{
+			case vtype_e1::e_vmove:
+			{
+				if (i > 0)
+				{
+					if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+						vkvg_close_path(cr);
+				}
+				mt = *t;
+				vkvg_move_to(cr, t->p.x, t->p.y);
+			}break;
+			case vtype_e1::e_vline:
+			{
+				vkvg_line_to(cr, t->p.x, t->p.y);
+			}break;
+			case vtype_e1::e_vcurve:
+			{
+				//static double dv = 2.0 / 3.0;
+				//auto p0 = glm::vec2(xt.p.x, xt.p.y);
+				//auto p1 = glm::vec2(t->c.x, t->c.y);
+				//auto p2 = glm::vec2(t->p.x, t->p.y);
+				//glm::vec2 c1, c2;
+				//c1 = p1 - p0; c1 *= dv; c1 += p0;
+				//c2 = p1 - p2; c2 *= dv; c2 += p2;
+				////	C0 = Q0
+				////	C1 = Q0 + (2 / 3) (Q1 - Q0)
+				////	C2 = Q2 + (2 / 3) (Q1 - Q2)
+				////	C3 = Q2
+				//vkvg_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->p.x, t->p.y);
+				vkvg_quadratic_to(cr, t->c.x, t->c.y, t->p.x, t->p.y);
+			}break;
+			case vtype_e1::e_vcubic:
+			{
+				vkvg_curve_to(cr, t->c.x, t->c.y, t->c1.x, t->c1.y, t->p.x, t->p.y);
+
+			}break;
+			default:
+				break;
+			}
+			xt = *t;
+		}
+	}
+	if (path->count > 2)
+	{
+		if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+			vkvg_close_path(cr);
+	}
+	set_fill_style(cr, style);
+	vkvg_restore(cr);
+}
+
+#define white 1, 1, 1
+#define red   1, 0, 0
+#define green 0, 1, 0
+#define blue  0, 0, 1
+
+void test_vkvg(const char* fn, dev_info_c* dc)
+{
+	vkvg_dev* vctx = new_vkvgdev(dc, 8);
+	auto dev = vctx->dev;
+	if (!dev)return;
+	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);
+	VkvgContext ctx = vkvg_create(surf);
+	vkvg_clear(ctx);
+	//vkvg_save(ctx);
+	if (1) {
+		print_time ptt("vkvg");
+		VkvgPattern pat;
+		VkvgContext  cr = ctx;
+		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+		vkvg_rectangle(cr, 0, 0, 256, 256);
+		vkvg_set_source(cr, pat);
+		vkvg_fill(cr);
+		vkvg_pattern_destroy(pat);
+		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+		vkvg_set_source(cr, pat);
+		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
+		vkvg_fill(cr);
+		vkvg_pattern_destroy(pat);
+		//vkvg_move_to(cr, 20, 100);
+		//vkvg_set_source_color(cr, 0xff0cC616);
+		//vkvg_select_font_face(ctx, (char*)u8"新宋体");
+		//vkvg_set_font_size(cr, 26);
+		//vkvg_show_text(cr, (char*)u8"abc123g0加0123");
+		vkvg_set_line_width(ctx, 2);
+		vkvg_set_source_rgba(ctx, red, 0.8);
+		float scale = 2.0;
+		draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
+
+		vkvg_set_line_width(ctx, 1);
+		vkvg_set_source_rgba(ctx, green, 0.8);
+		double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
+		const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
+		int           contours_size = 3;
+		for (int i = 0; i < contours_size - 1; i++) {
+			auto p = contours_array[i];
+			vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
+			p += 2;
+			while (p < contours_array[i + 1]) {
+				draw_arrow(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
+				p += 2;
+			}
+			vkvg_stroke(ctx);
+		}
+
+		float dashes[] = { 50.0,  /* ink */
+				   10.0,  /* skip */
+				   10.0,  /* ink */
+				   10.0   /* skip*/
+		};
+		int    ndash = sizeof(dashes) / sizeof(dashes[0]);
+		double offset = -50.0;
+		vkvg_save(cr);
+		vkvg_set_dash(cr, dashes, ndash, offset);
+		vkvg_set_line_width(cr, 10.0);
+
+		vkvg_move_to(cr, 128.0, 25.6);
+		vkvg_line_to(cr, 230.4, 230.4);
+		vkvg_rel_line_to(cr, -102.4, 0.0);
+		vkvg_curve_to(cr, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
+
+		vkvg_stroke(cr);
+		vkvg_restore(cr);
+		bspline_ct bs;
+		std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
+		auto bptr = bs.new_bspline(pts.data(), pts.size());
+		if (bptr)
+		{
+			auto v = bs.sample2(64);
+			vkvg_move_to(cr, v[0].x, v[0].y);
+			for (size_t i = 1; i < v.size(); i++)
+			{
+				vkvg_line_to(cr, v[i].x, v[i].y);
+			}
+			vkvg_set_source_color(cr, 0xff0080ff);
+			vkvg_scale(cr, 1.52, 1.52);
+			vkvg_set_line_width(cr, 2.0);
+			vkvg_stroke(cr);
+		}
+	}
+
+	vkvg_flush(ctx);
+	//vkvg_restore(ctx);
+	if (!fn || !*fn)
+		fn = "temp/offscreen_vkvg.png";
+	vkvg_surface_resolve(surf);//msaa采样转换输出
+	vkvg_surface_write_to_png(surf, fn);
+	vkvg_destroy(ctx);
+	vkvg_surface_destroy(surf);
+	//vkvg_set_source_rgb(ctx, 0, 0, 0);
+	//vkvg_paint(ctx);
+	//vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.9);
+
+	//vkvg_load_font_from_path(ctx, "C:\\Windows\\Fonts\\consola.ttf", "consola");
+	//vkvg_set_font_size(ctx, 12);
+	//vkvg_select_font_face(ctx, "consola");
+	//vkvg_set_font_size(ctx, 16);
+
+	//vkvg_move_to(ctx, 100.0, 100.0);
+	//vkvg_show_text(ctx, "vkvg");
+
+	//vkvg_font_extents_t fe;
+	//vkvg_font_extents(ctx, &fe);
+	//print_boxed(ctx, "abcdefghijklmnopqrstuvwxyz", 20, 60, 20);
+	//print_boxed(ctx, "ABC", 20, 160, 60);
+	//vkvg_select_font_face(ctx, "mono");
+	//print_boxed(ctx, "This is a test string!", 20, 250, 20);
+	//print_boxed(ctx, "ANOTHER ONE TO CHECK..", 20, 350, 20);
+	//free_vkvgdev(vctx);
+}

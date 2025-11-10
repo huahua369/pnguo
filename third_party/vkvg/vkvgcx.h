@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "vkvg.h"
-#include <vg.h>
 struct style_path_t;
 class path_v;
 

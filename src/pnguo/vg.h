@@ -1,4 +1,4 @@
-#pragma once
+
 #ifndef VG_H
 #define VG_H
 
@@ -19,8 +19,12 @@ struct path_vertex_t
 	path_type_e type;
 };
 struct path_d {
-	path_vertex_t* v;
-	size_t count;
+	path_vertex_t* v = 0;
+	size_t count = 0;
+	glm::vec2 pos = {};
+	float scale = 0;		// 整体缩放
+	float scale_pos = 0.0;	// 缩放坐标
+	int8_t flip_y = 0;
 };
 
 /*
@@ -284,6 +288,13 @@ private:
 };
 
 #endif // NO_FLEX_CX
+
+
+
+#endif // __cplusplus
+
+#endif // !VG_H
+
 
 
 
@@ -1068,8 +1079,3 @@ void flex_item::layout()
 
 #endif // !FLEX_IMPLEMENTATION
 
-
-
-#endif // __cplusplus
-
-#endif // !VG_H
