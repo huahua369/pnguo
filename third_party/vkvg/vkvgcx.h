@@ -177,4 +177,17 @@ size：数据大小
 order：渲染顺序，0=默认，数值越小，越靠前
 */
 void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t size, vg_style_data* style);
- 
+// 绘制路径函数
+void vgc_draw_path(void* ctx, path_d* path, fill_style_d* style);
+/*
+批量渲染块(圆或矩形)
+坐标数组point，count数量
+rc的xy宽高。如果y为0，则表示绘制圆形，x为直径
+*/
+struct dblock_d {
+	glm::vec2* points = 0; int count = 0; glm::vec2 rc = {};
+	glm::vec2 pos = {};
+	glm::vec2 view_pos = {};
+	float scale_pos = 0;
+};
+void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);

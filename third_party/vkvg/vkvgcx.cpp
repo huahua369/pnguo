@@ -1067,6 +1067,49 @@ void vgc_draw_path(void* ctx, path_d* path, fill_style_d* style)
 	vkvg_restore(cr);
 }
 
+void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
+{
+	if (!ctx || !p || !p->points || p->count == 0 || p->rc.x <= 0 || p->rc.y < 0 || !style)return;
+	auto cr = (VkvgContext)ctx;
+	vkvg_save(cr);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	if (p->scale_pos > 0)
+	{
+		auto sp = p->scale_pos;
+		vkvg_translate(cr, p->pos.x * sp, p->pos.y * sp);
+		vkvg_translate(cr, p->view_pos.x, p->view_pos.y);
+		for (size_t i = 0; i < p->count; i++)
+		{
+			auto pt = p->points[i];
+			if (pt.y > 0)
+			{
+				vkvg_rectangle(cr, pt.x * sp, pt.y * sp, p->rc.x * sp, p->rc.y * sp);
+			}
+			else {
+				vkvg_ellipse(cr, p->rc.x * sp, p->rc.x * sp, pt.x * sp, pt.y * sp, 0);
+			}
+		}
+	}
+	else
+	{
+		vkvg_translate(cr, p->pos.x, p->pos.y);
+		vkvg_translate(cr, p->view_pos.x, p->view_pos.y);
+		for (size_t i = 0; i < p->count; i++)
+		{
+			auto pt = p->points[i];
+			if (pt.y > 0)
+			{
+				vkvg_rectangle(cr, pt.x, pt.y, p->rc.x, p->rc.y);
+			}
+			else {
+				vkvg_ellipse(cr, p->rc.x, p->rc.x, pt.x, pt.y, 0);
+			}
+		}
+	}
+	set_fill_style(cr, style);
+	vkvg_restore(cr);
+}
+
 #define white 1, 1, 1
 #define red   1, 0, 0
 #define green 0, 1, 0
