@@ -362,7 +362,7 @@ class app_cx;
 namespace hz {
 
 	size_t read_binary_file(const std::string& filename0, std::string& result);
-	void save_cache(const char* fnstr, void* data, int size, const std::string& externalCachePath); 
+	void save_cache(const char* fnstr, void* data, int size, const std::string& externalCachePath);
 
 }
 
@@ -381,8 +381,10 @@ namespace md {
 	uint32_t get_u8_idx(const char* str, int64_t idx);
 	const char* get_u8_last(const char* str, uint32_t* codepoint);
 	std::string u16_u8(uint16_t* str, size_t len);
-	std::wstring u8_u16(const std::string& str);
+	//std::wstring u8_u16(const std::string& str);
+	std::u16string u8_u16(const char* str, size_t len);
 	std::wstring u8_w(const char* str, size_t len);
+	std::wstring u8_w(const std::string& str);
 	std::string gb_u8(const char* str, size_t len);
 
 	int utf8_to_unicode(const char* utf8, int* unicode);

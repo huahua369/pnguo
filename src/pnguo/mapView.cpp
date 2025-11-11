@@ -318,7 +318,27 @@ namespace md {
 
 		return -1;
 	}
-
+	int u32_to_u16(uint32_t cp, uint16_t* utf16)
+	{
+		int j = 0;
+		// 处理基本平面
+		if (cp <= 0xFFFF) {
+			utf16[j++] = (uint16_t)cp;
+		}
+		// 处理辅助平面（需代理对）
+		else if (cp >= 0x10000 && cp <= 0x10FFFF) {
+			cp -= 0x10000;
+			uint16_t high = (cp >> 10) + 0xD800; // 高位代理
+			uint16_t low = (cp & 0x3FF) + 0xDC00; // 低位代理 
+			utf16[j++] = high;
+			utf16[j++] = low;
+		}
+		// 非法码点处理 
+		else {
+			utf16[j++] = 0xFFFD; // Unicode替换字符
+		}
+		return j;
+	}
 	// 处理UTF - 8字符串转换为Unicode数组 
 	int utf8_string_to_unicode(const char* utf8, int* unicode_array, int max_count) {
 		int count = 0;
@@ -334,7 +354,31 @@ namespace md {
 		return count;
 	}
 
-	std::wstring u8_u16(const std::string& str)
+	std::u16string u8_u16(const char* str, size_t len)
+	{
+		std::u16string r = {};
+		auto t = str;
+		for (; t && *t && len > 0; len--)
+		{
+			int unicode = 0;
+			int bytes = utf8_to_unicode(t, &unicode);
+			if (bytes > 0)
+				t += bytes;
+			else
+				break;
+			if (unicode)
+			{
+				uint16_t w2[4] = {};
+				auto n = u32_to_u16(unicode, (uint16_t*)w2);
+				r.push_back(w2[0]);
+				if (n > 1)
+					r.push_back(w2[1]);
+			}
+			else { break; }
+		}
+		return r;
+	}
+	std::wstring u8_w(const std::string& str)
 	{
 		return u8_w(str.c_str(), str.size());
 	}
@@ -350,26 +394,67 @@ namespace md {
 				t += bytes;
 			else
 				break;
-			//t = md::get_u8_last(t, &codepoint);
 			if (unicode)
 			{
-				wt.push_back(unicode);
+				if (sizeof(std::wstring::value_type) == 4)
+				{
+					wt.push_back(unicode);
+				}
+				else
+				{
+					wchar_t w2[4] = {};
+					auto n = u32_to_u16(unicode, (uint16_t*)w2);
+					wt.push_back(w2[0]);
+					if (n > 1)
+						wt.push_back(w2[1]);
+				}
 			}
 			else { break; }
 		}
 		return wt;
 	}
+
 	std::string gb_u8(const char* str, size_t len)
 	{
 		return hz::gb_to_u8(str, len);
 	}
+	// 检查是否为前导代理 
+	bool is_lead_surrogate(uint16_t code) {
+		return (code >= 0xD800 && code <= 0xDBFF);
+	}
+
+	// 检查是否为后尾代理 
+	bool is_trail_surrogate(uint16_t code) {
+		return (code >= 0xDC00 && code <= 0xDFFF);
+	}
+
+	size_t utf16_to_utf32(const uint16_t* utf16, uint32_t* utf32) {
+		size_t i = 0;
+		uint16_t code = utf16[i];
+		if (is_lead_surrogate(code) && is_trail_surrogate(utf16[i + 1])) {
+			// 处理代理对 
+			uint32_t high = (code - 0xD800) << 10;
+			uint32_t low = utf16[i + 1] - 0xDC00;
+			utf32[0] = 0x10000 + high + low;
+			i++;
+		}
+		else {
+			// 基本平面字符或非法序列（此处简化处理）
+			utf32[0] = (uint32_t)code;
+		}
+		return i; // 返回转换后的UTF-32字符数 
+	}
+
 	std::string u16_u8(uint16_t* str, size_t len)
 	{
 		char utf8_str[8] = {};
 		std::string r;
 		auto t = str;
 		for (size_t i = 0; t && *t && i < len; ++i, t++) {
-			unicode_to_utf8(utf8_str, *t);
+			uint32_t ch = 0;
+			auto n = utf16_to_utf32(t, &ch);
+			t += n;
+			unicode_to_utf8(utf8_str, ch);
 			if (utf8_str[0])
 			{
 				r += utf8_str; utf8_str[0] = 0;
@@ -1742,9 +1827,9 @@ namespace hz
 			if (it == '\t')
 				it = '\0';
 		}
-		auto wt = md::u8_u16(title);
-		auto fwt = md::u8_u16(filter);
-		auto cp = md::u8_u16(strCurrentPath);
+		auto wt = md::u8_w(title);
+		auto fwt = md::u8_w(filter);
+		auto cp = md::u8_w(strCurrentPath);
 		//设置过滤  
 		opfn.lpstrFilter = fwt.size() ? fwt.c_str() : L"所有文件\0*.*\0\0文本文件\0*.txt\0";
 		//默认过滤器索引设为1  
@@ -1862,9 +1947,9 @@ namespace hz
 		opfn.lStructSize = sizeof(OPENFILENAMEW);//结构体大小  
 		opfn.hwndOwner = (HWND)hWnd;
 
-		auto wt = md::u8_u16(title);
-		auto fwt = md::u8_u16(filter);
-		auto cp = md::u8_u16(strCurrentPath);
+		auto wt = md::u8_w(title);
+		auto fwt = md::u8_w(filter);
+		auto cp = md::u8_w(strCurrentPath);
 		//设置过滤  
 		opfn.lpstrFilter = fwt.size() ? fwt.c_str() : L"所有文件\0*.*\0\0文本文件\0*.txt\0";
 		//默认过滤器索引设为1  

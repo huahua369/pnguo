@@ -14518,8 +14518,8 @@ namespace vkr {
 		{
 			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
 			{
-				auto w = md::u8_u16(it->first);
-				auto w2 = md::u8_u16(it->second);
+				auto w = md::u8_w(it->first);
+				auto w2 = md::u8_w(it->second);
 				DxcDefine d = {};
 				auto pos = twstr.size();
 				w.push_back(0);
@@ -14561,7 +14561,7 @@ namespace vkr {
 				params = pParams;
 			auto pv = md::split(params, " ");
 			for (auto& it : pv) {
-				auto w = md::u8_u16(it.c_str());
+				auto w = md::u8_w(it.c_str());
 				auto pos = twstr.size();
 				w.push_back(0);
 				twstr.append(w);

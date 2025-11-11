@@ -1408,21 +1408,26 @@ int main()
 			}
 		}
 		std::vector<font_t*> familys = { ksun ,seg };
-		std::string k8 = (char*)u8"q我\n的大刀➗😊😎😭\n💣🚩❓❌🟦⬜";
-		std::string k81 = (char*)u8"🏳️‍🌈";
-		std::string k80 = (char*)u8"👨‍👨‍👧";
-		k8 += k80 + k81;
-		text_image_t opt = {};
-		//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
-		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
-		auto cr = cairo_create(img);
 
+
+
+		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
-		text_p text = text_create(k8.c_str(), k8.size(), family);
-		text_build(text, 26);
-		auto ptext = (text_run_cx*)text;
-		//glm::extractEulerAngleYXZ();
+		//text_p text = text_create(k8.c_str(), k8.size(), family);
+		//text_update(text, 26);
+		//auto ptext = (text_run_cx*)text; 
+
+
+
 		delete_font_family(family);
+
+
+
+
+
+
+
+
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
 		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
 		int fontsize = 128;
@@ -1432,6 +1437,11 @@ int main()
 		int yy = sue->get_line_height(fontsize);
 		int h = sue->get_line_height(fontsize);
 		std::vector<font_item_t> tm;
+		text_image_t opt = {};
+		//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
+		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
+		auto cr = cairo_create(img);
+
 		// 光栅化glyph index并缓存
 		for (size_t i = 0; i < gp.len; i++)
 		{

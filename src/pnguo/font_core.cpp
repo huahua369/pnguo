@@ -2406,7 +2406,7 @@ uint32_t font_t::CollectGlyphsFromFont(const void* text, size_t length, int type
 	hb_buffer_reset(hb_buffer);
 	// Set global configuration
 	hb_buffer_set_language(hb_buffer, hp->hb_language);
-	hb_buffer_set_direction(hb_buffer, (hb_direction_t)direction);
+	hb_buffer_set_direction(hb_buffer, (hb_direction_t)(direction == 0 ? HB_DIRECTION_LTR : HB_DIRECTION_RTL));
 	hb_buffer_set_script(hb_buffer, (hb_script_t)script);
 	switch (type) {
 	case 8:
@@ -3349,6 +3349,34 @@ int font_t::get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector
 		{
 			for (auto it : *fallbacks)
 			{
+				if (font == it->font)continue;
+				int fallbackIndex = stb_font::getGlyphIndex(it->font, codepoint);
+				if (fallbackIndex != 0) {
+					g = fallbackIndex;
+					if (renderFont)
+						*renderFont = it;
+					break;
+				}
+			}
+		}
+	}
+	else
+	{
+		if (renderFont)
+			*renderFont = this;
+	}
+	return g;
+}
+
+int font_t::get_glyph_index0(uint32_t codepoint, font_t** renderFont, font_family_t* fallbacks)
+{
+	int g = stb_font::getGlyphIndex(font, codepoint);
+	if (g == 0) {
+		if (fallbacks)
+		{
+			for (size_t i = 0; i < fallbacks->count; i++)
+			{
+				auto it = fallbacks->familys[i];
 				if (font == it->font)continue;
 				int fallbackIndex = stb_font::getGlyphIndex(it->font, codepoint);
 				if (fallbackIndex != 0) {
@@ -7181,7 +7209,7 @@ std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool i
 			font->lineh = (float)(fh + lineGap);
 			font->_name = get_info_str(2052, 1, detail);
 			font->fullname = get_info_str(2052, 4, detail);
-			font->_namew = md::u8_u16(font->_name);
+			font->_namew = md::u8_w(font->_name);
 			auto& mt = mk[font->_name];
 			if (mt)
 			{
@@ -7737,8 +7765,8 @@ struct icu_lib_t
 	void (*_ubidi_close)(UBiDi* pBiDi);
 	UBiDiDirection(*_ubidi_getVisualRun)(UBiDi* pBiDi, int32_t runIndex, int32_t* pLogicalStart, int32_t* pLength);
 	void (*_ubidi_setClassCallback)(UBiDi* pBiDi, UBiDiClassCallback* newFn,
-			const void* newContext, UBiDiClassCallback** oldFn,
-			const void** oldContext, UErrorCode* pErrorCode); 
+		const void* newContext, UBiDiClassCallback** oldFn,
+		const void** oldContext, UErrorCode* pErrorCode);
 	void (*_ubidi_getClassCallback)(UBiDi* pBiDi, UBiDiClassCallback** fn, const void** context);
 
 
@@ -7905,6 +7933,7 @@ struct ScriptRecord
 	UChar32 startChar;
 	UChar32 endChar;
 	UScriptCode scriptCode;
+	font_t* font;
 };
 
 struct ParenStackEntry
@@ -7951,6 +7980,7 @@ public:
 	static inline UClassID getStaticClassID() { return (UClassID)&fgClassID; }
 
 	icu_lib_t* icub = 0;
+	font_family_t* family = 0;
 private:
 
 	static UBool sameScript(int32_t scriptOne, int32_t scriptTwo);
@@ -7962,7 +7992,7 @@ private:
 	int32_t scriptStart;
 	int32_t scriptEnd;
 	UScriptCode scriptCode;
-
+	font_t* font = 0;
 	ParenStackEntry parenStack[128];
 	int32_t parenSP;
 
@@ -8445,11 +8475,10 @@ struct str_info_t
 };
 struct bidi_item
 {
-	hb_script_t sc;
-	std::string hs;
+	//hb_script_t sc;
+	//std::string hs;
 	std::string s;
-	uint32_t first, second;
-	font_t* font;
+	size_t first = 0, second = 0;
 	bool rtl = false;
 };
 enum class lt_dir
@@ -8828,8 +8857,8 @@ struct BidiScriptRunRecords {
 	bool isRtl;
 	std::deque<ScriptRecord> records;
 };
-static void collectBidiScriptRuns(BidiScriptRunRecords& scriptRunRecords,
-	const UChar* chars, int32_t start, int32_t end, bool isRTL) {
+static void collectBidiScriptRuns(BidiScriptRunRecords& scriptRunRecords, const UChar* chars, int32_t start, int32_t end, bool isRTL, font_family_t* family)
+{
 	scriptRunRecords.isRtl = isRTL;
 
 	ScriptRun scriptRun(chars, start, end);
@@ -9013,7 +9042,7 @@ UCharDirection bidiccb(const void* context, UChar32 c) {
 	return U_LEFT_TO_RIGHT;
 }
 
-void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
+void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_item>& info)
 {
 	//print_time ftpt("ubidi");
 
@@ -9043,9 +9072,7 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 			return;
 		}
 		info.reserve(len);
-		UCharDirection U_CALLCONV
-			UBiDiClassCallback(const void* context, UChar32 c);
-		icub->_ubidi_setClassCallback(bidi, bidiccb, NULL, NULL, NULL, &status);
+		//icub->_ubidi_setClassCallback(bidi, bidiccb, NULL, NULL, NULL, &status);
 		icub->_ubidi_setPara(bidi, testChars, stringLen, bidiReq, NULL, &status);
 		if (U_SUCCESS(status)) {
 			//int paraDir = ubidi_getParaLevel(bidi);
@@ -9055,9 +9082,13 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 				int32_t lengthRun = 0;
 				UBiDiDirection runDir = icub->_ubidi_getVisualRun(bidi, i, &startRun, &lengthRun);
 				bool isRTL = (runDir == UBIDI_RTL);
+				std::string u8strd = md::u16_u8((uint16_t*)(testChars + startRun), lengthRun);
+				size_t endRun = startRun + lengthRun;
+				info.push_back({ /*sc,scrn,*/ u8strd,  (size_t)(testChars + startRun), endRun, isRTL });
+#if 0
 				//printf("Processing Bidi Run = %lld -- run-start = %d, run-len = %d, isRTL = %d\n", i, startRun, lengthRun, isRTL);
 				BidiScriptRunRecords scriptRunRecords;
-				collectBidiScriptRuns(scriptRunRecords, testChars, startRun, lengthRun, isRTL);
+				collectBidiScriptRuns(scriptRunRecords, testChars, startRun, lengthRun, isRTL, family);
 
 				//print_time ftpt("ubidi_2");
 				while (!scriptRunRecords.records.empty()) {
@@ -9077,9 +9108,10 @@ void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)
 					auto scrn = icub->_uscript_getName(code);
 					auto sc = get_script(scrn);
 					std::string u8strd = md::u16_u8((uint16_t*)(testChars + start), end - start);
-					info.push_back({ sc,scrn, u8strd, start, end, 0,isRTL });
+					info.push_back({ /*sc,scrn,*/ u8strd, start, end, isRTL });
 					//printf("Script '%s' from %d to %d.\t%d\n", scrn, start, end, sc);
 				}
+#endif
 			}
 		}
 	}
@@ -9135,6 +9167,20 @@ void delete_font_family(font_family_t* p)
 	}
 }
 
+struct strfont_t {
+	std::string_view v;
+	font_t* font;
+	bool rtl = false;
+	std::vector<font_t::GlyphPosition> _tnpos;
+};
+
+struct value_block {
+	union {
+		text_block* t;
+		image_block* i;
+	};
+	int type = 0;
+};
 /*
 	text_block_t* t;
 	size_t count;
@@ -9145,6 +9191,8 @@ class text_run_cx :public text_run_t
 public:
 	std::vector<bidi_item> bv;
 	std::vector<font_item_t> _tm;
+	std::vector<strfont_t> _block;
+	std::vector<value_block> _value;
 public:
 	text_run_cx();
 	~text_run_cx();
@@ -9160,47 +9208,50 @@ text_run_cx::text_run_cx()
 text_run_cx::~text_run_cx()
 {
 }
-text_p text_create(const char* text, uint32_t length, font_family_t* family)
+text_bp text_create()
 {
 	auto p = new text_run_cx();
-	text_p pr = p;
+	text_bp pr = p;
 	pr->_private = p;
-	p->family = family;
-	text_set_bidi(p, text, 0, length);
 	return pr;
 }
 
-void text_set_family(text_p p1, font_family_t* family)
+void text_add(text_bp p, text_block* tb)
 {
-	auto p = (text_run_cx*)p1->_private;
-	if (p)
-	{
-		p->family = family;
-		//for (auto& it : p->bv) {
-		//}
-	}
+	auto p1 = (text_run_cx*)p->_private;
+	p1->_value.push_back({ .t = tb, .type = 0 });
 }
 
-void text_set(text_p p1, const char* str, size_t first, size_t count)
+void text_add_image(text_bp p, image_block* img)
 {
-	auto p = (text_run_cx*)p1->_private;
-	if (p)
-	{
-		text_set_bidi(p, str, first, count);
-	}
+	auto p1 = (text_run_cx*)p->_private;
+	p1->_value.push_back({ .i = img, .type = 1 });
 }
-void text_set_bidi(text_p p1, const char* str, size_t first, size_t count)
+
+void text_clear(text_bp p)
+{
+	auto p1 = (text_run_cx*)p->_private;
+	p1->bv.clear();
+	p1->_tm.clear();
+	p1->_block.clear();
+}
+
+void text_update(text_bp p, float width)
+{
+
+}
+
+void text_set_bidi(text_bp p1, const char* str, size_t first, size_t count, font_family_t* family)
 {
 	auto p = (text_run_cx*)p1->_private;
 	auto t = md::utf8_char_pos(str, first, count);
-	auto te = md::utf8_char_pos(t, count, count);
-	auto wk = md::u8_w(t, te - t);
+	auto te = t + count;// md::utf8_char_pos(t, count, count);
+	auto wk = md::u8_u16(t, count);
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
 	{
 		p->bv.clear();
-		//print_time ftpt("bidi a");
-		do_bidi((UChar*)str1, n, p->bv);
+		do_bidi((UChar*)str1, n, family, p->bv);
 		std::stable_sort(p->bv.begin(), p->bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 	}
 	return;
@@ -9221,72 +9272,168 @@ font_t* get_font(font_family_t* p, const std::string& hs) {
 	return r;
 }
 
-void text_build(text_p p1, float fontsize)
+glm::ivec4 font_get_char_extent(char32_t ch, unsigned char font_size, font_family_t* fallbacks, font_t** oft)
 {
+	ft_char_s cs;
+	cs.v.font_dpi = 0;// font_dpi;
+	cs.v.font_size = font_size;
+	cs.v.unicode_codepoint = ch;
+#if 0
+	{
+		auto it = _char_lut.find(cs.u);
+		if (it != _char_lut.end())
+		{
+			return it->second;
+		}
+	}
+#endif
+	glm::ivec4 ret = {};
+	font_t* rfont = nullptr;
+	auto g = fallbacks->familys[0]->get_glyph_index0(ch, &rfont, fallbacks);
+	if (g)
+	{
+		if (oft)*oft = rfont;
+		double fns = font_size;// round((double)font_size * font_dpi / 72.0);
+		double scale = rfont->get_scale(fns);
+		int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
+		stb_font::buildGlyphBitmap(rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+		double adv = scale * advance;
+		auto bl = rfont->get_base_line(font_size);
+		ret = { x1 - x0, y1 - y0, adv, bl };
+		//_char_lut[cs.u] = ret;
+	}
+	return ret;
+}
+void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, std::vector<strfont_t>& vstr)
+{
+	if (!str8 || !len || !p || !p->count)
+		return;
+	auto str = (const char*)str8;
+	auto str0 = (const char*)str8;
+	auto font = p->familys[0];
+	font_t* oft0 = font;
+	font_t* rfont = nullptr;
+
+	do
+	{
+		if (!str || !(*str)) { break; }
+		int ch = 0;
+		rfont = nullptr;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		if (ch == '\n')
+		{
+			strfont_t t = {};
+			if (str0 != str)
+			{
+				t.v = std::string_view(str0, str);
+				t.rtl = rtl;
+				t.font = oft0;
+				vstr.push_back(t);
+			}
+			{
+				t.v = std::string_view(str, str + kk);
+				t.rtl = rtl;
+				t.font = 0;
+				vstr.push_back(t);
+			}
+			str0 = str + kk;
+			str += kk;
+			continue;
+		}
+		auto g = font->get_glyph_index0(ch, &rfont, p);
+		if (oft0 != rfont)
+		{
+			if (rfont && str0 != str) {
+				strfont_t t = {};
+				t.v = std::string_view(str0, str);
+				t.rtl = rtl;
+				t.font = oft0;
+				str0 = str;
+				vstr.push_back(t);
+			}
+			oft0 = rfont;
+		}
+		str += kk;
+	} while (str && *str);
+	if (str0 != str)
+	{
+		vstr.push_back({ std::string_view(str0,str), oft0 });
+	}
+	return;
+}
+
+void text_update(text_bp p1, text_block* tb)
+{
+	if (!p1)return;
 	auto p = (text_run_cx*)p1->_private;
 	p->_tm.clear();
-
-	struct text_block_at {
-		font_t* font;
-		text_extents_t extents;     /* store computed text extends */
-		const char* text;        /* utf8 char array of text*/
-		unsigned int glyph_count; /* Total glyph count */
-		hb_buffer_t* hbBuf;  /* HarfBuzz buffer of text */
-		hb_glyph_position_t* glyphs; /* HarfBuzz computed glyph positions array */
-	};
+	p->_block.clear();
 	std::vector<hb_tag_t> vv;
-	std::vector<std::string_view> vstr;
+	auto& vstr = p->_block;
+	vstr.clear();
+	auto t = tb->style;
+	text_set_bidi(p1, tb->str, tb->first, tb->size, t->family);
 	for (auto& it : p->bv)
 	{
-		vstr.clear();
-		auto font = get_font(p->family, it.hs);
-		it.font = font;
+		get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr);
+	}
+	for (auto& kt : vstr)
+	{
+		if (!kt.font)
+		{
+			continue;
+		}
+		auto st = kt.v;
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
-		auto ws = md::u8_u16(it.s);
-		auto pt = it.s.c_str();
-		auto pt0 = pt;
-		for (; *pt; pt++) {
-			if (*pt == '\n')
-			{
-				vstr.push_back(std::string_view(pt0, pt));
-				vstr.push_back(std::string_view());
-				pt0 = pt + 1;
-			}
+		auto w = md::u8_w(std::string(st));
+		auto nn0 = kt.font->CollectGlyphsFromFont(st.data(), st.size(), 8, kt.rtl, 0, &gp);
+		kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
+	}
+	for (auto& kt : vstr)
+	{
+		if (!kt.font) {
+			font_item_t git = {}; git.cpt = kt.v[0];
+			p->_tm.push_back(git); continue;
 		}
-		if (pt0 != pt)
+		double scale_h = kt.font->get_scale(t->fontsize);
+		uint32_t color = -1;
+		int xx = 0;
+		int yy = kt.font->get_line_height(t->fontsize);
+		int h = kt.font->get_line_height(t->fontsize);
+		// 光栅化glyph index并缓存
+		for (auto& gt : kt._tnpos)
 		{
-			vstr.push_back(std::string_view(pt0, pt));
-		}
-		for (auto& kt : vstr)
-		{
-			if (kt.empty())
-			{
-				font_item_t em = {};
-				em.cpt = '\n';
-				p->_tm.push_back(em);
-				continue;
-			}
-			auto nn0 = font->CollectGlyphsFromFont(kt.data(), kt.size(), 8, 0, 0, &gp);
-			double scale_h = font->get_scale(fontsize);
-			uint32_t color = -1;
-			int xx = 0;
-			int yy = font->get_line_height(fontsize);
-			int h = font->get_line_height(fontsize);
-			// 光栅化glyph index并缓存
-			for (size_t i = 0; i < gp.len; i++)
-			{
-				auto pos = &gp.pos[i];
-				auto git = font->get_glyph_item(pos->index, 0, fontsize);
-				glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-				git._apos = offset;
-				p->_tm.push_back(git);
-			}
+			auto pos = &gt;
+			auto git = kt.font->get_glyph_item(pos->index, 0, t->fontsize);
+			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+			git._apos = offset;
+			p->_tm.push_back(git);
 		}
 	}
 	return;
 }
 
-
+/*
+[
+  { "text": "标题", "bold": true, "size": 24 },
+  "\n", // 换行
+  { "text": "这是一段普通文本" },
+  { "text": "加粗文本", "bold": true },
+  { "text": "红色斜体", "italic": true, "color": "#ff0000" },
+  {
+	"type": "image",
+	"src": "https://example.com/image.jpg",
+	"width": 200,
+	"height": 100
+  },
+  {
+	"type": "link",
+	"url": "https://example.com",
+	"text": "这是一个链接"
+  }
+]
+*/
 
 
 #else

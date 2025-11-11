@@ -33,6 +33,7 @@ struct tinypath_t
 
 
 struct hps_t;
+struct font_family_t;
 struct font_impl;
 struct font_item_t;
 class font_imp;
@@ -178,9 +179,9 @@ public:
 		};
 	};
 	struct GlyphPosition {
-		font_t* font;
 		uint32_t index;
 		c_glyph* glyph;
+		font_t* font;
 		int x_offset;
 		int y_offset;
 		int x_advance;
@@ -227,6 +228,7 @@ public:
 	// 获取文字在哪个字体
 	static const char* get_glyph_index_u8(const char* u8str, int* oidx, font_t** renderFont, std::vector<font_t*>* fallbacks);
 	int get_glyph_index(uint32_t codepoint, font_t** renderFont, std::vector<font_t*>* fallbacks);
+	int get_glyph_index0(uint32_t codepoint, font_t** renderFont, font_family_t* fallbacks);
 
 	std::map<int, std::vector<info_one>> get_detail();
 	// 返回的positions.pos自动管理内存,返回字形数量
@@ -594,25 +596,45 @@ struct text_block_t {
 	hb_glyph_position_t* glyphs; /* HarfBuzz computed glyph positions array */
 };
 struct text_run_t {
-	text_block_t* t = 0;
-	size_t count = 0;
-	font_family_t* family = 0;
 	void* _private = 0;
 };
-typedef struct text_run_t* text_p;
+typedef struct text_run_t* text_bp;
 typedef struct font_t* font_p;
+class text_run_cx;
 // familys多个字体时用小写逗号分隔，style逗号分隔字体的风格(可空)
 //  new_font_family(font_rctx* ctx,(char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic");
 font_family_t* new_font_family(font_rctx* ctx, const char* familys, const char* style = nullptr);
 void delete_font_family(font_family_t* p);
+// 文本样式
+struct text_style
+{
+	font_family_t* family = 0;
+	float fontsize = 0;
+	uint32_t color = 0;
+	glm::vec2 text_align = { 0.0,0.5 };
+};
+// 文本块
+struct text_block
+{
+	text_style* style = 0;
+	const char* str = 0; size_t first = 0; size_t size = 0;
+	glm::vec2 extents = {};   // 文本渲染大小
+};
+struct image_block
+{
+	image_ptr_t* img = 0;
+	glm::vec2 pos;					// 渲染位置*排版设置
+	glm::vec4 rc;					// 图片区域
+	glm::vec2 dsize = { -1,-1 };	// 渲染大小
+	glm::vec4 sliced = {};			// 九宫格图片
+	uint32_t color = -1;			// 颜色混合
+};
+text_bp text_create();
+void text_add(text_bp p, text_block* tb);
+void text_add_image(text_bp p, image_block* img);
+void text_clear(text_bp p);
+void text_update(text_bp p, float width);
 
-text_p text_create(const char* text, uint32_t length, font_family_t* family);
-void text_set_family(text_p p, font_family_t* family);
-void text_set(text_p p, const char* str, size_t first, size_t count);
-void text_set_bidi(text_p p, const char* str, size_t first, size_t count);
-void text_build(text_p p, float fontheight);
-
-class text_run_cx;
 
 
 #endif // !FONT_CORE_H
