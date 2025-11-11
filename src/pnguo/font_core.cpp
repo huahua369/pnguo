@@ -9259,11 +9259,6 @@ void text_update(text_bp p)
 {
 	if (!p)return;
 	auto p1 = (text_run_cx*)p->_private;
-	p1->_tm.clear();
-	p1->_block.clear();
-	std::vector<hb_tag_t> vv;
-	auto& vstr = p1->_block;
-	vstr.clear();
 	for (auto& it : p1->_value)
 	{
 		if (it.type == 0)
@@ -9406,6 +9401,7 @@ void text_update_text(text_bp p1, text_block* tb)
 	auto p = (text_run_cx*)p1->_private;
 	p->_tm.clear();
 	p->_block.clear();
+	p->bv.clear();
 	std::vector<hb_tag_t> vv;
 	auto& vstr = p->_block;
 	vstr.clear();
