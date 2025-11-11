@@ -368,6 +368,16 @@ vkvg_ctx* vkvg_dev::new_ctx(VkvgSurface p)
 	return r;
 }
 
+vkvg_ctx* vkvg_dev::new_context(VkvgSurface p)
+{
+	auto r = p ? new vkvg_ctx(p) : nullptr;
+	if (r)
+	{
+		r->fun = get_fun();
+	}
+	return r;
+}
+
 void vkvg_dev::free_ctx(vkvg_ctx* p)
 {
 	if (p)delete p;

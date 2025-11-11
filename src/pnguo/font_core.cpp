@@ -2427,13 +2427,17 @@ uint32_t font_t::CollectGlyphsFromFont(const void* text, size_t length, int type
 	}
 	hb_buffer_guess_segment_properties(hb_buffer);
 
-	hb_feature_t userfeatures[1];
+	hb_feature_t userfeatures[2];
 	userfeatures[0].tag = HB_TAG('k', 'e', 'r', 'n');
 	userfeatures[0].value = enable_kerning;
 	userfeatures[0].start = HB_FEATURE_GLOBAL_START;
 	userfeatures[0].end = HB_FEATURE_GLOBAL_END;
+	userfeatures[1].tag = HB_TAG('l', 'i', 'g', 'a');
+	userfeatures[1].value = enable_liga;
+	userfeatures[1].start = HB_FEATURE_GLOBAL_START;
+	userfeatures[1].end = HB_FEATURE_GLOBAL_END;
 
-	hb_shape(hp->hb_font, hb_buffer, userfeatures, 1);
+	hb_shape(hp->hb_font, hb_buffer, userfeatures, 2);
 
 	// Get the result
 	unsigned int glyph_count_u = 0;

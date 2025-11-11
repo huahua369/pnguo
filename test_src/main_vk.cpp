@@ -1053,6 +1053,23 @@ text_image_t* get_glyph_item(std::vector<font_t*>& familys, int fontsize, const 
 	return opt;
 }
 
+#define SP_RGBA32_R_U(v) ((v) & 0xff)
+#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
+#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
+#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
+#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
+#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
+#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
+#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
+#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
+#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+void set_color0(cairo_t* cr, uint32_t rgba)
+{
+	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
+		SP_RGBA32_G_F(rgba),
+		SP_RGBA32_B_F(rgba),
+		SP_RGBA32_A_F(rgba));
+}
 glm::vec2 draw_image1(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& dsize)
 {
 	glm::vec2 ss = { rc.z, rc.w };
@@ -1079,7 +1096,7 @@ glm::vec2 draw_image1(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos,
 				cairo_scale(cr, sc.x, sc.y);
 			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
 			cairo_clip(cr);
-			cairo_set_source_rgba(cr, 1, 1, 1, 1);
+			set_color0(cr, color);
 			cairo_mask_surface(cr, image, -rc.x, -rc.y);
 			cairo_restore(cr);
 		}
@@ -1194,7 +1211,61 @@ void draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color,
 		nps.x += it.advance;
 	}
 }
+void vkvg_render(vkvg_dev* dev, font_t* sue, font_t::GlyphPositions& gp)
+{
+	auto surf = dev->new_surface(2024, 512);
+	auto ctx = dev->new_context(surf);
+	int fontsize = 128;
+	double scale_h = sue->get_scale(fontsize);
+	uint32_t color = 0xff0080ff;
+	int xx = 0;
+	int yy = sue->get_line_height(fontsize);
+	int h = sue->get_line_height(fontsize);
+	std::vector<font_item_t> tm;
+	text_image_t opt = {};
+	//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
+	auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
+	auto cr = cairo_create(img);
 
+	// 光栅化glyph index并缓存
+	for (size_t i = 0; i < gp.len; i++)
+	{
+		auto pos = &gp.pos[i];
+		auto git = sue->get_glyph_item(pos->index, 0, fontsize);
+		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+		git._apos = offset;
+		tm.push_back(git);
+	}
+	for (size_t i = 0; i < gp.len; i++)
+	{
+		auto pos = &gp.pos[i];
+		glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
+		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+		auto git = tm[i];
+		if (git._image) {
+			auto ft = (cairo_surface_t*)git._image->ptr;
+			if (!ft) {
+				ft = new_image_cr(git._image);
+				git._image->ptr = ft;
+				cairo_surface_write_to_png(ft, "temp/cacheemoji.png");
+			}
+			if (ft)
+			{
+				auto ps = git._dwpos;// +git._apos;
+				ps.x += xx;
+				ps += offset;
+				ps.y += yy;
+				draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
+			}
+		}
+		xx += adv.x;
+	}
+	std::string fn = "temp/emojitest2.png";
+	cairo_surface_write_to_png(img, fn.c_str());
+	cairo_destroy(cr);
+	cairo_surface_destroy(img);
+
+}
 int main()
 {
 	auto k = time(0);
@@ -1411,74 +1482,25 @@ int main()
 
 
 
-		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
-		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
+		std::string k8 = (char*)u8"سلام➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
+		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 		//text_p text = text_create(k8.c_str(), k8.size(), family);
 		//text_update(text, 26);
 		//auto ptext = (text_run_cx*)text; 
 
 
 
-		delete_font_family(family);
+		//delete_font_family(family);
 
 
 
 
 
-
-
+		sue = family->familys[0];
+		//k8 = "fffittttt";
 
 		font_t::GlyphPositions gp = {};// 执行harfbuzz
-		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 0, 0, &gp);
-		int fontsize = 128;
-		double scale_h = sue->get_scale(fontsize);
-		uint32_t color = -1;
-		int xx = 0;
-		int yy = sue->get_line_height(fontsize);
-		int h = sue->get_line_height(fontsize);
-		std::vector<font_item_t> tm;
-		text_image_t opt = {};
-		//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
-		auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
-		auto cr = cairo_create(img);
-
-		// 光栅化glyph index并缓存
-		for (size_t i = 0; i < gp.len; i++)
-		{
-			auto pos = &gp.pos[i];
-			auto git = sue->get_glyph_item(pos->index, 0, fontsize);
-			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-			git._apos = offset;
-			tm.push_back(git);
-		}
-		for (size_t i = 0; i < gp.len; i++)
-		{
-			auto pos = &gp.pos[i];
-			glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
-			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-			auto git = tm[i];
-			if (git._image) {
-				auto ft = (cairo_surface_t*)git._image->ptr;
-				if (!ft) {
-					ft = new_image_cr(git._image);
-					git._image->ptr = ft;
-					cairo_surface_write_to_png(ft, "temp/cacheemoji.png");
-				}
-				if (ft)
-				{
-					auto ps = git._dwpos;// +git._apos;
-					ps.x += xx;
-					ps += offset;
-					ps.y += yy;
-					draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
-				}
-			}
-			xx += adv.x;
-			if (git.cpt == '\n')
-			{
-				yy += h; xx = 0;
-			}
-		}
+		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 1, 0, &gp);
 
 
 		std::vector<vertex_f> vdp;
@@ -1506,7 +1528,7 @@ int main()
 			auto bs = sue->get_shape_box_glyph(gidx[i], fheight, &box);
 			kvs.push_back({ bs.x,bs.y,box.x,box.y });
 			get_path_bitmap((vertex_32f*)vdp.data(), vdp.size(), bmp, { sc,sc }, { box.x, box.y }, 1);
-			gray_copy2rgba(&rgba, bmp, { box.x,bl + box.y + posy }, glm::ivec4(0, 0, box.z, box.w), -1, true);
+			gray_copy2rgba(&rgba, bmp, { box.x,bl + box.y + posy }, glm::ivec4(0, 0, box.z, box.w), 0xff0080ff, true);
 			std::string fni0 = "temp/chu_" + std::to_string(i) + ".png";
 			save_img_png(bmp, fni0.c_str());
 		}
@@ -1518,10 +1540,6 @@ int main()
 				c++;
 			}
 		}
-		std::string fn = "temp/emojitest2.png";
-		cairo_surface_write_to_png(img, fn.c_str());
-		cairo_destroy(cr);
-		cairo_surface_destroy(img);
 		//vkrender_test(0);
 		{
 
@@ -1593,12 +1611,18 @@ int main()
 		vkdg_cx* vkd = new_vkdg(0, 0, 0);	// 创建vk渲染器 
 		// 使用3D渲染器的设备创建渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
+		vkvg_dev* vctx = 0;
 		{
 			dev_info_c cc = {};
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
 			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
-			test_vkvg(0, &cc);
+			//test_vkvg(0, &cc);
+			vctx = new_vkvgdev(&cc, 8);
+			vkvg_render(vctx, sue, gp);
 		}
+
+
+
 		glm::mat2x2 aaa;
 		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);

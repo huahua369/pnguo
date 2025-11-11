@@ -153,6 +153,7 @@ public:
 	bool first_bitmap = false;
 	// Whether kerning is desired
 	bool enable_kerning = false;
+	bool enable_liga = true;
 	bool use_no_color = false;
 
 	struct c_glyph {

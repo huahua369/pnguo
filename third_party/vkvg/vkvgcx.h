@@ -143,6 +143,7 @@ public:
 	VkvgSurface new_surface(const char* fn);
 	void free_surface(VkvgSurface p);
 	vkvg_ctx* new_ctx(VkvgSurface p);
+	vkvg_ctx* new_context(VkvgSurface p);
 	void free_ctx(vkvg_ctx* p);
 
 	void* get_vkimage(void* surface);
