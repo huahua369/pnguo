@@ -9200,6 +9200,7 @@ public:
 private:
 
 };
+void text_update_text(text_bp p1, text_block* tb);
 
 text_run_cx::text_run_cx()
 {
@@ -9216,29 +9217,65 @@ text_bp text_create()
 	return pr;
 }
 
+void text_free(text_bp p)
+{
+	if (p)
+	{
+		auto p1 = (text_run_cx*)p->_private;
+		delete p1;
+	}
+}
+void text_set_rect(text_bp p, const glm::ivec4& rc)
+{
+	if (!p)return;
+	auto p1 = (text_run_cx*)p->_private;
+	p1->_rect = rc;
+}
 void text_add(text_bp p, text_block* tb)
 {
+	if (!p)return;
 	auto p1 = (text_run_cx*)p->_private;
 	p1->_value.push_back({ .t = tb, .type = 0 });
 }
 
 void text_add_image(text_bp p, image_block* img)
 {
+	if (!p)return;
 	auto p1 = (text_run_cx*)p->_private;
+	if (!p)return;
 	p1->_value.push_back({ .i = img, .type = 1 });
 }
 
 void text_clear(text_bp p)
 {
+	if (!p)return;
 	auto p1 = (text_run_cx*)p->_private;
 	p1->bv.clear();
 	p1->_tm.clear();
 	p1->_block.clear();
 }
 
-void text_update(text_bp p, float width)
+void text_update(text_bp p)
 {
-
+	if (!p)return;
+	auto p1 = (text_run_cx*)p->_private;
+	p1->_tm.clear();
+	p1->_block.clear();
+	std::vector<hb_tag_t> vv;
+	auto& vstr = p1->_block;
+	vstr.clear();
+	for (auto& it : p1->_value)
+	{
+		if (it.type == 0)
+		{
+			auto tb = it.t;
+			text_update_text(p1, tb);
+		}
+		else if (it.type == 1)
+		{
+		}
+	}
+	return;
 }
 
 void text_set_bidi(text_bp p1, const char* str, size_t first, size_t count, font_family_t* family)
@@ -9363,7 +9400,7 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 	return;
 }
 
-void text_update(text_bp p1, text_block* tb)
+void text_update_text(text_bp p1, text_block* tb)
 {
 	if (!p1)return;
 	auto p = (text_run_cx*)p1->_private;

@@ -596,6 +596,8 @@ struct text_block_t {
 	hb_glyph_position_t* glyphs; /* HarfBuzz computed glyph positions array */
 };
 struct text_run_t {
+	glm::ivec4 _rect = {};	// 文本框位置\大小
+	bool is_update = false;
 	void* _private = 0;
 };
 typedef struct text_run_t* text_bp;
@@ -630,10 +632,13 @@ struct image_block
 	uint32_t color = -1;			// 颜色混合
 };
 text_bp text_create();
+void text_free(text_bp p);
+void text_set_rect(text_bp p, const glm::ivec4& rc);
+// 添加文本块，图片块，可修改，最后调用text_update更新渲染数据，指针必需保留
 void text_add(text_bp p, text_block* tb);
 void text_add_image(text_bp p, image_block* img);
 void text_clear(text_bp p);
-void text_update(text_bp p, float width);
+void text_update(text_bp p);
 
 
 
