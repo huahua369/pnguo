@@ -383,6 +383,12 @@ void vkvg_dev::free_ctx(vkvg_ctx* p)
 	if (p)delete p;
 }
 
+void vkvg_dev::update_image(VkvgSurface image, uint32_t* data, int width, int height)
+{
+
+}
+ 
+
 void* vkvg_dev::get_vkimage(void* surface)
 {
 	return surface ? vkvg_surface_get_vk_image((VkvgSurface)surface) : nullptr;//获取vk image指针 
@@ -1119,6 +1125,10 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
 	set_fill_style(cr, style);
 	vkvg_restore(cr);
 }
+
+ 
+
+
 
 #define white 1, 1, 1
 #define red   1, 0, 0

@@ -145,7 +145,10 @@ public:
 	vkvg_ctx* new_ctx(VkvgSurface p);
 	vkvg_ctx* new_context(VkvgSurface p);
 	void free_ctx(vkvg_ctx* p);
+	 
+	void update_image(VkvgSurface image, uint32_t* data, int width, int height);
 
+	// 直接获取VkImage指针
 	void* get_vkimage(void* surface);
 	void image_save(void* surface, const char* fn);
 	glm::ivec2 get_image_data(void* surface, std::vector<uint32_t>* opt);
