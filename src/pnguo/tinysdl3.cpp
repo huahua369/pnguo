@@ -2605,6 +2605,16 @@ void* new_texture_r(void* renderer, int width, int height, int type, void* data,
 	}
 	return p;
 }
+
+void* new_texture_0(void* renderer, int width, int height)
+{
+	SDL_Texture* p = 0;
+	if (renderer && width > 0 && height > 0)
+	{
+		p = (SDL_Texture*)new_texture_r(renderer, width, height, SDL_PIXELFORMAT_ABGR8888, 0, 0, (int)BlendMode_e::none, true, false);
+	}
+	return p;
+}
 void update_texture_r(void* texture, const glm::ivec4* rect, const void* pixels, int pitch)
 {
 	if (texture && pixels)
@@ -2721,6 +2731,9 @@ texture_cb get_texture_cb() {
 	cb.render_texture_tiled = render_texture_tiled;
 	cb.render_texture_9grid = render_texture_9grid;
 	cb.render_geometryraw = render_geometryraw;
+	cb.new_texture_0 = new_texture_0;
+	cb.draw_geometry = (bool (*)(void* renderer, void* texture, const float* xy, int xy_stride
+		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices))SDL_RenderGeometryRaw;
 	return cb;
 }
 

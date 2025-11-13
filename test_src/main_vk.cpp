@@ -22,7 +22,7 @@
 //#include <cgltf.h>
 #include <mcut/stlrw.h>
 #include <cairo/cairo.h>
-
+#include <spine/spine-sdl3/spinesdl3.h>
 #include <vkvgcx.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
@@ -1319,8 +1319,27 @@ int main()
 			vkd->_state.EmissiveFactor = 30;
 			vkd->_state.IBLFactor = 1.0;
 			new_ui(form0, vkd);
+
+			texture_cb tcb = get_texture_cb();
+			// 动画测试
+			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)tcb.draw_geometry, (newTexture_fun)tcb.new_texture_0
+				, (UpdateTexture_fun)tcb.update_texture, (DestroyTexture_fun)tcb.free_texture, (SetTextureBlendMode_fun)tcb.set_texture_blend);
+
+			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)");
+			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0, 0.5);
+
+			static std::vector<char*> nv;
+			sp_drawable_get_anim_names(dd1, &nv);
+			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
+			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
+			sp_drawable_set_pos(dd1, 500, 500);
 			if (texok)
 			{
+				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
+					{
+						sp_drawable_update(dd1, delta);
+						sp_drawable_draw(dd1);
+					};
 				form0->up_cb = [=](float delta, int* ret)
 					{
 						auto light = vkd->get_light(0);

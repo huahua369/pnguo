@@ -416,6 +416,10 @@ struct texture_cb
 	bool (*render_texture_9grid)(void* renderer, void* texture, texture_9grid_dt* p, int count);
 	// 渲染2d三角网,支持顶点色、纹理
 	bool (*render_geometryraw)(void* renderer, void* texture, geometryraw_dt* p, int count);
+
+	void* (*new_texture_0)(void* renderer, int width, int height);
+	bool (*draw_geometry)(void* renderer, void* texture, const float* xy, int xy_stride
+		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
 };
 #else
 typedef struct texture_cb texture_cb;

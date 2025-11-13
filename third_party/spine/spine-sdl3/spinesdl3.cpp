@@ -166,7 +166,7 @@ void _spAtlasPage_createTexture(spAtlasPage* self, const char* path)
 		stbi_image_free(imageData);
 		return;
 	}
-	if (!p->ptr->UpdateTexture(texture, imageData, width * 4)) {
+	if (!p->ptr->UpdateTexture(texture, 0, imageData, width * 4)) {
 		stbi_image_free(imageData);
 		return;
 	}
@@ -195,7 +195,10 @@ void _spAtlasPage_disposeTexture(spAtlasPage* self) {
 char* _spUtil_readFile(const char* path, int* length) {
 	return _spReadFile(path, length);
 }
-
+SP_Texture* get_tex(void* p1) {
+	auto p = (robj_t*)p1;
+	return p->texture;
+}
 
 #ifndef SDL_BLENDMODE_NONE
 #define SDL_BLENDMODE_NONE                  0x00000000u /**< no blending: dstRGBA = srcRGBA */
@@ -252,7 +255,7 @@ void sp_drawable_draw0(spine_ctx* ctx, void* self1)
 			uvs = region->uvs;
 			indices = quadIndices;
 			indicesCount = 6;
-			texture = (SP_Texture*)((spAtlasRegion*)region->rendererObject)->page->rendererObject;
+			texture = get_tex(((spAtlasRegion*)region->rendererObject)->page->rendererObject);
 		}
 		else if (attachment->type == SP_ATTACHMENT_MESH) {
 			spMeshAttachment* mesh = (spMeshAttachment*)attachment;
@@ -270,7 +273,7 @@ void sp_drawable_draw0(spine_ctx* ctx, void* self1)
 			uvs = mesh->uvs;
 			indices = mesh->triangles;
 			indicesCount = mesh->trianglesCount;
-			texture = (SP_Texture*)((spAtlasRegion*)mesh->rendererObject)->page->rendererObject;
+			texture = get_tex(((spAtlasRegion*)mesh->rendererObject)->page->rendererObject);
 		}
 		else if (attachment->type == SP_ATTACHMENT_CLIPPING) {
 			spClippingAttachment* clip = (spClippingAttachment*)slot->attachment;
@@ -309,11 +312,19 @@ void sp_drawable_draw0(spine_ctx* ctx, void* self1)
 		spIntArray_clear(self->sdlIndices);
 		for (int ii = 0; ii < (int)indicesCount; ii++)
 			spIntArray_add(self->sdlIndices, indices[ii]);
-
+		enum class blendmode_e :int {
+			none = -1,
+			normal = 0,	// 普通混合
+			additive,
+			multiply,
+			modulate,
+			screen
+		};
 		//static SDL_BlendMode screen = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD);
 		bool pma0 = self->usePremultipliedAlpha == 0;
 		if (ctx->SetTextureBlendMode)
 		{
+#if 0
 			switch (slot->data->blendMode) {
 			case SP_BLEND_MODE_NORMAL:
 				ctx->SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED);
@@ -328,6 +339,23 @@ void sp_drawable_draw0(spine_ctx* ctx, void* self1)
 				ctx->SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);//screen);//
 				break;
 			}
+#else
+			switch (slot->data->blendMode) {
+			case SP_BLEND_MODE_NORMAL:
+				ctx->SetTextureBlendMode(texture, (uint32_t)blendmode_e::normal, pma0);
+				break;
+			case SP_BLEND_MODE_MULTIPLY:
+				ctx->SetTextureBlendMode(texture, (uint32_t)blendmode_e::multiply, pma0);
+				break;
+			case SP_BLEND_MODE_ADDITIVE:
+				ctx->SetTextureBlendMode(texture, (uint32_t)blendmode_e::additive, pma0);
+				break;
+			case SP_BLEND_MODE_SCREEN:
+				ctx->SetTextureBlendMode(texture, (uint32_t)blendmode_e::screen, pma0);
+				break;
+			}
+
+#endif
 		}
 
 		//SDL_RenderGeometry(renderer, texture, self->sdlVertices->items, self->sdlVertices->size, self->sdlIndices->items, indicesCount);
@@ -931,9 +959,9 @@ spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize)
 	{
 		auto pkbs = (spe_ht*)atlasf;
 		std::string pkbn = "spa";
-		if (pkbs->n != pkbn)return;
+		if (pkbs->n != pkbn)return 0;
 		njson0 pk = njson0::from_cbor(atlasf + sizeof(spe_ht), pkbs->datalen);
-		if (!(pk.is_object() && pk.size()))return;
+		if (!(pk.is_object() && pk.size()))return 0;
 		int atlas_offset = pk["atlas_offset"];
 		int atlas_len = pk["atlas_length"];
 		int ske_offset = pk["ske_offset"];
@@ -959,6 +987,7 @@ spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize)
 		p->_texs = pot._texs;
 		ctx->rc_count++;
 	}
+	return p;
 }
 
 void sp_atlas_dispose(spine_atlas_t* atlas)

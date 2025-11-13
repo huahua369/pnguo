@@ -42,10 +42,10 @@ extern "C" {
 	typedef bool (*draw_geometry_fun)(void* renderer, SP_Texture* texture, const float* xy, int xy_stride
 		, const SP_color* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
 	// 设置纹理混合模式函数指针
-	typedef bool (*SetTextureBlendMode_fun)(SP_Texture* texture, uint32_t blendMode);
+	typedef bool (*SetTextureBlendMode_fun)(SP_Texture* texture, uint32_t blendMode, bool multiply);
 	// 创建纹理函数指针, rgba8格式
 	typedef SP_Texture* (*newTexture_fun)(void* renderer, int w, int h);
-	typedef bool (*UpdateTexture_fun)(SP_Texture* texture, const void* pixels, int pitch);
+	typedef bool (*UpdateTexture_fun)(SP_Texture* texture, const float* rect, const void* pixels, int pitch);
 	typedef void (*DestroyTexture_fun)(SP_Texture* texture);
 	struct spine_ctx {
 		void* renderer = nullptr;								// 渲染器指针
@@ -64,7 +64,6 @@ extern "C" {
 	void sp_ctx_dispose(spine_ctx* ctx);
 	// 创建图集,支持打包格式
 	spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize = 0);
-	// 销毁图集
 	void sp_atlas_dispose(spine_atlas_t* atlas);
 	// 打包图集和纹理到内存数据
 	void sp_atlas_packages(spine_atlas_t* atlas, std::vector<char>* opt);
@@ -72,7 +71,7 @@ extern "C" {
 	spine_drawable_t* sp_new_drawable(spine_ctx* ctx, spine_atlas_t* atlas, const char* skef, size_t fdsize = 0, float scale = 1.0f, float defaultMix = 0.2f);
 	void sp_drawable_dispose(spine_drawable_t* drawable);
 	void sp_drawable_set_pos(spine_drawable_t* drawable, int x, int y);
-	void sp_drawable_get_anim_names(spine_drawable_t* drawable, std::vector<char*>* v);
+	void sp_drawable_get_anim_names(spine_drawable_t* drawable, std::vector<char*>* v);	// 获取动画名称列表
 	void sp_drawable_set_animationbyname(spine_drawable_t* drawable, int trackIndex, const char* animationName, int loop);
 	void sp_drawable_add_animationbyname(spine_drawable_t* drawable, int trackIndex, const char* animationName, int loop, float delay);
 	// 更新动画数据
