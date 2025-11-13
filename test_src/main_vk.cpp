@@ -2,6 +2,10 @@
 文本渲染：fontconfig、stb_truetype、harfBuzz、icu
 矢量图渲染： vkvg
 窗口：SDL3
+
+文本渲染数据：图集+三角形
+视图纹理：前景、背景各一张。文本渲染在中间
+
 */
 #include <pch1.h>
 
@@ -1216,9 +1220,9 @@ int main()
 			dev_info_c cc = {};
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
 			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
-			//test_vkvg(0, &cc);
+			test_vkvg(0, &cc);
 			vctx = new_vkvgdev(&cc, 8);
-			vkvg_render(vctx, sue, gp);
+			//vkvg_render(vctx, sue, gp);
 		}
 
 

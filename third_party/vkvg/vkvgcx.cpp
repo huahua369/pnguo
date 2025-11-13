@@ -1221,6 +1221,13 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 			vkvg_set_line_width(cr, 2.0);
 			vkvg_stroke(cr);
 		}
+		vkvg_set_source_color(cr, 0xff0020ff);
+		vkvg_select_font_face(ctx, "times");
+		vkvg_move_to(ctx, 100.f, 100);
+		vkvg_set_font_size(ctx, 30);
+		static const char* txt = "The quick brown fox jumps over the lazy dog";
+		vkvg_show_text(ctx, txt);
+
 	}
 
 	vkvg_flush(ctx);
