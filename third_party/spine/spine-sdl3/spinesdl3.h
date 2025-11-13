@@ -52,70 +52,39 @@ extern "C" {
 }
 #endif
 
-class sp_drawable_ctx
-{
-public:
-	void* renderer = nullptr;
-	draw_geometry_fun RenderGeometryRaw = nullptr;
-	SetTextureBlendMode_fun SetTextureBlendMode = nullptr;
-	newTexture_fun CreateTexture = nullptr;
-	UpdateTexture_fun UpdateTexture = nullptr;
-	DestroyTexture_fun DestroyTexture = nullptr;
-	struct sp_obj_c {
-		void* drawable = 0;
-		void* atlas = 0;
-		bool visible = true;
-	};
-	std::vector<sp_obj_c> drawables;
-	struct able_t
-	{
-		std::string atlas;
-		std::string ske;
-		float scale = 0.5f;
-		float defaultMix = 0.2f;
-	};
-	std::vector<able_t> vable;
-public:
-	sp_drawable_ctx();
-	~sp_drawable_ctx();
-	void set_renderer(void* p, draw_geometry_fun rendergeometryraw, newTexture_fun createtexture, UpdateTexture_fun updatetexture, DestroyTexture_fun destroytexture, SetTextureBlendMode_fun settextureblendmode);
-	// package_file可用于输出到打包
-	void add(const std::string& atlas, const std::string& ske, float scale = 0.5f, float defaultMix = 0.2f, const std::string& package_file = "");
-	// 从打包文件加载
-	void add_pkg_data(const char* data, size_t len, float scale = 0.5f, float defaultMix = 0.2f);
-	void add_pkg(const std::string& pkgfn, float scale = 0.5f, float defaultMix = 0.2f);
-	void dispose_sp(size_t idx);
-	void animationstate_set_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop);
-	void animationstate_add_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop, float delay);
-	void set_pos(size_t idx, int x, int y);
-	void get_anim_name(size_t idx, std::vector<char*>* v);
-	void update_draw(double deltaTime);
 
-private:
-	void draw(void* self);
-
+struct spine_ctx {
+	void* renderer = nullptr;								// 渲染器指针
+	draw_geometry_fun RenderGeometryRaw = nullptr;			// 渲染函数指针
+	SetTextureBlendMode_fun SetTextureBlendMode = nullptr;	// 设置纹理混合模式函数指针，可选
+	newTexture_fun CreateTexture = nullptr;					// 创建纹理函数指针	
+	UpdateTexture_fun UpdateTexture = nullptr;				// 更新纹理函数指针
+	DestroyTexture_fun DestroyTexture = nullptr;			// 销毁纹理函数指针
+	size_t rc_count = 0;									// 创建资源计数
 };
 
-class drawable2d_cx
-{
-public:
-	struct obj_c {
-		void* drawable = 0;
-		void* skeletonData = 0;
-		void* animationStateData = 0;
-		bool visible = true;
-	};
-	void* atlas = 0;
-	void* renderer = 0;
-	std::vector<obj_c> vable;
-public:
-	drawable2d_cx();
-	~drawable2d_cx();
-
-private:
-
-};
-
-
+typedef struct spine_atlas_t spine_atlas_t;
+typedef struct spSkeletonDrawable spine_drawable_t;
+// 创建上下文
+spine_ctx* sp_ctx_create(void* renderer, draw_geometry_fun rendergeometryraw, newTexture_fun createtexture, UpdateTexture_fun updatetexture, DestroyTexture_fun destroytexture, SetTextureBlendMode_fun settextureblendmode);
+// 销毁上下文
+void sp_ctx_dispose(spine_ctx* ctx);
+// 创建图集
+spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize);
+// 销毁图集
+void sp_atlas_dispose(spine_atlas_t* atlas);
+// 打包到数据
+void sp_atlas_packages(spine_atlas_t* atlas, std::vector<char>* opt);
+// 创建可绘制对象,json\skel
+spine_drawable_t* sp_new_drawable(spine_ctx* ctx, spine_atlas_t* atlas, const char* skef, size_t fdsize, float scale = 1.0f, float defaultMix = 0.2f);
+void sp_drawable_dispose(spine_drawable_t* drawable);
+void sp_drawable_set_pos(spine_drawable_t* drawable, int x, int y);
+void sp_drawable_get_anim_names(spine_drawable_t* drawable, std::vector<char*>* v);
+void sp_drawable_set_animationbyname(spine_drawable_t* drawable, int trackIndex, const char* animationName, int loop);
+void sp_drawable_add_animationbyname(spine_drawable_t* drawable, int trackIndex, const char* animationName, int loop, float delay);
+// 更新动画数据
+void sp_drawable_update(spine_drawable_t* drawable, double deltaTime);
+// 绘制
+void sp_drawable_draw(spine_drawable_t* drawable);
 
 #endif // !SPSDL3_H
