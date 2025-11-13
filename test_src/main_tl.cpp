@@ -2742,7 +2742,7 @@ int main(int argc, char* argv[])
 	float x = 0.2;
 	auto v3y = m3y * x;
 	auto v3y0 = x * m3y;
-	auto d2 = new sp_drawable();
+	auto d2 = new sp_drawable_ctx();
 	d2->set_renderer(form0->renderer);
 	/*d2->add(R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)"
 		, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0.25, 0.2, "temp/spineboy-j.spt");

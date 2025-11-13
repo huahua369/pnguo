@@ -13,7 +13,7 @@
 #endif
 #include <io.h>
 
-#include <SDL3/SDL.h>
+//#include <SDL3/SDL.h>
 #include <set>
 #include "spinesdl3.h"
 
@@ -27,9 +27,12 @@ using njson0 = nlohmann::ordered_json;	// key无序
 #include <mapView.h>
 #endif
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
 	struct spSdlVertexArray;
 	typedef struct spSkeletonDrawable {
 		spSkeleton* skeleton;
@@ -49,9 +52,9 @@ extern "C" {
 
 	SP_API void spSkeletonDrawable_update(spSkeletonDrawable* self, float delta, spPhysics physics);
 
-	SP_API void spSkeletonDrawable_draw(spSkeletonDrawable* self, struct SDL_Renderer* renderer);
+	//SP_API void spSkeletonDrawable_draw(spSkeletonDrawable* self, struct SDL_Renderer* renderer);
 
-	_SP_ARRAY_DECLARE_TYPE(spSdlVertexArray, struct SDL_Vertex)
+	_SP_ARRAY_DECLARE_TYPE(spSdlVertexArray, struct SP_Vertex)
 #ifdef __cplusplus
 }
 #endif
@@ -64,7 +67,7 @@ extern "C" {
 
 #include <stb_image.h>
 
-_SP_ARRAY_IMPLEMENT_TYPE_NO_CONTAINS(spSdlVertexArray, SDL_Vertex)
+_SP_ARRAY_IMPLEMENT_TYPE_NO_CONTAINS(spSdlVertexArray, SP_Vertex)
 
 spSkeletonDrawable* spSkeletonDrawable_create(spSkeletonData* skeletonData, spAnimationStateData* animationStateData, int ownsSkeletonData, float defaultMix) {
 	spBone_setYDown(-1);
@@ -117,138 +120,20 @@ void spSkeletonDrawable_update(spSkeletonDrawable* self, float delta, spPhysics 
 	spSkeleton_updateWorldTransform(self->skeleton, physics);
 }
 
-void spSkeletonDrawable_draw(spSkeletonDrawable* self, struct SDL_Renderer* renderer) {
-	static unsigned short quadIndices[] = { 0, 1, 2, 2, 3, 0 };
-	spSkeleton* skeleton = self->skeleton;
-	spSkeletonClipping* clipper = self->clipper;
-	SDL_Texture* texture;
-	SDL_Vertex sdlVertex;
-	for (int i = 0; i < skeleton->slotsCount; ++i) {
-		spSlot* slot = skeleton->drawOrder[i];
-		spAttachment* attachment = slot->attachment;
-		if (!attachment) {
-			spSkeletonClipping_clipEnd(clipper, slot);
-			continue;
-		}
-
-		// Early out if the slot color is 0 or the bone is not active
-		if (slot->color.a == 0 || !slot->bone->active) {
-			spSkeletonClipping_clipEnd(clipper, slot);
-			continue;
-		}
-
-		spFloatArray* vertices = self->worldVertices;
-		int verticesCount = 0;
-		float* uvs = NULL;
-		unsigned short* indices;
-		int indicesCount = 0;
-		spColor* attachmentColor = NULL;
-
-		if (attachment->type == SP_ATTACHMENT_REGION) {
-			spRegionAttachment* region = (spRegionAttachment*)attachment;
-			attachmentColor = &region->color;
-
-			// Early out if the slot color is 0
-			if (attachmentColor->a == 0) {
-				spSkeletonClipping_clipEnd(clipper, slot);
-				continue;
-			}
-
-			spFloatArray_setSize(vertices, 8);
-			spRegionAttachment_computeWorldVertices(region, slot, vertices->items, 0, 2);
-			verticesCount = 4;
-			uvs = region->uvs;
-			indices = quadIndices;
-			indicesCount = 6;
-			texture = (SDL_Texture*)((spAtlasRegion*)region->rendererObject)->page->rendererObject;
-		}
-		else if (attachment->type == SP_ATTACHMENT_MESH) {
-			spMeshAttachment* mesh = (spMeshAttachment*)attachment;
-			attachmentColor = &mesh->color;
-
-			// Early out if the slot color is 0
-			if (attachmentColor->a == 0) {
-				spSkeletonClipping_clipEnd(clipper, slot);
-				continue;
-			}
-
-			spFloatArray_setSize(vertices, mesh->super.worldVerticesLength);
-			spVertexAttachment_computeWorldVertices(SUPER(mesh), slot, 0, mesh->super.worldVerticesLength, vertices->items, 0, 2);
-			verticesCount = mesh->super.worldVerticesLength >> 1;
-			uvs = mesh->uvs;
-			indices = mesh->triangles;
-			indicesCount = mesh->trianglesCount;
-			texture = (SDL_Texture*)((spAtlasRegion*)mesh->rendererObject)->page->rendererObject;
-		}
-		else if (attachment->type == SP_ATTACHMENT_CLIPPING) {
-			spClippingAttachment* clip = (spClippingAttachment*)slot->attachment;
-			spSkeletonClipping_clipStart(clipper, slot, clip);
-			continue;
-		}
-		else
-			continue;
-
-		auto r = std::clamp(skeleton->color.r * slot->color.r * attachmentColor->r, 0.0f, 1.0f);
-		auto g = std::clamp(skeleton->color.g * slot->color.g * attachmentColor->g, 0.0f, 1.0f);
-		auto b = std::clamp(skeleton->color.b * slot->color.b * attachmentColor->b, 0.0f, 1.0f);
-		auto a = std::clamp(skeleton->color.a * slot->color.a * attachmentColor->a, 0.0f, 1.0f);
-		sdlVertex.color.r = r;
-		sdlVertex.color.g = g;
-		sdlVertex.color.b = b;
-		sdlVertex.color.a = a;
-
-		if (spSkeletonClipping_isClipping(clipper)) {
-			spSkeletonClipping_clipTriangles(clipper, vertices->items, verticesCount << 1, indices, indicesCount, uvs, 2);
-			vertices = clipper->clippedVertices;
-			verticesCount = clipper->clippedVertices->size >> 1;
-			uvs = clipper->clippedUVs->items;
-			indices = clipper->clippedTriangles->items;
-			indicesCount = clipper->clippedTriangles->size;
-		}
-
-		spSdlVertexArray_clear(self->sdlVertices);
-		for (int ii = 0; ii < verticesCount << 1; ii += 2) {
-			sdlVertex.position.x = vertices->items[ii];
-			sdlVertex.position.y = vertices->items[ii + 1];
-			sdlVertex.tex_coord.x = uvs[ii];
-			sdlVertex.tex_coord.y = uvs[ii + 1];
-			spSdlVertexArray_add(self->sdlVertices, sdlVertex);
-		}
-		spIntArray_clear(self->sdlIndices);
-		for (int ii = 0; ii < (int)indicesCount; ii++)
-			spIntArray_add(self->sdlIndices, indices[ii]);
-
-		static SDL_BlendMode screen = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD);
-		bool pma0 = self->usePremultipliedAlpha == 0;
-		switch (slot->data->blendMode) {
-		case SP_BLEND_MODE_NORMAL:
-			SDL_SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED);
-			break;
-		case SP_BLEND_MODE_MULTIPLY:
-			SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_MOD);
-			break;
-		case SP_BLEND_MODE_ADDITIVE:
-			SDL_SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_ADD_PREMULTIPLIED);
-			break;
-		case SP_BLEND_MODE_SCREEN:
-			SDL_SetTextureBlendMode(texture, screen);// SDL_BLENDMODE_BLEND);
-			break;
-		}
-
-		SDL_RenderGeometry(renderer, texture, self->sdlVertices->items, self->sdlVertices->size, self->sdlIndices->items,
-			indicesCount);
-		spSkeletonClipping_clipEnd(clipper, slot);
-	}
-	spSkeletonClipping_clipEnd2(clipper);
-}
 
 struct page_obj_t
 {
+	sp_drawable_ctx* ptr = 0;
 	void* renderer = 0;
 	std::map<void*, std::string> _texs;
 	njson0 img;
 	char* data;
 	int len;
+};
+struct robj_t
+{
+	sp_drawable_ctx* ptr;
+	SP_Texture* texture;
 };
 
 void _spAtlasPage_createTexture(spAtlasPage* self, const char* path)
@@ -275,24 +160,35 @@ void _spAtlasPage_createTexture(spAtlasPage* self, const char* path)
 	stbi_uc* imageData = data && len > 0 ? stbi_load_from_memory(data, len, &width, &height, &components, 4)
 		: stbi_load(path, &width, &height, &components, 4);
 	if (!imageData) return;
-	SDL_Texture* texture = SDL_CreateTexture((SDL_Renderer*)p->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width,
-		height);
+	SP_Texture* texture = p->ptr->CreateTexture((SDL_Renderer*)p->renderer, width, height);// SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC,
 	if (!texture) {
 		stbi_image_free(imageData);
 		return;
 	}
-	if (!SDL_UpdateTexture(texture, NULL, imageData, width * 4)) {
+	if (!p->ptr->UpdateTexture(texture, imageData, width * 4)) {
 		stbi_image_free(imageData);
 		return;
 	}
 	p->_texs[texture] = path;
 	stbi_image_free(imageData);
-	self->rendererObject = texture;
+
+	robj_t* robj = (robj_t*)malloc(sizeof(robj_t));
+	if (robj)
+	{
+		robj->ptr = p->ptr;
+		robj->texture = texture;
+		self->rendererObject = robj;
+	}
+	else {
+		p->ptr->DestroyTexture(texture);
+	}
 	return;
 }
 
 void _spAtlasPage_disposeTexture(spAtlasPage* self) {
-	SDL_DestroyTexture((SDL_Texture*)self->rendererObject);
+	auto p = (robj_t*)self->rendererObject;
+	if (p->ptr && p->ptr->DestroyTexture)
+		p->ptr->DestroyTexture((SP_Texture*)p->texture);
 }
 
 char* _spUtil_readFile(const char* path, int* length) {
@@ -309,20 +205,25 @@ void dispose_spobj(sp_obj* p) {
 	spSkeletonDrawable_dispose(p->drawable);
 }
 
-sp_drawable::sp_drawable()
+sp_drawable_ctx::sp_drawable_ctx()
 {
 }
 
-sp_drawable::~sp_drawable()
+sp_drawable_ctx::~sp_drawable_ctx()
 {
 	for (auto& it : drawables) {
 		dispose_spobj((sp_obj*)&it);
 	}
 }
 
-void sp_drawable::set_renderer(void* p)
-{
+void sp_drawable_ctx::set_renderer(void* p, draw_geometry_fun rendergeometryraw, newTexture_fun createtexture, UpdateTexture_fun updatetexture, DestroyTexture_fun destroytexture, SetTextureBlendMode_fun settextureblendmode)
+{ 
 	renderer = p;
+	RenderGeometryRaw = rendergeometryraw;
+	CreateTexture = createtexture;
+	UpdateTexture = updatetexture;
+	DestroyTexture = destroytexture;
+	SetTextureBlendMode = settextureblendmode;
 }
 struct spe_ht
 {
@@ -331,7 +232,7 @@ struct spe_ht
 };
 void packages_b(const std::string& package_file, std::map<void*, std::string>& texs, int atlas_length, int ske_length, const char* atlas_data, const char* ske_data, bool isbin);
 
-void sp_drawable::add(const std::string& atlasf, const std::string& ske, float scale, float defaultMix, const std::string& package_file)
+void sp_drawable_ctx::add(const std::string& atlasf, const std::string& ske, float scale, float defaultMix, const std::string& package_file)
 {
 	if (!renderer)return;
 	sp_obj c = {};
@@ -353,7 +254,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 	atlas_length -= xal;
 	ske_data = hz::tbom(ske_data, &xal);
 	ske_length -= xal;
-	page_obj_t pot = { renderer };
+	page_obj_t pot = { this, renderer };
 	c.atlas = spAtlas_createFromFile(atlasf.c_str(), &pot);
 	bool isbin = false;
 	std::string jd;
@@ -400,7 +301,7 @@ void sp_drawable::add(const std::string& atlasf, const std::string& ske, float s
 	if (sd)
 		_spFree(sd);
 }
-void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float defaultMix)
+void sp_drawable_ctx::add_pkg_data(const char* data, size_t len, float scale, float defaultMix)
 {
 	if (!renderer || (sizeof(spe_ht) + 16) > len)return;
 	sp_obj c = {};
@@ -415,7 +316,7 @@ void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float 
 	int ske_length = pk["ske_length"];
 	bool is_binary = pk["is_binary"];
 	data += pkbs->datalen + sizeof(spe_ht);
-	page_obj_t pot = { renderer };
+	page_obj_t pot = { this, renderer };
 	pot.img = pk["images"];
 	pot.data = (char*)data;
 	pot.len = pk["data_length"];
@@ -446,7 +347,7 @@ void sp_drawable::add_pkg_data(const char* data, size_t len, float scale, float 
 	}
 }
 
-void sp_drawable::add_pkg(const std::string& pkgfn, float scale, float defaultMix)
+void sp_drawable_ctx::add_pkg(const std::string& pkgfn, float scale, float defaultMix)
 {
 #ifdef _MFILE_
 	{
@@ -468,7 +369,7 @@ void sp_drawable::add_pkg(const std::string& pkgfn, float scale, float defaultMi
 #endif
 }
 
-void sp_drawable::dispose_sp(size_t idx)
+void sp_drawable_ctx::dispose_sp(size_t idx)
 {
 	if (idx > drawables.size() || drawables.empty())return;
 	auto k = &drawables[idx];
@@ -477,21 +378,21 @@ void sp_drawable::dispose_sp(size_t idx)
 	v.erase(v.begin() + idx);
 }
 
-void sp_drawable::animationstate_set_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop)
+void sp_drawable_ctx::animationstate_set_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop)
 {
 	if (idx > drawables.size() || drawables.empty())return;
 	spSkeletonDrawable* drawable = (spSkeletonDrawable*)drawables[idx].drawable;
 	spAnimationState_setAnimationByName(drawable->animationState, trackIndex, animationName, loop);
 }
 
-void sp_drawable::animationstate_add_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop, float delay)
+void sp_drawable_ctx::animationstate_add_animationbyname(size_t idx, int trackIndex, const char* animationName, int loop, float delay)
 {
 	if (idx > drawables.size() || drawables.empty())return;
 	spSkeletonDrawable* drawable = (spSkeletonDrawable*)drawables[idx].drawable;
 	spAnimationState_addAnimationByName(drawable->animationState, trackIndex, animationName, loop, delay);
 }
 
-void sp_drawable::set_pos(size_t idx, int x, int y)
+void sp_drawable_ctx::set_pos(size_t idx, int x, int y)
 {
 	if (idx > drawables.size() || drawables.empty())return;
 	spSkeletonDrawable* drawable = (spSkeletonDrawable*)drawables[idx].drawable;
@@ -499,7 +400,7 @@ void sp_drawable::set_pos(size_t idx, int x, int y)
 	drawable->skeleton->y = y;
 }
 
-void sp_drawable::get_anim_name(size_t idx, std::vector<char*>* v)
+void sp_drawable_ctx::get_anim_name(size_t idx, std::vector<char*>* v)
 {
 	if (idx > drawables.size() || drawables.empty() || !v)return;
 	spSkeletonDrawable* drawable = (spSkeletonDrawable*)drawables[idx].drawable;
@@ -512,7 +413,7 @@ void sp_drawable::get_anim_name(size_t idx, std::vector<char*>* v)
 	}
 }
 
-void sp_drawable::update_draw(double deltaTime)
+void sp_drawable_ctx::update_draw(double deltaTime)
 {
 	if (!renderer || deltaTime < 0)return;
 	for (auto& it : drawables)
@@ -520,9 +421,155 @@ void sp_drawable::update_draw(double deltaTime)
 		auto drawable = (spSkeletonDrawable*)it.drawable;
 		if (it.visible && drawable) {
 			spSkeletonDrawable_update(drawable, deltaTime, SP_PHYSICS_UPDATE);
-			spSkeletonDrawable_draw(drawable, (SDL_Renderer*)renderer);
+			draw(drawable);
 		}
 	}
+}
+#ifndef SDL_BLENDMODE_NONE
+#define SDL_BLENDMODE_NONE                  0x00000000u /**< no blending: dstRGBA = srcRGBA */
+#define SDL_BLENDMODE_BLEND                 0x00000001u /**< alpha blending: dstRGB = (srcRGB * srcA) + (dstRGB * (1-srcA)), dstA = srcA + (dstA * (1-srcA)) */
+#define SDL_BLENDMODE_BLEND_PREMULTIPLIED   0x00000010u /**< pre-multiplied alpha blending: dstRGBA = srcRGBA + (dstRGBA * (1-srcA)) */
+#define SDL_BLENDMODE_ADD                   0x00000002u /**< additive blending: dstRGB = (srcRGB * srcA) + dstRGB, dstA = dstA */
+#define SDL_BLENDMODE_ADD_PREMULTIPLIED     0x00000020u /**< pre-multiplied additive blending: dstRGB = srcRGB + dstRGB, dstA = dstA */
+#define SDL_BLENDMODE_MOD                   0x00000004u /**< color modulate: dstRGB = srcRGB * dstRGB, dstA = dstA */
+#define SDL_BLENDMODE_MUL                   0x00000008u /**< color multiply: dstRGB = (srcRGB * dstRGB) + (dstRGB * (1-srcA)), dstA = dstA */
+#endif
+void sp_drawable_ctx::draw(void* self1)
+{
+	auto self = (spSkeletonDrawable*)self1;
+	static unsigned short quadIndices[] = { 0, 1, 2, 2, 3, 0 };
+	spSkeleton* skeleton = self->skeleton;
+	spSkeletonClipping* clipper = self->clipper;
+	SP_Texture* texture;
+	SP_Vertex sdlVertex;
+	for (int i = 0; i < skeleton->slotsCount; ++i) {
+		spSlot* slot = skeleton->drawOrder[i];
+		spAttachment* attachment = slot->attachment;
+		if (!attachment) {
+			spSkeletonClipping_clipEnd(clipper, slot);
+			continue;
+		}
+
+		// Early out if the slot color is 0 or the bone is not active
+		if (slot->color.a == 0 || !slot->bone->active) {
+			spSkeletonClipping_clipEnd(clipper, slot);
+			continue;
+		}
+
+		spFloatArray* vertices = self->worldVertices;
+		int verticesCount = 0;
+		float* uvs = NULL;
+		unsigned short* indices;
+		int indicesCount = 0;
+		spColor* attachmentColor = NULL;
+
+		if (attachment->type == SP_ATTACHMENT_REGION) {
+			spRegionAttachment* region = (spRegionAttachment*)attachment;
+			attachmentColor = &region->color;
+
+			// Early out if the slot color is 0
+			if (attachmentColor->a == 0) {
+				spSkeletonClipping_clipEnd(clipper, slot);
+				continue;
+			}
+
+			spFloatArray_setSize(vertices, 8);
+			spRegionAttachment_computeWorldVertices(region, slot, vertices->items, 0, 2);
+			verticesCount = 4;
+			uvs = region->uvs;
+			indices = quadIndices;
+			indicesCount = 6;
+			texture = (SP_Texture*)((spAtlasRegion*)region->rendererObject)->page->rendererObject;
+		}
+		else if (attachment->type == SP_ATTACHMENT_MESH) {
+			spMeshAttachment* mesh = (spMeshAttachment*)attachment;
+			attachmentColor = &mesh->color;
+
+			// Early out if the slot color is 0
+			if (attachmentColor->a == 0) {
+				spSkeletonClipping_clipEnd(clipper, slot);
+				continue;
+			}
+
+			spFloatArray_setSize(vertices, mesh->super.worldVerticesLength);
+			spVertexAttachment_computeWorldVertices(SUPER(mesh), slot, 0, mesh->super.worldVerticesLength, vertices->items, 0, 2);
+			verticesCount = mesh->super.worldVerticesLength >> 1;
+			uvs = mesh->uvs;
+			indices = mesh->triangles;
+			indicesCount = mesh->trianglesCount;
+			texture = (SP_Texture*)((spAtlasRegion*)mesh->rendererObject)->page->rendererObject;
+		}
+		else if (attachment->type == SP_ATTACHMENT_CLIPPING) {
+			spClippingAttachment* clip = (spClippingAttachment*)slot->attachment;
+			spSkeletonClipping_clipStart(clipper, slot, clip);
+			continue;
+		}
+		else
+			continue;
+
+		auto r = std::clamp(skeleton->color.r * slot->color.r * attachmentColor->r, 0.0f, 1.0f);
+		auto g = std::clamp(skeleton->color.g * slot->color.g * attachmentColor->g, 0.0f, 1.0f);
+		auto b = std::clamp(skeleton->color.b * slot->color.b * attachmentColor->b, 0.0f, 1.0f);
+		auto a = std::clamp(skeleton->color.a * slot->color.a * attachmentColor->a, 0.0f, 1.0f);
+		sdlVertex.color.r = r;
+		sdlVertex.color.g = g;
+		sdlVertex.color.b = b;
+		sdlVertex.color.a = a;
+
+		if (spSkeletonClipping_isClipping(clipper)) {
+			spSkeletonClipping_clipTriangles(clipper, vertices->items, verticesCount << 1, indices, indicesCount, uvs, 2);
+			vertices = clipper->clippedVertices;
+			verticesCount = clipper->clippedVertices->size >> 1;
+			uvs = clipper->clippedUVs->items;
+			indices = clipper->clippedTriangles->items;
+			indicesCount = clipper->clippedTriangles->size;
+		}
+
+		spSdlVertexArray_clear(self->sdlVertices);
+		for (int ii = 0; ii < verticesCount << 1; ii += 2) {
+			sdlVertex.position.x = vertices->items[ii];
+			sdlVertex.position.y = vertices->items[ii + 1];
+			sdlVertex.tex_coord.x = uvs[ii];
+			sdlVertex.tex_coord.y = uvs[ii + 1];
+			spSdlVertexArray_add(self->sdlVertices, sdlVertex);
+		}
+		spIntArray_clear(self->sdlIndices);
+		for (int ii = 0; ii < (int)indicesCount; ii++)
+			spIntArray_add(self->sdlIndices, indices[ii]);
+
+		//static SDL_BlendMode screen = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR, SDL_BLENDOPERATION_ADD);
+		bool pma0 = self->usePremultipliedAlpha == 0;
+		switch (slot->data->blendMode) {
+		case SP_BLEND_MODE_NORMAL:
+			SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_BLEND_PREMULTIPLIED);
+			break;
+		case SP_BLEND_MODE_MULTIPLY:
+			SetTextureBlendMode(texture, SDL_BLENDMODE_MOD);
+			break;
+		case SP_BLEND_MODE_ADDITIVE:
+			SetTextureBlendMode(texture, pma0 ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_ADD_PREMULTIPLIED);
+			break;
+		case SP_BLEND_MODE_SCREEN:
+			SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);//screen);//
+			break;
+		}
+
+		//SDL_RenderGeometry(renderer, texture, self->sdlVertices->items, self->sdlVertices->size, self->sdlIndices->items, indicesCount);
+
+		auto pv = self->sdlVertices->items;
+		int num_vertices = self->sdlVertices->size;
+		const float* xy = &pv->position.x;
+		int xy_stride = sizeof(SP_Vertex);
+		const SP_color* color = &pv->color;
+		int color_stride = sizeof(SP_Vertex);
+		const float* uv = &pv->tex_coord.x;
+		int uv_stride = sizeof(SP_Vertex);
+		int size_indices = 4;
+		RenderGeometryRaw(renderer, texture, xy, xy_stride, color, color_stride, uv, uv_stride, num_vertices, self->sdlIndices->items, indicesCount, size_indices);
+
+		spSkeletonClipping_clipEnd(clipper, slot);
+	}
+	spSkeletonClipping_clipEnd2(clipper);
 }
 
 //void sp_drawable::add_pre(const std::string& atlas, const std::string& ske, float scale, float defaultMix)
@@ -629,7 +676,7 @@ void testdraw(void* renderer)
 	spSkeletonDrawable_update(drawable, 0, SP_PHYSICS_UPDATE);
 	spAnimationState_setAnimationByName(drawable->animationState, 0, "portal", 0);
 	spAnimationState_addAnimationByName(drawable->animationState, 0, "run", -1, 0);
-
+#if 0
 	int quit = 0;
 	uint64_t lastFrameTime = SDL_GetPerformanceCounter();
 	while (!quit) {
@@ -640,9 +687,8 @@ void testdraw(void* renderer)
 
 		spSkeletonDrawable_update(drawable, deltaTime, SP_PHYSICS_UPDATE);
 		spSkeletonDrawable_draw(drawable, (SDL_Renderer*)renderer);
-
-
 	}
+#endif
 }
 
 

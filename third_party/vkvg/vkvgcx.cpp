@@ -1171,7 +1171,6 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		vkvg_set_source_rgba(ctx, red, 0.8);
 		float scale = 2.0;
 		draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
-
 		vkvg_set_line_width(ctx, 1);
 		vkvg_set_source_rgba(ctx, green, 0.8);
 		double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };

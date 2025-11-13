@@ -582,7 +582,7 @@ int main()
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->run_thread();
 	coders_t* cp = new_coders();
-	auto d2 = new sp_drawable();
+	auto d2 = new sp_drawable_ctx();
 	d2->set_renderer(form0->renderer);
 	//d2->add_pkg("temp/spineboy-j.spt", 0.25, 0.2);
 	//d2->add_pkg("temp/spineboy-skel.spt", 0.25, 0.2);
