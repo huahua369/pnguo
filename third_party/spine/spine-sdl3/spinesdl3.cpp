@@ -918,14 +918,37 @@ struct spine_atlas_t
 	spine_ctx* ctx = 0;
 	std::string fn;
 	void* atlas = 0;
+	std::map<void*, std::string> _texs;
 };
 typedef struct spSkeletonDrawable spine_drawable_t;
 
 spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize)
 {
-	if (!ctx || !atlasf || *atlasf == 0)return nullptr;
+	if (!ctx || !ctx->renderer || !atlasf || *atlasf == 0)return nullptr;
 	page_obj_t pot = { ctx, ctx->renderer };
-	auto atlas = spAtlas_createFromFile(atlasf, &pot);
+	spAtlas* atlas = 0;
+	if (fdsize > 0 && (sizeof(spe_ht) + 16) < fdsize)
+	{
+		auto pkbs = (spe_ht*)atlasf;
+		std::string pkbn = "spa";
+		if (pkbs->n != pkbn)return;
+		njson0 pk = njson0::from_cbor(atlasf + sizeof(spe_ht), pkbs->datalen);
+		if (!(pk.is_object() && pk.size()))return;
+		int atlas_offset = pk["atlas_offset"];
+		int atlas_len = pk["atlas_length"];
+		int ske_offset = pk["ske_offset"];
+		int ske_length = pk["ske_length"];
+		bool is_binary = pk["is_binary"];
+		atlasf += pkbs->datalen + sizeof(spe_ht);
+		pot.img = pk["images"];
+		pot.data = (char*)atlasf;
+		pot.len = pk["data_length"];
+		atlas = spAtlas_create(atlasf + atlas_offset, atlas_len, "", &pot);
+	}
+	else
+	{
+		atlas = spAtlas_createFromFile(atlasf, &pot);
+	}
 	spine_atlas_t* p = 0;
 	if (atlas)
 	{
@@ -933,6 +956,7 @@ spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize)
 		p->atlas = atlas;
 		p->fn = atlasf;
 		p->ctx = ctx;
+		p->_texs = pot._texs;
 		ctx->rc_count++;
 	}
 }
@@ -949,6 +973,7 @@ void sp_atlas_dispose(spine_atlas_t* atlas)
 
 void sp_atlas_packages(spine_atlas_t* atlas, std::vector<char>* opt)
 {
+	if (!atlas || !opt)return;
 	int atlas_length = 0;
 	auto atlas_data = _spUtil_readFile(atlas->fn.c_str(), &atlas_length);
 	if (!atlas_data) {
@@ -960,6 +985,58 @@ void sp_atlas_packages(spine_atlas_t* atlas, std::vector<char>* opt)
 	auto ad = atlas_data;
 	atlas_data = hz::tbom(atlas_data, &xal);
 	atlas_length -= xal;
+	std::vector<std::pair<char*, int>> imgd;
+	do {
+		njson0 pk;
+		pk["atlas_offset"] = 0;
+		pk["atlas_length"] = atlas_length;
+		auto& img = pk["images"];
+		int ilen = 0;
+		int imgpos = atlas_length;
+		int64_t imgalen = 0;
+		for (auto& [k, v] : atlas->_texs) {
+			njson it;
+			it["offset"] = ilen + imgpos;
+			auto idata = _spUtil_readFile(v.c_str(), &ilen);
+			if (idata)
+			{
+				std::string pathstr;
+				auto cc = strrchr(v.c_str(), '/');
+				auto cc1 = strrchr(v.c_str(), '\\');
+				if (cc > cc1)
+					pathstr = cc + 1;
+				else
+					pathstr = cc1 + 1;
+				if (pathstr.empty())
+					pathstr = v.c_str();
+				imgalen += ilen;
+				it["name"] = pathstr;
+				it["length"] = ilen;
+				img.push_back(it);
+				imgd.push_back({ idata ,ilen });
+			}
+		}
+		int64_t datalen = atlas_length + imgalen;
+		pk["data_length"] = datalen;
+		auto pkb = njson0::to_cbor(pk);
+		int64_t alen = pkb.size() + sizeof(spe_ht) + datalen;
+		opt->resize(alen);
+		auto mpd = opt->data();
+		auto pkbs = (spe_ht*)mpd;
+		*pkbs = {};
+		strcpy(pkbs->n, "spa");
+		pkbs->datalen = pkb.size();
+		mpd += sizeof(spe_ht);
+		memcpy(mpd, pkb.data(), pkb.size());
+		mpd += pkb.size();
+		memcpy(mpd, atlas_data, atlas_length);
+		mpd += atlas_length;
+		for (auto& [k, v] : imgd) {
+			memcpy(mpd, k, v);
+			mpd += v;
+		}
+	} while (0);
+
 	_spFree(ad);
 }
 
@@ -968,12 +1045,21 @@ spine_drawable_t* sp_new_drawable(spine_ctx* ctx, spine_atlas_t* atlas, const ch
 	if (!ctx || !atlas || !skef || *skef == 0)return nullptr;
 	int ske_length = 0;
 	spine_drawable_t* p = 0;
-	auto ske_data = _spUtil_readFile(skef, &ske_length);
+	char* ske_data = nullptr;
+	char* sd = nullptr;
+	if (fdsize > 0)
+	{
+		ske_data = (char*)skef;
+	}
+	else
+	{
+		ske_data = _spUtil_readFile(skef, &ske_length);
+		sd = ske_data;
+	}
 	if (!ske_data) {
 		return 0;
 	}
 	int xal = 0;
-	auto sd = ske_data;
 	ske_data = hz::tbom(ske_data, &xal);
 	ske_length -= xal;
 	bool isbin = false;

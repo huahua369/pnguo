@@ -69,14 +69,14 @@ typedef struct spSkeletonDrawable spine_drawable_t;
 spine_ctx* sp_ctx_create(void* renderer, draw_geometry_fun rendergeometryraw, newTexture_fun createtexture, UpdateTexture_fun updatetexture, DestroyTexture_fun destroytexture, SetTextureBlendMode_fun settextureblendmode);
 // 销毁上下文
 void sp_ctx_dispose(spine_ctx* ctx);
-// 创建图集
-spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize);
+// 创建图集,支持打包格式
+spine_atlas_t* sp_new_atlas(spine_ctx* ctx, const char* atlasf, size_t fdsize = 0);
 // 销毁图集
 void sp_atlas_dispose(spine_atlas_t* atlas);
-// 打包到数据
+// 打包图集和纹理到内存数据
 void sp_atlas_packages(spine_atlas_t* atlas, std::vector<char>* opt);
 // 创建可绘制对象,json\skel
-spine_drawable_t* sp_new_drawable(spine_ctx* ctx, spine_atlas_t* atlas, const char* skef, size_t fdsize, float scale = 1.0f, float defaultMix = 0.2f);
+spine_drawable_t* sp_new_drawable(spine_ctx* ctx, spine_atlas_t* atlas, const char* skef, size_t fdsize = 0, float scale = 1.0f, float defaultMix = 0.2f);
 void sp_drawable_dispose(spine_drawable_t* drawable);
 void sp_drawable_set_pos(spine_drawable_t* drawable, int x, int y);
 void sp_drawable_get_anim_names(spine_drawable_t* drawable, std::vector<char*>* v);
