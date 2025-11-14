@@ -1434,7 +1434,7 @@ public:
 	{
 	}
 };
-class fbo_info_cx
+class rfbo_cx
 {
 public:
 	class FBO
@@ -1468,11 +1468,11 @@ public:
 	int cmdcount = 0;
 	std::vector<VkCommandBuffer> drawCmdBuffers;
 public:
-	fbo_info_cx()
+	rfbo_cx()
 	{
 	}
 
-	~fbo_info_cx()
+	~rfbo_cx()
 	{
 	}
 
@@ -1519,7 +1519,7 @@ public:
 		samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		if (!sampler)
 			createSampler(&sampler, &samplerinfo);
-		resetFramebuffer(width, height);
+		reset_fbo(width, height);
 	}
 
 	uint32_t getMemoryType(vkvg_dev* dev, uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound)
@@ -1723,13 +1723,12 @@ public:
 		return semaphore;
 	}
 	//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
-	void resetFramebuffer(int width, int height)
+	void reset_fbo(int width, int height)
 	{
+		if (framebuffers.size() && framebuffers[0].framebuffer && _width == width && _height == height)
+			return;
 		_width = width;
 		_height = height;
-#ifdef _WIN32
-		destroyImage();
-#endif
 		// Color attachment
 		VkImageCreateInfo image = {};
 		image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1807,16 +1806,16 @@ public:
 			fbufCreateInfo.width = width;
 			fbufCreateInfo.height = height;
 			fbufCreateInfo.layers = 1;
+			if (it.framebuffer)
+				vkDestroyFramebuffer(_dev->vkdev, it.framebuffer, 0);
+			it.framebuffer = 0;
 			auto hr = vkCreateFramebuffer(_dev->vkdev, &fbufCreateInfo, nullptr, &it.framebuffer);
 			it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			it.descriptor.imageView = it.color._view;
 			it.descriptor.sampler = sampler;
 		}
 	}
-	void reset_fbo(int width, int height)
-	{
-		resetFramebuffer(width, height);
-	}
+
 	void resetCommandBuffers()
 	{
 		if (count_ < 1)
@@ -1858,7 +1857,7 @@ public:
 		}
 	}
 public:
-	void destroyImage()
+	void destroy_all()
 	{
 		for (auto& it : framebuffers)
 		{
@@ -1866,10 +1865,6 @@ public:
 				vkDestroyFramebuffer(_dev->vkdev, it.framebuffer, 0);
 			it.framebuffer = 0;
 		}
-	}
-	void destroy_all()
-	{
-		destroyImage();
 		renderPass = 0;
 	}
 private:
