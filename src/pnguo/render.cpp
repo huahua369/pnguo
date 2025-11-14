@@ -17,12 +17,15 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #define FLEX_IMPLEMENTATION
 #include <vg.h>
 #include <vkvg/vkvg.h> 
-#include "vkvgcx.h"
+
+#include "render.h"
 #include <stb_rect_pack.h> 
 #include <print_time.h> 
-
-
-
+#include <vkh.h>
+#include "shaders/base3d.vert.h"
+#include "shaders/base3d.frag.h"
+#include "shaders/base3d2.vert.h"
+#include "shaders/base3d2.frag.h"
 
 	// 线，二阶曲线，三阶曲线
 enum class vtype_e1 :uint8_t
@@ -387,7 +390,7 @@ void vkvg_dev::update_image(VkvgSurface image, uint32_t* data, int width, int he
 {
 
 }
- 
+
 
 void* vkvg_dev::get_vkimage(void* surface)
 {
@@ -436,13 +439,16 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 			break;
 		}
 	}
+	VkDevice vkdev = c->vkdev;
 	for (; i < sv.size(); i++)
 	{
 		auto it = sv[i];
 		vkvg_device_create_info_t info = { it, true ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
 		dev = vkvg_device_create(&info);
+
 		if (dev)
 		{
+			vkdev = c->vkdev;
 			cus = it;
 			break;
 		}
@@ -452,6 +458,7 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 	{
 		p = new vkvg_dev();
 		p->dev = dev;
+		p->vkdev = vkdev;
 		p->samplecount = cus;
 	}
 	return p;
@@ -1126,9 +1133,284 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
 	vkvg_restore(cr);
 }
 
- 
+VkShaderModule newModule(VkDevice device, const uint32_t* SpvData, size_t SpvSize, VkResult* r)
+{
+	VkShaderModule pShaderModule = {};
+	VkShaderModuleCreateInfo moduleCreateInfo = {};
+	moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	moduleCreateInfo.pCode = (uint32_t*)SpvData;
+	moduleCreateInfo.codeSize = SpvSize;
+	auto hr = vkCreateShaderModule(device, &moduleCreateInfo, NULL, &pShaderModule);
+	if (r)*r = hr;
+	return pShaderModule;
+}
+#define new_module(device,spvdata,r) newModule(device,spvdata,sizeof(spvdata),r)
+
+#define BLENDMODE_NONE                  0x00000000u /**< no blending: dstRGBA = srcRGBA */
+#define BLENDMODE_BLEND                 0x00000001u /**< alpha blending: dstRGB = (srcRGB * srcA) + (dstRGB * (1-srcA)), dstA = srcA + (dstA * (1-srcA)) */
+#define BLENDMODE_BLEND_PREMULTIPLIED   0x00000010u /**< pre-multiplied alpha blending: dstRGBA = srcRGBA + (dstRGBA * (1-srcA)) */
+#define BLENDMODE_ADD                   0x00000002u /**< additive blending: dstRGB = (srcRGB * srcA) + dstRGB, dstA = dstA */
+#define BLENDMODE_ADD_PREMULTIPLIED     0x00000020u /**< pre-multiplied additive blending: dstRGB = srcRGB + dstRGB, dstA = dstA */
+#define BLENDMODE_MOD                   0x00000004u /**< color modulate: dstRGB = srcRGB * dstRGB, dstA = dstA */
+#define BLENDMODE_MUL                   0x00000008u /**< color multiply: dstRGB = (srcRGB * dstRGB) + (dstRGB * (1-srcA)), dstA = dstA */
+
+void set_cblend(VkPipelineColorBlendAttachmentState& opt, const std::array<uint32_t, 6>& b) {
+	opt.srcColorBlendFactor = (VkBlendFactor)b[0];
+	opt.srcAlphaBlendFactor = (VkBlendFactor)b[1];
+	opt.colorBlendOp = (VkBlendOp)b[2];
+	opt.dstColorBlendFactor = (VkBlendFactor)b[3];
+	opt.dstAlphaBlendFactor = (VkBlendFactor)b[4];
+	opt.alphaBlendOp = (VkBlendOp)b[5];
+}
+#if 1
+#define BLENDMODE_NONE_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD})
+#define BLENDMODE_BLEND_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD})
+#define BLENDMODE_BLEND_PREMULTIPLIED_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD})
+#define BLENDMODE_ADD_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_ADD_PREMULTIPLIED_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_MOD_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_MUL_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD})
+#define BLENDMODE_SCREEN_FULL set_cblend(colorBlendAttachment,{VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD})
+#endif
+
+// Color blend
+void set_blend(VkPipelineColorBlendAttachmentState& colorBlendAttachment, uint32_t blendMode)
+{
+	colorBlendAttachment = {};
+	colorBlendAttachment.blendEnable = VK_TRUE;
+	auto bm = (blendmode_e)blendMode;
+	switch (bm)
+	{
+	case blendmode_e::none:
+		BLENDMODE_NONE_FULL;
+		break;
+	case blendmode_e::normal:
+		BLENDMODE_BLEND_FULL;
+		break;
+	case blendmode_e::additive:
+		BLENDMODE_ADD_FULL;
+		break;
+	case blendmode_e::normal_prem:
+		BLENDMODE_BLEND_PREMULTIPLIED_FULL;
+		break;
+	case blendmode_e::additive_prem:
+		BLENDMODE_ADD_PREMULTIPLIED_FULL;
+		break;
+	case blendmode_e::multiply:
+		BLENDMODE_MUL_FULL;
+		break;
+	case blendmode_e::modulate:
+		BLENDMODE_MOD_FULL;
+		break;
+	case blendmode_e::screen:
+		BLENDMODE_SCREEN_FULL;
+		break;
+	default:
+		break;
+	}
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+}
+struct pipelinestate_p
+{
+	int shader;			// 0: base3d, 1: base3d2
+	uint32_t blendMode;
+	VkPrimitiveTopology topology;
+	VkFormat format;
+	VkPipelineLayout pipelineLayout;
+	VkDescriptorSetLayout descriptorSetLayout;
+	VkPipeline pipeline;
+};
+struct pipe_data {
+	VkDevice dev = {};
+	VkShaderModule vert[2] = {};
+	VkShaderModule frag[2] = {};
+	VkRenderPass renderPass = {};
+	std::vector<pipelinestate_p> pipelineStates;
+};
+static pipelinestate_p* newPipelineState(pipe_data* pd, int shader, uint32_t blendMode, VkPrimitiveTopology topology)
+{
+	pipelinestate_p pipelineStates = {};
+	VkPipeline pipeline = VK_NULL_HANDLE;
+	VkResult result = VK_SUCCESS;
+	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
+	VkVertexInputAttributeDescription attributeDescriptions[3];
+	VkVertexInputBindingDescription bindingDescriptions[1];
+	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2];
+	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
+	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
+	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
+	VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = {};
+	VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {};
+	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = {};
+
+	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineCreateInfo.flags = 0;
+	pipelineCreateInfo.pStages = shaderStageCreateInfo;
+	pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
+	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
+	pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
+	pipelineCreateInfo.pRasterizationState = &rasterizationStateCreateInfo;
+	pipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
+	pipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
+	pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
+	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
+
+	// Shaders
+	const char* name = "main";
+	for (uint32_t i = 0; i < 2; i++) {
+		shaderStageCreateInfo[i] = {};
+		shaderStageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shaderStageCreateInfo[i].module = (i == 0) ? pd->vert[shader] : pd->frag[shader];
+		shaderStageCreateInfo[i].stage = (i == 0) ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+		shaderStageCreateInfo[i].pName = name;
+	}
+	pipelineCreateInfo.stageCount = 2;
+	pipelineCreateInfo.pStages = &shaderStageCreateInfo[0];
 
 
+	VkPipelineLayout pipelineLayout = {};
+	VkDescriptorSetLayout descriptorSetLayout = {};
+	VkPushConstantRange pushConstantRange[] = {
+		{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4)},
+		//{VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(push_constants)}
+	};
+	std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
+	layoutBindings[0].binding = 1;
+	layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	layoutBindings[0].descriptorCount = 1;
+	layoutBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	layoutBindings[0].pImmutableSamplers = NULL;
+
+	VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+	descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptor_layout.pNext = NULL;
+	descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+	descriptor_layout.pBindings = layoutBindings.data();
+	result = vkCreateDescriptorSetLayout(pd->dev, &descriptor_layout, NULL, &descriptorSetLayout);
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { };
+	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+	pipelineLayoutCreateInfo.pPushConstantRanges = (VkPushConstantRange*)&pushConstantRange;
+	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+	result = vkCreatePipelineLayout(pd->dev, &pipelineLayoutCreateInfo, NULL, &pipelineLayout);
+	/*
+	layout(location = 0) in vec3 pos;
+	layout(location = 1) in vec2 uv;
+	layout(location = 2) in vec4 col;
+	layout(location = 3) in vec4 col1;
+	*/
+	VkVertexInputAttributeDescription vi_attrs[] =
+	{
+		{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+		{ 1, 0, VK_FORMAT_R32G32_SFLOAT, 12 },
+		{ 2, 0, VK_FORMAT_R8G8B8A8_UNORM, 20 },
+		{ 3, 0, VK_FORMAT_R8G8B8A8_UNORM, 24 },
+	};
+	//uint32_t    location;
+	//uint32_t    binding;
+	//VkFormat    format;
+	//uint32_t    offset;
+	//_countof(vi_attrs); 
+	// Vertex input
+	vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputCreateInfo.vertexAttributeDescriptionCount = 3 + shader;
+	vertexInputCreateInfo.pVertexAttributeDescriptions = vi_attrs;
+	vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+	vertexInputCreateInfo.pVertexBindingDescriptions = &bindingDescriptions[0];
+
+	bindingDescriptions[0].binding = 0;
+	bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	bindingDescriptions[0].stride = sizeof(float) * 5 + sizeof(int) * (shader + 1);
+
+	// Input assembly
+	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssemblyStateCreateInfo.topology = topology;
+	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
+
+	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportStateCreateInfo.scissorCount = 1;
+	viewportStateCreateInfo.viewportCount = 1;
+
+	// Dynamic states
+	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	VkDynamicState dynamicStates[2] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+	dynamicStateCreateInfo.dynamicStateCount = sizeof(dynamicStates) / sizeof(dynamicStates[0]);
+	dynamicStateCreateInfo.pDynamicStates = dynamicStates;
+
+	// Rasterization state
+	rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
+	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
+	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
+	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
+	rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
+	rasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
+	rasterizationStateCreateInfo.lineWidth = 1.0f;
+
+	// MSAA state
+	multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	VkSampleMask multiSampleMask = 0xFFFFFFFF;
+	multisampleStateCreateInfo.pSampleMask = &multiSampleMask;
+	multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	// Depth Stencil
+	depthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+
+	// Color blend
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = { 0 };
+	colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlendStateCreateInfo.attachmentCount = 1;
+	colorBlendStateCreateInfo.pAttachments = &colorBlendAttachment;
+	colorBlendAttachment.blendEnable = VK_TRUE;
+	set_blend(colorBlendAttachment, blendMode);
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	// Renderpass / layout
+	pipelineCreateInfo.renderPass = pd->renderPass;
+	pipelineCreateInfo.subpass = 0;
+	pipelineCreateInfo.layout = pipelineLayout;
+
+	result = vkCreateGraphicsPipelines(pd->dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline);
+	if (result != VK_SUCCESS) {
+		return NULL;
+	}
+
+	pipelineStates.shader = shader;
+	pipelineStates.blendMode = blendMode;
+	pipelineStates.topology = topology;
+	pipelineStates.pipeline = pipeline;
+	pipelineStates.descriptorSetLayout = descriptorSetLayout;
+	pipelineStates.pipelineLayout = pipelineCreateInfo.layout;
+	pd->pipelineStates.push_back(pipelineStates);
+	auto pps = &pd->pipelineStates.back();
+	return pps;
+}
+
+pipelinestate_p* new_spv_base(VkDevice device)
+{
+	auto base3d_frag_m = new_module(device, base3d_frag, 0);
+	auto base3d_vert_m = new_module(device, base3d_vert, 0);
+	auto base3d2_frag_m = new_module(device, base3d2_frag, 0);
+	auto base3d2_vert_m = new_module(device, base3d2_vert, 0);
+	auto pd = new pipe_data();
+	pd->dev = device;
+	pd->frag[0] = base3d_frag_m;
+	pd->vert[0] = base3d_vert_m;
+	pd->frag[1] = base3d2_frag_m;
+	pd->vert[1] = base3d2_vert_m;
+	int blendMode = 0; VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	pipelinestate_p* p = newPipelineState(pd, 0, blendMode, topology);
+	return p;
+}
 
 #define white 1, 1, 1
 #define red   1, 0, 0
@@ -1137,9 +1419,11 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
 
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
+
 	vkvg_dev* vctx = new_vkvgdev(dc, 8);
 	auto dev = vctx->dev;
 	if (!dev)return;
+	new_spv_base(vctx->vkdev);
 	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);
 	VkvgContext ctx = vkvg_create(surf);
 	vkvg_clear(ctx);

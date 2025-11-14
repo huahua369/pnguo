@@ -105,6 +105,22 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
+
+
+// 混合模式
+enum class blendmode_e :int {
+	none = -1,
+	normal = 0,	// 普通混合
+	additive,
+	multiply,
+	modulate,
+	screen,
+	normal_prem,	// 预乘alpha
+	additive_prem,
+};
+
+
 class vkvg_ctx
 {
 public:
@@ -130,6 +146,7 @@ class vkvg_dev
 {
 public:
 	VkvgDevice dev = 0;
+	VkDevice vkdev = 0;
 	vkvg_func_t* fun = {};
 	VkSampleCountFlags samplecount = {};
 public:
@@ -145,7 +162,7 @@ public:
 	vkvg_ctx* new_ctx(VkvgSurface p);
 	vkvg_ctx* new_context(VkvgSurface p);
 	void free_ctx(vkvg_ctx* p);
-	 
+
 	void update_image(VkvgSurface image, uint32_t* data, int width, int height);
 
 	// 直接获取VkImage指针

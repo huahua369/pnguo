@@ -27,7 +27,7 @@
 #include <mcut/stlrw.h>
 #include <cairo/cairo.h>
 #include <spine/spine-sdl3/spinesdl3.h>
-#include <vkvgcx.h>
+#include <pnguo/render.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
@@ -1031,7 +1031,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 
 		{
@@ -1220,6 +1220,7 @@ int main()
 			dev_info_c cc = {};
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
 			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
+
 			test_vkvg(0, &cc);
 			vctx = new_vkvgdev(&cc, 8);
 			//vkvg_render(vctx, sue, gp);

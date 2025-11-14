@@ -198,9 +198,7 @@ list(APPEND tpv_src
 
 "third_party/tinyspline/parson.c"
 "third_party/tinyspline/tinyspline.c"
-"third_party/tinyspline/tinysplinecxx.cpp" 
-"third_party/vkvg/vkvgcx.cpp"  
-"src/pnguo/mapView.cpp"  
+"third_party/tinyspline/tinysplinecxx.cpp"  
 
 "third_party/mcut/bvh.cpp"  
 "third_party/mcut/frontend.cpp"  

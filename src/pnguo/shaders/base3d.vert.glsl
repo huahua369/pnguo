@@ -1,6 +1,7 @@
 ﻿#version 450
-
-layout(binding=0) uniform u_UniformBuffer {
+layout(push_constant) uniform uPushConstant
+//layout(binding=0) uniform u_UniformBuffer 
+{
     mat4 u_mvpMatrix;
 };
 
