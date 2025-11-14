@@ -149,6 +149,7 @@ public:
 	VkDevice vkdev = 0;
 	vkvg_func_t* fun = {};
 	VkSampleCountFlags samplecount = {};
+	void* memoryProperties = 0;
 public:
 	vkvg_dev();
 	~vkvg_dev();
