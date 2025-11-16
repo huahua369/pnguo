@@ -409,11 +409,19 @@ void vkrender_test(form_x* form0)
 	}
 	else {		// 独立线程或主线程执行渲染
 		mouse_state_t mio = {};
+		int64_t prev_time = 0;
 		while (1) {
+			uint64_t curr_time = vkr_get_ticks();
+			if (prev_time > 0)
+			{
+				double delta = (curr_time - prev_time);
+				mio.DeltaTime = delta / 1000.0f;
+			}
 			vkd->update(&mio);		// 更新事件
 			vkd->on_render();		// 执行渲染 
 			// todo 提交到窗口渲染
 			Sleep(1);
+			prev_time = curr_time;
 		}
 		free_vkdg(vkd);			// 释放渲染器
 		free_instance(inst0);		// 释放实例
@@ -1031,7 +1039,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 
 		{
@@ -1144,12 +1152,12 @@ int main()
 				c++;
 			}
 		}
-		//vkrender_test(0);
 		{
 
 
 #if 0
 
+		vkrender_test(0);
 			glm::quat qk = glm::quat(1, 0, 0, 0);
 			static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
 			static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;

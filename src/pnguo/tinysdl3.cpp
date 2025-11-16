@@ -1,4 +1,8 @@
-﻿
+﻿/*
+
+SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
+
+*/
 #include <pch1.h>
 
 #include <print_time.h>

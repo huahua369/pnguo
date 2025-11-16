@@ -1560,7 +1560,7 @@ public:
 		}
 #endif
 	}
-	int64_t createImage(VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
+	int64_t newImage(VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
 		, texture_cx* texture, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
 	{
 		VkImageView* imageview;
@@ -1758,7 +1758,7 @@ public:
 
 		for (auto& it : framebuffers)
 		{
-			createImage(&image, &colorImageView, &it.color, 0);
+			newImage(&image, &colorImageView, &it.color, 0);
 			it.color.width = width;
 			it.color.height = height;
 			it.color._format = colorFormat;
@@ -1787,7 +1787,7 @@ public:
 		}
 		for (auto& it : framebuffers)
 		{
-			createImage(&image, &depthStencilView, &it.depth_stencil, 0);
+			newImage(&image, &depthStencilView, &it.depth_stencil, 0);
 			it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
 		}
 

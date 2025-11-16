@@ -347,4 +347,5 @@ namespace vkr {
 //!vkr
 
 uint32_t gray_float_to_rgba(float gray);
+uint64_t vkr_get_ticks();
 

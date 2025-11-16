@@ -4,13 +4,13 @@ vk渲染器
 创建日期：2024-07-16
 
 vk渲染流程:
-第一步创建实例，枚举设备，选择一个物理设备，创建逻辑设备
-0.创建渲染目标：窗口交换链接或纹理
-1.创建shader
-2.分配vbo/ibo/纹理
-3.更新ubo
-4.渲染命令
-5.提交列队
+	0.创建实例，枚举设备，选择物理设备，创建逻辑设备
+	1.创建渲染目标：窗口交换链或纹理、fbo
+	2.创建管线、状态等
+	3.分配vbo/ibo/纹理/ubo等资源
+	4.更新ubo、纹理、vbo等资源
+	5.渲染命令
+	6.提交列队
 
 
  todo 变形动画实现：
@@ -4840,11 +4840,11 @@ namespace vkr
 		DefineList attributeDefines;
 
 		VkPipelineShaderStageCreateInfo m_vertexShader;
-		res = VKCompileFromString(pDevice->GetDevice(), SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+		res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 		assert(res == VK_SUCCESS);
 
 		VkPipelineShaderStageCreateInfo m_fragmentShader;
-		res = VKCompileFromString(pDevice->GetDevice(), SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+		res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 		assert(res == VK_SUCCESS);
 
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { m_vertexShader, m_fragmentShader };
@@ -4876,7 +4876,7 @@ namespace vkr
 		pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)1;
 		pPipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
 
-		res = vkCreatePipelineLayout(pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
+		res = vkCreatePipelineLayout(pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
 		assert(res == VK_SUCCESS);
 
 		/////////////////////////////////////////////
@@ -5034,16 +5034,16 @@ namespace vkr
 		pipeline.renderPass = renderPass;
 		pipeline.subpass = 0;
 
-		res = vkCreateGraphicsPipelines(pDevice->GetDevice(), pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
+		res = vkCreateGraphicsPipelines(pDevice->m_device, pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_pipeline, "Wireframe P");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_pipeline, "Wireframe P");
 	}
 
 	void Wireframe::OnDestroy()
 	{
-		vkDestroyPipeline(m_pDevice->GetDevice(), m_pipeline, nullptr);
-		vkDestroyPipelineLayout(m_pDevice->GetDevice(), m_pipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroyPipeline(m_pDevice->m_device, m_pipeline, nullptr);
+		vkDestroyPipelineLayout(m_pDevice->m_device, m_pipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 		m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet);
 	}
 
@@ -5303,7 +5303,7 @@ namespace vkr
 		}
 		if (pGLTFTexturesAndBuffers->m_pGLTFCommon->pm)
 		{
-			load(m_pDevice->GetDevice(), pAsyncPool);
+			load(m_pDevice->m_device, pAsyncPool);
 			return;
 		}
 
@@ -5322,21 +5322,21 @@ namespace vkr
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
 				DepthPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
-				vkDestroyPipeline(m_pDevice->GetDevice(), pPrimitive->m_pipeline, nullptr);
+				vkDestroyPipeline(m_pDevice->m_device, pPrimitive->m_pipeline, nullptr);
 				pPrimitive->m_pipeline = VK_NULL_HANDLE;
-				vkDestroyPipelineLayout(m_pDevice->GetDevice(), pPrimitive->m_pipelineLayout, nullptr);
-				vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), pPrimitive->m_descriptorSetLayout, NULL);
+				vkDestroyPipelineLayout(m_pDevice->m_device, pPrimitive->m_pipelineLayout, nullptr);
+				vkDestroyDescriptorSetLayout(m_pDevice->m_device, pPrimitive->m_descriptorSetLayout, NULL);
 				m_pResourceViewHeaps->FreeDescriptor(pPrimitive->m_descriptorSet);
 			}
 		}
 
 		for (int i = 0; i < m_materialsData.size(); i++)
 		{
-			vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_materialsData[i].m_descriptorSetLayout, NULL);
+			vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_descriptorSetLayout, NULL);
 			m_pResourceViewHeaps->FreeDescriptor(m_materialsData[i].m_descriptorSet);
 		}
 
-		//vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -5419,7 +5419,7 @@ namespace vkr
 
 		if (morphing)
 		{
-			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
+			SetDescriptorSet1(m_pDevice->m_device, morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
 			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
 		}
 
@@ -5438,9 +5438,9 @@ namespace vkr
 		pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
 		pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
 
-		VkResult res = vkCreatePipelineLayout(m_pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &pPrimitive->m_pipelineLayout);
+		VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &pPrimitive->m_pipelineLayout);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pPrimitive->m_pipelineLayout, "GltfDepthPass PL");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pPrimitive->m_pipelineLayout, "GltfDepthPass PL");
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -5455,8 +5455,8 @@ namespace vkr
 
 		VkPipelineShaderStageCreateInfo vertexShader, fragmentShader = {};
 		{
-			VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "GLTFDepthPass-vert.glsl", "main", "", &defines, &vertexShader);
-			VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFDepthPass-frag.glsl", "main", "", &defines, &fragmentShader);
+			VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "GLTFDepthPass-vert.glsl", "main", "", &defines, &vertexShader);
+			VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFDepthPass-frag.glsl", "main", "", &defines, &fragmentShader);
 		}
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
 
@@ -5614,9 +5614,9 @@ namespace vkr
 		pipeline.renderPass = m_renderPass;
 		pipeline.subpass = 0;
 
-		VkResult res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pPrimitive->m_pipeline);
+		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pPrimitive->m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)pPrimitive->m_pipeline, "GltfDepthPass P");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pPrimitive->m_pipeline, "GltfDepthPass P");
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -5735,12 +5735,12 @@ namespace vkr
 			0,                                            // VkQueryPipelineStatisticFlags    pipelineStatistics
 		};
 
-		VkResult res = vkCreateQueryPool(pDevice->GetDevice(), &queryPoolCreateInfo, NULL, &m_QueryPool);
+		VkResult res = vkCreateQueryPool(pDevice->m_device, &queryPoolCreateInfo, NULL, &m_QueryPool);
 	}
 
 	void GPUTimestamps::OnDestroy()
 	{
-		vkDestroyQueryPool(m_pDevice->GetDevice(), m_QueryPool, nullptr);
+		vkDestroyQueryPool(m_pDevice->m_device, m_QueryPool, nullptr);
 
 		for (uint32_t i = 0; i < m_NumberOfBackBuffers; i++)
 			m_labels[i].clear();
@@ -5787,7 +5787,7 @@ namespace vkr
 			double microsecondsPerTick = (1e-3f * m_pDevice->GetPhysicalDeviceProperries().limits.timestampPeriod);
 			{
 				UINT64 TimingsInTicks[256] = {};
-				VkResult res = vkGetQueryPoolResults(m_pDevice->GetDevice(), m_QueryPool, offset, measurements, measurements * sizeof(UINT64), &TimingsInTicks, sizeof(UINT64), VK_QUERY_RESULT_64_BIT);
+				VkResult res = vkGetQueryPoolResults(m_pDevice->m_device, m_QueryPool, offset, measurements, measurements * sizeof(UINT64), &TimingsInTicks, sizeof(UINT64), VK_QUERY_RESULT_64_BIT);
 				if (res == VK_SUCCESS)
 				{
 					for (uint32_t i = 1; i < measurements; i++)
@@ -6160,7 +6160,7 @@ namespace vkr
 	{
 		for (int i = 0; i < m_textures.size(); i++)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_textureViews[i], NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_textureViews[i], NULL);
 			m_textures[i].OnDestroy();
 		}
 		if (_pStaticBufferPool)
@@ -6986,7 +6986,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines[std::string("ID_") + it.first] = std::to_string(cnt);
 
-				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				//SetDescriptorSet(m_pDevice->m_device, cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 
@@ -6995,7 +6995,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
 				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
-				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
+				//SetDescriptorSet(m_pDevice->m_device, cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
 
 				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
@@ -7018,7 +7018,7 @@ namespace vkr
 			}
 			if (tfmat->m_pbrMaterialParameters.transmission) {
 				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
-				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				//SetDescriptorSet(m_pDevice->m_device, cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
@@ -7026,7 +7026,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
 				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				//SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				//SetDescriptorSet(m_pDevice->m_device, cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 		}
@@ -7207,7 +7207,7 @@ namespace vkr
 				info.maxAnisotropy = 1.0f;
 				set_sampler_info(info, &it);
 				VkSampler r = pDevice->newSampler(&info);
-				//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &r);
+				//VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &r);
 
 				_samplers.push_back(r);
 				//assert(res == VK_SUCCESS);
@@ -7235,7 +7235,7 @@ namespace vkr
 			info.maxAnisotropy = 1.0f;
 			set_sampler_info(info, &dsa);
 			m_samplerPbr = pDevice->newSampler(&info);
-			//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
+			//VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerPbr);
 			//assert(res == VK_SUCCESS);
 		}
 
@@ -7253,7 +7253,7 @@ namespace vkr
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_brdfLutSampler = pDevice->newSampler(&info);
-			/*VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
+			/*VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_brdfLutSampler);
 			assert(res == VK_SUCCESS);*/
 		}
 
@@ -7273,7 +7273,7 @@ namespace vkr
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerShadow = pDevice->newSampler(&info);
-			/*	VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
+			/*	VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerShadow);
 				assert(res == VK_SUCCESS);*/
 		}
 
@@ -7497,7 +7497,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines[std::string("ID_") + it.first] = std::to_string(cnt);
 
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 
@@ -7506,7 +7506,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
 				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
 
 				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
@@ -7529,7 +7529,7 @@ namespace vkr
 			}
 			if (tfmat->m_pbrMaterialParameters.transmission) {
 				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
@@ -7537,7 +7537,7 @@ namespace vkr
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
 				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// 
-				SetDescriptorSet(m_pDevice->GetDevice(), cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 		}
@@ -7560,7 +7560,7 @@ namespace vkr
 			if (id != def.end())
 			{
 				int index = std::stoi(id->second);
-				SetDescriptorSet(m_pDevice->GetDevice(), index, SSAO, m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, index, SSAO, m_samplerPbr, tfmat->m_texturesDescriptorSet);
 			}
 		}
 	}
@@ -7576,19 +7576,19 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	void GltfPbrPass::OnDestroy()
 	{
-		auto dev = m_pDevice->GetDevice();
+		auto dev = m_pDevice->m_device;
 		for (uint32_t m = 0; m < m_meshes.size(); m++)
 		{
 			PBRMesh* pMesh = &m_meshes[m];
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
 				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
-				//vkDestroyPipeline(m_pDevice->GetDevice(), pPrimitive->m_pipeline, nullptr);
+				//vkDestroyPipeline(m_pDevice->m_device, pPrimitive->m_pipeline, nullptr);
 				//pPrimitive->m_pipeline = VK_NULL_HANDLE;
-				//vkDestroyPipeline(m_pDevice->GetDevice(), pPrimitive->m_pipelineWireframe, nullptr);
+				//vkDestroyPipeline(m_pDevice->m_device, pPrimitive->m_pipelineWireframe, nullptr);
 				//pPrimitive->m_pipelineWireframe = VK_NULL_HANDLE;
-				//vkDestroyPipelineLayout(m_pDevice->GetDevice(), pPrimitive->m_pipelineLayout, nullptr);
-				vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), pPrimitive->m_uniformsDescriptorSetLayout, NULL);
+				//vkDestroyPipelineLayout(m_pDevice->m_device, pPrimitive->m_pipelineLayout, nullptr);
+				vkDestroyDescriptorSetLayout(m_pDevice->m_device, pPrimitive->m_uniformsDescriptorSetLayout, NULL);
 				m_pResourceViewHeaps->FreeDescriptor(pPrimitive->m_uniformsDescriptorSet);
 			}
 		}
@@ -7605,25 +7605,25 @@ namespace vkr
 
 		for (int i = 0; i < m_materialsData.size(); i++)
 		{
-			vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_materialsData[i].m_texturesDescriptorSetLayout, NULL);
+			vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_texturesDescriptorSetLayout, NULL);
 			m_pResourceViewHeaps->FreeDescriptor(m_materialsData[i].m_texturesDescriptorSet);
 		}
 
 		//destroy default material
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_defaultMaterial.m_texturesDescriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_defaultMaterial.m_texturesDescriptorSetLayout, NULL);
 		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
 		for (auto& p : _samplers) {
 			if (p)
 			{
-				vkDestroySampler(m_pDevice->GetDevice(), p, nullptr);
+				vkDestroySampler(m_pDevice->m_device, p, nullptr);
 			}
 		}
 		_samplers.clear();
-		vkDestroySampler(m_pDevice->GetDevice(), m_samplerPbr, nullptr);
-		vkDestroySampler(m_pDevice->GetDevice(), m_samplerShadow, nullptr);
+		vkDestroySampler(m_pDevice->m_device, m_samplerPbr, nullptr);
+		vkDestroySampler(m_pDevice->m_device, m_samplerShadow, nullptr);
 
-		vkDestroyImageView(m_pDevice->GetDevice(), m_brdfLutView, NULL);
-		vkDestroySampler(m_pDevice->GetDevice(), m_brdfLutSampler, nullptr);
+		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
+		vkDestroySampler(m_pDevice->m_device, m_brdfLutSampler, nullptr);
 		m_brdfLutTexture.OnDestroy();
 
 	}
@@ -7744,9 +7744,9 @@ namespace vkr
 			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
 			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
 
-			VkResult res = vkCreatePipelineLayout(m_pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &oldp.m_pipelineLayout);
+			VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &oldp.m_pipelineLayout);
 			assert(res == VK_SUCCESS);
-			SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)oldp.m_pipelineLayout, "GltfPbrPass PL");
+			SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)oldp.m_pipelineLayout, "GltfPbrPass PL");
 		}
 
 		m_pResourceViewHeaps->AllocDescriptor(oldp.m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
@@ -7762,13 +7762,13 @@ namespace vkr
 		if (morphing)
 		{
 			//vec4 per_target_data[];
-			SetDescriptorSet1(m_pDevice->GetDevice(), morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
+			SetDescriptorSet1(m_pDevice->m_device, morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
 			//float u_morphWeights[];
 			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 		if (muvt_size > 0)
 		{
-			//SetDescriptorSet1(m_pDevice->GetDevice(), mm->uvtdata->buffer, td, mm->uvtdata->offset, (uint32_t)mm->uvtdata->range, pPrimitive->m_uniformsDescriptorSet, dt1);
+			//SetDescriptorSet1(m_pDevice->m_device, mm->uvtdata->buffer, td, mm->uvtdata->offset, (uint32_t)mm->uvtdata->range, pPrimitive->m_uniformsDescriptorSet, dt1);
 			m_pDynamicBufferRing->SetDescriptorSet(muvt, (uint32_t)muvt_size, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
 
@@ -7786,9 +7786,9 @@ namespace vkr
 		//pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
 		//pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
 
-		//VkResult res = vkCreatePipelineLayout(m_pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &pPrimitive->_pipe->m_pipelineLayout);
+		//VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &pPrimitive->_pipe->m_pipelineLayout);
 		//assert(res == VK_SUCCESS);
-		//SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pPrimitive->_pipe->m_pipelineLayout, "GltfPbrPass PL");
+		//SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pPrimitive->_pipe->m_pipelineLayout, "GltfPbrPass PL");
 	}
 	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
 	{
@@ -7835,8 +7835,8 @@ namespace vkr
 		}
 		//defines["pbr_glsl"] = "1";
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
-		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
-		VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
+		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
+		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
 
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
 
@@ -8113,17 +8113,17 @@ namespace vkr
 		pipeline.renderPass = 0;// m_pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
 
-		VkResult res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipeline);
+		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)oldp.m_pipeline, "GltfPbrPass P");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)oldp.m_pipeline, "GltfPbrPass P");
 
 		// create wireframe pipeline
 		rs.polygonMode = VK_POLYGON_MODE_LINE;
 		rs.cullMode = VK_CULL_MODE_NONE;
 		//ds.depthWriteEnable = false;
-		res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipelineWireframe);
+		res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)oldp.m_pipelineWireframe, "GltfPbrPass Wireframe P");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)oldp.m_pipelineWireframe, "GltfPbrPass Wireframe P");
 		pPrimitive->_pipe = &oldp;
 	}
 
@@ -8555,7 +8555,7 @@ namespace vkr
 			info.maxLod = 10000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerPbr = pDevice->newSampler(&info);
-			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerPbr);
+			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerPbr);
 			//assert(res == VK_SUCCESS);
 		}
 
@@ -8573,7 +8573,7 @@ namespace vkr
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_brdfLutSampler = pDevice->newSampler(&info);
-			/*		res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_brdfLutSampler);
+			/*		res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_brdfLutSampler);
 					assert(res == VK_SUCCESS);*/
 		}
 
@@ -8593,7 +8593,7 @@ namespace vkr
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerShadow = pDevice->newSampler(&info);
-			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerShadow);
+			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerShadow);
 			//assert(res == VK_SUCCESS);
 		}
 
@@ -8642,8 +8642,8 @@ namespace vkr
 #else
 		if (m_deviceMemory != VK_NULL_HANDLE)
 		{
-			vkDestroyImage(m_pDevice->GetDevice(), m_pResource, nullptr);
-			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, nullptr);
+			vkDestroyImage(m_pDevice->m_device, m_pResource, nullptr);
+			vkFreeMemory(m_pDevice->m_device, m_deviceMemory, nullptr);
 			m_deviceMemory = VK_NULL_HANDLE;
 		}
 #endif
@@ -8675,14 +8675,14 @@ namespace vkr
 		VmaAllocationInfo gpuImageAllocInfo = {};
 		VkResult res = vmaCreateImage(m_pDevice->GetAllocator(), pCreateInfo, &imageAllocCreateInfo, &m_pResource, &m_ImageAlloc, &gpuImageAllocInfo);
 		assert(res == VK_SUCCESS);
-		SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_IMAGE, (uint64_t)m_pResource, m_name.c_str());
+		SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_IMAGE, (uint64_t)m_pResource, m_name.c_str());
 #else
 		/* Create image */
-		VkResult res = vkCreateImage(m_pDevice->GetDevice(), pCreateInfo, NULL, &m_pResource);
+		VkResult res = vkCreateImage(m_pDevice->m_device, pCreateInfo, NULL, &m_pResource);
 		assert(res == VK_SUCCESS);
 
 		VkMemoryRequirements mem_reqs;
-		vkGetImageMemoryRequirements(m_pDevice->GetDevice(), m_pResource, &mem_reqs);
+		vkGetImageMemoryRequirements(m_pDevice->m_device, m_pResource, &mem_reqs);
 
 		VkMemoryAllocateInfo alloc_info = {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -8697,11 +8697,11 @@ namespace vkr
 		assert(pass);
 
 		/* Allocate memory */
-		res = vkAllocateMemory(m_pDevice->GetDevice(), &alloc_info, NULL, &m_deviceMemory);
+		res = vkAllocateMemory(m_pDevice->m_device, &alloc_info, NULL, &m_deviceMemory);
 		assert(res == VK_SUCCESS);
 
 		/* bind memory */
-		res = vkBindImageMemory(m_pDevice->GetDevice(), m_pResource, m_deviceMemory, 0);
+		res = vkBindImageMemory(m_pDevice->m_device, m_pResource, m_deviceMemory, 0);
 		assert(res == VK_SUCCESS);
 #endif
 		return 0;
@@ -8773,10 +8773,10 @@ namespace vkr
 		}
 
 		info.subresourceRange.baseArrayLayer = 0;
-		VkResult res = vkCreateImageView(m_pDevice->GetDevice(), &info, NULL, pImageView);
+		VkResult res = vkCreateImageView(m_pDevice->m_device, &info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, ResourceName.c_str());
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, ResourceName.c_str());
 	}
 
 	void Texture::CreateSRV(VkImageView* pImageView, int mipLevel)
@@ -8813,10 +8813,10 @@ namespace vkr
 
 		info.subresourceRange.baseArrayLayer = 0;
 
-		VkResult res = vkCreateImageView(m_pDevice->GetDevice(), &info, NULL, pImageView);
+		VkResult res = vkCreateImageView(m_pDevice->m_device, &info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
 	}
 
 	void Texture::CreateCubeSRV(VkImageView* pImageView)
@@ -8832,10 +8832,10 @@ namespace vkr
 		info.subresourceRange.baseArrayLayer = 0;
 		info.subresourceRange.layerCount = m_header.arraySize;
 
-		VkResult res = vkCreateImageView(m_pDevice->GetDevice(), &info, NULL, pImageView);
+		VkResult res = vkCreateImageView(m_pDevice->m_device, &info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
 	}
 
 	void Texture::CreateDSV(VkImageView* pImageView)
@@ -8860,10 +8860,10 @@ namespace vkr
 
 		m_header.mipMapCount = 1;
 
-		VkResult res = vkCreateImageView(m_pDevice->GetDevice(), &view_info, NULL, pImageView);
+		VkResult res = vkCreateImageView(m_pDevice->m_device, &view_info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
 	}
 
 	INT32 Texture::InitDepthStencil(Device* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, const char* name)
@@ -8951,13 +8951,13 @@ namespace vkr
 			VmaAllocationInfo gpuImageAllocInfo = {};
 			VkResult res = vmaCreateImage(pDevice->GetAllocator(), &info, &imageAllocCreateInfo, &tex, &m_ImageAlloc, &gpuImageAllocInfo);
 			assert(res == VK_SUCCESS);
-			SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_IMAGE, (uint64_t)tex, m_name.c_str());
+			SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_IMAGE, (uint64_t)tex, m_name.c_str());
 #else
-			VkResult res = vkCreateImage(pDevice->GetDevice(), &info, NULL, &tex);
+			VkResult res = vkCreateImage(pDevice->m_device, &info, NULL, &tex);
 			assert(res == VK_SUCCESS);
 
 			VkMemoryRequirements mem_reqs;
-			vkGetImageMemoryRequirements(pDevice->GetDevice(), tex, &mem_reqs);
+			vkGetImageMemoryRequirements(pDevice->m_device, tex, &mem_reqs);
 
 			VkMemoryAllocateInfo alloc_info = {};
 			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -8969,10 +8969,10 @@ namespace vkr
 				&alloc_info.memoryTypeIndex);
 			assert(pass && "No mappable, coherent memory");
 
-			res = vkAllocateMemory(pDevice->GetDevice(), &alloc_info, NULL, &m_deviceMemory);
+			res = vkAllocateMemory(pDevice->m_device, &alloc_info, NULL, &m_deviceMemory);
 			assert(res == VK_SUCCESS);
 
-			res = vkBindImageMemory(pDevice->GetDevice(), tex, m_deviceMemory, 0);
+			res = vkBindImageMemory(pDevice->m_device, tex, m_deviceMemory, 0);
 			assert(res == VK_SUCCESS);
 #endif
 		}
@@ -9495,7 +9495,7 @@ namespace vkr
 			cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 			cmd_pool_info.queueFamilyIndex = m_pDevice->GetGraphicsQueueFamilyIndex();
 			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-			res = vkCreateCommandPool(m_pDevice->GetDevice(), &cmd_pool_info, NULL, &m_commandPool);
+			res = vkCreateCommandPool(m_pDevice->m_device, &cmd_pool_info, NULL, &m_commandPool);
 			assert(res == VK_SUCCESS);
 
 			VkCommandBufferAllocateInfo cmd = {};
@@ -9504,7 +9504,7 @@ namespace vkr
 			cmd.commandPool = m_commandPool;
 			cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 			cmd.commandBufferCount = 1;
-			res = vkAllocateCommandBuffers(m_pDevice->GetDevice(), &cmd, &m_pCommandBuffer);
+			res = vkAllocateCommandBuffers(m_pDevice->m_device, &cmd, &m_pCommandBuffer);
 			assert(res == VK_SUCCESS);
 		}
 
@@ -9515,11 +9515,11 @@ namespace vkr
 			buffer_info.size = uSize;
 			buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			res = vkCreateBuffer(m_pDevice->GetDevice(), &buffer_info, NULL, &m_buffer);
+			res = vkCreateBuffer(m_pDevice->m_device, &buffer_info, NULL, &m_buffer);
 			assert(res == VK_SUCCESS);
 
 			VkMemoryRequirements mem_reqs;
-			vkGetBufferMemoryRequirements(m_pDevice->GetDevice(), m_buffer, &mem_reqs);
+			vkGetBufferMemoryRequirements(m_pDevice->m_device, m_buffer, &mem_reqs);
 
 			VkMemoryAllocateInfo alloc_info = {};
 			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -9531,13 +9531,13 @@ namespace vkr
 				&alloc_info.memoryTypeIndex);
 			assert(pass && "No mappable, coherent memory");
 
-			res = vkAllocateMemory(m_pDevice->GetDevice(), &alloc_info, NULL, &m_deviceMemory);
+			res = vkAllocateMemory(m_pDevice->m_device, &alloc_info, NULL, &m_deviceMemory);
 			assert(res == VK_SUCCESS);
 
-			res = vkBindBufferMemory(m_pDevice->GetDevice(), m_buffer, m_deviceMemory, 0);
+			res = vkBindBufferMemory(m_pDevice->m_device, m_buffer, m_deviceMemory, 0);
 			assert(res == VK_SUCCESS);
 
-			res = vkMapMemory(m_pDevice->GetDevice(), m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pDataBegin);
+			res = vkMapMemory(m_pDevice->m_device, m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pDataBegin);
 			assert(res == VK_SUCCESS);
 
 			m_pDataCur = m_pDataBegin;
@@ -9549,7 +9549,7 @@ namespace vkr
 			VkFenceCreateInfo fence_ci = {};
 			fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 
-			res = vkCreateFence(m_pDevice->GetDevice(), &fence_ci, NULL, &m_fence);
+			res = vkCreateFence(m_pDevice->m_device, &fence_ci, NULL, &m_fence);
 			assert(res == VK_SUCCESS);
 		}
 
@@ -9572,14 +9572,14 @@ namespace vkr
 	{
 		if (m_buffer)
 		{
-			vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
-			vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
-			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
+			vkDestroyBuffer(m_pDevice->m_device, m_buffer, NULL);
+			vkUnmapMemory(m_pDevice->m_device, m_deviceMemory);
+			vkFreeMemory(m_pDevice->m_device, m_deviceMemory, NULL);
 
-			vkFreeCommandBuffers(m_pDevice->GetDevice(), m_commandPool, 1, &m_pCommandBuffer);
-			vkDestroyCommandPool(m_pDevice->GetDevice(), m_commandPool, NULL);
+			vkFreeCommandBuffers(m_pDevice->m_device, m_commandPool, 1, &m_pCommandBuffer);
+			vkDestroyCommandPool(m_pDevice->m_device, m_commandPool, NULL);
 
-			vkDestroyFence(m_pDevice->GetDevice(), m_fence, NULL);
+			vkDestroyFence(m_pDevice->m_device, m_fence, NULL);
 
 			m_buffer = 0;
 		}
@@ -9676,7 +9676,7 @@ namespace vkr
 		range[0].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 		range[0].memory = m_deviceMemory;
 		range[0].size = m_pDataCur - m_pDataBegin;
-		res = vkFlushMappedMemoryRanges(m_pDevice->GetDevice(), 1, range);
+		res = vkFlushMappedMemoryRanges(m_pDevice->m_device, 1, range);
 		assert(res == VK_SUCCESS);
 	}
 
@@ -9739,15 +9739,15 @@ namespace vkr
 		submit_info.signalSemaphoreCount = 0;
 		submit_info.pSignalSemaphores = NULL;
 
-		res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, m_fence);
+		res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info, m_fence);
 		assert(res == VK_SUCCESS);
 
 		// Make sure it's been processed by the GPU
 
-		res = vkWaitForFences(m_pDevice->GetDevice(), 1, &m_fence, VK_TRUE, UINT64_MAX);
+		res = vkWaitForFences(m_pDevice->m_device, 1, &m_fence, VK_TRUE, UINT64_MAX);
 		assert(res == VK_SUCCESS);
 
-		vkResetFences(m_pDevice->GetDevice(), 1, &m_fence);
+		vkResetFences(m_pDevice->m_device, 1, &m_fence);
 
 		// Reset so it can be reused
 		VkCommandBufferBeginInfo cmd_buf_info = {};
@@ -9786,13 +9786,13 @@ namespace vkr
 		descriptor_pool.poolSizeCount = _countof(type_count);
 		descriptor_pool.pPoolSizes = type_count;
 
-		VkResult res = vkCreateDescriptorPool(pDevice->GetDevice(), &descriptor_pool, NULL, &m_descriptorPool);
+		VkResult res = vkCreateDescriptorPool(pDevice->m_device, &descriptor_pool, NULL, &m_descriptorPool);
 		assert(res == VK_SUCCESS);
 	}
 
 	void ResourceViewHeaps::OnDestroy()
 	{
-		vkDestroyDescriptorPool(m_pDevice->GetDevice(), m_descriptorPool, NULL);
+		vkDestroyDescriptorPool(m_pDevice->m_device, m_descriptorPool, NULL);
 	}
 
 	bool ResourceViewHeaps::CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout)
@@ -9805,7 +9805,7 @@ namespace vkr
 		descriptor_layout.bindingCount = (uint32_t)pDescriptorLayoutBinding->size();
 		descriptor_layout.pBindings = pDescriptorLayoutBinding->data();
 
-		VkResult res = vkCreateDescriptorSetLayout(m_pDevice->GetDevice(), &descriptor_layout, NULL, pDescSetLayout);
+		VkResult res = vkCreateDescriptorSetLayout(m_pDevice->m_device, &descriptor_layout, NULL, pDescSetLayout);
 		assert(res == VK_SUCCESS);
 		return (res == VK_SUCCESS);
 	}
@@ -9819,7 +9819,7 @@ namespace vkr
 		descriptor_layout.bindingCount = (uint32_t)pDescriptorLayoutBinding->size();
 		descriptor_layout.pBindings = pDescriptorLayoutBinding->data();
 
-		VkResult res = vkCreateDescriptorSetLayout(m_pDevice->GetDevice(), &descriptor_layout, NULL, pDescSetLayout);
+		VkResult res = vkCreateDescriptorSetLayout(m_pDevice->m_device, &descriptor_layout, NULL, pDescSetLayout);
 		assert(res == VK_SUCCESS);
 
 		return AllocDescriptor(*pDescSetLayout, pDescriptorSet);
@@ -9836,7 +9836,7 @@ namespace vkr
 		alloc_info.descriptorSetCount = 1;
 		alloc_info.pSetLayouts = &descLayout;
 
-		VkResult res = vkAllocateDescriptorSets(m_pDevice->GetDevice(), &alloc_info, pDescriptorSet);
+		VkResult res = vkAllocateDescriptorSets(m_pDevice->m_device, &alloc_info, pDescriptorSet);
 		assert(res == VK_SUCCESS);
 
 		m_allocatedDescriptorCount++;
@@ -9847,7 +9847,7 @@ namespace vkr
 	void ResourceViewHeaps::FreeDescriptor(VkDescriptorSet descriptorSet)
 	{
 		m_allocatedDescriptorCount--;
-		vkFreeDescriptorSets(m_pDevice->GetDevice(), m_descriptorPool, 1, &descriptorSet);
+		vkFreeDescriptorSets(m_pDevice->m_device, m_descriptorPool, 1, &descriptorSet);
 	}
 
 	bool ResourceViewHeaps::AllocDescriptor(int size, const VkSampler* pSamplers, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
@@ -9904,7 +9904,7 @@ namespace vkr
 
 		res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_buffer, &m_bufferAlloc, nullptr);
 		assert(res == VK_SUCCESS);
-		SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "StaticBufferPool (sys mem)");
+		SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "StaticBufferPool (sys mem)");
 
 		res = vmaMapMemory(pDevice->GetAllocator(), m_bufferAlloc, (void**)&m_pData);
 		assert(res == VK_SUCCESS);
@@ -9922,13 +9922,13 @@ namespace vkr
 		buf_info.pQueueFamilyIndices = NULL;
 		buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		buf_info.flags = 0;
-		res = vkCreateBuffer(m_pDevice->GetDevice(), &buf_info, NULL, &m_buffer);
+		res = vkCreateBuffer(m_pDevice->m_device, &buf_info, NULL, &m_buffer);
 		assert(res == VK_SUCCESS);
 
 		// allocate the buffer in system memory
 
 		VkMemoryRequirements mem_reqs;
-		vkGetBufferMemoryRequirements(m_pDevice->GetDevice(), m_buffer, &mem_reqs);
+		vkGetBufferMemoryRequirements(m_pDevice->m_device, m_buffer, &mem_reqs);
 
 		VkMemoryAllocateInfo alloc_info = {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -9941,17 +9941,17 @@ namespace vkr
 			&alloc_info.memoryTypeIndex);
 		assert(pass && "No mappable, coherent memory");
 
-		res = vkAllocateMemory(m_pDevice->GetDevice(), &alloc_info, NULL, &m_deviceMemory);
+		res = vkAllocateMemory(m_pDevice->m_device, &alloc_info, NULL, &m_deviceMemory);
 		assert(res == VK_SUCCESS);
 
 		// bind buffer
 
-		res = vkBindBufferMemory(m_pDevice->GetDevice(), m_buffer, m_deviceMemory, 0);
+		res = vkBindBufferMemory(m_pDevice->m_device, m_buffer, m_deviceMemory, 0);
 		assert(res == VK_SUCCESS);
 
 		// Map it and leave it mapped. This is fine for Win10 and Win7.
 
-		res = vkMapMemory(m_pDevice->GetDevice(), m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pData);
+		res = vkMapMemory(m_pDevice->m_device, m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pData);
 		assert(res == VK_SUCCESS);
 #endif
 
@@ -9969,7 +9969,7 @@ namespace vkr
 
 			res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_bufferVid, &m_bufferAllocVid, nullptr);
 			assert(res == VK_SUCCESS);
-			SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "StaticBufferPool (vid mem)");
+			SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "StaticBufferPool (vid mem)");
 #else
 
 			// create the buffer, allocate it in VIDEO memory and bind it 
@@ -9983,13 +9983,13 @@ namespace vkr
 			buf_info.pQueueFamilyIndices = NULL;
 			buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			buf_info.flags = 0;
-			res = vkCreateBuffer(m_pDevice->GetDevice(), &buf_info, NULL, &m_bufferVid);
+			res = vkCreateBuffer(m_pDevice->m_device, &buf_info, NULL, &m_bufferVid);
 			assert(res == VK_SUCCESS);
 
 			// allocate the buffer in VIDEO memory
 
 			VkMemoryRequirements mem_reqs;
-			vkGetBufferMemoryRequirements(m_pDevice->GetDevice(), m_bufferVid, &mem_reqs);
+			vkGetBufferMemoryRequirements(m_pDevice->m_device, m_bufferVid, &mem_reqs);
 
 			VkMemoryAllocateInfo alloc_info = {};
 			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -10000,12 +10000,12 @@ namespace vkr
 			bool pass = memory_type_from_properties(m_pDevice->GetPhysicalDeviceMemoryProperties(), mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_info.memoryTypeIndex);
 			assert(pass && "No mappable, coherent memory");
 
-			res = vkAllocateMemory(m_pDevice->GetDevice(), &alloc_info, NULL, &m_deviceMemoryVid);
+			res = vkAllocateMemory(m_pDevice->m_device, &alloc_info, NULL, &m_deviceMemoryVid);
 			assert(res == VK_SUCCESS);
 
 			// bind buffer
 
-			res = vkBindBufferMemory(m_pDevice->GetDevice(), m_bufferVid, m_deviceMemoryVid, 0);
+			res = vkBindBufferMemory(m_pDevice->m_device, m_bufferVid, m_deviceMemoryVid, 0);
 			assert(res == VK_SUCCESS);
 #endif
 		}
@@ -10020,8 +10020,8 @@ namespace vkr
 #ifdef USE_VMA
 			vmaDestroyBuffer(m_pDevice->GetAllocator(), m_bufferVid, m_bufferAllocVid);
 #else
-			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemoryVid, NULL);
-			vkDestroyBuffer(m_pDevice->GetDevice(), m_bufferVid, NULL);
+			vkFreeMemory(m_pDevice->m_device, m_deviceMemoryVid, NULL);
+			vkDestroyBuffer(m_pDevice->m_device, m_bufferVid, NULL);
 #endif
 
 		}
@@ -10032,8 +10032,8 @@ namespace vkr
 			vmaUnmapMemory(m_pDevice->GetAllocator(), m_bufferAlloc);
 			vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
 #else
-			vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
-			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
+			vkUnmapMemory(m_pDevice->m_device, m_deviceMemory);
+			vkFreeMemory(m_pDevice->m_device, m_deviceMemory, NULL);
 			vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
 #endif
 			m_buffer = VK_NULL_HANDLE;
@@ -10280,7 +10280,7 @@ namespace vkr
 			assert(m_GBufferFlags & GBUFFER_DEPTH); // asserts if there if the RT is not present in the GBuffer
 		}
 
-		return CreateRenderPassOptimal(m_pDevice->GetDevice(), colorAttanchmentCount, colorAttachments, &depthAttachment);
+		return CreateRenderPassOptimal(m_pDevice->m_device, colorAttanchmentCount, colorAttachments, &depthAttachment);
 	}
 
 	void GBuffer::GetAttachmentList(GBufferFlags flags, std::vector<VkImageView>* pAttachments, std::vector<VkClearValue>* pClearValues)
@@ -10464,52 +10464,52 @@ namespace vkr
 	{
 		if (m_GBufferFlags & GBUFFER_SPECULAR_ROUGHNESS)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_SpecularRoughnessSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_SpecularRoughnessSRV, nullptr);
 			m_SpecularRoughness.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_DIFFUSE)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_DiffuseSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_DiffuseSRV, nullptr);
 			m_Diffuse.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_NORMAL_BUFFER)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_NormalBufferSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_NormalBufferSRV, nullptr);
 			m_NormalBuffer.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_MOTION_VECTORS)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_MotionVectorsSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_MotionVectorsSRV, nullptr);
 			m_MotionVectors.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_FORWARD)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_HDRSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_HDRSRV, nullptr);
 			m_HDR.OnDestroy();
-			vkDestroyImageView(m_pDevice->GetDevice(), m_HDRSRVt, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_HDRSRVt, nullptr);
 			m_HDRt.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_HDR_oit_accumSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_HDR_oit_accumSRV, nullptr);
 			m_HDR_oit_accum.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_OIT_WEIGHT)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_HDR_oit_weightSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_HDR_oit_weightSRV, nullptr);
 			m_HDR_oit_weight.OnDestroy();
 		}
 
 		if (m_GBufferFlags & GBUFFER_DEPTH)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_DepthBufferDSV, nullptr);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_DepthBufferSRV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_DepthBufferDSV, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_DepthBufferSRV, nullptr);
 			m_DepthBuffer.OnDestroy();
 		}
 	}
@@ -10539,7 +10539,7 @@ namespace vkr
 
 		res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_buffer, &m_bufferAlloc, nullptr);
 		assert(res == VK_SUCCESS);
-		SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "DynamicBufferRing");
+		SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "DynamicBufferRing");
 
 		res = vmaMapMemory(pDevice->GetAllocator(), m_bufferAlloc, (void**)&m_pData);
 		assert(res == VK_SUCCESS);
@@ -10554,11 +10554,11 @@ namespace vkr
 		buf_info.pQueueFamilyIndices = NULL;
 		buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		buf_info.flags = 0;
-		res = vkCreateBuffer(m_pDevice->GetDevice(), &buf_info, NULL, &m_buffer);
+		res = vkCreateBuffer(m_pDevice->m_device, &buf_info, NULL, &m_buffer);
 		assert(res == VK_SUCCESS);
 
 		VkMemoryRequirements mem_reqs;
-		vkGetBufferMemoryRequirements(m_pDevice->GetDevice(), m_buffer, &mem_reqs);
+		vkGetBufferMemoryRequirements(m_pDevice->m_device, m_buffer, &mem_reqs);
 
 		VkMemoryAllocateInfo alloc_info = {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -10573,13 +10573,13 @@ namespace vkr
 			&alloc_info.memoryTypeIndex);
 		assert(pass && "No mappable, coherent memory");
 
-		res = vkAllocateMemory(m_pDevice->GetDevice(), &alloc_info, NULL, &m_deviceMemory);
+		res = vkAllocateMemory(m_pDevice->m_device, &alloc_info, NULL, &m_deviceMemory);
 		assert(res == VK_SUCCESS);
 
-		res = vkMapMemory(m_pDevice->GetDevice(), m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pData);
+		res = vkMapMemory(m_pDevice->m_device, m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pData);
 		assert(res == VK_SUCCESS);
 
-		res = vkBindBufferMemory(m_pDevice->GetDevice(), m_buffer, m_deviceMemory, 0);
+		res = vkBindBufferMemory(m_pDevice->m_device, m_buffer, m_deviceMemory, 0);
 		assert(res == VK_SUCCESS);
 #endif
 		return res;
@@ -10596,9 +10596,9 @@ namespace vkr
 		vmaUnmapMemory(m_pDevice->GetAllocator(), m_bufferAlloc);
 		vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
 #else
-		vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
-		vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
-		vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
+		vkUnmapMemory(m_pDevice->m_device, m_deviceMemory);
+		vkFreeMemory(m_pDevice->m_device, m_deviceMemory, NULL);
+		vkDestroyBuffer(m_pDevice->m_device, m_buffer, NULL);
 #endif
 		m_mem.OnDestroy();
 	}
@@ -10693,7 +10693,7 @@ namespace vkr
 		write.dstArrayElement = 0;
 		write.dstBinding = index;
 
-		vkUpdateDescriptorSets(m_pDevice->GetDevice(), 1, &write, 0, NULL);
+		vkUpdateDescriptorSets(m_pDevice->m_device, 1, &write, 0, NULL);
 	}
 	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
 	{
@@ -10777,13 +10777,13 @@ namespace vkr {
 #else
 		std::string CompileFlagsVS("-T vs_6_0");
 #endif // _DEBUG
-		//res = VKCompileFromString(m_pDevice->GetDevice(), SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
-		res = VKCompileFromFile(pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, "sky.v.glsl", "main", "", &attributeDefines, &m_vertexShader);
+		//res = VKCompileFromString(m_pDevice->m_device, SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
+		res = VKCompileFromFile(pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "sky.v.glsl", "main", "", &attributeDefines, &m_vertexShader);
 		assert(res == VK_SUCCESS);
 
 		m_fragmentShaderName = shaderEntryPoint;
 		VkPipelineShaderStageCreateInfo m_fragmentShader;
-		res = VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, shaderFilename.c_str(), m_fragmentShaderName.c_str(), shaderCompilerParams.c_str(), &attributeDefines, &m_fragmentShader);
+		res = VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, shaderFilename.c_str(), m_fragmentShaderName.c_str(), shaderCompilerParams.c_str(), &attributeDefines, &m_fragmentShader);
 		assert(res == VK_SUCCESS);
 
 		m_shaderStages.clear();
@@ -10800,7 +10800,7 @@ namespace vkr {
 		pPipelineLayoutCreateInfo.setLayoutCount = 1;
 		pPipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
 
-		res = vkCreatePipelineLayout(pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
+		res = vkCreatePipelineLayout(pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
 		assert(res == VK_SUCCESS);
 
 		UpdatePipeline(renderPass, pBlendDesc, sampleDescCount);
@@ -10818,7 +10818,7 @@ namespace vkr {
 
 		if (m_pipeline != VK_NULL_HANDLE)
 		{
-			vkDestroyPipeline(m_pDevice->GetDevice(), m_pipeline, nullptr);
+			vkDestroyPipeline(m_pDevice->m_device, m_pipeline, nullptr);
 			m_pipeline = VK_NULL_HANDLE;
 		}
 
@@ -10965,9 +10965,9 @@ namespace vkr {
 		pipeline.renderPass = renderPass;
 		pipeline.subpass = 0;
 
-		res = vkCreateGraphicsPipelines(m_pDevice->GetDevice(), m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
+		res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_pipeline, "cacaca P");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_pipeline, "cacaca P");
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -10979,13 +10979,13 @@ namespace vkr {
 	{
 		if (m_pipeline != VK_NULL_HANDLE)
 		{
-			vkDestroyPipeline(m_pDevice->GetDevice(), m_pipeline, nullptr);
+			vkDestroyPipeline(m_pDevice->m_device, m_pipeline, nullptr);
 			m_pipeline = VK_NULL_HANDLE;
 		}
 
 		if (m_pipelineLayout != VK_NULL_HANDLE)
 		{
-			vkDestroyPipelineLayout(m_pDevice->GetDevice(), m_pipelineLayout, nullptr);
+			vkDestroyPipelineLayout(m_pDevice->m_device, m_pipelineLayout, nullptr);
 			m_pipelineLayout = VK_NULL_HANDLE;
 		}
 	}
@@ -11041,7 +11041,7 @@ namespace vkr {
 		defines["WIDTH"] = std::to_string(dwWidth);
 		defines["HEIGHT"] = std::to_string(dwHeight);
 		defines["DEPTH"] = std::to_string(dwDepth);
-		res = VKCompileFromFile(m_pDevice->GetDevice(), VK_SHADER_STAGE_COMPUTE_BIT, shaderFilename.c_str(), shaderEntryPoint.c_str(), shaderCompilerParams.c_str(), &defines, &computeShader);
+		res = VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_COMPUTE_BIT, shaderFilename.c_str(), shaderEntryPoint.c_str(), shaderCompilerParams.c_str(), &defines, &computeShader);
 		assert(res == VK_SUCCESS);
 		VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
 		pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -11050,7 +11050,7 @@ namespace vkr {
 		pPipelineLayoutCreateInfo.pPushConstantRanges = NULL;
 		pPipelineLayoutCreateInfo.setLayoutCount = 1;
 		pPipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
-		res = vkCreatePipelineLayout(pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
+		res = vkCreatePipelineLayout(pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
 		assert(res == VK_SUCCESS);
 		VkComputePipelineCreateInfo pipeline = {};
 		pipeline.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -11060,13 +11060,13 @@ namespace vkr {
 		pipeline.stage = computeShader;
 		pipeline.basePipelineHandle = VK_NULL_HANDLE;
 		pipeline.basePipelineIndex = 0;
-		res = vkCreateComputePipelines(pDevice->GetDevice(), pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
+		res = vkCreateComputePipelines(pDevice->m_device, pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
 		assert(res == VK_SUCCESS);
 	}
 	void PostProcCS::OnDestroy()
 	{
-		vkDestroyPipeline(m_pDevice->GetDevice(), m_pipeline, nullptr);
-		vkDestroyPipelineLayout(m_pDevice->GetDevice(), m_pipelineLayout, nullptr);
+		vkDestroyPipeline(m_pDevice->m_device, m_pipeline, nullptr);
+		vkDestroyPipelineLayout(m_pDevice->m_device, m_pipelineLayout, nullptr);
 	}
 	void PostProcCS::Draw(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo* pConstantBuffer, VkDescriptorSet descSet, uint32_t dispatchX, uint32_t dispatchY, uint32_t dispatchZ)
 	{
@@ -11470,7 +11470,7 @@ namespace vkr {
 
 		m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet);
 
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorLayout, NULL);
 	}
 
 	void SkyDomeProc::Draw(VkCommandBuffer cmd_buf, SkyDomeProc::Constants constants)
@@ -11514,7 +11514,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerDiffuseCube = pDevice->newSampler(&info);
-			/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerDiffuseCube);
+			/*		VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerDiffuseCube);
 					assert(res == VK_SUCCESS);*/
 		}
 
@@ -11531,7 +11531,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerSpecularCube = pDevice->newSampler(&info);
-			//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplerSpecularCube);
+			//VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerSpecularCube);
 			//assert(res == VK_SUCCESS);
 		}
 
@@ -11560,13 +11560,13 @@ namespace vkr {
 	void SkyDome::OnDestroy()
 	{
 		m_skydome.OnDestroy();
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorLayout, NULL);
 
-		vkDestroySampler(m_pDevice->GetDevice(), m_samplerDiffuseCube, nullptr);
-		vkDestroySampler(m_pDevice->GetDevice(), m_samplerSpecularCube, nullptr);
+		vkDestroySampler(m_pDevice->m_device, m_samplerDiffuseCube, nullptr);
+		vkDestroySampler(m_pDevice->m_device, m_samplerSpecularCube, nullptr);
 
-		vkDestroyImageView(m_pDevice->GetDevice(), m_CubeDiffuseTextureView, NULL);
-		vkDestroyImageView(m_pDevice->GetDevice(), m_CubeSpecularTextureView, NULL);
+		vkDestroyImageView(m_pDevice->m_device, m_CubeDiffuseTextureView, NULL);
+		vkDestroyImageView(m_pDevice->m_device, m_CubeSpecularTextureView, NULL);
 
 		m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet);
 
@@ -11576,12 +11576,12 @@ namespace vkr {
 
 	void SkyDome::SetDescriptorDiff(uint32_t index, VkDescriptorSet descriptorSet)
 	{
-		SetDescriptorSet(m_pDevice->GetDevice(), index, m_CubeDiffuseTextureView, m_samplerDiffuseCube, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, index, m_CubeDiffuseTextureView, m_samplerDiffuseCube, descriptorSet);
 	}
 
 	void SkyDome::SetDescriptorSpec(uint32_t index, VkDescriptorSet descriptorSet)
 	{
-		SetDescriptorSet(m_pDevice->GetDevice(), index, m_CubeSpecularTextureView, m_samplerSpecularCube, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, index, m_CubeSpecularTextureView, m_samplerSpecularCube, descriptorSet);
 	}
 
 	void SkyDome::Draw(VkCommandBuffer cmd_buf, const glm::mat4& invViewProj)
@@ -11652,20 +11652,20 @@ namespace vkr {
 			info.maxAnisotropy = 1.0f;
 
 			m_samplers[0] = m_samplers[1] = m_samplers[3] = pDevice->newSampler(&info);
-			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[0]);
+			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplers[0]);
 			//assert(res == VK_SUCCESS);
 
-			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[1]);
+			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplers[1]);
 			//assert(res == VK_SUCCESS);
 
-			//res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[3]);
+			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplers[3]);
 			//(res == VK_SUCCESS);
 
 			info.magFilter = VK_FILTER_LINEAR;
 			info.minFilter = VK_FILTER_LINEAR;
 			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 			m_samplers[2] = pDevice->newSampler(&info);
-			/*		res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_samplers[2]);
+			/*		res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplers[2]);
 					assert(res == VK_SUCCESS);*/
 
 					// Create VkDescriptor Set Layout Bindings
@@ -11743,14 +11743,14 @@ namespace vkr {
 	{
 		m_TAA.OnDestroy();
 		m_TAAFirst.OnDestroy();
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_TaaDescriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_TaaDescriptorSetLayout, NULL);
 
 		m_Sharpen.OnDestroy();
 		m_Post.OnDestroy();
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_SharpenDescriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_SharpenDescriptorSetLayout, NULL);
 
 		for (int i = 0; i < 4; i++)
-			vkDestroySampler(m_pDevice->GetDevice(), m_samplers[i], nullptr);
+			vkDestroySampler(m_pDevice->m_device, m_samplers[i], nullptr);
 
 		m_pResourceViewHeaps->FreeDescriptor(m_SharpenDescriptorSet);
 		m_pResourceViewHeaps->FreeDescriptor(m_TaaDescriptorSet);
@@ -11782,11 +11782,11 @@ namespace vkr {
 
 		// update the TAA descriptor
 		//
-		SetDescriptorSet(m_pDevice->GetDevice(), 0, m_pGBuffer->m_HDRSRV, NULL, m_TaaDescriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, m_pGBuffer->m_DepthBufferSRV, NULL, m_TaaDescriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 2, m_HistoryBufferSRV, NULL, m_TaaDescriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 3, m_pGBuffer->m_MotionVectorsSRV, NULL, m_TaaDescriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 4, m_TAABufferUAV, m_TaaDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 0, m_pGBuffer->m_HDRSRV, NULL, m_TaaDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 1, m_pGBuffer->m_DepthBufferSRV, NULL, m_TaaDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 2, m_HistoryBufferSRV, NULL, m_TaaDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 3, m_pGBuffer->m_MotionVectorsSRV, NULL, m_TaaDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 4, m_TAABufferUAV, m_TaaDescriptorSet);
 
 		for (int i = 0; i < 4; i++)
 		{
@@ -11804,14 +11804,14 @@ namespace vkr {
 			write.dstBinding = i + 5;
 			write.dstArrayElement = 0;
 
-			vkUpdateDescriptorSets(m_pDevice->GetDevice(), 1, &write, 0, NULL);
+			vkUpdateDescriptorSets(m_pDevice->m_device, 1, &write, 0, NULL);
 		}
 
 		// update the Sharpen descriptor
 		//
-		SetDescriptorSet(m_pDevice->GetDevice(), 0, m_TAABufferSRV, NULL, m_SharpenDescriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, m_pGBuffer->m_HDRSRV, m_SharpenDescriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 2, m_HistoryBufferSRV, m_SharpenDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 0, m_TAABufferSRV, NULL, m_SharpenDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 1, m_pGBuffer->m_HDRSRV, m_SharpenDescriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 2, m_HistoryBufferSRV, m_SharpenDescriptorSet);
 
 		m_bFirst = true;
 	}
@@ -11826,10 +11826,10 @@ namespace vkr {
 		m_HistoryBuffer.OnDestroy();
 		m_TAABuffer.OnDestroy();
 
-		vkDestroyImageView(m_pDevice->GetDevice(), m_TAABufferSRV, nullptr);
-		vkDestroyImageView(m_pDevice->GetDevice(), m_TAABufferUAV, nullptr);
-		vkDestroyImageView(m_pDevice->GetDevice(), m_HistoryBufferSRV, nullptr);
-		//vkDestroyImageView(m_pDevice->GetDevice(), m_HistoryBufferUAV, nullptr);
+		vkDestroyImageView(m_pDevice->m_device, m_TAABufferSRV, nullptr);
+		vkDestroyImageView(m_pDevice->m_device, m_TAABufferUAV, nullptr);
+		vkDestroyImageView(m_pDevice->m_device, m_HistoryBufferSRV, nullptr);
+		//vkDestroyImageView(m_pDevice->m_device, m_HistoryBufferUAV, nullptr);
 	}
 
 	void TAA::Draw(VkCommandBuffer cmd_buf)
@@ -11972,7 +11972,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-			/*		VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+			/*		VkResult res = vkCreateSampler(m_pDevice->m_device, &info, NULL, &m_sampler);
 					assert(res == VK_SUCCESS);*/
 		}
 
@@ -12005,9 +12005,9 @@ namespace vkr {
 		for (int i = 0; i < s_descriptorBuffers; i++)
 			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
 
-		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 	}
 
 	void ToneMapping::UpdatePipelines(VkRenderPass renderPass)
@@ -12031,7 +12031,7 @@ namespace vkr {
 		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
 
 		// modify Descriptor set
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, m_sampler, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 1, HDRSRV, m_sampler, descriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ToneMappingConsts), descriptorSet);
 
 		// Draw!
@@ -12075,7 +12075,7 @@ namespace vkr {
 		for (int i = 0; i < s_descriptorBuffers; i++)
 			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
 
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 	}
 
 	void ToneMappingCS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, float exposure, int toneMapper, int width, int height)
@@ -12094,7 +12094,7 @@ namespace vkr {
 		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
 
 		// modify Descriptor set
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 1, HDRSRV, descriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ToneMappingConsts), descriptorSet);
 
 		// Draw!
@@ -12127,7 +12127,7 @@ namespace vkr {
 		oitblend.OnDestroy();
 		for (int i = 0; i < s_descriptorBuffers; i++)
 			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 	}
 	void oitblendCS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, VkImageView accumTex, VkImageView weightTex, int width, int height)
 	{
@@ -12135,9 +12135,9 @@ namespace vkr {
 		VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
 		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
 		// modify Descriptor set
-		SetDescriptorSet(m_pDevice->GetDevice(), 0, HDRSRV, descriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, accumTex, descriptorSet);
-		SetDescriptorSet(m_pDevice->GetDevice(), 2, weightTex, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 0, HDRSRV, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 1, accumTex, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 2, weightTex, descriptorSet);
 		// Draw!
 		oitblend.Draw(cmd_buf, 0, descriptorSet, (width + 7) / 8, (height + 7) / 8, 1);
 		SetPerfMarkerEnd(cmd_buf);
@@ -12185,13 +12185,13 @@ namespace vkr {
 			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
 			descriptor_layout.pBindings = layoutBindings.data();
 
-			VkResult res = vkCreateDescriptorSetLayout(pDevice->GetDevice(), &descriptor_layout, NULL, &m_descriptorSetLayout);
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->m_device, &descriptor_layout, NULL, &m_descriptorSetLayout);
 			assert(res == VK_SUCCESS);
 		}
 
 		// Create a Render pass that accounts for blending
 		//
-		m_blendPass = SimpleColorBlendRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		m_blendPass = SimpleColorBlendRenderPass(pDevice->m_device, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
 
 		//blending add
@@ -12235,7 +12235,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-			/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			/*		VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_sampler);
 					assert(res == VK_SUCCESS);*/
 		}
 
@@ -12281,15 +12281,15 @@ namespace vkr {
 				fb_info.width = Width >> i;
 				fb_info.height = Height >> i;
 				fb_info.layers = 1;
-				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_mip[i].m_frameBuffer);
+				VkResult res = vkCreateFramebuffer(m_pDevice->m_device, &fb_info, NULL, &m_mip[i].m_frameBuffer);
 				assert(res == VK_SUCCESS);
 
-				SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].m_frameBuffer, "BloomBlended");
+				SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].m_frameBuffer, "BloomBlended");
 			}
 
 			// Set descriptors        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_mip[i].m_descriptorSet);
-			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, m_sampler, m_mip[i].m_descriptorSet);
+			SetDescriptorSet(m_pDevice->m_device, 1, m_mip[i].m_SRV, m_sampler, m_mip[i].m_descriptorSet);
 		}
 
 		{
@@ -12310,15 +12310,15 @@ namespace vkr {
 				fb_info.width = Width * 2;
 				fb_info.height = Height * 2;
 				fb_info.layers = 1;
-				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_output.m_frameBuffer);
+				VkResult res = vkCreateFramebuffer(m_pDevice->m_device, &fb_info, NULL, &m_output.m_frameBuffer);
 				assert(res == VK_SUCCESS);
 
-				SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_output.m_frameBuffer, "BloomOutput");
+				SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_output.m_frameBuffer, "BloomOutput");
 			}
 
 			// Set descriptors        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_output.m_descriptorSet);
-			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[1].m_SRV, m_sampler, m_output.m_descriptorSet);
+			SetDescriptorSet(m_pDevice->m_device, 1, m_mip[1].m_SRV, m_sampler, m_output.m_descriptorSet);
 		}
 
 		// set weights of each mip level
@@ -12344,13 +12344,13 @@ namespace vkr {
 
 		for (int i = 0; i < m_mipCount; i++)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].m_SRV, NULL);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].m_RTV, NULL);
-			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_mip[i].m_frameBuffer, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_mip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_mip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->m_device, m_mip[i].m_frameBuffer, NULL);
 		}
 
-		vkDestroyImageView(m_pDevice->GetDevice(), m_output.m_RTV, NULL);
-		vkDestroyFramebuffer(m_pDevice->GetDevice(), m_output.m_frameBuffer, NULL);
+		vkDestroyImageView(m_pDevice->m_device, m_output.m_RTV, NULL);
+		vkDestroyFramebuffer(m_pDevice->m_device, m_output.m_frameBuffer, NULL);
 	}
 
 	void Bloom::OnDestroy()
@@ -12364,12 +12364,12 @@ namespace vkr {
 
 		m_blur.OnDestroy();
 
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
-		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
+		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
 		m_blendAdd.OnDestroy();
 
-		vkDestroyRenderPass(m_pDevice->GetDevice(), m_blendPass, NULL);
+		vkDestroyRenderPass(m_pDevice->m_device, m_blendPass, NULL);
 	}
 
 	void Bloom::Draw(VkCommandBuffer cmd_buf)
@@ -12521,13 +12521,13 @@ namespace vkr {
 			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
 			descriptor_layout.pBindings = layoutBindings.data();
 
-			VkResult res = vkCreateDescriptorSetLayout(pDevice->GetDevice(), &descriptor_layout, NULL, &m_descriptorSetLayout);
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->m_device, &descriptor_layout, NULL, &m_descriptorSetLayout);
 			assert(res == VK_SUCCESS);
 		}
 
 		// Create a Render pass that will discard the contents of the render target.
 		//
-		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		m_in = SimpleColorWriteRenderPass(pDevice->m_device, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, format);
 
 		// The sampler we want to use for downsampling, all linear
@@ -12545,7 +12545,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-			/*		VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			/*		VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_sampler);
 					assert(res == VK_SUCCESS);*/
 		}
 
@@ -12622,15 +12622,15 @@ namespace vkr {
 					fb_info.width = Width >> i;
 					fb_info.height = Height >> i;
 					fb_info.layers = 1;
-					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_horizontalMip[i].m_frameBuffer);
+					VkResult res = vkCreateFramebuffer(m_pDevice->m_device, &fb_info, NULL, &m_horizontalMip[i].m_frameBuffer);
 					assert(res == VK_SUCCESS);
 
-					SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_horizontalMip[i].m_frameBuffer, "BlurPSHorizontal");
+					SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_horizontalMip[i].m_frameBuffer, "BlurPSHorizontal");
 				}
 
 				// Create Descriptor sets (all of them use the same Descriptor Layout)            
 				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_horizontalMip[i].m_descriptorSet);
-				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_horizontalMip[i].m_SRV, m_sampler, m_horizontalMip[i].m_descriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, 1, m_horizontalMip[i].m_SRV, m_sampler, m_horizontalMip[i].m_descriptorSet);
 			}
 
 			// Vertical pass, from m_tempBlur back to pInput
@@ -12651,15 +12651,15 @@ namespace vkr {
 					fb_info.width = Width >> i;
 					fb_info.height = Height >> i;
 					fb_info.layers = 1;
-					VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_verticalMip[i].m_frameBuffer);
+					VkResult res = vkCreateFramebuffer(m_pDevice->m_device, &fb_info, NULL, &m_verticalMip[i].m_frameBuffer);
 					assert(res == VK_SUCCESS);
 
-					SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_verticalMip[i].m_frameBuffer, "BlurPSVertical");
+					SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_verticalMip[i].m_frameBuffer, "BlurPSVertical");
 				}
 
 				// create and update descriptor
 				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_verticalMip[i].m_descriptorSet);
-				SetDescriptorSet(m_pDevice->GetDevice(), 1, m_verticalMip[i].m_SRV, m_sampler, m_verticalMip[i].m_descriptorSet);
+				SetDescriptorSet(m_pDevice->m_device, 1, m_verticalMip[i].m_SRV, m_sampler, m_verticalMip[i].m_descriptorSet);
 			}
 		}
 	}
@@ -12670,13 +12670,13 @@ namespace vkr {
 		//
 		for (int i = 0; i < m_mipCount; i++)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_horizontalMip[i].m_SRV, NULL);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_horizontalMip[i].m_RTV, NULL);
-			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_horizontalMip[i].m_frameBuffer, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_horizontalMip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_horizontalMip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->m_device, m_horizontalMip[i].m_frameBuffer, NULL);
 
-			vkDestroyImageView(m_pDevice->GetDevice(), m_verticalMip[i].m_SRV, NULL);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_verticalMip[i].m_RTV, NULL);
-			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_verticalMip[i].m_frameBuffer, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_verticalMip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_verticalMip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->m_device, m_verticalMip[i].m_frameBuffer, NULL);
 		}
 
 		// Destroy temporary render target used to hold the horizontal pass
@@ -12694,9 +12694,9 @@ namespace vkr {
 		}
 
 		m_directionalBlur.OnDestroy();
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
-		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
-		vkDestroyRenderPass(m_pDevice->GetDevice(), m_in, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
+		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
+		vkDestroyRenderPass(m_pDevice->m_device, m_in, NULL);
 	}
 
 	void BlurPS::Draw(VkCommandBuffer cmd_buf, int mipLevel)
@@ -12816,7 +12816,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-			//VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_sampler);
+			//VkResult res = vkCreateSampler(m_pDevice->m_device, &info, NULL, &m_sampler);
 			//assert(res == VK_SUCCESS);
 		}
 
@@ -12849,9 +12849,9 @@ namespace vkr {
 		for (int i = 0; i < s_descriptorBuffers; i++)
 			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
 
-		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 	}
 
 	void ColorConversionPS::UpdatePipelines(VkRenderPass renderPass, DisplayMode displayMode)
@@ -12898,7 +12898,7 @@ namespace vkr {
 		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
 
 		// modify Descriptor set
-		SetDescriptorSet(m_pDevice->GetDevice(), 1, HDRSRV, m_sampler, descriptorSet);
+		SetDescriptorSet(m_pDevice->m_device, 1, HDRSRV, m_sampler, descriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ColorConversionConsts), descriptorSet);
 
 		// Draw!
@@ -12944,13 +12944,13 @@ namespace vkr {
 			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
 			descriptor_layout.pBindings = layoutBindings.data();
 
-			VkResult res = vkCreateDescriptorSetLayout(pDevice->GetDevice(), &descriptor_layout, NULL, &m_descriptorSetLayout);
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->m_device, &descriptor_layout, NULL, &m_descriptorSetLayout);
 			assert(res == VK_SUCCESS);
 		}
 
 		// In Render pass
 		//
-		m_in = SimpleColorWriteRenderPass(pDevice->GetDevice(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		m_in = SimpleColorWriteRenderPass(pDevice->m_device, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
 
 		// The sampler we want to use for downsampling, all linear
@@ -12968,7 +12968,7 @@ namespace vkr {
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_sampler = pDevice->newSampler(&info);
-			//VkResult res = vkCreateSampler(pDevice->GetDevice(), &info, NULL, &m_sampler);
+			//VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_sampler);
 			//assert(res == VK_SUCCESS);
 		}
 
@@ -13022,7 +13022,7 @@ namespace vkr {
 			}
 			// Create and initialize the Descriptor Sets (all of them use the same Descriptor Layout)        
 			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(DownSamplePS::cbDownscale), m_mip[i].descriptorSet);
-			SetDescriptorSet(m_pDevice->GetDevice(), 1, m_mip[i].m_SRV, m_sampler, m_mip[i].descriptorSet);
+			SetDescriptorSet(m_pDevice->m_device, 1, m_mip[i].m_SRV, m_sampler, m_mip[i].descriptorSet);
 			// destination -----------
 			m_result.CreateRTV(&m_mip[i].RTV, i);
 			// Create framebuffer 
@@ -13037,13 +13037,13 @@ namespace vkr {
 				fb_info.width = m_Width >> (i + 1);
 				fb_info.height = m_Height >> (i + 1);
 				fb_info.layers = 1;
-				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &m_mip[i].frameBuffer);
+				VkResult res = vkCreateFramebuffer(m_pDevice->m_device, &fb_info, NULL, &m_mip[i].frameBuffer);
 				assert(res == VK_SUCCESS);
 
 				std::string ResourceName = "DownsamplePS";
 				ResourceName += std::to_string(i);
 
-				SetResourceName(m_pDevice->GetDevice(), VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].frameBuffer, ResourceName.c_str());
+				SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].frameBuffer, ResourceName.c_str());
 			}
 		}
 	}
@@ -13052,9 +13052,9 @@ namespace vkr {
 	{
 		for (int i = 0; i < m_mipCount; i++)
 		{
-			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].m_SRV, NULL);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_mip[i].RTV, NULL);
-			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_mip[i].frameBuffer, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_mip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->m_device, m_mip[i].RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->m_device, m_mip[i].frameBuffer, NULL);
 		}
 
 		m_result.OnDestroy();
@@ -13068,10 +13068,10 @@ namespace vkr {
 		}
 
 		m_downscale.OnDestroy();
-		vkDestroyDescriptorSetLayout(m_pDevice->GetDevice(), m_descriptorSetLayout, NULL);
-		vkDestroySampler(m_pDevice->GetDevice(), m_sampler, nullptr);
+		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
+		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
-		vkDestroyRenderPass(m_pDevice->GetDevice(), m_in, NULL);
+		vkDestroyRenderPass(m_pDevice->m_device, m_in, NULL);
 	}
 
 	void DownSamplePS::Draw(VkCommandBuffer cmd_buf)
@@ -14950,7 +14950,7 @@ namespace vkr {
 	//
 	void DestroyShaderCache(Device* pDevice)
 	{
-		DestroyShadersInTheCache(pDevice->GetDevice());
+		DestroyShadersInTheCache(pDevice->m_device);
 	}
 #endif // 1
 	// misc
@@ -14961,10 +14961,10 @@ namespace vkr {
 //
 	double MillisecondsNow()
 	{
+		double milliseconds = 0;
+#ifdef _WIN32
 		static LARGE_INTEGER s_frequency;
 		static BOOL s_use_qpc = QueryPerformanceFrequency(&s_frequency);
-		double milliseconds = 0;
-
 		if (s_use_qpc)
 		{
 			LARGE_INTEGER now;
@@ -14975,7 +14975,7 @@ namespace vkr {
 		{
 			milliseconds = double(GetTickCount());
 		}
-
+#endif
 		return milliseconds;
 	}
 
@@ -17143,7 +17143,7 @@ namespace vkr {
 		, size_t size, VkBuffer* buffer, VkDeviceMemory* memory, void* data, size_t* cap_size, void* _this)
 	{
 
-		auto device = dev->GetDevice();
+		auto device = dev->m_device;
 		// Create the buffer handle
 		VkBufferCreateInfo bufferCreateInfo = {};
 		bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -17215,7 +17215,7 @@ namespace vkr {
 		if (dev)
 		{
 			descriptor = new VkDescriptorBufferInfo();
-			device = dev->GetDevice();
+			device = dev->m_device;
 			create_buffer(dev, usage, (VkMemoryPropertyFlags)mempro, size, &buffer, &memory, data, &_capacity, this);
 		}
 	}
@@ -17377,7 +17377,7 @@ namespace vkr {
 			assert(_dev == devs);
 			return;
 		}
-		auto device = dev->GetDevice();
+		auto device = dev->m_device;
 		auto qctx = _dev->get_graphics_queue(1);
 		auto cp = qctx->new_cmd_pool();
 		auto copyQueue = qctx->get_vkptr();
@@ -17560,7 +17560,7 @@ namespace vkr {
 		range[0].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 		range[0].memory = _ubo->memory;
 		range[0].size = size;
-		res = vkFlushMappedMemoryRanges(dev->GetDevice(), 1, range);
+		res = vkFlushMappedMemoryRanges(dev->m_device, 1, range);
 		assert(res == VK_SUCCESS);
 	}
 
@@ -17644,7 +17644,7 @@ namespace vkr {
 
 	void dvk_staging_buffer::initBuffer(Device* dev, VkDeviceSize size)
 	{
-		_dev = dev->GetDevice();
+		_dev = dev->m_device;
 		if (bufferSize != size)
 		{
 			bufferSize = size;
@@ -17768,7 +17768,7 @@ namespace vkr {
 		assert(_dev);
 		ncap = size;
 		VkResult res;
-		auto device = dev->GetDevice();
+		auto device = dev->m_device;
 		db = new dynamic_buffer_cx(dev, size, false, true);
 		// 获取列队
 
@@ -17815,13 +17815,13 @@ namespace vkr {
 		//vkFreeMemory(_dev->device, _deviceMemory, NULL);
 		if (_commandPool && _pCommandBuffer)
 		{
-			vkFreeCommandBuffers(_dev->GetDevice(), _commandPool, 1, &_pCommandBuffer);
-			vkDestroyCommandPool(_dev->GetDevice(), _commandPool, NULL);
+			vkFreeCommandBuffers(_dev->m_device, _commandPool, 1, &_pCommandBuffer);
+			vkDestroyCommandPool(_dev->m_device, _commandPool, NULL);
 			_commandPool = {}; _pCommandBuffer = {};
 		}
 		if (_fence)
 		{
-			vkDestroyFence(_dev->GetDevice(), _fence, NULL);
+			vkDestroyFence(_dev->m_device, _fence, NULL);
 			_fence = {};
 		}
 	}
@@ -17982,10 +17982,10 @@ namespace vkr {
 			submit_info.pCommandBuffers = &_pCommandBuffer;
 			submit_info.signalSemaphoreCount = 0;
 			submit_info.pSignalSemaphores = NULL;
-			res = vkQueueSubmit(_dev->GetGraphicsQueue(), 1, &submit_info, _fence);
+			res = vkQueueSubmit(_dev->graphics_queue, 1, &submit_info, _fence);
 			assert(res == VK_SUCCESS);
-			vkWaitForFences(_dev->GetDevice(), 1, &_fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(_dev->GetDevice(), 1, &_fence);
+			vkWaitForFences(_dev->m_device, 1, &_fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(_dev->m_device, 1, &_fence);
 		}
 #endif
 
@@ -18558,7 +18558,7 @@ namespace vkr {
 				cmd_pool_info.queueFamilyIndex = pDevice->GetComputeQueueFamilyIndex();
 			}
 			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-			VkResult res = vkCreateCommandPool(pDevice->GetDevice(), &cmd_pool_info, NULL, &pCBPF->m_commandPool);
+			VkResult res = vkCreateCommandPool(pDevice->m_device, &cmd_pool_info, NULL, &pCBPF->m_commandPool);
 			assert(res == VK_SUCCESS);
 
 			// Create command buffers
@@ -18570,7 +18570,7 @@ namespace vkr {
 			cmd.commandPool = pCBPF->m_commandPool;
 			cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 			cmd.commandBufferCount = commandListsPerBackBuffer;
-			res = vkAllocateCommandBuffers(pDevice->GetDevice(), &cmd, pCBPF->m_pCommandBuffer);
+			res = vkAllocateCommandBuffers(pDevice->m_device, &cmd, pCBPF->m_pCommandBuffer);
 			assert(res == VK_SUCCESS);
 
 			pCBPF->m_UsedCls = 0;
@@ -18593,9 +18593,9 @@ namespace vkr {
 		//release and delete command allocators
 		for (uint32_t a = 0; a < m_numberOfAllocators; a++)
 		{
-			vkFreeCommandBuffers(m_pDevice->GetDevice(), m_pCommandBuffers[a].m_commandPool, m_commandListsPerBackBuffer, m_pCommandBuffers[a].m_pCommandBuffer);
+			vkFreeCommandBuffers(m_pDevice->m_device, m_pCommandBuffers[a].m_commandPool, m_commandListsPerBackBuffer, m_pCommandBuffers[a].m_pCommandBuffer);
 
-			vkDestroyCommandPool(m_pDevice->GetDevice(), m_pCommandBuffers[a].m_commandPool, NULL);
+			vkDestroyCommandPool(m_pDevice->m_device, m_pCommandBuffers[a].m_commandPool, NULL);
 		}
 
 		delete[] m_pCommandBuffers;
@@ -18726,7 +18726,7 @@ namespace vkr {
 		VkMemoryAllocateInfo memAlloc = {};
 		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		VkMemoryRequirements memReqs;
-		auto device = dev->GetDevice();
+		auto device = dev->m_device;
 #if 1
 		VkImage* image = &texture->_image;
 		VkDeviceMemory mem = texture->image_memory;
@@ -18897,7 +18897,7 @@ namespace vkr {
 			samplerinfo.maxLod = 1.0f;
 			samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 			if (!sampler)
-				createSampler(_dev->GetDevice(), &sampler, &samplerinfo);
+				createSampler(_dev->m_device, &sampler, &samplerinfo);
 			//VkFormatProperties phyStencilProps = { 0 }, phyImgProps[2] = {0};
 			////check png blit format
 			//VkFormat pngBlitFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_R8G8B8A8_UNORM };
@@ -18966,7 +18966,7 @@ namespace vkr {
 				}
 				if (!_fence)
 				{
-					_fence = createFence(_dev->GetDevice());
+					_fence = createFence(_dev->m_device);
 				}
 			}
 			else
@@ -19025,7 +19025,7 @@ namespace vkr {
 				fbufCreateInfo.width = width;
 				fbufCreateInfo.height = height;
 				fbufCreateInfo.layers = 1;
-				auto hr = vkCreateFramebuffer(_dev->GetDevice(), &fbufCreateInfo, nullptr, &it.framebuffer);
+				auto hr = vkCreateFramebuffer(_dev->m_device, &fbufCreateInfo, nullptr, &it.framebuffer);
 				// Fill a descriptor for later use in a descriptor set
 				it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				it.descriptor.imageView = it.color._view;
@@ -19048,7 +19048,7 @@ namespace vkr {
 				it.depth_stencil._dev = _dev;
 				if (it.semaphore == VK_NULL_HANDLE)
 				{
-					createSemaphore(_dev->GetDevice(), &it.semaphore, 0);
+					createSemaphore(_dev->m_device, &it.semaphore, 0);
 				}
 			}
 			if (isColor)
@@ -19098,7 +19098,7 @@ namespace vkr {
 			for (auto& it : framebuffers)
 			{
 				if (it.framebuffer)
-					vkDestroyFramebuffer(_dev->GetDevice(), it.framebuffer, 0);
+					vkDestroyFramebuffer(_dev->m_device, it.framebuffer, 0);
 				it.framebuffer = 0;
 			}
 		}
@@ -19196,7 +19196,7 @@ namespace vkr {
 		{
 			VkAttachmentDescription depthAttachments;
 			AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
-			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->GetDevice(), 0, NULL, &depthAttachments);
+			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->m_device, 0, NULL, &depthAttachments);
 		}
 
 		{
@@ -19271,7 +19271,7 @@ namespace vkr {
 		m_RenderPassFullGBuffer.OnDestroy();
 		m_GBuffer.OnDestroy();
 
-		vkDestroyRenderPass(m_pDevice->GetDevice(), m_Render_pass_shadow, nullptr);
+		vkDestroyRenderPass(m_pDevice->m_device, m_Render_pass_shadow, nullptr);
 		m_UploadHeap.OnDestroy();
 		m_GPUTimer.OnDestroy();
 		m_VidMemBufferPool.OnDestroy();
@@ -19544,9 +19544,9 @@ namespace vkr {
 		while (!m_shadowMapPool.empty())
 		{
 			m_shadowMapPool.back().ShadowMap.OnDestroy();
-			vkDestroyFramebuffer(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_ShadowSRVPool.back(), nullptr);
-			vkDestroyImageView(m_pDevice->GetDevice(), m_shadowMapPool.back().ShadowDSV, nullptr);
+			vkDestroyFramebuffer(m_pDevice->m_device, m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_ShadowSRVPool.back(), nullptr);
+			vkDestroyImageView(m_pDevice->m_device, m_shadowMapPool.back().ShadowDSV, nullptr);
 			m_ShadowSRVPool.pop_back();
 			m_shadowMapPool.pop_back();
 		}
@@ -19593,7 +19593,7 @@ namespace vkr {
 				fb_info.width = CurrentShadow->ShadowResolution;
 				fb_info.height = CurrentShadow->ShadowResolution;
 				fb_info.layers = 1;
-				VkResult res = vkCreateFramebuffer(m_pDevice->GetDevice(), &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
+				VkResult res = vkCreateFramebuffer(m_pDevice->m_device, &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
 				assert(res == VK_SUCCESS);
 			}
 			VkImageView ShadowSRV;
@@ -20323,8 +20323,7 @@ namespace vkr {
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "Magnifier");
 
 		}
-#endif
-#if 1
+#endif 
 		// Start tracking input/output resources at this point to handle HDR and SDR render paths 
 		VkImage      ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer.m_HDR.Resource();
 		VkImageView  SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer.m_HDRSRV;
@@ -20430,116 +20429,81 @@ namespace vkr {
 			submit_info.pCommandBuffers = &cmdBuf1;
 			submit_info.signalSemaphoreCount = 1;
 			submit_info.pSignalSemaphores = &_fbo.sem;	// 完成发信号
-			res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info, 0);
+			res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info, 0);
 			assert(res == VK_SUCCESS);
 
 		}
+		m_CommandListRing.OnBeginFrame();
+		VkCommandBuffer cmdBuf2 = m_CommandListRing.GetNewCommandList();
 		{
-			vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(m_pDevice->GetDevice(), 1, &_fbo.fence);
-			// Wait for swapchain (we are going to render to it) -----------------------------------
-			//int imageIndex = pSwapChain->WaitForSwapChain();
-			// Keep tracking input/output resource views 
-			auto ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer.m_HDR.Resource(); // these haven't changed, re-assign as sanity check
-			auto SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer.m_HDRSRV;         // these haven't changed, re-assign as sanity check
+			VkCommandBufferBeginInfo cmd_buf_info;
+			cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			cmd_buf_info.pNext = NULL;
+			cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			cmd_buf_info.pInheritanceInfo = NULL;
+			VkResult res = vkBeginCommandBuffer(cmdBuf2, &cmd_buf_info);
 
-			m_CommandListRing.OnBeginFrame();
-
-			VkCommandBuffer cmdBuf2 = m_CommandListRing.GetNewCommandList();
-
-			{
-				VkCommandBufferBeginInfo cmd_buf_info;
-				cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-				cmd_buf_info.pNext = NULL;
-				cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-				cmd_buf_info.pInheritanceInfo = NULL;
-				VkResult res = vkBeginCommandBuffer(cmdBuf2, &cmd_buf_info);
-				assert(res == VK_SUCCESS);
-			}
-
+			assert(res == VK_SUCCESS);
+			// prepare render pass		
 			SetPerfMarkerBegin(cmdBuf2, "Swapchain RenderPass");
-
-			// prepare render pass
-			{
-				VkRenderPassBeginInfo rp_begin = {};
-				rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				rp_begin.pNext = NULL;
-				rp_begin.renderPass = _fbo.renderPass;
-				rp_begin.framebuffer = _fbo.framebuffer;
-				rp_begin.renderArea.offset.x = 0;
-				rp_begin.renderArea.offset.y = 0;
-				rp_begin.renderArea.extent.width = m_Width;
-				rp_begin.renderArea.extent.height = m_Height;
-				VkClearValue clearValues[2] = {};
-				clearValues->color = { 0.0f, 0.0f, 0.0f, 0.0f };
-				clearValues[1].depthStencil = { 1.0f, 0 };
-				rp_begin.clearValueCount = 2;
-				rp_begin.pClearValues = clearValues;
-				vkCmdBeginRenderPass(cmdBuf2, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-			}
-
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = _fbo.renderPass;
+			rp_begin.framebuffer = _fbo.framebuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width;
+			rp_begin.renderArea.extent.height = m_Height;
+			VkClearValue clearValues[2] = {};
+			clearValues->color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			clearValues[1].depthStencil = { 1.0f, 0 };
+			rp_begin.clearValueCount = 2;
+			rp_begin.pClearValues = clearValues;
+			vkCmdBeginRenderPass(cmdBuf2, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdSetScissor(cmdBuf2, 0, 1, &m_RectScissor);
 			vkCmdSetViewport(cmdBuf2, 0, 1, &m_Viewport);
-
 			if (bHDR)
 			{
 				m_ColorConversionPS.Draw(cmdBuf2, SRVCurrentInput);
 				m_GPUTimer.GetTimeStamp(cmdBuf2, "Color Conversion");
 			}
-
-			// For SDR pipeline, we apply the tonemapping and then draw the GUI and skip the color conversion
 			else
 			{
-				// Tonemapping ------------------------------------------------------------------------
-				{
-					m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex);
-					m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
-				}
-
-				// Render HUD  -------------------------------------------------------------------------
-				{
-					//m_ImGUI.Draw(cmdBuf2);
-					//m_GPUTimer.GetTimeStamp(cmdBuf2, "ImGUI Rendering");
-				}
+				// For SDR pipeline, we apply the tonemapping and then draw the GUI and skip the color conversion
+				// 对于 SDR 流水线，我们先应用色调映射，然后绘制 GUI 并跳过颜色转换
+				// Tonemapping ------------------------------------------------------------------------ 
+				m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex);
+				m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
 			}
-
-
+			// Render HUD  -------------------------------------------------------------------------
+			{
+				//guiDraw(cmdBuf2);
+				//m_GPUTimer.GetTimeStamp(cmdBuf2, "GUI Rendering");
+			}
 			SetPerfMarkerEnd(cmdBuf2);
-
 			m_GPUTimer.OnEndFrame();
 			vkCmdEndRenderPass(cmdBuf2);
+			res = vkEndCommandBuffer(cmdBuf2);
 
-			// Close & Submit the command list ----------------------------------------------------
-			{
-				VkResult res = vkEndCommandBuffer(cmdBuf2);
-				assert(res == VK_SUCCESS);
-
-				VkSemaphore ImageAvailableSemaphore;
-				VkSemaphore RenderFinishedSemaphores;
-
-				VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;//
-				VkSubmitInfo submit_info2;
-				submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-				submit_info2.pNext = NULL;
-				submit_info2.waitSemaphoreCount = 1;
-				submit_info2.pWaitSemaphores = &_fbo.sem;	// 收到信号再执行 
-				submit_info2.pWaitDstStageMask = &submitWaitStage;
-				submit_info2.commandBufferCount = 1;
-				submit_info2.pCommandBuffers = &cmdBuf2;
-				submit_info2.signalSemaphoreCount = 0;
-				submit_info2.pSignalSemaphores = 0;// todo 渲染完成信号，这里直接WaitForFence
-
-				{
-					//print_time a("qsubmit");
-					res = vkQueueSubmit(m_pDevice->GetGraphicsQueue(), 1, &submit_info2, _fbo.fence);
-					assert(res == VK_SUCCESS);
-					vkWaitForFences(m_pDevice->GetDevice(), 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-
-				}
-			}
+			assert(res == VK_SUCCESS);
+			VkSemaphore ImageAvailableSemaphore;
+			VkSemaphore RenderFinishedSemaphores;
+			VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;	//等待所有gpu操作
+			VkSubmitInfo submit_info2;
+			submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit_info2.pNext = NULL;
+			submit_info2.waitSemaphoreCount = 1;
+			submit_info2.pWaitSemaphores = &_fbo.sem;			// 等待3D场景渲染完成信号再执行 
+			submit_info2.pWaitDstStageMask = &submitWaitStage;
+			submit_info2.commandBufferCount = 1;
+			submit_info2.pCommandBuffers = &cmdBuf2;
+			submit_info2.signalSemaphoreCount = 0;
+			submit_info2.pSignalSemaphores = 0;					// todo 渲染完成信号，SDL3默认渲染器不支持接入外部信号，所有这里直接WaitForFence
+			res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, _fbo.fence);
+			assert(res == VK_SUCCESS);
+			vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
 		}
-#endif
-		//printf("OnRender end\t\thdr\t%p\n", m_GBuffer.m_HDR.Resource());
 	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
 	{
@@ -20739,11 +20703,11 @@ namespace vkr {
 
 #endif //1
 
-	class sample_cx
+	class draw3d_ctx
 	{
 	public:
-		sample_cx();
-		~sample_cx();
+		draw3d_ctx();
+		~draw3d_ctx();
 		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
 		void OnCreate();
 		void OnDestroy();
@@ -20751,7 +20715,6 @@ namespace vkr {
 		void OnResize(bool resizeRender);
 		void OnUpdateDisplay();
 
-		void BeginFrame();
 		void add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap);
 
 		void OnUpdate();
@@ -20768,9 +20731,7 @@ namespace vkr {
 		int curridx = 0;
 		int setidx = 0;
 		fbo_info_cx* _fbo = 0;
-		// Simulation management
-		double  m_lastFrameTime = 0.0;
-		double  m_deltaTime = 0.0;
+
 		GLTFCommon* _tmpgc = 0;
 		std::vector<GLTFCommon*> _loaders;
 		std::queue<GLTFCommon*> _lts;
@@ -20785,7 +20746,7 @@ namespace vkr {
 		CameraX tpfc = {};
 
 		mouse_state_t io = {};
-		float m_time = 0; // Time accumulator in seconds, used for animation.
+		double _time = 0; // Time accumulator in seconds, used for animation.
 
 		SystemInfo systemi = {};
 		// njson config file
@@ -20811,13 +20772,13 @@ namespace vkr {
 
 
 #if 1
-	sample_cx::sample_cx()
+	draw3d_ctx::draw3d_ctx()
 	{
-		m_time = 0;
+		_time = 0;
 		m_bPlay = true;
 
 	}
-	sample_cx::~sample_cx() {
+	draw3d_ctx::~draw3d_ctx() {
 		if (_fbo)delete _fbo; _fbo = 0;
 	}
 	//--------------------------------------------------------------------------------------
@@ -20825,7 +20786,7 @@ namespace vkr {
 	// OnParseCommandLine
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight)
+	void draw3d_ctx::OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight)
 	{
 		// set some default values
 		if (pWidth)
@@ -20850,7 +20811,7 @@ namespace vkr {
 		addAttachment(format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
 		if (is_depth_tex(depth_format))
 			addAttachment(depth_format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, &depthAttachment);
-		return CreateRenderPassOptimal(pDevice->GetDevice(), colorAttanchmentCount, colorAttachments, &depthAttachment);
+		return CreateRenderPassOptimal(pDevice->m_device, colorAttanchmentCount, colorAttachments, &depthAttachment);
 		// color RT
 		VkAttachmentDescription attachments[1];
 		attachments[0].format = format;
@@ -20896,7 +20857,7 @@ namespace vkr {
 		rp_info.dependencyCount = 1;
 		rp_info.pDependencies = &dep;
 		VkRenderPass m_render_pass_swap_chain = {};
-		VkResult res = vkCreateRenderPass(pDevice->GetDevice(), &rp_info, NULL, &m_render_pass_swap_chain);
+		VkResult res = vkCreateRenderPass(pDevice->m_device, &rp_info, NULL, &m_render_pass_swap_chain);
 		assert(res == VK_SUCCESS);
 		return m_render_pass_swap_chain;
 	}
@@ -20905,7 +20866,7 @@ namespace vkr {
 	{
 		if (rp != VK_NULL_HANDLE)
 		{
-			vkDestroyRenderPass(pDevice->GetDevice(), rp, nullptr);
+			vkDestroyRenderPass(pDevice->m_device, rp, nullptr);
 		}
 	}
 
@@ -20915,7 +20876,7 @@ namespace vkr {
 	// OnCreate
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnCreate()
+	void draw3d_ctx::OnCreate()
 	{
 		// Init the shader compiler
 		InitDirectXCompiler();
@@ -20989,7 +20950,7 @@ namespace vkr {
 	// OnDestroy
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnDestroy()
+	void draw3d_ctx::OnDestroy()
 	{
 		//ImGUI_Shutdown();
 
@@ -21017,7 +20978,7 @@ namespace vkr {
 	// OnResize
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnResize(bool resizeRender)
+	void draw3d_ctx::OnResize(bool resizeRender)
 	{
 		// destroy resources (if we are not minimized)
 		if (resizeRender && m_Width && m_Height && m_pRenderer)
@@ -21040,7 +21001,7 @@ namespace vkr {
 	// UpdateDisplay
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnUpdateDisplay()
+	void draw3d_ctx::OnUpdateDisplay()
 	{
 		// Destroy resources (if we are not minimized)
 		if (m_pRenderer)
@@ -21054,7 +21015,7 @@ namespace vkr {
 	// add_model
 	// TODO 加载模型文件
 	//--------------------------------------------------------------------------------------
-	void sample_cx::add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
+	void draw3d_ctx::add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
 	{
 		//print_time Pt("push gltf", 1);
 		std::thread a([=]()
@@ -21090,7 +21051,7 @@ namespace vkr {
 	// OnUpdate
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnUpdate()
+	void draw3d_ctx::OnUpdate()
 	{
 		if (bShowProfilerWindow)
 		{
@@ -21134,20 +21095,7 @@ namespace vkr {
 			_tlabs.push_back(txtGPU);
 			_tlabs.push_back(txtCPU);
 			_tlabs.push_back(txtFPS);
-			//if (ImGui::CollapsingHeader("GPU Timings", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				//std::string msOrUsButtonText = m_UIState.bShowMilliseconds ? "Switch to microseconds(us)" : "Switch to milliseconds(ms)";
-				//if (ImGui::Button(msOrUsButtonText.c_str())) {
-				//	m_UIState.bShowMilliseconds = !m_UIState.bShowMilliseconds;
-				//}
-				//
-
-				//if (m_isCpuValidationLayerEnabled || m_isGpuValidationLayerEnabled)
-				//{
-					//std::string txt=std::formatColored(ImVec4(1, 1, 0, 1), "WARNING: Validation layer is switched on");
-					//std::string txt=format("Performance numbers may be inaccurate!");
-				//}
-
 				// find the index of the FrameTimeGraphMaxValue as the next higher-than-recent-highest-frame-time in the pre-determined value list
 				size_t iFrameTimeGraphMaxValue = 0;
 				for (uint64_t i = 0; i < _countof(FRAME_TIME_GRAPH_MAX_VALUES); ++i)
@@ -21159,7 +21107,6 @@ namespace vkr {
 					}
 				}
 				//ImGui::PlotLines("", FRAME_TIME_ARRAY, NUM_FRAMES, 0, "GPU frame time (us)", 0.0f, FRAME_TIME_GRAPH_MAX_VALUES[iFrameTimeGraphMaxValue], ImVec2(0, 80));
-
 				_tlabs.push_back("GPU Timings");
 				for (uint32_t i = 0; i < timeStamps.size(); i++)
 				{
@@ -21177,8 +21124,6 @@ namespace vkr {
 				}
 			}
 		}
-		////If the mouse was not used by the GUI then it's for the camera
-		////
 		if (io.WantCaptureMouse)
 		{
 			io.MouseDelta.x = 0;
@@ -21201,20 +21146,20 @@ namespace vkr {
 
 		// Animation Update
 		if (m_bPlay)
-			m_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
+			_time += io.DeltaTime;// (float)m_deltaTime / 1000.0f; // animation time in seconds
 
 		int i = 0;
 		static float speed = 1.0;
 		for (auto it : _loaders)
 		{
 			auto n = it->get_animation_count();
-			it->update(m_time * speed);
+			it->update(_time * speed);
 			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::mat4(1.0f), glm::vec3(it->_scale));
 			it->TransformScene(0, m);
 		}
 	}
 
-	void sample_cx::HandleInput()
+	void draw3d_ctx::HandleInput()
 	{
 #if 0
 		auto fnIsKeyTriggered = [&io](char key) { return io.KeysDown[key] && io.KeysDownDuration[key] == 0.0f; };
@@ -21277,7 +21222,7 @@ namespace vkr {
 
 		return glm::vec4(x, y, z, t);
 	}
-	void sample_cx::UpdateCamera(Camera& cam)
+	void draw3d_ctx::UpdateCamera(Camera& cam)
 	{
 		float yaw = cam.GetYaw();
 		float pitch = cam.GetPitch();
@@ -21362,31 +21307,18 @@ namespace vkr {
 		}
 	}
 
-	void sample_cx::set_fboidx(int idx)
+	void draw3d_ctx::set_fboidx(int idx)
 	{
 		setidx = idx;
 	}
 
-	void sample_cx::BeginFrame()
-	{
-		// Get timings
-		double timeNow = MillisecondsNow();
-		m_deltaTime = (float)(timeNow - m_lastFrameTime);
-		m_lastFrameTime = timeNow;
-		io.DeltaTime;// = m_deltaTime;
-
-
-	}
 	//--------------------------------------------------------------------------------------
 	//
 	// OnRender, updates the state from the UI, animates, transforms and renders the scene
 	//
 	//--------------------------------------------------------------------------------------
-	void sample_cx::OnRender()
+	void draw3d_ctx::OnRender()
 	{
-		// Do any start of frame necessities
-		BeginFrame();
-
 		if (_lts.size() || _tmpgc)
 		{
 			// the scene loads in chuncks, that way we can show a progress bar 
@@ -21408,8 +21340,6 @@ namespace vkr {
 			curridx = setidx;
 			m_pRenderer->set_fbo(_fbo, curridx);
 		}
-		// Framework will handle Present and some other end of frame logic
-		//EndFrame();
 	}
 #endif
 
@@ -21452,9 +21382,9 @@ namespace vkr {
 	}
 	void pipeinfo_cx::freeobj()
 	{
-		vkDestroyPipeline(pDevice->GetDevice(), m_pipeline, nullptr);
-		vkDestroyPipelineLayout(pDevice->GetDevice(), m_pipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(pDevice->GetDevice(), m_descriptorSetLayout, NULL);
+		vkDestroyPipeline(pDevice->m_device, m_pipeline, nullptr);
+		vkDestroyPipelineLayout(pDevice->m_device, m_pipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(pDevice->m_device, m_descriptorSetLayout, NULL);
 		for (auto it : dset)
 		{
 			if (it)
@@ -21472,22 +21402,22 @@ namespace vkr {
 		VkPipelineShaderStageCreateInfo m_vertexShader, m_fragmentShader;
 		if (has_fh(vertexShader, '='))
 		{
-			res = VKCompileFromString(pDevice->GetDevice(), SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+			res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 			assert(res == VK_SUCCESS);
 		}
 		else
 		{
-			res = VKCompileFromFile(pDevice->GetDevice(), VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+			res = VKCompileFromFile(pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 			assert(res == VK_SUCCESS);
 		}
 		if (has_fh(pixelShader, '='))
 		{
-			res = VKCompileFromString(pDevice->GetDevice(), SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+			res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 			assert(res == VK_SUCCESS);
 		}
 		else
 		{
-			res = VKCompileFromFile(pDevice->GetDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+			res = VKCompileFromFile(pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 			assert(res == VK_SUCCESS);
 		}
 
@@ -21528,7 +21458,7 @@ namespace vkr {
 		pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)1;
 		pPipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
 
-		auto res = vkCreatePipelineLayout(pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
+		auto res = vkCreatePipelineLayout(pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
 		assert(res == VK_SUCCESS);
 
 		/////////////////////////////////////////////
@@ -21696,9 +21626,9 @@ namespace vkr {
 		pipeline.renderPass = renderPass;
 		pipeline.subpass = 0;
 
-		res = vkCreateGraphicsPipelines(pDevice->GetDevice(), pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
+		res = vkCreateGraphicsPipelines(pDevice->m_device, pDevice->GetPipelineCache(), 1, &pipeline, NULL, &m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_pipeline, "Wireframe P");
+		SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)m_pipeline, "Wireframe P");
 
 	}
 
@@ -21725,14 +21655,14 @@ void vkdg_cx::set_label_cb(std::function<void(int count, int idx, const char* st
 {
 	if (ctx)
 	{
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		tx->cb_showtxt = cb;
 	}
 }
 void vkdg_cx::update(mouse_state_t* io)
 {
 	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		tx->io = *io;
 		{
 			io->MouseDelta.x = 0;
@@ -21746,7 +21676,7 @@ void vkdg_cx::update(mouse_state_t* io)
 void vkdg_cx::on_render()
 {
 	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		tx->OnRender();
 
 	}
@@ -21756,7 +21686,7 @@ image_vkr vkdg_cx::get_vkimage(int idx)
 {
 	image_vkr r = {};
 	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
 			r.vkimage = tx->_fbo->framebuffers[idx].color._image;
 			r.size = { tx->_fbo->framebuffers[idx].color.width,tx->_fbo->framebuffers[idx].color.height };
@@ -21786,7 +21716,7 @@ image_vkr vkdg_cx::get_vkimage(int idx)
 //}
 void vkdg_cx::resize(int w, int h) {
 	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		if (w > 0 && h > 0 && (w != tx->m_Width || h != tx->m_Height)) {
 			tx->m_Width = w;
 			tx->m_Height = h;
@@ -21804,7 +21734,7 @@ void vkdg_cx::save_fbo(int idx)
 			q->init((vkr::Device*)dev, width * height * 6, 0);
 			qupload = q;
 		}
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
 			auto ptex = &tx->_fbo->framebuffers[idx].color;
 			dt.resize(width * height);
@@ -21846,7 +21776,7 @@ void get_tex_buffer(vkr::Texture* tex, char* outbuf, vkr::upload_cx* q)//, dvk_q
 image_dr vkdg_cx::save_shadow(int idx)
 {
 	if (!ctx) return {};
-	auto tx = (vkr::sample_cx*)ctx;
+	auto tx = (vkr::draw3d_ctx*)ctx;
 	auto& smp = tx->m_pRenderer->m_shadowMapPool;
 	auto& m = smp[idx];
 
@@ -21877,7 +21807,7 @@ void vkdg_cx::copy2(int idx, void* vkptr)
 			q->init((vkr::Device*)dev, width * height * 6, 0);
 			qupload = q;
 		}
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		if (tx->_fbo && tx->_fbo->framebuffers.size() > idx) {
 			auto ptex = &tx->_fbo->framebuffers[idx].color;
 			ptex->copy2image((VkImage)vkptr, q);
@@ -21897,7 +21827,7 @@ void vkdg_cx::copy2(int idx, void* vkptr)
 void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
 {
 	if (!ctx || !fn)return;
-	auto tx = (vkr::sample_cx*)ctx;
+	auto tx = (vkr::draw3d_ctx*)ctx;
 	tx->add_model(fn, pos, scale, has_shadowMap);
 }
 
@@ -21905,7 +21835,7 @@ vkr::light_t* vkdg_cx::get_light(size_t idx)
 {
 	vkr::light_t* p = 0;
 	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		if (tx->m_pRenderer)
 			p = tx->m_pRenderer->get_light(idx);
 	}
@@ -21915,7 +21845,7 @@ size_t vkdg_cx::get_light_size()
 {
 	size_t c = 0;
 	if (ctx) {
-		auto tx = (vkr::sample_cx*)ctx;
+		auto tx = (vkr::draw3d_ctx*)ctx;
 		if (tx->m_pRenderer)
 			c = tx->m_pRenderer->get_light_size();
 	}
@@ -21988,7 +21918,7 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 		m_systemInfo.mGfxAPI = "Vulkan";
 		p->_dev_info = c[0];
 		p->dev = dev;
-		auto tx = new vkr::sample_cx();
+		auto tx = new vkr::draw3d_ctx();
 		tx->m_device = dev;
 		tx->systemi = m_systemInfo;
 		tx->OnParseCommandLine(0, 0, 0);
@@ -22163,11 +22093,11 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	vkr::DefineList attributeDefines;
 
 	VkPipelineShaderStageCreateInfo m_vertexShader;
-	res = VKCompileFromString(pDevice->GetDevice(), vkr::SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+	res = VKCompileFromString(pDevice->m_device, vkr::SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 	assert(res == VK_SUCCESS);
 
 	VkPipelineShaderStageCreateInfo m_fragmentShader;
-	res = VKCompileFromString(pDevice->GetDevice(), vkr::SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+	res = VKCompileFromString(pDevice->m_device, vkr::SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 	assert(res == VK_SUCCESS);
 
 	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { m_vertexShader, m_fragmentShader };
@@ -22199,7 +22129,7 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)1;
 	pPipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
 
-	res = vkCreatePipelineLayout(pDevice->GetDevice(), &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
+	res = vkCreatePipelineLayout(pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &m_pipelineLayout);
 	assert(res == VK_SUCCESS);
 
 	/////////////////////////////////////////////
@@ -22357,9 +22287,9 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	pipeline.renderPass = renderPass;
 	pipeline.subpass = 0;
 
-	res = vkCreateGraphicsPipelines(pDevice->GetDevice(), pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pipe);
+	res = vkCreateGraphicsPipelines(pDevice->m_device, pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pipe);
 	assert(res == VK_SUCCESS);
-	vkr::SetResourceName(pDevice->GetDevice(), VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipe, "Wireframe P");
+	vkr::SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipe, "Wireframe P");
 }
 uint32_t gray_float_to_rgba(float gray)
 {
@@ -22621,7 +22551,7 @@ uint64_t vkr_get_ticks() {
 	return ms;
 }
 
-void vkrender_test()
+void vkrender_test0()
 {
 	auto inst = new_instance();
 	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
