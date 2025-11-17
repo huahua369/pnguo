@@ -1,4 +1,5 @@
 ﻿/*
+--------------------------------------------------------------------------------------------------------------
 vk渲染器
 
 创建日期：2024-07-16
@@ -11,8 +12,19 @@ vk渲染流程:
 	4.更新ubo、纹理、vbo等资源
 	5.渲染命令
 	6.提交列队
+--------------------------------------------------------------------------------------------------------------
+2D渲染：
+	底层：三角形数据、纹理、混合模式
+	前端：纹理、矩形数据、其他参数
+	gui：矢量图、文本、位图
+		 矢量图渲染到msaa纹理，再跟位图/文本纹理一起推送到SDL渲染
+	控件：flex布局
+3D渲染：
+	场景管理：json
+	对象：gltf/glb
+	控制：transform、参数控制
 
-
+--------------------------------------------------------------------------------------------------------------
  todo 变形动画实现：
   "targets": [
 	 {
@@ -66,6 +78,7 @@ if(KHR_materials_transmission透明介质透射材质){
 渲染透明介质透射transmissionDrawables 需要opaqueRenderTexture纹理
 渲染透明物体transparentDrawables
 
+--------------------------------------------------------------------------------------------------------------
 */
 
 
@@ -17085,6 +17098,10 @@ namespace vkr {
 		PerFrame_t _perFrameData;
 
 		fbo_cxt _fbo = {};
+		// VkCommandBuffer
+		void(*hubDraw)(void* commandBuffer) = nullptr;
+
+
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		bool bHDR = false;
 		bool m_bMagResourceReInit = false;
@@ -20477,9 +20494,10 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
 			}
 			// Render HUD  -------------------------------------------------------------------------
+			if(hubDraw)
 			{
-				//guiDraw(cmdBuf2);
-				//m_GPUTimer.GetTimeStamp(cmdBuf2, "GUI Rendering");
+				hubDraw(cmdBuf2);
+				m_GPUTimer.GetTimeStamp(cmdBuf2, "HUB Rendering");
 			}
 			SetPerfMarkerEnd(cmdBuf2);
 			m_GPUTimer.OnEndFrame();
