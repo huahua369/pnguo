@@ -785,6 +785,7 @@ void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count
 				k->parent = fitem + it->parent;
 				k->parent->item_add(k);
 			}
+			k->baseline = it->baseline;
 			k->width = it->size.x; k->height = it->size.y;
 			k->left = it->offset.x; k->top = it->offset.y;
 			k->right = it->offset.z; k->bottom = it->offset.w;

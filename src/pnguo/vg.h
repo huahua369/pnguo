@@ -255,6 +255,7 @@ struct node_dt
 	glm::vec4 offset;	// in偏移位置
 	glm::vec4 frame;	// out输出位置大小
 	size_t index = 0;	// 样式序号
+	float baseline = 0.0; // 基线位置
 	node_dt* child = 0;
 	size_t child_count = 0;
 	size_t parent = -1;	// 自动计算父节点索引
