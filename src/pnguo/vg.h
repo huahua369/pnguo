@@ -187,9 +187,7 @@ typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
 	FLEX_ALIGN_SPACE_AROUND,	//分散居中,两端间隔0.5，中间间隔1
 	FLEX_ALIGN_SPACE_EVENLY,	//分散居中,每个间隔1
 */
-#ifndef NO_FLEX_CX
 #ifdef __cplusplus
-
 enum class flex_align :uint8_t {
 	ALIGN_AUTO = 0,
 	ALIGN_STRETCH,
@@ -264,7 +262,6 @@ struct node_dt
 // 输入样式数据，根节点指针，所有节点数量
 void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
 
-#endif // NO_FLEX_CX
 
 #endif // !VG_H
 

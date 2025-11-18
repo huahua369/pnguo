@@ -27,8 +27,7 @@ public:
 public:
 	flex_item();
 	~flex_item();
-	// 复制除宽高偏移以外的属性
-	void copy_a(flex_item* p);
+
 	flex_item* init();
 	void update_should_order_children();	// 子元素属性改变时执行
 
@@ -63,15 +62,6 @@ void flex_item::update_should_order_children()
 	if (order != 0 && parent != NULL) {
 		parent->should_order_children = true;
 	}
-}
-
-
-void flex_item::copy_a(flex_item* p)
-{
-	auto d0 = (char*)&padding_left;
-	auto d1 = (char*)&managed_ptr;
-	auto d2 = (char*)&p->padding_left;
-	memcpy(d0, d2, d1 - d0);
 }
 
 flex_item* flex_item::init()
