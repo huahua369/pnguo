@@ -176,9 +176,6 @@ typedef void (*vg_draw_cmd_fun)(void* ctx, uint8_t* cmds, size_t count, void* da
 typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
 
 
-#ifdef __cplusplus
-
-#ifndef NO_FLEX_CX
 /*
 	根元素要求
 	assert(parent == NULL);
@@ -190,6 +187,9 @@ typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
 	FLEX_ALIGN_SPACE_AROUND,	//分散居中,两端间隔0.5，中间间隔1
 	FLEX_ALIGN_SPACE_EVENLY,	//分散居中,每个间隔1
 */
+#ifndef NO_FLEX_CX
+#ifdef __cplusplus
+
 enum class flex_align :uint8_t {
 	ALIGN_AUTO = 0,
 	ALIGN_STRETCH,
@@ -219,25 +219,23 @@ enum class flex_wrap :uint8_t {
 	WRAP,
 	WRAP_REVERSE
 };
+#else
+typedef uint8_t flex_align;
+typedef uint8_t flex_position;
+typedef uint8_t flex_direction;
+typedef uint8_t flex_wrap;
+#endif // __cplusplus
 struct flex_data {
-	float width = NAN;
-	float height = NAN;
-
-	float left = NAN;			// 左偏移坐标
-	float right = NAN;
-	float top = NAN;
-	float bottom = NAN;
-
+	float width = NAN, height = NAN;	// 大小
+	float left = NAN, right = NAN, top = NAN, bottom = NAN;	// 偏移
 	float padding_left = 0;		// 本元素内边距
 	float padding_right = 0;
 	float padding_top = 0;
 	float padding_bottom = 0;
-
 	float margin_left = 0;		// 本元素外边距
 	float margin_right = 0;
 	float margin_top = 0;
 	float margin_bottom = 0;
-
 	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
 	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
 	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
@@ -247,19 +245,26 @@ struct flex_data {
 	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\space-evenly\stretch 
 	flex_align align_items = flex_align::ALIGN_STRETCH;		// 父元素:副轴上的元素的排列方式 start\end\center\stretch\baseline
 	flex_align align_self = flex_align::ALIGN_AUTO;			// 子元素:覆盖父容器align-items的设置
-
 	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
 	flex_direction direction = flex_direction::ROW;			// 父元素:
 	flex_wrap wrap = flex_wrap::WRAP;						// 父元素:是否换行，超出宽度自动换行
-
 	bool should_order_children = false;
 };
 
+struct node_dt
+{
+	glm::vec2 size;		// in原大小
+	glm::vec4 offset;	// in偏移位置
+	glm::vec4 frame;	// out输出位置大小
+	size_t index = 0;	// 样式序号
+	node_dt* child = 0;
+	size_t child_count = 0;
+	size_t parent = -1;	// 自动计算父节点索引
+};
+// 输入样式数据，根节点指针，所有节点数量
+void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
+
 #endif // NO_FLEX_CX
-
-
-
-#endif // __cplusplus
 
 #endif // !VG_H
 

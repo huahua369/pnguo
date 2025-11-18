@@ -26,8 +26,8 @@ public:
 	std::vector<char> temp_layout;
 public:
 	flex_item();
-	~flex_item(); 
-	// 复制除宽高外的属性
+	~flex_item();
+	// 复制除宽高偏移以外的属性
 	void copy_a(flex_item* p);
 	flex_item* init();
 	void update_should_order_children();	// 子元素属性改变时执行
@@ -65,12 +65,12 @@ void flex_item::update_should_order_children()
 	}
 }
 
- 
+
 void flex_item::copy_a(flex_item* p)
 {
-	auto d0 = (char*)&left;
+	auto d0 = (char*)&padding_left;
 	auto d1 = (char*)&managed_ptr;
-	auto d2 = (char*)&p->left;
+	auto d2 = (char*)&p->padding_left;
 	memcpy(d0, d2, d1 - d0);
 }
 
@@ -765,5 +765,56 @@ void flex_item::layout()
 	assert(self_sizing == NULL);
 	layout_item(width, height);
 }
-
+void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count)
+{
+	if (!fd || count == 0 || !p || !node_count || !p->child || !p->child_count)
+		return;
+	auto fitem = new flex_item[node_count];
+	if (!fitem) return;
+	for (size_t i = 0; i < node_count; i++) {
+		fitem[i].init();
+	}
+	size_t idx = 0;
+	std::stack<node_dt*> q;  // 队列存储待处理坐标 	 
+	q.push(p);
+	while (q.size()) {
+		auto it = q.top(); q.pop();
+		if (it)
+		{
+			auto k = &fitem[idx];
+			if (it->index < count)
+			{
+				*k = *(fd + it->index);
+			}
+			else {
+				*k = *fd;
+			}
+			k->managed_ptr = it;
+			if (it->parent != -1)
+			{
+				k->parent = fitem + it->parent;
+				k->parent->item_add(k);
+			}
+			k->width = it->size.x; k->height = it->size.y;
+			k->left = it->offset.x; k->top = it->offset.y;
+			k->right = it->offset.z; k->bottom = it->offset.w;
+			for (size_t i = 0; i < it->child_count; i++) {
+				it->child[i].parent = idx;
+				q.push(it->child + i);
+			}
+			idx++;
+		}
+	}
+	fitem->layout();
+	for (size_t i = 0; i < node_count; i++)
+	{
+		auto& it = fitem[i];
+		auto pt = (node_dt*)it.managed_ptr;
+		pt->frame = glm::vec4(it.frame[0], it.frame[1], it.frame[2], it.frame[3]);
+	}
+	if (fitem)
+	{
+		delete[]fitem;
+	}
+}
 #endif // !NO_FLEX_IMP
