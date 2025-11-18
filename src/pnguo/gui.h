@@ -666,11 +666,11 @@ class tview_x;
 // 容器用
 struct layout_info_x {
 	glm::vec2 pos_align = { 0.5,0.5 };	// 默认的子元素偏移对齐。左中右上下布局计算auto ps = size * align - (ext * align + bearing);
-	flex_item::flex_align justify_content = flex_item::flex_align::ALIGN_START;
-	flex_item::flex_align align_content = flex_item::flex_align::ALIGN_START;
-	flex_item::flex_align align_items = flex_item::flex_align::ALIGN_START;
-	flex_item::flex_direction direction = flex_item::flex_direction::ROW;		// 行/列
-	flex_item::flex_wrap wrap = flex_item::flex_wrap::WRAP;						// 是否换行
+	flex_align justify_content = flex_align::ALIGN_START;
+	flex_align align_content = flex_align::ALIGN_START;
+	flex_align align_items = flex_align::ALIGN_START;
+	flex_direction direction = flex_direction::ROW;		// 行/列
+	flex_wrap wrap = flex_wrap::WRAP;						// 是否换行
 };
 struct drag_v6
 {

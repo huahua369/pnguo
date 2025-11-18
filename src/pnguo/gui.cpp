@@ -5279,49 +5279,49 @@ void plane_cx::update(float delta)
 
 
 
-flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap)
-{
-	flex_item* p = 0;
-	auto length = v.size();
-	if (r && length)
-	{
-		p = new flex_item[length];
-		if (p)
-		{
-			for (size_t i = 0; i < length; i++)
-			{
-				v[i].z += gap.x; v[i].w += gap.y;
-				p[i].width = v[i].z;
-				p[i].height = v[i].w;
-				r->item_add(p + i);
-			}
-			r->layout();
-
-			for (size_t i = 0; i < length; i++)
-			{
-				if (p[i].position != flex_item::flex_position::POS_ABSOLUTE) {
-					v[i].x = p[i].frame[0] + pos.x;
-					v[i].y = p[i].frame[1] + pos.y;
-				}
-			}
-		}
-	}
-	return p;
-}
+//flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap)
+//{
+//	flex_item* p = 0;
+//	auto length = v.size();
+//	if (r && length)
+//	{
+//		p = new flex_item[length];
+//		if (p)
+//		{
+//			for (size_t i = 0; i < length; i++)
+//			{
+//				v[i].z += gap.x; v[i].w += gap.y;
+//				p[i].width = v[i].z;
+//				p[i].height = v[i].w;
+//				r->item_add(p + i);
+//			}
+//			r->layout();
+//
+//			for (size_t i = 0; i < length; i++)
+//			{
+//				if (p[i].position != flex_position::POS_ABSOLUTE) {
+//					v[i].x = p[i].frame[0] + pos.x;
+//					v[i].y = p[i].frame[1] + pos.y;
+//				}
+//			}
+//		}
+//	}
+//	return p;
+//}
 
 void plane_cx::mk_layout()
 {
 	uplayout = false;
 	if (custom_layout)return;// 自定义布局计算则退出默认而已计算
-	flex_item root;
-	auto ss = get_size();
-	root.width = ss.x;
-	root.height = ss.y;
-	root.justify_content = _css.justify_content;
-	root.align_content = _css.align_content;
-	root.align_items = _css.align_items;
-	root.wrap = _css.wrap;
-	root.direction = _css.direction;
+	//flex_item root;
+	//auto ss = get_size();
+	//root.width = ss.x;
+	//root.height = ss.y;
+	//root.justify_content = _css.justify_content;
+	//root.align_content = _css.align_content;
+	//root.align_items = _css.align_items;
+	//root.wrap = _css.wrap;
+	//root.direction = _css.direction;
 
 	std::vector<glm::vec4> layouts;
 	std::vector<widget_base*> wbs;
@@ -5333,20 +5333,20 @@ void plane_cx::mk_layout()
 		layouts.push_back({ p->pos, p->size });
 		wbs.push_back(p);
 	}
-	flex_item* c = flexlayout(&root, layouts, _lpos, _lms);
-	if (c)
-	{
-		auto length = wbs.size();
-		for (size_t i = 0; i < length; i++)
-		{
-			auto p = (widget_base*)wbs[i];
-			auto it = layouts[i];
-			glm::vec2 itss = { it.z,it.w };
-			p->pos = it;
-			p->pos += (itss - p->size) * _css.pos_align;
-		}
-		delete[] c;
-	}
+	//flex_item* c = flexlayout(&root, layouts, _lpos, _lms);
+	//if (c)
+	//{
+	//	auto length = wbs.size();
+	//	for (size_t i = 0; i < length; i++)
+	//	{
+	//		auto p = (widget_base*)wbs[i];
+	//		auto it = layouts[i];
+	//		glm::vec2 itss = { it.z,it.w };
+	//		p->pos = it;
+	//		p->pos += (itss - p->size) * _css.pos_align;
+	//	}
+	//	delete[] c;
+	//}
 }
 bool vht(const std::vector<widget_base*>& widgets, const glm::ivec2& p, glm::ivec2 ips, const glm::ivec2& scroll_pos) {
 	bool r = false;

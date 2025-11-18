@@ -21,9 +21,9 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 	div->set_fontctx(form->app->font_ctx);
 	div->add_familys(bc->family, 0);
 	div->fontsize = bc->fonst_size;
-	div->_css.align_content = flex_item::flex_align::ALIGN_CENTER;
-	div->_css.justify_content = flex_item::flex_align::ALIGN_CENTER;
-	div->_css.align_items = flex_item::flex_align::ALIGN_CENTER;
+	div->_css.align_content = flex_align::ALIGN_CENTER;
+	div->_css.justify_content = flex_align::ALIGN_CENTER;
+	div->_css.align_items = flex_align::ALIGN_CENTER;
 
 	div->_lpos = { 0,0 }; div->_lms = { 0,0 };
 	div->border = { bc->color.y,bc->thickness,bc->radius,bc->color.x };
@@ -341,114 +341,7 @@ dialog_cx::~dialog_cx()
 #endif // 1
 
 #if 1
-
-div2_t::div2_t()
-{
-}
-
-div2_t::~div2_t()
-{
-}
-
-void div2_t::set_root(const std::vector<int>& r)
-{
-	rcs.clear();
-	for (auto it : r)
-		rcs.push_back({ 0,0,it,0 });
-	childs.resize(rcs.size());
-	rcs_st.resize(rcs.size());
-}
-
-void div2_t::set_root_style(size_t idx, const flex_item& it)
-{
-	rcs_st[idx] = it;
-}
-
-void div2_t::add_child(size_t idx, const glm::vec2& ss)
-{
-	childs[idx].push_back({ { 0,0, ss},0,0 });
-}
-
-void div2_t::layout()
-{
-	auto length = rcs.size();
-	flex_item r1;
-	r1.width = 1024;
-	r1.height = 0;
-	for (size_t x = 0; x < length; x++)
-	{
-		auto r = &rcs_st[x];
-		auto it = rcs[x];
-		r->width = it.z;
-		r->height = it.w;
-		r1.item_add(r);
-	}
-	std::vector<std::vector<flex_item>> c;
-	c.resize(length);
-	for (size_t x = 0; x < length; x++)
-	{
-		auto& v = childs[x];
-		auto r = &rcs_st[x];
-		r->clear();
-		// todo 子元素可以设置更多属性，这里用默认值
-		c[x].resize(v.size());
-		flex_item* p = c[x].data();
-		if (p)
-		{
-			for (size_t i = 0; i < v.size(); i++)
-			{
-				//v[i].z += ms.x; v[i].w += ms.y;
-				p[i].width = v[i].z;
-				p[i].height = v[i].w;
-				if (x == 2)
-					p[i].grow = 1;
-				r->item_add(p + i);
-			}
-		}
-	}
-	r1.layout();
-	for (size_t x = 0; x < length; x++)
-	{
-		auto rt = &rcs_st[x];
-		auto& it = rcs[x];
-		if (rt->position != flex_item::flex_position::POS_ABSOLUTE) {
-			it.x = rt->frame[0];
-			it.y = rt->frame[1];
-		}
-		auto& v = childs[x];
-		flex_item* p = c[x].data();
-		for (size_t i = 0; i < v.size(); i++)
-		{
-			if (p[i].position != flex_item::flex_position::POS_ABSOLUTE) {
-				v[i].x = p[i].frame[0];
-				v[i].y = p[i].frame[1];
-				v[i].px = p[i].frame[2];
-				v[i].py = p[i].frame[3];
-			}
-		}
-	}
-
-}
-
-void div2_t::draw(void* cr)
-{
-	auto length = rcs.size();
-	for (size_t x = 0; x < length; x++)
-	{
-		auto it = rcs[x];
-		if (it.w <= 0)it.w = 1024;
-		//draw_rectangle(cr, { 0.5 + it.x,0.5 + it.y,it.z,it.w }, 4);
-		//fill_stroke(cr, 0x10805c42, 0xff0020cC, 1, false);
-		auto& v = childs[x];
-		auto n = v.size();
-		for (size_t i = 0; i < n; i++)
-		{
-			auto vt = v[i];
-			//draw_rectangle(cr, { 0.5 + vt.x + it.x,0.5 + vt.y + it.y,vt.px,vt.py }, 4);
-			//fill_stroke(cr, 0xff805c42, 0xff2C80ff, 1, false);
-		}
-	}
-}
+ 
 // 渲染树节点
 //void draw_treenode(cairo_t* cr, layout_text_x* ltx)
 //{

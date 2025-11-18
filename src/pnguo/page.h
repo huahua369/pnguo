@@ -140,29 +140,7 @@ private:
 };
 
 
-
-class div2_t
-{
-public:
-	struct v6_t :public glm::vec4
-	{
-		float px, py;
-	};
-	std::vector<glm::vec4> rcs;
-	std::vector<flex_item> rcs_st, c2;
-	std::vector<std::vector<v6_t>> childs;
-public:
-	div2_t();
-	~div2_t();
-	void set_root(const std::vector<int>& r);
-	void set_root_style(size_t idx, const flex_item& it);
-	void add_child(size_t idx, const glm::vec2& ss);
-	void layout();
-	void draw(void* cr);
-private:
-
-};
-
+ 
 struct action_show_t
 {
 	void* ptr = 0;

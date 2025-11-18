@@ -934,7 +934,7 @@ colorpick_tl* add_colorpick(uint32_t c, int width, int h, bool alpha);
 
 
 
-flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap);
+//flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap);
 
 
 double get_alpha_f(uint32_t c);
