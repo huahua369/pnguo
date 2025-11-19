@@ -1227,24 +1227,24 @@ int main()
 		//form0->set_mouse_mode(grab_enable, rmode);
 		get_queue_info(sdldev.phy);
 		// 菜单窗口
-		form_x* popw = new_form_popup(form0, 200, 600);
+		//form_x* popw = new_form_popup(form0, 200, 600);
 
-		form_x* ttw = new_form1(app, 200, 600, 0);
-		popw->set_pos({ -100,00 });
-		ttw->set_pos({ 50,100 });
-		popw->render_cb = [=](SDL_Renderer* renderer, double delta)
-			{
-				SDL_FRect rc = { 0,0,180,580 };
-				SDL_SetRenderDrawColorFloat(renderer, 0.90f, 0.10f, 0.0f, 0.8f);
-				SDL_RenderFillRect(renderer, &rc);
-			};
+		//form_x* ttw = new_form1(app, 200, 600, 0);
+		//popw->set_pos({ -100,00 });
+		//ttw->set_pos({ 50,100 });
+		//popw->render_cb = [=](SDL_Renderer* renderer, double delta)
+		//	{
+		//		SDL_FRect rc = { 0,0,180,580 };
+		//		SDL_SetRenderDrawColorFloat(renderer, 0.90f, 0.10f, 0.0f, 0.8f);
+		//		SDL_RenderFillRect(renderer, &rc);
+		//	};
 
-		ttw->render_cb = [=](SDL_Renderer* renderer, double delta)
-			{
-				SDL_FRect rc = { 0,0,180,580 };
-				SDL_SetRenderDrawColorFloat(renderer, 0.10f, 0.90f, 0.0f, 0.8f);
-				SDL_RenderFillRect(renderer, &rc);
-			};
+		//ttw->render_cb = [=](SDL_Renderer* renderer, double delta)
+		//	{
+		//		SDL_FRect rc = { 0,0,180,580 };
+		//		SDL_SetRenderDrawColorFloat(renderer, 0.10f, 0.90f, 0.0f, 0.8f);
+		//		SDL_RenderFillRect(renderer, &rc);
+		//	};
 
 
 

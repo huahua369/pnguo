@@ -381,7 +381,7 @@ app_cx::app_cx()
 		SDL_free(idp);
 	}
 #endif
-
+	UpdateMonitors();
 }
 
 app_cx::~app_cx()
@@ -895,6 +895,8 @@ int app_cx::run_loop(int t)
 		uint32_t curr_time = SDL_GetTicks();
 		if (prev_time > 0)
 		{
+			if (WantUpdateMonitors)
+				UpdateMonitors();
 			double delta = (float)(curr_time - prev_time) / 1000.0f;
 			auto length = forms.size();
 			for (size_t i = 0; i < length; i++)
@@ -1672,6 +1674,15 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 	if (!pw)return false;
 	switch (e->type)
 	{
+	case SDL_EVENT_DISPLAY_ORIENTATION:
+	case SDL_EVENT_DISPLAY_ADDED:
+	case SDL_EVENT_DISPLAY_REMOVED:
+	case SDL_EVENT_DISPLAY_MOVED:
+	case SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED:
+	{
+		WantUpdateMonitors = true;
+		return true;
+	}
 	case SDL_EVENT_MOUSE_MOTION:
 	{
 		//auto afp = ctx->get_activate_form();
@@ -1960,6 +1971,35 @@ int app_cx::on_call_we(const SDL_Event* e, form_x* pw)
 	}
 	return 0;
 }
+
+void app_cx::UpdateMonitors()
+{
+	WantUpdateMonitors = false;
+	int display_count;
+	SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+	for (int n = 0; n < display_count; n++)
+	{
+		// Warning: the validity of monitor DPI information on Windows depends on the application DPI awareness settings, which generally needs to be set in the manifest or at runtime.
+		SDL_DisplayID display_id = displays[n];
+		PlatformMonitor monitor = {};
+		SDL_Rect r;
+		SDL_GetDisplayBounds(display_id, &r);
+		monitor.MainPos = monitor.WorkPos = glm::vec2((float)r.x, (float)r.y);
+		monitor.MainSize = monitor.WorkSize = glm::vec2((float)r.w, (float)r.h);
+		if (SDL_GetDisplayUsableBounds(display_id, &r) && r.w > 0 && r.h > 0)
+		{
+			monitor.WorkPos = glm::vec2((float)r.x, (float)r.y);
+			monitor.WorkSize = glm::vec2((float)r.w, (float)r.h);
+		}
+		monitor.DpiScale = SDL_GetDisplayContentScale(display_id); // See https://wiki.libsdl.org/SDL3/README-highdpi for details.
+		monitor.PlatformHandle = (void*)(intptr_t)n;
+		if (monitor.DpiScale <= 0.0f)
+			continue; // Some accessibility applications are declaring virtual monitors with a DPI of 0, see #7902.
+		monitors.push_back(monitor);
+	}
+	SDL_free(displays);
+}
+
 void form_x::on_size(const glm::ivec2& ss)
 {
 	if (ss != _size)
@@ -3476,8 +3516,8 @@ form_x* new_form1(void* app, int width, int height, form_x* parent)
 		ptf.app = app; ptf.title = (char*)u8"menu";
 		ptf.size = { width,height };
 		ptf.has_renderer = true;
-		ptf.flags = ef_resizable | ef_borderless | ef_transparent; 
-		ptf.flags |= ef_dx11; 
+		ptf.flags = ef_resizable | ef_borderless | ef_transparent;
+		ptf.flags |= ef_dx11;
 		ptf.parent = parent;
 		ptf.pos = { 0,0 };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
