@@ -1245,12 +1245,12 @@ int main()
 		//		SDL_SetRenderDrawColorFloat(renderer, 0.10f, 0.90f, 0.0f, 0.8f);
 		//		SDL_RenderFillRect(renderer, &rc);
 		//	};
+		//ttw->mmove_type = 1;
+		//popw->mmove_type = 1;
+		//popw->_focus_lost_hide = 0;
 
 
 
-		ttw->mmove_type = 1;
-		popw->mmove_type = 1;
-		popw->_focus_lost_hide = 0;
 		//sdldev.vkdev = 0;
 		//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
