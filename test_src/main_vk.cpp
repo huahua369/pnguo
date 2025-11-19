@@ -30,6 +30,8 @@
 #include <pnguo/render.h>
 #include <pnguo/win_core.h>
 
+#include <SDL3/SDL.h>
+
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
@@ -1226,8 +1228,29 @@ int main()
 		get_queue_info(sdldev.phy);
 		// 菜单窗口
 		form_x* popw = new_form_popup(form0, 200, 600);
-		// 提示窗口
-		form_x* ttw = new_form_tooltip(form0, 200, 60);
+
+		form_x* ttw = new_form1(app, 200, 600, 0);
+		popw->set_pos({ -100,00 });
+		ttw->set_pos({ 50,100 });
+		popw->render_cb = [=](SDL_Renderer* renderer, double delta)
+			{
+				SDL_FRect rc = { 0,0,180,580 };
+				SDL_SetRenderDrawColorFloat(renderer, 0.90f, 0.10f, 0.0f, 0.8f);
+				SDL_RenderFillRect(renderer, &rc);
+			};
+
+		ttw->render_cb = [=](SDL_Renderer* renderer, double delta)
+			{
+				SDL_FRect rc = { 0,0,180,580 };
+				SDL_SetRenderDrawColorFloat(renderer, 0.10f, 0.90f, 0.0f, 0.8f);
+				SDL_RenderFillRect(renderer, &rc);
+			};
+
+
+
+		ttw->mmove_type = 1;
+		popw->mmove_type = 1;
+		popw->_focus_lost_hide = 0;
 		//sdldev.vkdev = 0;
 		//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
@@ -1298,7 +1321,7 @@ int main()
 			}
 			vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-			auto texok = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
+			auto tex3d = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			/*
 			case 0: return AMDTonemapper(color);
 			case 1: return DX11DSK(color);
@@ -1326,20 +1349,19 @@ int main()
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
 			sp_drawable_set_pos(dd1, 500, 500);
-			if (texok)
+			if (tex3d)
 			{
 				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 					{
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 10,10,vki.size.x,vki.size.y };
-						tcb.render_texture(renderer, texok, &tdt, 1);
-						sp_drawable_update(dd1, delta);
+						tcb.render_texture(renderer, tex3d, &tdt, 1);
 						sp_drawable_draw(dd1);
-
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{
+						sp_drawable_update(dd1, delta);
 						auto light = vkd->get_light(0);
 						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 						vkd->_state.Exposure;				// 曝光度：默认1.0
@@ -1347,7 +1369,7 @@ int main()
 						static int ity = 10.5;
 						light->_intensity = ity;
 						vkd->update(form0->io);	// 更新事件
-						vkd->on_render();		// 执行渲染
+						vkd->on_render();		// 渲染到fbo纹理tex3d
 						static bool sa = false;
 						if (sa)
 						{

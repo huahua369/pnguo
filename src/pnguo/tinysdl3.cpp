@@ -484,7 +484,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	auto st = SDL_GetSystemTheme();
 	if (fgs & ef_tooltip || fgs & ef_popup)
 	{
-		window = SDL_CreatePopupWindow(parent->_ptr, pos.x, pos.y, ws.x, ws.y, flags);
+		window = SDL_CreatePopupWindow(parent ? parent->_ptr : nullptr, pos.x, pos.y, ws.x, ws.y, flags);
 	}
 	else
 	{
@@ -3463,6 +3463,26 @@ form_x* new_form_popup(form_x* parent, int width, int height)
 			/*form1->set_alpha(true);*/
 			form1->mmove_type = 0;
 			form1->_focus_lost_hide = true;
+		}
+	}
+	return form1;
+}
+form_x* new_form1(void* app, int width, int height, form_x* parent)
+{
+	form_x* form1 = 0;
+	if (width > 0 && height > 0)
+	{
+		form_newinfo_t ptf = {};
+		ptf.app = app; ptf.title = (char*)u8"menu";
+		ptf.size = { width,height };
+		ptf.has_renderer = true;
+		ptf.flags = ef_resizable | ef_borderless | ef_transparent; 
+		ptf.flags |= ef_dx11; 
+		ptf.parent = parent;
+		ptf.pos = { 0,0 };
+		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+		if (form1) {
+			/*form1->set_alpha(true);*/
 		}
 	}
 	return form1;
