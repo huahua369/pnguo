@@ -299,7 +299,7 @@ app_cx::app_cx()
 	font_ctx = new_fonts_ctx();
 
 	fct = new Timer();
-	r2d = new render_2d();
+	//r2d = new render_2d();
 	uint32_t f = -1;
 	//f &= ~SDL_INIT_CAMERA; // 相机退出有bug
 	int kr = SDL_Init(f);
@@ -397,10 +397,10 @@ app_cx::~app_cx()
 		}
 		delete[]system_cursor; system_cursor = 0;
 	}
-	if (r2d)
-	{
-		delete r2d; r2d = 0;
-	}
+	//if (r2d)
+	//{
+	//	delete r2d; r2d = 0;
+	//}
 	if (fct)
 	{
 		delete fct; fct = 0;
@@ -449,7 +449,7 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_UTILITY;
 	return flags;
 }
-int on_call_we(const SDL_Event* e, form_x* pw);
+
 
 
 
@@ -1544,6 +1544,7 @@ void form_x::trigger(uint32_t etype, void* e)
 				break;
 			}
 		}
+#if 0
 		for (int i = 1; i >= 0; i--) {
 			auto pt = _planes[i];
 			for (auto it = pt.rbegin(); it != pt.rend(); it++)
@@ -1559,6 +1560,7 @@ void form_x::trigger(uint32_t etype, void* e)
 				break;
 			}
 		}
+#endif
 	} while (0);
 }
 void form_x::set_capture()
@@ -1665,7 +1667,7 @@ struct finger_et;
 ole_drop_et*/
 
 
-bool on_call_emit(const SDL_Event* e, form_x* pw)
+bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return false;
 	switch (e->type)
@@ -1674,19 +1676,23 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	{
 		//auto afp = ctx->get_activate_form();
 		mouse_move_et mt = {};
-		mt.x = e->motion.x;
-		mt.y = e->motion.y;			// 鼠标移动坐标
+		mouse_pos = { e->motion.x,e->motion.y };
 		mt.xrel = e->motion.xrel;
 		mt.yrel = e->motion.yrel;		// The relative motion in the XY direction 
 		mt.which = e->motion.which;		// 鼠标实例 
+		if (viewports_enable)
+		{
+			int window_x = 0, window_y = 0;
+			SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
+			mouse_pos.x += window_x;
+			mouse_pos.y += window_y;
+		}
+		mt.x = mouse_pos.x;
+		mt.y = mouse_pos.y;			// 鼠标移动坐标
 
-		int window_x = 0, window_y = 0;
-		SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
-		glm::vec2 pos = { mt.x + window_x,mt.y + window_y };
-
-		pw->hittest({ mt.x, mt.y });
+		pw->hittest(mouse_pos);
 		if (pw->io) {
-			pw->io->MousePos = { mt.x,mt.y };
+			pw->io->MousePos = mouse_pos;
 			pw->io->MouseDelta = { mt.xrel,mt.yrel };
 			int ms = SDL_GetModState();
 			pw->io->KeyCtrl = (ms & SDL_KMOD_LCTRL || ms & SDL_KMOD_RCTRL);
@@ -1695,7 +1701,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 			pw->io->KeySuper = (ms & SDL_KMOD_LGUI || ms & SDL_KMOD_RGUI);
 		}
 		pw->trigger((uint32_t)devent_type_e::mouse_move_e, &mt);
-		pw->_last_pos = { mt.x, mt.y };
+		pw->_last_pos = mouse_pos;
 		if (mt.cursor > 0) {
 			pw->app->set_defcursor(mt.cursor);
 		}
@@ -1757,8 +1763,8 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		t.button = e->button.button;
 		t.down = e->button.down; //SDL_PRESSED; SDL_RELEASED;
 		t.clicks = e->button.clicks;
-		t.x = e->button.x;
-		t.y = e->button.y;
+		t.x = mouse_pos.x;// e->button.x;
+		t.y = mouse_pos.y;// e->button.y;
 		if (t.down)
 		{
 			pw->hide_child();
@@ -1834,6 +1840,13 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		ole_drop_et t = {};
 		t.x = e->drop.x;
 		t.y = e->drop.y;
+		if (viewports_enable)
+		{
+			int window_x = 0, window_y = 0;
+			SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
+			t.x += window_x;
+			t.y += window_y;
+		}
 		pw->trigger((uint32_t)devent_type_e::ole_drop_e, &t);
 		printf("pos\n");
 	}break;
@@ -1842,6 +1855,13 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 		ole_drop_et t = {};
 		t.x = e->drop.x;
 		t.y = e->drop.y;//结束
+		if (viewports_enable)
+		{
+			int window_x = 0, window_y = 0;
+			SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
+			t.x += window_x;
+			t.y += window_y;
+		}
 		if (pw->drop_text.size()) {
 			if ('\n' == *pw->drop_text.rbegin())
 				pw->drop_text.pop_back();
@@ -1870,7 +1890,7 @@ bool on_call_emit(const SDL_Event* e, form_x* pw)
 	}
 	return false;
 }
-int on_call_we(const SDL_Event* e, form_x* pw)
+int app_cx::on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
 	int r = 0;
@@ -1999,31 +2019,31 @@ void form_x::remove_f(form_x* p)
 }
 void form_x::clear_wt()
 {
-	for (int i = 0; i < 2; i++)
-	{
-		auto pks = _planes[i];
-		for (auto it : pks)
-		{
-			unbind(it);
-			if (it->autofree)
-				delete it;
-		}
-	}
-	_planes[0].clear();
-	_planes[1].clear();
-	for (size_t i = 0; i < 2; i++)
-	{
-		auto& tt = atlas[i];
-		for (auto it : tt) {
-			if (it && it->autofree)
-				delete it;
-		}
-		tt.clear();
-	}
+	//for (int i = 0; i < 2; i++)
+	//{
+	//	auto pks = _planes[i];
+	//	for (auto it : pks)
+	//	{
+	//		unbind(it);
+	//		if (it->autofree)
+	//			delete it;
+	//	}
+	//}
+	//_planes[0].clear();
+	//_planes[1].clear();
+	//for (size_t i = 0; i < 2; i++)
+	//{
+	//	auto& tt = atlas[i];
+	//	for (auto it : tt) {
+	//		if (it && it->autofree)
+	//			delete it;
+	//	}
+	//	tt.clear();
+	//}
 }
 size_t form_x::count_wt()
 {
-	return _planes[0].size() + _planes[1].size();
+	return 0;// _planes[0].size() + _planes[1].size();
 }
 void* form_x::get_nptr()
 {
@@ -2127,7 +2147,7 @@ void form_x::update(float delta)
 	{
 		up_cb(delta, &dwt);
 	}
-
+#if 0
 	for (int i = 0; i < 2; i++) {
 		for (auto it = _planes[i].begin(); it != _planes[i].end(); it++)
 		{
@@ -2155,9 +2175,10 @@ void form_x::update(float delta)
 				canvas_atlas_update(kt, renderer, delta);
 		}
 	}
-	for (auto kt : skeletons) {
-		kt->update(delta);
-	}
+#endif
+	//for (auto kt : skeletons) {
+	//	kt->update(delta);
+	//}
 	app_cx::sleep_ms(dwt);
 }
 void form_x::draw_rects(const glm::vec4* rects, int n, const glm::vec4& color)
@@ -2249,7 +2270,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 }
 void form_x::present(double delta)
 {
-	if (!visible || !renderer || !app || !app->r2d || display_size.x < 1 || display_size.y < 1)return;
+	if (!visible || !renderer || !app ||/* !app->r2d ||*/ display_size.x < 1 || display_size.y < 1)return;
 	float rsx = 1.0f;
 	float rsy = 1.0f;
 	SDL_GetRenderScale(renderer, &rsx, &rsy);
@@ -2257,7 +2278,6 @@ void form_x::present(double delta)
 	glm::vec2 render_scale;
 	render_scale.x = (rsx == 1.0f) ? display_framebuffer_scale.x : 1.0f;
 	render_scale.y = (rsy == 1.0f) ? display_framebuffer_scale.y : 1.0f;
-
 	// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
 	int fb_width = (int)(display_size.x * render_scale.x);
 	int fb_height = (int)(display_size.y * render_scale.y);
@@ -2269,32 +2289,33 @@ void form_x::present(double delta)
 	SDL_SetRenderClipRect(renderer, &viewport);
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 	SDL_RenderClear(renderer);
-#if 1
+	if (render_cb)
 	{
-#if 1
+		render_cb(renderer, delta);
+	}
+#if 0
+	{
 		auto ktd = textures[0].data();
 		auto length = textures[0].size();
 		for (size_t i = 0; i < length; i++)
-			//for (auto& it : textures[1])
 		{
 			auto& it = ktd[i];
 			auto src = it.src.w > 0 && it.src.z > 0 ? &it.src : nullptr;
 			auto dst = it.dst.w > 0 && it.dst.z > 0 ? &it.dst : nullptr;
 			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 		}
-#endif
 	}
-	if (!skeletons.empty()) {
+	//if (!skeletons.empty()) {
 
-		if (skelet_viewport.z > 0 && skelet_viewport.w > 0)
-			SDL_SetRenderViewport(renderer, (SDL_Rect*)&skelet_viewport);
-		if (skelet_clip.z > 0 && skelet_clip.w > 0)
-			SDL_SetRenderClipRect(renderer, (SDL_Rect*)&skelet_clip);
-		// 渲染骨骼动画
-		for (auto kt : skeletons) {
-			app->r2d->draw_data(renderer, kt);
-		}
-	}
+	//	if (skelet_viewport.z > 0 && skelet_viewport.w > 0)
+	//		SDL_SetRenderViewport(renderer, (SDL_Rect*)&skelet_viewport);
+	//	if (skelet_clip.z > 0 && skelet_clip.w > 0)
+	//		SDL_SetRenderClipRect(renderer, (SDL_Rect*)&skelet_clip);
+	//	// 渲染骨骼动画
+	//	for (auto kt : skeletons) {
+	//		app->r2d->draw_data(renderer, kt);
+	//	}
+	//}
 	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
 	SDL_SetRenderClipRect(renderer, &viewport);
 	// 渲染图集/UI
@@ -2310,11 +2331,6 @@ void form_x::present(double delta)
 	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
 	SDL_SetRenderClipRect(renderer, &viewport);
 	{
-		if (render_cb)
-		{
-			render_cb(renderer, delta);
-		}
-#if 1
 		auto ktd = textures[1].data();
 		auto length = textures[1].size();
 		for (size_t i = 0; i < length; i++)
@@ -2337,7 +2353,6 @@ void form_x::present(double delta)
 				SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
 			}
 		}
-#endif
 	}
 #endif
 	SDL_RenderPresent(renderer);
@@ -2408,15 +2423,15 @@ bool form_x::hittest(const glm::ivec2& pos)
 	_HitTest = false;
 	if (_ptr)
 	{
-		for (int i = 1; i >= 0; i--) {
-			for (auto it = _planes[i].rbegin(); it != _planes[i].rend(); it++)
-			{
-				if ((*it)->visible && (*it)->hittest(pos))
-				{
-					_HitTest = true; break;
-				}
-			}
-		}
+		//for (int i = 1; i >= 0; i--) {
+		//	for (auto it = _planes[i].rbegin(); it != _planes[i].rend(); it++)
+		//	{
+		//		if ((*it)->visible && (*it)->hittest(pos))
+		//		{
+		//			_HitTest = true; break;
+		//		}
+		//	}
+		//}
 	}
 	return _HitTest;
 }
@@ -2799,6 +2814,10 @@ SDL_Texture* form_x::new_texture(int width, int height, void* vkptr, int format)
 	}
 	return texture;
 }
+SDL_Texture* form_x::new_texture(const glm::ivec2& size, void* vkptr, int format)
+{
+	return new_texture(size.x, size.y, vkptr, format);
+}
 SDL_Texture* form_x::new_texture(const char* fn)
 {
 	SDL_Texture* p = nullptr;
@@ -2942,7 +2961,8 @@ void form_x::flash_window(int opera)
 		SDL_FlashWindow(_ptr, o);
 	}
 }
-#if 1
+
+#if 0
 bool form_x::add_vkimage(const glm::ivec2& size, void* vkimage, const glm::vec2& pos, int type)
 {
 	bool ret = false;
@@ -2982,21 +3002,22 @@ void form_x::pop_texture(SDL_Texture* p)
 	}
 }
 #endif
-void form_x::add_skeleton(skeleton_t* p)
-{
-	if (p)
-		skeletons.push_back(p);
-}
+//void form_x::add_skeleton(skeleton_t* p)
+//{
+//	if (p)
+//		skeletons.push_back(p);
+//}
+//void form_x::remove(skeleton_t* p)
+//{
+//	auto& v = skeletons;
+//	v.erase(std::remove(v.begin(), v.end(), p), v.end());
+//}
+#if 0
 void form_x::add_canvas_atlas(canvas_atlas* p, int level)
 {
 	level = glm::clamp(level, 0, 1);
 	if (p)
 		atlas[level].push_back(p);
-}
-void form_x::remove(skeleton_t* p)
-{
-	auto& v = skeletons;
-	v.erase(std::remove(v.begin(), v.end(), p), v.end());
 }
 void form_x::remove(canvas_atlas* p)
 {
@@ -3031,10 +3052,10 @@ void form_x::unbind(plane_cx* p) {
 		{
 			p->form->remove_event(p);
 			p->form->remove(p);
-			for (int i = 0; i < 2; i++) {
-				auto& v = p->form->_planes[i];
-				v.erase(std::remove(v.begin(), v.end(), p), v.end());
-			}
+			//for (int i = 0; i < 2; i++) {
+			//	auto& v = p->form->_planes[i];
+			//	v.erase(std::remove(v.begin(), v.end(), p), v.end());
+			//}
 			p->form = 0;
 		}
 	}
@@ -3044,7 +3065,7 @@ void form_x::move2end(plane_cx* p)
 {
 	bind(p);
 }
-
+#endif
 dev_info_cx form_x::get_dev()
 {
 	dev_info_cx c = {};
@@ -3395,12 +3416,12 @@ void free_app(void* p)
 	if (app)delete app;
 }
 
-void form_move2end(form_x* f, plane_cx* ud) {
-	if (f && ud)
-	{
-		f->move2end(ud);
-	}
-}
+//void form_move2end(form_x* f, plane_cx* ud) {
+//	if (f && ud)
+//	{
+//		f->move2end(ud);
+//	}
+//}
 void form_set_input_ptr(form_x* f, void* ud) {
 	if (f) { f->set_input_ptr(ud); }
 }

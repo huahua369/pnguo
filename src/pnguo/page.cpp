@@ -46,7 +46,7 @@ void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, s
 		form->tooltip->clear_wt();
 		form->tooltip->set_size(drc);
 	}
-	form->tooltip->bind(div);
+	//form->tooltip->bind(div);
 	form->tooltip->show();
 	form->tooltip->set_pos(pos);
 }
@@ -242,12 +242,12 @@ void menu_cx::show_item(mitem_t* it, const glm::vec2& pos)
 		if (it->backgs->count())
 			it->f->remove(it->backgs);
 		it->f->remove(it->fronts);
-		it->f->unbind(it->pv.p);
+		//it->f->unbind(it->pv.p);
 	}
 	it->f = mf1;
 	if (it->backgs->count())
 		mf1->add_canvas_atlas(it->backgs);
-	mf1->bind(it->pv.p);
+	//mf1->bind(it->pv.p);
 	mf1->add_canvas_atlas(it->fronts);
 	mf1->set_size(it->pv.fsize);
 	mf1->set_pos(pos);
@@ -1376,7 +1376,7 @@ namespace mg {
 	{
 		if (!mm || !mm->form0 || !mm->fontn || !mm->mvs)return 0;
 		auto mainmenu = new plane_cx();
-		mm->form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
+		//mm->form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
 		auto p = mainmenu;
 		p->add_familys(mm->fontn, 0);
 		p->set_color({ 0,1,0,mm->bc_color });

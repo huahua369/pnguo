@@ -754,7 +754,6 @@ namespace hz {
 	public:
 		port_cx();
 		~port_cx();
-		static port_cx* new_port(int size);
 		void init(int buflen = 1024);
 		//---------------------------------------------------------------------------------
 
@@ -799,17 +798,22 @@ namespace hz {
 		bool isUpdateUI = false;
 	};
 
-
-
-	port_cx* port_cx::new_port(int size)
+	com_port* new_com_port(const char* portname, int baudrate, int idx)
 	{
+		size_t x = idx;
+		if (!portname || baudrate <= 0 || x > 13)return nullptr;
 		auto p = new port_cx();
-		if (size < 16)size = 16;
 		if (p)
 		{
-			p->init(size);
+			p->init(1024);
+			auto fd = p->Open_driver(portname, baudrate, idx, true);
+			if (!fd)
+			{
+				delete p;
+				p = 0;
+			}
 		}
-		return p;
+		return (com_port*)p;
 	}
 
 	port_cx::port_cx() : _fd(0), isRead(0), _buflen(1024)
@@ -923,15 +927,11 @@ namespace hz {
 		}
 		//打开串口
 		_isAsync = isSA;
-		HANDLE m_hCom = CreateFile(name, GENERIC_READ | GENERIC_WRITE, 0, NULL,
-
-			OPEN_EXISTING, isSA ? FILE_FLAG_OVERLAPPED : 0, NULL);
-
+		HANDLE m_hCom = CreateFile(name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, isSA ? FILE_FLAG_OVERLAPPED : 0, NULL);
 		if (m_hCom == INVALID_HANDLE_VALUE)
 		{
-
+			auto k = mfile_t::getLastError();
 			printf("Create File faile\n");
-
 			return NULL;
 
 		}

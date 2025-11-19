@@ -4,7 +4,8 @@
 #include "pch1.h"
 #include "pnguo.h"
 #include "print_time.h"
-#include "event.h"
+#include "vg.h"
+
 
 #ifndef no_cairo_ 
 #ifdef __cplusplus

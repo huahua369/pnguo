@@ -220,16 +220,7 @@ struct image_sliced_t
 	uint32_t color = 0;	// 颜色混合/透明度
 };
 struct atlas_t;
-
-struct quadratic_v
-{
-	glm::vec2 p0, p1, p2;
-};
-struct cubic_v
-{
-	glm::vec2 p0, p1, p2, p3;	// p1 p2是控制点
-};
-
+ 
 struct vertex_v2
 {
 	glm::vec2 position = {};		// 坐标	

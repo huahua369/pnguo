@@ -18,7 +18,7 @@ void premultiply_data(int w, unsigned char* data, int type, bool multiply);
 X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
 Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
 */
-struct rect_shadow_t
+struct rect_shadow_t0
 {
 	float radius = 4;	// 半径
 	int segment = 6;	// 细分段

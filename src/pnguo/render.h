@@ -1,6 +1,9 @@
 ﻿#pragma once
 
 #include "vkvg.h"
+#ifndef vkvg_pattern_add_color_stop_rgba
+#define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop
+#endif
 struct style_path_t;
 class path_v;
 

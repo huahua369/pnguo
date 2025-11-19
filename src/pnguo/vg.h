@@ -2,6 +2,31 @@
 #ifndef VG_H
 #define VG_H
 
+struct quadratic_v
+{
+	glm::vec2 p0, p1, p2;
+};
+struct cubic_v
+{
+	glm::vec2 p0, p1, p2, p3;	// p1 p2是控制点
+};
+/*
+用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
+这里使用下面的曲线形式，其中
+X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+*/
+struct rect_shadow_t
+{
+	float radius = 4;	// 半径
+	int segment = 6;	// 细分段
+	glm::vec4 cfrom = { 0,0,0,0.8 }, cto = { 0.5,0.5,0.5,0.5 };// 颜色从cf到ct
+	/*	cubic
+		X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+		Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+	*/
+	cubic_v cubic = { {0.0,0.6},{0.5,0.39},{0.4,0.1},{1.0,0.0 } };
+};
 
 // 线，二阶曲线，三阶曲线
 enum class path_type_e :uint32_t

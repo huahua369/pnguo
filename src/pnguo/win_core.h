@@ -82,5 +82,7 @@ namespace hz {
 	void shell_exe(const char* path0, bool admin);
 	std::string get_modulefile(void* hModule);
 
+	typedef struct com_port com_port;
+	com_port* new_com_port(const char* portname, int baudrate, int idx);
 }
 //!hz

@@ -28,6 +28,7 @@
 #include <cairo/cairo.h>
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <pnguo/render.h>
+#include <pnguo/win_core.h>
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
@@ -35,7 +36,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
+	//form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
 	p->_lms = { 6,6 };
 	p->add_familys(fontn, 0);
@@ -99,7 +100,7 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 		auto p = new plane_cx();
 		uint32_t tc = cc[i];
 		p->set_color({ 0x80ff802C,1,5,0xff2c2c2c });
-		form0->bind(p);	// 绑定到窗口  
+		//form0->bind(p);	// 绑定到窗口  
 		p->set_rss(5);
 		p->_lms = { 6,6 };
 		p->add_familys(fontn, 0);
@@ -128,7 +129,7 @@ void show_cpuinfo(form_x* form0)
 	auto p = new plane_cx();
 	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
+	//form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
 	p->_lms = { 8,8 };
 	p->add_familys(fontn, 0);
@@ -277,7 +278,7 @@ void show_belt(form_x* form0)
 	auto p = new plane_cx();
 	uint32_t pbc = 0xf02c2c2c;
 	p->set_color({ 0x80ff802C,1,5,pbc });
-	form0->bind(p);	// 绑定到窗口  
+	//form0->bind(p);	// 绑定到窗口  
 	p->set_rss(5);
 	p->_lms = { 8,8 };
 	p->add_familys(fontn, 0);
@@ -398,7 +399,7 @@ void vkrender_test(form_x* form0)
 	auto vki = vkd->get_vkimage(0);			// 获取第一个fbo纹理弄到窗口显示
 	auto dstate = vkd->_state;	// 渲染状态属性
 	if (form0) {
-		auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理  
+		auto texok = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理  
 		if (texok) {
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1042,38 +1043,13 @@ int main()
 		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 
-		{
-			step_cx stp;
-			stp.load(R"(data\ACEB10.stp)");
+		//{
+		//	step_cx stp;
+		//	stp.load(R"(data\ACEB10.stp)");
 
 
-			{
-				const char* filename = "temp/cairo_gradient.png";
-				cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 256, 256);
-				cairo_t* ctx = cairo_create(surface);
-				//struct cairo_gradient_t* grad;
-				{
-					print_time ptt(filename);
-					cairo_pattern_t* grad = cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-					cairo_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
-					cairo_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
-					cairo_set_source(ctx, grad);
-					cairo_rectangle(ctx, 0, 0, 256, 256);
-					cairo_fill(ctx);
-					//cairo_pattern_t* rg = cairo_pattern_create_radial(15.2, 12.4, 25.6, 102.4, 102.4, 128.0);
-					cairo_pattern_t* rg = cairo_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-					cairo_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
-					cairo_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
-					cairo_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
-					cairo_set_source(ctx, rg);
-					//cairo_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
-					cairo_rectangle(ctx, 0, 0, 256, 256);
-					cairo_fill(ctx);
-				}
-				cairo_surface_write_to_png(surface, filename);
-			}
-		}
-		printf("");
+		//}
+		//printf("");
 
 		auto fctx = app->font_ctx;
 		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
@@ -1157,7 +1133,7 @@ int main()
 
 #if 0
 
-		vkrender_test(0);
+			vkrender_test(0);
 			glm::quat qk = glm::quat(1, 0, 0, 0);
 			static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
 			static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
@@ -1248,6 +1224,10 @@ int main()
 		bool rmode = true;			// 设置窗口的相对鼠标模式。
 		//form0->set_mouse_mode(grab_enable, rmode);
 		get_queue_info(sdldev.phy);
+		// 菜单窗口
+		form_x* popw = new_form_popup(form0, 200, 600);
+		// 提示窗口
+		form_x* ttw = new_form_tooltip(form0, 200, 60);
 		//sdldev.vkdev = 0;
 		//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
 		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
@@ -1318,7 +1298,7 @@ int main()
 			}
 			vkd->resize(1024, 800);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-			auto texok = form0->add_vkimage(vki.size, vki.vkimage, { 20,36 }, 0);// 创建SDL的rgba纹理 
+			auto texok = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			/*
 			case 0: return AMDTonemapper(color);
 			case 1: return DX11DSK(color);
@@ -1350,8 +1330,13 @@ int main()
 			{
 				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 					{
+						texture_dt tdt = {};
+						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+						tdt.dst_rect = { 10,10,vki.size.x,vki.size.y };
+						tcb.render_texture(renderer, texok, &tdt, 1);
 						sp_drawable_update(dd1, delta);
 						sp_drawable_draw(dd1);
+
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{

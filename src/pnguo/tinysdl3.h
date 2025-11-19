@@ -68,7 +68,7 @@ struct et_un_t;
 struct image_ptr_t;
 class font_rctx;
 class render_2d;
-class plane_cx;
+//class plane_cx;
 class menu_cx;
 struct mnode_t;
 class form_x;
@@ -79,7 +79,7 @@ class app_cx
 public:
 	std::set<std::string> rdv;
 	std::vector<form_x*> forms;		// 窗口列表
-	render_2d* r2d = 0;				// 2d动画渲染
+	//render_2d* r2d = 0;				// 2d动画渲染
 	font_rctx* font_ctx = 0;
 	SDL_Cursor** system_cursor = 0;	// 系统光标
 	Timer* fct = {};
@@ -97,7 +97,9 @@ public:
 
 	uint32_t audio_device = 0;
 	dev_info_cx _set_dev = {};
+	glm::vec2 mouse_pos = {};
 	bool nc_down = 0;
+	bool viewports_enable = false;	// docking用
 public:
 	app_cx();
 	~app_cx();
@@ -144,6 +146,8 @@ public:
 private:
 	int get_event();
 	void render(double delta);
+	int on_call_we(const SDL_Event* e, form_x* pw);
+	bool on_call_emit(const SDL_Event* e, form_x* pw);
 };
 
 class skeleton_t;
@@ -175,17 +179,17 @@ public:
 	app_cx* app = 0;				// 应用ctx
 	glm::ivec2 _size = {};			// 窗口大小
 	glm::ivec2 display_size = {};	// 窗口显示大小
-	glm::ivec2 save_size = {};	// 保存窗口大小
+	glm::ivec2 save_size = {};		// 保存窗口大小
 	glm::vec2 display_framebuffer_scale = {};
 	SDL_Renderer* renderer = 0;
+	std::function<int()> on_close_cb;		// 关闭事件
 	std::function<void(float delta, int* ret)> up_cb;	// 更新动画等
 	std::function<void(SDL_Renderer* renderer, double delta)> render_cb;	// 更新和渲染
-	std::function<int()> on_close_cb;		// 关闭事件
-
-	std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
+#if 0
+	//std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
 	std::vector<canvas_atlas*> atlas[2];		// 图集渲染列表		简单贴图或ui用
 	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
-#if 1
+
 	struct tex_rs {
 		SDL_Texture* tex = 0;
 		glm::vec4 src = {}, dst = {};
@@ -193,9 +197,9 @@ public:
 		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
 	};
 	std::vector<tex_rs> textures[2];		// 纹理渲染列表,0是背景，1是前景
-#endif
 	glm::ivec4 skelet_viewport = {};
 	glm::ivec4 skelet_clip = {};
+#endif
 
 	std::string title;
 	char* clipstr = 0;
@@ -279,6 +283,7 @@ public:
 	SDL_Texture* new_texture(int width, int height, int type, void* data, int stride, int bm = 0, bool static_tex = false, bool multiply = false);
 	//  int format:0=RGBA,1=BGRA
 	SDL_Texture* new_texture(int width, int height, void* vkptr, int format);
+	SDL_Texture* new_texture(const glm::ivec2& size, void* vkptr, int format);
 	SDL_Texture* new_texture(const char* fn);
 
 	void update_texture(SDL_Texture* p, void* data, glm::ivec4 rc, int stride);
@@ -288,7 +293,7 @@ public:
 	// 获取纹理vk image
 	void* get_texture_vk(SDL_Texture* p);
 
-#if 1
+#if 0
 	// 添加纹理渲染。target = 0背景层，1上层
 	void push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target);
 	// 弹出纹理渲染
@@ -296,14 +301,14 @@ public:
 	bool add_vkimage(const glm::ivec2& size, void* vkimage, const glm::vec2& pos, int type);
 #endif
 	// 添加动画、图集渲染
-	void add_skeleton(skeleton_t* p);
 	void add_canvas_atlas(canvas_atlas* p, int level = 0);
-	void remove(skeleton_t* p);
+	//void add_skeleton(skeleton_t* p);
+	//void remove(skeleton_t* p);
 	void remove(canvas_atlas* p);
 	// 绑定面板组件
-	void bind(plane_cx* p, int level = 0);
-	void unbind(plane_cx* p);
-	void move2end(plane_cx* p);
+	//void bind(plane_cx* p, int level = 0);
+	//void unbind(plane_cx* p);
+	//void move2end(plane_cx* p);
 	dev_info_cx get_dev();
 	glm::ivec2 get_size();
 	glm::ivec2 get_pos();
@@ -427,7 +432,7 @@ typedef struct texture_cb texture_cb;
 
 texture_cb get_texture_cb();
 
-void form_move2end(form_x* f, plane_cx* ud);
+//void form_move2end(form_x* f, plane_cx* ud);
 // 设置接收输入的控件
 void form_set_input_ptr(form_x* f, void* ud);
 // OLO拖放文本

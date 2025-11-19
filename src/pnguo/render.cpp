@@ -1135,6 +1135,165 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
 	set_fill_style(cr, style);
 	vkvg_restore(cr);
 }
+void vkvg_rect(VkvgContext ctx, const glm::vec4& rc) {
+	vkvg_rectangle(ctx, rc.x, rc.y, rc.z, rc.w);
+}
+struct stops_t {
+	float o;
+	float x, y, z, w;
+};
+/*
+用 bezier curve（贝塞尔曲线） 来设置 color stop（颜色渐变规则），
+这里使用下面的曲线形式，其中
+X轴为 offset（偏移量，取值范围为 0~1，0 代表阴影绘制起点），
+Y轴为 alpha（颜 色透明度，取值范围为0~1，0 代表完全透明），
+*/
+
+void draw_rectangle_gradient(void* ctx, int width, int height, const rect_shadow_t* pr)
+{
+	if (!ctx || !pr || width < 4 || height < 4)return;
+	auto cr = (VkvgContext)ctx;
+	auto& rs = *pr;
+	std::vector<stops_t> color_stops;
+	float radius = rs.radius;
+	if (radius < 1 || width < 2 || height < 2)
+		return;
+	auto bv = get_bezier(&rs.cubic, 1, rs.segment > 3 ? rs.segment : 3);
+	for (size_t i = 0; i < bv.size(); i++)
+	{
+		float ratio = bv[i].x;
+		float a = bv[i].y;
+		glm::vec4 color = mix_colors0(rs.cfrom, rs.cto, ratio);
+		color_stops.push_back({ ratio,color.x, color.y, color.z, color.w * a });
+	}
+	if (width < 2 * radius)
+	{
+		width = 2 * radius;
+	}
+	if (height < 2 * radius)
+	{
+		height = 2 * radius;
+	}
+
+	//# radial gradient center points for four corners, top - left, top - right, etc
+	glm::vec2 corner_tl = glm::vec2(radius, radius);
+	glm::vec2 corner_tr = glm::vec2(width - radius, radius);
+	glm::vec2 corner_bl = glm::vec2(radius, height - radius);
+	glm::vec2 corner_br = glm::vec2(width - radius, height - radius);
+	std::vector<glm::vec2> corner_points = { corner_tl, corner_tr, corner_br, corner_bl };
+
+	//# linear gradient rectangle info for four sides
+	glm::vec4 side_top = glm::vec4(radius, 0, width - 2 * radius, radius);
+	glm::vec4 side_bottom = glm::vec4(radius, height - radius, width - 2 * radius, radius);
+	glm::vec4 side_left = glm::vec4(0, radius, radius, height - 2 * radius);
+	glm::vec4 side_right = glm::vec4(width - radius, radius, radius, height - 2 * radius);
+
+	//# draw four corners through radial gradient
+	int i = 0;
+	for (auto& point : corner_points)
+	{
+		auto rg = vkvg_pattern_create_radial(point[0], point[1], 0, point[0], point[1], radius);
+		for (auto& stop : color_stops)
+		{
+			vkvg_pattern_add_color_stop_rgba(rg, stop.o, stop.x, stop.y, stop.z, stop.w);
+		}
+		vkvg_move_to(cr, point[0], point[1]);
+		double	angle1 = M_PI + 0.5 * M_PI * i, angle2 = angle1 + 0.5 * M_PI;
+		vkvg_arc(cr, point[0], point[1], radius, angle1, angle2);
+		vkvg_set_source(cr, rg);
+		vkvg_fill(cr);
+		vkvg_pattern_destroy(rg);
+		i++;
+	}
+
+	//# draw four sides through linear gradient
+	//# top side
+
+	auto lg_top = vkvg_pattern_create_linear(side_top[0], side_top[1] + radius, side_top[0], side_top[1]);
+	for (auto& stop : color_stops)
+	{
+		vkvg_pattern_add_color_stop_rgba(lg_top, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	vkvg_rect(cr, side_top);
+	vkvg_set_source(cr, lg_top);
+	vkvg_fill(cr);
+
+	//# bottom side
+	auto lg_bottom = vkvg_pattern_create_linear(side_bottom[0], side_bottom[1], side_bottom[0], side_bottom[1] + radius);
+	for (auto& stop : color_stops)
+	{
+		vkvg_pattern_add_color_stop_rgba(lg_bottom, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	vkvg_rect(cr, side_bottom);
+	vkvg_set_source(cr, lg_bottom);
+	vkvg_fill(cr);
+
+	//# left side
+	auto lg_left = vkvg_pattern_create_linear(side_left[0] + radius, side_left[1], side_left[0], side_left[1]);
+	for (auto& stop : color_stops)
+	{
+		vkvg_pattern_add_color_stop_rgba(lg_left, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	vkvg_rect(cr, side_left);
+	vkvg_set_source(cr, lg_left);
+	vkvg_fill(cr);
+
+	//# right side
+	auto lg_right = vkvg_pattern_create_linear(side_right[0], side_right[1], side_right[0] + radius, side_right[1]);
+	for (auto& stop : color_stops)
+	{
+		vkvg_pattern_add_color_stop_rgba(lg_right, stop.o, stop.x, stop.y, stop.z, stop.w);
+	}
+	vkvg_rect(cr, side_right);
+	vkvg_set_source(cr, lg_right);
+	vkvg_fill(cr);
+
+	vkvg_flush(cr);
+	//vkvg_surface_resolve(surf);//msaa采样转换输出
+
+	vkvg_pattern_destroy(lg_top);
+	vkvg_pattern_destroy(lg_bottom);
+	vkvg_pattern_destroy(lg_left);
+	vkvg_pattern_destroy(lg_right);
+}
+#if 0
+image_sliced_t new_rect(const rect_shadow_t& rs)
+{
+	image_sliced_t r = {};
+	glm::ivec2 ss = { rs.radius * 3, rs.radius * 3 };
+	timg.resize(ss.x * ss.y);
+#ifdef _CR__
+	auto sur = new_image_cr(ss, timg.data());
+	cairo_t* cr = new_cr(sur);
+	// 边框阴影
+	draw_rectangle_gradient(cr, ss.x, ss.y, &rs);
+
+	image_ptr_t px = {};
+	px.width = ss.x;
+	px.height = ss.y;
+	px.type = 1;
+	px.stride = ss.x * sizeof(int);
+	px.data = timg.data();
+	px.comp = 4;
+	glm::ivec2 ps = {};
+	auto px0 = bcc.push_cache_bitmap(&px, &ps);
+	if (px0) {
+		r.img_rc = { 0,0,ss.x,ss.y };
+		r.tex_rc = { ps.x,ps.y,ss.x,ss.y };
+		r.sliced.x = r.sliced.y = r.sliced.z = r.sliced.w = rs.radius + 1;
+		r.color = -1;
+		img = px0;
+	}
+#ifdef _DEBUG
+	image_save_png(sur, "temp/gshadow.png");
+#endif
+	free_image_cr(sur);
+	free_cr(cr);
+#endif
+	return r;
+}
+#endif
+
 
 VkShaderModule newModule(VkDevice device, const uint32_t* SpvData, size_t SpvSize, VkResult* r)
 {
@@ -1985,15 +2144,15 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		vkvg_move_to(ctx, 100.f, 100);
 		vkvg_set_font_size(ctx, 30);
 		static const char* txt = "The quick brown fox jumps over the lazy dog";
-		vkvg_show_text(ctx, txt);
+		//vkvg_show_text(ctx, txt);
 
 	}
 
 	vkvg_flush(ctx);
-	//vkvg_restore(ctx);
 	if (!fn || !*fn)
 		fn = "temp/offscreen_vkvg.png";
 	vkvg_surface_resolve(surf);//msaa采样转换输出
+
 	vkvg_surface_write_to_png(surf, fn);
 	vkvg_destroy(ctx);
 	vkvg_surface_destroy(surf);
@@ -2017,4 +2176,64 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	//print_boxed(ctx, "This is a test string!", 20, 250, 20);
 	//print_boxed(ctx, "ANOTHER ONE TO CHECK..", 20, 350, 20);
 	//free_vkvgdev(vctx);
+
+	{
+		const char* filename = "temp/vkvg_gradient.png";
+		VkvgSurface surf = vctx->new_surface(256, 256);
+		auto ctx = vkvg_create(surf);
+		{
+			print_time ptt(filename);
+			VkvgPattern grad = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+			vkvg_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
+			vkvg_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
+			vkvg_set_source(ctx, grad);
+			vkvg_rectangle(ctx, 0, 0, 256, 256);
+			vkvg_fill(ctx);
+			VkvgPattern rg = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+			vkvg_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
+			vkvg_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
+			vkvg_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
+			vkvg_set_source(ctx, rg);
+			vkvg_rectangle(ctx, 0, 0, 256, 256);
+			vkvg_fill(ctx);
+			vkvg_pattern_destroy(grad);
+			vkvg_pattern_destroy(rg);
+		}
+		vkvg_flush(ctx);
+		vkvg_surface_resolve(surf);//msaa采样转换输出
+		vkvg_surface_write_to_png(surf, filename);
+		vkvg_destroy(ctx);
+		vctx->free_surface(surf);
+	}
+#if 0
+	{
+		const char* filename = "temp/cairo_gradient.png";
+		cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 256, 256);
+		cairo_t* ctx = cairo_create(surface);
+		//struct cairo_gradient_t* grad;
+		{
+			print_time ptt(filename);
+			cairo_pattern_t* grad = cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+			cairo_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
+			cairo_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
+			cairo_set_source(ctx, grad);
+			cairo_rectangle(ctx, 0, 0, 256, 256);
+			cairo_fill(ctx);
+			//cairo_pattern_t* rg = cairo_pattern_create_radial(15.2, 12.4, 25.6, 102.4, 102.4, 128.0);
+			cairo_pattern_t* rg = cairo_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+			cairo_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
+			cairo_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
+			cairo_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
+			cairo_set_source(ctx, rg);
+			//cairo_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
+			cairo_rectangle(ctx, 0, 0, 256, 256);
+			cairo_fill(ctx);
+			cairo_pattern_destroy(grad);
+			cairo_pattern_destroy(rg);
+		}
+		cairo_surface_write_to_png(surface, filename);
+		cairo_destroy(ctx);
+		cairo_surface_destroy(surface);
+	}
+#endif
 }
