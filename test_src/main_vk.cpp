@@ -1036,6 +1036,25 @@ int main()
 		//return 0;
 		//test_img();
 		auto app = new_app();
+		// 常用分辨率
+		glm::ivec2 dpis[] = {
+			{1024,768},
+			{1152,864},
+			{1280,720},
+			{1280,768},
+			{1280,800},
+			{1280,960},
+			{1280,1024},
+			{1360,768},
+			{1366,768},
+			{1400,1050},
+			{1440,900},
+			{1600,900},
+			{1680,1050},
+			{1920,1080},
+		};
+		// 渲染fbo尺寸比例从50%到200%,步长5%
+		int fbo_scale[3] = { 50,200,5 };
 
 #ifdef _DEBUG
 		system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
@@ -1247,35 +1266,8 @@ int main()
 		//	};
 		//ttw->mmove_type = 1;
 		//popw->mmove_type = 1;
-		//popw->_focus_lost_hide = 0;
-
-
-
-		//sdldev.vkdev = 0;
-		//vkdg_cx* vkd1 = new_vkdg(&sdldev);	// 创建vk渲染器  
-		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图
-		//if (vkd1) {
-		//	vkd1->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 15,0,8 }, 1.0);
-		//	vkd1->resize(1024, 800);				// 设置fbo缓冲区大小
-		//	auto vr = vkd1->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-		//	auto texok = form1->add_vkimage(vr.size, vr.vkimageptr, { 20,36 }, 1);// 创建SDL的bgra纹理 
-		//	//vkd->state.SelectedTonemapperIndex = 1;
-		//	vkd1->state.Exposure = 0.9928;
-		//	vkd1->state.EmissiveFactor = 250;
-		//	new_ui(form1, vkd1);
-		//	if (texok)
-		//	{
-		//		form1->up_cb = [=](float delta, int* ret)
-		//			{
-		//				auto light = vkd1->get_light(0);
-		//				vkd1->state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-		//				vkd1->state.Exposure;				// 曝光度：默认1.0
-		//				vkd1->state.bUseTAA;
-		//				vkd1->update(form1->io);	// 更新事件
-		//				vkd1->on_render();		// 执行渲染
-		//			};
-		//	}
-		//}
+		//popw->_focus_lost_hide = 0; 
+		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图 
 		if (vkd) {
 			{
 				int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
