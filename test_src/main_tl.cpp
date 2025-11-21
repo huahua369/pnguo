@@ -3071,3 +3071,53 @@ void tiled_data(const char* data)
 	//	}
 	//}
 }
+void testft()
+{
+
+
+
+	sue = family->familys[0];
+	//k8 = "fffittttt";
+
+	font_t::GlyphPositions gp = {};// 执行harfbuzz
+	auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 1, 0, &gp);
+
+
+	std::vector<vertex_f> vdp;
+	int gidx[3] = { 57889,57888,57890 };
+	image_gray bmp[1] = {};
+	bmp->width = bmp->height = 1024;
+	int fheight = 300;
+	auto bl = sue->get_base_line(fheight);
+	auto sc = sue->get_scale(fheight);
+	std::string fni = "temp/chu_x.png";
+	std::vector<uint32_t> idata;
+	idata.resize(bmp->width * bmp->height);
+	for (auto& it : idata) { it = 0xff000000; }
+	image_ptr_t rgba = {};
+	rgba.data = idata.data();
+	rgba.width = bmp->width;
+	rgba.height = bmp->height;
+	rgba.stride = bmp->width * 4;
+	rgba.comp = 4;
+	int posy = 100;
+	std::vector<glm::vec4> kvs;
+	for (int i = 0; i < 3; i++) {
+		auto vnn = sue->GetGlyphShapeTT(gidx[i], &vdp);
+		glm::vec4 box = {};
+		auto bs = sue->get_shape_box_glyph(gidx[i], fheight, &box);
+		kvs.push_back({ bs.x,bs.y,box.x,box.y });
+		get_path_bitmap((vertex_32f*)vdp.data(), vdp.size(), bmp, { sc,sc }, { box.x, box.y }, 1);
+		gray_copy2rgba(&rgba, bmp, { box.x,bl + box.y + posy }, glm::ivec4(0, 0, box.z, box.w), 0xff0080ff, true);
+		std::string fni0 = "temp/chu_" + std::to_string(i) + ".png";
+		save_img_png(bmp, fni0.c_str());
+	}
+	save_img_png(&rgba, fni.c_str());
+	size_t c = 0;
+	for (auto& it : bmp->_data) {
+		if (it > 0)
+		{
+			c++;
+		}
+	}
+}

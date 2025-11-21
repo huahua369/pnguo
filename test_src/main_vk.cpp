@@ -1058,6 +1058,119 @@ void c_render(text_render_o* p)
 	cairo_surface_destroy(img);
 
 }
+void c_render_data(text_render_o* p, image_ptr_t* dst)
+{
+	glm::vec2 pos = { 0, 0 };
+	std::vector<font_item_t>& tm = p->_vstr;
+	text_image_t opt = {};
+	int xx = 0;
+	uint32_t color = p->tb->style->color;
+	for (auto& git : tm) {
+		if (git._image) {
+			auto ps = git._dwpos + git._apos;
+			ps += pos;
+			rgba_copy2rgba(dst, git._image, ps, git._rect, git.color ? git.color : color, true);
+		}
+	}
+}
+
+void generateTriangleData(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<float>* opt, std::vector<uint32_t>* idx)
+{
+	glm::ivec2 tex_size = { img->width,img->height };
+	// 1. 计算矩形顶点（像素坐标）
+	glm::ivec2 A = glm::ivec2(rc.x, rc.y); // 左下
+	glm::ivec2 B = A + glm::ivec2(rc.z, 0); // 右下
+	glm::ivec2 C = A + glm::ivec2(rc.z, rc.w); // 右上
+	glm::ivec2 D = A + glm::ivec2(0, rc.w); // 左上
+	glm::vec2 A1 = dst_pos;
+	glm::vec2 B1 = dst_pos + glm::ivec2(rc.z, 0);
+	glm::vec2 C1 = dst_pos + glm::ivec2(rc.z, rc.w);
+	glm::vec2 D1 = dst_pos + glm::ivec2(0, rc.w);
+
+	// 2. 归一化因子
+	float inv_w = 1.0f / static_cast<float>(tex_size.x);
+	float inv_h = 1.0f / static_cast<float>(tex_size.y);
+
+	// 3. 归一化顶点坐标
+	auto normalize2 = [&](const glm::ivec2& p) -> glm::vec2 {
+		return glm::vec2(p.x * inv_w, p.y * inv_h);
+		};
+	glm::vec2 A_norm = normalize2(A);
+	glm::vec2 B_norm = normalize2(B);
+	glm::vec2 C_norm = normalize2(C);
+	glm::vec2 D_norm = normalize2(D);
+
+	// 4. 解析颜色
+	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
+
+	// 5. 生成顶点数组（6顶点，36个浮点数）
+	//std::vector<float> vertices = {
+	//	// 三角形1: A→B→C
+	//	A_norm.x, A_norm.y, r, g, b, a,
+	//	B_norm.x, B_norm.y, r, g, b, a,
+	//	C_norm.x, C_norm.y, r, g, b, a,
+
+	//	// 三角形2: A→C→D
+	//	A_norm.x, A_norm.y, r, g, b, a,
+	//	C_norm.x, C_norm.y, r, g, b, a,
+	//	D_norm.x, D_norm.y, r, g, b, a
+	//};
+	uint32_t ps = opt->size() / 8;
+	opt->insert(opt->end(), { A1.x, A1.y,A_norm.x, A_norm.y, c.x, c.y, c.z, c.w });
+	opt->insert(opt->end(), { B1.x, B1.y,B_norm.x, B_norm.y, c.x, c.y, c.z, c.w });
+	opt->insert(opt->end(), { C1.x, C1.y,C_norm.x, C_norm.y, c.x, c.y, c.z, c.w });
+	opt->insert(opt->end(), { D1.x, D1.y,D_norm.x, D_norm.y, c.x, c.y, c.z, c.w });
+	idx->insert(idx->end(), { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 });
+	return;
+}
+struct sdl3_textdata
+{
+	std::map<image_ptr_t*, void*> vt;
+	std::vector<float> opt; std::vector<uint32_t> idx;
+	texture_cb* rcb;
+	void* tex = 0;
+};
+void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
+{
+	std::vector<font_item_t>& tm = p->_vstr;
+	uint32_t color = p->tb->style->color;
+	void* tex = 0;
+	const int vsize = sizeof(float) * 8;
+	if (pt->opt.empty())
+	{
+		for (auto& git : tm) {
+			if (git._image) {
+				auto& tp = pt->vt[git._image];
+				if (!tp)
+				{
+					tp = pt->rcb->make_tex(renderer, git._image);
+				}
+				if (tex != tp)
+				{
+					if (tex && pt->opt.size()) {
+						auto nv = pt->opt.size() / 8;
+						pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+						pt->opt.clear();
+						pt->idx.clear();
+					}
+					tex = tp;
+					pt->tex = tp;
+				}
+				auto ps = git._dwpos + git._apos;
+				ps += pos;
+				generateTriangleData(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
+			}
+		}
+	}
+	if (pt->tex && pt->opt.size()) {
+		auto nv = pt->opt.size() / 8;
+		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		//pt->opt.clear();
+		//pt->idx.clear();
+	}
+}
 int main()
 {
 	auto k = time(0);
@@ -1093,7 +1206,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 
 		//{
@@ -1123,14 +1236,15 @@ int main()
 
 
 
-		//std::string k8 = (char*)u8"سلام➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
-		std::string k8 = (char*)u8"👨‍👨‍👧q";
+		std::string k8 = (char*)u8"سلام➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
+
+		std::string k80 = (char*)u8"👨‍👨‍👧q";//سلام
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
 		text_style ts = {};
 		ts.family = family;
-		ts.fontsize = 30;
-		ts.color = -1;
+		ts.fontsize = 50;
+		ts.color = 0xff00fF10;
 		ts.text_align = { 0.0,1.0 };
 		// 文本块
 		text_block tb = {};
@@ -1138,62 +1252,25 @@ int main()
 		tb.str = k8.c_str();
 		tb.first = 0;
 		tb.size = k8.size();
-		tb.rc = { 10,10,500,37 };
+		tb.rc = { 10,10,500,300 };
 		text_render_o trt = {};
 		build_text_render(&tb, &trt);
+
 		c_render(&trt);
-
-
+		std::vector<uint32_t> vd;
+		image_ptr_t dst = {};
+		glm::ivec2 imgsize = { 500,100 };
+		if (vd.size() < imgsize.x * imgsize.y)
+		{
+			vd.resize(imgsize.x * imgsize.y);
+		}
+		dst.data = vd.data();
+		dst.width = imgsize.x; dst.height = imgsize.y;
+		dst.comp = 4; dst.stride = dst.width * sizeof(uint32_t);
+		c_render_data(&trt, &dst);
 		//delete_font_family(family);
 
 
-
-
-
-		sue = family->familys[0];
-		//k8 = "fffittttt";
-
-		font_t::GlyphPositions gp = {};// 执行harfbuzz
-		auto nn0 = sue->CollectGlyphsFromFont(k8.data(), k8.size(), 8, 1, 0, &gp);
-
-
-		std::vector<vertex_f> vdp;
-		int gidx[3] = { 57889,57888,57890 };
-		image_gray bmp[1] = {};
-		bmp->width = bmp->height = 1024;
-		int fheight = 300;
-		auto bl = sue->get_base_line(fheight);
-		auto sc = sue->get_scale(fheight);
-		std::string fni = "temp/chu_x.png";
-		std::vector<uint32_t> idata;
-		idata.resize(bmp->width * bmp->height);
-		for (auto& it : idata) { it = 0xff000000; }
-		image_ptr_t rgba = {};
-		rgba.data = idata.data();
-		rgba.width = bmp->width;
-		rgba.height = bmp->height;
-		rgba.stride = bmp->width * 4;
-		rgba.comp = 4;
-		int posy = 100;
-		std::vector<glm::vec4> kvs;
-		for (int i = 0; i < 3; i++) {
-			auto vnn = sue->GetGlyphShapeTT(gidx[i], &vdp);
-			glm::vec4 box = {};
-			auto bs = sue->get_shape_box_glyph(gidx[i], fheight, &box);
-			kvs.push_back({ bs.x,bs.y,box.x,box.y });
-			get_path_bitmap((vertex_32f*)vdp.data(), vdp.size(), bmp, { sc,sc }, { box.x, box.y }, 1);
-			gray_copy2rgba(&rgba, bmp, { box.x,bl + box.y + posy }, glm::ivec4(0, 0, box.z, box.w), 0xff0080ff, true);
-			std::string fni0 = "temp/chu_" + std::to_string(i) + ".png";
-			save_img_png(bmp, fni0.c_str());
-		}
-		save_img_png(&rgba, fni.c_str());
-		size_t c = 0;
-		for (auto& it : bmp->_data) {
-			if (it > 0)
-			{
-				c++;
-			}
-		}
 		{
 
 
@@ -1374,6 +1451,10 @@ int main()
 			new_ui(form0, vkd);
 
 			texture_cb tcb = get_texture_cb();
+			auto pcb = &tcb;
+			auto ptrt = &trt;
+			auto ptstr = tcb.make_tex(form0->renderer, &dst);
+
 			// 动画测试
 			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)tcb.draw_geometry, (newTexture_fun)tcb.new_texture_0
 				, (UpdateTexture_fun)tcb.update_texture, (DestroyTexture_fun)tcb.free_texture, (SetTextureBlendMode_fun)tcb.set_texture_blend);
@@ -1388,13 +1469,19 @@ int main()
 			sp_drawable_set_pos(dd1, 500, 500);
 			if (tex3d)
 			{
+				sdl3_textdata* td3 = new sdl3_textdata();
+				td3->rcb = &tcb;
 				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 					{
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 10,10,vki.size.x,vki.size.y };
 						tcb.render_texture(renderer, tex3d, &tdt, 1);
-						sp_drawable_draw(dd1);
+						//sp_drawable_draw(dd1);
+						tdt.src_rect = { 0,0,dst.width,dst.height };
+						tdt.dst_rect = { 200,10,dst.width,dst.height };
+						//tcb.render_texture(renderer, ptstr, &tdt, 1);
+						r_render_data(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{

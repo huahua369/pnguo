@@ -565,7 +565,7 @@ void gray_copy2rgba(image_ptr_t* dst, image_gray* src, const glm::ivec2& dst_pos
 //单色位图1位
 void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color);
 
-void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, bool isblend);
+void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, bool isblend);
 
 void split_v(std::string str, const std::string& pattern, std::vector<std::string>& result);
 struct text_extents_t {

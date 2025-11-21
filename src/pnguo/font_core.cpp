@@ -6950,7 +6950,7 @@ image_ptr_t* bitmap_cache_cx::push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* po
 		case 32:
 		{
 			src.comp = 4;
-			rgba_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, true);
+			rgba_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, -1, true);
 		}
 		break;
 		default:
@@ -6998,7 +6998,7 @@ image_ptr_t* bitmap_cache_cx::push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2*
 		break;
 		case 4:
 		{
-			rgba_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, true);
+			rgba_copy2rgba(&dst, &src, { rc4.x,rc4.y }, { 0,0,rc4.z,rc4.w }, -1, true);
 		}
 		break;
 		default:
@@ -9754,7 +9754,17 @@ void bit_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos
 		}
 	}
 }
-void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, bool isblend)
+uint32_t multiply_colors(uint32_t color1, uint32_t color2) {
+	glm::vec4 c = *(glm::u8vec4*)&color1;
+	glm::vec4 c1 = *(glm::u8vec4*)&color2;
+	c /= 255;
+	c1 /= 255;
+	c *= c1;
+	c *= 255;
+	glm::u8vec4 col = c;
+	return *(uint32_t*)&col;
+}
+void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, bool isblend)
 {
 	if (src && src->data && src->comp == 4 && dst && dst->width > 0 && dst->height > 0 && dst->data && dst->comp == 4)
 	{
@@ -9768,7 +9778,7 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 		for (int j = 0; j < h && (j + dst_pos.y) < ts.y; j++)
 		{
 			auto pj = pitch * j;
-			auto pixel = bit + pj;
+			auto pixel = bit + pj + posx;
 			auto jp = j + dst_pos.y;
 			int64_t psy = (jp * ts.x);
 			if (psy < 0 || jp >= dst->height)
@@ -9782,6 +9792,8 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 				auto c = pixel[i];
 				if (c)
 				{
+					if (color != -1)
+						c = multiply_colors(c, color);
 					if (isblend)
 					{
 						px_blend2c(&dc[i + dst_pos.x], c, -1);
