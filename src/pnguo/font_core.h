@@ -584,6 +584,15 @@ typedef struct hb_buffer_t hb_buffer_t;
 typedef struct hb_glyph_position_t hb_glyph_position_t;
 #endif
 
+struct bidi_item
+{
+	//hb_script_t sc;
+	//std::string hs;
+	std::string s;
+	size_t first = 0, second = 0;
+	bool rtl = false;
+};
+
 struct font_family_t {
 	font_t** familys;
 	int count;
@@ -598,7 +607,10 @@ struct text_block_t {
 };
 struct text_run_t {
 	glm::ivec4 _rect = {};	// 文本框位置\大小
+	size_t first_line = 0;
+	int64_t posx = 0;
 	bool is_update = false;
+	bool autobr = false;
 	void* _private = 0;
 };
 typedef struct text_run_t* text_bp;
@@ -615,14 +627,34 @@ struct text_style
 	float fontsize = 0;
 	uint32_t color = 0;
 	glm::vec2 text_align = { 0.0,0.5 };
+	bool autobr = false;		// 是否自动换行
 };
 // 文本块
 struct text_block
 {
 	text_style* style = 0;
 	const char* str = 0; size_t first = 0; size_t size = 0;
-	glm::vec2 extents = {};   // 文本渲染大小
+	glm::ivec4 rc = {};   // 设置文本渲染 偏移大小
+	int line_height = 0;    // 行高，0则使用字体默认行高
+	int baseline = 0;       // 基线偏移，0则使用字体默认基线
 };
+
+struct strfont_t {
+	std::string_view v;
+	font_t* font;
+	bool rtl = false;
+	std::vector<font_t::GlyphPosition> _tnpos;
+};
+// 文本渲染对象
+struct text_render_o
+{
+	text_block* tb = 0;
+	std::vector<font_item_t> _vstr;	// 渲染数据
+	std::vector<strfont_t> _block;
+	std::vector<bidi_item> bv;
+};
+void build_text_render(text_block* tb, text_render_o* trt);
+
 struct image_block
 {
 	image_ptr_t* img = 0;
@@ -632,14 +664,16 @@ struct image_block
 	glm::vec4 sliced = {};			// 九宫格图片
 	uint32_t color = -1;			// 颜色混合
 };
-text_bp text_create();
-void text_free(text_bp p);
-void text_set_rect(text_bp p, const glm::ivec4& rc);
-// 添加文本块，图片块，可修改，最后调用text_update更新渲染数据，指针必需保留
-void text_add(text_bp p, text_block* tb);
-void text_add_image(text_bp p, image_block* img);
-void text_clear(text_bp p);
-void text_update(text_bp p);
+// 创建文本渲染，显示的宽高、是否自动换行
+//text_bp text_create(int width, int height, bool autobr = false);
+//void text_free(text_bp p);
+//// 设置显示的开始行号，x滚动偏移
+//void text_set_show(text_bp p, size_t first_line, int64_t x);
+//// 添加文本块，图片块，可修改，最后调用text_update更新渲染数据，指针必需保留
+//void text_add(text_bp p, text_block* tb);
+//void text_add_image(text_bp p, image_block* img);
+//void text_clear(text_bp p);
+//void text_update(text_bp p);
 
 
 

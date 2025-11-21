@@ -1026,6 +1026,38 @@ void vkvg_render(vkvg_dev* dev, font_t* sue, font_t::GlyphPositions& gp)
 	cairo_surface_destroy(img);
 
 }
+void c_render(text_render_o* p)
+{
+	glm::vec2 pos = { 0, 0 };
+	std::vector<font_item_t>& tm = p->_vstr;
+	text_image_t opt = {};
+	//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
+	auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
+	int xx = 0;
+	uint32_t color = 0xff0080f0;
+	auto cr = cairo_create(img);
+	for (auto& git : tm) {
+		if (git._image) {
+			auto ft = (cairo_surface_t*)git._image->ptr;
+			if (!ft) {
+				ft = new_image_cr(git._image);
+				git._image->ptr = ft;
+				cairo_surface_write_to_png(ft, "temp/cache_fonttest2.png");
+			}
+			if (ft)
+			{
+				auto ps = git._dwpos + git._apos;
+				ps += pos;
+				draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
+			}
+		}
+	}
+	std::string fn = "temp/fonttest2.png";
+	cairo_surface_write_to_png(img, fn.c_str());
+	cairo_destroy(cr);
+	cairo_surface_destroy(img);
+
+}
 int main()
 {
 	auto k = time(0);
@@ -1091,12 +1123,25 @@ int main()
 
 
 
-		std::string k8 = (char*)u8"سلام➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
+		//std::string k8 = (char*)u8"سلام➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
+		std::string k8 = (char*)u8"👨‍👨‍👧q";
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
-		//text_p text = text_create(k8.c_str(), k8.size(), family);
-		//text_update(text, 26);
-		//auto ptext = (text_run_cx*)text; 
 
+		text_style ts = {};
+		ts.family = family;
+		ts.fontsize = 30;
+		ts.color = -1;
+		ts.text_align = { 0.0,0.5 };
+		// 文本块
+		text_block tb = {};
+		tb.style = &ts;
+		tb.str = k8.c_str();
+		tb.first = 0;
+		tb.size = k8.size();
+		tb.rc = { 0,0,500,50 };
+		text_render_o trt = {};
+		build_text_render(&tb, &trt);
+		c_render(&trt);
 
 
 		//delete_font_family(family);

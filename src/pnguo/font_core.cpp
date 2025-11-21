@@ -8477,14 +8477,6 @@ struct str_info_t
 		str.p32 = (uint32_t*)s;
 	}
 };
-struct bidi_item
-{
-	//hb_script_t sc;
-	//std::string hs;
-	std::string s;
-	size_t first = 0, second = 0;
-	bool rtl = false;
-};
 enum class lt_dir
 {
 	invalid = 0,
@@ -9171,12 +9163,6 @@ void delete_font_family(font_family_t* p)
 	}
 }
 
-struct strfont_t {
-	std::string_view v;
-	font_t* font;
-	bool rtl = false;
-	std::vector<font_t::GlyphPosition> _tnpos;
-};
 
 struct value_block {
 	union {
@@ -9197,6 +9183,7 @@ public:
 	std::vector<font_item_t> _tm;
 	std::vector<strfont_t> _block;
 	std::vector<value_block> _value;
+
 public:
 	text_run_cx();
 	~text_run_cx();
@@ -9204,7 +9191,6 @@ public:
 private:
 
 };
-void text_update_text(text_bp p1, text_block* tb);
 
 text_run_cx::text_run_cx()
 {
@@ -9213,11 +9199,17 @@ text_run_cx::text_run_cx()
 text_run_cx::~text_run_cx()
 {
 }
-text_bp text_create()
+text_bp text_create(int width, int height, bool autobr)
 {
 	auto p = new text_run_cx();
 	text_bp pr = p;
-	pr->_private = p;
+	if (p)
+	{
+		p->_rect.z = width;
+		p->_rect.w = height;
+		pr->_private = p;
+		p->autobr = autobr;
+	}
 	return pr;
 }
 
@@ -9229,6 +9221,14 @@ void text_free(text_bp p)
 		delete p1;
 	}
 }
+void text_set_show(text_bp p, size_t first_line, int64_t x)
+{
+	if (!p)return;
+	auto p1 = (text_run_cx*)p->_private;
+	p->first_line = first_line;
+	p->posx = x;
+}
+
 void text_set_rect(text_bp p, const glm::ivec4& rc)
 {
 	if (!p)return;
@@ -9268,7 +9268,7 @@ void text_update(text_bp p)
 		if (it.type == 0)
 		{
 			auto tb = it.t;
-			text_update_text(p1, tb);
+			//text_update_text(p1, tb);
 		}
 		else if (it.type == 1)
 		{
@@ -9277,18 +9277,17 @@ void text_update(text_bp p)
 	return;
 }
 
-void text_set_bidi(text_bp p1, const char* str, size_t first, size_t count, font_family_t* family)
+void text_set_bidi(std::vector<bidi_item>& bv, const char* str, size_t first, size_t count, font_family_t* family)
 {
-	auto p = (text_run_cx*)p1->_private;
 	auto t = md::utf8_char_pos(str, first, count);
 	auto te = t + count;// md::utf8_char_pos(t, count, count);
 	auto wk = md::u8_u16(t, count);
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
 	{
-		p->bv.clear();
-		do_bidi((UChar*)str1, n, family, p->bv);
-		std::stable_sort(p->bv.begin(), p->bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
+		bv.clear();
+		do_bidi((UChar*)str1, n, family, bv);
+		std::stable_sort(bv.begin(), bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 	}
 	return;
 }
@@ -9378,6 +9377,8 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 			continue;
 		}
 		auto g = font->get_glyph_index0(ch, &rfont, p);
+		if (ch == 0x200d)
+			rfont = oft0;
 		if (oft0 != rfont)
 		{
 			if (rfont && str0 != str) {
@@ -9399,18 +9400,17 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 	return;
 }
 
-void text_update_text(text_bp p1, text_block* tb)
+void update_text(text_render_o* p, text_block* tb)
 {
-	if (!p1)return;
-	auto p = (text_run_cx*)p1->_private;
-	p->_tm.clear();
+	if (!p)return;
+	p->_vstr.clear();
 	p->_block.clear();
 	p->bv.clear();
 	std::vector<hb_tag_t> vv;
 	auto& vstr = p->_block;
 	vstr.clear();
 	auto t = tb->style;
-	text_set_bidi(p1, tb->str, tb->first, tb->size, t->family);
+	text_set_bidi(p->bv, tb->str, tb->first, tb->size, t->family);
 	for (auto& it : p->bv)
 	{
 		get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr);
@@ -9427,17 +9427,26 @@ void text_update_text(text_bp p1, text_block* tb)
 		auto nn0 = kt.font->CollectGlyphsFromFont(st.data(), st.size(), 8, kt.rtl, 0, &gp);
 		kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
 	}
+	int dh = tb->line_height;
+	int baseline = tb->baseline;
 	for (auto& kt : vstr)
 	{
 		if (!kt.font) {
 			font_item_t git = {}; git.cpt = kt.v[0];
-			p->_tm.push_back(git); continue;
+			p->_vstr.push_back(git); continue;
 		}
 		double scale_h = kt.font->get_scale(t->fontsize);
 		uint32_t color = -1;
-		int xx = 0;
-		int yy = kt.font->get_line_height(t->fontsize);
-		int h = kt.font->get_line_height(t->fontsize);
+		if (tb->line_height == 0)
+		{
+			int h = kt.font->get_line_height(t->fontsize);
+			dh = std::max(dh, h);
+		}
+		if (tb->baseline == 0)
+		{
+			int bl = kt.font->get_base_line(t->fontsize);
+			baseline = std::max(baseline, bl);
+		}
 		// 光栅化glyph index并缓存
 		for (auto& gt : kt._tnpos)
 		{
@@ -9445,10 +9454,87 @@ void text_update_text(text_bp p1, text_block* tb)
 			auto git = kt.font->get_glyph_item(pos->index, 0, t->fontsize);
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._apos = offset;
-			p->_tm.push_back(git);
+			git.advance = ceil(pos->x_advance * scale_h);
+			p->_vstr.push_back(git);
 		}
 	}
+	glm::vec2 rct = {};
+	float xxx = 0;
+	int line_count = 1;
+	auto ta = tb->style->text_align;
+	glm::vec2 tps = {};
+	glm::ivec4 rc = tb->rc;
+	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
+	if (tb->style->autobr && rc.z > 0)
+	{
+		auto ps = bearing;
+		ps.x += rc.x;
+		ps.y += rc.y;
+		for (auto& it : p->_vstr)
+		{
+			if (it.cpt == '\n' || tps.x + it.advance > ss.x)
+			{
+				tps.y += dh;
+				tps.x = 0;
+			}
+			if (it.cpt == '\t')
+			{
+				it.advance = t->fontsize;
+			}
+			it._dwpos += it._apos;
+			it._apos = ps + tps;
+			tps.x += it.advance;
+		}
+	}
+	else
+	{
+		for (auto& it : p->_vstr)
+		{
+			if (it.cpt == '\t' && it.advance < 1)
+			{
+				it.advance = t->fontsize;
+			}
+			if (it.cpt == '\n')
+			{
+				rct.x = std::max(rct.x, xxx);
+				line_count++;
+			}
+			else
+			{
+				xxx += it.advance;
+			}
+		}
+		rct.y = line_count * dh;
+		if (ta.x < 0)ta.x = 0;
+		if (ta.y < 0)ta.y = 0;
+		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
+		auto ps = (ss - rct) * ta + bearing;
+		ps.x += rc.x;
+		ps.y += rc.y;
+		for (auto& it : p->_vstr)
+		{
+			if (it.cpt == '\n')
+			{
+				tps.y += dh;
+				tps.x = 0;
+			}
+			if (it.cpt == '\t')
+			{
+				it.advance = t->fontsize;
+			}
+			it._dwpos += it._apos;
+			it._apos = ps + tps;
+			tps.x += it.advance;
+		}
+	}
+	p->tb = tb;
 	return;
+}
+
+void build_text_render(text_block* tb, text_render_o* trt)
+{
+	if (!tb || !trt)return;
+	update_text(trt, tb);
 }
 
 /*
