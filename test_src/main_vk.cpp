@@ -1131,14 +1131,14 @@ int main()
 		ts.family = family;
 		ts.fontsize = 30;
 		ts.color = -1;
-		ts.text_align = { 0.0,0.5 };
+		ts.text_align = { 0.0,1.0 };
 		// 文本块
 		text_block tb = {};
 		tb.style = &ts;
 		tb.str = k8.c_str();
 		tb.first = 0;
 		tb.size = k8.size();
-		tb.rc = { 0,0,500,50 };
+		tb.rc = { 10,10,500,37 };
 		text_render_o trt = {};
 		build_text_render(&tb, &trt);
 		c_render(&trt);

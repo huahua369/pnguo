@@ -9455,6 +9455,7 @@ void update_text(text_render_o* p, text_block* tb)
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._apos = offset;
 			git.advance = ceil(pos->x_advance * scale_h);
+			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);
 		}
 	}
@@ -9504,6 +9505,7 @@ void update_text(text_render_o* p, text_block* tb)
 				xxx += it.advance;
 			}
 		}
+		rct.x = std::max(rct.x, xxx);
 		rct.y = line_count * dh;
 		if (ta.x < 0)ta.x = 0;
 		if (ta.y < 0)ta.y = 0;
