@@ -1073,8 +1073,8 @@ void c_render_data(text_render_o* p, image_ptr_t* dst)
 		}
 	}
 }
-
-void generateTriangleData(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<float>* opt, std::vector<uint32_t>* idx)
+// generateTriangleData
+void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<float>* opt, std::vector<uint32_t>* idx)
 {
 	glm::ivec2 tex_size = { img->width,img->height };
 	// 1. 计算矩形顶点（像素坐标）
@@ -1124,9 +1124,17 @@ void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_
 	uint32_t color = p->tb->style->color;
 	void* tex = 0;
 	const int vsize = sizeof(float) * 8;
+	static size_t x = -1;
+	static size_t x1 = 0;
+	if (x1 != x)
+	{
+		pt->opt.clear(); pt->idx.clear(); x1 = x;
+	}
 	if (pt->opt.empty())
 	{
-		for (auto& git : tm) {
+		for (size_t i = 0; i < tm.size() && i < x; i++)
+		{
+			auto& git = tm[i];
 			if (git._image) {
 				auto& tp = pt->vt[git._image];
 				if (!tp)
@@ -1147,7 +1155,7 @@ void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
-				generateTriangleData(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
+				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
 			}
 		}
 	}
@@ -1224,7 +1232,7 @@ int main()
 
 
 
-		std::string k8 = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
+		std::string k8 = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧q我\n的大刀";
 
 		std::string k80 = (char*)u8"👨‍👨‍👧q";//سلام
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
@@ -1233,17 +1241,16 @@ int main()
 		ts.family = family;
 		ts.fontsize = 50;
 		ts.color = 0xff00fF10;
-		ts.text_align = { 0.0,1.0 };
 		// 文本块
 		text_block tb = {};
 		tb.style = &ts;
 		tb.str = k8.c_str();
 		tb.first = 0;
 		tb.size = k8.size();
-		tb.rc = { 10,10,500,300 };
 		text_render_o trt = {};
+		trt.box.rc = { 0,0,200,500 };
+		trt.box.autobr = true;
 		build_text_render(&tb, &trt);
-
 		c_render(&trt);
 		std::vector<uint32_t> vd;
 		image_ptr_t dst = {};

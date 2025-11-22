@@ -2469,7 +2469,7 @@ uint32_t font_t::CollectGlyphsFromFont(const void* text, size_t length, int type
 			pos->y_advance = hb_glyph_position[i].y_advance;
 			pos->x_offset = hb_glyph_position[i].x_offset;
 			pos->y_offset = hb_glyph_position[i].y_offset;
-			pos->offset = (int)hb_glyph_info[i].cluster;
+			pos->cluster = (int)hb_glyph_info[i].cluster;
 			//if (!Find_GlyphByIndex(font, pos->index, 0, 0, 0, 0, 0, 0, &pos->glyph, NULL)) 
 			if (pos->index <= 0)continue;
 		}
@@ -9288,16 +9288,15 @@ void text_set_bidi(std::vector<bidi_item>& bv, const char* str, size_t first, si
 	auto wk = md::u8_u16(t, count);
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
-	std::vector<std::wstring> vw1, vw2;
+	//std::vector<std::wstring> vw1, vw2;
 	{
 		bv.clear();
 		do_bidi((UChar*)str1, n, family, bv);
 		std::stable_sort(bv.begin(), bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
-		
-		for (auto& it : bv) {
-			vw1.push_back(md::u8_w(it.s));
-			vw2.push_back(std::wstring(str1 + it.first, str1 + it.second));
-		}
+		//for (auto& it : bv) {
+		//	vw1.push_back(md::u8_w(it.s));
+		//	vw2.push_back(std::wstring(str1 + it.first, str1 + it.second));
+		//}
 	}
 	return;
 }
@@ -9391,7 +9390,7 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 			rfont = oft0;
 		if (oft0 != rfont)
 		{
-			if (rfont && str0 != str) {
+			if (oft0 && str0 != str) {
 				strfont_t t = {};
 				t.v = std::string_view(str0, str);
 				t.rtl = rtl;
@@ -9412,13 +9411,10 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 
 void update_text(text_render_o* p, text_block* tb)
 {
-	if (!p)return;
-	p->_vstr.clear();
-	p->_block.clear();
-	p->bv.clear();
+	if (!p || !tb || !tb->style)return;
 	std::vector<hb_tag_t> vv;
+	text_render_clear(p);
 	auto& vstr = p->_block;
-	vstr.clear();
 	auto t = tb->style;
 	text_set_bidi(p->bv, tb->str, tb->first, tb->size, t->family);
 	for (auto& it : p->bv)
@@ -9463,36 +9459,56 @@ void update_text(text_render_o* p, text_block* tb)
 			auto pos = &gt;
 			auto git = kt.font->get_glyph_item(pos->index, 0, t->fontsize);
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-			git._apos = offset;
+			git._dwpos += offset;
 			git.advance = ceil(pos->x_advance * scale_h);
+			git.cluster = gt.cluster;
+			if (git.cpt == '\t')
+			{
+				git.advance = t->fontsize;
+			}
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);
 		}
 	}
+	tb->line_height = dh;
+	tb->baseline = baseline;
+	p->tb = (tb);
+	return;
+}
+void text_render_layout1(text_render_o* p) {
+	if (!p || !p->tb)return;
+	auto tb = p->tb;
 	glm::vec2 rct = {};
 	float xxx = 0;
 	int line_count = 1;
-	auto ta = tb->style->text_align;
+	auto ta = p->box.text_align;
 	glm::vec2 tps = {};
-	glm::ivec4 rc = tb->rc;
-	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0, baseline };
-	if (tb->style->autobr && rc.z > 0)
+	glm::ivec4 rc = p->box.rc;
+	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,tb->baseline };
+	float fontsize = tb->style->fontsize;
+	if (p->box.autobr && rc.z > 0)
 	{
 		auto ps = bearing;
 		ps.x += rc.x;
 		ps.y += rc.y;
-		for (auto& it : p->_vstr)
+		size_t xx = 0;
+		int cluster = -1, cpt = -1;
+		auto t = p->_vstr.data();
+		for (size_t i = 0; i < p->_vstr.size(); i++, t++)
 		{
-			if (it.cpt == '\n' || tps.x + it.advance > ss.x)
+			auto& it = *t;
+			xx = 0;
+			auto t1 = t;
+			for (; it.cpt == 0 && it.cluster == t->cluster; t++)
 			{
-				tps.y += dh;
+				xx += t->advance;
+			}
+			t = t1;
+			if (it.cpt == '\n' || tps.x + xx > ss.x)
+			{
+				tps.y += tb->line_height;
 				tps.x = 0;
 			}
-			if (it.cpt == '\t')
-			{
-				it.advance = t->fontsize;
-			}
-			it._dwpos += it._apos;
 			it._apos = ps + tps;
 			tps.x += it.advance;
 		}
@@ -9501,10 +9517,6 @@ void update_text(text_render_o* p, text_block* tb)
 	{
 		for (auto& it : p->_vstr)
 		{
-			if (it.cpt == '\t' && it.advance < 1)
-			{
-				it.advance = t->fontsize;
-			}
 			if (it.cpt == '\n')
 			{
 				rct.x = std::max(rct.x, xxx);
@@ -9516,7 +9528,7 @@ void update_text(text_render_o* p, text_block* tb)
 			}
 		}
 		rct.x = std::max(rct.x, xxx);
-		rct.y = line_count * dh;
+		rct.y = line_count * tb->line_height;
 		if (ta.x < 0)ta.x = 0;
 		if (ta.y < 0)ta.y = 0;
 		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
@@ -9527,26 +9539,32 @@ void update_text(text_render_o* p, text_block* tb)
 		{
 			if (it.cpt == '\n')
 			{
-				tps.y += dh;
+				tps.y += tb->line_height;
 				tps.x = 0;
 			}
-			if (it.cpt == '\t')
-			{
-				it.advance = t->fontsize;
-			}
-			it._dwpos += it._apos;
 			it._apos = ps + tps;
 			tps.x += it.advance;
 		}
 	}
-	p->tb = tb;
-	return;
+}
+void text_render_set(text_render_o* p, text_box_t* b)
+{
+	if (!p || !b)return;
+	p->box = *b;
+}
+void text_render_clear(text_render_o* p)
+{
+	if (!p)return;
+	p->_vstr.clear();
+	p->_block.clear();
+	p->bv.clear();
 }
 
 void build_text_render(text_block* tb, text_render_o* trt)
 {
 	if (!tb || !trt)return;
 	update_text(trt, tb);
+	text_render_layout1(trt);
 }
 
 /*

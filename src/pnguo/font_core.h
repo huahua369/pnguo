@@ -181,15 +181,15 @@ public:
 	};
 	struct GlyphPosition {
 		uint32_t index;
-		c_glyph* glyph;
-		font_t* font;
+		int cluster;
+		//c_glyph* glyph;
 		int x_offset;
 		int y_offset;
 		int x_advance;
 		int y_advance;
 		int x;
 		int y;
-		int offset;
+		font_t* font;
 	};
 	struct GlyphPositions {
 		GlyphPosition* pos;
@@ -351,6 +351,7 @@ struct font_item_t
 {
 public:
 	uint32_t _glyph_index = 0;
+	int cluster;
 	// 原始的advance
 	int advance = 0;
 	// 渲染偏移坐标
@@ -626,7 +627,11 @@ struct text_style
 	font_family_t* family = 0;
 	float fontsize = 0;
 	uint32_t color = 0;
-	glm::vec2 text_align = { 0.0,0.5 };
+};
+// 文本区域
+struct text_box_t {
+	glm::ivec4 rc = {};		// 设置文本渲染区域，偏移/大小
+	glm::vec2 text_align = { 0.0,0.0 };// 文本对齐
 	bool autobr = false;		// 是否自动换行
 };
 // 文本块
@@ -634,7 +639,6 @@ struct text_block
 {
 	text_style* style = 0;
 	const char* str = 0; size_t first = 0; size_t size = 0;
-	glm::ivec4 rc = {};   // 设置文本渲染 偏移大小
 	int line_height = 0;    // 行高，0则使用字体默认行高
 	int baseline = 0;       // 基线偏移，0则使用字体默认基线
 };
@@ -648,12 +652,17 @@ struct strfont_t {
 // 文本渲染对象
 struct text_render_o
 {
+	text_box_t box = {};
 	text_block* tb = 0;
 	std::vector<font_item_t> _vstr;	// 渲染数据
 	std::vector<strfont_t> _block;
 	std::vector<bidi_item> bv;
 };
+void text_render_set(text_render_o* p, text_box_t* b);
+void text_render_clear(text_render_o* p);
 void build_text_render(text_block* tb, text_render_o* trt);
+
+
 
 struct image_block
 {

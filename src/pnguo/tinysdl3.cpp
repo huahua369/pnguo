@@ -1226,12 +1226,19 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 		{
 			if (ptx)
 			{
-				glm::vec2 oldss = {};
-				if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
-					glm::ivec2 iss = oldss;
-					if (img->width != iss.x || img->height != iss.y) {
-						SDL_DestroyTexture(ptx);
-						ptx = nullptr;
+				if (renderer != SDL_GetRendererFromTexture(ptx))
+				{
+					SDL_DestroyTexture(ptx);
+					ptx = nullptr;
+				}else
+				{
+					glm::vec2 oldss = {};
+					if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
+						glm::ivec2 iss = oldss;
+						if (img->width != iss.x || img->height != iss.y) {
+							SDL_DestroyTexture(ptx);
+							ptx = nullptr;
+						}
 					}
 				}
 			}
