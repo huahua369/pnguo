@@ -1101,20 +1101,8 @@ void generateTriangleData(image_ptr_t* img, const glm::ivec2& dst_pos, const glm
 	glm::vec2 D_norm = normalize2(D);
 
 	// 4. 解析颜色
-	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
-
-	// 5. 生成顶点数组（6顶点，36个浮点数）
-	//std::vector<float> vertices = {
-	//	// 三角形1: A→B→C
-	//	A_norm.x, A_norm.y, r, g, b, a,
-	//	B_norm.x, B_norm.y, r, g, b, a,
-	//	C_norm.x, C_norm.y, r, g, b, a,
-
-	//	// 三角形2: A→C→D
-	//	A_norm.x, A_norm.y, r, g, b, a,
-	//	C_norm.x, C_norm.y, r, g, b, a,
-	//	D_norm.x, D_norm.y, r, g, b, a
-	//};
+	glm::vec4 c = ucolor2f(color);
+	// 5. 生成顶点数组（4顶点，32个浮点数）
 	uint32_t ps = opt->size() / 8;
 	opt->insert(opt->end(), { A1.x, A1.y,A_norm.x, A_norm.y, c.x, c.y, c.z, c.w });
 	opt->insert(opt->end(), { B1.x, B1.y,B_norm.x, B_norm.y, c.x, c.y, c.z, c.w });
@@ -1127,7 +1115,7 @@ struct sdl3_textdata
 {
 	std::map<image_ptr_t*, void*> vt;
 	std::vector<float> opt; std::vector<uint32_t> idx;
-	texture_cb* rcb;
+	texture_cb* rcb = 0;
 	void* tex = 0;
 };
 void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
@@ -1206,7 +1194,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 
 		//{
@@ -1236,7 +1224,7 @@ int main()
 
 
 
-		std::string k8 = (char*)u8"سلام➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
+		std::string k8 = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌🟦⬜👨‍👨‍👧q我\n的大刀";
 
 		std::string k80 = (char*)u8"👨‍👨‍👧q";//سلام
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");

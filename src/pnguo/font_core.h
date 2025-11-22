@@ -4,7 +4,7 @@
 #ifndef FONT_CORE_H
 #define FONT_CORE_H
 
-
+glm::vec4 ucolor2f(uint32_t c);
 struct vertex_f
 {
 	float x, y, cx, cy, cx1, cy1;

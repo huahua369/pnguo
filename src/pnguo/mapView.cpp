@@ -442,7 +442,7 @@ namespace md {
 			// 基本平面字符或非法序列（此处简化处理）
 			utf32[0] = (uint32_t)code;
 		}
-		return i; // 返回转换后的UTF-32字符数 
+		return i + 1; // 返回转换后的UTF-32字符数 
 	}
 
 	std::string u16_u8(uint16_t* str, size_t len)
@@ -450,7 +450,8 @@ namespace md {
 		char utf8_str[8] = {};
 		std::string r;
 		auto t = str;
-		for (size_t i = 0; t && *t && i < len; ++i, t++) {
+		auto t1 = t + len;
+		for (; t && *t && t < t1; ) {
 			uint32_t ch = 0;
 			auto n = utf16_to_utf32(t, &ch);
 			t += n;

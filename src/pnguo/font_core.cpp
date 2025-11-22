@@ -40,7 +40,11 @@
 
 typedef uint16_t Offset16;
 typedef uint32_t Offset32;
-
+glm::vec4 ucolor2f(uint32_t color)
+{
+	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
+	return c;
+}
 /*
 * 获取字体信息名
 1 family名
@@ -9055,7 +9059,7 @@ void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_
 		}
 	} while (0);
 
-
+	std::vector<bidi_item>& v1 = info;
 	UBiDi* bidi = icub->_ubidi_open();
 	UBiDiLevel bidiReq = UBIDI_DEFAULT_LTR;
 	int stringLen = len;
@@ -9080,8 +9084,8 @@ void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_
 				bool isRTL = (runDir == UBIDI_RTL);
 				std::string u8strd = md::u16_u8((uint16_t*)(testChars + startRun), lengthRun);
 				size_t endRun = startRun + lengthRun;
-				info.push_back({ /*sc,scrn,*/ u8strd,  (size_t)(testChars + startRun), endRun, isRTL });
-#if 0
+				//info.push_back({ /*sc,scrn,*/ u8strd,  (size_t)(startRun), endRun, isRTL });
+#if 1
 				//printf("Processing Bidi Run = %lld -- run-start = %d, run-len = %d, isRTL = %d\n", i, startRun, lengthRun, isRTL);
 				BidiScriptRunRecords scriptRunRecords;
 				collectBidiScriptRuns(scriptRunRecords, testChars, startRun, lengthRun, isRTL, family);
@@ -9104,7 +9108,7 @@ void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_
 					auto scrn = icub->_uscript_getName(code);
 					auto sc = get_script(scrn);
 					std::string u8strd = md::u16_u8((uint16_t*)(testChars + start), end - start);
-					info.push_back({ /*sc,scrn,*/ u8strd, start, end, isRTL });
+					v1.push_back({ /*sc,scrn,*/ u8strd, start, end, isRTL });
 					//printf("Script '%s' from %d to %d.\t%d\n", scrn, start, end, sc);
 				}
 #endif
@@ -9284,10 +9288,16 @@ void text_set_bidi(std::vector<bidi_item>& bv, const char* str, size_t first, si
 	auto wk = md::u8_u16(t, count);
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
+	std::vector<std::wstring> vw1, vw2;
 	{
 		bv.clear();
 		do_bidi((UChar*)str1, n, family, bv);
 		std::stable_sort(bv.begin(), bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
+		
+		for (auto& it : bv) {
+			vw1.push_back(md::u8_w(it.s));
+			vw2.push_back(std::wstring(str1 + it.first, str1 + it.second));
+		}
 	}
 	return;
 }
