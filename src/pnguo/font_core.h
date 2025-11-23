@@ -669,18 +669,35 @@ void text_render_set(text_render_o* p, text_box_t* b);
 void text_render_clear(text_render_o* p);
 void build_text_render(text_block* tb, text_render_o* trt);
 void text_render_layout1(text_render_o* p);
-
-
-
 struct image_block
 {
 	image_ptr_t* img = 0;
-	glm::vec2 pos;					// 渲染位置*排版设置
+	glm::ivec2 pos;					// 渲染位置*排版设置
 	glm::vec4 rc;					// 图片区域
 	glm::vec2 dsize = { -1,-1 };	// 渲染大小
 	glm::vec4 sliced = {};			// 九宫格图片
 	uint32_t color = -1;			// 颜色混合
 };
+struct lay_value
+{
+	union {
+		std::vector<font_item_t>* v = 0;
+		image_block* img;
+	}d;
+	text_block* tb = 0;
+	int type = 0;
+};
+struct layout_tx
+{
+	text_box_t box = {};
+	std::vector<lay_value> value;
+};
+// 图文布局
+void text_multi_add(layout_tx* p, text_render_o* t);
+void text_multi_add_i(layout_tx* p, image_block* t);
+void text_multi_layout(layout_tx* p);
+
+
 // 创建文本渲染，显示的宽高、是否自动换行
 //text_bp text_create(int width, int height, bool autobr = false);
 //void text_free(text_bp p);

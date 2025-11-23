@@ -9746,7 +9746,6 @@ void text_render_layout1(text_render_o* p) {
 	glm::vec2 tps = {};
 	glm::ivec4 rc = p->box.rc;
 	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,tb->baseline };
-	float fontsize = tb->style->fontsize;
 	if (p->box.auto_break && rc.z > 0)
 	{
 		auto ps = bearing;
@@ -9825,6 +9824,113 @@ void build_text_render(text_block* tb, text_render_o* trt)
 	if (!tb || !trt)return;
 	update_text(trt, tb);
 	text_render_layout1(trt);
+}
+void get_lineheight(std::vector<lay_value>& v, int w, const glm::vec2& ps)
+{
+	int lineheight = 0;
+	glm::vec2 tps = {};
+	size_t xx = 0;
+	size_t ww = w;
+	if (w < 1)
+	{
+		ww = -1;
+	}
+	size_t vc = 0;
+	struct linedt
+	{
+		std::vector<glm::ivec2*> lined;
+		int h = 0;
+	};
+	std::vector<linedt> ls;
+	std::vector<glm::ivec2*> lined;
+	for (auto& kt : v)
+	{
+		if (kt.type == 0)
+		{
+			auto tb = kt.tb;
+			auto t = kt.d.v->data();
+			auto cn = kt.d.v->size();
+			for (size_t i = 0; i < cn; i++, t++)
+			{
+				auto& it = *t;
+				xx = 0;
+				auto t1 = t;
+				for (; it.cpt == 0 && it.user_ptr == t->user_ptr; t++)
+				{
+					xx += t->advance;
+				}
+				t = t1;
+				if (it.cpt == '\n' || tps.x + xx > ww)
+				{
+					lineheight = std::max(lineheight, (int)tb->line_height);
+					ls.push_back({ lined,lineheight });
+					lined.clear();
+					tps.x = 0;
+				}
+				it._apos = ps + tps;
+				it._apos.y += tb->baseline;
+				lined.push_back(&it._apos);
+				tps.x += it.advance;
+			}
+		}
+		else {
+			auto t = kt.d.img;
+			if (tps.x + t->dsize.x > ww)
+			{
+				ls.push_back({ lined,lineheight });
+				lined.clear();
+				tps.x = 0;
+			}
+			lined.push_back(&t->pos);
+			t->pos = ps + tps;
+			tps.x += t->dsize.x;
+			lineheight = std::max(lineheight, (int)t->dsize.y);
+		}
+		vc++;
+	}
+	if (lined.size())
+		ls.push_back({ lined,lineheight });
+	lineheight = 0;
+	for (auto& it : ls) {
+		for (auto& dt : it.lined) {
+			dt->y += lineheight;
+		}
+		lineheight += it.h;
+	}
+}
+void text_multi_add(layout_tx* p, text_render_o* t)
+{
+	if (p && t) {
+		lay_value v = {};
+		v.d.v = &t->_vstr;
+		v.type = 0;
+		v.tb = t->tb;
+		p->value.push_back(v);
+	}
+}
+void text_multi_add_i(layout_tx* p, image_block* t)
+{
+	if (p && t) {
+		lay_value v = {};
+		v.d.img = t;
+		v.type = 1;
+		p->value.push_back(v);
+	}
+}
+void text_multi_layout(layout_tx* p)
+{
+	if (!p || p->value.empty())return;
+	glm::vec2 rct = {};
+	float xxx = 0;
+	int line_count = 1;
+	auto ta = p->box.text_align;
+	glm::vec2 tps = {};
+	glm::ivec4 rc = p->box.rc;
+	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,0 };
+	auto ps = bearing;
+	ps.x += rc.x;
+	ps.y += rc.y;
+	get_lineheight(p->value, (p->box.auto_break && rc.z > 0) ? rc.z : -1, ps);
 }
 
 /*
