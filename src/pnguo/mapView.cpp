@@ -465,6 +465,25 @@ namespace md {
 		return r;
 	}
 
+	void u16_u8(uint16_t* str, size_t len, std::string& r)
+	{
+		char utf8_str[8] = {};
+		auto t = str;
+		auto t1 = t + len;
+		for (; t && *t && t < t1; ) {
+			uint32_t ch = 0;
+			auto n = utf16_to_utf32(t, &ch);
+			t += n;
+			unicode_to_utf8(utf8_str, ch);
+			if (utf8_str[0])
+			{
+				r += utf8_str; utf8_str[0] = 0;
+			}
+			else { break; }
+		}
+		return;
+	}
+
 
 
 #if 1

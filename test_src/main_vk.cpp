@@ -1128,6 +1128,7 @@ void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_
 	static size_t x1 = 0;
 	if (x1 != x)
 	{
+		text_render_layout1(p);
 		pt->opt.clear(); pt->idx.clear(); x1 = x;
 	}
 	if (pt->opt.empty())
@@ -1232,7 +1233,7 @@ int main()
 
 
 
-		std::string k8 = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧q我\n的大刀";
+		std::string k8 = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
 		std::string k80 = (char*)u8"👨‍👨‍👧q";//سلام
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
@@ -1248,8 +1249,9 @@ int main()
 		tb.first = 0;
 		tb.size = k8.size();
 		text_render_o trt = {};
-		trt.box.rc = { 0,0,200,500 };
-		trt.box.autobr = true;
+		trt.box.rc = { 0,0,260,500 };
+		trt.box.auto_break = true;
+		trt.box.word_wrap = 0;
 		build_text_render(&tb, &trt);
 		c_render(&trt);
 		std::vector<uint32_t> vd;

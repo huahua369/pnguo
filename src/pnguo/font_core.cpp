@@ -30,7 +30,8 @@
 #include <unicode/unistr.h>
 #include <unicode/ustring.h>
 #include <unicode/ubidi.h> 
-#include <unicode/uscript.h>  
+#include <unicode/uscript.h>
+#include <unicode/brkiter.h>
 #endif
 
 #include <stb_image.h>
@@ -7791,6 +7792,30 @@ struct icu_lib_t
 	const UCharsetMatch* (*_ucsdet_detect)(UCharsetDetector* ucsd, UErrorCode* status);
 	const char* (*_ucsdet_getName)(const UCharsetMatch* ucsm, UErrorCode* status);
 
+	UBreakIterator* (*_ubrk_open)(UBreakIteratorType type, const char* locale, const UChar* text, int32_t textLength, UErrorCode* status);
+	UBreakIterator* (*_ubrk_openRules)(const UChar* rules, int32_t rulesLength, const UChar* text, int32_t textLength, UParseError* parseErr, UErrorCode* status);
+	UBreakIterator* (*_ubrk_openBinaryRules)(const uint8_t* binaryRules, int32_t rulesLength, const UChar* text, int32_t textLength, UErrorCode* status);
+	UBreakIterator* (*_ubrk_safeClone)(const UBreakIterator* bi, void* stackBuffer, int32_t* pBufferSize, UErrorCode* status);
+	UBreakIterator* (*_ubrk_clone)(const UBreakIterator* bi, UErrorCode* status);
+	void (*_ubrk_close)(UBreakIterator* bi);
+	void (*_ubrk_setText)(UBreakIterator* bi, const UChar* text, int32_t textLength, UErrorCode* status);
+	void (*_ubrk_setUText)(UBreakIterator* bi, UText* text, UErrorCode* status);
+	int32_t(*_ubrk_current)(const UBreakIterator* bi);
+	int32_t(*_ubrk_next)(UBreakIterator* bi);
+	int32_t(*_ubrk_previous)(UBreakIterator* bi);
+	int32_t(*_ubrk_first)(UBreakIterator* bi);
+	int32_t(*_ubrk_last)(UBreakIterator* bi);
+	int32_t(*_ubrk_preceding)(UBreakIterator* bi, int32_t offset);
+	int32_t(*_ubrk_following)(UBreakIterator* bi, int32_t offset);
+	const char* (*_ubrk_getAvailable)(int32_t index);
+	int32_t(*_ubrk_countAvailable)(void);
+	UBool(*_ubrk_isBoundary)(UBreakIterator* bi, int32_t offset);
+	int32_t(*_ubrk_getRuleStatus)(UBreakIterator* bi);
+	int32_t(*_ubrk_getRuleStatusVec)(UBreakIterator* bi, int32_t* fillInVec, int32_t capacity, UErrorCode* status);
+	const char* (*_ubrk_getLocaleByType)(const UBreakIterator* bi, ULocDataLocaleType type, UErrorCode* status);
+	void (*_ubrk_refreshUText)(UBreakIterator* bi, UText* text, UErrorCode* status);
+	int32_t(*_ubrk_getBinaryRules)(UBreakIterator* bi, uint8_t* binaryRules, int32_t rulesCapacity, UErrorCode* status);
+
 	void* _handle;
 };
 
@@ -7803,6 +7828,29 @@ static std::vector<std::string> icu_funstr = { "ubidi_setPara","ubidi_countRuns"
 "ucsdet_setDeclaredEncoding",
 "ucsdet_detect",
 "ucsdet_getName",
+"ubrk_open",
+"ubrk_openRules",
+"ubrk_openBinaryRules",
+"ubrk_safeClone",
+"ubrk_clone",
+"ubrk_close",
+"ubrk_setText",
+"ubrk_setUText",
+"ubrk_current",
+"ubrk_next",
+"ubrk_previous",
+"ubrk_first",
+"ubrk_last",
+"ubrk_preceding",
+"ubrk_following",
+"ubrk_getAvailable",
+"ubrk_countAvailable",
+"ubrk_isBoundary",
+"ubrk_getRuleStatus",
+"ubrk_getRuleStatusVec",
+"ubrk_getLocaleByType",
+"ubrk_refreshUText",
+"ubrk_getBinaryRules",
 };
 
 #ifdef _WIN32
@@ -9117,7 +9165,124 @@ void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_
 	}
 	return;
 }
+/*
+typedef enum UBreakIteratorType {
+   Character breaks  @stable ICU 2.0
+UBRK_CHARACTER = 0,
+  Word breaks @stable ICU 2.0
+UBRK_WORD = 1,
+  Line breaks @stable ICU 2.0
+UBRK_LINE = 2,
+  Sentence breaks @stable ICU 2.0
+UBRK_SENTENCE = 3,
+*/
+struct break_c
+{
+	icu_lib_t* icub = 0;
+	UBreakIterator* bi = 0;
+	int type = 0;
+	int32_t len;
+	uint16_t* s = 0;
+	int errorcode = 0;
+};
+break_c* new_break(const uint16_t* s, int len, int type)
+{
+	auto icub = get_icu(U_ICU_VERSION_MAJOR_NUM);
+	if (!icub)return nullptr;
+	auto p = new break_c();
+	if (!p)return nullptr;
+	p->icub = icub;
+	p->type = type;
+	p->s = (uint16_t*)s;
+	p->len = len;
+	UErrorCode err = U_ZERO_ERROR;
+	p->bi = icub->_ubrk_open((UBreakIteratorType)type, 0, (UChar*)s, len, &err);
+	if (!p->bi && err) {
+		if (p)delete p;
+		return nullptr;
+	}
+	return p;
+}
+void free_break(break_c* bp) {
+	if (bp)
+	{
+		if (bp->bi)
+			bp->icub->_ubrk_close(bp->bi);
+		bp->bi = 0;
+		delete bp;
+	}
+}
+void break_set_text(break_c* bp, const uint16_t* s, int32_t len) {
+	if (!bp || !bp->bi || !bp->icub || !s || len < 1)return;
+	UErrorCode err = U_ZERO_ERROR;
+	if (s && len > 0)
+	{
+		bp->icub->_ubrk_setText(bp->bi, (UChar*)s, len, &err);
+	}
+	if (err)
+		return;
+	bp->s = (uint16_t*)s;
+	bp->len = len;
+}
 
+// 单词边界
+void listWordBoundaries(break_c* bp, const uint16_t* s, int32_t len, std::function<void(const char* str, int len)>cb) {
+	if (!bp || !bp->bi || !bp->icub || !s || len < 1)return;
+	int32_t p;
+	UErrorCode err = U_ZERO_ERROR;
+	if (s && len > 0)
+	{
+		bp->icub->_ubrk_setText(bp->bi, (UChar*)s, len, &err);
+	}
+	p = bp->icub->_ubrk_first(bp->bi);
+	std::string ss;
+	do {
+		printf("Boundary at position %d\t", p);
+		auto p0 = p;
+		p = bp->icub->_ubrk_next(bp->bi);
+		if (p != UBRK_DONE)
+		{
+			std::wstring w(s + p0, s + p);
+			ss.clear();
+			md::u16_u8((uint16_t*)w.c_str(), w.size(), ss);
+			cb(ss.c_str(), ss.size());
+			printf("\"%s\"\n", ss.c_str());
+		}
+	} while (p != UBRK_DONE);
+	printf("\n");
+}
+//获取包含双击位置的单词的边界
+void wordContaining(break_c* bp, int32_t idx, const uint16_t* s, int32_t sLen, int32_t* start, int32_t* end) {
+	UErrorCode err = U_ZERO_ERROR;
+	if (!bp || !bp->bi || !bp->icub)return;
+	if (s == NULL || start == NULL || end == NULL) {
+		err = U_ILLEGAL_ARGUMENT_ERROR;
+		return;
+	}
+	bp->icub->_ubrk_setText(bp->bi, (UChar*)s, sLen, &err);
+	if (!err) {
+		*start = bp->icub->_ubrk_preceding(bp->bi, idx + 1);
+		*end = bp->icub->_ubrk_next(bp->bi);
+	}
+	bp->errorcode = err;
+}
+//检查是否为完整单词
+bool isWholeWord(break_c* bp, const uint16_t* s, int32_t sLen, int32_t start, int32_t end)
+{
+	UErrorCode err = U_ZERO_ERROR;
+	bool result = false;
+	if (!bp || !bp->bi || !bp->icub)return false;
+	if (s == NULL) {
+		err = U_ILLEGAL_ARGUMENT_ERROR;
+		return false;
+	}
+	bp->icub->_ubrk_setText(bp->bi, (UChar*)s, sLen, &err);
+	if (!err) {
+		result = bp->icub->_ubrk_isBoundary(bp->bi, start) && bp->icub->_ubrk_isBoundary(bp->bi, end);
+	}
+	bp->errorcode = (int)err;
+	return result;
+}
 
 font_family_t* new_font_family(font_rctx* ctx, const char* family, const char* styles)
 {
@@ -9281,11 +9446,14 @@ void text_update(text_bp p)
 	return;
 }
 
-void text_set_bidi(std::vector<bidi_item>& bv, const char* str, size_t first, size_t count, font_family_t* family)
+void text_set_bidi(text_render_o* p, const char* str, size_t first, size_t count, font_family_t* family)
 {
+	std::vector<bidi_item>& bv = p->bv;
 	auto t = md::utf8_char_pos(str, first, count);
 	auto te = t + count;// md::utf8_char_pos(t, count, count);
 	auto wk = md::u8_u16(t, count);
+	if (wk.size())
+		p->str.swap(wk);
 	const uint16_t* str1 = (const uint16_t*)wk.c_str();
 	size_t n = wk.size();
 	//std::vector<std::wstring> vw1, vw2;
@@ -9294,8 +9462,8 @@ void text_set_bidi(std::vector<bidi_item>& bv, const char* str, size_t first, si
 		do_bidi((UChar*)str1, n, family, bv);
 		std::stable_sort(bv.begin(), bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 		//for (auto& it : bv) {
-		//	vw1.push_back(md::u8_w(it.s));
-		//	vw2.push_back(std::wstring(str1 + it.first, str1 + it.second));
+		//	//vw1.push_back(md::u8_w(it.s));
+		//	//vw2.push_back(std::wstring(str1 + it.first, str1 + it.second));
 		//}
 	}
 	return;
@@ -9416,11 +9584,29 @@ void update_text(text_render_o* p, text_block* tb)
 	text_render_clear(p);
 	auto& vstr = p->_block;
 	auto t = tb->style;
-	text_set_bidi(p->bv, tb->str, tb->first, tb->size, t->family);
-	for (auto& it : p->bv)
-	{
-		get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr);
-	}
+	text_set_bidi(p, tb->str, tb->first, tb->size, t->family);
+	do {
+		if (p->box.auto_break)
+		{
+			auto bk = new_break(0, 0, p->box.word_wrap);
+			if (bk)
+			{
+				for (auto& it : p->bv)
+				{
+					listWordBoundaries(bk, (uint16_t*)p->str.c_str() + it.first, it.second - it.first, [=, &vstr](const char* str, int len)
+						{
+							get_font_fallbacks(t->family, str, len, it.rtl, vstr);
+						});
+				}
+				free_break(bk);
+				break;
+			}
+		}
+		for (auto& it : p->bv)
+		{
+			get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr);
+		}
+	} while (0);
 	for (auto& kt : vstr)
 	{
 		if (!kt.font)
@@ -9486,7 +9672,7 @@ void text_render_layout1(text_render_o* p) {
 	glm::ivec4 rc = p->box.rc;
 	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,tb->baseline };
 	float fontsize = tb->style->fontsize;
-	if (p->box.autobr && rc.z > 0)
+	if (p->box.auto_break && rc.z > 0)
 	{
 		auto ps = bearing;
 		ps.x += rc.x;
