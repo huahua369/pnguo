@@ -353,9 +353,9 @@ struct font_item_t
 {
 public:
 	uint32_t _glyph_index = 0;
-	int cluster;
 	// 原始的advance
 	int advance = 0;
+	size_t user_ptr;
 	// 渲染偏移坐标
 	glm::ivec2 _dwpos = {};
 	image_ptr_t* _image = nullptr;		// 排列int width,height,v2pad,data  

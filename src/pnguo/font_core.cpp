@@ -9683,7 +9683,7 @@ void update_text(text_render_o* p, text_block* tb)
 	}
 	int dh = tb->line_height;
 	int baseline = tb->baseline;
-	size_t cluster = 0;
+	size_t bidx = 0;
 	for (auto& kt : vstr)
 	{
 		if (!kt.font) {
@@ -9696,8 +9696,9 @@ void update_text(text_render_o* p, text_block* tb)
 			{
 				git.cpt = *((char*)kt.v);
 			}
+			git.user_ptr = bidx;
 			p->_vstr.push_back(git);
-			cluster++;
+			bidx++;
 			continue;
 		}
 		double scale_h = kt.font->get_scale(t->fontsize);
@@ -9720,7 +9721,7 @@ void update_text(text_render_o* p, text_block* tb)
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._dwpos += offset;
 			git.advance = ceil(pos->x_advance * scale_h);
-			git.cluster = cluster /*+ gt.cluster*/;
+			git.user_ptr = bidx /*+ gt.cluster*/;
 			if (git.cpt == '\t')
 			{
 				git.advance = t->fontsize;
@@ -9728,7 +9729,7 @@ void update_text(text_render_o* p, text_block* tb)
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);
 		}
-		cluster++;
+		bidx++;
 	}
 	tb->line_height = dh;
 	tb->baseline = baseline;
@@ -9752,14 +9753,13 @@ void text_render_layout1(text_render_o* p) {
 		ps.x += rc.x;
 		ps.y += rc.y;
 		size_t xx = 0;
-		int cluster = -1, cpt = -1;
 		auto t = p->_vstr.data();
 		for (size_t i = 0; i < p->_vstr.size(); i++, t++)
 		{
 			auto& it = *t;
 			xx = 0;
 			auto t1 = t;
-			for (; it.cpt == 0 && it.cluster == t->cluster; t++)
+			for (; it.cpt == 0 && it.user_ptr == t->user_ptr; t++)
 			{
 				xx += t->advance;
 			}
