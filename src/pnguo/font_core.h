@@ -648,10 +648,12 @@ struct text_block
 };
 
 struct strfont_t {
-	std::string_view v;
-	font_t* font;
+	void* v = 0;
+	size_t len = 0;
 	bool rtl = false;
+	int8_t type = 8;
 	std::vector<font_t::GlyphPosition> _tnpos;
+	font_t* font = 0;
 };
 // 文本渲染对象
 struct text_render_o

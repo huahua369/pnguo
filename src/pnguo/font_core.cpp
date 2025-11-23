@@ -9226,7 +9226,7 @@ void break_set_text(break_c* bp, const uint16_t* s, int32_t len) {
 }
 
 // 单词边界
-void listWordBoundaries(break_c* bp, const uint16_t* s, int32_t len, std::function<void(const char* str, int len)>cb) {
+void listWordBoundaries(break_c* bp, const uint16_t* s, int32_t len, std::function<void(const uint16_t* str, int len)>cb) {
 	if (!bp || !bp->bi || !bp->icub || !s || len < 1)return;
 	int32_t p;
 	UErrorCode err = U_ZERO_ERROR;
@@ -9245,7 +9245,7 @@ void listWordBoundaries(break_c* bp, const uint16_t* s, int32_t len, std::functi
 			std::wstring w(s + p0, s + p);
 			ss.clear();
 			md::u16_u8((uint16_t*)w.c_str(), w.size(), ss);
-			cb(ss.c_str(), ss.size());
+			cb(s + p0, p - p0);
 			printf("\"%s\"\n", ss.c_str());
 		}
 	} while (p != UBRK_DONE);
@@ -9454,8 +9454,8 @@ void text_set_bidi(text_render_o* p, const char* str, size_t first, size_t count
 	auto wk = md::u8_u16(t, count);
 	if (wk.size())
 		p->str.swap(wk);
-	const uint16_t* str1 = (const uint16_t*)wk.c_str();
-	size_t n = wk.size();
+	const uint16_t* str1 = (const uint16_t*)p->str.c_str();
+	size_t n = p->str.size();
 	//std::vector<std::wstring> vw1, vw2;
 	{
 		bv.clear();
@@ -9525,7 +9525,9 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 	auto font = p->familys[0];
 	font_t* oft0 = font;
 	font_t* rfont = nullptr;
-
+	strfont_t t = {};
+	t.rtl = rtl;
+	t.type = 8;
 	do
 	{
 		if (!str || !(*str)) { break; }
@@ -9535,22 +9537,20 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 		if (kk < 1)break;
 		if (ch == '\n')
 		{
-			strfont_t t = {};
 			if (str0 != str)
 			{
-				t.v = std::string_view(str0, str);
-				t.rtl = rtl;
+				t.v = (char*)str0; t.len = str - str0;
 				t.font = oft0;
 				vstr.push_back(t);
 			}
 			{
-				t.v = std::string_view(str, str + kk);
-				t.rtl = rtl;
+				t.v = (char*)str; t.len = kk;
 				t.font = 0;
 				vstr.push_back(t);
 			}
 			str0 = str + kk;
 			str += kk;
+			len -= kk;
 			continue;
 		}
 		auto g = font->get_glyph_index0(ch, &rfont, p);
@@ -9559,9 +9559,8 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 		if (oft0 != rfont)
 		{
 			if (oft0 && str0 != str) {
-				strfont_t t = {};
-				t.v = std::string_view(str0, str);
-				t.rtl = rtl;
+
+				t.v = (char*)str0; t.len = str - str0;
 				t.font = oft0;
 				str0 = str;
 				vstr.push_back(t);
@@ -9569,10 +9568,75 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 			oft0 = rfont;
 		}
 		str += kk;
-	} while (str && *str);
+		len -= kk;
+	} while (str && *str && len > 0);
 	if (str0 != str)
 	{
-		vstr.push_back({ std::string_view(str0,str), oft0 });
+		t.v = (char*)str0; t.len = str - str0;
+		t.font = oft0;
+		vstr.push_back(t);
+	}
+	return;
+}
+
+void get_font_fallbacks16(font_family_t* p, const uint16_t* str16, int len, bool rtl, std::vector<strfont_t>& vstr)
+{
+	if (!str16 || !len || !p || !p->count)
+		return;
+	auto str = (uint16_t*)str16;
+	auto str0 = (uint16_t*)str16;
+	auto font = p->familys[0];
+	font_t* oft0 = font;
+	font_t* rfont = nullptr;
+	strfont_t t = {};
+	t.rtl = rtl;
+	t.type = 16;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		uint32_t ch = 0;
+		rfont = nullptr;
+		auto kk = md::utf16_to_utf32(str, &ch);
+		if (kk < 1)break;
+		if (ch == '\n')
+		{
+			if (str0 != str)
+			{
+				t.v = str0; t.len = str - str0;
+				t.font = oft0;
+				vstr.push_back(t);
+			}
+			{
+				t.v = str; t.len = kk;
+				t.font = 0;
+				vstr.push_back(t);
+			}
+			str0 = str + kk;
+			str += kk;
+			len -= kk;
+			continue;
+		}
+		auto g = font->get_glyph_index0(ch, &rfont, p);
+		if (ch == 0x200d)
+			rfont = oft0;
+		if (oft0 != rfont)
+		{
+			if (oft0 && str0 != str) {
+				t.v = str0; t.len = str - str0;
+				t.font = oft0;
+				str0 = str;
+				vstr.push_back(t);
+			}
+			oft0 = rfont;
+		}
+		str += kk;
+		len -= kk;
+	} while (str && *str && len > 0);
+	if (str0 != str)
+	{
+		t.v = str0; t.len = str - str0;
+		t.font = oft0;
+		vstr.push_back(t);
 	}
 	return;
 }
@@ -9593,9 +9657,9 @@ void update_text(text_render_o* p, text_block* tb)
 			{
 				for (auto& it : p->bv)
 				{
-					listWordBoundaries(bk, (uint16_t*)p->str.c_str() + it.first, it.second - it.first, [=, &vstr](const char* str, int len)
+					listWordBoundaries(bk, (uint16_t*)p->str.c_str() + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len)
 						{
-							get_font_fallbacks(t->family, str, len, it.rtl, vstr);
+							get_font_fallbacks16(t->family, str, len, it.rtl, vstr);
 						});
 				}
 				free_break(bk);
@@ -9613,19 +9677,28 @@ void update_text(text_render_o* p, text_block* tb)
 		{
 			continue;
 		}
-		auto st = kt.v;
-		font_t::GlyphPositions gp = {};// 执行harfbuzz
-		auto w = md::u8_w(std::string(st));
-		auto nn0 = kt.font->CollectGlyphsFromFont(st.data(), st.size(), 8, kt.rtl, 0, &gp);
+		font_t::GlyphPositions gp = {};// 执行harfbuzz 
+		auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
 		kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
 	}
 	int dh = tb->line_height;
 	int baseline = tb->baseline;
+	size_t cluster = 0;
 	for (auto& kt : vstr)
 	{
 		if (!kt.font) {
-			font_item_t git = {}; git.cpt = kt.v[0];
-			p->_vstr.push_back(git); continue;
+			font_item_t git = {};
+			if (kt.type == 16)
+			{
+				git.cpt = *((uint16_t*)kt.v);
+			}
+			else if (kt.type == 8)
+			{
+				git.cpt = *((char*)kt.v);
+			}
+			p->_vstr.push_back(git);
+			cluster++;
+			continue;
 		}
 		double scale_h = kt.font->get_scale(t->fontsize);
 		uint32_t color = -1;
@@ -9647,7 +9720,7 @@ void update_text(text_render_o* p, text_block* tb)
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._dwpos += offset;
 			git.advance = ceil(pos->x_advance * scale_h);
-			git.cluster = gt.cluster;
+			git.cluster = cluster /*+ gt.cluster*/;
 			if (git.cpt == '\t')
 			{
 				git.advance = t->fontsize;
@@ -9655,6 +9728,7 @@ void update_text(text_render_o* p, text_block* tb)
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);
 		}
+		cluster++;
 	}
 	tb->line_height = dh;
 	tb->baseline = baseline;

@@ -382,6 +382,7 @@ namespace md {
 	const char* get_u8_last(const char* str, uint32_t* codepoint);
 	std::string u16_u8(uint16_t* str, size_t len);
 	void u16_u8(uint16_t* str, size_t len, std::string& r);
+	size_t utf16_to_utf32(const uint16_t* utf16, uint32_t* utf32);
 	//std::wstring u8_u16(const std::string& str);
 	std::u16string u8_u16(const char* str, size_t len);
 	std::wstring u8_w(const char* str, size_t len);

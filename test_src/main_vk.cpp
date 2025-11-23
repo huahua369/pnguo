@@ -1250,8 +1250,8 @@ int main()
 		tb.size = k8.size();
 		text_render_o trt = {};
 		trt.box.rc = { 0,0,260,500 };
-		trt.box.auto_break = true;
-		trt.box.word_wrap = 0;
+		trt.box.auto_break = 0;
+		trt.box.word_wrap = 1;
 		build_text_render(&tb, &trt);
 		c_render(&trt);
 		std::vector<uint32_t> vd;
