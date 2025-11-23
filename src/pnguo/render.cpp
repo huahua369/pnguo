@@ -1342,6 +1342,7 @@ void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_text
 	bool devrtex = (pt->rcb->set_texture_color4 && pt->rcb->render_texture);
 	auto rect = p->box.rc;
 	glm::ivec4 rc = {};
+	glm::ivec2 pos0 = pos;
 	pt->rcb->get_cliprect(renderer, &rc);
 	pt->rcb->set_cliprect(renderer, &rect);
 	for (auto& it : p->rd) {
@@ -1360,14 +1361,13 @@ void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_text
 				pt->idx.clear();
 			}
 			tex = tp;
-			pt->tex = tp;
 		}
 		auto c = it.color ? it.color : color;
 		if (it.sliced.x > 0 || it.sliced.y > 0 || it.sliced.z > 0 || it.sliced.w > 0)
 		{
 			texture_9grid_dt t9 = {};
 			t9.src_rect = it.rc;
-			t9.dst_rect = glm::vec4(it.pos, it.dsize);
+			t9.dst_rect = glm::vec4(it.pos + pos0, it.dsize);
 			t9.scale = 0.0;
 			t9.left_width = it.sliced.x, t9.right_width = it.sliced.y, t9.top_height = it.sliced.z, t9.bottom_height = it.sliced.w;
 			t9.tileScale = -1; // 大于0则是9gridtiled中间平铺
@@ -1378,7 +1378,7 @@ void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_text
 			if (devrtex)
 			{
 				texture_dt p = {};
-				p.dst_rect = glm::vec4(it.pos, it.dsize);
+				p.dst_rect = glm::vec4(it.pos + pos0, it.dsize);
 				p.src_rect = it.rc;
 				auto c4 = ucolor2f(c);
 				pt->rcb->set_texture_color4(tex, &c4);
@@ -1386,14 +1386,14 @@ void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_text
 			}
 			else
 			{
-				gen3data(it.img, it.pos, it.rc, c, &pt->opt, &pt->idx);
+				gen3data(it.img, it.pos + pos0, it.rc, c, &pt->opt, &pt->idx);
 				pt->tex = tp;
 			}
 		}
 	}
-	if (!devrtex && pt->tex && pt->opt.size()) {
+	if (!devrtex && tex && pt->opt.size()) {
 		auto nv = pt->opt.size() / 8;
-		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 		pt->opt.clear();
 		pt->idx.clear();
 	}
