@@ -691,6 +691,7 @@ struct layout_tx
 {
 	text_box_t box = {};
 	std::vector<lay_value> value;
+	std::vector<image_block> rd;
 };
 // 图文布局
 void text_multi_add(layout_tx* p, text_render_o* t);

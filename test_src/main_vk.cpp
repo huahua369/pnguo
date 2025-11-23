@@ -1118,6 +1118,45 @@ struct sdl3_textdata
 	texture_cb* rcb = 0;
 	void* tex = 0;
 };
+void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
+{
+	if (!p)return;
+	uint32_t color = -1;
+	const int vsize = sizeof(float) * 8;
+	void* tex = 0;
+	for (auto& it : p->rd) {
+		if (!it.img)continue;
+		auto& tp = pt->vt[it.img];
+		if (!tp)
+		{
+			tp = pt->rcb->make_tex(renderer, it.img);
+		}
+		if (tex != tp)
+		{
+			if (tex && pt->opt.size()) {
+				auto nv = pt->opt.size() / 8;
+				pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+					, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+				pt->opt.clear();
+				pt->idx.clear();
+			}
+			tex = tp;
+			pt->tex = tp;
+		}
+		if (it.sliced.x > 0 || it.sliced.y > 0 || it.sliced.z > 0 || it.sliced.w > 0)
+		{
+
+		}
+		gen3data(it.img, it.pos, it.rc, it.color ? it.color : color, &pt->opt, &pt->idx);
+	}
+	if (pt->tex && pt->opt.size()) {
+		auto nv = pt->opt.size() / 8;
+		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		pt->opt.clear();
+		pt->idx.clear();
+	}
+}
 void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
 {
 	std::vector<font_item_t>& tm = p->_vstr;

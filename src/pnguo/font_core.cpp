@@ -9931,6 +9931,29 @@ void text_multi_layout(layout_tx* p)
 	ps.x += rc.x;
 	ps.y += rc.y;
 	get_lineheight(p->value, (p->box.auto_break && rc.z > 0) ? rc.z : -1, ps);
+
+	for (auto& kt : p->value)
+	{
+		if (kt.type == 0)
+		{
+			auto tb = kt.tb;
+			auto t = kt.d.v->data();
+			auto cn = kt.d.v->size();
+			for (size_t i = 0; i < cn; i++, t++)
+			{
+				auto& it = *t;
+				image_block b = {};
+				b.img = it._image;
+				b.rc = it._rect;
+				b.color = it.color;
+				b.dsize = { it._rect.z,it._rect.w };
+				b.pos = it._apos + it._dwpos;
+			}
+		}
+		else {
+			p->rd.push_back(*kt.d.img);
+		}
+	}
 }
 
 /*
