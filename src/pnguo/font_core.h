@@ -686,6 +686,7 @@ struct lay_value
 	}d;
 	text_block* tb = 0;
 	int type = 0;
+	int8_t abspos = 0;	// 图片固定坐标不参与布局
 };
 struct layout_tx
 {
@@ -695,7 +696,7 @@ struct layout_tx
 };
 // 图文布局
 void text_multi_add(layout_tx* p, text_render_o* t);
-void text_multi_add_i(layout_tx* p, image_block* t);
+void text_multi_add_i(layout_tx* p, image_block* t, bool abspos);
 void text_multi_layout(layout_tx* p);
 
 

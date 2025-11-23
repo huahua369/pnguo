@@ -1406,16 +1406,18 @@ void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, 
 	uint32_t color = p->tb->style->color;
 	void* tex = 0;
 	const int vsize = sizeof(float) * 8;
-	static size_t x = -1;
-	static size_t x1 = 0;
-	if (x1 != x)
-	{
-		text_render_layout1(p);
-		pt->opt.clear(); pt->idx.clear(); x1 = x;
-	}
+	//static size_t x = -1;
+	//static size_t x1 = 0;
+	//if (x1 != x)
+	//{
+	//	text_render_layout1(p);
+	//	pt->opt.clear(); pt->idx.clear(); x1 = x;
+	//}
+
 	if (pt->opt.empty())
 	{
-		for (size_t i = 0; i < tm.size() && i < x; i++)
+		size_t ct = 0;
+		for (size_t i = 0; i < tm.size(); i++)
 		{
 			auto& git = tm[i];
 			if (git._image) {
@@ -1432,22 +1434,43 @@ void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, 
 							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 						pt->opt.clear();
 						pt->idx.clear();
+						ct++;
 					}
 					tex = tp;
-					pt->tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
 				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
 			}
 		}
+		if (tex && pt->opt.size()) {
+			auto nv = pt->opt.size() / 8;
+			pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		}
+		if (ct > 0)
+		{
+			pt->opt.clear();
+			pt->idx.clear();
+		}
+		else {
+			pt->tex = tex;
+		}
 	}
-	if (pt->tex && pt->opt.size()) {
+	else {
 		auto nv = pt->opt.size() / 8;
-		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
-			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-		//pt->opt.clear();
-		//pt->idx.clear();
+		if (pt->tex && pt->opt.size())
+			pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+	}
+}
+
+void r_render_free_tex(sdl3_textdata* p)
+{
+	if (p)
+	{
+		for (auto& [k, v] : p->vt) {
+			p->rcb->free_texture(v);
+		}
+		p->vt.clear();
 	}
 }
 

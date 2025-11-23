@@ -9874,17 +9874,20 @@ void get_lineheight(std::vector<lay_value>& v, int w, const glm::vec2& ps)
 			}
 		}
 		else {
-			auto t = kt.d.img;
-			if (tps.x + t->dsize.x > ww)
+			if (!kt.abspos)
 			{
-				ls.push_back({ lined,lineheight });
-				lined.clear();
-				tps.x = 0;
+				auto t = kt.d.img;
+				if (tps.x + t->dsize.x > ww)
+				{
+					ls.push_back({ lined,lineheight });
+					lined.clear();
+					tps.x = 0;
+				}
+				lined.push_back(&t->pos);
+				t->pos = ps + tps;
+				tps.x += t->dsize.x;
+				lineheight = std::max(lineheight, (int)t->dsize.y);
 			}
-			lined.push_back(&t->pos);
-			t->pos = ps + tps;
-			tps.x += t->dsize.x;
-			lineheight = std::max(lineheight, (int)t->dsize.y);
 		}
 		vc++;
 	}
@@ -9908,12 +9911,13 @@ void text_multi_add(layout_tx* p, text_render_o* t)
 		p->value.push_back(v);
 	}
 }
-void text_multi_add_i(layout_tx* p, image_block* t)
+void text_multi_add_i(layout_tx* p, image_block* t, bool abspos)
 {
 	if (p && t) {
 		lay_value v = {};
 		v.d.img = t;
 		v.type = 1;
+		v.abspos = abspos;
 		p->value.push_back(v);
 	}
 }
@@ -9948,6 +9952,7 @@ void text_multi_layout(layout_tx* p)
 				b.color = it.color;
 				b.dsize = { it._rect.z,it._rect.w };
 				b.pos = it._apos + it._dwpos;
+				p->rd.push_back(b);
 			}
 		}
 		else {
