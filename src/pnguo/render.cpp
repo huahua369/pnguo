@@ -1295,6 +1295,162 @@ image_sliced_t new_rect(const rect_shadow_t& rs)
 #endif
 
 
+void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<float>* opt, std::vector<uint32_t>* idx)
+{
+	glm::ivec2 tex_size = { img->width,img->height };
+	// 1. 计算矩形顶点（像素坐标）
+	glm::ivec2 A = glm::ivec2(rc.x, rc.y); // 左下
+	glm::ivec2 B = A + glm::ivec2(rc.z, 0); // 右下
+	glm::ivec2 C = A + glm::ivec2(rc.z, rc.w); // 右上
+	glm::ivec2 D = A + glm::ivec2(0, rc.w); // 左上
+	glm::vec2 A1 = dst_pos;
+	glm::vec2 B1 = dst_pos + glm::ivec2(rc.z, 0);
+	glm::vec2 C1 = dst_pos + glm::ivec2(rc.z, rc.w);
+	glm::vec2 D1 = dst_pos + glm::ivec2(0, rc.w);
+
+	// 2. 归一化因子
+	float inv_w = 1.0f / static_cast<float>(tex_size.x);
+	float inv_h = 1.0f / static_cast<float>(tex_size.y);
+
+	// 3. 归一化顶点坐标
+	auto normalize2 = [&](const glm::ivec2& p) -> glm::vec2 {
+		return glm::vec2(p.x * inv_w, p.y * inv_h);
+		};
+	glm::vec2 A_norm = normalize2(A);
+	glm::vec2 B_norm = normalize2(B);
+	glm::vec2 C_norm = normalize2(C);
+	glm::vec2 D_norm = normalize2(D);
+
+	// 4. 解析颜色
+	glm::vec4 c = ucolor2f(color);
+	// 5. 生成顶点数组（4顶点，32个浮点数）
+	uint32_t ps = opt->size() / 8;
+	opt->insert(opt->end(), { A1.x, A1.y,A_norm.x, A_norm.y, c.x, c.y, c.z, c.w });
+	opt->insert(opt->end(), { B1.x, B1.y,B_norm.x, B_norm.y, c.x, c.y, c.z, c.w });
+	opt->insert(opt->end(), { C1.x, C1.y,C_norm.x, C_norm.y, c.x, c.y, c.z, c.w });
+	opt->insert(opt->end(), { D1.x, D1.y,D_norm.x, D_norm.y, c.x, c.y, c.z, c.w });
+	idx->insert(idx->end(), { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 });
+	return;
+}
+
+void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
+{
+	if (!p)return;
+	uint32_t color = -1;
+	const int vsize = sizeof(float) * 8;
+	void* tex = 0;
+	bool devrtex = (pt->rcb->set_texture_color4 && pt->rcb->render_texture);
+	auto rect = p->box.rc;
+	glm::ivec4 rc = {};
+	pt->rcb->get_cliprect(renderer, &rc);
+	pt->rcb->set_cliprect(renderer, &rect);
+	for (auto& it : p->rd) {
+		if (!it.img)continue;
+		auto& tp = pt->vt[it.img];
+		if (!tp)
+		{
+			tp = pt->rcb->make_tex(renderer, it.img);
+		}
+		if (!devrtex && tex != tp)
+		{
+			if (tex && pt->opt.size()) {
+				auto nv = pt->opt.size() / 8;
+				pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+				pt->opt.clear();
+				pt->idx.clear();
+			}
+			tex = tp;
+			pt->tex = tp;
+		}
+		auto c = it.color ? it.color : color;
+		if (it.sliced.x > 0 || it.sliced.y > 0 || it.sliced.z > 0 || it.sliced.w > 0)
+		{
+			texture_9grid_dt t9 = {};
+			t9.src_rect = it.rc;
+			t9.dst_rect = glm::vec4(it.pos, it.dsize);
+			t9.scale = 0.0;
+			t9.left_width = it.sliced.x, t9.right_width = it.sliced.y, t9.top_height = it.sliced.z, t9.bottom_height = it.sliced.w;
+			t9.tileScale = -1; // 大于0则是9gridtiled中间平铺
+			pt->rcb->render_texture_9grid(renderer, tex, &t9, 1);
+		}
+		else
+		{
+			if (devrtex)
+			{
+				texture_dt p = {};
+				p.dst_rect = glm::vec4(it.pos, it.dsize);
+				p.src_rect = it.rc;
+				auto c4 = ucolor2f(c);
+				pt->rcb->set_texture_color4(tex, &c4);
+				pt->rcb->render_texture(renderer, tex, &p, 1);
+			}
+			else
+			{
+				gen3data(it.img, it.pos, it.rc, c, &pt->opt, &pt->idx);
+				pt->tex = tp;
+			}
+		}
+	}
+	if (!devrtex && pt->tex && pt->opt.size()) {
+		auto nv = pt->opt.size() / 8;
+		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		pt->opt.clear();
+		pt->idx.clear();
+	}
+	pt->rcb->set_cliprect(renderer, &rc);
+}
+
+void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
+{
+	std::vector<font_item_t>& tm = p->_vstr;
+	uint32_t color = p->tb->style->color;
+	void* tex = 0;
+	const int vsize = sizeof(float) * 8;
+	static size_t x = -1;
+	static size_t x1 = 0;
+	if (x1 != x)
+	{
+		text_render_layout1(p);
+		pt->opt.clear(); pt->idx.clear(); x1 = x;
+	}
+	if (pt->opt.empty())
+	{
+		for (size_t i = 0; i < tm.size() && i < x; i++)
+		{
+			auto& git = tm[i];
+			if (git._image) {
+				auto& tp = pt->vt[git._image];
+				if (!tp)
+				{
+					tp = pt->rcb->make_tex(renderer, git._image);
+				}
+				if (tex != tp)
+				{
+					if (tex && pt->opt.size()) {
+						auto nv = pt->opt.size() / 8;
+						pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+						pt->opt.clear();
+						pt->idx.clear();
+					}
+					tex = tp;
+					pt->tex = tp;
+				}
+				auto ps = git._dwpos + git._apos;
+				ps += pos;
+				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
+			}
+		}
+	}
+	if (pt->tex && pt->opt.size()) {
+		auto nv = pt->opt.size() / 8;
+		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		//pt->opt.clear();
+		//pt->idx.clear();
+	}
+}
+
 VkShaderModule newModule(VkDevice device, const uint32_t* SpvData, size_t SpvSize, VkResult* r)
 {
 	VkShaderModule pShaderModule = {};

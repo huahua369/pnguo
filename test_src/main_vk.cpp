@@ -1073,140 +1073,7 @@ void c_render_data(text_render_o* p, image_ptr_t* dst)
 		}
 	}
 }
-// generateTriangleData
-void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<float>* opt, std::vector<uint32_t>* idx)
-{
-	glm::ivec2 tex_size = { img->width,img->height };
-	// 1. 计算矩形顶点（像素坐标）
-	glm::ivec2 A = glm::ivec2(rc.x, rc.y); // 左下
-	glm::ivec2 B = A + glm::ivec2(rc.z, 0); // 右下
-	glm::ivec2 C = A + glm::ivec2(rc.z, rc.w); // 右上
-	glm::ivec2 D = A + glm::ivec2(0, rc.w); // 左上
-	glm::vec2 A1 = dst_pos;
-	glm::vec2 B1 = dst_pos + glm::ivec2(rc.z, 0);
-	glm::vec2 C1 = dst_pos + glm::ivec2(rc.z, rc.w);
-	glm::vec2 D1 = dst_pos + glm::ivec2(0, rc.w);
 
-	// 2. 归一化因子
-	float inv_w = 1.0f / static_cast<float>(tex_size.x);
-	float inv_h = 1.0f / static_cast<float>(tex_size.y);
-
-	// 3. 归一化顶点坐标
-	auto normalize2 = [&](const glm::ivec2& p) -> glm::vec2 {
-		return glm::vec2(p.x * inv_w, p.y * inv_h);
-		};
-	glm::vec2 A_norm = normalize2(A);
-	glm::vec2 B_norm = normalize2(B);
-	glm::vec2 C_norm = normalize2(C);
-	glm::vec2 D_norm = normalize2(D);
-
-	// 4. 解析颜色
-	glm::vec4 c = ucolor2f(color);
-	// 5. 生成顶点数组（4顶点，32个浮点数）
-	uint32_t ps = opt->size() / 8;
-	opt->insert(opt->end(), { A1.x, A1.y,A_norm.x, A_norm.y, c.x, c.y, c.z, c.w });
-	opt->insert(opt->end(), { B1.x, B1.y,B_norm.x, B_norm.y, c.x, c.y, c.z, c.w });
-	opt->insert(opt->end(), { C1.x, C1.y,C_norm.x, C_norm.y, c.x, c.y, c.z, c.w });
-	opt->insert(opt->end(), { D1.x, D1.y,D_norm.x, D_norm.y, c.x, c.y, c.z, c.w });
-	idx->insert(idx->end(), { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 });
-	return;
-}
-struct sdl3_textdata
-{
-	std::map<image_ptr_t*, void*> vt;
-	std::vector<float> opt; std::vector<uint32_t> idx;
-	texture_cb* rcb = 0;
-	void* tex = 0;
-};
-void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
-{
-	if (!p)return;
-	uint32_t color = -1;
-	const int vsize = sizeof(float) * 8;
-	void* tex = 0;
-	for (auto& it : p->rd) {
-		if (!it.img)continue;
-		auto& tp = pt->vt[it.img];
-		if (!tp)
-		{
-			tp = pt->rcb->make_tex(renderer, it.img);
-		}
-		if (tex != tp)
-		{
-			if (tex && pt->opt.size()) {
-				auto nv = pt->opt.size() / 8;
-				pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
-					, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-				pt->opt.clear();
-				pt->idx.clear();
-			}
-			tex = tp;
-			pt->tex = tp;
-		}
-		if (it.sliced.x > 0 || it.sliced.y > 0 || it.sliced.z > 0 || it.sliced.w > 0)
-		{
-
-		}
-		gen3data(it.img, it.pos, it.rc, it.color ? it.color : color, &pt->opt, &pt->idx);
-	}
-	if (pt->tex && pt->opt.size()) {
-		auto nv = pt->opt.size() / 8;
-		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
-			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-		pt->opt.clear();
-		pt->idx.clear();
-	}
-}
-void r_render_data(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
-{
-	std::vector<font_item_t>& tm = p->_vstr;
-	uint32_t color = p->tb->style->color;
-	void* tex = 0;
-	const int vsize = sizeof(float) * 8;
-	static size_t x = -1;
-	static size_t x1 = 0;
-	if (x1 != x)
-	{
-		text_render_layout1(p);
-		pt->opt.clear(); pt->idx.clear(); x1 = x;
-	}
-	if (pt->opt.empty())
-	{
-		for (size_t i = 0; i < tm.size() && i < x; i++)
-		{
-			auto& git = tm[i];
-			if (git._image) {
-				auto& tp = pt->vt[git._image];
-				if (!tp)
-				{
-					tp = pt->rcb->make_tex(renderer, git._image);
-				}
-				if (tex != tp)
-				{
-					if (tex && pt->opt.size()) {
-						auto nv = pt->opt.size() / 8;
-						pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
-							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-						pt->opt.clear();
-						pt->idx.clear();
-					}
-					tex = tp;
-					pt->tex = tp;
-				}
-				auto ps = git._dwpos + git._apos;
-				ps += pos;
-				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
-			}
-		}
-	}
-	if (pt->tex && pt->opt.size()) {
-		auto nv = pt->opt.size() / 8;
-		pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
-			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-		//pt->opt.clear();
-		//pt->idx.clear();
-	}
-}
 int main()
 {
 	auto k = time(0);
@@ -1485,15 +1352,15 @@ int main()
 			vkd->_state.EmissiveFactor = 30;
 			vkd->_state.IBLFactor = 1.0;
 			new_ui(form0, vkd);
-
-			texture_cb tcb = get_texture_cb();
-			auto pcb = &tcb;
+			auto pcb = new texture_cb(); 
+			assert(pcb);
+			get_sdl_texture_cb(pcb);
 			auto ptrt = &trt;
-			auto ptstr = tcb.make_tex(form0->renderer, &dst);
+			auto ptstr = pcb->make_tex(form0->renderer, &dst);
 
 			// 动画测试
-			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)tcb.draw_geometry, (newTexture_fun)tcb.new_texture_0
-				, (UpdateTexture_fun)tcb.update_texture, (DestroyTexture_fun)tcb.free_texture, (SetTextureBlendMode_fun)tcb.set_texture_blend);
+			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
+				, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend);
 
 			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)");
 			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0, 0.5);
@@ -1506,18 +1373,18 @@ int main()
 			if (tex3d)
 			{
 				sdl3_textdata* td3 = new sdl3_textdata();
-				td3->rcb = &tcb;
+				td3->rcb = pcb;
 				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 					{
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 10,10,vki.size.x,vki.size.y };
-						tcb.render_texture(renderer, tex3d, &tdt, 1);
+						pcb->render_texture(renderer, tex3d, &tdt, 1);
 						//sp_drawable_draw(dd1);
 						tdt.src_rect = { 0,0,dst.width,dst.height };
 						tdt.dst_rect = { 200,10,dst.width,dst.height };
-						//tcb.render_texture(renderer, ptstr, &tdt, 1);
-						r_render_data(renderer, ptrt, { 200,100 }, td3);
+						//pcb->render_texture(renderer, ptstr, &tdt, 1);
+						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{

@@ -1,4 +1,4 @@
-
+#pragma once
 #ifndef VG_H
 #define VG_H
 
@@ -288,6 +288,91 @@ struct node_dt
 // 输入样式数据，根节点指针，所有节点数量
 void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
 
+
+
+struct texture_dt
+{
+	// 源区域、目标区域 
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+};
+struct texture_angle_dt
+{
+	// 源区域、目标区域 
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+	glm::vec2 center = {};	//旋转中心
+	double angle = 0;		//旋转角度
+	int flip = 0;			//翻转模式，0=SDL_FLIP_NONE，1=SDL_FLIP_HORIZONTAL，2=SDL_FLIP_VERTICAL
+};
+// 渲染重复平铺
+struct texture_tiled_dt
+{
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+	float scale = 1.0;
+};
+// 九宫格渲染
+struct texture_9grid_dt
+{
+	glm::vec4 src_rect = {};
+	glm::vec4 dst_rect = {};
+	float scale = 1.0;
+	float left_width = 1.0, right_width = 1.0, top_height = 1.0, bottom_height = 1.0;
+	float tileScale = -1; // 大于0则是9gridtiled中间平铺
+};
+
+// 渲染三角网，indices支持uint8_t uint16_t uint(实际最大值int_max)
+struct geometryraw_dt
+{
+	const float* xy; int xy_stride;
+	const glm::vec4* color; int color_stride;// color_stride等于0时，用一个颜色
+	const float* uv; int uv_stride;
+	int num_vertices;
+	const void* indices; int num_indices; int size_indices;
+};
+typedef struct image_ptr_t image_ptr_t;
+#ifndef TEX_CB
+#define TEX_CB
+struct texture_cb
+{
+	// 创建纹理
+	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
+	// 更新纹理数据
+	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
+	// 设置纹理混合模式
+	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
+	void (*set_texture_color)(void* texture, float r, float g, float b, float a);
+	void (*set_texture_color4)(void* texture, const glm::vec4* c);
+	// 删除纹理
+	void (*free_texture)(void* texture);
+	// 创建或更新纹理
+	void* (*make_tex)(void* renderer, image_ptr_t* img);
+	// 从图片文件创建纹理
+	void* (*new_texture_file)(void* renderer, const char* fn);
+	// 纹理渲染
+	// 批量区域渲染
+	int (*render_texture)(void* renderer, void* texture, texture_dt* p, int count);
+	// 单个区域支持旋转
+	bool (*render_texture_rotated)(void* renderer, void* texture, texture_angle_dt* p, int count);
+	// 平铺渲染
+	bool (*render_texture_tiled)(void* renderer, void* texture, texture_tiled_dt* p, int count);
+	// 九宫格渲染
+	bool (*render_texture_9grid)(void* renderer, void* texture, texture_9grid_dt* p, int count);
+	// 渲染2d三角网,支持顶点色、纹理
+	bool (*render_geometryraw)(void* renderer, void* texture, geometryraw_dt* p, int count);
+	// 创建一个指定宽高的rgba纹理
+	void* (*new_texture_0)(void* renderer, int width, int height);
+	bool (*draw_geometry)(void* renderer, void* texture, const float* xy, int xy_stride
+		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
+	bool (*set_viewport)(void* renderer, const glm::ivec4* rect);
+	bool (*set_cliprect)(void* renderer, const glm::ivec4* rect);
+	bool (*get_viewport)(void* renderer, glm::ivec4* rect);
+	bool (*get_cliprect)(void* renderer, glm::ivec4* rect);
+};
+#else
+typedef struct texture_cb texture_cb;
+#endif
 
 #endif // !VG_H
 

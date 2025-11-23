@@ -190,6 +190,17 @@ vkvg_dev* new_vkvgdev(dev_info_c* c = 0, int sample = 8);
 void free_vkvgdev(vkvg_dev* p);
 
 
+
+typedef struct texture_cb texture_cb;
+
+struct sdl3_textdata
+{
+	std::map<image_ptr_t*, void*> vt;
+	std::vector<float> opt; std::vector<uint32_t> idx;
+	texture_cb* rcb = 0;
+	void* tex = 0;
+};
+
 /*
 渲染命令函数，
 ctx：渲染上下文指针VkvgContext
@@ -214,3 +225,6 @@ struct dblock_d {
 	float scale_pos = 0;		// 视图缩放，不缩放线宽
 };
 void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
+
+void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
+void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);

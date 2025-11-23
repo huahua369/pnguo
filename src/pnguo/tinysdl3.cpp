@@ -26,6 +26,9 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #include <tinysdl3.h>
 #include <event.h>
 
+
+#include "vg.h"
+
 #ifdef max
 #undef max
 #undef min
@@ -1230,7 +1233,8 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 				{
 					SDL_DestroyTexture(ptx);
 					ptx = nullptr;
-				}else
+				}
+				else
 				{
 					glm::vec2 oldss = {};
 					if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
@@ -2692,7 +2696,23 @@ void update_texture_r(void* texture, const glm::ivec4* rect, const void* pixels,
 void set_texture_blend_r(void* texture, uint32_t b, bool multiply)
 {
 	if (texture)
-		SDL_SetTextureBlendMode(((SDL_Texture*)texture), get_blend_x((BlendMode_e)b, multiply));
+		SDL_SetTextureBlendMode((SDL_Texture*)texture, get_blend_x((BlendMode_e)b, multiply));
+}
+void set_texture_color_r(void* texture, float r, float g, float b, float a)
+{
+	if (texture)
+	{
+		SDL_SetTextureAlphaModFloat((SDL_Texture*)texture, a);
+		SDL_SetTextureColorModFloat((SDL_Texture*)texture, r, g, b);
+	}
+}
+void set_texture_color4_r(void* texture, const glm::vec4* c)
+{
+	if (texture && c)
+	{
+		SDL_SetTextureAlphaModFloat((SDL_Texture*)texture, c->w);
+		SDL_SetTextureColorModFloat((SDL_Texture*)texture, c->x, c->y, c->z);
+	}
 }
 void free_texture_r(void* texture)
 {
@@ -2786,11 +2806,16 @@ bool render_geometryraw(void* renderer, void* texture, geometryraw_dt* p, int co
 	return r;
 }
 
-
-
-texture_cb get_texture_cb() {
-	texture_cb cb = { new_texture_r, update_texture_r, set_texture_blend_r, free_texture_r };
+void get_sdl_texture_cb(texture_cb* p)
+{
+	texture_cb cb = {};
 	cb.make_tex = (void* (*)(void*, image_ptr_t*))newuptex;
+	cb.new_texture = new_texture_r;
+	cb.update_texture = update_texture_r;
+	cb.set_texture_blend = set_texture_blend_r;
+	cb.free_texture = free_texture_r;
+	cb.set_texture_color = set_texture_color_r;
+	cb.set_texture_color4 = set_texture_color4_r;
 	cb.new_texture_file = new_tex2file;
 	cb.render_texture = render_texture;
 	cb.render_texture_rotated = render_texture_rotated;
@@ -2800,7 +2825,14 @@ texture_cb get_texture_cb() {
 	cb.new_texture_0 = new_texture_0;
 	cb.draw_geometry = (bool (*)(void* renderer, void* texture, const float* xy, int xy_stride
 		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices))SDL_RenderGeometryRaw;
-	return cb;
+
+	cb.set_viewport = (bool(*)(void* renderer, const glm::ivec4 * rect))SDL_SetRenderViewport;
+	cb.set_cliprect = (bool(*)(void* renderer, const glm::ivec4 * rect))SDL_SetRenderClipRect;
+	cb.get_viewport = (bool(*)(void* renderer, glm::ivec4 * rect)) SDL_GetRenderViewport;
+	cb.get_cliprect = (bool(*)(void* renderer, glm::ivec4 * rect))SDL_GetRenderClipRect;
+	if (p)
+		*p = cb;
+	return;
 }
 
 SDL_Texture* form_x::new_texture(int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply)
