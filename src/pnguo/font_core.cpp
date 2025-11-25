@@ -4,7 +4,7 @@
 #include "pch1.h" 
 #include "font_core.h"
 #include "mapView.h" 
-
+#include "vg.h"
 #ifdef _WIN32
 #include <dwrite.h>
 #ifdef min
@@ -34,7 +34,6 @@
 #include <unicode/brkiter.h>
 #endif
 
-#include <stb_image.h>
 #include <stb_image_write.h>
 #include <stb_rect_pack.h>
 #include <stb_truetype.h>
@@ -9333,119 +9332,6 @@ void delete_font_family(font_family_t* p)
 }
 
 
-struct value_block {
-	union {
-		text_block* t;
-		image_block* i;
-	};
-	int type = 0;
-};
-/*
-	text_block_t* t;
-	size_t count;
-	font_family_t* family;
-*/
-class text_run_cx :public text_run_t
-{
-public:
-	std::vector<bidi_item> bv;
-	std::vector<font_item_t> _tm;
-	std::vector<strfont_t> _block;
-	std::vector<value_block> _value;
-
-public:
-	text_run_cx();
-	~text_run_cx();
-
-private:
-
-};
-
-text_run_cx::text_run_cx()
-{
-}
-
-text_run_cx::~text_run_cx()
-{
-}
-text_bp text_create(int width, int height, bool autobr)
-{
-	auto p = new text_run_cx();
-	text_bp pr = p;
-	if (p)
-	{
-		p->_rect.z = width;
-		p->_rect.w = height;
-		pr->_private = p;
-		p->autobr = autobr;
-	}
-	return pr;
-}
-
-void text_free(text_bp p)
-{
-	if (p)
-	{
-		auto p1 = (text_run_cx*)p->_private;
-		delete p1;
-	}
-}
-void text_set_show(text_bp p, size_t first_line, int64_t x)
-{
-	if (!p)return;
-	auto p1 = (text_run_cx*)p->_private;
-	p->first_line = first_line;
-	p->posx = x;
-}
-
-void text_set_rect(text_bp p, const glm::ivec4& rc)
-{
-	if (!p)return;
-	auto p1 = (text_run_cx*)p->_private;
-	p1->_rect = rc;
-}
-void text_add(text_bp p, text_block* tb)
-{
-	if (!p)return;
-	auto p1 = (text_run_cx*)p->_private;
-	p1->_value.push_back({ .t = tb, .type = 0 });
-}
-
-void text_add_image(text_bp p, image_block* img)
-{
-	if (!p)return;
-	auto p1 = (text_run_cx*)p->_private;
-	if (!p)return;
-	p1->_value.push_back({ .i = img, .type = 1 });
-}
-
-void text_clear(text_bp p)
-{
-	if (!p)return;
-	auto p1 = (text_run_cx*)p->_private;
-	p1->bv.clear();
-	p1->_tm.clear();
-	p1->_block.clear();
-}
-
-void text_update(text_bp p)
-{
-	if (!p)return;
-	auto p1 = (text_run_cx*)p->_private;
-	for (auto& it : p1->_value)
-	{
-		if (it.type == 0)
-		{
-			auto tb = it.t;
-			//text_update_text(p1, tb);
-		}
-		else if (it.type == 1)
-		{
-		}
-	}
-	return;
-}
-
 void text_set_bidi(text_render_o* p, const char* str, size_t first, size_t count, font_family_t* family)
 {
 	std::vector<bidi_item>& bv = p->bv;
@@ -10232,76 +10118,6 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 	}
 }
 
-
-stbimage_load::stbimage_load()
-{
-}
-
-stbimage_load::stbimage_load(const char* fn)
-{
-	load(fn);
-}
-
-stbimage_load::~stbimage_load()
-{
-	stbi_image_free(data);
-}
-void stbimage_load::free_img(stbimage_load* p)
-{
-	if (p)
-		delete p;
-}
-stbimage_load* stbimage_load::new_load(const void* fnd, size_t len)
-{
-	stbimage_load t;
-	if (fnd)
-	{
-		if (len)
-			t.load_mem((char*)fnd, len);
-		else
-			t.load((char*)fnd);
-	}
-	if (t.data && t.width && t.height)
-	{
-		auto p = new stbimage_load();
-		if (p)
-		{
-			*p = t;
-			t.data = 0;
-		}
-		return p;
-	}
-	return nullptr;
-}
-void stbimage_load::tobgr()
-{
-	auto n = width * height;
-	auto t = (char*)data;
-	for (size_t i = 0; i < n; i++)
-	{
-		std::swap(*(t + 0), *(t + 2));
-		t += 4;
-	}
-}
-bool stbimage_load::load(const char* fn)
-{
-	hz::mfile_t mf;
-	if (!fn || !*fn)return false;
-	auto rawd = mf.open_d(fn, true);
-	if (!rawd)
-	{
-		return false;
-	}
-	data = (uint32_t*)stbi_load_from_memory((stbi_uc*)rawd, mf.size(), &width, &height, &rcomp, comp);
-	type = 0;
-	return (data ? true : false);
-}
-bool stbimage_load::load_mem(const char* d, size_t s)
-{
-	data = (uint32_t*)stbi_load_from_memory((stbi_uc*)d, s, &width, &height, &rcomp, comp);
-	type = 0;
-	return (data ? true : false);
-}
 
 void save_img_png(image_ptr_t* p, const char* str)
 {

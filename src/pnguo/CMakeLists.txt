@@ -3,6 +3,7 @@
 set(pnguo_src
 "mapView.cpp"
 "render.cpp"
+"vg.cpp"  
 "tinysdl3.cpp"
 "pnguo.cpp"
 "tria.cpp"

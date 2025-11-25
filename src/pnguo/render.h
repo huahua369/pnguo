@@ -226,6 +226,8 @@ struct dblock_d {
 	float scale_pos = 0;		// 视图缩放，不缩放线宽
 };
 void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
+
+// SDL渲染器专用
 // 渲染一组图文列表
 void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 渲染一段文本

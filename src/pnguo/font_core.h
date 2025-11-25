@@ -47,20 +47,7 @@ struct Bitmap_p;
 class stb_packer;
 class bitmap_cache_cx;
 
-struct image_ptr_t
-{
-	int width = 0, height = 0;
-	int type = 0;				// 0=rgba，1=bgra
-	int stride = 0;
-	uint32_t* data = 0;			// 像素数据
-	void* texid = 0;			// 纹理指针，由调用方自动生成管理
-	void* ptr = 0;				// 用户数据
-	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
-	int  blendmode = 0;			// 混合模式
-	bool static_tex = false;	// 静态纹理
-	bool multiply = false;		// 预乘的纹理
-	bool valid = false;			// 是否更新到纹理
-};
+typedef struct image_ptr_t image_ptr_t;
 struct atlas_t
 {
 	image_ptr_t* img = 0;
@@ -89,23 +76,6 @@ public:
 packer_base* new_packer(int width, int height);
 void free_packer(packer_base* p);
 
-// 简易stb_image加载
-class stbimage_load :public image_ptr_t
-{
-public:
-	int rcomp = 4;	// 目标通道
-public:
-	stbimage_load();
-	stbimage_load(const char* fn);
-
-	~stbimage_load();
-	bool load(const char* fn);
-
-	bool load_mem(const char* d, size_t s);
-	void tobgr();
-	static stbimage_load* new_load(const void* fnd, size_t len);
-	static void free_img(stbimage_load* p);
-};
 
 class info_one
 {
@@ -486,11 +456,11 @@ struct text_image_t
 	std::vector<font_item_t> tv;
 
 };
-struct text_atlas_t
-{
-	atlas_t atlas = {};
-	image_ptr_t ipt = {};
-};
+//struct text_atlas_t
+//{
+//	atlas_t atlas = {};
+//	image_ptr_t ipt = {};
+//};
 
 // Histogram
 class yHist
@@ -699,17 +669,7 @@ void text_multi_add(layout_tx* p, text_render_o* t);
 void text_multi_add_i(layout_tx* p, image_block* t, bool abspos);
 void text_multi_layout(layout_tx* p);
 
-
-// 创建文本渲染，显示的宽高、是否自动换行
-//text_bp text_create(int width, int height, bool autobr = false);
-//void text_free(text_bp p);
-//// 设置显示的开始行号，x滚动偏移
-//void text_set_show(text_bp p, size_t first_line, int64_t x);
-//// 添加文本块，图片块，可修改，最后调用text_update更新渲染数据，指针必需保留
-//void text_add(text_bp p, text_block* tb);
-//void text_add_image(text_bp p, image_block* img);
-//void text_clear(text_bp p);
-//void text_update(text_bp p);
+ 
 
 
 

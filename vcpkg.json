@@ -5,7 +5,6 @@
     "harfbuzz",
     "icu",
     "librsvg",
-    "cairo",
     "openssl",
     "glm",
     "stb",

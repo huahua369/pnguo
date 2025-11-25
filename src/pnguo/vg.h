@@ -2,6 +2,21 @@
 #ifndef VG_H
 #define VG_H
 
+struct image_ptr_t
+{
+	int width = 0, height = 0;
+	int type = 0;				// 0=rgba，1=bgra
+	int stride = 0;
+	uint32_t* data = 0;			// 像素数据
+	void* texid = 0;			// 纹理指针，由调用方自动生成管理
+	void* ptr = 0;				// 用户数据
+	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
+	int  blendmode = 0;			// 混合模式
+	bool static_tex = false;	// 静态纹理
+	bool multiply = false;		// 预乘的纹理
+	bool valid = false;			// 是否更新到纹理
+};
+
 struct quadratic_v
 {
 	glm::vec2 p0, p1, p2;
@@ -201,6 +216,24 @@ typedef void (*vg_draw_cmd_fun)(void* ctx, uint8_t* cmds, size_t count, void* da
 typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
 
 
+#ifdef __cplusplus
+// 简易stb_image加载
+class stbimage_load :public image_ptr_t
+{
+public:
+	int rcomp = 4;	// 目标通道
+public:
+	stbimage_load();
+	stbimage_load(const char* fn);
+
+	~stbimage_load();
+	bool load(const char* fn);
+
+	bool load_mem(const char* d, size_t s);
+	void tobgr();
+	static stbimage_load* new_load(const void* fnd, size_t len);
+	static void free_img(stbimage_load* p);
+};
 /*
 	根元素要求
 	assert(parent == NULL);
@@ -212,7 +245,6 @@ typedef void (*vg_draw_path_fun)(void* ctx, path_d* path, fill_style_d* style);
 	FLEX_ALIGN_SPACE_AROUND,	//分散居中,两端间隔0.5，中间间隔1
 	FLEX_ALIGN_SPACE_EVENLY,	//分散居中,每个间隔1
 */
-#ifdef __cplusplus
 enum class flex_align :uint8_t {
 	ALIGN_AUTO = 0,
 	ALIGN_STRETCH,
@@ -331,7 +363,6 @@ struct geometryraw_dt
 	int num_vertices;
 	const void* indices; int num_indices; int size_indices;
 };
-typedef struct image_ptr_t image_ptr_t;
 #ifndef TEX_CB
 #define TEX_CB
 struct texture_cb

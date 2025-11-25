@@ -8,7 +8,79 @@
 
 #include "pch1.h"
 #include "vg.h"
+#include "mapView.h"
+#include <stb_image.h>
+#include <stb_image_write.h>
 
+stbimage_load::stbimage_load()
+{
+}
+
+stbimage_load::stbimage_load(const char* fn)
+{
+	load(fn);
+}
+
+stbimage_load::~stbimage_load()
+{
+	stbi_image_free(data);
+}
+void stbimage_load::free_img(stbimage_load* p)
+{
+	if (p)
+		delete p;
+}
+stbimage_load* stbimage_load::new_load(const void* fnd, size_t len)
+{
+	stbimage_load t;
+	if (fnd)
+	{
+		if (len)
+			t.load_mem((char*)fnd, len);
+		else
+			t.load((char*)fnd);
+	}
+	if (t.data && t.width && t.height)
+	{
+		auto p = new stbimage_load();
+		if (p)
+		{
+			*p = t;
+			t.data = 0;
+		}
+		return p;
+	}
+	return nullptr;
+}
+void stbimage_load::tobgr()
+{
+	auto n = width * height;
+	auto t = (char*)data;
+	for (size_t i = 0; i < n; i++)
+	{
+		std::swap(*(t + 0), *(t + 2));
+		t += 4;
+	}
+}
+bool stbimage_load::load(const char* fn)
+{
+	hz::mfile_t mf;
+	if (!fn || !*fn)return false;
+	auto rawd = mf.open_d(fn, true);
+	if (!rawd)
+	{
+		return false;
+	}
+	data = (uint32_t*)stbi_load_from_memory((stbi_uc*)rawd, mf.size(), &width, &height, &rcomp, comp);
+	type = 0;
+	return (data ? true : false);
+}
+bool stbimage_load::load_mem(const char* d, size_t s)
+{
+	data = (uint32_t*)stbi_load_from_memory((stbi_uc*)d, s, &width, &height, &rcomp, comp);
+	type = 0;
+	return (data ? true : false);
+}
 
 
 #ifndef NO_FLEX_IMP
@@ -29,6 +101,7 @@ public:
 	~flex_item();
 
 	flex_item* init();
+	void setdata(flex_data* d);
 	void update_should_order_children();	// 子元素属性改变时执行
 
 	void item_add(flex_item* child);
@@ -74,6 +147,11 @@ flex_item* flex_item::init()
 		item->children->clear();
 	item->should_order_children = false;
 	return item;
+}
+
+void flex_item::setdata(flex_data* d)
+{
+	*((flex_data*)this) = *d;
 }
 
 
@@ -771,24 +849,24 @@ void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count
 		auto it = q.top(); q.pop();
 		if (it)
 		{
-			auto k = &fitem[idx];
+			auto& k = fitem[idx];
 			if (it->index < count)
 			{
-				*k = *(fd + it->index);
+				k.setdata(fd + it->index);
 			}
 			else {
-				*k = *fd;
+				k.setdata(fd);
 			}
-			k->managed_ptr = it;
+			k.managed_ptr = it;
 			if (it->parent != -1)
 			{
-				k->parent = fitem + it->parent;
-				k->parent->item_add(k);
+				k.parent = fitem + it->parent;
+				k.parent->item_add(&k);
 			}
-			k->baseline = it->baseline;
-			k->width = it->size.x; k->height = it->size.y;
-			k->left = it->offset.x; k->top = it->offset.y;
-			k->right = it->offset.z; k->bottom = it->offset.w;
+			k.baseline = it->baseline;
+			k.width = it->size.x; k.height = it->size.y;
+			k.left = it->offset.x; k.top = it->offset.y;
+			k.right = it->offset.z; k.bottom = it->offset.w;
 			for (size_t i = 0; i < it->child_count; i++) {
 				it->child[i].parent = idx;
 				q.push(it->child + i);
