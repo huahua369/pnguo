@@ -1159,7 +1159,7 @@ int main()
 		text_render_o trt = {};
 		trt.box.rc = { 0,0,300,500 };
 		trt.box.auto_break = 1;
-		trt.box.word_wrap = 1;
+		trt.box.word_wrap = 0;
 		build_text_render(&tb, &trt);
 		//c_render(&trt);
 		std::vector<uint32_t> vd;

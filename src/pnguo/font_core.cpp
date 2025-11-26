@@ -9543,34 +9543,30 @@ void update_text(text_render_o* p, text_block* tb)
 	do {
 		if (p->box.auto_break)
 		{
-			auto bk = new_break(0, 0, p->box.word_wrap);
+			auto bk = new_break(0, 0, p->box.word_wrap); // 创建icu断行
 			if (bk)
 			{
 				for (auto& it : p->bv)
 				{
-					listWordBoundaries(bk, (uint16_t*)p->str.c_str() + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len)
-						{
-							get_font_fallbacks16(t->family, str, len, it.rtl, vstr);
+					listWordBoundaries(bk, (uint16_t*)p->str.c_str() + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len) {
+						get_font_fallbacks16(t->family, str, len, it.rtl, vstr);
 						});
 				}
 				free_break(bk);
 				break;
 			}
 		}
-		for (auto& it : p->bv)
-		{
-			get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr);
-		}
+		// 不执行断行或无自动换行时，查询字体
+		for (auto& it : p->bv) { get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr); }
 	} while (0);
 	for (auto& kt : vstr)
 	{
-		if (!kt.font)
+		if (kt.font)
 		{
-			continue;
+			font_t::GlyphPositions gp = {};// 执行harfbuzz 
+			auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
+			kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
 		}
-		font_t::GlyphPositions gp = {};// 执行harfbuzz 
-		auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
-		kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
 	}
 	int dh = tb->line_height;
 	int baseline = tb->baseline;
@@ -9651,6 +9647,7 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 	size_t ct = 0, ct1 = 0;
 	size_t cline = 0;
 	std::vector<glm::ivec4> b_data;
+	std::vector<std::vector<glm::ivec4>> line_data;
 	glm::ivec4 c4 = {};
 	c4.y = tb->line_height;
 	c4.z = 0;
@@ -9669,6 +9666,13 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 		}
 		if (it.cpt == '\n')
 		{
+			c4.w = ct;
+			b_data.push_back(c4);
+			c4.x = it.advance;
+			c4.z = ct;
+			cline = it.user_ptr + 1;
+			line_data.push_back(b_data);
+			b_data.clear();
 			rct.x = std::max(rct.x, xxx);
 			line_count++;
 			linex.push_back({ ct1,ct,xxx });
@@ -9684,118 +9688,67 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 		c4.w = ct;
 		b_data.push_back(c4);
 	}
+	if (b_data.size())
+	{
+		line_data.push_back(b_data);
+	}
 	if (xxx > 0) {
 		line_count++;
 		linex.push_back({ ct1,ct,xxx });
 	}
-	// 不自动换行时宽高。
 	rct.x = std::max(rct.x, xxx);
 	rct.y = line_count * tb->line_height;
-
 	if (rc.z < 1) {
 		rc.z = rct.x;
 	}
 	if (rc.w < 1) {
 		rc.w = rct.y;
 	}
-
 	fnode->size = glm::vec2(rc.z, rc.w);
-	auto pc = p->_vstr.size();
-	{
-		auto t = fnode + 1;
-		auto vt = p->_vstr.data();
-		fnode->baseline = tb->baseline;
-		for (size_t i = 0; i < pc; i++, vt++, t++)
-		{
-			t->size = glm::vec2(vt->advance, tb->line_height);
-			t->baseline = tb->baseline;
-			t->index = 1;
-		}
-	}
 	auto ps = bearing;
 	ps.x += rc.x;
 	ps.y += rc.y;
 	int64_t yh = 0;
-	for (size_t i = 0; i < line_count; i++)
+	auto lc = line_data.size();
+	size_t xp = 0;
+	auto kt = p->_vstr.data();
+	for (size_t i = 0; i < lc; i++)
 	{
-		auto& it = linex[i];
-		fnode->child = fnode + 1 + it.x;
-		fnode->child_count = it.y - it.x;
+		auto& it = line_data[i];
+		fnode->child = fnode + 1 + xp;
+		fnode->child_count = it.size();
 		fnode->line_count = 0;
 		fnode->size.y = 0;
+		xp += it.size();
+		fnode->baseline = tb->baseline;
+		auto t = fnode->child;
+		for (size_t e = 0; e < fnode->child_count; e++, t++)
+		{
+			auto vt = it[e];
+			t->size = glm::vec2(vt.x, vt.y);
+			t->baseline = tb->baseline;
+			t->index = 1;
+		}
 		auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
-		auto vt = p->_vstr.data() + it.x;
 		for (size_t y = 0; y < fnode->child_count; y++)
 		{
 			auto t0 = fnode->child + y;
+			auto& bt = it[y];
 			glm::vec2 vps2 = t0->frame;
-			vt->_apos = ps + vps2;
-			vt->_apos.y += yh;
-			vt++;
+			auto pos = ps + vps2;
+			size_t px = 0;
+			for (size_t q = bt.z; q < bt.w; q++)
+			{
+				auto dt = kt + q;
+				dt->_apos = pos;
+				dt->_apos.y += yh;
+				dt->_apos.x += px;
+				px += dt->advance;
+			}
 		}
 		yh += fnode->line_count * tb->line_height;
 	}
-#if 0
-	if (p->box.auto_break && rc.z > 0)
-	{
-		auto ps = bearing;
-		ps.x += rc.x;
-		ps.y += rc.y;
-		size_t xx = 0;
-		auto t = p->_vstr.data();
-		for (size_t i = 0; i < p->_vstr.size(); i++, t++)
-		{
-			auto& it = *t;
-			xx = 0;
-			auto t1 = t;
-			for (; it.cpt == 0 && it.user_ptr == t->user_ptr; t++)
-			{
-				xx += t->advance;
-			}
-			t = t1;
-			if (it.cpt == '\n' || tps.x + xx > ss.x)
-			{
-				tps.y += tb->line_height;
-				tps.x = 0;
-			}
-			it._apos = ps + tps;
-			tps.x += it.advance;
-		}
-	}
-	else
-	{
-		for (auto& it : p->_vstr)
-		{
-			if (it.cpt == '\n')
-			{
-				rct.x = std::max(rct.x, xxx);
-				line_count++;
-			}
-			else
-			{
-				xxx += it.advance;
-			}
-		}
-		rct.x = std::max(rct.x, xxx);
-		rct.y = line_count * tb->line_height;
-		if (ta.x < 0)ta.x = 0;
-		if (ta.y < 0)ta.y = 0;
-		// 区域大小 - 文本包围盒大小。居中就是text_align={0.5,0.5}
-		auto ps = (ss - rct) * ta + bearing;
-		ps.x += rc.x;
-		ps.y += rc.y;
-		for (auto& it : p->_vstr)
-		{
-			if (it.cpt == '\n')
-			{
-				tps.y += tb->line_height;
-				tps.x = 0;
-			}
-			it._apos = ps + tps;
-			tps.x += it.advance;
-		}
-	}
-#endif
+	return;
 }
 void text_render_set(text_render_o* p, text_box_t* b)
 {
