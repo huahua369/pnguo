@@ -9698,10 +9698,10 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 	}
 	rct.x = std::max(rct.x, xxx);
 	rct.y = line_count * tb->line_height;
-	if (rc.z < 1) {
+	if (rc.z < 0) {
 		rc.z = rct.x;
 	}
-	if (rc.w < 1) {
+	if (rc.w < 0) {
 		rc.w = rct.y;
 	}
 	fnode->size = glm::vec2(rc.z, rc.w);
@@ -9746,7 +9746,7 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 				px += dt->advance;
 			}
 		}
-		yh += fnode->line_count * tb->line_height;
+		yh += nrc.w;
 	}
 	return;
 }
