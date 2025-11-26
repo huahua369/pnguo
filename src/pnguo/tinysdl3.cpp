@@ -1269,6 +1269,7 @@ SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
 	}
 	return pr;
 }
+#if 0
 void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 {
 	if (!p)return;
@@ -1335,7 +1336,7 @@ void canvas_atlas_update(canvas_atlas* p, SDL_Renderer* renderer, float delta)
 
 	p->apply();
 }
-
+#endif
 
 #endif
 

@@ -218,6 +218,7 @@ list(APPEND tpv_src
 include_directories("third_party")  
 include_directories("src") 
 include_directories("src/pnguo") 
+include_directories("third_party/stb_src") 
 include_directories("third_party/mcut") 
 include_directories("third_party/vkvg")
 include_directories("third_party/vkvg/src")

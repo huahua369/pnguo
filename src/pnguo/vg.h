@@ -261,7 +261,7 @@ enum class flex_position :uint8_t {
 	POS_RELATIVE = 0,
 	POS_ABSOLUTE
 };
-
+// row行，reverse反向，column列
 enum flex_direction :uint8_t {
 	ROW = 0,
 	ROW_REVERSE,
@@ -302,23 +302,25 @@ struct flex_data {
 	flex_align align_self = flex_align::ALIGN_AUTO;			// 子元素:覆盖父容器align-items的设置
 	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
 	flex_direction direction = flex_direction::ROW;			// 父元素:
-	flex_wrap wrap = flex_wrap::WRAP;						// 父元素:是否换行，超出宽度自动换行
+	flex_wrap wrap = flex_wrap::NO_WRAP;						// 父元素:是否换行，超出宽度自动换行
 	bool should_order_children = false;
 };
 
 struct node_dt
 {
-	glm::vec2 size;		// in原大小
-	glm::vec4 offset;	// in偏移位置
-	glm::vec4 frame;	// out输出位置大小
+	glm::vec2 size = {};		// in原大小
+	glm::vec4 offset = {};	// in偏移位置
+	glm::vec4 frame = {};	// out输出位置大小
 	size_t index = 0;	// 样式序号
 	float baseline = 0.0; // 基线位置
 	node_dt* child = 0;
 	size_t child_count = 0;
+	size_t tidx = -1;	// out自动计算节点索引
 	size_t parent = -1;	// out自动计算父节点索引
+	size_t line_count = 0;	// out行数量
 };
 // 输入样式数据，根节点指针，所有节点数量
-void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
+glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
 
 
 

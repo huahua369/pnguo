@@ -9627,16 +9627,115 @@ void update_text(text_render_o* p, text_block* tb)
 	p->tb = (tb);
 	return;
 }
-void text_render_layout1(text_render_o* p) {
+void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 	if (!p || !p->tb)return;
 	auto tb = p->tb;
 	glm::vec2 rct = {};
 	float xxx = 0;
-	int line_count = 1;
+	int line_count = 0;
 	auto ta = p->box.text_align;
 	glm::vec2 tps = {};
 	glm::ivec4 rc = p->box.rc;
 	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,tb->baseline };
+
+	flex_data tf[2] = {};
+	if (boxflex)
+		*tf = *boxflex;
+	std::vector<node_dt> fv;
+	std::vector<glm::ivec3> linex;
+	fv.resize(p->_vstr.size() + 1);
+	node_dt* fnode = fv.data();
+	tf->wrap = p->box.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
+	//tf->justify_content = flex_align::ALIGN_START;
+	//tf->align_content = flex_align::ALIGN_START;
+	size_t ct = 0, ct1 = 0;
+	size_t cline = 0;
+	std::vector<glm::ivec4> b_data;
+	glm::ivec4 c4 = {};
+	c4.y = tb->line_height;
+	c4.z = 0;
+	for (auto& it : p->_vstr)
+	{
+		if (it.user_ptr == cline)
+		{
+			c4.x += it.advance;
+		}
+		else {
+			c4.w = ct;
+			b_data.push_back(c4);
+			c4.x = it.advance;
+			c4.z = ct;
+			cline = it.user_ptr;
+		}
+		if (it.cpt == '\n')
+		{
+			rct.x = std::max(rct.x, xxx);
+			line_count++;
+			linex.push_back({ ct1,ct,xxx });
+			ct1 = ct; xxx = 0;
+		}
+		else
+		{
+			xxx += it.advance;
+		}
+		ct++;
+	}
+	if (c4.z != ct) {
+		c4.w = ct;
+		b_data.push_back(c4);
+	}
+	if (xxx > 0) {
+		line_count++;
+		linex.push_back({ ct1,ct,xxx });
+	}
+	// 不自动换行时宽高。
+	rct.x = std::max(rct.x, xxx);
+	rct.y = line_count * tb->line_height;
+
+	if (rc.z < 1) {
+		rc.z = rct.x;
+	}
+	if (rc.w < 1) {
+		rc.w = rct.y;
+	}
+
+	fnode->size = glm::vec2(rc.z, rc.w);
+	auto pc = p->_vstr.size();
+	{
+		auto t = fnode + 1;
+		auto vt = p->_vstr.data();
+		fnode->baseline = tb->baseline;
+		for (size_t i = 0; i < pc; i++, vt++, t++)
+		{
+			t->size = glm::vec2(vt->advance, tb->line_height);
+			t->baseline = tb->baseline;
+			t->index = 1;
+		}
+	}
+	auto ps = bearing;
+	ps.x += rc.x;
+	ps.y += rc.y;
+	int64_t yh = 0;
+	for (size_t i = 0; i < line_count; i++)
+	{
+		auto& it = linex[i];
+		fnode->child = fnode + 1 + it.x;
+		fnode->child_count = it.y - it.x;
+		fnode->line_count = 0;
+		fnode->size.y = 0;
+		auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
+		auto vt = p->_vstr.data() + it.x;
+		for (size_t y = 0; y < fnode->child_count; y++)
+		{
+			auto t0 = fnode->child + y;
+			glm::vec2 vps2 = t0->frame;
+			vt->_apos = ps + vps2;
+			vt->_apos.y += yh;
+			vt++;
+		}
+		yh += fnode->line_count * tb->line_height;
+	}
+#if 0
 	if (p->box.auto_break && rc.z > 0)
 	{
 		auto ps = bearing;
@@ -9696,6 +9795,7 @@ void text_render_layout1(text_render_o* p) {
 			tps.x += it.advance;
 		}
 	}
+#endif
 }
 void text_render_set(text_render_o* p, text_box_t* b)
 {
@@ -9714,7 +9814,7 @@ void build_text_render(text_block* tb, text_render_o* trt)
 {
 	if (!tb || !trt)return;
 	update_text(trt, tb);
-	text_render_layout1(trt);
+	text_render_layout1(trt, 0);
 }
 void get_lineheight(std::vector<lay_value>& v, int w, const glm::vec2& ps)
 {

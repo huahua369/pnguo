@@ -94,6 +94,7 @@ public:
 	flex_self_sizing self_sizing = NULL; // 运行时计算大小
 	float frame[4] = {};	// 输出坐标、大小
 	flex_item* parent = 0;	// 父级
+	size_t line_count = 0;
 	std::vector<flex_item*>* children = 0;	// 子级 
 	std::vector<char> temp_layout;
 public:
@@ -145,7 +146,7 @@ flex_item* flex_item::init()
 	item->parent = NULL;
 	if (item->children)
 		item->children->clear();
-	item->should_order_children = false;
+	item->should_order_children = true;
 	return item;
 }
 
@@ -163,6 +164,7 @@ void flex_item::item_add(flex_item* child)
 	}
 	item->children->push_back(child);
 	child->parent = item;
+	should_order_children = true;
 	child->update_should_order_children();
 }
 
@@ -266,6 +268,7 @@ struct flex_layout {
 	//uint32_t lines_count;
 	float lines_sizes;
 	//uint32_t lines_cap;
+	size_t lines_idx0;
 };
 
 flex_align child_align(flex_item* child, flex_item* parent)
@@ -364,6 +367,7 @@ void layout_init(flex_item* item, float width, float height, struct flex_layout*
 	layout->need_lines = layout->wrap && item->align_content != flex_align::ALIGN_START;
 	layout->lines = (flex_layout::flex_layout_line*)(item->temp_layout.data() + sizeof(uint32_t) * item->children->size());
 	layout->lines_idx = 0;
+	layout->lines_idx0 = 1;
 	layout->lines_sizes = 0;
 	auto align_items = child_align(item, item->parent);
 	if (align_items == flex_align::ALIGN_BASELINE && item->children)
@@ -728,6 +732,7 @@ void flex_item::layout_item(float width, float height)
 				if (last_count < relative_children_count)
 					last_count = relative_children_count;
 				relative_children_count = 0;
+				layout->lines_idx0++;
 			}
 
 			float child_size2 = CHILD_SIZE2(child);
@@ -811,7 +816,7 @@ void flex_item::layout_item(float width, float height)
 			}
 		}
 	}
-
+	line_count = layout->lines_idx > 0 ? layout->lines_idx : layout->lines_idx0;
 	layout_cleanup(layout);
 }
 
@@ -833,23 +838,27 @@ void flex_item::layout()
 	assert(self_sizing == NULL);
 	layout_item(width, height);
 }
-void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count)
+glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count)
 {
+	glm::vec4 rect = {};
 	if (!fd || count == 0 || !p || !node_count || !p->child || !p->child_count)
-		return;
+		return rect;
 	auto fitem = new flex_item[node_count];
-	if (!fitem) return;
+	if (!fitem) return rect;
 	for (size_t i = 0; i < node_count; i++) {
 		fitem[i].init();
 	}
 	size_t idx = 0;
 	std::stack<node_dt*> q;  // 队列存储待处理坐标 	 
 	q.push(p);
+	p->tidx = idx;
 	while (q.size()) {
 		auto it = q.top(); q.pop();
-		if (it)
+		if (it && it->tidx < node_count)
 		{
-			auto& k = fitem[idx];
+			auto& k = fitem[it->tidx];
+			auto pidx = it->tidx;
+			idx++;
 			if (it->index < count)
 			{
 				k.setdata(fd + it->index);
@@ -858,20 +867,17 @@ void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count
 				k.setdata(fd);
 			}
 			k.managed_ptr = it;
-			if (it->parent != -1)
-			{
-				k.parent = fitem + it->parent;
-				k.parent->item_add(&k);
-			}
 			k.baseline = it->baseline;
 			k.width = it->size.x; k.height = it->size.y;
 			k.left = it->offset.x; k.top = it->offset.y;
 			k.right = it->offset.z; k.bottom = it->offset.w;
 			for (size_t i = 0; i < it->child_count; i++) {
-				it->child[i].parent = idx;
+				it->child[i].parent = pidx;
+				it->child[i].tidx = idx;
 				q.push(it->child + i);
+				k.item_add(fitem + idx);
+				idx++;
 			}
-			idx++;
 		}
 	}
 	fitem->layout();
@@ -880,10 +886,17 @@ void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count
 		auto& it = fitem[i];
 		auto pt = (node_dt*)it.managed_ptr;
 		pt->frame = glm::vec4(it.frame[0], it.frame[1], it.frame[2], it.frame[3]);
+		rect.x = std::min(rect.x, it.frame[0]);
+		rect.y = std::min(rect.y, it.frame[1]);
+		rect.z = std::max(rect.z, it.frame[2] + it.frame[0]);
+		rect.w = std::max(rect.w, it.frame[3] + it.frame[1]);
+
 	}
+	p->line_count = fitem->line_count;
 	if (fitem)
 	{
 		delete[]fitem;
 	}
+	return rect;
 }
 #endif // !NO_FLEX_IMP

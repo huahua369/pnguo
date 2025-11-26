@@ -1139,9 +1139,11 @@ int main()
 
 
 
-		std::string k8 = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
+		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
-		std::string k80 = (char*)u8"👨‍👨‍👧q";//سلام
+		std::string k80 = (char*)u8"👨‍👨‍👧q"; 
+		std::string ka8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀"; 
+		std::string k8 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀"; 
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
 		text_style ts = {};
@@ -1155,11 +1157,11 @@ int main()
 		tb.first = 0;
 		tb.size = k8.size();
 		text_render_o trt = {};
-		trt.box.rc = { 0,0,260,500 };
-		trt.box.auto_break = 0;
+		trt.box.rc = { 0,0,300,500 };
+		trt.box.auto_break = 1;
 		trt.box.word_wrap = 1;
 		build_text_render(&tb, &trt);
-		c_render(&trt);
+		//c_render(&trt);
 		std::vector<uint32_t> vd;
 		image_ptr_t dst = {};
 		glm::ivec2 imgsize = { 500,100 };
@@ -1170,7 +1172,7 @@ int main()
 		dst.data = vd.data();
 		dst.width = imgsize.x; dst.height = imgsize.y;
 		dst.comp = 4; dst.stride = dst.width * sizeof(uint32_t);
-		c_render_data(&trt, &dst);
+		//c_render_data(&trt, &dst);
 		//delete_font_family(family);
 
 
