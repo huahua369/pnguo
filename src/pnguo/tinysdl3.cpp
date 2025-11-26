@@ -2714,6 +2714,15 @@ void set_texture_color4_r(void* texture, const glm::vec4* c)
 		SDL_SetTextureColorModFloat((SDL_Texture*)texture, c->x, c->y, c->z);
 	}
 }
+void set_texture_color32_r(void* texture, const uint32_t* c2)
+{
+	if (texture && c2)
+	{
+		auto c4 = ucolor2fp(c2); auto c = &c4;
+		SDL_SetTextureAlphaModFloat((SDL_Texture*)texture, c->w);
+		SDL_SetTextureColorModFloat((SDL_Texture*)texture, c->x, c->y, c->z);
+	}
+}
 void free_texture_r(void* texture)
 {
 	if (texture)
@@ -2741,6 +2750,42 @@ int render_texture(void* renderer, void* texture, texture_dt* p, int count)
 	{
 		auto& srcrect = p->src_rect;
 		auto& dstrect = p->dst_rect;
+		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)texture, (const SDL_FRect*)&srcrect, (const SDL_FRect*)&dstrect);
+		if (r)
+		{
+			ern++;
+		}
+	}
+	return ern;
+}
+int render_texture_color(void* renderer, void* texture, texture_dt* p, int count, const void* color, int color_count, int color_type)
+{
+	if (!renderer || !p || !texture || !count)return 0;
+	int ern = 0;
+	auto tex = (SDL_Texture*)texture;
+	auto cp = (glm::vec4*)color;
+	auto cp2 = (uint32_t*)color;
+	if (color && color_count == 1)
+	{
+		auto c4 = ucolor2fp(cp2);
+		set_texture_color4_r(tex, color_type == 0 ? &c4 : cp);
+	}
+	for (size_t i = 0; i < count; i++, p++)
+	{
+		auto& srcrect = p->src_rect;
+		auto& dstrect = p->dst_rect;
+		if (color_count > 1 && color && (i < color_count))
+		{
+			if (color_type == 0)
+			{
+				set_texture_color32_r(tex, cp2);
+				cp2++;
+			}
+			else {
+				set_texture_color4_r(tex, cp);
+				cp++;
+			}
+		}
 		bool r = SDL_RenderTexture((SDL_Renderer*)renderer, (SDL_Texture*)texture, (const SDL_FRect*)&srcrect, (const SDL_FRect*)&dstrect);
 		if (r)
 		{
@@ -2816,8 +2861,10 @@ void get_sdl_texture_cb(texture_cb* p)
 	cb.free_texture = free_texture_r;
 	cb.set_texture_color = set_texture_color_r;
 	cb.set_texture_color4 = set_texture_color4_r;
+	cb.set_texture_color32 = set_texture_color32_r;
 	cb.new_texture_file = new_tex2file;
 	cb.render_texture = render_texture;
+	cb.render_texture_color = render_texture_color;
 	cb.render_texture_rotated = render_texture_rotated;
 	cb.render_texture_tiled = render_texture_tiled;
 	cb.render_texture_9grid = render_texture_9grid;

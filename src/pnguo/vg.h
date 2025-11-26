@@ -315,7 +315,7 @@ struct node_dt
 	float baseline = 0.0; // 基线位置
 	node_dt* child = 0;
 	size_t child_count = 0;
-	size_t parent = -1;	// 自动计算父节点索引
+	size_t parent = -1;	// out自动计算父节点索引
 };
 // 输入样式数据，根节点指针，所有节点数量
 void flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
@@ -375,6 +375,7 @@ struct texture_cb
 	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
 	void (*set_texture_color)(void* texture, float r, float g, float b, float a);
 	void (*set_texture_color4)(void* texture, const glm::vec4* c);
+	void (*set_texture_color32)(void* texture, const uint32_t* c);
 	// 删除纹理
 	void (*free_texture)(void* texture);
 	// 创建或更新纹理
@@ -384,6 +385,8 @@ struct texture_cb
 	// 纹理渲染
 	// 批量区域渲染
 	int (*render_texture)(void* renderer, void* texture, texture_dt* p, int count);
+	// 批量区域渲染,颜色可选，uint32_t和vec4两种颜色指针，color_count等于1或和区域count相同
+	int (*render_texture_color)(void* renderer, void* texture, texture_dt* p, int count, const void* color, int color_count, int color_type);
 	// 单个区域支持旋转
 	bool (*render_texture_rotated)(void* renderer, void* texture, texture_angle_dt* p, int count);
 	// 平铺渲染

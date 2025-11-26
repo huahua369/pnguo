@@ -45,6 +45,11 @@ glm::vec4 ucolor2f(uint32_t color)
 	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
 	return c;
 }
+glm::vec4 ucolor2fp(const uint32_t* color)
+{
+	glm::vec4 c = *(glm::u8vec4*)color; c /= 255.0f;
+	return c;
+}
 /*
 * 获取字体信息名
 1 family名

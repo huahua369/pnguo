@@ -7,6 +7,7 @@
 #include <string> 
 
 glm::vec4 ucolor2f(uint32_t c);
+glm::vec4 ucolor2fp(const uint32_t* c);
 struct vertex_f
 {
 	float x, y, cx, cy, cx1, cy1;
@@ -669,7 +670,7 @@ void text_multi_add(layout_tx* p, text_render_o* t);
 void text_multi_add_i(layout_tx* p, image_block* t, bool abspos);
 void text_multi_layout(layout_tx* p);
 
- 
+
 
 
 
