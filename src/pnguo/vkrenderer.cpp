@@ -21737,6 +21737,10 @@ void vkdg_cx::resize(int w, int h) {
 		}
 	}
 }
+void vkdg_cx::resize(const glm::vec2& size)
+{
+	resize(size.x, size.y);
+}
 void vkdg_cx::save_fbo(int idx)
 {
 	if (ctx) {

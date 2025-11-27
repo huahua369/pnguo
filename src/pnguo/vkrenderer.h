@@ -254,6 +254,7 @@ public:
 	image_vkr get_vkimage(int idx);
 	// 重置大小
 	void resize(int w, int h);
+	void resize(const glm::vec2& size);
 	// 保存fbo idx的像素到dt
 	void save_fbo(int idx);
 	image_dr save_shadow(int idx);

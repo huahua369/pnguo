@@ -896,8 +896,8 @@ int main()
 		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
 		std::string k80 = (char*)u8"👨‍👨‍👧q";
-		std::string ka8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
-		std::string k8 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
+		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
+		std::string k85 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
 		text_style ts = {};
@@ -915,7 +915,6 @@ int main()
 		trt.box.auto_break = 1;
 		trt.box.word_wrap = 0;
 		build_text_render(&tb, &trt);
-		//c_render(&trt);
 		std::vector<uint32_t> vd;
 		image_ptr_t dst = {};
 		glm::ivec2 imgsize = { 500,100 };
@@ -958,9 +957,7 @@ int main()
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-#ifdef _WIN32
-		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图 
-#endif
+
 		auto kd = sdldev.vkdev;
 		//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 		std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
@@ -1033,7 +1030,7 @@ int main()
 				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\NegativeScaleTest\glTF-Binary\NegativeScaleTest.glb)", { 0,0,0 }, 1.0);//
 				//vkd->add_gltf(R"(E:\zmodel\NodePerformanceTest.glb)", { 0,0.1,0 }, 1.0);//
 			}
-			vkd->resize(1024, 800);				// 设置fbo缓冲区大小
+			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 			auto tex3d = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			/*
