@@ -2507,7 +2507,14 @@ void form_x::hide_child()
 			it->hide();
 	}
 }
-
+void form_x::set_displayaffinity(bool v)
+{
+#ifdef _WIN32
+	auto hwnd = (HWND)get_nptr();
+	if (hwnd)
+		SetWindowDisplayAffinity(hwnd, v ? WDA_MONITOR : WDA_NONE);// 反截图 
+#endif
+}
 
 
 

@@ -362,6 +362,8 @@ public:
 	bool hittest(const glm::ivec2& pos);
 	void focus_lost();
 	void hide_child();
+	// 反截图
+	void set_displayaffinity(bool v);
 private:
 };
 

@@ -19,13 +19,11 @@
 #include <pnguo/vkrenderer.h>
 #include <pnguo/page.h>
 #include <pnguo/mapView.h>
-#include <pnguo/print_time.h>
-#include <cairo/cairo.h>
+#include <pnguo/print_time.h> 
 #include <pnguo/mesh3d.h>
 #include "mshell.h"
 //#include <cgltf.h>
-#include <mcut/stlrw.h>
-#include <cairo/cairo.h>
+#include <mcut/stlrw.h> 
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <pnguo/render.h>
 #include <pnguo/win_core.h>
@@ -221,7 +219,7 @@ public:
 	~belt_cx();
 
 	void update(float delta);
-	void draw(cairo_t* cr);
+	void draw(void* cr);
 private:
 
 };
@@ -813,251 +811,6 @@ text_image_t* get_glyph_item(std::vector<font_t*>& familys, int fontsize, const 
 	return opt;
 }
 
-#define SP_RGBA32_R_U(v) ((v) & 0xff)
-#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
-#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
-#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
-#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
-#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
-#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
-#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
-#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
-#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
-void set_color0(cairo_t* cr, uint32_t rgba)
-{
-	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
-		SP_RGBA32_G_F(rgba),
-		SP_RGBA32_B_F(rgba),
-		SP_RGBA32_A_F(rgba));
-}
-glm::vec2 draw_image1(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& dsize)
-{
-	glm::vec2 ss = { rc.z, rc.w };
-	if (ss.x < 0)
-	{
-		ss.x = cairo_image_surface_get_width(image);
-	}
-	if (ss.y < 0)
-	{
-		ss.y = cairo_image_surface_get_height(image);
-	}
-	if (ss.x > 0 && ss.y > 0)
-	{
-		glm::vec2 sc = { 1,1 };
-		if (dsize.x > 0 && dsize.y > 0) {
-			sc = dsize / ss;
-		}
-		if (color > 0 && color != -1)
-		{
-			cairo_save(cr);
-			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-			cairo_translate(cr, pos.x, pos.y);
-			if (sc.x != 1 || sc.y != 1)
-				cairo_scale(cr, sc.x, sc.y);
-			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
-			cairo_clip(cr);
-			set_color0(cr, color);
-			cairo_mask_surface(cr, image, -rc.x, -rc.y);
-			cairo_restore(cr);
-		}
-		else {
-			cairo_save(cr);
-			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-			cairo_translate(cr, pos.x, pos.y);
-			if (sc.x != 1 || sc.y != 1)
-				cairo_scale(cr, sc.x, sc.y);
-			cairo_set_source_surface(cr, image, -rc.x, -rc.y);
-			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
-			cairo_fill(cr);
-			cairo_restore(cr);
-		}
-	}
-	return ss;
-}
-void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void(*destroy_func)(void* data))
-{
-	if (p && key) {
-		cairo_surface_set_user_data(p, (cairo_user_data_key_t*)key, ud, destroy_func);
-	}
-}
-#ifndef key_def_data
-#define key_def_data 1024
-#define key_def_data_iptr 1025
-#define key_def_data_svgptr 1026
-#define key_def_data_done 1000
-#endif
-void destroy_image_data(void* d) {
-	auto p = (uint32_t*)d;
-	if (d)delete[]p;
-}
-void free_image_cr(cairo_surface_t* image)
-{
-	if (image)
-	{
-		cairo_surface_destroy(image);
-	}
-}
-cairo_surface_t* new_image_cr(image_ptr_t* img)
-{
-	cairo_surface_t* image = 0;
-	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
-	auto px = new uint32_t[img->width * img->height];
-	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
-	if (image)
-	{
-		image_set_ud(image, key_def_data, px, destroy_image_data);
-		memcpy(px, (unsigned char*)img->data, img->height * img->width * sizeof(int));
-		if (img->multiply && img->type == 1)
-		{
-		}
-		else {
-			int stride = cairo_image_surface_get_stride(image);
-			auto data = cairo_image_surface_get_data(image);
-			auto t = data;
-			auto ts = (unsigned char*)img->data;
-			for (size_t i = 0; i < img->height; i++)
-			{
-				premultiply_data(img->width * 4, t, img->type, !img->multiply);
-				t += stride;
-				ts += img->stride;
-			}
-			//#define _DEBUG
-			//			save_img_png(img, "update_text_img.png");
-			//			cairo_surface_write_to_png(image, "update_text_surface.png");
-			//#endif
-		}
-	}
-	else {
-		delete[]px;
-	}
-	return image;
-}
-cairo_surface_t* new_image_cr(const glm::ivec2& size, uint32_t* data)
-{
-	cairo_surface_t* image = 0;
-	image_ptr_t img[1] = {};
-	img->width = size.x;
-	img->height = size.y;
-	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
-	auto px = data ? data : new uint32_t[img->width * img->height];
-	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
-	if (image)
-	{
-		if (!data)
-			image_set_ud(image, key_def_data, px, destroy_image_data);
-		memset(px, 0, img->width * img->height * sizeof(int));
-	}
-	else {
-		delete[]px;
-	}
-	return image;
-}
-void draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color, const glm::ivec2& pos)
-{
-	auto mx = rtv.size();
-	glm::ivec2 nps = pos;
-	for (size_t i = 0; i < mx; i++)
-	{
-		auto& it = rtv[i];
-		if (it._image)
-		{
-			auto ft = (cairo_surface_t*)it._image->ptr;
-			if (!ft) { ft = new_image_cr(it._image); it._image->ptr = ft; }
-			if (ft)
-			{
-				draw_image1(cr, ft, it._dwpos + it._apos + nps, it._rect, it.color ? it.color : color, {});
-			}
-		}
-		nps.x += it.advance;
-	}
-}
-void vkvg_render(vkvg_dev* dev, font_t* sue, font_t::GlyphPositions& gp)
-{
-	auto surf = dev->new_surface(2024, 512);
-	auto ctx = dev->new_context(surf);
-	int fontsize = 128;
-	double scale_h = sue->get_scale(fontsize);
-	uint32_t color = 0xff0080ff;
-	int xx = 0;
-	int yy = sue->get_line_height(fontsize);
-	int h = sue->get_line_height(fontsize);
-	std::vector<font_item_t> tm;
-	text_image_t opt = {};
-	//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
-	auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
-	auto cr = cairo_create(img);
-
-	// 光栅化glyph index并缓存
-	for (size_t i = 0; i < gp.len; i++)
-	{
-		auto pos = &gp.pos[i];
-		auto git = sue->get_glyph_item(pos->index, 0, fontsize);
-		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-		git._apos = offset;
-		tm.push_back(git);
-	}
-	for (size_t i = 0; i < gp.len; i++)
-	{
-		auto pos = &gp.pos[i];
-		glm::vec2 adv = { ceil(pos->x_advance * scale_h), ceil(pos->y_advance * scale_h) };
-		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
-		auto git = tm[i];
-		if (git._image) {
-			auto ft = (cairo_surface_t*)git._image->ptr;
-			if (!ft) {
-				ft = new_image_cr(git._image);
-				git._image->ptr = ft;
-				cairo_surface_write_to_png(ft, "temp/cacheemoji.png");
-			}
-			if (ft)
-			{
-				auto ps = git._dwpos;// +git._apos;
-				ps.x += xx;
-				ps += offset;
-				ps.y += yy;
-				draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
-			}
-		}
-		xx += adv.x;
-	}
-	std::string fn = "temp/emojitest2.png";
-	cairo_surface_write_to_png(img, fn.c_str());
-	cairo_destroy(cr);
-	cairo_surface_destroy(img);
-
-}
-void c_render(text_render_o* p)
-{
-	glm::vec2 pos = { 0, 0 };
-	std::vector<font_item_t>& tm = p->_vstr;
-	text_image_t opt = {};
-	//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
-	auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
-	int xx = 0;
-	uint32_t color = 0xff0080f0;
-	auto cr = cairo_create(img);
-	for (auto& git : tm) {
-		if (git._image) {
-			auto ft = (cairo_surface_t*)git._image->ptr;
-			if (!ft) {
-				ft = new_image_cr(git._image);
-				git._image->ptr = ft;
-				cairo_surface_write_to_png(ft, "temp/cache_fonttest2.png");
-			}
-			if (ft)
-			{
-				auto ps = git._dwpos + git._apos;
-				ps += pos;
-				draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
-			}
-		}
-	}
-	std::string fn = "temp/fonttest2.png";
-	cairo_surface_write_to_png(img, fn.c_str());
-	cairo_destroy(cr);
-	cairo_surface_destroy(img);
-
-}
 void c_render_data(text_render_o* p, image_ptr_t* dst)
 {
 	glm::vec2 pos = { 0, 0 };
@@ -1103,7 +856,7 @@ int main()
 		};
 		// 渲染fbo尺寸比例从50%到200%,步长5%
 		int fbo_scale[3] = { 50,200,5 };
-
+#ifdef _WIN32
 #ifdef _DEBUG
 		system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
@@ -1111,6 +864,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
+#endif // _WIN32
 
 		//{
 		//	step_cx stp;
@@ -1141,9 +895,9 @@ int main()
 
 		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
-		std::string k80 = (char*)u8"👨‍👨‍👧q"; 
-		std::string ka8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀"; 
-		std::string k8 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀"; 
+		std::string k80 = (char*)u8"👨‍👨‍👧q";
+		std::string ka8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
+		std::string k8 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
 		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
 		text_style ts = {};
@@ -1175,72 +929,13 @@ int main()
 		//c_render_data(&trt, &dst);
 		//delete_font_family(family);
 
-
-		{
-
-
-#if 0
-
-			vkrender_test(0);
-			glm::quat qk = glm::quat(1, 0, 0, 0);
-			static constexpr float AMD_PI = 3.1415926535897932384626433832795f;
-			static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
-			static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
-			auto a = glm::radians(75.0f);
-			auto ak = AMD_PI_OVER_4;
-			auto ac = cosf(a);
-			auto ac0 = cosf(ak);
-			printf("\n")
-				vkr::Transform transform = {};
-			transform.LookAt(p2v(AMD_PI_OVER_2, 0.58f) * 3.5f, glm::vec4(0, 0, 0, 0), false);
-			vkr::light_t l = {};
-			l._type = vkr::light_t::LIGHT_SPOTLIGHT;
-			l._intensity = 50.0;
-			l._color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			l._range = 15.0;
-			l._outerConeAngle = AMD_PI_OVER_4;// glm::radians(20.0);
-			l._innerConeAngle = AMD_PI_OVER_4 * 0.9f;
-			glm::mat4 lightMat = transform.GetWorldMat();
-			glm::mat4 lightView = glm::affineInverse(lightMat);
-			glm::mat4 mLightViewProj;
-			glm::mat4 per = glm::perspective(l._outerConeAngle * 2.0f, 1.0f, .1f, 100.0f);
-			auto mLightView = lightView;
-			if (l._type == vkr::light_t::LIGHT_SPOTLIGHT)
-				mLightViewProj = per * lightView;
-			//transpose
-			auto direction = glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-			auto position = lightMat[3];
-			auto outerConeCos = cosf(l._outerConeAngle);
-			auto innerConeCos = cosf(l._innerConeAngle);
-
-			glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
-			glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
-			glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			glm::mat4 spotlightMatrix = glm::inverse(mLightViewProj);
-
-			printf("Spotlight Matrix:\n");
-#endif
-		}
-
-
-
-		//{
-		//	hz::mfile_t m;
-		//	auto pd = m.open_d(R"(E:\zt\c00951ea.spr)", 0);
-		//	std::vector<int> fv;
-		//	if (pd)
-		//	{
-		//		fv.resize(20);
-		//		memcpy(fv.data(), pd, 20 * 4);
-		//	}
-		//}
 		uint32_t* cc = get_wcolor();
 		for (size_t i = 0; i < 16; i++)
 		{
 			auto str = get_wcname(i, 0);
 			printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
 		}
-		//testnjson();
+
 		glm::ivec2 ws = { 1280,860 };
 		const char* wtitle = (char*)u8"窗口0";
 		const char* wtitle1 = (char*)u8"窗口1";
@@ -1253,9 +948,7 @@ int main()
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
 			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
 
-			test_vkvg(0, &cc);
 			vctx = new_vkvgdev(&cc, 8);
-			//vkvg_render(vctx, sue, gp);
 		}
 
 
@@ -1265,6 +958,9 @@ int main()
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
+#ifdef _WIN32
+		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图 
+#endif
 		auto kd = sdldev.vkdev;
 		//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 		std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
@@ -1294,7 +990,6 @@ int main()
 		//ttw->mmove_type = 1;
 		//popw->mmove_type = 1;
 		//popw->_focus_lost_hide = 0; 
-		//SetWindowDisplayAffinity((HWND)form0->get_nptr(), WDA_MONITOR);// 反截图 
 		if (vkd) {
 			{
 				int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
@@ -1354,11 +1049,10 @@ int main()
 			vkd->_state.EmissiveFactor = 30;
 			vkd->_state.IBLFactor = 1.0;
 			new_ui(form0, vkd);
-			auto pcb = new texture_cb(); 
+			auto pcb = new texture_cb();
 			assert(pcb);
 			get_sdl_texture_cb(pcb);
 			auto ptrt = &trt;
-			auto ptstr = pcb->make_tex(form0->renderer, &dst);
 
 			// 动画测试
 			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
@@ -1382,10 +1076,7 @@ int main()
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 10,10,vki.size.x,vki.size.y };
 						pcb->render_texture(renderer, tex3d, &tdt, 1);
-						//sp_drawable_draw(dd1);
-						tdt.src_rect = { 0,0,dst.width,dst.height };
-						tdt.dst_rect = { 200,10,dst.width,dst.height };
-						//pcb->render_texture(renderer, ptstr, &tdt, 1);
+						sp_drawable_draw(dd1);
 						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)

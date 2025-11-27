@@ -3121,3 +3121,197 @@ void testft()
 		}
 	}
 }
+
+#if 0
+#define SP_RGBA32_R_U(v) ((v) & 0xff)
+#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
+#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
+#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
+#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
+#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
+#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
+#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
+#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
+#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+void set_color0(cairo_t* cr, uint32_t rgba)
+{
+	cairo_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
+		SP_RGBA32_G_F(rgba),
+		SP_RGBA32_B_F(rgba),
+		SP_RGBA32_A_F(rgba));
+}
+glm::vec2 draw_image1(cairo_t* cr, cairo_surface_t* image, const glm::vec2& pos, const glm::vec4& rc, uint32_t color, const glm::vec2& dsize)
+{
+	glm::vec2 ss = { rc.z, rc.w };
+	if (ss.x < 0)
+	{
+		ss.x = cairo_image_surface_get_width(image);
+	}
+	if (ss.y < 0)
+	{
+		ss.y = cairo_image_surface_get_height(image);
+	}
+	if (ss.x > 0 && ss.y > 0)
+	{
+		glm::vec2 sc = { 1,1 };
+		if (dsize.x > 0 && dsize.y > 0) {
+			sc = dsize / ss;
+		}
+		if (color > 0 && color != -1)
+		{
+			cairo_save(cr);
+			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+			cairo_translate(cr, pos.x, pos.y);
+			if (sc.x != 1 || sc.y != 1)
+				cairo_scale(cr, sc.x, sc.y);
+			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
+			cairo_clip(cr);
+			set_color0(cr, color);
+			cairo_mask_surface(cr, image, -rc.x, -rc.y);
+			cairo_restore(cr);
+		}
+		else {
+			cairo_save(cr);
+			cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+			cairo_translate(cr, pos.x, pos.y);
+			if (sc.x != 1 || sc.y != 1)
+				cairo_scale(cr, sc.x, sc.y);
+			cairo_set_source_surface(cr, image, -rc.x, -rc.y);
+			cairo_rectangle(cr, 0, 0, ss.x, ss.y);
+			cairo_fill(cr);
+			cairo_restore(cr);
+		}
+	}
+	return ss;
+}
+void image_set_ud(cairo_surface_t* p, uint64_t key, void* ud, void(*destroy_func)(void* data))
+{
+	if (p && key) {
+		cairo_surface_set_user_data(p, (cairo_user_data_key_t*)key, ud, destroy_func);
+	}
+}
+#ifndef key_def_data
+#define key_def_data 1024
+#define key_def_data_iptr 1025
+#define key_def_data_svgptr 1026
+#define key_def_data_done 1000
+#endif
+void destroy_image_data(void* d) {
+	auto p = (uint32_t*)d;
+	if (d)delete[]p;
+}
+void free_image_cr(cairo_surface_t* image)
+{
+	if (image)
+	{
+		cairo_surface_destroy(image);
+	}
+}
+cairo_surface_t* new_image_cr(image_ptr_t* img)
+{
+	cairo_surface_t* image = 0;
+	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
+	auto px = new uint32_t[img->width * img->height];
+	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
+	if (image)
+	{
+		image_set_ud(image, key_def_data, px, destroy_image_data);
+		memcpy(px, (unsigned char*)img->data, img->height * img->width * sizeof(int));
+		if (img->multiply && img->type == 1)
+		{
+		}
+		else {
+			int stride = cairo_image_surface_get_stride(image);
+			auto data = cairo_image_surface_get_data(image);
+			auto t = data;
+			auto ts = (unsigned char*)img->data;
+			for (size_t i = 0; i < img->height; i++)
+			{
+				premultiply_data(img->width * 4, t, img->type, !img->multiply);
+				t += stride;
+				ts += img->stride;
+			}
+			//#define _DEBUG
+			//			save_img_png(img, "update_text_img.png");
+			//			cairo_surface_write_to_png(image, "update_text_surface.png");
+			//#endif
+		}
+	}
+	else {
+		delete[]px;
+	}
+	return image;
+}
+cairo_surface_t* new_image_cr(const glm::ivec2& size, uint32_t* data)
+{
+	cairo_surface_t* image = 0;
+	image_ptr_t img[1] = {};
+	img->width = size.x;
+	img->height = size.y;
+	if (img->stride < 1)img->stride = img->width * sizeof(uint32_t);
+	auto px = data ? data : new uint32_t[img->width * img->height];
+	image = cairo_image_surface_create_for_data((unsigned char*)px, CAIRO_FORMAT_ARGB32, img->width, img->height, img->width * sizeof(int));
+	if (image)
+	{
+		if (!data)
+			image_set_ud(image, key_def_data, px, destroy_image_data);
+		memset(px, 0, img->width * img->height * sizeof(int));
+	}
+	else {
+		delete[]px;
+	}
+	return image;
+}
+void draw_text(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color, const glm::ivec2& pos)
+{
+	auto mx = rtv.size();
+	glm::ivec2 nps = pos;
+	for (size_t i = 0; i < mx; i++)
+	{
+		auto& it = rtv[i];
+		if (it._image)
+		{
+			auto ft = (cairo_surface_t*)it._image->ptr;
+			if (!ft) { ft = new_image_cr(it._image); it._image->ptr = ft; }
+			if (ft)
+			{
+				draw_image1(cr, ft, it._dwpos + it._apos + nps, it._rect, it.color ? it.color : color, {});
+			}
+		}
+		nps.x += it.advance;
+	}
+}
+
+void c_render(text_render_o* p)
+{
+	glm::vec2 pos = { 0, 0 };
+	std::vector<font_item_t>& tm = p->_vstr;
+	text_image_t opt = {};
+	//text_image_t* a = get_glyph_item(familys, 32, estr, &opt);
+	auto img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 2024, 512);
+	int xx = 0;
+	uint32_t color = 0xff0080f0;
+	auto cr = cairo_create(img);
+	for (auto& git : tm) {
+		if (git._image) {
+			auto ft = (cairo_surface_t*)git._image->ptr;
+			if (!ft) {
+				ft = new_image_cr(git._image);
+				git._image->ptr = ft;
+				cairo_surface_write_to_png(ft, "temp/cache_fonttest2.png");
+			}
+			if (ft)
+			{
+				auto ps = git._dwpos + git._apos;
+				ps += pos;
+				draw_image1(cr, ft, ps, git._rect, git.color ? git.color : color, {});
+			}
+		}
+	}
+	std::string fn = "temp/fonttest2.png";
+	cairo_surface_write_to_png(img, fn.c_str());
+	cairo_destroy(cr);
+	cairo_surface_destroy(img);
+
+}
+#endif

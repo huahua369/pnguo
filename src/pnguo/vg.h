@@ -308,16 +308,16 @@ struct flex_data {
 
 struct node_dt
 {
-	glm::vec2 size = {};		// in原大小
-	glm::vec4 offset = {};	// in偏移位置
-	glm::vec4 frame = {};	// out输出位置大小
-	size_t index = 0;	// 样式序号
-	float baseline = 0.0; // 基线位置
-	node_dt* child = 0;
+	glm::vec2 size = {};	// in 原大小
+	glm::vec4 offset = {};	// in 偏移位置
+	glm::vec4 frame = {};	// out 输出位置大小
+	size_t index = 0;		// in 样式序号
+	float baseline = 0.0;	// in 基线位置
+	node_dt* child = 0;		// in 子元素指针
 	size_t child_count = 0;
-	size_t tidx = -1;	// out自动计算节点索引
-	size_t parent = -1;	// out自动计算父节点索引
-	size_t line_count = 0;	// out行数量
+	size_t tidx = -1;		// out 自动计算节点索引
+	size_t parent = -1;		// out 自动计算父节点索引
+	size_t line_count = 0;	// out 行数量
 };
 // 输入样式数据，根节点指针，所有节点数量
 glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
@@ -364,6 +364,15 @@ struct geometryraw_dt
 	const float* uv; int uv_stride;
 	int num_vertices;
 	const void* indices; int num_indices; int size_indices;
+};
+// 混合模式
+enum class BLENDMODE_E :int {
+	none = -1,
+	normal = 0,	// 普通混合
+	additive,
+	multiply,
+	modulate,
+	screen
 };
 #ifndef TEX_CB
 #define TEX_CB
