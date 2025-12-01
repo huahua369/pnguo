@@ -2955,7 +2955,7 @@ glm::ivec3 font_t::get_text_rect(int fontsize, const void* str8, int len)
 	do
 	{
 		if (!str || !(*str)) { break; }
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -8804,7 +8804,7 @@ int layout_text::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<l
 		glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 		unsigned int cp = 0;
 		//laststr = md::get_u8_last(pstr + info->cluster, &cp);
-		int ch = 0;
+		uint32_t ch = 0;
 		auto nstr = pstr + info->cluster;
 		auto kk = md::utf8_to_unicode(nstr, &ch);
 		if (kk < 1)break;
@@ -8841,7 +8841,7 @@ int layout_text::tolayout(const std::string& str, dlinfo_t* dinfo, std::vector<l
 					for (int k = 0; k < uc; k++)
 					{
 						//laststr = md::get_u8_last(laststr, &cp1);
-						auto kk = md::utf8_to_unicode(laststr, (int*)&cp1);
+						auto kk = md::utf8_to_unicode(laststr, &cp1);
 						assert(c < 8 && kk>0);
 						if (kk > 0)
 						{
@@ -9422,7 +9422,7 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 	do
 	{
 		if (!str || !(*str)) { break; }
-		int ch = 0;
+		uint32_t ch = 0;
 		rfont = nullptr;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
@@ -9487,7 +9487,7 @@ void get_font_fallbacks16(font_family_t* p, const uint16_t* str16, int len, bool
 		if (!str || !(*str)) { break; }
 		uint32_t ch = 0;
 		rfont = nullptr;
-		auto kk = md::utf16_to_utf32(str, &ch);
+		auto kk = md::utf16_to_unicode(str, &ch);
 		if (kk < 1)break;
 		if (ch == '\n')
 		{
@@ -9573,17 +9573,21 @@ void update_text(text_render_o* p, text_block* tb)
 	size_t bidx = 0;
 	for (auto& kt : vstr)
 	{
+		char* nstr = (char*)kt.v;
 		if (!kt.font) {
+			uint32_t ch = 0;
+			int kk = 0;
+			if (kt.type == 8)
+				kk = md::utf8_to_unicode(nstr, &ch);
+			else if (kt.type == 16)
+				kk = md::utf16_to_unicode(((uint16_t*)nstr), &ch);
 			font_item_t git = {};
-			if (kt.type == 16)
-			{
-				git.cpt = *((uint16_t*)kt.v);
-			}
-			else if (kt.type == 8)
-			{
-				git.cpt = *((char*)kt.v);
-			}
+			git.cpt = ch;
 			git.user_ptr = bidx;
+			if (git.cpt == '\t' && git.advance < 1)
+			{
+				git.advance = t->fontsize;
+			}
 			p->_vstr.push_back(git);
 			bidx++;
 			continue;
@@ -9604,12 +9608,20 @@ void update_text(text_render_o* p, text_block* tb)
 		for (auto& gt : kt._tnpos)
 		{
 			auto pos = &gt;
-			auto git = kt.font->get_glyph_item(pos->index, 0, t->fontsize);
+			uint32_t ch = 0;
+			int kk = 0;
+			if (kt.type == 8)
+				kk = md::utf8_to_unicode(nstr + pos->cluster, &ch);
+			else if (kt.type == 16)
+				kk = md::utf16_to_unicode(((uint16_t*)nstr) + pos->cluster, &ch);
+			assert(kk > 0);
+			auto git = kt.font->get_glyph_item(pos->index, ch, t->fontsize);
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._dwpos += offset;
 			git.advance = ceil(pos->x_advance * scale_h);
 			git.user_ptr = bidx /*+ gt.cluster*/;
-			if (git.cpt == '\t')
+			git.cpt = ch;
+			if (git.cpt == '\t' && git.advance < 1)
 			{
 				git.advance = t->fontsize;
 			}

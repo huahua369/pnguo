@@ -335,7 +335,7 @@ public:
 	glm::ivec2 _apos = {};// 布局坐标
 	// 彩色字体时用
 	uint32_t color = 0;
-	int cpt = 0;
+	uint32_t cpt = 0;
 };
 /*
 	LINE_CAP_BUTT,0

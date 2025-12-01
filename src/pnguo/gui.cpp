@@ -329,7 +329,7 @@ glm::ivec3 layout_text_x::get_text_rect(size_t idx, int fontsize, const void* st
 	do
 	{
 		if (!str || !(*str)) { break; }
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -380,7 +380,7 @@ glm::ivec3 layout_text_x::get_text_rect1(size_t idx, int fontsize, const void* s
 	do
 	{
 		if (!str || !(*str)) { break; }
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -424,7 +424,7 @@ int layout_text_x::get_text_pos(size_t idx, int fontsize, const void* str8, int 
 	{
 		if (!str || !(*str)) { break; }
 		auto pstr = str;
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -473,7 +473,7 @@ int layout_text_x::get_text_ipos(size_t idx, int fontsize, const void* str8, int
 	{
 		if (!str || !(*str) || str >= str0) { break; }
 
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -506,7 +506,7 @@ int layout_text_x::get_text_posv(size_t idx, int fontsize, const void* str8, int
 	{
 		if (!str || !(*str)) { break; }
 
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -981,8 +981,8 @@ text_image_t* layout_text_x::get_glyph_item(size_t idx, int fontsize, const void
 			gidx = 0;
 		auto ostr = str;
 
-		int ch = 0;
-		int ch1 = 0;
+		uint32_t ch = 0;
+		uint32_t ch1 = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -1051,7 +1051,7 @@ text_image_t* layout_text_x::get_glyph_item1(font_t* p, int fontsize, const void
 		if (*str == '\n')
 			gidx = 0;
 		auto ostr = str;
-		int ch = 0;
+		uint32_t ch = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;

@@ -764,8 +764,8 @@ text_image_t* get_glyph_item(std::vector<font_t*>& familys, int fontsize, const 
 			gidx = 0;
 		auto ostr = str;
 
-		int ch = 0;
-		int ch1 = 0;
+		uint32_t ch = 0;
+		uint32_t ch1 = 0;
 		auto kk = md::utf8_to_unicode(str, &ch);
 		if (kk < 1)break;
 		str += kk;
@@ -877,8 +877,8 @@ int main()
 		auto fctx = app->font_ctx;
 		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
 		auto seg = fctx->get_font((char*)u8"Segoe UI Emoji", 0);
-		auto sues = fctx->add2file(R"(data\seguiemj.ttf)", 0);
-		auto sue = sues[0];
+		//auto sues = fctx->add2file(R"(data\seguiemj.ttf)", 0);
+		//auto sue = sues[0];
 		{
 			//纹理缓存
 			auto p = new bitmap_cache_cx();
@@ -897,13 +897,13 @@ int main()
 
 		std::string k80 = (char*)u8"👨‍👨‍👧q";
 		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
-		std::string k85 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
-		auto family = new_font_family(fctx, (char*)u8"Calibri,新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
+		std::string k821 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ\t我\n的大刀";
+		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
 		text_style ts = {};
 		ts.family = family;
-		ts.fontsize = 50;
-		ts.color = 0xff00fF10;
+		ts.fontsize = 16;
+		ts.color = 0xfffF5000;
 		// 文本块
 		text_block tb = {};
 		tb.style = &ts;
@@ -1071,7 +1071,7 @@ int main()
 					{
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-						tdt.dst_rect = { 10,10,vki.size.x,vki.size.y };
+						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 						pcb->render_texture(renderer, tex3d, &tdt, 1);
 						sp_drawable_draw(dd1);
 						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
