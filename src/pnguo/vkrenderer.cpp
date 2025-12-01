@@ -450,7 +450,86 @@ namespace vkr
 			pDevice_extension_names->push_back(name);
 	}
 
+#if 1
+	static PFN_vkCreateDebugReportCallbackEXT g_vkCreateDebugReportCallbackEXT = NULL;
+	static PFN_vkDebugReportMessageEXT g_vkDebugReportMessageEXT = NULL;
+	static PFN_vkDestroyDebugReportCallbackEXT g_vkDestroyDebugReportCallbackEXT = NULL;
+	static VkDebugReportCallbackEXT g_DebugReportCallback = NULL;
 
+	static bool s_bCanUseDebugReport = false;
+
+	static VKAPI_ATTR VkBool32 VKAPI_CALL MyDebugReportCallback(
+		VkDebugReportFlagsEXT flags,
+		VkDebugReportObjectTypeEXT objectType,
+		uint64_t object,
+		size_t location,
+		int32_t messageCode,
+		const char* pLayerPrefix,
+		const char* pMessage,
+		void* pUserData)
+	{
+		OutputDebugStringA(pMessage);
+		OutputDebugStringA("\n");
+		return VK_FALSE;
+	}
+
+	const VkValidationFeatureEnableEXT featuresRequested[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT, VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT };
+	VkValidationFeaturesEXT features = {};
+
+	const char instanceExtensionName[] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+	const char instanceLayerName[] = "VK_LAYER_KHRONOS_validation";
+
+	bool ExtDebugReportCheckInstanceExtensions(InstanceProperties* pIP, bool gpuValidation)
+	{
+		s_bCanUseDebugReport = pIP->AddInstanceLayerName(instanceLayerName) && pIP->AddInstanceExtensionName(instanceExtensionName);
+		if (s_bCanUseDebugReport && gpuValidation)
+		{
+			features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+			features.pNext = pIP->GetNext();
+			features.enabledValidationFeatureCount = _countof(featuresRequested);
+			features.pEnabledValidationFeatures = featuresRequested;
+
+			pIP->SetNewNext(&features);
+		}
+
+		return s_bCanUseDebugReport;
+	}
+
+	void ExtDebugReportGetProcAddresses(VkInstance instance)
+	{
+		if (s_bCanUseDebugReport)
+		{
+			g_vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+			g_vkDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
+			g_vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+			assert(g_vkCreateDebugReportCallbackEXT);
+			assert(g_vkDebugReportMessageEXT);
+			assert(g_vkDestroyDebugReportCallbackEXT);
+		}
+	}
+
+	void ExtDebugReportOnCreate(VkInstance instance)
+	{
+		if (g_vkCreateDebugReportCallbackEXT)
+		{
+			VkDebugReportCallbackCreateInfoEXT debugReportCallbackInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT };
+			debugReportCallbackInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
+			debugReportCallbackInfo.pfnCallback = MyDebugReportCallback;
+			VkResult res = g_vkCreateDebugReportCallbackEXT(instance, &debugReportCallbackInfo, nullptr, &g_DebugReportCallback);
+			assert(res == VK_SUCCESS);
+		}
+	}
+
+	void ExtDebugReportOnDestroy(VkInstance instance)
+	{
+		// It should happen after destroing device, before destroying instance.
+		if (g_DebugReportCallback)
+		{
+			g_vkDestroyDebugReportCallbackEXT(instance, g_DebugReportCallback, nullptr);
+			g_DebugReportCallback = nullptr;
+		}
+	}
+#endif
 	void SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp)
 	{
 		const char* exn[] = {
@@ -475,11 +554,11 @@ namespace vkr
 		f_ExtDebugUtilsCheckInstanceExtensions(pIp);
 #ifdef ExtCheckHDRInstanceExtensions
 		ExtCheckHDRInstanceExtensions(pIp);
+#endif
 		if (cpuValidationLayerEnabled)
 		{
 			ExtDebugReportCheckInstanceExtensions(pIp, gpuValidationLayerEnabled);
 		}
-#endif
 	}
 
 	void SetEssentialDeviceExtensions(DeviceProperties* pDp)
@@ -564,7 +643,26 @@ namespace vkr
 				auto devs = get_devices(instance);
 				if (devs.size() > 0)
 				{
+					if (pdnv) {
+						for (auto& dt : devs) {
+							pdnv->push_back(dt.name);
+						}
+					}
 					nd.phy = devs[0].phd;
+					// 选择自定义显卡
+					if (spdname && *spdname)
+					{
+						std::string pdn;
+						for (size_t i = 0; i < devs.size(); i++)
+						{
+							pdn.assign(devs[i].name);
+							if (pdn.find(spdname) != std::string::npos)
+							{
+								nd.phy = devs[i].phd;
+								break;
+							}
+						}
+					}
 				}
 				d = &nd;
 			}
@@ -6146,7 +6244,8 @@ namespace vkr
 			// Create a 'static' pool for vertices and indices  
 			if (all_size > 0)
 			{
-				_pStaticBufferPool->OnCreate(m_pDevice, all_size, true, "StaticGeom");
+				auto nas = AlignUp(all_size, (size_t)512);
+				_pStaticBufferPool->OnCreate(m_pDevice, nas, true, "StaticGeom");
 				for (auto& it : vbs) {
 					VkDescriptorBufferInfo vbv;
 					_pStaticBufferPool->AllocBuffer(it.vertexBufferAcc.m_count, it.vertexBufferAcc.m_stride, it.vertexBufferAcc.m_data, &vbv);
@@ -9168,8 +9267,17 @@ namespace vkr
 		m_pResource = CreateTextureCommitted(m_pDevice, uploadHeap, name, useSRGB);
 
 		UINT8* pixels = 0;
-		pixels = uploadHeap->Suballocate(dsize, 512);
-		assert(pixels);
+		do {
+			pixels = uploadHeap->Suballocate(dsize, 512);
+			if (!pixels)
+			{
+				uploadHeap->FlushAndFinish();
+				pixels = uploadHeap->Suballocate(dsize, 512);
+				assert(pixels);
+				if (!pixels)return false;
+			}
+			assert(pixels);
+		} while (0);
 
 		memcpy(pixels, data, dsize);
 
@@ -10690,6 +10798,7 @@ namespace vkr
 	void DynamicBufferRing::SetDescriptorSet(int index, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
 	{
 		VkDescriptorBufferInfo out = {};
+		assert(m_buffer);
 		out.buffer = m_buffer;
 		out.offset = 0;
 		out.range = size;// alignUp(size, (uint32_t)256);
@@ -10714,7 +10823,7 @@ namespace vkr
 		out.buffer = buffer;
 		out.offset = pos;
 		out.range = size;// alignUp(size, (uint32_t)256);
-
+		assert(buffer);
 		VkWriteDescriptorSet write;
 		write = {};
 		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -19167,7 +19276,7 @@ namespace vkr {
 		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, ct.constantBuffersMemSize, (char*)"Uniforms");
 
 		// Create a 'static' pool for vertices and indices 
-		const uint32_t staticGeometryMemSize = (1 * 1) * 1024 * 1024;
+		const uint32_t staticGeometryMemSize = 20000000;// (1 * 1) * 1024 * 1024;
 		m_VidMemBufferPool.OnCreate(pDevice, staticGeometryMemSize, true, "StaticGeom");
 
 		// Create a 'static' pool for vertices and indices in system memory
@@ -21908,7 +22017,7 @@ void free_instance(void* inst)
 		vkDestroyInstance((VkInstance)inst, 0);
 }
 
-vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, const char* shaderCacheDir)
+vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, const char* shaderCacheDir, const char* devname)
 {
 	dev_info_cx c[1] = {};
 	c->inst = inst;
@@ -21926,7 +22035,8 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 #endif // _DEBUG
 
 		auto dev = new vkr::Device();
-		dev->OnCreate(c, cpuvalid, gpuvalid, 0, 0, 0);
+
+		dev->OnCreate(c, cpuvalid, gpuvalid, 0, devname, &p->dev_name);
 		dev->CreatePipelineCache();
 		// Get system info
 		std::string dummyStr;

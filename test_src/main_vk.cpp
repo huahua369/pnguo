@@ -938,7 +938,7 @@ int main()
 		glm::ivec2 ws = { 1280,860 };
 		const char* wtitle = (char*)u8"窗口0";
 		const char* wtitle1 = (char*)u8"窗口1";
-		vkdg_cx* vkd = new_vkdg(0, 0, 0);	// 创建vk渲染器 
+		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, "Intel(R)");	// 创建vk渲染器 
 		// 使用3D渲染器的设备创建渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 		vkvg_dev* vctx = 0;
@@ -999,6 +999,8 @@ int main()
 				//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 				// 机器
 				vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, true);
+				//vkd->add_gltf(R"(E:\tx\droid\scene.gltf)", { 0,0,0 }, 1.0, true);
+				//vkd->add_gltf(R"(E:\tx\droid\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 1.0, true);
 				//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 				//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 				//变形树
@@ -1007,7 +1009,7 @@ int main()
 				//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
 
 				//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-				vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 10,0,20 }, 1.0, true);// 飞船
+				//vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 10,0,20 }, 1.0, true);// 飞船
 				//vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
 				//vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
 
@@ -1072,7 +1074,7 @@ int main()
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-						pcb->render_texture(renderer, tex3d, &tdt, 1);
+						//pcb->render_texture(renderer, tex3d, &tdt, 1);
 						sp_drawable_draw(dd1);
 						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};

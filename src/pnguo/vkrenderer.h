@@ -98,14 +98,14 @@ namespace vkr {
 		// Create a commandlist ring for the Direct queue
 		uint32_t commandListsPerBackBuffer = 8;
 		// Create a 'dynamic' constant buffer动态常量缓冲区大小
-		uint32_t constantBuffersMemSize = 10 * 1024 * 1024;
+		uint32_t constantBuffersMemSize = 15 * 1024 * 1024;
 		// Create a 'static' pool for vertices and indices 静态顶点/索引缓冲区大小
 		uint32_t staticGeometryMemSize = (10 * 128) * 1024 * 1024;
 		// Create a 'static' pool for vertices and indices in system memory静态几何缓冲区大小
 		uint32_t systemGeometryMemSize = 32 * 1024;
 
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
-		uint32_t uploadHeapMemSize = (uint32_t)128 * 2048 * 2048;
+		uint32_t uploadHeapMemSize = (uint32_t)8 * 4096 * 4096;
 	};
 	struct gtime_t
 	{
@@ -242,6 +242,7 @@ public:
 	void* renderpass_transparent = 0;	// 用于渲染透明物体transparent
 	void* renderpass_fbo = 0;			// 结果缓冲区fbo 
 	std::vector<uint32_t> dt;  // save_fbo缓存像素时用
+	std::vector<std::string> dev_name;
 	int width = 0, height = 0;
 	scene_state _state = {};
 public:
@@ -272,7 +273,7 @@ void* new_instance();
 void free_instance(void* inst);
 
 // todo 创建渲染器，shader目录默认"ShaderLibVK", "cache/shadervk"
-vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0);
+vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0, const char* devname = 0);
 // f是否需要删除vk资源
 void free_vkdg(vkdg_cx* p, bool f = false);
 
