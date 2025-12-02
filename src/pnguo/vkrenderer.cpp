@@ -20606,7 +20606,7 @@ namespace vkr {
 				m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
 			}
 			// Render HUD  -------------------------------------------------------------------------
-			if (hubDraw)
+			if(hubDraw)
 			{
 				hubDraw(cmdBuf2);
 				m_GPUTimer.GetTimeStamp(cmdBuf2, "HUB Rendering");
@@ -21035,11 +21035,6 @@ namespace vkr {
 		m_camera.LookAt(glm::vec4(0, 10, 15, 0), glm::vec4(0, 0, 0, 0));
 		// todo set camera
 		m_camera.is_eulerAngles = false;
-		float yaw = m_camera.GetYaw();
-		float pitch = m_camera.GetPitch();
-		int distance = m_camera.GetDistance();
-		m_camera.UpdatePreviousMatrices(); // set previous view matrix
-		m_camera.UpdateCameraPolar(yaw, pitch, 0.0f, 0.0f, distance);
 
 		// todo 添加默认灯光Add a default light in case there are none
 		{
@@ -21369,13 +21364,16 @@ namespace vkr {
 
 		cam.UpdatePreviousMatrices(); // set previous view matrix
 #if 1
-		//yaw = 0;
-		//pitch = 0.0;
+		yaw = 0;
+		pitch = 0.0;
 		// Sets Camera based on UI selection (WASD, Orbit or any of the GLTF cameras)
 		if ((io.KeyCtrl == false) && (io.MouseDown[0] == true))
 		{
 			yaw += io.MouseDelta.x;
 			pitch += io.MouseDelta.y;
+			if (yaw != 0) {
+				yaw = yaw;
+			}
 		}
 		if (_customize_camera)
 		{
@@ -21383,14 +21381,21 @@ namespace vkr {
 			int wy = io.wheel.y;
 			if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
 			{
+				//pitch = io.DeltaTime * 60;
+				yaw = io.DeltaTime * 60;
 				auto vw = onMoveWASD(io.KeysDown);
 				if (vw.w > 0)
 				{
 					tpfc.keyMovement(vw, io.DeltaTime);
 				}
 			}
+			else {
+			}
 			//鼠标移动位置  
 			tpfc.mouseMovement(io.MouseDelta.x, -io.MouseDelta.y, io.DeltaTime, io.MouseDown[0]);
+			//if (wy != 0)
+			//	tpfc.processScroll(io.wheel.y);
+			//cam.SetMatrix(tpfc.view);
 			cam.set_mat(tpfc.view, tpfc.cameraPos);
 		}
 		else
@@ -21403,7 +21408,7 @@ namespace vkr {
 				if (!wy && (!io.MouseDown[0] || (!io.MouseDelta.x && !io.MouseDelta.y)))
 				{
 					//pitch = io.DeltaTime * 60;
-					//yaw = io.DeltaTime * 60;
+					yaw = io.DeltaTime * 60;
 					return;
 				}
 
