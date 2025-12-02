@@ -1076,7 +1076,7 @@ int main()
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 						pcb->render_texture(renderer, tex3d, &tdt, 1);
 						//sp_drawable_draw(dd1);
-						//r_render_data_text(renderer, ptrt, { 200,100 }, td3);
+						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{

@@ -290,7 +290,7 @@ namespace vkr
 		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
 		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
 		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = {};
-
+		PFN_vkCmdSetFrontFace _vkCmdSetFrontFace = {};
 
 		bool m_usingValidationLayer = false;
 		bool m_usingFp16 = false;
@@ -585,10 +585,12 @@ namespace vkr
 			 // dynamic_rendering
 			 // The sample uses the extension (instead of Vulkan 1.2, where dynamic rendering is core)
 			 VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-			 VK_KHR_MAINTENANCE2_EXTENSION_NAME,
+			 VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
+			 VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
 			 VK_KHR_MULTIVIEW_EXTENSION_NAME,
 			 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
-			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME
+			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+			 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
 			});
 	}
 
@@ -609,7 +611,7 @@ namespace vkr
 		SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
 		auto apiVersion3 = VK_API_VERSION_1_3;
 		auto apiVersion4 = VK_API_VERSION_1_4;
-		auto apiVersion = apiVersion4;
+		auto apiVersion = VK_VERSION_1_2;// VK_API_VERSION_1_0;
 		VkInstanceCreateInfo inst_info = {};
 		if (!d || !d->inst || !d->phy)
 		{
@@ -923,28 +925,37 @@ namespace vkr
 		// enable feature to support fp16 with subgroup operations
 		//
 		VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR shaderSubgroupExtendedType = {};
+
+#if 0
 		shaderSubgroupExtendedType.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES_KHR;
 		shaderSubgroupExtendedType.pNext = pDp->GetNext(); //used to be pNext of VkDeviceCreateInfo
 		shaderSubgroupExtendedType.shaderSubgroupExtendedTypes = VK_TRUE;
-
+#endif
+		bool enabledMS = pDp->IsExtensionPresent(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+		bool supportsKHRSamplerYCbCrConversion = pDp->IsExtensionPresent(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+		bool dr = pDp->IsExtensionPresent(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		bool dr13 = pDp->IsExtensionPresent(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
 		VkPhysicalDeviceRobustness2FeaturesEXT robustness2 = {};
 		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
-		robustness2.pNext = &shaderSubgroupExtendedType;
 		robustness2.nullDescriptor = VK_TRUE;
 		// vkvg需要
-		robustness2.pNext = get_device_requirements(&physicalDeviceFeatures, robustness2.pNext, true, false);
-
+		auto pNext2 = get_device_requirements(&physicalDeviceFeatures, pDp->GetNext(), true, false);
+		if (!dr13)
+		{
+			robustness2.pNext = pNext2;
+			pNext2 = &robustness2;
+		}
 		// to be able to bind NULL views
 		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2 = {};
 		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		physicalDeviceFeatures2.features = physicalDeviceFeatures;
-		physicalDeviceFeatures2.pNext = &robustness2;
+		physicalDeviceFeatures2.pNext = pNext2;
+
 		VkPhysicalDeviceFeatures2 features = {};
 		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		vkGetPhysicalDeviceFeatures2(m_physicaldevice, &features);
 
 		VkPhysicalDeviceMeshShaderFeaturesEXT enabledMeshShaderFeatures{};
-		bool enabledMS = pDp->IsExtensionPresent(VK_EXT_MESH_SHADER_EXTENSION_NAME);
 		if (enabledMS) {
 			enabledMeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
 			enabledMeshShaderFeatures.meshShader = VK_TRUE;
@@ -952,7 +963,6 @@ namespace vkr
 			enabledMeshShaderFeatures.pNext = physicalDeviceFeatures2.pNext;
 			physicalDeviceFeatures2.pNext = &enabledMeshShaderFeatures;
 		}
-		bool supportsKHRSamplerYCbCrConversion = pDp->IsExtensionPresent(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
 		VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
 		if (supportsKHRSamplerYCbCrConversion) {
 			deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
@@ -960,15 +970,32 @@ namespace vkr
 			deviceSamplerYcbcrConversionFeatures.pNext = (void*)physicalDeviceFeatures2.pNext;
 			physicalDeviceFeatures2.pNext = &deviceSamplerYcbcrConversionFeatures;
 		}
-		bool dr = pDp->IsExtensionPresent(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
 		VkPhysicalDeviceDynamicRenderingFeaturesKHR enabledDynamicRenderingFeaturesKHR = {};
-		if (dr) {
+		if (dr && !dr13) {
 			enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
 			enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
 			enabledDynamicRenderingFeaturesKHR.pNext = (void*)physicalDeviceFeatures2.pNext;
 			physicalDeviceFeatures2.pNext = &enabledDynamicRenderingFeaturesKHR;
 		}
 
+		VkPhysicalDeviceVulkan13Features device_features_1_3 = {};
+		device_features_1_3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+		if (dr13) {
+			device_features_1_3.maintenance4 = VK_TRUE;
+			device_features_1_3.shaderDemoteToHelperInvocation = VK_TRUE;
+			device_features_1_3.dynamicRendering = VK_TRUE;
+			device_features_1_3.synchronization2 = VK_TRUE;
+			device_features_1_3.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &device_features_1_3;
+		}
+		dr = pDp->IsExtensionPresent(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT ds = {};
+		if (dr) {
+			ds.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+			ds.extendedDynamicState = VK_TRUE;
+			ds.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &ds;
+		}
 		if (dev)
 		{
 			m_device = dev;
@@ -991,6 +1018,9 @@ namespace vkr
 		{
 			_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
 			_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
+			_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFace)vkGetDeviceProcAddr(m_device, "vkCmdSetFrontFace");
+			//if (!_vkCmdSetFrontFace)
+			//	_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFaceEXT)vkGetDeviceProcAddr(m_device, "vkCmdSetFrontFaceEXT");
 		}
 		if (enabledMS)
 		{
@@ -4375,7 +4405,7 @@ namespace vkr {
 
 		void OnDestroy();
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
-		static void DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
+		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
 		GLTFCommon* get_cp();
 	private:
@@ -8148,8 +8178,9 @@ namespace vkr
 			VK_DYNAMIC_STATE_SCISSOR,
 			VK_DYNAMIC_STATE_LINE_WIDTH,
 			//VK_DYNAMIC_STATE_CULL_MODE,
-			VK_DYNAMIC_STATE_FRONT_FACE
+			//VK_DYNAMIC_STATE_FRONT_FACE
 		};
+
 		VkPipelineDynamicStateCreateInfo dynamicState = {};
 		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		dynamicState.pNext = NULL;
@@ -8222,7 +8253,7 @@ namespace vkr
 		pipeline.pDepthStencilState = &ds;
 		pipeline.pStages = shaderStages.data();
 		pipeline.stageCount = (uint32_t)shaderStages.size();
-		pipeline.renderPass =  m_pRenderPass->GetRenderPass();
+		pipeline.renderPass = m_pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
 
 		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipeline);
@@ -8328,7 +8359,7 @@ namespace vkr
 		}
 	}
 
-	void GltfPbrPass::DrawBatchList(VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe/*=false*/)
+	void GltfPbrPass::DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe/*=false*/)
 	{
 		SetPerfMarkerBegin(commandBuffer, "gltfPBR");
 		uint32_t uniformOffsets[6] = {};
@@ -8340,6 +8371,13 @@ namespace vkr
 			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
 			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }		// 变形动画偏移
 			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
+
+			if (c == 3) {
+				c = c;
+			}
+			// todo FrontFace
+			if (dev->_vkCmdSetFrontFace)
+				dev->_vkCmdSetFrontFace(commandBuffer, (VkFrontFace)t.frontFace);
 			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe, &t);
 		}
 		SetPerfMarkerEnd(commandBuffer);
@@ -8361,7 +8399,6 @@ namespace vkr
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout
 			, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? _pipe->m_pipelineWireframe : _pipe->m_pipeline);
-		vkCmdSetFrontFace(cmd_buf, (VkFrontFace)t.frontFace);
 		if (m_geometry.m_IBV.buffer)
 			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
 		else
@@ -10786,6 +10823,13 @@ namespace vkr
 		m_mem.OnBeginFrame();
 	}
 
+	void update_dsets(VkDevice device, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount, const VkCopyDescriptorSet* pDescriptorCopies)
+	{
+		if (pDescriptorWrites && pDescriptorWrites->pBufferInfo && !pDescriptorWrites->pBufferInfo->buffer) {
+			assert(pDescriptorWrites->pBufferInfo->offset == 0 && pDescriptorWrites->pBufferInfo->range == 0);
+		}
+		vkUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount, pDescriptorCopies);
+	}
 	void DynamicBufferRing::SetDescriptorSet(int index, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
 	{
 		VkDescriptorBufferInfo out = {};
@@ -10806,7 +10850,7 @@ namespace vkr
 		write.dstArrayElement = 0;
 		write.dstBinding = index;
 
-		vkUpdateDescriptorSets(m_pDevice->m_device, 1, &write, 0, NULL);
+		update_dsets(m_pDevice->m_device, 1, &write, 0, NULL);
 	}
 	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
 	{
@@ -10827,7 +10871,7 @@ namespace vkr
 		write.dstArrayElement = 0;
 		write.dstBinding = index;
 
-		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+		update_dsets(device, 1, &write, 0, NULL);
 	}
 
 
@@ -11917,7 +11961,7 @@ namespace vkr {
 			write.dstBinding = i + 5;
 			write.dstArrayElement = 0;
 
-			vkUpdateDescriptorSets(m_pDevice->m_device, 1, &write, 0, NULL);
+			update_dsets(m_pDevice->m_device, 1, &write, 0, NULL);
 		}
 
 		// update the Sharpen descriptor
@@ -14075,7 +14119,7 @@ namespace vkr {
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
 
-		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+		update_dsets(device, 1, &write, 0, NULL);
 	}
 
 	void SetDescriptorSet(VkDevice device, uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet)
@@ -14108,7 +14152,7 @@ namespace vkr {
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
 
-		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+		update_dsets(device, 1, &write, 0, NULL);
 	}
 
 	void SetDescriptorSet(VkDevice device, uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet)
@@ -14144,7 +14188,7 @@ namespace vkr {
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
 
-		vkUpdateDescriptorSets(device, 1, &write, 0, NULL);
+		update_dsets(device, 1, &write, 0, NULL);
 	}
 
 	VkResult CreateDescriptorSetLayoutVK(VkDevice device, std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
@@ -20036,12 +20080,12 @@ namespace vkr {
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
 			if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 			{
-				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, false);
-				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque1, bWireframe);
+				GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, false);
+				GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque1, bWireframe);
 			}
 			else
 			{
-				GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.opaque, bWireframe);
+				GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, bWireframe);
 			}
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
@@ -20054,7 +20098,7 @@ namespace vkr {
 		if (!drawables.transparent.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transparent.begin(), drawables.transparent.end(), bcmp);
-			GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transparent, false);
+			GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transparent, false);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 		}
@@ -20101,7 +20145,7 @@ namespace vkr {
 		if (!drawables.transmission.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
-			GltfPbrPass::DrawBatchList(cmdBuf1, &drawables.transmission, bWireframe);
+			GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transmission, bWireframe);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
 			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 		}
@@ -21667,7 +21711,7 @@ namespace vkr {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
 			//VK_DYNAMIC_STATE_CULL_MODE,
-			VK_DYNAMIC_STATE_FRONT_FACE
+			//VK_DYNAMIC_STATE_FRONT_FACE
 		};
 		VkPipelineDynamicStateCreateInfo dynamicState = {};
 		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -22611,7 +22655,7 @@ void main()
 		std::vector<VkWriteDescriptorSet> modelWriteDescriptorSets = {
 			initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
+		update_dsets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
 
 		DefineList attributeDefines = {};
 		VkPipelineShaderStageCreateInfo msmShader;
