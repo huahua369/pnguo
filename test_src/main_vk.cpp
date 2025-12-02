@@ -953,7 +953,7 @@ int main()
 
 
 		glm::mat2x2 aaa;
-		vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
+		//vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
@@ -987,6 +987,7 @@ int main()
 		//ttw->mmove_type = 1;
 		//popw->mmove_type = 1;
 		//popw->_focus_lost_hide = 0; 
+		bool shadowMap = true;
 		if (vkd) {
 			{
 				int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
@@ -998,9 +999,9 @@ int main()
 				//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 				//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 				// 机器
-				vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, true);
-				//vkd->add_gltf(R"(E:\tx\droid\scene.gltf)", { 0,0,0 }, 1.0, true);
-				//vkd->add_gltf(R"(E:\tx\droid\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 1.0, true);
+				vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, shadowMap);
+				//vkd->add_gltf(R"(E:\tx\droid\scene.gltf)", { 0,0,0 }, 10.0, shadowMap);
+				//vkd->add_gltf(R"(E:\tx\droid\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 10.0, shadowMap);
 				//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 				//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 				//变形树
@@ -1076,7 +1077,7 @@ int main()
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 						pcb->render_texture(renderer, tex3d, &tdt, 1);
 						//sp_drawable_draw(dd1);
-						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
+						//r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{

@@ -206,7 +206,7 @@ namespace vkr
 	public:
 		VkPhysicalDevice m_physicaldevice;
 
-		std::set<const char*> m_device_extension_names;
+		std::set<std::string> m_device_extension_names;
 
 		std::vector<VkExtensionProperties> m_deviceExtensionProperties;
 
@@ -215,6 +215,7 @@ namespace vkr
 	public:
 		VkResult Init(VkPhysicalDevice physicaldevice);
 		bool IsExtensionPresent(const char* pExtName);
+		bool has_extension(const char* pExtName);
 		bool AddDeviceExtensionName(const char* deviceExtensionName);
 		int AddDeviceExtensionName(std::vector<const char*> deviceExtensionName);
 		void* GetNext() { return m_pNext; }
@@ -402,6 +403,11 @@ namespace vkr
 				return strcmp(extensionProps.extensionName, pExtName) == 0;
 			}) != m_deviceExtensionProperties.end();
 	}
+	bool DeviceProperties::has_extension(const char* pExtName)
+	{
+		auto it = m_device_extension_names.find(pExtName);
+		return pExtName && *pExtName && it != m_device_extension_names.end();
+	}
 	// 获取设备支持的扩展
 	VkResult DeviceProperties::Init(VkPhysicalDevice physicaldevice)
 	{
@@ -447,7 +453,7 @@ namespace vkr
 	void  DeviceProperties::GetExtensionNamesAndConfigs(std::vector<const char*>* pDevice_extension_names)
 	{
 		for (auto& name : m_device_extension_names)
-			pDevice_extension_names->push_back(name);
+			pDevice_extension_names->push_back(name.c_str());
 	}
 
 #if 1
@@ -590,7 +596,8 @@ namespace vkr
 			 VK_KHR_MULTIVIEW_EXTENSION_NAME,
 			 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
 			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
-			 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
+			 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
 			});
 	}
 
@@ -611,7 +618,7 @@ namespace vkr
 		SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
 		auto apiVersion3 = VK_API_VERSION_1_3;
 		auto apiVersion4 = VK_API_VERSION_1_4;
-		auto apiVersion = VK_VERSION_1_2;// VK_API_VERSION_1_0;
+		auto apiVersion = apiVersion3;// VK_VERSION_1_2;// VK_API_VERSION_1_0;
 		VkInstanceCreateInfo inst_info = {};
 		if (!d || !d->inst || !d->phy)
 		{
@@ -931,16 +938,18 @@ namespace vkr
 		shaderSubgroupExtendedType.pNext = pDp->GetNext(); //used to be pNext of VkDeviceCreateInfo
 		shaderSubgroupExtendedType.shaderSubgroupExtendedTypes = VK_TRUE;
 #endif
-		bool enabledMS = pDp->IsExtensionPresent(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-		bool supportsKHRSamplerYCbCrConversion = pDp->IsExtensionPresent(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-		bool dr = pDp->IsExtensionPresent(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-		bool dr13 = pDp->IsExtensionPresent(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+		bool enabledMS = pDp->has_extension(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+		bool supportsKHRSamplerYCbCrConversion = pDp->has_extension(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+		bool dr = pDp->has_extension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		bool dr13 = pDp->has_extension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+		bool robustness_2 = pDp->has_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+		bool bds = pDp->has_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
 		VkPhysicalDeviceRobustness2FeaturesEXT robustness2 = {};
 		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
 		robustness2.nullDescriptor = VK_TRUE;
 		// vkvg需要
 		auto pNext2 = get_device_requirements(&physicalDeviceFeatures, pDp->GetNext(), true, false);
-		if (!dr13)
+		if (robustness_2)
 		{
 			robustness2.pNext = pNext2;
 			pNext2 = &robustness2;
@@ -981,6 +990,7 @@ namespace vkr
 		VkPhysicalDeviceVulkan13Features device_features_1_3 = {};
 		device_features_1_3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 		if (dr13) {
+			device_features_1_3.robustImageAccess = VK_TRUE;
 			device_features_1_3.maintenance4 = VK_TRUE;
 			device_features_1_3.shaderDemoteToHelperInvocation = VK_TRUE;
 			device_features_1_3.dynamicRendering = VK_TRUE;
@@ -988,9 +998,8 @@ namespace vkr
 			device_features_1_3.pNext = (void*)physicalDeviceFeatures2.pNext;
 			physicalDeviceFeatures2.pNext = &device_features_1_3;
 		}
-		dr = pDp->IsExtensionPresent(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
 		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT ds = {};
-		if (dr) {
+		if (bds) {
 			ds.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
 			ds.extendedDynamicState = VK_TRUE;
 			ds.pNext = (void*)physicalDeviceFeatures2.pNext;
@@ -5827,12 +5836,23 @@ namespace vkr
 				//
 				VkDescriptorSet descriptorSets[2] = { pPrimitive->m_descriptorSet, pPrimitive->m_pMaterial->m_descriptorSet };
 				uint32_t descritorSetCount = 1 + (pPrimitive->m_pMaterial->m_textureCount > 0 ? 1 : 0);
-
-				if (!pPerSkeleton && morph)pPerSkeleton = morph;// &morph->morphWeights;// 变形动画和骨骼动画二选一
-
-				uint32_t uniformOffsets[3] = { (uint32_t)m_perFrameDesc.offset,  (uint32_t)perObjectDesc.offset, (pPerSkeleton) ? (uint32_t)pPerSkeleton->offset : 0 };
-				uint32_t uniformOffsetsCount = (pPerSkeleton) ? 3 : 2;
-
+				uint32_t uniformOffsets[4] = {
+					(uint32_t)m_perFrameDesc.offset,
+					(uint32_t)perObjectDesc.offset,
+				};
+				uint32_t uniformOffsetsCount = 2;
+				// 变形动画
+				if (pPerSkeleton)
+				{
+					uniformOffsets[uniformOffsetsCount] = pPerSkeleton->offset;
+					uniformOffsetsCount++;
+				}
+				// 骨骼动画
+				if (morph)
+				{
+					uniformOffsets[uniformOffsetsCount] = morph->offset;
+					uniformOffsetsCount++;
+				}
 				vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pPrimitive->m_pipelineLayout, 0, descritorSetCount, descriptorSets, uniformOffsetsCount, uniformOffsets);
 
 				// Bind Pipeline
@@ -7678,7 +7698,7 @@ namespace vkr
 			if (!ShadowMapViewPool.empty())
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
-				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// 
+				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				SetDescriptorSet(m_pDevice->m_device, cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
@@ -7865,7 +7885,9 @@ namespace vkr
 
 		auto h = pAttributeDefines->Hash();
 		auto& oldp = _pipem[h];
-
+		if (layout_bindings.size() == 4) {
+			h = h;
+		}
 		if (!oldp.m_pipelineLayout || !oldp.m_uniformsDescriptorSetLayout) {
 			m_pResourceViewHeaps->CreateDescriptorSetLayout(&layout_bindings, &oldp.m_uniformsDescriptorSetLayout);
 
@@ -8308,8 +8330,10 @@ namespace vkr
 				// do frustrum culling
 				//
 				tfPrimitives boundingBox = _ptb->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
+				/*
+				* todo 相机剔除算法
 				if (CameraFrustumToBoxCollision(mModelViewProj, boundingBox.m_center, boundingBox.m_radius))
-					continue;
+					continue;*/
 
 				PBRMaterialParameters* pPbrParams = &pPrimitive->m_pMaterial->m_pbrMaterialParameters;
 				pPbrParams->m_params.transmissionFramebufferSize = transmissionFramebufferSize;
@@ -14884,7 +14908,7 @@ namespace vkr {
 		std::string commandLine;
 		if (sourceType == SST_GLSL)
 		{
-			commandLine = format("glslc --target-env=vulkan1.3 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
+			commandLine = format("glslc --target-env=vulkan1.1 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
 
 			std::string filenameErr = hz::genfn(format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash));
 
@@ -14897,7 +14921,7 @@ namespace vkr {
 		}
 		else
 		{
-			std::string scp = format("-spirv -fspv-target-env=vulkan1.3 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
+			std::string scp = format("-spirv -fspv-target-env=vulkan1.1 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
 			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData, outSpvSize);
 			assert(*outSpvSize != 0);
 
