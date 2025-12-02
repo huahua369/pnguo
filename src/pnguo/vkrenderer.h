@@ -230,12 +230,16 @@ struct image_vkr
 	glm::ivec2 size = {};
 	void* vkimage = 0;
 };
+namespace vkr {
+	class Device;
+	class draw3d_ctx;
+}
 class vkdg_cx
 {
 public:
 	dev_info_cx _dev_info = {};
-	void* ctx = 0;
-	void* dev = 0;
+	vkr::draw3d_ctx* ctx = 0;
+	vkr::Device* dev = 0;
 	void* qupload = 0;
 	void* renderpass_opaque = 0;		// 用于渲染不透明物体及清空缓冲区opaque
 	void* renderpass_justdepth = 0;		// 用于渲染天空盒、线框justdepth

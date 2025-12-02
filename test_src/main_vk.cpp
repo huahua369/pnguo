@@ -862,7 +862,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 #endif // _WIN32
 
@@ -938,7 +938,7 @@ int main()
 		glm::ivec2 ws = { 1280,860 };
 		const char* wtitle = (char*)u8"窗口0";
 		const char* wtitle1 = (char*)u8"窗口1";
-		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, "Intel(R)");	// 创建vk渲染器 
+		vkdg_cx* vkd = new_vkdg(0, 0, 0);//, 0, 0, "Intel(R)");	// 创建vk渲染器 
 		// 使用3D渲染器的设备创建渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 		vkvg_dev* vctx = 0;
@@ -1074,13 +1074,13 @@ int main()
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-						//pcb->render_texture(renderer, tex3d, &tdt, 1);
-						sp_drawable_draw(dd1);
-						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
+						pcb->render_texture(renderer, tex3d, &tdt, 1);
+						//sp_drawable_draw(dd1);
+						//r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{
-						sp_drawable_update(dd1, delta);
+						//sp_drawable_update(dd1, delta);
 						auto light = vkd->get_light(0);
 						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 						vkd->_state.Exposure;				// 曝光度：默认1.0

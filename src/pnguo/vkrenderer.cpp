@@ -9859,7 +9859,8 @@ namespace vkr
 		submit_info.pCommandBuffers = cmd_bufs;
 		submit_info.signalSemaphoreCount = 0;
 		submit_info.pSignalSemaphores = NULL;
-
+		auto st = vkGetFenceStatus(m_pDevice->m_device, m_fence);
+		printf("UploadHeap fence: %d\n", st);
 		res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info, m_fence);
 		assert(res == VK_SUCCESS);
 
@@ -18108,6 +18109,8 @@ namespace vkr {
 			submit_info.pCommandBuffers = &_pCommandBuffer;
 			submit_info.signalSemaphoreCount = 0;
 			submit_info.pSignalSemaphores = NULL;
+			auto st = vkGetFenceStatus(_dev->m_device, _fence);
+			printf("upload fence: %d\n", st);
 			res = vkQueueSubmit(_dev->graphics_queue, 1, &submit_info, _fence);
 			assert(res == VK_SUCCESS);
 			vkWaitForFences(_dev->m_device, 1, &_fence, VK_TRUE, UINT64_MAX);
@@ -20627,9 +20630,13 @@ namespace vkr {
 			submit_info2.pCommandBuffers = &cmdBuf2;
 			submit_info2.signalSemaphoreCount = 0;
 			submit_info2.pSignalSemaphores = 0;					// todo 渲染完成信号，SDL3默认渲染器不支持接入外部信号，所有这里直接WaitForFence
+
+			auto st = vkGetFenceStatus(m_pDevice->m_device, _fbo.fence);
+			//printf("Renderer_cx fence %p: %d\n", _fbo.fence, st);
 			res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, _fbo.fence);
 			assert(res == VK_SUCCESS);
 			vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
 		}
 	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
