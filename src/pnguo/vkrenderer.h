@@ -105,7 +105,7 @@ namespace vkr {
 		uint32_t systemGeometryMemSize = 32 * 1024;
 
 		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
-		uint32_t uploadHeapMemSize = (uint32_t)8 * 4096 * 4096;
+		uint32_t uploadHeapMemSize = (uint32_t)1000 * 1024 * 1024;
 	};
 	struct gtime_t
 	{
