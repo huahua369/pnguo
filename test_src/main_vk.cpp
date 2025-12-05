@@ -1001,7 +1001,7 @@ int main()
 				// 机器
 				vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, shadowMap);
 				//vkd->add_gltf(R"(E:\tx\droid\scene.gltf)", { 0,0,0 }, 10.0, shadowMap);
-				//vkd->add_gltf(R"(E:\tx\droid\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 10.0, shadowMap);
+				vkd->add_gltf(R"(E:\tx\droid\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 10.0, shadowMap);
 				//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 				//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 				//变形树
@@ -1035,7 +1035,7 @@ int main()
 			}
 			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-			auto tex3d = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
+			void* tex3d = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			/*
 			case 0: return AMDTonemapper(color);
 			case 1: return DX11DSK(color);
@@ -1066,7 +1066,6 @@ int main()
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
 			sp_drawable_set_pos(dd1, 500, 500);
-			if (tex3d)
 			{
 				sdl3_textdata* td3 = new sdl3_textdata();
 				td3->rcb = pcb;
@@ -1075,7 +1074,8 @@ int main()
 						texture_dt tdt = {};
 						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-						pcb->render_texture(renderer, tex3d, &tdt, 1);
+						if (tex3d)
+							pcb->render_texture(renderer, tex3d, &tdt, 1);
 						//sp_drawable_draw(dd1);
 						//r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};

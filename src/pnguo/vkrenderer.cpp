@@ -3141,6 +3141,8 @@ namespace vkr {
 		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
 		bool AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin);
 		VkDescriptorBufferInfo AllocConstantBuffer(uint32_t size, void* pData);
+
+		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
 		bool AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
 		bool AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
 		void OnBeginFrame();
@@ -3842,6 +3844,7 @@ namespace vkr {
 
 		ResourceViewHeaps* _pResourceViewHeaps = 0;		// 管理set分配
 		DynamicBufferRing* _pDynamicBufferRing = 0;	// 动态常量缓冲区ubo
+		DynamicBufferRing* _p_static_buffer = 0;	// 静态缓冲区ubo
 		StaticBufferPool* _pStaticBufferPool = 0;		// 静态顶点/索引缓冲区
 	public:
 		// maps GLTF ids into views
@@ -5836,7 +5839,7 @@ namespace vkr
 				//
 				VkDescriptorSet descriptorSets[2] = { pPrimitive->m_descriptorSet, pPrimitive->m_pMaterial->m_descriptorSet };
 				uint32_t descritorSetCount = 1 + (pPrimitive->m_pMaterial->m_textureCount > 0 ? 1 : 0);
-				uint32_t uniformOffsets[4] = {
+				uint32_t uniformOffsets[6] = {
 					(uint32_t)m_perFrameDesc.offset,
 					(uint32_t)perObjectDesc.offset,
 				};
@@ -6150,6 +6153,7 @@ namespace vkr
 			std::vector<mp_t> mbs;
 			std::vector<ib_t> ibs;
 			size_t all_size = 0;
+			size_t subo_size = 0;
 			for (auto& mesh : pm->meshes)
 			{
 				for (auto& primitive : mesh.primitives)
@@ -6265,7 +6269,7 @@ namespace vkr
 						if (tv.size()) {
 							//VkDescriptorBufferInfo& vbv = mp->mdb;
 							//tas.push_back(vbv);
-							all_size += AlignUp(tv.size() * sizeof(glm::vec4), (size_t)64u);
+							subo_size += AlignUp(tv.size() * sizeof(glm::vec4), (size_t)64u);
 							mbs.push_back({ mp, std::move(tv) });
 						}
 
@@ -6296,13 +6300,19 @@ namespace vkr
 			{
 				auto nas = AlignUp(all_size, (size_t)512);
 				_pStaticBufferPool->OnCreate(m_pDevice, nas, true, "StaticGeom");
+				if (subo_size > 0) {
+					if (!_p_static_buffer)
+						_p_static_buffer = new DynamicBufferRing();
+					_p_static_buffer->OnCreate(m_pDevice, 1, subo_size, (char*)"StaticUBO");
+					_p_static_buffer->OnBeginFrame();
+				}
 				for (auto& it : vbs) {
 					VkDescriptorBufferInfo vbv;
 					_pStaticBufferPool->AllocBuffer(it.vertexBufferAcc.m_count, it.vertexBufferAcc.m_stride, it.vertexBufferAcc.m_data, &vbv);
 					m_vertexBufferMap[it.vbmidx] = vbv;
 				}
 				for (auto& it : mbs) {
-					_pStaticBufferPool->AllocBuffer(it.tv.size(), sizeof(glm::vec4), it.tv.data(), &it.mp->mdb);
+					_p_static_buffer->AllocBuffer(it.tv.size(), sizeof(glm::vec4), it.tv.data(), &it.mp->mdb);
 				}
 				for (auto& it : ibs) {
 					VkDescriptorBufferInfo ibv = {};
@@ -8392,7 +8402,9 @@ namespace vkr
 			uint32_t c = 2;
 			uniformOffsets[0] = t.m_perFrameDesc.offset;	// 相机、灯光
 			uniformOffsets[1] = t.m_perObjectDesc.offset;	// 材质参数
-			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
+			if (t.m_pPerSkeleton) {
+				uniformOffsets[c++] = t.m_pPerSkeleton->offset;
+			}	// 骨骼动画偏移
 			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }		// 变形动画偏移
 			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
 
@@ -10008,7 +10020,10 @@ namespace vkr
 		alloc_info.descriptorPool = m_descriptorPool;
 		alloc_info.descriptorSetCount = 1;
 		alloc_info.pSetLayouts = &descLayout;
-
+		static uint64_t dp = 0x160000000016;
+		if ((uint64_t)m_descriptorPool == dp) {
+			dp = dp;
+		}
 		VkResult res = vkAllocateDescriptorSets(m_pDevice->m_device, &alloc_info, pDescriptorSet);
 		assert(res == VK_SUCCESS);
 
@@ -10805,6 +10820,12 @@ namespace vkr
 		return AllocConstantBuffer1(size, pData, pOut, 64u);
 	}
 
+	bool DynamicBufferRing::AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut)
+	{
+		auto db = AllocConstantBuffer(numbeOfVertices * strideInBytes, (void*)pInitData);
+		if (pOut)*pOut = db;
+		return db.buffer != 0;
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// AllocConstantBuffer
@@ -10849,8 +10870,13 @@ namespace vkr
 
 	void update_dsets(VkDevice device, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount, const VkCopyDescriptorSet* pDescriptorCopies)
 	{
-		if (pDescriptorWrites && pDescriptorWrites->pBufferInfo && !pDescriptorWrites->pBufferInfo->buffer) {
-			assert(pDescriptorWrites->pBufferInfo->offset == 0 && pDescriptorWrites->pBufferInfo->range == 0);
+		if (pDescriptorWrites && pDescriptorWrites->pBufferInfo) {
+			//static VkBuffer y = (VkBuffer)0;
+			//if (pDescriptorWrites->pBufferInfo->buffer == y) {
+			//	assert(0);
+			//}
+			if (!pDescriptorWrites->pBufferInfo->buffer)
+				assert(pDescriptorWrites->pBufferInfo->offset == 0 && pDescriptorWrites->pBufferInfo->range == 0);
 		}
 		vkUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount, pDescriptorCopies);
 	}
@@ -12127,6 +12153,7 @@ namespace vkr {
 				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0
 					, NULL, 0, NULL, 2, barriers);
 			}
+			SetPerfMarkerEnd(cmd_buf);
 		}
 
 		SetPerfMarkerEnd(cmd_buf);
@@ -20357,7 +20384,6 @@ namespace vkr {
 		SetPerfMarkerBegin(cmdBuf1, "Color pass");
 
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
-
 		if (_robject.size() > 0)
 		{
 			drawables.clear();	// 清空获取可渲染物体
@@ -20396,22 +20422,22 @@ namespace vkr {
 			draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 		}
 
-		//VkImageMemoryBarrier barrier[1] = {};
-		//barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//barrier[0].pNext = NULL;
-		//barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		//barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		//barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		//barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		//barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		//barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//barrier[0].subresourceRange.baseMipLevel = 0;
-		//barrier[0].subresourceRange.levelCount = 1;
-		//barrier[0].subresourceRange.baseArrayLayer = 0;
-		//barrier[0].subresourceRange.layerCount = 1;
-		//barrier[0].image = m_GBuffer.m_HDR.Resource();
-		//vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+		VkImageMemoryBarrier barrier[1] = {};
+		barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier[0].pNext = NULL;
+		barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier[0].subresourceRange.baseMipLevel = 0;
+		barrier[0].subresourceRange.levelCount = 1;
+		barrier[0].subresourceRange.baseArrayLayer = 0;
+		barrier[0].subresourceRange.layerCount = 1;
+		barrier[0].image = m_GBuffer.m_HDR.Resource();
+		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
 		SetPerfMarkerEnd(cmdBuf1);
 
@@ -20442,10 +20468,10 @@ namespace vkr {
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 
+			SetPerfMarkerEnd(cmdBuf1);
 
 		}
 
-		SetPerfMarkerEnd(cmdBuf1);
 
 		// Post proc---------------------------------------------------------------------------
 
@@ -20690,11 +20716,15 @@ namespace vkr {
 			submit_info2.pSignalSemaphores = 0;					// todo 渲染完成信号，SDL3默认渲染器不支持接入外部信号，所有这里直接WaitForFence
 
 			auto st = vkGetFenceStatus(m_pDevice->m_device, _fbo.fence);
+			if (!st)
+			{
+				vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
+			}
 			//printf("Renderer_cx fence %p: %d\n", _fbo.fence, st);
 			res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, _fbo.fence);
 			assert(res == VK_SUCCESS);
 			vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
+			//vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
 		}
 	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)

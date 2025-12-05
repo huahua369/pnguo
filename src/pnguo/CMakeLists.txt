@@ -15,6 +15,7 @@ set(pnguo_src
 "win_core.cpp" 
 "page.cpp"  
 "vkrenderer.cpp"  
+"vkrenderer_core.cpp"  
 "testshader.cpp"  
 "audio.cpp"  
 )
