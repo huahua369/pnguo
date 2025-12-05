@@ -19,6 +19,19 @@ vk渲染流程:
 */
 
 namespace vkc {
+	struct dev_info_cx
+	{
+		void* inst;
+		void* phy;
+		void* vkdev;
+		uint32_t qFamIdx;		// familyIndex
+		uint32_t qIndex = 0;
+	};
+	struct device_info_t
+	{
+		char name[256];
+		void* phd;
+	};
 	struct layout_set_pool
 	{
 		VkDescriptorPool descriptorPool = {};
@@ -31,7 +44,16 @@ namespace vkc {
 #endif // _HAS_VK_MULTITHREADING
 
 	};
-	// 资源管理
+	// 实例、设备
+	class Device;
+
+	// 纹理
+
+	// 渲染目标
+
+
+	// 着色器管线创建
+
 	// 创建描述符堆
 	bool new_set_layout(VkDevice pDevice, VkDescriptorSetLayoutBinding* layout_binding, uint32_t count, uint32_t maxcount, layout_set_pool* opt);
 	void free_layout_set_pool(layout_set_pool* p);
@@ -52,7 +74,7 @@ namespace vkc {
 
 	// 缓冲区
 
-
+	// 列队
 
 }
 //!vkc

@@ -113,7 +113,7 @@ struct pbrMaterial
 
 	int unlit;
 	float pad[3];
-	mat3 uvTransform[UVT_COUNT];
+	//mat3 uvTransform[UVT_COUNT];
 };
 
 struct MaterialInfo
@@ -987,7 +987,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	vec3 uv3 = vec3(mesh.tc, 1);
 	// KHR_texture_transform 
 #ifdef MATERIAL_TEXTURE_TRANSFORM
-	uv3 *= material.uvTransform;
+	//uv3 *= material.uvTransform;
 #endif
 	vec2 texCoord = vec2(uv3);
 	uv = texCoord;

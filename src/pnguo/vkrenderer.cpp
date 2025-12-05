@@ -455,8 +455,7 @@ namespace vkr
 		for (auto& name : m_device_extension_names)
 			pDevice_extension_names->push_back(name.c_str());
 	}
-
-#if 1
+	 
 	static PFN_vkCreateDebugReportCallbackEXT g_vkCreateDebugReportCallbackEXT = NULL;
 	static PFN_vkDebugReportMessageEXT g_vkDebugReportMessageEXT = NULL;
 	static PFN_vkDestroyDebugReportCallbackEXT g_vkDestroyDebugReportCallbackEXT = NULL;
@@ -535,7 +534,7 @@ namespace vkr
 			g_DebugReportCallback = nullptr;
 		}
 	}
-#endif
+ 
 	void SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp)
 	{
 		const char* exn[] = {
@@ -2081,6 +2080,8 @@ namespace vkr {
 		e_AnisotropyUVTransform,
 		e_COUNT
 	};
+#define UVMAT_TYPE glm::mat3
+	//glm::mat3x4
 	// todo pbr UBO用结构体
 	struct pbr_factors_t
 	{
@@ -2132,14 +2133,13 @@ namespace vkr {
 		float envIntensity = 1;
 		int unlit = 0;
 		float u_OcclusionStrength = 1.0;
-		float pad[2];
-		mat3x4 uvTransform = mat3x4(1.0);
+		float pad[3];
+		//UVMAT_TYPE uvt = UVMAT_TYPE(1.0);
 		//glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
 	};
 
 
 #define pbrMaterial pbr_factors_t
-
 	struct PBRMaterialParameters
 	{
 		bool     m_doubleSided = false;
@@ -2149,7 +2149,7 @@ namespace vkr {
 		DefineList m_defines;
 
 		pbrMaterial m_params = {};
-		glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
+		UVMAT_TYPE uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
 		size_t uvc = 0;
 		int mid = 0;
 	};
@@ -5844,13 +5844,13 @@ namespace vkr
 					(uint32_t)perObjectDesc.offset,
 				};
 				uint32_t uniformOffsetsCount = 2;
-				// 变形动画
+				// 骨骼动画
 				if (pPerSkeleton)
 				{
 					uniformOffsets[uniformOffsetsCount] = pPerSkeleton->offset;
 					uniformOffsetsCount++;
 				}
-				// 骨骼动画
+				// 变形动画
 				if (morph)
 				{
 					uniformOffsets[uniformOffsetsCount] = morph->offset;
@@ -6746,7 +6746,7 @@ namespace vkr
 		// look for textures and store their IDs in a map 
 		for (size_t i = 0; i < (int)UVT_E::e_COUNT; i++)
 		{
-			tfmat->uvTransform[i] = glm::mat3(1.0);
+			tfmat->uvTransform[i] = UVMAT_TYPE(1.0);
 		}
 		auto& uvtm = tfmat->uvTransform;
 		if (material.normalTexture.index != -1)
@@ -9959,6 +9959,7 @@ namespace vkr
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, srvDescriptorCount },
 			{ VK_DESCRIPTOR_TYPE_SAMPLER, samplerDescriptorCount },
 			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, uavDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, uavDescriptorCount },
 			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, uavDescriptorCount },
 			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, samplerDescriptorCount }
 		};
