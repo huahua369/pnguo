@@ -8314,8 +8314,8 @@ namespace vkr
 
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(pNode->skinIndex);
-
-			glm::mat4 mModelViewProj = _ptb->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * pNodesMatrices[i].GetCurrent();
+			auto nodemat = pNodesMatrices[i].GetCurrent();
+			glm::mat4 mModelViewProj = _ptb->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * nodemat;
 
 			// loop through primitives
 			//

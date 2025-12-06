@@ -989,51 +989,51 @@ int main()
 		//popw->_focus_lost_hide = 0; 
 		bool shadowMap = true;
 		if (vkd) {
+			auto rmd = hz::read_json("data/vksample.json");
+			auto scenes = rmd["scenes"];
+			if (scenes.empty())
 			{
-				int kadf[] = { sizeof(std::string),sizeof(std::vector<char>) };
-				//vkd->add_gltf(R"(E:\model\sharp2.glb)", { 0,0,0 }, 1.0);// 地板
-				//vkd->add_gltf(R"(E:\model\zw\fantasy_church_ruins.glb)", { -5,0,-6 }, 1.0);// 加载gltf
-				//vkd->add_gltf(R"(E:\model\zw\autumnal_forest.glb)", { -15,0,-6 }, 1.0);// 加载gltf
-				//vkd->add_gltf(R"(E:\model\realistic_palm_tree_10_free.glb)", { 2,0,0 }, 1.0);
-				//vkd->add_gltf(R"(E:\model\bc22.glb)", { 0,0,5 }, 0.52);
-				//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
-				//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
-				// 机器
-				vkd->add_gltf(R"(E:\model\testgltf\busterDrone.gltf)", { 0,1.8,0 }, 1.0, shadowMap);
-				//vkd->add_gltf(R"(E:\code\cpp\vk\g\gt\a\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,1.8,0 }, 1.0, shadowMap);
-				//vkd->add_gltf(R"(E:\tx\droid\scene.gltf)", { 0,0,0 }, 10.0, shadowMap);
-				//vkd->add_gltf(R"(E:\model\testgltf\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 10.0, shadowMap);
-				vkd->add_gltf(R"(E:\tx\droid\1.glb)", { 0,0,0 }, 10.0, shadowMap);
-				//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
-				//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
-				//变形树
-				//vkd->add_gltf(R"(E:\model\pale_radiance_tree.glb)", { }, 1.0);
-				//vkd->add_gltf(R"(E:\model\ka-2000__scx2800-2_cranes (1).glb)", { 5,0,-8 }, 1.0);
-				//vkd->add_gltf(R"(E:\model\maple_trees.glb)", { 20,0,10 }, 0.10);
+				{
+					njson item;
+					item["name"] = "busterDrone";
+					item["dir"] = R"(E:\model\testgltf\)";
+					item["filename"] = "busterDrone.gltf";
+					item["pos"] = { 0.0,1.8,0.0 };
+					item["scale"] = 1.0;
+					item["shadowMap"] = true;
+					scenes.push_back(item);
+				}
+				{
+					njson item;
+					item["name"] = "droide";
+					item["dir"] = R"(E:\model\testgltf\)";
+					item["filename"] = "free_droide_de_seguridad_k-2so_by_oscar_creativo.glb";
+					item["pos"] = { 0.0,0.0,0.0 };
+					item["scale"] = 10.0;
+					item["shadowMap"] = true;
+					scenes.push_back(item);
+				}
+			}
+			hz::save_json("data/vksample.json", rmd, 2);
+			for (auto& it : scenes)
+			{
+				std::string path = it["dir"];
+				std::string fn = it["filename"];
+				if (fn.empty())continue;
+				if (path.size()) {
+					char xx = *path.rbegin();
+					char fx = fn[0];
+					if (!(xx == '\\' || xx == '/') && !(fx == '\\' || fx == '/')) {
+						path += "/";
+					}
+				}
+				path += fn;
+				if (hz::access_2(path.c_str()))
+				{
 
-				//vkd->add_gltf(R"(E:\model\rock_monster.glb)", { 5,0,10 }, 0.5);
-				//vkd->add_gltf(R"(E:\model\helicopter_space_ship.glb)", { 10,0,20 }, 1.0, true);// 飞船
-				//vkd->add_gltf(R"(E:\zmodel\cr123.glb)", {0,0,10}, 10.0);
-				//vkd->add_gltf(R"(E:\model\spaceship.glb)", { 0 * 5,10,-8 * 0 }, 1.0);
-
-				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\ClearcoatRing\glTF\ClearcoatRing.gltf)", {  }, 1.0);
-				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\MorphStressTest\glTF-Binary\MorphStressTest.glb)", {  }, 1.0);
-				//vkd->add_gltf(R"(E:\zmodel\MorphStressTest.glb)", { }, 1.0);
-				//vkd->add_gltf(R"(E:\model\psx_houses.glb)", { 15,0,-8 }, 1.0);
-				//vkd->add_gltf(R"(E:\model\psx_old_house.glb)", { 0 * 5,0,-8 * 0 }, 1.0);
-				//vkd->add_gltf(R"(E:\model\o-tech_reaper-4k-materialtest.glb)", { 5,10,-8 }, 10.0);
-				//vkd->add_gltf(R"(E:\zmodel\sofa.glb)", { 0,0,0 }, 1.0);
-				//vkd->add_gltf(R"(E:\tx\parlahti.glb)", { 0,0,0 }, 1.0);
-				//vkd->add_gltf(R"(E:\model\black_hole.glb)", { 0,0,0 }, 0.0010);
-
-				//vkd->add_gltf(R"(E:\model\space_station_4.glb)");
-				//vkd->add_gltf(R"(E:\model\sexy_guardian_woman_model_18.glb)");
-				//vkd->add_gltf(R"(E:\code\hub\cpp\vulkanFrame\vulkanFrame\DamagedHelmet.glb)");
-				//vkd->add_gltf(R"(E:\model\DragonAttenuation.glb)", { 0,0,0 }, 1.0);//玻璃龙
-				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\Fox\glTF-Binary\Fox.glb)", { 0,0,0 }, 0.20);//
-				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\TextureSettingsTest\glTF-Binary\TextureSettingsTest.glb)", { 0,11,0 }, 1.0);//
-				//vkd->add_gltf(R"(E:\zmodel\glTF-Sample-Models-main\2.0\NegativeScaleTest\glTF-Binary\NegativeScaleTest.glb)", { 0,0,0 }, 1.0);//
-				//vkd->add_gltf(R"(E:\zmodel\NodePerformanceTest.glb)", { 0,0.1,0 }, 1.0);//
+					auto pos = hz::toVec3(it["pos"]);
+					vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toBool(it["shadowMap"]));
+				}
 			}
 			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//

@@ -267,7 +267,7 @@ namespace hz {
 	int64_t toInt(const njson& v, int64_t de = 0);
 	double toDouble(const njson& v, double de = 0);
 
-	static bool toBool(const njson& v, bool def = false);
+	bool toBool(const njson& v, bool def = false);
 	bool toBool(const njson& v, const char* k, bool def);
 	std::string toStr(const njson& v, const char* k, const std::string& des);
 	std::string toStr(const njson& v, const std::string& des = "");

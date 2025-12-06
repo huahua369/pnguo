@@ -1076,6 +1076,10 @@ namespace hz
 		return;
 
 	}
+	bool access_2(const char* filename)
+	{
+		return (access(filename, 0) == 0);
+	}
 	size_t read_binary_file(const std::string& filename0, std::string& result)
 	{
 		int64_t size = 0;

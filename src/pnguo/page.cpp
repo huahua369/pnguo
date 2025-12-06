@@ -236,22 +236,22 @@ mitem_t* menu_cx::new_menu(int width, int height, const std::vector<std::string>
 void menu_cx::show_item(mitem_t* it, const glm::vec2& pos)
 {
 	if (!form)return;
-	auto mf1 = it->f ? it->f : new_form_popup(form, it->pv.fsize.x, it->pv.fsize.y);
-	if (it->f)
-	{
-		if (it->backgs->count())
-			it->f->remove(it->backgs);
-		it->f->remove(it->fronts);
-		//it->f->unbind(it->pv.p);
-	}
-	it->f = mf1;
-	if (it->backgs->count())
-		mf1->add_canvas_atlas(it->backgs);
-	//mf1->bind(it->pv.p);
-	mf1->add_canvas_atlas(it->fronts);
-	mf1->set_size(it->pv.fsize);
-	mf1->set_pos(pos);
-	mf1->show();
+	//auto mf1 = it->f ? it->f : new_form_popup(form, it->pv.fsize.x, it->pv.fsize.y);
+	//if (it->f)
+	//{
+	//	if (it->backgs->count())
+	//		it->f->remove(it->backgs);
+	//	it->f->remove(it->fronts);
+	//	//it->f->unbind(it->pv.p);
+	//}
+	//it->f = mf1;
+	//if (it->backgs->count())
+	//	mf1->add_canvas_atlas(it->backgs);
+	////mf1->bind(it->pv.p);
+	//mf1->add_canvas_atlas(it->fronts);
+	//mf1->set_size(it->pv.fsize);
+	//mf1->set_pos(pos);
+	//mf1->show();
 }
 
 void menu_cx::free_item(mitem_t* p)

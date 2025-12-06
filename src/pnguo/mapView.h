@@ -3,6 +3,7 @@
 #include <string> 
 #include <functional> 
 #include <vector>  
+#include <map>  
 #include <thread>  
 #include <mutex>
 //---------------------------------------------------------------------------------------------
@@ -352,6 +353,7 @@ namespace hz
 	char* get_suffix(const char* name);
 	void check_make_path(const std::string& filename);
 	std::string _dirname(const char* path);
+	bool access_2(const char* filename);
 
 }//!hz
 
