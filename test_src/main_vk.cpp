@@ -990,7 +990,7 @@ int main()
 		bool shadowMap = true;
 		if (vkd) {
 			auto rmd = hz::read_json("data/vksample.json");
-			auto scenes = rmd["scenes"];
+			auto &scenes = rmd["scenes"];
 			if (scenes.empty())
 			{
 				{
@@ -1001,6 +1001,7 @@ int main()
 					item["pos"] = { 0.0,1.8,0.0 };
 					item["scale"] = 1.0;
 					item["shadowMap"] = true;
+					item["visible"] = true;
 					scenes.push_back(item);
 				}
 				{
@@ -1011,10 +1012,11 @@ int main()
 					item["pos"] = { 0.0,0.0,0.0 };
 					item["scale"] = 10.0;
 					item["shadowMap"] = true;
+					item["visible"] = true;
 					scenes.push_back(item);
 				}
+				hz::save_json("data/vksample.json", rmd, 2);
 			}
-			hz::save_json("data/vksample.json", rmd, 2);
 			for (auto& it : scenes)
 			{
 				std::string path = it["dir"];
@@ -1030,7 +1032,6 @@ int main()
 				path += fn;
 				if (hz::access_2(path.c_str()))
 				{
-
 					auto pos = hz::toVec3(it["pos"]);
 					vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toBool(it["shadowMap"]));
 				}

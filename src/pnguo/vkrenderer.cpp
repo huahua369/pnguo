@@ -21251,6 +21251,7 @@ namespace vkr {
 	void draw3d_ctx::add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
 	{
 		//print_time Pt("push gltf", 1);
+		std::string fn1 = fn && *fn ? fn : "";
 		std::thread a([=]()
 			{
 				GLTFCommon* pgc = 0;
@@ -21260,7 +21261,7 @@ namespace vkr {
 					pgc->has_shadowMap = has_shadowMap;
 					pgc->_pos = pos;
 					pgc->_scale = scale;
-					if (pgc->Load(fn, "") == false)
+					if (pgc->Load(fn1.c_str(), "") == false)
 					{
 						printf("The selected model couldn't be found, please check the documentation!\n");
 						delete pgc;
