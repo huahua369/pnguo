@@ -862,7 +862,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 #endif // _WIN32
 
@@ -999,9 +999,11 @@ int main()
 				//vkd->add_gltf(R"(E:\vsz\h\avl\av\Bee.glb)", { 0,0,0 }, 10.0); 
 				//vkd->add_gltf(R"(E:\code\c\assimp\test\models\glTF2\textureTransform\TextureTransformTest.gltf)", { 0,0,0 }, 1.0);
 				// 机器
-				vkd->add_gltf(R"(E:\ag\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,01.8,0 }, 1.0, shadowMap);
+				vkd->add_gltf(R"(E:\model\testgltf\busterDrone.gltf)", { 0,1.8,0 }, 1.0, shadowMap);
+				//vkd->add_gltf(R"(E:\code\cpp\vk\g\gt\a\glTFSample\media\Cauldron-Media\buster_drone\busterDrone.gltf)", { 0,1.8,0 }, 1.0, shadowMap);
 				//vkd->add_gltf(R"(E:\tx\droid\scene.gltf)", { 0,0,0 }, 10.0, shadowMap);
-				vkd->add_gltf(R"(E:\tx\droid\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 10.0, shadowMap);
+				//vkd->add_gltf(R"(E:\model\testgltf\free_droide_de_seguridad_k-2so_by_oscar_creativo.glb)", { 0,0,0 }, 10.0, shadowMap);
+				vkd->add_gltf(R"(E:\tx\droid\1.glb)", { 0,0,0 }, 10.0, shadowMap);
 				//vkd->add_gltf(R"(E:\model\lets_go_to_the_beach_-_beach_themed_diorama.glb)", { 0,0,20 }, 1.0);
 				//vkd->add_gltf( R"(E:\model\hero_alice_lobby.glb)");
 				//变形树

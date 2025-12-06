@@ -455,7 +455,7 @@ namespace vkr
 		for (auto& name : m_device_extension_names)
 			pDevice_extension_names->push_back(name.c_str());
 	}
-	 
+
 	static PFN_vkCreateDebugReportCallbackEXT g_vkCreateDebugReportCallbackEXT = NULL;
 	static PFN_vkDebugReportMessageEXT g_vkDebugReportMessageEXT = NULL;
 	static PFN_vkDestroyDebugReportCallbackEXT g_vkDestroyDebugReportCallbackEXT = NULL;
@@ -534,7 +534,7 @@ namespace vkr
 			g_DebugReportCallback = nullptr;
 		}
 	}
- 
+
 	void SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp)
 	{
 		const char* exn[] = {
@@ -2080,8 +2080,7 @@ namespace vkr {
 		e_AnisotropyUVTransform,
 		e_COUNT
 	};
-#define UVMAT_TYPE glm::mat3
-	//glm::mat3x4
+#define UVMAT_TYPE glm::mat3x4
 	// todo pbr UBO用结构体
 	struct pbr_factors_t
 	{
@@ -2134,8 +2133,6 @@ namespace vkr {
 		int unlit = 0;
 		float u_OcclusionStrength = 1.0;
 		float pad[3];
-		//UVMAT_TYPE uvt = UVMAT_TYPE(1.0);
-		//glm::mat3 uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
 	};
 
 
@@ -6044,7 +6041,6 @@ namespace vkr
 							unsigned char* buffer = nullptr;
 							VkDeviceSize   bufferSize = 0;
 							bool           deleteBuffer = false;
-
 							if (img.as_is) {
 
 								int w = 0, h = 0, comp = 4, req_comp = 0;
@@ -6097,23 +6093,19 @@ namespace vkr
 							pTex->InitFromData(m_pDevice, m_pUploadHeap, &header, buffer, bufferSize, name.c_str(), useSRGB);
 							if (sdata)
 								stbi_image_free(sdata);
-
 						}
 						else
 						{
-
 							bool result = pTex->InitFromFile(m_pDevice, m_pUploadHeap, filename.c_str(), useSRGB, 0 /*VkImageUsageFlags*/, cutOff);
 							assert(result != false);
 						}
-						m_pUploadHeap->FlushAndFinish();
+						//m_pUploadHeap->FlushAndFinish();
 						m_textures[imageIndex].CreateSRV(&m_textureViews[imageIndex]);
 					}
 				);
 			}
-
 			if (pAsyncPool)
 				pAsyncPool->Flush();
-
 			// copy textures and apply barriers, then flush the GPU
 			m_pUploadHeap->FlushAndFinish();
 		}
@@ -6742,7 +6734,7 @@ namespace vkr
 		{
 			tfmat->m_params.alphaMode = 2;
 		}
-		int uvc = 1;
+		int uvc = 0;
 		// look for textures and store their IDs in a map 
 		for (size_t i = 0; i < (int)UVT_E::e_COUNT; i++)
 		{
@@ -6961,8 +6953,8 @@ namespace vkr
 			}
 
 		} while (0);
-		if (uvc < 1)
-			uvc = 1;
+		if (uvc > 0)
+			uvc = uvc;
 		tfmat->m_defines["UVT_count"] = std::to_string(uvc);
 		tfmat->uvc = uvc;
 	}
@@ -16295,7 +16287,8 @@ namespace vkr {
 		{
 			GetBufferDetails(skins[i].inverseBindMatrices, &m_skins[i].m_InverseBindMatrices);
 			m_count += m_skins[i].m_InverseBindMatrices.m_count;
-			m_skins[i].m_pSkeleton = &m_nodes[skins[i].skeleton];
+			auto idx = skins[i].skeleton;
+			m_skins[i].m_pSkeleton = &m_nodes[idx < 0 ? 0 : idx];
 
 			auto& joints = skins[i].joints;
 			for (uint32_t n = 0; n < joints.size(); n++)
@@ -16830,7 +16823,19 @@ namespace vkr {
 		uint32_t pidx = (uint32_t)-1;
 		glm::mat4 m = glm::mat4(1.0);
 	};
-
+#if 0
+	void GLTFCommon::TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes)
+	{
+		auto p = pNodes->data();
+		for (uint32_t n = 0; n < pNodes->size(); n++)
+		{
+			uint32_t nodeIdx = p[n];
+			glm::mat4 m = world * m_animatedMats[nodeIdx];
+			m_worldSpaceMats[nodeIdx].Set(m);
+			TransformNodes(m, &m_nodes[nodeIdx].m_children);
+		}
+	}
+#else
 	void GLTFCommon::TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes)
 	{
 		std::stack<node_mat> q;
@@ -16862,7 +16867,7 @@ namespace vkr {
 		}
 		return;
 	}
-
+#endif
 	//
 	// Initializes the GLTFCommonTransformed structure 
 	//
