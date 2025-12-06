@@ -990,7 +990,7 @@ int main()
 		bool shadowMap = true;
 		if (vkd) {
 			auto rmd = hz::read_json("data/vksample.json");
-			auto &scenes = rmd["scenes"];
+			auto& scenes = rmd["scenes"];
 			if (scenes.empty())
 			{
 				{
@@ -1021,7 +1021,7 @@ int main()
 			{
 				std::string path = it["dir"];
 				std::string fn = it["filename"];
-				if (fn.empty())continue;
+				if (fn.empty() || !hz::toBool(it["visible"]))continue;
 				if (path.size()) {
 					char xx = *path.rbegin();
 					char fx = fn[0];

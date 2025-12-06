@@ -16260,10 +16260,16 @@ namespace vkr {
 			{
 				tfnode->m_tranform.m_rotation = (glm::make_mat4x4(node.matrix.data()));
 			}
+			float yaw, pitch, roll;
+			glm::extractEulerAngleYXZ(tfnode->m_tranform.m_rotation, yaw, pitch, roll);
+			// 转换为角度并输出
+			printf((char*)u8"i %d\tYaw: %d°\tPitch: %d°\tRoll: %d°\t\n", i, (int)glm::degrees(yaw), (int)glm::degrees(pitch), (int)glm::degrees(roll));
+
 			if (node.weights.size()) {
 				// todo node weights
 			}
 		}
+		return;
 	}
 	void GLTFCommon::load_scenes()
 	{
@@ -16946,14 +16952,13 @@ namespace vkr {
 			tfSkins& skin = m_skins[i];
 
 			//pick the matrices that affect the skin and multiply by the inverse of the bind      
-			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;
-
-			auto& skinningMats = m_worldSpaceSkeletonMats[i];
+			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;	auto& skinningMats = m_worldSpaceSkeletonMats[i];
 			for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
 			{
 				skinningMats.m[j] = (m_worldSpaceMats[skin.m_jointsNodeIdx[j]].GetCurrent() * pM[j]);// todo Set
 			}
 		}
+		return;
 	}
 
 	bool GLTFCommon::GetCamera(uint32_t cameraIdx, Camera* pCam) const
