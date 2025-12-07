@@ -3760,6 +3760,7 @@ namespace vkr {
 		std::vector<tfCamera> m_cameras;
 
 		std::vector<tfNode> m_nodes;
+		std::vector<glm::ivec3> _meshskin;
 		std::vector<tfAnimation> m_animations;
 		std::vector<float> acv[4];				// 缓存动画结果	
 		std::vector<char*> m_buffersData;		// 原始数据
@@ -3775,7 +3776,7 @@ namespace vkr {
 			glm::mat4* m = 0;
 			size_t count = 0;
 		};
-		std::map<int, matp2> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
+		std::map<glm::ivec2, matp2> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
 		std::map<int, std::vector<glm::mat3x4>> m_uv_mats; // UVmat
 
 		std::map<int, std::vector<glm::vec3>> targets_data;
@@ -3784,7 +3785,7 @@ namespace vkr {
 		PerFrame_t m_perFrameData_w;
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
-		uint32_t _animationIndex = -1;
+		uint32_t _animationIndex = 0;
 		size_t mat_count = 0;	// 矩阵数量
 		size_t ubo_size = 0;
 		bool has_shadowMap = true;
@@ -3855,8 +3856,8 @@ namespace vkr {
 
 		std::vector<Texture> m_textures;
 		std::vector<VkImageView> m_textureViews;
-
-		std::map<int, VkDescriptorBufferInfo> m_skeletonMatricesBuffer;
+		// x是skin,y是mesh
+		std::map<glm::ivec2, VkDescriptorBufferInfo> m_skeletonMatricesBuffer;
 
 		ResourceViewHeaps* _pResourceViewHeaps = 0;		// 管理set分配
 		DynamicBufferRing* _pDynamicBufferRing = 0;	// 动态常量缓冲区ubo
@@ -3888,7 +3889,7 @@ namespace vkr {
 
 		VkImageView GetTextureViewByID(int id);
 
-		VkDescriptorBufferInfo* GetSkinningMatricesBuffer(int skinIndex);
+		VkDescriptorBufferInfo* GetSkinningMatricesBuffer(const glm::ivec2& skinIndex);
 		//morph_t* get_mb(int idx);
 		VkDescriptorBufferInfo* get_mb(int idx);
 		VkDescriptorBufferInfo* get_uvm(int idx);
@@ -5820,10 +5821,9 @@ namespace vkr
 			tfNode* pNode = &pNodes->at(i);
 			if ((pNode == NULL) || (pNode->meshIndex < 0))
 				continue;
-
+			glm::ivec2 sm = { pNode->skinIndex, pNode->meshIndex };
 			// skinning matrices constant buffer
-			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(pNode->skinIndex);
-
+			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(sm);
 			DepthMesh* pMesh = &m_meshes[pNode->meshIndex];
 			auto mesh = pm->meshes[pNode->meshIndex];
 			for (int p = 0; p < pMesh->m_pPrimitives.size(); p++)
@@ -6564,13 +6564,11 @@ namespace vkr
 		}
 	}
 
-	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::GetSkinningMatricesBuffer(int skinIndex)
+	VkDescriptorBufferInfo* GLTFTexturesAndBuffers::GetSkinningMatricesBuffer(const glm::ivec2& skinIndex)
 	{
 		auto it = m_skeletonMatricesBuffer.find(skinIndex);
-
 		if (it == m_skeletonMatricesBuffer.end())
 			return NULL;
-
 		return &it->second;
 	}
 	//morph_t* GLTFTexturesAndBuffers::get_mb(int idx)
@@ -8331,8 +8329,9 @@ namespace vkr
 			if ((pNode == NULL) || (pNode->meshIndex < 0))
 				continue;
 
+			glm::ivec2 sm = { pNode->skinIndex, pNode->meshIndex };
 			// skinning matrices constant buffer
-			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(pNode->skinIndex);
+			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(sm);
 			auto nodemat = pNodesMatrices[i].GetCurrent();
 			glm::mat4 mModelViewProj = _ptb->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * nodemat;
 
@@ -16313,7 +16312,6 @@ namespace vkr {
 		for (uint32_t i = 0; i < skins.size(); i++)
 		{
 			GetBufferDetails(skins[i].inverseBindMatrices, &m_skins[i].m_InverseBindMatrices);
-			mat_count += m_skins[i].m_InverseBindMatrices.m_count;
 			auto idx = skins[i].skeleton;
 			m_skins[i].m_pSkeleton = &m_nodes[idx < 0 ? 0 : idx];
 
@@ -16477,7 +16475,7 @@ namespace vkr {
 		byteLength -= byteOffset;
 		return buffer + offset;
 	}
-
+#if 1
 	int GetFormatSize(int id)
 	{
 		switch (id)
@@ -16732,6 +16730,7 @@ namespace vkr {
 		}
 		return 1;
 	}
+#endif
 	void GLTFCommon::GetBufferDetails(int accessor_idx, tfAccessor* pAccessor)
 	{
 		if (pm)
@@ -16949,7 +16948,8 @@ namespace vkr {
 			return;
 		// initializes matrix buffers to have the same dimension as the nodes
 		m_worldSpaceMats.resize(m_nodes.size());
-		_mats.resize(mat_count);
+
+
 
 		get_model_data(pm, _materialsData, _meshes);
 
@@ -16973,43 +16973,74 @@ namespace vkr {
 			dysize += weights.size() * sizeof(float);
 		}
 
+		_meshskin.clear();
+		for (uint32_t i = 0; i < m_nodes.size(); i++)
+		{
+			auto& it = m_nodes[i];
+			if (it.skinIndex >= 0 && it.skinIndex < m_skins.size()) {
+				mat_count += m_skins[it.skinIndex].m_InverseBindMatrices.m_count;
+			}
+		}
+		_mats.resize(mat_count);
 		auto ptr = _mats.data();
 		m_animatedMats = ptr;
 		ptr += m_nodes.size();
+
+		for (uint32_t i = 0; i < m_nodes.size(); i++)
+		{
+			auto& it = m_nodes[i];
+			m_animatedMats[i] = it.m_tranform.GetWorldMat();
+			if (it.meshIndex >= 0) {
+				_meshskin.push_back({ it.skinIndex,it.meshIndex,i });
+			}
+		}
+
 		// same thing for the skinning matrices but using the size of the InverseBindMatrices
-		for (uint32_t i = 0; i < m_skins.size(); i++)
+		/*for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
 			auto& it = m_worldSpaceSkeletonMats[i];
 			it.m = ptr;
 			it.count = m_skins[i].m_InverseBindMatrices.m_count;
 			ptr += it.count;
 			dysize += it.count * sizeof(glm::mat4);
+		}*/
+		//for (uint32_t i = 0; i < m_nodes.size(); i++)
+		//{
+		//	auto& it = m_nodes[i];
+		//	m_animatedMats[i] = it.m_tranform.GetWorldMat();
+		//	if (it.meshIndex >= 0) {
+		//		m_meshes[it.meshIndex];
+		//	}
+		//}
+		if (m_skins.size())
+		{
+			for (auto& mt : _meshskin)
+			{
+				glm::ivec2 k = mt;
+				auto& it = m_worldSpaceSkeletonMats[k];
+				it.m = ptr;
+				if (mt.x >= 0 && mt.x < m_skins.size()) {
+					it.count = m_skins[mt.x].m_InverseBindMatrices.m_count;
+					ptr += it.count;
+					dysize += it.count * sizeof(glm::mat4);
+				}
+			}
 		}
-
 		ubo_size = dysize;
 		// sets the animated data to the default values of the nodes
 		// later on these values can be updated by the SetAnimationTime function
 		// .resize(m_nodes.size());
-		std::vector<glm::ivec2> meshid;
-		for (uint32_t i = 0; i < m_nodes.size(); i++)
-		{
-			auto& it = m_nodes[i];
-			m_animatedMats[i] = it.m_tranform.GetWorldMat();
-			if (it.meshIndex >= 0) {
-				meshid.push_back({ it.meshIndex,i });
-			}
-		}
 		// 初始化的矩阵测试
-		std::vector<int> sceneNodes = { m_scenes[0].m_nodes };
-		std::vector<glm::mat4> nodemat;
-		make_mat(glm::mat4(1.0), &sceneNodes, &nodemat);
-		njson mj;
-		for (auto& it : nodemat) {
-			njson a;
-			mat2json(it, a);
-			mj.push_back(a);
-		}
-		hz::save_json("temp/mat_nodes.json", mj, 2);
+		//std::vector<int> sceneNodes = { m_scenes[0].m_nodes };
+		//std::vector<glm::mat4> nodemat;
+		//make_mat(glm::mat4(1.0), &sceneNodes, &nodemat);
+		//njson mj;
+		//for (auto& it : nodemat) {
+		//	njson a;
+		//	mat2json(it, a);
+		//	mj.push_back(a);
+		//}
+		//hz::save_json("temp/mat_nodes.json", mj, 2);
 		return;
 	}
 
@@ -17026,23 +17057,43 @@ namespace vkr {
 		std::vector<int> sceneNodes = { m_scenes[sceneIndex].m_nodes };
 		TransformNodes(world, &sceneNodes);
 		//process skeletons, takes the skinning matrices from the scene and puts them into a buffer that the vertex shader will consume
+#if 1
+		auto num = m_skins.size();
+		if (num > 0) {
+			for (auto& mt : _meshskin)
+			{
+				if (mt.x < 0 || mt.x >= num)continue;
+				glm::ivec2 k = mt;
+				auto& it = m_worldSpaceSkeletonMats[k];
+				auto m = m_worldSpaceMats[mt.z].GetCurrent();
+				glm::mat4 inverseTransform = glm::inverse(m);
+				glm::mat4* jointMatrix = it.m;
+				tfSkins& skin = m_skins[mt.x];
+				auto jointNode = skin.m_pSkeleton;
+				glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;
+				for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
+				{
+					auto nidx = skin.m_jointsNodeIdx[j];
+					auto& ibm = pM[j];
+					auto jointMat = m_worldSpaceMats[nidx].GetCurrent() * ibm;
+					jointMatrix[j] = inverseTransform * jointMat;
+				}
+			}
+		}
+#else
 		for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
 			tfSkins& skin = m_skins[i];
 			//pick the matrices that affect the skin and multiply by the inverse of the bind      
 			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;
 			auto& skinningMats = m_worldSpaceSkeletonMats[i];
-			//glm::mat4 inverseTransform = glm::inverse();
 			for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
 			{
 				auto nidx = skin.m_jointsNodeIdx[j];
-				//auto ibm = pM[j];
-				//auto jointMatrix = m_worldSpaceMats[nidx].GetCurrent() * ibm;
-				//jointMatrix = inverseTransform * jointMatrix;
-				//skinningMats.m[j] = jointMatrix;
-				skinningMats.m[j] = (m_worldSpaceMats[nidx].GetCurrent() * pM[j]);// todo Set
+				skinningMats.m[j] = m_worldSpaceMats[nidx].GetCurrent() * pM[j];// todo Set
 			}
 		}
+#endif
 		return;
 	}
 
