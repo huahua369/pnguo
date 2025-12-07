@@ -3784,8 +3784,8 @@ namespace vkr {
 		PerFrame_t m_perFrameData_w;
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
-		uint32_t _animationIndex = 0;
-		size_t m_count = 0;	// 矩阵数量
+		uint32_t _animationIndex = -1;
+		size_t mat_count = 0;	// 矩阵数量
 		size_t ubo_size = 0;
 		bool has_shadowMap = true;
 		std::vector<PBRMaterial> _materialsData;
@@ -16224,7 +16224,7 @@ namespace vkr {
 	{
 		auto& nodes = pm->nodes;
 		m_nodes.resize(nodes.size());
-		m_count = nodes.size();
+		mat_count = nodes.size();
 		for (int i = 0; i < nodes.size(); i++)
 		{
 			tfNode* tfnode = &m_nodes[i];
@@ -16279,10 +16279,10 @@ namespace vkr {
 			{
 				tfnode->m_tranform.m_rotation = (glm::make_mat4x4(node.matrix.data()));
 			}
-			float yaw, pitch, roll;
-			glm::extractEulerAngleYXZ(tfnode->m_tranform.m_rotation, yaw, pitch, roll);
-			// 转换为角度并输出
-			printf((char*)u8"i %d\tYaw: %d°\tPitch: %d°\tRoll: %d°\t\n", i, (int)glm::degrees(yaw), (int)glm::degrees(pitch), (int)glm::degrees(roll));
+			//float yaw, pitch, roll;
+			//glm::extractEulerAngleYXZ(tfnode->m_tranform.m_rotation, yaw, pitch, roll);
+			//// 转换为角度并输出
+			//printf((char*)u8"i %d\tYaw: %d°\tPitch: %d°\tRoll: %d°\t\n", i, (int)glm::degrees(yaw), (int)glm::degrees(pitch), (int)glm::degrees(roll));
 
 			if (node.weights.size()) {
 				// todo node weights
@@ -16313,7 +16313,7 @@ namespace vkr {
 		for (uint32_t i = 0; i < skins.size(); i++)
 		{
 			GetBufferDetails(skins[i].inverseBindMatrices, &m_skins[i].m_InverseBindMatrices);
-			m_count += m_skins[i].m_InverseBindMatrices.m_count;
+			mat_count += m_skins[i].m_InverseBindMatrices.m_count;
 			auto idx = skins[i].skeleton;
 			m_skins[i].m_pSkeleton = &m_nodes[idx < 0 ? 0 : idx];
 
@@ -16945,11 +16945,11 @@ namespace vkr {
 	//
 	void GLTFCommon::InitTransformedData()
 	{
-		if (m_nodes.empty() || m_count == 0 || !pm)
+		if (m_nodes.empty() || mat_count == 0 || !pm)
 			return;
 		// initializes matrix buffers to have the same dimension as the nodes
 		m_worldSpaceMats.resize(m_nodes.size());
-		_mats.resize(m_count);
+		_mats.resize(mat_count);
 
 		get_model_data(pm, _materialsData, _meshes);
 
@@ -16990,9 +16990,14 @@ namespace vkr {
 		// sets the animated data to the default values of the nodes
 		// later on these values can be updated by the SetAnimationTime function
 		// .resize(m_nodes.size());
+		std::vector<glm::ivec2> meshid;
 		for (uint32_t i = 0; i < m_nodes.size(); i++)
 		{
-			m_animatedMats[i] = m_nodes[i].m_tranform.GetWorldMat();
+			auto& it = m_nodes[i];
+			m_animatedMats[i] = it.m_tranform.GetWorldMat();
+			if (it.meshIndex >= 0) {
+				meshid.push_back({ it.meshIndex,i });
+			}
 		}
 		// 初始化的矩阵测试
 		std::vector<int> sceneNodes = { m_scenes[0].m_nodes };
@@ -17025,10 +17030,17 @@ namespace vkr {
 		{
 			tfSkins& skin = m_skins[i];
 			//pick the matrices that affect the skin and multiply by the inverse of the bind      
-			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;	auto& skinningMats = m_worldSpaceSkeletonMats[i];
+			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;
+			auto& skinningMats = m_worldSpaceSkeletonMats[i];
+			//glm::mat4 inverseTransform = glm::inverse();
 			for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
 			{
-				skinningMats.m[j] = (m_worldSpaceMats[skin.m_jointsNodeIdx[j]].GetCurrent() * pM[j]);// todo Set
+				auto nidx = skin.m_jointsNodeIdx[j];
+				//auto ibm = pM[j];
+				//auto jointMatrix = m_worldSpaceMats[nidx].GetCurrent() * ibm;
+				//jointMatrix = inverseTransform * jointMatrix;
+				//skinningMats.m[j] = jointMatrix;
+				skinningMats.m[j] = (m_worldSpaceMats[nidx].GetCurrent() * pM[j]);// todo Set
 			}
 		}
 		return;
