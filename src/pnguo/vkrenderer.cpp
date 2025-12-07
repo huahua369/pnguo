@@ -8417,10 +8417,6 @@ namespace vkr
 			}	// 骨骼动画偏移
 			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }		// 变形动画偏移
 			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
-
-			if (c == 3) {
-				c = c;
-			}
 			// todo FrontFace
 			if (dev->_vkCmdSetFrontFace)
 				dev->_vkCmdSetFrontFace(commandBuffer, (VkFrontFace)t.frontFace);
@@ -16949,15 +16945,9 @@ namespace vkr {
 		// initializes matrix buffers to have the same dimension as the nodes
 		m_worldSpaceMats.resize(m_nodes.size());
 
-
-
 		get_model_data(pm, _materialsData, _meshes);
 
 		size_t dysize = sizeof(PerFrame_t) * 2;
-		for (auto& [k, v] : m_animated_morphWeights)
-		{
-			//dysize += (v.size() * sizeof(float));
-		}
 		for (auto& it : _materialsData)
 		{
 			auto c = it.m_pbrMaterialParameters.uvc;
@@ -16965,13 +16955,13 @@ namespace vkr {
 		}
 
 		auto& meshes = pm->meshes;
-		for (uint32_t i = 0; i < meshes.size(); i++)
-		{
-			auto& mesh = meshes[i];
-			auto& primitives = meshes[i].primitives;
-			auto& weights = meshes[i].weights;
-			dysize += weights.size() * sizeof(float);
-		}
+		//for (uint32_t i = 0; i < meshes.size(); i++)
+		//{
+		//	auto& mesh = meshes[i];
+		//	auto& primitives = meshes[i].primitives;
+		//	auto& weights = meshes[i].weights;
+		//	dysize += weights.size() * sizeof(float);
+		//}
 
 		_meshskin.clear();
 		for (uint32_t i = 0; i < m_nodes.size(); i++)
@@ -16994,7 +16984,16 @@ namespace vkr {
 				_meshskin.push_back({ it.skinIndex,it.meshIndex,i });
 			}
 		}
-
+		for (auto& mt : _meshskin)
+		{
+			auto& mesh = meshes[mt.y];
+			auto& weights = mesh.weights;
+			if (weights.size()) {
+				auto& mw = m_animated_morphWeights[mt.z];
+				dysize += weights.size() * sizeof(float);
+				mw.resize(weights.size());
+			}
+		}
 		// same thing for the skinning matrices but using the size of the InverseBindMatrices
 		/*for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
