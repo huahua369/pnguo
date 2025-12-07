@@ -170,6 +170,8 @@ namespace vkr
 
 	size_t HashShaderString(const char* pRootDir, const char* pShader, size_t result = 2166136261);
 
+
+
 #if 1
 
 	struct inspd_t {
@@ -2208,7 +2210,7 @@ namespace vkr {
 	};
 
 	// Define a maximum number of shadows supported in a scene (note, these are only for spots and directional)
-	static const uint32_t MaxLightInstances = 80;
+	static const uint32_t MaxLightInstances = 32;
 	static const uint32_t MaxShadowInstances = 32;
 	class Matrix2
 	{
@@ -2250,12 +2252,29 @@ namespace vkr {
 	const uint32_t LightType_Point = 1;
 	const uint32_t LightType_Spot = 2;
 
-	struct PerFrame_t
+	struct PerFrame_t0
 	{
 		glm::mat4 mCameraCurrViewProj;
 		glm::mat4 mCameraPrevViewProj;
 		glm::mat4  mInverseCameraCurrViewProj;
 		glm::vec4  cameraPos;
+		float     iblFactor;
+		float     emmisiveFactor;
+		float     invScreenResolution[2];
+
+		glm::vec4 wireframeOptions;
+		float     lodBias = 0.0f;
+		float	  oit_w = 0.0f;
+		float	  oit_k = 0.0f;
+		int		  lightCount;
+		Light     lights[0];
+	};
+	struct PerFrame_t
+	{
+		glm::mat4 mCameraCurrViewProj;
+		glm::mat4 mCameraPrevViewProj;
+		glm::mat4 mInverseCameraCurrViewProj;
+		glm::vec4 cameraPos;
 		float     iblFactor;
 		float     emmisiveFactor;
 		float     invScreenResolution[2];
@@ -3741,7 +3760,6 @@ namespace vkr {
 		std::vector<tfCamera> m_cameras;
 
 		std::vector<tfNode> m_nodes;
-
 		std::vector<tfAnimation> m_animations;
 		std::vector<float> acv[4];				// 缓存动画结果	
 		std::vector<char*> m_buffersData;		// 原始数据
@@ -3801,6 +3819,7 @@ namespace vkr {
 	private:
 		void InitTransformedData(); //this is called after loading the data from the GLTF
 		void TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes);
+		void make_mat(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes, std::vector<glm::mat4>* opt);
 		void load_Buffers();
 		void load_Meshes();
 		void load_lights();
@@ -16267,8 +16286,10 @@ namespace vkr {
 
 			if (node.weights.size()) {
 				// todo node weights
+				printf("\n");
 			}
 		}
+
 		return;
 	}
 	void GLTFCommon::load_scenes()
@@ -16437,6 +16458,26 @@ namespace vkr {
 		}
 	}
 
+	uint8_t* GLTFCommon::buffer_view_data(size_t bvidx, size_t pos)
+	{
+		int32_t bufferViewIdx = bvidx;
+		if (bufferViewIdx < 0)
+			return 0;
+		assert(bufferViewIdx >= 0);
+		auto& bufferView = pm->bufferViews[bufferViewIdx];
+		int32_t bufferIdx = bufferView.buffer;
+		if (bufferIdx < 0)
+			return 0;
+		assert(bufferIdx >= 0);
+		uint8_t* buffer = (uint8_t*)m_buffersData[bufferIdx];
+		int32_t offset = bufferView.byteOffset;
+		int byteLength = bufferView.byteLength;
+		int32_t byteOffset = pos;
+		offset += byteOffset;
+		byteLength -= byteOffset;
+		return buffer + offset;
+	}
+
 	int GetFormatSize(int id)
 	{
 		switch (id)
@@ -16564,26 +16605,6 @@ namespace vkr {
 		}
 		else
 			return def;
-	}
-
-	uint8_t* GLTFCommon::buffer_view_data(size_t bvidx, size_t pos)
-	{
-		int32_t bufferViewIdx = bvidx;
-		if (bufferViewIdx < 0)
-			return 0;
-		assert(bufferViewIdx >= 0);
-		auto& bufferView = pm->bufferViews[bufferViewIdx];
-		int32_t bufferIdx = bufferView.buffer;
-		if (bufferIdx < 0)
-			return 0;
-		assert(bufferIdx >= 0);
-		uint8_t* buffer = (uint8_t*)m_buffersData[bufferIdx];
-		int32_t offset = bufferView.byteOffset;
-		int byteLength = bufferView.byteLength;
-		int32_t byteOffset = pos;
-		offset += byteOffset;
-		byteLength -= byteOffset;
-		return buffer + offset;
 	}
 
 	static size_t component_read_index(const void* in, uint32_t component_type)
@@ -16873,8 +16894,53 @@ namespace vkr {
 		}
 		return;
 	}
+	void GLTFCommon::make_mat(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes, std::vector<glm::mat4>* opt)
+	{
+		std::stack<node_mat> q;
+		auto p = pNodes->data();
+		if (opt->size() != m_nodes.size())
+			opt->resize(m_nodes.size());
+		auto pt = opt->data();
+		for (uint32_t n = 0; n < pNodes->size(); n++)
+		{
+			uint32_t nodeIdx = p[n];
+			if (nodeIdx >= m_nodes.size())
+				continue;
+			node_mat nm = {};
+			nm.idx = nodeIdx;
+			nm.m = world * m_animatedMats[nodeIdx];
+			pt[nodeIdx] = nm.m;
+			q.push(nm);
+		}
+		while (q.size()) {
+			auto k = q.top(); q.pop();
+			if (m_nodes[k.idx].m_children.size())
+			{
+				for (auto idx : m_nodes[k.idx].m_children)
+				{
+					node_mat nm = {};
+					nm.idx = idx;
+					nm.m = k.m * m_animatedMats[idx];
+					pt[idx] = nm.m;
+					q.push(nm);
+				}
+			}
+		}
+		return;
+	}
 #endif
-	//
+
+	void mat2json(const glm::mat4& m, njson& a) {
+		std::string str;
+		for (int i = 0; i < 4; i++) {
+			auto it = m[i];
+			str += to_string_g(it.x) + ",";
+			str += to_string_g(it.y) + ",";
+			str += to_string_g(it.z) + ",";
+			str += to_string_g(it.w) + "; ";
+		}
+		a = str;
+	}
 	// Initializes the GLTFCommonTransformed structure 
 	//
 	void GLTFCommon::InitTransformedData()
@@ -16928,6 +16994,18 @@ namespace vkr {
 		{
 			m_animatedMats[i] = m_nodes[i].m_tranform.GetWorldMat();
 		}
+		// 初始化的矩阵测试
+		std::vector<int> sceneNodes = { m_scenes[0].m_nodes };
+		std::vector<glm::mat4> nodemat;
+		make_mat(glm::mat4(1.0), &sceneNodes, &nodemat);
+		njson mj;
+		for (auto& it : nodemat) {
+			njson a;
+			mat2json(it, a);
+			mj.push_back(a);
+		}
+		hz::save_json("temp/mat_nodes.json", mj, 2);
+		return;
 	}
 
 	//
@@ -16939,18 +17017,13 @@ namespace vkr {
 		{
 			m_worldSpaceMats.resize(m_nodes.size());
 		}
-
 		// transform all the nodes of the scene (and make 
-		//           
 		std::vector<int> sceneNodes = { m_scenes[sceneIndex].m_nodes };
 		TransformNodes(world, &sceneNodes);
-
 		//process skeletons, takes the skinning matrices from the scene and puts them into a buffer that the vertex shader will consume
-		//
 		for (uint32_t i = 0; i < m_skins.size(); i++)
 		{
 			tfSkins& skin = m_skins[i];
-
 			//pick the matrices that affect the skin and multiply by the inverse of the bind      
 			glm::mat4* pM = (glm::mat4*)skin.m_InverseBindMatrices.m_data;	auto& skinningMats = m_worldSpaceSkeletonMats[i];
 			for (int j = 0; j < skin.m_InverseBindMatrices.m_count; j++)
@@ -16970,7 +17043,6 @@ namespace vkr {
 		glm::mat4 m1 = m_worldSpaceMats[m_cameras[cameraIdx].m_nodeIndex].GetCurrent();
 		pCam->SetMatrix(m1);
 		pCam->SetFov(m_cameras[cameraIdx].yfov, pCam->GetAspectRatio(), m_cameras[cameraIdx].znear, m_cameras[cameraIdx].zfar);
-
 		return true;
 	}
 
@@ -17018,7 +17090,6 @@ namespace vkr {
 		//m_scenes[0].m_nodes.push_back(idx);
 		//auto tf = node.m_tranform;
 		//m_animatedMats.push_back(tf.GetWorldMat());
-
 		return idx;
 	}
 
