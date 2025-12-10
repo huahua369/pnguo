@@ -1063,14 +1063,15 @@ int main()
 			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
 				, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend);
 
-			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pma.atlas)");
-			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sdl\data\spineboy-pro.json)", 0, 0.5);
+			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pma.atlas)");
+			float scale = 1.0f;
+			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pro.json)", 0, scale);
 
 			static std::vector<char*> nv;
 			sp_drawable_get_anim_names(dd1, &nv);
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
-			sp_drawable_set_pos(dd1, 500, 500);
+			sp_drawable_set_pos(dd1, 500, 1000);
 			{
 				sdl3_textdata* td3 = new sdl3_textdata();
 				td3->rcb = pcb;
@@ -1081,8 +1082,8 @@ int main()
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 						if (tex3d)
 							pcb->render_texture(renderer, tex3d, &tdt, 1);
-						//sp_drawable_draw(dd1);
-						//r_render_data_text(renderer, ptrt, { 200,100 }, td3);
+						sp_drawable_draw(dd1);
+						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{

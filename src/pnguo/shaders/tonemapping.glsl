@@ -69,5 +69,5 @@ void main()
 
     vec3 color = Tonemap(texColor.rgb, myPerScene.u_exposure, myPerScene.u_toneMapper);
 
-    outColor = vec4(color,1.0);
+    outColor = vec4(ApplyGamma(color),1.0);
 }

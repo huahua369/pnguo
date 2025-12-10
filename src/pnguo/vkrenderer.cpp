@@ -4551,7 +4551,7 @@ namespace vkr {
 	private:
 		ResourceViewHeaps* m_pResourceViewHeaps;
 		DynamicBufferRing* m_pDynamicBufferRing;
-		StaticBufferPool* m_pStaticBufferPool;
+		//StaticBufferPool* m_pStaticBufferPool;
 
 		std::vector<DepthMesh> m_meshes;
 		std::vector<DepthMaterial> m_materialsData;
@@ -5442,7 +5442,7 @@ namespace vkr
 		m_renderPass = renderPass;
 
 		m_pResourceViewHeaps = pHeaps;
-		m_pStaticBufferPool = pStaticBufferPool;
+		//m_pStaticBufferPool = pStaticBufferPool;
 		m_pDynamicBufferRing = pDynamicBufferRing;
 		_ptb = pGLTFTexturesAndBuffers;
 
@@ -21250,7 +21250,7 @@ namespace vkr {
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
-		auto format = VK_FORMAT_R8G8B8A8_SRGB;//VK_FORMAT_R8G8B8A8_UNORM;//  VK_FORMAT_R8G8B8A8_UNORM，VK_FORMAT_B8G8R8A8_SRGB
+		auto format = VK_FORMAT_R8G8B8A8_UNORM;//VK_FORMAT_R8G8B8A8_SRGB;//  VK_FORMAT_B8G8R8A8_SRGB
 		_fbo_renderpass = newRenderPass(m_device, format, VK_FORMAT_D32_SFLOAT);
 
 		auto f = new fbo_info_cx();
