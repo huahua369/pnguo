@@ -1040,7 +1040,6 @@ int main()
 			}
 			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
-			void* tex3d = form0->new_texture(vki.size, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			/*
 			case 0: return AMDTonemapper(color);
 			case 1: return DX11DSK(color);
@@ -1058,6 +1057,8 @@ int main()
 			assert(pcb);
 			get_sdl_texture_cb(pcb);
 			auto ptrt = &trt;
+
+			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 
 			// 动画测试
 			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0

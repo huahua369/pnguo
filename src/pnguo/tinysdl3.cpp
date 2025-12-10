@@ -2665,6 +2665,38 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 	return ret;
 }
 
+
+void* new_texture_vk(void* renderer, int width, int height, void* vkptr, int format)
+{
+	SDL_Texture* texture = 0;
+	if (renderer && width > 0 && height > 0 && vkptr)
+	{
+		int access = SDL_TEXTUREACCESS_STATIC;
+		if (format == 0)
+		{
+			format = SDL_PIXELFORMAT_ABGR8888; // VK_RGBA
+		}
+		if (format == 1)
+		{
+			format = SDL_PIXELFORMAT_ARGB8888; // VK_BGRA
+		}
+		SDL_PropertiesID props = SDL_CreateProperties();
+		if (format < 0)
+		{
+			format = SDL_PIXELFORMAT_ABGR8888; // VK_RGBA
+			SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_COLORSPACE_NUMBER, SDL_COLORSPACE_SRGB_LINEAR);
+		}
+		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER, format);
+		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER, (int64_t)vkptr);
+		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, access);
+		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, width);
+		SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, height);
+		texture = SDL_CreateTextureWithProperties((SDL_Renderer*)renderer, props);
+		SDL_DestroyProperties(props);
+	}
+	return texture;
+}
+
 void* new_texture_r(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply)
 {
 	SDL_Texture* p = 0;
@@ -2878,6 +2910,7 @@ void get_sdl_texture_cb(texture_cb* p)
 	cb.render_texture_9grid = render_texture_9grid;
 	cb.render_geometryraw = render_geometryraw;
 	cb.new_texture_0 = new_texture_0;
+	cb.new_texture_vk = new_texture_vk;
 	cb.draw_geometry = (bool (*)(void* renderer, void* texture, const float* xy, int xy_stride
 		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices))SDL_RenderGeometryRaw;
 

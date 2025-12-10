@@ -408,6 +408,8 @@ struct texture_cb
 	bool (*render_geometryraw)(void* renderer, void* texture, geometryraw_dt* p, int count);
 	// 创建一个指定宽高的rgba纹理
 	void* (*new_texture_0)(void* renderer, int width, int height);
+	// 通过vk image创建纹理
+	void* (*new_texture_vk)(void* renderer, int width, int height, void* vkptr, int format);
 	bool (*draw_geometry)(void* renderer, void* texture, const float* xy, int xy_stride
 		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices);
 	bool (*set_viewport)(void* renderer, const glm::ivec4* rect);
