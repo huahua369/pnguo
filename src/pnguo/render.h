@@ -189,6 +189,16 @@ struct dev_info_c
 vkvg_dev* new_vkvgdev(dev_info_c* c = 0, int sample = 8);
 void free_vkvgdev(vkvg_dev* p);
 
+void submit_style(VkvgContext cr, fill_style_d* st);
+void draw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r);
+void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+
+// 画网格填充
+void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols, int width);
+// 画线性渐变填充
+void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count);
+
+
 /*
 渲染命令函数，
 ctx：渲染上下文指针VkvgContext

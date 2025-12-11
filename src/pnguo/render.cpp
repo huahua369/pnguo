@@ -572,7 +572,7 @@ void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float
 // __has_include(<vg.h>)
 
 
-void set_fill_style(VkvgContext cr, fill_style_d* st) {
+void submit_style(VkvgContext cr, fill_style_d* st) {
 	bool stroke = st && st->thickness > 0 && st->color > 0;
 	if (!cr || !st)return;
 	if (st->fill)
@@ -624,7 +624,7 @@ void set_fill_style(VkvgContext cr, fill_style_d* st) {
 
 
 // r，左右下左
-void vdraw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r)
+void draw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r)
 {
 #ifndef M_PI
 	auto M_PI = glm::pi<double>();
@@ -879,16 +879,16 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 				vkvg_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y);
 			}
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
-				set_fill_style(cr, style->fs + p->st);
+				submit_style(cr, style->fs + p->st);
 			pd += sizeof(rect_d);
 		}
 		break;
 		case VG_DRAW_CMD::VG_CMD_RECT4R:
 		{
 			auto p = (rect4r_d*)pd;
-			vdraw_round_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
+			draw_round_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
-				set_fill_style(cr, style->fs + p->st);
+				submit_style(cr, style->fs + p->st);
 			pd += sizeof(rect4r_d);
 		}
 		break;
@@ -897,7 +897,7 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 			auto p = (circle_d*)pd;
 			vkvg_ellipse(cr, p->radius, p->radius, p->pos.x, p->pos.y, 0);
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
-				set_fill_style(cr, style->fs + p->st);
+				submit_style(cr, style->fs + p->st);
 			pd += sizeof(circle_d);
 		}
 		break;
@@ -906,7 +906,7 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 			auto p = (ellipse_d*)pd;
 			vkvg_ellipse(cr, p->radius.x, p->radius.y, p->pos.x, p->pos.y, p->rotationAngle);
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
-				set_fill_style(cr, style->fs + p->st);
+				submit_style(cr, style->fs + p->st);
 			pd += sizeof(ellipse_d);
 		}
 		break;
@@ -915,7 +915,7 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 			auto p = (triangle_d*)pd;
 			draw_triangle(cr, p->pos, p->size, p->spos);
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
-				set_fill_style(cr, style->fs + p->st);
+				submit_style(cr, style->fs + p->st);
 			pd += sizeof(triangle_d);
 		}
 		break;
@@ -939,7 +939,7 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 			vkvg_move_to(cr, p->p1.x, p->p1.y);
 			vkvg_line_to(cr, p->p2.x, p->p2.y);
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
-				set_fill_style(cr, style->fs + p->st);
+				submit_style(cr, style->fs + p->st);
 		}
 		break;
 		case VG_DRAW_CMD::VG_CMD_STROKE_POLYLINE:
@@ -955,21 +955,21 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 				if (p->closed)
 					vkvg_close_path(cr);
 				if (style->fs && p->st >= 0 && p->st < style->fs_count)
-					set_fill_style(cr, style->fs + p->st);
+					submit_style(cr, style->fs + p->st);
 			}
 			pd += sizeof(polyline_d) + sizeof(glm::vec2) * (p->count - 1);
 		}
 		break;
-		case VG_DRAW_CMD::VG_CMD_TEXT:
-		{
-			auto p = (text_d*)pd;
-			if (style->ts && p->font_st >= 0 && p->font_st < style->ts_count)
-			{
-				auto& ts = style->ts[p->font_st];
-			}
-			pd += sizeof(text_d) + p->len + 1;
-		}
-		break;
+		//case VG_DRAW_CMD::VG_CMD_TEXT:
+		//{
+		//	auto p = (text_d*)pd;
+		//	if (style->ts && p->font_st >= 0 && p->font_st < style->ts_count)
+		//	{
+		//		auto& ts = style->ts[p->font_st];
+		//	}
+		//	pd += sizeof(text_d) + p->len + 1;
+		//}
+		//break;
 		default:
 			break;
 		}
@@ -1089,7 +1089,7 @@ void vgc_draw_path(void* ctx, path_d* path, fill_style_d* style)
 		if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
 			vkvg_close_path(cr);
 	}
-	set_fill_style(cr, style);
+	submit_style(cr, style);
 	vkvg_restore(cr);
 }
 
@@ -1132,7 +1132,7 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
 			}
 		}
 	}
-	set_fill_style(cr, style);
+	submit_style(cr, style);
 	vkvg_restore(cr);
 }
 void vkvg_rect(VkvgContext ctx, const glm::vec4& rc) {
