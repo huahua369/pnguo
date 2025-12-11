@@ -227,8 +227,45 @@ namespace vkr
 		void GetExtensionNamesAndConfigs(std::vector<const char*>* pDevice_extension_names);
 	private:
 	};
+	struct sampler_t {
+		VkSamplerCreateInfo info = {};
+		VkSampler sampler = {};
+	};
 	class Device
 	{
+	public:
+		VkInstance m_instance = 0;
+		VkDevice m_device = 0;
+		VkPhysicalDevice m_physicaldevice = {};
+		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
+		VkPhysicalDeviceProperties m_deviceProperties = {};
+		VkPhysicalDeviceProperties2 m_deviceProperties2 = {};
+		VkPhysicalDeviceSubgroupProperties m_subgroupProperties = {};
+		VkSurfaceKHR m_surface = {};
+
+		VkQueue present_queue = 0;
+		uint32_t present_queue_family_index = 0;
+		VkQueue graphics_queue = 0;
+		uint32_t graphics_queue_family_index = 0;
+		VkQueue compute_queue = 0;
+		uint32_t compute_queue_family_index = 0;
+		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
+		std::map<size_t, sampler_t> _samplers;
+
+		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
+		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
+		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = {};
+		PFN_vkCmdSetFrontFace _vkCmdSetFrontFace = {};
+
+		bool m_usingValidationLayer = false;
+		bool m_usingFp16 = false;
+		bool m_rt10Supported = false;
+		bool m_rt11Supported = false;
+		bool m_vrs1Supported = false;
+		bool m_vrs2Supported = false;
+#ifdef USE_VMA
+		VmaAllocator m_hAllocator = NULL;
+#endif
 	public:
 		Device();
 		~Device();
@@ -271,39 +308,6 @@ namespace vkr
 		void GPUFlush();
 		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
 
-	public:
-		VkInstance m_instance = 0;
-		VkDevice m_device = 0;
-		VkPhysicalDevice m_physicaldevice = {};
-		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
-		VkPhysicalDeviceProperties m_deviceProperties = {};
-		VkPhysicalDeviceProperties2 m_deviceProperties2 = {};
-		VkPhysicalDeviceSubgroupProperties m_subgroupProperties = {};
-		VkSurfaceKHR m_surface = {};
-
-		VkQueue present_queue = 0;
-		uint32_t present_queue_family_index = 0;
-		VkQueue graphics_queue = 0;
-		uint32_t graphics_queue_family_index = 0;
-		VkQueue compute_queue = 0;
-		uint32_t compute_queue_family_index = 0;
-		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
-		std::map<size_t, VkSampler> _samplers;
-
-		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
-		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
-		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = {};
-		PFN_vkCmdSetFrontFace _vkCmdSetFrontFace = {};
-
-		bool m_usingValidationLayer = false;
-		bool m_usingFp16 = false;
-		bool m_rt10Supported = false;
-		bool m_rt11Supported = false;
-		bool m_vrs1Supported = false;
-		bool m_vrs2Supported = false;
-#ifdef USE_VMA
-		VmaAllocator m_hAllocator = NULL;
-#endif
 	};
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex);
@@ -1104,9 +1108,9 @@ namespace vkr
 	{
 		for (auto& it : _samplers)
 		{
-			if (it.second)
+			if (it.second.sampler)
 			{
-				vkDestroySampler(m_device, it.second, NULL);
+				vkDestroySampler(m_device, it.second.sampler, NULL);
 			}
 		}
 		_samplers.clear();
@@ -1141,11 +1145,19 @@ namespace vkr
 	VkSampler Device::newSampler(const VkSamplerCreateInfo* pCreateInfo) {
 		auto h = Hash_p((const size_t*)pCreateInfo, sizeof(VkSamplerCreateInfo));
 		auto& sampler = _samplers[h];
-		if (!sampler)
+		if (!sampler.sampler)
 		{
-			vkCreateSampler(m_device, pCreateInfo, 0, &sampler);
+			vkCreateSampler(m_device, pCreateInfo, 0, &sampler.sampler);
+			sampler.info = *pCreateInfo;
 		}
-		return sampler;
+		else {
+			if (memcmp(pCreateInfo, &sampler.info, sizeof(VkSamplerCreateInfo)) != 0)
+			{
+				assert(0);
+				//vkCreateSampler(m_device, pCreateInfo, 0, &sampler.sampler);
+			}
+		}
+		return sampler.sampler;
 	}
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex) {

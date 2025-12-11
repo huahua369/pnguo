@@ -938,7 +938,9 @@ int main()
 		glm::ivec2 ws = { 1280,860 };
 		const char* wtitle = (char*)u8"窗口0";
 		const char* wtitle1 = (char*)u8"窗口1";
-		vkdg_cx* vkd = new_vkdg(0, 0, 0);//, 0, 0, "Intel(R)");	// 创建vk渲染器 
+		auto devname = "Intel(R)";
+		devname = 0;
+		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
 		// 使用3D渲染器的设备创建渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 		vkvg_dev* vctx = 0;

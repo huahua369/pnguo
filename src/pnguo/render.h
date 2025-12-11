@@ -189,19 +189,6 @@ struct dev_info_c
 vkvg_dev* new_vkvgdev(dev_info_c* c = 0, int sample = 8);
 void free_vkvgdev(vkvg_dev* p);
 
-
-
-typedef struct texture_cb texture_cb;
-
-struct sdl3_textdata
-{
-	std::map<image_ptr_t*, void*> vt;
-	std::vector<float> opt; std::vector<uint32_t> idx;
-	texture_cb* rcb = 0;
-	void* tex = 0;
-	void* rptr = 0;
-};
-
 /*
 渲染命令函数，
 ctx：渲染上下文指针VkvgContext
@@ -221,13 +208,22 @@ rc的xy宽高。如果y为0，则表示绘制圆形，x为直径
 */
 struct dblock_d {
 	glm::vec2* points = 0; int count = 0; glm::vec2 rc = {};
-	glm::vec2 pos = {};			// 块偏移
-	glm::vec2 view_pos = {};	// 视图偏移
+	glm::vec2 pos = {};			// 块偏移，受scale_pos影响
+	glm::vec2 view_pos = {};	// 视图偏移，不受scale_pos影响
 	float scale_pos = 0;		// 视图缩放，不缩放线宽
 };
 void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
 
 // SDL渲染器专用
+typedef struct texture_cb texture_cb;
+struct sdl3_textdata
+{
+	std::map<image_ptr_t*, void*> vt;
+	std::vector<float> opt; std::vector<uint32_t> idx;
+	texture_cb* rcb = 0;
+	void* tex = 0;
+	void* rptr = 0;
+};
 // 渲染一组图文列表
 void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 渲染一段文本
