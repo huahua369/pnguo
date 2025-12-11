@@ -1065,14 +1065,14 @@ int main()
 				, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend);
 
 			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pma.atlas)");
-			float scale = 1.0f;
+			float scale = 0.50f;
 			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pro.json)", 0, scale);
 
 			static std::vector<char*> nv;
 			sp_drawable_get_anim_names(dd1, &nv);
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
-			sp_drawable_set_pos(dd1, 500, 1000);
+			sp_drawable_set_pos(dd1, 500, 500);
 			{
 				sdl3_textdata* td3 = new sdl3_textdata();
 				td3->rcb = pcb;
@@ -1088,7 +1088,7 @@ int main()
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{
-						//sp_drawable_update(dd1, delta);
+						sp_drawable_update(dd1, delta);
 						auto light = vkd->get_light(0);
 						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 						vkd->_state.Exposure;				// 曝光度：默认1.0

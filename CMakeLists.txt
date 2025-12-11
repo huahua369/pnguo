@@ -240,11 +240,13 @@ target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::Vulkan
 PkgConfig::GLIB  
 #mimalloc-static 
 #PkgConfig::LIBGIT2
+mktx
 )
 
 
 #2d渲染器
 add_subdirectory(third_party/spine/spine-c ${CMAKE_BINARY_DIR}/spine-c)
+add_subdirectory(third_party/ktx)
 #3d渲染器
 add_subdirectory(src/pnguo)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)
