@@ -527,7 +527,7 @@ const float point_label_delta = -10;
 
 glm::vec2 avec2_perp(glm::vec2 a) { return  glm::vec2(a.y, -a.x); }
 
-void draw_arrow(VkvgContext ctx, float x, float y)
+void draw_arrow2(VkvgContext ctx, float x, float y)
 {
 	glm::vec2 p0;
 	glm::vec2 p1 = { x, y };
@@ -2278,7 +2278,7 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 			vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
 			p += 2;
 			while (p < contours_array[i + 1]) {
-				draw_arrow(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
+				draw_arrow2(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
 				p += 2;
 			}
 			vkvg_stroke(ctx);

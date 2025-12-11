@@ -192,6 +192,8 @@ void free_vkvgdev(vkvg_dev* p);
 void submit_style(VkvgContext cr, fill_style_d* st);
 void draw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+void draw_arrow2(VkvgContext ctx, float x, float y);
+void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size);
 
 // 画网格填充
 void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols, int width);

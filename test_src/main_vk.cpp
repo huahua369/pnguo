@@ -1059,7 +1059,105 @@ int main()
 			assert(pcb);
 			get_sdl_texture_cb(pcb);
 			auto ptrt = &trt;
+			void* vg2dtex = nullptr;
+			int texwidth = 1024;
+			{
+				const char* filename = "temp/vkvg_gb.png";
+				VkvgSurface surf = vctx->new_surface(texwidth, texwidth);
+				auto ctx = vkvg_create(surf);
+				{
+#define white 1, 1, 1
+#define red   1, 0, 0
+#define green 0, 1, 0
+#define blue  0, 0, 1
+					print_time ptt(filename);
+					VkvgPattern pat;
+					VkvgContext  cr = ctx;
+					pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+					vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+					vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+					vkvg_rectangle(cr, 0, 0, 256, 256);
+					vkvg_set_source(cr, pat);
+					vkvg_fill(cr);
+					vkvg_pattern_destroy(pat);
+					pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+					vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+					vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+					vkvg_set_source(cr, pat);
+					vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
+					vkvg_fill(cr);
+					vkvg_pattern_destroy(pat);
 
+					vkvg_set_line_width(ctx, 2);
+					vkvg_set_source_rgba(ctx, red, 0.8);
+					float scale = 2.0;
+					draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
+					vkvg_set_line_width(ctx, 1);
+					vkvg_set_source_rgba(ctx, green, 0.8);
+					double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
+					const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
+					int           contours_size = 3;
+					for (int i = 0; i < contours_size - 1; i++) {
+						auto p = contours_array[i];
+						vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
+						p += 2;
+						while (p < contours_array[i + 1]) {
+							draw_arrow2(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
+							p += 2;
+						}
+						vkvg_stroke(ctx);
+					}
+
+					float dashes[] = { 50.0,  /* ink */
+							   10.0,  /* skip */
+							   10.0,  /* ink */
+							   10.0   /* skip*/
+					};
+					int    ndash = sizeof(dashes) / sizeof(dashes[0]);
+					double offset = -50.0;
+					vkvg_save(cr);
+					vkvg_set_dash(cr, dashes, ndash, offset);
+					vkvg_set_line_width(cr, 10.0);
+
+					vkvg_move_to(cr, 128.0, 25.6);
+					vkvg_line_to(cr, 230.4, 230.4);
+					vkvg_rel_line_to(cr, -102.4, 0.0);
+					vkvg_curve_to(cr, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
+
+					vkvg_stroke(cr);
+					vkvg_restore(cr);
+					bspline_ct bs;
+					std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
+					auto bptr = bs.new_bspline(pts.data(), pts.size());
+					if (bptr)
+					{
+						auto v = bs.sample2(64);
+						vkvg_translate(cr, 0, -700);
+						vkvg_move_to(cr, v[0].x, v[0].y);
+						for (size_t i = 1; i < v.size(); i++)
+						{
+							vkvg_line_to(cr, v[i].x, v[i].y);
+						}
+						vkvg_set_source_color(cr, 0xff0080ff);
+						vkvg_scale(cr, 1.52, 1.52);
+						vkvg_set_line_width(cr, 2.0);
+						vkvg_stroke(cr);
+					}
+				}
+				vkvg_flush(ctx);
+				vkvg_surface_resolve(surf);//msaa采样转换输出
+				vkvg_surface_write_to_png(surf, filename);
+				vkvg_destroy(ctx);
+
+				VkImage image = vkvg_surface_get_vk_image(surf);
+				VkFormat format = vkvg_surface_get_vk_format(surf);
+				//vctx->free_surface(surf);
+				if (image)
+				{
+					vg2dtex = pcb->new_texture_vk(form0->renderer, texwidth, texwidth, image, format == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);// 创建SDL的rgba纹理 
+					pcb->set_texture_blend(vg2dtex, 0, true);
+				}
+			}
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 
 			// 动画测试
@@ -1085,6 +1183,12 @@ int main()
 						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 						if (tex3d)
 							pcb->render_texture(renderer, tex3d, &tdt, 1);
+						if (vg2dtex)
+						{
+							tdt.src_rect = { 0,0,texwidth,texwidth };
+							tdt.dst_rect = { 0,0,texwidth,texwidth };
+							pcb->render_texture(renderer, vg2dtex, &tdt, 1);
+						}
 						sp_drawable_draw(dd1);
 						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
 					};
