@@ -16794,7 +16794,7 @@ namespace vkr {
 					pAccessor->m_type = GetFormatSize(inAccessor.componentType);
 					pAccessor->m_stride = pAccessor->m_dimension * pAccessor->m_type;
 					pAccessor->m_count = inAccessor.count;
-					return;
+					return;	// sparse数据
 				}
 			} while (0);
 			pAccessor->m_data = buffer_view_data(inAccessor.bufferView, inAccessor.byteOffset);
@@ -16802,7 +16802,7 @@ namespace vkr {
 			pAccessor->m_type = GetFormatSize(inAccessor.componentType);
 			pAccessor->m_stride = pAccessor->m_dimension * pAccessor->m_type;
 			pAccessor->m_count = inAccessor.count;
-			return;
+			return;	// 正常数据
 		}
 
 	}

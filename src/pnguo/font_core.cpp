@@ -9241,7 +9241,7 @@ void listWordBoundaries(break_c* bp, const uint16_t* s, int32_t len, std::functi
 	p = bp->icub->_ubrk_first(bp->bi);
 	std::string ss;
 	do {
-		printf("Boundary at position %d\t", p);
+		//printf("Boundary at position %d\t", p);
 		auto p0 = p;
 		p = bp->icub->_ubrk_next(bp->bi);
 		if (p != UBRK_DONE)
@@ -9250,10 +9250,10 @@ void listWordBoundaries(break_c* bp, const uint16_t* s, int32_t len, std::functi
 			ss.clear();
 			md::u16_u8((uint16_t*)w.c_str(), w.size(), ss);
 			cb(s + p0, p - p0);
-			printf("\"%s\"\n", ss.c_str());
+			//printf("\"%s\"\n", ss.c_str());
 		}
 	} while (p != UBRK_DONE);
-	printf("\n");
+	//printf("\n");
 }
 //获取包含双击位置的单词的边界
 void wordContaining(break_c* bp, int32_t idx, const uint16_t* s, int32_t sLen, int32_t* start, int32_t* end) {

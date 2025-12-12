@@ -271,6 +271,11 @@ public:
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();
 };
+// 2D渲染对象
+typedef struct drawable2_t drawable2_t;
+// 3D渲染对象
+typedef struct drawable3_t drawable3_t;
+
 
 // 创建vk实例,参数可选
 void* new_instance();
