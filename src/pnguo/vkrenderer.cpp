@@ -117,6 +117,7 @@ typedef uint32_t DXGI_FORMAT;
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 #endif
+#define TINYGLTF_NOEXCEPTION
 #include <tiny_gltf.h>
 #include <zlib.h>
 #include <queue>

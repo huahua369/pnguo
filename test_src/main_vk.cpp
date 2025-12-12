@@ -1061,10 +1061,13 @@ int main()
 			auto ptrt = &trt;
 			void* vg2dtex = nullptr;
 			int texwidth = 1024;
+			VkvgSurface surf = vctx->new_surface(texwidth, texwidth);
+			auto ctx = vkvg_create(surf);
+			const char* filename = "temp/vkvg_gb.png";
+			bspline_ct* bs = new bspline_ct();
+			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
+			auto bptr = bs->new_bspline(pts.data(), pts.size());
 			{
-				const char* filename = "temp/vkvg_gb.png";
-				VkvgSurface surf = vctx->new_surface(texwidth, texwidth);
-				auto ctx = vkvg_create(surf);
 				{
 #define white 1, 1, 1
 #define red   1, 0, 0
@@ -1126,12 +1129,10 @@ int main()
 
 					vkvg_stroke(cr);
 					vkvg_restore(cr);
-					bspline_ct bs;
-					std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
-					auto bptr = bs.new_bspline(pts.data(), pts.size());
 					if (bptr)
 					{
-						auto v = bs.sample2(64);
+						vkvg_save(cr);
+						auto v = bs->sample2(64);
 						vkvg_translate(cr, 0, -700);
 						vkvg_move_to(cr, v[0].x, v[0].y);
 						for (size_t i = 1; i < v.size(); i++)
@@ -1142,12 +1143,13 @@ int main()
 						vkvg_scale(cr, 1.52, 1.52);
 						vkvg_set_line_width(cr, 2.0);
 						vkvg_stroke(cr);
+						vkvg_restore(cr);
 					}
 				}
 				vkvg_flush(ctx);
-				vkvg_surface_resolve(surf);//msaa采样转换输出
-				vkvg_surface_write_to_png(surf, filename);
-				vkvg_destroy(ctx);
+				//vkvg_surface_resolve(surf);//msaa采样转换输出
+				//vkvg_surface_write_to_png(surf, filename);
+				//vkvg_destroy(ctx);
 
 				VkImage image = vkvg_surface_get_vk_image(surf);
 				VkFormat format = vkvg_surface_get_vk_format(surf);
@@ -1185,6 +1187,33 @@ int main()
 							pcb->render_texture(renderer, tex3d, &tdt, 1);
 						if (vg2dtex)
 						{
+							vkvg_clear(ctx);
+							vkvg_save(ctx);
+							VkvgPattern pat;
+							VkvgContext  cr = ctx;
+							pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+							vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+							vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+							vkvg_rectangle(cr, 0, 0, 256, 256);
+							vkvg_set_source(cr, pat);
+							vkvg_fill(cr);
+							vkvg_pattern_destroy(pat);
+							auto v = bs->sample2(64);
+							//vkvg_translate(ctx, -50, -200);
+							vkvg_move_to(ctx, v[0].x, v[0].y);
+							for (size_t i = 1; i < v.size(); i++)
+							{
+								vkvg_line_to(ctx, v[i].x, v[i].y);
+							}
+							vkvg_set_source_color(ctx, 0xff0080ff);
+							//vkvg_scale(ctx, 1.52, 1.52);
+							vkvg_set_line_width(ctx, 2.0);
+							vkvg_stroke(ctx);
+							vkvg_restore(ctx);
+
+							vkvg_flush(ctx);
+							vkvg_surface_resolve(surf);//msaa采样转换输出
+							//vkvg_surface_write_to_png(surf, filename);
 							tdt.src_rect = { 0,0,texwidth,texwidth };
 							tdt.dst_rect = { 0,0,texwidth,texwidth };
 							pcb->render_texture(renderer, vg2dtex, &tdt, 1);
