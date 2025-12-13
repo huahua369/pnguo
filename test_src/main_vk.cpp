@@ -898,7 +898,7 @@ int main()
 		std::string k80 = (char*)u8"👨‍👨‍👧q";
 		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
 		std::string k821 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ\t我\n的大刀";
-		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
+		auto family = new_font_family(fctx, (char*)u8"微软雅黑,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
 		text_style ts = {};
 		ts.family = family;

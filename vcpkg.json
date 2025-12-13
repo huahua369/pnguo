@@ -23,6 +23,7 @@
     "libnoise",
     "curl",
     "tinygltf",
+    "draco",
     "libogg",
     "libflac",
     "mpg123",

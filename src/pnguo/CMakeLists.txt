@@ -70,6 +70,7 @@ find_package(mpg123 CONFIG REQUIRED)
 find_package(FFTW3 CONFIG REQUIRED)
 find_package(FFTW3f CONFIG REQUIRED)
 find_package(FFTW3l CONFIG REQUIRED)
+find_package(draco CONFIG REQUIRED)
 
 add_library (pnguo STATIC ${pnguo_src})
 #add_library (pnguo SHARED ${pnguo_src})
@@ -83,6 +84,7 @@ GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
     dxcompiler
     FLAC::FLAC MPG123::libmpg123
     FFTW3::fftw3 FFTW3::fftw3f FFTW3::fftw3l
+    draco::draco
 )
 target_include_directories (pnguo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)

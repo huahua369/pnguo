@@ -117,7 +117,12 @@ typedef uint32_t DXGI_FORMAT;
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 #endif
+#ifdef min
+#undef min
+#undef max
+#endif // min
 #define TINYGLTF_NOEXCEPTION
+#define TINYGLTF_ENABLE_DRACO
 #include <tiny_gltf.h>
 #include <zlib.h>
 #include <queue>
@@ -128,10 +133,6 @@ typedef uint32_t DXGI_FORMAT;
 
 #include "vkrenderer.h"
 
-#ifdef min
-#undef min
-#undef max
-#endif // min
 
 
 namespace vkr
