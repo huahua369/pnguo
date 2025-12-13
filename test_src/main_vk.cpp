@@ -1180,6 +1180,7 @@ int main()
 				td3->rcb = pcb;
 				td3->rptr = form0->renderer;
 				r_update_data_text(ptrt, td3, 0);
+				vkd->on_render();
 				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 					{
 						texture_dt tdt = {};
@@ -1198,6 +1199,7 @@ int main()
 					};
 				form0->up_cb = [=](float delta, int* ret)
 					{
+						r_update_data_text(ptrt, td3, 0);
 						if (1) {
 							vkvg_clear(ctx);
 							vkvg_save(ctx);
@@ -1211,14 +1213,13 @@ int main()
 							vkvg_fill(cr);
 							vkvg_pattern_destroy(pat);
 							auto v = bs->sample2(64);
-							//vkvg_translate(ctx, -50, -200);
+							vkvg_translate(ctx, 10, 20);
 							vkvg_move_to(ctx, v[0].x, v[0].y);
 							for (size_t i = 1; i < v.size(); i++)
 							{
 								vkvg_line_to(ctx, v[i].x, v[i].y);
 							}
 							vkvg_set_source_color(ctx, 0xff0080ff);
-							//vkvg_scale(ctx, 1.52, 1.52);
 							vkvg_set_line_width(ctx, 2.0);
 							vkvg_stroke(ctx);
 							vkvg_restore(ctx);
@@ -1226,7 +1227,6 @@ int main()
 							vkvg_flush(ctx);
 							vkvg_surface_resolve(surf);//msaa采样转换输出 
 						}
-
 						sp_drawable_update(dd1, delta);
 						auto light = vkd->get_light(0);
 						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
