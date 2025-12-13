@@ -3779,7 +3779,7 @@ namespace vkr {
 		std::vector<char*> m_buffersData;		// 原始数据
 		std::vector<float*> _sparseData;		// 解码的稀疏数据
 		std::vector<hz::mfile_t*> _fileData;	// 文件数据
-		//std::vector<char*> _fileData_f;			// 原始数据
+		//std::vector<char*> _fileData_f;		// 原始数据
 
 		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
 		glm::mat4* m_animatedMats = 0;			// _mats的指针。object space matrices of each node after being animated
@@ -7100,9 +7100,31 @@ namespace vkr
 
 		return (index > -1);
 	}
+
+	VkFilter getVkFilterMode(int32_t filterMode)
+	{
+		switch (filterMode) {
+		case -1:
+		case TINYGLTF_TEXTURE_FILTER_NEAREST:
+			return VK_FILTER_NEAREST;
+		case TINYGLTF_TEXTURE_FILTER_LINEAR:
+			return VK_FILTER_LINEAR;
+		case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+			return VK_FILTER_NEAREST;
+		case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+			return VK_FILTER_NEAREST;
+		case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+			return VK_FILTER_LINEAR;
+		case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+			return VK_FILTER_LINEAR;
+		}
+		//VK_FILTER_CUBIC_IMG
+		printf("Unknown filter mode for getVkFilterMode: %d\n", filterMode);
+		return VK_FILTER_NEAREST;
+	}
 	void set_sampler_info(VkSamplerCreateInfo& info, tinygltf::Sampler* samp) {
-		info.magFilter = samp->magFilter == TINYGLTF_TEXTURE_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-		info.minFilter = samp->minFilter == TINYGLTF_TEXTURE_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+		info.magFilter = getVkFilterMode(samp->magFilter);
+		info.minFilter = getVkFilterMode(samp->minFilter);
 		//info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;// :VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -15699,7 +15721,7 @@ namespace vkr {
 #endif // 1
 
 	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void*);
-#if 1
+
 
 	//
 	// Hash a string of source code and recurse over its #include files
@@ -15857,7 +15879,7 @@ namespace vkr {
 		m_current = m;
 	}
 
-
+#if 1
 	GLTFCommon::~GLTFCommon()
 	{
 		Unload();
@@ -17252,8 +17274,8 @@ namespace vkr {
 		AxisAlignedBoundingBox projectedBoundingBox = get_BoundingBox(mLightView);
 		return ComputeDirectionalLight_mat(projectedBoundingBox);
 	}
-
 #endif // 1
+
 
 
 

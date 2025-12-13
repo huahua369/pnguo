@@ -941,7 +941,7 @@ int main()
 		auto devname = "Intel(R)";
 		devname = 0;
 		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
-		// 使用3D渲染器的设备创建渲染器
+		// 准备使用3D渲染器的设备创建SDL渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 		vkvg_dev* vctx = 0;
 		{
@@ -1178,6 +1178,7 @@ int main()
 			{
 				sdl3_textdata* td3 = new sdl3_textdata();
 				td3->rcb = pcb;
+				td3->rptr = form0->renderer;
 				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 					{
 						texture_dt tdt = {};
@@ -1187,6 +1188,17 @@ int main()
 							pcb->render_texture(renderer, tex3d, &tdt, 1);
 						if (vg2dtex)
 						{
+							tdt.src_rect = { 0,0,texwidth,texwidth };
+							tdt.dst_rect = { 0,0,texwidth,texwidth };
+							pcb->render_texture(renderer, vg2dtex, &tdt, 1);
+						}
+						sp_drawable_draw(dd1);
+						r_render_data_text(ptrt, { 200,100 }, td3);
+					};
+				form0->up_cb = [=](float delta, int* ret)
+					{
+						r_update_data_text(ptrt, td3, delta);
+						if (0) {
 							vkvg_clear(ctx);
 							vkvg_save(ctx);
 							VkvgPattern pat;
@@ -1212,17 +1224,9 @@ int main()
 							vkvg_restore(ctx);
 
 							vkvg_flush(ctx);
-							vkvg_surface_resolve(surf);//msaa采样转换输出
-							//vkvg_surface_write_to_png(surf, filename);
-							tdt.src_rect = { 0,0,texwidth,texwidth };
-							tdt.dst_rect = { 0,0,texwidth,texwidth };
-							pcb->render_texture(renderer, vg2dtex, &tdt, 1);
+							vkvg_surface_resolve(surf);//msaa采样转换输出 
 						}
-						sp_drawable_draw(dd1);
-						r_render_data_text(renderer, ptrt, { 200,100 }, td3);
-					};
-				form0->up_cb = [=](float delta, int* ret)
-					{
+
 						sp_drawable_update(dd1, delta);
 						auto light = vkd->get_light(0);
 						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择

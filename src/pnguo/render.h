@@ -237,9 +237,10 @@ struct sdl3_textdata
 	void* rptr = 0;
 };
 // 渲染一组图文列表
-void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
+void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 渲染一段文本
-void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
+void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);
+void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 释放渲染器的纹理
 void r_render_free_tex(sdl3_textdata* p);
 

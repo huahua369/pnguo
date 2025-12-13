@@ -1333,9 +1333,10 @@ void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc,
 	return;
 }
 
-void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
+void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 {
-	if (!p)return;
+	void* renderer = pt->rptr;
+	if (!p || !pt || !renderer)return;
 	uint32_t color = -1;
 	const int vsize = sizeof(float) * 8;
 	void* tex = 0;
@@ -1400,20 +1401,27 @@ void r_render_data(void* renderer, layout_tx* p, const glm::vec2& pos, sdl3_text
 	pt->rcb->set_cliprect(renderer, &rc);
 }
 
-void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
+void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
 {
+	std::vector<font_item_t>& tm = p->_vstr;
+	for (auto& it : tm)
+	{
+		if (it._image) {
+			auto& tp = pt->vt[it._image];
+			if (!tp)
+			{
+				tp = pt->rcb->make_tex(pt->rptr, it._image);
+			}
+		}
+	}
+}
+void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
+{
+	void* renderer = pt->rptr;
 	std::vector<font_item_t>& tm = p->_vstr;
 	uint32_t color = p->tb->style->color;
 	void* tex = 0;
 	const int vsize = sizeof(float) * 8;
-	//static size_t x = -1;
-	//static size_t x1 = 0;
-	//if (x1 != x)
-	//{
-	//	text_render_layout1(p);
-	//	pt->opt.clear(); pt->idx.clear(); x1 = x;
-	//}
-
 	if (pt->opt.empty())
 	{
 		size_t ct = 0;
@@ -1422,10 +1430,6 @@ void r_render_data_text(void* renderer, text_render_o* p, const glm::vec2& pos, 
 			auto& git = tm[i];
 			if (git._image) {
 				auto& tp = pt->vt[git._image];
-				if (!tp)
-				{
-					tp = pt->rcb->make_tex(renderer, git._image);
-				}
 				if (tex != tp)
 				{
 					if (tex && pt->opt.size()) {
