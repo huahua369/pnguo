@@ -2335,12 +2335,11 @@ void form_x::present(double delta)
 	int fb_height = (int)(display_size.y * render_scale.y);
 	if (fb_width == 0 || fb_height == 0)
 		return;
-
-	SDL_Rect    viewport = { 0,0,display_size.x,display_size.y };
-	SDL_SetRenderViewport(renderer, &viewport);
-	SDL_SetRenderClipRect(renderer, &viewport);
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 	SDL_RenderClear(renderer);
+	SDL_Rect viewport = { 0,0,display_size.x,display_size.y };
+	SDL_SetRenderViewport(renderer, &viewport);
+	SDL_SetRenderClipRect(renderer, &viewport);
 	if (render_cb)
 	{
 		render_cb(renderer, delta);

@@ -3757,7 +3757,7 @@ namespace vkr {
 		bool HasNoVolume() const;
 	};
 
-
+	// todo gltf解析后
 	class GLTFCommon
 	{
 	public:
@@ -7122,30 +7122,35 @@ namespace vkr
 		printf("Unknown filter mode for getVkFilterMode: %d\n", filterMode);
 		return VK_FILTER_NEAREST;
 	}
+
+	//#define TINYGLTF_TEXTURE_WRAP_REPEAT (10497)
+	//#define TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE (33071)
+	//#define TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT (33648)
+	//		enum VkSamplerAddressMode
+	//		VK_SAMPLER_ADDRESS_MODE_REPEAT = 0,
+	//		VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT = 1,
+	//		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE = 2,
+	//		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER = 3,
+	//		VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE = 4,
+	VkSamplerAddressMode getVkAddressMode(int32_t addressMode) {
+		VkSamplerAddressMode m = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		switch (addressMode) {
+		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+			m = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+			m = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+			break;
+		}
+		return m;
+	}
 	void set_sampler_info(VkSamplerCreateInfo& info, tinygltf::Sampler* samp) {
 		info.magFilter = getVkFilterMode(samp->magFilter);
 		info.minFilter = getVkFilterMode(samp->minFilter);
 		//info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;// :VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		info.addressModeU = getVkAddressMode(samp->wrapS);
+		info.addressModeV = getVkAddressMode(samp->wrapT);
 		info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		switch (samp->wrapS) {
-		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			break;
-		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-			break;
-		}
-		switch (samp->wrapT) {
-		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			break;
-		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-			break;
-		}
-
 	}
 
 	struct ts_t0 {
