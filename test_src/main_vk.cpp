@@ -869,7 +869,7 @@ int main()
 
 		glm::mat2x2 aaa;
 		//vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
-		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_borderless*/);
+		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable | ef_vsync/*| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 
@@ -1012,7 +1012,8 @@ int main()
 			sdl3_textdata* td3 = new sdl3_textdata();
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
-			r_update_data_text(ptrt, td3, 0);
+			//r_update_data_text(ptrt, td3, 0);
+			vkd->update(form0->io);	// 更新事件
 			vkd->on_render();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
@@ -1020,19 +1021,28 @@ int main()
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d)
-						pcb->render_texture(renderer, tex3d, &tdt, 1);
+						pcb->render_texture(renderer, tex3d, &tdt, 1);//*
 					if (vg2dtex)
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						pcb->render_texture(renderer, vg2dtex, &tdt, 1);
+						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
 					}
-					sp_drawable_draw(dd1);
-					r_render_data_text(ptrt, { 200,100 }, td3);
+					//sp_drawable_draw(dd1); // ok
+					static int icc = 0;
+					if (icc < 150) {
+						std::string ss = "Frame count: " + std::to_string(icc) + "\n";
+						//OutputDebugStringA(ss.c_str());
+					}
+					if (icc == 4 || icc == 5)
+						icc = icc;
+					icc++;
+					//r_render_data_text(ptrt, { 200,100 }, td3);//*
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
 					r_update_data_text(ptrt, td3, 0);
+#if 1
 					if (1) {
 						vkvg_clear(ctx);
 						vkvg_save(ctx);
@@ -1060,6 +1070,7 @@ int main()
 						vkvg_flush(ctx);
 						vkvg_surface_resolve(surf);	// msaa采样转换输出 
 					}
+#endif
 					sp_drawable_update(dd1, delta);
 					auto light = vkd->get_light(0);
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
