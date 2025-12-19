@@ -99,6 +99,7 @@ public:
 	int _fps = 60;
 	int c_fps = 60;
 	int fms = 0;
+	int waitms = 1;
 
 	// 内部数据路径、外部数据路径、外部缓存路径；
 	std::string internalDataPath;
@@ -129,7 +130,7 @@ public:
 	void set_defcursor(uint32_t t);
 	void remove(form_x* f);
 	void clearf();
-
+	// 获取电池信息
 	glm::vec3 get_power_info();
 	const char* get_power_str();
 	// 隐藏子窗口

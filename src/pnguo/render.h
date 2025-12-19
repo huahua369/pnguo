@@ -1,13 +1,14 @@
 ﻿#pragma once
-
+/*
+* 
+*	vkvg渲染矢量图到VkvgSurface表面
+*	
+*/
 #include "vkvg.h"
 #ifndef vkvg_pattern_add_color_stop_rgba
 #define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop
-#endif
-struct style_path_t;
-class path_v;
+#endif 
 
-void draw_path_vkvg(void* cr, path_v* p, style_path_t* st);
 #ifndef VK_DEFINE_HANDLE
 #define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;
 VK_DEFINE_HANDLE(VkInstance)

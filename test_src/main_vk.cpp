@@ -869,7 +869,7 @@ int main()
 
 		glm::mat2x2 aaa;
 		//vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
-		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable | ef_vsync/*| ef_borderless*/);
+		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_vsync| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 
@@ -1013,8 +1013,8 @@ int main()
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
 			//r_update_data_text(ptrt, td3, 0);
-			vkd->update(form0->io);	// 更新事件
-			vkd->on_render();
+			//vkd->update(form0->io);	// 更新事件
+			//vkd->on_render();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1026,9 +1026,9 @@ int main()
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
+						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
 					}
-					//sp_drawable_draw(dd1); // ok
+					sp_drawable_draw(dd1); // ok
 					static int icc = 0;
 					if (icc < 150) {
 						std::string ss = "Frame count: " + std::to_string(icc) + "\n";
@@ -1037,10 +1037,11 @@ int main()
 					if (icc == 4 || icc == 5)
 						icc = icc;
 					icc++;
-					//r_render_data_text(ptrt, { 200,100 }, td3);//*
+					r_render_data_text(ptrt, { 200,100 }, td3);//*
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
+					int d = delta * 1000;
 					r_update_data_text(ptrt, td3, 0);
 #if 1
 					if (1) {

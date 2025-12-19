@@ -888,6 +888,8 @@ void app_cx::render(double delta)
 	{
 		it->present(delta);
 	}
+	if (_set_dev.vkdev)
+		vkDeviceWaitIdle((VkDevice)_set_dev.vkdev);
 }
 
 int app_cx::run_loop(int t)
@@ -908,7 +910,6 @@ int app_cx::run_loop(int t)
 				it->update(delta);
 			}
 			render(delta);
-			auto power = get_power_info();
 		}
 		prev_time = curr_time;
 		int gev = get_event();
@@ -917,7 +918,7 @@ int app_cx::run_loop(int t)
 			auto kt = (fct->get_time() + fct->extra_time);
 			do {
 				get_event();
-				sleep_ms(2);
+				sleep_ms(waitms);
 			} while ((fct->get_time() + fct->extra_time) < fct->screen_ticks_per_frame);
 			if (fct->get_time() < (fct->screen_ticks_per_frame)) {
 				fct->extra_time -= fct->screen_ticks_per_frame - fct->get_time();
