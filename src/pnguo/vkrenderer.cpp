@@ -2224,7 +2224,7 @@ namespace vkr {
 	};
 
 	// Define a maximum number of shadows supported in a scene (note, these are only for spots and directional)
-	static const uint32_t MaxLightInstances = 32;
+	static const uint32_t MaxLightInstances = 4;
 	static const uint32_t MaxShadowInstances = 32;
 	class Matrix2
 	{
@@ -3795,8 +3795,6 @@ namespace vkr {
 
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
-		PerFrame_t m_perFrameData;
-		PerFrame_t m_perFrameData_w;
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
 		uint32_t _animationIndex = 0;
@@ -3805,6 +3803,9 @@ namespace vkr {
 		bool has_shadowMap = true;
 		std::vector<PBRMaterial> _materialsData;
 		std::vector<PBRMesh> _meshes;
+		std::vector<char> _ubo_md;
+		PerFrame_t* _perFrameData = 0;
+		PerFrame_t* _perFrameData_w = 0;
 	public:
 		~GLTFCommon();
 		bool Load(const std::string& path, const std::string& filename);
@@ -6532,13 +6533,13 @@ namespace vkr
 		{
 			PerFrame_t* cbPerFrame;
 			_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
-			*cbPerFrame = m_pGLTFCommon->m_perFrameData;
+			*cbPerFrame = *(m_pGLTFCommon->_perFrameData);
 		}
 		if (bWireframe)
 		{
 			PerFrame_t* cbPerFrame;
 			_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
-			*cbPerFrame = m_pGLTFCommon->m_perFrameData_w;
+			*cbPerFrame = *(m_pGLTFCommon->_perFrameData_w);
 		}
 	}
 
@@ -8374,7 +8375,7 @@ namespace vkr
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(sm);
 			auto nodemat = pNodesMatrices[i].GetCurrent();
-			glm::mat4 mModelViewProj = _ptb->m_pGLTFCommon->m_perFrameData.mCameraCurrViewProj * nodemat;
+			glm::mat4 mModelViewProj = _ptb->m_pGLTFCommon->_perFrameData->mCameraCurrViewProj * nodemat;
 
 			// loop through primitives
 			//
@@ -15901,6 +15902,10 @@ namespace vkr {
 			return false;
 		}
 		pm = pm1;
+
+		_ubo_md.resize(sizeof(PerFrame_t) * 2);
+		_perFrameData = (PerFrame_t*)_ubo_md.data();
+		_perFrameData_w = _perFrameData + 1;
 		tinygltf::TinyGLTF loader = {};
 		std::string err;
 		std::string warn;
@@ -17157,31 +17162,31 @@ namespace vkr {
 	{
 		if (pfd)
 		{
-			m_perFrameData = *pfd;
-			m_perFrameData.lightCount = (int32_t)m_lightInstances.size();
+			*_perFrameData = *pfd;
+			_perFrameData->lightCount = (int32_t)m_lightInstances.size();
 			int32_t ShadowMapIndex = 0;
 			for (int i = 0; i < m_lightInstances.size(); i++)
 			{
-				Light* pSL = &m_perFrameData.lights[i];
+				Light* pSL = &_perFrameData->lights[i];
 				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
 			}
 		}
-		return &m_perFrameData;
+		return _perFrameData;
 	}
 	PerFrame_t* GLTFCommon::SetPerFrameData_w(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
 	{
 		if (pfd)
 		{
-			m_perFrameData_w = *pfd;
-			m_perFrameData_w.lightCount = (int32_t)m_lightInstances.size();
+			*_perFrameData_w = *pfd;
+			_perFrameData_w->lightCount = (int32_t)m_lightInstances.size();
 			int32_t ShadowMapIndex = 0;
 			for (int i = 0; i < m_lightInstances.size(); i++)
 			{
-				Light* pSL = &m_perFrameData_w.lights[i];
+				Light* pSL = &_perFrameData_w->lights[i];
 				*pSL = pfd->lights[m_lightInstances[i].m_lightId];
 			}
 		}
-		return &m_perFrameData_w;
+		return _perFrameData_w;
 	}
 
 

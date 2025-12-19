@@ -32,7 +32,7 @@ using namespace glm;
 #define sampler2DShadow void*
 
 
-#define MAX_LIGHT_INSTANCES  80 
+#define MAX_LIGHT_INSTANCES  4 
 //#define ID_baseTexCoord  0
 
 glm::vec3 px(const glm::vec2& pss) {
