@@ -244,5 +244,4 @@ void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);
 void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 释放渲染器的纹理
 void r_render_free_tex(sdl3_textdata* p);
-
-
+ 

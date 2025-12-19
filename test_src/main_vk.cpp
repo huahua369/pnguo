@@ -32,6 +32,13 @@
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
+
+spine_ctx* sp_ctx_create1(void* renderer, texture_cb* pcb) {
+	return renderer && pcb ? sp_ctx_create(renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
+		, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend) : nullptr;
+
+}
+
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	auto p = new plane_cx();
 	uint32_t pbc = 0xc02c2c2c;
@@ -997,13 +1004,10 @@ int main()
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
 			// 动画测试
-			auto d2 = sp_ctx_create(form0->renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
-				, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend);
-
+			auto d2 = sp_ctx_create1(form0->renderer, pcb);
 			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pma.atlas)");
 			float scale = 0.50f;
 			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pro.json)", 0, scale);
-
 			static std::vector<char*> nv;
 			sp_drawable_get_anim_names(dd1, &nv);
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);

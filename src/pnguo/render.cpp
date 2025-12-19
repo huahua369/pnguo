@@ -27,6 +27,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include "shaders/base3d2.vert.h"
 #include "shaders/base3d2.frag.h"
 
+
 	// 线，二阶曲线，三阶曲线
 enum class vtype_e1 :uint8_t
 {
@@ -2228,6 +2229,22 @@ pipelinestate_p* new_spv_base(VkDevice device)
 	pipelinestate_p* p = newPipelineState(pd, 0, blendMode, topology);
 	return p;
 }
+
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 #define white 1, 1, 1
 #define red   1, 0, 0

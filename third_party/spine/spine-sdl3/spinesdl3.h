@@ -58,8 +58,11 @@ extern "C" {
 	};
 	typedef struct spine_atlas_t spine_atlas_t;
 	typedef struct spSkeletonDrawable spine_drawable_t;
+	struct texture_cb;
+
 	// 创建上下文
 	spine_ctx* sp_ctx_create(void* renderer, draw_geometry_fun rendergeometryraw, newTexture_fun createtexture, UpdateTexture_fun updatetexture, DestroyTexture_fun destroytexture, SetTextureBlendMode_fun settextureblendmode);
+	spine_ctx* sp_ctx_create1(void* renderer, texture_cb* tcb);
 	// 销毁上下文
 	void sp_ctx_dispose(spine_ctx* ctx);
 	// 创建图集,支持打包格式
