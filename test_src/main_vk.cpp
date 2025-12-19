@@ -748,85 +748,6 @@ int mainc() {
 
 void test_vkvg(const char* fn, dev_info_c* dc);
 
-
-bitmap_cache_cx* bc_ctx = 0;  //纹理缓存
-
-text_image_t* get_glyph_item(std::vector<font_t*>& familys, int fontsize, const void* str8, text_image_t* opt)
-{
-	auto str = (const char*)str8;
-	font_t* r = 0;
-	do
-	{
-		if (!str || !(*str) || !opt) { opt = 0; break; }
-		int gidx = 0;
-		r = 0;
-		if (*str == '\n')
-			gidx = 0;
-		auto ostr = str;
-
-		uint32_t ch = 0;
-		uint32_t ch1 = 0;
-		auto kk = md::utf8_to_unicode(str, &ch);
-		if (kk < 1)break;
-		str += kk;
-#if 0
-		auto bstr = str;
-		auto bstr1 = str;
-		bstr1 += kk;
-		int d2 = 0;
-		s32.clear();
-		s32.push_back(ch);
-		for (int zwj = 1; zwj < 2; )
-		{
-			auto nk1 = md::utf8_to_unicode(bstr1, &ch1);
-			bstr1 += nk1;
-			if (ch1 != 0x200d)
-			{
-				zwj++;
-				if (zwj == 2)break;
-				s32.push_back(ch1);
-			}
-			else {
-				zwj = 0; d2++;
-			}
-		}
-#endif
-		font_t::get_glyph_index_u8(ostr, &gidx, &r, &familys);
-		if (r && gidx >= 0)
-		{
-			auto k = r->get_glyph_item(gidx, ch, fontsize, bc_ctx);
-			if (k._glyph_index)
-			{
-				k.cpt = ch;
-				opt->tv.push_back(k);
-			}
-		}
-		else {
-			font_item_t k = {};
-			k.cpt = ch;
-			k.advance = 0;
-			opt->tv.push_back(k);
-		}
-	} while (str && *str);
-	return opt;
-}
-
-void c_render_data(text_render_o* p, image_ptr_t* dst)
-{
-	glm::vec2 pos = { 0, 0 };
-	std::vector<font_item_t>& tm = p->_vstr;
-	text_image_t opt = {};
-	int xx = 0;
-	uint32_t color = p->tb->style->color;
-	for (auto& git : tm) {
-		if (git._image) {
-			auto ps = git._dwpos + git._apos;
-			ps += pos;
-			rgba_copy2rgba(dst, git._image, ps, git._rect, git.color ? git.color : color, true);
-		}
-	}
-}
-
 int main()
 {
 	auto k = time(0);
@@ -878,17 +799,7 @@ int main()
 		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
 		auto seg = fctx->get_font((char*)u8"Segoe UI Emoji", 0);
 		//auto sues = fctx->add2file(R"(data\seguiemj.ttf)", 0);
-		//auto sue = sues[0];
-		{
-			//纹理缓存
-			auto p = new bitmap_cache_cx();
-			if (p)
-			{
-				p->resize(1024, 1024);
-				if (!bc_ctx)
-					bc_ctx = p;
-			}
-		}
+		//auto sue = sues[0]; 
 		std::vector<font_t*> familys = { ksun ,seg };
 
 
@@ -1068,85 +979,8 @@ int main()
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
 			{
-				{
-#define white 1, 1, 1
-#define red   1, 0, 0
-#define green 0, 1, 0
-#define blue  0, 0, 1
-					print_time ptt(filename);
-					VkvgPattern pat;
-					VkvgContext  cr = ctx;
-					pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-					vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-					vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-					vkvg_rectangle(cr, 0, 0, 256, 256);
-					vkvg_set_source(cr, pat);
-					vkvg_fill(cr);
-					vkvg_pattern_destroy(pat);
-					pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-					vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-					vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-					vkvg_set_source(cr, pat);
-					vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
-					vkvg_fill(cr);
-					vkvg_pattern_destroy(pat);
-
-					vkvg_set_line_width(ctx, 2);
-					vkvg_set_source_rgba(ctx, red, 0.8);
-					float scale = 2.0;
-					draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
-					vkvg_set_line_width(ctx, 1);
-					vkvg_set_source_rgba(ctx, green, 0.8);
-					double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
-					const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
-					int           contours_size = 3;
-					for (int i = 0; i < contours_size - 1; i++) {
-						auto p = contours_array[i];
-						vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
-						p += 2;
-						while (p < contours_array[i + 1]) {
-							draw_arrow2(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
-							p += 2;
-						}
-						vkvg_stroke(ctx);
-					}
-
-					float dashes[] = { 50.0,  /* ink */
-							   10.0,  /* skip */
-							   10.0,  /* ink */
-							   10.0   /* skip*/
-					};
-					int    ndash = sizeof(dashes) / sizeof(dashes[0]);
-					double offset = -50.0;
-					vkvg_save(cr);
-					vkvg_set_dash(cr, dashes, ndash, offset);
-					vkvg_set_line_width(cr, 10.0);
-
-					vkvg_move_to(cr, 128.0, 25.6);
-					vkvg_line_to(cr, 230.4, 230.4);
-					vkvg_rel_line_to(cr, -102.4, 0.0);
-					vkvg_curve_to(cr, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
-
-					vkvg_stroke(cr);
-					vkvg_restore(cr);
-					if (bptr)
-					{
-						vkvg_save(cr);
-						auto v = bs->sample2(64);
-						vkvg_translate(cr, 0, -700);
-						vkvg_move_to(cr, v[0].x, v[0].y);
-						for (size_t i = 1; i < v.size(); i++)
-						{
-							vkvg_line_to(cr, v[i].x, v[i].y);
-						}
-						vkvg_set_source_color(cr, 0xff0080ff);
-						vkvg_scale(cr, 1.52, 1.52);
-						vkvg_set_line_width(cr, 2.0);
-						vkvg_stroke(cr);
-						vkvg_restore(cr);
-					}
-				}
-				vkvg_flush(ctx);
+				//vkvg_clear(ctx);
+				//vkvg_flush(ctx);
 				//vkvg_surface_resolve(surf);//msaa采样转换输出
 				//vkvg_surface_write_to_png(surf, filename);
 				//vkvg_destroy(ctx);
@@ -1175,82 +1009,80 @@ int main()
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
 			sp_drawable_set_pos(dd1, 500, 500);
-			{
-				sdl3_textdata* td3 = new sdl3_textdata();
-				td3->rcb = pcb;
-				td3->rptr = form0->renderer;
-				r_update_data_text(ptrt, td3, 0);
-				vkd->on_render();
-				form0->render_cb = [=](SDL_Renderer* renderer, double delta)
+			sdl3_textdata* td3 = new sdl3_textdata();
+			td3->rcb = pcb;
+			td3->rptr = form0->renderer;
+			r_update_data_text(ptrt, td3, 0);
+			vkd->on_render();
+			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
+				{
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					if (tex3d)
+						pcb->render_texture(renderer, tex3d, &tdt, 1);
+					if (vg2dtex)
 					{
-						texture_dt tdt = {};
-						tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-						tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-						if (tex3d)
-							pcb->render_texture(renderer, tex3d, &tdt, 1);
-						if (vg2dtex)
+						tdt.src_rect = { 0,0,texwidth,texwidth };
+						tdt.dst_rect = { 0,0,texwidth,texwidth };
+						pcb->render_texture(renderer, vg2dtex, &tdt, 1);
+					}
+					sp_drawable_draw(dd1);
+					r_render_data_text(ptrt, { 200,100 }, td3);
+				};
+			form0->up_cb = [=](float delta, int* ret)
+				{
+					r_update_data_text(ptrt, td3, 0);
+					if (1) {
+						vkvg_clear(ctx);
+						vkvg_save(ctx);
+						VkvgPattern pat;
+						VkvgContext  cr = ctx;
+						pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+						vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+						vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+						vkvg_rectangle(cr, 0, 0, 256, 256);
+						vkvg_set_source(cr, pat);
+						vkvg_fill(cr);
+						vkvg_pattern_destroy(pat);
+						auto v = bs->sample2(64);
+						vkvg_translate(ctx, 10, 20);
+						vkvg_move_to(ctx, v[0].x, v[0].y);
+						for (size_t i = 1; i < v.size(); i++)
 						{
-							tdt.src_rect = { 0,0,texwidth,texwidth };
-							tdt.dst_rect = { 0,0,texwidth,texwidth };
-							pcb->render_texture(renderer, vg2dtex, &tdt, 1);
+							vkvg_line_to(ctx, v[i].x, v[i].y);
 						}
-						sp_drawable_draw(dd1);
-						r_render_data_text(ptrt, { 200,100 }, td3);
-					};
-				form0->up_cb = [=](float delta, int* ret)
-					{
-						r_update_data_text(ptrt, td3, 0);
-						if (1) {
-							vkvg_clear(ctx);
-							vkvg_save(ctx);
-							VkvgPattern pat;
-							VkvgContext  cr = ctx;
-							pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-							vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-							vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-							vkvg_rectangle(cr, 0, 0, 256, 256);
-							vkvg_set_source(cr, pat);
-							vkvg_fill(cr);
-							vkvg_pattern_destroy(pat);
-							auto v = bs->sample2(64);
-							vkvg_translate(ctx, 10, 20);
-							vkvg_move_to(ctx, v[0].x, v[0].y);
-							for (size_t i = 1; i < v.size(); i++)
-							{
-								vkvg_line_to(ctx, v[i].x, v[i].y);
-							}
-							vkvg_set_source_color(ctx, 0xff0080ff);
-							vkvg_set_line_width(ctx, 2.0);
-							vkvg_stroke(ctx);
-							vkvg_restore(ctx);
+						vkvg_set_source_color(ctx, 0xff0080ff);
+						vkvg_set_line_width(ctx, 2.0);
+						vkvg_stroke(ctx);
+						vkvg_restore(ctx);
 
-							vkvg_flush(ctx);
-							vkvg_surface_resolve(surf);//msaa采样转换输出 
-						}
-						sp_drawable_update(dd1, delta);
-						auto light = vkd->get_light(0);
-						vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-						vkd->_state.Exposure;				// 曝光度：默认1.0
-						vkd->_state.bUseTAA;
-						static int ity = 10.5;
-						light->_intensity = ity;
-						vkd->update(form0->io);	// 更新事件
-						vkd->on_render();		// 渲染到fbo纹理tex3d
-						static bool sa = false;
-						if (sa)
+						vkvg_flush(ctx);
+						vkvg_surface_resolve(surf);	// msaa采样转换输出 
+					}
+					sp_drawable_update(dd1, delta);
+					auto light = vkd->get_light(0);
+					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
+					vkd->_state.Exposure;					// 曝光度：默认1.0
+					vkd->_state.bUseTAA;
+					static int ity = 10.5;
+					light->_intensity = ity;
+					vkd->update(form0->io);	// 更新事件
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					static bool sa = false;
+					if (sa)
+					{
+						auto img = vkd->save_shadow(0);	// 保存阴影贴图
+						auto pf = (float*)img.data;
+						for (size_t i = 0; i < img.size.x * img.size.y; i++)
 						{
-							auto img = vkd->save_shadow(0);	// 保存阴影贴图
-							auto pf = (float*)img.data;
-							for (size_t i = 0; i < img.size.x * img.size.y; i++)
-							{
-								img.data[i] = gray_float_to_rgba(*pf);
-								pf++;
-							}
-							stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
-							sa = false;
+							img.data[i] = gray_float_to_rgba(*pf);
+							pf++;
 						}
-					};
-			}
+						stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
+						sa = false;
+					}
+				};
 
 		}
 

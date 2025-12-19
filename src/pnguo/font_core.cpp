@@ -10188,6 +10188,21 @@ void rgba_copy2rgba(image_ptr_t* dst, image_ptr_t* src, const glm::ivec2& dst_po
 	}
 }
 
+void c_render_data(text_render_o* p, image_ptr_t* dst)
+{
+	glm::vec2 pos = { 0, 0 };
+	std::vector<font_item_t>& tm = p->_vstr;
+	text_image_t opt = {};
+	int xx = 0;
+	uint32_t color = p->tb->style->color;
+	for (auto& git : tm) {
+		if (git._image) {
+			auto ps = git._dwpos + git._apos;
+			ps += pos;
+			rgba_copy2rgba(dst, git._image, ps, git._rect, git.color ? git.color : color, true);
+		}
+	}
+}
 
 void save_img_png(image_ptr_t* p, const char* str)
 {
