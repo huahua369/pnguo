@@ -1016,9 +1016,23 @@ int main()
 			sdl3_textdata* td3 = new sdl3_textdata();
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
-			//r_update_data_text(ptrt, td3, 0);
-			//vkd->update(form0->io);	// 更新事件
-			//vkd->on_render();
+
+			std::string str = (char*)u8"这是一个Vkvg渲染矢量图到Vulkan纹理，spine动画渲染，3D动画渲染！\nThis is a Vkvg rendering vector graphics to Vulkan textures, spine animation rendering, and 3D animation rendering!";
+			text_style ts = {};
+			ts.family = family;
+			ts.fontsize = 26;
+			ts.color = 0xfffF5000;
+			// 文本块
+			text_block tb = {};
+			tb.style = &ts;
+			tb.str = str.c_str();
+			tb.first = 0;
+			tb.size = str.size();
+			//text_render_o trt = {};
+			trt.box.rc = { 0,0,500,500 };
+			trt.box.auto_break = 1;
+			trt.box.word_wrap = 1;
+			build_text_render(&tb, &trt);
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1033,14 +1047,6 @@ int main()
 						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
 					}
 					sp_drawable_draw(dd1); // ok
-					static int icc = 0;
-					if (icc < 150) {
-						std::string ss = "Frame count: " + std::to_string(icc) + "\n";
-						//OutputDebugStringA(ss.c_str());
-					}
-					if (icc == 4 || icc == 5)
-						icc = icc;
-					icc++;
 					r_render_data_text(ptrt, { 200,100 }, td3);//*
 				};
 			form0->up_cb = [=](float delta, int* ret)
@@ -1053,13 +1059,13 @@ int main()
 						vkvg_save(ctx);
 						VkvgPattern pat;
 						VkvgContext  cr = ctx;
-						pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-						vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-						vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-						vkvg_rectangle(cr, 0, 0, 256, 256);
-						vkvg_set_source(cr, pat);
-						vkvg_fill(cr);
-						vkvg_pattern_destroy(pat);
+						//pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+						//vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+						//vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+						//vkvg_rectangle(cr, 0, 0, 256, 256);
+						//vkvg_set_source(cr, pat);
+						//vkvg_fill(cr);
+						//vkvg_pattern_destroy(pat);
 						auto v = bs->sample2(64);
 						vkvg_translate(ctx, 10, 20);
 						vkvg_move_to(ctx, v[0].x, v[0].y);
