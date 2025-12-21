@@ -642,12 +642,12 @@ AngularInfo getAngularInfo(vec3 pointToLight, vec3 normal, vec3 view)
 #endif // 1
 
 // 阴影
-#if 1 
+#if 1
 // shadowmap filtering
 float FilterShadow(int shadowIndex, vec3 uv)
 {
 	float shadow = 0.0;
-#ifdef ID_shadowMap
+#ifdef ID_shadowMap 
 	ivec2 texDim = textureSize(u_shadowMap[shadowIndex], 0);
 	float scale = 1.0;
 	float dx = scale * 1.0 / float(texDim.x);
@@ -663,7 +663,6 @@ float FilterShadow(int shadowIndex, vec3 uv)
 			shadow += texture(u_shadowMap[shadowIndex], uv + vec3(dx * i, dy * j, 0)).r;
 		}
 	}
-
 	shadow /= (kernelWidth * kernelWidth);
 #endif
 	return shadow;
