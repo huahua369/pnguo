@@ -4423,13 +4423,14 @@ namespace vkr {
 		struct drawables_t
 		{
 			std::vector<BatchList> opaque, transparent, transmission;
-			std::vector<BatchList> opaque1;
+			std::vector<BatchList> wireframe[3];
 			void clear()
 			{
 				opaque.clear();
 				transparent.clear();
 				transmission.clear();
-				opaque1.clear();
+				for (int i = 0; i < 3; i++)
+					wireframe[i].clear();
 			}
 		};
 
@@ -8426,20 +8427,24 @@ namespace vkr
 				t.morph = morph;
 				t.m_uvtDesc = uvtDesc;
 				// append primitive to list 
+				int wx = 0;
 				if (pPbrParams->transmission) {
 					opt->transmission.push_back(t);
+					wx = 2;
 				}
 				else if (pPbrParams->m_blending == false)
 				{
 					pSolid->push_back(t);
-					if (bWireframe && pPrimitive->_pipe->m_pipelineWireframe) {
-						t.m_perFrameDesc = _ptb->m_perFrameConstants_w;
-						opt->opaque1.push_back(t);
-					}
+					wx = 0;
 				}
 				else if (pPbrParams->m_blending)
 				{
 					pTransparent->push_back(t);
+					wx = 1;
+				}
+				if (bWireframe && pPrimitive->_pipe->m_pipelineWireframe) {
+					t.m_perFrameDesc = _ptb->m_perFrameConstants_w;
+					opt->wireframe[wx].push_back(t);
 				}
 			}
 		}
@@ -17407,10 +17412,10 @@ namespace vkr {
 	private:
 		void draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj);
 
-		void draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj, bool bWireframe);
-		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, bool bWireframe);
+		void draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
 		void copy_transmission(VkCommandBuffer cmdBuf1);
-		void draw_pbr_transmission(VkCommandBuffer cmdBuf1, bool bWireframe);
+		void draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
 		void draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pf, const scene_state* pState);
 	public:
 		Device* m_pDevice = 0;
@@ -20313,33 +20318,50 @@ namespace vkr {
 			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 		}
 	}
-	void Renderer_cx::draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj, bool bWireframe)
+	void draw_pbrpass(vkr::Device* dev, VkCommandBuffer cmdBuf1, const scene_state* pState
+		, std::vector<GltfPbrPass::BatchList>* ds, std::vector<GltfPbrPass::BatchList>* dsw, bool bWireframe)
+	{
+		if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+		{
+			if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR_FACE1)
+				GltfPbrPass::DrawBatchList(dev, cmdBuf1, ds, false);
+			GltfPbrPass::DrawBatchList(dev, cmdBuf1, dsw, bWireframe);
+		}
+		else
+		{
+			GltfPbrPass::DrawBatchList(dev, cmdBuf1, ds, bWireframe);
+		}
+	}
+	void Renderer_cx::draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
 	{
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// Render opaque 渲染不透明物体
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
-			if (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
-			{
-				GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, false);
-				GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque1, bWireframe);
-			}
-			else
-			{
-				GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, bWireframe);
-			}
+			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.opaque, &drawables.wireframe[0], bWireframe);
+			//if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+			//{
+			//	if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR_FACE1)
+			//		GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, false);
+			//	GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque1, bWireframe);
+			//}
+			//else
+			//{
+			//	GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, bWireframe);
+			//}
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
 		}
 	}
-	void Renderer_cx::draw_pbr_transparent(VkCommandBuffer cmdBuf1, bool bWireframe)
+	void Renderer_cx::draw_pbr_transparent(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
 	{
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// draw transparent geometry 渲染透明物体
 		if (!drawables.transparent.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transparent.begin(), drawables.transparent.end(), bcmp);
-			GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transparent, false);
+			//GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transparent, false);
+			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.transparent, &drawables.wireframe[1], bWireframe);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 		}
@@ -20379,14 +20401,15 @@ namespace vkr {
 				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 		}
 	}
-	void Renderer_cx::draw_pbr_transmission(VkCommandBuffer cmdBuf1, bool bWireframe)
+	void Renderer_cx::draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
 	{
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
 		if (!drawables.transmission.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
-			GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transmission, bWireframe);
+			//GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transmission, bWireframe);
+			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.transmission, &drawables.wireframe[2], bWireframe);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
 			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
 		}
@@ -20509,7 +20532,7 @@ namespace vkr {
 						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
 						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
 						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
-						pPerFrame->wireframeOptions.w = (pState->WireframeMode == (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+						pPerFrame->wireframeOptions.w = (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 						pPerFrame->lodBias = 0.0f;
 					}
 					it->_ptb->SetPerFrameConstants(bWireframe);
@@ -20582,25 +20605,25 @@ namespace vkr {
 			}
 			if (!drawables.transmission.empty())
 			{
-				draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 渲染不透明物体、天空盒
+				draw_pbr_opaque(cmdBuf1, pState, bWireframe);	// 渲染不透明物体、天空盒
 				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
-				draw_pbr_transparent(cmdBuf1, bWireframe);							// 渲染透明物体
+				draw_pbr_transparent(cmdBuf1, pState, bWireframe);							// 渲染透明物体
 				copy_transmission(cmdBuf1);
 				if (!drawables.transparent.empty())
 				{
-					draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);	// 没有透明物体时，不需要渲染第二次
+					draw_pbr_opaque(cmdBuf1, pState, bWireframe);	// 没有透明物体时，不需要渲染第二次
 					draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 				}
-				draw_pbr_transmission(cmdBuf1, bWireframe);								// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
+				draw_pbr_transmission(cmdBuf1, pState, bWireframe);								// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
 				if (!drawables.transparent.empty())
 				{
-					draw_pbr_transparent(cmdBuf1, bWireframe);
+					draw_pbr_transparent(cmdBuf1, pState, bWireframe);
 				}
 			}
 			else {
-				draw_pbr_opaque(cmdBuf1, pState, mCameraCurrViewProj, bWireframe);
+				draw_pbr_opaque(cmdBuf1, pState, bWireframe);
 				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
-				draw_pbr_transparent(cmdBuf1, bWireframe);
+				draw_pbr_transparent(cmdBuf1, pState, bWireframe);
 			}
 			// draw object's bounding boxes
 			draw_boxes(cmdBuf1, pfd, pState);

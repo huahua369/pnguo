@@ -208,6 +208,8 @@ struct scene_state {
 		WIREFRAME_MODE_OFF = 0,
 		WIREFRAME_MODE_SHADED = 1,
 		WIREFRAME_MODE_SOLID_COLOR = 2,
+		WIREFRAME_MODE_SOLID_COLOR_FACE1 = 4,
+		WIREFRAME_MODE_SOLID_COLOR_FACE = 6,
 	};
 	int WireframeMode = 0;
 	float WireframeColor[3] = { 1.0,1.0,1.0 };

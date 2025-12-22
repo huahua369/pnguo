@@ -1012,7 +1012,7 @@ int main()
 			sp_drawable_get_anim_names(dd1, &nv);
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
-			sp_drawable_set_pos(dd1, 500, 500);
+			sp_drawable_set_pos(dd1, 0, 500);
 			sdl3_textdata* td3 = new sdl3_textdata();
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
@@ -1087,6 +1087,7 @@ int main()
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;					// 曝光度：默认1.0
 					vkd->_state.bUseTAA;
+					vkd->_state.WireframeMode;				// 0 1 2 6
 					static int ity = 10.5;
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
