@@ -3012,15 +3012,16 @@ namespace vkr {
 		VkImageView                     m_NormalBufferSRV;
 
 		// HDR
-		Texture                         m_HDR;
+		Texture                         m_HDR;		// color
 		VkImageView                     m_HDRSRV;
-		Texture                         m_HDRt;
+		Texture                         m_HDRt;		// transmission
 		VkImageView                     m_HDRSRVt;
-
+#if 0
 		Texture                         m_HDR_oit_accum;
 		VkImageView                     m_HDR_oit_accumSRV;
 		Texture                         m_HDR_oit_weight;
 		VkImageView                     m_HDR_oit_weightSRV;
+#endif
 	private:
 		Device* m_pDevice;
 
@@ -10544,6 +10545,7 @@ namespace vkr
 			}
 		}
 		// GBUFFER_OIT_ACCUM GBUFFER_OIT_WEIGHT
+#if 0
 		if (flags & GBUFFER_OIT_ACCUM)
 		{
 			pAttachments->push_back(m_HDR_oit_accumSRV);
@@ -10566,7 +10568,7 @@ namespace vkr
 				pClearValues->push_back(cv);
 			}
 		}
-
+#endif
 		// Motion Vectors
 		//
 		if (flags & GBUFFER_MOTION_VECTORS)
@@ -10649,6 +10651,7 @@ namespace vkr
 			m_HDRt.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_FORWARD], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT), false, "m_HDRt");
 			m_HDRt.CreateSRV(&m_HDRSRVt);
 		}
+#if 0
 		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
 		{
 			m_HDR_oit_accum.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_OIT_ACCUM], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HDR_oit_accum");
@@ -10659,7 +10662,7 @@ namespace vkr
 			m_HDR_oit_weight.InitRenderTarget(m_pDevice, Width, Height, m_formats[GBUFFER_OIT_WEIGHT], m_sampleCount, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HDR_oit_weight");
 			m_HDR_oit_weight.CreateSRV(&m_HDR_oit_weightSRV);
 		}
-
+#endif
 		// Motion Vectors
 		//
 		if (m_GBufferFlags & GBUFFER_MOTION_VECTORS)
@@ -10735,7 +10738,7 @@ namespace vkr
 			vkDestroyImageView(m_pDevice->m_device, m_HDRSRVt, nullptr);
 			m_HDRt.OnDestroy();
 		}
-
+#if 0
 		if (m_GBufferFlags & GBUFFER_OIT_ACCUM)
 		{
 			vkDestroyImageView(m_pDevice->m_device, m_HDR_oit_accumSRV, nullptr);
@@ -10747,7 +10750,7 @@ namespace vkr
 			vkDestroyImageView(m_pDevice->m_device, m_HDR_oit_weightSRV, nullptr);
 			m_HDR_oit_weight.OnDestroy();
 		}
-
+#endif
 		if (m_GBufferFlags & GBUFFER_DEPTH)
 		{
 			vkDestroyImageView(m_pDevice->m_device, m_DepthBufferDSV, nullptr);
@@ -20653,7 +20656,7 @@ namespace vkr {
 		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
 		SetPerfMarkerEnd(cmdBuf1);
-
+#if 0
 		if (has_oit)
 		{
 			SetPerfMarkerBegin(cmdBuf1, "oit");
@@ -20684,7 +20687,7 @@ namespace vkr {
 			SetPerfMarkerEnd(cmdBuf1);
 
 		}
-
+#endif
 
 		// Post proc---------------------------------------------------------------------------
 
