@@ -1040,14 +1040,14 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d)
 						pcb->render_texture(renderer, tex3d, &tdt, 1);//*
-					if (vg2dtex)
-					{
-						tdt.src_rect = { 0,0,texwidth,texwidth };
-						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
-					}
-					sp_drawable_draw(dd1); // ok
-					r_render_data_text(ptrt, { 200,100 }, td3);//*
+					//if (vg2dtex)
+					//{
+					//	tdt.src_rect = { 0,0,texwidth,texwidth };
+					//	tdt.dst_rect = { 0,0,texwidth,texwidth };
+					//	pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
+					//}
+					//sp_drawable_draw(dd1); // ok
+					//r_render_data_text(ptrt, { 200,100 }, td3);//*
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{

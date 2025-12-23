@@ -20414,7 +20414,7 @@ namespace vkr {
 	void Renderer_cx::draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
 	{
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
-		// todo 渲染 玻璃材质(KHR_materials_transmission、KHR_materials_volume)
+		// todo 渲染 透射材质(KHR_materials_transmission、KHR_materials_volume)
 		if (!drawables.transmission.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
