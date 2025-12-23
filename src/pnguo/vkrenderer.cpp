@@ -17452,10 +17452,10 @@ namespace vkr {
 		//MagnifierPS                     m_MagnifierPS = {};
 
 		// GBuffer and render passes
-		GBuffer                         m_GBuffer = {};							// hdr缓冲区
+		GBuffer* m_GBuffer = {};							// hdr缓冲区
 		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区opaque
 		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框justdepth
-		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体transparent
+		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体transparent、透射材质transmission
 
 		// shadowmaps
 		VkRenderPass                    m_Render_pass_shadow = {};
@@ -17500,6 +17500,8 @@ namespace vkr {
 		bool m_bMagResourceReInit = false;
 		// 不启用oit
 		bool has_oit = false;
+		// 是否启用模板测试
+		bool _stencil_test = false;
 
 	};
 
@@ -19533,6 +19535,9 @@ namespace vkr {
 
 	Renderer_cx::~Renderer_cx()
 	{
+		if (m_GBuffer)
+			delete m_GBuffer;
+		m_GBuffer = 0;
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -19576,32 +19581,34 @@ namespace vkr {
 		//const uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
 		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
 		// Create GBuffer and render passes
+		assert(!m_GBuffer);
+		m_GBuffer = new GBuffer();
+		// 向前颜色格式
 		VkFormat mformat = VK_FORMAT_R16G16B16A16_SFLOAT;
-		// todo oit 有问题
+		// 深度缓冲格式
+		VkFormat dformat = _stencil_test ? VK_FORMAT_D32_SFLOAT_S8_UINT : VK_FORMAT_D32_SFLOAT;
 		{
 			std::map<GBufferFlags, VkFormat> formats =
 			{
-				{ GBUFFER_DEPTH, VK_FORMAT_D32_SFLOAT},
+				{ GBUFFER_DEPTH, dformat},
 				{ GBUFFER_FORWARD, mformat},
-				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT},
+				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT}, //运动矢量
 				//{ GBUFFER_NORMAL_BUFFER, GBFORMAT_E},
 			};
-			if (has_oit) {
-				formats[GBUFFER_OIT_ACCUM] = mformat;
-				formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R16_SFLOAT;
-			}
-			m_GBuffer.OnCreate(
-				pDevice,
-				&m_ResourceViewHeaps, formats,
-				1
-			);
-
+			//if (has_oit) {
+			//	formats[GBUFFER_OIT_ACCUM] = mformat;
+			//	formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R16_SFLOAT;
+			//}
+			m_GBuffer->OnCreate(pDevice, &m_ResourceViewHeaps, formats, 1);
 			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;// | GBUFFER_NORMAL_BUFFER;
-			if (has_oit) fullGBuffer |= GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
+			//if (has_oit) fullGBuffer |= GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
 			bool bClear = true;
-			m_RenderPassFullGBufferWithClear.OnCreate(&m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");
-			m_RenderPassFullGBuffer.OnCreate(&m_GBuffer, fullGBuffer, !bClear, "m_RenderPassFullGBuffer");
-			m_RenderPassJustDepthAndHdr.OnCreate(&m_GBuffer, GBUFFER_DEPTH | GBUFFER_FORWARD, !bClear, "m_RenderPassJustDepthAndHdr");
+			// 用于渲染不透明物体及清空缓冲区opaque
+			m_RenderPassFullGBufferWithClear.OnCreate(m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");
+			// 用于渲染透明物体transparent、透射材质transmission
+			m_RenderPassFullGBuffer.OnCreate(m_GBuffer, fullGBuffer, !bClear, "m_RenderPassFullGBuffer");
+			// 用于渲染天空盒、线框justdepth
+			m_RenderPassJustDepthAndHdr.OnCreate(m_GBuffer, GBUFFER_DEPTH | GBUFFER_FORWARD, !bClear, "m_RenderPassJustDepthAndHdr");
 		}
 
 		// Create render pass shadow, will clear contents
@@ -19681,7 +19688,7 @@ namespace vkr {
 		m_RenderPassFullGBufferWithClear.OnDestroy();
 		m_RenderPassJustDepthAndHdr.OnDestroy();
 		m_RenderPassFullGBuffer.OnDestroy();
-		m_GBuffer.OnDestroy();
+		m_GBuffer->OnDestroy();
 
 		vkDestroyRenderPass(m_pDevice->m_device, m_Render_pass_shadow, nullptr);
 		m_UploadHeap.OnDestroy();
@@ -19721,7 +19728,7 @@ namespace vkr {
 
 		// Create GBuffer
 		//
-		m_GBuffer.OnCreateWindowSizeDependentResources(Width, Height);
+		m_GBuffer->OnCreateWindowSizeDependentResources(Width, Height);
 
 		// Create frame buffers for the GBuffer render passes
 		//
@@ -19731,11 +19738,11 @@ namespace vkr {
 
 		// Update PostProcessing passes
 		//
-		m_DownSample.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer.m_HDR, 6); //downsample the HDR texture 6 times
+		m_DownSample.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer->m_HDR, 6); //downsample the HDR texture 6 times
 		// todo bloom
-		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer.m_HDR);
-		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer);
-		//m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer.m_HDR);
+		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer->m_HDR);
+		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, m_GBuffer);
+		//m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer->m_HDR);
 
 
 
@@ -19757,7 +19764,7 @@ namespace vkr {
 		m_RenderPassFullGBufferWithClear.OnDestroyWindowSizeDependentResources();
 		m_RenderPassJustDepthAndHdr.OnDestroyWindowSizeDependentResources();
 		m_RenderPassFullGBuffer.OnDestroyWindowSizeDependentResources();
-		m_GBuffer.OnDestroyWindowSizeDependentResources();
+		m_GBuffer->OnDestroyWindowSizeDependentResources();
 	}
 
 	void Renderer_cx::OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier)
@@ -20373,9 +20380,9 @@ namespace vkr {
 	{
 		if (!drawables.transmission.empty()) {
 			// 复制 HDR 图像到 HDRt
-			//_transfer.copy_image(&m_GBuffer.m_HDR, &m_GBuffer.m_HDRt, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			//_transfer.copy_image(&m_GBuffer->m_HDR, &m_GBuffer->m_HDRt, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			//_transfer.flush(cmdBuf1);
-			auto image = &m_GBuffer.m_HDR;
+			auto image = &m_GBuffer->m_HDR;
 			VkImageCopy cr = {};
 			cr.dstOffset = {};
 			cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -20387,19 +20394,19 @@ namespace vkr {
 			cr.extent.depth = 1;
 			cr.srcOffset = {};
 			cr.srcSubresource = cr.dstSubresource;
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 			// copy HDR to HDRt
-			vkCmdCopyImage(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
+			vkCmdCopyImage(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer->m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
 
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 		}
@@ -20465,7 +20472,7 @@ namespace vkr {
 
 	void Renderer_cx::OnRender(const scene_state* pState, const Camera& Cam)
 	{
-		//printf("OnRender \t\thdr\t%p\n", m_GBuffer.m_HDR.Resource());
+		//printf("OnRender \t\thdr\t%p\n", m_GBuffer->m_HDR.Resource());
 		// Let our resource managers do some house keeping 
 		m_ConstantBufferRing.OnBeginFrame();
 
@@ -20652,7 +20659,7 @@ namespace vkr {
 		barrier[0].subresourceRange.levelCount = 1;
 		barrier[0].subresourceRange.baseArrayLayer = 0;
 		barrier[0].subresourceRange.layerCount = 1;
-		barrier[0].image = m_GBuffer.m_HDR.Resource();
+		barrier[0].image = m_GBuffer->m_HDR.Resource();
 		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
 
 		SetPerfMarkerEnd(cmdBuf1);
@@ -20660,26 +20667,26 @@ namespace vkr {
 		if (has_oit)
 		{
 			SetPerfMarkerBegin(cmdBuf1, "oit");
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			m_oitblendCS.Draw(cmdBuf1, m_GBuffer.m_HDRSRV, m_GBuffer.m_HDR_oit_accumSRV, m_GBuffer.m_HDR_oit_weightSRV, m_Width, m_Height);
+			m_oitblendCS.Draw(cmdBuf1, m_GBuffer->m_HDRSRV, m_GBuffer->m_HDR_oit_accumSRV, m_GBuffer->m_HDR_oit_weightSRV, m_Width, m_Height);
 
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-			vkr_image_set_layout(cmdBuf1, m_GBuffer.m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+			vkr_image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
@@ -20709,7 +20716,7 @@ namespace vkr {
 		if (pState->bUseTAA)
 		{
 			m_TAA.m_bSharpening = pState->bTAAsharpening;
-			cp_barrier(cmdBuf1, &m_GBuffer);
+			cp_barrier(cmdBuf1, m_GBuffer);
 
 			m_TAA.Draw(cmdBuf1);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
@@ -20754,8 +20761,8 @@ namespace vkr {
 		}
 #endif 
 		// Start tracking input/output resources at this point to handle HDR and SDR render paths 
-		VkImage      ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer.m_HDR.Resource();
-		VkImageView  SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer.m_HDRSRV;
+		VkImage      ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer->m_HDR.Resource();
+		VkImageView  SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer->m_HDRSRV;
 
 		//VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
