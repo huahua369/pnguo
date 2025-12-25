@@ -1621,6 +1621,48 @@ namespace vkr
 	{
 	}
 
+	uint32_t GetScore(void* phd)
+	{
+		VkPhysicalDevice physicalDevice = (VkPhysicalDevice)phd;
+		uint32_t score = 0;
+		VkPhysicalDeviceProperties deviceProperties;
+		vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+		// Use the features for a more precise way to select the GPU
+		//VkPhysicalDeviceFeatures deviceFeatures;
+		//vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+		switch (deviceProperties.deviceType)
+		{
+		case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+			score += 1000;
+			break;
+		case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+			score += 10000;
+			break;
+		case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+			score += 100;
+			break;
+		case VK_PHYSICAL_DEVICE_TYPE_CPU:
+			score += 10;
+			break;
+		default:
+			break;
+		}
+
+		// TODO: add other constraints
+
+		return score;
+	}
+
+	VkPhysicalDevice SelectPhysicalDevice(std::vector<device_info_t>& physicalDevices)
+	{
+		assert(physicalDevices.size() > 0 && "No GPU found");
+		std::multimap<uint32_t, VkPhysicalDevice> ratings;
+		for (auto& it : physicalDevices) {
+			ratings.insert(std::make_pair(GetScore(it.phd), (VkPhysicalDevice)it.phd));
+		}
+		return ratings.rbegin()->second;
+	}
+
 	void Device::OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw
 		, const char* spdname, std::vector<std::string>* pdnv)
 	{
@@ -1669,7 +1711,8 @@ namespace vkr
 							pdnv->push_back(dt.name);
 						}
 					}
-					nd.phy = devs[0].phd;
+					nd.phy = SelectPhysicalDevice(devs);
+
 					// 选择自定义显卡
 					if (spdname && *spdname)
 					{
