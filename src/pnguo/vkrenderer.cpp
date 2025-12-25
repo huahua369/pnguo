@@ -137,6 +137,169 @@ typedef uint32_t DXGI_FORMAT;
 
 namespace vkr
 {
+	// Define a maximum number of shadows supported in a scene (note, these are only for spots and directional)
+	static const uint32_t MaxLightInstances = 4;
+	static const uint32_t MaxShadowInstances = 32;
+	class Matrix2
+	{
+		glm::mat4 m_current = {};
+		glm::mat4 m_previous = {};
+		//glm::mat4 m_current = {};//glm::mat4::identity();
+		//glm::mat4 m_previous = {};//glm::mat4::identity();
+	public:
+		void Set(const glm::mat4& m);
+		glm::mat4 GetCurrent() const { return m_current; }
+		glm::mat4 GetPrevious() const { return m_previous; }
+	};
+
+	//
+	// Structures holding the per frame constant buffer data. 
+	//
+	struct Light
+	{
+		glm::mat4   mLightViewProj;
+		glm::mat4   mLightView;
+
+		float         direction[3];
+		float         range;
+
+		float         color[3];
+		float         intensity;
+
+		float         position[3];
+		float         innerConeCos;
+
+		float         outerConeCos;
+		uint32_t      type;
+		float         depthBias;
+		int32_t       shadowMapIndex = -1;
+	};
+
+
+	const uint32_t LightType_Directional = 0;
+	const uint32_t LightType_Point = 1;
+	const uint32_t LightType_Spot = 2;
+
+	struct PerFrame_t0
+	{
+		glm::mat4 mCameraCurrViewProj;
+		glm::mat4 mCameraPrevViewProj;
+		glm::mat4  mInverseCameraCurrViewProj;
+		glm::vec4  cameraPos;
+		float     iblFactor;
+		float     emmisiveFactor;
+		float     invScreenResolution[2];
+
+		glm::vec4 wireframeOptions;
+		float     lodBias = 0.0f;
+		float	  oit_w = 0.0f;
+		float	  oit_k = 0.0f;
+		int		  lightCount;
+		Light     lights[0];
+	};
+	struct PerFrame_t
+	{
+		glm::mat4 mCameraCurrViewProj;
+		glm::mat4 mCameraPrevViewProj;
+		glm::mat4 mInverseCameraCurrViewProj;
+		glm::vec4 cameraPos;
+		float     iblFactor;
+		float     emmisiveFactor;
+		float     invScreenResolution[2];
+
+		glm::vec4 wireframeOptions;
+		float     lodBias = 0.0f;
+		float	  oit_w = 0.0f;
+		float	  oit_k = 0.0f;
+		int		  lightCount;
+		Light     lights[MaxLightInstances];
+	};
+
+
+	struct camera_info
+	{
+		glm::quat qt = {};
+		glm::vec3 camera_position;
+		glm::vec3 camera_look_at;
+		glm::vec3 camera_position_delta;//in
+		glm::vec3 camera_direction;	// in
+		glm::vec3 camera_up;		// in 
+		float pitch;			// in
+		float yaw;		// in
+		float _distance = 5.0;			// old dist
+		float distance;		// in
+		glm::vec2 yp = {};
+	};
+
+	class Camera
+	{
+	public:
+		Camera();
+		void SetMatrix(const glm::mat4& cameraMatrix);
+		void set_mat(const glm::mat4& cameraMatrix, const glm::vec3& e);
+		void LookAt(const glm::vec4& eyePos, const glm::vec4& lookAt);
+		void LookAt(const glm::vec3& eyePos, const glm::vec3& lookAt);
+		void LookAt(float yaw, float pitch, float distance, const glm::vec4& at);
+		void SetFov(float fov, uint32_t width, uint32_t height, float nearPlane, float farPlane);
+		void SetFov(float fov, float aspectRatio, float nearPlane, float farPlane);
+		void UpdateCameraPolar(float yaw, float pitch, float x, float y, float distance);
+		void UpdateCameraWASD(float yaw, float pitch, const bool keyDown[256], double deltaTime);
+
+		glm::mat4 GetView() const { return m_View; }
+		glm::mat4 GetPrevView() const { return m_PrevView; }
+		glm::vec4 GetPosition() const { return m_eyePos; }
+
+
+		glm::vec4 GetDirection()    const { return glm::vec4(glm::vec3(glm::transpose(m_View) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)), 0); }
+		glm::vec4 GetUp()           const { return glm::vec4(glm::vec3(glm::transpose(m_View) * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)), 0); }
+		glm::vec4 GetSide()         const { return glm::vec4(glm::vec3(glm::transpose(m_View) * glm::vec4(1.0f, 1.0f, 0.0f, 0.0f)), 0); }
+		glm::mat4 GetProjection()   const { return m_Proj; }
+
+		float GetFovH() const { return m_fovH; }
+		float GetFovV() const { return m_fovV; }
+
+		float GetAspectRatio() const { return m_aspectRatio; }
+
+		float GetNearPlane() const { return m_near; }
+		float GetFarPlane() const { return m_far; }
+
+		float GetYaw() const { return m_yaw; }
+		float GetPitch() const { return m_pitch; }
+		float GetDistance() const { return m_distance; }
+
+		void SetSpeed(float speed) { m_speed = speed; }
+		void SetProjectionJitter(float jitterX, float jitterY);
+		void SetProjectionJitter(uint32_t width, uint32_t height, uint32_t& seed);
+		void UpdatePreviousMatrices() { m_PrevView = m_View; }
+
+	private:
+		glm::mat4       m_View = {};
+		glm::mat4       m_Proj = {};
+		glm::mat4       m_PrevView = {};
+		glm::vec4       m_eyePos = {};
+		glm::vec4       atPos = {};
+		glm::quat		mqt = {};
+		glm::vec3		_axis = {};
+		float			_angle = 0;
+		camera_info		pca = {};
+		float               m_distance = 0.0f;
+		float               m_fovV = 0.0f, m_fovH = 0.0f;
+		float               m_near = 0.0f, m_far = 0.0f;
+		float               m_aspectRatio = 0.0f;
+
+		float               m_speed = 1.0f;
+		float               m_yaw = 0.0f;
+		float               m_pitch = 0.0f;
+		float               m_roll = 0.0f;
+	public:
+		glm::vec3	ryp = {};
+		bool flipY = false;
+		bool is_eulerAngles = true;
+	};
+
+
+
+
 	//  VK_KHR_shader_float16_int8
 	//	VK_KHR_16bit_storage
 	//	VK_KHR_8bit_storage 
@@ -171,6 +334,173 @@ namespace vkr
 	size_t HashPtr(const void* type, size_t result = HASH_SEED);
 
 	size_t HashShaderString(const char* pRootDir, const char* pShader, size_t result = 2166136261);
+
+
+#if 1
+
+
+	/* todo 相机
+	  [x]第一人称相机
+	  [ ]第三人称相机
+	  [ ]场景漫游相机
+	*/
+	class CameraX
+	{
+	public:
+		glm::mat4 view;                         //视图
+		glm::dvec3 pos = { 0,2.8,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
+		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量  
+		glm::vec3 rota = {};                         //位置角度
+		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量 
+		glm::vec2 size = { 1.0f, 1.0f }; //视口大小
+		glm::quat qt = {};
+		glm::quat src_qt = {};
+		glm::quat dst_qt = {};
+		double qtime = 0;		//插值时间
+		double qmaxtime = 0.1;	//最大插值时间
+		// 相机参数 
+		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
+		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
+		float cameraHeight = 1.5f;                               // 相机垂直高度
+		bool bFirstPerson = false;	// 是否第一人称视角
+		float fixheight = 0;		// 0就是固定高度
+		CameraX() {
+			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
+			qt = dst_qt = e2q(rota);
+			mouseMovement(0, 0, 0, 1);                //不初始化的话，开局不移动没画面
+		}
+
+	private:
+		//float keySpeed = 1.0f;    //键盘移动速率,最好不要高过64
+		float keySpeed = 5.0f;
+		float xMouseSpeed = 0.51f;   //鼠标移动X速率
+		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
+
+		// auto zz = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * (moveSpeed * direction.x);
+	public:
+		void set_size(float w, float h) {
+			size.x = w;
+			size.y = h;
+			xMouseSpeed = h / 360.0 * 0.15;
+			yMouseSpeed = w / 360.0 * 0.25;
+		}
+
+		// 输入角度欧拉角，计算四元数向量
+		glm::vec3 cfront(const glm::ivec2& r)
+		{
+			auto rota_rad = glm::radians(glm::vec2(r));
+			glm::vec3 f = {};
+			f.x = glm::cos(rota_rad.x) * glm::cos(rota_rad.y);
+			f.y = glm::sin(rota_rad.x);
+			f.z = glm::cos(rota_rad.x) * glm::sin(rota_rad.y);
+			return f;
+		}
+		glm::quat e2q(const glm::ivec2& r)
+		{
+			auto ry = glm::radians(glm::vec2(r));
+			glm::vec3 EulerAngles(ry.x, ry.y, 0.0);// x=pitch; y=yaw； roll忽略
+			glm::quat q = glm::quat(EulerAngles);
+			return q;
+		}
+		//	正弦函数y=sin(a)和余弦函数x=cos(a)
+		//	正切函数tan(a) = sin(a) / cos(a)
+		glm::vec3 quat_up(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(0, 1, 0);
+			return glm::vec3(v.z, v.y, v.x);
+		}
+		glm::vec3 quat_right(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(1, 0, 0);
+			return glm::vec3(v.z, v.y, v.x);
+		}
+		glm::vec3 quat_forward(const glm::quat& q)
+		{
+			auto v = q * glm::vec3(0, 0, 1);
+			return glm::vec3(v.z, -v.y, v.x);
+		}
+		//键盘移动处理
+		void keyMovement(glm::vec3 direction, double deltaTime) {
+			float moveSpeed = deltaTime * keySpeed;
+			auto z = worldUp * direction.z;
+			// 第一人称相机计算
+#if 1 
+			auto x = -quat_right(qt);	// 左右移动
+			auto y = -quat_forward(qt);	// 前后移动
+			//auto z0 = quat_up(qi); 
+			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
+#else
+			auto front1 = cfront(rota);
+			auto front0 = -front1;// 获取和摄像机前向向量相反的向量
+			auto right = glm::normalize(glm::cross(front0, worldUp));
+			//根据摄像机坐标系下的移动方向进行移动
+			auto npos1 = moveSpeed * (direction.x * right + z + direction.y * front0);
+#endif
+			if (abs(direction.x) > 0 || abs(direction.y) > 0)
+				npos.y *= fixheight;
+			pos += npos;
+			updateView();
+		}
+
+		//鼠标移动处理
+		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown)
+		{
+			if (!bFirstPerson && !mousedown)
+			{
+				return; // 非第一人称视角且鼠标未按下时不处理鼠标移动
+			}
+			//计算摄像机的前向向量
+			//pitch()：俯仰，将物体绕X轴旋转
+			//yaw()：航向，将物体绕Y轴旋转
+			//roll()：横滚，将物体绕Z轴旋转 
+			// 计算前向向量 
+			//front = cfront(rota);
+			if (abs(deltaX) > 0 || abs(deltaY) > 0)
+			{
+				auto sr = rota;
+				// 角度配置
+				rota.x += deltaY * xMouseSpeed;
+				rota.y += deltaX * yMouseSpeed;
+				//角度限制
+				rota.y = glm::mod(rota.y, 360.0f);
+				rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
+				src_qt = qt; // 保存当前四元数 
+				dst_qt = e2q(rota);
+				auto qd = glm::distance2(sr, rota);
+				if (qd > 1)
+				{
+					qtime = 0;
+				}
+			}
+			qt = dst_qt;
+			front = quat_forward(qt);
+			updateView();
+			qtime += deltaTime;
+		}
+
+		void updateView() {
+			glm::vec3 tpos = pos;
+			glm::vec3 camera_forward;
+			glm::vec3 camera_right;
+			glm::vec3 camera_up;
+			float cameraSmooth = 2.0f;	// 平滑因子  
+			cameraPos = tpos;
+			camera_forward = glm::normalize(front);
+			camera_right = glm::normalize(glm::cross(camera_forward, worldUp));
+			camera_up = glm::normalize(glm::cross(camera_right, camera_forward));
+			if (!bFirstPerson)
+			{
+				cameraPos += camera_forward * cameraDistance + camera_up * cameraHeight;
+			}
+			auto view0 = glm::lookAt(cameraPos, front + cameraPos, camera_up);
+			view = view0;
+			//cameraPos = view[3];
+			//printf("pos %.2f,%.2f,%.2f\t %.2f,%.2f,%.2f\t %.2f,%.2f\n", pos.x, pos.y, pos.z, front.x, front.y, front.z, rota.x, rota.y);
+		}
+	};
+
+#endif //1
+
 
 
 
@@ -315,6 +645,681 @@ namespace vkr
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex);
 
 #endif // 1
+
+
+	class GltfPbrPass;
+	class GltfBBoxPass;
+	class GltfDepthPass;
+	class GLTFTexturesAndBuffers;
+
+	// todo renderer 
+
+	struct robj_info {
+		//gltf passes
+		GltfPbrPass* m_GLTFPBR;
+		GltfBBoxPass* m_GLTFBBox;
+		GltfDepthPass* m_GLTFDepth;
+		GLTFTexturesAndBuffers* _ptb;
+		bool shadowMap = true;		// 是否有阴影
+	};
+	// todo cmdlr
+	class CommandListRing
+	{
+	public:
+		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerframe, bool compute = false);
+		void OnDestroy();
+		void OnBeginFrame();
+		VkCommandBuffer GetNewCommandList();
+		VkCommandPool GetPool() { return m_pCommandBuffers->m_commandPool; }
+
+	private:
+		uint32_t m_frameIndex;
+		uint32_t m_numberOfAllocators;
+		uint32_t m_commandListsPerBackBuffer;
+
+		Device* m_pDevice;
+
+		struct CommandBuffersPerFrame
+		{
+			VkCommandPool        m_commandPool;
+			VkCommandBuffer* m_pCommandBuffer;
+			uint32_t m_UsedCls;
+		} *m_pCommandBuffers, * m_pCurrentFrame;
+
+	};
+	struct fbo_cxt {
+		VkRenderPass renderPass = 0;
+		VkFramebuffer framebuffer = 0;
+		VkFence fence = {};
+		VkSemaphore sem = {};
+		VkImage image = 0;
+	};
+	struct PassParameters
+	{
+		PassParameters()
+			: uImageWidth(1)
+			, uImageHeight(1)
+			, iMousePos{ 0, 0 }
+			, fBorderColorRGB{ 1, 1, 1, 1 }
+			, fMagnificationAmount(6.0f)
+			, fMagnifierScreenRadius(0.35f)
+			, iMagnifierOffset{ 500, -500 }
+		{
+		}
+
+		uint32_t    uImageWidth;
+		uint32_t    uImageHeight;
+		int         iMousePos[2];            // in pixels, driven by ImGuiIO.MousePos.xy
+
+		float       fBorderColorRGB[4];      // Linear RGBA
+
+		float       fMagnificationAmount;    // [1-...]
+		float       fMagnifierScreenRadius;  // [0-1]
+		mutable int iMagnifierOffset[2];     // in pixels
+	};
+
+	class AsyncPool;
+	class GltfDepthPass;
+	struct PBRPrimitives;
+
+	struct BatchList
+	{
+		float m_depth = 0;
+		int frontFace = 0;
+		PBRPrimitives* m_pPrimitive;
+		VkDescriptorBufferInfo m_perFrameDesc;
+		VkDescriptorBufferInfo m_perObjectDesc;
+		VkDescriptorBufferInfo* m_uvtDesc = 0;
+		VkDescriptorBufferInfo* m_pPerSkeleton = 0;
+		VkDescriptorBufferInfo* morph = 0;
+		operator float() { return -m_depth; }
+	};
+	struct drawables_t
+	{
+		std::vector<BatchList> opaque, transparent, transmission;
+		std::vector<BatchList> wireframe[3];
+		void clear()
+		{
+			opaque.clear();
+			transparent.clear();
+			transmission.clear();
+			for (int i = 0; i < 3; i++)
+				wireframe[i].clear();
+		}
+	};
+
+	struct TimeStamp
+	{
+		std::string m_label;
+		float       m_microseconds;
+	};
+
+
+	class Ring
+	{
+	public:
+		void Create(uint32_t TotalSize)
+		{
+			m_Head = 0;
+			m_AllocatedSize = 0;
+			m_TotalSize = TotalSize;
+		}
+
+		uint32_t GetSize() { return m_AllocatedSize; }
+		uint32_t GetHead() { return m_Head; }
+		uint32_t GetTail() { return (m_Head + m_AllocatedSize) % m_TotalSize; }
+
+		//helper to avoid allocating chunks that wouldn't fit contiguously in the ring
+		uint32_t PaddingToAvoidCrossOver(uint32_t size)
+		{
+			int tail = GetTail();
+			if ((tail + size) > m_TotalSize)
+				return (m_TotalSize - tail);
+			else
+				return 0;
+		}
+
+		bool Alloc(uint32_t size, uint32_t* pOut)
+		{
+			if (m_AllocatedSize + size <= m_TotalSize)
+			{
+				if (pOut)
+					*pOut = GetTail();
+				if (size % 64)
+					size = size;
+				m_AllocatedSize += size;
+				return true;
+			}
+
+			assert(false);
+			return false;
+		}
+
+		bool Free(uint32_t size)
+		{
+			if (m_AllocatedSize >= size)
+			{
+				m_Head = (m_Head + size) % m_TotalSize;
+				m_AllocatedSize -= size;
+				return true;
+			}
+			return false;
+		}
+	private:
+		uint32_t m_Head;
+		uint32_t m_AllocatedSize;
+		uint32_t m_TotalSize;
+	};
+
+	// 
+	// This class can be thought as ring buffer inside a ring buffer. The outer ring is for , 
+	// the frames and the internal one is for the resources that were allocated for that frame.
+	// The size of the outer ring is typically the number of back buffers.
+	//
+	// When the outer ring is full, for the next allocation it automatically frees the entries 
+	// of the oldest frame and makes those entries available for the next frame. This happens 
+	// when you call 'OnBeginFrame()' 
+	//
+	class RingWithTabs
+	{
+	public:
+
+		void OnCreate(uint32_t numberOfBackBuffers, uint32_t memTotalSize)
+		{
+			m_backBufferIndex = 0;
+			m_numberOfBackBuffers = numberOfBackBuffers;
+
+			//init mem per frame tracker
+			m_memAllocatedInFrame = 0;
+			for (int i = 0; i < 4; i++)
+				m_allocatedMemPerBackBuffer[i] = 0;
+
+			m_mem.Create(memTotalSize);
+		}
+
+		void OnDestroy()
+		{
+			m_mem.Free(m_mem.GetSize());
+		}
+
+		bool Alloc(uint32_t size, uint32_t* pOut)
+		{
+			uint32_t padding = m_mem.PaddingToAvoidCrossOver(size);
+			if (padding > 0)
+			{
+				m_memAllocatedInFrame += padding;
+
+				if (m_mem.Alloc(padding, NULL) == false) //alloc chunk to avoid crossover, ignore offset        
+				{
+					return false;  //no mem, cannot allocate apdding
+				}
+			}
+
+			if (m_mem.Alloc(size, pOut) == true)
+			{
+				m_memAllocatedInFrame += size;
+				return true;
+			}
+			return false;
+		}
+
+		void OnBeginFrame()
+		{
+			m_allocatedMemPerBackBuffer[m_backBufferIndex] = m_memAllocatedInFrame;
+			m_memAllocatedInFrame = 0;
+
+			m_backBufferIndex = (m_backBufferIndex + 1) % m_numberOfBackBuffers;
+
+			// free all the entries for the oldest buffer in one go
+			uint32_t memToFree = m_allocatedMemPerBackBuffer[m_backBufferIndex];
+			m_mem.Free(memToFree);
+		}
+	private:
+		//internal ring buffer
+		Ring m_mem;
+
+		//this is the external ring buffer (I could have reused the Ring class though)
+		uint32_t m_backBufferIndex;
+		uint32_t m_numberOfBackBuffers;
+
+		uint32_t m_memAllocatedInFrame;
+		uint32_t m_allocatedMemPerBackBuffer[4];
+	};
+
+	class DynamicBufferRing
+	{
+	public:
+		VkResult OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t memTotalSize, char* name = NULL);
+		void OnDestroy();
+		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
+		bool AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin);
+		VkDescriptorBufferInfo AllocConstantBuffer(uint32_t size, void* pData);
+
+		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
+		bool AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
+		bool AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
+		void OnBeginFrame();
+		void SetDescriptorSet(int i, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+
+	private:
+		Device* m_pDevice;
+		uint32_t        m_memTotalSize;
+		RingWithTabs    m_mem;
+		char* m_pData = nullptr;
+		VkBuffer        m_buffer;
+
+#ifdef USE_VMA
+		VmaAllocation   m_bufferAlloc = VK_NULL_HANDLE;
+#else
+		VkDeviceMemory  m_deviceMemory = VK_NULL_HANDLE;
+#endif
+	};
+	class StaticBufferPool
+	{
+	public:
+		VkResult OnCreate(Device* pDevice, uint32_t totalMemSize, bool bUseVidMem, const char* name);
+		void OnDestroy();
+
+		// Allocates a IB/VB and returns a pointer to fill it + a descriptot
+		//
+		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
+
+		// Allocates a IB/VB and fill it with pInitData, returns a descriptor
+		//
+		bool AllocBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
+
+		// if using vidmem this kicks the upload from the upload heap to the video mem
+		void UploadData(VkCommandBuffer cmd_buf);
+
+		// if using vidmem frees the upload heap
+		void FreeUploadHeap();
+
+	private:
+		Device* m_pDevice;
+
+		std::mutex       m_mutex = {};
+
+		bool             m_bUseVidMem = true;
+
+		char* m_pData = nullptr;
+		uint32_t         m_memOffset = 0;
+		uint32_t         m_totalMemSize = 0;
+
+		VkBuffer         m_buffer;
+		VkBuffer         m_bufferVid;
+
+#ifdef USE_VMA
+		VmaAllocation    m_bufferAlloc = VK_NULL_HANDLE;
+		VmaAllocation    m_bufferAllocVid = VK_NULL_HANDLE;
+#else
+		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;;
+		VkDeviceMemory   m_deviceMemoryVid = VK_NULL_HANDLE;;
+#endif 
+	};
+
+	// set管理
+	class ResourceViewHeaps
+	{
+	public:
+		void OnCreate(Device* pDevice, uint32_t cbvDescriptorCount, uint32_t srvDescriptorCount, uint32_t uavDescriptorCount, uint32_t samplerDescriptorCount);
+		void OnDestroy();
+		bool AllocDescriptor(VkDescriptorSetLayout descriptorLayout, VkDescriptorSet* pDescriptor);
+		bool AllocDescriptor(int size, const VkSampler* pSamplers, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
+		bool AllocDescriptor(std::vector<uint32_t>& descriptorCounts, const VkSampler* pSamplers, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
+		bool CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout);
+		bool CreateDescriptorSetLayoutAndAllocDescriptorSet(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
+		void FreeDescriptor(VkDescriptorSet descriptorSet);
+	private:
+		Device* m_pDevice;
+		VkDescriptorPool m_descriptorPool;
+		std::mutex       m_mutex;
+		int              m_allocatedDescriptorCount = 0;
+	};
+
+	class GBuffer;
+	class dvk_texture;
+
+	class Sync
+	{
+		int m_count = 0;
+		std::mutex m_mutex;
+		std::condition_variable condition;
+	public:
+		int Inc()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count++;
+			return m_count;
+		}
+
+		int Dec()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count--;
+			if (m_count == 0)
+				condition.notify_all();
+			return m_count;
+		}
+
+		int Get()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			return m_count;
+		}
+
+		void Reset()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count = 0;
+			condition.notify_all();
+		}
+
+		void Wait()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			while (m_count != 0)
+				condition.wait(lock);
+		}
+
+	};
+
+	class Async
+	{
+		static int s_activeThreads;
+		static int s_maxThreads;
+		static std::mutex s_mutex;
+		static std::condition_variable s_condition;
+		static bool s_bExiting;
+
+		std::function<void()> m_job;
+		Sync* m_pSync;
+		std::thread* m_pThread;
+
+	public:
+		Async(std::function<void()> job, Sync* pSync = NULL);
+		~Async();
+		static void Wait(Sync* pSync);
+	};
+
+	class AsyncPool
+	{
+		std::vector<Async*> m_pool;
+	public:
+		~AsyncPool();
+		void Flush();
+		void AddAsyncTask(std::function<void()> job, Sync* pSync = NULL);
+	};
+
+	void ExecAsyncIfThereIsAPool(AsyncPool* pAsyncPool, std::function<void()> job);
+
+
+	class UploadHeap
+	{
+		Sync allocating, flushing;
+		struct COPY_t
+		{
+			VkImage m_image; VkBufferImageCopy m_bufferImageCopy;
+		};
+		std::vector<COPY_t> m_copies;
+
+		std::vector<VkImageMemoryBarrier> m_toPreBarrier;
+		std::vector<VkImageMemoryBarrier> m_toPostBarrier;
+
+		std::mutex m_mutex;
+	public:
+		void OnCreate(Device* pDevice, SIZE_T uSize);
+		void OnDestroy();
+
+		UINT8* Suballocate(SIZE_T uSize, UINT64 uAlign);
+		UINT8* BeginSuballocate(SIZE_T uSize, UINT64 uAlign);
+		void EndSuballocate();
+		UINT8* BasePtr() { return m_pDataBegin; }
+		VkBuffer GetResource() { return m_buffer; }
+		VkCommandBuffer GetCommandList() { return m_pCommandBuffer; }
+
+		void AddCopy(VkImage image, VkBufferImageCopy bufferImageCopy);
+		void AddPreBarrier(VkImageMemoryBarrier imageMemoryBarrier);
+		void AddPostBarrier(VkImageMemoryBarrier imageMemoryBarrier);
+
+		void Flush();
+		void FlushAndFinish(bool bDoBarriers = false);
+
+	private:
+
+		Device* m_pDevice;
+
+		VkCommandPool           m_commandPool;
+		VkCommandBuffer         m_pCommandBuffer;
+
+		VkBuffer                m_buffer;
+		VkDeviceMemory          m_deviceMemory;
+
+		VkFence m_fence;
+
+		UINT8* m_pDataBegin = nullptr;    // starting position of upload heap
+		UINT8* m_pDataCur = nullptr;      // current position of upload heap
+		UINT8* m_pDataEnd = nullptr;      // ending position of upload heap 
+		size_t ac = 0;
+		size_t ac0 = 0;
+	};
+
+	struct IMG_INFO
+	{
+		UINT32           width;
+		UINT32           height;
+		UINT32           depth;
+		UINT32           arraySize;
+		UINT32           mipMapCount;
+		DXGI_FORMAT      format;
+		UINT32           bitCount;
+		VkFormat		 vkformat;
+	};
+
+	//Loads a Image file
+
+	class ImgLoader
+	{
+	public:
+		virtual ~ImgLoader() {};
+		virtual bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo) = 0;
+		// after calling Load, calls to CopyPixels return each time a lower mip level 
+		virtual void CopyPixels(void* pDest, uint32_t stride, uint32_t width, uint32_t height) = 0;
+	};
+
+
+	ImgLoader* CreateImageLoader(const char* pFilename);
+
+
+	class Texture
+	{
+	public:
+		Texture();
+		virtual ~Texture();
+		virtual void OnDestroy();
+
+		// load file into heap
+		INT32 Init(Device* pDevice, VkImageCreateInfo* pCreateInfo, const char* name = nullptr);
+		INT32 InitRenderTarget(Device* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, VkImageUsageFlags usage, bool bUAV, const char* name = nullptr, VkImageCreateFlagBits flags = (VkImageCreateFlagBits)0);
+		INT32 InitDepthStencil(Device* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, const char* name = nullptr);
+		bool InitFromFile(Device* pDevice, UploadHeap* pUploadHeap, const char* szFilename, bool useSRGB = false, VkImageUsageFlags usageFlags = 0, float cutOff = 1.0f);
+		//bool InitFromData(Device* pDevice, UploadHeap* uploadHeap, const IMG_INFO& header, const void* data, const char* name = nullptr, bool useSRGB = false);
+		bool InitFromData(Device* pDevice, UploadHeap* uploadHeap, IMG_INFO* header, const void* data, int dsize, const char* name, bool useSRGB);
+
+		VkImage Resource() const { return m_pResource; }
+		// Render Target View (RTV) 【渲染目标纹理】
+		void CreateRTV(VkImageView* pRV, int mipLevel = -1, VkFormat format = VK_FORMAT_UNDEFINED);
+		// Shader resource view (SRV) 【用于提交给shader的纹理】
+		void CreateSRV(VkImageView* pImageView, int mipLevel = -1);
+		// Depth Stencil View (DSV) 【渲染目标深度/模板共享纹理】
+		void CreateDSV(VkImageView* pView);
+		void CreateCubeSRV(VkImageView* pImageView);
+
+		uint32_t GetWidth() const { return m_header.width; }
+		uint32_t GetHeight() const { return m_header.height; }
+		glm::ivec2 get_size() { return glm::ivec2(m_header.width, m_header.height); }
+		uint32_t GetMipCount() const { return m_header.mipMapCount; }
+		uint32_t GetArraySize() const { return m_header.arraySize; }
+		VkFormat GetFormat() const { return m_format; }
+
+	private:
+		Device* m_pDevice = NULL;
+		std::string     m_name = "";
+#ifdef USE_VMA
+		VmaAllocation    m_ImageAlloc = VK_NULL_HANDLE;
+#else
+		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;
+#endif
+		VkFormat         m_format;
+		VkImage          m_pResource = VK_NULL_HANDLE;
+
+		IMG_INFO  m_header;
+
+	protected:
+
+		struct FootPrint
+		{
+			UINT8* pixels;
+			uint32_t width, height, offset;
+		};// footprints[6][12];
+
+		VkImage CreateTextureCommitted(Device* pDevice, UploadHeap* pUploadHeap, const char* pName, bool useSRGB = false, VkImageUsageFlags usageFlags = 0);
+		void LoadAndUpload(Device* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D);
+
+		bool    isCubemap()const;
+	};
+
+	struct SceneShadowInfo {
+		Texture         ShadowMap;
+		uint32_t        ShadowIndex;
+		uint32_t        ShadowResolution;
+		uint32_t        LightIndex;
+		VkImageView     ShadowDSV;
+		VkFramebuffer   ShadowFrameBuffer;
+		VkImageView		ShadowSRV;
+	};
+
+	// todo GPUTimestamps
+	// This class helps insert queries in the command buffer and readback the results.
+	// The tricky part in fact is reading back the results without stalling the GPU. 
+	// For that it splits the readback heap in <numberOfBackBuffers> pieces and it reads 
+	// from the last used chuck.
+
+	class GPUTimestamps
+	{
+	public:
+		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers);
+		void OnDestroy();
+
+		void GetTimeStamp(VkCommandBuffer cmd_buf, const char* label);
+		void GetTimeStampUser(TimeStamp ts);
+		void OnBeginFrame(VkCommandBuffer cmd_buf, std::vector<TimeStamp>* pTimestamp);
+		void OnEndFrame();
+
+	private:
+		Device* m_pDevice;
+
+		const uint32_t MaxValuesPerFrame = 128;
+
+		VkQueryPool        m_QueryPool;
+
+		uint32_t m_frame = 0;
+		uint32_t m_NumberOfBackBuffers = 0;
+
+		std::vector<std::string> m_labels[5];
+		std::vector<TimeStamp> m_cpuTimeStamps[5];
+	};
+
+	enum PresentationMode
+	{
+		PRESENTATIONMODE_WINDOWED,
+		PRESENTATIONMODE_BORDERLESS_FULLSCREEN,
+		PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN
+	};
+
+	enum DisplayMode
+	{
+		DISPLAYMODE_SDR,
+		DISPLAYMODE_FSHDR_Gamma22,
+		DISPLAYMODE_FSHDR_SCRGB,
+		DISPLAYMODE_HDR10_2084,
+		DISPLAYMODE_HDR10_SCRGB
+	};
+	//
+	// DefineList, holds pairs of key & value that will be used by the compiler as defines
+	//
+	class DefineList : public std::map<const std::string, std::string>
+	{
+	public:
+		bool Has(const std::string& str) const
+		{
+			return find(str) != end();
+		}
+
+		size_t Hash(size_t result = HASH_SEED) const
+		{
+			for (auto it = begin(); it != end(); it++)
+			{
+				result = HashString(it->first, result);
+				result = HashString(it->second, result);
+			}
+			return result;
+		}
+
+		friend DefineList operator+(DefineList   def1,        // passing lhs by value helps optimize chained a+b+c
+			const DefineList& def2)  // otherwise, both parameters may be const references
+		{
+			for (auto it = def2.begin(); it != def2.end(); it++)
+				def1[it->first] = it->second;
+			return def1;
+		}
+	};
+
+	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName);
+
+
+	typedef enum GBufferFlagBits
+	{
+		GBUFFER_NONE = 0,
+		GBUFFER_DEPTH = 1,
+		GBUFFER_FORWARD = 2,
+		GBUFFER_MOTION_VECTORS = 4,
+		GBUFFER_NORMAL_BUFFER = 8,
+		GBUFFER_DIFFUSE = 16,
+		GBUFFER_SPECULAR_ROUGHNESS = 32,
+		GBUFFER_OIT_ACCUM = 64,
+		GBUFFER_OIT_WEIGHT = 128,
+	} GBufferFlagBits;
+
+	typedef uint32_t GBufferFlags;
+
+
+	class GBufferRenderPass
+	{
+	public:
+		void OnCreate(GBuffer* pGBuffer, GBufferFlags flags, bool bClear, const std::string& name);
+		void OnDestroy();
+		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
+		void OnDestroyWindowSizeDependentResources();
+		void BeginPass(VkCommandBuffer commandList, VkRect2D renderArea);
+		void EndPass(VkCommandBuffer commandList);
+		void GetCompilerDefines(DefineList& defines);
+		VkRenderPass GetRenderPass() { return m_renderPass; }
+		VkFramebuffer GetFramebuffer() { return m_frameBuffer; }
+		VkSampleCountFlagBits  GetSampleCount();
+	public:
+		Device* m_pDevice;
+		GBufferFlags                    m_flags;
+		GBuffer* m_pGBuffer;
+		VkRenderPass                    m_renderPass;
+		VkFramebuffer                   m_frameBuffer;
+		std::vector<VkClearValue>       m_clearValues;
+	};
+
+	class fbo_info_cx;
+	class GLTFCommon;
+
+
+
 	// device
 #if 1
 
@@ -915,6 +1920,7 @@ namespace vkr
 		// Create device 
 		//
 		float queue_priorities[1] = { 0.0 };
+		int qcount = 1;
 		VkDeviceQueueCreateInfo queue_info[2] = {};
 		queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queue_info[0].pNext = NULL;
@@ -926,7 +1932,8 @@ namespace vkr
 		queue_info[1].queueCount = 1;
 		queue_info[1].pQueuePriorities = queue_priorities;
 		queue_info[1].queueFamilyIndex = compute_queue_family_index;
-
+		if (compute_queue_family_index != graphics_queue_family_index)
+			qcount++;
 		VkPhysicalDeviceFeatures physicalDeviceFeatures = {};
 		physicalDeviceFeatures.fillModeNonSolid = true;
 		physicalDeviceFeatures.pipelineStatisticsQuery = true;
@@ -1021,7 +2028,7 @@ namespace vkr
 			VkDeviceCreateInfo device_info = {};
 			device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 			device_info.pNext = &physicalDeviceFeatures2;
-			device_info.queueCreateInfoCount = 2;
+			device_info.queueCreateInfoCount = qcount;
 			device_info.pQueueCreateInfos = queue_info;
 			device_info.enabledExtensionCount = (uint32_t)extension_names.size();
 			device_info.ppEnabledExtensionNames = device_info.enabledExtensionCount ? extension_names.data() : NULL;
@@ -1061,10 +2068,10 @@ namespace vkr
 		{
 			vkGetDeviceQueue(m_device, present_queue_family_index, 0, &present_queue);
 		}
-		//if (compute_queue_family_index != UINT32_MAX)
-		//{
-		//	vkGetDeviceQueue(m_device, compute_queue_family_index, 0, &compute_queue);
-		//}
+		if (compute_queue_family_index != UINT32_MAX && compute_queue_family_index != graphics_queue_family_index)
+		{
+			vkGetDeviceQueue(m_device, compute_queue_family_index, 0, &compute_queue);
+		}
 
 		// Init the extensions (if they have been enabled successfuly)
 		//
@@ -1181,6 +2188,7 @@ namespace vkr
 #endif // 1
 
 	//
+
 
 
 }
@@ -1888,56 +2896,6 @@ namespace vkr {
 
 
 }
-namespace vkr {
-
-	enum PresentationMode
-	{
-		PRESENTATIONMODE_WINDOWED,
-		PRESENTATIONMODE_BORDERLESS_FULLSCREEN,
-		PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN
-	};
-
-	enum DisplayMode
-	{
-		DISPLAYMODE_SDR,
-		DISPLAYMODE_FSHDR_Gamma22,
-		DISPLAYMODE_FSHDR_SCRGB,
-		DISPLAYMODE_HDR10_2084,
-		DISPLAYMODE_HDR10_SCRGB
-	};
-	//
-	// DefineList, holds pairs of key & value that will be used by the compiler as defines
-	//
-	class DefineList : public std::map<const std::string, std::string>
-	{
-	public:
-		bool Has(const std::string& str) const
-		{
-			return find(str) != end();
-		}
-
-		size_t Hash(size_t result = HASH_SEED) const
-		{
-			for (auto it = begin(); it != end(); it++)
-			{
-				result = HashString(it->first, result);
-				result = HashString(it->second, result);
-			}
-			return result;
-		}
-
-		friend DefineList operator+(DefineList   def1,        // passing lhs by value helps optimize chained a+b+c
-			const DefineList& def2)  // otherwise, both parameters may be const references
-		{
-			for (auto it = def2.begin(); it != def2.end(); it++)
-				def1[it->first] = it->second;
-			return def1;
-		}
-	};
-
-	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName);
-
-}
 
 // todo PBR渲染管线
 
@@ -2223,291 +3181,7 @@ namespace vkr {
 		std::vector<PBRPrimitives> m_pPrimitives;
 	};
 
-	// Define a maximum number of shadows supported in a scene (note, these are only for spots and directional)
-	static const uint32_t MaxLightInstances = 4;
-	static const uint32_t MaxShadowInstances = 32;
-	class Matrix2
-	{
-		glm::mat4 m_current = {};
-		glm::mat4 m_previous = {};
-		//glm::mat4 m_current = {};//glm::mat4::identity();
-		//glm::mat4 m_previous = {};//glm::mat4::identity();
-	public:
-		void Set(const glm::mat4& m);
-		glm::mat4 GetCurrent() const { return m_current; }
-		glm::mat4 GetPrevious() const { return m_previous; }
-	};
 
-	//
-	// Structures holding the per frame constant buffer data. 
-	//
-	struct Light
-	{
-		glm::mat4   mLightViewProj;
-		glm::mat4   mLightView;
-
-		float         direction[3];
-		float         range;
-
-		float         color[3];
-		float         intensity;
-
-		float         position[3];
-		float         innerConeCos;
-
-		float         outerConeCos;
-		uint32_t      type;
-		float         depthBias;
-		int32_t       shadowMapIndex = -1;
-	};
-
-
-	const uint32_t LightType_Directional = 0;
-	const uint32_t LightType_Point = 1;
-	const uint32_t LightType_Spot = 2;
-
-	struct PerFrame_t0
-	{
-		glm::mat4 mCameraCurrViewProj;
-		glm::mat4 mCameraPrevViewProj;
-		glm::mat4  mInverseCameraCurrViewProj;
-		glm::vec4  cameraPos;
-		float     iblFactor;
-		float     emmisiveFactor;
-		float     invScreenResolution[2];
-
-		glm::vec4 wireframeOptions;
-		float     lodBias = 0.0f;
-		float	  oit_w = 0.0f;
-		float	  oit_k = 0.0f;
-		int		  lightCount;
-		Light     lights[0];
-	};
-	struct PerFrame_t
-	{
-		glm::mat4 mCameraCurrViewProj;
-		glm::mat4 mCameraPrevViewProj;
-		glm::mat4 mInverseCameraCurrViewProj;
-		glm::vec4 cameraPos;
-		float     iblFactor;
-		float     emmisiveFactor;
-		float     invScreenResolution[2];
-
-		glm::vec4 wireframeOptions;
-		float     lodBias = 0.0f;
-		float	  oit_w = 0.0f;
-		float	  oit_k = 0.0f;
-		int		  lightCount;
-		Light     lights[MaxLightInstances];
-	};
-
-
-	class Sync
-	{
-		int m_count = 0;
-		std::mutex m_mutex;
-		std::condition_variable condition;
-	public:
-		int Inc()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count++;
-			return m_count;
-		}
-
-		int Dec()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count--;
-			if (m_count == 0)
-				condition.notify_all();
-			return m_count;
-		}
-
-		int Get()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			return m_count;
-		}
-
-		void Reset()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count = 0;
-			condition.notify_all();
-		}
-
-		void Wait()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			while (m_count != 0)
-				condition.wait(lock);
-		}
-
-	};
-
-	class Async
-	{
-		static int s_activeThreads;
-		static int s_maxThreads;
-		static std::mutex s_mutex;
-		static std::condition_variable s_condition;
-		static bool s_bExiting;
-
-		std::function<void()> m_job;
-		Sync* m_pSync;
-		std::thread* m_pThread;
-
-	public:
-		Async(std::function<void()> job, Sync* pSync = NULL);
-		~Async();
-		static void Wait(Sync* pSync);
-	};
-
-	class AsyncPool
-	{
-		std::vector<Async*> m_pool;
-	public:
-		~AsyncPool();
-		void Flush();
-		void AddAsyncTask(std::function<void()> job, Sync* pSync = NULL);
-	};
-
-	void ExecAsyncIfThereIsAPool(AsyncPool* pAsyncPool, std::function<void()> job);
-	class UploadHeap
-	{
-		Sync allocating, flushing;
-		struct COPY_t
-		{
-			VkImage m_image; VkBufferImageCopy m_bufferImageCopy;
-		};
-		std::vector<COPY_t> m_copies;
-
-		std::vector<VkImageMemoryBarrier> m_toPreBarrier;
-		std::vector<VkImageMemoryBarrier> m_toPostBarrier;
-
-		std::mutex m_mutex;
-	public:
-		void OnCreate(Device* pDevice, SIZE_T uSize);
-		void OnDestroy();
-
-		UINT8* Suballocate(SIZE_T uSize, UINT64 uAlign);
-		UINT8* BeginSuballocate(SIZE_T uSize, UINT64 uAlign);
-		void EndSuballocate();
-		UINT8* BasePtr() { return m_pDataBegin; }
-		VkBuffer GetResource() { return m_buffer; }
-		VkCommandBuffer GetCommandList() { return m_pCommandBuffer; }
-
-		void AddCopy(VkImage image, VkBufferImageCopy bufferImageCopy);
-		void AddPreBarrier(VkImageMemoryBarrier imageMemoryBarrier);
-		void AddPostBarrier(VkImageMemoryBarrier imageMemoryBarrier);
-
-		void Flush();
-		void FlushAndFinish(bool bDoBarriers = false);
-
-	private:
-
-		Device* m_pDevice;
-
-		VkCommandPool           m_commandPool;
-		VkCommandBuffer         m_pCommandBuffer;
-
-		VkBuffer                m_buffer;
-		VkDeviceMemory          m_deviceMemory;
-
-		VkFence m_fence;
-
-		UINT8* m_pDataBegin = nullptr;    // starting position of upload heap
-		UINT8* m_pDataCur = nullptr;      // current position of upload heap
-		UINT8* m_pDataEnd = nullptr;      // ending position of upload heap 
-		size_t ac = 0;
-		size_t ac0 = 0;
-	};
-
-	struct IMG_INFO
-	{
-		UINT32           width;
-		UINT32           height;
-		UINT32           depth;
-		UINT32           arraySize;
-		UINT32           mipMapCount;
-		DXGI_FORMAT      format;
-		UINT32           bitCount;
-		VkFormat		 vkformat;
-	};
-
-	//Loads a Image file
-
-	class ImgLoader
-	{
-	public:
-		virtual ~ImgLoader() {};
-		virtual bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo) = 0;
-		// after calling Load, calls to CopyPixels return each time a lower mip level 
-		virtual void CopyPixels(void* pDest, uint32_t stride, uint32_t width, uint32_t height) = 0;
-	};
-
-
-	ImgLoader* CreateImageLoader(const char* pFilename);
-
-
-	class Texture
-	{
-	public:
-		Texture();
-		virtual       ~Texture();
-		virtual void OnDestroy();
-
-		// load file into heap
-		INT32 Init(Device* pDevice, VkImageCreateInfo* pCreateInfo, const char* name = nullptr);
-		INT32 InitRenderTarget(Device* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, VkImageUsageFlags usage, bool bUAV, const char* name = nullptr, VkImageCreateFlagBits flags = (VkImageCreateFlagBits)0);
-		INT32 InitDepthStencil(Device* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, const char* name = nullptr);
-		bool InitFromFile(Device* pDevice, UploadHeap* pUploadHeap, const char* szFilename, bool useSRGB = false, VkImageUsageFlags usageFlags = 0, float cutOff = 1.0f);
-		//bool InitFromData(Device* pDevice, UploadHeap* uploadHeap, const IMG_INFO& header, const void* data, const char* name = nullptr, bool useSRGB = false);
-		bool InitFromData(Device* pDevice, UploadHeap* uploadHeap, IMG_INFO* header, const void* data, int dsize, const char* name, bool useSRGB);
-
-		VkImage Resource() const { return m_pResource; }
-		// Render Target View (RTV) 【渲染目标纹理】
-		void CreateRTV(VkImageView* pRV, int mipLevel = -1, VkFormat format = VK_FORMAT_UNDEFINED);
-		// Shader resource view (SRV) 【用于提交给shader的纹理】
-		void CreateSRV(VkImageView* pImageView, int mipLevel = -1);
-		// Depth Stencil View (DSV) 【渲染目标深度/模板共享纹理】
-		void CreateDSV(VkImageView* pView);
-		void CreateCubeSRV(VkImageView* pImageView);
-
-		uint32_t GetWidth() const { return m_header.width; }
-		uint32_t GetHeight() const { return m_header.height; }
-		glm::ivec2 get_size() { return glm::ivec2(m_header.width, m_header.height); }
-		uint32_t GetMipCount() const { return m_header.mipMapCount; }
-		uint32_t GetArraySize() const { return m_header.arraySize; }
-		VkFormat GetFormat() const { return m_format; }
-
-	private:
-		Device* m_pDevice = NULL;
-		std::string     m_name = "";
-#ifdef USE_VMA
-		VmaAllocation    m_ImageAlloc = VK_NULL_HANDLE;
-#else
-		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;
-#endif
-		VkFormat         m_format;
-		VkImage          m_pResource = VK_NULL_HANDLE;
-
-		IMG_INFO  m_header;
-
-	protected:
-
-		struct FootPrint
-		{
-			UINT8* pixels;
-			uint32_t width, height, offset;
-		};// footprints[6][12];
-
-		VkImage CreateTextureCommitted(Device* pDevice, UploadHeap* pUploadHeap, const char* pName, bool useSRGB = false, VkImageUsageFlags usageFlags = 0);
-		void LoadAndUpload(Device* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D);
-
-		bool    isCubemap()const;
-	};
 
 	class pipeline_ptr_info;
 	class queuethread_cx;
@@ -2916,63 +3590,6 @@ namespace vkr {
 
 
 
-	typedef enum GBufferFlagBits
-	{
-		GBUFFER_NONE = 0,
-		GBUFFER_DEPTH = 1,
-		GBUFFER_FORWARD = 2,
-		GBUFFER_MOTION_VECTORS = 4,
-		GBUFFER_NORMAL_BUFFER = 8,
-		GBUFFER_DIFFUSE = 16,
-		GBUFFER_SPECULAR_ROUGHNESS = 32,
-		GBUFFER_OIT_ACCUM = 64,
-		GBUFFER_OIT_WEIGHT = 128,
-	} GBufferFlagBits;
-
-	typedef uint32_t GBufferFlags;
-
-	class GBuffer;
-
-	class GBufferRenderPass
-	{
-	public:
-		void OnCreate(GBuffer* pGBuffer, GBufferFlags flags, bool bClear, const std::string& name);
-		void OnDestroy();
-		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
-		void OnDestroyWindowSizeDependentResources();
-		void BeginPass(VkCommandBuffer commandList, VkRect2D renderArea);
-		void EndPass(VkCommandBuffer commandList);
-		void GetCompilerDefines(DefineList& defines);
-		VkRenderPass GetRenderPass() { return m_renderPass; }
-		VkFramebuffer GetFramebuffer() { return m_frameBuffer; }
-		VkSampleCountFlagBits  GetSampleCount();
-	public:
-		Device* m_pDevice;
-		GBufferFlags                    m_flags;
-		GBuffer* m_pGBuffer;
-		VkRenderPass                    m_renderPass;
-		VkFramebuffer                   m_frameBuffer;
-		std::vector<VkClearValue>       m_clearValues;
-	};
-	// set管理
-	class ResourceViewHeaps
-	{
-	public:
-		void OnCreate(Device* pDevice, uint32_t cbvDescriptorCount, uint32_t srvDescriptorCount, uint32_t uavDescriptorCount, uint32_t samplerDescriptorCount);
-		void OnDestroy();
-		bool AllocDescriptor(VkDescriptorSetLayout descriptorLayout, VkDescriptorSet* pDescriptor);
-		bool AllocDescriptor(int size, const VkSampler* pSamplers, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
-		bool AllocDescriptor(std::vector<uint32_t>& descriptorCounts, const VkSampler* pSamplers, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
-		bool CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout);
-		bool CreateDescriptorSetLayoutAndAllocDescriptorSet(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
-		void FreeDescriptor(VkDescriptorSet descriptorSet);
-	private:
-		Device* m_pDevice;
-		VkDescriptorPool m_descriptorPool;
-		std::mutex       m_mutex;
-		int              m_allocatedDescriptorCount = 0;
-	};
-
 	class GBuffer
 	{
 	public:
@@ -3032,208 +3649,8 @@ namespace vkr {
 
 		std::map<GBufferFlags, VkFormat> m_formats;
 	};
-	class Ring
-	{
-	public:
-		void Create(uint32_t TotalSize)
-		{
-			m_Head = 0;
-			m_AllocatedSize = 0;
-			m_TotalSize = TotalSize;
-		}
 
-		uint32_t GetSize() { return m_AllocatedSize; }
-		uint32_t GetHead() { return m_Head; }
-		uint32_t GetTail() { return (m_Head + m_AllocatedSize) % m_TotalSize; }
-
-		//helper to avoid allocating chunks that wouldn't fit contiguously in the ring
-		uint32_t PaddingToAvoidCrossOver(uint32_t size)
-		{
-			int tail = GetTail();
-			if ((tail + size) > m_TotalSize)
-				return (m_TotalSize - tail);
-			else
-				return 0;
-		}
-
-		bool Alloc(uint32_t size, uint32_t* pOut)
-		{
-			if (m_AllocatedSize + size <= m_TotalSize)
-			{
-				if (pOut)
-					*pOut = GetTail();
-				if (size % 64)
-					size = size;
-				m_AllocatedSize += size;
-				return true;
-			}
-
-			assert(false);
-			return false;
-		}
-
-		bool Free(uint32_t size)
-		{
-			if (m_AllocatedSize >= size)
-			{
-				m_Head = (m_Head + size) % m_TotalSize;
-				m_AllocatedSize -= size;
-				return true;
-			}
-			return false;
-		}
-	private:
-		uint32_t m_Head;
-		uint32_t m_AllocatedSize;
-		uint32_t m_TotalSize;
-	};
-
-	// 
-	// This class can be thought as ring buffer inside a ring buffer. The outer ring is for , 
-	// the frames and the internal one is for the resources that were allocated for that frame.
-	// The size of the outer ring is typically the number of back buffers.
-	//
-	// When the outer ring is full, for the next allocation it automatically frees the entries 
-	// of the oldest frame and makes those entries available for the next frame. This happens 
-	// when you call 'OnBeginFrame()' 
-	//
-	class RingWithTabs
-	{
-	public:
-
-		void OnCreate(uint32_t numberOfBackBuffers, uint32_t memTotalSize)
-		{
-			m_backBufferIndex = 0;
-			m_numberOfBackBuffers = numberOfBackBuffers;
-
-			//init mem per frame tracker
-			m_memAllocatedInFrame = 0;
-			for (int i = 0; i < 4; i++)
-				m_allocatedMemPerBackBuffer[i] = 0;
-
-			m_mem.Create(memTotalSize);
-		}
-
-		void OnDestroy()
-		{
-			m_mem.Free(m_mem.GetSize());
-		}
-
-		bool Alloc(uint32_t size, uint32_t* pOut)
-		{
-			uint32_t padding = m_mem.PaddingToAvoidCrossOver(size);
-			if (padding > 0)
-			{
-				m_memAllocatedInFrame += padding;
-
-				if (m_mem.Alloc(padding, NULL) == false) //alloc chunk to avoid crossover, ignore offset        
-				{
-					return false;  //no mem, cannot allocate apdding
-				}
-			}
-
-			if (m_mem.Alloc(size, pOut) == true)
-			{
-				m_memAllocatedInFrame += size;
-				return true;
-			}
-			return false;
-		}
-
-		void OnBeginFrame()
-		{
-			m_allocatedMemPerBackBuffer[m_backBufferIndex] = m_memAllocatedInFrame;
-			m_memAllocatedInFrame = 0;
-
-			m_backBufferIndex = (m_backBufferIndex + 1) % m_numberOfBackBuffers;
-
-			// free all the entries for the oldest buffer in one go
-			uint32_t memToFree = m_allocatedMemPerBackBuffer[m_backBufferIndex];
-			m_mem.Free(memToFree);
-		}
-	private:
-		//internal ring buffer
-		Ring m_mem;
-
-		//this is the external ring buffer (I could have reused the Ring class though)
-		uint32_t m_backBufferIndex;
-		uint32_t m_numberOfBackBuffers;
-
-		uint32_t m_memAllocatedInFrame;
-		uint32_t m_allocatedMemPerBackBuffer[4];
-	};
 	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
-
-	class DynamicBufferRing
-	{
-	public:
-		VkResult OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t memTotalSize, char* name = NULL);
-		void OnDestroy();
-		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
-		bool AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin);
-		VkDescriptorBufferInfo AllocConstantBuffer(uint32_t size, void* pData);
-
-		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
-		bool AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
-		bool AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
-		void OnBeginFrame();
-		void SetDescriptorSet(int i, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
-
-	private:
-		Device* m_pDevice;
-		uint32_t        m_memTotalSize;
-		RingWithTabs    m_mem;
-		char* m_pData = nullptr;
-		VkBuffer        m_buffer;
-
-#ifdef USE_VMA
-		VmaAllocation   m_bufferAlloc = VK_NULL_HANDLE;
-#else
-		VkDeviceMemory  m_deviceMemory = VK_NULL_HANDLE;
-#endif
-	};
-	class StaticBufferPool
-	{
-	public:
-		VkResult OnCreate(Device* pDevice, uint32_t totalMemSize, bool bUseVidMem, const char* name);
-		void OnDestroy();
-
-		// Allocates a IB/VB and returns a pointer to fill it + a descriptot
-		//
-		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
-
-		// Allocates a IB/VB and fill it with pInitData, returns a descriptor
-		//
-		bool AllocBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
-
-		// if using vidmem this kicks the upload from the upload heap to the video mem
-		void UploadData(VkCommandBuffer cmd_buf);
-
-		// if using vidmem frees the upload heap
-		void FreeUploadHeap();
-
-	private:
-		Device* m_pDevice;
-
-		std::mutex       m_mutex = {};
-
-		bool             m_bUseVidMem = true;
-
-		char* m_pData = nullptr;
-		uint32_t         m_memOffset = 0;
-		uint32_t         m_totalMemSize = 0;
-
-		VkBuffer         m_buffer;
-		VkBuffer         m_bufferVid;
-
-#ifdef USE_VMA
-		VmaAllocation    m_bufferAlloc = VK_NULL_HANDLE;
-		VmaAllocation    m_bufferAllocVid = VK_NULL_HANDLE;
-#else
-		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;;
-		VkDeviceMemory   m_deviceMemoryVid = VK_NULL_HANDLE;;
-#endif 
-	};
 
 
 
@@ -3656,86 +4073,6 @@ namespace vkr {
 		tfNodeIdx m_nodeIndex = -1;
 	};
 
-	struct camera_info
-	{
-		glm::quat qt = {};
-		glm::vec3 camera_position;
-		glm::vec3 camera_look_at;
-		glm::vec3 camera_position_delta;//in
-		glm::vec3 camera_direction;	// in
-		glm::vec3 camera_up;		// in 
-		float pitch;			// in
-		float yaw;		// in
-		float _distance = 5.0;			// old dist
-		float distance;		// in
-		glm::vec2 yp = {};
-	};
-
-	class Camera
-	{
-	public:
-		Camera();
-		void SetMatrix(const glm::mat4& cameraMatrix);
-		void set_mat(const glm::mat4& cameraMatrix, const glm::vec3& e);
-		void LookAt(const glm::vec4& eyePos, const glm::vec4& lookAt);
-		void LookAt(const glm::vec3& eyePos, const glm::vec3& lookAt);
-		void LookAt(float yaw, float pitch, float distance, const glm::vec4& at);
-		void SetFov(float fov, uint32_t width, uint32_t height, float nearPlane, float farPlane);
-		void SetFov(float fov, float aspectRatio, float nearPlane, float farPlane);
-		void UpdateCameraPolar(float yaw, float pitch, float x, float y, float distance);
-		void UpdateCameraWASD(float yaw, float pitch, const bool keyDown[256], double deltaTime);
-
-		glm::mat4 GetView() const { return m_View; }
-		glm::mat4 GetPrevView() const { return m_PrevView; }
-		glm::vec4 GetPosition() const { return m_eyePos; }
-
-
-		glm::vec4 GetDirection()    const { return glm::vec4(glm::vec3(glm::transpose(m_View) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)), 0); }
-		glm::vec4 GetUp()           const { return glm::vec4(glm::vec3(glm::transpose(m_View) * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)), 0); }
-		glm::vec4 GetSide()         const { return glm::vec4(glm::vec3(glm::transpose(m_View) * glm::vec4(1.0f, 1.0f, 0.0f, 0.0f)), 0); }
-		glm::mat4 GetProjection()   const { return m_Proj; }
-
-		float GetFovH() const { return m_fovH; }
-		float GetFovV() const { return m_fovV; }
-
-		float GetAspectRatio() const { return m_aspectRatio; }
-
-		float GetNearPlane() const { return m_near; }
-		float GetFarPlane() const { return m_far; }
-
-		float GetYaw() const { return m_yaw; }
-		float GetPitch() const { return m_pitch; }
-		float GetDistance() const { return m_distance; }
-
-		void SetSpeed(float speed) { m_speed = speed; }
-		void SetProjectionJitter(float jitterX, float jitterY);
-		void SetProjectionJitter(uint32_t width, uint32_t height, uint32_t& seed);
-		void UpdatePreviousMatrices() { m_PrevView = m_View; }
-
-	private:
-		glm::mat4       m_View = {};
-		glm::mat4       m_Proj = {};
-		glm::mat4       m_PrevView = {};
-		glm::vec4       m_eyePos = {};
-		glm::vec4       atPos = {};
-		glm::quat		mqt = {};
-		glm::vec3		_axis = {};
-		float			_angle = 0;
-		camera_info		pca = {};
-		float               m_distance = 0.0f;
-		float               m_fovV = 0.0f, m_fovH = 0.0f;
-		float               m_near = 0.0f, m_far = 0.0f;
-		float               m_aspectRatio = 0.0f;
-
-		float               m_speed = 1.0f;
-		float               m_yaw = 0.0f;
-		float               m_pitch = 0.0f;
-		float               m_roll = 0.0f;
-	public:
-		glm::vec3	ryp = {};
-		bool flipY = false;
-		bool is_eulerAngles = true;
-	};
 
 	glm::vec4 PolarToVector(float roll, float pitch);
 	glm::mat4 LookAtRH(const glm::vec4& eyePos, const glm::vec4& lookAt, bool flipY);
@@ -4353,41 +4690,6 @@ namespace vkr {
 		VkDescriptorSetLayout m_descriptorSetLayout = {};
 	};
 
-	// todo GPUTimestamps
-	// This class helps insert queries in the command buffer and readback the results.
-	// The tricky part in fact is reading back the results without stalling the GPU. 
-	// For that it splits the readback heap in <numberOfBackBuffers> pieces and it reads 
-	// from the last used chuck.
-
-	struct TimeStamp
-	{
-		std::string m_label;
-		float       m_microseconds;
-	};
-	class GPUTimestamps
-	{
-	public:
-		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers);
-		void OnDestroy();
-
-		void GetTimeStamp(VkCommandBuffer cmd_buf, const char* label);
-		void GetTimeStampUser(TimeStamp ts);
-		void OnBeginFrame(VkCommandBuffer cmd_buf, std::vector<TimeStamp>* pTimestamp);
-		void OnEndFrame();
-
-	private:
-		Device* m_pDevice;
-
-		const uint32_t MaxValuesPerFrame = 128;
-
-		VkQueryPool        m_QueryPool;
-
-		uint32_t m_frame = 0;
-		uint32_t m_NumberOfBackBuffers = 0;
-
-		std::vector<std::string> m_labels[5];
-		std::vector<TimeStamp> m_cpuTimeStamps[5];
-	};
 
 	struct ts_t {
 		VkImageView v;
@@ -4409,31 +4711,6 @@ namespace vkr {
 			pbrMaterial m_pbrParams;
 		};
 
-		struct BatchList
-		{
-			float m_depth = 0;
-			int frontFace = 0;
-			PBRPrimitives* m_pPrimitive;
-			VkDescriptorBufferInfo m_perFrameDesc;
-			VkDescriptorBufferInfo m_perObjectDesc;
-			VkDescriptorBufferInfo* m_uvtDesc = 0;
-			VkDescriptorBufferInfo* m_pPerSkeleton = 0;
-			VkDescriptorBufferInfo* morph = 0;
-			operator float() { return -m_depth; }
-		};
-		struct drawables_t
-		{
-			std::vector<BatchList> opaque, transparent, transmission;
-			std::vector<BatchList> wireframe[3];
-			void clear()
-			{
-				opaque.clear();
-				transparent.clear();
-				transmission.clear();
-				for (int i = 0; i < 3; i++)
-					wireframe[i].clear();
-			}
-		};
 
 		void OnCreate(
 			Device* pDevice,
@@ -4480,7 +4757,7 @@ namespace vkr {
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
 
-	bool bcmp(const GltfPbrPass::BatchList& l, const GltfPbrPass::BatchList& r)
+	bool bcmp(const BatchList& l, const BatchList& r)
 	{
 		return -l.m_depth < -r.m_depth;
 	}
@@ -4873,6 +5150,296 @@ namespace vkr {
 	};
 
 	void GetSrgbAndCutOffOfImageGivenItsUse(int imageIndex, const std::vector<tinygltf::Material>* p, bool* pSrgbOut, float* pCutoff);
+
+
+
+	// todo renderer 渲染器
+	class Renderer_cx
+	{
+	public:
+		Renderer_cx(const_vk* p);
+		~Renderer_cx();
+		void OnCreate(Device* pDevice, VkRenderPass rp);
+		void OnDestroy();
+
+		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
+		void OnDestroyWindowSizeDependentResources();
+		void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
+		void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
+
+		int load_model(GLTFCommon* pGLTFCommon, int Stage = 0);
+		void UnloadScene();
+		void unloadgltf(robj_info* p);
+
+		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
+
+		PerFrame_t* mkPerFrameData(const Camera& cam);
+		void OnRender(const scene_state* pState, const Camera& Cam);
+		void set_fbo(fbo_info_cx* p, int idx);
+		// 释放上传堆和缓冲区
+		void freeVidMBP();
+
+
+		size_t AddLight(const light_t& light);
+		light_t* get_light(size_t idx);
+		size_t get_light_size();
+		void AllocateShadowMaps();
+
+		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
+	private:
+		void draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj);
+
+		void draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void copy_transmission(VkCommandBuffer cmdBuf1);
+		void draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pf, const scene_state* pState);
+	public:
+		Device* m_pDevice = 0;
+		const_vk ct = {};
+		uint32_t                        m_Width = {};
+		uint32_t                        m_Height = {};
+
+		VkRect2D                        m_RectScissor = {};
+		VkViewport                      m_Viewport = {};
+
+		// todo Initialize helper classes资源管理
+		ResourceViewHeaps               m_ResourceViewHeaps = {};	// set管理
+		UploadHeap                      m_UploadHeap = {};			// 纹理上传堆
+		DynamicBufferRing               m_ConstantBufferRing = {};	// 动态常量缓冲区
+		StaticBufferPool                m_VidMemBufferPool = {};	// 静态顶点/索引缓冲区
+		StaticBufferPool                m_SysMemBufferPool = {};	// 系统静态几何缓冲区
+		CommandListRing                 m_CommandListRing = {};		// 命令管理VkCommandBuffer
+
+		GPUTimestamps                   m_GPUTimer = {};			// 记录GPU执行时间
+
+		// effects
+		Bloom                           m_Bloom = {};
+		SkyDome                         m_SkyDome = {};
+		DownSamplePS                    m_DownSample = {};
+		SkyDomeProc                     m_SkyDomeProc = {};
+		ToneMapping                     m_ToneMappingPS = {};
+		ToneMappingCS                   m_ToneMappingCS = {};
+		oitblendCS						m_oitblendCS = {};
+		ColorConversionPS               m_ColorConversionPS = {};
+		TAA                             m_TAA = {};
+		//MagnifierPS                     m_MagnifierPS = {};
+
+		// GBuffer and render passes
+		GBuffer* m_GBuffer = {};							// hdr缓冲区
+		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区opaque
+		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框justdepth
+		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体transparent、透射材质transmission
+
+		// shadowmaps
+		VkRenderPass                    m_Render_pass_shadow = {};
+		// 程序天空盒参数
+		SkyDomeProc::Constants			skyDomeConstants = {};
+
+		// widgets
+		Wireframe                       m_Wireframe = {};
+		WireframeBox                    m_WireframeBox = {};
+		WireframeSphere					_WireframeSphere = {};
+		//Axis							_axis= {};
+		//CheckerBoardFloor				_cbf = {};
+		std::vector<TimeStamp>          m_TimeStamps = {};
+
+		AsyncPool* m_AsyncPool = {};
+		// 渲染对象
+		std::vector<robj_info*>         _robject = {};
+		robj_info* currobj = {};
+
+		std::vector<SceneShadowInfo>    m_shadowMapPool = {};
+		std::vector<VkImageView>        m_ShadowSRVPool = {};
+		std::vector<GltfDepthPass*>     _depthpass = {};
+		// 灯光管理
+		std::vector<light_t> _lights;
+		std::queue<light_t> _lights_q;
+		std::vector<glm::mat4> lightMats;
+		// 渲染对象
+		drawables_t drawables;
+
+		transfer_cx _transfer = {};
+
+
+		PerFrame_t _perFrameData;
+
+		fbo_cxt _fbo = {};
+		// VkCommandBuffer
+		void(*hubDraw)(void* commandBuffer) = nullptr;
+
+
+		DisplayMode _dm = DISPLAYMODE_SDR;
+		bool bHDR = false;
+		bool m_bMagResourceReInit = false;
+		// 不启用oit
+		bool has_oit = false;
+		// 是否启用模板测试
+		bool _stencil_test = false;
+
+	};
+
+
+	class pipeinfo_cx
+	{
+	public:
+		pipeinfo_cx();
+		~pipeinfo_cx();
+		void compiler_pipe(const char* vertexShader, const char* pixelShader, Device* pDevice);
+		void set_pipeinfo(DynamicBufferRing* m_pDynamicBufferRing, ResourceViewHeaps* m_pResourceViewHeaps, VkRenderPass renderPass);
+		VkDescriptorSet new_dset();
+		void freeobj();
+	private:
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		Device* pDevice = 0;
+		DynamicBufferRing* m_pDynamicBufferRing = 0;
+		ResourceViewHeaps* m_pResourceViewHeaps = 0;
+		VkRenderPass renderPass = {};
+		VkPipeline m_pipeline = {};
+		VkPipelineLayout m_pipelineLayout = {};
+		VkDescriptorSetLayout m_descriptorSetLayout = {};
+		std::vector<VkDescriptorSet> dset;
+	};
+
+	// todo fbo
+
+	class fbo_info_cx
+	{
+	public:
+		class FBO
+		{
+		public:
+			VkFramebuffer framebuffer = 0;
+			//深度、模板缓冲
+			dvk_texture color;
+			dvk_texture depth_stencil;
+			VkDescriptorImageInfo descriptor = {};
+			// Semaphore used to synchronize between offscreen and final scene rendering
+			//信号量用于在屏幕外和最终场景渲染之间进行同步
+			VkSemaphore semaphore = VK_NULL_HANDLE;
+		public:
+			FBO() {}
+			~FBO() {}
+		};
+		size_t count_ = 0;
+		int _width = 0, _height = 0;
+		//dvk_swapchain* _swapc = 0;
+		VkRenderPass renderPass = 0, nrp = 0;
+		//采样器
+		VkSampler sampler = 0;
+		// 渲染到纹理同步cpu
+		VkFence _fence = 0;
+		// 缓冲区列表
+		std::vector<FBO> framebuffers;
+
+		Device* _dev = nullptr;
+		VkClearValue clearValues[2] = {};
+		// VK_FORMAT_B8G8R8A8_UNORM, 浮点纹理 VK_FORMAT_R32G32B32A32_SFLOAT;//如果要模板则depthFormat用VK_FORMAT_D32_SFLOAT_S8_UINT
+		VkFormat depthFormat = VK_FORMAT_D32_SFLOAT, colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+		bool isColor = false;	//渲染到纹理则为true
+
+		int cmdcount = 0;
+		// Command buffers used for rendering
+		std::vector<VkCommandBuffer> drawCmdBuffers;
+		//std::vector<dvk_cmd> dcmds; 
+	public:
+		fbo_info_cx();
+
+		~fbo_info_cx();
+
+		void setClearValues(uint32_t color, float depth = 1.0f, uint32_t Stencil = 0);
+
+		void setClearValues(float* color, float depth = 1.0f, uint32_t Stencil = 0);
+#ifndef VKVG_SURFACE_IMGS_REQUIREMENTS
+#define FB_COLOR_FORMAT VK_FORMAT_B8G8R8A8_UNORM
+#define VKVG_SURFACE_IMGS_REQUIREMENTS (VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT|VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT|\
+	VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_BLIT_SRC_BIT)
+#define VKVG_PNG_WRITE_IMG_REQUIREMENTS (VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_BLIT_DST_BIT)
+#endif
+		//swapchainbuffers交换链
+		void initFBO(int width, int height, int count, VkRenderPass rp);
+
+		//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
+		void resetFramebuffer(int width, int height);
+		void reset_fbo(int width, int height);
+		void resetCommandBuffers();
+
+
+		void build_cmd_empty();
+	public:
+
+		void destroyImage();
+		void destroy_all();
+	private:
+
+	};
+
+	struct SystemInfo
+	{
+		std::string mCPUName = "UNAVAILABLE";
+		std::string mGPUName = "UNAVAILABLE";
+		std::string mGfxAPI = "UNAVAILABLE";
+	};
+
+	class draw3d_ctx
+	{
+	public:
+		draw3d_ctx();
+		~draw3d_ctx();
+		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
+		void OnCreate();
+		void OnDestroy();
+		void OnRender();
+		void OnResize(bool resizeRender);
+		void OnUpdateDisplay();
+
+		void add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap);
+
+		void OnUpdate();
+
+		void HandleInput();
+		void UpdateCamera(Camera& cam);
+		void set_fboidx(int idx);
+
+	public:
+		Device* m_device = 0;
+		int m_Width = 1280;  // application window dimensions
+		int m_Height = 800;  // application window dimensions
+		int shadowResolution = 1024;
+		int curridx = 0;
+		int setidx = 0;
+		fbo_info_cx* _fbo = 0;
+
+		GLTFCommon* _tmpgc = 0;
+		std::vector<GLTFCommon*> _loaders;
+		std::queue<GLTFCommon*> _lts;
+		std::mutex m_ltsm;
+
+		Renderer_cx* m_pRenderer = NULL;
+		VkRenderPass _fbo_renderpass = 0;				// fbo的VkRenderPass
+		DisplayMode _dm = DISPLAYMODE_SDR;
+		scene_state m_UIState;
+		Camera m_camera;
+		glm::vec3 eyePos = {}, lookAt = {};
+		CameraX tpfc = {};
+
+		mouse_state_t io = {};
+		double _time = 0; // Time accumulator in seconds, used for animation.
+
+		SystemInfo systemi = {};
+		// njson config file
+		njson m_jsonConfigFile;
+		std::vector<std::string>    m_sceneNames;
+		int	m_activeScene = 0;
+		int	m_activeCamera = 0;
+		std::function<void(int count, int idx, const char* str)> cb_showtxt;
+		std::vector<std::string>    _tlabs;
+		int loadingStage = 0;
+		bool m_bPlay = 0;
+		bool bShowProfilerWindow = true;
+		bool m_bIsBenchmarking = false;
+		bool _customize_camera = 0;
+	};
 
 
 
@@ -8474,7 +9041,7 @@ namespace vkr
 	}
 	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t0)
 	{
-		GltfPbrPass::BatchList& t = *(GltfPbrPass::BatchList*)t0;
+		BatchList& t = *(BatchList*)t0;
 		// Bind indices and vertices using the right offsets into the buffer 
 		for (uint32_t i = 0; i < m_geometry.m_VBV.size(); i++)
 		{
@@ -16380,7 +16947,6 @@ namespace vkr {
 		{
 			auto& channels = animations[i].channels;
 			auto& samplers = animations[i].samplers;
-
 			tfAnimation* tfanim = &m_animations[i];
 			for (int c = 0; c < channels.size(); c++)
 			{
@@ -16388,7 +16954,6 @@ namespace vkr {
 				int sampler = channel.sampler;
 				int node = channel.target_node;// GetElementInt(channel, "target/node", -1);
 				std::string path = channel.target_path;// GetElementString(channel, "target/path", std::string());
-
 				tfChannel* tfchannel;
 				auto ch = tfanim->m_channels.find(node);
 				if (ch == tfanim->m_channels.end())
@@ -16399,22 +16964,15 @@ namespace vkr {
 				{
 					tfchannel = &ch->second;
 				}
-
 				tfSampler* tfsmp = new tfSampler();
-
 				// Get time line
-				//
 				GetBufferDetails(samplers[sampler].input, &tfsmp->m_time);
 				assert(tfsmp->m_time.m_stride == 4);
-
 				tfanim->m_duration = std::max<float>(tfanim->m_duration, *(float*)tfsmp->m_time.Get(tfsmp->m_time.m_count - 1));
-
 				// Get value line
-				//
 				GetBufferDetails(samplers[sampler].output, &tfsmp->m_value);
 				tfsmp->mstride = tfsmp->m_value.m_dimension;
 				// Index appropriately
-				// 
 				if (path == "translation")
 				{
 					tfsmp->path = 0;
@@ -16456,9 +17014,8 @@ namespace vkr {
 	{
 		return m_animations.size();
 	}
-	//
+
 	// Animates the matrices (they are still in object space)
-	//
 	//loop animation
 	void GLTFCommon::update(float time) {
 		SetAnimationTime(_animationIndex, time);
@@ -16864,9 +17421,7 @@ namespace vkr {
 		}
 	}
 
-	//
 	// Given a mesh find the skin it belongs to
-	//
 	int GLTFCommon::FindMeshSkinId(int meshId) const
 	{
 		for (int i = 0; i < m_nodes.size(); i++)
@@ -16880,9 +17435,7 @@ namespace vkr {
 		return -1;
 	}
 
-	//
 	// given a skinId return the size of the skeleton matrices (vulkan needs this to compute the offsets into the uniform buffers)
-	//
 	int GLTFCommon::GetInverseBindMatricesBufferSizeByID(int id) const
 	{
 		if (id == -1 || (id >= m_skins.size()))
@@ -16891,7 +17444,6 @@ namespace vkr {
 		return m_skins[id].m_InverseBindMatrices.m_count * (sizeof(glm::mat4));// Matrix2));
 	}
 
-	//
 	// Transforms a node hierarchy recursively 
 	struct node_mat
 	{
@@ -16991,7 +17543,6 @@ namespace vkr {
 		a = str;
 	}
 	// Initializes the GLTFCommonTransformed structure 
-	//
 	void GLTFCommon::InitTransformedData()
 	{
 		if (m_nodes.empty() || mat_count == 0 || !pm)
@@ -17097,9 +17648,7 @@ namespace vkr {
 		return;
 	}
 
-	//
 	// Takes the animated matrices and processes the hierarchy, also computes the skinning matrix buffers. 
-	//
 	void GLTFCommon::TransformScene(int sceneIndex, const glm::mat4& world)
 	{
 		if (m_worldSpaceMats.size() < m_nodes.size())
@@ -17161,11 +17710,8 @@ namespace vkr {
 		pCam->SetFov(m_cameras[cameraIdx].yfov, pCam->GetAspectRatio(), m_cameras[cameraIdx].znear, m_cameras[cameraIdx].zfar);
 		return true;
 	}
-
-	//
 	// Sets the per frame data from the GLTF, returns a pointer to it in case the user wants to override some values
 	// The scene needs to be animated and transformed before we can set the PerFrame_t data. We need those final matrices for the lights and the camera.
-	//
 	PerFrame_t* GLTFCommon::SetPerFrameData(PerFrame_t* pfd, const Camera& cam, std::vector<light_t>& lights, std::vector<glm::mat4>& lightMats)
 	{
 		if (pfd)
@@ -17300,213 +17846,6 @@ namespace vkr {
 
 }
 //! vkr 
-// todo renderer
-namespace vkr {
-
-	struct SceneShadowInfo {
-		Texture         ShadowMap;
-		uint32_t        ShadowIndex;
-		uint32_t        ShadowResolution;
-		uint32_t        LightIndex;
-		VkImageView     ShadowDSV;
-		VkFramebuffer   ShadowFrameBuffer;
-		VkImageView		ShadowSRV;
-	};
-
-	struct robj_info {
-		//gltf passes
-		GltfPbrPass* m_GLTFPBR;
-		GltfBBoxPass* m_GLTFBBox;
-		GltfDepthPass* m_GLTFDepth;
-		GLTFTexturesAndBuffers* _ptb;
-		bool shadowMap = true;		// 是否有阴影
-	};
-	// todo cmdlr
-	class CommandListRing
-	{
-	public:
-		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerframe, bool compute = false);
-		void OnDestroy();
-		void OnBeginFrame();
-		VkCommandBuffer GetNewCommandList();
-		VkCommandPool GetPool() { return m_pCommandBuffers->m_commandPool; }
-
-	private:
-		uint32_t m_frameIndex;
-		uint32_t m_numberOfAllocators;
-		uint32_t m_commandListsPerBackBuffer;
-
-		Device* m_pDevice;
-
-		struct CommandBuffersPerFrame
-		{
-			VkCommandPool        m_commandPool;
-			VkCommandBuffer* m_pCommandBuffer;
-			uint32_t m_UsedCls;
-		} *m_pCommandBuffers, * m_pCurrentFrame;
-
-	};
-	struct fbo_cxt {
-		VkRenderPass renderPass = 0;
-		VkFramebuffer framebuffer = 0;
-		VkFence fence = {};
-		VkSemaphore sem = {};
-		VkImage image = 0;
-	};
-	struct PassParameters
-	{
-		PassParameters()
-			: uImageWidth(1)
-			, uImageHeight(1)
-			, iMousePos{ 0, 0 }
-			, fBorderColorRGB{ 1, 1, 1, 1 }
-			, fMagnificationAmount(6.0f)
-			, fMagnifierScreenRadius(0.35f)
-			, iMagnifierOffset{ 500, -500 }
-		{
-		}
-
-		uint32_t    uImageWidth;
-		uint32_t    uImageHeight;
-		int         iMousePos[2];            // in pixels, driven by ImGuiIO.MousePos.xy
-
-		float       fBorderColorRGB[4];      // Linear RGBA
-
-		float       fMagnificationAmount;    // [1-...]
-		float       fMagnifierScreenRadius;  // [0-1]
-		mutable int iMagnifierOffset[2];     // in pixels
-	};
-
-
-	class fbo_info_cx;
-	// todo renderer 渲染器
-	class Renderer_cx
-	{
-	public:
-		Renderer_cx(const_vk* p);
-		~Renderer_cx();
-		void OnCreate(Device* pDevice, VkRenderPass rp);
-		void OnDestroy();
-
-		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
-		void OnDestroyWindowSizeDependentResources();
-		void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
-		void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
-
-		int load_model(GLTFCommon* pGLTFCommon, int Stage = 0);
-		void UnloadScene();
-		void unloadgltf(robj_info* p);
-
-		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
-
-		PerFrame_t* mkPerFrameData(const Camera& cam);
-		void OnRender(const scene_state* pState, const Camera& Cam);
-		void set_fbo(fbo_info_cx* p, int idx);
-		// 释放上传堆和缓冲区
-		void freeVidMBP();
-
-
-		size_t AddLight(const light_t& light);
-		light_t* get_light(size_t idx);
-		size_t get_light_size();
-		void AllocateShadowMaps();
-
-		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
-	private:
-		void draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj);
-
-		void draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
-		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
-		void copy_transmission(VkCommandBuffer cmdBuf1);
-		void draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
-		void draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pf, const scene_state* pState);
-	public:
-		Device* m_pDevice = 0;
-		const_vk ct = {};
-		uint32_t                        m_Width = {};
-		uint32_t                        m_Height = {};
-
-		VkRect2D                        m_RectScissor = {};
-		VkViewport                      m_Viewport = {};
-
-		// todo Initialize helper classes资源管理
-		ResourceViewHeaps               m_ResourceViewHeaps = {};	// set管理
-		UploadHeap                      m_UploadHeap = {};			// 纹理上传堆
-		DynamicBufferRing               m_ConstantBufferRing = {};	// 动态常量缓冲区
-		StaticBufferPool                m_VidMemBufferPool = {};	// 静态顶点/索引缓冲区
-		StaticBufferPool                m_SysMemBufferPool = {};	// 系统静态几何缓冲区
-		CommandListRing                 m_CommandListRing = {};		// 命令管理VkCommandBuffer
-
-		GPUTimestamps                   m_GPUTimer = {};			// 记录GPU执行时间
-
-		// effects
-		Bloom                           m_Bloom = {};
-		SkyDome                         m_SkyDome = {};
-		DownSamplePS                    m_DownSample = {};
-		SkyDomeProc                     m_SkyDomeProc = {};
-		ToneMapping                     m_ToneMappingPS = {};
-		ToneMappingCS                   m_ToneMappingCS = {};
-		oitblendCS						m_oitblendCS = {};
-		ColorConversionPS               m_ColorConversionPS = {};
-		TAA                             m_TAA = {};
-		//MagnifierPS                     m_MagnifierPS = {};
-
-		// GBuffer and render passes
-		GBuffer* m_GBuffer = {};							// hdr缓冲区
-		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区opaque
-		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框justdepth
-		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体transparent、透射材质transmission
-
-		// shadowmaps
-		VkRenderPass                    m_Render_pass_shadow = {};
-		// 程序天空盒参数
-		SkyDomeProc::Constants			skyDomeConstants = {};
-
-		// widgets
-		Wireframe                       m_Wireframe = {};
-		WireframeBox                    m_WireframeBox = {};
-		WireframeSphere					_WireframeSphere = {};
-		//Axis							_axis= {};
-		//CheckerBoardFloor				_cbf = {};
-		std::vector<TimeStamp>          m_TimeStamps = {};
-
-		AsyncPool                       m_AsyncPool = {};
-		// 渲染对象
-		std::vector<robj_info*>         _robject = {};
-		robj_info* currobj = {};
-
-		std::vector<SceneShadowInfo>    m_shadowMapPool = {};
-		std::vector<VkImageView>        m_ShadowSRVPool = {};
-		std::vector<GltfDepthPass*>     _depthpass = {};
-		// 灯光管理
-		std::vector<light_t> _lights;
-		std::queue<light_t> _lights_q;
-		std::vector<glm::mat4> lightMats;
-		// 渲染对象
-		GltfPbrPass::drawables_t drawables;
-
-		transfer_cx _transfer = {};
-
-
-		PerFrame_t _perFrameData;
-
-		fbo_cxt _fbo = {};
-		// VkCommandBuffer
-		void(*hubDraw)(void* commandBuffer) = nullptr;
-
-
-		DisplayMode _dm = DISPLAYMODE_SDR;
-		bool bHDR = false;
-		bool m_bMagResourceReInit = false;
-		// 不启用oit
-		bool has_oit = false;
-		// 是否启用模板测试
-		bool _stencil_test = false;
-
-	};
-
-}
-//!vkr
 
 
 namespace vkr {
@@ -19208,326 +19547,288 @@ namespace vkr {
 		(vkCreateFence(dev, &fence_create_info, nullptr, &fence));
 		return fence;
 	}
-	// todo fbo
 
-	class fbo_info_cx
+
+
+
+
+	fbo_info_cx::fbo_info_cx()
 	{
-	public:
-		class FBO
-		{
-		public:
-			VkFramebuffer framebuffer = 0;
-			//深度、模板缓冲
-			dvk_texture color;
-			dvk_texture depth_stencil;
-			VkDescriptorImageInfo descriptor = {};
-			// Semaphore used to synchronize between offscreen and final scene rendering
-			//信号量用于在屏幕外和最终场景渲染之间进行同步
-			VkSemaphore semaphore = VK_NULL_HANDLE;
-		public:
-			FBO() {}
-			~FBO() {}
-		};
-		size_t count_ = 0;
-		int _width = 0, _height = 0;
-		//dvk_swapchain* _swapc = 0;
-		VkRenderPass renderPass = 0, nrp = 0;
-		//采样器
-		VkSampler sampler = 0;
-		// 渲染到纹理同步cpu
-		VkFence _fence = 0;
-		// 缓冲区列表
-		std::vector<FBO> framebuffers;
+	}
 
-		Device* _dev = nullptr;
-		VkClearValue clearValues[2] = {};
-		// VK_FORMAT_B8G8R8A8_UNORM, 浮点纹理 VK_FORMAT_R32G32B32A32_SFLOAT;//如果要模板则depthFormat用VK_FORMAT_D32_SFLOAT_S8_UINT
-		VkFormat depthFormat = VK_FORMAT_D32_SFLOAT, colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
-		bool isColor = false;	//渲染到纹理则为true
+	fbo_info_cx::~fbo_info_cx()
+	{
+	}
 
-		int cmdcount = 0;
-		// Command buffers used for rendering
-		std::vector<VkCommandBuffer> drawCmdBuffers;
-		//std::vector<dvk_cmd> dcmds; 
-	public:
-		fbo_info_cx()
-		{
-		}
+	void fbo_info_cx::setClearValues(uint32_t color, float depth, uint32_t Stencil)
+	{
+		//float r[] = { vk_R(color) / 255.0f,  vk_G(color) / 255.0f,  vk_B(color) / 255.0f,  vk_A(color) / 255.0f };
+		//memcpy(&clearValues[0].color, r, sizeof(float) * 4);
+		unsigned char* uc = (unsigned char*)&color;
+		clearValues[0].color = { uc[0] / 255.0f, uc[1] / 255.0f, uc[2] / 255.0f, uc[3] / 255.0f };
+		clearValues[1].depthStencil = { depth, Stencil };
+	}
 
-		~fbo_info_cx()
-		{
-		}
+	void fbo_info_cx::setClearValues(float* color, float depth, uint32_t Stencil)
+	{
+		clearValues[0].color = { { color[0], color[1], color[2], color[3] } };
+		clearValues[1].depthStencil = { depth, Stencil };
+	}
 
-		void setClearValues(uint32_t color, float depth = 1.0f, uint32_t Stencil = 0)
-		{
-			//float r[] = { vk_R(color) / 255.0f,  vk_G(color) / 255.0f,  vk_B(color) / 255.0f,  vk_A(color) / 255.0f };
-			//memcpy(&clearValues[0].color, r, sizeof(float) * 4);
-			unsigned char* uc = (unsigned char*)&color;
-			clearValues[0].color = { uc[0] / 255.0f, uc[1] / 255.0f, uc[2] / 255.0f, uc[3] / 255.0f };
-			clearValues[1].depthStencil = { depth, Stencil };
-		}
+	//swapchainbuffers交换链
+	void fbo_info_cx::initFBO(int width, int height, int count, VkRenderPass rp)
+	{
+		_width = width; _height = height;
+		count_ = count;
+		//是否创建颜色缓冲纹理
+		isColor = true;// !swapchainbuffers || swapchainbuffers->empty();
+		// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
+		resetCommandBuffers();
 
-		void setClearValues(float* color, float depth = 1.0f, uint32_t Stencil = 0)
+		if (!renderPass)
 		{
-			clearValues[0].color = { {color[0], color[1], color[2], color[3]} };
-			clearValues[1].depthStencil = { depth, Stencil };
-		}
-#ifndef VKVG_SURFACE_IMGS_REQUIREMENTS
-#define FB_COLOR_FORMAT VK_FORMAT_B8G8R8A8_UNORM
-#define VKVG_SURFACE_IMGS_REQUIREMENTS (VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT|VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT|\
-	VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_BLIT_SRC_BIT)
-#define VKVG_PNG_WRITE_IMG_REQUIREMENTS (VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_BLIT_DST_BIT)
-#endif
-		//swapchainbuffers交换链
-		void initFBO(int width, int height, int count, VkRenderPass rp)
-		{
-			_width = width; _height = height;
-			count_ = count;
-			//是否创建颜色缓冲纹理
-			isColor = true;// !swapchainbuffers || swapchainbuffers->empty();
-			// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
-			resetCommandBuffers();
-
-			if (!renderPass)
+			if (!rp)
 			{
-				if (!rp)
-				{
-					//nrp = rp = _dev->new_render_pass(colorFormat, depthFormat);
-				}
-				renderPass = rp;
+				//nrp = rp = _dev->new_render_pass(colorFormat, depthFormat);
 			}
-			// Create sampler to sample from the color attachments
-			VkSamplerCreateInfo samplerinfo = {};
-			samplerinfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			samplerinfo.magFilter = VK_FILTER_LINEAR;
-			samplerinfo.minFilter = VK_FILTER_LINEAR;
-			samplerinfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			samplerinfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			samplerinfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			samplerinfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			samplerinfo.mipLodBias = 0.0f;
-			samplerinfo.maxAnisotropy = 1;
-			samplerinfo.minLod = 0.0f;
-			samplerinfo.maxLod = 1.0f;
-			samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-			if (!sampler)
-				createSampler(_dev->m_device, &sampler, &samplerinfo);
-			//VkFormatProperties phyStencilProps = { 0 }, phyImgProps[2] = {0};
-			////check png blit format
-			//VkFormat pngBlitFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_R8G8B8A8_UNORM };
-			//for (int i = 0; i < 2; i++)
+			renderPass = rp;
+		}
+		// Create sampler to sample from the color attachments
+		VkSamplerCreateInfo samplerinfo = {};
+		samplerinfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerinfo.magFilter = VK_FILTER_LINEAR;
+		samplerinfo.minFilter = VK_FILTER_LINEAR;
+		samplerinfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerinfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerinfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerinfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerinfo.mipLodBias = 0.0f;
+		samplerinfo.maxAnisotropy = 1;
+		samplerinfo.minLod = 0.0f;
+		samplerinfo.maxLod = 1.0f;
+		samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		if (!sampler)
+			createSampler(_dev->m_device, &sampler, &samplerinfo);
+		//VkFormatProperties phyStencilProps = { 0 }, phyImgProps[2] = {0};
+		////check png blit format
+		//VkFormat pngBlitFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_R8G8B8A8_UNORM };
+		//for (int i = 0; i < 2; i++)
+		//{
+		//	vkGetPhysicalDeviceFormatProperties(_dev->GetPhysicalDevice(), pngBlitFormats[i], &phyImgProps[i]);	
+		//	if ((phyImgProps[i].linearTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
+		//		//dev->pngStagFormat = pngBlitFormats[i];
+		//		//dev->pngStagTiling = VK_IMAGE_TILING_LINEAR;
+		//		//break;
+		//		printf("");
+		//	}
+		//	else if ((phyImgProps[i].optimalTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
+		//		//dev->pngStagFormat = pngBlitFormats[i];
+		//		//dev->pngStagTiling = VK_IMAGE_TILING_OPTIMAL;
+		//		//break;
+		//		printf("");
+		//	}
+		//}
+		// Create num frame buffers
+		resetFramebuffer(width, height);
+	}
+
+	//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
+	void fbo_info_cx::resetFramebuffer(int width, int height)
+	{
+		_width = width;
+		_height = height;
+#ifdef _WIN32
+		destroyImage();
+#endif
+		// Color attachment
+		VkImageCreateInfo image = {};
+		image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image.imageType = VK_IMAGE_TYPE_2D;
+		image.format = colorFormat;
+		image.extent.width = width;
+		image.extent.height = height;
+		image.extent.depth = 1;
+		image.mipLevels = 1;
+		image.arrayLayers = 1;
+		image.samples = VK_SAMPLE_COUNT_1_BIT;
+		image.tiling = VK_IMAGE_TILING_OPTIMAL;
+		// We will sample directly from the color attachment
+		image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		VkImageViewCreateInfo colorImageView = {};
+		colorImageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		colorImageView.format = colorFormat;
+		colorImageView.flags = 0;
+		colorImageView.subresourceRange = {};
+		colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		colorImageView.subresourceRange.baseMipLevel = 0;
+		colorImageView.subresourceRange.levelCount = 1;
+		colorImageView.subresourceRange.baseArrayLayer = 0;
+		colorImageView.subresourceRange.layerCount = 1;
+		if (isColor)
+		{
+			for (auto& it : framebuffers)
+			{
+				createImage(_dev, &image, &colorImageView, &it.color, 0);
+				it.color.width = width;
+				it.color.height = height;
+				it.color._format = colorFormat;
+			}
+			if (!_fence)
+			{
+				_fence = createFence(_dev->m_device);
+			}
+		}
+		else
+		{
+			//int i = 0;
+			//for (auto it : *swapchainbuffers)
 			//{
-			//	vkGetPhysicalDeviceFormatProperties(_dev->GetPhysicalDevice(), pngBlitFormats[i], &phyImgProps[i]);	
-			//	if ((phyImgProps[i].linearTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
-			//		//dev->pngStagFormat = pngBlitFormats[i];
-			//		//dev->pngStagTiling = VK_IMAGE_TILING_LINEAR;
-			//		//break;
-			//		printf("");
-			//	}
-			//	else if ((phyImgProps[i].optimalTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
-			//		//dev->pngStagFormat = pngBlitFormats[i];
-			//		//dev->pngStagTiling = VK_IMAGE_TILING_OPTIMAL;
-			//		//break;
-			//		printf("");
+			//	if (framebuffers.size() > i)
+			//	{
+			//		framebuffers[i].color._dev = _dev;
+			//		framebuffers[i].color._image = it.image;
+			//		framebuffers[i].color._view = it._view;
+			//		framebuffers[i].color.width = width;
+			//		framebuffers[i].color.height = height;
+			//		framebuffers[i].color._format = (VkFormat)it.colorFormat;
+			//		i++;
 			//	}
 			//}
-			// Create num frame buffers
-			resetFramebuffer(width, height);
 		}
+		// Depth stencil attachment
+		image.format = depthFormat;
+		image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-		//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
-		void resetFramebuffer(int width, int height)
+		VkImageViewCreateInfo depthStencilView = {};
+		depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		depthStencilView.format = depthFormat;
+		depthStencilView.flags = 0;
+		depthStencilView.subresourceRange = {};
+		depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		depthStencilView.subresourceRange.baseMipLevel = 0;
+		depthStencilView.subresourceRange.levelCount = 1;
+		depthStencilView.subresourceRange.baseArrayLayer = 0;
+		depthStencilView.subresourceRange.layerCount = 1;
+		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+			depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		for (auto& it : framebuffers)
 		{
-			_width = width;
-			_height = height;
-#ifdef _WIN32
-			destroyImage();
-#endif
-			// Color attachment
-			VkImageCreateInfo image = {};
-			image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-			image.imageType = VK_IMAGE_TYPE_2D;
-			image.format = colorFormat;
-			image.extent.width = width;
-			image.extent.height = height;
-			image.extent.depth = 1;
-			image.mipLevels = 1;
-			image.arrayLayers = 1;
-			image.samples = VK_SAMPLE_COUNT_1_BIT;
-			image.tiling = VK_IMAGE_TILING_OPTIMAL;
-			// We will sample directly from the color attachment
-			image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-			VkImageViewCreateInfo colorImageView = {};
-			colorImageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			colorImageView.format = colorFormat;
-			colorImageView.flags = 0;
-			colorImageView.subresourceRange = {};
-			colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			colorImageView.subresourceRange.baseMipLevel = 0;
-			colorImageView.subresourceRange.levelCount = 1;
-			colorImageView.subresourceRange.baseArrayLayer = 0;
-			colorImageView.subresourceRange.layerCount = 1;
-			if (isColor)
-			{
-				for (auto& it : framebuffers)
-				{
-					createImage(_dev, &image, &colorImageView, &it.color, 0);
-					it.color.width = width;
-					it.color.height = height;
-					it.color._format = colorFormat;
-				}
-				if (!_fence)
-				{
-					_fence = createFence(_dev->m_device);
-				}
-			}
-			else
-			{
-				//int i = 0;
-				//for (auto it : *swapchainbuffers)
-				//{
-				//	if (framebuffers.size() > i)
-				//	{
-				//		framebuffers[i].color._dev = _dev;
-				//		framebuffers[i].color._image = it.image;
-				//		framebuffers[i].color._view = it._view;
-				//		framebuffers[i].color.width = width;
-				//		framebuffers[i].color.height = height;
-				//		framebuffers[i].color._format = (VkFormat)it.colorFormat;
-				//		i++;
-				//	}
-				//}
-			}
-			// Depth stencil attachment
-			image.format = depthFormat;
-			image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-			VkImageViewCreateInfo depthStencilView = {};
-			depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			depthStencilView.format = depthFormat;
-			depthStencilView.flags = 0;
-			depthStencilView.subresourceRange = {};
-			depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-			depthStencilView.subresourceRange.baseMipLevel = 0;
-			depthStencilView.subresourceRange.levelCount = 1;
-			depthStencilView.subresourceRange.baseArrayLayer = 0;
-			depthStencilView.subresourceRange.layerCount = 1;
-			if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
-				depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-			}
-			for (auto& it : framebuffers)
-			{
-				createImage(_dev, &image, &depthStencilView, &it.depth_stencil, 0);
-				it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
-			}
-
-			VkImageView attachments[2];
-			int inc = 0;
-			for (auto& it : framebuffers)
-			{
-				inc++;
-				attachments[0] = it.color._view;
-				attachments[1] = it.depth_stencil._view;
-				VkFramebufferCreateInfo fbufCreateInfo = {};
-				fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-				fbufCreateInfo.renderPass = renderPass;
-				fbufCreateInfo.attachmentCount = 2;
-				fbufCreateInfo.pAttachments = attachments;
-				fbufCreateInfo.width = width;
-				fbufCreateInfo.height = height;
-				fbufCreateInfo.layers = 1;
-				auto hr = vkCreateFramebuffer(_dev->m_device, &fbufCreateInfo, nullptr, &it.framebuffer);
-				// Fill a descriptor for later use in a descriptor set
-				it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				it.descriptor.imageView = it.color._view;
-				it.descriptor.sampler = sampler;
-			}
+			createImage(_dev, &image, &depthStencilView, &it.depth_stencil, 0);
+			it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
 		}
-		void reset_fbo(int width, int height)
+
+		VkImageView attachments[2];
+		int inc = 0;
+		for (auto& it : framebuffers)
 		{
-			resetFramebuffer(width, height);
+			inc++;
+			attachments[0] = it.color._view;
+			attachments[1] = it.depth_stencil._view;
+			VkFramebufferCreateInfo fbufCreateInfo = {};
+			fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			fbufCreateInfo.renderPass = renderPass;
+			fbufCreateInfo.attachmentCount = 2;
+			fbufCreateInfo.pAttachments = attachments;
+			fbufCreateInfo.width = width;
+			fbufCreateInfo.height = height;
+			fbufCreateInfo.layers = 1;
+			auto hr = vkCreateFramebuffer(_dev->m_device, &fbufCreateInfo, nullptr, &it.framebuffer);
+			// Fill a descriptor for later use in a descriptor set
+			it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			it.descriptor.imageView = it.color._view;
+			it.descriptor.sampler = sampler;
 		}
-		void resetCommandBuffers()
+	}
+
+	void fbo_info_cx::reset_fbo(int width, int height)
+	{
+		resetFramebuffer(width, height);
+	}
+
+	void fbo_info_cx::resetCommandBuffers()
+	{
+		if (count_ < 1)
+			return;
+		destroy_all();
+		framebuffers.resize(count_);
+		drawCmdBuffers.resize(count_);
+		for (auto& it : framebuffers)
 		{
-			if (count_ < 1)
-				return;
-			destroy_all();
-			framebuffers.resize(count_);
-			drawCmdBuffers.resize(count_);
-			for (auto& it : framebuffers)
+			it.depth_stencil._dev = _dev;
+			if (it.semaphore == VK_NULL_HANDLE)
 			{
-				it.depth_stencil._dev = _dev;
-				if (it.semaphore == VK_NULL_HANDLE)
-				{
-					createSemaphore(_dev->m_device, &it.semaphore, 0);
-				}
-			}
-			if (isColor)
-			{
-				for (auto& it : framebuffers)
-					it.color._dev = _dev;
+				createSemaphore(_dev->m_device, &it.semaphore, 0);
 			}
 		}
-
-
-		void build_cmd_empty()
-		{
-			{
-				VkCommandBufferBeginInfo cmdBufInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, 0, 0 };
-				VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 0, 0, 0, 0, 0, 0 };
-				renderPassBeginInfo.renderPass = renderPass;
-				renderPassBeginInfo.renderArea.offset.x = 0;
-				renderPassBeginInfo.renderArea.offset.y = 0;
-				renderPassBeginInfo.renderArea.extent.width = _width;
-				renderPassBeginInfo.renderArea.extent.height = _height;
-				renderPassBeginInfo.clearValueCount = 2;
-				renderPassBeginInfo.pClearValues = clearValues;
-
-				for (size_t i = 0; i < framebuffers.size(); ++i)
-				{
-
-					// Set target frame buffer
-					renderPassBeginInfo.framebuffer = framebuffers[i].framebuffer;
-
-					(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
-
-					// Draw the particle system using the update vertex buffer
-
-					vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-
-					vkCmdEndRenderPass(drawCmdBuffers[i]);
-
-					(vkEndCommandBuffer(drawCmdBuffers[i]));
-				}
-			}
-		}
-	public:
-
-		void destroyImage()
+		if (isColor)
 		{
 			for (auto& it : framebuffers)
+				it.color._dev = _dev;
+		}
+	}
+
+	void fbo_info_cx::build_cmd_empty()
+	{
+		{
+			VkCommandBufferBeginInfo cmdBufInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, 0, 0 };
+			VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 0, 0, 0, 0, 0, 0 };
+			renderPassBeginInfo.renderPass = renderPass;
+			renderPassBeginInfo.renderArea.offset.x = 0;
+			renderPassBeginInfo.renderArea.offset.y = 0;
+			renderPassBeginInfo.renderArea.extent.width = _width;
+			renderPassBeginInfo.renderArea.extent.height = _height;
+			renderPassBeginInfo.clearValueCount = 2;
+			renderPassBeginInfo.pClearValues = clearValues;
+
+			for (size_t i = 0; i < framebuffers.size(); ++i)
 			{
-				if (it.framebuffer)
-					vkDestroyFramebuffer(_dev->m_device, it.framebuffer, 0);
-				it.framebuffer = 0;
+
+				// Set target frame buffer
+				renderPassBeginInfo.framebuffer = framebuffers[i].framebuffer;
+
+				(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+
+				// Draw the particle system using the update vertex buffer
+
+				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+
+				vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+				(vkEndCommandBuffer(drawCmdBuffers[i]));
 			}
 		}
-		void destroy_all()
-		{
-			destroyImage();
-			renderPass = 0;
-		}
-	private:
+	}
 
-	};
+	void fbo_info_cx::destroyImage()
+	{
+		for (auto& it : framebuffers)
+		{
+			if (it.framebuffer)
+				vkDestroyFramebuffer(_dev->m_device, it.framebuffer, 0);
+			it.framebuffer = 0;
+		}
+	}
+
+	void fbo_info_cx::destroy_all()
+	{
+		destroyImage();
+		renderPass = 0;
+	}
+
+
+
+
+
 
 	// todo vkrenderer
 	Renderer_cx::Renderer_cx(const_vk* p)
 	{
+		m_AsyncPool = new AsyncPool();
 		if (p)
 			ct = *p;
 	}
@@ -19535,6 +19836,10 @@ namespace vkr {
 
 	Renderer_cx::~Renderer_cx()
 	{
+		if (m_AsyncPool) {
+			delete m_AsyncPool;
+			m_AsyncPool = nullptr;
+		}
 		if (m_GBuffer)
 			delete m_GBuffer;
 		m_GBuffer = 0;
@@ -19666,7 +19971,7 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void Renderer_cx::OnDestroy()
 	{
-		m_AsyncPool.Flush();
+		m_AsyncPool->Flush();
 
 		//m_ImGUI.OnDestroy();
 		m_ColorConversionPS.OnDestroy();
@@ -19805,7 +20110,7 @@ namespace vkr {
 		//}
 
 		// use multi threading
-		AsyncPool* pAsyncPool = &m_AsyncPool;
+		AsyncPool* pAsyncPool = m_AsyncPool;
 
 		// Loading stages
 		//
@@ -19951,7 +20256,7 @@ namespace vkr {
 	void Renderer_cx::UnloadScene()
 	{
 		// wait for all the async loading operations to finish
-		m_AsyncPool.Flush();
+		m_AsyncPool->Flush();
 
 		m_pDevice->GPUFlush();
 		for (auto it : _robject)
@@ -20329,7 +20634,7 @@ namespace vkr {
 		}
 	}
 	void draw_pbrpass(vkr::Device* dev, VkCommandBuffer cmdBuf1, const scene_state* pState
-		, std::vector<GltfPbrPass::BatchList>* ds, std::vector<GltfPbrPass::BatchList>* dsw, bool bWireframe)
+		, std::vector<BatchList>* ds, std::vector<BatchList>* dsw, bool bWireframe)
 	{
 		if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 		{
@@ -20965,251 +21270,6 @@ namespace vkr {
 	}
 #endif
 
-	struct SystemInfo
-	{
-		std::string mCPUName = "UNAVAILABLE";
-		std::string mGPUName = "UNAVAILABLE";
-		std::string mGfxAPI = "UNAVAILABLE";
-	};
-
-#if 1
-
-
-	/* todo 相机
-	  [x]第一人称相机
-	  [ ]第三人称相机
-	  [ ]场景漫游相机
-	*/
-	class CameraX
-	{
-	public:
-		glm::mat4 view;                         //视图
-		glm::dvec3 pos = { 0,2.8,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
-		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量  
-		glm::vec3 rota = {};                         //位置角度
-		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量 
-		glm::vec2 size = { 1.0f, 1.0f }; //视口大小
-		glm::quat qt = {};
-		glm::quat src_qt = {};
-		glm::quat dst_qt = {};
-		double qtime = 0;	//插值时间
-		double qmaxtime = 0.1;	//最大插值时间
-		// 相机参数 
-		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
-		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
-		float cameraHeight = 1.5f;                               // 相机垂直高度
-		bool bFirstPerson = false;	// 是否第一人称视角
-		float fixheight = 0;		// 0就是固定高度
-		CameraX() {
-			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
-			qt = dst_qt = e2q(rota);
-			mouseMovement(0, 0, 0, 1);                //不初始化的话，开局不移动没画面
-		}
-
-	private:
-		//float keySpeed = 1.0f;    //键盘移动速率,最好不要高过64
-		float keySpeed = 5.0f;
-		float xMouseSpeed = 0.51f;   //鼠标移动X速率
-		float yMouseSpeed = 0.81f;   //鼠标移动Y速率
-
-		//		auto zz = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * (moveSpeed * direction.x);
-	public:
-		void set_size(float w, float h) {
-			size.x = w;
-			size.y = h;
-			xMouseSpeed = h / 360.0 * 0.15;
-			yMouseSpeed = w / 360.0 * 0.25;
-		}
-
-		// 输入角度欧拉角，计算四元数向量
-		glm::vec3 cfront(const glm::ivec2& r)
-		{
-			auto rota_rad = glm::radians(glm::vec2(r));
-			glm::vec3 f = {};
-			f.x = glm::cos(rota_rad.x) * glm::cos(rota_rad.y);
-			f.y = glm::sin(rota_rad.x);
-			f.z = glm::cos(rota_rad.x) * glm::sin(rota_rad.y);
-			return f;
-		}
-		glm::quat e2q(const glm::ivec2& r)
-		{
-			auto ry = glm::radians(glm::vec2(r));
-			glm::vec3 EulerAngles(ry.x, ry.y, 0.0);// x=pitch; y=yaw； roll忽略
-			glm::quat q = glm::quat(EulerAngles);
-			return q;
-		}
-		//	正弦函数y=sin(a)和余弦函数x=cos(a)
-		//	正切函数tan(a) = sin(a) / cos(a)
-		glm::vec3 quat_up(const glm::quat& q)
-		{
-			auto v = q * glm::vec3(0, 1, 0);
-			return glm::vec3(v.z, v.y, v.x);
-		}
-		glm::vec3 quat_right(const glm::quat& q)
-		{
-			auto v = q * glm::vec3(1, 0, 0);
-			return glm::vec3(v.z, v.y, v.x);
-		}
-		glm::vec3 quat_forward(const glm::quat& q)
-		{
-			auto v = q * glm::vec3(0, 0, 1);
-			return glm::vec3(v.z, -v.y, v.x);
-		}
-		//键盘移动处理
-		void keyMovement(glm::vec3 direction, double deltaTime) {
-			float moveSpeed = deltaTime * keySpeed;
-			auto z = worldUp * direction.z;
-			// 第一人称相机计算
-#if 1 
-			auto x = -quat_right(qt);	// 左右移动
-			auto y = -quat_forward(qt);	// 前后移动
-			//auto z0 = quat_up(qi); 
-			auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
-#else
-			auto front1 = cfront(rota);
-			auto front0 = -front1;// 获取和摄像机前向向量相反的向量
-			auto right = glm::normalize(glm::cross(front0, worldUp));
-			//根据摄像机坐标系下的移动方向进行移动
-			auto npos1 = moveSpeed * (direction.x * right + z + direction.y * front0);
-#endif
-			if (abs(direction.x) > 0 || abs(direction.y) > 0)
-				npos.y *= fixheight;
-			pos += npos;
-			updateView();
-		}
-
-		//鼠标移动处理
-		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown)
-		{
-			if (!bFirstPerson && !mousedown)
-			{
-				return; // 非第一人称视角且鼠标未按下时不处理鼠标移动
-			}
-			//计算摄像机的前向向量
-			//pitch()：俯仰，将物体绕X轴旋转
-			//yaw()：航向，将物体绕Y轴旋转
-			//roll()：横滚，将物体绕Z轴旋转 
-			// 计算前向向量 
-			//front = cfront(rota);
-			if (abs(deltaX) > 0 || abs(deltaY) > 0)
-			{
-				auto sr = rota;
-				// 角度配置
-				rota.x += deltaY * xMouseSpeed;
-				rota.y += deltaX * yMouseSpeed;
-				//角度限制
-				rota.y = glm::mod(rota.y, 360.0f);
-				rota.x = glm::clamp(rota.x, -89.0f, 89.0f);
-				src_qt = qt; // 保存当前四元数 
-				dst_qt = e2q(rota);
-				auto qd = glm::distance2(sr, rota);
-				if (qd > 1)
-				{
-					qtime = 0;
-				}
-			}
-
-			//if (qtime <= qmaxtime)
-			//{
-			//	qt = glm::slerp(src_qt, dst_qt, (float)(qtime / qmaxtime)); // 四元数插值 
-			//}
-			//else
-			{
-				qt = dst_qt;
-			}
-			front = quat_forward(qt);
-			//auto front0 = cfront(rota);
-			//auto front1 = get_front(qt);
-			updateView();
-			qtime += deltaTime;
-		}
-
-		void updateView() {
-			glm::vec3 tpos = pos;
-			//auto nq = glm::conjugate(qt);
-			glm::vec3 camera_forward; // +Z is forward direction= qt * glm::vec3(0, 0, 1)
-			glm::vec3 camera_right; // +X is right direction= qt * glm::vec3(1, 0, 0)
-			glm::vec3 camera_up; // +Y is up direction= qt * glm::vec3(0, 1, 0)
-			float cameraSmooth = 2.0f;	// 平滑因子  
-			cameraPos = tpos;
-			camera_forward = glm::normalize(front);
-			camera_right = glm::normalize(glm::cross(camera_forward, worldUp));
-			camera_up = glm::normalize(glm::cross(camera_right, camera_forward));
-			if (!bFirstPerson)
-			{
-				cameraPos += camera_forward * cameraDistance + camera_up * cameraHeight;
-			}
-			auto view0 = glm::lookAt(cameraPos, front + cameraPos, camera_up);
-			view = view0;
-			//cameraPos = view[3];
-			//printf("pos %.2f,%.2f,%.2f\t %.2f,%.2f,%.2f\t %.2f,%.2f\n", pos.x, pos.y, pos.z, front.x, front.y, front.z, rota.x, rota.y);
-		}
-	};
-
-#endif //1
-
-	class draw3d_ctx
-	{
-	public:
-		draw3d_ctx();
-		~draw3d_ctx();
-		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
-		void OnCreate();
-		void OnDestroy();
-		void OnRender();
-		void OnResize(bool resizeRender);
-		void OnUpdateDisplay();
-
-		void add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap);
-
-		void OnUpdate();
-
-		void HandleInput();
-		void UpdateCamera(Camera& cam);
-		void set_fboidx(int idx);
-
-	public:
-		Device* m_device = 0;
-		int m_Width = 1280;  // application window dimensions
-		int m_Height = 800;  // application window dimensions
-		int shadowResolution = 1024;
-		int curridx = 0;
-		int setidx = 0;
-		fbo_info_cx* _fbo = 0;
-
-		GLTFCommon* _tmpgc = 0;
-		std::vector<GLTFCommon*> _loaders;
-		std::queue<GLTFCommon*> _lts;
-		std::mutex m_ltsm;
-
-		Renderer_cx* m_pRenderer = NULL;
-		VkRenderPass _fbo_renderpass = 0;				// fbo的VkRenderPass
-		DisplayMode _dm = DISPLAYMODE_SDR;
-		scene_state m_UIState;
-		Camera m_camera;
-		glm::vec3 eyePos = {}, lookAt = {};
-		CameraX tpfc = {};
-
-		mouse_state_t io = {};
-		double _time = 0; // Time accumulator in seconds, used for animation.
-
-		SystemInfo systemi = {};
-		// njson config file
-		njson m_jsonConfigFile;
-		std::vector<std::string>    m_sceneNames;
-		int	m_activeScene = 0;
-		int	m_activeCamera = 0;
-		std::function<void(int count, int idx, const char* str)> cb_showtxt;
-		std::vector<std::string>    _tlabs;
-		int loadingStage = 0;
-		bool m_bPlay = 0;
-		bool bShowProfilerWindow = true;
-		bool m_bIsBenchmarking = false;
-		bool _customize_camera = 0;
-	};
-
-
-
 
 
 
@@ -21793,26 +21853,6 @@ namespace vkr {
 		return r;
 	}
 
-	class pipeinfo_cx
-	{
-	public:
-		pipeinfo_cx();
-		~pipeinfo_cx();
-		void compiler_pipe(const char* vertexShader, const char* pixelShader, Device* pDevice);
-		void set_pipeinfo(DynamicBufferRing* m_pDynamicBufferRing, ResourceViewHeaps* m_pResourceViewHeaps, VkRenderPass renderPass);
-		VkDescriptorSet new_dset();
-		void freeobj();
-	private:
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-		Device* pDevice = 0;
-		DynamicBufferRing* m_pDynamicBufferRing = 0;
-		ResourceViewHeaps* m_pResourceViewHeaps = 0;
-		VkRenderPass renderPass = {};
-		VkPipeline m_pipeline = {};
-		VkPipelineLayout m_pipelineLayout = {};
-		VkDescriptorSetLayout m_descriptorSetLayout = {};
-		std::vector<VkDescriptorSet> dset;
-	};
 
 	pipeinfo_cx::pipeinfo_cx()
 	{
