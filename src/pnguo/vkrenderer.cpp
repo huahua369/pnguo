@@ -2211,6 +2211,7 @@ namespace vkr
 		{
 			vkCreateSampler(m_device, pCreateInfo, 0, &sampler.sampler);
 			sampler.info = *pCreateInfo;
+			ret = sampler.sampler;
 		}
 		else {
 			if (memcmp(pCreateInfo, &sampler.info, sizeof(VkSamplerCreateInfo)) == 0)
@@ -8478,18 +8479,18 @@ namespace vkr
 		//destroy default material
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_defaultMaterial.m_texturesDescriptorSetLayout, NULL);
 		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
-		for (auto& p : _samplers) {
-			if (p)
-			{
-				vkDestroySampler(m_pDevice->m_device, p, nullptr);
-			}
-		}
+		//for (auto& p : _samplers) {
+		//	if (p)
+		//	{
+		//		vkDestroySampler(m_pDevice->m_device, p, nullptr);
+		//	}
+		//}
 		_samplers.clear();
-		vkDestroySampler(m_pDevice->m_device, m_samplerPbr, nullptr);
-		vkDestroySampler(m_pDevice->m_device, m_samplerShadow, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_samplerPbr, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_samplerShadow, nullptr);
 
 		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
-		vkDestroySampler(m_pDevice->m_device, m_brdfLutSampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_brdfLutSampler, nullptr);
 		m_brdfLutTexture.OnDestroy();
 
 	}
@@ -12467,8 +12468,8 @@ namespace vkr {
 		m_skydome.OnDestroy();
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorLayout, NULL);
 
-		vkDestroySampler(m_pDevice->m_device, m_samplerDiffuseCube, nullptr);
-		vkDestroySampler(m_pDevice->m_device, m_samplerSpecularCube, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_samplerDiffuseCube, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_samplerSpecularCube, nullptr);
 
 		vkDestroyImageView(m_pDevice->m_device, m_CubeDiffuseTextureView, NULL);
 		vkDestroyImageView(m_pDevice->m_device, m_CubeSpecularTextureView, NULL);
@@ -12654,8 +12655,8 @@ namespace vkr {
 		m_Post.OnDestroy();
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_SharpenDescriptorSetLayout, NULL);
 
-		for (int i = 0; i < 4; i++)
-			vkDestroySampler(m_pDevice->m_device, m_samplers[i], nullptr);
+		//for (int i = 0; i < 4; i++)
+		//	vkDestroySampler(m_pDevice->m_device, m_samplers[i], nullptr);
 
 		m_pResourceViewHeaps->FreeDescriptor(m_SharpenDescriptorSet);
 		m_pResourceViewHeaps->FreeDescriptor(m_TaaDescriptorSet);
@@ -12911,7 +12912,7 @@ namespace vkr {
 		for (int i = 0; i < s_descriptorBuffers; i++)
 			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
 
-		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 	}
@@ -13271,7 +13272,7 @@ namespace vkr {
 		m_blur.OnDestroy();
 
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
-		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
 		m_blendAdd.OnDestroy();
 
@@ -13601,7 +13602,7 @@ namespace vkr {
 
 		m_directionalBlur.OnDestroy();
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
-		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 		vkDestroyRenderPass(m_pDevice->m_device, m_in, NULL);
 	}
 
@@ -13755,7 +13756,7 @@ namespace vkr {
 		for (int i = 0; i < s_descriptorBuffers; i++)
 			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
 
-		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
 	}
@@ -13975,7 +13976,7 @@ namespace vkr {
 
 		m_downscale.OnDestroy();
 		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_descriptorSetLayout, NULL);
-		vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
+		//vkDestroySampler(m_pDevice->m_device, m_sampler, nullptr);
 
 		vkDestroyRenderPass(m_pDevice->m_device, m_in, NULL);
 	}
