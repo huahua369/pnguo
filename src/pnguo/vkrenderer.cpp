@@ -583,6 +583,7 @@ namespace vkr
 		uint32_t compute_queue_family_index = 0;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
 		std::map<size_t, sampler_t> _samplers;
+		std::vector<sampler_t> _samplers_v;
 
 		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
 		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
@@ -2165,7 +2166,15 @@ namespace vkr
 				vkDestroySampler(m_device, it.second.sampler, NULL);
 			}
 		}
+		for (auto& it : _samplers_v)
+		{
+			if (it.sampler)
+			{
+				vkDestroySampler(m_device, it.sampler, NULL);
+			}
+		}
 		_samplers.clear();
+		_samplers_v.clear();
 		if (m_surface != VK_NULL_HANDLE)
 		{
 			vkDestroySurfaceKHR(m_instance, m_surface, NULL);
@@ -2197,19 +2206,41 @@ namespace vkr
 	VkSampler Device::newSampler(const VkSamplerCreateInfo* pCreateInfo) {
 		auto h = Hash_p((const size_t*)pCreateInfo, sizeof(VkSamplerCreateInfo));
 		auto& sampler = _samplers[h];
+		VkSampler ret = {};
 		if (!sampler.sampler)
 		{
 			vkCreateSampler(m_device, pCreateInfo, 0, &sampler.sampler);
 			sampler.info = *pCreateInfo;
 		}
 		else {
-			if (memcmp(pCreateInfo, &sampler.info, sizeof(VkSamplerCreateInfo)) != 0)
+			if (memcmp(pCreateInfo, &sampler.info, sizeof(VkSamplerCreateInfo)) == 0)
 			{
-				assert(0);
-				//vkCreateSampler(m_device, pCreateInfo, 0, &sampler.sampler);
+				ret = sampler.sampler;
+			}
+			else
+			{
+				// 解决samplers哈希冲突问题
+				for (auto& it : _samplers_v)
+				{
+					if (memcmp(pCreateInfo, &it.info, sizeof(VkSamplerCreateInfo)) == 0)
+					{
+						ret = it.sampler;
+						break;
+					}
+				}
+				if (!ret) {
+					vkCreateSampler(m_device, pCreateInfo, 0, &ret);
+					if (ret)
+					{
+						sampler_t t = {};
+						t.info = *pCreateInfo;
+						t.sampler = ret;
+						_samplers_v.push_back(t);
+					}
+				}
 			}
 		}
-		return sampler.sampler;
+		return ret;
 	}
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex) {
