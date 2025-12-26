@@ -676,10 +676,10 @@ namespace vkr
 		};
 		std::vector<CommandBuffersPerFrame> m_pCommandBuffers;
 		CommandBuffersPerFrame* m_pCurrentFrame = 0;
-		Device* m_pDevice;
-		uint32_t m_frameIndex;
-		uint32_t m_numberOfAllocators;
-		uint32_t m_commandListsPerBackBuffer;
+		Device* m_pDevice = 0;
+		uint32_t m_frameIndex = 0;
+		uint32_t m_numberOfAllocators = 0;
+		uint32_t m_commandListsPerBackBuffer = 0;
 	public:
 		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerframe, bool compute = false);
 		void OnDestroy();
@@ -708,15 +708,15 @@ namespace vkr
 		{
 		}
 
-		uint32_t    uImageWidth;
-		uint32_t    uImageHeight;
-		int         iMousePos[2];            // in pixels, driven by ImGuiIO.MousePos.xy
+		uint32_t    uImageWidth = 0;
+		uint32_t    uImageHeight = 0;
+		int         iMousePos[2] = {};            // in pixels, driven by ImGuiIO.MousePos.xy
 
-		float       fBorderColorRGB[4];      // Linear RGBA
+		float       fBorderColorRGB[4] = {};      // Linear RGBA
 
-		float       fMagnificationAmount;    // [1-...]
-		float       fMagnifierScreenRadius;  // [0-1]
-		mutable int iMagnifierOffset[2];     // in pixels
+		float       fMagnificationAmount = {};    // [1-...]
+		float       fMagnifierScreenRadius = {};  // [0-1]
+		mutable int iMagnifierOffset[2] = {};     // in pixels
 	};
 
 	class AsyncPool;
