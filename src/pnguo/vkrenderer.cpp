@@ -664,30 +664,30 @@ namespace vkr
 		bool shadowMap = true;		// 是否有阴影
 	};
 	// todo cmdlr
+
 	class CommandListRing
 	{
-	public:
-		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerframe, bool compute = false);
-		void OnDestroy();
-		void OnBeginFrame();
-		VkCommandBuffer GetNewCommandList();
-		VkCommandPool GetPool() { return m_pCommandBuffers->m_commandPool; }
-
 	private:
-		uint32_t m_frameIndex;
-		uint32_t m_numberOfAllocators;
-		uint32_t m_commandListsPerBackBuffer;
-
-		Device* m_pDevice;
-
 		struct CommandBuffersPerFrame
 		{
 			VkCommandPool        m_commandPool;
 			VkCommandBuffer* m_pCommandBuffer;
 			uint32_t m_UsedCls;
-		} *m_pCommandBuffers, * m_pCurrentFrame;
-
+		};
+		std::vector<CommandBuffersPerFrame> m_pCommandBuffers;
+		CommandBuffersPerFrame* m_pCurrentFrame = 0;
+		Device* m_pDevice;
+		uint32_t m_frameIndex;
+		uint32_t m_numberOfAllocators;
+		uint32_t m_commandListsPerBackBuffer;
+	public:
+		void OnCreate(Device* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerframe, bool compute = false);
+		void OnDestroy();
+		void OnBeginFrame();
+		VkCommandBuffer GetNewCommandList();
+		//VkCommandPool GetPool() { return m_pCommandBuffers[0].m_commandPool; }
 	};
+
 	struct fbo_cxt {
 		VkRenderPass renderPass = 0;
 		VkFramebuffer framebuffer = 0;
@@ -19364,7 +19364,7 @@ namespace vkr {
 		m_numberOfAllocators = numberOfBackBuffers;
 		m_commandListsPerBackBuffer = commandListsPerBackBuffer;
 
-		m_pCommandBuffers = new CommandBuffersPerFrame[m_numberOfAllocators]();
+		m_pCommandBuffers.resize(m_numberOfAllocators);
 
 		// Create command allocators, for each frame in flight we wannt to have a single Command Allocator, and <commandListsPerBackBuffer> command buffers
 		//
@@ -19422,11 +19422,9 @@ namespace vkr {
 		for (uint32_t a = 0; a < m_numberOfAllocators; a++)
 		{
 			vkFreeCommandBuffers(m_pDevice->m_device, m_pCommandBuffers[a].m_commandPool, m_commandListsPerBackBuffer, m_pCommandBuffers[a].m_pCommandBuffer);
-
 			vkDestroyCommandPool(m_pDevice->m_device, m_pCommandBuffers[a].m_commandPool, NULL);
 		}
-
-		delete[] m_pCommandBuffers;
+		m_pCommandBuffers.clear();
 	}
 
 	//--------------------------------------------------------------------------------------
@@ -19437,9 +19435,7 @@ namespace vkr {
 	VkCommandBuffer CommandListRing::GetNewCommandList()
 	{
 		VkCommandBuffer commandBuffer = m_pCurrentFrame->m_pCommandBuffer[m_pCurrentFrame->m_UsedCls++];
-
 		assert(m_pCurrentFrame->m_UsedCls < m_commandListsPerBackBuffer); //if hit increase commandListsPerBackBuffer
-
 		return commandBuffer;
 	}
 
@@ -19451,9 +19447,7 @@ namespace vkr {
 	void CommandListRing::OnBeginFrame()
 	{
 		m_pCurrentFrame = &m_pCommandBuffers[m_frameIndex % m_numberOfAllocators];
-
 		m_pCurrentFrame->m_UsedCls = 0;
-
 		m_frameIndex++;
 	}
 
@@ -19473,82 +19467,8 @@ namespace vkr {
 		auto hr = vkCreateSemaphore(dev, semaphoreCreateInfo, nullptr, semaphore);
 		return;
 	}
-	//创建采样器
-	bool createSampler(VkDevice dev, VkSampler* sampler, VkSamplerCreateInfo* info)
-	{
-		VkSamplerCreateInfo sampler_create_info = {
-			VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,                // VkStructureType            sType
-			nullptr,                                              // const void*                pNext
-			0,                                                    // VkSamplerCreateFlags       flags
-			VK_FILTER_LINEAR,                                     // VkFilter                   magFilter
-			VK_FILTER_LINEAR,                                     // VkFilter                   minFilter
-			VK_SAMPLER_MIPMAP_MODE_LINEAR,                       // VkSamplerMipmapMode        mipmapMode
-			VK_SAMPLER_ADDRESS_MODE_REPEAT,                // VkSamplerAddressMode       addressModeU
-			VK_SAMPLER_ADDRESS_MODE_REPEAT,                // VkSamplerAddressMode       addressModeV
-			VK_SAMPLER_ADDRESS_MODE_REPEAT,                // VkSamplerAddressMode       addressModeW
-			0.0f,                                                 // float                      mipLodBias
-			VK_FALSE,                                             // VkBool32                   anisotropyEnable
-			1.0f,                                                 // float                      maxAnisotropy
-			VK_FALSE,                                             // VkBool32                   compareEnable
-			VK_COMPARE_OP_ALWAYS,                                 // VkCompareOp                compareOp
-			0.0f,                                                 // float                      minLod
-			0.0f,                                                 // float                      maxLod
-			VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,              // VkBorderColor              borderColor
-			VK_FALSE                                              // VkBool32                   unnormalizedCoordinates
-		};
-		return vkCreateSampler(dev, info ? info : &sampler_create_info, nullptr, sampler) == VK_SUCCESS;
-	}
-
-	VkSampler createSampler(VkDevice dev, VkFilter filter = VK_FILTER_LINEAR, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_REPEAT)
-	{
-		VkSampler sampler = 0;
-		// Create sampler
-		VkSamplerCreateInfo samplerCreateInfo = {};
-		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		samplerCreateInfo.magFilter = filter;
-		samplerCreateInfo.minFilter = filter;
-		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		//samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		//samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		//samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeU = samplerCreateInfo.addressModeV = samplerCreateInfo.addressModeW = addressMode;
-		samplerCreateInfo.mipLodBias = 0.0f;
-		samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
-		samplerCreateInfo.minLod = 0.0f;
-		samplerCreateInfo.maxLod = 0.0f;
-		samplerCreateInfo.compareEnable = VK_FALSE;
-		// Enable anisotropic filtering
-		samplerCreateInfo.maxAnisotropy = 8;
-		samplerCreateInfo.anisotropyEnable = VK_FALSE;
-		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;// VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-
-		VkSamplerCreateInfo sampler_create_info = {
-			VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,                // VkStructureType            sType
-			nullptr,                                              // const void*                pNext
-			0,                                                    // VkSamplerCreateFlags       flags
-			VK_FILTER_LINEAR,                                     // VkFilter                   magFilter
-			VK_FILTER_LINEAR,                                     // VkFilter                   minFilter
-			VK_SAMPLER_MIPMAP_MODE_LINEAR,                       // VkSamplerMipmapMode        mipmapMode
-			VK_SAMPLER_ADDRESS_MODE_REPEAT,						  // VkSamplerAddressMode       addressModeU
-			VK_SAMPLER_ADDRESS_MODE_REPEAT,						  // VkSamplerAddressMode       addressModeV
-			VK_SAMPLER_ADDRESS_MODE_REPEAT,						  // VkSamplerAddressMode       addressModeW
-			0.0f,                                                 // float                      mipLodBias
-			VK_FALSE,                                             // VkBool32                   anisotropyEnable
-			1.0f,                                                 // float                      maxAnisotropy
-			VK_FALSE,                                             // VkBool32                   compareEnable
-			VK_COMPARE_OP_ALWAYS,                                 // VkCompareOp                compareOp
-			0.0f,                                                 // float                      minLod
-			0.0f,                                                 // float                      maxLod
-			VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,              // VkBorderColor              borderColor
-			VK_FALSE                                              // VkBool32                   unnormalizedCoordinates
-		};
-		(vkCreateSampler(dev, &sampler_create_info, nullptr, &sampler));
-		return sampler;
-	}
-
 	//创建图像
-	int64_t createImage(Device* dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo
-		, dvk_texture* texture, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
+	int64_t createImage(Device* dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo, dvk_texture* texture)//, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
 	{
 		VkImageView* imageview;
 		VkMemoryAllocateInfo memAlloc = {};
@@ -19562,7 +19482,7 @@ namespace vkr {
 		{
 			vkDestroyImage(device, texture->_image, 0); texture->_image = 0;
 		}
-		auto hr = (vkCreateImage(device, imageinfo, nullptr, image));
+		auto hr = vkCreateImage(device, imageinfo, nullptr, image);
 		vkGetImageMemoryRequirements(device, texture->_image, &memReqs);
 		// 设备内存分配空间小于需求的重新申请内存
 		if (texture->cap_device_mem_size < memReqs.size)
@@ -19597,16 +19517,14 @@ namespace vkr {
 		}
 		texture->cap_inc++;
 		// 绑定显存
-		(vkBindImageMemory(device, texture->_image, mem, 0));
+		hr = vkBindImageMemory(device, texture->_image, mem, 0);
 
 		viewinfo->image = texture->_image;
 		if (texture->_view)
 		{
 			vkDestroyImageView(device, texture->_view, 0);
 		}
-		(vkCreateImageView(device, viewinfo, nullptr, &texture->_view));
-		if (sampler)
-			createSampler(device, sampler, info);
+		hr = vkCreateImageView(device, viewinfo, nullptr, &texture->_view);
 #endif
 		return memAlloc.allocationSize;
 	}
@@ -19683,7 +19601,9 @@ namespace vkr {
 		samplerinfo.maxLod = 1.0f;
 		samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		if (!sampler)
-			createSampler(_dev->m_device, &sampler, &samplerinfo);
+		{
+			sampler = _dev->newSampler(&samplerinfo);
+		}
 		//VkFormatProperties phyStencilProps = { 0 }, phyImgProps[2] = {0};
 		////check png blit format
 		//VkFormat pngBlitFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_R8G8B8A8_UNORM };
@@ -19745,7 +19665,7 @@ namespace vkr {
 		{
 			for (auto& it : framebuffers)
 			{
-				createImage(_dev, &image, &colorImageView, &it.color, 0);
+				createImage(_dev, &image, &colorImageView, &it.color);
 				it.color.width = width;
 				it.color.height = height;
 				it.color._format = colorFormat;
@@ -19792,7 +19712,7 @@ namespace vkr {
 		}
 		for (auto& it : framebuffers)
 		{
-			createImage(_dev, &image, &depthStencilView, &it.depth_stencil, 0);
+			createImage(_dev, &image, &depthStencilView, &it.depth_stencil);
 			it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
 		}
 
@@ -19848,34 +19768,26 @@ namespace vkr {
 
 	void fbo_info_cx::build_cmd_empty()
 	{
+		VkCommandBufferBeginInfo cmdBufInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, 0, 0 };
+		VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 0, 0, 0, 0, 0, 0 };
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderArea.offset.x = 0;
+		renderPassBeginInfo.renderArea.offset.y = 0;
+		renderPassBeginInfo.renderArea.extent.width = _width;
+		renderPassBeginInfo.renderArea.extent.height = _height;
+		renderPassBeginInfo.clearValueCount = 2;
+		renderPassBeginInfo.pClearValues = clearValues;
+		VkResult hr = {};
+		for (size_t i = 0; i < framebuffers.size(); ++i)
 		{
-			VkCommandBufferBeginInfo cmdBufInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, 0, 0 };
-			VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 0, 0, 0, 0, 0, 0 };
-			renderPassBeginInfo.renderPass = renderPass;
-			renderPassBeginInfo.renderArea.offset.x = 0;
-			renderPassBeginInfo.renderArea.offset.y = 0;
-			renderPassBeginInfo.renderArea.extent.width = _width;
-			renderPassBeginInfo.renderArea.extent.height = _height;
-			renderPassBeginInfo.clearValueCount = 2;
-			renderPassBeginInfo.pClearValues = clearValues;
+			// Set target frame buffer
+			renderPassBeginInfo.framebuffer = framebuffers[i].framebuffer;
+			hr = vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo);
+			// Draw the particle system using the update vertex buffer
+			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-			for (size_t i = 0; i < framebuffers.size(); ++i)
-			{
-
-				// Set target frame buffer
-				renderPassBeginInfo.framebuffer = framebuffers[i].framebuffer;
-
-				(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
-
-				// Draw the particle system using the update vertex buffer
-
-				vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-
-				vkCmdEndRenderPass(drawCmdBuffers[i]);
-
-				(vkEndCommandBuffer(drawCmdBuffers[i]));
-			}
+			vkCmdEndRenderPass(drawCmdBuffers[i]);
+			hr = vkEndCommandBuffer(drawCmdBuffers[i]);
 		}
 	}
 
