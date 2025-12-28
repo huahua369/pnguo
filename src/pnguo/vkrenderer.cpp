@@ -1147,10 +1147,10 @@ namespace vkr
 #else
 		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;
 #endif
-		VkFormat         m_format;
+		VkFormat         m_format = {};
 		VkImage          m_pResource = VK_NULL_HANDLE;
 
-		IMG_INFO  m_header;
+		IMG_INFO  m_header = {};
 
 	protected:
 
@@ -4861,58 +4861,41 @@ namespace vkr {
 	class GltfPbrPass
 	{
 	public:
-		std::map<size_t, PBRPipe_t> _pipem;
-	public:
 		struct per_object
 		{
 			glm::mat4 mCurrentWorld;
 			glm::mat4 mPreviousWorld;
-
-			//PBRMaterialParametersConstantBuffer m_pbrParams;
 			pbrMaterial m_pbrParams;
 		};
-
-
-		void OnCreate(
-			Device* pDevice,
-			UploadHeap* pUploadHeap,
-			ResourceViewHeaps* pHeaps,
-			DynamicBufferRing* pDynamicBufferRing,
-			//StaticBufferPool* pStaticBufferPool,
-			GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers,
-			SkyDome* pSkyDome,
-			bool bUseSSAOMask,
-			std::vector<VkImageView>& ShadowMapViewPool,
-			GBufferRenderPass* pRenderPass,
-			AsyncPool* pAsyncPool = NULL
+		std::map<size_t, PBRPipe_t> _pipem;
+		GLTFTexturesAndBuffers* _ptb = 0;
+		ResourceViewHeaps* m_pResourceViewHeaps = 0;
+		DynamicBufferRing* m_pDynamicBufferRing = 0;
+		//StaticBufferPool* m_pStaticBufferPool;
+		std::vector<PBRMesh> m_meshes;
+		std::vector<PBRMaterial> m_materialsData;
+		std::vector<VkSampler> _samplers;
+		PBRMaterial m_defaultMaterial = {};
+		Device* m_pDevice = 0;
+		GBufferRenderPass* m_pRenderPass = 0;
+		VkSampler m_samplerPbr = VK_NULL_HANDLE, m_samplerShadow = VK_NULL_HANDLE;
+		// PBR Brdf
+		Texture m_brdfLutTexture = {};
+		VkImageView m_brdfLutView = VK_NULL_HANDLE;
+		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
+	public:
+		GltfPbrPass();
+		~GltfPbrPass();
+		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing,
+			GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask,
+			std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL
 		);
-
 		void OnDestroy();
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
 		GLTFCommon* get_cp();
 	private:
-		GLTFTexturesAndBuffers* _ptb;
-
-		ResourceViewHeaps* m_pResourceViewHeaps;
-		DynamicBufferRing* m_pDynamicBufferRing;
-		//StaticBufferPool* m_pStaticBufferPool;
-
-		std::vector<PBRMesh> m_meshes;
-		std::vector<PBRMaterial> m_materialsData;
-		std::vector<VkSampler> _samplers;
-
-		PBRMaterial m_defaultMaterial;
-
-		Device* m_pDevice;
-		GBufferRenderPass* m_pRenderPass;
-		VkSampler m_samplerPbr = VK_NULL_HANDLE, m_samplerShadow = VK_NULL_HANDLE;
-
-		// PBR Brdf
-		Texture m_brdfLutTexture;
-		VkImageView m_brdfLutView = VK_NULL_HANDLE;
-		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
 		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
@@ -8072,6 +8055,14 @@ namespace vkr
 	}
 
 
+	GltfPbrPass::GltfPbrPass()
+	{
+	}
+
+	GltfPbrPass::~GltfPbrPass()
+	{
+	}
+
 	//--------------------------------------------------------------------------------------
 	//
 	// OnCreate
@@ -8160,10 +8151,8 @@ namespace vkr
 				info.maxAnisotropy = 1.0f;
 				set_sampler_info(info, &it);
 				VkSampler r = pDevice->newSampler(&info);
-				//VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &r);
-
+				assert(r);
 				_samplers.push_back(r);
-				//assert(res == VK_SUCCESS);
 			}
 		}
 		//for pbr materials
@@ -8188,8 +8177,7 @@ namespace vkr
 			info.maxAnisotropy = 1.0f;
 			set_sampler_info(info, &dsa);
 			m_samplerPbr = pDevice->newSampler(&info);
-			//VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerPbr);
-			//assert(res == VK_SUCCESS);
+			assert(m_samplerPbr);
 		}
 
 		// specular BRDF lut sampler
@@ -8206,8 +8194,7 @@ namespace vkr
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_brdfLutSampler = pDevice->newSampler(&info);
-			/*VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_brdfLutSampler);
-			assert(res == VK_SUCCESS);*/
+			assert(m_brdfLutSampler);
 		}
 
 		// shadowmap sampler
@@ -8226,8 +8213,7 @@ namespace vkr
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
 			m_samplerShadow = pDevice->newSampler(&info);
-			/*	VkResult res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerShadow);
-				assert(res == VK_SUCCESS);*/
+			assert(m_samplerShadow);
 		}
 
 		// Create default material, this material will be used if none is assigned
@@ -8240,7 +8226,6 @@ namespace vkr
 		}
 
 		// Load PBR 2.0 Materials
-		//
 		auto pm = pGLTFTexturesAndBuffers->m_pGLTFCommon->pm;
 		if (pm)
 		{
@@ -8402,7 +8387,6 @@ namespace vkr
 			{
 				descriptorCounts.push_back(1);
 			}
-
 			if (pSkyDome)
 			{
 				tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
@@ -8410,7 +8394,6 @@ namespace vkr
 				descriptorCounts.push_back(1);
 				descriptorCounts.push_back(1);
 			}
-
 			if (bUseSSAOMask)
 			{
 				tfmat->m_textureCount += 1;
@@ -8442,18 +8425,14 @@ namespace vkr
 		{
 			// allocate descriptor table for the textures
 			m_pResourceViewHeaps->AllocDescriptor(descriptorCounts, NULL, &tfmat->m_texturesDescriptorSetLayout, &tfmat->m_texturesDescriptorSet);
-
 			uint32_t cnt = 0;
-
 			// 1) create SRV for the PBR materials
 			for (auto const& it : texturesBase)
 			{
 				tfmat->m_pbrMaterialParameters.m_defines[std::string("ID_") + it.first] = std::to_string(cnt);
-
 				SetDescriptorSet(m_pDevice->m_device, cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
-
 			// 2) 3 SRVs for the IBL probe
 			if (pSkyDome)
 			{
@@ -8461,20 +8440,15 @@ namespace vkr
 				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
 				SetDescriptorSet(m_pDevice->m_device, cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
-
 				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
 				pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
 				cnt++;
-
 				tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
 				pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
 				cnt++;
-
 				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
 			}
-
 			// 3) SSAO mask
-			//
 			if (bUseSSAOMask)
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_SSAO"] = std::to_string(cnt);
@@ -21426,7 +21400,6 @@ namespace vkr {
 			barrier.subresourceRange.baseArrayLayer = 0;
 			barrier.subresourceRange.layerCount = 1;
 			barrier.image = m_MagnifierPS.GetPassOutputResource();
-
 			if (m_bMagResourceReInit)
 			{
 				barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -21438,7 +21411,6 @@ namespace vkr {
 				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 			}
-
 			// Note: assumes the input texture (specified in OnCreateWindowSizeDependentResources()) is in read state
 			m_MagnifierPS.Draw(cmdBuf1, pState->MagnifierParams);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "Magnifier");
@@ -23436,7 +23408,50 @@ void main()
 		assert(res == VK_SUCCESS);
 		return pipeline;
 	}
+	// test pbr
 
+	class pbrPass_t
+	{
+	public:
+		struct per_object
+		{
+			glm::mat4 mCurrentWorld;
+			glm::mat4 mPreviousWorld;
+			pbrMaterial m_pbrParams;
+		};
+		std::map<size_t, PBRPipe_t> _pipem;
+		GLTFTexturesAndBuffers* _ptb = 0;
+		ResourceViewHeaps* m_pResourceViewHeaps = 0;
+		DynamicBufferRing* m_pDynamicBufferRing = 0;
+		//StaticBufferPool* m_pStaticBufferPool;
+		std::vector<PBRMesh> m_meshes;
+		std::vector<PBRMaterial> m_materialsData;
+		std::vector<VkSampler> _samplers;
+		PBRMaterial m_defaultMaterial = {};
+		Device* m_pDevice = 0;
+		GBufferRenderPass* m_pRenderPass = 0;
+		VkSampler m_samplerPbr = VK_NULL_HANDLE, m_samplerShadow = VK_NULL_HANDLE;
+		// PBR Brdf
+		Texture m_brdfLutTexture = {};
+		VkImageView m_brdfLutView = VK_NULL_HANDLE;
+		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
+	public:
+		pbrPass_t();
+		~pbrPass_t();
+		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing,
+			GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask,
+			std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL
+		);
+		void OnDestroy();
+		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
+		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
+		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
+		GLTFCommon* get_cp();
+	private:
+		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
+		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
+		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
+	};
 
 }
 //!vkr
