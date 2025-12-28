@@ -194,6 +194,17 @@ struct dev_info_cx
 };
 #endif // !DEV_INFO_CXH
 
+struct PassParameters
+{
+	uint32_t    uImageWidth = 1;
+	uint32_t    uImageHeight = 1;
+	int         iMousePos[2] = {};            // in pixels, driven by MousePos.xy
+	float       fBorderColorRGB[4] = { 1,1,1,1 };      // Linear RGBA
+	float       fMagnificationAmount = 6.0f;    // [1-...]
+	float       fMagnifierScreenRadius = 0.35f;  // [0-1]
+	mutable int iMagnifierOffset[2] = { 500,-500 };     // in pixels
+};
+
 struct scene_state {
 	// POST PROCESS CONTROLS 
 	int   SelectedTonemapperIndex = 0;// 0-5
@@ -202,6 +213,10 @@ struct scene_state {
 	float IBLFactor = 1.0;
 	float EmissiveFactor = 50.0;
 	int   SelectedSkydomeTypeIndex = 0; // 0-1 
+
+	PassParameters MagnifierParams = {};
+	int   LockedMagnifiedScreenPositionX;
+	int   LockedMagnifiedScreenPositionY;
 
 	enum class WireframeMode : int
 	{
@@ -219,6 +234,9 @@ struct scene_state {
 	bool  bDrawBoundingBoxes = false;
 	bool  bShowMilliseconds = true;
 	bool  bBloom = true;
+	bool  bUseMagnifier = false;
+	bool  bLockMagnifierPosition;
+	bool  bLockMagnifierPositionHistory;
 };
 
 struct image_dr

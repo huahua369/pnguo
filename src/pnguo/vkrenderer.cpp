@@ -696,30 +696,6 @@ namespace vkr
 		VkImage image = 0;
 	};
 	// 
-	struct PassParameters
-	{
-		PassParameters()
-			: uImageWidth(1)
-			, uImageHeight(1)
-			, iMousePos{ 0, 0 }
-			, fBorderColorRGB{ 1, 1, 1, 1 }
-			, fMagnificationAmount(6.0f)
-			, fMagnifierScreenRadius(0.35f)
-			, iMagnifierOffset{ 500, -500 }
-		{
-		}
-
-		uint32_t    uImageWidth = 0;
-		uint32_t    uImageHeight = 0;
-		int         iMousePos[2] = {};            // in pixels, driven by ImGuiIO.MousePos.xy
-
-		float       fBorderColorRGB[4] = {};      // Linear RGBA
-
-		float       fMagnificationAmount = {};    // [1-...]
-		float       fMagnifierScreenRadius = {};  // [0-1]
-		mutable int iMagnifierOffset[2] = {};     // in pixels
-	};
-
 	class AsyncPool;
 	class GltfDepthPass;
 	struct PBRPrimitives;
@@ -4755,6 +4731,7 @@ namespace vkr {
 
 
 	// Forward declarations
+	class ResourceViewHeaps;
 	class DynamicBufferRing;
 	//class SwapChain;
 
@@ -4780,10 +4757,7 @@ namespace vkr {
 		// Draws a magnified region on top of the given image to OnCreateWindowSizeDependentResources()
 		// if @pSwapChain is provided, expects swapchain to be sycned before this call.
 		// Barriers are to be managed by the caller.
-		void Draw(
-			VkCommandBuffer         cmd
-			, const PassParameters& params
-		);
+		void Draw(VkCommandBuffer cmd, PassParameters& params);
 
 		inline Texture& GetPassOutput() { assert(!m_bOutputsToSwapchain); return m_TexPassOutput; }
 		inline VkImage GetPassOutputResource() const { assert(!m_bOutputsToSwapchain); return m_TexPassOutput.Resource(); }
@@ -4798,8 +4772,8 @@ namespace vkr {
 		void InitializeDescriptorSets();
 		void UpdateDescriptorSets(VkImageView ImageViewSrc);
 		void DestroyDescriptorSets();
-		VkDescriptorBufferInfo SetConstantBufferData(const PassParameters& params);
-		static void KeepMagnifierOnScreen(const PassParameters& params);
+		VkDescriptorBufferInfo SetConstantBufferData(PassParameters& params);
+		static void KeepMagnifierOnScreen(PassParameters& params);
 
 		//--------------------------------------------------------------------------------------------------------
 		// DATA
@@ -5361,7 +5335,7 @@ namespace vkr {
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 		PerFrame_t* mkPerFrameData(const Camera& cam);
-		void OnRender(const scene_state* pState, const Camera& Cam);
+		void OnRender(scene_state* pState, const Camera& Cam);
 		void set_fbo(fbo_info_cx* p, int idx);
 		// 释放上传堆和缓冲区
 		void freeVidMBP();
@@ -5410,7 +5384,7 @@ namespace vkr {
 		oitblendCS						m_oitblendCS = {};
 		ColorConversionPS               m_ColorConversionPS = {};
 		TAA                             m_TAA = {};
-		//MagnifierPS                     m_MagnifierPS = {};
+		MagnifierPS                     m_MagnifierPS = {};
 
 		// GBuffer and render passes
 		GBuffer* m_GBuffer = {};							// hdr缓冲区
@@ -14371,11 +14345,7 @@ namespace vkr {
 	}
 
 
-	void MagnifierPS::Draw(
-		VkCommandBuffer           cmd
-		, const PassParameters& params
-		/*, SwapChain* pSwapChain  = nullptr*/
-	)
+	void MagnifierPS::Draw(VkCommandBuffer cmd, PassParameters& params /*, SwapChain* pSwapChain  = nullptr*/)
 	{
 		SetPerfMarkerBegin(cmd, "Magnifier");
 
@@ -14400,7 +14370,7 @@ namespace vkr {
 	}
 
 
-	VkDescriptorBufferInfo MagnifierPS::SetConstantBufferData(const PassParameters& params)
+	VkDescriptorBufferInfo MagnifierPS::SetConstantBufferData(PassParameters& params)
 	{
 		KeepMagnifierOnScreen(params);
 
@@ -14415,7 +14385,7 @@ namespace vkr {
 		return cbHandle;
 	}
 
-	void MagnifierPS::KeepMagnifierOnScreen(const PassParameters& params)
+	void MagnifierPS::KeepMagnifierOnScreen(PassParameters& params)
 	{
 		const int IMAGE_SIZE[2] = { static_cast<int>(params.uImageWidth), static_cast<int>(params.uImageHeight) };
 		const int& W = IMAGE_SIZE[0];
@@ -20356,7 +20326,7 @@ namespace vkr {
 		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
 		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
 		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing, false);
-		//m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
+		m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
 
 		// Create tonemapping pass
 		m_ToneMappingCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
@@ -20391,7 +20361,7 @@ namespace vkr {
 		m_TAA.OnDestroy();
 		m_Bloom.OnDestroy();
 		m_DownSample.OnDestroy();
-		//m_MagnifierPS.OnDestroy();
+		m_MagnifierPS.OnDestroy();
 		m_WireframeBox.OnDestroy();
 		m_Wireframe.OnDestroy();
 		_WireframeSphere.OnDestroy();
@@ -20457,7 +20427,7 @@ namespace vkr {
 		// todo bloom
 		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer->m_HDR);
 		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, m_GBuffer);
-		//m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer->m_HDR);
+		m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer->m_HDR);
 
 
 
@@ -20474,7 +20444,7 @@ namespace vkr {
 		m_Bloom.OnDestroyWindowSizeDependentResources();
 		m_DownSample.OnDestroyWindowSizeDependentResources();
 		m_TAA.OnDestroyWindowSizeDependentResources();
-		//m_MagnifierPS.OnDestroyWindowSizeDependentResources();
+		m_MagnifierPS.OnDestroyWindowSizeDependentResources();
 
 		m_RenderPassFullGBufferWithClear.OnDestroyWindowSizeDependentResources();
 		m_RenderPassJustDepthAndHdr.OnDestroyWindowSizeDependentResources();
@@ -21185,7 +21155,7 @@ namespace vkr {
 		}
 	}
 
-	void Renderer_cx::OnRender(const scene_state* pState, const Camera& Cam)
+	void Renderer_cx::OnRender(scene_state* pState, const Camera& Cam)
 	{
 		//printf("OnRender \t\thdr\t%p\n", m_GBuffer->m_HDR.Resource());
 		// Let our resource managers do some house keeping 
@@ -21438,7 +21408,7 @@ namespace vkr {
 		}
 
 
-#if 0
+#if 1
 		// Magnifier Pass: m_HDR as input, pass' own output
 		if (pState->bUseMagnifier)
 		{
@@ -21476,8 +21446,8 @@ namespace vkr {
 		}
 #endif 
 		// Start tracking input/output resources at this point to handle HDR and SDR render paths 
-		VkImage      ImgCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() :*/ m_GBuffer->m_HDR.Resource();
-		VkImageView  SRVCurrentInput = /*pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() :*/ m_GBuffer->m_HDRSRV;
+		VkImage      ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer->m_HDR.Resource();
+		VkImageView  SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer->m_HDRSRV;
 
 		//VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
@@ -21516,8 +21486,8 @@ namespace vkr {
 
 			// Render HUD  ------------------------------------------------------------------------
 			{
-#if 0
-				if (bUseMagnifier)
+#if 1
+				if (pState->bUseMagnifier)
 				{
 					m_MagnifierPS.BeginPass(cmdBuf1, renderArea);
 				}
@@ -21531,7 +21501,7 @@ namespace vkr {
 
 				//m_ImGUI.Draw(cmdBuf1);
 
-				if (bUseMagnifier)
+				if (pState->bUseMagnifier)
 				{
 					m_MagnifierPS.EndPass(cmdBuf1);
 				}
@@ -21540,7 +21510,7 @@ namespace vkr {
 					m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 				}
 
-				if (bHDR && !bUseMagnifier)
+				if (bHDR && !pState->bUseMagnifier)
 				{
 					VkImageMemoryBarrier barrier = {};
 					barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -21560,7 +21530,7 @@ namespace vkr {
 					vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 				}
 
-				m_GPUTimer.GetTimeStamp(cmdBuf1, "ImGUI Rendering");
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "GUI Rendering");
 #endif
 			}
 		}
@@ -21584,6 +21554,10 @@ namespace vkr {
 			assert(res == VK_SUCCESS);
 
 		}
+		// Keep tracking input/output resource views 
+		ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer->m_HDR.Resource(); // these haven't changed, re-assign as sanity check
+		SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer->m_HDRSRV;         // these haven't changed, re-assign as sanity check
+
 		m_CommandListRing.OnBeginFrame();
 		VkCommandBuffer cmdBuf2 = m_CommandListRing.GetNewCommandList();
 		{
@@ -22559,6 +22533,34 @@ void vkdg_cx::update(mouse_state_t* io)
 			io->MouseDelta.x = 0;
 			io->MouseDelta.y = 0;
 			io->wheel.y = 0;
+		}
+		if (_state.bUseMagnifier) {
+			auto& params = _state.MagnifierParams;
+			params.uImageHeight = height;
+			params.uImageWidth = width;
+			params.iMousePos[0] = _state.bLockMagnifierPosition ? _state.LockedMagnifiedScreenPositionX : static_cast<int>(io->MousePos.x);
+			params.iMousePos[1] = _state.bLockMagnifierPosition ? _state.LockedMagnifiedScreenPositionY : static_cast<int>(io->MousePos.y);
+
+			//ImGui::Checkbox("Show Magnifier (M)", &_state.bUseMagnifier);
+
+			//DisableUIStateBegin(_state.bUseMagnifier);
+			//{
+			//	// Use a local bool state here to track locked state through the UI widget,
+			//	// and then call ToggleMagnifierLockedState() to update the persistent state (_state).
+			//	// The keyboard input for toggling lock directly operates on the persistent state.
+			//	const bool bIsMagnifierCurrentlyLocked = _state.bLockMagnifierPosition;
+			//	bool bMagnifierToggle = bIsMagnifierCurrentlyLocked;
+			//	ImGui::Checkbox("Lock Position (L)", &bMagnifierToggle);
+
+			//	if (bMagnifierToggle != bIsMagnifierCurrentlyLocked)
+			//		_state.ToggleMagnifierLock();
+
+			//	ImGui::SliderFloat("Screen Size", &params.fMagnifierScreenRadius, MAGNIFIER_RADIUS_MIN, MAGNIFIER_RADIUS_MAX);
+			//	ImGui::SliderFloat("Magnification", &params.fMagnificationAmount, MAGNIFICATION_AMOUNT_MIN, MAGNIFICATION_AMOUNT_MAX);
+			//	ImGui::SliderInt("OffsetX", &params.iMagnifierOffset[0], -m_Width, m_Width);
+			//	ImGui::SliderInt("OffsetY", &params.iMagnifierOffset[1], -m_Height, m_Height);
+			//}
+			//DisableUIStateEnd(_state.bUseMagnifier);
 		}
 		tx->m_UIState = _state;
 	}
