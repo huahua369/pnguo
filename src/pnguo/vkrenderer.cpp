@@ -4908,7 +4908,7 @@ namespace vkr {
 		void DestroyShaders();
 
 		void InitializeDescriptorSets();
-		void UpdateDescriptorSets(VkImageView ImageViewSrc);
+		void update_set(VkImageView ImageViewSrc);
 		void DestroyDescriptorSets();
 		VkDescriptorBufferInfo SetConstantBufferData(PassParameters& params);
 		static void KeepMagnifierOnScreen(PassParameters& params);
@@ -14237,24 +14237,15 @@ namespace vkr {
 
 
 
-	void MagnifierPS::OnCreate(
-		Device* pDevice
-		, ResourceViewHeaps* pResourceViewHeaps
-		, DynamicBufferRing* pDynamicBufferRing
-		, StaticBufferPool* pStaticBufferPool
-		, VkFormat outFormat
-		, bool bOutputsToSwapchain /*= false*/
-	)
+	void MagnifierPS::OnCreate(Device* pDevice, ResourceViewHeaps* pResourceViewHeaps, DynamicBufferRing* pDynamicBufferRing, StaticBufferPool* pStaticBufferPool, VkFormat outFormat, bool bOutputsToSwapchain /*= false*/)
 	{
 		m_pDevice = pDevice;
 		m_pResourceViewHeaps = pResourceViewHeaps;
 		m_pDynamicBufferRing = pDynamicBufferRing;
 		m_bOutputsToSwapchain = bOutputsToSwapchain;
-
 		InitializeDescriptorSets();
 		//VK_FORMAT_R16G16B16A16_SFLOAT
-		m_RenderPass = SimpleColorBlendRenderPass(m_pDevice->GetDevice(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-			, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
+		m_RenderPass = SimpleColorBlendRenderPass(m_pDevice->GetDevice(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
 		CompileShaders(pStaticBufferPool, outFormat); // expects a non-null Render Pass!
 	}
 
@@ -14262,7 +14253,7 @@ namespace vkr {
 	void MagnifierPS::OnDestroy()
 	{
 		vkDestroyRenderPass(m_pDevice->GetDevice(), m_RenderPass, NULL);
-
+		m_RenderPass = 0;
 		DestroyShaders();
 		DestroyDescriptorSets();
 	}
@@ -14271,7 +14262,7 @@ namespace vkr {
 	void MagnifierPS::OnCreateWindowSizeDependentResources(Texture* pTexture)
 	{
 		pTexture->CreateSRV(&m_ImageViewSrc);
-		UpdateDescriptorSets(m_ImageViewSrc);
+		update_set(m_ImageViewSrc);
 
 		if (!m_bOutputsToSwapchain)
 		{
@@ -14323,37 +14314,22 @@ namespace vkr {
 	void MagnifierPS::OnDestroyWindowSizeDependentResources()
 	{
 		VkDevice device = m_pDevice->GetDevice();
-
 		vkDestroyImageView(m_pDevice->GetDevice(), m_ImageViewSrc, NULL);
-
 		vkDestroyImageView(device, m_SRVOutput, NULL);
-
 		vkDestroySampler(m_pDevice->GetDevice(), m_SamplerSrc, nullptr);
-
 		if (!m_bOutputsToSwapchain)
 		{
 			vkDestroyImageView(device, m_RTVOutput, NULL);
 			m_TexPassOutput.OnDestroy();
-
 			vkDestroyFramebuffer(device, m_FrameBuffer, NULL);
 		}
 	}
 
 	void MagnifierPS::CompileShaders(StaticBufferPool* pStaticBufferPool, VkFormat outFormat)
 	{
-		//
 		// Compile Magnifier Pixel Shader
-		//
-		m_ShaderMagnify.OnCreate(m_pDevice,
-			m_RenderPass
-			, SHADER_FILE_NAME_MAGNIFIER
-			, SHADER_ENTRY_POINT
-			, ""
-			, pStaticBufferPool
-			, m_pDynamicBufferRing
-			, m_DescriptorSetLayout
-			, NULL, VK_SAMPLE_COUNT_1_BIT
-		);
+		m_ShaderMagnify.OnCreate(m_pDevice, m_RenderPass, SHADER_FILE_NAME_MAGNIFIER, SHADER_ENTRY_POINT, "", pStaticBufferPool,
+			m_pDynamicBufferRing, m_DescriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
 		return;
 	}
 
@@ -14383,7 +14359,7 @@ namespace vkr {
 		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindingsMagnifier, &m_DescriptorSetLayout, &m_DescriptorSet);
 		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(PassParameters), m_DescriptorSet);
 	}
-	void MagnifierPS::UpdateDescriptorSets(VkImageView ImageViewSrc)
+	void MagnifierPS::update_set(VkImageView ImageViewSrc)
 	{
 		// nearest sampler
 		{
@@ -14447,7 +14423,6 @@ namespace vkr {
 		rp_begin.renderArea = renderArea;
 		rp_begin.clearValueCount = 0;
 		rp_begin.pClearValues = NULL;
-
 		vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 	}
 
