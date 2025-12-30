@@ -9645,10 +9645,11 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 	glm::vec2 tps = {};
 	glm::ivec4 rc = p->box.rc;
 	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,tb->baseline };
-
 	flex_data tf[2] = {};
 	if (boxflex)
+	{
 		*tf = *boxflex;
+	}
 	std::vector<node_dt> fv;
 	std::vector<glm::ivec3> linex;
 	fv.resize(p->_vstr.size() + 1);

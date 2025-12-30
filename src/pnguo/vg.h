@@ -302,7 +302,7 @@ struct flex_data {
 	flex_align align_self = flex_align::ALIGN_AUTO;			// 子元素:覆盖父容器align-items的设置
 	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
 	flex_direction direction = flex_direction::ROW;			// 父元素:
-	flex_wrap wrap = flex_wrap::NO_WRAP;						// 父元素:是否换行，超出宽度自动换行
+	flex_wrap wrap = flex_wrap::NO_WRAP;					// 父元素:是否换行，超出宽度自动换行
 	bool should_order_children = false;
 };
 

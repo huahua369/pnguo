@@ -191,7 +191,7 @@ vkvg_dev* new_vkvgdev(dev_info_c* c = 0, int sample = 8);
 void free_vkvgdev(vkvg_dev* p);
 
 void submit_style(VkvgContext cr, fill_style_d* st);
-void draw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r);
+void draw_rounded_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 void draw_arrow2(VkvgContext ctx, float x, float y);
 void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size);
@@ -229,13 +229,20 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
 
 // SDL渲染器专用
 typedef struct texture_cb texture_cb;
+struct text_vx
+{
+	glm::vec2 pos;
+	glm::vec2 uv;
+	glm::vec4 color;
+};
 struct sdl3_textdata
 {
 	std::map<image_ptr_t*, void*> vt;
-	std::vector<float> opt; std::vector<uint32_t> idx;
+	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	texture_cb* rcb = 0;
 	void* tex = 0;
 	void* rptr = 0;
+	uint32_t color = 0;
 };
 // 渲染一组图文列表
 void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);

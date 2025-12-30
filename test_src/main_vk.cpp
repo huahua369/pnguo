@@ -1017,11 +1017,11 @@ int main()
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
 
-			std::string str = (char*)u8"这是一个Vkvg渲染矢量图到Vulkan纹理，spine动画渲染，3D动画渲染！\nThis is a Vkvg rendering vector graphics to Vulkan textures, spine animation rendering, and 3D animation rendering!";
+			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (based on vkvg), Spine animation rendering, and 3D animation rendering!";
 			text_style ts = {};
 			ts.family = family;
-			ts.fontsize = 26;
-			ts.color = 0xfffF5000;
+			ts.fontsize = 22;
+			ts.color = 0xff000000;
 			// 文本块
 			text_block tb = {};
 			tb.style = &ts;
@@ -1029,6 +1029,7 @@ int main()
 			tb.first = 0;
 			tb.size = str.size();
 			//text_render_o trt = {};
+			trt.box.text_align = { };
 			trt.box.rc = { 0,0,500,500 };
 			trt.box.auto_break = 1;
 			trt.box.word_wrap = 1;
@@ -1040,14 +1041,14 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d)
 						pcb->render_texture(renderer, tex3d, &tdt, 1);//*
-					//if (vg2dtex)
-					//{
-					//	tdt.src_rect = { 0,0,texwidth,texwidth };
-					//	tdt.dst_rect = { 0,0,texwidth,texwidth };
-					//	pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
-					//}
-					//sp_drawable_draw(dd1); // ok
-					//r_render_data_text(ptrt, { 200,100 }, td3);//*
+					if (vg2dtex)
+					{
+						tdt.src_rect = { 0,0,texwidth,texwidth };
+						tdt.dst_rect = { 0,0,texwidth,texwidth };
+						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//*
+					}
+					sp_drawable_draw(dd1); // ok
+					r_render_data_text(ptrt, { 200,100 }, td3);//*
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1077,7 +1078,13 @@ int main()
 						vkvg_set_line_width(ctx, 2.0);
 						vkvg_stroke(ctx);
 						vkvg_restore(ctx);
-
+						fill_style_d st = {};
+						glm::vec4 rect = { 195.5,95.5,510,210 };
+						st.fill = 0x80121212;
+						st.color = 0x50cccccc;
+						static glm::vec4 rr = { 6,7,3,4 };
+						draw_rounded_rectangle(cr, rect.x, rect.y, rect.z, rect.w, rr);
+						submit_style(cr, &st);
 						vkvg_flush(ctx);
 						vkvg_surface_resolve(surf);	// msaa采样转换输出 
 					}

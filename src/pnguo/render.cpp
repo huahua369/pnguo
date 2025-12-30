@@ -623,27 +623,43 @@ void submit_style(VkvgContext cr, fill_style_d* st) {
 
 }
 
-
+inline float get_radius(float& radius, float width, float height) {
+	if (radius > 0)
+	{
+		if ((radius > width / 2.0f) || (radius > height / 2.0f))
+			radius = fmin(width / 2.0f, width / 2.0f);
+	}
+	return radius;
+}
 // r，左右下左
-void draw_round_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r)
+void draw_rounded_rectangle(VkvgContext ctx, double x, double y, double width, double height, const glm::vec4& r1)
 {
 #ifndef M_PI
 	auto M_PI = glm::pi<double>();
 #endif
-	vkvg_move_to(cr, x + r.x, y);
-	vkvg_line_to(cr, x + width - r.y, y);
-	if (r.y)
-		vkvg_arc(cr, x + width - r.y, y + r.y, r.y, 3 * M_PI / 2, 2 * M_PI);
-	vkvg_line_to(cr, x + width, y + height - r.z);
-	if (r.z)
-		vkvg_arc(cr, x + width - r.z, y + height - r.z, r.z, 0, M_PI / 2);
-	vkvg_line_to(cr, x + r.w, y + height);
-	if (r.w)
-		vkvg_arc(cr, x + r.w, y + height - r.w, r.w, M_PI / 2, M_PI);
-	vkvg_line_to(cr, x, y + r.x);
-	if (r.x > 0)
-		vkvg_arc(cr, x + r.x, y + r.x, r.x, M_PI, 3 * M_PI / 2.0);
-	vkvg_close_path(cr);
+	if (width <= 0 || height <= 0)
+		return;
+	auto r = r1;
+	get_radius(r.x, width, height);
+	get_radius(r.y, width, height);
+	get_radius(r.z, width, height);
+	get_radius(r.w, width, height);
+	auto w = width;
+	auto h = height;
+	vkvg_move_to(ctx, x + r.x, y);
+	vkvg_line_to(ctx, x + w - r.y, y);// 上
+	if (r.y > 0.0f)
+		vkvg_elliptic_arc_to(ctx, x + w, y + r.y, false, true, r.y, r.y, 0);
+	vkvg_line_to(ctx, x + w, y + h - r.z);// 右
+	if (r.z > 0.0f)
+		vkvg_elliptic_arc_to(ctx, x + w - r.z, y + h, false, true, r.z, r.z, 0);
+	vkvg_line_to(ctx, x + r.w, y + h);// 下
+	if (r.w > 0.0f)
+		vkvg_elliptic_arc_to(ctx, x, y + h - r.w, false, true, r.w, r.w, 0);
+	vkvg_line_to(ctx, x, y + r.x);// 左
+	if (r.x > 0.0f)
+		vkvg_elliptic_arc_to(ctx, x + r.x, y, false, true, r.x, r.x, 0);
+	vkvg_close_path(ctx);
 }
 void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
 {
@@ -887,7 +903,7 @@ void vgc_draw_cmds(void* ctx, uint8_t* cmds, size_t count, void* data, size_t si
 		case VG_DRAW_CMD::VG_CMD_RECT4R:
 		{
 			auto p = (rect4r_d*)pd;
-			draw_round_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
+			draw_rounded_rectangle(cr, p->pos.x, p->pos.y, p->size.x, p->size.y, p->r);
 			if (style->fs && p->st >= 0 && p->st < style->fs_count)
 				submit_style(cr, style->fs + p->st);
 			pd += sizeof(rect4r_d);
@@ -1295,8 +1311,7 @@ image_sliced_t new_rect(const rect_shadow_t& rs)
 }
 #endif
 
-
-void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<float>* opt, std::vector<uint32_t>* idx)
+void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<text_vx>* opt, std::vector<uint32_t>* idx)
 {
 	glm::ivec2 tex_size = { img->width,img->height };
 	// 1. 计算矩形顶点（像素坐标）
@@ -1325,11 +1340,11 @@ void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc,
 	// 4. 解析颜色
 	glm::vec4 c = ucolor2f(color);
 	// 5. 生成顶点数组（4顶点，32个浮点数）
-	uint32_t ps = opt->size() / 8;
-	opt->insert(opt->end(), { A1.x, A1.y,A_norm.x, A_norm.y, c.x, c.y, c.z, c.w });
-	opt->insert(opt->end(), { B1.x, B1.y,B_norm.x, B_norm.y, c.x, c.y, c.z, c.w });
-	opt->insert(opt->end(), { C1.x, C1.y,C_norm.x, C_norm.y, c.x, c.y, c.z, c.w });
-	opt->insert(opt->end(), { D1.x, D1.y,D_norm.x, D_norm.y, c.x, c.y, c.z, c.w });
+	uint32_t ps = opt->size();
+	opt->insert(opt->end(), text_vx{ A1 ,A_norm , c });
+	opt->insert(opt->end(), text_vx{ B1 ,B_norm , c });
+	opt->insert(opt->end(), text_vx{ C1 ,C_norm , c });
+	opt->insert(opt->end(), text_vx{ D1 ,D_norm , c });
 	idx->insert(idx->end(), { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 });
 	return;
 }
@@ -1339,7 +1354,7 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 	void* renderer = pt->rptr;
 	if (!p || !pt || !renderer)return;
 	uint32_t color = -1;
-	const int vsize = sizeof(float) * 8;
+	const int vsize = sizeof(text_vx);
 	void* tex = 0;
 	bool devrtex = (pt->rcb->set_texture_color4 && pt->rcb->render_texture);
 	auto rect = p->box.rc;
@@ -1357,8 +1372,8 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 		if (!devrtex && tex != tp)
 		{
 			if (tex && pt->opt.size()) {
-				auto nv = pt->opt.size() / 8;
-				pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+				auto nv = pt->opt.size();
+				pt->rcb->draw_geometry(renderer, tex, (float*)pt->opt.data(), vsize, ((float*)pt->opt.data()) + 4, vsize, ((float*)pt->opt.data()) + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 				pt->opt.clear();
 				pt->idx.clear();
 			}
@@ -1394,8 +1409,8 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 		}
 	}
 	if (!devrtex && tex && pt->opt.size()) {
-		auto nv = pt->opt.size() / 8;
-		pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		auto nv = pt->opt.size();
+		pt->rcb->draw_geometry(renderer, tex, (float*)pt->opt.data(), vsize, ((float*)pt->opt.data()) + 4, vsize, ((float*)pt->opt.data()) + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 		pt->opt.clear();
 		pt->idx.clear();
 	}
@@ -1421,8 +1436,13 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 	void* renderer = pt->rptr;
 	std::vector<font_item_t>& tm = p->_vstr;
 	uint32_t color = p->tb->style->color;
+	if (color != pt->color) {
+		pt->color = color;
+		pt->opt.clear();
+		pt->idx.clear();
+	}
 	void* tex = 0;
-	const int vsize = sizeof(float) * 8;
+	const int vsize = sizeof(text_vx);
 	if (pt->opt.empty())
 	{
 		size_t ct = 0;
@@ -1434,8 +1454,9 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 				if (tex != tp)
 				{
 					if (tex && pt->opt.size()) {
-						auto nv = pt->opt.size() / 8;
-						pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv
+						auto nv = pt->opt.size();
+						pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
+							((float*)&pt->opt.data()->uv), vsize, nv
 							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 						pt->opt.clear();
 						pt->idx.clear();
@@ -1449,8 +1470,9 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 			}
 		}
 		if (tex && pt->opt.size()) {
-			auto nv = pt->opt.size() / 8;
-			pt->rcb->draw_geometry(renderer, tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+			auto nv = pt->opt.size();
+			pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
+				((float*)&pt->opt.data()->uv), vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 		}
 		if (ct > 0)
 		{
@@ -1462,9 +1484,12 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 		}
 	}
 	else {
-		auto nv = pt->opt.size() / 8;
+		auto nv = pt->opt.size();
 		if (pt->tex && pt->opt.size())
-			pt->rcb->draw_geometry(renderer, pt->tex, pt->opt.data(), vsize, pt->opt.data() + 4, vsize, pt->opt.data() + 2, vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		{
+			pt->rcb->draw_geometry(renderer, pt->tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
+				((float*)&pt->opt.data()->uv), vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
+		}
 	}
 }
 
