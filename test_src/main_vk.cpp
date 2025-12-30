@@ -1017,7 +1017,7 @@ int main()
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
 
-			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (based on vkvg), Spine animation rendering, and 3D animation rendering!";
+			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
 			text_style ts = {};
 			ts.family = family;
 			ts.fontsize = 22;
@@ -1085,7 +1085,7 @@ int main()
 						static glm::vec4 rr = { 6,7,3,4 };
 						draw_rounded_rectangle(cr, rect.x, rect.y, rect.z, rect.w, rr);
 						submit_style(cr, &st);
-						vkvg_set_line_width(ctx, 5.0);
+						vkvg_set_line_width(ctx, 6.0);
 						vkvg_set_source_color(ctx, 0xffE97B5F);
 						draw_arrow(ctx, glm::vec2(300, 350), glm::vec2(500, 350), 15, 50); 
 						draw_arrow(ctx, glm::vec2(300, 380), glm::vec2(500, 550), 15, 40);  
