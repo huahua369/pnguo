@@ -20950,37 +20950,31 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void Renderer_cx::draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj)
 	{
-
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// Render skydome天空盒
 		{
 			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
-
+			glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
 			if (pState->SelectedSkydomeTypeIndex == 1)
 			{
-				glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
 				m_SkyDome.Draw(cmdBuf1, clipToView);
-
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
 			}
 			else if (pState->SelectedSkydomeTypeIndex == 0)
 			{
-				skyDomeConstants.invViewProj = glm::inverse(mCameraCurrViewProj);
-
+				skyDomeConstants.invViewProj = clipToView;
 				m_SkyDomeProc.Draw(cmdBuf1, skyDomeConstants);
-
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome Proc");
 			}
-
 			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
 		}
 	}
-	void draw_pbrpass(vkr::Device* dev, VkCommandBuffer cmdBuf1, const scene_state* pState
-		, std::vector<BatchList>* ds, std::vector<BatchList>* dsw, bool bWireframe)
+
+	void draw_pbrpass(vkr::Device* dev, VkCommandBuffer cmdBuf1, const scene_state* pState, std::vector<BatchList>* ds, std::vector<BatchList>* dsw, bool bWireframe)
 	{
 		if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
 		{
-			if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR_FACE1)
+			if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_FACE)
 				GltfPbrPass::DrawBatchList(dev, cmdBuf1, ds, false);
 			GltfPbrPass::DrawBatchList(dev, cmdBuf1, dsw, bWireframe);
 		}
@@ -20996,16 +20990,6 @@ namespace vkr {
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
 			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.opaque, &drawables.wireframe[0], bWireframe);
-			//if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
-			//{
-			//	if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR_FACE1)
-			//		GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, false);
-			//	GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque1, bWireframe);
-			//}
-			//else
-			//{
-			//	GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.opaque, bWireframe);
-			//}
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
 		}
@@ -21017,7 +21001,6 @@ namespace vkr {
 		if (!drawables.transparent.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transparent.begin(), drawables.transparent.end(), bcmp);
-			//GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transparent, false);
 			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.transparent, &drawables.wireframe[1], bWireframe);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
 			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
@@ -21065,7 +21048,6 @@ namespace vkr {
 		if (!drawables.transmission.empty()) {
 			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
 			std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
-			//GltfPbrPass::DrawBatchList(m_pDevice, cmdBuf1, &drawables.transmission, bWireframe);
 			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.transmission, &drawables.wireframe[2], bWireframe);
 			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
 			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
@@ -21097,7 +21079,6 @@ namespace vkr {
 			if (pState->bDrawLightFrustum)
 			{
 				SetPerfMarkerBegin(cmdBuf1, "light frustums");
-
 				glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
 				glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
 				glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -21108,9 +21089,7 @@ namespace vkr {
 					m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
 					//_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
 				}
-
 				m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
-
 				SetPerfMarkerEnd(cmdBuf1);
 			}
 			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
