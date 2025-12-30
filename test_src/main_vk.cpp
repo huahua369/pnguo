@@ -1067,7 +1067,7 @@ int main()
 						//vkvg_set_source(cr, pat);
 						//vkvg_fill(cr);
 						//vkvg_pattern_destroy(pat);
-						auto v = bs->sample2(64);
+						auto v = bs->sample2(64);	// 样条线转线段，细分64段
 						vkvg_translate(ctx, 10, 20);
 						vkvg_move_to(ctx, v[0].x, v[0].y);
 						for (size_t i = 1; i < v.size(); i++)
@@ -1085,6 +1085,10 @@ int main()
 						static glm::vec4 rr = { 6,7,3,4 };
 						draw_rounded_rectangle(cr, rect.x, rect.y, rect.z, rect.w, rr);
 						submit_style(cr, &st);
+						vkvg_set_line_width(ctx, 5.0);
+						vkvg_set_source_color(ctx, 0xffE97B5F);
+						draw_arrow(ctx, glm::vec2(300, 350), glm::vec2(500, 350), 15, 50); 
+						draw_arrow(ctx, glm::vec2(300, 380), glm::vec2(500, 550), 15, 40);  
 						vkvg_flush(ctx);
 						vkvg_surface_resolve(surf);	// msaa采样转换输出 
 					}

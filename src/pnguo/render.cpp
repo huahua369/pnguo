@@ -551,13 +551,25 @@ void draw_arrow2(VkvgContext ctx, float x, float y)
 	vkvg_move_to(ctx, x, y);
 }
 
-void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size)
+void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type)
 {
 	glm::vec2 dir = (p0 - p1);
 	glm::vec2 n = glm::normalize(dir);
 	glm::vec2 perp = avec2_perp(n) * arrow_hwidth;
+	auto dir1 = p1 - p0;
+	float len = glm::length(dir1);
 	vkvg_move_to(ctx, p0.x, p0.y);
-	vkvg_line_to(ctx, p1.x, p1.y);
+	float e = arrow_size * 0.5;
+	if (len > e && type == 0) {
+		dir1 = glm::normalize(dir1);
+		glm::vec2 e2 = { e, arrow_hwidth };
+		float newLength = len - e;
+		glm::vec2 p1n = p0 + dir1 * newLength;
+		vkvg_line_to(ctx, p1n.x, p1n.y);
+	}
+	else {
+		vkvg_line_to(ctx, p1.x, p1.y);
+	}
 	vkvg_stroke(ctx);
 	vkvg_move_to(ctx, p1.x, p1.y);
 	glm::vec2 p = (p1 + (n * arrow_size));

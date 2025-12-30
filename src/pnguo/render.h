@@ -1,8 +1,8 @@
 ﻿#pragma once
 /*
-* 
+*
 *	vkvg渲染矢量图到VkvgSurface表面
-*	
+*
 */
 #include "vkvg.h"
 #ifndef vkvg_pattern_add_color_stop_rgba
@@ -194,7 +194,8 @@ void submit_style(VkvgContext cr, fill_style_d* st);
 void draw_rounded_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 void draw_arrow2(VkvgContext ctx, float x, float y);
-void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size);
+// type=0线终点在三角形中间
+void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type = 0);
 
 // 画网格填充
 void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols, int width);
@@ -251,4 +252,3 @@ void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);
 void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 释放渲染器的纹理
 void r_render_free_tex(sdl3_textdata* p);
- 
