@@ -9300,9 +9300,7 @@ namespace vkr
 			uint32_t c = 2;
 			uniformOffsets[0] = t.m_perFrameDesc.offset;	// 相机、灯光
 			uniformOffsets[1] = t.m_perObjectDesc.offset;	// 材质参数
-			if (t.m_pPerSkeleton) {
-				uniformOffsets[c++] = t.m_pPerSkeleton->offset;
-			}	// 骨骼动画偏移
+			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
 			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }		// 变形动画偏移
 			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
 			// todo FrontFace
@@ -9326,8 +9324,7 @@ namespace vkr
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
 		if (!uniformOffsets) { uniformOffsetsCount = 0; }
 		if (!uniformOffsetsCount) { uniformOffsets = 0; }
-		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout
-			, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
+		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? _pipe->m_pipelineWireframe : _pipe->m_pipeline);
 		if (m_geometry.m_IBV.buffer)
 			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
