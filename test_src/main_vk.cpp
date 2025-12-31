@@ -790,7 +790,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 #endif // _WIN32
 
@@ -998,7 +998,7 @@ int main()
 				if (image)
 				{
 					vg2dtex = pcb->new_texture_vk(form0->renderer, texwidth, texwidth, image, format == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);// 创建SDL的rgba纹理 
-					pcb->set_texture_blend(vg2dtex, 0, true);
+					pcb->set_texture_blend(vg2dtex, (int)BLENDMODE_E::normal, true);
 				}
 			}
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
@@ -1021,7 +1021,7 @@ int main()
 			text_style ts = {};
 			ts.family = family;
 			ts.fontsize = 22;
-			ts.color = 0xff000000;
+			ts.color = 0xffc2c2c2;
 			// 文本块
 			text_block tb = {};
 			tb.style = &ts;
@@ -1080,17 +1080,24 @@ int main()
 						vkvg_restore(ctx);
 						fill_style_d st = {};
 						glm::vec4 rect = { 195.5,95.5,510,210 };
-						st.fill = 0x80121212;
-						st.color = 0x50cccccc;
+						st.fill = 0xc0121212;
+						st.color = 0x82cccccc;
+						st.thickness = 12;
 						static glm::vec4 rr = { 6,7,3,4 };
 						draw_rounded_rectangle(cr, rect.x, rect.y, rect.z, rect.w, rr);
 						submit_style(cr, &st);
 						vkvg_set_line_width(ctx, 6.0);
-						vkvg_set_source_color(ctx, 0xffE97B5F);
-						draw_arrow(ctx, glm::vec2(300, 350), glm::vec2(500, 350), 15, 50); 
-						draw_arrow(ctx, glm::vec2(300, 380), glm::vec2(500, 550), 15, 40);  
+						vkvg_set_source_color(ctx, 0x80E97B5F);
+						draw_arrow(ctx, glm::vec2(300, 350), glm::vec2(500, 350), 15, 50);
+						draw_arrow(ctx, glm::vec2(300, 380), glm::vec2(500, 550), 15, 40);
 						vkvg_flush(ctx);
 						vkvg_surface_resolve(surf);	// msaa采样转换输出 
+						static bool savepng = false;
+						if (savepng)
+						{
+							savepng = false;
+							vkvg_surface_write_to_png(surf, filename);
+						}
 					}
 #endif
 					sp_drawable_update(dd1, delta);
