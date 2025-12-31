@@ -1074,20 +1074,20 @@ int main()
 						{
 							vkvg_line_to(ctx, v[i].x, v[i].y);
 						}
-						vkvg_set_source_color(ctx, 0xff0080ff);
-						vkvg_set_line_width(ctx, 2.0);
+						vkvg_set_source_color(ctx, 0x800080ff);
+						vkvg_set_line_width(ctx, 12.0);
 						vkvg_stroke(ctx);
 						vkvg_restore(ctx);
 						fill_style_d st = {};
 						glm::vec4 rect = { 195.5,95.5,510,210 };
 						st.fill = 0xc0121212;
-						st.color = 0x82cccccc;
+						st.color = 0x801152cc;
 						st.thickness = 12;
-						static glm::vec4 rr = { 6,7,3,4 };
+						static glm::vec4 rr = { 6,6,6,6 };
 						draw_rounded_rectangle(cr, rect.x, rect.y, rect.z, rect.w, rr);
 						submit_style(cr, &st);
 						vkvg_set_line_width(ctx, 6.0);
-						vkvg_set_source_color(ctx, 0x80E97B5F);
+						vkvg_set_source_color(ctx, 0xffE97B5F);
 						draw_arrow(ctx, glm::vec2(300, 350), glm::vec2(500, 350), 15, 50);
 						draw_arrow(ctx, glm::vec2(300, 380), glm::vec2(500, 550), 15, 40);
 						vkvg_flush(ctx);
