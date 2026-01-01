@@ -320,6 +320,7 @@ namespace vkr
 	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name);
 	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
 
+	void DestroyShadersInTheCache(VkDevice device);
 
 	uint32_t SizeOfFormat(VkFormat format);
 
@@ -637,10 +638,11 @@ namespace vkr
 		void DestroyPipelineCache();
 		VkPipelineCache GetPipelineCache();
 
-		void CreateShaderCache() {};
-		void DestroyShaderCache() {};
+		void CreateShaderCache();
+		void DestroyShaderCache();
 
 		void GPUFlush();
+
 		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
 
 		void SetDescriptorSet(uint32_t index, VkImageView imageView, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet);
@@ -649,8 +651,9 @@ namespace vkr
 		void SetDescriptorSet(uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler pSampler, VkDescriptorSet descriptorSet);
 		void SetDescriptorSetForDepth(uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet);
 		void SetDescriptorSet(uint32_t index, VkImageView imageView, VkDescriptorSet descriptorSet);
-		VkResult CreateDescriptorSetLayoutVK(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet);
-		VkFramebuffer CreateFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
+
+		VkDescriptorSetLayout newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding);
+		VkFramebuffer newFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
 	};
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex);
@@ -1259,6 +1262,15 @@ namespace vkr
 			for (auto it = def2.begin(); it != def2.end(); it++)
 				def1[it->first] = it->second;
 			return def1;
+		}
+		std::string to_string() const
+		{
+			std::string result;
+			for (auto it = begin(); it != end(); it++)
+			{
+				result += it->first + "=" + it->second + "; ";
+			}
+			return result;
 		}
 	};
 
@@ -2145,6 +2157,23 @@ namespace vkr
 		return m_pipelineCache;
 	}
 
+	void Device::CreateShaderCache()
+	{
+#if 0
+		PWSTR path = NULL;
+		SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path);
+		std::wstring sShaderCachePathW = std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK";
+		CreateDirectoryW((std::wstring(path) + L"\\AMD").c_str(), 0);
+		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron").c_str(), 0);
+		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK").c_str(), 0); //std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(sShaderCachePathW)
+#endif
+	}
+
+	void Device::DestroyShaderCache()
+	{
+		DestroyShadersInTheCache(m_device);
+	}
+	 
 	void Device::OnDestroy()
 	{
 		for (auto& it : _samplers)
@@ -2338,20 +2367,21 @@ namespace vkr
 		update_dsets(m_device, 1, &write, 0, NULL);
 	}
 
-	VkResult Device::CreateDescriptorSetLayoutVK(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
+	VkDescriptorSetLayout Device::newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding)
 	{
+		VkDescriptorSetLayout descSetLayout = {};
 		VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
 		descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		descriptor_layout.pNext = NULL;
 		descriptor_layout.bindingCount = (uint32_t)pDescriptorLayoutBinding->size();
 		descriptor_layout.pBindings = pDescriptorLayoutBinding->data();
 
-		VkResult res = vkCreateDescriptorSetLayout(m_device, &descriptor_layout, NULL, pDescSetLayout);
+		VkResult res = vkCreateDescriptorSetLayout(m_device, &descriptor_layout, NULL, &descSetLayout);
 		assert(res == VK_SUCCESS);
-		return res;
+		return descSetLayout;
 	}
 
-	VkFramebuffer Device::CreateFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height)
+	VkFramebuffer Device::newFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height)
 	{
 		VkFramebufferCreateInfo fb_info = {};
 		fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -3339,6 +3369,7 @@ namespace vkr {
 		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_texturesDescriptorSetLayout = VK_NULL_HANDLE;
+		std::string pipe_kv;
 	};
 
 	struct DepthPipe_t {
@@ -5386,9 +5417,6 @@ namespace vkr {
 		SST_HLSL,
 		SST_GLSL
 	};
-
-	void CreateShaderCache();
-	void DestroyShaderCache(Device* pDevice);
 
 
 	// Does as the function name says and uses a cache
@@ -8838,24 +8866,6 @@ namespace vkr
 			//SetDescriptorSet1(m_pDevice->m_device, mm->uvtdata->buffer, td, mm->uvtdata->offset, (uint32_t)mm->uvtdata->range, pPrimitive->m_uniformsDescriptorSet, dt1);
 			m_pDynamicBufferRing->SetDescriptorSet(muvt, (uint32_t)muvt_size, pPrimitive->m_uniformsDescriptorSet, dt);
 		}
-
-		// Create the pipeline layout
-		//
-		//std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pPrimitive->m_uniformsDescriptorSetLayout };
-		//if (pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout != VK_NULL_HANDLE)
-		//	descriptorSetLayout.push_back(pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout);
-
-		//VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
-		//pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		//pPipelineLayoutCreateInfo.pNext = NULL;
-		//pPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-		//pPipelineLayoutCreateInfo.pPushConstantRanges = NULL;
-		//pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
-		//pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
-
-		//VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &pPrimitive->_pipe->m_pipelineLayout);
-		//assert(res == VK_SUCCESS);
-		//SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pPrimitive->_pipe->m_pipelineLayout, "GltfPbrPass PL");
 	}
 	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
 	{
@@ -8895,23 +8905,27 @@ namespace vkr
 		auto defines = defines0;
 		auto h = defines.Hash();
 		auto& oldp = _pipem[h];
+		auto nstr = defines.to_string();
 		if (oldp.m_pipeline)
 		{
-			pPrimitive->_pipe = &oldp;
-			return;
+			if (nstr == oldp.pipe_kv)
+			{
+				pPrimitive->_pipe = &oldp;
+				return;
+			}
+			else {
+				assert(0); // 哈希冲突了？
+			}
 		}
-		//defines["pbr_glsl"] = "1";
+		else {
+			oldp.pipe_kv = nstr;
+		}
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
 		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
-
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
-
-		// Create pipeline
-		//
-
+		// Create pipeline 
 		// vertex input state
-
 		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
 		for (int i = 0; i < layout.size(); i++)
 		{
@@ -8919,7 +8933,6 @@ namespace vkr
 			vi_binding[i].stride = SizeOfFormat(layout[i].format);
 			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		}
-
 		VkPipelineVertexInputStateCreateInfo vi = {};
 		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vi.pNext = NULL;
@@ -8960,16 +8973,6 @@ namespace vkr
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
 			get_blend(!depthwrite, att_state);
-#if 0
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = (defines.Has("DEF_alphaMode_BLEND"));
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-#endif
 			att_states.push_back(att_state);
 		}
 		if (defines.Has("HAS_OIT_ACCUM_RT"))
@@ -8981,7 +8984,6 @@ namespace vkr
 			att_state.colorBlendOp = VK_BLEND_OP_ADD;
 			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 			att_states.push_back(att_state);
-
 		}
 		if (defines.Has("HAS_OIT_WEIGHT_RT"))
 		{
@@ -8997,39 +8999,6 @@ namespace vkr
 
 			att_states.push_back(att_state);
 		}
-		/*
-			case BlendMode::WEIGHTED_COLOR:
-	  // Test but don't write to depth
-	  depthStencilState.depthWriteEnable = false;
-	  blendInfo.attachmentCount          = 2;
-	  blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
-																			   .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
-																			   .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
-																			   .colorBlendOp        = VK_BLEND_OP_ADD,
-																			   .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-																			   .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-																			   .colorWriteMask      = allBits};
-	  blendAttachments[1]                = VkPipelineColorBlendAttachmentState{.blendEnable         = VK_TRUE,
-																			   .srcColorBlendFactor = VK_BLEND_FACTOR_ZERO,
-																			   .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
-																			   .colorBlendOp        = VK_BLEND_OP_ADD,
-																			   .srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-																			   .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-																			   .colorWriteMask = allBits};
-	  break;
-	case BlendMode::WEIGHTED_COMPOSITE:
-	  // Test but don't write to depth
-	  depthStencilState.depthWriteEnable = false;
-	  blendAttachments[0]                = VkPipelineColorBlendAttachmentState{.blendEnable = VK_TRUE,
-																			   .srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-																			   .dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-																			   .colorBlendOp        = VK_BLEND_OP_ADD,
-																			   .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-																			   .dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-
-		*/
-
-
 		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
@@ -10912,15 +10881,9 @@ namespace vkr
 		alloc_info.descriptorPool = m_descriptorPool;
 		alloc_info.descriptorSetCount = 1;
 		alloc_info.pSetLayouts = &descLayout;
-		static uint64_t dp = 0x160000000016;
-		if ((uint64_t)m_descriptorPool == dp) {
-			dp = dp;
-		}
 		VkResult res = vkAllocateDescriptorSets(m_pDevice->m_device, &alloc_info, pDescriptorSet);
 		assert(res == VK_SUCCESS);
-
 		m_allocatedDescriptorCount++;
-
 		return res == VK_SUCCESS;
 	}
 
@@ -11200,7 +11163,7 @@ namespace vkr
 	{
 		std::vector<VkImageView> attachments;
 		m_pGBuffer->GetAttachmentList(m_flags, &attachments, &m_clearValues);
-		m_frameBuffer = m_pGBuffer->GetDevice()->CreateFrameBuffer(m_renderPass, &attachments, Width, Height);
+		m_frameBuffer = m_pGBuffer->GetDevice()->newFrameBuffer(m_renderPass, &attachments, Width, Height);
 	}
 
 	void GBufferRenderPass::OnDestroyWindowSizeDependentResources()
@@ -16188,29 +16151,6 @@ namespace vkr {
 		return VK_NOT_READY;
 	}
 
-	//
-	// Creates the shader cache
-	//
-	void CreateShaderCache()
-	{
-#if 0
-		PWSTR path = NULL;
-		SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path);
-		std::wstring sShaderCachePathW = std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK";
-		CreateDirectoryW((std::wstring(path) + L"\\AMD").c_str(), 0);
-		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron").c_str(), 0);
-		CreateDirectoryW((std::wstring(path) + L"\\AMD\\Cauldron\\ShaderCacheVK").c_str(), 0); //std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(sShaderCachePathW)
-#endif
-
-	}
-
-	//
-	// Destroys the shader cache object (not the cached data in disk)
-	//
-	void DestroyShaderCache(Device* pDevice)
-	{
-		DestroyShadersInTheCache(pDevice->m_device);
-	}
 #endif // 1
 	// misc
 #if 1
@@ -21705,7 +21645,7 @@ namespace vkr {
 	{
 		// Init the shader compiler
 		InitDirectXCompiler();
-		CreateShaderCache();
+		m_device->CreateShaderCache();
 
 		// Create a instance of the renderer and initialize it, we need to do that for each GPU
 		m_pRenderer = new Renderer_cx(nullptr);
@@ -21793,7 +21733,7 @@ namespace vkr {
 		delete m_pRenderer;
 
 		// shut down the shader compiler 
-		DestroyShaderCache(m_device);
+		m_device->DestroyShaderCache();
 
 		for (auto it : _loaders)
 		{
@@ -23416,6 +23356,99 @@ void main()
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
+	// 创建材质的描述符表，输出信息到PBRMaterial
+	void new_material(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask)
+	{
+		std::vector<uint32_t> descriptorCounts;
+		// count the number of textures to init bindings and descriptor
+		{
+			tfmat->m_textureCount = (int)texturesBase.size();
+			for (int i = 0; i < texturesBase.size(); ++i)
+			{
+				descriptorCounts.push_back(1);
+			}
+			if (pSkyDome)
+			{
+				tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
+				descriptorCounts.push_back(1);
+				descriptorCounts.push_back(1);
+				descriptorCounts.push_back(1);
+			}
+			if (bUseSSAOMask)
+			{
+				tfmat->m_textureCount += 1;
+				descriptorCounts.push_back(1);
+			}
+			if (tfmat->m_pbrMaterialParameters.transmission)
+			{
+				tfmat->m_textureCount += 1;
+				descriptorCounts.push_back(1);
+			}
+			if (!ShadowMapViewPool.empty())
+			{
+				assert(ShadowMapViewPool.size() <= MaxShadowInstances);
+				tfmat->m_textureCount += (int)ShadowMapViewPool.size();//1;
+				// this is an array of samplers/textures
+				// We should set the exact number of descriptors to avoid validation errors
+				descriptorCounts.push_back(MaxShadowInstances);
+			}
+		}
+
+		// Alloc a descriptor layout and init the descriptor set for the following textures 
+		// 1) all the textures of the PBR material (if any)
+		// 2) the 3 textures used for IBL: 
+		//         - 1 BRDF LUT 
+		//         - 2 cubemaps for the specular, difusse
+		// 3) SSAO texture
+		// 4) the shadowmaps (array of MaxShadowInstances entries -- maximum)
+		// for each entry we create a #define with that texture name that hold the id of the texture. That way the PS knows in what slot is each texture.      
+		{
+			// allocate descriptor table for the textures
+			//*m_pResourceViewHeaps->AllocDescriptor(descriptorCounts, NULL, &tfmat->m_texturesDescriptorSetLayout, &tfmat->m_texturesDescriptorSet);
+			uint32_t cnt = 0;
+			// 1) create SRV for the PBR materials
+			for (auto const& it : texturesBase)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines[std::string("ID_") + it.first] = std::to_string(cnt);
+				//m_pDevice->SetDescriptorSet(cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
+			// 2) 3 SRVs for the IBL probe
+			if (pSkyDome)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
+				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
+				//m_pDevice->SetDescriptorSet(cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
+				cnt++;
+				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
+				//pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
+				cnt++;
+				tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
+				//pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
+				cnt++;
+				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
+			}
+			// 3) SSAO mask
+			if (bUseSSAOMask)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_SSAO"] = std::to_string(cnt);
+				cnt++;
+			}
+			if (tfmat->m_pbrMaterialParameters.transmission) {
+				tfmat->m_pbrMaterialParameters.m_defines["ID_transmissionFramebufferTexture"] = std::to_string(cnt);
+				//m_pDevice->SetDescriptorSet(cnt, m_pRenderPass->m_pGBuffer->m_HDRSRVt, m_samplerPbr, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
+			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
+			if (!ShadowMapViewPool.empty())
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
+				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				//m_pDevice->SetDescriptorSet(cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
+		}
+	}
 
 }
 //!vkr

@@ -1021,7 +1021,7 @@ int main()
 			text_style ts = {};
 			ts.family = family;
 			ts.fontsize = 22;
-			ts.color = 0xffc2c2c2;
+			ts.color = -1;
 			// 文本块
 			text_block tb = {};
 			tb.style = &ts;
