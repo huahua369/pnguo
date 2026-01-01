@@ -1878,7 +1878,7 @@ namespace vkr
 
 		vkGetPhysicalDeviceProperties2(m_physicaldevice, &m_deviceProperties2);
 
-		{
+		if (pw) {
 
 #if defined(_WIN32)
 			// Crate a Win32 Surface
@@ -1901,42 +1901,57 @@ namespace vkr
 #else
 #error platform not supported
 #endif
+			if (m_physicaldevice && m_surface)
+				get_surface_formats(m_physicaldevice, m_surface, _surfaceFormats);
 		}
-		if (m_physicaldevice && m_surface)
-			get_surface_formats(m_physicaldevice, m_surface, _surfaceFormats);
 		auto qfp = get_queue_fp(queue_props.data(), queue_family_count, VK_QUEUE_GRAPHICS_BIT);
 		// Find a graphics device and a queue that can present to the above surface
 		//
-		graphics_queue_family_index = UINT32_MAX;
-		present_queue_family_index = UINT32_MAX;
-		for (uint32_t i = 0; i < queue_family_count; ++i)
-		{
-			if ((queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
-			{
-				if (graphics_queue_family_index == UINT32_MAX) graphics_queue_family_index = i;
-
-				VkBool32 supportsPresent;
-				vkGetPhysicalDeviceSurfaceSupportKHR(m_physicaldevice, i, m_surface, &supportsPresent);
-				if (supportsPresent == VK_TRUE)
-				{
-					graphics_queue_family_index = i;
-					present_queue_family_index = i;
-					break;
-				}
-			}
-		}
-
-		// If didn't find a queue that supports both graphics and present, then
-		// find a separate present queue.
-		if (present_queue_family_index == UINT32_MAX)
+		graphics_queue_family_index = 0;
+		present_queue_family_index = 0;
+		if (m_surface)
 		{
 			for (uint32_t i = 0; i < queue_family_count; ++i)
 			{
-				VkBool32 supportsPresent;
-				vkGetPhysicalDeviceSurfaceSupportKHR(m_physicaldevice, i, m_surface, &supportsPresent);
-				if (supportsPresent == VK_TRUE)
+				if ((queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
 				{
-					present_queue_family_index = (uint32_t)i;
+					if (graphics_queue_family_index == UINT32_MAX) graphics_queue_family_index = i;
+
+					VkBool32 supportsPresent;
+					vkGetPhysicalDeviceSurfaceSupportKHR(m_physicaldevice, i, m_surface, &supportsPresent);
+					if (supportsPresent == VK_TRUE)
+					{
+						graphics_queue_family_index = i;
+						present_queue_family_index = i;
+						break;
+					}
+				}
+			}
+
+			// If didn't find a queue that supports both graphics and present, then
+			// find a separate present queue.
+			if (present_queue_family_index == UINT32_MAX)
+			{
+				for (uint32_t i = 0; i < queue_family_count; ++i)
+				{
+					VkBool32 supportsPresent;
+					vkGetPhysicalDeviceSurfaceSupportKHR(m_physicaldevice, i, m_surface, &supportsPresent);
+					if (supportsPresent == VK_TRUE)
+					{
+						present_queue_family_index = (uint32_t)i;
+						break;
+					}
+				}
+			}
+		}
+		else {
+
+			for (uint32_t i = 0; i < queue_family_count; ++i)
+			{
+				if ((queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+				{
+					if (graphics_queue_family_index == UINT32_MAX) graphics_queue_family_index = i;
+					present_queue_family_index = i;
 					break;
 				}
 			}
