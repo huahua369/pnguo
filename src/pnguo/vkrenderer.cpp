@@ -2173,7 +2173,7 @@ namespace vkr
 	{
 		DestroyShadersInTheCache(m_device);
 	}
-	 
+
 	void Device::OnDestroy()
 	{
 		for (auto& it : _samplers)
@@ -3370,6 +3370,7 @@ namespace vkr {
 		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_texturesDescriptorSetLayout = VK_NULL_HANDLE;
 		std::string pipe_kv;
+		PBRPipe_t* next = 0;
 	};
 
 	struct DepthPipe_t {
@@ -3382,19 +3383,12 @@ namespace vkr {
 	struct PBRPrimitives
 	{
 		Geometry m_geometry;
-
 		PBRMaterial* m_pMaterial = NULL;
-
 		PBRPipe_t* _pipe = 0;
-		//VkPipeline m_pipeline = VK_NULL_HANDLE;
-		//VkPipeline m_pipelineWireframe = VK_NULL_HANDLE;
-		//VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
-		VkDescriptorSetLayout m_uniformsDescriptorSetLayout = VK_NULL_HANDLE;
 		int mid = 0;
 		std::vector<material_v> material_variants;
-		//void DrawPrimitive(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo perSceneDesc, VkDescriptorBufferInfo perObjectDesc, VkDescriptorBufferInfo* pPerSkeleton, morph_t* morph, bool bWireframe);
+	public:
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t);
 	};
 
@@ -5064,6 +5058,8 @@ namespace vkr {
 		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
 		void OnUpdateWindowSizeDependentResources(VkImageView SSAO);
 		GLTFCommon* get_cp();
+
+		PBRPipe_t* get_pipem(DefineList* defines);
 	private:
 		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
@@ -8676,12 +8672,7 @@ namespace vkr
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
 				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
-				//vkDestroyPipeline(m_pDevice->m_device, pPrimitive->m_pipeline, nullptr);
-				//pPrimitive->m_pipeline = VK_NULL_HANDLE;
-				//vkDestroyPipeline(m_pDevice->m_device, pPrimitive->m_pipelineWireframe, nullptr);
-				//pPrimitive->m_pipelineWireframe = VK_NULL_HANDLE;
-				//vkDestroyPipelineLayout(m_pDevice->m_device, pPrimitive->m_pipelineLayout, nullptr);
-				vkDestroyDescriptorSetLayout(m_pDevice->m_device, pPrimitive->m_uniformsDescriptorSetLayout, NULL);
+				//vkDestroyDescriptorSetLayout(m_pDevice->m_device, pPrimitive->m_uniformsDescriptorSetLayout, NULL);
 				m_pResourceViewHeaps->FreeDescriptor(pPrimitive->m_uniformsDescriptorSet);
 			}
 		}
@@ -8694,6 +8685,21 @@ namespace vkr
 				vkDestroyDescriptorSetLayout(dev, v.m_texturesDescriptorSetLayout, NULL);
 			if (v.m_uniformsDescriptorSetLayout)
 				vkDestroyDescriptorSetLayout(dev, v.m_uniformsDescriptorSetLayout, NULL);
+
+			auto p = v.next;
+			for (; p;) {
+
+				if (p->m_pipeline)
+					vkDestroyPipeline(dev, p->m_pipeline, nullptr);
+				if (p->m_pipelineLayout)
+					vkDestroyPipelineLayout(dev, p->m_pipelineLayout, nullptr);
+				if (p->m_texturesDescriptorSetLayout)
+					vkDestroyDescriptorSetLayout(dev, p->m_texturesDescriptorSetLayout, NULL);
+				if (p->m_uniformsDescriptorSetLayout)
+					vkDestroyDescriptorSetLayout(dev, p->m_uniformsDescriptorSetLayout, NULL);
+
+				p = p->next;
+			}
 		}
 
 		for (int i = 0; i < m_materialsData.size(); i++)
@@ -8720,7 +8726,42 @@ namespace vkr
 		m_brdfLutTexture.OnDestroy();
 
 	}
-
+	PBRPipe_t* GltfPbrPass::get_pipem(DefineList* defines)
+	{
+		PBRPipe_t* r = 0;
+		auto h = defines->Hash();
+		auto& oldp = _pipem[h];
+		auto nstr = defines->to_string();
+		if (oldp.pipe_kv.empty())
+		{
+			oldp.pipe_kv = nstr;
+			r = &oldp;
+			return r;
+		}
+		if (nstr == oldp.pipe_kv)
+		{
+			r = &oldp;
+		}
+		else {
+			auto p = oldp.next;
+			for (; p;) {
+				if (nstr == p->pipe_kv)
+				{
+					r = p;
+					break;
+				}
+				p = p->next;
+			}
+			if (!p) {
+				p = new PBRPipe_t();
+				p->pipe_kv = nstr;
+				r = p;
+				p->next = oldp.next;
+				oldp.next = p;
+			}
+		}
+		return r;
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// CreateDescriptors for a combination of material and geometry
@@ -8815,20 +8856,24 @@ namespace vkr
 		//m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
 
 		auto h = pAttributeDefines->Hash();
-		auto& oldp = _pipem[h];
-		if (layout_bindings.size() == 4) {
-			h = h;
+
+		auto pbrpipe = get_pipem(pAttributeDefines);
+		assert(pbrpipe);
+		if (!pbrpipe)
+		{
+			return;
 		}
-		if (!oldp.m_pipelineLayout || !oldp.m_uniformsDescriptorSetLayout) {
-			m_pResourceViewHeaps->CreateDescriptorSetLayout(&layout_bindings, &oldp.m_uniformsDescriptorSetLayout);
+
+		if (!pbrpipe->m_pipelineLayout || !pbrpipe->m_uniformsDescriptorSetLayout) {
+			m_pResourceViewHeaps->CreateDescriptorSetLayout(&layout_bindings, &pbrpipe->m_uniformsDescriptorSetLayout);
 
 			// Create the pipeline layout
 			//
-			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { oldp.m_uniformsDescriptorSetLayout };
+			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pbrpipe->m_uniformsDescriptorSetLayout };
 			if (pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout != VK_NULL_HANDLE)
 			{
 				descriptorSetLayout.push_back(pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout);
-				oldp.m_texturesDescriptorSetLayout = pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout;
+				pbrpipe->m_texturesDescriptorSetLayout = pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout;
 			}
 
 			VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
@@ -8839,12 +8884,12 @@ namespace vkr
 			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
 			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
 
-			VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &oldp.m_pipelineLayout);
+			VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
 			assert(res == VK_SUCCESS);
-			SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)oldp.m_pipelineLayout, "GltfPbrPass PL");
+			SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
 		}
 
-		m_pResourceViewHeaps->AllocDescriptor(oldp.m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
+		m_pResourceViewHeaps->AllocDescriptor(pbrpipe->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
 		// Init descriptors sets for the constant buffers
 		//
 		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(PerFrame_t), pPrimitive->m_uniformsDescriptorSet);
@@ -8904,21 +8949,14 @@ namespace vkr
 		// Compile and create shaders
 		auto defines = defines0;
 		auto h = defines.Hash();
-		auto& oldp = _pipem[h];
+		auto pbrpipe = get_pipem(&defines);
+		if (!pbrpipe)
+			return;
 		auto nstr = defines.to_string();
-		if (oldp.m_pipeline)
+		pPrimitive->_pipe = pbrpipe;
+		if (pbrpipe->m_pipeline)
 		{
-			if (nstr == oldp.pipe_kv)
-			{
-				pPrimitive->_pipe = &oldp;
-				return;
-			}
-			else {
-				assert(0); // 哈希冲突了？
-			}
-		}
-		else {
-			oldp.pipe_kv = nstr;
+			return;
 		}
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
@@ -9132,7 +9170,7 @@ namespace vkr
 		VkGraphicsPipelineCreateInfo pipeline = {};
 		pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipeline.pNext = NULL;
-		pipeline.layout = oldp.m_pipelineLayout;
+		pipeline.layout = pbrpipe->m_pipelineLayout;
 		pipeline.basePipelineHandle = VK_NULL_HANDLE;
 		pipeline.basePipelineIndex = 0;
 		pipeline.flags = 0;
@@ -9150,18 +9188,18 @@ namespace vkr
 		pipeline.renderPass = m_pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
 
-		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipeline);
+		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)oldp.m_pipeline, "GltfPbrPass P");
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
 
 		// create wireframe pipeline
 		rs.polygonMode = VK_POLYGON_MODE_LINE;
 		rs.cullMode = VK_CULL_MODE_NONE;
 		//ds.depthWriteEnable = false;
-		res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &oldp.m_pipelineWireframe);
+		res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)oldp.m_pipelineWireframe, "GltfPbrPass Wireframe P");
-		pPrimitive->_pipe = &oldp;
+		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
+		pPrimitive->_pipe = pbrpipe;
 	}
 
 	//--------------------------------------------------------------------------------------
