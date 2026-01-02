@@ -1799,7 +1799,56 @@ pipelinestate_p* new_spv_base(VkDevice device)
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+rLibrary new_rdevlib(rdev_impl* opt)
+{
+	if (!opt) return nullptr;
 
+	struct rdev_impl0
+	{
+		rLibrary library = 0;
+		rDevice(*NewDevice)(rLibrary library, const char* type/* = "default"*/);
+		rArray1D(*NewArray1D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1);
+		rArray2D(*NewArray2D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2);
+		rArray3D(*NewArray3D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3);
+		void* (*MapArray)(rDevice device, rArray array);
+		void (*UnmapArray)(rDevice device, rArray array);
+		rLight(*NewLight)(rDevice device, const char* type);
+		rCamera(*NewCamera)(rDevice device, const char* type);
+		rGeometry(*NewGeometry)(rDevice device, const char* type);
+		rSpatialField(*NewSpatialField)(rDevice device, const char* type);
+		rVolume(*NewVolume)(rDevice device, const char* type);
+		rSurface(*NewSurface)(rDevice device);
+		rMaterial(*NewMaterial)(rDevice device, const char* type);
+		rSampler(*NewSampler)(rDevice device, const char* type);
+		rGroup(*NewGroup)(rDevice device);
+		rInstance(*NewInstance)(rDevice device, const char* type);
+		rWorld(*NewWorld)(rDevice device);
+		rObject(*NewObject)(rDevice device, const char* objectType, const char* type);
+		void (*SetParameter)(rDevice device, rObject object, const char* name, rDataType dataType, const void* mem);
+		void (*UnsetParameter)(rDevice device, rObject object, const char* name);
+		void (*UnsetAllParameters)(rDevice device, rObject object);
+		void* (*MapParameterArray1D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride);
+		void* (*MapParameterArray2D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride);
+		void* (*MapParameterArray3D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride);
+		void (*UnmapParameterArray)(rDevice device, rObject object, const char* name);
+		void (*CommitParameters)(rDevice device, rObject object);
+		void (*Release)(rDevice device, rObject object);
+		void (*Retain)(rDevice device, rObject object);
+		const char** (*GetDeviceSubtypes)(rLibrary library);
+		const char** (*GetDeviceExtensions)(rLibrary library, const char* deviceSubtype);
+		const char** (*GetObjectSubtypes)(rDevice device, rDataType objectType);
+		const void* (*GetObjectInfo)(rDevice device, rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType);
+		const void* (*GetParameterInfo)(rDevice device, rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType);
+		int (*GetProperty)(rDevice device, rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask);
+		rFrame(*NewFrame)(rDevice device);
+		const void* (*MapFrame)(rDevice device, rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType);
+		void (*UnmapFrame)(rDevice device, rFrame frame, const char* channel);
+		rRenderer(*NewRenderer)(rDevice device, const char* type);
+		void (*RenderFrame)(rDevice device, rFrame frame);
+		int (*FrameReady)(rDevice device, rFrame frame, rWaitMask mask);
+		void (*DiscardFrame)(rDevice device, rFrame frame);
+	};
+}
 
 
 

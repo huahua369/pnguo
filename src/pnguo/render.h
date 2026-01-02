@@ -252,3 +252,111 @@ void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);
 void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 释放渲染器的纹理
 void r_render_free_tex(sdl3_textdata* p);
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	typedef void* rLibrary;
+	typedef void* rObject;
+	typedef void* rDevice;
+	typedef void* rCamera;
+	typedef void* rArray;
+	typedef void* rArray1D;
+	typedef void* rArray2D;
+	typedef void* rArray3D;
+	typedef void* rFrame;
+	typedef void* rFuture;
+	typedef void* rGeometry;
+	typedef void* rGroup;
+	typedef void* rInstance;
+	typedef void* rLight;
+	typedef void* rMaterial;
+	typedef void* rSampler;
+	typedef void* rSurface;
+	typedef void* rRenderer;
+	typedef void* rSpatialField;
+	typedef void* rVolume;
+	typedef void* rWorld;
+
+	typedef int rDataType;
+	typedef int rStatusSeverity;
+	typedef int rStatusCode;
+	typedef uint32_t rWaitMask;
+
+	typedef struct {
+		const char* name;
+		rDataType type;
+	} rParameter;
+
+	typedef void (*rMemoryDeleter)(const void* userPtr, const void* appMemory);
+	typedef void (*rStatusCallback)(const void* userPtr, rDevice device, rObject source, rDataType sourceType, rStatusSeverity severity, rStatusCode code, const char* message);
+	typedef void (*rFrameCompletionCallback)(const void* userPtr, rDevice device, rFrame frame);
+	/*
+		关系图
+		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
+		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
+		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group
+		Group		: Surface(1:N)、Light(1:N)
+		Surface		: Geometry(1:1)、Material(1:1)
+		Geometry	: transform、动画等属性
+
+		rLibrary(*LoadLibrary)(const char* name, rStatusCallback statusCallback, const void* statusCallbackUserData);
+		void (*UnloadLibrary)(rLibrary module);
+		void (*LoadModule)(rLibrary library, const char* name);
+		void (*UnloadModule)(rLibrary library, const char* name);
+	*/
+
+	struct rdev_impl
+	{
+		rLibrary library = 0;
+		rDevice(*NewDevice)(rLibrary library, const char* type/* = "default"*/);
+		rArray1D(*NewArray1D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1);
+		rArray2D(*NewArray2D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2);
+		rArray3D(*NewArray3D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3);
+		void* (*MapArray)(rDevice device, rArray array);
+		void (*UnmapArray)(rDevice device, rArray array);
+		rLight(*NewLight)(rDevice device, const char* type);
+		rCamera(*NewCamera)(rDevice device, const char* type);
+		rGeometry(*NewGeometry)(rDevice device, const char* type);
+		rSpatialField(*NewSpatialField)(rDevice device, const char* type);
+		rVolume(*NewVolume)(rDevice device, const char* type);
+		rSurface(*NewSurface)(rDevice device);
+		rMaterial(*NewMaterial)(rDevice device, const char* type);
+		rSampler(*NewSampler)(rDevice device, const char* type);
+		rGroup(*NewGroup)(rDevice device);
+		rInstance(*NewInstance)(rDevice device, const char* type);
+		rWorld(*NewWorld)(rDevice device);
+		rObject(*NewObject)(rDevice device, const char* objectType, const char* type);
+		void (*SetParameter)(rDevice device, rObject object, const char* name, rDataType dataType, const void* mem);
+		void (*UnsetParameter)(rDevice device, rObject object, const char* name);
+		void (*UnsetAllParameters)(rDevice device, rObject object);
+		void* (*MapParameterArray1D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride);
+		void* (*MapParameterArray2D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride);
+		void* (*MapParameterArray3D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride);
+		void (*UnmapParameterArray)(rDevice device, rObject object, const char* name);
+		void (*CommitParameters)(rDevice device, rObject object);
+		void (*Release)(rDevice device, rObject object);
+		void (*Retain)(rDevice device, rObject object);
+		const char** (*GetDeviceSubtypes)(rLibrary library);
+		const char** (*GetDeviceExtensions)(rLibrary library, const char* deviceSubtype);
+		const char** (*GetObjectSubtypes)(rDevice device, rDataType objectType);
+		const void* (*GetObjectInfo)(rDevice device, rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType);
+		const void* (*GetParameterInfo)(rDevice device, rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType);
+		int (*GetProperty)(rDevice device, rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask);
+		rFrame(*NewFrame)(rDevice device);
+		const void* (*MapFrame)(rDevice device, rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType);
+		void (*UnmapFrame)(rDevice device, rFrame frame, const char* channel);
+		rRenderer(*NewRenderer)(rDevice device, const char* type);
+		void (*RenderFrame)(rDevice device, rFrame frame);
+		int (*FrameReady)(rDevice device, rFrame frame, rWaitMask mask);
+		void (*DiscardFrame)(rDevice device, rFrame frame);
+	};
+	typedef struct rdev_impl rdev_impl;
+	// 创建lib获取渲染接口输出到opt
+	rLibrary new_rdevlib(rdev_impl* opt);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

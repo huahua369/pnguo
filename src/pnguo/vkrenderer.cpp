@@ -3329,7 +3329,7 @@ namespace vkr {
 		//KHR_materials_dispersion
 		float dispersion = 0;
 		vec3 attenuationColor = glm::vec3(1.0);
-		float attenuationDistance = 0;
+		float attenuationDistance = 10240;
 		// KHR_materials_iridescence
 		float iridescenceFactor = 0;
 		float iridescenceIor = 1.3;
@@ -5064,10 +5064,7 @@ namespace vkr {
 	public:
 		GltfPbrPass();
 		~GltfPbrPass();
-		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing,
-			GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask,
-			std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL
-		);
+		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask, std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL);
 		void OnDestroy();
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
@@ -8144,16 +8141,16 @@ namespace vkr
 			}
 		}
 	}
-	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& m_materialsData, std::vector<PBRMesh>& _meshes)
+	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& mdv, std::vector<PBRMesh>& _meshes)
 	{
 		// Load PBR 2.0 Materials 
 		if (pm)
 		{
 			auto& materials = pm->materials;
-			m_materialsData.resize(materials.size());
+			mdv.resize(materials.size());
 			for (uint32_t i = 0; i < materials.size(); i++)
 			{
-				auto tfmat = &m_materialsData[i];
+				auto tfmat = &mdv[i];
 				//tfmat->m_pbrMaterialParameters.m_defines["MATERIAL_UNLIT"] = "1";//无光照
 				// Get PBR material parameters and texture IDs
 				//
@@ -8245,19 +8242,7 @@ namespace vkr
 	// OnCreate
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::OnCreate(
-		Device* pDevice,
-		UploadHeap* pUploadHeap,
-		ResourceViewHeaps* pHeaps,
-		DynamicBufferRing* pDynamicBufferRing,
-		//StaticBufferPool* pStaticBufferPool,
-		GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers,
-		SkyDome* pSkyDome,
-		bool bUseSSAOMask,
-		std::vector<VkImageView>& ShadowMapViewPool,
-		GBufferRenderPass* pRenderPass,
-		AsyncPool* pAsyncPool
-	)
+	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask, std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool)
 	{
 		m_pDevice = pDevice;
 		m_pRenderPass = pRenderPass;
@@ -17979,15 +17964,7 @@ namespace vkr {
 			dysize += (c * sizeof(glm::mat3x4));
 		}
 
-		auto& meshes = pm->meshes;
-		//for (uint32_t i = 0; i < meshes.size(); i++)
-		//{
-		//	auto& mesh = meshes[i];
-		//	auto& primitives = meshes[i].primitives;
-		//	auto& weights = meshes[i].weights;
-		//	dysize += weights.size() * sizeof(float);
-		//}
-
+		auto& meshes = pm->meshes; 
 		_meshskin.clear();
 		for (uint32_t i = 0; i < m_nodes.size(); i++)
 		{
@@ -18018,24 +17995,7 @@ namespace vkr {
 				dysize += weights.size() * sizeof(float);
 				mw.resize(weights.size());
 			}
-		}
-		// same thing for the skinning matrices but using the size of the InverseBindMatrices
-		/*for (uint32_t i = 0; i < m_skins.size(); i++)
-		{
-			auto& it = m_worldSpaceSkeletonMats[i];
-			it.m = ptr;
-			it.count = m_skins[i].m_InverseBindMatrices.m_count;
-			ptr += it.count;
-			dysize += it.count * sizeof(glm::mat4);
-		}*/
-		//for (uint32_t i = 0; i < m_nodes.size(); i++)
-		//{
-		//	auto& it = m_nodes[i];
-		//	m_animatedMats[i] = it.m_tranform.GetWorldMat();
-		//	if (it.meshIndex >= 0) {
-		//		m_meshes[it.meshIndex];
-		//	}
-		//}
+		} 
 		if (m_skins.size())
 		{
 			for (auto& mt : _meshskin)
@@ -18051,20 +18011,6 @@ namespace vkr {
 			}
 		}
 		ubo_size = dysize;
-		// sets the animated data to the default values of the nodes
-		// later on these values can be updated by the SetAnimationTime function
-		// .resize(m_nodes.size());
-		// 初始化的矩阵测试
-		//std::vector<int> sceneNodes = { m_scenes[0].m_nodes };
-		//std::vector<glm::mat4> nodemat;
-		//make_mat(glm::mat4(1.0), &sceneNodes, &nodemat);
-		//njson mj;
-		//for (auto& it : nodemat) {
-		//	njson a;
-		//	mat2json(it, a);
-		//	mj.push_back(a);
-		//}
-		//hz::save_json("temp/mat_nodes.json", mj, 2);
 		return;
 	}
 
