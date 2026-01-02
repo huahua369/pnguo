@@ -383,11 +383,7 @@ namespace vkr {
 		mesh3_mt* d = 0;
 		glm::mat4 m;
 		bool visible = true;
-	};
-	// 添加渲染数据对象
-	void vkdg_add(vkdg_cx* p, rdata_t* d);
-	// 删除对象
-	void vkdg_remove(vkdg_cx* p, rdata_t* d);
+	}; 
 
 	// 创建brdflut纹理数据，大小，类型0=float16，1=rgba
 	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim, int type);

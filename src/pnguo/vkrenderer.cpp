@@ -1675,7 +1675,9 @@ namespace vkr
 		auto apiVersion4 = VK_API_VERSION_1_4;
 		auto apiVersion = apiVersion3;// VK_VERSION_1_2;// VK_API_VERSION_1_0;
 		VkInstanceCreateInfo inst_info = {};
-		if (!d || !d->inst || !d->phy)
+		if (d) { nd = *d; }
+		d = &nd;
+		if (!d->phy)
 		{
 			std::vector<const char*> instance_layer_names;
 			std::vector<const char*> instance_extension_names;
@@ -1713,7 +1715,6 @@ namespace vkr
 						}
 					}
 					nd.phy = SelectPhysicalDevice(devs);
-
 					// 选择自定义显卡
 					if (spdname && *spdname)
 					{
@@ -1729,7 +1730,6 @@ namespace vkr
 						}
 					}
 				}
-				d = &nd;
 			}
 		}
 		if (!d || !d->inst || !d->phy)
@@ -17964,7 +17964,7 @@ namespace vkr {
 			dysize += (c * sizeof(glm::mat3x4));
 		}
 
-		auto& meshes = pm->meshes; 
+		auto& meshes = pm->meshes;
 		_meshskin.clear();
 		for (uint32_t i = 0; i < m_nodes.size(); i++)
 		{
@@ -17995,7 +17995,7 @@ namespace vkr {
 				dysize += weights.size() * sizeof(float);
 				mw.resize(weights.size());
 			}
-		} 
+		}
 		if (m_skins.size())
 		{
 			for (auto& mt : _meshskin)
