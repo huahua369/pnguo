@@ -534,9 +534,6 @@ namespace vkr
 
 	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP);
 
-	void update_dsets(VkDevice device, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount, const VkCopyDescriptorSet* pDescriptorCopies);
-
-
 
 	class DeviceProperties
 	{
@@ -651,6 +648,7 @@ namespace vkr
 		void SetDescriptorSet(uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler pSampler, VkDescriptorSet descriptorSet);
 		void SetDescriptorSetForDepth(uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet);
 		void SetDescriptorSet(uint32_t index, VkImageView imageView, VkDescriptorSet descriptorSet);
+		void SetDescriptorSet1(VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
 
 		VkDescriptorSetLayout newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding);
 		VkFramebuffer newFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
@@ -2310,7 +2308,7 @@ namespace vkr
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
 
-		update_dsets(m_device, 1, &write, 0, NULL);
+		vkUpdateDescriptorSets(m_device, 1, &write, 0, NULL);
 	}
 
 	void Device::SetDescriptorSet(uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet)
@@ -2343,7 +2341,7 @@ namespace vkr
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
 
-		update_dsets(m_device, 1, &write, 0, NULL);
+		vkUpdateDescriptorSets(m_device, 1, &write, 0, NULL);
 	}
 
 	void Device::SetDescriptorSet(uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet)
@@ -2379,7 +2377,29 @@ namespace vkr
 		write.dstBinding = index;
 		write.dstArrayElement = 0;
 
-		update_dsets(m_device, 1, &write, 0, NULL);
+		vkUpdateDescriptorSets(m_device, 1, &write, 0, NULL);
+	}
+
+	void Device::SetDescriptorSet1(VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
+	{
+		VkDescriptorBufferInfo out = {};
+		out.buffer = buffer;
+		out.offset = pos;
+		out.range = size;// alignUp(size, (uint32_t)256);
+		assert(buffer);
+		VkWriteDescriptorSet write;
+		write = {};
+		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		write.pNext = NULL;
+		write.dstSet = descriptorSet;
+		write.descriptorCount = 1;
+		int dk = dt;
+		write.descriptorType = (VkDescriptorType)(dk > 0 ? dt : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+		write.pBufferInfo = &out;
+		write.dstArrayElement = 0;
+		write.dstBinding = index;
+
+		vkUpdateDescriptorSets(m_device, 1, &write, 0, NULL);
 	}
 
 	VkDescriptorSetLayout Device::newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding)
@@ -3881,7 +3901,6 @@ namespace vkr {
 		std::map<GBufferFlags, VkFormat> m_formats;
 	};
 
-	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
 
 
 
@@ -6491,7 +6510,7 @@ namespace vkr
 
 		if (morphing)
 		{
-			SetDescriptorSet1(m_pDevice->m_device, morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
+			m_pDevice->SetDescriptorSet1(morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_descriptorSet, dt1);
 			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_descriptorSet, dt);
 		}
 
@@ -8902,7 +8921,7 @@ namespace vkr
 		if (morphing)
 		{
 			//vec4 per_target_data[];
-			SetDescriptorSet1(m_pDevice->m_device, morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
+			m_pDevice->SetDescriptorSet1(morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
 			//float u_morphWeights[];
 			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
 		}
@@ -11763,18 +11782,6 @@ namespace vkr
 		m_mem.OnBeginFrame();
 	}
 
-	void update_dsets(VkDevice device, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount, const VkCopyDescriptorSet* pDescriptorCopies)
-	{
-		if (pDescriptorWrites && pDescriptorWrites->pBufferInfo) {
-			//static VkBuffer y = (VkBuffer)0;
-			//if (pDescriptorWrites->pBufferInfo->buffer == y) {
-			//	assert(0);
-			//}
-			if (!pDescriptorWrites->pBufferInfo->buffer)
-				assert(pDescriptorWrites->pBufferInfo->offset == 0 && pDescriptorWrites->pBufferInfo->range == 0);
-		}
-		vkUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount, pDescriptorCopies);
-	}
 	void DynamicBufferRing::SetDescriptorSet(int index, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
 	{
 		VkDescriptorBufferInfo out = {};
@@ -11795,30 +11802,8 @@ namespace vkr
 		write.dstArrayElement = 0;
 		write.dstBinding = index;
 
-		update_dsets(m_pDevice->m_device, 1, &write, 0, NULL);
+		vkUpdateDescriptorSets(m_pDevice->m_device, 1, &write, 0, NULL);
 	}
-	void SetDescriptorSet1(VkDevice device, VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
-	{
-		VkDescriptorBufferInfo out = {};
-		out.buffer = buffer;
-		out.offset = pos;
-		out.range = size;// alignUp(size, (uint32_t)256);
-		assert(buffer);
-		VkWriteDescriptorSet write;
-		write = {};
-		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		write.pNext = NULL;
-		write.dstSet = descriptorSet;
-		write.descriptorCount = 1;
-		int dk = dt;
-		write.descriptorType = (VkDescriptorType)(dk > 0 ? dt : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
-		write.pBufferInfo = &out;
-		write.dstArrayElement = 0;
-		write.dstBinding = index;
-
-		update_dsets(device, 1, &write, 0, NULL);
-	}
-
 
 
 
@@ -12906,7 +12891,7 @@ namespace vkr {
 			write.dstBinding = i + 5;
 			write.dstArrayElement = 0;
 
-			update_dsets(m_pDevice->m_device, 1, &write, 0, NULL);
+			vkUpdateDescriptorSets(m_pDevice->m_device, 1, &write, 0, NULL);
 		}
 
 		// update the Sharpen descriptor
@@ -21575,55 +21560,7 @@ namespace vkr {
 		addAttachment(format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
 		if (is_depth_tex(depth_format))
 			addAttachment(depth_format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, &depthAttachment);
-		return CreateRenderPassOptimal(pDevice->m_device, colorAttanchmentCount, colorAttachments, &depthAttachment);
-		// color RT
-		VkAttachmentDescription attachments[1];
-		attachments[0].format = format;
-		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		attachments[0].flags = 0;
-
-		VkAttachmentReference color_reference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-
-		VkSubpassDescription subpass = {};
-		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.flags = 0;
-		subpass.inputAttachmentCount = 0;
-		subpass.pInputAttachments = NULL;
-		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &color_reference;
-		subpass.pResolveAttachments = NULL;
-		subpass.pDepthStencilAttachment = NULL;
-		subpass.preserveAttachmentCount = 0;
-		subpass.pPreserveAttachments = NULL;
-
-		VkSubpassDependency dep = {};
-		dep.dependencyFlags = 0;
-		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dep.dstSubpass = 0;
-		dep.srcAccessMask = 0;
-		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-
-		VkRenderPassCreateInfo rp_info = {};
-		rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		rp_info.pNext = NULL;
-		rp_info.attachmentCount = 1;
-		rp_info.pAttachments = attachments;
-		rp_info.subpassCount = 1;
-		rp_info.pSubpasses = &subpass;
-		rp_info.dependencyCount = 1;
-		rp_info.pDependencies = &dep;
-		VkRenderPass m_render_pass_swap_chain = {};
-		VkResult res = vkCreateRenderPass(pDevice->m_device, &rp_info, NULL, &m_render_pass_swap_chain);
-		assert(res == VK_SUCCESS);
-		return m_render_pass_swap_chain;
+		return CreateRenderPassOptimal(pDevice->m_device, colorAttanchmentCount, colorAttachments, &depthAttachment); 
 	}
 
 	void DestroyRenderPass(Device* pDevice, VkRenderPass rp)
@@ -23260,7 +23197,7 @@ void main()
 		std::vector<VkWriteDescriptorSet> modelWriteDescriptorSets = {
 			initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &descriptor),
 		};
-		update_dsets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
 
 		DefineList attributeDefines = {};
 		VkPipelineShaderStageCreateInfo msmShader;
