@@ -355,8 +355,8 @@ extern "C" {
 	};
 	typedef struct rdev_impl rdev_impl;
 	// 创建lib获取渲染接口输出到opt
-	rLibrary new_rdevlib(rdev_impl* opt);
-
+	rLibrary loadRLibrary(rdev_impl* opt);
+	void unloadRLibrary(rLibrary m);
 #ifdef __cplusplus
 } // extern "C"
 
@@ -375,40 +375,64 @@ namespace vkr {
 		rArray3D NewArray3D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3);
 		void* MapArray(rArray array);
 		void  UnmapArray(rArray array);
+		// 创建光源
 		rLight NewLight(const char* type);
+		// 创建相机
 		rCamera NewCamera(const char* type);
+		// 创建几何体
 		rGeometry NewGeometry(const char* type);
-		rSpatialField NewSpatialField(const char* type);
-		rVolume NewVolume(const char* type);
+		// 创建表面实体
 		rSurface NewSurface(rDevice device);
+		// 创建材质
 		rMaterial NewMaterial(const char* type);
+		// 创建纹理采样器
 		rSampler NewSampler(const char* type);
+		// 创建组
 		rGroup NewGroup(rDevice device);
+		// 创建实例
 		rInstance NewInstance(const char* type);
+		// 创建世界
 		rWorld NewWorld(rDevice device);
+		// 创建以上对象
 		rObject NewObject(const char* objectType, const char* type);
+		// 设置参数
 		void  SetParameter(rObject object, const char* name, rDataType dataType, const void* mem);
+		// 取消设置参数
 		void  UnsetParameter(rObject object, const char* name);
+		// 取消设置所有参数
 		void  UnsetAllParameters(rObject object);
+		// 映射参数数组
 		void* MapParameterArray1D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride);
 		void* MapParameterArray2D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride);
 		void* MapParameterArray3D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride);
 		void  UnmapParameterArray(rObject object, const char* name);
+		// 提交参数设置
 		void  CommitParameters(rObject object);
+		// 释放对象
 		void  Release(rObject object);
+		// 引用对象
 		void  Retain(rObject object);
-		const char** GetDeviceSubtypes(rLibrary library);
-		const char** GetDeviceExtensions(rLibrary library, const char* deviceSubtype);
+		// 获取设备子类型
 		const char** GetObjectSubtypes(rDataType objectType);
+		// 获取对象信息
 		const void* GetObjectInfo(rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType);
+		// 获取参数信息
 		const void* GetParameterInfo(rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType);
+		// 获取属性
 		int  GetProperty(rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask);
+		// 创建帧缓冲
 		rFrame NewFrame(rDevice device);
+		// 映射帧数据
 		const void* MapFrame(rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType);
+		// 解除映射帧数据
 		void  UnmapFrame(rFrame frame, const char* channel);
+		// 创建渲染器
 		rRenderer NewRenderer(const char* type);
+		// 提交帧渲染
 		void  RenderFrame(rFrame frame);
+		// 帧渲染完成检查
 		int  FrameReady(rFrame frame, rWaitMask mask);
+		// 丢弃帧
 		void  DiscardFrame(rFrame frame);
 	};
 }

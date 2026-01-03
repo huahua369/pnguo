@@ -1799,57 +1799,6 @@ pipelinestate_p* new_spv_base(VkDevice device)
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-rLibrary new_rdevlib(rdev_impl* opt)
-{
-	if (!opt) return nullptr;
-
-	struct rdev_impl0
-	{
-		rLibrary library = 0;
-		rDevice(*NewDevice)(rLibrary library, const char* type/* = "default"*/);
-		rArray1D(*NewArray1D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1);
-		rArray2D(*NewArray2D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2);
-		rArray3D(*NewArray3D)(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3);
-		void* (*MapArray)(rDevice device, rArray array);
-		void (*UnmapArray)(rDevice device, rArray array);
-		rLight(*NewLight)(rDevice device, const char* type);
-		rCamera(*NewCamera)(rDevice device, const char* type);
-		rGeometry(*NewGeometry)(rDevice device, const char* type);
-		rSpatialField(*NewSpatialField)(rDevice device, const char* type);
-		rVolume(*NewVolume)(rDevice device, const char* type);
-		rSurface(*NewSurface)(rDevice device);
-		rMaterial(*NewMaterial)(rDevice device, const char* type);
-		rSampler(*NewSampler)(rDevice device, const char* type);
-		rGroup(*NewGroup)(rDevice device);
-		rInstance(*NewInstance)(rDevice device, const char* type);
-		rWorld(*NewWorld)(rDevice device);
-		rObject(*NewObject)(rDevice device, const char* objectType, const char* type);
-		void (*SetParameter)(rDevice device, rObject object, const char* name, rDataType dataType, const void* mem);
-		void (*UnsetParameter)(rDevice device, rObject object, const char* name);
-		void (*UnsetAllParameters)(rDevice device, rObject object);
-		void* (*MapParameterArray1D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride);
-		void* (*MapParameterArray2D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride);
-		void* (*MapParameterArray3D)(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride);
-		void (*UnmapParameterArray)(rDevice device, rObject object, const char* name);
-		void (*CommitParameters)(rDevice device, rObject object);
-		void (*Release)(rDevice device, rObject object);
-		void (*Retain)(rDevice device, rObject object);
-		const char** (*GetDeviceSubtypes)(rLibrary library);
-		const char** (*GetDeviceExtensions)(rLibrary library, const char* deviceSubtype);
-		const char** (*GetObjectSubtypes)(rDevice device, rDataType objectType);
-		const void* (*GetObjectInfo)(rDevice device, rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType);
-		const void* (*GetParameterInfo)(rDevice device, rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType);
-		int (*GetProperty)(rDevice device, rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask);
-		rFrame(*NewFrame)(rDevice device);
-		const void* (*MapFrame)(rDevice device, rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType);
-		void (*UnmapFrame)(rDevice device, rFrame frame, const char* channel);
-		rRenderer(*NewRenderer)(rDevice device, const char* type);
-		void (*RenderFrame)(rDevice device, rFrame frame);
-		int (*FrameReady)(rDevice device, rFrame frame, rWaitMask mask);
-		void (*DiscardFrame)(rDevice device, rFrame frame);
-	};
-}
-
 
 
 
@@ -2053,6 +2002,224 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 #endif
 }
 
+
+
+rDevice NewDevice(rLibrary library, const char* type/* = "default"*/) {
+	return 0;
+}
+rArray1D NewArray1D(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1) {
+
+	return 0;
+}
+rArray2D NewArray2D(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2) {
+
+	return 0;
+}
+rArray3D NewArray3D(rDevice device, const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3) {
+
+	return 0;
+}
+void* MapArray(rDevice device, rArray array) {
+
+	return 0;
+}
+void UnmapArray(rDevice device, rArray array) {
+}
+rLight NewLight(rDevice device, const char* type) {
+
+	return 0;
+}
+rCamera NewCamera(rDevice device, const char* type) {
+
+	return 0;
+}
+rGeometry NewGeometry(rDevice device, const char* type) {
+
+	return 0;
+}
+rSpatialField NewSpatialField(rDevice device, const char* type) {
+
+	return 0;
+}
+rVolume NewVolume(rDevice device, const char* type) {
+
+	return 0;
+}
+rSurface NewSurface(rDevice device) {
+
+	return 0;
+}
+rMaterial NewMaterial(rDevice device, const char* type) {
+
+	return 0;
+}
+rSampler NewSampler(rDevice device, const char* type) {
+
+	return 0;
+}
+rGroup NewGroup(rDevice device) {
+
+	return 0;
+}
+rInstance NewInstance(rDevice device, const char* type) {
+
+	return 0;
+}
+rWorld NewWorld(rDevice device) {
+
+	return 0;
+}
+rObject NewObject(rDevice device, const char* objectType, const char* type) {
+
+	return 0;
+}
+void SetParameter(rDevice device, rObject object, const char* name, rDataType dataType, const void* mem) {
+}
+void UnsetParameter(rDevice device, rObject object, const char* name) {
+}
+void UnsetAllParameters(rDevice device, rObject object) {
+}
+void* MapParameterArray1D(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride) {
+
+	return 0;
+}
+void* MapParameterArray2D(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride) {
+
+	return 0;
+}
+void* MapParameterArray3D(rDevice device, rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride) {
+
+	return 0;
+}
+void UnmapParameterArray(rDevice device, rObject object, const char* name) {
+}
+void CommitParameters(rDevice device, rObject object) {
+}
+void Release(rDevice device, rObject object) {
+}
+void Retain(rDevice device, rObject object) {
+}
+const char** GetDeviceSubtypes(rLibrary library) {
+
+	return 0;
+}
+const char** GetDeviceExtensions(rLibrary library, const char* deviceSubtype) {
+
+	return 0;
+}
+const char** GetObjectSubtypes(rDevice device, rDataType objectType) {
+
+	return 0;
+}
+const void* GetObjectInfo(rDevice device, rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType) {
+
+	return 0;
+}
+const void* GetParameterInfo(rDevice device, rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType) {
+	return 0;
+}
+int  GetProperty(rDevice device, rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask) {
+
+	return 0;
+}
+rFrame NewFrame(rDevice device) {
+	return 0;
+}
+const void* MapFrame(rDevice device, rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType) {
+
+	return 0;
+}
+void UnmapFrame(rDevice device, rFrame frame, const char* channel) {
+}
+rRenderer NewRenderer(rDevice device, const char* type) {
+
+	return 0;
+}
+void RenderFrame(rDevice device, rFrame frame) {
+}
+int  FrameReady(rDevice device, rFrame frame, rWaitMask mask) {
+
+	return 0;
+}
+void DiscardFrame(rDevice device, rFrame frame) {
+}
+class rlib_t
+{
+public:
+	rdev_impl impl;
+public:
+	rlib_t();
+	~rlib_t();
+
+private:
+
+};
+
+rlib_t::rlib_t()
+{
+	rdev_impl* opt = &impl;
+	opt->library = this;
+	opt->NewDevice = NewDevice;
+	opt->NewArray1D = NewArray1D;
+	opt->NewArray2D = NewArray2D;
+	opt->NewArray3D = NewArray3D;
+	opt->MapArray = MapArray;
+	opt->UnmapArray = UnmapArray;
+	opt->NewLight = NewLight;
+	opt->NewCamera = NewCamera;
+	opt->NewGeometry = NewGeometry;
+	//opt->NewSpatialField = NewSpatialField;
+	//opt->NewVolume = NewVolume;
+	opt->NewSurface = NewSurface;
+	opt->NewMaterial = NewMaterial;
+	opt->NewSampler = NewSampler;
+	opt->NewGroup = NewGroup;
+	opt->NewInstance = NewInstance;
+	opt->NewWorld = NewWorld;
+	opt->NewObject = NewObject;
+	opt->SetParameter = SetParameter;
+	opt->UnsetParameter = UnsetParameter;
+	opt->UnsetAllParameters = UnsetAllParameters;
+	opt->MapParameterArray1D = MapParameterArray1D;
+	opt->MapParameterArray2D = MapParameterArray2D;
+	opt->MapParameterArray3D = MapParameterArray3D;
+	opt->UnmapParameterArray = UnmapParameterArray;
+	opt->CommitParameters = CommitParameters;
+	opt->Release = Release;
+	opt->Retain = Retain;
+	opt->GetDeviceSubtypes = GetDeviceSubtypes;
+	opt->GetDeviceExtensions = GetDeviceExtensions;
+	opt->GetObjectSubtypes = GetObjectSubtypes;
+	opt->GetObjectInfo = GetObjectInfo;
+	opt->GetParameterInfo = GetParameterInfo;
+	opt->GetProperty = GetProperty;
+	opt->NewFrame = NewFrame;
+	opt->MapFrame = MapFrame;
+	opt->UnmapFrame = UnmapFrame;
+	opt->NewRenderer = NewRenderer;
+	opt->RenderFrame = RenderFrame;
+	opt->FrameReady = FrameReady;
+	opt->DiscardFrame = DiscardFrame;
+
+}
+
+rlib_t::~rlib_t()
+{
+}
+rLibrary loadRLibrary(rdev_impl* opt)
+{
+	auto p = new rlib_t();
+	if (opt)
+		*opt = p->impl;
+	return p;
+}
+
+void unloadRLibrary(rLibrary m) {
+	auto p = (rlib_t*)m;
+	if (m) {
+		delete p;
+	}
+}
 namespace vkr {
 	vDevice::vDevice()
 	{
@@ -2083,5 +2250,127 @@ namespace vkr {
 	void vDevice::UnmapArray(rArray array)
 	{
 	}
+	rLight vDevice::NewLight(const char* type)
+	{
+		return rLight();
+	}
+	rCamera vDevice::NewCamera(const char* type)
+	{
+		return rCamera();
+	}
+	rGeometry vDevice::NewGeometry(const char* type)
+	{
+		return rGeometry();
+	}
+	rSurface vDevice::NewSurface(rDevice device)
+	{
+		return rSurface();
+	}
+	rMaterial vDevice::NewMaterial(const char* type)
+	{
+		return rMaterial();
+	}
+	rSampler vDevice::NewSampler(const char* type)
+	{
+		return rSampler();
+	}
+	rGroup vDevice::NewGroup(rDevice device)
+	{
+		return rGroup();
+	}
+	rInstance vDevice::NewInstance(const char* type)
+	{
+		return rInstance();
+	}
+	rWorld vDevice::NewWorld(rDevice device)
+	{
+		return rWorld();
+	}
+	rObject vDevice::NewObject(const char* objectType, const char* type)
+	{
+		return rObject();
+	}
+	void vDevice::SetParameter(rObject object, const char* name, rDataType dataType, const void* mem)
+	{
+	}
+	void vDevice::UnsetParameter(rObject object, const char* name)
+	{
+	}
+	void vDevice::UnsetAllParameters(rObject object)
+	{
+	}
+	void* vDevice::MapParameterArray1D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride)
+	{
+		return nullptr;
+	}
+	void* vDevice::MapParameterArray2D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride)
+	{
+		return nullptr;
+	}
+	void* vDevice::MapParameterArray3D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride)
+	{
+		return nullptr;
+	}
+	void vDevice::UnmapParameterArray(rObject object, const char* name)
+	{
+	}
+	void vDevice::CommitParameters(rObject object)
+	{
+	}
+	void vDevice::Release(rObject object)
+	{
+	}
+	void vDevice::Retain(rObject object)
+	{
+	}
+	const char** vDevice::GetObjectSubtypes(rDataType objectType)
+	{
+		return nullptr;
+	}
+	const void* vDevice::GetObjectInfo(rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType)
+	{
+		return nullptr;
+	}
+	const void* vDevice::GetParameterInfo(rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType)
+	{
+		return nullptr;
+	}
+	int vDevice::GetProperty(rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask)
+	{
+		return 0;
+	}
+
+	rFrame vDevice::NewFrame(rDevice device)
+	{
+		return rFrame();
+	}
+
+	const void* vDevice::MapFrame(rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType)
+	{
+		return nullptr;
+	}
+
+	void vDevice::UnmapFrame(rFrame frame, const char* channel)
+	{
+	}
+
+	rRenderer vDevice::NewRenderer(const char* type)
+	{
+		return rRenderer();
+	}
+
+	void vDevice::RenderFrame(rFrame frame)
+	{
+	}
+
+	int vDevice::FrameReady(rFrame frame, rWaitMask mask)
+	{
+		return 0;
+	}
+
+	void vDevice::DiscardFrame(rFrame frame)
+	{
+	}
+
 }
 //!vkr
