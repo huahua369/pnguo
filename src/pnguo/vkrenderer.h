@@ -34,6 +34,9 @@ vk渲染流程:
 		Group		: Surface(1:N)、Light(1:N)，相当一个完整的模型
 		Surface		: Geometry(1:1)、Material(1:1)
 		Geometry	: transform、动画等属性，网格数据，一个节点
+
+	场景渲染需要：camera、light、world、renderer、frame、instance
+	Param
 --------------------------------------------------------------------------------------------------------------
 	示例：
 
@@ -399,9 +402,11 @@ namespace vkr {
 	std::vector<uint32_t> generateCookTorranceBRDFLUT1632f(uint32_t mapDim, int type);
 
 	void* new_ms_pipe(void* device, void* renderPass);
+	 
 }
 //!vkr
 
 uint32_t gray_float_to_rgba(float gray);
 uint64_t vkr_get_ticks();
 
+ 

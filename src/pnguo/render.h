@@ -359,4 +359,61 @@ extern "C" {
 
 #ifdef __cplusplus
 } // extern "C"
+
+namespace vkr {
+	class vDevice
+	{
+	public:
+		rdev_impl* rdev = 0;
+		rDevice dev = 0;
+	public:
+		vDevice();
+		~vDevice();
+		rDevice init(rLibrary library, const char* type/* = "default"*/);
+		rArray1D NewArray1D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1);
+		rArray2D NewArray2D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2);
+		rArray3D NewArray3D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3);
+		void* MapArray(rArray array);
+		void  UnmapArray(rArray array);
+		rLight NewLight(const char* type);
+		rCamera NewCamera(const char* type);
+		rGeometry NewGeometry(const char* type);
+		rSpatialField NewSpatialField(const char* type);
+		rVolume NewVolume(const char* type);
+		rSurface NewSurface(rDevice device);
+		rMaterial NewMaterial(const char* type);
+		rSampler NewSampler(const char* type);
+		rGroup NewGroup(rDevice device);
+		rInstance NewInstance(const char* type);
+		rWorld NewWorld(rDevice device);
+		rObject NewObject(const char* objectType, const char* type);
+		void  SetParameter(rObject object, const char* name, rDataType dataType, const void* mem);
+		void  UnsetParameter(rObject object, const char* name);
+		void  UnsetAllParameters(rObject object);
+		void* MapParameterArray1D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride);
+		void* MapParameterArray2D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride);
+		void* MapParameterArray3D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride);
+		void  UnmapParameterArray(rObject object, const char* name);
+		void  CommitParameters(rObject object);
+		void  Release(rObject object);
+		void  Retain(rObject object);
+		const char** GetDeviceSubtypes(rLibrary library);
+		const char** GetDeviceExtensions(rLibrary library, const char* deviceSubtype);
+		const char** GetObjectSubtypes(rDataType objectType);
+		const void* GetObjectInfo(rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType);
+		const void* GetParameterInfo(rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType);
+		int  GetProperty(rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask);
+		rFrame NewFrame(rDevice device);
+		const void* MapFrame(rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType);
+		void  UnmapFrame(rFrame frame, const char* channel);
+		rRenderer NewRenderer(const char* type);
+		void  RenderFrame(rFrame frame);
+		int  FrameReady(rFrame frame, rWaitMask mask);
+		void  DiscardFrame(rFrame frame);
+	};
+}
+// !vkr
+	//camera、light、world、renderer、frame、instance
+	//	void setParam();
+
 #endif

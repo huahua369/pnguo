@@ -2052,3 +2052,36 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	}
 #endif
 }
+
+namespace vkr {
+	vDevice::vDevice()
+	{
+	}
+	vDevice::~vDevice()
+	{
+	}
+	rDevice vDevice::init(rLibrary library, const char* type)
+	{
+		return rDevice();
+	}
+	rArray1D vDevice::NewArray1D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1)
+	{
+		return rArray1D();
+	}
+	rArray2D vDevice::NewArray2D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2)
+	{
+		return rArray2D();
+	}
+	rArray3D vDevice::NewArray3D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3)
+	{
+		return rArray3D();
+	}
+	void* vDevice::MapArray(rArray array)
+	{
+		return nullptr;
+	}
+	void vDevice::UnmapArray(rArray array)
+	{
+	}
+}
+//!vkr
