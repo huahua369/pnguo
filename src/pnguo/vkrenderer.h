@@ -26,6 +26,14 @@ vk渲染流程:
 	对象：渲染对象创建、管理
 	控制：transform、参数控制
 
+	--------------------------------------------------------------------------------------------------------------
+	对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light
+		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
+		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
+		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group
+		Group		: Surface(1:N)、Light(1:N)，相当一个完整的模型
+		Surface		: Geometry(1:1)、Material(1:1)
+		Geometry	: transform、动画等属性，网格数据，一个节点
 --------------------------------------------------------------------------------------------------------------
 	示例：
 
