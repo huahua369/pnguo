@@ -375,7 +375,8 @@ namespace vkr {
 	class vDevice
 	{
 	public:
-		rdev_impl* rdev = 0;
+		rLibrary lib = 0;
+		rdev_impl* rcb = 0;
 		rDevice dev = 0;
 	public:
 		vDevice();
@@ -446,8 +447,8 @@ namespace vkr {
 		// 丢弃帧
 		void  discardFrame(rFrame frame);
 	};
-
-	vDevice* new_vdevice();
+	// 可输入显卡名称创建vDevice对象
+	vDevice* new_vdevice(const char* devname);
 	void free_vdevice(vDevice* p);
 
 }

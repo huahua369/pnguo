@@ -2372,5 +2372,23 @@ namespace vkr {
 	{
 	}
 
+	vDevice* new_vdevice(const char* devname)
+	{
+		auto p = new vDevice();
+		p->lib = loadRLibrary(nullptr);
+		auto pl = (rlib_t*)p->lib;
+		p->rcb = &pl->impl;
+		return p;
+	}
+
+	void free_vdevice(vDevice* p)
+	{
+		if (p)
+		{
+			unloadRLibrary(p->lib);
+			delete p;
+		}
+	}
+
 }
 //!vkr
