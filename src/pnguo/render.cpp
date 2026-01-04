@@ -2002,7 +2002,7 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 #endif
 }
 
-
+#if 1
 
 rDevice NewDevice(rLibrary library, const char* type/* = "default"*/) {
 	return 0;
@@ -2365,6 +2365,7 @@ namespace vkr {
 
 	int vDevice::frameReady(rFrame frame, rWaitMask mask)
 	{
+
 		return 0;
 	}
 
@@ -2392,3 +2393,5 @@ namespace vkr {
 
 }
 //!vkr
+#endif
+//! render3d

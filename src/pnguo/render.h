@@ -370,7 +370,7 @@ namespace vkr {
 		Surface		: Geometry(1:1)、Material(1:1)
 		Geometry	: transform、动画等属性，网格数据，一个节点
 
-		场景渲染至少需要：camera、light、world、renderer、frame、instance
+		场景渲染至少需要：camera、light、world、renderer、frame、instance 
 	*/
 	class vDevice
 	{
@@ -453,7 +453,5 @@ namespace vkr {
 
 }
 // !vkr
-	//camera、light、world、renderer、frame、instance
-	//	void setParam();
 
 #endif
