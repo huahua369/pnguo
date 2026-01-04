@@ -21560,7 +21560,7 @@ namespace vkr {
 		addAttachment(format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &colorAttachments[colorAttanchmentCount++]);
 		if (is_depth_tex(depth_format))
 			addAttachment(depth_format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, &depthAttachment);
-		return CreateRenderPassOptimal(pDevice->m_device, colorAttanchmentCount, colorAttachments, &depthAttachment); 
+		return CreateRenderPassOptimal(pDevice->m_device, colorAttanchmentCount, colorAttachments, &depthAttachment);
 	}
 
 	void DestroyRenderPass(Device* pDevice, VkRenderPass rp)
@@ -22651,12 +22651,11 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 	return p;
 }
 
-void free_vkdg(vkdg_cx* p, bool f)
+void free_vkdg(vkdg_cx* p)
 {
 	if (p)
 	{
-		if (f)
-			DeviceShutdown((vkr::Device*)p->dev);
+		DeviceShutdown((vkr::Device*)p->dev);
 		delete p;
 	}
 }

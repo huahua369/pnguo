@@ -314,8 +314,8 @@ void free_instance(void* inst);
 
 // todo 创建渲染器，shader目录默认"ShaderLibVK", "cache/shadervk"
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0, const char* devname = 0);
-// f是否需要删除vk资源
-void free_vkdg(vkdg_cx* p, bool f = false);
+// 删除vk资源
+void free_vkdg(vkdg_cx* p);
 
 struct device_info_t
 {
@@ -394,7 +394,7 @@ namespace vkr {
 		mesh3_mt* d = 0;
 		glm::mat4 m;
 		bool visible = true;
-	}; 
+	};
 
 	// 创建brdflut纹理数据，大小，类型0=float16，1=rgba
 	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim, int type);
@@ -402,11 +402,10 @@ namespace vkr {
 	std::vector<uint32_t> generateCookTorranceBRDFLUT1632f(uint32_t mapDim, int type);
 
 	void* new_ms_pipe(void* device, void* renderPass);
-	 
+
 }
 //!vkr
 
 uint32_t gray_float_to_rgba(float gray);
 uint64_t vkr_get_ticks();
 
- 

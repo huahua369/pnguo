@@ -361,6 +361,17 @@ extern "C" {
 } // extern "C"
 
 namespace vkr {
+	/*
+		对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light
+		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
+		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
+		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group
+		Group		: Surface(1:N)、Light(1:N)，相当一个完整的模型
+		Surface		: Geometry(1:1)、Material(1:1)
+		Geometry	: transform、动画等属性，网格数据，一个节点
+
+		场景渲染至少需要：camera、light、world、renderer、frame、instance
+	*/
 	class vDevice
 	{
 	public:
@@ -381,17 +392,17 @@ namespace vkr {
 		rCamera newCamera(const char* type);
 		// 创建几何体
 		rGeometry newGeometry(const char* type);
-		// 创建表面实体
+		// 创建表面实体，支持绑定一个几何体和材质
 		rSurface newSurface();
-		// 创建材质
+		// 创建材质，绑定纹理或颜色等参数
 		rMaterial newMaterial(const char* type);
 		// 创建纹理采样器
 		rSampler newSampler(const char* type);
-		// 创建组
+		// 创建组，包含多个表面和光源，支持直接导入gltf模型
 		rGroup newGroup();
-		// 创建实例
+		// 创建实例，绑定一个组，支持变换属性
 		rInstance newInstance(const char* type);
-		// 创建世界
+		// 创建世界，包含多个实例、表面和光源
 		rWorld newWorld();
 		// 创建以上对象
 		rObject newObject(const char* objectType, const char* type);
@@ -435,6 +446,10 @@ namespace vkr {
 		// 丢弃帧
 		void  discardFrame(rFrame frame);
 	};
+
+	vDevice* new_vdevice();
+	void free_vdevice(vDevice* p);
+
 }
 // !vkr
 	//camera、light、world、renderer、frame、instance
