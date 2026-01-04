@@ -2231,144 +2231,144 @@ namespace vkr {
 	{
 		return rDevice();
 	}
-	rArray1D vDevice::NewArray1D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1)
+	rArray1D vDevice::newArray1D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1)
 	{
 		return rArray1D();
 	}
-	rArray2D vDevice::NewArray2D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2)
+	rArray2D vDevice::newArray2D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2)
 	{
 		return rArray2D();
 	}
-	rArray3D vDevice::NewArray3D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3)
+	rArray3D vDevice::newArray3D(const void* appMemory, rMemoryDeleter deleter, const void* userData, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3)
 	{
 		return rArray3D();
 	}
-	void* vDevice::MapArray(rArray array)
+	void* vDevice::mapArray(rArray array)
 	{
 		return nullptr;
 	}
-	void vDevice::UnmapArray(rArray array)
+	void vDevice::unmapArray(rArray array)
 	{
 	}
-	rLight vDevice::NewLight(const char* type)
+	rLight vDevice::newLight(const char* type)
 	{
 		return rLight();
 	}
-	rCamera vDevice::NewCamera(const char* type)
+	rCamera vDevice::newCamera(const char* type)
 	{
 		return rCamera();
 	}
-	rGeometry vDevice::NewGeometry(const char* type)
+	rGeometry vDevice::newGeometry(const char* type)
 	{
 		return rGeometry();
 	}
-	rSurface vDevice::NewSurface(rDevice device)
+	rSurface vDevice::newSurface()
 	{
 		return rSurface();
 	}
-	rMaterial vDevice::NewMaterial(const char* type)
+	rMaterial vDevice::newMaterial(const char* type)
 	{
 		return rMaterial();
 	}
-	rSampler vDevice::NewSampler(const char* type)
+	rSampler vDevice::newSampler(const char* type)
 	{
 		return rSampler();
 	}
-	rGroup vDevice::NewGroup(rDevice device)
+	rGroup vDevice::newGroup()
 	{
 		return rGroup();
 	}
-	rInstance vDevice::NewInstance(const char* type)
+	rInstance vDevice::newInstance(const char* type)
 	{
 		return rInstance();
 	}
-	rWorld vDevice::NewWorld(rDevice device)
+	rWorld vDevice::newWorld()
 	{
 		return rWorld();
 	}
-	rObject vDevice::NewObject(const char* objectType, const char* type)
+	rObject vDevice::newObject(const char* objectType, const char* type)
 	{
 		return rObject();
 	}
-	void vDevice::SetParameter(rObject object, const char* name, rDataType dataType, const void* mem)
+	void vDevice::setParameter(rObject object, const char* name, rDataType dataType, const void* mem)
 	{
 	}
-	void vDevice::UnsetParameter(rObject object, const char* name)
+	void vDevice::unsetParameter(rObject object, const char* name)
 	{
 	}
-	void vDevice::UnsetAllParameters(rObject object)
+	void vDevice::unsetAllParameters(rObject object)
 	{
 	}
-	void* vDevice::MapParameterArray1D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride)
-	{
-		return nullptr;
-	}
-	void* vDevice::MapParameterArray2D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride)
+	void* vDevice::mapParameterArray1D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride)
 	{
 		return nullptr;
 	}
-	void* vDevice::MapParameterArray3D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride)
+	void* vDevice::mapParameterArray2D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride)
 	{
 		return nullptr;
 	}
-	void vDevice::UnmapParameterArray(rObject object, const char* name)
-	{
-	}
-	void vDevice::CommitParameters(rObject object)
-	{
-	}
-	void vDevice::Release(rObject object)
-	{
-	}
-	void vDevice::Retain(rObject object)
-	{
-	}
-	const char** vDevice::GetObjectSubtypes(rDataType objectType)
+	void* vDevice::mapParameterArray3D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride)
 	{
 		return nullptr;
 	}
-	const void* vDevice::GetObjectInfo(rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType)
+	void vDevice::unmapParameterArray(rObject object, const char* name)
+	{
+	}
+	void vDevice::commitParameters(rObject object)
+	{
+	}
+	void vDevice::release(rObject object)
+	{
+	}
+	void vDevice::retain(rObject object)
+	{
+	}
+	const char** vDevice::getObjectSubtypes(rDataType objectType)
 	{
 		return nullptr;
 	}
-	const void* vDevice::GetParameterInfo(rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType)
+	const void* vDevice::getObjectInfo(rDataType objectType, const char* objectSubtype, const char* infoName, rDataType infoType)
 	{
 		return nullptr;
 	}
-	int vDevice::GetProperty(rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask)
+	const void* vDevice::getParameterInfo(rDataType objectType, const char* objectSubtype, const char* parameterName, rDataType parameterType, const char* infoName, rDataType infoType)
+	{
+		return nullptr;
+	}
+	int vDevice::getProperty(rObject object, const char* name, rDataType type, void* mem, uint64_t size, rWaitMask mask)
 	{
 		return 0;
 	}
 
-	rFrame vDevice::NewFrame(rDevice device)
+	rFrame vDevice::newFrame()
 	{
 		return rFrame();
 	}
 
-	const void* vDevice::MapFrame(rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType)
+	const void* vDevice::mapFrame(rFrame frame, const char* channel, uint32_t* width, uint32_t* height, rDataType* pixelType)
 	{
 		return nullptr;
 	}
 
-	void vDevice::UnmapFrame(rFrame frame, const char* channel)
+	void vDevice::unmapFrame(rFrame frame, const char* channel)
 	{
 	}
 
-	rRenderer vDevice::NewRenderer(const char* type)
+	rRenderer vDevice::newRenderer(const char* type)
 	{
 		return rRenderer();
 	}
 
-	void vDevice::RenderFrame(rFrame frame)
+	void vDevice::renderFrame(rFrame frame)
 	{
 	}
 
-	int vDevice::FrameReady(rFrame frame, rWaitMask mask)
+	int vDevice::frameReady(rFrame frame, rWaitMask mask)
 	{
 		return 0;
 	}
 
-	void vDevice::DiscardFrame(rFrame frame)
+	void vDevice::discardFrame(rFrame frame)
 	{
 	}
 
