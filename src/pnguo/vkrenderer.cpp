@@ -4488,7 +4488,7 @@ namespace vkr {
 
 		void CreateIndexBuffer(int indexBufferId, uint32_t* pNumIndices, VkIndexType* pIndexType, VkDescriptorBufferInfo* pIBV);
 		void CreateGeometry(int indexBufferId, std::vector<int>& vertexBufferIds, Geometry* pGeometry);
-		void CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry);
+		void CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry, int  instance_count);
 
 		VkImageView GetTextureViewByID(int id);
 
@@ -6313,7 +6313,7 @@ namespace vkr
 							// shader's can tell the slots from the #defines
 							//
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
+							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry, 1);
 
 							// Create Pipeline
 							//
@@ -7389,7 +7389,7 @@ namespace vkr
 		return VK_FORMAT_UNDEFINED;
 	}
 
-	void GLTFTexturesAndBuffers::CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry)
+	void GLTFTexturesAndBuffers::CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry, int  instance_count)
 	{
 
 		// Get Index buffer view
@@ -7426,6 +7426,11 @@ namespace vkr
 			layout[cnt] = l;
 			if (indexBufferId < 0)
 				pGeometry->m_NumIndices = ina.count;
+			cnt++;
+		}
+		if (instance_count > 1)
+		{
+			defines["ID_INSTANCE_MAT"] = std::to_string(cnt);
 			cnt++;
 		}
 	}
@@ -8514,7 +8519,7 @@ namespace vkr
 							// shader's can tell the slots from the #defines
 							// todo 加载顶点数据到显存
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
+							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry, 1);
 							mesh_mapd_ptr mm = {};
 							morph_t* morphing = 0;
 							auto tsa = primitive.targets.size();// todo 变形判断
@@ -21536,7 +21541,7 @@ namespace vkr {
 		if (pWidth)
 			*pWidth = 1920;
 		if (pHeight)
-			*pHeight = 1080;  
+			*pHeight = 1080;
 		m_activeCamera = 0;
 
 	}
