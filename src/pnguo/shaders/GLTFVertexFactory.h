@@ -75,12 +75,12 @@ void gltfVertexFactory()
 #endif
 
 	mat4 transMatrix = GetWorldMatrix() * skinningMatrix;
-#ifdef ID_INSTANCE_MAT
-	transMatrix *= instance_mat;
-#endif
 	vec4 pos = vec4(a_Position, 1);
 #ifdef ID_MORPHING_DATA
 	pos += getTargetPosition(gl_VertexIndex);
+#endif
+#ifdef ID_INSTANCE_MAT
+	pos *= instance_mat;
 #endif
 	pos = transMatrix * pos;
 #ifndef __cplusplus
