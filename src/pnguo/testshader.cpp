@@ -160,11 +160,28 @@ namespace pbr
 
 }
 
+mat4 GetWorldMatrix()
+{
+	return mat4(1.0);
+}
+mat4 GetCameraViewProj()
+{
+	return mat4(1.0);
+}
 
+mat4 GetCameraView()
+{
+	return mat4(1.0);
+}
+
+vec3 a_Position;
+vec4 gl_Position;
+VS2PS Output;
 #if 1
 #define USE_dIBL
 #define S_VERT
 #include "shaders/pbr_px.h"
+#include "shaders/GLTFVertexFactory.h"
 
 
 //--------------------------------------------------------------------------------------

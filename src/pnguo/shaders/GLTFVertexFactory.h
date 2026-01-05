@@ -48,7 +48,14 @@ layout(location = ID_JOINTS_1) in  uvec4 a_Joints1;
 layout(location = ID_TARGETS) in  vec4 a_Targets;
 #endif
 
+// Instanced attributes
+#ifdef ID_INSTANCE_MAT
+layout(location = ID_INSTANCE_MAT) in mat4 instance_mat;
+#endif
+//--------------------------------------------------------------------------------------
+#ifdef ID_POSITION
 layout(location = 0) out VS2PS Output;
+#endif
 void gltfVertexFactory()
 {
 #ifdef ID_WEIGHTS_0
@@ -68,12 +75,17 @@ void gltfVertexFactory()
 #endif
 
 	mat4 transMatrix = GetWorldMatrix() * skinningMatrix;
+#ifdef ID_INSTANCE_MAT
+	transMatrix *= instance_mat;
+#endif
 	vec4 pos = vec4(a_Position, 1);
 #ifdef ID_MORPHING_DATA
 	pos += getTargetPosition(gl_VertexIndex);
 #endif
 	pos = transMatrix * pos;
+#ifndef __cplusplus
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
+#endif
 	gl_Position = GetCameraViewProj() * pos; // needs w for proper perspective correction
 	mat4 v = GetCameraView();
 	vec4 npos = v * pos; // view space position
