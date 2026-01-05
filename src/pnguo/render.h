@@ -413,7 +413,7 @@ namespace vkr {
 		void  unsetParameter(rObject object, const char* name);
 		// 取消设置所有参数
 		void  unsetAllParameters(rObject object);
-		// 映射参数数组
+		// 输入对象，映射参数数组
 		void* mapParameterArray1D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t* elementStride);
 		void* mapParameterArray2D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t* elementStride);
 		void* mapParameterArray3D(rObject object, const char* name, rDataType dataType, uint64_t numElements1, uint64_t numElements2, uint64_t numElements3, uint64_t* elementStride);

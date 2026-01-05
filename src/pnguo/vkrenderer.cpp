@@ -5764,17 +5764,12 @@ namespace vkr {
 		double _time = 0; // Time accumulator in seconds, used for animation.
 
 		SystemInfo systemi = {};
-		// njson config file
-		njson m_jsonConfigFile;
-		std::vector<std::string>    m_sceneNames;
-		int	m_activeScene = 0;
 		int	m_activeCamera = 0;
 		std::function<void(int count, int idx, const char* str)> cb_showtxt;
 		std::vector<std::string>    _tlabs;
 		int loadingStage = 0;
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
-		bool m_bIsBenchmarking = false;
 		bool _customize_camera = 0;
 	};
 
@@ -21541,10 +21536,7 @@ namespace vkr {
 		if (pWidth)
 			*pWidth = 1920;
 		if (pHeight)
-			*pHeight = 1080;
-		m_activeScene = 0;          //load the first one by default
-		m_bIsBenchmarking = false;
-		//m_VsyncEnabled = false; 
+			*pHeight = 1080;  
 		m_activeCamera = 0;
 
 	}
