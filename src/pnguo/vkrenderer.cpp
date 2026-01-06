@@ -7268,12 +7268,6 @@ namespace vkr
 			delete _pStaticBufferPool;
 			_pStaticBufferPool = 0;
 		}
-		if (_pDynamicBufferRing)
-		{
-			_pDynamicBufferRing->OnDestroy();
-			delete _pDynamicBufferRing;
-			_pDynamicBufferRing = 0;
-		}
 	}
 
 	VkImageView GLTFTexturesAndBuffers::GetTextureViewByID(int id)
