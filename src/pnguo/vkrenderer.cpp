@@ -8990,6 +8990,9 @@ namespace vkr
 			vi_binding[i].stride = SizeOfFormat(layout[i].format);
 			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		}
+		if (defines.Has("ID_INSTANCE_MAT")) {
+			vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+		}
 		VkPipelineVertexInputStateCreateInfo vi = {};
 		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vi.pNext = NULL;
@@ -11123,7 +11126,7 @@ namespace vkr
 			vkFreeMemory(m_pDevice->m_device, m_deviceMemoryVid, NULL);
 			vkDestroyBuffer(m_pDevice->m_device, m_bufferVid, NULL);
 #endif
-
+			m_bufferVid = 0; m_bufferAllocVid = 0;
 		}
 
 		if (m_buffer != VK_NULL_HANDLE)
@@ -11697,11 +11700,14 @@ namespace vkr
 #ifdef USE_VMA
 		vmaUnmapMemory(m_pDevice->GetAllocator(), m_bufferAlloc);
 		vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
+		m_bufferAlloc = 0;
 #else
 		vkUnmapMemory(m_pDevice->m_device, m_deviceMemory);
 		vkFreeMemory(m_pDevice->m_device, m_deviceMemory, NULL);
 		vkDestroyBuffer(m_pDevice->m_device, m_buffer, NULL);
+		m_deviceMemory = 0;
 #endif
+		m_buffer = 0;
 		m_mem.OnDestroy();
 	}
 
@@ -21519,7 +21525,6 @@ namespace vkr {
 
 
 
-
 #if 1
 	draw3d_ctx::draw3d_ctx()
 	{
@@ -21528,6 +21533,7 @@ namespace vkr {
 
 	}
 	draw3d_ctx::~draw3d_ctx() {
+		OnDestroy();
 		if (_fbo)delete _fbo; _fbo = 0;
 	}
 	//--------------------------------------------------------------------------------------
@@ -21664,7 +21670,7 @@ namespace vkr {
 		m_pRenderer->OnDestroy();
 		DestroyRenderPass(m_device, _fbo_renderpass); _fbo_renderpass = 0;
 		delete m_pRenderer;
-
+		m_pRenderer = 0;
 		// shut down the shader compiler 
 		m_device->DestroyShaderCache();
 
@@ -22324,6 +22330,10 @@ vkdg_cx::vkdg_cx()
 
 vkdg_cx::~vkdg_cx()
 {
+	if (ctx)
+		delete ctx;
+	ctx = 0;
+	DeviceShutdown((vkr::Device*)dev);
 }
 void vkdg_cx::set_label_cb(std::function<void(int count, int idx, const char* str)> cb)
 {
@@ -22652,7 +22662,6 @@ void free_vkdg(vkdg_cx* p)
 {
 	if (p)
 	{
-		DeviceShutdown((vkr::Device*)p->dev);
 		delete p;
 	}
 }
