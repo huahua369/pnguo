@@ -6419,7 +6419,8 @@ namespace vkr
 
 		for (int i = 0; i < m_materialsData.size(); i++)
 		{
-			vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_descriptorSetLayout, NULL);
+			if (m_materialsData[i].m_descriptorSetLayout)
+				vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_descriptorSetLayout, NULL);
 			m_pResourceViewHeaps->FreeDescriptor(m_materialsData[i].m_descriptorSet);
 		}
 
@@ -8680,37 +8681,36 @@ namespace vkr
 	void GltfPbrPass::OnDestroy()
 	{
 		auto dev = m_pDevice->m_device;
+		std::set<VkDescriptorSetLayout> sslayout;
 		for (uint32_t m = 0; m < m_meshes.size(); m++)
 		{
 			PBRMesh* pMesh = &m_meshes[m];
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
-				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
-				//vkDestroyDescriptorSetLayout(m_pDevice->m_device, pPrimitive->m_uniformsDescriptorSetLayout, NULL);
+				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p]; 
 				m_pResourceViewHeaps->FreeDescriptor(pPrimitive->m_uniformsDescriptorSet);
 			}
 		}
 		for (auto& [k, v] : _pipem) {
 			if (v.m_pipeline)
 				vkDestroyPipeline(dev, v.m_pipeline, nullptr);
+			if (v.m_pipelineWireframe)
+				vkDestroyPipeline(dev, v.m_pipelineWireframe, nullptr);
 			if (v.m_pipelineLayout)
 				vkDestroyPipelineLayout(dev, v.m_pipelineLayout, nullptr);
-			if (v.m_texturesDescriptorSetLayout)
-				vkDestroyDescriptorSetLayout(dev, v.m_texturesDescriptorSetLayout, NULL);
-			if (v.m_uniformsDescriptorSetLayout)
-				vkDestroyDescriptorSetLayout(dev, v.m_uniformsDescriptorSetLayout, NULL);
+			sslayout.insert(v.m_texturesDescriptorSetLayout);
+			sslayout.insert(v.m_uniformsDescriptorSetLayout);
 
 			auto p = v.next;
 			for (; p;) {
-
 				if (p->m_pipeline)
 					vkDestroyPipeline(dev, p->m_pipeline, nullptr);
+				if (p->m_pipelineWireframe)
+					vkDestroyPipeline(dev, p->m_pipelineWireframe, nullptr);
 				if (p->m_pipelineLayout)
 					vkDestroyPipelineLayout(dev, p->m_pipelineLayout, nullptr);
-				if (p->m_texturesDescriptorSetLayout)
-					vkDestroyDescriptorSetLayout(dev, p->m_texturesDescriptorSetLayout, NULL);
-				if (p->m_uniformsDescriptorSetLayout)
-					vkDestroyDescriptorSetLayout(dev, p->m_uniformsDescriptorSetLayout, NULL);
+				sslayout.insert(p->m_texturesDescriptorSetLayout);
+				sslayout.insert(p->m_uniformsDescriptorSetLayout);
 
 				p = p->next;
 			}
@@ -8718,25 +8718,17 @@ namespace vkr
 
 		for (int i = 0; i < m_materialsData.size(); i++)
 		{
-			//vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_texturesDescriptorSetLayout, NULL);
+			sslayout.insert(m_materialsData[i].m_texturesDescriptorSetLayout);
 			m_pResourceViewHeaps->FreeDescriptor(m_materialsData[i].m_texturesDescriptorSet);
 		}
 
 		//destroy default material
-		vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_defaultMaterial.m_texturesDescriptorSetLayout, NULL);
-		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
-		//for (auto& p : _samplers) {
-		//	if (p)
-		//	{
-		//		vkDestroySampler(m_pDevice->m_device, p, nullptr);
-		//	}
-		//}
-		_samplers.clear();
-		//vkDestroySampler(m_pDevice->m_device, m_samplerPbr, nullptr);
-		//vkDestroySampler(m_pDevice->m_device, m_samplerShadow, nullptr);
-
-		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
-		//vkDestroySampler(m_pDevice->m_device, m_brdfLutSampler, nullptr);
+		sslayout.insert(m_defaultMaterial.m_texturesDescriptorSetLayout);
+		for (auto& s : sslayout)
+			vkDestroyDescriptorSetLayout(m_pDevice->m_device, s, NULL);
+		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet); 
+		_samplers.clear(); 
+		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL); 
 		m_brdfLutTexture.OnDestroy();
 
 	}
