@@ -94,7 +94,7 @@ void main()
 	discardPixelIfAlphaCutOff(Input);
 	gpuMaterial m = defaultPbrMaterial();
 #ifdef ID_TEXCOORD_0
-	vec2 uv = Input.UV0;
+	vec2 uv = Input.UV[0];
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif

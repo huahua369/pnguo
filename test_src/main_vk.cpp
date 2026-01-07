@@ -870,6 +870,10 @@ int main()
 			vctx = new_vkvgdev(&cc, 8);
 		}
 
+		int texwidth = 1024;
+		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
+		auto ctx = vkvg_create(surf);
+
 		auto f = glm::mat4(1.4420948028564453, 0.0, 0.0, 0.0, 0.0, -0.00016932648114409524, 1.4420948028564453, 0.0, 0.0, -1.4420948028564453, -0.00016932648114409524, 0.0, 0.0, 0.0, 0.0, 1.0);
 		auto f1 = glm::mat4(0.009999999776482582, 0.0, 0.0, 0.0, 0.0, -0.009999999776482582, 0.0, 0.0, 0.0, 0.0, -0.009999999776482582, 0.0, 0.0, 0.0, 0.0, 1.0);
 		auto f2 = f * f1;
@@ -978,9 +982,6 @@ int main()
 			get_sdl_texture_cb(pcb);
 			auto ptrt = &trt;
 			void* vg2dtex = nullptr;
-			int texwidth = 1024;
-			VkvgSurface surf = vctx->new_surface(texwidth, texwidth);
-			auto ctx = vkvg_create(surf);
 			const char* filename = "temp/vkvg_gb.png";
 			bspline_ct* bs = new bspline_ct();
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
@@ -1131,6 +1132,12 @@ int main()
 		//show_cpuinfo(form0);
 		// 运行消息循环
 		run_app(app, 0);
+
+		vkvg_flush(ctx);
+		vkvg_destroy(ctx);
+		vctx->free_surface(surf);
+
+		free_vkvgdev(vctx);
 		free_vkdg(vkd);
 		free_app(app);
 	}

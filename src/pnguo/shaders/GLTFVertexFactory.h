@@ -124,17 +124,17 @@ void gltfVertexFactory()
 #endif
 
 #ifdef ID_TEXCOORD_0
-	Output.UV0 = a_UV0;
+	Output.UV[0] = a_UV0;
 #ifdef HAS_MORPH_TARGETS
-	Output.UV0 += getTargetTexCoord0(gl_VertexIndex);
+	Output.UV[0] += getTargetTexCoord0(gl_VertexIndex);
 #endif
 
 #endif
 
 #ifdef ID_TEXCOORD_1
-	Output.UV1 = a_UV1;
+	Output.UV[1] = a_UV1;
 #ifdef HAS_MORPH_TARGETS 
-	Output.UV1 += getTargetTexCoord1(gl_VertexIndex);
+	Output.UV[1] += getTargetTexCoord1(gl_VertexIndex);
 #endif
 
 #endif  

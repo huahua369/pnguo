@@ -249,8 +249,7 @@ layout(set = 0, binding = ID_MATUV_DATA) buffer readonly per_u_matuv
 #if 1
 
 #define CONCAT(a,b) a ## b
-//#define TEXCOORD(id) CONCAT(Input.UV, id)
-#define TEXCOORD(id) (Input.UV[id])
+#define TEXCOORD(id) CONCAT(Input.UV, id)
 
 
 //disable texcoords that are not in the VS2PS structure
@@ -903,7 +902,7 @@ vec4 getBaseColor2(VS2PS Input, pbrMaterial params, vec2 uv)
 void discardPixelIfAlphaCutOff(VS2PS Input)
 {
 #ifdef ID_TEXCOORD_0
-	vec2 uv = Input.UV[0];
+	vec2 uv = Input.UV0;
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif

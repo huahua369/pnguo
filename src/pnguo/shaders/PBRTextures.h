@@ -20,9 +20,9 @@
 //#define CONCAT(a,b) a ## b
 //#define TEXCOORD_old(id) CONCAT(Input.UV, id)
 #ifdef ID_TEXCOORD_1
-#define TEXCOORD(id) vec2(id < 1 ? Input.UV0 : Input.UV1);
+#define TEXCOORD(id) Input.UV[id];
 #else
-#define TEXCOORD(id) vec2(Input.UV0);
+#define TEXCOORD(id) vec2(Input.UV[0]);
 #endif
 
 //disable texcoords that are not in the VS2PS structure
@@ -388,7 +388,7 @@ vec4 getBaseColor(VS2PS Input, vec2 uv)
 void discardPixelIfAlphaCutOff(VS2PS Input)
 {
 #ifdef ID_TEXCOORD_0
-	vec2 uv = Input.UV0;
+	vec2 uv = Input.UV[0];
 #else
 	vec2 uv = vec2(0.0, 0.0);
 #endif

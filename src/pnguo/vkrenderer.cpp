@@ -8717,7 +8717,7 @@ namespace vkr
 
 		for (int i = 0; i < m_materialsData.size(); i++)
 		{
-			vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_texturesDescriptorSetLayout, NULL);
+			//vkDestroyDescriptorSetLayout(m_pDevice->m_device, m_materialsData[i].m_texturesDescriptorSetLayout, NULL);
 			m_pResourceViewHeaps->FreeDescriptor(m_materialsData[i].m_texturesDescriptorSet);
 		}
 
@@ -9202,8 +9202,18 @@ namespace vkr
 		pipeline.pStages = shaderStages.data();
 		pipeline.stageCount = (uint32_t)shaderStages.size();
 		pipeline.renderPass = m_pRenderPass->GetRenderPass();
-		pipeline.subpass = 0;
-
+		pipeline.subpass = 0;  
+		uint32_t specConstants = 0;
+		VkSpecializationMapEntry specializationMapEntry = VkSpecializationMapEntry{};
+		specializationMapEntry.constantID = 0;
+		specializationMapEntry.offset = 0;
+		specializationMapEntry.size = sizeof(uint32_t);
+		VkSpecializationInfo specializationInfo = VkSpecializationInfo();
+		specializationInfo.mapEntryCount = 1;
+		specializationInfo.pMapEntries = &specializationMapEntry;
+		specializationInfo.dataSize = sizeof(uint32_t);
+		specializationInfo.pData = &specConstants;
+		shaderStages[1].pSpecializationInfo = &specializationInfo; 
 		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
 		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
@@ -22324,6 +22334,10 @@ vkdg_cx::vkdg_cx()
 
 vkdg_cx::~vkdg_cx()
 {
+	auto q = (vkr::upload_cx*)qupload;
+	if (q)
+		delete q;
+	qupload = 0;
 	if (ctx)
 		delete ctx;
 	ctx = 0;

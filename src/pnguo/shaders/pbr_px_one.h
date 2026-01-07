@@ -303,7 +303,7 @@ layout(set = 0, binding = ID_MATUV_DATA) buffer readonly per_u_matuv
 layout(set = 1, binding = ID_TextureA) uniform sampler2D u_ColorSampler[24];
 #endif
 #ifdef ID_Cube
-layout(set = 1, binding = ID_diffuseCube) uniform samplerCube u_EnvSampler[3]; // 环境贴图3种
+layout(set = 1, binding = ID_Cube) uniform samplerCube u_EnvSampler[3]; // 环境贴图3种
 #endif
 #ifdef ID_shadowMap
 layout(set = 1, binding = ID_shadowMap) uniform sampler2DShadow u_shadowMap[MAX_SHADOW_INSTANCES];
@@ -466,8 +466,7 @@ vec4 getBaseColorTexture(VS2PS Input, vec2 uv)
 	vec2 uv1 = uv;
 #ifdef ID_baseColorTexture
 	uv1 = getBaseColorUV(Input);
-	return texture(u_BaseColorSampler, uv1); 
-	return texture(u_ColorSampler[], uv1);
+	return texture(u_ColorSampler[ID_baseColorTexture], uv1);
 #else
 	return vec4(1, 1, 1, 1); //OPAQUE
 #endif
