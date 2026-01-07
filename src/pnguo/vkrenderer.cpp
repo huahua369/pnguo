@@ -559,10 +559,40 @@ namespace vkr
 		void GetExtensionNamesAndConfigs(std::vector<const char*>* pDevice_extension_names);
 	private:
 	};
-	struct sampler_t {
+	bool equal_sampler_info(const VkSamplerCreateInfo& a, const VkSamplerCreateInfo& b) {
+		return a.sType == b.sType &&
+			a.pNext == nullptr && b.pNext == nullptr && // 忽略 pNext
+			a.flags == b.flags &&
+			a.magFilter == b.magFilter &&
+			a.minFilter == b.minFilter &&
+			a.mipmapMode == b.mipmapMode &&
+			a.addressModeU == b.addressModeU &&
+			a.addressModeV == b.addressModeV &&
+			a.addressModeW == b.addressModeW &&
+			fabsf(a.mipLodBias - b.mipLodBias) < 1e-6f &&
+			a.anisotropyEnable == b.anisotropyEnable &&
+			fabsf(a.maxAnisotropy - b.maxAnisotropy) < 1e-6f &&
+			a.compareEnable == b.compareEnable &&
+			a.compareOp == b.compareOp &&
+			fabsf(a.minLod - b.minLod) < 1e-6f &&
+			fabsf(a.maxLod - b.maxLod) < 1e-6f &&
+			a.borderColor == b.borderColor &&
+			a.unnormalizedCoordinates == b.unnormalizedCoordinates;
+	}
+	struct sampler_kt {
 		VkSamplerCreateInfo info = {};
-		VkSampler sampler = {};
+		bool operator==(const sampler_kt& other) const {
+			return equal_sampler_info(this->info, other.info);  // 自定义比较
+		}
 	};
+	struct SamplerKeyHash {
+		size_t operator()(const sampler_kt& k) const {
+			return Hash_p((const size_t*)&k.info, sizeof(VkSamplerCreateInfo));
+		}
+	};
+
+
+
 	class Device
 	{
 	public:
@@ -582,8 +612,9 @@ namespace vkr
 		VkQueue compute_queue = 0;
 		uint32_t compute_queue_family_index = 0;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
-		std::map<size_t, sampler_t> _samplers;
-		std::vector<sampler_t> _samplers_v;
+
+		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
+		//std::vector<sampler_t> _samplers_v;
 
 		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
 		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
@@ -2189,22 +2220,22 @@ namespace vkr
 
 	void Device::OnDestroy()
 	{
-		for (auto& it : _samplers)
+		for (auto& [k, v] : _samplers)
 		{
-			if (it.second.sampler)
+			if (v)
 			{
-				vkDestroySampler(m_device, it.second.sampler, NULL);
+				vkDestroySampler(m_device, v, NULL);
 			}
 		}
-		for (auto& it : _samplers_v)
-		{
-			if (it.sampler)
-			{
-				vkDestroySampler(m_device, it.sampler, NULL);
-			}
-		}
+		//for (auto& it : _samplers_v)
+		//{
+		//	if (it.sampler)
+		//	{
+		//		vkDestroySampler(m_device, it.sampler, NULL);
+		//	}
+		//}
 		_samplers.clear();
-		_samplers_v.clear();
+		//_samplers_v.clear();
 		if (m_surface != VK_NULL_HANDLE)
 		{
 			vkDestroySurfaceKHR(m_instance, m_surface, NULL);
@@ -2233,45 +2264,15 @@ namespace vkr
 		vkDeviceWaitIdle(m_device);
 	}
 
+
 	VkSampler Device::newSampler(const VkSamplerCreateInfo* pCreateInfo) {
-		auto h = Hash_p((const size_t*)pCreateInfo, sizeof(VkSamplerCreateInfo));
-		auto& sampler = _samplers[h];
-		VkSampler ret = {};
-		if (!sampler.sampler)
+		sampler_kt k = { *pCreateInfo };
+		auto& p = _samplers[k];
+		if (!p)
 		{
-			vkCreateSampler(m_device, pCreateInfo, 0, &sampler.sampler);
-			sampler.info = *pCreateInfo;
-			ret = sampler.sampler;
+			vkCreateSampler(m_device, pCreateInfo, 0, &p);
 		}
-		else {
-			if (memcmp(pCreateInfo, &sampler.info, sizeof(VkSamplerCreateInfo)) == 0)
-			{
-				ret = sampler.sampler;
-			}
-			else
-			{
-				// 解决samplers哈希冲突问题
-				for (auto& it : _samplers_v)
-				{
-					if (memcmp(pCreateInfo, &it.info, sizeof(VkSamplerCreateInfo)) == 0)
-					{
-						ret = it.sampler;
-						break;
-					}
-				}
-				if (!ret) {
-					vkCreateSampler(m_device, pCreateInfo, 0, &ret);
-					if (ret)
-					{
-						sampler_t t = {};
-						t.info = *pCreateInfo;
-						t.sampler = ret;
-						_samplers_v.push_back(t);
-					}
-				}
-			}
-		}
-		return ret;
+		return p;
 	}
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex) {
@@ -9202,7 +9203,7 @@ namespace vkr
 		pipeline.pStages = shaderStages.data();
 		pipeline.stageCount = (uint32_t)shaderStages.size();
 		pipeline.renderPass = m_pRenderPass->GetRenderPass();
-		pipeline.subpass = 0;  
+		pipeline.subpass = 0;
 		uint32_t specConstants = 0;
 		VkSpecializationMapEntry specializationMapEntry = VkSpecializationMapEntry{};
 		specializationMapEntry.constantID = 0;
@@ -9213,7 +9214,7 @@ namespace vkr
 		specializationInfo.pMapEntries = &specializationMapEntry;
 		specializationInfo.dataSize = sizeof(uint32_t);
 		specializationInfo.pData = &specConstants;
-		shaderStages[1].pSpecializationInfo = &specializationInfo; 
+		shaderStages[1].pSpecializationInfo = &specializationInfo;
 		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
 		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
