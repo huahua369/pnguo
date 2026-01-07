@@ -19754,6 +19754,22 @@ namespace vkr {
 		auto hr = vkCreateSemaphore(dev, semaphoreCreateInfo, nullptr, semaphore);
 		return;
 	}
+	void destroyTexture(Device* dev, dvk_texture* texture) {
+
+		auto device = dev->m_device;
+		if (texture->_image)
+		{
+			vkDestroyImage(device, texture->_image, 0); texture->_image = 0;
+		}
+		if (texture->image_memory)
+		{
+			vkFreeMemory(device, texture->image_memory, 0); texture->image_memory = 0;
+		}
+		if (texture->_view)
+		{
+			vkDestroyImageView(device, texture->_view, 0); texture->_view = 0;
+		}
+	}
 	//创建图像
 	int64_t createImage(Device* dev, VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo, dvk_texture* texture)//, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
 	{
@@ -19772,7 +19788,7 @@ namespace vkr {
 		auto hr = vkCreateImage(device, imageinfo, nullptr, image);
 		vkGetImageMemoryRequirements(device, texture->_image, &memReqs);
 		// 设备内存分配空间小于需求的重新申请内存
-		if (texture->cap_device_mem_size < memReqs.size)
+		if (texture->cap_device_mem_size < memReqs.size || !mem)
 		{
 			texture->cap_inc = 0;
 			if (texture->image_memory)
@@ -19838,6 +19854,7 @@ namespace vkr {
 
 	fbo_info_cx::~fbo_info_cx()
 	{
+		destroy_all();
 	}
 
 	void fbo_info_cx::setClearValues(uint32_t color, float depth, uint32_t Stencil)
@@ -20082,6 +20099,11 @@ namespace vkr {
 	{
 		for (auto& it : framebuffers)
 		{
+			if (isColor)
+			{
+				destroyTexture(_dev, &it.color);
+				destroyTexture(_dev, &it.depth_stencil);
+			}
 			if (it.framebuffer)
 				vkDestroyFramebuffer(_dev->m_device, it.framebuffer, 0);
 			it.framebuffer = 0;
@@ -20091,6 +20113,18 @@ namespace vkr {
 	void fbo_info_cx::destroy_all()
 	{
 		destroyImage();
+		for (auto& it : framebuffers)
+		{
+			if (it.semaphore)
+				vkDestroySemaphore(_dev->m_device, it.semaphore, 0);
+			it.semaphore = 0;
+			if (it.framebuffer)
+				vkDestroyFramebuffer(_dev->m_device, it.framebuffer, 0);
+			it.framebuffer = 0;
+		}
+		if (_fence)
+			vkDestroyFence(_dev->m_device, _fence, 0);
+		_fence = 0;
 		renderPass = 0;
 	}
 

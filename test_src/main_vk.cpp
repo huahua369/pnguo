@@ -959,7 +959,7 @@ int main()
 				if (hz::access_2(path.c_str()))
 				{
 					auto pos = hz::toVec3(it["pos"]);
-					vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toBool(it["shadowMap"]));
+					//vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toBool(it["shadowMap"]));
 				}
 			}
 			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小
@@ -1014,6 +1014,8 @@ int main()
 			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
 			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
 			sp_drawable_set_pos(dd1, 0, 500);
+
+
 			sdl3_textdata* td3 = new sdl3_textdata();
 			td3->rcb = pcb;
 			td3->rptr = form0->renderer;
@@ -1126,18 +1128,24 @@ int main()
 					}
 				};
 
+			// 运行消息循环
+			run_app(app, 0);
+
+			// 销毁对象
+			sp_atlas_dispose(a1);
+			sp_drawable_dispose(dd1);
+			sp_ctx_dispose(d2);
+			delete td3;
+			vkvg_flush(ctx);
+			vkvg_destroy(ctx);
+			vctx->free_surface(surf);
+
+			free_vkvgdev(vctx);
 		}
 
 		//show_belt(form0);
 		//show_cpuinfo(form0);
-		// 运行消息循环
-		run_app(app, 0);
 
-		vkvg_flush(ctx);
-		vkvg_destroy(ctx);
-		vctx->free_surface(surf);
-
-		free_vkvgdev(vctx);
 		free_vkdg(vkd);
 		free_app(app);
 	}
