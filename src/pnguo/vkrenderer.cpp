@@ -3379,7 +3379,7 @@ namespace vkr {
 		pbrMaterial m_params = {};
 		UVMAT_TYPE uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
 		size_t uvc = 0;
-		int mid = 0;
+		uint32_t mid = 0;
 	};
 	struct morph_t;
 
@@ -3395,7 +3395,7 @@ namespace vkr {
 	};
 	struct material_v
 	{
-		int mid;
+		uint32_t mid;
 		std::vector<int> variants;
 	};
 
@@ -3423,6 +3423,8 @@ namespace vkr {
 		PBRPipe_t* _pipe = 0;
 		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
 		int mid = 0;
+		int variants_id = 0;
+		int variants_id0 = 0;
 		std::vector<material_v> material_variants;
 	public:
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t);
@@ -4393,6 +4395,7 @@ namespace vkr {
 		std::vector<PBRMaterial> _materialsData;
 		std::vector<PBRMesh> _meshes;
 		std::vector<char> _ubo_md;
+		std::vector<std::string> variants;
 		PerFrame_t* _perFrameData = 0;
 		PerFrame_t* _perFrameData_w = 0;
 	public:
@@ -9332,6 +9335,18 @@ namespace vkr
 				if (!pPrimitive->_pipe->m_pipeline)
 					continue;
 
+				if (pPrimitive->material_variants.size() > 0)
+				{
+					if (pPrimitive->variants_id != pPrimitive->variants_id0) {
+						pPrimitive->variants_id = pPrimitive->variants_id0;
+						auto& it = pPrimitive->material_variants[pPrimitive->variants_id];
+						if (it.mid < m_materialsData.size())
+						{
+							pPrimitive->mid = it.mid;
+							pPrimitive->m_pMaterial = &m_materialsData[pPrimitive->mid];
+						}
+					}
+				}
 				auto morph = _ptb->get_mb(i);
 				auto uvtDesc = _ptb->get_uvm(pPrimitive->mid);
 				// do frustrum culling
@@ -18012,6 +18027,29 @@ namespace vkr {
 		}
 		a = str;
 	}
+
+	void load_materials_variant(tinygltf::ExtensionMap& extensions, std::vector<std::string>& vns)
+	{
+		auto tt = get_ext(extensions, "KHR_materials_variants");
+		if (tt)
+		{
+			if (tt->Has("variants"))
+			{
+				auto& vt = tt->Get("variants");
+				auto vn = vt.Size();
+				if (vt.IsArray())
+				{
+					for (size_t k = 0; k < vn; k++)
+					{
+						auto& vk = vt.Get(k);
+						std::string name = vk.Get("name").Get<std::string>();
+						vns.push_back(name);
+					}
+				}
+			}
+		}
+	}
+
 	// Initializes the GLTFCommonTransformed structure 
 	void GLTFCommon::InitTransformedData()
 	{
@@ -18019,7 +18057,7 @@ namespace vkr {
 			return;
 		// initializes matrix buffers to have the same dimension as the nodes
 		m_worldSpaceMats.resize(m_nodes.size());
-
+		load_materials_variant(pm->extensions, variants);
 		get_model_data(pm, _materialsData, _meshes);
 
 		size_t dysize = sizeof(PerFrame_t) * 2;
@@ -20507,8 +20545,7 @@ namespace vkr {
 		else if (Stage == 6)
 		{
 			Profile p("Load(Textures Geometry)");
-			// here we are loading onto the GPU all the textures and the inverse matrices
-			// this data will be used to create the PBR and Depth passes       
+			// 纹理、数据传输到GPU       
 			currobj->_ptb->LoadTextures(true);
 			currobj->_ptb->LoadGeometry();
 		}
@@ -20518,10 +20555,7 @@ namespace vkr {
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
 			currobj->m_GLTFDepth->has_shadowMap = pGLTFCommon->has_shadowMap;
-			//currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, 0, 0, 0, 0, currobj->_ptb, pAsyncPool);
-			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow,
-				&m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool,
-				currobj->_ptb, pAsyncPool);
+			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, currobj->_ptb, pAsyncPool);
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
 		}
@@ -20531,20 +20565,8 @@ namespace vkr {
 
 			// same thing as above but for the PBR pass
 			currobj->m_GLTFPBR = new GltfPbrPass();
-			currobj->m_GLTFPBR->OnCreate(
-				m_pDevice,
-				&m_UploadHeap,
-				&m_ResourceViewHeaps,
-				&m_ConstantBufferRing,
-				//currobj->_ptb->_pStaticBufferPool,
-				//&m_VidMemBufferPool, 
-				currobj->_ptb,
-				&m_SkyDome,
-				false, // use SSAO mask
-				m_ShadowSRVPool,
-				&m_RenderPassFullGBufferWithClear,
-				pAsyncPool
-			);
+			currobj->m_GLTFPBR->OnCreate(m_pDevice, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing
+				, currobj->_ptb, &m_SkyDome, false, m_ShadowSRVPool, &m_RenderPassFullGBufferWithClear, pAsyncPool);
 
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
@@ -20555,15 +20577,8 @@ namespace vkr {
 
 			// just a bounding box pass that will draw boundingboxes instead of the geometry itself
 			currobj->m_GLTFBBox = new GltfBBoxPass();
-			currobj->m_GLTFBBox->OnCreate(
-				m_pDevice,
-				m_RenderPassJustDepthAndHdr.GetRenderPass(),
-				&m_ResourceViewHeaps,
-				&m_ConstantBufferRing,
-				&m_VidMemBufferPool,
-				currobj->_ptb,
-				&m_Wireframe
-			);
+			currobj->m_GLTFBBox->OnCreate(m_pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool
+				, currobj->_ptb, &m_Wireframe);
 
 			// we are borrowing the upload heap command list for uploading to the GPU the IBs and VBs
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
@@ -20572,9 +20587,7 @@ namespace vkr {
 		else if (Stage == 10)
 		{
 			Profile p("Flush");
-
 			m_UploadHeap.FlushAndFinish();
-
 			//once everything is uploaded we dont need the upload heaps anymore
 			//m_VidMemBufferPool.FreeUploadHeap(); 
 			_robject.push_back(currobj);
