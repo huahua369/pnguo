@@ -4483,7 +4483,7 @@ namespace vkr {
 
 		~GLTFTexturesAndBuffers();
 		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, DynamicBufferRing* pd);
-		void LoadTextures(AsyncPool* pAsyncPool = NULL);
+		void LoadTextures(bool async_de);
 		void LoadGeometry();
 		void OnDestroy();
 
@@ -6937,112 +6937,185 @@ namespace vkr
 		//ResourceViewHeaps* pResourceViewHeaps,		// 管理set分配  
 		return true;
 	}
-	void get_texdata(IMG_INFO& header, tinygltf::Image& img, std::vector<char>& tidata)
+	struct image_pxt
 	{
-		// Get the image data from the glTF loader
-
-
+		IMG_INFO header = {};
+		std::vector<char> tidata;
+		unsigned char* buffer = nullptr;
+		VkDeviceSize   bufferSize = 0;
+		bool deleteBuffer = false;
+	};
+	void get_texdata(tinygltf::Image& img, image_pxt* opt)
+	{
+		bool isimg = img.image.size();
+		opt->deleteBuffer = false;
+		if (isimg)
+		{
+			IMG_INFO& header = opt->header;
+			std::vector<char>& tidata = opt->tidata;
+			if (img.as_is) {
+				int w = 0, h = 0, comp = 4, req_comp = 0;
+				auto data = (uint32_t*)stbi_load_from_memory((stbi_uc*)img.image.data(), img.image.size(), &w, &h, &req_comp, comp);
+				if (data)
+				{
+					opt->buffer = (unsigned char*)data;
+					opt->bufferSize = w * h * comp;
+					opt->deleteBuffer = true;
+				}
+			}
+			else
+			{
+				// We convert RGB-only images to RGBA, as most devices don't support RGB-formats in Vulkan
+				if (img.component == 3)
+				{
+					opt->bufferSize = img.width * img.height * 4;
+					tidata.resize(opt->bufferSize);
+					opt->buffer = (unsigned char*)tidata.data();
+					unsigned char* rgba = opt->buffer;
+					unsigned char* rgb = &img.image[0];
+					for (size_t i = 0; i < img.width * img.height; ++i)
+					{
+						memcpy(rgba, rgb, sizeof(unsigned char) * 3);
+						rgba += 4;
+						rgb += 3;
+					}
+				}
+				else
+				{
+					opt->buffer = &img.image[0];
+					opt->bufferSize = img.image.size();
+				}
+			}
+			header.width = img.width;
+			header.height = img.height;
+			header.depth = 1;
+			header.arraySize = 1;
+			header.mipMapCount = 1;
+#ifdef _WIN32
+			header.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+#else
+			header.vkformat = VK_FORMAT_R8G8B8A8_UNORM;
+#endif
+			header.bitCount = img.bits * img.component;
+		}
 	}
-	void GLTFTexturesAndBuffers::LoadTextures(AsyncPool* pAsyncPool)
+	class TaskQueue
 	{
-		// load textures and create views
-		//
+	public:
+		std::vector<std::jthread> workers;
+		std::queue<std::function<void()>> tasks;
+		std::mutex mtx;
+	public:
+		TaskQueue();
+		~TaskQueue();
+		void add(std::function<void()> task);
+		void run(int num);
+		void wait_stop();
+	private:
+	};
+
+	TaskQueue::TaskQueue()
+	{
+	}
+
+	TaskQueue::~TaskQueue()
+	{
+		wait_stop();
+	}
+	void TaskQueue::add(std::function<void()> task)
+	{
+		std::lock_guard<std::mutex> lock(mtx);
+		tasks.push(task);
+	}
+	void TaskQueue::run(int num)
+	{
+		for (int i = 0; i < num; ++i) {
+			workers.emplace_back([this](std::stop_token st) {
+				while (!st.stop_requested() || !tasks.empty()) {
+					while (tasks.size())
+					{
+						std::function<void()> task;
+						{
+							std::lock_guard<std::mutex> lock(mtx);
+							//std::unique_lock<std::mutex> lock(mtx);
+							if (tasks.empty()) break;
+							task = std::move(tasks.front());  tasks.pop();
+						}
+						task();
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+				});
+		}
+	}
+	void TaskQueue::wait_stop() {
+		while (tasks.size()) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		for (auto& w : workers)
+		{
+			w.request_stop();
+		}
+	}
+	void GLTFTexturesAndBuffers::LoadTextures(bool async_de)
+	{
+		// load textures and create views 
 		auto pm = m_pGLTFCommon->pm;
 		if (pm && pm->images.size())
 		{
 			auto& images = pm->images;
-
-			std::vector<Async*> taskQueue(images.size());
-
 			m_textures.resize(images.size());
 			m_textureViews.resize(images.size());
-
+			TaskQueue vts;
+			if (async_de)
+			{
+				size_t tn = std::thread::hardware_concurrency();
+				vts.run(std::min(images.size(), tn));
+			}
 			for (int imageIndex = 0; imageIndex < images.size(); imageIndex++)
 			{
 				Texture* pTex = &m_textures[imageIndex];
-				std::string filename = m_pGLTFCommon->m_path + images[imageIndex].uri;// ["uri"] .get<std::string>();
-
-				ExecAsyncIfThereIsAPool(pAsyncPool, [imageIndex, pTex, this, filename, pm]()
+				std::string filename = m_pGLTFCommon->m_path + images[imageIndex].uri;
+				auto tv = &m_textureViews[imageIndex];
+				//ExecAsyncIfThereIsAPool(pAsyncPool, [imageIndex, pTex, tv, this, filename, pm]()
+				std::function<void()> ccb = [imageIndex, pTex, tv, this, filename, pm]()
 					{
 						print_time Pt("load texture", 1);
-						bool useSRGB;
-						float cutOff;
+						bool useSRGB = false;
+						float cutOff = 1.0;
 						auto& img = pm->images[imageIndex];
 						GetSrgbAndCutOffOfImageGivenItsUse(imageIndex, &pm->materials, &useSRGB, &cutOff);
+						image_pxt pxt = {};
 						bool isimg = img.image.size();
-						void* sdata = 0;
 						if (isimg)
 						{
-							IMG_INFO header = {};
-							std::vector<char> tidata;
-							unsigned char* buffer = nullptr;
-							VkDeviceSize   bufferSize = 0;
-							bool           deleteBuffer = false;
-							if (img.as_is) {
-
-								int w = 0, h = 0, comp = 4, req_comp = 0;
-								auto data = (uint32_t*)stbi_load_from_memory((stbi_uc*)img.image.data(), img.image.size(), &w, &h, &req_comp, comp);
-								if (data)
-								{
-									sdata = data;
-									buffer = (unsigned char*)data;
-									bufferSize = w * h * comp;
-								}
-							}
-							else
-							{
-								// We convert RGB-only images to RGBA, as most devices don't support RGB-formats in Vulkan
-								if (img.component == 3)
-								{
-									bufferSize = img.width * img.height * 4;
-									tidata.resize(bufferSize);
-									buffer = (unsigned char*)tidata.data();
-									unsigned char* rgba = buffer;
-									unsigned char* rgb = &img.image[0];
-									for (size_t i = 0; i < img.width * img.height; ++i)
-									{
-										memcpy(rgba, rgb, sizeof(unsigned char) * 3);
-										rgba += 4;
-										rgb += 3;
-									}
-									deleteBuffer = true;
-								}
-								else
-								{
-									buffer = &img.image[0];
-									bufferSize = img.image.size();
-								}
-							}
-							header.width = img.width;
-							header.height = img.height;
-							header.depth = 1;
-							header.arraySize = 1;
-							header.mipMapCount = 1;
-#ifdef _WIN32
-							header.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-#else
-							header.vkformat = VK_FORMAT_R8G8B8A8_UNORM;
-#endif
-							header.bitCount = img.bits * img.component;
+							get_texdata(img, &pxt);
 							auto name = img.name.size() ? img.name : filename;
 							if (img.uri.empty())
 								name += std::to_string(imageIndex);
-							pTex->InitFromData(m_pDevice, m_pUploadHeap, &header, buffer, bufferSize, name.c_str(), useSRGB);
-							if (sdata)
-								stbi_image_free(sdata);
+							bool result = pTex->InitFromData(m_pDevice, m_pUploadHeap, &pxt.header, pxt.buffer, pxt.bufferSize, name.c_str(), useSRGB);
+							if (pxt.deleteBuffer)
+								stbi_image_free(pxt.buffer);
+							assert(result != false);
 						}
 						else
 						{
 							bool result = pTex->InitFromFile(m_pDevice, m_pUploadHeap, filename.c_str(), useSRGB, 0 /*VkImageUsageFlags*/, cutOff);
 							assert(result != false);
 						}
-						//m_pUploadHeap->FlushAndFinish();
-						m_textures[imageIndex].CreateSRV(&m_textureViews[imageIndex]);
-					}
-				);
+						pTex->CreateSRV(tv);
+					};
+				if (async_de) {
+					vts.add(ccb);
+				}
+				else {
+					ccb();
+				}
 			}
-			if (pAsyncPool)
-				pAsyncPool->Flush();
+			if (async_de)
+			{
+				vts.wait_stop();
+			}
 			// copy textures and apply barriers, then flush the GPU
 			m_pUploadHeap->FlushAndFinish();
 		}
@@ -7254,6 +7327,10 @@ namespace vkr
 					m_IndexBufferMap[it.primitive_indices] = ibv;
 				}
 			}
+
+			_pStaticBufferPool->UploadData(m_pUploadHeap->GetCommandList());
+			m_pUploadHeap->FlushAndFinish();
+			_pStaticBufferPool->FreeUploadHeap();
 		}
 	}
 
@@ -8687,7 +8764,7 @@ namespace vkr
 			PBRMesh* pMesh = &m_meshes[m];
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
 			{
-				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p]; 
+				PBRPrimitives* pPrimitive = &pMesh->m_pPrimitives[p];
 				m_pResourceViewHeaps->FreeDescriptor(pPrimitive->m_uniformsDescriptorSet);
 			}
 		}
@@ -8726,9 +8803,9 @@ namespace vkr
 		sslayout.insert(m_defaultMaterial.m_texturesDescriptorSetLayout);
 		for (auto& s : sslayout)
 			vkDestroyDescriptorSetLayout(m_pDevice->m_device, s, NULL);
-		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet); 
-		_samplers.clear(); 
-		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL); 
+		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
+		_samplers.clear();
+		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
 		m_brdfLutTexture.OnDestroy();
 
 	}
@@ -20429,14 +20506,11 @@ namespace vkr {
 		}
 		else if (Stage == 6)
 		{
-			Profile p("LoadTextures");
+			Profile p("Load(Textures Geometry)");
 			// here we are loading onto the GPU all the textures and the inverse matrices
 			// this data will be used to create the PBR and Depth passes       
-			currobj->_ptb->LoadTextures(pAsyncPool);
+			currobj->_ptb->LoadTextures(true);
 			currobj->_ptb->LoadGeometry();
-			currobj->_ptb->_pStaticBufferPool->UploadData(m_UploadHeap.GetCommandList());
-			m_UploadHeap.FlushAndFinish();
-			currobj->_ptb->_pStaticBufferPool->FreeUploadHeap();
 		}
 		else if (Stage == 7)
 		{
