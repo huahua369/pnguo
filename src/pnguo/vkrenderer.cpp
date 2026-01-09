@@ -3362,7 +3362,6 @@ namespace vkr {
 		float clearcoatNormalScale = 1;
 		float envIntensity = 1;
 		int unlit = 0;
-		float u_OcclusionStrength = 1.0;
 		float pad[3];
 	};
 
@@ -7731,10 +7730,10 @@ namespace vkr
 		glm::vec4 zeroes = { 0.0, 0.0, 0.0, 0.0 };
 		tfmat->m_doubleSided = material.doubleSided;
 		tfmat->m_blending = material.alphaMode == "BLEND";
-		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes);
+		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes); 
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
-		tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
-		tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
+		//tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
+		//tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
 		// ALPHA_OPAQUE 0
 		// ALPHA_MASK 1
 		// ALPHA_BLEND 2 
@@ -7780,8 +7779,7 @@ namespace vkr
 		{
 			textureIds["occlusionTexture"] = material.occlusionTexture.index;
 			tfmat->m_params.occlusionStrength = material.occlusionTexture.strength;
-			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord);
-			tfmat->m_defines["u_OcclusionStrength"] = std::to_string(material.occlusionTexture.strength);
+			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord); 
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.occlusionTexture.extensions, &m3)) {
 				uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));
@@ -9351,8 +9349,8 @@ namespace vkr
 				auto uvtDesc = _ptb->get_uvm(pPrimitive->mid);
 				// do frustrum culling
 				//
-				tfPrimitives boundingBox = _ptb->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
-				/*
+				/*tfPrimitives boundingBox = _ptb->m_pGLTFCommon->m_meshes[pNode->meshIndex].m_pPrimitives[p];
+
 				* todo 相机剔除算法
 				if (CameraFrustumToBoxCollision(mModelViewProj, boundingBox.m_center, boundingBox.m_radius))
 					continue;*/

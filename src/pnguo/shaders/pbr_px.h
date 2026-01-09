@@ -187,6 +187,7 @@ struct gpuMaterial
 	float sheenRoughness;
 	float ao;
 
+	float occlusionStrength;
 };
 
 // alphaMode
@@ -291,9 +292,6 @@ layout(set = 1, binding = ID_metallicRoughnessTexture) uniform sampler2D u_Metal
 
 #ifdef ID_occlusionTexture
 layout(set = 1, binding = ID_occlusionTexture) uniform sampler2D u_OcclusionSampler;
-#ifndef u_OcclusionStrength
-float u_OcclusionStrength = 1.0;
-#endif
 #endif
 
 #ifdef ID_diffuseTexture
@@ -1163,8 +1161,10 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 
 #ifdef ID_occlusionTexture
 	m.ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
+	m.occlusionStrength = material.occlusionStrength;
 #else
 	m.ao = 1.0;
+	m.occlusionStrength = 1.0;
 #endif
 #endif 
 
@@ -2228,7 +2228,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 	// Apply optional PBR terms for additional (optional) shading 
 #ifdef ID_occlusionTexture
-	color = mix(color, color * m.ao, u_OcclusionStrength);
+	color = mix(color, color * m.ao, m.occlusionStrength);
 #endif
 
 	color += m.emissive * (vec3(1.0) - cxf);
@@ -2403,7 +2403,7 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 	vec3 shade = getPointShade(pointToLight, materialInfo, normal, view);
 	return rangeAttenuation * spotAttenuation * light.intensity * light.color * shade;
 }
-
+#ifdef PLOLD
 vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
 #ifdef __cplusplus
@@ -2484,7 +2484,8 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 	// Apply optional PBR terms for additional (optional) shading
 #ifdef ID_occlusionTexture
 	ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
-	color = mix(color, color * ao, u_OcclusionStrength);
+	float occlusionStrength = 1.0;
+	color = mix(color, color * ao, occlusionStrength);
 #endif
 
 	vec3 emissive = vec3(0);
@@ -2542,6 +2543,8 @@ vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColo
 
 	return outColor;
 }
+#endif
+
 #endif // 1
 
 
