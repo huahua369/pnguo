@@ -1051,7 +1051,7 @@ int main()
 						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					sp_drawable_draw(dd1); // spine动画
-					r_render_data_text(ptrt, { 200,100 }, td3);//*
+					r_render_data_text(ptrt, { 200,100 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1150,7 +1150,7 @@ int main()
 		free_app(app);
 	}
 #ifdef _WIN32
-	ExitProcess(0);
+	//ExitProcess(0);
 #endif
 	return 0;
 }

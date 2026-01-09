@@ -245,6 +245,17 @@ struct sdl3_textdata
 	void* rptr = 0;
 	uint32_t color = 0;
 };
+class clicprect_cx
+{
+public:
+	texture_cb* rcb = 0;
+	void* _renderer = 0;
+	glm::ivec4 oldrc = {};
+public:
+	clicprect_cx(void* renderer, texture_cb* cb, const glm::ivec4& rc);
+	~clicprect_cx();
+};
+
 // 渲染一组图文列表
 void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 渲染一段文本

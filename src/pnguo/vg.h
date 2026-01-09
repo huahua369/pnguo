@@ -378,6 +378,7 @@ enum class BLENDMODE_E :int {
 #define TEX_CB
 struct texture_cb
 {
+	void* renderer = 0;
 	// 创建纹理
 	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
 	// 更新纹理数据

@@ -1361,6 +1361,24 @@ void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc,
 	return;
 }
 
+
+clicprect_cx::clicprect_cx(void* renderer, texture_cb* cb, const glm::ivec4& rc) :rcb(cb), _renderer(renderer)
+{
+	if (rcb && renderer)
+	{
+		rcb->get_cliprect(renderer, &oldrc);
+		rcb->set_cliprect(renderer, &rc);
+	}
+}
+
+clicprect_cx::~clicprect_cx()
+{
+	if (rcb && _renderer)
+	{
+		rcb->set_cliprect(_renderer, &oldrc);
+	}
+}
+
 void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 {
 	void* renderer = pt->rptr;
@@ -1372,8 +1390,8 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 	auto rect = p->box.rc;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = pos;
-	pt->rcb->get_cliprect(renderer, &rc);
-	pt->rcb->set_cliprect(renderer, &rect);
+	rect.x += pos.x; rect.y += pos.y;
+	clicprect_cx cp(renderer, pt->rcb, rect); // 设置裁剪区域
 	for (auto& it : p->rd) {
 		if (!it.img)continue;
 		auto& tp = pt->vt[it.img];
@@ -1426,7 +1444,6 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 		pt->opt.clear();
 		pt->idx.clear();
 	}
-	pt->rcb->set_cliprect(renderer, &rc);
 }
 
 void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
@@ -1455,6 +1472,9 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 	}
 	void* tex = 0;
 	const int vsize = sizeof(text_vx);
+	auto rect = p->box.rc;
+	rect.x += pos.x; rect.y += pos.y;
+	clicprect_cx cp(renderer, pt->rcb, rect); // 设置裁剪区域
 	if (pt->opt.empty())
 	{
 		size_t ct = 0;
