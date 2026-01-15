@@ -88,7 +88,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Libssh2 CONFIG REQUIRED)
 find_package(cpuid CONFIG REQUIRED)
        
-#find_package(libuv CONFIG REQUIRED)
+find_package(libuv CONFIG REQUIRED)
  
 #find_package(OpenCV CONFIG REQUIRED)
 #find_package(unofficial-joltphysics CONFIG REQUIRED)
@@ -119,7 +119,7 @@ list(APPEND lklib
    unofficial::noise::noise-static
    unofficial::noiseutils::noiseutils-static
     harfbuzz::harfbuzz 
-    #$<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
+    $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     #opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     pnguo
     tpv
