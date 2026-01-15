@@ -126,6 +126,7 @@ typedef uint32_t DXGI_FORMAT;
 #include <tiny_gltf.h>
 #include <zlib.h>
 #include <queue>
+#include <unordered_set>
 // 本地头文件
 #include <event.h>
 #include <print_time.h>
@@ -7730,7 +7731,7 @@ namespace vkr
 		glm::vec4 zeroes = { 0.0, 0.0, 0.0, 0.0 };
 		tfmat->m_doubleSided = material.doubleSided;
 		tfmat->m_blending = material.alphaMode == "BLEND";
-		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes); 
+		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes);
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
 		//tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
 		//tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
@@ -7779,7 +7780,7 @@ namespace vkr
 		{
 			textureIds["occlusionTexture"] = material.occlusionTexture.index;
 			tfmat->m_params.occlusionStrength = material.occlusionTexture.strength;
-			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord); 
+			tfmat->m_defines["ID_occlusionTexCoord"] = std::to_string(material.occlusionTexture.texCoord);
 			glm::mat3 m3 = glm::mat3(1.0);
 			if (get_KHR_texture_transform(material.occlusionTexture.extensions, &m3)) {
 				uvtm[uvc] = m3;//memcpy(&uvtm[uvc], &m3, sizeof(glm::mat3));
@@ -23510,6 +23511,440 @@ void main()
 			}
 		}
 	}
+}
+// !vkr
+	// 半边
+#if 1
+
+namespace std {
+	template<typename A, typename B>
+	struct hash< std::pair<A, B>> {
+		size_t operator()(std::pair<A, B> const& key) const {
+			static const std::hash<A> ha;
+			static const std::hash<B> hb;
+			size_t hf = ha(key.first);
+			size_t hs = hb(key.second);
+			//NOTE: if this were C++20 we could use std::rotr or std::rotl
+			return hf ^ (hs << (sizeof(size_t) * 4)) ^ (hs >> (sizeof(size_t) * 4));
+		}
+	};
+	template <>
+	struct hash<glm::uvec2> {
+		size_t operator()(const glm::uvec2& key) const noexcept {
+			size_t seed = 0;
+			// 组合 x 和 y 的哈希值
+			seed ^= hash<uint32_t>()(key.x) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+			seed ^= hash<uint32_t>()(key.y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+			return seed;
+		}
+	};
+}
+namespace vkr {
+	MeshHalfEdge* from_indexed_faces(std::vector< glm::vec3 > const& vertices_,
+		std::vector< std::vector< Index > > const& faces_,
+		std::vector< std::vector< Index > > const& corner_normal_idxs,
+		std::vector< std::vector< Index > > const& corner_uv_idxs,
+		std::vector<glm::vec3> const& corner_normals_,
+		std::vector<glm::vec2> const& corner_uvs_)
+	{
+		auto rp = new MeshHalfEdge();
+		MeshHalfEdge& mesh = *rp;
+		//for quick lookup of vertices by index
+		mesh.vertices.reserve(vertices_.size());
+		for (auto const& v : vertices_) {
+			Vertex vx = {};
+			vx.pos = v;
+			mesh.vertices.emplace_back(vx);
+		}
+
+		// std::pair< Index, Index >,HalfEdge*
+		std::unordered_map<glm::uvec2, size_t > halfedges; //for quick lookup of halfedges by from/to vertex index
+
+		uint32_t num_faces = static_cast<uint32_t>(faces_.size());
+		const bool add_corner_normals = corner_normal_idxs.size() >= num_faces;
+		const bool add_corner_uvs = corner_uv_idxs.size() >= num_faces;
+		//helper to add a face (and, later, boundary):
+		auto add_loop = [&](std::vector< Index > const& loop, bool boundary,
+			std::vector< Index> const& n_loop = std::vector<Index>{},
+			std::vector< Index> const& uv_loop = std::vector<Index>{}) {
+				assert(loop.size() >= 3);
+
+				for (uint32_t j = 0; j < loop.size(); ++j) {
+					//omit adding a face with vertices of the same index, otherwise crashes on cylinder/cone
+					if (loop[j] == loop[(j + 1) % loop.size()]) { return; }
+				}
+
+				Face* face = mesh.emplace_face(); face->boundary = boundary;
+				HalfEdge* prev = &(*mesh.halfedges.end()); //keep track of previous edge around face to set next pointer
+				for (uint32_t i = 0; i < loop.size(); ++i) {
+					Index a = loop[i];
+					Index b = loop[(i + 1) % loop.size()];
+					assert(a != b);
+
+					HalfEdge* halfedge = mesh.emplace_halfedge();
+					if (i == 0) face->halfedge = halfedge->id; //store first edge as face's halfedge pointer
+					halfedge->origin = a;// mesh.vertices[a];
+
+					//if first to mention vertex, set vertex's halfedge pointer:
+					if (mesh.vertices[a].leavingEdge > mesh.halfedges.size()) {
+						assert(!boundary); //boundary faces should never be mentioning novel vertices, since they are created second
+						mesh.vertices[a].leavingEdge = halfedge->id;
+					}
+					halfedge->face = face->id;
+					size_t hid = halfedge->id;
+					auto k = glm::uvec2(a, b);
+					auto inserted = halfedges.emplace(k, hid);
+					assert(inserted.second); //if edge mentioned more than once in the same direction, not an oriented, manifold mesh
+
+					auto twin = halfedges.find(glm::uvec2(b, a));
+					if (twin == halfedges.end()) {
+						assert(!boundary); //boundary faces exist only to complete edges so should *always* match
+						//not twinned yet -- create an edge just for this halfedge:
+						Edge* edge = mesh.emplace_edge();
+						halfedge->edge = edge->id;
+						edge->halfedge = halfedge->id;
+					}
+					else {
+						//found a twin -- connect twin pointers and reference its edge:
+						auto& ts = mesh.halfedges[twin->second];
+						assert(ts.twin > mesh.halfedges.size());
+						halfedge->twin = twin->second;
+						halfedge->edge = ts.edge;
+						ts.twin = halfedge->id;
+					}
+
+					if (i != 0) prev->next = halfedge->id; //set previous halfedge's next pointer
+					prev = halfedge;
+
+					if (add_corner_normals && i < n_loop.size()) halfedge->corner_normal = corner_normals_[n_loop[i]];
+					if (add_corner_uvs && i < uv_loop.size()) halfedge->corner_uv = corner_uvs_[uv_loop[i]];
+				}
+
+				prev->next = face->halfedge; //set next pointer for last halfedge to first edge
+			};
+
+		//add all faces:
+		for (uint32_t i = 0; i < num_faces; i++) {
+			if (add_corner_normals && add_corner_uvs) add_loop(faces_[i], false, corner_normal_idxs[i], corner_uv_idxs[i]);
+			else if (add_corner_normals) add_loop(faces_[i], false, corner_normal_idxs[i]);
+			else add_loop(faces_[i], false);
+		}
+
+		// All halfedges created so far have valid next pointers, but some may be missing twins because they are at a boundary.
+
+		std::map< Index, Index > next_on_boundary;
+
+		//first, look for all un-twinned halfedges to figure out the shape of the boundary:
+		for (auto const& [from_to, halfedge] : halfedges) {
+			auto& it = mesh.halfedges[halfedge];
+			if (it.twin > mesh.halfedges.size()) {
+				auto ret = next_on_boundary.emplace(from_to.y, from_to.x); //twin needed on the boundary
+				assert(ret.second); //every boundary vertex should have a unique successor because the boundary is "half-disc-like"
+			}
+		}
+
+		//now pull out boundary loops until all edges are exhausted:
+		while (!next_on_boundary.empty()) {
+			std::vector< Index > loop;
+			loop.emplace_back(next_on_boundary.begin()->first);
+
+			do {
+				//look up next hop on the boundary:
+				auto next = next_on_boundary.find(loop.back());
+				//should never be dead ends on boundary:
+				assert(next != next_on_boundary.end());
+
+				//add next hop to loop:
+				loop.emplace_back(next->second);
+				//...and remove from nexts structure:
+				next_on_boundary.erase(next);
+			} while (loop[0] != loop.back());
+
+			loop.pop_back(); //remove duplicated first/last element
+
+			assert(loop.size() >= 3); //all faces must be non-degenerate
+
+			//add boundary loop:
+			add_loop(loop, true);
+		}
+
+		//with boundary faces created, mesh should be ready to go with all edges nicely twinned.
+
+		//PARANOIA: this should never happen:
+		//auto error = mesh.validate();
+		//if (error) {
+		//	std::cerr << "MeshHalfEdge from_indexed_faces failed validation: " << error->second << std::endl;
+		//	assert(0);
+		//}
+
+		return rp;
+	}
+	void MeshHalfEdge::set_corner_normals(float threshold) {
+#if 0
+		//first, figure out which edges to consider sharp for this operation:
+		std::unordered_set< Edge const* > sharp_edges;
+		sharp_edges.reserve(edges.size());
+
+		//all edges between boundary and non-boundary get marked sharp regardless of mode:
+		for (auto const& edge : edges) {
+			auto& ef = halfedges[edge.halfedge];
+			auto& tf = halfedges[ef.twin];
+			if (faces[ef.face].boundary != faces[tf.face].boundary) {
+				sharp_edges.emplace(&edge);
+			}
+		}
+
+		if (threshold >= 180.0f) {
+			//"smooth mode" -- all other edges are considered smooth
+		}
+		else {
+			//"flat mode" / "auto mode" -- any edges which are marked sharp or have face angle <= threshold get marked sharp:
+			float cos_threshold = std::cos(glm::radians(std::clamp(threshold, 0.0f, 180.0f)));
+			if (threshold <= 0.0f) cos_threshold = 2.0f; //make sure everything is sharp
+			for (auto const& edge : edges) {
+				//get adjacent halfedges:
+				HalfEdge* h1 = &halfedges[edge.halfedge];
+				HalfEdge* h2 = &halfedges[h1->twin];
+				if (faces[h1->face].boundary || faces[h2->face].boundary) {
+					//don't care about edges boundary-boundary, and inside-boundary already marked.
+					//thus: nothing to do here
+				}
+				else if (edge.sharp) {
+					//flagged as sharp, so mark it sharp:
+					sharp_edges.emplace(&edge);
+				}
+				else {
+					//inside-inside edge, non-marked, check angle:
+					glm::vec3 n1 = face_normal(h1->face);
+					glm::vec3 n2 = face_normal(h2->face);
+					float cos = dot(n1, n2);
+					if (cos <= cos_threshold) {
+						//treat as sharp:
+						sharp_edges.emplace(&edge);
+					}
+				}
+			}
+		}
+
+		//clear current corner normals:
+		for (auto h = halfedges.begin(); h != halfedges.end(); ++h) {
+			h->corner_normal = glm::vec3{ 0.0f, 0.0f, 0.0f };
+		}
+
+		//now circulate all vertices to set normals:
+		for (auto const& v : vertices) {
+			//get halfedge leaving this vertex:
+			HalfEdge* begin = &halfedges[v.leavingEdge];
+			assert(begin->origin == v.leavingEdge);
+
+			//circulate begin until it is at a sharp edge (thus, the next corner starts a smoothing group):
+			do {
+				if (sharp_edges.count(&edges[begin->edge])) break;
+				begin = &halfedges[halfedges[begin->twin].next];
+			} while (begin->id != v.leavingEdge); //could be all one big happy smoothing group
+
+			//store all corners around the vertex:
+			struct Corner {
+				HalfEdge* in; //halfedge pointing to v
+				HalfEdge* out; //halfedge pointing away from v
+				glm::vec3 weighted_normal; //face normal at corner, weighted... somehow (see below)
+			};
+
+			std::vector< std::vector< Corner > > groups;
+			HalfEdge* h = begin;
+			do {
+				//start a new smoothing group on sharp edges (or at the very first edge):
+				if (h == begin || sharp_edges.count(&*h->edge)) {
+					groups.emplace_back();
+				}
+				//add corner after h to current smoothing group:
+				Corner corner;
+				corner.in = h->twin;
+				corner.out = h->twin->next;
+				assert(corner.in->face == corner.out->face); //PARANOIA
+				{ //compute some sort of weighted normal:
+					assert(&*corner.in->vertex != &v);
+					assert(&*corner.in->twin->vertex == &v);
+					glm::vec3 from = corner.in->vertex->pos - v.pos;
+
+					assert(&*corner.out->vertex == &v);
+					assert(&*corner.out->twin->vertex != &v);
+					glm::vec3 to = corner.out->twin->vertex->pos - v.pos;
+					/*
+					//basic area weighting (weird with non-flat faces and reflex vertices):
+					corner.weighted_normal = cross(to - v.pos, from - v.pos);
+					*/
+					/*//sort sort of angle weighting thing -- this never works as well as one would hope:
+					//...still needs work for reflex angles also
+					float angle = std::atan2(cross(from,to).norm(), dot(from, to));
+					corner.weighted_normal = angle * corner.in->face->normal();
+					*/
+					//some other sort of slightly fancy area weighting:
+					corner.weighted_normal = cross(to - v.pos, from - v.pos).norm() * corner.in->face->normal();
+				}
+				groups.back().emplace_back(corner);
+
+				//advance h:
+				h = h->twin->next;
+			} while (h != begin);
+
+			//compute weighted normals per-corner:
+			for (auto const& group : groups) {
+				assert(!group.empty());
+				if (group[0].in->face->boundary) {
+					//boundary group.
+					//PARANOIA:
+					for (auto const& corner : group) {
+						assert(corner.in->face->boundary);
+					}
+					//no need for normals on boundary corners
+					continue;
+				}
+				//compute weighted normal:
+				glm::vec3 sum = glm::vec3{ 0.0f, 0.0f, 0.0f };
+				for (auto const& corner : group) {
+					sum += corner.weighted_normal;
+				}
+				//normalize:
+				sum = sum.unit();
+				//assign to all corners in group:
+				for (auto const& corner : group) {
+					assert(&*corner.out->vertex == &v);
+					corner.out->corner_normal = sum;
+				}
+			}
+		}
+#endif
+		//normals computed!
+	}
+
+	/// Take minimum of each component
+	inline glm::vec2 hmin(glm::vec2 l, glm::vec2 r) {
+		return glm::vec2(std::min(l.x, r.x), std::min(l.y, r.y));
+	}
+	/// Take maximum of each component
+	inline glm::vec2 hmax(glm::vec2 l, glm::vec2 r) {
+		return glm::vec2(std::max(l.x, r.x), std::max(l.y, r.y));
+	}
+	/*
+	 * set_corner_uvs_per_face: set uv coordinates to map texture per-face
+	 */
+	void MeshHalfEdge::set_corner_uvs_per_face() {
+#if 0
+		//clear existing UVs:
+		for (auto& halfedge : halfedges) {
+			halfedge.corner_uv = glm::vec2(0.0f, 0.0f);
+		}
+
+		//set UVs per-face:
+		for (auto const& face : faces) {
+			if (face.boundary) continue;
+
+			//come up with a plane perpendicular-ish to the face:
+			glm::vec3 n = face.normal();
+			glm::vec3 p1;
+			if (std::abs(n.x) < std::abs(n.y) && std::abs(n.x) < std::abs(n.z)) {
+				p1 = glm::vec3(1.0f, 0.0f, 0.0f);
+			}
+			else if (std::abs(n.y) < std::abs(n.z)) {
+				p1 = glm::vec3(0.0f, 1.0f, 0.0f);
+			}
+			else {
+				p1 = glm::vec3(0.0f, 0.0f, 1.0f);
+			}
+			p1 = (p1 - dot(p1, n) * n).unit();
+			glm::vec3 p2 = cross(n, p1);
+
+			//find bounds of face on plane:
+			glm::vec2 min0 = glm::vec2(std::numeric_limits< float >::infinity(), std::numeric_limits< float >::infinity());
+			glm::vec2 max0 = glm::vec2(-std::numeric_limits< float >::infinity(), -std::numeric_limits< float >::infinity());
+			HalfEdge* v = face.halfedge;
+			do {
+				glm::vec2 pt = glm::vec2(dot(p1, v->vertex->pos), dot(p2, v->vertex->pos));
+				min0 = hmin(min0, pt);
+				max0 = hmax(max0, pt);
+				v = v->next;
+			} while (v != face.halfedge);
+
+			//set corner uvs based on position within bounds:
+			do {
+				glm::vec2 pt = glm::vec2(dot(p1, v->vertex->pos), dot(p2, v->vertex->pos));
+				v->corner_uv = glm::vec2(
+					(pt.x - min0.x) / (max0.x - min0.x),
+					(pt.y - min0.y) / (max0.y - min0.y)
+				);
+				v = v->next;
+			} while (v != face.halfedge);
+		}
+#endif
+	}
+
+	/*
+	 * set_corner_uvs_project: set uv coordinates to map texture by projection to a plane
+	 */
+	void MeshHalfEdge::set_corner_uvs_project(glm::vec3 origin, glm::vec3 u_axis, glm::vec3 v_axis) {
+
+#if 0
+		u_axis /= u_axis.norm_squared();
+		v_axis /= v_axis.norm_squared();
+
+		for (auto& halfedge : halfedges) {
+			if (halfedge.face->boundary) {
+				halfedge.corner_uv = glm::vec2(0.0f, 0.0f);
+			}
+			else {
+				halfedge.corner_uv = glm::vec2(
+					dot(halfedge.vertex->pos - origin, u_axis),
+					dot(halfedge.vertex->pos - origin, v_axis)
+				);
+			}
+		}
+#endif
+	}
+
+	HalfEdge* MeshHalfEdge::emplace_halfedge()
+	{
+		HalfEdge he = {};
+		return (HalfEdge*)&halfedges.emplace_back(he);
+	}
+
+	Edge* MeshHalfEdge::emplace_edge()
+	{
+		Edge e = {};
+		return (Edge*)&edges.emplace_back(e);
+	}
+
+	Face* MeshHalfEdge::emplace_face()
+	{
+		Face f = {};
+		return (Face*)&faces.emplace_back(f);
+	}
+
+
+	MeshHalfEdge* new_cube(float r) {
+		MeshHalfEdge* mesh = from_indexed_faces(
+			std::vector< glm::vec3 >{
+			glm::vec3{ -r, -r, -r }, glm::vec3{ r, -r, -r },
+				glm::vec3{ -r,  r, -r }, glm::vec3{ r,  r, -r },
+				glm::vec3{ -r, -r,  r }, glm::vec3{ r, -r,  r },
+				glm::vec3{ -r,  r,  r }, glm::vec3{ r,  r,  r }
+		},
+			std::vector< std::vector< Index > >{
+				{0, 2, 3, 1}, { 4,5,7,6 },
+				{ 0,1,5,4 }, { 1,3,7,5 },
+				{ 3,2,6,7 }, { 2,0,4,6 },
+		}
+		);
+
+		for (auto& edge : mesh->edges) {
+			edge.sharp = true;
+		}
+		mesh->set_corner_normals(0.0f);
+		mesh->set_corner_uvs_per_face();
+
+		return mesh;
+	}
+#endif // 1半边
 
 }
 //!vkr

@@ -1048,10 +1048,10 @@ int main()
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
+						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
-					sp_drawable_draw(dd1); // spine动画
-					r_render_data_text(ptrt, { 200,100 }, td3);
+					//sp_drawable_draw(dd1); // spine动画
+					//r_render_data_text(ptrt, { 200,100 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{

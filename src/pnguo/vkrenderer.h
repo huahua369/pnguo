@@ -276,7 +276,7 @@ public:
 	void* renderpass_justdepth = 0;		// 用于渲染天空盒、线框justdepth
 	void* renderpass_transparent = 0;	// 用于渲染透明物体transparent
 	void* renderpass_fbo = 0;			// 结果缓冲区fbo 
-	std::vector<uint32_t> dt;  // save_fbo缓存像素时用
+	std::vector<uint32_t> dt;			// save_fbo缓存像素时用
 	std::vector<std::string> dev_name;
 	int width = 0, height = 0;
 	scene_state _state = {};
@@ -354,6 +354,95 @@ namespace vkr {
 
 	};
 
+	struct Vertex {
+		glm::vec3 pos;
+		size_t leavingEdge; // HalfEdge必须指向边界半边（若为边界点）
+	};
+	struct Edge {
+		size_t halfedge; //one of the two halfedges adjacent to this edge 
+		int id;              // 边ID（可选）
+		float length;        // 几何长度 
+		double weight;       // 权重（物理模拟/路径规划）
+		bool is_boundary;    // 边界标识 
+		bool sharp = false;
+	};
+	struct Face {
+		size_t halfedge;        // half，任意一条边界半边
+		int id;
+		bool boundary = false; //is this a boundary loop?
+	};
+	struct HalfEdge {
+		int id;
+		size_t origin;	// Vertex*起点顶点 
+		size_t twin;	// HalfEdge*反向半边（边界边pair=nullptr）
+		size_t next;	// 同一面的下一条半边
+		size_t prev;	// 上一半边（可选但推荐，加速遍历）
+		size_t edge;	// 所属边Edge*
+		size_t face;	// 所属面Face* 
+		glm::vec2 corner_uv = glm::vec2(0.0f, 0.0f); //uv coordinate for this corner of the face
+		glm::vec3 corner_normal = glm::vec3(0.0f, 0.0f, 0.0f); //shading normal for this corner of the face
+
+	};
+	using Index = uint32_t; //to distinguish indices from sizes
+	struct MeshHalfEdge {
+		std::vector<Vertex> vertices;
+		std::vector<Edge> edges;
+		std::vector<Face> faces;
+		std::vector<HalfEdge> halfedges;
+	public:
+		//re-orients every face in the mesh by flipping halfedge directions.
+		// no elements are created or erased; only Halfedge::next, Halfedge::vertex, and Vertex::halfedge pointers are changed.
+		void flip_orientation();
+
+		//set corner normals:
+		// "smooth mode" (threshold >= 180.0f)
+		//   - all edges treated as smooth (even if 'sharp' flag is set)
+		// "auto mode" (0.0f < threshold < 180.0f)
+		//   - all edges with sharp flag are treated as sharp.
+		//   - all edges with angle (in degrees) > threshold are also treated as sharp.
+		// "flat mode" (threshold <= 0)
+		//   - all edges are treated as sharp
+		void set_corner_normals(float threshold = 30.0f);
+
+		//set corner uvs per-face:
+		void set_corner_uvs_per_face();
+
+		//set corner uvs by projection to a plane:
+		//  origin maps to (0,0)
+		//  origin + u_axis maps to (1,0)
+		//  origin + v_axis maps to (0,1)
+		void set_corner_uvs_project(glm::vec3 origin, glm::vec3 u_axis, glm::vec3 v_axis);
+		HalfEdge* emplace_halfedge();
+		Edge* emplace_edge();
+		Face* emplace_face();
+	public:
+		// 面
+		glm::vec3 face_center(size_t idx) const; // 面中心点
+		glm::vec3 face_normal(size_t idx) const; // 面积加权面的法向量
+		uint32_t face_degree(size_t idx) const; //此面的顶点/边数量
+		float face_area(size_t idx) const; //此面的面积
+		// 边
+		bool on_edge_boundary(size_t idx) const; // Is edge on a boundary loop?
+		glm::vec3 edge_center(size_t idx) const; // The midpoint of the edge
+		glm::vec3 edge_normal(size_t idx) const; // The average of the face normals on either side of this edge
+		float edge_length(size_t idx) const; // The length of the edge
+		// 顶点
+		bool on_v_boundary(size_t idx) const; //is vertex on a boundary loop?
+		uint32_t v_degree(size_t idx) const; //number of faces adjacent to the vertex, including boundary faces
+		glm::vec3 v_normal(size_t idx) const; //area-weighted normal vector at the vertex (excluding any boundary faces)
+		glm::vec3 v_neighborhood_center(size_t idx) const; //center of adjacent vertices
+		float v_angle_defect(size_t idx) const; //difference between sum of adjacent face angles and 2pi
+		float v_gaussian_curvature(size_t idx) const; //product of principle curvatures
+
+	};
+
+	MeshHalfEdge* from_indexed_faces(std::vector< glm::vec3 > const& vertices_,
+		std::vector< std::vector< Index > > const& faces_,
+		std::vector< std::vector< Index > > const& corner_normal_idxs = {},
+		std::vector< std::vector< Index > > const& corner_uv_idxs = {},
+		std::vector<glm::vec3> const& corner_normals_ = {},
+		std::vector<glm::vec2> const& corner_uvs_ = {});
+
 	// 顶点数据、纹理、矩阵、灯光、渲染命令
 	// 多边形
 	struct mesh_mt
@@ -361,7 +450,7 @@ namespace vkr {
 		std::vector<uint32_t> face_size;		// 面的边数3\4、多边形
 		std::vector<uint32_t> face_indice;		// 索引
 		std::vector<double> vertex_coord;		// 顶点坐标
-		std::vector<glm::uvec2> halfedge;		// 半边
+		MeshHalfEdge* halfedge = 0;				// 半边
 	public:
 		void add_vertex(const glm::dvec3* v, size_t n);
 		void add_vertex(const glm::vec3* v, size_t n);
