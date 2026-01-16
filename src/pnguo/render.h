@@ -295,12 +295,10 @@ extern "C" {
 	typedef int rStatusSeverity;
 	typedef int rStatusCode;
 	typedef uint32_t rWaitMask;
-
 	typedef struct {
 		const char* name;
 		rDataType type;
 	} rParameter;
-
 	typedef void (*rMemoryDeleter)(const void* userPtr, const void* appMemory);
 	typedef void (*rStatusCallback)(const void* userPtr, rDevice device, rObject source, rDataType sourceType, rStatusSeverity severity, rStatusCode code, const char* message);
 	typedef void (*rFrameCompletionCallback)(const void* userPtr, rDevice device, rFrame frame);
@@ -312,13 +310,11 @@ extern "C" {
 		Group		: Surface(1:N)、Light(1:N)
 		Surface		: Geometry(1:1)、Material(1:1)
 		Geometry	: transform、动画等属性
-
 		rLibrary(*LoadLibrary)(const char* name, rStatusCallback statusCallback, const void* statusCallbackUserData);
 		void (*UnloadLibrary)(rLibrary module);
 		void (*LoadModule)(rLibrary library, const char* name);
 		void (*UnloadModule)(rLibrary library, const char* name);
 	*/
-
 	struct rdev_impl
 	{
 		rLibrary library = 0;

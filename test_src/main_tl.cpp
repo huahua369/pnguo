@@ -3315,3 +3315,218 @@ void c_render(text_render_o* p)
 
 }
 #endif
+// ntp 
+#if 0
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#ifdef _WIN32
+#include <WinSock2.h>
+#else
+#include <arpa/inet.h>  // Linux 网络字节序转换 
+#endif // _WIN32
+#include <uv.h>         // libuv 核心库
+
+// NTP 协议常量 
+#define NTP_PORT 123 
+#define NTP_PACKET_SIZE 48
+#define NTP_TIMESTAMP_DELTA 2208988800ull  // 1900 到 1970 的秒数
+#define NTP_EPOCH_OFFSET 2208988800ull  // 1900 到 1970 的秒数
+
+// NTP 协议头结构体 (RFC 5905)
+typedef struct {
+	uint8_t li_vn_mode;      // 跳跃指示器 + 版本号 + 模式
+	uint8_t stratum;         // 层级 
+	uint8_t poll;            // 轮询间隔
+	uint8_t precision;       // 精度 
+	uint32_t root_delay;     // 根延迟
+	uint32_t root_disp;      // 根离散
+	uint32_t ref_id;         // 参考 ID 
+	uint32_t ref_ts_sec;     // 参考时间戳（秒）
+	uint32_t ref_ts_frac;    // 参考时间戳（小数）
+	uint32_t orig_ts_sec;    // 原始时间戳（秒）
+	uint32_t orig_ts_frac;   // 原始时间戳（小数）
+	uint32_t rx_ts_sec;      // 接收时间戳（秒）
+	uint32_t rx_ts_frac;     // 接收时间戳（小数）
+	uint32_t tx_ts_sec;      // 传输时间戳（秒） <- 我们需要这个 
+	uint32_t tx_ts_frac;     // 传输时间戳（小数）
+} ntp_packet;
+
+// 全局上下文 
+typedef struct {
+	uv_udp_t socket;
+	struct sockaddr_in server_addr;
+	ntp_packet send_buf;
+} ntp_context;
+
+// 创建 NTP 请求包
+void build_ntp_request(ntp_packet* packet) {
+	memset(packet, 0, sizeof(ntp_packet));
+	//packet->li_vn_mode = (0x03 << 3) | 0x03;  // 版本 3 + 客户端模式
+	packet->li_vn_mode = (0x03 << 6) | (0x04 << 3) | 0x03; // LI=0, VN=4, Mode=3（客户端）
+}
+
+// 解析 NTP 响应并转换为 Unix 时间戳 
+time_t parse_ntp_response(const ntp_packet* packet) {
+	uint32_t tx_sec = ntohl(packet->tx_ts_sec);
+	return (time_t)(tx_sec - NTP_TIMESTAMP_DELTA);
+}
+
+// 接收回调函数
+void on_ntp_response(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf,
+	const struct sockaddr* addr, unsigned flags) {
+	if (nread < 0) {
+		fprintf(stderr, "Read error: %s\n", uv_strerror(nread));
+		uv_close((uv_handle_t*)handle, NULL);
+		return;
+	}
+
+	if (nread < (ssize_t)sizeof(ntp_packet)) {
+		fprintf(stderr, "Invalid packet size: %zd\n", nread);
+		return;
+	}
+
+	ntp_packet* resp = (ntp_packet*)buf->base;
+	time_t timestamp = parse_ntp_response(resp);
+	printf("NTP time: %s", ctime(&timestamp));  // 打印可读时间
+	printf("s: %lld", timestamp);  // 打印可读时间
+	auto milliseconds = (timestamp * 1000ULL) >> 32;
+	uv_close((uv_handle_t*)handle, NULL);  // 关闭 UDP 句柄 
+	free(buf->base);  // 释放缓冲区
+}
+
+// 分配接收缓冲区
+void alloc_buffer(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
+	buf->base = (char*)malloc(size);
+	buf->len = size;
+}
+
+// 发送回调函数（确保请求已发送）
+void on_send_complete(uv_udp_send_t* req, int status) {
+	if (status < 0) {
+		fprintf(stderr, "Send error: %s\n", uv_strerror(status));
+		uv_close((uv_handle_t*)req->handle, NULL);
+	}
+	free(req);  // 释放发送请求 
+}
+struct NtpPacket {
+	uint8_t li_vn_mode;      // 前2位: Leap Indicator, 中间3位: Version, 后3位: Mode
+	uint8_t stratum;         // 层级（0=未同步，1=一级服务器）
+	uint8_t poll;            // 轮询间隔（log2秒）
+	uint8_t precision;       // 时钟精度（log2秒）
+	uint32_t root_delay;     // 根延迟（固定小数点）
+	uint32_t root_disp;      // 根离散
+	uint32_t ref_id;         // 参考时钟ID
+	uint32_t ref_ts_sec;     // 参考时间戳（秒）
+	uint32_t ref_ts_frac;    // 参考时间戳（小数秒）
+	uint32_t orig_ts_sec;    // 原始时间戳（秒）
+	uint32_t orig_ts_frac;   // 原始时间戳（小数秒）
+	uint32_t recv_ts_sec;    // 接收时间戳（秒）
+	uint32_t recv_ts_frac;   // 接收时间戳（小数秒）
+	uint32_t trans_ts_sec;   // 传输时间戳（秒）   *
+	uint32_t trans_ts_frac;  // 传输时间戳（小数秒）
+};
+struct addr_tt
+{
+	char addr0[INET6_ADDRSTRLEN];
+	int ai_family;
+	union {
+		struct sockaddr_in ipv4;
+		struct sockaddr_in6 ipv6;
+	} addr;
+};
+struct res_addr
+{
+	std::vector<addr_tt> v;
+	bool st = false;
+};
+void on_resolved(uv_getaddrinfo_t* resolver, int status, struct addrinfo* res) {
+	if (status < 0) {
+		fprintf(stderr, "DNS error: %s\n", uv_strerror(status));
+		return;
+	}
+	auto v = (res_addr*)resolver->data;
+	char addr[INET6_ADDRSTRLEN] = { '\0' };
+	struct addrinfo* p = res;
+	while (p) {
+		void* addr_ptr = (p->ai_family == AF_INET)
+			? (void*)&((struct sockaddr_in*)p->ai_addr)->sin_addr
+			: (void*)&((struct sockaddr_in6*)p->ai_addr)->sin6_addr;
+		addr_tt a = {};
+		a.ai_family = p->ai_family;
+		memcpy(&a.addr, p->ai_addr, p->ai_addrlen);
+		uv_inet_ntop(p->ai_family, addr_ptr, a.addr0, sizeof(a.addr0));
+		if (v)
+		{
+			v->v.push_back(a);
+		}
+		else
+		{
+			uv_inet_ntop(p->ai_family, addr_ptr, addr, sizeof(addr));
+			printf("IP: %s\n", addr);
+		}
+		p = p->ai_next;
+	}
+	if (v)
+		v->st = true;
+	uv_freeaddrinfo(res);
+}
+
+res_addr* getip(const char* sn) {
+	if (!sn || !sn[0])return 0;
+	uv_loop_t* loop = uv_default_loop();
+	uv_getaddrinfo_t resolver;
+
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	auto p = new res_addr();
+	resolver.data = p;
+	int r = uv_getaddrinfo(loop, &resolver, on_resolved, sn, NULL, &hints);
+	if (r) {
+		fprintf(stderr, "Request error: %s\n", uv_strerror(r));
+		if (p)
+		{
+			delete p;
+		}
+		return 0;
+	}
+	uv_run(loop, UV_RUN_DEFAULT);
+	return p;
+}
+
+// 主函数
+int main() {
+	uv_loop_t* loop = uv_default_loop();
+	ntp_context ctx = {};
+	const char* ntp_servers[] = { "pool.ntp.org","ntp.ntsc.ac.cn","ntp.aliyun.com","time.tencentcloud.com","time.hicloud.com" };
+	auto pad = getip(ntp_servers[2]);
+	auto ntp_server = "121.199.69.55";  // 默认 NTP 服务器ntp1.nim.ac.cn 和 ntp2.nim.ac.cn
+	// 初始化 UDP 套接字
+	uv_udp_init(loop, &ctx.socket);
+	ntp_server = pad->v[0].addr0;
+	// 解析 NTP 服务器地址
+	uv_ip4_addr(ntp_server, NTP_PORT, &ctx.server_addr);
+
+	// 构建 NTP 请求包
+	build_ntp_request(&ctx.send_buf);
+
+	// 发送请求
+	uv_udp_send_t* send_req = (uv_udp_send_t*)malloc(sizeof(uv_udp_send_t));
+	uv_buf_t send_buf = uv_buf_init((char*)&ctx.send_buf, sizeof(ntp_packet));
+
+	uv_udp_send(send_req, &ctx.socket, &send_buf, 1,
+		(const struct sockaddr*)&ctx.server_addr, on_send_complete);
+
+	// 开始接收响应
+	uv_udp_recv_start(&ctx.socket, alloc_buffer, on_ntp_response);
+
+	printf("Requesting time from %s...\n", ntp_server);
+	uv_run(loop, UV_RUN_DEFAULT);  // 启动事件循环
+
+	return 0;
+}
+#endif // 0

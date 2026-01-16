@@ -9333,7 +9333,7 @@ namespace vkr
 				//if ((bWireframe && pPrimitive->m_pipelineWireframe == VK_NULL_HANDLE) || (!bWireframe && pPrimitive->m_pipeline == VK_NULL_HANDLE))
 				if (!pPrimitive->_pipe->m_pipeline)
 					continue;
-
+				// 材质变体
 				if (pPrimitive->material_variants.size() > 0)
 				{
 					if (pPrimitive->variants_id != pPrimitive->variants_id0) {
@@ -17929,12 +17929,6 @@ namespace vkr {
 	}
 
 	// Transforms a node hierarchy recursively 
-	struct node_mat
-	{
-		uint32_t idx = 0;
-		uint32_t pidx = (uint32_t)-1;
-		glm::mat4 m = glm::mat4(1.0);
-	};
 #if 0
 	void GLTFCommon::TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes)
 	{
@@ -17948,6 +17942,12 @@ namespace vkr {
 		}
 	}
 #else
+	struct node_mat
+	{
+		uint32_t idx = 0;
+		uint32_t pidx = (uint32_t)-1;
+		glm::mat4 m = glm::mat4(1.0);
+	};
 	void GLTFCommon::TransformNodes(const glm::mat4& world, const std::vector<tfNodeIdx>* pNodes)
 	{
 		std::stack<node_mat> q;
@@ -21285,34 +21285,33 @@ namespace vkr {
 			}
 			if (!drawables.transmission.empty())
 			{
-				draw_pbr_opaque(cmdBuf1, pState, bWireframe);	// 渲染不透明物体、天空盒
-				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
-				draw_pbr_transparent(cmdBuf1, pState, bWireframe);							// 渲染透明物体
+				draw_pbr_opaque(cmdBuf1, pState, bWireframe);		// 渲染不透明物体
+				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);	// 渲染天空盒
+				draw_pbr_transparent(cmdBuf1, pState, bWireframe);	// 渲染透明物体
 				copy_transmission(cmdBuf1);
 				if (!drawables.transparent.empty())
 				{
-					draw_pbr_opaque(cmdBuf1, pState, bWireframe);	// 没有透明物体时，不需要渲染第二次
+					draw_pbr_opaque(cmdBuf1, pState, bWireframe);	// 有透明物体时，需要重新渲染
 					draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 				}
-				draw_pbr_transmission(cmdBuf1, pState, bWireframe);								// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
+				draw_pbr_transmission(cmdBuf1, pState, bWireframe);	// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
 				if (!drawables.transparent.empty())
 				{
 					draw_pbr_transparent(cmdBuf1, pState, bWireframe);
 				}
 			}
 			else {
-				draw_pbr_opaque(cmdBuf1, pState, bWireframe);
+				draw_pbr_opaque(cmdBuf1, pState, bWireframe);		// 无透射材质时的渲染
 				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
 				draw_pbr_transparent(cmdBuf1, pState, bWireframe);
 			}
-			// draw object's bounding boxes
-			draw_boxes(cmdBuf1, pfd, pState);
+			draw_boxes(cmdBuf1, pfd, pState);						// 渲染物体的包围框
 		}
 		else
 		{
 			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
 			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
-			draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
+			draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);		// 无物体时只渲染天空盒
 		}
 
 		VkImageMemoryBarrier barrier[1] = {};
