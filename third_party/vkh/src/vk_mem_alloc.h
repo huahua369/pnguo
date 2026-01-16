@@ -17486,7 +17486,7 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaCreateBuffer(
 		return VK_ERROR_VALIDATION_FAILED_EXT;
 	}
 	
-	VMA_DEBUG_LOG("vmaCreateBuffer");
+	//VMA_DEBUG_LOG("vmaCreateBuffer");
 	
 	VMA_DEBUG_GLOBAL_MUTEX_LOCK
 
@@ -17499,6 +17499,9 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaCreateBuffer(
 		pBufferCreateInfo,
 		allocator->GetAllocationCallbacks(),
 		pBuffer);
+
+	VMA_DEBUG_LOG("vmaCreateBuffer:%p", *pBuffer);
+
 	if(res >= 0)
 	{
 		// 2. vkGetBufferMemoryRequirements.
@@ -17596,7 +17599,7 @@ VMA_CALL_PRE void VMA_CALL_POST vmaDestroyBuffer(
 		return;
 	}
 
-	VMA_DEBUG_LOG("vmaDestroyBuffer");
+	VMA_DEBUG_LOG("vmaDestroyBuffer:%p", buffer);
 
 	VMA_DEBUG_GLOBAL_MUTEX_LOCK
 

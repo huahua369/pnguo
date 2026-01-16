@@ -100,6 +100,12 @@ if(KHR_materials_transmission透明介质透射材质){
 #ifndef NOT_VULKAN
 #include <vkh.h>
 #ifdef USE_VMA
+
+#define VMA_DEBUG_LOGa(format, ...) do { \
+	   printf(format, __VA_ARGS__); \
+	   printf("\n"); \
+   } while(false)
+
 //#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 #endif
@@ -7375,6 +7381,12 @@ namespace vkr
 			delete _pStaticBufferPool;
 			_pStaticBufferPool = 0;
 		}
+		if (_p_static_buffer)
+		{
+			_p_static_buffer->OnDestroy();
+			delete _p_static_buffer;
+			_p_static_buffer = 0;
+		}
 	}
 
 	VkImageView GLTFTexturesAndBuffers::GetTextureViewByID(int id)
@@ -11107,7 +11119,6 @@ namespace vkr
 		allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 		allocInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
 		allocInfo.pUserData = (void*)name;
-
 		res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_buffer, &m_bufferAlloc, nullptr);
 		assert(res == VK_SUCCESS);
 		SetResourceName(pDevice->m_device, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "StaticBufferPool (sys mem)");
