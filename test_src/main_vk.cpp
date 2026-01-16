@@ -938,7 +938,6 @@ int main() {
 	const char* ntp_servers[] = { "pool.ntp.org","ntp.ntsc.ac.cn","ntp.aliyun.com","time.tencentcloud.com","time.hicloud.com"};
 	auto pad = getip(ntp_servers[2]);
 	auto ntp_server = "121.199.69.55";  // 默认 NTP 服务器ntp1.nim.ac.cn 和 ntp2.nim.ac.cn
-	ntp_server = "111.203.6.13";
 	// 初始化 UDP 套接字
 	uv_udp_init(loop, &ctx.socket);
 	ntp_server = pad->v[0].addr0;
