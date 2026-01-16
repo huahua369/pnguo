@@ -765,7 +765,6 @@ int mainc() {
 // NTP 协议常量 
 #define NTP_PORT 123 
 #define NTP_PACKET_SIZE 48
-#define NTP_SERVER "121.199.69.55"   // 默认 NTP 服务器ntp1.nim.ac.cn 和 ntp2.nim.ac.cn
 #define NTP_TIMESTAMP_DELTA 2208988800ull  // 1900 到 1970 的秒数
 #define NTP_EPOCH_OFFSET 2208988800ull  // 1900 到 1970 的秒数
 
@@ -862,17 +861,89 @@ struct NtpPacket {
 	uint32_t trans_ts_sec;   // 传输时间戳（秒）   *
 	uint32_t trans_ts_frac;  // 传输时间戳（小数秒）
 };
+struct addr_tt
+{
+	char addr0[INET6_ADDRSTRLEN];
+	int ai_family;
+	union {
+		struct sockaddr_in ipv4;
+		struct sockaddr_in6 ipv6;
+	} addr;
+};
+struct res_addr
+{
+	std::vector<addr_tt> v;
+	bool st = false;
+};
+void on_resolved(uv_getaddrinfo_t* resolver, int status, struct addrinfo* res) {
+	if (status < 0) {
+		fprintf(stderr, "DNS error: %s\n", uv_strerror(status));
+		return;
+	}
+	auto v = (res_addr*)resolver->data;
+	char addr[INET6_ADDRSTRLEN] = { '\0' };
+	struct addrinfo* p = res;
+	while (p) {
+		void* addr_ptr = (p->ai_family == AF_INET)
+			? (void*)&((struct sockaddr_in*)p->ai_addr)->sin_addr
+			: (void*)&((struct sockaddr_in6*)p->ai_addr)->sin6_addr;
+		addr_tt a = {};
+		a.ai_family = p->ai_family;
+		memcpy(&a.addr, p->ai_addr, p->ai_addrlen);
+		uv_inet_ntop(p->ai_family, addr_ptr, a.addr0, sizeof(a.addr0));
+		if (v)
+		{
+			v->v.push_back(a);
+		}
+		else
+		{
+			uv_inet_ntop(p->ai_family, addr_ptr, addr, sizeof(addr));
+			printf("IP: %s\n", addr);
+		}
+		p = p->ai_next;
+	}
+	if (v)
+		v->st = true;
+	uv_freeaddrinfo(res);
+}
+
+res_addr* getip(const char* sn) {
+	if (!sn || !sn[0])return 0;
+	uv_loop_t* loop = uv_default_loop();
+	uv_getaddrinfo_t resolver;
+
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	auto p = new res_addr();
+	resolver.data = p;
+	int r = uv_getaddrinfo(loop, &resolver, on_resolved, sn, NULL, &hints);
+	if (r) {
+		fprintf(stderr, "Request error: %s\n", uv_strerror(r));
+		if (p)
+		{
+			delete p;
+		}
+		return 0;
+	}
+	uv_run(loop, UV_RUN_DEFAULT);
+	return p;
+}
 
 // 主函数
 int main() {
 	uv_loop_t* loop = uv_default_loop();
 	ntp_context ctx = {};
-
+	const char* ntp_servers[] = { "pool.ntp.org","ntp.ntsc.ac.cn","ntp.aliyun.com","time.tencentcloud.com","time.hicloud.com"};
+	auto pad = getip(ntp_servers[2]);
+	auto ntp_server = "121.199.69.55";  // 默认 NTP 服务器ntp1.nim.ac.cn 和 ntp2.nim.ac.cn
+	ntp_server = "111.203.6.13";
 	// 初始化 UDP 套接字
 	uv_udp_init(loop, &ctx.socket);
-
+	ntp_server = pad->v[0].addr0;
 	// 解析 NTP 服务器地址
-	uv_ip4_addr(NTP_SERVER, NTP_PORT, &ctx.server_addr);
+	uv_ip4_addr(ntp_server, NTP_PORT, &ctx.server_addr);
 
 	// 构建 NTP 请求包
 	build_ntp_request(&ctx.send_buf);
@@ -887,7 +958,7 @@ int main() {
 	// 开始接收响应
 	uv_udp_recv_start(&ctx.socket, alloc_buffer, on_ntp_response);
 
-	printf("Requesting time from %s...\n", NTP_SERVER);
+	printf("Requesting time from %s...\n", ntp_server);
 	uv_run(loop, UV_RUN_DEFAULT);  // 启动事件循环
 
 	return 0;
