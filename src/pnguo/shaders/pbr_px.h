@@ -179,7 +179,7 @@ struct gpuMaterial
 	vec3 clearcoatNormal;
 	float clearcoatRoughness;
 
-	float iridescence;
+	float iridescenceFactor;
 	float iridescenceIor;
 	float iridescenceThickness;
 
@@ -830,7 +830,7 @@ gpuMaterial defaultPbrMaterial()
 	mat.clearcoatRoughness = 0.0F;
 	mat.clearcoatNormal = vec3(0.0F, 0.0F, 1.0F);
 
-	mat.iridescence = 0.0F;
+	mat.iridescenceFactor = 0.0F;
 	mat.iridescenceIor = 1.5F;
 	mat.iridescenceThickness = 0.1F;
 
@@ -1110,7 +1110,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	const float t = texture(u_iridescenceThicknessTexture, getuv(Input, TEXCOORD(ID_iridescenceThicknessTexCoord), 0)).y;
 	iridescenceThickness = mix(material.iridescenceThicknessMinimum, material.iridescenceThicknessMaximum, t);
 #endif
-	m.iridescence = (iridescenceThickness > 0.0f) ? iridescence : 0.0f;  // No iridescence when the thickness is zero.
+	m.iridescenceFactor = (iridescenceThickness > 0.0f) ? iridescence : 0.0f;  // No iridescence when the thickness is zero.
 	m.iridescenceIor = material.iridescenceIor;
 	m.iridescenceThickness = iridescenceThickness;
 
@@ -1973,6 +1973,118 @@ vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWe
 	return vec3(0.0);
 #endif
 }
+#ifdef MATERIAL_IRIDESCENCE
+// XYZ to sRGB color space
+const mat3 XYZ_TO_REC709 = mat3(
+	3.2404542, -0.9692660, 0.0556434,
+	-1.5371385, 1.8760108, -0.2040259,
+	-0.4985314, 0.0415560, 1.0572252
+);
+
+// Assume air interface for top
+// Note: We don't handle the case fresnel0 == 1
+vec3 Fresnel0ToIor(vec3 fresnel0) {
+	vec3 sqrtF0 = sqrt(fresnel0);
+	return (vec3(1.0) + sqrtF0) / (vec3(1.0) - sqrtF0);
+}
+
+// Conversion FO/IOR
+vec3 IorToFresnel0(vec3 transmittedIor, float incidentIor) {
+	return sq((transmittedIor - vec3(incidentIor)) / (transmittedIor + vec3(incidentIor)));
+}
+
+// ior is a value between 1.0 and 3.0. 1.0 is air interface
+float IorToFresnel0(float transmittedIor, float incidentIor) {
+	return sq((transmittedIor - incidentIor) / (transmittedIor + incidentIor));
+}
+
+// Fresnel equations for dielectric/dielectric interfaces.
+// Ref: https://belcour.github.io/blog/research/2017/05/01/brdf-thin-film.html
+// Evaluation XYZ sensitivity curves in Fourier space
+vec3 evalSensitivity(float OPD, vec3 shift) {
+	float phase = 2.0 * M_PI * OPD * 1.0e-9;
+	vec3 val = vec3(5.4856e-13, 4.4201e-13, 5.2481e-13);
+	vec3 pos = vec3(1.6810e+06, 1.7953e+06, 2.2084e+06);
+	vec3 var = vec3(4.3278e+09, 9.3046e+09, 6.6121e+09);
+
+	vec3 xyz = val * sqrt(2.0 * M_PI * var) * cos(pos * phase + shift) * exp(-sq(phase) * var);
+	xyz.x += 9.7470e-14 * sqrt(2.0 * M_PI * 4.5282e+09) * cos(2.2399e+06 * phase + shift[0]) * exp(-4.5282e+09 * sq(phase));
+	xyz /= 1.0685e-7;
+
+	vec3 srgb = XYZ_TO_REC709 * xyz;
+	return srgb;
+}
+
+vec3 evalIridescence(float outsideIOR, float eta2, float cosTheta1, float thinFilmThickness, vec3 baseF0) {
+	vec3 I;
+
+	// Force iridescenceIor -> outsideIOR when thinFilmThickness -> 0.0
+	float iridescenceIor = mix(outsideIOR, eta2, smoothstep(0.0, 0.03, thinFilmThickness));
+	// Evaluate the cosTheta on the base layer (Snell law)
+	float sinTheta2Sq = sq(outsideIOR / iridescenceIor) * (1.0 - sq(cosTheta1));
+
+	// Handle TIR:
+	float cosTheta2Sq = 1.0 - sinTheta2Sq;
+	if (cosTheta2Sq < 0.0) {
+		return vec3(1.0);
+	}
+
+	float cosTheta2 = sqrt(cosTheta2Sq);
+
+	// First interface
+	float R0 = IorToFresnel0(iridescenceIor, outsideIOR);
+	float R12 = F_Schlick(R0, cosTheta1);
+	float R21 = R12;
+	float T121 = 1.0 - R12;
+	float phi12 = 0.0;
+	if (iridescenceIor < outsideIOR) phi12 = M_PI;
+	float phi21 = M_PI - phi12;
+
+	// Second interface
+	vec3 baseIOR = Fresnel0ToIor(clamp(baseF0, 0.0, 0.9999)); // guard against 1.0
+	vec3 R1 = IorToFresnel0(baseIOR, iridescenceIor);
+	vec3 R23 = F_Schlick(R1, cosTheta2);
+	vec3 phi23 = vec3(0.0);
+	if (baseIOR[0] < iridescenceIor) phi23[0] = M_PI;
+	if (baseIOR[1] < iridescenceIor) phi23[1] = M_PI;
+	if (baseIOR[2] < iridescenceIor) phi23[2] = M_PI;
+
+	// Phase shift
+	float OPD = 2.0 * iridescenceIor * thinFilmThickness * cosTheta2;
+	vec3 phi = vec3(phi21) + phi23;
+
+	// Compound terms
+	vec3 R123 = clamp(R12 * R23, 1e-5, 0.9999);
+	vec3 r123 = sqrt(R123);
+	vec3 Rs = sq(T121) * R23 / (vec3(1.0) - R123);
+
+	// Reflectance term for m = 0 (DC term amplitude)
+	vec3 C0 = R12 + Rs;
+	I = C0;
+
+	// Reflectance term for m > 0 (pairs of diracs)
+	vec3 Cm = Rs - T121;
+	for (int m = 1; m <= 2; ++m)
+	{
+		Cm *= r123;
+		vec3 Sm = 2.0 * evalSensitivity(float(m) * OPD, float(m) * phi);
+		I += Cm * Sm;
+	}
+
+	// Since out of gamut colors might be produced, negative color values are clamped to 0.
+	return max(I, vec3(0.0));
+}
+
+vec3 rgb_mix(vec3 base, vec3 layer, vec3 rgb_alpha)
+{
+	float rgb_alpha_max = max(rgb_alpha.r, max(rgb_alpha.g, rgb_alpha.b));
+	return (1.0 - rgb_alpha_max) * base + rgb_alpha * layer;
+}
+#endif // MATERIAL_IRIDESCENCE
+
+
+
+
 
 vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 {
@@ -2039,6 +2151,21 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	float clearcoatFactor = 0.0;
 	vec3 clearcoatFresnel = vec3(0);
 	vec3 cxf = vec3(0.0);
+	 
+	vec3 t = m.T;
+	vec3 b = m.B;
+
+	float NdotV = clampedDot(n, v);
+	float TdotV = clampedDot(t, v);
+	float BdotV = clampedDot(b, v);
+
+#ifdef MATERIAL_IRIDESCENCE
+	vec3 iridescenceFresnel_dielectric = evalIridescence(1.0, m.iridescenceIor, NdotV, m.iridescenceThickness, m.f0_dielectric);
+	vec3 iridescenceFresnel_metallic = evalIridescence(1.0, m.iridescenceIor, NdotV, m.iridescenceThickness, baseColor.rgb);
+	if (m.iridescenceThickness == 0.0) {
+		m.iridescenceFactor = 0.0;
+	}
+#endif
 
 #ifdef MATERIAL_CLEARCOAT
 	clearcoat_brdf = getIBLRadianceGGX(m.clearcoatNormal, view, m.clearcoatRoughness);
@@ -2160,13 +2287,11 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 #ifdef MATERIAL_DIFFUSE_TRANSMISSION
 		vec3 diffuse_btdf = lightIntensity * clampedDot(-n, l) * BRDF_lambertian(m.diffuseTransmissionColorFactor);
-
 #ifdef MATERIAL_VOLUME
 		diffuse_btdf = applyVolumeAttenuation(diffuse_btdf, diffuseTransmissionThickness, m.attenuationColor, m.attenuationDistance);
 #endif
 		l_diffuse = mix(l_diffuse, diffuse_btdf, m.diffuseTransmissionFactor);
-#endif // MATERIAL_DIFFUSE_TRANSMISSION
-
+#endif	// MATERIAL_DIFFUSE_TRANSMISSION
 		// BTDF (Bidirectional Transmittance Distribution Function)
 #ifdef MATERIAL_TRANSMISSION
 		// If the light ray travels through the geometry, use the point it exits the geometry again.
@@ -2174,19 +2299,15 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		vec3 transmissionRay = getVolumeTransmissionRay(n, v, m.thickness, m.ior, u_ModelMatrix);
 		pointToLight -= transmissionRay;
 		l = normalize(pointToLight);
-
 		vec3 transmittedLight = lightIntensity * getPunctualRadianceTransmission(n, v, l, m.alphaRoughness, m.f0_dielectric, m.f90, baseColor.rgb, m.ior);
-
 #ifdef MATERIAL_VOLUME
 		transmittedLight = applyVolumeAttenuation(transmittedLight, length(transmissionRay), m.attenuationColor, m.attenuationDistance);
 #endif
 		l_diffuse = mix(l_diffuse, transmittedLight, m.transmissionFactor);
 #endif
-
 		// Calculation of analytical light
 		// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
 		vec3 intensity = getLighIntensity(light, pointToLight, m, n, v, 1.0) * shadowFactor;
-
 #ifdef MATERIAL_ANISOTROPY
 		l_specular_metal = intensity * NdotL * BRDF_specularGGXAnisotropy(m.alphaRoughness, m.anisotropyStrength, n, v, l, h, m.anisotropicT, m.anisotropicB);
 		l_specular_dielectric = l_specular_metal;
@@ -2194,26 +2315,19 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		l_specular_metal = intensity * NdotL * BRDF_specularGGX(m.alphaRoughness, NdotL, NdotV, NdotH);
 		l_specular_dielectric = l_specular_metal;
 #endif
-
 		l_metal_brdf = metal_fresnel * l_specular_metal;
 		l_dielectric_brdf = mix(l_diffuse, l_specular_dielectric, dielectric_fresnel); // Do we need to handle vec3 fresnel here?
-
 #ifdef MATERIAL_IRIDESCENCE
 		l_metal_brdf = mix(l_metal_brdf, l_specular_metal * iridescenceFresnel_metallic, m.iridescenceFactor);
 		l_dielectric_brdf = mix(l_dielectric_brdf, rgb_mix(l_diffuse, l_specular_dielectric, iridescenceFresnel_dielectric), m.iridescenceFactor);
 #endif
-
 #ifdef MATERIAL_CLEARCOAT
-		l_clearcoat_brdf = intensity * getPunctualRadianceClearCoat(m.clearcoatNormal, v, l, h, VdotH,
-			m.clearcoatF0, m.clearcoatF90, m.clearcoatRoughness);
+		l_clearcoat_brdf = intensity * getPunctualRadianceClearCoat(m.clearcoatNormal, v, l, h, VdotH, m.clearcoatF0, m.clearcoatF90, m.clearcoatRoughness);
 #endif
-
 #ifdef MATERIAL_SHEEN
 		l_sheen = intensity * getPunctualRadianceSheen(m.sheenColorFactor, m.sheenRoughnessFactor, NdotL, NdotV, NdotH);
-		l_albedoSheenScaling = min(1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotV, m.sheenRoughnessFactor),
-			1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotL, m.sheenRoughnessFactor));
+		l_albedoSheenScaling = min(1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotV, m.sheenRoughnessFactor), 1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotL, m.sheenRoughnessFactor));
 #endif
-
 		vec3 l_color = mix(l_dielectric_brdf, l_metal_brdf, m.metallic);
 		l_color = l_sheen + l_color * l_albedoSheenScaling;
 		l_color = mix(l_color, l_clearcoat_brdf, cxf);
@@ -2281,6 +2395,9 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	return outColor;
 }
 
+
+#ifdef PLOLD
+
 #ifdef USE_IBL
 vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 v)
 {
@@ -2309,7 +2426,6 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 v)
 	return diffuse + specular;
 }
 #endif
-
 // Lambert lighting
 // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
 vec3 diffuse(MaterialInfo materialInfo)
@@ -2351,7 +2467,6 @@ float microfacetDistribution(MaterialInfo materialInfo, AngularInfo angularInfo)
 	float f = (angularInfo.NdotH * alphaRoughnessSq - angularInfo.NdotH) * angularInfo.NdotH + 1.0;
 	return alphaRoughnessSq / (M_PI * f * f + 0.000001f);
 }
-
 vec3 getPointShade(vec3 pointToLight, MaterialInfo materialInfo, vec3 normal, vec3 view)
 {
 	AngularInfo angularInfo = getAngularInfo(pointToLight, normal, view);
@@ -2403,7 +2518,6 @@ vec3 applySpotLight(Light light, MaterialInfo materialInfo, vec3 normal, vec3 wo
 	vec3 shade = getPointShade(pointToLight, materialInfo, normal, view);
 	return rangeAttenuation * spotAttenuation * light.intensity * light.color * shade;
 }
-#ifdef PLOLD
 vec3 doPbrLighting_old(VS2PS Input, PerFrame perFrame, vec2 uv, vec3 diffuseColor, vec3 specularColor, float perceptualRoughness, vec4 baseColor)
 {
 #ifdef __cplusplus

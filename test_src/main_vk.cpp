@@ -753,6 +753,13 @@ int mainc() {
 
 
 void test_vkvg(const char* fn, dev_info_c* dc);
+struct listm_t
+{
+	void* data = 0;
+	int cap_count = 0;	// 容量
+	int count = 0;		// 当前使用数量
+	listm_t* next = 0;	// 下一个节点
+};
 
 int main()
 {
