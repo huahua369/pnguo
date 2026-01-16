@@ -183,8 +183,8 @@ struct gpuMaterial
 	float iridescenceIor;
 	float iridescenceThickness;
 
-	vec3  sheenColor;
-	float sheenRoughness;
+	vec3  sheenColorFactor;
+	float sheenRoughnessFactor;
 	float ao;
 
 	float occlusionStrength;
@@ -312,14 +312,14 @@ layout(set = 1, binding = ID_specularCube) uniform samplerCube u_SpecularEnvSamp
 #define USE_TEX_LOD
 #endif
 
-#ifdef ID_brdfTexture
-layout(set = 1, binding = ID_brdfTexture) uniform sampler2D u_brdfLUT;//u_GGXLUT
+#ifdef ID_GGXLUT
+layout(set = 1, binding = ID_GGXLUT) uniform sampler2D u_GGXLUT;
 #endif
 #ifdef ID_CharlieTexture
 layout(set = 1, binding = ID_CharlieTexture) uniform sampler2D u_CharlieLUT;
 #endif
-#ifdef ID_CharlieTexture
-layout(set = 1, binding = ID_CharlieTexture) uniform sampler2D u_SheenELUT;
+#ifdef ID_SheenETexture
+layout(set = 1, binding = ID_SheenETexture) uniform sampler2D u_SheenELUT;
 #endif
 #ifdef ID_sheenColorTexture
 layout(set = 1, binding = ID_sheenColorTexture) uniform sampler2D u_sheenColorTexture;
@@ -834,8 +834,8 @@ gpuMaterial defaultPbrMaterial()
 	mat.iridescenceIor = 1.5F;
 	mat.iridescenceThickness = 0.1F;
 
-	mat.sheenColor = vec3(0.0F);
-	mat.sheenRoughness = 0.0F;
+	mat.sheenColorFactor = vec3(0.0F);
+	mat.sheenRoughnessFactor = 0.0F;
 	mat.ao = 0;
 	return mat;
 }
@@ -1150,14 +1150,14 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 #ifdef ID_sheenColorTexture 
 	sheenColor *= vec3(texture(u_sheenColorTexture, getuv(Input, TEXCOORD(ID_sheenColorTexCoord), 0)));  // sRGB
 #endif
-	m.sheenColor = sheenColor;  // No sheen if this is black.
+	m.sheenColorFactor = sheenColor;  // No sheen if this is black.
 
 	float sheenRoughness = material.sheenRoughnessFactor;
 #ifdef ID_sheenRoughnessTexture 
 	sheenRoughness *= texture(u_sheenRoughnessTexture, getuv(Input, TEXCOORD(ID_sheenRoughnessTexCoord), 0)).w;
 #endif
 	sheenRoughness = max(MICROFACET_MIN_ROUGHNESS, sheenRoughness);
-	m.sheenRoughness = sheenRoughness;
+	m.sheenRoughnessFactor = sheenRoughness;
 
 #ifdef ID_occlusionTexture
 	m.ao = texture(u_OcclusionSampler, getOcclusionUV(Input)).r;
@@ -1197,7 +1197,7 @@ vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
 	// retrieve a scale and bias to F0. See [1], Figure 3
-	vec2 brdf = texture(u_brdfLUT, brdfSamplePoint).rg;
+	vec2 brdf = texture(u_GGXLUT, brdfSamplePoint).rg;
 
 	vec3 diffuseLight = texture(u_DiffuseEnvSampler, n).rgb;
 
@@ -1823,7 +1823,7 @@ vec3 getIBLVolumeRefraction(vec3 n, vec3 v, float perceptualRoughness, vec3 base
 	// Sample GGX LUT to get the specular component.
 	float NdotV = clampedDot(n, v);
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	vec2 brdf = vec2(texture(u_brdfLUT, brdfSamplePoint));// .rg;
+	vec2 brdf = vec2(texture(u_GGXLUT, brdfSamplePoint));// .rg;
 	vec3 specularColor = f0 * brdf.x + f90 * brdf.y;
 
 	return (1.0f - specularColor) * attenuatedColor * baseColor;
@@ -1860,7 +1860,7 @@ vec3 getIBLRadianceAnisotropy(vec3 n, vec3 v, float roughness, float anisotropy,
 //ID_charlieLUT
 vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor)
 {
-	int   mipCount = textureQueryLevels(u_CharlieEnvSampler);
+	int   mipCount = u_pbrParams.mipCount;// textureQueryLevels(u_CharlieEnvSampler);
 	float NdotV = clampedDot(n, v);
 	float lod = sheenRoughness * float(mipCount - 1);
 	vec3 reflection = normalize(reflect(-v, n));
@@ -1953,12 +1953,12 @@ vec3 getPunctualRadianceSheen(vec3 sheenColor, float sheenRoughness, float NdotL
 
 vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWeight)
 {
-#ifdef  ID_brdfTexture
+#ifdef ID_GGXLUT
 	// see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
 	// Roughness dependent fresnel, from Fdez-Aguera
 	float NdotV = clampedDot(n, v);
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, roughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	vec2 f_ab = vec2(texture(u_brdfLUT, brdfSamplePoint));// .rg;
+	vec2 f_ab = vec2(texture(u_GGXLUT, brdfSamplePoint));// .rg;
 	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
 	vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
 	vec3 FssEss = specularWeight * (k_S * f_ab.x + f_ab.y);
@@ -2409,7 +2409,7 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 v)
 
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
 	// retrieve a scale and bias to F0. See [1], Figure 3
-	vec2 brdf = texture(u_brdfLUT, brdfSamplePoint).rg;
+	vec2 brdf = texture(u_GGXLUT, brdfSamplePoint).rg;
 
 	vec3 diffuseLight = texture(u_DiffuseEnvSampler, n).rgb;
 

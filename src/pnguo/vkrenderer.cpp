@@ -3373,6 +3373,7 @@ namespace vkr {
 		bool     m_doubleSided = false;
 		bool     m_blending = false;
 		bool     transmission = false;
+		bool     useSheen = false;
 
 		DefineList m_defines;
 
@@ -5057,6 +5058,20 @@ namespace vkr {
 		VkImageView v;
 		VkSampler s;
 	};
+	struct lut_tex_t
+	{
+		Texture texture = {};
+		VkImageView view = VK_NULL_HANDLE;
+		VkSampler sampler = VK_NULL_HANDLE;
+	};
+	struct env_res_t
+	{
+		SkyDome* pSkyDome;
+		std::vector<VkImageView>* ShadowMapViewPool;
+		VkSampler m_samplerShadow = VK_NULL_HANDLE;
+		lut_tex_t* lut = 0;// lut_ggx\lut_charlie\lut_sheen_E 
+		bool bUseSSAOMask;
+	};
 
 	// todo pbr
 	class GltfPbrPass
@@ -5079,15 +5094,18 @@ namespace vkr {
 		PBRMaterial m_defaultMaterial = {};
 		Device* m_pDevice = 0;
 		GBufferRenderPass* m_pRenderPass = 0;
-		VkSampler m_samplerPbr = VK_NULL_HANDLE, m_samplerShadow = VK_NULL_HANDLE;
+		VkSampler m_samplerPbr = VK_NULL_HANDLE;
 		// PBR Brdf
-		Texture m_brdfLutTexture = {};
-		VkImageView m_brdfLutView = VK_NULL_HANDLE;
-		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
+		//Texture m_brdfLutTexture = {};
+		//VkImageView m_brdfLutView = VK_NULL_HANDLE;
+		//VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
+		env_res_t* _envr = 0;
 	public:
 		GltfPbrPass();
 		~GltfPbrPass();
-		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask, std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL);
+		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers
+			, env_res_t* r//SkyDome* pSkyDome, bool bUseSSAOMask, std::vector<VkImageView>& ShadowMapViewPool,
+			, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL);
 		void OnDestroy();
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
@@ -5096,7 +5114,8 @@ namespace vkr {
 
 		PBRPipe_t* get_pipem(DefineList* defines);
 	private:
-		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
+		void CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, env_res_t* r);
+		//	, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask);
 		void CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* m, int muvt_size, bool bUseSSAOMask);
 		void CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines, PBRPrimitives* pPrimitive);
 	};
@@ -5527,6 +5546,8 @@ namespace vkr {
 		void AllocateShadowMaps();
 
 		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
+		void init_envres();
+		void un_envres();
 	private:
 		void draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj);
 
@@ -5577,6 +5598,10 @@ namespace vkr {
 		// 程序天空盒参数
 		SkyDomeProc::Constants			skyDomeConstants = {};
 
+		// pbr通用资源
+		// lut_ggx\lut_charlie\lut_sheen_E
+		lut_tex_t _lut[3] = {};
+		env_res_t _envr = {};
 		// widgets
 		Wireframe                       m_Wireframe = {};
 		WireframeBox                    m_WireframeBox = {};
@@ -7925,6 +7950,7 @@ namespace vkr
 				{
 					auto tt = get_ext(extensions, "KHR_materials_sheen");
 					if (tt) {
+						tfmat->useSheen = 1;
 						tfmat->m_defines["MATERIAL_SHEEN"] = "1";
 						tfmat->m_params.sheenColorFactor = get_v(tt, "sheenColorFactor", glm::vec3());
 						tfmat->m_params.sheenRoughnessFactor = get_v(tt, "sheenRoughnessFactor", 0.0);
@@ -8213,6 +8239,13 @@ namespace vkr
 				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
 			}
 
+			if (tfmat->m_pbrMaterialParameters.useSheen)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_CharlieTexture"] = std::to_string(cnt);
+				cnt++;
+				tfmat->m_pbrMaterialParameters.m_defines["ID_SheenETexture"] = std::to_string(cnt);
+				cnt++;
+			}
 			// 3) SSAO mask
 			//
 			if (bUseSSAOMask)
@@ -8336,8 +8369,11 @@ namespace vkr
 	// OnCreate
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, SkyDome* pSkyDome, bool bUseSSAOMask, std::vector<VkImageView>& ShadowMapViewPool, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool)
+	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing
+		, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, env_res_t* r
+		, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool)
 	{
+		_envr = r;
 		m_pDevice = pDevice;
 		m_pRenderPass = pRenderPass;
 		m_pResourceViewHeaps = pHeaps;
@@ -8345,11 +8381,13 @@ namespace vkr
 		m_pDynamicBufferRing = pDynamicBufferRing;
 		_ptb = pGLTFTexturesAndBuffers;
 
+		auto bUseSSAOMask = r->bUseSSAOMask;
+
 		//set bindings for the render targets
 		//
 		DefineList rtDefines;
 		m_pRenderPass->GetCompilerDefines(rtDefines);
-
+#if 0
 		// Load BRDF look up table for the PBR shader
 		if (1)
 		{
@@ -8382,7 +8420,7 @@ namespace vkr
 			m_brdfLutTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "brdf", false);
 		}
 		m_brdfLutTexture.CreateSRV(&m_brdfLutView);
-
+#endif
 		/////////////////////////////////////////////
 		// Create Samplers
 		tinygltf::Sampler dsa = {};
@@ -8436,41 +8474,6 @@ namespace vkr
 			assert(m_samplerPbr);
 		}
 
-		// specular BRDF lut sampler
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.minLod = -1000;
-			info.maxLod = 1000;
-			info.maxAnisotropy = 1.0f;
-			m_brdfLutSampler = pDevice->newSampler(&info);
-			assert(m_brdfLutSampler);
-		}
-
-		// shadowmap sampler
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.compareEnable = VK_TRUE;
-			info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-			info.minLod = -1000;
-			info.maxLod = 1000;
-			info.maxAnisotropy = 1.0f;
-			m_samplerShadow = pDevice->newSampler(&info);
-			assert(m_samplerShadow);
-		}
 
 		// Create default material, this material will be used if none is assigned
 		//
@@ -8478,7 +8481,7 @@ namespace vkr
 			SetDefaultMaterialParamters(&m_defaultMaterial.m_pbrMaterialParameters);
 
 			std::map<std::string, ts_t> texturesBase;
-			CreateDescriptorTableForMaterialTextures(&m_defaultMaterial, texturesBase, pSkyDome, ShadowMapViewPool, bUseSSAOMask);
+			CreateDescriptorTableForMaterialTextures(&m_defaultMaterial, texturesBase, r);
 		}
 
 		// Load PBR 2.0 Materials
@@ -8506,7 +8509,7 @@ namespace vkr
 					texturesBase[value.first].s = _samplers[tinfo.sampler];
 				}
 				//tfmat->m_pbrMaterialParameters.m_defines["MAX_LIGHT_INSTANCES"] = "1";
-				CreateDescriptorTableForMaterialTextures(tfmat, texturesBase, pSkyDome, ShadowMapViewPool, bUseSSAOMask);
+				CreateDescriptorTableForMaterialTextures(tfmat, texturesBase, r);
 			}
 
 			// Load Meshes
@@ -8627,13 +8630,12 @@ namespace vkr
 			}
 		}
 	}
-
 	//--------------------------------------------------------------------------------------
 	//
 	// CreateDescriptorTableForMaterialTextures
 	//
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, SkyDome* pSkyDome, std::vector<VkImageView>& ShadowMapViewPool, bool bUseSSAOMask)
+	void GltfPbrPass::CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, env_res_t* r)
 	{
 		std::vector<uint32_t> descriptorCounts;
 		// count the number of textures to init bindings and descriptor
@@ -8643,14 +8645,18 @@ namespace vkr
 			{
 				descriptorCounts.push_back(1);
 			}
-			if (pSkyDome)
+			if (r->pSkyDome)
 			{
 				tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
 				descriptorCounts.push_back(1);
 				descriptorCounts.push_back(1);
 				descriptorCounts.push_back(1);
 			}
-			if (bUseSSAOMask)
+			if (tfmat->m_pbrMaterialParameters.useSheen) {
+				descriptorCounts.push_back(1);
+				descriptorCounts.push_back(1);
+			}
+			if (r->bUseSSAOMask)
 			{
 				tfmat->m_textureCount += 1;
 				descriptorCounts.push_back(1);
@@ -8660,10 +8666,10 @@ namespace vkr
 				tfmat->m_textureCount += 1;
 				descriptorCounts.push_back(1);
 			}
-			if (!ShadowMapViewPool.empty())
+			if (!r->ShadowMapViewPool->empty())
 			{
-				assert(ShadowMapViewPool.size() <= MaxShadowInstances);
-				tfmat->m_textureCount += (int)ShadowMapViewPool.size();//1;
+				assert(r->ShadowMapViewPool->size() <= MaxShadowInstances);
+				tfmat->m_textureCount += (int)r->ShadowMapViewPool->size();//1;
 				// this is an array of samplers/textures
 				// We should set the exact number of descriptors to avoid validation errors
 				descriptorCounts.push_back(MaxShadowInstances);
@@ -8690,22 +8696,31 @@ namespace vkr
 				cnt++;
 			}
 			// 2) 3 SRVs for the IBL probe
-			if (pSkyDome)
+			if (r->pSkyDome)
 			{
-				tfmat->m_pbrMaterialParameters.m_defines["ID_brdfTexture"] = std::to_string(cnt);
-				//tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
-				m_pDevice->SetDescriptorSet(cnt, m_brdfLutView, m_brdfLutSampler, tfmat->m_texturesDescriptorSet);
+				//lut_ggx\lut_charlie\lut_sheen_E
+				tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
+				m_pDevice->SetDescriptorSet(cnt, r->lut[0].view, r->lut[0].sampler, tfmat->m_texturesDescriptorSet);
 				cnt++;
 				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
-				pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
+				r->pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
 				cnt++;
 				tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
-				pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
+				r->pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
 				cnt++;
 				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
 			}
+			if (tfmat->m_pbrMaterialParameters.useSheen)
+			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_CharlieTexture"] = std::to_string(cnt);
+				m_pDevice->SetDescriptorSet(cnt, r->lut[1].view, r->lut[1].sampler, tfmat->m_texturesDescriptorSet);
+				cnt++;
+				tfmat->m_pbrMaterialParameters.m_defines["ID_SheenETexture"] = std::to_string(cnt);
+				m_pDevice->SetDescriptorSet(cnt, r->lut[2].view, r->lut[2].sampler, tfmat->m_texturesDescriptorSet);
+				cnt++;
+			}
 			// 3) SSAO mask
-			if (bUseSSAOMask)
+			if (r->bUseSSAOMask)
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_SSAO"] = std::to_string(cnt);
 				cnt++;
@@ -8716,11 +8731,11 @@ namespace vkr
 				cnt++;
 			}
 			// 4) Up to MaxShadowInstances SRVs for the shadowmaps
-			if (!ShadowMapViewPool.empty())
+			if (!r->ShadowMapViewPool->empty())
 			{
 				tfmat->m_pbrMaterialParameters.m_defines["ID_shadowMap"] = std::to_string(cnt);
 				VkImageLayout ShadowMapViewLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				m_pDevice->SetDescriptorSet(cnt, descriptorCounts[cnt], ShadowMapViewPool, ShadowMapViewLayout, m_samplerShadow, tfmat->m_texturesDescriptorSet);
+				m_pDevice->SetDescriptorSet(cnt, descriptorCounts[cnt], *r->ShadowMapViewPool, ShadowMapViewLayout, r->m_samplerShadow, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
 		}
@@ -8807,8 +8822,8 @@ namespace vkr
 			vkDestroyDescriptorSetLayout(m_pDevice->m_device, s, NULL);
 		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
 		_samplers.clear();
-		vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
-		m_brdfLutTexture.OnDestroy();
+		//vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
+		//m_brdfLutTexture.OnDestroy();
 
 	}
 	PBRPipe_t* GltfPbrPass::get_pipem(DefineList* defines)
@@ -18092,10 +18107,12 @@ namespace vkr {
 		{
 			auto& mesh = meshes[mt.y];
 			auto& weights = mesh.weights;
-			if (weights.size()) {
+			auto a = mesh.primitives[0].targets.size();
+			a = std::max(a, weights.size());
+			if (a > 0) {
 				auto& mw = m_animated_morphWeights[mt.z];
-				dysize += weights.size() * sizeof(float);
-				mw.resize(weights.size());
+				dysize += a * sizeof(float);
+				mw.resize(a);
 			}
 		}
 		if (m_skins.size())
@@ -20371,10 +20388,13 @@ namespace vkr {
 		// Initialize UI rendering resources
 		//m_ImGUI.OnCreate(m_pDevice, pSwapChain->GetRenderPass(), &m_UploadHeap, &m_ConstantBufferRing, FontSize);
 
+		init_envres();
+
 		// Make sure upload heap has finished uploading before continuing
 		m_SysMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 		m_UploadHeap.FlushAndFinish();
 		m_SysMemBufferPool.FreeUploadHeap();
+
 
 	}
 
@@ -20386,7 +20406,7 @@ namespace vkr {
 	void Renderer_cx::OnDestroy()
 	{
 		m_AsyncPool->Flush();
-
+		un_envres();
 		//m_ImGUI.OnDestroy();
 		m_ColorConversionPS.OnDestroy();
 		m_ToneMappingPS.OnDestroy();
@@ -20565,7 +20585,7 @@ namespace vkr {
 			// same thing as above but for the PBR pass
 			currobj->m_GLTFPBR = new GltfPbrPass();
 			currobj->m_GLTFPBR->OnCreate(m_pDevice, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing
-				, currobj->_ptb, &m_SkyDome, false, m_ShadowSRVPool, &m_RenderPassFullGBufferWithClear, pAsyncPool);
+				, currobj->_ptb, &_envr, &m_RenderPassFullGBufferWithClear, pAsyncPool);
 
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
@@ -20709,6 +20729,67 @@ namespace vkr {
 			VkImageView ShadowSRV;
 			CurrentShadow->ShadowMap.CreateSRV(&CurrentShadow->ShadowSRV);
 		}
+	}
+	void Renderer_cx::un_envres() {
+		for (size_t i = 0; i < 3; i++)
+		{
+			auto& it = _lut[i];
+			vkDestroyImageView(m_pDevice->m_device, it.view, NULL);
+			it.texture.OnDestroy();
+		}
+	}
+	void Renderer_cx::init_envres()
+	{
+		// lut_ggx\lut_charlie\lut_sheen_E
+		const char* lut_files[3] = { "images/lut_ggx.png", "images/lut_charlie.png","images/lut_sheen_E.png" };
+		{
+			print_time Pt("load LUT", 1);
+			// specular BRDF lut sampler 
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			auto luts = m_pDevice->newSampler(&info);
+			assert(luts);
+			for (size_t i = 0; i < 3; i++)
+			{
+				auto& it = _lut[i];
+				it.texture.InitFromFile(m_pDevice, &m_UploadHeap, lut_files[i], false);
+				it.texture.CreateSRV(&it.view);
+				it.sampler = luts;
+			}
+		}
+
+		// shadowmap sampler
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.compareEnable = VK_TRUE;
+			info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			_envr.m_samplerShadow = m_pDevice->newSampler(&info);
+			assert(_envr.m_samplerShadow);
+		}
+
+		_envr.pSkyDome = &m_SkyDome; _envr.bUseSSAOMask = false;
+		_envr.ShadowMapViewPool = &m_ShadowSRVPool;
+		_envr.lut = _lut;
+
 	}
 #if 1
 	void Renderer_cx::AllocateShadowMaps()
