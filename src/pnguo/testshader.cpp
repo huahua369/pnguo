@@ -180,6 +180,7 @@ VS2PS Output;
 #if 1
 #define USE_dIBL
 #define S_VERT
+#define USE_PUNCTUAL
 #include "shaders/pbr_px.h"
 #include "shaders/GLTFVertexFactory.h"
 
@@ -245,3 +246,113 @@ void amain()
 #endif
 
 
+void testp(){
+
+	glm::vec3 worldPos = {};
+	glm::vec3 n = {};
+	glm::vec3 v = {};
+	glm::vec3 baseColor = {};
+	vec3 cxf = {};	// clearcoatFactor * clearcoatFresnel
+
+	gpuMaterial m = defaultPbrMaterial();
+
+	// out
+	vec3 color;
+
+#ifdef USE_PUNCTUAL
+	vec3 c = vec3(0.0, 0.0, 0.0);
+	for (int i = 0; i < myPerFrame.u_lightCount; ++i)
+	{
+		Light light = myPerFrame.u_lights[i];
+
+		float shadowFactor = DoSpotShadow(worldPos, light);
+		vec3 pointToLight;
+		if (light.type != LightType_Directional)
+		{
+			pointToLight = light.position - worldPos;
+		}
+		else
+		{
+			pointToLight = light.direction;
+		}
+
+		// BSTF
+		vec3 l = normalize(pointToLight);   // Direction from surface point to light
+		vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
+		float NdotL = clampedDot(n, l);
+		float NdotV = clampedDot(n, v);
+		float NdotH = clampedDot(n, h);
+		float LdotH = clampedDot(l, h);
+		float VdotH = clampedDot(v, h);
+
+		vec3 dielectric_fresnel = F_Schlick(m.f0_dielectric * m.specularWeight, m.f90_dielectric, abs(VdotH));
+		vec3 metal_fresnel = F_Schlick(baseColor, vec3(1.0), abs(VdotH));
+
+		vec3 lightIntensity = getLighIntensity(light, pointToLight, m, n, v, 1.0) * shadowFactor;
+
+		vec3 l_diffuse = lightIntensity * NdotL * BRDF_lambertian(baseColor);
+		vec3 l_specular_dielectric = vec3(0.0);
+		vec3 l_specular_metal = vec3(0.0);
+		vec3 l_dielectric_brdf = vec3(0.0);
+		vec3 l_metal_brdf = vec3(0.0);
+		vec3 l_clearcoat_brdf = vec3(0.0);
+		vec3 l_sheen = vec3(0.0);
+		float l_albedoSheenScaling = 1.0;
+
+#ifdef MATERIAL_DIFFUSE_TRANSMISSION
+		vec3 diffuse_btdf = lightIntensity * clampedDot(-n, l) * BRDF_lambertian(m.diffuseTransmissionColorFactor);
+#ifdef MATERIAL_VOLUME
+		diffuse_btdf = applyVolumeAttenuation(diffuse_btdf, diffuseTransmissionThickness, m.attenuationColor, m.attenuationDistance);
+#endif
+		l_diffuse = mix(l_diffuse, diffuse_btdf, m.diffuseTransmissionFactor);
+#endif	// MATERIAL_DIFFUSE_TRANSMISSION
+		// BTDF (Bidirectional Transmittance Distribution Function)
+#ifdef MATERIAL_TRANSMISSION
+		// If the light ray travels through the geometry, use the point it exits the geometry again.
+		// That will change the angle to the light source, if the material refracts the light ray.
+		vec3 transmissionRay = getVolumeTransmissionRay(n, v, m.thickness, m.ior, u_ModelMatrix);
+		pointToLight -= transmissionRay;
+		l = normalize(pointToLight);
+		vec3 transmittedLight = lightIntensity * getPunctualRadianceTransmission(n, v, l, m.alphaRoughness, m.f0_dielectric, m.f90, baseColor.rgb, m.ior);
+#ifdef MATERIAL_VOLUME
+		transmittedLight = applyVolumeAttenuation(transmittedLight, length(transmissionRay), m.attenuationColor, m.attenuationDistance);
+#endif
+		l_diffuse = mix(l_diffuse, transmittedLight, m.transmissionFactor);
+#endif
+		// Calculation of analytical light
+		// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+		vec3 intensity = getLighIntensity(light, pointToLight, m, n, v, 1.0) * shadowFactor;
+#ifdef MATERIAL_ANISOTROPY
+		l_specular_metal = intensity * NdotL * BRDF_specularGGXAnisotropy(m.alphaRoughness, m.anisotropyStrength, n, v, l, h, m.anisotropicT, m.anisotropicB);
+		l_specular_dielectric = l_specular_metal;
+#else
+		l_specular_metal = intensity * NdotL * BRDF_specularGGX(m.alphaRoughness, NdotL, NdotV, NdotH);
+		l_specular_dielectric = l_specular_metal;
+#endif
+		l_metal_brdf = metal_fresnel * l_specular_metal;
+		l_dielectric_brdf = mix(l_diffuse, l_specular_dielectric, dielectric_fresnel); // Do we need to handle vec3 fresnel here?
+#ifdef MATERIAL_IRIDESCENCE
+		l_metal_brdf = mix(l_metal_brdf, l_specular_metal * iridescenceFresnel_metallic, m.iridescenceFactor);
+		l_dielectric_brdf = mix(l_dielectric_brdf, rgb_mix(l_diffuse, l_specular_dielectric, iridescenceFresnel_dielectric), m.iridescenceFactor);
+#endif
+#ifdef MATERIAL_CLEARCOAT
+		l_clearcoat_brdf = intensity * getPunctualRadianceClearCoat(m.clearcoatNormal, v, l, h, VdotH, m.clearcoatF0, m.clearcoatF90, m.clearcoatRoughness);
+#endif
+#ifdef MATERIAL_SHEEN
+		l_sheen = intensity * getPunctualRadianceSheen(m.sheenColorFactor, m.sheenRoughnessFactor, NdotL, NdotV, NdotH);
+		l_albedoSheenScaling = min(1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotV, m.sheenRoughnessFactor), 1.0 - max3(m.sheenColorFactor) * albedoSheenScalingLUT(NdotL, m.sheenRoughnessFactor));
+#endif
+		vec3 l_color = mix(l_dielectric_brdf, l_metal_brdf, m.metallic);
+		l_color = l_sheen + l_color * l_albedoSheenScaling;
+		l_color = mix(l_color, l_clearcoat_brdf, cxf);
+		l_color = max(l_color, vec3(0.0));
+		color += l_color + intensity;
+
+	}
+#endif
+
+	color += m.emissive * (vec3(1.0) - cxf);
+	color = max(color, vec3(0.0));
+
+
+}

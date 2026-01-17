@@ -1164,7 +1164,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.occlusionStrength = material.occlusionStrength;
 #else
 	m.ao = 1.0;
-	m.occlusionStrength = 1.0;
+	m.occlusionStrength = 0.0;
 #endif
 #endif 
 
@@ -2200,7 +2200,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	f_specular_transmission = getIBLVolumeRefraction(
 		n, v,
 		m.perceptualRoughness,
-		baseColor.rgb, m.f0_dielectric, m.f90,
+		baseColor, m.f0_dielectric, m.f90,
 		worldPos, u_ModelMatrix, u_ViewMatrix,// u_ProjectionMatrix,
 		m.ior, m.thickness, m.attenuationColor, m.attenuationDistance, m.dispersion);
 	f_diffuse = mix(f_diffuse, f_specular_transmission, m.transmissionFactor);
@@ -2241,6 +2241,10 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 #endif //end USE_IBL 
 
+#ifdef ID_occlusionTexture
+	color = mix(color, color * m.ao, m.occlusionStrength);
+#endif
+
 	f_diffuse = vec3(0.0);
 	f_specular_dielectric = vec3(0.0);
 	f_specular_metal = vec3(0.0);
@@ -2272,11 +2276,11 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		float VdotH = clampedDot(v, h);
 
 		vec3 dielectric_fresnel = F_Schlick(m.f0_dielectric * m.specularWeight, m.f90_dielectric, abs(VdotH));
-		vec3 metal_fresnel = F_Schlick(baseColor.rgb, vec3(1.0), abs(VdotH));
+		vec3 metal_fresnel = F_Schlick(baseColor, vec3(1.0), abs(VdotH));
 
 		vec3 lightIntensity = getLighIntensity(light, pointToLight, m, n, v, 1.0) * shadowFactor;
 
-		vec3 l_diffuse = lightIntensity * NdotL * BRDF_lambertian(baseColor.rgb);
+		vec3 l_diffuse = lightIntensity * NdotL * BRDF_lambertian(baseColor);
 		vec3 l_specular_dielectric = vec3(0.0);
 		vec3 l_specular_metal = vec3(0.0);
 		vec3 l_dielectric_brdf = vec3(0.0);
@@ -2299,7 +2303,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 		vec3 transmissionRay = getVolumeTransmissionRay(n, v, m.thickness, m.ior, u_ModelMatrix);
 		pointToLight -= transmissionRay;
 		l = normalize(pointToLight);
-		vec3 transmittedLight = lightIntensity * getPunctualRadianceTransmission(n, v, l, m.alphaRoughness, m.f0_dielectric, m.f90, baseColor.rgb, m.ior);
+		vec3 transmittedLight = lightIntensity * getPunctualRadianceTransmission(n, v, l, m.alphaRoughness, m.f0_dielectric, m.f90, baseColor, m.ior);
 #ifdef MATERIAL_VOLUME
 		transmittedLight = applyVolumeAttenuation(transmittedLight, length(transmissionRay), m.attenuationColor, m.attenuationDistance);
 #endif
@@ -2337,18 +2341,9 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 	}
 #endif
 	//!USE_PUNCTUAL
-	//! 
-	// Calculate lighting contribution from image based lighting source (IBL)
-
-	// Apply optional PBR terms for additional (optional) shading 
-#ifdef ID_occlusionTexture
-	color = mix(color, color * m.ao, m.occlusionStrength);
-#endif
 
 	color += m.emissive * (vec3(1.0) - cxf);
-
 	color = max(color, vec3(0.0));
-
 
 #ifndef DEBUG_OUTPUT // no debug 
 	// regular shading
@@ -2372,7 +2367,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #endif
 
 #ifdef DEBUG_BASECOLOR
-	outColor.rgb = (baseColor.rgb);
+	outColor.rgb = baseColor;
 #endif
 
 #ifdef DEBUG_OCCLUSION
@@ -2380,7 +2375,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #endif
 
 #ifdef DEBUG_EMISSIVE
-	outColor.rgb = (emissive);
+	outColor.rgb = vec3(emissive);
 #endif
 
 #ifdef DEBUG_F0
@@ -2388,7 +2383,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #endif
 
 #ifdef DEBUG_ALPHA
-	outColor.rgb = vec3(baseColor.a);
+	outColor.rgb = vec3(m.baseColor.a);
 #endif
 
 #endif // !DEBUG_OUTPUT 
