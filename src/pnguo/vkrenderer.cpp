@@ -4246,7 +4246,9 @@ namespace vkr {
 		auto keyDelta = input[nextKey] - input[prevKey];
 
 		// Normalize t: [t0, t1] -> [0, 1]
-		auto tn = (t - input[prevKey]) / keyDelta;
+		float tn = 0.0;
+		if (keyDelta > 0)
+			tn = (t - input[prevKey]) / keyDelta;
 		// 0"translation",1"rotation",2"scale",3"weights";
 		if (sampler->path == 1)
 		{
