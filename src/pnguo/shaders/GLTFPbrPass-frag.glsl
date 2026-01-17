@@ -41,7 +41,6 @@
 
 precision highp float;
 
-#define USE_PUNCTUAL
 
 //--------------------------------------------------------------------------------------
 //  PS Inputs
@@ -99,17 +98,9 @@ void main()
 	vec2 uv = vec2(0.0, 0.0);
 #endif
 	m.uv = uv;
-#if 1
 	getPBRParams(Input, u_pbrParams, m);
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
-	vec4 color = vec4(c3, m.baseColor.a);  
-#else
-	float perceptualRoughness;
-	vec3 diffuseColor;
-	vec3 specularColor;
-	vec4 baseColor = get_roughness(Input, u_pbrParams, uv, diffuseColor, specularColor, perceptualRoughness); 
-	vec4 color = vec4(doPbrLighting_old(Input, myPerFrame, uv, diffuseColor, specularColor, perceptualRoughness ,baseColor) , baseColor.a);
-#endif
+	vec4 color = vec4(c3, m.baseColor.a);   
 #ifdef HAS_MOTION_VECTORS_RT
 	Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w - Input.PrevPosition.xy / Input.PrevPosition.w;
 #endif

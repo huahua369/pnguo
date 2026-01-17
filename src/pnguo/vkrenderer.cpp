@@ -5078,7 +5078,8 @@ namespace vkr {
 		std::vector<VkImageView>* ShadowMapViewPool;
 		VkSampler m_samplerShadow = VK_NULL_HANDLE;
 		lut_tex_t* lut = 0;// lut_ggx\lut_charlie\lut_sheen_E 
-		bool bUseSSAOMask;
+		bool bUseSSAOMask = false;
+		bool use_punctual = true;
 	};
 
 	// todo pbr
@@ -7761,7 +7762,7 @@ namespace vkr
 		}
 		return tt;
 	}
-	void ProcessMaterials(tinygltf::Material* pm, PBRMaterialParameters* tfmat, std::map<std::string, int>& textureIds)
+	void ProcessMaterials(tinygltf::Material* pm, PBRMaterialParameters* tfmat, std::map<std::string, int>& textureIds, bool use_punctual)
 	{
 		//njson material;
 		// Load material constants
@@ -7772,6 +7773,8 @@ namespace vkr
 		tfmat->m_blending = material.alphaMode == "BLEND";
 		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes);
 		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
+		if (use_punctual)
+			tfmat->m_defines["USE_PUNCTUAL"] = 1;
 		//tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
 		//tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
 		// ALPHA_OPAQUE 0
@@ -8282,7 +8285,7 @@ namespace vkr
 			}
 		}
 	}
-	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& mdv, std::vector<PBRMesh>& _meshes)
+	void get_model_data(tinygltf::Model* pm, std::vector<PBRMaterial>& mdv, std::vector<PBRMesh>& _meshes, bool use_punctual)
 	{
 		// Load PBR 2.0 Materials 
 		if (pm)
@@ -8296,7 +8299,7 @@ namespace vkr
 				// Get PBR material parameters and texture IDs
 				//
 				std::map<std::string, int> textureIds;
-				ProcessMaterials(&pm->materials[i], &tfmat->m_pbrMaterialParameters, textureIds);
+				ProcessMaterials(&pm->materials[i], &tfmat->m_pbrMaterialParameters, textureIds, use_punctual);
 				tfmat->m_pbrMaterialParameters.mid = i;
 				// translate texture IDs into textureViews
 
@@ -8511,7 +8514,7 @@ namespace vkr
 				// Get PBR material parameters and texture IDs
 				//
 				std::map<std::string, int> textureIds;
-				ProcessMaterials(&pm->materials[i], &tfmat->m_pbrMaterialParameters, textureIds);
+				ProcessMaterials(&pm->materials[i], &tfmat->m_pbrMaterialParameters, textureIds, r->use_punctual);
 				tfmat->m_pbrMaterialParameters.mid = i;
 				// translate texture IDs into textureViews
 				//
@@ -18085,7 +18088,7 @@ namespace vkr {
 		// initializes matrix buffers to have the same dimension as the nodes
 		m_worldSpaceMats.resize(m_nodes.size());
 		load_materials_variant(pm->extensions, variants);
-		get_model_data(pm, _materialsData, _meshes);
+		get_model_data(pm, _materialsData, _meshes, false);
 
 		size_t dysize = sizeof(PerFrame_t) * 2;
 		for (auto& it : _materialsData)
@@ -20798,7 +20801,7 @@ namespace vkr {
 			_envr.m_samplerShadow = m_pDevice->newSampler(&info);
 			assert(_envr.m_samplerShadow);
 		}
-
+		_envr.use_punctual = true;
 		_envr.pSkyDome = &m_SkyDome; _envr.bUseSSAOMask = false;
 		_envr.ShadowMapViewPool = &m_ShadowSRVPool;
 		_envr.lut = _lut;
