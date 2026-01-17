@@ -5800,8 +5800,8 @@ namespace vkr {
 
 		SystemInfo systemi = {};
 		int	m_activeCamera = 0;
-		std::function<void(int count, int idx, const char* str)> cb_showtxt;
-		std::vector<std::string>    _tlabs;
+		std::vector<std::string> _tlabs;
+		std::string _labelstr, _cts;
 		int loadingStage = 0;
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
@@ -22032,14 +22032,9 @@ namespace vkr {
 					std::string txt = format("%-18s: %7.2f %s", timeStamps[i].m_label.c_str(), value, pStrUnit);
 					_tlabs.push_back(txt);
 				}
-				if (cb_showtxt) {
-					cb_showtxt(_tlabs.size(), -1, 0);
-					for (size_t i = 0; i < _tlabs.size(); i++)
-					{
-						auto& it = _tlabs[i];
-						cb_showtxt(_tlabs.size(), i, it.c_str());
-					}
-				}
+				_cts.clear();
+				for (auto& it : _tlabs) { _cts += it + "\n"; }
+				_labelstr.swap(_cts);
 			}
 		}
 		if (io.WantCaptureMouse)
@@ -22241,7 +22236,6 @@ namespace vkr {
 				_tmpgc = 0;
 			}
 		}
-		OnUpdate();
 		// Do Render frame using AFR
 		m_pRenderer->OnRender(&m_UIState, m_camera);
 		if (setidx != curridx) {
@@ -22547,14 +22541,8 @@ vkdg_cx::~vkdg_cx()
 	ctx = 0;
 	DeviceShutdown((vkr::Device*)dev);
 }
-void vkdg_cx::set_label_cb(std::function<void(int count, int idx, const char* str)> cb)
-{
-	if (ctx)
-	{
-		auto tx = (vkr::draw3d_ctx*)ctx;
-		tx->cb_showtxt = cb;
-	}
-}
+
+
 void vkdg_cx::update(mouse_state_t* io)
 {
 	if (ctx) {
@@ -22593,8 +22581,17 @@ void vkdg_cx::update(mouse_state_t* io)
 			//}
 			//DisableUIStateEnd(_state.bUseMagnifier);
 		}
+
+
 		tx->m_UIState = _state;
+		tx->OnUpdate();
 	}
+}
+
+const char* vkdg_cx::get_label()
+{
+	auto tx = (vkr::draw3d_ctx*)ctx;
+	return tx ? tx->_labelstr.c_str() : "";
 }
 
 void vkdg_cx::on_render()

@@ -635,15 +635,19 @@ struct text_render_o
 	std::vector<strfont_t> _block;
 	std::vector<bidi_item> bv;
 	std::u16string str;
+	bool update = true;
 };
 struct flex_data;
+struct text_t1 {
+	text_style ts = {};
+	text_block tb = {};
+};
 
 void text_render_set(text_render_o* p, text_box_t* b);
 void text_render_clear(text_render_o* p);
 void build_text_render(text_block* tb, text_render_o* trt);
 void text_render_layout1(text_render_o* p, flex_data* boxflex);
 void c_render_data(text_render_o* p, image_ptr_t* dst);
-
 struct image_block
 {
 	image_ptr_t* img = 0;

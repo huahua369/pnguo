@@ -88,17 +88,6 @@ void new_ui(form_x* form0, vkdg_cx* vkd) {
 			kcb->_disabled_events = true;
 			lbs.push_back(kcb);
 		}
-		vkd->set_label_cb([=](int count, int idx, const char* str)
-			{
-				if (idx < 0) {
-					for (size_t i = 0; i < 18; i++)
-						lbs[i]->str.clear();
-				}
-				else
-				{
-					lbs[idx]->str = str;
-				}
-			});
 	}
 
 
@@ -822,23 +811,23 @@ int main()
 		std::string k80 = (char*)u8"👨‍👨‍👧q";
 		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
 		std::string k821 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ\t我\n的大刀";
-		auto family = new_font_family(fctx, (char*)u8"微软雅黑,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
+		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
 
-		text_style ts = {};
-		ts.family = family;
-		ts.fontsize = 16;
-		ts.color = 0xfffF5000;
-		// 文本块
-		text_block tb = {};
-		tb.style = &ts;
-		tb.str = k8.c_str();
-		tb.first = 0;
-		tb.size = k8.size();
-		text_render_o trt = {};
-		trt.box.rc = { 0,0,300,500 };
-		trt.box.auto_break = 1;
-		trt.box.word_wrap = 0;
-		build_text_render(&tb, &trt);
+		//text_style ts = {};
+		//ts.family = family;
+		//ts.fontsize = 16;
+		//ts.color = 0xfffF5000;
+		//// 文本块
+		//text_block tb = {};
+		//tb.style = &ts;
+		//tb.str = k8.c_str();
+		//tb.first = 0;
+		//tb.size = k8.size();
+		//text_render_o trt = {};
+		//trt.box.rc = { 0,0,300,500 };
+		//trt.box.auto_break = 1;
+		//trt.box.word_wrap = 0;
+		//build_text_render(&tb, &trt);
 		std::vector<uint32_t> vd;
 		image_ptr_t dst = {};
 		glm::ivec2 imgsize = { 500,100 };
@@ -986,7 +975,6 @@ int main()
 			auto pcb = new texture_cb();
 			assert(pcb);
 			get_sdl_texture_cb(pcb);
-			auto ptrt = &trt;
 			void* vg2dtex = nullptr;
 			const char* filename = "temp/vkvg_gb.png";
 			bspline_ct* bs = new bspline_ct();
@@ -1037,12 +1025,14 @@ int main()
 			tb.str = str.c_str();
 			tb.first = 0;
 			tb.size = str.size();
-			//text_render_o trt = {};
+			text_render_o trt = {};
+			auto ptrt = &trt;
 			trt.box.text_align = { };
 			trt.box.rc = { 0,0,500,500 };
 			trt.box.auto_break = 1;
 			trt.box.word_wrap = 1;
 			build_text_render(&tb, &trt);
+			auto ptb = new text_t1();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1057,12 +1047,11 @@ int main()
 						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
-					//r_render_data_text(ptrt, { 200,100 }, td3);
+					r_render_data_text(ptrt, { 20,10 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
 					int d = delta * 1000;
-					r_update_data_text(ptrt, td3, 0);
 #if 1
 					if (1) {
 						vkvg_clear(ctx);
@@ -1118,6 +1107,21 @@ int main()
 					static int ity = 10.5;
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
+					{
+						std::string str = vkd->get_label();
+						text_style& ts = ptb->ts;
+						ts.family = family;
+						ts.fontsize = 16;
+						ts.color = 0xff222222;
+						// 文本块
+						text_block& tb = ptb->tb;
+						tb.style = &ts;
+						tb.str = str.c_str();
+						tb.first = 0;
+						tb.size = str.size();
+						build_text_render(&tb, ptrt);
+						r_update_data_text(ptrt, td3, 0);
+					}
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					static bool sa = false;
 					if (sa)
@@ -1136,7 +1140,7 @@ int main()
 
 			// 运行消息循环
 			run_app(app, 0);
-
+			delete ptb;
 			// 销毁对象
 			sp_atlas_dispose(a1);
 			sp_drawable_dispose(dd1);

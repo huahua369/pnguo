@@ -283,8 +283,8 @@ public:
 public:
 	vkdg_cx();
 	~vkdg_cx();
-	void set_label_cb(std::function<void(int count, int idx, const char* str)> cb); // 设置标签回调
 	void update(mouse_state_t* io); // 更新事件
+	const char* get_label();		// 获取标签信息，执行update后有效
 	void on_render();				// 执行渲染
 	// 获取framebuffer image
 	image_vkr get_vkimage(int idx);

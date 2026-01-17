@@ -9781,6 +9781,7 @@ void build_text_render(text_block* tb, text_render_o* trt)
 	if (!tb || !trt)return;
 	update_text(trt, tb);
 	text_render_layout1(trt, 0);
+	trt->update = true;
 }
 void get_lineheight(std::vector<lay_value>& v, int w, const glm::vec2& ps)
 {

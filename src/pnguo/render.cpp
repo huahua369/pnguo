@@ -1453,9 +1453,11 @@ void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
 	{
 		if (it._image) {
 			auto& tp = pt->vt[it._image];
-			if (!tp)
+			if (it._image->valid || !tp)
 			{
-				tp = pt->rcb->make_tex(pt->rptr, it._image);
+				auto t = pt->rcb->make_tex(pt->rptr, it._image);
+				if (t && t != tp)
+					tp = t;
 			}
 		}
 	}
@@ -1465,10 +1467,11 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 	void* renderer = pt->rptr;
 	std::vector<font_item_t>& tm = p->_vstr;
 	uint32_t color = p->tb->style->color;
-	if (color != pt->color) {
+	if (color != pt->color || p->update) {
 		pt->color = color;
 		pt->opt.clear();
 		pt->idx.clear();
+		p->update = false;
 	}
 	void* tex = 0;
 	const int vsize = sizeof(text_vx);
