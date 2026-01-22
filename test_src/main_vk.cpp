@@ -954,7 +954,7 @@ int main()
 				if (hz::access_2(path.c_str()))
 				{
 					auto pos = hz::toVec3(it["pos"]);
-					vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toBool(it["shadowMap"]));
+					vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toUInt(it["instanceCount"], 1.0), hz::toBool(it["shadowMap"]));
 				}
 			}
 			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小

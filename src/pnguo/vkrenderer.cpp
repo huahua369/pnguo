@@ -4400,6 +4400,7 @@ namespace vkr {
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
 		glm::vec3 _pos = {};
 		float _scale = 1.0;
+		uint32_t instanceCount = 1;
 		uint32_t _animationIndex = 0;
 		size_t mat_count = 0;	// 矩阵数量
 		size_t ubo_size = 0;
@@ -4479,7 +4480,7 @@ namespace vkr {
 		std::map<glm::ivec2, VkDescriptorBufferInfo> m_skeletonMatricesBuffer;
 
 		ResourceViewHeaps* _pResourceViewHeaps = 0;		// 管理set分配
-		DynamicBufferRing* _pDynamicBufferRing = 0;	// 动态常量缓冲区ubo
+		//DynamicBufferRing* _pDynamicBufferRing = 0;	// 动态常量缓冲区ubo
 		DynamicBufferRing* _p_static_buffer = 0;	// 静态缓冲区ubo
 		StaticBufferPool* _pStaticBufferPool = 0;		// 静态顶点/索引缓冲区
 	public:
@@ -4490,6 +4491,7 @@ namespace vkr {
 		std::map<int, VkDescriptorBufferInfo> _morphWeights;	// 节点 mesh id访问
 		std::map<int, VkDescriptorBufferInfo> m_uvmMap;
 		int _indextype = 0;
+		uint32_t instanceCount = 1;
 	public:
 		GLTFCommon* m_pGLTFCommon;
 
@@ -4497,7 +4499,7 @@ namespace vkr {
 		VkDescriptorBufferInfo m_perFrameConstants_w = {}; // 线框
 
 		~GLTFTexturesAndBuffers();
-		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, DynamicBufferRing* pd);
+		bool OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap);
 		void LoadTextures(bool async_de);
 		void LoadGeometry();
 		void OnDestroy();
@@ -4512,8 +4514,8 @@ namespace vkr {
 		//morph_t* get_mb(int idx);
 		VkDescriptorBufferInfo* get_mb(int idx);
 		VkDescriptorBufferInfo* get_uvm(int idx);
-		void SetSkinningMatricesForSkeletons();
-		void SetPerFrameConstants(bool bWireframe);
+		void SetSkinningMatricesForSkeletons(DynamicBufferRing* ubo);
+		void SetPerFrameConstants(DynamicBufferRing* ubo, bool bWireframe);
 	};
 	// todo post
 
@@ -5771,7 +5773,7 @@ namespace vkr {
 		void OnResize(bool resizeRender);
 		void OnUpdateDisplay();
 
-		void add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap);
+		void add_model(const char* fn, const glm::vec3& pos, float scale, uint32_t instanceCount, bool has_shadowMap);
 
 		void OnUpdate();
 
@@ -6966,12 +6968,15 @@ namespace vkr
 	}
 
 	// todo t2b
-	bool GLTFTexturesAndBuffers::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap, DynamicBufferRing* pd)
+	bool GLTFTexturesAndBuffers::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap)
 	{
+		if (!pDevice || !pGLTFCommon || !pUploadHeap)
+			return false;
+		// 实例数量
+		instanceCount = pGLTFCommon->instanceCount;
 		m_pDevice = pDevice;
 		m_pGLTFCommon = pGLTFCommon;
 		m_pUploadHeap = pUploadHeap;
-		_pDynamicBufferRing = pd;
 		if (!_pStaticBufferPool)
 			_pStaticBufferPool = new StaticBufferPool();
 		//ResourceViewHeaps* pResourceViewHeaps,		// 管理set分配  
@@ -7553,30 +7558,32 @@ namespace vkr
 			cnt++;
 		}
 	}
-	void GLTFTexturesAndBuffers::SetPerFrameConstants(bool bWireframe)
+	void GLTFTexturesAndBuffers::SetPerFrameConstants(DynamicBufferRing* ubo, bool bWireframe)
 	{
+		if (!ubo)return;
 		{
 			PerFrame_t* cbPerFrame;
-			_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
+			ubo->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants);
 			*cbPerFrame = *(m_pGLTFCommon->_perFrameData);
 		}
 		if (bWireframe)
 		{
 			PerFrame_t* cbPerFrame;
-			_pDynamicBufferRing->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
+			ubo->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
 			*cbPerFrame = *(m_pGLTFCommon->_perFrameData_w);
 		}
 	}
 
-	void GLTFTexturesAndBuffers::SetSkinningMatricesForSkeletons()
+	void GLTFTexturesAndBuffers::SetSkinningMatricesForSkeletons(DynamicBufferRing* ubo)
 	{
+		if (!ubo)return;
 		for (auto& t : m_pGLTFCommon->m_worldSpaceSkeletonMats)
 		{
 			auto matrices = &t.second;
 			VkDescriptorBufferInfo perSkeleton = {};
 			glm::mat4* cbPerSkeleton = 0;
 			uint32_t size = (uint32_t)(matrices->count * sizeof(glm::mat4));
-			_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbPerSkeleton, &perSkeleton);
+			ubo->AllocConstantBuffer(size, (void**)&cbPerSkeleton, &perSkeleton);
 			memcpy(cbPerSkeleton, matrices->m, size);
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
 		}
@@ -7587,7 +7594,7 @@ namespace vkr
 			VkDescriptorBufferInfo per = {};
 			float* cbd = 0;
 			uint32_t size = (uint32_t)(d->size() * sizeof(float));
-			_pDynamicBufferRing->AllocConstantBuffer(size, (void**)&cbd, &per);
+			ubo->AllocConstantBuffer(size, (void**)&cbd, &per);
 			memcpy(cbd, d->data(), size);
 			//auto& node = m_pGLTFCommon->m_nodes[t.first];
 			//auto& mesh = m_pGLTFCommon->pm->meshes[node.meshIndex];
@@ -7598,7 +7605,7 @@ namespace vkr
 			VkDescriptorBufferInfo db = {};
 			float* cbd = 0;
 			uint32_t size = (uint32_t)(v.size() * sizeof(glm::mat3x4));
-			_pDynamicBufferRing->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
+			ubo->AllocConstantBuffer1(size, (void**)&cbd, &db, 64);
 			memcpy(cbd, v.data(), size);
 			m_uvmMap[k] = db;
 		}
@@ -20577,7 +20584,7 @@ namespace vkr {
 			Profile p("m_pGltfLoader->Load");
 
 			currobj->_ptb = new GLTFTexturesAndBuffers();
-			currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap, &m_ConstantBufferRing);
+			currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap);
 			//currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &, &m_VidMemBufferPool, );
 		}
 		else if (Stage == 6)
@@ -21266,6 +21273,7 @@ namespace vkr {
 		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
 		const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
 		Light* lights = pfd->lights;
+		auto ubo = &m_ConstantBufferRing;
 		int lightCount = pfd->lightCount;
 		{
 			PerFrame_t* pPerFrame = NULL;
@@ -21315,9 +21323,9 @@ namespace vkr {
 						pPerFrame->wireframeOptions.w = (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
 						pPerFrame->lodBias = 0.0f;
 					}
-					it->_ptb->SetPerFrameConstants(bWireframe);
+					it->_ptb->SetPerFrameConstants(ubo, bWireframe);
 					// 更新骨骼矩阵到ubo
-					it->_ptb->SetSkinningMatricesForSkeletons();
+					it->_ptb->SetSkinningMatricesForSkeletons(ubo);
 				}
 			}
 		}
@@ -21940,7 +21948,7 @@ namespace vkr {
 	// add_model
 	// TODO 加载模型文件
 	//--------------------------------------------------------------------------------------
-	void draw3d_ctx::add_model(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
+	void draw3d_ctx::add_model(const char* fn, const glm::vec3& pos, float scale, uint32_t instanceCount, bool has_shadowMap)
 	{
 		//print_time Pt("push gltf", 1);
 		std::string fn1 = fn && *fn ? fn : "";
@@ -21953,6 +21961,7 @@ namespace vkr {
 					pgc->has_shadowMap = has_shadowMap;
 					pgc->_pos = pos;
 					pgc->_scale = scale;
+					pgc->instanceCount = instanceCount;
 					if (pgc->Load(fn1.c_str(), "") == false)
 					{
 						printf("The selected model couldn't be found, please check the documentation!\n");
@@ -22757,11 +22766,11 @@ void vkdg_cx::copy2(int idx, void* vkptr)
 //	}
 //	return p;
 //}
-void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale, bool has_shadowMap)
+void vkdg_cx::add_gltf(const char* fn, const glm::vec3& pos, float scale, uint32_t instanceCount, bool has_shadowMap)
 {
 	if (!ctx || !fn)return;
 	auto tx = (vkr::draw3d_ctx*)ctx;
-	tx->add_model(fn, pos, scale, has_shadowMap);
+	tx->add_model(fn, pos, scale, instanceCount, has_shadowMap);
 }
 
 vkr::light_t* vkdg_cx::get_light(size_t idx)
@@ -22882,15 +22891,15 @@ void free_vkdg(vkdg_cx* p)
 		delete p;
 	}
 }
-
-void add_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
-{
-	if (!p || !fn)return;
-	glm::vec3 ps = {};
-	if (pos)
-		ps = { pos[0],pos[1],pos[2] };
-	p->add_gltf(fn, ps, scale);
-}
+//
+//void add_gltf(vkdg_cx* p, const char* fn, const float* pos, float scale)
+//{
+//	if (!p || !fn)return;
+//	glm::vec3 ps = {};
+//	if (pos)
+//		ps = { pos[0],pos[1],pos[2] };
+//	p->add_gltf(fn, ps, scale);
+//}
 
 #endif 
 namespace vkr {
