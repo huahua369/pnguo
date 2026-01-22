@@ -49,13 +49,15 @@ layout(location = ID_TARGETS) in  vec4 a_Targets;
 #endif
 
 // Instanced attributes
-#ifdef ID_INSTANCE_MAT
-layout(location = ID_INSTANCE_MAT) in mat4 instance_mat;
+#ifdef USE_INSTANCING
+layout(location = ID_INSTANCING) in mat4 a_instance_model_matrix;
 #endif
 //--------------------------------------------------------------------------------------
 #ifdef ID_POSITION
 layout(location = 0) out VS2PS Output;
 #endif
+ 
+
 void gltfVertexFactory()
 {
 #ifdef ID_WEIGHTS_0
@@ -79,10 +81,10 @@ void gltfVertexFactory()
 #ifdef ID_MORPHING_DATA
 	pos += getTargetPosition(gl_VertexIndex);
 #endif
-#ifdef ID_INSTANCE_MAT
-	pos *= instance_mat;
-#endif
 	pos = transMatrix * pos;
+#ifdef USE_INSTANCING
+	pos = a_instance_model_matrix * pos;
+#endif
 #ifndef __cplusplus
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
 #endif
@@ -92,7 +94,6 @@ void gltfVertexFactory()
 	Output.depth = npos.z;
 #ifdef HAS_MOTION_VECTORS
 	Output.CurrPosition = gl_Position; // current's frame vertex position 
-
 	mat4 prevTransMatrix = GetPrevWorldMatrix() * skinningMatrix;
 	vec3 worldPrevPos = (prevTransMatrix * vec4(a_Position, 1)).xyz;
 	Output.PrevPosition = GetPrevCameraViewProj() * vec4(worldPrevPos, 1);

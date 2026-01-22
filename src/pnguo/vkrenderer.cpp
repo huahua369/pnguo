@@ -3166,9 +3166,10 @@ namespace vkr {
 namespace vkr {
 	struct Geometry
 	{
-		VkIndexType m_indexType;
-		uint32_t m_NumIndices;
-		VkDescriptorBufferInfo m_IBV;
+		VkIndexType m_indexType = {};
+		uint32_t m_NumIndices = 0;
+		uint32_t instanceCount = 1;
+		VkDescriptorBufferInfo m_IBV = {};
 		std::vector<VkDescriptorBufferInfo> m_VBV;
 	};
 	using glm::vec2;
@@ -6837,9 +6838,9 @@ namespace vkr
 
 				// Draw
 				if (pGeometry->m_IBV.buffer)
-					vkCmdDrawIndexed(cmd_buf, pGeometry->m_NumIndices, 1, 0, 0, 0);
+					vkCmdDrawIndexed(cmd_buf, pGeometry->m_NumIndices, pGeometry->instanceCount, 0, 0, 0);
 				else
-					vkCmdDraw(cmd_buf, pGeometry->m_NumIndices, 1, 0, 0);
+					vkCmdDraw(cmd_buf, pGeometry->m_NumIndices, pGeometry->instanceCount, 0, 0);
 			}
 		}
 
@@ -9478,9 +9479,9 @@ namespace vkr
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? _pipe->m_pipelineWireframe : _pipe->m_pipeline);
 		if (m_geometry.m_IBV.buffer)
-			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0, 0);
+			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0, 0);
 		else
-			vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, 1, 0, 0);
+			vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0);
 	}
 
 	// todo pbr_pass
