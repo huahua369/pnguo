@@ -4490,6 +4490,7 @@ namespace vkr {
 		std::map<int, morph_t> m_BufferMap;	// 材质id
 		std::map<int, VkDescriptorBufferInfo> _morphWeights;	// 节点 mesh id访问
 		std::map<int, VkDescriptorBufferInfo> m_uvmMap;
+		VkDescriptorBufferInfo instance_info = {};		// 实例矩阵
 		int _indextype = 0;
 		uint32_t instanceCount = 1;
 	public:
@@ -8400,6 +8401,7 @@ namespace vkr
 		, GLTFTexturesAndBuffers* pGLTFTexturesAndBuffers, env_res_t* r
 		, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool)
 	{
+		print_time Pt("init pbr", 1);
 		_envr = r;
 		m_pDevice = pDevice;
 		m_pRenderPass = pRenderPass;
