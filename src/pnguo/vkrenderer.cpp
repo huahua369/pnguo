@@ -4118,7 +4118,7 @@ namespace vkr {
 			{
 				r[i] = v[i];
 			}
-			memcpy(&result, rb.data(), std::min(4, stride) * sizeof(float));
+			memcpy(&result, rb.data(), std::max(4, stride) * sizeof(float));
 			return result;
 		}
 
@@ -4218,7 +4218,7 @@ namespace vkr {
 		if (!rb)rb = &rb1;
 		rb->resize(stride);
 
-		if (vlength == stride) // no interpolation for single keyFrame animations
+		if (vlength == 1) // no interpolation for single keyFrame animations
 		{
 			return get_v4(output, 0, stride, *rb);
 		}
@@ -4247,8 +4247,10 @@ namespace vkr {
 
 		// Normalize t: [t0, t1] -> [0, 1]
 		float tn = 0.0;
-		if (keyDelta > 0)
+		if (nextKey != prevKey)
 			tn = (t - input[prevKey]) / keyDelta;
+		else
+			tn = tn;
 		// 0"translation",1"rotation",2"scale",3"weights";
 		if (sampler->path == 1)
 		{
