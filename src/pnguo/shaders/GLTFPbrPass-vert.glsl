@@ -43,11 +43,22 @@ layout (std140, binding = ID_PER_OBJECT) uniform perObject
     mat4 u_mPrevWorld;
 } myPerObject;
 
+
+#ifdef ID_INSTANCING
+layout (std140, set = 0, binding = ID_INSTANCING) buffer readonly insObject
+{
+    mat4 instance_model_matrix[]; 
+};
+mat4 GetWorldMatrix()
+{
+	return instance_model_matrix[gl_InstanceIndex] * myPerObject.u_mCurrWorld;
+}
+#else
 mat4 GetWorldMatrix()
 {
     return myPerObject.u_mCurrWorld;
 }
-
+#endif
 mat4 GetCameraViewProj()
 {
     return myPerFrame.u_mCameraCurrViewProj;

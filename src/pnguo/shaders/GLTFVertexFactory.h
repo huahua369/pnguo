@@ -48,10 +48,6 @@ layout(location = ID_JOINTS_1) in  uvec4 a_Joints1;
 layout(location = ID_TARGETS) in  vec4 a_Targets;
 #endif
 
-// Instanced attributes
-#ifdef USE_INSTANCING
-layout(location = ID_INSTANCING) in mat4 a_instance_model_matrix;
-#endif
 //--------------------------------------------------------------------------------------
 #ifdef ID_POSITION
 layout(location = 0) out VS2PS Output;
@@ -82,9 +78,6 @@ void gltfVertexFactory()
 	pos += getTargetPosition(gl_VertexIndex);
 #endif
 	pos = transMatrix * pos;
-#ifdef USE_INSTANCING
-	pos = a_instance_model_matrix * pos;
-#endif
 #ifndef __cplusplus
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
 #endif

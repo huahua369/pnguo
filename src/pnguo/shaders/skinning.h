@@ -31,13 +31,6 @@ layout(set = 0, binding = ID_TARGET_DATA) buffer per_morphing
 #endif
 
 #ifdef ID_SKINNING_MATRICES
-
-struct Matrix2
-{
-	mat4 m_current;
-	mat4 m_previous;
-};
-
 layout(set = 0, binding = ID_SKINNING_MATRICES) buffer perSkeleton
 {
 	mat4 u_ModelMatrix[];
