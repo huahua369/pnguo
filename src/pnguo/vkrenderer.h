@@ -314,8 +314,12 @@ void free_instance(void* inst);
 
 // todo 创建渲染器，shader目录默认"ShaderLibVK", "cache/shadervk"
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0, const char* devname = 0);
-// 删除vk资源
+// 删除渲染器
 void free_vkdg(vkdg_cx* p);
+
+void* new_vkobj(void* dev, int type);
+void free_vkobj(void* dev, void* obj);
+void set_vkobj_param(void* obj, const char* key, int dataType, void* val);
 
 struct device_info_t
 {
