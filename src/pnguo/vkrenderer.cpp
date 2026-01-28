@@ -5659,7 +5659,7 @@ namespace vkr {
 		// 不启用oit
 		bool has_oit = false;
 		// 是否启用模板测试
-		bool _stencil_test = false;
+		bool _stencil_test = true;
 
 	};
 
@@ -9305,7 +9305,7 @@ namespace vkr
 		std::vector<VkDynamicState> dynamicStateEnables = {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
-			VK_DYNAMIC_STATE_LINE_WIDTH,
+			//VK_DYNAMIC_STATE_LINE_WIDTH,
 			//VK_DYNAMIC_STATE_CULL_MODE,
 			//VK_DYNAMIC_STATE_FRONT_FACE
 		};
@@ -9346,7 +9346,7 @@ namespace vkr
 		ds.depthBoundsTestEnable = VK_FALSE;
 		ds.minDepthBounds = 0;
 		ds.maxDepthBounds = 0;
-		ds.stencilTestEnable = VK_FALSE;
+		ds.stencilTestEnable = VK_TRUE;
 		ds.front = ds.back;
 
 		// multi sample state
@@ -15521,6 +15521,43 @@ namespace vkr {
 		vkCmdSetScissor(cmd_buf, 0, 1, &scissor);
 	}
 
+
+	std::vector<VkDynamicState> GetDynamicStatesForPipeline()
+	{
+		std::vector<VkDynamicState> dynamicStates =
+		{
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR,
+			VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE,
+			VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+			VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+			VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+			VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
+			VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+		};
+		return dynamicStates;
+	}
+
+	//VK_STENCIL_FACE_FRONT_BIT = 0x00000001,
+	//VK_STENCIL_FACE_BACK_BIT = 0x00000002,
+	//VK_STENCIL_FACE_FRONT_AND_BACK = 0x00000003,
+	struct ds_t
+	{
+		VkStencilFaceFlags faceMask;
+		uint32_t compareMask, writeMask, reference;
+		VkBool32 depthTestEnable;
+		VkBool32 depthWriteEnable;
+		VkBool32 stencilTestEnable;
+	};
+	void set_ds(VkCommandBuffer c, ds_t* t)
+	{
+		vkCmdSetDepthTestEnable(c, t->depthTestEnable);
+		vkCmdSetDepthWriteEnable(c, t->depthWriteEnable);
+		vkCmdSetStencilTestEnable(c, t->stencilTestEnable);
+		vkCmdSetStencilCompareMask(c, t->faceMask, t->compareMask);
+		vkCmdSetStencilWriteMask(c, t->faceMask, t->writeMask);
+		vkCmdSetStencilReference(c, t->faceMask, t->reference);
+	}
 
 	void BeginRenderPass(VkCommandBuffer commandList, VkRenderPass renderPass, VkFramebuffer frameBuffer, const std::vector<VkClearValue>* pClearValues, uint32_t Width, uint32_t Height)
 	{
