@@ -4600,6 +4600,7 @@ namespace vkr {
 		PostProcPS  m_skydome;
 
 		DynamicBufferRing* m_pDynamicBufferRing = NULL;
+		glm::vec4 default_specular = glm::vec4(0.5);	// 默认环境高光值
 	};
 
 #define BLURPS_MAX_MIP_LEVELS 12
@@ -12892,8 +12893,8 @@ namespace vkr {
 		{
 			int cs = 16;
 			IMG_INFO header = {};
-			std::vector<float> px;
-			px.resize(cs * cs * 6 * 4);
+			std::vector<glm::vec4> px;
+			px.resize(cs * cs * 6);
 			unsigned char* buffer = (unsigned char*)px.data();
 			VkDeviceSize   bufferSize = px.size() * sizeof(px[0]);
 			header.width = cs;
@@ -12904,7 +12905,7 @@ namespace vkr {
 			header.vkformat = VK_FORMAT_R32G32B32A32_SFLOAT;
 			header.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 			header.bitCount = 32 * 4;
-			for (auto& c : px) { c = 0.28; }
+			for (auto& c : px) { c = default_specular; }
 			m_CubeSpecularTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "cubeSpecular", false);
 		}
 		pUploadHeap->FlushAndFinish();
