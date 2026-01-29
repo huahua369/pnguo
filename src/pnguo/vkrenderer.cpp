@@ -723,10 +723,10 @@ namespace vkr
 
 	struct robj_info {
 		//gltf passes
-		GltfPbrPass* m_GLTFPBR;
-		GltfBBoxPass* m_GLTFBBox;
-		GltfDepthPass* m_GLTFDepth;
-		gltf_gpu_res_cx* _ptb;
+		GltfPbrPass* m_GLTFPBR = nullptr;
+		GltfBBoxPass* m_GLTFBBox = nullptr;
+		GltfDepthPass* m_GLTFDepth = nullptr;
+		gltf_gpu_res_cx* _ptb = nullptr;
 		bool shadowMap = true;		// 是否有阴影
 	};
 	// todo cmdlr
@@ -16597,14 +16597,11 @@ namespace vkr {
 
 	void Trace(const std::string& str)
 	{
-
 #ifdef _WIN32
 		static std::mutex mutex;
 		std::unique_lock<std::mutex> lock(mutex);
-
 		// Output to attached debugger
 		OutputDebugStringA(str.c_str());
-
 		// Also log to file
 		Log::Trace(str.c_str());
 #endif
@@ -16621,7 +16618,7 @@ namespace vkr {
 		const size_t bufLen = (size_t)_vscprintf(pFormat, args) + 2;
 		std::string buf; buf.resize(bufLen);
 		vsnprintf_s(buf.data(), bufLen, bufLen, pFormat, args);
-		va_end(args); 
+		va_end(args);
 		buf.push_back('\n');
 		// Output to attached debugger
 		OutputDebugStringA(buf.data());
@@ -16630,28 +16627,22 @@ namespace vkr {
 #endif
 	}
 
-	//
 	//  Reads a file into a buffer
-	//
 	bool readfile(const char* name, char** data, size_t* size, bool isbinary)
 	{
 		FILE* file;
-
 		//Open file
 		if (fopen_s(&file, name, isbinary ? "rb" : "r") != 0)
 		{
 			return false;
 		}
-
 		//Get file length
 		fseek(file, 0, SEEK_END);
 		size_t fileLen = ftell(file);
 		fseek(file, 0, SEEK_SET);
-
 		// if ascii add one more char to accomodate for the \0
 		if (!isbinary)
 			fileLen++;
-
 		//Allocate memory
 		char* buffer = (char*)malloc(std::max<size_t>(fileLen, 1));
 		if (!buffer)
@@ -16659,7 +16650,6 @@ namespace vkr {
 			fclose(file);
 			return false;
 		}
-
 		//Read file contents into buffer
 		size_t bytesRead = 0;
 		if (fileLen > 0)
@@ -16667,38 +16657,31 @@ namespace vkr {
 			bytesRead = fread(buffer, 1, fileLen, file);
 		}
 		fclose(file);
-
 		if (!isbinary)
 		{
 			buffer[bytesRead] = 0;
 			fileLen = bytesRead;
 		}
-
 		*data = buffer;
 		if (size != NULL)
 			*size = fileLen;
-
 		return true;
 	}
 	bool readfile(const char* name, std::vector<char>& data, bool isbinary)
 	{
 		FILE* file;
-
 		//Open file
 		if (fopen_s(&file, name, isbinary ? "rb" : "r") != 0)
 		{
 			return false;
 		}
-
 		//Get file length
 		fseek(file, 0, SEEK_END);
 		size_t fileLen = ftell(file);
 		fseek(file, 0, SEEK_SET);
-
 		// if ascii add one more char to accomodate for the \0
 		if (!isbinary)
 			fileLen++;
-
 		//Allocate memory
 		data.resize(std::max<size_t>(fileLen, 1));
 		char* buffer = data.data();// (char*)malloc(std::max<size_t>(fileLen, 1));
@@ -16707,7 +16690,6 @@ namespace vkr {
 			fclose(file);
 			return false;
 		}
-
 		//Read file contents into buffer
 		size_t bytesRead = 0;
 		if (fileLen > 0)
@@ -16715,7 +16697,6 @@ namespace vkr {
 			bytesRead = fread(buffer, 1, fileLen, file);
 		}
 		fclose(file);
-
 		if (!isbinary)
 		{
 			buffer[bytesRead] = 0;
@@ -16734,33 +16715,25 @@ namespace vkr {
 			fclose(file);
 			return true;
 		}
-
 		return false;
 	}
 
-	//
 	// Launch a process, captures stderr into a file
-	//
 	bool LaunchProcess(const char* commandLine, const char* filenameErr)
 	{
 #ifdef _WIN32
 		char cmdLine[1024];
 		strcpy_s<1024>(cmdLine, commandLine);
-
 		// create a pipe to get possible errors from the process
-		//
 		HANDLE g_hChildStd_OUT_Rd = NULL;
 		HANDLE g_hChildStd_OUT_Wr = NULL;
-
 		SECURITY_ATTRIBUTES saAttr;
 		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
 		saAttr.bInheritHandle = TRUE;
 		saAttr.lpSecurityDescriptor = NULL;
 		if (!CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0))
 			return false;
-
 		// launch process
-		//
 		PROCESS_INFORMATION pi = {};
 		STARTUPINFOA si = {};
 		si.cb = sizeof(si);
@@ -16768,12 +16741,10 @@ namespace vkr {
 		si.hStdError = g_hChildStd_OUT_Wr;
 		si.hStdOutput = g_hChildStd_OUT_Wr;
 		si.wShowWindow = SW_HIDE;
-
 		if (CreateProcessA(NULL, cmdLine, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
 		{
 			WaitForSingleObject(pi.hProcess, INFINITE);
 			CloseHandle(g_hChildStd_OUT_Wr);
-
 			ULONG rc;
 			if (GetExitCodeProcess(pi.hProcess, &rc))
 			{
@@ -16785,10 +16756,8 @@ namespace vkr {
 				else
 				{
 					Trace(format("*** Process %s returned an error, see %s ***\n\n", commandLine, filenameErr));
-
 					// save errors to disk
 					std::ofstream ofs(filenameErr, std::ofstream::out);
-
 					for (;;)
 					{
 						DWORD dwRead;
@@ -16796,16 +16765,12 @@ namespace vkr {
 						BOOL bSuccess = ::ReadFile(g_hChildStd_OUT_Rd, chBuf, 2048, &dwRead, NULL);
 						chBuf[dwRead] = 0;
 						if (!bSuccess || dwRead == 0) break;
-
 						Trace(chBuf);
-
 						ofs << chBuf;
 					}
-
 					ofs.close();
 				}
 			}
-
 			CloseHandle(g_hChildStd_OUT_Rd);
 			CloseHandle(pi.hProcess);
 			CloseHandle(pi.hThread);
@@ -16818,15 +16783,12 @@ namespace vkr {
 		return false;
 	}
 
-	//
 	// Frustum culls an AABB. The culling is done in clip space. 
-	//
 	bool CameraFrustumToBoxCollision(const glm::mat4& mCameraViewProj, const glm::vec4& boxCenter, const glm::vec4& boxExtent)
 	{
 		float ex = boxExtent.x;
 		float ey = boxExtent.y;
 		float ez = boxExtent.z;
-
 		glm::vec4 p[8];
 		p[0] = mCameraViewProj * (boxCenter + glm::vec4(ex, ey, ez, 0));
 		p[1] = mCameraViewProj * (boxCenter + glm::vec4(ex, ey, -ez, 0));
@@ -16836,7 +16798,6 @@ namespace vkr {
 		p[5] = mCameraViewProj * (boxCenter + glm::vec4(-ex, ey, -ez, 0));
 		p[6] = mCameraViewProj * (boxCenter + glm::vec4(-ex, -ey, ez, 0));
 		p[7] = mCameraViewProj * (boxCenter + glm::vec4(-ex, -ey, -ez, 0));
-
 		uint32_t left = 0;
 		uint32_t right = 0;
 		uint32_t top = 0;
@@ -16848,22 +16809,15 @@ namespace vkr {
 			float y = p[i].y;
 			float z = p[i].z;
 			float w = p[i].w;
-
 			if (x < -w) left++;
 			if (x > w) right++;
 			if (y < -w) bottom++;
 			if (y > w) top++;
 			if (z < 0) back++;
 		}
-
 		return left == 8 || right == 8 || top == 8 || bottom == 8 || back == 8;
 	}
-
-
-	AxisAlignedBoundingBox::AxisAlignedBoundingBox()
-		: m_min()
-		, m_max()
-		, m_isEmpty{ true }
+	AxisAlignedBoundingBox::AxisAlignedBoundingBox() : m_min(), m_max(), m_isEmpty{ true }
 	{
 	}
 
@@ -16871,7 +16825,6 @@ namespace vkr {
 	{
 		if (bb.m_isEmpty)
 			return;
-
 		if (m_isEmpty)
 		{
 			m_max = bb.m_max;
@@ -16902,8 +16855,7 @@ namespace vkr {
 
 	bool AxisAlignedBoundingBox::HasNoVolume() const
 	{
-		return m_isEmpty
-			|| (m_max.x == m_min.x && m_max.y == m_min.y && m_max.z == m_min.z);
+		return m_isEmpty || (m_max.x == m_min.x && m_max.y == m_min.y && m_max.z == m_min.z);
 	}
 
 	AxisAlignedBoundingBox GetAABBInGivenSpace(const glm::mat4& mTransform, const glm::vec4& boxCenter, const glm::vec4& boxExtent)
