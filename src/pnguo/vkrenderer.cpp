@@ -305,6 +305,21 @@ namespace vkr
 	};
 
 
+	class TaskQueue
+	{
+	public:
+		std::vector<std::jthread> workers;
+		std::queue<std::function<void()>> tasks;
+		std::mutex mtx;
+		size_t w_count = 0;
+	public:
+		TaskQueue(size_t count);
+		~TaskQueue();
+		void add(std::function<void()> task);
+		void run(int num);
+		void wait_stop();
+	private:
+	};
 
 
 	//  VK_KHR_shader_float16_int8
@@ -1006,7 +1021,6 @@ namespace vkr
 
 	class GBuffer;
 	class dvk_texture;
-
 	class Sync
 	{
 		int m_count = 0;
@@ -1051,6 +1065,7 @@ namespace vkr
 
 	};
 
+#if 0
 	class Async
 	{
 		static int s_activeThreads;
@@ -1079,7 +1094,7 @@ namespace vkr
 	};
 
 	void ExecAsyncIfThereIsAPool(AsyncPool* pAsyncPool, std::function<void()> job);
-
+#endif
 
 	class UploadHeap
 	{
@@ -1212,8 +1227,8 @@ namespace vkr
 
 		VkImage CreateTextureCommitted(Device* pDevice, UploadHeap* pUploadHeap, const char* pName, bool useSRGB = false, VkImageUsageFlags usageFlags = 0);
 		void LoadAndUpload(Device* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D);
-
-		bool    isCubemap()const;
+		void LoadAndUpload0(Device* pDevice, UploadHeap* pUploadHeap, char* data, VkImage pTexture2D);
+		bool isCubemap()const;
 	};
 
 	struct SceneShadowInfo {
@@ -5082,6 +5097,7 @@ namespace vkr {
 		lut_tex_t* lut = 0;// lut_ggx\lut_charlie\lut_sheen_E 
 		bool bUseSSAOMask = false;
 		bool use_punctual = true;
+		bool is_async = true;
 	};
 
 	// todo pbr
@@ -5116,7 +5132,7 @@ namespace vkr {
 		~GltfPbrPass();
 		void OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, gltf_gpu_res_cx* pGLTFTexturesAndBuffers
 			, env_res_t* r//SkyDome* pSkyDome, bool bUseSSAOMask, std::vector<VkImageView>& ShadowMapViewPool,
-			, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool = NULL);
+			, GBufferRenderPass* pRenderPass);
 		void OnDestroy();
 		void BuildBatchLists(drawables_t* opt, bool bWireframe = false);
 		static void DrawBatchList(Device* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false);
@@ -5621,7 +5637,7 @@ namespace vkr {
 		//CheckerBoardFloor				_cbf = {};
 		std::vector<TimeStamp>          m_TimeStamps = {};
 
-		AsyncPool* m_AsyncPool = {};
+		//AsyncPool* m_AsyncPool = {};
 		// 渲染对象
 		std::vector<robj_info*>         _robject = {};
 		robj_info* currobj = {};
@@ -6307,6 +6323,7 @@ namespace vkr
 		// Load Meshes 
 		{
 			auto& meshes = pm->meshes;
+			TaskQueue vts(meshes.size());
 			m_meshes.resize(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
@@ -6319,7 +6336,8 @@ namespace vkr
 					auto& primitive = primitives[p];
 					DepthPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 					pPrimitive->m_geometry.instanceCount = _ptb->instanceCount;
-					ExecAsyncIfThereIsAPool(pAsyncPool, [this, i, p, mesh, &primitive, pPrimitive]()
+					//ExecAsyncIfThereIsAPool(pAsyncPool, 
+					std::function<void()> cb = [this, i, p, mesh, &primitive, pPrimitive]()
 						{
 							// Set Material
 							//
@@ -6375,9 +6393,11 @@ namespace vkr
 								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing);
 								CreatePipeline(inputLayout, defines, pPrimitive);
 							}
-						});
+						};
+					vts.add(cb);
 				}
 			}
+			vts.wait_stop();
 		}
 	}
 	//--------------------------------------------------------------------------------------
@@ -7067,23 +7087,14 @@ namespace vkr
 			header.bitCount = img.bits * img.component;
 		}
 	}
-	class TaskQueue
-	{
-	public:
-		std::vector<std::jthread> workers;
-		std::queue<std::function<void()>> tasks;
-		std::mutex mtx;
-	public:
-		TaskQueue();
-		~TaskQueue();
-		void add(std::function<void()> task);
-		void run(int num);
-		void wait_stop();
-	private:
-	};
 
-	TaskQueue::TaskQueue()
+	TaskQueue::TaskQueue(size_t count)
 	{
+		if (count > 0)
+		{
+			size_t tn = std::thread::hardware_concurrency();
+			run(std::min(count, tn));
+		}
 	}
 
 	TaskQueue::~TaskQueue()
@@ -7092,11 +7103,19 @@ namespace vkr
 	}
 	void TaskQueue::add(std::function<void()> task)
 	{
-		std::lock_guard<std::mutex> lock(mtx);
-		tasks.push(task);
+		if (w_count > 0)
+		{
+			std::lock_guard<std::mutex> lock(mtx);
+			tasks.push(task);
+		}
+		else {
+			task();
+		}
 	}
 	void TaskQueue::run(int num)
 	{
+		if (num < 1)return;
+		w_count += num;
 		for (int i = 0; i < num; ++i) {
 			workers.emplace_back([this](std::stop_token st) {
 				while (!st.stop_requested() || !tasks.empty()) {
@@ -7134,12 +7153,7 @@ namespace vkr
 			auto& images = pm->images;
 			m_textures.resize(images.size());
 			m_textureViews.resize(images.size());
-			TaskQueue vts;
-			if (async_de)
-			{
-				size_t tn = std::thread::hardware_concurrency();
-				vts.run(std::min(images.size(), tn));
-			}
+			TaskQueue vts(images.size());
 			for (int imageIndex = 0; imageIndex < images.size(); imageIndex++)
 			{
 				Texture* pTex = &m_textures[imageIndex];
@@ -7173,17 +7187,9 @@ namespace vkr
 						}
 						pTex->CreateSRV(tv);
 					};
-				if (async_de) {
-					vts.add(ccb);
-				}
-				else {
-					ccb();
-				}
+				vts.add(ccb);
 			}
-			if (async_de)
-			{
-				vts.wait_stop();
-			}
+			vts.wait_stop();
 			// copy textures and apply barriers, then flush the GPU
 			m_pUploadHeap->FlushAndFinish();
 		}
@@ -7342,10 +7348,8 @@ namespace vkr
 						}
 
 					}
-					//
 					//  Load index buffers
-					//
-					int indexAcc = primitive.indices;// .value("indices", -1);
+					int indexAcc = primitive.indices;
 					if (indexAcc >= 0)
 					{
 						tfAccessor indexBufferAcc = {};
@@ -7438,8 +7442,6 @@ namespace vkr
 	}
 
 	// Creates a Index Buffer from the accessor
-	//
-	//
 	void gltf_gpu_res_cx::CreateIndexBuffer(int indexBufferId, uint32_t* pNumIndices, VkIndexType* pIndexType, VkDescriptorBufferInfo* pIBV)
 	{
 		tfAccessor indexBuffer;
@@ -7452,8 +7454,6 @@ namespace vkr
 	}
 
 	// Creates Vertex Buffers from accessors and sets them in the Primitive struct.
-	//
-	//
 	void gltf_gpu_res_cx::CreateGeometry(int indexBufferId, std::vector<int>& vertexBufferIds, Geometry* pGeometry)
 	{
 		CreateIndexBuffer(indexBufferId, &pGeometry->m_NumIndices, &pGeometry->m_indexType, &pGeometry->m_IBV);
@@ -7538,14 +7538,12 @@ namespace vkr
 	{
 
 		// Get Index buffer view
-		//
 		tfAccessor indexBuffer;
-		int indexBufferId = primitive->indices;// .value("indices", -1);
+		int indexBufferId = primitive->indices;
 		if (indexBufferId > -1)
 			CreateIndexBuffer(indexBufferId, &pGeometry->m_NumIndices, &pGeometry->m_indexType, &pGeometry->m_IBV);
 
 		// Create vertex buffers and input layout
-		//
 		int cnt = 0;
 		layout.resize(requiredAttributes.size());
 		pGeometry->m_VBV.resize(requiredAttributes.size());
@@ -7554,7 +7552,6 @@ namespace vkr
 		for (auto attrName : requiredAttributes)
 		{
 			// get vertex buffer view
-			// 
 			const int attr = attributes[attrName];
 			pGeometry->m_VBV[cnt] = m_vertexBufferMap[attr];
 
@@ -8229,7 +8226,7 @@ namespace vkr
 		int  v;//VkImageView
 		int s;//VkSampler
 	};
-	void getDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t0>& texturesBase, bool pSkyDome, int Shadow_count, bool bUseSSAOMask)
+	void getDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t0>& texturesBase, int pSkyDome, int Shadow_count, bool bUseSSAOMask)
 	{
 		std::vector<uint32_t> descriptorCounts;
 		// count the number of textures to init bindings and descriptor
@@ -8242,10 +8239,14 @@ namespace vkr
 
 			if (pSkyDome)
 			{
-				tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
+				tfmat->m_textureCount += 2;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
 				descriptorCounts.push_back(1);
 				descriptorCounts.push_back(1);
-				descriptorCounts.push_back(1);
+				if (pSkyDome > 1)
+				{
+					tfmat->m_textureCount++;
+					descriptorCounts.push_back(1);
+				}
 			}
 
 			if (bUseSSAOMask)
@@ -8295,9 +8296,11 @@ namespace vkr
 				//pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
 				cnt++;
 
-				tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
-				//pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
-				cnt++;
+				if (pSkyDome > 1) {
+					tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
+					//pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
+					cnt++;
+				}
 
 				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
 			}
@@ -8434,7 +8437,7 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing
 		, gltf_gpu_res_cx* pGLTFTexturesAndBuffers, env_res_t* r
-		, GBufferRenderPass* pRenderPass, AsyncPool* pAsyncPool)
+		, GBufferRenderPass* pRenderPass)//AsyncPool* pAsyncPool)
 	{
 		print_time Pt("init pbr", 1);
 		_envr = r;
@@ -8580,6 +8583,7 @@ namespace vkr
 			//
 			auto& meshes = pm->meshes;
 
+			TaskQueue vts(1);
 			m_meshes.resize(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
@@ -8636,7 +8640,8 @@ namespace vkr
 						primitive.material;
 					}
 
-					ExecAsyncIfThereIsAPool(0, [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
+					//ExecAsyncIfThereIsAPool(0, 
+					std::function<void()> cb = [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
 						{
 							// Sets primitive's material, or set a default material if none was specified in the GLTF
 							//
@@ -8689,9 +8694,11 @@ namespace vkr
 							}
 							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, &mm, sizeof(glm::mat3x4) * muvt_size, bUseSSAOMask);
 							CreatePipeline(inputLayout, defines, pPrimitive);
-						});
+						};
+					vts.add(cb);
 				}
 			}
+			vts.wait_stop();
 		}
 	}
 	//--------------------------------------------------------------------------------------
@@ -8711,10 +8718,16 @@ namespace vkr
 			}
 			if (r->pSkyDome)
 			{
-				tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
 				descriptorCounts.push_back(1);
 				descriptorCounts.push_back(1);
-				descriptorCounts.push_back(1);
+				if (r->pSkyDome->GetCubeSpecularTextureView())
+				{
+					tfmat->m_textureCount += 3;   // +3 because the skydome has a specular, diffusse and a BDRF LUT map
+					descriptorCounts.push_back(1);
+				}
+				else {
+					tfmat->m_textureCount += 2;
+				}
 			}
 			if (tfmat->m_pbrMaterialParameters.useSheen) {
 				descriptorCounts.push_back(1);
@@ -8769,9 +8782,12 @@ namespace vkr
 				tfmat->m_pbrMaterialParameters.m_defines["ID_diffuseCube"] = std::to_string(cnt);
 				r->pSkyDome->SetDescriptorDiff(cnt, tfmat->m_texturesDescriptorSet);
 				cnt++;
-				tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
-				r->pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
-				cnt++;
+				if (r->pSkyDome->GetCubeSpecularTextureView())
+				{
+					tfmat->m_pbrMaterialParameters.m_defines["ID_specularCube"] = std::to_string(cnt);
+					r->pSkyDome->SetDescriptorSpec(cnt, tfmat->m_texturesDescriptorSet);
+					cnt++;
+				}
 				tfmat->m_pbrMaterialParameters.m_defines["USE_IBL"] = "1";
 			}
 			if (tfmat->m_pbrMaterialParameters.useSheen)
@@ -10027,6 +10043,10 @@ namespace vkr
 	bool is_depth_tex(VkFormat format) {
 		return !(format < VK_FORMAT_D16_UNORM || format > VK_FORMAT_D32_SFLOAT_S8_UINT);//VK_FORMAT_D32_SFLOAT
 	}
+	bool is_stencil_tex(VkFormat format) {
+		bool d = format == VK_FORMAT_S8_UINT || format == VK_FORMAT_D16_UNORM_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+		return d;
+	}
 	void Texture::CreateRTV(VkImageView* pImageView, int mipLevel, VkFormat format)
 	{
 		VkImageViewCreateInfo info = {};
@@ -10046,12 +10066,12 @@ namespace vkr
 			info.format = m_format;
 		else
 			info.format = format;
-		//if (is_depth_tex(m_format))
-		if (m_format == VK_FORMAT_D32_SFLOAT)
+		if (is_depth_tex(m_format))
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		else
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
+		//if (is_stencil_tex(m_format))
+		//	info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		std::string ResourceName = m_name;
 
 		if (mipLevel == -1)
@@ -10067,6 +10087,7 @@ namespace vkr
 		}
 
 		info.subresourceRange.baseArrayLayer = 0;
+		if (!m_pResource)return;
 		VkResult res = vkCreateImageView(m_pDevice->m_device, &info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
@@ -10089,10 +10110,12 @@ namespace vkr
 			info.subresourceRange.layerCount = 1;
 		}
 		info.format = m_format;
-		if (m_format == VK_FORMAT_D32_SFLOAT)
+		if (is_depth_tex(m_format))
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		else
 			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		//if (is_stencil_tex(m_format))
+		//	info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 
 		if (mipLevel == -1)
 		{
@@ -10107,6 +10130,7 @@ namespace vkr
 
 		info.subresourceRange.baseArrayLayer = 0;
 
+		if (!m_pResource)return;
 		VkResult res = vkCreateImageView(m_pDevice->m_device, &info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
@@ -10125,7 +10149,7 @@ namespace vkr
 		info.subresourceRange.levelCount = m_header.mipMapCount;
 		info.subresourceRange.baseArrayLayer = 0;
 		info.subresourceRange.layerCount = m_header.arraySize;
-
+		if (!m_pResource)return;
 		VkResult res = vkCreateImageView(m_pDevice->m_device, &info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
@@ -10154,6 +10178,7 @@ namespace vkr
 
 		m_header.mipMapCount = 1;
 
+		if (!m_pResource)return;
 		VkResult res = vkCreateImageView(m_pDevice->m_device, &view_info, NULL, pImageView);
 		assert(res == VK_SUCCESS);
 
@@ -10362,6 +10387,93 @@ namespace vkr
 		}
 	}
 
+	char* copyPixels(void* pDest, char* data, uint32_t stride, uint32_t bytesWidth, uint32_t height)
+	{
+		for (uint32_t y = 0; y < height; y++)
+		{
+			memcpy((char*)pDest + y * stride, data, bytesWidth);
+			data += stride;
+		}
+		return data;
+	}
+
+	void Texture::LoadAndUpload0(Device* pDevice, UploadHeap* pUploadHeap, char* data, VkImage pTexture2D)
+	{
+		// Upload Image
+		{
+			VkImageMemoryBarrier copy_barrier = {};
+			copy_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			copy_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			copy_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			copy_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copy_barrier.image = pTexture2D;
+			copy_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy_barrier.subresourceRange.baseMipLevel = 0;
+			copy_barrier.subresourceRange.levelCount = m_header.mipMapCount;
+			copy_barrier.subresourceRange.layerCount = m_header.arraySize;
+			pUploadHeap->AddPreBarrier(copy_barrier);
+		}
+		//compute pixel size
+		UINT32 bytesPerPixel = (UINT32)GetPixelByteSize((DXGI_FORMAT)m_header.format); // note that bytesPerPixel in BC formats is treated as bytesPerBlock 
+		UINT32 pixelsPerBlock = 1;
+		if (IsBCFormat(m_header.format))
+		{
+			pixelsPerBlock = 4 * 4; // BC formats have 4*4 pixels per block
+		}
+		auto t = data;
+		for (uint32_t a = 0; a < m_header.arraySize; a++)
+		{
+			// copy all the mip slices into the offsets specified by the footprint structure 
+			for (uint32_t mip = 0; mip < m_header.mipMapCount; mip++)
+			{
+				uint32_t dwWidth = std::max<uint32_t>(m_header.width >> mip, 1);
+				uint32_t dwHeight = std::max<uint32_t>(m_header.height >> mip, 1);
+				UINT64 UplHeapSize = (dwWidth * dwHeight * bytesPerPixel) / pixelsPerBlock;
+				UINT8* pixels = pUploadHeap->BeginSuballocate(SIZE_T(UplHeapSize), 512);
+				if (pixels == NULL)
+				{
+					// oh! We ran out of mem in the upload heap, flush it and try allocating mem from it again
+					pUploadHeap->FlushAndFinish(true);
+					pixels = pUploadHeap->Suballocate(SIZE_T(UplHeapSize), 512);
+					assert(pixels != NULL);
+				}
+				uint32_t offset = uint32_t(pixels - pUploadHeap->BasePtr());
+				t = copyPixels(pixels, t, (dwWidth * bytesPerPixel) / pixelsPerBlock, (dwWidth * bytesPerPixel) / pixelsPerBlock, dwHeight);
+				pUploadHeap->EndSuballocate();
+				{
+					VkBufferImageCopy region = {};
+					region.bufferOffset = offset;
+					region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					region.imageSubresource.layerCount = 1;
+					region.imageSubresource.baseArrayLayer = a;
+					region.imageSubresource.mipLevel = mip;
+					region.imageExtent.width = dwWidth;
+					region.imageExtent.height = dwHeight;
+					region.imageExtent.depth = 1;
+					pUploadHeap->AddCopy(pTexture2D, region);
+				}
+			}
+		}
+		// prepare to shader read
+		{
+			VkImageMemoryBarrier use_barrier = {};
+			use_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			use_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			use_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			use_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			use_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			use_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.image = pTexture2D;
+			use_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			use_barrier.subresourceRange.levelCount = m_header.mipMapCount;
+			use_barrier.subresourceRange.layerCount = m_header.arraySize;
+			pUploadHeap->AddPostBarrier(use_barrier);
+		}
+	}
+
 	void upload_data(Device* pDevice, UploadHeap* up, IMG_INFO* info, uint32_t bufferOffset, uint32_t usage, VkImage image)
 	{
 		uint32_t imageUsageFlags = usage | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; //uint32_t imageLayout;
@@ -10417,9 +10529,9 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	bool Texture::InitFromFile(Device* pDevice, UploadHeap* pUploadHeap, const char* pFilename, bool useSRGB, VkImageUsageFlags usageFlags, float cutOff)
 	{
-		m_pDevice = pDevice;
 		assert(m_pResource == NULL);
 		if (!pFilename || !(*pFilename))return false;
+		m_pDevice = pDevice;
 		ImgLoader* img = CreateImageLoader(pFilename);
 		bool result = img->Load(pFilename, cutOff, &m_header);
 		if (result)
@@ -10440,21 +10552,21 @@ namespace vkr
 
 	bool Texture::InitFromData(Device* pDevice, UploadHeap* uploadHeap, IMG_INFO* header, const void* data, int dsize, const char* name, bool useSRGB)
 	{
-		assert(!m_pResource && !m_pDevice);
-		assert(header->arraySize == 1 && header->mipMapCount == 1);
-
+		assert(!m_pResource && (m_pDevice || m_pDevice != pDevice));
 		m_pDevice = pDevice;
 		m_header = *header;
-
 		m_pResource = CreateTextureCommitted(m_pDevice, uploadHeap, name, useSRGB);
-
-		UINT8* pixels = 0;
-		pixels = uploadHeap->Suballocate(dsize, 512);
-		assert(pixels);
-		memcpy(pixels, data, dsize);
-
-		uint32_t offset = uint32_t(pixels - uploadHeap->BasePtr());
-		upload_data(pDevice, uploadHeap, header, offset, 0, m_pResource);
+		if (header->arraySize == 1 && header->mipMapCount == 1) {
+			UINT8* pixels = 0;
+			pixels = uploadHeap->Suballocate(dsize, 512);
+			assert(pixels);
+			memcpy(pixels, data, dsize);
+			uint32_t offset = uint32_t(pixels - uploadHeap->BasePtr());
+			upload_data(pDevice, uploadHeap, header, offset, 0, m_pResource);
+		}
+		else {
+			LoadAndUpload0(pDevice, uploadHeap, (char*)data, m_pResource);
+		}
 		return true;
 	}
 
@@ -12776,7 +12888,25 @@ namespace vkr {
 
 		m_CubeDiffuseTexture.InitFromFile(pDevice, pUploadHeap, pDiffuseCubemap, true); // SRGB
 		m_CubeSpecularTexture.InitFromFile(pDevice, pUploadHeap, pSpecularCubemap, true);
-
+		if (!m_CubeSpecularTexture.Resource())
+		{
+			int cs = 16;
+			IMG_INFO header = {};
+			std::vector<float> px;
+			px.resize(cs * cs * 6 * 4);
+			unsigned char* buffer = (unsigned char*)px.data();
+			VkDeviceSize   bufferSize = px.size() * sizeof(px[0]);
+			header.width = cs;
+			header.height = cs;
+			header.depth = 1;
+			header.arraySize = 6;
+			header.mipMapCount = 1;
+			header.vkformat = VK_FORMAT_R32G32B32A32_SFLOAT;
+			header.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+			header.bitCount = 32 * 4;
+			for (auto& c : px) { c = 0.28; }
+			m_CubeSpecularTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "cubeSpecular", false);
+		}
 		pUploadHeap->FlushAndFinish();
 
 		m_CubeDiffuseTexture.CreateCubeSRV(&m_CubeDiffuseTextureView);
@@ -15105,7 +15235,7 @@ namespace vkr {
 			return new WICLoader();
 		}
 	}
-
+#if 0
 	Async::Async(std::function<void()> job, Sync* pSync) :
 		m_job{ job },
 		m_pSync{ pSync }
@@ -15216,7 +15346,7 @@ namespace vkr {
 	std::condition_variable Async::s_condition;
 	bool Async::s_bExiting = false;
 	int Async::s_maxThreads = std::thread::hardware_concurrency();
-
+#endif
 	//
 	// Compute a hash of an array
 	//
@@ -15743,6 +15873,12 @@ namespace vkr {
 		std::mutex m_mutex;
 
 	public:
+		void Async_Wait(Sync* pSync)
+		{
+			if (pSync->Get() == 0)
+				return;
+			pSync->Wait();
+		}
 		bool CacheMiss(size_t hash, T* pOut)
 		{
 #ifdef CACHE_ENABLE
@@ -15774,7 +15910,7 @@ namespace vkr {
 #ifdef CACHE_LOG
 					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
 #endif
-					Async::Wait(&kt->m_Sync);
+					Async_Wait(&kt->m_Sync);
 				}
 
 				// if the shader was compiled then return it
@@ -20256,7 +20392,7 @@ namespace vkr {
 		depthStencilView.subresourceRange.levelCount = 1;
 		depthStencilView.subresourceRange.baseArrayLayer = 0;
 		depthStencilView.subresourceRange.layerCount = 1;
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+		if (is_stencil_tex(depthFormat)) {
 			depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
 		for (auto& it : framebuffers)
@@ -20381,7 +20517,7 @@ namespace vkr {
 	// todo vkrenderer
 	Renderer_cx::Renderer_cx(const_vk* p)
 	{
-		m_AsyncPool = new AsyncPool();
+		//m_AsyncPool = new AsyncPool();
 		if (p)
 			ct = *p;
 	}
@@ -20389,10 +20525,10 @@ namespace vkr {
 
 	Renderer_cx::~Renderer_cx()
 	{
-		if (m_AsyncPool) {
-			delete m_AsyncPool;
-			m_AsyncPool = nullptr;
-		}
+		//if (m_AsyncPool) {
+		//	delete m_AsyncPool;
+		//	m_AsyncPool = nullptr;
+		//}
 		if (m_GBuffer)
 			delete m_GBuffer;
 		m_GBuffer = 0;
@@ -20484,7 +20620,7 @@ namespace vkr {
 			skyDomeConstants.mieDirectionalG = 0.8f;
 			skyDomeConstants.luminance = 1.0f;
 		}
-		auto specular = "images\\specular.dds"; "images\\default_specular.dds";
+		auto specular = "images\\specular.dds"; specular = 0;
 		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, mformat, &m_ResourceViewHeaps
 			, &m_ConstantBufferRing, &m_SysMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
 		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, mformat, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
@@ -20527,7 +20663,7 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void Renderer_cx::OnDestroy()
 	{
-		m_AsyncPool->Flush();
+		//m_AsyncPool->Flush();
 		un_envres();
 		//m_ImGUI.OnDestroy();
 		m_ColorConversionPS.OnDestroy();
@@ -20666,7 +20802,7 @@ namespace vkr {
 		//}
 
 		// use multi threading
-		AsyncPool* pAsyncPool = m_AsyncPool;
+		//AsyncPool* pAsyncPool = m_AsyncPool;
 
 		// Loading stages
 		//
@@ -20696,7 +20832,7 @@ namespace vkr {
 			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
 			currobj->m_GLTFDepth = new GltfDepthPass();
 			currobj->m_GLTFDepth->has_shadowMap = pGLTFCommon->has_shadowMap;
-			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, currobj->_ptb, pAsyncPool);
+			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, currobj->_ptb);
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
 		}
@@ -20707,7 +20843,7 @@ namespace vkr {
 			// same thing as above but for the PBR pass
 			currobj->m_GLTFPBR = new GltfPbrPass();
 			currobj->m_GLTFPBR->OnCreate(m_pDevice, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing
-				, currobj->_ptb, &_envr, &m_RenderPassFullGBufferWithClear, pAsyncPool);
+				, currobj->_ptb, &_envr, &m_RenderPassFullGBufferWithClear);
 
 			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
 			m_UploadHeap.FlushAndFinish();
@@ -20784,7 +20920,7 @@ namespace vkr {
 	void Renderer_cx::UnloadScene()
 	{
 		// wait for all the async loading operations to finish
-		m_AsyncPool->Flush();
+		//m_AsyncPool->Flush();
 
 		m_pDevice->GPUFlush();
 		for (auto it : _robject)
@@ -21172,6 +21308,11 @@ namespace vkr {
 		barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if (is_stencil_tex(gbp->m_DepthBuffer.GetFormat()))
+		{
+			barriers[0].subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+
 		barriers[0].image = gbp->m_DepthBuffer.Resource();
 
 		barriers[1] = barrier;

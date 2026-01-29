@@ -79,6 +79,13 @@ gltf加载：解析gltf文件，提取纹理、材质、网格信息
  ResourceViewHeaps* pResourceViewHeaps,		// 管理set分配
  DynamicBufferRing* pConstantBufferRing,	// 动态常量缓冲区ubo
  StaticBufferPool* pStaticBufferPool,		// 静态顶点/索引缓冲区
+
+
+顶点属性：
+POSITION、COLOR_0、TEXCOORD_0、TEXCOORD_1、
+NORMAL、TANGENT、
+WEIGHTS_0、WEIGHTS_1、JOINTS_0、JOINTS_1、
+
 */
 namespace vkr {
 	struct transform_t

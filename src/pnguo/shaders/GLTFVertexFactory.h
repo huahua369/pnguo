@@ -44,9 +44,6 @@ layout(location = ID_JOINTS_0) in  uvec4 a_Joints0;
 #ifdef ID_JOINTS_1
 layout(location = ID_JOINTS_1) in  uvec4 a_Joints1;
 #endif
-#ifdef ID_TARGETS
-layout(location = ID_TARGETS) in  vec4 a_Targets;
-#endif
 
 //--------------------------------------------------------------------------------------
 #ifdef ID_POSITION

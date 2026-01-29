@@ -1186,13 +1186,10 @@ float GetSSAO(vec2 coords)
 // 灯光
 #if 1
 #ifdef USE_IBL
-#ifdef ID_specularCube
 vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 {
 	float NdotV = clamp(dot(n, v), 0.0f, 1.0f);
 
-	float u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_pbrParams.mipCount - 1.0;// 9.0; // resolution of 512x512 of the IBL
-	float lod = clamp(materialInfo.perceptualRoughness * float(u_MipCount), 0.0f, float(u_MipCount));
 	vec3 reflection = normalize(reflect(-v, n));
 
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
@@ -1201,18 +1198,23 @@ vec3 getIBLContribution(gpuMaterial materialInfo, vec3 n, vec3 v)
 
 	vec3 diffuseLight = texture(u_DiffuseEnvSampler, n).rgb;
 
+#ifdef ID_specularCube
 #ifdef USE_TEX_LOD
+	float u_MipCount = textureQueryLevels(u_SpecularEnvSampler);// u_pbrParams.mipCount - 1.0;// 9.0; // resolution of 512x512 of the IBL
+	float lod = clamp(materialInfo.perceptualRoughness * float(u_MipCount), 0.0f, float(u_MipCount));
 	vec3 specularLight = textureLod(u_SpecularEnvSampler, reflection, lod).rgb;
 #else
 	vec3 specularLight = texture(u_SpecularEnvSampler, reflection).rgb;
 #endif 
+#else
+	vec3 specularLight = vec3(0.0);
+#endif
 	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
 	vec3 specular = specularLight * (materialInfo.specularColorlight * brdf.x + brdf.y);
 
 	return diffuse + specular;
 }
-#endif
-#endif
+#endif 
 
 // Lambert lighting
 // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
