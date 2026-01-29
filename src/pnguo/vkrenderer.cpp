@@ -4615,7 +4615,7 @@ namespace vkr {
 		uint32_t instanceCount = 1;
 	public:
 		GLTFCommon* m_pGLTFCommon;
-
+		std::vector<size_t> _nodes;
 		VkDescriptorBufferInfo m_perFrameConstants = {};
 		VkDescriptorBufferInfo m_perFrameConstants_w = {}; // 线框
 
@@ -4627,7 +4627,7 @@ namespace vkr {
 
 		void CreateIndexBuffer(int indexBufferId, uint32_t* pNumIndices, VkIndexType* pIndexType, VkDescriptorBufferInfo* pIBV);
 		void CreateGeometry(int indexBufferId, std::vector<int>& vertexBufferIds, Geometry* pGeometry);
-		void CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry, int  instance_count);
+		void CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry);
 
 		VkImageView GetTextureViewByID(int id);
 
@@ -4637,6 +4637,7 @@ namespace vkr {
 		VkDescriptorBufferInfo* get_instance_info();
 		void SetSkinningMatricesForSkeletons(DynamicBufferRing* ubo);
 		void SetPerFrameConstants(DynamicBufferRing* ubo, bool bWireframe);
+		void update_node();
 	};
 	// todo post
 
@@ -5226,7 +5227,6 @@ namespace vkr {
 		DynamicBufferRing* m_pDynamicBufferRing = 0;
 		//StaticBufferPool* m_pStaticBufferPool;
 
-		std::vector<size_t> _nodes;
 		std::vector<PBRMesh> m_meshes;
 		std::vector<PBRMaterial> m_materialsData;
 		std::vector<VkSampler> _samplers;
@@ -6418,7 +6418,7 @@ namespace vkr
 		// Load Meshes 
 		{
 			auto& meshes = pm->meshes;
-			TaskQueue vts(meshes.size());
+			TaskQueue vts(1);
 			m_meshes.resize(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
@@ -6467,7 +6467,7 @@ namespace vkr
 							// shader's can tell the slots from the #defines
 							//
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry, 1);
+							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 
 							// Create Pipeline
 							//
@@ -6907,14 +6907,13 @@ namespace vkr
 	{
 		SetPerfMarkerBegin(cmd_buf, "DepthPass");
 		// loop through nodes
-		std::vector<tfNode>* pNodes = &_ptb->m_pGLTFCommon->m_nodes;
+		std::vector<tfNode>& ns = _ptb->m_pGLTFCommon->m_nodes;
 		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
 		auto pm = _ptb->m_pGLTFCommon->pm;
-		for (uint32_t i = 0; i < pNodes->size(); i++)
+		for (auto i : _ptb->_nodes)
 		{
-			tfNode* pNode = &pNodes->at(i);
-			if ((pNode == NULL) || (pNode->meshIndex < 0))
-				continue;
+			tfNode* pNode = &ns[i];
+			assert(pNode && pNode->meshIndex >= 0);
 			glm::ivec2 sm = { pNode->skinIndex, pNode->meshIndex };
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(sm);
@@ -7605,9 +7604,8 @@ namespace vkr
 		return VK_FORMAT_UNDEFINED;
 	}
 
-	void gltf_gpu_res_cx::CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry, int  instance_count)
+	void gltf_gpu_res_cx::CreateGeometry(tinygltf::Primitive* primitive, const std::vector<std::string> requiredAttributes, std::vector<VkVertexInputAttributeDescription>& layout, DefineList& defines, Geometry* pGeometry)
 	{
-
 		// Get Index buffer view
 		tfAccessor indexBuffer;
 		int indexBufferId = primitive->indices;
@@ -7641,11 +7639,6 @@ namespace vkr
 				pGeometry->m_NumIndices = ina.count;
 			cnt++;
 		}
-		if (instance_count > 1)
-		{
-			defines["ID_INSTANCE_MAT"] = std::to_string(cnt);
-			cnt++;
-		}
 	}
 	void gltf_gpu_res_cx::SetPerFrameConstants(DynamicBufferRing* ubo, bool bWireframe)
 	{
@@ -7660,6 +7653,21 @@ namespace vkr
 			PerFrame_t* cbPerFrame;
 			ubo->AllocConstantBuffer(sizeof(PerFrame_t), (void**)&cbPerFrame, &m_perFrameConstants_w);
 			*cbPerFrame = *(m_pGLTFCommon->_perFrameData_w);
+		}
+	}
+
+	void gltf_gpu_res_cx::update_node()
+	{
+		std::vector<tfNode>& n = m_pGLTFCommon->m_nodes;
+		if (_nodes.empty()) {
+			_nodes.reserve(n.size());
+			for (uint32_t i = 0; i < n.size(); i++)
+			{
+				tfNode* pNode = &n[i];
+				if ((pNode == NULL) || (pNode->meshIndex < 0))
+					continue;
+				_nodes.push_back(i);
+			}
 		}
 	}
 
@@ -8728,7 +8736,7 @@ namespace vkr
 							// shader's can tell the slots from the #defines
 							// todo 加载顶点数据到显存
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry, 1);
+							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 							mesh_mapd_ptr mm = {};
 							morph_t* morphing = 0;
 							auto tsa = primitive.targets.size();// todo 变形判断
@@ -9440,23 +9448,13 @@ namespace vkr
 	//--------------------------------------------------------------------------------------
 	void GltfPbrPass::BuildBatchLists(drawables_t* opt, bool bWireframe)
 	{
-		std::vector<tfNode>* pNodes = &_ptb->m_pGLTFCommon->m_nodes;
-		if (_nodes.empty()) {
-			_nodes.reserve(pNodes->size());
-			for (uint32_t i = 0; i < pNodes->size(); i++)
-			{
-				tfNode* pNode = &pNodes->at(i);
-				if ((pNode == NULL) || (pNode->meshIndex < 0))
-					continue;
-				_nodes.push_back(i);
-			}
-		}
+		std::vector<tfNode>& pNodes = _ptb->m_pGLTFCommon->m_nodes;
 		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
 		auto pSolid = &opt->opaque;
 		auto pTransparent = &opt->transparent;
 		glm::ivec2 transmissionFramebufferSize = m_pRenderPass->m_pGBuffer->m_HDR.get_size();
-		auto& ns = *pNodes;
-		for (auto i : _nodes)
+		auto& ns = pNodes;
+		for (auto i : _ptb->_nodes)
 		{
 			tfNode* pNode = &ns[i];
 			assert(pNode && pNode->meshIndex >= 0);
@@ -21310,9 +21308,11 @@ namespace vkr {
 					it->_ptb->SetPerFrameConstants(ubo, bWireframe);
 					// 更新骨骼矩阵到ubo
 					it->_ptb->SetSkinningMatricesForSkeletons(ubo);
+					it->_ptb->update_node();
 				}
 			}
 		}
+
 
 		// Render all shadow maps
 
@@ -21950,9 +21950,11 @@ namespace vkr {
 					pgc->instance_mat.resize(instanceCount);
 #ifdef DEBUG
 					float x = 2;
-					for (size_t i = 0; i < instanceCount; i++)
+					float x1 = 1;
+					pgc->instance_mat[0] = glm::mat4(1.0f);
+					for (size_t i = 1; i < instanceCount; i++)
 					{
-						pgc->instance_mat[i] = glm::translate(glm::vec3(x * i, 0.0f, 0.0f)) * glm::rotate(glm::radians(i * 45.0f), glm::vec3(0.0, 1.0, 0.0));
+						pgc->instance_mat[i] = glm::translate(glm::vec3(x * i, 0.2, 0.0f)) * glm::rotate(glm::radians(i * 45.0f), glm::vec3(0.0, 1.0, 0.0));
 					}
 #endif
 					if (pgc->Load(fn1.c_str(), "") == false)
