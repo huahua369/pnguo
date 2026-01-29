@@ -5225,6 +5225,8 @@ namespace vkr {
 		ResourceViewHeaps* m_pResourceViewHeaps = 0;
 		DynamicBufferRing* m_pDynamicBufferRing = 0;
 		//StaticBufferPool* m_pStaticBufferPool;
+
+		std::vector<size_t> _nodes;
 		std::vector<PBRMesh> m_meshes;
 		std::vector<PBRMaterial> m_materialsData;
 		std::vector<VkSampler> _samplers;
@@ -5262,23 +5264,6 @@ namespace vkr {
 		return -l.m_depth < -r.m_depth;
 	}
 
-	class pbr_pass
-	{
-	public:
-		VkSampler m_samplerPbr = VK_NULL_HANDLE, m_samplerShadow = VK_NULL_HANDLE;
-		// PBR Brdf
-		Texture m_brdfLutTexture;
-		VkImageView m_brdfLutView = VK_NULL_HANDLE;
-		VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
-		Device* _pDevice = 0;
-	public:
-		pbr_pass();
-		~pbr_pass();
-		// 创建共用资源
-		void new_pbrts(Device* pDevice, UploadHeap* pUploadHeap, const char* brdflut);
-	private:
-
-	};
 
 
 
@@ -9456,15 +9441,25 @@ namespace vkr
 	void GltfPbrPass::BuildBatchLists(drawables_t* opt, bool bWireframe)
 	{
 		std::vector<tfNode>* pNodes = &_ptb->m_pGLTFCommon->m_nodes;
+		if (_nodes.empty()) {
+			_nodes.reserve(pNodes->size());
+			for (uint32_t i = 0; i < pNodes->size(); i++)
+			{
+				tfNode* pNode = &pNodes->at(i);
+				if ((pNode == NULL) || (pNode->meshIndex < 0))
+					continue;
+				_nodes.push_back(i);
+			}
+		}
 		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
 		auto pSolid = &opt->opaque;
 		auto pTransparent = &opt->transparent;
 		glm::ivec2 transmissionFramebufferSize = m_pRenderPass->m_pGBuffer->m_HDR.get_size();
-		for (uint32_t i = 0; i < pNodes->size(); i++)
+		auto& ns = *pNodes;
+		for (auto i : _nodes)
 		{
-			tfNode* pNode = &pNodes->at(i);
-			if ((pNode == NULL) || (pNode->meshIndex < 0))
-				continue;
+			tfNode* pNode = &ns[i];
+			assert(pNode && pNode->meshIndex >= 0);
 			glm::ivec2 sm = { pNode->skinIndex, pNode->meshIndex };
 			// skinning matrices constant buffer
 			VkDescriptorBufferInfo* pPerSkeleton = _ptb->GetSkinningMatricesBuffer(sm);
@@ -9583,14 +9578,6 @@ namespace vkr
 			vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0);
 	}
 
-	// todo pbr_pass
-	pbr_pass::pbr_pass()
-	{
-	}
-
-	pbr_pass::~pbr_pass()
-	{
-	}
 #if 1
 	glm::vec2 hammersley(uint32_t i, uint32_t N) {
 		// Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
@@ -9843,88 +9830,6 @@ namespace vkr
 	}
 #endif // 1
 
-	// 共用资源
-	void pbr_pass::new_pbrts(Device* pDevice, UploadHeap* pUploadHeap, const char* brdflut)
-	{
-		_pDevice = pDevice;
-		// Load BRDF look up table for the PBR shader
-		auto br = m_brdfLutTexture.InitFromFile(pDevice, pUploadHeap, brdflut, false); // LUT images are stored as linear
-		if (!br) {
-			print_time Pt("generate BRDFLUT", 1);
-			const int cs = 256;
-			static auto brdf = generateCookTorranceBRDFLUT(cs, 0);
-			IMG_INFO header = {};
-			unsigned char* buffer = (unsigned char*)brdf.data();
-			VkDeviceSize   bufferSize = cs * cs * sizeof(int);
-			header.width = cs;
-			header.height = cs;
-			header.depth = 1;
-			header.arraySize = 1;
-			header.mipMapCount = 1;
-			header.vkformat = VK_FORMAT_R16G16_SFLOAT;
-			header.bitCount = 32;
-			m_brdfLutTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "brdf", false);
-		}
-		m_brdfLutTexture.CreateSRV(&m_brdfLutView);
-
-		/////////////////////////////////////////////
-		// Create Samplers
-		VkResult res = VK_SUCCESS;
-		//for pbr materials
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			info.addressModeU = info.addressModeV = info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.minLod = 0;
-			info.maxLod = 10000;
-			info.maxAnisotropy = 1.0f;
-			m_samplerPbr = pDevice->newSampler(&info);
-			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerPbr);
-			//assert(res == VK_SUCCESS);
-		}
-
-		// specular BRDF lut sampler
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.minLod = -1000;
-			info.maxLod = 1000;
-			info.maxAnisotropy = 1.0f;
-			m_brdfLutSampler = pDevice->newSampler(&info);
-			/*		res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_brdfLutSampler);
-					assert(res == VK_SUCCESS);*/
-		}
-
-		// shadowmap sampler
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.compareEnable = VK_TRUE;
-			info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-			info.minLod = -1000;
-			info.maxLod = 1000;
-			info.maxAnisotropy = 1.0f;
-			m_samplerShadow = pDevice->newSampler(&info);
-			//res = vkCreateSampler(pDevice->m_device, &info, NULL, &m_samplerShadow);
-			//assert(res == VK_SUCCESS);
-		}
-
-	}
 
 }
 //!vkr
