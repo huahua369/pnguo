@@ -322,6 +322,8 @@ namespace vkr
 	};
 
 
+
+
 	//  VK_KHR_shader_float16_int8
 	//	VK_KHR_16bit_storage
 	//	VK_KHR_8bit_storage 
@@ -1095,6 +1097,114 @@ namespace vkr
 
 	void ExecAsyncIfThereIsAPool(AsyncPool* pAsyncPool, std::function<void()> job);
 #endif
+
+
+
+#define CACHE_ENABLE
+	//#define CACHE_LOG 
+	template<typename T>
+	class Cache
+	{
+	public:
+		struct CacheEntry
+		{
+			Sync m_Sync;
+			T m_data;
+		};
+		typedef std::map<size_t, CacheEntry> DatabaseType;
+	private:
+		DatabaseType m_database;
+		std::mutex m_mutex;
+	public:
+		void Async_Wait(Sync* pSync)
+		{
+			if (pSync->Get() == 0)
+				return;
+			pSync->Wait();
+		}
+		bool CacheMiss(size_t hash, T* pOut)
+		{
+#ifdef CACHE_ENABLE
+			//DatabaseType::iterator it;
+			CacheEntry* kt = {};
+			// find whether the shader is in the cache, create an empty entry just so other threads know this thread will be compiling the shader
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_database.find(hash);
+
+				// shader not found, we need to compile the shader!
+				if (it == m_database.end())
+				{
+#ifdef CACHE_LOG
+					Trace(format("thread 0x%04x Compi Begin: %p %i\n", GetCurrentThreadId(), hash, m_database[hash].m_Sync.Get()));
+#endif
+					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
+					m_database[hash].m_Sync.Inc();
+					return true;
+				}
+				kt = &it->second;
+			}
+			// If we have seen these shaders before then:
+			{
+				// If there is a thread already trying to compile this shader then wait for that thread to finish
+				if (kt->m_Sync.Get() == 1)
+				{
+#ifdef CACHE_LOG
+					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
+#endif
+					Async_Wait(&kt->m_Sync);
+				}
+
+				// if the shader was compiled then return it
+				*pOut = kt->m_data;
+
+#ifdef CACHE_LOG
+				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
+#endif
+				return false;
+			}
+#endif
+			return true;
+		}
+
+		void UpdateCache(size_t hash, T* pValue)
+		{
+#ifdef CACHE_ENABLE
+			// DatabaseType::iterator it;
+			CacheEntry* kt = {};
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_database.find(hash);
+				assert(it != m_database.end());
+				if (it == m_database.end())return;
+				kt = &it->second;
+			}
+#ifdef CACHE_LOG
+			Trace(format("thread 0x%04x Compi End: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
+#endif
+			kt->m_data = *pValue;
+			//assert(kt->m_Sync.Get() == 1);
+			// The shader has been compiled, set sync to 0 to indicate it is compiled
+			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
+			kt->m_Sync.Dec();
+#endif
+			// CACHE_ENABLE 1
+		}
+		template<typename Func>
+		void ForEach(Func func)
+		{
+			std::lock_guard<std::mutex> lock(m_mutex);
+			for (auto it = m_database.begin(); it != m_database.end(); ++it)
+			{
+				func(it);
+			}
+		}
+	};
+
+
+
+
+
 
 	class UploadHeap
 	{
@@ -13962,7 +14072,7 @@ namespace vkr {
 					assert(res == VK_SUCCESS);*/
 		}
 
-		// Use helper class to create the fullscreen pass 
+		// Use helper class_to create the fullscreen pass 
 		//
 		m_directionalBlur.OnCreate(pDevice, m_in, "blur.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout);
 
@@ -14385,7 +14495,7 @@ namespace vkr {
 			//assert(res == VK_SUCCESS);
 		}
 
-		// Use helper class to create the fullscreen pass
+		// Use helper class_to create the fullscreen pass
 		//
 		m_downscale.OnCreate(pDevice, m_in, "DownSamplePS.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout);
 
@@ -15855,111 +15965,6 @@ namespace vkr {
 	// 编译shader
 #if 1
 
-#define CACHE_ENABLE
-//#define CACHE_LOG 
-
-	template<typename T>
-	class Cache
-	{
-	public:
-		struct CacheEntry
-		{
-			Sync m_Sync;
-			T m_data;
-		};
-		typedef std::map<size_t, CacheEntry> DatabaseType;
-
-	private:
-		DatabaseType m_database;
-		std::mutex m_mutex;
-
-	public:
-		void Async_Wait(Sync* pSync)
-		{
-			if (pSync->Get() == 0)
-				return;
-			pSync->Wait();
-		}
-		bool CacheMiss(size_t hash, T* pOut)
-		{
-#ifdef CACHE_ENABLE
-			//DatabaseType::iterator it;
-			CacheEntry* kt = {};
-			// find whether the shader is in the cache, create an empty entry just so other threads know this thread will be compiling the shader
-			{
-				std::lock_guard<std::mutex> lock(m_mutex);
-				auto it = m_database.find(hash);
-
-				// shader not found, we need to compile the shader!
-				if (it == m_database.end())
-				{
-#ifdef CACHE_LOG
-					Trace(format("thread 0x%04x Compi Begin: %p %i\n", GetCurrentThreadId(), hash, m_database[hash].m_Sync.Get()));
-#endif
-					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
-					m_database[hash].m_Sync.Inc();
-					return true;
-				}
-				kt = &it->second;
-			}
-
-			// If we have seen these shaders before then:
-			{
-				// If there is a thread already trying to compile this shader then wait for that thread to finish
-				if (kt->m_Sync.Get() == 1)
-				{
-#ifdef CACHE_LOG
-					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
-#endif
-					Async_Wait(&kt->m_Sync);
-				}
-
-				// if the shader was compiled then return it
-				*pOut = kt->m_data;
-
-#ifdef CACHE_LOG
-				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
-#endif
-				return false;
-			}
-#endif
-			return true;
-		}
-
-		void UpdateCache(size_t hash, T* pValue)
-		{
-#ifdef CACHE_ENABLE
-			// DatabaseType::iterator it;
-			CacheEntry* kt = {};
-			{
-				std::lock_guard<std::mutex> lock(m_mutex);
-				auto it = m_database.find(hash);
-				assert(it != m_database.end());
-				if (it == m_database.end())return;
-				kt = &it->second;
-			}
-#ifdef CACHE_LOG
-			Trace(format("thread 0x%04x Compi End: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
-#endif
-			kt->m_data = *pValue;
-			//assert(kt->m_Sync.Get() == 1);
-
-			// The shader has been compiled, set sync to 0 to indicate it is compiled
-			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
-			kt->m_Sync.Dec();
-#endif
-		}
-
-		template<typename Func>
-		void ForEach(Func func)
-		{
-			std::lock_guard<std::mutex> lock(m_mutex);
-			for (auto it = m_database.begin(); it != m_database.end(); ++it)
-			{
-				func(it);
-			}
-		}
-	};
 
 	std::string s_shaderLibDir;
 	std::string s_shaderCacheDir;
@@ -16542,7 +16547,8 @@ namespace vkr {
 		return VK_NOT_READY;
 	}
 
-#endif // 1
+#endif 
+	// 12
 	// misc
 #if 1
 
@@ -16553,58 +16559,39 @@ namespace vkr {
 	{
 		double milliseconds = 0;
 #ifdef _WIN32
-		static LARGE_INTEGER s_frequency;
+		static LARGE_INTEGER s_frequency = {};
 		static BOOL s_use_qpc = QueryPerformanceFrequency(&s_frequency);
 		if (s_use_qpc)
 		{
-			LARGE_INTEGER now;
+			LARGE_INTEGER now = {};
 			QueryPerformanceCounter(&now);
 			milliseconds = double(1000.0 * now.QuadPart) / s_frequency.QuadPart;
 		}
 		else
 		{
-			milliseconds = double(GetTickCount());
+			milliseconds = (double)GetTickCount64();
 		}
 #endif
 		return milliseconds;
 	}
 
-	class MessageBuffer
-	{
-	public:
-		MessageBuffer(size_t len) :
-			m_dynamic(len > STATIC_LEN ? len : 0),
-			m_ptr(len > STATIC_LEN ? m_dynamic.data() : m_static)
-		{
-		}
-		char* Data() { return m_ptr; }
-
-	private:
-		static const size_t STATIC_LEN = 256;
-		char m_static[STATIC_LEN];
-		std::vector<char> m_dynamic;
-		char* m_ptr;
-	};
-
-	//
 	// Formats a string
-	//
 	std::string format(const char* format, ...)
 	{
 		va_list args;
 		va_start(args, format);
 #ifndef _MSC_VER
 		size_t size = std::snprintf(nullptr, 0, format, args) + 1; // Extra space for '\0'
-		MessageBuffer buf(size);
+		std::string buf; buf.resize(size);
 		std::vsnprintf(buf.Data(), size, format, args);
 		va_end(args);
 		return std::string(buf.Data(), buf.Data() + size - 1); // We don't want the '\0' inside
 #else
 		const size_t size = (size_t)_vscprintf(format, args) + 1;
-		MessageBuffer buf(size);
-		vsnprintf_s(buf.Data(), size, _TRUNCATE, format, args);
+		std::string buf; buf.resize(size);
+		vsnprintf_s(buf.data(), size, _TRUNCATE, format, args);
 		va_end(args);
-		return std::string(buf.Data(), buf.Data() + size - 1);
+		return buf.c_str();
 #endif
 	}
 
@@ -16628,22 +16615,18 @@ namespace vkr {
 #ifdef _WIN32
 		static std::mutex mutex;
 		std::unique_lock<std::mutex> lock(mutex);
-
 		va_list args;
-
 		// generate formatted string
 		va_start(args, pFormat);
 		const size_t bufLen = (size_t)_vscprintf(pFormat, args) + 2;
-		MessageBuffer buf(bufLen);
-		vsnprintf_s(buf.Data(), bufLen, bufLen, pFormat, args);
-		va_end(args);
-		strcat_s(buf.Data(), bufLen, "\n");
-
+		std::string buf; buf.resize(bufLen);
+		vsnprintf_s(buf.data(), bufLen, bufLen, pFormat, args);
+		va_end(args); 
+		buf.push_back('\n');
 		// Output to attached debugger
-		OutputDebugStringA(buf.Data());
-
+		OutputDebugStringA(buf.data());
 		// Also log to file
-		Log::Trace(buf.Data());
+		Log::Trace(buf.data());
 #endif
 	}
 
