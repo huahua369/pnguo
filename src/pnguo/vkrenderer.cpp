@@ -2549,7 +2549,7 @@ namespace vkr
 
 
 
-	}
+}
 //!vkr
 
 
@@ -6357,7 +6357,7 @@ namespace vkr
 			// Load material constants. This is a depth pass and we are only interested in the mask texture
 			//               
 			tfmat->m_doubleSided = material.doubleSided;
-			std::string alphaMode = material.alphaMode;// ", "OPAQUE");
+			std::string alphaMode = material.alphaMode;
 			tfmat->m_defines["DEF_alphaMode_" + alphaMode] = std::to_string(1);
 
 			tfmat->m_blending = alphaMode == "BLEND";
@@ -6367,7 +6367,7 @@ namespace vkr
 			{
 				tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);//  0.5));
 
-				auto pbrMetallicRoughnessIt = material.pbrMetallicRoughness;// .find("pbrMetallicRoughness");
+				auto pbrMetallicRoughnessIt = material.pbrMetallicRoughness;
 				int id = pbrMetallicRoughnessIt.baseColorTexture.index;
 				if (id >= 0)
 				{
@@ -7055,7 +7055,6 @@ namespace vkr
 		m_pUploadHeap = pUploadHeap;
 		if (!_pStaticBufferPool)
 			_pStaticBufferPool = new StaticBufferPool();
-		//ResourceViewHeaps* pResourceViewHeaps,		// 管理set分配  
 		return true;
 	}
 	struct image_pxt
@@ -7904,7 +7903,7 @@ namespace vkr
 
 		// If using pbrMetallicRoughness
 		//
-		auto pbrMetallicRoughness = material.pbrMetallicRoughness;// .find("pbrMetallicRoughness");
+		auto pbrMetallicRoughness = material.pbrMetallicRoughness;
 
 		do
 		{
@@ -8459,9 +8458,44 @@ namespace vkr
 	}
 
 	//--------------------------------------------------------------------------------------
-	//
-	// OnCreate
-	//
+	void load_materials_variants(tinygltf::Primitive* primitive, PBRPrimitives* pPrimitive)
+	{
+		if (primitive && primitive->extensions.size() && pPrimitive) {
+			auto extensions = primitive->extensions;
+			auto tt = get_ext(extensions, "KHR_materials_variants");
+			if (tt)
+			{
+				if (tt->Has("mappings"))
+				{
+					auto& vt = tt->Get("mappings");
+					auto vn = vt.Size();
+					if (vt.IsArray())
+					{
+						for (size_t k = 0; k < vn; k++)
+						{
+							auto& vk = vt.Get(k);
+							int mid = vk.Get("material").GetNumberAsInt();
+							material_v mv = {};
+							mv.mid = mid;
+							if (vk.Has("variants") && vk.Get("variants").IsArray())
+							{
+								auto& va = vk.Get("variants");
+								auto van = va.Size();
+								mv.variants.reserve(van);
+								for (size_t m = 0; m < van; m++)
+								{
+									int vid = va.Get(m).GetNumberAsInt();
+									mv.variants.push_back(vid);
+								}
+							}
+							pPrimitive->material_variants.push_back(mv);
+						}
+					}
+				}
+			}
+		}
+	}
+	// OnCreate 
 	//--------------------------------------------------------------------------------------
 	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing
 		, gltf_gpu_res_cx* pGLTFTexturesAndBuffers, env_res_t* r
@@ -8631,56 +8665,21 @@ namespace vkr
 				{
 					auto& primitive = primitives[p];
 					PBRPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
-					pPrimitive->m_geometry.instanceCount = _ptb->instanceCount;
-					if (primitive.extensions.size()) {
-						auto extensions = primitive.extensions;
-						auto tt = get_ext(extensions, "KHR_materials_variants");
-						if (tt)
-						{
-							if (tt->Has("mappings"))
-							{
-								auto& vt = tt->Get("mappings");
-								auto vn = vt.Size();
-								if (vt.IsArray())
-								{
-									for (size_t k = 0; k < vn; k++)
-									{
-										auto& vk = vt.Get(k);
-										int mid = vk.Get("material").GetNumberAsInt();
-										material_v mv = {};
-										mv.mid = mid;
-										if (vk.Has("variants") && vk.Get("variants").IsArray())
-										{
-											auto& va = vk.Get("variants");
-											auto van = va.Size();
-											mv.variants.reserve(van);
-											for (size_t m = 0; m < van; m++)
-											{
-												int vid = va.Get(m).GetNumberAsInt();
-												mv.variants.push_back(vid);
-											}
-										}
-										pPrimitive->material_variants.push_back(mv);
-									}
-								}
-							}
-						}
-						primitive.material;
-					}
-
+					pPrimitive->m_geometry.instanceCount = _ptb->instanceCount;	// 实例数量
 					std::function<void()> cb = [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
 						{
-							// Sets primitive's material, or set a default material if none was specified in the GLTF
-							//
-							auto mid = primitive.material;// .find("material");
+							// Sets primitive's material, or set a default material if none was specified in the GLTF 
+							load_materials_variants(&primitive, pPrimitive);
+							auto mid = primitive.material;
 							pPrimitive->m_pMaterial = (mid != -1) ? &m_materialsData[mid] : &m_defaultMaterial;
 							pPrimitive->mid = mid;
 							auto ts = primitive.targets.size();// todo 变形
+#ifdef _DEBUG
 							if (ts > 0) {
 								printf("targets %zu\n", ts);
 							}
+#endif // _DEBUG 
 							// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
-							//
 							DefineList defines = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_defines + rtDefines;
 							auto& mde = pPrimitive->m_pMaterial->m_pbrMaterialParameters.uvTransform;
 							// make a list of all the attribute names our pass requires, in the case of PBR we need them all
@@ -15117,7 +15116,7 @@ namespace vkr {
 		{
 			return new WICLoader();
 		}
-	} 
+	}
 	// Compute a hash of an array
 	size_t Hash(const void* ptr, size_t size, size_t result)
 	{

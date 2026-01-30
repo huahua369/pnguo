@@ -2187,8 +2187,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 #ifdef USE_IBL
 	color += getIBLContribution(m, normal, view) * myPerFrame.u_iblFactor * GetSSAO(gl_FragCoord.xy * myPerFrame.u_invScreenResolution);
 
-#if 1
-	//def EXT_IBL
+
 #ifdef MATERIAL_DIFFUSE_TRANSMISSION
 	vec3 diffuseTransmissionIBL = getDiffuseLight(-n) * m.diffuseTransmissionColorFactor;
 #ifdef MATERIAL_VOLUME
@@ -2237,7 +2236,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, m.metallic);
 	color = max(vec3(0.0), f_sheen + color * albedoSheenScaling);
-#endif 
+ 
 
 #endif //end USE_IBL 
 
