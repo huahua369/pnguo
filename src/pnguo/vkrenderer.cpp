@@ -312,6 +312,7 @@ namespace vkr
 		std::queue<std::function<void()>> tasks;
 		std::mutex mtx;
 		size_t w_count = 0;
+		std::atomic_int rc = 0;
 	public:
 		TaskQueue(size_t count);
 		~TaskQueue();
@@ -1014,8 +1015,9 @@ namespace vkr
 		bool CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout);
 		bool CreateDescriptorSetLayoutAndAllocDescriptorSet(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
 		void FreeDescriptor(VkDescriptorSet descriptorSet);
+		Device* get_dev();
 	private:
-		Device* m_pDevice;
+		Device* m_pDevice = 0;
 		VkDescriptorPool m_descriptorPool;
 		std::mutex       m_mutex;
 		int              m_allocatedDescriptorCount = 0;
@@ -3509,6 +3511,7 @@ namespace vkr {
 		VkDescriptorSetLayout m_texturesDescriptorSetLayout = VK_NULL_HANDLE;
 		std::string pipe_kv;
 		PBRPipe_t* next = 0;
+		std::atomic_int st;
 	};
 
 	struct DepthPipe_t {
@@ -7122,11 +7125,7 @@ namespace vkr
 
 	TaskQueue::TaskQueue(size_t count)
 	{
-		if (count > 0)
-		{
-			size_t tn = std::thread::hardware_concurrency();
-			run(std::min(count, tn));
-		}
+		run(count);
 	}
 
 	TaskQueue::~TaskQueue()
@@ -7137,6 +7136,7 @@ namespace vkr
 	{
 		if (w_count > 0)
 		{
+			rc++;
 			std::lock_guard<std::mutex> lock(mtx);
 			tasks.push(task);
 		}
@@ -7147,10 +7147,12 @@ namespace vkr
 	void TaskQueue::run(int num)
 	{
 		if (num < 1)return;
+		int tn = std::thread::hardware_concurrency();
+		num = std::min(num, tn);
 		w_count += num;
 		for (int i = 0; i < num; ++i) {
 			workers.emplace_back([this](std::stop_token st) {
-				while (!st.stop_requested() || !tasks.empty()) {
+				while (!st.stop_requested()) {
 					while (tasks.size())
 					{
 						std::function<void()> task;
@@ -7161,6 +7163,7 @@ namespace vkr
 							task = std::move(tasks.front());  tasks.pop();
 						}
 						task();
+						rc--;
 					}
 					std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				}
@@ -7168,7 +7171,7 @@ namespace vkr
 		}
 	}
 	void TaskQueue::wait_stop() {
-		while (tasks.size()) {
+		while (rc > 0) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 		for (auto& w : workers)
@@ -8495,11 +8498,30 @@ namespace vkr
 			}
 		}
 	}
+
+	struct primitive_info_c
+	{
+		PBRPrimitives* pPrimitive;
+		morph_t* morphing = 0;
+		PBRPipe_t* pbrpipe = 0;
+		int skimb = 0;
+		int td = 0;
+		int md = 0;
+		int muvt = 0;
+		int icbinding = 0;
+		int inverseMatrixBufferSize = 0;
+		int muvt_size = 0;
+		int ins_size = 0;
+	};
+	void makeDescriptors(primitive_info_c* pc, int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* mm, int muvt_size, int instanceCount, std::vector<VkDescriptorSetLayoutBinding>& layout_bindings);
+	void new_pipeline(ResourceViewHeaps* prv, PBRPipe_t* pbrpipe, const DefineList& defines0, std::vector<VkVertexInputAttributeDescription>* playout
+		, std::vector<VkDescriptorSetLayoutBinding>* layout_bindings, VkDescriptorSetLayout tex_layout, GBufferRenderPass* pRenderPass, bool doubleSided, bool blending);
+
+	void set_descriptors(primitive_info_c* pi, ResourceViewHeaps* prv, DynamicBufferRing* pdyb);
+
 	// OnCreate 
 	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing
-		, gltf_gpu_res_cx* pGLTFTexturesAndBuffers, env_res_t* r
-		, GBufferRenderPass* pRenderPass)//AsyncPool* pAsyncPool)
+	void GltfPbrPass::OnCreate(Device* pDevice, UploadHeap* pUploadHeap, ResourceViewHeaps* pHeaps, DynamicBufferRing* pDynamicBufferRing, gltf_gpu_res_cx* pGLTFTexturesAndBuffers, env_res_t* r, GBufferRenderPass* pRenderPass)
 	{
 		print_time Pt("init pbr", 1);
 		_envr = r;
@@ -8645,8 +8667,22 @@ namespace vkr
 			//
 			auto& meshes = pm->meshes;
 
-			TaskQueue vts(1);
+			TaskQueue vts(0);
 			m_meshes.resize(meshes.size());
+			std::vector<primitive_info_c> primitive_infos;
+			std::set<PBRPipe_t*> used_pipelines;
+			struct pipenew_info_c
+			{
+				PBRPipe_t* pbrpipe = 0;
+				DefineList defines0;
+				std::vector<VkVertexInputAttributeDescription> layout;
+				std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
+				VkDescriptorSetLayout tex_layout = {};
+				GBufferRenderPass* pRenderPass = 0;
+				bool doubleSided = false; bool blending = false;
+			};
+			std::vector<pipenew_info_c> pics;
+			primitive_infos.reserve(meshes.size());
 			for (uint32_t i = 0; i < meshes.size(); i++)
 			{
 				auto& mesh = meshes[i];
@@ -8666,65 +8702,99 @@ namespace vkr
 					auto& primitive = primitives[p];
 					PBRPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 					pPrimitive->m_geometry.instanceCount = _ptb->instanceCount;	// 实例数量
-					std::function<void()> cb = [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
-						{
-							// Sets primitive's material, or set a default material if none was specified in the GLTF 
-							load_materials_variants(&primitive, pPrimitive);
-							auto mid = primitive.material;
-							pPrimitive->m_pMaterial = (mid != -1) ? &m_materialsData[mid] : &m_defaultMaterial;
-							pPrimitive->mid = mid;
-							auto ts = primitive.targets.size();// todo 变形
+					//std::function<void()> cb = [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
+					{
+						// Sets primitive's material, or set a default material if none was specified in the GLTF 
+						load_materials_variants(&primitive, pPrimitive);
+						auto mid = primitive.material;
+						pPrimitive->m_pMaterial = (mid != -1) ? &m_materialsData[mid] : &m_defaultMaterial;
+						pPrimitive->mid = mid;
+						auto ts = primitive.targets.size();// todo 变形
 #ifdef _DEBUG
-							if (ts > 0) {
-								printf("targets %zu\n", ts);
-							}
+						if (ts > 0) {
+							printf("targets %zu\n", ts);
+						}
 #endif // _DEBUG 
-							// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
-							DefineList defines = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_defines + rtDefines;
-							auto& mde = pPrimitive->m_pMaterial->m_pbrMaterialParameters.uvTransform;
-							// make a list of all the attribute names our pass requires, in the case of PBR we need them all
-							//
-							std::vector<std::string> requiredAttributes;
-							for (auto const& it : primitive.attributes)//["attributes"].items())
-								requiredAttributes.push_back(it.first);
+						pipenew_info_c c = {};
+						// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
+						c.defines0 = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_defines + rtDefines;
+						auto& mde = pPrimitive->m_pMaterial->m_pbrMaterialParameters.uvTransform;
+						// make a list of all the attribute names our pass requires, in the case of PBR we need them all
+						//
+						std::vector<std::string> requiredAttributes;
+						for (auto const& it : primitive.attributes)//["attributes"].items())
+							requiredAttributes.push_back(it.first);
 
-							// create an input layout from the required attributes
-							// shader's can tell the slots from the #defines
-							// todo 加载顶点数据到显存
-							std::vector<VkVertexInputAttributeDescription> inputLayout;
-							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
-							mesh_mapd_ptr mm = {};
-							morph_t* morphing = 0;
-							auto tsa = primitive.targets.size();// todo 变形判断
-							if (tsa > 0) {
-								auto mid = primitive.targets[0].begin()->second;
-								auto bm = &_ptb->m_BufferMap[mid];
-								morphing = bm;
-								if (morphing->mdb.buffer)
-									mm.m = morphing;
-							}
-							// Create descriptors and pipelines
-							auto uc = defines["UVT_count"];
-							int muvt_size = std::atoi(uc.c_str());
-							int skinId = _ptb->m_pGLTFCommon->FindMeshSkinId(i);
-							int inverseMatrixBufferSize = _ptb->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-							if (muvt_size)
+						// create an input layout from the required attributes
+						// shader's can tell the slots from the #defines
+						// todo 加载顶点数据到显存
+						std::vector<VkVertexInputAttributeDescription>& inputLayout = c.layout;
+						_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, c.defines0, &pPrimitive->m_geometry);
+						mesh_mapd_ptr mm = {};
+						morph_t* morphing = 0;
+						auto tsa = primitive.targets.size();// todo 变形判断
+						if (tsa > 0) {
+							auto mid = primitive.targets[0].begin()->second;
+							auto bm = &_ptb->m_BufferMap[mid];
+							morphing = bm;
+							if (morphing->mdb.buffer)
+								mm.m = morphing;
+						}
+						// Create descriptors and pipelines
+						auto uc = c.defines0["UVT_count"];
+						int muvt_size = std::atoi(uc.c_str());
+						int skinId = _ptb->m_pGLTFCommon->FindMeshSkinId(i);
+						int inverseMatrixBufferSize = _ptb->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
+						if (muvt_size)
+						{
+							auto& uvm = _ptb->m_pGLTFCommon->m_uv_mats[primitive.material];
+							mm.uvtdata = &_ptb->m_uvmMap[primitive.material];
+							uvm.resize(muvt_size);
+							for (int j = 0; j < muvt_size; j++)
 							{
-								auto& uvm = _ptb->m_pGLTFCommon->m_uv_mats[primitive.material];
-								mm.uvtdata = &_ptb->m_uvmMap[primitive.material];
-								uvm.resize(muvt_size);
-								for (int j = 0; j < muvt_size; j++)
-								{
-									uvm[j] = mde[j];
-								}
+								uvm[j] = mde[j];
 							}
-							CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, &mm, sizeof(glm::mat3x4) * muvt_size, bUseSSAOMask);
-							CreatePipeline(inputLayout, defines, pPrimitive);
-						};
-					vts.add(cb);
+						}
+
+						auto pc = get_cp();
+						primitive_info_c pn;
+						makeDescriptors(&pn, inverseMatrixBufferSize, &c.defines0, pPrimitive, &mm, sizeof(glm::mat3x4) * muvt_size, _ptb->instanceCount, c.layout_bindings);
+						auto pbrpipe = get_pipem(&c.defines0);
+						pn.pbrpipe = pbrpipe;
+						primitive_infos.push_back(pn);
+						assert(pbrpipe);
+						if (!pbrpipe)
+						{
+							return;
+						}
+						if (used_pipelines.insert(pbrpipe).second)
+						{
+							c.pbrpipe = pbrpipe;
+							c.tex_layout = pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout;
+							c.doubleSided = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_doubleSided;
+							c.blending = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_blending;
+							pics.push_back(std::move(c));
+						}
+					}
 				}
 			}
+			vts.run(pics.size());
+			for (size_t i = 0; i < pics.size(); i++)
+			{
+				vts.add([=, &pics]() {
+					auto& it = pics[i];
+					new_pipeline(m_pResourceViewHeaps, it.pbrpipe, it.defines0, &it.layout, &it.layout_bindings, it.tex_layout, m_pRenderPass, it.doubleSided, it.blending);
+					});
+			}
 			vts.wait_stop();
+			{
+				print_time Pt("set pbr pipeline", 1);
+				for (size_t i = 0; i < primitive_infos.size(); i++)
+				{
+					auto& it = primitive_infos[i];
+					set_descriptors(&it, m_pResourceViewHeaps, m_pDynamicBufferRing);
+				}
+			}
 		}
 	}
 	//--------------------------------------------------------------------------------------
@@ -8962,27 +9032,33 @@ namespace vkr
 		return r;
 	}
 	//--------------------------------------------------------------------------------------
-	// CreateDescriptors for a combination of material and geometry
-	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* mm, int muvt_size, bool bUseSSAOMask)
+	void makeDescriptors(primitive_info_c* pc, int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* mm, int muvt_size, int instanceCount, std::vector<VkDescriptorSetLayoutBinding>& layout_bindings)
 	{
 		// Creates descriptor set layout binding for the constant buffers
-		std::vector<VkDescriptorSetLayoutBinding> layout_bindings(2);
+		layout_bindings.reserve(7);
 		auto& ad = *pAttributeDefines;
-		// Constant buffer 'per frame'
-		layout_bindings[0].binding = 0;
-		layout_bindings[0].descriptorCount = 1;
-		layout_bindings[0].pImmutableSamplers = NULL;
-		layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		layout_bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		ad["ID_PER_FRAME"] = std::to_string(layout_bindings[0].binding);
+		{
+			VkDescriptorSetLayoutBinding b;
+			// Constant buffer 'per frame'
+			b.binding = 0;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			ad["ID_PER_FRAME"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
+		}
 		// Constant buffer 'per object'
-		layout_bindings[1].binding = 1;
-		layout_bindings[1].descriptorCount = 1;
-		layout_bindings[1].pImmutableSamplers = NULL;
-		layout_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		layout_bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		ad["ID_PER_OBJECT"] = std::to_string(layout_bindings[1].binding);
+		{
+			VkDescriptorSetLayoutBinding b;
+			b.binding = 1;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			ad["ID_PER_OBJECT"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
+		}
 		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		auto dt1 = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		int binc = 2;
@@ -9002,7 +9078,6 @@ namespace vkr
 			b.descriptorType = dt;
 			skb = b.binding;
 			ad["ID_SKINNING_MATRICES"] = std::to_string(b.binding);
-
 			layout_bindings.push_back(b);
 		}
 		auto morphing = mm ? mm->m : 0;
@@ -9043,10 +9118,9 @@ namespace vkr
 			ad["ID_MATUV_DATA"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
 		}
-		auto pc = get_cp();
 		int icbinding = 0;
 		uint32_t ins_size = 0;
-		if (pc && pc->instanceCount > 1)
+		if (instanceCount > 1)
 		{
 			// 实例矩阵
 			VkDescriptorSetLayoutBinding b;
@@ -9058,11 +9132,56 @@ namespace vkr
 			icbinding = b.binding;
 			ad["ID_INSTANCING"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
-			ins_size = sizeof(glm::mat4) * pc->instanceCount;
+			ins_size = sizeof(glm::mat4) * instanceCount;
 		}
-		// todo pbr buffer初始化
-		//m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &pPrimitive->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
-		auto h = pAttributeDefines->Hash();
+		pc->pPrimitive = pPrimitive;
+		pc->morphing = morphing;
+		pc->skimb = skb;
+		pc->td = td;
+		pc->md = md;
+		pc->muvt = muvt;
+		pc->icbinding = icbinding;
+		pc->inverseMatrixBufferSize = inverseMatrixBufferSize;
+		pc->muvt_size = muvt_size;
+		pc->ins_size = ins_size;
+	}
+	void set_descriptors(primitive_info_c* pi, ResourceViewHeaps* prv, DynamicBufferRing* pdyb)
+	{
+		prv->AllocDescriptor(pi->pbrpipe->m_uniformsDescriptorSetLayout, &pi->pPrimitive->m_uniformsDescriptorSet);
+		// Init descriptors sets for the constant buffers
+		pdyb->SetDescriptorSet(0, sizeof(PerFrame_t), pi->pPrimitive->m_uniformsDescriptorSet);
+		pdyb->SetDescriptorSet(1, sizeof(GltfPbrPass::per_object), pi->pPrimitive->m_uniformsDescriptorSet);
+		auto dt = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		auto dt1 = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		if (pi->inverseMatrixBufferSize > 0)
+		{
+			pdyb->SetDescriptorSet(pi->skimb, (uint32_t)pi->inverseMatrixBufferSize, pi->pPrimitive->m_uniformsDescriptorSet, dt);
+		}
+		if (pi->morphing)
+		{
+			//vec4 per_target_data[];
+			prv->get_dev()->SetDescriptorSet1(pi->morphing->mdb.buffer, pi->td, pi->morphing->mdb.offset, (uint32_t)pi->morphing->mdb.range, pi->pPrimitive->m_uniformsDescriptorSet, dt1);
+			//float u_morphWeights[];
+			pdyb->SetDescriptorSet(pi->md, (uint32_t)pi->morphing->targetCount * sizeof(float), pi->pPrimitive->m_uniformsDescriptorSet, dt);
+		}
+		if (pi->muvt_size > 0)
+		{
+			pdyb->SetDescriptorSet(pi->muvt, (uint32_t)pi->muvt_size, pi->pPrimitive->m_uniformsDescriptorSet, dt);
+		}
+		// 实例矩阵
+		if (pi->icbinding > 0)
+		{
+			pdyb->SetDescriptorSet(pi->icbinding, pi->ins_size, pi->pPrimitive->m_uniformsDescriptorSet, dt);
+		}
+		pi->pPrimitive->_pipe = pi->pbrpipe;
+	}
+	// CreateDescriptors for a combination of material and geometry
+	//--------------------------------------------------------------------------------------
+	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* mm, int muvt_size, bool bUseSSAOMask)
+	{
+		// Creates descriptor set layout binding for the constant buffers
+		std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
+		auto pc = get_cp();
 		auto pbrpipe = get_pipem(pAttributeDefines);
 		assert(pbrpipe);
 		if (!pbrpipe)
@@ -9090,31 +9209,7 @@ namespace vkr
 			assert(res == VK_SUCCESS);
 			SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
 		}
-		m_pResourceViewHeaps->AllocDescriptor(pbrpipe->m_uniformsDescriptorSetLayout, &pPrimitive->m_uniformsDescriptorSet);
-		// Init descriptors sets for the constant buffers
-		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(PerFrame_t), pPrimitive->m_uniformsDescriptorSet);
-		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(per_object), pPrimitive->m_uniformsDescriptorSet);
 
-		if (inverseMatrixBufferSize > 0)
-		{
-			m_pDynamicBufferRing->SetDescriptorSet(skb, (uint32_t)inverseMatrixBufferSize, pPrimitive->m_uniformsDescriptorSet, dt);
-		}
-		if (morphing)
-		{
-			//vec4 per_target_data[];
-			m_pDevice->SetDescriptorSet1(morphing->mdb.buffer, td, morphing->mdb.offset, (uint32_t)morphing->mdb.range, pPrimitive->m_uniformsDescriptorSet, dt1);
-			//float u_morphWeights[];
-			m_pDynamicBufferRing->SetDescriptorSet(md, (uint32_t)morphing->targetCount * sizeof(float), pPrimitive->m_uniformsDescriptorSet, dt);
-		}
-		if (muvt_size > 0)
-		{
-			m_pDynamicBufferRing->SetDescriptorSet(muvt, (uint32_t)muvt_size, pPrimitive->m_uniformsDescriptorSet, dt);
-		}
-		// 实例矩阵
-		if (icbinding > 0)
-		{
-			m_pDynamicBufferRing->SetDescriptorSet(icbinding, ins_size, pPrimitive->m_uniformsDescriptorSet, dt);
-		}
 
 	}
 	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
@@ -9145,6 +9240,277 @@ namespace vkr
 		out = blend ? color_blend : color_no_blend;
 	}
 	//--------------------------------------------------------------------------------------
+
+	void new_pipeline(ResourceViewHeaps* prv, PBRPipe_t* pbrpipe, const DefineList& defines0,
+		std::vector<VkVertexInputAttributeDescription>* playout, std::vector<VkDescriptorSetLayoutBinding>* layout_bindings
+		, VkDescriptorSetLayout tex_layout, GBufferRenderPass* pRenderPass, bool doubleSided, bool blending)
+	{
+		if (!pbrpipe || pbrpipe->m_pipeline)
+		{
+			return;
+		}
+		auto& layout = *playout;
+		auto pdev = prv->get_dev();
+		auto dev = pdev->m_device;
+		if (!pbrpipe->m_pipelineLayout || !pbrpipe->m_uniformsDescriptorSetLayout) {
+			prv->CreateDescriptorSetLayout(layout_bindings, &pbrpipe->m_uniformsDescriptorSetLayout);
+			// Create the pipeline layout
+			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pbrpipe->m_uniformsDescriptorSetLayout };
+			if (tex_layout != VK_NULL_HANDLE)
+			{
+				descriptorSetLayout.push_back(tex_layout);
+				pbrpipe->m_texturesDescriptorSetLayout = tex_layout;
+			}
+			VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
+			pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			pPipelineLayoutCreateInfo.pNext = NULL;
+			pPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+			pPipelineLayoutCreateInfo.pPushConstantRanges = NULL;
+			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
+			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
+			VkResult res = vkCreatePipelineLayout(dev, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
+			assert(res == VK_SUCCESS);
+			SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
+		}
+
+		// Compile and create shaders
+		auto defines = defines0;
+		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
+		// Create pipeline 
+		VKCompileFromFile(dev, VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
+		VKCompileFromFile(dev, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
+		// vertex input state
+		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
+		for (int i = 0; i < layout.size(); i++)
+		{
+			vi_binding[i].binding = layout[i].binding;
+			vi_binding[i].stride = SizeOfFormat(layout[i].format);
+			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		}
+		if (defines.Has("ID_INSTANCE_MAT")) { vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
+		VkPipelineVertexInputStateCreateInfo vi = {};
+		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vi.pNext = NULL;
+		vi.flags = 0;
+		vi.vertexBindingDescriptionCount = (uint32_t)vi_binding.size();
+		vi.pVertexBindingDescriptions = vi_binding.data();
+		vi.vertexAttributeDescriptionCount = (uint32_t)layout.size();
+		vi.pVertexAttributeDescriptions = layout.data();
+		// input assembly state
+		VkPipelineInputAssemblyStateCreateInfo ia;
+		ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		ia.pNext = NULL;
+		ia.flags = 0;
+		ia.primitiveRestartEnable = VK_FALSE;
+		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		// rasterizer state
+		VkPipelineRasterizationStateCreateInfo rs;
+		rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rs.pNext = NULL;
+		rs.flags = 0;
+		rs.polygonMode = VK_POLYGON_MODE_FILL;
+		rs.cullMode = doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
+		rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		rs.depthClampEnable = VK_FALSE;
+		rs.rasterizerDiscardEnable = VK_FALSE;
+		rs.depthBiasEnable = VK_FALSE;
+		rs.depthBiasConstantFactor = 0;
+		rs.depthBiasClamp = 0;
+		rs.depthBiasSlopeFactor = 0;
+		rs.lineWidth = 2.0f;
+		bool depthwrite = !blending;// || (defines.Has("DEF_alphaMode_BLEND")));
+		std::vector<VkPipelineColorBlendAttachmentState> att_states;
+		if (defines.Has("HAS_FORWARD_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			get_blend(blending, att_state);
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_OIT_ACCUM_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_TRUE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_OIT_WEIGHT_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_TRUE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_DIFFUSE_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_NORMALS_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_MOTION_VECTORS_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		// Color blend state
+		VkPipelineColorBlendStateCreateInfo cb;
+		cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		cb.flags = 0;
+		cb.pNext = NULL;
+		cb.attachmentCount = static_cast<uint32_t>(att_states.size());
+		cb.pAttachments = att_states.data();
+		cb.logicOpEnable = VK_FALSE;
+		cb.logicOp = VK_LOGIC_OP_NO_OP;
+		cb.blendConstants[0] = 0.0f;
+		cb.blendConstants[1] = 0.0f;
+		cb.blendConstants[2] = 0.0f;
+		cb.blendConstants[3] = 0.0f;
+		std::vector<VkDynamicState> dynamicStateEnables = {
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR,
+			//VK_DYNAMIC_STATE_LINE_WIDTH,
+			//VK_DYNAMIC_STATE_CULL_MODE,
+			//VK_DYNAMIC_STATE_FRONT_FACE
+		};
+		VkPipelineDynamicStateCreateInfo dynamicState = {};
+		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamicState.pNext = NULL;
+		dynamicState.pDynamicStates = dynamicStateEnables.data();
+		dynamicState.dynamicStateCount = (uint32_t)dynamicStateEnables.size();
+		// view port state
+		VkPipelineViewportStateCreateInfo vp = {};
+		vp.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		vp.pNext = NULL;
+		vp.flags = 0;
+		vp.viewportCount = 1;
+		vp.scissorCount = 1;
+		vp.pScissors = NULL;
+		vp.pViewports = NULL;
+		// todo depth stencil state
+		VkPipelineDepthStencilStateCreateInfo ds;
+		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		ds.pNext = NULL;
+		ds.flags = 0;
+		ds.depthTestEnable = true;
+		ds.depthWriteEnable = depthwrite;
+		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		ds.back.failOp = VK_STENCIL_OP_KEEP;
+		ds.back.passOp = VK_STENCIL_OP_KEEP;
+		ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
+		ds.back.compareMask = 0;
+		ds.back.reference = 0;
+		ds.back.depthFailOp = VK_STENCIL_OP_KEEP;
+		ds.back.writeMask = 0;
+		ds.depthBoundsTestEnable = VK_FALSE;
+		ds.minDepthBounds = 0;
+		ds.maxDepthBounds = 0;
+		ds.stencilTestEnable = VK_TRUE;
+		ds.front = ds.back;
+		// multi sample state
+		VkPipelineMultisampleStateCreateInfo ms;
+		ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		ms.pNext = NULL;
+		ms.flags = 0;
+		ms.pSampleMask = NULL;
+		ms.rasterizationSamples = pRenderPass->GetSampleCount();
+		ms.sampleShadingEnable = VK_FALSE;
+		ms.alphaToCoverageEnable = VK_FALSE;
+		ms.alphaToOneEnable = VK_FALSE;
+		ms.minSampleShading = 0.0;
+		// create pipeline 
+		VkGraphicsPipelineCreateInfo pipeline = {};
+		pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipeline.pNext = NULL;
+		pipeline.layout = pbrpipe->m_pipelineLayout;
+		pipeline.basePipelineHandle = VK_NULL_HANDLE;
+		pipeline.basePipelineIndex = 0;
+		pipeline.flags = 0;
+		pipeline.pVertexInputState = &vi;
+		pipeline.pInputAssemblyState = &ia;
+		pipeline.pRasterizationState = &rs;
+		pipeline.pColorBlendState = &cb;
+		pipeline.pTessellationState = NULL;
+		pipeline.pMultisampleState = &ms;
+		pipeline.pDynamicState = &dynamicState;
+		pipeline.pViewportState = &vp;
+		pipeline.pDepthStencilState = &ds;
+		pipeline.pStages = shaderStages.data();
+		pipeline.stageCount = (uint32_t)shaderStages.size();
+		pipeline.renderPass = pRenderPass->GetRenderPass();
+		pipeline.subpass = 0;
+		uint32_t specConstants = 0;
+		VkSpecializationMapEntry specializationMapEntry = VkSpecializationMapEntry{};
+		specializationMapEntry.constantID = 0;
+		specializationMapEntry.offset = 0;
+		specializationMapEntry.size = sizeof(uint32_t);
+		VkSpecializationInfo specializationInfo = VkSpecializationInfo();
+		specializationInfo.mapEntryCount = 1;
+		specializationInfo.pMapEntries = &specializationMapEntry;
+		specializationInfo.dataSize = sizeof(uint32_t);
+		specializationInfo.pData = &specConstants;
+		shaderStages[1].pSpecializationInfo = &specializationInfo;
+		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
+		assert(res == VK_SUCCESS);
+		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
+		// create wireframe pipeline
+		rs.polygonMode = VK_POLYGON_MODE_LINE;
+		rs.cullMode = VK_CULL_MODE_NONE;
+		//ds.depthWriteEnable = false;
+		res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
+		assert(res == VK_SUCCESS);
+		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
+	}
 	// CreatePipeline
 	//--------------------------------------------------------------------------------------
 	void GltfPbrPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines0, PBRPrimitives* pPrimitive)
@@ -11128,6 +11494,11 @@ namespace vkr
 	{
 		m_allocatedDescriptorCount--;
 		vkFreeDescriptorSets(m_pDevice->m_device, m_descriptorPool, 1, &descriptorSet);
+	}
+
+	Device* ResourceViewHeaps::get_dev()
+	{
+		return m_pDevice;
 	}
 
 	bool ResourceViewHeaps::AllocDescriptor(int size, const VkSampler* pSamplers, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
