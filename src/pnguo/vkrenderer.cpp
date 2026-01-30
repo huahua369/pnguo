@@ -1067,38 +1067,6 @@ namespace vkr
 
 	};
 
-#if 0
-	class Async
-	{
-		static int s_activeThreads;
-		static int s_maxThreads;
-		static std::mutex s_mutex;
-		static std::condition_variable s_condition;
-		static bool s_bExiting;
-
-		std::function<void()> m_job;
-		Sync* m_pSync;
-		std::thread* m_pThread;
-
-	public:
-		Async(std::function<void()> job, Sync* pSync = NULL);
-		~Async();
-		static void Wait(Sync* pSync);
-	};
-
-	class AsyncPool
-	{
-		std::vector<Async*> m_pool;
-	public:
-		~AsyncPool();
-		void Flush();
-		void AddAsyncTask(std::function<void()> job, Sync* pSync = NULL);
-	};
-
-	void ExecAsyncIfThereIsAPool(AsyncPool* pAsyncPool, std::function<void()> job);
-#endif
-
-
 
 #define CACHE_ENABLE
 	//#define CACHE_LOG 
@@ -2581,7 +2549,7 @@ namespace vkr
 
 
 
-}
+	}
 //!vkr
 
 
@@ -5606,7 +5574,9 @@ namespace vkr {
 		// after calling Load, calls to CopyPixels return each time a lower mip level 
 		void CopyPixels(void* pDest, uint32_t stride, uint32_t width, uint32_t height);
 	private:
+#ifdef _WIN32
 		HANDLE m_handle = INVALID_HANDLE_VALUE;
+#endif
 	};
 
 	// Loads a JPEGs, PNGs, BMPs and any image the Windows Imaging Component can load.
@@ -6431,19 +6401,15 @@ namespace vkr
 					auto& primitive = primitives[p];
 					DepthPrimitives* pPrimitive = &tfmesh->m_pPrimitives[p];
 					pPrimitive->m_geometry.instanceCount = _ptb->instanceCount;
-					//ExecAsyncIfThereIsAPool(pAsyncPool, 
 					std::function<void()> cb = [this, i, p, mesh, &primitive, pPrimitive]()
 						{
 							// Set Material
-							//
-							auto mid = primitive.material;// .find("material");
+							auto mid = primitive.material;
 							if (mid < 0)
 								pPrimitive->m_pMaterial = &m_defaultMaterial;
 							else
 								pPrimitive->m_pMaterial = &m_materialsData[mid];
-
 							// make a list of all the attribute names our pass requires, in the case of a depth pass we only need the position and a few other things. 
-							//
 							std::vector<std::string > requiredAttributes;
 							for (auto& it : primitive.attributes)//["attributes"].items())
 							{
@@ -6468,9 +6434,6 @@ namespace vkr
 							//
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
 							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
-
-							// Create Pipeline
-							//
 							{
 								morph_t* morphing = 0;
 								auto tsa = primitive.targets.size();// todo 变形
@@ -6484,7 +6447,7 @@ namespace vkr
 								}
 								int skinId = _ptb->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = _ptb->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
-
+								// Create Pipeline
 								CreateDescriptors(inverseMatrixBufferSize, &defines, pPrimitive, morphing);
 								CreatePipeline(inputLayout, defines, pPrimitive);
 							}
@@ -7229,7 +7192,6 @@ namespace vkr
 				Texture* pTex = &m_textures[imageIndex];
 				std::string filename = m_pGLTFCommon->m_path + images[imageIndex].uri;
 				auto tv = &m_textureViews[imageIndex];
-				//ExecAsyncIfThereIsAPool(pAsyncPool, [imageIndex, pTex, tv, this, filename, pm]()
 				std::function<void()> ccb = [imageIndex, pTex, tv, this, filename, pm]()
 					{
 						print_time Pt("load texture", 1);
@@ -7764,17 +7726,14 @@ namespace vkr
 	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName)
 	{
 		// search if any *TexCoord mentions this channel
-		//
 		if (semanticName.substr(0, 9) == "TEXCOORD_")
 		{
 			char id = semanticName[9];
-
-			for (auto def : defines)
+			for (auto& def : defines)
 			{
 				uint32_t size = static_cast<uint32_t>(def.first.size());
 				if (size <= 8)
 					continue;
-
 				if (def.first.substr(size - 8) == "TexCoord")
 				{
 					if (id == def.second.c_str()[0])
@@ -7785,7 +7744,6 @@ namespace vkr
 			}
 			return false;
 		}
-
 		return false;
 	}
 
@@ -8710,7 +8668,6 @@ namespace vkr
 						primitive.material;
 					}
 
-					//ExecAsyncIfThereIsAPool(0, 
 					std::function<void()> cb = [this, i, p, mesh, rtDefines, &primitive, pPrimitive, bUseSSAOMask]()
 						{
 							// Sets primitive's material, or set a default material if none was specified in the GLTF
@@ -15046,10 +15003,12 @@ namespace vkr {
 
 	DDSLoader::~DDSLoader()
 	{
+#ifdef _WIN32
 		if (m_handle != INVALID_HANDLE_VALUE)
 		{
 			CloseHandle(m_handle);
 		}
+#endif
 	}
 
 	bool DDSLoader::Load(const char* pFilename, float cutOff, IMG_INFO* pInfo)
@@ -15072,6 +15031,7 @@ namespace vkr {
 			UINT32           reserved;
 		} DDS_HEADER_DXT10;
 
+#ifdef _WIN32
 		if (GetFileAttributesA(pFilename) == 0xFFFFFFFF)
 			return false;
 
@@ -15129,16 +15089,19 @@ namespace vkr {
 		}
 
 		SetFilePointer(m_handle, fileSize - rawTextureSize, 0, FILE_BEGIN);
+#endif
 		return true;
 	}
 
 	void DDSLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
 	{
+#ifdef _WIN32
 		assert(m_handle != INVALID_HANDLE_VALUE);
 		for (uint32_t y = 0; y < height; y++)
 		{
 			::ReadFile(m_handle, (char*)pDest + y * stride, bytesWidth, NULL, NULL);
 		}
+#endif
 	}
 
 	ImgLoader* CreateImageLoader(const char* pFilename)
@@ -15154,122 +15117,8 @@ namespace vkr {
 		{
 			return new WICLoader();
 		}
-	}
-#if 0
-	Async::Async(std::function<void()> job, Sync* pSync) :
-		m_job{ job },
-		m_pSync{ pSync }
-	{
-		if (m_pSync)
-			m_pSync->Inc();
-
-		{
-			std::unique_lock<std::mutex> lock(s_mutex);
-
-			while (s_activeThreads >= s_maxThreads)
-			{
-				s_condition.wait(lock);
-			}
-
-			s_activeThreads++;
-		}
-
-		m_pThread = new std::thread([this]()
-			{
-				m_job();
-
-				{
-					std::lock_guard<std::mutex> lock(s_mutex);
-					s_activeThreads--;
-				}
-
-				s_condition.notify_one();
-
-				if (m_pSync)
-					m_pSync->Dec();
-			});
-	}
-
-	Async::~Async()
-	{
-		m_pThread->join();
-		delete m_pThread;
-	}
-
-	void Async::Wait(Sync* pSync)
-	{
-		if (pSync->Get() == 0)
-			return;
-
-		{
-			std::lock_guard <std::mutex> lock(s_mutex);
-			s_activeThreads--;
-		}
-
-		s_condition.notify_one();
-
-		pSync->Wait();
-
-		{
-			std::unique_lock<std::mutex> lock(s_mutex);
-
-			s_condition.wait(lock, []
-				{
-					return s_bExiting || (s_activeThreads < s_maxThreads);
-				});
-
-			s_activeThreads++;
-		}
-	}
-
-	//
-	// Basic async pool
-	//
-
-	AsyncPool::~AsyncPool()
-	{
-		Flush();
-	}
-
-	void AsyncPool::Flush()
-	{
-		for (int i = 0; i < m_pool.size(); i++)
-			delete m_pool[i];
-		m_pool.clear();
-	}
-
-	void AsyncPool::AddAsyncTask(std::function<void()> job, Sync* pSync)
-	{
-		m_pool.push_back(new Async(job, pSync));
-	}
-
-	//
-	// ExecAsyncIfThereIsAPool, will use async if there is a pool, otherwise will run the task synchronously
-	void ExecAsyncIfThereIsAPool(AsyncPool* pAsyncPool, std::function<void()> job)
-	{
-		// use MT if there is a pool
-		if (pAsyncPool != NULL)
-		{
-			pAsyncPool->AddAsyncTask(job);
-		}
-		else
-		{
-			job();
-		}
-	}
-
-	//
-	// Some static functions
-	//
-	int Async::s_activeThreads = 0;
-	std::mutex Async::s_mutex;
-	std::condition_variable Async::s_condition;
-	bool Async::s_bExiting = false;
-	int Async::s_maxThreads = std::thread::hardware_concurrency();
-#endif
-	//
+	} 
 	// Compute a hash of an array
-	//
 	size_t Hash(const void* ptr, size_t size, size_t result)
 	{
 		for (size_t i = 0; i < size; ++i)
