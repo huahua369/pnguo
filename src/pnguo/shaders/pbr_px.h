@@ -2237,9 +2237,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, m.metallic);
 	color = max(vec3(0.0), f_sheen + color * albedoSheenScaling);
-#endif
-	vec3 xxc = clamp(clearcoatFactor * clearcoatFresnel, 0.0, 1.0);
-	//color = mix(color, clearcoat_brdf, xxc);
+#endif 
 
 #endif //end USE_IBL 
 
