@@ -968,9 +968,9 @@ int main()
 			case 5: return color;
 			*/
 			vkd->_state.SelectedTonemapperIndex = 0;
-			vkd->_state.Exposure = 1.0;
-			vkd->_state.EmissiveFactor = 30;
-			vkd->_state.IBLFactor = 1.0;
+			vkd->_state.Exposure = 0.8;
+			vkd->_state.EmissiveFactor = 50;
+			vkd->_state.IBLFactor = 0.5;
 			new_ui(form0, vkd);
 			auto pcb = new texture_cb();
 			assert(pcb);
@@ -1104,7 +1104,7 @@ int main()
 					vkd->_state.Exposure;					// 曝光度：默认1.0
 					vkd->_state.bUseTAA;
 					vkd->_state.WireframeMode;				// 0 1 2 6
-					static int ity = 10.5;
+					static int ity = 6.5;
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
 					{
