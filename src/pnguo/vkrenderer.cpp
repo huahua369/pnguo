@@ -9178,7 +9178,7 @@ namespace vkr
 				{
 					auto tinfo = pm->textures[value.second];
 					texturesBase[value.first].v = _ptb->GetTextureViewByID(value.second);
-					texturesBase[value.first].s = _samplers[tinfo.sampler];
+					texturesBase[value.first].s = (tinfo.sampler < 0 || tinfo.sampler >= _samplers.size()) ? m_samplerPbr : _samplers[tinfo.sampler];
 				}
 				//tfmat->m_pbrMaterialParameters.m_defines["MAX_LIGHT_INSTANCES"] = "1";
 				CreateDescriptorTableForMaterialTextures(tfmat, texturesBase, r);
@@ -9805,7 +9805,7 @@ namespace vkr
 		rs.depthBiasConstantFactor = 0;
 		rs.depthBiasClamp = 0;
 		rs.depthBiasSlopeFactor = 0;
-		rs.lineWidth = 2.0f;
+		rs.lineWidth = 1.0f;
 		bool depthwrite = !blending;// || (defines.Has("DEF_alphaMode_BLEND")));
 		std::vector<VkPipelineColorBlendAttachmentState> att_states;
 		if (defines.Has("HAS_FORWARD_RT"))
@@ -22281,7 +22281,7 @@ namespace vkr {
 		rs.depthBiasConstantFactor = 0;
 		rs.depthBiasClamp = 0;
 		rs.depthBiasSlopeFactor = 0;
-		rs.lineWidth = 2.0f;
+		rs.lineWidth = 1.0f;
 
 		VkPipelineColorBlendAttachmentState att_state[1];
 		att_state[0].colorWriteMask = allBits;
@@ -22986,7 +22986,7 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	rs.depthBiasConstantFactor = 0;
 	rs.depthBiasClamp = 0;
 	rs.depthBiasSlopeFactor = 0;
-	rs.lineWidth = 2.0f;
+	rs.lineWidth = 1.0f;
 
 	VkPipelineColorBlendAttachmentState att_state[1];
 	att_state[0].colorWriteMask = vkr::allBits;
