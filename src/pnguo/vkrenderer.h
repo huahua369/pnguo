@@ -500,7 +500,7 @@ namespace vkr {
 	std::vector<uint32_t> generateCookTorranceBRDFLUT(uint32_t mapDim, int type);
 	// todo速度比上面函数慢，类型0 = float16，1 = float32
 	std::vector<uint32_t> generateCookTorranceBRDFLUT1632f(uint32_t mapDim, int type);
-
+	// vkr::Device
 	void* new_ms_pipe(void* device, void* renderPass);
 
 }

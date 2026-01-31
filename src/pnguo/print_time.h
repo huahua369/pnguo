@@ -25,9 +25,9 @@ public:
 		double aa = elapsed_micro();
 		aa *= 0.001;
 		std::string a;
-		std::string fmt = "time:\t\x1b[32;1m %g \x1b[0mms\t(\x1b[33m%s\x1b[0m)\t\n";
+		std::string fmt = "(\x1b[33m%s\x1b[0m) <time:\x1b[32;1m %.2f \x1b[0mms>\n";//g
 		a.resize(_str.size() + fmt.size() + 256);
-		sprintf((char*)a.c_str(), fmt.c_str(), aa, _str.c_str());
+		sprintf((char*)a.c_str(), fmt.c_str(), _str.c_str(), aa);
 		if (ispr)
 		{
 			printf(a.c_str());

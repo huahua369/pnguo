@@ -140,6 +140,8 @@ typedef uint32_t DXGI_FORMAT;
 
 #include "vkrenderer.h"
 
+#define CACHE_ENABLE
+//#define CACHE_LOG 
 
 
 namespace vkr
@@ -345,7 +347,6 @@ namespace vkr
 	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name);
 	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
 
-	void DestroyShadersInTheCache(VkDevice device);
 
 	uint32_t SizeOfFormat(VkFormat format);
 
@@ -528,6 +529,45 @@ namespace vkr
 #endif //1
 
 
+	//
+	// DefineList, holds pairs of key & value that will be used by the compiler as defines
+	//
+	class DefineList : public std::map<const std::string, std::string>
+	{
+	public:
+		bool Has(const std::string& str) const
+		{
+			return find(str) != end();
+		}
+
+		size_t Hash(size_t result = HASH_SEED) const
+		{
+			for (auto it = begin(); it != end(); it++)
+			{
+				result = HashString(it->first, result);
+				result = HashString(it->second, result);
+			}
+			return result;
+		}
+
+		friend DefineList operator+(DefineList   def1,        // passing lhs by value helps optimize chained a+b+c
+			const DefineList& def2)  // otherwise, both parameters may be const references
+		{
+			for (auto it = def2.begin(); it != def2.end(); it++)
+				def1[it->first] = it->second;
+			return def1;
+		}
+		std::string to_string() const
+		{
+			std::string result;
+			for (auto it = begin(); it != end(); it++)
+			{
+				result += it->first + "=" + it->second + "; ";
+			}
+			return result;
+		}
+	};
+
 
 
 #if 1
@@ -616,6 +656,158 @@ namespace vkr
 		}
 	};
 
+	class Sync
+	{
+		int m_count = 0;
+		std::mutex m_mutex;
+		std::condition_variable condition;
+	public:
+		int Inc()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count++;
+			return m_count;
+		}
+
+		int Dec()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count--;
+			if (m_count == 0)
+				condition.notify_all();
+			return m_count;
+		}
+
+		int Get()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			return m_count;
+		}
+
+		void Reset()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count = 0;
+			condition.notify_all();
+		}
+
+		void Wait()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			while (m_count != 0)
+				condition.wait(lock);
+		}
+
+	};
+
+
+
+	template<typename T>
+	class Cache
+	{
+	public:
+		struct CacheEntry
+		{
+			Sync m_Sync;
+			T m_data;
+		};
+		typedef std::map<size_t, CacheEntry> DatabaseType;
+	private:
+		DatabaseType m_database;
+		std::mutex m_mutex;
+	public:
+		void Async_Wait(Sync* pSync)
+		{
+			if (pSync->Get() == 0)
+				return;
+			pSync->Wait();
+		}
+		bool CacheMiss(size_t hash, T* pOut)
+		{
+#ifdef CACHE_ENABLE
+			//DatabaseType::iterator it;
+			CacheEntry* kt = {};
+			// find whether the shader is in the cache, create an empty entry just so other threads know this thread will be compiling the shader
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_database.find(hash);
+
+				// shader not found, we need to compile the shader!
+				if (it == m_database.end())
+				{
+#ifdef CACHE_LOG
+					Trace(format("thread 0x%04x Compi Begin: %p %i\n", GetCurrentThreadId(), hash, m_database[hash].m_Sync.Get()));
+#endif
+					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
+					m_database[hash].m_Sync.Inc();
+					return true;
+				}
+				kt = &it->second;
+			}
+			// If we have seen these shaders before then:
+			{
+				// If there is a thread already trying to compile this shader then wait for that thread to finish
+				if (kt->m_Sync.Get() == 1)
+				{
+#ifdef CACHE_LOG
+					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
+#endif
+					Async_Wait(&kt->m_Sync);
+				}
+
+				// if the shader was compiled then return it
+				*pOut = kt->m_data;
+
+#ifdef CACHE_LOG
+				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
+#endif
+				return false;
+			}
+#endif
+			return true;
+		}
+
+		void UpdateCache(size_t hash, T* pValue)
+		{
+#ifdef CACHE_ENABLE
+			// DatabaseType::iterator it;
+			CacheEntry* kt = {};
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_database.find(hash);
+				assert(it != m_database.end());
+				if (it == m_database.end())return;
+				kt = &it->second;
+			}
+#ifdef CACHE_LOG
+			Trace(format("thread 0x%04x Compi End: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
+#endif
+			kt->m_data = *pValue;
+			//assert(kt->m_Sync.Get() == 1);
+			// The shader has been compiled, set sync to 0 to indicate it is compiled
+			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
+			kt->m_Sync.Dec();
+#endif
+			// CACHE_ENABLE 1
+		}
+		template<typename Func>
+		void ForEach(Func func)
+		{
+			std::lock_guard<std::mutex> lock(m_mutex);
+			for (auto it = m_database.begin(); it != m_database.end(); ++it)
+			{
+				func(it);
+			}
+		}
+	};
+
+
+	enum ShaderSourceType
+	{
+		SST_HLSL,
+		SST_GLSL
+	};
+
 
 
 	class Device
@@ -640,6 +832,8 @@ namespace vkr
 
 		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
 		//std::vector<sampler_t> _samplers_v;
+
+		Cache<VkShaderModule> s_shaderCache;
 
 		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
 		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
@@ -708,6 +902,15 @@ namespace vkr
 
 		VkDescriptorSetLayout newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding);
 		VkFramebuffer newFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
+
+
+
+		// Does as the function name says and uses a cache
+		VkResult VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* pExtraParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
+		VkResult VKCompileFromFile(const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* pExtraParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
+	private:
+		VkResult VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
+
 	};
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex);
@@ -1025,154 +1228,6 @@ namespace vkr
 
 	class GBuffer;
 	class dvk_texture;
-	class Sync
-	{
-		int m_count = 0;
-		std::mutex m_mutex;
-		std::condition_variable condition;
-	public:
-		int Inc()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count++;
-			return m_count;
-		}
-
-		int Dec()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count--;
-			if (m_count == 0)
-				condition.notify_all();
-			return m_count;
-		}
-
-		int Get()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			return m_count;
-		}
-
-		void Reset()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count = 0;
-			condition.notify_all();
-		}
-
-		void Wait()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			while (m_count != 0)
-				condition.wait(lock);
-		}
-
-	};
-
-
-#define CACHE_ENABLE
-	//#define CACHE_LOG 
-	template<typename T>
-	class Cache
-	{
-	public:
-		struct CacheEntry
-		{
-			Sync m_Sync;
-			T m_data;
-		};
-		typedef std::map<size_t, CacheEntry> DatabaseType;
-	private:
-		DatabaseType m_database;
-		std::mutex m_mutex;
-	public:
-		void Async_Wait(Sync* pSync)
-		{
-			if (pSync->Get() == 0)
-				return;
-			pSync->Wait();
-		}
-		bool CacheMiss(size_t hash, T* pOut)
-		{
-#ifdef CACHE_ENABLE
-			//DatabaseType::iterator it;
-			CacheEntry* kt = {};
-			// find whether the shader is in the cache, create an empty entry just so other threads know this thread will be compiling the shader
-			{
-				std::lock_guard<std::mutex> lock(m_mutex);
-				auto it = m_database.find(hash);
-
-				// shader not found, we need to compile the shader!
-				if (it == m_database.end())
-				{
-#ifdef CACHE_LOG
-					Trace(format("thread 0x%04x Compi Begin: %p %i\n", GetCurrentThreadId(), hash, m_database[hash].m_Sync.Get()));
-#endif
-					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
-					m_database[hash].m_Sync.Inc();
-					return true;
-				}
-				kt = &it->second;
-			}
-			// If we have seen these shaders before then:
-			{
-				// If there is a thread already trying to compile this shader then wait for that thread to finish
-				if (kt->m_Sync.Get() == 1)
-				{
-#ifdef CACHE_LOG
-					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
-#endif
-					Async_Wait(&kt->m_Sync);
-				}
-
-				// if the shader was compiled then return it
-				*pOut = kt->m_data;
-
-#ifdef CACHE_LOG
-				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
-#endif
-				return false;
-			}
-#endif
-			return true;
-		}
-
-		void UpdateCache(size_t hash, T* pValue)
-		{
-#ifdef CACHE_ENABLE
-			// DatabaseType::iterator it;
-			CacheEntry* kt = {};
-			{
-				std::lock_guard<std::mutex> lock(m_mutex);
-				auto it = m_database.find(hash);
-				assert(it != m_database.end());
-				if (it == m_database.end())return;
-				kt = &it->second;
-			}
-#ifdef CACHE_LOG
-			Trace(format("thread 0x%04x Compi End: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
-#endif
-			kt->m_data = *pValue;
-			//assert(kt->m_Sync.Get() == 1);
-			// The shader has been compiled, set sync to 0 to indicate it is compiled
-			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
-			kt->m_Sync.Dec();
-#endif
-			// CACHE_ENABLE 1
-		}
-		template<typename Func>
-		void ForEach(Func func)
-		{
-			std::lock_guard<std::mutex> lock(m_mutex);
-			for (auto it = m_database.begin(); it != m_database.end(); ++it)
-			{
-				func(it);
-			}
-		}
-	};
-
-
-
 
 
 
@@ -1367,45 +1422,6 @@ namespace vkr
 		DISPLAYMODE_HDR10_2084,
 		DISPLAYMODE_HDR10_SCRGB
 	};
-	//
-	// DefineList, holds pairs of key & value that will be used by the compiler as defines
-	//
-	class DefineList : public std::map<const std::string, std::string>
-	{
-	public:
-		bool Has(const std::string& str) const
-		{
-			return find(str) != end();
-		}
-
-		size_t Hash(size_t result = HASH_SEED) const
-		{
-			for (auto it = begin(); it != end(); it++)
-			{
-				result = HashString(it->first, result);
-				result = HashString(it->second, result);
-			}
-			return result;
-		}
-
-		friend DefineList operator+(DefineList   def1,        // passing lhs by value helps optimize chained a+b+c
-			const DefineList& def2)  // otherwise, both parameters may be const references
-		{
-			for (auto it = def2.begin(); it != def2.end(); it++)
-				def1[it->first] = it->second;
-			return def1;
-		}
-		std::string to_string() const
-		{
-			std::string result;
-			for (auto it = begin(); it != end(); it++)
-			{
-				result += it->first + "=" + it->second + "; ";
-			}
-			return result;
-		}
-	};
-
 	bool DoesMaterialUseSemantic(DefineList& defines, const std::string semanticName);
 
 
@@ -2318,7 +2334,10 @@ namespace vkr
 
 	void Device::DestroyShaderCache()
 	{
-		DestroyShadersInTheCache(m_device);
+		s_shaderCache.ForEach([=](const Cache<VkShaderModule>::DatabaseType::iterator& it)
+			{
+				vkDestroyShaderModule(m_device, it->second.m_data, NULL);
+			});
 	}
 
 	void Device::OnDestroy()
@@ -2541,6 +2560,600 @@ namespace vkr
 		SetResourceName(m_device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)frameBuffer, "HelperCreateFrameBuffer");
 
 		return frameBuffer;
+	}
+
+	struct AxisAlignedBoundingBox
+	{
+		glm::vec4 m_min;
+		glm::vec4 m_max;
+		bool m_isEmpty;
+
+		AxisAlignedBoundingBox();
+
+		void Merge(const AxisAlignedBoundingBox& bb);
+		void Grow(const glm::vec4 v);
+
+		bool HasNoVolume() const;
+	};
+
+	double MillisecondsNow();
+	bool readfile(const char* name, char** data, size_t* size, bool isbinary);
+	bool savefile(const char* name, void const* data, size_t size, bool isbinary);
+	void Trace(const std::string& str);
+	void Trace(const char* pFormat, ...);
+	bool LaunchProcess(const char* commandLine, const char* filenameErr);
+	bool CameraFrustumToBoxCollision(const glm::mat4& mCameraViewProj, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
+	AxisAlignedBoundingBox GetAABBInGivenSpace(const glm::mat4& mTransform, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
+
+	// 编译shader
+#if 1
+
+
+	std::string s_shaderLibDir;
+	std::string s_shaderCacheDir;
+
+	bool InitShaderCompilerCache(const std::string shaderLibDir, std::string shaderCacheDir)
+	{
+		s_shaderLibDir = hz::genfn(shaderLibDir);
+		s_shaderCacheDir = hz::genfn(shaderCacheDir);
+
+		return true;
+	}
+
+	std::string GetShaderCompilerLibDir()
+	{
+		return s_shaderLibDir;
+	}
+
+	std::string GetShaderCompilerCacheDir()
+	{
+		return s_shaderCacheDir;
+	}
+
+#ifdef _WIN32
+
+	void ShowErrorMessageBox(LPCWSTR lpErrorString)
+	{
+		int msgboxID = MessageBoxW(NULL, lpErrorString, L"Error", MB_OK);
+	}
+
+	void ShowCustomErrorMessageBox(_In_opt_ LPCWSTR lpErrorString)
+	{
+		int msgboxID = MessageBoxW(NULL, lpErrorString, L"Error", MB_OK | MB_TOPMOST);
+	}
+	inline void ThrowIfFailed(HRESULT hr)
+	{
+		if (FAILED(hr))
+		{
+			wchar_t err[256];
+			memset(err, 0, 256);
+			FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), err, 255, NULL);
+			char errA[256];
+			size_t returnSize;
+			wcstombs_s(&returnSize, errA, 255, err, 255);
+			Trace(errA);
+#ifdef _DEBUG
+			ShowErrorMessageBox(err);
+#endif
+			throw 1;
+		}
+	}
+#define USE_DXC_SPIRV_FROM_DISK
+
+	void CompileMacros(const DefineList* pMacros, std::vector<D3D_SHADER_MACRO>* pOut)
+	{
+		if (pMacros != NULL)
+		{
+			for (auto it = pMacros->begin(); it != pMacros->end(); it++)
+			{
+				D3D_SHADER_MACRO macro;
+				macro.Name = it->first.c_str();
+				macro.Definition = it->second.c_str();
+				pOut->push_back(macro);
+			}
+		}
+	}
+
+	DxcCreateInstanceProc s_dxc_create_func;
+
+	bool InitDirectXCompiler()
+	{
+		std::string fullshaderCompilerPath = "dxcompiler.dll";
+		std::string fullshaderDXILPath = "dxil.dll";
+
+		//HMODULE dxil_module = ::LoadLibrary(fullshaderDXILPath.c_str());
+
+		//HMODULE dxc_module = ::LoadLibrary(fullshaderCompilerPath.c_str());
+		//if (dxc_module)
+		//	s_dxc_create_func = (DxcCreateInstanceProc)::GetProcAddress(dxc_module, "DxcCreateInstance");
+		//else
+		s_dxc_create_func = DxcCreateInstance;
+
+		return s_dxc_create_func != NULL;
+	}
+
+	interface Includer : public ID3DInclude
+	{
+	public:
+		virtual ~Includer() {}
+
+		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID * ppData, UINT * pBytes)
+		{
+			std::string fullpath = hz::genfn(GetShaderCompilerLibDir() + "/" + pFileName);
+			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
+		}
+		HRESULT Close(LPCVOID pData)
+		{
+			free((void*)pData);
+			return S_OK;
+		}
+	};
+
+	interface IncluderDxc : public IDxcIncludeHandler
+	{
+		IDxcLibrary * m_pLibrary;
+	public:
+		IncluderDxc(IDxcLibrary* pLibrary) : m_pLibrary(pLibrary) {}
+		HRESULT QueryInterface(const IID&, void**) { return S_OK; }
+		ULONG AddRef() { return 0; }
+		ULONG Release() { return 0; }
+		HRESULT LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource)
+		{
+			std::string kfp = hz::genfn(GetShaderCompilerLibDir() + "/" + hz::u16_to_gbk(pFilename));
+			LPCVOID pData;
+			size_t bytes;
+			HRESULT hr = readfile(kfp.c_str(), (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
+
+			if (hr == E_FAIL)
+			{
+				// return the failure here instead of crashing on CreateBlobWithEncodingFromPinned 
+				// to be able to report the error to the output console
+				return hr;
+			}
+
+			IDxcBlobEncoding* pSource;
+			ThrowIfFailed(m_pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pData, (UINT32)bytes, CP_UTF8, &pSource));
+
+			*ppIncludeSource = pSource;
+
+			return S_OK;
+		}
+	};
+
+	bool DXCompileToDXO(size_t hash, const char* pSrcCode, const DefineList* pDefines, const char* pEntryPoint, const char* pParams, char** outSpvData, size_t* outSpvSize)
+	{
+		//detect output bytecode type (DXBC/SPIR-V) and use proper extension
+		std::string filenameOut;
+		{
+			auto found = std::string(pParams).find("-spirv ");
+			if (found == std::string::npos)
+				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.dxo", hash));
+			else
+				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.spv", hash));
+		}
+
+#ifdef USE_DXC_SPIRV_FROM_DISK
+		if (readfile(filenameOut.c_str(), outSpvData, outSpvSize, true) && *outSpvSize > 0)
+		{
+			//Trace(format("thread 0x%04x compile: %p disk\n", GetCurrentThreadId(), hash));
+			return true;
+		}
+#endif
+
+		// create hlsl file for shader compiler to compile
+		//
+		std::string filenameHlsl = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.hlsl", hash));
+		std::ofstream ofs(filenameHlsl, std::ofstream::out);
+		ofs << pSrcCode;
+		ofs.close();
+
+		std::string filenamePdb = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.lld", hash));
+
+		std::wstring twstr;
+		// get defines
+		// 
+		std::vector<DxcDefine> defines;
+		defines.reserve(50);
+		int defineCount = 0;
+		if (pDefines != NULL)
+		{
+			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+			{
+				auto w = md::u8_w(it->first);
+				auto w2 = md::u8_w(it->second);
+				DxcDefine d = {};
+				auto pos = twstr.size();
+				w.push_back(0);
+				twstr.append(w);
+				auto pos2 = twstr.size();
+				w.push_back(0);
+				twstr.append(w2);
+				d.Name = (wchar_t*)pos;
+				d.Value = (wchar_t*)pos2;
+				defineCount++;
+				defines.push_back(d);
+			}
+		}
+		// check whether DXCompiler is initialized
+		if (s_dxc_create_func == nullptr)
+		{
+			Trace("Error: s_dxc_create_func() is null, have you called InitDirectXCompiler() ?");
+			return false;
+		}
+
+		IDxcLibrary* pLibrary;
+		ThrowIfFailed(s_dxc_create_func(CLSID_DxcLibrary, IID_PPV_ARGS(&pLibrary)));
+
+		IDxcBlobEncoding* pSource = 0;
+		ThrowIfFailed(pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pSrcCode, (UINT32)strlen(pSrcCode), CP_UTF8, &pSource));
+		if (!pSource)
+			return false;
+		IDxcCompiler2* pCompiler;
+		ThrowIfFailed(s_dxc_create_func(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler)));
+
+		IncluderDxc Includer(pLibrary);
+
+		std::vector<LPCWSTR> ppArgs;
+		std::string params;
+		// splits params string into an array of strings
+		{
+
+			if (pParams && *pParams)
+				params = pParams;
+			auto pv = md::split(params, " ");
+			for (auto& it : pv) {
+				auto w = md::u8_w(it.c_str());
+				auto pos = twstr.size();
+				w.push_back(0);
+				twstr.append(w);
+				ppArgs.push_back((wchar_t*)pos);
+			}
+		}
+		auto ws = twstr.data();
+		for (auto& it : ppArgs) {
+			it = ws + (size_t)it;
+		}
+		for (auto& it : defines) {
+			it.Name = ws + (size_t)it.Name;
+			it.Value = ws + (size_t)it.Value;
+		}
+
+		auto pEntryPointW = md::u8_w(pEntryPoint, -1);
+		IDxcOperationResult* pResultPre;
+		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines.data(), defineCount, &Includer, &pResultPre);
+		if (res1 == S_OK)
+		{
+			Microsoft::WRL::ComPtr<IDxcBlob> pCode1;
+			pResultPre->GetResult(pCode1.GetAddressOf());
+			std::string preprocessedCode = "";
+
+			preprocessedCode = "// dxc -E" + std::string(pEntryPoint) + " " + params + " " + filenameHlsl + "\n\n";
+			if (pDefines)
+			{
+				for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+					preprocessedCode += "#define " + it->first + " " + it->second + "\n";
+			}
+			preprocessedCode += std::string((char*)pCode1->GetBufferPointer());
+			preprocessedCode += "\n";
+			savefile(filenameHlsl.c_str(), preprocessedCode.c_str(), preprocessedCode.size(), false);
+
+			IDxcOperationResult* pOpRes;
+			HRESULT res;
+#if 0
+			if (false)
+			{
+				Microsoft::WRL::ComPtr<IDxcBlob> pPDB;
+				LPWSTR pDebugBlobName[1024];
+				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
+
+				// Setup the correct name for the PDB
+				if (pPDB)
+				{
+					char pPDBName[1024];
+					sprintf_s(pPDBName, "%s\\%ls", GetShaderCompilerCacheDir().c_str(), *pDebugBlobName);
+					savefile(pPDBName, pPDB->GetBufferPointer(), pPDB->GetBufferSize(), true);
+				}
+			}
+			else
+#endif
+			{
+				res = pCompiler->Compile(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes);
+			}
+
+			pSource->Release();
+			pLibrary->Release();
+			pCompiler->Release();
+
+			IDxcBlob* pResult = NULL;
+			IDxcBlobEncoding* pError = NULL;
+			if (pOpRes != NULL)
+			{
+				pOpRes->GetResult(&pResult);
+				pOpRes->GetErrorBuffer(&pError);
+				pOpRes->Release();
+			}
+
+			if (pResult != NULL && pResult->GetBufferSize() > 0)
+			{
+				*outSpvSize = pResult->GetBufferSize();
+				*outSpvData = (char*)malloc(*outSpvSize);
+
+				memcpy(*outSpvData, pResult->GetBufferPointer(), *outSpvSize);
+
+				pResult->Release();
+
+				// Make sure pError doesn't leak if it was allocated
+				if (pError)
+					pError->Release();
+
+#ifdef USE_DXC_SPIRV_FROM_DISK
+				savefile(filenameOut.c_str(), *outSpvData, *outSpvSize, true);
+#endif
+				return true;
+			}
+			else
+			{
+				IDxcBlobEncoding* pErrorUtf8 = 0;
+				if (pError)
+					pLibrary->GetBlobAsUtf8(pError, &pErrorUtf8);
+
+				Trace("*** Error compiling %p.hlsl ***\n", hash);
+
+				std::string filenameErr = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.err", hash));
+				savefile(filenameErr.c_str(), pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize(), false);
+
+				std::string errMsg = std::string((char*)pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize());
+				Trace(errMsg);
+
+				// Make sure pResult doesn't leak if it was allocated
+				if (pResult)
+					pResult->Release();
+
+				pErrorUtf8->Release();
+			}
+		}
+
+		return false;
+	}
+
+
+#endif // _WIN32
+
+	//
+	// Compiles a shader into SpirV
+	//
+	bool VKCompileToSpirv(size_t hash, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const std::string& shaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, char** outSpvData, size_t* outSpvSize)
+	{
+		// create glsl file for shader compiler to compile
+		//
+		std::string filenameSpv;
+		std::string filenameGlsl;
+		if (sourceType == SST_GLSL)
+		{
+			filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
+			filenameGlsl = hz::genfn(format("%s\\%p.glsl", GetShaderCompilerCacheDir().c_str(), hash));
+		}
+		else if (sourceType == SST_HLSL)
+		{
+			filenameSpv = hz::genfn(format("%s\\%p.dxo", GetShaderCompilerCacheDir().c_str(), hash));
+			filenameGlsl = hz::genfn(format("%s\\%p.hlsl", GetShaderCompilerCacheDir().c_str(), hash));
+		}
+		else
+			assert(!"unknown shader extension");
+
+		std::ofstream ofs(filenameGlsl, std::ofstream::out);
+		ofs << shaderCode;
+		ofs.close();
+
+		// compute command line to invoke the shader compiler
+		//
+		const char* stage = NULL;
+		switch (shader_type)
+		{
+		case VK_SHADER_STAGE_VERTEX_BIT:  stage = "vertex"; break;
+		case VK_SHADER_STAGE_FRAGMENT_BIT:  stage = "fragment"; break;
+		case VK_SHADER_STAGE_COMPUTE_BIT:  stage = "compute"; break;
+		case VK_SHADER_STAGE_TASK_BIT_EXT:  stage = "task"; break;
+		case VK_SHADER_STAGE_MESH_BIT_EXT:  stage = "mesh"; break;
+		}
+
+		// add the #defines
+		//
+		std::string defines;
+		if (pDefines)
+		{
+			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+				defines += "-D" + it->first + "=" + it->second + " ";
+		}
+		std::string commandLine;
+		if (sourceType == SST_GLSL)
+		{
+			commandLine = format("glslc --target-env=vulkan1.1 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
+
+			std::string filenameErr = hz::genfn(format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash));
+
+			if (LaunchProcess(commandLine.c_str(), filenameErr.c_str()) == true)
+			{
+				readfile(filenameSpv.c_str(), outSpvData, outSpvSize, true);
+				assert(*outSpvSize != 0);
+				return true;
+			}
+		}
+		else
+		{
+			std::string scp = format("-spirv -fspv-target-env=vulkan1.1 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
+			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData, outSpvSize);
+			assert(*outSpvSize != 0);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	//
+	// Generate sources from the input data
+	//
+	std::string GenerateSource(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* shaderCompilerParams, const DefineList* pDefines)
+	{
+		std::string shaderCode(pshader);
+		std::string code;
+
+		if (sourceType == SST_GLSL)
+		{
+			// the first line in a GLSL shader must be the #version, insert the #defines right after this line
+			size_t index = shaderCode.find_first_of('\n');
+			code = shaderCode.substr(index, shaderCode.size() - index);
+
+			shaderCode = shaderCode.substr(0, index) + "\n";
+		}
+		else if (sourceType == SST_HLSL)
+		{
+			code = shaderCode;
+			shaderCode = "";
+		}
+
+		// add the #defines to the code to help debugging
+		if (pDefines)
+		{
+			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+				shaderCode += "#define " + it->first + " " + it->second + "\n";
+		}
+		// concat the actual shader code
+		shaderCode += code;
+
+		return shaderCode;
+	}
+
+
+	VkResult CreateModule(VkDevice device, char* SpvData, size_t SpvSize, VkShaderModule* pShaderModule)
+	{
+		VkShaderModuleCreateInfo moduleCreateInfo = {};
+		moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		moduleCreateInfo.pCode = (uint32_t*)SpvData;
+		moduleCreateInfo.codeSize = SpvSize;
+		return vkCreateShaderModule(device, &moduleCreateInfo, NULL, pShaderModule);
+	}
+
+	//
+	// Compile a GLSL or a HLSL, will cache binaries to disk
+	//
+	VkResult Device::VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
+	{
+		VkResult res = VK_SUCCESS;
+
+		//compute hash
+		// 
+		size_t hash;
+		size_t pslen = strlen(pshader);
+		auto sf = hz::genfn(GetShaderCompilerLibDir() + "\\");
+		hash = HashShaderString(sf.c_str(), pshader);
+		hash = Hash(pShaderEntryPoint, strlen(pShaderEntryPoint), hash);
+		hash = Hash(shaderCompilerParams, strlen(shaderCompilerParams), hash);
+		hash = Hash((char*)&shader_type, sizeof(shader_type), hash);
+		if (pDefines != NULL)
+		{
+			hash = pDefines->Hash(hash);
+		}
+
+#define USE_MULTITHREADED_CACHE 
+#define USE_SPIRV_FROM_DISK   
+
+#ifdef USE_MULTITHREADED_CACHE
+		// Compile if not in cache
+		//
+		if (s_shaderCache.CacheMiss(hash, &pShader->module))
+#endif
+		{
+			auto strk = format("%p", hash);
+			print_time Pt("new shaderModule " + strk, 1);
+			char* SpvData = NULL;
+			size_t SpvSize = 0;
+#ifdef USE_SPIRV_FROM_DISK
+			std::string filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
+			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
+#endif
+			{
+				print_time Pt("Compile Pipeline " + strk, 1);
+				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
+				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, &SpvData, &SpvSize);
+				if (SpvSize == 0) {
+					printf("\n%s\n", shader.c_str());
+				}
+				assert(SpvSize != 0);
+			}
+			else {
+				if (SpvSize == 0) {
+					printf("\n%s\n", strk.c_str());
+				}
+			}
+			//auto c = crc32(-1, (Bytef*)pshader, strlen(pshader));  
+			assert(SpvSize != 0);
+			CreateModule(m_device, SpvData, SpvSize, &pShader->module);
+
+#ifdef USE_MULTITHREADED_CACHE
+			s_shaderCache.UpdateCache(hash, &pShader->module);
+#endif
+		}
+		else {
+			//print_time Pt("no Compile Pipeline", 1);
+		}
+
+		pShader->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		pShader->pNext = NULL;
+		pShader->pSpecializationInfo = NULL;
+		pShader->flags = 0;
+		pShader->stage = shader_type;
+		pShader->pName = pShaderEntryPoint;
+
+		return res;
+	}
+
+#endif 
+	// 1
+
+	VkResult Device::VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
+	{
+		assert(strlen(pShaderCode) > 0);
+		VkResult res = VKCompile(sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
+		assert(res == VK_SUCCESS);
+		return res;
+	}
+	// pExtraParams
+	VkResult Device::VKCompileFromFile(const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
+	{
+		char* pShaderCode;
+		size_t size;
+
+		ShaderSourceType sourceType;
+		std::string pfn = pFilename;
+		if (pfn.find(".glsl") != std::string::npos)
+		{
+			sourceType = SST_GLSL;
+		}
+		else if (pfn.find(".hlsl") != std::string::npos)
+		{
+			sourceType = SST_HLSL;
+		}
+		//const char* pExtension = pFilename + std::max<size_t>(strlen(pFilename) - 4, 0);
+		//if (strcmp(pExtension, "glsl") == 0)
+		//	sourceType = SST_GLSL;
+		//else if (strcmp(pExtension, "hlsl") == 0)
+		//	sourceType = SST_HLSL;
+		else
+			assert(!"Can't tell shader type from its extension");
+
+		//append path
+		auto fullpath = hz::genfn(GetShaderCompilerLibDir() + std::string("/") + pFilename);
+
+		if (readfile(fullpath.c_str(), &pShaderCode, &size, false))
+		{
+			VkResult res = VKCompileFromString(sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
+			SetResourceName(m_device, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)pShader->module, pFilename);
+			return res;
+		}
+
+		return VK_NOT_READY;
 	}
 
 
@@ -4444,19 +5057,6 @@ namespace vkr {
 
 	glm::vec4 get_row(const glm::mat4& m, int n);
 
-	struct AxisAlignedBoundingBox
-	{
-		glm::vec4 m_min;
-		glm::vec4 m_max;
-		bool m_isEmpty;
-
-		AxisAlignedBoundingBox();
-
-		void Merge(const AxisAlignedBoundingBox& bb);
-		void Grow(const glm::vec4 v);
-
-		bool HasNoVolume() const;
-	};
 
 	// todo gltf解析后
 	class GLTFCommon
@@ -5193,6 +5793,7 @@ namespace vkr {
 			pbrMaterial m_pbrParams;
 		};
 		std::map<size_t, PBRPipe_t> _pipem;
+		std::vector<PBRPipe_t*> _pipe_fv;
 		gltf_gpu_res_cx* _ptb = 0;
 		ResourceViewHeaps* m_pResourceViewHeaps = 0;
 		DynamicBufferRing* m_pDynamicBufferRing = 0;
@@ -5210,6 +5811,7 @@ namespace vkr {
 		//VkImageView m_brdfLutView = VK_NULL_HANDLE;
 		//VkSampler m_brdfLutSampler = VK_NULL_HANDLE;
 		env_res_t* _envr = 0;
+		//std::mutex mtx;
 	public:
 		GltfPbrPass();
 		~GltfPbrPass();
@@ -5480,12 +6082,6 @@ namespace vkr {
 	static constexpr float AMD_PI_OVER_2 = 1.5707963267948966192313216916398f;
 	static constexpr float AMD_PI_OVER_4 = 0.78539816339744830961566084581988f;
 
-	double MillisecondsNow();
-	bool readfile(const char* name, char** data, size_t* size, bool isbinary);
-	bool savefile(const char* name, void const* data, size_t size, bool isbinary);
-	void Trace(const std::string& str);
-	void Trace(const char* pFormat, ...);
-	bool LaunchProcess(const char* commandLine, const char* filenameErr);
 
 	inline void GetXYZ(float* f, glm::vec4 v)
 	{
@@ -5493,13 +6089,6 @@ namespace vkr {
 		f[1] = v.y;
 		f[2] = v.z;
 	}
-
-	bool CameraFrustumToBoxCollision(const glm::mat4& mCameraViewProj, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
-
-
-
-	AxisAlignedBoundingBox GetAABBInGivenSpace(const glm::mat4& mTransform, const glm::vec4& boxCenter, const glm::vec4& boxExtent);
-
 	//// align val to the next multiple of alignment
 	//template<typename T> inline T AlignUp(T val, T alignment)
 	//{
@@ -5524,7 +6113,7 @@ namespace vkr {
 			m_startTime = MillisecondsNow(); m_label = label ? label : "";
 		}
 		~Profile() {
-			printf("*** %s  %f ms\n", m_label, (MillisecondsNow() - m_startTime));
+			printf("*** %s  %.2f ms\n", m_label, (MillisecondsNow() - m_startTime));
 		}
 	};
 
@@ -5554,17 +6143,6 @@ namespace vkr {
 	};
 
 	int countBits(uint32_t v);
-
-	enum ShaderSourceType
-	{
-		SST_HLSL,
-		SST_GLSL
-	};
-
-
-	// Does as the function name says and uses a cache
-	VkResult VKCompileFromString(VkDevice device, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* pExtraParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
-	VkResult VKCompileFromFile(VkDevice device, const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* pExtraParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
 
 
 	//Loads a DDS file
@@ -6050,11 +6628,11 @@ namespace vkr
 		DefineList attributeDefines;
 
 		VkPipelineShaderStageCreateInfo m_vertexShader;
-		res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+		res = pDevice->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 		assert(res == VK_SUCCESS);
 
 		VkPipelineShaderStageCreateInfo m_fragmentShader;
-		res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+		res = pDevice->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 		assert(res == VK_SUCCESS);
 
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { m_vertexShader, m_fragmentShader };
@@ -6349,33 +6927,25 @@ namespace vkr
 		auto sampler = m_sampler;
 		auto pm = _ptb->m_pGLTFCommon->pm;
 		auto& materials = pm->materials;
-
 		m_materialsData.resize(materials.size());
 		for (uint32_t i = 0; i < materials.size(); i++)
 		{
 			auto& material = materials[i];
-
 			DepthMaterial* tfmat = &m_materialsData[i];
-
 			// Load material constants. This is a depth pass and we are only interested in the mask texture
-			//               
 			tfmat->m_doubleSided = material.doubleSided;
 			std::string alphaMode = material.alphaMode;
 			tfmat->m_defines["DEF_alphaMode_" + alphaMode] = std::to_string(1);
-
 			tfmat->m_blending = alphaMode == "BLEND";
 			// If transparent use the baseColorTexture for alpha
-			//
 			if (alphaMode == "MASK")
 			{
-				tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);//  0.5));
-
+				tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
 				auto pbrMetallicRoughnessIt = material.pbrMetallicRoughness;
 				int id = pbrMetallicRoughnessIt.baseColorTexture.index;
 				if (id >= 0)
 				{
 					tfmat->m_defines["MATERIAL_METALLICROUGHNESS"] = "1";
-
 					// allocate descriptor table for the texture
 					tfmat->m_textureCount = 1;
 					tfmat->m_defines["ID_baseColorTexture"] = "0";
@@ -6387,7 +6957,6 @@ namespace vkr
 				}
 			}
 		}
-
 		// Load Meshes 
 		{
 			auto& meshes = pm->meshes;
@@ -6414,7 +6983,7 @@ namespace vkr
 								pPrimitive->m_pMaterial = &m_materialsData[mid];
 							// make a list of all the attribute names our pass requires, in the case of a depth pass we only need the position and a few other things. 
 							std::vector<std::string > requiredAttributes;
-							for (auto& it : primitive.attributes)//["attributes"].items())
+							for (auto& it : primitive.attributes)
 							{
 								const std::string semanticName = it.first;
 								if (
@@ -6427,14 +6996,10 @@ namespace vkr
 									requiredAttributes.push_back(semanticName);
 								}
 							}
-
 							// holds all the #defines from materials, geometry and texture IDs, the VS & PS shaders need this to get the bindings and code paths
-							//
 							DefineList defines = pPrimitive->m_pMaterial->m_defines;
-
 							// create an input layout from the required attributes
 							// shader's can tell the slots from the #defines
-							//
 							std::vector<VkVertexInputAttributeDescription> inputLayout;
 							_ptb->CreateGeometry(&primitive, requiredAttributes, inputLayout, defines, &pPrimitive->m_geometry);
 							{
@@ -6443,10 +7008,7 @@ namespace vkr
 								if (tsa > 0) {
 									auto moid = primitive.targets[0].begin()->second;
 									morphing = &_ptb->m_BufferMap[moid];
-									if (!morphing->mdb.buffer)
-									{
-										morphing = 0;
-									}
+									if (!morphing->mdb.buffer) { morphing = 0; }
 								}
 								int skinId = _ptb->m_pGLTFCommon->FindMeshSkinId(i);
 								int inverseMatrixBufferSize = _ptb->m_pGLTFCommon->GetInverseBindMatricesBufferSizeByID(skinId);
@@ -6684,19 +7246,15 @@ namespace vkr
 	{
 		/////////////////////////////////////////////
 		// Compile and create shaders
-
 		VkPipelineShaderStageCreateInfo vertexShader, fragmentShader = {};
 		{
-			VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "GLTFDepthPass-vert.glsl", "main", "", &defines, &vertexShader);
-			VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFDepthPass-frag.glsl", "main", "", &defines, &fragmentShader);
+			m_pDevice->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, "GLTFDepthPass-vert.glsl", "main", "", &defines, &vertexShader);
+			m_pDevice->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFDepthPass-frag.glsl", "main", "", &defines, &fragmentShader);
 		}
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
-
 		/////////////////////////////////////////////
 		// Create a Pipeline 
-
 		// vertex input state
-
 		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
 		for (int i = 0; i < layout.size(); i++)
 		{
@@ -6704,7 +7262,6 @@ namespace vkr
 			vi_binding[i].stride = SizeOfFormat(layout[i].format);
 			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		}
-
 		VkPipelineVertexInputStateCreateInfo vi = {};
 		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vi.pNext = NULL;
@@ -6713,18 +7270,14 @@ namespace vkr
 		vi.pVertexBindingDescriptions = vi_binding.data();
 		vi.vertexAttributeDescriptionCount = (uint32_t)layout.size();
 		vi.pVertexAttributeDescriptions = layout.data();
-
 		// input assembly state
-
 		VkPipelineInputAssemblyStateCreateInfo ia;
 		ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		ia.pNext = NULL;
 		ia.flags = 0;
 		ia.primitiveRestartEnable = VK_FALSE;
 		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
 		// rasterizer state
-
 		VkPipelineRasterizationStateCreateInfo rs;
 		rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 		rs.pNext = NULL;
@@ -6739,7 +7292,6 @@ namespace vkr
 		rs.depthBiasClamp = 0;
 		rs.depthBiasSlopeFactor = 0;
 		rs.lineWidth = 1.0f;
-
 		VkPipelineColorBlendAttachmentState att_state[1];
 		att_state[0].colorWriteMask = allBits;
 		att_state[0].blendEnable = VK_TRUE;
@@ -6749,9 +7301,7 @@ namespace vkr
 		att_state[0].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		att_state[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 		att_state[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-
 		// Color blend state
-
 		VkPipelineColorBlendStateCreateInfo cb;
 		cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 		cb.flags = 0;
@@ -6764,7 +7314,6 @@ namespace vkr
 		cb.blendConstants[1] = 1.0f;
 		cb.blendConstants[2] = 1.0f;
 		cb.blendConstants[3] = 1.0f;
-
 		std::vector<VkDynamicState> dynamicStateEnables = {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR
@@ -6774,9 +7323,7 @@ namespace vkr
 		dynamicState.pNext = NULL;
 		dynamicState.pDynamicStates = dynamicStateEnables.data();
 		dynamicState.dynamicStateCount = (uint32_t)dynamicStateEnables.size();
-
 		// view port state
-
 		VkPipelineViewportStateCreateInfo vp = {};
 		vp.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 		vp.pNext = NULL;
@@ -6785,9 +7332,7 @@ namespace vkr
 		vp.scissorCount = 1;
 		vp.pScissors = NULL;
 		vp.pViewports = NULL;
-
 		// depth stencil state
-
 		VkPipelineDepthStencilStateCreateInfo ds;
 		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		ds.pNext = NULL;
@@ -6796,7 +7341,6 @@ namespace vkr
 		ds.depthWriteEnable = true;
 		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		ds.depthCompareOp = m_bInvertedDepth ? VK_COMPARE_OP_GREATER_OR_EQUAL : VK_COMPARE_OP_LESS_OR_EQUAL;
-
 		ds.back.failOp = VK_STENCIL_OP_KEEP;
 		ds.back.passOp = VK_STENCIL_OP_KEEP;
 		ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
@@ -6809,9 +7353,7 @@ namespace vkr
 		ds.maxDepthBounds = 0;
 		ds.stencilTestEnable = VK_FALSE;
 		ds.front = ds.back;
-
 		// multi sample state
-
 		VkPipelineMultisampleStateCreateInfo ms;
 		ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		ms.pNext = NULL;
@@ -6822,9 +7364,7 @@ namespace vkr
 		ms.alphaToCoverageEnable = VK_FALSE;
 		ms.alphaToOneEnable = VK_FALSE;
 		ms.minSampleShading = 0.0;
-
 		// create pipeline 
-
 		VkGraphicsPipelineCreateInfo pipeline = {};
 		pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipeline.pNext = NULL;
@@ -6845,7 +7385,6 @@ namespace vkr
 		pipeline.stageCount = (uint32_t)shaderStages.size();
 		pipeline.renderPass = m_renderPass;
 		pipeline.subpass = 0;
-
 		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pPrimitive->m_pipeline);
 		assert(res == VK_SUCCESS);
 		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pPrimitive->m_pipeline, "GltfDepthPass P");
@@ -6865,9 +7404,7 @@ namespace vkr
 	}
 
 	//--------------------------------------------------------------------------------------
-	//
 	// Draw
-	//
 	//--------------------------------------------------------------------------------------
 	void GltfDepthPass::Draw(VkCommandBuffer cmd_buf)
 	{
@@ -6953,14 +7490,12 @@ namespace vkr
 			MaxValuesPerFrame * numberOfBackBuffers,      // deUint32                         entryCount
 			0,                                            // VkQueryPipelineStatisticFlags    pipelineStatistics
 		};
-
 		VkResult res = vkCreateQueryPool(pDevice->m_device, &queryPoolCreateInfo, NULL, &m_QueryPool);
 	}
 
 	void GPUTimestamps::OnDestroy()
 	{
 		vkDestroyQueryPool(m_pDevice->m_device, m_QueryPool, nullptr);
-
 		for (uint32_t i = 0; i < m_NumberOfBackBuffers; i++)
 			m_labels[i].clear();
 	}
@@ -6969,9 +7504,7 @@ namespace vkr
 	{
 		uint32_t measurements = (uint32_t)m_labels[m_frame].size();
 		uint32_t offset = m_frame * MaxValuesPerFrame + measurements;
-
 		vkCmdWriteTimestamp(cmd_buf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPool, offset);
-
 		m_labels[m_frame].push_back(label);
 	}
 
@@ -6984,21 +7517,15 @@ namespace vkr
 	{
 		std::vector<TimeStamp>& cpuTimeStamps = m_cpuTimeStamps[m_frame];
 		std::vector<std::string>& gpuLabels = m_labels[m_frame];
-
 		pTimestamps->clear();
 		pTimestamps->reserve(cpuTimeStamps.size() + gpuLabels.size());
-
 		// copy CPU timestamps
-		//
 		for (uint32_t i = 0; i < cpuTimeStamps.size(); i++)
 		{
 			pTimestamps->push_back(cpuTimeStamps[i]);
 		}
-
 		// copy GPU timestamps
-		//
 		uint32_t offset = m_frame * MaxValuesPerFrame;
-
 		uint32_t measurements = (uint32_t)gpuLabels.size();
 		if (measurements > 0)
 		{
@@ -7014,7 +7541,6 @@ namespace vkr
 						TimeStamp ts = { m_labels[m_frame][i], float(microsecondsPerTick * (double)(TimingsInTicks[i] - TimingsInTicks[i - 1])) };
 						pTimestamps->push_back(ts);
 					}
-
 					// compute total
 					TimeStamp ts = { "Total GPU Time", float(microsecondsPerTick * (double)(TimingsInTicks[measurements - 1] - TimingsInTicks[0])) };
 					pTimestamps->push_back(ts);
@@ -7025,13 +7551,10 @@ namespace vkr
 				}
 			}
 		}
-
 		vkCmdResetQueryPool(cmd_buf, m_QueryPool, offset, MaxValuesPerFrame);
-
 		// we always need to clear these ones
 		cpuTimeStamps.clear();
 		gpuLabels.clear();
-
 		GetTimeStamp(cmd_buf, "Begin Frame");
 	}
 
@@ -7040,10 +7563,8 @@ namespace vkr
 		m_frame = (m_frame + 1) % m_NumberOfBackBuffers;
 	}
 
-
 	gltf_gpu_res_cx::~gltf_gpu_res_cx()
 	{
-
 	}
 
 	// todo t2b
@@ -8788,7 +9309,6 @@ namespace vkr
 			}
 			vts.wait_stop();
 			{
-				print_time Pt("set pbr pipeline", 1);
 				for (size_t i = 0; i < primitive_infos.size(); i++)
 				{
 					auto& it = primitive_infos[i];
@@ -8976,7 +9496,6 @@ namespace vkr
 					vkDestroyPipelineLayout(dev, p->m_pipelineLayout, nullptr);
 				sslayout.insert(p->m_texturesDescriptorSetLayout);
 				sslayout.insert(p->m_uniformsDescriptorSetLayout);
-
 				p = p->next;
 			}
 		}
@@ -8991,9 +9510,12 @@ namespace vkr
 			vkDestroyDescriptorSetLayout(m_pDevice->m_device, s, NULL);
 		m_pResourceViewHeaps->FreeDescriptor(m_defaultMaterial.m_texturesDescriptorSet);
 		_samplers.clear();
-		//vkDestroyImageView(m_pDevice->m_device, m_brdfLutView, NULL);
-		//m_brdfLutTexture.OnDestroy();
-
+		for (auto it : _pipe_fv)
+		{
+			if (it) delete it;
+		}
+		_pipe_fv.clear();
+		_pipem.clear();
 	}
 	PBRPipe_t* GltfPbrPass::get_pipem(DefineList* defines)
 	{
@@ -9023,6 +9545,7 @@ namespace vkr
 			}
 			if (!p) {
 				p = new PBRPipe_t();
+				_pipe_fv.push_back(p);
 				p->pipe_kv = nstr;
 				r = p;
 				p->next = oldp.next;
@@ -9175,43 +9698,7 @@ namespace vkr
 		}
 		pi->pPrimitive->_pipe = pi->pbrpipe;
 	}
-	// CreateDescriptors for a combination of material and geometry
-	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreateDescriptors(int inverseMatrixBufferSize, DefineList* pAttributeDefines, PBRPrimitives* pPrimitive, mesh_mapd_ptr* mm, int muvt_size, bool bUseSSAOMask)
-	{
-		// Creates descriptor set layout binding for the constant buffers
-		std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
-		auto pc = get_cp();
-		auto pbrpipe = get_pipem(pAttributeDefines);
-		assert(pbrpipe);
-		if (!pbrpipe)
-		{
-			return;
-		}
-		if (!pbrpipe->m_pipelineLayout || !pbrpipe->m_uniformsDescriptorSetLayout) {
-			m_pResourceViewHeaps->CreateDescriptorSetLayout(&layout_bindings, &pbrpipe->m_uniformsDescriptorSetLayout);
-			// Create the pipeline layout
-			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { pbrpipe->m_uniformsDescriptorSetLayout };
-			if (pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout != VK_NULL_HANDLE)
-			{
-				descriptorSetLayout.push_back(pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout);
-				pbrpipe->m_texturesDescriptorSetLayout = pPrimitive->m_pMaterial->m_texturesDescriptorSetLayout;
-			}
-			VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
-			pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pPipelineLayoutCreateInfo.pNext = NULL;
-			pPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-			pPipelineLayoutCreateInfo.pPushConstantRanges = NULL;
-			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
-			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
 
-			VkResult res = vkCreatePipelineLayout(m_pDevice->m_device, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
-			assert(res == VK_SUCCESS);
-			SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
-		}
-
-
-	}
 	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
 	{
 		VkPipelineColorBlendAttachmentState color_blend =
@@ -9277,8 +9764,8 @@ namespace vkr
 		auto defines = defines0;
 		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
 		// Create pipeline 
-		VKCompileFromFile(dev, VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
-		VKCompileFromFile(dev, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
+		pdev->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
+		pdev->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
 		// vertex input state
 		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
@@ -9510,259 +9997,6 @@ namespace vkr
 		res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
 		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
-	}
-	// CreatePipeline
-	//--------------------------------------------------------------------------------------
-	void GltfPbrPass::CreatePipeline(std::vector<VkVertexInputAttributeDescription>& layout, const DefineList& defines0, PBRPrimitives* pPrimitive)
-	{
-		// Compile and create shaders
-		auto defines = defines0;
-		auto h = defines.Hash();
-		auto pbrpipe = get_pipem(&defines);
-		if (!pbrpipe)
-			return;
-		auto nstr = defines.to_string();
-		pPrimitive->_pipe = pbrpipe;
-		if (pbrpipe->m_pipeline)
-		{
-			return;
-		}
-		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
-		// Create pipeline 
-		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
-		VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
-		// vertex input state
-		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
-		for (int i = 0; i < layout.size(); i++)
-		{
-			vi_binding[i].binding = layout[i].binding;
-			vi_binding[i].stride = SizeOfFormat(layout[i].format);
-			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		}
-		if (defines.Has("ID_INSTANCE_MAT")) { vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
-		VkPipelineVertexInputStateCreateInfo vi = {};
-		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vi.pNext = NULL;
-		vi.flags = 0;
-		vi.vertexBindingDescriptionCount = (uint32_t)vi_binding.size();
-		vi.pVertexBindingDescriptions = vi_binding.data();
-		vi.vertexAttributeDescriptionCount = (uint32_t)layout.size();
-		vi.pVertexAttributeDescriptions = layout.data();
-		// input assembly state
-		VkPipelineInputAssemblyStateCreateInfo ia;
-		ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		ia.pNext = NULL;
-		ia.flags = 0;
-		ia.primitiveRestartEnable = VK_FALSE;
-		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		// rasterizer state
-		VkPipelineRasterizationStateCreateInfo rs;
-		rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-		rs.pNext = NULL;
-		rs.flags = 0;
-		rs.polygonMode = VK_POLYGON_MODE_FILL;
-		rs.cullMode = pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
-		rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		rs.depthClampEnable = VK_FALSE;
-		rs.rasterizerDiscardEnable = VK_FALSE;
-		rs.depthBiasEnable = VK_FALSE;
-		rs.depthBiasConstantFactor = 0;
-		rs.depthBiasClamp = 0;
-		rs.depthBiasSlopeFactor = 0;
-		rs.lineWidth = 2.0f;
-		bool depthwrite = !(pPrimitive->m_pMaterial->m_pbrMaterialParameters.m_blending || (defines.Has("DEF_alphaMode_BLEND")));
-		std::vector<VkPipelineColorBlendAttachmentState> att_states;
-		if (defines.Has("HAS_FORWARD_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			get_blend(!depthwrite, att_state);
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_OIT_ACCUM_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_TRUE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_OIT_WEIGHT_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_TRUE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_DIFFUSE_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_NORMALS_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_MOTION_VECTORS_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
-		}
-		// Color blend state
-		VkPipelineColorBlendStateCreateInfo cb;
-		cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		cb.flags = 0;
-		cb.pNext = NULL;
-		cb.attachmentCount = static_cast<uint32_t>(att_states.size());
-		cb.pAttachments = att_states.data();
-		cb.logicOpEnable = VK_FALSE;
-		cb.logicOp = VK_LOGIC_OP_NO_OP;
-		cb.blendConstants[0] = 0.0f;
-		cb.blendConstants[1] = 0.0f;
-		cb.blendConstants[2] = 0.0f;
-		cb.blendConstants[3] = 0.0f;
-		std::vector<VkDynamicState> dynamicStateEnables = {
-			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR,
-			//VK_DYNAMIC_STATE_LINE_WIDTH,
-			//VK_DYNAMIC_STATE_CULL_MODE,
-			//VK_DYNAMIC_STATE_FRONT_FACE
-		};
-		VkPipelineDynamicStateCreateInfo dynamicState = {};
-		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		dynamicState.pNext = NULL;
-		dynamicState.pDynamicStates = dynamicStateEnables.data();
-		dynamicState.dynamicStateCount = (uint32_t)dynamicStateEnables.size();
-		// view port state
-		VkPipelineViewportStateCreateInfo vp = {};
-		vp.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-		vp.pNext = NULL;
-		vp.flags = 0;
-		vp.viewportCount = 1;
-		vp.scissorCount = 1;
-		vp.pScissors = NULL;
-		vp.pViewports = NULL;
-		// todo depth stencil state
-		VkPipelineDepthStencilStateCreateInfo ds;
-		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		ds.pNext = NULL;
-		ds.flags = 0;
-		ds.depthTestEnable = true;
-		ds.depthWriteEnable = true;/// depthwrite;
-		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-		ds.back.failOp = VK_STENCIL_OP_KEEP;
-		ds.back.passOp = VK_STENCIL_OP_KEEP;
-		ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
-		ds.back.compareMask = 0;
-		ds.back.reference = 0;
-		ds.back.depthFailOp = VK_STENCIL_OP_KEEP;
-		ds.back.writeMask = 0;
-		ds.depthBoundsTestEnable = VK_FALSE;
-		ds.minDepthBounds = 0;
-		ds.maxDepthBounds = 0;
-		ds.stencilTestEnable = VK_TRUE;
-		ds.front = ds.back;
-		// multi sample state
-		VkPipelineMultisampleStateCreateInfo ms;
-		ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		ms.pNext = NULL;
-		ms.flags = 0;
-		ms.pSampleMask = NULL;
-		ms.rasterizationSamples = m_pRenderPass->GetSampleCount();
-		ms.sampleShadingEnable = VK_FALSE;
-		ms.alphaToCoverageEnable = VK_FALSE;
-		ms.alphaToOneEnable = VK_FALSE;
-		ms.minSampleShading = 0.0;
-		// create pipeline 
-		VkGraphicsPipelineCreateInfo pipeline = {};
-		pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		pipeline.pNext = NULL;
-		pipeline.layout = pbrpipe->m_pipelineLayout;
-		pipeline.basePipelineHandle = VK_NULL_HANDLE;
-		pipeline.basePipelineIndex = 0;
-		pipeline.flags = 0;
-		pipeline.pVertexInputState = &vi;
-		pipeline.pInputAssemblyState = &ia;
-		pipeline.pRasterizationState = &rs;
-		pipeline.pColorBlendState = &cb;
-		pipeline.pTessellationState = NULL;
-		pipeline.pMultisampleState = &ms;
-		pipeline.pDynamicState = &dynamicState;
-		pipeline.pViewportState = &vp;
-		pipeline.pDepthStencilState = &ds;
-		pipeline.pStages = shaderStages.data();
-		pipeline.stageCount = (uint32_t)shaderStages.size();
-		pipeline.renderPass = m_pRenderPass->GetRenderPass();
-		pipeline.subpass = 0;
-		uint32_t specConstants = 0;
-		VkSpecializationMapEntry specializationMapEntry = VkSpecializationMapEntry{};
-		specializationMapEntry.constantID = 0;
-		specializationMapEntry.offset = 0;
-		specializationMapEntry.size = sizeof(uint32_t);
-		VkSpecializationInfo specializationInfo = VkSpecializationInfo();
-		specializationInfo.mapEntryCount = 1;
-		specializationInfo.pMapEntries = &specializationMapEntry;
-		specializationInfo.dataSize = sizeof(uint32_t);
-		specializationInfo.pData = &specConstants;
-		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VkResult res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
-		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
-		// create wireframe pipeline
-		rs.polygonMode = VK_POLYGON_MODE_LINE;
-		rs.cullMode = VK_CULL_MODE_NONE;
-		//ds.depthWriteEnable = false;
-		res = vkCreateGraphicsPipelines(m_pDevice->m_device, m_pDevice->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
-		assert(res == VK_SUCCESS);
-		SetResourceName(m_pDevice->m_device, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
-		pPrimitive->_pipe = pbrpipe;
 	}
 
 	//-------------------------------------------------------------------------------------- 
@@ -12418,12 +12652,12 @@ namespace vkr {
 		std::string CompileFlagsVS("-T vs_6_0");
 #endif // _DEBUG
 		//res = VKCompileFromString(m_pDevice->m_device, SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
-		res = VKCompileFromFile(pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, "sky.v.glsl", "main", "", &attributeDefines, &m_vertexShader);
+		res = pDevice->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, "sky.v.glsl", "main", "", &attributeDefines, &m_vertexShader);
 		assert(res == VK_SUCCESS);
 
 		m_fragmentShaderName = shaderEntryPoint;
 		VkPipelineShaderStageCreateInfo m_fragmentShader;
-		res = VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, shaderFilename.c_str(), m_fragmentShaderName.c_str(), shaderCompilerParams.c_str(), &attributeDefines, &m_fragmentShader);
+		res = m_pDevice->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, shaderFilename.c_str(), m_fragmentShaderName.c_str(), shaderCompilerParams.c_str(), &attributeDefines, &m_fragmentShader);
 		assert(res == VK_SUCCESS);
 
 		m_shaderStages.clear();
@@ -12681,7 +12915,7 @@ namespace vkr {
 		defines["WIDTH"] = std::to_string(dwWidth);
 		defines["HEIGHT"] = std::to_string(dwHeight);
 		defines["DEPTH"] = std::to_string(dwDepth);
-		res = VKCompileFromFile(m_pDevice->m_device, VK_SHADER_STAGE_COMPUTE_BIT, shaderFilename.c_str(), shaderEntryPoint.c_str(), shaderCompilerParams.c_str(), &defines, &computeShader);
+		res = m_pDevice->VKCompileFromFile(VK_SHADER_STAGE_COMPUTE_BIT, shaderFilename.c_str(), shaderEntryPoint.c_str(), shaderCompilerParams.c_str(), &defines, &computeShader);
 		assert(res == VK_SUCCESS);
 		VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
 		pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -15990,593 +16224,6 @@ namespace vkr {
 	}
 #endif // 1
 
-	// 编译shader
-#if 1
-
-
-	std::string s_shaderLibDir;
-	std::string s_shaderCacheDir;
-
-	bool InitShaderCompilerCache(const std::string shaderLibDir, std::string shaderCacheDir)
-	{
-		s_shaderLibDir = hz::genfn(shaderLibDir);
-		s_shaderCacheDir = hz::genfn(shaderCacheDir);
-
-		return true;
-	}
-
-	std::string GetShaderCompilerLibDir()
-	{
-		return s_shaderLibDir;
-	}
-
-	std::string GetShaderCompilerCacheDir()
-	{
-		return s_shaderCacheDir;
-	}
-
-#ifdef _WIN32
-
-	void ShowErrorMessageBox(LPCWSTR lpErrorString)
-	{
-		int msgboxID = MessageBoxW(NULL, lpErrorString, L"Error", MB_OK);
-	}
-
-	void ShowCustomErrorMessageBox(_In_opt_ LPCWSTR lpErrorString)
-	{
-		int msgboxID = MessageBoxW(NULL, lpErrorString, L"Error", MB_OK | MB_TOPMOST);
-	}
-	inline void ThrowIfFailed(HRESULT hr)
-	{
-		if (FAILED(hr))
-		{
-			wchar_t err[256];
-			memset(err, 0, 256);
-			FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), err, 255, NULL);
-			char errA[256];
-			size_t returnSize;
-			wcstombs_s(&returnSize, errA, 255, err, 255);
-			Trace(errA);
-#ifdef _DEBUG
-			ShowErrorMessageBox(err);
-#endif
-			throw 1;
-		}
-	}
-#define USE_DXC_SPIRV_FROM_DISK
-
-	void CompileMacros(const DefineList* pMacros, std::vector<D3D_SHADER_MACRO>* pOut)
-	{
-		if (pMacros != NULL)
-		{
-			for (auto it = pMacros->begin(); it != pMacros->end(); it++)
-			{
-				D3D_SHADER_MACRO macro;
-				macro.Name = it->first.c_str();
-				macro.Definition = it->second.c_str();
-				pOut->push_back(macro);
-			}
-		}
-	}
-
-	DxcCreateInstanceProc s_dxc_create_func;
-
-	bool InitDirectXCompiler()
-	{
-		std::string fullshaderCompilerPath = "dxcompiler.dll";
-		std::string fullshaderDXILPath = "dxil.dll";
-
-		//HMODULE dxil_module = ::LoadLibrary(fullshaderDXILPath.c_str());
-
-		//HMODULE dxc_module = ::LoadLibrary(fullshaderCompilerPath.c_str());
-		//if (dxc_module)
-		//	s_dxc_create_func = (DxcCreateInstanceProc)::GetProcAddress(dxc_module, "DxcCreateInstance");
-		//else
-		s_dxc_create_func = DxcCreateInstance;
-
-		return s_dxc_create_func != NULL;
-	}
-
-	interface Includer : public ID3DInclude
-	{
-	public:
-		virtual ~Includer() {}
-
-		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID * ppData, UINT * pBytes)
-		{
-			std::string fullpath = hz::genfn(GetShaderCompilerLibDir() + "/" + pFileName);
-			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
-		}
-		HRESULT Close(LPCVOID pData)
-		{
-			free((void*)pData);
-			return S_OK;
-		}
-	};
-
-	interface IncluderDxc : public IDxcIncludeHandler
-	{
-		IDxcLibrary * m_pLibrary;
-	public:
-		IncluderDxc(IDxcLibrary* pLibrary) : m_pLibrary(pLibrary) {}
-		HRESULT QueryInterface(const IID&, void**) { return S_OK; }
-		ULONG AddRef() { return 0; }
-		ULONG Release() { return 0; }
-		HRESULT LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource)
-		{
-			std::string kfp = hz::genfn(GetShaderCompilerLibDir() + "/" + hz::u16_to_gbk(pFilename));
-			LPCVOID pData;
-			size_t bytes;
-			HRESULT hr = readfile(kfp.c_str(), (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
-
-			if (hr == E_FAIL)
-			{
-				// return the failure here instead of crashing on CreateBlobWithEncodingFromPinned 
-				// to be able to report the error to the output console
-				return hr;
-			}
-
-			IDxcBlobEncoding* pSource;
-			ThrowIfFailed(m_pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pData, (UINT32)bytes, CP_UTF8, &pSource));
-
-			*ppIncludeSource = pSource;
-
-			return S_OK;
-		}
-	};
-
-	bool DXCompileToDXO(size_t hash, const char* pSrcCode, const DefineList* pDefines, const char* pEntryPoint, const char* pParams, char** outSpvData, size_t* outSpvSize)
-	{
-		//detect output bytecode type (DXBC/SPIR-V) and use proper extension
-		std::string filenameOut;
-		{
-			auto found = std::string(pParams).find("-spirv ");
-			if (found == std::string::npos)
-				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.dxo", hash));
-			else
-				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.spv", hash));
-		}
-
-#ifdef USE_DXC_SPIRV_FROM_DISK
-		if (readfile(filenameOut.c_str(), outSpvData, outSpvSize, true) && *outSpvSize > 0)
-		{
-			//Trace(format("thread 0x%04x compile: %p disk\n", GetCurrentThreadId(), hash));
-			return true;
-		}
-#endif
-
-		// create hlsl file for shader compiler to compile
-		//
-		std::string filenameHlsl = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.hlsl", hash));
-		std::ofstream ofs(filenameHlsl, std::ofstream::out);
-		ofs << pSrcCode;
-		ofs.close();
-
-		std::string filenamePdb = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.lld", hash));
-
-		std::wstring twstr;
-		// get defines
-		// 
-		std::vector<DxcDefine> defines;
-		defines.reserve(50);
-		int defineCount = 0;
-		if (pDefines != NULL)
-		{
-			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
-			{
-				auto w = md::u8_w(it->first);
-				auto w2 = md::u8_w(it->second);
-				DxcDefine d = {};
-				auto pos = twstr.size();
-				w.push_back(0);
-				twstr.append(w);
-				auto pos2 = twstr.size();
-				w.push_back(0);
-				twstr.append(w2);
-				d.Name = (wchar_t*)pos;
-				d.Value = (wchar_t*)pos2;
-				defineCount++;
-				defines.push_back(d);
-			}
-		}
-		// check whether DXCompiler is initialized
-		if (s_dxc_create_func == nullptr)
-		{
-			Trace("Error: s_dxc_create_func() is null, have you called InitDirectXCompiler() ?");
-			return false;
-		}
-
-		IDxcLibrary* pLibrary;
-		ThrowIfFailed(s_dxc_create_func(CLSID_DxcLibrary, IID_PPV_ARGS(&pLibrary)));
-
-		IDxcBlobEncoding* pSource = 0;
-		ThrowIfFailed(pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pSrcCode, (UINT32)strlen(pSrcCode), CP_UTF8, &pSource));
-		if (!pSource)
-			return false;
-		IDxcCompiler2* pCompiler;
-		ThrowIfFailed(s_dxc_create_func(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler)));
-
-		IncluderDxc Includer(pLibrary);
-
-		std::vector<LPCWSTR> ppArgs;
-		std::string params;
-		// splits params string into an array of strings
-		{
-
-			if (pParams && *pParams)
-				params = pParams;
-			auto pv = md::split(params, " ");
-			for (auto& it : pv) {
-				auto w = md::u8_w(it.c_str());
-				auto pos = twstr.size();
-				w.push_back(0);
-				twstr.append(w);
-				ppArgs.push_back((wchar_t*)pos);
-			}
-		}
-		auto ws = twstr.data();
-		for (auto& it : ppArgs) {
-			it = ws + (size_t)it;
-		}
-		for (auto& it : defines) {
-			it.Name = ws + (size_t)it.Name;
-			it.Value = ws + (size_t)it.Value;
-		}
-
-		auto pEntryPointW = md::u8_w(pEntryPoint, -1);
-		IDxcOperationResult* pResultPre;
-		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines.data(), defineCount, &Includer, &pResultPre);
-		if (res1 == S_OK)
-		{
-			Microsoft::WRL::ComPtr<IDxcBlob> pCode1;
-			pResultPre->GetResult(pCode1.GetAddressOf());
-			std::string preprocessedCode = "";
-
-			preprocessedCode = "// dxc -E" + std::string(pEntryPoint) + " " + params + " " + filenameHlsl + "\n\n";
-			if (pDefines)
-			{
-				for (auto it = pDefines->begin(); it != pDefines->end(); it++)
-					preprocessedCode += "#define " + it->first + " " + it->second + "\n";
-			}
-			preprocessedCode += std::string((char*)pCode1->GetBufferPointer());
-			preprocessedCode += "\n";
-			savefile(filenameHlsl.c_str(), preprocessedCode.c_str(), preprocessedCode.size(), false);
-
-			IDxcOperationResult* pOpRes;
-			HRESULT res;
-#if 0
-			if (false)
-			{
-				Microsoft::WRL::ComPtr<IDxcBlob> pPDB;
-				LPWSTR pDebugBlobName[1024];
-				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
-
-				// Setup the correct name for the PDB
-				if (pPDB)
-				{
-					char pPDBName[1024];
-					sprintf_s(pPDBName, "%s\\%ls", GetShaderCompilerCacheDir().c_str(), *pDebugBlobName);
-					savefile(pPDBName, pPDB->GetBufferPointer(), pPDB->GetBufferSize(), true);
-				}
-			}
-			else
-#endif
-			{
-				res = pCompiler->Compile(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes);
-			}
-
-			pSource->Release();
-			pLibrary->Release();
-			pCompiler->Release();
-
-			IDxcBlob* pResult = NULL;
-			IDxcBlobEncoding* pError = NULL;
-			if (pOpRes != NULL)
-			{
-				pOpRes->GetResult(&pResult);
-				pOpRes->GetErrorBuffer(&pError);
-				pOpRes->Release();
-			}
-
-			if (pResult != NULL && pResult->GetBufferSize() > 0)
-			{
-				*outSpvSize = pResult->GetBufferSize();
-				*outSpvData = (char*)malloc(*outSpvSize);
-
-				memcpy(*outSpvData, pResult->GetBufferPointer(), *outSpvSize);
-
-				pResult->Release();
-
-				// Make sure pError doesn't leak if it was allocated
-				if (pError)
-					pError->Release();
-
-#ifdef USE_DXC_SPIRV_FROM_DISK
-				savefile(filenameOut.c_str(), *outSpvData, *outSpvSize, true);
-#endif
-				return true;
-			}
-			else
-			{
-				IDxcBlobEncoding* pErrorUtf8 = 0;
-				if (pError)
-					pLibrary->GetBlobAsUtf8(pError, &pErrorUtf8);
-
-				Trace("*** Error compiling %p.hlsl ***\n", hash);
-
-				std::string filenameErr = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.err", hash));
-				savefile(filenameErr.c_str(), pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize(), false);
-
-				std::string errMsg = std::string((char*)pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize());
-				Trace(errMsg);
-
-				// Make sure pResult doesn't leak if it was allocated
-				if (pResult)
-					pResult->Release();
-
-				pErrorUtf8->Release();
-			}
-		}
-
-		return false;
-	}
-
-
-#endif // _WIN32
-
-	//
-	// Compiles a shader into SpirV
-	//
-	bool VKCompileToSpirv(size_t hash, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const std::string& shaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, char** outSpvData, size_t* outSpvSize)
-	{
-		// create glsl file for shader compiler to compile
-		//
-		std::string filenameSpv;
-		std::string filenameGlsl;
-		if (sourceType == SST_GLSL)
-		{
-			filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
-			filenameGlsl = hz::genfn(format("%s\\%p.glsl", GetShaderCompilerCacheDir().c_str(), hash));
-		}
-		else if (sourceType == SST_HLSL)
-		{
-			filenameSpv = hz::genfn(format("%s\\%p.dxo", GetShaderCompilerCacheDir().c_str(), hash));
-			filenameGlsl = hz::genfn(format("%s\\%p.hlsl", GetShaderCompilerCacheDir().c_str(), hash));
-		}
-		else
-			assert(!"unknown shader extension");
-
-		std::ofstream ofs(filenameGlsl, std::ofstream::out);
-		ofs << shaderCode;
-		ofs.close();
-
-		// compute command line to invoke the shader compiler
-		//
-		const char* stage = NULL;
-		switch (shader_type)
-		{
-		case VK_SHADER_STAGE_VERTEX_BIT:  stage = "vertex"; break;
-		case VK_SHADER_STAGE_FRAGMENT_BIT:  stage = "fragment"; break;
-		case VK_SHADER_STAGE_COMPUTE_BIT:  stage = "compute"; break;
-		case VK_SHADER_STAGE_TASK_BIT_EXT:  stage = "task"; break;
-		case VK_SHADER_STAGE_MESH_BIT_EXT:  stage = "mesh"; break;
-		}
-
-		// add the #defines
-		//
-		std::string defines;
-		if (pDefines)
-		{
-			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
-				defines += "-D" + it->first + "=" + it->second + " ";
-		}
-		std::string commandLine;
-		if (sourceType == SST_GLSL)
-		{
-			commandLine = format("glslc --target-env=vulkan1.1 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
-
-			std::string filenameErr = hz::genfn(format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash));
-
-			if (LaunchProcess(commandLine.c_str(), filenameErr.c_str()) == true)
-			{
-				readfile(filenameSpv.c_str(), outSpvData, outSpvSize, true);
-				assert(*outSpvSize != 0);
-				return true;
-			}
-		}
-		else
-		{
-			std::string scp = format("-spirv -fspv-target-env=vulkan1.1 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
-			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData, outSpvSize);
-			assert(*outSpvSize != 0);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	//
-	// Generate sources from the input data
-	//
-	std::string GenerateSource(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* shaderCompilerParams, const DefineList* pDefines)
-	{
-		std::string shaderCode(pshader);
-		std::string code;
-
-		if (sourceType == SST_GLSL)
-		{
-			// the first line in a GLSL shader must be the #version, insert the #defines right after this line
-			size_t index = shaderCode.find_first_of('\n');
-			code = shaderCode.substr(index, shaderCode.size() - index);
-
-			shaderCode = shaderCode.substr(0, index) + "\n";
-		}
-		else if (sourceType == SST_HLSL)
-		{
-			code = shaderCode;
-			shaderCode = "";
-		}
-
-		// add the #defines to the code to help debugging
-		if (pDefines)
-		{
-			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
-				shaderCode += "#define " + it->first + " " + it->second + "\n";
-		}
-		// concat the actual shader code
-		shaderCode += code;
-
-		return shaderCode;
-	}
-
-	Cache<VkShaderModule> s_shaderCache;
-
-	void DestroyShadersInTheCache(VkDevice device)
-	{
-		s_shaderCache.ForEach([device](const Cache<VkShaderModule>::DatabaseType::iterator& it)
-			{
-				vkDestroyShaderModule(device, it->second.m_data, NULL);
-			});
-	}
-
-	VkResult CreateModule(VkDevice device, char* SpvData, size_t SpvSize, VkShaderModule* pShaderModule)
-	{
-		VkShaderModuleCreateInfo moduleCreateInfo = {};
-		moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		moduleCreateInfo.pCode = (uint32_t*)SpvData;
-		moduleCreateInfo.codeSize = SpvSize;
-		return vkCreateShaderModule(device, &moduleCreateInfo, NULL, pShaderModule);
-	}
-
-	//
-	// Compile a GLSL or a HLSL, will cache binaries to disk
-	//
-	VkResult VKCompile(VkDevice device, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
-	{
-		VkResult res = VK_SUCCESS;
-
-		//compute hash
-		// 
-		size_t hash;
-		size_t pslen = strlen(pshader);
-		auto sf = hz::genfn(GetShaderCompilerLibDir() + "\\");
-		hash = HashShaderString(sf.c_str(), pshader);
-		hash = Hash(pShaderEntryPoint, strlen(pShaderEntryPoint), hash);
-		hash = Hash(shaderCompilerParams, strlen(shaderCompilerParams), hash);
-		hash = Hash((char*)&shader_type, sizeof(shader_type), hash);
-		if (pDefines != NULL)
-		{
-			hash = pDefines->Hash(hash);
-		}
-
-#define USE_MULTITHREADED_CACHE 
-#define USE_SPIRV_FROM_DISK   
-
-#ifdef USE_MULTITHREADED_CACHE
-		// Compile if not in cache
-		//
-		if (s_shaderCache.CacheMiss(hash, &pShader->module))
-#endif
-		{
-			auto strk = format("%p", hash);
-			print_time Pt("Compile Pipeline" + strk, 1);
-			char* SpvData = NULL;
-			size_t SpvSize = 0;
-#ifdef USE_SPIRV_FROM_DISK
-			std::string filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
-			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
-#endif
-			{
-				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
-				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, &SpvData, &SpvSize);
-				if (SpvSize == 0) {
-					printf("\n%s\n", shader.c_str());
-				}
-				assert(SpvSize != 0);
-			}
-			else {
-				if (SpvSize == 0) {
-					printf("\n%s\n", strk.c_str());
-				}
-			}
-			//auto c = crc32(-1, (Bytef*)pshader, strlen(pshader));  
-			assert(SpvSize != 0);
-			CreateModule(device, SpvData, SpvSize, &pShader->module);
-
-#ifdef USE_MULTITHREADED_CACHE
-			s_shaderCache.UpdateCache(hash, &pShader->module);
-#endif
-		}
-		else {
-			//print_time Pt("no Compile Pipeline", 1);
-		}
-
-		pShader->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		pShader->pNext = NULL;
-		pShader->pSpecializationInfo = NULL;
-		pShader->flags = 0;
-		pShader->stage = shader_type;
-		pShader->pName = pShaderEntryPoint;
-
-		return res;
-	}
-
-
-	//
-	// VKCompileFromString
-	//
-	VkResult VKCompileFromString(VkDevice device, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
-	{
-		assert(strlen(pShaderCode) > 0);
-
-		VkResult res = VKCompile(device, sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
-		assert(res == VK_SUCCESS);
-
-		return res;
-	}
-
-	//
-	// VKCompileFromFile
-	//
-	VkResult VKCompileFromFile(VkDevice device, const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
-	{
-		char* pShaderCode;
-		size_t size;
-
-		ShaderSourceType sourceType;
-		std::string pfn = pFilename;
-		if (pfn.find(".glsl") != std::string::npos)
-		{
-			sourceType = SST_GLSL;
-		}
-		else if (pfn.find(".hlsl") != std::string::npos)
-		{
-			sourceType = SST_HLSL;
-		}
-		//const char* pExtension = pFilename + std::max<size_t>(strlen(pFilename) - 4, 0);
-		//if (strcmp(pExtension, "glsl") == 0)
-		//	sourceType = SST_GLSL;
-		//else if (strcmp(pExtension, "hlsl") == 0)
-		//	sourceType = SST_HLSL;
-		else
-			assert(!"Can't tell shader type from its extension");
-
-		//append path
-		auto fullpath = hz::genfn(GetShaderCompilerLibDir() + std::string("/") + pFilename);
-
-		if (readfile(fullpath.c_str(), &pShaderCode, &size, false))
-		{
-			VkResult res = VKCompileFromString(device, sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
-			SetResourceName(device, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)pShader->module, pFilename);
-			return res;
-		}
-
-		return VK_NOT_READY;
-	}
-
-#endif 
-	// 12
 	// misc
 #if 1
 
@@ -17729,7 +17376,7 @@ namespace vkr {
 				}
 				else if (path == "pointer")
 				{
-					tfsmp->path = 4; 
+					tfsmp->path = 4;
 				}
 				tfchannel->sampler[tfsmp->path] = tfsmp;
 			}
@@ -22519,22 +22166,22 @@ namespace vkr {
 		VkPipelineShaderStageCreateInfo m_vertexShader, m_fragmentShader;
 		if (has_fh(vertexShader, '='))
 		{
-			res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+			res = pDevice->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 			assert(res == VK_SUCCESS);
 		}
 		else
 		{
-			res = VKCompileFromFile(pDevice->m_device, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+			res = pDevice->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 			assert(res == VK_SUCCESS);
 		}
 		if (has_fh(pixelShader, '='))
 		{
-			res = VKCompileFromString(pDevice->m_device, SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+			res = pDevice->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 			assert(res == VK_SUCCESS);
 		}
 		else
 		{
-			res = VKCompileFromFile(pDevice->m_device, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+			res = pDevice->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 			assert(res == VK_SUCCESS);
 		}
 
@@ -23252,11 +22899,11 @@ void Wireframe_pipe(vkr::Device* pDevice, VkRenderPass renderPass,
 	vkr::DefineList attributeDefines;
 
 	VkPipelineShaderStageCreateInfo m_vertexShader;
-	res = VKCompileFromString(pDevice->m_device, vkr::SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
+	res = pDevice->VKCompileFromString(vkr::SST_GLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "main", "", &attributeDefines, &m_vertexShader);
 	assert(res == VK_SUCCESS);
 
 	VkPipelineShaderStageCreateInfo m_fragmentShader;
-	res = VKCompileFromString(pDevice->m_device, vkr::SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
+	res = pDevice->VKCompileFromString(vkr::SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, pixelShader, "main", "", &attributeDefines, &m_fragmentShader);
 	assert(res == VK_SUCCESS);
 
 	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { m_vertexShader, m_fragmentShader };
@@ -23615,7 +23262,9 @@ void main()
 
 	void* new_ms_pipe(void* dev, void* rpass)
 	{
-		VkDevice device = (VkDevice)dev;  VkRenderPass renderPass = (VkRenderPass)rpass;
+		auto pdev = (vkr::Device*)dev;
+		VkDevice device = pdev->GetDevice();
+		VkRenderPass renderPass = (VkRenderPass)rpass;
 		struct UniformData {
 			glm::mat4 projection;
 			glm::mat4 model;
@@ -23650,15 +23299,15 @@ void main()
 
 		DefineList attributeDefines = {};
 		VkPipelineShaderStageCreateInfo msmShader;
-		auto res = VKCompileFromString(device, SST_GLSL, VK_SHADER_STAGE_MESH_BIT_EXT, ms_mesh, "main", "", &attributeDefines, &msmShader);
+		auto res = pdev->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_MESH_BIT_EXT, ms_mesh, "main", "", &attributeDefines, &msmShader);
 		assert(res == VK_SUCCESS);
 
 		VkPipelineShaderStageCreateInfo mfragmentShader;
-		res = VKCompileFromString(device, SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, ms_frag, "main", "", &attributeDefines, &mfragmentShader);
+		res = pdev->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_FRAGMENT_BIT, ms_frag, "main", "", &attributeDefines, &mfragmentShader);
 		assert(res == VK_SUCCESS);
 
 		VkPipelineShaderStageCreateInfo taskShader;
-		res = VKCompileFromString(device, SST_GLSL, VK_SHADER_STAGE_TASK_BIT_EXT, ms_task, "main", "", &attributeDefines, &taskShader);
+		res = pdev->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_TASK_BIT_EXT, ms_task, "main", "", &attributeDefines, &taskShader);
 		assert(res == VK_SUCCESS);
 
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { msmShader,taskShader, mfragmentShader };
