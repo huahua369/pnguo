@@ -4240,7 +4240,7 @@ namespace vkr {
 		std::vector<float>* weights = 0;
 		int mstride = 0;
 		int interpolation = 0;	// linear=0，step=1，cubicspline=2
-		int path = 0;			// 0"translation",1"rotation",2"scale",3"weights"; 
+		int path = 0;			// 0"translation",1"rotation",2"scale",3"weights",4"pointer"; 
 		void SampleLinear(float time, float* frac, float** pCurr, float** pNext) const
 		{
 			int curr_index = m_time.FindClosestFloatIndex(time);
@@ -4289,14 +4289,14 @@ namespace vkr {
 	public:
 		~tfChannel()
 		{
-			for (size_t i = 0; i < 4; i++)
+			for (size_t i = 0; i < 5; i++)
 			{
 				if (sampler[i])
 					delete sampler[i];
 				sampler[i] = 0;
 			}
 		}
-		tfSampler* sampler[4] = {};
+		tfSampler* sampler[5] = {};
 
 	};
 
@@ -17726,6 +17726,10 @@ namespace vkr {
 					tfsmp->path = 3;
 					assert(tfsmp->m_value.m_stride == 4);
 					assert(tfsmp->m_value.m_dimension == 1);
+				}
+				else if (path == "pointer")
+				{
+					tfsmp->path = 4; 
 				}
 				tfchannel->sampler[tfsmp->path] = tfsmp;
 			}
