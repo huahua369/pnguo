@@ -148,7 +148,7 @@ namespace vkr
 {
 	// Define a maximum number of shadows supported in a scene (note, these are only for spots and directional)
 	static const uint32_t MaxLightInstances = 4;
-	static const uint32_t MaxShadowInstances = 32;
+	static const uint32_t MaxShadowInstances = 4;
 	class Matrix2
 	{
 		glm::mat4 m_current = {};

@@ -9,7 +9,7 @@
 #ifndef UVT_COUNT
 #define UVT_COUNT  1
 #endif
-#define MAX_SHADOW_INSTANCES 32
+#define MAX_SHADOW_INSTANCES 4
 
 struct Light
 {
