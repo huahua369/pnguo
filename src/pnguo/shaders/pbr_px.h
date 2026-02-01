@@ -1031,7 +1031,7 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	m.Ng = mesh.Ng;
 
 	// Emissive term
-	vec3 emissive = material.emissiveFactor * mesh.emissiveFactor;
+	vec3 emissive = material.emissiveFactor * material.emissiveStrength * mesh.emissiveFactor;
 #ifdef ID_emissiveTexture
 	emissive *= texture(u_EmissiveSampler, getEmissiveUV(Input)).rgb;
 #endif 
@@ -2236,7 +2236,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 
 	color = mix(f_dielectric_brdf_ibl, f_metal_brdf_ibl, m.metallic);
 	color = max(vec3(0.0), f_sheen + color * albedoSheenScaling);
- 
+
 
 #endif //end USE_IBL 
 

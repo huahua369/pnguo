@@ -229,7 +229,7 @@ struct scene_state {
 	float Exposure = 1.0;
 	// APP/SCENE CONTROLS 
 	float IBLFactor = 1.0;
-	float EmissiveFactor = 50.0;
+	float EmissiveFactor = 1.0;
 	int   SelectedSkydomeTypeIndex = 0; // 0-1 
 
 	PassParameters MagnifierParams = {};

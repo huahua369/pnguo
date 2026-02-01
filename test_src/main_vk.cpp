@@ -785,7 +785,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
-		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+		auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 #endif 
 #endif // _WIN32
 
@@ -969,7 +969,7 @@ int main()
 			*/
 			vkd->_state.SelectedTonemapperIndex = 0;
 			vkd->_state.Exposure = 0.8;
-			vkd->_state.EmissiveFactor = 50;
+			vkd->_state.EmissiveFactor = 1;
 			vkd->_state.IBLFactor = 0.5;
 			new_ui(form0, vkd);
 			auto pcb = new texture_cb();

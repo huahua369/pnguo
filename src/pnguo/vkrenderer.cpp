@@ -4038,7 +4038,7 @@ namespace vkr {
 		float roughnessFactor = 0;			// 粗糙度
 		float normalScale = 1.0;
 		// KHR_materials_emissive_strength
-		float emissiveStrength = 1.0;
+		float emissiveStrength = 0.0;
 		vec3 emissiveFactor = glm::vec3(1.0);
 		int   alphaMode;
 		float alphaCutoff;
@@ -5148,6 +5148,8 @@ namespace vkr {
 		void load_skins();
 		void load_animations();
 
+
+		void get_target_node(std::string& path, tfSampler* tfsmp, tinygltf::AnimationChannel& channel);
 	};
 	struct morph_t
 	{
@@ -8213,7 +8215,7 @@ namespace vkr
 
 	void SetDefaultMaterialParamters(PBRMaterialParameters* pPbrMaterialParameters)
 	{
-		pPbrMaterialParameters->m_doubleSided = false;
+		pPbrMaterialParameters->m_doubleSided = true;
 		pPbrMaterialParameters->m_blending = false;
 		auto& pbrm = pPbrMaterialParameters->m_params;
 		pbrm = pbr_factors_t();
@@ -8322,6 +8324,73 @@ namespace vkr
 		}
 		return rdef;
 	}
+	// todo KHR_animation_pointer
+	/*
+	{
+				"sampler": 0,
+				"target": {
+					"path": "pointer",
+					"extensions": {
+						"KHR_animation_pointer": {
+							"pointer": "/nodes/0/rotation"
+						}
+					}
+				}
+			}
+	https://github.com/KhronosGroup/glTF/blob/main/specification/2.0/ObjectModel.adoc
+	Pointer	Type
+/cameras/{}/orthographic/xmag float
+
+/cameras/{}/orthographic/ymag float
+
+/cameras/{}/orthographic/zfar float
+
+/cameras/{}/orthographic/znear float
+
+/cameras/{}/perspective/aspectRatio float
+
+/cameras/{}/perspective/yfov float
+
+/cameras/{}/perspective/zfar float
+
+/cameras/{}/perspective/znear float
+
+/materials/{}/alphaCutoff float
+
+/materials/{}/emissiveFactor float3
+
+/materials/{}/normalTexture/scale float
+
+/materials/{}/occlusionTexture/strength float
+
+/materials/{}/pbrMetallicRoughness/baseColorFactor float4
+
+/materials/{}/pbrMetallicRoughness/metallicFactor float
+
+/materials/{}/pbrMetallicRoughness/roughnessFactor float
+
+/nodes/{}/translation float3
+
+/nodes/{}/rotation float4
+
+/nodes/{}/scale float3
+
+/nodes/{}/weights float[]
+
+/nodes/{}/weights/{} float
+	*/
+	void get_KHR_animation_pointer(tinygltf::ExtensionMap& extensions, glm::mat3* m)
+	{
+		auto tt = get_ext(extensions, "KHR_animation_pointer");
+		if (tt) {
+			auto pointer = get_v(tt, "pointer", std::string(""));
+			if (pointer.size())
+			{
+
+			}
+		}
+	}
+
 	bool get_KHR_texture_transform(tinygltf::ExtensionMap& extensions, glm::mat3* m)
 	{
 		auto tt = get_ext(extensions, "KHR_texture_transform");
@@ -17286,6 +17355,48 @@ namespace vkr {
 			}
 		}
 	}
+	void GLTFCommon::get_target_node(std::string& path, tfSampler* tfsmp, tinygltf::AnimationChannel& channel) {
+		// Index appropriately
+		if (path == "translation")
+		{
+			tfsmp->path = 0;
+			assert(tfsmp->m_value.m_stride == 3 * 4);
+			assert(tfsmp->m_value.m_dimension == 3);
+		}
+		else if (path == "rotation")
+		{
+			tfsmp->path = 1;
+			assert(tfsmp->m_value.m_stride == 4 * 4);
+			assert(tfsmp->m_value.m_dimension == 4);
+		}
+		else if (path == "scale")
+		{
+			tfsmp->path = 2;
+			assert(tfsmp->m_value.m_stride == 3 * 4);
+			assert(tfsmp->m_value.m_dimension == 3);
+		}
+		else if (path == "weights")
+		{
+			if (channel.target_node >= 0)
+			{
+				auto& np = m_nodes[channel.target_node];
+				if (np.meshIndex >= 0) {
+					auto& mp = m_meshes[np.meshIndex];
+					tfsmp->mstride = mp.weights.size();
+					tfsmp->weights = &mp.weights;
+				}
+			}
+			tfsmp->path = 3;
+			assert(tfsmp->m_value.m_stride == 4);
+			assert(tfsmp->m_value.m_dimension == 1);
+		}
+		else if (path == "pointer")
+		{
+			// todo KHR_animation_pointer
+			tfsmp->path = 4;
+			get_KHR_animation_pointer(channel.target_extensions, 0);
+		}
+	}
 	void GLTFCommon::load_animations()
 	{
 		auto& animations = pm->animations;
@@ -17301,17 +17412,22 @@ namespace vkr {
 				int sampler = channel.sampler;
 				int node = channel.target_node;// GetElementInt(channel, "target/node", -1);
 				std::string path = channel.target_path;// GetElementString(channel, "target/path", std::string());
-				tfChannel* tfchannel;
+				tfChannel* tfchannel = 0;
 				auto ch = tfanim->m_channels.find(node);
-				if (ch == tfanim->m_channels.end())
-				{
-					tfchannel = &tfanim->m_channels[node];
-				}
-				else
-				{
-					tfchannel = &ch->second;
-				}
 				tfSampler* tfsmp = new tfSampler();
+				if (node >= 0) {
+					if (ch == tfanim->m_channels.end())
+					{
+						tfchannel = &tfanim->m_channels[node];
+					}
+					else
+					{
+						tfchannel = &ch->second;
+					}
+					if (tfchannel->sampler)
+						tfchannel->sampler[tfsmp->path] = tfsmp;
+				}
+				get_target_node(path, tfsmp, channel);
 				// Get time line
 				GetBufferDetails(samplers[sampler].input, &tfsmp->m_time);
 				assert(tfsmp->m_time.m_stride == 4);
@@ -17319,45 +17435,6 @@ namespace vkr {
 				// Get value line
 				GetBufferDetails(samplers[sampler].output, &tfsmp->m_value);
 				tfsmp->mstride = tfsmp->m_value.m_dimension;
-				// Index appropriately
-				if (path == "translation")
-				{
-					tfsmp->path = 0;
-					assert(tfsmp->m_value.m_stride == 3 * 4);
-					assert(tfsmp->m_value.m_dimension == 3);
-				}
-				else if (path == "rotation")
-				{
-					tfsmp->path = 1;
-					assert(tfsmp->m_value.m_stride == 4 * 4);
-					assert(tfsmp->m_value.m_dimension == 4);
-				}
-				else if (path == "scale")
-				{
-					tfsmp->path = 2;
-					assert(tfsmp->m_value.m_stride == 3 * 4);
-					assert(tfsmp->m_value.m_dimension == 3);
-				}
-				else if (path == "weights")
-				{
-					if (node >= 0)
-					{
-						auto& np = m_nodes[node];
-						if (np.meshIndex >= 0) {
-							auto& mp = m_meshes[np.meshIndex];
-							tfsmp->mstride = mp.weights.size();
-							tfsmp->weights = &mp.weights;
-						}
-					}
-					tfsmp->path = 3;
-					assert(tfsmp->m_value.m_stride == 4);
-					assert(tfsmp->m_value.m_dimension == 1);
-				}
-				else if (path == "pointer")
-				{
-					tfsmp->path = 4;
-				}
-				tfchannel->sampler[tfsmp->path] = tfsmp;
 			}
 		}
 	}
