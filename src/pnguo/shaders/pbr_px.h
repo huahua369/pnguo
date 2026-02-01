@@ -2390,7 +2390,7 @@ vec3 doPbrLighting(VS2PS Input, PerFrame perFrame, gpuMaterial m)
 }
 
 
-#endif // 1
+#endif // 1灯光
 
 
 #endif
