@@ -185,6 +185,7 @@ VS2PS Output;
 #include "shaders/GLTFVertexFactory.h"
 
 
+#include "shaders/pbr_pixel.h"
 //--------------------------------------------------------------------------------------
 // PerFrame structure, must match the one in GltfPbrPass.h
 //--------------------------------------------------------------------------------------
