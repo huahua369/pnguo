@@ -21792,6 +21792,12 @@ namespace vkr {
 				{
 					print_time Pt("load gltf", 1);
 					pgc = new GLTFCommon();
+					if (pgc->Load(fn1.c_str(), "") == false)
+					{
+						printf("The selected model couldn't be found, please check the documentation!\n");
+						delete pgc;
+						return;
+					}
 					pgc->has_shadowMap = has_shadowMap;
 					pgc->_pos = pos;
 					pgc->_scale = scale;
@@ -21806,12 +21812,6 @@ namespace vkr {
 						pgc->instance_mat[i] = glm::translate(glm::vec3(x * i, 0.2, 0.0f)) * glm::rotate(glm::radians(i * 45.0f), glm::vec3(0.0, 1.0, 0.0));
 					}
 #endif
-					if (pgc->Load(fn1.c_str(), "") == false)
-					{
-						printf("The selected model couldn't be found, please check the documentation!\n");
-						delete pgc;
-						return;
-					}
 				}
 				if (pgc)
 				{
