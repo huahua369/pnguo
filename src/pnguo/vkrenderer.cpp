@@ -4038,8 +4038,8 @@ namespace vkr {
 		float roughnessFactor = 0;			// 粗糙度
 		float normalScale = 1.0;
 		// KHR_materials_emissive_strength
-		float emissiveStrength = 0.0;
-		vec3 emissiveFactor = glm::vec3(1.0);
+		float emissiveStrength = 1.0;
+		vec3 emissiveFactor = glm::vec3(0.0);
 		int   alphaMode;
 		float alphaCutoff;
 		float occlusionStrength;
@@ -4901,7 +4901,7 @@ namespace vkr {
 	{
 	public:
 		tfSampler* sampler[5] = {};
-		int nodeid = -1;	// 节点id
+		int targetIndex = -1;	// 节点id
 	public:
 		~tfChannel()
 		{
@@ -4918,13 +4918,14 @@ namespace vkr {
 		rotation,
 		scale,
 		weights,
-		visible
+		visible,
+		material_emissiveFactor,
 	};
 	class nChannel
 	{
 	public:
 		tfSampler* sampler = {};
-		int nodeid = -1;	// 节点id
+		int targetIndex = -1;	// 节点id
 		int ext_type = -1;
 		void* ptr = 0;		// 目标指针
 	public:
@@ -5089,7 +5090,7 @@ namespace vkr {
 		glm::mat4* m_animatedMats = 0;			// _mats的指针。object space matrices of each node after being animated
 		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
 		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
-		std::set<size_t> hidden_node;			// 不显示的节点
+		std::unordered_set<size_t> hidden_node;			// 不显示的节点
 		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
 		struct matp2 {
 			glm::mat4* m = 0;
@@ -5216,7 +5217,7 @@ namespace vkr {
 		int _indextype = 0;
 		uint32_t instanceCount = 1;
 	public:
-		GLTFCommon* m_pGLTFCommon;
+		GLTFCommon* m_pGLTFCommon = 0;
 		std::vector<size_t> _nodes;
 		VkDescriptorBufferInfo m_perFrameConstants = {};
 		VkDescriptorBufferInfo m_perFrameConstants_w = {}; // 线框
@@ -8413,6 +8414,7 @@ namespace vkr
 /nodes/{}/weights float[]
 
 /nodes/{}/weights/{} float
+/materials/{}/extensions/KHR_materials_emissive_strength/emissiveStrength
 	*/
 	enum class ANIMATION_TARGET_TYPE :uint8_t {
 		node,
@@ -8462,18 +8464,17 @@ namespace vkr
 				int targetIndex = std::stoi(segments[1]);
 
 				auto type = ANIMATION_TARGET_TYPE::node;
-				if (targetType == "/materials/")
+				if (targetType == "materials")
 					type = ANIMATION_TARGET_TYPE::material;
-				else if (targetType == "/extensions/KHR_lights_punctual/lights/")
+				else if (targetType == "extensions/KHR_lights_punctual/lights")
 					type = ANIMATION_TARGET_TYPE::light;
-				else if (targetType == "/cameras/")
+				else if (targetType == "cameras")
 					type = ANIMATION_TARGET_TYPE::camera;
 
 				std::string targetProperty = segments[2];
-
+				nc->targetIndex = targetIndex;
 				switch (type) {
 				case ANIMATION_TARGET_TYPE::node:
-					nc->nodeid = targetIndex;
 					switch (targetProperty[0]) {
 
 					case 't':
@@ -8505,8 +8506,14 @@ namespace vkr
 					{
 						targetProperty = "visible"; nc->ext_type = (int)exttype_e::visible;
 					}
-
 					break;
+				case ANIMATION_TARGET_TYPE::material:
+				{
+					if (targetProperty == "emissiveFactor")
+					{
+						nc->ext_type = (int)exttype_e::material_emissiveFactor;
+					}
+				}break;
 
 #if 0
 
@@ -10361,6 +10368,14 @@ namespace vkr
 		auto pTransparent = &opt->transparent;
 		glm::ivec2 transmissionFramebufferSize = m_pRenderPass->m_pGBuffer->m_HDR.get_size();
 		auto& ns = pNodes;
+		auto cp = get_cp();
+		for (size_t i = 0; i < m_materialsData.size(); i++)
+		{
+			auto pt =& m_materialsData[i];
+			auto st = &cp->_materialsData[i];
+			pt->m_pbrMaterialParameters.m_params = st->m_pbrMaterialParameters.m_params;
+			//pt->m_pbrMaterialParameters.uvTransform
+		}
 		for (auto i : _ptb->_nodes)
 		{
 			auto& hidenode = _ptb->m_pGLTFCommon->_anim_data.hidden_node;
@@ -17721,7 +17736,7 @@ namespace vkr {
 			for (int c = 0; c < channels.size(); c++)
 			{
 				auto& channel = channels[c];
-				int sampler = channel.sampler;
+				auto& sampler = samplers[channel.sampler];
 				int node = channel.target_node;// GetElementInt(channel, "target/node", -1);
 				std::string path = channel.target_path;// GetElementString(channel, "target/path", std::string());
 				tfChannel* tfchannel = 0;
@@ -17741,23 +17756,53 @@ namespace vkr {
 				}
 				nChannel nc = {};
 				nc.sampler = tfsmp;
+				// Get time line
+				GetBufferDetails(sampler.input, &tfsmp->m_time);
+				assert(tfsmp->m_time.m_stride == 4);
+				tfanim->m_duration = std::max<float>(tfanim->m_duration, *(float*)tfsmp->m_time.Get(tfsmp->m_time.m_count - 1));
+				// Get value line
+				GetBufferDetails(sampler.output, &tfsmp->m_value);
+				tfsmp->mstride = tfsmp->m_value.m_dimension;
+
 				get_target_node(path, &nc, channel);
+				switch (sampler.interpolation[0])
+				{
+				case 'L':
+				{
+					if (sampler.interpolation == "LINEAR")
+					{
+						tfsmp->interpolation = 0;
+					}
+					break;
+				}
+				case 'S':
+				{
+					if (sampler.interpolation == "STEP")
+					{
+
+						tfsmp->interpolation = 1;
+					}
+					break;
+				}
+				case 'C':
+				{
+					if (sampler.interpolation == "CUBICSPLINE")
+					{
+						tfsmp->interpolation = 2;
+
+					}
+					break;
+				}
+				}
 				if (tfchannel && tfchannel->sampler)
 				{
 					tfchannel->sampler[tfsmp->path] = tfsmp;
 				}
 				else {
 					auto& kn = tfanim->_channels.emplace_back(nc);
-					kn.nodeid;
+					kn.targetIndex;
 				}
 				nc.sampler = 0;
-				// Get time line
-				GetBufferDetails(samplers[sampler].input, &tfsmp->m_time);
-				assert(tfsmp->m_time.m_stride == 4);
-				tfanim->m_duration = std::max<float>(tfanim->m_duration, *(float*)tfsmp->m_time.Get(tfsmp->m_time.m_count - 1));
-				// Get value line
-				GetBufferDetails(samplers[sampler].output, &tfsmp->m_value);
-				tfsmp->mstride = tfsmp->m_value.m_dimension;
 			}
 		}
 	}
@@ -17780,13 +17825,12 @@ namespace vkr {
 			for (auto it = anim->m_channels.begin(); it != anim->m_channels.end(); it++)
 			{
 				auto np = &m_nodes[it->first];
-				Transform* pSourceTrans = &m_nodes[it->first].m_tranform;
-				Transform animated = {};
 				float frac, * pCurr, * pNext;
 				auto c = &it->second;
-				animated.m_translation = pSourceTrans->m_translation;
-				animated.m_rotation = pSourceTrans->m_rotation;
-				animated.m_scale = pSourceTrans->m_scale;
+				Transform animated = {};
+				animated.m_translation = np->m_tranform.m_translation;
+				animated.m_rotation = np->m_tranform.m_rotation;
+				animated.m_scale = np->m_tranform.m_scale;
 				for (size_t k = 0; k < 4; k++) {
 					auto& rb = acv[k];
 					auto st = it->second.sampler[k];
@@ -17808,8 +17852,11 @@ namespace vkr {
 					va.clear();
 					va.swap(acv[3]);
 				}
-				// it->first是节点idx
-				_anim_data.m_animatedMats[it->first] = animated.GetWorldMat();
+				else
+				{
+					// it->first是节点idx
+					_anim_data.m_animatedMats[it->first] = animated.GetWorldMat();
+				}
 			}
 			for (auto& st : anim->_channels) {
 				if (st.sampler)
@@ -17817,15 +17864,51 @@ namespace vkr {
 					auto& rb = acv[0];
 					// 插值类型支持：线性、步长、三次样条插值
 					auto v4 = st.sampler->interpolator.interpolate(st.sampler, time, anim->m_duration, &rb);
-					if (st.ext_type == (int)exttype_e::visible && st.nodeid >= 0)
-					{
-						auto np = &m_nodes[st.nodeid];
-						if (rb[0] > 0)
+					if (st.targetIndex >= 0) {
+						auto np = &m_nodes[st.targetIndex];
+						Transform animated = {};
+						animated.m_translation = np->m_tranform.m_translation;
+						animated.m_rotation = np->m_tranform.m_rotation;
+						animated.m_scale = np->m_tranform.m_scale;
+						auto et = (exttype_e)st.ext_type;
+						switch (et) {
+						case exttype_e::translation:
+							animated.m_translation = v4;
+							break;
+						case exttype_e::rotation:
+							animated.m_rotation = glm::mat4(glm::quat(v4.w, v4.x, v4.y, v4.z));
+							break;
+						case exttype_e::scale:
+							animated.m_scale = v4;
+							break;
+						case exttype_e::weights:
 						{
-							_anim_data.hidden_node.insert(st.nodeid);
+							auto& va = _anim_data.m_animated_morphWeights[st.targetIndex];
+							va.swap(rb);
+							break;
 						}
-						else {
-							_anim_data.hidden_node.erase(st.nodeid);
+						case exttype_e::visible:
+						{
+							auto np = &m_nodes[st.targetIndex];
+							if (rb[0] > 0)
+							{
+								_anim_data.hidden_node.erase(st.targetIndex);
+							}
+							else {
+								_anim_data.hidden_node.insert(st.targetIndex);
+							}
+						}
+						break;
+						case exttype_e::material_emissiveFactor:
+						{
+							if (st.targetIndex < _materialsData.size())
+							{
+								_materialsData[st.targetIndex].m_pbrMaterialParameters.m_params.emissiveFactor = glm::vec3(v4);
+							}
+						}break;
+						}
+						if (et < exttype_e::weights) {
+							_anim_data.m_animatedMats[st.targetIndex] = animated.GetWorldMat();
 						}
 					}
 				}
