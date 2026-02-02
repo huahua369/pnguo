@@ -4716,16 +4716,14 @@ namespace vkr {
 	struct tfNode
 	{
 		std::vector<tfNodeIdx> m_children;
-
+		std::string m_name;
+		Transform m_tranform;
 		int skinIndex = -1;
 		int meshIndex = -1;
 		int channel = -1;
 		bool bIsJoint = false;
 		bool negativescale = false;
-
-		std::string m_name;
-
-		Transform m_tranform;
+		bool visible = true;
 	};
 
 	struct NodeMatrixPostTransform
@@ -4841,7 +4839,7 @@ namespace vkr {
 			auto w = output[4 * index + 3];
 			return glm::quat(w, x, y, z);
 		}
-		glm::vec4 interpolate(tfChannel* channel, tfSampler* sampler, float t, float maxTime, std::vector<float>* rb);
+		glm::vec4 interpolate(tfSampler* sampler, float t, float maxTime, std::vector<float>* rb);
 	};
 
 	class tfSampler
@@ -4854,6 +4852,8 @@ namespace vkr {
 		int mstride = 0;
 		int interpolation = 0;	// linear=0，step=1，cubicspline=2
 		int path = 0;			// 0"translation",1"rotation",2"scale",3"weights",4"pointer"; 
+
+	public:
 		void SampleLinear(float time, float* frac, float** pCurr, float** pNext) const
 		{
 			int curr_index = m_time.FindClosestFloatIndex(time);
@@ -4900,6 +4900,9 @@ namespace vkr {
 	class tfChannel
 	{
 	public:
+		tfSampler* sampler[5] = {};
+		int nodeid = -1;	// 节点id
+	public:
 		~tfChannel()
 		{
 			for (size_t i = 0; i < 5; i++)
@@ -4909,11 +4912,33 @@ namespace vkr {
 				sampler[i] = 0;
 			}
 		}
-		tfSampler* sampler[5] = {};
-
+	};
+	enum class exttype_e :uint8_t {
+		translation,
+		rotation,
+		scale,
+		weights,
+		visible
+	};
+	class nChannel
+	{
+	public:
+		tfSampler* sampler = {};
+		int nodeid = -1;	// 节点id
+		int ext_type = -1;
+		void* ptr = 0;		// 目标指针
+	public:
+		~nChannel()
+		{
+			if (ptr && sampler)
+			{
+				delete sampler;
+				sampler = 0;
+			}
+		}
 	};
 
-	glm::vec4 tfInterpolator::interpolate(tfChannel* channel, tfSampler* sampler, float t, float maxTime, std::vector<float>* rb)
+	glm::vec4 tfInterpolator::interpolate(tfSampler* sampler, float t, float maxTime, std::vector<float>* rb)
 	{
 		if (!(t > 0) || !sampler)
 		{
@@ -5017,7 +5042,8 @@ namespace vkr {
 	struct tfAnimation
 	{
 		float m_duration;
-		std::map<int, tfChannel> m_channels;
+		std::map<int, tfChannel> m_channels;	// 节点id的通道
+		std::vector<nChannel> _channels;		// 散装
 	};
 
 	struct tfLight
@@ -5057,6 +5083,20 @@ namespace vkr {
 
 	glm::vec4 get_row(const glm::mat4& m, int n);
 
+	struct anim_dy_t
+	{
+		uint32_t _animationIndex = 0;
+		glm::mat4* m_animatedMats = 0;			// _mats的指针。object space matrices of each node after being animated
+		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
+		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
+		std::set<size_t> hidden_node;			// 不显示的节点
+		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
+		struct matp2 {
+			glm::mat4* m = 0;
+			size_t count = 0;
+		};
+		std::map<glm::ivec2, matp2> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
+	};
 
 	// todo gltf解析后
 	class GLTFCommon
@@ -5081,32 +5121,21 @@ namespace vkr {
 		std::vector<float*> _sparseData;		// 解码的稀疏数据
 		std::vector<hz::mfile_t*> _fileData;	// 文件数据
 		//std::vector<char*> _fileData_f;		// 原始数据
-
-		std::vector<glm::mat4> _mats;			// 动画矩阵和蒙皮矩阵
-		glm::mat4* m_animatedMats = 0;			// _mats的指针。object space matrices of each node after being animated
-		std::map<int, std::vector<float>> m_animated_morphWeights;// 变形插值数据
-		std::vector<Matrix2> m_worldSpaceMats;     // world space matrices of each node after processing the hierarchy
-		struct matp2 {
-			glm::mat4* m = 0;
-			size_t count = 0;
-		};
-		std::map<glm::ivec2, matp2> m_worldSpaceSkeletonMats; // skinning matrices, following the m_jointsNodeIdx order
+		anim_dy_t _anim_data;				// 运行时动画数据
 		std::map<int, std::vector<glm::mat3x4>> m_uv_mats; // UVmat
-
 		std::map<int, std::vector<glm::vec3>> targets_data;
 		std::map<int, std::vector<glm::dvec3>> targets_datad;
 		std::vector<glm::mat4> instance_mat;
-		glm::vec3 _pos = {};
-		float _scale = 1.0;
-		uint32_t instanceCount = 1;
-		uint32_t _animationIndex = 0;
-		size_t mat_count = 0;	// 矩阵数量
-		size_t ubo_size = 0;
-		bool has_shadowMap = true;
 		std::vector<PBRMaterial> _materialsData;
 		std::vector<PBRMesh> _meshes;
 		std::vector<char> _ubo_md;
 		std::vector<std::string> variants;
+		glm::vec3 _pos = {};
+		float _scale = 1.0;
+		size_t mat_count = 0;	// 矩阵数量
+		size_t ubo_size = 0;
+		uint32_t instanceCount = 1;
+		bool has_shadowMap = true;
 		PerFrame_t* _perFrameData = 0;
 		PerFrame_t* _perFrameData_w = 0;
 	public:
@@ -5149,7 +5178,7 @@ namespace vkr {
 		void load_animations();
 
 
-		void get_target_node(std::string& path, tfSampler* tfsmp, tinygltf::AnimationChannel& channel);
+		void get_target_node(std::string& path, nChannel* tfsmp, tinygltf::AnimationChannel& channel);
 	};
 	struct morph_t
 	{
@@ -5208,7 +5237,7 @@ namespace vkr {
 		VkDescriptorBufferInfo* get_mb(int idx);
 		VkDescriptorBufferInfo* get_uvm(int idx);
 		VkDescriptorBufferInfo* get_instance_info();
-		void SetSkinningMatricesForSkeletons(DynamicBufferRing* ubo);
+		void update_anim_data(DynamicBufferRing* ubo);
 		void SetPerFrameConstants(DynamicBufferRing* ubo, bool bWireframe);
 		void update_node();
 	};
@@ -6891,7 +6920,7 @@ namespace vkr
 			if (pNode->meshIndex < 0)
 				continue;
 
-			glm::mat4 mWorldViewProj = cameraViewProjMatrix * pC->m_worldSpaceMats[i].GetCurrent();
+			glm::mat4 mWorldViewProj = cameraViewProjMatrix * pC->_anim_data.m_worldSpaceMats[i].GetCurrent();
 
 			tfMesh* pMesh = &pC->m_meshes[pNode->meshIndex];
 			for (uint32_t p = 0; p < pMesh->m_pPrimitives.size(); p++)
@@ -7392,10 +7421,15 @@ namespace vkr
 		SetPerfMarkerBegin(cmd_buf, "DepthPass");
 		// loop through nodes
 		std::vector<tfNode>& ns = _ptb->m_pGLTFCommon->m_nodes;
-		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
+		auto& hidenode = _ptb->m_pGLTFCommon->_anim_data.hidden_node;
+		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->_anim_data.m_worldSpaceMats.data();
 		auto pm = _ptb->m_pGLTFCommon->pm;
 		for (auto i : _ptb->_nodes)
 		{
+			if (hidenode.find(i) != hidenode.end())
+			{
+				continue;
+			}
 			tfNode* pNode = &ns[i];
 			assert(pNode && pNode->meshIndex >= 0);
 			glm::ivec2 sm = { pNode->skinIndex, pNode->meshIndex };
@@ -8137,11 +8171,12 @@ namespace vkr
 		}
 	}
 
-	void gltf_gpu_res_cx::SetSkinningMatricesForSkeletons(DynamicBufferRing* ubo)
+	void gltf_gpu_res_cx::update_anim_data(DynamicBufferRing* ubo)
 	{
+		update_node();
 		if (!ubo)return;
 		auto pc = m_pGLTFCommon;
-		for (auto& t : pc->m_worldSpaceSkeletonMats)
+		for (auto& t : pc->_anim_data.m_worldSpaceSkeletonMats)
 		{
 			auto matrices = &t.second;
 			VkDescriptorBufferInfo perSkeleton = {};
@@ -8152,7 +8187,7 @@ namespace vkr
 			m_skeletonMatricesBuffer[t.first] = perSkeleton;
 		}
 		// todo 设置变形插值数据到ubo
-		for (auto& t : pc->m_animated_morphWeights)
+		for (auto& t : pc->_anim_data.m_animated_morphWeights)
 		{
 			auto d = &t.second;
 			VkDescriptorBufferInfo per = {};
@@ -8410,7 +8445,7 @@ namespace vkr
 		}
 		return segments;
 	}
-	void get_KHR_animation_pointer(tinygltf::ExtensionMap& extensions, glm::mat3* m)
+	void get_KHR_animation_pointer(tinygltf::ExtensionMap& extensions, nChannel* nc)
 	{
 		auto tt = get_ext(extensions, "KHR_animation_pointer");
 		if (tt) {
@@ -8438,27 +8473,38 @@ namespace vkr
 
 				switch (type) {
 				case ANIMATION_TARGET_TYPE::node:
+					nc->nodeid = targetIndex;
 					switch (targetProperty[0]) {
 
 					case 't':
 						if (targetProperty == "translation")
-							targetProperty = "position";
+						{
+							targetProperty = "position"; nc->ext_type = (int)exttype_e::translation;
+						}
 						break;
 					case 'r':
 						if (targetProperty == "rotation")
-							targetProperty = "quaternion";
+						{
+							targetProperty = "quaternion"; nc->ext_type = (int)exttype_e::rotation;
+						}
 						break;
 					case 's':
 						if (targetProperty == "scale")
-							targetProperty = "scale";
+						{
+							targetProperty = "scale"; nc->ext_type = (int)exttype_e::scale;
+						}
 						break;
 					case 'w':
 						if (targetProperty == "weights")
-							targetProperty = "morphTargetInfluences";
+						{
+							targetProperty = "morphTargetInfluences"; nc->ext_type = (int)exttype_e::weights;
+						}
 						break;
 					}
 					if (targetProperty == "extensions/KHR_node_visibility/visible")
-						targetProperty = "visible";
+					{
+						targetProperty = "visible"; nc->ext_type = (int)exttype_e::visible;
+					}
 
 					break;
 
@@ -10310,13 +10356,18 @@ namespace vkr
 	void GltfPbrPass::BuildBatchLists(drawables_t* opt, bool bWireframe)
 	{
 		std::vector<tfNode>& pNodes = _ptb->m_pGLTFCommon->m_nodes;
-		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->m_worldSpaceMats.data();
+		Matrix2* pNodesMatrices = _ptb->m_pGLTFCommon->_anim_data.m_worldSpaceMats.data();
 		auto pSolid = &opt->opaque;
 		auto pTransparent = &opt->transparent;
 		glm::ivec2 transmissionFramebufferSize = m_pRenderPass->m_pGBuffer->m_HDR.get_size();
 		auto& ns = pNodes;
 		for (auto i : _ptb->_nodes)
 		{
+			auto& hidenode = _ptb->m_pGLTFCommon->_anim_data.hidden_node;
+			if (hidenode.find(i) != hidenode.end())
+			{
+				continue;
+			}
 			tfNode* pNode = &ns[i];
 			assert(pNode && pNode->meshIndex >= 0);
 			glm::ivec2 sm = { pNode->skinIndex, pNode->meshIndex };
@@ -17221,7 +17272,6 @@ namespace vkr {
 		}
 		_sparseData.clear();
 		m_buffersData.clear();
-
 		m_animations.clear();
 		m_nodes.clear();
 		m_scenes.clear();
@@ -17517,9 +17567,7 @@ namespace vkr {
 		for (int i = 0; i < nodes.size(); i++)
 		{
 			tfNode* tfnode = &m_nodes[i];
-
 			// Read node data
-			//
 			auto& node = nodes[i];
 
 			for (int c = 0; c < node.children.size(); c++)
@@ -17536,13 +17584,19 @@ namespace vkr {
 				m_cameras[cameraIdx].m_nodeIndex = i;
 
 			node.extras;
-			if (node.extensions.find("KHR_lights_punctual") != node.extensions.end())
+			auto nv = get_ext(node.extensions, "KHR_node_visibility");
+			if (nv)
 			{
-				auto lp = node.extensions["KHR_lights_punctual"];
+				int visible = get_v(nv, "visible", 1);
+				tfnode->visible = visible != 0;
+			}
+			auto lp = get_ext(node.extensions, "KHR_lights_punctual");
+			if (lp)
+			{
 				// GetElementInt(node, "extensions/KHR_lights_punctual/light", -1);
-				if (lp.Has("light"))
+				if (lp->Has("light"))
 				{
-					int lightIdx = lp.Get("light").Get<int>();
+					int lightIdx = lp->Get("light").Get<int>();
 					if (lightIdx > -1)
 						m_lightInstances.push_back({ lightIdx, i });
 				}
@@ -17612,8 +17666,9 @@ namespace vkr {
 			}
 		}
 	}
-	void GLTFCommon::get_target_node(std::string& path, tfSampler* tfsmp, tinygltf::AnimationChannel& channel) {
+	void GLTFCommon::get_target_node(std::string& path, nChannel* nc, tinygltf::AnimationChannel& channel) {
 		// Index appropriately
+		auto tfsmp = nc->sampler;
 		if (path == "translation")
 		{
 			tfsmp->path = 0;
@@ -17651,7 +17706,7 @@ namespace vkr {
 		{
 			// todo KHR_animation_pointer
 			tfsmp->path = 4;
-			get_KHR_animation_pointer(channel.target_extensions, 0);
+			get_KHR_animation_pointer(channel.target_extensions, nc);
 		}
 	}
 	void GLTFCommon::load_animations()
@@ -17672,6 +17727,8 @@ namespace vkr {
 				tfChannel* tfchannel = 0;
 				auto ch = tfanim->m_channels.find(node);
 				tfSampler* tfsmp = new tfSampler();
+				if (!tfsmp)
+					continue;
 				if (node >= 0) {
 					if (ch == tfanim->m_channels.end())
 					{
@@ -17681,10 +17738,19 @@ namespace vkr {
 					{
 						tfchannel = &ch->second;
 					}
-					if (tfchannel->sampler)
-						tfchannel->sampler[tfsmp->path] = tfsmp;
 				}
-				get_target_node(path, tfsmp, channel);
+				nChannel nc = {};
+				nc.sampler = tfsmp;
+				get_target_node(path, &nc, channel);
+				if (tfchannel && tfchannel->sampler)
+				{
+					tfchannel->sampler[tfsmp->path] = tfsmp;
+				}
+				else {
+					auto& kn = tfanim->_channels.emplace_back(nc);
+					kn.nodeid;
+				}
+				nc.sampler = 0;
 				// Get time line
 				GetBufferDetails(samplers[sampler].input, &tfsmp->m_time);
 				assert(tfsmp->m_time.m_stride == 4);
@@ -17703,7 +17769,7 @@ namespace vkr {
 	// Animates the matrices (they are still in object space)
 	//loop animation
 	void GLTFCommon::update(float time) {
-		SetAnimationTime(_animationIndex, time);
+		SetAnimationTime(_anim_data._animationIndex, time);
 	}
 	void GLTFCommon::SetAnimationTime(uint32_t animationIndex, float time)
 	{
@@ -17727,7 +17793,7 @@ namespace vkr {
 					if (st)
 					{
 						// 插值类型支持：线性、步长、三次样条插值
-						auto v4 = st->interpolator.interpolate(c, st, time, anim->m_duration, &rb);
+						auto v4 = st->interpolator.interpolate(st, time, anim->m_duration, &rb);
 						if (k == 0)
 							animated.m_translation = v4;
 						if (k == 1)
@@ -17738,12 +17804,31 @@ namespace vkr {
 				}
 				if (it->second.sampler[3])
 				{
-					auto& va = m_animated_morphWeights[it->first];
+					auto& va = _anim_data.m_animated_morphWeights[it->first];
 					va.clear();
 					va.swap(acv[3]);
 				}
 				// it->first是节点idx
-				m_animatedMats[it->first] = animated.GetWorldMat();
+				_anim_data.m_animatedMats[it->first] = animated.GetWorldMat();
+			}
+			for (auto& st : anim->_channels) {
+				if (st.sampler)
+				{
+					auto& rb = acv[0];
+					// 插值类型支持：线性、步长、三次样条插值
+					auto v4 = st.sampler->interpolator.interpolate(st.sampler, time, anim->m_duration, &rb);
+					if (st.ext_type == (int)exttype_e::visible && st.nodeid >= 0)
+					{
+						auto np = &m_nodes[st.nodeid];
+						if (rb[0] > 0)
+						{
+							_anim_data.hidden_node.insert(st.nodeid);
+						}
+						else {
+							_anim_data.hidden_node.erase(st.nodeid);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -18153,6 +18238,8 @@ namespace vkr {
 	{
 		std::stack<node_mat> q;
 		auto p = pNodes->data();
+		auto pam = _anim_data.m_animatedMats;
+		auto pws = _anim_data.m_worldSpaceMats.data();
 		for (uint32_t n = 0; n < pNodes->size(); n++)
 		{
 			uint32_t nodeIdx = p[n];
@@ -18160,8 +18247,9 @@ namespace vkr {
 				continue;
 			node_mat nm = {};
 			nm.idx = nodeIdx;
-			nm.m = world * m_animatedMats[nodeIdx];
-			m_worldSpaceMats[nodeIdx].Set(nm.m);
+			nm.m = world * pam[nodeIdx];
+			pws[nodeIdx].Set(nm.m);
+			auto pNode = &m_nodes[nodeIdx];
 			q.push(nm);
 		}
 		while (q.size()) {
@@ -18172,8 +18260,9 @@ namespace vkr {
 				{
 					node_mat nm = {};
 					nm.idx = idx;
-					nm.m = k.m * m_animatedMats[idx];
-					m_worldSpaceMats[idx].Set(nm.m);
+					nm.m = k.m * pam[idx];
+					pws[idx].Set(nm.m);
+					auto pNode = &m_nodes[idx];
 					q.push(nm);
 				}
 			}
@@ -18194,7 +18283,7 @@ namespace vkr {
 				continue;
 			node_mat nm = {};
 			nm.idx = nodeIdx;
-			nm.m = world * m_animatedMats[nodeIdx];
+			nm.m = world * _anim_data.m_animatedMats[nodeIdx];
 			pt[nodeIdx] = nm.m;
 			q.push(nm);
 		}
@@ -18206,7 +18295,7 @@ namespace vkr {
 				{
 					node_mat nm = {};
 					nm.idx = idx;
-					nm.m = k.m * m_animatedMats[idx];
+					nm.m = k.m * _anim_data.m_animatedMats[idx];
 					pt[idx] = nm.m;
 					q.push(nm);
 				}
@@ -18256,7 +18345,7 @@ namespace vkr {
 		if (m_nodes.empty() || mat_count == 0 || !pm)
 			return;
 		// initializes matrix buffers to have the same dimension as the nodes
-		m_worldSpaceMats.resize(m_nodes.size());
+		_anim_data.m_worldSpaceMats.resize(m_nodes.size());
 		load_materials_variant(pm->extensions, variants);
 		get_model_data(pm, _materialsData, _meshes, false);
 
@@ -18276,15 +18365,15 @@ namespace vkr {
 				mat_count += m_skins[it.skinIndex].m_InverseBindMatrices.m_count;
 			}
 		}
-		_mats.resize(mat_count);
-		auto ptr = _mats.data();
-		m_animatedMats = ptr;
+		_anim_data._mats.resize(mat_count);
+		auto ptr = _anim_data._mats.data();
+		_anim_data.m_animatedMats = ptr;
 		ptr += m_nodes.size();
 
 		for (uint32_t i = 0; i < m_nodes.size(); i++)
 		{
 			auto& it = m_nodes[i];
-			m_animatedMats[i] = it.m_tranform.GetWorldMat();
+			_anim_data.m_animatedMats[i] = it.m_tranform.GetWorldMat();
 			if (it.meshIndex >= 0) {
 				_meshskin.push_back({ it.skinIndex,it.meshIndex,i });
 			}
@@ -18296,7 +18385,7 @@ namespace vkr {
 			auto a = mesh.primitives[0].targets.size();
 			a = std::max(a, weights.size());
 			if (a > 0) {
-				auto& mw = m_animated_morphWeights[mt.z];
+				auto& mw = _anim_data.m_animated_morphWeights[mt.z];
 				dysize += a * sizeof(float);
 				mw.resize(a);
 			}
@@ -18306,7 +18395,7 @@ namespace vkr {
 			for (auto& mt : _meshskin)
 			{
 				glm::ivec2 k = mt;
-				auto& it = m_worldSpaceSkeletonMats[k];
+				auto& it = _anim_data.m_worldSpaceSkeletonMats[k];
 				it.m = ptr;
 				if (mt.x >= 0 && mt.x < m_skins.size()) {
 					it.count = m_skins[mt.x].m_InverseBindMatrices.m_count;
@@ -18322,9 +18411,9 @@ namespace vkr {
 	// Takes the animated matrices and processes the hierarchy, also computes the skinning matrix buffers. 
 	void GLTFCommon::TransformScene(int sceneIndex, const glm::mat4& world)
 	{
-		if (m_worldSpaceMats.size() < m_nodes.size())
+		if (_anim_data.m_worldSpaceMats.size() < m_nodes.size())
 		{
-			m_worldSpaceMats.resize(m_nodes.size());
+			_anim_data.m_worldSpaceMats.resize(m_nodes.size());
 		}
 		// transform all the nodes of the scene (and make 
 		std::vector<int> sceneNodes = { m_scenes[sceneIndex].m_nodes };
@@ -18337,8 +18426,8 @@ namespace vkr {
 			{
 				if (mt.x < 0 || mt.x >= num)continue;
 				glm::ivec2 k = mt;
-				auto& it = m_worldSpaceSkeletonMats[k];
-				auto m = m_worldSpaceMats[mt.z].GetCurrent();
+				auto& it = _anim_data.m_worldSpaceSkeletonMats[k];
+				auto m = _anim_data.m_worldSpaceMats[mt.z].GetCurrent();
 				glm::mat4 inverseTransform = glm::inverse(m);
 				glm::mat4* jointMatrix = it.m;
 				tfSkins& skin = m_skins[mt.x];
@@ -18348,7 +18437,7 @@ namespace vkr {
 				{
 					auto nidx = skin.m_jointsNodeIdx[j];
 					auto& ibm = pM[j];
-					auto jointMat = m_worldSpaceMats[nidx].GetCurrent() * ibm;
+					auto jointMat = _anim_data.m_worldSpaceMats[nidx].GetCurrent() * ibm;
 					jointMatrix[j] = inverseTransform * jointMat;
 				}
 			}
@@ -18376,7 +18465,7 @@ namespace vkr {
 		{
 			return false;
 		}
-		glm::mat4 m1 = m_worldSpaceMats[m_cameras[cameraIdx].m_nodeIndex].GetCurrent();
+		glm::mat4 m1 = _anim_data.m_worldSpaceMats[m_cameras[cameraIdx].m_nodeIndex].GetCurrent();
 		pCam->SetMatrix(m1);
 		pCam->SetFov(m_cameras[cameraIdx].yfov, pCam->GetAspectRatio(), m_cameras[cameraIdx].znear, m_cameras[cameraIdx].zfar);
 		return true;
@@ -18456,7 +18545,7 @@ namespace vkr {
 			for (size_t p = 0; p < primitives.size(); ++p)
 			{
 				tfPrimitives boundingBox = m_meshes[pNode->meshIndex].m_pPrimitives[p];
-				projectedBoundingBox.Merge(GetAABBInGivenSpace(mLightView * m_worldSpaceMats[i].GetCurrent(), boundingBox.m_center, boundingBox.m_radius));
+				projectedBoundingBox.Merge(GetAABBInGivenSpace(mLightView * _anim_data.m_worldSpaceMats[i].GetCurrent(), boundingBox.m_center, boundingBox.m_radius));
 			}
 		}
 		return projectedBoundingBox;
@@ -21490,8 +21579,7 @@ namespace vkr {
 					}
 					it->_ptb->SetPerFrameConstants(ubo, bWireframe);
 					// 更新骨骼矩阵到ubo
-					it->_ptb->SetSkinningMatricesForSkeletons(ubo);
-					it->_ptb->update_node();
+					it->_ptb->update_anim_data(ubo);
 				}
 			}
 		}
