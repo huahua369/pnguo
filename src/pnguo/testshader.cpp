@@ -184,12 +184,13 @@ VS2PS Output;
 #include "shaders/pbr_px.h"
 #include "shaders/GLTFVertexFactory.h"
 
-
+namespace pbr {
 #include "shaders/pbr_pixel.h"
+}
 //--------------------------------------------------------------------------------------
 // PerFrame structure, must match the one in GltfPbrPass.h
 //--------------------------------------------------------------------------------------
- 
+
 
 	//PBRFactors u_pbrParams;
 //mat4 myPerObject_u_mCurrWorld;
@@ -197,7 +198,7 @@ VS2PS Input;
 //--------------------------------------------------------------------------------------
 // mainPS
 //--------------------------------------------------------------------------------------
- 
+
 
 void amain()
 {
@@ -218,8 +219,8 @@ void amain()
 	vec3 c3 = doPbrLighting(Input, myPerFrame, m);
 	vec4 color = vec4(c3, m.baseColor.w);
 
-// Roughness is authored as perceptual roughness; as is convention,
-// convert to material roughness by squaring the perceptual roughness [2].
+	// Roughness is authored as perceptual roughness; as is convention,
+	// convert to material roughness by squaring the perceptual roughness [2].
 
 #ifdef HAS_MOTION_VECTORS_RT
 	//Output_motionVect = Input.CurrPosition.xy / Input.CurrPosition.w - Input.PrevPosition.xy / Input.PrevPosition.w;
@@ -247,7 +248,7 @@ void amain()
 #endif
 
 
-void testp(){
+void testp() {
 
 	glm::vec3 worldPos = {};
 	glm::vec3 n = {};
