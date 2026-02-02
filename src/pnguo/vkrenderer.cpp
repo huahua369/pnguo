@@ -8379,15 +8379,272 @@ namespace vkr
 
 /nodes/{}/weights/{} float
 	*/
+	enum class ANIMATION_TARGET_TYPE :uint8_t {
+		node,
+		material,
+		camera,
+		light,
+	};
+	std::vector<std::string> SplitPath(const std::string& path, int maxSplits)
+	{
+		std::vector<std::string> segments;
+		size_t start = 0;
+		size_t end = path.find('/');
+		while (end != std::string::npos)
+		{
+			if (end != start) // Avoid empty segments
+			{
+				segments.push_back(path.substr(start, end - start));
+			}
+			start = end + 1;
+			end = path.find('/', start);
+			if (maxSplits > 0 && segments.size() >= maxSplits - 1)
+			{
+				break;
+			}
+		}
+		// Add the last segment
+		if (start < path.length())
+		{
+			segments.push_back(path.substr(start));
+		}
+		return segments;
+	}
 	void get_KHR_animation_pointer(tinygltf::ExtensionMap& extensions, glm::mat3* m)
 	{
 		auto tt = get_ext(extensions, "KHR_animation_pointer");
 		if (tt) {
 			auto pointer = get_v(tt, "pointer", std::string(""));
-			if (pointer.size())
-			{
+			auto property = get_v(tt, "property", std::string(""));
 
-			}
+			do {
+				if (pointer.empty())break;
+				std::vector<std::string> segments = SplitPath(pointer, 3);
+				if (segments.size() < 2) break;
+
+				// 获取目标类型（节点、材质等）
+				std::string targetType = segments[0];
+				int targetIndex = std::stoi(segments[1]);
+
+				auto type = ANIMATION_TARGET_TYPE::node;
+				if (targetType == "/materials/")
+					type = ANIMATION_TARGET_TYPE::material;
+				else if (targetType == "/extensions/KHR_lights_punctual/lights/")
+					type = ANIMATION_TARGET_TYPE::light;
+				else if (targetType == "/cameras/")
+					type = ANIMATION_TARGET_TYPE::camera;
+
+				std::string targetProperty = segments[2];
+
+				switch (type) {
+				case ANIMATION_TARGET_TYPE::node:
+					switch (targetProperty[0]) {
+
+					case 't':
+						if (targetProperty == "translation")
+							targetProperty = "position";
+						break;
+					case 'r':
+						if (targetProperty == "rotation")
+							targetProperty = "quaternion";
+						break;
+					case 's':
+						if (targetProperty == "scale")
+							targetProperty = "scale";
+						break;
+					case 'w':
+						if (targetProperty == "weights")
+							targetProperty = "morphTargetInfluences";
+						break;
+					}
+					if (targetProperty == "extensions/KHR_node_visibility/visible")
+						targetProperty = "visible";
+
+					break;
+
+#if 0
+
+				case ANIMATION_TARGET_TYPE::material:
+					const pathIndex = ("/materials/" + targetId.toString() + "/").length;
+					const pathStart = path.substring(0, pathIndex);
+					targetProperty = path.substring(pathIndex);
+
+					switch (targetProperty) {
+
+						// Core Spec PBR Properties
+					case "pbrMetallicRoughness/baseColorFactor":
+						targetProperty = "color";
+						break;
+					case "pbrMetallicRoughness/roughnessFactor":
+						targetProperty = "roughness";
+						break;
+					case "pbrMetallicRoughness/metallicFactor":
+						targetProperty = "metalness";
+						break;
+					case "emissiveFactor":
+						targetProperty = "emissive";
+						break;
+					case "alphaCutoff":
+						targetProperty = "alphaTest";
+						break;
+					case "occlusionTexture/strength":
+						targetProperty = "aoMapIntensity";
+						break;
+					case "normalTexture/scale":
+						targetProperty = "normalScale";
+						break;
+
+						// Core Spec + KHR_texture_transform
+					case "pbrMetallicRoughness/baseColorTexture/extensions/KHR_texture_transform/scale":
+						targetProperty = "map/repeat";
+						break;
+					case "pbrMetallicRoughness/baseColorTexture/extensions/KHR_texture_transform/offset":
+						targetProperty = "map/offset";
+						break;
+
+						// UV transforms for anything but map doesn"t seem to currently be supported in three.js
+					case "emissiveTexture/extensions/KHR_texture_transform/scale":
+						targetProperty = "emissiveMap/repeat";
+						break;
+					case "emissiveTexture/extensions/KHR_texture_transform/offset":
+						targetProperty = "emissiveMap/offset";
+						break;
+
+						// KHR_materials_emissive_strength
+					case "extensions/KHR_materials_emissive_strength/emissiveStrength":
+						targetProperty = "emissiveIntensity";
+						break;
+
+						// KHR_materials_transmission
+					case "extensions/KHR_materials_transmission/transmissionFactor":
+						targetProperty = "transmission";
+						break;
+
+						// KHR_materials_ior
+					case "extensions/KHR_materials_ior/ior":
+						targetProperty = "ior";
+						break;
+
+						// KHR_materials_volume
+					case "extensions/KHR_materials_volume/thicknessFactor":
+						targetProperty = "thickness";
+						break;
+					case "extensions/KHR_materials_volume/attenuationColor":
+						targetProperty = "attenuationColor";
+						break;
+					case "extensions/KHR_materials_volume/attenuationDistance":
+						targetProperty = "attenuationDistance";
+						break;
+
+						// KHR_materials_iridescence
+					case "extensions/KHR_materials_iridescence/iridescenceFactor":
+						targetProperty = "iridescence";
+						break;
+					case "extensions/KHR_materials_iridescence/iridescenceIor":
+						targetProperty = "iridescenceIOR";
+						break;
+					case "extensions/KHR_materials_iridescence/iridescenceThicknessMinimum":
+						targetProperty = "iridescenceThicknessRange[0]";
+						break;
+					case "extensions/KHR_materials_iridescence/iridescenceThicknessMaximum":
+						targetProperty = "iridescenceThicknessRange[1]";
+						break;
+
+						// KHR_materials_clearcoat
+					case "extensions/KHR_materials_clearcoat/clearcoatFactor":
+						targetProperty = "clearcoat";
+						break;
+					case "extensions/KHR_materials_clearcoat/clearcoatRoughnessFactor":
+						targetProperty = "clearcoatRoughness";
+						break;
+
+						// KHR_materials_sheen
+					case "extensions/KHR_materials_sheen/sheenColorFactor":
+						targetProperty = "sheenColor";
+						break;
+					case "extensions/KHR_materials_sheen/sheenRoughnessFactor":
+						targetProperty = "sheenRoughness";
+						break;
+
+						// KHR_materials_specular
+					case "extensions/KHR_materials_specular/specularFactor":
+						targetProperty = "specularIntensity";
+						break;
+					case "extensions/KHR_materials_specular/specularColorFactor":
+						targetProperty = "specularColor";
+						break;
+
+					}
+
+					path = pathStart + targetProperty;
+					if (_animationPointerDebug) console.log("PROPERTY PATH", pathStart, targetProperty, path);
+					break;
+
+
+				case ANIMATION_TARGET_TYPE::light:
+					const pathIndexLight = ("/extensions/KHR_lights_punctual/lights/" + targetId.toString() + "/").length;
+					targetProperty = path.substring(pathIndexLight);
+
+					switch (targetProperty) {
+
+					case "color":
+						break;
+					case "intensity":
+						break;
+					case "spot/innerConeAngle":
+						// TODO would need to set .penumbra, but requires calculations on every animation change (?)
+						targetProperty = "penumbra";
+						break;
+					case "spot/outerConeAngle":
+						targetProperty = "angle";
+						break;
+					case "range":
+						targetProperty = "distance";
+						break;
+
+					}
+
+					path = "/lights/" + targetId.toString() + "/" + targetProperty;
+					break;
+
+				case ANIMATION_TARGET_TYPE::camera:
+					const pathIndexCamera = ("/cameras/" + targetId.toString() + "/").length;
+					const pathStartCamera = path.substring(0, pathIndexCamera);
+					targetProperty = path.substring(pathIndexCamera);
+
+					switch (targetProperty) {
+
+					case "perspective/yfov":
+						targetProperty = "fov";
+						break;
+					case "perspective/znear":
+					case "orthographic/znear":
+						targetProperty = "near";
+						break;
+					case "perspective/zfar":
+					case "orthographic/zfar":
+						targetProperty = "far";
+						break;
+					case "perspective/aspect":
+						targetProperty = "aspect";
+						break;
+						// these two write to the same target property since three.js orthographic camera only supports "zoom".
+						// TODO should there be a warning for either of them? E.g. a warning for "xmag" so that "yfov" + "ymag" work by default?
+					case "orthographic/xmag":
+						targetProperty = "zoom";
+						break;
+					case "orthographic/ymag":
+						targetProperty = "zoom";
+						break;
+
+					}
+
+					path = pathStartCamera + targetProperty;
+					break;
+
+#endif
+				}
+			} while (0);
 		}
 	}
 

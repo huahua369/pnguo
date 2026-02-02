@@ -180,7 +180,7 @@ VS2PS Output;
 #if 1
 #define USE_dIBL
 #define S_VERT
-#define USE_PUNCTUAL
+#define USE_PUNCTUAL0
 #include "shaders/pbr_px.h"
 #include "shaders/GLTFVertexFactory.h"
 
