@@ -316,7 +316,7 @@ typedef struct drawable3_t drawable3_t;
 
 
 // 创建vk实例,参数可选
-void* new_instance();
+void* new_instance(const char* pApplicationName, const char* pEngineName);
 void free_instance(void* inst);
 
 // todo 创建渲染器，shader目录默认"ShaderLibVK", "cache/shadervk"

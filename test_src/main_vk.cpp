@@ -383,7 +383,7 @@ void vkrender_test(form_x* form0)
 		inst = sdldev.inst; phy = sdldev.phy; vkdev = sdldev.vkdev;	// 获取vk设备
 	}
 	else {
-		inst0 = new_instance();
+		inst0 = new_instance(0, 0);
 		inst = inst0;
 	}
 	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表 
@@ -759,6 +759,7 @@ int main()
 		//hz::main_ssh2();
 		//return 0;
 		//test_img();
+
 		auto app = new_app();
 		// 常用分辨率
 		glm::ivec2 dpis[] = {
@@ -786,6 +787,7 @@ int main()
 		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
 		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+
 #endif 
 #endif // _WIN32
 
@@ -1100,6 +1102,14 @@ int main()
 #endif
 					sp_drawable_update(dd1, delta);
 					auto light = vkd->get_light(0);
+					/*
+					case 0:  AMDTonemapper(color);
+					case 1:  DX11DSK(color);
+					case 2:  Reinhard(color);
+					case 3:  Uncharted2Tonemap(color);
+					case 4:  tonemapACES(color);
+					case 5:  color;
+					*/
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;					// 曝光度：默认1.0
 					vkd->_state.bUseTAA;

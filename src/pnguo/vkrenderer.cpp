@@ -572,10 +572,6 @@ namespace vkr
 
 #if 1
 
-	struct inspd_t {
-		VkInstance instance;
-		VkPhysicalDevice physicalDevice;
-	};
 	class InstanceProperties
 	{
 		std::vector<VkLayerProperties> m_instanceLayerProperties;
@@ -591,7 +587,7 @@ namespace vkr
 		void* GetNext() { return m_pNext; }
 		void SetNewNext(void* pNext) { m_pNext = pNext; }
 
-		void GetExtensionNamesAndConfigs(std::vector<const char*>* pInstance_layer_names, std::vector<const char*>* pInstance_extension_names);
+		void GetExtensionNamesAndConfigs(std::vector<const char*>* pInstance_layer_names, std::vector<const char*>* pInstance_extension_names, bool all);
 	private:
 		bool IsLayerPresent(const char* pExtName);
 		bool IsExtensionPresent(const char* pExtName);
@@ -831,7 +827,6 @@ namespace vkr
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
 
 		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
-		//std::vector<sampler_t> _samplers_v;
 
 		Cache<VkShaderModule> s_shaderCache;
 
@@ -1547,13 +1542,22 @@ namespace vkr
 		return false;
 	}
 
-	void  InstanceProperties::GetExtensionNamesAndConfigs(std::vector<const char*>* pInstance_layer_names, std::vector<const char*>* pInstance_extension_names)
+	void  InstanceProperties::GetExtensionNamesAndConfigs(std::vector<const char*>* pInstance_layer_names, std::vector<const char*>* pInstance_extension_names, bool all)
 	{
-		for (auto& name : m_instance_layer_names)
-			pInstance_layer_names->push_back(name);
-
-		for (auto& name : m_instance_extension_names)
-			pInstance_extension_names->push_back(name);
+		if (all)
+		{
+			for (auto& it : m_instanceLayerProperties)
+				pInstance_layer_names->push_back(it.layerName);
+			for (auto& it : m_instanceExtensionProperties) {
+				pInstance_extension_names->push_back(it.extensionName);
+			}
+		}
+		else {
+			for (auto& name : m_instance_layer_names)
+				pInstance_layer_names->push_back(name);
+			for (auto& name : m_instance_extension_names)
+				pInstance_extension_names->push_back(name);
+		}
 	}
 
 	bool DeviceProperties::IsExtensionPresent(const char* pExtName)
@@ -1816,40 +1820,41 @@ namespace vkr
 		, const char* spdname, std::vector<std::string>* pdnv)
 	{
 		dev_info_cx nd = {};
-		InstanceProperties ip;
-		ip.Init();
-		SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
-		auto apiVersion3 = VK_API_VERSION_1_3;
-		auto apiVersion4 = VK_API_VERSION_1_4;
-		auto apiVersion = apiVersion3;// VK_VERSION_1_2;// VK_API_VERSION_1_0;
-		VkInstanceCreateInfo inst_info = {};
+		//InstanceProperties ip;
+		//ip.Init();
+		//SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
+		//auto apiVersion3 = VK_API_VERSION_1_3;
+		//auto apiVersion4 = VK_API_VERSION_1_4;
+		//auto apiVersion = apiVersion3;// VK_VERSION_1_2;// VK_API_VERSION_1_0;
+		//VkInstanceCreateInfo inst_info = {};
 		if (d) { nd = *d; }
 		d = &nd;
 		if (!d->phy)
 		{
-			std::vector<const char*> instance_layer_names;
-			std::vector<const char*> instance_extension_names;
-			ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names);
+			//std::vector<const char*> instance_layer_names;
+			//std::vector<const char*> instance_extension_names;
+			//ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names, true);
 			VkInstance instance = (VkInstance)d->inst;
 			if (!d->inst) {
-				VkApplicationInfo app_info = {};
-				app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-				app_info.pNext = NULL;
-				app_info.pApplicationName = "vkcmp";
-				app_info.applicationVersion = 1;
-				app_info.pEngineName = "pnguo";
-				app_info.engineVersion = 1;
-				app_info.apiVersion = apiVersion;
-				inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-				inst_info.pNext = 0;
-				inst_info.flags = 0;
-				inst_info.pApplicationInfo = &app_info;
-				inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
-				inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
-				inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
-				inst_info.ppEnabledExtensionNames = instance_extension_names.data();
-				VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
-				assert(res == VK_SUCCESS);
+				instance = (VkInstance)new_instance(0, 0);
+				//VkApplicationInfo app_info = {};
+				//app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+				//app_info.pNext = NULL;
+				//app_info.pApplicationName = "vkcmp";
+				//app_info.applicationVersion = 1;
+				//app_info.pEngineName = "pnguo";
+				//app_info.engineVersion = 1;
+				//app_info.apiVersion = apiVersion;
+				//inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+				//inst_info.pNext = 0;
+				//inst_info.flags = 0;
+				//inst_info.pApplicationInfo = &app_info;
+				//inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
+				//inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
+				//inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
+				//inst_info.ppEnabledExtensionNames = instance_extension_names.data();
+				//VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
+				//assert(res == VK_SUCCESS);
 			}
 			if (instance)
 			{
@@ -2349,15 +2354,7 @@ namespace vkr
 				vkDestroySampler(m_device, v, NULL);
 			}
 		}
-		//for (auto& it : _samplers_v)
-		//{
-		//	if (it.sampler)
-		//	{
-		//		vkDestroySampler(m_device, it.sampler, NULL);
-		//	}
-		//}
 		_samplers.clear();
-		//_samplers_v.clear();
 		if (m_surface != VK_NULL_HANDLE)
 		{
 			vkDestroySurfaceKHR(m_instance, m_surface, NULL);
@@ -10371,7 +10368,7 @@ namespace vkr
 		auto cp = get_cp();
 		for (size_t i = 0; i < m_materialsData.size(); i++)
 		{
-			auto pt =& m_materialsData[i];
+			auto pt = &m_materialsData[i];
 			auto st = &cp->_materialsData[i];
 			pt->m_pbrMaterialParameters.m_params = st->m_pbrMaterialParameters.m_params;
 			//pt->m_pbrMaterialParameters.uvTransform
@@ -22909,24 +22906,30 @@ size_t vkdg_cx::get_light_size()
 	return c;
 }
 
-void* new_instance()
+void* new_instance(const char* pApplicationName, const char* pEngineName)
 {
 	vkr::InstanceProperties ip;
 	ip.Init();
-	vkr::SetEssentialInstanceExtensions(1, 1, &ip);
+	bool cpuvalid = false;
+	bool gpuvalid = false;
+#ifdef _DEBUG
+	cpuvalid = 1;
+	gpuvalid = 1;
+#endif // _DEBUG
+	vkr::SetEssentialInstanceExtensions(cpuvalid, gpuvalid, &ip);
 	auto apiVersion3 = VK_API_VERSION_1_3;
 	auto apiVersion4 = VK_API_VERSION_1_4;
 	VkInstanceCreateInfo inst_info = {};
 	std::vector<const char*> instance_layer_names;
 	std::vector<const char*> instance_extension_names;
-	ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names);
+	ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names, 0);
 	VkInstance instance = {};
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	app_info.pNext = NULL;
-	app_info.pApplicationName = "vkcmp";
+	app_info.pApplicationName = pApplicationName ? pApplicationName : "vkapp";
 	app_info.applicationVersion = 1;
-	app_info.pEngineName = "pnguo";
+	app_info.pEngineName = pEngineName ? pEngineName : "pnguo";
 	app_info.engineVersion = 1;
 	app_info.apiVersion = VK_API_VERSION_1_3;
 	inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -24046,7 +24049,7 @@ uint64_t vkr_get_ticks() {
 
 void vkrender_test0()
 {
-	auto inst = new_instance();
+	auto inst = new_instance(0, 0);
 	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表
 	if (devs.empty())return;
