@@ -6344,6 +6344,7 @@ namespace vkr {
 		bool has_oit = false;
 		// 是否启用模板测试
 		bool _stencil_test = true;
+		bool has_skydome = true;
 
 	};
 
@@ -11948,7 +11949,7 @@ namespace vkr
 		std::unique_lock<std::mutex> lock(m_mutex);
 		Flush();
 		if (m_copies.size()) {
-			Trace("flushing %i", m_copies.size());
+			//Trace("flushing %i", m_copies.size());
 
 			//apply pre barriers in one go
 			if (m_toPreBarrier.size() > 0)
@@ -21437,6 +21438,7 @@ namespace vkr {
 	{
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// Render skydome天空盒
+		if(has_skydome)
 		{
 			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
 			glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
