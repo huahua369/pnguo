@@ -10500,7 +10500,14 @@ namespace vkr
 		else
 			vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0);
 	}
-
+	//void tcmddraw(VkCommandBuffer cmd_buf) {
+	//	vkCmdBindVertexBuffers(cmd_buf, i, 1, &m_geometry.m_VBV[i].buffer, &m_geometry.m_VBV[i].offset);
+	//	vkCmdBindIndexBuffer(cmd_buf, m_geometry.m_IBV.buffer, m_geometry.m_IBV.offset, m_geometry.m_indexType);
+	//	vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
+	//	vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? _pipe->m_pipelineWireframe : _pipe->m_pipeline);
+	//	vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0, 0);
+	//	vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0);
+	//}
 #if 1
 	glm::vec2 hammersley(uint32_t i, uint32_t N) {
 		// Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
@@ -21438,7 +21445,7 @@ namespace vkr {
 	{
 		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
 		// Render skydome天空盒
-		if(has_skydome)
+		if (has_skydome)
 		{
 			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
 			glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
