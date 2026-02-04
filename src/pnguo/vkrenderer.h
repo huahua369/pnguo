@@ -339,23 +339,93 @@ vs:
 	骨骼动画(可选)：mat4 u_ModelMatrix[]
 	实例化(可选)：mat4 instance_model_matrix[]
 ps:
-	场景结构：set 0,binding 0 struct PerFrame 
+	场景结构：set 0,binding 0 struct PerFrame,相机、灯光等参数
 	材质结构：set 0,binding 1 Object和struct pbrMaterial
 	UV矩(可选)：mat3 u_matuv[]
-	纹理：set 1  
+	纹理：set 1
 		普通uniform sampler2D[24]
 		环境samplerCube[3]
 		阴影sampler2DShadow[MAX_SHADOW_INSTANCES]
 
 */
-struct renderer3_cb
-{
-	void* ctx = 0;
-	//
-};
-void* new_vkobj(void* dev, int type);
-void free_vkobj(void* dev, void* obj);
-void set_vkobj_param(void* obj, const char* key, int dataType, void* val);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+	typedef void* aObject;
+	typedef void* aDevice;
+	typedef void* aCamera;
+	typedef void* aArray;
+	typedef void* aArray1D;
+	typedef void* aArray2D;
+	typedef void* aArray3D;
+	typedef void* aFrame;
+	typedef void* aGeometry;
+	typedef void* aGroup;
+	typedef void* aInstance;
+	typedef void* aLight;
+	typedef void* aMaterial;
+	typedef void* aSampler;
+	typedef void* aSurface;
+	typedef void* aRenderer;
+	typedef void* aWorld;
+	enum obj_type_e
+	{
+		OBJ_DEVICE,
+		OBJ_CAMERA,
+		OBJ_ARRAY,
+		OBJ_ARRAY1D,
+		OBJ_ARRAY2D,
+		OBJ_ARRAY3D,
+		OBJ_FRAME,
+		OBJ_GEOMETRY,
+		OBJ_GROUP,
+		OBJ_INSTANCE,
+		OBJ_LIGHT,
+		OBJ_MATERIAL,
+		OBJ_SAMPLER,
+		OBJ_SURFACE,
+		OBJ_RENDERER,
+		OBJ_WORLD
+	};
+	/*
+	关系图
+		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
+		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
+		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group
+		Group		: Surface(1:N)、Light(1:N)
+		Surface		: Geometry(1:1)、Material(1:1)
+		Geometry	: transform、动画等属性
+	*/
+	struct renderer3_cb
+	{
+		void* ctx = 0;
+		// obj_type_e
+		aObject(*new_object)(int obj_type, const char* type);
+		void (*free_object)(void* obj);
+		// 设置参数
+		void (*set_param)(void* obj, const char* name, int data_type, void* data);
+		// 取消参数
+		void (*unset_param)(aObject object, const char* name);
+		void (*unset_allparams)(aObject object);
+		// 提交参数
+		void (*commit_params)(aObject object);
+		// 获取对象支持的参数名
+		size_t(*get_param_count)(aObject object);
+		const char** (*get_param_names)(aObject object);
+		// 获取参数值, data_type返回值类型
+		void* (*get_param)(aObject object, const char* name, int* data_type);
+		// 获取属性
+		int (*get_property)(aObject object, const char* name, int data_type, void* mem, uint64_t size, int mask);
+		// 提交帧渲染
+		void (*render_frame)(aFrame frame);
+		// 帧渲染完成检查
+		int (*frame_ready)(aFrame frame, int wait_mask);
+	};
+
+#ifdef __cplusplus
+}
+#endif
 
 struct device_info_t
 {
