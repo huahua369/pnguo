@@ -79,7 +79,7 @@ void gltfVertexFactory()
 	Output.WorldPos = vec3(pos.xyz) / pos.w;
 #endif
 	gl_Position = GetCameraViewProj() * pos; // needs w for proper perspective correction
-	mat4 v = GetCameraView();
+	mat4 v = GetCameraViewProj();
 	vec4 npos = v * pos; // view space position
 	Output.depth = npos.z;
 #ifdef HAS_MOTION_VECTORS

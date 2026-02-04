@@ -324,6 +324,35 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0
 // 删除渲染器
 void free_vkdg(vkdg_cx* p);
 
+/*
+渲染需要：VkBuffer、VkDescriptorSet、VkPipeline
+	VkBuffer：vbo、ibo、ubo、ssbo
+	VkDescriptorSet：纹理、ubo\ssbo绑定
+	VkPipeline：
+vs:
+	顶点属性：使用分散绑定
+	Frame：set 0,binding 0
+		mat4 u_mCameraCurrViewProj;
+		mat4 u_mCameraPrevViewProj;
+	Object：绑定set 0,binding 1		mat4[2]关节动画用
+	变形动画(可选)：float u_morphWeights[]，vec4 per_target_data[]
+	骨骼动画(可选)：mat4 u_ModelMatrix[]
+	实例化(可选)：mat4 instance_model_matrix[]
+ps:
+	场景结构：set 0,binding 0 struct PerFrame 
+	材质结构：set 0,binding 1 Object和struct pbrMaterial
+	UV矩(可选)：mat3 u_matuv[]
+	纹理：set 1  
+		普通uniform sampler2D[24]
+		环境samplerCube[3]
+		阴影sampler2DShadow[MAX_SHADOW_INSTANCES]
+
+*/
+struct renderer3_cb
+{
+	void* ctx = 0;
+	//
+};
 void* new_vkobj(void* dev, int type);
 void free_vkobj(void* dev, void* obj);
 void set_vkobj_param(void* obj, const char* key, int dataType, void* val);
