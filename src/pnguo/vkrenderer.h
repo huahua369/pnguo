@@ -396,7 +396,7 @@ extern "C" {
 	/*
 	关系图
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
-		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
+		World		: Instance(1:N)、Group(1:N)
 		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group。参数需要设置实例数量
 		Group		: Surface(1:N)、Light(1:N)
 		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
