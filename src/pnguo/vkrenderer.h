@@ -399,8 +399,10 @@ extern "C" {
 		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
 		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group。参数需要设置实例数量
 		Group		: Surface(1:N)、Light(1:N)
-		Surface		: Geometry(1:1)、Material(1:1)
+		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
 		Geometry	: transform、动画等属性
+		pipelineCS	: 计算管线,可以绑定数组、纹理
+
 	*/
 	struct adevice3_t
 	{
