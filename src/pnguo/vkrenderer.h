@@ -397,7 +397,7 @@ extern "C" {
 		Surface		: Geometry(1:1)、Material(1:1)
 		Geometry	: transform、动画等属性
 	*/
-	struct renderer3_cb
+	struct adevice3_t
 	{
 		void* ctx = 0;
 		// obj_type_e
@@ -422,6 +422,14 @@ extern "C" {
 		// 帧渲染完成检查
 		int (*frame_ready)(aFrame frame, int wait_mask);
 	};
+	/*
+	*	void* inst, void* phy, void* dev可选
+	* 	set_param(); 着色器编译缓存目录const char* shaderLibDir = 0, const char* shaderCacheDir = 0,
+		devname可以显卡名
+	*/
+	adevice3_t* new_adev(void* inst, void* phy, void* dev, const char* devname = 0);
+	// 删除渲染器
+	void free_adev(adevice3_t* p);
 
 #ifdef __cplusplus
 }

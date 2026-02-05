@@ -6457,7 +6457,7 @@ namespace vkr {
 		int curridx = 0;
 		int setidx = 0;
 		fbo_info_cx* _fbo = 0;
-
+		adevice3_t ad_cb = {};
 		GLTFCommon* _tmpgc = 0;
 		std::vector<GLTFCommon*> _loaders;
 		std::queue<GLTFCommon*> _lts;
@@ -24045,9 +24045,139 @@ namespace vkr {
 	}
 #endif // 1半边
 
+	// 新渲染器
+	aDevice new_aDevice() {
+		aDevice p = nullptr;
+		return p;
+	}
+	aCamera new_aCamera() {
+		aCamera p = nullptr;
+		return p;
+	}
+	aArray new_aArray() {
+		aArray p = nullptr;
+		return p;
+	}
+	aArray1D new_aArray1D() {
+		aArray1D p = nullptr;
+		return p;
+	}
+	aArray2D new_aArray2D() {
+		aArray2D p = nullptr;
+		return p;
+	}
+	aArray3D new_aArray3D() {
+		aArray3D p = nullptr;
+		return p;
+	}
+	aFrame new_aFrame() {
+		aFrame p = nullptr;
+		return p;
+	}
+	aGeometry new_aGeometry() {
+		aGeometry p = nullptr;
+		return p;
+	}
+	aGroup new_aGroup() {
+		aGroup p = nullptr;
+		return p;
+	}
+	aInstance new_aInstance() {
+		aInstance p = nullptr;
+		return p;
+	}
+	aLight new_aLight() {
+		aLight p = nullptr;
+		return p;
+	}
+	aMaterial new_aMaterial() {
+		aMaterial p = nullptr;
+		return p;
+	}
+	aSampler new_aSampler() {
+		aSampler p = nullptr;
+		return p;
+	}
+	aSurface new_aSurface() {
+		aSurface p = nullptr;
+		return p;
+	}
+	aRenderer new_aRenderer() {
+		aRenderer p = nullptr;
+		return p;
+	}
+	aWorld new_aWorld() {
+		aWorld p = nullptr;
+		return p;
+	}
+
+
+	aObject new_object(int obj_type, const char* type) {
+		return nullptr;
+	}
+	void free_object(void* obj) {
+	}
+	// 设置参数
+	void set_param(void* obj, const char* name, int data_type, void* data) {
+	}
+	// 取消参数
+	void unset_param(aObject object, const char* name) {
+	}
+	void unset_allparams(aObject object) {}
+	// 提交参数
+	void commit_params(aObject object) {
+	}
+	// 获取对象支持的参数名
+	size_t get_param_count(aObject object) {
+		return 0;
+	}
+	const char** get_param_names(aObject object) {
+		return 0;
+	}
+	// 获取参数值, data_type返回值类型
+	void* get_param(aObject object, const char* name, int* data_type) {
+		return nullptr;
+	}
+	// 获取属性
+	int get_property(aObject object, const char* name, int data_type, void* mem, uint64_t size, int mask) {
+		return 0;
+	}
+	// 提交帧渲染
+	void render_frame(aFrame frame) {
+	}
+	// 帧渲染完成检查
+	int frame_ready(aFrame frame, int wait_mask) {
+		return 0;
+	}
 }
 //!vkr
 
+adevice3_t* new_adev(void* inst, void* phy, void* dev, const char* devname) {
+	vkdg_cx* ctx = new_vkdg(inst, phy, dev, 0, 0, devname);
+	auto d = ctx->ctx;
+	auto p = &d->ad_cb;
+	p->ctx = ctx;
+	p->new_object = vkr::new_object;
+	p->free_object = vkr::free_object;
+	p->set_param = vkr::set_param;
+	p->unset_param = vkr::unset_param;
+	p->unset_allparams = vkr::unset_allparams;
+	p->commit_params = vkr::commit_params;
+	p->get_param_count = vkr::get_param_count;
+	p->get_param_names = vkr::get_param_names;
+	p->get_param = vkr::get_param;
+	p->get_property = vkr::get_property;
+	p->render_frame = vkr::render_frame;
+	p->frame_ready = vkr::frame_ready;
+
+	return p;
+}
+// 删除渲染器
+void free_adev(adevice3_t* p) {
+	if (p && p->ctx) {
+		free_vkdg((vkdg_cx*)p->ctx);
+	}
+}
 
 uint64_t vkr_get_ticks() {
 	auto now = std::chrono::high_resolution_clock::now();
