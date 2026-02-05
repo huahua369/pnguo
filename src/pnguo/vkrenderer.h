@@ -352,23 +352,26 @@ ps:
 #ifdef __cplusplus
 extern "C" {
 #endif
-	typedef void* aObject;
-	typedef void* aDevice;
-	typedef void* aCamera;
-	typedef void* aArray;
-	typedef void* aArray1D;
-	typedef void* aArray2D;
-	typedef void* aArray3D;
-	typedef void* aFrame;
-	typedef void* aGeometry;
-	typedef void* aGroup;
-	typedef void* aInstance;
-	typedef void* aLight;
-	typedef void* aMaterial;
-	typedef void* aSampler;
-	typedef void* aSurface;
-	typedef void* aRenderer;
-	typedef void* aWorld;
+	typedef void* aObject;		// 通用对象
+	typedef void* aDevice;		// 设备
+	typedef void* aCamera;		// 相机
+	typedef void* aArray;		// 数组
+	typedef void* aArray1D;		// 一维数组
+	typedef void* aArray2D;		// 二维数组
+	typedef void* aArray3D;		// 三维数组
+	typedef void* aFrame;		// 帧
+	typedef void* aGeometry;	// 几何体
+	typedef void* aGroup;		// 组
+	typedef void* aInstance;	// 实例
+	typedef void* aLight;		// 光源
+	typedef void* aMaterial;	// 材质
+	typedef void* aPipeline;	// 渲染管线
+	typedef void* aPipelineCS;	// 计算管线
+	typedef void* aSampler;		// 纹理采样器
+	typedef void* aSurface;		// 表面
+	typedef void* aRenderer;	// 渲染器
+	typedef void* aWorld;		// 世界
+
 	enum obj_type_e
 	{
 		OBJ_DEVICE,
@@ -383,6 +386,8 @@ extern "C" {
 		OBJ_INSTANCE,
 		OBJ_LIGHT,
 		OBJ_MATERIAL,
+		OBJ_PIPELINE,
+		OBJ_PIPELINECS,
 		OBJ_SAMPLER,
 		OBJ_SURFACE,
 		OBJ_RENDERER,
@@ -392,7 +397,7 @@ extern "C" {
 	关系图
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
 		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
-		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group
+		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group。参数需要设置实例数量
 		Group		: Surface(1:N)、Light(1:N)
 		Surface		: Geometry(1:1)、Material(1:1)
 		Geometry	: transform、动画等属性
@@ -401,7 +406,7 @@ extern "C" {
 	{
 		void* ctx = 0;
 		// obj_type_e
-		aObject(*new_object)(int obj_type, const char* type);
+		aObject(*new_object)(void* ctx, int obj_type, const char* type);
 		void (*free_object)(void* obj);
 		// 设置参数
 		void (*set_param)(void* obj, const char* name, int data_type, void* data);
@@ -425,11 +430,11 @@ extern "C" {
 	/*
 	*	void* inst, void* phy, void* dev可选
 	* 	set_param(); 着色器编译缓存目录const char* shaderLibDir = 0, const char* shaderCacheDir = 0,
-		devname可以显卡名
+	*	devname可以显卡名
 	*/
-	adevice3_t* new_adev(void* inst, void* phy, void* dev, const char* devname = 0);
+	adevice3_t* new_gdev(void* inst, void* phy, void* dev, const char* devname = 0);
 	// 删除渲染器
-	void free_adev(adevice3_t* p);
+	void free_gdev(adevice3_t* p);
 
 #ifdef __cplusplus
 }

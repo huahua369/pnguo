@@ -24046,74 +24046,105 @@ namespace vkr {
 #endif // 1半边
 
 	// 新渲染器
-	aDevice new_aDevice() {
+	aDevice new_aDevice(void* ctx, const char* type) {
 		aDevice p = nullptr;
 		return p;
 	}
-	aCamera new_aCamera() {
+	aCamera new_aCamera(void* ctx, const char* type) {
 		aCamera p = nullptr;
 		return p;
 	}
-	aArray new_aArray() {
+	aArray new_aArray(void* ctx, const char* type) {
 		aArray p = nullptr;
 		return p;
 	}
-	aArray1D new_aArray1D() {
+	aArray1D new_aArray1D(void* ctx, const char* type) {
 		aArray1D p = nullptr;
 		return p;
 	}
-	aArray2D new_aArray2D() {
+	aArray2D new_aArray2D(void* ctx, const char* type) {
 		aArray2D p = nullptr;
 		return p;
 	}
-	aArray3D new_aArray3D() {
+	aArray3D new_aArray3D(void* ctx, const char* type) {
 		aArray3D p = nullptr;
 		return p;
 	}
-	aFrame new_aFrame() {
+	aFrame new_aFrame(void* ctx, const char* type) {
 		aFrame p = nullptr;
 		return p;
 	}
-	aGeometry new_aGeometry() {
+	aGeometry new_aGeometry(void* ctx, const char* type) {
 		aGeometry p = nullptr;
 		return p;
 	}
-	aGroup new_aGroup() {
+	aGroup new_aGroup(void* ctx, const char* type) {
 		aGroup p = nullptr;
 		return p;
 	}
-	aInstance new_aInstance() {
+	aInstance new_aInstance(void* ctx, const char* type) {
 		aInstance p = nullptr;
 		return p;
 	}
-	aLight new_aLight() {
+	aLight new_aLight(void* ctx, const char* type) {
 		aLight p = nullptr;
 		return p;
 	}
-	aMaterial new_aMaterial() {
+	aMaterial new_aMaterial(void* ctx, const char* type) {
 		aMaterial p = nullptr;
 		return p;
 	}
-	aSampler new_aSampler() {
+	aPipeline new_aPipeline(void* ctx, const char* type) {
+		aPipeline p = nullptr;
+		return p;
+	}
+	aPipelineCS new_aPipelineCS(void* ctx, const char* type) {
+		aPipelineCS p = nullptr;
+		return p;
+	}
+	aSampler new_aSampler(void* ctx, const char* type) {
 		aSampler p = nullptr;
 		return p;
 	}
-	aSurface new_aSurface() {
+	aSurface new_aSurface(void* ctx, const char* type) {
 		aSurface p = nullptr;
 		return p;
 	}
-	aRenderer new_aRenderer() {
+	aRenderer new_aRenderer(void* ctx, const char* type) {
 		aRenderer p = nullptr;
 		return p;
 	}
-	aWorld new_aWorld() {
+	aWorld new_aWorld(void* ctx, const char* type) {
 		aWorld p = nullptr;
 		return p;
 	}
 
 
-	aObject new_object(int obj_type, const char* type) {
-		return nullptr;
+	aObject new_object(void* ctx, int obj_type, const char* type) {
+		auto t = (obj_type_e)obj_type;
+		aObject p = nullptr;
+		switch (t) {
+		case OBJ_CAMERA:	p = new_aCamera(ctx, type); break;
+		case OBJ_ARRAY:		p = new_aArray(ctx, type); break;
+		case OBJ_ARRAY1D:	p = new_aArray1D(ctx, type); break;
+		case OBJ_ARRAY2D:	p = new_aArray2D(ctx, type); break;
+		case OBJ_ARRAY3D:	p = new_aArray3D(ctx, type); break;
+		case OBJ_FRAME:		p = new_aFrame(ctx, type); break;
+		case OBJ_GEOMETRY:	p = new_aGeometry(ctx, type); break;
+		case OBJ_GROUP:		p = new_aGroup(ctx, type); break;
+		case OBJ_INSTANCE:	p = new_aInstance(ctx, type); break;
+		case OBJ_LIGHT:		p = new_aLight(ctx, type); break;
+		case OBJ_MATERIAL:	p = new_aMaterial(ctx, type); break;
+		case OBJ_PIPELINE:	p = new_aPipeline(ctx, type); break;
+		case OBJ_PIPELINECS:p = new_aPipelineCS(ctx, type); break;
+		case OBJ_SAMPLER:	p = new_aSampler(ctx, type); break;
+		case OBJ_SURFACE:	p = new_aSurface(ctx, type); break;
+		case OBJ_RENDERER:	p = new_aRenderer(ctx, type); break;
+		case OBJ_WORLD:		p = new_aWorld(ctx, type); break;
+		default:
+			break;
+		}
+		return p;
 	}
 	void free_object(void* obj) {
 	}
@@ -24152,7 +24183,7 @@ namespace vkr {
 }
 //!vkr
 
-adevice3_t* new_adev(void* inst, void* phy, void* dev, const char* devname) {
+adevice3_t* new_gdev(void* inst, void* phy, void* dev, const char* devname) {
 	vkdg_cx* ctx = new_vkdg(inst, phy, dev, 0, 0, devname);
 	auto d = ctx->ctx;
 	auto p = &d->ad_cb;
@@ -24173,7 +24204,7 @@ adevice3_t* new_adev(void* inst, void* phy, void* dev, const char* devname) {
 	return p;
 }
 // 删除渲染器
-void free_adev(adevice3_t* p) {
+void free_gdev(adevice3_t* p) {
 	if (p && p->ctx) {
 		free_vkdg((vkdg_cx*)p->ctx);
 	}
