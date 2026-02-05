@@ -401,7 +401,8 @@ extern "C" {
 		Group		: Surface(1:N)、Light(1:N)
 		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
 		Geometry	: transform、动画等属性
-		pipelineCS	: 计算管线,可以绑定数组、纹理
+		FrameCS		: 计算帧,类型同上Frame，用于计算任务，可绑定输出到数组或纹理
+		pipelineCS	: 计算管线, 绑定数组、纹理做输入
 
 	*/
 	struct adevice3_t
