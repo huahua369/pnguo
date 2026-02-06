@@ -143,7 +143,20 @@ typedef uint32_t DXGI_FORMAT;
 #define CACHE_ENABLE
 //#define CACHE_LOG 
 
-
+/*
+pbrMetallicRoughness基础颜色、金属度、粗糙度
+KHR_materials_emissive_strength
+vec3 emissiveFactor
+KHR_materials_ior
+KHR_materials_pbrSpecularGlossiness
+KHR_materials_specular
+KHR_materials_sheen 
+KHR_materials_anisotropy
+KHR_materials_transmission
+KHR_materials_dispersion
+KHR_materials_iridescence
+KHR_materials_clearcoat
+*/
 namespace vkr
 {
 	// Define a maximum number of shadows supported in a scene (note, these are only for spots and directional)
@@ -2169,6 +2182,7 @@ namespace vkr
 		bool dr = pDp->has_extension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
 		bool dr13 = pDp->has_extension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
 		bool robustness_2 = pDp->has_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+		bool descriptor_heap = pDp->IsExtensionPresent(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
 		bool bds = pDp->has_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
 		VkPhysicalDeviceRobustness2FeaturesEXT robustness2 = {};
 		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
@@ -22939,7 +22953,7 @@ void* new_instance(const char* pApplicationName, const char* pEngineName)
 	app_info.applicationVersion = 1;
 	app_info.pEngineName = pEngineName ? pEngineName : "pnguo";
 	app_info.engineVersion = 1;
-	app_info.apiVersion = VK_API_VERSION_1_3;
+	app_info.apiVersion = apiVersion4;
 	inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	inst_info.pNext = 0;
 	inst_info.flags = 0;

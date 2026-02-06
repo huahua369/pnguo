@@ -214,7 +214,7 @@ list(APPEND tpv_src
 "third_party/xatlas/xatlas.cpp"
 )
 
-#include_directories("third_lib/libsoundio")  
+#include_directories("third_lib/libsoundio") 
 include_directories("third_party")  
 include_directories("src") 
 include_directories("src/pnguo") 
@@ -229,7 +229,7 @@ include_directories("test_src")
 
 #add_definitions(-DMCUT_WITH_COMPUTE_HELPER_THREADPOOL=1)
 
-#include_directories("$ENV{VULKAN_SDK}/Include")
+include_directories("$ENV{VULKAN_SDK}/Include")
 #link_directories("$ENV{VULKAN_SDK}/Lib") vulkan-1
 
 add_library (tpv STATIC ${tpv_src})

@@ -791,13 +791,29 @@ int main()
 #endif 
 #endif // _WIN32
 
-		//{
-		//	step_cx stp;
-		//	stp.load(R"(data\ACEB10.stp)");
 
+		{
+			std::vector<entt::entity> vs;
+			vs.resize(1000);
+			entt::registry reg;
+			reg.create(vs.begin(), vs.end());
+			struct post_t
+			{
+				float x, y, z;
+			};
+			struct visible_t {};
+			post_t a = { 1.0f,2.0f,3.0f };
+			reg.emplace<post_t>(vs[0], a);
+			reg.emplace<visible_t>(vs[0]);
 
-		//}
-		//printf("");
+			a.x += 10;
+			reg.emplace<post_t>(vs[1], a);
+			auto view = reg.view<post_t, visible_t>();
+			for (auto& it : view) {
+				auto& pos = reg.get<post_t>(it);
+				reg.remove<visible_t>(it);
+			}
+		}
 
 		auto fctx = app->font_ctx;
 		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
