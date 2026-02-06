@@ -6457,7 +6457,6 @@ namespace vkr {
 		int curridx = 0;
 		int setidx = 0;
 		fbo_info_cx* _fbo = 0;
-		adevice3_t ad_cb = {};
 		GLTFCommon* _tmpgc = 0;
 		std::vector<GLTFCommon*> _loaders;
 		std::queue<GLTFCommon*> _lts;
@@ -24045,7 +24044,112 @@ namespace vkr {
 	}
 #endif // 1半边
 
+}
+//!vkr
+
+
 	// 新渲染器
+#if 1
+namespace vkr {
+	class gdev_cx
+	{
+	public:
+		adevice3_t ad_cb = {};
+		void* inst = 0;
+		vkr::Device* _dev = nullptr;
+		std::vector<vkr::Device*> devicelist;
+		std::vector<std::string> dev_name;
+		vkr::SystemInfo _systemInfo;
+	public:
+		gdev_cx();
+		~gdev_cx();
+
+		void* new_device(void* phy, void* dev, const char* devname);
+		dev_info_cx get_devinfo();
+	private:
+
+	};
+
+	gdev_cx::gdev_cx()
+	{
+	}
+
+	gdev_cx::~gdev_cx()
+	{
+	}
+	void* gdev_cx::new_device(void* phy, void* dev0, const char* devname)
+	{
+		dev_info_cx c[1] = {};
+		c->inst = inst;
+		c->phy = phy;
+		c->vkdev = dev0;
+		vkr::Log::InitLogSystem();
+		if (!c) return 0;
+		vkr::SystemInfo m_systemInfo;
+		bool cpuvalid = false;
+		bool gpuvalid = false;
+#ifdef _DEBUG
+		cpuvalid = 1;
+		gpuvalid = 1;
+#endif // _DEBUG
+		auto dev = new vkr::Device();
+		dev->OnCreate(c, cpuvalid, gpuvalid, 0, devname, &dev_name);
+		dev->CreatePipelineCache();
+		// Get system info
+		std::string dummyStr;
+		dev->GetDeviceInfo(&m_systemInfo.mGPUName, &dummyStr); // 2nd parameter is unused
+		m_systemInfo.mCPUName = GetCPUNameString();
+		m_systemInfo.mGfxAPI = "Vulkan";
+		_systemInfo = m_systemInfo;
+		const char* shaderLibDir = getenv("SHADERLIB_DIR");
+		const char* shaderCacheDir = getenv("SHADERCACHE_DIR");
+		if (!shaderLibDir || !(*shaderLibDir))
+		{
+			shaderLibDir = "ShaderLibVK";
+		}
+		if (!shaderCacheDir || !(*shaderCacheDir)) {
+			shaderCacheDir = "cache/shadervk/";
+		}
+		vkr::InitShaderCompilerCache(shaderLibDir, shaderCacheDir);
+		// Init the shader compiler
+#ifdef _WIN32
+		InitDirectXCompiler();
+#endif
+		dev->CreateShaderCache();
+		// Create a instance of the renderer and initialize it, we need to do that for each GPU
+		//m_pRenderer = new Renderer_cx(nullptr);
+		//auto format = VK_FORMAT_R8G8B8A8_UNORM;//VK_FORMAT_R8G8B8A8_SRGB;//  VK_FORMAT_B8G8R8A8_SRGB
+		//_fbo_renderpass = newRenderPass(m_device, format, VK_FORMAT_D32_SFLOAT);
+
+		//auto f = new fbo_info_cx();
+		//f->_dev = m_device;
+		//f->colorFormat = format;
+		//f->initFBO(m_Width, m_Height, 2, _fbo_renderpass);
+		//m_pRenderer->set_fbo(f, 0);
+		//m_pRenderer->OnCreate(m_device, _fbo_renderpass);
+		//_fbo = f;
+		//OnResize(true);
+		//OnUpdateDisplay();
+		return dev;
+	}
+	dev_info_cx gdev_cx::get_devinfo()
+	{
+		dev_info_cx r = {};
+		if (_dev) {
+			r.inst = _dev->m_instance;
+			r.phy = _dev->m_physicaldevice;
+			r.vkdev = _dev->m_device;
+		}
+		return r;
+	}
+	aDevice new_device(void* vctx, void* phy, void* dev, const char* devname) {
+		aDevice p = nullptr;
+		if (!vctx)return p;
+		auto ctx = (gdev_cx*)vctx;
+		vkdg_cx* d = new_vkdg(ctx->inst, phy, dev, 0, 0, devname);
+		p = d;
+		return p;
+	}
 	aDevice new_aDevice(void* ctx, const char* type) {
 		aDevice p = nullptr;
 		return p;
@@ -24146,7 +24250,10 @@ namespace vkr {
 		}
 		return p;
 	}
-	void free_object(void* obj) {
+	void release(aObject obj) {
+	}
+	// 增加引用计数
+	void retain(aObject obj) {
 	}
 	// 设置参数
 	void set_param(void* obj, const char* name, int data_type, void* data) {
@@ -24183,13 +24290,15 @@ namespace vkr {
 }
 //!vkr
 
-adevice3_t* new_gdev(void* inst, void* phy, void* dev, const char* devname) {
-	vkdg_cx* ctx = new_vkdg(inst, phy, dev, 0, 0, devname);
-	auto d = ctx->ctx;
-	auto p = &d->ad_cb;
+adevice3_t* new_gdev(void* inst) {
+	auto ctx = new vkr::gdev_cx();
+	ctx->inst = inst;
+	auto p = &ctx->ad_cb;
 	p->ctx = ctx;
+	p->new_device = vkr::new_device;
 	p->new_object = vkr::new_object;
-	p->free_object = vkr::free_object;
+	p->release = vkr::release;
+	p->retain = vkr::retain;
 	p->set_param = vkr::set_param;
 	p->unset_param = vkr::unset_param;
 	p->unset_allparams = vkr::unset_allparams;
@@ -24206,9 +24315,12 @@ adevice3_t* new_gdev(void* inst, void* phy, void* dev, const char* devname) {
 // 删除渲染器
 void free_gdev(adevice3_t* p) {
 	if (p && p->ctx) {
-		free_vkdg((vkdg_cx*)p->ctx);
+		delete ((vkr::gdev_cx*)p->ctx);
 	}
 }
+#endif
+// !新渲染器
+
 
 uint64_t vkr_get_ticks() {
 	auto now = std::chrono::high_resolution_clock::now();

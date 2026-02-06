@@ -323,6 +323,163 @@ void free_instance(void* inst);
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0, const char* devname = 0);
 // 删除渲染器
 void free_vkdg(vkdg_cx* p);
+// 数据类型
+#if 1
+
+#ifdef __cplusplus
+struct ADataType
+{
+	ADataType() = default;
+	constexpr ADataType(int v) noexcept : value(v) {}
+	constexpr operator int() const noexcept { return value; }
+	constexpr bool operator==(int v) const noexcept { return v == value; }
+private:
+	int value;
+};
+constexpr bool operator<(ADataType v1, ADataType v2)
+{
+	return static_cast<int>(v1) < static_cast<int>(v2);
+}
+#define A_DATA_TYPE_DEFINE(v) ADataType(v)
+#else
+typedef int ADataType;
+#define A_DATA_TYPE_DEFINE(v) v
+#endif
+#define A_UNKNOWN A_DATA_TYPE_DEFINE(0)
+#define A_DATA_TYPE A_DATA_TYPE_DEFINE(100)
+#define A_STRING A_DATA_TYPE_DEFINE(101)
+#define A_VOID_POINTER A_DATA_TYPE_DEFINE(102)
+#define A_BOOL A_DATA_TYPE_DEFINE(103)
+#define A_STRING_LIST A_DATA_TYPE_DEFINE(150)
+#define A_DATA_TYPE_LIST A_DATA_TYPE_DEFINE(151)
+#define A_PARAMETER_LIST A_DATA_TYPE_DEFINE(152)
+#define A_FUNCTION_POINTER A_DATA_TYPE_DEFINE(200)
+#define A_MEMORY_DELETER A_DATA_TYPE_DEFINE(201)
+#define A_STATUS_CALLBACK A_DATA_TYPE_DEFINE(202)
+#define A_LIBRARY A_DATA_TYPE_DEFINE(500)
+#define A_DEVICE A_DATA_TYPE_DEFINE(501)
+#define A_OBJECT A_DATA_TYPE_DEFINE(502)
+#define A_ARRAY A_DATA_TYPE_DEFINE(503)
+#define A_ARRAY1D A_DATA_TYPE_DEFINE(504)
+#define A_ARRAY2D A_DATA_TYPE_DEFINE(505)
+#define A_ARRAY3D A_DATA_TYPE_DEFINE(506)
+#define A_CAMERA A_DATA_TYPE_DEFINE(507)
+#define A_FRAME A_DATA_TYPE_DEFINE(508)
+#define A_GEOMETRY A_DATA_TYPE_DEFINE(509)
+#define A_GROUP A_DATA_TYPE_DEFINE(510)
+#define A_INSTANCE A_DATA_TYPE_DEFINE(511)
+#define A_LIGHT A_DATA_TYPE_DEFINE(512)
+#define A_MATERIAL A_DATA_TYPE_DEFINE(513)
+#define A_RENDERER A_DATA_TYPE_DEFINE(514)
+#define A_SURFACE A_DATA_TYPE_DEFINE(515)
+#define A_SAMPLER A_DATA_TYPE_DEFINE(516)
+#define A_SPATIAL_FIELD A_DATA_TYPE_DEFINE(517)
+#define A_VOLUME A_DATA_TYPE_DEFINE(518)
+#define A_WORLD A_DATA_TYPE_DEFINE(519)
+#define A_INT8 A_DATA_TYPE_DEFINE(1000)
+#define A_INT8_VEC2 A_DATA_TYPE_DEFINE(1001)
+#define A_INT8_VEC3 A_DATA_TYPE_DEFINE(1002)
+#define A_INT8_VEC4 A_DATA_TYPE_DEFINE(1003)
+#define A_UINT8 A_DATA_TYPE_DEFINE(1004)
+#define A_UINT8_VEC2 A_DATA_TYPE_DEFINE(1005)
+#define A_UINT8_VEC3 A_DATA_TYPE_DEFINE(1006)
+#define A_UINT8_VEC4 A_DATA_TYPE_DEFINE(1007)
+#define A_INT16 A_DATA_TYPE_DEFINE(1008)
+#define A_INT16_VEC2 A_DATA_TYPE_DEFINE(1009)
+#define A_INT16_VEC3 A_DATA_TYPE_DEFINE(1010)
+#define A_INT16_VEC4 A_DATA_TYPE_DEFINE(1011)
+#define A_UINT16 A_DATA_TYPE_DEFINE(1012)
+#define A_UINT16_VEC2 A_DATA_TYPE_DEFINE(1013)
+#define A_UINT16_VEC3 A_DATA_TYPE_DEFINE(1014)
+#define A_UINT16_VEC4 A_DATA_TYPE_DEFINE(1015)
+#define A_INT32 A_DATA_TYPE_DEFINE(1016)
+#define A_INT32_VEC2 A_DATA_TYPE_DEFINE(1017)
+#define A_INT32_VEC3 A_DATA_TYPE_DEFINE(1018)
+#define A_INT32_VEC4 A_DATA_TYPE_DEFINE(1019)
+#define A_UINT32 A_DATA_TYPE_DEFINE(1020)
+#define A_UINT32_VEC2 A_DATA_TYPE_DEFINE(1021)
+#define A_UINT32_VEC3 A_DATA_TYPE_DEFINE(1022)
+#define A_UINT32_VEC4 A_DATA_TYPE_DEFINE(1023)
+#define A_INT64 A_DATA_TYPE_DEFINE(1024)
+#define A_INT64_VEC2 A_DATA_TYPE_DEFINE(1025)
+#define A_INT64_VEC3 A_DATA_TYPE_DEFINE(1026)
+#define A_INT64_VEC4 A_DATA_TYPE_DEFINE(1027)
+#define A_UINT64 A_DATA_TYPE_DEFINE(1028)
+#define A_UINT64_VEC2 A_DATA_TYPE_DEFINE(1029)
+#define A_UINT64_VEC3 A_DATA_TYPE_DEFINE(1030)
+#define A_UINT64_VEC4 A_DATA_TYPE_DEFINE(1031)
+#define A_FIXED8 A_DATA_TYPE_DEFINE(1032)
+#define A_FIXED8_VEC2 A_DATA_TYPE_DEFINE(1033)
+#define A_FIXED8_VEC3 A_DATA_TYPE_DEFINE(1034)
+#define A_FIXED8_VEC4 A_DATA_TYPE_DEFINE(1035)
+#define A_UFIXED8 A_DATA_TYPE_DEFINE(1036)
+#define A_UFIXED8_VEC2 A_DATA_TYPE_DEFINE(1037)
+#define A_UFIXED8_VEC3 A_DATA_TYPE_DEFINE(1038)
+#define A_UFIXED8_VEC4 A_DATA_TYPE_DEFINE(1039)
+#define A_FIXED16 A_DATA_TYPE_DEFINE(1040)
+#define A_FIXED16_VEC2 A_DATA_TYPE_DEFINE(1041)
+#define A_FIXED16_VEC3 A_DATA_TYPE_DEFINE(1042)
+#define A_FIXED16_VEC4 A_DATA_TYPE_DEFINE(1043)
+#define A_UFIXED16 A_DATA_TYPE_DEFINE(1044)
+#define A_UFIXED16_VEC2 A_DATA_TYPE_DEFINE(1045)
+#define A_UFIXED16_VEC3 A_DATA_TYPE_DEFINE(1046)
+#define A_UFIXED16_VEC4 A_DATA_TYPE_DEFINE(1047)
+#define A_FIXED32 A_DATA_TYPE_DEFINE(1048)
+#define A_FIXED32_VEC2 A_DATA_TYPE_DEFINE(1049)
+#define A_FIXED32_VEC3 A_DATA_TYPE_DEFINE(1050)
+#define A_FIXED32_VEC4 A_DATA_TYPE_DEFINE(1051)
+#define A_UFIXED32 A_DATA_TYPE_DEFINE(1052)
+#define A_UFIXED32_VEC2 A_DATA_TYPE_DEFINE(1053)
+#define A_UFIXED32_VEC3 A_DATA_TYPE_DEFINE(1054)
+#define A_UFIXED32_VEC4 A_DATA_TYPE_DEFINE(1055)
+#define A_FIXED64 A_DATA_TYPE_DEFINE(1056)
+#define A_FIXED64_VEC2 A_DATA_TYPE_DEFINE(1057)
+#define A_FIXED64_VEC3 A_DATA_TYPE_DEFINE(1058)
+#define A_FIXED64_VEC4 A_DATA_TYPE_DEFINE(1059)
+#define A_UFIXED64 A_DATA_TYPE_DEFINE(1060)
+#define A_UFIXED64_VEC2 A_DATA_TYPE_DEFINE(1061)
+#define A_UFIXED64_VEC3 A_DATA_TYPE_DEFINE(1062)
+#define A_UFIXED64_VEC4 A_DATA_TYPE_DEFINE(1063)
+#define A_FLOAT16 A_DATA_TYPE_DEFINE(1064)
+#define A_FLOAT16_VEC2 A_DATA_TYPE_DEFINE(1065)
+#define A_FLOAT16_VEC3 A_DATA_TYPE_DEFINE(1066)
+#define A_FLOAT16_VEC4 A_DATA_TYPE_DEFINE(1067)
+#define A_FLOAT32 A_DATA_TYPE_DEFINE(1068)
+#define A_FLOAT32_VEC2 A_DATA_TYPE_DEFINE(1069)
+#define A_FLOAT32_VEC3 A_DATA_TYPE_DEFINE(1070)
+#define A_FLOAT32_VEC4 A_DATA_TYPE_DEFINE(1071)
+#define A_FLOAT64 A_DATA_TYPE_DEFINE(1072)
+#define A_FLOAT64_VEC2 A_DATA_TYPE_DEFINE(1073)
+#define A_FLOAT64_VEC3 A_DATA_TYPE_DEFINE(1074)
+#define A_FLOAT64_VEC4 A_DATA_TYPE_DEFINE(1075)
+#define A_UFIXED8_RGBA_SRGB A_DATA_TYPE_DEFINE(2003)
+#define A_UFIXED8_RGB_SRGB A_DATA_TYPE_DEFINE(2002)
+#define A_UFIXED8_RA_SRGB A_DATA_TYPE_DEFINE(2001)
+#define A_UFIXED8_R_SRGB A_DATA_TYPE_DEFINE(2000)
+#define A_INT32_BOX1 A_DATA_TYPE_DEFINE(2004)
+#define A_INT32_BOX2 A_DATA_TYPE_DEFINE(2005)
+#define A_INT32_BOX3 A_DATA_TYPE_DEFINE(2006)
+#define A_INT32_BOX4 A_DATA_TYPE_DEFINE(2007)
+#define A_FLOAT32_BOX1 A_DATA_TYPE_DEFINE(2008)
+#define A_FLOAT32_BOX2 A_DATA_TYPE_DEFINE(2009)
+#define A_FLOAT32_BOX3 A_DATA_TYPE_DEFINE(2010)
+#define A_FLOAT32_BOX4 A_DATA_TYPE_DEFINE(2011)
+#define A_FLOAT64_BOX1 A_DATA_TYPE_DEFINE(2208)
+#define A_FLOAT64_BOX2 A_DATA_TYPE_DEFINE(2209)
+#define A_FLOAT64_BOX3 A_DATA_TYPE_DEFINE(2210)
+#define A_FLOAT64_BOX4 A_DATA_TYPE_DEFINE(2211)
+#define A_UINT64_REGION1 A_DATA_TYPE_DEFINE(2104)
+#define A_UINT64_REGION2 A_DATA_TYPE_DEFINE(2105)
+#define A_UINT64_REGION3 A_DATA_TYPE_DEFINE(2106)
+#define A_UINT64_REGION4 A_DATA_TYPE_DEFINE(2107)
+#define A_FLOAT32_MAT2 A_DATA_TYPE_DEFINE(2012)
+#define A_FLOAT32_MAT3 A_DATA_TYPE_DEFINE(2013)
+#define A_FLOAT32_MAT4 A_DATA_TYPE_DEFINE(2014)
+#define A_FLOAT32_MAT2x3 A_DATA_TYPE_DEFINE(2015)
+#define A_FLOAT32_MAT3x4 A_DATA_TYPE_DEFINE(2016)
+#define A_FLOAT32_QUAT_IJKW A_DATA_TYPE_DEFINE(2017)
+#define A_FRAME_COMPLETION_CALLBACK A_DATA_TYPE_DEFINE(203)
+#endif // 1
 
 /*
 渲染需要：VkBuffer、VkDescriptorSet、VkPipeline
@@ -359,7 +516,7 @@ extern "C" {
 	typedef void* aArray1D;		// 一维数组
 	typedef void* aArray2D;		// 二维数组
 	typedef void* aArray3D;		// 三维数组
-	typedef void* aFrame;		// 帧
+	typedef void* aFrame;		// 帧：渲染帧、计算帧
 	typedef void* aGeometry;	// 几何体
 	typedef void* aGroup;		// 组
 	typedef void* aInstance;	// 实例
@@ -371,23 +528,18 @@ extern "C" {
 	typedef void* aSurface;		// 表面
 	typedef void* aRenderer;	// 渲染器
 	typedef void* aWorld;		// 世界
-
 	enum obj_type_e
 	{
 		OBJ_DEVICE,
 		OBJ_CAMERA,
-		OBJ_ARRAY,
-		OBJ_ARRAY1D,
-		OBJ_ARRAY2D,
-		OBJ_ARRAY3D,
+		OBJ_ARRAY, OBJ_ARRAY1D, OBJ_ARRAY2D, OBJ_ARRAY3D,
 		OBJ_FRAME,
 		OBJ_GEOMETRY,
 		OBJ_GROUP,
 		OBJ_INSTANCE,
 		OBJ_LIGHT,
 		OBJ_MATERIAL,
-		OBJ_PIPELINE,
-		OBJ_PIPELINECS,
+		OBJ_PIPELINE, OBJ_PIPELINECS,
 		OBJ_SAMPLER,
 		OBJ_SURFACE,
 		OBJ_RENDERER,
@@ -397,22 +549,28 @@ extern "C" {
 	关系图
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
 		World		: Instance(1:N)、Group(1:N)
-		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group。参数需要设置实例数量
+		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
 		Group		: Surface(1:N)、Light(1:N)
 		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
-		Geometry	: transform、动画等属性
-		FrameCS		: 计算帧,类型同上Frame，用于计算任务，可绑定输出到数组或纹理
+		Geometry	: 网格数据、transform、动画等属性
+		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
 		pipelineCS	: 计算管线, 绑定数组、纹理做输入
 
+		NO_WAIT 0
+		WAIT 1
 	*/
 	struct adevice3_t
 	{
 		void* ctx = 0;
+		aDevice(*new_device)(void* ctx, void* phy, void* dev, const char* devname);
 		// obj_type_e
-		aObject(*new_object)(void* ctx, int obj_type, const char* type);
-		void (*free_object)(void* obj);
+		aObject(*new_object)(void* dev, int obj_type, const char* type);
+		// 删除对象
+		void (*release)(aObject obj);
+		// 增加引用计数
+		void (*retain)(aObject obj);
 		// 设置参数
-		void (*set_param)(void* obj, const char* name, int data_type, void* data);
+		void (*set_param)(aObject obj, const char* name, int data_type, void* data);
 		// 取消参数
 		void (*unset_param)(aObject object, const char* name);
 		void (*unset_allparams)(aObject object);
@@ -435,7 +593,7 @@ extern "C" {
 	* 	set_param(); 着色器编译缓存目录const char* shaderLibDir = 0, const char* shaderCacheDir = 0,
 	*	devname可以显卡名
 	*/
-	adevice3_t* new_gdev(void* inst, void* phy, void* dev, const char* devname = 0);
+	adevice3_t* new_gdev(void* inst);
 	// 删除渲染器
 	void free_gdev(adevice3_t* p);
 
