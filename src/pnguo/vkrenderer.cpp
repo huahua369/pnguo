@@ -24082,6 +24082,35 @@ namespace vkr {
 	}
 #endif // 1半边
 
+	using namespace glm;
+
+	vec4 slerp(vec4 q1, vec4 q2, float t) {
+		// 单位化输入（确保四元数正规化）
+		q1 = normalize(q1);
+		q2 = normalize(q2);
+
+		// 计算点积并截断范围 
+		float dot_q = dot(q1, q2);
+		dot_q = clamp(dot_q, -1.0f, 1.0f); // 避免 acos 输入超界
+
+		// 处理短路径：θ 过小时退化为线性插值 
+		if (abs(dot_q) > 0.9995) {
+			vec4 result = mix(q1, q2, t);
+			return normalize(result); // NLerp 需重新单位化
+		}
+		// 计算夹角 θ 及插值系数
+		float theta = acos(dot_q);
+		float sin_theta = sin(theta);
+		float coeff1 = sin((1.0 - t) * theta) / sin_theta;
+		float coeff2 = sin(t * theta) / sin_theta;
+
+		// 处理方向：确保走最短路径（点积为负时反转）
+		if (dot_q < 0.0) {
+			q2 = -q2;
+			coeff2 = -coeff2;
+		}
+		return coeff1 * q1 + coeff2 * q2;
+	}
 }
 //!vkr
 
