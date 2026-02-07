@@ -7,17 +7,43 @@
 	创建日期：2026-02-07
 
 --------------------------------------------------------------------------------------------------------------
-	对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light
+	对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light	 
+	关系图
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
-		World		: Instance(1:N)、Surface(1:N)、Light(1:N)
-		Instance	: Group(1:1)	属性名transform、group。一个Instance只能绑定一个Group
-		Group		: Surface(1:N)、Light(1:N)，相当一个完整的模型
-		Surface		: Geometry(1:1)、Material(1:1)
-		Geometry	: transform、动画等属性，网格数据，一个节点
+		World		: Instance(1:N)、Group(1:N)
+		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
+		Group		: Surface(1:N)、Light(1:N)
+		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
+		Geometry	: 网格数据、transform、动画等属性
+		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
+		pipelineCS	: 计算管线, 绑定数组、纹理做输入
 
-	场景渲染需要：camera、light、world、renderer、frame、instance
-	Param
+		NO_WAIT 0
+		WAIT 1 
 --------------------------------------------------------------------------------------------------------------
+
+渲染需要：VkBuffer、VkDescriptorSet、VkPipeline
+	VkBuffer：vbo、ibo、ubo、ssbo
+	VkDescriptorSet：纹理、ubo\ssbo绑定
+	VkPipeline：
+vs:
+	顶点属性：使用分散绑定
+	Frame：set 0,binding 0
+		mat4 u_mCameraCurrViewProj;
+		mat4 u_mCameraPrevViewProj;
+	Object：绑定set 0,binding 1		mat4[2]关节动画用
+	变形动画(可选)：float u_morphWeights[]，vec4 per_target_data[]
+	骨骼动画(可选)：mat4 u_ModelMatrix[]
+	实例化(可选)：mat4 instance_model_matrix[]
+ps:
+	场景结构：set 0,binding 0 struct PerFrame,相机、灯光等参数
+	材质结构：set 0,binding 1 Object和struct pbrMaterial
+	UV矩(可选)：mat3 u_matuv[]
+	纹理：set 1
+		普通uniform sampler2D[24]
+		环境samplerCube[3]
+		阴影sampler2DShadow[MAX_SHADOW_INSTANCES]
+
 
 */
 namespace vkg {
@@ -249,30 +275,6 @@ typedef int ADataType;
 #define A_FRAME_COMPLETION_CALLBACK A_DATA_TYPE_DEFINE(203)
 #endif // 1
 
-/*
-渲染需要：VkBuffer、VkDescriptorSet、VkPipeline
-	VkBuffer：vbo、ibo、ubo、ssbo
-	VkDescriptorSet：纹理、ubo\ssbo绑定
-	VkPipeline：
-vs:
-	顶点属性：使用分散绑定
-	Frame：set 0,binding 0
-		mat4 u_mCameraCurrViewProj;
-		mat4 u_mCameraPrevViewProj;
-	Object：绑定set 0,binding 1		mat4[2]关节动画用
-	变形动画(可选)：float u_morphWeights[]，vec4 per_target_data[]
-	骨骼动画(可选)：mat4 u_ModelMatrix[]
-	实例化(可选)：mat4 instance_model_matrix[]
-ps:
-	场景结构：set 0,binding 0 struct PerFrame,相机、灯光等参数
-	材质结构：set 0,binding 1 Object和struct pbrMaterial
-	UV矩(可选)：mat3 u_matuv[]
-	纹理：set 1
-		普通uniform sampler2D[24]
-		环境samplerCube[3]
-		阴影sampler2DShadow[MAX_SHADOW_INSTANCES]
-
-*/
 
 #ifdef __cplusplus
 extern "C" {
@@ -324,20 +326,7 @@ extern "C" {
 		OBJ_RENDERER,
 		OBJ_WORLD
 	};
-	/*
-	关系图
-		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
-		World		: Instance(1:N)、Group(1:N)
-		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
-		Group		: Surface(1:N)、Light(1:N)
-		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
-		Geometry	: 网格数据、transform、动画等属性
-		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
-		pipelineCS	: 计算管线, 绑定数组、纹理做输入
 
-		NO_WAIT 0
-		WAIT 1
-	*/
 	struct adevice3_t
 	{
 		void* ctx = 0;
