@@ -116,6 +116,8 @@ KHR_materials_clearcoat
 
 // 新渲染器声明  
 namespace vkg {
+	static const uint32_t MaxLightInstances = 4;
+	static const uint32_t MaxShadowInstances = 4;
 
 	class Device;
 
@@ -364,6 +366,46 @@ uint64_t vkg_get_ticks() {
 	// 转换为毫秒级时间戳
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 	return ms;
+}
+
+VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding)
+{
+	VkDescriptorSetLayout descSetLayout = {};
+	VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+	descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptor_layout.pNext = NULL;
+	descriptor_layout.bindingCount = (uint32_t)pDescriptorLayoutBinding->size();
+	descriptor_layout.pBindings = pDescriptorLayoutBinding->data();
+	VkResult res = vkCreateDescriptorSetLayout(dev, &descriptor_layout, NULL, &descSetLayout);
+	assert(res == VK_SUCCESS);
+	return descSetLayout;
+}
+void makeTextureDescriptors(int first, std::vector<VkDescriptorSetLayoutBinding>& layout_bindings)
+{
+	uint32_t descriptorCounts[] = { 23, 3, MaxShadowInstances };
+	for (int i = 0; i < 3; i++)
+	{
+		VkDescriptorSetLayoutBinding b = {};
+		b.binding = first + i;
+		b.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		b.descriptorCount = descriptorCounts[i];
+		b.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		b.pImmutableSamplers = NULL;
+		layout_bindings.push_back(b);
+	}
+}
+VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, std::vector<uint32_t>& descriptorCounts, const VkSampler* pSamplers, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
+{
+	std::vector<VkDescriptorSetLayoutBinding> layoutBindings(descriptorCounts.size());
+	for (int i = 0; i < descriptorCounts.size(); i++)
+	{
+		layoutBindings[i].binding = i;
+		layoutBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layoutBindings[i].descriptorCount = descriptorCounts[i];
+		layoutBindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[i].pImmutableSamplers = (pSamplers != NULL) ? &pSamplers[i] : NULL;
+	}
+	return newDescriptorSetLayout(dev, &layoutBindings);
 }
 
 void gpu_vk_test0()

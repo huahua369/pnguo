@@ -24,7 +24,7 @@
 
 渲染需要：VkBuffer、VkDescriptorSet、VkPipeline
 	VkBuffer：vbo、ibo、ubo、ssbo
-	VkDescriptorSet：纹理、ubo\ssbo绑定
+	VkDescriptorSet：纹理、ubo\ssbo绑定点7个ubo, 23个纹理、3个环境纹理、MAX_SHADOW_INSTANCES个阴影纹理
 	VkPipeline：
 vs:
 	顶点属性：使用分散绑定
@@ -40,7 +40,7 @@ ps:
 	材质结构：set 0,binding 1 Object和struct pbrMaterial
 	UV矩(可选)：mat3 u_matuv[]
 	纹理：set 1
-		普通uniform sampler2D[24]
+		普通uniform sampler2D[23]
 		环境samplerCube[3]
 		阴影sampler2DShadow[MAX_SHADOW_INSTANCES]
 

@@ -9693,6 +9693,20 @@ namespace vkr
 	// CreateDescriptorTableForMaterialTextures
 	//
 	//--------------------------------------------------------------------------------------
+	void makeTextureDescriptors(int first, std::vector<VkDescriptorSetLayoutBinding>& layout_bindings)
+	{
+		uint32_t descriptorCounts[] = { 23, 3, MaxShadowInstances };
+		for (int i = 0; i < 3; i++)
+		{
+			VkDescriptorSetLayoutBinding b = {};
+			b.binding = first + i;
+			b.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			b.descriptorCount = descriptorCounts[i];
+			b.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			b.pImmutableSamplers = NULL;
+			layout_bindings.push_back(b);
+		}
+	}
 	void GltfPbrPass::CreateDescriptorTableForMaterialTextures(PBRMaterial* tfmat, std::map<std::string, ts_t>& texturesBase, env_res_t* r)
 	{
 		std::vector<uint32_t> descriptorCounts;
@@ -9999,19 +10013,6 @@ namespace vkr
 				ad[k] = std::to_string(v);
 			}
 		}
-		if (muvt_size && mm && mm->uvtdata)
-		{
-			// UV矩阵
-			VkDescriptorSetLayoutBinding b;
-			b.binding = binc++;
-			b.descriptorCount = 1;
-			b.pImmutableSamplers = NULL;
-			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			b.descriptorType = dt;
-			muvt = b.binding;
-			ad["ID_MATUV_DATA"] = std::to_string(b.binding);
-			layout_bindings.push_back(b);
-		}
 		int icbinding = 0;
 		uint32_t ins_size = 0;
 		if (instanceCount > 1)
@@ -10027,6 +10028,19 @@ namespace vkr
 			ad["ID_INSTANCING"] = std::to_string(b.binding);
 			layout_bindings.push_back(b);
 			ins_size = sizeof(glm::mat4) * instanceCount;
+		}
+		if (muvt_size && mm && mm->uvtdata)
+		{
+			// UV矩阵
+			VkDescriptorSetLayoutBinding b;
+			b.binding = binc++;
+			b.descriptorCount = 1;
+			b.pImmutableSamplers = NULL;
+			b.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			b.descriptorType = dt;
+			muvt = b.binding;
+			ad["ID_MATUV_DATA"] = std::to_string(b.binding);
+			layout_bindings.push_back(b);
 		}
 		pc->pPrimitive = pPrimitive;
 		pc->morphing = morphing;
