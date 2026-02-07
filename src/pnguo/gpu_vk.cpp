@@ -382,7 +382,7 @@ VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, std::vector<VkDescrip
 }
 void makeTextureDescriptors(int first, std::vector<VkDescriptorSetLayoutBinding>& layout_bindings)
 {
-	uint32_t descriptorCounts[] = { 23, 3, MaxShadowInstances };
+	uint32_t descriptorCounts[] = { 23, 3, vkg::MaxShadowInstances };
 	for (int i = 0; i < 3; i++)
 	{
 		VkDescriptorSetLayoutBinding b = {};
