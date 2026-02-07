@@ -173,8 +173,7 @@ namespace vkr
 		glm::mat4 GetCurrent() const { return m_current; }
 		glm::mat4 GetPrevious() const { return m_previous; }
 	};
-
-	//
+ 
 	// Structures holding the per frame constant buffer data. 
 	//
 	struct Light

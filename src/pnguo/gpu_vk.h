@@ -7,7 +7,7 @@
 	创建日期：2026-02-07
 
 --------------------------------------------------------------------------------------------------------------
-	对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light	 
+	对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light
 	关系图
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
 		World		: Instance(1:N)、Group(1:N)
@@ -19,7 +19,7 @@
 		pipelineCS	: 计算管线, 绑定数组、纹理做输入
 
 		NO_WAIT 0
-		WAIT 1 
+		WAIT 1
 --------------------------------------------------------------------------------------------------------------
 
 渲染需要：VkBuffer、VkDescriptorSet、VkPipeline
@@ -114,6 +114,32 @@ namespace vkg {
 		int16_t	_type = 0;
 	};
 
+	// 变形动画偏移 MORPH_TARGET_*_OFFSET	 
+	struct morph_target_t {
+		int vertex_count = 0;
+		int weight_count = 0;
+		int position_offset = -1;
+		int normal_offset = -1;
+		int tangent_offset = -1;
+		int texcoord0_offset = -1;
+		int texcoord1_offset = -1;
+		int color0_offset = -1;
+		//int color1_offset;
+	};
+	// ubo_size_t morph_target_t
+	// 全局、对象、骨骼动画、实例化、材质UV、目标数据、变形数据，的大小或绑定点索引
+	struct ubo_size_t {
+		// 普通纹理、环境纹理、阴影纹理数量
+		uint32_t texCounts[3] = { 23, 3, 4 };
+		int ID_PER_FRAME;
+		int ID_PER_OBJECT;
+		int ID_SKINNING_MATRICES;
+		int ID_INSTANCING;
+		int ID_MATUV_DATA;
+		int ID_TARGET_DATA;
+		int ID_MORPHING_DATA;
+	};
+	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, ubo_size_t* us, morph_target_t* mt, ubo_size_t* binding);
 }
 //!vkg
 
