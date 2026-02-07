@@ -29,7 +29,7 @@ namespace vkg {
 		glm::vec3 right;		//	世界空间中变换的红轴。 
 		glm::vec3 up;			//	世界空间中变换的绿轴。 
 		glm::vec3 scale;		//	缩放。 
-		bool hasChanged;		//	自上次将标志设置为“false”以来，变换是否发生更改  
+		bool hasChanged;		//	自上次将标志设置为false以来，变换是否发生更改  
 	};
 	struct node_t
 	{
@@ -40,24 +40,6 @@ namespace vkg {
 		int child_count;		//	子项数量。
 	};
 
-	struct const_vk {
-		// Create all the heaps for the resources views
-		uint32_t cbvDescriptorCount = 2000;
-		uint32_t srvDescriptorCount = 8000;
-		uint32_t uavDescriptorCount = 10;
-		uint32_t samplerDescriptorCount = 20;
-		// Create a commandlist ring for the Direct queue
-		uint32_t commandListsPerBackBuffer = 8;
-		// Create a 'dynamic' constant buffer动态常量缓冲区大小
-		uint32_t constantBuffersMemSize = 15 * 1024 * 1024;
-		// Create a 'static' pool for vertices and indices 静态顶点/索引缓冲区大小
-		uint32_t staticGeometryMemSize = (10 * 128) * 1024 * 1024;
-		// Create a 'static' pool for vertices and indices in system memory静态几何缓冲区大小
-		uint32_t systemGeometryMemSize = 32 * 1024;
-
-		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
-		uint32_t uploadHeapMemSize = (uint32_t)1000 * 1024 * 1024;
-	};
 	struct gtime_t
 	{
 	public:
@@ -361,7 +343,7 @@ extern "C" {
 		void* ctx = 0;
 		aDevice(*new_device)(void* ctx, void* phy, void* dev, const char* devname);
 		// obj_type_e
-		aObject(*new_object)(void* dev, int obj_type, const char* type);
+		aObject(*new_object)(aDevice* dev, int obj_type, const char* type);
 		// 删除对象
 		void (*release)(aObject obj);
 		// 增加引用计数
@@ -379,7 +361,7 @@ extern "C" {
 		// 获取参数值, data_type返回值类型
 		void* (*get_param)(aObject object, const char* name, int* data_type);
 		// 获取属性
-		int (*get_property)(aObject object, const char* name, int data_type, void* mem, uint64_t size, int mask);
+		int (*get_property)(aObject object, const char* name, int data_type, void* mem, uint64_t size, int wait_mask);
 		// 提交帧渲染
 		void (*render_frame)(aFrame frame);
 		// 帧渲染完成检查

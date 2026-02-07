@@ -187,11 +187,7 @@ namespace vkg {
 		auto d = ctx->new_device(phy, dev, devname);
 		p = d;
 		return p;
-	}
-	aDevice new_aDevice(void* ctx, const char* type) {
-		aDevice p = nullptr;
-		return p;
-	}
+	} 
 	aCamera new_aCamera(void* ctx, const char* type) {
 		aCamera p = nullptr;
 		return p;
@@ -262,7 +258,7 @@ namespace vkg {
 	}
 
 
-	aObject new_object(void* ctx, int obj_type, const char* type) {
+	aObject new_object(aDevice* ctx, int obj_type, const char* type) {
 		auto t = (obj_type_e)obj_type;
 		aObject p = nullptr;
 		switch (t) {
