@@ -150,7 +150,7 @@ vec3 emissiveFactor
 KHR_materials_ior
 KHR_materials_pbrSpecularGlossiness
 KHR_materials_specular
-KHR_materials_sheen 
+KHR_materials_sheen
 KHR_materials_anisotropy
 KHR_materials_transmission
 KHR_materials_dispersion
@@ -971,6 +971,7 @@ namespace vkr
 		VkFramebuffer framebuffer = 0;
 		VkFence fence = {};
 		VkSemaphore sem = {};
+		VkSemaphore sem_out = {};
 		VkImage image = 0;
 	};
 	// 
@@ -6379,6 +6380,7 @@ namespace vkr {
 			// Semaphore used to synchronize between offscreen and final scene rendering
 			//信号量用于在屏幕外和最终场景渲染之间进行同步
 			VkSemaphore semaphore = VK_NULL_HANDLE;
+			VkSemaphore semaphore1 = VK_NULL_HANDLE;
 		public:
 			FBO() {}
 			~FBO() {}
@@ -6462,7 +6464,7 @@ namespace vkr {
 		void HandleInput();
 		void UpdateCamera(Camera& cam);
 		void set_fboidx(int idx);
-
+		int64_t get_fbo_semaphore();
 	public:
 		Device* m_device = 0;
 		int m_Width = 1280;  // application window dimensions
@@ -20561,6 +20563,10 @@ namespace vkr {
 			{
 				createSemaphore(_dev->m_device, &it.semaphore, 0);
 			}
+			if (it.semaphore1 == VK_NULL_HANDLE)
+			{
+				createSemaphore(_dev->m_device, &it.semaphore1, 0);
+			}
 		}
 		if (isColor)
 		{
@@ -20617,6 +20623,9 @@ namespace vkr {
 			if (it.semaphore)
 				vkDestroySemaphore(_dev->m_device, it.semaphore, 0);
 			it.semaphore = 0;
+			if (it.semaphore1)
+				vkDestroySemaphore(_dev->m_device, it.semaphore1, 0);
+			it.semaphore1 = 0;
 			if (it.framebuffer)
 				vkDestroyFramebuffer(_dev->m_device, it.framebuffer, 0);
 			it.framebuffer = 0;
@@ -22071,8 +22080,8 @@ namespace vkr {
 			submit_info2.pWaitDstStageMask = &submitWaitStage;
 			submit_info2.commandBufferCount = 1;
 			submit_info2.pCommandBuffers = &cmdBuf2;
-			submit_info2.signalSemaphoreCount = 0;
-			submit_info2.pSignalSemaphores = 0;					// todo 渲染完成信号，SDL3默认渲染器不支持接入外部信号，所有这里直接WaitForFence
+			submit_info2.signalSemaphoreCount = 1;
+			submit_info2.pSignalSemaphores = &_fbo.sem_out;					// 渲染完成信号
 
 			auto st = vkGetFenceStatus(m_pDevice->m_device, _fbo.fence);
 			if (!st)
@@ -22082,8 +22091,7 @@ namespace vkr {
 			//printf("Renderer_cx fence %p: %d\n", _fbo.fence, st);
 			res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, _fbo.fence);
 			assert(res == VK_SUCCESS);
-			vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
-			//vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
+			//vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
 		}
 	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
@@ -22091,6 +22099,7 @@ namespace vkr {
 		_fbo.fence = p->_fence;
 		_fbo.framebuffer = p->framebuffers[idx].framebuffer;
 		_fbo.sem = p->framebuffers[idx].semaphore;
+		_fbo.sem_out = p->framebuffers[idx].semaphore1;
 		_fbo.renderPass = p->renderPass;
 		_fbo.image = p->framebuffers[idx].color._image;
 	}
@@ -22600,6 +22609,11 @@ namespace vkr {
 		setidx = idx;
 	}
 
+	int64_t draw3d_ctx::get_fbo_semaphore()
+	{
+		return (int64_t)(m_pRenderer ? m_pRenderer->_fbo.sem_out : 0);
+	}
+
 	//--------------------------------------------------------------------------------------
 	//
 	// OnRender, updates the state from the UI, animates, transforms and renders the scene
@@ -22926,6 +22940,16 @@ size_t vkdg_cx::get_light_size()
 			c = tx->m_pRenderer->get_light_size();
 	}
 	return c;
+}
+
+int64_t vkdg_cx::get_fbo_semaphore()
+{
+	if (ctx)
+	{
+		auto tx = (vkr::draw3d_ctx*)ctx;
+		return tx->get_fbo_semaphore();
+	}
+	return 0;
 }
 
 void* new_instance(const char* pApplicationName, const char* pEngineName)
@@ -24060,7 +24084,7 @@ namespace vkr {
 
 }
 //!vkr
- 
+
 
 uint64_t vkr_get_ticks() {
 	auto now = std::chrono::high_resolution_clock::now();

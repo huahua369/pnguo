@@ -308,6 +308,7 @@ public:
 	// 获取灯光信息
 	vkr::light_t* get_light(size_t idx);
 	size_t get_light_size();
+	int64_t get_fbo_semaphore();
 };
 // 2D渲染对象
 typedef struct drawable2_t drawable2_t;

@@ -888,8 +888,8 @@ void app_cx::render(double delta)
 	{
 		it->present(delta);
 	}
-	if (_set_dev.vkdev)
-		vkDeviceWaitIdle((VkDevice)_set_dev.vkdev);
+	//if (_set_dev.vkdev)
+	//	vkDeviceWaitIdle((VkDevice)_set_dev.vkdev);
 }
 
 int app_cx::run_loop(int t)
@@ -2110,6 +2110,14 @@ void form_x::push_menu(menu_cx* p)
 {
 	if (p)
 		menus.push_back(p);
+}
+
+void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask)
+{
+	if (!wait_stage_mask)
+		wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	if (renderer)
+		SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
 }
 void form_x::update_w()
 {

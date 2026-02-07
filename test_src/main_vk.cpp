@@ -1062,9 +1062,9 @@ int main()
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
+						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
-					//sp_drawable_draw(dd1); // spine动画
+					sp_drawable_draw(dd1); // spine动画
 					r_render_data_text(ptrt, { 20,10 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
@@ -1149,6 +1149,8 @@ int main()
 						r_update_data_text(ptrt, td3, 0);
 					}
 					vkd->on_render();		// 渲染到fbo纹理tex3d
+					auto sem = vkd->get_fbo_semaphore();
+					form0->add_vk_semaphores(sem, 0, 0);
 					static bool sa = false;
 					if (sa)
 					{

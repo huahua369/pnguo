@@ -114,8 +114,7 @@ KHR_materials_clearcoat
 
 
 
-// 新渲染器
-#if 1
+// 新渲染器声明  
 namespace vkg {
 
 	class Device;
@@ -145,7 +144,11 @@ namespace vkg {
 	private:
 
 	};
+}
+// !vkg
 
+// 新渲染器实现
+namespace vkg {
 	gdev_cx::gdev_cx()
 	{
 	}
@@ -187,7 +190,7 @@ namespace vkg {
 		auto d = ctx->new_device(phy, dev, devname);
 		p = d;
 		return p;
-	} 
+	}
 	aCamera new_aCamera(void* ctx, const char* type) {
 		aCamera p = nullptr;
 		return p;
@@ -352,7 +355,7 @@ void free_gdev(adevice3_t* p) {
 		delete ((vkg::gdev_cx*)p->ctx);
 	}
 }
-#endif
+
 // !新渲染器
 
 

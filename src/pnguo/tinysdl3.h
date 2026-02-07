@@ -344,6 +344,9 @@ public:
 	void warp_mouse_in_window(float x, float y);
 	// 限制鼠标在窗口内grab_enable，相对窗口隐藏鼠标rmode
 	void set_mouse_mode(bool grab_enable, bool rmode);
+
+	// 同步
+	void add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask);
 public:
 	void update_w();
 	void update(float delta);
