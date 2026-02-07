@@ -139,7 +139,32 @@ namespace vkg {
 		int ID_TARGET_DATA;
 		int ID_MORPHING_DATA;
 	};
+	// 创建绑定点布局
 	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, ubo_size_t* us, morph_target_t* mt, ubo_size_t* binding);
+	// 顶点布局
+	struct vertex_input_binding_description {
+		uint32_t binding;
+		uint32_t stride;
+		uint32_t inputRate;	// 0顶点，1实例
+	};
+	struct vertex_input_attribute_description {
+		uint32_t location;
+		uint32_t binding;
+		VkFormat format;
+		uint32_t offset;
+	};
+	struct pipeline_info_t {
+		float lineWidth = 1.0;
+		int frontFace = 0;
+		int topology = 3;
+		int rasterizationSamples = 0x00000001;
+		uint64_t renderPass = 0;
+		bool blending = false;
+		bool primitiveRestartEnable = false;
+		bool doubleSided = false;	// cullMode
+	};
+	void* new_pipeline();
+
 }
 //!vkg
 

@@ -173,7 +173,7 @@ namespace vkr
 		glm::mat4 GetCurrent() const { return m_current; }
 		glm::mat4 GetPrevious() const { return m_previous; }
 	};
- 
+
 	// Structures holding the per frame constant buffer data. 
 	//
 	struct Light
@@ -10159,7 +10159,7 @@ namespace vkr
 			vi_binding[i].stride = SizeOfFormat(layout[i].format);
 			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		}
-		if (defines.Has("ID_INSTANCE_MAT")) { vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
+		//if (defines.Has("ID_INSTANCE_MAT")) { vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
 		VkPipelineVertexInputStateCreateInfo vi = {};
 		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vi.pNext = NULL;
@@ -10370,7 +10370,7 @@ namespace vkr
 		specializationInfo.pMapEntries = &specializationMapEntry;
 		specializationInfo.dataSize = sizeof(uint32_t);
 		specializationInfo.pData = &specConstants;
-		shaderStages[1].pSpecializationInfo = &specializationInfo;
+		//shaderStages[1].pSpecializationInfo = &specializationInfo;
 		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
 		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
