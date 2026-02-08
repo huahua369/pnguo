@@ -164,15 +164,19 @@ namespace vkg {
 		assert(res == VK_SUCCESS);
 		return descSetLayout;
 	}
-	bool is_morph_target_valid(vkg::ubo_size_t* us, vkg::morph_target_t* mt)
+	bool is_morph_target_valid(vkg::ubotex_size_t* us, vkg::morph_target_t* mt)
 	{
 		return us && (us->ID_TARGET_DATA || us->ID_MORPHING_DATA) && mt && (mt->position_offset >= 0 || mt->normal_offset >= 0 || mt->tangent_offset >= 0 || mt->texcoord0_offset >= 0 || mt->texcoord1_offset >= 0 || mt->color0_offset >= 0);
 	}
-	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, vkg::ubo_size_t* us, vkg::morph_target_t* mt, vkg::ubo_size_t* binding)
+	bool is_morph_target_valid(vkg::ubotex_size_t* us)
+	{
+		return us && (us->ID_TARGET_DATA || us->ID_MORPHING_DATA);
+	}
+	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, vkg::ubotex_size_t* us, vkg::ubotex_size_t* binding)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
 		int binc = 0;
-		vkg::ubo_size_t binding0 = {};
+		vkg::ubotex_size_t binding0 = {};
 		if (!binding)
 			binding = &binding0;
 		layout_bindings.reserve(10);
@@ -226,7 +230,7 @@ namespace vkg {
 			binding->ID_SKINNING_MATRICES = b.binding;
 			layout_bindings.push_back(b);
 		}
-		if (is_morph_target_valid(us, mt))
+		if (is_morph_target_valid(us))
 		{
 			VkDescriptorSetLayoutBinding b;
 			// 变形动画
@@ -310,64 +314,130 @@ namespace vkg {
 		out = blend ? color_blend : color_no_blend;
 	}
 #if 1
-
-	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, const vkr::DefineList& defines0, std::vector<VkVertexInputAttributeDescription>* playout, VkDescriptorSetLayout layout1, VkDescriptorSetLayout layout2, pipeline_info_t* info)
+	void md_vis(pipeline_info_2* info2, vkr::DefineList& defines, std::vector<VkVertexInputAttributeDescription>& playout, std::vector<VkVertexInputBindingDescription>& vi_binding) 
 	{
-		if (!pbrpipe || !info || pbrpipe->m_pipeline)
+		static const char* kdefstr[] = { "ID_POSITION","ID_COLOR_0","ID_TEXCOORD_0","ID_NORMAL","ID_TANGENT","ID_WEIGHTS_0","ID_JOINTS_0","ID_TEXCOORD_1","ID_WEIGHTS_1","ID_JOINTS_1" };
+		playout.reserve(info2->attributeCount);
+		char tmp[64] = {};
+		for (size_t i = 0; i < info2->attributeCount; i++)
+		{
+			auto& it = info2->attributes[i];
+			VkVertexInputAttributeDescription a = {};
+			a.location = i;
+			a.binding = it.binding;
+			a.format = (VkFormat)it.format;
+			a.offset = it.offset;
+			if (it.name < 10)
+			{
+				defines[kdefstr[it.name]] = i;
+			}
+			else {
+				auto idx = it.name - 10;
+				if (info2->names && info2->namesCount > idx && info2->names[idx])
+				{
+					defines[info2->names[idx]] = i;
+				}
+				else {
+					sprintf(tmp, "ID_ATTR_%d", it.name);
+					defines[tmp] = i;
+				}
+			}
+			playout.push_back(a);
+		}
+		std::stable_sort(playout.begin(), playout.end(), [](const VkVertexInputAttributeDescription& a, const VkVertexInputAttributeDescription& b) { return a.location < b.location; });
+		if (info2->bindingCount > 0)
+		{
+			vi_binding.resize(info2->bindingCount);
+			for (int i = 0; i < info2->bindingCount; i++)
+			{
+				vi_binding[i].binding = info2->bindings[i].binding;
+				vi_binding[i].stride = info2->bindings[i].stride;
+				vi_binding[i].inputRate = info2->bindings[i].inputRate ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
+			}
+		}
+		else {
+			auto cc = playout[playout.size() - 1].binding;
+			vi_binding.resize(cc);
+			int offset = 0;
+			int last_binding = 0;
+			for (auto& it : playout)
+			{
+				auto b = it.binding;
+				auto f = it.format;
+				auto s = vkr::SizeOfFormat(f);
+				assert(b < vi_binding.size());
+				if (last_binding != b)
+				{
+					offset = 0; last_binding = b;
+				}
+				it.offset = offset;
+				offset += s;
+				vi_binding[b].binding = b;
+				vi_binding[b].stride += s;
+				vi_binding[b].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			}
+		}
+		return;
+	}
+	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2)
+	{
+		auto info = &info2->info;
+		if (!pbrpipe || !info2 || !info || pbrpipe->m_pipeline || !(info2->attributeCount > 0))
 		{
 			return;
 		}
 		auto dev = pdev->GetDevice();
-		auto& layout = *playout;
+
+		// 创建描述符布局
+		VkDescriptorSetLayout layout1 = newDescriptorSetLayout(dev, &info2->set_binding, &pbrpipe->binding);
+
 		if (!pbrpipe->m_pipelineLayout) {
-			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { layout1 };
-			if (layout2 != VK_NULL_HANDLE)
-			{
-				descriptorSetLayout.push_back(layout2);
-			}
 			VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
 			pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			pPipelineLayoutCreateInfo.pNext = NULL;
 			pPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 			pPipelineLayoutCreateInfo.pPushConstantRanges = NULL;
-			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
-			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
+			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)1;
+			pPipelineLayoutCreateInfo.pSetLayouts = &layout1;
 			VkResult res = vkCreatePipelineLayout(dev, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
 			assert(res == VK_SUCCESS);
 			vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
 		}
 
 		// Compile and create shaders
-		auto defines = defines0;
-		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
-		// Create pipeline 
-		pdev->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
-		pdev->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
-		// vertex input state
-		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
-		for (int i = 0; i < layout.size(); i++)
+		vkr::DefineList defines;
+		auto tt = info2->defines0;
+		for (size_t i = 0; i < info2->define_count; i++, tt += 2)
 		{
-			vi_binding[i].binding = layout[i].binding;
-			vi_binding[i].stride = vkr::SizeOfFormat(layout[i].format);
-			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			auto k = tt[0];
+			auto v = tt[1];
+			if (k && v)
+				defines[k] = v;
 		}
-		//inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
+		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
+		// vertex input state
+		std::vector<VkVertexInputAttributeDescription> playout;
+		std::vector<VkVertexInputBindingDescription> vi_binding;
 		VkPipelineVertexInputStateCreateInfo vi = {};
 		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vi.pNext = NULL;
 		vi.flags = 0;
+		md_vis(info2, defines, playout, vi_binding);// 解析顶点输入布局，生成绑定和属性描述
 		vi.vertexBindingDescriptionCount = (uint32_t)vi_binding.size();
 		vi.pVertexBindingDescriptions = vi_binding.data();
-		vi.vertexAttributeDescriptionCount = (uint32_t)layout.size();
-		vi.pVertexAttributeDescriptions = layout.data();
+		vi.vertexAttributeDescriptionCount = (uint32_t)playout.size();
+		vi.pVertexAttributeDescriptions = playout.data();
+		// Create pipeline 
+		pdev->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, info2->vertexShaderFile ? info2->vertexShaderFile : "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
+		pdev->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, info2->fragmentShaderFile ? info2->fragmentShaderFile : "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
 		// input assembly state
 		VkPipelineInputAssemblyStateCreateInfo ia;
 		ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		ia.pNext = NULL;
 		ia.flags = 0;
 		ia.primitiveRestartEnable = info->primitiveRestartEnable;
-		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		ia.topology = (VkPrimitiveTopology)info->topology;// VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		// rasterizer state
 		VkPipelineRasterizationStateCreateInfo rs;
 		rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -506,7 +576,7 @@ namespace vkg {
 		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		ds.pNext = NULL;
 		ds.flags = 0;
-		ds.depthTestEnable = true;
+		ds.depthTestEnable = info->depthTestEnable;
 		ds.depthWriteEnable = depthwrite;
 		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 		ds.back.failOp = VK_STENCIL_OP_KEEP;
@@ -519,7 +589,7 @@ namespace vkg {
 		ds.depthBoundsTestEnable = VK_FALSE;
 		ds.minDepthBounds = 0;
 		ds.maxDepthBounds = 0;
-		ds.stencilTestEnable = VK_TRUE;
+		ds.stencilTestEnable = info->stencilTestEnable;
 		ds.front = ds.back;
 		// multi sample state
 		VkPipelineMultisampleStateCreateInfo ms;

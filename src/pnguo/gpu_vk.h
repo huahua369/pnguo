@@ -121,46 +121,36 @@ namespace vkg {
 		int position_offset = -1;
 		int normal_offset = -1;
 		int tangent_offset = -1;
-		int texcoord0_offset = -1;
-		int texcoord1_offset = -1;
-		int color0_offset = -1;
-		//int color1_offset;
+		int texcoord0_offset = -1;		int texcoord1_offset = -1;
+		int color0_offset = -1;		//int color1_offset;
 	};
-	// ubo_size_t morph_target_t
 	// 全局、对象、骨骼动画、实例化、材质UV、目标数据、变形数据，的大小或绑定点索引
-	struct ubo_size_t {
+	struct ubotex_size_t {
 		// 普通纹理、环境纹理、阴影纹理数量
-		uint32_t texCounts[3] = { 23, 3, 4 };
-		int ID_PER_FRAME;
-		int ID_PER_OBJECT;
-		int ID_SKINNING_MATRICES;
-		int ID_INSTANCING;
-		int ID_MATUV_DATA;
-		int ID_TARGET_DATA;
-		int ID_MORPHING_DATA;
+		int texCounts[3] = { 25, 3, 4 };
+		int ID_PER_FRAME = 1;
+		int ID_PER_OBJECT = 1;
+		int ID_SKINNING_MATRICES = 0;
+		int ID_INSTANCING = 0;
+		int ID_MATUV_DATA = 0;
+		int ID_TARGET_DATA = 0;
+		int ID_MORPHING_DATA = 0;
 	};
-	/*
-	顶点属性：
-		POSITION、COLOR_0、TEXCOORD_0、TEXCOORD_1、
-		NORMAL、TANGENT、
-		WEIGHTS_0、WEIGHTS_1、JOINTS_0、JOINTS_1
-	*/
-	// 创建绑定点布局
-	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, ubo_size_t* us, morph_target_t* mt, ubo_size_t* binding);
-	// 顶点布局
+	struct vertex_attribute_b
+	{
+		uint16_t name;		// 0=POSITION、1=COLOR_0、2=TEXCOORD_0、3=NORMAL、4=TANGENT、5=WEIGHTS_0、6=JOINTS_0、7=TEXCOORD_1、8=WEIGHTS_1、9=JOINTS_1
+		uint16_t binding;	// 同样绑定号则同一块
+		VkFormat format;
+		uint32_t offset;	// 如果bindings/bindingCount为空则自动计算
+	};
 	struct vertex_input_binding_description {
-		uint32_t binding;
-		uint32_t stride;
+		uint32_t binding;	// 绑定号
+		uint32_t stride;	// 结构大小
 		uint32_t inputRate;	// 0顶点，1实例
 	};
-	struct vertex_input_attribute_description {
-		uint32_t location;
-		uint32_t binding;
-		VkFormat format;
-		uint32_t offset;
-	};
+	// 管线状态信息
 	struct pipeline_info_t {
-		float lineWidth = 1.0;
+		int lineWidth = 1;
 		int polygonMode = 0;//    VK_POLYGON_MODE_FILL = 0,		VK_POLYGON_MODE_LINE = 1,			VK_POLYGON_MODE_POINT = 2,
 		int frontFace = 0;
 		int topology = 3;
@@ -169,17 +159,37 @@ namespace vkg {
 		bool blending = false;
 		bool primitiveRestartEnable = false;
 		bool doubleSided = false;	// cullMode
+		bool depthTestEnable = true;
+		bool stencilTestEnable = false;
 	};
+	// 输出管线信息
 	struct PBRPipe_t {
 		VkPipeline m_pipeline = VK_NULL_HANDLE;
 		VkPipeline m_pipelineWireframe = VK_NULL_HANDLE;
 		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+		ubotex_size_t binding = {}; // 输出的绑定号
 		std::string pipe_kv;
 		PBRPipe_t* next = 0;
 		std::atomic_int st;
 	};
-	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, const vkr::DefineList& defines0, std::vector<VkVertexInputAttributeDescription>* playout, VkDescriptorSetLayout layout1, VkDescriptorSetLayout layout2, pipeline_info_t* info);
+	// 输入管线信息
+	struct pipeline_info_2 {
+		pipeline_info_t info = {};		// 状态信息
+		ubotex_size_t set_binding = {}; // 绑定信息 
+		morph_target_t morph = {};		// 变形结构信息
+		vertex_attribute_b attributes[16] = {};	// 最多16个顶点属性
+		vertex_input_binding_description bindings[16] = {};// 最多16个绑定，为空时默认自动计算
+		const char** names = 0;					// 自定义属性名称，10开始，0-9为预定义属性
+		int attributeCount = 0;
+		int bindingCount = 0;
+		int namesCount = 0;
+		int define_count = 0;			// kv数量
+		const char** defines0 = 0;		// "key","value"
+		const char* vertexShaderFile = 0;
+		const char* fragmentShaderFile = 0;
+	};
+	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2);
 
 
 }
