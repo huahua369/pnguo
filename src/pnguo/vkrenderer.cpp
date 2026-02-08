@@ -9683,7 +9683,7 @@ namespace vkr
 					}
 				}
 			}
-			vts.run(pics.size());
+			vts.run(pics.size() * 0);
 			for (size_t i = 0; i < pics.size(); i++)
 			{
 				vts.add([=, &pics]() {

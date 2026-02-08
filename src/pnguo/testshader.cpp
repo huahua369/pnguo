@@ -184,6 +184,7 @@ VS2PS Output;
 #include "shaders/pbr_px.h"
 #include "shaders/GLTFVertexFactory.h"
 
+#define USE_PUNCTUAL
 namespace pbr {
 //#include "shaders/pbr_pixel.h"
 }

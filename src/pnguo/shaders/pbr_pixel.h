@@ -1,8 +1,17 @@
+
+// vec4 px_main()
+
 #ifndef pbrpixel_h_
 #define pbrpixel_h_
 #ifndef LIGHT_COUNT
-#define LIGHT_COUNT 3
+#define LIGHT_COUNT 4
+#define MAX_SHADOW_INSTANCES 4
 #endif // !LIGHT_COUNT
+
+// alphaMode
+#define ALPHA_OPAQUE 0
+#define ALPHA_MASK 1
+#define ALPHA_BLEND 2
 
 struct pbrMaterial_t {
 	// Metallic Roughness
@@ -53,8 +62,9 @@ struct pbrMaterial_t {
 	float u_Dispersion;
 
 	// Alpha mode
-	float u_AlphaCutoff;
+	float alphaCutoff;
 
+	int   alphaMode;
 	// MATERIAL_TRANSMISSION
 	// ivec2 u_ScreenSize;
 };
@@ -198,7 +208,7 @@ struct perFrame_t
 	int u_SheenELUT;
 
 #ifdef USE_PUNCTUAL
-	Light_t u_Lights[LIGHT_COUNT + 1]; //Array [0] is not allowed
+	Light_t u_Lights[LIGHT_COUNT]; //Array [0] is not allowed
 #endif
 };
 
@@ -267,10 +277,14 @@ struct psInput_t
 	vec2 v_texcoord_1;
 };
 #ifdef PSINPUT
-layout(location = 0) in psInput_t inInput;
+//layout(location = 0) in psInput_t inInput;
 #else
-psInput_t inInput;
+//psInput_t inInput;
 #endif
+
+
+#if 1
+
 //#include <tonemapping.glsl>
 #ifdef TONEMAPPING
 
@@ -410,7 +424,7 @@ vec3 toneMap(vec3 color)
 #endif // TONEMAPPING
 
 //#include <textures.glsl>
-#ifdef TEXTURES
+#ifndef NO_TEXTURES
 vec2 getNormalUV()
 {
 	vec3 uv = vec3(u_tex.u_NormalUVSet < 1 ? inInput.v_texcoord_0 : inInput.v_texcoord_1, 1.0);
@@ -705,7 +719,7 @@ vec2 getAnisotropyUV()
 #endif // TEXTURES
 
 //#include <functions.glsl>
-#ifdef FUNCTIONS
+#ifndef NO_FUNCTIONS
 const float M_PI = 3.141592653589793;
 
 
@@ -784,7 +798,7 @@ vec3 rgb_mix(vec3 base, vec3 layer, vec3 rgb_alpha)
 #endif // FUNCTIONS
 
 //#include <brdf.glsl>
-#ifdef BRDF
+#ifndef NO_BRDF
 //
 // Fresnel
 //
@@ -1002,7 +1016,7 @@ vec3 BRDF_specularSheen(vec3 sheenColor, float sheenRoughness, float NdotL, floa
 #endif // BRDF
 
 //#include <punctual.glsl>
-#ifdef PUNCTUAL
+#ifdef USE_PUNCTUAL
 
 
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
@@ -1060,7 +1074,7 @@ vec3 getPunctualRadianceTransmission(vec3 normal, vec3 view, vec3 pointToLight, 
 	vec3 n = normalize(normal);           // Outward direction of surface point
 	vec3 v = normalize(view);             // Direction from surface point to view
 	vec3 l = normalize(pointToLight);
-	vec3 l_mirror = normalize(l + 2.0 * n * dot(-l, n));     // Mirror light reflection vector on surface
+	vec3 l_mirror = normalize(l + 2.0f * n * dot(-l, n));     // Mirror light reflection vector on surface
 	vec3 h = normalize(l_mirror + v);            // Halfway vector between transmission light vector and v
 
 	float D = D_GGX(clamp(dot(n, h), 0.0, 1.0), transmissionRougness);
@@ -1110,10 +1124,11 @@ vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 m
 
 	// Compute rotation-independant scaling of the model matrix.
 	vec3 modelScale;
+#ifndef __cplusplus
 	modelScale.x = length(vec3(modelMatrix[0].xyz));
 	modelScale.y = length(vec3(modelMatrix[1].xyz));
 	modelScale.z = length(vec3(modelMatrix[2].xyz));
-
+#endif
 	// The thickness is specified in local space.
 	return normalize(refractionVector) * thickness * modelScale;
 }
@@ -1121,10 +1136,10 @@ vec3 getVolumeTransmissionRay(vec3 n, vec3 v, float thickness, float ior, mat4 m
 #endif // PUNCTUAL
 
 //#include <ibl.glsl>
-#ifdef IBL
+#ifdef USE_IBL
 vec3 getDiffuseLight(vec3 n)
 {
-	vec4 textureSample = texture(u_ColorSampler[u_LambertianEnvSampler], u_perFrame.u_EnvRotation * n);
+	vec4 textureSample = texture(u_ColorSampler[u_pbr.u_LambertianEnvSampler], u_perFrame.u_EnvRotation * n);
 	textureSample.rgb *= u_perFrame.u_EnvIntensity;
 	return textureSample.rgb;
 }
@@ -1132,7 +1147,7 @@ vec3 getDiffuseLight(vec3 n)
 
 vec4 getSpecularSample(vec3 reflection, float lod)
 {
-	vec4 textureSample = textureLod(u_ColorSampler[u_GGXEnvSampler], u_perFrame.u_EnvRotation * reflection, lod);
+	vec4 textureSample = textureLod(u_ColorSampler[u_pbr.u_GGXEnvSampler], u_perFrame.u_EnvRotation * reflection, lod);
 	textureSample.rgb *= u_perFrame.u_EnvIntensity;
 	return textureSample;
 }
@@ -1140,7 +1155,7 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 
 vec4 getSheenSample(vec3 reflection, float lod)
 {
-	vec4 textureSample = textureLod(u_ColorSampler[u_CharlieEnvSampler], u_perFrame.u_EnvRotation * reflection, lod);
+	vec4 textureSample = textureLod(u_ColorSampler[u_pbr.u_CharlieEnvSampler], u_perFrame.u_EnvRotation * reflection, lod);
 	textureSample.rgb *= u_perFrame.u_EnvIntensity;
 	return textureSample;
 }
@@ -1151,7 +1166,7 @@ vec3 getIBLGGXFresnel(vec3 n, vec3 v, float roughness, vec3 F0, float specularWe
 	// Roughness dependent fresnel, from Fdez-Aguera
 	float NdotV = clampedDot(n, v);
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, roughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	vec2 f_ab = texture(u_ColorSampler[u_GGXLUT], brdfSamplePoint).rg;
+	vec2 f_ab = texture(u_ColorSampler[u_pbr.u_GGXLUT], brdfSamplePoint).rg;
 	vec3 Fr = max(vec3(1.0 - roughness), F0) - F0;
 	vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
 	vec3 FssEss = specularWeight * (k_S * f_ab.x + f_ab.y);
@@ -1268,7 +1283,7 @@ vec3 getIBLRadianceCharlie(vec3 n, vec3 v, float sheenRoughness, vec3 sheenColor
 	vec3 reflection = normalize(reflect(-v, n));
 
 	vec2 brdfSamplePoint = clamp(vec2(NdotV, sheenRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	float brdf = texture(u_ColorSampler[u_CharlieLUT], brdfSamplePoint).b;
+	float brdf = texture(u_ColorSampler[u_pbr.u_CharlieLUT], brdfSamplePoint).b;
 	vec4 sheenSample = getSheenSample(reflection, lod);
 
 	vec3 sheenLight = sheenSample.rgb;
@@ -1627,7 +1642,7 @@ MaterialInfo_t getAnisotropyInfo(MaterialInfo_t info, NormalInfo normalInfo)
 #ifdef MATERIAL_SHEEN
 float albedoSheenScalingLUT(float NdotV, float sheenRoughnessFactor)
 {
-	return texture(u_ColorSampler[u_SheenELUT], vec2(NdotV, sheenRoughnessFactor)).r;
+	return texture(u_ColorSampler[u_pbr.u_SheenELUT], vec2(NdotV, sheenRoughnessFactor)).r;
 }
 #endif
 
@@ -2078,7 +2093,7 @@ vec4 px_main()
 
 #if ALPHAMODE == ALPHAMODE_MASK
 	// Late discard to avoid sampling artifacts. See https://github.com/KhronosGroup/glTF-Sample-Viewer/issues/267
-	if (baseColor.a < u_AlphaCutoff)
+	if (baseColor.a < u_pbr.alphaCutoff)
 	{
 		discard;
 	}
@@ -2241,7 +2256,40 @@ vec4 px_main()
 #endif
 	return finalColor;
 }
+#else
 
+vec4 getBaseColor()
+{
+	vec4 baseColor = u_pbr.u_BaseColorFactor;
+	return baseColor;
+}
+vec4 px_main()
+{
+	vec4 finalColor = vec4(0.0); 
+	return finalColor;
+}
+#endif
+void discardPixelIfAlphaCutOff(VS2PS Input)
+{
+#ifdef ID_TEXCOORD_0
+	vec2 uv = Input.UV[0];
+#else
+	vec2 uv = vec2(0.0, 0.0);
+#endif
+	vec4 baseColor = getBaseColor();
+#ifndef __cplusplus
+	if (u_pbr.alphaMode == ALPHA_BLEND)
+	{
+		if (baseColor.a <= 0)
+			discard;
+	}
+	if (u_pbr.alphaMode == ALPHA_MASK)
+	{
+		if (baseColor.a < u_pbr.alphaCutoff)
+			discard;
+	}
+#endif // !__cplusplus
+}
 
 #endif
 //pbrpixel_h_
