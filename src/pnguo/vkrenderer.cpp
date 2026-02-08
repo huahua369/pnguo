@@ -9786,9 +9786,12 @@ namespace vkr
 				m_pDevice->SetDescriptorSet(cnt, it.second.v, it.second.s ? it.second.s : m_samplerPbr, tfmat->m_texturesDescriptorSet);
 				cnt++;
 			}
+			if (texturesBase.size() > 0)
+				tfmat->m_pbrMaterialParameters.m_defines["ID_TextureA"] = std::to_string(cnt);
 			// 2) 3 SRVs for the IBL probe
 			if (r->pSkyDome)
 			{
+				tfmat->m_pbrMaterialParameters.m_defines["ID_Cube"] = std::to_string(cnt);
 				//lut_ggx\lut_charlie\lut_sheen_E
 				tfmat->m_pbrMaterialParameters.m_defines["ID_GGXLUT"] = std::to_string(cnt);
 				m_pDevice->SetDescriptorSet(cnt, r->lut[0].view, r->lut[0].sampler, tfmat->m_texturesDescriptorSet);
