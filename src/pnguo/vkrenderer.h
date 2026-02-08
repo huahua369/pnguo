@@ -200,17 +200,6 @@ namespace vkr {
 }
 //!vkr
 
-#ifndef DEV_INFO_CXH
-#define DEV_INFO_CXH
-struct dev_info_cx
-{
-	void* inst;
-	void* phy;
-	void* vkdev;
-	uint32_t qFamIdx;		// familyIndex
-	uint32_t qIndex = 0;
-};
-#endif // !DEV_INFO_CXH
 
 struct PassParameters
 {
@@ -271,11 +260,23 @@ struct image_vkr
 namespace vkr {
 	class Device;
 	class draw3d_ctx;
+
+#ifndef DEV_INFO_CX
+#define DEV_INFO_CX
+	struct dev_info_cx
+	{
+		void* inst = 0;
+		void* phy = 0;
+		void* vkdev = 0;
+		uint32_t qFamIdx = 0;		// familyIndex
+		uint32_t qIndex = 0;
+	};
+#endif
 }
 class vkdg_cx
 {
 public:
-	dev_info_cx _dev_info = {};
+	vkr::dev_info_cx _dev_info = {};
 	vkr::draw3d_ctx* ctx = 0;
 	vkr::Device* dev = 0;
 	void* qupload = 0;
@@ -325,14 +326,18 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0
 // 删除渲染器
 void free_vkdg(vkdg_cx* p);
 
-struct device_info_t
-{
-	char name[256];
-	void* phd;
-};
-// 获取设备名称列表
-std::vector<device_info_t> get_devices(void* inst);
-
+namespace vkr {
+#ifndef DEVICE_INFO_T
+#define DEVICE_INFO_T
+	struct device_info_t
+	{
+		char name[256];
+		void* phd;
+	};
+#endif
+	// 获取设备名称列表
+	std::vector<device_info_t> get_devices(void* inst);
+}
 void get_queue_info(void* physicaldevice);
 
 

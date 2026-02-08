@@ -71,7 +71,7 @@ list(APPEND src_mmd
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (vkcmp ${src_vkcmp} ) 
-add_executable (vkr_spr ${src_spr} ) 
+#add_executable (vkr_spr ${src_spr} ) 
 add_executable (mtl ${src_mtl} ) 
 add_executable (audios ${src_audios} ) 
 #add_executable (mmd ${src_mmd} ) 
@@ -150,7 +150,7 @@ Ogg::ogg
 #target_link_libraries(tcmp PRIVATE ${lklib})
  
 target_link_libraries(vkcmp PRIVATE ${lklib} ) 
-target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
+#target_link_libraries(vkr_spr PRIVATE ${lklib} ) 
 target_link_libraries(mtl PRIVATE ${lklib}  )
 target_link_libraries(mw PRIVATE ${lklib} )
 target_link_libraries(audios PRIVATE ${lkalib})

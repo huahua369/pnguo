@@ -386,7 +386,7 @@ void vkrender_test(form_x* form0)
 		inst0 = new_instance(0, 0);
 		inst = inst0;
 	}
-	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表 
+	std::vector<vkr::device_info_t> devs = vkr::get_devices(inst);  // 获取设备名称列表 
 	if (devs.empty())return;
 	if (!phy) { phy = devs[0].phd; }
 	vkdg_cx* vkd = new_vkdg(inst, phy, vkdev);			// 创建vk渲染器  
@@ -899,7 +899,7 @@ int main()
 
 		auto kd = sdldev.vkdev;
 		//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
-		std::vector<device_info_t> devs = get_devices(sdldev.inst); // 获取设备名称列表
+		auto devs = vkr::get_devices(sdldev.inst); // 获取设备名称列表
 		bool grab_enable = false;	// 设置鼠标范围在窗口内
 		bool rmode = true;			// 设置窗口的相对鼠标模式。
 		//form0->set_mouse_mode(grab_enable, rmode);

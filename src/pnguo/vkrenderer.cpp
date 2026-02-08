@@ -138,6 +138,8 @@ typedef uint32_t DXGI_FORMAT;
 #include <print_time.h>
 #include <mapView.h>
 
+
+#include "vkrh.h"
 #include "vkrenderer.h"
 
 #define CACHE_ENABLE
@@ -164,6 +166,7 @@ namespace vkr
 	static const uint32_t MaxShadowInstances = 4;
 	class Matrix2
 	{
+	public:
 		glm::mat4 m_current = {};
 		glm::mat4 m_previous = {};
 		//glm::mat4 m_current = {};//glm::mat4::identity();
@@ -201,23 +204,6 @@ namespace vkr
 	const uint32_t LightType_Point = 1;
 	const uint32_t LightType_Spot = 2;
 
-	struct PerFrame_t0
-	{
-		glm::mat4 mCameraCurrViewProj;
-		glm::mat4 mCameraPrevViewProj;
-		glm::mat4  mInverseCameraCurrViewProj;
-		glm::vec4  cameraPos;
-		float     iblFactor;
-		float     emmisiveFactor;
-		float     invScreenResolution[2];
-
-		glm::vec4 wireframeOptions;
-		float     lodBias = 0.0f;
-		float	  oit_w = 0.0f;
-		float	  oit_k = 0.0f;
-		int		  lightCount;
-		Light     lights[0];
-	};
 	struct PerFrame_t
 	{
 		glm::mat4 mCameraCurrViewProj;
@@ -543,42 +529,38 @@ namespace vkr
 
 	//
 	// DefineList, holds pairs of key & value that will be used by the compiler as defines
-	//
-	class DefineList : public std::map<const std::string, std::string>
+
+	bool DefineList::Has(const std::string& str) const
 	{
-	public:
-		bool Has(const std::string& str) const
-		{
-			return find(str) != end();
-		}
+		return find(str) != end();
+	}
 
-		size_t Hash(size_t result = HASH_SEED) const
+	size_t DefineList::Hash(size_t result) const
+	{
+		for (auto it = begin(); it != end(); it++)
 		{
-			for (auto it = begin(); it != end(); it++)
-			{
-				result = HashString(it->first, result);
-				result = HashString(it->second, result);
-			}
-			return result;
+			result = HashString(it->first, result);
+			result = HashString(it->second, result);
 		}
-
-		friend DefineList operator+(DefineList   def1,        // passing lhs by value helps optimize chained a+b+c
-			const DefineList& def2)  // otherwise, both parameters may be const references
+		return result;
+	}
+	// passing lhs by value helps optimize chained a+b+c
+	// otherwise, both parameters may be const references
+	DefineList operator+(DefineList def1, const DefineList& def2)
+	{
+		for (auto it = def2.begin(); it != def2.end(); it++)
+			def1[it->first] = it->second;
+		return def1;
+	}
+	std::string DefineList::to_string() const
+	{
+		std::string result;
+		for (auto it = begin(); it != end(); it++)
 		{
-			for (auto it = def2.begin(); it != def2.end(); it++)
-				def1[it->first] = it->second;
-			return def1;
+			result += it->first + "=" + it->second + "; ";
 		}
-		std::string to_string() const
-		{
-			std::string result;
-			for (auto it = begin(); it != end(); it++)
-			{
-				result += it->first + "=" + it->second + "; ";
-			}
-			return result;
-		}
-	};
+		return result;
+	}
 
 
 
@@ -1829,45 +1811,16 @@ namespace vkr
 		return ratings.rbegin()->second;
 	}
 
-	void Device::OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw
-		, const char* spdname, std::vector<std::string>* pdnv)
+	void Device::OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw, const char* spdname, std::vector<std::string>* pdnv)
 	{
 		dev_info_cx nd = {};
-		//InstanceProperties ip;
-		//ip.Init();
-		//SetEssentialInstanceExtensions(cpuValidationLayerEnabled, gpuValidationLayerEnabled, &ip);
-		//auto apiVersion3 = VK_API_VERSION_1_3;
-		//auto apiVersion4 = VK_API_VERSION_1_4;
-		//auto apiVersion = apiVersion3;// VK_VERSION_1_2;// VK_API_VERSION_1_0;
-		//VkInstanceCreateInfo inst_info = {};
 		if (d) { nd = *d; }
 		d = &nd;
 		if (!d->phy)
 		{
-			//std::vector<const char*> instance_layer_names;
-			//std::vector<const char*> instance_extension_names;
-			//ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names, true);
 			VkInstance instance = (VkInstance)d->inst;
 			if (!d->inst) {
 				instance = (VkInstance)new_instance(0, 0);
-				//VkApplicationInfo app_info = {};
-				//app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-				//app_info.pNext = NULL;
-				//app_info.pApplicationName = "vkcmp";
-				//app_info.applicationVersion = 1;
-				//app_info.pEngineName = "pnguo";
-				//app_info.engineVersion = 1;
-				//app_info.apiVersion = apiVersion;
-				//inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-				//inst_info.pNext = 0;
-				//inst_info.flags = 0;
-				//inst_info.pApplicationInfo = &app_info;
-				//inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
-				//inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
-				//inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
-				//inst_info.ppEnabledExtensionNames = instance_extension_names.data();
-				//VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
-				//assert(res == VK_SUCCESS);
 			}
 			if (instance)
 			{
@@ -23101,7 +23054,7 @@ void free_instance(void* inst)
 
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, const char* shaderCacheDir, const char* devname)
 {
-	dev_info_cx c[1] = {};
+	vkr::dev_info_cx c[1] = {};
 	c->inst = inst;
 	c->phy = phy;
 	c->vkdev = dev;
@@ -23194,45 +23147,45 @@ namespace vkr {
 		boxs.clear();
 		box_ms.clear();
 	}
-}
-// !vkr
 
 
 
-std::vector<device_info_t> get_devices(void* inst)
-{
-	VkPhysicalDeviceProperties dp = {};
-	std::vector<device_info_t> r;
-	std::vector<VkExtensionProperties> dep;
-	std::vector<void*> phyDevices;
-	uint32_t count = 0;
-	if (inst) {
-		auto hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, NULL));
-		if (count > 0)
-		{
-			phyDevices.resize(count);
-			hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, (VkPhysicalDevice*)phyDevices.data()));
-		}
-		if (count)
-		{
-			r.reserve(count);
-			for (auto p : phyDevices)
+	std::vector<device_info_t> get_devices(void* inst)
+	{
+		VkPhysicalDeviceProperties dp = {};
+		std::vector<device_info_t> r;
+		std::vector<VkExtensionProperties> dep;
+		std::vector<void*> phyDevices;
+		uint32_t count = 0;
+		if (inst) {
+			auto hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, NULL));
+			if (count > 0)
 			{
-				uint32_t extensionCount;
-				VkResult res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, NULL);
-				dep.resize(extensionCount);
-				res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, dep.data());
-				vkGetPhysicalDeviceProperties((VkPhysicalDevice)p, &dp);
-				device_info_t d = {};
-				strcpy(d.name, dp.deviceName);
-				d.phd = p;
-				r.push_back(d);
+				phyDevices.resize(count);
+				hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, (VkPhysicalDevice*)phyDevices.data()));
+			}
+			if (count)
+			{
+				r.reserve(count);
+				for (auto p : phyDevices)
+				{
+					uint32_t extensionCount;
+					VkResult res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, NULL);
+					dep.resize(extensionCount);
+					res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, dep.data());
+					vkGetPhysicalDeviceProperties((VkPhysicalDevice)p, &dp);
+					device_info_t d = {};
+					strcpy(d.name, dp.deviceName);
+					d.phd = p;
+					r.push_back(d);
+				}
 			}
 		}
+		return r;
 	}
-	return r;
-}
 
+}
+// !vkr
 void get_queue_info(void* physicaldevice)
 {
 	uint32_t queue_family_count = 0;
@@ -24228,7 +24181,7 @@ void vkrender_test0()
 {
 	auto inst = new_instance(0, 0);
 	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-	std::vector<device_info_t> devs = get_devices(inst);  // 获取设备名称列表
+	auto devs = vkr::get_devices(inst);  // 获取设备名称列表
 	if (devs.empty())return;
 	//vkdg_cx* vkd = new_vkdg(sdldev.inst, sdldev.phy, sdldev.vkdev);	// 从SDL3获取设备创建vk渲染器
 	vkdg_cx* vkd = new_vkdg(inst, devs[0].phd, 0, "ShaderLibVK", "cache/shadervk");			// 创建vk渲染器

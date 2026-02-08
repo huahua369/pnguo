@@ -281,6 +281,349 @@ namespace vkg {
 		assert(res == VK_SUCCESS);
 		return descSetLayout;
 	}
+#if 0
+	void new_pipeline(ResourceViewHeaps* prv, PBRPipe_t* pbrpipe, const DefineList& defines0,
+		std::vector<VkVertexInputAttributeDescription>* playout, std::vector<VkDescriptorSetLayoutBinding>* layout_bindings
+		, VkDescriptorSetLayout layout1,VkDescriptorSetLayout layout2, GBufferRenderPass* pRenderPass, bool doubleSided, bool blending)
+	{
+		if (!pbrpipe || pbrpipe->m_pipeline)
+		{
+			return;
+		}
+		auto& layout = *playout;
+		auto pdev = prv->get_dev();
+		auto dev = pdev->m_device;
+		if (!pbrpipe->m_pipelineLayout  ) { 
+			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { layout1 };
+			if (layout2 != VK_NULL_HANDLE)
+			{
+				descriptorSetLayout.push_back(layout2);
+			}
+			VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
+			pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			pPipelineLayoutCreateInfo.pNext = NULL;
+			pPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+			pPipelineLayoutCreateInfo.pPushConstantRanges = NULL;
+			pPipelineLayoutCreateInfo.setLayoutCount = (uint32_t)descriptorSetLayout.size();
+			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
+			VkResult res = vkCreatePipelineLayout(dev, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
+			assert(res == VK_SUCCESS);
+			SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
+		}
+
+		// Compile and create shaders
+		auto defines = defines0;
+		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
+		// Create pipeline 
+		pdev->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, "GLTFPbrPass-vert.glsl", "main", "", &defines, &vertexShader);
+		pdev->VKCompileFromFile(VK_SHADER_STAGE_FRAGMENT_BIT, "GLTFPbrPass-frag.glsl", "main", "", &defines, &fragmentShader);
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertexShader, fragmentShader };
+		// vertex input state
+		std::vector<VkVertexInputBindingDescription> vi_binding(layout.size());
+		for (int i = 0; i < layout.size(); i++)
+		{
+			vi_binding[i].binding = layout[i].binding;
+			vi_binding[i].stride = SizeOfFormat(layout[i].format);
+			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		}
+		//if (defines.Has("ID_INSTANCE_MAT")) { vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
+		VkPipelineVertexInputStateCreateInfo vi = {};
+		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vi.pNext = NULL;
+		vi.flags = 0;
+		vi.vertexBindingDescriptionCount = (uint32_t)vi_binding.size();
+		vi.pVertexBindingDescriptions = vi_binding.data();
+		vi.vertexAttributeDescriptionCount = (uint32_t)layout.size();
+		vi.pVertexAttributeDescriptions = layout.data();
+		// input assembly state
+		VkPipelineInputAssemblyStateCreateInfo ia;
+		ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		ia.pNext = NULL;
+		ia.flags = 0;
+		ia.primitiveRestartEnable = VK_FALSE;
+		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		// rasterizer state
+		VkPipelineRasterizationStateCreateInfo rs;
+		rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rs.pNext = NULL;
+		rs.flags = 0;
+		rs.polygonMode = VK_POLYGON_MODE_FILL;
+		rs.cullMode = doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
+		rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		rs.depthClampEnable = VK_FALSE;
+		rs.rasterizerDiscardEnable = VK_FALSE;
+		rs.depthBiasEnable = VK_FALSE;
+		rs.depthBiasConstantFactor = 0;
+		rs.depthBiasClamp = 0;
+		rs.depthBiasSlopeFactor = 0;
+		rs.lineWidth = 1.0f;
+		bool depthwrite = !blending;// || (defines.Has("DEF_alphaMode_BLEND")));
+		std::vector<VkPipelineColorBlendAttachmentState> att_states;
+		if (defines.Has("HAS_FORWARD_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			get_blend(blending, att_state);
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_OIT_ACCUM_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_TRUE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_OIT_WEIGHT_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_TRUE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_DIFFUSE_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_NORMALS_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		if (defines.Has("HAS_MOTION_VECTORS_RT"))
+		{
+			VkPipelineColorBlendAttachmentState att_state = {};
+			att_state.colorWriteMask = allBits;
+			att_state.blendEnable = VK_FALSE;
+			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state.colorBlendOp = VK_BLEND_OP_ADD;
+			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			att_states.push_back(att_state);
+		}
+		// Color blend state
+		VkPipelineColorBlendStateCreateInfo cb;
+		cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		cb.flags = 0;
+		cb.pNext = NULL;
+		cb.attachmentCount = static_cast<uint32_t>(att_states.size());
+		cb.pAttachments = att_states.data();
+		cb.logicOpEnable = VK_FALSE;
+		cb.logicOp = VK_LOGIC_OP_NO_OP;
+		cb.blendConstants[0] = 0.0f;
+		cb.blendConstants[1] = 0.0f;
+		cb.blendConstants[2] = 0.0f;
+		cb.blendConstants[3] = 0.0f;
+		std::vector<VkDynamicState> dynamicStateEnables = {
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR,
+			//VK_DYNAMIC_STATE_LINE_WIDTH,
+			//VK_DYNAMIC_STATE_CULL_MODE,
+			//VK_DYNAMIC_STATE_FRONT_FACE
+		};
+		VkPipelineDynamicStateCreateInfo dynamicState = {};
+		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamicState.pNext = NULL;
+		dynamicState.pDynamicStates = dynamicStateEnables.data();
+		dynamicState.dynamicStateCount = (uint32_t)dynamicStateEnables.size();
+		// view port state
+		VkPipelineViewportStateCreateInfo vp = {};
+		vp.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		vp.pNext = NULL;
+		vp.flags = 0;
+		vp.viewportCount = 1;
+		vp.scissorCount = 1;
+		vp.pScissors = NULL;
+		vp.pViewports = NULL;
+		// todo depth stencil state
+		VkPipelineDepthStencilStateCreateInfo ds;
+		ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		ds.pNext = NULL;
+		ds.flags = 0;
+		ds.depthTestEnable = true;
+		ds.depthWriteEnable = depthwrite;
+		ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		ds.back.failOp = VK_STENCIL_OP_KEEP;
+		ds.back.passOp = VK_STENCIL_OP_KEEP;
+		ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
+		ds.back.compareMask = 0;
+		ds.back.reference = 0;
+		ds.back.depthFailOp = VK_STENCIL_OP_KEEP;
+		ds.back.writeMask = 0;
+		ds.depthBoundsTestEnable = VK_FALSE;
+		ds.minDepthBounds = 0;
+		ds.maxDepthBounds = 0;
+		ds.stencilTestEnable = VK_TRUE;
+		ds.front = ds.back;
+		// multi sample state
+		VkPipelineMultisampleStateCreateInfo ms;
+		ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		ms.pNext = NULL;
+		ms.flags = 0;
+		ms.pSampleMask = NULL;
+		ms.rasterizationSamples = pRenderPass->GetSampleCount();
+		ms.sampleShadingEnable = VK_FALSE;
+		ms.alphaToCoverageEnable = VK_FALSE;
+		ms.alphaToOneEnable = VK_FALSE;
+		ms.minSampleShading = 0.0;
+		// create pipeline 
+		VkGraphicsPipelineCreateInfo pipeline = {};
+		pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipeline.pNext = NULL;
+		pipeline.layout = pbrpipe->m_pipelineLayout;
+		pipeline.basePipelineHandle = VK_NULL_HANDLE;
+		pipeline.basePipelineIndex = 0;
+		pipeline.flags = 0;
+		pipeline.pVertexInputState = &vi;
+		pipeline.pInputAssemblyState = &ia;
+		pipeline.pRasterizationState = &rs;
+		pipeline.pColorBlendState = &cb;
+		pipeline.pTessellationState = NULL;
+		pipeline.pMultisampleState = &ms;
+		pipeline.pDynamicState = &dynamicState;
+		pipeline.pViewportState = &vp;
+		pipeline.pDepthStencilState = &ds;
+		pipeline.pStages = shaderStages.data();
+		pipeline.stageCount = (uint32_t)shaderStages.size();
+		pipeline.renderPass = pRenderPass->GetRenderPass();
+		pipeline.subpass = 0;
+#if 0
+		struct sc {
+			bool ID_diffuseCube = true;	// 漫反环境
+			bool ID_specularCube = false;	// 高光镜面环境u_GGXEnvSampler
+			bool ID_CharlieCube = false;	// 光泽环境
+			bool USE_TEX_LOD = true;		// 环境lod
+
+			int ID_baseColorTexture = -1;
+			int ID_normalTexture = -1;
+			int ID_emissiveTexture = -1;
+			int ID_metallicRoughnessTexture = -1;
+			int ID_occlusionTexture = -1;
+			int ID_diffuseTexture = -1;
+			int ID_specularGlossinessTexture = -1;
+			int ID_GGXLUT = -1;
+			int ID_CharlieTexture = -1;
+			int ID_SheenETexture = -1;
+			int ID_sheenColorTexture = -1;
+			int ID_sheenRoughnessTexture = -1;
+			int ID_specularTexture = -1;
+			int ID_specularColorTexture = -1;
+			int ID_transmissionTexture = -1;
+			int ID_thicknessTexture = -1;
+			int ID_clearcoatRoughnessTexture = -1;
+			int ID_clearcoatNormalTexture = -1;
+			int ID_iridescenceTexture = -1;
+			int ID_iridescenceThicknessTexture = -1;
+			int ID_anisotropyTexture = -1;
+			int ID_SSAO = -1;
+			int ID_transmissionFramebufferTexture = -1;
+
+			int UVT_baseColorTexture = 0;
+			int UVT_normalTexture = 0;
+			int UVT_emissiveTexture = 0;
+			int UVT_metallicRoughnessTexture = 0;
+			int UVT_occlusionTexture = 0;
+			int UVT_diffuseTexture = 0;
+			int UVT_specularGlossinessTexture = 0;
+			int UVT_GGXLUT = 0;
+			int UVT_CharlieTexture = 0;
+			int UVT_SheenETexture = 0;
+			int UVT_sheenColorTexture = 0;
+			int UVT_sheenRoughnessTexture = 0;
+			int UVT_specularTexture = 0;
+			int UVT_specularColorTexture = 0;
+			int UVT_transmissionTexture = 0;
+			int UVT_thicknessTexture = 0;
+			int UVT_clearcoatRoughnessTexture = 0;
+			int UVT_clearcoatNormalTexture = 0;
+			int UVT_iridescenceTexture = 0;
+			int UVT_iridescenceThicknessTexture = 0;
+			int UVT_anisotropyTexture = 0;
+			int UVT_SSAO = 0;
+			int UVT_transmissionFramebufferTexture = 0;
+		};
+		sc specConstants = {};
+		std::vector<VkSpecializationMapEntry> specializationMapEntry = {};
+		specializationMapEntry.resize(50);
+		auto smt = specializationMapEntry.data();
+		int offset = 0;
+		for (size_t i = 0; i < 4; i++)
+		{
+			smt->constantID = i;
+			smt->offset = offset;
+			smt->size = sizeof(bool);
+			offset += smt->size;
+			smt++;
+		}
+		for (size_t i = 4; i < 50; i++)
+		{
+			smt->constantID = i;
+			smt->offset = offset;
+			smt->size = sizeof(int);
+			offset += smt->size;
+			smt++;
+		}
+		VkSpecializationInfo specializationInfo = VkSpecializationInfo();
+		specializationInfo.mapEntryCount = specializationMapEntry.size();
+		specializationInfo.pMapEntries = specializationMapEntry.data();
+		specializationInfo.dataSize = sizeof(sc);
+		specializationInfo.pData = &specConstants;
+		shaderStages[1].pSpecializationInfo = &specializationInfo;
+#endif
+		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
+		assert(res == VK_SUCCESS);
+		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
+		// create wireframe pipeline
+		rs.polygonMode = VK_POLYGON_MODE_LINE;
+		rs.cullMode = VK_CULL_MODE_NONE;
+		//ds.depthWriteEnable = false;
+		res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
+		assert(res == VK_SUCCESS);
+		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
+	}
+#endif
+
+
 	gdev_cx::gdev_cx()
 	{
 	}
