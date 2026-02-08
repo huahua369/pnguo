@@ -92,8 +92,8 @@ typedef uint32_t DXGI_FORMAT;
 #include <print_time.h>
 #include <mapView.h>
 
+#include "vkrh.h"
 #include "gpu_vk.h"
-
 #define CACHE_ENABLE
 //#define CACHE_LOG 
 
@@ -118,6 +118,7 @@ KHR_materials_clearcoat
 namespace vkg {
 	static const uint32_t MaxLightInstances = 4;
 	static const uint32_t MaxShadowInstances = 4;
+	const VkColorComponentFlags allBits = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	class Device;
 
@@ -281,19 +282,44 @@ namespace vkg {
 		assert(res == VK_SUCCESS);
 		return descSetLayout;
 	}
-#if 0
-	void new_pipeline(ResourceViewHeaps* prv, PBRPipe_t* pbrpipe, const DefineList& defines0,
-		std::vector<VkVertexInputAttributeDescription>* playout, std::vector<VkDescriptorSetLayoutBinding>* layout_bindings
-		, VkDescriptorSetLayout layout1,VkDescriptorSetLayout layout2, GBufferRenderPass* pRenderPass, bool doubleSided, bool blending)
+	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
 	{
-		if (!pbrpipe || pbrpipe->m_pipeline)
+		VkPipelineColorBlendAttachmentState color_blend =
+		{
+			VK_TRUE,                                                      // VkBool32                                       blendEnable
+			VK_BLEND_FACTOR_SRC_ALPHA,                                    // VkBlendFactor                                  srcColorBlendFactor
+			VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstColorBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      colorBlendOp
+			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcAlphaBlendFactor
+			VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstAlphaBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      alphaBlendOp
+			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
+			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+		};
+		VkPipelineColorBlendAttachmentState color_no_blend = {
+			VK_FALSE,                                                     // VkBool32                                       blendEnable
+			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcColorBlendFactor
+			VK_BLEND_FACTOR_ZERO,                                         // VkBlendFactor                                  dstColorBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      colorBlendOp
+			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcAlphaBlendFactor
+			VK_BLEND_FACTOR_ZERO,                                         // VkBlendFactor                                  dstAlphaBlendFactor
+			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      alphaBlendOp
+			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
+			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+		};
+		out = blend ? color_blend : color_no_blend;
+	}
+#if 1
+
+	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, const vkr::DefineList& defines0, std::vector<VkVertexInputAttributeDescription>* playout, VkDescriptorSetLayout layout1, VkDescriptorSetLayout layout2, pipeline_info_t* info)
+	{
+		if (!pbrpipe || !info || pbrpipe->m_pipeline)
 		{
 			return;
 		}
+		auto dev = pdev->GetDevice();
 		auto& layout = *playout;
-		auto pdev = prv->get_dev();
-		auto dev = pdev->m_device;
-		if (!pbrpipe->m_pipelineLayout  ) { 
+		if (!pbrpipe->m_pipelineLayout) {
 			std::vector<VkDescriptorSetLayout> descriptorSetLayout = { layout1 };
 			if (layout2 != VK_NULL_HANDLE)
 			{
@@ -308,7 +334,7 @@ namespace vkg {
 			pPipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout.data();
 			VkResult res = vkCreatePipelineLayout(dev, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
 			assert(res == VK_SUCCESS);
-			SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
+			vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
 		}
 
 		// Compile and create shaders
@@ -323,10 +349,10 @@ namespace vkg {
 		for (int i = 0; i < layout.size(); i++)
 		{
 			vi_binding[i].binding = layout[i].binding;
-			vi_binding[i].stride = SizeOfFormat(layout[i].format);
+			vi_binding[i].stride = vkr::SizeOfFormat(layout[i].format);
 			vi_binding[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		}
-		//if (defines.Has("ID_INSTANCE_MAT")) { vi_binding.rbegin()->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
+		//inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; }
 		VkPipelineVertexInputStateCreateInfo vi = {};
 		vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		vi.pNext = NULL;
@@ -340,29 +366,29 @@ namespace vkg {
 		ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		ia.pNext = NULL;
 		ia.flags = 0;
-		ia.primitiveRestartEnable = VK_FALSE;
+		ia.primitiveRestartEnable = info->primitiveRestartEnable;
 		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		// rasterizer state
 		VkPipelineRasterizationStateCreateInfo rs;
 		rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 		rs.pNext = NULL;
 		rs.flags = 0;
-		rs.polygonMode = VK_POLYGON_MODE_FILL;
-		rs.cullMode = doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
-		rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		rs.polygonMode = (VkPolygonMode)info->polygonMode; //VK_POLYGON_MODE_FILL;
+		rs.cullMode = info->doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
+		rs.frontFace = (VkFrontFace)info->frontFace;// VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rs.depthClampEnable = VK_FALSE;
 		rs.rasterizerDiscardEnable = VK_FALSE;
 		rs.depthBiasEnable = VK_FALSE;
 		rs.depthBiasConstantFactor = 0;
 		rs.depthBiasClamp = 0;
 		rs.depthBiasSlopeFactor = 0;
-		rs.lineWidth = 1.0f;
-		bool depthwrite = !blending;// || (defines.Has("DEF_alphaMode_BLEND")));
+		rs.lineWidth = info->lineWidth;
+		bool depthwrite = !info->blending;// || (defines.Has("DEF_alphaMode_BLEND")));
 		std::vector<VkPipelineColorBlendAttachmentState> att_states;
 		if (defines.Has("HAS_FORWARD_RT"))
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
-			get_blend(blending, att_state);
+			get_blend(info->blending, att_state);
 			att_states.push_back(att_state);
 		}
 		if (defines.Has("HAS_OIT_ACCUM_RT"))
@@ -501,7 +527,7 @@ namespace vkg {
 		ms.pNext = NULL;
 		ms.flags = 0;
 		ms.pSampleMask = NULL;
-		ms.rasterizationSamples = pRenderPass->GetSampleCount();
+		ms.rasterizationSamples = (VkSampleCountFlagBits)info->rasterizationSamples;
 		ms.sampleShadingEnable = VK_FALSE;
 		ms.alphaToCoverageEnable = VK_FALSE;
 		ms.alphaToOneEnable = VK_FALSE;
@@ -525,7 +551,7 @@ namespace vkg {
 		pipeline.pDepthStencilState = &ds;
 		pipeline.pStages = shaderStages.data();
 		pipeline.stageCount = (uint32_t)shaderStages.size();
-		pipeline.renderPass = pRenderPass->GetRenderPass();
+		pipeline.renderPass = (VkRenderPass)info->renderPass;
 		pipeline.subpass = 0;
 #if 0
 		struct sc {
@@ -612,14 +638,14 @@ namespace vkg {
 #endif
 		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
-		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
+		vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
 		// create wireframe pipeline
 		rs.polygonMode = VK_POLYGON_MODE_LINE;
 		rs.cullMode = VK_CULL_MODE_NONE;
 		//ds.depthWriteEnable = false;
 		res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
-		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
+		vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
 	}
 #endif
 

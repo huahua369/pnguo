@@ -176,7 +176,7 @@ namespace vkr
 		glm::mat4 GetCurrent() const { return m_current; }
 		glm::mat4 GetPrevious() const { return m_previous; }
 	};
-	 
+
 	const uint32_t LightType_Directional = 0;
 	const uint32_t LightType_Point = 1;
 	const uint32_t LightType_Spot = 2;
@@ -593,17 +593,7 @@ namespace vkr
 			a.borderColor == b.borderColor &&
 			a.unnormalizedCoordinates == b.unnormalizedCoordinates;
 	}
-	struct sampler_kt {
-		VkSamplerCreateInfo info = {};
-		bool operator==(const sampler_kt& other) const {
-			return equal_sampler_info(this->info, other.info);  // 自定义比较
-		}
-	};
-	struct SamplerKeyHash {
-		size_t operator()(const sampler_kt& k) const {
-			return Hash_p((const size_t*)&k.info, sizeof(VkSamplerCreateInfo));
-		}
-	};
+
 
 	class Sync
 	{
@@ -751,115 +741,9 @@ namespace vkr
 	};
 
 
-	enum ShaderSourceType
-	{
-		SST_HLSL,
-		SST_GLSL
-	};
 
 
 
-	class Device
-	{
-	public:
-		VkInstance m_instance = 0;
-		VkDevice m_device = 0;
-		VkPhysicalDevice m_physicaldevice = {};
-		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
-		VkPhysicalDeviceProperties m_deviceProperties = {};
-		VkPhysicalDeviceProperties2 m_deviceProperties2 = {};
-		VkPhysicalDeviceSubgroupProperties m_subgroupProperties = {};
-		VkSurfaceKHR m_surface = {};
-
-		VkQueue present_queue = 0;
-		uint32_t present_queue_family_index = 0;
-		VkQueue graphics_queue = 0;
-		uint32_t graphics_queue_family_index = 0;
-		VkQueue compute_queue = 0;
-		uint32_t compute_queue_family_index = 0;
-		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
-
-		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
-
-		Cache<VkShaderModule> s_shaderCache;
-
-		PFN_vkCmdDrawMeshTasksEXT _vkCmdDrawMeshTasksEXT = { };
-		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = {};
-		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = {};
-		PFN_vkCmdSetFrontFace _vkCmdSetFrontFace = {};
-
-		bool m_usingValidationLayer = false;
-		bool m_usingFp16 = false;
-		bool m_rt10Supported = false;
-		bool m_rt11Supported = false;
-		bool m_vrs1Supported = false;
-		bool m_vrs2Supported = false;
-#ifdef USE_VMA
-		VmaAllocator m_hAllocator = NULL;
-#endif
-	public:
-		Device();
-		~Device();
-		void OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw
-			, const char* spdname, std::vector<std::string>* pdnv);
-		void OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp);
-		void OnDestroy();
-		VkDevice GetDevice() { return m_device; }
-		VkQueue GetGraphicsQueue() { return graphics_queue; }
-		uint32_t GetGraphicsQueueFamilyIndex() { return present_queue_family_index; }
-		VkQueue GetPresentQueue() { return present_queue; }
-		uint32_t GetPresentQueueFamilyIndex() { return graphics_queue_family_index; }
-		VkQueue GetComputeQueue() { return compute_queue; }
-		uint32_t GetComputeQueueFamilyIndex() { return compute_queue_family_index; }
-		VkPhysicalDevice GetPhysicalDevice() { return m_physicaldevice; }
-		VkSurfaceKHR GetSurface() { return m_surface; }
-		void GetDeviceInfo(std::string* deviceName, std::string* driverVersion);
-#ifdef USE_VMA
-		VmaAllocator GetAllocator() { return m_hAllocator; }
-#endif
-		VkPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties() { return m_memoryProperties; }
-		VkPhysicalDeviceProperties GetPhysicalDeviceProperries() { return m_deviceProperties; }
-		VkPhysicalDeviceSubgroupProperties GetPhysicalDeviceSubgroupProperties() { return m_subgroupProperties; }
-
-		bool IsFp16Supported() { return m_usingFp16; };
-		bool IsRT10Supported() { return m_rt10Supported; }
-		bool IsRT11Supported() { return m_rt11Supported; }
-		bool IsVRSTier1Supported() { return m_vrs1Supported; }
-		bool IsVRSTier2Supported() { return m_vrs2Supported; }
-
-		// pipeline cache
-		VkPipelineCache m_pipelineCache = {};
-		void CreatePipelineCache();
-		void DestroyPipelineCache();
-		VkPipelineCache GetPipelineCache();
-
-		void CreateShaderCache();
-		void DestroyShaderCache();
-
-		void GPUFlush();
-
-		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
-
-		void SetDescriptorSet(uint32_t index, VkImageView imageView, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet);
-		void SetDescriptorSet(uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet);
-		void SetDescriptorSet(uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet);
-		void SetDescriptorSet(uint32_t index, uint32_t descriptorsCount, const std::vector<VkImageView>& imageViews, VkSampler pSampler, VkDescriptorSet descriptorSet);
-		void SetDescriptorSetForDepth(uint32_t index, VkImageView imageView, VkSampler pSampler, VkDescriptorSet descriptorSet);
-		void SetDescriptorSet(uint32_t index, VkImageView imageView, VkDescriptorSet descriptorSet);
-		void SetDescriptorSet1(VkBuffer buffer, int index, uint32_t pos, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt);
-
-		VkDescriptorSetLayout newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding);
-		VkFramebuffer newFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
-
-
-
-		// Does as the function name says and uses a cache
-		VkResult VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* pExtraParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
-		VkResult VKCompileFromFile(const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* pExtraParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
-	private:
-		VkResult VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
-
-	};
 
 	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex);
 
@@ -1719,13 +1603,22 @@ namespace vkr
 			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
 			});
 	}
+	bool sampler_kt::operator==(const sampler_kt& other) const
+	{
+		return equal_sampler_info(this->info, other.info);  // 自定义比较
+	}
+	size_t SamplerKeyHash::operator()(const sampler_kt& k) const {
+		return Hash_p((const size_t*)&k.info, sizeof(VkSamplerCreateInfo));
+	}
 
 	Device::Device()
 	{
+		s_shaderCache = new Cache<VkShaderModule>();
 	}
 
 	Device::~Device()
 	{
+		if (s_shaderCache)delete s_shaderCache; s_shaderCache = 0;
 	}
 
 	uint32_t GetScore(void* phd)
@@ -2226,6 +2119,28 @@ namespace vkr
 		*driverVersion = vkr::format("%i.%i.%i", EXTRACT(m_deviceProperties.driverVersion, 22, 10), EXTRACT(m_deviceProperties.driverVersion, 14, 8), EXTRACT(m_deviceProperties.driverVersion, 0, 16));
 	}
 
+	VkDevice Device::GetDevice() { return m_device; }
+	VkQueue Device::GetGraphicsQueue() { return graphics_queue; }
+	uint32_t Device::GetGraphicsQueueFamilyIndex() { return present_queue_family_index; }
+	VkQueue Device::GetPresentQueue() { return present_queue; }
+	uint32_t Device::GetPresentQueueFamilyIndex() { return graphics_queue_family_index; }
+	VkQueue Device::GetComputeQueue() { return compute_queue; }
+	uint32_t Device::GetComputeQueueFamilyIndex() { return compute_queue_family_index; }
+	VkPhysicalDevice Device::GetPhysicalDevice() { return m_physicaldevice; }
+	VkSurfaceKHR Device::GetSurface() { return m_surface; }
+#ifdef USE_VMA
+	VmaAllocator Device::GetAllocator() { return m_hAllocator; }
+#endif
+	VkPhysicalDeviceMemoryProperties Device::GetPhysicalDeviceMemoryProperties() { return m_memoryProperties; }
+	VkPhysicalDeviceProperties Device::GetPhysicalDeviceProperries() { return m_deviceProperties; }
+	VkPhysicalDeviceSubgroupProperties Device::GetPhysicalDeviceSubgroupProperties() { return m_subgroupProperties; }
+
+	bool Device::IsFp16Supported() { return m_usingFp16; };
+	bool Device::IsRT10Supported() { return m_rt10Supported; }
+	bool Device::IsRT11Supported() { return m_rt11Supported; }
+	bool Device::IsVRSTier1Supported() { return m_vrs1Supported; }
+	bool Device::IsVRSTier2Supported() { return m_vrs2Supported; }
+
 	void Device::CreatePipelineCache()
 	{
 		// create pipeline cache
@@ -2265,7 +2180,7 @@ namespace vkr
 
 	void Device::DestroyShaderCache()
 	{
-		s_shaderCache.ForEach([=](const Cache<VkShaderModule>::DatabaseType::iterator& it)
+		s_shaderCache->ForEach([=](const Cache<VkShaderModule>::DatabaseType::iterator& it)
 			{
 				vkDestroyShaderModule(m_device, it->second.m_data, NULL);
 			});
@@ -2985,7 +2900,7 @@ namespace vkr
 #ifdef USE_MULTITHREADED_CACHE
 		// Compile if not in cache
 		//
-		if (s_shaderCache.CacheMiss(hash, &pShader->module))
+		if (s_shaderCache->CacheMiss(hash, &pShader->module))
 #endif
 		{
 			auto strk = format("%p", hash);
@@ -3018,7 +2933,7 @@ namespace vkr
 				assert(!pShader->module);
 			}
 #ifdef USE_MULTITHREADED_CACHE
-			s_shaderCache.UpdateCache(hash, &pShader->module);
+			s_shaderCache->UpdateCache(hash, &pShader->module);
 #endif
 		}
 		else {

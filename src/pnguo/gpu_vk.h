@@ -161,6 +161,7 @@ namespace vkg {
 	};
 	struct pipeline_info_t {
 		float lineWidth = 1.0;
+		int polygonMode = 0;//    VK_POLYGON_MODE_FILL = 0,		VK_POLYGON_MODE_LINE = 1,			VK_POLYGON_MODE_POINT = 2,
 		int frontFace = 0;
 		int topology = 3;
 		int rasterizationSamples = 0x00000001;
@@ -169,7 +170,17 @@ namespace vkg {
 		bool primitiveRestartEnable = false;
 		bool doubleSided = false;	// cullMode
 	};
-	void* new_pipeline();
+	struct PBRPipe_t {
+		VkPipeline m_pipeline = VK_NULL_HANDLE;
+		VkPipeline m_pipelineWireframe = VK_NULL_HANDLE;
+		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+		std::string pipe_kv;
+		PBRPipe_t* next = 0;
+		std::atomic_int st;
+	};
+	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, const vkr::DefineList& defines0, std::vector<VkVertexInputAttributeDescription>* playout, VkDescriptorSetLayout layout1, VkDescriptorSetLayout layout2, pipeline_info_t* info);
+
 
 }
 //!vkg
