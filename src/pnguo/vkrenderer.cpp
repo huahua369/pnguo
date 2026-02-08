@@ -176,30 +176,7 @@ namespace vkr
 		glm::mat4 GetCurrent() const { return m_current; }
 		glm::mat4 GetPrevious() const { return m_previous; }
 	};
-
-	// Structures holding the per frame constant buffer data. 
-	//
-	struct Light
-	{
-		glm::mat4   mLightViewProj;
-		glm::mat4   mLightView;
-
-		float         direction[3];
-		float         range;
-
-		float         color[3];
-		float         intensity;
-
-		float         position[3];
-		float         innerConeCos;
-
-		float         outerConeCos;
-		uint32_t      type;
-		float         depthBias;
-		int32_t       shadowMapIndex = -1;
-	};
-
-
+	 
 	const uint32_t LightType_Directional = 0;
 	const uint32_t LightType_Point = 1;
 	const uint32_t LightType_Spot = 2;
@@ -305,23 +282,6 @@ namespace vkr
 	};
 
 
-	class TaskQueue
-	{
-	public:
-		std::vector<std::jthread> workers;
-		std::queue<std::function<void()>> tasks;
-		std::mutex mtx;
-		size_t w_count = 0;
-		std::atomic_int rc = 0;
-	public:
-		TaskQueue(size_t count);
-		~TaskQueue();
-		void add(std::function<void()> task);
-		void run(int num);
-		void wait_stop();
-	private:
-	};
-
 
 
 
@@ -329,7 +289,6 @@ namespace vkr
 	//	VK_KHR_16bit_storage
 	//	VK_KHR_8bit_storage 
 
-	std::string format(const char* format, ...);
 	inline std::string to_string_g(double _Val) {
 		const auto _Len = static_cast<size_t>(_scprintf("%g", _Val));
 		std::string _Str(_Len, '\0');

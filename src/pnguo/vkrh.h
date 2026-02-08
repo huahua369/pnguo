@@ -55,5 +55,46 @@ namespace vkr {
 		friend DefineList operator+(DefineList def1, const DefineList& def2);
 		std::string to_string() const;
 	};
+
+	struct Light
+	{
+		glm::mat4   mLightViewProj;
+		glm::mat4   mLightView;
+
+		float         direction[3];
+		float         range;
+
+		float         color[3];
+		float         intensity;
+
+		float         position[3];
+		float         innerConeCos;
+
+		float         outerConeCos;
+		uint32_t      type;
+		float         depthBias;
+		int32_t       shadowMapIndex = -1;
+	};
+
+	class TaskQueue
+	{
+	public:
+		std::vector<std::jthread> workers;
+		std::queue<std::function<void()>> tasks;
+		std::mutex mtx;
+		size_t w_count = 0;
+		std::atomic_int rc = 0;
+	public:
+		TaskQueue(size_t count);
+		~TaskQueue();
+		void add(std::function<void()> task);
+		void run(int num);
+		void wait_stop();
+	private:
+	};
+
+	std::string format(const char* format, ...);
+
+
 }
 //!vkc
