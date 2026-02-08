@@ -163,6 +163,10 @@ namespace vkg {
 		assert(res == VK_SUCCESS);
 		return descSetLayout;
 	}
+	bool is_morph_target_valid(vkg::ubo_size_t* us, vkg::morph_target_t* mt)
+	{
+		return us && (us->ID_TARGET_DATA || us->ID_MORPHING_DATA) && mt && (mt->position_offset >= 0 || mt->normal_offset >= 0 || mt->tangent_offset >= 0 || mt->texcoord0_offset >= 0 || mt->texcoord1_offset >= 0 || mt->color0_offset >= 0);
+	}
 	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, vkg::ubo_size_t* us, vkg::morph_target_t* mt, vkg::ubo_size_t* binding)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
@@ -221,7 +225,7 @@ namespace vkg {
 			binding->ID_SKINNING_MATRICES = b.binding;
 			layout_bindings.push_back(b);
 		}
-		if (mt)
+		if (is_morph_target_valid(us, mt))
 		{
 			VkDescriptorSetLayoutBinding b;
 			// 变形动画

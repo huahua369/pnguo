@@ -10360,17 +10360,88 @@ namespace vkr
 		pipeline.stageCount = (uint32_t)shaderStages.size();
 		pipeline.renderPass = pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
-		uint32_t specConstants = 0;
-		VkSpecializationMapEntry specializationMapEntry = VkSpecializationMapEntry{};
-		specializationMapEntry.constantID = 0;
-		specializationMapEntry.offset = 0;
-		specializationMapEntry.size = sizeof(uint32_t);
+
+		struct sc {
+			bool ID_diffuseCube = true;	// 漫反环境
+			bool ID_specularCube = false;	// 高光镜面环境u_GGXEnvSampler
+			bool ID_CharlieCube = false;	// 光泽环境
+			bool USE_TEX_LOD = true;		// 环境lod
+
+			int ID_baseColorTexture = -1;
+			int ID_normalTexture = -1;
+			int ID_emissiveTexture = -1;
+			int ID_metallicRoughnessTexture = -1;
+			int ID_occlusionTexture = -1;
+			int ID_diffuseTexture = -1;
+			int ID_specularGlossinessTexture = -1;
+			int ID_GGXLUT = -1;
+			int ID_CharlieTexture = -1;
+			int ID_SheenETexture = -1;
+			int ID_sheenColorTexture = -1;
+			int ID_sheenRoughnessTexture = -1;
+			int ID_specularTexture = -1;
+			int ID_specularColorTexture = -1;
+			int ID_transmissionTexture = -1;
+			int ID_thicknessTexture = -1;
+			int ID_clearcoatRoughnessTexture = -1;
+			int ID_clearcoatNormalTexture = -1;
+			int ID_iridescenceTexture = -1;
+			int ID_iridescenceThicknessTexture = -1;
+			int ID_anisotropyTexture = -1;
+			int ID_SSAO = -1;
+			int ID_transmissionFramebufferTexture = -1;
+
+			int UVT_baseColorTexture = 0;
+			int UVT_normalTexture = 0;
+			int UVT_emissiveTexture = 0;
+			int UVT_metallicRoughnessTexture = 0;
+			int UVT_occlusionTexture = 0;
+			int UVT_diffuseTexture = 0;
+			int UVT_specularGlossinessTexture = 0;
+			int UVT_GGXLUT = 0;
+			int UVT_CharlieTexture = 0;
+			int UVT_SheenETexture = 0;
+			int UVT_sheenColorTexture = 0;
+			int UVT_sheenRoughnessTexture = 0;
+			int UVT_specularTexture = 0;
+			int UVT_specularColorTexture = 0;
+			int UVT_transmissionTexture = 0;
+			int UVT_thicknessTexture = 0;
+			int UVT_clearcoatRoughnessTexture = 0;
+			int UVT_clearcoatNormalTexture = 0;
+			int UVT_iridescenceTexture = 0;
+			int UVT_iridescenceThicknessTexture = 0;
+			int UVT_anisotropyTexture = 0;
+			int UVT_SSAO = 0;
+			int UVT_transmissionFramebufferTexture = 0;
+		};
+		sc specConstants = {};
+		std::vector<VkSpecializationMapEntry> specializationMapEntry = {};
+		specializationMapEntry.resize(50);
+		auto smt = specializationMapEntry.data();
+		int offset = 0;
+		for (size_t i = 0; i < 4; i++)
+		{
+			smt->constantID = i;
+			smt->offset = offset;
+			smt->size = sizeof(bool);
+			offset += smt->size;
+			smt++;
+		}
+		for (size_t i = 4; i < 50; i++)
+		{
+			smt->constantID = i;
+			smt->offset = offset;
+			smt->size = sizeof(int);
+			offset += smt->size;
+			smt++;
+		}
 		VkSpecializationInfo specializationInfo = VkSpecializationInfo();
-		specializationInfo.mapEntryCount = 1;
-		specializationInfo.pMapEntries = &specializationMapEntry;
-		specializationInfo.dataSize = sizeof(uint32_t);
+		specializationInfo.mapEntryCount = specializationMapEntry.size();
+		specializationInfo.pMapEntries = specializationMapEntry.data();
+		specializationInfo.dataSize = sizeof(sc);
 		specializationInfo.pData = &specConstants;
-		//shaderStages[1].pSpecializationInfo = &specializationInfo;
+		shaderStages[1].pSpecializationInfo = &specializationInfo;
 		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
 		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");

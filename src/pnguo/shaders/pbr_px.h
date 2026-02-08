@@ -249,7 +249,7 @@ layout(set = 0, binding = ID_MATUV_DATA) buffer readonly per_u_matuv
 // 纹理
 #if 1
 
-#define CONCAT(a,b) a ## b
+//#define CONCAT(a,b) a ## b
 //#define TEXCOORD(id) CONCAT(Input.UV, id)
 #define TEXCOORD(id) (Input.UV[id])
 
@@ -324,8 +324,8 @@ layout(set = 1, binding = ID_SheenETexture) uniform sampler2D u_SheenELUT;
 #ifdef ID_sheenColorTexture
 layout(set = 1, binding = ID_sheenColorTexture) uniform sampler2D u_sheenColorTexture;
 #endif
-#ifdef ID_CharlieEnvSampler
-layout(set = 1, binding = ID_CharlieEnvSampler) uniform samplerCube u_CharlieEnvSampler;//光泽环境
+#ifdef ID_CharlieCube
+layout(set = 1, binding = ID_CharlieCube) uniform samplerCube u_CharlieEnvSampler;//光泽环境
 #endif
 #ifdef ID_sheenRoughnessTexture
 layout(set = 1, binding = ID_sheenRoughnessTexture) uniform sampler2D u_sheenRoughnessTexture;
@@ -1471,7 +1471,7 @@ vec4 getSpecularSample(vec3 reflection, float lod)
 vec4 getSheenSample(vec3 reflection, float lod)
 {
 	vec4 textureSample = vec4(1.0);
-#ifdef  ID_CharlieEnvSampler
+#ifdef  ID_CharlieCube
 #ifdef ID_MATUV_DATA
 	// todo ID_specularCube
 	reflection = u_matuv[0] * reflection;
