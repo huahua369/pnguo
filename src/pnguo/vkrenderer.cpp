@@ -3088,6 +3088,7 @@ namespace vkr
 				print_time Pt("Compile Pipeline " + strk, 1);
 				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
 				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, &SpvData, &SpvSize);
+
 				if (SpvSize == 0) {
 					printf("\n%s\n", shader.c_str());
 				}
@@ -3101,7 +3102,9 @@ namespace vkr
 			//auto c = crc32(-1, (Bytef*)pshader, strlen(pshader));  
 			assert(SpvSize != 0);
 			CreateModule(m_device, SpvData, SpvSize, &pShader->module);
-
+			if (!pShader->module) {
+				assert(!pShader->module);
+			}
 #ifdef USE_MULTITHREADED_CACHE
 			s_shaderCache.UpdateCache(hash, &pShader->module);
 #endif
@@ -8866,6 +8869,17 @@ namespace vkr
 						itcb(*tt, "transmissionTexture", "ID_transmissionTexCoord", tfmat->m_defines, textureIds);
 					}
 				}
+				{
+					auto tt = get_ext(extensions, "KHR_materials_diffuse_transmission");
+					if (tt) {
+						tfmat->m_defines["MATERIAL_DIFFUSE_TRANSMISSION"] = "1";
+						tfmat->m_params.diffuseTransmissionFactor = get_v(tt, "diffuseTransmissionFactor", 0.0);
+						tfmat->m_params.diffuseTransmissionColorFactor = get_v(tt, "diffuseTransmissionColorFactor", glm::vec3(1.0));
+						tfmat->transmission = true;
+						itcb(*tt, "diffuseTransmissionTexture", "ID_diffuseTransmissionTexCoord", tfmat->m_defines, textureIds);
+						itcb(*tt, "diffuseTransmissionColorTexture", "ID_diffuseTransmissionColorTexCoord", tfmat->m_defines, textureIds);
+					}
+				}
 				//this.shader.updateUniform("transmissionFactor", material.extensions ? .KHR_materials_transmission ? .transmissionFactor);
 				//this.shader.updateUniform("transmissionUVSet", material.extensions ? .KHR_materials_transmission ? .transmissionTexture ? .texCoord);
 
@@ -10360,7 +10374,7 @@ namespace vkr
 		pipeline.stageCount = (uint32_t)shaderStages.size();
 		pipeline.renderPass = pRenderPass->GetRenderPass();
 		pipeline.subpass = 0;
-
+#if 0
 		struct sc {
 			bool ID_diffuseCube = true;	// 漫反环境
 			bool ID_specularCube = false;	// 高光镜面环境u_GGXEnvSampler
@@ -10442,6 +10456,7 @@ namespace vkr
 		specializationInfo.dataSize = sizeof(sc);
 		specializationInfo.pData = &specConstants;
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
+#endif
 		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
 		SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");

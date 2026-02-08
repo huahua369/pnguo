@@ -168,9 +168,6 @@ struct gpuMaterial
 	vec3  specularColor;  // color of the dielectric specular layer
 	float transmissionFactor;   // KHR_materials_transmission
 
-	float diffuseTransmissionFactor;
-	vec3 diffuseTransmissionColorFactor;
-
 	vec3  attenuationColor;     // KHR_materials_volume
 	float attenuationDistance;  //
 	float thickness;            // Replace for isThinWalled?
@@ -276,6 +273,7 @@ layout(set = 0, binding = ID_MATUV_DATA) buffer readonly per_u_matuv
 #undef ID_metallicRoughnessTexCoord
 #endif
 #endif
+#if 0
 
 #ifdef ID_baseColorTexture
 layout(set = 1, binding = ID_baseColorTexture) uniform sampler2D u_BaseColorSampler;
@@ -343,14 +341,6 @@ layout(set = 1, binding = ID_specularColorTexture) uniform sampler2D u_specularC
 #ifdef ID_transmissionTexture
 layout(set = 1, binding = ID_transmissionTexture) uniform sampler2D u_transmissionTexture;
 #endif  
-
-#ifdef ID_diffuse_transmissionTexture
-layout(set = 1, binding = ID_diffuse_transmissionTexture) uniform sampler2D u_DiffuseTransmissionSampler;
-#endif
-#ifdef ID_diffuse_transmissionColorTexture
-layout(set = 1, binding = ID_diffuse_transmissionColorTexture) uniform sampler2D u_DiffuseTransmissionColorSampler;
-#endif
-
 #ifdef ID_thicknessTexture
 layout(set = 1, binding = ID_thicknessTexture) uniform sampler2D u_thicknessTexture;
 #endif
@@ -381,6 +371,18 @@ layout(set = 1, binding = ID_SSAO) uniform sampler2D ssaoSampler;
 #ifdef ID_transmissionFramebufferTexture
 layout(set = 1, binding = ID_transmissionFramebufferTexture) uniform sampler2D u_TransmissionFramebufferSampler;
 #endif
+#endif // 0
+
+#ifdef ID_TextureA
+layout(set = 1, binding = ID_TextureA) uniform sampler2D v_ColorSampler[23];
+#endif
+#ifdef ID_Cube
+layout(set = 1, binding = ID_Cube) uniform samplerCube v_EnvSampler[3]; // 环境贴图3种
+#endif
+#ifdef ID_shadowMap
+layout(set = 1, binding = ID_shadowMap) uniform sampler2DShadow u_shadowMap[MAX_SHADOW_INSTANCES];
+#endif
+
 //------------------------------------------------------------
 // UV getters
 //------------------------------------------------------------
@@ -978,45 +980,6 @@ vec4 get_roughness(VS2PS Input, pbrMaterial params, vec2 uv, out vec3 diffuseCol
 	float metallic = 0.0f;
 	return get_roughness(Input, params, uv, diffuseColor, specularColor, perceptualRoughness, metallic);
 }
-
-
-
-#ifdef MATERIAL_DIFFUSE_TRANSMISSION
-
-vec2 getDiffuseTransmissionUV()
-{
-	vec3 uv = getuv(Input, TEXCOORD(ID_specularTexCoord));// vec3(u_DiffuseTransmissionUVSet < 1 ? v_texcoord_0 : v_texcoord_1, 1.0);
-#ifdef HAS_DIFFUSETRANSMISSION_UV_TRANSFORM
-	uv = u_DiffuseTransmissionUVTransform * uv;
-#endif
-	return uv.xy;
-}
-
-vec2 getDiffuseTransmissionColorUV()
-{
-	vec3 uv = vec3(u_DiffuseTransmissionColorUVSet < 1 ? v_texcoord_0 : v_texcoord_1, 1.0);
-#ifdef HAS_DIFFUSETRANSMISSIONCOLOR_UV_TRANSFORM
-	uv = u_DiffuseTransmissionColorUVTransform * uv;
-#endif
-	return uv.xy;
-}
-gpuMaterial getDiffuseTransmissionInfo(pbrMaterial material, gpuMaterial info)
-{
-	info.diffuseTransmissionFactor = material.diffuseTransmissionFactor;
-	info.diffuseTransmissionColorFactor = material.diffuseTransmissionColorFactor;
-
-#ifdef ID_diffuse_transmissionTexture
-	info.diffuseTransmissionFactor *= texture(u_DiffuseTransmissionSampler, getDiffuseTransmissionUV()).a;
-#endif
-
-#ifdef ID_diffuse_transmissionColorTexture
-	info.diffuseTransmissionColorFactor *= texture(u_DiffuseTransmissionColorSampler, getDiffuseTransmissionColorUV()).rgb;
-#endif
-
-	return info;
-}
-#endif
-
 //-----------------------------------------------------------------------
 
 void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
@@ -1114,10 +1077,8 @@ void getPBRParams(VS2PS Input, pbrMaterial material, inout gpuMaterial m)
 	// KHR_materials_transmission
 	m.transmissionFactor = material.transmissionFactor;
 #ifdef ID_transmissionTexture  
+	// todo uvt
 	m.transmissionFactor *= texture(u_transmissionTexture, getuv(Input, TEXCOORD(ID_transmissionTexCoord), 0)).r;
-#endif
-#ifdef MATERIAL_DIFFUSE_TRANSMISSION
-	m = getDiffuseTransmissionInfo(material, m);
 #endif
 	// KHR_materials_volume
 	m.attenuationColor = material.attenuationColor;

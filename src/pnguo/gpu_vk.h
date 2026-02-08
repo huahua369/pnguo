@@ -139,60 +139,6 @@ namespace vkg {
 		int ID_TARGET_DATA;
 		int ID_MORPHING_DATA;
 	};
-	struct sc {
-		bool ID_diffuseCube = true;	// 漫反环境
-		bool ID_specularCube = false;	// 高光镜面环境u_GGXEnvSampler
-		bool ID_CharlieCube = false;	// 光泽环境
-		bool USE_TEX_LOD = true;		// 环境lod
-
-		int ID_baseColorTexture = -1;
-		int ID_normalTexture = -1;
-		int ID_emissiveTexture = -1;
-		int ID_metallicRoughnessTexture = -1;
-		int ID_occlusionTexture = -1;
-		int ID_diffuseTexture = -1;
-		int ID_specularGlossinessTexture = -1;
-		int ID_GGXLUT = -1;
-		int ID_CharlieTexture = -1;
-		int ID_SheenETexture = -1;
-		int ID_sheenColorTexture = -1;
-		int ID_sheenRoughnessTexture = -1;
-		int ID_specularTexture = -1;
-		int ID_specularColorTexture = -1;
-		int ID_transmissionTexture = -1;
-		int ID_thicknessTexture = -1;
-		int ID_clearcoatRoughnessTexture = -1;
-		int ID_clearcoatNormalTexture = -1;
-		int ID_iridescenceTexture = -1;
-		int ID_iridescenceThicknessTexture = -1;
-		int ID_anisotropyTexture = -1;
-		int ID_SSAO = -1;
-		int ID_transmissionFramebufferTexture = -1;
-
-		int UVT_baseColorTexture = 0;
-		int UVT_normalTexture = 0;
-		int UVT_emissiveTexture = 0;
-		int UVT_metallicRoughnessTexture = 0;
-		int UVT_occlusionTexture = 0;
-		int UVT_diffuseTexture = 0;
-		int UVT_specularGlossinessTexture = 0;
-		int UVT_GGXLUT = 0;
-		int UVT_CharlieTexture = 0;
-		int UVT_SheenETexture = 0;
-		int UVT_sheenColorTexture = 0;
-		int UVT_sheenRoughnessTexture = 0;
-		int UVT_specularTexture = 0;
-		int UVT_specularColorTexture = 0;
-		int UVT_transmissionTexture = 0;
-		int UVT_thicknessTexture = 0;
-		int UVT_clearcoatRoughnessTexture = 0;
-		int UVT_clearcoatNormalTexture = 0;
-		int UVT_iridescenceTexture = 0;
-		int UVT_iridescenceThicknessTexture = 0;
-		int UVT_anisotropyTexture = 0;
-		int UVT_SSAO = 0;
-		int UVT_transmissionFramebufferTexture = 0;
-	};
 	/*
 	顶点属性：
 		POSITION、COLOR_0、TEXCOORD_0、TEXCOORD_1、

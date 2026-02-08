@@ -39,6 +39,7 @@ set(Shaders_PostProc_src
 )
 
 set(Shaders_GLTF_src
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass0-frag.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-frag.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFPbrPass-vert.glsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTF_VS2PS_IO.h 
@@ -53,6 +54,7 @@ set(Shaders_GLTF_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/SkyDomeProc.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pbr_px.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pbr_pixel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/GLTFVertexFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/perFrameStruct.h
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/PBRTextures.h 
