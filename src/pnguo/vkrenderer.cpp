@@ -2806,7 +2806,7 @@ namespace vkr
 		std::string commandLine;
 		if (sourceType == SST_GLSL)
 		{
-			commandLine = format("glslc --target-env=vulkan1.1 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
+			commandLine = format("glslc --target-env=vulkan1.3 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
 
 			std::string filenameErr = hz::genfn(format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash));
 
@@ -5027,6 +5027,14 @@ namespace vkr {
 		std::map<std::string, size_t> defs;
 		VkDescriptorBufferInfo mdb = {};
 		size_t targetCount = 0;
+		int vertex_count = 0;
+		int weight_count = 0;
+		int position_offset = 0;
+		int normal_offset = 0;
+		int tangent_offset = 0;
+		int texcoord0_offset = 0;
+		int color0_offset = 0;
+		int texcoord1_offset = 0;
 	};
 	struct mesh_mapd_ptr {
 		morph_t* m = {};
@@ -7643,6 +7651,7 @@ namespace vkr
 			std::vector<ib_t> ibs;
 			size_t all_size = 0;
 			size_t subo_size = 0;
+			const int strsize = sizeof(int) * 8;
 			for (auto& mesh : pm->meshes)
 			{
 				for (auto& primitive : mesh.primitives)
@@ -7682,9 +7691,11 @@ namespace vkr
 						mp = &mn;
 						auto ss = vss.begin()->second;// 顶点数量
 						tv.reserve(attributes.size() * ss * targetCount);
-						mp->defs["vertex_count"] = ss;
-						mp->defs["WEIGHT_COUNT"] = targetCount;
+						//mp->defs["vertex_count"] = ss;
+						//mp->defs["WEIGHT_COUNT"] = targetCount;
 						mp->targetCount = targetCount;
+						mp->weight_count = targetCount;
+						mp->vertex_count = ss;
 						// Pos=vec3
 						// Normal=vec3
 						// Tangent=vec3
@@ -7693,11 +7704,29 @@ namespace vkr
 						//MORPH_TARGET_${ attribute }
 						size_t ct = 0;
 						for (auto& [k, v] : attributes) {
-							auto kn = "MORPH_TARGET_" + k + "_OFFSET";
-							mp->defs[kn] = ct;
+							auto kn = "HAS_MORPH_TARGET_" + k;
+							mp->defs[kn] = 1;
+							// POSITION NORMAL TANGENT TEXCOORD_0 TEXCOORD_1 COLOR_0
+							if (k == "POSITION") {
+								mp->position_offset = ct;
+							}
+							else if (k == "NORMAL") {
+								mp->normal_offset = ct;
+							}
+							else if (k == "TANGENT") {
+								mp->tangent_offset = ct;
+							}
+							else if (k == "TEXCOORD_0") {
+								mp->texcoord0_offset = ct;
+							}
+							else if (k == "TEXCOORD_1") {
+								mp->texcoord1_offset = ct;
+							}
+							else if (k == "COLOR_0") {
+								mp->color0_offset = ct;
+							}
 							if (k == "TEXCOORD_1" && v[0].m_stride == 8) {
-								auto nt = mp->defs["MORPH_TARGET_TEXCOORD_0_OFFSET"];
-								mp->defs[kn] = nt;
+								auto nt = mp->texcoord0_offset;
 								auto tt = tv.data() + nt;
 								for (auto& acc : v) {
 									auto vd = (char*)acc.m_data;
@@ -7754,9 +7783,7 @@ namespace vkr
 							}
 						}
 						if (tv.size()) {
-							//VkDescriptorBufferInfo& vbv = mp->mdb;
-							//tas.push_back(vbv);
-							subo_size += AlignUp(tv.size() * sizeof(glm::vec4), (size_t)64u);
+							subo_size += AlignUp(strsize + tv.size() * sizeof(glm::vec4), (size_t)64u);
 							mbs.push_back({ mp, std::move(tv) });
 						}
 
@@ -7797,7 +7824,16 @@ namespace vkr
 					m_vertexBufferMap[it.vbmidx] = vbv;
 				}
 				for (auto& it : mbs) {
-					_p_static_buffer->AllocBuffer(it.tv.size(), sizeof(glm::vec4), it.tv.data(), &it.mp->mdb);
+					char* pBuffer = 0;
+					VkDescriptorBufferInfo out;
+					size_t size = it.tv.size() * sizeof(glm::vec4);
+					size += strsize;
+					if (_p_static_buffer->AllocConstantBuffer(size, (void**)&pBuffer, &it.mp->mdb))
+					{
+						memcpy(pBuffer, &it.mp->vertex_count, strsize);
+						memcpy(pBuffer + strsize, it.tv.data(), size);
+					}
+					//_p_static_buffer->AllocBuffer(it.tv.size(), sizeof(glm::vec4), it.tv.data(), &it.mp->mdb);
 				}
 				for (auto& it : ibs) {
 					VkDescriptorBufferInfo ibv = {};
@@ -12856,7 +12892,7 @@ namespace vkr
 	{
 		void* pBuffer;
 		VkDescriptorBufferInfo out;
-		if (AllocConstantBuffer(size, &pBuffer, &out))
+		if (AllocConstantBuffer(size, &pBuffer, &out) && pData)
 		{
 			memcpy(pBuffer, pData, size);
 		}
@@ -23523,7 +23559,7 @@ void main()
 		std::vector<VkWriteDescriptorSet> modelWriteDescriptorSets = {
 			initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &descriptor),
 		};
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
+		//vkUpdateDescriptorSets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
 
 		DefineList attributeDefines = {};
 		VkPipelineShaderStageCreateInfo msmShader;
@@ -23566,7 +23602,7 @@ void main()
 		pipelineCI.pDynamicState = &dynamicState;
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		pipelineCI.renderPass = 0;
+		pipelineCI.renderPass = renderPass;
 		// Not using a vertex shader, mesh shading doesn't require vertex input state
 		pipelineCI.pInputAssemblyState = nullptr;
 		pipelineCI.pVertexInputState = nullptr;

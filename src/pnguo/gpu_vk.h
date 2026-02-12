@@ -121,8 +121,9 @@ namespace vkg {
 		int position_offset = -1;
 		int normal_offset = -1;
 		int tangent_offset = -1;
-		int texcoord0_offset = -1;		int texcoord1_offset = -1;
-		int color0_offset = -1;		//int color1_offset;
+		int texcoord0_offset = -1;
+		int color0_offset = -1;
+		int texcoord1_offset = -1;	//int color1_offset;
 	};
 	// 全局、对象、骨骼动画、实例化、材质UV、目标数据、变形数据，的大小或绑定点索引
 	struct ubotex_size_t {

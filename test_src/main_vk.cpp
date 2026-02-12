@@ -898,6 +898,10 @@ int main()
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 
 		auto kd = sdldev.vkdev;
+
+
+		void* aaaa = vkr::new_ms_pipe(vkd->dev, vkd->renderpass_fbo);
+
 		//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
 		auto devs = vkr::get_devices(sdldev.inst); // 获取设备名称列表
 		bool grab_enable = false;	// 设置鼠标范围在窗口内

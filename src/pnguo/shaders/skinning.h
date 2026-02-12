@@ -1,31 +1,21 @@
-// AMD Cauldron code
-// 
-// Copyright(c) 2018 Advanced Micro Devices, Inc.All rights reserved.
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files(the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions :
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
+// gltf变形动画和骨骼动画
 #ifdef ID_MORPHING_DATA
-// 插值数据
+// 变形插值数据
 layout(set = 0, binding = ID_MORPHING_DATA) buffer per_morphing_mw
 {
 	float u_morphWeights[];
 };
-// 目标数据：每个顶点有插值数据数量的vec3
+// 静态目标数据：每个顶点有插值数据数量的vec3
 layout(set = 0, binding = ID_TARGET_DATA) buffer per_morphing
 {
+	int vertex_count;
+	int weight_count;
+	int position_offset;
+	int normal_offset;
+	int tangent_offset;
+	int texcoord0_offset;
+	int color0_offset;
+	int texcoord1_offset;
 	vec4 per_target_data[];
 };
 #endif
@@ -59,10 +49,10 @@ vec4 getDisplacement(int vertexID, int targetIndex)
 vec4 getTargetPosition(int vertexID)
 {
 	vec4 pos = vec4(0);
-#ifdef MORPH_TARGET_POSITION_OFFSET 
-	for (int i = 0; i < WEIGHT_COUNT; i++)
+#ifdef HAS_MORPH_TARGET_POSITION
+	for (int i = 0; i < weight_count; i++)
 	{
-		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_POSITION_OFFSET + i * vertex_count);
+		vec4 displacement = getDisplacement(vertexID, position_offset + i * vertex_count);
 		pos += u_morphWeights[i] * displacement;
 	}
 #endif 
@@ -73,10 +63,10 @@ vec3 getTargetNormal(int vertexID)
 {
 	vec3 normal = vec3(0);
 
-#ifdef MORPH_TARGET_NORMAL_OFFSET 
-	for (int i = 0; i < WEIGHT_COUNT; i++)
+#ifdef HAS_MORPH_TARGET_NORMAL
+	for (int i = 0; i < weight_count; i++)
 	{
-		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_NORMAL_OFFSET + i * vertex_count).xyz;
+		vec3 displacement = getDisplacement(vertexID, normal_offset + i * vertex_count).xyz;
 		normal += u_morphWeights[i] * displacement;
 	}
 #endif
@@ -89,10 +79,10 @@ vec3 getTargetTangent(int vertexID)
 {
 	vec3 tangent = vec3(0);
 
-#ifdef MORPH_TARGET_TANGENT_OFFSET 
-	for (int i = 0; i < WEIGHT_COUNT; i++)
+#ifdef HAS_MORPH_TARGET_TANGENT
+	for (int i = 0; i < weight_count; i++)
 	{
-		vec3 displacement = getDisplacement(vertexID, MORPH_TARGET_TANGENT_OFFSET + i * vertex_count).xyz;
+		vec3 displacement = getDisplacement(vertexID, tangent_offset + i * vertex_count).xyz;
 		tangent += u_morphWeights[i] * displacement;
 	}
 #endif
@@ -104,10 +94,10 @@ vec2 getTargetTexCoord0(int vertexID)
 {
 	vec2 uv = vec2(0);
 
-#ifdef MORPH_TARGET_TEXCOORD_0_OFFSET 
-	for (int i = 0; i < WEIGHT_COUNT; i++)
+#ifdef HAS_MORPH_TARGET_TEXCOORD_0
+	for (int i = 0; i < weight_count; i++)
 	{
-		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_0_OFFSET + i * vertex_count).xy;
+		vec2 displacement = getDisplacement(vertexID, texcoord0_offset + i * vertex_count).xy;
 		uv += u_morphWeights[i] * displacement;
 	}
 #endif
@@ -119,10 +109,10 @@ vec2 getTargetTexCoord1(int vertexID)
 {
 	vec2 uv = vec2(0);
 
-#ifdef MORPH_TARGET_TEXCOORD_1_OFFSET 
-	for (int i = 0; i < WEIGHT_COUNT; i++)
+#ifdef HAS_MORPH_TARGET_TEXCOORD_1
+	for (int i = 0; i < weight_count; i++)
 	{
-		vec2 displacement = getDisplacement(vertexID, MORPH_TARGET_TEXCOORD_1_OFFSET + i * vertex_count).zw;
+		vec2 displacement = getDisplacement(vertexID, texcoord1_offset + i * vertex_count).zw;
 		uv += u_morphWeights[i] * displacement;
 	}
 #endif
@@ -134,10 +124,10 @@ vec4 getTargetColor0(int vertexID)
 {
 	vec4 color = vec4(0);
 
-#ifdef MORPH_TARGET_COLOR_0_OFFSET 
-	for (int i = 0; i < WEIGHT_COUNT; i++)
+#ifdef HAS_MORPH_TARGET_COLOR_0
+	for (int i = 0; i < weight_count; i++)
 	{
-		vec4 displacement = getDisplacement(vertexID, MORPH_TARGET_COLOR_0_OFFSET + i * vertex_count);
+		vec4 displacement = getDisplacement(vertexID, color0_offset + i * vertex_count);
 		color += u_morphWeights[i] * displacement;
 	}
 #endif
