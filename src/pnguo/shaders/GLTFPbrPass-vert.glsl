@@ -43,6 +43,10 @@ layout (std140, binding = ID_PER_OBJECT) uniform perObject
 } myPerObject;
 
 
+#ifdef ID_INSTANCING_A
+layout(location = ID_INSTANCING_A) in mat4 a_instance_model_matrix;
+#endif
+
 #ifdef ID_INSTANCING
 layout (std140, set = 0, binding = ID_INSTANCING) buffer readonly insObject
 {

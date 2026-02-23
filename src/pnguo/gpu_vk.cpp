@@ -314,7 +314,7 @@ namespace vkg {
 		out = blend ? color_blend : color_no_blend;
 	}
 #if 1
-	void md_vis(pipeline_info_2* info2, vkr::DefineList& defines, std::vector<VkVertexInputAttributeDescription>& playout, std::vector<VkVertexInputBindingDescription>& vi_binding) 
+	void md_vis(pipeline_info_2* info2, vkr::DefineList& defines, std::vector<VkVertexInputAttributeDescription>& playout, std::vector<VkVertexInputBindingDescription>& vi_binding)
 	{
 		static const char* kdefstr[] = { "ID_POSITION","ID_COLOR_0","ID_TEXCOORD_0","ID_NORMAL","ID_TANGENT","ID_WEIGHTS_0","ID_JOINTS_0","ID_TEXCOORD_1","ID_WEIGHTS_1","ID_JOINTS_1" };
 		playout.reserve(info2->attributeCount);
@@ -485,57 +485,31 @@ namespace vkg {
 
 			att_states.push_back(att_state);
 		}
+
+		VkPipelineColorBlendAttachmentState cblend = {};
+		cblend.colorWriteMask = allBits;
+		cblend.blendEnable = VK_FALSE;
+		cblend.alphaBlendOp = VK_BLEND_OP_ADD;
+		cblend.colorBlendOp = VK_BLEND_OP_ADD;
+		cblend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		cblend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		cblend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		cblend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
+		{ 
+			att_states.push_back(cblend);
 		}
 		if (defines.Has("HAS_DIFFUSE_RT"))
 		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
+			att_states.push_back(cblend);
 		}
 		if (defines.Has("HAS_NORMALS_RT"))
 		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
+			att_states.push_back(cblend);
 		}
 		if (defines.Has("HAS_MOTION_VECTORS_RT"))
 		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_FALSE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_states.push_back(att_state);
+			att_states.push_back(cblend);
 		}
 		// Color blend state
 		VkPipelineColorBlendStateCreateInfo cb;
