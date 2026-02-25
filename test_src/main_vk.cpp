@@ -1054,7 +1054,9 @@ int main()
 			trt.box.auto_break = 1;
 			trt.box.word_wrap = 1;
 			build_text_render(&tb, &trt);
+
 			auto ptb = new text_t1();
+			ptb->trt = trt;
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1069,7 +1071,7 @@ int main()
 						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
-					r_render_data_text(ptrt, { 20,10 }, td3);
+					r_render_data_text(&ptb->trt, { 20,10 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1139,18 +1141,8 @@ int main()
 					vkd->update(form0->io);	// 更新事件
 					{
 						std::string str = vkd->get_label();
-						text_style& ts = ptb->ts;
-						ts.family = family;
-						ts.fontsize = 16;
-						ts.color = 0xff222222;
-						// 文本块
-						text_block& tb = ptb->tb;
-						tb.style = &ts;
-						tb.str = str.c_str();
-						tb.first = 0;
-						tb.size = str.size();
-						build_text_render(&tb, ptrt);
-						r_update_data_text(ptrt, td3, 0);
+						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						r_update_data_text(&ptb->trt, td3, 0);
 					}
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto sem = vkd->get_fbo_semaphore();

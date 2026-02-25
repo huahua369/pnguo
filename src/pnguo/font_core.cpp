@@ -9783,6 +9783,26 @@ void build_text_render(text_block* tb, text_render_o* trt)
 	text_render_layout1(trt, 0);
 	trt->update = true;
 }
+
+
+void build_text_t1(text_t1* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
+{
+	if (!p)return;
+	text_style& ts = p->ts;
+	if (family)
+		ts.family = family;
+	if (fontsize > 0)
+		ts.fontsize = fontsize;
+	ts.color = color;
+	// 文本块
+	text_block& tb = p->tb;
+	tb.style = &ts;
+	tb.str = (char*)str;
+	tb.first = first;
+	tb.size = size;
+	build_text_render(&tb, &p->trt);
+}
+
 void get_lineheight(std::vector<lay_value>& v, int w, const glm::vec2& ps)
 {
 	int lineheight = 0;
