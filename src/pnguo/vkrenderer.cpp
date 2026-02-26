@@ -23560,7 +23560,10 @@ void main()
 			initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &descriptor),
 		};
 		//vkUpdateDescriptorSets(device, static_cast<uint32_t>(modelWriteDescriptorSets.size()), modelWriteDescriptorSets.data(), 0, nullptr);
-
+		if (descriptorPool == (VkDescriptorPool)0x3b600000003b6)
+		{
+			printf("Failed to create descriptor pool\n");
+		}
 		DefineList attributeDefines = {};
 		VkPipelineShaderStageCreateInfo msmShader;
 		auto res = pdev->VKCompileFromString(SST_GLSL, VK_SHADER_STAGE_MESH_BIT_EXT, ms_mesh, "main", "", &attributeDefines, &msmShader);

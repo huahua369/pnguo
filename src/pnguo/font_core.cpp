@@ -9625,6 +9625,7 @@ void update_text(text_render_o* p, text_block* tb)
 			{
 				git.advance = t->fontsize;
 			}
+			p->ov.insert(git._image);
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);
 		}

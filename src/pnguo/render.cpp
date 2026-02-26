@@ -1449,13 +1449,13 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
 {
 	std::vector<font_item_t>& tm = p->_vstr;
-	for (auto& it : tm)
+	for (auto& it : p->ov)
 	{
-		if (it._image) {
-			auto& tp = pt->vt[it._image];
-			if (it._image->valid || !tp)
+		if (it) {
+			auto& tp = pt->vt[it];
+			if (it->valid || !tp)
 			{
-				auto t = pt->rcb->make_tex(pt->rptr, it._image);
+				auto t = pt->rcb->make_tex(pt->rptr, it);
 				if (t && t != tp)
 					tp = t;
 			}

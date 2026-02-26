@@ -635,6 +635,7 @@ struct text_render_o
 	std::vector<strfont_t> _block;
 	std::vector<bidi_item> bv;
 	std::u16string str;
+	std::set<image_ptr_t*> ov;		// 用到的字体纹理对象
 	bool update = true;
 };
 struct flex_data;
