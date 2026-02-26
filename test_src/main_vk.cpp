@@ -899,7 +899,6 @@ int main()
 
 		auto kd = sdldev.vkdev;
 
-
 		//void* aaaa = vkr::new_ms_pipe(vkd->dev, vkd->renderpass_fbo);
 
 		//sdldev.vkdev = 0;	// 清空使用独立创建逻辑设备
