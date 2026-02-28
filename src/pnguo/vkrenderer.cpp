@@ -22309,6 +22309,13 @@ namespace vkr {
 					{
 						pgc->instance_mat[i] = glm::translate(glm::vec3(x * i, 0.2, 0.0f)) * glm::rotate(glm::radians(i * 45.0f), glm::vec3(0.0, 1.0, 0.0));
 					}
+#else
+
+					pgc->instance_mat[0] = glm::mat4(1.0f);
+					for (size_t i = 1; i < instanceCount; i++)
+					{
+						pgc->instance_mat[i] = glm::mat4(1.0f);
+					}
 #endif
 				}
 				if (pgc)
