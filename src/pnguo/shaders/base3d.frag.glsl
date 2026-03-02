@@ -9,5 +9,5 @@ layout(location = 0) out vec4 o_Color;
 void main()
 {
   vec4 c = texture(u_Texture, d.uv.st);
-  o_Color = d.col; 
+  o_Color = d.col * c; 
 }
