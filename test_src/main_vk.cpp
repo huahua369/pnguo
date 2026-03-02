@@ -1146,19 +1146,6 @@ int main()
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto sem = vkd->get_fbo_semaphore();
 					form0->add_vk_semaphores(sem, 0, 0);
-					static bool sa = false;
-					if (sa)
-					{
-						auto img = vkd->save_shadow(0);	// 保存阴影贴图
-						auto pf = (float*)img.data;
-						for (size_t i = 0; i < img.size.x * img.size.y; i++)
-						{
-							img.data[i] = gray_float_to_rgba(*pf);
-							pf++;
-						}
-						stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
-						sa = false;
-					}
 				};
 
 			// 运行消息循环

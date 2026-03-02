@@ -14439,7 +14439,6 @@ namespace vkr {
 		}
 
 		// Create a Render pass that accounts for blending
-		//
 		m_blendPass = SimpleColorBlendRenderPass(pDevice->m_device, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
 
@@ -16295,7 +16294,7 @@ namespace vkr {
 	{
 		// color RT
 		VkAttachmentDescription attachments[1];
-		attachments[0].format = (VkFormat)format;// 
+		attachments[0].format = (VkFormat)format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -24125,6 +24124,21 @@ void vkrender_test0()
 			vkd->update(&mio);		// 更新事件
 			vkd->on_render();		// 执行渲染
 			// todo 提交到窗口渲染
+
+			// 保存阴影贴图
+			static bool sa = false;
+			if (sa)
+			{
+				auto img = vkd->save_shadow(0);	// 获取阴影纹理
+				auto pf = (float*)img.data;
+				for (size_t i = 0; i < img.size.x * img.size.y; i++)
+				{
+					img.data[i] = gray_float_to_rgba(*pf);
+					pf++;
+				}
+				stbi_write_png("temp/shadow.png", img.size.x, img.size.y, 4, img.data, img.size.x * 4);
+				sa = false;
+			}
 			Sleep(1);
 			prev_time = curr_time;
 		}
