@@ -1001,18 +1001,7 @@ namespace vkg {
 		aArray p = nullptr;
 		return p;
 	}
-	aArray1D new_aArray1D(void* ctx, const char* type) {
-		aArray1D p = nullptr;
-		return p;
-	}
-	aArray2D new_aArray2D(void* ctx, const char* type) {
-		aArray2D p = nullptr;
-		return p;
-	}
-	aArray3D new_aArray3D(void* ctx, const char* type) {
-		aArray3D p = nullptr;
-		return p;
-	}
+
 	aFrame new_aFrame(void* ctx, const char* type) {
 		aFrame p = nullptr;
 		return p;
@@ -1069,9 +1058,6 @@ namespace vkg {
 		switch (t) {
 		case OBJ_CAMERA:	p = new_aCamera(ctx, type); break;
 		case OBJ_ARRAY:		p = new_aArray(ctx, type); break;
-		case OBJ_ARRAY1D:	p = new_aArray1D(ctx, type); break;
-		case OBJ_ARRAY2D:	p = new_aArray2D(ctx, type); break;
-		case OBJ_ARRAY3D:	p = new_aArray3D(ctx, type); break;
 		case OBJ_FRAME:		p = new_aFrame(ctx, type); break;
 		case OBJ_GEOMETRY:	p = new_aGeometry(ctx, type); break;
 		case OBJ_GROUP:		p = new_aGroup(ctx, type); break;

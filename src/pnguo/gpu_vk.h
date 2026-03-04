@@ -372,10 +372,7 @@ extern "C" {
 	typedef void* aObject;		// 通用对象
 	typedef void* aDevice;		// 设备
 	typedef void* aCamera;		// 相机
-	typedef void* aArray;		// 数组
-	typedef void* aArray1D;		// 一维数组
-	typedef void* aArray2D;		// 二维数组
-	typedef void* aArray3D;		// 三维数组
+	typedef void* aArray;		// 数组： 一维数组、二维数组、三维数组
 	typedef void* aFrame;		// 帧：渲染帧、计算帧
 	typedef void* aGeometry;	// 几何体
 	typedef void* aGroup;		// 组
@@ -392,7 +389,7 @@ extern "C" {
 	{
 		OBJ_DEVICE,
 		OBJ_CAMERA,
-		OBJ_ARRAY, OBJ_ARRAY1D, OBJ_ARRAY2D, OBJ_ARRAY3D,
+		OBJ_ARRAY,
 		OBJ_FRAME,
 		OBJ_GEOMETRY,
 		OBJ_GROUP,
