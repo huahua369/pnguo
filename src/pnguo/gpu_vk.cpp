@@ -496,7 +496,7 @@ namespace vkg {
 		cblend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 		cblend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
-		{ 
+		{
 			att_states.push_back(cblend);
 		}
 		if (defines.Has("HAS_DIFFUSE_RT"))
@@ -728,6 +728,263 @@ namespace vkg {
 		}
 		return r;
 	}
+
+#if 1
+	/*
+		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
+		World		: Instance(1:N)、Group(1:N)
+		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
+		Group		: Surface(1:N)、Light(1:N)
+		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
+		Geometry	: 网格数据、transform、动画等属性
+		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
+		pipelineCS	: 计算管线, 绑定数组、纹理做输入
+	*/
+	class cxObject;		// 通用对象
+	class cxDevice;		// 设备
+	class cxCamera;		// 相机
+	class cxArray;		// 数组
+	class cxArray1D;	// 一维数组
+	class cxArray2D;	// 二维数组
+	class cxArray3D;	// 三维数组
+	class cxFrame;		// 帧：渲染帧、计算帧
+	class cxGeometry;	// 几何体
+	class cxGroup;		// 组
+	class cxInstance;	// 实例
+	class cxLight;		// 光源
+	class cxMaterial;	// 材质
+	class cxPipeline;	// 渲染管线
+	class cxPipelineCS;	// 计算管线
+	class cxSampler;	// 纹理采样器
+	class cxSurface;	// 表面
+	class cxRenderer;	// 渲染器
+	class cxWorld;		// 世界
+
+	class cxObject
+	{
+	public:
+		int obj_type = 0;
+	public:
+		cxObject();
+		cxObject(int t);
+		virtual ~cxObject();
+	};
+	class cxDevice :public cxObject
+	{
+	public:
+		cxDevice();
+		~cxDevice();
+	};
+	class cxCamera :public cxObject
+	{
+	public:
+		cxCamera();
+		~cxCamera();
+
+	private:
+
+	};
+	class cxArray :public cxObject
+	{
+	public:
+		cxArray();
+		~cxArray();
+	};
+	class cxFrame :public cxObject
+	{
+	public:
+		cxFrame();
+		~cxFrame();
+
+	private:
+
+	};
+	class cxGeometry :public cxObject
+	{
+	public:
+		cxGeometry();
+		~cxGeometry();
+
+	private:
+
+	};
+	class cxGroup :public cxObject
+	{
+	public:
+		cxGroup();
+		~cxGroup();
+
+	private:
+
+	};
+	class cxInstance :public cxObject
+	{
+	public:
+		cxInstance();
+		~cxInstance();
+	};
+	class cxLight :public cxObject
+	{
+	public:
+		cxLight();
+		~cxLight();
+	};
+	class cxMaterial :public cxObject
+	{
+	public:
+		cxMaterial();
+		~cxMaterial();
+	};
+	class cxPipeline :public cxObject
+	{
+	public:
+		cxPipeline();
+		~cxPipeline();
+	};
+	class cxPipelineCS :public cxObject
+	{
+	public:
+		cxPipelineCS();
+		~cxPipelineCS();
+	};
+	class cxSampler :public cxObject
+	{
+	public:
+		cxSampler();
+		~cxSampler();
+	};
+	class cxSurface :public cxObject
+	{
+	public:
+		cxSurface();
+		~cxSurface();
+	};
+	class cxRenderer :public cxObject
+	{
+	public:
+		cxRenderer();
+		~cxRenderer();
+	};
+	class cxWorld :public cxObject
+	{
+	public:
+		cxWorld();
+		~cxWorld();
+	};
+
+
+#endif // 1
+
+	// 实现
+#if 1
+
+	cxObject::cxObject() {}
+	cxObject::cxObject(int t) :obj_type(t)
+	{
+	}
+	cxObject::~cxObject() {}
+	cxDevice::cxDevice() :cxObject(OBJ_DEVICE)
+	{
+	}
+	cxDevice::~cxDevice()
+	{
+	}
+
+	cxCamera::cxCamera() :cxObject(OBJ_CAMERA)
+	{
+	}
+
+	cxCamera::~cxCamera()
+	{
+	}
+	cxFrame::cxFrame() :cxObject(OBJ_FRAME)
+	{
+	}
+
+	cxFrame::~cxFrame()
+	{
+	}
+	cxArray::cxArray() :cxObject(OBJ_ARRAY)
+	{
+	}
+	cxArray::~cxArray()
+	{
+	}
+	cxGeometry::cxGeometry() :cxObject(OBJ_GEOMETRY)
+	{
+	}
+
+	cxGeometry::~cxGeometry()
+	{
+	}
+
+	cxGroup::cxGroup() :cxObject(OBJ_GROUP)
+	{
+	}
+
+	cxGroup::~cxGroup()
+	{
+	}
+	cxInstance::cxInstance() :cxObject(OBJ_INSTANCE)
+	{
+	}
+	cxInstance::~cxInstance()
+	{
+	}
+
+	cxLight::cxLight() :cxObject(OBJ_LIGHT)
+	{
+	}
+	cxLight::~cxLight()
+	{
+	}
+	cxMaterial::cxMaterial() :cxObject(OBJ_MATERIAL)
+	{
+	}
+	cxMaterial::~cxMaterial()
+	{
+	}
+	cxPipeline::cxPipeline() :cxObject(OBJ_PIPELINE)
+	{
+	}
+	cxPipeline::~cxPipeline()
+	{
+	}
+	cxPipelineCS::cxPipelineCS() :cxObject(OBJ_PIPELINECS)
+	{
+	}
+	cxPipelineCS::~cxPipelineCS()
+	{
+	}
+	cxSampler::cxSampler() :cxObject(OBJ_SAMPLER)
+	{
+	}
+	cxSampler::~cxSampler()
+	{
+	}
+	cxSurface::cxSurface() :cxObject(OBJ_SURFACE)
+	{
+	}
+	cxSurface::~cxSurface()
+	{
+	}
+	cxRenderer::cxRenderer() :cxObject(OBJ_RENDERER)
+	{
+	}
+	cxRenderer::~cxRenderer()
+	{
+	}
+	cxWorld::cxWorld() :cxObject(OBJ_WORLD)
+	{
+	}
+	cxWorld::~cxWorld()
+	{
+	}
+
+
+#endif // !1 实现
+
+
 	aDevice new_device(void* vctx, void* phy, void* dev, const char* devname) {
 		aDevice p = nullptr;
 		if (!vctx)return p;
@@ -869,6 +1126,7 @@ namespace vkg {
 	int frame_ready(aFrame frame, int wait_mask) {
 		return 0;
 	}
+
 }
 //!vkg
 
