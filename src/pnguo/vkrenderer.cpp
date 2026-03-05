@@ -9962,12 +9962,11 @@ namespace vkr
 		}
 		pi->pPrimitive->_pipe = pi->pbrpipe;
 	}
-
 	void get_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
 	{
 		VkPipelineColorBlendAttachmentState color_blend =
 		{
-			VK_TRUE,                                                      // VkBool32                                       blendEnable
+			blend ? VK_TRUE : VK_FALSE,                                                      // VkBool32                                       blendEnable
 			VK_BLEND_FACTOR_SRC_ALPHA,                                    // VkBlendFactor                                  srcColorBlendFactor
 			VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                          // VkBlendFactor                                  dstColorBlendFactor
 			VK_BLEND_OP_ADD,                                              // VkBlendOp                                      colorBlendOp
@@ -9977,6 +9976,10 @@ namespace vkr
 			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
 			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
 		};
+		out = color_blend;
+	}
+	void get_one_blend(bool blend, VkPipelineColorBlendAttachmentState& out)
+	{
 		VkPipelineColorBlendAttachmentState color_no_blend = {
 			VK_FALSE,                                                     // VkBool32                                       blendEnable
 			VK_BLEND_FACTOR_ONE,                                          // VkBlendFactor                                  srcColorBlendFactor
@@ -9988,8 +9991,8 @@ namespace vkr
 			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |         // VkColorComponentFlags                          colorWriteMask
 			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
 		};
-		out = blend ? color_blend : color_no_blend;
-	}
+		out = color_no_blend;
+	} 
 	//--------------------------------------------------------------------------------------
 
 	void new_pipeline(ResourceViewHeaps* prv, PBRPipe_t* pbrpipe, const DefineList& defines0,
