@@ -78,7 +78,7 @@
 #include <glm/gtx/vector_angle.hpp>
 #include <glm/gtx/closest_point.hpp>
 #include <glm/gtc/type_ptr.hpp> 
-#include <glm/gtc/matrix_transform.hpp> 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp> 
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtx/euler_angles.hpp>

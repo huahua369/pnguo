@@ -759,7 +759,8 @@ namespace vkg {
 	class cxMaterial;	// 材质
 	class cxPipeline;	// 渲染管线
 	class cxPipelineCS;	// 计算管线
-	class cxSampler;	// 纹理采样器
+	class cxSampler;	// 采样器
+	class cxImage;		// 纹理
 	class cxSurface;	// 表面
 	class cxRenderer;	// 渲染器
 	class cxWorld;		// 世界
@@ -856,6 +857,12 @@ namespace vkg {
 	public:
 		cxSampler();
 		~cxSampler();
+	};
+	class cxImage :public cxObject
+	{
+	public:
+		cxImage();
+		~cxImage();
 	};
 	class cxSurface :public cxObject
 	{
@@ -966,6 +973,12 @@ namespace vkg {
 	cxSampler::~cxSampler()
 	{
 	}
+	cxImage::cxImage() :cxObject(OBJ_IMAGE)
+	{
+	}
+	cxImage::~cxImage()
+	{
+	}
 	cxSurface::cxSurface() :cxObject(OBJ_SURFACE)
 	{
 	}
@@ -983,6 +996,386 @@ namespace vkg {
 	}
 	cxWorld::~cxWorld()
 	{
+	}
+
+
+	// 生成四边形（XY平面，中心在原点，边长2） 
+	void generate_quad(std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, std::vector<glm::vec3>& normals) {
+		// 顶点：左下、右下、右上、左上 
+		vertices = {
+			glm::vec3(-1.0f, -1.0f, 0.0f),
+			glm::vec3(1.0f, -1.0f, 0.0f),
+			glm::vec3(1.0f, 1.0f, 0.0f),
+			glm::vec3(-1.0f, 1.0f, 0.0f)
+		};
+		// 索引：两个三角形（0,1,2）、（0,2,3）
+		indices = { 0, 1, 2, 0, 2, 3 };
+		// 法线：正面朝Z轴正方向（0,0,1）
+		normals = {
+			glm::vec3(0.0f, 0.0f, 1.0f),
+			glm::vec3(0.0f, 0.0f, 1.0f),
+			glm::vec3(0.0f, 0.0f, 1.0f),
+			glm::vec3(0.0f, 0.0f, 1.0f)
+		};
+	}
+	/*
+	圆柱（Cylinder）
+描述：由底面（圆形）、顶面（圆形）、**侧面（矩形绕Y轴旋转）**组成。
+参数：radius（底面半径）、height（高度）、segments（圆周分段数，越大越光滑）。
+	*/
+	void generate_cylinder(float radius, float height, int segments,
+		std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, std::vector<glm::vec3>& normals) {
+		vertices.clear();
+		indices.clear();
+		normals.clear();
+
+		// 1. 底面（Y=0）
+		vertices.push_back(glm::vec3(0.0f, 0.0f, 0.0f)); // 底面中心 
+		for (int i = 0; i < segments; ++i) {
+			float theta = 2.0f * glm::pi<float>() * static_cast<float>(i) / segments;
+			float x = radius * glm::cos(theta);
+			float z = radius * glm::sin(theta);
+			vertices.push_back(glm::vec3(x, 0.0f, z)); // 底面圆周点
+		}
+
+		// 2. 顶面（Y=height）
+		vertices.push_back(glm::vec3(0.0f, height, 0.0f)); // 顶面中心 
+		for (int i = 0; i < segments; ++i) {
+			float theta = 2.0f * glm::pi<float>() * static_cast<float>(i) / segments;
+			float x = radius * glm::cos(theta);
+			float z = radius * glm::sin(theta);
+			vertices.push_back(glm::vec3(x, height, z)); // 顶面圆周点
+		}
+
+		// 3. 索引数组（三角扇+三角带） 
+		// 底面三角扇（中心+圆周点） 
+		for (int i = 1; i < segments; ++i) {
+			indices.push_back(0);  // 底面中心 
+			indices.push_back(i);
+			indices.push_back(i + 1);
+		}
+		indices.push_back(0);
+		indices.push_back(segments);
+		indices.push_back(1);  // 闭合底面 
+
+		// 顶面三角扇（中心+圆周点） 
+		int top_center = segments + 1;
+		for (int i = 0; i < segments; ++i) {
+			indices.push_back(top_center);  // 顶面中心 
+			indices.push_back(top_center + 1 + i);
+			indices.push_back(top_center + 1 + (i + 1) % segments);
+		}
+
+		// 侧面三角带（底面圆周点+顶面圆周点） 
+		for (int i = 0; i < segments; ++i) {
+			int bottom = 1 + i;
+			int top = top_center + 1 + i;
+			indices.push_back(bottom);
+			indices.push_back(top);
+		}
+		indices.push_back(1);
+		indices.push_back(top_center + 1); // 闭合侧面 
+
+		// 4. 法线数组 
+		// 底面中心法线（垂直向下）
+		normals.push_back(glm::vec3(0.0f, -1.0f, 0.0f));
+		// 底面圆周点法线（径向，归一化） 
+		for (int i = 0; i < segments; ++i) {
+			float theta = 2.0f * glm::pi<float>() * static_cast<float>(i) / segments;
+			normals.push_back(glm::vec3(glm::cos(theta), 0.0f, glm::sin(theta)));
+		}
+		// 顶面中心法线（垂直向上）
+		normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+		// 顶面圆周点法线（径向，归一化） 
+		for (int i = 0; i < segments; ++i) {
+			float theta = 2.0f * glm::pi<float>() * static_cast<float>(i) / segments;
+			normals.push_back(glm::vec3(glm::cos(theta), 0.0f, glm::sin(theta)));
+		}
+	}
+
+	/*
+	圆锥（Cone）
+描述：由底面（圆形）、**侧面（三角形带，连接底面圆周点与顶点）**组成。
+参数：radius（底面半径）、height（高度）、segments（圆周分段数）。
+	*/
+	void generate_cone(float radius, float height, int segments,
+		std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, std::vector<glm::vec3>& normals) {
+		vertices.clear();
+		indices.clear();
+		normals.clear();
+
+		// 1. 顶点（底面中心+底面圆周点+顶点）
+		vertices.push_back(glm::vec3(0.0f, 0.0f, 0.0f)); // 底面中心 
+		for (int i = 0; i < segments; ++i) {
+			float theta = 2.0f * glm::pi<float>() * static_cast<float>(i) / segments;
+			float x = radius * glm::cos(theta);
+			float z = radius * glm::sin(theta);
+			vertices.push_back(glm::vec3(x, 0.0f, z)); // 底面圆周点
+		}
+		vertices.push_back(glm::vec3(0.0f, height, 0.0f)); // 顶点（圆锥顶） 
+
+		// 2. 索引数组（底面三角扇+侧面三角列表）
+		// 底面三角扇
+		for (int i = 1; i < segments; ++i) {
+			indices.push_back(0);
+			indices.push_back(i);
+			indices.push_back(i + 1);
+		}
+		indices.push_back(0);
+		indices.push_back(segments);
+		indices.push_back(1);  // 闭合底面 
+
+		// 侧面三角列表（每个三角形：顶点+底面点i+底面点i+1）
+		int apex = segments + 1;
+		for (int i = 0; i < segments; ++i) {
+			int b = 1 + i;
+			int c = 1 + (i + 1) % segments;
+			indices.push_back(apex);
+			indices.push_back(b);
+			indices.push_back(c);
+		}
+
+		// 3. 法线数组（侧面法线=三角形叉乘，顶点法线=侧面法线平均）
+		std::vector<glm::vec3> face_normals;
+		for (int i = 0; i < segments; ++i) {
+			glm::vec3 V = vertices[apex];
+			glm::vec3 B_i = vertices[1 + i];
+			glm::vec3 B_ip1 = vertices[1 + (i + 1) % segments];
+			glm::vec3 normal = glm::normalize(glm::cross(B_i - V, B_ip1 - V));
+			face_normals.push_back(normal);
+		}
+
+		// 底面中心法线（垂直向下）
+		normals.push_back(glm::vec3(0.0f, -1.0f, 0.0f));
+		// 底面圆周点法线（相邻侧面法线平均）
+		for (int i = 0; i < segments; ++i) {
+			glm::vec3 normal = (face_normals[i] + face_normals[(i - 1 + segments) % segments]) / 2.0f;
+			normals.push_back(glm::normalize(normal));
+		}
+		// 顶点法线（所有侧面法线平均）
+		glm::vec3 apex_normal(0.0f);
+		for (const auto& n : face_normals) apex_normal += n;
+		normals.push_back(glm::normalize(apex_normal));
+	}
+	/*
+	曲线（三次贝塞尔曲线的管状体）
+描述：将贝塞尔曲线扩展为管状体（中心轴为曲线，垂直于曲线的平面上生成圆形，连接相邻圆形点形成三角带）。
+参数：control_points（三次贝塞尔控制点，4个）、radius（管状体半径）、curve_segments（曲线分段数）、tube_segments（管状体圆周分段数）。
+
+	*/
+	struct bcp_pt {
+		double x0, y0;    // P0
+		double x1, y1;    // P1
+		double x2, y2;    // P2
+		double x3, y3;    // P3
+	};
+	// 计算贝塞尔曲线点坐标 
+	glm::vec3 bezier_point(const glm::vec3* ctrl, double t) {
+		double u = 1.0 - t;
+		glm::vec3 r = {};
+		r.x = pow(u, 3) * ctrl[0].x + 3 * t * pow(u, 2) * ctrl[1].x + 3 * pow(t, 2) * u * ctrl[2].x + pow(t, 3) * ctrl[3].x;
+		r.y = pow(u, 3) * ctrl[0].y + 3 * t * pow(u, 2) * ctrl[1].y + 3 * pow(t, 2) * u * ctrl[2].y + pow(t, 3) * ctrl[3].y;
+		return r;
+	}
+
+	// 计算贝塞尔曲线导数 
+	glm::vec3 bezier_derivative(const glm::vec3* ctrl, double t) {
+		double u = 1.0 - t;
+		glm::vec3 r = {};
+		r.x = 3 * pow(u, 2) * (ctrl[1].x - ctrl[0].x) + 6 * t * u * (ctrl[2].x - ctrl[1].x) + 3 * pow(t, 2) * (ctrl[3].x - ctrl[2].x);
+		r.y = 3 * pow(u, 2) * (ctrl[1].y - ctrl[0].y) + 6 * t * u * (ctrl[2].y - ctrl[1].y) + 3 * pow(t, 2) * (ctrl[3].y - ctrl[2].y);
+		return r;
+	}
+
+	void generate_curve_tube(const std::vector<glm::vec3>& control_points, float radius, int curve_segments, int tube_segments,
+		std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, std::vector<glm::vec3>& normals) {
+		vertices.clear();
+		indices.clear();
+		normals.clear();
+
+		// 1. 计算贝塞尔曲线上的点和切线 
+		std::vector<glm::vec3> curve_points;
+		std::vector<glm::vec3> tangents;
+		for (int i = 0; i <= curve_segments; ++i) {
+			float t = static_cast<float>(i) / curve_segments;
+			curve_points.push_back(bezier_point(control_points.data(), t));
+			tangents.push_back(glm::normalize(bezier_derivative(control_points.data(), t)));
+		}
+
+		// 2. 生成管状体顶点（每个曲线点处的圆形）
+		for (int i = 0; i < curve_segments; ++i) {
+			glm::vec3 point = curve_points[i];
+			glm::vec3 tangent = tangents[i];
+			// 计算垂直于切线的两个单位向量（u: 切线×上方向，v: 切线×u）
+			glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+			if (glm::dot(tangent, up) > 0.99f) up = glm::vec3(1.0f, 0.0f, 0.0f); // 避免切线与up平行 
+			glm::vec3 u = glm::normalize(glm::cross(tangent, up));
+			glm::vec3 v = glm::normalize(glm::cross(tangent, u));
+
+			// 生成圆形上的点
+			for (int j = 0; j < tube_segments; ++j) {
+				float theta = 2.0f * glm::pi<float>() * static_cast<float>(j) / tube_segments;
+				glm::vec3 offset = radius * (glm::cos(theta) * u + glm::sin(theta) * v);
+				vertices.push_back(point + offset);
+			}
+		}
+
+		// 3. 生成索引（三角带，连接相邻圆形点） 
+		for (int i = 0; i < curve_segments - 1; ++i) {
+			for (int j = 0; j < tube_segments; ++j) {
+				int current = i * tube_segments + j;
+				int next = (i + 1) * tube_segments + j;
+				int next_j = (j + 1) % tube_segments;
+				indices.push_back(current);
+				indices.push_back(next);
+				indices.push_back(next + next_j); // 三角形1: current→next→next_j 
+				indices.push_back(current);
+				indices.push_back(next + next_j);
+				indices.push_back(current + next_j); // 三角形2: current→next_j→current_next_j 
+			}
+		}
+
+		// 4. 法线数组（径向向量，顶点-曲线点归一化） 
+		for (int i = 0; i < curve_segments; ++i) {
+			glm::vec3 point = curve_points[i];
+			for (int j = 0; j < tube_segments; ++j) {
+				normals.push_back(glm::normalize(vertices[i * tube_segments + j] - point));
+			}
+		}
+	}
+	/*
+	棱角球（正二十面体细分）
+描述：通过细分正二十面体生成球面（每个三角形面分成四个小三角形，边中点归一化到球面上）。
+参数：subdivisions（细分次数，越大越光滑）
+	*/
+	// 正二十面体初始顶点（黄金比例φ=(1+√5)/2≈1.618） 
+	std::vector<glm::vec3> get_icosahedron_vertices() {
+		float phi = (1.0f + glm::sqrt(5.0f)) / 2.0f;
+		return {
+			glm::vec3(0.0f, 1.0f, phi),
+			glm::vec3(0.0f, -1.0f, phi),
+			glm::vec3(0.0f, 1.0f, -phi),
+			glm::vec3(0.0f, -1.0f, -phi),
+			glm::vec3(1.0f, phi, 0.0f),
+			glm::vec3(-1.0f, phi, 0.0f),
+			glm::vec3(1.0f, -phi, 0.0f),
+			glm::vec3(-1.0f, -phi, 0.0f),
+			glm::vec3(phi, 0.0f, 1.0f),
+			glm::vec3(-phi, 0.0f, 1.0f),
+			glm::vec3(phi, 0.0f, -1.0f),
+			glm::vec3(-phi, 0.0f, -1.0f)
+		};
+	}
+
+	// 正二十面体初始面索引（每个面3个顶点）
+	std::vector<unsigned int> get_icosahedron_indices() {
+		return {
+			0, 11, 5,  0, 5, 1,  0, 1, 7,  0, 7, 10,  0, 10, 11,
+			11, 10, 2, 10, 7, 6,  7, 1, 4,  1, 5, 3,   5, 11, 8,
+			2, 10, 6,  6, 7, 4,  4, 1, 3,  3, 5, 8,   8, 11, 2
+		};
+	}
+
+	// 细分函数：将每个三角形面分成四个小三角形 
+	void subdivide_icosahedron(std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices) {
+		std::vector<glm::vec3> new_vertices = vertices;
+		std::vector<unsigned int> new_indices;
+		std::map<std::pair<unsigned int, unsigned int>, unsigned int> edge_midpoints;
+
+		// 处理每个原三角形面
+		for (size_t i = 0; i < indices.size(); i += 3) {
+			unsigned int a = indices[i];
+			unsigned int b = indices[i + 1];
+			unsigned int c = indices[i + 2];
+
+			// 获取边中点（避免重复计算）
+			auto get_midpoint = [&](unsigned int u, unsigned int v) -> unsigned int {
+				if (u > v) std::swap(u, v);
+				auto key = std::make_pair(u, v);
+				if (edge_midpoints.count(key))  return edge_midpoints[key];
+				glm::vec3 mid = glm::normalize((vertices[u] + vertices[v]) / 2.0f);
+				unsigned int idx = new_vertices.size();
+				new_vertices.push_back(mid);
+				edge_midpoints[key] = idx;
+				return idx;
+				};
+
+			unsigned int ab = get_midpoint(a, b);
+			unsigned int bc = get_midpoint(b, c);
+			unsigned int ca = get_midpoint(c, a);
+
+			// 新增四个小三角形 
+			new_indices.insert(new_indices.end(), { a, ab, ca });
+			new_indices.insert(new_indices.end(), { b, ab, bc });
+			new_indices.insert(new_indices.end(), { c, bc, ca });
+			new_indices.insert(new_indices.end(), { ab, bc, ca });
+		}
+
+		vertices = new_vertices;
+		indices = new_indices;
+	}
+
+	// 生成棱角球（正二十面体细分）
+	void generate_geodesic_sphere(int subdivisions,
+		std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, std::vector<glm::vec3>& normals) {
+		vertices = get_icosahedron_vertices();
+		indices = get_icosahedron_indices();
+
+		// 细分指定次数 
+		for (int i = 0; i < subdivisions; ++i) {
+			subdivide_icosahedron(vertices, indices);
+		}
+
+		// 法线：顶点坐标归一化（已在球面上）
+		normals.reserve(vertices.size());
+		for (const auto& v : vertices) {
+			normals.push_back(glm::normalize(v));
+		}
+	}
+	/*
+	经纬球（UV Sphere）
+描述：通过**纬度（θ，-π/2到π/2）和经度（φ，0到2π）**划分球面，生成三角网格（每个四边形分成两个三角形）。
+参数：radius（半径）、lat_segments（纬度分段数，如10段=11个纬度圈）、lon_segments（经度分段数，如20段=21个经度线）。
+	*/
+
+	void generate_uv_sphere(float radius, int lat_segments, int lon_segments,
+		std::vector<glm::vec3>& vertices, std::vector<unsigned int>& indices, std::vector<glm::vec3>& normals) {
+		vertices.clear();
+		indices.clear();
+		normals.clear();
+
+		// 1. 计算顶点坐标 
+		for (int lat = 0; lat <= lat_segments; ++lat) {
+			float theta = glm::pi<float>() * static_cast<float>(lat) / lat_segments - glm::pi<float>() / 2.0f; // 纬度（-π/2到π/2） 
+			float sin_theta = glm::sin(theta);
+			float cos_theta = glm::cos(theta);
+			for (int lon = 0; lon <= lon_segments; ++lon) {
+				float phi = 2.0f * glm::pi<float>() * static_cast<float>(lon) / lon_segments; // 经度（0到2π） 
+				float sin_phi = glm::sin(phi);
+				float cos_phi = glm::cos(phi);
+				// 球面坐标转笛卡尔坐标 
+				float x = radius * cos_theta * cos_phi;
+				float y = radius * sin_theta;
+				float z = radius * cos_theta * sin_phi;
+				vertices.push_back(glm::vec3(x, y, z));
+			}
+		}
+
+		// 2. 生成索引（每个四边形分成两个三角形）
+		for (int lat = 0; lat < lat_segments; ++lat) {
+			for (int lon = 0; lon < lon_segments; ++lon) {
+				unsigned int a = lat * (lon_segments + 1) + lon;
+				unsigned int b = (lat + 1) * (lon_segments + 1) + lon;
+				unsigned int c = (lat + 1) * (lon_segments + 1) + (lon + 1);
+				unsigned int d = lat * (lon_segments + 1) + (lon + 1);
+				indices.insert(indices.end(), { a, b, c, a, c, d }); // 两个三角形 
+			}
+		}
+
+		// 3. 法线数组（顶点坐标归一化，已在球面上）
+		for (const auto& v : vertices) {
+			normals.push_back(glm::normalize(v));
+		}
 	}
 
 
@@ -1042,6 +1435,10 @@ namespace vkg {
 		aSampler p = nullptr;
 		return p;
 	}
+	aImage new_aImage(void* ctx, const char* type) {
+		aImage p = nullptr;
+		return p;
+	}
 	aSurface new_aSurface(void* ctx, const char* type) {
 		aSurface p = nullptr;
 		return p;
@@ -1071,6 +1468,7 @@ namespace vkg {
 		case OBJ_PIPELINE:	p = new_aPipeline(ctx, type); break;
 		case OBJ_PIPELINECS:p = new_aPipelineCS(ctx, type); break;
 		case OBJ_SAMPLER:	p = new_aSampler(ctx, type); break;
+		case OBJ_IMAGE:		p = new_aImage(ctx, type); break;
 		case OBJ_SURFACE:	p = new_aSurface(ctx, type); break;
 		case OBJ_RENDERER:	p = new_aRenderer(ctx, type); break;
 		case OBJ_WORLD:		p = new_aWorld(ctx, type); break;
