@@ -768,11 +768,14 @@ namespace vkg {
 	class cxObject
 	{
 	public:
+		int64_t refcount = 1;
 		int obj_type = 0;
 	public:
 		cxObject();
 		cxObject(int t);
 		virtual ~cxObject();
+		int64_t get_release();
+		void retain();
 	};
 	class cxDevice :public cxObject
 	{
@@ -894,6 +897,15 @@ namespace vkg {
 	{
 	}
 	cxObject::~cxObject() {}
+	int64_t cxObject::get_release()
+	{
+		refcount--;
+		return refcount;
+	}
+	void cxObject::retain()
+	{
+		refcount++;
+	}
 	cxDevice::cxDevice() :cxObject(OBJ_DEVICE)
 	{
 	}
@@ -1392,63 +1404,93 @@ namespace vkg {
 	}
 	aCamera new_aCamera(void* ctx, const char* type) {
 		aCamera p = nullptr;
+		auto c = new cxCamera();
+		p = c;
 		return p;
 	}
 	aArray new_aArray(void* ctx, const char* type) {
 		aArray p = nullptr;
+		auto c = new cxArray();
+		p = c;
 		return p;
 	}
 
 	aFrame new_aFrame(void* ctx, const char* type) {
 		aFrame p = nullptr;
+		auto c = new cxFrame();
+		p = c;
 		return p;
 	}
 	aGeometry new_aGeometry(void* ctx, const char* type) {
 		aGeometry p = nullptr;
+		auto c = new cxGeometry();
+		p = c;
 		return p;
 	}
 	aGroup new_aGroup(void* ctx, const char* type) {
 		aGroup p = nullptr;
+		auto c = new cxGroup();
+		p = c;
 		return p;
 	}
 	aInstance new_aInstance(void* ctx, const char* type) {
 		aInstance p = nullptr;
+		auto c = new cxInstance();
+		p = c;
 		return p;
 	}
 	aLight new_aLight(void* ctx, const char* type) {
 		aLight p = nullptr;
+		auto c = new cxLight();
+		p = c;
 		return p;
 	}
 	aMaterial new_aMaterial(void* ctx, const char* type) {
 		aMaterial p = nullptr;
+		auto c = new cxMaterial();
+		p = c;
 		return p;
 	}
 	aPipeline new_aPipeline(void* ctx, const char* type) {
 		aPipeline p = nullptr;
+		auto c = new cxPipeline();
+		p = c;
 		return p;
 	}
 	aPipelineCS new_aPipelineCS(void* ctx, const char* type) {
 		aPipelineCS p = nullptr;
+		auto c = new cxPipelineCS();
+		p = c;
 		return p;
 	}
 	aSampler new_aSampler(void* ctx, const char* type) {
 		aSampler p = nullptr;
+		auto c = new cxSampler();
+		p = c;
 		return p;
 	}
 	aImage new_aImage(void* ctx, const char* type) {
 		aImage p = nullptr;
+		auto c = new cxImage();
+		p = c;
 		return p;
 	}
 	aSurface new_aSurface(void* ctx, const char* type) {
 		aSurface p = nullptr;
+		auto c = new cxSurface();
+		p = c;
 		return p;
 	}
 	aRenderer new_aRenderer(void* ctx, const char* type) {
 		aRenderer p = nullptr;
+		auto c = new cxRenderer();
+		p = c;
 		return p;
 	}
 	aWorld new_aWorld(void* ctx, const char* type) {
 		aWorld p = nullptr;
+		auto c = new cxWorld();
+		p = c;
 		return p;
 	}
 
@@ -1478,9 +1520,15 @@ namespace vkg {
 		return p;
 	}
 	void release(aObject obj) {
+		auto c = (cxObject*)obj;
+		if (c && c->get_release() == 0)
+			delete c;
 	}
 	// 增加引用计数
 	void retain(aObject obj) {
+		auto c = (cxObject*)obj;
+		if (c)
+			c->retain();
 	}
 	// 设置参数
 	void set_param(void* obj, const char* name, int data_type, void* data) {
