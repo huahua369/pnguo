@@ -768,23 +768,29 @@ namespace vkg {
 	class cxObject
 	{
 	public:
-		int64_t refcount = 1;
+		int refcount = 1;
 		int obj_type = 0;
 	public:
 		cxObject();
 		cxObject(int t);
 		virtual ~cxObject();
-		int64_t get_release();
+		int get_release();
 		void retain();
 	};
 	class cxDevice :public cxObject
 	{
 	public:
+		// 逻辑设备
+		void* _dev = nullptr;
+		void* _queue = nullptr;
+	public:
 		cxDevice();
 		~cxDevice();
+		void set_device(void* dev, int idx);
 	};
 	class cxCamera :public cxObject
 	{
+	public:
 	public:
 		cxCamera();
 		~cxCamera();
@@ -795,11 +801,13 @@ namespace vkg {
 	class cxArray :public cxObject
 	{
 	public:
+	public:
 		cxArray();
 		~cxArray();
 	};
 	class cxFrame :public cxObject
 	{
+	public:
 	public:
 		cxFrame();
 		~cxFrame();
@@ -810,6 +818,7 @@ namespace vkg {
 	class cxGeometry :public cxObject
 	{
 	public:
+	public:
 		cxGeometry();
 		~cxGeometry();
 
@@ -818,6 +827,7 @@ namespace vkg {
 	};
 	class cxGroup :public cxObject
 	{
+	public:
 	public:
 		cxGroup();
 		~cxGroup();
@@ -828,11 +838,13 @@ namespace vkg {
 	class cxInstance :public cxObject
 	{
 	public:
+	public:
 		cxInstance();
 		~cxInstance();
 	};
 	class cxLight :public cxObject
 	{
+	public:
 	public:
 		cxLight();
 		~cxLight();
@@ -840,11 +852,13 @@ namespace vkg {
 	class cxMaterial :public cxObject
 	{
 	public:
+	public:
 		cxMaterial();
 		~cxMaterial();
 	};
 	class cxPipeline :public cxObject
 	{
+	public:
 	public:
 		cxPipeline();
 		~cxPipeline();
@@ -852,11 +866,13 @@ namespace vkg {
 	class cxPipelineCS :public cxObject
 	{
 	public:
+	public:
 		cxPipelineCS();
 		~cxPipelineCS();
 	};
 	class cxSampler :public cxObject
 	{
+	public:
 	public:
 		cxSampler();
 		~cxSampler();
@@ -864,11 +880,13 @@ namespace vkg {
 	class cxImage :public cxObject
 	{
 	public:
+	public:
 		cxImage();
 		~cxImage();
 	};
 	class cxSurface :public cxObject
 	{
+	public:
 	public:
 		cxSurface();
 		~cxSurface();
@@ -876,11 +894,13 @@ namespace vkg {
 	class cxRenderer :public cxObject
 	{
 	public:
+	public:
 		cxRenderer();
 		~cxRenderer();
 	};
 	class cxWorld :public cxObject
 	{
+	public:
 	public:
 		cxWorld();
 		~cxWorld();
@@ -897,7 +917,7 @@ namespace vkg {
 	{
 	}
 	cxObject::~cxObject() {}
-	int64_t cxObject::get_release()
+	int cxObject::get_release()
 	{
 		refcount--;
 		return refcount;

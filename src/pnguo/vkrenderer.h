@@ -270,6 +270,7 @@ namespace vkr {
 		void* vkdev = 0;
 		uint32_t qFamIdx = 0;		// familyIndex
 		uint32_t qIndex = 0;
+		uint32_t qCount = 0;
 	};
 #endif
 }

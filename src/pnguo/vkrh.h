@@ -20,6 +20,7 @@ namespace vkr {
 		void* vkdev = 0;
 		uint32_t qFamIdx = 0;		// familyIndex
 		uint32_t qIndex = 0;
+		uint32_t qCount = 0;
 	};
 #endif
 #ifndef DEVICE_INFO_T
@@ -112,8 +113,8 @@ namespace vkr {
 		uint32_t graphics_queue_family_index = 0;
 		VkQueue compute_queue = 0;
 		uint32_t compute_queue_family_index = 0;
+		std::vector<VkQueue> _graphics_queues;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
-
 		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
 
 		Cache<VkShaderModule>* s_shaderCache = 0;
@@ -149,6 +150,9 @@ namespace vkr {
 		VkPhysicalDevice GetPhysicalDevice();
 		VkSurfaceKHR GetSurface();
 		void GetDeviceInfo(std::string* deviceName, std::string* driverVersion);
+
+		VkQueue get_graphics_queue(uint32_t idx);
+		size_t get_graphics_queue_count();
 #ifdef USE_VMA
 		VmaAllocator GetAllocator();
 #endif

@@ -1817,30 +1817,29 @@ namespace vkr
 #endif
 		return pNext;
 	}
-
+	void get_qfp(VkPhysicalDevice physicalDevice, std::vector<VkQueueFamilyProperties>& queue_props)
+	{
+		uint32_t queue_family_count;
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queue_family_count, NULL);
+		assert(queue_family_count >= 1);
+		queue_props.resize(queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queue_family_count, queue_props.data());
+	}
 	void Device::OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp)
 	{
 		VkResult res;
-
 		m_instance = vulkanInstance;
 		m_physicaldevice = physicalDevice;
-
-		// Get queue/memory/device properties
-		//
-		uint32_t queue_family_count;
-		vkGetPhysicalDeviceQueueFamilyProperties(m_physicaldevice, &queue_family_count, NULL);
-		assert(queue_family_count >= 1);
-
+		// Get queue/memory/device properties 
 		std::vector<VkQueueFamilyProperties> queue_props;
-		queue_props.resize(queue_family_count);
-		vkGetPhysicalDeviceQueueFamilyProperties(m_physicaldevice, &queue_family_count, queue_props.data());
+		get_qfp(m_physicaldevice, queue_props);
+		uint32_t queue_family_count = queue_props.size();
 		assert(queue_family_count >= 1);
 
 		vkGetPhysicalDeviceMemoryProperties(m_physicaldevice, &m_memoryProperties);
 		vkGetPhysicalDeviceProperties(m_physicaldevice, &m_deviceProperties);
 
-		// Get subgroup properties to check if subgroup operations are supported
-		//
+		// Get subgroup properties to check if subgroup operations are supported 
 		m_subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
 		m_subgroupProperties.pNext = NULL;
 
@@ -1929,34 +1928,56 @@ namespace vkr
 		}
 
 		compute_queue_family_index = UINT32_MAX;
-
+		std::vector<int> computes;
 		for (uint32_t i = 0; i < queue_family_count; ++i)
 		{
 			if ((queue_props[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0)
 			{
-				if (compute_queue_family_index == UINT32_MAX)
-					compute_queue_family_index = i;
-				if (i != graphics_queue_family_index) {
-					compute_queue_family_index = i;
-					break;
-				}
+				computes.push_back(i);
+				//if (compute_queue_family_index == UINT32_MAX)
+				//	compute_queue_family_index = i;
+				//if (i != graphics_queue_family_index) {
+				//	compute_queue_family_index = i;
+				//	break;
+				//}
 			}
 		}
-
+		if (computes.size())
+			graphics_queue_family_index = computes[0];
 		// prepare existing extensions names into a buffer for vkCreateDevice
 		std::vector<const char*> extension_names;
 		pDp->GetExtensionNamesAndConfigs(&extension_names);
 
 		// Create device 
-		//
-		float queue_priorities[1] = { 0.0 };
+		std::vector<VkDeviceQueueCreateInfo> device_queue_create_infos;
+		std::vector<float> queue_priorities;
 		int qcount = 1;
+#if 1
+		size_t qc = 0;
+		for (size_t i = 0; i < queue_family_count; i++)
+		{
+			auto& it = queue_props[i];
+			qc += it.queueCount;
+		}
+		device_queue_create_infos.resize(queue_family_count);
+		queue_priorities.resize(qc, 0.0f);
+		auto qp = queue_priorities.data();
+		for (size_t i = 0; i < queue_family_count; i++)
+		{
+			auto& it = queue_props[i];
+			auto& qf = device_queue_create_infos[i];
+			qf.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			qf.pNext = NULL;
+			qf.queueCount = it.queueCount;
+			qf.pQueuePriorities = qp;
+			qp += it.queueCount;
+			qf.queueFamilyIndex = i;
+		}
+		VkDeviceQueueCreateInfo* queue_info = device_queue_create_infos.data();
+		qcount = queue_family_count;
+#else
+		float queue_priorities[1] = { 0.0 };
 		VkDeviceQueueCreateInfo queue_info[2] = {};
-		queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_info[0].pNext = NULL;
-		queue_info[0].queueCount = 1;// qfp->queueCount;
-		queue_info[0].pQueuePriorities = queue_priorities;
-		queue_info[0].queueFamilyIndex = graphics_queue_family_index;
 		queue_info[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queue_info[1].pNext = NULL;
 		queue_info[1].queueCount = 1;
@@ -1964,6 +1985,7 @@ namespace vkr
 		queue_info[1].queueFamilyIndex = compute_queue_family_index;
 		if (compute_queue_family_index != graphics_queue_family_index)
 			qcount++;
+#endif
 		VkPhysicalDeviceFeatures physicalDeviceFeatures = {};
 		physicalDeviceFeatures.fillModeNonSolid = true;
 		physicalDeviceFeatures.pipelineStatisticsQuery = true;
@@ -2091,6 +2113,22 @@ namespace vkr
 		// create queues
 		//
 		vkGetDeviceQueue(m_device, graphics_queue_family_index, 0, &graphics_queue);
+		uint32_t graphics_fidx = 0;
+		for (size_t i = 0; i < queue_family_count; i++)
+		{
+			auto& it = queue_props[i];
+			if (it.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				graphics_fidx = i;
+				_graphics_queues.resize(it.queueCount);
+				break;
+			}
+		}
+		for (int i = 0; i < _graphics_queues.size(); i++) {
+			VkQueue gq = 0;
+			vkGetDeviceQueue(m_device, graphics_fidx, i, &gq);
+			_graphics_queues[i] = gq;
+		}
 		if (graphics_queue_family_index == present_queue_family_index)
 		{
 			present_queue = graphics_queue;
@@ -2103,6 +2141,7 @@ namespace vkr
 		{
 			vkGetDeviceQueue(m_device, compute_queue_family_index, 0, &compute_queue);
 		}
+		else { compute_queue = graphics_queue; }
 
 		// Init the extensions (if they have been enabled successfuly)
 		//
@@ -2111,7 +2150,17 @@ namespace vkr
 		ExtGetHDRFSEFreesyncHDRProcAddresses(m_instance, m_device);
 #endif
 	}
-
+	VkQueue Device::get_graphics_queue(uint32_t idx)
+	{
+		VkQueue gq = nullptr;
+		if (_graphics_queues.size() > idx)
+			return _graphics_queues[idx];
+		return gq;
+	}
+	size_t Device::get_graphics_queue_count()
+	{
+		return _graphics_queues.size();
+	}
 	void Device::GetDeviceInfo(std::string* deviceName, std::string* driverVersion)
 	{
 #define EXTRACT(v,offset, length) ((v>>offset) & ((1<<length)-1))
@@ -9992,7 +10041,7 @@ namespace vkr
 			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
 		};
 		out = color_no_blend;
-	} 
+	}
 	//--------------------------------------------------------------------------------------
 
 	void new_pipeline(ResourceViewHeaps* prv, PBRPipe_t* pbrpipe, const DefineList& defines0,
@@ -23013,6 +23062,7 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 		vkr::InitShaderCompilerCache(shaderLibDir, shaderCacheDir);
 		tx->OnCreate();
 		p->_dev_info = { dev->m_instance,dev->m_physicaldevice,dev->m_device };
+		p->_dev_info.qCount = dev->get_graphics_queue_count();
 		p->ctx = tx;
 		p->renderpass_opaque = tx->m_pRenderer->m_RenderPassFullGBufferWithClear.m_renderPass;
 		p->renderpass_justdepth = tx->m_pRenderer->m_RenderPassJustDepthAndHdr.m_renderPass;

@@ -878,8 +878,9 @@ int main()
 		{
 			dev_info_c cc = {};
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
-			cc.qFamIdx = vkd->_dev_info.qFamIdx; cc.qIndex = vkd->_dev_info.qIndex;
-
+			cc.qFamIdx = vkd->_dev_info.qFamIdx;
+			if (vkd->_dev_info.qCount > 2)
+				cc.qIndex = 2;
 			vctx = new_vkvgdev(&cc, 8);
 		}
 
@@ -1067,7 +1068,7 @@ int main()
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
+						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
 					r_render_data_text(&ptb->trt, { 20,10 }, td3);

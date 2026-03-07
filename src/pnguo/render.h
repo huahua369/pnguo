@@ -185,6 +185,7 @@ struct dev_info_c
 	VkDevice vkdev;
 	uint32_t qFamIdx;		// familyIndex
 	uint32_t qIndex = 0;
+	uint32_t qCount = 0;
 };
 // 64,32,16,8,4,2,1
 vkvg_dev* new_vkvgdev(dev_info_c* c = 0, int sample = 8);
