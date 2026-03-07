@@ -265,6 +265,7 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 // 释放渲染器的纹理
 void r_render_free_tex(sdl3_textdata* p);
 
+void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename);
 
 #ifdef __cplusplus
 extern "C" {

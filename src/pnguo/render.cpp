@@ -1539,6 +1539,52 @@ void r_render_free_tex(sdl3_textdata* p)
 	}
 }
 
+
+
+void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename)
+{
+	vkvg_clear(ctx);
+	vkvg_save(ctx);
+	VkvgPattern pat;
+	VkvgContext  cr = ctx;
+	//pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+	//vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+	//vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+	//vkvg_rectangle(cr, 0, 0, 256, 256);
+	//vkvg_set_source(cr, pat);
+	//vkvg_fill(cr);
+	//vkvg_pattern_destroy(pat);
+	auto v = bs->sample2(64);	// 样条线转线段，细分64段
+	vkvg_translate(ctx, 10, 20);
+	vkvg_move_to(ctx, v[0].x, v[0].y);
+	for (size_t i = 1; i < v.size(); i++)
+	{
+		vkvg_line_to(ctx, v[i].x, v[i].y);
+	}
+	vkvg_set_source_color(ctx, 0x800080ff);
+	vkvg_set_line_width(ctx, 12.0);
+	vkvg_stroke(ctx);
+	vkvg_restore(ctx);
+	fill_style_d st = {};
+	glm::vec4 rect = { 195.5,95.5,510,210 };
+	st.fill = 0xc0121212;
+	st.color = 0x801152cc;
+	st.thickness = 12;
+	static glm::vec4 rr = { 6,6,6,6 };
+	draw_rounded_rectangle(cr, rect.x, rect.y, rect.z, rect.w, rr);
+	submit_style(cr, &st);
+	vkvg_set_line_width(ctx, 6.0);
+	vkvg_set_source_color(ctx, 0xffE97B5F);
+	draw_arrow(ctx, glm::vec2(300, 350), glm::vec2(500, 350), 15, 50);
+	draw_arrow(ctx, glm::vec2(300, 380), glm::vec2(500, 550), 15, 40);
+	vkvg_flush(ctx);
+	vkvg_surface_resolve(surf);	// msaa采样转换输出  
+	if (filename && *filename)
+	{
+		vkvg_surface_write_to_png(surf, filename);
+	}
+}
+
 VkShaderModule newModule(VkDevice device, const uint32_t* SpvData, size_t SpvSize, VkResult* r)
 {
 	VkShaderModule pShaderModule = {};
