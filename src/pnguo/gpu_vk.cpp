@@ -776,11 +776,28 @@ namespace vkg {
 		int get_release();
 		void retain();
 	};
+	struct SamplerCreateInfo {
+		uint32_t magFilter;
+		uint32_t minFilter;
+		uint32_t addressModeU;
+		uint32_t addressModeV;
+		uint32_t addressModeW;
+		int mipLodBias;
+		int maxAnisotropy;
+		uint32_t compareOp;
+		int minLod;
+		int maxLod;
+		uint32_t borderColor;
+		bool mipmapMode;		//		VK_SAMPLER_MIPMAP_MODE_NEAREST = 0,			VK_SAMPLER_MIPMAP_MODE_LINEAR = 1,
+		bool anisotropyEnable;
+		bool compareEnable;
+		bool unnormalizedCoordinates;
+	};
 	struct sampler_kt {
-		VkSamplerCreateInfo info = {};
+		SamplerCreateInfo info = {};
 		bool operator==(const sampler_kt& other) const;
 	};
-	struct SamplerKeyHash {
+	struct SAKHash {
 		size_t operator()(const sampler_kt& k) const;
 	};
 	class cxDevice :public cxObject
@@ -789,14 +806,15 @@ namespace vkg {
 		// 逻辑设备
 		VkDevice _dev = nullptr;
 		VkQueue _queue = nullptr;
-		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
+		//std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
+		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
 	public:
 		cxDevice();
 		~cxDevice();
 		// 设置vk设备和队列，必须调用此函数设置设备后才能使用其他对象
 		void set_device(void* dev, void* q);
 		// 创建采样器，内部会缓存相同参数的采样器对象
-		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
+		VkSampler newSampler(const SamplerCreateInfo* pCreateInfo);
 	};
 	class cxCamera :public cxObject
 	{
@@ -914,6 +932,32 @@ namespace vkg {
 
 	// 实现
 #if 1
+#ifndef HASH_SEED
+#define HASH_SEED 2166136261
+#endif
+	size_t Hash_p(const size_t* ptr, size_t size, size_t result)
+	{
+		auto n = size / sizeof(size_t);
+		auto m = size % sizeof(size_t);
+		for (size_t i = 0; i < n; ++i)
+		{
+			result = (result * 16777619) ^ ptr[i];
+		}
+		auto p = ptr + n;
+		for (size_t i = 0; i < m; ++i)
+		{
+			result = (result * 16777619) ^ ((char*)p)[i];
+		}
+		return result;
+	}
+	bool sampler_kt::operator==(const sampler_kt& other) const
+	{
+		return memcmp(&info, &other.info, sizeof(SamplerCreateInfo)) == 0;
+	}
+	size_t SAKHash::operator()(const sampler_kt& k) const
+	{
+		return Hash_p((const size_t*)&k.info, sizeof(SamplerCreateInfo), HASH_SEED);
+	}
 
 	cxObject::cxObject() {}
 	cxObject::cxObject(int t) :obj_type(t)
@@ -943,12 +987,31 @@ namespace vkg {
 		assert(_dev && _queue);
 	}
 
-	VkSampler cxDevice::newSampler(const VkSamplerCreateInfo* pCreateInfo) {
+	VkSampler cxDevice::newSampler(const SamplerCreateInfo* pCreateInfo) {
 		sampler_kt k = { *pCreateInfo };
+		auto kt = *pCreateInfo;
 		auto& p = _samplers[k];
 		if (!p)
 		{
-			vkCreateSampler(_dev, pCreateInfo, 0, &p);
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.flags = 0;
+			info.magFilter = (VkFilter)kt.magFilter;
+			info.minFilter =(VkFilter) kt.minFilter;
+			info.addressModeU = (VkSamplerAddressMode)kt.addressModeU;
+			info.addressModeV = (VkSamplerAddressMode)kt.addressModeV;
+			info.addressModeW =(VkSamplerAddressMode) kt.addressModeW;
+			info.mipLodBias = kt.mipLodBias;
+			info.maxAnisotropy = kt.maxAnisotropy;
+			info.compareOp =(VkCompareOp) kt.compareOp;
+			info.minLod = kt.minLod;
+			info.maxLod = kt.maxLod;
+			info.borderColor = (VkBorderColor)kt.borderColor;
+			info.mipmapMode = kt.mipmapMode ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.anisotropyEnable = kt.anisotropyEnable ? VK_TRUE : VK_FALSE;
+			info.compareEnable = kt.compareEnable ? VK_TRUE : VK_FALSE;
+			info.unnormalizedCoordinates = kt.unnormalizedCoordinates ? VK_TRUE : VK_FALSE;
+			vkCreateSampler(_dev, &info, 0, &p);
 		}
 		return p;
 	}
