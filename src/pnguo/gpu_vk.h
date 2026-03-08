@@ -381,8 +381,7 @@ extern "C" {
 	typedef void* aMaterial;	// 材质
 	typedef void* aPipeline;	// 渲染管线
 	typedef void* aPipelineCS;	// 计算管线
-	typedef void* aImage;		// 纹理
-	typedef void* aSampler;		// 采样器
+	typedef void* aSampler;		// 纹理采样
 	typedef void* aSurface;		// 表面
 	typedef void* aRenderer;	// 渲染器
 	typedef void* aWorld;		// 世界
@@ -399,7 +398,6 @@ extern "C" {
 		OBJ_MATERIAL,
 		OBJ_PIPELINE, OBJ_PIPELINECS,
 		OBJ_SAMPLER,
-		OBJ_IMAGE,
 		OBJ_SURFACE,
 		OBJ_RENDERER,
 		OBJ_WORLD

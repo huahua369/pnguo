@@ -759,8 +759,7 @@ namespace vkg {
 	class cxMaterial;	// 材质
 	class cxPipeline;	// 渲染管线
 	class cxPipelineCS;	// 计算管线
-	class cxSampler;	// 采样器
-	class cxImage;		// 纹理
+	class cxSampler;	// 纹理采样
 	class cxSurface;	// 表面
 	class cxRenderer;	// 渲染器
 	class cxWorld;		// 世界
@@ -888,13 +887,6 @@ namespace vkg {
 		cxSampler();
 		~cxSampler();
 	};
-	class cxImage :public cxObject
-	{
-	public:
-	public:
-		cxImage();
-		~cxImage();
-	};
 	class cxSurface :public cxObject
 	{
 	public:
@@ -946,7 +938,7 @@ namespace vkg {
 
 	void cxDevice::set_device(void* dev, void* q)
 	{
-		_dev =(VkDevice) dev;
+		_dev = (VkDevice)dev;
 		_queue = (VkQueue)q;
 		assert(_dev && _queue);
 	}
@@ -1030,12 +1022,6 @@ namespace vkg {
 	{
 	}
 	cxSampler::~cxSampler()
-	{
-	}
-	cxImage::cxImage() :cxObject(OBJ_IMAGE)
-	{
-	}
-	cxImage::~cxImage()
 	{
 	}
 	cxSurface::cxSurface() :cxObject(OBJ_SURFACE)
@@ -1516,12 +1502,6 @@ namespace vkg {
 		p = c;
 		return p;
 	}
-	aImage new_aImage(void* ctx, const char* type) {
-		aImage p = nullptr;
-		auto c = new cxImage();
-		p = c;
-		return p;
-	}
 	aSurface new_aSurface(void* ctx, const char* type) {
 		aSurface p = nullptr;
 		auto c = new cxSurface();
@@ -1557,7 +1537,6 @@ namespace vkg {
 		case OBJ_PIPELINE:	p = new_aPipeline(ctx, type); break;
 		case OBJ_PIPELINECS:p = new_aPipelineCS(ctx, type); break;
 		case OBJ_SAMPLER:	p = new_aSampler(ctx, type); break;
-		case OBJ_IMAGE:		p = new_aImage(ctx, type); break;
 		case OBJ_SURFACE:	p = new_aSurface(ctx, type); break;
 		case OBJ_RENDERER:	p = new_aRenderer(ctx, type); break;
 		case OBJ_WORLD:		p = new_aWorld(ctx, type); break;
