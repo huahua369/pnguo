@@ -777,16 +777,27 @@ namespace vkg {
 		int get_release();
 		void retain();
 	};
+	struct sampler_kt {
+		VkSamplerCreateInfo info = {};
+		bool operator==(const sampler_kt& other) const;
+	};
+	struct SamplerKeyHash {
+		size_t operator()(const sampler_kt& k) const;
+	};
 	class cxDevice :public cxObject
 	{
 	public:
 		// 逻辑设备
-		void* _dev = nullptr;
-		void* _queue = nullptr;
+		VkDevice _dev = nullptr;
+		VkQueue _queue = nullptr;
+		std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
 	public:
 		cxDevice();
 		~cxDevice();
-		void set_device(void* dev, int idx);
+		// 设置vk设备和队列，必须调用此函数设置设备后才能使用其他对象
+		void set_device(void* dev, void* q);
+		// 创建采样器，内部会缓存相同参数的采样器对象
+		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
 	};
 	class cxCamera :public cxObject
 	{
@@ -933,6 +944,22 @@ namespace vkg {
 	{
 	}
 
+	void cxDevice::set_device(void* dev, void* q)
+	{
+		_dev =(VkDevice) dev;
+		_queue = (VkQueue)q;
+		assert(_dev && _queue);
+	}
+
+	VkSampler cxDevice::newSampler(const VkSamplerCreateInfo* pCreateInfo) {
+		sampler_kt k = { *pCreateInfo };
+		auto& p = _samplers[k];
+		if (!p)
+		{
+			vkCreateSampler(_dev, pCreateInfo, 0, &p);
+		}
+		return p;
+	}
 	cxCamera::cxCamera() :cxObject(OBJ_CAMERA)
 	{
 	}

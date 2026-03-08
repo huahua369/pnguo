@@ -9410,7 +9410,7 @@ namespace vkr
 				info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 				info.minLod = 0;
 				info.maxLod = 10000;
-				info.maxAnisotropy = 1.0f;
+				info.maxAnisotropy = 1.0f;//1-16
 				set_sampler_info(info, &it);
 				VkSampler r = pDevice->newSampler(&info);
 				assert(r);
