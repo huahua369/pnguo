@@ -1671,7 +1671,7 @@ namespace vkr
 		return ratings.rbegin()->second;
 	}
 
-	void Device::OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw, const char* spdname, std::vector<std::string>* pdnv)
+	void Device::OnCreate(dev_info_cx* d, void* pw, const char* spdname, std::vector<std::string>* pdnv)
 	{
 		dev_info_cx nd = {};
 		if (d) { nd = *d; }
@@ -23038,16 +23038,8 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 	vkr::Log::InitLogSystem();
 	if (c) {
 		vkr::SystemInfo m_systemInfo;
-		bool cpuvalid = false;
-		bool gpuvalid = false;
-#ifdef _DEBUG
-		cpuvalid = 1;
-		gpuvalid = 1;
-#endif // _DEBUG
-
 		auto dev = new vkr::Device();
-
-		dev->OnCreate(c, cpuvalid, gpuvalid, 0, devname, &p->dev_name);
+		dev->OnCreate(c, 0, devname, &p->dev_name);
 		dev->CreatePipelineCache();
 		// Get system info
 		std::string dummyStr;

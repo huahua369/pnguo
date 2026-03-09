@@ -66,7 +66,7 @@ if(KHR_materials_transmission透明介质透射材质){
 #ifndef DXGI_FORMAT_DEFINED
 typedef uint32_t DXGI_FORMAT;
 #endif 
-#define TINYGLTF_IMPLEMENTATION 
+#define TINYGLTF_IMPLEMENTATION23 
 #if 0
 #define TINYGLTF_USE_RAPIDJSON
 // 多线程初始化文档时会崩
@@ -120,7 +120,17 @@ namespace vkg {
 	static const uint32_t MaxShadowInstances = 4;
 	const VkColorComponentFlags allBits = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-	class Device;
+	// 输出管线信息
+	struct PBRPipe_t {
+		VkPipeline m_pipeline = VK_NULL_HANDLE;
+		VkPipeline m_pipelineWireframe = VK_NULL_HANDLE;
+		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+		ubotex_size_t binding = {}; // 输出的绑定号
+		std::string pipe_kv;
+		PBRPipe_t* next = 0;
+		std::atomic_int st;
+	};
 
 	struct SystemInfo
 	{
@@ -134,21 +144,38 @@ namespace vkg {
 		char name[256];
 		void* phd;
 	};
+	struct devinfo_x {
+		VkInstance _instance = 0;
+		VkDevice _device = 0;
+		VkPhysicalDevice _physicaldevice = {};
+		VkSurfaceKHR _surface = {};
+		VkPhysicalDeviceMemoryProperties _memoryProperties = {};
+		VkPhysicalDeviceProperties _deviceProperties = {};
+		VkPhysicalDeviceProperties2 _deviceProperties2 = {};
+		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
+		uint32_t graphics_queueFlags = 0;
+		std::vector<VkQueue> _graphics_queues;
+		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
+#ifdef USE_VMA
+		VmaAllocator _hAllocator = NULL;
+#endif
+	};
+
 
 	class gdev_cx
 	{
 	public:
 		adevice3_t ad_cb = {};
 		void* inst = 0;
-		Device* _dev = nullptr;
-		std::vector<Device*> devicelist;
+		devinfo_x* _dev = nullptr;
+		std::vector<devinfo_x*> devicelist;
 		std::vector<std::string> dev_name;
 		SystemInfo _systemInfo;
 	public:
 		gdev_cx();
 		~gdev_cx();
 		void init(const char* pApplicationName, const char* pEngineName);
-		void* new_device(void* phy, void* dev, const char* devname);
+		void* new_device(void* phy, void* dev, const char* devname, devinfo_x* px);
 		dev_info_cx get_devinfo();
 	private:
 
@@ -682,22 +709,6 @@ namespace vkg {
 		queue_props.resize(queue_family_count);
 		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queue_family_count, queue_props.data());
 	}
-	struct devinfo_x {
-		VkInstance _instance = 0;
-		VkDevice _device = 0;
-		VkPhysicalDevice _physicaldevice = {};
-		VkSurfaceKHR _surface = {};
-		VkPhysicalDeviceMemoryProperties _memoryProperties = {};
-		VkPhysicalDeviceProperties _deviceProperties = {};
-		VkPhysicalDeviceProperties2 _deviceProperties2 = {};
-		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
-		std::vector<VkQueue> _graphics_queues;
-		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
-#ifdef USE_VMA
-		VmaAllocator _hAllocator = NULL;
-#endif
-	};
-
 
 	std::vector<VkDynamicState> GetDynamicStatesForPipeline()
 	{
@@ -1078,14 +1089,26 @@ namespace vkg {
 #endif
 		// create queues
 		uint32_t graphics_fidx = 0;
+		std::vector<size_t> gqf, cqf, tqf;
 		for (size_t i = 0; i < queue_family_count; i++)
 		{
 			auto& it = queue_props[i];
 			if (it.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
+				gqf.push_back(i);
+			}
+			if (it.queueFlags & VK_QUEUE_COMPUTE_BIT)
+			{
+				cqf.push_back(i);
+			}
+			if (it.queueFlags & VK_QUEUE_TRANSFER_BIT)
+			{
+				tqf.push_back(i);
+			}
+			if (it.queueFlags & VK_QUEUE_GRAPHICS_BIT && it.queueFlags & VK_QUEUE_COMPUTE_BIT) {
 				graphics_fidx = i;
+				px->graphics_queueFlags = it.queueFlags;
 				px->_graphics_queues.resize(it.queueCount);
-				break;
 			}
 		}
 		for (int i = 0; i < px->_graphics_queues.size(); i++) {
@@ -1094,13 +1117,13 @@ namespace vkg {
 			px->_graphics_queues[i] = gq;
 		}
 
-		// Init the extensions (if they have been enabled successfuly) 
+		// 初始化扩展函数地址
 		ExtDebugUtilsGetProcAddresses(px->_device);
 #ifdef ExtGetHDRFSEFreesyncHDRProcAddresses
 		ExtGetHDRFSEFreesyncHDRProcAddresses(px->_instance, m_device);
 #endif
 	}
-	void Device_Create(devinfo_x* px, dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw, const char* spdname, std::vector<std::string>* pdnv)
+	void Device_Create(devinfo_x* px, dev_info_cx* d, void* pw, const char* spdname, std::vector<std::string>* pdnv)
 	{
 		dev_info_cx nd = {};
 		if (d) { nd = *d; }
@@ -1714,30 +1737,23 @@ namespace vkg {
 	{
 		inst = vkg::new_instance(pApplicationName, pEngineName);
 	}
-	void* gdev_cx::new_device(void* phy, void* dev0, const char* devname)
+	void* gdev_cx::new_device(void* phy, void* dev0, const char* devname, devinfo_x* px)
 	{
-		Device* dev = 0;
 		dev_info_cx c[1] = {};
 		c->inst = inst;
 		c->phy = phy;
 		c->vkdev = dev0;
-		if (!c) return 0;
-		SystemInfo systemInfo;
-		bool cpuvalid = false;
-		bool gpuvalid = false;
-#ifdef _DEBUG
-		cpuvalid = 1;
-		gpuvalid = 1;
-#endif // _DEBUG 
-		return dev;
+		if (px)
+			Device_Create(px, c, 0, devname, &dev_name);
+		return px;
 	}
 	dev_info_cx gdev_cx::get_devinfo()
 	{
 		dev_info_cx r = {};
 		if (_dev) {
-			//r.inst = _dev->_instance;
-			//r.phy = _dev->_physicaldevice;
-			//r.vkdev = _dev->_device;
+			r.inst = _dev->_instance;
+			r.phy = _dev->_physicaldevice;
+			r.vkdev = _dev->_device;
 		}
 		return r;
 	}
@@ -1796,6 +1812,7 @@ namespace vkg {
 		// 逻辑设备
 		VkDevice _dev = nullptr;
 		VkQueue _queue = nullptr;
+		devinfo_x d = {};
 		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
 	public:
 		cxDevice();
@@ -1973,7 +1990,7 @@ namespace vkg {
 	{
 		_dev = (VkDevice)dev;
 		_queue = (VkQueue)q;
-		assert(_dev && _queue);
+		//assert(_dev && _queue);
 	}
 
 	VkSampler cxDevice::newSampler(const SamplerCreateInfo* pCreateInfo) {
@@ -2483,8 +2500,13 @@ namespace vkg {
 		aDevice p = nullptr;
 		if (!vctx)return p;
 		auto ctx = (gdev_cx*)vctx;
-		auto d = ctx->new_device(phy, dev, devname);
-		p = d;
+		auto pd = new cxDevice();
+		if (pd)
+		{
+			auto d = (devinfo_x*)ctx->new_device(phy, dev, devname, &pd->d);
+			pd->set_device(d->_device, 0);
+			p = (aDevice)pd;
+		}
 		return p;
 	}
 	aCamera new_aCamera(void* ctx, const char* type) {

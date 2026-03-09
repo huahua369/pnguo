@@ -17,6 +17,7 @@
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
 #include <pnguo/vkrenderer.h>
+#include <pnguo/gpu_vk.h>
 #include <pnguo/page.h>
 #include <pnguo/mapView.h>
 #include <pnguo/print_time.h> 
@@ -821,6 +822,8 @@ int main()
 		const char* wtitle1 = (char*)u8"窗口1";
 		auto devname = "Intel(R)";
 		devname = 0;
+		adevice3_t* gd = new_gdev(0, 0);
+		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0);
 		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
 		// 准备使用3D渲染器的设备创建SDL渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
@@ -1081,6 +1084,7 @@ int main()
 		//show_cpuinfo(form0);
 
 		free_vkdg(vkd);
+		free_gdev(gd);
 		free_app(app);
 	}
 #ifdef _WIN32

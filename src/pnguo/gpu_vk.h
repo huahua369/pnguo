@@ -141,7 +141,7 @@ namespace vkg {
 	{
 		uint16_t name;		// 0=POSITION、1=COLOR_0、2=TEXCOORD_0、3=NORMAL、4=TANGENT、5=WEIGHTS_0、6=JOINTS_0、7=TEXCOORD_1、8=WEIGHTS_1、9=JOINTS_1
 		uint16_t binding;	// 同样绑定号则同一块
-		VkFormat format;
+		uint32_t format;	// VkFormat
 		uint32_t offset;	// 如果bindings/bindingCount为空则自动计算
 	};
 	struct vertex_input_binding_description {
@@ -163,17 +163,7 @@ namespace vkg {
 		bool depthTestEnable = true;
 		bool stencilTestEnable = false;
 	};
-	// 输出管线信息
-	struct PBRPipe_t {
-		VkPipeline m_pipeline = VK_NULL_HANDLE;
-		VkPipeline m_pipelineWireframe = VK_NULL_HANDLE;
-		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-		ubotex_size_t binding = {}; // 输出的绑定号
-		std::string pipe_kv;
-		PBRPipe_t* next = 0;
-		std::atomic_int st;
-	};
+	struct PBRPipe_t;
 	// 输入管线信息
 	struct pipeline_info_2 {
 		pipeline_info_t info = {};		// 状态信息
@@ -324,7 +314,7 @@ extern "C" {
 		int (*frame_ready)(aFrame frame, int wait_mask);
 	};
 	// 创建管理器
-	adevice3_t* new_gdev();
+	adevice3_t* new_gdev(const char* pApplicationName, const char* pEngineName);
 	// 删除管理器
 	void free_gdev(adevice3_t* p);
 

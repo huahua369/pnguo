@@ -137,7 +137,7 @@ namespace vkr {
 	public:
 		Device();
 		~Device();
-		void OnCreate(dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw, const char* spdname, std::vector<std::string>* pdnv);
+		void OnCreate(dev_info_cx* d, void* pw, const char* spdname, std::vector<std::string>* pdnv);
 		void OnCreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp);
 		void OnDestroy();
 		VkDevice GetDevice();
