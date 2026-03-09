@@ -129,6 +129,12 @@ namespace vkg {
 		std::string mGfxAPI = "UNAVAILABLE";
 	};
 
+	struct device_info_t
+	{
+		char name[256];
+		void* phd;
+	};
+
 	class gdev_cx
 	{
 	public:
@@ -141,17 +147,1014 @@ namespace vkg {
 	public:
 		gdev_cx();
 		~gdev_cx();
-
+		void init(const char* pApplicationName, const char* pEngineName);
 		void* new_device(void* phy, void* dev, const char* devname);
 		dev_info_cx get_devinfo();
 	private:
 
 	};
+
+	class InstanceProperties
+	{
+		std::vector<VkLayerProperties> m_instanceLayerProperties;
+		std::vector<VkExtensionProperties> m_instanceExtensionProperties;
+
+		std::vector<const char*> m_instance_layer_names;
+		std::vector<const char*> m_instance_extension_names;
+		void* m_pNext = NULL;
+	public:
+		VkResult Init();
+		bool AddInstanceLayerName(const char* instanceLayerName);
+		bool AddInstanceExtensionName(const char* instanceExtensionName);
+		void* GetNext() { return m_pNext; }
+		void SetNewNext(void* pNext) { m_pNext = pNext; }
+
+		void GetExtensionNamesAndConfigs(std::vector<const char*>* pInstance_layer_names, std::vector<const char*>* pInstance_extension_names, bool all);
+	private:
+		bool IsLayerPresent(const char* pExtName);
+		bool IsExtensionPresent(const char* pExtName);
+	};
+
+	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP);
+
+
+	class DeviceProperties
+	{
+	public:
+		VkPhysicalDevice m_physicaldevice;
+
+		std::set<std::string> m_device_extension_names;
+
+		std::vector<VkExtensionProperties> m_deviceExtensionProperties;
+
+
+		void* m_pNext = NULL;
+	public:
+		VkResult Init(VkPhysicalDevice physicaldevice);
+		bool IsExtensionPresent(const char* pExtName);
+		bool has_extension(const char* pExtName);
+		bool AddDeviceExtensionName(const char* deviceExtensionName);
+		int AddDeviceExtensionName(std::vector<const char*> deviceExtensionName);
+		void* GetNext() { return m_pNext; }
+		void SetNewNext(void* pNext) { m_pNext = pNext; }
+
+		VkPhysicalDevice GetPhysicalDevice() { return m_physicaldevice; }
+		void GetExtensionNamesAndConfigs(std::vector<const char*>* pDevice_extension_names);
+	private:
+	};
+
+
 }
 // !vkg
 
+
 // 新渲染器实现
 namespace vkg {
+
+	bool InstanceProperties::IsLayerPresent(const char* pExtName)
+	{
+		return std::find_if(
+			m_instanceLayerProperties.begin(),
+			m_instanceLayerProperties.end(),
+			[pExtName](const VkLayerProperties& layerProps) -> bool {
+				return strcmp(layerProps.layerName, pExtName) == 0;
+			}) != m_instanceLayerProperties.end();
+	}
+
+	bool InstanceProperties::IsExtensionPresent(const char* pExtName)
+	{
+		return std::find_if(
+			m_instanceExtensionProperties.begin(),
+			m_instanceExtensionProperties.end(),
+			[pExtName](const VkExtensionProperties& extensionProps) -> bool {
+				return strcmp(extensionProps.extensionName, pExtName) == 0;
+			}) != m_instanceExtensionProperties.end();
+	}
+
+	VkResult InstanceProperties::Init()
+	{
+		// Query instance layers.
+		//
+		uint32_t instanceLayerPropertyCount = 0;
+		VkResult res = vkEnumerateInstanceLayerProperties(&instanceLayerPropertyCount, nullptr);
+		m_instanceLayerProperties.resize(instanceLayerPropertyCount);
+		assert(res == VK_SUCCESS);
+		if (instanceLayerPropertyCount > 0)
+		{
+			res = vkEnumerateInstanceLayerProperties(&instanceLayerPropertyCount, m_instanceLayerProperties.data());
+			assert(res == VK_SUCCESS);
+		}
+
+		// Query instance extensions.
+		//
+		uint32_t instanceExtensionPropertyCount = 0;
+		res = vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionPropertyCount, nullptr);
+		assert(res == VK_SUCCESS);
+		m_instanceExtensionProperties.resize(instanceExtensionPropertyCount);
+		if (instanceExtensionPropertyCount > 0)
+		{
+			res = vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionPropertyCount, m_instanceExtensionProperties.data());
+			assert(res == VK_SUCCESS);
+		}
+
+		return res;
+	}
+
+	bool InstanceProperties::AddInstanceLayerName(const char* instanceLayerName)
+	{
+		if (IsLayerPresent(instanceLayerName))
+		{
+			m_instance_layer_names.push_back(instanceLayerName);
+			return true;
+		}
+
+		//Trace("The instance layer '%s' has not been found\n", instanceLayerName);
+
+		return false;
+	}
+
+	bool InstanceProperties::AddInstanceExtensionName(const char* instanceExtensionName)
+	{
+		if (IsExtensionPresent(instanceExtensionName))
+		{
+			m_instance_extension_names.push_back(instanceExtensionName);
+			return true;
+		}
+
+		//Trace("The instance extension '%s' has not been found\n", instanceExtensionName);
+
+		return false;
+	}
+
+	void  InstanceProperties::GetExtensionNamesAndConfigs(std::vector<const char*>* pInstance_layer_names, std::vector<const char*>* pInstance_extension_names, bool all)
+	{
+		if (all)
+		{
+			for (auto& it : m_instanceLayerProperties)
+				pInstance_layer_names->push_back(it.layerName);
+			for (auto& it : m_instanceExtensionProperties) {
+				pInstance_extension_names->push_back(it.extensionName);
+			}
+		}
+		else {
+			for (auto& name : m_instance_layer_names)
+				pInstance_layer_names->push_back(name);
+			for (auto& name : m_instance_extension_names)
+				pInstance_extension_names->push_back(name);
+		}
+	}
+
+	bool DeviceProperties::IsExtensionPresent(const char* pExtName)
+	{
+		return std::find_if(
+			m_deviceExtensionProperties.begin(),
+			m_deviceExtensionProperties.end(),
+			[pExtName](const VkExtensionProperties& extensionProps) -> bool {
+				return strcmp(extensionProps.extensionName, pExtName) == 0;
+			}) != m_deviceExtensionProperties.end();
+	}
+	bool DeviceProperties::has_extension(const char* pExtName)
+	{
+		auto it = m_device_extension_names.find(pExtName);
+		return pExtName && *pExtName && it != m_device_extension_names.end();
+	}
+	// 获取设备支持的扩展
+	VkResult DeviceProperties::Init(VkPhysicalDevice physicaldevice)
+	{
+		m_physicaldevice = physicaldevice;
+
+		// Enumerate device extensions
+		//
+		uint32_t extensionCount;
+		VkResult res = vkEnumerateDeviceExtensionProperties(physicaldevice, nullptr, &extensionCount, NULL);
+		m_deviceExtensionProperties.resize(extensionCount);
+		res = vkEnumerateDeviceExtensionProperties(physicaldevice, nullptr, &extensionCount, m_deviceExtensionProperties.data());
+
+		return res;
+	}
+
+	bool DeviceProperties::AddDeviceExtensionName(const char* deviceExtensionName)
+	{
+		if (IsExtensionPresent(deviceExtensionName))
+		{
+			m_device_extension_names.insert(deviceExtensionName);
+			return true;
+		}
+
+		//Trace("The device extension '%s' has not been found", deviceExtensionName);
+
+		return false;
+	}
+
+	int DeviceProperties::AddDeviceExtensionName(std::vector<const char*> deviceExtensionName)
+	{
+		int r = 0;
+		for (auto& name : deviceExtensionName)
+		{
+			if (IsExtensionPresent(name))
+			{
+				m_device_extension_names.insert(name);
+				r++;
+			}
+		}
+		return r;
+	}
+
+	void  DeviceProperties::GetExtensionNamesAndConfigs(std::vector<const char*>* pDevice_extension_names)
+	{
+		for (auto& name : m_device_extension_names)
+			pDevice_extension_names->push_back(name.c_str());
+	}
+
+	static PFN_vkCreateDebugReportCallbackEXT g_vkCreateDebugReportCallbackEXT = NULL;
+	static PFN_vkDebugReportMessageEXT g_vkDebugReportMessageEXT = NULL;
+	static PFN_vkDestroyDebugReportCallbackEXT g_vkDestroyDebugReportCallbackEXT = NULL;
+	static VkDebugReportCallbackEXT g_DebugReportCallback = NULL;
+
+	static bool s_bCanUseDebugReport = false;
+
+	static VKAPI_ATTR VkBool32 VKAPI_CALL MyDebugReportCallback(
+		VkDebugReportFlagsEXT flags,
+		VkDebugReportObjectTypeEXT objectType,
+		uint64_t object,
+		size_t location,
+		int32_t messageCode,
+		const char* pLayerPrefix,
+		const char* pMessage,
+		void* pUserData)
+	{
+		OutputDebugStringA(pMessage);
+		OutputDebugStringA("\n");
+		return VK_FALSE;
+	}
+
+	const VkValidationFeatureEnableEXT featuresRequested[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT, VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT };
+	VkValidationFeaturesEXT features = {};
+
+	const char instanceExtensionName[] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+	const char instanceLayerName[] = "VK_LAYER_KHRONOS_validation";
+
+	bool ExtDebugReportCheckInstanceExtensions(InstanceProperties* pIP, bool gpuValidation)
+	{
+		s_bCanUseDebugReport = pIP->AddInstanceLayerName(instanceLayerName) && pIP->AddInstanceExtensionName(instanceExtensionName);
+		if (s_bCanUseDebugReport && gpuValidation)
+		{
+			features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+			features.pNext = pIP->GetNext();
+			features.enabledValidationFeatureCount = _countof(featuresRequested);
+			features.pEnabledValidationFeatures = featuresRequested;
+
+			pIP->SetNewNext(&features);
+		}
+
+		return s_bCanUseDebugReport;
+	}
+
+	void ExtDebugReportGetProcAddresses(VkInstance instance)
+	{
+		if (s_bCanUseDebugReport)
+		{
+			g_vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+			g_vkDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
+			g_vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+			assert(g_vkCreateDebugReportCallbackEXT);
+			assert(g_vkDebugReportMessageEXT);
+			assert(g_vkDestroyDebugReportCallbackEXT);
+		}
+	}
+
+	void ExtDebugReportOnCreate(VkInstance instance)
+	{
+		if (g_vkCreateDebugReportCallbackEXT)
+		{
+			VkDebugReportCallbackCreateInfoEXT debugReportCallbackInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT };
+			debugReportCallbackInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
+			debugReportCallbackInfo.pfnCallback = MyDebugReportCallback;
+			VkResult res = g_vkCreateDebugReportCallbackEXT(instance, &debugReportCallbackInfo, nullptr, &g_DebugReportCallback);
+			assert(res == VK_SUCCESS);
+		}
+	}
+
+	void ExtDebugReportOnDestroy(VkInstance instance)
+	{
+		// It should happen after destroing device, before destroying instance.
+		if (g_DebugReportCallback)
+		{
+			g_vkDestroyDebugReportCallbackEXT(instance, g_DebugReportCallback, nullptr);
+			g_DebugReportCallback = nullptr;
+		}
+	}
+
+	void SetEssentialInstanceExtensions(bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, InstanceProperties* pIp)
+	{
+		const char* exn[] = {
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+			VK_KHR_XLIB_SURFACE_EXTENSION_NAME
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+			VK_KHR_XCB_SURFACE_EXTENSION_NAME
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+			VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
+#elif defined(VK_USE_PLATFORM_MIR_KHR)
+			VK_KHR_MIR_SURFACE_EXTENSION_NAME
+#elif defined(__ANDROID__)
+			VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
+#elif defined(_WIN32)
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+#endif
+		};
+		pIp->AddInstanceExtensionName(exn[0]);
+		pIp->AddInstanceExtensionName(VK_KHR_SURFACE_EXTENSION_NAME);
+		pIp->AddInstanceExtensionName(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		pIp->AddInstanceExtensionName(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+		f_ExtDebugUtilsCheckInstanceExtensions(pIp);
+#ifdef ExtCheckHDRInstanceExtensions
+		ExtCheckHDRInstanceExtensions(pIp);
+#endif
+		if (cpuValidationLayerEnabled)
+		{
+			ExtDebugReportCheckInstanceExtensions(pIp, gpuValidationLayerEnabled);
+		}
+	}
+
+	void SetEssentialDeviceExtensions(DeviceProperties* pDp)
+	{
+#ifdef ExtRTCheckExtensions
+		m_usingFp16 = ExtFp16CheckExtensions(pDp);
+		ExtRTCheckExtensions(pDp, m_rt10Supported, m_rt11Supported);
+		ExtVRSCheckExtensions(pDp, m_vrs1Supported, m_vrs2Supported);
+		ExtCheckHDRDeviceExtensions(pDp);
+		ExtCheckFSEDeviceExtensions(pDp);
+		ExtCheckFreeSyncHDRDeviceExtensions(pDp);
+#endif
+		pDp->AddDeviceExtensionName(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+		pDp->AddDeviceExtensionName({ VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,							// 支持yuv纹理采样
+			VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+			VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
+			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME });
+		pDp->AddDeviceExtensionName({
+			// mesh shader
+			 VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,VK_EXT_MESH_SHADER_EXTENSION_NAME,VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+			 // Required by VK_KHR_spirv_1_4
+			 VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
+			 // dynamic_rendering
+			 // The sample uses the extension (instead of Vulkan 1.2, where dynamic rendering is core)
+			 VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+			 VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
+			 VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
+			 VK_KHR_MULTIVIEW_EXTENSION_NAME,
+			 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+			 VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
+			});
+	}
+
+	void* new_instance(const char* pApplicationName, const char* pEngineName)
+	{
+		vkg::InstanceProperties ip;
+		ip.Init();
+		bool cpuvalid = false;
+		bool gpuvalid = false;
+#ifdef _DEBUG
+		cpuvalid = 1;
+		gpuvalid = 1;
+#endif // _DEBUG
+		vkg::SetEssentialInstanceExtensions(cpuvalid, gpuvalid, &ip);
+		auto apiVersion3 = VK_API_VERSION_1_3;
+		auto apiVersion4 = VK_API_VERSION_1_4;
+		VkInstanceCreateInfo inst_info = {};
+		std::vector<const char*> instance_layer_names;
+		std::vector<const char*> instance_extension_names;
+		ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names, 0);
+		VkInstance instance = {};
+		VkApplicationInfo app_info = {};
+		app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		app_info.pNext = NULL;
+		app_info.pApplicationName = pApplicationName ? pApplicationName : "vkapp";
+		app_info.applicationVersion = 1;
+		app_info.pEngineName = pEngineName ? pEngineName : "pnguo";
+		app_info.engineVersion = 1;
+		app_info.apiVersion = apiVersion4;
+		inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		inst_info.pNext = 0;
+		inst_info.flags = 0;
+		inst_info.pApplicationInfo = &app_info;
+		inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
+		inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
+		inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
+		inst_info.ppEnabledExtensionNames = instance_extension_names.data();
+		VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
+		assert(res == VK_SUCCESS);
+		return instance;
+	}
+
+	void free_instance(void* inst)
+	{
+		if (inst)
+			vkDestroyInstance((VkInstance)inst, 0);
+	}
+
+	// 获取设备分数
+	uint32_t GetScore(void* phd)
+	{
+		VkPhysicalDevice physicalDevice = (VkPhysicalDevice)phd;
+		uint32_t score = 0;
+		VkPhysicalDeviceProperties deviceProperties = {};
+		vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+		//score += deviceProperties.limits.maxImageDimension1D;
+		switch (deviceProperties.deviceType)
+		{
+		case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+			score += 1000;
+			break;
+		case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+			score += 10000;
+			break;
+		case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+			score += 100;
+			break;
+		case VK_PHYSICAL_DEVICE_TYPE_CPU:
+			score += 10;
+			break;
+		default:
+			break;
+		}
+		return score;
+	}
+	// 选择物理设备
+	VkPhysicalDevice SelectPhysicalDevice(std::vector<device_info_t>& physicalDevices)
+	{
+		assert(physicalDevices.size() > 0 && "No GPU found");
+		std::multimap<uint32_t, VkPhysicalDevice> ratings;
+		for (auto& it : physicalDevices) {
+			ratings.insert(std::make_pair(GetScore(it.phd), (VkPhysicalDevice)it.phd));
+		}
+		return ratings.rbegin()->second;
+	}
+
+	std::vector<device_info_t> get_devices(void* inst)
+	{
+		VkPhysicalDeviceProperties dp = {};
+		std::vector<device_info_t> r;
+		std::vector<VkExtensionProperties> dep;
+		std::vector<void*> phyDevices;
+		uint32_t count = 0;
+		if (inst) {
+			auto hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, NULL));
+			if (count > 0)
+			{
+				phyDevices.resize(count);
+				hr = (vkEnumeratePhysicalDevices((VkInstance)inst, &count, (VkPhysicalDevice*)phyDevices.data()));
+			}
+			if (count)
+			{
+				r.reserve(count);
+				for (auto p : phyDevices)
+				{
+					uint32_t extensionCount;
+					VkResult res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, NULL);
+					dep.resize(extensionCount);
+					res = vkEnumerateDeviceExtensionProperties((VkPhysicalDevice)p, nullptr, &extensionCount, dep.data());
+					vkGetPhysicalDeviceProperties((VkPhysicalDevice)p, &dp);
+					device_info_t d = {};
+					strcpy(d.name, dp.deviceName);
+					d.phd = p;
+					r.push_back(d);
+				}
+			}
+		}
+		return r;
+	}
+
+	// 获取表面支持的格式
+	void get_surface_formats(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, std::vector<VkSurfaceFormatKHR>& rs)
+	{
+		uint32_t surfaceFormatCount = 0;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, NULL);
+		if (surfaceFormatCount > 0)
+		{
+			rs.resize(surfaceFormatCount);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, rs.data());
+		}
+	}
+	void* get_device_requirements(VkPhysicalDeviceFeatures* pEnabledFeatures, void* pNext, bool scalar_block_layout, bool timeline_semaphore)
+	{
+		pEnabledFeatures->fillModeNonSolid = VK_TRUE;
+		pEnabledFeatures->sampleRateShading = VK_TRUE;
+		pEnabledFeatures->logicOp = VK_TRUE;
+#ifdef VK_VERSION_1_2
+		static VkPhysicalDeviceVulkan12Features enabledFeatures12 = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+		if (scalar_block_layout)
+		{
+			enabledFeatures12.scalarBlockLayout = VK_TRUE;
+		}
+		if (timeline_semaphore)
+		{
+			enabledFeatures12.timelineSemaphore = VK_TRUE;
+		}
+		enabledFeatures12.pNext = pNext;
+		pNext = &enabledFeatures12;
+#else
+		if (scalar_block_layout)
+		{
+			static VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalarBlockFeat = {
+				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT, .scalarBlockLayout = VK_TRUE };
+			scalarBlockFeat.pNext = pNext;
+			pNext = &scalarBlockFeat;
+		}
+		if (timeline_semaphore)
+		{
+
+			static VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaFeat = {
+				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR, .timelineSemaphore = VK_TRUE };
+			timelineSemaFeat.pNext = pNext;
+			pNext = &timelineSemaFeat;
+		}
+#endif
+		return pNext;
+	}
+	void get_qfp(VkPhysicalDevice physicalDevice, std::vector<VkQueueFamilyProperties>& queue_props)
+	{
+		uint32_t queue_family_count;
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queue_family_count, NULL);
+		assert(queue_family_count >= 1);
+		queue_props.resize(queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queue_family_count, queue_props.data());
+	}
+	struct devinfo_x {
+		VkInstance _instance = 0;
+		VkDevice _device = 0;
+		VkPhysicalDevice _physicaldevice = {};
+		VkSurfaceKHR _surface = {};
+		VkPhysicalDeviceMemoryProperties _memoryProperties = {};
+		VkPhysicalDeviceProperties _deviceProperties = {};
+		VkPhysicalDeviceProperties2 _deviceProperties2 = {};
+		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
+		std::vector<VkQueue> _graphics_queues;
+		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
+#ifdef USE_VMA
+		VmaAllocator _hAllocator = NULL;
+#endif
+	};
+
+
+	std::vector<VkDynamicState> GetDynamicStatesForPipeline()
+	{
+		std::vector<VkDynamicState> dynamicStates =
+		{
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR,
+			VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE,
+			VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+			VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+			VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+			VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
+			VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+		};
+		return dynamicStates;
+	}
+
+	//VK_STENCIL_FACE_FRONT_BIT = 0x00000001,
+	//VK_STENCIL_FACE_BACK_BIT = 0x00000002,
+	//VK_STENCIL_FACE_FRONT_AND_BACK = 0x00000003,
+	struct ds_t
+	{
+		VkStencilFaceFlags faceMask;
+		uint32_t compareMask, writeMask, reference;
+		VkBool32 depthTestEnable;
+		VkBool32 depthWriteEnable;
+		VkBool32 stencilTestEnable;
+	};
+	void set_ds(VkCommandBuffer c, ds_t* t)
+	{
+		vkCmdSetDepthTestEnable(c, t->depthTestEnable);
+		vkCmdSetDepthWriteEnable(c, t->depthWriteEnable);
+		vkCmdSetStencilTestEnable(c, t->stencilTestEnable);
+		vkCmdSetStencilCompareMask(c, t->faceMask, t->compareMask);
+		vkCmdSetStencilWriteMask(c, t->faceMask, t->writeMask);
+		vkCmdSetStencilReference(c, t->faceMask, t->reference);
+	}
+
+	void BeginRenderPass(VkCommandBuffer commandList, VkRenderPass renderPass, VkFramebuffer frameBuffer, const std::vector<VkClearValue>* pClearValues, uint32_t Width, uint32_t Height)
+	{
+		VkRenderPassBeginInfo rp_begin;
+		rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		rp_begin.pNext = NULL;
+		rp_begin.renderPass = renderPass;
+		rp_begin.framebuffer = frameBuffer;
+		rp_begin.renderArea.offset.x = 0;
+		rp_begin.renderArea.offset.y = 0;
+		rp_begin.renderArea.extent.width = Width;
+		rp_begin.renderArea.extent.height = Height;
+		rp_begin.pClearValues = pClearValues->data();
+		rp_begin.clearValueCount = (uint32_t)pClearValues->size();
+		vkCmdBeginRenderPass(commandList, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+	}
+#if 1
+	static PFN_vkSetDebugUtilsObjectNameEXT     s_vkSetDebugUtilsObjectName = nullptr;
+	static PFN_vkCmdBeginDebugUtilsLabelEXT     s_vkCmdBeginDebugUtilsLabel = nullptr;
+	static PFN_vkCmdEndDebugUtilsLabelEXT       s_vkCmdEndDebugUtilsLabel = nullptr;
+	static bool s_bCanUseDebugUtils = false;
+	static std::mutex s_mutex;
+
+	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP)
+	{
+		s_bCanUseDebugUtils = pDP->AddInstanceExtensionName("VK_EXT_debug_utils");
+		return s_bCanUseDebugUtils;
+	}
+
+	void ExtDebugUtilsGetProcAddresses(VkDevice device)
+	{
+		if (s_bCanUseDebugUtils)
+		{
+			s_vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetDeviceProcAddr(device, "vkSetDebugUtilsObjectNameEXT");
+			s_vkCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetDeviceProcAddr(device, "vkCmdBeginDebugUtilsLabelEXT");
+			s_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetDeviceProcAddr(device, "vkCmdEndDebugUtilsLabelEXT");
+		}
+	}
+
+	void SetResourceName(VkDevice device, VkObjectType objectType, uint64_t handle, const char* name)
+	{
+		if (s_vkSetDebugUtilsObjectName && handle && name)
+		{
+			std::unique_lock<std::mutex> lock(s_mutex);
+
+			VkDebugUtilsObjectNameInfoEXT nameInfo = {};
+			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+			nameInfo.objectType = objectType;
+			nameInfo.objectHandle = handle;
+			nameInfo.pObjectName = name;
+			s_vkSetDebugUtilsObjectName(device, &nameInfo);
+		}
+	}
+
+	void SetPerfMarkerBegin(VkCommandBuffer cmd_buf, const char* name)
+	{
+		if (s_vkCmdBeginDebugUtilsLabel)
+		{
+			VkDebugUtilsLabelEXT label = {};
+			label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+			label.pLabelName = name;
+			const float color[] = { 1.0f, 0.0f, 0.0f, 1.0f };
+			memcpy(label.color, color, sizeof(color));
+			s_vkCmdBeginDebugUtilsLabel(cmd_buf, &label);
+		}
+	}
+
+	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf)
+	{
+		if (s_vkCmdEndDebugUtilsLabel)
+		{
+			s_vkCmdEndDebugUtilsLabel(cmd_buf);
+		}
+	}
+#endif
+
+	void Device_CreateEx(VkInstance vulkanInstance, VkPhysicalDevice physicalDevice, VkDevice dev, void* pw, DeviceProperties* pDp, devinfo_x* px)
+	{
+		VkResult res;
+		// Get queue/memory/device properties 
+		std::vector<VkQueueFamilyProperties> queue_props;
+		get_qfp(physicalDevice, queue_props);
+		uint32_t queue_family_count = queue_props.size();
+		assert(queue_family_count >= 1);
+		px->_physicaldevice = physicalDevice;
+		px->_device = dev;
+		px->_instance = vulkanInstance;
+		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &px->_memoryProperties);
+		vkGetPhysicalDeviceProperties(physicalDevice, &px->_deviceProperties);
+
+		// Get subgroup properties to check if subgroup operations are supported 
+		px->_subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+		px->_subgroupProperties.pNext = NULL;
+
+		px->_deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		px->_deviceProperties2.pNext = &px->_subgroupProperties;
+
+		vkGetPhysicalDeviceProperties2(physicalDevice, &px->_deviceProperties2);
+
+		if (pw) {
+
+#if defined(_WIN32)
+			// Crate a Win32 Surface
+			//
+			VkWin32SurfaceCreateInfoKHR createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+			createInfo.pNext = NULL;
+			createInfo.hinstance = NULL;
+			createInfo.hwnd = (HWND)pw;
+			res = vkCreateWin32SurfaceKHR(px->_instance, &createInfo, NULL, &px->_surface);
+#elif __ANDROID__
+			ANativeWindow* window = (ANativeWindow*)pw;// platformWindow_;
+			VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
+			surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+			surfaceCreateInfo.window = window;
+			//if (surface)
+			//	vkDestroySurfaceKHR(instance, surface, 0);
+			surface = 0;
+			err = vkCreateAndroidSurfaceKHR(_instance, &surfaceCreateInfo, NULL, &surface);
+#else
+#error platform not supported
+#endif
+			if (physicalDevice && px->_surface)
+				get_surface_formats(physicalDevice, px->_surface, px->_surfaceFormats);
+		}
+		uint32_t graphics_queue_family_index = UINT32_MAX;
+		uint32_t present_queue_family_index = UINT32_MAX;
+		if (px->_surface)
+		{
+			for (uint32_t i = 0; i < queue_family_count; ++i)
+			{
+				if ((queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+				{
+					if (graphics_queue_family_index == UINT32_MAX) graphics_queue_family_index = i;
+
+					VkBool32 supportsPresent;
+					vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, px->_surface, &supportsPresent);
+					if (supportsPresent == VK_TRUE)
+					{
+						graphics_queue_family_index = i;
+						present_queue_family_index = i;
+						break;
+					}
+				}
+			}
+
+			// If didn't find a queue that supports both graphics and present, then
+			// find a separate present queue.
+			if (present_queue_family_index == UINT32_MAX)
+			{
+				for (uint32_t i = 0; i < queue_family_count; ++i)
+				{
+					VkBool32 supportsPresent;
+					vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, px->_surface, &supportsPresent);
+					if (supportsPresent == VK_TRUE)
+					{
+						present_queue_family_index = (uint32_t)i;
+						break;
+					}
+				}
+			}
+		}
+		else {
+
+			for (uint32_t i = 0; i < queue_family_count; ++i)
+			{
+				if ((queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+				{
+					if (graphics_queue_family_index == UINT32_MAX) graphics_queue_family_index = i;
+					present_queue_family_index = i;
+					break;
+				}
+			}
+		}
+
+		// prepare existing extensions names into a buffer for vkCreateDevice
+		std::vector<const char*> extension_names;
+		pDp->GetExtensionNamesAndConfigs(&extension_names);
+
+		// Create device 
+		std::vector<VkDeviceQueueCreateInfo> device_queue_create_infos;
+		std::vector<float> queue_priorities;
+		int qcount = 1;
+#if 1
+		size_t qc = 0;
+		for (size_t i = 0; i < queue_family_count; i++)
+		{
+			auto& it = queue_props[i];
+			qc += it.queueCount;
+		}
+		device_queue_create_infos.resize(queue_family_count);
+		queue_priorities.resize(qc, 0.0f);
+		auto qp = queue_priorities.data();
+		for (size_t i = 0; i < queue_family_count; i++)
+		{
+			auto& it = queue_props[i];
+			auto& qf = device_queue_create_infos[i];
+			qf.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			qf.pNext = NULL;
+			qf.queueCount = it.queueCount;
+			qf.pQueuePriorities = qp;
+			qp += it.queueCount;
+			qf.queueFamilyIndex = i;
+		}
+		VkDeviceQueueCreateInfo* queue_info = device_queue_create_infos.data();
+		qcount = queue_family_count;
+#else
+		float queue_priorities[1] = { 0.0 };
+		VkDeviceQueueCreateInfo queue_info[2] = {};
+		queue_info[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queue_info[1].pNext = NULL;
+		queue_info[1].queueCount = 1;
+		queue_info[1].pQueuePriorities = queue_priorities;
+		queue_info[1].queueFamilyIndex = compute_queue_family_index;
+		if (compute_queue_family_index != graphics_queue_family_index)
+			qcount++;
+#endif
+		VkPhysicalDeviceFeatures physicalDeviceFeatures = {};
+		physicalDeviceFeatures.fillModeNonSolid = true;
+		physicalDeviceFeatures.pipelineStatisticsQuery = true;
+		physicalDeviceFeatures.fragmentStoresAndAtomics = true;
+		physicalDeviceFeatures.vertexPipelineStoresAndAtomics = true;
+		physicalDeviceFeatures.shaderImageGatherExtended = true;
+		physicalDeviceFeatures.wideLines = true; //needed for drawing lines with a specific width.
+		physicalDeviceFeatures.independentBlend = true; // needed for having different blend for each render target 
+
+		// enable feature to support fp16 with subgroup operations
+		//
+		VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR shaderSubgroupExtendedType = {};
+
+#if 0
+		shaderSubgroupExtendedType.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES_KHR;
+		shaderSubgroupExtendedType.pNext = pDp->GetNext(); //used to be pNext of VkDeviceCreateInfo
+		shaderSubgroupExtendedType.shaderSubgroupExtendedTypes = VK_TRUE;
+#endif
+		bool enabledMS = pDp->has_extension(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+		bool supportsKHRSamplerYCbCrConversion = pDp->has_extension(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+		bool dr = pDp->has_extension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		bool dr13 = pDp->has_extension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+		bool robustness_2 = pDp->has_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+		bool descriptor_heap = pDp->IsExtensionPresent(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+		bool bds = pDp->has_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+		VkPhysicalDeviceRobustness2FeaturesEXT robustness2 = {};
+		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+		robustness2.nullDescriptor = VK_TRUE;
+		// vkvg需要
+		auto pNext2 = get_device_requirements(&physicalDeviceFeatures, pDp->GetNext(), true, false);
+		if (robustness_2)
+		{
+			robustness2.pNext = pNext2;
+			pNext2 = &robustness2;
+		}
+		// to be able to bind NULL views
+		VkPhysicalDeviceFeatures2 physicalDeviceFeatures2 = {};
+		physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		physicalDeviceFeatures2.features = physicalDeviceFeatures;
+		physicalDeviceFeatures2.pNext = pNext2;
+
+		VkPhysicalDeviceFeatures2 features = {};
+		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		vkGetPhysicalDeviceFeatures2(physicalDevice, &features);
+
+		VkPhysicalDeviceMeshShaderFeaturesEXT enabledMeshShaderFeatures{};
+		if (enabledMS) {
+			enabledMeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+			enabledMeshShaderFeatures.meshShader = VK_TRUE;
+			enabledMeshShaderFeatures.taskShader = VK_TRUE;
+			enabledMeshShaderFeatures.pNext = physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &enabledMeshShaderFeatures;
+		}
+		VkPhysicalDeviceSamplerYcbcrConversionFeatures deviceSamplerYcbcrConversionFeatures = {  };
+		if (supportsKHRSamplerYCbCrConversion) {
+			deviceSamplerYcbcrConversionFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+			deviceSamplerYcbcrConversionFeatures.samplerYcbcrConversion = VK_TRUE;
+			deviceSamplerYcbcrConversionFeatures.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &deviceSamplerYcbcrConversionFeatures;
+		}
+		VkPhysicalDeviceDynamicRenderingFeaturesKHR enabledDynamicRenderingFeaturesKHR = {};
+		if (dr && !dr13) {
+			enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+			enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
+			enabledDynamicRenderingFeaturesKHR.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &enabledDynamicRenderingFeaturesKHR;
+		}
+
+		VkPhysicalDeviceVulkan13Features device_features_1_3 = {};
+		device_features_1_3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+		if (dr13) {
+			device_features_1_3.robustImageAccess = VK_TRUE;
+			device_features_1_3.maintenance4 = VK_TRUE;
+			device_features_1_3.shaderDemoteToHelperInvocation = VK_TRUE;
+			device_features_1_3.dynamicRendering = VK_TRUE;
+			device_features_1_3.synchronization2 = VK_TRUE;
+			device_features_1_3.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &device_features_1_3;
+		}
+		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT ds = {};
+		if (bds) {
+			ds.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+			ds.extendedDynamicState = VK_TRUE;
+			ds.pNext = (void*)physicalDeviceFeatures2.pNext;
+			physicalDeviceFeatures2.pNext = &ds;
+		}
+		if (dev)
+		{
+			px->_device = dev;
+		}
+		else
+		{
+			VkDeviceCreateInfo device_info = {};
+			device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+			device_info.pNext = &physicalDeviceFeatures2;
+			device_info.queueCreateInfoCount = qcount;
+			device_info.pQueueCreateInfos = queue_info;
+			device_info.enabledExtensionCount = (uint32_t)extension_names.size();
+			device_info.ppEnabledExtensionNames = device_info.enabledExtensionCount ? extension_names.data() : NULL;
+			device_info.pEnabledFeatures = NULL;
+			res = vkCreateDevice(physicalDevice, &device_info, NULL, &px->_device);
+			assert(res == VK_SUCCESS);
+		}
+		if (!px->_device)return;
+		//if (dr)
+		//{
+		//	_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdBeginRenderingKHR");
+		//	_vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdEndRenderingKHR");
+		//	_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFace)vkGetDeviceProcAddr(px->_device, "vkCmdSetFrontFace");
+		//	//if (!_vkCmdSetFrontFace)
+		//	//	_vkCmdSetFrontFace = (PFN_vkCmdSetFrontFaceEXT)vkGetDeviceProcAddr(m_device, "vkCmdSetFrontFaceEXT");
+		//}
+		//if (enabledMS)
+		//{
+		//	_vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(px->_device, "vkCmdDrawMeshTasksEXT"));
+		//}
+
+#ifdef USE_VMA
+		VmaAllocatorCreateInfo allocatorInfo = {};
+		allocatorInfo.physicalDevice = physicalDevice;
+		allocatorInfo.device = px->_device;
+		allocatorInfo.instance = px->_instance;
+		vmaCreateAllocator(&allocatorInfo, &px->_hAllocator);
+#endif
+		// create queues
+		uint32_t graphics_fidx = 0;
+		for (size_t i = 0; i < queue_family_count; i++)
+		{
+			auto& it = queue_props[i];
+			if (it.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				graphics_fidx = i;
+				px->_graphics_queues.resize(it.queueCount);
+				break;
+			}
+		}
+		for (int i = 0; i < px->_graphics_queues.size(); i++) {
+			VkQueue gq = 0;
+			vkGetDeviceQueue(px->_device, graphics_fidx, i, &gq);
+			px->_graphics_queues[i] = gq;
+		}
+
+		// Init the extensions (if they have been enabled successfuly) 
+		ExtDebugUtilsGetProcAddresses(px->_device);
+#ifdef ExtGetHDRFSEFreesyncHDRProcAddresses
+		ExtGetHDRFSEFreesyncHDRProcAddresses(px->_instance, m_device);
+#endif
+	}
+	void Device_Create(devinfo_x* px, dev_info_cx* d, bool cpuValidationLayerEnabled, bool gpuValidationLayerEnabled, void* pw, const char* spdname, std::vector<std::string>* pdnv)
+	{
+		dev_info_cx nd = {};
+		if (d) { nd = *d; }
+		d = &nd;
+		if (!d->phy)
+		{
+			VkInstance instance = (VkInstance)d->inst;
+			if (!d->inst) {
+				instance = (VkInstance)new_instance(0, 0);
+			}
+			if (instance)
+			{
+				nd.inst = instance;
+				auto devs = get_devices(instance);
+				if (devs.size() > 0)
+				{
+					if (pdnv) {
+						for (auto& dt : devs) {
+							pdnv->push_back(dt.name);
+						}
+					}
+					nd.phy = SelectPhysicalDevice(devs);
+					// 选择自定义显卡
+					if (spdname && *spdname)
+					{
+						std::string pdn;
+						for (size_t i = 0; i < devs.size(); i++)
+						{
+							pdn.assign(devs[i].name);
+							if (pdn.find(spdname) != std::string::npos)
+							{
+								nd.phy = devs[i].phd;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		if (!d || !d->inst || !d->phy)
+		{
+			printf("Failed to create Vulkan instance or physical device.\n");
+			return;
+		}
+		DeviceProperties dp;
+		dp.Init((VkPhysicalDevice)d->phy);
+		SetEssentialDeviceExtensions(&dp);
+		Device_CreateEx((VkInstance)d->inst, (VkPhysicalDevice)d->phy, (VkDevice)d->vkdev, pw, &dp, px);
+		if (!d->vkdev)
+			d->vkdev = px->_device;
+	}
+
+
+
 	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding)
 	{
 		VkDescriptorSetLayout descSetLayout = {};
@@ -318,6 +1321,7 @@ namespace vkg {
 		out = color_no_blend;
 	}
 #if 1
+	// 计算顶点输入布局和绑定
 	void md_vis(pipeline_info_2* info2, vkr::DefineList& defines, std::vector<VkVertexInputAttributeDescription>& playout, std::vector<VkVertexInputBindingDescription>& vi_binding)
 	{
 		static const char* kdefstr[] = { "ID_POSITION","ID_COLOR_0","ID_TEXCOORD_0","ID_NORMAL","ID_TANGENT","ID_WEIGHTS_0","ID_JOINTS_0","ID_TEXCOORD_1","ID_WEIGHTS_1","ID_JOINTS_1" };
@@ -704,6 +1708,11 @@ namespace vkg {
 
 	gdev_cx::~gdev_cx()
 	{
+		free_instance(inst);
+	}
+	void gdev_cx::init(const char* pApplicationName, const char* pEngineName)
+	{
+		inst = vkg::new_instance(pApplicationName, pEngineName);
 	}
 	void* gdev_cx::new_device(void* phy, void* dev0, const char* devname)
 	{
@@ -744,25 +1753,6 @@ namespace vkg {
 		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
 		pipelineCS	: 计算管线, 绑定数组、纹理做输入
 	*/
-	class cxObject;		// 通用对象
-	class cxDevice;		// 设备
-	class cxCamera;		// 相机
-	class cxArray;		// 数组
-	class cxArray1D;	// 一维数组
-	class cxArray2D;	// 二维数组
-	class cxArray3D;	// 三维数组
-	class cxFrame;		// 帧：渲染帧、计算帧
-	class cxGeometry;	// 几何体
-	class cxGroup;		// 组
-	class cxInstance;	// 实例
-	class cxLight;		// 光源
-	class cxMaterial;	// 材质
-	class cxPipeline;	// 渲染管线
-	class cxPipelineCS;	// 计算管线
-	class cxSampler;	// 纹理采样
-	class cxSurface;	// 表面
-	class cxRenderer;	// 渲染器
-	class cxWorld;		// 世界
 
 	class cxObject
 	{
@@ -806,7 +1796,6 @@ namespace vkg {
 		// 逻辑设备
 		VkDevice _dev = nullptr;
 		VkQueue _queue = nullptr;
-		//std::unordered_map<sampler_kt, VkSampler, SamplerKeyHash> _samplers;
 		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
 	public:
 		cxDevice();
@@ -991,19 +1980,19 @@ namespace vkg {
 		sampler_kt k = { *pCreateInfo };
 		auto kt = *pCreateInfo;
 		auto& p = _samplers[k];
-		if (!p)
+		if (!p && _dev)
 		{
 			VkSamplerCreateInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 			info.flags = 0;
 			info.magFilter = (VkFilter)kt.magFilter;
-			info.minFilter =(VkFilter) kt.minFilter;
+			info.minFilter = (VkFilter)kt.minFilter;
 			info.addressModeU = (VkSamplerAddressMode)kt.addressModeU;
 			info.addressModeV = (VkSamplerAddressMode)kt.addressModeV;
-			info.addressModeW =(VkSamplerAddressMode) kt.addressModeW;
+			info.addressModeW = (VkSamplerAddressMode)kt.addressModeW;
 			info.mipLodBias = kt.mipLodBias;
 			info.maxAnisotropy = kt.maxAnisotropy;
-			info.compareOp =(VkCompareOp) kt.compareOp;
+			info.compareOp = (VkCompareOp)kt.compareOp;
 			info.minLod = kt.minLod;
 			info.maxLod = kt.maxLod;
 			info.borderColor = (VkBorderColor)kt.borderColor;
@@ -1655,26 +2644,38 @@ namespace vkg {
 }
 //!vkg
 
-adevice3_t* new_gdev(void* inst) {
+adevice3_t* new_gdev(const char* pApplicationName, const char* pEngineName) {
 	auto ctx = new vkg::gdev_cx();
-	ctx->inst = inst;
-	auto p = &ctx->ad_cb;
-	p->ctx = ctx;
-	p->new_device = vkg::new_device;
-	p->new_object = vkg::new_object;
-	p->release = vkg::release;
-	p->retain = vkg::retain;
-	p->set_param = vkg::set_param;
-	p->unset_param = vkg::unset_param;
-	p->unset_allparams = vkg::unset_allparams;
-	p->commit_params = vkg::commit_params;
-	p->get_param_count = vkg::get_param_count;
-	p->get_param_names = vkg::get_param_names;
-	p->get_param = vkg::get_param;
-	p->get_property = vkg::get_property;
-	p->render_frame = vkg::render_frame;
-	p->frame_ready = vkg::frame_ready;
-
+	adevice3_t* p = nullptr;
+	if (ctx)
+	{
+		p = &ctx->ad_cb;
+		ctx->init(pApplicationName, pEngineName);
+		if (!ctx->inst)
+		{
+			delete ctx;
+			ctx = 0;
+			p = 0;
+		}
+	}
+	if (p)
+	{
+		p->ctx = ctx;
+		p->new_device = vkg::new_device;
+		p->new_object = vkg::new_object;
+		p->release = vkg::release;
+		p->retain = vkg::retain;
+		p->set_param = vkg::set_param;
+		p->unset_param = vkg::unset_param;
+		p->unset_allparams = vkg::unset_allparams;
+		p->commit_params = vkg::commit_params;
+		p->get_param_count = vkg::get_param_count;
+		p->get_param_names = vkg::get_param_names;
+		p->get_param = vkg::get_param;
+		p->get_property = vkg::get_property;
+		p->render_frame = vkg::render_frame;
+		p->frame_ready = vkg::frame_ready;
+	}
 	return p;
 }
 // 删除渲染器

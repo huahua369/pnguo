@@ -312,15 +312,6 @@ public:
 	size_t get_light_size();
 	int64_t get_fbo_semaphore();
 };
-// 2D渲染对象
-typedef struct drawable2_t drawable2_t;
-// 3D渲染对象
-typedef struct drawable3_t drawable3_t;
-
-
-// 创建vk实例,参数可选
-void* new_instance(const char* pApplicationName, const char* pEngineName);
-void free_instance(void* inst);
 
 // todo 创建渲染器，shader目录默认"ShaderLibVK", "cache/shadervk"
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir = 0, const char* shaderCacheDir = 0, const char* devname = 0);

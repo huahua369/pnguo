@@ -224,5 +224,8 @@ namespace vkr {
 	void SetPerfMarkerEnd(VkCommandBuffer cmd_buf);
 
 
+	// 创建vk实例,参数可选
+	void* new_instance(const char* pApplicationName, const char* pEngineName);
+	void free_instance(void* inst);
 }
-//!vkc
+//!vkr

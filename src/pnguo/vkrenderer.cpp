@@ -1627,9 +1627,17 @@ namespace vkr
 		uint32_t score = 0;
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-		// Use the features for a more precise way to select the GPU
 		//VkPhysicalDeviceFeatures deviceFeatures;
 		//vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+		//VkPhysicalDeviceMemoryProperties mp = {};
+		//vkGetPhysicalDeviceMemoryProperties(physicalDevice, &mp);
+		//VkDeviceSize heapSize = 0;
+		//for (uint32_t i = 0; i < mp.memoryHeapCount; i++) {
+		//	if (mp.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+		//		heapSize += mp.memoryHeaps[i].size;  // 显存总大小（字节）
+		//	}
+		//}
+		//score += deviceProperties.limits.maxImageDimension1D;
 		switch (deviceProperties.deviceType)
 		{
 		case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
@@ -22710,6 +22718,50 @@ namespace vkr {
 		return;
 	}
 
+	void* new_instance(const char* pApplicationName, const char* pEngineName)
+	{
+		vkr::InstanceProperties ip;
+		ip.Init();
+		bool cpuvalid = false;
+		bool gpuvalid = false;
+#ifdef _DEBUG
+		cpuvalid = 1;
+		gpuvalid = 1;
+#endif // _DEBUG
+		vkr::SetEssentialInstanceExtensions(cpuvalid, gpuvalid, &ip);
+		auto apiVersion3 = VK_API_VERSION_1_3;
+		auto apiVersion4 = VK_API_VERSION_1_4;
+		VkInstanceCreateInfo inst_info = {};
+		std::vector<const char*> instance_layer_names;
+		std::vector<const char*> instance_extension_names;
+		ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names, 0);
+		VkInstance instance = {};
+		VkApplicationInfo app_info = {};
+		app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		app_info.pNext = NULL;
+		app_info.pApplicationName = pApplicationName ? pApplicationName : "vkapp";
+		app_info.applicationVersion = 1;
+		app_info.pEngineName = pEngineName ? pEngineName : "pnguo";
+		app_info.engineVersion = 1;
+		app_info.apiVersion = apiVersion4;
+		inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		inst_info.pNext = 0;
+		inst_info.flags = 0;
+		inst_info.pApplicationInfo = &app_info;
+		inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
+		inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
+		inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
+		inst_info.ppEnabledExtensionNames = instance_extension_names.data();
+		VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
+		assert(res == VK_SUCCESS);
+		return instance;
+	}
+
+	void free_instance(void* inst)
+	{
+		if (inst)
+			vkDestroyInstance((VkInstance)inst, 0);
+	}
 }
 //!vkr
 
@@ -22975,50 +23027,6 @@ int64_t vkdg_cx::get_fbo_semaphore()
 	return 0;
 }
 
-void* new_instance(const char* pApplicationName, const char* pEngineName)
-{
-	vkr::InstanceProperties ip;
-	ip.Init();
-	bool cpuvalid = false;
-	bool gpuvalid = false;
-#ifdef _DEBUG
-	cpuvalid = 1;
-	gpuvalid = 1;
-#endif // _DEBUG
-	vkr::SetEssentialInstanceExtensions(cpuvalid, gpuvalid, &ip);
-	auto apiVersion3 = VK_API_VERSION_1_3;
-	auto apiVersion4 = VK_API_VERSION_1_4;
-	VkInstanceCreateInfo inst_info = {};
-	std::vector<const char*> instance_layer_names;
-	std::vector<const char*> instance_extension_names;
-	ip.GetExtensionNamesAndConfigs(&instance_layer_names, &instance_extension_names, 0);
-	VkInstance instance = {};
-	VkApplicationInfo app_info = {};
-	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	app_info.pNext = NULL;
-	app_info.pApplicationName = pApplicationName ? pApplicationName : "vkapp";
-	app_info.applicationVersion = 1;
-	app_info.pEngineName = pEngineName ? pEngineName : "pnguo";
-	app_info.engineVersion = 1;
-	app_info.apiVersion = apiVersion4;
-	inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	inst_info.pNext = 0;
-	inst_info.flags = 0;
-	inst_info.pApplicationInfo = &app_info;
-	inst_info.enabledLayerCount = (uint32_t)instance_layer_names.size();
-	inst_info.ppEnabledLayerNames = (uint32_t)instance_layer_names.size() ? instance_layer_names.data() : NULL;
-	inst_info.enabledExtensionCount = (uint32_t)instance_extension_names.size();
-	inst_info.ppEnabledExtensionNames = instance_extension_names.data();
-	VkResult res = vkCreateInstance(&inst_info, NULL, &instance);
-	assert(res == VK_SUCCESS);
-	return instance;
-}
-
-void free_instance(void* inst)
-{
-	if (inst)
-		vkDestroyInstance((VkInstance)inst, 0);
-}
 
 vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, const char* shaderCacheDir, const char* devname)
 {
@@ -24151,7 +24159,7 @@ uint64_t vkr_get_ticks() {
 
 void vkrender_test0()
 {
-	auto inst = new_instance(0, 0);
+	auto inst = vkr::new_instance(0, 0);
 	//auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
 	auto devs = vkr::get_devices(inst);  // 获取设备名称列表
 	if (devs.empty())return;
@@ -24197,7 +24205,7 @@ void vkrender_test0()
 		}
 	}
 	free_vkdg(vkd);				// 释放渲染器
-	free_instance(inst);		// 释放实例
+	vkr::free_instance(inst);		// 释放实例
 }
 
 
