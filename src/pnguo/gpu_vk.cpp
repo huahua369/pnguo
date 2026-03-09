@@ -2500,95 +2500,95 @@ namespace vkg {
 		aDevice p = nullptr;
 		if (!vctx)return p;
 		auto ctx = (gdev_cx*)vctx;
-		auto pd = new cxDevice();
-		if (pd)
+		auto c = new cxDevice();
+		if (c)
 		{
-			auto d = (devinfo_x*)ctx->new_device(phy, dev, devname, &pd->d);
-			pd->set_device(d->_device, 0);
-			p = (aDevice)pd;
+			auto d = (devinfo_x*)ctx->new_device(phy, dev, devname, &c->d);
+			c->set_device(d->_device, 0);
+			p = c;
 		}
 		return p;
 	}
-	aCamera new_aCamera(void* ctx, const char* type) {
+	aCamera new_aCamera(cxDevice* ctx, const char* type) {
 		aCamera p = nullptr;
 		auto c = new cxCamera();
 		p = c;
 		return p;
 	}
-	aArray new_aArray(void* ctx, const char* type) {
+	aArray new_aArray(cxDevice* ctx, const char* type) {
 		aArray p = nullptr;
 		auto c = new cxArray();
 		p = c;
 		return p;
 	}
 
-	aFrame new_aFrame(void* ctx, const char* type) {
+	aFrame new_aFrame(cxDevice* ctx, const char* type) {
 		aFrame p = nullptr;
 		auto c = new cxFrame();
 		p = c;
 		return p;
 	}
-	aGeometry new_aGeometry(void* ctx, const char* type) {
+	aGeometry new_aGeometry(cxDevice* ctx, const char* type) {
 		aGeometry p = nullptr;
 		auto c = new cxGeometry();
 		p = c;
 		return p;
 	}
-	aGroup new_aGroup(void* ctx, const char* type) {
+	aGroup new_aGroup(cxDevice* ctx, const char* type) {
 		aGroup p = nullptr;
 		auto c = new cxGroup();
 		p = c;
 		return p;
 	}
-	aInstance new_aInstance(void* ctx, const char* type) {
+	aInstance new_aInstance(cxDevice* ctx, const char* type) {
 		aInstance p = nullptr;
 		auto c = new cxInstance();
 		p = c;
 		return p;
 	}
-	aLight new_aLight(void* ctx, const char* type) {
+	aLight new_aLight(cxDevice* ctx, const char* type) {
 		aLight p = nullptr;
 		auto c = new cxLight();
 		p = c;
 		return p;
 	}
-	aMaterial new_aMaterial(void* ctx, const char* type) {
+	aMaterial new_aMaterial(cxDevice* ctx, const char* type) {
 		aMaterial p = nullptr;
 		auto c = new cxMaterial();
 		p = c;
 		return p;
 	}
-	aPipeline new_aPipeline(void* ctx, const char* type) {
+	aPipeline new_aPipeline(cxDevice* ctx, const char* type) {
 		aPipeline p = nullptr;
 		auto c = new cxPipeline();
 		p = c;
 		return p;
 	}
-	aPipelineCS new_aPipelineCS(void* ctx, const char* type) {
+	aPipelineCS new_aPipelineCS(cxDevice* ctx, const char* type) {
 		aPipelineCS p = nullptr;
 		auto c = new cxPipelineCS();
 		p = c;
 		return p;
 	}
-	aSampler new_aSampler(void* ctx, const char* type) {
+	aSampler new_aSampler(cxDevice* ctx, const char* type) {
 		aSampler p = nullptr;
 		auto c = new cxSampler();
 		p = c;
 		return p;
 	}
-	aSurface new_aSurface(void* ctx, const char* type) {
+	aSurface new_aSurface(cxDevice* ctx, const char* type) {
 		aSurface p = nullptr;
 		auto c = new cxSurface();
 		p = c;
 		return p;
 	}
-	aRenderer new_aRenderer(void* ctx, const char* type) {
+	aRenderer new_aRenderer(cxDevice* ctx, const char* type) {
 		aRenderer p = nullptr;
 		auto c = new cxRenderer();
 		p = c;
 		return p;
 	}
-	aWorld new_aWorld(void* ctx, const char* type) {
+	aWorld new_aWorld(cxDevice* ctx, const char* type) {
 		aWorld p = nullptr;
 		auto c = new cxWorld();
 		p = c;
@@ -2596,9 +2596,10 @@ namespace vkg {
 	}
 
 
-	aObject new_object(aDevice* ctx, int obj_type, const char* type) {
+	aObject new_object(aDevice* ctx0, int obj_type, const char* type) {
 		auto t = (obj_type_e)obj_type;
 		aObject p = nullptr;
+		auto ctx = (cxDevice*)ctx0;
 		switch (t) {
 		case OBJ_CAMERA:	p = new_aCamera(ctx, type); break;
 		case OBJ_ARRAY:		p = new_aArray(ctx, type); break;
