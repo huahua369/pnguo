@@ -1823,13 +1823,44 @@ namespace vkg {
 		// 创建采样器，内部会缓存相同参数的采样器对象
 		VkSampler newSampler(const SamplerCreateInfo* pCreateInfo);
 	};
+	struct firstPerson_t
+	{
+		glm::vec3 pos = { 0.0, 0.0, 0.0 };		//物体位置
+		glm::vec3 rota = {};					//位置角度
+		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };	//y轴做世界坐标系法向量 
+		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量
+
+		// 相机参数 
+		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
+		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
+		float cameraHeight = 1.5f;                               // 相机垂直高度
+
+		glm::quat qt = {};
+		glm::quat src_qt = {};
+		glm::quat dst_qt = {};
+
+		float fixheight = 0;		// 0就是固定高度
+	};
+
 	class cxCamera :public cxObject
 	{
 	public:
-
+		glm::mat4 proj, view;
+		glm::vec3 _eye, _center, _up;
+		firstPerson_t fp = {};
+		float keySpeed = 5.0f;
+		float xMouseSpeed = 0.51f;  //鼠标移动X速率
+		float yMouseSpeed = 0.81f;  //鼠标移动Y速率
+		int type = 1;				//1第一人称
 	public:
 		cxCamera();
 		~cxCamera();
+		void set_fov(float fovy, float aspect, float zNear, float zFar);
+		void set_lookat(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up);
+
+		// 第一人称移动，direction为移动方向向量，deltaTime为帧间时间
+		void keyMovement(glm::vec3 direction, double deltaTime);
+		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown);
 
 	private:
 
@@ -2032,6 +2063,107 @@ namespace vkg {
 	cxCamera::~cxCamera()
 	{
 	}
+	void cxCamera::set_fov(float fovy, float aspect, float zNear, float zFar)
+	{
+		proj = glm::perspective(fovy, aspect, zNear, zFar);
+	}
+	void cxCamera::set_lookat(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up)
+	{
+		_eye = eye; _center = center; _up = up;
+		view = glm::lookAt(eye, center, up);
+	}
+
+	glm::quat e2q(const glm::ivec2& r)
+	{
+		auto ry = glm::radians(glm::vec2(r));
+		glm::vec3 EulerAngles(ry.x, ry.y, 0.0);// x=pitch; y=yaw； roll忽略
+		glm::quat q = glm::quat(EulerAngles);
+		return q;
+	}
+	glm::vec3 quat_up(const glm::quat& q)
+	{
+		auto v = q * glm::vec3(0, 1, 0);
+		return glm::vec3(v.z, v.y, v.x);
+	}
+	glm::vec3 quat_right(const glm::quat& q)
+	{
+		auto v = q * glm::vec3(1, 0, 0);
+		return glm::vec3(v.z, v.y, v.x);
+	}
+	glm::vec3 quat_forward(const glm::quat& q)
+	{
+		auto v = q * glm::vec3(0, 0, 1);
+		return glm::vec3(v.z, -v.y, v.x);
+	}
+	void key_move(firstPerson_t* p, glm::vec3 direction, double deltaTime, float keySpeed) {
+		float moveSpeed = deltaTime * keySpeed;
+		auto z = p->worldUp * direction.z;
+		// 第一人称相机计算 
+		auto x = -quat_right(p->qt);	// 左右移动
+		auto y = -quat_forward(p->qt);	// 前后移动
+		//auto z0 = quat_up(qi); 
+		auto npos = moveSpeed * (x * direction.x + y * direction.y + z);
+		if (abs(direction.x) > 0 || abs(direction.y) > 0)
+			npos.y *= p->fixheight;
+		p->pos += npos;
+	}
+	void mouse_move(firstPerson_t* p, float deltaX, float deltaY, double deltaTime, bool mousedown, float xMouseSpeed, float yMouseSpeed) {
+		if (abs(deltaX) > 0 || abs(deltaY) > 0)
+		{
+			auto sr = p->rota;
+			// 角度配置
+			p->rota.x += deltaY * xMouseSpeed;
+			p->rota.y += deltaX * yMouseSpeed;
+			//角度限制
+			p->rota.y = glm::mod(p->rota.y, 360.0f);
+			p->rota.x = glm::clamp(p->rota.x, -89.0f, 89.0f);
+			p->src_qt = p->qt; // 保存当前四元数 
+			p->dst_qt = e2q(p->rota);
+			auto qd = glm::distance2(sr, p->rota);
+		}
+		p->qt = p->dst_qt;
+		p->front = quat_forward(p->qt);
+	}
+	glm::mat4 get_view(firstPerson_t* p)
+	{
+		glm::vec3 tpos = p->pos;
+		glm::vec3 camera_forward;
+		glm::vec3 camera_right;
+		glm::vec3 camera_up;
+		float cameraSmooth = 2.0f;	// 平滑因子  
+		p->cameraPos = tpos;
+		camera_forward = glm::normalize(p->front);
+		camera_right = glm::normalize(glm::cross(camera_forward, p->worldUp));
+		camera_up = glm::normalize(glm::cross(camera_right, camera_forward));
+		//if (type == 1)
+		{
+			p->cameraPos += camera_forward * p->cameraDistance + camera_up * p->cameraHeight;
+		}
+		auto view0 = glm::lookAt(p->cameraPos, p->front + p->cameraPos, camera_up);
+		return view0;
+	}
+
+	//键盘移动处理
+	void cxCamera::keyMovement(glm::vec3 direction, double deltaTime) {
+		if (type == 1)
+		{
+			key_move(&fp, direction, deltaTime, keySpeed);
+			view = get_view(&fp);
+		}
+	}
+
+	//鼠标移动处理
+	void cxCamera::mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown)
+	{
+		if (type == 1 && !mousedown)
+		{
+			return; // 非第一人称视角且鼠标未按下时不处理鼠标移动
+		}
+		mouse_move(&fp, deltaX, deltaY, deltaTime, mousedown, xMouseSpeed, yMouseSpeed);
+		view = get_view(&fp);
+	}
+
+
 	cxFrame::cxFrame() :cxObject(OBJ_FRAME)
 	{
 	}
