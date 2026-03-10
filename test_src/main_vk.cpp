@@ -1084,6 +1084,7 @@ int main()
 		//show_cpuinfo(form0);
 
 		free_vkdg(vkd);
+		gd->release(dctx);
 		free_gdev(gd);
 		free_app(app);
 	}

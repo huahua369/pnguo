@@ -13396,7 +13396,7 @@ namespace vkr {
 	//--------------------------------------------------------------------------------------
 	void Camera::SetFov(float fovV, uint32_t width, uint32_t height, float nearPlane, float farPlane)
 	{
-		SetFov(fovV, width * 1.f / height, nearPlane, farPlane);
+		SetFov(fovV, width * 1.0 / height, nearPlane, farPlane);
 	}
 
 	void Camera::SetFov(float fovV, float aspectRatio, float nearPlane, float farPlane)
