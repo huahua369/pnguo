@@ -474,7 +474,8 @@ namespace vkr
 			camera_up = glm::normalize(glm::cross(camera_right, camera_forward));
 			if (!bFirstPerson)
 			{
-				cameraPos += camera_forward * cameraDistance + camera_up * cameraHeight;
+				tpos = camera_forward * cameraDistance + camera_up * cameraHeight;
+				cameraPos += tpos;
 			}
 			auto view0 = glm::lookAt(cameraPos, front + cameraPos, camera_up);
 			view = view0;

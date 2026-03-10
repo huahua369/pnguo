@@ -1021,7 +1021,7 @@ int main()
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
+						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
 					r_render_data_text(&ptb->trt, { 20,10 }, td3);
