@@ -2130,15 +2130,15 @@ namespace vkg {
 		glm::vec3 camera_forward;
 		glm::vec3 camera_right;
 		glm::vec3 camera_up;
-		float cameraSmooth = 2.0f;	// 平滑因子  
+		//float cameraSmooth = 2.0f;	// 平滑因子  
 		p->cameraPos = tpos;
 		camera_forward = glm::normalize(p->front);
 		camera_right = glm::normalize(glm::cross(camera_forward, p->worldUp));
 		camera_up = glm::normalize(glm::cross(camera_right, camera_forward));
-		//if (type == 1)
-		{
-			p->cameraPos += camera_forward * p->cameraDistance + camera_up * p->cameraHeight;
-		}
+		//if (type == 0)
+		//{
+		//	p->cameraPos += camera_forward * p->cameraDistance + camera_up * p->cameraHeight;
+		//}
 		auto view0 = glm::lookAt(p->cameraPos, p->front + p->cameraPos, camera_up);
 		return view0;
 	}

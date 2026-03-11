@@ -332,7 +332,7 @@ namespace vkr
 	{
 	public:
 		glm::mat4 view;                         //视图
-		glm::dvec3 pos = { 0,2.8,0 };                         //实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
+		glm::dvec3 pos = { 0,2.8,0 };	//实际坐标,计算时必须用glm::floor来偏移出正确结果,不偏移的话xyz任意一条为0时其上下两部分为0.5和-0.5,此时使用(int)强转结果都为0
 		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量  
 		glm::vec3 rota = {};                         //位置角度
 		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };    //y轴做世界坐标系法向量 
@@ -429,7 +429,7 @@ namespace vkr
 		//鼠标移动处理
 		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown)
 		{
-			if (!bFirstPerson && !mousedown)
+			if (/*!bFirstPerson &&*/ !mousedown)
 			{
 				return; // 非第一人称视角且鼠标未按下时不处理鼠标移动
 			}
@@ -6391,7 +6391,7 @@ namespace vkr {
 		int loadingStage = 0;
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
-		bool _customize_camera = 0;
+		bool _customize_camera = true;
 	};
 
 
