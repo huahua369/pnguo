@@ -347,6 +347,7 @@ namespace vkr
 		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
 		float cameraHeight = 1.5f;                               // 相机垂直高度
 		bool bFirstPerson = false;	// 是否第一人称视角
+		bool bQDown = false;	// 是否按下鼠标才能旋转
 		float fixheight = 0;		// 0就是固定高度
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
@@ -429,16 +430,10 @@ namespace vkr
 		//鼠标移动处理
 		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown)
 		{
-			if (/*!bFirstPerson &&*/ !mousedown)
+			if (bQDown && !mousedown)
 			{
-				return; // 非第一人称视角且鼠标未按下时不处理鼠标移动
+				return; // bQDown为true时，鼠标未按下时不处理鼠标移动
 			}
-			//计算摄像机的前向向量
-			//pitch()：俯仰，将物体绕X轴旋转
-			//yaw()：航向，将物体绕Y轴旋转
-			//roll()：横滚，将物体绕Z轴旋转 
-			// 计算前向向量 
-			//front = cfront(rota);
 			if (abs(deltaX) > 0 || abs(deltaY) > 0)
 			{
 				auto sr = rota;
@@ -7488,8 +7483,7 @@ namespace vkr
 	}
 
 	gltf_gpu_res_cx::~gltf_gpu_res_cx()
-	{
-	}
+	{}
 
 	// todo t2b
 	bool gltf_gpu_res_cx::OnCreate(Device* pDevice, GLTFCommon* pGLTFCommon, UploadHeap* pUploadHeap)
@@ -9279,12 +9273,10 @@ namespace vkr
 
 
 	GltfPbrPass::GltfPbrPass()
-	{
-	}
+	{}
 
 	GltfPbrPass::~GltfPbrPass()
-	{
-	}
+	{}
 
 	//--------------------------------------------------------------------------------------
 	void load_materials_variants(tinygltf::Primitive* primitive, PBRPrimitives* pPrimitive)
@@ -12517,8 +12509,7 @@ namespace vkr
 	}
 
 	void GBuffer::OnDestroy()
-	{
-	}
+	{}
 
 	//
 	// create render pass based on usage flags
@@ -16909,8 +16900,7 @@ namespace vkr {
 		return left == 8 || right == 8 || top == 8 || bottom == 8 || back == 8;
 	}
 	AxisAlignedBoundingBox::AxisAlignedBoundingBox() : m_min(), m_max(), m_isEmpty{ true }
-	{
-	}
+	{}
 
 	void AxisAlignedBoundingBox::Merge(const AxisAlignedBoundingBox& bb)
 	{
@@ -19259,8 +19249,7 @@ namespace vkr {
 	// todo dvk_staging_buffer
 
 	dvk_staging_buffer::dvk_staging_buffer()
-	{
-	}
+	{}
 
 	dvk_staging_buffer::~dvk_staging_buffer()
 	{
@@ -19393,8 +19382,7 @@ namespace vkr {
 	}
 	// todo upload_cx
 	upload_cx::upload_cx()
-	{
-	}
+	{}
 
 	upload_cx::~upload_cx()
 	{
@@ -20375,8 +20363,7 @@ namespace vkr {
 
 
 	fbo_info_cx::fbo_info_cx()
-	{
-	}
+	{}
 
 	fbo_info_cx::~fbo_info_cx()
 	{
@@ -22768,8 +22755,7 @@ namespace vkr {
 
 
 vkdg_cx::vkdg_cx()
-{
-}
+{}
 
 vkdg_cx::~vkdg_cx()
 {
@@ -23094,12 +23080,10 @@ void free_vkdg(vkdg_cx* p)
 namespace vkr {
 
 	BBoxPass::BBoxPass()
-	{
-	}
+	{}
 
 	BBoxPass::~BBoxPass()
-	{
-	}
+	{}
 
 	void BBoxPass::add(glm::mat4* m, BBoxPass::box_t* vcr, size_t count)
 	{
@@ -23441,8 +23425,7 @@ namespace vkr
 	场景编辑管理
 	*/
 	scene_edit::scene_edit()
-	{
-	}
+	{}
 	scene_edit::~scene_edit()
 	{
 		// 清理光源
