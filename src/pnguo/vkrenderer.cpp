@@ -6387,7 +6387,7 @@ namespace vkr {
 		int loadingStage = 0;
 		bool m_bPlay = 0;
 		bool bShowProfilerWindow = true;
-		bool _customize_camera = true;
+		bool _customize_camera = 0;
 	};
 
 
@@ -22491,11 +22491,12 @@ namespace vkr {
 
 		int i = 0;
 		static float speed = 1.0;
+		//auto ymat = glm::scale(glm::vec3(1, -1, 1));
 		for (auto it : _loaders)
 		{
 			auto n = it->get_animation_count();
 			it->update(_time * speed);
-			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::mat4(1.0f), glm::vec3(it->_scale));
+			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::mat4(1.0f), glm::vec3(it->_scale)) /** ymat*/;
 			it->TransformScene(0, m);
 		}
 	}
