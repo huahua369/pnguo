@@ -65,25 +65,11 @@ if(KHR_materials_transmission透明介质透射材质){
 #endif
 #ifndef DXGI_FORMAT_DEFINED
 typedef uint32_t DXGI_FORMAT;
-#endif 
-#define TINYGLTF_IMPLEMENTATION23 
-#if 0
-#define TINYGLTF_USE_RAPIDJSON
-// 多线程初始化文档时会崩
-#define TINYGLTF_NO_INCLUDE_RAPIDJSON
-#include <rapidjson/document.h>
-#include <rapidjson/prettywriter.h>
-#include <rapidjson/rapidjson.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-#endif
+#endif  
 #ifdef min
 #undef min
 #undef max
-#endif // min
-#define TINYGLTF_NOEXCEPTION
-#define TINYGLTF_ENABLE_DRACO
-#include <tiny_gltf.h>
+#endif // min 
 #include <zlib.h>
 #include <queue>
 #include <unordered_set>
@@ -1726,8 +1712,7 @@ namespace vkg {
 
 
 	gdev_cx::gdev_cx()
-	{
-	}
+	{}
 
 	gdev_cx::~gdev_cx()
 	{
@@ -1845,8 +1830,8 @@ namespace vkg {
 	class cxCamera :public cxObject
 	{
 	public:
-		glm::mat4 proj, view;
-		glm::vec3 _eye, _center, _up;
+		glm::mat4 proj = glm::mat4(1.0f), view = glm::mat4(1.0f);
+		glm::vec3 _eye = {}, _center = {}, _up = {};
 		firstPerson_t fp = {};
 		float keySpeed = 5.0f;
 		float xMouseSpeed = 0.51f;  //鼠标移动X速率
@@ -2000,8 +1985,7 @@ namespace vkg {
 
 	cxObject::cxObject() {}
 	cxObject::cxObject(int t) :obj_type(t)
-	{
-	}
+	{}
 	cxObject::~cxObject() {}
 	int cxObject::get_release()
 	{
@@ -2013,8 +1997,7 @@ namespace vkg {
 		refcount++;
 	}
 	cxDevice::cxDevice() :cxObject(OBJ_DEVICE)
-	{
-	}
+	{}
 	cxDevice::~cxDevice()
 	{
 		if (_newdevice && _dev)
@@ -2057,12 +2040,10 @@ namespace vkg {
 		return p;
 	}
 	cxCamera::cxCamera() :cxObject(OBJ_CAMERA)
-	{
-	}
+	{}
 
 	cxCamera::~cxCamera()
-	{
-	}
+	{}
 	void cxCamera::set_fov(float fovy, float aspect, float zNear, float zFar)
 	{
 		proj = glm::perspective(fovy, aspect, zNear, zFar);
@@ -2165,88 +2146,62 @@ namespace vkg {
 
 
 	cxFrame::cxFrame() :cxObject(OBJ_FRAME)
-	{
-	}
+	{}
 
 	cxFrame::~cxFrame()
-	{
-	}
+	{}
 	cxArray::cxArray() :cxObject(OBJ_ARRAY)
-	{
-	}
+	{}
 	cxArray::~cxArray()
-	{
-	}
+	{}
 	cxGeometry::cxGeometry() :cxObject(OBJ_GEOMETRY)
-	{
-	}
+	{}
 
 	cxGeometry::~cxGeometry()
-	{
-	}
+	{}
 
 	cxGroup::cxGroup() :cxObject(OBJ_GROUP)
-	{
-	}
+	{}
 
 	cxGroup::~cxGroup()
-	{
-	}
+	{}
 	cxInstance::cxInstance() :cxObject(OBJ_INSTANCE)
-	{
-	}
+	{}
 	cxInstance::~cxInstance()
-	{
-	}
+	{}
 
 	cxLight::cxLight() :cxObject(OBJ_LIGHT)
-	{
-	}
+	{}
 	cxLight::~cxLight()
-	{
-	}
+	{}
 	cxMaterial::cxMaterial() :cxObject(OBJ_MATERIAL)
-	{
-	}
+	{}
 	cxMaterial::~cxMaterial()
-	{
-	}
+	{}
 	cxPipeline::cxPipeline() :cxObject(OBJ_PIPELINE)
-	{
-	}
+	{}
 	cxPipeline::~cxPipeline()
-	{
-	}
+	{}
 	cxPipelineCS::cxPipelineCS() :cxObject(OBJ_PIPELINECS)
-	{
-	}
+	{}
 	cxPipelineCS::~cxPipelineCS()
-	{
-	}
+	{}
 	cxSampler::cxSampler() :cxObject(OBJ_SAMPLER)
-	{
-	}
+	{}
 	cxSampler::~cxSampler()
-	{
-	}
+	{}
 	cxSurface::cxSurface() :cxObject(OBJ_SURFACE)
-	{
-	}
+	{}
 	cxSurface::~cxSurface()
-	{
-	}
+	{}
 	cxRenderer::cxRenderer() :cxObject(OBJ_RENDERER)
-	{
-	}
+	{}
 	cxRenderer::~cxRenderer()
-	{
-	}
+	{}
 	cxWorld::cxWorld() :cxObject(OBJ_WORLD)
-	{
-	}
+	{}
 	cxWorld::~cxWorld()
-	{
-	}
+	{}
 
 
 
@@ -2390,15 +2345,12 @@ namespace vkg {
 			c->retain();
 	}
 	// 设置参数
-	void set_param(void* obj, const char* name, int data_type, void* data) {
-	}
+	void set_param(void* obj, const char* name, int data_type, void* data) {}
 	// 取消参数
-	void unset_param(aObject object, const char* name) {
-	}
+	void unset_param(aObject object, const char* name) {}
 	void unset_allparams(aObject object) {}
 	// 提交参数
-	void commit_params(aObject object) {
-	}
+	void commit_params(aObject object) {}
 	// 获取对象支持的参数名
 	size_t get_param_count(aObject object) {
 		return 0;
@@ -2415,8 +2367,7 @@ namespace vkg {
 		return 0;
 	}
 	// 提交帧渲染
-	void render_frame(aFrame frame) {
-	}
+	void render_frame(aFrame frame) {}
 	// 帧渲染完成检查
 	int frame_ready(aFrame frame, int wait_mask) {
 		return 0;

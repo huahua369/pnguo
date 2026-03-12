@@ -347,7 +347,7 @@ namespace vkr
 		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
 		float cameraHeight = 1.5f;                               // 相机垂直高度
 		bool bFirstPerson = false;	// 是否第一人称视角
-		bool bQDown = false;	// 是否按下鼠标才能旋转
+		bool bQDown = true;	// 是否按下鼠标才能旋转
 		float fixheight = 0;		// 0就是固定高度
 		CameraX() {
 			view = glm::lookAt(glm::vec3(0)/*摄像机坐标*/, glm::vec3(0)/*被观测坐标*/, worldUp);
@@ -5988,7 +5988,7 @@ namespace vkr {
 
 	// Sets the viewport and the scissor to a fixed height and width
 	//
-	void SetViewportAndScissor(VkCommandBuffer cmd_buf, uint32_t topX, uint32_t topY, uint32_t width, uint32_t height);
+	void SetViewportAndScissor(VkCommandBuffer cmd_buf, uint32_t topX, uint32_t topY, uint32_t width, uint32_t height, bool flipY = false);
 
 	// Creates a Render pass that will discard the contents of the render target.
 	//
@@ -6251,6 +6251,7 @@ namespace vkr {
 		bool _stencil_test = true;
 		bool has_skydome = true;
 
+		bool flipY = false;
 	};
 
 
@@ -13403,6 +13404,8 @@ namespace vkr {
 		m_fovV = m_fovH / aspectRatio;
 
 		m_Proj = glm::perspective(fovV, m_aspectRatio, nearPlane, farPlane);
+		if (flipY)
+			m_Proj[1][1] *= -1.0;
 	}
 
 	void Camera::SetMatrix(const glm::mat4& cameraMatrix)
@@ -16399,13 +16402,19 @@ namespace vkr {
 	}
 
 
-	void SetViewportAndScissor(VkCommandBuffer cmd_buf, uint32_t topX, uint32_t topY, uint32_t width, uint32_t height)
+	void SetViewportAndScissor(VkCommandBuffer cmd_buf, uint32_t topX, uint32_t topY, uint32_t width, uint32_t height, bool flipY)
 	{
 		VkViewport viewport;
 		viewport.x = static_cast<float>(topX);
-		viewport.y = static_cast<float>(topY) + static_cast<float>(height);
 		viewport.width = static_cast<float>(width);
-		viewport.height = -static_cast<float>(height);
+		if (flipY) {
+			viewport.y = static_cast<float>(topY);
+			viewport.height = static_cast<float>(height);
+		}
+		else {
+			viewport.y = static_cast<float>(topY) + static_cast<float>(height);
+			viewport.height = -static_cast<float>(height);
+		}
 		viewport.minDepth = (float)0.0f;
 		viewport.maxDepth = (float)1.0f;
 		vkCmdSetViewport(cmd_buf, 0, 1, &viewport);
@@ -21238,11 +21247,16 @@ namespace vkr {
 			// get light data and node trans
 			auto& lightData = _lights[i];
 			auto q = glm::normalize(lightData._rotation);
-			glm::mat4 lightMat = glm::translate(glm::mat4(1.0), lightData._position) * glm::mat4(q);
+			glm::vec3 poss = lightData._position;
+			glm::mat4 lightMat = glm::translate(glm::mat4(1.0), poss) * glm::mat4(q);
 
 			glm::mat4 lightView = glm::affineInverse(lightMat);
 			auto a = glm::radians(glm::clamp(lightData._cone_angle, 1.0f, 180.0f) * 0.5f);
 			glm::mat4 per = glm::perspective(a * 2.0f, 1.0f, .1f, 100.0f);
+			if (flipY)
+			{
+				per[1][1] *= -1.0;
+			}
 			pSL->mLightView = lightView;
 			if (lightData._type == LightType_Spot)
 				pSL->mLightViewProj = per * lightView;
@@ -22302,6 +22316,7 @@ namespace vkr {
 		}
 		if (m_Width && m_Height)
 		{
+			m_camera.flipY = m_pRenderer->flipY;
 			m_camera.SetFov(AMD_PI_OVER_4, m_Width, m_Height, 0.1f, 1000.0f);
 			tpfc.set_size((float)m_Width, (float)m_Height);
 		}
