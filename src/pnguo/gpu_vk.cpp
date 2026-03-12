@@ -1808,6 +1808,12 @@ namespace vkg {
 		// 创建采样器，内部会缓存相同参数的采样器对象
 		VkSampler newSampler(const SamplerCreateInfo* pCreateInfo);
 	};
+
+	/* 第一人称：鼠标旋转、键盘移动、跳
+	 上帝视角：
+		移动：键盘wsad、鼠标边缘
+		旋转：键盘qe、鼠标右键拖动
+	*/
 	struct firstPerson_t
 	{
 		glm::vec3 pos = { 0.0, 0.0, 0.0 };		//物体位置

@@ -20856,7 +20856,6 @@ namespace vkr {
 		m_Height = Height;
 
 		// Set the viewport
-		//
 		m_Viewport.x = 0;
 		m_Viewport.y = (float)Height;
 		m_Viewport.width = (float)Width;
@@ -20865,7 +20864,6 @@ namespace vkr {
 		m_Viewport.maxDepth = (float)1.0f;
 
 		// Create scissor rectangle
-		//
 		m_RectScissor.extent.width = Width;
 		m_RectScissor.extent.height = Height;
 		m_RectScissor.offset.x = 0;
