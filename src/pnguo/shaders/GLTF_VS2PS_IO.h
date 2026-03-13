@@ -7,6 +7,9 @@ struct VS2PS
 #ifdef ID_COLOR_0
 	vec3 Color0;
 #endif
+#ifdef ID_COLOR_1
+	vec3 Color1;
+#endif
 
 	vec2 UV[2];
 

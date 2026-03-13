@@ -736,9 +736,20 @@ vec4 getPixelColor(VS2PS Input)
 	vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
 
 #ifdef ID_COLOR_0
-	color.xyz = Input.Color0;
+	color = Input.Color0;
 #endif
+#ifdef ID_COLOR_1
+	if (!gl_FrontFacing)
+	{
+		color = Input.Color1;
+	}
+#endif
+	return color;
+}
 
+vec4 getPixelColor1(VS2PS Input)
+{
+	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
 	return color;
 }
 

@@ -13,6 +13,10 @@ layout(location = ID_POSITION) in vec3 a_Position;
 layout(location = ID_COLOR_0) in  vec3 a_Color0;
 #endif
 
+#ifdef ID_COLOR_1
+layout(location = ID_COLOR_1) in  vec3 a_Color1;
+#endif
+
 #ifdef ID_TEXCOORD_0
 layout(location = ID_TEXCOORD_0) in  vec2 a_UV0;
 #endif
@@ -111,6 +115,13 @@ void gltfVertexFactory()
 	Output.Color0 = a_Color0;
 #ifdef HAS_MORPH_TARGETS
 	Output.Color0 = clamp(Output.Color0 + getTargetColor0(gl_VertexIndex), 0.0f, 1.0f);
+#endif 
+#endif
+
+#ifdef ID_COLOR_1
+	Output.Color1 = a_Color1;
+#ifdef HAS_MORPH_TARGETS
+	Output.Color1 = clamp(Output.Color1 + getTargetColor1(gl_VertexIndex), 0.0f, 1.0f);
 #endif 
 #endif
 
