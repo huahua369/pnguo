@@ -17,7 +17,7 @@
 		Geometry	: 网格数据、transform、动画等属性
 		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
 		pipelineCS	: 计算管线, 绑定数组、纹理做输入
-
+		Material	：材质由shader和参数、纹理等资源组成。
 		NO_WAIT 0
 		WAIT 1
 --------------------------------------------------------------------------------------------------------------
@@ -47,6 +47,49 @@ ps:
 
 */
 namespace vkg {
+#pragma pack(push, 16)
+	// 224字节
+	struct pbr_factors_t
+	{
+		glm::vec4 baseColorFactor = glm::vec4(1.0);
+		float metallicFactor = 0;			// pbrMetallicRoughness金属度
+		float roughnessFactor = 0;			// 粗糙度
+		float normalScale = 1.0;
+		// KHR_materials_emissive_strength自发光强度
+		float emissiveStrength = 1.0;
+		glm::vec3 emissiveFactor = glm::vec3(0.0);// 自发光颜色
+		int   alphaMode;	float alphaCutoff;	float occlusionStrength;
+		//KHR_materials_ior折射率
+		float ior = 1.5;		int mipCount = 10;
+		// KHR_materials_pbrSpecularGlossiness镜面反射-光泽度
+		glm::vec4 pbrDiffuseFactor = glm::vec4(1.0);	glm::vec3 pbrSpecularFactor = glm::vec3(1.0);
+		float glossinessFactor = 1.0;
+		// Specular KHR_materials_specular镜面反射
+		glm::vec3  specularColorFactor = glm::vec3(1.0);
+		float specularFactor = 1.0;
+		// KHR_materials_sheen 光泽、织物丝光
+		glm::vec3 sheenColorFactor = glm::vec3();
+		float sheenRoughnessFactor = 0;
+		// KHR_materials_anisotropy各向异性
+		glm::vec3 anisotropy = glm::vec3();
+		// KHR_materials_transmission透射材质
+		float transmissionFactor = 0;	glm::ivec2 transmissionFramebufferSize;
+		float thicknessFactor;
+		float diffuseTransmissionFactor;
+		glm::vec3 diffuseTransmissionColorFactor;
+		//KHR_materials_dispersion色散/弥散
+		float dispersion = 0;
+		glm::vec3 attenuationColor = glm::vec3(1.0);
+		float attenuationDistance = 10240;
+		// KHR_materials_iridescence彩虹色
+		float iridescenceFactor = 0;	float iridescenceIor = 1.3;		float iridescenceThicknessMinimum = 100;	float iridescenceThicknessMaximum = 400;
+		// KHR_materials_clearcoat清漆
+		float clearcoatFactor = 0;		float clearcoatRoughness = 0;	float clearcoatNormalScale = 1;
+		float envIntensity = 1;		// 环境强度
+		//int unlit = 0;			// 宏定义实现非pbr材质，unlit材质不受光照影响，直接输出baseColorFactor颜色		 
+	};
+#pragma pack(pop)
+
 	struct transform_t
 	{
 		glm::quat rotation;		//  四元数，用于存储变换在世界空间中的旋转。
