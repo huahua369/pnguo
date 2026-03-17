@@ -90,6 +90,24 @@ namespace vkg {
 	};
 #pragma pack(pop)
 
+	struct sampler_info_t {
+		uint32_t magFilter;
+		uint32_t minFilter;
+		uint32_t addressModeU;
+		uint32_t addressModeV;
+		uint32_t addressModeW;
+		int mipLodBias;
+		int maxAnisotropy;
+		uint32_t compareOp;
+		int minLod;
+		int maxLod;
+		uint32_t borderColor;
+		bool mipmapMode;		//		VK_SAMPLER_MIPMAP_MODE_NEAREST = 0,			VK_SAMPLER_MIPMAP_MODE_LINEAR = 1,
+		bool anisotropyEnable;
+		bool compareEnable;
+		bool unnormalizedCoordinates;
+	};
+
 	struct transform_t
 	{
 		glm::quat rotation;		//  四元数，用于存储变换在世界空间中的旋转。
@@ -330,7 +348,7 @@ extern "C" {
 	struct adevice3_t
 	{
 		void* ctx = 0;
-		aDevice(*new_device)(void* ctx, void* phy, void* dev, const char* devname);
+		aDevice(*new_device)(void* ctx, void* phy, void* dev, const char* devname, void* hwnd);
 		// obj_type_e
 		aObject(*new_object)(aDevice* dev, int obj_type, const char* type);
 		// 删除对象

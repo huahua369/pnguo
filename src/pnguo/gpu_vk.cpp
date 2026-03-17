@@ -139,6 +139,7 @@ namespace vkg {
 		VkPhysicalDeviceProperties _deviceProperties = {};
 		VkPhysicalDeviceProperties2 _deviceProperties2 = {};
 		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
+		std::string name;
 		uint32_t graphics_queueFlags = 0;
 		std::vector<VkQueue> _graphics_queues;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
@@ -153,6 +154,7 @@ namespace vkg {
 	public:
 		adevice3_t ad_cb = {};
 		void* inst = 0;
+		std::vector<device_info_t> devs;
 		std::vector<devinfo_x*> devicelist;
 		std::vector<std::string> dev_name;
 		SystemInfo _systemInfo;
@@ -160,7 +162,7 @@ namespace vkg {
 		gdev_cx();
 		~gdev_cx();
 		void init(const char* pApplicationName, const char* pEngineName);
-		void* new_device(void* phy, void* dev, const char* devname, devinfo_x* px);
+		void* new_device(void* phy, void* dev, const char* devname, void* hwnd);
 		dev_info_cx get_devinfo(uint32_t idx);
 	private:
 
@@ -1108,46 +1110,11 @@ namespace vkg {
 		ExtGetHDRFSEFreesyncHDRProcAddresses(px->_instance, m_device);
 #endif
 	}
-	void Device_Create(devinfo_x* px, dev_info_cx* d, void* pw, const char* spdname, std::vector<std::string>* pdnv)
+	void Device_init(devinfo_x* px, dev_info_cx* d, void* pw)
 	{
 		dev_info_cx nd = {};
 		if (d) { nd = *d; }
 		d = &nd;
-		if (!d->phy)
-		{
-			VkInstance instance = (VkInstance)d->inst;
-			if (!d->inst) {
-				instance = (VkInstance)new_instance(0, 0);
-			}
-			if (instance)
-			{
-				nd.inst = instance;
-				auto devs = get_devices(instance);
-				if (devs.size() > 0)
-				{
-					if (pdnv) {
-						for (auto& dt : devs) {
-							pdnv->push_back(dt.name);
-						}
-					}
-					nd.phy = SelectPhysicalDevice(devs);
-					// 选择自定义显卡
-					if (spdname && *spdname)
-					{
-						std::string pdn;
-						for (size_t i = 0; i < devs.size(); i++)
-						{
-							pdn.assign(devs[i].name);
-							if (pdn.find(spdname) != std::string::npos)
-							{
-								nd.phy = devs[i].phd;
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
 		if (!d || !d->inst || !d->phy)
 		{
 			printf("Failed to create Vulkan instance or physical device.\n");
@@ -1156,6 +1123,7 @@ namespace vkg {
 		DeviceProperties dp;
 		dp.Init((VkPhysicalDevice)d->phy);
 		SetEssentialDeviceExtensions(&dp);
+
 		Device_CreateEx((VkInstance)d->inst, (VkPhysicalDevice)d->phy, (VkDevice)d->vkdev, pw, &dp, px);
 		if (!d->vkdev)
 			d->vkdev = px->_device;
@@ -1720,15 +1688,60 @@ namespace vkg {
 	void gdev_cx::init(const char* pApplicationName, const char* pEngineName)
 	{
 		inst = vkg::new_instance(pApplicationName, pEngineName);
+
+		VkInstance instance = (VkInstance)inst;
+		if (instance)
+		{
+			devs = get_devices(instance);
+			if (devs.size() > 0)
+			{
+				devicelist.resize(devs.size());
+				dev_name.reserve(devs.size());
+				for (size_t i = 0; i < devs.size(); i++)
+				{
+
+				}
+				for (auto& dt : devs) {
+					dev_name.push_back(dt.name);
+
+				}
+			}
+		}
 	}
-	void* gdev_cx::new_device(void* phy, void* dev0, const char* devname, devinfo_x* px)
+	void* gdev_cx::new_device(void* phy, void* dev0, const char* devname, void* hwnd)
 	{
 		dev_info_cx c[1] = {};
 		c->inst = inst;
 		c->phy = phy;
 		c->vkdev = dev0;
+		devinfo_x* px = 0;
+		if (!dev0)
+		{
+			// 选择自定义显卡
+			if (devname && *devname)
+			{
+				std::string pdn;
+				for (size_t i = 0; i < devs.size(); i++)
+				{
+					pdn.assign(devs[i].name);
+					if (pdn.find(devname) != std::string::npos)
+					{
+						c->phy = (VkPhysicalDevice)devs[i].phd;
+						auto& px0 = devicelist[i];
+						if (!px0)
+						{
+							px0 = new devinfo_x();
+						}
+						px = px0;
+						break;
+					}
+				}
+			}
+			if (!c->phy)
+				c->phy = SelectPhysicalDevice(devs);
+		}
 		if (px)
-			Device_Create(px, c, 0, devname, &dev_name);
+			Device_init(px, c, hwnd);
 		return px;
 	}
 	dev_info_cx gdev_cx::get_devinfo(uint32_t idx)
@@ -1770,25 +1783,8 @@ namespace vkg {
 		int get_release();
 		void retain();
 	};
-	struct SamplerCreateInfo {
-		uint32_t magFilter;
-		uint32_t minFilter;
-		uint32_t addressModeU;
-		uint32_t addressModeV;
-		uint32_t addressModeW;
-		int mipLodBias;
-		int maxAnisotropy;
-		uint32_t compareOp;
-		int minLod;
-		int maxLod;
-		uint32_t borderColor;
-		bool mipmapMode;		//		VK_SAMPLER_MIPMAP_MODE_NEAREST = 0,			VK_SAMPLER_MIPMAP_MODE_LINEAR = 1,
-		bool anisotropyEnable;
-		bool compareEnable;
-		bool unnormalizedCoordinates;
-	};
 	struct sampler_kt {
-		SamplerCreateInfo info = {};
+		sampler_info_t info = {};
 		bool operator==(const sampler_kt& other) const;
 	};
 	struct SAKHash {
@@ -1800,7 +1796,7 @@ namespace vkg {
 		// 逻辑设备
 		VkDevice _dev = nullptr;
 		VkQueue _queue = nullptr;
-		devinfo_x d = {};
+		devinfo_x* d = {};
 		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
 		bool _newdevice = false;
 	public:
@@ -1809,7 +1805,7 @@ namespace vkg {
 		// 设置vk设备和队列，必须调用此函数设置设备后才能使用其他对象
 		void set_device(void* dev, void* q);
 		// 创建采样器，内部会缓存相同参数的采样器对象
-		VkSampler newSampler(const SamplerCreateInfo* pCreateInfo);
+		VkSampler newSampler(const sampler_info_t* pCreateInfo);
 	};
 
 	/* 第一人称：鼠标旋转、键盘移动、跳
@@ -1985,11 +1981,11 @@ namespace vkg {
 	}
 	bool sampler_kt::operator==(const sampler_kt& other) const
 	{
-		return memcmp(&info, &other.info, sizeof(SamplerCreateInfo)) == 0;
+		return memcmp(&info, &other.info, sizeof(sampler_info_t)) == 0;
 	}
 	size_t SAKHash::operator()(const sampler_kt& k) const
 	{
-		return Hash_p((const size_t*)&k.info, sizeof(SamplerCreateInfo), HASH_SEED);
+		return Hash_p((const size_t*)&k.info, sizeof(sampler_info_t), HASH_SEED);
 	}
 
 	cxObject::cxObject() {}
@@ -2020,7 +2016,7 @@ namespace vkg {
 		//assert(_dev && _queue);
 	}
 
-	VkSampler cxDevice::newSampler(const SamplerCreateInfo* pCreateInfo) {
+	VkSampler cxDevice::newSampler(const sampler_info_t* pCreateInfo) {
 		sampler_kt k = { *pCreateInfo };
 		auto kt = *pCreateInfo;
 		auto& p = _samplers[k];
@@ -2217,16 +2213,24 @@ namespace vkg {
 #endif // !1 实现
 
 
-	aDevice new_device(void* vctx, void* phy, void* dev, const char* devname) {
+	aDevice new_device(void* vctx, void* phy, void* dev, const char* devname, void* hwnd) {
 		aDevice p = nullptr;
 		if (!vctx)return p;
 		auto ctx = (gdev_cx*)vctx;
 		auto c = new cxDevice();
 		if (c)
 		{
-			auto d = (devinfo_x*)ctx->new_device(phy, dev, devname, &c->d);
-			c->set_device(d->_device, 0);
-			c->_newdevice = dev ? false : true;
+			auto d = (devinfo_x*)ctx->new_device(phy, dev, devname, hwnd);
+			if (d && d->_device)
+			{
+				c->d = d;
+				c->set_device(d->_device, 0);
+				c->_newdevice = dev ? false : true;
+			}
+			else {
+				delete c;
+				c = nullptr;
+			}
 			p = c;
 		}
 		return p;
