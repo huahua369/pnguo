@@ -153,7 +153,6 @@ namespace vkg {
 	public:
 		adevice3_t ad_cb = {};
 		void* inst = 0;
-		devinfo_x* _dev = nullptr;
 		std::vector<devinfo_x*> devicelist;
 		std::vector<std::string> dev_name;
 		SystemInfo _systemInfo;
@@ -162,7 +161,7 @@ namespace vkg {
 		~gdev_cx();
 		void init(const char* pApplicationName, const char* pEngineName);
 		void* new_device(void* phy, void* dev, const char* devname, devinfo_x* px);
-		dev_info_cx get_devinfo();
+		dev_info_cx get_devinfo(uint32_t idx);
 	private:
 
 	};
@@ -1732,13 +1731,17 @@ namespace vkg {
 			Device_Create(px, c, 0, devname, &dev_name);
 		return px;
 	}
-	dev_info_cx gdev_cx::get_devinfo()
+	dev_info_cx gdev_cx::get_devinfo(uint32_t idx)
 	{
 		dev_info_cx r = {};
-		if (_dev) {
-			r.inst = _dev->_instance;
-			r.phy = _dev->_physicaldevice;
-			r.vkdev = _dev->_device;
+		if (idx < devicelist.size())
+		{
+			auto dev = devicelist[idx];
+			if (dev) {
+				r.inst = dev->_instance;
+				r.phy = dev->_physicaldevice;
+				r.vkdev = dev->_device;
+			}
 		}
 		return r;
 	}

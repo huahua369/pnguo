@@ -241,8 +241,7 @@ belt_cx::belt_cx()
 }
 
 belt_cx::~belt_cx()
-{
-}
+{}
 void belt_cx::update(float delta) {
 	ts += delta;
 	if (ts > 0.12 * 0.5)
