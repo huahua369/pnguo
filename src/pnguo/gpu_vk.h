@@ -7,7 +7,7 @@
 	创建日期：2026-02-07
 
 --------------------------------------------------------------------------------------------------------------
-todo:星号是完成的
+todo:星号是已实现完成的
 	设备：*
 		采样器*：结构体sampler_info_t
 		图像： 2D纹理、3D纹理、立方体贴图、纹理数组。
@@ -20,7 +20,7 @@ todo:星号是完成的
 		实例：群组、实例数量、实例矩阵等数据
 		群组：表面、灯光
 		表面：几何、材质
-		几何：三角形
+		几何：三角形->顶点、索引(可选)
 		材质：pbr参数、纹理、自定义管线。
 		变换：transform_t
 		动画：
@@ -29,28 +29,21 @@ todo:星号是完成的
 
 
 
-	几何：7种默认可选顶点属性
+	几何：6种默认可选顶点属性
 		vec3 a_Position;
-		vec3 a_Color0;vec3 a_Color1;
-		vec2 a_UV0;vec2 a_UV1;
+		vec3 a_Color0;		vec3 a_Color1;
+		vec2 a_UV0;			vec2 a_UV1;
 		vec3 a_Normal;
 		vec4 a_Tangent;
-		vec4 a_Weights0;vec4 a_Weights1;
-		uvec4 a_Joints0;uvec4 a_Joints1;
+		vec4 a_Weights0;	vec4 a_Weights1;	uvec4 a_Joints0;	uvec4 a_Joints1;
 	变形动画
 		变形插值ubo数据：float u_morphWeights[]; 
 		静态目标ssbo数据：每个顶点有插值数据、数量、偏移
-		{
-			int vertex_count;
-			int weight_count;
-			int position_offset;
-			int normal_offset;
-			int tangent_offset;
-			int texcoord0_offset;
-			int color0_offset;
-			int texcoord1_offset;
+			int vertex_count;			int weight_count;
+			int position_offset;		int normal_offset;
+			int tangent_offset;			int texcoord0_offset;
+			int color0_offset;			int texcoord1_offset;
 			vec4 per_target_data[];
-		};
 	骨骼动画
 		计算后的矩阵ubo数据：mat4 u_ModelMatrix[];
 --------------------------------------------------------------------------------------------------------------
