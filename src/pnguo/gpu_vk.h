@@ -7,17 +7,64 @@
 	创建日期：2026-02-07
 
 --------------------------------------------------------------------------------------------------------------
+todo:星号是完成的
+	设备：*
+		采样器*：结构体sampler_info_t
+		图像： 2D纹理、3D纹理、立方体贴图、纹理数组。
+		缓冲区：vbo、ibo、ubo、ssbo
+		管线：着色器
+		渲染器：向前渲染缓冲区、bloom、后处理等
+	对象：
+		帧图：相机、世界、渲染器、rgba纹理、深度纹理等
+		世界：群组、实例
+		实例：群组、实例数量、实例矩阵等数据
+		群组：表面、灯光
+		表面：几何、材质
+		几何：三角形
+		材质：pbr参数、纹理、自定义管线。
+		变换：transform_t
+		动画：
+		灯光：
+		相机：
+
+
+
+	几何：7种默认可选顶点属性
+		vec3 a_Position;
+		vec3 a_Color0;vec3 a_Color1;
+		vec2 a_UV0;vec2 a_UV1;
+		vec3 a_Normal;
+		vec4 a_Tangent;
+		vec4 a_Weights0;vec4 a_Weights1;
+		uvec4 a_Joints0;uvec4 a_Joints1;
+	变形动画
+		变形插值ubo数据：float u_morphWeights[]; 
+		静态目标ssbo数据：每个顶点有插值数据、数量、偏移
+		{
+			int vertex_count;
+			int weight_count;
+			int position_offset;
+			int normal_offset;
+			int tangent_offset;
+			int texcoord0_offset;
+			int color0_offset;
+			int texcoord1_offset;
+			vec4 per_target_data[];
+		};
+	骨骼动画
+		计算后的矩阵ubo数据：mat4 u_ModelMatrix[];
+--------------------------------------------------------------------------------------------------------------
 	对象：Camera、World、Renderer、Frame、Instance、Group、Surface、Geometry、Material、Light
 	关系图
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
 		World		: Instance(1:N)、Group(1:N)
 		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
 		Group		: Surface(1:N)、Light(1:N)
-		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
+		Surface		: Geometry(1:1)、Material(1:1)
 		Geometry	: 网格数据、transform、动画等属性
 		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
 		pipelineCS	: 计算管线, 绑定数组、纹理做输入
-		Material	：材质由shader和参数、纹理等资源组成。
+		Material	：材质由shader和参数、纹理、自定义pipeline等资源组成。
 		NO_WAIT 0
 		WAIT 1
 --------------------------------------------------------------------------------------------------------------
