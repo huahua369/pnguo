@@ -824,6 +824,9 @@ int main()
 		adevice3_t* gd = new_gdev(0, 0);
 		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
 		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
+
+		gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
+
 		// 准备使用3D渲染器的设备创建SDL渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 		vkvg_dev* vctx = 0;
@@ -1039,14 +1042,6 @@ int main()
 #endif
 					sp_drawable_update(dd1, delta);
 					auto light = vkd->get_light(0);
-					/*
-					case 0:  AMDTonemapper(color);
-					case 1:  DX11DSK(color);
-					case 2:  Reinhard(color);
-					case 3:  Uncharted2Tonemap(color);
-					case 4:  tonemapACES(color);
-					case 5:  color;
-					*/
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;					// 曝光度：默认1.0
 					vkd->_state.bUseTAA;

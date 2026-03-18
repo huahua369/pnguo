@@ -1727,18 +1727,26 @@ namespace vkg {
 					if (pdn.find(devname) != std::string::npos)
 					{
 						c->phy = (VkPhysicalDevice)devs[i].phd;
-						auto& px0 = devicelist[i];
-						if (!px0)
-						{
-							px0 = new devinfo_x();
-						}
-						px = px0;
 						break;
 					}
 				}
 			}
 			if (!c->phy)
 				c->phy = SelectPhysicalDevice(devs);
+
+			for (size_t i = 0; i < devs.size(); i++)
+			{
+				if (devs[i].phd == c->phy)
+				{
+					auto& px0 = devicelist[i];
+					if (!px0)
+					{
+						px0 = new devinfo_x();
+					}
+					px = px0;
+					break;
+				}
+			}
 		}
 		if (px)
 			Device_init(px, c, hwnd);
@@ -2299,6 +2307,8 @@ namespace vkg {
 	aSampler new_aSampler(cxDevice* ctx, const char* type) {
 		aSampler p = nullptr;
 		auto c = new cxSampler();
+		sampler_info_t info = {};
+		ctx->newSampler(&info);
 		p = c;
 		return p;
 	}
