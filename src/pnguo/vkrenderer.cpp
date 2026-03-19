@@ -1051,7 +1051,7 @@ namespace vkr
 	private:
 		Device* m_pDevice = 0;
 		VkDescriptorPool m_descriptorPool;
-		std::mutex       m_mutex;
+		//std::mutex       _mutex;
 		int              m_allocatedDescriptorCount = 0;
 	};
 
@@ -12041,7 +12041,7 @@ namespace vkr
 
 	bool ResourceViewHeaps::AllocDescriptor(VkDescriptorSetLayout descLayout, VkDescriptorSet* pDescriptorSet)
 	{
-		std::lock_guard<std::mutex> lock(m_mutex);
+		//std::lock_guard<std::mutex> lock(m_mutex);
 
 		VkDescriptorSetAllocateInfo alloc_info;
 		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
