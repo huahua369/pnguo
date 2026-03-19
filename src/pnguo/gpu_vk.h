@@ -9,11 +9,11 @@
 --------------------------------------------------------------------------------------------------------------
 todo:星号是已实现完成的
 	设备：*
-		采样器*：结构体sampler_info_t
-		图像： 2D纹理、3D纹理、立方体贴图、纹理数组。
-		缓冲区：vbo、ibo、ubo、ssbo
-		管线：着色器
-		渲染器：向前渲染缓冲区、bloom、后处理等
+		采样器：	结构体sampler_info_t*，newSampler函数创建VkSampler
+		图像：	2D纹理、3D纹理、立方体贴图、纹理数组。
+		缓冲区：	static_buffer_pool_cx*(vbo、ibo)、buffer_ring_cx*(ubo、ssbo)
+		管线：	pbr着色器*、自定义着色器
+		渲染器：	向前渲染缓冲区、bloom、后处理等
 	对象：
 		帧图：相机、世界、渲染器、rgba纹理、深度纹理等
 		世界：群组、实例
@@ -250,8 +250,13 @@ namespace vkg {
 		uint32_t stride;	// 结构大小
 		uint32_t inputRate;	// 0顶点，1实例
 	};
+	enum ShaderSourceType
+	{
+		SST_HLSL,
+		SST_GLSL
+	};
 	// 管线状态信息
-	struct pipeline_info_t {
+	struct pipeline_state_t {
 		int lineWidth = 1;
 		int polygonMode = 0;//    VK_POLYGON_MODE_FILL = 0,		VK_POLYGON_MODE_LINE = 1,			VK_POLYGON_MODE_POINT = 2,
 		int frontFace = 0;
@@ -267,7 +272,7 @@ namespace vkg {
 	struct PBRPipe_t;
 	// 输入管线信息
 	struct pipeline_info_2 {
-		pipeline_info_t info = {};		// 状态信息
+		pipeline_state_t info = {};		// 状态信息
 		ubotex_size_t set_binding = {}; // 绑定信息 
 		morph_target_t morph = {};		// 变形结构信息
 		vertex_attribute_b attributes[16] = {};	// 最多16个顶点属性
@@ -281,7 +286,6 @@ namespace vkg {
 		const char* vertexShaderFile = 0;
 		const char* fragmentShaderFile = 0;
 	};
-	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2);
 
 	class cxObject;		// 通用对象
 	class cxDevice;		// 设备
@@ -302,6 +306,8 @@ namespace vkg {
 	class cxSurface;	// 表面
 	class cxRenderer;	// 渲染器
 	class cxWorld;		// 世界
+
+	void new_pbr_pipeline(cxDevice* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2);
 
 }
 //!vkg

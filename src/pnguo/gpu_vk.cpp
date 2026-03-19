@@ -146,8 +146,9 @@ namespace vkg {
 #ifdef USE_VMA
 		VmaAllocator _hAllocator = NULL;
 #endif
+		bool is_newdevice = false;
 	};
-
+	void free_devinfo(devinfo_x* d);
 
 	class gdev_cx
 	{
@@ -217,6 +218,417 @@ namespace vkg {
 	private:
 	};
 
+#ifndef HASH_SEED
+#define HASH_SEED 2166136261
+#endif
+	class DefineList : public std::map<const std::string, std::string>
+	{
+	public:
+		bool Has(const std::string& str) const;
+		size_t Hash(size_t result = HASH_SEED) const;
+		friend DefineList operator+(DefineList def1, const DefineList& def2);
+		std::string to_string() const;
+	};
+
+	template<typename T>
+	class Cache;
+
+
+#if 1
+	/*
+		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
+		World		: Instance(1:N)、Group(1:N)
+		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
+		Group		: Surface(1:N)、Light(1:N)
+		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
+		Geometry	: 网格数据、transform、动画等属性
+		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
+		pipelineCS	: 计算管线, 绑定数组、纹理做输入
+	*/
+
+	class cxObject
+	{
+	public:
+		int refcount = 1;
+		int obj_type = 0;
+	public:
+		cxObject();
+		cxObject(int t);
+		virtual ~cxObject();
+		int get_release();
+		void retain();
+	};
+	struct sampler_kt {
+		sampler_info_t info = {};
+		bool operator==(const sampler_kt& other) const;
+	};
+	struct SAKHash {
+		size_t operator()(const sampler_kt& k) const;
+	};
+	class cxDevice :public cxObject
+	{
+	public:
+		// 逻辑设备
+		VkDevice _dev = nullptr;
+		VkQueue _queue = nullptr;
+		devinfo_x* d = {};
+		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
+		Cache<VkShaderModule>* s_shaderCache = 0;
+		VkPipelineCache _pipelineCache = {};
+
+	public:
+		cxDevice();
+		~cxDevice();
+		// 设置vk设备和队列，必须调用此函数设置设备后才能使用其他对象
+		void set_device(void* dev, void* q);
+		// 创建采样器，内部会缓存相同参数的采样器对象
+		VkSampler newSampler(const sampler_info_t* pCreateInfo);
+
+		VkResult VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
+		VkResult VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
+		VkResult VKCompileFromFile(const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
+
+		void CreatePipelineCache();
+		void DestroyPipelineCache();
+		VkPipelineCache GetPipelineCache();
+
+#ifdef USE_VMA
+		VmaAllocator GetAllocator();
+#endif
+		VkPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties();
+
+	};
+
+	/* 第一人称：鼠标旋转、键盘移动、跳
+	 上帝视角：
+		移动：键盘wsad、鼠标边缘
+		旋转：键盘qe、鼠标右键拖动
+	*/
+	struct firstPerson_t
+	{
+		glm::vec3 pos = { 0.0, 0.0, 0.0 };		//物体位置
+		glm::vec3 rota = {};					//位置角度
+		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };	//y轴做世界坐标系法向量 
+		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量
+
+		// 相机参数 
+		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
+		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
+		float cameraHeight = 1.5f;                               // 相机垂直高度
+
+		glm::quat qt = {};
+		glm::quat src_qt = {};
+		glm::quat dst_qt = {};
+
+		float fixheight = 0;		// 0就是固定高度
+	};
+
+	class cxCamera :public cxObject
+	{
+	public:
+		glm::mat4 proj = glm::mat4(1.0f), view = glm::mat4(1.0f);
+		glm::vec3 _eye = {}, _center = {}, _up = {};
+		firstPerson_t fp = {};
+		float keySpeed = 5.0f;
+		float xMouseSpeed = 0.51f;  //鼠标移动X速率
+		float yMouseSpeed = 0.81f;  //鼠标移动Y速率
+		int type = 1;				//1第一人称
+	public:
+		cxCamera();
+		~cxCamera();
+		void set_fov(float fovy, float aspect, float zNear, float zFar);
+		void set_lookat(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up);
+
+		// 第一人称移动，direction为移动方向向量，deltaTime为帧间时间
+		void keyMovement(glm::vec3 direction, double deltaTime);
+		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown);
+
+	private:
+
+	};
+	class cxArray :public cxObject
+	{
+	public:
+	public:
+		cxArray();
+		~cxArray();
+	};
+	class cxFrame :public cxObject
+	{
+	public:
+	public:
+		cxFrame();
+		~cxFrame();
+
+	private:
+
+	};
+	class cxGeometry :public cxObject
+	{
+	public:
+	public:
+		cxGeometry();
+		~cxGeometry();
+
+	private:
+
+	};
+	class cxGroup :public cxObject
+	{
+	public:
+	public:
+		cxGroup();
+		~cxGroup();
+
+	private:
+
+	};
+	class cxInstance :public cxObject
+	{
+	public:
+	public:
+		cxInstance();
+		~cxInstance();
+	};
+	class cxLight :public cxObject
+	{
+	public:
+	public:
+		cxLight();
+		~cxLight();
+	};
+	class cxMaterial :public cxObject
+	{
+	public:
+	public:
+		cxMaterial();
+		~cxMaterial();
+	};
+	class cxPipeline :public cxObject
+	{
+	public:
+	public:
+		cxPipeline();
+		~cxPipeline();
+	};
+	class cxPipelineCS :public cxObject
+	{
+	public:
+	public:
+		cxPipelineCS();
+		~cxPipelineCS();
+	};
+	class cxSampler :public cxObject
+	{
+	public:
+	public:
+		cxSampler();
+		~cxSampler();
+	};
+	class cxSurface :public cxObject
+	{
+	public:
+	public:
+		cxSurface();
+		~cxSurface();
+	};
+	class cxRenderer :public cxObject
+	{
+	public:
+	public:
+		cxRenderer();
+		~cxRenderer();
+	};
+	class cxWorld :public cxObject
+	{
+	public:
+	public:
+		cxWorld();
+		~cxWorld();
+	};
+
+
+	class Ring
+	{
+	public:
+		void Create(uint32_t TotalSize)
+		{
+			m_Head = 0;
+			m_AllocatedSize = 0;
+			m_TotalSize = TotalSize;
+		}
+
+		uint32_t GetSize() { return m_AllocatedSize; }
+		uint32_t GetHead() { return m_Head; }
+		uint32_t GetTail() { return (m_Head + m_AllocatedSize) % m_TotalSize; }
+
+		//helper to avoid allocating chunks that wouldn't fit contiguously in the ring
+		uint32_t PaddingToAvoidCrossOver(uint32_t size)
+		{
+			int tail = GetTail();
+			if ((tail + size) > m_TotalSize)
+				return (m_TotalSize - tail);
+			else
+				return 0;
+		}
+
+		bool Alloc(uint32_t size, uint32_t* pOut)
+		{
+			if (m_AllocatedSize + size <= m_TotalSize)
+			{
+				if (pOut)
+					*pOut = GetTail();
+				if (size % 64)
+					size = size;
+				m_AllocatedSize += size;
+				return true;
+			}
+
+			assert(false);
+			return false;
+		}
+
+		bool Free(uint32_t size)
+		{
+			if (m_AllocatedSize >= size)
+			{
+				m_Head = (m_Head + size) % m_TotalSize;
+				m_AllocatedSize -= size;
+				return true;
+			}
+			return false;
+		}
+	private:
+		uint32_t m_Head;
+		uint32_t m_AllocatedSize;
+		uint32_t m_TotalSize;
+	};
+	class RingWithTabs
+	{
+	public:
+
+		void OnCreate(uint32_t numberOfBackBuffers, uint32_t memTotalSize)
+		{
+			m_backBufferIndex = 0;
+			m_numberOfBackBuffers = numberOfBackBuffers;
+
+			//init mem per frame tracker
+			m_memAllocatedInFrame = 0;
+			for (int i = 0; i < 4; i++)
+				m_allocatedMemPerBackBuffer[i] = 0;
+
+			m_mem.Create(memTotalSize);
+		}
+
+		void OnDestroy()
+		{
+			m_mem.Free(m_mem.GetSize());
+		}
+
+		bool Alloc(uint32_t size, uint32_t* pOut)
+		{
+			uint32_t padding = m_mem.PaddingToAvoidCrossOver(size);
+			if (padding > 0)
+			{
+				m_memAllocatedInFrame += padding;
+
+				if (m_mem.Alloc(padding, NULL) == false) //alloc chunk to avoid crossover, ignore offset        
+				{
+					return false;  //no mem, cannot allocate apdding
+				}
+			}
+
+			if (m_mem.Alloc(size, pOut) == true)
+			{
+				m_memAllocatedInFrame += size;
+				return true;
+			}
+			return false;
+		}
+
+		void OnBeginFrame()
+		{
+			m_allocatedMemPerBackBuffer[m_backBufferIndex] = m_memAllocatedInFrame;
+			m_memAllocatedInFrame = 0;
+
+			m_backBufferIndex = (m_backBufferIndex + 1) % m_numberOfBackBuffers;
+
+			// free all the entries for the oldest buffer in one go
+			uint32_t memToFree = m_allocatedMemPerBackBuffer[m_backBufferIndex];
+			m_mem.Free(memToFree);
+		}
+	private:
+		//internal ring buffer
+		Ring m_mem;
+
+		//this is the external ring buffer (I could have reused the Ring class though)
+		uint32_t m_backBufferIndex;
+		uint32_t m_numberOfBackBuffers;
+
+		uint32_t m_memAllocatedInFrame;
+		uint32_t m_allocatedMemPerBackBuffer[4];
+	};
+	// Dynamic/Static UBO
+	class buffer_ring_cx
+	{
+	public:
+		VkResult OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, uint32_t memTotalSize, char* name = NULL);
+		void OnDestroy();
+		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
+		bool AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin);
+		VkDescriptorBufferInfo AllocConstantBuffer(uint32_t size, void* pData);
+
+		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
+		bool AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
+		bool AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
+		void OnBeginFrame();
+		void SetDescriptorSet(int i, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+
+	private:
+		cxDevice* m_pDevice = nullptr;
+		uint32_t        m_memTotalSize=0;
+		RingWithTabs    m_mem;
+		char* m_pData = nullptr;
+		VkBuffer        m_buffer;
+
+#ifdef USE_VMA
+		VmaAllocation   m_bufferAlloc = VK_NULL_HANDLE;
+#else
+		VkDeviceMemory  m_deviceMemory = VK_NULL_HANDLE;
+#endif
+	};
+	class static_buffer_pool_cx
+	{
+	public:
+		VkResult OnCreate(cxDevice* pDevice, uint32_t totalMemSize, bool bUseVidMem, const char* name);
+		void OnDestroy();
+		// 分配IB/VB, 返回descriptor、pData
+		bool AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut);
+		// 分配IB/VB用pInitData填充, 返回descriptor
+		bool AllocBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut);
+		// 更新到video mem
+		void UploadData(VkCommandBuffer cmd_buf);
+		// m_bUseVidMem是否释放上传堆
+		void FreeUploadHeap();
+
+	private:
+		cxDevice* m_pDevice = nullptr;
+		std::mutex       m_mutex = {};
+		char* m_pData = nullptr;
+		uint32_t         m_memOffset = 0;
+		uint32_t         m_totalMemSize = 0;
+		VkBuffer         m_buffer = {};
+		VkBuffer         m_bufferVid = {};
+#ifdef USE_VMA
+		VmaAllocation    m_bufferAlloc = VK_NULL_HANDLE;
+		VmaAllocation    m_bufferAllocVid = VK_NULL_HANDLE;
+#else
+		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;;
+		VkDeviceMemory   m_deviceMemoryVid = VK_NULL_HANDLE;;
+#endif 
+		bool             m_bUseVidMem = true;
+	};
+#endif // 1
 
 }
 // !vkg
@@ -224,6 +636,172 @@ namespace vkg {
 
 // 新渲染器实现
 namespace vkg {
+
+	template<typename T> inline T alignUp(T& val, T alignment)
+	{
+		auto r = (val + alignment - (T)1) & ~(alignment - (T)1);
+		val = r;
+		return r;
+	}
+
+	// align val to the next multiple of alignment
+	template<typename T> inline T AlignUp(T val, T alignment)
+	{
+		return (val + alignment - (T)1) & ~(alignment - (T)1);
+	}
+	// align val to the previous multiple of alignment
+	template<typename T> inline T AlignDown(T val, T alignment)
+	{
+		return val & ~(alignment - (T)1);
+	}
+	template<typename T> inline T DivideRoundingUp(T a, T b)
+	{
+		return (a + b - (T)1) / b;
+	}
+
+	class Sync
+	{
+		int m_count = 0;
+		std::mutex m_mutex;
+		std::condition_variable condition;
+	public:
+		int Inc()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count++;
+			return m_count;
+		}
+
+		int Dec()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count--;
+			if (m_count == 0)
+				condition.notify_all();
+			return m_count;
+		}
+
+		int Get()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			return m_count;
+		}
+
+		void Reset()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_count = 0;
+			condition.notify_all();
+		}
+
+		void Wait()
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			while (m_count != 0)
+				condition.wait(lock);
+		}
+
+	};
+
+	template<typename T>
+	class Cache
+	{
+	public:
+		struct CacheEntry
+		{
+			Sync m_Sync;
+			T m_data;
+		};
+		typedef std::map<size_t, CacheEntry> DatabaseType;
+	private:
+		DatabaseType m_database;
+		std::mutex m_mutex;
+	public:
+		void Async_Wait(Sync* pSync)
+		{
+			if (pSync->Get() == 0)
+				return;
+			pSync->Wait();
+		}
+		bool CacheMiss(size_t hash, T* pOut)
+		{
+#ifdef CACHE_ENABLE
+			//DatabaseType::iterator it;
+			CacheEntry* kt = {};
+			// find whether the shader is in the cache, create an empty entry just so other threads know this thread will be compiling the shader
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_database.find(hash);
+
+				// shader not found, we need to compile the shader!
+				if (it == m_database.end())
+				{
+#ifdef CACHE_LOG
+					Trace(format("thread 0x%04x Compi Begin: %p %i\n", GetCurrentThreadId(), hash, m_database[hash].m_Sync.Get()));
+#endif
+					// inc syncing object so other threads requesting this same shader can tell there is a compilation in progress and they need to wait for this thread to finish.
+					m_database[hash].m_Sync.Inc();
+					return true;
+				}
+				kt = &it->second;
+			}
+			// If we have seen these shaders before then:
+			{
+				// If there is a thread already trying to compile this shader then wait for that thread to finish
+				if (kt->m_Sync.Get() == 1)
+				{
+#ifdef CACHE_LOG
+					Trace(format("thread 0x%04x Wait: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
+#endif
+					Async_Wait(&kt->m_Sync);
+				}
+
+				// if the shader was compiled then return it
+				*pOut = kt->m_data;
+
+#ifdef CACHE_LOG
+				Trace(format("thread 0x%04x Was cache: %p \n", GetCurrentThreadId(), hash));
+#endif
+				return false;
+			}
+#endif
+			return true;
+		}
+
+		void UpdateCache(size_t hash, T* pValue)
+		{
+#ifdef CACHE_ENABLE
+			// DatabaseType::iterator it;
+			CacheEntry* kt = {};
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_database.find(hash);
+				assert(it != m_database.end());
+				if (it == m_database.end())return;
+				kt = &it->second;
+			}
+#ifdef CACHE_LOG
+			Trace(format("thread 0x%04x Compi End: %p %i\n", GetCurrentThreadId(), hash, kt->m_Sync.Get()));
+#endif
+			kt->m_data = *pValue;
+			//assert(kt->m_Sync.Get() == 1);
+			// The shader has been compiled, set sync to 0 to indicate it is compiled
+			// This also wakes up all the threads waiting on  Async::Wait(&kt->m_Sync);
+			kt->m_Sync.Dec();
+#endif
+			// CACHE_ENABLE 1
+		}
+		template<typename Func>
+		void ForEach(Func func)
+		{
+			std::lock_guard<std::mutex> lock(m_mutex);
+			for (auto it = m_database.begin(); it != m_database.end(); ++it)
+			{
+				func(it);
+			}
+		}
+	};
+
 
 	bool InstanceProperties::IsLayerPresent(const char* pExtName)
 	{
@@ -756,6 +1334,24 @@ namespace vkg {
 	static bool s_bCanUseDebugUtils = false;
 	static std::mutex s_mutex;
 
+	void free_devinfo(devinfo_x* d)
+	{
+		if (!d)return;
+		if (d->_surface)
+			vkDestroySurfaceKHR(d->_instance, d->_surface, 0);
+		d->_surface = 0;
+#ifdef USE_VMA
+		if (d->_hAllocator)
+		{
+			vmaDestroyAllocator(d->_hAllocator);
+			d->_hAllocator = NULL;
+		}
+#endif
+
+		if (d->is_newdevice && d->_device)
+			vkDestroyDevice(d->_device, 0);
+	}
+
 	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP)
 	{
 		s_bCanUseDebugUtils = pDP->AddInstanceExtensionName("VK_EXT_debug_utils");
@@ -1052,6 +1648,8 @@ namespace vkg {
 			device_info.pEnabledFeatures = NULL;
 			res = vkCreateDevice(physicalDevice, &device_info, NULL, &px->_device);
 			assert(res == VK_SUCCESS);
+			if (px->_device)
+				px->is_newdevice = true;
 		}
 		if (!px->_device)return;
 		//if (dr)
@@ -1129,6 +1727,1038 @@ namespace vkg {
 			d->vkdev = px->_device;
 	}
 
+
+
+	// 哈希
+	size_t Hash(const void* ptr, size_t size, size_t result)
+	{
+		for (size_t i = 0; i < size; ++i)
+		{
+			result = (result * 16777619) ^ ((char*)ptr)[i];
+		}
+
+		return result;
+	}
+
+	size_t Hash_p(const size_t* ptr, size_t size, size_t result)
+	{
+		auto n = size / sizeof(size_t);
+		auto m = size % sizeof(size_t);
+		for (size_t i = 0; i < n; ++i)
+		{
+			result = (result * 16777619) ^ ptr[i];
+		}
+		auto p = ptr + n;
+		for (size_t i = 0; i < m; ++i)
+		{
+			result = (result * 16777619) ^ ((char*)p)[i];
+		}
+		return result;
+	}
+
+	size_t HashString(const char* str, size_t result)
+	{
+		return Hash(str, strlen(str), result);
+	}
+
+	size_t HashString(const std::string& str, size_t result)
+	{
+		return HashString(str.c_str(), result);
+	}
+
+	bool DefineList::Has(const std::string& str) const
+	{
+		return find(str) != end();
+	}
+
+	size_t DefineList::Hash(size_t result) const
+	{
+		for (auto it = begin(); it != end(); it++)
+		{
+			result = HashString(it->first, result);
+			result = HashString(it->second, result);
+		}
+		return result;
+	}
+	// passing lhs by value helps optimize chained a+b+c
+	// otherwise, both parameters may be const references
+	DefineList operator+(DefineList def1, const DefineList& def2)
+	{
+		for (auto it = def2.begin(); it != def2.end(); it++)
+			def1[it->first] = it->second;
+		return def1;
+	}
+	std::string DefineList::to_string() const
+	{
+		std::string result;
+		for (auto it = begin(); it != end(); it++)
+		{
+			result += it->first + "=" + it->second + "; ";
+		}
+		return result;
+	}
+
+
+	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void*);
+
+
+	//
+	// Hash a string of source code and recurse over its #include files
+	//
+	size_t HashShaderString(const char* pRootDir, const char* pShader, size_t hash)
+	{
+		hash = Hash(pShader, strlen(pShader), hash);
+		std::vector<unsigned char> tfd;
+		std::vector<char> td;
+		const char* pch = pShader;
+		while (*pch != 0)
+		{
+			if (*pch == '/') // parse comments
+			{
+				pch++;
+				if (*pch != 0 && *pch == '/')
+				{
+					pch++;
+					while (*pch != 0 && *pch != '\n')
+						pch++;
+				}
+				else if (*pch != 0 && *pch == '*')
+				{
+					pch++;
+					while ((*pch != 0 && *pch != '*') && (*(pch + 1) != 0 && *(pch + 1) != '/'))
+						pch++;
+				}
+			}
+			else if (*pch == '#') // parse #include
+			{
+				pch++;
+				const char include[] = "include";
+				int i = 0;
+				while ((*pch != 0) && *pch == include[i])
+				{
+					pch++;
+					i++;
+				}
+
+				if (i == strlen(include))
+				{
+					while (*pch != 0 && *pch == ' ')
+						pch++;
+
+					if (*pch != 0 && *pch == '\"')
+					{
+						pch++;
+						const char* pName = pch;
+
+						while (*pch != 0 && *pch != '\"')
+							pch++;
+
+						char includeName[1024];
+						strcpy_s<1024>(includeName, pRootDir);
+						strncat_s<1024>(includeName, pName, pch - pName);
+
+						pch++;
+
+						tfd.clear();
+						vkmReadWholeFile(&tfd, 0, includeName, 0);
+						if (tfd.size())
+						{
+							tfd.push_back(0);
+							hash = HashShaderString(pRootDir, (char*)tfd.data(), hash);
+						}
+					}
+				}
+			}
+			else
+			{
+				pch++;
+			}
+		}
+
+		return hash;
+	}
+#ifndef fseeki64
+#ifdef _WIN32
+#define fseeki64 _fseeki64
+#define ftelli64 _ftelli64
+#else			
+#define fseeki64 fseeko64
+#define ftelli64 ftello64
+#endif // _WIN32
+#endif
+	bool vkmReadWholeFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void* ptr)
+	{
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+		if (asset_manager) {
+			AAsset* asset = AAssetManager_open(asset_manager, filepath.c_str(),
+				AASSET_MODE_STREAMING);
+			if (!asset) {
+				if (err) {
+					(*err) += "File open error : " + filepath + "\n";
+				}
+				return false;
+			}
+			size_t size = AAsset_getLength(asset);
+			if (size == 0) {
+				if (err) {
+					(*err) += "Invalid file size : " + filepath +
+						" (does the path point to a directory?)";
+				}
+				return false;
+			}
+			out->resize(size);
+			AAsset_read(asset, reinterpret_cast<char*>(&out->at(0)), size);
+			AAsset_close(asset);
+			return true;
+		}
+		else {
+			if (err) {
+				(*err) += "No asset manager specified : " + filepath + "\n";
+			}
+			return false;
+		}
+#else
+		int64_t size = 0;
+		const char* fn = filepath.c_str();
+#if 0
+		FILE* fp = fopen(filepath.c_str(), "rb");
+		if (fp)
+		{
+			fseeki64(fp, 0L, SEEK_END);
+			size = ftelli64(fp);
+			fseeki64(fp, 0L, SEEK_SET);
+			out->resize(size);
+			auto buff = out->data();
+			auto retval = fread(buff, size, 1, fp);
+			assert(retval == 1);
+			fclose(fp);
+		}
+#else
+		hz::mfile_t mt;
+		auto fp = mt.open_d(fn, true);
+		if (fp)
+		{
+			size = mt.size();
+			out->resize(size);
+			auto buff = out->data();
+			memcpy(buff, fp, size);
+		}
+#endif
+		return fp;// hz::File::read_binary_file(filepath.c_str(), *out);
+#endif
+	}
+
+	// Formats a string
+	std::string format(const char* format, ...)
+	{
+		va_list args;
+		va_start(args, format);
+#ifndef _MSC_VER
+		size_t size = std::snprintf(nullptr, 0, format, args) + 1; // Extra space for '\0'
+		std::string buf; buf.resize(size);
+		std::vsnprintf(buf.Data(), size, format, args);
+		va_end(args);
+		return std::string(buf.Data(), buf.Data() + size - 1); // We don't want the '\0' inside
+#else
+		const size_t size = (size_t)_vscprintf(format, args) + 1;
+		std::string buf; buf.resize(size);
+		vsnprintf_s(buf.data(), size, _TRUNCATE, format, args);
+		va_end(args);
+		return buf.c_str();
+#endif
+	}
+
+	void Trace(const std::string& str)
+	{
+#ifdef _WIN32
+		static std::mutex mutex;
+		std::unique_lock<std::mutex> lock(mutex);
+		// Output to attached debugger
+		OutputDebugStringA(str.c_str());
+#endif
+	}
+
+	void Trace(const char* pFormat, ...)
+	{
+#ifdef _WIN32
+		static std::mutex mutex;
+		std::unique_lock<std::mutex> lock(mutex);
+		va_list args;
+		// generate formatted string
+		va_start(args, pFormat);
+		const size_t bufLen = (size_t)_vscprintf(pFormat, args) + 2;
+		std::string buf; buf.resize(bufLen);
+		vsnprintf_s(buf.data(), bufLen, bufLen, pFormat, args);
+		va_end(args);
+		buf.push_back('\n');
+		// Output to attached debugger
+		OutputDebugStringA(buf.data());
+#endif
+	}
+
+	bool readfile(const char* name, char** data, size_t* size, bool isbinary)
+	{
+		FILE* file;
+		//Open file
+		if (fopen_s(&file, name, isbinary ? "rb" : "r") != 0)
+		{
+			return false;
+		}
+		//Get file length
+		fseek(file, 0, SEEK_END);
+		size_t fileLen = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		// if ascii add one more char to accomodate for the \0
+		if (!isbinary)
+			fileLen++;
+		//Allocate memory
+		char* buffer = (char*)malloc(std::max<size_t>(fileLen, 1));
+		if (!buffer)
+		{
+			fclose(file);
+			return false;
+		}
+		//Read file contents into buffer
+		size_t bytesRead = 0;
+		if (fileLen > 0)
+		{
+			bytesRead = fread(buffer, 1, fileLen, file);
+		}
+		fclose(file);
+		if (!isbinary)
+		{
+			buffer[bytesRead] = 0;
+			fileLen = bytesRead;
+		}
+		*data = buffer;
+		if (size != NULL)
+			*size = fileLen;
+		return true;
+	}
+	bool readfile(const char* name, std::vector<char>& data, bool isbinary)
+	{
+		FILE* file;
+		//Open file
+		if (fopen_s(&file, name, isbinary ? "rb" : "r") != 0)
+		{
+			return false;
+		}
+		//Get file length
+		fseek(file, 0, SEEK_END);
+		size_t fileLen = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		// if ascii add one more char to accomodate for the \0
+		if (!isbinary)
+			fileLen++;
+		//Allocate memory
+		data.resize(std::max<size_t>(fileLen, 1));
+		char* buffer = data.data();// (char*)malloc(std::max<size_t>(fileLen, 1));
+		if (!buffer)
+		{
+			fclose(file);
+			return false;
+		}
+		//Read file contents into buffer
+		size_t bytesRead = 0;
+		if (fileLen > 0)
+		{
+			bytesRead = fread(buffer, 1, fileLen, file);
+		}
+		fclose(file);
+		if (!isbinary)
+		{
+			buffer[bytesRead] = 0;
+			fileLen = bytesRead;
+		}
+		data.resize(fileLen);
+		return true;
+	}
+
+	bool savefile(const char* name, void const* data, size_t size, bool isbinary)
+	{
+		FILE* file;
+		if (fopen_s(&file, name, isbinary ? "wb" : "w") == 0)
+		{
+			fwrite(data, size, 1, file);
+			fclose(file);
+			return true;
+		}
+		return false;
+	}
+
+	bool LaunchProcess(const char* commandLine, const char* filenameErr)
+	{
+#ifdef _WIN32
+		std::string cmdlinestr;
+		cmdlinestr = commandLine && *commandLine ? commandLine : "";
+		auto cmdLine = (char*)cmdlinestr.c_str();
+		// create a pipe to get possible errors from the process
+		HANDLE g_hChildStd_OUT_Rd = NULL;
+		HANDLE g_hChildStd_OUT_Wr = NULL;
+		SECURITY_ATTRIBUTES saAttr;
+		saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+		saAttr.bInheritHandle = TRUE;
+		saAttr.lpSecurityDescriptor = NULL;
+		if (!CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0))
+			return false;
+		// launch process
+		PROCESS_INFORMATION pi = {};
+		STARTUPINFOA si = {};
+		si.cb = sizeof(si);
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.hStdError = g_hChildStd_OUT_Wr;
+		si.hStdOutput = g_hChildStd_OUT_Wr;
+		si.wShowWindow = SW_HIDE;
+		if (CreateProcessA(NULL, cmdLine, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+		{
+			WaitForSingleObject(pi.hProcess, INFINITE);
+			CloseHandle(g_hChildStd_OUT_Wr);
+			ULONG rc;
+			if (GetExitCodeProcess(pi.hProcess, &rc))
+			{
+				if (rc == 0)
+				{
+					DeleteFileA(filenameErr);
+					return true;
+				}
+				else
+				{
+					Trace(format("*** Process %s returned an error, see %s ***\n\n", commandLine, filenameErr));
+					// save errors to disk
+					std::ofstream ofs(filenameErr, std::ofstream::out);
+					for (;;)
+					{
+						DWORD dwRead;
+						char chBuf[2049];
+						BOOL bSuccess = ::ReadFile(g_hChildStd_OUT_Rd, chBuf, 2048, &dwRead, NULL);
+						chBuf[dwRead] = 0;
+						if (!bSuccess || dwRead == 0) break;
+						Trace(chBuf);
+						ofs << chBuf;
+					}
+					ofs.close();
+				}
+			}
+			CloseHandle(g_hChildStd_OUT_Rd);
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+		}
+		else
+		{
+			Trace(format("*** Can't launch: %s \n", commandLine));
+		}
+#endif
+		return false;
+	}
+
+
+
+	// 编译shader
+#if 1
+
+
+	std::string s_shaderLibDir;
+	std::string s_shaderCacheDir;
+
+	bool InitShaderCompilerCache(const std::string shaderLibDir, std::string shaderCacheDir)
+	{
+		s_shaderLibDir = hz::genfn(shaderLibDir);
+		s_shaderCacheDir = hz::genfn(shaderCacheDir);
+
+		return true;
+	}
+
+	std::string GetShaderCompilerLibDir()
+	{
+		return s_shaderLibDir;
+	}
+
+	std::string GetShaderCompilerCacheDir()
+	{
+		return s_shaderCacheDir;
+	}
+
+#ifdef _WIN32
+
+	void ShowErrorMessageBox(LPCWSTR lpErrorString)
+	{
+		int msgboxID = MessageBoxW(NULL, lpErrorString, L"Error", MB_OK);
+	}
+
+	void ShowCustomErrorMessageBox(_In_opt_ LPCWSTR lpErrorString)
+	{
+		int msgboxID = MessageBoxW(NULL, lpErrorString, L"Error", MB_OK | MB_TOPMOST);
+	}
+	inline void ThrowIfFailed(HRESULT hr)
+	{
+		if (FAILED(hr))
+		{
+			wchar_t err[256];
+			memset(err, 0, 256);
+			FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), err, 255, NULL);
+			char errA[256];
+			size_t returnSize;
+			wcstombs_s(&returnSize, errA, 255, err, 255);
+			Trace(errA);
+#ifdef _DEBUG
+			ShowErrorMessageBox(err);
+#endif
+			throw 1;
+		}
+	}
+#define USE_DXC_SPIRV_FROM_DISK
+
+	void CompileMacros(const DefineList* pMacros, std::vector<D3D_SHADER_MACRO>* pOut)
+	{
+		if (pMacros != NULL)
+		{
+			for (auto it = pMacros->begin(); it != pMacros->end(); it++)
+			{
+				D3D_SHADER_MACRO macro;
+				macro.Name = it->first.c_str();
+				macro.Definition = it->second.c_str();
+				pOut->push_back(macro);
+			}
+		}
+	}
+
+	DxcCreateInstanceProc s_dxc_create_func;
+
+	bool InitDirectXCompiler()
+	{
+		std::string fullshaderCompilerPath = "dxcompiler.dll";
+		std::string fullshaderDXILPath = "dxil.dll";
+
+		//HMODULE dxil_module = ::LoadLibrary(fullshaderDXILPath.c_str());
+
+		//HMODULE dxc_module = ::LoadLibrary(fullshaderCompilerPath.c_str());
+		//if (dxc_module)
+		//	s_dxc_create_func = (DxcCreateInstanceProc)::GetProcAddress(dxc_module, "DxcCreateInstance");
+		//else
+		s_dxc_create_func = DxcCreateInstance;
+
+		return s_dxc_create_func != NULL;
+	}
+
+	interface Includer : public ID3DInclude
+	{
+	public:
+		virtual ~Includer() {}
+
+		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID * ppData, UINT * pBytes)
+		{
+			std::string fullpath = hz::genfn(GetShaderCompilerLibDir() + "/" + pFileName);
+			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
+		}
+		HRESULT Close(LPCVOID pData)
+		{
+			free((void*)pData);
+			return S_OK;
+		}
+	};
+
+	interface IncluderDxc : public IDxcIncludeHandler
+	{
+		IDxcLibrary * m_pLibrary;
+	public:
+		IncluderDxc(IDxcLibrary* pLibrary) : m_pLibrary(pLibrary) {}
+		HRESULT QueryInterface(const IID&, void**) { return S_OK; }
+		ULONG AddRef() { return 0; }
+		ULONG Release() { return 0; }
+		HRESULT LoadSource(LPCWSTR pFilename, IDxcBlob** ppIncludeSource)
+		{
+			std::string kfp = hz::genfn(GetShaderCompilerLibDir() + "/" + hz::u16_to_gbk(pFilename));
+			LPCVOID pData;
+			size_t bytes;
+			HRESULT hr = readfile(kfp.c_str(), (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
+
+			if (hr == E_FAIL)
+			{
+				// return the failure here instead of crashing on CreateBlobWithEncodingFromPinned 
+				// to be able to report the error to the output console
+				return hr;
+			}
+
+			IDxcBlobEncoding* pSource;
+			ThrowIfFailed(m_pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pData, (UINT32)bytes, CP_UTF8, &pSource));
+
+			*ppIncludeSource = pSource;
+
+			return S_OK;
+		}
+	};
+
+	bool DXCompileToDXO(size_t hash, const char* pSrcCode, const DefineList* pDefines, const char* pEntryPoint, const char* pParams, char** outSpvData, size_t* outSpvSize)
+	{
+		//detect output bytecode type (DXBC/SPIR-V) and use proper extension
+		std::string filenameOut;
+		{
+			auto found = std::string(pParams).find("-spirv ");
+			if (found == std::string::npos)
+				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.dxo", hash));
+			else
+				filenameOut = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.spv", hash));
+		}
+
+#ifdef USE_DXC_SPIRV_FROM_DISK
+		if (readfile(filenameOut.c_str(), outSpvData, outSpvSize, true) && *outSpvSize > 0)
+		{
+			//Trace(format("thread 0x%04x compile: %p disk\n", GetCurrentThreadId(), hash));
+			return true;
+		}
+#endif
+
+		// create hlsl file for shader compiler to compile
+		//
+		std::string filenameHlsl = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.hlsl", hash));
+		std::ofstream ofs(filenameHlsl, std::ofstream::out);
+		ofs << pSrcCode;
+		ofs.close();
+
+		std::string filenamePdb = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.lld", hash));
+
+		std::wstring twstr;
+		// get defines
+		// 
+		std::vector<DxcDefine> defines;
+		defines.reserve(50);
+		int defineCount = 0;
+		if (pDefines != NULL)
+		{
+			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+			{
+				auto w = md::u8_w(it->first);
+				auto w2 = md::u8_w(it->second);
+				DxcDefine d = {};
+				auto pos = twstr.size();
+				w.push_back(0);
+				twstr.append(w);
+				auto pos2 = twstr.size();
+				w.push_back(0);
+				twstr.append(w2);
+				d.Name = (wchar_t*)pos;
+				d.Value = (wchar_t*)pos2;
+				defineCount++;
+				defines.push_back(d);
+			}
+		}
+		// check whether DXCompiler is initialized
+		if (s_dxc_create_func == nullptr)
+		{
+			Trace("Error: s_dxc_create_func() is null, have you called InitDirectXCompiler() ?");
+			return false;
+		}
+
+		IDxcLibrary* pLibrary;
+		ThrowIfFailed(s_dxc_create_func(CLSID_DxcLibrary, IID_PPV_ARGS(&pLibrary)));
+
+		IDxcBlobEncoding* pSource = 0;
+		ThrowIfFailed(pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pSrcCode, (UINT32)strlen(pSrcCode), CP_UTF8, &pSource));
+		if (!pSource)
+			return false;
+		IDxcCompiler2* pCompiler;
+		ThrowIfFailed(s_dxc_create_func(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler)));
+
+		IncluderDxc Includer(pLibrary);
+
+		std::vector<LPCWSTR> ppArgs;
+		std::string params;
+		// splits params string into an array of strings
+		{
+
+			if (pParams && *pParams)
+				params = pParams;
+			auto pv = md::split(params, " ");
+			for (auto& it : pv) {
+				auto w = md::u8_w(it.c_str());
+				auto pos = twstr.size();
+				w.push_back(0);
+				twstr.append(w);
+				ppArgs.push_back((wchar_t*)pos);
+			}
+		}
+		auto ws = twstr.data();
+		for (auto& it : ppArgs) {
+			it = ws + (size_t)it;
+		}
+		for (auto& it : defines) {
+			it.Name = ws + (size_t)it.Name;
+			it.Value = ws + (size_t)it.Value;
+		}
+
+		auto pEntryPointW = md::u8_w(pEntryPoint, -1);
+		IDxcOperationResult* pResultPre;
+		HRESULT res1 = pCompiler->Preprocess(pSource, L"", NULL, 0, defines.data(), defineCount, &Includer, &pResultPre);
+		if (res1 == S_OK)
+		{
+			Microsoft::WRL::ComPtr<IDxcBlob> pCode1;
+			pResultPre->GetResult(pCode1.GetAddressOf());
+			std::string preprocessedCode = "";
+
+			preprocessedCode = "// dxc -E" + std::string(pEntryPoint) + " " + params + " " + filenameHlsl + "\n\n";
+			if (pDefines)
+			{
+				for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+					preprocessedCode += "#define " + it->first + " " + it->second + "\n";
+			}
+			preprocessedCode += std::string((char*)pCode1->GetBufferPointer());
+			preprocessedCode += "\n";
+			savefile(filenameHlsl.c_str(), preprocessedCode.c_str(), preprocessedCode.size(), false);
+
+			IDxcOperationResult* pOpRes;
+			HRESULT res;
+#if 0
+			if (false)
+			{
+				Microsoft::WRL::ComPtr<IDxcBlob> pPDB;
+				LPWSTR pDebugBlobName[1024];
+				res = pCompiler->CompileWithDebug(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes, pDebugBlobName, pPDB.GetAddressOf());
+
+				// Setup the correct name for the PDB
+				if (pPDB)
+				{
+					char pPDBName[1024];
+					sprintf_s(pPDBName, "%s\\%ls", GetShaderCompilerCacheDir().c_str(), *pDebugBlobName);
+					savefile(pPDBName, pPDB->GetBufferPointer(), pPDB->GetBufferSize(), true);
+				}
+			}
+			else
+#endif
+			{
+				res = pCompiler->Compile(pSource, NULL, pEntryPointW.c_str(), L"", ppArgs.data(), (UINT32)ppArgs.size(), defines.data(), defineCount, &Includer, &pOpRes);
+			}
+
+			pSource->Release();
+			pLibrary->Release();
+			pCompiler->Release();
+
+			IDxcBlob* pResult = NULL;
+			IDxcBlobEncoding* pError = NULL;
+			if (pOpRes != NULL)
+			{
+				pOpRes->GetResult(&pResult);
+				pOpRes->GetErrorBuffer(&pError);
+				pOpRes->Release();
+			}
+
+			if (pResult != NULL && pResult->GetBufferSize() > 0)
+			{
+				*outSpvSize = pResult->GetBufferSize();
+				*outSpvData = (char*)malloc(*outSpvSize);
+
+				memcpy(*outSpvData, pResult->GetBufferPointer(), *outSpvSize);
+
+				pResult->Release();
+
+				// Make sure pError doesn't leak if it was allocated
+				if (pError)
+					pError->Release();
+
+#ifdef USE_DXC_SPIRV_FROM_DISK
+				savefile(filenameOut.c_str(), *outSpvData, *outSpvSize, true);
+#endif
+				return true;
+			}
+			else
+			{
+				IDxcBlobEncoding* pErrorUtf8 = 0;
+				if (pError)
+					pLibrary->GetBlobAsUtf8(pError, &pErrorUtf8);
+
+				Trace("*** Error compiling %p.hlsl ***\n", hash);
+
+				std::string filenameErr = hz::genfn(GetShaderCompilerCacheDir() + format("\\%p.err", hash));
+				savefile(filenameErr.c_str(), pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize(), false);
+
+				std::string errMsg = std::string((char*)pErrorUtf8->GetBufferPointer(), pErrorUtf8->GetBufferSize());
+				Trace(errMsg);
+
+				// Make sure pResult doesn't leak if it was allocated
+				if (pResult)
+					pResult->Release();
+
+				pErrorUtf8->Release();
+			}
+		}
+
+		return false;
+	}
+
+
+#endif // _WIN32
+
+	//
+	// Compiles a shader into SpirV
+	//
+	bool VKCompileToSpirv(size_t hash, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const std::string& shaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, char** outSpvData, size_t* outSpvSize)
+	{
+		// create glsl file for shader compiler to compile
+		//
+		std::string filenameSpv;
+		std::string filenameGlsl;
+		if (sourceType == SST_GLSL)
+		{
+			filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
+			filenameGlsl = hz::genfn(format("%s\\%p.glsl", GetShaderCompilerCacheDir().c_str(), hash));
+		}
+		else if (sourceType == SST_HLSL)
+		{
+			filenameSpv = hz::genfn(format("%s\\%p.dxo", GetShaderCompilerCacheDir().c_str(), hash));
+			filenameGlsl = hz::genfn(format("%s\\%p.hlsl", GetShaderCompilerCacheDir().c_str(), hash));
+		}
+		else
+			assert(!"unknown shader extension");
+
+		std::ofstream ofs(filenameGlsl, std::ofstream::out);
+		ofs << shaderCode;
+		ofs.close();
+
+		// compute command line to invoke the shader compiler
+		//
+		const char* stage = NULL;
+		switch (shader_type)
+		{
+		case VK_SHADER_STAGE_VERTEX_BIT:  stage = "vertex"; break;
+		case VK_SHADER_STAGE_FRAGMENT_BIT:  stage = "fragment"; break;
+		case VK_SHADER_STAGE_COMPUTE_BIT:  stage = "compute"; break;
+		case VK_SHADER_STAGE_TASK_BIT_EXT:  stage = "task"; break;
+		case VK_SHADER_STAGE_MESH_BIT_EXT:  stage = "mesh"; break;
+		}
+
+		// add the #defines
+		//
+		std::string defines;
+		if (pDefines)
+		{
+			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+				defines += "-D" + it->first + "=" + it->second + " ";
+		}
+		std::string commandLine;
+		if (sourceType == SST_GLSL)
+		{
+			commandLine = format("glslc --target-env=vulkan1.3 -fshader-stage=%s -fentry-point=%s %s \"%s\" -o \"%s\" -I %s %s", stage, pShaderEntryPoint, shaderCompilerParams, filenameGlsl.c_str(), filenameSpv.c_str(), GetShaderCompilerLibDir().c_str(), defines.c_str());
+
+			std::string filenameErr = hz::genfn(format("%s\\%p.err", GetShaderCompilerCacheDir().c_str(), hash));
+
+			if (LaunchProcess(commandLine.c_str(), filenameErr.c_str()) == true)
+			{
+				readfile(filenameSpv.c_str(), outSpvData, outSpvSize, true);
+				assert(*outSpvSize != 0);
+				return true;
+			}
+		}
+		else
+		{
+			std::string scp = format("-spirv -fspv-target-env=vulkan1.1 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
+			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData, outSpvSize);
+			assert(*outSpvSize != 0);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	//
+	// Generate sources from the input data
+	//
+	std::string GenerateSource(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* shaderCompilerParams, const DefineList* pDefines)
+	{
+		std::string shaderCode(pshader);
+		std::string code;
+
+		if (sourceType == SST_GLSL)
+		{
+			// the first line in a GLSL shader must be the #version, insert the #defines right after this line
+			size_t index = shaderCode.find_first_of('\n');
+			code = shaderCode.substr(index, shaderCode.size() - index);
+
+			shaderCode = shaderCode.substr(0, index) + "\n";
+		}
+		else if (sourceType == SST_HLSL)
+		{
+			code = shaderCode;
+			shaderCode = "";
+		}
+
+		// add the #defines to the code to help debugging
+		if (pDefines)
+		{
+			for (auto it = pDefines->begin(); it != pDefines->end(); it++)
+				shaderCode += "#define " + it->first + " " + it->second + "\n";
+		}
+		// concat the actual shader code
+		shaderCode += code;
+
+		return shaderCode;
+	}
+
+
+	VkResult CreateModule(VkDevice device, char* SpvData, size_t SpvSize, VkShaderModule* pShaderModule)
+	{
+		VkShaderModuleCreateInfo moduleCreateInfo = {};
+		moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		moduleCreateInfo.pCode = (uint32_t*)SpvData;
+		moduleCreateInfo.codeSize = SpvSize;
+		return vkCreateShaderModule(device, &moduleCreateInfo, NULL, pShaderModule);
+	}
+
+	// Compile a GLSL or a HLSL, will cache binaries to disk
+	//
+	VkResult cxDevice::VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
+	{
+		VkResult res = VK_SUCCESS;
+		//compute hash
+		size_t hash;
+		size_t pslen = strlen(pshader);
+		auto sf = hz::genfn(GetShaderCompilerLibDir() + "\\");
+		hash = HashShaderString(sf.c_str(), pshader, HASH_SEED);
+		hash = Hash(pShaderEntryPoint, strlen(pShaderEntryPoint), hash);
+		hash = Hash(shaderCompilerParams, strlen(shaderCompilerParams), hash);
+		hash = Hash((char*)&shader_type, sizeof(shader_type), hash);
+		if (pDefines != NULL)
+		{
+			hash = pDefines->Hash(hash);
+		}
+
+#define USE_MULTITHREADED_CACHE 
+#define USE_SPIRV_FROM_DISK   
+
+#ifdef USE_MULTITHREADED_CACHE
+		// Compile if not in cache
+		if (s_shaderCache->CacheMiss(hash, &pShader->module))
+#endif
+		{
+			auto strk = format("%p", hash);
+			print_time Pt("new shaderModule " + strk, 1);
+			char* SpvData = NULL;
+			size_t SpvSize = 0;
+#ifdef USE_SPIRV_FROM_DISK
+			std::string filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
+			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
+#endif
+			{
+				print_time Pt("Compile Pipeline " + strk, 1);
+				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
+				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, &SpvData, &SpvSize);
+
+				if (SpvSize == 0) {
+					printf("\n%s\n", shader.c_str());
+				}
+				assert(SpvSize != 0);
+			}
+			else {
+				if (SpvSize == 0) {
+					printf("\n%s\n", strk.c_str());
+				}
+			}
+			//auto c = crc32(-1, (Bytef*)pshader, strlen(pshader));  
+			assert(SpvSize != 0);
+			CreateModule(_dev, SpvData, SpvSize, &pShader->module);
+			if (!pShader->module) {
+				assert(!pShader->module);
+			}
+#ifdef USE_MULTITHREADED_CACHE
+			s_shaderCache->UpdateCache(hash, &pShader->module);
+#endif
+		}
+		else {
+			//print_time Pt("no Compile Pipeline", 1);
+		}
+
+		pShader->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		pShader->pNext = NULL;
+		pShader->pSpecializationInfo = NULL;
+		pShader->flags = 0;
+		pShader->stage = shader_type;
+		pShader->pName = pShaderEntryPoint;
+
+		return res;
+	}
+
+	VkResult cxDevice::VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
+	{
+		assert(strlen(pShaderCode) > 0);
+		VkResult res = VKCompile(sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
+		assert(res == VK_SUCCESS);
+		return res;
+	}
+	// pExtraParams
+	VkResult cxDevice::VKCompileFromFile(const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
+	{
+		char* pShaderCode;
+		size_t size;
+
+		ShaderSourceType sourceType;
+		std::string pfn = pFilename;
+		if (pfn.find(".glsl") != std::string::npos)
+		{
+			sourceType = SST_GLSL;
+		}
+		else if (pfn.find(".hlsl") != std::string::npos)
+		{
+			sourceType = SST_HLSL;
+		}
+		//const char* pExtension = pFilename + std::max<size_t>(strlen(pFilename) - 4, 0);
+		//if (strcmp(pExtension, "glsl") == 0)
+		//	sourceType = SST_GLSL;
+		//else if (strcmp(pExtension, "hlsl") == 0)
+		//	sourceType = SST_HLSL;
+		else
+		{
+			assert(!"Can't tell shader type from its extension");
+			return VK_NOT_READY;
+		}
+
+		//append path
+		auto fullpath = hz::genfn(GetShaderCompilerLibDir() + std::string("/") + pFilename);
+
+		if (readfile(fullpath.c_str(), &pShaderCode, &size, false))
+		{
+			VkResult res = VKCompileFromString(sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
+			SetResourceName(_dev, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)pShader->module, pFilename);
+			return res;
+		}
+
+		return VK_NOT_READY;
+	}
+
+	void cxDevice::CreatePipelineCache()
+	{
+		if (!_dev || _pipelineCache)
+			return;
+		VkPipelineCacheCreateInfo pipelineCache;
+		pipelineCache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		pipelineCache.pNext = NULL;
+		pipelineCache.initialDataSize = 0;
+		pipelineCache.pInitialData = NULL;
+		pipelineCache.flags = 0;
+		VkResult res = vkCreatePipelineCache(_dev, &pipelineCache, NULL, &_pipelineCache);
+		printf("vkCreatePipelineCache %d\n", (int)res);
+		assert(res == VK_SUCCESS);
+	}
+
+	void cxDevice::DestroyPipelineCache()
+	{
+		if (_dev && _pipelineCache)
+			vkDestroyPipelineCache(_dev, _pipelineCache, NULL);
+	}
+	VkPipelineCache cxDevice::GetPipelineCache()
+	{
+		return _pipelineCache;
+	}
+
+	VmaAllocator cxDevice::GetAllocator()
+	{
+		return d ? d->_hAllocator : nullptr;
+	}
+
+	VkPhysicalDeviceMemoryProperties cxDevice::GetPhysicalDeviceMemoryProperties()
+	{
+		return d->_memoryProperties;
+	}
+#endif 
+	// 1 shader
 
 
 	VkDescriptorSetLayout newDescriptorSetLayout(VkDevice dev, std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding)
@@ -1298,7 +2928,7 @@ namespace vkg {
 	}
 #if 1
 	// 计算顶点输入布局和绑定
-	void md_vis(pipeline_info_2* info2, vkr::DefineList& defines, std::vector<VkVertexInputAttributeDescription>& playout, std::vector<VkVertexInputBindingDescription>& vi_binding)
+	void md_vis(pipeline_info_2* info2, DefineList& defines, std::vector<VkVertexInputAttributeDescription>& playout, std::vector<VkVertexInputBindingDescription>& vi_binding)
 	{
 		static const char* kdefstr[] = { "ID_POSITION","ID_COLOR_0","ID_TEXCOORD_0","ID_NORMAL","ID_TANGENT","ID_WEIGHTS_0","ID_JOINTS_0","ID_TEXCOORD_1","ID_WEIGHTS_1","ID_JOINTS_1" };
 		playout.reserve(info2->attributeCount);
@@ -1363,14 +2993,14 @@ namespace vkg {
 		}
 		return;
 	}
-	void new_pipeline(vkr::Device* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2)
+	void new_pbr_pipeline(cxDevice* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2)
 	{
 		auto info = &info2->info;
 		if (!pbrpipe || !info2 || !info || pbrpipe->m_pipeline || !(info2->attributeCount > 0))
 		{
 			return;
 		}
-		auto dev = pdev->GetDevice();
+		auto dev = pdev->_dev;
 
 		// 创建描述符布局
 		VkDescriptorSetLayout layout1 = newDescriptorSetLayout(dev, &info2->set_binding, &pbrpipe->binding);
@@ -1385,11 +3015,11 @@ namespace vkg {
 			pPipelineLayoutCreateInfo.pSetLayouts = &layout1;
 			VkResult res = vkCreatePipelineLayout(dev, &pPipelineLayoutCreateInfo, NULL, &pbrpipe->m_pipelineLayout);
 			assert(res == VK_SUCCESS);
-			vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PL");
+			vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pbrpipe->m_pipelineLayout, "GltfPbrPass PipelineLayout");
 		}
 
 		// Compile and create shaders
-		vkr::DefineList defines;
+		DefineList defines;
 		auto tt = info2->defines0;
 		for (size_t i = 0; i < info2->define_count; i++, tt += 2)
 		{
@@ -1666,16 +3296,419 @@ namespace vkg {
 #endif
 		VkResult res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipeline);
 		assert(res == VK_SUCCESS);
-		vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass P");
+		vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipeline, "GltfPbrPass Pipeline");
 		// create wireframe pipeline
 		rs.polygonMode = VK_POLYGON_MODE_LINE;
 		rs.cullMode = VK_CULL_MODE_NONE;
 		//ds.depthWriteEnable = false;
 		res = vkCreateGraphicsPipelines(dev, pdev->GetPipelineCache(), 1, &pipeline, NULL, &pbrpipe->m_pipelineWireframe);
 		assert(res == VK_SUCCESS);
-		vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe P");
+		vkr::SetResourceName(dev, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pbrpipe->m_pipelineWireframe, "GltfPbrPass Wireframe Pipeline");
 	}
 #endif
+
+
+	VkResult buffer_ring_cx::OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, uint32_t memTotalSize, char* name)
+	{
+		VkResult res;
+		m_pDevice = pDevice;
+
+		m_memTotalSize = AlignUp(memTotalSize, 64u);
+
+		m_mem.OnCreate(numberOfBackBuffers, m_memTotalSize);
+
+#ifdef USE_VMA
+		VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+		bufferInfo.size = m_memTotalSize;
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+		VmaAllocationCreateInfo allocInfo = {};
+		allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		allocInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
+		allocInfo.pUserData = name;
+
+		res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_buffer, &m_bufferAlloc, nullptr);
+		assert(res == VK_SUCCESS);
+		SetResourceName(pDevice->_dev, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "buffer_ring_cx");
+
+		res = vmaMapMemory(pDevice->GetAllocator(), m_bufferAlloc, (void**)&m_pData);
+		assert(res == VK_SUCCESS);
+#else
+		// create a buffer that can host uniforms, indices and vertexbuffers
+		VkBufferCreateInfo buf_info = {};
+		buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		buf_info.pNext = NULL;
+		buf_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		buf_info.size = m_memTotalSize;
+		buf_info.queueFamilyIndexCount = 0;
+		buf_info.pQueueFamilyIndices = NULL;
+		buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		buf_info.flags = 0;
+		res = vkCreateBuffer(m_pDevice->_dev, &buf_info, NULL, &m_buffer);
+		assert(res == VK_SUCCESS);
+
+		VkMemoryRequirements mem_reqs;
+		vkGetBufferMemoryRequirements(m_pDevice->_dev, m_buffer, &mem_reqs);
+
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.pNext = NULL;
+		alloc_info.memoryTypeIndex = 0;
+		alloc_info.memoryTypeIndex = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		alloc_info.allocationSize = mem_reqs.size;
+		alloc_info.memoryTypeIndex = 0;
+
+		bool pass = memory_type_from_properties(m_pDevice->GetPhysicalDeviceMemoryProperties(), mem_reqs.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&alloc_info.memoryTypeIndex);
+		assert(pass && "No mappable, coherent memory");
+
+		res = vkAllocateMemory(m_pDevice->_dev, &alloc_info, NULL, &m_deviceMemory);
+		assert(res == VK_SUCCESS);
+
+		res = vkMapMemory(m_pDevice->_dev, m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pData);
+		assert(res == VK_SUCCESS);
+
+		res = vkBindBufferMemory(m_pDevice->_dev, m_buffer, m_deviceMemory, 0);
+		assert(res == VK_SUCCESS);
+#endif
+		return res;
+	}
+
+	//-------------------------------------------------------------------------------------- 
+	// OnDestroy 
+	void buffer_ring_cx::OnDestroy()
+	{
+#ifdef USE_VMA
+		vmaUnmapMemory(m_pDevice->GetAllocator(), m_bufferAlloc);
+		vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
+		m_bufferAlloc = 0;
+#else
+		vkUnmapMemory(m_pDevice->_dev, m_deviceMemory);
+		vkFreeMemory(m_pDevice->_dev, m_deviceMemory, NULL);
+		vkDestroyBuffer(m_pDevice->_dev, m_buffer, NULL);
+		m_deviceMemory = 0;
+#endif
+		m_buffer = 0;
+		m_mem.OnDestroy();
+	}
+
+	//-------------------------------------------------------------------------------------- 
+	// AllocConstantBuffer 
+	bool buffer_ring_cx::AllocConstantBuffer1(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut, uint32_t algin)
+	{
+		size = AlignUp(size, algin);
+
+		uint32_t memOffset;
+		if (m_mem.Alloc(size, &memOffset) == false)
+		{
+			assert("Ran out of mem for 'dynamic' buffers, please increase the allocated size");
+			return false;
+		}
+
+		*pData = (void*)(m_pData + memOffset);
+
+		pOut->buffer = m_buffer;
+		pOut->offset = memOffset;
+		pOut->range = size;
+
+		return true;
+	}
+	bool buffer_ring_cx::AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut)
+	{
+		return AllocConstantBuffer1(size, pData, pOut, 64u);
+	}
+
+	bool buffer_ring_cx::AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut)
+	{
+		auto db = AllocConstantBuffer(numbeOfVertices * strideInBytes, (void*)pInitData);
+		if (pOut)*pOut = db;
+		return db.buffer != 0;
+	}
+	//-------------------------------------------------------------------------------------- 
+	// AllocConstantBuffer 
+	VkDescriptorBufferInfo buffer_ring_cx::AllocConstantBuffer(uint32_t size, void* pData)
+	{
+		void* pBuffer;
+		VkDescriptorBufferInfo out;
+		if (AllocConstantBuffer(size, &pBuffer, &out) && pData)
+		{
+			memcpy(pBuffer, pData, size);
+		}
+
+		return out;
+	}
+
+	//-------------------------------------------------------------------------------------- 
+	// AllocVertexBuffer 
+	bool buffer_ring_cx::AllocVertexBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut)
+	{
+		return AllocConstantBuffer(numbeOfVertices * strideInBytes, pData, pOut);
+	}
+
+	bool buffer_ring_cx::AllocIndexBuffer(uint32_t numbeOfIndices, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut)
+	{
+		return AllocConstantBuffer(numbeOfIndices * strideInBytes, pData, pOut);
+	}
+
+	//-------------------------------------------------------------------------------------- 
+	void buffer_ring_cx::OnBeginFrame()
+	{
+		m_mem.OnBeginFrame();
+	}
+
+	void buffer_ring_cx::SetDescriptorSet(int index, uint32_t size, VkDescriptorSet descriptorSet, uint32_t dt)
+	{
+		VkDescriptorBufferInfo out = {};
+		assert(m_buffer);
+		out.buffer = m_buffer;
+		out.offset = 0;
+		out.range = size;// alignUp(size, (uint32_t)256);
+
+		VkWriteDescriptorSet write;
+		write = {};
+		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		write.pNext = NULL;
+		write.dstSet = descriptorSet;
+		write.descriptorCount = 1;
+		int dk = dt;
+		write.descriptorType = (VkDescriptorType)(dk > 0 ? dt : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+		write.pBufferInfo = &out;
+		write.dstArrayElement = 0;
+		write.dstBinding = index;
+
+		vkUpdateDescriptorSets(m_pDevice->_dev, 1, &write, 0, NULL);
+	}
+	VkResult static_buffer_pool_cx::OnCreate(cxDevice* pDevice, uint32_t totalMemSize, bool bUseVidMem, const char* name)
+	{
+		VkResult res;
+		m_pDevice = pDevice;
+
+		m_totalMemSize = totalMemSize;
+		m_memOffset = 0;
+		m_pData = NULL;
+		m_bUseVidMem = bUseVidMem;
+
+#ifdef USE_VMA
+		VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+		bufferInfo.size = m_totalMemSize;
+		bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		if (bUseVidMem)
+			bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+		VmaAllocationCreateInfo allocInfo = {};
+		allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+		allocInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
+		allocInfo.pUserData = (void*)name;
+		res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_buffer, &m_bufferAlloc, nullptr);
+		assert(res == VK_SUCCESS);
+		SetResourceName(pDevice->_dev, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "static buffer pool (sys mem)");
+
+		res = vmaMapMemory(pDevice->GetAllocator(), m_bufferAlloc, (void**)&m_pData);
+		assert(res == VK_SUCCESS);
+#else
+		// create the buffer, allocate it in SYSTEM memory, bind it and map it
+
+		VkBufferCreateInfo buf_info = {};
+		buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		buf_info.pNext = NULL;
+		buf_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		if (bUseVidMem)
+			buf_info.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		buf_info.size = m_totalMemSize;
+		buf_info.queueFamilyIndexCount = 0;
+		buf_info.pQueueFamilyIndices = NULL;
+		buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		buf_info.flags = 0;
+		res = vkCreateBuffer(m_pDevice->_dev, &buf_info, NULL, &m_buffer);
+		assert(res == VK_SUCCESS);
+
+		// allocate the buffer in system memory
+
+		VkMemoryRequirements mem_reqs;
+		vkGetBufferMemoryRequirements(m_pDevice->_dev, m_buffer, &mem_reqs);
+
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.pNext = NULL;
+		alloc_info.memoryTypeIndex = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		alloc_info.allocationSize = mem_reqs.size;
+
+		bool pass = memory_type_from_properties(m_pDevice->GetPhysicalDeviceMemoryProperties(), mem_reqs.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&alloc_info.memoryTypeIndex);
+		assert(pass && "No mappable, coherent memory");
+
+		res = vkAllocateMemory(m_pDevice->_dev, &alloc_info, NULL, &m_deviceMemory);
+		assert(res == VK_SUCCESS);
+
+		// bind buffer
+
+		res = vkBindBufferMemory(m_pDevice->_dev, m_buffer, m_deviceMemory, 0);
+		assert(res == VK_SUCCESS);
+
+		// Map it and leave it mapped. This is fine for Win10 and Win7.
+
+		res = vkMapMemory(m_pDevice->_dev, m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pData);
+		assert(res == VK_SUCCESS);
+#endif
+
+		if (m_bUseVidMem)
+		{
+#ifdef USE_VMA
+			VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+			bufferInfo.size = m_totalMemSize;
+			bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+			VmaAllocationCreateInfo allocInfo = {};
+			allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+			allocInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
+			allocInfo.pUserData = (void*)name;
+
+			res = vmaCreateBuffer(pDevice->GetAllocator(), &bufferInfo, &allocInfo, &m_bufferVid, &m_bufferAllocVid, nullptr);
+			assert(res == VK_SUCCESS);
+			SetResourceName(pDevice->_dev, VK_OBJECT_TYPE_BUFFER, (uint64_t)m_buffer, "static buffer pool (vid mem)");
+#else
+
+			// create the buffer, allocate it in VIDEO memory and bind it 
+
+			VkBufferCreateInfo buf_info = {};
+			buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			buf_info.pNext = NULL;
+			buf_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			buf_info.size = m_totalMemSize;
+			buf_info.queueFamilyIndexCount = 0;
+			buf_info.pQueueFamilyIndices = NULL;
+			buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			buf_info.flags = 0;
+			res = vkCreateBuffer(m_pDevice->_dev, &buf_info, NULL, &m_bufferVid);
+			assert(res == VK_SUCCESS);
+
+			// allocate the buffer in VIDEO memory
+
+			VkMemoryRequirements mem_reqs;
+			vkGetBufferMemoryRequirements(m_pDevice->_dev, m_bufferVid, &mem_reqs);
+
+			VkMemoryAllocateInfo alloc_info = {};
+			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			alloc_info.pNext = NULL;
+			alloc_info.memoryTypeIndex = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			alloc_info.allocationSize = mem_reqs.size;
+
+			bool pass = memory_type_from_properties(m_pDevice->GetPhysicalDeviceMemoryProperties(), mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_info.memoryTypeIndex);
+			assert(pass && "No mappable, coherent memory");
+
+			res = vkAllocateMemory(m_pDevice->_dev, &alloc_info, NULL, &m_deviceMemoryVid);
+			assert(res == VK_SUCCESS);
+
+			// bind buffer
+
+			res = vkBindBufferMemory(m_pDevice->_dev, m_bufferVid, m_deviceMemoryVid, 0);
+			assert(res == VK_SUCCESS);
+#endif
+		}
+
+		return res;
+	}
+
+	void static_buffer_pool_cx::OnDestroy()
+	{
+		if (m_bUseVidMem)
+		{
+#ifdef USE_VMA
+			vmaDestroyBuffer(m_pDevice->GetAllocator(), m_bufferVid, m_bufferAllocVid);
+#else
+			vkFreeMemory(m_pDevice->_dev, m_deviceMemoryVid, NULL);
+			vkDestroyBuffer(m_pDevice->_dev, m_bufferVid, NULL);
+#endif
+			m_bufferVid = 0; m_bufferAllocVid = 0;
+		}
+
+		if (m_buffer != VK_NULL_HANDLE)
+		{
+#ifdef USE_VMA
+			vmaUnmapMemory(m_pDevice->GetAllocator(), m_bufferAlloc);
+			vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
+#else
+			vkUnmapMemory(m_pDevice->_dev, m_deviceMemory);
+			vkFreeMemory(m_pDevice->_dev, m_deviceMemory, NULL);
+			vkDestroyBuffer(m_pDevice->_dev, m_buffer, NULL);
+#endif
+			m_buffer = VK_NULL_HANDLE;
+		}
+	}
+
+
+	bool static_buffer_pool_cx::AllocBuffer(uint32_t numbeOfElements, uint32_t strideInBytes, void** pData, VkDescriptorBufferInfo* pOut)
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+
+		uint32_t size = AlignUp(numbeOfElements * strideInBytes, 64u);
+		auto d = (int64_t)m_totalMemSize - (m_memOffset + size);
+		assert(m_memOffset + size <= m_totalMemSize);
+
+		*pData = (void*)(m_pData + m_memOffset);
+
+		pOut->buffer = m_bUseVidMem ? m_bufferVid : m_buffer;
+		pOut->offset = m_memOffset;
+		pOut->range = size;
+
+		m_memOffset += size;
+
+		return true;
+	}
+
+	bool static_buffer_pool_cx::AllocBuffer(uint32_t numbeOfVertices, uint32_t strideInBytes, const void* pInitData, VkDescriptorBufferInfo* pOut)
+	{
+		void* pData;
+		if (AllocBuffer(numbeOfVertices, strideInBytes, &pData, pOut))
+		{
+			memcpy(pData, pInitData, numbeOfVertices * strideInBytes);
+			return true;
+		}
+		return false;
+	}
+
+	void static_buffer_pool_cx::UploadData(VkCommandBuffer cmd_buf)
+	{
+		VkBufferCopy region;
+		region.srcOffset = 0;
+		region.dstOffset = 0;
+		region.size = m_totalMemSize;
+
+		vkCmdCopyBuffer(cmd_buf, m_buffer, m_bufferVid, 1, &region);
+	}
+
+	void static_buffer_pool_cx::FreeUploadHeap()
+	{
+		if (m_bUseVidMem)
+		{
+			assert(m_buffer != VK_NULL_HANDLE);
+#ifdef USE_VMA
+			vmaUnmapMemory(m_pDevice->GetAllocator(), m_bufferAlloc);
+			vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
+#else
+			//release upload heap
+			vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
+			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
+			m_deviceMemory = VK_NULL_HANDLE;
+			vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
+
+#endif
+			m_buffer = VK_NULL_HANDLE;
+		}
+	}
+
+
+
+
+
+
+
+
+
+
+
 
 
 	gdev_cx::gdev_cx()
@@ -1767,226 +3800,8 @@ namespace vkg {
 		return r;
 	}
 
-#if 1
-	/*
-		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
-		World		: Instance(1:N)、Group(1:N)
-		Instance	: Group(1:1) 一个Instance对象只能绑定一个Group。参数需要设置实例数量\矩阵等数据
-		Group		: Surface(1:N)、Light(1:N)
-		Surface		: Geometry(1:1)、Material(1:1)、或自定义pipeline
-		Geometry	: 网格数据、transform、动画等属性
-		FrameCS		: 计算帧,绑定pipelineCS。用于计算任务，可绑定输出到数组或纹理
-		pipelineCS	: 计算管线, 绑定数组、纹理做输入
-	*/
-
-	class cxObject
-	{
-	public:
-		int refcount = 1;
-		int obj_type = 0;
-	public:
-		cxObject();
-		cxObject(int t);
-		virtual ~cxObject();
-		int get_release();
-		void retain();
-	};
-	struct sampler_kt {
-		sampler_info_t info = {};
-		bool operator==(const sampler_kt& other) const;
-	};
-	struct SAKHash {
-		size_t operator()(const sampler_kt& k) const;
-	};
-	class cxDevice :public cxObject
-	{
-	public:
-		// 逻辑设备
-		VkDevice _dev = nullptr;
-		VkQueue _queue = nullptr;
-		devinfo_x* d = {};
-		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
-		bool _newdevice = false;
-	public:
-		cxDevice();
-		~cxDevice();
-		// 设置vk设备和队列，必须调用此函数设置设备后才能使用其他对象
-		void set_device(void* dev, void* q);
-		// 创建采样器，内部会缓存相同参数的采样器对象
-		VkSampler newSampler(const sampler_info_t* pCreateInfo);
-	};
-
-	/* 第一人称：鼠标旋转、键盘移动、跳
-	 上帝视角：
-		移动：键盘wsad、鼠标边缘
-		旋转：键盘qe、鼠标右键拖动
-	*/
-	struct firstPerson_t
-	{
-		glm::vec3 pos = { 0.0, 0.0, 0.0 };		//物体位置
-		glm::vec3 rota = {};					//位置角度
-		glm::vec3 worldUp = { 0.0, 1.0, 0.0 };	//y轴做世界坐标系法向量 
-		glm::vec3 front = { 1.0, 1.0, 1.0 };	//相机前向向量
-
-		// 相机参数 
-		glm::vec3 cameraPos = glm::vec3(0.0f, 1.5f, 5.0f);       // 相机初始位置（玩家后方5米，上方1.5米） 
-		float cameraDistance = 5.0f;                             // 相机与玩家的距离 
-		float cameraHeight = 1.5f;                               // 相机垂直高度
-
-		glm::quat qt = {};
-		glm::quat src_qt = {};
-		glm::quat dst_qt = {};
-
-		float fixheight = 0;		// 0就是固定高度
-	};
-
-	class cxCamera :public cxObject
-	{
-	public:
-		glm::mat4 proj = glm::mat4(1.0f), view = glm::mat4(1.0f);
-		glm::vec3 _eye = {}, _center = {}, _up = {};
-		firstPerson_t fp = {};
-		float keySpeed = 5.0f;
-		float xMouseSpeed = 0.51f;  //鼠标移动X速率
-		float yMouseSpeed = 0.81f;  //鼠标移动Y速率
-		int type = 1;				//1第一人称
-	public:
-		cxCamera();
-		~cxCamera();
-		void set_fov(float fovy, float aspect, float zNear, float zFar);
-		void set_lookat(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up);
-
-		// 第一人称移动，direction为移动方向向量，deltaTime为帧间时间
-		void keyMovement(glm::vec3 direction, double deltaTime);
-		void mouseMovement(float deltaX, float deltaY, double deltaTime, bool mousedown);
-
-	private:
-
-	};
-	class cxArray :public cxObject
-	{
-	public:
-	public:
-		cxArray();
-		~cxArray();
-	};
-	class cxFrame :public cxObject
-	{
-	public:
-	public:
-		cxFrame();
-		~cxFrame();
-
-	private:
-
-	};
-	class cxGeometry :public cxObject
-	{
-	public:
-	public:
-		cxGeometry();
-		~cxGeometry();
-
-	private:
-
-	};
-	class cxGroup :public cxObject
-	{
-	public:
-	public:
-		cxGroup();
-		~cxGroup();
-
-	private:
-
-	};
-	class cxInstance :public cxObject
-	{
-	public:
-	public:
-		cxInstance();
-		~cxInstance();
-	};
-	class cxLight :public cxObject
-	{
-	public:
-	public:
-		cxLight();
-		~cxLight();
-	};
-	class cxMaterial :public cxObject
-	{
-	public:
-	public:
-		cxMaterial();
-		~cxMaterial();
-	};
-	class cxPipeline :public cxObject
-	{
-	public:
-	public:
-		cxPipeline();
-		~cxPipeline();
-	};
-	class cxPipelineCS :public cxObject
-	{
-	public:
-	public:
-		cxPipelineCS();
-		~cxPipelineCS();
-	};
-	class cxSampler :public cxObject
-	{
-	public:
-	public:
-		cxSampler();
-		~cxSampler();
-	};
-	class cxSurface :public cxObject
-	{
-	public:
-	public:
-		cxSurface();
-		~cxSurface();
-	};
-	class cxRenderer :public cxObject
-	{
-	public:
-	public:
-		cxRenderer();
-		~cxRenderer();
-	};
-	class cxWorld :public cxObject
-	{
-	public:
-	public:
-		cxWorld();
-		~cxWorld();
-	};
-
-
-#endif // 1
-
 	// 实现
 #if 1
-#ifndef HASH_SEED
-#define HASH_SEED 2166136261
-#endif
-	size_t Hash_p(const size_t* ptr, size_t size, size_t result)
-	{
-		auto n = size / sizeof(size_t);
-		auto m = size % sizeof(size_t);
-		for (size_t i = 0; i < n; ++i)
-		{
-			result = (result * 16777619) ^ ptr[i];
-		}
-		auto p = ptr + n;
-		for (size_t i = 0; i < m; ++i)
-		{
-			result = (result * 16777619) ^ ((char*)p)[i];
-		}
-		return result;
-	}
 	bool sampler_kt::operator==(const sampler_kt& other) const
 	{
 		return memcmp(&info, &other.info, sizeof(sampler_info_t)) == 0;
@@ -2010,11 +3825,13 @@ namespace vkg {
 		refcount++;
 	}
 	cxDevice::cxDevice() :cxObject(OBJ_DEVICE)
-	{}
+	{
+		s_shaderCache = new Cache<VkShaderModule>();
+	}
 	cxDevice::~cxDevice()
 	{
-		if (_newdevice && _dev)
-			vkDestroyDevice(_dev, 0);
+		if (s_shaderCache)delete s_shaderCache; s_shaderCache = 0;
+		free_devinfo(d);
 	}
 
 	void cxDevice::set_device(void* dev, void* q)
@@ -2022,6 +3839,7 @@ namespace vkg {
 		_dev = (VkDevice)dev;
 		_queue = (VkQueue)q;
 		//assert(_dev && _queue);
+		CreatePipelineCache();
 	}
 
 	VkSampler cxDevice::newSampler(const sampler_info_t* pCreateInfo) {
@@ -2233,7 +4051,6 @@ namespace vkg {
 			{
 				c->d = d;
 				c->set_device(d->_device, 0);
-				c->_newdevice = dev ? false : true;
 			}
 			else {
 				delete c;

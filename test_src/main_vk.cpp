@@ -809,7 +809,7 @@ int main()
 		//c_render_data(&trt, &dst);
 		//delete_font_family(family);
 
-		uint32_t* cc = get_wcolor();
+		uint32_t* pcolor = get_wcolor();
 		for (size_t i = 0; i < 16; i++)
 		{
 			auto str = get_wcname(i, 0);
