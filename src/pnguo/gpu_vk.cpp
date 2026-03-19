@@ -141,6 +141,7 @@ namespace vkg {
 		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
 		std::string name;
 		uint32_t graphics_queueFlags = 0;
+		uint32_t _queue_family_index = 0;
 		std::vector<VkQueue> _graphics_queues;
 		std::vector<VkSurfaceFormatKHR> _surfaceFormats;
 #ifdef USE_VMA
@@ -271,6 +272,7 @@ namespace vkg {
 		// 逻辑设备
 		VkDevice _dev = nullptr;
 		VkQueue _queue = nullptr;
+		uint32_t _queue_family_index = 0;
 		devinfo_x* d = {};
 		std::unordered_map<sampler_kt, VkSampler, SAKHash> _samplers;
 		Cache<VkShaderModule>* s_shaderCache = 0;
@@ -280,7 +282,7 @@ namespace vkg {
 		cxDevice();
 		~cxDevice();
 		// 设置vk设备和队列，必须调用此函数设置设备后才能使用其他对象
-		void set_device(void* dev, void* q);
+		void set_device(void* dev, uint32_t idx);
 		// 创建采样器，内部会缓存相同参数的采样器对象
 		VkSampler newSampler(const sampler_info_t* pCreateInfo);
 
@@ -586,7 +588,7 @@ namespace vkg {
 
 	private:
 		cxDevice* m_pDevice = nullptr;
-		uint32_t        m_memTotalSize=0;
+		uint32_t        m_memTotalSize = 0;
 		RingWithTabs    m_mem;
 		char* m_pData = nullptr;
 		VkBuffer        m_buffer;
@@ -628,6 +630,190 @@ namespace vkg {
 #endif 
 		bool             m_bUseVidMem = true;
 	};
+
+
+	class UploadHeap
+	{
+		Sync allocating, flushing;
+		struct COPY_t
+		{
+			VkImage m_image; VkBufferImageCopy m_bufferImageCopy;
+		};
+		std::vector<COPY_t> m_copies;
+
+		std::vector<VkImageMemoryBarrier> m_toPreBarrier;
+		std::vector<VkImageMemoryBarrier> m_toPostBarrier;
+
+		std::mutex m_mutex;
+	public:
+		void OnCreate(cxDevice* pDevice, SIZE_T uSize);
+		void OnDestroy();
+
+		UINT8* Suballocate(SIZE_T uSize, UINT64 uAlign);
+		UINT8* BeginSuballocate(SIZE_T uSize, UINT64 uAlign);
+		void EndSuballocate();
+		UINT8* BasePtr() { return m_pDataBegin; }
+		VkBuffer GetResource() { return m_buffer; }
+		VkCommandBuffer GetCommandList() { return m_pCommandBuffer; }
+
+		void AddCopy(VkImage image, VkBufferImageCopy bufferImageCopy);
+		void AddPreBarrier(VkImageMemoryBarrier imageMemoryBarrier);
+		void AddPostBarrier(VkImageMemoryBarrier imageMemoryBarrier);
+
+		void Flush();
+		void FlushAndFinish(bool bDoBarriers = false);
+
+	private:
+
+		cxDevice* m_pDevice;
+
+		VkCommandPool           m_commandPool;
+		VkCommandBuffer         m_pCommandBuffer;
+
+		VkBuffer                m_buffer;
+		VkDeviceMemory          m_deviceMemory;
+
+		VkFence m_fence;
+
+		UINT8* m_pDataBegin = nullptr;    // starting position of upload heap
+		UINT8* m_pDataCur = nullptr;      // current position of upload heap
+		UINT8* m_pDataEnd = nullptr;      // ending position of upload heap 
+		size_t ac = 0;
+		size_t ac0 = 0;
+	};
+
+	struct IMG_INFO
+	{
+		UINT32           width;
+		UINT32           height;
+		UINT32           depth;
+		UINT32           arraySize;
+		UINT32           mipMapCount;
+		DXGI_FORMAT      format;
+		UINT32           bitCount;
+		VkFormat		 vkformat;
+	};
+
+	//Loads a Image file
+
+	class ImgLoader
+	{
+	public:
+		virtual ~ImgLoader() {};
+		virtual bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo) = 0;
+		// after calling Load, calls to CopyPixels return each time a lower mip level 
+		virtual void CopyPixels(void* pDest, uint32_t stride, uint32_t width, uint32_t height) = 0;
+	};
+
+
+	class DDSLoader : public ImgLoader
+	{
+	public:
+		~DDSLoader();
+		bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo);
+		// after calling Load, calls to CopyPixels return each time a lower mip level 
+		void CopyPixels(void* pDest, uint32_t stride, uint32_t width, uint32_t height);
+	private:
+#ifdef _WIN32
+		HANDLE m_handle = INVALID_HANDLE_VALUE;
+#endif
+	};
+
+	// Loads a JPEGs, PNGs, BMPs and any image the Windows Imaging Component can load.
+	// It even applies some alpha scaling to prevent cutouts to fade away when lower mips are used.
+
+	class WICLoader : public ImgLoader
+	{
+	public:
+		~WICLoader();
+		bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo);
+		// after calling Load, calls to CopyPixels return each time a lower mip level 
+		void CopyPixels(void* pDest, uint32_t stride, uint32_t width, uint32_t height);
+	private:
+		void MipImage(uint32_t width, uint32_t height);
+		// scale alpha to prevent thinning when lower mips are used
+		float GetAlphaCoverage(uint32_t width, uint32_t height, float scale, int cutoff) const;
+		void ScaleAlpha(uint32_t width, uint32_t height, float scale);
+
+		char* m_pData;
+
+		float m_alphaTestCoverage;
+		float m_cutOff;
+	};
+
+
+	ImgLoader* CreateImageLoader(const char* pFilename);
+
+
+	class Texture
+	{
+	public:
+		Texture();
+		virtual ~Texture();
+		virtual void OnDestroy();
+
+		// load file into heap
+		INT32 Init(cxDevice* pDevice, VkImageCreateInfo* pCreateInfo, const char* name = nullptr);
+		INT32 InitRenderTarget(cxDevice* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, VkImageUsageFlags usage, bool bUAV, const char* name = nullptr, VkImageCreateFlagBits flags = (VkImageCreateFlagBits)0);
+		INT32 InitDepthStencil(cxDevice* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, const char* name = nullptr);
+		bool InitFromFile(cxDevice* pDevice, UploadHeap* pUploadHeap, const char* szFilename, bool useSRGB = false, VkImageUsageFlags usageFlags = 0, float cutOff = 1.0f);
+		//bool InitFromData(cxDevice* pDevice, UploadHeap* uploadHeap, const IMG_INFO& header, const void* data, const char* name = nullptr, bool useSRGB = false);
+		bool InitFromData(cxDevice* pDevice, UploadHeap* uploadHeap, IMG_INFO* header, const void* data, int dsize, const char* name, bool useSRGB);
+
+		VkImage Resource() const { return m_pResource; }
+		// Render Target View (RTV) 【渲染目标纹理】
+		void CreateRTV(VkImageView* pRV, int mipLevel = -1, VkFormat format = VK_FORMAT_UNDEFINED);
+		// Shader resource view (SRV) 【用于提交给shader的纹理】
+		void CreateSRV(VkImageView* pImageView, int mipLevel = -1);
+		// Depth Stencil View (DSV) 【渲染目标深度/模板共享纹理】
+		void CreateDSV(VkImageView* pView);
+		void CreateCubeSRV(VkImageView* pImageView);
+
+		uint32_t GetWidth() const { return m_header.width; }
+		uint32_t GetHeight() const { return m_header.height; }
+		glm::ivec2 get_size() { return glm::ivec2(m_header.width, m_header.height); }
+		uint32_t GetMipCount() const { return m_header.mipMapCount; }
+		uint32_t GetArraySize() const { return m_header.arraySize; }
+		VkFormat GetFormat() const { return m_format; }
+
+	private:
+		cxDevice* m_pDevice = NULL;
+		std::string     m_name = "";
+#ifdef USE_VMA
+		VmaAllocation    m_ImageAlloc = VK_NULL_HANDLE;
+#else
+		VkDeviceMemory   m_deviceMemory = VK_NULL_HANDLE;
+#endif
+		VkFormat         m_format = {};
+		VkImage          m_pResource = VK_NULL_HANDLE;
+
+		IMG_INFO  m_header = {};
+
+	protected:
+
+		struct FootPrint
+		{
+			UINT8* pixels;
+			uint32_t width, height, offset;
+		};// footprints[6][12];
+
+		VkImage CreateTextureCommitted(cxDevice* pDevice, UploadHeap* pUploadHeap, const char* pName, bool useSRGB = false, VkImageUsageFlags usageFlags = 0);
+		void LoadAndUpload(cxDevice* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D);
+		void LoadAndUpload0(cxDevice* pDevice, UploadHeap* pUploadHeap, char* data, VkImage pTexture2D);
+		bool isCubemap()const;
+	};
+
+
+
+
+
+
+
+
+
+
+
+
 #endif // 1
 
 }
@@ -1693,6 +1879,7 @@ namespace vkg {
 			if (it.queueFlags & VK_QUEUE_GRAPHICS_BIT && it.queueFlags & VK_QUEUE_COMPUTE_BIT) {
 				graphics_fidx = i;
 				px->graphics_queueFlags = it.queueFlags;
+				px->_queue_family_index = graphics_fidx;
 				px->_graphics_queues.resize(it.queueCount);
 			}
 		}
@@ -3699,8 +3886,1243 @@ namespace vkg {
 		}
 	}
 
+	// 纹理
+#if 1
+	Texture::Texture() {}
+
+	//--------------------------------------------------------------------------------------
+	// Destructor of the Texture class
+	//--------------------------------------------------------------------------------------
+	Texture::~Texture() {}
+
+	void Texture::OnDestroy()
+	{
+#ifdef USE_VMA
+		if (m_pResource != VK_NULL_HANDLE)
+		{
+			vmaDestroyImage(m_pDevice->GetAllocator(), m_pResource, m_ImageAlloc);
+			m_pResource = VK_NULL_HANDLE;
+		}
+#else
+		if (m_deviceMemory != VK_NULL_HANDLE)
+		{
+			vkDestroyImage(m_pDevice->_dev, m_pResource, nullptr);
+			vkFreeMemory(m_pDevice->_dev, m_deviceMemory, nullptr);
+			m_deviceMemory = VK_NULL_HANDLE;
+		}
+#endif
+
+	}
+
+	bool Texture::isCubemap() const
+	{
+		return m_header.arraySize == 6;
+	}
+
+	INT32 Texture::Init(cxDevice* pDevice, VkImageCreateInfo* pCreateInfo, const char* name)
+	{
+		m_pDevice = pDevice;
+		m_header.mipMapCount = pCreateInfo->mipLevels;
+		m_header.width = pCreateInfo->extent.width;
+		m_header.height = pCreateInfo->extent.height;
+		m_header.depth = pCreateInfo->extent.depth;
+		m_header.arraySize = pCreateInfo->arrayLayers;
+		m_format = pCreateInfo->format;
+		if (name)
+			m_name = name;
+
+#ifdef USE_VMA
+		VmaAllocationCreateInfo imageAllocCreateInfo = {};
+		imageAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		imageAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
+		imageAllocCreateInfo.pUserData = (void*)m_name.c_str();
+		VmaAllocationInfo gpuImageAllocInfo = {};
+		VkResult res = vmaCreateImage(m_pDevice->GetAllocator(), pCreateInfo, &imageAllocCreateInfo, &m_pResource, &m_ImageAlloc, &gpuImageAllocInfo);
+		assert(res == VK_SUCCESS);
+		SetResourceName(pDevice->_dev, VK_OBJECT_TYPE_IMAGE, (uint64_t)m_pResource, m_name.c_str());
+#else
+		/* Create image */
+		VkResult res = vkCreateImage(m_pDevice->_dev, pCreateInfo, NULL, &m_pResource);
+		assert(res == VK_SUCCESS);
+
+		VkMemoryRequirements mem_reqs;
+		vkGetImageMemoryRequirements(m_pDevice->_dev, m_pResource, &mem_reqs);
+
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.pNext = NULL;
+		alloc_info.allocationSize = 0;
+		alloc_info.allocationSize = mem_reqs.size;
+		alloc_info.memoryTypeIndex = 0;
+
+		bool pass = memory_type_from_properties(m_pDevice->GetPhysicalDeviceMemoryProperties(), mem_reqs.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			&alloc_info.memoryTypeIndex);
+		assert(pass);
+
+		/* Allocate memory */
+		res = vkAllocateMemory(m_pDevice->_dev, &alloc_info, NULL, &m_deviceMemory);
+		assert(res == VK_SUCCESS);
+
+		/* bind memory */
+		res = vkBindImageMemory(m_pDevice->_dev, m_pResource, m_deviceMemory, 0);
+		assert(res == VK_SUCCESS);
+#endif
+		return 0;
+	}
+
+	INT32 Texture::InitRenderTarget(cxDevice* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, VkImageUsageFlags usage, bool bUAV, const char* name, VkImageCreateFlagBits flags)
+	{
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = NULL;
+		image_info.imageType = VK_IMAGE_TYPE_2D;
+		image_info.format = format;
+		image_info.extent.width = width;
+		image_info.extent.height = height;
+		image_info.extent.depth = 1;
+		image_info.mipLevels = 1;
+		image_info.arrayLayers = 1;
+		image_info.samples = msaa;
+		image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image_info.queueFamilyIndexCount = 0;
+		image_info.pQueueFamilyIndices = NULL;
+		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		image_info.usage = usage;
+		image_info.flags = flags;
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;   // VK_IMAGE_TILING_LINEAR should never be used and will never be faster
+
+		return Init(pDevice, &image_info, name);
+	}
+	bool is_depth_tex(VkFormat format) {
+		return !(format < VK_FORMAT_D16_UNORM || format > VK_FORMAT_D32_SFLOAT_S8_UINT);//VK_FORMAT_D32_SFLOAT
+	}
+	bool is_stencil_tex(VkFormat format) {
+		bool d = format == VK_FORMAT_S8_UINT || format == VK_FORMAT_D16_UNORM_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+		return d;
+	}
+	void Texture::CreateRTV(VkImageView* pImageView, int mipLevel, VkFormat format)
+	{
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = m_pResource;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		if (m_header.arraySize > 1)
+		{
+			info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			info.subresourceRange.layerCount = m_header.arraySize;
+		}
+		else
+		{
+			info.subresourceRange.layerCount = 1;
+		}
+		if (format == VK_FORMAT_UNDEFINED)
+			info.format = m_format;
+		else
+			info.format = format;
+		if (is_depth_tex(m_format))
+			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		else
+			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		//if (is_stencil_tex(m_format))
+		//	info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		std::string ResourceName = m_name;
+
+		if (mipLevel == -1)
+		{
+			info.subresourceRange.baseMipLevel = 0;
+			info.subresourceRange.levelCount = m_header.mipMapCount;
+		}
+		else
+		{
+			info.subresourceRange.baseMipLevel = mipLevel;
+			info.subresourceRange.levelCount = 1;
+			ResourceName += std::to_string(mipLevel);
+		}
+
+		info.subresourceRange.baseArrayLayer = 0;
+		if (!m_pResource)return;
+		VkResult res = vkCreateImageView(m_pDevice->_dev, &info, NULL, pImageView);
+		assert(res == VK_SUCCESS);
+
+		SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, ResourceName.c_str());
+	}
+
+	void Texture::CreateSRV(VkImageView* pImageView, int mipLevel)
+	{
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = m_pResource;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		if (m_header.arraySize > 1)
+		{
+			info.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			info.subresourceRange.layerCount = m_header.arraySize;
+		}
+		else
+		{
+			info.subresourceRange.layerCount = 1;
+		}
+		info.format = m_format;
+		if (is_depth_tex(m_format))
+			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		else
+			info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		//if (is_stencil_tex(m_format))
+		//	info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+		if (mipLevel == -1)
+		{
+			info.subresourceRange.baseMipLevel = 0;
+			info.subresourceRange.levelCount = m_header.mipMapCount;
+		}
+		else
+		{
+			info.subresourceRange.baseMipLevel = mipLevel;
+			info.subresourceRange.levelCount = 1;
+		}
+
+		info.subresourceRange.baseArrayLayer = 0;
+
+		if (!m_pResource)return;
+		VkResult res = vkCreateImageView(m_pDevice->_dev, &info, NULL, pImageView);
+		assert(res == VK_SUCCESS);
+
+		SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
+	}
+
+	void Texture::CreateCubeSRV(VkImageView* pImageView)
+	{
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = m_pResource;
+		info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+		info.format = m_format;
+		info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		info.subresourceRange.baseMipLevel = 0;
+		info.subresourceRange.levelCount = m_header.mipMapCount;
+		info.subresourceRange.baseArrayLayer = 0;
+		info.subresourceRange.layerCount = m_header.arraySize;
+		if (!m_pResource)return;
+		VkResult res = vkCreateImageView(m_pDevice->_dev, &info, NULL, pImageView);
+		assert(res == VK_SUCCESS);
+
+		SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
+	}
+
+	void Texture::CreateDSV(VkImageView* pImageView)
+	{
+		VkImageViewCreateInfo view_info = {};
+		view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		view_info.pNext = NULL;
+		view_info.image = m_pResource;
+		view_info.format = m_format;
+		view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		view_info.subresourceRange.baseMipLevel = 0;
+		view_info.subresourceRange.levelCount = 1;
+		view_info.subresourceRange.baseArrayLayer = 0;
+		view_info.subresourceRange.layerCount = 1;
+		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+		if (m_format == VK_FORMAT_D16_UNORM_S8_UINT || m_format == VK_FORMAT_D24_UNORM_S8_UINT || m_format == VK_FORMAT_D32_SFLOAT_S8_UINT)
+			//if (is_depth_tex(m_format))
+		{
+			view_info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+
+		m_header.mipMapCount = 1;
+
+		if (!m_pResource)return;
+		VkResult res = vkCreateImageView(m_pDevice->_dev, &view_info, NULL, pImageView);
+		assert(res == VK_SUCCESS);
+
+		SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)*pImageView, m_name.c_str());
+	}
+
+	INT32 Texture::InitDepthStencil(cxDevice* pDevice, uint32_t width, uint32_t height, VkFormat format, VkSampleCountFlagBits msaa, const char* name)
+	{
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = NULL;
+		image_info.imageType = VK_IMAGE_TYPE_2D;
+		image_info.format = format;
+		image_info.extent.width = width;
+		image_info.extent.height = height;
+		image_info.extent.depth = 1;
+		image_info.mipLevels = 1;
+		image_info.arrayLayers = 1;
+		image_info.samples = msaa;
+		image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image_info.queueFamilyIndexCount = 0;
+		image_info.pQueueFamilyIndices = NULL;
+		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		image_info.flags = 0;
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;   // VK_IMAGE_TILING_LINEAR should never be used and will never be faster
+
+		return Init(pDevice, &image_info, name);
+	}
+
+	//--------------------------------------------------------------------------------------
+	// create a comitted resource using m_header
+	//--------------------------------------------------------------------------------------
+	VkImage Texture::CreateTextureCommitted(cxDevice* pDevice, UploadHeap* pUploadHeap, const char* pName, bool useSRGB, VkImageUsageFlags usageFlags)
+	{
+		VkImageCreateInfo info = {};
+
+		if (pName)
+			m_name = pName;
+
+		if (useSRGB && ((usageFlags & VK_IMAGE_USAGE_STORAGE_BIT) != 0))
+		{
+			// the storage bit is not supported for srgb formats
+			// we can still use the srgb format on an image view if the access is read-only
+			// for write access, we need to use an image view with unorm format
+			// this is ok as srgb and unorm formats are compatible with each other
+			VkImageFormatListCreateInfo formatListInfo = {};
+			formatListInfo.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
+			formatListInfo.viewFormatCount = 2;
+			VkFormat list[2];
+			list[0] = TranslateDxgiFormatIntoVulkans(m_header.format);
+			list[1] = TranslateDxgiFormatIntoVulkans(SetFormatGamma(m_header.format, useSRGB));
+			formatListInfo.pViewFormats = list;
+
+			info.pNext = &formatListInfo;
+		}
+		else {
+			m_header.format = SetFormatGamma(m_header.format, useSRGB);
+		}
+
+		m_format = m_header.vkformat ? m_header.vkformat : TranslateDxgiFormatIntoVulkans((DXGI_FORMAT)m_header.format);
+
+		VkImage tex;
+
+		// Create the Image:
+		{
+			info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			info.imageType = VK_IMAGE_TYPE_2D;
+			info.format = m_format;
+			info.extent.width = m_header.width;
+			info.extent.height = m_header.height;
+			info.extent.depth = 1;
+			info.mipLevels = m_header.mipMapCount;
+			info.arrayLayers = m_header.arraySize;
+			if (m_header.arraySize == 6)
+				info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.tiling = VK_IMAGE_TILING_OPTIMAL;
+			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | usageFlags;
+			info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			// allocate memory and bind the image to it
+#ifdef USE_VMA
+			VmaAllocationCreateInfo imageAllocCreateInfo = {};
+			imageAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+			imageAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT;
+			imageAllocCreateInfo.pUserData = (void*)m_name.c_str();
+			VmaAllocationInfo gpuImageAllocInfo = {};
+			VkResult res = vmaCreateImage(pDevice->GetAllocator(), &info, &imageAllocCreateInfo, &tex, &m_ImageAlloc, &gpuImageAllocInfo);
+			assert(res == VK_SUCCESS);
+			SetResourceName(pDevice->_dev, VK_OBJECT_TYPE_IMAGE, (uint64_t)tex, m_name.c_str());
+#else
+			VkResult res = vkCreateImage(pDevice->_dev, &info, NULL, &tex);
+			assert(res == VK_SUCCESS);
+
+			VkMemoryRequirements mem_reqs;
+			vkGetImageMemoryRequirements(pDevice->_dev, tex, &mem_reqs);
+
+			VkMemoryAllocateInfo alloc_info = {};
+			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			alloc_info.allocationSize = mem_reqs.size;
+			alloc_info.memoryTypeIndex = 0;
+
+			bool pass = memory_type_from_properties(pDevice->GetPhysicalDeviceMemoryProperties(), mem_reqs.memoryTypeBits,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				&alloc_info.memoryTypeIndex);
+			assert(pass && "No mappable, coherent memory");
+
+			res = vkAllocateMemory(pDevice->_dev, &alloc_info, NULL, &m_deviceMemory);
+			assert(res == VK_SUCCESS);
+
+			res = vkBindImageMemory(pDevice->_dev, tex, m_deviceMemory, 0);
+			assert(res == VK_SUCCESS);
+#endif
+		}
+
+		return tex;
+	}
+
+	void Texture::LoadAndUpload(cxDevice* pDevice, UploadHeap* pUploadHeap, ImgLoader* pDds, VkImage pTexture2D)
+	{
+		// Upload Image
+		{
+			VkImageMemoryBarrier copy_barrier = {};
+			copy_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			copy_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			copy_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			copy_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copy_barrier.image = pTexture2D;
+			copy_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy_barrier.subresourceRange.baseMipLevel = 0;
+			copy_barrier.subresourceRange.levelCount = m_header.mipMapCount;
+			copy_barrier.subresourceRange.layerCount = m_header.arraySize;
+			pUploadHeap->AddPreBarrier(copy_barrier);
+		}
+
+		//compute pixel size
+		//
+		UINT32 bytesPerPixel = (UINT32)GetPixelByteSize((DXGI_FORMAT)m_header.format); // note that bytesPerPixel in BC formats is treated as bytesPerBlock 
+		UINT32 pixelsPerBlock = 1;
+		if (IsBCFormat(m_header.format))
+		{
+			pixelsPerBlock = 4 * 4; // BC formats have 4*4 pixels per block
+		}
+
+		for (uint32_t a = 0; a < m_header.arraySize; a++)
+		{
+			// copy all the mip slices into the offsets specified by the footprint structure
+			//
+			for (uint32_t mip = 0; mip < m_header.mipMapCount; mip++)
+			{
+				uint32_t dwWidth = std::max<uint32_t>(m_header.width >> mip, 1);
+				uint32_t dwHeight = std::max<uint32_t>(m_header.height >> mip, 1);
+
+				UINT64 UplHeapSize = (dwWidth * dwHeight * bytesPerPixel) / pixelsPerBlock;
+				UINT8* pixels = pUploadHeap->BeginSuballocate(SIZE_T(UplHeapSize), 512);
+
+				if (pixels == NULL)
+				{
+					// oh! We ran out of mem in the upload heap, flush it and try allocating mem from it again
+					pUploadHeap->FlushAndFinish(true);
+					pixels = pUploadHeap->Suballocate(SIZE_T(UplHeapSize), 512);
+					assert(pixels != NULL);
+				}
+
+				uint32_t offset = uint32_t(pixels - pUploadHeap->BasePtr());
+
+				pDds->CopyPixels(pixels, (dwWidth * bytesPerPixel) / pixelsPerBlock, (dwWidth * bytesPerPixel) / pixelsPerBlock, dwHeight);
+
+				pUploadHeap->EndSuballocate();
+
+				{
+					VkBufferImageCopy region = {};
+					region.bufferOffset = offset;
+					region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					region.imageSubresource.layerCount = 1;
+					region.imageSubresource.baseArrayLayer = a;
+					region.imageSubresource.mipLevel = mip;
+					region.imageExtent.width = dwWidth;
+					region.imageExtent.height = dwHeight;
+					region.imageExtent.depth = 1;
+					pUploadHeap->AddCopy(pTexture2D, region);
+				}
+			}
+		}
+
+		// prepare to shader read
+		//
+		{
+			VkImageMemoryBarrier use_barrier = {};
+			use_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			use_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			use_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			use_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			use_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			use_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.image = pTexture2D;
+			use_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			use_barrier.subresourceRange.levelCount = m_header.mipMapCount;
+			use_barrier.subresourceRange.layerCount = m_header.arraySize;
+			pUploadHeap->AddPostBarrier(use_barrier);
+		}
+	}
+
+	char* copyPixels(void* pDest, char* data, uint32_t stride, uint32_t bytesWidth, uint32_t height)
+	{
+		for (uint32_t y = 0; y < height; y++)
+		{
+			memcpy((char*)pDest + y * stride, data, bytesWidth);
+			data += stride;
+		}
+		return data;
+	}
+
+	void Texture::LoadAndUpload0(cxDevice* pDevice, UploadHeap* pUploadHeap, char* data, VkImage pTexture2D)
+	{
+		// Upload Image
+		{
+			VkImageMemoryBarrier copy_barrier = {};
+			copy_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			copy_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			copy_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			copy_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copy_barrier.image = pTexture2D;
+			copy_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy_barrier.subresourceRange.baseMipLevel = 0;
+			copy_barrier.subresourceRange.levelCount = m_header.mipMapCount;
+			copy_barrier.subresourceRange.layerCount = m_header.arraySize;
+			pUploadHeap->AddPreBarrier(copy_barrier);
+		}
+		//compute pixel size
+		UINT32 bytesPerPixel = (UINT32)GetPixelByteSize((DXGI_FORMAT)m_header.format); // note that bytesPerPixel in BC formats is treated as bytesPerBlock 
+		UINT32 pixelsPerBlock = 1;
+		if (IsBCFormat(m_header.format))
+		{
+			pixelsPerBlock = 4 * 4; // BC formats have 4*4 pixels per block
+		}
+		auto t = data;
+		for (uint32_t a = 0; a < m_header.arraySize; a++)
+		{
+			// copy all the mip slices into the offsets specified by the footprint structure 
+			for (uint32_t mip = 0; mip < m_header.mipMapCount; mip++)
+			{
+				uint32_t dwWidth = std::max<uint32_t>(m_header.width >> mip, 1);
+				uint32_t dwHeight = std::max<uint32_t>(m_header.height >> mip, 1);
+				UINT64 UplHeapSize = (dwWidth * dwHeight * bytesPerPixel) / pixelsPerBlock;
+				UINT8* pixels = pUploadHeap->BeginSuballocate(SIZE_T(UplHeapSize), 512);
+				if (pixels == NULL)
+				{
+					// oh! We ran out of mem in the upload heap, flush it and try allocating mem from it again
+					pUploadHeap->FlushAndFinish(true);
+					pixels = pUploadHeap->Suballocate(SIZE_T(UplHeapSize), 512);
+					assert(pixels != NULL);
+				}
+				uint32_t offset = uint32_t(pixels - pUploadHeap->BasePtr());
+				t = copyPixels(pixels, t, (dwWidth * bytesPerPixel) / pixelsPerBlock, (dwWidth * bytesPerPixel) / pixelsPerBlock, dwHeight);
+				pUploadHeap->EndSuballocate();
+				{
+					VkBufferImageCopy region = {};
+					region.bufferOffset = offset;
+					region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					region.imageSubresource.layerCount = 1;
+					region.imageSubresource.baseArrayLayer = a;
+					region.imageSubresource.mipLevel = mip;
+					region.imageExtent.width = dwWidth;
+					region.imageExtent.height = dwHeight;
+					region.imageExtent.depth = 1;
+					pUploadHeap->AddCopy(pTexture2D, region);
+				}
+			}
+		}
+		// prepare to shader read
+		{
+			VkImageMemoryBarrier use_barrier = {};
+			use_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			use_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			use_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			use_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			use_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			use_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			use_barrier.image = pTexture2D;
+			use_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			use_barrier.subresourceRange.levelCount = m_header.mipMapCount;
+			use_barrier.subresourceRange.layerCount = m_header.arraySize;
+			pUploadHeap->AddPostBarrier(use_barrier);
+		}
+	}
+
+	void upload_data(cxDevice* pDevice, UploadHeap* up, IMG_INFO* info, uint32_t bufferOffset, uint32_t usage, VkImage image)
+	{
+		uint32_t imageUsageFlags = usage | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; //uint32_t imageLayout;
+		{
+
+			//mipLevels = info->mipMapCount;
+			//mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+			// Copy to Image:
+			{
+				VkImageMemoryBarrier copy_barrier = {};
+				copy_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				copy_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				copy_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				copy_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+				copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				copy_barrier.image = image;
+				copy_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				copy_barrier.subresourceRange.levelCount = info->mipMapCount;
+				copy_barrier.subresourceRange.layerCount = info->arraySize;
+				//vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, copy_barrier);
+				up->AddPreBarrier(copy_barrier);
+				VkBufferImageCopy region = {};
+				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.imageSubresource.layerCount = info->arraySize;
+				region.imageExtent.width = info->width;
+				region.imageExtent.height = info->height;
+				region.imageExtent.depth = info->depth;
+				region.bufferOffset = bufferOffset;
+				//vkCmdCopyBufferToImage(copyCmd, staging->buffer, _image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+				up->AddCopy(image, region);
+				VkImageMemoryBarrier use_barrier = {};
+				use_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				use_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				use_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				use_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+				use_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				use_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				use_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				use_barrier.image = image;
+				use_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				use_barrier.subresourceRange.levelCount = info->mipMapCount;
+				use_barrier.subresourceRange.layerCount = info->arraySize;
+				//vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, use_barrier);
+				up->AddPostBarrier(use_barrier);
+			}
+
+		}
+	}
+	//--------------------------------------------------------------------------------------
+	// entry function to initialize an image from a .DDS texture
+	//--------------------------------------------------------------------------------------
+	bool Texture::InitFromFile(cxDevice* pDevice, UploadHeap* pUploadHeap, const char* pFilename, bool useSRGB, VkImageUsageFlags usageFlags, float cutOff)
+	{
+		assert(m_pResource == NULL);
+		if (!pFilename || !(*pFilename))return false;
+		m_pDevice = pDevice;
+		ImgLoader* img = CreateImageLoader(pFilename);
+		bool result = img->Load(pFilename, cutOff, &m_header);
+		if (result)
+		{
+			m_pResource = CreateTextureCommitted(pDevice, pUploadHeap, pFilename, useSRGB, usageFlags);
+			LoadAndUpload(pDevice, pUploadHeap, img, m_pResource);
+		}
+		else
+		{
+			Trace("Error loading texture from file: %s", pFilename);
+			assert(result && "Could not load requested file. Please make sure it exists on disk.");
+		}
+
+		delete(img);
+
+		return result;
+	}
+
+	bool Texture::InitFromData(cxDevice* pDevice, UploadHeap* uploadHeap, IMG_INFO* header, const void* data, int dsize, const char* name, bool useSRGB)
+	{
+		assert(!m_pResource && (m_pDevice || m_pDevice != pDevice));
+		m_pDevice = pDevice;
+		m_header = *header;
+		m_pResource = CreateTextureCommitted(m_pDevice, uploadHeap, name, useSRGB);
+		if (header->arraySize == 1 && header->mipMapCount == 1) {
+			UINT8* pixels = 0;
+			pixels = uploadHeap->Suballocate(dsize, 512);
+			assert(pixels);
+			memcpy(pixels, data, dsize);
+			uint32_t offset = uint32_t(pixels - uploadHeap->BasePtr());
+			upload_data(pDevice, uploadHeap, header, offset, 0, m_pResource);
+		}
+		else {
+			LoadAndUpload0(pDevice, uploadHeap, (char*)data, m_pResource);
+		}
+		return true;
+	}
+
+	VkFormat TranslateDxgiFormatIntoVulkans(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+		case DXGI_FORMAT_B8G8R8A8_UNORM: return VK_FORMAT_B8G8R8A8_UNORM;
+		case DXGI_FORMAT_R8G8B8A8_UNORM: return VK_FORMAT_R8G8B8A8_UNORM;
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return VK_FORMAT_B8G8R8A8_SRGB;
+		case DXGI_FORMAT_BC1_UNORM:         return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+		case DXGI_FORMAT_BC1_UNORM_SRGB:    return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
+		case DXGI_FORMAT_BC2_UNORM:         return VK_FORMAT_BC2_UNORM_BLOCK;
+		case DXGI_FORMAT_BC2_UNORM_SRGB:    return VK_FORMAT_BC2_SRGB_BLOCK;
+		case DXGI_FORMAT_BC3_UNORM:         return VK_FORMAT_BC3_UNORM_BLOCK;
+		case DXGI_FORMAT_BC3_UNORM_SRGB:    return VK_FORMAT_BC3_SRGB_BLOCK;
+		case DXGI_FORMAT_BC4_UNORM:         return VK_FORMAT_BC4_UNORM_BLOCK;
+		case DXGI_FORMAT_BC4_SNORM:         return VK_FORMAT_BC4_UNORM_BLOCK;
+		case DXGI_FORMAT_BC5_UNORM:         return VK_FORMAT_BC5_UNORM_BLOCK;
+		case DXGI_FORMAT_BC5_SNORM:         return VK_FORMAT_BC5_UNORM_BLOCK;
+		case DXGI_FORMAT_B5G6R5_UNORM:      return VK_FORMAT_B5G6R5_UNORM_PACK16;
+		case DXGI_FORMAT_B5G5R5A1_UNORM:    return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
+		case DXGI_FORMAT_BC6H_UF16:         return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+		case DXGI_FORMAT_BC6H_SF16:         return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+		case DXGI_FORMAT_BC7_UNORM:         return VK_FORMAT_BC7_UNORM_BLOCK;
+		case DXGI_FORMAT_BC7_UNORM_SRGB:    return VK_FORMAT_BC7_SRGB_BLOCK;
+		case DXGI_FORMAT_R10G10B10A2_UNORM: return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+		case DXGI_FORMAT_R16G16B16A16_FLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
+		case DXGI_FORMAT_R32G32B32A32_FLOAT: return VK_FORMAT_R32G32B32A32_SFLOAT;
+		case DXGI_FORMAT_A8_UNORM:          return VK_FORMAT_R8_UNORM;
+		default: assert(false);  return VK_FORMAT_UNDEFINED;
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	// Return the BPP for a particular format
+	//--------------------------------------------------------------------------------------
+	size_t BitsPerPixel(DXGI_FORMAT fmt)
+	{
+		switch (fmt)
+		{
+		case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+		case DXGI_FORMAT_R32G32B32A32_FLOAT:
+		case DXGI_FORMAT_R32G32B32A32_UINT:
+		case DXGI_FORMAT_R32G32B32A32_SINT:
+			return 128;
+
+		case DXGI_FORMAT_R32G32B32_TYPELESS:
+		case DXGI_FORMAT_R32G32B32_FLOAT:
+		case DXGI_FORMAT_R32G32B32_UINT:
+		case DXGI_FORMAT_R32G32B32_SINT:
+			return 96;
+
+		case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+		case DXGI_FORMAT_R16G16B16A16_FLOAT:
+		case DXGI_FORMAT_R16G16B16A16_UNORM:
+		case DXGI_FORMAT_R16G16B16A16_UINT:
+		case DXGI_FORMAT_R16G16B16A16_SNORM:
+		case DXGI_FORMAT_R16G16B16A16_SINT:
+		case DXGI_FORMAT_R32G32_TYPELESS:
+		case DXGI_FORMAT_R32G32_FLOAT:
+		case DXGI_FORMAT_R32G32_UINT:
+		case DXGI_FORMAT_R32G32_SINT:
+		case DXGI_FORMAT_R32G8X24_TYPELESS:
+		case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+		case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+		case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+		case DXGI_FORMAT_Y416:
+		case DXGI_FORMAT_Y210:
+		case DXGI_FORMAT_Y216:
+			return 64;
+
+		case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+		case DXGI_FORMAT_R10G10B10A2_UNORM:
+		case DXGI_FORMAT_R10G10B10A2_UINT:
+		case DXGI_FORMAT_R11G11B10_FLOAT:
+		case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+		case DXGI_FORMAT_R8G8B8A8_UNORM:
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+		case DXGI_FORMAT_R8G8B8A8_UINT:
+		case DXGI_FORMAT_R8G8B8A8_SNORM:
+		case DXGI_FORMAT_R8G8B8A8_SINT:
+		case DXGI_FORMAT_R16G16_TYPELESS:
+		case DXGI_FORMAT_R16G16_FLOAT:
+		case DXGI_FORMAT_R16G16_UNORM:
+		case DXGI_FORMAT_R16G16_UINT:
+		case DXGI_FORMAT_R16G16_SNORM:
+		case DXGI_FORMAT_R16G16_SINT:
+		case DXGI_FORMAT_R32_TYPELESS:
+		case DXGI_FORMAT_D32_FLOAT:
+		case DXGI_FORMAT_R32_FLOAT:
+		case DXGI_FORMAT_R32_UINT:
+		case DXGI_FORMAT_R32_SINT:
+		case DXGI_FORMAT_R24G8_TYPELESS:
+		case DXGI_FORMAT_D24_UNORM_S8_UINT:
+		case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+		case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+		case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
+		case DXGI_FORMAT_R8G8_B8G8_UNORM:
+		case DXGI_FORMAT_G8R8_G8B8_UNORM:
+		case DXGI_FORMAT_B8G8R8A8_UNORM:
+		case DXGI_FORMAT_B8G8R8X8_UNORM:
+		case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+		case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+		case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+		case DXGI_FORMAT_AYUV:
+		case DXGI_FORMAT_Y410:
+		case DXGI_FORMAT_YUY2:
+			return 32;
+
+		case DXGI_FORMAT_P010:
+		case DXGI_FORMAT_P016:
+			return 24;
+
+		case DXGI_FORMAT_R8G8_TYPELESS:
+		case DXGI_FORMAT_R8G8_UNORM:
+		case DXGI_FORMAT_R8G8_UINT:
+		case DXGI_FORMAT_R8G8_SNORM:
+		case DXGI_FORMAT_R8G8_SINT:
+		case DXGI_FORMAT_R16_TYPELESS:
+		case DXGI_FORMAT_R16_FLOAT:
+		case DXGI_FORMAT_D16_UNORM:
+		case DXGI_FORMAT_R16_UNORM:
+		case DXGI_FORMAT_R16_UINT:
+		case DXGI_FORMAT_R16_SNORM:
+		case DXGI_FORMAT_R16_SINT:
+		case DXGI_FORMAT_B5G6R5_UNORM:
+		case DXGI_FORMAT_B5G5R5A1_UNORM:
+		case DXGI_FORMAT_A8P8:
+		case DXGI_FORMAT_B4G4R4A4_UNORM:
+			return 16;
+
+		case DXGI_FORMAT_NV12:
+		case DXGI_FORMAT_420_OPAQUE:
+		case DXGI_FORMAT_NV11:
+			return 12;
+
+		case DXGI_FORMAT_R8_TYPELESS:
+		case DXGI_FORMAT_R8_UNORM:
+		case DXGI_FORMAT_R8_UINT:
+		case DXGI_FORMAT_R8_SNORM:
+		case DXGI_FORMAT_R8_SINT:
+		case DXGI_FORMAT_A8_UNORM:
+		case DXGI_FORMAT_AI44:
+		case DXGI_FORMAT_IA44:
+		case DXGI_FORMAT_P8:
+			return 8;
+
+		case DXGI_FORMAT_BC2_TYPELESS:
+		case DXGI_FORMAT_BC2_UNORM:
+		case DXGI_FORMAT_BC2_UNORM_SRGB:
+		case DXGI_FORMAT_BC3_TYPELESS:
+		case DXGI_FORMAT_BC3_UNORM:
+		case DXGI_FORMAT_BC3_UNORM_SRGB:
+		case DXGI_FORMAT_BC5_TYPELESS:
+		case DXGI_FORMAT_BC5_UNORM:
+		case DXGI_FORMAT_BC5_SNORM:
+		case DXGI_FORMAT_BC6H_TYPELESS:
+		case DXGI_FORMAT_BC6H_UF16:
+		case DXGI_FORMAT_BC6H_SF16:
+		case DXGI_FORMAT_BC7_TYPELESS:
+		case DXGI_FORMAT_BC7_UNORM:
+		case DXGI_FORMAT_BC7_UNORM_SRGB:
+			return 8;
+
+		case DXGI_FORMAT_BC1_TYPELESS:
+		case DXGI_FORMAT_BC1_UNORM:
+		case DXGI_FORMAT_BC1_UNORM_SRGB:
+		case DXGI_FORMAT_BC4_TYPELESS:
+		case DXGI_FORMAT_BC4_UNORM:
+		case DXGI_FORMAT_BC4_SNORM:
+			return 4;
+
+		case DXGI_FORMAT_R1_UNORM:
+			return 1;
+
+		default:
+			return 0;
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	// return the byte size of a pixel (or block if block compressed)
+	//--------------------------------------------------------------------------------------
+	size_t GetPixelByteSize(DXGI_FORMAT fmt)
+	{
+		switch (fmt)
+		{
+		case(DXGI_FORMAT_A8_UNORM):
+			return 1;
+
+		case(DXGI_FORMAT_R10G10B10A2_TYPELESS):
+		case(DXGI_FORMAT_R10G10B10A2_UNORM):
+		case(DXGI_FORMAT_R10G10B10A2_UINT):
+		case(DXGI_FORMAT_R11G11B10_FLOAT):
+		case(DXGI_FORMAT_R8G8B8A8_TYPELESS):
+		case(DXGI_FORMAT_R8G8B8A8_UNORM):
+		case(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB):
+		case(DXGI_FORMAT_R8G8B8A8_UINT):
+		case(DXGI_FORMAT_R8G8B8A8_SNORM):
+		case(DXGI_FORMAT_R8G8B8A8_SINT):
+		case(DXGI_FORMAT_B8G8R8A8_UNORM):
+		case(DXGI_FORMAT_B8G8R8X8_UNORM):
+		case(DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM):
+		case(DXGI_FORMAT_B8G8R8A8_TYPELESS):
+		case(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB):
+		case(DXGI_FORMAT_B8G8R8X8_TYPELESS):
+		case(DXGI_FORMAT_B8G8R8X8_UNORM_SRGB):
+		case(DXGI_FORMAT_R16G16_TYPELESS):
+		case(DXGI_FORMAT_R16G16_FLOAT):
+		case(DXGI_FORMAT_R16G16_UNORM):
+		case(DXGI_FORMAT_R16G16_UINT):
+		case(DXGI_FORMAT_R16G16_SNORM):
+		case(DXGI_FORMAT_R16G16_SINT):
+		case(DXGI_FORMAT_R32_TYPELESS):
+		case(DXGI_FORMAT_D32_FLOAT):
+		case(DXGI_FORMAT_R32_FLOAT):
+		case(DXGI_FORMAT_R32_UINT):
+		case(DXGI_FORMAT_R32_SINT):
+			return 4;
+
+		case(DXGI_FORMAT_BC1_TYPELESS):
+		case(DXGI_FORMAT_BC1_UNORM):
+		case(DXGI_FORMAT_BC1_UNORM_SRGB):
+		case(DXGI_FORMAT_BC4_TYPELESS):
+		case(DXGI_FORMAT_BC4_UNORM):
+		case(DXGI_FORMAT_BC4_SNORM):
+		case(DXGI_FORMAT_R16G16B16A16_FLOAT):
+		case(DXGI_FORMAT_R16G16B16A16_TYPELESS):
+			return 8;
+
+		case(DXGI_FORMAT_BC2_TYPELESS):
+		case(DXGI_FORMAT_BC2_UNORM):
+		case(DXGI_FORMAT_BC2_UNORM_SRGB):
+		case(DXGI_FORMAT_BC3_TYPELESS):
+		case(DXGI_FORMAT_BC3_UNORM):
+		case(DXGI_FORMAT_BC3_UNORM_SRGB):
+		case(DXGI_FORMAT_BC5_TYPELESS):
+		case(DXGI_FORMAT_BC5_UNORM):
+		case(DXGI_FORMAT_BC5_SNORM):
+		case(DXGI_FORMAT_BC6H_TYPELESS):
+		case(DXGI_FORMAT_BC6H_UF16):
+		case(DXGI_FORMAT_BC6H_SF16):
+		case(DXGI_FORMAT_BC7_TYPELESS):
+		case(DXGI_FORMAT_BC7_UNORM):
+		case(DXGI_FORMAT_BC7_UNORM_SRGB):
+		case(DXGI_FORMAT_R32G32B32A32_FLOAT):
+		case(DXGI_FORMAT_R32G32B32A32_TYPELESS):
+			return 16;
+
+		default:
+			assert(0);
+			break;
+		}
+		return 0;
+	}
 
 
+
+	//--------------------------------------------------------------------------------------
+	// Convert a *_SRGB format into a non-gamma one
+	//--------------------------------------------------------------------------------------
+	DXGI_FORMAT ConvertIntoNonGammaFormat(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8A8_UNORM;
+		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8X8_UNORM;
+		case DXGI_FORMAT_BC1_UNORM_SRGB: return DXGI_FORMAT_BC1_UNORM;
+		case DXGI_FORMAT_BC2_UNORM_SRGB: return DXGI_FORMAT_BC2_UNORM;
+		case DXGI_FORMAT_BC3_UNORM_SRGB: return DXGI_FORMAT_BC3_UNORM;
+		case DXGI_FORMAT_BC7_UNORM_SRGB: return DXGI_FORMAT_BC7_UNORM;
+		}
+
+		return format;
+	}
+
+	DXGI_FORMAT ConvertIntoGammaFormat(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+		case DXGI_FORMAT_B8G8R8A8_UNORM: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+		case DXGI_FORMAT_R8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		case DXGI_FORMAT_B8G8R8X8_UNORM: return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
+		case DXGI_FORMAT_BC1_UNORM: return DXGI_FORMAT_BC1_UNORM_SRGB;
+		case DXGI_FORMAT_BC2_UNORM: return DXGI_FORMAT_BC2_UNORM_SRGB;
+		case DXGI_FORMAT_BC3_UNORM: return DXGI_FORMAT_BC3_UNORM_SRGB;
+		case DXGI_FORMAT_BC7_UNORM: return DXGI_FORMAT_BC7_UNORM_SRGB;
+		}
+
+		return format;
+	}
+
+	DXGI_FORMAT SetFormatGamma(DXGI_FORMAT format, bool addGamma)
+	{
+		if (addGamma)
+		{
+			format = ConvertIntoGammaFormat(format);
+		}
+		else
+		{
+			format = ConvertIntoNonGammaFormat(format);
+		}
+
+		return format;
+	}
+
+	bool IsBCFormat(DXGI_FORMAT format)
+	{
+		return (format >= DXGI_FORMAT_BC1_TYPELESS && format <= DXGI_FORMAT_BC5_SNORM) || (format >= DXGI_FORMAT_BC6H_TYPELESS && format <= DXGI_FORMAT_BC7_UNORM_SRGB);
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreate
+	//
+	//--------------------------------------------------------------------------------------
+	void UploadHeap::OnCreate(cxDevice* pDevice, SIZE_T uSize)
+	{
+		m_pDevice = pDevice;
+
+		VkResult res;
+
+		// Create command list and allocators 
+		{
+			VkCommandPoolCreateInfo cmd_pool_info = {};
+			cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			cmd_pool_info.queueFamilyIndex = m_pDevice->GetGraphicsQueueFamilyIndex();
+			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+			res = vkCreateCommandPool(m_pDevice->_dev, &cmd_pool_info, NULL, &m_commandPool);
+			assert(res == VK_SUCCESS);
+
+			VkCommandBufferAllocateInfo cmd = {};
+			cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			cmd.pNext = NULL;
+			cmd.commandPool = m_commandPool;
+			cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			cmd.commandBufferCount = 1;
+			res = vkAllocateCommandBuffers(m_pDevice->_dev, &cmd, &m_pCommandBuffer);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Create buffer to suballocate
+		{
+			VkBufferCreateInfo buffer_info = {};
+			buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			buffer_info.size = uSize;
+			buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			res = vkCreateBuffer(m_pDevice->_dev, &buffer_info, NULL, &m_buffer);
+			assert(res == VK_SUCCESS);
+
+			VkMemoryRequirements mem_reqs;
+			vkGetBufferMemoryRequirements(m_pDevice->_dev, m_buffer, &mem_reqs);
+
+			VkMemoryAllocateInfo alloc_info = {};
+			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			alloc_info.allocationSize = mem_reqs.size;
+			alloc_info.memoryTypeIndex = 0;
+			auto dmp = m_pDevice->GetPhysicalDeviceMemoryProperties();
+			bool pass = memory_type_from_properties(dmp, mem_reqs.memoryTypeBits,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+				&alloc_info.memoryTypeIndex);
+			assert(pass && "No mappable, coherent memory");
+
+			res = vkAllocateMemory(m_pDevice->_dev, &alloc_info, NULL, &m_deviceMemory);
+			assert(res == VK_SUCCESS);
+
+			res = vkBindBufferMemory(m_pDevice->_dev, m_buffer, m_deviceMemory, 0);
+			assert(res == VK_SUCCESS);
+
+			res = vkMapMemory(m_pDevice->_dev, m_deviceMemory, 0, mem_reqs.size, 0, (void**)&m_pDataBegin);
+			assert(res == VK_SUCCESS);
+
+			m_pDataCur = m_pDataBegin;
+			m_pDataEnd = m_pDataBegin + mem_reqs.size;
+		}
+
+		// Create fence
+		{
+			VkFenceCreateInfo fence_ci = {};
+			fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+			res = vkCreateFence(m_pDevice->_dev, &fence_ci, NULL, &m_fence);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Begin Command Buffer
+		{
+			VkCommandBufferBeginInfo cmd_buf_info = {};
+			cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+			res = vkBeginCommandBuffer(m_pCommandBuffer, &cmd_buf_info);
+			assert(res == VK_SUCCESS);
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroy
+	//
+	//--------------------------------------------------------------------------------------
+	void UploadHeap::OnDestroy()
+	{
+		if (m_buffer)
+		{
+			vkDestroyBuffer(m_pDevice->_dev, m_buffer, NULL);
+			vkUnmapMemory(m_pDevice->_dev, m_deviceMemory);
+			vkFreeMemory(m_pDevice->_dev, m_deviceMemory, NULL);
+
+			vkFreeCommandBuffers(m_pDevice->_dev, m_commandPool, 1, &m_pCommandBuffer);
+			vkDestroyCommandPool(m_pDevice->_dev, m_commandPool, NULL);
+
+			vkDestroyFence(m_pDevice->_dev, m_fence, NULL);
+
+			m_buffer = 0;
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// SuballocateFromUploadHeap
+	//
+	//--------------------------------------------------------------------------------------
+	UINT8* UploadHeap::Suballocate(SIZE_T uSize, UINT64 uAlign)
+	{
+		// wait until we are done flusing the heap
+		flushing.Wait();
+
+		UINT8* pRet = NULL;
+
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+
+			// make sure resource (and its mips) would fit the upload heap, if not please make the upload heap bigger
+			auto bca = (m_pDataEnd - m_pDataBegin);
+			assert(uSize < (size_t)bca);
+
+			m_pDataCur = reinterpret_cast<UINT8*>(AlignUp(reinterpret_cast<SIZE_T>(m_pDataCur), uAlign));
+			uSize = AlignUp(uSize, uAlign);
+
+			ac = m_pDataCur - m_pDataBegin;
+			ac0 = m_pDataEnd - m_pDataBegin;
+			// return NULL if we ran out of space in the heap
+			if ((m_pDataCur >= m_pDataEnd) || (m_pDataCur + uSize >= m_pDataEnd))
+			{
+				return NULL;
+			}
+
+			pRet = m_pDataCur;
+			m_pDataCur += uSize;
+		}
+
+		return pRet;
+	}
+
+	UINT8* UploadHeap::BeginSuballocate(SIZE_T uSize, UINT64 uAlign)
+	{
+		UINT8* pRes = NULL;
+
+		for (;;) {
+			pRes = Suballocate(uSize, uAlign);
+			if (pRes != NULL)
+			{
+				break;
+			}
+
+			FlushAndFinish();
+		}
+
+		allocating.Inc();
+
+		return pRes;
+	}
+
+	void UploadHeap::EndSuballocate()
+	{
+		allocating.Dec();
+	}
+
+
+	void UploadHeap::AddCopy(VkImage image, VkBufferImageCopy bufferImageCopy)
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_copies.push_back({ image, bufferImageCopy });
+	}
+
+	void UploadHeap::AddPreBarrier(VkImageMemoryBarrier imageMemoryBarrier)
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+
+		m_toPreBarrier.push_back(imageMemoryBarrier);
+	}
+
+
+	void UploadHeap::AddPostBarrier(VkImageMemoryBarrier imageMemoryBarrier)
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+
+		m_toPostBarrier.push_back(imageMemoryBarrier);
+	}
+
+	void UploadHeap::Flush()
+	{
+		VkResult res;
+
+		VkMappedMemoryRange range[1] = {};
+		range[0].sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		range[0].memory = m_deviceMemory;
+		range[0].size = m_pDataCur - m_pDataBegin;
+		res = vkFlushMappedMemoryRanges(m_pDevice->_dev, 1, range);
+		assert(res == VK_SUCCESS);
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// FlushAndFinish
+	//
+	//--------------------------------------------------------------------------------------
+	void UploadHeap::FlushAndFinish(bool bDoBarriers)
+	{
+		// make sure another thread is not already flushing
+		flushing.Wait();
+
+		// begins a critical section, and make sure no allocations happen while a thread is inside it
+		flushing.Inc();
+
+		// wait for pending allocations to finish
+		allocating.Wait();
+
+		std::unique_lock<std::mutex> lock(m_mutex);
+		Flush();
+		if (m_copies.size()) {
+			//Trace("flushing %i", m_copies.size());
+
+			//apply pre barriers in one go
+			if (m_toPreBarrier.size() > 0)
+			{
+				vkCmdPipelineBarrier(GetCommandList(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, (uint32_t)m_toPreBarrier.size(), m_toPreBarrier.data());
+				m_toPreBarrier.clear();
+			}
+
+			for (auto c : m_copies)
+			{
+				vkCmdCopyBufferToImage(GetCommandList(), GetResource(), c.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &c.m_bufferImageCopy);
+			}
+			m_copies.clear();
+
+			//apply post barriers in one go
+			if (m_toPostBarrier.size() > 0)
+			{
+				vkCmdPipelineBarrier(GetCommandList(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, (uint32_t)m_toPostBarrier.size(), m_toPostBarrier.data());
+				m_toPostBarrier.clear();
+			}
+		}
+
+		// Close 
+		VkResult res = vkEndCommandBuffer(m_pCommandBuffer);
+		assert(res == VK_SUCCESS);
+
+		// Submit
+		const VkCommandBuffer cmd_bufs[] = { m_pCommandBuffer };
+		VkSubmitInfo submit_info;
+		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit_info.pNext = NULL;
+		submit_info.waitSemaphoreCount = 0;
+		submit_info.pWaitSemaphores = NULL;
+		submit_info.pWaitDstStageMask = NULL;
+		submit_info.commandBufferCount = 1;
+		submit_info.pCommandBuffers = cmd_bufs;
+		submit_info.signalSemaphoreCount = 0;
+		submit_info.pSignalSemaphores = NULL;
+		auto st = vkGetFenceStatus(m_pDevice->_dev, m_fence);
+		printf("UploadHeap fence: %d\n", st);
+		res = vkQueueSubmit(m_pDevice->_queue, 1, &submit_info, m_fence);
+		assert(res == VK_SUCCESS);
+
+		// Make sure it's been processed by the GPU
+
+		res = vkWaitForFences(m_pDevice->_dev, 1, &m_fence, VK_TRUE, UINT64_MAX);
+		assert(res == VK_SUCCESS);
+
+		vkResetFences(m_pDevice->_dev, 1, &m_fence);
+
+		// Reset so it can be reused
+		VkCommandBufferBeginInfo cmd_buf_info = {};
+		cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		res = vkBeginCommandBuffer(m_pCommandBuffer, &cmd_buf_info);
+		assert(res == VK_SUCCESS);
+
+		m_pDataCur = m_pDataBegin;
+
+		flushing.Dec();
+	}
+
+#endif // 1
+	// 纹理
 
 
 
@@ -3834,10 +5256,10 @@ namespace vkg {
 		free_devinfo(d);
 	}
 
-	void cxDevice::set_device(void* dev, void* q)
+	void cxDevice::set_device(void* dev, uint32_t idx)
 	{
 		_dev = (VkDevice)dev;
-		_queue = (VkQueue)q;
+		_queue_family_index = idx;
 		//assert(_dev && _queue);
 		CreatePipelineCache();
 	}
@@ -4050,7 +5472,7 @@ namespace vkg {
 			if (d && d->_device)
 			{
 				c->d = d;
-				c->set_device(d->_device, 0);
+				c->set_device(d->_device, d->_queue_family_index);
 			}
 			else {
 				delete c;
