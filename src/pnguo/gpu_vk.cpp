@@ -77,6 +77,8 @@ typedef uint32_t DXGI_FORMAT;
 #include <event.h>
 #include <print_time.h>
 #include <mapView.h>
+#include <stb_image.h>
+
 
 #include "vkrh.h"
 #include "gpu_vk.h"
@@ -234,6 +236,25 @@ namespace vkg {
 	template<typename T>
 	class Cache;
 
+	class Sync
+	{
+		int m_count = 0;
+		std::mutex m_mutex;
+		std::condition_variable condition;
+	public:
+		Sync();
+		~Sync();
+		int Inc();
+
+		int Dec();
+
+		int Get();
+
+		void Reset();
+
+		void Wait();
+
+	};
 
 #if 1
 	/*
@@ -453,6 +474,8 @@ namespace vkg {
 	class Ring
 	{
 	public:
+		Ring() {}
+		~Ring() {}
 		void Create(uint32_t TotalSize)
 		{
 			m_Head = 0;
@@ -508,7 +531,8 @@ namespace vkg {
 	class RingWithTabs
 	{
 	public:
-
+		RingWithTabs() {}
+		~RingWithTabs() {}
 		void OnCreate(uint32_t numberOfBackBuffers, uint32_t memTotalSize)
 		{
 			m_backBufferIndex = 0;
@@ -574,6 +598,8 @@ namespace vkg {
 	class buffer_ring_cx
 	{
 	public:
+		buffer_ring_cx() {}
+		~buffer_ring_cx() {}
 		VkResult OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, uint32_t memTotalSize, char* name = NULL);
 		void OnDestroy();
 		bool AllocConstantBuffer(uint32_t size, void** pData, VkDescriptorBufferInfo* pOut);
@@ -602,6 +628,8 @@ namespace vkg {
 	class static_buffer_pool_cx
 	{
 	public:
+		static_buffer_pool_cx() {}
+		~static_buffer_pool_cx() {}
 		VkResult OnCreate(cxDevice* pDevice, uint32_t totalMemSize, bool bUseVidMem, const char* name);
 		void OnDestroy();
 		// 分配IB/VB, 返回descriptor、pData
@@ -646,6 +674,8 @@ namespace vkg {
 
 		std::mutex m_mutex;
 	public:
+		UploadHeap() {}
+		~UploadHeap() {}
 		void OnCreate(cxDevice* pDevice, SIZE_T uSize);
 		void OnDestroy();
 
@@ -709,6 +739,7 @@ namespace vkg {
 	class DDSLoader : public ImgLoader
 	{
 	public:
+		DDSLoader();
 		~DDSLoader();
 		bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo);
 		// after calling Load, calls to CopyPixels return each time a lower mip level 
@@ -725,6 +756,7 @@ namespace vkg {
 	class WICLoader : public ImgLoader
 	{
 	public:
+		WICLoader();
 		~WICLoader();
 		bool Load(const char* pFilename, float cutOff, IMG_INFO* pInfo);
 		// after calling Load, calls to CopyPixels return each time a lower mip level 
@@ -845,49 +877,43 @@ namespace vkg {
 		return (a + b - (T)1) / b;
 	}
 
-	class Sync
+	Sync::Sync() {}
+	Sync::~Sync() {}
+	int Sync::Inc()
 	{
-		int m_count = 0;
-		std::mutex m_mutex;
-		std::condition_variable condition;
-	public:
-		int Inc()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count++;
-			return m_count;
-		}
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_count++;
+		return m_count;
+	}
 
-		int Dec()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count--;
-			if (m_count == 0)
-				condition.notify_all();
-			return m_count;
-		}
-
-		int Get()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			return m_count;
-		}
-
-		void Reset()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			m_count = 0;
+	int Sync::Dec()
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_count--;
+		if (m_count == 0)
 			condition.notify_all();
-		}
+		return m_count;
+	}
 
-		void Wait()
-		{
-			std::unique_lock<std::mutex> lock(m_mutex);
-			while (m_count != 0)
-				condition.wait(lock);
-		}
+	int Sync::Get()
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+		return m_count;
+	}
 
-	};
+	void Sync::Reset()
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_count = 0;
+		condition.notify_all();
+	}
+
+	void Sync::Wait()
+	{
+		std::unique_lock<std::mutex> lock(m_mutex);
+		while (m_count != 0)
+			condition.wait(lock);
+	}
 
 	template<typename T>
 	class Cache
@@ -1451,6 +1477,21 @@ namespace vkg {
 		}
 #endif
 		return pNext;
+	}
+	bool memory_type_from_properties(VkPhysicalDeviceMemoryProperties& memory_properties, uint32_t typeBits, VkFlags requirements_mask, uint32_t* typeIndex) {
+		// Search memtypes to find first index with those properties
+		for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
+			if ((typeBits & 1) == 1) {
+				// Type is available, does it match user properties?
+				if ((memory_properties.memoryTypes[i].propertyFlags & requirements_mask) == requirements_mask) {
+					*typeIndex = i;
+					return true;
+				}
+			}
+			typeBits >>= 1;
+		}
+		// No memory types matched, return failure
+		return false;
 	}
 	void get_qfp(VkPhysicalDevice physicalDevice, std::vector<VkQueueFamilyProperties>& queue_props)
 	{
@@ -3886,8 +3927,746 @@ namespace vkg {
 		}
 	}
 
-	// 纹理
+	// todo 纹理相关
 #if 1
+
+
+	VkFormat TranslateDxgiFormatIntoVulkans(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+		case DXGI_FORMAT_B8G8R8A8_UNORM: return VK_FORMAT_B8G8R8A8_UNORM;
+		case DXGI_FORMAT_R8G8B8A8_UNORM: return VK_FORMAT_R8G8B8A8_UNORM;
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return VK_FORMAT_B8G8R8A8_SRGB;
+		case DXGI_FORMAT_BC1_UNORM:         return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+		case DXGI_FORMAT_BC1_UNORM_SRGB:    return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
+		case DXGI_FORMAT_BC2_UNORM:         return VK_FORMAT_BC2_UNORM_BLOCK;
+		case DXGI_FORMAT_BC2_UNORM_SRGB:    return VK_FORMAT_BC2_SRGB_BLOCK;
+		case DXGI_FORMAT_BC3_UNORM:         return VK_FORMAT_BC3_UNORM_BLOCK;
+		case DXGI_FORMAT_BC3_UNORM_SRGB:    return VK_FORMAT_BC3_SRGB_BLOCK;
+		case DXGI_FORMAT_BC4_UNORM:         return VK_FORMAT_BC4_UNORM_BLOCK;
+		case DXGI_FORMAT_BC4_SNORM:         return VK_FORMAT_BC4_UNORM_BLOCK;
+		case DXGI_FORMAT_BC5_UNORM:         return VK_FORMAT_BC5_UNORM_BLOCK;
+		case DXGI_FORMAT_BC5_SNORM:         return VK_FORMAT_BC5_UNORM_BLOCK;
+		case DXGI_FORMAT_B5G6R5_UNORM:      return VK_FORMAT_B5G6R5_UNORM_PACK16;
+		case DXGI_FORMAT_B5G5R5A1_UNORM:    return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
+		case DXGI_FORMAT_BC6H_UF16:         return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+		case DXGI_FORMAT_BC6H_SF16:         return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+		case DXGI_FORMAT_BC7_UNORM:         return VK_FORMAT_BC7_UNORM_BLOCK;
+		case DXGI_FORMAT_BC7_UNORM_SRGB:    return VK_FORMAT_BC7_SRGB_BLOCK;
+		case DXGI_FORMAT_R10G10B10A2_UNORM: return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+		case DXGI_FORMAT_R16G16B16A16_FLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
+		case DXGI_FORMAT_R32G32B32A32_FLOAT: return VK_FORMAT_R32G32B32A32_SFLOAT;
+		case DXGI_FORMAT_A8_UNORM:          return VK_FORMAT_R8_UNORM;
+		default: assert(false);  return VK_FORMAT_UNDEFINED;
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	// Return the BPP for a particular format
+	//--------------------------------------------------------------------------------------
+	size_t BitsPerPixel(DXGI_FORMAT fmt)
+	{
+		switch (fmt)
+		{
+		case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+		case DXGI_FORMAT_R32G32B32A32_FLOAT:
+		case DXGI_FORMAT_R32G32B32A32_UINT:
+		case DXGI_FORMAT_R32G32B32A32_SINT:
+			return 128;
+
+		case DXGI_FORMAT_R32G32B32_TYPELESS:
+		case DXGI_FORMAT_R32G32B32_FLOAT:
+		case DXGI_FORMAT_R32G32B32_UINT:
+		case DXGI_FORMAT_R32G32B32_SINT:
+			return 96;
+
+		case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+		case DXGI_FORMAT_R16G16B16A16_FLOAT:
+		case DXGI_FORMAT_R16G16B16A16_UNORM:
+		case DXGI_FORMAT_R16G16B16A16_UINT:
+		case DXGI_FORMAT_R16G16B16A16_SNORM:
+		case DXGI_FORMAT_R16G16B16A16_SINT:
+		case DXGI_FORMAT_R32G32_TYPELESS:
+		case DXGI_FORMAT_R32G32_FLOAT:
+		case DXGI_FORMAT_R32G32_UINT:
+		case DXGI_FORMAT_R32G32_SINT:
+		case DXGI_FORMAT_R32G8X24_TYPELESS:
+		case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+		case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+		case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+		case DXGI_FORMAT_Y416:
+		case DXGI_FORMAT_Y210:
+		case DXGI_FORMAT_Y216:
+			return 64;
+
+		case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+		case DXGI_FORMAT_R10G10B10A2_UNORM:
+		case DXGI_FORMAT_R10G10B10A2_UINT:
+		case DXGI_FORMAT_R11G11B10_FLOAT:
+		case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+		case DXGI_FORMAT_R8G8B8A8_UNORM:
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+		case DXGI_FORMAT_R8G8B8A8_UINT:
+		case DXGI_FORMAT_R8G8B8A8_SNORM:
+		case DXGI_FORMAT_R8G8B8A8_SINT:
+		case DXGI_FORMAT_R16G16_TYPELESS:
+		case DXGI_FORMAT_R16G16_FLOAT:
+		case DXGI_FORMAT_R16G16_UNORM:
+		case DXGI_FORMAT_R16G16_UINT:
+		case DXGI_FORMAT_R16G16_SNORM:
+		case DXGI_FORMAT_R16G16_SINT:
+		case DXGI_FORMAT_R32_TYPELESS:
+		case DXGI_FORMAT_D32_FLOAT:
+		case DXGI_FORMAT_R32_FLOAT:
+		case DXGI_FORMAT_R32_UINT:
+		case DXGI_FORMAT_R32_SINT:
+		case DXGI_FORMAT_R24G8_TYPELESS:
+		case DXGI_FORMAT_D24_UNORM_S8_UINT:
+		case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+		case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+		case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
+		case DXGI_FORMAT_R8G8_B8G8_UNORM:
+		case DXGI_FORMAT_G8R8_G8B8_UNORM:
+		case DXGI_FORMAT_B8G8R8A8_UNORM:
+		case DXGI_FORMAT_B8G8R8X8_UNORM:
+		case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+		case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+		case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+		case DXGI_FORMAT_AYUV:
+		case DXGI_FORMAT_Y410:
+		case DXGI_FORMAT_YUY2:
+			return 32;
+
+		case DXGI_FORMAT_P010:
+		case DXGI_FORMAT_P016:
+			return 24;
+
+		case DXGI_FORMAT_R8G8_TYPELESS:
+		case DXGI_FORMAT_R8G8_UNORM:
+		case DXGI_FORMAT_R8G8_UINT:
+		case DXGI_FORMAT_R8G8_SNORM:
+		case DXGI_FORMAT_R8G8_SINT:
+		case DXGI_FORMAT_R16_TYPELESS:
+		case DXGI_FORMAT_R16_FLOAT:
+		case DXGI_FORMAT_D16_UNORM:
+		case DXGI_FORMAT_R16_UNORM:
+		case DXGI_FORMAT_R16_UINT:
+		case DXGI_FORMAT_R16_SNORM:
+		case DXGI_FORMAT_R16_SINT:
+		case DXGI_FORMAT_B5G6R5_UNORM:
+		case DXGI_FORMAT_B5G5R5A1_UNORM:
+		case DXGI_FORMAT_A8P8:
+		case DXGI_FORMAT_B4G4R4A4_UNORM:
+			return 16;
+
+		case DXGI_FORMAT_NV12:
+		case DXGI_FORMAT_420_OPAQUE:
+		case DXGI_FORMAT_NV11:
+			return 12;
+
+		case DXGI_FORMAT_R8_TYPELESS:
+		case DXGI_FORMAT_R8_UNORM:
+		case DXGI_FORMAT_R8_UINT:
+		case DXGI_FORMAT_R8_SNORM:
+		case DXGI_FORMAT_R8_SINT:
+		case DXGI_FORMAT_A8_UNORM:
+		case DXGI_FORMAT_AI44:
+		case DXGI_FORMAT_IA44:
+		case DXGI_FORMAT_P8:
+			return 8;
+
+		case DXGI_FORMAT_BC2_TYPELESS:
+		case DXGI_FORMAT_BC2_UNORM:
+		case DXGI_FORMAT_BC2_UNORM_SRGB:
+		case DXGI_FORMAT_BC3_TYPELESS:
+		case DXGI_FORMAT_BC3_UNORM:
+		case DXGI_FORMAT_BC3_UNORM_SRGB:
+		case DXGI_FORMAT_BC5_TYPELESS:
+		case DXGI_FORMAT_BC5_UNORM:
+		case DXGI_FORMAT_BC5_SNORM:
+		case DXGI_FORMAT_BC6H_TYPELESS:
+		case DXGI_FORMAT_BC6H_UF16:
+		case DXGI_FORMAT_BC6H_SF16:
+		case DXGI_FORMAT_BC7_TYPELESS:
+		case DXGI_FORMAT_BC7_UNORM:
+		case DXGI_FORMAT_BC7_UNORM_SRGB:
+			return 8;
+
+		case DXGI_FORMAT_BC1_TYPELESS:
+		case DXGI_FORMAT_BC1_UNORM:
+		case DXGI_FORMAT_BC1_UNORM_SRGB:
+		case DXGI_FORMAT_BC4_TYPELESS:
+		case DXGI_FORMAT_BC4_UNORM:
+		case DXGI_FORMAT_BC4_SNORM:
+			return 4;
+
+		case DXGI_FORMAT_R1_UNORM:
+			return 1;
+
+		default:
+			return 0;
+		}
+	}
+
+	//--------------------------------------------------------------------------------------
+	// return the byte size of a pixel (or block if block compressed)
+	//--------------------------------------------------------------------------------------
+	size_t GetPixelByteSize(DXGI_FORMAT fmt)
+	{
+		switch (fmt)
+		{
+		case(DXGI_FORMAT_A8_UNORM):
+			return 1;
+
+		case(DXGI_FORMAT_R10G10B10A2_TYPELESS):
+		case(DXGI_FORMAT_R10G10B10A2_UNORM):
+		case(DXGI_FORMAT_R10G10B10A2_UINT):
+		case(DXGI_FORMAT_R11G11B10_FLOAT):
+		case(DXGI_FORMAT_R8G8B8A8_TYPELESS):
+		case(DXGI_FORMAT_R8G8B8A8_UNORM):
+		case(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB):
+		case(DXGI_FORMAT_R8G8B8A8_UINT):
+		case(DXGI_FORMAT_R8G8B8A8_SNORM):
+		case(DXGI_FORMAT_R8G8B8A8_SINT):
+		case(DXGI_FORMAT_B8G8R8A8_UNORM):
+		case(DXGI_FORMAT_B8G8R8X8_UNORM):
+		case(DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM):
+		case(DXGI_FORMAT_B8G8R8A8_TYPELESS):
+		case(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB):
+		case(DXGI_FORMAT_B8G8R8X8_TYPELESS):
+		case(DXGI_FORMAT_B8G8R8X8_UNORM_SRGB):
+		case(DXGI_FORMAT_R16G16_TYPELESS):
+		case(DXGI_FORMAT_R16G16_FLOAT):
+		case(DXGI_FORMAT_R16G16_UNORM):
+		case(DXGI_FORMAT_R16G16_UINT):
+		case(DXGI_FORMAT_R16G16_SNORM):
+		case(DXGI_FORMAT_R16G16_SINT):
+		case(DXGI_FORMAT_R32_TYPELESS):
+		case(DXGI_FORMAT_D32_FLOAT):
+		case(DXGI_FORMAT_R32_FLOAT):
+		case(DXGI_FORMAT_R32_UINT):
+		case(DXGI_FORMAT_R32_SINT):
+			return 4;
+
+		case(DXGI_FORMAT_BC1_TYPELESS):
+		case(DXGI_FORMAT_BC1_UNORM):
+		case(DXGI_FORMAT_BC1_UNORM_SRGB):
+		case(DXGI_FORMAT_BC4_TYPELESS):
+		case(DXGI_FORMAT_BC4_UNORM):
+		case(DXGI_FORMAT_BC4_SNORM):
+		case(DXGI_FORMAT_R16G16B16A16_FLOAT):
+		case(DXGI_FORMAT_R16G16B16A16_TYPELESS):
+			return 8;
+
+		case(DXGI_FORMAT_BC2_TYPELESS):
+		case(DXGI_FORMAT_BC2_UNORM):
+		case(DXGI_FORMAT_BC2_UNORM_SRGB):
+		case(DXGI_FORMAT_BC3_TYPELESS):
+		case(DXGI_FORMAT_BC3_UNORM):
+		case(DXGI_FORMAT_BC3_UNORM_SRGB):
+		case(DXGI_FORMAT_BC5_TYPELESS):
+		case(DXGI_FORMAT_BC5_UNORM):
+		case(DXGI_FORMAT_BC5_SNORM):
+		case(DXGI_FORMAT_BC6H_TYPELESS):
+		case(DXGI_FORMAT_BC6H_UF16):
+		case(DXGI_FORMAT_BC6H_SF16):
+		case(DXGI_FORMAT_BC7_TYPELESS):
+		case(DXGI_FORMAT_BC7_UNORM):
+		case(DXGI_FORMAT_BC7_UNORM_SRGB):
+		case(DXGI_FORMAT_R32G32B32A32_FLOAT):
+		case(DXGI_FORMAT_R32G32B32A32_TYPELESS):
+			return 16;
+
+		default:
+			assert(0);
+			break;
+		}
+		return 0;
+	}
+
+
+
+	//--------------------------------------------------------------------------------------
+	// Convert a *_SRGB format into a non-gamma one
+	//--------------------------------------------------------------------------------------
+	DXGI_FORMAT ConvertIntoNonGammaFormat(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8A8_UNORM;
+		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8X8_UNORM;
+		case DXGI_FORMAT_BC1_UNORM_SRGB: return DXGI_FORMAT_BC1_UNORM;
+		case DXGI_FORMAT_BC2_UNORM_SRGB: return DXGI_FORMAT_BC2_UNORM;
+		case DXGI_FORMAT_BC3_UNORM_SRGB: return DXGI_FORMAT_BC3_UNORM;
+		case DXGI_FORMAT_BC7_UNORM_SRGB: return DXGI_FORMAT_BC7_UNORM;
+		}
+
+		return format;
+	}
+
+	DXGI_FORMAT ConvertIntoGammaFormat(DXGI_FORMAT format)
+	{
+		switch (format)
+		{
+		case DXGI_FORMAT_B8G8R8A8_UNORM: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+		case DXGI_FORMAT_R8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		case DXGI_FORMAT_B8G8R8X8_UNORM: return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
+		case DXGI_FORMAT_BC1_UNORM: return DXGI_FORMAT_BC1_UNORM_SRGB;
+		case DXGI_FORMAT_BC2_UNORM: return DXGI_FORMAT_BC2_UNORM_SRGB;
+		case DXGI_FORMAT_BC3_UNORM: return DXGI_FORMAT_BC3_UNORM_SRGB;
+		case DXGI_FORMAT_BC7_UNORM: return DXGI_FORMAT_BC7_UNORM_SRGB;
+		}
+
+		return format;
+	}
+
+	DXGI_FORMAT SetFormatGamma(DXGI_FORMAT format, bool addGamma)
+	{
+		if (addGamma)
+		{
+			format = ConvertIntoGammaFormat(format);
+		}
+		else
+		{
+			format = ConvertIntoNonGammaFormat(format);
+		}
+
+		return format;
+	}
+
+	bool IsBCFormat(DXGI_FORMAT format)
+	{
+		return (format >= DXGI_FORMAT_BC1_TYPELESS && format <= DXGI_FORMAT_BC5_SNORM) || (format >= DXGI_FORMAT_BC6H_TYPELESS && format <= DXGI_FORMAT_BC7_UNORM_SRGB);
+	}
+
+
+#ifdef USE_WIC
+#include "wincodec.h"
+	static IWICImagingFactory* m_pWICFactory = NULL;
+#endif
+
+	WICLoader::WICLoader()
+	{}
+	WICLoader::~WICLoader()
+	{
+		free(m_pData);
+	}
+
+	bool WICLoader::Load(const char* pFilename, float cutOff, IMG_INFO* pInfo)
+	{
+#ifdef USE_WIC
+		HRESULT hr = S_OK;
+
+		if (m_pWICFactory == NULL)
+		{
+			hr = CoInitialize(NULL);
+			assert(SUCCEEDED(hr));
+			hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pWICFactory));
+			assert(SUCCEEDED(hr));
+		}
+
+		IWICStream* pWicStream;
+		hr = m_pWICFactory->CreateStream(&pWicStream);
+		assert(SUCCEEDED(hr));
+
+		wchar_t  uniName[1024];
+		swprintf(uniName, 1024, L"%S", pFilename);
+		hr = pWicStream->InitializeFromFilename(uniName, GENERIC_READ);
+		//assert(hr == S_OK);
+		if (FAILED(hr))
+			return false;
+
+		IWICBitmapDecoder* pBitmapDecoder;
+		hr = m_pWICFactory->CreateDecoderFromStream(pWicStream, NULL, WICDecodeMetadataCacheOnDemand, &pBitmapDecoder);
+		assert(SUCCEEDED(hr));
+
+		IWICBitmapFrameDecode* pFrameDecode;
+		hr = pBitmapDecoder->GetFrame(0, &pFrameDecode);
+		assert(SUCCEEDED(hr));
+
+		IWICFormatConverter* pIFormatConverter;
+		hr = m_pWICFactory->CreateFormatConverter(&pIFormatConverter);
+		assert(SUCCEEDED(hr));
+
+		hr = pIFormatConverter->Initialize(pFrameDecode, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, NULL, 100.0, WICBitmapPaletteTypeCustom);
+		assert(SUCCEEDED(hr));
+
+		uint32_t width, height;
+		pFrameDecode->GetSize(&width, &height);
+		pFrameDecode->Release();
+
+		int bufferSize = width * height * 4;
+		m_pData = (char*)malloc(bufferSize);
+		hr = pIFormatConverter->CopyPixels(NULL, width * 4, bufferSize, (BYTE*)m_pData);
+		assert(SUCCEEDED(hr));
+#else
+		int32_t width, height, channels;
+		m_pData = (char*)stbi_load(pFilename, &width, &height, &channels, STBI_rgb_alpha);
+#endif
+
+		// compute number of mips
+		//
+		uint32_t mipWidth = width;
+		uint32_t mipHeight = height;
+		uint32_t mipCount = 0;
+		for (;;)
+		{
+			mipCount++;
+			if (mipWidth > 1) mipWidth >>= 1;
+			if (mipHeight > 1) mipHeight >>= 1;
+			if (mipWidth == 1 && mipHeight == 1)
+				break;
+		}
+
+		// fill img struct
+		//
+		pInfo->arraySize = 1;
+		pInfo->width = width;
+		pInfo->height = height;
+		pInfo->depth = 1;
+		pInfo->mipMapCount = mipCount;
+		pInfo->bitCount = 32;
+		pInfo->format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		// if there is a cut off, compute the alpha test coverage of the top mip
+		// mip generation will try to match this value so objects dont get thinner
+		// as they use lower mips
+		m_cutOff = cutOff;
+		if (m_cutOff < 1.0f)
+			m_alphaTestCoverage = GetAlphaCoverage(width, height, 1.0f, (int)(255 * m_cutOff));
+		else
+			m_alphaTestCoverage = 1.0f;
+
+#ifdef USE_WIC
+		pIFormatConverter->Release();
+		pBitmapDecoder->Release();
+		pWicStream->Release();
+#endif
+
+		return true;
+	}
+
+	void WICLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
+	{
+		for (uint32_t y = 0; y < height; y++)
+		{
+			memcpy((char*)pDest + y * stride, m_pData + y * bytesWidth, bytesWidth);
+		}
+
+		MipImage(bytesWidth / 4, height);
+	}
+
+	float WICLoader::GetAlphaCoverage(uint32_t width, uint32_t height, float scale, int cutoff) const
+	{
+		double val = 0;
+
+		uint32_t* pImg = (uint32_t*)m_pData;
+
+		for (uint32_t y = 0; y < height; y++)
+		{
+			for (uint32_t x = 0; x < width; x++)
+			{
+				uint8_t* pPixel = (uint8_t*)pImg++;
+
+				int alpha = (int)(scale * (float)pPixel[3]);
+				if (alpha > 255) alpha = 255;
+				if (alpha <= cutoff)
+					continue;
+
+				val += alpha;
+			}
+		}
+
+		return (float)(val / (height * width * 255));
+	}
+
+	void WICLoader::ScaleAlpha(uint32_t width, uint32_t height, float scale)
+	{
+		uint32_t* pImg = (uint32_t*)m_pData;
+
+		for (uint32_t y = 0; y < height; y++)
+		{
+			for (uint32_t x = 0; x < width; x++)
+			{
+				uint8_t* pPixel = (uint8_t*)pImg++;
+
+				int alpha = (int)(scale * (float)pPixel[3]);
+				if (alpha > 255) alpha = 255;
+
+				pPixel[3] = alpha;
+			}
+		}
+	}
+
+	void WICLoader::MipImage(uint32_t width, uint32_t height)
+	{
+		//compute mip so next call gets the lower mip
+		int offsetsX[] = { 0,1,0,1 };
+		int offsetsY[] = { 0,0,1,1 };
+
+		uint32_t* pImg = (uint32_t*)m_pData;
+
+#define GetByte(color, component) (((color) >> (8 * (component))) & 0xff)
+#define GetColor(ptr, x,y) (ptr[(x)+(y)*width])
+#define SetColor(ptr, x,y, col) ptr[(x)+(y)*width/2]=col;
+
+		for (uint32_t y = 0; y < height; y += 2)
+		{
+			for (uint32_t x = 0; x < width; x += 2)
+			{
+				uint32_t ccc = 0;
+				for (uint32_t c = 0; c < 4; c++)
+				{
+					uint32_t cc = 0;
+					for (uint32_t i = 0; i < 4; i++)
+						cc += GetByte(GetColor(pImg, x + offsetsX[i], y + offsetsY[i]), 3 - c);
+
+					ccc = (ccc << 8) | (cc / 4);
+				}
+				SetColor(pImg, x / 2, y / 2, ccc);
+			}
+		}
+
+
+		// For cutouts we need to scale the alpha channel to match the coverage of the top MIP map
+		// otherwise cutouts seem to get thinner when smaller mips are used
+		// Credits: http://www.ludicon.com/castano/blog/articles/computing-alpha-mipmaps/    
+		if (m_alphaTestCoverage < 1.0)
+		{
+			float ini = 0;
+			float fin = 10;
+			float mid;
+			float alphaPercentage;
+			int iter = 0;
+			for (; iter < 50; iter++)
+			{
+				mid = (ini + fin) / 2;
+				alphaPercentage = GetAlphaCoverage(width / 2, height / 2, mid, (int)(m_cutOff * 255));
+
+				if (fabs(alphaPercentage - m_alphaTestCoverage) < .001)
+					break;
+
+				if (alphaPercentage > m_alphaTestCoverage)
+					fin = mid;
+				if (alphaPercentage < m_alphaTestCoverage)
+					ini = mid;
+			}
+			ScaleAlpha(width / 2, height / 2, mid);
+			//Trace(format("(%4i x %4i), %f, %f, %i\n", width, height, alphaPercentage, 1.0f, 0));       
+		}
+
+	}
+
+	struct DDS_PIXELFORMAT
+	{
+		UINT32 size;
+		UINT32 flags;
+		UINT32 fourCC;
+		UINT32 bitCount;
+		UINT32 bitMaskR;
+		UINT32 bitMaskG;
+		UINT32 bitMaskB;
+		UINT32 bitMaskA;
+	};
+
+	struct DDS_HEADER
+	{
+
+		UINT32       dwSize;
+		UINT32       dwHeaderFlags;
+		UINT32       dwHeight;
+		UINT32       dwWidth;
+		UINT32       dwPitchOrLinearSize;
+		UINT32       dwDepth;
+		UINT32       dwMipMapCount;
+		UINT32       dwReserved1[11];
+		DDS_PIXELFORMAT ddspf;
+		UINT32       dwSurfaceFlags;
+		UINT32       dwCubemapFlags;
+		UINT32       dwCaps3;
+		UINT32       dwCaps4;
+		UINT32       dwReserved2;
+	};
+
+	//--------------------------------------------------------------------------------------
+	// retrieve the GetDxgiFormat from a DDS_PIXELFORMAT
+	//--------------------------------------------------------------------------------------
+	static DXGI_FORMAT GetDxgiFormat(DDS_PIXELFORMAT pixelFmt)
+	{
+		if (pixelFmt.flags & 0x00000004)   //DDPF_FOURCC
+		{
+			// Check for D3DFORMAT enums being set here
+			switch (pixelFmt.fourCC)
+			{
+			case '1TXD':         return DXGI_FORMAT_BC1_UNORM;
+			case '3TXD':         return DXGI_FORMAT_BC2_UNORM;
+			case '5TXD':         return DXGI_FORMAT_BC3_UNORM;
+			case 'U4CB':         return DXGI_FORMAT_BC4_UNORM;
+			case 'A4CB':         return DXGI_FORMAT_BC4_SNORM;
+			case '2ITA':         return DXGI_FORMAT_BC5_UNORM;
+			case 'S5CB':         return DXGI_FORMAT_BC5_SNORM;
+			case 'GBGR':         return DXGI_FORMAT_R8G8_B8G8_UNORM;
+			case 'BGRG':         return DXGI_FORMAT_G8R8_G8B8_UNORM;
+			case 36:             return DXGI_FORMAT_R16G16B16A16_UNORM;
+			case 110:            return DXGI_FORMAT_R16G16B16A16_SNORM;
+			case 111:            return DXGI_FORMAT_R16_FLOAT;
+			case 112:            return DXGI_FORMAT_R16G16_FLOAT;
+			case 113:            return DXGI_FORMAT_R16G16B16A16_FLOAT;
+			case 114:            return DXGI_FORMAT_R32_FLOAT;
+			case 115:            return DXGI_FORMAT_R32G32_FLOAT;
+			case 116:            return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			default:             return DXGI_FORMAT_UNKNOWN;
+			}
+		}
+		else
+		{
+			switch (pixelFmt.bitMaskR)
+			{
+			case 0xff:        return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case 0x00ff0000:  return DXGI_FORMAT_B8G8R8A8_UNORM;
+			case 0xffff:      return DXGI_FORMAT_R16G16_UNORM;
+			case 0x3ff:       return DXGI_FORMAT_R10G10B10A2_UNORM;
+			case 0x7c00:      return DXGI_FORMAT_B5G5R5A1_UNORM;
+			case 0xf800:      return DXGI_FORMAT_B5G6R5_UNORM;
+			case 0:           return DXGI_FORMAT_A8_UNORM;
+			default:          return DXGI_FORMAT_UNKNOWN;
+			};
+		}
+	}
+
+	DDSLoader::DDSLoader()
+	{}
+	DDSLoader::~DDSLoader()
+	{
+#ifdef _WIN32
+		if (m_handle != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(m_handle);
+		}
+#endif
+	}
+
+	bool DDSLoader::Load(const char* pFilename, float cutOff, IMG_INFO* pInfo)
+	{
+		typedef enum RESOURCE_DIMENSION
+		{
+			RESOURCE_DIMENSION_UNKNOWN = 0,
+			RESOURCE_DIMENSION_BUFFER = 1,
+			RESOURCE_DIMENSION_TEXTURE1D = 2,
+			RESOURCE_DIMENSION_TEXTURE2D = 3,
+			RESOURCE_DIMENSION_TEXTURE3D = 4
+		} RESOURCE_DIMENSION;
+
+		typedef struct
+		{
+			DXGI_FORMAT      dxgiFormat;
+			RESOURCE_DIMENSION  resourceDimension;
+			UINT32           miscFlag;
+			UINT32           arraySize;
+			UINT32           reserved;
+		} DDS_HEADER_DXT10;
+
+#ifdef _WIN32
+		if (GetFileAttributesA(pFilename) == 0xFFFFFFFF)
+			return false;
+
+		m_handle = CreateFileA(pFilename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (m_handle == INVALID_HANDLE_VALUE)
+		{
+			return false;
+		}
+
+		LARGE_INTEGER largeFileSize;
+		GetFileSizeEx(m_handle, &largeFileSize);
+		assert(0 == largeFileSize.HighPart);
+		UINT32 fileSize = largeFileSize.LowPart;
+		UINT32 rawTextureSize = fileSize;
+
+		// read the header
+		char headerData[4 + sizeof(DDS_HEADER) + sizeof(DDS_HEADER_DXT10)];
+		DWORD dwBytesRead = 0;
+		if (::ReadFile(m_handle, headerData, 4 + sizeof(DDS_HEADER) + sizeof(DDS_HEADER_DXT10), &dwBytesRead, NULL))
+		{
+			char* pByteData = headerData;
+			UINT32 dwMagic = *reinterpret_cast<UINT32*>(pByteData);
+			if (dwMagic != ' SDD')   // "DDS "
+			{
+				return false;
+			}
+
+			pByteData += 4;
+			rawTextureSize -= 4;
+
+			DDS_HEADER* header = reinterpret_cast<DDS_HEADER*>(pByteData);
+			pByteData += sizeof(DDS_HEADER);
+			rawTextureSize -= sizeof(DDS_HEADER);
+
+			pInfo->width = header->dwWidth;
+			pInfo->height = header->dwHeight;
+			pInfo->depth = header->dwDepth ? header->dwDepth : 1;
+			pInfo->mipMapCount = header->dwMipMapCount ? header->dwMipMapCount : 1;
+
+			if (header->ddspf.fourCC == '01XD')
+			{
+				DDS_HEADER_DXT10* header10 = reinterpret_cast<DDS_HEADER_DXT10*>((char*)header + sizeof(DDS_HEADER));
+				rawTextureSize -= sizeof(DDS_HEADER_DXT10);
+
+				pInfo->arraySize = header10->arraySize;
+				pInfo->format = header10->dxgiFormat;
+				pInfo->bitCount = header->ddspf.bitCount;
+			}
+			else
+			{
+				pInfo->arraySize = (header->dwCubemapFlags == 0xfe00) ? 6 : 1;
+				pInfo->format = GetDxgiFormat(header->ddspf);
+				pInfo->bitCount = (UINT32)BitsPerPixel(pInfo->format);
+			}
+		}
+
+		SetFilePointer(m_handle, fileSize - rawTextureSize, 0, FILE_BEGIN);
+#endif
+		return true;
+	}
+
+	void DDSLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
+	{
+#ifdef _WIN32
+		assert(m_handle != INVALID_HANDLE_VALUE);
+		for (uint32_t y = 0; y < height; y++)
+		{
+			::ReadFile(m_handle, (char*)pDest + y * stride, bytesWidth, NULL, NULL);
+		}
+#endif
+	}
+
+	ImgLoader* CreateImageLoader(const char* pFilename)
+	{
+		// get the last 4 char (assuming this is the file extension)
+		size_t len = strlen(pFilename);
+		const char* ext = pFilename + (len - 4);
+		if (_stricmp(ext, ".dds") == 0)
+		{
+			return new DDSLoader();
+		}
+		else
+		{
+			return new WICLoader();
+		}
+	}
+
+
+
+
+
+
+
+
+
 	Texture::Texture() {}
 
 	//--------------------------------------------------------------------------------------
@@ -4524,318 +5303,6 @@ namespace vkg {
 		return true;
 	}
 
-	VkFormat TranslateDxgiFormatIntoVulkans(DXGI_FORMAT format)
-	{
-		switch (format)
-		{
-		case DXGI_FORMAT_B8G8R8A8_UNORM: return VK_FORMAT_B8G8R8A8_UNORM;
-		case DXGI_FORMAT_R8G8B8A8_UNORM: return VK_FORMAT_R8G8B8A8_UNORM;
-		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
-		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return VK_FORMAT_B8G8R8A8_SRGB;
-		case DXGI_FORMAT_BC1_UNORM:         return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
-		case DXGI_FORMAT_BC1_UNORM_SRGB:    return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
-		case DXGI_FORMAT_BC2_UNORM:         return VK_FORMAT_BC2_UNORM_BLOCK;
-		case DXGI_FORMAT_BC2_UNORM_SRGB:    return VK_FORMAT_BC2_SRGB_BLOCK;
-		case DXGI_FORMAT_BC3_UNORM:         return VK_FORMAT_BC3_UNORM_BLOCK;
-		case DXGI_FORMAT_BC3_UNORM_SRGB:    return VK_FORMAT_BC3_SRGB_BLOCK;
-		case DXGI_FORMAT_BC4_UNORM:         return VK_FORMAT_BC4_UNORM_BLOCK;
-		case DXGI_FORMAT_BC4_SNORM:         return VK_FORMAT_BC4_UNORM_BLOCK;
-		case DXGI_FORMAT_BC5_UNORM:         return VK_FORMAT_BC5_UNORM_BLOCK;
-		case DXGI_FORMAT_BC5_SNORM:         return VK_FORMAT_BC5_UNORM_BLOCK;
-		case DXGI_FORMAT_B5G6R5_UNORM:      return VK_FORMAT_B5G6R5_UNORM_PACK16;
-		case DXGI_FORMAT_B5G5R5A1_UNORM:    return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
-		case DXGI_FORMAT_BC6H_UF16:         return VK_FORMAT_BC6H_UFLOAT_BLOCK;
-		case DXGI_FORMAT_BC6H_SF16:         return VK_FORMAT_BC6H_SFLOAT_BLOCK;
-		case DXGI_FORMAT_BC7_UNORM:         return VK_FORMAT_BC7_UNORM_BLOCK;
-		case DXGI_FORMAT_BC7_UNORM_SRGB:    return VK_FORMAT_BC7_SRGB_BLOCK;
-		case DXGI_FORMAT_R10G10B10A2_UNORM: return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
-		case DXGI_FORMAT_R16G16B16A16_FLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
-		case DXGI_FORMAT_R32G32B32A32_FLOAT: return VK_FORMAT_R32G32B32A32_SFLOAT;
-		case DXGI_FORMAT_A8_UNORM:          return VK_FORMAT_R8_UNORM;
-		default: assert(false);  return VK_FORMAT_UNDEFINED;
-		}
-	}
-
-	//--------------------------------------------------------------------------------------
-	// Return the BPP for a particular format
-	//--------------------------------------------------------------------------------------
-	size_t BitsPerPixel(DXGI_FORMAT fmt)
-	{
-		switch (fmt)
-		{
-		case DXGI_FORMAT_R32G32B32A32_TYPELESS:
-		case DXGI_FORMAT_R32G32B32A32_FLOAT:
-		case DXGI_FORMAT_R32G32B32A32_UINT:
-		case DXGI_FORMAT_R32G32B32A32_SINT:
-			return 128;
-
-		case DXGI_FORMAT_R32G32B32_TYPELESS:
-		case DXGI_FORMAT_R32G32B32_FLOAT:
-		case DXGI_FORMAT_R32G32B32_UINT:
-		case DXGI_FORMAT_R32G32B32_SINT:
-			return 96;
-
-		case DXGI_FORMAT_R16G16B16A16_TYPELESS:
-		case DXGI_FORMAT_R16G16B16A16_FLOAT:
-		case DXGI_FORMAT_R16G16B16A16_UNORM:
-		case DXGI_FORMAT_R16G16B16A16_UINT:
-		case DXGI_FORMAT_R16G16B16A16_SNORM:
-		case DXGI_FORMAT_R16G16B16A16_SINT:
-		case DXGI_FORMAT_R32G32_TYPELESS:
-		case DXGI_FORMAT_R32G32_FLOAT:
-		case DXGI_FORMAT_R32G32_UINT:
-		case DXGI_FORMAT_R32G32_SINT:
-		case DXGI_FORMAT_R32G8X24_TYPELESS:
-		case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
-		case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-		case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
-		case DXGI_FORMAT_Y416:
-		case DXGI_FORMAT_Y210:
-		case DXGI_FORMAT_Y216:
-			return 64;
-
-		case DXGI_FORMAT_R10G10B10A2_TYPELESS:
-		case DXGI_FORMAT_R10G10B10A2_UNORM:
-		case DXGI_FORMAT_R10G10B10A2_UINT:
-		case DXGI_FORMAT_R11G11B10_FLOAT:
-		case DXGI_FORMAT_R8G8B8A8_TYPELESS:
-		case DXGI_FORMAT_R8G8B8A8_UNORM:
-		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-		case DXGI_FORMAT_R8G8B8A8_UINT:
-		case DXGI_FORMAT_R8G8B8A8_SNORM:
-		case DXGI_FORMAT_R8G8B8A8_SINT:
-		case DXGI_FORMAT_R16G16_TYPELESS:
-		case DXGI_FORMAT_R16G16_FLOAT:
-		case DXGI_FORMAT_R16G16_UNORM:
-		case DXGI_FORMAT_R16G16_UINT:
-		case DXGI_FORMAT_R16G16_SNORM:
-		case DXGI_FORMAT_R16G16_SINT:
-		case DXGI_FORMAT_R32_TYPELESS:
-		case DXGI_FORMAT_D32_FLOAT:
-		case DXGI_FORMAT_R32_FLOAT:
-		case DXGI_FORMAT_R32_UINT:
-		case DXGI_FORMAT_R32_SINT:
-		case DXGI_FORMAT_R24G8_TYPELESS:
-		case DXGI_FORMAT_D24_UNORM_S8_UINT:
-		case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
-		case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
-		case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
-		case DXGI_FORMAT_R8G8_B8G8_UNORM:
-		case DXGI_FORMAT_G8R8_G8B8_UNORM:
-		case DXGI_FORMAT_B8G8R8A8_UNORM:
-		case DXGI_FORMAT_B8G8R8X8_UNORM:
-		case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
-		case DXGI_FORMAT_B8G8R8A8_TYPELESS:
-		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
-		case DXGI_FORMAT_B8G8R8X8_TYPELESS:
-		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
-		case DXGI_FORMAT_AYUV:
-		case DXGI_FORMAT_Y410:
-		case DXGI_FORMAT_YUY2:
-			return 32;
-
-		case DXGI_FORMAT_P010:
-		case DXGI_FORMAT_P016:
-			return 24;
-
-		case DXGI_FORMAT_R8G8_TYPELESS:
-		case DXGI_FORMAT_R8G8_UNORM:
-		case DXGI_FORMAT_R8G8_UINT:
-		case DXGI_FORMAT_R8G8_SNORM:
-		case DXGI_FORMAT_R8G8_SINT:
-		case DXGI_FORMAT_R16_TYPELESS:
-		case DXGI_FORMAT_R16_FLOAT:
-		case DXGI_FORMAT_D16_UNORM:
-		case DXGI_FORMAT_R16_UNORM:
-		case DXGI_FORMAT_R16_UINT:
-		case DXGI_FORMAT_R16_SNORM:
-		case DXGI_FORMAT_R16_SINT:
-		case DXGI_FORMAT_B5G6R5_UNORM:
-		case DXGI_FORMAT_B5G5R5A1_UNORM:
-		case DXGI_FORMAT_A8P8:
-		case DXGI_FORMAT_B4G4R4A4_UNORM:
-			return 16;
-
-		case DXGI_FORMAT_NV12:
-		case DXGI_FORMAT_420_OPAQUE:
-		case DXGI_FORMAT_NV11:
-			return 12;
-
-		case DXGI_FORMAT_R8_TYPELESS:
-		case DXGI_FORMAT_R8_UNORM:
-		case DXGI_FORMAT_R8_UINT:
-		case DXGI_FORMAT_R8_SNORM:
-		case DXGI_FORMAT_R8_SINT:
-		case DXGI_FORMAT_A8_UNORM:
-		case DXGI_FORMAT_AI44:
-		case DXGI_FORMAT_IA44:
-		case DXGI_FORMAT_P8:
-			return 8;
-
-		case DXGI_FORMAT_BC2_TYPELESS:
-		case DXGI_FORMAT_BC2_UNORM:
-		case DXGI_FORMAT_BC2_UNORM_SRGB:
-		case DXGI_FORMAT_BC3_TYPELESS:
-		case DXGI_FORMAT_BC3_UNORM:
-		case DXGI_FORMAT_BC3_UNORM_SRGB:
-		case DXGI_FORMAT_BC5_TYPELESS:
-		case DXGI_FORMAT_BC5_UNORM:
-		case DXGI_FORMAT_BC5_SNORM:
-		case DXGI_FORMAT_BC6H_TYPELESS:
-		case DXGI_FORMAT_BC6H_UF16:
-		case DXGI_FORMAT_BC6H_SF16:
-		case DXGI_FORMAT_BC7_TYPELESS:
-		case DXGI_FORMAT_BC7_UNORM:
-		case DXGI_FORMAT_BC7_UNORM_SRGB:
-			return 8;
-
-		case DXGI_FORMAT_BC1_TYPELESS:
-		case DXGI_FORMAT_BC1_UNORM:
-		case DXGI_FORMAT_BC1_UNORM_SRGB:
-		case DXGI_FORMAT_BC4_TYPELESS:
-		case DXGI_FORMAT_BC4_UNORM:
-		case DXGI_FORMAT_BC4_SNORM:
-			return 4;
-
-		case DXGI_FORMAT_R1_UNORM:
-			return 1;
-
-		default:
-			return 0;
-		}
-	}
-
-	//--------------------------------------------------------------------------------------
-	// return the byte size of a pixel (or block if block compressed)
-	//--------------------------------------------------------------------------------------
-	size_t GetPixelByteSize(DXGI_FORMAT fmt)
-	{
-		switch (fmt)
-		{
-		case(DXGI_FORMAT_A8_UNORM):
-			return 1;
-
-		case(DXGI_FORMAT_R10G10B10A2_TYPELESS):
-		case(DXGI_FORMAT_R10G10B10A2_UNORM):
-		case(DXGI_FORMAT_R10G10B10A2_UINT):
-		case(DXGI_FORMAT_R11G11B10_FLOAT):
-		case(DXGI_FORMAT_R8G8B8A8_TYPELESS):
-		case(DXGI_FORMAT_R8G8B8A8_UNORM):
-		case(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB):
-		case(DXGI_FORMAT_R8G8B8A8_UINT):
-		case(DXGI_FORMAT_R8G8B8A8_SNORM):
-		case(DXGI_FORMAT_R8G8B8A8_SINT):
-		case(DXGI_FORMAT_B8G8R8A8_UNORM):
-		case(DXGI_FORMAT_B8G8R8X8_UNORM):
-		case(DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM):
-		case(DXGI_FORMAT_B8G8R8A8_TYPELESS):
-		case(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB):
-		case(DXGI_FORMAT_B8G8R8X8_TYPELESS):
-		case(DXGI_FORMAT_B8G8R8X8_UNORM_SRGB):
-		case(DXGI_FORMAT_R16G16_TYPELESS):
-		case(DXGI_FORMAT_R16G16_FLOAT):
-		case(DXGI_FORMAT_R16G16_UNORM):
-		case(DXGI_FORMAT_R16G16_UINT):
-		case(DXGI_FORMAT_R16G16_SNORM):
-		case(DXGI_FORMAT_R16G16_SINT):
-		case(DXGI_FORMAT_R32_TYPELESS):
-		case(DXGI_FORMAT_D32_FLOAT):
-		case(DXGI_FORMAT_R32_FLOAT):
-		case(DXGI_FORMAT_R32_UINT):
-		case(DXGI_FORMAT_R32_SINT):
-			return 4;
-
-		case(DXGI_FORMAT_BC1_TYPELESS):
-		case(DXGI_FORMAT_BC1_UNORM):
-		case(DXGI_FORMAT_BC1_UNORM_SRGB):
-		case(DXGI_FORMAT_BC4_TYPELESS):
-		case(DXGI_FORMAT_BC4_UNORM):
-		case(DXGI_FORMAT_BC4_SNORM):
-		case(DXGI_FORMAT_R16G16B16A16_FLOAT):
-		case(DXGI_FORMAT_R16G16B16A16_TYPELESS):
-			return 8;
-
-		case(DXGI_FORMAT_BC2_TYPELESS):
-		case(DXGI_FORMAT_BC2_UNORM):
-		case(DXGI_FORMAT_BC2_UNORM_SRGB):
-		case(DXGI_FORMAT_BC3_TYPELESS):
-		case(DXGI_FORMAT_BC3_UNORM):
-		case(DXGI_FORMAT_BC3_UNORM_SRGB):
-		case(DXGI_FORMAT_BC5_TYPELESS):
-		case(DXGI_FORMAT_BC5_UNORM):
-		case(DXGI_FORMAT_BC5_SNORM):
-		case(DXGI_FORMAT_BC6H_TYPELESS):
-		case(DXGI_FORMAT_BC6H_UF16):
-		case(DXGI_FORMAT_BC6H_SF16):
-		case(DXGI_FORMAT_BC7_TYPELESS):
-		case(DXGI_FORMAT_BC7_UNORM):
-		case(DXGI_FORMAT_BC7_UNORM_SRGB):
-		case(DXGI_FORMAT_R32G32B32A32_FLOAT):
-		case(DXGI_FORMAT_R32G32B32A32_TYPELESS):
-			return 16;
-
-		default:
-			assert(0);
-			break;
-		}
-		return 0;
-	}
-
-
-
-	//--------------------------------------------------------------------------------------
-	// Convert a *_SRGB format into a non-gamma one
-	//--------------------------------------------------------------------------------------
-	DXGI_FORMAT ConvertIntoNonGammaFormat(DXGI_FORMAT format)
-	{
-		switch (format)
-		{
-		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM;
-		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8A8_UNORM;
-		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8X8_UNORM;
-		case DXGI_FORMAT_BC1_UNORM_SRGB: return DXGI_FORMAT_BC1_UNORM;
-		case DXGI_FORMAT_BC2_UNORM_SRGB: return DXGI_FORMAT_BC2_UNORM;
-		case DXGI_FORMAT_BC3_UNORM_SRGB: return DXGI_FORMAT_BC3_UNORM;
-		case DXGI_FORMAT_BC7_UNORM_SRGB: return DXGI_FORMAT_BC7_UNORM;
-		}
-
-		return format;
-	}
-
-	DXGI_FORMAT ConvertIntoGammaFormat(DXGI_FORMAT format)
-	{
-		switch (format)
-		{
-		case DXGI_FORMAT_B8G8R8A8_UNORM: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-		case DXGI_FORMAT_R8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-		case DXGI_FORMAT_B8G8R8X8_UNORM: return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
-		case DXGI_FORMAT_BC1_UNORM: return DXGI_FORMAT_BC1_UNORM_SRGB;
-		case DXGI_FORMAT_BC2_UNORM: return DXGI_FORMAT_BC2_UNORM_SRGB;
-		case DXGI_FORMAT_BC3_UNORM: return DXGI_FORMAT_BC3_UNORM_SRGB;
-		case DXGI_FORMAT_BC7_UNORM: return DXGI_FORMAT_BC7_UNORM_SRGB;
-		}
-
-		return format;
-	}
-
-	DXGI_FORMAT SetFormatGamma(DXGI_FORMAT format, bool addGamma)
-	{
-		if (addGamma)
-		{
-			format = ConvertIntoGammaFormat(format);
-		}
-		else
-		{
-			format = ConvertIntoNonGammaFormat(format);
-		}
-
-		return format;
-	}
-
-	bool IsBCFormat(DXGI_FORMAT format)
-	{
-		return (format >= DXGI_FORMAT_BC1_TYPELESS && format <= DXGI_FORMAT_BC5_SNORM) || (format >= DXGI_FORMAT_BC6H_TYPELESS && format <= DXGI_FORMAT_BC7_UNORM_SRGB);
-	}
 
 	//--------------------------------------------------------------------------------------
 	//
@@ -4852,7 +5319,7 @@ namespace vkg {
 		{
 			VkCommandPoolCreateInfo cmd_pool_info = {};
 			cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-			cmd_pool_info.queueFamilyIndex = m_pDevice->GetGraphicsQueueFamilyIndex();
+			cmd_pool_info.queueFamilyIndex = m_pDevice->_queue_family_index;
 			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 			res = vkCreateCommandPool(m_pDevice->_dev, &cmd_pool_info, NULL, &m_commandPool);
 			assert(res == VK_SUCCESS);

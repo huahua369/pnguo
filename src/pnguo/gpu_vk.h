@@ -10,7 +10,7 @@
 todo:星号是已实现完成的
 	设备：*
 		采样器：	结构体sampler_info_t*，newSampler函数创建VkSampler
-		图像：	2D纹理、3D纹理、立方体贴图、纹理数组。
+		图像：	2D纹理、3D纹理、立方体贴图、纹理数组。*
 		缓冲区：	static_buffer_pool_cx*(vbo、ibo)、buffer_ring_cx*(ubo、ssbo)
 		管线：	pbr着色器*、自定义着色器
 		渲染器：	向前渲染缓冲区、bloom、后处理等
