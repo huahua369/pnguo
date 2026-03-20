@@ -12,7 +12,7 @@ todo:星号是已实现完成的
 		采样器：	结构体sampler_info_t*，newSampler函数创建VkSampler
 		图像：	2D纹理、3D纹理、立方体贴图、纹理数组。*
 		缓冲区：	static_buffer_pool_cx*(vbo、ibo)、buffer_ring_cx*(ubo、ssbo)
-		管线：	pbr着色器*、自定义着色器
+		管线：	pbr着色器*、自定义着色器*
 		渲染器：	向前渲染缓冲区、bloom、后处理等
 	对象：
 		帧图：相机、世界、渲染器、rgba纹理、深度纹理等
@@ -37,7 +37,7 @@ todo:星号是已实现完成的
 		vec4 a_Tangent;
 		vec4 a_Weights0;	vec4 a_Weights1;	uvec4 a_Joints0;	uvec4 a_Joints1;
 	变形动画
-		变形插值ubo数据：float u_morphWeights[]; 
+		变形插值ubo数据：float u_morphWeights[];
 		静态目标ssbo数据：每个顶点有插值数据、数量、偏移
 			int vertex_count;			int weight_count;
 			int position_offset;		int normal_offset;
@@ -147,7 +147,16 @@ namespace vkg {
 		bool compareEnable;
 		bool unnormalizedCoordinates;
 	};
-
+	enum class GBufferFlagBits :uint32_t
+	{
+		GBUFFER_NONE = 0,
+		GBUFFER_DEPTH = 1,
+		GBUFFER_FORWARD = 2,
+		GBUFFER_MOTION_VECTORS = 4,
+		GBUFFER_NORMAL_BUFFER = 8,
+		GBUFFER_DIFFUSE = 16,
+		GBUFFER_SPECULAR_ROUGHNESS = 32,
+	};
 	struct transform_t
 	{
 		glm::quat rotation;		//  四元数，用于存储变换在世界空间中的旋转。
@@ -282,6 +291,7 @@ namespace vkg {
 		int bindingCount = 0;
 		int namesCount = 0;
 		int define_count = 0;			// kv数量
+		GBufferFlagBits gbufferflag = GBufferFlagBits::GBUFFER_NONE;
 		const char** defines0 = 0;		// "key","value"
 		const char* vertexShaderFile = 0;
 		const char* fragmentShaderFile = 0;

@@ -3297,37 +3297,12 @@ namespace vkg {
 		rs.lineWidth = info->lineWidth;
 		bool depthwrite = !info->blending;// || (defines.Has("DEF_alphaMode_BLEND")));
 		std::vector<VkPipelineColorBlendAttachmentState> att_states;
-		if (defines.Has("HAS_FORWARD_RT"))
+		if ((uint32_t)info2->gbufferflag & (uint32_t)GBufferFlagBits::GBUFFER_FORWARD)
 		{
 			VkPipelineColorBlendAttachmentState att_state = {};
 			get_blend(info->blending, att_state);
 			att_states.push_back(att_state);
 		}
-		if (defines.Has("HAS_OIT_ACCUM_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_TRUE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			att_states.push_back(att_state);
-		}
-		if (defines.Has("HAS_OIT_WEIGHT_RT"))
-		{
-			VkPipelineColorBlendAttachmentState att_state = {};
-			att_state.colorWriteMask = allBits;
-			att_state.blendEnable = VK_TRUE;
-			att_state.alphaBlendOp = VK_BLEND_OP_ADD;
-			att_state.colorBlendOp = VK_BLEND_OP_ADD;
-			att_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-			att_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			att_state.srcColorBlendFactor = att_state.dstColorBlendFactor = att_state.srcAlphaBlendFactor = att_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-
-			att_states.push_back(att_state);
-		}
-
 		VkPipelineColorBlendAttachmentState cblend = {};
 		cblend.colorWriteMask = allBits;
 		cblend.blendEnable = VK_FALSE;
@@ -3337,19 +3312,19 @@ namespace vkg {
 		cblend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		cblend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 		cblend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		if (defines.Has("HAS_SPECULAR_ROUGHNESS_RT"))
+		if ((uint32_t)info2->gbufferflag & (uint32_t)GBufferFlagBits::GBUFFER_SPECULAR_ROUGHNESS)
 		{
 			att_states.push_back(cblend);
 		}
-		if (defines.Has("HAS_DIFFUSE_RT"))
+		if ((uint32_t)info2->gbufferflag & (uint32_t)GBufferFlagBits::GBUFFER_DIFFUSE)
 		{
 			att_states.push_back(cblend);
 		}
-		if (defines.Has("HAS_NORMALS_RT"))
+		if ((uint32_t)info2->gbufferflag & (uint32_t)GBufferFlagBits::GBUFFER_NORMAL_BUFFER)
 		{
 			att_states.push_back(cblend);
 		}
-		if (defines.Has("HAS_MOTION_VECTORS_RT"))
+		if ((uint32_t)info2->gbufferflag & (uint32_t)GBufferFlagBits::GBUFFER_MOTION_VECTORS)
 		{
 			att_states.push_back(cblend);
 		}
