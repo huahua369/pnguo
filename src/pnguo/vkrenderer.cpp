@@ -3816,7 +3816,7 @@ namespace vkr {
 	};
 
 	using glm::ivec2;
-	 
+
 	enum class UVT_E
 	{
 		e_EnvRotation,
@@ -6169,7 +6169,7 @@ namespace vkr {
 		// 不启用oit
 		bool has_oit = false;
 		// 是否启用模板测试
-		bool _stencil_test = true;
+		bool _stencil_test = false;
 		bool has_skydome = true;
 
 		bool flipY = false;
@@ -6771,7 +6771,9 @@ namespace vkr
 			// Load material constants. This is a depth pass and we are only interested in the mask texture
 			tfmat->m_doubleSided = material.doubleSided;
 			std::string alphaMode = material.alphaMode;
-			tfmat->m_defines["DEF_alphaMode_" + alphaMode] = std::to_string(1);
+			tfmat->m_defines["DEF_doubleSided"] = std::to_string(material.doubleSided ? 1 : 0);
+			tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
+			tfmat->m_defines["DEF_alphaMode_" + alphaMode] = "1";
 			tfmat->m_blending = alphaMode == "BLEND";
 			// If transparent use the baseColorTexture for alpha
 			if (alphaMode == "MASK")
@@ -8576,11 +8578,11 @@ namespace vkr
 		tfmat->m_doubleSided = material.doubleSided;
 		tfmat->m_blending = material.alphaMode == "BLEND";
 		tfmat->m_params.emissiveFactor = tov3(material.emissiveFactor, zeroes);
-		tfmat->m_defines["DEF_doubleSided"] = std::to_string(tfmat->m_doubleSided ? 1 : 0);
+		tfmat->m_defines["DEF_doubleSided"] = std::to_string(material.doubleSided ? 1 : 0);
 		if (use_punctual)
 			tfmat->m_defines["USE_PUNCTUAL"] = "1";
-		//tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
-		//tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = std::to_string(1);
+		tfmat->m_defines["DEF_alphaCutoff"] = to_string_g(material.alphaCutoff);
+		tfmat->m_defines["DEF_alphaMode_" + material.alphaMode] = "1";
 		// ALPHA_OPAQUE 0
 		// ALPHA_MASK 1
 		// ALPHA_BLEND 2 
@@ -10448,6 +10450,8 @@ namespace vkr
 		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
 		if (!uniformOffsets) { uniformOffsetsCount = 0; }
 		if (!uniformOffsetsCount) { uniformOffsets = 0; }
+
+		vkCmdSetStencilTestEnable(cmd_buf, VK_FALSE);
 		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
 		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? _pipe->m_pipelineWireframe : _pipe->m_pipeline);
 		if (m_geometry.m_IBV.buffer)
@@ -22415,7 +22419,7 @@ namespace vkr {
 		{
 			auto n = it->get_animation_count();
 			it->update(_time * speed);
-			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::mat4(1.0f), glm::vec3(it->_scale)) /** ymat*/;
+			auto m = glm::translate(glm::mat4(1.0f), it->_pos) * glm::scale(glm::vec3(it->_scale)) /** ymat*/;
 			it->TransformScene(0, m);
 		}
 	}
