@@ -306,6 +306,7 @@ namespace vkg {
 		void set_device(void* dev, uint32_t idx);
 		// 创建采样器，内部会缓存相同参数的采样器对象
 		VkSampler newSampler(const sampler_info_t* pCreateInfo);
+		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
 
 		VkResult VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
 		VkResult VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
@@ -893,10 +894,48 @@ namespace vkg {
 		DISPLAYMODE_HDR10_SCRGB
 	};
 
+	struct PBRPrimitives;
+	struct BatchList
+	{
+		float m_depth = 0;
+		int frontFace = 0;
+		PBRPrimitives* m_pPrimitive;
+		VkDescriptorBufferInfo m_perFrameDesc;
+		VkDescriptorBufferInfo m_perObjectDesc;
+		VkDescriptorBufferInfo* m_uvtDesc = 0;
+		VkDescriptorBufferInfo* m_pPerSkeleton = 0;
+		VkDescriptorBufferInfo* morph = 0;
+		VkDescriptorBufferInfo* instance_info = 0;
+		operator float() { return -m_depth; }
+	};
+	struct drawables_t
+	{
+		std::vector<BatchList> opaque, transparent, transmission;
+		std::vector<BatchList> wireframe[3];
+		void clear()
+		{
+			opaque.clear();
+			transparent.clear();
+			transmission.clear();
+			for (int i = 0; i < 3; i++)
+				wireframe[i].clear();
+		}
+	};
+
 	struct TimeStamp
 	{
 		std::string m_label;
 		float       m_microseconds;
+	};
+
+	struct SceneShadowInfo {
+		Texture         ShadowMap;
+		uint32_t        ShadowIndex;
+		uint32_t        ShadowResolution;
+		uint32_t        LightIndex;
+		VkImageView     ShadowDSV;
+		VkFramebuffer   ShadowFrameBuffer;
+		VkImageView		ShadowSRV;
 	};
 
 	class GPUTimestamps
@@ -1493,6 +1532,367 @@ namespace vkg {
 		PostProcPS m_ShaderMagnify;
 		bool m_bOutputsToSwapchain = false;
 	};
+
+
+	class fbo_info_cx
+	{
+	public:
+		class FBO
+		{
+		public:
+			VkFramebuffer framebuffer = 0;
+			//深度、模板缓冲
+			Texture color;
+			Texture depth_stencil;
+			VkDescriptorImageInfo descriptor = {};
+			// Semaphore used to synchronize between offscreen and final scene rendering
+			//信号量用于在屏幕外和最终场景渲染之间进行同步
+			VkSemaphore semaphore = VK_NULL_HANDLE;
+			VkSemaphore semaphore1 = VK_NULL_HANDLE;
+		public:
+			FBO() {}
+			~FBO() {}
+		};
+		size_t count_ = 0;
+		int _width = 0, _height = 0;
+		//dvk_swapchain* _swapc = 0;
+		VkRenderPass renderPass = 0, nrp = 0;
+		//采样器
+		VkSampler sampler = 0;
+		// 渲染到纹理同步cpu
+		VkFence _fence = 0;
+		// 缓冲区列表
+		std::vector<FBO> framebuffers;
+
+		cxDevice* _dev = nullptr;
+		VkClearValue clearValues[2] = {};
+		// VK_FORMAT_B8G8R8A8_UNORM, 浮点纹理 VK_FORMAT_R32G32B32A32_SFLOAT;//如果要模板则depthFormat用VK_FORMAT_D32_SFLOAT_S8_UINT
+		VkFormat depthFormat = VK_FORMAT_D32_SFLOAT, colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+		bool isColor = false;	//渲染到纹理则为true
+
+		int cmdcount = 0;
+		// Command buffers used for rendering
+		std::vector<VkCommandBuffer> drawCmdBuffers;
+		//std::vector<dvk_cmd> dcmds; 
+	public:
+		fbo_info_cx();
+
+		~fbo_info_cx();
+
+		void setClearValues(uint32_t color, float depth = 1.0f, uint32_t Stencil = 0);
+
+		void setClearValues(float* color, float depth = 1.0f, uint32_t Stencil = 0);
+#ifndef VKVG_SURFACE_IMGS_REQUIREMENTS
+#define FB_COLOR_FORMAT VK_FORMAT_B8G8R8A8_UNORM
+#define VKVG_SURFACE_IMGS_REQUIREMENTS (VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT|VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT|\
+	VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_BLIT_SRC_BIT)
+#define VKVG_PNG_WRITE_IMG_REQUIREMENTS (VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_TRANSFER_DST_BIT|VK_FORMAT_FEATURE_BLIT_DST_BIT)
+#endif
+		//swapchainbuffers交换链
+		void initFBO(int width, int height, int count, VkRenderPass rp);
+
+		//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
+		void resetFramebuffer(int width, int height);
+		void reset_fbo(int width, int height);
+		void resetCommandBuffers();
+
+
+		void build_cmd_empty();
+	public:
+
+		void destroyImage();
+		void destroy_all();
+	private:
+
+	};
+
+	struct Light
+	{
+		glm::mat4   mLightViewProj;
+		glm::mat4   mLightView;
+
+		float         direction[3];
+		float         range;
+
+		float         color[3];
+		float         intensity;
+
+		float         position[3];
+		float         innerConeCos;
+
+		float         outerConeCos;
+		uint32_t      type;
+		float         depthBias;
+		int32_t       shadowMapIndex = -1;
+	};
+	struct PerFrame_t
+	{
+		glm::mat4 mCameraCurrViewProj;
+		glm::mat4 mCameraPrevViewProj;
+		glm::mat4 mInverseCameraCurrViewProj;
+		glm::vec4 cameraPos;
+		float     iblFactor;
+		float     emmisiveFactor;
+		float     invScreenResolution[2];
+
+		glm::vec4 wireframeOptions;
+		float     lodBias = 0.0f;
+		float	  oit_w = 0.0f;
+		float	  oit_k = 0.0f;
+		int		  lightCount;
+		Light     lights[MaxLightInstances];
+	};
+	struct const_vk {
+		// Create all the heaps for the resources views
+		uint32_t cbvDescriptorCount = 2000;
+		uint32_t srvDescriptorCount = 8000;
+		uint32_t uavDescriptorCount = 10;
+		uint32_t samplerDescriptorCount = 20;
+		// Create a commandlist ring for the Direct queue
+		uint32_t commandListsPerBackBuffer = 8;
+		// Create a 'dynamic' constant buffer动态常量缓冲区大小
+		uint32_t constantBuffersMemSize = 15 * 1024 * 1024;
+		// Create a 'static' pool for vertices and indices 静态顶点/索引缓冲区大小
+		uint32_t staticGeometryMemSize = (10 * 128) * 1024 * 1024;
+		// Create a 'static' pool for vertices and indices in system memory静态几何缓冲区大小
+		uint32_t systemGeometryMemSize = 32 * 1024;
+
+		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
+		uint32_t uploadHeapMemSize = (uint32_t)1000 * 1024 * 1024;
+	};
+
+ 
+
+	struct scene_state {
+		// POST PROCESS CONTROLS 
+		int   SelectedTonemapperIndex = 0;// 0-5
+		float Exposure = 1.0;
+		// APP/SCENE CONTROLS 
+		float IBLFactor = 1.0;
+		float EmissiveFactor = 1.0;
+		int   SelectedSkydomeTypeIndex = 0; // 0-1 
+
+		PassParameters MagnifierParams = {};
+		int   LockedMagnifiedScreenPositionX;
+		int   LockedMagnifiedScreenPositionY;
+
+		enum class WireframeMode : int
+		{
+			WIREFRAME_MODE_OFF = 0,
+			WIREFRAME_MODE_FACE = 1,
+			WIREFRAME_MODE_SHADED = 2,
+			WIREFRAME_MODE_SOLID_COLOR = 4,
+			WIREFRAME_MODE_SOLID_COLOR_FACE = 5,
+		};
+		int WireframeMode = 0;
+		float WireframeColor[3] = { 1.0,1.0,1.0 };
+		bool  bUseTAA = true;
+		bool  bTAAsharpening = true;
+		bool  bDrawLightFrustum = false;
+		bool  bDrawBoundingBoxes = false;
+		bool  bShowMilliseconds = true;
+		bool  bBloom = true;
+		bool  bUseMagnifier = false;
+		bool  bLockMagnifierPosition;
+		bool  bLockMagnifierPositionHistory;
+	};
+
+	struct robj_info {
+		//gltf passes
+		//GltfPbrPass* m_GLTFPBR = nullptr;
+		//GltfBBoxPass* m_GLTFBBox = nullptr;
+		//GltfDepthPass* m_GLTFDepth = nullptr;
+		//gltf_gpu_res_cx* _ptb = nullptr;
+		bool shadowMap = true;		// 是否有阴影
+	};
+	// todo cmdlr
+
+	class CommandListRing
+	{
+	private:
+		struct CommandBuffersPerFrame
+		{
+			VkCommandPool        m_commandPool;
+			VkCommandBuffer* m_pCommandBuffer;
+			uint32_t m_UsedCls;
+		};
+		std::vector<CommandBuffersPerFrame> m_pCommandBuffers;
+		CommandBuffersPerFrame* m_pCurrentFrame = 0;
+		cxDevice* m_pDevice = 0;
+		uint32_t m_frameIndex = 0;
+		uint32_t m_numberOfAllocators = 0;
+		uint32_t m_commandListsPerBackBuffer = 0;
+	public:
+		void OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerframe, bool compute = false);
+		void OnDestroy();
+		void OnBeginFrame();
+		VkCommandBuffer GetNewCommandList();
+		//VkCommandPool GetPool() { return m_pCommandBuffers[0].m_commandPool; }
+	};
+
+	struct fbo_cxt {
+		VkRenderPass renderPass = 0;
+		VkFramebuffer framebuffer = 0;
+		VkFence fence = {};
+		VkSemaphore sem = {};
+		VkSemaphore sem_out = {};
+		VkImage image = 0;
+	};
+
+	struct ts_t {
+		VkImageView v;
+		VkSampler s;
+	};
+	struct lut_tex_t
+	{
+		Texture texture = {};
+		VkImageView view = VK_NULL_HANDLE;
+		VkSampler sampler = VK_NULL_HANDLE;
+	};
+	struct env_res_t
+	{
+		SkyDome* pSkyDome;
+		std::vector<VkImageView>* ShadowMapViewPool;
+		VkSampler m_samplerShadow = VK_NULL_HANDLE;
+		lut_tex_t* lut = 0;// lut_ggx\lut_charlie\lut_sheen_E 
+		bool bUseSSAOMask = false;
+		bool use_punctual = true;
+		bool is_async = true;
+	};
+	// todo renderer 渲染器
+	class Renderer_cx
+	{
+	public:
+		Renderer_cx(const_vk* p);
+		~Renderer_cx();
+		void OnCreate(cxDevice* pDevice, VkRenderPass rp);
+		void OnDestroy();
+
+		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height);
+		void OnDestroyWindowSizeDependentResources();
+		void OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier);
+		void OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm);
+
+		//int load_model(GLTFCommon* pGLTFCommon, int Stage = 0);
+		//void UnloadScene();
+		//void unloadgltf(robj_info* p);
+
+		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
+
+		//PerFrame_t* mkPerFrameData(const Camera& cam);
+		//void OnRender(scene_state* pState, const Camera& Cam);
+		void set_fbo(fbo_info_cx* p, int idx);
+		// 释放上传堆和缓冲区
+		void freeVidMBP();
+
+
+		size_t AddLight(const light_t& light);
+		light_t* get_light(size_t idx);
+		size_t get_light_size();
+		void AllocateShadowMaps();
+
+		void new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx);
+		void init_envres();
+		void un_envres();
+	private:
+		void draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj);
+
+		void draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void draw_pbr_transparent(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void copy_transmission(VkCommandBuffer cmdBuf1);
+		void draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe);
+		void draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pf, const scene_state* pState);
+	public:
+		cxDevice* m_pDevice = 0;
+		const_vk ct = {};
+		uint32_t                        m_Width = {};
+		uint32_t                        m_Height = {};
+
+		VkRect2D                        m_RectScissor = {};
+		VkViewport                      m_Viewport = {};
+
+		// todo Initialize helper classes资源管理
+		ResourceViewHeaps               m_ResourceViewHeaps = {};	// set管理
+		UploadHeap                      m_UploadHeap = {};			// 纹理上传堆
+		buffer_ring_cx					m_ConstantBufferRing = {};	// 动态常量缓冲区
+		static_buffer_pool_cx			m_VidMemBufferPool = {};	// 静态顶点/索引缓冲区
+		static_buffer_pool_cx			m_SysMemBufferPool = {};	// 系统静态几何缓冲区
+		CommandListRing                 m_CommandListRing = {};		// 命令管理VkCommandBuffer
+
+		GPUTimestamps                   m_GPUTimer = {};			// 记录GPU执行时间
+
+		// effects
+		Bloom                           m_Bloom = {};
+		SkyDome                         m_SkyDome = {};
+		DownSamplePS                    m_DownSample = {};
+		SkyDomeProc                     m_SkyDomeProc = {};
+		ToneMapping                     m_ToneMappingPS = {};
+		ToneMappingCS                   m_ToneMappingCS = {};
+		//oitblendCS						m_oitblendCS = {};
+		ColorConversionPS               m_ColorConversionPS = {};
+		TAA                             m_TAA = {};
+		MagnifierPS                     m_MagnifierPS = {};
+
+		// GBuffer and render passes
+		GBuffer* m_GBuffer = {};							// hdr缓冲区
+		GBufferRenderPass               m_RenderPassFullGBufferWithClear = {};	// 用于渲染不透明物体及清空缓冲区opaque
+		GBufferRenderPass               m_RenderPassJustDepthAndHdr = {};		// 用于渲染天空盒、线框justdepth
+		GBufferRenderPass               m_RenderPassFullGBuffer = {};			// 用于渲染透明物体transparent、透射材质transmission
+
+		// shadowmaps
+		VkRenderPass                    m_Render_pass_shadow = {};
+		// 程序天空盒参数
+		SkyDomeProc::Constants			skyDomeConstants = {};
+
+		// pbr通用资源
+		// lut_ggx\lut_charlie\lut_sheen_E
+		lut_tex_t _lut[3] = {};
+		env_res_t _envr = {};
+		// widgets
+		//Wireframe                       m_Wireframe = {};
+		//WireframeBox                    m_WireframeBox = {};
+		//WireframeSphere					_WireframeSphere = {};
+		////Axis							_axis= {};
+		////CheckerBoardFloor				_cbf = {};
+		std::vector<TimeStamp>          m_TimeStamps = {};
+
+		//AsyncPool* m_AsyncPool = {};
+		// 渲染对象
+		std::vector<robj_info*>         _robject = {};
+		robj_info* currobj = {};
+
+		std::vector<SceneShadowInfo>    m_shadowMapPool = {};
+		std::vector<VkImageView>        m_ShadowSRVPool = {};
+		//std::vector<GltfDepthPass*>     _depthpass = {};
+		// 灯光管理
+		std::vector<light_t> _lights;
+		std::queue<light_t> _lights_q;
+		std::vector<glm::mat4> lightMats;
+		// 渲染对象
+		drawables_t drawables;
+
+		//transfer_cx _transfer = {};
+
+
+		PerFrame_t _perFrameData;
+
+		fbo_cxt _fbo = {};
+		// VkCommandBuffer
+		void(*hubDraw)(void* commandBuffer) = nullptr;
+
+
+		DisplayMode _dm = DISPLAYMODE_SDR;
+		bool bHDR = false;
+		bool m_bMagResourceReInit = false;
+		// 不启用oit
+		bool has_oit = false;
+		// 是否启用模板测试
+		bool _stencil_test = false;
+		bool has_skydome = true;
+
+		bool flipY = false;
+	};
+
 
 
 
@@ -4386,15 +4786,140 @@ namespace vkg {
 			vmaDestroyBuffer(m_pDevice->GetAllocator(), m_buffer, m_bufferAlloc);
 #else
 			//release upload heap
-			vkUnmapMemory(m_pDevice->GetDevice(), m_deviceMemory);
-			vkFreeMemory(m_pDevice->GetDevice(), m_deviceMemory, NULL);
+			vkUnmapMemory(m_pDevice->_dev, m_deviceMemory);
+			vkFreeMemory(m_pDevice->_dev, m_deviceMemory, NULL);
 			m_deviceMemory = VK_NULL_HANDLE;
-			vkDestroyBuffer(m_pDevice->GetDevice(), m_buffer, NULL);
+			vkDestroyBuffer(m_pDevice->_dev, m_buffer, NULL);
 
 #endif
 			m_buffer = VK_NULL_HANDLE;
 		}
 	}
+
+	// todo set
+
+	void ResourceViewHeaps::OnCreate(cxDevice* pDevice, uint32_t cbvDescriptorCount, uint32_t srvDescriptorCount, uint32_t uavDescriptorCount, uint32_t samplerDescriptorCount)
+	{
+		m_pDevice = pDevice;
+		m_allocatedDescriptorCount = 0;
+
+		const VkDescriptorPoolSize type_count[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, cbvDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, cbvDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, srvDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, samplerDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, uavDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, uavDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, uavDescriptorCount },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, samplerDescriptorCount }
+		};
+
+		VkDescriptorPoolCreateInfo descriptor_pool = {};
+		descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		descriptor_pool.pNext = NULL;
+		descriptor_pool.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		descriptor_pool.maxSets = 50000;
+		descriptor_pool.poolSizeCount = _countof(type_count);
+		descriptor_pool.pPoolSizes = type_count;
+
+		VkResult res = vkCreateDescriptorPool(pDevice->_dev, &descriptor_pool, NULL, &m_descriptorPool);
+		assert(res == VK_SUCCESS);
+	}
+
+	void ResourceViewHeaps::OnDestroy()
+	{
+		vkDestroyDescriptorPool(m_pDevice->_dev, m_descriptorPool, NULL);
+	}
+
+	bool ResourceViewHeaps::CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout)
+	{
+		// Next take layout bindings and use them to create a descriptor set layout
+
+		VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+		descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		descriptor_layout.pNext = NULL;
+		descriptor_layout.bindingCount = (uint32_t)pDescriptorLayoutBinding->size();
+		descriptor_layout.pBindings = pDescriptorLayoutBinding->data();
+
+		VkResult res = vkCreateDescriptorSetLayout(m_pDevice->_dev, &descriptor_layout, NULL, pDescSetLayout);
+		assert(res == VK_SUCCESS);
+		return (res == VK_SUCCESS);
+	}
+	bool ResourceViewHeaps::CreateDescriptorSetLayoutAndAllocDescriptorSet(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
+	{
+		// Next take layout bindings and use them to create a descriptor set layout
+
+		VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+		descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		descriptor_layout.pNext = NULL;
+		descriptor_layout.bindingCount = (uint32_t)pDescriptorLayoutBinding->size();
+		descriptor_layout.pBindings = pDescriptorLayoutBinding->data();
+
+		VkResult res = vkCreateDescriptorSetLayout(m_pDevice->_dev, &descriptor_layout, NULL, pDescSetLayout);
+		assert(res == VK_SUCCESS);
+
+		return AllocDescriptor(*pDescSetLayout, pDescriptorSet);
+	}
+
+	bool ResourceViewHeaps::AllocDescriptor(VkDescriptorSetLayout descLayout, VkDescriptorSet* pDescriptorSet)
+	{
+		//std::lock_guard<std::mutex> lock(m_mutex);
+
+		VkDescriptorSetAllocateInfo alloc_info;
+		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		alloc_info.pNext = NULL;
+		alloc_info.descriptorPool = m_descriptorPool;
+		alloc_info.descriptorSetCount = 1;
+		alloc_info.pSetLayouts = &descLayout;
+		VkResult res = vkAllocateDescriptorSets(m_pDevice->_dev, &alloc_info, pDescriptorSet);
+		assert(res == VK_SUCCESS);
+		m_allocatedDescriptorCount++;
+		return res == VK_SUCCESS;
+	}
+
+	void ResourceViewHeaps::FreeDescriptor(VkDescriptorSet descriptorSet)
+	{
+		m_allocatedDescriptorCount--;
+		vkFreeDescriptorSets(m_pDevice->_dev, m_descriptorPool, 1, &descriptorSet);
+	}
+
+	cxDevice* ResourceViewHeaps::get_dev()
+	{
+		return m_pDevice;
+	}
+
+	bool ResourceViewHeaps::AllocDescriptor(int size, const VkSampler* pSamplers, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
+	{
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(size);
+		for (int i = 0; i < size; i++)
+		{
+			layoutBindings[i].binding = i;
+			layoutBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[i].descriptorCount = 1;
+			layoutBindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[i].pImmutableSamplers = (pSamplers != NULL) ? &pSamplers[i] : NULL;
+		}
+
+		return CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindings, pDescSetLayout, pDescriptorSet);
+	}
+
+	bool ResourceViewHeaps::AllocDescriptor(std::vector<uint32_t>& descriptorCounts, const VkSampler* pSamplers, VkDescriptorSetLayout* pDescSetLayout, VkDescriptorSet* pDescriptorSet)
+	{
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(descriptorCounts.size());
+		for (int i = 0; i < descriptorCounts.size(); i++)
+		{
+			layoutBindings[i].binding = i;
+			layoutBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[i].descriptorCount = descriptorCounts[i];
+			layoutBindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[i].pImmutableSamplers = (pSamplers != NULL) ? &pSamplers[i] : NULL;
+		}
+
+		return CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindings, pDescSetLayout, pDescriptorSet);
+	}
+
+
 
 	// todo 纹理相关
 #if 1
@@ -6150,6 +6675,116 @@ namespace vkg {
 	}
 
 
+	VkRenderPass SimpleColorWriteRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout, uint32_t format)
+	{
+		// color RT
+		VkAttachmentDescription attachments[1];
+		attachments[0].format = (VkFormat)format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // we don't care about the previous contents, this is for a full screen pass with no blending
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = initialLayout;
+		attachments[0].finalLayout = finalLayout;
+		attachments[0].flags = 0;
+
+		VkAttachmentReference color_reference = { 0, passLayout };
+
+		VkSubpassDescription subpass = {};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.flags = 0;
+		subpass.inputAttachmentCount = 0;
+		subpass.pInputAttachments = NULL;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &color_reference;
+		subpass.pResolveAttachments = NULL;
+		subpass.pDepthStencilAttachment = NULL;
+		subpass.preserveAttachmentCount = 0;
+		subpass.pPreserveAttachments = NULL;
+
+		VkSubpassDependency dep = {};
+		dep.dependencyFlags = 0;
+		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dep.dstSubpass = VK_SUBPASS_EXTERNAL;
+		dep.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.srcSubpass = 0;
+
+		VkRenderPassCreateInfo rp_info = {};
+		rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		rp_info.pNext = NULL;
+		rp_info.attachmentCount = 1;
+		rp_info.pAttachments = attachments;
+		rp_info.subpassCount = 1;
+		rp_info.pSubpasses = &subpass;
+		rp_info.dependencyCount = 1;
+		rp_info.pDependencies = &dep;
+
+		VkRenderPass renderPass;
+		VkResult res = vkCreateRenderPass(device, &rp_info, NULL, &renderPass);
+		assert(res == VK_SUCCESS);
+
+		SetResourceName(device, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)renderPass, "SimpleColorWriteRenderPass");
+
+		return renderPass;
+	}
+	VkRenderPass SimpleColorBlendRenderPass(VkDevice device, VkImageLayout initialLayout, VkImageLayout passLayout, VkImageLayout finalLayout, uint32_t format)
+	{
+		// color RT
+		VkAttachmentDescription attachments[1];
+		attachments[0].format = (VkFormat)format;
+		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[0].initialLayout = initialLayout;
+		attachments[0].finalLayout = finalLayout;
+		attachments[0].flags = 0;
+
+		VkAttachmentReference color_reference = { 0, passLayout };
+
+		VkSubpassDescription subpass = {};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.flags = 0;
+		subpass.inputAttachmentCount = 0;
+		subpass.pInputAttachments = NULL;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &color_reference;
+		subpass.pResolveAttachments = NULL;
+		subpass.pDepthStencilAttachment = NULL;
+		subpass.preserveAttachmentCount = 0;
+		subpass.pPreserveAttachments = NULL;
+
+		VkSubpassDependency dep = {};
+		dep.dependencyFlags = 0;
+		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dep.dstSubpass = VK_SUBPASS_EXTERNAL;
+		dep.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.srcSubpass = 0;
+
+		VkRenderPassCreateInfo rp_info = {};
+		rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		rp_info.pNext = NULL;
+		rp_info.attachmentCount = 1;
+		rp_info.pAttachments = attachments;
+		rp_info.subpassCount = 1;
+		rp_info.pSubpasses = &subpass;
+		rp_info.dependencyCount = 1;
+		rp_info.pDependencies = &dep;
+
+		VkRenderPass renderPass;
+		VkResult res = vkCreateRenderPass(device, &rp_info, NULL, &renderPass);
+		assert(res == VK_SUCCESS);
+
+		SetResourceName(device, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)renderPass, "SimpleColorBlendRenderPass");
+
+		return renderPass;
+	}
 	void SetViewportAndScissor(VkCommandBuffer cmd_buf, uint32_t topX, uint32_t topY, uint32_t width, uint32_t height, bool flipY)
 	{
 		VkViewport viewport;
@@ -6679,7 +7314,8 @@ namespace vkg {
 		}
 	}
 
-	//--------------------------------------------------------------------------------------    
+	//--------------------------------------------------------------------------------------
+	// todo PostProcPS
 	void PostProcPS::OnCreate(
 		cxDevice* pDevice,
 		VkRenderPass renderPass,
@@ -6724,7 +7360,7 @@ namespace vkg {
 #else
 		std::string CompileFlagsVS("-T vs_6_0");
 #endif // _DEBUG
-		//res = VKCompileFromString(m_pDevice->m_device, SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
+		//res = VKCompileFromString(m_pDevice->_dev, SST_HLSL, VK_SHADER_STAGE_VERTEX_BIT, vertexShader, "mainVS", CompileFlagsVS.c_str(), &attributeDefines, &m_vertexShader);
 		res = pDevice->VKCompileFromFile(VK_SHADER_STAGE_VERTEX_BIT, "sky.v.glsl", "main", "", &attributeDefines, &m_vertexShader);
 		assert(res == VK_SUCCESS);
 
@@ -7031,6 +7667,1947 @@ namespace vkg {
 		vkCmdDispatch(cmd_buf, dispatchX, dispatchY, dispatchZ);
 	}
 
+	void SkyDomeProc::OnCreate(cxDevice* pDevice, VkRenderPass renderPass, UploadHeap* pUploadHeap, VkFormat outFormat, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing, static_buffer_pool_cx* pStaticBufferPool, VkSampleCountFlagBits sampleDescCount)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+
+		// Create Descriptor Set Layout, all we need is a uniform dynamic buffer to pass some parameters to the shader. All is procedural and we need no textures.
+		//
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(1);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[0].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindings, &m_descriptorLayout, &m_descriptorSet);
+		pDynamicBufferRing->SetDescriptorSet(0, sizeof(SkyDomeProc::Constants), m_descriptorSet);
+
+		m_skydome.OnCreate(pDevice, renderPass, "SkyDomeProc.hlsl", "main", "-T ps_6_0", pStaticBufferPool, pDynamicBufferRing, m_descriptorLayout, NULL, sampleDescCount);
+	}
+
+	void SkyDomeProc::OnDestroy()
+	{
+		m_skydome.OnDestroy();
+
+		m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet);
+
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorLayout, NULL);
+	}
+
+	void SkyDomeProc::Draw(VkCommandBuffer cmd_buf, SkyDomeProc::Constants constants)
+	{
+		SetPerfMarkerBegin(cmd_buf, "Skydome Proc");
+
+		SkyDomeProc::Constants* cbPerDraw;
+		VkDescriptorBufferInfo constantBuffer;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(SkyDomeProc::Constants), (void**)&cbPerDraw, &constantBuffer);
+		*cbPerDraw = constants;
+
+		m_skydome.Draw(cmd_buf, &constantBuffer, m_descriptorSet);
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void SkyDome::OnCreate(cxDevice* pDevice, VkRenderPass renderPass, UploadHeap* pUploadHeap, VkFormat outFormat, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing, static_buffer_pool_cx* pStaticBufferPool, const char* pDiffuseCubemap, const char* pSpecularCubemap, VkSampleCountFlagBits sampleDescCount)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+
+		m_CubeDiffuseTexture.InitFromFile(pDevice, pUploadHeap, pDiffuseCubemap, true); // SRGB
+		m_CubeSpecularTexture.InitFromFile(pDevice, pUploadHeap, pSpecularCubemap, true);
+		if (!m_CubeSpecularTexture.Resource())
+		{
+			int cs = 16;
+			IMG_INFO header = {};
+			std::vector<glm::vec4> px;
+			px.resize(cs * cs * 6);
+			unsigned char* buffer = (unsigned char*)px.data();
+			VkDeviceSize   bufferSize = px.size() * sizeof(px[0]);
+			header.width = cs;
+			header.height = cs;
+			header.depth = 1;
+			header.arraySize = 6;
+			header.mipMapCount = 1;
+			header.vkformat = VK_FORMAT_R32G32B32A32_SFLOAT;
+			header.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+			header.bitCount = 32 * 4;
+			for (auto& c : px) { c = default_specular; }
+			m_CubeSpecularTexture.InitFromData(pDevice, pUploadHeap, &header, buffer, bufferSize, "cubeSpecular", false);
+		}
+		pUploadHeap->FlushAndFinish();
+
+		m_CubeDiffuseTexture.CreateCubeSRV(&m_CubeDiffuseTextureView);
+		m_CubeSpecularTexture.CreateCubeSRV(&m_CubeSpecularTextureView);
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_NEAREST;
+			info.minFilter = VK_FILTER_NEAREST;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_samplerDiffuseCube = pDevice->newSampler(&info);
+			/*		VkResult res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_samplerDiffuseCube);
+					assert(res == VK_SUCCESS);*/
+		}
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_samplerSpecularCube = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_samplerSpecularCube);
+			//assert(res == VK_SUCCESS);
+		}
+
+		//create descriptor
+		//
+		std::vector<VkDescriptorSetLayoutBinding> layout_bindings(2);
+		layout_bindings[0].binding = 0;
+		layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layout_bindings[0].descriptorCount = 1;
+		layout_bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		layout_bindings[0].pImmutableSamplers = NULL;
+
+		layout_bindings[1].binding = 1;
+		layout_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layout_bindings[1].descriptorCount = 1;
+		layout_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layout_bindings[1].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layout_bindings, &m_descriptorLayout, &m_descriptorSet);
+		pDynamicBufferRing->SetDescriptorSet(0, sizeof(glm::mat4), m_descriptorSet);
+		SetDescriptorSpec(1, m_descriptorSet);
+
+		m_skydome.OnCreate(pDevice, renderPass, "SkyDome.glsl", "main", "", pStaticBufferPool, pDynamicBufferRing, m_descriptorLayout, NULL, sampleDescCount);
+	}
+
+	void SkyDome::OnDestroy()
+	{
+		m_skydome.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorLayout, NULL);
+
+		//vkDestroySampler(m_pDevice->_dev, m_samplerDiffuseCube, nullptr);
+		//vkDestroySampler(m_pDevice->_dev, m_samplerSpecularCube, nullptr);
+
+		vkDestroyImageView(m_pDevice->_dev, m_CubeDiffuseTextureView, NULL);
+		vkDestroyImageView(m_pDevice->_dev, m_CubeSpecularTextureView, NULL);
+
+		m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet);
+
+		m_CubeDiffuseTexture.OnDestroy();
+		m_CubeSpecularTexture.OnDestroy();
+	}
+
+	void SkyDome::SetDescriptorDiff(uint32_t index, VkDescriptorSet descriptorSet)
+	{
+		m_pDevice->SetDescriptorSet(index, m_CubeDiffuseTextureView, m_samplerDiffuseCube, descriptorSet);
+	}
+
+	void SkyDome::SetDescriptorSpec(uint32_t index, VkDescriptorSet descriptorSet)
+	{
+		m_pDevice->SetDescriptorSet(index, m_CubeSpecularTextureView, m_samplerSpecularCube, descriptorSet);
+	}
+
+	void SkyDome::Draw(VkCommandBuffer cmd_buf, const glm::mat4& invViewProj)
+	{
+		SetPerfMarkerBegin(cmd_buf, "Skydome cube");
+
+		glm::mat4* cbPerDraw;
+		VkDescriptorBufferInfo constantBuffer;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(glm::mat4), (void**)&cbPerDraw, &constantBuffer);
+		*cbPerDraw = invViewProj;
+
+		m_skydome.Draw(cmd_buf, &constantBuffer, m_descriptorSet);
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+
+	void SkyDome::GenerateDiffuseMapFromEnvironmentMap()
+	{
+
+	}
+
+	// Sampler and TextureView getters
+	//
+
+	VkImageView SkyDome::GetCubeDiffuseTextureView() const
+	{
+		return m_CubeDiffuseTextureView;
+	}
+
+	VkImageView SkyDome::GetCubeSpecularTextureView() const
+	{
+		return m_CubeSpecularTextureView;
+	}
+
+	VkSampler SkyDome::GetCubeDiffuseTextureSampler() const
+	{
+		return m_samplerDiffuseCube;
+	}
+
+	VkSampler SkyDome::GetCubeSpecularTextureSampler() const
+	{
+		return m_samplerSpecularCube;
+	}
+
+	// todo taa src
+	void TAA::OnCreate(cxDevice* pDevice, ResourceViewHeaps* pResourceViewHeaps, static_buffer_pool_cx* pStaticBufferPool, buffer_ring_cx* pDynamicBufferRing, bool sharpening)
+	{
+		m_bSharpening = sharpening;
+		m_pDevice = pDevice;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		VkResult res;
+
+		// TAA
+		//
+		{
+			// Create samplers
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_NEAREST;
+			info.minFilter = VK_FILTER_NEAREST;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+
+			m_samplers[0] = m_samplers[1] = m_samplers[3] = pDevice->newSampler(&info);
+			//res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_samplers[0]);
+			//assert(res == VK_SUCCESS);
+
+			//res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_samplers[1]);
+			//assert(res == VK_SUCCESS);
+
+			//res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_samplers[3]);
+			//(res == VK_SUCCESS);
+
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			m_samplers[2] = pDevice->newSampler(&info);
+			/*		res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_samplers[2]);
+					assert(res == VK_SUCCESS);*/
+
+					// Create VkDescriptor Set Layout Bindings
+					//
+
+			std::vector<VkDescriptorSetLayoutBinding> m_TAAInputs(5 + 4);
+			for (int i = 0; i < 4; i++)
+			{
+				m_TAAInputs[i].binding = i;
+				m_TAAInputs[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;//VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;// 
+				m_TAAInputs[i].descriptorCount = 1;
+				m_TAAInputs[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				m_TAAInputs[i].pImmutableSamplers = NULL;
+			}
+
+			m_TAAInputs[4].binding = 4;
+			m_TAAInputs[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			m_TAAInputs[4].descriptorCount = 1;
+			m_TAAInputs[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			m_TAAInputs[4].pImmutableSamplers = NULL;
+
+			for (int i = 5; i < 4 + 5; i++)
+			{
+				m_TAAInputs[i].binding = i;
+				m_TAAInputs[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+				m_TAAInputs[i].descriptorCount = 1;
+				m_TAAInputs[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				m_TAAInputs[i].pImmutableSamplers = NULL;// &m_samplers[i];
+			}
+
+			m_pResourceViewHeaps->CreateDescriptorSetLayout(&m_TAAInputs, &m_TaaDescriptorSetLayout);
+			m_pResourceViewHeaps->AllocDescriptor(m_TaaDescriptorSetLayout, &m_TaaDescriptorSet);
+#if 1
+			m_TAA.OnCreate(m_pDevice, "TAA.hlsl", "main", "-T cs_6_0", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
+			m_TAAFirst.OnCreate(m_pDevice, "TAA.hlsl", "first", "-T cs_6_0", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
+#else
+			DefineList defines;
+			defines["FIRST_PASS"] = "1";
+			m_TAA.OnCreate(m_pDevice, "TAA.glsl.h", "main", "", m_TaaDescriptorSetLayout, 16, 16, 1, NULL);
+			m_TAAFirst.OnCreate(m_pDevice, "TAA.glsl.h", "main", "", m_TaaDescriptorSetLayout, 16, 16, 1, &defines);
+#endif
+		}
+
+		// Sharpener
+		//
+		{
+			std::vector<VkDescriptorSetLayoutBinding> m_SharpenInputs(3);
+			m_SharpenInputs[0].binding = 0;
+			m_SharpenInputs[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+			m_SharpenInputs[0].descriptorCount = 1;
+			m_SharpenInputs[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			m_SharpenInputs[0].pImmutableSamplers = NULL;
+
+			m_SharpenInputs[1].binding = 1;
+			m_SharpenInputs[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			m_SharpenInputs[1].descriptorCount = 1;
+			m_SharpenInputs[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			m_SharpenInputs[1].pImmutableSamplers = NULL;
+
+			m_SharpenInputs[2].binding = 2;
+			m_SharpenInputs[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			m_SharpenInputs[2].descriptorCount = 1;
+			m_SharpenInputs[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			m_SharpenInputs[2].pImmutableSamplers = NULL;
+
+			m_pResourceViewHeaps->CreateDescriptorSetLayout(&m_SharpenInputs, &m_SharpenDescriptorSetLayout);
+			m_pResourceViewHeaps->AllocDescriptor(m_SharpenDescriptorSetLayout, &m_SharpenDescriptorSet);
+
+			m_Sharpen.OnCreate(m_pDevice, "TAASharpenerCS.hlsl", "mainCS", "-T cs_6_0", m_SharpenDescriptorSetLayout, 8, 8, 1, NULL);
+			m_Post.OnCreate(m_pDevice, "TAASharpenerCS.hlsl", "postCS", "-T cs_6_0", m_SharpenDescriptorSetLayout, 8, 8, 1, NULL);
+		}
+	}
+
+	void TAA::OnDestroy()
+	{
+		m_TAA.OnDestroy();
+		m_TAAFirst.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_TaaDescriptorSetLayout, NULL);
+
+		m_Sharpen.OnDestroy();
+		m_Post.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_SharpenDescriptorSetLayout, NULL);
+
+		//for (int i = 0; i < 4; i++)
+		//	vkDestroySampler(m_pDevice->_dev, m_samplers[i], nullptr);
+
+		m_pResourceViewHeaps->FreeDescriptor(m_SharpenDescriptorSet);
+		m_pResourceViewHeaps->FreeDescriptor(m_TaaDescriptorSet);
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreateWindowSizeDependentResources
+	//
+	//--------------------------------------------------------------------------------------
+	void TAA::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, GBuffer* pGBuffer)
+	{
+		m_pGBuffer = pGBuffer;
+
+		m_Width = Width;
+		m_Height = Height;
+
+		// TAA buffers
+		//
+		m_TAABuffer.InitRenderTarget(m_pDevice, Width, Height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_TAABuffer");
+		m_TAABuffer.CreateSRV(&m_TAABufferSRV);
+		m_TAABuffer.CreateSRV(&m_TAABufferUAV);
+
+		m_HistoryBuffer.InitRenderTarget(m_pDevice, Width, Height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT), false, "m_HistoryBuffer");
+		m_HistoryBuffer.CreateSRV(&m_HistoryBufferSRV);
+		//m_HistoryBuffer.CreateSRV(&m_HistoryBufferUAV);
+
+		m_TexturesInUndefinedLayout = true;
+
+		// update the TAA descriptor
+		//
+		m_pDevice->SetDescriptorSet(0, m_pGBuffer->m_HDRSRV, NULL, m_TaaDescriptorSet);
+		m_pDevice->SetDescriptorSet(1, m_pGBuffer->m_DepthBufferSRV, NULL, m_TaaDescriptorSet);
+		m_pDevice->SetDescriptorSet(2, m_HistoryBufferSRV, NULL, m_TaaDescriptorSet);
+		m_pDevice->SetDescriptorSet(3, m_pGBuffer->m_MotionVectorsSRV, NULL, m_TaaDescriptorSet);
+		m_pDevice->SetDescriptorSet(4, m_TAABufferUAV, m_TaaDescriptorSet);
+
+		for (int i = 0; i < 4; i++)
+		{
+			VkDescriptorImageInfo samplerInfo = {};
+			samplerInfo.sampler = m_samplers[i];
+
+			VkWriteDescriptorSet write;
+			write = {};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.pNext = NULL;
+			write.dstSet = m_TaaDescriptorSet;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+			write.pImageInfo = &samplerInfo;
+			write.dstBinding = i + 5;
+			write.dstArrayElement = 0;
+
+			vkUpdateDescriptorSets(m_pDevice->_dev, 1, &write, 0, NULL);
+		}
+
+		// update the Sharpen descriptor
+		//
+		m_pDevice->SetDescriptorSet(0, m_TAABufferSRV, NULL, m_SharpenDescriptorSet);
+		m_pDevice->SetDescriptorSet(1, m_pGBuffer->m_HDRSRV, m_SharpenDescriptorSet);
+		m_pDevice->SetDescriptorSet(2, m_HistoryBufferSRV, m_SharpenDescriptorSet);
+
+		m_bFirst = true;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroyWindowSizeDependentResources
+	//
+	//--------------------------------------------------------------------------------------
+	void TAA::OnDestroyWindowSizeDependentResources()
+	{
+		m_HistoryBuffer.OnDestroy();
+		m_TAABuffer.OnDestroy();
+
+		vkDestroyImageView(m_pDevice->_dev, m_TAABufferSRV, nullptr);
+		vkDestroyImageView(m_pDevice->_dev, m_TAABufferUAV, nullptr);
+		vkDestroyImageView(m_pDevice->_dev, m_HistoryBufferSRV, nullptr);
+		//vkDestroyImageView(m_pDevice->_dev, m_HistoryBufferUAV, nullptr);
+	}
+
+	void TAA::Draw(VkCommandBuffer cmd_buf)
+	{
+		{
+			SetPerfMarkerBegin(cmd_buf, "TAA");
+
+			{
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.pNext = NULL;
+				barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+
+				VkImageMemoryBarrier barriers[2];
+				barriers[0] = barrier;
+				barriers[0].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barriers[0].oldLayout = m_TexturesInUndefinedLayout ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barriers[0].image = m_TAABuffer.Resource();
+
+				barriers[1] = barrier;
+				barriers[1].oldLayout = m_TexturesInUndefinedLayout ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[1].image = m_HistoryBuffer.Resource();
+
+				m_TexturesInUndefinedLayout = false;
+
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 2, barriers);
+			}
+			if (m_bFirst)
+			{
+				m_bFirst = false;
+				m_TAAFirst.Draw(cmd_buf, NULL, m_TaaDescriptorSet, (m_Width + 15) / 16, (m_Height + 15) / 16, 1);
+			}
+			else
+				m_TAA.Draw(cmd_buf, NULL, m_TaaDescriptorSet, (m_Width + 15) / 16, (m_Height + 15) / 16, 1);
+		}
+
+		{
+			SetPerfMarkerBegin(cmd_buf, "TAASharpener");
+
+			{
+				// default is color texture from SRV to UAV
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.pNext = NULL;
+				barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+
+				VkImageMemoryBarrier barriers[3];
+				barriers[0] = barrier;
+				barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[0].image = m_TAABuffer.Resource();
+
+				barriers[1] = barrier;
+				barriers[1].image = m_HistoryBuffer.Resource();
+
+				barriers[2] = barrier;
+				barriers[2].image = m_pGBuffer->m_HDR.Resource();
+
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0
+					, NULL, 0, NULL, 3, barriers);
+			}
+			if (m_bSharpening)
+				m_Sharpen.Draw(cmd_buf, NULL, m_SharpenDescriptorSet, (m_Width + 7) / 8, (m_Height + 7) / 8, 1);
+			else
+				m_Post.Draw(cmd_buf, NULL, m_SharpenDescriptorSet, (m_Width + 7) / 8, (m_Height + 7) / 8, 1);
+			{
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.pNext = NULL;
+				barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+
+				VkImageMemoryBarrier barriers[2];
+				barriers[0] = barrier;
+				barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barriers[0].image = m_HistoryBuffer.Resource();
+
+				barriers[1] = barrier;
+				barriers[1].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barriers[1].image = m_pGBuffer->m_HDR.Resource();
+
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0
+					, NULL, 0, NULL, 2, barriers);
+			}
+			SetPerfMarkerEnd(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	// todo tonemapping
+
+	void ToneMapping::OnCreate(cxDevice* pDevice, VkRenderPass renderPass, ResourceViewHeaps* pResourceViewHeaps, static_buffer_pool_cx* pStaticBufferPool, buffer_ring_cx* pDynamicBufferRing, uint32_t srvTableSize, const char* shaderSource)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_sampler = pDevice->newSampler(&info);
+			/*		VkResult res = vkCreateSampler(m_pDevice->_dev, &info, NULL, &m_sampler);
+					assert(res == VK_SUCCESS);*/
+		}
+
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[0].pImmutableSamplers = NULL;
+
+		layoutBindings[1].binding = 1;
+		layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layoutBindings[1].descriptorCount = srvTableSize;
+		layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[1].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
+
+		m_toneMapping.OnCreate(m_pDevice, renderPass, shaderSource, "main", "", pStaticBufferPool, pDynamicBufferRing, m_descriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
+
+		m_descriptorIndex = 0;
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_descriptorSet[i]);
+	}
+
+	void ToneMapping::OnDestroy()
+	{
+		m_toneMapping.OnDestroy();
+
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
+
+		//vkDestroySampler(m_pDevice->_dev, m_sampler, nullptr);
+
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorSetLayout, NULL);
+	}
+
+	void ToneMapping::UpdatePipelines(VkRenderPass renderPass)
+	{
+		m_toneMapping.UpdatePipeline(renderPass, NULL, VK_SAMPLE_COUNT_1_BIT);
+	}
+
+	void ToneMapping::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, float exposure, int toneMapper)
+	{
+		SetPerfMarkerBegin(cmd_buf, "tonemapping");
+
+		VkDescriptorBufferInfo cbTonemappingHandle;
+		ToneMappingConsts* pToneMapping;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(ToneMappingConsts), (void**)&pToneMapping, &cbTonemappingHandle);
+		pToneMapping->exposure = exposure;
+		pToneMapping->toneMapper = toneMapper;
+
+		// We'll be modifying the descriptor set(DS), to prevent writing on a DS that is in use we 
+		// need to do some basic buffering. Just to keep it safe and simple we'll have 10 buffers.
+		VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
+		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
+
+		// modify Descriptor set
+		m_pDevice->SetDescriptorSet(1, HDRSRV, m_sampler, descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ToneMappingConsts), descriptorSet);
+
+		// Draw!
+		m_toneMapping.Draw(cmd_buf, &cbTonemappingHandle, descriptorSet);
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void ToneMappingCS::OnCreate(cxDevice* pDevice, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		layoutBindings[0].pImmutableSamplers = NULL;
+
+		layoutBindings[1].binding = 1;
+		layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		layoutBindings[1].descriptorCount = 1;
+		layoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		layoutBindings[1].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
+
+		m_toneMapping.OnCreate(m_pDevice, "ToneMappingCS.glsl", "main", "", m_descriptorSetLayout, 8, 8, 1, NULL);
+
+		m_descriptorIndex = 0;
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_descriptorSet[i]);
+	}
+
+	void ToneMappingCS::OnDestroy()
+	{
+		m_toneMapping.OnDestroy();
+
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
+
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorSetLayout, NULL);
+	}
+
+	void ToneMappingCS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, float exposure, int toneMapper, int width, int height)
+	{
+		SetPerfMarkerBegin(cmd_buf, "ToneMappingCS");
+
+		VkDescriptorBufferInfo cbTonemappingHandle;
+		ToneMappingConsts* pToneMapping;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(ToneMappingConsts), (void**)&pToneMapping, &cbTonemappingHandle);
+		pToneMapping->exposure = exposure;
+		pToneMapping->toneMapper = toneMapper;
+
+		// We'll be modifying the descriptor set(DS), to prevent writing on a DS that is in use we 
+		// need to do some basic buffering. Just to keep it safe and simple we'll have 10 buffers.
+		VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
+		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
+
+		// modify Descriptor set
+		m_pDevice->SetDescriptorSet(1, HDRSRV, descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ToneMappingConsts), descriptorSet);
+
+		// Draw!
+		m_toneMapping.Draw(cmd_buf, &cbTonemappingHandle, descriptorSet, (width + 7) / 8, (height + 7) / 8, 1);
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+
+	// todo bloom
+
+	void Bloom::OnCreate(
+		cxDevice* pDevice,
+		ResourceViewHeaps* pResourceViewHeaps,
+		buffer_ring_cx* pConstantBufferRing,
+		static_buffer_pool_cx* pStaticBufferPool,
+		VkFormat outFormat
+	)
+	{
+		m_pDevice = pDevice;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pConstantBufferRing = pConstantBufferRing;
+		m_outFormat = outFormat;
+
+		m_blur.OnCreate(pDevice, m_pResourceViewHeaps, m_pConstantBufferRing, pStaticBufferPool, m_outFormat);
+
+		// Create Descriptor Set Layout (for each mip level we will create later on the individual Descriptor Sets)
+		//
+		{
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+			layoutBindings[0].binding = 0;
+			layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			layoutBindings[0].descriptorCount = 1;
+			layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[0].pImmutableSamplers = NULL;
+
+			layoutBindings[1].binding = 1;
+			layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[1].descriptorCount = 1;
+			layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[1].pImmutableSamplers = NULL;
+
+			VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+			descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptor_layout.pNext = NULL;
+			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+			descriptor_layout.pBindings = layoutBindings.data();
+
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->_dev, &descriptor_layout, NULL, &m_descriptorSetLayout);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Create a Render pass that accounts for blending
+		m_blendPass = SimpleColorBlendRenderPass(pDevice->_dev, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
+
+		//blending add
+		{
+			VkPipelineColorBlendAttachmentState att_state[1];
+			att_state[0].colorWriteMask = allBits;
+			att_state[0].blendEnable = VK_TRUE;
+			att_state[0].alphaBlendOp = VK_BLEND_OP_ADD;
+			att_state[0].colorBlendOp = VK_BLEND_OP_ADD;
+			att_state[0].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state[0].dstColorBlendFactor = VK_BLEND_FACTOR_CONSTANT_COLOR;
+			att_state[0].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			att_state[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+
+			VkPipelineColorBlendStateCreateInfo cb;
+			cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			cb.flags = 0;
+			cb.pNext = NULL;
+			cb.attachmentCount = 1;
+			cb.pAttachments = att_state;
+			cb.logicOpEnable = VK_FALSE;
+			cb.logicOp = VK_LOGIC_OP_NO_OP;
+			cb.blendConstants[0] = 1.0f;
+			cb.blendConstants[1] = 1.0f;
+			cb.blendConstants[2] = 1.0f;
+			cb.blendConstants[3] = 1.0f;
+
+			m_blendAdd.OnCreate(pDevice, m_blendPass, "blend.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout, &cb);
+		}
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_sampler = pDevice->newSampler(&info);
+			/*		VkResult res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_sampler);
+					assert(res == VK_SUCCESS);*/
+		}
+
+		// Allocate descriptors for the mip chain
+		//
+		for (int i = 0; i < BLOOM_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_mip[i].m_descriptorSet);
+		}
+
+		// Allocate descriptors for the output pass
+		//
+		m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_output.m_descriptorSet);
+
+		m_doBlur = true;
+		m_doUpscale = true;
+	}
+
+	void Bloom::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mipCount, Texture* pOutput)
+	{
+		m_Width = Width;
+		m_Height = Height;
+		m_mipCount = mipCount;
+
+		m_blur.OnCreateWindowSizeDependentResources(m_pDevice, Width, Height, pInput, mipCount);
+
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			pInput->CreateSRV(&m_mip[i].m_SRV, i);     // source (pInput)
+			pInput->CreateRTV(&m_mip[i].m_RTV, i);     // target (pInput)
+
+			// Create framebuffer for target
+			//
+			{
+				VkImageView attachments[1] = { m_mip[i].m_RTV };
+
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_blendPass;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachments;
+				fb_info.width = Width >> i;
+				fb_info.height = Height >> i;
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->_dev, &fb_info, NULL, &m_mip[i].m_frameBuffer);
+				assert(res == VK_SUCCESS);
+
+				SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].m_frameBuffer, "BloomBlended");
+			}
+
+			// Set descriptors        
+			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_mip[i].m_descriptorSet);
+			m_pDevice->SetDescriptorSet(1, m_mip[i].m_SRV, m_sampler, m_mip[i].m_descriptorSet);
+		}
+
+		{
+			// output pass
+			pOutput->CreateRTV(&m_output.m_RTV, 0);
+
+			// Create framebuffer for target
+			//
+			{
+				VkImageView attachments[1] = { m_output.m_RTV };
+
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_blendPass;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachments;
+				fb_info.width = Width * 2;
+				fb_info.height = Height * 2;
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->_dev, &fb_info, NULL, &m_output.m_frameBuffer);
+				assert(res == VK_SUCCESS);
+
+				SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_output.m_frameBuffer, "BloomOutput");
+			}
+
+			// Set descriptors        
+			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(Bloom::cbBlend), m_output.m_descriptorSet);
+			m_pDevice->SetDescriptorSet(1, m_mip[1].m_SRV, m_sampler, m_output.m_descriptorSet);
+		}
+
+		// set weights of each mip level
+		m_mip[0].m_weight = 1.0f - 0.08f;
+		m_mip[1].m_weight = 0.25f;
+		m_mip[2].m_weight = 0.75f;
+		m_mip[3].m_weight = 1.5f;
+		m_mip[4].m_weight = 2.5f;
+		m_mip[5].m_weight = 3.0f;
+
+		// normalize weights
+		float n = 0;
+		for (uint32_t i = 1; i < 6; i++)
+			n += m_mip[i].m_weight;
+
+		for (uint32_t i = 1; i < 6; i++)
+			m_mip[i].m_weight /= n;
+	}
+
+	void Bloom::OnDestroyWindowSizeDependentResources()
+	{
+		m_blur.OnDestroyWindowSizeDependentResources();
+
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			vkDestroyImageView(m_pDevice->_dev, m_mip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->_dev, m_mip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->_dev, m_mip[i].m_frameBuffer, NULL);
+		}
+
+		vkDestroyImageView(m_pDevice->_dev, m_output.m_RTV, NULL);
+		vkDestroyFramebuffer(m_pDevice->_dev, m_output.m_frameBuffer, NULL);
+	}
+
+	void Bloom::OnDestroy()
+	{
+		for (int i = 0; i < BLOOM_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->FreeDescriptor(m_mip[i].m_descriptorSet);
+		}
+
+		m_pResourceViewHeaps->FreeDescriptor(m_output.m_descriptorSet);
+
+		m_blur.OnDestroy();
+
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorSetLayout, NULL);
+		//vkDestroySampler(m_pDevice->_dev, m_sampler, nullptr);
+
+		m_blendAdd.OnDestroy();
+
+		vkDestroyRenderPass(m_pDevice->_dev, m_blendPass, NULL);
+	}
+
+	void Bloom::Draw(VkCommandBuffer cmd_buf)
+	{
+		SetPerfMarkerBegin(cmd_buf, "Bloom");
+
+		//float weights[6] = { 0.25, 0.75, 1.5, 2, 2.5, 3.0 };
+
+		// given a RT, and its mip chain m0, m1, m2, m3, m4 
+		// 
+		// m4 = blur(m5)
+		// m4 = blur(m4) + w5 *m5
+		// m3 = blur(m3) + w4 *m4
+		// m2 = blur(m2) + w3 *m3
+		// m1 = blur(m1) + w2 *m2
+		// m0 = blur(m0) + w1 *m1
+		// RT = 0.92 * RT + 0.08 * m0
+
+		// blend and upscale
+		for (int i = m_mipCount - 1; i >= 0; i--)
+		{
+			// blur mip level
+			//
+			if (m_doBlur)
+			{
+				m_blur.Draw(cmd_buf, i);
+				// force wait for the draw to completely finish
+				// TODO: need to find a better way to do it
+				vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 0, NULL);
+			}
+
+			// blend with mip above   
+			SetPerfMarkerBegin(cmd_buf, "blend above");
+
+			Bloom::cbBlend* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(Bloom::cbBlend), (void**)&data, &constantBuffer);
+
+			if (i != 0)
+			{
+				VkRenderPassBeginInfo rp_begin = {};
+				rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				rp_begin.pNext = NULL;
+				rp_begin.renderPass = m_blendPass;
+				rp_begin.framebuffer = m_mip[i - 1].m_frameBuffer;
+				rp_begin.renderArea.offset.x = 0;
+				rp_begin.renderArea.offset.y = 0;
+				rp_begin.renderArea.extent.width = m_Width >> (i - 1);
+				rp_begin.renderArea.extent.height = m_Height >> (i - 1);
+				rp_begin.clearValueCount = 0;
+				rp_begin.pClearValues = NULL;
+				vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+				SetViewportAndScissor(cmd_buf, 0, 0, m_Width >> (i - 1), m_Height >> (i - 1), false);
+
+				float blendConstants[4] = { m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight };
+				vkCmdSetBlendConstants(cmd_buf, blendConstants);
+
+				data->weight = 1.0f;
+			}
+			else
+			{
+				//composite
+				VkRenderPassBeginInfo rp_begin = {};
+				rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				rp_begin.pNext = NULL;
+				rp_begin.renderPass = m_blendPass;
+				rp_begin.framebuffer = m_output.m_frameBuffer;
+				rp_begin.renderArea.offset.x = 0;
+				rp_begin.renderArea.offset.y = 0;
+				rp_begin.renderArea.extent.width = m_Width * 2;
+				rp_begin.renderArea.extent.height = m_Height * 2;
+				rp_begin.clearValueCount = 0;
+				rp_begin.pClearValues = NULL;
+				vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+				SetViewportAndScissor(cmd_buf, 0, 0, m_Width * 2, m_Height * 2, false);
+
+				float blendConstants[4] = { m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight, m_mip[i].m_weight };
+				vkCmdSetBlendConstants(cmd_buf, blendConstants);
+
+				data->weight = 1.0f - m_mip[i].m_weight;
+			}
+
+			if (m_doUpscale)
+				m_blendAdd.Draw(cmd_buf, &constantBuffer, m_mip[i].m_descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+			SetPerfMarkerEnd(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void Bloom::Gui()
+	{
+		//bool opened = true;
+		//if (ImGui::Begin("Bloom Controls", &opened))
+		//{
+		//	ImGui::Checkbox("Blur Bloom Stages", &m_doBlur);
+		//	ImGui::Checkbox("Upscaling", &m_doUpscale);
+
+		//	ImGui::SliderFloat("weight 0", &m_mip[0].m_weight, 0.0f, 1.0f);
+
+		//	for (int i = 1; i < m_mipCount; i++)
+		//	{
+		//		char buf[32];
+		//		sprintf_s<32>(buf, "weight %i", i);
+		//		ImGui::SliderFloat(buf, &m_mip[i].m_weight, 0.0f, 4.0f);
+		//	}
+		//}
+		//ImGui::End();
+	}
+	// todo blur
+
+	void BlurPS::OnCreate(
+		cxDevice* pDevice,
+		ResourceViewHeaps* pResourceViewHeaps,
+		buffer_ring_cx* pConstantBufferRing,
+		static_buffer_pool_cx* pStaticBufferPool,
+		VkFormat format
+	)
+	{
+		m_pDevice = pDevice;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pConstantBufferRing = pConstantBufferRing;
+
+		m_outFormat = format;
+
+		// Create Descriptor Set Layout, the shader needs a uniform dynamic buffer and a texture + sampler
+		// The Descriptor Sets will be created and initialized once we know the input to the shader, that happens in OnCreateWindowSizeDependentResources()
+		{
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+			layoutBindings[0].binding = 0;
+			layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			layoutBindings[0].descriptorCount = 1;
+			layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[0].pImmutableSamplers = NULL;
+
+			layoutBindings[1].binding = 1;
+			layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[1].descriptorCount = 1;
+			layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[1].pImmutableSamplers = NULL;
+
+			VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+			descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptor_layout.pNext = NULL;
+			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+			descriptor_layout.pBindings = layoutBindings.data();
+
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->_dev, &descriptor_layout, NULL, &m_descriptorSetLayout);
+			assert(res == VK_SUCCESS);
+		}
+
+		// Create a Render pass that will discard the contents of the render target.
+		//
+		m_in = SimpleColorWriteRenderPass(pDevice->_dev, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, format);
+
+		// The sampler we want to use for downsampling, all linear
+		//
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_sampler = pDevice->newSampler(&info);
+			/*		VkResult res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_sampler);
+					assert(res == VK_SUCCESS);*/
+		}
+
+		// Use helper class_to create the fullscreen pass 
+		//
+		m_directionalBlur.OnCreate(pDevice, m_in, "blur.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout);
+
+		// Allocate descriptors for the mip chain
+		//
+		for (int i = 0; i < BLURPS_MAX_MIP_LEVELS; i++)
+		{
+			// Horizontal pass
+			//
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_horizontalMip[i].m_descriptorSet);
+
+			// Vertical pass
+			//
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_verticalMip[i].m_descriptorSet);
+		}
+
+	}
+
+	void BlurPS::OnCreateWindowSizeDependentResources(cxDevice* pDevice, uint32_t Width, uint32_t Height, Texture* pInput, int mipCount)
+	{
+		m_Width = Width;
+		m_Height = Height;
+		m_mipCount = mipCount;
+
+		m_inputTexture = pInput;
+
+		// Create a temporary texture to hold the horizontal pass (only now we know the size of the render target we want to downsample, hence we create the temporary render target here)
+		//
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = NULL;
+		image_info.imageType = VK_IMAGE_TYPE_2D;
+		image_info.format = m_outFormat;
+		image_info.extent.width = m_Width;
+		image_info.extent.height = m_Height;
+		image_info.extent.depth = 1;
+		image_info.mipLevels = mipCount;
+		image_info.arrayLayers = 1;
+		image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+		image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image_info.queueFamilyIndexCount = 0;
+		image_info.pQueueFamilyIndices = NULL;
+		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+		image_info.flags = 0;
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;   // VK_IMAGE_TILING_LINEAR should never be used and will never be faster
+		m_tempBlur.Init(m_pDevice, &image_info, "BlurHorizontal");
+
+		// Create framebuffers and views for the mip chain
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			// Horizontal pass, from pInput to m_tempBlur
+			//
+			{
+				pInput->CreateSRV(&m_horizontalMip[i].m_SRV, i);     // source (pInput)
+				m_tempBlur.CreateRTV(&m_horizontalMip[i].m_RTV, i);  // target (m_tempBlur)
+
+				// Create framebuffer for target
+				//
+				{
+					VkImageView attachments[1] = { m_horizontalMip[i].m_RTV };
+
+					VkFramebufferCreateInfo fb_info = {};
+					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+					fb_info.pNext = NULL;
+					fb_info.renderPass = m_in;
+					fb_info.attachmentCount = 1;
+					fb_info.pAttachments = attachments;
+					fb_info.width = Width >> i;
+					fb_info.height = Height >> i;
+					fb_info.layers = 1;
+					VkResult res = vkCreateFramebuffer(m_pDevice->_dev, &fb_info, NULL, &m_horizontalMip[i].m_frameBuffer);
+					assert(res == VK_SUCCESS);
+
+					SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_horizontalMip[i].m_frameBuffer, "BlurPSHorizontal");
+				}
+
+				// Create Descriptor sets (all of them use the same Descriptor Layout)            
+				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_horizontalMip[i].m_descriptorSet);
+				m_pDevice->SetDescriptorSet(1, m_horizontalMip[i].m_SRV, m_sampler, m_horizontalMip[i].m_descriptorSet);
+			}
+
+			// Vertical pass, from m_tempBlur back to pInput
+			//
+			{
+				m_tempBlur.CreateSRV(&m_verticalMip[i].m_SRV, i);   // source (pInput)(m_tempBlur)
+				pInput->CreateRTV(&m_verticalMip[i].m_RTV, i);      // target (pInput)
+
+				{
+					VkImageView attachments[1] = { m_verticalMip[i].m_RTV };
+
+					VkFramebufferCreateInfo fb_info = {};
+					fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+					fb_info.pNext = NULL;
+					fb_info.renderPass = m_in;
+					fb_info.attachmentCount = 1;
+					fb_info.pAttachments = attachments;
+					fb_info.width = Width >> i;
+					fb_info.height = Height >> i;
+					fb_info.layers = 1;
+					VkResult res = vkCreateFramebuffer(m_pDevice->_dev, &fb_info, NULL, &m_verticalMip[i].m_frameBuffer);
+					assert(res == VK_SUCCESS);
+
+					SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_verticalMip[i].m_frameBuffer, "BlurPSVertical");
+				}
+
+				// create and update descriptor
+				m_pConstantBufferRing->SetDescriptorSet(0, sizeof(BlurPS::cbBlur), m_verticalMip[i].m_descriptorSet);
+				m_pDevice->SetDescriptorSet(1, m_verticalMip[i].m_SRV, m_sampler, m_verticalMip[i].m_descriptorSet);
+			}
+		}
+	}
+
+	void BlurPS::OnDestroyWindowSizeDependentResources()
+	{
+		// destroy views and framebuffers of the vertical and horizontal passes
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			vkDestroyImageView(m_pDevice->_dev, m_horizontalMip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->_dev, m_horizontalMip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->_dev, m_horizontalMip[i].m_frameBuffer, NULL);
+
+			vkDestroyImageView(m_pDevice->_dev, m_verticalMip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->_dev, m_verticalMip[i].m_RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->_dev, m_verticalMip[i].m_frameBuffer, NULL);
+		}
+
+		// Destroy temporary render target used to hold the horizontal pass
+		//
+		m_tempBlur.OnDestroy();
+	}
+
+	void BlurPS::OnDestroy()
+	{
+		// destroy views
+		for (int i = 0; i < BLURPS_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->FreeDescriptor(m_horizontalMip[i].m_descriptorSet);
+			m_pResourceViewHeaps->FreeDescriptor(m_verticalMip[i].m_descriptorSet);
+		}
+
+		m_directionalBlur.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorSetLayout, NULL);
+		//vkDestroySampler(m_pDevice->_dev, m_sampler, nullptr);
+		vkDestroyRenderPass(m_pDevice->_dev, m_in, NULL);
+	}
+
+	void BlurPS::Draw(VkCommandBuffer cmd_buf, int mipLevel)
+	{
+		SetPerfMarkerBegin(cmd_buf, "blur");
+
+		SetViewportAndScissor(cmd_buf, 0, 0, m_Width >> mipLevel, m_Height >> mipLevel, false);
+
+		// horizontal pass
+		//
+		{
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_in;
+			rp_begin.framebuffer = m_horizontalMip[mipLevel].m_frameBuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width >> mipLevel;
+			rp_begin.renderArea.extent.height = m_Height >> mipLevel;
+			rp_begin.clearValueCount = 0;
+			rp_begin.pClearValues = NULL;
+			vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+			BlurPS::cbBlur* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(BlurPS::cbBlur), (void**)&data, &constantBuffer);
+			data->dirX = 1.0f / (float)(m_Width >> mipLevel);
+			data->dirY = 0.0f / (float)(m_Height >> mipLevel);
+			data->mipLevel = mipLevel;
+			m_directionalBlur.Draw(cmd_buf, &constantBuffer, m_horizontalMip[mipLevel].m_descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+		}
+
+		// Memory barrier to transition input texture layout from shader read to render target
+		// Note the miplevel
+		//
+		{
+			VkImageMemoryBarrier barrier[1] = {};
+
+			// transition input to render target
+			barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier[0].pNext = nullptr;
+			barrier[0].srcAccessMask = 0;
+			barrier[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			barrier[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier[0].image = m_inputTexture->Resource();
+			barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier[0].subresourceRange.baseMipLevel = mipLevel;
+			barrier[0].subresourceRange.levelCount = 1;
+			barrier[0].subresourceRange.baseArrayLayer = 0;
+			barrier[0].subresourceRange.layerCount = 1;
+
+			vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+		}
+
+		// vertical pass
+		//
+		{
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_in;
+			rp_begin.framebuffer = m_verticalMip[mipLevel].m_frameBuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width >> mipLevel;
+			rp_begin.renderArea.extent.height = m_Height >> mipLevel;
+			rp_begin.clearValueCount = 0;
+			rp_begin.pClearValues = NULL;
+			vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+			BlurPS::cbBlur* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(BlurPS::cbBlur), (void**)&data, &constantBuffer);
+			data->dirX = 0.0f / (float)(m_Width >> mipLevel);
+			data->dirY = 1.0f / (float)(m_Height >> mipLevel);
+			data->mipLevel = mipLevel;
+			m_directionalBlur.Draw(cmd_buf, &constantBuffer, m_verticalMip[mipLevel].m_descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void BlurPS::Draw(VkCommandBuffer cmd_buf)
+	{
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			Draw(cmd_buf, i);
+		}
+	}
+
+	// todo cc
+
+	void ColorConversionPS::OnCreate(cxDevice* pDevice, VkRenderPass renderPass, ResourceViewHeaps* pResourceViewHeaps, static_buffer_pool_cx* pStaticBufferPool, buffer_ring_cx* pDynamicBufferRing)
+	{
+		m_pDevice = pDevice;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_sampler = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(m_pDevice->_dev, &info, NULL, &m_sampler);
+			//assert(res == VK_SUCCESS);
+		}
+
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[0].pImmutableSamplers = NULL;
+
+		layoutBindings[1].binding = 1;
+		layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layoutBindings[1].descriptorCount = 1;
+		layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindings[1].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayout(&layoutBindings, &m_descriptorSetLayout);
+
+		m_ColorConversion.OnCreate(m_pDevice, renderPass, "ColorConversionPS.glsl", "main", "", pStaticBufferPool, pDynamicBufferRing, m_descriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
+
+		m_descriptorIndex = 0;
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_descriptorSet[i]);
+	}
+
+	void ColorConversionPS::OnDestroy()
+	{
+		m_ColorConversion.OnDestroy();
+
+		for (int i = 0; i < s_descriptorBuffers; i++)
+			m_pResourceViewHeaps->FreeDescriptor(m_descriptorSet[i]);
+
+		//vkDestroySampler(m_pDevice->_dev, m_sampler, nullptr);
+
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorSetLayout, NULL);
+	}
+
+	void ColorConversionPS::UpdatePipelines(VkRenderPass renderPass, DisplayMode displayMode)
+	{
+		m_ColorConversion.UpdatePipeline(renderPass, NULL, VK_SAMPLE_COUNT_1_BIT);
+
+		m_colorConversionConsts.m_displayMode = displayMode;
+
+		if (displayMode != DISPLAYMODE_SDR)
+		{
+#ifdef fsHdrGetDisplayInfo
+			const VkHdrMetadataEXT* pHDRMetatData = fsHdrGetDisplayInfo();
+
+			m_colorConversionConsts.m_displayMinLuminancePerNits = (float)pHDRMetatData->minLuminance / 80.0f; // RGB(1, 1, 1) maps to 80 nits in scRGB;
+			m_colorConversionConsts.m_displayMaxLuminancePerNits = (float)pHDRMetatData->maxLuminance / 80.0f; // This means peak white equals RGB(m_maxLuminanace/80.0f, m_maxLuminanace/80.0f, m_maxLuminanace/80.0f) in scRGB;
+
+			FillDisplaySpecificPrimaries(
+				pHDRMetatData->whitePoint.x, pHDRMetatData->whitePoint.y,
+				pHDRMetatData->displayPrimaryRed.x, pHDRMetatData->displayPrimaryRed.y,
+				pHDRMetatData->displayPrimaryGreen.x, pHDRMetatData->displayPrimaryGreen.y,
+				pHDRMetatData->displayPrimaryBlue.x, pHDRMetatData->displayPrimaryBlue.y
+			);
+
+			SetupGamutMapperMatrices(
+				ColorSpace_REC709,
+				ColorSpace_Display,
+				&m_colorConversionConsts.m_contentToMonitorRecMatrix);
+#endif
+		}
+	}
+
+	void ColorConversionPS::Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV)
+	{
+		SetPerfMarkerBegin(cmd_buf, "ColorConversion");
+
+		VkDescriptorBufferInfo cbTonemappingHandle;
+		ColorConversionConsts* pColorConversionConsts;
+		m_pDynamicBufferRing->AllocConstantBuffer(sizeof(ColorConversionConsts), (void**)&pColorConversionConsts, &cbTonemappingHandle);
+		*pColorConversionConsts = m_colorConversionConsts;
+
+		// We'll be modifying the descriptor set(DS), to prevent writing on a DS that is in use we 
+		// need to do some basic buffering. Just to keep it safe and simple we'll have 10 buffers.
+		VkDescriptorSet descriptorSet = m_descriptorSet[m_descriptorIndex];
+		m_descriptorIndex = (m_descriptorIndex + 1) % s_descriptorBuffers;
+
+		// modify Descriptor set
+		m_pDevice->SetDescriptorSet(1, HDRSRV, m_sampler, descriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(0, sizeof(ColorConversionConsts), descriptorSet);
+
+		// Draw!
+		m_ColorConversion.Draw(cmd_buf, &cbTonemappingHandle, descriptorSet);
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+	// todo downs
+
+	void DownSamplePS::OnCreate(
+		cxDevice* pDevice,
+		ResourceViewHeaps* pResourceViewHeaps,
+		buffer_ring_cx* pConstantBufferRing,
+		static_buffer_pool_cx* pStaticBufferPool,
+		VkFormat outFormat
+	)
+	{
+		m_pDevice = pDevice;
+		m_pStaticBufferPool = pStaticBufferPool;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pConstantBufferRing = pConstantBufferRing;
+		m_outFormat = outFormat;
+
+		// Create Descriptor Set Layout, the shader needs a uniform dynamic buffer and a texture + sampler
+		// The Descriptor Sets will be created and initialized once we know the input to the shader, that happens in OnCreateWindowSizeDependentResources()
+		{
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings(2);
+			layoutBindings[0].binding = 0;
+			layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			layoutBindings[0].descriptorCount = 1;
+			layoutBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[0].pImmutableSamplers = NULL;
+
+			layoutBindings[1].binding = 1;
+			layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBindings[1].descriptorCount = 1;
+			layoutBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			layoutBindings[1].pImmutableSamplers = NULL;
+
+			VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+			descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptor_layout.pNext = NULL;
+			descriptor_layout.bindingCount = (uint32_t)layoutBindings.size();
+			descriptor_layout.pBindings = layoutBindings.data();
+
+			VkResult res = vkCreateDescriptorSetLayout(pDevice->_dev, &descriptor_layout, NULL, &m_descriptorSetLayout);
+			assert(res == VK_SUCCESS);
+		}
+
+		// In Render pass
+		//
+		m_in = SimpleColorWriteRenderPass(pDevice->_dev, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
+
+		// The sampler we want to use for downsampling, all linear
+		//
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			m_sampler = pDevice->newSampler(&info);
+			//VkResult res = vkCreateSampler(pDevice->_dev, &info, NULL, &m_sampler);
+			//assert(res == VK_SUCCESS);
+		}
+
+		// Use helper class_to create the fullscreen pass
+		//
+		m_downscale.OnCreate(pDevice, m_in, "DownSamplePS.glsl", "main", "", pStaticBufferPool, pConstantBufferRing, m_descriptorSetLayout);
+
+		// Allocate descriptors for the mip chain
+		//
+		for (int i = 0; i < DOWNSAMPLEPS_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->AllocDescriptor(m_descriptorSetLayout, &m_mip[i].descriptorSet);
+		}
+	}
+
+	void DownSamplePS::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mipCount)
+	{
+		m_Width = Width;
+		m_Height = Height;
+		m_mipCount = mipCount;
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = NULL;
+		image_info.imageType = VK_IMAGE_TYPE_2D;
+		image_info.format = m_outFormat;
+		image_info.extent.width = m_Width >> 1;
+		image_info.extent.height = m_Height >> 1;
+		image_info.extent.depth = 1;
+		image_info.mipLevels = mipCount;
+		image_info.arrayLayers = 1;
+		image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+		image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image_info.queueFamilyIndexCount = 0;
+		image_info.pQueueFamilyIndices = NULL;
+		image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+		image_info.flags = 0;
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		m_result.Init(m_pDevice, &image_info, "DownsampleMip");
+		// Create views for the mip chain
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			// source -----------
+			if (i == 0)
+			{
+				pInput->CreateSRV(&m_mip[i].m_SRV, 0);
+			}
+			else
+			{
+				m_result.CreateSRV(&m_mip[i].m_SRV, i - 1);
+			}
+			// Create and initialize the Descriptor Sets (all of them use the same Descriptor Layout)        
+			m_pConstantBufferRing->SetDescriptorSet(0, sizeof(DownSamplePS::cbDownscale), m_mip[i].descriptorSet);
+			m_pDevice->SetDescriptorSet(1, m_mip[i].m_SRV, m_sampler, m_mip[i].descriptorSet);
+			// destination -----------
+			m_result.CreateRTV(&m_mip[i].RTV, i);
+			// Create framebuffer 
+			{
+				VkImageView attachments[1] = { m_mip[i].RTV };
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_in;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachments;
+				fb_info.width = m_Width >> (i + 1);
+				fb_info.height = m_Height >> (i + 1);
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->_dev, &fb_info, NULL, &m_mip[i].frameBuffer);
+				assert(res == VK_SUCCESS);
+
+				std::string ResourceName = "DownsamplePS";
+				ResourceName += std::to_string(i);
+
+				SetResourceName(m_pDevice->_dev, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_mip[i].frameBuffer, ResourceName.c_str());
+			}
+		}
+	}
+
+	void DownSamplePS::OnDestroyWindowSizeDependentResources()
+	{
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			vkDestroyImageView(m_pDevice->_dev, m_mip[i].m_SRV, NULL);
+			vkDestroyImageView(m_pDevice->_dev, m_mip[i].RTV, NULL);
+			vkDestroyFramebuffer(m_pDevice->_dev, m_mip[i].frameBuffer, NULL);
+		}
+
+		m_result.OnDestroy();
+	}
+
+	void DownSamplePS::OnDestroy()
+	{
+		for (int i = 0; i < DOWNSAMPLEPS_MAX_MIP_LEVELS; i++)
+		{
+			m_pResourceViewHeaps->FreeDescriptor(m_mip[i].descriptorSet);
+		}
+
+		m_downscale.OnDestroy();
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_descriptorSetLayout, NULL);
+		//vkDestroySampler(m_pDevice->_dev, m_sampler, nullptr);
+
+		vkDestroyRenderPass(m_pDevice->_dev, m_in, NULL);
+	}
+
+	void DownSamplePS::Draw(VkCommandBuffer cmd_buf)
+	{
+		SetPerfMarkerBegin(cmd_buf, "Downsample");
+
+		// downsample
+		//
+		for (int i = 0; i < m_mipCount; i++)
+		{
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_in;
+			rp_begin.framebuffer = m_mip[i].frameBuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width >> (i + 1);
+			rp_begin.renderArea.extent.height = m_Height >> (i + 1);
+			rp_begin.clearValueCount = 0;
+			rp_begin.pClearValues = NULL;
+			vkCmdBeginRenderPass(cmd_buf, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+			SetViewportAndScissor(cmd_buf, 0, 0, m_Width >> (i + 1), m_Height >> (i + 1), false);
+
+			cbDownscale* data;
+			VkDescriptorBufferInfo constantBuffer;
+			m_pConstantBufferRing->AllocConstantBuffer(sizeof(cbDownscale), (void**)&data, &constantBuffer);
+			data->invWidth = 1.0f / (float)(m_Width >> i);
+			data->invHeight = 1.0f / (float)(m_Height >> i);
+			data->mipLevel = i;
+
+			m_downscale.Draw(cmd_buf, &constantBuffer, m_mip[i].descriptorSet);
+
+			vkCmdEndRenderPass(cmd_buf);
+		}
+
+		SetPerfMarkerEnd(cmd_buf);
+	}
+
+	void DownSamplePS::Gui()
+	{
+		//bool opened = true;
+		//ImGui::Begin("DownSamplePS", &opened);
+
+		//for (int i = 0; i < m_mipCount; i++)
+		//{
+		//	ImGui::Image((ImTextureID)m_mip[i].m_SRV, ImVec2(320 / 2, 180 / 2));
+		//}
+
+		//ImGui::End();
+	}
+
+	// todo
+
+	static const char* SHADER_FILE_NAME_MAGNIFIER = "MagnifierPS.glsl";
+	static const char* SHADER_ENTRY_POINT = "main";
+	using cbHandle_t = VkDescriptorBufferInfo;
+
+
+
+	void MagnifierPS::OnCreate(cxDevice* pDevice, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing, static_buffer_pool_cx* pStaticBufferPool, VkFormat outFormat, bool bOutputsToSwapchain /*= false*/)
+	{
+		m_pDevice = pDevice;
+		m_pResourceViewHeaps = pResourceViewHeaps;
+		m_pDynamicBufferRing = pDynamicBufferRing;
+		m_bOutputsToSwapchain = bOutputsToSwapchain;
+		InitializeDescriptorSets();
+		//VK_FORMAT_R16G16B16A16_SFLOAT
+		m_RenderPass = SimpleColorBlendRenderPass(m_pDevice->_dev, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, outFormat);
+		CompileShaders(pStaticBufferPool, outFormat); // expects a non-null Render Pass!
+	}
+
+
+	void MagnifierPS::OnDestroy()
+	{
+		vkDestroyRenderPass(m_pDevice->_dev, m_RenderPass, NULL);
+		m_RenderPass = 0;
+		DestroyShaders();
+		DestroyDescriptorSets();
+	}
+
+
+	void MagnifierPS::OnCreateWindowSizeDependentResources(Texture* pTexture)
+	{
+		pTexture->CreateSRV(&m_ImageViewSrc);
+		update_set(m_ImageViewSrc);
+
+		if (!m_bOutputsToSwapchain)
+		{
+			VkDevice device = m_pDevice->_dev;
+			const uint32_t ImgWidth = pTexture->GetWidth();
+			const uint32_t ImgHeight = pTexture->GetHeight();
+
+			// create pass output image and its views
+			VkImageCreateInfo image_info = {};
+			image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			image_info.pNext = NULL;
+			image_info.imageType = VK_IMAGE_TYPE_2D;
+			image_info.format = pTexture->GetFormat();
+			image_info.extent.width = ImgWidth;
+			image_info.extent.height = ImgHeight;
+			image_info.extent.depth = 1;
+			image_info.mipLevels = 1;
+			image_info.arrayLayers = 1;
+			image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+			image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			image_info.queueFamilyIndexCount = 0;
+			image_info.pQueueFamilyIndices = NULL;
+			image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			image_info.usage = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+			image_info.flags = 0;
+			image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+			m_TexPassOutput.Init(m_pDevice, &image_info, "TexMagnifierOutput");
+			m_TexPassOutput.CreateSRV(&m_SRVOutput);
+			m_TexPassOutput.CreateRTV(&m_RTVOutput);
+
+			// create framebuffer
+			VkImageView attachments[] = { m_RTVOutput };
+			VkFramebufferCreateInfo fb_info = {};
+			fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			fb_info.pNext = NULL;
+			fb_info.renderPass = m_RenderPass;
+			fb_info.attachmentCount = 1;
+			fb_info.pAttachments = attachments;
+			fb_info.width = ImgWidth;
+			fb_info.height = ImgHeight;
+			fb_info.layers = 1;
+			VkResult res = vkCreateFramebuffer(device, &fb_info, NULL, &m_FrameBuffer);
+			assert(res == VK_SUCCESS);
+			SetResourceName(device, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)m_FrameBuffer, "MagnifierPS");
+		}
+	}
+
+
+	void MagnifierPS::OnDestroyWindowSizeDependentResources()
+	{
+		VkDevice device = m_pDevice->_dev;
+		vkDestroyImageView(device, m_ImageViewSrc, NULL);
+		vkDestroyImageView(device, m_SRVOutput, NULL);
+		vkDestroySampler(device, m_SamplerSrc, nullptr);
+		if (!m_bOutputsToSwapchain)
+		{
+			vkDestroyImageView(device, m_RTVOutput, NULL);
+			m_TexPassOutput.OnDestroy();
+			vkDestroyFramebuffer(device, m_FrameBuffer, NULL);
+		}
+	}
+
+	void MagnifierPS::CompileShaders(static_buffer_pool_cx* pStaticBufferPool, VkFormat outFormat)
+	{
+		// Compile Magnifier Pixel Shader
+		m_ShaderMagnify.OnCreate(m_pDevice, m_RenderPass, SHADER_FILE_NAME_MAGNIFIER, SHADER_ENTRY_POINT, "", pStaticBufferPool,
+			m_pDynamicBufferRing, m_DescriptorSetLayout, NULL, VK_SAMPLE_COUNT_1_BIT);
+		return;
+	}
+
+	void MagnifierPS::DestroyShaders()
+	{
+		m_ShaderMagnify.OnDestroy();
+	}
+
+
+	void MagnifierPS::InitializeDescriptorSets()
+	{
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindingsMagnifier(2);
+		layoutBindingsMagnifier[0] = {};
+		layoutBindingsMagnifier[0].binding = 0;
+		layoutBindingsMagnifier[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindingsMagnifier[0].descriptorCount = 1;
+		layoutBindingsMagnifier[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		layoutBindingsMagnifier[0].pImmutableSamplers = NULL;
+
+		layoutBindingsMagnifier[1] = {};
+		layoutBindingsMagnifier[1].binding = 1;
+		layoutBindingsMagnifier[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutBindingsMagnifier[1].descriptorCount = 1;
+		layoutBindingsMagnifier[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		layoutBindingsMagnifier[1].pImmutableSamplers = NULL;
+
+		m_pResourceViewHeaps->CreateDescriptorSetLayoutAndAllocDescriptorSet(&layoutBindingsMagnifier, &m_DescriptorSetLayout, &m_DescriptorSet);
+		m_pDynamicBufferRing->SetDescriptorSet(1, sizeof(PassParameters), m_DescriptorSet);
+	}
+	void MagnifierPS::update_set(VkImageView ImageViewSrc)
+	{
+		// nearest sampler
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_NEAREST;
+			info.minFilter = VK_FILTER_NEAREST;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			VkResult res = vkCreateSampler(m_pDevice->_dev, &info, NULL, &m_SamplerSrc);
+			assert(res == VK_SUCCESS);
+		}
+
+		constexpr size_t NUM_WRITES = 1;
+		constexpr size_t NUM_IMAGES = 1;
+
+		VkDescriptorImageInfo ImgInfo[NUM_IMAGES] = {};
+		VkWriteDescriptorSet  SetWrites[NUM_WRITES] = {};
+
+		for (size_t i = 0; i < NUM_IMAGES; ++i) { ImgInfo[i].sampler = m_SamplerSrc; }
+		for (size_t i = 0; i < NUM_WRITES; ++i)
+		{
+			SetWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			SetWrites[i].dstSet = m_DescriptorSet;
+			SetWrites[i].descriptorCount = 1;
+			SetWrites[i].pImageInfo = ImgInfo + i;
+		}
+
+		SetWrites[0].dstBinding = 0;
+		SetWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		ImgInfo[0].imageView = ImageViewSrc;
+		ImgInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		vkUpdateDescriptorSets(m_pDevice->_dev, _countof(SetWrites), SetWrites, 0, NULL);
+	}
+
+	void MagnifierPS::DestroyDescriptorSets()
+	{
+		m_pResourceViewHeaps->FreeDescriptor(m_DescriptorSet);
+		vkDestroyDescriptorSetLayout(m_pDevice->_dev, m_DescriptorSetLayout, NULL);
+	}
+
+	void MagnifierPS::UpdatePipelines(VkRenderPass renderPass)
+	{
+		m_ShaderMagnify.UpdatePipeline(renderPass, NULL, VK_SAMPLE_COUNT_1_BIT);
+	}
+
+	void MagnifierPS::BeginPass(VkCommandBuffer cmd, VkRect2D renderArea)
+	{
+		VkRenderPassBeginInfo rp_begin = {};
+		rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		rp_begin.pNext = NULL;
+		rp_begin.renderPass = /*pSwapChain ? pSwapChain->GetRenderPass() :*/ m_RenderPass;
+		rp_begin.framebuffer = /*pSwapChain ? pSwapChain->GetCurrentFramebuffer() :*/ m_FrameBuffer;
+		rp_begin.renderArea = renderArea;
+		rp_begin.clearValueCount = 0;
+		rp_begin.pClearValues = NULL;
+		vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+	}
+
+	void MagnifierPS::EndPass(VkCommandBuffer cmd)
+	{
+		vkCmdEndRenderPass(cmd);
+	}
+
+
+	void MagnifierPS::Draw(VkCommandBuffer cmd, PassParameters& params /*, SwapChain* pSwapChain  = nullptr*/)
+	{
+		SetPerfMarkerBegin(cmd, "Magnifier");
+
+		if (m_bOutputsToSwapchain)
+		{
+			Trace("Warning: MagnifierPS::Draw() is called with NULL swapchain RTV handle, bOutputsToSwapchain was true during MagnifierPS::OnCreate(). No Draw calls will be issued.");
+			return;
+		}
+
+		cbHandle_t cbHandle = SetConstantBufferData(params);
+
+		VkRect2D renderArea;
+		renderArea.offset.x = 0;
+		renderArea.offset.y = 0;
+		renderArea.extent.width = params.uImageWidth;
+		renderArea.extent.height = params.uImageHeight;
+		BeginPass(cmd, renderArea);
+
+		m_ShaderMagnify.Draw(cmd, &cbHandle, m_DescriptorSet);
+		EndPass(cmd);
+		SetPerfMarkerEnd(cmd);
+	}
+
+
+	VkDescriptorBufferInfo MagnifierPS::SetConstantBufferData(PassParameters& params)
+	{
+		KeepMagnifierOnScreen(params);
+
+		// memcpy to cbuffer
+		cbHandle_t cbHandle = {};
+		uint32_t* pConstMem = nullptr;
+		const uint32_t szConstBuff = sizeof(PassParameters);
+		void const* pConstBufSrc = static_cast<void const*>(&params);
+		m_pDynamicBufferRing->AllocConstantBuffer(szConstBuff, reinterpret_cast<void**>(&pConstMem), &cbHandle);
+		memcpy(pConstMem, pConstBufSrc, szConstBuff);
+
+		return cbHandle;
+	}
+
+	void MagnifierPS::KeepMagnifierOnScreen(PassParameters& params)
+	{
+		const int IMAGE_SIZE[2] = { static_cast<int>(params.uImageWidth), static_cast<int>(params.uImageHeight) };
+		const int& W = IMAGE_SIZE[0];
+		const int& H = IMAGE_SIZE[1];
+
+		const int radiusInPixelsMagifier = static_cast<int>(params.fMagnifierScreenRadius * H);
+		const int radiusInPixelsMagifiedArea = static_cast<int>(params.fMagnifierScreenRadius * H / params.fMagnificationAmount);
+
+		const bool bCirclesAreOverlapping = radiusInPixelsMagifiedArea + radiusInPixelsMagifier > std::sqrt(params.iMagnifierOffset[0] * params.iMagnifierOffset[0] + params.iMagnifierOffset[1] * params.iMagnifierOffset[1]);
+
+
+		if (bCirclesAreOverlapping) // don't let the two circles overlap
+		{
+			params.iMagnifierOffset[0] = radiusInPixelsMagifiedArea + radiusInPixelsMagifier + 1;
+			params.iMagnifierOffset[1] = radiusInPixelsMagifiedArea + radiusInPixelsMagifier + 1;
+		}
+
+		for (int i = 0; i < 2; ++i) // try to move the magnified area to be fully on screen, if possible
+		{
+			const bool bMagnifierOutOfScreenRegion = params.iMousePos[i] + params.iMagnifierOffset[i] + radiusInPixelsMagifier > IMAGE_SIZE[i]
+				|| params.iMousePos[i] + params.iMagnifierOffset[i] - radiusInPixelsMagifier < 0;
+			if (bMagnifierOutOfScreenRegion)
+			{
+				if (!(params.iMousePos[i] - params.iMagnifierOffset[i] + radiusInPixelsMagifier > IMAGE_SIZE[i]
+					|| params.iMousePos[i] - params.iMagnifierOffset[i] - radiusInPixelsMagifier < 0))
+				{
+					// flip offset if possible
+					params.iMagnifierOffset[i] = -params.iMagnifierOffset[i];
+				}
+				else
+				{
+					// otherwise clamp
+					if (params.iMousePos[i] + params.iMagnifierOffset[i] + radiusInPixelsMagifier > IMAGE_SIZE[i])
+						params.iMagnifierOffset[i] = IMAGE_SIZE[i] - params.iMousePos[i] - radiusInPixelsMagifier;
+					if (params.iMousePos[i] + params.iMagnifierOffset[i] - radiusInPixelsMagifier < 0)
+						params.iMagnifierOffset[i] = -params.iMousePos[i] + radiusInPixelsMagifier;
+				}
+			}
+		}
+	}
 
 
 	//--------------------------------------------------------------------------------------
@@ -7350,6 +9927,18 @@ namespace vkg {
 			info.compareEnable = kt.compareEnable ? VK_TRUE : VK_FALSE;
 			info.unnormalizedCoordinates = kt.unnormalizedCoordinates ? VK_TRUE : VK_FALSE;
 			vkCreateSampler(_dev, &info, 0, &p);
+		}
+		return p;
+	}
+
+	VkSampler cxDevice::newSampler(const VkSamplerCreateInfo* pCreateInfo)
+	{
+		VkSampler p = {};
+		sampler_info_t ki = {};
+		if (pCreateInfo)
+		{
+			ki.magFilter = pCreateInfo->magFilter;
+
 		}
 		return p;
 	}
