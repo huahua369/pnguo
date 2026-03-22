@@ -147,7 +147,7 @@ namespace vkg {
 		bool compareEnable;
 		bool unnormalizedCoordinates;
 	};
-	enum class GBufferFlagBits :uint32_t
+	enum GBufferFlagBits
 	{
 		GBUFFER_NONE = 0,
 		GBUFFER_DEPTH = 1,
