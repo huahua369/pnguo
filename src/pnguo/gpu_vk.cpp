@@ -255,7 +255,7 @@ namespace vkg {
 		void Wait();
 
 	};
-
+	// 对象实现头
 #if 1
 	/*
 		Frame		: Camera(1:1)、World(1:1)、Renderer(1:1)
@@ -617,7 +617,7 @@ namespace vkg {
 		uint32_t        m_memTotalSize = 0;
 		RingWithTabs    m_mem;
 		char* m_pData = nullptr;
-		VkBuffer        m_buffer;
+		VkBuffer        m_buffer = {};
 
 #ifdef USE_VMA
 		VmaAllocation   m_bufferAlloc = VK_NULL_HANDLE;
@@ -658,6 +658,28 @@ namespace vkg {
 #endif 
 		bool             m_bUseVidMem = true;
 	};
+
+
+	// set管理
+	class ResourceViewHeaps
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, uint32_t cbvDescriptorCount, uint32_t srvDescriptorCount, uint32_t uavDescriptorCount, uint32_t samplerDescriptorCount);
+		void OnDestroy();
+		bool AllocDescriptor(VkDescriptorSetLayout descriptorLayout, VkDescriptorSet* pDescriptor);
+		bool AllocDescriptor(int size, const VkSampler* pSamplers, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
+		bool AllocDescriptor(std::vector<uint32_t>& descriptorCounts, const VkSampler* pSamplers, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
+		bool CreateDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* pDescSetLayout);
+		bool CreateDescriptorSetLayoutAndAllocDescriptorSet(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding, VkDescriptorSetLayout* descriptorLayout, VkDescriptorSet* pDescriptor);
+		void FreeDescriptor(VkDescriptorSet descriptorSet);
+		cxDevice* get_dev();
+	private:
+		cxDevice* m_pDevice = 0;
+		VkDescriptorPool m_descriptorPool;
+		//std::mutex       _mutex;
+		int              m_allocatedDescriptorCount = 0;
+	};
+
 
 
 	class UploadHeap
@@ -838,15 +860,605 @@ namespace vkg {
 
 
 
-
-
-
-
-
-
-
-
 #endif // 1
+	// 对象实现头
+
+
+	enum PresentationMode
+	{
+		PRESENTATIONMODE_WINDOWED,
+		PRESENTATIONMODE_BORDERLESS_FULLSCREEN,
+		PRESENTATIONMODE_EXCLUSIVE_FULLSCREEN
+	};
+
+	enum DisplayMode
+	{
+		DISPLAYMODE_SDR,
+		DISPLAYMODE_FSHDR_Gamma22,
+		DISPLAYMODE_FSHDR_SCRGB,
+		DISPLAYMODE_HDR10_2084,
+		DISPLAYMODE_HDR10_SCRGB
+	};
+
+	struct TimeStamp
+	{
+		std::string m_label;
+		float       m_microseconds;
+	};
+
+	class GPUTimestamps
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers);
+		void OnDestroy();
+
+		void GetTimeStamp(VkCommandBuffer cmd_buf, const char* label);
+		void GetTimeStampUser(TimeStamp ts);
+		void OnBeginFrame(VkCommandBuffer cmd_buf, std::vector<TimeStamp>* pTimestamp);
+		void OnEndFrame();
+
+	private:
+		cxDevice* m_pDevice;
+
+		const uint32_t MaxValuesPerFrame = 128;
+
+		VkQueryPool        m_QueryPool;
+
+		uint32_t m_frame = 0;
+		uint32_t m_NumberOfBackBuffers = 0;
+
+		std::vector<std::string> m_labels[5];
+		std::vector<TimeStamp> m_cpuTimeStamps[5];
+	};
+
+	typedef uint32_t GBufferFlags;
+
+	class GBuffer
+	{
+	public:
+
+		void OnCreate(cxDevice* pDevice, ResourceViewHeaps* pHeaps, const std::map<GBufferFlags, VkFormat>& m_formats, int sampleCount);
+		void OnDestroy();
+
+		void OnCreateWindowSizeDependentResources(/*SwapChain* pSwapChain,*/ uint32_t Width, uint32_t Height);
+		void OnDestroyWindowSizeDependentResources();
+
+		void GetAttachmentList(GBufferFlags flags, std::vector<VkImageView>* pAttachments, std::vector<VkClearValue>* pClearValues);
+		VkRenderPass CreateRenderPass(GBufferFlags flags, bool bClear);
+
+		//void GetCompilerDefines(DefineList& defines);
+		VkSampleCountFlagBits  GetSampleCount() { return m_sampleCount; }
+		cxDevice* GetDevice() { return m_pDevice; }
+
+		// depth buffer
+		Texture                         m_DepthBuffer;
+		VkImageView                     m_DepthBufferDSV;
+		VkImageView                     m_DepthBufferSRV;
+		// diffuse
+		Texture                         m_Diffuse;
+		VkImageView                     m_DiffuseSRV;
+		// specular
+		Texture                         m_SpecularRoughness;
+		VkImageView                     m_SpecularRoughnessSRV;
+		// motion vectors
+		Texture                         m_MotionVectors;
+		VkImageView                     m_MotionVectorsSRV;
+		// normal buffer
+		Texture                         m_NormalBuffer;
+		VkImageView                     m_NormalBufferSRV;
+		// HDR
+		Texture                         m_HDR;		// color
+		VkImageView                     m_HDRSRV;
+		Texture                         m_HDRt;		// transmission
+		VkImageView                     m_HDRSRVt;
+#if 0
+		Texture                         m_HDR_oit_accum;
+		VkImageView                     m_HDR_oit_accumSRV;
+		Texture                         m_HDR_oit_weight;
+		VkImageView                     m_HDR_oit_weightSRV;
+#endif
+	private:
+		cxDevice* m_pDevice;
+		VkSampleCountFlagBits           m_sampleCount;
+		GBufferFlags                    m_GBufferFlags;
+		std::vector<VkClearValue>       m_clearValues;
+		std::map<GBufferFlags, VkFormat> m_formats;
+	};
+
+
+
+
+	class PostProcPS
+	{
+	public:
+		void OnCreate(
+			cxDevice* pDevice,
+			VkRenderPass renderPass,
+			const std::string& shaderFilename,
+			const std::string& shaderEntryPoint,
+			const std::string& shaderCompilerParams,
+			static_buffer_pool_cx* pStaticBufferPool,
+			buffer_ring_cx* pDynamicBufferRing,
+			VkDescriptorSetLayout descriptorSetLayout,
+			VkPipelineColorBlendStateCreateInfo* pBlendDesc = NULL,
+			VkSampleCountFlagBits sampleDescCount = VK_SAMPLE_COUNT_1_BIT
+		);
+		void OnDestroy();
+		void UpdatePipeline(VkRenderPass renderPass, VkPipelineColorBlendStateCreateInfo* pBlendDesc = NULL, VkSampleCountFlagBits sampleDescCount = VK_SAMPLE_COUNT_1_BIT);
+		void Draw(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo* pConstantBuffer, VkDescriptorSet descriptorSet = NULL);
+
+	private:
+		cxDevice* m_pDevice;
+		std::vector<VkPipelineShaderStageCreateInfo> m_shaderStages;
+		std::string m_fragmentShaderName;
+
+		// all bounding boxes of all the meshes use the same geometry, shaders and pipelines.
+		uint32_t m_NumIndices;
+		VkIndexType m_indexType;
+		VkDescriptorBufferInfo m_IBV;
+
+		VkPipeline m_pipeline = VK_NULL_HANDLE;
+		VkRenderPass m_renderPass = VK_NULL_HANDLE;
+		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+
+	};
+	class SkyDome
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, VkRenderPass renderPass, UploadHeap* pUploadHeap, VkFormat outFormat, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing, static_buffer_pool_cx* pStaticBufferPool, const char* pDiffuseCubemap, const char* pSpecularCubemap, VkSampleCountFlagBits sampleDescCount);
+		void OnDestroy();
+		void Draw(VkCommandBuffer cmd_buf, const glm::mat4& invViewProj);
+		void GenerateDiffuseMapFromEnvironmentMap();
+
+		void SetDescriptorDiff(uint32_t index, VkDescriptorSet descriptorSet);
+		void SetDescriptorSpec(uint32_t index, VkDescriptorSet descriptorSet);
+
+		VkImageView GetCubeDiffuseTextureView() const;
+		VkImageView GetCubeSpecularTextureView() const;
+		VkSampler GetCubeDiffuseTextureSampler() const;
+		VkSampler GetCubeSpecularTextureSampler() const;
+
+	private:
+		cxDevice* m_pDevice;
+
+		ResourceViewHeaps* m_pResourceViewHeaps;
+
+		Texture m_CubeDiffuseTexture;
+		Texture m_CubeSpecularTexture;
+
+		VkImageView m_CubeDiffuseTextureView;
+		VkImageView m_CubeSpecularTextureView;
+
+		VkSampler m_samplerDiffuseCube, m_samplerSpecularCube;
+
+		VkDescriptorSet       m_descriptorSet;
+		VkDescriptorSetLayout m_descriptorLayout;
+
+		PostProcPS  m_skydome;
+
+		buffer_ring_cx* m_pDynamicBufferRing = NULL;
+		glm::vec4 default_specular = glm::vec4(0.5);	// 默认环境高光值
+	};
+
+#define BLURPS_MAX_MIP_LEVELS 12
+
+	// Implements a simple separable gaussian blur
+
+	class BlurPS
+	{
+	public:
+		void OnCreate(
+			cxDevice* pDevice,
+			ResourceViewHeaps* pResourceViewHeaps,
+			buffer_ring_cx* pConstantBufferRing,
+			static_buffer_pool_cx* pStaticBufferPool,
+			VkFormat format
+		);
+		void OnDestroy();
+
+		void OnCreateWindowSizeDependentResources(cxDevice* pDevice, uint32_t Width, uint32_t Height, Texture* pInput, int mipCount);
+		void OnDestroyWindowSizeDependentResources();
+
+		void Draw(VkCommandBuffer cmd_buf, int mipLevel);
+		void Draw(VkCommandBuffer cmd_buf);
+
+	private:
+		cxDevice* m_pDevice;
+
+		ResourceViewHeaps* m_pResourceViewHeaps;
+		buffer_ring_cx* m_pConstantBufferRing;
+
+		VkFormat                   m_outFormat;
+
+		uint32_t                   m_Width;
+		uint32_t                   m_Height;
+		int                        m_mipCount;
+
+		Texture* m_inputTexture;
+		Texture                    m_tempBlur;
+
+		struct Pass
+		{
+			VkImageView     m_RTV;
+			VkImageView     m_SRV;
+			VkFramebuffer   m_frameBuffer;
+			VkDescriptorSet m_descriptorSet;
+		};
+
+		Pass                       m_horizontalMip[BLURPS_MAX_MIP_LEVELS];
+		Pass                       m_verticalMip[BLURPS_MAX_MIP_LEVELS];
+
+		VkDescriptorSetLayout      m_descriptorSetLayout;
+
+		PostProcPS                 m_directionalBlur;
+
+		VkSampler                  m_sampler;
+
+		VkRenderPass               m_in;
+
+		struct cbBlur
+		{
+			float dirX, dirY;
+			int mipLevel;
+		};
+	};
+
+#ifndef BLOOM_MAX_MIP_LEVELS 
+#define BLOOM_MAX_MIP_LEVELS 12
+#endif
+	class Bloom
+	{
+	private:
+		struct cbBlend
+		{
+			float weight;
+		};
+		struct Pass
+		{
+			VkImageView     m_RTV;
+			VkImageView     m_SRV;
+			VkFramebuffer   m_frameBuffer;
+			VkDescriptorSet m_descriptorSet;
+			float m_weight;
+		};
+		cxDevice* m_pDevice = nullptr;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+		buffer_ring_cx* m_pConstantBufferRing;
+		Pass                       m_mip[BLOOM_MAX_MIP_LEVELS] = {};
+		Pass                       m_output = {};
+		BlurPS                     m_blur;
+		PostProcPS                 m_blendAdd;
+		VkDescriptorSetLayout      m_descriptorSetLayout;
+		VkSampler                  m_sampler;
+		VkRenderPass               m_blendPass;
+		VkFormat                   m_outFormat;
+		uint32_t                   m_Width;
+		uint32_t                   m_Height;
+		int                        m_mipCount;
+		bool                       m_doBlur;
+		bool                       m_doUpscale;
+
+	public:
+		void OnCreate(cxDevice* pDevice, ResourceViewHeaps* pHeaps, buffer_ring_cx* pConstantBufferRing, static_buffer_pool_cx* pResourceViewHeaps, VkFormat format);
+		void OnDestroy();
+		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mipCount, Texture* pOutput);
+		void OnDestroyWindowSizeDependentResources();
+		void Draw(VkCommandBuffer cmd_buf);
+
+		void Gui();
+
+	};
+
+	class ColorConversionPS
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, VkRenderPass renderPass, ResourceViewHeaps* pResourceViewHeaps, static_buffer_pool_cx* pStaticBufferPool, buffer_ring_cx* pDynamicBufferRing);
+		void OnDestroy();
+
+		void UpdatePipelines(VkRenderPass renderPass, DisplayMode displayMode);
+
+		void Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV);
+
+	private:
+		cxDevice* m_pDevice;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+
+		PostProcPS m_ColorConversion;
+		buffer_ring_cx* m_pDynamicBufferRing = NULL;
+
+		VkSampler m_sampler;
+
+		uint32_t              m_descriptorIndex;
+		static const uint32_t s_descriptorBuffers = 10;
+
+		VkDescriptorSet       m_descriptorSet[s_descriptorBuffers];
+		VkDescriptorSetLayout m_descriptorSetLayout;
+
+		struct ColorConversionConsts
+		{
+			glm::mat4 m_contentToMonitorRecMatrix;
+			DisplayMode m_displayMode;
+			float m_displayMinLuminancePerNits;
+			float m_displayMaxLuminancePerNits;
+		};
+
+		ColorConversionConsts m_colorConversionConsts;
+	};
+
+#define DOWNSAMPLEPS_MAX_MIP_LEVELS 12
+
+	class DownSamplePS
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* m_pConstantBufferRing, static_buffer_pool_cx* pStaticBufferPool, VkFormat outFormat);
+		void OnDestroy();
+
+		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, Texture* pInput, int mips);
+		void OnDestroyWindowSizeDependentResources();
+
+		void Draw(VkCommandBuffer cmd_buf);
+		Texture* GetTexture() { return &m_result; }
+		VkImageView GetTextureView(int i) { return m_mip[i].m_SRV; }
+		void Gui();
+
+		struct cbDownscale
+		{
+			float invWidth, invHeight;
+			int mipLevel;
+		};
+
+	private:
+		cxDevice* m_pDevice;
+		VkFormat                    m_outFormat;
+
+		Texture                     m_result;
+
+		struct Pass
+		{
+			VkImageView     RTV; //dest
+			VkImageView     m_SRV; //src
+			VkFramebuffer   frameBuffer;
+			VkDescriptorSet descriptorSet;
+		};
+
+		Pass                         m_mip[DOWNSAMPLEPS_MAX_MIP_LEVELS];
+
+		static_buffer_pool_cx* m_pStaticBufferPool;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+		buffer_ring_cx* m_pConstantBufferRing;
+
+		uint32_t                     m_Width;
+		uint32_t                     m_Height;
+		int                          m_mipCount;
+
+		VkDescriptorSetLayout        m_descriptorSetLayout;
+
+		PostProcPS                   m_downscale;
+
+		VkRenderPass                 m_in;
+
+		VkSampler                    m_sampler;
+	};
+
+	class PostProcCS
+	{
+	public:
+		void OnCreate(
+			cxDevice* pDevice,
+			const std::string& shaderFilename,
+			const std::string& shaderEntryPoint,
+			const std::string& shaderCompilerParams,
+			VkDescriptorSetLayout descriptorSetLayout,
+			uint32_t dwWidth, uint32_t dwHeight, uint32_t dwDepth,
+			DefineList* userDefines = 0
+		);
+		void OnDestroy();
+		void Draw(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo* pConstantBuffer, VkDescriptorSet descSet, uint32_t dispatchX, uint32_t dispatchY, uint32_t dispatchZ);
+
+	private:
+		cxDevice* m_pDevice;
+
+		VkPipeline m_pipeline = VK_NULL_HANDLE;
+		VkPipelineLayout m_pipelineLayout;
+	};
+
+	// This renders a procedural sky, see the SkyDomeProc.glsl for more references and credits
+	// todo sky
+	class SkyDomeProc
+	{
+	public:
+
+		struct Constants
+		{
+			glm::mat4 invViewProj;
+			glm::vec4 vSunDirection;		// 太阳方向
+			float rayleigh = 2;				// 瑞利散射，视觉效果就是傍晚晚霞的红光的深度
+			float turbidity = 10;			// 浑浊度
+			float mieCoefficient = 0.005;	// 散射系数
+			float luminance = 1.0;			// 亮度
+			float mieDirectionalG = 0.8;	// 定向散射值
+		};
+
+		void OnCreate(cxDevice* pDevice, VkRenderPass renderPass, UploadHeap* pUploadHeap, VkFormat outFormat, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing, static_buffer_pool_cx* pStaticBufferPool, VkSampleCountFlagBits sampleDescCount);
+		void OnDestroy();
+		void Draw(VkCommandBuffer cmd_buf, SkyDomeProc::Constants constants);
+
+	private:
+		cxDevice* m_pDevice;
+
+		ResourceViewHeaps* m_pResourceViewHeaps;
+
+		VkDescriptorSet         m_descriptorSet;
+		VkDescriptorSetLayout   m_descriptorLayout;
+
+		PostProcPS  m_skydome;
+
+		buffer_ring_cx* m_pDynamicBufferRing = NULL;
+	};
+	// todo taa
+	class TAA
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, ResourceViewHeaps* pResourceViewHeaps, static_buffer_pool_cx* pStaticBufferPool, buffer_ring_cx* pDynamicBufferRing, bool sharpening);
+		void OnDestroy();
+
+		void OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height, GBuffer* pGBuffer);
+		void OnDestroyWindowSizeDependentResources();
+
+		void Draw(VkCommandBuffer cmd_buf);
+
+	private:
+		cxDevice* m_pDevice;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+
+		uint32_t              m_Width, m_Height;
+
+		GBuffer* m_pGBuffer;
+
+		bool                  m_TexturesInUndefinedLayout;
+
+		Texture               m_TAABuffer;
+		VkImageView           m_TAABufferSRV;
+		VkImageView           m_TAABufferUAV;
+
+		Texture               m_HistoryBuffer;
+		VkImageView           m_HistoryBufferSRV;
+		//VkImageView           m_HistoryBufferUAV;
+
+		VkSampler             m_samplers[4];
+
+		VkDescriptorSet       m_TaaDescriptorSet;
+		VkDescriptorSetLayout m_TaaDescriptorSetLayout;
+		PostProcCS            m_TAA;
+		PostProcCS            m_TAAFirst;
+
+		//
+		VkDescriptorSet       m_SharpenDescriptorSet;
+		VkDescriptorSetLayout m_SharpenDescriptorSetLayout;
+		PostProcCS            m_Sharpen;
+		PostProcCS            m_Post;
+	public:
+		bool                  m_bSharpening = true;
+		bool                  m_bFirst = true;
+	};
+	class ToneMapping
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, VkRenderPass renderPass, ResourceViewHeaps* pResourceViewHeaps, static_buffer_pool_cx* pStaticBufferPool, buffer_ring_cx* pDynamicBufferRing, uint32_t srvTableSize = 1, const char* shaderSource = "Tonemapping.glsl");
+		void OnDestroy();
+
+		void UpdatePipelines(VkRenderPass renderPass);
+
+		void Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, float exposure, int toneMapper);
+
+	protected:
+		cxDevice* m_pDevice;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+
+		PostProcPS m_toneMapping;
+		buffer_ring_cx* m_pDynamicBufferRing = NULL;
+
+		VkSampler m_sampler;
+
+		uint32_t              m_descriptorIndex;
+		static const uint32_t s_descriptorBuffers = 10;
+
+		VkDescriptorSet       m_descriptorSet[s_descriptorBuffers];
+		VkDescriptorSetLayout m_descriptorSetLayout;
+
+		struct ToneMappingConsts { float exposure; int toneMapper; };
+	};
+	class ToneMappingCS
+	{
+	public:
+		void OnCreate(cxDevice* pDevice, ResourceViewHeaps* pResourceViewHeaps, buffer_ring_cx* pDynamicBufferRing);
+		void OnDestroy();
+
+		void Draw(VkCommandBuffer cmd_buf, VkImageView HDRSRV, float exposure, int toneMapper, int width, int height);
+
+	private:
+		cxDevice* m_pDevice;
+		ResourceViewHeaps* m_pResourceViewHeaps;
+
+		PostProcCS m_toneMapping;
+		buffer_ring_cx* m_pDynamicBufferRing = NULL;
+
+		uint32_t              m_descriptorIndex;
+		static const uint32_t s_descriptorBuffers = 10;
+
+		VkDescriptorSet       m_descriptorSet[s_descriptorBuffers];
+		VkDescriptorSetLayout m_descriptorSetLayout;
+
+		struct ToneMappingConsts { float exposure; int toneMapper; };
+	};
+
+	class MagnifierPS
+	{
+	public:
+		void OnCreate(
+			cxDevice* pDevice
+			, ResourceViewHeaps* pResourceViewHeaps
+			, buffer_ring_cx* pDynamicBufferRing
+			, static_buffer_pool_cx* pStaticBufferPool
+			, VkFormat outFormat
+			, bool bOutputsToSwapchain = false
+		);
+
+		void OnDestroy();
+		void OnCreateWindowSizeDependentResources(Texture* pTexture);
+		void OnDestroyWindowSizeDependentResources();
+		void BeginPass(VkCommandBuffer cmd, VkRect2D renderArea);
+		void EndPass(VkCommandBuffer cmd);
+
+
+		// Draws a magnified region on top of the given image to OnCreateWindowSizeDependentResources()
+		// if @pSwapChain is provided, expects swapchain to be sycned before this call.
+		// Barriers are to be managed by the caller.
+		void Draw(VkCommandBuffer cmd, PassParameters& params);
+
+		inline Texture& GetPassOutput() { assert(!m_bOutputsToSwapchain); return m_TexPassOutput; }
+		inline VkImage GetPassOutputResource() const { assert(!m_bOutputsToSwapchain); return m_TexPassOutput.Resource(); }
+		inline VkImageView GetPassOutputSRV() const { assert(!m_bOutputsToSwapchain); return m_SRVOutput; }
+		inline VkRenderPass GetPassRenderPass() const { assert(!m_bOutputsToSwapchain); return m_RenderPass; }
+		void UpdatePipelines(VkRenderPass renderPass);
+	private:
+
+		void CompileShaders(static_buffer_pool_cx* pStaticBufferPool, VkFormat outFormat);
+		void DestroyShaders();
+
+		void InitializeDescriptorSets();
+		void update_set(VkImageView ImageViewSrc);
+		void DestroyDescriptorSets();
+		VkDescriptorBufferInfo SetConstantBufferData(PassParameters& params);
+		static void KeepMagnifierOnScreen(PassParameters& params);
+
+		//--------------------------------------------------------------------------------------------------------
+		// DATA
+		//--------------------------------------------------------------------------------------------------------
+	private:
+		// DEVICE & MEMORY
+		cxDevice* m_pDevice = nullptr;
+		ResourceViewHeaps* m_pResourceViewHeaps = nullptr;
+		buffer_ring_cx* m_pDynamicBufferRing = nullptr;
+
+		// DESCRIPTOR SETS & LAYOUTS
+		VkDescriptorSet m_DescriptorSet;
+		VkDescriptorSetLayout m_DescriptorSetLayout;
+		// RENDER PASSES & RESOURCE VIEWS
+		VkSampler   m_SamplerSrc;
+		VkImageView m_ImageViewSrc;
+
+		VkRenderPass  m_RenderPass;
+		VkFramebuffer m_FrameBuffer;
+		VkImageView   m_RTVOutput;
+		VkImageView   m_SRVOutput;
+
+		Texture m_TexPassOutput;
+		PostProcPS m_ShaderMagnify;
+		bool m_bOutputsToSwapchain = false;
+	};
+
+
 
 }
 // !vkg

@@ -1046,7 +1046,7 @@ int main()
 					vkd->_state.Exposure;					// 曝光度：默认1.0
 					vkd->_state.bUseTAA;
 					vkd->_state.WireframeMode;				// 0 1 2 6
-					static int ity = 6.5;
+					static int ity = 6;
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
 					{

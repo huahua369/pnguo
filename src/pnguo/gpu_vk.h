@@ -13,7 +13,7 @@ todo:星号是已实现完成的
 		图像：	2D纹理、3D纹理、立方体贴图、纹理数组。*
 		缓冲区：	static_buffer_pool_cx*(vbo、ibo)、buffer_ring_cx*(ubo、ssbo)
 		管线：	pbr着色器*、自定义着色器*
-		渲染器：	向前渲染缓冲区、bloom、后处理等
+		渲染器：	向前渲染缓冲区、bloom、后处理等*
 	对象：
 		帧图：相机、世界、渲染器、rgba纹理、深度纹理等
 		世界：群组、实例
@@ -296,6 +296,19 @@ namespace vkg {
 		const char* vertexShaderFile = 0;
 		const char* fragmentShaderFile = 0;
 	};
+
+	struct PassParameters
+	{
+		uint32_t    uImageWidth = 1;
+		uint32_t    uImageHeight = 1;
+		int         iMousePos[2] = {};            // in pixels, driven by MousePos.xy
+		float       fBorderColorRGB[4] = { 1,1,1,1 };      // Linear RGBA
+		float       fMagnificationAmount = 6.0f;    // [1-...]
+		float       fMagnifierScreenRadius = 0.35f;  // [0-1]
+		mutable int iMagnifierOffset[2] = { 500,-500 };     // in pixels
+	};
+
+
 
 	class cxObject;		// 通用对象
 	class cxDevice;		// 设备
