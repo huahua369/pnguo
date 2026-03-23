@@ -805,6 +805,63 @@ namespace vkg {
 		rp_begin.clearValueCount = (uint32_t)pClearValues->size();
 		vkCmdBeginRenderPass(commandList, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 	}
+
+	void image_set_layout_subres(VkCommandBuffer cmdBuff, VkImage image, VkImageSubresourceRange subresourceRange,
+		VkImageLayout old_image_layout, VkImageLayout new_image_layout,
+		VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages) {
+		VkImageMemoryBarrier image_memory_barrier = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+													  .oldLayout = old_image_layout,
+													  .newLayout = new_image_layout,
+													  .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+													  .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+													  .image = image,
+													  .subresourceRange = subresourceRange };
+
+		switch (old_image_layout) {
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+		default:
+			break;
+		}
+
+		switch (new_image_layout) {
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		default:
+			break;
+		}
+
+		vkCmdPipelineBarrier(cmdBuff, src_stages, dest_stages, 0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
+		//image->layout = new_image_layout;
+	}
+
+	void image_set_layout(VkCommandBuffer cmdBuff, VkImage image, VkImageAspectFlags aspectMask, VkImageLayout old_image_layout, VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages)
+	{
+		VkImageSubresourceRange subres = { aspectMask,0,1,0,1 };
+		image_set_layout_subres(cmdBuff, image, subres, old_image_layout, new_image_layout, src_stages, dest_stages);
+	}
+
+
 #if 1
 	static PFN_vkSetDebugUtilsObjectNameEXT     s_vkSetDebugUtilsObjectName = nullptr;
 	static PFN_vkCmdBeginDebugUtilsLabelEXT     s_vkCmdBeginDebugUtilsLabel = nullptr;
@@ -4789,8 +4846,9 @@ namespace vkg {
 	// 纹理
 
 
-	void GPUTimestamps::OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, double timestamp_period)
+	void GPUTimestamps::OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers)
 	{
+		double timestamp_period = pDevice->get_limits()->timestampPeriod;
 		m_pDevice = pDevice;
 		m_NumberOfBackBuffers = numberOfBackBuffers;
 		m_frame = 0;
@@ -7813,6 +7871,1891 @@ namespace vkg {
 	}
 
 
+	dvk_texture::dvk_texture() {
+
+	}
+	dvk_texture::dvk_texture(cxDevice* dev) :_dev(dev) {}
+
+	dvk_texture::~dvk_texture() {}
+
+
+
+	// todo fbo
+
+	fbo_info_cx::fbo_info_cx()
+	{}
+
+	fbo_info_cx::~fbo_info_cx()
+	{
+		destroy_all();
+	}
+
+	void fbo_info_cx::setClearValues(uint32_t color, float depth, uint32_t Stencil)
+	{
+		//float r[] = { vk_R(color) / 255.0f,  vk_G(color) / 255.0f,  vk_B(color) / 255.0f,  vk_A(color) / 255.0f };
+		//memcpy(&clearValues[0].color, r, sizeof(float) * 4);
+		unsigned char* uc = (unsigned char*)&color;
+		clearValues[0].color = { uc[0] / 255.0f, uc[1] / 255.0f, uc[2] / 255.0f, uc[3] / 255.0f };
+		clearValues[1].depthStencil = { depth, Stencil };
+	}
+
+	void fbo_info_cx::setClearValues(float* color, float depth, uint32_t Stencil)
+	{
+		clearValues[0].color = { { color[0], color[1], color[2], color[3] } };
+		clearValues[1].depthStencil = { depth, Stencil };
+	}
+
+	//swapchainbuffers交换链
+	void fbo_info_cx::initFBO(int width, int height, int count, VkRenderPass rp)
+	{
+		_width = width; _height = height;
+		count_ = count;
+		//是否创建颜色缓冲纹理
+		isColor = true;// !swapchainbuffers || swapchainbuffers->empty();
+		// Create a separate render pass for the offscreen rendering as it may differ from the one used for scene rendering
+		resetCommandBuffers();
+
+		if (!renderPass)
+		{
+			if (!rp)
+			{
+				//nrp = rp = _dev->new_render_pass(colorFormat, depthFormat);
+			}
+			renderPass = rp;
+		}
+		// Create sampler to sample from the color attachments
+		VkSamplerCreateInfo samplerinfo = {};
+		samplerinfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerinfo.magFilter = VK_FILTER_LINEAR;
+		samplerinfo.minFilter = VK_FILTER_LINEAR;
+		samplerinfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerinfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerinfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerinfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		samplerinfo.mipLodBias = 0.0f;
+		samplerinfo.maxAnisotropy = 1;
+		samplerinfo.minLod = 0.0f;
+		samplerinfo.maxLod = 1.0f;
+		samplerinfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		if (!sampler)
+		{
+			sampler = _dev->newSampler(&samplerinfo);
+		}
+
+		// Create num frame buffers
+		resetFramebuffer(width, height);
+	}
+
+	//窗口大小改变时需要重新创建image,如果是交换链则传swapchainbuffers
+	void fbo_info_cx::resetFramebuffer(int width, int height)
+	{
+		_width = width;
+		_height = height;
+#ifdef _WIN32
+		destroyImage();
+#endif
+		// Color attachment
+		VkImageCreateInfo image = {};
+		image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image.imageType = VK_IMAGE_TYPE_2D;
+		image.format = colorFormat;
+		image.extent.width = width;
+		image.extent.height = height;
+		image.extent.depth = 1;
+		image.mipLevels = 1;
+		image.arrayLayers = 1;
+		image.samples = VK_SAMPLE_COUNT_1_BIT;
+		image.tiling = VK_IMAGE_TILING_OPTIMAL;
+		// We will sample directly from the color attachment
+		image.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		VkImageViewCreateInfo colorImageView = {};
+		colorImageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		colorImageView.format = colorFormat;
+		colorImageView.flags = 0;
+		colorImageView.subresourceRange = {};
+		colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		colorImageView.subresourceRange.baseMipLevel = 0;
+		colorImageView.subresourceRange.levelCount = 1;
+		colorImageView.subresourceRange.baseArrayLayer = 0;
+		colorImageView.subresourceRange.layerCount = 1;
+		if (isColor)
+		{
+			for (auto& it : framebuffers)
+			{
+				_dev->newImage(&image, &colorImageView, &it.color);
+				it.color.width = width;
+				it.color.height = height;
+				it.color._format = colorFormat;
+			}
+			if (!_fence)
+			{
+				_fence = _dev->newFence();
+			}
+		}
+		else
+		{
+			//int i = 0;
+			//for (auto it : *swapchainbuffers)
+			//{
+			//	if (framebuffers.size() > i)
+			//	{
+			//		framebuffers[i].color._dev = _dev;
+			//		framebuffers[i].color._image = it.image;
+			//		framebuffers[i].color._view = it._view;
+			//		framebuffers[i].color.width = width;
+			//		framebuffers[i].color.height = height;
+			//		framebuffers[i].color._format = (VkFormat)it.colorFormat;
+			//		i++;
+			//	}
+			//}
+		}
+		// Depth stencil attachment
+		image.format = depthFormat;
+		image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+		VkImageViewCreateInfo depthStencilView = {};
+		depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		depthStencilView.format = depthFormat;
+		depthStencilView.flags = 0;
+		depthStencilView.subresourceRange = {};
+		depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		depthStencilView.subresourceRange.baseMipLevel = 0;
+		depthStencilView.subresourceRange.levelCount = 1;
+		depthStencilView.subresourceRange.baseArrayLayer = 0;
+		depthStencilView.subresourceRange.layerCount = 1;
+		if (is_stencil_tex(depthFormat)) {
+			depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		for (auto& it : framebuffers)
+		{
+			_dev->newImage(&image, &depthStencilView, &it.depth_stencil);
+			it.depth_stencil.width = width; it.depth_stencil.height = height; it.depth_stencil._format = depthFormat;
+		}
+
+		VkImageView attachments[2];
+		int inc = 0;
+		for (auto& it : framebuffers)
+		{
+			inc++;
+			attachments[0] = it.color._view;
+			attachments[1] = it.depth_stencil._view;
+			VkFramebufferCreateInfo fbufCreateInfo = {};
+			fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			fbufCreateInfo.renderPass = renderPass;
+			fbufCreateInfo.attachmentCount = 2;
+			fbufCreateInfo.pAttachments = attachments;
+			fbufCreateInfo.width = width;
+			fbufCreateInfo.height = height;
+			fbufCreateInfo.layers = 1;
+			auto hr = vkCreateFramebuffer(_dev->_dev, &fbufCreateInfo, nullptr, &it.framebuffer);
+			// Fill a descriptor for later use in a descriptor set
+			it.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			it.descriptor.imageView = it.color._view;
+			it.descriptor.sampler = sampler;
+		}
+	}
+
+	void fbo_info_cx::reset_fbo(int width, int height)
+	{
+		resetFramebuffer(width, height);
+	}
+
+	void fbo_info_cx::resetCommandBuffers()
+	{
+		if (count_ < 1)
+			return;
+		destroy_all();
+		framebuffers.resize(count_);
+		drawCmdBuffers.resize(count_);
+		for (auto& it : framebuffers)
+		{
+			it.depth_stencil._dev = _dev;
+			if (it.semaphore == VK_NULL_HANDLE)
+			{
+				_dev->newSemaphore(&it.semaphore, 0);
+			}
+			if (it.semaphore1 == VK_NULL_HANDLE)
+			{
+				_dev->newSemaphore(&it.semaphore1, 0);
+			}
+		}
+		if (isColor)
+		{
+			for (auto& it : framebuffers)
+				it.color._dev = _dev;
+		}
+	}
+
+	void fbo_info_cx::build_cmd_empty()
+	{
+		VkCommandBufferBeginInfo cmdBufInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, 0, 0, 0 };
+		VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 0, 0, 0, 0, 0, 0 };
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.renderArea.offset.x = 0;
+		renderPassBeginInfo.renderArea.offset.y = 0;
+		renderPassBeginInfo.renderArea.extent.width = _width;
+		renderPassBeginInfo.renderArea.extent.height = _height;
+		renderPassBeginInfo.clearValueCount = 2;
+		renderPassBeginInfo.pClearValues = clearValues;
+		VkResult hr = {};
+		for (size_t i = 0; i < framebuffers.size(); ++i)
+		{
+			// Set target frame buffer
+			renderPassBeginInfo.framebuffer = framebuffers[i].framebuffer;
+			hr = vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo);
+			// Draw the particle system using the update vertex buffer
+			vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			vkCmdEndRenderPass(drawCmdBuffers[i]);
+			hr = vkEndCommandBuffer(drawCmdBuffers[i]);
+		}
+	}
+	void fbo_info_cx::destroyImage()
+	{
+		for (auto& it : framebuffers)
+		{
+			if (isColor)
+			{
+				_dev->destroyTexture(&it.color);
+				_dev->destroyTexture(&it.depth_stencil);
+			}
+			if (it.framebuffer)
+				vkDestroyFramebuffer(_dev->_dev, it.framebuffer, 0);
+			it.framebuffer = 0;
+		}
+	}
+
+	void fbo_info_cx::destroy_all()
+	{
+		destroyImage();
+		for (auto& it : framebuffers)
+		{
+			if (it.semaphore)
+				vkDestroySemaphore(_dev->_dev, it.semaphore, 0);
+			it.semaphore = 0;
+			if (it.semaphore1)
+				vkDestroySemaphore(_dev->_dev, it.semaphore1, 0);
+			it.semaphore1 = 0;
+			if (it.framebuffer)
+				vkDestroyFramebuffer(_dev->_dev, it.framebuffer, 0);
+			it.framebuffer = 0;
+		}
+		if (_fence)
+			vkDestroyFence(_dev->_dev, _fence, 0);
+		_fence = 0;
+		renderPass = 0;
+	}
+
+	void CommandListRing::OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, uint32_t commandListsPerBackBuffer, bool compute /* = false */)
+	{
+		m_pDevice = pDevice;
+		m_numberOfAllocators = numberOfBackBuffers;
+		m_commandListsPerBackBuffer = commandListsPerBackBuffer;
+
+		m_pCommandBuffers.resize(m_numberOfAllocators);
+
+		// Create command allocators, for each frame in flight we wannt to have a single Command Allocator, and <commandListsPerBackBuffer> command buffers
+		//
+		for (uint32_t a = 0; a < m_numberOfAllocators; a++)
+		{
+			CommandBuffersPerFrame* pCBPF = &m_pCommandBuffers[a];
+
+			// Create allocator
+			//
+			VkCommandPoolCreateInfo cmd_pool_info = {};
+			cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			cmd_pool_info.pNext = NULL;
+			if (compute == false)
+			{
+				cmd_pool_info.queueFamilyIndex = pDevice->_queue_family_index;
+			}
+			else
+			{
+				cmd_pool_info.queueFamilyIndex = pDevice->_queue_family_index;
+			}
+			cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+			VkResult res = vkCreateCommandPool(pDevice->_dev, &cmd_pool_info, NULL, &pCBPF->m_commandPool);
+			assert(res == VK_SUCCESS);
+
+			// Create command buffers
+			//
+			pCBPF->m_pCommandBuffer = new VkCommandBuffer[m_commandListsPerBackBuffer];
+			VkCommandBufferAllocateInfo cmd = {};
+			cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			cmd.pNext = NULL;
+			cmd.commandPool = pCBPF->m_commandPool;
+			cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			cmd.commandBufferCount = commandListsPerBackBuffer;
+			res = vkAllocateCommandBuffers(pDevice->_dev, &cmd, pCBPF->m_pCommandBuffer);
+			assert(res == VK_SUCCESS);
+
+			pCBPF->m_UsedCls = 0;
+		}
+
+		m_frameIndex = 0;
+		m_pCurrentFrame = &m_pCommandBuffers[m_frameIndex % m_numberOfAllocators];
+		m_frameIndex++;
+		m_pCurrentFrame->m_UsedCls = 0;
+	}
+
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroy
+	//
+	//--------------------------------------------------------------------------------------
+	void CommandListRing::OnDestroy()
+	{
+		//release and delete command allocators
+		for (uint32_t a = 0; a < m_numberOfAllocators; a++)
+		{
+			vkFreeCommandBuffers(m_pDevice->_dev, m_pCommandBuffers[a].m_commandPool, m_commandListsPerBackBuffer, m_pCommandBuffers[a].m_pCommandBuffer);
+			vkDestroyCommandPool(m_pDevice->_dev, m_pCommandBuffers[a].m_commandPool, NULL);
+		}
+		m_pCommandBuffers.clear();
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// GetNewCommandList
+	//
+	//--------------------------------------------------------------------------------------
+	VkCommandBuffer CommandListRing::GetNewCommandList()
+	{
+		VkCommandBuffer commandBuffer = m_pCurrentFrame->m_pCommandBuffer[m_pCurrentFrame->m_UsedCls++];
+		assert(m_pCurrentFrame->m_UsedCls < m_commandListsPerBackBuffer); //if hit increase commandListsPerBackBuffer
+		return commandBuffer;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnBeginFrame
+	//
+	//--------------------------------------------------------------------------------------
+	void CommandListRing::OnBeginFrame()
+	{
+		m_pCurrentFrame = &m_pCommandBuffers[m_frameIndex % m_numberOfAllocators];
+		m_pCurrentFrame->m_UsedCls = 0;
+		m_frameIndex++;
+	}
+
+
+
+#if 1
+
+	// todo vkrenderer
+	Renderer_cx::Renderer_cx(const_vk* p)
+	{
+		if (p)
+			ct = *p;
+	}
+
+
+	Renderer_cx::~Renderer_cx()
+	{
+		if (m_GBuffer)
+			delete m_GBuffer;
+		m_GBuffer = 0;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreate
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnCreate(cxDevice* pDevice, VkRenderPass rp)
+	{
+		m_pDevice = pDevice;
+
+		// Initialize helpers
+
+		// Create all the heaps for the resources views
+		/*const uint32_t cbvDescriptorCount = 2000;
+		const uint32_t srvDescriptorCount = 8000;
+		const uint32_t uavDescriptorCount = 10;
+		const uint32_t samplerDescriptorCount = 20;*/
+		m_ResourceViewHeaps.OnCreate(pDevice, ct.cbvDescriptorCount, ct.srvDescriptorCount, ct.uavDescriptorCount, ct.samplerDescriptorCount);
+
+		// Create a commandlist ring for the Direct queue
+		//uint32_t commandListsPerBackBuffer = 8;
+		m_CommandListRing.OnCreate(pDevice, backBufferCount, ct.commandListsPerBackBuffer);
+
+		// Create a 'dynamic' constant buffer
+		const uint32_t constantBuffersMemSize = 64 * 1024;
+		m_ConstantBufferRing.OnCreate(pDevice, backBufferCount, ct.constantBuffersMemSize, (char*)"Uniforms");
+
+		// Create a 'static' pool for vertices and indices 
+		const uint32_t staticGeometryMemSize = 128 * 1024 * 1024;
+		m_VidMemBufferPool.OnCreate(pDevice, staticGeometryMemSize, true, "StaticGeom");
+
+		// Create a 'static' pool for vertices and indices in system memory
+		const uint32_t systemGeometryMemSize = 32 * 1024;
+		m_SysMemBufferPool.OnCreate(pDevice, systemGeometryMemSize, true, "PostProcGeom");
+
+		// initialize the GPU time stamps module
+		m_GPUTimer.OnCreate(pDevice, backBufferCount);
+
+		// Quick helper to upload resources, it has it's own commandList and uses suballocation.
+		//const uint32_t uploadHeapMemSize = 1000 * 1024 * 1024;
+		m_UploadHeap.OnCreate(pDevice, ct.uploadHeapMemSize);    // initialize an upload heap (uses suballocation for faster results)
+		// Create GBuffer and render passes
+		assert(!m_GBuffer);
+		m_GBuffer = new GBuffer();
+		// 向前颜色格式
+		VkFormat mformat = VK_FORMAT_R16G16B16A16_SFLOAT;
+		// 深度缓冲格式
+		VkFormat dformat = _stencil_test ? VK_FORMAT_D32_SFLOAT_S8_UINT : VK_FORMAT_D32_SFLOAT;
+		{
+			std::map<GBufferFlags, VkFormat> formats =
+			{
+				{ GBUFFER_DEPTH, dformat},
+				{ GBUFFER_FORWARD, mformat},
+				{ GBUFFER_MOTION_VECTORS, VK_FORMAT_R16G16_SFLOAT}, //运动矢量
+				//{ GBUFFER_NORMAL_BUFFER, GBFORMAT_E},
+			};
+			//if (has_oit) {
+			//	formats[GBUFFER_OIT_ACCUM] = mformat;
+			//	formats[GBUFFER_OIT_WEIGHT] = VK_FORMAT_R16_SFLOAT;
+			//}
+			m_GBuffer->OnCreate(pDevice, &m_ResourceViewHeaps, formats, 1);
+			GBufferFlags fullGBuffer = GBUFFER_DEPTH | GBUFFER_FORWARD | GBUFFER_MOTION_VECTORS;// | GBUFFER_NORMAL_BUFFER;
+			//if (has_oit) fullGBuffer |= GBUFFER_OIT_ACCUM | GBUFFER_OIT_WEIGHT;
+			bool bClear = true;
+			// 用于渲染不透明物体及清空缓冲区opaque
+			m_RenderPassFullGBufferWithClear.OnCreate(m_GBuffer, fullGBuffer, bClear, "m_RenderPassFullGBufferWithClear");
+			// 用于渲染透明物体transparent、透射材质transmission
+			m_RenderPassFullGBuffer.OnCreate(m_GBuffer, fullGBuffer, !bClear, "m_RenderPassFullGBuffer");
+			// 用于渲染天空盒、线框justdepth
+			m_RenderPassJustDepthAndHdr.OnCreate(m_GBuffer, GBUFFER_DEPTH | GBUFFER_FORWARD, !bClear, "m_RenderPassJustDepthAndHdr");
+		}
+
+		// Create render pass shadow, will clear contents
+		{
+			VkAttachmentDescription depthAttachments;
+			AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+			m_Render_pass_shadow = CreateRenderPassOptimal(m_pDevice->_dev, 0, NULL, &depthAttachments);
+		}
+
+		{
+			skyDomeConstants.vSunDirection = glm::vec4(1.0f, 0.05f, 0.0f, glm::radians(2.0f));
+			skyDomeConstants.turbidity = 10.0f;
+			skyDomeConstants.rayleigh = 2.0f;
+			skyDomeConstants.mieCoefficient = 0.005f;
+			skyDomeConstants.mieDirectionalG = 0.8f;
+			skyDomeConstants.luminance = 1.0f;
+		}
+		auto specular = "images\\specular.dds"; specular = 0;
+		m_SkyDome.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, mformat, &m_ResourceViewHeaps
+			, &m_ConstantBufferRing, &m_SysMemBufferPool, "images\\diffuse.dds", specular, VK_SAMPLE_COUNT_1_BIT);
+		m_SkyDomeProc.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_UploadHeap, mformat, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		//m_Wireframe.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+		//m_WireframeBox.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool);
+		//_WireframeSphere.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool);
+
+		//_cbf.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+
+		//_axis.OnCreate(pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, VK_SAMPLE_COUNT_1_BIT);
+
+
+		m_DownSample.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
+		m_Bloom.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
+		m_TAA.OnCreate(pDevice, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing, false);
+		m_MagnifierPS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_SysMemBufferPool, mformat);
+
+		// Create tonemapping pass
+		m_ToneMappingCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
+		//m_oitblendCS.OnCreate(pDevice, &m_ResourceViewHeaps, &m_ConstantBufferRing);
+		m_ToneMappingPS.OnCreate(m_pDevice, rp, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing);
+		m_ColorConversionPS.OnCreate(pDevice, rp, &m_ResourceViewHeaps, &m_SysMemBufferPool, &m_ConstantBufferRing);
+
+		// Initialize UI rendering resources
+		//m_ImGUI.OnCreate(m_pDevice, pSwapChain->GetRenderPass(), &m_UploadHeap, &m_ConstantBufferRing, FontSize);
+
+		init_envres();
+
+		// Make sure upload heap has finished uploading before continuing
+		m_SysMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+		m_UploadHeap.FlushAndFinish();
+		m_SysMemBufferPool.FreeUploadHeap();
+
+
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroy 
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnDestroy()
+	{
+		//m_AsyncPool->Flush();
+		un_envres();
+		//m_ImGUI.OnDestroy();
+		m_ColorConversionPS.OnDestroy();
+		m_ToneMappingPS.OnDestroy();
+		m_ToneMappingCS.OnDestroy();
+		m_TAA.OnDestroy();
+		m_Bloom.OnDestroy();
+		m_DownSample.OnDestroy();
+		m_MagnifierPS.OnDestroy();
+		//m_WireframeBox.OnDestroy();
+		//m_Wireframe.OnDestroy();
+		//_WireframeSphere.OnDestroy();
+		//m_oitblendCS.OnDestroy();
+		//_cbf.OnDestroy();
+		//_axis.OnDestroy();
+		m_SkyDomeProc.OnDestroy();
+		m_SkyDome.OnDestroy();
+
+		m_RenderPassFullGBufferWithClear.OnDestroy();
+		m_RenderPassJustDepthAndHdr.OnDestroy();
+		m_RenderPassFullGBuffer.OnDestroy();
+		m_GBuffer->OnDestroy();
+
+		vkDestroyRenderPass(m_pDevice->_dev, m_Render_pass_shadow, nullptr);
+		m_UploadHeap.OnDestroy();
+		m_GPUTimer.OnDestroy();
+		m_VidMemBufferPool.OnDestroy();
+		m_SysMemBufferPool.OnDestroy();
+		m_ConstantBufferRing.OnDestroy();
+		m_ResourceViewHeaps.OnDestroy();
+		m_CommandListRing.OnDestroy();
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnCreateWindowSizeDependentResources
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnCreateWindowSizeDependentResources(uint32_t Width, uint32_t Height)
+	{
+		m_Width = Width;
+		m_Height = Height;
+
+		// Set the viewport
+		m_Viewport.x = 0;
+		m_Viewport.y = (float)Height;
+		m_Viewport.width = (float)Width;
+		m_Viewport.height = -(float)(Height);
+		m_Viewport.minDepth = (float)0.0f;
+		m_Viewport.maxDepth = (float)1.0f;
+
+		// Create scissor rectangle
+		m_RectScissor.extent.width = Width;
+		m_RectScissor.extent.height = Height;
+		m_RectScissor.offset.x = 0;
+		m_RectScissor.offset.y = 0;
+
+		// Create GBuffer
+		//
+		m_GBuffer->OnCreateWindowSizeDependentResources(Width, Height);
+
+		// Create frame buffers for the GBuffer render passes
+		//
+		m_RenderPassFullGBufferWithClear.OnCreateWindowSizeDependentResources(Width, Height);
+		m_RenderPassJustDepthAndHdr.OnCreateWindowSizeDependentResources(Width, Height);
+		m_RenderPassFullGBuffer.OnCreateWindowSizeDependentResources(Width, Height);
+
+		// Update PostProcessing passes
+		//
+		m_DownSample.OnCreateWindowSizeDependentResources(Width, Height, &m_GBuffer->m_HDR, 6); //downsample the HDR texture 6 times
+		// todo bloom
+		m_Bloom.OnCreateWindowSizeDependentResources(Width / 2, Height / 2, m_DownSample.GetTexture(), 6, &m_GBuffer->m_HDR);
+		m_TAA.OnCreateWindowSizeDependentResources(Width, Height, m_GBuffer);
+		m_MagnifierPS.OnCreateWindowSizeDependentResources(&m_GBuffer->m_HDR);
+
+
+
+		m_bMagResourceReInit = true;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnDestroyWindowSizeDependentResources
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnDestroyWindowSizeDependentResources()
+	{
+		m_Bloom.OnDestroyWindowSizeDependentResources();
+		m_DownSample.OnDestroyWindowSizeDependentResources();
+		m_TAA.OnDestroyWindowSizeDependentResources();
+		m_MagnifierPS.OnDestroyWindowSizeDependentResources();
+
+		m_RenderPassFullGBufferWithClear.OnDestroyWindowSizeDependentResources();
+		m_RenderPassJustDepthAndHdr.OnDestroyWindowSizeDependentResources();
+		m_RenderPassFullGBuffer.OnDestroyWindowSizeDependentResources();
+		m_GBuffer->OnDestroyWindowSizeDependentResources();
+	}
+
+	void Renderer_cx::OnUpdateDisplayDependentResources(VkRenderPass rp, DisplayMode dm, bool bUseMagnifier)
+	{
+		// Update the pipelines if the swapchain render pass has changed (for example when the format of the swapchain changes)
+		//
+		m_ColorConversionPS.UpdatePipelines(rp, dm);
+		m_ToneMappingPS.UpdatePipelines(rp);
+
+		//m_ImGUI.UpdatePipeline((pSwapChain->GetDisplayMode() == DISPLAYMODE_SDR) ? pSwapChain->GetRenderPass() : bUseMagnifier ? m_MagnifierPS.GetPassRenderPass() : m_RenderPassJustDepthAndHdr.GetRenderPass());
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// OnUpdateLocalDimmingChangedResources
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::OnUpdateLocalDimmingChangedResources(VkRenderPass rp, DisplayMode dm)
+	{
+		m_ColorConversionPS.UpdatePipelines(rp, dm);
+	}
+#if 0
+	//--------------------------------------------------------------------------------------
+	//
+	// load_model
+	//
+	//--------------------------------------------------------------------------------------
+	int Renderer_cx::load_model(GLTFCommon* pGLTFCommon, int Stage)
+	{
+		// show loading progress
+		//
+		//ImGui::OpenPopup("Loading");
+		//if (ImGui::BeginPopupModal("Loading", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		//{
+		//	float progress = (float)Stage / 12.0f;
+		//	ImGui::ProgressBar(progress, ImVec2(0.f, 0.f), NULL);
+		//	ImGui::EndPopup();
+		//}
+
+		// use multi threading
+		//AsyncPool* pAsyncPool = m_AsyncPool;
+
+		// Loading stages
+		//
+		if (Stage == 0)
+		{
+			if (!currobj)
+				currobj = new robj_info();
+		}
+		else if (Stage == 5)
+		{
+			Profile p("m_pGltfLoader->Load");
+
+			currobj->_ptb = new gltf_gpu_res_cx();
+			currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &m_UploadHeap);
+			//currobj->_ptb->OnCreate(m_pDevice, pGLTFCommon, &, &m_VidMemBufferPool, );
+		}
+		else if (Stage == 6)
+		{
+			Profile p("Load(Textures Geometry)");
+			// 纹理、数据传输到GPU       
+			currobj->_ptb->LoadTextures(true);
+			currobj->_ptb->LoadGeometry();
+		}
+		else if (Stage == 7)
+		{
+			Profile p("m_GLTFDepth->OnCreate");
+			//create the glTF's textures, VBs, IBs, shaders and descriptors for this particular pass    
+			currobj->m_GLTFDepth = new GltfDepthPass();
+			currobj->m_GLTFDepth->has_shadowMap = pGLTFCommon->has_shadowMap;
+			currobj->m_GLTFDepth->OnCreate(m_pDevice, m_Render_pass_shadow, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool, currobj->_ptb);
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+			m_UploadHeap.FlushAndFinish();
+		}
+		else if (Stage == 8)
+		{
+			Profile p("m_GLTFPBR->OnCreate");
+
+			// same thing as above but for the PBR pass
+			currobj->m_GLTFPBR = new GltfPbrPass();
+			currobj->m_GLTFPBR->OnCreate(m_pDevice, &m_UploadHeap, &m_ResourceViewHeaps, &m_ConstantBufferRing
+				, currobj->_ptb, &_envr, &m_RenderPassFullGBufferWithClear);
+
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+			m_UploadHeap.FlushAndFinish();
+		}
+		else if (Stage == 9)
+		{
+			Profile p("m_GLTFBBox->OnCreate");
+
+			// just a bounding box pass that will draw boundingboxes instead of the geometry itself
+			currobj->m_GLTFBBox = new GltfBBoxPass();
+			currobj->m_GLTFBBox->OnCreate(m_pDevice, m_RenderPassJustDepthAndHdr.GetRenderPass(), &m_ResourceViewHeaps, &m_ConstantBufferRing, &m_VidMemBufferPool
+				, currobj->_ptb, &m_Wireframe);
+
+			// we are borrowing the upload heap command list for uploading to the GPU the IBs and VBs
+			m_VidMemBufferPool.UploadData(m_UploadHeap.GetCommandList());
+
+		}
+		else if (Stage == 10)
+		{
+			Profile p("Flush");
+			m_UploadHeap.FlushAndFinish();
+			//once everything is uploaded we dont need the upload heaps anymore
+			//m_VidMemBufferPool.FreeUploadHeap(); 
+			_robject.push_back(currobj);
+			_depthpass.push_back(currobj->m_GLTFDepth);
+			currobj = 0;
+			// tell caller that we are done loading the map
+			return 0;
+		}
+
+		Stage++;
+		return Stage;
+	}
+
+	//--------------------------------------------------------------------------------------
+	//
+	// UnloadScene
+	//
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::unloadgltf(robj_info* p)
+	{
+		if (!p)return;
+
+		if (p->m_GLTFPBR)
+		{
+			p->m_GLTFPBR->OnDestroy();
+			delete p->m_GLTFPBR;
+			p->m_GLTFPBR = NULL;
+		}
+
+		if (p->m_GLTFDepth)
+		{
+			p->m_GLTFDepth->OnDestroy();
+			delete p->m_GLTFDepth;
+			p->m_GLTFDepth = NULL;
+		}
+
+		if (p->m_GLTFBBox)
+		{
+			p->m_GLTFBBox->OnDestroy();
+			delete p->m_GLTFBBox;
+			p->m_GLTFBBox = NULL;
+		}
+
+		if (p->_ptb)
+		{
+			p->_ptb->OnDestroy();
+			delete p->_ptb;
+			p->_ptb = NULL;
+		}
+
+		delete p;
+	}
+	void Renderer_cx::UnloadScene()
+	{
+		// wait for all the async loading operations to finish
+		//m_AsyncPool->Flush();
+
+		m_pDevice->GPUFlush();
+		for (auto it : _robject)
+			unloadgltf(it);
+		_robject.clear();
+
+		// todo 阴影
+		assert(m_shadowMapPool.size() == m_ShadowSRVPool.size());
+		while (!m_shadowMapPool.empty())
+		{
+			m_shadowMapPool.back().ShadowMap.OnDestroy();
+			vkDestroyFramebuffer(m_pDevice->_dev, m_shadowMapPool.back().ShadowFrameBuffer, nullptr);
+			vkDestroyImageView(m_pDevice->_dev, m_ShadowSRVPool.back(), nullptr);
+			vkDestroyImageView(m_pDevice->_dev, m_shadowMapPool.back().ShadowDSV, nullptr);
+			m_ShadowSRVPool.pop_back();
+			m_shadowMapPool.pop_back();
+		}
+	}
+#endif
+	size_t Renderer_cx::AddLight(const light_t& light)
+	{
+		_lights_q.push(light);
+		return _lights_q.size();
+	}
+	light_t* Renderer_cx::get_light(size_t idx)
+	{
+		if (idx < _lights.size())
+			return &_lights[idx];
+		return nullptr;
+	}
+	size_t Renderer_cx::get_light_size()
+	{
+		return _lights.size();
+	}
+	void Renderer_cx::new_shadow(SceneShadowInfo& ShadowInfo, uint32_t shadowResolution, int shadows, int idx)
+	{
+		ShadowInfo.ShadowResolution = shadowResolution;
+		ShadowInfo.ShadowIndex = shadows;
+		ShadowInfo.LightIndex = idx;
+
+		{
+			auto CurrentShadow = &ShadowInfo;
+			// 初始化阴影深度图
+			CurrentShadow->ShadowMap.InitDepthStencil(m_pDevice, CurrentShadow->ShadowResolution, CurrentShadow->ShadowResolution, VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, "ShadowMap");
+			CurrentShadow->ShadowMap.CreateDSV(&CurrentShadow->ShadowDSV);
+			// Create render pass shadow, will clear contents
+			{
+				VkAttachmentDescription depthAttachments;
+				AttachClearBeforeUse(VK_FORMAT_D32_SFLOAT, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &depthAttachments);
+
+				// Create frame buffer
+				VkImageView attachmentViews[1] = { CurrentShadow->ShadowDSV };
+				VkFramebufferCreateInfo fb_info = {};
+				fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				fb_info.pNext = NULL;
+				fb_info.renderPass = m_Render_pass_shadow;
+				fb_info.attachmentCount = 1;
+				fb_info.pAttachments = attachmentViews;
+				fb_info.width = CurrentShadow->ShadowResolution;
+				fb_info.height = CurrentShadow->ShadowResolution;
+				fb_info.layers = 1;
+				VkResult res = vkCreateFramebuffer(m_pDevice->_dev, &fb_info, NULL, &CurrentShadow->ShadowFrameBuffer);
+				assert(res == VK_SUCCESS);
+			}
+			VkImageView ShadowSRV;
+			CurrentShadow->ShadowMap.CreateSRV(&CurrentShadow->ShadowSRV);
+		}
+	}
+	void Renderer_cx::un_envres() {
+		for (size_t i = 0; i < 3; i++)
+		{
+			auto& it = _lut[i];
+			vkDestroyImageView(m_pDevice->_dev, it.view, NULL);
+			it.texture.OnDestroy();
+		}
+	}
+	void Renderer_cx::init_envres()
+	{
+		// lut_ggx\lut_charlie\lut_sheen_E
+		const char* lut_files[3] = { "images/lut_ggx.png", "images/lut_charlie.png","images/lut_sheen_E.png" };
+		{
+			print_time Pt("load LUT", 1);
+			// specular BRDF lut sampler 
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			auto luts = m_pDevice->newSampler(&info);
+			assert(luts);
+			for (size_t i = 0; i < 3; i++)
+			{
+				auto& it = _lut[i];
+				it.texture.InitFromFile(m_pDevice, &m_UploadHeap, lut_files[i], false);
+				it.texture.CreateSRV(&it.view);
+				it.sampler = luts;
+			}
+		}
+
+		// shadowmap sampler
+		{
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			info.compareEnable = VK_TRUE;
+			info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+			info.minLod = -1000;
+			info.maxLod = 1000;
+			info.maxAnisotropy = 1.0f;
+			_envr.m_samplerShadow = m_pDevice->newSampler(&info);
+			assert(_envr.m_samplerShadow);
+		}
+		_envr.use_punctual = true;
+		_envr.pSkyDome = &m_SkyDome; _envr.bUseSSAOMask = false;
+		_envr.ShadowMapViewPool = &m_ShadowSRVPool;
+		_envr.lut = _lut;
+
+	}
+#if 1
+	void Renderer_cx::AllocateShadowMaps()
+	{
+		auto NumShadows = m_shadowMapPool.size();
+		if (_lights_q.size())
+		{
+			auto i = _lights.size();
+			for (; _lights_q.size();) {
+				auto q = _lights_q.front(); _lights_q.pop();
+				if (q._shadowResolution && q._type != light_t::LIGHT_POINTLIGHT)
+				{
+					SceneShadowInfo ShadowInfo;
+					new_shadow(ShadowInfo, q._shadowResolution, NumShadows++, i); // 创建场景阴影信息
+					m_ShadowSRVPool.push_back(ShadowInfo.ShadowSRV);
+					m_shadowMapPool.push_back(ShadowInfo);
+				}
+				_lights.push_back(q); i++;
+			}
+		}
+		if (NumShadows > MaxShadowInstances)
+		{
+			Trace("Number of shadows has exceeded maximum supported. Please grow value in gltfCommon.h/perFrameStruct.h");
+			throw;
+		}
+
+	}
+#endif
+
+	PerFrame_t* Renderer_cx::mkPerFrameData()
+	{
+#if 0
+		Camera cam;
+		//Sets the camera
+		_perFrameData.mCameraCurrViewProj = cam.GetProjection() * cam.GetView();
+		_perFrameData.mCameraPrevViewProj = cam.GetProjection() * cam.GetPrevView();
+		// more accurate calculation
+		_perFrameData.mInverseCameraCurrViewProj = cam.GetView();// glm::affineInverse(cam.GetView())* glm::inverse(cam.GetProjection());
+		_perFrameData.cameraPos = cam.GetPosition();
+
+		_perFrameData.wireframeOptions = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+
+		// Process lights
+		_perFrameData.lightCount = (int32_t)_lights.size();
+		int32_t ShadowMapIndex = 0;
+		for (int i = 0; i < _perFrameData.lightCount; i++)
+		{
+			Light* pSL = &_perFrameData.lights[i];
+
+			// get light data and node trans
+			auto& lightData = _lights[i];
+			auto q = glm::normalize(lightData._rotation);
+			glm::vec3 poss = lightData._position;
+			glm::mat4 lightMat = glm::translate(glm::mat4(1.0), poss) * glm::mat4(q);
+
+			glm::mat4 lightView = glm::affineInverse(lightMat);
+			auto a = glm::radians(glm::clamp(lightData._cone_angle, 1.0f, 180.0f) * 0.5f);
+			glm::mat4 per = glm::perspective(a * 2.0f, 1.0f, .1f, 100.0f);
+			if (flipY)
+			{
+				per[1][1] *= -1.0;
+			}
+			pSL->mLightView = lightView;
+			if (lightData._type == LightType_Spot)
+				pSL->mLightViewProj = per * lightView;
+			else if (lightData._type == LightType_Directional)
+			{
+				AxisAlignedBoundingBox projectedBoundingBox = {};
+				for (auto it : _robject)
+				{
+					if (it->_ptb)
+					{
+						projectedBoundingBox.Merge(it->_ptb->m_pGLTFCommon->get_BoundingBox(lightView));
+					}
+				}
+				auto dlm = ComputeDirectionalLight_mat(projectedBoundingBox);
+				pSL->mLightViewProj = dlm * lightView;
+			}
+			//transpose
+			GetXYZ(pSL->direction, glm::transpose(lightView) * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
+			GetXYZ(pSL->position, lightMat[3]);
+			GetXYZ(pSL->color, lightData._color);
+			pSL->range = lightData._range;
+			pSL->intensity = lightData._intensity;
+
+			pSL->outerConeCos = cosf(a);
+			pSL->innerConeCos = cosf(a * (1.0 - glm::clamp(lightData._cone_mix, 0.0f, 1.0f)));
+			pSL->type = lightData._type;
+
+			// Setup shadow information for light (if it has any)
+			if (lightData._shadowResolution && lightData._type != LightType_Point)
+			{
+				pSL->shadowMapIndex = ShadowMapIndex++;
+				pSL->depthBias = lightData._bias;
+			}
+			else
+				pSL->shadowMapIndex = -1;
+		}
+#endif
+		return &_perFrameData;
+	}
+	void insertImageMemoryBarrier(
+		VkCommandBuffer cmdbuffer,
+		VkImage image,
+		VkAccessFlags srcAccessMask,
+		VkAccessFlags dstAccessMask,
+		VkImageLayout oldImageLayout,
+		VkImageLayout newImageLayout,
+		VkPipelineStageFlags srcStageMask,
+		VkPipelineStageFlags dstStageMask,
+		VkImageSubresourceRange subresourceRange)
+	{
+		VkImageMemoryBarrier imageMemoryBarrier = {};
+		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageMemoryBarrier.srcAccessMask = srcAccessMask;
+		imageMemoryBarrier.dstAccessMask = dstAccessMask;
+		imageMemoryBarrier.oldLayout = oldImageLayout;
+		imageMemoryBarrier.newLayout = newImageLayout;
+		imageMemoryBarrier.image = image;
+		imageMemoryBarrier.subresourceRange = subresourceRange;
+
+		vkCmdPipelineBarrier(
+			cmdbuffer,
+			srcStageMask,
+			dstStageMask,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &imageMemoryBarrier);
+	}
+
+	void dynamicrendering_t::dr_begin(VkCommandBuffer cmd1)
+	{
+		if (!_vkCmdBeginRenderingKHR)return;
+		_cmd1 = cmd1;
+		// With dynamic rendering there are no subpass dependencies, so we need to take care of proper layout transitions by using barriers
+		// This set of barriers prepares the color and depth images for output
+		insertImageMemoryBarrier(
+			cmd1,
+			sc_image,
+			0,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+		insertImageMemoryBarrier(
+			cmd1,
+			depthStencil_image,
+			0,
+			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 });
+
+		// New structures are used to define the attachments used in dynamic rendering
+		VkRenderingAttachmentInfoKHR colorAttachment{};
+		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+		colorAttachment.imageView = sc_view;
+		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachment.clearValue.color = { 0.0f,0.0f,0.0f,0.0f };
+
+		// A single depth stencil attachment info can be used, but they can also be specified separately.
+		// When both are specified separately, the only requirement is that the image view is identical.			
+		VkRenderingAttachmentInfoKHR depthStencilAttachment{};
+		depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+		depthStencilAttachment.imageView = ds_view;// depthStencil.view;
+		depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		depthStencilAttachment.clearValue.depthStencil = { 1.0f,  0 };
+
+		VkRenderingInfoKHR renderingInfo{};
+		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+		renderingInfo.renderArea = { 0, 0, width,height };
+		renderingInfo.layerCount = 1;
+		renderingInfo.colorAttachmentCount = 1;
+		renderingInfo.pColorAttachments = &colorAttachment;
+		renderingInfo.pDepthAttachment = &depthStencilAttachment;
+		renderingInfo.pStencilAttachment = &depthStencilAttachment;
+
+		// Begin dynamic rendering
+		_vkCmdBeginRenderingKHR(cmd1, &renderingInfo);
+
+		if (width > 0 && height > 0) {
+			VkViewport viewport = {}; viewport.width = (float)width; viewport.height = (float)height; viewport.minDepth = 0.0f; viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(cmd1, 0, 1, &viewport);
+
+			VkRect2D scissor = {};
+			scissor.extent.width = width;
+			scissor.extent.height = height;
+			scissor.offset.x = 0;
+			scissor.offset.y = 0;
+			//initializers::rect2D(width, height, 0, 0);
+			vkCmdSetScissor(cmd1, 0, 1, &scissor);
+		}
+
+		//vkCmdBindDescriptorSets(cmd1, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		//vkCmdBindPipeline(cmd1, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		//model.draw(cmd1, vkglTF::RenderFlags::BindImages, pipelineLayout);
+
+		//drawUI(cmd1);
+
+	}
+	void dynamicrendering_t::dr_end() {
+		if (!_vkCmdEndRenderingKHR)return;
+		// End dynamic rendering
+		_vkCmdEndRenderingKHR(_cmd1);
+
+		// This set of barriers prepares the color image for presentation, we don't need to care for the depth image
+		insertImageMemoryBarrier(
+			_cmd1,
+			sc_image,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			0,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+	}
+
+#if 1
+
+	void cp_barrier(VkCommandBuffer cmdBuf1, GBuffer* gbp)
+	{
+		VkImageMemoryBarrier barrier = {};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.pNext = NULL;
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+
+		VkImageMemoryBarrier barriers[3];
+		barriers[0] = barrier;
+		barriers[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		barriers[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if (is_stencil_tex(gbp->m_DepthBuffer.GetFormat()))
+		{
+			barriers[0].subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+
+		barriers[0].image = gbp->m_DepthBuffer.Resource();
+
+		barriers[1] = barrier;
+		barriers[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		barriers[1].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barriers[1].image = gbp->m_MotionVectors.Resource();
+
+		// no layout transition but we still need to wait
+		barriers[2] = barrier;
+		barriers[2].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barriers[2].image = gbp->m_HDR.Resource();
+
+		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+			, 0, 0, NULL, 0, NULL, 3, barriers);
+	}
+#endif // 1
+
+	//--------------------------------------------------------------------------------------\
+	// todo OnRender
+
+	bool bcmp(const BatchList& l, const BatchList& r)
+	{
+		return -l.m_depth < -r.m_depth;
+	}
+	void PBRPrimitives::DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t0)
+	{
+		BatchList& t = *(BatchList*)t0;
+		// Bind indices and vertices using the right offsets into the buffer 
+		for (uint32_t i = 0; i < m_geometry.m_VBV.size(); i++) { vkCmdBindVertexBuffers(cmd_buf, i, 1, &m_geometry.m_VBV[i].buffer, &m_geometry.m_VBV[i].offset); }
+		if (m_geometry.m_IBV.buffer)
+			vkCmdBindIndexBuffer(cmd_buf, m_geometry.m_IBV.buffer, m_geometry.m_IBV.offset, m_geometry.m_indexType);
+		VkDescriptorSet descritorSets[2] = { m_uniformsDescriptorSet, m_pMaterial->m_texturesDescriptorSet };
+		uint32_t descritorSetsCount = (m_pMaterial->m_textureCount == 0) ? 1 : 2;
+		if (!uniformOffsets) { uniformOffsetsCount = 0; }
+		if (!uniformOffsetsCount) { uniformOffsets = 0; }
+
+		vkCmdSetStencilTestEnable(cmd_buf, VK_FALSE);
+		vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipe->m_pipelineLayout, 0, descritorSetsCount, descritorSets, uniformOffsetsCount, uniformOffsets);
+		vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, bWireframe ? _pipe->m_pipelineWireframe : _pipe->m_pipeline);
+		if (m_geometry.m_IBV.buffer)
+			vkCmdDrawIndexed(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0, 0);
+		else
+			vkCmdDraw(cmd_buf, m_geometry.m_NumIndices, m_geometry.instanceCount, 0, 0);
+	}
+	void DrawBatchList(cxDevice* dev, VkCommandBuffer commandBuffer, std::vector<BatchList>* pBatchList, bool bWireframe = false) {
+
+		SetPerfMarkerBegin(commandBuffer, "gltfPBR");
+		uint32_t uniformOffsets[6] = {};
+		for (auto& t : *pBatchList)
+		{
+			uint32_t c = 2;
+			uniformOffsets[0] = t.m_perFrameDesc.offset;	// 相机、灯光
+			uniformOffsets[1] = t.m_perObjectDesc.offset;	// 材质参数
+			if (t.m_pPerSkeleton) { uniformOffsets[c++] = t.m_pPerSkeleton->offset; }	// 骨骼动画偏移
+			if (t.morph) { uniformOffsets[c++] = t.morph->offset; }						// 变形动画偏移
+			if (t.m_uvtDesc) { uniformOffsets[c++] = t.m_uvtDesc->offset; }				// UV矩阵偏移
+			if (t.instance_info) { uniformOffsets[c++] = t.instance_info->offset; }		// 实例矩阵偏移
+			// todo FrontFace
+			//if (dev->_vkCmdSetFrontFace) dev->_vkCmdSetFrontFace(commandBuffer, (VkFrontFace)t.frontFace);
+			t.m_pPrimitive->DrawPrimitive(commandBuffer, uniformOffsets, c, bWireframe, &t);
+		}
+		SetPerfMarkerEnd(commandBuffer);
+	}
+
+	//--------------------------------------------------------------------------------------
+	void Renderer_cx::draw_skydome(VkCommandBuffer cmdBuf1, const scene_state* pState, const glm::mat4& mCameraCurrViewProj)
+	{
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// Render skydome天空盒
+		if (has_skydome)
+		{
+			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+			glm::mat4 clipToView = glm::inverse(mCameraCurrViewProj);
+			if (pState->SelectedSkydomeTypeIndex == 1)
+			{
+				m_SkyDome.Draw(cmdBuf1, clipToView);
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome cube");
+			}
+			else if (pState->SelectedSkydomeTypeIndex == 0)
+			{
+				skyDomeConstants.invViewProj = clipToView;
+				m_SkyDomeProc.Draw(cmdBuf1, skyDomeConstants);
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Skydome Proc");
+			}
+			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+		}
+	}
+
+	void draw_pbrpass(cxDevice* dev, VkCommandBuffer cmdBuf1, const scene_state* pState, std::vector<BatchList>* ds, std::vector<BatchList>* dsw, bool bWireframe)
+	{
+		if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR)
+		{
+			if (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_FACE)
+				DrawBatchList(dev, cmdBuf1, ds, false);
+			DrawBatchList(dev, cmdBuf1, dsw, bWireframe);
+		}
+		else
+		{
+			DrawBatchList(dev, cmdBuf1, ds, bWireframe);
+		}
+	}
+	void Renderer_cx::draw_pbr_opaque(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
+	{
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// Render opaque 渲染不透明物体
+		{
+			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.opaque, &drawables.wireframe[0], bWireframe);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Opaque");
+			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
+		}
+	}
+	void Renderer_cx::draw_pbr_transparent(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
+	{
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// draw transparent geometry 渲染透明物体
+		if (!drawables.transparent.empty()) {
+			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
+			std::stable_sort(drawables.transparent.begin(), drawables.transparent.end(), bcmp);
+			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.transparent, &drawables.wireframe[1], bWireframe);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR Transparent");
+			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
+		}
+	}
+	void Renderer_cx::copy_transmission(VkCommandBuffer cmdBuf1)
+	{
+		if (!drawables.transmission.empty()) {
+			// 复制 HDR 图像到 HDRt
+			//_transfer.copy_image(&m_GBuffer->m_HDR, &m_GBuffer->m_HDRt, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			//_transfer.flush(cmdBuf1);
+			auto image = &m_GBuffer->m_HDR;
+			VkImageCopy cr = {};
+			cr.dstOffset = {};
+			cr.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			cr.dstSubresource.mipLevel = 0;
+			cr.dstSubresource.baseArrayLayer = 0;
+			cr.dstSubresource.layerCount = image->GetArraySize();
+			cr.extent.width = image->GetWidth();
+			cr.extent.height = image->GetHeight();
+			cr.extent.depth = 1;
+			cr.srcOffset = {};
+			cr.srcSubresource = cr.dstSubresource;
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+			// copy HDR to HDRt
+			vkCmdCopyImage(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_GBuffer->m_HDRt.Resource(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cr);
+
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDRt.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		}
+	}
+	void Renderer_cx::draw_pbr_transmission(VkCommandBuffer cmdBuf1, const scene_state* pState, bool bWireframe)
+	{
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// todo 渲染 透射材质(KHR_materials_transmission、KHR_materials_volume)
+		if (!drawables.transmission.empty()) {
+			m_RenderPassFullGBuffer.BeginPass(cmdBuf1, renderArea);
+			std::stable_sort(drawables.transmission.begin(), drawables.transmission.end(), bcmp);
+			draw_pbrpass(m_pDevice, cmdBuf1, pState, &drawables.transmission, &drawables.wireframe[2], bWireframe);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "PBR transmission");
+			m_RenderPassFullGBuffer.EndPass(cmdBuf1);
+		}
+	}
+
+	void Renderer_cx::draw_boxes(VkCommandBuffer cmdBuf1, PerFrame_t* pfd, const scene_state* pState)
+	{
+		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		bool has_box = (pState->bDrawLightFrustum && pfd->lightCount > 0) || (pState->bDrawBoundingBoxes && _robject.size());
+		if (has_box)
+		{
+			m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+			// todo 渲染bounding boxes
+			if (pState->bDrawBoundingBoxes && _robject.size())
+			{
+				for (auto it : _robject)
+				{
+					//if (it->m_GLTFBBox)
+					//{
+					//	it->m_GLTFBBox->Draw(cmdBuf1, mCameraCurrViewProj);
+					//}
+				}
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Bounding Box");
+			}
+
+			// draw light's frustums
+			if (pState->bDrawLightFrustum)
+			{
+				SetPerfMarkerBegin(cmdBuf1, "light frustums");
+				glm::vec4 vCenter = glm::vec4(0.0f, 0.0f, 0.5f, 0.0f);
+				glm::vec4 vRadius = glm::vec4(1.0f, 1.0f, 0.5f, 0.0f);
+				glm::vec4 vColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				for (uint32_t i = 0; i < pfd->lightCount; i++)
+				{
+					glm::mat4 spotlightMatrix = glm::inverse(pfd->lights[i].mLightViewProj);
+					glm::mat4 worldMatrix = mCameraCurrViewProj * spotlightMatrix;
+					//m_WireframeBox.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+
+					//_WireframeSphere.Draw(cmdBuf1, &m_Wireframe, worldMatrix, vCenter, vRadius, vColor);
+				}
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Light's frustum");
+				SetPerfMarkerEnd(cmdBuf1);
+			}
+			m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+		}
+	}
+
+	void Renderer_cx::OnRender(scene_state* pState)
+	{
+		//printf("OnRender \t\thdr\t%p\n", m_GBuffer->m_HDR.Resource());
+		// Let our resource managers do some house keeping 
+		m_ConstantBufferRing.OnBeginFrame();
+
+		// command buffer calls
+		VkCommandBuffer cmdBuf1 = m_CommandListRing.GetNewCommandList();
+
+		{
+			VkCommandBufferBeginInfo cmd_buf_info;
+			cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			cmd_buf_info.pNext = NULL;
+			cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			cmd_buf_info.pInheritanceInfo = NULL;
+			VkResult res = vkBeginCommandBuffer(cmdBuf1, &cmd_buf_info);
+			assert(res == VK_SUCCESS);
+		}
+
+		m_GPUTimer.OnBeginFrame(cmdBuf1, &m_TimeStamps);
+
+		// Sets the perFrame data 
+		auto pfd = mkPerFrameData();
+		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
+		const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
+		Light* lights = pfd->lights;
+		auto ubo = &m_ConstantBufferRing;
+		int lightCount = pfd->lightCount;
+#if 0
+		{
+			PerFrame_t* pPerFrame = NULL;
+			for (auto& it : _robject)
+			{
+				if (it->_ptb)
+				{
+					// fill as much as possible using the GLTF (camera, lights, ...)
+					pPerFrame = it->_ptb->m_pGLTFCommon->SetPerFrameData(pfd, Cam, _lights, lightMats);
+					// Set some lighting factors
+					pPerFrame->iblFactor = pState->IBLFactor;
+					pPerFrame->emmisiveFactor = pState->EmissiveFactor;
+					pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
+					pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
+
+					pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
+					pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
+					pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
+					pPerFrame->wireframeOptions.w = 0;
+					pPerFrame->lodBias = 0.0f;
+					//if (!it->shadowMap)
+					//{
+					for (size_t i = 0; i < pPerFrame->lightCount; i++)
+					{
+						//pPerFrame->lights[i].shadowMapIndex = -1;
+						//auto& ml = pPerFrame->lights[i];
+						//auto lvp = ml.mLightViewProj;
+						//if (ml.type == LightType_Directional)
+						//{
+						//	auto cp = it->_ptb->m_pGLTFCommon;
+						//	lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
+						//}
+						////ml.mLightViewProj = lvp;
+					}
+					//}
+					if (bWireframe)
+					{
+						pPerFrame = it->_ptb->m_pGLTFCommon->SetPerFrameData_w(pfd, Cam, _lights, lightMats);
+						pPerFrame->iblFactor = pState->IBLFactor;
+						pPerFrame->emmisiveFactor = pState->EmissiveFactor;
+						pPerFrame->invScreenResolution[0] = 1.0f / ((float)m_Width);
+						pPerFrame->invScreenResolution[1] = 1.0f / ((float)m_Height);
+
+						pPerFrame->wireframeOptions.x = (pState->WireframeColor[0]);
+						pPerFrame->wireframeOptions.y = (pState->WireframeColor[1]);
+						pPerFrame->wireframeOptions.z = (pState->WireframeColor[2]);
+						pPerFrame->wireframeOptions.w = (pState->WireframeMode & (int)scene_state::WireframeMode::WIREFRAME_MODE_SOLID_COLOR ? 1.0f : 0.0f);
+						pPerFrame->lodBias = 0.0f;
+					}
+					it->_ptb->SetPerFrameConstants(ubo, bWireframe);
+					// 更新骨骼矩阵到ubo
+					it->_ptb->update_anim_data(ubo);
+				}
+			}
+		}
+
+
+		// Render all shadow maps
+
+		if (_depthpass.size())
+		{
+			SetPerfMarkerBegin(cmdBuf1, "ShadowPass");
+
+			VkClearValue depth_clear_values[1];
+			depth_clear_values[0].depthStencil.depth = 1.0f;
+			depth_clear_values[0].depthStencil.stencil = 0;
+
+			VkRenderPassBeginInfo rp_begin;
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = m_Render_pass_shadow;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.clearValueCount = 1;
+			rp_begin.pClearValues = depth_clear_values;
+			int idx = 0;
+			std::vector<SceneShadowInfo>::iterator ShadowMap = m_shadowMapPool.begin();
+			while (ShadowMap < m_shadowMapPool.end())
+			{
+				// Clear shadow map
+				rp_begin.framebuffer = ShadowMap->ShadowFrameBuffer;
+				rp_begin.renderArea.extent.width = ShadowMap->ShadowResolution;
+				rp_begin.renderArea.extent.height = ShadowMap->ShadowResolution;
+				vkCmdBeginRenderPass(cmdBuf1, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+				// Render to shadow map
+				SetViewportAndScissor(cmdBuf1, 0, 0, ShadowMap->ShadowResolution, ShadowMap->ShadowResolution);
+				for (auto& it : _depthpass)
+				{
+					if (!it->has_shadowMap)continue;
+					// Set per frame constant buffer values
+					GltfDepthPass::PerFrame_t* cbPerFrame = it->SetPerFrameConstants();
+					auto& ml = lights[ShadowMap->LightIndex];
+					auto lvp = ml.mLightViewProj;
+					//if (ml.type == LightType_Directional)
+					//{
+					//	auto cp = it->get_cp();
+					//	lvp = cp->ComputeDirectionalLightOrthographicMatrix(ml.mLightView) * ml.mLightView;
+					//}
+					cbPerFrame->mViewProj = lvp;
+					it->Draw(cmdBuf1);
+				}
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "Shadow Map Render");
+				vkCmdEndRenderPass(cmdBuf1);
+				++ShadowMap;
+			}
+			SetPerfMarkerEnd(cmdBuf1);
+		}
+#endif
+		// Render Scene to the GBuffer ------------------------------------------------
+		SetPerfMarkerBegin(cmdBuf1, "Color pass");
+
+		VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		if (_robject.size() > 0)
+		{
+			drawables.clear();	// 清空获取可渲染物体
+			for (auto it : _robject) {
+				//	it->m_GLTFPBR->BuildBatchLists(&drawables, bWireframe);
+			}
+			if (!drawables.transmission.empty())
+			{
+				draw_pbr_opaque(cmdBuf1, pState, bWireframe);		// 渲染不透明物体
+				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);	// 渲染天空盒
+				draw_pbr_transparent(cmdBuf1, pState, bWireframe);	// 渲染透明物体
+				copy_transmission(cmdBuf1);
+				if (!drawables.transparent.empty())
+				{
+					draw_pbr_opaque(cmdBuf1, pState, bWireframe);	// 有透明物体时，需要重新渲染
+					draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
+				}
+				draw_pbr_transmission(cmdBuf1, pState, bWireframe);	// 渲染透射材质(KHR_materials_transmission、KHR_materials_volume)
+				if (!drawables.transparent.empty())
+				{
+					draw_pbr_transparent(cmdBuf1, pState, bWireframe);
+				}
+			}
+			else {
+				draw_pbr_opaque(cmdBuf1, pState, bWireframe);		// 无透射材质时的渲染
+				draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);
+				draw_pbr_transparent(cmdBuf1, pState, bWireframe);
+			}
+			draw_boxes(cmdBuf1, pfd, pState);						// 渲染物体的包围框
+		}
+		else
+		{
+			m_RenderPassFullGBufferWithClear.BeginPass(cmdBuf1, renderArea);
+			m_RenderPassFullGBufferWithClear.EndPass(cmdBuf1);
+			draw_skydome(cmdBuf1, pState, mCameraCurrViewProj);		// 无物体时只渲染天空盒
+		}
+
+		VkImageMemoryBarrier barrier[1] = {};
+		barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier[0].pNext = NULL;
+		barrier[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barrier[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier[0].subresourceRange.baseMipLevel = 0;
+		barrier[0].subresourceRange.levelCount = 1;
+		barrier[0].subresourceRange.baseArrayLayer = 0;
+		barrier[0].subresourceRange.layerCount = 1;
+		barrier[0].image = m_GBuffer->m_HDR.Resource();
+		vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, barrier);
+
+		SetPerfMarkerEnd(cmdBuf1);
+#if 0
+		if (has_oit)
+		{
+			SetPerfMarkerBegin(cmdBuf1, "oit");
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+			m_oitblendCS.Draw(cmdBuf1, m_GBuffer->m_HDRSRV, m_GBuffer->m_HDR_oit_accumSRV, m_GBuffer->m_HDR_oit_weightSRV, m_Width, m_Height);
+
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_accum.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			image_set_layout(cmdBuf1, m_GBuffer->m_HDR_oit_weight.Resource(), VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+
+			SetPerfMarkerEnd(cmdBuf1);
+
+		}
+#endif
+
+		// Post proc---------------------------------------------------------------------------
+
+		// Bloom, takes HDR as input and applies bloom to it.
+		if (pState->bBloom)
+		{
+			SetPerfMarkerBegin(cmdBuf1, "PostProcess");
+			// Downsample pass
+			m_DownSample.Draw(cmdBuf1);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Downsample");
+
+			// Bloom pass (needs the downsampled data)
+			m_Bloom.Draw(cmdBuf1);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Bloom");
+			SetPerfMarkerEnd(cmdBuf1);
+		}
+
+		// Apply TAA & Sharpen to m_HDR
+		if (pState->bUseTAA)
+		{
+			m_TAA.m_bSharpening = pState->bTAAsharpening;
+			cp_barrier(cmdBuf1, m_GBuffer);
+
+			m_TAA.Draw(cmdBuf1);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "TAA");
+		}
+
+
+#if 1
+		// Magnifier Pass: m_HDR as input, pass' own output
+		if (pState->bUseMagnifier)
+		{
+			VkImageMemoryBarrier barrier = {};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.pNext = NULL;
+			barrier.srcAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.image = m_MagnifierPS.GetPassOutputResource();
+			if (m_bMagResourceReInit)
+			{
+				barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+				m_bMagResourceReInit = false;
+			}
+			else
+			{
+				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+			}
+			// Note: assumes the input texture (specified in OnCreateWindowSizeDependentResources()) is in read state
+			m_MagnifierPS.Draw(cmdBuf1, pState->MagnifierParams);
+			m_GPUTimer.GetTimeStamp(cmdBuf1, "Magnifier");
+
+		}
+#endif 
+		// Start tracking input/output resources at this point to handle HDR and SDR render paths 
+		VkImage      ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer->m_HDR.Resource();
+		VkImageView  SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer->m_HDRSRV;
+
+		//VkRect2D renderArea = { 0, 0, m_Width, m_Height };
+		// If using FreeSync HDR, we need to do these in order: Tonemapping -> GUI -> Color Conversion
+		bHDR = _dm != DISPLAYMODE_SDR;
+		if (bHDR)
+		{
+			// In place Tonemapping ------------------------------------------------------------------------
+			{
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.pNext = NULL;
+				barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+				barrier.image = ImgCurrentInput;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+				m_ToneMappingCS.Draw(cmdBuf1, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex, m_Width, m_Height);
+
+				barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				barrier.image = ImgCurrentInput;
+				vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+			}
+
+			// Render HUD  ------------------------------------------------------------------------
+			{
+#if 1
+				if (pState->bUseMagnifier)
+				{
+					m_MagnifierPS.BeginPass(cmdBuf1, renderArea);
+				}
+				else
+				{
+					m_RenderPassJustDepthAndHdr.BeginPass(cmdBuf1, renderArea);
+				}
+
+				vkCmdSetScissor(cmdBuf1, 0, 1, &m_RectScissor);
+				vkCmdSetViewport(cmdBuf1, 0, 1, &m_Viewport);
+
+				//m_ImGUI.Draw(cmdBuf1);
+
+				if (pState->bUseMagnifier)
+				{
+					m_MagnifierPS.EndPass(cmdBuf1);
+				}
+				else
+				{
+					m_RenderPassJustDepthAndHdr.EndPass(cmdBuf1);
+				}
+
+				if (bHDR && !pState->bUseMagnifier)
+				{
+					VkImageMemoryBarrier barrier = {};
+					barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+					barrier.pNext = NULL;
+					barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+					barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+					barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+					barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+					barrier.subresourceRange.baseMipLevel = 0;
+					barrier.subresourceRange.levelCount = 1;
+					barrier.subresourceRange.baseArrayLayer = 0;
+					barrier.subresourceRange.layerCount = 1;
+					barrier.image = ImgCurrentInput;
+					vkCmdPipelineBarrier(cmdBuf1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+				}
+
+				m_GPUTimer.GetTimeStamp(cmdBuf1, "GUI Rendering");
+#endif
+			}
+		}
+		// submit command buffer
+		{
+			//print_time a("qsubmit 0");
+			VkResult res = vkEndCommandBuffer(cmdBuf1);
+			assert(res == VK_SUCCESS);
+
+			VkSubmitInfo submit_info;
+			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit_info.pNext = NULL;
+			submit_info.waitSemaphoreCount = 0;
+			submit_info.pWaitSemaphores = NULL;
+			submit_info.pWaitDstStageMask = NULL;
+			submit_info.commandBufferCount = 1;
+			submit_info.pCommandBuffers = &cmdBuf1;
+			submit_info.signalSemaphoreCount = 1;
+			submit_info.pSignalSemaphores = &_fbo.sem;	// 完成发信号
+			res = vkQueueSubmit(m_pDevice->_queue, 1, &submit_info, 0);
+			assert(res == VK_SUCCESS);
+
+		}
+		// Keep tracking input/output resource views 
+		ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer->m_HDR.Resource(); // these haven't changed, re-assign as sanity check
+		SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer->m_HDRSRV;         // these haven't changed, re-assign as sanity check
+
+		m_CommandListRing.OnBeginFrame();
+		VkCommandBuffer cmdBuf2 = m_CommandListRing.GetNewCommandList();
+		{
+			VkCommandBufferBeginInfo cmd_buf_info;
+			cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			cmd_buf_info.pNext = NULL;
+			cmd_buf_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			cmd_buf_info.pInheritanceInfo = NULL;
+			VkResult res = vkBeginCommandBuffer(cmdBuf2, &cmd_buf_info);
+
+			assert(res == VK_SUCCESS);
+			// prepare render pass		
+			SetPerfMarkerBegin(cmdBuf2, "Swapchain RenderPass");
+			VkRenderPassBeginInfo rp_begin = {};
+			rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			rp_begin.pNext = NULL;
+			rp_begin.renderPass = _fbo.renderPass;
+			rp_begin.framebuffer = _fbo.framebuffer;
+			rp_begin.renderArea.offset.x = 0;
+			rp_begin.renderArea.offset.y = 0;
+			rp_begin.renderArea.extent.width = m_Width;
+			rp_begin.renderArea.extent.height = m_Height;
+			VkClearValue clearValues[2] = {};
+			clearValues->color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			clearValues[1].depthStencil = { 1.0f, 0 };
+			rp_begin.clearValueCount = 2;
+			rp_begin.pClearValues = clearValues;
+			vkCmdBeginRenderPass(cmdBuf2, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdSetScissor(cmdBuf2, 0, 1, &m_RectScissor);
+			vkCmdSetViewport(cmdBuf2, 0, 1, &m_Viewport);
+			if (bHDR)
+			{
+				m_ColorConversionPS.Draw(cmdBuf2, SRVCurrentInput);
+				m_GPUTimer.GetTimeStamp(cmdBuf2, "Color Conversion");
+			}
+			else
+			{
+				// For SDR pipeline, we apply the tonemapping and then draw the GUI and skip the color conversion
+				// 对于 SDR 流水线，我们先应用色调映射，然后绘制 GUI 并跳过颜色转换
+				// Tonemapping ------------------------------------------------------------------------ 
+				m_ToneMappingPS.Draw(cmdBuf2, SRVCurrentInput, pState->Exposure, pState->SelectedTonemapperIndex);
+				m_GPUTimer.GetTimeStamp(cmdBuf2, "Tonemapping");
+			}
+			// Render HUD  -------------------------------------------------------------------------
+			if (hubDraw)
+			{
+				hubDraw(cmdBuf2);
+				m_GPUTimer.GetTimeStamp(cmdBuf2, "HUB Rendering");
+			}
+			SetPerfMarkerEnd(cmdBuf2);
+			m_GPUTimer.OnEndFrame();
+			vkCmdEndRenderPass(cmdBuf2);
+			res = vkEndCommandBuffer(cmdBuf2);
+
+			assert(res == VK_SUCCESS);
+			VkSemaphore ImageAvailableSemaphore;
+			VkSemaphore RenderFinishedSemaphores;
+			VkPipelineStageFlags submitWaitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;	//等待所有gpu操作
+			VkSubmitInfo submit_info2;
+			submit_info2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit_info2.pNext = NULL;
+			submit_info2.waitSemaphoreCount = 1;
+			submit_info2.pWaitSemaphores = &_fbo.sem;			// 等待3D场景渲染完成信号再执行 
+			submit_info2.pWaitDstStageMask = &submitWaitStage;
+			submit_info2.commandBufferCount = 1;
+			submit_info2.pCommandBuffers = &cmdBuf2;
+			submit_info2.signalSemaphoreCount = 1;
+			submit_info2.pSignalSemaphores = &_fbo.sem_out;					// 渲染完成信号
+
+			auto st = vkGetFenceStatus(m_pDevice->_dev, _fbo.fence);
+			if (!st)
+			{
+				vkResetFences(m_pDevice->_dev, 1, &_fbo.fence);
+			}
+			//printf("Renderer_cx fence %p: %d\n", _fbo.fence, st);
+			res = vkQueueSubmit(m_pDevice->_queue, 1, &submit_info2, _fbo.fence);
+			assert(res == VK_SUCCESS);
+			//vkWaitForFences(m_pDevice->_dev, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
+		}
+	}
+	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
+	{
+		_fbo.fence = p->_fence;
+		_fbo.framebuffer = p->framebuffers[idx].framebuffer;
+		_fbo.sem = p->framebuffers[idx].semaphore;
+		_fbo.sem_out = p->framebuffers[idx].semaphore1;
+		_fbo.renderPass = p->renderPass;
+		_fbo.image = p->framebuffers[idx].color._image;
+	}
+	void Renderer_cx::freeVidMBP()
+	{
+		m_VidMemBufferPool.FreeUploadHeap();
+		m_UploadHeap.OnDestroy();
+	}
+
+#endif // 1
+
+
+
+
+
+
+
+
 	//--------------------------------------------------------------------------------------
 
 	gdev_cx::gdev_cx()
@@ -8146,6 +10089,137 @@ namespace vkg {
 		return p;
 	}
 
+	//创建信号
+	void cxDevice::newSemaphore(VkSemaphore* semaphore, VkSemaphoreCreateInfo* semaphoreCreateInfo)
+	{
+		VkSemaphoreCreateInfo semaphore_create_info = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
+		if (!semaphoreCreateInfo)
+			semaphoreCreateInfo = &semaphore_create_info;
+		auto hr = vkCreateSemaphore(_dev, semaphoreCreateInfo, nullptr, semaphore);
+		return;
+	}
+	//创建图像
+	int64_t cxDevice::newImage(VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo, dvk_texture* texture)//, VkSampler* sampler = nullptr, VkSamplerCreateInfo* info = nullptr)
+	{
+		VkImageView* imageview;
+		VkMemoryAllocateInfo memAlloc = {};
+		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		VkMemoryRequirements memReqs;
+#if 1
+		VkImage* image = &texture->_image;
+		VkDeviceMemory mem = texture->image_memory;
+		if (texture->_image)
+		{
+			vkDestroyImage(_dev, texture->_image, 0); texture->_image = 0;
+		}
+		auto hr = vkCreateImage(_dev, imageinfo, nullptr, image);
+		vkGetImageMemoryRequirements(_dev, texture->_image, &memReqs);
+		// 设备内存分配空间小于需求的重新申请内存
+		if (texture->cap_device_mem_size < memReqs.size || !mem)
+		{
+			texture->cap_inc = 0;
+			if (texture->image_memory)
+			{
+				vkFreeMemory(_dev, texture->image_memory, 0);
+				texture->image_memory = 0;
+			}
+			memAlloc.allocationSize = memReqs.size;
+			texture->cap_device_mem_size = memReqs.size;
+			VkBool32 memTypeFound = 0;
+			uint32_t dh = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			if ((imageinfo->usage & VK_IMAGE_USAGE_STORAGE_BIT))
+			{
+				dh = (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			}
+			do {
+				memAlloc.memoryTypeIndex = getMemoryType(memReqs.memoryTypeBits, dh, &memTypeFound);
+				if (!memTypeFound && dh != VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+				{
+					dh = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+					continue;
+				}
+				break;
+			} while (1);
+
+			auto hr = vkAllocateMemory(_dev, &memAlloc, nullptr, &mem);
+			assert(hr == VK_SUCCESS);
+			texture->image_memory = mem;
+		}
+		texture->cap_inc++;
+		// 绑定显存
+		hr = vkBindImageMemory(_dev, texture->_image, mem, 0);
+
+		viewinfo->image = texture->_image;
+		if (texture->_view)
+		{
+			vkDestroyImageView(_dev, texture->_view, 0);
+		}
+		hr = vkCreateImageView(_dev, viewinfo, nullptr, &texture->_view);
+#endif
+		return memAlloc.allocationSize;
+	}
+	void cxDevice::destroyTexture(dvk_texture* texture) {
+
+		if (texture->_image)
+		{
+			vkDestroyImage(_dev, texture->_image, 0); texture->_image = 0;
+		}
+		if (texture->image_memory)
+		{
+			vkFreeMemory(_dev, texture->image_memory, 0); texture->image_memory = 0;
+		}
+		if (texture->_view)
+		{
+			vkDestroyImageView(_dev, texture->_view, 0); texture->_view = 0;
+		}
+	}
+	VkFence cxDevice::newFence(VkFenceCreateFlags flags)
+	{
+		VkFenceCreateInfo fence_create_info = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, flags };
+		VkFence fence = 0;
+		auto hr = vkCreateFence(_dev, &fence_create_info, nullptr, &fence);
+		return fence;
+	}
+
+
+	uint32_t cxDevice::getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound)
+	{
+		auto memoryProperties = GetPhysicalDeviceMemoryProperties();
+		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+		{
+			if ((typeBits & 1) == 1)
+			{
+				if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				{
+					if (memTypeFound)
+					{
+						*memTypeFound = true;
+					}
+					return i;
+				}
+			}
+			typeBits >>= 1;
+		}
+
+#if defined(__ANDROID__)
+		//todo : Exceptions are disabled by default on Android (need to add LOCAL_CPP_FEATURES += exceptions to Android.mk), so for now just return zero
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+		}
+		return 0;
+#else
+		if (memTypeFound)
+		{
+			*memTypeFound = false;
+			return 0;
+		}
+		else
+		{
+			throw std::runtime_error("Could not find a matching memory type");
+		}
+#endif
+	}
 
 
 	void cxDevice::SetDescriptorSet(uint32_t index, VkImageView imageView, VkImageLayout imageLayout, VkSampler pSampler, VkDescriptorSet descriptorSet)

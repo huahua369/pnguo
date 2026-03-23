@@ -7,6 +7,8 @@ namespace vkg {
 	static const uint32_t MaxShadowInstances = 4;
 	const VkColorComponentFlags allBits = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+	class dvk_texture;
+
 	// 输出管线信息
 	struct PBRPipe_t {
 		VkPipeline m_pipeline = VK_NULL_HANDLE;
@@ -51,6 +53,7 @@ namespace vkg {
 		bool is_newdevice = false;
 	};
 	void free_devinfo(devinfo_x* d);
+
 
 	class gdev_cx
 	{
@@ -206,6 +209,15 @@ namespace vkg {
 		// 创建采样器，内部会缓存相同参数的采样器对象
 		VkSampler newSampler(const sampler_info_t* pCreateInfo);
 		VkSampler newSampler(const VkSamplerCreateInfo* pCreateInfo);
+
+		//创建信号
+		void newSemaphore(VkSemaphore* semaphore, VkSemaphoreCreateInfo* semaphoreCreateInfo);
+		//创建图像
+		int64_t newImage(VkImageCreateInfo* imageinfo, VkImageViewCreateInfo* viewinfo, dvk_texture* texture);
+		void destroyTexture(dvk_texture* texture);
+		VkFence newFence(VkFenceCreateFlags flags = VK_FENCE_CREATE_SIGNALED_BIT);
+
+		uint32_t getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound);
 
 		VkResult VKCompile(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pshader, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
 		VkResult VKCompileFromString(ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const char* pShaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader);
@@ -842,7 +854,7 @@ namespace vkg {
 	class GPUTimestamps
 	{
 	public:
-		void OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers, double timestamp_period);
+		void OnCreate(cxDevice* pDevice, uint32_t numberOfBackBuffers);
 		void OnDestroy();
 
 		void GetTimeStamp(VkCommandBuffer cmd_buf, const char* label);
@@ -1219,15 +1231,8 @@ namespace vkg {
 	class PostProcCS
 	{
 	public:
-		void OnCreate(
-			cxDevice* pDevice,
-			const std::string& shaderFilename,
-			const std::string& shaderEntryPoint,
-			const std::string& shaderCompilerParams,
-			VkDescriptorSetLayout descriptorSetLayout,
-			uint32_t dwWidth, uint32_t dwHeight, uint32_t dwDepth,
-			DefineList* userDefines = 0
-		);
+		void OnCreate(cxDevice* pDevice, const std::string& shaderFilename, const std::string& shaderEntryPoint, const std::string& shaderCompilerParams
+			, VkDescriptorSetLayout descriptorSetLayout, uint32_t dwWidth, uint32_t dwHeight, uint32_t dwDepth, DefineList* userDefines = 0);
 		void OnDestroy();
 		void Draw(VkCommandBuffer cmd_buf, VkDescriptorBufferInfo* pConstantBuffer, VkDescriptorSet descSet, uint32_t dispatchX, uint32_t dispatchY, uint32_t dispatchZ);
 
@@ -1434,7 +1439,72 @@ namespace vkg {
 		bool m_bOutputsToSwapchain = false;
 	};
 
+	enum class ImageLayoutBarrier
+	{
+		UNDEFINED,
+		TRANSFER_DST,
+		COLOR_ATTACHMENT,
+		DEPTH_STENCIL_ATTACHMENT,
+		TRANSFER_SRC,
+		PRESENT_SRC,
+		SHADER_READ,
+		DEPTH_STENCIL_READ,
+		ComputeGeneralRW,
+		PixelGeneralRW,
+	};
 
+#ifndef YUV_INFO_ST
+#define YUV_INFO_ST
+	struct yuv_info_t {
+		void* ctx = 0;
+		void* data[3] = {};
+		uint32_t size[3] = {};
+		uint32_t ws[3] = {};
+		uint32_t width = 0, height = 0;
+		int8_t format = 0;		// 0=420, 1=422, 2=444
+		int8_t b = 8;			// bpp=8,10,12,16
+		int8_t t = 0;			// 1plane时422才有0=gbr, 1=brg
+		int8_t plane = 0;		// 1 2 3
+		int rotate = 0;
+	};
+#endif
+	class dvk_texture
+	{
+	public:
+		VkImage _image = 0;
+		VkImageView _view = 0;
+		VkSampler sampler = 0;
+		VkDeviceMemory image_memory = 0;
+		int64_t cap_device_mem_size = 0;
+		int cap_inc = 0, caps = 8;			// 分配8次就重新释放显存
+		VkDescriptorImageInfo* descriptor = {};
+		VkImageCreateInfo* _info = 0;
+		uint32_t width = 0, height = 0;
+		uint32_t mipLevels = 1;
+		uint32_t layerCount = 1;
+		uint32_t _depth = 1;
+		//VkDescriptorType dtype = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		//VkFormat _format = VK_FORMAT_R8G8B8A8_UNORM;
+		uint32_t _format = 37;
+		int64_t _alloc_size = 0;		// 数据字节大小
+		cxDevice* _dev = nullptr;
+		std::string _name;
+		ImageLayoutBarrier _image_layout = ImageLayoutBarrier::SHADER_READ;
+		void* user_data = 0;
+		void* uimg = 0;
+		void* mapped = nullptr;
+		IMG_INFO* _header = 0;
+		void* ad = 0;
+		void* ad1 = 0;
+		//pipeline_ptr_info* pipe = 0;
+		yuv_info_t yuv = {};
+		VkSamplerYcbcrConversion ycbcr_sampler_conversion = {};
+	public:
+		dvk_texture();
+		dvk_texture(cxDevice* dev);
+
+		~dvk_texture();
+	};
 	class fbo_info_cx
 	{
 	public:
@@ -1443,8 +1513,8 @@ namespace vkg {
 		public:
 			VkFramebuffer framebuffer = 0;
 			//深度、模板缓冲
-			Texture color;
-			Texture depth_stencil;
+			dvk_texture color;
+			dvk_texture depth_stencil;
 			VkDescriptorImageInfo descriptor = {};
 			// Semaphore used to synchronize between offscreen and final scene rendering
 			//信号量用于在屏幕外和最终场景渲染之间进行同步
@@ -1660,6 +1730,87 @@ namespace vkg {
 		bool use_punctual = true;
 		bool is_async = true;
 	};
+	struct Geometry
+	{
+		VkIndexType m_indexType = {};
+		uint32_t m_NumIndices = 0;
+		uint32_t instanceCount = 1;
+		VkDescriptorBufferInfo m_IBV = {};
+		std::vector<VkDescriptorBufferInfo> m_VBV;
+	};
+
+
+	enum class UVT_E
+	{
+		e_EnvRotation,
+		e_NormalUVTransform,
+		e_EmissiveUVTransform,
+		e_OcclusionUVTransform,
+		e_BaseColorUVTransform,
+		e_MetallicRoughnessUVTransform,
+		e_DiffuseUVTransform,
+		e_SpecularGlossinessUVTransform,
+		e_ClearcoatUVTransform,
+		e_ClearcoatRoughnessUVTransform,
+		e_ClearcoatNormalUVTransform,
+		e_SheenColorUVTransform,
+		e_SheenRoughnessUVTransform,
+		e_SpecularUVTransform,
+		e_SpecularColorUVTransform,
+		e_TransmissionUVTransform,
+		e_ThicknessUVTransform,
+		e_IridescenceUVTransform,
+		e_IridescenceThicknessUVTransform,
+		e_DiffuseTransmissionUVTransform,
+		e_DiffuseTransmissionColorUVTransform,
+		e_AnisotropyUVTransform,
+		e_COUNT
+	};
+	using UVMAT_TYPE = glm::mat3x4;
+	using pbrMaterial = pbr_factors_t;
+
+	struct PBRMaterialParameters
+	{
+		bool     m_doubleSided = false;
+		bool     m_blending = false;
+		bool     transmission = false;
+		bool     useSheen = false;
+
+		DefineList m_defines;
+
+		pbrMaterial m_params = {};
+		UVMAT_TYPE uvTransform[static_cast<int>(UVT_E::e_COUNT)] = {};
+		size_t uvc = 0;
+		uint32_t mid = 0;
+	};
+	struct PBRMaterial
+	{
+		int m_textureCount = 0;
+		VkDescriptorSet m_texturesDescriptorSet = VK_NULL_HANDLE;
+		VkDescriptorSetLayout m_texturesDescriptorSetLayout = VK_NULL_HANDLE;
+
+		PBRMaterialParameters m_pbrMaterialParameters = {};
+	};
+	struct material_v
+	{
+		uint32_t mid;
+		std::vector<int> variants;
+	};
+	struct PBRPrimitives
+	{
+		Geometry m_geometry;
+		PBRMaterial* m_pMaterial = NULL;
+		PBRPipe_t* _pipe = 0;
+		VkDescriptorSet m_uniformsDescriptorSet = VK_NULL_HANDLE;
+		int mid = 0;
+		int variants_id = 0;
+		int variants_id0 = 0;
+		std::vector<material_v> material_variants;
+	public:
+		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t);
+	};
+
+
 	// todo renderer 渲染器
 	class Renderer_cx
 	{
@@ -1681,7 +1832,9 @@ namespace vkg {
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
 		//PerFrame_t* mkPerFrameData(const Camera& cam);
+		PerFrame_t* mkPerFrameData();
 		//void OnRender(scene_state* pState, const Camera& Cam);
+		void OnRender(scene_state* pState);
 		void set_fbo(fbo_info_cx* p, int idx);
 		// 释放上传堆和缓冲区
 		void freeVidMBP();
@@ -1780,7 +1933,7 @@ namespace vkg {
 		fbo_cxt _fbo = {};
 		// VkCommandBuffer
 		void(*hubDraw)(void* commandBuffer) = nullptr;
-
+		int backBufferCount = 3;
 
 		DisplayMode _dm = DISPLAYMODE_SDR;
 		bool bHDR = false;
@@ -1793,6 +1946,22 @@ namespace vkg {
 
 		bool flipY = false;
 	};
+	class dynamicrendering_t
+	{
+	public:
+		uint32_t width, height;	// 可选
+		VkImageView sc_view;	// 	
+		VkImageView ds_view;
+		VkImage sc_image;
+		VkImage depthStencil_image;
+		VkCommandBuffer _cmd1;
+		PFN_vkCmdBeginRenderingKHR _vkCmdBeginRenderingKHR = VK_NULL_HANDLE;
+		PFN_vkCmdEndRenderingKHR _vkCmdEndRenderingKHR = VK_NULL_HANDLE;
+	public:
+		void dr_begin(VkCommandBuffer cmd1);
+		void dr_end();
+	};
+
 
 #endif
 	// 1对象头
