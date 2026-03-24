@@ -15498,8 +15498,7 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			VkResult res = vkCreateSampler(m_pDevice->GetDevice(), &info, NULL, &m_SamplerSrc);
-			assert(res == VK_SUCCESS);
+			m_SamplerSrc = m_pDevice->newSampler(&info); 
 		}
 
 		constexpr size_t NUM_WRITES = 1;
