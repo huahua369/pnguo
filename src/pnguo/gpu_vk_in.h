@@ -275,6 +275,7 @@ namespace vkg {
 	{
 	public:
 		glm::mat4 proj = glm::mat4(1.0f), view = glm::mat4(1.0f);
+		glm::mat4 _prev_view = glm::mat4(1.0f);
 		glm::vec3 _eye = {}, _center = {}, _up = {};
 		firstPerson_t fp = {};
 		float keySpeed = 5.0f;
@@ -1810,6 +1811,31 @@ namespace vkg {
 		void DrawPrimitive(VkCommandBuffer cmd_buf, uint32_t* uniformOffsets, uint32_t uniformOffsetsCount, bool bWireframe, void* t);
 	};
 
+	struct tfPrimitives
+	{
+		glm::vec4 m_center;
+		glm::vec4 m_radius;
+		/*
+		x=类型
+		'P':v2.x = 0;
+		'N':v2.x = 1;
+		'T':v2.x = 2;
+		"TEXCOORD_0" = 3;
+		"TEXCOORD_1" = 4;
+		"COLOR_0" = 5;
+		"COLOR_1" = 6;
+		.y=accessors id
+		*/
+		std::vector<glm::ivec2> targets;//[“POSITION”，“NORMAL”，//“TANGENT”]
+		uint32_t vcount = 0;
+	};
+
+	struct tfMesh
+	{
+		std::vector<tfPrimitives> m_pPrimitives;
+		std::vector<float> weights;
+	};
+
 
 	// todo renderer 渲染器
 	class Renderer_cx
@@ -1831,10 +1857,10 @@ namespace vkg {
 
 		const std::vector<TimeStamp>& GetTimingValues() { return m_TimeStamps; }
 
-		//PerFrame_t* mkPerFrameData(const Camera& cam);
-		PerFrame_t* mkPerFrameData();
-		//void OnRender(scene_state* pState, const Camera& Cam);
-		void OnRender(scene_state* pState);
+		PerFrame_t* mkPerFrameData(const cxCamera& cam);
+		//PerFrame_t* mkPerFrameData();
+		void OnRender(scene_state* pState, const cxCamera& Cam);
+		//void OnRender(scene_state* pState);
 		void set_fbo(fbo_info_cx* p, int idx);
 		// 释放上传堆和缓冲区
 		void freeVidMBP();
@@ -1960,6 +1986,77 @@ namespace vkg {
 	public:
 		void dr_begin(VkCommandBuffer cmd1);
 		void dr_end();
+	};
+
+	class AxisAlignedBoundingBox
+	{
+	public:
+		glm::vec4 m_min;
+		glm::vec4 m_max;
+		bool m_isEmpty;
+
+		AxisAlignedBoundingBox();
+
+		void Merge(const AxisAlignedBoundingBox& bb);
+		void Grow(const glm::vec4 v);
+
+		bool HasNoVolume() const;
+	};
+
+
+
+	class draw3d_ctx
+	{
+	public:
+		draw3d_ctx();
+		~draw3d_ctx();
+		void OnParseCommandLine(LPSTR lpCmdLine, uint32_t* pWidth, uint32_t* pHeight);
+		void OnCreate();
+		void OnDestroy();
+		void OnRender();
+		void OnResize(bool resizeRender);
+		void OnUpdateDisplay();
+
+		void add_model(const char* fn, const glm::vec3& pos, float scale, uint32_t instanceCount, bool has_shadowMap);
+
+		void OnUpdate();
+
+		void HandleInput();
+		void UpdateCamera(cxCamera& cam);
+		void set_fboidx(int idx);
+		int64_t get_fbo_semaphore();
+	public:
+		cxDevice* m_device = 0;
+		int m_Width = 1280;  // application window dimensions
+		int m_Height = 800;  // application window dimensions
+		int shadowResolution = 1024;
+		int curridx = 0;
+		int setidx = 0;
+		fbo_info_cx* _fbo = 0;
+		//GLTFCommon* _tmpgc = 0;
+		//std::vector<GLTFCommon*> _loaders;
+		//std::queue<GLTFCommon*> _lts;
+		std::mutex m_ltsm;
+
+		Renderer_cx* m_pRenderer = NULL;
+		VkRenderPass _fbo_renderpass = 0;				// fbo的VkRenderPass
+		DisplayMode _dm = DISPLAYMODE_SDR;
+		scene_state m_UIState;
+		cxCamera m_camera;
+		glm::vec3 eyePos = {}, lookAt = {};
+		//CameraX tpfc = {};
+
+		mouse_state_t io = {};
+		double _time = 0; // Time accumulator in seconds, used for animation.
+
+		SystemInfo systemi = {};
+		int	m_activeCamera = 0;
+		std::vector<std::string> _tlabs;
+		std::string _labelstr, _cts;
+		int loadingStage = 0;
+		bool m_bPlay = 0;
+		bool bShowProfilerWindow = true;
+		bool _customize_camera = 0;
 	};
 
 

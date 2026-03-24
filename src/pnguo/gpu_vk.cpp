@@ -8804,16 +8804,65 @@ namespace vkg {
 	}
 #endif
 
-	PerFrame_t* Renderer_cx::mkPerFrameData()
+	inline void GetXYZ(float* f, glm::vec4 v)
 	{
-#if 0
-		Camera cam;
+		f[0] = v.x;
+		f[1] = v.y;
+		f[2] = v.z;
+	}
+
+	glm::mat4 ComputeDirectionalLight_mat(const AxisAlignedBoundingBox& projectedBoundingBox)
+	{
+		if (projectedBoundingBox.HasNoVolume())
+		{
+			// default ortho matrix that won't work in most cases
+			return glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
+		}
+
+		// we now have the final bounding box
+		tfPrimitives finalBoundingBox;
+		finalBoundingBox.m_center = 0.5f * (projectedBoundingBox.m_max + projectedBoundingBox.m_min);
+		finalBoundingBox.m_radius = 0.5f * (projectedBoundingBox.m_max - projectedBoundingBox.m_min);
+
+		finalBoundingBox.m_center.w = (1.0f);
+		finalBoundingBox.m_radius.w = (0.0f);
+
+		// we want a square aspect ratio
+		float spanX = finalBoundingBox.m_radius.x;
+		float spanY = finalBoundingBox.m_radius.y;
+		float maxSpan = spanX > spanY ? spanX : spanY;
+
+		//return glm::ortho(projectedBoundingBox.m_min.x, projectedBoundingBox.m_max.x, projectedBoundingBox.m_min.y, projectedBoundingBox.m_max.y, 0.1f, 100.0f);
+
+		// manually create the orthographic matrix
+		glm::mat4 projectionMatrix = {};//glm::mat4::identity();
+		projectionMatrix[0] = (glm::vec4(
+			1.0f / maxSpan, 0.0f, 0.0f, 0.0f
+		));
+		projectionMatrix[1] = (glm::vec4(
+			0.0f, 1.0f / maxSpan, 0.0f, 0.0f
+		));
+		projectionMatrix[2] = (glm::vec4(
+			0.0f, 0.0f, -0.5f / finalBoundingBox.m_radius.z, 0.0f
+		));
+		projectionMatrix[3] = (glm::vec4(
+			-finalBoundingBox.m_center.x / maxSpan,
+			-finalBoundingBox.m_center.y / maxSpan,
+			0.5f * (finalBoundingBox.m_center.z + finalBoundingBox.m_radius.z) / finalBoundingBox.m_radius.z,
+			1.0f
+		));
+		return projectionMatrix;
+	}
+
+	PerFrame_t* Renderer_cx::mkPerFrameData(const cxCamera& cam)
+	{
+#if 1
 		//Sets the camera
-		_perFrameData.mCameraCurrViewProj = cam.GetProjection() * cam.GetView();
-		_perFrameData.mCameraPrevViewProj = cam.GetProjection() * cam.GetPrevView();
+		_perFrameData.mCameraCurrViewProj = cam.proj * cam.view;
+		_perFrameData.mCameraPrevViewProj = cam.proj * cam._prev_view;
 		// more accurate calculation
-		_perFrameData.mInverseCameraCurrViewProj = cam.GetView();// glm::affineInverse(cam.GetView())* glm::inverse(cam.GetProjection());
-		_perFrameData.cameraPos = cam.GetPosition();
+		_perFrameData.mInverseCameraCurrViewProj = cam.view;// glm::affineInverse(cam.view)* glm::inverse(cam.proj);
+		_perFrameData.cameraPos = glm::vec4(cam._eye, 1.0f);
 
 		_perFrameData.wireframeOptions = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -8838,17 +8887,17 @@ namespace vkg {
 				per[1][1] *= -1.0;
 			}
 			pSL->mLightView = lightView;
-			if (lightData._type == LightType_Spot)
+			if (lightData._type == light_t::LIGHT_SPOTLIGHT  )
 				pSL->mLightViewProj = per * lightView;
-			else if (lightData._type == LightType_Directional)
+			else if (lightData._type == light_t::LIGHT_DIRECTIONAL)
 			{
 				AxisAlignedBoundingBox projectedBoundingBox = {};
 				for (auto it : _robject)
 				{
-					if (it->_ptb)
-					{
-						projectedBoundingBox.Merge(it->_ptb->m_pGLTFCommon->get_BoundingBox(lightView));
-					}
+					//if (it->_ptb)
+					//{
+					//	projectedBoundingBox.Merge(it->_ptb->m_pGLTFCommon->get_BoundingBox(lightView));
+					//}
 				}
 				auto dlm = ComputeDirectionalLight_mat(projectedBoundingBox);
 				pSL->mLightViewProj = dlm * lightView;
@@ -8865,7 +8914,7 @@ namespace vkg {
 			pSL->type = lightData._type;
 
 			// Setup shadow information for light (if it has any)
-			if (lightData._shadowResolution && lightData._type != LightType_Point)
+			if (lightData._shadowResolution && lightData._type != light_t::LIGHT_POINTLIGHT)
 			{
 				pSL->shadowMapIndex = ShadowMapIndex++;
 				pSL->depthBias = lightData._bias;
@@ -9249,7 +9298,7 @@ namespace vkg {
 		}
 	}
 
-	void Renderer_cx::OnRender(scene_state* pState)
+	void Renderer_cx::OnRender(scene_state* pState, const cxCamera& cam)
 	{
 		//printf("OnRender \t\thdr\t%p\n", m_GBuffer->m_HDR.Resource());
 		// Let our resource managers do some house keeping 
@@ -9271,7 +9320,7 @@ namespace vkg {
 		m_GPUTimer.OnBeginFrame(cmdBuf1, &m_TimeStamps);
 
 		// Sets the perFrame data 
-		auto pfd = mkPerFrameData();
+		auto pfd = mkPerFrameData(cam);
 		glm::mat4 mCameraCurrViewProj = pfd->mCameraCurrViewProj;
 		const bool bWireframe = pState->WireframeMode != (int)scene_state::WireframeMode::WIREFRAME_MODE_OFF;
 		Light* lights = pfd->lights;
@@ -9746,6 +9795,107 @@ namespace vkg {
 		m_VidMemBufferPool.FreeUploadHeap();
 		m_UploadHeap.OnDestroy();
 	}
+
+	// Frustum culls an AABB. The culling is done in clip space. 
+	bool CameraFrustumToBoxCollision(const glm::mat4& mCameraViewProj, const glm::vec4& boxCenter, const glm::vec4& boxExtent)
+	{
+		float ex = boxExtent.x;
+		float ey = boxExtent.y;
+		float ez = boxExtent.z;
+		glm::vec4 p[8];
+		p[0] = mCameraViewProj * (boxCenter + glm::vec4(ex, ey, ez, 0));
+		p[1] = mCameraViewProj * (boxCenter + glm::vec4(ex, ey, -ez, 0));
+		p[2] = mCameraViewProj * (boxCenter + glm::vec4(ex, -ey, ez, 0));
+		p[3] = mCameraViewProj * (boxCenter + glm::vec4(ex, -ey, -ez, 0));
+		p[4] = mCameraViewProj * (boxCenter + glm::vec4(-ex, ey, ez, 0));
+		p[5] = mCameraViewProj * (boxCenter + glm::vec4(-ex, ey, -ez, 0));
+		p[6] = mCameraViewProj * (boxCenter + glm::vec4(-ex, -ey, ez, 0));
+		p[7] = mCameraViewProj * (boxCenter + glm::vec4(-ex, -ey, -ez, 0));
+		uint32_t left = 0;
+		uint32_t right = 0;
+		uint32_t top = 0;
+		uint32_t bottom = 0;
+		uint32_t back = 0;
+		for (int i = 0; i < 8; i++)
+		{
+			float x = p[i].x;
+			float y = p[i].y;
+			float z = p[i].z;
+			float w = p[i].w;
+			if (x < -w) left++;
+			if (x > w) right++;
+			if (y < -w) bottom++;
+			if (y > w) top++;
+			if (z < 0) back++;
+		}
+		return left == 8 || right == 8 || top == 8 || bottom == 8 || back == 8;
+	}
+	AxisAlignedBoundingBox::AxisAlignedBoundingBox() : m_min(), m_max(), m_isEmpty{ true }
+	{}
+
+	void AxisAlignedBoundingBox::Merge(const AxisAlignedBoundingBox& bb)
+	{
+		if (bb.m_isEmpty)
+			return;
+		if (m_isEmpty)
+		{
+			m_max = bb.m_max;
+			m_min = bb.m_min;
+			m_isEmpty = false;
+		}
+		else
+		{
+			m_min = glm::min(m_min, bb.m_min);// Vectormath::SSE::minPerElem(m_min, bb.m_min);
+			m_max = glm::max(m_max, bb.m_max);//Vectormath::SSE::maxPerElem(m_max, bb.m_max);
+		}
+	}
+
+	void AxisAlignedBoundingBox::Grow(const glm::vec4 v)
+	{
+		if (m_isEmpty)
+		{
+			m_max = v;
+			m_min = v;
+			m_isEmpty = false;
+		}
+		else
+		{
+			m_min = glm::min(m_min, v);
+			m_max = glm::max(m_max, v);
+		}
+	}
+
+	bool AxisAlignedBoundingBox::HasNoVolume() const
+	{
+		return m_isEmpty || (m_max.x == m_min.x && m_max.y == m_min.y && m_max.z == m_min.z);
+	}
+
+	AxisAlignedBoundingBox GetAABBInGivenSpace(const glm::mat4& mTransform, const glm::vec4& boxCenter, const glm::vec4& boxExtent)
+	{
+		float ex = boxExtent.x;
+		float ey = boxExtent.y;
+		float ez = boxExtent.z;
+
+		AxisAlignedBoundingBox aabb;
+
+		// get the position of each corner of the bounding box in the camera space
+		glm::vec4 p[8];
+		p[0] = mTransform * (boxCenter + glm::vec4(ex, ey, ez, 0));
+		p[1] = mTransform * (boxCenter + glm::vec4(ex, ey, -ez, 0));
+		p[2] = mTransform * (boxCenter + glm::vec4(ex, -ey, ez, 0));
+		p[3] = mTransform * (boxCenter + glm::vec4(ex, -ey, -ez, 0));
+		p[4] = mTransform * (boxCenter + glm::vec4(-ex, ey, ez, 0));
+		p[5] = mTransform * (boxCenter + glm::vec4(-ex, ey, -ez, 0));
+		p[6] = mTransform * (boxCenter + glm::vec4(-ex, -ey, ez, 0));
+		p[7] = mTransform * (boxCenter + glm::vec4(-ex, -ey, -ez, 0));
+
+		for (int i = 0; i < 8; ++i)
+			aabb.Grow(p[i]);
+
+		return aabb;
+	}
+
+
 
 #endif // 1
 
