@@ -15437,9 +15437,11 @@ namespace vkr {
 	void MagnifierPS::OnDestroyWindowSizeDependentResources()
 	{
 		VkDevice device = m_pDevice->GetDevice();
-		vkDestroyImageView(m_pDevice->GetDevice(), m_ImageViewSrc, NULL);
-		vkDestroyImageView(device, m_SRVOutput, NULL);
-		vkDestroySampler(m_pDevice->GetDevice(), m_SamplerSrc, nullptr);
+		if (m_ImageViewSrc)
+			vkDestroyImageView(device, m_ImageViewSrc, NULL);
+		if (m_SRVOutput)
+			vkDestroyImageView(device, m_SRVOutput, NULL);
+		//vkDestroySampler(device, m_SamplerSrc, nullptr);
 		if (!m_bOutputsToSwapchain)
 		{
 			vkDestroyImageView(device, m_RTVOutput, NULL);
@@ -15498,7 +15500,7 @@ namespace vkr {
 			info.minLod = -1000;
 			info.maxLod = 1000;
 			info.maxAnisotropy = 1.0f;
-			m_SamplerSrc = m_pDevice->newSampler(&info); 
+			m_SamplerSrc = m_pDevice->newSampler(&info);
 		}
 
 		constexpr size_t NUM_WRITES = 1;
