@@ -7670,14 +7670,18 @@ namespace vkg {
 	void MagnifierPS::OnDestroyWindowSizeDependentResources()
 	{
 		VkDevice device = m_pDevice->_dev;
-		vkDestroyImageView(device, m_ImageViewSrc, NULL);
-		vkDestroyImageView(device, m_SRVOutput, NULL);
-		vkDestroySampler(device, m_SamplerSrc, nullptr);
+		if (m_ImageViewSrc)
+			vkDestroyImageView(device, m_ImageViewSrc, NULL);
+		if (m_SRVOutput)
+			vkDestroyImageView(device, m_SRVOutput, NULL);
+		//vkDestroySampler(device, m_SamplerSrc, nullptr);
 		if (!m_bOutputsToSwapchain)
 		{
-			vkDestroyImageView(device, m_RTVOutput, NULL);
+			if (m_RTVOutput)
+				vkDestroyImageView(device, m_RTVOutput, NULL);
 			m_TexPassOutput.OnDestroy();
-			vkDestroyFramebuffer(device, m_FrameBuffer, NULL);
+			if (m_FrameBuffer)
+				vkDestroyFramebuffer(device, m_FrameBuffer, NULL);
 		}
 	}
 
@@ -8887,7 +8891,7 @@ namespace vkg {
 				per[1][1] *= -1.0;
 			}
 			pSL->mLightView = lightView;
-			if (lightData._type == light_t::LIGHT_SPOTLIGHT  )
+			if (lightData._type == light_t::LIGHT_SPOTLIGHT)
 				pSL->mLightViewProj = per * lightView;
 			else if (lightData._type == light_t::LIGHT_DIRECTIONAL)
 			{
@@ -10027,6 +10031,11 @@ namespace vkg {
 	}
 	cxDevice::~cxDevice()
 	{
+		for (auto p : _samplers) {
+			vkDestroySampler(_dev, p.second, NULL);
+		}
+		_samplers.clear(); 
+		DestroyPipelineCache();
 		if (s_shaderCache)delete s_shaderCache; s_shaderCache = 0;
 		free_devinfo(d);
 	}
@@ -10678,7 +10687,9 @@ namespace vkg {
 	cxSampler::cxSampler() :cxObject(OBJ_SAMPLER)
 	{}
 	cxSampler::~cxSampler()
-	{}
+	{
+
+	}
 	cxSurface::cxSurface() :cxObject(OBJ_SURFACE)
 	{}
 	cxSurface::~cxSurface()

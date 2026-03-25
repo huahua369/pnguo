@@ -821,11 +821,11 @@ int main()
 		const char* wtitle1 = (char*)u8"窗口1";
 		auto devname = "Intel(R)";
 		devname = 0;
-		//adevice3_t* gd = new_gdev(0, 0);
-		//auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
+		adevice3_t* gd = new_gdev(0, 0);
+		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
 		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
 
-		//gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
+		auto sampler = gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
 
 		// 准备使用3D渲染器的设备创建SDL渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
@@ -1078,8 +1078,9 @@ int main()
 		//show_cpuinfo(form0);
 
 		free_vkdg(vkd);
-		//gd->release(dctx);
-		//free_gdev(gd);
+		gd->release(sampler);
+		gd->release(dctx);
+		free_gdev(gd);
 		free_app(app);
 	}
 #ifdef _WIN32
