@@ -9899,6 +9899,43 @@ namespace vkg {
 		return aabb;
 	}
 
+	TaskQueue::TaskQueue(size_t count) { run(count); }
+	TaskQueue::~TaskQueue() { wait_stop(); }
+	void TaskQueue::add(std::function<void()> task) {
+		if (w_count > 0) {
+			rc++;
+			std::lock_guard<std::mutex> lock(mtx);
+			tasks.push(task);
+		}
+		else { task(); }
+	}
+	void TaskQueue::run(int num) {
+		if (num < 1)return;
+		int tn = std::thread::hardware_concurrency();
+		num = std::min(num, tn);
+		w_count += num;
+		for (int i = 0; i < num; ++i) {
+			workers.emplace_back([this](std::stop_token st) {
+				while (!st.stop_requested()) {
+					while (tasks.size()) {
+						std::function<void()> task;
+						{
+							std::lock_guard<std::mutex> lock(mtx);
+							if (tasks.empty()) break;
+							task = std::move(tasks.front());  tasks.pop();
+						}
+						task();
+						rc--;
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+				});
+		}
+	}
+	void TaskQueue::wait_stop() {
+		while (rc > 0) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+		for (auto& w : workers) { w.request_stop(); }
+	}
 
 
 #endif // 1
@@ -10034,7 +10071,7 @@ namespace vkg {
 		for (auto p : _samplers) {
 			vkDestroySampler(_dev, p.second, NULL);
 		}
-		_samplers.clear(); 
+		_samplers.clear();
 		DestroyPipelineCache();
 		if (s_shaderCache)delete s_shaderCache; s_shaderCache = 0;
 		free_devinfo(d);

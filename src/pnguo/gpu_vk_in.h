@@ -2059,6 +2059,22 @@ namespace vkg {
 		bool _customize_camera = 0;
 	};
 
+	class TaskQueue
+	{
+	public:
+		std::vector<std::jthread> workers;
+		std::queue<std::function<void()>> tasks;
+		std::mutex mtx;
+		size_t w_count = 0;
+		std::atomic_int rc = 0;
+	public:
+		TaskQueue(size_t count);
+		~TaskQueue();
+		void add(std::function<void()> task);
+		void run(int num);
+		void wait_stop();
+	private:
+	};
 
 #endif
 	// 1对象头

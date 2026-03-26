@@ -1050,7 +1050,7 @@ int main()
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
 					{
-						std::string str = vkd->get_label();
+						std::string str = vkd->get_label(); str += (char*)u8"🔥➗️";
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						r_update_data_text(&ptb->trt, td3, 0);
 					}
