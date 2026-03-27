@@ -741,7 +741,6 @@ int main()
 #endif 
 #endif // _WIN32
 
-
 		{
 			std::vector<entt::entity> vs;
 			vs.resize(1000);

@@ -10831,7 +10831,7 @@ namespace vkg {
 		aSampler p = nullptr;
 		auto c = new cxSampler();
 		sampler_info_t info = {};
-		ctx->newSampler(&info);
+		//ctx->newSampler(&info);
 		p = c;
 		return p;
 	}
