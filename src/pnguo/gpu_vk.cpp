@@ -10909,7 +10909,7 @@ namespace vkg {
 		return nullptr;
 	}
 	// 获取属性
-	int get_property(aObject object, const char* name, int data_type, void* mem, uint64_t size, int mask) {
+	bool get_property(aObject object, const char* name, int data_type, void* mem, uint64_t size, int mask) {
 		return 0;
 	}
 	// 提交帧渲染

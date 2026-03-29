@@ -437,10 +437,10 @@ extern "C" {
 		// 获取参数值, data_type返回值类型
 		void* (*get_param)(aObject object, const char* name, int* data_type);
 		// 获取属性
-		int (*get_property)(aObject object, const char* name, int data_type, void* mem, uint64_t size, int wait_mask);
+		bool (*get_property)(aObject object, const char* name, int data_type, void* mem, uint64_t size, int wait_mask);
 		// 提交帧渲染
 		void (*render_frame)(aFrame frame);
-		// 帧渲染完成检查
+		// 帧渲染完成检查，0完成，1未完成，-1渲染出错
 		int (*frame_ready)(aFrame frame, int wait_mask);
 	};
 	// 创建管理器
