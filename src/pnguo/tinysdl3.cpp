@@ -2190,7 +2190,9 @@ void form_x::update(float delta)
 
 	int display_w, display_h;
 
-	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h);
+	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h); 
+	//float wx, wy;
+	//SDL_RenderCoordinatesToWindow(renderer, 100,200,&wx, &wy);
 	display_size = _size;
 	if (_size.x > 0 && _size.y > 0)
 	{
