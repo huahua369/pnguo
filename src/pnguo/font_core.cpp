@@ -22,6 +22,9 @@
 #ifndef NO_FONT_ICU
 #include <hb.h>
 #include <hb-ot.h>
+#if __has_include(<hb-raster.h>)
+#include <hb-raster.h>
+#endif
 #include <fontconfig/fontconfig.h> 
 #include <unicode/uchar.h>
 #include <unicode/ucnv.h>
@@ -1033,18 +1036,20 @@ struct hps_t {
 	hb_font_t* hb_font;
 	hb_language_t hb_language;
 	hb_buffer_t* hb_buffer;
+#ifdef HB_RASTER_H
+	hb_raster_draw_t* rdr;
+	hb_raster_paint_t* pnt;
+#endif
 #endif
 };
 class stb_font
 {
 public:
 	stb_font()
-	{
-	}
+	{}
 
 	~stb_font()
-	{
-	}
+	{}
 	static font_impl* new_fontinfo()
 	{
 		return new font_impl();
@@ -1671,12 +1676,10 @@ public:
 		uint32_t numSizes = 0;
 	public:
 		eblc_h()
-		{
-		}
+		{}
 
 		~eblc_h()
-		{
-		}
+		{}
 
 	private:
 
@@ -2361,6 +2364,14 @@ font_t::~font_t()
 	}
 	if (hp->hb_buffer)
 		hb_buffer_destroy(hp->hb_buffer);
+
+#ifdef HB_RASTER_H
+	if (hp->pnt)
+		hb_raster_paint_destroy(hp->pnt);
+	if (hp->rdr)
+		hb_raster_draw_destroy(hp->rdr);
+#endif
+
 #endif
 	if (hp)delete hp; hp = 0;
 }
@@ -2389,12 +2400,79 @@ void font_t::init_post_table()
 		}
 		//hb_ft_font_set_load_flags(font->hb_font, FT_LOAD_DEFAULT | font->ft_load_target); 
 		hp->hb_language = hb_language_from_string("", -1);
-
 		hp->hb_buffer = hb_buffer_create();
+
+#ifdef HB_RASTER_H
+
+		bool has_color = hb_ot_color_has_paint(face) ||
+			hb_ot_color_has_layers(face) ||
+#ifndef HB_NO_SVG
+			hb_ot_color_has_svg(face);
+#else
+			false;
+#endif
+
+		auto bp = hb_ot_color_has_png(face);
+		hp->rdr = hb_raster_draw_create_or_fail();
+		hp->pnt = has_color ? hb_raster_paint_create_or_fail() : nullptr;
+#endif
 	}
 	if (blob)hb_blob_destroy(blob);
 #endif
 
+}
+void font_t::mk_glyph_image(uint32_t gid, int font_size, std::vector<char>* outdt, glm::ivec4* ot)
+{
+#ifdef HB_RASTER_H
+	hb_raster_image_t* img = nullptr;
+	auto font = hp->hb_font;
+	auto pnt = hp->pnt;
+	auto rdr = hp->rdr;
+	do {
+		hb_font_set_scale(font, font_size, font_size);
+		if (pnt)
+		{
+			hb_glyph_extents_t gext;
+			if (hb_font_get_glyph_extents(font, gid, &gext) &&
+				hb_raster_paint_set_glyph_extents(pnt, &gext))
+			{
+				hb_raster_paint_set_transform(pnt, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
+				hb_bool_t painted = hb_raster_paint_glyph(pnt, font, gid, 0.f, 0.f,
+					0, HB_COLOR(255, 255, 255, 255));
+				if (painted)
+					img = hb_raster_paint_render(pnt);
+			}
+
+			if (img)
+			{
+				write_png(img, outdir, gid);
+				hb_raster_paint_recycle_image(pnt, img);
+				break;
+			}
+		}
+		hb_raster_draw_set_transform(rdr, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
+		hb_raster_draw_glyph(rdr, font, gid, 0.f, 0.f);
+		//hb_font_draw_glyph(font, gid, dfuncs, (void*)2);
+		img = hb_raster_draw_render(rdr);
+		if (img)
+		{
+			write_png(img, outdir, gid);
+			hb_raster_draw_recycle_image(rdr, img);
+		}
+	} while (0);
+
+	hb_raster_extents_t ext = {};
+	if (img) {
+		hb_raster_image_get_extents(img, &ext);
+		if (!ext.width || !ext.height) return;
+		if (ot)
+		{
+			ot->z = ext.width;
+			ot->w = ext.height;
+		}
+
+	}
+#endif
 }
 
 uint32_t font_t::CollectGlyphsFromFont(const void* text, size_t length, int type, int direction, uint32_t script, GlyphPositions* positions)
@@ -2909,6 +2987,62 @@ int font_t::get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap_p* b
 				bitmap->bearingX = adlsb.x;
 				bitmap->pixel_mode = PX_GRAY;	//255灰度图
 				bitmap->lcd_mode = lcd_type;
+				init_bitmap_bitdepth(bitmap, 8);
+				ret = 1;
+			}
+		}
+		if (bitmap)
+		{
+			bitmap->x = ot->x;
+			bitmap->y = ot->y;
+		}
+	}
+	return ret;
+}
+
+int font_t::get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, uint32_t unicode_codepoint)
+{
+	int ret = 0;
+	if (gidx > 0)
+	{
+		double scale = get_scale(height);
+		//double scale = get_scale_height(height);
+		if (height < 0)
+		{
+			height *= -1;
+		}
+#ifndef _FONT_NO_BITMAP
+		if (first_bitmap)
+		{
+			// 解析位图
+			ret = get_glyph_bitmap(gidx, height, ot, bitmap, out);
+			// 找不到位图时尝试用自定义解码
+			if (!ret)
+				ret = get_custom_decoder_bitmap(unicode_codepoint, height, ot, bitmap, out);
+		}
+#endif
+		if (!ret)
+		{
+			// 解析轮廓并光栅化 
+			glm::vec3 adlsb = { 0,0,height };
+			//mk_glyph_image(gidx);
+			if (bitmap)
+			{
+				auto hh = hp->hhea;
+				auto he = hp->hhea.ascender + hp->hhea.descender + hp->hhea.lineGap;
+				auto hef = hp->hhea.ascender - hp->hhea.descender + hp->hhea.lineGap;
+
+				double hed = (scale * he);//ceil
+				double hedf = (scale * hef);
+				double lg = (scale * hp->hhea.lineGap);
+				if (out)
+					bitmap->buffer = (unsigned char*)out->data();
+				bitmap->width = bitmap->pitch = ot->z;
+				bitmap->rows = ot->w;
+				bitmap->advance = adlsb.z;
+				bitmap->bearingX = adlsb.x;
+				bitmap->pixel_mode = PX_GRAY;	//255灰度图
+				bitmap->lcd_mode = 0;
 				init_bitmap_bitdepth(bitmap, 8);
 				ret = 1;
 			}
@@ -3711,8 +3845,7 @@ public:
 	}
 
 	~SBitDecoder()
-	{
-	}
+	{}
 
 	int init(font_t* ttp, uint32_t strike_index);
 public:
@@ -6626,11 +6759,9 @@ int font_t::get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, gl
 
 
 packer_base::packer_base()
-{
-}
+{}
 packer_base::~packer_base()
-{
-}
+{}
 
 void packer_base::init_target(int width, int height) {}
 void packer_base::clear() {}
@@ -6865,8 +6996,7 @@ bitmap_cache_cx::bitmap_cache_cx()
 }
 
 bitmap_cache_cx::~bitmap_cache_cx()
-{
-}
+{}
 
 void bitmap_cache_cx::resize(int w, int h)
 {
@@ -7077,8 +7207,7 @@ public:
 	std::set<std::string> vname;
 public:
 	fd_info0()
-	{
-	}
+	{}
 	fd_info0(hz::mfile_t* p)
 	{
 		init(p);
@@ -7122,8 +7251,7 @@ private:
 
 };
 font_imp::font_imp()
-{
-}
+{}
 
 font_imp::~font_imp()
 {
@@ -7753,12 +7881,10 @@ void free_fonts_ctx(font_rctx* p)
 
 
 internal_text_cx::internal_text_cx()
-{
-}
+{}
 
 internal_text_cx::~internal_text_cx()
-{
-}
+{}
 
 
 
@@ -8270,8 +8396,7 @@ ScriptRun::ScriptRun()
 	reset(NULL, 0, 0);
 }
 ScriptRun::~ScriptRun()
-{
-}
+{}
 
 ScriptRun::ScriptRun(const UChar chars[], int32_t length)
 {
@@ -8933,8 +9058,7 @@ word_key::word_key()
 }
 
 word_key::~word_key()
-{
-}
+{}
 void word_key::push(int sc)
 {
 	_sc.insert(sc);
@@ -9964,8 +10088,7 @@ void text_multi_layout(layout_tx* p)
 
 #else
 void do_text(const char* str, size_t first, size_t count)
-{
-}
+{}
 #endif // !NO_HB_CX
 
 
@@ -10246,12 +10369,10 @@ void save_img_png(image_gray* p, const char* str)
 #if 1
 
 image_gray::image_gray()
-{
-}
+{}
 
 image_gray::~image_gray()
-{
-}
+{}
 
 unsigned char* image_gray::data()
 {

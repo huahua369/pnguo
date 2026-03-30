@@ -205,6 +205,9 @@ public:
 	int get_glyph_index0(uint32_t codepoint, font_t** renderFont, font_family_t* fallbacks);
 
 	std::map<int, std::vector<info_one>> get_detail();
+
+	void mk_glyph_image(uint32_t gid, int font_size, std::vector<char>* outdt, glm::ivec4* ot);
+
 	// 返回的positions.pos自动管理内存,返回字形数量
 	uint32_t CollectGlyphsFromFont(const void* text, size_t length, int type, int direction, uint32_t script, GlyphPositions* positions);
 	int GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd);
@@ -223,6 +226,7 @@ private:
 	int get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out);
 	int get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out);
 
+	int get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, uint32_t unicode_codepoint);
 };
 
 

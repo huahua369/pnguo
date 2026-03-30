@@ -765,11 +765,11 @@ int main()
 		}
 
 		auto fctx = app->font_ctx;
-		auto ksun = fctx->get_font((char*)u8"新宋体", 0);
-		auto seg = fctx->get_font((char*)u8"Segoe UI Emoji", 0);
+		//auto ksun = fctx->get_font((char*)u8"新宋体", 0);
+		//auto seg = fctx->get_font((char*)u8"Segoe UI Emoji", 0);
 		//auto sues = fctx->add2file(R"(data\seguiemj.ttf)", 0);
 		//auto sue = sues[0]; 
-		std::vector<font_t*> familys = { ksun ,seg };
+		//std::vector<font_t*> familys = { ksun ,seg };
 
 
 
@@ -1003,8 +1003,8 @@ int main()
 			tb.size = str.size();
 			text_render_o trt = {};
 			auto ptrt = &trt;
-			trt.box.text_align = { };
-			trt.box.rc = { 0,0,500,500 };
+			trt.box.text_align = {0,0.5 };
+			trt.box.rc = { 0,0,1500,500 };
 			trt.box.auto_break = 1;
 			trt.box.word_wrap = 1;
 			build_text_render(&tb, &trt);
@@ -1049,7 +1049,7 @@ int main()
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
 					{
-						std::string str = vkd->get_label(); str += (char*)u8"🔥➗️";
+						std::string str = vkd->get_label(); str += (char*)u8"\n🔥➗️👪️";
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						r_update_data_text(&ptb->trt, td3, 0);
 					}
