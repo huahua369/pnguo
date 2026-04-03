@@ -1003,8 +1003,8 @@ int main()
 			tb.size = str.size();
 			text_render_o trt = {};
 			auto ptrt = &trt;
-			trt.box.text_align = {0,0.5 };
-			trt.box.rc = { 0,0,1500,500 };
+			trt.box.text_align = { 0,0.5 };
+			trt.box.rc = { 0,0,1500,600 };
 			trt.box.auto_break = 1;
 			trt.box.word_wrap = 1;
 			build_text_render(&tb, &trt);
@@ -1049,9 +1049,15 @@ int main()
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
 					{
-						std::string str = vkd->get_label(); str += (char*)u8"\n🔥➗️👪️";
+						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						r_update_data_text(&ptb->trt, td3, 0);
+						static bool save_test = false;
+						if (save_test)
+						{
+							auto img = fctx->bcc._data[0];
+							save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
+						}
 					}
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto sem = vkd->get_fbo_semaphore();

@@ -383,7 +383,7 @@ struct texture_cb
 	void* (*new_texture)(void* renderer, int width, int height, int type, void* data, int stride, int bm, bool static_tex, bool multiply);
 	// 更新纹理数据
 	void (*update_texture)(void* texture, const glm::ivec4* rect, const void* pixels, int pitch);
-	// 设置纹理混合模式
+	// 设置纹理混合模式，b混合模式，multiply是否为预乘纹理
 	void (*set_texture_blend)(void* texture, uint32_t b, bool multiply);
 	void (*set_texture_color)(void* texture, float r, float g, float b, float a);
 	void (*set_texture_color4)(void* texture, const glm::vec4* c);

@@ -8,9 +8,6 @@
 
 
 #ifndef no_cairo_ 
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include <cairo/cairo.h>
 #ifdef _WIN32
 #include <cairo/cairo-win32.h>
@@ -21,6 +18,9 @@ extern "C" {
 #ifndef NO_SVG
 #include <librsvg/rsvg.h>
 #endif 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef __cplusplus
 }

@@ -2369,7 +2369,7 @@ namespace hz
 			g_free(tstr);
 		}
 #else
-		ret = md::u8_u16(str);
+		ret = md::u8_w(str);
 #endif
 		return ret;
 	}

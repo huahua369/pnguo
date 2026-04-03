@@ -5,17 +5,12 @@
       "generator": "Ninja",
       "configurationType": "Debug",
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "buildRoot": "${projectDir}\\out\\build\\${name}",
-      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "buildRoot": "${projectDir}/out/build/${name}",
+      "installRoot": "${projectDir}/out/install/${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "-j8",
       "ctestCommandArgs": "",
       "variables": [
-        {
-          "name": "SDL3_DIR",
-          "value": "",
-          "type": "PATH"
-        },
         {
           "name": "VCPKG_TARGET_TRIPLET",
           "value": "x64-windows-static",
@@ -27,18 +22,13 @@
       "name": "x64-Release",
       "generator": "Ninja",
       "configurationType": "Release",
-      "buildRoot": "${projectDir}\\out\\build\\${name}",
-      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "buildRoot": "${projectDir}/out/build/${name}",
+      "installRoot": "${projectDir}/out/install/${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "-j8",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
       "variables": [
-        {
-          "name": "mimalloc_DIR",
-          "value": "",
-          "type": "PATH"
-        },
         {
           "name": "VCPKG_TARGET_TRIPLET",
           "value": "x64-windows-static",
@@ -50,8 +40,8 @@
       "name": "x86-Release",
       "generator": "Ninja",
       "configurationType": "RelWithDebInfo",
-      "buildRoot": "${projectDir}\\out\\build\\${name}",
-      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "buildRoot": "${projectDir}/out/build/${name}",
+      "installRoot": "${projectDir}/out/install/${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
@@ -61,18 +51,13 @@
       "name": "x64-Release-2",
       "generator": "Ninja",
       "configurationType": "RelWithDebInfo",
-      "buildRoot": "${projectDir}\\out\\build\\${name}",
-      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "buildRoot": "${projectDir}/out/build/${name}",
+      "installRoot": "${projectDir}/out/install/${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "-j8",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
       "variables": [
-        {
-          "name": "mimalloc_DIR",
-          "value": "",
-          "type": "PATH"
-        },
         {
           "name": "VCPKG_TARGET_TRIPLET",
           "value": "x64-windows-static",

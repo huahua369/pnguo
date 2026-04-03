@@ -2,7 +2,6 @@
   "dependencies": [
     "pkgconf",
     "fontconfig",
-    "harfbuzz",
     "icu",
     "librsvg",
     "openssl",
@@ -17,7 +16,6 @@
     "exprtk",
     "clipper2",
     "libuv",
-    "libusb",
     "entt",
     "libssh2",
     "libnoise",

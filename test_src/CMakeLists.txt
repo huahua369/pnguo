@@ -101,6 +101,7 @@ find_package(libzip CONFIG REQUIRED)
 
 #git submodule add https://github.com/EsotericSoftware/spine-runtimes third_lib/spine
  
+
 set(lklib)
 list(APPEND lklib  
     Dwmapi
@@ -118,7 +119,7 @@ list(APPEND lklib
     #${SDL3_LIBRARIES}
    unofficial::noise::noise-static
    unofficial::noiseutils::noiseutils-static
-    harfbuzz::harfbuzz 
+    harfbuzz::harfbuzz harfbuzz::harfbuzz-raster
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     #opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     pnguo

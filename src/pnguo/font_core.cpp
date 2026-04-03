@@ -2334,7 +2334,6 @@ font_t::font_t()
 	hp = new hps_t();
 	assert(font);
 }
-void free_colorinfo(gcolors_t* colorinfo);
 
 font_t::~font_t()
 {
@@ -2351,10 +2350,6 @@ font_t::~font_t()
 	}
 	detail.clear();
 	if (bitinfo)delete bitinfo; bitinfo = 0;
-	if (colorinfo) {
-		free_colorinfo(colorinfo);
-		delete colorinfo; colorinfo = 0;
-	}
 	if (font)delete font; font = 0;
 #if TTF_USE_HARFBUZZ
 	if (hp->hb_font) {
@@ -2421,59 +2416,148 @@ void font_t::init_post_table()
 #endif
 
 }
-void font_t::mk_glyph_image(uint32_t gid, int font_size, std::vector<char>* outdt, glm::ivec4* ot)
-{
+
 #ifdef HB_RASTER_H
+
+void* font_t::mk_glyph_image_hb(uint32_t gid, int font_size, int* ot)
+{
 	hb_raster_image_t* img = nullptr;
+	hb_glyph_extents_t gext = {};
+	auto rdr = hp->rdr;
 	auto font = hp->hb_font;
 	auto pnt = hp->pnt;
-	auto rdr = hp->rdr;
 	do {
 		hb_font_set_scale(font, font_size, font_size);
+		hb_raster_draw_reset(rdr);
+		bool bext = hb_font_get_glyph_extents(font, gid, &gext);
 		if (pnt)
 		{
-			hb_glyph_extents_t gext;
-			if (hb_font_get_glyph_extents(font, gid, &gext) &&
-				hb_raster_paint_set_glyph_extents(pnt, &gext))
+			if (bext && hb_raster_paint_set_glyph_extents(pnt, &gext))
 			{
 				hb_raster_paint_set_transform(pnt, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
-				hb_bool_t painted = hb_raster_paint_glyph(pnt, font, gid, 0.f, 0.f,
-					0, HB_COLOR(255, 255, 255, 255));
+				hb_bool_t painted = hb_raster_paint_glyph(pnt, font, gid, 0.f, 0.f, 0, HB_COLOR(255, 255, 255, 255));
 				if (painted)
 					img = hb_raster_paint_render(pnt);
 			}
-
 			if (img)
 			{
-				write_png(img, outdir, gid);
 				hb_raster_paint_recycle_image(pnt, img);
 				break;
 			}
 		}
-		hb_raster_draw_set_transform(rdr, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
-		hb_raster_draw_glyph(rdr, font, gid, 0.f, 0.f);
-		//hb_font_draw_glyph(font, gid, dfuncs, (void*)2);
-		img = hb_raster_draw_render(rdr);
-		if (img)
 		{
-			write_png(img, outdir, gid);
-			hb_raster_draw_recycle_image(rdr, img);
+			hb_raster_draw_set_transform(rdr, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
+			hb_raster_draw_glyph(rdr, font, gid, 0.f, 0.f);
+			img = hb_raster_draw_render(rdr);
+			if (img)
+			{
+				hb_raster_draw_recycle_image(rdr, img);
+			}
 		}
 	} while (0);
-
 	hb_raster_extents_t ext = {};
 	if (img) {
 		hb_raster_image_get_extents(img, &ext);
-		if (!ext.width || !ext.height) return;
+		if (!ext.width || !ext.height) { img = 0; return img; }
 		if (ot)
 		{
-			ot->z = ext.width;
-			ot->w = ext.height;
+			ot[0] = ext.x_origin;
+			ot[1] = -(ext.height + ext.y_origin);
+			ot[2] = ext.width;
+			ot[3] = ext.height;
 		}
-
 	}
+	return img;
+}
+
+void font_t::set_hb_fontsize(int font_size)
+{
+#ifdef HB_RASTER_H 
+	auto font = hp->hb_font;
+	hb_font_set_scale(font, font_size, font_size);
 #endif
 }
+
+
+void rgba_copy(image_ptr_t* dst, int x, int y, int w, int h, const uint32_t* dt, int stride, bool fy)
+{
+	if (!dst || !dt || w <= 0 || h <= 0) return;
+	if (stride < 1)
+		stride = w * sizeof(int);
+	int dst_x = std::max(0, x), dst_y = std::max(0, y);
+	int src_x = dst_x - x;
+	int src_y = dst_y - y;
+	int src_w = w - (dst_x - x), src_h = h - (dst_y - y);
+	int copy_w = std::min(src_w, dst->width - dst_x);
+	int copy_h = std::min(src_h, dst->height - dst_y);
+	auto t = (uint8_t*)dt;
+	for (int iy = 0; iy < copy_h; ++iy) {
+		const uint8_t* src_row = fy ? t + (h - 1 - (src_y + iy)) * stride : t + (src_y + iy) * stride + src_x;
+		memcpy(dst->data + ((dst_y + iy) * dst->width + dst_x), src_row, copy_w * sizeof(uint32_t));
+	}
+}
+
+void rgba_copy_bgra(image_ptr_t* dst, int x, int y, int w, int h, const uint32_t* dt, int stride, bool fy)
+{
+	if (!dst || !dt || w <= 0 || h <= 0) return;
+	if (stride < 1)
+		stride = w * sizeof(int);
+	int dst_x = std::max(0, x), dst_y = std::max(0, y);
+	int src_x = dst_x - x;
+	int src_y = dst_y - y;
+	int src_w = w - (dst_x - x), src_h = h - (dst_y - y);
+	int copy_w = std::min(src_w, dst->width - dst_x);
+	int copy_h = std::min(src_h, dst->height - dst_y);
+	auto t = (uint8_t*)dt;
+	for (int iy = 0; iy < copy_h; ++iy) {
+		const uint8_t* src_row = fy ? t + (h - 1 - (src_y + iy)) * stride : t + (src_y + iy) * stride + src_x;
+		auto dstp = dst->data + ((dst_y + iy) * dst->width + dst_x);
+		memcpy(dstp, src_row, copy_w * sizeof(uint32_t));
+		for (size_t i = 0; i < copy_w; i++)
+		{
+			auto it = (uint8_t*)&dstp[i];
+			std::swap(it[0], it[2]);
+		}
+	}
+}
+
+void rgba_copy2gray(image_ptr_t* dst, int x, int y, int w, int h, uint32_t c, const uint8_t* dt, int stride, bool fy)
+{
+	if (stride < 1)stride = w;
+	if (!dst || !dt || w <= 0 || h <= 0 || stride < w) return;
+	// 计算实际绘制区域（处理边界裁剪）
+	int dst_x = std::max(0, x);
+	int dst_y = std::max(0, y);
+	int src_x = dst_x - x;
+	int src_y = dst_y - y;
+	int copy_w = std::min(w - src_x, dst->width - dst_x);
+	int copy_h = std::min(h - src_y, dst->height - dst_y);
+	c = (c & 0x00FFFFFF);
+	for (int iy = 0; iy < copy_h; ++iy) {
+		const uint8_t* src_row = fy ? dt + (h - 1 - (src_y + iy)) * stride : dt + (src_y + iy) * stride + src_x;
+		uint32_t* dst_row = dst->data + ((dst_y + iy) * dst->width + dst_x);
+		for (int ix = 0; ix < copy_w; ++ix) {
+			uint8_t gray = src_row[ix];
+			dst_row[ix] = c | ((uint32_t)gray << 24);
+		}
+	}
+}
+bool gfont_copy_image(image_ptr_t* dst, int rx, int ry, uint32_t color, hb_raster_image_t* img_src)
+{
+	bool has_color = false;
+	hb_raster_extents_t ext = {};
+	hb_raster_image_get_extents(img_src, &ext);
+	hb_raster_format_t fmt = hb_raster_image_get_format(img_src);
+	if (fmt == HB_RASTER_FORMAT_A8)
+		rgba_copy2gray(dst, rx, ry, ext.width, ext.height, color, hb_raster_image_get_buffer(img_src), ext.stride, true);
+	else if (fmt == HB_RASTER_FORMAT_BGRA32)
+	{
+		has_color = true;
+		rgba_copy_bgra(dst, rx, ry, ext.width, ext.height, (uint32_t*)hb_raster_image_get_buffer(img_src), ext.stride, true);
+	}
+	return has_color;
+}
+#endif // HB_RASTER_H
 
 uint32_t font_t::CollectGlyphsFromFont(const void* text, size_t length, int type, int direction, uint32_t script, GlyphPositions* positions)
 {
@@ -2656,279 +2740,6 @@ sfnt_header* get_tag(font_impl* font_i, const std::string& tag)
 }
 
 
-typedef struct  LayerIterator_
-{
-	uint32_t   num_layers;
-	uint32_t   layer;
-	uint8_t* p;
-
-} LayerIterator;
-typedef struct  Palette_Data_ {
-	uint16_t         num_palettes;
-	const uint16_t* palette_name_ids;
-	const uint16_t* palette_flags;
-
-	uint16_t         num_palette_entries;
-	const uint16_t* palette_entry_name_ids;
-
-} Palette_Data;
-
-union Color_2
-{
-	uint32_t c;
-	struct {
-		uint8_t r, g, b, a;
-	};
-	struct {
-		uint8_t red, green, blue, alpha;
-	};
-};
-struct Cpal;
-struct Colr;
-struct gcolors_t
-{
-	Cpal* cpal;
-	Colr* colr;
-	/* glyph colors */
-	Palette_Data palette_data;         /* since 2.10 */
-	uint16_t palette_index;
-	Color_2* palette;
-	Color_2 foreground_color;
-	bool have_foreground_color;
-	char td[256];
-};
-struct GlyphSlot;
-
-typedef union {
-	uint32_t color;
-	struct {
-		unsigned char b, g, r, a;
-	} argb;
-} stbtt_color;
-bool stbtt_FontHasPalette(const stbtt_fontinfo* info);
-unsigned short stbtt_FontPaletteCount(const stbtt_fontinfo* info);
-unsigned short stbtt_FontPaletteGetColors(const stbtt_fontinfo* info, unsigned short paletteIndex, stbtt_color** colorPalette);
-//// Glyph layers (COLR) /////////////////////////////////////////////////////
-typedef struct {
-	unsigned short glyphid, colorid;
-} stbtt_glyphlayer;
-bool stbtt_FontHasLayers(const stbtt_fontinfo* info);
-unsigned short stbtt_GetGlyphLayers(const stbtt_fontinfo* info, unsigned short glypId, stbtt_glyphlayer** glyphLayer);
-unsigned short stbtt_GetCodepointLayers(const stbtt_fontinfo* info, unsigned short codePoint, stbtt_glyphlayer** glyphLayer);
-
-
-
-void free_colorinfo(gcolors_t* colorinfo) {
-
-	if (colorinfo->palette_data.palette_name_ids)delete[]colorinfo->palette_data.palette_name_ids;
-	if (colorinfo->palette_data.palette_flags)delete[]colorinfo->palette_data.palette_flags;
-	if (colorinfo->palette_data.palette_entry_name_ids)delete[]colorinfo->palette_data.palette_entry_name_ids;
-}
-
-
-int tt_face_load_colr(font_t* face, uint8_t* b, sfnt_header* sp);
-
-void tt_face_free_colr(font_t*);
-
-bool tt_face_get_colr_layer(font_t* face,
-	uint32_t            base_glyph,
-	uint32_t* aglyph_index,
-	uint32_t* acolor_index,
-	LayerIterator* iterator);
-// 获取颜色
-Color_2 get_c2(font_t* face1, uint32_t color_index);
-
-int tt_face_colr_blend_layer(font_t* face, uint32_t       color_index, GlyphSlot* dstSlot, GlyphSlot* srcSlot);
-
-
-int tt_face_load_cpal(font_t* face, uint8_t* b, sfnt_header* sp);
-
-void tt_face_free_cpal(font_t* face);
-
-int tt_face_palette_set(font_t* face, uint32_t  palette_index);
-// 初始化颜色
-int font_t::init_color()
-{
-	font_impl* font_i = font;
-	const stbtt_fontinfo* font = font_i;
-	int i, count, stringOffset;
-	uint8_t* fc = font->data;
-	uint32_t offset = font->fontstart, table_size = 0, sbit_num_strikes = 0;
-	uint32_t ebdt_start = 0, ebdt_size = 0;
-	sfnt_header* ebdt_table = 0;
-	auto cpal_table = get_tag(font_i, TAG_CPAL);
-	auto colr_table = get_tag(font_i, TAG_COLR);
-	if (!cpal_table || !colr_table)
-		return 0;
-	if (!colorinfo)
-		colorinfo = new gcolors_t();
-	font_t* ttp = (font_t*)font->userdata;
-	uint8_t* b = fc + cpal_table->offset;
-	uint8_t* b1 = fc + colr_table->offset;
-	tt_face_load_cpal(this, b, cpal_table);
-	tt_face_load_colr(this, b1, colr_table);
-
-	return 0;
-}
-
-int font_t::get_gcolor(uint32_t base_glyph, std::vector<glm::uvec2>& cols)
-{
-	uint32_t aglyph_index = base_glyph;
-	uint32_t acolor_index = 0;
-	LayerIterator it = {};
-	std::vector<vertex_f> vdp;
-	for (;;)
-	{
-		if (!tt_face_get_colr_layer(this, aglyph_index, &aglyph_index, &acolor_index, &it))
-		{
-			break;
-		}
-		cols.push_back({ aglyph_index, get_c2(this, acolor_index).c });
-	}
-	return it.num_layers;
-}
-
-
-#ifndef no_colr
-
-uint32_t stbtt__find_table(uint8_t* data, uint32_t fontstart, const char* tag)
-{
-	int32_t num_tables = stb_font::ttUSHORT(data + fontstart + 4);
-	uint32_t tabledir = fontstart + 12;
-	int32_t i;
-	for (i = 0; i < num_tables; ++i) {
-		uint32_t loc = tabledir + 16 * i;
-		if (stbtt_tag(data + loc + 0, tag))
-			return stb_font::ttULONG(data + loc + 8);
-	}
-	return 0;
-}
-//////////////////////////////////////////////////////////////////////////////
-// Glyph layered color font support using COLR/CPAL tables
-//
-
-static int stbtt__get_cpal(font_impl* info)
-{
-	if (info->cpal < 0 && info != NULL) //Load table if not exists
-		info->cpal = stbtt__find_table(info->data, info->fontstart, "CPAL");
-	return info->cpal;
-}
-
-static int stbtt__get_colr(font_impl* info)
-{
-	if (info->colr < 0 && info != NULL) //Load table if not exists
-	{
-		info->colr = stbtt__find_table(info->data, info->fontstart, "COLR");
-		if (info->colr > 0) //swap bytes on table, so it can be returned
-		{
-			const uint32_t layerRecordsOffset = stb_font::ttULONG(info->data + info->colr + 8);
-			const uint16_t numLayerRecords = stb_font::ttUSHORT(info->data + info->colr + 12);
-			unsigned char* colOffset = info->data + info->colr + layerRecordsOffset;
-			for (int i = 0; i < numLayerRecords; i++) //Swap bytes
-			{
-				unsigned short* col = (unsigned short*)colOffset + (2 * i);
-				col[0] = (col[0] >> 8) | (col[0] << 8);
-				col[1] = (col[1] >> 8) | (col[1] << 8);
-			}
-		}
-	}
-	return info->colr;
-}
-
-bool stbtt_FontHasLayers(const font_impl* info)
-{
-	const int table_colr = stbtt__get_colr((font_impl*)info);
-	if (table_colr > 0 && info != NULL) //Check table and if theres glyphs
-		if (stb_font::ttUSHORT(info->data + table_colr + 2 /*numBaseGlyphRecords*/) > 0)
-			return 1;
-	return 0;
-}
-
-bool stbtt_FontHasPalette(const font_impl* info)
-{
-	const int table_cpal = stbtt__get_cpal((font_impl*)info);
-	if (table_cpal > 0 && info != NULL) //Check table and if theres palettes
-		if (stb_font::ttUSHORT(info->data + table_cpal + 4 /*numPalettes*/) > 0)
-			return 1;
-	return 0;
-}
-
-unsigned short stbtt_FontPaletteCount(const font_impl* info)
-{
-	const int table_cpal = stbtt__get_cpal((font_impl*)info);
-	if (table_cpal > 0 && info != NULL) //Check palettes and input
-	{
-		const uint16_t numPalettes = stb_font::ttUSHORT(info->data + table_cpal + 4);
-		return numPalettes; //Success
-	}
-	return 0; //Failed
-}
-
-unsigned short stbtt_FontPaletteGetColors(const font_impl* info, unsigned short paletteIndex, stbtt_color** colorPalette)
-{
-	const int table_cpal = stbtt__get_cpal((font_impl*)info);
-	if (table_cpal > 0 && info != NULL) //Check palettes
-	{
-		const uint16_t numPaletteEntries = stb_font::ttUSHORT(info->data + table_cpal + 2);
-		if (colorPalette)
-		{
-			const uint16_t numPalettes = stb_font::ttUSHORT(info->data + table_cpal + 4);
-			if (paletteIndex > numPalettes - 1) return 0; //Invalid palette index
-			const uint32_t colorRecordsArrayOffset = stb_font::ttULONG(info->data + table_cpal + 8);
-			const uint16_t colorRecordIndices = stb_font::ttUSHORT(info->data + table_cpal + 12 + (2 * paletteIndex));
-			const uint8_t* colorptr = info->data + table_cpal + colorRecordsArrayOffset + (colorRecordIndices * 4);
-			*colorPalette = (stbtt_color*)colorptr;
-		}
-		return numPaletteEntries;
-	}
-	return 0; //Failed
-}
-
-unsigned short stbtt_GetGlyphLayers(const font_impl* info, unsigned short glypId, stbtt_glyphlayer** glyphLayer)
-{
-	const int table_colr = stbtt__get_colr((font_impl*)info);
-	if (table_colr > 0 && info != NULL) //Check glyph table
-	{
-		const uint16_t numBaseGlyphRecords = stb_font::ttUSHORT(info->data + table_colr + 2);
-		const uint32_t baseGlyphRecordsOffset = stb_font::ttULONG(info->data + table_colr + 4);
-		const uint32_t layerRecordsOffset = stb_font::ttULONG(info->data + table_colr + 8);
-		int32_t low = 0;
-		int32_t high = (int32_t)numBaseGlyphRecords;
-		while (low < high) // Binary search, lookup glyph table.
-		{
-			int32_t mid = low + ((high - low) >> 1);
-			uint16_t foundGlyphID = stb_font::ttUSHORT(info->data + table_colr + baseGlyphRecordsOffset + (6 * mid));
-			if ((uint32_t)glypId < foundGlyphID) //Trim high
-				high = mid;
-			else if ((uint32_t)glypId > foundGlyphID) //Trim low
-				low = mid + 1;
-			else //Result found
-			{
-				const uint16_t numLayers = stb_font::ttUSHORT(info->data + table_colr + baseGlyphRecordsOffset + (6 * mid) + 4);
-				if (glyphLayer)
-				{
-					const uint16_t firstLayerIndex = stb_font::ttUSHORT(info->data + table_colr + baseGlyphRecordsOffset + (6 * mid) + 2);
-					const uint8_t* layerptr = info->data + table_colr + layerRecordsOffset + (firstLayerIndex * 4);
-					*glyphLayer = (stbtt_glyphlayer*)layerptr;
-				}
-				return numLayers; //Sucess
-			}
-		}
-	}
-	return 0; //Not found, failed
-}
-
-unsigned short stbtt_GetCodepointLayers(const font_impl* info, unsigned short codePoint, stbtt_glyphlayer** glyphLayer)
-{
-	return stbtt_GetGlyphLayers(info, stbtt_FindGlyphIndex(info, codePoint), glyphLayer); //Lookup by glyph id
-}
-#endif // !no_colr
-
-
-
-
-
-
 
 void init_bitmap_bitdepth(Bitmap_p* bitmap, int bit_depth);
 /*
@@ -3000,9 +2811,9 @@ int font_t::get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap_p* b
 	return ret;
 }
 
-int font_t::get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, uint32_t unicode_codepoint)
+bool font_t::get_glyph_image_bitmap(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, uint32_t unicode_codepoint)
 {
-	int ret = 0;
+	bool ret = 0;
 	if (gidx > 0)
 	{
 		double scale = get_scale(height);
@@ -3019,38 +2830,36 @@ int font_t::get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, Bitmap_p
 			// 找不到位图时尝试用自定义解码
 			if (!ret)
 				ret = get_custom_decoder_bitmap(unicode_codepoint, height, ot, bitmap, out);
+			if (bitmap)
+			{
+				bitmap->x = ot->x;
+				bitmap->y = ot->y;
+			}
 		}
-#endif
+#endif 
+	}
+	return ret;
+}
+
+bool font_t::get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, void** bitmap, uint32_t unicode_codepoint)
+{
+	bool ret = 0;
+	if (gidx > 0)
+	{
+		if (height < 0)
+		{
+			height *= -1;
+		}
 		if (!ret)
 		{
 			// 解析轮廓并光栅化 
 			glm::vec3 adlsb = { 0,0,height };
-			//mk_glyph_image(gidx);
+			auto ig = mk_glyph_image_hb(gidx, height, (int*)ot);
 			if (bitmap)
 			{
-				auto hh = hp->hhea;
-				auto he = hp->hhea.ascender + hp->hhea.descender + hp->hhea.lineGap;
-				auto hef = hp->hhea.ascender - hp->hhea.descender + hp->hhea.lineGap;
-
-				double hed = (scale * he);//ceil
-				double hedf = (scale * hef);
-				double lg = (scale * hp->hhea.lineGap);
-				if (out)
-					bitmap->buffer = (unsigned char*)out->data();
-				bitmap->width = bitmap->pitch = ot->z;
-				bitmap->rows = ot->w;
-				bitmap->advance = adlsb.z;
-				bitmap->bearingX = adlsb.x;
-				bitmap->pixel_mode = PX_GRAY;	//255灰度图
-				bitmap->lcd_mode = 0;
-				init_bitmap_bitdepth(bitmap, 8);
-				ret = 1;
+				*bitmap = ig;
 			}
-		}
-		if (bitmap)
-		{
-			bitmap->x = ot->x;
-			bitmap->y = ot->y;
+			ret = true;
 		}
 	}
 	return ret;
@@ -3551,7 +3360,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 	font_t* rfont = this;
 	Bitmap_p bitmap[1] = {};
 	std::vector<char> bitbuf[1];
-	glm::ivec4 rc;
+	glm::ivec4 rc = {};
 	std::vector<font_item_t>  ps;
 	glm::ivec3 rets;
 	font_item_t ret = {};
@@ -3564,74 +3373,49 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 	if (rfont && glyph_index)
 	{
 		auto rp = rfont->get_gcache(glyph_index, fontsize);
+		bool bret = false;
+		glm::ivec2 pos = {};
+		int advance = 0;
+		bool has_color = false;
 		do {
 			if (rp)break;
-			auto bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, 0, lcd_type, unicode_codepoint);
-			if (colorinfo && bit && !use_no_color)
+#ifndef HB_RASTER_H
+			auto bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint);
+#else
+			glm::ivec4 rc1 = {};
+			//auto bit0 = rfont->get_glyph_image(glyph_index, fontsize, &rc1, bitmap, 0, lcd_type, unicode_codepoint);
+			auto bit = rfont->get_glyph_image_bitmap(glyph_index, fontsize, &rc, bitmap, bitbuf, unicode_codepoint);
+			hb_raster_image_t* rimg = 0;
+			image_ptr_t* img = 0;
+			if (!bit)
 			{
-				glm::ivec4 bs = { rc.x, rc.y, bitmap->width, bitmap->rows };
-				std::vector<glm::uvec2> cols;	// uvec2.x=glyph_index,.y=color
-				if (get_gcolor(glyph_index, cols))
+				advance = hb_font_get_glyph_h_advance(hp->hb_font, glyph_index);// 水平
+				bit = rfont->get_glyph_image_hb(glyph_index, fontsize, &rc, (void**)&rimg, unicode_codepoint);
+				auto rcs = glm::ivec2(rc.z, rc.w);
+				img = use_ctx->push_cache_size(rcs, &pos, linegap);//申请缓存位置
+				if (img && rimg)
 				{
-					glm::ivec2 pos = {};
-					image_ptr_t* img = 0;
-					glm::ivec4 maxbox = { MAXINT,MAXINT,0,0 };
-					for (size_t i = 0; i < cols.size(); i++)
-					{
-						glm::vec4 abox = {};
-						rfont->get_shape_box_glyph(cols[i].x, fontsize, &abox);
-						maxbox.x = std::min(maxbox.x, (int)abox.x);
-						maxbox.y = std::min(maxbox.y, (int)abox.y);
-						maxbox.z = std::max(maxbox.z, (int)(abox.z));
-						maxbox.w = std::max(maxbox.w, (int)(abox.w));
-					}
-					bs = maxbox;
-					bitmap->width = bitmap->pitch = std::max(rc.z, bs.z - bs.x);// 重置组合大小
-					bitmap->rows = std::max(rc.w, bs.w - bs.y);
-					bs.z = bitmap->width;
-					bs.w = bitmap->rows;
-					img = use_ctx->push_cache_bitmap_old(bitmap, &pos, 0, img, linegap); // 申请缓存位置 
-					glm::vec2 dpos = pos;
-					dpos.x += bs.x < 0 ? abs(bs.x) : 0;
-					dpos.y += abs(bs.y);
-					for (auto& ct : cols)
-					{
-						bitbuf->clear();
-						bitbuf->resize(bitmap->width * bitmap->rows);
-						// 光栅化单个颜色块
-						auto bit = rfont->get_glyph_image(ct.x, fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint, 0);
-						if (bit)
-						{
-							glm::ivec2 ps1 = dpos;
-							ps1.x += (bitmap->x) - bs.x, ps1.y += (bitmap->y);
-							img = use_ctx->push_cache_bitmap_old(bitmap, &ps1, ct.y, img, linegap);
-						}
-					}
-					glm::ivec4 rc4 = { pos.x, pos.y, bs.z, bs.w };
-					if (img)
-					{
-						// 提交到查询缓存
-						rp = rfont->push_gcache(glyph_index, fontsize, img, rc4, bs);
-						if (rp)
-						{
-							rp->color = -1;
-							rp->advance = bitmap->advance;
-						}
-					}
-					break;
+					has_color = gfont_copy_image(img, pos.x, pos.y, col, rimg);
+					img->valid = 1;
+				}
+				if (!rimg) {
+					auto ch = (char32_t)unicode_codepoint;
+					rimg = 0;
 				}
 			}
-			bit = rfont->get_glyph_image(glyph_index, fontsize, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint);
+			else {
+				img = use_ctx->push_cache_bitmap(bitmap, &pos, linegap, col);//申请缓存位置
+				advance = bitmap->advance;
+			}
+#endif // !HB_RASTER_H
 			if (bit)
 			{
-				glm::ivec2 pos = {};
-				auto img = use_ctx->push_cache_bitmap(bitmap, &pos, linegap, col);//申请缓存位置
-				glm::ivec4 rc4 = { pos.x, pos.y, bitmap->width, bitmap->rows };
+				glm::ivec4 rc4 = { pos.x, pos.y, rc.z,rc.w };
 				if (img)
 				{
 					rp = rfont->push_gcache(glyph_index, fontsize, img, rc4, { rc.x, rc.y });
-					rp->color = 0;
-					if (rp)rp->advance = bitmap->advance;
+					rp->color = has_color ? -1 : 0;
+					if (rp)rp->advance = advance;
 				}
 			}
 		} while (0);
@@ -4907,1691 +4691,6 @@ int font_t::init_sbit()
 
 
 
-#ifndef NO_COLOR_FONT
-
-/**************************************************************************
- *
- * `COLR' table specification:
- *
- *   https://www.microsoft.com/typography/otspec/colr.htm
- *
- */
-
-
-
- /* NOTE: These are the table sizes calculated through the specs. */
-#define BASE_GLYPH_SIZE0            6
-#define LAYER_SIZE0                 4
-#define COLR_HEADER_SIZE          14
-/* 3 * uint16 + 2 * Offset32 */
-#define COLRV0_HEADER_SIZE               14U
-/* COLRV0_HEADER_SIZE + 5 * Offset32 */
-#define COLRV1_HEADER_SIZE               34U
-
-#define BASE_GLYPH_SIZE                   6U
-#define BASE_GLYPH_PAINT_RECORD_SIZE      6U
-#define LAYER_V1_LIST_PAINT_OFFSET_SIZE   4U
-#define LAYER_V1_LIST_NUM_LAYERS_SIZE     4U
-#define COLOR_STOP_SIZE                   6U
-#define VAR_IDX_BASE_SIZE                 4U
-#define LAYER_SIZE                        4U
-
-
-struct BaseGlyphRecord
-{
-	uint16_t  gid;
-	uint16_t  first_layer_index;
-	uint16_t  num_layers;
-
-};
-
-
-struct Colr
-{
-	uint16_t  version;
-	uint16_t  num_base_glyphs;
-	uint16_t  num_layers;
-
-	uint8_t* base_glyphs;
-	uint8_t* layers;
-
-	uint32_t  num_base_glyphs_v1;
-	/* Points at beginning of BaseGlyphV1List. */
-	uint8_t* base_glyphs_v1;
-
-	uint32_t  num_layers_v1;
-	uint8_t* layers_v1;
-
-	uint8_t* clip_list;
-
-	/*
-	 * Paint tables start at the minimum of the end of the LayerList and the
-	 * end of the BaseGlyphList.  Record this location in a field here for
-	 * safety checks when accessing paint tables.
-	 */
-	uint8_t* paints_start_v1;
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-	/* Item Variation Store for variable 'COLR' v1. */
-	GX_ItemVarStoreRec    var_store;
-	GX_DeltaSetIdxMapRec  delta_set_idx_map;
-#endif
-
-	/* The memory which backs up the `COLR' table. */
-	void* table;
-	unsigned long  table_size;
-
-};
-struct colr_v0 {
-	uint16_t	version;//	Table version number—set to 0.
-	uint16_t	numBaseGlyphRecords;//	Number of BaseGlyph records.
-	Offset32	baseGlyphRecordsOffset;//	Offset to baseGlyphRecords array, from beginning of COLR table.
-	Offset32	layerRecordsOffset;//	Offset to layerRecords array, from beginning of COLR table.
-	uint16_t	numLayerRecords;//	Number of Layer records.
-};
-struct colr_v1 {
-	uint16_t	version;//	Table version number—set to 1.
-	uint16_t	numBaseGlyphRecords;//	Number of BaseGlyph records; may be 0 in a version 1 table.
-	Offset32	baseGlyphRecordsOffset;//	Offset to baseGlyphRecords array, from beginning of COLR table(may be NULL).
-	Offset32	layerRecordsOffset;//	Offset to layerRecords array, from beginning of COLR table(may be NULL).
-	uint16_t	numLayerRecords;//	Number of Layer records; may be 0 in a version 1 table.
-	Offset32	baseGlyphListOffset;//	Offset to BaseGlyphList table, from beginning of COLR table.
-	Offset32	layerListOffset;//	Offset to LayerList table, from beginning of COLR table(may be NULL).
-	Offset32	clipListOffset;//	Offset to ClipList table, from beginning of COLR table(may be NULL).
-	Offset32	varIndexMapOffset;//	Offset to DeltaSetIndexMap table, from beginning of COLR table(may be NULL).
-	Offset32	itemVariationStoreOffset;//	Offset to ItemVariationStore, from beginning of COLR table(may be NULL).
-};
-
-int	tt_face_load_colr(font_t* face, uint8_t* b, sfnt_header* sp)
-{
-	int   error = 0;
-	//FT_Memory  memory = face->root.memory;
-
-	uint8_t* table = b;
-	uint8_t* p = NULL;
-
-	Colr* colr = NULL;
-
-	//uint32_t  base_glyph_offset, layer_offset;
-	uint32_t  table_size = sp->logicalLength;
-	auto cp = face->colorinfo;
-
-	uint8_t* p1 = NULL;
-	uint32_t  base_glyph_offset, layer_offset;
-	uint32_t  base_glyphs_offset_v1, num_base_glyphs_v1;
-	uint32_t  layer_offset_v1, num_layers_v1, clip_list_offset;
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-	uint32_t  colr_offset_in_stream;
-#endif
-	/* `COLR' always needs `CPAL' */
-	//if (!face->cpal)
-	//	return FT_THROW(Invalid_File_Format);
-
-	//error = face->goto_table(face, TTAG_COLR, stream, &table_size);
-	//if (error)
-	//	goto NoColr;
-	do {
-
-		if (table_size < COLR_HEADER_SIZE)break;
-		//	goto InvalidTable;
-
-		//if (FT_FRAME_EXTRACT(table_size, table))
-		//	goto NoColr;
-
-		p = table;
-		colr = (Colr*)cp->td;
-
-		if (!(colr))
-			break;
-		auto cv0 = (colr_v0*)p;
-		auto cv1 = (colr_v1*)p;
-		colr->version = NEXT_USHORT(p);
-		if (colr->version > 1)
-		{
-			error = -1; break;
-		}
-
-		colr->num_base_glyphs = NEXT_USHORT(p);
-		base_glyph_offset = NEXT_ULONG(p);
-
-		if (base_glyph_offset >= table_size)
-		{
-			error = -1; break;
-		}
-		if (colr->num_base_glyphs * BASE_GLYPH_SIZE >
-			table_size - base_glyph_offset)
-		{
-			error = -1; break;
-		}
-
-		layer_offset = NEXT_ULONG(p);
-		colr->num_layers = NEXT_USHORT(p);
-
-		if (layer_offset >= table_size)
-		{
-			error = -1; break;
-		}
-		if (colr->num_layers * LAYER_SIZE > table_size - layer_offset)
-		{
-			error = -1; break;
-		}
-		if (colr->version == 1) {
-			if (table_size < COLRV1_HEADER_SIZE)
-			{
-				error = -21; break;
-			}
-
-			base_glyphs_offset_v1 = NEXT_ULONG(p);
-
-			if (base_glyphs_offset_v1 + 4 >= table_size)
-				break;
-
-			p1 = (uint8_t*)(table + base_glyphs_offset_v1);
-			num_base_glyphs_v1 = PEEK_ULONG(p1);
-
-			if (num_base_glyphs_v1 * BASE_GLYPH_PAINT_RECORD_SIZE >
-				table_size - base_glyphs_offset_v1)
-				break;
-
-			colr->num_base_glyphs_v1 = num_base_glyphs_v1;
-			colr->base_glyphs_v1 = p1;
-
-			layer_offset_v1 = NEXT_ULONG(p);
-
-			if (layer_offset_v1 >= table_size)
-				break;
-
-			if (layer_offset_v1)
-			{
-				if (layer_offset_v1 + 4 >= table_size)
-					break;
-
-				p1 = (uint8_t*)(table + layer_offset_v1);
-				num_layers_v1 = PEEK_ULONG(p1);
-
-				if (num_layers_v1 * LAYER_V1_LIST_PAINT_OFFSET_SIZE >
-					table_size - layer_offset_v1)
-					break;
-
-				colr->num_layers_v1 = num_layers_v1;
-				colr->layers_v1 = p1;
-
-				colr->paints_start_v1 =
-					std::min(colr->base_glyphs_v1 +
-						colr->num_base_glyphs_v1 * BASE_GLYPH_PAINT_RECORD_SIZE,
-						colr->layers_v1 +
-						colr->num_layers_v1 * LAYER_V1_LIST_PAINT_OFFSET_SIZE);
-			}
-			else
-			{
-				colr->num_layers_v1 = 0;
-				colr->layers_v1 = 0;
-				colr->paints_start_v1 =
-					colr->base_glyphs_v1 +
-					colr->num_base_glyphs_v1 * BASE_GLYPH_PAINT_RECORD_SIZE;
-			}
-
-			clip_list_offset = NEXT_ULONG(p);
-
-			if (clip_list_offset >= table_size)
-				break;
-
-			if (clip_list_offset)
-				colr->clip_list = (uint8_t*)(table + clip_list_offset);
-			else
-				colr->clip_list = 0;
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-			colr->var_store.dataCount = 0;
-			colr->var_store.varData = NULL;
-			colr->var_store.axisCount = 0;
-			colr->var_store.regionCount = 0;
-			colr->var_store.varRegionList = 0;
-
-			colr->delta_set_idx_map.mapCount = 0;
-			colr->delta_set_idx_map.outerIndex = NULL;
-			colr->delta_set_idx_map.innerIndex = NULL;
-
-			if (face->variation_support & TT_FACE_FLAG_VAR_FVAR)
-			{
-				uint32_t  var_idx_map_offset, var_store_offset;
-
-				FT_Service_MultiMasters  mm = (FT_Service_MultiMasters)face->mm;
-
-
-				var_idx_map_offset = FT_NEXT_ULONG(p);
-
-				if (var_idx_map_offset >= table_size)
-					goto InvalidTable;
-
-				var_store_offset = FT_NEXT_ULONG(p);
-				if (var_store_offset >= table_size)
-					goto InvalidTable;
-
-				if (var_store_offset)
-				{
-					/* If variation info has not been initialized yet, try doing so, */
-					/* otherwise loading the variation store will fail as it         */
-					/* requires access to `blend` for checking the number of axes.   */
-					if (!face->blend)
-						if (mm->get_mm_var(FT_FACE(face), NULL))
-							goto InvalidTable;
-
-					/* Try loading `VarIdxMap` and `VarStore`. */
-					error = mm->load_item_var_store(
-						FT_FACE(face),
-						colr_offset_in_stream + var_store_offset,
-						&colr->var_store);
-					if (error != FT_Err_Ok)
-						goto InvalidTable;
-				}
-
-				if (colr->var_store.axisCount && var_idx_map_offset)
-				{
-					error = mm->load_delta_set_idx_map(
-						FT_FACE(face),
-						colr_offset_in_stream + var_idx_map_offset,
-						&colr->delta_set_idx_map,
-						&colr->var_store,
-						table_size);
-					if (error != FT_Err_Ok)
-						goto InvalidTable;
-				}
-			}
-#endif /* TT_CONFIG_OPTION_GX_VAR_SUPPORT */
-		}
-
-		colr->base_glyphs = (uint8_t*)(table + base_glyph_offset);
-		colr->layers = (uint8_t*)(table + layer_offset);
-		colr->table = table;
-		colr->table_size = table_size;
-
-		cp->colr = colr;
-
-
-	} while (0);
-
-	return error;
-}
-
-
-void tt_face_free_colr(font_t* p)
-{
-	//sfnt_header* sp = face->root.stream;
-	////FT_Memory  memory = face->root.memory;
-
-	//Colr* colr = (Colr*)face->colr;
-
-
-	//if (colr)
-	//{
-	//	FT_FRAME_RELEASE(colr->table);
-	//	FT_FREE(colr);
-	//}
-}
-
-
-static bool find_base_glyph_record(uint8_t* base_glyph_begin,
-	int            num_base_glyph,
-	uint32_t           glyph_id,
-	BaseGlyphRecord* record)
-{
-	int  min = 0;
-	int  max = num_base_glyph - 1;
-
-
-	while (min <= max)
-	{
-		int    mid = min + (max - min) / 2;
-		uint8_t* p = base_glyph_begin + mid * BASE_GLYPH_SIZE;
-
-		uint16_t  gid = NEXT_USHORT(p);
-
-
-		if (gid < glyph_id)
-			min = mid + 1;
-		else if (gid > glyph_id)
-			max = mid - 1;
-		else
-		{
-			record->gid = gid;
-			record->first_layer_index = NEXT_USHORT(p);
-			record->num_layers = NEXT_USHORT(p);
-
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-
-bool tt_face_get_colr_layer(font_t* face,
-	uint32_t            base_glyph,
-	uint32_t* aglyph_index,
-	uint32_t* acolor_index,
-	LayerIterator* iterator)
-{
-	Colr* colr = (Colr*)face->colorinfo->colr;
-	BaseGlyphRecord  glyph_record = {};
-	auto cp = face->colorinfo;
-
-	if (!colr)
-		return 0;
-
-	if (!iterator->p)
-	{
-		uint32_t  offset;
-
-
-		/* first call to function */
-		iterator->layer = 0;
-
-		if (!find_base_glyph_record(colr->base_glyphs,
-			colr->num_base_glyphs,
-			base_glyph,
-			&glyph_record))
-			return 0;
-
-		if (glyph_record.num_layers)
-			iterator->num_layers = glyph_record.num_layers;
-		else
-			return 0;
-
-		offset = LAYER_SIZE * glyph_record.first_layer_index;
-		if (offset + LAYER_SIZE * glyph_record.num_layers > colr->table_size)
-			return 0;
-
-		iterator->p = colr->layers + offset;
-	}
-
-	if (iterator->layer >= iterator->num_layers)
-		return 0;
-
-	*aglyph_index = NEXT_USHORT(iterator->p);
-	*acolor_index = NEXT_USHORT(iterator->p);
-
-	if (*aglyph_index >= (uint32_t)(face->num_glyphs) ||
-		(*acolor_index != 0xFFFF &&
-			*acolor_index >= cp->palette_data.num_palette_entries))
-		return 0;
-
-	iterator->layer++;
-
-	return 1;
-}
-
-#define PALETTE_FOR_LIGHT_BACKGROUND  0x01
-#define PALETTE_FOR_DARK_BACKGROUND   0x02
-Color_2 get_c2(font_t* face1, uint32_t color_index)
-{
-	Color_2 c = {};
-	auto face = face1->colorinfo;
-	if (color_index == 0xFFFF)
-	{
-		if (face->have_foreground_color)
-		{
-			c.b = face->foreground_color.blue;
-			c.g = face->foreground_color.green;
-			c.r = face->foreground_color.red;
-			c.alpha = face->foreground_color.alpha;
-		}
-		else
-		{
-			if (face->palette_data.palette_flags &&
-				(face->palette_data.palette_flags[face->palette_index] &
-					PALETTE_FOR_DARK_BACKGROUND))
-			{
-				/* white opaque */
-				c.b = 0xFF;
-				c.g = 0xFF;
-				c.r = 0xFF;
-				c.alpha = 0xFF;
-			}
-			else
-			{
-				/* black opaque */
-				c.b = 0x00;
-				c.g = 0x00;
-				c.r = 0x00;
-				c.alpha = 0xFF;
-			}
-		}
-	}
-	else
-	{
-		c = face->palette[color_index];
-	}
-	return c;
-}
-int tt_face_colr_blend_layer(font_t* face1,
-	uint32_t       color_index,
-	GlyphSlot* dstSlot,
-	GlyphSlot* srcSlot)
-{
-	int  error = 0;
-	auto face = face1->colorinfo;
-	uint32_t  x, y;
-	uint8_t  b, g, r, alpha;
-
-	uint32_t  size;
-	uint8_t* src;
-	uint8_t* dst;
-#if 0
-
-	if (!dstSlot->bitmap.buffer)
-	{
-		/* Initialize destination of color bitmap */
-		/* with the size of first component.      */
-		dstSlot->bitmap_left = srcSlot->bitmap_left;
-		dstSlot->bitmap_top = srcSlot->bitmap_top;
-
-		dstSlot->bitmap.width = srcSlot->bitmap.width;
-		dstSlot->bitmap.rows = srcSlot->bitmap.rows;
-		dstSlot->bitmap.pixel_mode = FT_PIXEL_MODE_BGRA;
-		dstSlot->bitmap.pitch = (int)dstSlot->bitmap.width * 4;
-		dstSlot->bitmap.num_grays = 256;
-
-		size = dstSlot->bitmap.rows * (uint32_t)dstSlot->bitmap.pitch;
-
-		error = ft_glyphslot_alloc_bitmap(dstSlot, size);
-		if (error)
-			return error;
-
-		FT_MEM_ZERO(dstSlot->bitmap.buffer, size);
-	}
-	else
-	{
-		/* Resize destination if needed such that new component fits. */
-		int  x_min, x_max, y_min, y_max;
-
-
-		x_min = FT_MIN(dstSlot->bitmap_left, srcSlot->bitmap_left);
-		x_max = FT_MAX(dstSlot->bitmap_left + (int)dstSlot->bitmap.width,
-			srcSlot->bitmap_left + (int)srcSlot->bitmap.width);
-
-		y_min = FT_MIN(dstSlot->bitmap_top - (int)dstSlot->bitmap.rows,
-			srcSlot->bitmap_top - (int)srcSlot->bitmap.rows);
-		y_max = FT_MAX(dstSlot->bitmap_top, srcSlot->bitmap_top);
-
-		if (x_min != dstSlot->bitmap_left ||
-			x_max != dstSlot->bitmap_left + (int)dstSlot->bitmap.width ||
-			y_min != dstSlot->bitmap_top - (int)dstSlot->bitmap.rows ||
-			y_max != dstSlot->bitmap_top)
-		{
-			FT_Memory  memory = face->root.memory;
-
-			uint32_t  width = (uint32_t)(x_max - x_min);
-			uint32_t  rows = (uint32_t)(y_max - y_min);
-			uint32_t  pitch = width * 4;
-
-			uint8_t* buf = NULL;
-			uint8_t* p;
-			uint8_t* q;
-
-
-			size = rows * pitch;
-			if (FT_ALLOC(buf, size))
-				return error;
-
-			p = dstSlot->bitmap.buffer;
-			q = buf +
-				(int)pitch * (y_max - dstSlot->bitmap_top) +
-				4 * (dstSlot->bitmap_left - x_min);
-
-			for (y = 0; y < dstSlot->bitmap.rows; y++)
-			{
-				FT_MEM_COPY(q, p, dstSlot->bitmap.width * 4);
-
-				p += dstSlot->bitmap.pitch;
-				q += pitch;
-			}
-
-			ft_glyphslot_set_bitmap(dstSlot, buf);
-
-			dstSlot->bitmap_top = y_max;
-			dstSlot->bitmap_left = x_min;
-
-			dstSlot->bitmap.width = width;
-			dstSlot->bitmap.rows = rows;
-			dstSlot->bitmap.pitch = (int)pitch;
-
-			dstSlot->internal->flags |= FT_GLYPH_OWN_BITMAP;
-			dstSlot->format = FT_GLYPH_FORMAT_BITMAP;
-		}
-	}
-
-	if (color_index == 0xFFFF)
-	{
-		if (face->have_foreground_color)
-		{
-			b = face->foreground_color.blue;
-			g = face->foreground_color.green;
-			r = face->foreground_color.red;
-			alpha = face->foreground_color.alpha;
-		}
-		else
-		{
-			if (face->palette_data.palette_flags &&
-				(face->palette_data.palette_flags[face->palette_index] &
-					FT_PALETTE_FOR_DARK_BACKGROUND))
-			{
-				/* white opaque */
-				b = 0xFF;
-				g = 0xFF;
-				r = 0xFF;
-				alpha = 0xFF;
-			}
-			else
-			{
-				/* black opaque */
-				b = 0x00;
-				g = 0x00;
-				r = 0x00;
-				alpha = 0xFF;
-			}
-		}
-	}
-	else
-	{
-		b = face->palette[color_index].blue;
-		g = face->palette[color_index].green;
-		r = face->palette[color_index].red;
-		alpha = face->palette[color_index].alpha;
-	}
-
-	/* XXX Convert if srcSlot.bitmap is not grey? */
-	src = srcSlot->bitmap.buffer;
-	dst = dstSlot->bitmap.buffer +
-		dstSlot->bitmap.pitch * (dstSlot->bitmap_top - srcSlot->bitmap_top) +
-		4 * (srcSlot->bitmap_left - dstSlot->bitmap_left);
-
-	for (y = 0; y < srcSlot->bitmap.rows; y++)
-	{
-		for (x = 0; x < srcSlot->bitmap.width; x++)
-		{
-			int  aa = src[x];
-			int  fa = alpha * aa / 255;
-
-			int  fb = b * fa / 255;
-			int  fg = g * fa / 255;
-			int  fr = r * fa / 255;
-
-			int  ba2 = 255 - fa;
-
-			int  bb = dst[4 * x + 0];
-			int  bg = dst[4 * x + 1];
-			int  br = dst[4 * x + 2];
-			int  ba = dst[4 * x + 3];
-
-
-			dst[4 * x + 0] = (uint8_t)(bb * ba2 / 255 + fb);
-			dst[4 * x + 1] = (uint8_t)(bg * ba2 / 255 + fg);
-			dst[4 * x + 2] = (uint8_t)(br * ba2 / 255 + fr);
-			dst[4 * x + 3] = (uint8_t)(ba * ba2 / 255 + fa);
-		}
-
-		src += srcSlot->bitmap.pitch;
-		dst += dstSlot->bitmap.pitch;
-	}
-#endif
-	return error;
-}
-
-
-
-/**************************************************************************
- *
- * `CPAL' table specification:
- *
- *   https://www.microsoft.com/typography/otspec/cpal.htm
- *
- */
-
- /* NOTE: These are the table sizes calculated through the specs. */
-#define CPAL_V0_HEADER_BASE_SIZE  12
-#define COLOR_SIZE                 4
-
-
-  /* all data from `CPAL' not covered in FT_Palette_Data */
-struct Cpal
-{
-	uint16_t  version;        /* Table version number (0 or 1 supported). */
-	uint16_t  num_colors;               /* Total number of color records, */
-	/* combined for all palettes.     */
-	uint8_t* colors;                              /* RGBA array of colors */
-	uint8_t* color_indices; /* Index of each palette's first color record */
-	/* in the combined color record array.        */
-
-/* The memory which backs up the `CPAL' table. */
-	void* table;
-	uint32_t  table_size;
-
-};
-enum PaintFormat_
-{
-	COLR_PAINTFORMAT_COLR_LAYERS = 1,
-	COLR_PAINTFORMAT_SOLID = 2,
-	COLR_PAINTFORMAT_LINEAR_GRADIENT = 4,
-	COLR_PAINTFORMAT_RADIAL_GRADIENT = 6,
-	COLR_PAINTFORMAT_SWEEP_GRADIENT = 8,
-	COLR_PAINTFORMAT_GLYPH = 10,
-	COLR_PAINTFORMAT_COLR_GLYPH = 11,
-	COLR_PAINTFORMAT_TRANSFORM = 12,
-	COLR_PAINTFORMAT_TRANSLATE = 14,
-	COLR_PAINTFORMAT_SCALE = 16,
-	COLR_PAINTFORMAT_ROTATE = 24,
-	COLR_PAINTFORMAT_SKEW = 28,
-	COLR_PAINTFORMAT_COMPOSITE = 32,
-	COLR_PAINT_FORMAT_MAX = 33,
-	COLR_PAINTFORMAT_UNSUPPORTED = 255
-
-};
-struct  PaintColrLayers
-{
-	uint32_t   num_layers;
-	uint32_t   layer;
-	uint8_t* p;
-};
-
-struct PaintScale
-{
-	uint8_t* p;
-	int32_t  scale_x;
-	int32_t  scale_y;
-
-	int32_t  center_x;
-	int32_t  center_y;
-};
-struct  PaintRotate
-{
-	uint8_t* p;
-	int32_t  angle;
-	int32_t  center_x;
-	int32_t  center_y;
-};
-struct PaintTranslate
-{
-	uint8_t* p;
-	int32_t  dx;
-	int32_t  dy;
-};
-struct  Affine_23
-{
-	int32_t  xx, xy, dx;
-	int32_t  yx, yy, dy;
-};
-struct  PaintTransform
-{
-	uint8_t* p;
-	Affine_23 affine;
-};
-struct PaintColrGlyph
-{
-	uint32_t  glyphID;
-};
-struct PaintGlyph
-{
-	uint8_t* p;
-	uint32_t glyphID;
-
-};
-struct  COLR_Paint_
-{
-	uint8_t format;
-
-	union
-	{
-		PaintColrLayers      colr_layers;
-		PaintGlyph           glyph;
-		//PaintSolid           solid;
-		//PaintLinearGradient  linear_gradient;
-		//PaintRadialGradient  radial_gradient;
-		//PaintSweepGradient   sweep_gradient;
-		PaintTransform       transform;
-		PaintTranslate       translate;
-		PaintScale           scale;
-		PaintRotate          rotate;
-		//PaintSkew            skew;
-		//PaintComposite       composite;
-		PaintColrGlyph       colr_glyph;
-
-	} u;
-
-};
-
-
-int tt_face_load_cpal(font_t* face1, uint8_t* b, sfnt_header* sp)
-{
-	int   error = 0;
-	//Memory  memory = face->root.memory;
-	auto face = face1->colorinfo;
-	uint8_t* table = b;
-	uint8_t* p = NULL;
-
-	Cpal* cpal = NULL;
-
-	uint32_t  colors_offset = 0;
-	uint32_t  table_size = sp->logicalLength;
-
-#if 1
-	//error = face->goto_table(face, TTAG_CPAL, stream, &table_size);
-	//if (error)
-	//	goto NoCpal;
-	do {
-
-		if (table_size < CPAL_V0_HEADER_BASE_SIZE)
-			break;
-
-		//if (FRAME_EXTRACT(table_size, table))
-		//	goto NoCpal;
-
-		p = table;
-		cpal = (Cpal*)&face->td[sizeof(Colr)];
-		if (!cpal)
-			break;
-
-		cpal->version = NEXT_USHORT(p);
-		if (cpal->version > 1)
-		{
-			error = -1; break;
-		}
-
-		face->palette_data.num_palette_entries = NEXT_USHORT(p);
-		face->palette_data.num_palettes = NEXT_USHORT(p);
-
-		cpal->num_colors = NEXT_USHORT(p);
-		colors_offset = NEXT_ULONG(p);
-
-		if (CPAL_V0_HEADER_BASE_SIZE +
-			face->palette_data.num_palettes * 2U > table_size)
-		{
-			error = -1; break;
-		}
-
-		if (colors_offset >= table_size)
-		{
-			error = -1; break;
-		}
-		if (cpal->num_colors * COLOR_SIZE > table_size - colors_offset)
-		{
-			error = -1; break;
-		}
-
-		if (face->palette_data.num_palette_entries > cpal->num_colors)
-		{
-			error = -1; break;
-		}
-
-		cpal->color_indices = p;
-		cpal->colors = (uint8_t*)(table + colors_offset);
-
-		if (cpal->version == 1)
-		{
-			uint32_t    type_offset, label_offset, entry_label_offset;
-			uint16_t* array0 = NULL;
-			uint16_t* limit;
-			uint16_t* q;
-
-
-			if (CPAL_V0_HEADER_BASE_SIZE +
-				face->palette_data.num_palettes * 2U +
-				3U * 4 > table_size)
-			{
-				error = -1; break;
-			}
-
-			p += face->palette_data.num_palettes * 2;
-
-			type_offset = NEXT_ULONG(p);
-			label_offset = NEXT_ULONG(p);
-			entry_label_offset = NEXT_ULONG(p);
-
-			if (type_offset)
-			{
-				if (type_offset >= table_size)
-				{
-					error = -1; break;
-				}
-				if (face->palette_data.num_palettes * 2 >
-					table_size - type_offset)
-				{
-					error = -1; break;
-				}
-				array0 = new uint16_t[face->palette_data.num_palettes];
-				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palettes))
-				{
-					error = -2; break;
-				}
-
-				p = table + type_offset;
-				q = array0;
-				limit = q + face->palette_data.num_palettes;
-
-				while (q < limit)
-					*q++ = NEXT_USHORT(p);
-
-				face->palette_data.palette_flags = array0;
-			}
-
-			if (label_offset)
-			{
-				if (label_offset >= table_size)
-				{
-					error = -1; break;
-				}
-				if (face->palette_data.num_palettes * 2 >
-					table_size - label_offset)
-				{
-					error = -1; break;
-				}
-
-				//if (QNEW_ARRAY(array, face->palette_data.num_palettes))
-
-				array0 = new uint16_t[face->palette_data.num_palettes];
-				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palettes))
-				{
-					error = -2; break;
-				}
-
-				p = table + label_offset;
-				q = array0;
-				limit = q + face->palette_data.num_palettes;
-
-				while (q < limit)
-					*q++ = NEXT_USHORT(p);
-
-				face->palette_data.palette_name_ids = array0;
-			}
-
-			if (entry_label_offset)
-			{
-				if (entry_label_offset >= table_size)
-				{
-					error = -1; break;
-				}
-				if (face->palette_data.num_palette_entries * 2 >
-					table_size - entry_label_offset)
-				{
-					error = -1; break;
-				}
-
-				array0 = new uint16_t[face->palette_data.num_palette_entries];
-				if (!array0)//face1->uac.new_mem(array, face->palette_data.num_palette_entries))
-				{
-					error = -2; break;
-				}
-
-				p = table + entry_label_offset;
-				q = array0;
-				limit = q + face->palette_data.num_palette_entries;
-
-				while (q < limit)
-					*q++ = NEXT_USHORT(p);
-
-				face->palette_data.palette_entry_name_ids = array0;
-			}
-		}
-
-		cpal->table = table;
-		cpal->table_size = table_size;
-
-		face->cpal = cpal;
-
-		/* set up default palette */
-		face->palette = new Color_2[face->palette_data.num_palette_entries];
-		//if (!face1->uac.new_mem(, face->palette_data.num_palette_entries))
-		if (!face->palette) {
-			error = -2; break;
-		}
-
-		if (tt_face_palette_set(face1, 0))
-		{
-			error = -1; break;
-		}
-		error = 0;
-		break;
-
-	} while (0);
-	if (error < 0)
-	{
-		//InvalidTable:
-		//	error = -1;// THROW(Invalid_Table);
-
-		//NoCpal:
-			//FRAME_RELEASE(table);
-		//face1->uac.free_mem(cpal, 1);
-
-		face->cpal = NULL;
-
-	}
-	/* arrays in `face->palette_data' and `face->palette' */
-	/* are freed in `sfnt_done_face'                      */
-#endif
-	return error;
-}
-
-
-void tt_face_free_cpal(font_t* face)
-{
-	//sfnt_header* sp = face->colorinfo.;
-	//Memory  memory = face->root.memory;
-
-	//Cpal* cpal = (Cpal*)face->cpal;
-
-
-	//if (cpal)
-	{
-		//	FRAME_RELEASE(cpal->table);
-		//	FREE(cpal);
-	}
-}
-
-int tt_face_palette_set(font_t* face, uint32_t  palette_index)
-{
-	Cpal* cpal = (Cpal*)face->colorinfo->cpal;
-	auto cp = face->colorinfo;
-	uint8_t* offset;
-	uint8_t* p;
-
-	Color_2* q;
-	Color_2* limit;
-
-	uint16_t  color_index;
-
-	if (!cpal || palette_index >= cp->palette_data.num_palettes)
-		return -6;// THROW(Invalid_Argument);
-
-	offset = cpal->color_indices + 2 * palette_index;
-	color_index = PEEK_USHORT(offset);
-
-	if (color_index + cp->palette_data.num_palette_entries >
-		cpal->num_colors)
-		return -7;// THROW(Invalid_Table);
-
-	p = cpal->colors + COLOR_SIZE * color_index;
-	q = (Color_2*)cp->palette;
-	limit = q + cp->palette_data.num_palette_entries;
-
-	while (q < limit)
-	{
-		q->blue = NEXT_BYTE(p);
-		q->green = NEXT_BYTE(p);
-		q->red = NEXT_BYTE(p);
-		q->alpha = NEXT_BYTE(p);
-
-		q++;
-	}
-
-	return 0;
-}
-
-#define ENSURE_READ_BYTES( byte_size )                             \
-  if ( p < colr->paints_start_v1                                || \
-       p > (uint8_t*)colr->table + colr->table_size - byte_size )  \
-    return 0
-
-static bool get_child_table_pointer(Colr* colr,
-	uint8_t* paint_base,
-	uint8_t** p,
-	uint8_t** child_table_pointer)
-{
-	uint32_t  paint_offset;
-	uint8_t* child_table_p;
-
-
-	if (!child_table_pointer)
-		return 0;
-
-	if (*p < colr->paints_start_v1 ||
-		*p >(uint8_t*)colr->table + colr->table_size - 1 - 3)
-		return 0;
-
-	paint_offset = NEXT_UOFF3(*p);
-	if (!paint_offset)
-		return 0;
-
-	child_table_p = (uint8_t*)(paint_base + paint_offset);
-
-	if (child_table_p < colr->paints_start_v1 ||
-		child_table_p >= ((uint8_t*)colr->table + colr->table_size))
-		return 0;
-
-	*child_table_pointer = child_table_p;
-	return 1;
-}
-static bool read_paint(font_t* face, Colr* colr, uint8_t* p, COLR_Paint_* apaint)
-{
-	uint8_t* paint_base = p;
-	uint8_t* child_table_p = NULL;
-	bool   do_read_var = FALSE;
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-	ULong         var_index_base = 0;
-	/* Longest varIndexBase offset is 5 in the spec. */
-	ItemVarDelta  item_deltas[6] = { 0, 0, 0, 0, 0, 0 };
-#else
-	//UNUSED(face);
-#endif
-
-
-	if (!p || !colr || !colr->table)
-		return 0;
-
-	/* The last byte of the 'COLR' table is at 'size-1'; subtract 1 of    */
-	/* that to account for the expected format byte we are going to read. */
-	if (p < colr->paints_start_v1 ||
-		p >(uint8_t*)colr->table + colr->table_size - 2)
-		return 0;
-
-	apaint->format = NEXT_BYTE(p);
-
-	if (apaint->format >= COLR_PAINT_FORMAT_MAX)
-		return 0;
-
-	if (apaint->format == COLR_PAINTFORMAT_COLR_LAYERS)
-	{
-		/* Initialize layer iterator/ */
-		uint8_t    num_layers;
-		uint32_t  first_layer_index;
-
-
-		num_layers = NEXT_BYTE(p);
-		if (num_layers > colr->num_layers_v1)
-			return 0;
-
-		first_layer_index = NEXT_ULONG(p);
-		if (first_layer_index + num_layers > colr->num_layers_v1)
-			return 0;
-
-		apaint->u.colr_layers.num_layers = num_layers;
-		apaint->u.colr_layers.layer = 0;
-		/* TODO: Check whether pointer is outside colr? */
-		apaint->u.colr_layers.p =
-			colr->layers_v1 +
-			LAYER_V1_LIST_NUM_LAYERS_SIZE +
-			LAYER_V1_LIST_PAINT_OFFSET_SIZE * first_layer_index;
-
-		return 1;
-	}
-#if 0
-	else if (apaint->format == COLR_PAINTFORMAT_SOLID)//|| apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_SOLID)
-	{
-		ENSURE_READ_BYTES(4);
-		apaint->u.solid.color.palette_index = NEXT_USHORT(p);
-		apaint->u.solid.color.alpha = NEXT_SHORT(p);
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SOLID)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 1,
-				item_deltas))
-				return 0;
-
-			apaint->u.solid.color.alpha += (F2Dot14)item_deltas[0];
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_SOLID;
-
-		return 1;
-	}
-#endif
-	else if (apaint->format == COLR_PAINTFORMAT_COLR_GLYPH)
-	{
-		ENSURE_READ_BYTES(2);
-		apaint->u.colr_glyph.glyphID = NEXT_USHORT(p);
-
-		return 1;
-	}
-
-	/*
-	 * Grouped below here are all paint formats that have an offset to a
-	 * child paint table as the first entry (for example, a color line or a
-	 * child paint table).  Retrieve that and determine whether that paint
-	 * offset is valid first.
-	 */
-
-	if (!get_child_table_pointer(colr, paint_base, &p, &child_table_p))
-		return 0;
-#if 0
-	if (apaint->format == COLR_PAINTFORMAT_LINEAR_GRADIENT ||
-		(do_read_var =
-			((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_LINEAR_GRADIENT)))
-	{
-		if (!read_color_line(colr,
-			child_table_p,
-			&apaint->u.linear_gradient.colorline,
-			do_read_var))
-			return 0;
-
-		/*
-		 * In order to support variations expose these as Fixed 16.16
-		 * values so that we can support fractional values after
-		 * interpolation.
-		 */
-		ENSURE_READ_BYTES(12);
-		apaint->u.linear_gradient.p0.x = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.linear_gradient.p0.y = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.linear_gradient.p1.x = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.linear_gradient.p1.y = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.linear_gradient.p2.x = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.linear_gradient.p2.y = INT_TO_FIXED(NEXT_SHORT(p));
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if (do_read_var)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 6,
-				item_deltas))
-				return 0;
-
-			apaint->u.linear_gradient.p0.x += INT_TO_FIXED(item_deltas[0]);
-			apaint->u.linear_gradient.p0.y += INT_TO_FIXED(item_deltas[1]);
-			apaint->u.linear_gradient.p1.x += INT_TO_FIXED(item_deltas[2]);
-			apaint->u.linear_gradient.p1.y += INT_TO_FIXED(item_deltas[3]);
-			apaint->u.linear_gradient.p2.x += INT_TO_FIXED(item_deltas[4]);
-			apaint->u.linear_gradient.p2.y += INT_TO_FIXED(item_deltas[5]);
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_LINEAR_GRADIENT;
-
-		return 1;
-	}
-
-	else if (apaint->format == COLR_PAINTFORMAT_RADIAL_GRADIENT ||
-		(do_read_var =
-			((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_RADIAL_GRADIENT)))
-	{
-		Pos  tmp;
-
-
-		if (!read_color_line(colr,
-			child_table_p,
-			&apaint->u.radial_gradient.colorline,
-			do_read_var))
-			return 0;
-
-
-		/* In the OpenType specification, `r0` and `r1` are defined as   */
-		/* `UFWORD`.  Since FreeType doesn't have a corresponding 16.16  */
-		/* format we convert to `FWORD` and replace negative values with */
-		/* (32bit) `INT_MAX`.                                         */
-
-		ENSURE_READ_BYTES(12);
-
-		apaint->u.radial_gradient.c0.x = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.radial_gradient.c0.y = INT_TO_FIXED(NEXT_SHORT(p));
-
-		tmp = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.radial_gradient.r0 = tmp < 0 ? INT_MAX : tmp;
-
-		apaint->u.radial_gradient.c1.x = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.radial_gradient.c1.y = INT_TO_FIXED(NEXT_SHORT(p));
-
-		tmp = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.radial_gradient.r1 = tmp < 0 ? INT_MAX : tmp;
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if (do_read_var)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 6,
-				item_deltas))
-				return 0;
-
-			apaint->u.radial_gradient.c0.x += INT_TO_FIXED(item_deltas[0]);
-			apaint->u.radial_gradient.c0.y += INT_TO_FIXED(item_deltas[1]);
-
-			// TODO: Anything to be done about UFWORD deltas here?
-			apaint->u.radial_gradient.r0 += INT_TO_FIXED(item_deltas[2]);
-
-			apaint->u.radial_gradient.c1.x += INT_TO_FIXED(item_deltas[3]);
-			apaint->u.radial_gradient.c1.y += INT_TO_FIXED(item_deltas[4]);
-
-			apaint->u.radial_gradient.r1 += INT_TO_FIXED(item_deltas[5]);
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_RADIAL_GRADIENT;
-
-		return 1;
-	}
-
-	else if (apaint->format == COLR_PAINTFORMAT_SWEEP_GRADIENT ||
-		(do_read_var =
-			((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SWEEP_GRADIENT)))
-	{
-		if (!read_color_line(colr,
-			child_table_p,
-			&apaint->u.sweep_gradient.colorline,
-			do_read_var))
-			return 0;
-
-		ENSURE_READ_BYTES(8);
-
-		apaint->u.sweep_gradient.center.x =
-			INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.sweep_gradient.center.y =
-			INT_TO_FIXED(NEXT_SHORT(p));
-
-		apaint->u.sweep_gradient.start_angle =
-			F2DOT14_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.sweep_gradient.end_angle =
-			F2DOT14_TO_FIXED(NEXT_SHORT(p));
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if (do_read_var)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 4,
-				item_deltas))
-				return 0;
-
-			// TODO: Handle overflow?
-			apaint->u.sweep_gradient.center.x += INT_TO_FIXED(item_deltas[0]);
-			apaint->u.sweep_gradient.center.y += INT_TO_FIXED(item_deltas[1]);
-
-			apaint->u.sweep_gradient.start_angle +=
-				F2DOT14_TO_FIXED(item_deltas[2]);
-			apaint->u.sweep_gradient.end_angle +=
-				F2DOT14_TO_FIXED(item_deltas[3]);
-		}
-#endif
-		apaint->format = COLR_PAINTFORMAT_SWEEP_GRADIENT;
-
-		return 1;
-	}
-#endif
-	if (apaint->format == COLR_PAINTFORMAT_GLYPH)
-	{
-		ENSURE_READ_BYTES(2);
-		apaint->u.glyph.p = child_table_p;
-		//apaint->u.glyph.paint.insert_root_transform = 0;
-		apaint->u.glyph.glyphID = NEXT_USHORT(p);
-
-		return 1;
-	}
-
-	else if (apaint->format == COLR_PAINTFORMAT_TRANSFORM)//||		(PaintFormat_Internal)apaint->format ==		COLR_PAINTFORMAT_INTERNAL_VAR_TRANSFORM)
-	{
-		apaint->u.transform.p = child_table_p;
-		//apaint->u.transform.paint.insert_root_transform = 0;
-
-		if (!get_child_table_pointer(colr, paint_base, &p, &child_table_p))
-			return 0;
-
-		p = child_table_p;
-
-		/*
-		 * The following matrix coefficients are encoded as
-		 * OpenType 16.16 fixed-point values.
-		 */
-		ENSURE_READ_BYTES(24);
-		apaint->u.transform.affine.xx = NEXT_LONG(p);
-		apaint->u.transform.affine.yx = NEXT_LONG(p);
-		apaint->u.transform.affine.xy = NEXT_LONG(p);
-		apaint->u.transform.affine.yy = NEXT_LONG(p);
-		apaint->u.transform.affine.dx = NEXT_LONG(p);
-		apaint->u.transform.affine.dy = NEXT_LONG(p);
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_TRANSFORM)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 6,
-				item_deltas))
-				return 0;
-
-			apaint->u.transform.affine.xx += (Fixed)item_deltas[0];
-			apaint->u.transform.affine.yx += (Fixed)item_deltas[1];
-			apaint->u.transform.affine.xy += (Fixed)item_deltas[2];
-			apaint->u.transform.affine.yy += (Fixed)item_deltas[3];
-			apaint->u.transform.affine.dx += (Fixed)item_deltas[4];
-			apaint->u.transform.affine.dy += (Fixed)item_deltas[5];
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_TRANSFORM;
-
-		return 1;
-	}
-
-	else if (apaint->format == COLR_PAINTFORMAT_TRANSLATE)// || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_TRANSLATE)
-	{
-		apaint->u.translate.p = child_table_p;
-		//apaint->u.translate.paint.insert_root_transform = 0;
-
-		ENSURE_READ_BYTES(4);
-		apaint->u.translate.dx = INT_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.translate.dy = INT_TO_FIXED(NEXT_SHORT(p));
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_TRANSLATE)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if (!get_deltas_for_var_index_base(face, colr, var_index_base, 2,
-				item_deltas))
-				return 0;
-
-			apaint->u.translate.dx += INT_TO_FIXED(item_deltas[0]);
-			apaint->u.translate.dy += INT_TO_FIXED(item_deltas[1]);
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_TRANSLATE;
-
-		return 1;
-	}
-
-	else if (apaint->format >= COLR_PAINTFORMAT_SCALE)// && (PaintFormat_Internal)apaint->format <= COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
-	{
-		apaint->u.scale.p = child_table_p;
-		//apaint->u.scale.paint.insert_root_transform = 0;
-
-		/* All scale paints get at least one scale value. */
-		ENSURE_READ_BYTES(2);
-		apaint->u.scale.scale_x = F2DOT14_TO_FIXED(NEXT_SHORT(p));
-
-		/* Non-uniform ones read an extra y value. */
-		//if (apaint->format == COLR_PAINTFORMAT_SCALE ||
-		//	(PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE ||
-		//	(PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_SCALE_CENTER ||
-		//	(PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER)
-		//{
-		//	ENSURE_READ_BYTES(2);
-		//	apaint->u.scale.scale_y = F2DOT14_TO_FIXED(NEXT_SHORT(p));
-		//}
-		//else
-		apaint->u.scale.scale_y = apaint->u.scale.scale_x;
-
-		/* Scale paints that have a center read center coordinates, */
-		/* otherwise the center is (0,0).                           */
-		//if ((PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_SCALE_CENTER ||
-		//	(PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER ||
-		//	(PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_SCALE_UNIFORM_CENTER ||
-		//	(PaintFormat_Internal)apaint->format ==
-		//	COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
-		//{
-		//	ENSURE_READ_BYTES(4);
-		//	apaint->u.scale.center_x = INT_TO_FIXED(NEXT_SHORT(p));
-		//	apaint->u.scale.center_y = INT_TO_FIXED(NEXT_SHORT(p));
-		//}
-		//else
-		{
-			apaint->u.scale.center_x = 0;
-			apaint->u.scale.center_y = 0;
-		}
-
-		/* Base values set, now handle variations. */
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE ||
-			(PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER ||
-			(PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM ||
-			(PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 2,
-					item_deltas))
-					return 0;
-
-				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[1]);
-			}
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_CENTER)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 4,
-					item_deltas))
-					return 0;
-
-				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[1]);
-				apaint->u.scale.center_x += INT_TO_FIXED(item_deltas[2]);
-				apaint->u.scale.center_y += INT_TO_FIXED(item_deltas[3]);
-			}
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 1,
-					item_deltas))
-					return 0;
-
-				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[0]);
-			}
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SCALE_UNIFORM_CENTER)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 3,
-					item_deltas))
-					return 0;
-
-				apaint->u.scale.scale_x += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.scale.scale_y += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.scale.center_x += INT_TO_FIXED(item_deltas[1]);
-				apaint->u.scale.center_y += INT_TO_FIXED(item_deltas[2]);
-			}
-		}
-#endif
-
-		/* FT 'COLR' v1 API output format always returns fully defined */
-		/* structs; we thus set the format to the public API value.    */
-		apaint->format = COLR_PAINTFORMAT_SCALE;
-
-		return 1;
-	}
-
-	else if (apaint->format == COLR_PAINTFORMAT_ROTATE)// || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_ROTATE_CENTER || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
-	{
-		apaint->u.rotate.p = child_table_p;
-		//apaint->u.rotate.paint.insert_root_transform = 0;
-
-		ENSURE_READ_BYTES(2);
-		apaint->u.rotate.angle = F2DOT14_TO_FIXED(NEXT_SHORT(p));
-
-		//if ((PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_ROTATE_CENTER || (PaintFormat_Internal)apaint->format == COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
-		//{
-		//	ENSURE_READ_BYTES(4);
-		//	apaint->u.rotate.center_x = INT_TO_FIXED(NEXT_SHORT(p));
-		//	apaint->u.rotate.center_y = INT_TO_FIXED(NEXT_SHORT(p));
-		//}
-		//else
-		{
-			apaint->u.rotate.center_x = 0;
-			apaint->u.rotate.center_y = 0;
-		}
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE ||
-			(PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
-		{
-			uint32_t  num_deltas = 0;
-
-
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE_CENTER)
-				num_deltas = 3;
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_ROTATE)
-				num_deltas = 1;
-
-			if (num_deltas > 0)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base,
-					num_deltas, item_deltas))
-					return 0;
-
-				apaint->u.rotate.angle += F2DOT14_TO_FIXED(item_deltas[0]);
-
-				if (num_deltas == 3)
-				{
-					apaint->u.rotate.center_x += INT_TO_FIXED(item_deltas[1]);
-					apaint->u.rotate.center_y += INT_TO_FIXED(item_deltas[2]);
-				}
-			}
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_ROTATE;
-
-
-		return 1;
-	}
-#if 0
-	else if (apaint->format == COLR_PAINTFORMAT_SKEW ||
-		(PaintFormat_Internal)apaint->format ==
-		COLR_PAINTFORMAT_INTERNAL_VAR_SKEW ||
-		(PaintFormat_Internal)apaint->format ==
-		COLR_PAINTFORMAT_INTERNAL_SKEW_CENTER ||
-		(PaintFormat_Internal)apaint->format ==
-		COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
-	{
-		apaint->u.skew.paint.p = child_table_p;
-		apaint->u.skew.paint.insert_root_transform = 0;
-
-		ENSURE_READ_BYTES(4);
-		apaint->u.skew.x_skew_angle = F2DOT14_TO_FIXED(NEXT_SHORT(p));
-		apaint->u.skew.y_skew_angle = F2DOT14_TO_FIXED(NEXT_SHORT(p));
-
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_SKEW_CENTER ||
-			(PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
-		{
-			ENSURE_READ_BYTES(4);
-			apaint->u.skew.center_x = INT_TO_FIXED(NEXT_SHORT(p));
-			apaint->u.skew.center_y = INT_TO_FIXED(NEXT_SHORT(p));
-		}
-		else
-		{
-			apaint->u.skew.center_x = 0;
-			apaint->u.skew.center_y = 0;
-		}
-
-
-#ifdef TT_CONFIG_OPTION_GX_VAR_SUPPORT
-		if ((PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SKEW ||
-			(PaintFormat_Internal)apaint->format ==
-			COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
-		{
-			ENSURE_READ_BYTES(4);
-			var_index_base = NEXT_ULONG(p);
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SKEW)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 2,
-					item_deltas))
-					return 0;
-
-				apaint->u.skew.x_skew_angle += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.skew.y_skew_angle += F2DOT14_TO_FIXED(item_deltas[1]);
-			}
-
-			if ((PaintFormat_Internal)apaint->format ==
-				COLR_PAINTFORMAT_INTERNAL_VAR_SKEW_CENTER)
-			{
-				if (!get_deltas_for_var_index_base(face, colr, var_index_base, 4,
-					item_deltas))
-					return 0;
-
-				apaint->u.skew.x_skew_angle += F2DOT14_TO_FIXED(item_deltas[0]);
-				apaint->u.skew.y_skew_angle += F2DOT14_TO_FIXED(item_deltas[1]);
-				apaint->u.skew.center_x += INT_TO_FIXED(item_deltas[2]);
-				apaint->u.skew.center_y += INT_TO_FIXED(item_deltas[3]);
-			}
-		}
-#endif
-
-		apaint->format = COLR_PAINTFORMAT_SKEW;
-
-		return 1;
-	}
-
-	else if (apaint->format == COLR_PAINTFORMAT_COMPOSITE)
-	{
-		uint32_t  composite_mode;
-
-
-		apaint->u.composite.source_paint.p = child_table_p;
-		apaint->u.composite.source_paint.insert_root_transform = 0;
-
-		ENSURE_READ_BYTES(1);
-		composite_mode = NEXT_BYTE(p);
-		if (composite_mode >= COLR_COMPOSITE_MAX)
-			return 0;
-
-		apaint->u.composite.composite_mode = (Composite_Mode)composite_mode;
-
-		if (!get_child_table_pointer(colr, paint_base, &p, &child_table_p))
-			return 0;
-
-		apaint->u.composite.backdrop_paint.p = child_table_p;
-		apaint->u.composite.backdrop_paint.insert_root_transform = 0;
-
-		return 1;
-	}
-#endif
-	return 0;
-}
-
-
-
-
-
-
-#endif // !NO_COLOR_FONT
-
-
-
-
-
 int font_t::get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out)
 {
 	Bitmap_p* bitmap = 0;
@@ -7047,6 +5146,24 @@ stb_packer* bitmap_cache_cx::get_last_packer(bool isnew)
 	}
 	return *_packer.rbegin();
 }
+image_ptr_t* bitmap_cache_cx::push_cache_size(const glm::ivec2& ss, glm::ivec2* pos, int linegap)
+{
+	int width = align_up(ss.x + linegap, 2), height = align_up(ss.y + linegap, 2);
+	glm::ivec4 rc4 = { 0, 0, ss.x,ss.y };
+	auto pt = get_last_packer(false);
+	if (!pt)return 0;
+	auto ret = pt->push_rect({ width, height }, pos);
+	if (!ret)
+	{
+		pt = get_last_packer(true);
+		ret = pt->push_rect({ width, height }, pos);
+	}
+	if (!ret)
+	{
+		return 0;
+	}
+	return pt->get();
+}
 image_ptr_t* bitmap_cache_cx::push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap, uint32_t col)
 {
 	int width = align_up(bitmap->width + linegap, 2), height = align_up(bitmap->rows + linegap, 2);
@@ -7386,7 +5503,6 @@ std::vector<font_t*> font_imp::add_font_mem(const char* data, size_t len, bool i
 				}
 			}
 			font->init_post_table();
-			font->init_color();
 #ifndef _FONT_NO_BITMAP
 			font->init_sbit();
 			if (cn_name == "NSimSun")
@@ -9688,6 +7804,7 @@ void update_text(text_render_o* p, text_block* tb)
 		if (kt.font)
 		{
 			font_t::GlyphPositions gp = {};// 执行harfbuzz 
+			kt.font->set_hb_fontsize(t->fontsize);
 			auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
 			kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
 		}
@@ -9742,7 +7859,7 @@ void update_text(text_render_o* p, text_block* tb)
 			auto git = kt.font->get_glyph_item(pos->index, ch, t->fontsize);
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._dwpos += offset;
-			git.advance = ceil(pos->x_advance * scale_h);
+			git.advance = pos->x_advance;// ceil(pos->x_advance * scale_h);
 			git.user_ptr = bidx /*+ gt.cluster*/;
 			git.cpt = ch;
 			if (git.cpt == '\t' && git.advance < 1)

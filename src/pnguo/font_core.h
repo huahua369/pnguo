@@ -120,7 +120,6 @@ public:
 	hps_t* hp = 0;
 
 	bitmap_ttinfo* bitinfo = 0;
-	gcolors_t* colorinfo = 0;
 	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存，多个字体共用 
 
 	bool first_bitmap = false;
@@ -206,27 +205,31 @@ public:
 
 	std::map<int, std::vector<info_one>> get_detail();
 
-	void mk_glyph_image(uint32_t gid, int font_size, std::vector<char>* outdt, glm::ivec4* ot);
+	// hb
+	void* mk_glyph_image_hb(uint32_t gid, int font_size, int* ot);
+	void set_hb_fontsize(int font_size);
 
 	// 返回的positions.pos自动管理内存,返回字形数量
 	uint32_t CollectGlyphsFromFont(const void* text, size_t length, int type, int direction, uint32_t script, GlyphPositions* positions);
 	int GetGlyphShapeTT(int glyph_index, std::vector<vertex_f>* vd);
 public:
 	void init_post_table();
-	int init_color();
 	int init_sbit();
 private:
 
 	// 字形索引缓存
 	font_item_t* push_gcache(uint32_t glyph_index, uint32_t height, image_ptr_t* img, const glm::ivec4& rect, const glm::ivec2& pos);
 	font_item_t* get_gcache(uint32_t glyph_index, uint32_t height);
+	// 获取位图数据
+	bool get_glyph_image_bitmap(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, uint32_t unicode_codepoint);
+
 	int get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, int lcd_type, uint32_t unicode_codepoint, int xf = 0);
 	int get_gcolor(uint32_t base_glyph, std::vector<glm::uvec2>& cols);
 
 	int get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out);
 	int get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, glm::ivec4* ot, Bitmap_p* out_bitmap, std::vector<char>* out);
 
-	int get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, Bitmap_p* bitmap, std::vector<char>* out, uint32_t unicode_codepoint);
+	bool get_glyph_image_hb(int gidx, double height, glm::ivec4* ot, void** bitmap, uint32_t unicode_codepoint);
 };
 
 
@@ -253,6 +256,8 @@ public:
 	~bitmap_cache_cx();
 	void resize(int w, int h);
 	glm::ivec2 fill_color(int w, int h, uint32_t color);
+	// 装箱一个矩形，返回坐标/图像
+	image_ptr_t* push_cache_size(const glm::ivec2& ss, glm::ivec2* pos, int linegap = 0);
 	// 复制像素到装箱，从pos返回坐标
 	image_ptr_t* push_cache_bitmap(Bitmap_p* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
 	image_ptr_t* push_cache_bitmap(image_ptr_t* bitmap, glm::ivec2* pos, int linegap = 0, uint32_t col = -1);
@@ -472,12 +477,10 @@ class yHist
 {
 public:
 	yHist()
-	{
-	}
+	{}
 
 	~yHist()
-	{
-	}
+	{}
 	void init(int c = 256);
 	void Hist(unsigned char c);
 
