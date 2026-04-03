@@ -8027,6 +8027,12 @@ void build_text_render(text_block* tb, text_render_o* trt)
 }
 
 
+void text_t1_set(text_t1* p, text_box_t* box)
+{
+	if (p && box)
+		p->trt.box = *box;
+}
+
 void build_text_t1(text_t1* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
 {
 	if (!p)return;

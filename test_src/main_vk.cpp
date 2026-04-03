@@ -991,26 +991,18 @@ int main()
 			td3->rptr = form0->renderer;
 
 			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
-			text_style ts = {};
-			ts.family = family;
-			ts.fontsize = 22;
-			ts.color = -1;
-			// 文本块
-			text_block tb = {};
-			tb.style = &ts;
-			tb.str = str.c_str();
-			tb.first = 0;
-			tb.size = str.size();
-			text_render_o trt = {};
-			auto ptrt = &trt;
-			trt.box.text_align = { 0,0.5 };
-			trt.box.rc = { 0,0,1500,600 };
-			trt.box.auto_break = 1;
-			trt.box.word_wrap = 1;
-			build_text_render(&tb, &trt);
+
+			text_box_t tbox = {};
+			tbox.text_align = { 0,0.5 };
+			tbox.rc = { 0,0,1500,600 };
+			tbox.auto_break = 1;
+			tbox.word_wrap = 1;
 
 			auto ptb = new text_t1();
-			ptb->trt = trt;
+			text_t1_set(ptb, &tbox);
+			auto ptb1 = new text_t1();
+			tbox.rc = { 0,320,1500,600 };
+			text_t1_set(ptb1, &tbox);
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1026,6 +1018,7 @@ int main()
 					}
 					//sp_drawable_draw(dd1); // spine动画
 					r_render_data_text(&ptb->trt, { 20,10 }, td3);
+					r_render_data_text(&ptb1->trt, { 20,10 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1051,7 +1044,10 @@ int main()
 					{
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						str = (char*)u8"表情💻🔥➗️👪️";
+						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 39, 0xff222222);
 						r_update_data_text(&ptb->trt, td3, 0);
+						r_update_data_text(&ptb1->trt, td3, 0);
 						static bool save_test = false;
 						if (save_test)
 						{
