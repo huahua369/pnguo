@@ -7440,7 +7440,7 @@ break_c* init_break(break_c* p, const uint16_t* s, int len, int type)
 	p->len = len;
 	UErrorCode err = U_ZERO_ERROR;
 	p->bi = icub->_ubrk_open((UBreakIteratorType)type, 0, (UChar*)s, len, &err);
-	if (!p->bi && err) { 
+	if (!p->bi && err) {
 		return nullptr;
 	}
 	return p;
@@ -7450,7 +7450,7 @@ void close_break(break_c* bp) {
 	{
 		if (bp->bi)
 			bp->icub->_ubrk_close(bp->bi);
-		bp->bi = 0; 
+		bp->bi = 0;
 	}
 }
 void break_set_text(break_c* bp, const uint16_t* s, int32_t len) {
@@ -7781,7 +7781,7 @@ void update_text(text_render_o* p, text_block* tb)
 		if (p->box.auto_break)
 		{
 			break_c bkc = {};
-			auto bk = init_break(&bkc,0, 0, p->box.word_wrap); // 创建icu断行
+			auto bk = init_break(&bkc, 0, 0, p->box.word_wrap); // 创建icu断行
 			if (bk)
 			{
 				for (auto& it : p->bv)
@@ -7861,7 +7861,7 @@ void update_text(text_render_o* p, text_block* tb)
 			git.advance = pos->x_advance;// ceil(pos->x_advance * scale_h);
 			git.user_ptr = bidx /*+ gt.cluster*/;
 			git.cpt = ch;
-			
+
 			p->ov.insert(git._image);
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);
@@ -7886,15 +7886,13 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 	flex_data tf[2] = {};
 	if (boxflex)
 	{
-		*tf = *boxflex;
+		tf[0] = *boxflex;
 	}
 	std::vector<node_dt> fv;
 	std::vector<glm::ivec3> linex;
 	fv.resize(p->_vstr.size() + 1);
 	node_dt* fnode = fv.data();
 	tf->wrap = p->box.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
-	//tf->justify_content = flex_align::ALIGN_START;
-	//tf->align_content = flex_align::ALIGN_START;
 	size_t ct = 0, ct1 = 0;
 	size_t cline = 0;
 	std::vector<glm::ivec4> b_data;
@@ -8014,11 +8012,11 @@ void text_render_clear(text_render_o* p)
 	p->bv.clear();
 }
 
-void build_text_render(text_block* tb, text_render_o* trt)
+void build_text_render(text_block* tb, text_render_o* trt, flex_data* fdt)
 {
 	if (!tb || !trt)return;
 	update_text(trt, tb);
-	text_render_layout1(trt, 0);
+	text_render_layout1(trt, fdt);
 	trt->update = true;
 }
 
@@ -8044,7 +8042,7 @@ void build_text_t1(text_t1* p, const void* str, int size, int first, font_family
 	tb.str = (char*)str;
 	tb.first = first;
 	tb.size = size;
-	build_text_render(&tb, &p->trt);
+	build_text_render(&tb, &p->trt, p->fdt);
 }
 
 void get_lineheight(std::vector<lay_value>& v, int w, const glm::vec2& ps)

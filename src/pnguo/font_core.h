@@ -648,8 +648,7 @@ struct text_render_o
 struct flex_data;
 void text_render_set(text_render_o* p, text_box_t* b);
 void text_render_clear(text_render_o* p);
-void build_text_render(text_block* tb, text_render_o* trt);
-void text_render_layout1(text_render_o* p, flex_data* boxflex);
+void build_text_render(text_block* tb, text_render_o* trt, flex_data* fdt);
 void c_render_data(text_render_o* p, image_ptr_t* dst);
 
 // 文本对象
@@ -657,6 +656,7 @@ struct text_t1 {
 	text_style ts = {};
 	text_block tb = {};
 	text_render_o trt = {};
+	flex_data* fdt = 0;
 };
 void text_t1_set(text_t1* p, text_box_t* box);
 void build_text_t1(text_t1* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
