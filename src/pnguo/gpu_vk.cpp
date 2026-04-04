@@ -1693,8 +1693,8 @@ namespace vkg {
 #if 1
 
 
-	std::string s_shaderLibDir;
-	std::string s_shaderCacheDir;
+	std::string s_shaderLibDir = "cache/sld/";
+	std::string s_shaderCacheDir = "cache/scc/";
 
 	bool InitShaderCompilerCache(const std::string shaderLibDir, std::string shaderCacheDir)
 	{
@@ -1881,8 +1881,12 @@ namespace vkg {
 		// check whether DXCompiler is initialized
 		if (s_dxc_create_func == nullptr)
 		{
-			Trace("Error: s_dxc_create_func() is null, have you called InitDirectXCompiler() ?");
-			return false;
+			InitDirectXCompiler();
+			if (s_dxc_create_func == nullptr)
+			{
+				Trace("Error: s_dxc_create_func() is null, have you called InitDirectXCompiler() ?");
+				return false;
+			}
 		}
 
 		IDxcLibrary* pLibrary;
@@ -2373,6 +2377,15 @@ namespace vkg {
 				vi_binding[b].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 			}
 		}
+		return;
+	}
+	void new_shader(cxDevice* pdev, const char* f, const char* v, int type)
+	{
+		DefineList defines;
+		//defines["A"] = "1";
+		VkPipelineShaderStageCreateInfo vertexShader = {}, fragmentShader = {};
+		pdev->VKCompileFromString((ShaderSourceType)type, VK_SHADER_STAGE_FRAGMENT_BIT, f, type ? "main" : "ps_main", "", &defines, &fragmentShader);
+		pdev->VKCompileFromString((ShaderSourceType)type, VK_SHADER_STAGE_VERTEX_BIT, v ? v : f, type ? "main" : "vs_main", "", &defines, &vertexShader);
 		return;
 	}
 	void new_pbr_pipeline(cxDevice* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2)

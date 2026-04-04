@@ -119,7 +119,7 @@ list(APPEND lklib
     #${SDL3_LIBRARIES}
    unofficial::noise::noise-static
    unofficial::noiseutils::noiseutils-static
-    harfbuzz::harfbuzz harfbuzz::harfbuzz-raster
+    harfbuzz::harfbuzz harfbuzz::harfbuzz-raster harfbuzz::harfbuzz-gpu
     $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     #opencv_ml opencv_dnn opencv_core opencv_flann opencv_features2d opencv_photo opencv_highgui
     pnguo

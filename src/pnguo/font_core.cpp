@@ -8873,3 +8873,11 @@ void ead_font(const std::string& internalDataPath)
 	} while (0);
 }
 #endif // __ANDROID__
+#include <hb-gpu.h>
+const char* gpu_shader_fragment_source(gpu_shader_lang_t lang) {
+	return hb_gpu_shader_fragment_source((hb_gpu_shader_lang_t)lang);
+}
+
+const char* gpu_shader_vertex_source(gpu_shader_lang_t lang) {
+	return hb_gpu_shader_vertex_source((hb_gpu_shader_lang_t)lang);
+}

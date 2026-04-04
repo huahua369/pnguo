@@ -332,13 +332,13 @@ void free_fonts_ctx(font_rctx* p);
 struct font_item_t
 {
 public:
+	image_ptr_t* _image = nullptr;		// 排列int width,height,v2pad,data  
 	uint32_t _glyph_index = 0;
 	// 原始的advance
 	int advance = 0;
 	size_t user_ptr;
 	// 渲染偏移坐标
 	glm::ivec2 _dwpos = {};
-	image_ptr_t* _image = nullptr;		// 排列int width,height,v2pad,data  
 	// 缓存位置xy, 字符图像zw(width,height)
 	glm::ivec4 _rect = {};
 	glm::ivec2 _apos = {};// 布局坐标
@@ -636,13 +636,13 @@ struct strfont_t {
 // 文本渲染对象
 struct text_render_o
 {
-	text_box_t box = {};
-	text_block* tb = 0;
-	std::vector<font_item_t> _vstr;	// 渲染数据
+	text_box_t box = {};			// *文本区域信息
+	text_block* tb = 0;				// 文本块信息
+	std::vector<font_item_t> _vstr;	// *渲染数据
 	std::vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
 	std::vector<bidi_item> bv;		// 存放bidi后的数据
 	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
-	std::set<image_ptr_t*> ov;		// 用到的字体纹理对象
+	std::set<image_ptr_t*> ov;		// *用到的字体纹理对象
 	bool update = true;
 };
 struct flex_data;
@@ -660,6 +660,25 @@ struct text_t1 {
 };
 void text_t1_set(text_t1* p, text_box_t* box);
 void build_text_t1(text_t1* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
+// 图文对象
+struct rich_text_t {
+	text_box_t box = {};			// *文本区域信息
+	std::vector<font_item_t> _vstr;	// *渲染数据
+	std::set<image_ptr_t*> ov;		// *用到的字体纹理对象
+	std::vector<text_block> tbs;	// *文本块信息
+
+	std::vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
+	std::vector<bidi_item> bv;		// 存放bidi后的数据
+	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
+};
+// 设置文本区域参数，flex参数可选，提供排版设置等参数
+void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt = 0);
+// 清除文本/图片，保留区域参数等设置
+void rt_clear(rich_text_t* p);
+// 添加文本
+void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
+// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、是否固定坐标不参与布局等参数
+void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 
 struct image_block
 {
@@ -692,7 +711,16 @@ void text_multi_add_i(layout_tx* p, image_block* t, bool abspos);
 void text_multi_layout(layout_tx* p);
 
 
+typedef enum {
+	GPU_SHADER_LANG_GLSL,
+	GPU_SHADER_LANG_WGSL,
+	GPU_SHADER_LANG_MSL,
+	GPU_SHADER_LANG_HLSL,
+} gpu_shader_lang_t;
 
+const char* gpu_shader_fragment_source(gpu_shader_lang_t lang);
+
+const char* gpu_shader_vertex_source(gpu_shader_lang_t lang);
 
 
 #endif // !FONT_CORE_H

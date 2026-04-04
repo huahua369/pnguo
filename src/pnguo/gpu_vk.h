@@ -332,6 +332,7 @@ namespace vkg {
 
 	void new_pbr_pipeline(cxDevice* pdev, PBRPipe_t* pbrpipe, pipeline_info_2* info2);
 
+	void new_shader(cxDevice* pdev, const char* f, const char* v, int type);
 }
 //!vkg
 

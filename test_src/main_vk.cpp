@@ -994,14 +994,14 @@ int main()
 
 			text_box_t tbox = {};
 			tbox.text_align = { 0,0.5 };
-			tbox.rc = { 0,0,1500,600 };
+			tbox.rc = { 10,10,1500,600 };
 			tbox.auto_break = 1;
 			tbox.word_wrap = 1;
 
 			auto ptb = new text_t1();
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
-			tbox.rc = { 0,320,1500,600 };
+			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
@@ -1017,8 +1017,8 @@ int main()
 						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
-					r_render_data_text(&ptb->trt, { 20,10 }, td3);
-					r_render_data_text(&ptb1->trt, { 20,10 }, td3);
+					r_render_data_text(&ptb->trt, { 0,0 }, td3);
+					r_render_data_text(&ptb1->trt, { 0,0 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1044,8 +1044,8 @@ int main()
 					{
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
-						str = (char*)u8"表情\t💻🔥➗️👪️🍕";
-						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 64, 0xff222222);
+						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
+						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
 						r_update_data_text(&ptb->trt, td3, 0);
 						r_update_data_text(&ptb1->trt, td3, 0);
 						static bool save_test = false;
@@ -1059,7 +1059,56 @@ int main()
 					auto sem = vkd->get_fbo_semaphore();
 					form0->add_vk_semaphores(sem, 0, 0);
 				};
+			{
+				static const char* vertex_glsl = R"glsl(
+layout(push_constant) uniform uPushConstant
+//layout(binding=0) uniform u_UniformBuffer 
+{
+    mat4 u_mvpMatrix;
+};
 
+layout(location = 0) in vec3 pos;
+layout(location = 1) in vec2 uv;
+layout(location = 2) in vec4 col; 
+
+out gl_PerVertex
+{
+    vec4 gl_Position;
+};
+
+layout(location = 0) out struct{
+    vec4 col;
+    vec2 uv;
+} o;
+
+void main(){
+    gl_Position = u_mvpMatrix * vec4(pos.xyz, 1);
+    o.uv = uv;
+    o.col = col;  
+}
+)glsl";
+				static const char* fragment_glsl = R"glsl(
+layout(binding=1) uniform sampler2D u_Texture;
+layout(location = 0) in struct{
+    vec4 col;
+    vec2 uv;
+} d;
+layout(location = 0) out vec4 o_Color;
+void main()
+{
+  vec4 c = texture(u_Texture, d.uv.st);
+  o_Color = d.col * c; 
+}
+
+)glsl";
+				std::string v1 = "#version 450\n";
+				std::string f1 = "#version 450\n";
+				//v1 += v;
+				v1 += vertex_glsl;
+				//f1 += f;
+				f1 += fragment_glsl;
+				//vkg::new_shader(dctx, f1.c_str(), v1.c_str(), 1);
+			}
 			// 运行消息循环
 			run_app(app, 0);
 			delete ptb;
