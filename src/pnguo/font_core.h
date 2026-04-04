@@ -626,12 +626,12 @@ struct text_block
 };
 
 struct strfont_t {
-	void* v = 0;
-	size_t len = 0;
-	bool rtl = false;
-	int8_t type = 8;
-	std::vector<font_t::GlyphPosition> _tnpos;
-	font_t* font = 0;
+	void* v = 0;		// 字符数据指针，类型由type指定
+	size_t len = 0;		// 字符数量
+	bool rtl = false;	// 是否从右向左
+	int8_t type = 8;	// 字符串类型，8=utf8,16=utf16,32=utf32
+	std::vector<font_t::GlyphPosition> _tnpos;	// 输出hb获取的字形位置数据
+	font_t* font = 0;	// 字符串使用的字体对象
 };
 // 文本渲染对象
 struct text_render_o
@@ -639,9 +639,9 @@ struct text_render_o
 	text_box_t box = {};
 	text_block* tb = 0;
 	std::vector<font_item_t> _vstr;	// 渲染数据
-	std::vector<strfont_t> _block;
-	std::vector<bidi_item> bv;
-	std::u16string str;
+	std::vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
+	std::vector<bidi_item> bv;		// 存放bidi后的数据
+	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
 	std::set<image_ptr_t*> ov;		// 用到的字体纹理对象
 	bool update = true;
 };

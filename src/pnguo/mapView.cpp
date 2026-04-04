@@ -384,6 +384,32 @@ namespace md {
 		}
 		return r;
 	}
+
+	size_t u8_u16p(const char* str, size_t len, std::u16string* r)
+	{
+		auto t = str;
+		size_t ct = 0;
+		for (; t && *t && len > 0; len--)
+		{
+			uint32_t unicode = 0;
+			int bytes = utf8_to_unicode(t, &unicode);
+			if (bytes > 0)
+				t += bytes;
+			else
+				break;
+			if (unicode)
+			{
+				uint16_t w2[4] = {};
+				auto n = u32_to_u16(unicode, (uint16_t*)w2);
+				r->push_back(w2[0]);
+				if (n > 1)
+					r->push_back(w2[1]);
+				ct += n;
+			}
+			else { break; }
+		}
+		return ct;
+	}
 	std::wstring u8_w(const std::string& str)
 	{
 		return u8_w(str.c_str(), str.size());
@@ -1204,8 +1230,7 @@ namespace hz
 
 
 	mfile_t::mfile_t()
-	{
-	}
+	{}
 
 	mfile_t::~mfile_t()
 	{
@@ -3368,8 +3393,7 @@ namespace hz
 	}
 
 	Zip::Zip()
-	{
-	}
+	{}
 
 	Zip::~Zip()
 	{

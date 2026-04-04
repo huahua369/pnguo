@@ -1044,8 +1044,8 @@ int main()
 					{
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
-						str = (char*)u8"表情💻🔥➗️👪️";
-						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 39, 0xff222222);
+						str = (char*)u8"表情\t💻🔥➗️👪️🍕";
+						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 64, 0xff222222);
 						r_update_data_text(&ptb->trt, td3, 0);
 						r_update_data_text(&ptb1->trt, td3, 0);
 						static bool save_test = false;

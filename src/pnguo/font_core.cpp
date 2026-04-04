@@ -7150,7 +7150,7 @@ struct BidiScriptRunRecords {
 	bool isRtl;
 	std::deque<ScriptRecord> records;
 };
-static void collectBidiScriptRuns(BidiScriptRunRecords& scriptRunRecords, const UChar* chars, int32_t start, int32_t end, bool isRTL, font_family_t* family)
+static void collectBidiScriptRuns(BidiScriptRunRecords& scriptRunRecords, const UChar* chars, int32_t start, int32_t end, bool isRTL/*, font_family_t* family*/)
 {
 	scriptRunRecords.isRtl = isRTL;
 
@@ -7334,7 +7334,7 @@ UCharDirection bidiccb(const void* context, UChar32 c) {
 	return U_LEFT_TO_RIGHT;
 }
 
-void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_item>& info)
+void do_bidi(UChar* testChars, int len, std::vector<bidi_item>& info)//font_family_t* family,
 {
 	//print_time ftpt("ubidi");
 
@@ -7380,7 +7380,7 @@ void do_bidi(UChar* testChars, int len, font_family_t* family, std::vector<bidi_
 #if 1
 				//printf("Processing Bidi Run = %lld -- run-start = %d, run-len = %d, isRTL = %d\n", i, startRun, lengthRun, isRTL);
 				BidiScriptRunRecords scriptRunRecords;
-				collectBidiScriptRuns(scriptRunRecords, testChars, startRun, lengthRun, isRTL, family);
+				collectBidiScriptRuns(scriptRunRecords, testChars, startRun, lengthRun, isRTL);
 
 				//print_time ftpt("ubidi_2");
 				while (!scriptRunRecords.records.empty()) {
@@ -7429,11 +7429,10 @@ struct break_c
 	uint16_t* s = 0;
 	int errorcode = 0;
 };
-break_c* new_break(const uint16_t* s, int len, int type)
+break_c* init_break(break_c* p, const uint16_t* s, int len, int type)
 {
 	auto icub = get_icu(U_ICU_VERSION_MAJOR_NUM);
 	if (!icub)return nullptr;
-	auto p = new break_c();
 	if (!p)return nullptr;
 	p->icub = icub;
 	p->type = type;
@@ -7441,19 +7440,17 @@ break_c* new_break(const uint16_t* s, int len, int type)
 	p->len = len;
 	UErrorCode err = U_ZERO_ERROR;
 	p->bi = icub->_ubrk_open((UBreakIteratorType)type, 0, (UChar*)s, len, &err);
-	if (!p->bi && err) {
-		if (p)delete p;
+	if (!p->bi && err) { 
 		return nullptr;
 	}
 	return p;
 }
-void free_break(break_c* bp) {
+void close_break(break_c* bp) {
 	if (bp)
 	{
 		if (bp->bi)
 			bp->icub->_ubrk_close(bp->bi);
-		bp->bi = 0;
-		delete bp;
+		bp->bi = 0; 
 	}
 }
 void break_set_text(break_c* bp, const uint16_t* s, int32_t len) {
@@ -7577,20 +7574,20 @@ void delete_font_family(font_family_t* p)
 }
 
 
-void text_set_bidi(text_render_o* p, const char* str, size_t first, size_t count, font_family_t* family)
+void text_set_bidi(text_render_o* p, const char* str, size_t first, size_t count/*, font_family_t* family*/)
 {
 	std::vector<bidi_item>& bv = p->bv;
 	auto t = md::utf8_char_pos(str, first, count);
-	auto te = t + count;// md::utf8_char_pos(t, count, count);
-	auto wk = md::u8_u16(t, count);
-	if (wk.size())
-		p->str.swap(wk);
-	const uint16_t* str1 = (const uint16_t*)p->str.c_str();
-	size_t n = p->str.size();
+	auto te = t + count;
+	p->bidi_str.clear();
+	auto n = md::u8_u16p(t, count, &p->bidi_str);
+	if (!n)
+		return;
+	const uint16_t* str1 = (const uint16_t*)p->bidi_str.c_str();
 	//std::vector<std::wstring> vw1, vw2;
 	{
 		bv.clear();
-		do_bidi((UChar*)str1, n, family, bv);
+		do_bidi((UChar*)str1, n, bv);//family,
 		std::stable_sort(bv.begin(), bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
 		//for (auto& it : bv) {
 		//	//vw1.push_back(md::u8_w(it.s));
@@ -7779,26 +7776,28 @@ void update_text(text_render_o* p, text_block* tb)
 	text_render_clear(p);
 	auto& vstr = p->_block;
 	auto t = tb->style;
-	text_set_bidi(p, tb->str, tb->first, tb->size, t->family);
+	text_set_bidi(p, tb->str, tb->first, tb->size);
 	do {
 		if (p->box.auto_break)
 		{
-			auto bk = new_break(0, 0, p->box.word_wrap); // 创建icu断行
+			break_c bkc = {};
+			auto bk = init_break(&bkc,0, 0, p->box.word_wrap); // 创建icu断行
 			if (bk)
 			{
 				for (auto& it : p->bv)
 				{
-					listWordBoundaries(bk, (uint16_t*)p->str.c_str() + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len) {
+					listWordBoundaries(bk, (uint16_t*)p->bidi_str.c_str() + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len) {
 						get_font_fallbacks16(t->family, str, len, it.rtl, vstr);
 						});
 				}
-				free_break(bk);
+				close_break(bk);
 				break;
 			}
 		}
 		// 不执行断行或无自动换行时，查询字体
 		for (auto& it : p->bv) { get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr); }
 	} while (0);
+	auto bwp = p->bidi_str.c_str();
 	for (auto& kt : vstr)
 	{
 		if (kt.font)
@@ -7862,10 +7861,7 @@ void update_text(text_render_o* p, text_block* tb)
 			git.advance = pos->x_advance;// ceil(pos->x_advance * scale_h);
 			git.user_ptr = bidx /*+ gt.cluster*/;
 			git.cpt = ch;
-			if (git.cpt == '\t' && git.advance < 1)
-			{
-				git.advance = t->fontsize;
-			}
+			
 			p->ov.insert(git._image);
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->_vstr.push_back(git);

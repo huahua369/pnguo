@@ -386,6 +386,7 @@ namespace md {
 	void u16_u8(uint16_t* str, size_t len, std::string& r);
 	//std::wstring u8_u16(const std::string& str);
 	std::u16string u8_u16(const char* str, size_t len);
+	size_t u8_u16p(const char* str, size_t len, std::u16string* r);
 	std::wstring u8_w(const char* str, size_t len);
 	std::wstring u8_w(const std::string& str);
 	std::string gb_u8(const char* str, size_t len);
