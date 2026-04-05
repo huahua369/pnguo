@@ -257,6 +257,7 @@ public:
 	~clicprect_cx();
 };
 
+void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta);
 void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt);
 
 void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);

@@ -1378,6 +1378,43 @@ clicprect_cx::~clicprect_cx()
 	}
 }
 #if 1
+void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta)
+{
+	void* renderer = pt->rptr;
+	if (!p || !pt || !renderer)return;
+	auto& tm = p->layout._vstr;
+	for (auto& vt : tm) {
+		if (vt.i.ctype)
+		{
+			auto& it = *vt.i.ib;
+			auto& tp = pt->vt[it.img];
+			if (!tp || it.img->valid)
+			{
+				auto t = pt->rcb->make_tex(renderer, it.img);
+				if (t && t != tp)
+				{
+					tp = t;
+				}
+			}
+
+		}
+		else if (vt.f.ctype == 0) {
+			auto& git = vt.f;
+			if (git._image) {
+				auto& tp = pt->vt[git._image];
+				if (!tp || git._image->valid)
+				{
+					auto t = pt->rcb->make_tex(renderer, git._image);
+					if (t && t != tp)
+					{
+						tp = t;
+					}
+				}
+
+			}
+		}
+	}
+}
 void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 {
 	void* renderer = pt->rptr;
@@ -1398,21 +1435,13 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
 			auto& tp = pt->vt[it.img];
-			if (!tp || it.img->valid)
-			{
-				auto newtp = pt->rcb->make_tex(renderer, it.img);
-				if (!tp)
-				{
-					tp = newtp;
-				}
-			}
 			if (!devrtex && tex != tp)
 			{
 				if (tex && pt->opt.size()) {
 					auto nv = pt->opt.size();
 					pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
 						((float*)&pt->opt.data()->uv), vsize, nv
-						, pt->idx.data(), pt->idx.size(), sizeof(uint32_t)); 
+						, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 					pt->opt.clear();
 					pt->idx.clear();
 				}
@@ -1452,14 +1481,6 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 			auto& git = vt.f;
 			if (git._image) {
 				auto& tp = pt->vt[git._image];
-				if (!tp || git._image->valid)
-				{
-					auto newtp = pt->rcb->make_tex(renderer, git._image);
-					if (!tp)
-					{
-						tp = newtp;
-					}
-				}
 				if (tex != tp)
 				{
 					if (tex && pt->opt.size()) {
@@ -1482,7 +1503,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 		auto nv = pt->opt.size();
 		pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
 			((float*)&pt->opt.data()->uv), vsize, nv
-			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t)); 
+			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 		pt->opt.clear();
 		pt->idx.clear();
 	}
