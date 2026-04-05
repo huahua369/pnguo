@@ -1019,9 +1019,9 @@ int main()
 						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
-					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
-					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
-					r_render_textdata(mtext, {100,100}, td3);
+					r_render_data_text(&ptb->trt, { 0,0 }, td3);
+					r_render_data_text(&ptb1->trt, { 0,0 }, td3);
+					//r_render_textdata(mtext, {100,100}, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1047,22 +1047,22 @@ int main()
 					{
 						rt_clear(mtext);
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
-						//build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						//rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
-						//build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
-						//r_update_data_text(&ptb->trt, td3, 0);
-						//r_update_data_text(&ptb1->trt, td3, 0);
+						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
+						r_update_data_text(&ptb->trt, td3, 0);
+						r_update_data_text(&ptb1->trt, td3, 0);
 
 						// 添加文本
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);
-						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
+						//rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
+						//rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);
+						//// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 
 						auto img = fctx->bcc._data[0];
-						rt_add_image(mtext, img, { 0,0,100,100 }, {}, -1, { 100,100 }, {}, true);
+						//rt_add_image(mtext, img, { 0,0,100,100 }, {}, -1, { 100,100 }, {}, true);
 
-						rt_build(mtext);
+						//rt_build(mtext);
 
 						static bool save_test = false;
 						if (save_test)
