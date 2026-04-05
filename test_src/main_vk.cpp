@@ -1060,7 +1060,7 @@ int main()
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 
 						auto img = fctx->bcc._data[0];
-						rt_add_image(mtext, img, { 0,0,100,100 }, {}, -1, { 100,100 }, {}, false);
+						rt_add_image(mtext, img, { 0,0,100,100 }, {}, -1, { 100,100 }, {}, true);
 
 						rt_build(mtext);
 

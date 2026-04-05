@@ -708,7 +708,7 @@ struct rich_text_t {
 	std::vector<image_block> ibs;	// *图片块信息
 	std::vector<glm::ivec2> data_index;	// *文本块和图片块在渲染数据中的索引位置，x为文本块索引，y为图片块索引，-1则不使用
 	layout_block_st layout = {};	// *布局结果数据
-	bool tex_batch = true;
+	bool tex_batch = false;
 };
 
 // 设置文本区域参数，flex参数可选，提供排版设置等参数
