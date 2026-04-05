@@ -3265,9 +3265,10 @@ font_item_t* font_t::push_gcache(uint32_t glyph_index, uint32_t height, image_pt
 			cache_data.push_back(new font_item_t[ccount]);
 			cache_count = ccount;
 		}
-		auto npt = cache_data.rbegin();
+		auto npt = cache_data.rbegin();		
 		pt = *npt;
 		pt += ccount - cache_count;
+		*pt = {};
 		cache_count--;
 	}
 	pt->_glyph_index = glyph_index;
@@ -7668,6 +7669,7 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 			if (str0 != str)
 			{
 				t.v = (char*)str0; t.len = str - str0;
+				t.v8 = (char*)t.v;
 				t.font = oft0;
 				vstr.push_back(t);
 			}
@@ -7689,6 +7691,7 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 			if (oft0 && str0 != str) {
 
 				t.v = (char*)str0; t.len = str - str0;
+				t.v8 = (char*)t.v;
 				t.font = oft0;
 				str0 = str;
 				vstr.push_back(t);
@@ -7701,6 +7704,7 @@ void get_font_fallbacks(font_family_t* p, const void* str8, int len, bool rtl, s
 	if (str0 != str)
 	{
 		t.v = (char*)str0; t.len = str - str0;
+		t.v8 = (char*)t.v;
 		t.font = oft0;
 		vstr.push_back(t);
 	}
@@ -7731,6 +7735,7 @@ void get_font_fallbacks16(font_family_t* p, const uint16_t* str16, int len, bool
 			if (str0 != str)
 			{
 				t.v = str0; t.len = str - str0;
+				t.v16 = (char16_t*)t.v;
 				t.font = oft0;
 				vstr.push_back(t);
 			}
@@ -7751,6 +7756,7 @@ void get_font_fallbacks16(font_family_t* p, const uint16_t* str16, int len, bool
 		{
 			if (oft0 && str0 != str) {
 				t.v = str0; t.len = str - str0;
+				t.v16 = (char16_t*)t.v;
 				t.font = oft0;
 				str0 = str;
 				vstr.push_back(t);
@@ -7763,6 +7769,7 @@ void get_font_fallbacks16(font_family_t* p, const uint16_t* str16, int len, bool
 	if (str0 != str)
 	{
 		t.v = str0; t.len = str - str0;
+		t.v16 = (char16_t*)t.v;
 		t.font = oft0;
 		vstr.push_back(t);
 	}
@@ -7771,11 +7778,11 @@ void get_font_fallbacks16(font_family_t* p, const uint16_t* str16, int len, bool
 
 void update_text(text_render_o* p, text_block* tb)
 {
-	if (!p || !tb || !tb->style)return;
+	if (!p || !tb || !tb->style.family)return;
 	std::vector<hb_tag_t> vv;
 	text_render_clear(p);
 	auto& vstr = p->_block;
-	auto t = tb->style;
+	auto t = &tb->style;
 	text_set_bidi(p, tb->str, tb->first, tb->size);
 	do {
 		if (p->box.auto_break)
@@ -7823,7 +7830,7 @@ void update_text(text_render_o* p, text_block* tb)
 				kk = md::utf16_to_unicode(((uint16_t*)nstr), &ch);
 			font_item_t git = {};
 			git.cpt = ch;
-			git.user_ptr = bidx;
+			git.block_idx = bidx;
 			if (git.cpt == '\t' && git.advance < 1)
 			{
 				git.advance = t->fontsize;
@@ -7859,7 +7866,7 @@ void update_text(text_render_o* p, text_block* tb)
 			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
 			git._dwpos += offset;
 			git.advance = pos->x_advance;// ceil(pos->x_advance * scale_h);
-			git.user_ptr = bidx /*+ gt.cluster*/;
+			git.block_idx = bidx /*+ gt.cluster*/;
 			git.cpt = ch;
 
 			p->ov.insert(git._image);
@@ -7902,7 +7909,7 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 	c4.z = 0;
 	for (auto& it : p->_vstr)
 	{
-		if (it.user_ptr == cline)
+		if (it.block_idx == cline)
 		{
 			c4.x += it.advance;
 		}
@@ -7911,7 +7918,7 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 			b_data.push_back(c4);
 			c4.x = it.advance;
 			c4.z = ct;
-			cline = it.user_ptr;
+			cline = it.block_idx;
 		}
 		if (it.cpt == '\n')
 		{
@@ -7919,7 +7926,7 @@ void text_render_layout1(text_render_o* p, flex_data* boxflex) {
 			b_data.push_back(c4);
 			c4.x = it.advance;
 			c4.z = ct;
-			cline = it.user_ptr + 1;
+			cline = it.block_idx + 1;
 			line_data.push_back(b_data);
 			b_data.clear();
 			rct.x = std::max(rct.x, xxx);
@@ -8030,21 +8037,399 @@ void text_t1_set(text_t1* p, text_box_t* box)
 void build_text_t1(text_t1* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
 {
 	if (!p)return;
-	text_style& ts = p->ts;
+	// 文本块
+	text_block& tb = p->tb;
+	text_style& ts = tb.style;
 	if (family)
 		ts.family = family;
 	if (fontsize > 0)
 		ts.fontsize = fontsize;
 	ts.color = color;
-	// 文本块
-	text_block& tb = p->tb;
-	tb.style = &ts;
 	tb.str = (char*)str;
 	tb.first = first;
 	tb.size = size;
 	build_text_render(&tb, &p->trt, p->fdt);
 }
- 
+
+void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt)
+{
+	if (!p || !(box && fdt))return;
+	if (box)
+	{
+		p->box = *box;
+	}
+	if (fdt)
+	{
+		p->flex = fdt;
+	}
+}
+
+void rt_clear(rich_text_t* p)
+{
+	if (p)
+	{
+		p->tbs.clear();
+		p->ibs.clear();
+		p->data_index.clear();
+		p->layout._vstr.clear();
+	}
+}
+
+void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
+{
+	if (!p || !str || !family || !fontsize)return;
+	auto idx = p->data_index.size();
+	auto& ut = p->layout.temp_map[idx];
+	if (size > 0)
+		ut.str.assign((char*)str + first, size);
+	else
+		ut.str = (char*)str + first;
+	text_block tb = {};
+	tb.str = (char*)ut.str.c_str();
+	tb.baseline = 0;
+	tb.first = 0;
+	tb.size = ut.str.size();
+	tb.style.color = color;
+	tb.style.family = family;
+	tb.style.fontsize = fontsize;
+	auto tidx = p->tbs.size();
+	p->tbs.push_back(tb);
+	p->data_index.push_back({ tidx ,-1 });
+
+}
+
+void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
+{
+	if (!p)return;
+	image_block ib = {};
+	ib.color = color;			// 颜色混合
+	ib.img = img;			// 图片对象
+	ib.pos = pos;					// 用户设置坐标
+	ib.rc = rc;					// 图片区域
+	ib.dsize = dsize;	// 渲染大小
+	ib.sliced = sliced;			// 九宫格图片
+	ib.abspos = abspos;				// 是否固定坐标则不参与布局
+	auto tidx = p->ibs.size();
+	p->ibs.push_back(ib);
+	p->data_index.push_back({ -1, tidx });
+}
+
+
+
+void rt_bidi(std::u16string* bidi_str, std::vector<bidi_item>& bv, const char* str, size_t first, size_t count/*, font_family_t* family*/)
+{
+	auto t = md::utf8_char_pos(str, first, count);
+	auto te = t + count;
+	bv.clear(); bidi_str->clear();
+	auto n = md::u8_u16p(t, count, bidi_str);
+	if (!n)
+		return;
+	const uint16_t* str1 = (const uint16_t*)bidi_str->c_str();
+	do_bidi((UChar*)str1, n, bv);
+	std::stable_sort(bv.begin(), bv.end(), [](const bidi_item& bi, const bidi_item& bi1) { return bi.first < bi1.first; });
+
+	return;
+}
+void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
+{
+	if (!pt || !rt)return;
+	std::vector<hb_tag_t> vv;
+	text_block* tb = &rt->tbs[tb_idx];
+	if (!tb->style.family)return;
+	auto& ut = pt->temp_map[tb_idx];
+	auto p = &ut;
+	auto& vstr = p->_block;
+	auto t = &tb->style;
+	rt_bidi(&p->bidi_str, p->bv, tb->str, tb->first, tb->size);
+	auto str16 = (uint16_t*)p->bidi_str.c_str();
+	auto& ov = pt->ov;
+	auto& _vstr = pt->_vstr;
+	auto& box = rt->box;
+	vstr.clear();
+	do {
+		if (box.auto_break)
+		{
+			break_c bkc = {};
+			auto bk = init_break(&bkc, 0, 0, box.word_wrap); // 创建icu断行
+			if (bk)
+			{
+				for (auto& it : p->bv)
+				{
+					listWordBoundaries(bk, str16 + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len) {
+						get_font_fallbacks16(t->family, str, len, it.rtl, vstr);
+						});
+				}
+				close_break(bk);
+				break;
+			}
+		}
+		// 不执行断行或无自动换行时，查询字体
+		for (auto& it : p->bv) { get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr); }
+	} while (0);
+	auto bwp = p->bidi_str.c_str();
+	for (auto& kt : vstr)
+	{
+		if (kt.font)
+		{
+			font_t::GlyphPositions gp = {};// 执行harfbuzz 
+			kt.font->set_hb_fontsize(t->fontsize);
+			auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
+			kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
+		}
+	}
+	int dh = tb->line_height;
+	int baseline = tb->baseline;
+	size_t bidx = 0;
+	for (auto& kt : vstr)
+	{
+		char* nstr = (char*)kt.v;
+		if (!kt.font) {
+			uint32_t ch = 0;
+			int kk = 0;
+			if (kt.type == 8)
+				kk = md::utf8_to_unicode(nstr, &ch);
+			else if (kt.type == 16)
+				kk = md::utf16_to_unicode(((uint16_t*)nstr), &ch);
+			fitem_t kit = {};
+			font_item_t& git = kit.f;
+			git.cpt = ch;
+			git.block_idx = bidx;
+			if (git.cpt == '\t' && git.advance < 1)
+			{
+				git.advance = t->fontsize;
+			}
+			_vstr.push_back(kit);
+			bidx++;
+			continue;
+		}
+		double scale_h = kt.font->get_scale(t->fontsize);
+		uint32_t color = -1;
+		if (tb->line_height == 0)
+		{
+			int h = kt.font->get_line_height(t->fontsize);
+			dh = std::max(dh, h);
+		}
+		if (tb->baseline == 0)
+		{
+			int bl = kt.font->get_base_line(t->fontsize);
+			baseline = std::max(baseline, bl);
+		}
+		// 光栅化glyph index并缓存
+		for (auto& gt : kt._tnpos)
+		{
+			auto pos = &gt;
+			uint32_t ch = 0;
+			int kk = 0;
+			if (kt.type == 8)
+				kk = md::utf8_to_unicode(nstr + pos->cluster, &ch);
+			else if (kt.type == 16)
+				kk = md::utf16_to_unicode(((uint16_t*)nstr) + pos->cluster, &ch);
+			assert(kk > 0);
+			auto git = kt.font->get_glyph_item(pos->index, ch, t->fontsize);
+			glm::vec2 offset = { ceil(pos->x_offset * scale_h), -ceil(pos->y_offset * scale_h) };
+			git._dwpos += offset;
+			git.advance = pos->x_advance;
+			git.block_idx = bidx;
+			git.cpt = ch;
+			ov.insert(git._image);
+			fitem_t kit = {};
+			kit.f = git;
+			_vstr.push_back(kit);
+		}
+		bidx++;
+	}
+	tb->line_height = dh;
+	tb->baseline = baseline;
+	return;
+}
+void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
+	if (!p)return;
+
+	glm::vec2 rct = {};
+	float xxx = 0;
+	int line_count = 0;
+	auto& box = r->box;
+	auto ta = box.text_align;
+	auto& _vstr = p->_vstr;
+	int baseline = 0;
+	int line_height = 0;
+	glm::vec2 tps = {};
+	glm::ivec4 rc = box.rc;
+	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,baseline };
+	flex_data tf[2] = {};
+	if (boxflex)
+	{
+		tf[0] = *boxflex;
+	}
+	std::vector<node_dt> fv;
+	std::vector<glm::ivec3> linex;
+	fv.resize(_vstr.size() + 1);
+	node_dt* fnode = fv.data();
+	tf->wrap = box.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
+	size_t ct = 0, ct1 = 0;
+	size_t cbidx = 0;
+	std::vector<glm::ivec4> b_data;
+	std::vector<std::vector<glm::ivec4>> line_data;
+	glm::ivec4 c4 = {};// x宽，y高，z起始索引，w结束索引
+	c4.y = line_height;
+	c4.z = 0;
+	for (auto& ft : p->_vstr)
+	{
+		if (ft.i.ctype == 1)	// 图片占位符
+		{
+			auto img = ft.i.ib;
+			if (img->abspos)
+			{
+
+			}
+			else {
+				if (cbidx >= 0)
+				{
+					c4.w = ct;
+					b_data.push_back(c4);
+				}
+				glm::ivec4 c = {};
+				c.x = img->dsize.x;
+				c.y = img->dsize.y;
+				c.z = c.w = ct;
+				b_data.push_back(c);
+				cbidx = -1;
+			}
+		}
+		// 文本分行
+		else if (ft.f.ctype == 0) {
+			auto& it = ft.f;
+			if (it.block_idx == cbidx)
+			{
+				c4.x += it.advance;
+			}
+			else {
+				c4.w = ct;
+				b_data.push_back(c4);
+				c4.x = it.advance;
+				c4.z = ct;
+				cbidx = it.block_idx;
+			}
+			if (it.cpt == '\n')
+			{
+				c4.w = ct;
+				b_data.push_back(c4);
+				c4.x = it.advance;
+				c4.z = ct;
+				cbidx = it.block_idx + 1;
+				line_data.push_back(b_data);
+				b_data.clear();
+				rct.x = std::max(rct.x, xxx);
+				line_count++;
+				linex.push_back({ ct1,ct,xxx });
+				ct1 = ct; xxx = 0;
+			}
+			else
+			{
+				xxx += it.advance;
+			}
+		}
+		ct++;
+	}
+	if (c4.z != ct) {
+		c4.w = ct;
+		b_data.push_back(c4);
+	}
+	if (b_data.size())
+	{
+		line_data.push_back(b_data);
+	}
+	if (xxx > 0) {
+		line_count++;
+		linex.push_back({ ct1,ct,xxx });
+	}
+	rct.x = std::max(rct.x, xxx);
+	rct.y = line_count * line_height;
+	if (rc.z < 0) {
+		rc.z = rct.x;
+	}
+	if (rc.w < 0) {
+		rc.w = rct.y;
+	}
+	fnode->size = glm::vec2(rc.z, rc.w);
+	auto ps = bearing;
+	ps.x += rc.x;
+	ps.y += rc.y;
+	int64_t yh = 0;
+	auto lc = line_data.size();
+	size_t xp = 0;
+	auto kt = _vstr.data();
+	for (size_t i = 0; i < lc; i++)
+	{
+		auto& it = line_data[i];
+		fnode->child = fnode + 1 + xp;
+		fnode->child_count = it.size();
+		fnode->line_count = 0;
+		fnode->size.y = 0;
+		xp += it.size();
+		fnode->baseline = baseline;
+		auto t = fnode->child;
+		for (size_t e = 0; e < fnode->child_count; e++, t++)
+		{
+			auto vt = it[e];
+			t->size = glm::vec2(vt.x, vt.y);
+			t->baseline = baseline;
+			t->index = 1;
+		}
+		auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
+		for (size_t y = 0; y < fnode->child_count; y++)
+		{
+			auto t0 = fnode->child + y;
+			auto& bt = it[y];
+			glm::vec2 vps2 = t0->frame;
+			auto pos = ps + vps2;
+			size_t px = 0;
+			pos.y += yh;
+			for (size_t q = bt.z; q < bt.w; q++)
+			{
+				auto dt0 = kt + q;
+				switch (dt0->i.ctype)
+				{
+				case 0:
+				{
+					auto& dt = dt0->f;
+					dt._apos = pos;
+					dt._apos.x += px;
+					px += dt.advance;
+				}break;
+				case 1:
+				{
+					auto& dt = dt0->i.ib;
+					dt->layout_pos = pos;
+				}break;
+				}
+			}
+		}
+		yh += nrc.w;
+	}
+	return;
+}
+
+void rt_build(rich_text_t* p)
+{
+	if (!p)return;
+	auto pt = &p->layout;
+	for (auto& it : p->data_index) {
+		if (it.x >= 0)
+		{
+			rt_update_text(p, pt, it.x);
+		}
+		if (it.y >= 0)
+		{
+			fitem_t kit = {};
+			kit.i.ctype = 1;
+			kit.i.ib = &p->ibs[it.y];
+			pt->_vstr.push_back(kit); // 占位图片
+		}
+	}
+	rt_layout1(p, pt, p->flex);
+}
+
 /*
 [
   { "text": "标题", "bold": true, "size": 24 },
@@ -8321,7 +8706,7 @@ void c_render_data(text_render_o* p, image_ptr_t* dst)
 	std::vector<font_item_t>& tm = p->_vstr;
 	text_image_t opt = {};
 	int xx = 0;
-	uint32_t color = p->tb->style->color;
+	uint32_t color = p->tb->style.color;
 	for (auto& git : tm) {
 		if (git._image) {
 			auto ps = git._dwpos + git._apos;

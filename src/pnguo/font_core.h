@@ -332,19 +332,20 @@ void free_fonts_ctx(font_rctx* p);
 struct font_item_t
 {
 public:
-	image_ptr_t* _image = nullptr;		// 排列int width,height,v2pad,data  
+	int ctype;	// 0文本，1图片对象
 	uint32_t _glyph_index = 0;
-	// 原始的advance
-	int advance = 0;
-	size_t user_ptr;
+	image_ptr_t* _image = nullptr;		// 排列int width,height,v2pad,data  
 	// 渲染偏移坐标
 	glm::ivec2 _dwpos = {};
+	glm::ivec2 _apos = {};// 布局坐标
 	// 缓存位置xy, 字符图像zw(width,height)
 	glm::ivec4 _rect = {};
-	glm::ivec2 _apos = {};// 布局坐标
+	// 原始的advance
+	int advance = 0;
 	// 彩色字体时用
 	uint32_t color = 0;
 	uint32_t cpt = 0;
+	uint32_t block_idx = 0;
 };
 /*
 	LINE_CAP_BUTT,0
@@ -622,7 +623,7 @@ struct text_block
 {
 	int ctype = 0;
 	int line_height = 0;    // 行高，0则使用字体默认行高
-	text_style* style = 0;
+	text_style style = {};
 	const char* str = 0; size_t first = 0; size_t size = 0;
 	int baseline = 0;       // 基线偏移，0则使用字体默认基线
 };
@@ -631,7 +632,7 @@ struct image_block
 {
 	int ctype = 1;
 	uint32_t color = -1;			// 颜色混合
-	image_ptr_t* img = 0;
+	image_ptr_t* img = 0;			// 图片对象
 	glm::ivec2 pos;					// 用户设置坐标
 	glm::ivec2 layout_pos;			// 布局坐标
 	glm::vec4 rc;					// 图片区域
@@ -640,6 +641,7 @@ struct image_block
 	bool abspos = true;				// 是否固定坐标则不参与布局
 };
 
+// 整形结果
 struct strfont_t {
 	void* v = 0;		// 字符数据指针，类型由type指定
 	size_t len = 0;		// 字符数量
@@ -647,6 +649,8 @@ struct strfont_t {
 	int8_t type = 8;	// 字符串类型，8=utf8,16=utf16,32=utf32
 	std::vector<font_t::GlyphPosition> _tnpos;	// 输出hb获取的字形位置数据
 	font_t* font = 0;	// 字符串使用的字体对象
+	char16_t* v16 = 0;
+	char* v8 = 0;
 };
 // 文本渲染对象
 struct text_render_o
@@ -668,24 +672,45 @@ void c_render_data(text_render_o* p, image_ptr_t* dst);
 
 // 文本对象
 struct text_t1 {
-	text_style ts = {};
 	text_block tb = {};
 	text_render_o trt = {};
 	flex_data* fdt = 0;
 };
 void text_t1_set(text_t1* p, text_box_t* box);
 void build_text_t1(text_t1* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
-// 图文对象
-struct rich_text_t {
-	text_box_t box = {};			// *文本区域信息
-	std::vector<font_item_t> _vstr;	// *渲染数据
-	std::set<image_ptr_t*> ov;		// *用到的字体纹理对象
-	std::vector<text_block> tbs;	// *文本块信息
 
+
+struct text_temp_t {
 	std::vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
 	std::vector<bidi_item> bv;		// 存放bidi后的数据
 	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
+	std::string str;
 };
+
+struct image_t1 {
+	int ctype;
+	image_block* ib;
+};
+union fitem_t {
+	font_item_t f;
+	image_t1 i;
+};
+struct layout_block_st {
+	std::vector<fitem_t> _vstr;	// *渲染数据
+	std::set<image_ptr_t*> ov;		// *用到的字体纹理对象
+	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
+};
+// 图文对象
+struct rich_text_t {
+	text_box_t box = {};			// *文本区域信息
+	flex_data* flex = 0;			// *flex布局参数
+	std::vector<text_block> tbs;	// *文本块信息
+	std::vector<image_block> ibs;	// *图片块信息
+	std::vector<glm::ivec2> data_index;	// *文本块和图片块在渲染数据中的索引位置，x为文本块索引，y为图片块索引，-1则不使用
+	layout_block_st layout = {};	// *布局结果数据
+	bool tex_batch = true;
+};
+
 // 设置文本区域参数，flex参数可选，提供排版设置等参数
 void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt = 0);
 // 清除文本/图片，保留区域参数等设置
@@ -695,7 +720,7 @@ void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_fami
 // 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 
-
+void rt_build(rich_text_t* p);
 
 
 typedef enum {
