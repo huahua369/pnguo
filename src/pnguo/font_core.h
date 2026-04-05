@@ -616,13 +616,28 @@ struct text_box_t {
 	int8_t word_wrap = 0;	// 0字符换行，1单词换行，2换行点，3句子断开，4标题大小写断点
 	int8_t ellipsis = 0;	// 省略号
 };
+// ctype:0文本，1图片
 // 文本块
 struct text_block
 {
+	int ctype = 0;
+	int line_height = 0;    // 行高，0则使用字体默认行高
 	text_style* style = 0;
 	const char* str = 0; size_t first = 0; size_t size = 0;
-	int line_height = 0;    // 行高，0则使用字体默认行高
 	int baseline = 0;       // 基线偏移，0则使用字体默认基线
+};
+
+struct image_block
+{
+	int ctype = 1;
+	uint32_t color = -1;			// 颜色混合
+	image_ptr_t* img = 0;
+	glm::ivec2 pos;					// 用户设置坐标
+	glm::ivec2 layout_pos;			// 布局坐标
+	glm::vec4 rc;					// 图片区域
+	glm::vec2 dsize = { -1,-1 };	// 渲染大小
+	glm::vec4 sliced = {};			// 九宫格图片
+	bool abspos = true;				// 是否固定坐标则不参与布局
 };
 
 struct strfont_t {
@@ -677,38 +692,10 @@ void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt = 0);
 void rt_clear(rich_text_t* p);
 // 添加文本
 void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
-// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、是否固定坐标不参与布局等参数
+// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 
-struct image_block
-{
-	image_ptr_t* img = 0;
-	glm::ivec2 pos;					// 渲染位置*排版设置
-	glm::vec4 rc;					// 图片区域
-	glm::vec2 dsize = { -1,-1 };	// 渲染大小
-	glm::vec4 sliced = {};			// 九宫格图片
-	uint32_t color = -1;			// 颜色混合
-};
-struct lay_value
-{
-	union {
-		std::vector<font_item_t>* v = 0;
-		image_block* img;
-	}d;
-	text_block* tb = 0;
-	int type = 0;
-	int8_t abspos = 0;	// 图片固定坐标不参与布局
-};
-struct layout_tx
-{
-	text_box_t box = {};
-	std::vector<lay_value> value;
-	std::vector<image_block> rd;
-};
-// 图文布局
-void text_multi_add(layout_tx* p, text_render_o* t);
-void text_multi_add_i(layout_tx* p, image_block* t, bool abspos);
-void text_multi_layout(layout_tx* p);
+
 
 
 typedef enum {

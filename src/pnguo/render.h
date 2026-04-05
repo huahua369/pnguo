@@ -257,10 +257,8 @@ public:
 	~clicprect_cx();
 };
 
-// 渲染一组图文列表
-void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt);
-// 渲染一段文本
 void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);
+// 渲染一段文本
 void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
 // 释放渲染器的纹理
 void r_render_free_tex(sdl3_textdata* p);

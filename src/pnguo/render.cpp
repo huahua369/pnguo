@@ -240,8 +240,7 @@ glm::mat3x2 vkvg_ctx::get_matrix()
 }
 
 vkvg_dev::vkvg_dev()
-{
-}
+{}
 
 vkvg_dev::~vkvg_dev()
 {
@@ -1378,7 +1377,7 @@ clicprect_cx::~clicprect_cx()
 		rcb->set_cliprect(_renderer, &oldrc);
 	}
 }
-
+#if 0
 void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 {
 	void* renderer = pt->rptr;
@@ -1386,7 +1385,7 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 	uint32_t color = -1;
 	const int vsize = sizeof(text_vx);
 	void* tex = 0;
-	bool devrtex = (pt->rcb->set_texture_color4 && pt->rcb->render_texture);
+	bool devrtex = !p->tex_batch && (pt->rcb->set_texture_color4 && pt->rcb->render_texture);
 	auto rect = p->box.rc;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = pos;
@@ -1445,7 +1444,7 @@ void r_render_data(layout_tx* p, const glm::vec2& pos, sdl3_textdata* pt)
 		pt->idx.clear();
 	}
 }
-
+#endif
 void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
 {
 	std::vector<font_item_t>& tm = p->_vstr;
