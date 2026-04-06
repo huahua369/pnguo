@@ -815,7 +815,7 @@ int main()
 			printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
 		}
 
-		glm::ivec2 ws = { 1280,860 };
+		glm::ivec2 ws = dpis[4];// { 1280, 860 };
 		const char* wtitle = (char*)u8"窗口0";
 		const char* wtitle1 = (char*)u8"窗口1";
 		auto devname = "Intel(R)";
@@ -933,7 +933,7 @@ int main()
 					vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toUInt(it["instanceCount"], 1.0), hz::toBool(it["shadowMap"]));
 				}
 			}
-			vkd->resize(dpis[4]);				// 设置fbo缓冲区大小
+			vkd->resize(ws);				// 设置fbo缓冲区大小
 			auto vki = vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 			/*
 			case 0: return AMDTonemapper(color);
@@ -1046,7 +1046,9 @@ int main()
 					vkd->update(form0->io);	// 更新事件
 					{
 						rt_clear(mtext);
+						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
+						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 1.5,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
@@ -1058,9 +1060,9 @@ int main()
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
-
-						auto img = fctx->bcc._data[0];
-						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64,16 }, {}, true);
+						static glm::ivec2 imgpos = { 100,100 };
+						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 1.5,64 }, imgpos, true);
+						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 
 						rt_build(mtext);
 						r_update_textdata(mtext, td3, 0);

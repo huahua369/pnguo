@@ -8286,7 +8286,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 	node_dt* fnode = fv.data();
 	tf->wrap = box.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
 	size_t ct = 0, ct1 = 0;
-	size_t cbidx = 0;
+	int64_t cbidx = 0;
 	std::vector<glm::ivec4> b_data;
 	std::vector<std::vector<glm::ivec4>> line_data;
 	glm::ivec4 c4 = {};// x宽，y高，z起始索引，w结束索引 
@@ -8304,46 +8304,47 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 		if (ft.i.ctype == 1)	// 图片占位符
 		{
 			auto img = ft.i.ib;
-			cbidx = -1;
+			if (cbidx >= 0)
+			{
+				c4.w = ct;
+				b_data.push_back(c4);
+				c4.z = c4.w = -1;
+			}
 			if (img->abspos)
 			{
 
 			}
 			else {
-				if (cbidx >= 0)
-				{
-					c4.w = ct;
-					c4.y = blhv[line_count].y;
-					b_data.push_back(c4);
-				}
 				glm::ivec4 c = {};
 				c.x = img->dsize.x;
 				c.y = img->dsize.y;
-				c.z = c.w = ct;
+				c.z = ct;
+				c.w = ct + 1;
 				// 图片高
 				line_height = std::max(c.y, line_height);
 				b_data.push_back(c);
 			}
+			cbidx = -1;
 		}
 		// 文本分行
 		else if (ft.f.ctype == 0) {
 			auto& it = ft.f;
 			c4.w = ct;
+			auto& tbm = tmd[it.tb_idx];
+			auto& bk = tbm._block[it.block_idx];
+			baseline = std::max(bk.baseline, baseline);
+			line_height = std::max(bk.lineheight, line_height);
 			if (it.block_idx == cbidx)
 			{
 				c4.x += it.advance;
 			}
 			else {
-				c4.y = blhv[line_count].y;
+				c4.y = line_height;
 				b_data.push_back(c4);
 				c4.x = it.advance;
 				c4.z = ct;
 				cbidx = it.block_idx;
 			}
-			auto& tbm = tmd[it.tb_idx];
-			auto& bk = tbm._block[it.block_idx];
-			baseline = std::max(bk.baseline, baseline);
-			line_height = std::max(bk.lineheight, line_height);
 			if (it.cpt == '\n')
 			{
 				blhv[line_count].x = baseline;

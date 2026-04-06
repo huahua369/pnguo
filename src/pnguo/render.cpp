@@ -1427,6 +1427,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = pos;
 	rect.x += pos.x; rect.y += pos.y;
+	pos0.x += rect.x; pos0.y += rect.y;
 	auto& tm = p->layout._vstr;
 	auto tbp = p->tbs.data();
 	clicprect_cx cp(renderer, pt->rcb, rect); // 设置裁剪区域
@@ -1436,7 +1437,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
 			auto& tp = pt->vt[it.img];
-			if (tex != tp)
+			if (tex != tp || devrtex)
 			{
 				if (tex && pt->opt.size()) {
 					auto nv = pt->opt.size();
