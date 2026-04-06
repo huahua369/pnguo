@@ -1001,10 +1001,10 @@ int main()
 			auto ptb = new text_t1();
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
-			tbox.rc = { 10,320,1500,600 };
-			text_t1_set(ptb1, &tbox);
 			auto mtext = new rich_text_t();
 			rt_set(mtext, &tbox, 0);
+			tbox.rc = { 10,320,1500,600 };
+			text_t1_set(ptb1, &tbox);
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1021,7 +1021,7 @@ int main()
 					//sp_drawable_draw(dd1); // spine动画
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
-					r_render_textdata(mtext, { 100,100 }, td3);
+					r_render_textdata(mtext, { 0,0 }, td3);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1047,7 +1047,7 @@ int main()
 					{
 						rt_clear(mtext);
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
-						//rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						build_text_t1(ptb, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
 						build_text_t1(ptb1, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
@@ -1060,7 +1060,7 @@ int main()
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 
 						auto img = fctx->bcc._data[0];
-						rt_add_image(mtext, img, { 0,0,100,100 }, {}, -1, { 100,100 }, {}, true);
+						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64,16 }, {}, true);
 
 						rt_build(mtext);
 						r_update_textdata(mtext, td3, 0);

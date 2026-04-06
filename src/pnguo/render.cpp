@@ -1428,6 +1428,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 	glm::ivec2 pos0 = pos;
 	rect.x += pos.x; rect.y += pos.y;
 	auto& tm = p->layout._vstr;
+	auto tbp = p->tbs.data();
 	clicprect_cx cp(renderer, pt->rcb, rect); // 设置裁剪区域
 	for (auto& vt : tm) {
 		if (vt.i.ctype)
@@ -1435,7 +1436,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
 			auto& tp = pt->vt[it.img];
-			if (!devrtex && tex != tp)
+			if (tex != tp)
 			{
 				if (tex && pt->opt.size()) {
 					auto nv = pt->opt.size();
@@ -1495,11 +1496,12 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
+				color = tbp[git.tb_idx].style.color;
 				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
 			}
 		}
 	}
-	if (!devrtex && tex && pt->opt.size()) {
+	if (tex && pt->opt.size()) {
 		auto nv = pt->opt.size();
 		pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
 			((float*)&pt->opt.data()->uv), vsize, nv
@@ -1589,6 +1591,9 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 				((float*)&pt->opt.data()->uv), vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
 		}
 	}
+
+	pt->opt.clear();
+	pt->idx.clear();
 }
 
 void r_render_free_tex(sdl3_textdata* p)

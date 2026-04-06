@@ -346,6 +346,7 @@ public:
 	uint32_t color = 0;
 	uint32_t cpt = 0;
 	uint32_t block_idx = 0;
+	uint32_t tb_idx = 0;
 };
 /*
 	LINE_CAP_BUTT,0
@@ -645,12 +646,14 @@ struct image_block
 struct strfont_t {
 	void* v = 0;		// 字符数据指针，类型由type指定
 	size_t len = 0;		// 字符数量
-	bool rtl = false;	// 是否从右向左
-	int8_t type = 8;	// 字符串类型，8=utf8,16=utf16,32=utf32
 	std::vector<font_t::GlyphPosition> _tnpos;	// 输出hb获取的字形位置数据
 	font_t* font = 0;	// 字符串使用的字体对象
 	char16_t* v16 = 0;
 	char* v8 = 0;
+	int baseline = 0;
+	int lineheight = 0;
+	bool rtl = false;	// 是否从右向左
+	int8_t type = 8;	// 字符串类型，8=utf8,16=utf16,32=utf32
 };
 // 文本渲染对象
 struct text_render_o
@@ -699,6 +702,8 @@ struct layout_block_st {
 	std::vector<fitem_t> _vstr;	// *渲染数据
 	std::set<image_ptr_t*> ov;		// *用到的字体纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
+	std::vector<glm::ivec2> baselines;	// 每行的基线，行高
+	size_t line_count = 0;
 };
 // 图文对象
 struct rich_text_t {

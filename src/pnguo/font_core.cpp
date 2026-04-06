@@ -3265,7 +3265,7 @@ font_item_t* font_t::push_gcache(uint32_t glyph_index, uint32_t height, image_pt
 			cache_data.push_back(new font_item_t[ccount]);
 			cache_count = ccount;
 		}
-		auto npt = cache_data.rbegin();		
+		auto npt = cache_data.rbegin();
 		pt = *npt;
 		pt += ccount - cache_count;
 		*pt = {};
@@ -8053,7 +8053,7 @@ void build_text_t1(text_t1* p, const void* str, int size, int first, font_family
 
 void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt)
 {
-	if (!p || !(box && fdt))return;
+	if (!p || !(box || fdt))return;
 	if (box)
 	{
 		p->box = *box;
@@ -8072,6 +8072,8 @@ void rt_clear(rich_text_t* p)
 		p->ibs.clear();
 		p->data_index.clear();
 		p->layout._vstr.clear();
+		p->layout.temp_map.clear();
+		p->layout.baselines.clear();
 	}
 }
 
@@ -8179,6 +8181,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 	}
 	int dh = tb->line_height;
 	int baseline = tb->baseline;
+	bool last_is_break = false;
 	size_t bidx = 0;
 	for (auto& kt : vstr)
 	{
@@ -8198,22 +8201,33 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 			{
 				git.advance = t->fontsize;
 			}
+			if (ch == '\n')
+			{
+				pt->line_count++;
+				//pt->baselines.push_back({ baseline, dh });
+				dh = tb->line_height;
+				baseline = tb->baseline;
+				last_is_break = false;
+			}
 			_vstr.push_back(kit);
 			bidx++;
 			continue;
 		}
+		last_is_break = true;
 		double scale_h = kt.font->get_scale(t->fontsize);
 		uint32_t color = -1;
+		int h = kt.font->get_line_height(t->fontsize);
 		if (tb->line_height == 0)
 		{
-			int h = kt.font->get_line_height(t->fontsize);
 			dh = std::max(dh, h);
 		}
+		int bl = kt.font->get_base_line(t->fontsize);
 		if (tb->baseline == 0)
 		{
-			int bl = kt.font->get_base_line(t->fontsize);
 			baseline = std::max(baseline, bl);
 		}
+		kt.baseline = bl;
+		kt.lineheight = h;
 		// 光栅化glyph index并缓存
 		for (auto& gt : kt._tnpos)
 		{
@@ -8231,6 +8245,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 			git.advance = pos->x_advance;
 			git.block_idx = bidx;
 			git.cpt = ch;
+			git.tb_idx = tb_idx;
 			ov.insert(git._image);
 			fitem_t kit = {};
 			kit.f = git;
@@ -8238,10 +8253,14 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 		}
 		bidx++;
 	}
+	if (last_is_break)
+		pt->line_count++;
+	//	pt->baselines.push_back({ baseline, dh });
 	tb->line_height = dh;
 	tb->baseline = baseline;
 	return;
 }
+
 void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 	if (!p)return;
 
@@ -8270,14 +8289,22 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 	size_t cbidx = 0;
 	std::vector<glm::ivec4> b_data;
 	std::vector<std::vector<glm::ivec4>> line_data;
-	glm::ivec4 c4 = {};// x宽，y高，z起始索引，w结束索引
+	glm::ivec4 c4 = {};// x宽，y高，z起始索引，w结束索引 
 	c4.y = line_height;
 	c4.z = 0;
+	auto& tmd = p->temp_map;
+	size_t cline = 0;
+
+	p->baselines.resize(p->line_count);
+	auto blhv = p->baselines.data();
+	auto blct = p->baselines.size();
+
 	for (auto& ft : p->_vstr)
 	{
 		if (ft.i.ctype == 1)	// 图片占位符
 		{
 			auto img = ft.i.ib;
+			cbidx = -1;
 			if (img->abspos)
 			{
 
@@ -8286,33 +8313,42 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 				if (cbidx >= 0)
 				{
 					c4.w = ct;
+					c4.y = blhv[line_count].y;
 					b_data.push_back(c4);
 				}
 				glm::ivec4 c = {};
 				c.x = img->dsize.x;
 				c.y = img->dsize.y;
 				c.z = c.w = ct;
+				// 图片高
+				line_height = std::max(c.y, line_height);
 				b_data.push_back(c);
-				cbidx = -1;
 			}
 		}
 		// 文本分行
 		else if (ft.f.ctype == 0) {
 			auto& it = ft.f;
+			c4.w = ct;
 			if (it.block_idx == cbidx)
 			{
 				c4.x += it.advance;
 			}
 			else {
-				c4.w = ct;
+				c4.y = blhv[line_count].y;
 				b_data.push_back(c4);
 				c4.x = it.advance;
 				c4.z = ct;
 				cbidx = it.block_idx;
 			}
+			auto& tbm = tmd[it.tb_idx];
+			auto& bk = tbm._block[it.block_idx];
+			baseline = std::max(bk.baseline, baseline);
+			line_height = std::max(bk.lineheight, line_height);
 			if (it.cpt == '\n')
 			{
-				c4.w = ct;
+				blhv[line_count].x = baseline;
+				blhv[line_count].y = line_height;
+				c4.y = line_height;
 				b_data.push_back(c4);
 				c4.x = it.advance;
 				c4.z = ct;
@@ -8323,6 +8359,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 				line_count++;
 				linex.push_back({ ct1,ct,xxx });
 				ct1 = ct; xxx = 0;
+				line_height = 0; baseline = 0;
 			}
 			else
 			{
@@ -8331,18 +8368,21 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 		}
 		ct++;
 	}
-	if (c4.z != ct) {
-		c4.w = ct;
-		b_data.push_back(c4);
-	}
-	if (b_data.size())
-	{
-		line_data.push_back(b_data);
-	}
 	if (xxx > 0) {
+		if (c4.z != c4.w) {
+			c4.y = line_height;
+			b_data.push_back(c4);
+		}
+		if (b_data.size())
+		{
+			line_data.push_back(b_data);
+		}
+		blhv[line_count].x = baseline;
+		blhv[line_count].y = line_height;
 		line_count++;
 		linex.push_back({ ct1,ct,xxx });
 	}
+
 	rct.x = std::max(rct.x, xxx);
 	rct.y = line_count * line_height;
 	if (rc.z < 0) {
@@ -8367,13 +8407,15 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 		fnode->line_count = 0;
 		fnode->size.y = 0;
 		xp += it.size();
-		fnode->baseline = baseline;
+		fnode->baseline = blhv[i].x;
 		auto t = fnode->child;
 		for (size_t e = 0; e < fnode->child_count; e++, t++)
 		{
 			auto vt = it[e];
 			t->size = glm::vec2(vt.x, vt.y);
-			t->baseline = baseline;
+			if (vt.y > 30)
+				t = t;
+			t->baseline = fnode->baseline;
 			t->index = 1;
 		}
 		auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
@@ -8395,6 +8437,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 					auto& dt = dt0->f;
 					dt._apos = pos;
 					dt._apos.x += px;
+					dt._apos.y += fnode->baseline;
 					px += dt.advance;
 				}break;
 				case 1:
