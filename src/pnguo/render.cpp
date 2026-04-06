@@ -1393,6 +1393,7 @@ void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta)
 				auto t = pt->rcb->make_tex(renderer, it.img);
 				if (t && t != tp)
 				{
+					pt->rcb->set_texture_blend(t, 0, true);
 					tp = t;
 				}
 			}
@@ -1407,6 +1408,7 @@ void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta)
 					auto t = pt->rcb->make_tex(renderer, git._image);
 					if (t && t != tp)
 					{
+						pt->rcb->set_texture_blend(t, 0, true);
 						tp = t;
 					}
 				}
@@ -1523,7 +1525,10 @@ void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
 			{
 				auto t = pt->rcb->make_tex(pt->rptr, it);
 				if (t && t != tp)
+				{
+					pt->rcb->set_texture_blend(t, 0, true);
 					tp = t;
+				}
 			}
 		}
 	}

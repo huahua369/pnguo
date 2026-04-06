@@ -2493,7 +2493,8 @@ void rgba_copy(image_ptr_t* dst, int x, int y, int w, int h, const uint32_t* dt,
 	auto t = (uint8_t*)dt;
 	for (int iy = 0; iy < copy_h; ++iy) {
 		const uint8_t* src_row = fy ? t + (h - 1 - (src_y + iy)) * stride : t + (src_y + iy) * stride + src_x;
-		memcpy(dst->data + ((dst_y + iy) * dst->width + dst_x), src_row, copy_w * sizeof(uint32_t));
+		auto dstp = dst->data + ((dst_y + iy) * dst->width + dst_x);
+		memcpy(dstp, src_row, copy_w * sizeof(uint32_t));
 	}
 }
 
@@ -2538,7 +2539,11 @@ void rgba_copy2gray(image_ptr_t* dst, int x, int y, int w, int h, uint32_t c, co
 		uint32_t* dst_row = dst->data + ((dst_y + iy) * dst->width + dst_x);
 		for (int ix = 0; ix < copy_w; ++ix) {
 			uint8_t gray = src_row[ix];
-			dst_row[ix] = c | ((uint32_t)gray << 24);
+			if (gray > 0)
+			{
+				auto cc = (uint32_t)(gray << 24) | (gray << 16) | (gray << 8) | gray;
+				dst_row[ix] = cc;
+			}
 		}
 	}
 }
@@ -8076,10 +8081,27 @@ void rt_clear(rich_text_t* p)
 		p->layout.baselines.clear();
 	}
 }
+uint32_t premultiply_rgba(uint32_t color) {
+	// 分解ARGB通道 
+	uint8_t a = (color >> 24) & 0xFF;  // Alpha通道
+	uint8_t b = (color >> 16) & 0xFF;  // Red通道
+	uint8_t g = (color >> 8) & 0xFF;  // Green通道
+	uint8_t r = color & 0xFF;          // Blue通道
 
+	// 预乘计算（避免浮点运算）
+	if (a == 0) return 0;  // 完全透明时直接返回0
+	r = (r * a) / 255;
+	g = (g * a) / 255;
+	b = (b * a) / 255;
+
+	// 重新组合为uint32_t 
+	return (a << 24) | (b << 16) | (g << 8) | r;
+}
 void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
 {
 	if (!p || !str || !family || !fontsize)return;
+	auto cc = premultiply_rgba(color);
+
 	auto idx = p->data_index.size();
 	auto& ut = p->layout.temp_map[idx];
 	if (size > 0)
@@ -8091,7 +8113,7 @@ void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_fami
 	tb.baseline = 0;
 	tb.first = 0;
 	tb.size = ut.str.size();
-	tb.style.color = color;
+	tb.style.color = cc;
 	tb.style.family = family;
 	tb.style.fontsize = fontsize;
 	auto tidx = p->tbs.size();
@@ -8104,7 +8126,7 @@ void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const 
 {
 	if (!p)return;
 	image_block ib = {};
-	ib.color = color;			// 颜色混合
+	ib.color = premultiply_rgba(color);			// 颜色混合
 	ib.img = img;			// 图片对象
 	ib.pos = pos;					// 用户设置坐标
 	ib.rc = rc;					// 图片区域

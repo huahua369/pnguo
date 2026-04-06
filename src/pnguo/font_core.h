@@ -8,6 +8,8 @@
 
 glm::vec4 ucolor2f(uint32_t c);
 glm::vec4 ucolor2fp(const uint32_t* c);
+uint32_t premultiply_rgba(uint32_t color);
+
 struct vertex_f
 {
 	float x, y, cx, cy, cx1, cy1;
