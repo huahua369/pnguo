@@ -1322,7 +1322,7 @@ image_sliced_t new_rect(const rect_shadow_t& rs)
 }
 #endif
 
-void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, uint32_t color, std::vector<text_vx>* opt, std::vector<uint32_t>* idx)
+void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, std::vector<text_vx>* opt, std::vector<uint32_t>* idx)
 {
 	glm::ivec2 tex_size = { img->width,img->height };
 	// 1. 计算矩形顶点（像素坐标）
@@ -1330,10 +1330,16 @@ void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc,
 	glm::ivec2 B = A + glm::ivec2(rc.z, 0); // 右下
 	glm::ivec2 C = A + glm::ivec2(rc.z, rc.w); // 右上
 	glm::ivec2 D = A + glm::ivec2(0, rc.w); // 左上
+	auto ds = dsize;
+	if (!(ds.x > 0 && ds.y > 0))
+	{
+		ds.x = rc.z;
+		ds.y = rc.w;
+	}
 	glm::vec2 A1 = dst_pos;
-	glm::vec2 B1 = dst_pos + glm::ivec2(rc.z, 0);
-	glm::vec2 C1 = dst_pos + glm::ivec2(rc.z, rc.w);
-	glm::vec2 D1 = dst_pos + glm::ivec2(0, rc.w);
+	glm::vec2 B1 = dst_pos + glm::ivec2(ds.x, 0);
+	glm::vec2 C1 = dst_pos + glm::ivec2(ds.x, ds.y);
+	glm::vec2 D1 = dst_pos + glm::ivec2(0, ds.y);
 
 	// 2. 归一化因子
 	float inv_w = 1.0f / static_cast<float>(tex_size.x);
@@ -1476,7 +1482,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 				}
 				else
 				{
-					gen3data(it.img, lpos, it.rc, c, &pt->opt, &pt->idx);
+					gen3data(it.img, lpos, it.rc, it.dsize, c, &pt->opt, &pt->idx);
 					pt->tex = tp;
 				}
 			}
@@ -1500,7 +1506,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
 				color = tbp[git.tb_idx].style.color;
-				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
+				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &pt->opt, &pt->idx);
 			}
 		}
 	}
@@ -1572,7 +1578,7 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
-				gen3data(git._image, ps, git._rect, git.color ? git.color : color, &pt->opt, &pt->idx);
+				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &pt->opt, &pt->idx);
 			}
 		}
 		if (tex && pt->opt.size()) {
