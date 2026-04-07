@@ -1049,7 +1049,7 @@ int main()
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
 						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff22ff22);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
 						// 添加文本
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
