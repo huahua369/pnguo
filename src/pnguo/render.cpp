@@ -1458,7 +1458,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 					texture_dt p = {};
 					p.dst_rect = glm::vec4(lpos, it.dsize);
 					p.src_rect = it.rc;
-					auto c4 = ucolor2f(c);
+					auto c4 = ucolor2fx(c);
 					pt->rcb->set_texture_color4(tex, &c4);
 					pt->rcb->render_texture(renderer, tex, &p, 1);
 				}

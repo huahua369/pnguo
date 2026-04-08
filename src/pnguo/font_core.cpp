@@ -43,6 +43,14 @@
 
 typedef uint16_t Offset16;
 typedef uint32_t Offset32;
+glm::vec4 ucolor2fx(uint32_t color)
+{
+	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
+	float a = c.w;
+	c *= a;
+	c.w = a;
+	return c;
+}
 glm::vec4 ucolor2f(uint32_t color)
 {
 	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
