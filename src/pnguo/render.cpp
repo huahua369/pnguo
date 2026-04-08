@@ -1388,37 +1388,19 @@ void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta)
 {
 	void* renderer = pt->rptr;
 	if (!p || !pt || !renderer)return;
-	auto& tm = p->layout._vstr;
-	for (auto& vt : tm) {
-		if (vt.i.ctype)
-		{
-			auto& it = *vt.i.ib;
-			auto& tp = pt->vt[it.img];
-			if (!tp || it.img->valid)
+	auto& ov = p->layout.ov;
+	for (auto& it : ov)
+	{
+		if (it) {
+			auto& tp = pt->vt[it];
+			if (it->valid || !tp)
 			{
-				auto t = pt->rcb->make_tex(renderer, it.img);
+				auto t = pt->rcb->make_tex(pt->rptr, it);
 				if (t && t != tp)
 				{
 					pt->rcb->set_texture_blend(t, 0, true);
 					tp = t;
 				}
-			}
-
-		}
-		else if (vt.f.ctype == 0) {
-			auto& git = vt.f;
-			if (git._image) {
-				auto& tp = pt->vt[git._image];
-				if (!tp || git._image->valid)
-				{
-					auto t = pt->rcb->make_tex(renderer, git._image);
-					if (t && t != tp)
-					{
-						pt->rcb->set_texture_blend(t, 0, true);
-						tp = t;
-					}
-				}
-
 			}
 		}
 	}

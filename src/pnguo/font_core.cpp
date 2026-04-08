@@ -8331,7 +8331,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 	c4.z = 0;
 	auto& tmd = p->temp_map;
 	size_t cline = 0;
-
+	auto& ov = p->ov;
 	p->baselines.resize(p->line_count);
 	auto blhv = p->baselines.data();
 	auto blct = p->baselines.size();
@@ -8347,6 +8347,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 				b_data.push_back(c4);
 				c4.z = c4.w = -1;
 			}
+			ov.insert(img->img);
 			if (img->abspos)
 			{
 
@@ -8451,8 +8452,6 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 		{
 			auto vt = it[e];
 			t->size = glm::vec2(vt.x, vt.y);
-			if (vt.y > 30)
-				t = t;
 			t->baseline = fnode->baseline;
 			t->index = 1;
 		}

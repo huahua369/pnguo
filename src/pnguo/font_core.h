@@ -701,10 +701,10 @@ union fitem_t {
 	image_t1 i;
 };
 struct layout_block_st {
-	std::vector<fitem_t> _vstr;	// *渲染数据
-	std::set<image_ptr_t*> ov;		// *用到的字体纹理对象
+	std::vector<fitem_t> _vstr;				// *渲染数据
+	std::set<image_ptr_t*> ov;				// *用到的字体纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
-	std::vector<glm::ivec2> baselines;	// 每行的基线，行高
+	std::vector<glm::ivec2> baselines;		// 每行的基线，行高
 	size_t line_count = 0;
 };
 // 图文对象
@@ -728,6 +728,9 @@ size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_fa
 size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 text_block* rt_get_text(rich_text_t* p, size_t idx);
 image_block* rt_get_image(rich_text_t* p, size_t idx);
+/* 构建渲染数据，提供文本块和图片块信息，flex布局参数等，输出渲染数据和用到的纹理对象等。
+	rt_get_text/rt_get_image获取对象指针后修改文本块和图片块信息后需要重新调用rt_build
+*/
 void rt_build(rich_text_t* p);
 
 
