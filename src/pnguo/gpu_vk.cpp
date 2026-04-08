@@ -10075,6 +10075,24 @@ namespace vkg {
 	{
 		refcount++;
 	}
+	void cxObject::commit_params()
+	{}
+	size_t cxObject::get_param_count()
+	{
+		return size_t();
+	}
+	const char** cxObject::get_param_names()
+	{
+		return nullptr;
+	}
+	void* cxObject::get_param(const char* name, int* data_type)
+	{
+		return nullptr;
+	}
+	bool cxObject::get_property(const char* name, int data_type, void* mem, uint64_t size, int mask)
+	{
+		return false;
+	}
 	cxDevice::cxDevice() :cxObject(OBJ_DEVICE)
 	{
 		s_shaderCache = new Cache<VkShaderModule>();
@@ -10595,6 +10613,31 @@ namespace vkg {
 		return r;
 	}
 
+	void cxDevice::commit_params()
+	{}
+
+	size_t cxDevice::get_param_count()
+	{
+		return size_t();
+	}
+
+	const char** cxDevice::get_param_names()
+	{
+		return nullptr;
+	}
+
+	void* cxDevice::get_param(const char* name, int* data_type)
+	{
+		return nullptr;
+	}
+
+	bool cxDevice::get_property(const char* name, int data_type, void* mem, uint64_t size, int mask)
+	{
+		static std::vector<std::string> prop_names = { "queue_count", "queue" };
+		
+		return false;
+	}
+
 
 
 
@@ -10924,22 +10967,26 @@ namespace vkg {
 	void unset_param(aObject object, const char* name) {}
 	void unset_allparams(aObject object) {}
 	// 提交参数
-	void commit_params(aObject object) {}
+	void commit_params(aObject object) {
+		auto c = (cxObject*)object;
+		if (c)
+		{
+			c->commit_params();
+		}
+	}
 	// 获取对象支持的参数名
 	size_t get_param_count(aObject object) {
-
-		//size_t cxDevice::get_queue_count()
-		//VkQueue cxDevice::get_queue(size_t idx)
-		return 0;
+		auto c = (cxObject*)object;
+		return c ? c->get_param_count() : 0;
 	}
 	const char** get_param_names(aObject object) {
-
-		return 0;
+		auto c = (cxObject*)object;
+		return c ? c->get_param_names() : nullptr;
 	}
 	// 获取参数值, data_type返回值类型
 	void* get_param(aObject object, const char* name, int* data_type) {
-
-		return nullptr;
+		auto c = (cxObject*)object;
+		return c ? c->get_param(name, data_type) : nullptr;
 	}
 	// 获取属性
 	bool get_property(aObject object, const char* name, int data_type, void* mem, uint64_t size, int mask) {

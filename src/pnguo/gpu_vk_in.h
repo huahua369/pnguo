@@ -181,6 +181,11 @@ namespace vkg {
 		virtual ~cxObject();
 		int get_release();
 		void retain();
+		virtual void commit_params();
+		virtual size_t get_param_count();
+		virtual const char** get_param_names();
+		virtual void* get_param(const char* name, int* data_type);
+		virtual bool get_property(const char* name, int data_type, void* mem, uint64_t size, int mask);
 	};
 	struct sampler_kt {
 		sampler_info_t info = {};
@@ -246,6 +251,11 @@ namespace vkg {
 
 		size_t get_queue_count();
 		VkQueue get_queue(size_t idx);
+		void commit_params();
+		size_t get_param_count();
+		const char** get_param_names();
+		void* get_param(const char* name, int* data_type);
+		bool get_property(const char* name, int data_type, void* mem, uint64_t size, int mask);
 	};
 
 	/* 第一人称：鼠标旋转、键盘移动、跳
