@@ -822,6 +822,7 @@ int main()
 		devname = 0;
 		adevice3_t* gd = new_gdev(0, 0);
 		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
+
 		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
 
 		auto sampler = gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
@@ -1005,6 +1006,27 @@ int main()
 			rt_set(mtext, &tbox, 0);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
+			std::atomic_int wait2d = 0;
+			std::thread jt([=, &wait2d]() {
+
+#if 1
+				static bool savepng = false;
+				while (1) {
+					auto afilename = savepng ? filename : 0;
+					if (wait2d == 0) {
+						test_drawvkvg(ctx, surf, bs, afilename);
+						wait2d = 1;
+					}
+					if (savepng)
+					{
+						savepng = false;
+					}
+					Sleep(1);
+				}
+#endif
+
+				});
+			jt.detach();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					texture_dt tdt = {};
@@ -1016,25 +1038,16 @@ int main()
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						//pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
+						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
 					//sp_drawable_draw(dd1); // spine动画
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
 					r_render_textdata(mtext, { 0,0 }, td3);
 				};
-			form0->up_cb = [=](float delta, int* ret)
+			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
 					int d = delta * 1000;
-#if 1
-					static bool savepng = false;
-					auto afilename = savepng ? filename : 0;
-					test_drawvkvg(ctx, surf, bs, afilename);
-					if (savepng)
-					{
-						savepng = false;
-					}
-#endif
 					sp_drawable_update(dd1, delta);
 					auto light = vkd->get_light(0);
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
@@ -1071,6 +1084,10 @@ int main()
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto sem = vkd->get_fbo_semaphore();
 					form0->add_vk_semaphores(sem, 0, 0);
+					wait2d = 0;
+					while (wait2d == 0) {
+						Sleep(1);
+					}
 				};
 			{
 				static const char* vertex_glsl = R"glsl(

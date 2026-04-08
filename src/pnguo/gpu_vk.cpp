@@ -10634,7 +10634,7 @@ namespace vkg {
 	bool cxDevice::get_property(const char* name, int data_type, void* mem, uint64_t size, int mask)
 	{
 		static std::vector<std::string> prop_names = { "queue_count", "queue" };
-		
+
 		return false;
 	}
 
@@ -10828,6 +10828,7 @@ namespace vkg {
 			{
 				c->d = d;
 				c->set_device(d->_device, d->_queue_family_index);
+				c->get_queue(0);
 			}
 			else {
 				delete c;
