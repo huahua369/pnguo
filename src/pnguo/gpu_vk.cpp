@@ -10580,6 +10580,21 @@ namespace vkg {
 		return frameBuffer;
 	}
 
+	size_t cxDevice::get_queue_count()
+	{
+		return d ? d->_graphics_queues.size() : 0;
+	}
+
+	VkQueue cxDevice::get_queue(size_t idx)
+	{
+		VkQueue r = {};
+		if (d && idx < d->_graphics_queues.size())
+		{
+			r = d->_graphics_queues[idx];
+		}
+		return r;
+	}
+
 
 
 
@@ -10912,13 +10927,18 @@ namespace vkg {
 	void commit_params(aObject object) {}
 	// 获取对象支持的参数名
 	size_t get_param_count(aObject object) {
+
+		//size_t cxDevice::get_queue_count()
+		//VkQueue cxDevice::get_queue(size_t idx)
 		return 0;
 	}
 	const char** get_param_names(aObject object) {
+
 		return 0;
 	}
 	// 获取参数值, data_type返回值类型
 	void* get_param(aObject object, const char* name, int* data_type) {
+
 		return nullptr;
 	}
 	// 获取属性

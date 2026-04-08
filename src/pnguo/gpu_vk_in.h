@@ -244,7 +244,8 @@ namespace vkg {
 		VkDescriptorSetLayout newDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding>* pDescriptorLayoutBinding);
 		VkFramebuffer newFrameBuffer(VkRenderPass renderPass, const std::vector<VkImageView>* pAttachments, uint32_t Width, uint32_t Height);
 
-
+		size_t get_queue_count();
+		VkQueue get_queue(size_t idx);
 	};
 
 	/* 第一人称：鼠标旋转、键盘移动、跳
