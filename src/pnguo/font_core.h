@@ -723,10 +723,11 @@ void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt = 0);
 // 清除文本/图片，保留区域参数等设置
 void rt_clear(rich_text_t* p);
 // 添加文本
-void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
+size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
 // 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
-void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
-
+size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+text_block* rt_get_text(rich_text_t* p, size_t idx);
+image_block* rt_get_image(rich_text_t* p, size_t idx);
 void rt_build(rich_text_t* p);
 
 

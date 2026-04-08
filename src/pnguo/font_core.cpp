@@ -8097,9 +8097,9 @@ uint32_t premultiply_rgba(uint32_t color) {
 	// 重新组合为uint32_t 
 	return (a << 24) | (b << 16) | (g << 8) | r;
 }
-void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
+size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
 {
-	if (!p || !str || !family || !fontsize)return;
+	if (!p || !str || !family || !fontsize)return -1;
 	auto cc = premultiply_rgba(color);
 
 	auto idx = p->data_index.size();
@@ -8119,12 +8119,12 @@ void rt_add_text(rich_text_t* p, const void* str, int size, int first, font_fami
 	auto tidx = p->tbs.size();
 	p->tbs.push_back(tb);
 	p->data_index.push_back({ tidx ,-1 });
-
+	return tidx;
 }
 
-void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
+size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p)return;
+	if (!p || !img)return -1;
 	image_block ib = {};
 	ib.color = premultiply_rgba(color);			// 颜色混合
 	ib.img = img;			// 图片对象
@@ -8136,6 +8136,21 @@ void rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const 
 	auto tidx = p->ibs.size();
 	p->ibs.push_back(ib);
 	p->data_index.push_back({ -1, tidx });
+	return tidx;
+}
+
+text_block* rt_get_text(rich_text_t* p, size_t idx)
+{
+	if (!p || idx >= p->tbs.size())
+		return nullptr;
+	return &p->tbs[idx];
+}
+
+image_block* rt_get_image(rich_text_t* p, size_t idx)
+{
+	if (!p || idx >= p->ibs.size())
+		return nullptr;
+	return &p->ibs[idx];
 }
 
 
