@@ -1384,35 +1384,45 @@ clicprect_cx::~clicprect_cx()
 	}
 }
 #if 1
-void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta)
+canvas2d_t::canvas2d_t()
+{}
+
+canvas2d_t::~canvas2d_t()
+{}
+
+void canvas2d_t::set_renderer(void* renderer, texture_cb* cb)
+{}
+
+void canvas2d_t::update(rich_text_t* p, float delta)
 {
-	void* renderer = pt->rptr;
-	if (!p || !pt || !renderer)return;
+	void* renderer = rptr;
+	if (!p || !rcb || !renderer)return;
 	auto& ov = p->layout.ov;
 	for (auto& it : ov)
 	{
 		if (it) {
-			auto& tp = pt->vt[it];
+			auto& tp = _vt[it];
 			if (it->valid || !tp)
 			{
-				auto t = pt->rcb->make_tex(pt->rptr, it);
+				auto t = rcb->make_tex(renderer, it);
 				if (t && t != tp)
 				{
-					pt->rcb->set_texture_blend(t, 0, true);
+					rcb->set_texture_blend(t, 0, true);
 					tp = t;
 				}
 			}
 		}
 	}
 }
-void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
+
+void canvas2d_t::render_textdata(rich_text_t* p, const glm::vec2& pos)
 {
-	void* renderer = pt->rptr;
-	if (!p || !pt || !renderer)return;
+	void* renderer = rptr;
+	if (!p || !rcb || !renderer)return;
 	uint32_t color = -1;
 	const int vsize = sizeof(text_vx);
 	void* tex = 0;
-	bool devrtex = !p->tex_batch && (pt->rcb->set_texture_color4 && pt->rcb->render_texture);
+	bool devrtex = !p->tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
 	auto rect = p->box.rc;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = pos;
@@ -1420,22 +1430,22 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto& tm = p->layout._vstr;
 	auto tbp = p->tbs.data();
-	clicprect_cx cp(renderer, pt->rcb, rect); // 设置裁剪区域
+	clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
 	for (auto& vt : tm) {
 		if (vt.i.ctype)
 		{
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
-			auto& tp = pt->vt[it.img];
+			auto& tp = _vt[it.img];
 			if (tex != tp || devrtex)
 			{
-				if (tex && pt->opt.size()) {
-					auto nv = pt->opt.size();
-					pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
-						((float*)&pt->opt.data()->uv), vsize, nv
-						, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-					pt->opt.clear();
-					pt->idx.clear();
+				if (tex && opt.size()) {
+					auto nv = opt.size();
+					rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+						((float*)&opt.data()->uv), vsize, nv
+						, idx.data(), idx.size(), sizeof(uint32_t));
+					opt.clear();
+					idx.clear();
 				}
 				tex = tp;
 			}
@@ -1449,7 +1459,7 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 				t9.scale = 0.0;
 				t9.left_width = it.sliced.x, t9.right_width = it.sliced.y, t9.top_height = it.sliced.z, t9.bottom_height = it.sliced.w;
 				t9.tileScale = -1; // 大于0则是9gridtiled中间平铺
-				pt->rcb->render_texture_9grid(renderer, tex, &t9, 1);
+				rcb->render_texture_9grid(renderer, tex, &t9, 1);
 			}
 			else
 			{
@@ -1459,56 +1469,72 @@ void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt)
 					p.dst_rect = glm::vec4(lpos, it.dsize);
 					p.src_rect = it.rc;
 					auto c4 = ucolor2fx(c);
-					pt->rcb->set_texture_color4(tex, &c4);
-					pt->rcb->render_texture(renderer, tex, &p, 1);
+					rcb->set_texture_color4(tex, &c4);
+					rcb->render_texture(renderer, tex, &p, 1);
 				}
 				else
 				{
-					gen3data(it.img, lpos, it.rc, it.dsize, c, &pt->opt, &pt->idx);
-					pt->tex = tp;
+					gen3data(it.img, lpos, it.rc, it.dsize, c, &opt, &idx);
+					tex = tp;
 				}
 			}
 		}
 		else if (vt.f.ctype == 0) {
 			auto& git = vt.f;
 			if (git._image) {
-				auto& tp = pt->vt[git._image];
+				auto& tp = _vt[git._image];
 				if (tex != tp)
 				{
-					if (tex && pt->opt.size()) {
-						auto nv = pt->opt.size();
-						pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
-							((float*)&pt->opt.data()->uv), vsize, nv
-							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-						pt->opt.clear();
-						pt->idx.clear();
+					if (tex && opt.size()) {
+						auto nv = opt.size();
+						rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+							((float*)&opt.data()->uv), vsize, nv
+							, idx.data(), idx.size(), sizeof(uint32_t));
+						opt.clear();
+						idx.clear();
 					}
 					tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
 				color = tbp[git.tb_idx].style.color;
-				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &pt->opt, &pt->idx);
+				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
 		}
 	}
-	if (tex && pt->opt.size()) {
-		auto nv = pt->opt.size();
-		pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
-			((float*)&pt->opt.data()->uv), vsize, nv
-			, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-		pt->opt.clear();
-		pt->idx.clear();
+	if (tex && opt.size()) {
+		auto nv = opt.size();
+		rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+			((float*)&opt.data()->uv), vsize, nv
+			, idx.data(), idx.size(), sizeof(uint32_t));
+		opt.clear();
+		idx.clear();
 	}
 }
+
+void canvas2d_t::free_tex()
+{
+	if (rcb && _vt.size())
+	{
+		for (auto& [k, v] : _vt) {
+			rcb->free_texture(v);
+		}
+		_vt.clear();
+	}
+}
+
+
+
 #endif
-void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
+
+
+void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta)
 {
 	std::vector<font_item_t>& tm = p->_vstr;
 	for (auto& it : p->ov)
 	{
 		if (it) {
-			auto& tp = pt->vt[it];
+			auto& tp = pt->_vt[it];
 			if (it->valid || !tp)
 			{
 				auto t = pt->rcb->make_tex(pt->rptr, it);
@@ -1521,7 +1547,7 @@ void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta)
 		}
 	}
 }
-void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt)
+void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt)
 {
 	void* renderer = pt->rptr;
 	std::vector<font_item_t>& tm = p->_vstr;
@@ -1544,7 +1570,7 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 		{
 			auto& git = tm[i];
 			if (git._image) {
-				auto& tp = pt->vt[git._image];
+				auto& tp = pt->_vt[git._image];
 				if (tex != tp)
 				{
 					if (tex && pt->opt.size()) {
@@ -1588,17 +1614,6 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* p
 
 	pt->opt.clear();
 	pt->idx.clear();
-}
-
-void r_render_free_tex(sdl3_textdata* p)
-{
-	if (p)
-	{
-		for (auto& [k, v] : p->vt) {
-			p->rcb->free_texture(v);
-		}
-		p->vt.clear();
-	}
 }
 
 

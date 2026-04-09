@@ -735,16 +735,16 @@ image_block* rt_get_image(rich_text_t* p, size_t idx);
 void rt_build(rich_text_t* p);
 
 
-typedef enum {
-	GPU_SHADER_LANG_GLSL,
-	GPU_SHADER_LANG_WGSL,
-	GPU_SHADER_LANG_MSL,
-	GPU_SHADER_LANG_HLSL,
-} gpu_shader_lang_t;
-
-const char* gpu_shader_fragment_source(gpu_shader_lang_t lang);
-
-const char* gpu_shader_vertex_source(gpu_shader_lang_t lang);
+//typedef enum {
+//	GPU_SHADER_LANG_GLSL,
+//	GPU_SHADER_LANG_WGSL,
+//	GPU_SHADER_LANG_MSL,
+//	GPU_SHADER_LANG_HLSL,
+//} gpu_shader_lang_t;
+//
+//const char* gpu_shader_fragment_source(gpu_shader_lang_t lang);
+//
+//const char* gpu_shader_vertex_source(gpu_shader_lang_t lang);
 
 
 #endif // !FONT_CORE_H

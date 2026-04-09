@@ -757,8 +757,8 @@ int main()
 
 			a.x += 10;
 			reg.emplace<post_t>(vs[1], a);
-			auto view = reg.view<post_t, visible_t>();
-			for (auto& it : view) {
+			auto _view = reg.view<post_t, visible_t>();
+			for (auto& it : _view) {
 				auto& pos = reg.get<post_t>(it);
 				reg.remove<visible_t>(it);
 			}
@@ -987,9 +987,8 @@ int main()
 			sp_drawable_set_pos(dd1, 0, 500);
 
 
-			sdl3_textdata* td3 = new sdl3_textdata();
-			td3->rcb = pcb;
-			td3->rptr = form0->renderer;
+			canvas2d_t* td3 = new canvas2d_t();
+			td3->set_renderer(form0->renderer, pcb);
 
 			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
 
@@ -1043,7 +1042,7 @@ int main()
 					//sp_drawable_draw(dd1); // spine动画
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
-					r_render_textdata(mtext, { 0,0 }, td3);
+					td3->render_textdata(mtext, { 0,0 });
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -1073,7 +1072,7 @@ int main()
 						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 
 						rt_build(mtext);
-						r_update_textdata(mtext, td3, 0);
+						td3->update(mtext, 0);
 
 						static bool save_test = false;
 						if (save_test)

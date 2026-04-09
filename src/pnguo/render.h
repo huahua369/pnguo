@@ -237,15 +237,26 @@ struct text_vx
 	glm::vec2 uv;
 	glm::vec4 color;
 };
-struct sdl3_textdata
+class canvas2d_t
 {
-	std::map<image_ptr_t*, void*> vt;
+public:
+	std::map<image_ptr_t*, void*> _vt;
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	texture_cb* rcb = 0;
 	void* tex = 0;
 	void* rptr = 0;
 	uint32_t color = 0;
+public:
+	canvas2d_t();
+	~canvas2d_t();
+	void set_renderer(void* renderer, texture_cb* cb);
+	void update(rich_text_t* p, float delta);
+	void render_textdata(rich_text_t* p, const glm::vec2& pos);
+
+	// 释放渲染器的纹理
+	void free_tex();
 };
+
 class clicprect_cx
 {
 public:
@@ -257,15 +268,10 @@ public:
 	~clicprect_cx();
 };
 
-void r_update_textdata(rich_text_t* p, sdl3_textdata* pt, float delta);
-void r_render_textdata(rich_text_t* p, const glm::vec2& pos, sdl3_textdata* pt);
 
-void r_update_data_text(text_render_o* p, sdl3_textdata* pt, float delta);
+void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta);
 // 渲染一段文本
-void r_render_data_text(text_render_o* p, const glm::vec2& pos, sdl3_textdata* pt);
-// 释放渲染器的纹理
-void r_render_free_tex(sdl3_textdata* p);
-
+void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt);
 void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename);
 
 
