@@ -1391,7 +1391,10 @@ canvas2d_t::~canvas2d_t()
 {}
 
 void canvas2d_t::set_renderer(void* renderer, texture_cb* cb)
-{}
+{
+	rptr = renderer;
+	rcb = cb;
+}
 
 void canvas2d_t::update(rich_text_t* p, float delta)
 {

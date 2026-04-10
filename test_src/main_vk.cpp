@@ -741,28 +741,6 @@ int main()
 #endif 
 #endif // _WIN32
 
-		{
-			std::vector<entt::entity> vs;
-			vs.resize(1000);
-			entt::registry reg;
-			reg.create(vs.begin(), vs.end());
-			struct post_t
-			{
-				float x, y, z;
-			};
-			struct visible_t {};
-			post_t a = { 1.0f,2.0f,3.0f };
-			reg.emplace<post_t>(vs[0], a);
-			reg.emplace<visible_t>(vs[0]);
-
-			a.x += 10;
-			reg.emplace<post_t>(vs[1], a);
-			auto _view = reg.view<post_t, visible_t>();
-			for (auto& it : _view) {
-				auto& pos = reg.get<post_t>(it);
-				reg.remove<visible_t>(it);
-			}
-		}
 
 		auto fctx = app->font_ctx;
 		//auto ksun = fctx->get_font((char*)u8"新宋体", 0);
@@ -822,8 +800,10 @@ int main()
 		devname = 0;
 		adevice3_t* gd = new_gdev(0, 0);
 		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
+		dev_info_cx devinfo = {};
+		get_dev_info(dctx, &devinfo);
 
-		vkdg_cx* vkd = new_vkdg(0, 0, 0, 0, 0, devname);	// 创建vk渲染器 
+		vkdg_cx* vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, devname);	// 创建vk渲染器 
 
 		auto sampler = gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
 

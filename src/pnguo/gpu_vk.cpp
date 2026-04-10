@@ -10638,6 +10638,17 @@ namespace vkg {
 		return false;
 	}
 
+	void cxDevice::get_dev_info(dev_info_cx* r)
+	{
+		if (r && d) {
+			r->inst = d->_instance;
+			r->phy = d->_physicaldevice;
+			r->vkdev = d->_device;
+			r->qFamIdx = d->_queue_family_index;
+			r->qCount = get_queue_count();
+		}
+	}
+
 
 
 
@@ -10927,7 +10938,7 @@ namespace vkg {
 	}
 
 
-	aObject new_object(aDevice* ctx0, int obj_type, const char* type) {
+	aObject new_object(aDevice ctx0, int obj_type, const char* type) {
 		auto t = (obj_type_e)obj_type;
 		aObject p = nullptr;
 		auto ctx = (cxDevice*)ctx0;
@@ -11043,7 +11054,14 @@ void free_gdev(adevice3_t* p) {
 		delete ((vkg::gdev_cx*)p->ctx);
 	}
 }
-
+void get_dev_info(aDevice p, dev_info_cx* r)
+{
+	auto c = (vkg::cxDevice*)p;
+	if (c)
+	{
+		c->get_dev_info(r);
+	}
+}
 // !新渲染器
 
 

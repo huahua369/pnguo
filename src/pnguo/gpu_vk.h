@@ -373,7 +373,7 @@ extern "C" {
 		void* phy;
 		void* vkdev;
 		uint32_t qFamIdx;		// familyIndex
-		uint32_t qIndex = 0;
+		uint32_t qCount = 1;
 	};
 #endif // !DEV_INFO_CXH
 	typedef void* aObject;		// 通用对象
@@ -420,7 +420,7 @@ extern "C" {
 		void* ctx = 0;
 		aDevice(*new_device)(void* ctx, void* phy, void* dev, const char* devname, void* hwnd);
 		// obj_type_e
-		aObject(*new_object)(aDevice* dev, int obj_type, const char* type);
+		aObject(*new_object)(aDevice dev, int obj_type, const char* type);
 		// 删除对象
 		void (*release)(aObject obj);
 		// 增加引用计数
@@ -448,6 +448,7 @@ extern "C" {
 	adevice3_t* new_gdev(const char* pApplicationName, const char* pEngineName);
 	// 删除管理器
 	void free_gdev(adevice3_t* p);
+	void get_dev_info(aDevice p, dev_info_cx* r);
 
 	void gpu_vk_test0();
 

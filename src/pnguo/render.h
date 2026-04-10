@@ -240,6 +240,9 @@ struct text_vx
 class canvas2d_t
 {
 public:
+	// 矢量图渲染用
+	vkvg_dev* vgdev = 0;
+	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	texture_cb* rcb = 0;
@@ -250,6 +253,8 @@ public:
 	canvas2d_t();
 	~canvas2d_t();
 	void set_renderer(void* renderer, texture_cb* cb);
+
+
 	void update(rich_text_t* p, float delta);
 	void render_textdata(rich_text_t* p, const glm::vec2& pos);
 

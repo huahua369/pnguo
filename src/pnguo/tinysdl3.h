@@ -62,7 +62,7 @@ struct dev_info_cx
 	void* phy;
 	void* vkdev;
 	uint32_t qFamIdx;		// familyIndex
-	uint32_t qIndex = 0;
+	uint32_t qCount = 1;
 };
 #endif // !DEV_INFO_CXH
 struct et_un_t;
