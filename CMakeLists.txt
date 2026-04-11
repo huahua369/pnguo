@@ -189,8 +189,6 @@ find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h") 
 find_package(EnTT CONFIG REQUIRED)
 
-
-
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
 pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)

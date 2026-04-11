@@ -968,29 +968,28 @@ int main()
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			std::atomic_int wait2d = 0;
-//			std::thread jt([=, &wait2d]() {
-//
-//#if 1
-//				while (0) {
-//					if (wait2d == 0) {
-//						wait2d = 1;
-//					}
-//					Sleep(1);
-//				}
-//#endif
-//
-//				});
-//			jt.detach();
+			//			std::thread jt([=, &wait2d]() {
+			//
+			//#if 1
+			//				while (0) {
+			//					if (wait2d == 0) {
+			//						wait2d = 1;
+			//					}
+			//					Sleep(1);
+			//				}
+			//#endif
+			//
+			//				});
+			//			jt.detach();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-					vkd->on_render();		// 渲染到fbo纹理tex3d
+						vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto sem = vkd->get_fbo_semaphore();
-					form0->add_vk_semaphores(sem, 0, 0);
+						form0->add_vk_semaphores(sem, 0, 0);
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d)
-						pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					if (vg2dtex)
 					{
 						tdt.src_rect = { 0,0,texwidth,texwidth };
