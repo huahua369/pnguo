@@ -173,6 +173,7 @@ add_definitions(-DVKVG_RECORDING)
 add_definitions(-DVKVG_PREMULT_ALPHA)
 add_definitions(-DVKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT)
 add_definitions(-DVKVG_USE_FONTCONFIG)
+#add_definitions(-DVKVG_ENABLE_VK_TIMELINE_SEMAPHORE)
 add_definitions(-DVKH_USE_VMA)
 
 add_definitions(-DXATLAS_C_API=1) 

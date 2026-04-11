@@ -215,8 +215,7 @@ public:
 	float extra_time = 0.0;
 	Timer()
 		:started_ticks{ SDL_GetPerformanceCounter() }
-	{
-	}
+	{}
 
 	void restart() {
 		started_ticks = SDL_GetPerformanceCounter();
@@ -231,8 +230,7 @@ public:
 		screen_ticks_per_frame = 1000.0f / static_cast<float>(target_fps);
 	}
 	void fps_sleep()
-	{
-	}
+	{}
 };
 
 
@@ -581,6 +579,13 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 
 	return pw;
 }
+void app_cx::wait_device()
+{
+	if (_set_dev.vkdev)
+		vkDeviceWaitIdle((VkDevice)_set_dev.vkdev);
+}
+void app_cx::wait_queue(size_t idx)
+{}
 void app_cx::call_cb(SDL_Event* e)
 {
 	auto fwp = SDL_GetWindowFromID(e->window.windowID);
@@ -975,12 +980,10 @@ SDL_FPoint get_v2(slot_t* s, const glm::vec2& ps)
 }
 // todo 骨骼动画渲染
 render_2d::render_2d()
-{
-}
+{}
 
 render_2d::~render_2d()
-{
-}
+{}
 
 SDL_BlendMode get_blend_x(BlendMode_e blendMode, bool pma);
 SDL_BlendMode get_blend(BlendMode_e blend_mode, bool usePremultipliedAlpha)
@@ -2190,7 +2193,7 @@ void form_x::update(float delta)
 
 	int display_w, display_h;
 
-	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h); 
+	SDL_GetWindowSizeInPixels(_ptr, &display_w, &display_h);
 	//float wx, wy;
 	//SDL_RenderCoordinatesToWindow(renderer, 100,200,&wx, &wy);
 	display_size = _size;
@@ -4023,8 +4026,7 @@ private:
 };
 
 gpu_device_cx::gpu_device_cx()
-{
-}
+{}
 
 gpu_device_cx::~gpu_device_cx()
 {

@@ -34,11 +34,6 @@
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 
-spine_ctx* sp_ctx_create1(void* renderer, texture_cb* pcb) {
-	return renderer && pcb ? sp_ctx_create(renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
-		, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend) : nullptr;
-
-}
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	auto p = new plane_cx();
@@ -785,7 +780,6 @@ int main()
 		dst.comp = 4; dst.stride = dst.width * sizeof(uint32_t);
 		//c_render_data(&trt, &dst);
 		//delete_font_family(family);
-
 		uint32_t* pcolor = get_wcolor();
 		for (size_t i = 0; i < 16; i++)
 		{
@@ -814,11 +808,10 @@ int main()
 			dev_info_c cc = {};
 			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
 			cc.qFamIdx = vkd->_dev_info.qFamIdx;
-			if (vkd->_dev_info.qCount > 2)
-				cc.qIndex = 2;
+			//if (vkd->_dev_info.qCount > 2)
+			//	cc.qIndex = 2;
 			vctx = new_vkvgdev(&cc, 8);
 		}
-
 		int texwidth = 1024;
 		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
 		auto ctx = vkvg_create(surf);
@@ -955,17 +948,6 @@ int main()
 			}
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
-			// 动画测试
-			auto d2 = sp_ctx_create1(form0->renderer, pcb);
-			auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pma.atlas)");
-			float scale = 0.50f;
-			auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pro.json)", 0, scale);
-			static std::vector<char*> nv;
-			sp_drawable_get_anim_names(dd1, &nv);
-			sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
-			sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
-			sp_drawable_set_pos(dd1, 0, 500);
-
 
 			canvas2d_t* td3 = new canvas2d_t();
 			td3->set_renderer(form0->renderer, pcb);
@@ -986,28 +968,24 @@ int main()
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			std::atomic_int wait2d = 0;
-			std::thread jt([=, &wait2d]() {
-
-#if 1
-				static bool savepng = false;
-				while (1) {
-					auto afilename = savepng ? filename : 0;
-					if (wait2d == 0) {
-						test_drawvkvg(ctx, surf, bs, afilename);
-						wait2d = 1;
-					}
-					if (savepng)
-					{
-						savepng = false;
-					}
-					Sleep(1);
-				}
-#endif
-
-				});
-			jt.detach();
+//			std::thread jt([=, &wait2d]() {
+//
+//#if 1
+//				while (0) {
+//					if (wait2d == 0) {
+//						wait2d = 1;
+//					}
+//					Sleep(1);
+//				}
+//#endif
+//
+//				});
+//			jt.detach();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					auto sem = vkd->get_fbo_semaphore();
+					form0->add_vk_semaphores(sem, 0, 0);
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
@@ -1019,7 +997,6 @@ int main()
 						tdt.dst_rect = { 0,0,texwidth,texwidth };
 						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
 					}
-					//sp_drawable_draw(dd1); // spine动画
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
 					td3->render_textdata(mtext, { 0,0 });
@@ -1027,7 +1004,6 @@ int main()
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
 					int d = delta * 1000;
-					sp_drawable_update(dd1, delta);
 					auto light = vkd->get_light(0);
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;					// 曝光度：默认1.0
@@ -1039,7 +1015,7 @@ int main()
 					{
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
-						std::string str = vkd->get_label(); str += (char*)u8"表情🔥➗️👪️";
+						std::string str = vkd->get_label(); str += (char*)u8"emoji表情🔥➗️👪️";
 						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
@@ -1048,7 +1024,7 @@ int main()
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 						static glm::ivec2 imgpos = { 100,100 };
-						rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, -1, { 64 * 5,64 * 3 }, imgpos, true);
+						rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, 0x50ffffff, { 64 * 5,64 * 3 }, imgpos, true);
 						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 
 						rt_build(mtext);
@@ -1060,13 +1036,19 @@ int main()
 							save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
 						}
 					}
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					auto sem = vkd->get_fbo_semaphore();
-					form0->add_vk_semaphores(sem, 0, 0);
-					wait2d = 0;
-					while (wait2d == 0) {
-						Sleep(1);
+					static bool savepng = false;
+					auto afilename = savepng ? filename : 0;
+					test_drawvkvg(ctx, surf, bs, afilename);
+					if (savepng)
+					{
+						savepng = false;
 					}
+					//app->wait_device();
+					//app->wait_queue(0);
+					wait2d = 0;
+					//while (wait2d == 0) {
+					//	Sleep(1);
+					//}
 				};
 			{
 				static const char* vertex_glsl = R"glsl(
@@ -1121,10 +1103,6 @@ void main()
 			// 运行消息循环
 			run_app(app, 0);
 			delete ptb;
-			// 销毁对象
-			sp_atlas_dispose(a1);
-			sp_drawable_dispose(dd1);
-			sp_ctx_dispose(d2);
 			delete td3;
 			vkvg_flush(ctx);
 			vkvg_destroy(ctx);

@@ -1191,3 +1191,30 @@ void sp_drawable_draw(spine_drawable_t* drawable)
 
 
 #endif // !SRC_LIBSRC
+
+#if 0
+spine_ctx* sp_ctx_create1(void* renderer, texture_cb* pcb) {
+	return renderer && pcb ? sp_ctx_create(renderer, (draw_geometry_fun)pcb->draw_geometry, (newTexture_fun)pcb->new_texture_0
+		, (UpdateTexture_fun)pcb->update_texture, (DestroyTexture_fun)pcb->free_texture, (SetTextureBlendMode_fun)pcb->set_texture_blend) : nullptr;
+
+}
+// 动画测试
+auto d2 = sp_ctx_create1(form0->renderer, pcb);
+auto a1 = sp_new_atlas(d2, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pma.atlas)");
+float scale = 0.50f;
+auto dd1 = sp_new_drawable(d2, a1, R"(E:\vsz\g3d\s2d\spine-runtimes\spine-sfml\cpp\data\spineboy-pro.json)", 0, scale);
+static std::vector<char*> nv;
+sp_drawable_get_anim_names(dd1, &nv);
+sp_drawable_set_animationbyname(dd1, 0, "portal", 0);
+sp_drawable_add_animationbyname(dd1, 0, "run", -1, 0);
+sp_drawable_set_pos(dd1, 0, 500);
+
+sp_drawable_update(dd1, delta);
+sp_drawable_draw(dd1); // spine动画
+
+// 销毁对象
+sp_atlas_dispose(a1);
+sp_drawable_dispose(dd1);
+sp_ctx_dispose(d2);
+
+#endif // 0

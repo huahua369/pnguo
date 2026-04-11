@@ -11694,6 +11694,17 @@ namespace vkr
 		return (format >= DXGI_FORMAT_BC1_TYPELESS && format <= DXGI_FORMAT_BC5_SNORM) || (format >= DXGI_FORMAT_BC6H_TYPELESS && format <= DXGI_FORMAT_BC7_UNORM_SRGB);
 	}
 
+	VkResult vk_timeline_wait(VkDevice dev, VkSemaphore timeline, const uint64_t wait) {
+		VkSemaphoreWaitInfo waitInfo;
+		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+		waitInfo.pNext = NULL;
+		waitInfo.flags = 0;
+		waitInfo.semaphoreCount = 1;
+		waitInfo.pSemaphores = &timeline;
+		waitInfo.pValues = &wait;
+
+		return vkWaitSemaphores(dev, &waitInfo, UINT64_MAX);
+	}
 	//--------------------------------------------------------------------------------------
 	//
 	// OnCreate

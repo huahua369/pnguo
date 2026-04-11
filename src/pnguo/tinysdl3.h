@@ -118,6 +118,8 @@ public:
 	void set_dev(void* instance, void* physical_device, void* device);
 	form_x* new_form_renderer(const std::string& title, const glm::ivec2& pos, const glm::ivec2& ws1, int fgs, bool derender, form_x* parent);
 public:
+	void wait_device();
+	void wait_queue(size_t idx);
 	int run_loop(int t);
 	void call_cb(SDL_Event* e);
 	// 睡眠毫秒
