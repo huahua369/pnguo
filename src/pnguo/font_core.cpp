@@ -8081,17 +8081,20 @@ uint32_t premultiply_rgba(uint32_t color) {
 	return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
-void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt)
+void rt_set(rich_text_t* p, text_box_t* box)
 {
-	if (!p || !(box || fdt))return;
+	if (!p || !box)return;
 	if (box)
 	{
 		p->box = *box;
 	}
-	if (fdt)
-	{
-		p->flex = fdt;
-	}
+}
+
+void rt_set_layout(rich_text_t* p, flex_data* rfp, flex_data* cfp)
+{
+	if (!p)return;
+	if (rfp) { p->flex = rfp; }
+	if (cfp) { p->flex_child = cfp; }
 }
 
 void rt_clear(rich_text_t* p)
@@ -8355,7 +8358,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 	return;
 }
 
-void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
+void rt_layout1(rich_text_t* r, layout_block_st* p) {
 	if (!p)return;
 
 	glm::vec2 rct = {};
@@ -8370,9 +8373,13 @@ void rt_layout1(rich_text_t* r, layout_block_st* p, flex_data* boxflex) {
 	glm::ivec4 rc = box.rc;
 	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,baseline };
 	flex_data tf[2] = {};
-	if (boxflex)
+	if (r->flex)
 	{
-		tf[0] = *boxflex;
+		tf[0] = *r->flex;
+	}
+	if (r->flex_child)
+	{
+		tf[1] = *r->flex_child;
 	}
 	std::vector<node_dt> fv;
 	std::vector<glm::ivec3> linex;
@@ -8564,7 +8571,7 @@ void rt_build(rich_text_t* p)
 			pt->_vstr.push_back(kit); // 占位图片
 		}
 	}
-	rt_layout1(p, pt, p->flex);
+	rt_layout1(p, pt);
 }
 
 /*

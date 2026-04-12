@@ -964,7 +964,7 @@ int main()
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
 			auto mtext = new rich_text_t();
-			rt_set(mtext, &tbox, 0);
+			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			std::atomic_int wait2d = 0;
