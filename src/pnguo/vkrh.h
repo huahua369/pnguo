@@ -100,6 +100,7 @@ namespace vkr {
 	public:
 		VkInstance m_instance = 0;
 		VkDevice m_device = 0;
+		VkDevice _device = 0;
 		VkPhysicalDevice m_physicaldevice = {};
 		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
 		VkPhysicalDeviceProperties m_deviceProperties = {};

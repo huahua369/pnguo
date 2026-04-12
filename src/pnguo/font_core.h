@@ -716,6 +716,7 @@ struct rich_text_t {
 	std::vector<image_block> ibs;	// *图片块信息
 	std::vector<glm::ivec2> data_index;	// *文本块和图片块在渲染数据中的索引位置，x为文本块索引，y为图片块索引，-1则不使用
 	layout_block_st layout = {};	// *布局结果数据
+	text_style	_ct_style = {};
 	bool tex_batch = false;
 };
 
@@ -723,15 +724,20 @@ struct rich_text_t {
 void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt = 0);
 // 清除文本/图片，保留区域参数等设置
 void rt_clear(rich_text_t* p);
+// 设置字体大小颜色
+bool rt_text_style(rich_text_t* p, font_family_t* family, int fontsize, uint32_t color);
+// 添加文本
+size_t rt_add_text0(rich_text_t* p, const void* str, int size, int first);
+size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text_style* ts);
 // 添加文本
 size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
 // 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
-text_block* rt_get_text(rich_text_t* p, size_t idx);
+text_block* rt_get_text(rich_text_t* p, size_t idx);	// 直接修改文本保证build前保留文本内存可用
+// 设置新的文本，复制到缓冲区
+bool rt_set_text(rich_text_t* p, size_t idx, const void* str, int size, int first);
 image_block* rt_get_image(rich_text_t* p, size_t idx);
-/* 构建渲染数据，提供文本块和图片块信息，flex布局参数等，输出渲染数据和用到的纹理对象等。
-	rt_get_text/rt_get_image获取对象指针后修改文本块和图片块信息后需要重新调用rt_build
-*/
+// 构建渲染数据
 void rt_build(rich_text_t* p);
 
 

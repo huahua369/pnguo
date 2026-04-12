@@ -8064,6 +8064,23 @@ void build_text_t1(text_t1* p, const void* str, int size, int first, font_family
 	build_text_render(&tb, &p->trt, p->fdt);
 }
 
+uint32_t premultiply_rgba(uint32_t color) {
+	// 分解ARGB通道 
+	uint8_t a = (color >> 24) & 0xFF;  // Alpha通道
+	uint8_t b = (color >> 16) & 0xFF;  // Red通道
+	uint8_t g = (color >> 8) & 0xFF;  // Green通道
+	uint8_t r = color & 0xFF;          // Blue通道
+
+	// 预乘计算（避免浮点运算）
+	if (a == 0) return 0;  // 完全透明时直接返回0
+	r = (r * a) / 255;
+	g = (g * a) / 255;
+	b = (b * a) / 255;
+
+	// 重新组合为uint32_t 
+	return (a << 24) | (b << 16) | (g << 8) | r;
+}
+
 void rt_set(rich_text_t* p, text_box_t* box, flex_data* fdt)
 {
 	if (!p || !(box || fdt))return;
@@ -8089,27 +8106,31 @@ void rt_clear(rich_text_t* p)
 		p->layout.baselines.clear();
 	}
 }
-uint32_t premultiply_rgba(uint32_t color) {
-	// 分解ARGB通道 
-	uint8_t a = (color >> 24) & 0xFF;  // Alpha通道
-	uint8_t b = (color >> 16) & 0xFF;  // Red通道
-	uint8_t g = (color >> 8) & 0xFF;  // Green通道
-	uint8_t r = color & 0xFF;          // Blue通道
-
-	// 预乘计算（避免浮点运算）
-	if (a == 0) return 0;  // 完全透明时直接返回0
-	r = (r * a) / 255;
-	g = (g * a) / 255;
-	b = (b * a) / 255;
-
-	// 重新组合为uint32_t 
-	return (a << 24) | (b << 16) | (g << 8) | r;
-}
-size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
+bool rt_text_style(rich_text_t* p, font_family_t* family, int fontsize, uint32_t color)
 {
-	if (!p || !str || !family || !fontsize)return -1;
-	auto cc = premultiply_rgba(color);
-
+	int c = 0;
+	do
+	{
+		if (!p)break;
+		p->_ct_style.color = premultiply_rgba(color);
+		if (family)
+		{
+			p->_ct_style.family = family; c++;
+		}
+		if (fontsize != 0)
+		{
+			p->_ct_style.fontsize = fontsize; c++;
+		}
+	} while (0);
+	return c > 0;
+}
+size_t rt_add_text0(rich_text_t* p, const void* str, int size, int first)
+{
+	return p ? rt_add_text_ts(p, str, size, first, &p->_ct_style) : -1;
+}
+size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text_style* ts)
+{
+	if (!p || !str || !ts || !ts->family || !ts->fontsize)return -1;
 	auto idx = p->data_index.size();
 	auto& ut = p->layout.temp_map[idx];
 	if (size > 0)
@@ -8121,13 +8142,21 @@ size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_fa
 	tb.baseline = 0;
 	tb.first = 0;
 	tb.size = ut.str.size();
-	tb.style.color = cc;
-	tb.style.family = family;
-	tb.style.fontsize = fontsize;
+	tb.style = *ts;
 	auto tidx = p->tbs.size();
 	p->tbs.push_back(tb);
 	p->data_index.push_back({ tidx ,-1 });
 	return tidx;
+}
+size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color)
+{
+	if (!p || !str || !family || !fontsize)return -1;
+	auto cc = premultiply_rgba(color);
+	text_style ts = {};
+	ts.family = family;
+	ts.fontsize = fontsize;
+	ts.color = cc;
+	return rt_add_text_ts(p, str, size, first, &ts);
 }
 
 size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
@@ -8152,6 +8181,26 @@ text_block* rt_get_text(rich_text_t* p, size_t idx)
 	if (!p || idx >= p->tbs.size())
 		return nullptr;
 	return &p->tbs[idx];
+}
+
+bool rt_set_text(rich_text_t* p, size_t idx, const void* str, int size, int first)
+{
+	bool ret = false;
+	auto pt = rt_get_text(p, idx);
+	if (pt)
+	{
+		auto& ut = p->layout.temp_map[idx];
+		if (size > 0)
+			ut.str.assign((char*)str + first, size);
+		else
+			ut.str = (char*)str + first;
+		text_block& tb = *pt;
+		tb.str = (char*)ut.str.c_str();
+		tb.first = 0;
+		tb.size = ut.str.size();
+		ret = true;
+	}
+	return ret;
 }
 
 image_block* rt_get_image(rich_text_t* p, size_t idx)

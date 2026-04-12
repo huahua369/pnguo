@@ -2090,7 +2090,8 @@ namespace vkr
 			device_info.enabledExtensionCount = (uint32_t)extension_names.size();
 			device_info.ppEnabledExtensionNames = device_info.enabledExtensionCount ? extension_names.data() : NULL;
 			device_info.pEnabledFeatures = NULL;
-			res = vkCreateDevice(m_physicaldevice, &device_info, NULL, &m_device);
+			res = vkCreateDevice(m_physicaldevice, &device_info, NULL, &_device);
+			m_device = _device;
 			assert(res == VK_SUCCESS);
 		}
 		if (!m_device)return;
@@ -2259,10 +2260,10 @@ namespace vkr
 		m_hAllocator = NULL;
 #endif
 
-		if (m_device != VK_NULL_HANDLE)
+		if (_device != VK_NULL_HANDLE)
 		{
-			vkDestroyDevice(m_device, nullptr);
-			m_device = VK_NULL_HANDLE;
+			vkDestroyDevice(_device, nullptr);
+			_device = VK_NULL_HANDLE;
 		}
 #if ExtDebugReportOnDestroy
 		ExtDebugReportOnDestroy(m_instance);
