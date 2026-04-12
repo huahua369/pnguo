@@ -803,18 +803,6 @@ int main()
 
 		// 准备使用3D渲染器的设备创建SDL渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
-		vkvg_dev* vctx = 0;
-		{
-			dev_info_c cc = {};
-			cc.inst = (VkInstance)vkd->_dev_info.inst; cc.phy = (VkPhysicalDevice)vkd->_dev_info.phy; cc.vkdev = (VkDevice)vkd->_dev_info.vkdev;
-			cc.qFamIdx = vkd->_dev_info.qFamIdx;
-			//if (vkd->_dev_info.qCount > 2)
-			//	cc.qIndex = 2;
-			vctx = new_vkvgdev(&cc, 8);
-		}
-		int texwidth = 1024;
-		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
-		auto ctx = vkvg_create(surf);
 
 		auto f = glm::mat4(1.4420948028564453, 0.0, 0.0, 0.0, 0.0, -0.00016932648114409524, 1.4420948028564453, 0.0, 0.0, -1.4420948028564453, -0.00016932648114409524, 0.0, 0.0, 0.0, 0.0, 1.0);
 		auto f1 = glm::mat4(0.009999999776482582, 0.0, 0.0, 0.0, 0.0, -0.009999999776482582, 0.0, 0.0, 0.0, 0.0, -0.009999999776482582, 0.0, 0.0, 0.0, 0.0, 1.0);
@@ -925,33 +913,18 @@ int main()
 			auto pcb = new texture_cb();
 			assert(pcb);
 			get_sdl_texture_cb(pcb);
-			void* vg2dtex = nullptr;
+			//void* vg2dtex = nullptr;
 			const char* filename = "temp/vkvg_gb.png";
 			bspline_ct* bs = new bspline_ct();
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
-			{
-				//vkvg_clear(ctx);
-				//vkvg_flush(ctx);
-				//vkvg_surface_resolve(surf);//msaa采样转换输出
-				//vkvg_surface_write_to_png(surf, filename);
-				//vkvg_destroy(ctx);
 
-				VkImage image = vkvg_surface_get_vk_image(surf);
-				VkFormat format = vkvg_surface_get_vk_format(surf);
-				//vctx->free_surface(surf);
-				if (image)
-				{
-					vg2dtex = pcb->new_texture_vk(form0->renderer, texwidth, texwidth, image, format == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);// 创建SDL的rgba纹理 
-					pcb->set_texture_blend(vg2dtex, (int)BLENDMODE_E::normal, true);
-				}
-			}
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
 
 			canvas2d_t* td3 = new canvas2d_t();
 			td3->set_renderer(form0->renderer, pcb);
-
+			td3->init_vgdev(&devinfo, 8);
 			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
 
 			text_box_t tbox = {};
@@ -983,19 +956,19 @@ int main()
 			//			jt.detach();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-						vkd->on_render();		// 渲染到fbo纹理tex3d
+					vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
+					form0->add_vk_semaphores(sem, 0, 0);
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
-					if (vg2dtex)
-					{
-						tdt.src_rect = { 0,0,texwidth,texwidth };
-						tdt.dst_rect = { 0,0,texwidth,texwidth };
-						pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
-					}
+					//if (vg2dtex)
+					//{
+					//	tdt.src_rect = { 0,0,texwidth,texwidth };
+					//	tdt.dst_rect = { 0,0,texwidth,texwidth };
+					//	pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
+					//}
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
 					td3->render_textdata(mtext, { 0,0 });
@@ -1037,7 +1010,7 @@ int main()
 					}
 					static bool savepng = false;
 					auto afilename = savepng ? filename : 0;
-					test_drawvkvg(ctx, surf, bs, afilename);
+					//test_drawvkvg(ctx, surf, bs, afilename);
 					if (savepng)
 					{
 						savepng = false;
@@ -1103,11 +1076,7 @@ void main()
 			run_app(app, 0);
 			delete ptb;
 			delete td3;
-			vkvg_flush(ctx);
-			vkvg_destroy(ctx);
-			vctx->free_surface(surf);
 
-			free_vkvgdev(vctx);
 		}
 
 		//show_belt(form0);

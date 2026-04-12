@@ -27,7 +27,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include "shaders/base3d2.vert.h"
 #include "shaders/base3d2.frag.h"
 
-
+#include "tinysdl3.h"
 	// 线，二阶曲线，三阶曲线
 enum class vtype_e1 :uint8_t
 {
@@ -1388,7 +1388,9 @@ canvas2d_t::canvas2d_t()
 {}
 
 canvas2d_t::~canvas2d_t()
-{}
+{
+	free_vkvgdev(vgdev); vgdev = nullptr;
+}
 
 void canvas2d_t::set_renderer(void* renderer, texture_cb* cb)
 {
@@ -1396,9 +1398,51 @@ void canvas2d_t::set_renderer(void* renderer, texture_cb* cb)
 	rcb = cb;
 }
 
-void canvas2d_t::init_vgdev(dev_info_cx* d)
-{}
+void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
+{
+	dev_info_c cc = {};
+	if (d)
+	{
+		cc.inst = (VkInstance)d->inst; cc.phy = (VkPhysicalDevice)d->phy; cc.vkdev = (VkDevice)d->vkdev;
+		cc.qFamIdx = d->qFamIdx;
+		if (d->qCount > 2)
+			cc.qIndex = 2;
+	}
+	auto p = new_vkvgdev(&cc, sample);
+	if (vgdev && p)
+	{
+		free_vkvgdev(vgdev); vgdev = nullptr;
+	}
+	if (p)
+	{
+		vgdev = p;
+	}
+}
+/*
+		int texwidth = 1024;
+		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
+		auto ctx = vkvg_create(surf);
+	{
+				//vkvg_clear(ctx);
+				//vkvg_flush(ctx);
+				//vkvg_surface_resolve(surf);//msaa采样转换输出
+				//vkvg_surface_write_to_png(surf, filename);
+				//vkvg_destroy(ctx);
 
+				VkImage image = vkvg_surface_get_vk_image(surf);
+				VkFormat format = vkvg_surface_get_vk_format(surf);
+				//vctx->free_surface(surf);
+				if (image)
+				{
+					vg2dtex = pcb->new_texture_vk(form0->renderer, texwidth, texwidth, image, format == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);// 创建SDL的rgba纹理
+					pcb->set_texture_blend(vg2dtex, (int)BLENDMODE_E::normal, true);
+				}
+			}
+		vkvg_flush(ctx);
+		vkvg_destroy(ctx);
+		vctx->free_surface(surf);
+		free_vkvgdev(vctx);
+*/
 void canvas2d_t::update(rich_text_t* p, float delta)
 {
 	void* renderer = rptr;
