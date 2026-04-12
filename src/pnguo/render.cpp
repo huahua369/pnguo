@@ -1396,6 +1396,9 @@ void canvas2d_t::set_renderer(void* renderer, texture_cb* cb)
 	rcb = cb;
 }
 
+void canvas2d_t::init_vgdev(dev_info_cx* d)
+{}
+
 void canvas2d_t::update(rich_text_t* p, float delta)
 {
 	void* renderer = rptr;

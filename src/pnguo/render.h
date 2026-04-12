@@ -237,6 +237,8 @@ struct text_vx
 	glm::vec2 uv;
 	glm::vec4 color;
 };
+struct dev_info_cx;
+
 class canvas2d_t
 {
 public:
@@ -253,7 +255,8 @@ public:
 	canvas2d_t();
 	~canvas2d_t();
 	void set_renderer(void* renderer, texture_cb* cb);
-
+	// 初始化矢量图渲染器，输入vk设备
+	void init_vgdev(dev_info_cx* d);
 
 	void update(rich_text_t* p, float delta);
 	void render_textdata(rich_text_t* p, const glm::vec2& pos);

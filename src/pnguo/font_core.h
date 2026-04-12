@@ -728,7 +728,7 @@ void rt_set_layout(rich_text_t* p, flex_data* rfp = 0, flex_data* cfp = 0);
 void rt_clear(rich_text_t* p);
 // 设置字体大小颜色
 bool rt_text_style(rich_text_t* p, font_family_t* family, int fontsize, uint32_t color);
-// 添加文本
+// 添加文本，返回索引
 size_t rt_add_text0(rich_text_t* p, const void* str, int size, int first);
 size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text_style* ts);
 // 添加文本
