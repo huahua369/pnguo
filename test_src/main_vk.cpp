@@ -939,6 +939,9 @@ int main()
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
+
+			auto ck = td3->new_surface_ctx(1024, 1024);
+			td3->free_surface_ctx(ck);
 			std::atomic_int wait2d = 0;
 			//			std::thread jt([=, &wait2d]() {
 			//
@@ -1014,7 +1017,7 @@ int main()
 					{
 						savepng = false;
 					}
-					//app->wait_device();
+					app->wait_device();
 					//app->wait_queue(0);
 					wait2d = 0;
 					//while (wait2d == 0) {

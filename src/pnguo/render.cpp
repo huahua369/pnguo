@@ -1435,6 +1435,37 @@ void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
 		vgdev = p;
 	}
 }
+//
+void* canvas2d_t::new_surface_ctx(int width, int height)
+{
+	if (width > 1 && height > 1 && vgdev && vgdev->ctx && vgdev->ctx->dev)
+	{
+		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height);
+		if (surf)
+		{
+			auto c = vkvg_create(surf);
+			if (c)
+			{
+				return c;
+			}
+			else {
+				vkvg_surface_destroy(surf);
+			}
+		}
+	}
+	return nullptr;
+}
+void canvas2d_t::free_surface_ctx(void* c)
+{
+	auto p = (VkvgContext)c;
+	if (p) {
+		VkvgSurface t = vkvg_get_target(p);
+		if (t) {
+			vkvg_surface_destroy(t);
+		}
+		vkvg_destroy(p);
+	}
+}
 /*
 		int texwidth = 1024;
 		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
