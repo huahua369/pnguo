@@ -386,11 +386,6 @@ void vkvg_dev::free_ctx(vkvg_ctx* p)
 	if (p)delete p;
 }
 
-void vkvg_dev::update_image(VkvgSurface image, uint32_t* data, int width, int height)
-{
-
-}
-
 
 void* vkvg_dev::get_vkimage(void* surface)
 {

@@ -168,8 +168,6 @@ public:
 	vkvg_ctx* new_context(VkvgSurface p);
 	void free_ctx(vkvg_ctx* p);
 
-	void update_image(VkvgSurface image, uint32_t* data, int width, int height);
-
 	// 直接获取VkImage指针
 	void* get_vkimage(void* surface);
 	void image_save(void* surface, const char* fn);
@@ -258,6 +256,7 @@ public:
 	// 初始化矢量图渲染器，输入vk设备
 	void init_vgdev(dev_info_cx* d, int sample = 8);
 
+	// 富文本渲染
 	void update(rich_text_t* p, float delta);
 	void render_textdata(rich_text_t* p, const glm::vec2& pos);
 
