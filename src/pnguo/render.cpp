@@ -198,6 +198,12 @@ void draw_path_vkvg(void* cr, path_v* p, style_path_t* st)
 #endif
 }
 
+
+struct vkvgctx {
+	VkvgDevice dev = 0;
+	VkhDevice vkhdev = 0;
+};
+
 vkvg_ctx::vkvg_ctx(VkvgSurface surf)
 {
 	if (surf) {
@@ -240,15 +246,25 @@ glm::mat3x2 vkvg_ctx::get_matrix()
 }
 
 vkvg_dev::vkvg_dev()
-{}
+{
+	ctx = new vkvgctx();
+}
 
 vkvg_dev::~vkvg_dev()
 {
 	if (fun)delete fun; fun = 0;
-	if (dev)
+	if (ctx)
 	{
-		vkvg_device_destroy(dev); dev = 0;
+		if (ctx->dev)
+		{
+			vkvg_device_destroy(ctx->dev); ctx->dev = 0;
+		}
+		if (ctx->vkhdev) {
+			vkh_device_destroy(ctx->vkhdev);
+		}
+		delete ctx; ctx = 0;
 	}
+
 }
 vkvg_func_t* vkvg_dev::get_fun()
 {
@@ -335,22 +351,27 @@ vkvg_func_t* vkvg_dev::get_fun()
 
 VkvgSurface vkvg_dev::new_surface(int width, int height)
 {
-	return width > 0 && height > 0 ? vkvg_surface_create(dev, width, height) : nullptr;
+	return width > 0 && height > 0 ? vkvg_surface_create(ctx->dev, width, height) : nullptr;
 }
 
 VkvgSurface vkvg_dev::new_surface(uint32_t* data, int width, int height)
 {
-	return width > 0 && height > 0 && data ? vkvg_surface_create_from_bitmap(dev, (unsigned char*)data, width, height) : nullptr;
+	return width > 0 && height > 0 && data ? vkvg_surface_create_from_bitmap(ctx->dev, (unsigned char*)data, width, height) : nullptr;
 }
 
-VkvgSurface vkvg_dev::new_surface(void* vkimg)
-{
-	return vkimg ? vkvg_surface_create_for_VkhImage(dev, vkimg) : nullptr;
-}
+//VkvgSurface vkvg_dev::new_surface(void* vkimg, int type, int width, int height)
+//{
+//	if (!vkimg || width < 2 || height < 2 || !ctx || !ctx->vkhdev)
+//	{
+//		return nullptr;
+//	}
+//	VkhImage p = vkh_image_import(ctx->vkhdev, (VkImage)vkimg, type ? VK_FORMAT_B8G8R8A8_UNORM : VK_FORMAT_R8G8B8A8_UNORM, width, height);
+//	return  vkvg_surface_create_for_VkhImage(ctx->dev, p);
+//}
 
 VkvgSurface vkvg_dev::new_surface(const char* fn)
 {
-	return fn && *fn ? vkvg_surface_create_from_image(dev, fn) : nullptr;
+	return fn && *fn ? vkvg_surface_create_from_image(ctx->dev, fn) : nullptr;
 }
 
 void vkvg_dev::free_surface(VkvgSurface p)
@@ -455,9 +476,10 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
 		vkGetPhysicalDeviceMemoryProperties(c->phy, &m_memoryProperties);
 		p->memoryProperties = new VkPhysicalDeviceMemoryProperties(m_memoryProperties);
-		p->dev = dev;
+		p->ctx->dev = dev;
 		p->vkdev = vkdev;
 		p->samplecount = cus;
+		//p->ctx->vkhdev = vkh_device_import(c->inst, c->phy, c->vkdev);
 	}
 	return p;
 }
@@ -2010,7 +2032,7 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 {
 
 	vkvg_dev* vctx = new_vkvgdev(dc, 8);
-	auto dev = vctx->dev;
+	auto dev = vctx->ctx->dev;
 	if (!dev)return;
 	new_spv_base(vctx->vkdev);
 	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);

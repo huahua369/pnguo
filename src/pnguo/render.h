@@ -144,13 +144,13 @@ public:
 private:
 
 };
-
+struct vkvgctx;
 
 class vkvg_dev
 {
 public:
-	VkvgDevice dev = 0;
 	VkDevice vkdev = 0;
+	vkvgctx* ctx = 0;
 	vkvg_func_t* fun = {};
 	VkSampleCountFlags samplecount = {};
 	void* memoryProperties = 0;
@@ -161,7 +161,6 @@ public:
 
 	VkvgSurface new_surface(int width, int height);
 	VkvgSurface new_surface(uint32_t* data, int width, int height);
-	VkvgSurface new_surface(void* vkimg);
 	VkvgSurface new_surface(const char* fn);
 	void free_surface(VkvgSurface p);
 	vkvg_ctx* new_ctx(VkvgSurface p);
