@@ -920,7 +920,7 @@ int main()
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
 
 			canvas2d_t* td3 = new canvas2d_t();
-			td3->set_renderer(form0->renderer, pcb);
+			td3->set_renderer(form0->renderer, pcb, { 0,0,ws.x, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
@@ -973,7 +973,7 @@ int main()
 					//}
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
-					td3->render_textdata(mtext, { 0,0 });
+					td3->draw_textdata(mtext, { 0,0 });
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{

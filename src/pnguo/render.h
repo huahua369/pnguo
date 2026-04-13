@@ -225,6 +225,18 @@ struct dblock_d {
 	float scale_pos = 0;		// 视图缩放，不缩放线宽
 };
 void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
+// 矢量图渲染缓存
+class vgcache_cx
+{
+public:
+
+public:
+	vgcache_cx();
+	~vgcache_cx();
+
+private:
+
+};
 
 // SDL渲染器专用
 typedef struct texture_cb texture_cb;
@@ -247,18 +259,37 @@ public:
 	texture_cb* rcb = 0;
 	void* tex = 0;
 	void* rptr = 0;
+	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	uint32_t color = 0;
 public:
 	canvas2d_t();
 	~canvas2d_t();
-	void set_renderer(void* renderer, texture_cb* cb);
+	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view);
 	// 初始化矢量图渲染器，输入vk设备
 	void init_vgdev(dev_info_cx* d, int sample = 8);
 	void* new_surface_ctx(int width, int height);
 	void free_surface_ctx(void* ctx);
+	// 提交样式执行填充或描边
+	void submit_style(fill_style_d* st);
+	void draw_rounded_rectangle(double x, double y, double width, double height, const glm::vec4& r);
+	void draw_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+
+	// 画2d箭头type=0线终点在三角形中间
+	void draw_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type = 0);
+	void draw_arrow2(float x, float y);
+
+	// 画网格填充
+	void draw_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width);
+	// 画线性渐变填充
+	void draw_linear(const glm::vec2& ss, const glm::vec4* cols, int count);
+	// 批量渲染同样式的块(圆或矩形)
+	void draw_block(dblock_d* p, fill_style_d* style);
+	// 描边或填充路径
+	void draw_path(path_d* path, fill_style_d* style);
+
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
-	void render_textdata(rich_text_t* p, const glm::vec2& pos);
+	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 
 	// 释放渲染器的纹理
 	void free_tex();

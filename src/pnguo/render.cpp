@@ -1400,6 +1400,17 @@ clicprect_cx::~clicprect_cx()
 		rcb->set_cliprect(_renderer, &oldrc);
 	}
 }
+
+
+
+vgcache_cx::vgcache_cx()
+{}
+
+vgcache_cx::~vgcache_cx()
+{}
+
+
+
 #if 1
 canvas2d_t::canvas2d_t()
 {}
@@ -1409,10 +1420,14 @@ canvas2d_t::~canvas2d_t()
 	free_vkvgdev(vgdev); vgdev = nullptr;
 }
 
-void canvas2d_t::set_renderer(void* renderer, texture_cb* cb)
+void canvas2d_t::set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view)
 {
 	rptr = renderer;
 	rcb = cb;
+	if (view.z > 0 && view.w > 0)
+	{
+		_view = view;
+	}
 }
 
 void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
@@ -1513,7 +1528,7 @@ void canvas2d_t::update(rich_text_t* p, float delta)
 	}
 }
 
-void canvas2d_t::render_textdata(rich_text_t* p, const glm::vec2& pos)
+void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 {
 	void* renderer = rptr;
 	if (!p || !rcb || !renderer)return;
