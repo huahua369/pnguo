@@ -79,7 +79,7 @@ struct fill_style_d {
 	uint32_t fill = 0;		// 填充颜色
 	uint32_t color = 0;		// 线颜色stroke
 	float thickness = 1;	// 线宽
-	int round = 0;			// 圆角
+	glm::ivec4 round = {};			// 圆角
 	int cap = -1, join = -1;
 	int dash_offset = 0;
 	int dash_num = 0;		// 虚线计数 dash最大8、dash_p建议最大64

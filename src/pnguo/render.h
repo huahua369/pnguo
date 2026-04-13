@@ -225,6 +225,16 @@ struct dblock_d {
 	float scale_pos = 0;		// 视图缩放，不缩放线宽
 };
 void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
+// ui基本结构
+// 文本渲染结构
+struct text_st {
+	glm::vec2 pos;
+	glm::vec2 size;
+	int st_bg;		// 背景样式
+	int st_text;	// 文本样式
+	const char* text;
+	int text_len;
+};
 // 矢量图渲染缓存
 class vgcache_cx
 {
@@ -300,6 +310,9 @@ public:
 	void add_line(line_d* p, size_t count);
 	// 折线只有stroke
 	void add_polyline(polyline_d* p, size_t count);
+	// 文本渲染
+	bool set_text_style(text_style* ts, size_t count);
+	void add_text(text_st* p, size_t count);
 
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
