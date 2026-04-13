@@ -271,21 +271,35 @@ public:
 	void free_surface_ctx(void* ctx);
 	// 提交样式执行填充或描边
 	void submit_style(fill_style_d* st);
-	void draw_rounded_rectangle(double x, double y, double width, double height, const glm::vec4& r);
-	void draw_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
-
 	// 画2d箭头type=0线终点在三角形中间
 	void draw_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type = 0);
 	void draw_arrow2(float x, float y);
 
+	// 设置当前样式,执行填充或描边
+	void submit_styles(fill_style_d* st, size_t count);
 	// 画网格填充
-	void draw_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width);
-	// 画线性渐变填充
-	void draw_linear(const glm::vec2& ss, const glm::vec4* cols, int count);
+	void add_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width, int st);
 	// 批量渲染同样式的块(圆或矩形)
-	void draw_block(dblock_d* p, fill_style_d* style);
+	void add_block(dblock_d* p, int st);
 	// 描边或填充路径
-	void draw_path(path_d* path, fill_style_d* style);
+	void add_path(path_d* path, int st);
+	// 添加矩形
+	void add_rect(rect_d* r, size_t count);
+	void add_rect4r(rect4r_d* r, size_t count);
+	void add_circle(circle_d* p, size_t count);
+	void add_ellipse(ellipse_d* p, size_t count);
+	// 三角形基于矩形内 
+	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
+	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
+	void add_triangle(triangle_d* p, size_t count);
+	// 填充网格
+	void add_grid_fill(grid_fill_d* p);
+	// 线性渐变填充
+	void add_linear_fill(linear_fill_d* p);
+	// 批量画线线
+	void add_line(line_d* p, size_t count);
+	// 折线只有stroke
+	void add_polyline(polyline_d* p, size_t count);
 
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
