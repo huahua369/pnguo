@@ -941,6 +941,37 @@ int main()
 			text_t1_set(ptb1, &tbox);
 
 			auto ck = td3->new_surface_ctx(1024, 1024);
+			{
+
+#define white 1, 1, 1
+#define red   1, 0, 0
+#define green 0, 1, 0
+#define blue  0, 0, 1
+				auto ctx = (VkvgContext)ck;
+				vkvg_set_line_width(ctx, 2);
+				vkvg_set_source_rgba(ctx, red, 0.8);
+				float scale = 1.0;
+				draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
+				vkvg_set_line_width(ctx, 1);
+				vkvg_set_source_rgba(ctx, green, 0.8);
+				double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
+				const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
+				int           contours_size = 3;
+				for (int i = 0; i < contours_size - 1; i++) {
+					auto p = contours_array[i];
+					vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
+					p += 2;
+					while (p < contours_array[i + 1]) {
+						draw_arrow_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
+						p += 2;
+					}
+					vkvg_stroke(ctx);
+				}
+				VkvgSurface t = vkvg_get_target(ctx);
+				vkvg_flush(ctx);
+				vkvg_surface_resolve(t);
+				vkvg_surface_write_to_png(t, "temp/vkvgtest1150.png");
+			}
 			td3->free_surface_ctx(ck);
 			std::atomic_int wait2d = 0;
 			//			std::thread jt([=, &wait2d]() {

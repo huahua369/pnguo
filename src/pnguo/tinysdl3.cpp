@@ -458,7 +458,27 @@ SDL_Renderer* newRenderer(SDL_Window* window, const char* name, void* instance, 
 {
 	SDL_Renderer* renderer;
 	SDL_PropertiesID props = SDL_CreateProperties();
-	SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, window);
+	if (window)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, window);
+	if (instance)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_INSTANCE_POINTER, instance);
+	if (physical_device)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_PHYSICAL_DEVICE_POINTER, physical_device);
+	if (device)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_DEVICE_POINTER, device);
+	SDL_SetStringProperty(props, SDL_PROP_RENDERER_CREATE_NAME_STRING, name);
+	renderer = SDL_CreateRendererWithProperties(props);
+	SDL_DestroyProperties(props);
+	return renderer;
+}
+
+SDL_Renderer* newRenderer(int width, int height, const char* name, void* instance, void* physical_device, void* device)
+{
+	SDL_Renderer* renderer;
+	SDL_PropertiesID props = SDL_CreateProperties();
+	SDL_Surface* surface = SDL_CreateSurface(width, height, SDL_PixelFormat::SDL_PIXELFORMAT_ABGR8888);
+	if (surface)
+		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_SURFACE_POINTER, surface);
 	if (instance)
 		SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_VULKAN_INSTANCE_POINTER, instance);
 	if (physical_device)
@@ -533,6 +553,7 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 		else {
 			rn = *rdv.begin();
 		}
+		// auto renderer2d = newRenderer(ws.x,ws.y, rn.c_str(), _set_dev.inst, _set_dev.phy, _set_dev.vkdev);
 		renderer = newRenderer(window, rn.c_str(), _set_dev.inst, _set_dev.phy, _set_dev.vkdev);
 	}
 	int vsync = 0;

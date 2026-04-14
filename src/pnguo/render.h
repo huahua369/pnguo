@@ -191,7 +191,7 @@ void free_vkvgdev(vkvg_dev* p);
 void submit_style(VkvgContext cr, fill_style_d* st);
 void draw_rounded_rectangle(VkvgContext cr, double x, double y, double width, double height, const glm::vec4& r);
 void draw_triangle(VkvgContext cr, const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
-void draw_arrow2(VkvgContext ctx, float x, float y);
+void draw_arrow_to(VkvgContext ctx, float x, float y);
 // type=0线终点在三角形中间
 void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type = 0);
 
