@@ -1495,46 +1495,46 @@ void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
 	}
 }
 //
-void* canvas2d_t::new_surface_ctx(int width, int height)
+void* canvas2d_t::new_surface(int width, int height)
 {
 	if (width > 1 && height > 1 && vgdev && vgdev->ctx && vgdev->ctx->dev)
 	{
-		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height);
-		if (surf)
-		{
-			auto c = vkvg_create(surf);
-			if (c)
-			{
-				return c;
-			}
-			else {
-				vkvg_surface_destroy(surf);
-			}
-		}
+		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height); 
+		return (void*)surf;
 	}
 	return nullptr;
 }
-void canvas2d_t::free_surface_ctx(void* c)
+void canvas2d_t::free_surface(void* c)
 {
-	auto p = (VkvgContext)c;
-	if (p) {
-		VkvgSurface t = vkvg_get_target(p);
-		vkvg_destroy(p);
-		if (t) {
-			vkvg_surface_destroy(t);
-		}
+	if (c) {
+		vkvg_surface_destroy((VkvgSurface)c);
 	}
 }
 
-void canvas2d_t::update(void* ctx, float delta)
+void* canvas2d_t::ctx_begin(void* surface)
+{
+	auto c = vkvg_create((VkvgSurface)surface);
+	cctx = c;
+	return c;
+}
+
+void canvas2d_t::ctx_end()
+{
+	if (cctx)
+	{
+		vkvg_destroy((VkvgContext)cctx);
+		cctx = 0;
+	}
+}
+
+void canvas2d_t::update(void* surface, float delta)
 {
 	void* renderer = rptr;
-	auto p = (VkvgContext)ctx;
-	if (!ctx || !rcb || !renderer)return;
-	auto& tp = _vgt[ctx];
+	auto surf = (VkvgSurface)surface;
+	if (!surface || !rcb || !renderer)return;
+	auto& tp = _vgt[surface];
 	if (!tp)
-	{
-		VkvgSurface surf = vkvg_get_target(p);
+	{ 
 		VkImage img = vkvg_surface_get_vk_image(surf);
 		VkFormat fmt = vkvg_surface_get_vk_format(surf);
 		uint32_t w = vkvg_surface_get_width(surf);
@@ -1548,12 +1548,11 @@ void canvas2d_t::update(void* ctx, float delta)
 	}
 }
 
-void canvas2d_t::draw_surface_ctx(void* ctx, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size)
+void canvas2d_t::draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size)
 {
 	void* renderer = rptr;
-	auto p = (VkvgContext)ctx;
-	if (!ctx || !rcb || !renderer)return;
-	auto& tp = _vgt[ctx];
+	if (!surface || !rcb || !renderer)return;
+	auto& tp = _vgt[surface];
 	if (tp)
 	{
 		texture_dt dt = {};

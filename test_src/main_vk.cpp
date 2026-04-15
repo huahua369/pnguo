@@ -940,20 +940,20 @@ int main()
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			glm::ivec2 sc_size = { 1024,1024 };
-			auto ck = td3->new_surface_ctx(sc_size.x, sc_size.y);
+			auto ck = td3->new_surface(sc_size.x, sc_size.y);
 			{
 
 #define white 1, 1, 1
 #define red   1, 0, 0
 #define green 0, 1, 0
 #define blue  0, 0, 1
-				auto ctx = (VkvgContext)ck;
+				auto ctx = (VkvgContext)td3->ctx_begin(ck);
 				vkvg_set_line_width(ctx, 2);
-				vkvg_set_source_rgba(ctx, red, 0.8);
+				vkvg_set_source_rgba(ctx, blue, 0.8);
 				float scale = 2.0;
 				draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
 				vkvg_set_line_width(ctx, 1);
-				vkvg_set_source_rgba(ctx, green, 0.8);
+				vkvg_set_source_rgba(ctx, white, 0.8);
 				double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
 				const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
 				int           contours_size = 3;
@@ -971,8 +971,9 @@ int main()
 				vkvg_flush(ctx);
 				vkvg_surface_resolve(t);
 				vkvg_surface_write_to_png(t, "temp/vkvgtest1150.png");
+				td3->ctx_end();
 			}
-			//td3->free_surface_ctx(ck);
+
 			std::atomic_int wait2d = 0;
 			//			std::thread jt([=, &wait2d]() {
 			//
@@ -996,16 +997,8 @@ int main()
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
-					//if (vg2dtex)
-					//{
-					//	tdt.src_rect = { 0,0,texwidth,texwidth };
-					//	tdt.dst_rect = { 0,0,texwidth,texwidth };
-					//	pcb->render_texture(renderer, vg2dtex, &tdt, 1);//2d
-					//}
-					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
-					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
 					td3->draw_textdata(mtext, { 0,0 });
-					td3->draw_surface_ctx(ck, { 0,0 }, { 0,0,sc_size.x,sc_size.y }, sc_size);
+					td3->draw_surface(ck, { 0,0 }, { 0,0,sc_size.x,sc_size.y }, sc_size);
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -1109,6 +1102,7 @@ void main()
 			}
 			// 运行消息循环
 			run_app(app, 0);
+			td3->free_surface(ck);
 			delete ptb;
 			delete td3;
 

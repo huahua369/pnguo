@@ -311,6 +311,7 @@ public:
 	void* tex = 0;
 	void* rptr = 0;
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
+	void* cctx = 0;
 	uint32_t color = 0;
 public:
 	canvas2d_t();
@@ -318,12 +319,14 @@ public:
 	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view);
 	// 初始化矢量图渲染器，输入vk设备
 	void init_vgdev(dev_info_cx* d, int sample = 8);
-	// 创建vkvg surface上下文，输入宽高，返回上下文指针
-	void* new_surface_ctx(int width, int height);
-	void free_surface_ctx(void* ctx);
+	// 创建vkvg surface，输入宽高
+	void* new_surface(int width, int height);
+	void free_surface(void* surface);
+	void* ctx_begin(void* surface);
+	void ctx_end();
 
-	void update(void* ctx, float delta);
-	void draw_surface_ctx(void* ctx, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
+	void update(void* surface, float delta);
+	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
 
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
