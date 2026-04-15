@@ -1519,10 +1519,47 @@ void canvas2d_t::free_surface_ctx(void* c)
 	auto p = (VkvgContext)c;
 	if (p) {
 		VkvgSurface t = vkvg_get_target(p);
+		vkvg_destroy(p);
 		if (t) {
 			vkvg_surface_destroy(t);
 		}
-		vkvg_destroy(p);
+	}
+}
+
+void canvas2d_t::update(void* ctx, float delta)
+{
+	void* renderer = rptr;
+	auto p = (VkvgContext)ctx;
+	if (!ctx || !rcb || !renderer)return;
+	auto& tp = _vgt[ctx];
+	if (!tp)
+	{
+		VkvgSurface surf = vkvg_get_target(p);
+		VkImage img = vkvg_surface_get_vk_image(surf);
+		VkFormat fmt = vkvg_surface_get_vk_format(surf);
+		uint32_t w = vkvg_surface_get_width(surf);
+		uint32_t h = vkvg_surface_get_height(surf);
+		auto t = rcb->new_texture_vk(renderer, w, h, img, fmt == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);
+		if (t && t != tp)
+		{
+			rcb->set_texture_blend(t, 0, true);
+			tp = t;
+		}
+	}
+}
+
+void canvas2d_t::draw_surface_ctx(void* ctx, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size)
+{
+	void* renderer = rptr;
+	auto p = (VkvgContext)ctx;
+	if (!ctx || !rcb || !renderer)return;
+	auto& tp = _vgt[ctx];
+	if (tp)
+	{
+		texture_dt dt = {};
+		dt.dst_rect = glm::vec4(pos, size);
+		dt.src_rect = rc;
+		rcb->render_texture(renderer, tp, &dt, 1);
 	}
 }
 

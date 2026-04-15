@@ -939,8 +939,8 @@ int main()
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
-
-			auto ck = td3->new_surface_ctx(1024, 1024);
+			glm::ivec2 sc_size = { 1024,1024 };
+			auto ck = td3->new_surface_ctx(sc_size.x, sc_size.y);
 			{
 
 #define white 1, 1, 1
@@ -950,7 +950,7 @@ int main()
 				auto ctx = (VkvgContext)ck;
 				vkvg_set_line_width(ctx, 2);
 				vkvg_set_source_rgba(ctx, red, 0.8);
-				float scale = 1.0;
+				float scale = 2.0;
 				draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
 				vkvg_set_line_width(ctx, 1);
 				vkvg_set_source_rgba(ctx, green, 0.8);
@@ -972,7 +972,7 @@ int main()
 				vkvg_surface_resolve(t);
 				vkvg_surface_write_to_png(t, "temp/vkvgtest1150.png");
 			}
-			td3->free_surface_ctx(ck);
+			//td3->free_surface_ctx(ck);
 			std::atomic_int wait2d = 0;
 			//			std::thread jt([=, &wait2d]() {
 			//
@@ -1005,6 +1005,7 @@ int main()
 					//r_render_data_text(&ptb->trt, { 0,0 }, td3);
 					//r_render_data_text(&ptb1->trt, { 0,0 }, td3);
 					td3->draw_textdata(mtext, { 0,0 });
+					td3->draw_surface_ctx(ck, { 0,0 }, { 0,0,sc_size.x,sc_size.y }, sc_size);
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -1018,6 +1019,7 @@ int main()
 					light->_intensity = ity;
 					vkd->update(form0->io);	// 更新事件
 					{
+						td3->update(ck, delta);
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label(); str += (char*)u8"emoji表情🔥➗️👪️";

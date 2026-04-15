@@ -305,6 +305,7 @@ public:
 	vkvg_dev* vgdev = 0;
 	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
+	std::map<void*, void*> _vgt;
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	texture_cb* rcb = 0;
 	void* tex = 0;
@@ -317,9 +318,12 @@ public:
 	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view);
 	// 初始化矢量图渲染器，输入vk设备
 	void init_vgdev(dev_info_cx* d, int sample = 8);
+	// 创建vkvg surface上下文，输入宽高，返回上下文指针
 	void* new_surface_ctx(int width, int height);
 	void free_surface_ctx(void* ctx);
 
+	void update(void* ctx, float delta);
+	void draw_surface_ctx(void* ctx, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
 
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
