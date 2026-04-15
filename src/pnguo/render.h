@@ -258,35 +258,16 @@ struct text_vx
 };
 struct dev_info_cx;
 
-class canvas2d_t
+class rvg_cx
 {
 public:
-	// 矢量图渲染用
-	vkvg_dev* vgdev = 0;
-	// 文本渲染用
-	std::map<image_ptr_t*, void*> _vt;
-	std::vector<text_vx> opt; std::vector<uint32_t> idx;
-	texture_cb* rcb = 0;
-	void* tex = 0;
-	void* rptr = 0;
-	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
-	uint32_t color = 0;
-public:
-	canvas2d_t();
-	~canvas2d_t();
-	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view);
-	// 初始化矢量图渲染器，输入vk设备
-	void init_vgdev(dev_info_cx* d, int sample = 8);
-	void* new_surface_ctx(int width, int height);
-	void free_surface_ctx(void* ctx);
-	// 提交样式执行填充或描边
-	void submit_style(fill_style_d* st);
-	// 画2d箭头type=0线终点在三角形中间
-	void draw_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type = 0);
-	void draw_arrow2(float x, float y);
+	rvg_cx();
+	~rvg_cx();
 
 	// 设置当前样式,执行填充或描边
 	void submit_styles(fill_style_d* st, size_t count);
+	// 画2d箭头type=0线终点在三角形中间
+	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type, int st);
 	// 画网格填充
 	void add_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width, int st);
 	// 批量渲染同样式的块(圆或矩形)
@@ -313,10 +294,37 @@ public:
 	// 文本渲染
 	bool set_text_style(text_style* ts, size_t count);
 	void add_text(text_st* p, size_t count);
+private:
+
+};
+// 输入矢量图返回渲染数据
+class canvas2d_t
+{
+public:
+	// 矢量图渲染用
+	vkvg_dev* vgdev = 0;
+	// 文本渲染用
+	std::map<image_ptr_t*, void*> _vt;
+	std::vector<text_vx> opt; std::vector<uint32_t> idx;
+	texture_cb* rcb = 0;
+	void* tex = 0;
+	void* rptr = 0;
+	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
+	uint32_t color = 0;
+public:
+	canvas2d_t();
+	~canvas2d_t();
+	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view);
+	// 初始化矢量图渲染器，输入vk设备
+	void init_vgdev(dev_info_cx* d, int sample = 8);
+	void* new_surface_ctx(int width, int height);
+	void free_surface_ctx(void* ctx);
+
 
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
+
 
 	// 释放渲染器的纹理
 	void free_tex();
