@@ -1499,7 +1499,7 @@ void* canvas2d_t::new_surface(int width, int height)
 {
 	if (width > 1 && height > 1 && vgdev && vgdev->ctx && vgdev->ctx->dev)
 	{
-		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height); 
+		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height);
 		return (void*)surf;
 	}
 	return nullptr;
@@ -1518,12 +1518,11 @@ void* canvas2d_t::ctx_begin(void* surface)
 	return c;
 }
 
-void canvas2d_t::ctx_end()
+void canvas2d_t::ctx_end(void* ctx)
 {
-	if (cctx)
+	if (ctx)
 	{
-		vkvg_destroy((VkvgContext)cctx);
-		cctx = 0;
+		vkvg_destroy((VkvgContext)ctx);
 	}
 }
 
@@ -1534,7 +1533,7 @@ void canvas2d_t::update(void* surface, float delta)
 	if (!surface || !rcb || !renderer)return;
 	auto& tp = _vgt[surface];
 	if (!tp)
-	{ 
+	{
 		VkImage img = vkvg_surface_get_vk_image(surf);
 		VkFormat fmt = vkvg_surface_get_vk_format(surf);
 		uint32_t w = vkvg_surface_get_width(surf);

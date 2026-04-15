@@ -323,7 +323,7 @@ public:
 	void* new_surface(int width, int height);
 	void free_surface(void* surface);
 	void* ctx_begin(void* surface);
-	void ctx_end();
+	void ctx_end(void* ctx);
 
 	void update(void* surface, float delta);
 	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);

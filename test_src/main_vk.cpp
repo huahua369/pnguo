@@ -971,7 +971,7 @@ int main()
 				vkvg_flush(ctx);
 				vkvg_surface_resolve(t);
 				vkvg_surface_write_to_png(t, "temp/vkvgtest1150.png");
-				td3->ctx_end();
+				td3->ctx_end(ctx);
 			}
 
 			std::atomic_int wait2d = 0;
@@ -1043,7 +1043,7 @@ int main()
 					{
 						savepng = false;
 					}
-					app->wait_device();
+					//app->wait_device();
 					//app->wait_queue(0);
 					wait2d = 0;
 					//while (wait2d == 0) {
