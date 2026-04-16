@@ -28,6 +28,20 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include "shaders/base3d2.frag.h"
 
 #include "tinysdl3.h"
+
+
+
+#define SP_RGBA32_R_U(v) ((v) & 0xff)
+#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
+#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
+#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
+#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
+#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
+#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
+#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
+#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
+#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+
 	// 线，二阶曲线，三阶曲线
 enum class vtype_e1 :uint8_t
 {
@@ -1455,6 +1469,189 @@ void rvg_cx::add_text(text_st* p, size_t count)
 {
 
 }
+union u_col
+{
+	uint32_t uc;
+	unsigned char u[4];
+	struct urgba
+	{
+		unsigned char r, g, b, a;
+	}c;
+};
+#define FCV 255.0
+#define FCV1 256.0
+inline uint32_t set_alpha_xf(uint32_t c, double af)
+{
+	if (af < 0)af = 0;
+	//uint32_t a = af * FCV;
+	u_col* t = (u_col*)&c;
+	double a = t->c.a * af + 0.5;
+	if (a > 255)
+		t->c.a = 255;
+	else
+		t->c.a = a;
+	return c;
+}
+inline uint32_t set_alpha_xf2(uint32_t c, double af)
+{
+	if (af < 0)af = 0;
+	u_col* t = (u_col*)&c;
+	t->c.r *= af;
+	t->c.g *= af;
+	t->c.b *= af;
+	return c;
+}
+inline uint32_t set_alpha_f(uint32_t c, double af)
+{
+	if (af > 1)af = 1;
+	if (af < 0)af = 0;
+	uint32_t a = af * FCV + 0.5;
+	u_col* t = (u_col*)&c;
+	t->c.a = a;
+	return c;
+}
+void set_color(VkvgContext cr, uint32_t rgba)
+{
+	vkvg_set_source_rgba(cr, SP_RGBA32_R_F(rgba),
+		SP_RGBA32_G_F(rgba),
+		SP_RGBA32_B_F(rgba),
+		SP_RGBA32_A_F(rgba));
+}
+void draw_rectangle(VkvgContext cr, const glm::ivec4& rc, int r)
+{
+	if (r > 0)
+	{
+		vkvg_rounded_rectangle(cr, rc.x, rc.y, rc.z, rc.w, r);
+	}
+	else {
+		vkvg_rectangle(cr, rc.x, rc.y, rc.z, rc.w);
+	}
+}
+inline glm::vec4 to_c4(uint32_t c)
+{
+	u_col* t = (u_col*)&c;
+	glm::vec4 fc;
+	float* f = &fc.x;
+	for (int i = 0; i < 4; i++)
+	{
+		*f++ = t->u[i] / FCV;
+	}
+	return  fc;
+}
+
+
+void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
+{
+	float x = p->pos.x, y = p->pos.y, w = p->size.x, h = p->size.y;
+	int pushed = p->mPushed ? 0 : 1;
+	uint32_t gradTop = p->gradTop;
+	uint32_t gradBot = p->gradBot;
+	uint32_t borderDark = p->borderDark;
+	uint32_t borderLight = p->borderLight;
+	double oa = p->opacity;
+	auto ns = p->size;
+	auto bc = p->effect == uTheme::light ? p->back_color : set_alpha_xf2(p->back_color, get_alpha_f(p->back_color));
+	double rounding = p->rounding;
+	glm::vec2 ns1 = { w * 0.5, h * 0.5 };
+	auto nr = (int)std::min(ns1.x, ns1.y);
+	if (rounding > nr)
+	{
+		rounding = nr;
+	}
+	vkvg_save(cr);
+	vkvg_translate(cr, x, y);
+	if (is_alpha(bc))
+	{
+		bc = set_alpha_f(bc, oa);
+		glm::ivec4 rcc = { p->thickness,p->thickness, w - p->thickness, h - p->thickness * 2 };
+		draw_rectangle(cr, rcc, rounding);
+		set_color(cr, bc);
+		vkvg_fill(cr);
+	}
+	if (p->mPushed) {
+		gradTop = set_alpha_f(gradTop, 0.8f);
+		gradBot = set_alpha_f(gradBot, 0.8f);
+	}
+	else {
+		double v = 1 - get_alpha_f(p->back_color);
+		auto gv = p->mEnabled ? v : v * .5f + .5f;
+		gradTop = set_alpha_xf(gradTop, gv);
+		gradBot = set_alpha_xf(gradBot, gv);
+	}
+	auto gt = to_c4(gradTop);
+	auto gt1 = to_c4(gradBot);
+	gradTop = set_alpha_xf(gradTop, oa);
+	gradBot = set_alpha_xf(gradBot, oa);
+	borderLight = set_alpha_xf(borderLight, oa);
+	borderDark = set_alpha_xf(borderDark, oa);
+	// 渐变
+	glm::vec4 r;
+	if (rounding > 0)
+	{
+		r = { rounding, rounding, rounding, rounding };
+	}
+	glm::vec2 rct = { w - p->thickness, h - p->thickness * 2 };
+	glm::vec4 gtop = to_c4(gradTop);
+	glm::vec4 gbot = to_c4(gradBot);
+
+	vkvg_save(cr);
+	if (p->effect == uTheme::dark)
+		vkvg_translate(cr, p->thickness, p->thickness);
+	else if (p->mPushed)
+		vkvg_translate(cr, p->thickness, p->thickness);
+	paint_shadow(cr, 0, rct.y, rct.x, rct.y, gtop, gbot, 0, rounding);// 垂直方向
+	vkvg_restore(cr);
+	// 渲染标签
+	glm::vec2 ps = { p->thickness * 2, p->thickness * 2 };
+	if (p->mPushed) {
+		ps += p->thickness;
+	}
+	ns -= p->thickness * 4;
+	glm::vec4 rc = { ps, ns };
+
+#if 0
+	text_style_t st = {};
+	st.font = 0;
+	st.text_align = p->text_align;
+	st.font_size = p->font_size;
+	st.text_color = p->text_color;
+	st.shadow_pos = { thickness, thickness };
+	st.text_color_shadow = text_color_shadow;
+	{
+		int font = 0;
+		glm::vec2 text_align = { 0.0,0.5 };
+		glm::vec2 shadow_pos = { 1.0,1.0 };
+		int font_size = 18;
+		uint32_t text_color = 0xffffffff;
+		uint32_t text_color_shadow = 0;
+	};
+	draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
+
+
+
+	ltx->tem_rtv.clear();
+	ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
+	ltx->update_text();
+	if (text_color_shadow)
+	{
+		vkvg_as _aa_(g);
+		vkvg_translate(g, thickness, thickness);
+		ltx->draw_text(g, ltx->tem_rtv, text_color_shadow);
+	}
+	ltx->draw_text(g, ltx->tem_rtv, p->text_color);
+
+#endif // 1
+	// 边框
+	vkvg_set_line_width(cr, p->thickness);
+	set_color(cr, borderLight);
+	draw_rectangle(cr, { 0.5f,  (p->mPushed ? 0.5f : 1.5f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
+	vkvg_stroke(cr);
+	set_color(cr, borderDark);
+	draw_rectangle(cr, { 0.5f,  0.5f, w, h - 0.5 }, rounding);
+	vkvg_stroke(cr);
+	vkvg_restore(cr);
+}
+
 
 canvas2d_t::canvas2d_t()
 {}
@@ -1491,6 +1688,7 @@ void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
 	}
 	if (p)
 	{
+		p->qindex = cc.qIndex;
 		vgdev = p;
 	}
 }

@@ -152,8 +152,9 @@ public:
 	VkDevice vkdev = 0;
 	vkvgctx* ctx = 0;
 	vkvg_func_t* fun = {};
-	VkSampleCountFlags samplecount = {};
 	void* memoryProperties = 0;
+	VkSampleCountFlags samplecount = {};
+	int qindex = 0;
 public:
 	vkvg_dev();
 	~vkvg_dev();
@@ -199,6 +200,31 @@ void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float
 void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols, int width);
 // 画线性渐变填充
 void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count);
+
+struct gradient_btn_t
+{
+	glm::vec2 pos = {}, size = {};
+	std::string str;
+	uint32_t back_color = 0xff000000;
+	uint32_t text_color = -1;
+	uint32_t text_color_shadow = 0x88111111;
+	double opacity = 1.0;
+	// private
+	uint32_t gradTop = 0;
+	uint32_t gradBot = 0;
+	uint32_t borderLight = 0;
+	uint32_t borderDark = 0;
+	uTheme effect = uTheme::light;	// dark
+	int rounding = 4;
+	int thickness = 1;
+	bool mPushed = false;
+	bool mChecked = false;
+	bool mMouseFocus = false;
+	bool mEnabled = true;
+	bool is_muilt = true;
+};
+
+void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p);
 
 
 /*
@@ -322,6 +348,7 @@ public:
 	// 创建vkvg surface，输入宽高
 	void* new_surface(int width, int height);
 	void free_surface(void* surface);
+	// begin/end渲染，输入surface指针，返回渲染上下文指针，中间可以调用vkvg的渲染函数
 	void* ctx_begin(void* surface);
 	void ctx_end(void* ctx);
 
