@@ -1517,7 +1517,7 @@ void set_color(VkvgContext cr, uint32_t rgba)
 		SP_RGBA32_B_F(rgba),
 		SP_RGBA32_A_F(rgba));
 }
-void draw_rectangle(VkvgContext cr, const glm::ivec4& rc, int r)
+void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r)
 {
 	if (r > 0)
 	{
@@ -1540,6 +1540,33 @@ inline glm::vec4 to_c4(uint32_t c)
 }
 
 
+bool gradient_btn_update(gradient_btn_t* p, float delta)
+{
+	if (!p)return false;
+	if (p->bst == p->_old_bst)return false;
+	p->_old_bst = p->bst;
+	auto& info = *p;
+
+	// (sta & hz::BTN_STATE::STATE_FOCUS)
+	uint32_t gradTop = 0xff4a4a4a;
+	uint32_t gradBot = 0xff3a3a3a;
+
+	info.mPushed = (p->bst & (int)BTN_STATE::STATE_ACTIVE);
+	info.mMouseFocus = (p->bst & (int)BTN_STATE::STATE_HOVER);
+	if (p->bst & (int)BTN_STATE::STATE_DISABLE)
+		info.mEnabled = false;
+	if (info.mPushed) {
+		gradTop = 0xff292929;
+		gradBot = 0xff1d1d1d;
+	}
+	else if (info.mMouseFocus && info.mEnabled) {
+		gradTop = 0x80404040;
+		gradBot = 0x80303030;
+	}
+	info.gradTop = gradTop;
+	info.gradBot = gradBot;
+	return true;
+}
 void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 {
 	float x = p->pos.x, y = p->pos.y, w = p->size.x, h = p->size.y;
@@ -1563,7 +1590,7 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 	if (is_alpha(bc))
 	{
 		bc = set_alpha_f(bc, oa);
-		glm::ivec4 rcc = { p->thickness,p->thickness, w - p->thickness, h - p->thickness * 2 };
+		glm::vec4 rcc = { p->thickness,p->thickness, w - p->thickness, h - p->thickness * 2 };
 		draw_rectangle(cr, rcc, rounding);
 		set_color(cr, bc);
 		vkvg_fill(cr);
@@ -1644,10 +1671,13 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 	// 边框
 	vkvg_set_line_width(cr, p->thickness);
 	set_color(cr, borderLight);
-	draw_rectangle(cr, { 0.5f,  (p->mPushed ? 0.5f : 1.5f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
+	w -= 1;
+	h -= 1;
+	glm::vec2 tps = { 0.5,0.5 };
+	draw_rectangle(cr, { tps.x,tps.y + (p->mPushed ? 0.f : 1.0f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
 	vkvg_stroke(cr);
 	set_color(cr, borderDark);
-	draw_rectangle(cr, { 0.5f,  0.5f, w, h - 0.5 }, rounding);
+	draw_rectangle(cr, { tps.x,tps.y, w , h }, rounding);
 	vkvg_stroke(cr);
 	vkvg_restore(cr);
 }

@@ -939,10 +939,9 @@ int main()
 			auto gbtn = new gradient_btn_t();
 			gbtn->pos = { 500,150 };
 			gbtn->size = { 200,36 };
-			gbtn->back_color = 0x8052cc22;
-			gbtn->back_color = 0x80222222;
-			gbtn->borderLight = 0xff5c5c5c;
-			gbtn->borderDark = 0xff1d1d1d;
+			gbtn->back_color = 0x905050fc;
+			gbtn->borderLight = 0xffacacac;
+			gbtn->borderDark = 0xff5d5d5d;
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
@@ -974,6 +973,7 @@ int main()
 					}
 					vkvg_stroke(ctx);
 				}
+				gradient_btn_update(gbtn, 0.0);
 				gradient_btn_draw(ctx, gbtn);
 				VkvgSurface t = vkvg_get_target(ctx);
 				vkvg_flush(ctx);
@@ -1024,7 +1024,7 @@ int main()
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label(); str += (char*)u8"emoji表情🔥➗️👪️";
-						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
+						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
 						// 添加文本
@@ -1032,7 +1032,7 @@ int main()
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 						static glm::ivec2 imgpos = { 100,100 };
-						rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, 0x50ffffff, { 64 * 5,64 * 3 }, imgpos, true);
+						//rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, 0x50ffffff, { 64 * 5,64 * 3 }, imgpos, true);
 						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 
 						rt_build(mtext);

@@ -203,7 +203,7 @@ void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int
 
 struct gradient_btn_t
 {
-	glm::vec2 pos = {}, size = {};
+	glm::ivec2 pos = {}, size = {};
 	std::string str;
 	uint32_t back_color = 0xff000000;
 	uint32_t text_color = -1;
@@ -212,11 +212,16 @@ struct gradient_btn_t
 	// private
 	uint32_t gradTop = 0;
 	uint32_t gradBot = 0;
-	uint32_t borderLight = 0;
-	uint32_t borderDark = 0;
+	uint32_t borderLight = 0xff5c5c5c;
+	uint32_t borderDark = 0xff1d1d1d;
 	uTheme effect = uTheme::light;	// dark
 	int rounding = 4;
 	int thickness = 1;
+
+	int bst = 1;				// 鼠标状态
+	int _old_bst = 0;			// 鼠标状态
+	int cks = 0;				// 鼠标点击状态
+
 	bool mPushed = false;
 	bool mChecked = false;
 	bool mMouseFocus = false;
@@ -224,6 +229,7 @@ struct gradient_btn_t
 	bool is_muilt = true;
 };
 
+bool gradient_btn_update(gradient_btn_t* p, float delta);
 void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p);
 
 
