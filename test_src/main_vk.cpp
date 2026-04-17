@@ -936,17 +936,14 @@ int main()
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
 			auto mtext = new rich_text_t();
-			auto gbtn = new gradient_btn_t();
-			gbtn->pos = { 500,150 };
-			gbtn->size = { 200,36 };
-			gbtn->back_color = 0x905050fc;
-			gbtn->borderLight = 0xffacacac;
-			gbtn->borderDark = 0xff5d5d5d;
+			auto gbtn = new gradient_btn_t[5];
+			auto gt = gbtn;
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			glm::ivec2 sc_size = { 1024,1024 };
 			auto ck = td3->new_surface(sc_size.x, sc_size.y);
+			//gbtn->bst = (int)BTN_STATE::STATE_ACTIVE;
 			{
 
 #define white 1, 1, 1
@@ -956,7 +953,7 @@ int main()
 				auto ctx = (VkvgContext)td3->ctx_begin(ck);
 				vkvg_set_line_width(ctx, 2);
 				vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.8);
-				float scale = 2.0;
+				float scale = 1.0;
 				draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
 				vkvg_set_line_width(ctx, 1);
 				vkvg_set_source_rgba(ctx, white, 0.8);
@@ -973,8 +970,20 @@ int main()
 					}
 					vkvg_stroke(ctx);
 				}
-				gradient_btn_update(gbtn, 0.0);
-				gradient_btn_draw(ctx, gbtn);
+				uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
+				int xx = 0;
+				for (size_t i = 0; i < 5; i++)
+				{
+					gt->pos = { 500 ,150 + xx };
+					gt->size = { 200,36 };
+					gt->back_color = colors[i];
+					gt->borderLight = 0x805c5c5c;
+					gt->borderDark = 0x801d1d1d;
+					gradient_btn_update(gt, 0.0);
+					gradient_btn_draw(ctx, gt);
+					gt++;
+					xx += 40;
+				}
 				VkvgSurface t = vkvg_get_target(ctx);
 				vkvg_flush(ctx);
 				vkvg_surface_resolve(t);
