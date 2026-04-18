@@ -7747,6 +7747,36 @@ void scroll_bar::draw(cairo_t* cr)
 		}
 	}
 }
+#else
+
+void scroll_bar::draw()
+{ 
+	glm::ivec2 poss = pos;
+	glm::ivec2 ss = size;
+
+	{
+		//cairo_translate(cr, poss.x, poss.y);
+		// 背景
+		if (!hideble || thumb_size_m.z) {
+			//draw_rectangle(cr, { 0,0,ss }, rounding);
+			//fill_stroke(cr, _color.x, 0, 0, 0);
+		}
+		// 滑块
+		double rw = _rc_width * scale_s;
+		glm::ivec4 trc = { 0,0,rw,rw };
+		int px = _dir ? 0 : 1;
+		auto pxs = ceil((ss[px] - rw) * 0.5);
+		trc.x = pxs;
+		trc.y = pxs;
+		trc[_dir] = tps[_dir] + _offset;
+		trc[2 + _dir] = thumb_size_m.x;
+		if (thumb_size_m.z)
+		{
+			//draw_rectangle(cr, trc, _rc_width * 0.5 * scale_s);
+			//fill_stroke(cr, _tcc, 0, 0, 0);
+		}
+	}
+}
 #endif
 
 
