@@ -244,13 +244,108 @@ public:
 	virtual glm::ivec2 get_pos(bool has_parent = true);
 };
 
+#ifndef NOT_UI
+class form_x;
+
+//  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
+struct widget_t
+{
+public:
+	int id = 0;
+	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
+	int _bst = 1;			// 鼠标状态
+	glm::vec2 pos = {};		// 控件坐标
+	glm::vec2 size = {};	// 控件大小
+	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
+	glm::ivec2 cmpos = {};	// 当前鼠标坐标
+	glm::ivec2 mmpos = {};	// 当前鼠标坐标
+	glm::ivec2 ppos = {};	// 父级坐标 
+	std::string text;		// 内部显示用字符串
+	std::string family;
+	float font_size = 16;
+	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
+	int rounding = 4;		// 圆角
+	float thickness = 1.0;	// 边框线粗
+
+	std::function<void(uint32_t type, et_un_t* e, const glm::vec2& pos)> on_event_cb;	//自定义事件处理
+	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
+	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
+	int _clicks = 0;		// 点击数量
+	layout_text_x* ltx = 0;
+
+	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
+	int _old_bst = 0;			// 鼠标状态
+	int cks = 0;				// 鼠标点击状态
+	widget_t* parent = 0;
+	double dtime = 0.0;
+	bool _disabled_events = false;
+	bool visible = true;
+	bool _absolute = false;		// true绝对坐标，false布局计算
+	bool has_drag = false;	// 是否有拖动事件
+	bool _autofree = false;
+	bool has_hover_sc = 0;	// 滚动在父级接收
+	bool _hover = true;
+	bool uplayout = true;
+public:
+	widget_t();
+	widget_t(WIDGET_TYPE wt);
+	virtual ~widget_t();
+	//event_type2
+	virtual bool on_mevent(int type, const glm::vec2& mps);
+	virtual bool update(float delta);
+	virtual void draw(rvg_cx* rv);
+	virtual glm::ivec2 get_pos(bool has_parent = true);
+	virtual glm::ivec2 get_spos();	// 滚动坐标
+};
+void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
+void send_hover(widget_t* wp, const glm::vec2& mps);
+
+struct drag_v6
+{
+	glm::ivec2 pos;
+	glm::ivec2 size;
+	glm::ivec2 tp, cp0, cp1;
+	int ck = 0;
+	int z = 0;
+};
+
+class div_cx :public widget_t
+{
+public:
+	glm::vec4 viewport = {};
+	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
+	glm::ivec2 _move_pos = {};
+	int evupdate = 0;
+	int ckinc = 0;
+	int ckup = 0;
+	std::vector<widget_t*> widgets, event_wts, event_wts1;
+	std::vector<drag_v6> drags;	// 拖动坐标
+	std::vector<drag_v6*> dragsp;	// 拖动区域
+public:
+	div_cx();
+	~div_cx();
+
+	void on_event(uint32_t type, et_un_t* ep);
+private:
+	void sortdg();
+};
+
+// 移到最后
+void form_move2end(form_x* f, div_cx* ud);
+// 设置接收输入的控件
+void form_set_input_ptr(form_x* f, void* ud);
+// OLO拖放文本
+bool dragdrop_begin(const wchar_t* str, size_t size);
+
+#endif // !NOT_UI
+
 
 // 输入布局样式等信息+文字
 #ifndef NO_EDIT
 
 class text_ctx_cx;
 
-class edit_tl :public widget_base
+class edit_tl :public widget_t
 {
 public:
 	text_ctx_cx* ctx = 0;							// 布局/渲染/事件处理
@@ -347,7 +442,7 @@ enum class BTN_STATE :uint8_t
 };
 
 // todo图片按钮
-struct image_btn :public widget_base {
+struct image_btn :public widget_t {
 	std::string str;
 	image_ptr_t* img = 0;
 	image_sliced_t state_img[5] = {};
@@ -361,7 +456,7 @@ public:
 	void draw(rvg_cx* rv);
 };
 // 纯色按钮
-struct color_btn :public widget_base
+struct color_btn :public widget_t
 {
 	std::string str;
 	float light = 0.512;
@@ -390,7 +485,7 @@ public:
 
 // 渐变按钮
 
-struct gradient_btn :public widget_base
+struct gradient_btn :public widget_t
 {
 	std::string str;
 	//const char* icon = nullptr;
@@ -472,7 +567,7 @@ struct group_radio_t
 	int ct = 0;				// 引用计数
 };
 // 单选
-struct radio_tl :public widget_base
+struct radio_tl :public widget_t
 {
 	radio_style_t style = {};	// 风格id
 	radio_info_t v;
@@ -491,7 +586,7 @@ public:
 	void draw(rvg_cx* rv);
 };
 // 复选
-struct checkbox_tl :public widget_base
+struct checkbox_tl :public widget_t
 {
 	check_style_t style = {};	// 风格id
 	checkbox_info_t v;
@@ -509,7 +604,7 @@ public:
 };
 
 // 开关
-struct switch_tl :public widget_base
+struct switch_tl :public widget_t
 {
 	glm::ivec3 color = { 0xffff9e40, 0xff4c4c4c,-1 }; // 开/关/圆点颜色 { 0xff66ce13, 0xff4949ff };
 	glm::ivec2 text_color = { 0xffff9e40, 0xff4c4c4c }; // 文本颜色;
@@ -532,7 +627,7 @@ public:
 	void draw(rvg_cx* rv);
 };
 // 进度条
-struct progress_tl :public widget_base
+struct progress_tl :public widget_t
 {
 	std::string format;				// 格式
 	glm::vec2 vr = { 0, 100 };		// 范围
@@ -554,7 +649,7 @@ public:
 	void draw(rvg_cx* rv);
 };
 // 滑块
-struct slider_tl :public widget_base
+struct slider_tl :public widget_t
 {
 	glm::vec2 vr = { 0, 100 };		// 范围
 	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色 
@@ -579,7 +674,7 @@ public:
 	void draw(rvg_cx* rv);
 };
 // 颜色控件
-struct colorpick_tl :public widget_base
+struct colorpick_tl :public widget_t
 {
 	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
 	glm::vec4 hsv = {}, oldhsv = {};	// 0-1保存hsv
@@ -611,7 +706,7 @@ public:
 };
 
 // 滚动条
-struct scroll_bar :public widget_base
+struct scroll_bar :public widget_t
 {
 	int64_t _view_size = 0;			// 视图大小
 	int64_t _content_size = 0;		// 内容大小 
@@ -672,14 +767,6 @@ struct layout_info_x {
 	flex_align align_items = flex_align::ALIGN_START;
 	flex_direction direction = flex_direction::ROW;		// 行/列
 	flex_wrap wrap = flex_wrap::WRAP;						// 是否换行
-};
-struct drag_v6
-{
-	glm::ivec2 pos;
-	glm::ivec2 size;
-	glm::ivec2 tp, cp0, cp1;
-	int ck = 0;
-	int z = 0;
 };
 struct scroll2_t
 {

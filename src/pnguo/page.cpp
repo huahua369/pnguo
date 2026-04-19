@@ -17,38 +17,38 @@
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc)
 {
 	if (!form || !bc || str.empty())return;
-	auto div = new plane_cx();
-	div->set_fontctx(form->app->font_ctx);
-	div->add_familys(bc->family, 0);
-	div->fontsize = bc->fonst_size;
-	div->_css.align_content = flex_align::ALIGN_CENTER;
-	div->_css.justify_content = flex_align::ALIGN_CENTER;
-	div->_css.align_items = flex_align::ALIGN_CENTER;
+	//auto div = new plane_cx();
+	////div->set_fontctx(form->app->font_ctx);
+	////div->add_familys(bc->family, 0);
+	//div->fontsize = bc->fonst_size;
+	//div->_css.align_content = flex_align::ALIGN_CENTER;
+	//div->_css.justify_content = flex_align::ALIGN_CENTER;
+	//div->_css.align_items = flex_align::ALIGN_CENTER;
 
-	div->_lpos = { 0,0 }; div->_lms = { 0,0 };
-	div->border = { bc->color.y,bc->thickness,bc->radius,bc->color.x };
-	auto ft = div->ltx;
-	auto rc = ft->get_text_rect(0, bc->fonst_size, str.c_str(), str.size());
-	auto h = ft->get_lineheight(0, bc->fonst_size);
-	div->set_clear_color(0);
-	auto drc = rc;
-	rc.y = h;
-	drc += h;
-	div->set_size(drc);
-	drc += h;
-	auto lp1 = div->add_label(str, rc, 0);
-	lp1->id = 1234;
-	lp1->text_align = {};
-	//auto lp = div->add_cbutton(str, rc, 0);
-	if (!form->tooltip)
-		form->tooltip = new_form_tooltip(form, drc.x, drc.y);
-	else {
-		form->tooltip->clear_wt();
-		form->tooltip->set_size(drc);
-	}
-	//form->tooltip->bind(div);
-	form->tooltip->show();
-	form->tooltip->set_pos(pos);
+	//div->_lpos = { 0,0 }; div->_lms = { 0,0 };
+	//div->border = { bc->color.y,bc->thickness,bc->radius,bc->color.x };
+	//auto ft = div->ltx;
+	//auto rc = ft->get_text_rect(0, bc->fonst_size, str.c_str(), str.size());
+	//auto h = ft->get_lineheight(0, bc->fonst_size);
+	//div->set_clear_color(0);
+	//auto drc = rc;
+	//rc.y = h;
+	//drc += h;
+	//div->set_size(drc);
+	//drc += h;
+	//auto lp1 = div->add_label(str, rc, 0);
+	//lp1->id = 1234;
+	//lp1->text_align = {};
+	////auto lp = div->add_cbutton(str, rc, 0);
+	//if (!form->tooltip)
+	//	form->tooltip = new_form_tooltip(form, drc.x, drc.y);
+	//else {
+	//	form->tooltip->clear_wt();
+	//	form->tooltip->set_size(drc);
+	//}
+	////form->tooltip->bind(div);
+	//form->tooltip->show();
+	//form->tooltip->set_pos(pos);
 }
 
 void hide_tooltip(form_x* form)
@@ -1375,128 +1375,129 @@ namespace mg {
 	menu_cx* new_mm(menumain_info* mm)
 	{
 		if (!mm || !mm->form0 || !mm->fontn || !mm->mvs)return 0;
-		auto mainmenu = new plane_cx();
-		//mm->form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
-		auto p = mainmenu;
-		p->add_familys(mm->fontn, 0);
-		p->set_color({ 0,1,0,mm->bc_color });
-		p->fontsize = 16;
-
-		{
-			glm::ivec2  fs = mm->form0->get_size();
-			if (fs.x & 1)
-				fs.x++;
-			if (fs.y & 1)
-				fs.y++;
-			p->set_size({ fs.x, 30 });
-		}
-		p->set_pos({});
-		glm::vec2 cs = { 1500,1600 };
-		auto vs = p->get_size();
-		auto mmd = *mm;
-		p->set_view(vs, cs);
-		p->update_cb = [=](float dt)
-			{
-				bool r = false;
-				if (mmd.form0)
-				{
-					glm::ivec2 ps = p->get_size(), fs = mmd.form0->get_size();
-					if (fs.x & 1)
-						fs.x++;
-					if (fs.y & 1)
-						fs.y++;
-					if (ps.x != fs.x)
-					{
-						p->set_size({ fs.x, 30 });
-						r = true;
-					}
-				}
-				return r;
-			};
 
 		menu_cx* mc = new menu_cx();	// 菜单管理
-		mc->set_main(mmd.form0);
-		mc->add_familys(mmd.fontn);
-		auto mgp = (mmd.pm && mmd.count && mmd.count == mmd.mvs->size()) ? mc->new_menu_g(mmd.pm, mmd.count, mmd.msize, mmd.cb) : nullptr;
+		//auto mainmenu = new plane_cx();
+		////mm->form0->bind(mainmenu, 1);	// 绑定主菜单到窗口
+		//auto p = mainmenu;
+		//p->add_familys(mm->fontn, 0);
+		//p->set_color({ 0,1,0,mm->bc_color });
+		//p->fontsize = 16;
 
-		int xc = 0;
-		mc->u = p;
-		int ix = 0;
-		for (auto& it : mmd.mvs[0])
-		{
-			auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
-			cbt->effect = uTheme::light;
-			cbt->hscroll = {};
-			cbt->rounding = 0;
-			cbt->light = 0.1;
+		//{
+		//	glm::ivec2  fs = mm->form0->get_size();
+		//	if (fs.x & 1)
+		//		fs.x++;
+		//	if (fs.y & 1)
+		//		fs.y++;
+		//	p->set_size({ fs.x, 30 });
+		//}
+		//p->set_pos({});
+		//glm::vec2 cs = { 1500,1600 };
+		//auto vs = p->get_size();
+		//auto mmd = *mm;
+		//p->set_view(vs, cs);
+		//p->update_cb = [=](float dt)
+		//	{
+		//		bool r = false;
+		//		if (mmd.form0)
+		//		{
+		//			glm::ivec2 ps = p->get_size(), fs = mmd.form0->get_size();
+		//			if (fs.x & 1)
+		//				fs.x++;
+		//			if (fs.y & 1)
+		//				fs.y++;
+		//			if (ps.x != fs.x)
+		//			{
+		//				p->set_size({ fs.x, 30 });
+		//				r = true;
+		//			}
+		//		}
+		//		return r;
+		//	};
 
-			cbt->click_cb = [=](void* ptr, int clicks)
-				{
-					if (mmd.mcb)mmd.mcb(ptr, clicks, ix);
-				};
-			ix++;
-			cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
-				{
-					static void* enterst = 0;
-					auto cp = (color_btn*)pt;
-					auto t = (event_type2)type;
-					switch (t)
-					{
-					case event_type2::on_down:
-					{
-						auto cps = cp->get_pos();
-						cps.y += cp->size.y + cp->thickness;
-						if (mgp)
-							mc->show_mg(mgp, xc, cps);
-						hide_tooltip(mmd.form0);
-						mmd.form0->uptr = 0;
-					}
-					break;
-					case event_type2::on_enter:
-					{
-						enterst = pt;
-						if (mgp && mgp->cx >= 0)
-						{
-							auto pmx = &mgp->ptr[mgp->cx];
-							if (pmx->get_visible()) {
-								auto cps = cp->get_pos();
-								cps.y += cp->size.y + cp->thickness;
-								pmx->hide(true);
-								mc->show_mg(mgp, xc, cps);
-							}
-						}
-					}
-					break;
-					case event_type2::on_hover:
-					{
-						// 0.5秒触发悬停事件
-						style_tooltip stp = {};
-						stp.family = mmd.fontn;
-						stp.fonst_size = 14;
-						glm::vec2 cps = mps;
-						cps.y += 20;
-						if (enterst == pt) {
-							if (mmd.form0->uptr != pt)
-							{
-								//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
-								mmd.form0->uptr = pt;
-							}
-						}
-					}
-					break;
-					case event_type2::on_leave:
-					{
-						if (enterst == pt) {
-							hide_tooltip(mmd.form0);
-							mmd.form0->uptr = 0;
-						}
-					}
-					break;
-					default:
-						break;
-					}
-				};
-		}
+		//mc->set_main(mmd.form0);
+		//mc->add_familys(mmd.fontn);
+		//auto mgp = (mmd.pm && mmd.count && mmd.count == mmd.mvs->size()) ? mc->new_menu_g(mmd.pm, mmd.count, mmd.msize, mmd.cb) : nullptr;
+
+		//int xc = 0;
+		//mc->u = p;
+		//int ix = 0;
+		//for (auto& it : mmd.mvs[0])
+		//{
+		//	auto cbt = p->add_cbutton(it.c_str(), { 60,26 }, (int)uType::info);
+		//	cbt->effect = uTheme::light;
+		//	cbt->hscroll = {};
+		//	cbt->rounding = 0;
+		//	cbt->light = 0.1;
+
+		//	cbt->click_cb = [=](void* ptr, int clicks)
+		//		{
+		//			if (mmd.mcb)mmd.mcb(ptr, clicks, ix);
+		//		};
+		//	ix++;
+		//	cbt->mevent_cb = [=](void* pt, int type, const glm::vec2& mps)
+		//		{
+		//			static void* enterst = 0;
+		//			auto cp = (color_btn*)pt;
+		//			auto t = (event_type2)type;
+		//			switch (t)
+		//			{
+		//			case event_type2::on_down:
+		//			{
+		//				auto cps = cp->get_pos();
+		//				cps.y += cp->size.y + cp->thickness;
+		//				if (mgp)
+		//					mc->show_mg(mgp, xc, cps);
+		//				hide_tooltip(mmd.form0);
+		//				mmd.form0->uptr = 0;
+		//			}
+		//			break;
+		//			case event_type2::on_enter:
+		//			{
+		//				enterst = pt;
+		//				if (mgp && mgp->cx >= 0)
+		//				{
+		//					auto pmx = &mgp->ptr[mgp->cx];
+		//					if (pmx->get_visible()) {
+		//						auto cps = cp->get_pos();
+		//						cps.y += cp->size.y + cp->thickness;
+		//						pmx->hide(true);
+		//						mc->show_mg(mgp, xc, cps);
+		//					}
+		//				}
+		//			}
+		//			break;
+		//			case event_type2::on_hover:
+		//			{
+		//				// 0.5秒触发悬停事件
+		//				style_tooltip stp = {};
+		//				stp.family = mmd.fontn;
+		//				stp.fonst_size = 14;
+		//				glm::vec2 cps = mps;
+		//				cps.y += 20;
+		//				if (enterst == pt) {
+		//					if (mmd.form0->uptr != pt)
+		//					{
+		//						//show_tooltip(form0, (char*)u8"提示信息！", cps, &stp);
+		//						mmd.form0->uptr = pt;
+		//					}
+		//				}
+		//			}
+		//			break;
+		//			case event_type2::on_leave:
+		//			{
+		//				if (enterst == pt) {
+		//					hide_tooltip(mmd.form0);
+		//					mmd.form0->uptr = 0;
+		//				}
+		//			}
+		//			break;
+		//			default:
+		//				break;
+		//			}
+		//		};
+		//}
 		return mc;
 	}
 

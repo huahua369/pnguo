@@ -738,79 +738,79 @@ pvm_t layout_text_x::new_menu(int width, int height, const char** v, size_t n, b
 {
 	pvm_t ret = {};
 	auto ltx = this;
-	auto p = new plane_cx();
-	if (p && n > 0)
-	{
-		p->fontsize = 16;
-		int lheight = height > 0 ? height : ltx->get_lineheight(0, p->fontsize) * 1.5;
-		if (width < 0)
-		{
-			int xw = lheight;
-			for (size_t i = 0; i < n; i++)
-			{
-				auto it = v[i];
-				auto rc = ltx->get_text_rect(0, p->fontsize, it, -1);
-				if (xw < rc.x) {
-					xw = rc.x;
-				}
-			}
-			width = xw + lheight;
-		}
-		ret.w = width;
-		ret.h = lheight;
-		ret.cpos = m_cpos;
-		glm::ivec2 iss = { width , lheight };
-		p->set_color(m_color);
-		glm::ivec2 ss = { width + p->border.y * 7, n * lheight + p->border.y * 7 };
+	//auto p = new plane_cx();
+	//if (p && n > 0)
+	//{
+	//	p->fontsize = 16;
+	//	int lheight = height > 0 ? height : ltx->get_lineheight(0, p->fontsize) * 1.5;
+	//	if (width < 0)
+	//	{
+	//		int xw = lheight;
+	//		for (size_t i = 0; i < n; i++)
+	//		{
+	//			auto it = v[i];
+	//			auto rc = ltx->get_text_rect(0, p->fontsize, it, -1);
+	//			if (xw < rc.x) {
+	//				xw = rc.x;
+	//			}
+	//		}
+	//		width = xw + lheight;
+	//	}
+	//	ret.w = width;
+	//	ret.h = lheight;
+	//	ret.cpos = m_cpos;
+	//	glm::ivec2 iss = { width , lheight };
+	//	p->set_color(m_color);
+	//	glm::ivec2 ss = { width + p->border.y * 7, n * lheight + p->border.y * 7 };
 
-		auto radius = ltx->sli_radius;
-		glm::ivec2 sas = {};
-		if (has_shadow)
-		{
-			sas += radius;
-			auto ass = ss + radius;
-			auto pa = ltx->new_shadow(ass, {});
-			ret.back = pa;
-		}
-		p->_lpos = { 0,0 }; p->_lms = { 0,0 };
-		p->custom_layout = true;
-		p->set_fontctx(ltx->ctx);
-		p->ltx->cpy_familys(ltx);
-		for (size_t i = 0; i < n; i++)
-		{
-			auto it = v[i];
-			auto pcb = p->add_cbutton(it, iss, 2);
-			pcb->pos = { 0, i * lheight };
-			pcb->pos += ret.cpos;
-			pcb->light = 0.051;
-			pcb->effect = uTheme::light;
-			pcb->pdc.hover_border_color = pcb->pdc.border_color;
-			pcb->pdc.border_color = 0;
-			pcb->text_align = { 0.0,0.5 };
-			if (pcb && cb)
-			{
-				pcb->click_cb = [=](void* pr, int)
-					{
-						cb(1, i);
-						auto pc = (color_btn*)pr;
-						if (pc)
-							pc->bst = (int)BTN_STATE::STATE_NOMAL;
-					};
-				pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
-					if (type == (int)event_type2::on_hover) {
-						cb(0, i);
-					}
-					if (type == (int)event_type2::on_move) {
-						cb(2, i);
-					}
-					};
-			}
-		}
-		p->set_size(ss);
-		p->set_pos({ radius * 0,radius * 0 });
-		ret.p = p;
-		ret.fsize = ss + sas;
-	}
+	//	auto radius = ltx->sli_radius;
+	//	glm::ivec2 sas = {};
+	//	if (has_shadow)
+	//	{
+	//		sas += radius;
+	//		auto ass = ss + radius;
+	//		auto pa = ltx->new_shadow(ass, {});
+	//		ret.back = pa;
+	//	}
+	//	p->_lpos = { 0,0 }; p->_lms = { 0,0 };
+	//	p->custom_layout = true;
+	//	p->set_fontctx(ltx->ctx);
+	//	p->ltx->cpy_familys(ltx);
+	//	for (size_t i = 0; i < n; i++)
+	//	{
+	//		auto it = v[i];
+	//		auto pcb = p->add_cbutton(it, iss, 2);
+	//		pcb->pos = { 0, i * lheight };
+	//		pcb->pos += ret.cpos;
+	//		pcb->light = 0.051;
+	//		pcb->effect = uTheme::light;
+	//		pcb->pdc.hover_border_color = pcb->pdc.border_color;
+	//		pcb->pdc.border_color = 0;
+	//		pcb->text_align = { 0.0,0.5 };
+	//		if (pcb && cb)
+	//		{
+	//			pcb->click_cb = [=](void* pr, int)
+	//				{
+	//					cb(1, i);
+	//					auto pc = (color_btn*)pr;
+	//					if (pc)
+	//						pc->_bst = (int)BTN_STATE::STATE_NOMAL;
+	//				};
+	//			pcb->mevent_cb = [=](void* p, int type, const glm::vec2& mps) {
+	//				if (type == (int)event_type2::on_hover) {
+	//					cb(0, i);
+	//				}
+	//				if (type == (int)event_type2::on_move) {
+	//					cb(2, i);
+	//				}
+	//				};
+	//		}
+	//	}
+	//	p->set_size(ss);
+	//	p->set_pos({ radius * 0,radius * 0 });
+	//	ret.p = p;
+	//	ret.fsize = ss + sas;
+	//}
 	return ret;
 }
 
@@ -1307,13 +1307,13 @@ void widget_base::draw(rvg_cx* rv)
 glm::ivec2 widget_base::get_pos(bool has_parent)
 {
 	glm::ivec2 ps = pos;
-	if (parent) {
-		auto pss = parent->get_pos();
-		auto ss = parent->get_spos();
-		ss *= hscroll;
-		ps += ss;
-		if (has_parent) { ps += pss; }
-	}
+	//if (parent) {
+	//	auto pss = parent->get_pos();
+	//	auto ss = parent->get_spos();
+	//	ss *= hscroll;
+	//	ps += ss;
+	//	if (has_parent) { ps += pss; }
+	//}
 	return ps;
 }
 
@@ -3450,7 +3450,7 @@ void text_ctx_cx::up_cursor(bool is)
 }
 edit_tl::edit_tl()
 {
-	widget_base::wtype = WIDGET_TYPE::WT_EDIT;
+	widget_t::wtype = WIDGET_TYPE::WT_EDIT;
 	ctx = new text_ctx_cx();
 	//set_family("NSimSun", 12);
 	set_family(0, 12);
@@ -3660,7 +3660,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					_istate = 0;
 
 					printf("drag begin:%p\n", this);
-					bool ok = parent && parent->dragdrop_begin ? parent->dragdrop_begin(ws.c_str(), ws.size()) : false;
+					bool ok = dragdrop_begin(ws.c_str(), ws.size());
 					printf("drag end:%p\n", this);
 					if (ok && !_read_only && !_istate) {
 
@@ -3750,7 +3750,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 					}
 					if (ep->form)
 					{
-						if (parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); };
+						form_set_input_ptr(ep->form, get_input_state(this, 1));
 						ctx->c_d = -1; is_input = true;
 					}
 					else {
@@ -3869,7 +3869,7 @@ void edit_tl::on_event_e(uint32_t type, et_un_t* ep) {
 				ctx->hover_text = false;
 			}
 			if (p->has) { *(p->has) = 1; }
-			if (ep->form && parent && parent->form_set_input_ptr) { parent->form_set_input_ptr(ep->form, get_input_state(this, 1)); }
+			if (ep->form) { form_set_input_ptr(ep->form, get_input_state(this, 1)); }
 			auto lastc = ctx->ccursor;
 			ctx->ccursor = cx;
 			is_input = true;
@@ -4570,10 +4570,10 @@ void tview_x::hit_test(const glm::vec2& ps)
 #endif // !NO_TVIEW
 
 
-#if 1
 void widget_on_event(widget_base* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
 void send_hover(widget_base* wp, const glm::vec2& mps);
 
+#if 0
 plane_cx::plane_cx()
 {
 	tv = new tview_x();
@@ -4594,8 +4594,8 @@ plane_cx::plane_cx()
 
 plane_cx::~plane_cx()
 {
-	remove_widget(horizontal);
-	remove_widget(vertical);
+	//remove_widget(horizontal);
+	//remove_widget(vertical);
 	if (horizontal)
 		delete horizontal;
 	horizontal = 0;
@@ -5265,35 +5265,6 @@ void plane_cx::update(float delta)
 
 
 
-//flex_item* flexlayout(flex_item* r, std::vector<glm::vec4>& v, const glm::vec2& pos, const glm::vec2& gap)
-//{
-//	flex_item* p = 0;
-//	auto length = v.size();
-//	if (r && length)
-//	{
-//		p = new flex_item[length];
-//		if (p)
-//		{
-//			for (size_t i = 0; i < length; i++)
-//			{
-//				v[i].z += gap.x; v[i].w += gap.y;
-//				p[i].width = v[i].z;
-//				p[i].height = v[i].w;
-//				r->item_add(p + i);
-//			}
-//			r->layout();
-//
-//			for (size_t i = 0; i < length; i++)
-//			{
-//				if (p[i].position != flex_position::POS_ABSOLUTE) {
-//					v[i].x = p[i].frame[0] + pos.x;
-//					v[i].y = p[i].frame[1] + pos.y;
-//				}
-//			}
-//		}
-//	}
-//	return p;
-//}
 
 void plane_cx::mk_layout()
 {
@@ -5764,6 +5735,7 @@ void plane_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	evupdate++;
 }
+#endif
 
 
 // 杂算法
@@ -5904,43 +5876,43 @@ namespace pn {
 #if 1
 // 默认按钮样式
 
-image_btn::image_btn() :widget_base(WIDGET_TYPE::WT_IMAGE_BTN)
+image_btn::image_btn() :widget_t(WIDGET_TYPE::WT_IMAGE_BTN)
 {
 
 }
 image_btn::~image_btn()
 {}
-color_btn::color_btn() :widget_base(WIDGET_TYPE::WT_COLOR_BTN)
+color_btn::color_btn() :widget_t(WIDGET_TYPE::WT_COLOR_BTN)
 {}
 color_btn::~color_btn()
 {}
-gradient_btn::gradient_btn() :widget_base(WIDGET_TYPE::WT_GRADIENT_BTN)
+gradient_btn::gradient_btn() :widget_t(WIDGET_TYPE::WT_GRADIENT_BTN)
 {}
 gradient_btn::~gradient_btn()
 {}
-radio_tl::radio_tl() :widget_base(WIDGET_TYPE::WT_RADIO)
+radio_tl::radio_tl() :widget_t(WIDGET_TYPE::WT_RADIO)
 {}
-checkbox_tl::checkbox_tl() :widget_base(WIDGET_TYPE::WT_CHECKBOX)
+checkbox_tl::checkbox_tl() :widget_t(WIDGET_TYPE::WT_CHECKBOX)
 {}
 checkbox_tl::~checkbox_tl()
 {}
-switch_tl::switch_tl() :widget_base(WIDGET_TYPE::WT_SWITCH)
+switch_tl::switch_tl() :widget_t(WIDGET_TYPE::WT_SWITCH)
 {}
 switch_tl::~switch_tl()
 {}
-progress_tl::progress_tl() :widget_base(WIDGET_TYPE::WT_PROGRESS)
+progress_tl::progress_tl() :widget_t(WIDGET_TYPE::WT_PROGRESS)
 {}
 progress_tl::~progress_tl()
 {}
-slider_tl::slider_tl() :widget_base(WIDGET_TYPE::WT_SLIDER)
+slider_tl::slider_tl() :widget_t(WIDGET_TYPE::WT_SLIDER)
 {}
 slider_tl::~slider_tl()
 {}
-colorpick_tl::colorpick_tl() :widget_base(WIDGET_TYPE::WT_COLORPICK)
+colorpick_tl::colorpick_tl() :widget_t(WIDGET_TYPE::WT_COLORPICK)
 {}
 colorpick_tl::~colorpick_tl()
 {}
-scroll_bar::scroll_bar() :widget_base(WIDGET_TYPE::WT_SCROLL_BAR)
+scroll_bar::scroll_bar() :widget_t(WIDGET_TYPE::WT_SCROLL_BAR)
 {}
 scroll_bar::~scroll_bar()
 {}
@@ -6179,17 +6151,17 @@ bool gradient_btn::update(float delta)
 {
 	auto p = this;
 	if (!p)return false;
-	if (bst == _old_bst)return false;
-	_old_bst = bst;
+	if (_bst == _old_bst)return false;
+	_old_bst = _bst;
 	auto& info = *p;
 
 	// (sta & hz::BTN_STATE::STATE_FOCUS)
 	uint32_t gradTop = 0xff4a4a4a;
 	uint32_t gradBot = 0xff3a3a3a;
 
-	info.mPushed = (bst & (int)BTN_STATE::STATE_ACTIVE);
-	info.mMouseFocus = (bst & (int)BTN_STATE::STATE_HOVER);
-	if (bst & (int)BTN_STATE::STATE_DISABLE)
+	info.mPushed = (_bst & (int)BTN_STATE::STATE_ACTIVE);
+	info.mMouseFocus = (_bst & (int)BTN_STATE::STATE_HOVER);
+	if (_bst & (int)BTN_STATE::STATE_DISABLE)
 		info.mEnabled = false;
 	if (info.mPushed) {
 		gradTop = 0xff292929;
@@ -6217,12 +6189,12 @@ bool color_btn::update(float delta)
 	}
 	else
 	{
-		if (bst == _old_bst)return false;
+		if (_bst == _old_bst)return false;
 	}
-	_old_bst = bst;
+	_old_bst = _bst;
 	auto p = this;
 	btn_cols_t* pdc = &p->pdc;
-	p->_disabled = (bst & (int)BTN_STATE::STATE_DISABLE);
+	p->_disabled = (_bst & (int)BTN_STATE::STATE_DISABLE);
 	if (p->_disabled)
 	{
 		p->hover = false;
@@ -6250,8 +6222,8 @@ bool color_btn::update(float delta)
 	}
 	else
 	{
-		bool isdown = mPushed = (bst & (int)BTN_STATE::STATE_ACTIVE);
-		p->hover = (bst & (int)BTN_STATE::STATE_HOVER);
+		bool isdown = mPushed = (_bst & (int)BTN_STATE::STATE_ACTIVE);
+		p->hover = (_bst & (int)BTN_STATE::STATE_HOVER);
 		if (isdown)
 		{
 			p->dfill = pdc->active_background_color;
@@ -6730,7 +6702,7 @@ bool radio_tl::update(float delta)
 					it.value1 = it.value; it.dt = 0;
 					dt = 1.0;
 
-					_old_bst = bst;
+					_old_bst = _bst;
 				}
 				else
 				{
@@ -6831,7 +6803,7 @@ bool checkbox_tl::update(float delta)
 				if (it.dt >= duration) {
 					it.value1 = it.value; it.dt = 0;
 					dt = 1.0;
-					_old_bst = bst;
+					_old_bst = _bst;
 				}
 				else
 				{
@@ -6913,7 +6885,7 @@ bool switch_tl::update(float delta)
 			if (it.dt >= it.duration) {
 				it.value1 = it.value; it.dt = 0;
 				dt = 1.0;
-				_old_bst = bst;
+				_old_bst = _bst;
 				if (v.pv) {
 					*v.pv = it.value;
 				}
@@ -7180,7 +7152,6 @@ void slider_tl::draw(rvg_cx* rv)
 	}
 #endif
 }
-#endif
 
 
 
@@ -7595,7 +7566,7 @@ bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 	break;
 	case event_type2::on_scroll:
 	{
-		if (thumb_size_m.z > 0 && ((bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
+		if (thumb_size_m.z > 0 && ((_bst & (int)BTN_STATE::STATE_HOVER) || hover_sc && (parent && parent->_hover)))
 		{
 			auto st = ss[_dir] - tsm;
 #if 0
@@ -7671,13 +7642,13 @@ bool scroll_bar::update(float delta)
 		thumb_size_m = sbs;
 		valid = false;
 	}
-	if (!(bst & (int)BTN_STATE::STATE_HOVER)) {
-		if (!(bst & (int)BTN_STATE::STATE_ACTIVE))
+	if (!(_bst & (int)BTN_STATE::STATE_HOVER)) {
+		if (!(_bst & (int)BTN_STATE::STATE_ACTIVE))
 		{
 			_tcc = _color.y; scale_s = scale_s0.x;
 		}
 	}
-	if ((bst & (int)BTN_STATE::STATE_ACTIVE) && _color.w) {
+	if ((_bst & (int)BTN_STATE::STATE_ACTIVE) && _color.w) {
 		_tcc = _color.w;
 	}
 	return r;
@@ -7770,63 +7741,529 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 std::vector<color_btn*> new_label(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* p, int clicks)> cb)
 {
 	std::vector<color_btn*> rv;
-	if (p && p->ltx) {
-		for (auto& it : t)
-		{
-			glm::vec2 bs;
-			bs.x = bs.y = p->fontsize;
-			bs.x = width;
-			bs.y = p->ltx->get_lineheight(0, bs.y);
-			auto kcb = p->add_label(it, bs, 0);
-			rv.push_back(kcb);
-		}
-	}
+	//if (p && p->ltx) {
+	//	for (auto& it : t)
+	//	{
+	//		glm::vec2 bs;
+	//		bs.x = bs.y = p->fontsize;
+	//		bs.x = width;
+	//		bs.y = p->ltx->get_lineheight(0, bs.y);
+	//		auto kcb = p->add_label(it, bs, 0);
+	//		rv.push_back(kcb);
+	//	}
+	//}
 	return rv;
 }
 
 std::vector<checkbox_com> new_checkbox(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb)
 {
 	std::vector<checkbox_com> rv;
-	if (p && p->ltx) {
-		for (auto& it : t)
-		{
-			glm::vec2 bs;
-			bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
-			bs.x *= 1.5;
-			auto c = p->add_checkbox(bs, it, false);
-			c->v.on_change_cb = cb;
-			bs.x = width;
-			auto kcb = p->add_label(it, bs, 0);
-			kcb->click_cb = [=](void* ptr, int clicks)
-				{
-					c->set_value();
-				};
-			rv.push_back({ c,kcb });
-		}
-	}
+	//if (p && p->ltx) {
+	//	for (auto& it : t)
+	//	{
+	//		glm::vec2 bs;
+	//		bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
+	//		bs.x *= 1.5;
+	//		auto c = p->add_checkbox(bs, it, false);
+	//		c->v.on_change_cb = cb;
+	//		bs.x = width;
+	//		auto kcb = p->add_label(it, bs, 0);
+	//		kcb->click_cb = [=](void* ptr, int clicks)
+	//			{
+	//				c->set_value();
+	//			};
+	//		rv.push_back({ c,kcb });
+	//	}
+	//}
 	return rv;
 }
 std::vector<radio_com> new_radio(plane_cx* p, const std::vector<std::string>& t, int width, std::function<void(void* ptr, bool v)> cb)
 {
 	std::vector<radio_com> rv;
-	if (p && p->ltx) {
-		auto gr = new group_radio_t();
-		for (auto& it : t)
-		{
-			glm::vec2 bs;
-			bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
-			bs.x *= 1.5;
-			auto c = p->add_radio(bs, it, false, gr);
-			c->v.on_change_cb = cb;
-			bs.x = width;
-			auto kcb = p->add_label(it, bs, 0);
-			kcb->click_cb = [=](void* ptr, int clicks)
-				{
-					c->set_value();
-				};
-			rv.push_back({ c,kcb });
-		}
-	}
+	//if (p && p->ltx) {
+	//	auto gr = new group_radio_t();
+	//	for (auto& it : t)
+	//	{
+	//		glm::vec2 bs;
+	//		bs.x = bs.y = p->ltx->get_lineheight(0, p->fontsize);
+	//		bs.x *= 1.5;
+	//		auto c = p->add_radio(bs, it, false, gr);
+	//		c->v.on_change_cb = cb;
+	//		bs.x = width;
+	//		auto kcb = p->add_label(it, bs, 0);
+	//		kcb->click_cb = [=](void* ptr, int clicks)
+	//			{
+	//				c->set_value();
+	//			};
+	//		rv.push_back({ c,kcb });
+	//	}
+	//}
 	return rv;
 }
+
+
+
+#if 1
+widget_t::widget_t()
+{}
+widget_t::widget_t(WIDGET_TYPE wt) :wtype(wt)
+{}
+widget_t::~widget_t()
+{}
+bool widget_t::on_mevent(int type, const glm::vec2& mps)
+{
+	return false;
+}
+
+bool widget_t::update(float delta)
+{
+	return false;
+}
+
+void widget_t::draw(rvg_cx* rv)
+{}
+glm::ivec2 widget_t::get_pos(bool has_parent)
+{
+	glm::ivec2 ps = pos;
+	if (parent) {
+		auto pss = parent->get_pos();
+		auto ss = parent->get_spos();
+		ss *= hscroll;
+		ps += ss;
+		if (has_parent) { ps += pss; }
+	}
+	return ps;
+}
+
+glm::ivec2 widget_t::get_spos()
+{
+	return glm::ivec2();
+}
+
+// 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
+bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	bool hover = false;
+	if (!wp)return hover;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	if (t == devent_type_e::mouse_move_e)
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
+		wp->mmpos = mps;
+		// 判断是否鼠标进入 
+		glm::vec4 trc = { wp->pos  ,wp->size };
+		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+		if (k.x) {
+			bool hoverold = wp->_bst & (int)BTN_STATE::STATE_HOVER;
+			wp->_bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
+			if (!(wp->_bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
+				ep->ret = 1;
+			if (!hoverold)
+			{
+				// 鼠标进入
+				wp->on_mevent((int)event_type2::on_enter, mps);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_enter, mps);
+				}
+			}
+		}
+		else {
+			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
+			{
+				wp->_bst &= ~(int)BTN_STATE::STATE_HOVER;
+				// 鼠标离开
+				wp->on_mevent((int)event_type2::on_leave, mps);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_leave, mps);
+				}
+			}
+		}
+
+		{
+			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
+			{
+				wp->on_mevent((int)event_type2::on_move, mps);
+				if (wp->mevent_cb)
+				{
+					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
+				}
+			}
+			if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE) {
+				auto dps = mps - wp->curpos;
+				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
+				if (wp->mevent_cb)
+				{
+					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+				}
+			}
+		}
+	}
+	return hover;
+}
+
+void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	if (!wp)return;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+		widget_on_move(wp, type, ep, pos);
+		break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
+		bool isd = wp->cmpos == mps;
+		wp->cmpos = mps;
+		if (wp->_bst & (int)BTN_STATE::STATE_HOVER) {
+			if (p->down == 1)
+			{
+				ep->ret = 1;
+			}
+			if (p->button == 1) {
+				if (p->down == 1) {
+					wp->_bst |= (int)BTN_STATE::STATE_ACTIVE;
+					wp->curpos = mps - (glm::ivec2)wp->pos;
+					wp->cks = 0;
+					wp->on_mevent((int)event_type2::on_down, mps);
+					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
+				}
+				else {
+					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
+					{
+						wp->cks = p->clicks;
+						wp->on_mevent((int)event_type2::on_up, mps);
+						if (wp->mevent_cb) {
+							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
+						}
+						int tc = (int)event_type2::on_click; //左键单击
+						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
+						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+						wp->_clicks = p->clicks;
+						wp->on_mevent(tc, mps);
+						if (wp->mevent_cb) {
+							wp->mevent_cb(wp, tc, mps);
+						}
+						if (wp->click_cb)
+						{
+							wp->click_cb(wp, p->clicks);
+						}
+					}
+					wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+				}
+			}
+		}
+		if (p->down == 0) {
+			wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+			wp->_bst |= (int)BTN_STATE::STATE_NOMAL;
+			wp->on_mevent((int)event_type2::mouse_up, mps);
+			if (wp->mevent_cb) {
+				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
+			}
+		}
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		glm::vec2 mps = { p->x, p->y };
+		if (wp->_bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
+		{
+			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
+			if (wp->mevent_cb) {
+				wp->mevent_cb(wp, (int)event_type2::on_scroll, mps);
+			}
+			ep->ret = 1;
+		}
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		// todo
+		//on_keyboard(ep);
+	}
+	break;
+	default:
+		break;
+	}
+
+}
+void send_hover(widget_t* wp, const glm::vec2& mps) {
+
+	wp->on_mevent((int)event_type2::on_hover, mps);
+	if (wp->mevent_cb)
+	{
+		wp->mevent_cb(wp, (int)event_type2::on_hover, mps);
+	}
+}
+
+bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
+{
+	bool r = false;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	if (pw->on_event_cb)
+	{
+		pw->on_event_cb(type, ep, ppos);
+	}
+	else {
+		widget_on_event(pw, type, ep, ppos);
+		if (ep->ret && t == devent_type_e::mouse_button_e)
+		{
+			auto p = e->b;
+			if (p->down == 1)
+				get_input_state(0, 1);
+		}
+	}
+	return (ep->ret);
+}
+
+div_cx::div_cx()
+{}
+
+div_cx::~div_cx()
+{}
+void div_cx::sortdg()
+{
+	std::stable_sort(dragsp.begin(), dragsp.end(), [](const drag_v6* t1, const drag_v6* t2) { return t1->z < t2->z; });
+}
+void div_cx::on_event(uint32_t type, et_un_t* ep)
+{
+	auto e = &ep->v;
+	if (!visible)return;
+	auto t = (devent_type_e)type;
+	glm::ivec2 vgpos = viewport;
+	int r1 = 0;
+	auto ppos = get_pos();
+	auto sps = get_spos();
+	_hover_eq.w = type;
+	widget_t* hpw = 0;
+	if (t == devent_type_e::mouse_move_e)
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y };
+		glm::vec4 trc = viewport;
+		auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+		if (k2.x) {
+			_bst |= (int)BTN_STATE::STATE_HOVER;
+			r1 = 1;
+			p->cursor = (int)cursor_st::cursor_arrow;
+			_hover = true;
+			if (_move_pos != mps)
+			{
+				_move_pos = mps;
+				_hover_eq.x = 0;
+			}
+			//printf("_hover\n");
+		}
+		else {
+			_move_pos = mps;
+			_hover_eq.z = 0;
+			_bst &= ~(int)BTN_STATE::STATE_HOVER;
+			if (ckinc == 0)
+				_hover = false;
+			//printf("on_leave\n");
+		}
+		//if (horizontal)
+		//{
+		//	widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
+		//}
+		//if (vertical) {
+		//	widget_on_event(vertical, type, ep, ppos);// 垂直滚动条 
+		//}
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			auto pw = *it;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			auto vpos = sps * pw->hscroll;
+			on_wpe(pw, type, ep, ppos + vpos);
+		}
+
+		event_wts.clear();
+		event_wts1.clear();
+		//if (horizontal) {
+		//	horizontal->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(horizontal) : event_wts1.push_back(horizontal);//水平滚动条
+		//}
+		//if (vertical) {
+		//	vertical->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(vertical) : event_wts1.push_back(vertical);//垂直滚动条
+		//}
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			if ((*it)->_bst & (int)BTN_STATE::STATE_HOVER)
+				event_wts.push_back(*it);
+			else
+				event_wts1.push_back(*it);
+		}
+		auto length = event_wts.size();
+		{
+			// 生成鼠标离开消息
+			for (size_t i = 1; i < length; i++) {
+				auto pw = event_wts[i];
+				if (!pw || !pw->visible || pw->_disabled_events)continue;
+				auto vpos = sps * pw->hscroll;
+				auto p = e->m;
+				glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
+				bool isd = pw->cmpos == mps;
+				pw->cmpos = mps;
+				pw->_bst &= ~(int)BTN_STATE::STATE_HOVER;
+				// 鼠标离开
+				pw->on_mevent((int)event_type2::on_leave, mps);
+				if (pw->mevent_cb) {
+					pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
+				}
+			}
+		}
+
+	}
+	else
+	{
+		bool btn = !(t == devent_type_e::mouse_button_e && e->b->down == 0);// 弹起判断
+		int icc = 0;
+		auto length = event_wts.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto pw = event_wts[i];
+			icc++;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			auto vpos = sps * pw->hscroll;
+			on_wpe(pw, type, ep, ppos + vpos);
+			if (ep->ret && btn) {
+				hpw = pw;
+				break;
+			}
+		}
+		if (!hpw)
+		{
+			auto ln = event_wts1.size();
+			for (size_t i = 0; i < ln; i++)
+			{
+				auto pw = event_wts1[i];
+				if (!pw || !pw->visible || pw->_disabled_events)continue;
+				auto vpos = sps * pw->hscroll;
+				on_wpe(pw, type, ep, ppos + vpos);
+				if (ep->ret && btn) {
+					hpw = pw; break;
+				}
+			}
+		}
+	}
+	if (!ep->ret)
+		ep->ret = r1;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+	{
+		auto length = event_wts.size();
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y };
+		//on_motion(mps);
+		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
+		if (ckinc > 0)
+		{
+			for (auto& it : drags)
+			{
+				if (it.ck > 0)
+				{
+					it.pos = mps - it.tp - ppos;	// 处理拖动坐标
+					it.cp1 = mps - ppos;
+				}
+			}
+		}
+		else {
+			for (auto& it : drags)
+			{
+				it.ck = 0;
+			}
+		}
+	}
+	break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y };
+		//on_button(p->button, p->down, mps, p->clicks, ep->ret);
+
+		if (p->button == 1) {
+			if (p->down == 1) {
+				mps -= ppos;
+				drag_v6* dp = 0;
+
+				for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+				{
+					auto dp1 = *vt;
+					auto& it = *dp1;
+					it.z = 0;
+					if (it.size.x > 0 && it.size.y > 0)
+					{
+						if (dp)continue;
+						glm::vec4 trc = { it.pos + sps,it.size };
+						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+						if (k2.x)
+						{
+							it.tp = mps - it.pos;	// 记录当前拖动坐标
+							it.ck = 1;
+							it.cp1 = it.cp0 = mps;
+							it.z = 1;
+							dp = dp1;
+						}
+					}
+				}
+				if (!dp)
+				{
+					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+					{
+						auto dp1 = *vt;
+						auto& it = *dp1;
+						if (it.size.x == 0 || it.size.y == 0)
+						{
+							it.z = 0;
+							it.cp1 = it.cp0 = mps;
+							it.tp = mps - it.pos;	// 记录当前拖动坐标
+							it.ck = 1;
+						}
+					}
+				}
+				else
+				{
+					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+					{
+						auto dp1 = *vt;
+						auto& it = *dp1;
+						if (it.size.x == 0 && it.size.y == 0)
+						{
+							it.z = 0;
+							it.cp1 = it.cp0 = mps;
+						}
+					}
+					sortdg();
+				}
+			}
+		}
+
+		_hover_eq.z = 0;
+		//printf("ck:%d\t%p\n", ckinc, this);
+		if (ckup > 0)
+			ep->ret = 1;
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		//on_wheel(p->x, p->y);
+		if (_hover)
+		{
+			ep->ret = 1;		// 滚轮独占本事件
+		}
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		//on_keyboard(ep);
+	}
+	break;
+	}
+	evupdate++;
+}
+
+#endif // 1
 

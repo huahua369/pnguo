@@ -40,152 +40,152 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 #undef max
 #endif
 
-void new_ui(form_x* form0, vkdg_cx* vkd) {
-	auto p = new plane_cx();
-	uint32_t pbc = 0xc02c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	//form0->bind(p);	// 绑定到窗口  
-	p->set_rss(5);
-	p->_lms = { 6,6 };
-	p->add_familys(fontn, 0);
-	p->draggable = true; //可拖动
-	p->set_size({ 320,660 });
-	p->set_pos({ 1000,100 });
-	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
-	{
-		// 设置带滚动条
-		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
-	}
-	p->set_view({ 320,660 }, { 600, 660 });
-	glm::vec2 bs = { 150,22 };
-	glm::vec2 bs1 = { 50,22 };
-	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
-	if (vkd)
-	{
-		std::vector<bool*> bps = { &vkd->_state.bUseTAA, &vkd->_state.bDrawLightFrustum, &vkd->_state.bDrawBoundingBoxes, &vkd->_state.bShowMilliseconds };
-		for (size_t i = 0; i < boolstr.size(); i++)
-		{
-			auto& it = boolstr[i];
-			auto kcb = p->add_label(it.c_str(), bs, 0);
-			{
-				kcb->_disabled_events = true;
-				kcb->text_color = 0xff7373ff;
-				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
-				//sw1->_disabled_events = true;
-				sw1->get_pos();
-				sw1->bind_ptr(bps[i]);
-			}
-		}
-		std::vector<color_btn*>* pbs = new std::vector<color_btn*>();
-		bs.x = 300;
-		auto& lbs = *pbs;
-		for (size_t i = 0; i < 30; i++)
-		{
-			auto kcb = p->add_label("", bs, 0);
-			kcb->text_color = 0xff80F61F;
-			kcb->_disabled_events = true;
-			lbs.push_back(kcb);
-		}
-	}
-
-
-	uint32_t* cc = get_wcolor() + 8;
-	for (int i = 0; i < 0 * 8; i++) {
-		auto p = new plane_cx();
-		uint32_t tc = cc[i];
-		p->set_color({ 0x80ff802C,1,5,0xff2c2c2c });
-		//form0->bind(p);	// 绑定到窗口  
-		p->set_rss(5);
-		p->_lms = { 6,6 };
-		p->add_familys(fontn, 0);
-		p->draggable = true; //可拖动
-		p->set_size({ 500,300 });
-		p->set_pos({ 100 + i * 20,100 + i * 20 });
-		for (size_t j = 0; j < boolstr.size(); j++)
-		{
-			auto& it = boolstr[j];
-			auto kcb = p->add_label(it.c_str(), bs, 0);
-			{
-				kcb->_disabled_events = true;
-				kcb->text_color = tc;
-				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), 0);
-				sw1->get_pos();
-				//sw1->bind_ptr(bps[j]);
-			}
-		}
-	}
-}
-
-void show_cpuinfo(form_x* form0)
-{
-	cpuinfo_t cpuinfo = get_cpuinfo();
-	if (!form0)return;
-	auto p = new plane_cx();
-	uint32_t pbc = 0xf02c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	//form0->bind(p);	// 绑定到窗口  
-	p->set_rss(5);
-	p->_lms = { 8,8 };
-	p->add_familys(fontn, 0);
-	p->draggable = true; //可拖动
-	p->set_size({ 420,660 });
-	p->set_pos({ 100,100 });
-	p->fontsize = 16;
-	int width = 16;
-	int rcw = 14;
-	{
-		// 设置带滚动条
-		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-		p->set_scroll_hide(1);
-	}
-	// 视图大小，内容大小
-	p->set_view({ 420,660 }, { 420, 660 });
-	glm::vec2 bs = { 150,22 };
-	glm::vec2 bs1 = { 50,22 };
-	std::vector<std::string> ncsstr = { (char*)u8"CPU信息","NumLogicalCPUCores","CPUCacheLineSize","SystemRAM","SIMDAlignment" };
-	std::vector<std::string> boolstr = { "AltiVec","MMX","SSE","SSE2","SSE3","SSE41","SSE42","AVX","AVX2","AVX512F","ARMSIMD","NEON","LSX","LASX" };
-
-	static std::vector<color_btn*> lbs;
-	bs.x = 300;
-	uint32_t txtcolor = 0xfff2f2f2;// 0xff7373ff;
-	int64_t ds[] = { 0, cpuinfo.NumLogicalCPUCores,cpuinfo.CPUCacheLineSize,cpuinfo.SystemRAM ,cpuinfo.SIMDAlignment };
-	{
-		int i = 0;
-		for (auto& it : ncsstr)
-		{
-			std::string txt = vkr::format("%-20s: %lld", it.c_str(), ds[i]);
-			auto tc = txtcolor;
-			if (i == 0) {
-				txt = it + ": " + cpuinfo.name;
-				tc = 0xffF6801F;
-			}
-			i++;
-			auto kcb = p->add_label(txt, bs, 0);
-			kcb->text_color = tc;
-			kcb->_disabled_events = true;
-			lbs.push_back(kcb);
-		}
-	}
-	bool* bps = &cpuinfo.AltiVec;
-	bs.x = 160;
-	for (size_t i = 0; i < boolstr.size(); i++)
-	{
-		auto& it = boolstr[i];
-		auto kcb = p->add_label(it.c_str(), bs, 0);
-		{
-			kcb->_disabled_events = true;
-			kcb->text_color = txtcolor;
-			auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), bps[i]);
-			sw1->_disabled_events = true;
-			sw1->get_pos();
-			kcb = p->add_label("", bs, 0);
-			kcb->_disabled_events = true;
-		}
-	}
-}
+//void new_ui(form_x* form0, vkdg_cx* vkd) {
+//	auto p = new plane_cx();
+//	uint32_t pbc = 0xc02c2c2c;
+//	p->set_color({ 0x80ff802C,1,5,pbc });
+//	//form0->bind(p);	// 绑定到窗口  
+//	p->set_rss(5);
+//	p->_lms = { 6,6 };
+//	p->add_familys(fontn, 0);
+//	p->draggable = true; //可拖动
+//	p->set_size({ 320,660 });
+//	p->set_pos({ 1000,100 });
+//	p->fontsize = 16;
+//	int width = 16;
+//	int rcw = 14;
+//	{
+//		// 设置带滚动条
+//		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
+//		p->set_scroll_hide(1);
+//	}
+//	p->set_view({ 320,660 }, { 600, 660 });
+//	glm::vec2 bs = { 150,22 };
+//	glm::vec2 bs1 = { 50,22 };
+//	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
+//	if (vkd)
+//	{
+//		std::vector<bool*> bps = { &vkd->_state.bUseTAA, &vkd->_state.bDrawLightFrustum, &vkd->_state.bDrawBoundingBoxes, &vkd->_state.bShowMilliseconds };
+//		for (size_t i = 0; i < boolstr.size(); i++)
+//		{
+//			auto& it = boolstr[i];
+//			auto kcb = p->add_label(it.c_str(), bs, 0);
+//			{
+//				kcb->_disabled_events = true;
+//				kcb->text_color = 0xff7373ff;
+//				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
+//				//sw1->_disabled_events = true;
+//				sw1->get_pos();
+//				sw1->bind_ptr(bps[i]);
+//			}
+//		}
+//		std::vector<color_btn*>* pbs = new std::vector<color_btn*>();
+//		bs.x = 300;
+//		auto& lbs = *pbs;
+//		for (size_t i = 0; i < 30; i++)
+//		{
+//			auto kcb = p->add_label("", bs, 0);
+//			kcb->text_color = 0xff80F61F;
+//			kcb->_disabled_events = true;
+//			lbs.push_back(kcb);
+//		}
+//	}
+//
+//
+//	uint32_t* cc = get_wcolor() + 8;
+//	for (int i = 0; i < 0 * 8; i++) {
+//		auto p = new plane_cx();
+//		uint32_t tc = cc[i];
+//		p->set_color({ 0x80ff802C,1,5,0xff2c2c2c });
+//		//form0->bind(p);	// 绑定到窗口  
+//		p->set_rss(5);
+//		p->_lms = { 6,6 };
+//		p->add_familys(fontn, 0);
+//		p->draggable = true; //可拖动
+//		p->set_size({ 500,300 });
+//		p->set_pos({ 100 + i * 20,100 + i * 20 });
+//		for (size_t j = 0; j < boolstr.size(); j++)
+//		{
+//			auto& it = boolstr[j];
+//			auto kcb = p->add_label(it.c_str(), bs, 0);
+//			{
+//				kcb->_disabled_events = true;
+//				kcb->text_color = tc;
+//				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), 0);
+//				sw1->get_pos();
+//				//sw1->bind_ptr(bps[j]);
+//			}
+//		}
+//	}
+//}
+//
+//void show_cpuinfo(form_x* form0)
+//{
+//	cpuinfo_t cpuinfo = get_cpuinfo();
+//	if (!form0)return;
+//	auto p = new plane_cx();
+//	uint32_t pbc = 0xf02c2c2c;
+//	p->set_color({ 0x80ff802C,1,5,pbc });
+//	//form0->bind(p);	// 绑定到窗口  
+//	p->set_rss(5);
+//	p->_lms = { 8,8 };
+//	p->add_familys(fontn, 0);
+//	p->draggable = true; //可拖动
+//	p->set_size({ 420,660 });
+//	p->set_pos({ 100,100 });
+//	p->fontsize = 16;
+//	int width = 16;
+//	int rcw = 14;
+//	{
+//		// 设置带滚动条
+//		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
+//		p->set_scroll_hide(1);
+//	}
+//	// 视图大小，内容大小
+//	p->set_view({ 420,660 }, { 420, 660 });
+//	glm::vec2 bs = { 150,22 };
+//	glm::vec2 bs1 = { 50,22 };
+//	std::vector<std::string> ncsstr = { (char*)u8"CPU信息","NumLogicalCPUCores","CPUCacheLineSize","SystemRAM","SIMDAlignment" };
+//	std::vector<std::string> boolstr = { "AltiVec","MMX","SSE","SSE2","SSE3","SSE41","SSE42","AVX","AVX2","AVX512F","ARMSIMD","NEON","LSX","LASX" };
+//
+//	static std::vector<color_btn*> lbs;
+//	bs.x = 300;
+//	uint32_t txtcolor = 0xfff2f2f2;// 0xff7373ff;
+//	int64_t ds[] = { 0, cpuinfo.NumLogicalCPUCores,cpuinfo.CPUCacheLineSize,cpuinfo.SystemRAM ,cpuinfo.SIMDAlignment };
+//	{
+//		int i = 0;
+//		for (auto& it : ncsstr)
+//		{
+//			std::string txt = vkr::format("%-20s: %lld", it.c_str(), ds[i]);
+//			auto tc = txtcolor;
+//			if (i == 0) {
+//				txt = it + ": " + cpuinfo.name;
+//				tc = 0xffF6801F;
+//			}
+//			i++;
+//			auto kcb = p->add_label(txt, bs, 0);
+//			kcb->text_color = tc;
+//			kcb->_disabled_events = true;
+//			lbs.push_back(kcb);
+//		}
+//	}
+//	bool* bps = &cpuinfo.AltiVec;
+//	bs.x = 160;
+//	for (size_t i = 0; i < boolstr.size(); i++)
+//	{
+//		auto& it = boolstr[i];
+//		auto kcb = p->add_label(it.c_str(), bs, 0);
+//		{
+//			kcb->_disabled_events = true;
+//			kcb->text_color = txtcolor;
+//			auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), bps[i]);
+//			sw1->_disabled_events = true;
+//			sw1->get_pos();
+//			kcb = p->add_label("", bs, 0);
+//			kcb->_disabled_events = true;
+//		}
+//	}
+//}
 #include <entt/entt.hpp>
 struct node_t
 {
@@ -265,63 +265,7 @@ void belt_cx::draw(cairo_t* cr) {
 	cairo_clip(cr);
 	draw_polylines(cr, ps, bline.data(), bline.size(), bline_idx.data(), bline_idx.size(), linecolor, 1);
 }
-#endif
-void show_belt(form_x* form0)
-{
-	if (!form0)return;
-	glm::ivec2 size = { 1024,800 };
-	glm::ivec2 cview = { 10240,10240 };
-	auto p = new plane_cx();
-	uint32_t pbc = 0xf02c2c2c;
-	p->set_color({ 0x80ff802C,1,5,pbc });
-	//form0->bind(p);	// 绑定到窗口  
-	p->set_rss(5);
-	p->_lms = { 8,8 };
-	p->add_familys(fontn, 0);
-	p->draggable = false; //可拖动
-	p->set_size(size);
-	p->set_pos({ 30,50 });
-	p->on_click = [](plane_ev* e) {};
-	p->fontsize = 16;
-
-	size.y -= 50;
-	size.x -= 50 * 10;
-	size /= 2;
-
-	auto dpx = p->push_dragpos(size);// 增加一个拖动坐标
-
-	auto bp = new belt_cx();
-	p->update_cb = [=](float delta)
-		{
-
-			bp->update(delta);
-			return 1;
-		};
-#ifdef _CR__
-	p->draw_back_cb = [=](cairo_t* cr, const glm::vec2& scroll)
-		{
-			auto dps = p->get_dragpos(dpx);//获取拖动时的坐标
-			cairo_translate(cr, dps.x, dps.y);
-			{
-				cairo_as _ss_(cr);
-				bp->draw(cr);
-			}
-			std::string str = (char*)u8"🍉";
-			glm::vec4 rc = { 0,0,200,56 };
-			text_style_t st = {};
-			st.font = 0;
-			st.text_align = { 0.0,0.5 };
-			st.font_size = 39;
-			st.text_color = -1;
-			auto rc1 = p->ltx->get_text_rect(st.font, st.font_size, str.c_str(), -1);
-			auto rc2 = rc;
-			//rc2.z = rc1.x; rc2.w = rc1.y;
-			//rc2.y = (rc.w - rc1.y) * st.text_align.y;
-			//draw_rect(cr, rc2, 0xf0222222, 0xff802Cff, 2, 1);
-			draw_text(cr, p->ltx, str.c_str(), -1, rc, &st);
-		};
-#endif
-}
+#endif 
 
 
 void test_img() {
@@ -689,550 +633,6 @@ int mainc() {
 
 	return 0;
 }
-#ifndef NOT_UI
-
-//  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
-struct widget_t
-{
-public:
-	int id = 0;
-	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
-	int _bst = 1;			// 鼠标状态
-	glm::vec2 pos = {};		// 控件坐标
-	glm::vec2 size = {};	// 控件大小
-	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
-	glm::ivec2 cmpos = {};	// 当前鼠标坐标
-	glm::ivec2 mmpos = {};	// 当前鼠标坐标
-	glm::ivec2 ppos = {};	// 父级坐标 
-	std::string text;		// 内部显示用字符串
-	std::string family;
-	float font_size = 16;
-	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
-	int rounding = 4;		// 圆角
-	float thickness = 1.0;	// 边框线粗
-
-	std::function<void(uint32_t type, et_un_t* e, const glm::vec2& pos)> on_event_cb;	//自定义事件处理
-	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
-	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
-	int _clicks = 0;		// 点击数量
-	layout_text_x* ltx = 0;
-
-	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
-	int _old_bst = 0;			// 鼠标状态
-	int cks = 0;				// 鼠标点击状态
-	widget_t* parent = 0;
-	double dtime = 0.0;
-	bool _disabled_events = false;
-	bool visible = true;
-	bool _absolute = false;		// true绝对坐标，false布局计算
-	bool has_drag = false;	// 是否有拖动事件
-	bool _autofree = false;
-	bool has_hover_sc = 0;	// 滚动在父级接收
-public:
-	widget_t();
-	widget_t(WIDGET_TYPE wt);
-	virtual ~widget_t();
-	//event_type2
-	virtual bool on_mevent(int type, const glm::vec2& mps);
-	virtual bool update(float delta);
-	virtual void draw(rvg_cx* rv);
-	virtual glm::ivec2 get_pos(bool has_parent = true);
-	virtual glm::ivec2 get_spos();	// 滚动坐标
-};
-void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
-void send_hover(widget_t* wp, const glm::vec2& mps);
-
-widget_t::widget_t()
-{}
-widget_t::widget_t(WIDGET_TYPE wt) :wtype(wt)
-{}
-widget_t::~widget_t()
-{}
-bool widget_t::on_mevent(int type, const glm::vec2& mps)
-{
-	return false;
-}
-
-bool widget_t::update(float delta)
-{
-	return false;
-}
-
-void widget_t::draw(rvg_cx* rv)
-{}
-glm::ivec2 widget_t::get_pos(bool has_parent)
-{
-	glm::ivec2 ps = pos;
-	if (parent) {
-		auto pss = parent->get_pos();
-		auto ss = parent->get_spos();
-		ss *= hscroll;
-		ps += ss;
-		if (has_parent) { ps += pss; }
-	}
-	return ps;
-}
-
-glm::ivec2 widget_t::get_spos()
-{
-	return glm::ivec2();
-}
-
-
-#endif // !NOT_UI
-
-
-#if 1
-// 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
-bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
-	bool hover = false;
-	if (!wp)return hover;
-	auto e = &ep->v;
-	auto t = (devent_type_e)type;
-	if (t == devent_type_e::mouse_move_e)
-	{
-		auto p = e->m;
-		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
-		wp->mmpos = mps;
-		// 判断是否鼠标进入 
-		glm::vec4 trc = { wp->pos  ,wp->size };
-		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
-		if (k.x) {
-			bool hoverold = wp->_bst & (int)BTN_STATE::STATE_HOVER;
-			wp->_bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
-			if (!(wp->_bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
-				ep->ret = 1;
-			if (!hoverold)
-			{
-				// 鼠标进入
-				wp->on_mevent((int)event_type2::on_enter, mps);
-				if (wp->mevent_cb) {
-					wp->mevent_cb(wp, (int)event_type2::on_enter, mps);
-				}
-			}
-		}
-		else {
-			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
-			{
-				wp->_bst &= ~(int)BTN_STATE::STATE_HOVER;
-				// 鼠标离开
-				wp->on_mevent((int)event_type2::on_leave, mps);
-				if (wp->mevent_cb) {
-					wp->mevent_cb(wp, (int)event_type2::on_leave, mps);
-				}
-			}
-		}
-
-		{
-			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
-			{
-				wp->on_mevent((int)event_type2::on_move, mps);
-				if (wp->mevent_cb)
-				{
-					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
-				}
-			}
-			if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE) {
-				auto dps = mps - wp->curpos;
-				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
-				if (wp->mevent_cb)
-				{
-					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
-				}
-			}
-		}
-	}
-	return hover;
-}
-
-void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
-	if (!wp)return;
-	auto e = &ep->v;
-	auto t = (devent_type_e)type;
-	switch (t)
-	{
-	case devent_type_e::mouse_move_e:
-		widget_on_move(wp, type, ep, pos);
-		break;
-	case devent_type_e::mouse_button_e:
-	{
-		auto p = e->b;
-		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
-		bool isd = wp->cmpos == mps;
-		wp->cmpos = mps;
-		if (wp->_bst & (int)BTN_STATE::STATE_HOVER) {
-			if (p->down == 1)
-			{
-				ep->ret = 1;
-			}
-			if (p->button == 1) {
-				if (p->down == 1) {
-					wp->_bst |= (int)BTN_STATE::STATE_ACTIVE;
-					wp->curpos = mps - (glm::ivec2)wp->pos;
-					wp->cks = 0;
-					wp->on_mevent((int)event_type2::on_down, mps);
-					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
-				}
-				else {
-					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
-					{
-						wp->cks = p->clicks;
-						wp->on_mevent((int)event_type2::on_up, mps);
-						if (wp->mevent_cb) {
-							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
-						}
-						int tc = (int)event_type2::on_click; //左键单击
-						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
-						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
-						wp->_clicks = p->clicks;
-						wp->on_mevent(tc, mps);
-						if (wp->mevent_cb) {
-							wp->mevent_cb(wp, tc, mps);
-						}
-						if (wp->click_cb)
-						{
-							wp->click_cb(wp, p->clicks);
-						}
-					}
-					wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
-				}
-			}
-		}
-		if (p->down == 0) {
-			wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
-			wp->_bst |= (int)BTN_STATE::STATE_NOMAL;
-			wp->on_mevent((int)event_type2::mouse_up, mps);
-			if (wp->mevent_cb) {
-				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
-			}
-		}
-	}
-	break;
-	case devent_type_e::mouse_wheel_e:
-	{
-		auto p = e->w;
-		glm::vec2 mps = { p->x, p->y };
-		if (wp->_bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
-		{
-			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
-			if (wp->mevent_cb) {
-				wp->mevent_cb(wp, (int)event_type2::on_scroll, mps);
-			}
-			ep->ret = 1;
-		}
-	}
-	break;
-	case devent_type_e::keyboard_e:
-	{
-		// todo
-		//on_keyboard(ep);
-	}
-	break;
-	default:
-		break;
-	}
-
-}
-void send_hover(widget_t* wp, const glm::vec2& mps) {
-
-	wp->on_mevent((int)event_type2::on_hover, mps);
-	if (wp->mevent_cb)
-	{
-		wp->mevent_cb(wp, (int)event_type2::on_hover, mps);
-	}
-}
-
-bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
-{
-	bool r = false;
-	auto e = &ep->v;
-	auto t = (devent_type_e)type;
-	if(pw->on_event_cb)
-	{
-		pw->on_event_cb(type, ep, ppos);
-	}
-	else {
-		widget_on_event(pw, type, ep, ppos);
-		if (ep->ret && t == devent_type_e::mouse_button_e)
-		{
-			auto p = e->b;
-			if (p->down == 1)
-				get_input_state(0, 1);
-		}
-	}
-	return (ep->ret);
-}
-
-class div_cx :public widget_t
-{
-public:
-	glm::vec4 viewport = {};
-	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
-	glm::ivec2 _move_pos = {};
-	int evupdate = 0;
-	int ckinc = 0;
-	int ckup = 0;
-	std::vector<widget_t*> widgets, event_wts, event_wts1;
-	std::vector<drag_v6> drags;	// 拖动坐标
-	std::vector<drag_v6*> dragsp;	// 拖动区域
-public:
-	div_cx();
-	~div_cx();
-
-	void on_event(uint32_t type, et_un_t* ep);
-private:
-	void sortdg();
-	bool _hover = true;
-};
-
-div_cx::div_cx()
-{}
-
-div_cx::~div_cx()
-{}
-void div_cx::sortdg()
-{
-	std::stable_sort(dragsp.begin(), dragsp.end(), [](const drag_v6* t1, const drag_v6* t2) { return t1->z < t2->z; });
-}
-void div_cx::on_event(uint32_t type, et_un_t* ep)
-{
-	auto e = &ep->v;
-	if (!visible)return;
-	auto t = (devent_type_e)type;
-	glm::ivec2 vgpos = viewport;
-	int r1 = 0;
-	auto ppos = get_pos();
-	auto sps = get_spos();
-	_hover_eq.w = type;
-	widget_t* hpw = 0;
-	if (t == devent_type_e::mouse_move_e)
-	{
-		auto p = e->m;
-		glm::ivec2 mps = { p->x,p->y };
-		glm::vec4 trc = viewport;
-		auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
-		if (k2.x) {
-			_bst |= (int)BTN_STATE::STATE_HOVER;
-			r1 = 1;
-			p->cursor = (int)cursor_st::cursor_arrow;
-			_hover = true;
-			if (_move_pos != mps)
-			{
-				_move_pos = mps;
-				_hover_eq.x = 0;
-			}
-			//printf("_hover\n");
-		}
-		else {
-			_move_pos = mps;
-			_hover_eq.z = 0;
-			_bst &= ~(int)BTN_STATE::STATE_HOVER;
-			if (ckinc == 0)
-				_hover = false;
-			//printf("on_leave\n");
-		}
-		//if (horizontal)
-		//{
-		//	widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
-		//}
-		//if (vertical) {
-		//	widget_on_event(vertical, type, ep, ppos);// 垂直滚动条 
-		//}
-		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
-			auto pw = *it;
-			if (!pw || !pw->visible || pw->_disabled_events)continue;
-			auto vpos = sps * pw->hscroll;
-			on_wpe(pw, type, ep, ppos + vpos);
-		}
-
-		event_wts.clear();
-		event_wts1.clear();
-		//if (horizontal) {
-		//	horizontal->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(horizontal) : event_wts1.push_back(horizontal);//水平滚动条
-		//}
-		//if (vertical) {
-		//	vertical->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(vertical) : event_wts1.push_back(vertical);//垂直滚动条
-		//}
-		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
-			if ((*it)->_bst & (int)BTN_STATE::STATE_HOVER)
-				event_wts.push_back(*it);
-			else
-				event_wts1.push_back(*it);
-		}
-		auto length = event_wts.size();
-		{
-			// 生成鼠标离开消息
-			for (size_t i = 1; i < length; i++) {
-				auto pw = event_wts[i];
-				if (!pw || !pw->visible || pw->_disabled_events)continue;
-				auto vpos = sps * pw->hscroll;
-				auto p = e->m;
-				glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
-				bool isd = pw->cmpos == mps;
-				pw->cmpos = mps;
-				pw->_bst &= ~(int)BTN_STATE::STATE_HOVER;
-				// 鼠标离开
-				pw->on_mevent((int)event_type2::on_leave, mps);
-				if (pw->mevent_cb) {
-					pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
-				}
-			}
-		}
-
-	}
-	else
-	{
-		bool btn = !(t == devent_type_e::mouse_button_e && e->b->down == 0);// 弹起判断
-		int icc = 0;
-		auto length = event_wts.size();
-		for (size_t i = 0; i < length; i++)
-		{
-			auto pw = event_wts[i];
-			icc++;
-			if (!pw || !pw->visible || pw->_disabled_events)continue;
-			auto vpos = sps * pw->hscroll;
-			on_wpe(pw, type, ep, ppos + vpos);
-			if (ep->ret && btn) {
-				hpw = pw;
-				break;
-			}
-		}
-		if (!hpw)
-		{
-			auto ln = event_wts1.size();
-			for (size_t i = 0; i < ln; i++)
-			{
-				auto pw = event_wts1[i];
-				if (!pw || !pw->visible || pw->_disabled_events)continue;
-				auto vpos = sps * pw->hscroll;
-				on_wpe(pw, type, ep, ppos + vpos);
-				if (ep->ret && btn) {
-					hpw = pw; break;
-				}
-			}
-		}
-	}
-	if (!ep->ret)
-		ep->ret = r1;
-	switch (t)
-	{
-	case devent_type_e::mouse_move_e:
-	{
-		auto length = event_wts.size();
-		auto p = e->m;
-		glm::ivec2 mps = { p->x,p->y };
-		//on_motion(mps);
-		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
-		if (ckinc > 0)
-		{
-			for (auto& it : drags)
-			{
-				if (it.ck > 0)
-				{
-					it.pos = mps - it.tp - ppos;	// 处理拖动坐标
-					it.cp1 = mps - ppos;
-				}
-			}
-		}
-		else {
-			for (auto& it : drags)
-			{
-				it.ck = 0;
-			}
-		}
-	}
-	break;
-	case devent_type_e::mouse_button_e:
-	{
-		auto p = e->b;
-		glm::ivec2 mps = { p->x,p->y };
-		//on_button(p->button, p->down, mps, p->clicks, ep->ret);
-
-		if (p->button == 1) {
-			if (p->down == 1) {
-				mps -= ppos;
-				drag_v6* dp = 0;
-
-				for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
-				{
-					auto dp1 = *vt;
-					auto& it = *dp1;
-					it.z = 0;
-					if (it.size.x > 0 && it.size.y > 0)
-					{
-						if (dp)continue;
-						glm::vec4 trc = { it.pos + sps,it.size };
-						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
-						if (k2.x)
-						{
-							it.tp = mps - it.pos;	// 记录当前拖动坐标
-							it.ck = 1;
-							it.cp1 = it.cp0 = mps;
-							it.z = 1;
-							dp = dp1;
-						}
-					}
-				}
-				if (!dp)
-				{
-					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
-					{
-						auto dp1 = *vt;
-						auto& it = *dp1;
-						if (it.size.x == 0 || it.size.y == 0)
-						{
-							it.z = 0;
-							it.cp1 = it.cp0 = mps;
-							it.tp = mps - it.pos;	// 记录当前拖动坐标
-							it.ck = 1;
-						}
-					}
-				}
-				else
-				{
-					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
-					{
-						auto dp1 = *vt;
-						auto& it = *dp1;
-						if (it.size.x == 0 && it.size.y == 0)
-						{
-							it.z = 0;
-							it.cp1 = it.cp0 = mps;
-						}
-					}
-					sortdg();
-				}
-			}
-		}
-
-		_hover_eq.z = 0;
-		//printf("ck:%d\t%p\n", ckinc, this);
-		if (ckup > 0)
-			ep->ret = 1;
-	}
-	break;
-	case devent_type_e::mouse_wheel_e:
-	{
-		auto p = e->w;
-		//on_wheel(p->x, p->y);
-		if (_hover)
-		{
-			ep->ret = 1;		// 滚轮独占本事件
-		}
-	}
-	break;
-	case devent_type_e::keyboard_e:
-	{
-		//on_keyboard(ep);
-	}
-	break;
-	}
-	evupdate++;
-}
-
-#endif // 1
-
-
 void test_vkvg(const char* fn, dev_info_c* dc);
 struct listm_t
 {
@@ -1456,7 +856,7 @@ int main()
 			vkd->_state.Exposure = 0.8;
 			vkd->_state.EmissiveFactor = 1;
 			vkd->_state.IBLFactor = 0.5;
-			new_ui(form0, vkd);
+			//new_ui(form0, vkd);
 			auto pcb = new texture_cb();
 			assert(pcb);
 			get_sdl_texture_cb(pcb);
