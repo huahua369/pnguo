@@ -1432,9 +1432,7 @@ rvg_cx::rvg_cx()
 
 rvg_cx::~rvg_cx()
 {}
-
-void rvg_cx::submit_styles(fill_style_d* st, size_t count)
-{}
+ 
 void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type, int st)
 {}
 void rvg_cx::add_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width, int st)

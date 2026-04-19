@@ -289,40 +289,43 @@ struct text_vx
 	glm::vec4 color;
 };
 struct dev_info_cx;
-
+/*
+add 需要先set_style
+push不用set_style
+*/
 class rvg_cx
 {
 public:
 	rvg_cx();
 	~rvg_cx();
 
-	// 设置当前样式,执行填充或描边
-	void submit_styles(fill_style_d* st, size_t count);
+	void set_style(fill_style_d* st);
+	void set_style(uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
+	// 填充网格
+	void push_grid_fill(const glm::vec2& pos, const glm::vec2 &size, const glm::ivec2& cols, int width);
+	// 线性渐变填充
+	void push_linear_fill(const glm::vec2& pos, const glm::vec2& size, const glm::vec4* cols, int count);
 	// 画2d箭头type=0线终点在三角形中间
-	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type, int st);
-	// 画网格填充
-	void add_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width, int st);
+	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type);
 	// 批量渲染同样式的块(圆或矩形)
-	void add_block(dblock_d* p, int st);
+	void add_block(dblock_d* p);
 	// 描边或填充路径
-	void add_path(path_d* path, int st);
-	// 添加矩形
-	void add_rect(rect_d* r, size_t count);
-	void add_rect4r(rect4r_d* r, size_t count);
-	void add_circle(circle_d* p, size_t count);
-	void add_ellipse(ellipse_d* p, size_t count);
+	void add_path(path_d* path);
+	// 批量画单条线
+	void add_line(glm::vec4* p, size_t count);
+
+	void add_rect(const glm::vec4& rc, double r);
+	void add_rect(const glm::vec4& rc, const glm::vec4& r);
+	void add_circle(const glm::vec2& pos, float r);
+	void add_ellipse(const glm::vec2& pos, const glm::vec2& r);
 	// 三角形基于矩形内 
 	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
-	void add_triangle(triangle_d* p, size_t count);
-	// 填充网格
-	void add_grid_fill(grid_fill_d* p);
-	// 线性渐变填充
-	void add_linear_fill(linear_fill_d* p);
-	// 批量画线线
-	void add_line(line_d* p, size_t count);
-	// 折线只有stroke
-	void add_polyline(polyline_d* p, size_t count);
+	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+	void add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
+	void add_polyline(const PathsD* p, bool closed);
+	// 渲染索引多段线，索引-1则跳过
+	void add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 	// 文本渲染
 	bool set_text_style(text_style* ts, size_t count);
 	void add_text(text_st* p, size_t count);
