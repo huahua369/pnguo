@@ -5954,7 +5954,7 @@ bool image_btn::on_mevent(int type, const glm::vec2& mps)
 bool image_btn::update(float) {
 	return false;
 }
-void image_btn::draw(draw(rvg_cx* rv) {
+void image_btn::draw(rvg_cx* rv) {
 
 }
 btn_cols_t* color_btn::set_btn_color_bgr(size_t idx)

@@ -13,7 +13,7 @@
 #include <pnguo/win_core.h>
 #include "win32msg.h"
 #include <pnguo/event.h>
-#define GUI_STATIC_LIB
+//#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
 #include <pnguo/vkrenderer.h>
@@ -33,7 +33,12 @@
 
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
-
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 
 void new_ui(form_x* form0, vkdg_cx* vkd) {
 	auto p = new plane_cx();
@@ -684,6 +689,275 @@ int mainc() {
 
 	return 0;
 }
+#ifndef NOT_UI
+
+//  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
+struct widget_t
+{
+public:
+	int id = 0;
+	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
+	int bst = 1;			// 鼠标状态
+	glm::vec2 pos = {};		// 控件坐标
+	glm::vec2 size = {};	// 控件大小
+	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
+	glm::ivec2 cmpos = {};	// 当前鼠标坐标
+	glm::ivec2 mmpos = {};	// 当前鼠标坐标
+	glm::ivec2 ppos = {};	// 父级坐标 
+	std::string text;		// 内部显示用字符串
+	std::string family;
+	float font_size = 16;
+	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
+	int rounding = 4;		// 圆角
+	float thickness = 1.0;	// 边框线粗
+
+	std::function<void(uint32_t type, et_un_t* e, const glm::vec2& pos)> on_event_cb;	//自定义事件处理
+	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
+	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
+	int _clicks = 0;		// 点击数量
+	layout_text_x* ltx = 0;
+
+	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
+	int _old_bst = 0;			// 鼠标状态
+	int cks = 0;				// 鼠标点击状态
+	plane_cx* parent = 0;
+	double dtime = 0.0;
+	bool _disabled_events = false;
+	bool visible = true;
+	bool _absolute = false;		// true绝对坐标，false布局计算
+	bool has_drag = false;	// 是否有拖动事件
+	bool _autofree = false;
+	bool has_hover_sc = 0;	// 滚动在父级接收
+public:
+	widget_t();
+	widget_t(WIDGET_TYPE wt);
+	virtual ~widget_t();
+	//event_type2
+	virtual bool on_mevent(int type, const glm::vec2& mps);
+	virtual bool update(float delta);
+	virtual void draw(rvg_cx* rv);
+	virtual glm::ivec2 get_pos(bool has_parent = true);
+};
+void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
+void send_hover(widget_t* wp, const glm::vec2& mps);
+
+widget_t::widget_t()
+{}
+widget_t::widget_t(WIDGET_TYPE wt) :wtype(wt)
+{}
+widget_t::~widget_t()
+{}
+bool widget_t::on_mevent(int type, const glm::vec2& mps)
+{
+	return false;
+}
+
+bool widget_t::update(float delta)
+{
+	return false;
+}
+
+void widget_t::draw(rvg_cx* rv)
+{}
+glm::ivec2 widget_t::get_pos(bool has_parent)
+{
+	glm::ivec2 ps = pos;
+	if (parent) {
+		auto pss = parent->get_pos();
+		auto ss = parent->get_spos();
+		ss *= hscroll;
+		ps += ss;
+		if (has_parent) { ps += pss; }
+	}
+	return ps;
+}
+
+
+#endif // !NOT_UI
+
+
+#if 1
+// 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
+bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	bool hover = false;
+	if (!wp)return hover;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	if (t == devent_type_e::mouse_move_e)
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
+		wp->mmpos = mps;
+		// 判断是否鼠标进入 
+		glm::vec4 trc = { wp->pos  ,wp->size };
+		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+		if (k.x) {
+			bool hoverold = wp->bst & (int)BTN_STATE::STATE_HOVER;
+			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
+			if (!(wp->bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
+				ep->ret = 1;
+			if (!hoverold)
+			{
+				// 鼠标进入
+				wp->on_mevent((int)event_type2::on_enter, mps);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_enter, mps);
+				}
+			}
+		}
+		else {
+			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
+			{
+				wp->bst &= ~(int)BTN_STATE::STATE_HOVER;
+				// 鼠标离开
+				wp->on_mevent((int)event_type2::on_leave, mps);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_leave, mps);
+				}
+			}
+		}
+
+		{
+			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
+			{
+				wp->on_mevent((int)event_type2::on_move, mps);
+				if (wp->mevent_cb)
+				{
+					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
+				}
+			}
+			if (wp->bst & (int)BTN_STATE::STATE_ACTIVE) {
+				auto dps = mps - wp->curpos;
+				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
+				if (wp->mevent_cb)
+				{
+					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+				}
+			}
+		}
+	}
+	return hover;
+}
+
+void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
+	if (!wp)return;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+		widget_on_move(wp, type, ep, pos);
+		break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
+		bool isd = wp->cmpos == mps;
+		wp->cmpos = mps;
+		if (wp->bst & (int)BTN_STATE::STATE_HOVER) {
+			if (p->down == 1)
+			{
+				ep->ret = 1;
+			}
+			if (p->button == 1) {
+				if (p->down == 1) {
+					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
+					wp->curpos = mps - (glm::ivec2)wp->pos;
+					wp->cks = 0;
+					wp->on_mevent((int)event_type2::on_down, mps);
+					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
+				}
+				else {
+					if ((wp->bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
+					{
+						wp->cks = p->clicks;
+						wp->on_mevent((int)event_type2::on_up, mps);
+						if (wp->mevent_cb) {
+							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
+						}
+						int tc = (int)event_type2::on_click; //左键单击
+						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
+						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+						wp->_clicks = p->clicks;
+						wp->on_mevent(tc, mps);
+						if (wp->mevent_cb) {
+							wp->mevent_cb(wp, tc, mps);
+						}
+						if (wp->click_cb)
+						{
+							wp->click_cb(wp, p->clicks);
+						}
+					}
+					wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+				}
+			}
+		}
+		if (p->down == 0) {
+			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
+			wp->on_mevent((int)event_type2::mouse_up, mps);
+			if (wp->mevent_cb) {
+				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
+			}
+		}
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		glm::vec2 mps = { p->x, p->y };
+		if (wp->bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
+		{
+			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
+			if (wp->mevent_cb) {
+				wp->mevent_cb(wp, (int)event_type2::on_scroll, mps);
+			}
+			ep->ret = 1;
+		}
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		// todo
+		//on_keyboard(ep);
+	}
+	break;
+	default:
+		break;
+	}
+
+}
+void send_hover(widget_t* wp, const glm::vec2& mps) {
+
+	wp->on_mevent((int)event_type2::on_hover, mps);
+	if (wp->mevent_cb)
+	{
+		wp->mevent_cb(wp, (int)event_type2::on_hover, mps);
+	}
+}
+
+bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
+{
+	bool r = false;
+	auto e = &ep->v;
+	auto t = (devent_type_e)type;
+	if(pw->on_event_cb)
+	{
+		pw->on_event_cb(type, ep, ppos);
+	}
+	else {
+		widget_on_event(pw, type, ep, ppos);
+		if (ep->ret && t == devent_type_e::mouse_button_e)
+		{
+			auto p = e->b;
+			if (p->down == 1)
+				get_input_state(0, 1);
+		}
+	}
+	return (ep->ret);
+}
+
+#endif // 1
 
 
 void test_vkvg(const char* fn, dev_info_c* dc);

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef VG_H
 #define VG_H
 
