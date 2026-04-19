@@ -697,7 +697,7 @@ struct widget_t
 public:
 	int id = 0;
 	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
-	int bst = 1;			// 鼠标状态
+	int _bst = 1;			// 鼠标状态
 	glm::vec2 pos = {};		// 控件坐标
 	glm::vec2 size = {};	// 控件大小
 	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
@@ -720,7 +720,7 @@ public:
 	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
 	int _old_bst = 0;			// 鼠标状态
 	int cks = 0;				// 鼠标点击状态
-	plane_cx* parent = 0;
+	widget_t* parent = 0;
 	double dtime = 0.0;
 	bool _disabled_events = false;
 	bool visible = true;
@@ -737,6 +737,7 @@ public:
 	virtual bool update(float delta);
 	virtual void draw(rvg_cx* rv);
 	virtual glm::ivec2 get_pos(bool has_parent = true);
+	virtual glm::ivec2 get_spos();	// 滚动坐标
 };
 void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
 void send_hover(widget_t* wp, const glm::vec2& mps);
@@ -772,6 +773,11 @@ glm::ivec2 widget_t::get_pos(bool has_parent)
 	return ps;
 }
 
+glm::ivec2 widget_t::get_spos()
+{
+	return glm::ivec2();
+}
+
 
 #endif // !NOT_UI
 
@@ -792,9 +798,9 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 		glm::vec4 trc = { wp->pos  ,wp->size };
 		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 		if (k.x) {
-			bool hoverold = wp->bst & (int)BTN_STATE::STATE_HOVER;
-			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
-			if (!(wp->bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
+			bool hoverold = wp->_bst & (int)BTN_STATE::STATE_HOVER;
+			wp->_bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
+			if (!(wp->_bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
 				ep->ret = 1;
 			if (!hoverold)
 			{
@@ -806,9 +812,9 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 			}
 		}
 		else {
-			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
+			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
 			{
-				wp->bst &= ~(int)BTN_STATE::STATE_HOVER;
+				wp->_bst &= ~(int)BTN_STATE::STATE_HOVER;
 				// 鼠标离开
 				wp->on_mevent((int)event_type2::on_leave, mps);
 				if (wp->mevent_cb) {
@@ -818,7 +824,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 		}
 
 		{
-			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
+			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
 			{
 				wp->on_mevent((int)event_type2::on_move, mps);
 				if (wp->mevent_cb)
@@ -826,7 +832,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
 				}
 			}
-			if (wp->bst & (int)BTN_STATE::STATE_ACTIVE) {
+			if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE) {
 				auto dps = mps - wp->curpos;
 				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
 				if (wp->mevent_cb)
@@ -854,21 +860,21 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
 		bool isd = wp->cmpos == mps;
 		wp->cmpos = mps;
-		if (wp->bst & (int)BTN_STATE::STATE_HOVER) {
+		if (wp->_bst & (int)BTN_STATE::STATE_HOVER) {
 			if (p->down == 1)
 			{
 				ep->ret = 1;
 			}
 			if (p->button == 1) {
 				if (p->down == 1) {
-					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
+					wp->_bst |= (int)BTN_STATE::STATE_ACTIVE;
 					wp->curpos = mps - (glm::ivec2)wp->pos;
 					wp->cks = 0;
 					wp->on_mevent((int)event_type2::on_down, mps);
 					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
 				}
 				else {
-					if ((wp->bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
+					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
 					{
 						wp->cks = p->clicks;
 						wp->on_mevent((int)event_type2::on_up, mps);
@@ -888,13 +894,13 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 							wp->click_cb(wp, p->clicks);
 						}
 					}
-					wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+					wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 				}
 			}
 		}
 		if (p->down == 0) {
-			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
-			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
+			wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
+			wp->_bst |= (int)BTN_STATE::STATE_NOMAL;
 			wp->on_mevent((int)event_type2::mouse_up, mps);
 			if (wp->mevent_cb) {
 				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
@@ -906,7 +912,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 	{
 		auto p = e->w;
 		glm::vec2 mps = { p->x, p->y };
-		if (wp->bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
+		if (wp->_bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
 		{
 			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
 			if (wp->mevent_cb) {
@@ -955,6 +961,273 @@ bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
 		}
 	}
 	return (ep->ret);
+}
+
+class div_cx :public widget_t
+{
+public:
+	glm::vec4 viewport = {};
+	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
+	glm::ivec2 _move_pos = {};
+	int evupdate = 0;
+	int ckinc = 0;
+	int ckup = 0;
+	std::vector<widget_t*> widgets, event_wts, event_wts1;
+	std::vector<drag_v6> drags;	// 拖动坐标
+	std::vector<drag_v6*> dragsp;	// 拖动区域
+public:
+	div_cx();
+	~div_cx();
+
+	void on_event(uint32_t type, et_un_t* ep);
+private:
+	void sortdg();
+	bool _hover = true;
+};
+
+div_cx::div_cx()
+{}
+
+div_cx::~div_cx()
+{}
+void div_cx::sortdg()
+{
+	std::stable_sort(dragsp.begin(), dragsp.end(), [](const drag_v6* t1, const drag_v6* t2) { return t1->z < t2->z; });
+}
+void div_cx::on_event(uint32_t type, et_un_t* ep)
+{
+	auto e = &ep->v;
+	if (!visible)return;
+	auto t = (devent_type_e)type;
+	glm::ivec2 vgpos = viewport;
+	int r1 = 0;
+	auto ppos = get_pos();
+	auto sps = get_spos();
+	_hover_eq.w = type;
+	widget_t* hpw = 0;
+	if (t == devent_type_e::mouse_move_e)
+	{
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y };
+		glm::vec4 trc = viewport;
+		auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+		if (k2.x) {
+			_bst |= (int)BTN_STATE::STATE_HOVER;
+			r1 = 1;
+			p->cursor = (int)cursor_st::cursor_arrow;
+			_hover = true;
+			if (_move_pos != mps)
+			{
+				_move_pos = mps;
+				_hover_eq.x = 0;
+			}
+			//printf("_hover\n");
+		}
+		else {
+			_move_pos = mps;
+			_hover_eq.z = 0;
+			_bst &= ~(int)BTN_STATE::STATE_HOVER;
+			if (ckinc == 0)
+				_hover = false;
+			//printf("on_leave\n");
+		}
+		//if (horizontal)
+		//{
+		//	widget_on_event(horizontal, type, ep, ppos);// 水平滚动条
+		//}
+		//if (vertical) {
+		//	widget_on_event(vertical, type, ep, ppos);// 垂直滚动条 
+		//}
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			auto pw = *it;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			auto vpos = sps * pw->hscroll;
+			on_wpe(pw, type, ep, ppos + vpos);
+		}
+
+		event_wts.clear();
+		event_wts1.clear();
+		//if (horizontal) {
+		//	horizontal->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(horizontal) : event_wts1.push_back(horizontal);//水平滚动条
+		//}
+		//if (vertical) {
+		//	vertical->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(vertical) : event_wts1.push_back(vertical);//垂直滚动条
+		//}
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			if ((*it)->_bst & (int)BTN_STATE::STATE_HOVER)
+				event_wts.push_back(*it);
+			else
+				event_wts1.push_back(*it);
+		}
+		auto length = event_wts.size();
+		{
+			// 生成鼠标离开消息
+			for (size_t i = 1; i < length; i++) {
+				auto pw = event_wts[i];
+				if (!pw || !pw->visible || pw->_disabled_events)continue;
+				auto vpos = sps * pw->hscroll;
+				auto p = e->m;
+				glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
+				bool isd = pw->cmpos == mps;
+				pw->cmpos = mps;
+				pw->_bst &= ~(int)BTN_STATE::STATE_HOVER;
+				// 鼠标离开
+				pw->on_mevent((int)event_type2::on_leave, mps);
+				if (pw->mevent_cb) {
+					pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
+				}
+			}
+		}
+
+	}
+	else
+	{
+		bool btn = !(t == devent_type_e::mouse_button_e && e->b->down == 0);// 弹起判断
+		int icc = 0;
+		auto length = event_wts.size();
+		for (size_t i = 0; i < length; i++)
+		{
+			auto pw = event_wts[i];
+			icc++;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			auto vpos = sps * pw->hscroll;
+			on_wpe(pw, type, ep, ppos + vpos);
+			if (ep->ret && btn) {
+				hpw = pw;
+				break;
+			}
+		}
+		if (!hpw)
+		{
+			auto ln = event_wts1.size();
+			for (size_t i = 0; i < ln; i++)
+			{
+				auto pw = event_wts1[i];
+				if (!pw || !pw->visible || pw->_disabled_events)continue;
+				auto vpos = sps * pw->hscroll;
+				on_wpe(pw, type, ep, ppos + vpos);
+				if (ep->ret && btn) {
+					hpw = pw; break;
+				}
+			}
+		}
+	}
+	if (!ep->ret)
+		ep->ret = r1;
+	switch (t)
+	{
+	case devent_type_e::mouse_move_e:
+	{
+		auto length = event_wts.size();
+		auto p = e->m;
+		glm::ivec2 mps = { p->x,p->y };
+		//on_motion(mps);
+		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
+		if (ckinc > 0)
+		{
+			for (auto& it : drags)
+			{
+				if (it.ck > 0)
+				{
+					it.pos = mps - it.tp - ppos;	// 处理拖动坐标
+					it.cp1 = mps - ppos;
+				}
+			}
+		}
+		else {
+			for (auto& it : drags)
+			{
+				it.ck = 0;
+			}
+		}
+	}
+	break;
+	case devent_type_e::mouse_button_e:
+	{
+		auto p = e->b;
+		glm::ivec2 mps = { p->x,p->y };
+		//on_button(p->button, p->down, mps, p->clicks, ep->ret);
+
+		if (p->button == 1) {
+			if (p->down == 1) {
+				mps -= ppos;
+				drag_v6* dp = 0;
+
+				for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+				{
+					auto dp1 = *vt;
+					auto& it = *dp1;
+					it.z = 0;
+					if (it.size.x > 0 && it.size.y > 0)
+					{
+						if (dp)continue;
+						glm::vec4 trc = { it.pos + sps,it.size };
+						auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
+						if (k2.x)
+						{
+							it.tp = mps - it.pos;	// 记录当前拖动坐标
+							it.ck = 1;
+							it.cp1 = it.cp0 = mps;
+							it.z = 1;
+							dp = dp1;
+						}
+					}
+				}
+				if (!dp)
+				{
+					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+					{
+						auto dp1 = *vt;
+						auto& it = *dp1;
+						if (it.size.x == 0 || it.size.y == 0)
+						{
+							it.z = 0;
+							it.cp1 = it.cp0 = mps;
+							it.tp = mps - it.pos;	// 记录当前拖动坐标
+							it.ck = 1;
+						}
+					}
+				}
+				else
+				{
+					for (auto vt = dragsp.rbegin(); vt != dragsp.rend(); vt++)
+					{
+						auto dp1 = *vt;
+						auto& it = *dp1;
+						if (it.size.x == 0 && it.size.y == 0)
+						{
+							it.z = 0;
+							it.cp1 = it.cp0 = mps;
+						}
+					}
+					sortdg();
+				}
+			}
+		}
+
+		_hover_eq.z = 0;
+		//printf("ck:%d\t%p\n", ckinc, this);
+		if (ckup > 0)
+			ep->ret = 1;
+	}
+	break;
+	case devent_type_e::mouse_wheel_e:
+	{
+		auto p = e->w;
+		//on_wheel(p->x, p->y);
+		if (_hover)
+		{
+			ep->ret = 1;		// 滚轮独占本事件
+		}
+	}
+	break;
+	case devent_type_e::keyboard_e:
+	{
+		//on_keyboard(ep);
+	}
+	break;
+	}
+	evupdate++;
 }
 
 #endif // 1
@@ -1217,7 +1490,7 @@ int main()
 			text_t1_set(ptb1, &tbox);
 			glm::ivec2 sc_size = { 1024,1024 };
 			auto ck = td3->new_surface(sc_size.x, sc_size.y);
-			//gbtn->bst = (int)BTN_STATE::STATE_ACTIVE;
+			//gbtn->_bst = (int)BTN_STATE::STATE_ACTIVE;
 			{
 
 #define white 1, 1, 1
