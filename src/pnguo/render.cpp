@@ -1432,33 +1432,42 @@ rvg_cx::rvg_cx()
 
 rvg_cx::~rvg_cx()
 {}
- 
-void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type, int st)
+
+void rvg_cx::submit(fill_style_d* st)
 {}
-void rvg_cx::add_grid_fill(const glm::vec2& ss, const glm::ivec2& cols, int width, int st)
+
+void rvg_cx::submit(uint32_t fill, uint32_t color, int linewidth, bool isbgr)
 {}
-void rvg_cx::add_block(dblock_d* p, int st)
+
+void rvg_cx::push_grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
 {}
-void rvg_cx::add_path(path_d* path, int st)
+
+void rvg_cx::push_linear_fill(const glm::vec2& size, const glm::vec4* cols, int count)
 {}
-void rvg_cx::add_rect(rect_d* r, size_t count)
+
+void rvg_cx::add_arrow(const glm::vec2 & p0, const glm::vec2 & p1, float arrow_hwidth, float arrow_size, bool type)
 {}
-void rvg_cx::add_rect4r(rect4r_d* r, size_t count)
+
+void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
 {}
-void rvg_cx::add_circle(circle_d* p, size_t count)
+
+void rvg_cx::add_rect(const glm::vec4& rc, double r)
 {}
-void rvg_cx::add_ellipse(ellipse_d* p, size_t count)
+
+void rvg_cx::add_circle(const glm::vec2& pos, float r)
 {}
-void rvg_cx::add_triangle(triangle_d* p, size_t count)
+
+void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r)
 {}
-void rvg_cx::add_grid_fill(grid_fill_d* p)
+
+void rvg_cx::add_triangle(const glm::vec2 & pos, const glm::vec2 & size, const glm::vec2 & dirspos)
 {}
-void rvg_cx::add_linear_fill(linear_fill_d* p)
+
+void rvg_cx::add_polyline(const glm::vec2 * p, int count)
 {}
-void rvg_cx::add_line(line_d* p, size_t count)
-{}
-void rvg_cx::add_polyline(polyline_d* p, size_t count)
-{}
+
+
+
 bool rvg_cx::set_text_style(text_style* ts, size_t count)
 {
 	return false;
@@ -1467,6 +1476,9 @@ void rvg_cx::add_text(text_st* p, size_t count)
 {
 
 }
+
+
+
 union u_col
 {
 	uint32_t uc;

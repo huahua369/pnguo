@@ -302,9 +302,9 @@ public:
 	void submit(fill_style_d* st);
 	void submit(uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
 	// 填充网格
-	void push_grid_fill(const glm::vec2& pos, const glm::vec2 &size, const glm::ivec2& cols, int width);
+	void push_grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width);
 	// 线性渐变填充
-	void push_linear_fill(const glm::vec2& pos, const glm::vec2& size, const glm::vec4* cols, int count);
+	void push_linear_fill(const glm::vec2& size, const glm::vec4* cols, int count);
 	// 画2d箭头type=0线终点在三角形中间
 	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type);
 	// 批量渲染同样式的块(圆或矩形)
@@ -313,6 +313,7 @@ public:
 	void add_path(path_d* path);
 	// 批量画单条线
 	void add_line(glm::vec4* p, size_t count);
+	void add_line(const glm::vec2& ps0, const glm::vec2& ps1);
 
 	void add_rect(const glm::vec4& rc, double r);
 	void add_rect(const glm::vec4& rc, const glm::vec4& r);
@@ -324,11 +325,14 @@ public:
 	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
 	void add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
 	void add_polyline(const PathsD* p, bool closed);
+	void add_polyline(const glm::vec2* p, int count);
 	// 渲染索引多段线，索引-1则跳过
 	void add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 	// 文本渲染
 	bool set_text_style(text_style* ts, size_t count);
 	void add_text(text_st* p, size_t count);
+
+	void add_paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
 private:
 
 };

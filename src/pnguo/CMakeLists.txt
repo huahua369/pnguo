@@ -16,8 +16,9 @@ set(pnguo_src
 "page.cpp"  
 "vkrenderer.cpp"  
 "gpu_vk.cpp"  
-"testshader.cpp"  
-"audio.cpp"  
+"testshader.cpp"
+"audio.cpp"
+"gui.cpp"
 )
  
 set(Shaders_PostProc_src
