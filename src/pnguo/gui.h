@@ -131,12 +131,12 @@ public:
 	text_image_t* get_glyph_item1(font_t* p, int fontsize, const void* str8, text_image_t* opt);
 	// 渲染部分文本
 #if 0
-	void draw_text(cairo_t* cr, const glm::ivec2& r, uint32_t color);
-	void draw_text(cairo_t* cr, const std::vector<font_item_t>& r, uint32_t color);
+	void draw_text(rvg_cx* rv, const glm::ivec2& r, uint32_t color);
+	void draw_text(rvg_cx* rv, const std::vector<font_item_t>& r, uint32_t color);
 
-	void draw_rect_rc(cairo_t* cr, const std::vector<font_item_t>& rtv, uint32_t color);
+	void draw_rect_rc(rvg_cx* rv, const std::vector<font_item_t>& rtv, uint32_t color);
 	// 渲染全部文本
-	void draw_text(cairo_t* cr, uint32_t color);
+	void draw_text(rvg_cx* rv, uint32_t color);
 #endif
 	// todo获取图集
 	atlas_t* get_atlas();
@@ -240,7 +240,7 @@ public:
 	//event_type2
 	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
-	//virtual void draw(cairo_t* cr);
+	virtual void draw(rvg_cx* rv);
 	virtual glm::ivec2 get_pos(bool has_parent = true);
 };
 
@@ -298,7 +298,7 @@ public:
 	bool update(float delta);
 	// 获取纹理/或者渲染到cairo
 	image_ptr_t* get_render_data();
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 
 	glm::ivec4 input_pos();
 	std::string get_select_str();
@@ -358,7 +358,7 @@ public:
 	~image_btn();
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 // 纯色按钮
 struct color_btn :public widget_base
@@ -385,7 +385,7 @@ public:
 	btn_cols_t* set_btn_color_bgr(size_t idx);
 
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 
 // 渐变按钮
@@ -418,7 +418,7 @@ public:
 	void init(glm::ivec4 rect, const std::string& text, uint32_t back_color = 0, uint32_t text_color = -1);
 
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 
 struct radio_style_t
@@ -488,7 +488,7 @@ public:
 
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 // 复选
 struct checkbox_tl :public widget_base
@@ -505,7 +505,7 @@ public:
 
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 
 // 开关
@@ -529,7 +529,7 @@ public:
 
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 // 进度条
 struct progress_tl :public widget_base
@@ -551,7 +551,7 @@ public:
 
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 // 滑块
 struct slider_tl :public widget_base
@@ -576,7 +576,7 @@ public:
 
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 // 颜色控件
 struct colorpick_tl :public widget_base
@@ -607,7 +607,7 @@ public:
 
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 };
 
 // 滚动条
@@ -641,7 +641,7 @@ public:
 	void set_viewsize(int64_t vs, int64_t cs, int rcw);
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
-	// void draw(cairo_t* cr);
+
 	void draw(rvg_cx* rv);
 	int64_t get_offset();			// 获取滚动偏移
 	int64_t get_offset_ns();			// 获取滚动偏移

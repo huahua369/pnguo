@@ -1302,10 +1302,8 @@ bool widget_base::update(float delta)
 	return false;
 }
 
-#ifdef _CR__
-void widget_base::draw(cairo_t* cr)
+void widget_base::draw(rvg_cx* rv)
 {}
-#endif
 glm::ivec2 widget_base::get_pos(bool has_parent)
 {
 	glm::ivec2 ps = pos;
@@ -1485,7 +1483,7 @@ public:
 	std::vector<glm::ivec4> get_bounds_px();
 	void up_caret();
 	bool update(float delta);
-	//void draw(cairo_t* cr);
+	void draw(rvg_cx* rv);
 
 	bool hit_test(const glm::ivec2& ps);
 	void up_cursor(bool is);
@@ -2457,7 +2455,7 @@ uint32_t get_reverse_color(uint32_t color) {
 }
 
 #ifdef _CR__
-void text_ctx_cx::draw(cairo_t* cr)
+void text_ctx_cx::draw(rvg_cx* rv)
 {
 	cairo_as _ss_(cr);
 	// 裁剪区域
@@ -3282,7 +3280,7 @@ uint32_t get_reverse_color(uint32_t color) {
 	c[2] = 255 - c[2];
 	return color;
 }
-void text_ctx_cx::draw(cairo_t* cr)
+void text_ctx_cx::draw(rvg_cx* rv)
 {
 	//printf("text_ctx_cx::draw\t%s\n",);
 	cairo_save(cr);
@@ -4247,12 +4245,11 @@ bool edit_tl::update(float delta) {
 image_ptr_t* edit_tl::get_render_data() {
 	return &ctx->cacheimg;
 }
-#ifdef _CR__
-void edit_tl::draw(cairo_t* cr)
+
+void edit_tl::draw(rvg_cx* rv)
 {
-	ctx->draw(cr);
+	ctx->draw(rv);
 }
-#endif // _CR__
 
 
 #ifdef INPUT_STATE_TH
@@ -5186,7 +5183,7 @@ void plane_cx::update(float delta)
 					rf.x = rf.y = 0.5;
 				}
 				draw_rectangle(cr, rf, border.z);
-				fill_stroke(cr, border.w, 0, 0, false);
+				rv->submit( border.w, 0, 0, false);
 			}
 			if (draw_back_cb)
 			{
@@ -5232,7 +5229,7 @@ void plane_cx::update(float delta)
 				{
 					auto r = ss.x < st->round * 2 || ss.y < st->round * 2 ? 0 : st->round;
 					draw_rectangle(cr, { pos.x + pad ,pos.y + pad ,ss.x,ss.y }, r);
-					fill_stroke(cr, st);
+					rv->submit( st);
 				}
 			}
 			if (horizontal)
@@ -5248,7 +5245,7 @@ void plane_cx::update(float delta)
 		{
 			ls -= 1;
 			draw_rectangle(cr, { 0.5,0.5,ls }, border.z);
-			fill_stroke(cr, 0, border.x, border.y, false);
+			rv->submit( 0, border.x, border.y, false);
 		}
 		tv->end_frame(cr);
 		_pat->img->valid = true;
@@ -5957,11 +5954,9 @@ bool image_btn::on_mevent(int type, const glm::vec2& mps)
 bool image_btn::update(float) {
 	return false;
 }
-#ifdef _CR__
-void image_btn::draw(cairo_t* g) {
+void image_btn::draw(draw(rvg_cx* rv) {
 
 }
-#endif
 btn_cols_t* color_btn::set_btn_color_bgr(size_t idx)
 {
 	static std::vector<std::array<uint32_t, 8>> bcs = { { 0xFFffffff, 0xFF409eff, 0xFF409eff, 0xFF66b1ff, 0xFFe6e6e6, 0xFF0d84ff, 0xFF0d84ff ,0 },
@@ -6044,8 +6039,7 @@ inline glm::vec4 to_c4(uint32_t c)
 	return  fc;
 }
 
-#ifdef _CR__
-void gradient_btn::draw(cairo_t* g)
+void gradient_btn::draw(draw(rvg_cx* rv)
 {
 	auto p = this;
 	float x = p->pos.x, y = p->pos.y, w = p->size.x, h = p->size.y;
@@ -6158,7 +6152,6 @@ void gradient_btn::draw(cairo_t* g)
 	cairo_stroke(g);
 	cairo_restore(g);
 }
-#endif
 
 const char* gradient_btn::c_str()
 {
@@ -6320,8 +6313,7 @@ bool color_btn::update(float delta)
 	return true;
 }
 
-#ifdef _CR__
-void color_btn::draw(cairo_t* g)
+void color_btn::draw(draw(rvg_cx* rv)
 {
 	auto p = this;
 	auto ns = p->size;
@@ -6393,8 +6385,6 @@ void color_btn::draw(cairo_t* g)
 	//	fill_stroke(g, 0, 0x80ff8000, 1, 0);
 	//}
 }
-#endif
-
 
 
 
@@ -6586,20 +6576,18 @@ void free_obt(T*& p) {
 // todo ui
 
 
-#ifdef _CR__
-
 void draw_radios(cairo_t* cr, radio_info_t* p, radio_style_t* ps)
 {
 	if (ps->radius > 0) {
-		draw_circle(cr, p->pos, ps->radius);
+		rv->add_circle( p->pos, ps->radius);
 		if (p->value || p->swidth > 0)
-			fill_stroke(cr, ps->col, 0, ps->thickness, 0);
+			rv->submit( ps->col, 0, ps->thickness, 0);
 		else
-			fill_stroke(cr, 0, ps->line_col, ps->thickness, 0);
+			rv->submit( 0, ps->line_col, ps->thickness, 0);
 	}
 	if (p->swidth > 0) {
-		draw_circle(cr, p->pos, p->swidth);
-		fill_stroke(cr, ps->innc, 0, ps->thickness, 0);
+		rv->add_circle( p->pos, p->swidth);
+		rv->submit( ps->innc, 0, ps->thickness, 0);
 	}
 }
 
@@ -6631,7 +6619,7 @@ void drawCheckMark(cairo_t* cr, glm::vec2 pos, uint32_t col, float sz1, bool mix
 		cairo_line_to(cr, bx, by);
 		cairo_line_to(cr, bx + third * 2.0f, by - third * 2.0f);
 	}
-	fill_stroke(cr, 0, col, thickness, 0);
+	rv->submit( 0, col, thickness, 0);
 }
 void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
 {
@@ -6640,9 +6628,9 @@ void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
 	glm::ivec2 ps = pn->pos;
 	draw_rectangle(cr, { ps.x,ps.y,p->square_sz,p->square_sz }, p->rounding);
 	if (pn->value || pn->new_alpha > 0)
-		fill_stroke(cr, p->fill, p->col, p->thickness, 0);
+		rv->submit( p->fill, p->col, p->thickness, 0);
 	else
-		fill_stroke(cr, 0, p->line_col, p->thickness, 0);
+		rv->submit( 0, p->line_col, p->thickness, 0);
 	const float pad = std::max(1.0f, floor(p->square_sz / 6.0f));
 	if (pn->new_alpha > 0)
 	{
@@ -6650,7 +6638,6 @@ void draw_checkbox(cairo_t* cr, check_style_t* p, checkbox_info_t* pn)
 		drawCheckMark(cr, (glm::vec2)ps + glm::vec2(pad, pad), cc, p->square_sz - pad * 2.0f, pn->mixed);
 	}
 }
-#endif
 
 
 radio_tl::~radio_tl()
@@ -6756,8 +6743,7 @@ bool radio_tl::update(float delta)
 	return ic > 0;
 }
 
-#ifdef _CR__
-void radio_tl::draw(cairo_t* cr)
+void radio_tl::draw(rvg_cx* rv)
 {
 	auto p = this;
 	if (cr && p) {
@@ -6776,7 +6762,6 @@ void radio_tl::draw(cairo_t* cr)
 		}
 	}
 }
-#endif
 
 void checkbox_tl::bind_ptr(bool* p)
 {}
@@ -6857,8 +6842,7 @@ bool checkbox_tl::update(float delta)
 	return ic > 0;
 }
 
-#ifdef _CR__
-void checkbox_tl::draw(cairo_t* cr)
+void checkbox_tl::draw(rvg_cx* rv)
 {
 	auto p = this;
 	if (cr && p) {
@@ -6875,7 +6859,6 @@ void checkbox_tl::draw(cairo_t* cr)
 		}
 	}
 }
-#endif
 
 void switch_tl::bind_ptr(bool* p)
 {
@@ -6940,8 +6923,7 @@ bool switch_tl::update(float delta)
 	return ic > 0;
 }
 
-#ifdef _CR__
-void switch_tl::draw(cairo_t* cr)
+void switch_tl::draw(rvg_cx* rv)
 {
 	cairo_as _as_(cr);
 	glm::ivec2 poss = pos;
@@ -6958,17 +6940,16 @@ void switch_tl::draw(cairo_t* cr)
 	poss.y += (size.y - height) * 0.5;
 	cairo_translate(cr, poss.x, poss.y);
 	draw_rectangle(cr, { 0.5,0.5, ss, h }, h * 0.5);
-	fill_stroke(cr, dcol, 0, 0, 0);
+	rv->submit( dcol, 0, 0, 0);
 	glm::vec2 cp = {};
 	{
 		auto ps = h * 0.5;
 		cp.x += (ss - h) * cpos + h * 0.5;
 		cp.y += ps;
-		draw_circle(cr, cp, fc);
-		fill_stroke(cr, color.z, 0, 0, 0);
+		rv->add_circle( cp, fc);
+		rv->submit( color.z, 0, 0, 0);
 	}
 }
-#endif
 void progress_tl::set_value(double b)
 {
 	if (b < 0)b = 0;
@@ -7009,16 +6990,15 @@ bool progress_tl::update(float delta)
 	return false;
 }
 
-#ifdef _CR__
-void progress_tl::draw(cairo_t* cr)
+void progress_tl::draw(rvg_cx* rv)
 {
-	cairo_as _as_(cr);
+	//cairo_as _as_(cr);
 	glm::ivec2 poss = pos;
 	glm::ivec2 ss = size;
 	ss.x = width;
 	cairo_translate(cr, poss.x, poss.y);
 	draw_rectangle(cr, { 0.5,0.5, ss.x, ss.y }, rounding);
-	fill_stroke(cr, color.y, 0, 0, 0);
+	rv->submit( color.y, 0, 0, 0);
 	double xx = ss.x * value;
 	int kx = 0;
 	int r = rounding;
@@ -7033,7 +7013,7 @@ void progress_tl::draw(cairo_t* cr)
 			kx = 1;
 		}
 		draw_rectangle(cr, { 0.5,0.5, xx, ss.y }, r);
-		fill_stroke(cr, color.x, 0, 0, 0);
+		rv->submit( color.x, 0, 0, 0);
 	}
 	if (text.size()) {
 		auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
@@ -7062,7 +7042,6 @@ void progress_tl::draw(cairo_t* cr)
 
 	}
 }
-#endif
 
 
 void slider_tl::bind_ptr(double* p)
@@ -7128,8 +7107,7 @@ bool slider_tl::update(float delta)
 	return false;
 }
 
-#ifdef _CR__
-void slider_tl::draw(cairo_t* cr)
+void slider_tl::draw(rvg_cx* rv)
 {
 	cairo_as _as_(cr);
 	glm::ivec2 poss = pos;
@@ -7172,17 +7150,17 @@ void slider_tl::draw(cairo_t* cr)
 		}
 	}
 	draw_rectangle(cr, brc, rounding);
-	fill_stroke(cr, color.y, 0, 0, 0);
+	rv->submit( color.y, 0, 0, 0);
 	if (xx >= 0)
 	{
 		{
 			cairo_as _as_a(cr);
 			draw_rectangle(cr, crc, r);
-			fill_stroke(cr, color.x, 0, 0, 0);
+			rv->submit( color.x, 0, 0, 0);
 		}
 		if (sl.x > 0) {
-			draw_circle(cr, spos, sl.x);
-			fill_stroke(cr, sl.y, color.x, thickness, 0);
+			rv->add_circle( spos, sl.x);
+			rv->submit( sl.y, color.x, thickness, 0);
 		}
 	}
 }
@@ -7406,9 +7384,9 @@ bool colorpick_tl::update(float delta)
 	}
 	return false;
 }
-#ifdef _CR__
-void draw_grid_fill(cairo_t* cr, const glm::vec2& ss, const glm::ivec2& cols, int width)
+void draw_grid_fill(rvg_cx* rv, const glm::vec2& ss, const glm::ivec2& cols, int width)
 {
+	rv->push_grid_fill(ss, cols, width);
 	int x = fmod(ss.x, width);
 	int y = fmod(ss.y, width);
 	int xn = ss.x / width;
@@ -7433,8 +7411,9 @@ void draw_grid_fill(cairo_t* cr, const glm::vec2& ss, const glm::ivec2& cols, in
 		}
 	}
 }
-void draw_linear(cairo_t* cr, const glm::vec2& ss, const glm::vec4* cols, int count)
+void draw_linear(rvg_cx* rv, const glm::vec2& ss, const glm::vec4* cols, int count)
 {
+	
 	cairo_pattern_t* gr = cairo_pattern_create_linear(0, 0, ss.x, ss.y);
 	double n = count - 1;
 	for (size_t i = 0; i < count; i++)
@@ -7448,7 +7427,7 @@ void draw_linear(cairo_t* cr, const glm::vec2& ss, const glm::vec4* cols, int co
 	cairo_pattern_destroy(gr);
 }
 
-void colorpick_tl::draw(cairo_t* cr)
+void colorpick_tl::draw(rvg_cx* rv)
 {
 	cairo_as _as_a(cr);
 	glm::ivec2 poss = pos;
@@ -7482,7 +7461,7 @@ void colorpick_tl::draw(cairo_t* cr)
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
-		fill_stroke(cr, -1, bc_color, thickness, false);
+		rv->submit( -1, bc_color, thickness, false);
 	}
 	{
 		cairo_translate(cr, 0, yh);
@@ -7493,7 +7472,7 @@ void colorpick_tl::draw(cairo_t* cr)
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
-		fill_stroke(cr, -1, bc_color, thickness, false);
+		rv->submit( -1, bc_color, thickness, false);
 	}
 	{
 		cairo_translate(cr, 0, yh);
@@ -7504,7 +7483,7 @@ void colorpick_tl::draw(cairo_t* cr)
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
-		fill_stroke(cr, -1, bc_color, thickness, false);
+		rv->submit( -1, bc_color, thickness, false);
 	}
 	{
 		cairo_translate(cr, 0, yh);
@@ -7515,11 +7494,10 @@ void colorpick_tl::draw(cairo_t* cr)
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		draw_rectangle(cr, rcf, 0);
-		fill_stroke(cr, -1, bc_color, thickness, false);
+		rv->submit( -1, bc_color, thickness, false);
 	}
 
 }
-#endif
 
 
 
@@ -7685,38 +7663,6 @@ bool scroll_bar::update(float delta)
 	return r;
 }
 
-#ifdef _CR__
-void scroll_bar::draw(cairo_t* cr)
-{
-	cairo_as _as_a(cr);
-	glm::ivec2 poss = pos;
-	glm::ivec2 ss = size;
-
-	{
-		cairo_translate(cr, poss.x, poss.y);
-		// 背景
-		if (!hideble || thumb_size_m.z) {
-			draw_rectangle(cr, { 0,0,ss }, rounding);
-			fill_stroke(cr, _color.x, 0, 0, 0);
-		}
-		// 滑块
-		double rw = _rc_width * scale_s;
-		glm::ivec4 trc = { 0,0,rw,rw };
-		int px = _dir ? 0 : 1;
-		auto pxs = ceil((ss[px] - rw) * 0.5);
-		trc.x = pxs;
-		trc.y = pxs;
-		trc[_dir] = tps[_dir] + _offset;
-		trc[2 + _dir] = thumb_size_m.x;
-		if (thumb_size_m.z)
-		{
-			draw_rectangle(cr, trc, _rc_width * 0.5 * scale_s);
-			fill_stroke(cr, _tcc, 0, 0, 0);
-		}
-	}
-}
-#else
-
 void scroll_bar::draw(rvg_cx* rv)
 {
 	glm::ivec2 poss = pos;
@@ -7744,7 +7690,6 @@ void scroll_bar::draw(rvg_cx* rv)
 		}
 	}
 }
-#endif
 
 
 int64_t scroll_bar::get_offset()
