@@ -642,7 +642,7 @@ public:
 	bool on_mevent(int type, const glm::vec2& mps);
 	bool update(float delta);
 	// void draw(cairo_t* cr);
-	void draw();
+	void draw(rvg_cx* rv);
 	int64_t get_offset();			// 获取滚动偏移
 	int64_t get_offset_ns();			// 获取滚动偏移
 	int get_range();			// 获取滚动偏移最大范围

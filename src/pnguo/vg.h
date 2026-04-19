@@ -2,6 +2,8 @@
 #ifndef VG_H
 #define VG_H
 
+class rvg_cx;
+
 struct image_ptr_t
 {
 	int width = 0, height = 0;

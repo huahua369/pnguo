@@ -30,7 +30,7 @@ extern "C" {
 
 #include "pnguo.h"
 #include "gui.h"  
-
+#include "render.h"
 #ifdef min
 #undef min
 #undef max
@@ -41,12 +41,10 @@ extern "C" {
 // 图集数据
 
 atlas_cx::atlas_cx()
-{
-}
+{}
 
 atlas_cx::~atlas_cx()
-{
-}
+{}
 void atlas_cx::add(image_rc_t* d, size_t count)
 {
 	if (d && count > 0)
@@ -90,12 +88,10 @@ void atlas_cx::clear() {
 
 #if 1
 gshadow_cx::gshadow_cx()
-{
-}
+{}
 
 gshadow_cx::~gshadow_cx()
-{
-}
+{}
 
 image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 {
@@ -138,12 +134,10 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 
 
 text_dta::text_dta()
-{
-}
+{}
 
 text_dta::~text_dta()
-{
-}
+{}
 
 
 
@@ -1293,14 +1287,11 @@ void free_tiny_image(tiny_image_t* p)
 #endif // 1
 
 widget_base::widget_base()
-{
-}
+{}
 widget_base::widget_base(WIDGET_TYPE wt) :wtype(wt)
-{
-}
+{}
 widget_base::~widget_base()
-{
-}
+{}
 bool widget_base::on_mevent(int type, const glm::vec2& mps)
 {
 	return false;
@@ -1313,8 +1304,7 @@ bool widget_base::update(float delta)
 
 #ifdef _CR__
 void widget_base::draw(cairo_t* cr)
-{
-}
+{}
 #endif
 glm::ivec2 widget_base::get_pos(bool has_parent)
 {
@@ -1540,8 +1530,7 @@ text_ctx_cx::~text_ctx_cx()
 }
 
 void text_ctx_cx::set_autobr(bool is)
-{
-}
+{}
 void text_ctx_cx::set_single(bool is) {
 	single_line = is;
 	//if (size.y > 0 && single_line)
@@ -5923,59 +5912,41 @@ image_btn::image_btn() :widget_base(WIDGET_TYPE::WT_IMAGE_BTN)
 
 }
 image_btn::~image_btn()
-{
-}
+{}
 color_btn::color_btn() :widget_base(WIDGET_TYPE::WT_COLOR_BTN)
-{
-}
+{}
 color_btn::~color_btn()
-{
-}
+{}
 gradient_btn::gradient_btn() :widget_base(WIDGET_TYPE::WT_GRADIENT_BTN)
-{
-}
+{}
 gradient_btn::~gradient_btn()
-{
-}
+{}
 radio_tl::radio_tl() :widget_base(WIDGET_TYPE::WT_RADIO)
-{
-}
+{}
 checkbox_tl::checkbox_tl() :widget_base(WIDGET_TYPE::WT_CHECKBOX)
-{
-}
+{}
 checkbox_tl::~checkbox_tl()
-{
-}
+{}
 switch_tl::switch_tl() :widget_base(WIDGET_TYPE::WT_SWITCH)
-{
-}
+{}
 switch_tl::~switch_tl()
-{
-}
+{}
 progress_tl::progress_tl() :widget_base(WIDGET_TYPE::WT_PROGRESS)
-{
-}
+{}
 progress_tl::~progress_tl()
-{
-}
+{}
 slider_tl::slider_tl() :widget_base(WIDGET_TYPE::WT_SLIDER)
-{
-}
+{}
 slider_tl::~slider_tl()
-{
-}
+{}
 colorpick_tl::colorpick_tl() :widget_base(WIDGET_TYPE::WT_COLORPICK)
-{
-}
+{}
 colorpick_tl::~colorpick_tl()
-{
-}
+{}
 scroll_bar::scroll_bar() :widget_base(WIDGET_TYPE::WT_SCROLL_BAR)
-{
-}
+{}
 scroll_bar::~scroll_bar()
-{
-}
+{}
 
 
 bool image_btn::on_mevent(int type, const glm::vec2& mps)
@@ -6693,8 +6664,7 @@ radio_tl::~radio_tl()
 }
 
 void radio_tl::bind_ptr(bool* p)
-{
-}
+{}
 
 void radio_tl::set_value(const std::string& str, bool bv)
 {
@@ -6809,8 +6779,7 @@ void radio_tl::draw(cairo_t* cr)
 #endif
 
 void checkbox_tl::bind_ptr(bool* p)
-{
-}
+{}
 
 void checkbox_tl::set_value(const std::string& str, bool bv)
 {
@@ -7097,8 +7066,7 @@ void progress_tl::draw(cairo_t* cr)
 
 
 void slider_tl::bind_ptr(double* p)
-{
-}
+{}
 
 void slider_tl::set_value(double b)
 {
@@ -7749,31 +7717,30 @@ void scroll_bar::draw(cairo_t* cr)
 }
 #else
 
-void scroll_bar::draw()
-{ 
+void scroll_bar::draw(rvg_cx* rv)
+{
 	glm::ivec2 poss = pos;
 	glm::ivec2 ss = size;
 
 	{
-		//cairo_translate(cr, poss.x, poss.y);
 		// 背景
 		if (!hideble || thumb_size_m.z) {
-			//draw_rectangle(cr, { 0,0,ss }, rounding);
-			//fill_stroke(cr, _color.x, 0, 0, 0);
+			rv->add_rect({ poss,ss }, rounding);
+			rv->submit(_color.x, 0, 0, 0);
 		}
 		// 滑块
 		double rw = _rc_width * scale_s;
-		glm::ivec4 trc = { 0,0,rw,rw };
+		glm::ivec4 trc = { poss.x,poss.y,rw,rw };
 		int px = _dir ? 0 : 1;
 		auto pxs = ceil((ss[px] - rw) * 0.5);
-		trc.x = pxs;
-		trc.y = pxs;
+		trc.x += pxs;
+		trc.y += pxs;
 		trc[_dir] = tps[_dir] + _offset;
 		trc[2 + _dir] = thumb_size_m.x;
 		if (thumb_size_m.z)
 		{
-			//draw_rectangle(cr, trc, _rc_width * 0.5 * scale_s);
-			//fill_stroke(cr, _tcc, 0, 0, 0);
+			rv->add_rect(trc, _rc_width * 0.5 * scale_s);
+			rv->submit(_tcc, 0, 0, 0);
 		}
 	}
 }

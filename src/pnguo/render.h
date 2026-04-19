@@ -290,8 +290,8 @@ struct text_vx
 };
 struct dev_info_cx;
 /*
-add 需要先set_style
-push不用set_style
+add 后需要submit style
+push不用submit
 */
 class rvg_cx
 {
@@ -299,8 +299,8 @@ public:
 	rvg_cx();
 	~rvg_cx();
 
-	void set_style(fill_style_d* st);
-	void set_style(uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
+	void submit(fill_style_d* st);
+	void submit(uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
 	// 填充网格
 	void push_grid_fill(const glm::vec2& pos, const glm::vec2 &size, const glm::ivec2& cols, int width);
 	// 线性渐变填充
