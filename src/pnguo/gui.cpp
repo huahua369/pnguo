@@ -8027,9 +8027,37 @@ div_cx::div_cx()
 
 div_cx::~div_cx()
 {}
+void div_cx::set_scroll(int width, int rcw, const glm::ivec2 & pos_width, const glm::ivec2 & vnpos, const glm::ivec2 & hnpos)
+{
+	auto pss = size;
+	{
+		auto cp = add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
+		bind_scroll_bar(cp, true); // 绑定垂直滚动条
+		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
+		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->has_hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->hscroll = {};
+		cp->_absolute = true;
+		cp->rounding = std::max(2, (int)(width * 0.5));
+	}
+	{
+		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false, hnpos);
+		bind_scroll_bar(cp, false); // 绑定水平滚动条
+		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
+		cp->hscroll = {};
+		cp->_absolute = true;
+		cp->rounding = std::max(2, (int)(width * 0.5));
+	}
+}
 void div_cx::sortdg()
 {
 	std::stable_sort(dragsp.begin(), dragsp.end(), [](const drag_v6* t1, const drag_v6* t2) { return t1->z < t2->z; });
+}
+void div_cx::bind_scroll_bar(scroll_bar* p, bool v)
+{}
+scroll_bar* div_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos)
+{
+	return nullptr;
 }
 void div_cx::on_event(uint32_t type, et_un_t* ep)
 {

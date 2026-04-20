@@ -306,8 +306,13 @@ struct drag_v6
 	glm::ivec2 tp, cp0, cp1;
 	int ck = 0;
 	int z = 0;
-};
+}; 
 class scroll_bar;
+struct scroll2_t
+{
+	scroll_bar* h = 0,		// 水平
+		* v = 0;			// 垂直
+};
 class div_cx :public widget_t
 {
 public:
@@ -327,6 +332,20 @@ public:
 	div_cx();
 	~div_cx();
 
+	// 设置本面板滚动条，pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移
+	void set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos = {}, const glm::ivec2& hnpos = {});
+	void set_scroll_hide(bool is);// 是否隐藏滚动条
+	void set_scroll_pos(const glm::ivec2& ps, bool v);
+	void set_scroll_size(const glm::ivec2& ps, bool v);
+	void set_view(const glm::ivec2& view_size, const glm::ivec2& content_size);
+	void set_scroll_visible(const glm::ivec2& hv);
+	glm::ivec2 get_scroll_range();
+	// 设置位置，t=0设置，1加减
+	void set_scroll_pts(const glm::ivec2& pts, int t);
+	// 添加滚动条
+	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
+	scroll2_t add_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
+public:
 	void on_event(uint32_t type, et_un_t* ep);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
@@ -338,6 +357,7 @@ public:
 	bool update(float delta);
 private:
 	void sortdg();
+	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
 };
 
 // 页面：
@@ -792,11 +812,7 @@ struct layout_info_x {
 	flex_direction direction = flex_direction::ROW;		// 行/列
 	flex_wrap wrap = flex_wrap::WRAP;						// 是否换行
 };
-struct scroll2_t
-{
-	scroll_bar* h = 0,		// 水平
-		* v = 0;			// 垂直
-};
+
 struct plane_ev
 {
 	plane_cx* p;
