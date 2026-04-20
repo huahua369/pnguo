@@ -296,15 +296,17 @@ push不用submit
 class rvg_cx
 {
 public:
+	VkvgContext ctx = 0;
+public:
 	rvg_cx();
 	~rvg_cx();
 
 	void submit(fill_style_d* st);
-	void submit(uint32_t fill, uint32_t color, int linewidth = 1, bool isbgr = 0);
+	void submit(uint32_t fill, uint32_t color, int linewidth = 1);
 	// 填充网格
-	void push_grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width);
+	void grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width);
 	// 线性渐变填充
-	void push_linear_fill(const glm::vec2& size, const glm::vec4* cols, int count);
+	void linear_fill(const glm::vec2& size, const glm::vec4* cols, int count);
 	// 画2d箭头type=0线终点在三角形中间
 	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type);
 	// 批量渲染同样式的块(圆或矩形)
@@ -332,7 +334,17 @@ public:
 	bool set_text_style(text_style* ts, size_t count);
 	void add_text(text_st* p, size_t count);
 
-	void add_paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
+	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
+
+	void translate(const glm::vec2& offset);
+	void clip();
+	void save();
+	void restore();
+	void fill();
+	void stroke();
+	void set_line_width(float w);
+	void set_color(uint32_t color);
+	void set_color(const glm::vec4& rgba);
 private:
 
 };

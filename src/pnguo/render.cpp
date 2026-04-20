@@ -863,7 +863,7 @@ VkvgPattern new_cubic_gradient(
 
 	return g;
 }
-void paint_shadow(VkvgContext cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, bool rev, float r)
+void paint_shadow_v(VkvgContext cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, bool rev, float r)
 {
 	auto trans = shadow;
 	trans.w = 0;
@@ -882,7 +882,7 @@ void paint_shadow(VkvgContext cr, double size_x, double size_y, double width, do
 	vkvg_fill(cr);
 	vkvg_pattern_destroy(gr);
 }
-void paint_shadow(VkvgContext cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
+void paint_shadow_v(VkvgContext cr, double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
 {
 	auto gr = rev ?
 		new_cubic_gradient(glm::vec4(0, 0, size_x, size_y), color_to, shadow, glm::vec2(0.5, 0.0), glm::vec2(1.0, 0.5))
@@ -1424,6 +1424,7 @@ vgcache_cx::~vgcache_cx()
 {}
 
 
+void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r);
 
 #if 1
 
@@ -1434,36 +1435,194 @@ rvg_cx::~rvg_cx()
 {}
 
 void rvg_cx::submit(fill_style_d* st)
-{}
+{
+	bool stroke = st && st->thickness > 0 && st->color > 0;
+	if (!ctx || !st)return;
+	auto cr = ctx;
+	if (st->fill)
+	{
+		set_color(st->fill);
+		if (stroke)
+			vkvg_fill_preserve(cr);
+		else
+			vkvg_fill(cr);
+	}
+	if (stroke)
+	{
+		vkvg_set_line_width(cr, st->thickness);
+		if (st->cap > 0)
+			vkvg_set_line_cap(cr, (vkvg_line_cap_t)st->cap);
+		if (st->join > 0)
+			vkvg_set_line_join(cr, (vkvg_line_join_t)st->join);
+		if (st->dash.v > 0 || st->dash_p)
+		{
+			float dashes[64] = {};
+			uint64_t x = 1;
+			auto t = dashes;
+			int num_dashes = st->dash_num;
+			if (st->dash_p)
+			{
+				if (num_dashes > 64)num_dashes = 64;
+				//for (size_t i = 0; i < num_dashes; i++)
+				//{
+				//	*t = st->dash_p[i]; t++;
+				//}
+				vkvg_set_dash(cr, st->dash_p, st->dash_num, st->dash_offset);
+			}
+			else
+			{
+				if (num_dashes > 8)num_dashes = 8;
+				for (size_t i = 0; i < num_dashes; i++)
+				{
+					*t = st->dash.v8[i]; t++;
+				}
+				if (num_dashes > 0)
+					vkvg_set_dash(cr, dashes, num_dashes, st->dash_offset);
+			}
+		}
+		set_color(st->color);
+		vkvg_stroke(cr);
+	}
+}
 
-void rvg_cx::submit(uint32_t fill, uint32_t color, int linewidth, bool isbgr)
-{}
+void rvg_cx::submit(uint32_t fill, uint32_t color, int linewidth/*, bool isbgr*/)
+{
+	bool stroke = linewidth > 0 && color;
+	auto cr = ctx;
+	if (fill)
+	{
+		//if (isbgr)
+		//	set_color_bgr(cr, fill);
+		//else
+		set_color(fill);
+		if (stroke)
+			vkvg_fill_preserve(cr);
+		else
+			vkvg_fill(cr);
+	}
+	if (stroke)
+	{
+		vkvg_set_line_width(cr, linewidth);
+		set_color(color);
+		vkvg_stroke(cr);
+	}
+}
 
-void rvg_cx::push_grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
-{}
+void rvg_cx::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
+{
+	int x = fmod(size.x, width);
+	int y = fmod(size.y, width);
+	int xn = size.x / width;
+	int yn = size.y / width;
+	if (x > 0)xn++;
+	if (y > 0)yn++;
+	save();
+	add_rect({ 0,0,size.x,size.y }, 0);
+	clip();
+	for (size_t i = 0; i < yn; i++)
+	{
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k = (j & 1);
+			if (!(i & 1))
+				k = !k;
+			auto c = cols[k];
+			add_rect({ j * width,i * width,width,width }, 0);
+			set_color(c);
+			fill();
+		}
+	}
+	restore();
+}
 
-void rvg_cx::push_linear_fill(const glm::vec2& size, const glm::vec4* cols, int count)
-{}
+void rvg_cx::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count)
+{
+	save();
+	VkvgPattern gr = vkvg_pattern_create_linear(0, 0, size.x, size.y);
+	double n = count - 1;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto color = cols[i];
+		vkvg_pattern_add_color_stop_rgba(gr, i / n, color.x, color.y, color.z, color.w);
+	}
+	add_rect({ 0,0,size.x,size.y }, 0);
+	vkvg_set_source(ctx, gr);
+	vkvg_fill(ctx);
+	vkvg_pattern_destroy(gr);
+	restore();
+}
 
-void rvg_cx::add_arrow(const glm::vec2 & p0, const glm::vec2 & p1, float arrow_hwidth, float arrow_size, bool type)
-{}
+void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type)
+{
+	draw_arrow(ctx, p0, p1, arrow_hwidth, arrow_size, type);
+}
 
 void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
-{}
+{
+	vkvg_move_to(ctx, ps0.x, ps0.y);
+	vkvg_line_to(ctx, ps1.x, ps1.y);
+}
 
 void rvg_cx::add_rect(const glm::vec4& rc, double r)
-{}
+{
+	draw_rectangle(ctx, rc, r);
+}
 
 void rvg_cx::add_circle(const glm::vec2& pos, float r)
-{}
+{
+	vkvg_arc(ctx, pos.x, pos.y, r, 0, 2 * M_PI);
+}
 
 void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r)
-{}
+{
+	vkvg_ellipse(ctx, r.x, r.y, pos.x, pos.y, 0);
+}
 
-void rvg_cx::add_triangle(const glm::vec2 & pos, const glm::vec2 & size, const glm::vec2 & dirspos)
-{}
+void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
+{
 
-void rvg_cx::add_polyline(const glm::vec2 * p, int count)
+	glm::vec2 tpos[3] = {};
+	float df = dirspos.y;
+	switch ((int)dirspos.x)
+	{
+	case 0:
+	{
+		tpos[0] = { size.x * df, 0 };
+		tpos[1] = { size.x, size.y };
+		tpos[2] = { 0, size.y };
+	}
+	break;
+	case 1:
+	{
+		tpos[0] = { size.x, size.y * df };
+		tpos[1] = { 0, size.y };
+		tpos[2] = { 0, 0 };
+	}
+	break;
+	case 2:
+	{
+		tpos[0] = { size.x * df, size.y };
+		tpos[1] = { 0, 0 };
+		tpos[2] = { size.x, 0 };
+	}
+	break;
+	case 3:
+	{
+		tpos[0] = { 0, size.y * df };
+		tpos[1] = { size.x, 0 };
+		tpos[2] = { size.x, size.y };
+	}
+	break;
+	default:
+		break;
+	}
+	vkvg_move_to(ctx, pos.x + tpos[0].x, pos.y + tpos[0].y);
+	vkvg_line_to(ctx, pos.x + tpos[1].x, pos.y + tpos[1].y);
+	vkvg_line_to(ctx, pos.x + tpos[2].x, pos.y + tpos[2].y);
+	vkvg_close_path(ctx);
+}
+
+void rvg_cx::add_polyline(const glm::vec2* p, int count)
 {}
 
 
@@ -1475,6 +1634,59 @@ bool rvg_cx::set_text_style(text_style* ts, size_t count)
 void rvg_cx::add_text(text_st* p, size_t count)
 {
 
+}
+
+void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
+{
+	paint_shadow_v(ctx, size_x, size_y, width, height, shadow, color_to, rev, r);
+}
+
+void rvg_cx::translate(const glm::vec2& offset)
+{
+	vkvg_translate(ctx, offset.x, offset.y);
+}
+
+void rvg_cx::clip()
+{
+	vkvg_clip(ctx);
+}
+
+void rvg_cx::save()
+{
+	vkvg_save(ctx);
+}
+
+void rvg_cx::restore()
+{
+	vkvg_restore(ctx);
+}
+
+void rvg_cx::fill()
+{
+	vkvg_fill(ctx);
+}
+
+void rvg_cx::stroke()
+{
+	vkvg_stroke(ctx);
+}
+
+void rvg_cx::set_line_width(float w)
+{
+	vkvg_set_line_width(ctx, w);
+}
+
+void rvg_cx::set_color(uint32_t color)
+{
+	vkvg_set_source_rgba(ctx, SP_RGBA32_R_F(color),
+		SP_RGBA32_G_F(color),
+		SP_RGBA32_B_F(color),
+		SP_RGBA32_A_F(color));
+}
+
+void rvg_cx::set_color(const glm::vec4& rgba)
+{
+	vkvg_set_source_rgba(ctx, rgba.x, rgba.y, rgba.z, rgba.w);
 }
 
 
@@ -1527,16 +1739,6 @@ void set_color(VkvgContext cr, uint32_t rgba)
 		SP_RGBA32_B_F(rgba),
 		SP_RGBA32_A_F(rgba));
 }
-void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r)
-{
-	if (r > 0)
-	{
-		vkvg_rounded_rectangle(cr, rc.x, rc.y, rc.z, rc.w, r);
-	}
-	else {
-		vkvg_rectangle(cr, rc.x, rc.y, rc.z, rc.w);
-	}
-}
 inline glm::vec4 to_c4(uint32_t c)
 {
 	u_col* t = (u_col*)&c;
@@ -1549,6 +1751,16 @@ inline glm::vec4 to_c4(uint32_t c)
 	return  fc;
 }
 
+void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r)
+{
+	if (r > 0)
+	{
+		vkvg_rounded_rectangle(cr, rc.x, rc.y, rc.z, rc.w, r);
+	}
+	else {
+		vkvg_rectangle(cr, rc.x, rc.y, rc.z, rc.w);
+	}
+}
 
 bool gradient_btn_update(gradient_btn_t* p, float delta)
 {
@@ -1636,7 +1848,7 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 		vkvg_translate(cr, p->thickness, p->thickness);
 	else if (p->mPushed)
 		vkvg_translate(cr, p->thickness, p->thickness);
-	paint_shadow(cr, 0, rct.y, rct.x, rct.y, gtop, gbot, 0, rounding);// 垂直方向
+	paint_shadow_v(cr, 0, rct.y, rct.x, rct.y, gtop, gbot, 0, rounding);// 垂直方向
 	vkvg_restore(cr);
 	// 渲染标签
 	glm::vec2 ps = { p->thickness * 2, p->thickness * 2 };

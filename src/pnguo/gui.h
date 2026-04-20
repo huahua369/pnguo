@@ -472,8 +472,7 @@ struct color_btn :public widget_t
 	bool _circle = false;			// 圆形按钮
 	bool _disabled = false;
 	bool mPushed = false;
-	bool hover = false;
-	bool bgr = 0;
+	bool hover = false; 
 public:
 	color_btn();
 	~color_btn();
