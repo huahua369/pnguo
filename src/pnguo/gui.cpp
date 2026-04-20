@@ -8343,5 +8343,14 @@ bool div_cx::update(float delta)
 	return false;
 }
 
+
+page_cx::page_cx()
+{}
+
+page_cx::~page_cx()
+{}
+
+
+
 #endif // 1
 

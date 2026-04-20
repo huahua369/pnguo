@@ -340,10 +340,27 @@ private:
 	void sortdg();
 };
 
+// 页面：
+class page_cx
+{
+public:
+	std::vector<div_cx*> divs;
+public:
+	page_cx();
+	~page_cx();
+
+private:
+
+};
+
+
 // 设置接收输入的控件
-void form_set_input_ptr(form_x* f, void* ud);
+void form_set_input_ptr(form_x* f, input_state_t* ud);
 // OLO拖放文本
 bool dragdrop_begin(const wchar_t* str, size_t size);
+
+
+
 
 #endif // !NOT_UI
 

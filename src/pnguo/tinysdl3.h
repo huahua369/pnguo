@@ -260,7 +260,7 @@ public:
 	size_t remove_event(void* ud);
 	void move2end_e(void* ud);
 	void trigger(uint32_t etype, void* e);
-	void set_input_ptr(void* ud);				// 设置接收输入法的对象指针 
+	void set_input_ptr(input_state_t* ud);				// 设置接收输入法的对象指针 
 	void set_capture();
 	void release_capture();
 	void on_size(const glm::ivec2& ss);
@@ -379,7 +379,7 @@ void get_sdl_texture_cb(texture_cb* p);
 
 //void form_move2end(form_x* f, plane_cx* ud);
 // 设置接收输入的控件
-void form_set_input_ptr(form_x* f, void* ud);
+void form_set_input_ptr(form_x* f, input_state_t* ud);
 // OLO拖放文本
 bool dragdrop_begin(const wchar_t* str, size_t size);
 

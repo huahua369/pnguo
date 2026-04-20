@@ -1535,7 +1535,7 @@ void form_x::move2end_e(void* ud)
 		}
 	}
 }
-void form_x::set_input_ptr(void* ud)
+void form_x::set_input_ptr(input_state_t* ud)
 {
 	lock_auto_x lx(&lkecb);
 	input_ptr = (input_state_t*)ud;
@@ -3623,7 +3623,7 @@ void free_app(void* p)
 //		f->move2end(ud);
 //	}
 //}
-void form_set_input_ptr(form_x* f, void* ud) {
+void form_set_input_ptr(form_x* f, input_state_t* ud) {
 	if (f) { f->set_input_ptr(ud); }
 }
 form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags) {
