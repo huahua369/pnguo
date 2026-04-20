@@ -1428,8 +1428,10 @@ void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r);
 
 #if 1
 
-rvg_cx::rvg_cx()
-{}
+rvg_cx::rvg_cx(VkvgContext p) :ctx(p)
+{
+	assert(ctx);
+}
 
 rvg_cx::~rvg_cx()
 {}
@@ -1557,6 +1559,179 @@ void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwi
 	draw_arrow(ctx, p0, p1, arrow_hwidth, arrow_size, type);
 }
 
+void rvg_cx::draw_block(dblock_d* p, fill_style_d* style)
+{
+	if (!ctx || !p || !p->points || p->count == 0 || p->rc.x <= 0 || p->rc.y < 0 || !style)return;
+	auto cr = (VkvgContext)ctx;
+	vkvg_save(cr);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	if (p->scale_pos > 0)
+	{
+		auto sp = p->scale_pos;
+		vkvg_translate(cr, p->pos.x * sp, p->pos.y * sp);
+		vkvg_translate(cr, p->view_pos.x, p->view_pos.y);
+		for (size_t i = 0; i < p->count; i++)
+		{
+			auto pt = p->points[i];
+			if (pt.y > 0)
+			{
+				vkvg_rectangle(cr, pt.x * sp, pt.y * sp, p->rc.x * sp, p->rc.y * sp);
+			}
+			else {
+				vkvg_ellipse(cr, p->rc.x * sp, p->rc.x * sp, pt.x * sp, pt.y * sp, 0);
+			}
+		}
+	}
+	else
+	{
+		vkvg_translate(cr, p->pos.x, p->pos.y);
+		vkvg_translate(cr, p->view_pos.x, p->view_pos.y);
+		for (size_t i = 0; i < p->count; i++)
+		{
+			auto pt = p->points[i];
+			if (pt.y > 0)
+			{
+				vkvg_rectangle(cr, pt.x, pt.y, p->rc.x, p->rc.y);
+			}
+			else {
+				vkvg_ellipse(cr, p->rc.x, p->rc.x, pt.x, pt.y, 0);
+			}
+		}
+	}
+	submit_style(cr, style);
+	vkvg_restore(cr);
+}
+
+void rvg_cx::draw_path(path_d* path, fill_style_d* style)
+{
+	if (!ctx || !path || path->count == 0 || !path->v || !style)return;
+	auto cr = (VkvgContext)ctx;
+	auto t = path->v;
+	bool stroke = false;
+	vkvg_save(cr);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	glm::vec2 pos, scale = {};
+	pos += path->pos;
+	if (path->flip_y)
+	{
+		vkvg_matrix_t flip_y = {};
+		vkvg_matrix_init(&flip_y, 1, 0, 0, -1, 0, 0); // 垂直翻转
+		vkvg_set_matrix(cr, &flip_y);
+		pos.y = -pos.y;
+	}
+	vkvg_translate(cr, pos.x, pos.y);
+	if (path->scale > 0)
+	{
+		vkvg_scale(cr, path->scale, path->scale);
+	}
+	float scale_pos = 1.0;
+	auto mt = *t;
+	auto xt = *t;
+	if (path->scale_pos > 0)
+	{
+		scale_pos = path->scale_pos;
+		for (size_t i = 0; i < path->count; i++, t++)
+		{
+			switch ((vtype_e1)t->type)
+			{
+			case vtype_e1::e_vmove:
+			{
+				if (i > 0)
+				{
+					if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+						vkvg_close_path(cr);
+				}
+				mt = *t;
+				vkvg_move_to(cr, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case vtype_e1::e_vline:
+			{
+				vkvg_line_to(cr, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case vtype_e1::e_vcurve:
+			{
+				vkvg_quadratic_to(cr, t->c.x * scale_pos, t->c.y * scale_pos, t->p.x * scale_pos, t->p.y * scale_pos);
+			}break;
+			case vtype_e1::e_vcubic:
+			{
+				vkvg_curve_to(cr, t->c.x * scale_pos, t->c.y * scale_pos, t->c1.x * scale_pos, t->c1.y * scale_pos, t->p.x * scale_pos, t->p.y * scale_pos);
+
+			}break;
+			default:
+				break;
+			}
+			xt = *t;
+		}
+	}
+	else
+	{
+		for (size_t i = 0; i < path->count; i++, t++)
+		{
+			switch ((vtype_e1)t->type)
+			{
+			case vtype_e1::e_vmove:
+			{
+				if (i > 0)
+				{
+					if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+						vkvg_close_path(cr);
+				}
+				mt = *t;
+				vkvg_move_to(cr, t->p.x, t->p.y);
+			}break;
+			case vtype_e1::e_vline:
+			{
+				vkvg_line_to(cr, t->p.x, t->p.y);
+			}break;
+			case vtype_e1::e_vcurve:
+			{
+				//static double dv = 2.0 / 3.0;
+				//auto p0 = glm::vec2(xt.p.x, xt.p.y);
+				//auto p1 = glm::vec2(t->c.x, t->c.y);
+				//auto p2 = glm::vec2(t->p.x, t->p.y);
+				//glm::vec2 c1, c2;
+				//c1 = p1 - p0; c1 *= dv; c1 += p0;
+				//c2 = p1 - p2; c2 *= dv; c2 += p2;
+				////	C0 = Q0
+				////	C1 = Q0 + (2 / 3) (Q1 - Q0)
+				////	C2 = Q2 + (2 / 3) (Q1 - Q2)
+				////	C3 = Q2
+				//vkvg_curve_to(cr, c1.x, c1.y, c2.x, c2.y, t->p.x, t->p.y);
+				vkvg_quadratic_to(cr, t->c.x, t->c.y, t->p.x, t->p.y);
+			}break;
+			case vtype_e1::e_vcubic:
+			{
+				vkvg_curve_to(cr, t->c.x, t->c.y, t->c1.x, t->c1.y, t->p.x, t->p.y);
+
+			}break;
+			default:
+				break;
+			}
+			xt = *t;
+		}
+	}
+	if (path->count > 2)
+	{
+		if (xt.p.x == mt.p.x && xt.p.y == mt.p.y)
+			vkvg_close_path(cr);
+	}
+	submit_style(cr, style);
+	vkvg_restore(cr);
+}
+
+
+void rvg_cx::add_line(glm::vec4* p, size_t count)
+{
+	if (!p || count == 0)return;
+	auto t = p;
+	for (size_t i = 0; i < count; i++)
+	{
+		vkvg_move_to(ctx, t->x, t->y);
+		vkvg_line_to(ctx, t->z, t->w);
+		t++;
+	}
+}
+
 void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
 {
 	vkvg_move_to(ctx, ps0.x, ps0.y);
@@ -1566,6 +1741,32 @@ void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
 void rvg_cx::add_rect(const glm::vec4& rc, double r)
 {
 	draw_rectangle(ctx, rc, r);
+}
+
+#ifndef M_PI
+auto M_PI = glm::pi<double>();
+#endif
+// r，左右下左
+void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r) {
+	auto cr = ctx;
+	auto x = rc.x;
+	auto y = rc.y;
+	auto width = rc.z;
+	auto height = rc.w;
+	vkvg_move_to(cr, x + r.x, y);
+	vkvg_line_to(cr, x + width - r.y, y);
+	if (r.y)
+		vkvg_arc(cr, x + width - r.y, y + r.y, r.y, 3 * M_PI / 2, 2 * M_PI);
+	vkvg_line_to(cr, x + width, y + height - r.z);
+	if (r.z)
+		vkvg_arc(cr, x + width - r.z, y + height - r.z, r.z, 0, M_PI / 2);
+	vkvg_line_to(cr, x + r.w, y + height);
+	if (r.w)
+		vkvg_arc(cr, x + r.w, y + height - r.w, r.w, M_PI / 2, M_PI);
+	vkvg_line_to(cr, x, y + r.x);
+	if (r.x > 0)
+		vkvg_arc(cr, x + r.x, y + r.x, r.x, M_PI, 3 * M_PI / 2.0);
+	vkvg_close_path(cr);
 }
 
 void rvg_cx::add_circle(const glm::vec2& pos, float r)
@@ -1622,8 +1823,90 @@ void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm
 	vkvg_close_path(ctx);
 }
 
+void rvg_cx::add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
+{
+	auto cr = ctx;
+	if (!cr || !points || points_count < 2 || !col)return;
+	vkvg_save(cr);
+	vkvg_translate(cr, pos.x, pos.y);
+	vkvg_move_to(cr, points->x, points->y);
+	for (size_t i = 1; i < points_count; i++)
+	{
+		vkvg_line_to(cr, points[i].x, points[i].y);
+	}
+	if (closed) { vkvg_close_path(cr); }
+	vkvg_set_line_width(cr, thickness);
+	if (col) {
+		set_color(col);
+		vkvg_stroke(cr);
+	}
+	vkvg_restore(cr);
+}
+
+void rvg_cx::add_polyline(const PathsD* p, bool closed)
+{
+	auto cr = ctx;
+	if (!cr || !p || p->size() < 1)return;
+	auto& d = *p;
+	auto length = d.size();
+	for (size_t i = 0; i < length; i++)
+	{
+		auto points = d[i];
+		vkvg_move_to(cr, points[0].x, points[0].y);
+		auto points_count = points.size();
+		for (size_t i = 1; i < points_count; i++)
+		{
+			vkvg_line_to(cr, points[i].x, points[i].y);
+		}
+		if (closed) { vkvg_close_path(cr); }
+	}
+}
+
 void rvg_cx::add_polyline(const glm::vec2* p, int count)
-{}
+{
+	if (!p || count == 0)return;
+	auto t = p;
+	vkvg_move_to(ctx, t->x, t->y);
+	t++;
+	for (size_t i = 1; i < count; i++)
+	{
+		vkvg_line_to(ctx, t->x, t->y);
+		t++;
+	}
+}
+
+void rvg_cx::add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
+{
+	auto cr = ctx;
+	if (!cr || !points || points_count < 2 || idx_count < 2 || !col)return;
+	vkvg_save(cr);
+	vkvg_translate(cr, pos.x, pos.y);
+	vkvg_set_line_width(cr, thickness);
+	int nc = 0;
+	for (size_t i = 0; i < idx_count; i++)
+	{
+		auto x = idx[i];
+		if (x < 0)
+		{
+			if (nc > 1) {
+				set_color(col);
+				vkvg_stroke(cr);
+			}
+			nc = 0;
+			continue;
+		}
+		if (nc == 0)
+			vkvg_move_to(cr, points[x].x, points[x].y);
+		else
+			vkvg_line_to(cr, points[x].x, points[x].y);
+		nc++;
+	}
+	if (nc > 1) {
+		set_color(col);
+		vkvg_stroke(cr);
+	}
+	vkvg_restore(cr);
+}
 
 
 

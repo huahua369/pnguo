@@ -291,14 +291,13 @@ struct text_vx
 struct dev_info_cx;
 /*
 add 后需要submit style
-push不用submit
 */
 class rvg_cx
 {
 public:
 	VkvgContext ctx = 0;
 public:
-	rvg_cx();
+	rvg_cx(VkvgContext p);
 	~rvg_cx();
 
 	void submit(fill_style_d* st);
@@ -310,9 +309,9 @@ public:
 	// 画2d箭头type=0线终点在三角形中间
 	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type);
 	// 批量渲染同样式的块(圆或矩形)
-	void add_block(dblock_d* p);
+	void draw_block(dblock_d* p, fill_style_d* st);
 	// 描边或填充路径
-	void add_path(path_d* path);
+	void draw_path(path_d* path, fill_style_d* style);
 	// 批量画单条线
 	void add_line(glm::vec4* p, size_t count);
 	void add_line(const glm::vec2& ps0, const glm::vec2& ps1);

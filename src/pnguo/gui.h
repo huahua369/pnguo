@@ -330,8 +330,6 @@ private:
 	void sortdg();
 };
 
-// 移到最后
-void form_move2end(form_x* f, div_cx* ud);
 // 设置接收输入的控件
 void form_set_input_ptr(form_x* f, void* ud);
 // OLO拖放文本
