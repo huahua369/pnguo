@@ -271,7 +271,6 @@ public:
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
 	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
 	int _clicks = 0;		// 点击数量
-	layout_text_x* ltx = 0;
 
 	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
 	int _old_bst = 0;			// 鼠标状态
@@ -308,7 +307,7 @@ struct drag_v6
 	int ck = 0;
 	int z = 0;
 };
-
+class scroll_bar;
 class div_cx :public widget_t
 {
 public:
@@ -318,14 +317,25 @@ public:
 	int evupdate = 0;
 	int ckinc = 0;
 	int ckup = 0;
+	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<widget_t*> widgets, event_wts, event_wts1;
 	std::vector<drag_v6> drags;	// 拖动坐标
 	std::vector<drag_v6*> dragsp;	// 拖动区域
+	bool update_drag = false;		// 是否更新拖动坐标
+	bool draggable = false;
 public:
 	div_cx();
 	~div_cx();
 
 	void on_event(uint32_t type, et_un_t* ep);
+	// 返回是否命中ui
+	bool hittest(const glm::ivec2& pos);
+	size_t add_dragpos(const glm::ivec2& pos, const glm::ivec2& size = {});
+	void remove_dragpos(size_t idx);
+	glm::ivec3 get_dragpos(size_t idx);
+	drag_v6* get_dragv6(size_t idx);
+
+	bool update(float delta);
 private:
 	void sortdg();
 };
@@ -470,7 +480,7 @@ struct color_btn :public widget_t
 	bool _circle = false;			// 圆形按钮
 	bool _disabled = false;
 	bool mPushed = false;
-	bool hover = false; 
+	bool hover = false;
 public:
 	color_btn();
 	~color_btn();
