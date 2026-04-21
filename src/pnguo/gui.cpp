@@ -7814,6 +7814,18 @@ widget_t::widget_t(WIDGET_TYPE wt) :wtype(wt)
 {}
 widget_t::~widget_t()
 {}
+void widget_t::set_pos(const glm::ivec2& ps)
+{
+	pos = ps;
+}
+void widget_t::set_size(const glm::vec2& ss)
+{
+	size = ss;
+}
+glm::vec2 widget_t::get_size()
+{
+	return size;
+}
 bool widget_t::on_mevent(int type, const glm::vec2& mps)
 {
 	return false;
@@ -8027,11 +8039,29 @@ div_cx::div_cx()
 
 div_cx::~div_cx()
 {}
-void div_cx::set_scroll(int width, int rcw, const glm::ivec2 & pos_width, const glm::ivec2 & vnpos, const glm::ivec2 & hnpos)
+void div_cx::add_widget(widget_t* p)
+{
+	if (p)
+	{
+		p->parent = this;
+		widgets.push_back(p); uplayout = true;
+	}
+}
+void div_cx::remove_widget(widget_t* p)
+{
+	auto& v = widgets;
+	auto ps = v.size();
+	v.erase(std::remove(v.begin(), v.end(), p), v.end());
+	if (v.size() != ps)
+	{
+		valid = true; uplayout = true;
+	}
+}
+void div_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
 {
 	auto pss = size;
 	{
-		auto cp = add_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
+		auto cp = new_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
 		bind_scroll_bar(cp, true); // 绑定垂直滚动条
 		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
 		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
@@ -8041,7 +8071,7 @@ void div_cx::set_scroll(int width, int rcw, const glm::ivec2 & pos_width, const 
 		cp->rounding = std::max(2, (int)(width * 0.5));
 	}
 	{
-		auto cp = add_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false, hnpos);
+		auto cp = new_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false, hnpos);
 		bind_scroll_bar(cp, false); // 绑定水平滚动条
 		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
 		cp->hscroll = {};
@@ -8049,15 +8079,256 @@ void div_cx::set_scroll(int width, int rcw, const glm::ivec2 & pos_width, const 
 		cp->rounding = std::max(2, (int)(width * 0.5));
 	}
 }
+void div_cx::set_scroll_hide(bool is)
+{
+	if (horizontal)
+		horizontal->hideble = is;
+	if (vertical)
+		vertical->hideble = is;
+}
+void div_cx::set_scroll_pos(const glm::ivec2& ps, bool v)
+{
+	if (v)
+	{
+		if (vertical)
+			vertical->pos = ps;
+	}
+	else
+	{
+		if (horizontal)
+			horizontal->pos = ps;
+	}
+}
+void div_cx::set_scroll_size(const glm::ivec2& ps, bool v)
+{
+	if (v)
+	{
+		if (vertical)
+			vertical->size = ps;
+	}
+	else
+	{
+		if (horizontal)
+			horizontal->size = ps;
+	}
+}
+void div_cx::set_view(const glm::ivec2& view_size, const glm::ivec2& content_size)
+{
+	if (horizontal)
+		horizontal->set_viewsize(view_size.x, content_size.x, 0);
+	if (vertical)
+		vertical->set_viewsize(view_size.y, content_size.y, 0);
+}
+void div_cx::set_scroll_visible(const glm::ivec2& hv)
+{
+	if (horizontal)//水平滚动条
+	{
+		horizontal->visible = hv.x;
+	}
+	//垂直滚动条
+	if (vertical)
+	{
+		vertical->visible = hv.y;
+	}
+}
+glm::ivec2 div_cx::get_scroll_range()
+{
+	glm::ivec2 r = {};
+	if (horizontal)//水平滚动条
+	{
+		r.x = horizontal->get_range();
+	}
+	//垂直滚动条
+	if (vertical)
+	{
+		r.y = vertical->get_range();
+	}
+	return r;
+}
+void div_cx::set_scroll_pts(const glm::ivec2& pts, int t)
+{
+	//水平滚动条
+	if (horizontal)
+	{
+		if (t == 0)
+			horizontal->set_offset(pts.x);
+		else
+			horizontal->set_offset_inc(pts.x);
+
+	}
+	//垂直滚动条
+	if (vertical)
+	{
+		if (t == 0)
+			vertical->set_offset(pts.y);
+		else
+			vertical->set_offset_inc(pts.y);
+	}
+}
 void div_cx::sortdg()
 {
 	std::stable_sort(dragsp.begin(), dragsp.end(), [](const drag_v6* t1, const drag_v6* t2) { return t1->z < t2->z; });
 }
 void div_cx::bind_scroll_bar(scroll_bar* p, bool v)
-{}
-scroll_bar* div_cx::add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos)
 {
-	return nullptr;
+	if (p)
+	{
+		if (v)
+		{
+			if (vertical)
+				delete vertical;
+			vertical = p;
+		}
+		else
+		{
+			if (horizontal)
+				delete horizontal;
+			horizontal = p;
+		}
+		remove_widget(p);
+	}
+}
+void div_cx::on_motion(const glm::vec2& pos)
+{
+	glm::ivec2 ps = pos;
+	if (ckinc > 0)
+	{
+		if (draggable)
+			set_pos(ps - curpos);
+		//else
+		//	set_scroll_pts(ps - curpos, 1);
+
+		div_ev e = {};
+		e.p = this; e.down = 1; e.clicks = 0; e.mpos = ps;
+		e.drag = true;
+		if (on_click)
+		{
+			on_click(&e);	// 执行拖动事件
+		}
+		//for (auto& c : on_mouses)
+		//{
+		//	c(&e);
+		//}
+	}
+
+	//tv->on_motion(ps - tpos);
+	update(0);
+}
+void div_cx::on_button(int idx, int down, const glm::vec2& pos, int clicks, int r)
+{
+	glm::ivec2 ps = pos;
+	if (idx == 1)
+	{
+		glm::vec4 trc = viewport;
+		auto k2 = check_box_cr1(pos, &trc, 1, sizeof(glm::vec4));
+
+		if (k2.x)
+		{
+			if (draggable && down == 1)
+			{
+				//todo form_move2end(form, this); // 移动窗口前面
+			}
+			if (!r)
+			{
+				if (down == 1 && ckinc == 0)
+				{
+					curpos = ps - tpos;
+					ckinc++;
+				}
+				div_ev e = {};
+				e.p = this; e.down = down; e.clicks = clicks; e.mpos = ps;
+				if (on_click)
+				{
+					on_click(&e);	// 执行单击事件
+				}
+				//for (auto& c : on_mouses)
+				//{
+				//	c(&e);
+				//}
+			}
+			ckup = 1;
+		}
+		else {
+			ckup = 0;
+			_hover = false;
+		}
+		if (down == 0)
+		{
+			if (ckinc)
+				ckup = 1;
+			ckinc = 0;
+		}
+	}
+	//tv->on_button(idx, down, ps - tpos, clicks);
+	update(0);
+	//_draw_valid = true;
+}
+void div_cx::on_wheel(double x, double y)
+{
+	update(0);
+}
+scroll_bar* div_cx::new_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos)
+{
+	auto p = new scroll_bar();
+	if (p)
+	{
+		add_widget(p);
+		p->_absolute = true;
+		p->size = size;
+		auto ss = get_size();
+		glm::ivec2 dw = {};
+		if (!v)
+		{
+			if (p->size.x < 0)
+				p->size.x = ss.x - border.z * 2;
+			p->pos.y = ss.y - border.y;
+			p->pos.x = border.z;
+			dw.y = 1;
+			p->_dir = 0;
+		}
+		if (v)
+		{
+			if (p->size.y < 0)
+				p->size.y = ss.y - border.z * 2;
+			p->pos.x = ss.x - (border.y);
+			p->pos.y = border.z;
+			dw.x = 1;
+			p->_dir = 1;
+		}
+		if (p->size.x < rcw) {
+			p->size.x = rcw;
+		}
+		if (p->size.y < rcw) {
+			p->size.y = rcw;
+		}
+		dw *= p->size;
+		p->pos -= dw;
+		p->pos -= npos;
+		p->set_viewsize(vs, cs, rcw);
+	}
+	return p;
+}
+scroll2_t div_cx::new_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
+{
+	scroll2_t r = {};
+	auto pss = viewsize;
+	{
+		auto cp = new_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
+		cp->_pos_width = pos_width.y > 0 ? pos_width.y : width * 2;//滚轮事件每次滚动量
+		cp->hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->has_hover_sc = 1;	// 鼠标不在范围内也响应滚轮事件
+		cp->hscroll = {};
+		cp->rounding = std::max(2, (int)(width * 0.5));
+		r.v = cp;
+	}
+	{
+		auto cp = new_scroll_bar({ pss.x - width * 2,width }, pss.x, pss.x, rcw, false, hnpos);
+		cp->_pos_width = pos_width.x > 0 ? pos_width.x : width;
+		cp->hscroll = {};
+		cp->rounding = std::max(2, (int)(width * 0.5));
+		r.h = cp;
+	}
+	return r;
 }
 void div_cx::on_event(uint32_t type, et_un_t* ep)
 {
@@ -8186,7 +8457,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 		auto length = event_wts.size();
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y };
-		//on_motion(mps);
+		on_motion(mps);
 		_hover_eq.z = (length > 0) ? 1 : 0;// 悬停准备
 		if (ckinc > 0)
 		{
@@ -8211,7 +8482,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y };
-		//on_button(p->button, p->down, mps, p->clicks, ep->ret);
+		on_button(p->button, p->down, mps, p->clicks, ep->ret);
 
 		if (p->button == 1) {
 			if (p->down == 1) {
@@ -8279,7 +8550,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	case devent_type_e::mouse_wheel_e:
 	{
 		auto p = e->w;
-		//on_wheel(p->x, p->y);
+		on_wheel(p->x, p->y);
 		if (_hover)
 		{
 			ep->ret = 1;		// 滚轮独占本事件

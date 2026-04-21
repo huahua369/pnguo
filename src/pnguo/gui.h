@@ -285,10 +285,15 @@ public:
 	bool has_hover_sc = 0;	// 滚动在父级接收
 	bool _hover = true;
 	bool uplayout = true;
+	bool valid = true;
 public:
 	widget_t();
 	widget_t(WIDGET_TYPE wt);
 	virtual ~widget_t();
+
+	virtual void set_pos(const glm::ivec2& ps);
+	virtual void set_size(const glm::vec2& ss);
+	virtual glm::vec2 get_size();
 	//event_type2
 	virtual bool on_mevent(int type, const glm::vec2& mps);
 	virtual bool update(float delta);
@@ -306,18 +311,29 @@ struct drag_v6
 	glm::ivec2 tp, cp0, cp1;
 	int ck = 0;
 	int z = 0;
-}; 
+};
 class scroll_bar;
 struct scroll2_t
 {
 	scroll_bar* h = 0,		// 水平
 		* v = 0;			// 垂直
 };
+class div_cx;
+struct div_ev
+{
+	div_cx* p;
+	int down;		// 是否按下
+	int clicks;		// 单击次数
+	glm::ivec2 mpos;// 鼠标坐标
+	bool drag;		// 是否拖动
+};
 class div_cx :public widget_t
 {
 public:
 	glm::vec4 viewport = {};
 	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
+	glm::ivec4 border = {};	// 颜色，线粗，圆角，背景色
+	glm::ivec2 curpos = {}, tpos = {};// 鼠标状态
 	glm::ivec2 _move_pos = {};
 	int evupdate = 0;
 	int ckinc = 0;
@@ -326,12 +342,15 @@ public:
 	std::vector<widget_t*> widgets, event_wts, event_wts1;
 	std::vector<drag_v6> drags;	// 拖动坐标
 	std::vector<drag_v6*> dragsp;	// 拖动区域
+	std::function<void(div_ev* e)> on_click;
+	std::function<void(div_ev* e)> on_click_outer;//模态窗口点中外围时
 	bool update_drag = false;		// 是否更新拖动坐标
 	bool draggable = false;
 public:
 	div_cx();
 	~div_cx();
-
+	void add_widget(widget_t* p);
+	void remove_widget(widget_t* p);
 	// 设置本面板滚动条，pos_width每次滚动量,垂直vnpos,水平hnpos为滚动条容器内偏移
 	void set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos = {}, const glm::ivec2& hnpos = {});
 	void set_scroll_hide(bool is);// 是否隐藏滚动条
@@ -342,9 +361,9 @@ public:
 	glm::ivec2 get_scroll_range();
 	// 设置位置，t=0设置，1加减
 	void set_scroll_pts(const glm::ivec2& pts, int t);
-	// 添加滚动条
-	scroll_bar* add_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
-	scroll2_t add_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
+	// 创建滚动条
+	scroll_bar* new_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
+	scroll2_t new_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
 public:
 	void on_event(uint32_t type, et_un_t* ep);
 	// 返回是否命中ui
@@ -357,7 +376,11 @@ public:
 	bool update(float delta);
 private:
 	void sortdg();
-	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板
+	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板	
+	void on_motion(const glm::vec2& pos);
+	// 	idx=1左，3右，2中
+	void on_button(int idx, int down, const glm::vec2& pos, int clicks, int r);
+	void on_wheel(double x, double y);
 };
 
 // 页面：
