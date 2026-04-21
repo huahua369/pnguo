@@ -254,8 +254,8 @@ public:
 	int id = 0;
 	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
 	int _bst = 1;			// 鼠标状态
-	glm::vec2 pos = {};		// 控件坐标
-	glm::vec2 size = {};	// 控件大小
+	glm::vec2 _pos = {};		// 控件坐标
+	glm::vec2 _size = {};	// 控件大小
 	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
 	glm::ivec2 cmpos = {};	// 当前鼠标坐标
 	glm::ivec2 mmpos = {};	// 当前鼠标坐标
@@ -337,13 +337,17 @@ public:
 	glm::ivec2 _move_pos = {};
 	int evupdate = 0;
 	int ckinc = 0;
-	int ckup = 0;
+	int ckup = 0; 
+	flex_data flex = {};
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<widget_t*> widgets, event_wts, event_wts1;
+	std::vector<glm::ivec2> lines;	// 控件分行
 	std::vector<drag_v6> drags;	// 拖动坐标
 	std::vector<drag_v6*> dragsp;	// 拖动区域
 	std::function<void(div_ev* e)> on_click;
 	std::function<void(div_ev* e)> on_click_outer;//模态窗口点中外围时
+
+	std::vector<node_dt> tempfv;
 	bool update_drag = false;		// 是否更新拖动坐标
 	bool draggable = false;
 public:

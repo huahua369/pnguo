@@ -3588,12 +3588,12 @@ void edit_tl::add_text(const void* str0, int len)
 }
 void edit_tl::set_size(const glm::ivec2& ss)
 {
-	size = ss;
+	_size = ss;
 	if (ss.x > 0 && ss.y > 0)
 		ctx->set_size(ss);
 }
 void edit_tl::set_pos(const glm::ivec2& ps) {
-	ctx->pos = pos = ps;
+	ctx->pos = _pos = ps;
 }
 void edit_tl::set_align_pos(const glm::vec2& ps)
 {
@@ -4231,11 +4231,11 @@ bool edit_tl::update(float delta) {
 	{
 		ctx->c_d = 0;
 	}
-	glm::ivec2 ss = size;
+	glm::ivec2 ss = _size;
 	if (ctx->size != ss) {
 		ctx->set_size(ss);
 	}
-	glm::ivec2 ps = pos;
+	glm::ivec2 ps = _pos;
 	if (ctx->pos != ps) {
 		ctx->pos = ps;
 	}
@@ -6043,8 +6043,8 @@ void gradient_btn::init(glm::ivec4 rect, const std::string& text, uint32_t back_
 {
 	auto p = this;
 	auto& info = *p;
-	info.pos = { rect.x, rect.y };
-	info.size = { rect.z, rect.w };
+	info._pos = { rect.x, rect.y };
+	info._size = { rect.z, rect.w };
 	info.rounding = 4;
 	info.back_color = back_color;
 	info.text_color = text_color;
@@ -6452,11 +6452,11 @@ bool radio_tl::update(float delta)
 	int ic = 0;
 	{
 		auto& it = v;
-		if (size.x <= 0) {
-			size.x = style.radius * 2;
+		if (_size.x <= 0) {
+			_size.x = style.radius * 2;
 		}
-		if (size.y <= 0) {
-			size.y = style.radius * 2;
+		if (_size.y <= 0) {
+			_size.y = style.radius * 2;
 		}
 		if (cks > 0 && v.value == v.value1) {
 			cks = 0; set_value();
@@ -6530,11 +6530,11 @@ bool checkbox_tl::update(float delta)
 
 	{
 		auto& it = v;
-		if (size.x <= 0) {
-			size.x = style.square_sz;
+		if (_size.x <= 0) {
+			_size.x = style.square_sz;
 		}
-		if (size.y <= 0) {
-			size.y = style.square_sz;
+		if (_size.y <= 0) {
+			_size.y = style.square_sz;
 		}
 
 		if (cks > 0 && v.value == v.value1) {
@@ -6643,7 +6643,7 @@ void progress_tl::set_value(double b)
 		double k = get_v();
 		std::string vv;
 		text = pg::to_string(k) + format;
-		width = size.x;
+		width = _size.x;
 		if (text.size() && !text_inside) {
 			//todo auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
 			//size.x = width + rk.x + rounding * 0.5;
@@ -6703,8 +6703,8 @@ double slider_tl::get_v()
 bool slider_tl::on_mevent(int type, const glm::vec2& mps)
 {
 	auto et = (event_type2)type;
-	glm::ivec2 poss = mps - pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = mps - _pos;
+	glm::ivec2 ss = _size;
 	if (et == event_type2::on_down) {
 
 	}
@@ -6829,10 +6829,10 @@ void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
 	if (width < minw) {
 		width = minw + h;
 	}
-	size.x = width;
+	_size.x = width;
 	int hn = 4;
 	if (alpha)hn++;
-	size.y = h * hn;
+	_size.y = h * hn;
 }
 
 uint32_t colorpick_tl::get_color()
@@ -6882,8 +6882,8 @@ void colorpick_tl::set_posv(const glm::ivec2& poss)
 bool colorpick_tl::on_mevent(int type, const glm::vec2& mps)
 {
 	auto et = (event_type2)type;
-	glm::ivec2 poss = mps - pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = mps - _pos;
+	glm::ivec2 ss = _size;
 	poss.x -= cpx;
 	poss.y -= height + step;
 	double htp = height + step;
@@ -6975,8 +6975,8 @@ void scroll_bar::set_viewsize(int64_t vs, int64_t cs, int rcw)
 bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
 {
 	auto et = (event_type2)type;
-	glm::ivec2 poss = mps - pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = mps - _pos;
+	glm::ivec2 ss = _size;
 	poss -= tps;
 	int px = _dir ? 0 : 1;
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
@@ -7080,10 +7080,10 @@ bool scroll_bar::update(float delta)
 		int vrc = _view_size - _rc_width;
 		auto vs = _view_size;
 		int px = _dir ? 0 : 1;
-		glm::ivec2 ss = size;
+		glm::ivec2 ss = _size;
 		auto pxs = (ss[px] - _rc_width) * 0.5;
 		auto ss1 = ss[_dir];
-		auto ss2 = pos[_dir];
+		auto ss2 = _pos[_dir];
 		glm::ivec3 sbs = calcu_scrollbar_size(vs, _content_size, pxs, 2);
 		tps = { pxs,pxs };
 		sbs.x = ss1 - (_content_size - vs);
@@ -7134,7 +7134,7 @@ int64_t scroll_bar::get_offset_ns()
 
 int scroll_bar::get_range()
 {
-	glm::ivec2 ss = size;
+	glm::ivec2 ss = _size;
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
 	auto st = ss[_dir] - tsm;
 	return st;
@@ -7142,7 +7142,7 @@ int scroll_bar::get_range()
 
 void scroll_bar::set_offset(int pts)
 {
-	glm::ivec2 ss = size;
+	glm::ivec2 ss = _size;
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
 	auto st = ss[_dir] - tsm;
 	if (limit)
@@ -7161,7 +7161,7 @@ void scroll_bar::set_offset_inc(int inc)
 void scroll_bar::set_posv(const glm::ivec2& poss)
 {
 	if (!hover || thumb_size_m.z <= 0)return;
-	glm::ivec2 ss = size;
+	glm::ivec2 ss = _size;
 	int px = _dir ? 0 : 1;
 	int tsm = thumb_size_m.x + tps[_dir] * 2.0;
 	auto pts = poss[_dir];
@@ -7191,14 +7191,14 @@ void gradient_btn::draw(rvg_cx* rv)
 {
 #if 1
 	auto p = this;
-	float x = p->pos.x, y = p->pos.y, w = p->size.x, h = p->size.y;
+	float x = p->_pos.x, y = p->_pos.y, w = p->_size.x, h = p->_size.y;
 	int pushed = p->mPushed ? 0 : 1;
 	uint32_t gradTop = p->gradTop;
 	uint32_t gradBot = p->gradBot;
 	uint32_t borderDark = p->borderDark;
 	uint32_t borderLight = p->borderLight;
 	double oa = p->opacity;
-	auto ns = p->size;
+	auto ns = p->_size;
 
 	auto bc = effect == uTheme::light ? p->back_color : set_alpha_xf2(p->back_color, get_alpha_f(p->back_color));
 	double rounding = p->rounding;
@@ -7372,8 +7372,8 @@ void radio_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 		rv->save();
-		glm::ivec2 poss = p->pos;
-		poss.y += size.y * 0.5 - style.radius;
+		glm::ivec2 poss = p->_pos;
+		poss.y += _size.y * 0.5 - style.radius;
 		rv->translate((glm::vec2)poss + glm::vec2(0.5f, 0.5f));
 		int x = 0;
 		{
@@ -7392,7 +7392,7 @@ void radio_tl::draw(rvg_cx* rv)
 void color_btn::draw(rvg_cx* rv)
 {
 	auto p = this;
-	auto ns = p->size;
+	auto ns = p->_size;
 	static int bid = 1234;
 	if (id == bid)
 	{
@@ -7400,19 +7400,19 @@ void color_btn::draw(rvg_cx* rv)
 	}
 #if 1
 	rv->save();
-	rv->translate(p->pos);
+	rv->translate(p->_pos);
 	if (p->dfill)
 	{
 		if (p->_circle)
 		{
-			auto sp = p->pos;
-			auto r = lround(p->size.y * 0.5);
+			auto sp = p->_pos;
+			auto r = lround(p->_size.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
 		else
 		{
-			rv->add_rect({ 0.5,0.5, p->size }, p->rounding);
+			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
 		}
 		rv->submit(p->dfill, 0, 0);
 	}
@@ -7444,14 +7444,14 @@ void color_btn::draw(rvg_cx* rv)
 	{
 		if (p->_circle)
 		{
-			auto sp = p->pos;
-			auto r = lround(p->size.y * 0.5);
+			auto sp = p->_pos;
+			auto r = lround(p->_size.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
 		else
 		{
-			rv->add_rect({ 0.5,0.5, p->size }, p->rounding);
+			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
 		}
 		rv->submit(0, p->dcol, p->thickness);
 	}
@@ -7471,8 +7471,8 @@ void checkbox_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 		rv->save();
-		glm::ivec2 poss = p->pos;
-		poss.y += (size.y - style.square_sz) * 0.5;
+		glm::ivec2 poss = p->_pos;
+		poss.y += (_size.y - style.square_sz) * 0.5;
 		rv->translate((glm::vec2)poss + glm::vec2(0.5f, 0.5f));
 		int x = 0;
 		{
@@ -7489,18 +7489,18 @@ void switch_tl::draw(rvg_cx* rv)
 {
 #if 1
 	rv->save();
-	glm::ivec2 poss = pos;
+	glm::ivec2 poss = _pos;
 	auto h = height;
 	auto fc = h * cv * 0.5;
 	auto ss = h * wf;
-	if (size.x <= 0) {
-		size.x = ss;
+	if (_size.x <= 0) {
+		_size.x = ss;
 	}
-	if (size.y <= 0) {
-		size.y = h;
+	if (_size.y <= 0) {
+		_size.y = h;
 	}
-	poss.x += (size.x - ss) * 0.5;
-	poss.y += (size.y - height) * 0.5;
+	poss.x += (_size.x - ss) * 0.5;
+	poss.y += (_size.y - height) * 0.5;
 	rv->translate((glm::vec2)poss);
 	rv->add_rect({ 0.5,0.5, ss, h }, h * 0.5);
 	rv->submit(dcol, 0, 0);
@@ -7518,8 +7518,8 @@ void switch_tl::draw(rvg_cx* rv)
 void progress_tl::draw(rvg_cx* rv)
 {
 
-	glm::ivec2 poss = pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = _pos;
+	glm::ivec2 ss = _size;
 	ss.x = width;
 #if 1
 	rv->save();
@@ -7577,8 +7577,8 @@ void slider_tl::draw(rvg_cx* rv)
 {
 #if 1
 	rv->save();
-	glm::ivec2 poss = pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = _pos;
+	glm::ivec2 ss = _size;
 	rv->translate(poss);
 	glm::vec4 brc = {}, cliprc, crc;
 	int x = 0, y = 0;
@@ -7638,8 +7638,8 @@ void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
 	rv->save();
-	glm::ivec2 poss = pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = _pos;
+	glm::ivec2 ss = _size;
 	rv->translate(poss);
 	//if (ltx)
 	//{
@@ -7711,8 +7711,8 @@ void colorpick_tl::draw(rvg_cx* rv)
 }
 void scroll_bar::draw(rvg_cx* rv)
 {
-	glm::ivec2 poss = pos;
-	glm::ivec2 ss = size;
+	glm::ivec2 poss = _pos;
+	glm::ivec2 ss = _size;
 
 	{
 		// 背景
@@ -7816,15 +7816,15 @@ widget_t::~widget_t()
 {}
 void widget_t::set_pos(const glm::ivec2& ps)
 {
-	pos = ps;
+	_pos = ps;
 }
 void widget_t::set_size(const glm::vec2& ss)
 {
-	size = ss;
+	_size = ss;
 }
 glm::vec2 widget_t::get_size()
 {
-	return size;
+	return _size;
 }
 bool widget_t::on_mevent(int type, const glm::vec2& mps)
 {
@@ -7838,7 +7838,7 @@ bool widget_t::update(float delta)
 
 glm::ivec2 widget_t::get_pos(bool has_parent)
 {
-	glm::ivec2 ps = pos;
+	glm::ivec2 ps = _pos;
 	if (parent) {
 		auto pss = parent->get_pos();
 		auto ss = parent->get_spos();
@@ -7866,7 +7866,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
 		wp->mmpos = mps;
 		// 判断是否鼠标进入 
-		glm::vec4 trc = { wp->pos  ,wp->size };
+		glm::vec4 trc = { wp->_pos  ,wp->_size };
 		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 		if (k.x) {
 			bool hoverold = wp->_bst & (int)BTN_STATE::STATE_HOVER;
@@ -7939,7 +7939,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 			if (p->button == 1) {
 				if (p->down == 1) {
 					wp->_bst |= (int)BTN_STATE::STATE_ACTIVE;
-					wp->curpos = mps - (glm::ivec2)wp->pos;
+					wp->curpos = mps - (glm::ivec2)wp->_pos;
 					wp->cks = 0;
 					wp->on_mevent((int)event_type2::on_down, mps);
 					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
@@ -8059,7 +8059,7 @@ void div_cx::remove_widget(widget_t* p)
 }
 void div_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
 {
-	auto pss = size;
+	auto pss = _size;
 	{
 		auto cp = new_scroll_bar({ width,pss.y - width * 2 }, pss.y, pss.y, rcw, true, vnpos);
 		bind_scroll_bar(cp, true); // 绑定垂直滚动条
@@ -8091,12 +8091,12 @@ void div_cx::set_scroll_pos(const glm::ivec2& ps, bool v)
 	if (v)
 	{
 		if (vertical)
-			vertical->pos = ps;
+			vertical->_pos = ps;
 	}
 	else
 	{
 		if (horizontal)
-			horizontal->pos = ps;
+			horizontal->_pos = ps;
 	}
 }
 void div_cx::set_scroll_size(const glm::ivec2& ps, bool v)
@@ -8104,12 +8104,12 @@ void div_cx::set_scroll_size(const glm::ivec2& ps, bool v)
 	if (v)
 	{
 		if (vertical)
-			vertical->size = ps;
+			vertical->_size = ps;
 	}
 	else
 	{
 		if (horizontal)
-			horizontal->size = ps;
+			horizontal->_size = ps;
 	}
 }
 void div_cx::set_view(const glm::ivec2& view_size, const glm::ivec2& content_size)
@@ -8274,36 +8274,36 @@ scroll_bar* div_cx::new_scroll_bar(const glm::ivec2& size, int vs, int cs, int r
 	{
 		add_widget(p);
 		p->_absolute = true;
-		p->size = size;
+		p->_size = size;
 		auto ss = get_size();
 		glm::ivec2 dw = {};
 		if (!v)
 		{
-			if (p->size.x < 0)
-				p->size.x = ss.x - border.z * 2;
-			p->pos.y = ss.y - border.y;
-			p->pos.x = border.z;
+			if (p->_size.x < 0)
+				p->_size.x = ss.x - border.z * 2;
+			p->_pos.y = ss.y - border.y;
+			p->_pos.x = border.z;
 			dw.y = 1;
 			p->_dir = 0;
 		}
 		if (v)
 		{
-			if (p->size.y < 0)
-				p->size.y = ss.y - border.z * 2;
-			p->pos.x = ss.x - (border.y);
-			p->pos.y = border.z;
+			if (p->_size.y < 0)
+				p->_size.y = ss.y - border.z * 2;
+			p->_pos.x = ss.x - (border.y);
+			p->_pos.y = border.z;
 			dw.x = 1;
 			p->_dir = 1;
 		}
-		if (p->size.x < rcw) {
-			p->size.x = rcw;
+		if (p->_size.x < rcw) {
+			p->_size.x = rcw;
 		}
-		if (p->size.y < rcw) {
-			p->size.y = rcw;
+		if (p->_size.y < rcw) {
+			p->_size.y = rcw;
 		}
-		dw *= p->size;
-		p->pos -= dw;
-		p->pos -= npos;
+		dw *= p->_size;
+		p->_pos -= dw;
+		p->_pos -= npos;
 		p->set_viewsize(vs, cs, rcw);
 	}
 	return p;
@@ -8573,7 +8573,7 @@ bool vht(const std::vector<widget_t*>& widgets, const glm::ivec2& p, glm::ivec2 
 		glm::vec2 mps = p; mps -= ips;
 		mps -= pw->hscroll * scroll_pos;
 		// 判断是否鼠标在控件上
-		glm::vec4 ppos = { pw->pos,pw->size };
+		glm::vec4 ppos = { pw->_pos,pw->_size };
 		auto k = check_box_cr1(mps, &ppos, 1, sizeof(glm::vec4));
 		if (k.x) { r = true; }
 	}
@@ -8583,7 +8583,7 @@ bool div_cx::hittest(const glm::ivec2& pos)
 {
 	bool r = false;
 	auto sps = get_spos();
-	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)size;
+	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)_size;
 	glm::vec4 rc = { ips ,ips + ss };
 	if (rect_includes(rc, pos)) {
 		if (draggable)
@@ -8642,7 +8642,7 @@ bool div_cx::update(float delta)
 	return false;
 }
 // 计算一行布局，range为当前行的控件起始索引和数量，tempfv为临时使用的数组
-void calc_line_layout(widget_t* p, const glm::ivec2& range, const glm::ivec2& box_rect, flex_data* boxflex, std::vector<node_dt>& tempfv) 
+glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ivec2& box_size, flex_data* boxflex, const glm::ivec2& pos, std::vector<node_dt>& tempfv)
 {
 	int count = range.y;
 	tempfv.resize(count + 1);
@@ -8653,37 +8653,52 @@ void calc_line_layout(widget_t* p, const glm::ivec2& range, const glm::ivec2& bo
 	if (boxflex)
 	{
 		tf[0] = *boxflex;
-		fnode->size = box_rect;
+		fnode->size = box_size;
 		fnode->child = cp;
 		fnode->child_count = count;
 		fnode->line_count = 0;
 	}
 	for (int i = 0; i < count; i++)
 	{
-		auto& it = p[range.x + i];
+		auto it = p[range.x + i];
 		cp[i] = {};
 		cp[i].index = 1;
-		cp[i].size = it.get_size();
-		cp[i].position = it._absolute ? 1 : 0;
+		cp[i].size = it->get_size();
+		cp[i].position = it->_absolute ? 1 : 0;
 	}
 	auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
 	for (size_t y = 0; y < fnode->child_count; y++)
 	{
 		auto t0 = fnode->child + y;
 		auto& bt = p[range.x + y];
-		if (bt._absolute)
+		if (bt->_absolute)
 		{
 			continue;
 		}
 		glm::vec2 vps2 = t0->frame;
-		bt.set_pos(vps2);
+		vps2 += pos;
+		bt->set_pos(vps2);
 	}
+	return glm::vec2(nrc.z, nrc.w);
 }
 void div_cx::clayout()
 {
 	if (!uplayout)return;
 	uplayout = false;
-
+	widget_t** p = widgets.data();
+	glm::vec2 pos = {};
+	if (lines.empty())
+	{
+		// 竖排
+		calc_line_layout(p, { 0,widgets.size() }, { _size.x,0 }, &flex, pos, tempfv);
+	}
+	else {
+		for (auto& it : lines)
+		{
+			auto cs = calc_line_layout(p, it, { _size.x,0 }, &flex, pos, tempfv);
+			pos.y += cs.y;
+		}
+	}
 }
 
 
