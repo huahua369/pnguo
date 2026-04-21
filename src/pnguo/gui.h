@@ -337,7 +337,7 @@ public:
 	glm::ivec2 _move_pos = {};
 	int evupdate = 0;
 	int ckinc = 0;
-	int ckup = 0; 
+	int ckup = 0;
 	flex_data flex = {};
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<widget_t*> widgets, event_wts, event_wts1;
@@ -378,6 +378,8 @@ public:
 	drag_v6* get_dragv6(size_t idx);
 
 	bool update(float delta);
+	void draw(rvg_cx* rv);
+
 	void clayout();
 private:
 	void sortdg();

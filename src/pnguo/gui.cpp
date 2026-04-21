@@ -7290,14 +7290,18 @@ void gradient_btn::draw(rvg_cx* rv)
 
 #endif // 1
 	// 边框
+	w -= 1;
+	h -= 1;
+	glm::vec2 tps = { 0.5,0.5 };
 	rv->set_line_width(thickness);
 	rv->set_color(borderLight);
-	rv->add_rect({ 0.5f,  (p->mPushed ? 0.5f : 1.5f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
+	rv->add_rect({ tps.x,tps.y + (p->mPushed ? 0.f : 1.0f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);
 	rv->stroke();
 	rv->set_color(borderDark);
-	rv->add_rect({ 0.5f,  0.5f, w, h - 0.5 }, rounding);
+	rv->add_rect({ tps.x,tps.y, w , h }, rounding);
 	rv->stroke();
 	rv->restore();
+
 #endif
 }
 
@@ -8632,14 +8636,37 @@ drag_v6* div_cx::get_dragv6(size_t idx)
 
 bool div_cx::update(float delta)
 {
+	int ic = 0;
 	if (update_drag)
 	{
 		dragsp.clear();
 		for (auto& it : drags) { dragsp.push_back(&it); }
 		sortdg();
-		update_drag = false;
+		update_drag = false; ic++;
 	}
-	return false;
+	for (auto& it : widgets) {
+		ic += it->update(delta);
+	}
+	if (uplayout)
+	{
+		clayout(); ic++;
+	}
+	return ic > 0;
+}
+void div_cx::draw(rvg_cx* rv)
+{
+	auto sps = get_spos();	// 获取滚动量
+	for (auto& it : widgets) {
+		if (it->visible)
+		{
+			rv->save();
+			auto scp = sps * it->hscroll;
+			if (scp.x != 0 || scp.y != 0)
+				rv->translate(scp);// 滚动条影响
+			it->draw(rv);
+			rv->restore();
+		}
+	}
 }
 // 计算一行布局，range为当前行的控件起始索引和数量，tempfv为临时使用的数组
 glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ivec2& box_size, flex_data* boxflex, const glm::ivec2& pos, std::vector<node_dt>& tempfv)
@@ -8690,12 +8717,12 @@ void div_cx::clayout()
 	if (lines.empty())
 	{
 		// 竖排
-		calc_line_layout(p, { 0,widgets.size() }, { _size.x,0 }, &flex, pos, tempfv);
+		calc_line_layout(p, { 0,widgets.size() }, { _size.x,_size.y }, &flex, pos, tempfv);
 	}
 	else {
 		for (auto& it : lines)
 		{
-			auto cs = calc_line_layout(p, it, { _size.x,0 }, &flex, pos, tempfv);
+			auto cs = calc_line_layout(p, it, { _size.x,_size.y }, &flex, pos, tempfv);
 			pos.y += cs.y;
 		}
 	}

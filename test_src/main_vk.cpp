@@ -937,7 +937,25 @@ int main()
 				vkvg_surface_write_to_png(t, "temp/vkvgtest1150.png");
 				td3->ctx_end(ctx);
 			}
-
+			auto dvv = new div_cx();
+			dvv->set_size({ 500,300 });
+			dvv->set_pos({ 10,360 });
+			dvv->flex.wrap = flex_wrap::WRAP;
+			dvv->flex.justify_content = flex_align::ALIGN_SPACE_AROUND;
+			//dvv->flex.direction = flex_direction::COLUMN;
+			uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
+			for (int i = 0; i < 5; i++) {
+				auto btn = new gradient_btn();
+				dvv->add_widget(btn);
+				btn->set_size({ 200,36 });
+				btn->back_color = colors[i];
+				btn->borderLight = 0x805c5c5c;
+				btn->borderDark = 0x801d1d1d;
+			}
+			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
+				auto div = (div_cx*)ud;
+				div->on_event(type, e);
+				});
 			std::atomic_int wait2d = 0;
 			//			std::thread jt([=, &wait2d]() {
 			//
@@ -962,7 +980,7 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
-					td3->draw_surface(ck, { 0,0 }, { 0,0,sc_size.x,sc_size.y }, sc_size);
+					td3->draw_surface(ck, dvv->get_pos(), {0,0,sc_size.x,sc_size.y}, sc_size);
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -974,22 +992,33 @@ int main()
 					vkd->_state.WireframeMode;				// 0 1 2 6
 					static int ity = 6;
 					light->_intensity = ity;
+					dvv->update(delta);
+					auto ctx = (VkvgContext)td3->ctx_begin(ck);
+					vkvg_clear(ctx);
+					rvg_cx rvg(ctx);
+					dvv->draw(&rvg);
+					VkvgSurface t = vkvg_get_target(ctx);
+					vkvg_flush(ctx);
+					vkvg_surface_resolve(t);
+					td3->ctx_end(ctx);
+
 					vkd->update(form0->io);	// 更新事件
 					{
 						td3->update(ck, delta);
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
-						std::string str = vkd->get_label(); str += (char*)u8"emoji表情🔥➗️👪️";
+						std::string str = vkd->get_label();
+						//str += (char*)u8"emoji表情🔥➗️👪️";
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
 						// 添加文本
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
+					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
+					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 						static glm::ivec2 imgpos = { 100,100 };
 						//rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, 0x50ffffff, { 64 * 5,64 * 3 }, imgpos, true);
-						rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
+					//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 
 						rt_build(mtext);
 						td3->update(mtext, 0);
