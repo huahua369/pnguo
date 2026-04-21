@@ -365,7 +365,7 @@ public:
 	scroll_bar* new_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
 	scroll2_t new_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
 public:
-	void on_event(uint32_t type, et_un_t* ep);
+	virtual void on_event(uint32_t type, et_un_t* ep);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
 	size_t add_dragpos(const glm::ivec2& pos, const glm::ivec2& size = {});
@@ -374,6 +374,7 @@ public:
 	drag_v6* get_dragv6(size_t idx);
 
 	bool update(float delta);
+	void clayout();
 private:
 	void sortdg();
 	void bind_scroll_bar(scroll_bar* p, bool v);	// 绑定到面板	

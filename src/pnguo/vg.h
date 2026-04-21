@@ -315,10 +315,11 @@ struct node_dt
 	glm::vec4 frame = {};	// out 输出位置大小
 	size_t index = 0;		// in 样式序号
 	float baseline = 0.0;	// in 基线位置
+	int position = 0;		// in 位置,0=relative，1=absolute
 	node_dt* child = 0;		// in 子元素指针
 	size_t child_count = 0;
-	size_t tidx = -1;		// out 自动计算节点索引
-	size_t parent = -1;		// out 自动计算父节点索引
+	size_t tidx = 0;		// out 自动计算节点索引
+	size_t parent = 0;		// out 自动计算父节点索引
 	size_t line_count = 0;	// out 行数量
 };
 // 输入样式数据，根节点指针，所有节点数量

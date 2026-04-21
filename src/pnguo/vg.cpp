@@ -13,8 +13,7 @@
 #include <stb_image_write.h>
 
 stbimage_load::stbimage_load()
-{
-}
+{}
 
 stbimage_load::stbimage_load(const char* fn)
 {
@@ -119,8 +118,7 @@ private:
 };
 
 flex_item::flex_item()
-{
-}
+{}
 
 flex_item::~flex_item()
 {
@@ -843,7 +841,8 @@ glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_
 	glm::vec4 rect = {};
 	if (!fd || count == 0 || !p || !node_count || !p->child || !p->child_count)
 		return rect;
-	auto fitem = new flex_item[node_count];
+	std::vector<flex_item> items(node_count);
+	auto fitem = items.data();
 	if (!fitem) return rect;
 	for (size_t i = 0; i < node_count; i++) {
 		fitem[i].init();
@@ -866,6 +865,7 @@ glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_
 			else {
 				k.setdata(fd);
 			}
+			k.position = it->position ? flex_position::POS_ABSOLUTE : flex_position::POS_RELATIVE;
 			k.managed_ptr = it;
 			k.baseline = it->baseline;
 			k.width = it->size.x; k.height = it->size.y;
@@ -893,10 +893,6 @@ glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_
 
 	}
 	p->line_count = fitem->line_count;
-	if (fitem)
-	{
-		delete[]fitem;
-	}
 	return rect;
 }
 #endif // !NO_FLEX_IMP

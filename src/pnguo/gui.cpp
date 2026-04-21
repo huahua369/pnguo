@@ -8641,6 +8641,50 @@ bool div_cx::update(float delta)
 	}
 	return false;
 }
+// 计算一行布局，range为当前行的控件起始索引和数量，tempfv为临时使用的数组
+void calc_line_layout(widget_t* p, const glm::ivec2& range, const glm::ivec2& box_rect, flex_data* boxflex, std::vector<node_dt>& tempfv) 
+{
+	int count = range.y;
+	tempfv.resize(count + 1);
+	node_dt* fnode = tempfv.data();
+	auto cp = fnode + 1;
+	*fnode = {};
+	flex_data tf[2] = {};
+	if (boxflex)
+	{
+		tf[0] = *boxflex;
+		fnode->size = box_rect;
+		fnode->child = cp;
+		fnode->child_count = count;
+		fnode->line_count = 0;
+	}
+	for (int i = 0; i < count; i++)
+	{
+		auto& it = p[range.x + i];
+		cp[i] = {};
+		cp[i].index = 1;
+		cp[i].size = it.get_size();
+		cp[i].position = it._absolute ? 1 : 0;
+	}
+	auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
+	for (size_t y = 0; y < fnode->child_count; y++)
+	{
+		auto t0 = fnode->child + y;
+		auto& bt = p[range.x + y];
+		if (bt._absolute)
+		{
+			continue;
+		}
+		glm::vec2 vps2 = t0->frame;
+		bt.set_pos(vps2);
+	}
+}
+void div_cx::clayout()
+{
+	if (!uplayout)return;
+	uplayout = false;
+
+}
 
 
 page_cx::page_cx()
