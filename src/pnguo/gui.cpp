@@ -6063,23 +6063,23 @@ bool gradient_btn::update(float delta)
 	auto& info = *p;
 
 	// (sta & hz::BTN_STATE::STATE_FOCUS)
-	uint32_t gradTop = 0xff4a4a4a;
-	uint32_t gradBot = 0xff3a3a3a;
+	uint32_t gradTop = info.gradTop.x;// 0xff4a4a4a;
+	uint32_t gradBot = info.gradBot.x;// 0xff3a3a3a;
 
 	info.mPushed = (_bst & (int)BTN_STATE::STATE_ACTIVE);
 	info.mMouseFocus = (_bst & (int)BTN_STATE::STATE_HOVER);
 	if (_bst & (int)BTN_STATE::STATE_DISABLE)
 		info.mEnabled = false;
 	if (info.mPushed) {
-		gradTop = 0xff292929;
-		gradBot = 0xff1d1d1d;
+		gradTop = info.gradTop.z;//0xff292929;
+		gradBot = info.gradBot.z;//0xff1d1d1d;
 	}
 	else if (info.mMouseFocus && info.mEnabled) {
-		gradTop = 0x80404040;
-		gradBot = 0x80303030;
+		gradTop = info.gradTop.y;// 0x80404040;
+		gradBot = info.gradBot.y;//0x80303030;
 	}
-	info.gradTop = gradTop;
-	info.gradBot = gradBot;
+	info._gradTop = gradTop;
+	info._gradBot = gradBot;
 	return true;
 }
 
@@ -7193,8 +7193,8 @@ void gradient_btn::draw(rvg_cx* rv)
 	auto p = this;
 	float x = p->_pos.x, y = p->_pos.y, w = p->_size.x, h = p->_size.y;
 	int pushed = p->mPushed ? 0 : 1;
-	uint32_t gradTop = p->gradTop;
-	uint32_t gradBot = p->gradBot;
+	uint32_t gradTop = p->_gradTop;
+	uint32_t gradBot = p->_gradBot;
 	uint32_t borderDark = p->borderDark;
 	uint32_t borderLight = p->borderLight;
 	double oa = p->opacity;
@@ -7208,12 +7208,13 @@ void gradient_btn::draw(rvg_cx* rv)
 	{
 		rounding = nr;
 	}
+	glm::vec2 tps = { 0.5,0.5 };
 	rv->save();
 	rv->translate({ x, y });
 	if (is_alpha(bc))
 	{
 		bc = set_alpha_f(bc, oa);
-		rv->add_rect({ thickness,thickness, w - thickness, h - thickness * 2 }, rounding);
+		rv->add_rect({ thickness, thickness, w - thickness * 2, h - thickness * 2 }, rounding);
 		rv->set_color(bc);
 		rv->fill();
 	}
@@ -7222,7 +7223,7 @@ void gradient_btn::draw(rvg_cx* rv)
 		gradBot = set_alpha_f(gradBot, 0.8f);
 	}
 	else {
-		double v = 1 - get_alpha_f(p->back_color);
+		double v = 1.0 - get_alpha_f(p->back_color);
 		auto gv = p->mEnabled ? v : v * .5f + .5f;
 		gradTop = set_alpha_xf(gradTop, gv);
 		gradBot = set_alpha_xf(gradBot, gv);
@@ -7239,7 +7240,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	{
 		r = { rounding, rounding, rounding, rounding };
 	}
-	glm::vec2 rct = { w - thickness, h - thickness * 2 };
+	glm::vec2 rct = { w - thickness, h - thickness * 2.0 };
 	glm::vec4 gtop = to_c4(gradTop);
 	glm::vec4 gbot = to_c4(gradBot);
 
@@ -7292,7 +7293,6 @@ void gradient_btn::draw(rvg_cx* rv)
 	// 边框
 	w -= 1;
 	h -= 1;
-	glm::vec2 tps = { 0.5,0.5 };
 	rv->set_line_width(thickness);
 	rv->set_color(borderLight);
 	rv->add_rect({ tps.x,tps.y + (p->mPushed ? 0.f : 1.0f), w, h - (p->mPushed ? 0.0f : 1.0f) }, rounding);

@@ -569,11 +569,13 @@ struct gradient_btn :public widget_t
 	uint32_t text_color = 0;
 	uint32_t text_color_shadow = 0x88111111;
 	double opacity = 1.0;
+	glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
 	// private
-	uint32_t gradTop = 0;
-	uint32_t gradBot = 0;
+	uint32_t _gradTop = 0;
+	uint32_t _gradBot = 0;
 	uint32_t borderLight = 0;
 	uint32_t borderDark = 0;
+
 	uTheme effect = uTheme::light;	// dark
 	bool mPushed = false;
 	bool mChecked = false;

@@ -944,13 +944,19 @@ int main()
 			dvv->flex.justify_content = flex_align::ALIGN_SPACE_AROUND;
 			//dvv->flex.direction = flex_direction::COLUMN;
 			uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
+
+			glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
+			glm::uvec3 gradTop1 = { 0xff8a8a8a,0x80bebebe,0xff303030 }, gradBot1 = { 0xff5a5a5a,0x80303030,0xff1d1d1d };
 			for (int i = 0; i < 5; i++) {
 				auto btn = new gradient_btn();
+				btn->rounding = 4;
 				dvv->add_widget(btn);
 				btn->set_size({ 200,36 });
 				btn->back_color = colors[i];
 				btn->borderLight = 0x805c5c5c;
 				btn->borderDark = 0x801d1d1d;
+				btn->gradTop = i == 4 ? gradTop1 : gradTop;
+				btn->gradBot = i == 4 ? gradBot1 : gradBot;
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
