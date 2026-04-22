@@ -1022,12 +1022,12 @@ int main()
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label();
-						str += (char*)u8"emoji表情🔥➗️👪️";
+						str += (char*)u8"emoji表情💻🔥➗️👪️🍕";
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
-						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
+						str = (char*)u8"渐变色表情: 💻🔥➗️👪️🍕";
 						// 添加文本
-						//rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
+						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
 						//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 						static glm::ivec2 imgpos = { 100,100 };
