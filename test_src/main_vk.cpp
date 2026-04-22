@@ -1022,7 +1022,7 @@ int main()
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label();
-						//str += (char*)u8"emoji表情🔥➗️👪️";
+						str += (char*)u8"emoji表情🔥➗️👪️";
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";

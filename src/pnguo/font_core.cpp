@@ -2440,12 +2440,12 @@ void* font_t::mk_glyph_image_hb(uint32_t gid, int font_size, int* ot)
 		bool bext = hb_font_get_glyph_extents(font, gid, &gext);
 		if (pnt)
 		{
+			hb_raster_paint_set_foreground(pnt, HB_COLOR(255, 255, 255, 255));
 			if (bext && hb_raster_paint_set_glyph_extents(pnt, &gext))
 			{
 				hb_raster_paint_set_transform(pnt, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
-				hb_bool_t painted = hb_raster_paint_glyph(pnt, font, gid, 0.f, 0.f, 0, HB_COLOR(255, 255, 255, 255));
-				if (painted)
-					img = hb_raster_paint_render(pnt);
+				hb_raster_paint_glyph(pnt, font, gid);
+				img = hb_raster_paint_render(pnt);
 			}
 			if (img)
 			{
@@ -2455,7 +2455,7 @@ void* font_t::mk_glyph_image_hb(uint32_t gid, int font_size, int* ot)
 		}
 		{
 			hb_raster_draw_set_transform(rdr, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
-			hb_raster_draw_glyph(rdr, font, gid, 0.f, 0.f);
+			hb_raster_draw_glyph(rdr, font, gid);
 			img = hb_raster_draw_render(rdr);
 			if (img)
 			{
