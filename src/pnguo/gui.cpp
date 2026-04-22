@@ -8668,11 +8668,21 @@ void div_cx::draw(rvg_cx* rv)
 		}
 	}
 }
+glm::vec2 get_margin_size(flex_data* c) {
+	glm::vec2 m = {};
+	if (c)
+	{
+		m.x = c->margin_left + c->margin_right;
+		m.y = c->margin_top + c->margin_bottom;
+	}
+	return m;
+}
 // 计算一行布局，range为当前行的控件起始索引和数量，tempfv为临时使用的数组
-glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ivec2& box_size, flex_data* boxflex, const glm::ivec2& pos, std::vector<node_dt>& tempfv)
+glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ivec2& box_size, flex_data* boxflex, flex_data* flex_child, const glm::ivec2& pos, std::vector<node_dt>& tempfv)
 {
 	int count = range.y;
 	tempfv.resize(count + 1);
+	auto cpos = pos;
 	node_dt* fnode = tempfv.data();
 	auto cp = fnode + 1;
 	*fnode = {};
@@ -8685,12 +8695,28 @@ glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ive
 		fnode->child_count = count;
 		fnode->line_count = 0;
 	}
+	glm::vec2 margin_size = {};
+	glm::vec2 margin_pos = {};
+	if (flex_child) {
+		tf[1] = *flex_child;
+		if (tf[0].wrap > flex_wrap::NO_WRAP)
+		{
+			margin_size = get_margin_size(flex_child);
+			margin_pos.x = flex_child->margin_left;
+			margin_pos.y = flex_child->margin_top;
+			cpos += margin_pos;
+			tf[1].margin_left = 0;
+			tf[1].margin_right = 0;
+			tf[1].margin_top = 0;
+			tf[1].margin_bottom = 0;
+		}
+	}
 	for (int i = 0; i < count; i++)
 	{
 		auto it = p[range.x + i];
 		cp[i] = {};
 		cp[i].index = 1;
-		cp[i].size = it->get_size();
+		cp[i].size = it->get_size() + margin_size;
 		cp[i].position = it->_absolute ? 1 : 0;
 	}
 	auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
@@ -8703,7 +8729,7 @@ glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ive
 			continue;
 		}
 		glm::vec2 vps2 = t0->frame;
-		vps2 += pos;
+		vps2 += cpos;
 		bt->set_pos(vps2);
 	}
 	return glm::vec2(nrc.z, nrc.w);
@@ -8717,12 +8743,12 @@ void div_cx::clayout()
 	if (lines.empty())
 	{
 		// 竖排
-		calc_line_layout(p, { 0,widgets.size() }, { _size.x,_size.y }, &flex, pos, tempfv);
+		calc_line_layout(p, { 0,widgets.size() }, { _size.x,_size.y }, &flex, &flex_child, pos, tempfv);
 	}
 	else {
 		for (auto& it : lines)
 		{
-			auto cs = calc_line_layout(p, it, { _size.x,_size.y }, &flex, pos, tempfv);
+			auto cs = calc_line_layout(p, it, { _size.x,_size.y }, &flex, &flex_child, pos, tempfv);
 			pos.y += cs.y;
 		}
 	}

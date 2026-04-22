@@ -941,7 +941,15 @@ int main()
 			dvv->set_size({ 500,300 });
 			dvv->set_pos({ 10,360 });
 			dvv->flex.wrap = flex_wrap::WRAP;
-			dvv->flex.justify_content = flex_align::ALIGN_SPACE_AROUND;
+			dvv->flex.direction = flex_direction::ROW;
+			dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+			dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
+			dvv->flex.align_items = flex_align::ALIGN_START;		// y轴，交叉轴对齐
+
+			dvv->flex_child.margin_left = 2;		// 子元素外边距
+			dvv->flex_child.margin_right = 2;
+			dvv->flex_child.margin_top = 2;
+			dvv->flex_child.margin_bottom = 2;
 			//dvv->flex.direction = flex_direction::COLUMN;
 			uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
 
@@ -986,7 +994,7 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
-					td3->draw_surface(ck, dvv->get_pos(), {0,0,sc_size.x,sc_size.y}, sc_size);
+					td3->draw_surface(ck, dvv->get_pos(), { 0,0,sc_size.x,sc_size.y }, sc_size);
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{

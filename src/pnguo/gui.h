@@ -339,6 +339,7 @@ public:
 	int ckinc = 0;
 	int ckup = 0;
 	flex_data flex = {};
+	flex_data flex_child = {};
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<widget_t*> widgets, event_wts, event_wts1;
 	std::vector<glm::ivec2> lines;	// 控件分行
