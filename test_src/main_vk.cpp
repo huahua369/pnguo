@@ -1015,7 +1015,7 @@ int main()
 					vkvg_flush(ctx);
 					vkvg_surface_resolve(t);
 					td3->ctx_end(ctx);
-
+					form0->io->WantCaptureMouse = dvv->hittest(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					{
 						td3->update(ck, delta);
@@ -1027,12 +1027,12 @@ int main()
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情:\n💻🔥➗️👪️🍕";
 						// 添加文本
-					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
-					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
+						//rt_add_text(mtext, str.c_str(), str.size(), 0, family, 64, 0xafffffff);
+						//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 						static glm::ivec2 imgpos = { 100,100 };
 						//rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, 0x50ffffff, { 64 * 5,64 * 3 }, imgpos, true);
-					//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
+						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 
 						rt_build(mtext);
 						td3->update(mtext, 0);

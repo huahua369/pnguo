@@ -8602,6 +8602,14 @@ bool div_cx::hittest(const glm::ivec2& pos)
 			}
 		}
 	}
+	// 按下鼠标时点中控件则捕获
+	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+		auto pw = (widget_t*)*it;
+		if (!pw || !pw->visible || pw->_disabled_events)continue;
+		if (pw->_bst & (int)BTN_STATE::STATE_ACTIVE) {
+			r = true;
+		}
+	}
 	return r;
 }
 
