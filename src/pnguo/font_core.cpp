@@ -4878,8 +4878,8 @@ packer_base::~packer_base()
 
 void packer_base::init_target(int width, int height) {}
 void packer_base::clear() {}
-int packer_base::push_rect(glm::ivec4* rc, int n) { return 0; }
-int packer_base::push_rect(glm::ivec2 rc, glm::ivec2* pos) { return 0; }
+bool packer_base::push_rect(glm::ivec4* rc, int n) { return false; }
+bool packer_base::push_rect(const glm::ivec2& rc, glm::ivec2* pos) { return false; }
 
 
 
@@ -4974,9 +4974,9 @@ public:
 	void clear() {
 		init_target(_ctx.width, _ctx.height);
 	}
-	int push_rect(glm::ivec4* rc, int n)
+	bool push_rect(glm::ivec4* rc, int n)
 	{
-		if (!rc || n < 1)return 0;
+		if (!rc || n < 1)return false;
 		std::vector<stbrp_rect> rct(n);
 		auto r = rc;
 		for (auto& it : rct)
@@ -4993,7 +4993,7 @@ public:
 		img->valid = 1;
 		return ret;
 	}
-	int push_rect(glm::ivec2 rc, glm::ivec2* pos)
+	bool push_rect(const glm::ivec2& rc, glm::ivec2* pos)
 	{
 		stbrp_rect rct[2] = {};
 		rct->w = rc.x;
@@ -5005,6 +5005,77 @@ public:
 		}
 		auto img = get();
 		img->valid = 1;
+		return ret;
+	}
+public:
+	// todo stb结构
+	int pack_rects(stbrp_rect* rects, int num_rects)
+	{
+		return stbrp_pack_rects(&_ctx, rects, num_rects);
+	}
+	void setup_allow_out_of_mem(int allow_out_of_mem)
+	{
+		stbrp_setup_allow_out_of_mem(&_ctx, allow_out_of_mem);
+	}
+	//可以选择库应该使用哪个打包启发式方法。不同启发式方法将为不同的数据集生成更好/更差的结果。 如果再次调用init，将重置为默认值。	
+	void setup_heuristic(int heuristic = 1)
+	{
+		stbrp_setup_heuristic(&_ctx, heuristic);
+	}
+private:
+
+};
+class image_packer :public packer_base
+{
+public:
+	stbrp_context _ctx = {};
+	std::vector<stbrp_node> _rpns;
+public:
+	image_packer() {}
+	~image_packer() {}
+	// BL = 0 “从下向左塞”（快速降低高度）
+	// BF = 1 “精打细算”（最小化空间浪费）
+	void init_target(int width, int height, int heuristic = 0) {
+		assert(!(width < 10 || height < 10));
+		if (width < 10 || height < 10)return;
+		this->width = width;
+		this->height = height;
+		_rpns.resize(width);
+		memset(_rpns.data(), 0, _rpns.size() * sizeof(stbrp_node));
+		stbrp_init_target(&_ctx, width, height, _rpns.data(), _rpns.size());
+		stbrp_setup_heuristic(&_ctx, heuristic);
+		stbrp_setup_allow_out_of_mem(&_ctx, 0);
+	}
+	void clear() {
+		init_target(_ctx.width, _ctx.height);
+	}
+	bool push_rect(glm::ivec4* rc, int n)
+	{
+		if (!rc || n < 1)return false;
+		std::vector<stbrp_rect> rct(n);
+		auto r = rc;
+		for (auto& it : rct)
+		{
+			it.w = r->z; it.h = r->w; r++;
+		}
+		int ret = stbrp_pack_rects(&_ctx, rct.data(), n);
+		r = rc;
+		for (auto& it : rct)
+		{
+			r->x = it.x; r->y = it.y; r++;
+		}
+		return ret;
+	}
+	bool push_rect(const glm::ivec2& rc, glm::ivec2* pos)
+	{
+		stbrp_rect rct[2] = {};
+		rct->w = rc.x;
+		rct->h = rc.y;
+		int ret = stbrp_pack_rects(&_ctx, rct, 1);
+		if (pos)
+		{
+			*pos = { rct->x,rct->y };
+		}
 		return ret;
 	}
 public:
@@ -5085,7 +5156,7 @@ void test_rect()
 
 packer_base* new_packer(int width, int height)
 {
-	auto p = new stb_packer();
+	auto p = new image_packer();
 	if (p)
 	{
 		p->init_target(width, height);

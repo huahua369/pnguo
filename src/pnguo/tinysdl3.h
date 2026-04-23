@@ -316,10 +316,10 @@ public:
 	bool add_vkimage(const glm::ivec2& size, void* vkimage, const glm::vec2& pos, int type);
 #endif
 	// 添加动画、图集渲染
-	void add_canvas_atlas(canvas_atlas* p, int level = 0);
+	//void add_canvas_atlas(canvas_atlas* p, int level = 0);
 	//void add_skeleton(skeleton_t* p);
 	//void remove(skeleton_t* p);
-	void remove(canvas_atlas* p);
+	//void remove(canvas_atlas* p);
 	// 绑定面板组件
 	//void bind(plane_cx* p, int level = 0);
 	//void unbind(plane_cx* p);

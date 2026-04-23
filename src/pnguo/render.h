@@ -289,6 +289,7 @@ struct text_vx
 	glm::vec4 color;
 };
 struct dev_info_cx;
+class packer_base;
 /*
 add 后需要submit style
 */
@@ -296,6 +297,7 @@ class rvg_cx
 {
 public:
 	VkvgContext ctx = 0;
+	packer_base* packer = 0;	// 矩形打包器
 public:
 	rvg_cx(VkvgContext p);
 	~rvg_cx();

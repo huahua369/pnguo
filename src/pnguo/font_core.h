@@ -74,8 +74,8 @@ public:
 	virtual ~packer_base();
 	virtual void init_target(int width, int height);
 	virtual void clear();
-	virtual int push_rect(glm::ivec4* rc, int n);
-	virtual int push_rect(glm::ivec2 rc, glm::ivec2* pos);
+	virtual bool push_rect(glm::ivec4* rc, int n);
+	virtual bool push_rect(const glm::ivec2& rc, glm::ivec2* pos);
 };
 packer_base* new_packer(int width, int height);
 void free_packer(packer_base* p);
