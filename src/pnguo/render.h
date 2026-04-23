@@ -176,6 +176,7 @@ private:
 
 };
 
+struct fill_style_d;
 struct dev_info_c
 {
 	VkInstance inst;
@@ -292,14 +293,24 @@ struct dev_info_cx;
 class packer_base;
 /*
 add 后需要submit style
+输入矢量信息，收集区域，生成渲染命令
 */
 class rvg_cx
 {
 public:
-	VkvgContext ctx = 0;
+	enum Opcode : uint8_t {
+		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
+		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_LINE_VEC2, OP_ADD_RECT_DOUBLE,
+		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_ADD_POLYLINE_VEC2,
+		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_ADD_POLYLINES, OP_SET_TEXT_STYLE,
+		OP_ADD_TEXT, OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL,
+		OP_STROKE, OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
+	};
+	std::vector<uint8_t> _cmdtype;
+	std::vector<uint8_t> _data;
 	packer_base* packer = 0;	// 矩形打包器
 public:
-	rvg_cx(VkvgContext p);
+	rvg_cx();
 	~rvg_cx();
 
 	void submit(fill_style_d* st);
