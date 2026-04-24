@@ -867,6 +867,7 @@ int main()
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
 
 			canvas2d_t* td3 = new canvas2d_t();
+			auto rvgd = new rvg_data_cx();
 			td3->set_renderer(form0->renderer, pcb, { 0,0,ws.x, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
@@ -1019,7 +1020,7 @@ int main()
 					vkvg_flush(ctx);
 					vkvg_surface_resolve(t);
 					td3->ctx_end(ctx);
-					td3->draw_rvg(&rvg);
+					td3->draw_rvg(&rvg, rvgd);
 					form0->io->WantCaptureMouse = dvv->hittest(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					{

@@ -388,12 +388,14 @@ public:
 	std::vector<uint8_t> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
 	std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
+	std::vector<glm::ivec2> _vg_bs;		// 统计矢量图批次渲染的索引
 	std::stack<glm::vec2> translate_pos;
 	glm::vec2 tpos = {};				// 当前偏移
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
+	size_t cidx = 0;
 public:
-	rvg_cx(); 
+	rvg_cx();
 	~rvg_cx();
 
 	void submit(fill_style_d* st);
@@ -449,6 +451,30 @@ public:
 private:
 
 };
+struct d2_rt {
+	glm::ivec2 pos;		// 纹理偏移
+	glm::ivec2 size;	// 区域大小
+	glm::ivec2 offset;	// 渲染偏移
+	int surface = 0;
+	int index = 0;
+};
+class rvg_data_cx
+{
+public:
+	packer_base* packer = 0;	// 矩形打包器
+	glm::ivec2 max_rect = {};			// 最大的区域
+	std::vector<d2_rt> dcv;
+	std::vector<d2_rt> tm, tm1;
+	std::vector<void*> surfaces;
+	glm::ivec4 _view = {};
+public:
+	rvg_data_cx();
+	~rvg_data_cx();
+	void update(rvg_cx* rvg);
+private:
+
+};
+
 // 输入矢量图返回渲染数据
 class canvas2d_t
 {
@@ -464,7 +490,6 @@ public:
 	void* rptr = 0;
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
-	packer_base* packer = 0;	// 矩形打包器
 	uint32_t color = 0;
 public:
 	canvas2d_t();
@@ -486,7 +511,7 @@ public:
 	void update(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	// 批量渲染矢量图、位图、文本
-	void draw_rvg(rvg_cx* rvg);
+	void draw_rvg(rvg_cx* rvg, rvg_data_cx* dst);
 	// 释放渲染器的纹理
 	void free_tex();
 };
