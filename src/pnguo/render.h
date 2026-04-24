@@ -8,6 +8,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <stack>
 
 #include "vkvg.h"
 #ifndef vkvg_pattern_add_color_stop_rgba
@@ -355,6 +356,16 @@ struct polyline_index_r
 	uint32_t col;
 	float thickness;
 };
+struct image_r
+{
+	image_ptr_t* img;
+	glm::ivec4 rc;
+	glm::ivec4 sliced;
+	glm::ivec2 dsize;
+	glm::ivec2 pos;
+	uint32_t color;
+};
+
 struct dev_info_cx;
 class packer_base;
 /*
@@ -366,18 +377,25 @@ class rvg_cx
 public:
 	enum Opcode : uint8_t {
 		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
-		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_LINE_VEC2, OP_ADD_RECT_DOUBLE,
+		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
 		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
 		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
-		OP_TEXT_STYLE, OP_ADD_TEXT, OP_PAINT_SHADOW, OP_TRANSLATE,
+		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE, OP_PAINT_SHADOW, OP_TRANSLATE,
 		OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
-		,OP_MAX_COUNT
+		, OP_MAX_COUNT
 	};
-	std::vector<uint8_t> _cmdtype;
-	std::vector<uint8_t> _cmd;
+	std::vector<uint8_t> _cmdtype;		// 操作类型
+	std::vector<uint8_t> _cmd;			// 命令数据
+	std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
+	std::stack<glm::vec2> translate_pos;
+	glm::vec2 tpos = {};				// 当前偏移
+	float _thickness = 1.0;
+	glm::ivec4* _prc = 0;				// 当前批次渲染区域
+	VkvgContext ctx = 0;
 public:
 	rvg_cx();
+	rvg_cx(VkvgContext p);
 	~rvg_cx();
 
 	void submit(fill_style_d* st);
@@ -404,6 +422,7 @@ public:
 	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
 	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+	// 折线
 	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
 	void add_polyline(const PathsD* p, bool closed);
 	void add_polyline(const glm::vec2* p, int count);
@@ -412,7 +431,8 @@ public:
 	// 文本渲染
 	void set_text_style(text_style* ts);
 	void add_text(text_st* p, size_t count, text_style* ts);
-
+	void add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos);
+	void add_image(image_r* r);
 	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
 
 	void translate(const glm::vec2& offset);
@@ -426,6 +446,8 @@ public:
 	void set_line_width(float w);
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
+	void push_vrc();
+	void merge_vrc(const glm::ivec4& c);
 private:
 
 };
@@ -488,4 +510,6 @@ void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta);
 void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt);
 void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename);
 
+// 区域是否相交
+bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2);
 

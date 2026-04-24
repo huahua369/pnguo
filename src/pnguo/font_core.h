@@ -613,6 +613,7 @@ struct text_style
 	font_family_t* family = 0;
 	float fontsize = 0;
 	uint32_t color = 0;
+	glm::vec2 align = { 0.0,0.0 };// 文本对齐
 };
 // 文本区域
 struct text_box_t {

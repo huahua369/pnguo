@@ -1010,6 +1010,7 @@ int main()
 					auto ctx = (VkvgContext)td3->ctx_begin(ck);
 					vkvg_clear(ctx);
 					rvg_cx rvg;
+					rvg.ctx = ctx;
 					rvg.add_rect({ 0,0,dvv->get_size() }, 0);
 					rvg.set_color(0xaf111111);
 					rvg.fill();

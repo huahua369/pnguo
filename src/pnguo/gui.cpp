@@ -7259,21 +7259,21 @@ void gradient_btn::draw(rvg_cx* rv)
 	glm::vec4 rc = { ps, ns };
 
 #if 1
-	text_style_t st = {};
-	st.font = 0;
-	st.text_align = p->text_align;
-	st.font_size = p->font_size;
-	st.text_color = p->text_color;
-	st.shadow_pos = { thickness, thickness };
-	st.text_color_shadow = text_color_shadow;
-	{
-		int font = 0;
-		glm::vec2 text_align = { 0.0,0.5 };
-		glm::vec2 shadow_pos = { 1.0,1.0 };
-		int font_size = 18;
-		uint32_t text_color = 0xffffffff;
-		uint32_t text_color_shadow = 0;
-	};
+	//text_style_t st = {};
+	//st.font = 0;
+	//st.text_align = p->text_align;
+	//st.font_size = p->font_size;
+	//st.text_color = p->text_color;
+	//st.shadow_pos = { thickness, thickness };
+	//st.text_color_shadow = text_color_shadow;
+	//{
+	//	int font = 0;
+	//	glm::vec2 text_align = { 0.0,0.5 };
+	//	glm::vec2 shadow_pos = { 1.0,1.0 };
+	//	int font_size = 18;
+	//	uint32_t text_color = 0xffffffff;
+	//	uint32_t text_color_shadow = 0;
+	//};
 	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
 
 #else
@@ -7300,6 +7300,17 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->set_color(borderDark);
 	rv->add_rect({ tps.x,tps.y, w , h }, rounding);
 	rv->stroke();
+
+	text_style st = {};
+	st.fontsize = p->font_size;
+	st.align = p->text_align;
+	st.color = p->text_color;
+	text_st tx = {};
+	tx.pos = {};
+	tx.size = get_size();
+	tx.text = p->str.c_str(); tx.text_len = p->str.size();
+	rv->add_text(&tx, 1, &st);
+
 	rv->restore();
 
 #endif
@@ -7430,15 +7441,15 @@ void color_btn::draw(rvg_cx* rv)
 
 	glm::vec4 rc = { ps, ns };
 
+
+	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
+
+	/*
 	text_style_t st = {};
 	st.font = 0;
 	st.text_align = p->text_align;
 	st.font_size = p->font_size;
-	st.text_color = p->text_color;
-
-	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
-
-	/*	ltx->tem_rtv.clear();
+	st.text_color = p->text_color;	ltx->tem_rtv.clear();
 		ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
 		ltx->update_text();
 		ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
@@ -7464,7 +7475,16 @@ void color_btn::draw(rvg_cx* rv)
 	//{
 	//	rv->add_rect( { 0,0,size.x,size.y }, p->rounding);
 	//	rv->submit( 0, 0x80ff8000, 1, 0);
-	//}
+	//} 
+	text_style st = {};
+	st.fontsize = p->font_size;
+	st.align = p->text_align;
+	st.color = p->text_color;
+	text_st tx = {};
+	tx.pos = {};
+	tx.size = get_size();
+	tx.text = p->str.c_str(); tx.text_len = p->str.size();
+	rv->add_text(&tx, 1, &st);
 	rv->restore();
 #endif
 }
