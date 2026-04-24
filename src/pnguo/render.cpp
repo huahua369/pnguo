@@ -18,7 +18,6 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include <vg.h>
 #include <vkvg/vkvg.h> 
 
-#include "render.h"
 #include <stb_rect_pack.h> 
 #include <print_time.h> 
 #include <vkh.h>
@@ -30,6 +29,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include "tinysdl3.h"
 
 
+#include "render.h"
 
 #define SP_RGBA32_R_U(v) ((v) & 0xff)
 #define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)

@@ -5,6 +5,7 @@
 #define FONT_CORE_H
 
 #include <string> 
+#include <vector> 
 
 glm::vec4 ucolor2fx(uint32_t color);
 glm::vec4 ucolor2f(uint32_t c);

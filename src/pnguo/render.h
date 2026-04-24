@@ -4,6 +4,11 @@
 *	vkvg渲染矢量图到VkvgSurface表面
 *
 */
+
+#include <vector>
+#include <map>
+#include <string>
+
 #include "vkvg.h"
 #ifndef vkvg_pattern_add_color_stop_rgba
 #define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop
@@ -138,8 +143,8 @@ public:
 
 	void transform(const glm::mat3* matrix);
 	void transform(const glm::mat3x2* matrix);
-	void set_matrix(const  glm::mat3* matrix);
-	void set_matrix(const  glm::mat3x2* matrix);
+	void set_matrix(const glm::mat3* matrix);
+	void set_matrix(const glm::mat3x2* matrix);
 	glm::mat3x2 get_matrix();
 private:
 
@@ -367,6 +372,7 @@ public:
 		OP_TEXT_STYLE, OP_ADD_TEXT, OP_PAINT_SHADOW, OP_TRANSLATE,
 		OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
+		,OP_MAX_COUNT
 	};
 	std::vector<uint8_t> _cmdtype;
 	std::vector<uint8_t> _cmd;
