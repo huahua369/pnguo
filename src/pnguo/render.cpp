@@ -1436,132 +1436,271 @@ rvg_cx::~rvg_cx()
 
 void rvg_cx::submit(fill_style_d* st)
 {
+	if (!st)return;
 	uint8_t op = OP_SUBMIT_STYLE;
 	_cmdtype.push_back(op);
-	_data.insert(_data.end(), (char*)&st, (char*)&st + sizeof(st));
+	auto t = *st;
+	if (t.dash_p) {
+		t.dash_p = (float*)(_cmd.size() + sizeof(t));
+	}
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	if (t.dash_p) {
+		_cmd.insert(_cmd.end(), (char*)st->dash_p, (char*)st->dash_p + sizeof(float) * st->dash_num);
+	}
 }
-
 void rvg_cx::submit(uint32_t fill, uint32_t color, int linewidth)
 {
 	uint8_t op = OP_SUBMIT_COLOR;
 	_cmdtype.push_back(op);
-	_data.insert(_data.end(), (char*)&fill, (char*)&fill + sizeof(fill));
-	_data.insert(_data.end(), (char*)&color, (char*)&color + sizeof(color));
-	_data.insert(_data.end(), (char*)&linewidth, (char*)&linewidth + sizeof(linewidth));
+	submit_color_d t = { fill,color,linewidth };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 }
-
 void rvg_cx::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
 {
 	uint8_t op = OP_GRID_FILL;
 	_cmdtype.push_back(op);
-	_data.insert(_data.end(), (char*)&size, (char*)&size + sizeof(size));
-	_data.insert(_data.end(), (char*)&cols, (char*)&cols + sizeof(cols));
-	_data.insert(_data.end(), (char*)&width, (char*)&width + sizeof(width));
+	grid_fill_r t = { size,cols,width };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 }
-
 void rvg_cx::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count)
 {
 	uint8_t op = OP_LINEAR_FILL;
 	_cmdtype.push_back(op);
-	_data.insert(_data.end(), (char*)&size, (char*)&size + sizeof(size));
-	_data.insert(_data.end(), (char*)&count, (char*)&count + sizeof(count));
-	_data.insert(_data.end(), (char*)cols, (char*)cols + sizeof(glm::vec4) * count);
+	linear_fill_r t = { size,count };
+	for (int i = 0; i < count && i < 8; i++)
+	{
+		t.cols[i] = cols[i];
+	}
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	if (count > 8)
+	{
+		_cmd.insert(_cmd.end(), (char*)(cols + 8), (char*)(cols + count));
+	}
 }
-
 void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type)
 {
 	uint8_t op = OP_ADD_ARROW;
 	_cmdtype.push_back(op);
-	_data.insert(_data.end(), (char*)&p0, (char*)&p0 + sizeof(p0));
-	_data.insert(_data.end(), (char*)&p1, (char*)&p1 + sizeof(p1));
-	_data.insert(_data.end(), (char*)&arrow_hwidth, (char*)&arrow_hwidth + sizeof(arrow_hwidth));
-	_data.insert(_data.end(), (char*)&arrow_size, (char*)&arrow_size + sizeof(arrow_size));
-	_data.insert(_data.end(), (char*)&type, (char*)&type + sizeof(type));
+	arrow_d t = { p0,p1,arrow_hwidth,arrow_size,type };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 }
-
 void rvg_cx::draw_block(dblock_d* p, fill_style_d* st)
 {
+	if (!p || !p->points || p->count == 0 || p->rc.x <= 0 || p->rc.y < 0 || !st)return;
 	uint8_t op = OP_DRAW_BLOCK;
 	_cmdtype.push_back(op);
-	_data.insert(_data.end(), (char*)&p, (char*)&p + sizeof(p));
-	_data.insert(_data.end(), (char*)&st, (char*)&st + sizeof(st));
+	auto t = *p;
+	t.points = (glm::vec2*)(_cmd.size() + sizeof(t));
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(dblock_d));
+	_cmd.insert(_cmd.end(), (char*)p->points, (char*)p->points + sizeof(glm::vec2) * p->count);
+	submit(st);
 }
 
 void rvg_cx::draw_path(path_d* path, fill_style_d* style)
 {
-
+	if (!path || path->count == 0 || !path->v || !style)return;
+	uint8_t op = OP_DRAW_PATH;
+	_cmdtype.push_back(op);
+	auto t = *path;
+	t.v = (path_vertex_t*)(_cmd.size() + sizeof(t));
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(path_d));
+	_cmd.insert(_cmd.end(), (char*)path->v, (char*)path->v + sizeof(path_vertex_t) * path->count);
+	submit(style);
 }
 
 void rvg_cx::add_line(glm::vec4* p, size_t count)
-{}
-
-void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
-{}
-
-void rvg_cx::add_rect(const glm::vec4& rc, double r)
-{}
-
-void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
-{}
-
-void rvg_cx::add_circle(const glm::vec2& pos, float r)
-{}
-
-void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r)
-{}
-
-void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
-{}
-
-void rvg_cx::add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
-{}
-
-void rvg_cx::add_polyline(const PathsD* p, bool closed)
-{}
-
-void rvg_cx::add_polyline(const glm::vec2* p, int count)
-{}
-
-void rvg_cx::add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
-{}
-
-bool rvg_cx::set_text_style(text_style* ts, size_t count)
 {
-	return false;
+	uint8_t op = OP_ADD_LINE_PTR;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(glm::vec4) * count);
 }
 
-void rvg_cx::add_text(text_st* p, size_t count)
-{}
+void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
+{
+	uint8_t op = OP_ADD_LINE_VEC2;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)&ps0, (char*)&ps0 + sizeof(ps0));
+	_cmd.insert(_cmd.end(), (char*)&ps1, (char*)&ps1 + sizeof(ps1));
+}
+
+void rvg_cx::add_rect(const glm::vec4& rc, double r)
+{
+	uint8_t op = OP_ADD_RECT_DOUBLE;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)&rc, (char*)&rc + sizeof(rc));
+	_cmd.insert(_cmd.end(), (char*)&r, (char*)&r + sizeof(r));
+}
+void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
+{
+	uint8_t op = OP_ADD_RECT_VEC4;
+	_cmdtype.push_back(op);
+	rect_v4 t = { rc, r };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+}
+
+void rvg_cx::add_circle(const glm::vec2& pos, float r)
+{
+	uint8_t op = OP_ADD_CIRCLE;
+	_cmdtype.push_back(op);
+	circle_r t = { pos,r };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+}
+
+void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle)
+{
+	uint8_t op = OP_ADD_ELLIPSE;
+	_cmdtype.push_back(op);
+	ellipse_r t = { pos, r, rotationAngle };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+}
+void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
+{
+	uint8_t op = OP_ADD_TRIANGLE;
+	_cmdtype.push_back(op);
+	triangle_r t = { pos,size,dirspos };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+}
+
+void rvg_cx::add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
+{
+	uint8_t op = OP_ADD_POLYLINE_VEC2;
+	_cmdtype.push_back(op);
+	polyline_r t = { pos,points_count,col,thickness,closed };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	_cmd.insert(_cmd.end(), (char*)points, (char*)points + sizeof(glm::vec2) * points_count);
+}
+
+void rvg_cx::add_polyline(const PathsD* p, bool closed)
+{
+	uint8_t op = OP_ADD_POLYLINE_PATH;
+	_cmdtype.push_back(op);
+}
+
+void rvg_cx::add_polyline(const glm::vec2* p, int count)
+{
+	if (!p || count < 2)return;
+	uint8_t op = OP_ADD_POLYLINE_VEC2_PTR;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(glm::vec2) * count);
+}
+void rvg_cx::add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
+{
+	if (!points || points_count <= 0 || !idx || idx_count <= 0)return;
+	uint8_t op = OP_ADD_POLYLINES;
+	_cmdtype.push_back(op);
+	polyline_index_r t = { pos,points_count,idx_count,col,thickness };
+	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	_cmd.insert(_cmd.end(), (char*)points, (char*)points + sizeof(glm::vec2) * points_count);
+	_cmd.insert(_cmd.end(), (char*)idx, (char*)idx + sizeof(int) * idx_count);
+}
+
+void rvg_cx::set_text_style(text_style* ts)
+{
+	if (!ts)return;
+	_cmdtype.push_back(OP_TEXT_STYLE);
+	_cmd.insert(_cmd.end(), (char*)ts, (char*)ts + sizeof(text_style));
+}
+
+void rvg_cx::add_text(text_st* p, size_t count, text_style* ts)
+{
+	if (!p || count == 0)return;
+	set_text_style(ts);
+	uint8_t op = OP_ADD_TEXT;
+	_cmdtype.push_back(op);
+	auto pos = _cmd.size();
+	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st) * count);
+	auto pd = (text_st*)(_cmd.data() + pos);
+	size_t ct = 0;
+	auto tpos = _cmd.size();
+	for (size_t i = 0; i < count; i++)
+	{
+		_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
+		pd->text = (char*)tpos + ct;
+		ct += pd->text_len;
+	}
+}
 
 void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
-{}
+{
+	uint8_t op = OP_PAINT_SHADOW;
+	_cmdtype.push_back(op);
+	paint_shadow_d d = {};
+	d.size = glm::vec2(size_x, size_y);
+	d.dst_size = glm::vec2(width, height);
+	d.shadow = shadow;
+	d.color_to = color_to;
+	d.rev = rev;
+	d.r = r;
+	_cmd.insert(_cmd.end(), (char*)&d, (char*)&d + sizeof(d));
+}
 
 void rvg_cx::translate(const glm::vec2& offset)
-{}
+{
+	uint8_t op = OP_TRANSLATE;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)&offset, (char*)&offset + sizeof(offset));
+}
 
 void rvg_cx::clip()
-{}
+{
+	uint8_t op = OP_CLIP;
+	_cmdtype.push_back(op);
+}
 
 void rvg_cx::save()
-{}
+{
+	uint8_t op = OP_SAVE;
+	_cmdtype.push_back(op);
+}
 
 void rvg_cx::restore()
-{}
+{
+	uint8_t op = OP_RESTORE;
+	_cmdtype.push_back(op);
+}
 
 void rvg_cx::fill()
-{}
+{
+	uint8_t op = OP_FILL;
+	_cmdtype.push_back(op);
+}
 
 void rvg_cx::stroke()
-{}
+{
+	uint8_t op = OP_STROKE;
+	_cmdtype.push_back(op);
+}
+
+void rvg_cx::fill_preserve()
+{
+	_cmdtype.push_back(OP_FILL_PRESERVE);
+}
+
+void rvg_cx::stroke_preserve()
+{
+	_cmdtype.push_back(OP_STROKE_PRESERVE);
+}
 
 void rvg_cx::set_line_width(float w)
-{}
+{
+	uint8_t op = OP_SET_LINE_WIDTH;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)&w, (char*)&w + sizeof(w));
+}
 
 void rvg_cx::set_color(uint32_t color)
-{}
+{
+	uint8_t op = OP_SET_COLOR_UINT;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)&color, (char*)&color + sizeof(color));
+}
 
 void rvg_cx::set_color(const glm::vec4& rgba)
-{}
+{
+	uint8_t op = OP_SET_COLOR_VEC4;
+	_cmdtype.push_back(op);
+	_cmd.insert(_cmd.end(), (char*)&rgba, (char*)&rgba + sizeof(rgba));
+}
 
 
 

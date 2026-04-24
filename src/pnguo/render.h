@@ -263,8 +263,6 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
 struct text_st {
 	glm::vec2 pos;
 	glm::vec2 size;
-	int st_bg;		// 背景样式
-	int st_text;	// 文本样式
 	const char* text;
 	int text_len;
 };
@@ -289,6 +287,69 @@ struct text_vx
 	glm::vec2 uv;
 	glm::vec4 color;
 };
+struct submit_color_d
+{
+	uint32_t fill, color; int linewidth;
+};
+struct paint_shadow_d
+{
+	glm::vec2 size;
+	glm::vec2 dst_size;
+	glm::vec4 shadow;
+	glm::vec4 color_to;
+	float r = 0;
+	bool rev = false;
+};
+struct grid_fill_r
+{
+	glm::vec2  size; glm::ivec2 cols; int width;
+};
+struct linear_fill_r
+{
+	glm::vec2 size; int count; glm::vec4 cols[8];
+};
+struct arrow_d
+{
+	glm::vec2 p0, p1; float arrow_hwidth, arrow_size; bool type;
+};
+struct rect_v4
+{
+	glm::vec4 rc;
+	glm::vec4 r;
+};
+struct triangle_r
+{
+	glm::vec2 pos;
+	glm::vec2 size;
+	glm::vec2 spos;
+};
+struct circle_r
+{
+	glm::vec2 pos;
+	float r;
+};
+struct ellipse_r
+{
+	glm::vec2 pos;
+	glm::vec2 radius;
+	float rotationAngle;
+};
+struct polyline_r
+{
+	glm::vec2 pos;
+	int points_count;
+	uint32_t col;
+	float thickness;
+	bool closed;
+};
+struct polyline_index_r
+{
+	glm::vec2 pos;
+	int points_count;
+	int idx_count;
+	uint32_t col;
+	float thickness;
+};
 struct dev_info_cx;
 class packer_base;
 /*
@@ -302,12 +363,13 @@ public:
 		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
 		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_LINE_VEC2, OP_ADD_RECT_DOUBLE,
 		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_ADD_POLYLINE_VEC2,
-		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_ADD_POLYLINES, OP_SET_TEXT_STYLE,
-		OP_ADD_TEXT, OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL,
-		OP_STROKE, OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
+		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_ADD_POLYLINES,
+		OP_TEXT_STYLE, OP_ADD_TEXT, OP_PAINT_SHADOW, OP_TRANSLATE,
+		OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
+		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
 	};
 	std::vector<uint8_t> _cmdtype;
-	std::vector<uint8_t> _data;
+	std::vector<uint8_t> _cmd;
 	packer_base* packer = 0;	// 矩形打包器
 public:
 	rvg_cx();
@@ -332,7 +394,7 @@ public:
 	void add_rect(const glm::vec4& rc, double r);
 	void add_rect(const glm::vec4& rc, const glm::vec4& r);
 	void add_circle(const glm::vec2& pos, float r);
-	void add_ellipse(const glm::vec2& pos, const glm::vec2& r);
+	void add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle);
 	// 三角形基于矩形内 
 	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
@@ -343,8 +405,8 @@ public:
 	// 渲染索引多段线，索引-1则跳过
 	void add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 	// 文本渲染
-	bool set_text_style(text_style* ts, size_t count);
-	void add_text(text_st* p, size_t count);
+	void set_text_style(text_style* ts);
+	void add_text(text_st* p, size_t count, text_style* ts);
 
 	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
 
@@ -354,6 +416,8 @@ public:
 	void restore();
 	void fill();
 	void stroke();
+	void fill_preserve();
+	void stroke_preserve();
 	void set_line_width(float w);
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
