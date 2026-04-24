@@ -1429,10 +1429,12 @@ void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r);
 #if 1
 
 rvg_cx::rvg_cx()
-{}
+{
+}
 
 rvg_cx::~rvg_cx()
-{}
+{
+}
 
 void rvg_cx::submit(fill_style_d* st)
 {
@@ -1561,9 +1563,9 @@ void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 }
 
-void rvg_cx::add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
+void rvg_cx::draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
 {
-	uint8_t op = OP_ADD_POLYLINE_VEC2;
+	uint8_t op = OP_POLYLINE_VEC2;
 	_cmdtype.push_back(op);
 	polyline_r t = { pos,points_count,col,thickness,closed };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
@@ -1583,10 +1585,10 @@ void rvg_cx::add_polyline(const glm::vec2* p, int count)
 	_cmdtype.push_back(op);
 	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(glm::vec2) * count);
 }
-void rvg_cx::add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
+void rvg_cx::draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
 {
 	if (!points || points_count <= 0 || !idx || idx_count <= 0)return;
-	uint8_t op = OP_ADD_POLYLINES;
+	uint8_t op = OP_POLYLINES;
 	_cmdtype.push_back(op);
 	polyline_index_r t = { pos,points_count,idx_count,col,thickness };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
@@ -1920,10 +1922,17 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 
 
 canvas2d_t::canvas2d_t()
-{}
+{
+	packer = new packer_base();
+}
 
 canvas2d_t::~canvas2d_t()
 {
+	if (packer)
+	{
+		delete packer;
+		packer = 0;
+	}
 	free_vkvgdev(vgdev); vgdev = nullptr;
 }
 

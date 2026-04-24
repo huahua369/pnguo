@@ -362,15 +362,14 @@ public:
 	enum Opcode : uint8_t {
 		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
 		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_LINE_VEC2, OP_ADD_RECT_DOUBLE,
-		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_ADD_POLYLINE_VEC2,
-		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_ADD_POLYLINES,
+		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
+		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
 		OP_TEXT_STYLE, OP_ADD_TEXT, OP_PAINT_SHADOW, OP_TRANSLATE,
 		OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
 	};
 	std::vector<uint8_t> _cmdtype;
 	std::vector<uint8_t> _cmd;
-	packer_base* packer = 0;	// 矩形打包器
 public:
 	rvg_cx();
 	~rvg_cx();
@@ -399,11 +398,11 @@ public:
 	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
 	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
-	void add_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
+	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
 	void add_polyline(const PathsD* p, bool closed);
 	void add_polyline(const glm::vec2* p, int count);
 	// 渲染索引多段线，索引-1则跳过
-	void add_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
+	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 	// 文本渲染
 	void set_text_style(text_style* ts);
 	void add_text(text_st* p, size_t count, text_style* ts);
@@ -439,6 +438,7 @@ public:
 	void* rptr = 0;
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
+	packer_base* packer = 0;	// 矩形打包器
 	uint32_t color = 0;
 public:
 	canvas2d_t();
