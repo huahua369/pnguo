@@ -391,11 +391,9 @@ public:
 	std::stack<glm::vec2> translate_pos;
 	glm::vec2 tpos = {};				// 当前偏移
 	float _thickness = 1.0;
-	glm::ivec4* _prc = 0;				// 当前批次渲染区域
-	VkvgContext ctx = 0;
+	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
 public:
-	rvg_cx();
-	rvg_cx(VkvgContext p);
+	rvg_cx(); 
 	~rvg_cx();
 
 	void submit(fill_style_d* st);
@@ -487,8 +485,8 @@ public:
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
-
-
+	// 批量渲染矢量图、位图、文本
+	void draw_rvg(rvg_cx* rvg);
 	// 释放渲染器的纹理
 	void free_tex();
 };

@@ -1920,7 +1920,7 @@ void rvg_cx::merge_vrc(const glm::ivec4& c)
 {
 	assert(_prc && (c.z > c.x && c.w > c.y));
 	if (!(c.z > c.x && c.w > c.y))return;
-	if(check_rect_cross(*_prc,c))
+	if (check_rect_cross(*_prc, c))
 	{
 		_prc->x = std::min(_prc->x, c.x);
 		_prc->y = std::min(_prc->y, c.y);
@@ -1934,10 +1934,6 @@ void rvg_cx::merge_vrc(const glm::ivec4& c)
 }
 
 #else
-rvg_cx::rvg_cx(VkvgContext p) :ctx(p)
-{
-	assert(ctx);
-}
 
 
 void rvg_cx::submit(fill_style_d* st)
@@ -2692,7 +2688,7 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 
 canvas2d_t::canvas2d_t()
 {
-	packer = new packer_base();
+	packer = new_packer(10, 10);
 }
 
 canvas2d_t::~canvas2d_t()
@@ -2947,6 +2943,64 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 		opt.clear();
 		idx.clear();
 	}
+}
+struct d2_rt {
+	glm::ivec2 pos;		// 纹理偏移
+	glm::ivec2 size;	// 区域大小
+	glm::ivec2 offset;	// 渲染偏移
+	int surface = 0;
+	int index = 0;
+};
+void cl_packed(std::vector<d2_rt>& dst, std::vector<d2_rt>& src, std::vector<d2_rt>* w, int sf) {
+	for (auto& it : src) {
+		if (!(it.pos.x < INT_MAX)) {
+			dst.push_back(it);
+		}
+		else {
+			if (w)
+			{
+				it.surface = sf;
+				(*w)[it.index] = it;
+			}
+		}
+	}
+}
+void canvas2d_t::draw_rvg(rvg_cx* rvg)
+{
+	//packer_base* packer = 0;	// 矩形打包器
+	assert(_view.z > 0 && _view.w > 0);
+	glm::ivec2 max_rect = {};			// 最大的区域
+	std::vector<d2_rt> dcv;
+	std::vector<d2_rt> tm, tm1;
+	//auto ck = new_surface(_view.z, _view.w);
+	packer->init_target(_view.z, _view.w, 0);
+	int sf = 0;
+	size_t i = 0;
+	for (auto& it : rvg->_vg_rect) {
+		if (it.z < 1 || it.w < 1)continue;
+		d2_rt d = {};
+		d.size = { it.z - std::max(0,it.x),it.w - std::max(0,it.y) };
+		d.size.x = std::min(_view.z, d.size.x);
+		d.size.y = std::min(_view.w, d.size.y);
+		d.offset = glm::ivec2(it.x, it.y);
+		max_rect.x = std::max(max_rect.x, d.size.x);
+		max_rect.y = std::max(max_rect.y, d.size.y);
+		d.index = i;
+		i++;
+		dcv.push_back(d);
+	}
+	auto ab = packer->push_rect((glm::ivec4*)dcv.data(), dcv.size(), sizeof(d2_rt));
+	cl_packed(tm, dcv, 0, sf);
+	do {
+		if (ab < 1)break;
+		packer->clear();
+		sf++;
+		ab = packer->push_rect((glm::ivec4*)tm.data(), tm.size(), sizeof(d2_rt));
+		cl_packed(tm1, tm, &dcv, sf);
+		tm.swap(tm1);
+		tm1.clear();
+	} while (ab);
+	return;
 }
 
 

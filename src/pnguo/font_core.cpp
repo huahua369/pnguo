@@ -4876,9 +4876,9 @@ packer_base::packer_base()
 packer_base::~packer_base()
 {}
 
-void packer_base::init_target(int width, int height) {}
+void packer_base::init_target(int width, int height, int heuristic) {}
 void packer_base::clear() {}
-bool packer_base::push_rect(glm::ivec4* rc, int n) { return false; }
+size_t packer_base::push_rect(glm::ivec4* rc, int n, size_t stride) { return 0; }
 bool packer_base::push_rect(const glm::ivec2& rc, glm::ivec2* pos) { return false; }
 
 
@@ -4929,7 +4929,7 @@ public:
 	}
 	// BL = 0 “从下向左塞”（快速降低高度）
 	// BF = 1 “精打细算”（最小化空间浪费）
-	void init_target(int width, int height, int heuristic = 0) {
+	void init_target(int width, int height, int heuristic) {
 		assert(!(width < 10 || height < 10));
 		if (width < 10 || height < 10)return;
 #ifdef STL_VU
@@ -4972,22 +4972,28 @@ public:
 		stbrp_setup_allow_out_of_mem(&_ctx, 0);
 	}
 	void clear() {
-		init_target(_ctx.width, _ctx.height);
+		init_target(_ctx.width, _ctx.height, 0);
 	}
-	bool push_rect(glm::ivec4* rc, int n)
+	size_t push_rect(glm::ivec4* rc, int n, size_t stride)
 	{
 		if (!rc || n < 1)return false;
 		std::vector<stbrp_rect> rct(n);
 		auto r = rc;
+		auto t = (char*)rc;
+		if (stride < sizeof(glm::ivec4))
+			stride = sizeof(glm::ivec4);
 		for (auto& it : rct)
 		{
-			it.w = r->z; it.h = r->w; r++;
+			r = (glm::ivec4*)t;
+			it.w = r->z; it.h = r->w;
+			t += stride;
 		}
 		int ret = stbrp_pack_rects(&_ctx, rct.data(), n);
-		r = rc;
 		for (auto& it : rct)
 		{
-			r->x = it.x; r->y = it.y; r++;
+			r = (glm::ivec4*)t;
+			r->x = it.x; r->y = it.y;
+			t += stride;
 		}
 		auto img = get();
 		img->valid = 1;
@@ -5035,7 +5041,7 @@ public:
 	~image_packer() {}
 	// BL = 0 “从下向左塞”（快速降低高度）
 	// BF = 1 “精打细算”（最小化空间浪费）
-	void init_target(int width, int height, int heuristic = 0) {
+	void init_target(int width, int height, int heuristic) {
 		assert(!(width < 10 || height < 10));
 		if (width < 10 || height < 10)return;
 		this->width = width;
@@ -5047,24 +5053,36 @@ public:
 		stbrp_setup_allow_out_of_mem(&_ctx, 0);
 	}
 	void clear() {
-		init_target(_ctx.width, _ctx.height);
+		init_target(_ctx.width, _ctx.height, 0);
 	}
-	bool push_rect(glm::ivec4* rc, int n)
+	size_t push_rect(glm::ivec4* rc, int n, size_t stride)
 	{
 		if (!rc || n < 1)return false;
 		std::vector<stbrp_rect> rct(n);
 		auto r = rc;
+		auto t = (char*)rc;
+		if (stride < sizeof(glm::ivec4))
+			stride = sizeof(glm::ivec4);
 		for (auto& it : rct)
 		{
-			it.w = r->z; it.h = r->w; r++;
+			r = (glm::ivec4*)t;
+			it.w = r->z; it.h = r->w;
+			t += stride;
 		}
+		t = (char*)rc;
 		int ret = stbrp_pack_rects(&_ctx, rct.data(), n);
-		r = rc;
+		size_t cx = 0;
 		for (auto& it : rct)
 		{
-			r->x = it.x; r->y = it.y; r++;
+			r = (glm::ivec4*)t;
+			r->x = it.x; r->y = it.y;
+			if (!it.was_packed)
+			{
+				cx++;
+			}
+			t += stride;
 		}
-		return ret;
+		return cx;
 	}
 	bool push_rect(const glm::ivec2& rc, glm::ivec2* pos)
 	{
@@ -5101,7 +5119,7 @@ void test_rect()
 {
 	glm::ivec2 r = { 730,1000 };
 	stb_packer pack;
-	pack.init_target(r.x, r.y);
+	pack.init_target(r.x, r.y, 0);
 	//hz::Image tespack;
 	//tespack.resize(r.x, r.y);
 	std::vector<uint32_t> colors = {
@@ -5159,7 +5177,7 @@ packer_base* new_packer(int width, int height)
 	auto p = new image_packer();
 	if (p)
 	{
-		p->init_target(width, height);
+		p->init_target(width, height, 0);
 	}
 	return p;
 }
@@ -5226,7 +5244,7 @@ stb_packer* bitmap_cache_cx::get_last_packer(bool isnew)
 		auto p = new stb_packer();
 		if (!p)return 0;
 		_packer.push_back(p);
-		p->init_target(width, height);
+		p->init_target(width, height, 0);
 		_data.push_back(p->get());
 	}
 	return *_packer.rbegin();

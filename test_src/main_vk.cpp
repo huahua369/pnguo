@@ -1010,7 +1010,7 @@ int main()
 					auto ctx = (VkvgContext)td3->ctx_begin(ck);
 					vkvg_clear(ctx);
 					rvg_cx rvg;
-					rvg.ctx = ctx;
+					//rvg.ctx = ctx;
 					rvg.add_rect({ 0,0,dvv->get_size() }, 0);
 					rvg.set_color(0xaf111111);
 					rvg.fill();
@@ -1019,6 +1019,7 @@ int main()
 					vkvg_flush(ctx);
 					vkvg_surface_resolve(t);
 					td3->ctx_end(ctx);
+					td3->draw_rvg(&rvg);
 					form0->io->WantCaptureMouse = dvv->hittest(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					{
