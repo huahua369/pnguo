@@ -354,7 +354,7 @@ struct dev_info_cx;
 class packer_base;
 /*
 add 后需要submit style
-输入矢量信息，收集区域，生成渲染命令
+输入矢量信息，生成渲染命令
 */
 class rvg_cx
 {
