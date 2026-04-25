@@ -972,6 +972,7 @@ int main()
 				div->on_event(type, e);
 				});
 			std::atomic_int wait2d = 0;
+
 			//			std::thread jt([=, &wait2d]() {
 			//
 			//#if 1

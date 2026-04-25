@@ -312,7 +312,7 @@ struct grid_fill_r
 };
 struct linear_fill_r
 {
-	glm::vec2 size; int count; glm::vec4 cols[8];
+	glm::vec2 size; int count; glm::vec4 cols[0];
 };
 struct arrow_d
 {
@@ -365,6 +365,11 @@ struct image_r
 	glm::ivec2 pos;
 	uint32_t color;
 };
+struct polyline_pd
+{
+	size_t count;
+	bool closed;
+};
 
 struct dev_info_cx;
 class packer_base;
@@ -376,6 +381,7 @@ class rvg_cx
 {
 public:
 	enum Opcode : uint8_t {
+		OP_NULL,
 		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
 		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
 		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
@@ -388,12 +394,12 @@ public:
 	std::vector<uint8_t> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
 	std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
-	std::vector<glm::ivec2> _vg_bs;		// 统计矢量图批次渲染的索引
+	std::vector<glm::ivec3> _vg_bs;		// 统计矢量图批次渲染的索引
 	std::stack<glm::vec2> translate_pos;
 	glm::vec2 tpos = {};				// 当前偏移
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
-	size_t cidx = 0;
+
 public:
 	rvg_cx();
 	~rvg_cx();
@@ -425,7 +431,7 @@ public:
 	// 折线
 	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
 	void add_polyline(const PathsD* p, bool closed);
-	void add_polyline(const glm::vec2* p, int count);
+	void add_polyline(const glm::vec2* p, size_t count);
 	// 渲染索引多段线，索引-1则跳过
 	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 	// 文本渲染
@@ -448,6 +454,9 @@ public:
 	void set_color(const glm::vec4& rgba);
 	void push_vrc();
 	void merge_vrc(const glm::ivec4& c);
+	void push_ct(uint8_t op);
+	void nk_bs();
+	bool is_image();
 private:
 
 };
@@ -458,6 +467,11 @@ struct d2_rt {
 	int surface = 0;
 	int index = 0;
 };
+struct surface_ctx {
+	void* surface;
+	void* ctx;
+};
+
 class rvg_data_cx
 {
 public:
@@ -465,7 +479,7 @@ public:
 	glm::ivec2 max_rect = {};			// 最大的区域
 	std::vector<d2_rt> dcv;
 	std::vector<d2_rt> tm, tm1;
-	std::vector<void*> surfaces;
+	std::vector<surface_ctx> surfaces;
 	glm::ivec4 _view = {};
 public:
 	rvg_data_cx();
