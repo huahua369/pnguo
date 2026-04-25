@@ -7209,6 +7209,7 @@ void gradient_btn::draw(rvg_cx* rv)
 		rounding = nr;
 	}
 	glm::vec2 tps = { 0.5,0.5 };
+	
 	rv->save();
 	rv->translate({ x, y });
 	if (is_alpha(bc))
@@ -7247,6 +7248,8 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->save();
 	if (effect == uTheme::dark || p->mPushed)
 		rv->translate({ thickness, thickness });
+	//else
+	//	rv->translate({ 0, 0 });
 	rv->paint_shadow(0, rct.y, rct.x, rct.y, gtop, gbot, 0, rounding);// 垂直方向
 	rv->restore();
 	// 渲染标签
@@ -7300,6 +7303,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->set_color(borderDark);
 	rv->add_rect({ tps.x,tps.y, w , h }, rounding);
 	rv->stroke();
+	rv->restore();
 
 	text_style st = {};
 	st.fontsize = p->font_size;
@@ -7311,8 +7315,8 @@ void gradient_btn::draw(rvg_cx* rv)
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, 1, &st);
 
-	rv->restore();
 
+	
 #endif
 }
 
@@ -7386,6 +7390,7 @@ void radio_tl::draw(rvg_cx* rv)
 	auto p = this;
 	if (rv && p) {
 #if 1
+		
 		rv->save();
 		glm::ivec2 poss = p->_pos;
 		poss.y += _size.y * 0.5 - style.radius;
@@ -7400,6 +7405,7 @@ void radio_tl::draw(rvg_cx* rv)
 			x++;
 		}
 		rv->restore();
+		
 #endif
 	}
 }
@@ -7414,6 +7420,7 @@ void color_btn::draw(rvg_cx* rv)
 		id = id;
 	}
 #if 1
+	
 	rv->save();
 	rv->translate(p->_pos);
 	if (p->dfill)
@@ -7470,7 +7477,7 @@ void color_btn::draw(rvg_cx* rv)
 		}
 		rv->submit(0, p->dcol, p->thickness);
 	}
-
+	rv->restore();
 	//if ((bst & (int)BTN_STATE::STATE_HOVER))
 	//{
 	//	rv->add_rect( { 0,0,size.x,size.y }, p->rounding);
@@ -7485,7 +7492,7 @@ void color_btn::draw(rvg_cx* rv)
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, 1, &st);
-	rv->restore();
+	
 #endif
 }
 
@@ -7494,6 +7501,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 	auto p = this;
 	if (rv && p) {
 #if 1
+		
 		rv->save();
 		glm::ivec2 poss = p->_pos;
 		poss.y += (_size.y - style.square_sz) * 0.5;
@@ -7506,12 +7514,14 @@ void checkbox_tl::draw(rvg_cx* rv)
 			x++;
 		}
 		rv->restore();
+		
 #endif
 	}
 }
 void switch_tl::draw(rvg_cx* rv)
 {
 #if 1
+	
 	rv->save();
 	glm::ivec2 poss = _pos;
 	auto h = height;
@@ -7537,6 +7547,7 @@ void switch_tl::draw(rvg_cx* rv)
 		rv->submit(color.z, 0, 0);
 	}
 	rv->stroke();
+	
 #endif
 }
 void progress_tl::draw(rvg_cx* rv)
@@ -7546,6 +7557,7 @@ void progress_tl::draw(rvg_cx* rv)
 	glm::ivec2 ss = _size;
 	ss.x = width;
 #if 1
+	
 	rv->save();
 	rv->translate(poss);
 	rv->add_rect({ 0.5,0.5, ss.x, ss.y }, rounding);
@@ -7594,12 +7606,14 @@ void progress_tl::draw(rvg_cx* rv)
 
 	//}
 	rv->restore();
+	
 #endif
 }
 
 void slider_tl::draw(rvg_cx* rv)
 {
 #if 1
+	
 	rv->save();
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
@@ -7654,6 +7668,7 @@ void slider_tl::draw(rvg_cx* rv)
 		}
 	}
 	rv->restore();
+	
 #endif
 }
 
@@ -7661,6 +7676,7 @@ void slider_tl::draw(rvg_cx* rv)
 void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
+	
 	rv->save();
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
@@ -7731,6 +7747,7 @@ void colorpick_tl::draw(rvg_cx* rv)
 		rv->submit(-1, bc_color, thickness);
 	}
 	rv->restore();
+	
 #endif
 }
 void scroll_bar::draw(rvg_cx* rv)
@@ -7738,6 +7755,7 @@ void scroll_bar::draw(rvg_cx* rv)
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
 
+	
 	{
 		// 背景
 		if (!hideble || thumb_size_m.z) {
@@ -7759,6 +7777,7 @@ void scroll_bar::draw(rvg_cx* rv)
 			rv->submit(_tcc, 0, 0);
 		}
 	}
+	
 }
 
 
@@ -8688,10 +8707,12 @@ void div_cx::draw(rvg_cx* rv)
 		if (it->visible)
 		{
 			rv->save();
+			rv->push_null(0);
 			auto scp = sps * it->hscroll;
 			if (scp.x != 0 || scp.y != 0)
 				rv->translate(scp);// 滚动条影响
 			it->draw(rv);
+			rv->push_null(-1);
 			rv->restore();
 		}
 	}

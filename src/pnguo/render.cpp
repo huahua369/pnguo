@@ -1930,8 +1930,10 @@ void rvg_cx::restore()
 {
 	push_ct(OP_RESTORE);
 	if (translate_pos.size())
+	{
 		tpos = translate_pos.top();
-	translate_pos.pop();
+		translate_pos.pop();
+	}
 }
 
 void rvg_cx::fill()
@@ -1994,6 +1996,13 @@ bool rvg_cx::is_image()
 	auto t = _cmdtype.back();
 	return t == OP_ADD_IMAGE || t == OP_ADD_TEXT;
 }
+void rvg_cx::push_null(int v)
+{
+	push_ct(v);
+}
+
+
+
 // 区域是否相交
 bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
 {
@@ -2914,6 +2923,7 @@ void canvas2d_t::update(void* surface, float delta)
 		VkFormat fmt = vkvg_surface_get_vk_format(surf);
 		uint32_t w = vkvg_surface_get_width(surf);
 		uint32_t h = vkvg_surface_get_height(surf);
+
 		auto t = rcb->new_texture_vk(renderer, w, h, img, fmt == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);
 		if (t && t != tp)
 		{
@@ -2934,6 +2944,31 @@ void canvas2d_t::draw_surface(void* surface, const glm::vec2& pos, const glm::iv
 		dt.dst_rect = glm::vec4(pos, size);
 		dt.src_rect = rc;
 		rcb->render_texture(renderer, tp, &dt, 1);
+	}
+}
+
+void canvas2d_t::draw_rvg(rvg_data_cx* dst)
+{
+	void* renderer = rptr;
+	if (!rcb || !renderer)return;
+	if (!dst || dst->dcv.empty())return;
+	for (auto& it : dst->dcv) {
+		auto surface = dst->surfaces[it.surface].surface;
+		auto& tp = _vgt[surface];
+		if (tp)
+		{
+			texture_dt dt = {};
+			auto ost = it.offset;
+			ost += dst->pos;
+			ost -= stwidth;
+			auto ss = it.size;
+			ss -= stwidth;
+			dt.dst_rect = glm::vec4(ost, ss);
+			auto pos = it.pos;
+			pos += stwidth;
+			dt.src_rect = glm::vec4(it.pos, ss);
+			rcb->render_texture(renderer, tp, &dt, 1);
+		}
 	}
 }
 
@@ -3122,6 +3157,9 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		if (it.z < 1 || it.w < 1)continue;
 		d2_rt d = {};
 		d.size = { it.z - std::max(0,it.x),it.w - std::max(0,it.y) };
+		d.size += stwidth * 2;
+		d.size.x = align_up(d.size.x, 4);
+		d.size.y = align_up(d.size.y, 4);
 		d.size.x = std::min(_view.z, d.size.x);
 		d.size.y = std::min(_view.w, d.size.y);
 		d.offset = glm::ivec2(it.x, it.y);
@@ -3131,30 +3169,49 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		i++;
 		dcv.push_back(d);
 	}
-	auto ab = packer->push_rect((glm::ivec4*)dcv.data(), dcv.size(), sizeof(d2_rt));
-	cl_packed(tm, dcv, 0, sf);
-	do {
-		if (ab < 1)break;
-		packer->clear();
-		sf++;
-		ab = packer->push_rect((glm::ivec4*)tm.data(), tm.size(), sizeof(d2_rt));
-		cl_packed(tm1, tm, &dcv, sf);
-		tm.swap(tm1);
-		tm1.clear();
-	} while (ab);
+	auto dcp = dcv.data();
+	size_t dcc = dcv.size();
+	do
+	{
+		auto ab = packer->push_rect((glm::ivec4*)dcp, 1, sizeof(d2_rt));
+		if (ab)
+		{
+			packer->clear();
+			sf++;
+		}
+		else {
+			dcp->surface = sf;
+			dcp++;
+			dcc--;
+		}
+	} while (dcc > 0);
+	//cl_packed(tm, dcv, 0, sf);
+	//do {
+	//	if (ab < 1)break;
+	//	ab = packer->push_rect((glm::ivec4*)tm.data(), tm.size(), sizeof(d2_rt));
+	//	cl_packed(tm1, tm, &dcv, sf);
+	//	tm.swap(tm1);
+	//	tm1.clear();
+	//} while (ab);
 	surfaces.resize(sf + 1);
 }
-void canvas2d_t::draw_rvg(rvg_cx* rvg, rvg_data_cx* dst)
+void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 {
 	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
 	dst->_view = _view;
+	dst->pos = rvg->pos;
 	rvg->push_vrc();
 	dst->update(rvg);
+	bool first = false;
 	for (auto& it : dst->surfaces)
 	{
 		if (!it.surface)
+		{
 			it.surface = new_surface(_view.z, _view.w);
+			first = true;
+		}
 		it.ctx = ctx_begin(it.surface);
+		vkvg_clear((VkvgContext)it.ctx);
 	}
 	auto d = rvg->_cmd.data();
 	size_t cx = 0;
@@ -3162,19 +3219,49 @@ void canvas2d_t::draw_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	for (auto& it : rvg->_vg_bs) {
 
 		auto ctx = (VkvgContext)(it.z > 0 ? nullptr : dst->surfaces[cx].ctx);
-		auto rcc = rvg->_vg_rect[ridx];
-		if (ctx) { ridx++; }
+		glm::vec2 clips = {};
+		glm::vec2 apos = {};
+		d2_rt* d2 = 0;
+		if (ctx) {
+			auto& rcc = dst->dcv[ridx];
+			if (ridx + 1 < dst->dcv.size())
+				ridx++;
+			clips = rcc.size;
+			apos = rcc.pos - rcc.offset;
+			apos += stwidth;
+			d2 = &rcc;
+			//vkvg_save(ctx);
+			//vkvg_translate(ctx, rcc.pos.x, rcc.pos.y);
+			//vkvg_rectangle(ctx, 0, 0, clips.x, clips.y);
+			//vkvg_clip(ctx);
+		}
+		static std::set<uint32_t> aa = { rvg_cx::OP_SUBMIT_STYLE,  rvg_cx::OP_SUBMIT_COLOR,rvg_cx::OP_FILL, rvg_cx::OP_STROKE,rvg_cx::OP_FILL_PRESERVE,rvg_cx::OP_STROKE_PRESERVE };
 		for (size_t i = it.x; i < it.y; i++)
 		{
 			auto ct = rvg->_cmdtype[i];
+			if (ct == 0)
+				vkvg_translate(ctx, apos.x, apos.y);
+			//if (ct == 0xff)
+			//	vkvg_translate(ctx, -apos.x, -apos.y);
 			size_t n = cmd_func(ct, d, ctx);
 			d += n;
+		}
+		if (ctx)
+		{
+			//vkvg_translate(ctx, -apos.x, -apos.y);
+			//vkvg_restore(ctx);
 		}
 	}
 	for (auto& it : dst->surfaces)
 	{
+		vkvg_surface_resolve((VkvgSurface)it.surface);
+		if (first)
+		{
+			vkvg_surface_write_to_png((VkvgSurface)it.surface, "temp/vgtest1630.png");
+		}
 		if (it.ctx)
 			ctx_end(it.ctx);
+		update((VkvgSurface)it.surface, 0);
 	}
 	return;
 }

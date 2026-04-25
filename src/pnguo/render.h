@@ -399,7 +399,7 @@ public:
 	glm::vec2 tpos = {};				// 当前偏移
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
-
+	glm::ivec2 pos = {};
 public:
 	rvg_cx();
 	~rvg_cx();
@@ -457,6 +457,7 @@ public:
 	void push_ct(uint8_t op);
 	void nk_bs();
 	bool is_image();
+	void push_null(int v);
 private:
 
 };
@@ -481,6 +482,8 @@ public:
 	std::vector<d2_rt> tm, tm1;
 	std::vector<surface_ctx> surfaces;
 	glm::ivec4 _view = {};
+	glm::ivec2 pos = {};
+	float stwidth = 2.0;
 public:
 	rvg_data_cx();
 	~rvg_data_cx();
@@ -505,6 +508,7 @@ public:
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
 	uint32_t color = 0;
+	float stwidth = 2.0;
 public:
 	canvas2d_t();
 	~canvas2d_t();
@@ -520,12 +524,12 @@ public:
 
 	void update(void* surface, float delta);
 	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
-
+	void draw_rvg(rvg_data_cx* dst);
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	// 批量渲染矢量图、位图、文本
-	void draw_rvg(rvg_cx* rvg, rvg_data_cx* dst);
+	void update_rvg(rvg_cx* rvg, rvg_data_cx* dst);
 	// 释放渲染器的纹理
 	void free_tex();
 };

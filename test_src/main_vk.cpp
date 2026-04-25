@@ -996,7 +996,7 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
-					td3->draw_surface(ck, dvv->get_pos(), { 0,0,sc_size.x,sc_size.y }, sc_size);
+					td3->draw_rvg(rvgd);
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -1012,16 +1012,22 @@ int main()
 					auto ctx = (VkvgContext)td3->ctx_begin(ck);
 					vkvg_clear(ctx);
 					rvg_cx rvg;
+					rvg.pos = dvv->get_pos();
 					//rvg.ctx = ctx;
+					rvg.save();
+					rvg.push_null(0);
 					rvg.add_rect({ 0,0,dvv->get_size() }, 0);
 					rvg.set_color(0xaf111111);
 					rvg.fill();
+					rvg.restore();
 					dvv->draw(&rvg);
 					VkvgSurface t = vkvg_get_target(ctx);
 					vkvg_flush(ctx);
 					vkvg_surface_resolve(t);
 					td3->ctx_end(ctx);
-					td3->draw_rvg(&rvg, rvgd);
+					td3->update_rvg(&rvg, rvgd);
+				 
+
 					form0->io->WantCaptureMouse = dvv->hittest(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					{
