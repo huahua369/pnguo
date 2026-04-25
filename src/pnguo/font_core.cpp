@@ -8267,7 +8267,23 @@ size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, cons
 	p->data_index.push_back({ -1, tidx });
 	return tidx;
 }
-
+size_t rt_add_image_vg(rich_text_t* p, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
+{
+	if (!p || !img_vg)return -1;
+	image_block ib = {};
+	ib.color = premultiply_rgba(color);			// 颜色混合
+	ib.img = (image_ptr_t*)img_vg;			// 图片对象
+	ib.pos = pos;					// 用户设置坐标
+	ib.rc = rc;					// 图片区域
+	ib.dsize = dsize;	// 渲染大小
+	ib.sliced = sliced;			// 九宫格图片
+	ib.abspos = abspos;				// 是否固定坐标则不参与布局
+	ib.is_surface = true;
+	auto tidx = p->ibs.size();
+	p->ibs.push_back(ib);
+	p->data_index.push_back({ -1, tidx });
+	return tidx;
+}
 text_block* rt_get_text(rich_text_t* p, size_t idx)
 {
 	if (!p || idx >= p->tbs.size())
@@ -8500,7 +8516,13 @@ void rt_layout1(rich_text_t* r, layout_block_st* p) {
 				b_data.push_back(c4);
 				c4.z = c4.w = -1;
 			}
-			ov.insert(img->img);
+			if(img->is_surface)
+			{
+				p->gv.insert(img->img);
+			}else
+			{
+				ov.insert(img->img);
+			}
 			if (img->abspos)
 			{
 

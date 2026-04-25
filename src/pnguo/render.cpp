@@ -3019,6 +3019,24 @@ void canvas2d_t::update(rich_text_t* p, float delta)
 			}
 		}
 	}
+	for (auto t : p->layout.gv) {
+		auto surface = (VkvgSurface)t;
+		if (!surface || !rcb || !renderer)return;
+		auto& tp = _vgt[surface];
+		if (!tp)
+		{
+			VkImage img = vkvg_surface_get_vk_image(surface);
+			VkFormat fmt = vkvg_surface_get_vk_format(surface);
+			uint32_t w = vkvg_surface_get_width(surface);
+			uint32_t h = vkvg_surface_get_height(surface);
+			auto t = rcb->new_texture_vk(renderer, w, h, img, fmt == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);
+			if (t && t != tp)
+			{
+				rcb->set_texture_blend(t, 0, true);
+				tp = t;
+			}
+		}
+	}
 }
 
 void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
@@ -3042,7 +3060,17 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 		{
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
-			auto& tp = _vt[it.img];
+			auto ipt = _vt.find(it.img);
+			void* tp = 0;
+			if (ipt != _vt.end())
+			{
+				tp = ipt->second;
+			}
+			else {
+				auto kpt = _vgt.find(it.img);
+				if (kpt != _vgt.end())
+					tp = kpt->second;
+			}
 			if (tex != tp || devrtex)
 			{
 				if (tex && opt.size()) {

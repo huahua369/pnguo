@@ -645,6 +645,7 @@ struct image_block
 	glm::vec2 dsize = { -1,-1 };	// 渲染大小
 	glm::vec4 sliced = {};			// 九宫格图片
 	bool abspos = true;				// 是否固定坐标则不参与布局
+	bool is_surface = false;		// 是否为vkvg gpu纹理
 };
 
 // 整形结果
@@ -706,6 +707,7 @@ union fitem_t {
 struct layout_block_st {
 	std::vector<fitem_t> _vstr;				// *渲染数据
 	std::set<image_ptr_t*> ov;				// *用到的字体纹理对象
+	std::set<void*> gv;				// *用到的vkvg纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
 	std::vector<glm::ivec2> baselines;		// 每行的基线，行高
 	size_t line_count = 0;
@@ -737,6 +739,8 @@ size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text
 size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_family_t* family, int fontsize, uint32_t color);
 // 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+// 添加vkvg纹理表面
+size_t rt_add_image_vg(rich_text_t* p, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 text_block* rt_get_text(rich_text_t* p, size_t idx);	// 直接修改文本保证build前保留文本内存可用
 // 设置新的文本，复制到缓冲区
 bool rt_set_text(rich_text_t* p, size_t idx, const void* str, int size, int first);
