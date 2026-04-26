@@ -666,7 +666,7 @@ struct text_render_o
 {
 	text_box_t box = {};			// *文本区域信息
 	text_block* tb = 0;				// 文本块信息
-	std::vector<font_item_t> _vstr;	// *渲染数据
+	std::vector<font_item_t> dst_vstr;	// *渲染数据
 	std::vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
 	std::vector<bidi_item> bv;		// 存放bidi后的数据
 	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
@@ -694,6 +694,7 @@ struct text_temp_t {
 	std::vector<bidi_item> bv;		// 存放bidi后的数据
 	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
 	std::string str;
+	size_t first = 0, count = 0;	// dst_vstr索引、数量
 };
 
 struct image_t1 {
@@ -705,9 +706,9 @@ union fitem_t {
 	image_t1 i;
 };
 struct layout_block_st {
-	std::vector<fitem_t> _vstr;				// *渲染数据
+	std::vector<fitem_t> dst_vstr;			// *渲染数据
 	std::set<image_ptr_t*> ov;				// *用到的字体纹理对象
-	std::set<void*> gv;				// *用到的vkvg纹理对象
+	std::set<void*> gv;						// *用到的vkvg纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
 	std::vector<glm::ivec2> baselines;		// 每行的基线，行高
 	size_t line_count = 0;

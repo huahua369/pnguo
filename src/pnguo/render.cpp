@@ -3052,7 +3052,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	glm::ivec2 pos0 = pos;
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
-	auto& tm = p->layout._vstr;
+	auto& tm = p->layout.dst_vstr;
 	auto tbp = p->tbs.data();
 	clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
 	for (auto& vt : tm) {
@@ -3314,7 +3314,7 @@ void canvas2d_t::free_tex()
 
 void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta)
 {
-	std::vector<font_item_t>& tm = p->_vstr;
+	std::vector<font_item_t>& tm = p->dst_vstr;
 	for (auto& it : p->ov)
 	{
 		if (it) {
@@ -3334,7 +3334,7 @@ void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta)
 void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt)
 {
 	void* renderer = pt->rptr;
-	std::vector<font_item_t>& tm = p->_vstr;
+	std::vector<font_item_t>& tm = p->dst_vstr;
 	uint32_t color = p->tb->style.color;
 	if (color != pt->color || p->update) {
 		pt->color = color;
