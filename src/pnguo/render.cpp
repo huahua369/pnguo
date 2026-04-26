@@ -3154,8 +3154,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	int sf = 0;
 	size_t i = 0;
 	dcv.clear();
-	tm.clear();
-	tm1.clear();
+
 	for (auto& it : rvg->_vg_rect) {
 		if (it.z < 1 || it.w < 1)continue;
 		d2_rt d = {};

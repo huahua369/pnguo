@@ -485,8 +485,7 @@ class rvg_data_cx
 public:
 	packer_base* packer = 0;			// 矩形打包器
 	glm::ivec2 max_rect = {};			// 最大的区域
-	std::vector<d2_rt> dcv;				// 矢量缓存信息
-	std::vector<d2_rt> tm, tm1;
+	std::vector<d2_rt> dcv;				// 矢量缓存信息 
 	std::vector<surface_ctx> surfaces;
 	std::vector<vitext_t> dst_data;		// 渲染数据列表
 	glm::ivec4 _view = {};
@@ -516,7 +515,7 @@ public:
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
 	uint32_t color = 0;
-	float stwidth = 2.0; 
+	float stwidth = 2.0;
 	bool tex_batch = true;
 public:
 	canvas2d_t();
