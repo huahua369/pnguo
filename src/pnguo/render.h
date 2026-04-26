@@ -472,15 +472,23 @@ struct surface_ctx {
 	void* surface;
 	void* ctx;
 };
-
+union fitem_t;
+struct vitext_t
+{
+	fitem_t* t = 0;		// 位图或文本
+	d2_rt* d2 = 0;		// 矢量图
+	size_t first = 0;	// 第一个位置
+	size_t count = 0;	// 渲染数量
+};
 class rvg_data_cx
 {
 public:
-	packer_base* packer = 0;	// 矩形打包器
+	packer_base* packer = 0;			// 矩形打包器
 	glm::ivec2 max_rect = {};			// 最大的区域
-	std::vector<d2_rt> dcv;
+	std::vector<d2_rt> dcv;				// 矢量缓存信息
 	std::vector<d2_rt> tm, tm1;
 	std::vector<surface_ctx> surfaces;
+	std::vector<vitext_t> dst_data;		// 渲染数据列表
 	glm::ivec4 _view = {};
 	glm::ivec2 pos = {};
 	float stwidth = 2.0;

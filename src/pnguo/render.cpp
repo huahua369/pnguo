@@ -2974,31 +2974,6 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 
 
 
-/*
-		int texwidth = 1024;
-		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
-		auto ctx = vkvg_create(surf);
-	{
-				//vkvg_clear(ctx);
-				//vkvg_flush(ctx);
-				//vkvg_surface_resolve(surf);//msaa采样转换输出
-				//vkvg_surface_write_to_png(surf, filename);
-				//vkvg_destroy(ctx);
-
-				VkImage image = vkvg_surface_get_vk_image(surf);
-				VkFormat format = vkvg_surface_get_vk_format(surf);
-				//vctx->free_surface(surf);
-				if (image)
-				{
-					vg2dtex = pcb->new_texture_vk(form0->renderer, texwidth, texwidth, image, format == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);// 创建SDL的rgba纹理
-					pcb->set_texture_blend(vg2dtex, (int)BLENDMODE_E::normal, true);
-				}
-			}
-		vkvg_flush(ctx);
-		vkvg_destroy(ctx);
-		vctx->free_surface(surf);
-		free_vkvgdev(vctx);
-*/
 void canvas2d_t::update(rich_text_t* p, float delta)
 {
 	void* renderer = rptr;
@@ -3931,3 +3906,29 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	}
 #endif
 }
+
+/*
+		int texwidth = 1024;
+		VkvgSurface surf = vctx ? vctx->new_surface(texwidth, texwidth) : 0;
+		auto ctx = vkvg_create(surf);
+	{
+				//vkvg_clear(ctx);
+				//vkvg_flush(ctx);
+				//vkvg_surface_resolve(surf);//msaa采样转换输出
+				//vkvg_surface_write_to_png(surf, filename);
+				//vkvg_destroy(ctx);
+
+				VkImage image = vkvg_surface_get_vk_image(surf);
+				VkFormat format = vkvg_surface_get_vk_format(surf);
+				//vctx->free_surface(surf);
+				if (image)
+				{
+					vg2dtex = pcb->new_texture_vk(form0->renderer, texwidth, texwidth, image, format == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);// 创建SDL的rgba纹理
+					pcb->set_texture_blend(vg2dtex, (int)BLENDMODE_E::normal, true);
+				}
+			}
+		vkvg_flush(ctx);
+		vkvg_destroy(ctx);
+		vctx->free_surface(surf);
+		free_vkvgdev(vctx);
+*/
