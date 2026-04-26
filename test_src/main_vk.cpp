@@ -1023,8 +1023,8 @@ int main()
 					//rvg.ctx = ctx;
 					rvg.save();
 					rvg.push_null(0);
-					rvg.add_rect({ 0,0,dvv->get_size() }, 0);
-					rvg.set_color(0xaf111111);
+					rvg.add_rect({ 0,0,dvv->get_size() }, 5);
+					rvg.set_color(0xaf555555);
 					rvg.fill();
 					rvg.restore();
 					dvv->draw(&rvg);

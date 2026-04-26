@@ -723,7 +723,6 @@ struct rich_text_t {
 	std::vector<glm::ivec2> data_index;	// *文本块和图片块在渲染数据中的索引位置，x为文本块索引，y为图片块索引，-1则不使用
 	layout_block_st layout = {};	// *布局结果数据
 	text_style	_ct_style = {};		// 当前文本样式，添加文本时如果文本块没有设置样式则使用当前样式
-	bool tex_batch = false;
 };
 
 // 设置文本区域参数，flex参数可选需要保持指针可用

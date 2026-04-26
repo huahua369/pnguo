@@ -3046,7 +3046,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	uint32_t color = -1;
 	const int vsize = sizeof(text_vx);
 	void* tex = 0;
-	bool devrtex = !p->tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
+	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
 	auto rect = p->box.rc;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = pos;
@@ -3205,7 +3205,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		if (ab)
 		{
 			packer->clear();
-			sf++;
+			sf++; // 满了重新用一张新纹理
 		}
 		else {
 			dcp->surface = sf;

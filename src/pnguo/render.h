@@ -508,7 +508,8 @@ public:
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
 	uint32_t color = 0;
-	float stwidth = 2.0;
+	float stwidth = 2.0; 
+	bool tex_batch = true;
 public:
 	canvas2d_t();
 	~canvas2d_t();
