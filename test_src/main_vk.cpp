@@ -953,19 +953,26 @@ int main()
 			dvv->flex_child.margin_bottom = 2;
 			//dvv->flex.direction = flex_direction::COLUMN;
 			uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
-
+			//x=默认，y=鼠标进入，z=按下
 			glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
 			glm::uvec3 gradTop1 = { 0xff8a8a8a,0x80bebebe,0xff303030 }, gradBot1 = { 0xff5a5a5a,0x80303030,0xff1d1d1d };
+			glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
 			for (int i = 0; i < 5; i++) {
 				auto btn = new gradient_btn();
 				btn->rounding = 4;
 				dvv->add_widget(btn);
 				btn->set_size({ 200,36 });
 				btn->back_color = colors[i];
-				btn->borderLight = 0x805c5c5c;
-				btn->borderDark = 0x801d1d1d;
-				btn->gradTop = i == 4 ? gradTop1 : gradTop;
-				btn->gradBot = i == 4 ? gradBot1 : gradBot;
+				btn->borderLight = blackb.x;
+				btn->borderDark = blackb.y;
+				btn->gradTop = gradTop;
+				btn->gradBot = gradBot;
+				if (i == 4) {
+					//btn->borderLight = blackb.y;
+					//btn->borderDark = blackb.x;
+					btn->gradTop = gradTop1;
+					btn->gradBot = gradBot1;
+				}
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
@@ -1026,9 +1033,9 @@ int main()
 					vkvg_surface_resolve(t);
 					td3->ctx_end(ctx);
 					td3->update_rvg(&rvg, rvgd);
-				 
 
-					form0->io->WantCaptureMouse = dvv->hittest(form0->io->MousePos);
+
+					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					{
 						td3->update(ck, delta);

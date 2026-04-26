@@ -6063,7 +6063,7 @@ bool gradient_btn::update(float delta)
 	auto& info = *p;
 
 	// (sta & hz::BTN_STATE::STATE_FOCUS)
-	uint32_t gradTop = info.gradTop.x;// 0xff4a4a4a;
+	uint32_t gradTop = info.gradTop.x;// 0xff4a4a4a; 
 	uint32_t gradBot = info.gradBot.x;// 0xff3a3a3a;
 
 	info.mPushed = (_bst & (int)BTN_STATE::STATE_ACTIVE);
@@ -7209,7 +7209,7 @@ void gradient_btn::draw(rvg_cx* rv)
 		rounding = nr;
 	}
 	glm::vec2 tps = { 0.5,0.5 };
-	
+
 	rv->save();
 	rv->translate({ x, y });
 	if (is_alpha(bc))
@@ -7316,7 +7316,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->add_text(&tx, 1, &st);
 
 
-	
+
 #endif
 }
 
@@ -7390,7 +7390,7 @@ void radio_tl::draw(rvg_cx* rv)
 	auto p = this;
 	if (rv && p) {
 #if 1
-		
+
 		rv->save();
 		glm::ivec2 poss = p->_pos;
 		poss.y += _size.y * 0.5 - style.radius;
@@ -7405,7 +7405,7 @@ void radio_tl::draw(rvg_cx* rv)
 			x++;
 		}
 		rv->restore();
-		
+
 #endif
 	}
 }
@@ -7420,7 +7420,7 @@ void color_btn::draw(rvg_cx* rv)
 		id = id;
 	}
 #if 1
-	
+
 	rv->save();
 	rv->translate(p->_pos);
 	if (p->dfill)
@@ -7492,7 +7492,7 @@ void color_btn::draw(rvg_cx* rv)
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, 1, &st);
-	
+
 #endif
 }
 
@@ -7501,7 +7501,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 	auto p = this;
 	if (rv && p) {
 #if 1
-		
+
 		rv->save();
 		glm::ivec2 poss = p->_pos;
 		poss.y += (_size.y - style.square_sz) * 0.5;
@@ -7514,14 +7514,14 @@ void checkbox_tl::draw(rvg_cx* rv)
 			x++;
 		}
 		rv->restore();
-		
+
 #endif
 	}
 }
 void switch_tl::draw(rvg_cx* rv)
 {
 #if 1
-	
+
 	rv->save();
 	glm::ivec2 poss = _pos;
 	auto h = height;
@@ -7547,7 +7547,7 @@ void switch_tl::draw(rvg_cx* rv)
 		rv->submit(color.z, 0, 0);
 	}
 	rv->stroke();
-	
+
 #endif
 }
 void progress_tl::draw(rvg_cx* rv)
@@ -7557,7 +7557,7 @@ void progress_tl::draw(rvg_cx* rv)
 	glm::ivec2 ss = _size;
 	ss.x = width;
 #if 1
-	
+
 	rv->save();
 	rv->translate(poss);
 	rv->add_rect({ 0.5,0.5, ss.x, ss.y }, rounding);
@@ -7606,14 +7606,14 @@ void progress_tl::draw(rvg_cx* rv)
 
 	//}
 	rv->restore();
-	
+
 #endif
 }
 
 void slider_tl::draw(rvg_cx* rv)
 {
 #if 1
-	
+
 	rv->save();
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
@@ -7668,7 +7668,7 @@ void slider_tl::draw(rvg_cx* rv)
 		}
 	}
 	rv->restore();
-	
+
 #endif
 }
 
@@ -7676,7 +7676,7 @@ void slider_tl::draw(rvg_cx* rv)
 void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
-	
+
 	rv->save();
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
@@ -7747,7 +7747,7 @@ void colorpick_tl::draw(rvg_cx* rv)
 		rv->submit(-1, bc_color, thickness);
 	}
 	rv->restore();
-	
+
 #endif
 }
 void scroll_bar::draw(rvg_cx* rv)
@@ -7755,7 +7755,7 @@ void scroll_bar::draw(rvg_cx* rv)
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
 
-	
+
 	{
 		// 背景
 		if (!hideble || thumb_size_m.z) {
@@ -7777,7 +7777,7 @@ void scroll_bar::draw(rvg_cx* rv)
 			rv->submit(_tcc, 0, 0);
 		}
 	}
-	
+
 }
 
 
@@ -8078,7 +8078,9 @@ bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
 }
 
 div_cx::div_cx()
-{}
+{
+	hscroll = {};
+}
 
 div_cx::~div_cx()
 {}
@@ -8423,6 +8425,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 			auto vpos = sps * pw->hscroll;
 			on_wpe(pw, type, ep, ppos + vpos);
 		}
+		on_wpe(this, type, ep, {});
 
 		event_wts.clear();
 		event_wts1.clear();
@@ -8438,6 +8441,9 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 			else
 				event_wts1.push_back(*it);
 		}
+		if (this) {
+			this->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(this) : event_wts1.push_back(this);//本容器
+		}
 		auto length = event_wts.size();
 		{
 			// 生成鼠标离开消息
@@ -8446,7 +8452,9 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 				if (!pw || !pw->visible || pw->_disabled_events)continue;
 				auto vpos = sps * pw->hscroll;
 				auto p = e->m;
-				glm::ivec2 mps = { p->x,p->y }; mps -= ppos + vpos;
+				glm::ivec2 mps = { p->x,p->y };
+				mps -= ppos + vpos;
+				if (pw == this)mps -= ppos;
 				bool isd = pw->cmpos == mps;
 				pw->cmpos = mps;
 				pw->_bst &= ~(int)BTN_STATE::STATE_HOVER;
@@ -8469,8 +8477,10 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 			auto pw = event_wts[i];
 			icc++;
 			if (!pw || !pw->visible || pw->_disabled_events)continue;
-			auto vpos = sps * pw->hscroll;
-			on_wpe(pw, type, ep, ppos + vpos);
+			auto vpos = sps * pw->hscroll + ppos;
+			if (pw == this)
+				vpos = {};
+			on_wpe(pw, type, ep, vpos);
 			if (ep->ret && btn) {
 				hpw = pw;
 				break;
@@ -8483,8 +8493,10 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 			{
 				auto pw = event_wts1[i];
 				if (!pw || !pw->visible || pw->_disabled_events)continue;
-				auto vpos = sps * pw->hscroll;
-				on_wpe(pw, type, ep, ppos + vpos);
+				auto vpos = sps * pw->hscroll + ppos;
+				if (pw == this)
+					vpos = {};
+				on_wpe(pw, type, ep, vpos);
 				if (ep->ret && btn) {
 					hpw = pw; break;
 				}
@@ -8493,6 +8505,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	if (!ep->ret)
 		ep->ret = r1;
+
 	switch (t)
 	{
 	case devent_type_e::mouse_move_e:
@@ -8641,12 +8654,28 @@ bool div_cx::hittest(const glm::ivec2& pos)
 			}
 		}
 	}
-	// 按下鼠标时点中控件则捕获
-	for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
-		auto pw = (widget_t*)*it;
-		if (!pw || !pw->visible || pw->_disabled_events)continue;
-		if (pw->_bst & (int)BTN_STATE::STATE_ACTIVE) {
-			r = true;
+	return r;
+}
+
+bool div_cx::press_test(const glm::ivec2& pos)
+{
+	bool r = false;
+	auto sps = get_spos();
+	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)_size;
+	glm::vec4 rc = { ips ,ips + ss };
+
+	if (_bst & (int)BTN_STATE::STATE_ACTIVE) {
+		r = true;
+	}
+	else
+	{
+		// 按下鼠标时点中控件则捕获
+		for (auto it = widgets.rbegin(); it != widgets.rend(); it++) {
+			auto pw = (widget_t*)*it;
+			if (!pw || !pw->visible || pw->_disabled_events)continue;
+			if (pw->_bst & (int)BTN_STATE::STATE_ACTIVE) {
+				r = true;
+			}
 		}
 	}
 	return r;

@@ -3260,17 +3260,18 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			d2 = &rcc;
 			//vkvg_save(ctx);
 			//vkvg_translate(ctx, rcc.pos.x, rcc.pos.y);
-			//vkvg_rectangle(ctx, 0, 0, clips.x, clips.y);
-			//vkvg_clip(ctx);
 		}
 		static std::set<uint32_t> aa = { rvg_cx::OP_SUBMIT_STYLE,  rvg_cx::OP_SUBMIT_COLOR,rvg_cx::OP_FILL, rvg_cx::OP_STROKE,rvg_cx::OP_FILL_PRESERVE,rvg_cx::OP_STROKE_PRESERVE };
 		for (size_t i = it.x; i < it.y; i++)
 		{
 			auto ct = rvg->_cmdtype[i];
 			if (ct == 0)
+			{
 				vkvg_translate(ctx, apos.x, apos.y);
-			//if (ct == 0xff)
-			//	vkvg_translate(ctx, -apos.x, -apos.y);
+			}
+			if (ct == 0xff)
+			{
+			}
 			size_t n = cmd_func(ct, d, ctx);
 			d += n;
 		}

@@ -373,6 +373,7 @@ public:
 	virtual void on_event(uint32_t type, et_un_t* ep);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
+	bool press_test(const glm::ivec2& pos);
 	size_t add_dragpos(const glm::ivec2& pos, const glm::ivec2& size = {});
 	void remove_dragpos(size_t idx);
 	glm::ivec3 get_dragpos(size_t idx);
@@ -570,6 +571,7 @@ struct gradient_btn :public widget_t
 	uint32_t text_color = 0;
 	uint32_t text_color_shadow = 0x88111111;
 	double opacity = 1.0;
+	// x=默认，y=鼠标进入，z=按下
 	glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
 	// private
 	uint32_t _gradTop = 0;
