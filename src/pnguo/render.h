@@ -239,8 +239,8 @@ struct d2_rt {
 	glm::ivec2 size;	// 区域大小
 	glm::ivec2 offset;	// 渲染偏移
 	int surface = 0;
-	int index = 0;
 	int type = 0;		// 0矢量图，1文本/位图
+	int index = 0;
 };
 struct surface_ctx {
 	void* surface;
@@ -258,6 +258,7 @@ struct cmdrect_v {
 	glm::ivec4 rc = {};	// 渲染区域
 	int type = 0;		// 0矢量图，1文本/位图
 	int first = 0, second = 0;// 命令索引
+	int index = 0;
 };
 
 class vkvg_ctx

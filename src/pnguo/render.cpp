@@ -1991,8 +1991,8 @@ void rvg_cx::merge_vrc(const glm::ivec4& c)
 	assert((c.z > c.x && c.w > c.y));
 	if (!(c.z > c.x && c.w > c.y))return;
 	auto ct = _cmdtype.size() > 0 ? _cmdtype.back() : 0;
-	auto ct0 = _cmdtype.size() > 1 ? _cmdtype[_cmdtype.size() - 2] : ct;
-	bool test = is_textimage(ct) == is_textimage(ct0);
+	bool ct0 = _data.back().type;
+	bool test = is_textimage(ct) == ct0;
 	if (_prc && test && check_rect_cross(*_prc, c))
 	{
 		_prc->x = std::min(_prc->x, c.x);
@@ -2004,6 +2004,8 @@ void rvg_cx::merge_vrc(const glm::ivec4& c)
 	}
 	else {
 		new_rc();
+		auto& d = _data.back();
+		d.type = is_textimage(ct);
 		*_prc = c;
 	}
 }
@@ -3151,20 +3153,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 		idx.clear();
 	}
 }
-void cl_packed(std::vector<d2_rt>& dst, std::vector<d2_rt>& src, std::vector<d2_rt>* w, int sf) {
-	for (auto& it : src) {
-		if (!(it.pos.x < INT_MAX)) {
-			dst.push_back(it);
-		}
-		else {
-			if (w)
-			{
-				it.surface = sf;
-				(*w)[it.index] = it;
-			}
-		}
-	}
-}
+
 
 rvg_data_cx::rvg_data_cx()
 {
@@ -3198,10 +3187,14 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		d.offset = glm::ivec2(it.rc.x, it.rc.y);
 		max_rect.x = std::max(max_rect.x, d.size.x);
 		max_rect.y = std::max(max_rect.y, d.size.y);
-		d.index = i;
 		d.type = it.type;
+		d.index = i;
 		i++;
-		dcv.push_back(d);
+		if (!it.type)
+		{
+			it.index = dcv.size();
+			dcv.push_back(d);
+		}
 	}
 	auto dcp = dcv.data();
 	size_t dcc = dcv.size();
@@ -3239,25 +3232,18 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		vkvg_clear((VkvgContext)it.ctx);
 	}
 	auto d = rvg->_cmd.data();
-	size_t cx = 0;
-	size_t ridx = 0;
 	dst->dst_data.push_back({});
 	for (auto& it : rvg->_data) {
-		auto ctx = (VkvgContext)(it.type > 0 ? nullptr : dst->surfaces[cx].ctx);
+		size_t ridx = it.index;
+		VkvgContext ctx = nullptr;
 		glm::vec2 clips = {};
 		glm::vec2 apos = {};
 		d2_rt* d2 = 0;
-		if (ctx) {
+		if (it.type == 0) {
 			auto& rcc = dst->dcv[ridx];
+			ctx = (VkvgContext)dst->surfaces[rcc.surface].ctx;
 			if (ridx + 1 < dst->dcv.size())
 			{
-				struct vitext_ta
-				{
-					fitem_t* t = 0;		// 位图或文本
-					d2_rt* d2 = 0;		// 矢量图
-					size_t first = 0;	// 第一个位置
-					size_t count = 0;	// 渲染数量
-				};
 				auto& v = dst->dst_data.back();
 				if (!v.d2)
 				{

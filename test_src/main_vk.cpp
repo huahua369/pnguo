@@ -882,7 +882,7 @@ int main()
 			auto ptb = new text_t1();
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
-			auto mtext = new rich_text_t();  
+			auto mtext = new rich_text_t();
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
@@ -914,7 +914,7 @@ int main()
 						p += 2;
 					}
 					vkvg_stroke(ctx);
-				} 
+				}
 				VkvgSurface t = vkvg_get_target(ctx);
 				vkvg_flush(ctx);
 				vkvg_surface_resolve(t);
@@ -950,6 +950,7 @@ int main()
 				btn->borderDark = blackb.y;
 				btn->gradTop = gradTop;
 				btn->gradBot = gradBot;
+				btn->str = "button " + std::to_string(i);
 				if (i == 4) {
 					//btn->borderLight = blackb.y;
 					//btn->borderDark = blackb.x;
