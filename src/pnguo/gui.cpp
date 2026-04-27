@@ -7303,7 +7303,6 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->set_color(borderDark);
 	rv->add_rect({ tps.x,tps.y, w , h }, rounding);
 	rv->stroke();
-	rv->restore();
 
 	text_style st = {};
 	st.fontsize = p->font_size;
@@ -7315,6 +7314,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, &st);
 
+	rv->restore();
 
 
 #endif
@@ -7477,7 +7477,6 @@ void color_btn::draw(rvg_cx* rv)
 		}
 		rv->submit(0, p->dcol, p->thickness);
 	}
-	rv->restore();
 	//if ((bst & (int)BTN_STATE::STATE_HOVER))
 	//{
 	//	rv->add_rect( { 0,0,size.x,size.y }, p->rounding);
@@ -7492,6 +7491,7 @@ void color_btn::draw(rvg_cx* rv)
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, &st);
+	rv->restore();
 
 #endif
 }

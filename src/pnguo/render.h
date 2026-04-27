@@ -255,9 +255,9 @@ struct vitext_t
 	size_t count = 0;	// 渲染数量
 };
 struct cmdrect_v {
-	glm::ivec4 rc = {};	// 渲染区域
 	int type = 0;		// 0矢量图，1文本/位图
 	int first = 0, second = 0;// 命令索引
+	glm::ivec4 rc = {};	// 渲染区域
 	int index = 0;
 };
 

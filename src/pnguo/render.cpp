@@ -1510,9 +1510,7 @@ void mr_v4(glm::vec4& rc, const glm::vec2& it) {
 }
 
 rvg_cx::rvg_cx()
-{
-	new_rc();
-}
+{}
 
 rvg_cx::~rvg_cx()
 {}
@@ -1861,9 +1859,9 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	if (!p || p->text == 0 || p->text_len < 1)return;
 	set_text_style(ts);
 	push_ct(OP_ADD_TEXT);
-	auto pos = _cmd.size();
+	auto idx = _cmd.size();
 	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st));
-	auto pd = (text_st*)(_cmd.data() + pos);
+	auto pd = (text_st*)(_cmd.data() + idx);
 	size_t ct = 0;
 	auto tps = _cmd.size();
 	for (size_t i = 0; i < 1; i++)
@@ -1872,7 +1870,8 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 		pd->text = (char*)tps + ct;
 		ct += pd->text_len;
 	}
-	glm::vec4 rc = { p->pos + tpos,p->size };
+	auto pos = p->pos + tpos;
+	glm::vec4 rc = { pos ,pos + p->size };
 	merge_vrc(rc);
 }
 
@@ -1984,30 +1983,37 @@ bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
 }
 
 inline bool is_textimage(uint8_t c) {
-	return c > rvg_cx::OP_TEXT_STYLE;
+	return c >= rvg_cx::OP_TEXT_STYLE;
 }
 void rvg_cx::merge_vrc(const glm::ivec4& c)
 {
-	assert((c.z > c.x && c.w > c.y));
-	if (!(c.z > c.x && c.w > c.y))return;
-	auto ct = _cmdtype.size() > 0 ? _cmdtype.back() : 0;
-	bool ct0 = _data.back().type;
-	bool test = is_textimage(ct) == ct0;
-	if (_prc && test && check_rect_cross(*_prc, c))
-	{
-		_prc->x = std::min(_prc->x, c.x);
-		_prc->y = std::min(_prc->y, c.y);
-		_prc->z = std::max(_prc->z, c.z);
-		_prc->w = std::max(_prc->w, c.w);
-		auto& d = _data.back();
-		d.type = is_textimage(ct);
-	}
-	else {
-		new_rc();
-		auto& d = _data.back();
-		d.type = is_textimage(ct);
-		*_prc = c;
-	}
+	assert((c.z > 0 && c.w > 0));
+
+	_data.push_back({});
+	auto& d = _data.back();
+	d.first = _cmdtype.size() - 1;
+	d.type = is_textimage(_cmdtype.back());
+	d.second = _cmdtype.size();
+	d.rc = c;
+
+	//auto ct =  > 0 ? _cmdtype.back() : 0;
+	//bool ct0 = _data.back().type;
+	//bool test = == ct0;
+	//if (_prc && test && check_rect_cross(*_prc, c))
+	//{
+	//	_prc->x = std::min(_prc->x, c.x);
+	//	_prc->y = std::min(_prc->y, c.y);
+	//	_prc->z = std::max(_prc->z, c.z);
+	//	_prc->w = std::max(_prc->w, c.w);
+	//	auto& d = _data.back();
+	//	d.type = is_textimage(ct);
+	//}
+	//else {
+	//	new_rc();
+	//	auto& d = _data.back();
+	//	d.type = is_textimage(ct);
+	//	*_prc = c;
+	//}
 }
 bool rvg_cx::is_image()
 {
@@ -2035,10 +2041,6 @@ void rvg_cx::new_rc()
 void rvg_cx::push_ct(uint8_t op)
 {
 	_cmdtype.push_back(op);
-	if (_data.size()) {
-		auto& k = _data.back();
-		k.second = _cmdtype.size();
-	}
 }
 
 
@@ -3181,7 +3183,47 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	int sf = 0;
 	size_t i = 0;
 	dcv.clear();
+	std::vector<cmdrect_v> data;
+	int lpush = 0;
+	auto f = rvg->_data.front();
+	for (auto& it : rvg->_data) {
+		auto c = it.rc;
+		if (it.type == f.type && check_rect_cross(f.rc, it.rc))
+		{
+			f.rc.x = std::min(f.rc.x, c.x);
+			f.rc.y = std::min(f.rc.y, c.y);
+			f.rc.z = std::max(f.rc.z, c.z);
+			f.rc.w = std::max(f.rc.w, c.w);
 
+		}
+		else {
+			data.push_back(f);
+			f = it;
+		}
+		lpush++;
+	}
+	data.push_back(f);
+	data.front().first = 0;
+	for (size_t i = 0; i < data.size() - 1; i++)
+	{
+		auto& it = data[i];
+		auto& it1 = data[i + 1];
+		if (it.type == 0)
+			it.second = it1.first;
+	}
+	for (size_t i = 1; i < data.size() - 1; i++)
+	{
+		auto& it = data[i];
+		auto& it1 = data[i - 1];
+		if (it.type == 0)
+			it.first = it1.second;
+	}
+	auto cmd_count = rvg->_cmdtype.size();
+	f = {};
+	f.first = data.back().second;
+	f.second = cmd_count;
+	data.push_back(f);
+	data.swap(rvg->_data);
 	for (auto& it : rvg->_data) {
 		if (it.rc.z < 1 || it.rc.w < 1)continue;
 		d2_rt d = {};
