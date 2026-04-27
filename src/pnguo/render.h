@@ -240,6 +240,7 @@ struct d2_rt {
 	glm::ivec2 offset;	// 渲染偏移
 	int surface = 0;
 	int index = 0;
+	int type = 0;		// 0矢量图，1文本/位图
 };
 struct surface_ctx {
 	void* surface;
@@ -255,9 +256,8 @@ struct vitext_t
 };
 struct cmdrect_v {
 	glm::ivec4 rc = {};	// 渲染区域
-	glm::ivec2 offset;	// 偏移
 	int type = 0;		// 0矢量图，1文本/位图
-	int first = 0, count = 0;// 命令索引
+	int first = 0, second = 0;// 命令索引
 };
 
 class vkvg_ctx
@@ -395,15 +395,15 @@ public:
 		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
 		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
 		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
-		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE, OP_PAINT_SHADOW, OP_TRANSLATE,
-		OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
-		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4
-		, OP_MAX_COUNT
+		OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
+		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
+		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
+		OP_MAX_COUNT
 	};
 	std::vector<uint8_t> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
-	std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
-	std::vector<glm::ivec3> _vg_bs;		// 统计矢量图批次渲染的索引
+	//std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
+	//std::vector<glm::ivec3> _vg_bs;		// 统计矢量图批次渲染的索引
 	std::stack<glm::vec2> translate_pos;
 	std::vector<cmdrect_v> _data;		// 渲染数据列表
 	glm::vec2 tpos = {};				// 当前偏移
@@ -446,7 +446,7 @@ public:
 	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
 	// 文本渲染
 	void set_text_style(text_style* ts);
-	void add_text(text_st* p, size_t count, text_style* ts);
+	void add_text(text_st* p, text_style* ts);
 	void add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos);
 	void add_image(image_r* r);
 	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
@@ -462,12 +462,12 @@ public:
 	void set_line_width(float w);
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
-	void push_vrc();
+
 	void merge_vrc(const glm::ivec4& c);
 	void push_ct(uint8_t op);
-	void nk_bs();
 	bool is_image();
 	void push_null(int v);
+	void new_rc();
 private:
 
 };

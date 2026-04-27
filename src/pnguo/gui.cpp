@@ -7313,7 +7313,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	tx.pos = {};
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
-	rv->add_text(&tx, 1, &st);
+	rv->add_text(&tx, &st);
 
 
 
@@ -7491,7 +7491,7 @@ void color_btn::draw(rvg_cx* rv)
 	tx.pos = {};
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
-	rv->add_text(&tx, 1, &st);
+	rv->add_text(&tx, &st);
 
 #endif
 }

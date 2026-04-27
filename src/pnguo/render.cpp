@@ -1511,10 +1511,7 @@ void mr_v4(glm::vec4& rc, const glm::vec2& it) {
 
 rvg_cx::rvg_cx()
 {
-	push_vrc();
-	//_vg_rect.push_back({ INT_MAX,INT_MAX,0,0 });
-	//_vg_bs.push_back({});
-	//_prc = &_vg_rect.back();
+	new_rc();
 }
 
 rvg_cx::~rvg_cx()
@@ -1550,7 +1547,7 @@ void rvg_cx::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
 	push_ct(OP_GRID_FILL);
 	grid_fill_r t = { size,cols,width };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
-	
+
 	glm::vec4 rv = { tpos, size };
 	rv.z += rv.x;
 	rv.w += rv.y;
@@ -1859,25 +1856,24 @@ void rvg_cx::set_text_style(text_style* ts)
 	_cmd.insert(_cmd.end(), (char*)ts, (char*)ts + sizeof(text_style));
 }
 
-void rvg_cx::add_text(text_st* p, size_t count, text_style* ts)
+void rvg_cx::add_text(text_st* p, text_style* ts)
 {
-	if (!p || count == 0)return;
-	if (!is_image())
-		nk_bs();
+	if (!p || p->text == 0 || p->text_len < 1)return;
 	set_text_style(ts);
 	push_ct(OP_ADD_TEXT);
 	auto pos = _cmd.size();
-	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st) * count);
+	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st));
 	auto pd = (text_st*)(_cmd.data() + pos);
 	size_t ct = 0;
 	auto tpos = _cmd.size();
-	for (size_t i = 0; i < count; i++)
+	for (size_t i = 0; i < 1; i++)
 	{
 		_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
 		pd->text = (char*)tpos + ct;
 		ct += pd->text_len;
 	}
-	push_vrc();
+	glm::vec4 rc = { p->pos,p->size };
+	merge_vrc(rc);
 }
 
 void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos)
@@ -1889,11 +1885,9 @@ void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4&
 void rvg_cx::add_image(image_r* r)
 {
 	if (!r || !r->img)return;
-	if (!is_image())
-		nk_bs();
 	push_ct(OP_ADD_IMAGE);
 	_cmd.insert(_cmd.end(), (char*)r, (char*)r + sizeof(image_r));
-	push_vrc();
+	merge_vrc(glm::ivec4(r->pos, r->dsize));
 }
 
 void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
@@ -1988,58 +1982,61 @@ bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
 		return false;   //无交集
 	}
 }
-void rvg_cx::push_vrc()
-{
-	if (!_prc || (_prc->z > 0.0f && _prc->w > 0.0f))
-	{
-		auto rc = glm::ivec4(INT_MAX, INT_MAX, 0, 0);
-		_vg_rect.push_back(rc);
-		nk_bs();
-	}
-	_prc = &_vg_rect.back();
-}
 
+inline bool is_textimage(uint8_t c) {
+	return c > rvg_cx::OP_TEXT_STYLE;
+}
 void rvg_cx::merge_vrc(const glm::ivec4& c)
 {
-	assert(_prc && (c.z > c.x && c.w > c.y));
+	assert((c.z > c.x && c.w > c.y));
 	if (!(c.z > c.x && c.w > c.y))return;
-	if (check_rect_cross(*_prc, c))
+	auto ct = _cmdtype.size() > 0 ? _cmdtype.back() : 0;
+	auto ct0 = _cmdtype.size() > 1 ? _cmdtype[_cmdtype.size() - 2] : ct;
+	bool test = is_textimage(ct) == is_textimage(ct0);
+	if (_prc && test && check_rect_cross(*_prc, c))
 	{
 		_prc->x = std::min(_prc->x, c.x);
 		_prc->y = std::min(_prc->y, c.y);
 		_prc->z = std::max(_prc->z, c.z);
 		_prc->w = std::max(_prc->w, c.w);
+		auto& d = _data.back();
+		d.type = is_textimage(ct);
 	}
 	else {
-		push_vrc();
+		new_rc();
 		*_prc = c;
 	}
-}
-void rvg_cx::nk_bs()
-{
-	auto n = _cmdtype.size();
-	if(_vg_bs.size()){
-		auto& k = _vg_bs.back();
-		k.y = n; k.z = is_image();
-	}
-	_vg_bs.push_back({ n,0,0 });
 }
 bool rvg_cx::is_image()
 {
 	auto t = _cmdtype.back();
-	return t == OP_ADD_IMAGE || t == OP_ADD_TEXT;
+	return t > OP_TEXT_STYLE;
 }
 void rvg_cx::push_null(int v)
 {
 	push_ct(v);
 }
 
+void rvg_cx::new_rc()
+{
+	//auto rc = glm::ivec4(INT_MAX, INT_MAX, 0, 0); 
+	_data.push_back({});
+	auto& d = _data.back();
+	d.second = 0;
+	d.first = _cmdtype.size();
+	d.type = 0;
+	//auto rc = glm::ivec4(INT_MAX, INT_MAX, 0, 0); 
+	_prc = &d.rc;
+}
+
 
 void rvg_cx::push_ct(uint8_t op)
 {
 	_cmdtype.push_back(op);
-	auto& k = _vg_bs.back();
-	k.y = _cmdtype.size();
+	if (_data.size()) {
+		auto& k = _data.back();
+		k.second = _cmdtype.size();
+	}
 }
 
 
@@ -2691,9 +2688,9 @@ size_t cmd_func(uint8_t c, uint8_t* d, VkvgContext ctx)
 		cmd_op_draw_block, cmd_op_draw_path, cmd_op_add_line_ptr, cmd_op_add_rect_double,
 		cmd_op_add_rect_vec4, cmd_op_add_circle, cmd_op_add_ellipse, cmd_op_add_triangle, cmd_op_polyline_vec2,
 		cmd_op_add_polyline_path, cmd_op_add_polyline_vec2_ptr, cmd_op_polylines,
-		cmd_op_text_style, cmd_op_add_text, cmd_op_add_image, cmd_op_paint_shadow, cmd_op_translate,
-		cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
-		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 };
+		cmd_op_paint_shadow, cmd_op_translate,cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
+		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
+		cmd_op_text_style, cmd_op_add_text, cmd_op_add_image, };
 
 	return c > 0 && c < rvg_cx::OP_MAX_COUNT ? cbs[c](d, ctx) : 0;
 }
@@ -3189,19 +3186,20 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	size_t i = 0;
 	dcv.clear();
 
-	for (auto& it : rvg->_vg_rect) {
-		if (it.z < 1 || it.w < 1)continue;
+	for (auto& it : rvg->_data) {
+		if (it.rc.z < 1 || it.rc.w < 1)continue;
 		d2_rt d = {};
-		d.size = { it.z - std::max(0,it.x),it.w - std::max(0,it.y) };
+		d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
 		d.size += stwidth * 2;
 		d.size.x = align_up(d.size.x, 4);
 		d.size.y = align_up(d.size.y, 4);
 		d.size.x = std::min(_view.z, d.size.x);
 		d.size.y = std::min(_view.w, d.size.y);
-		d.offset = glm::ivec2(it.x, it.y);
+		d.offset = glm::ivec2(it.rc.x, it.rc.y);
 		max_rect.x = std::max(max_rect.x, d.size.x);
 		max_rect.y = std::max(max_rect.y, d.size.y);
 		d.index = i;
+		d.type = it.type;
 		i++;
 		dcv.push_back(d);
 	}
@@ -3228,7 +3226,6 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
 	dst->_view = _view;
 	dst->pos = rvg->pos;
-	rvg->push_vrc();
 	dst->update(rvg);
 	bool first = false;
 	for (auto& it : dst->surfaces)
@@ -3245,8 +3242,8 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	size_t cx = 0;
 	size_t ridx = 0;
 	dst->dst_data.push_back({});
-	for (auto& it : rvg->_vg_bs) {
-		auto ctx = (VkvgContext)(it.z > 0 ? nullptr : dst->surfaces[cx].ctx);
+	for (auto& it : rvg->_data) {
+		auto ctx = (VkvgContext)(it.type > 0 ? nullptr : dst->surfaces[cx].ctx);
 		glm::vec2 clips = {};
 		glm::vec2 apos = {};
 		d2_rt* d2 = 0;
@@ -3279,7 +3276,7 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			dst->dst_data.push_back({});
 		}
 		static std::set<uint32_t> aa = { rvg_cx::OP_SUBMIT_STYLE,  rvg_cx::OP_SUBMIT_COLOR,rvg_cx::OP_FILL, rvg_cx::OP_STROKE,rvg_cx::OP_FILL_PRESERVE,rvg_cx::OP_STROKE_PRESERVE };
-		for (size_t i = it.x; i < it.y; i++)
+		for (size_t i = it.first; i < it.second; i++)
 		{
 			auto ct = rvg->_cmdtype[i];
 			if (ct == 0)
