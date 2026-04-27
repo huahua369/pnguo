@@ -1865,14 +1865,14 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st));
 	auto pd = (text_st*)(_cmd.data() + pos);
 	size_t ct = 0;
-	auto tpos = _cmd.size();
+	auto tps = _cmd.size();
 	for (size_t i = 0; i < 1; i++)
 	{
 		_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
-		pd->text = (char*)tpos + ct;
+		pd->text = (char*)tps + ct;
 		ct += pd->text_len;
 	}
-	glm::vec4 rc = { p->pos,p->size };
+	glm::vec4 rc = { p->pos + tpos,p->size };
 	merge_vrc(rc);
 }
 
