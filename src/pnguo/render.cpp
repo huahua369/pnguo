@@ -5,6 +5,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include <pch1.h>
 #include <stdint.h>
 #include <stdio.h>
+
 // 实现
 //#define GLM_ENABLE_EXPERIMENTAL 
 //#include <glm/glm.hpp>
@@ -1548,7 +1549,7 @@ void rvg_cx::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
 	push_ct(OP_GRID_FILL);
 	grid_fill_r t = { size,cols,width };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
-
+	
 	glm::vec4 rv = { tpos, size };
 	rv.z += rv.x;
 	rv.w += rv.y;
@@ -1974,6 +1975,18 @@ void rvg_cx::set_color(const glm::vec4& rgba)
 	_cmd.insert(_cmd.end(), (char*)&rgba, (char*)&rgba + sizeof(rgba));
 }
 
+
+// 区域是否相交
+bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
+{
+	if (glm::max(r1.x, r2.x) <= glm::min(r1.z, r2.z) && glm::max(r1.y, r2.y) <= glm::min(r1.w, r2.w))
+	{
+		return true;   //有交集
+	}
+	else {
+		return false;   //无交集
+	}
+}
 void rvg_cx::push_vrc()
 {
 	if (_prc->z > 0.0f && _prc->w > 0.0f)
@@ -1983,6 +1996,23 @@ void rvg_cx::push_vrc()
 		nk_bs();
 	}
 	_prc = &_vg_rect.back();
+}
+
+void rvg_cx::merge_vrc(const glm::ivec4& c)
+{
+	assert(_prc && (c.z > c.x && c.w > c.y));
+	if (!(c.z > c.x && c.w > c.y))return;
+	if (check_rect_cross(*_prc, c))
+	{
+		_prc->x = std::min(_prc->x, c.x);
+		_prc->y = std::min(_prc->y, c.y);
+		_prc->z = std::max(_prc->z, c.z);
+		_prc->w = std::max(_prc->w, c.w);
+	}
+	else {
+		push_vrc();
+		*_prc = c;
+	}
 }
 void rvg_cx::nk_bs()
 {
@@ -2001,35 +2031,6 @@ void rvg_cx::push_null(int v)
 	push_ct(v);
 }
 
-
-
-// 区域是否相交
-bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
-{
-	if (glm::max(r1.x, r2.x) <= glm::min(r1.z, r2.z) && glm::max(r1.y, r2.y) <= glm::min(r1.w, r2.w))
-	{
-		return true;   //有交集
-	}
-	else {
-		return false;   //无交集
-	}
-}
-void rvg_cx::merge_vrc(const glm::ivec4& c)
-{
-	assert(_prc && (c.z > c.x && c.w > c.y));
-	if (!(c.z > c.x && c.w > c.y))return;
-	if (check_rect_cross(*_prc, c))
-	{
-		_prc->x = std::min(_prc->x, c.x);
-		_prc->y = std::min(_prc->y, c.y);
-		_prc->z = std::max(_prc->z, c.z);
-		_prc->w = std::max(_prc->w, c.w);
-	}
-	else {
-		push_vrc();
-		*_prc = c;
-	}
-}
 
 void rvg_cx::push_ct(uint8_t op)
 {
@@ -2696,7 +2697,37 @@ size_t cmd_func(uint8_t c, uint8_t* d, VkvgContext ctx)
 
 #endif
 
+#if 0
+struct gradient_btn_t
+{
+	glm::ivec2 pos = {}, size = {};
+	std::string str;
+	uint32_t back_color = 0xff000000;
+	uint32_t text_color = -1;
+	uint32_t text_color_shadow = 0x88111111;
+	double opacity = 1.0;
+	// private
+	uint32_t gradTop = 0;
+	uint32_t gradBot = 0;
+	uint32_t borderLight = 0xff5c5c5c;
+	uint32_t borderDark = 0xff1d1d1d;
+	uTheme effect = uTheme::light;	// dark
+	int rounding = 4;
+	int thickness = 1;
 
+	int bst = 1;				// 鼠标状态
+	int _old_bst = 0;			// 鼠标状态
+	int cks = 0;				// 鼠标点击状态
+
+	bool mPushed = false;
+	bool mChecked = false;
+	bool mMouseFocus = false;
+	bool mEnabled = true;
+	bool is_muilt = true;
+};
+
+bool gradient_btn_update(gradient_btn_t* p, float delta);
+void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p);
 bool gradient_btn_update(gradient_btn_t* p, float delta)
 {
 	if (!p)return false;
@@ -2838,7 +2869,7 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 	vkvg_stroke(cr);
 	vkvg_restore(cr);
 }
-
+#endif
 
 canvas2d_t::canvas2d_t()
 {}
@@ -3187,14 +3218,6 @@ void rvg_data_cx::update(rvg_cx* rvg)
 			dcc--;
 		}
 	} while (dcc > 0);
-	//cl_packed(tm, dcv, 0, sf);
-	//do {
-	//	if (ab < 1)break;
-	//	ab = packer->push_rect((glm::ivec4*)tm.data(), tm.size(), sizeof(d2_rt));
-	//	cl_packed(tm1, tm, &dcv, sf);
-	//	tm.swap(tm1);
-	//	tm1.clear();
-	//} while (ab);
 	surfaces.resize(sf + 1);
 }
 void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
@@ -3218,8 +3241,8 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	auto d = rvg->_cmd.data();
 	size_t cx = 0;
 	size_t ridx = 0;
+	dst->dst_data.push_back({});
 	for (auto& it : rvg->_vg_bs) {
-
 		auto ctx = (VkvgContext)(it.z > 0 ? nullptr : dst->surfaces[cx].ctx);
 		glm::vec2 clips = {};
 		glm::vec2 apos = {};
@@ -3227,13 +3250,30 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		if (ctx) {
 			auto& rcc = dst->dcv[ridx];
 			if (ridx + 1 < dst->dcv.size())
+			{
+				struct vitext_ta
+				{
+					fitem_t* t = 0;		// 位图或文本
+					d2_rt* d2 = 0;		// 矢量图
+					size_t first = 0;	// 第一个位置
+					size_t count = 0;	// 渲染数量
+				};
+				auto& v = dst->dst_data.back();
+				if (!v.d2)
+				{
+					v.d2 = &rcc;
+					v.first = 0;
+				}
+				v.count++;
 				ridx++;
+			}
 			clips = rcc.size;
 			apos = rcc.pos - rcc.offset;
 			apos += stwidth;
 			d2 = &rcc;
-			//vkvg_save(ctx);
-			//vkvg_translate(ctx, rcc.pos.x, rcc.pos.y);
+		}
+		else {
+			dst->dst_data.push_back({});
 		}
 		static std::set<uint32_t> aa = { rvg_cx::OP_SUBMIT_STYLE,  rvg_cx::OP_SUBMIT_COLOR,rvg_cx::OP_FILL, rvg_cx::OP_STROKE,rvg_cx::OP_FILL_PRESERVE,rvg_cx::OP_STROKE_PRESERVE };
 		for (size_t i = it.x; i < it.y; i++)
@@ -3248,11 +3288,6 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			}
 			size_t n = cmd_func(ct, d, ctx);
 			d += n;
-		}
-		if (ctx)
-		{
-			//vkvg_translate(ctx, -apos.x, -apos.y);
-			//vkvg_restore(ctx);
 		}
 	}
 	for (auto& it : dst->surfaces)

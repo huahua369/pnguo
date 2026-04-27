@@ -8,7 +8,6 @@
 
 */
 #include <pch1.h>
-
 #include <random>
 #include <pnguo/win_core.h>
 #include "win32msg.h"
@@ -883,9 +882,7 @@ int main()
 			auto ptb = new text_t1();
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
-			auto mtext = new rich_text_t();
-			auto gbtn = new gradient_btn_t[5];
-			auto gt = gbtn;
+			auto mtext = new rich_text_t();  
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
@@ -917,21 +914,7 @@ int main()
 						p += 2;
 					}
 					vkvg_stroke(ctx);
-				}
-				uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
-				int xx = 0;
-				for (size_t i = 0; i < 5; i++)
-				{
-					gt->pos = { 500 ,150 + xx };
-					gt->size = { 200,36 };
-					gt->back_color = colors[i];
-					gt->borderLight = 0x805c5c5c;
-					gt->borderDark = 0x801d1d1d;
-					gradient_btn_update(gt, 0.0);
-					gradient_btn_draw(ctx, gt);
-					gt++;
-					xx += 40;
-				}
+				} 
 				VkvgSurface t = vkvg_get_target(ctx);
 				vkvg_flush(ctx);
 				vkvg_surface_resolve(t);

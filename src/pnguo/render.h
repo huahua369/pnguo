@@ -9,8 +9,13 @@
 #include <map>
 #include <string>
 #include <stack>
-
 #include "vkvg.h"
+
+#ifndef GLM_FORCE_XYZW_ONLY
+#define GLM_ENABLE_EXPERIMENTAL 
+#define GLM_FORCE_XYZW_ONLY
+#include <glm/glm.hpp>   
+#endif
 #ifndef vkvg_pattern_add_color_stop_rgba
 #define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop
 #endif 
@@ -208,36 +213,6 @@ void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols,
 // 画线性渐变填充
 void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count);
 
-struct gradient_btn_t
-{
-	glm::ivec2 pos = {}, size = {};
-	std::string str;
-	uint32_t back_color = 0xff000000;
-	uint32_t text_color = -1;
-	uint32_t text_color_shadow = 0x88111111;
-	double opacity = 1.0;
-	// private
-	uint32_t gradTop = 0;
-	uint32_t gradBot = 0;
-	uint32_t borderLight = 0xff5c5c5c;
-	uint32_t borderDark = 0xff1d1d1d;
-	uTheme effect = uTheme::light;	// dark
-	int rounding = 4;
-	int thickness = 1;
-
-	int bst = 1;				// 鼠标状态
-	int _old_bst = 0;			// 鼠标状态
-	int cks = 0;				// 鼠标点击状态
-
-	bool mPushed = false;
-	bool mChecked = false;
-	bool mMouseFocus = false;
-	bool mEnabled = true;
-	bool is_muilt = true;
-};
-
-bool gradient_btn_update(gradient_btn_t* p, float delta);
-void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p);
 
 
 /*
@@ -371,12 +346,41 @@ struct polyline_pd
 	bool closed;
 };
 
+struct d2_rt {
+	glm::ivec2 pos;		// 纹理偏移
+	glm::ivec2 size;	// 区域大小
+	glm::ivec2 offset;	// 渲染偏移
+	int surface = 0;
+	int index = 0;
+};
+struct surface_ctx {
+	void* surface;
+	void* ctx;
+};
+
+struct path_d;
+struct image_block;
+struct image_ptr_t;
+struct text_style;
+union fitem_t;
+struct vitext_t
+{
+	fitem_t* t = 0;		// 位图或文本
+	d2_rt* d2 = 0;		// 矢量图
+	size_t first = 0;	// 第一个位置
+	size_t count = 0;	// 渲染数量
+};
+struct cmdrect_v {
+	glm::ivec4 rc = {};	// 渲染区域
+	glm::ivec2 offset;	// 偏移
+	int type = 0;		// 0矢量图，1文本/位图
+	int first = 0, count = 0;// 命令索引
+};
 struct dev_info_cx;
+
 class packer_base;
-/*
-add 后需要submit style
-输入矢量信息，生成渲染命令
-*/
+
+
 class rvg_cx
 {
 public:
@@ -396,6 +400,7 @@ public:
 	std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
 	std::vector<glm::ivec3> _vg_bs;		// 统计矢量图批次渲染的索引
 	std::stack<glm::vec2> translate_pos;
+	std::vector<cmdrect_v> _data;		// 渲染数据列表
 	glm::vec2 tpos = {};				// 当前偏移
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
@@ -461,25 +466,7 @@ public:
 private:
 
 };
-struct d2_rt {
-	glm::ivec2 pos;		// 纹理偏移
-	glm::ivec2 size;	// 区域大小
-	glm::ivec2 offset;	// 渲染偏移
-	int surface = 0;
-	int index = 0;
-};
-struct surface_ctx {
-	void* surface;
-	void* ctx;
-};
-union fitem_t;
-struct vitext_t
-{
-	fitem_t* t = 0;		// 位图或文本
-	d2_rt* d2 = 0;		// 矢量图
-	size_t first = 0;	// 第一个位置
-	size_t count = 0;	// 渲染数量
-};
+
 class rvg_data_cx
 {
 public:

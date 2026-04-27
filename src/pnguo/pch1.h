@@ -64,8 +64,7 @@
 #include <assert.h>
 #include <unordered_map>
 
-#ifndef PCH_GLM_H
-#define PCH_GLM_H
+#ifndef GLM_FORCE_XYZW_ONLY 
 #define GLM_ENABLE_EXPERIMENTAL
 //#define GLM_FORCE_ALIGNED
 //#define GLM_FORCE_INTRINSICS
