@@ -2686,6 +2686,13 @@ size_t cmd_op_set_color_vec4(uint8_t* d, VkvgContext ctx)
 
 size_t cmd_func(uint8_t c, uint8_t* d, VkvgContext ctx)
 {
+	//OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
+	//	OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
+	//	OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
+	//	OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
+	//	OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
+	//	OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
+	//	OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
 	static size_t(*cbs[])(uint8_t * d, VkvgContext ctx) = { nullptr, cmd_op_submit_style, cmd_op_submit_color, cmd_op_grid_fill, cmd_op_linear_fill, cmd_op_add_arrow,
 		cmd_op_draw_block, cmd_op_draw_path, cmd_op_add_line_ptr, cmd_op_add_rect_double,
 		cmd_op_add_rect_vec4, cmd_op_add_circle, cmd_op_add_ellipse, cmd_op_add_triangle, cmd_op_polyline_vec2,
