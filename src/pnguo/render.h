@@ -134,7 +134,131 @@ enum class blendmode_e :int {
 	normal_prem,	// 预乘alpha
 	additive_prem,
 };
+#ifndef CLIPPER_CORE_H
+using PathsD = std::vector<std::vector<double>>;
+#endif // !CLIPPER_CORE_H
 
+struct path_d;
+struct image_block;
+struct image_ptr_t;
+struct text_style;
+union fitem_t;
+struct dev_info_cx;
+struct vg_style_data;
+struct rich_text_t;
+class packer_base;
+
+// SDL渲染器专用
+typedef struct texture_cb texture_cb;
+struct text_vx
+{
+	glm::vec2 pos;
+	glm::vec2 uv;
+	glm::vec4 color;
+};
+struct submit_color_d
+{
+	uint32_t fill, color; int linewidth;
+};
+struct paint_shadow_d
+{
+	glm::vec2 size;
+	glm::vec2 dst_size;
+	glm::vec4 shadow;
+	glm::vec4 color_to;
+	float r = 0;
+	bool rev = false;
+};
+struct grid_fill_r
+{
+	glm::vec2  size; glm::ivec2 cols; int width;
+};
+struct linear_fill_r
+{
+	glm::vec2 size; int count; glm::vec4 cols[0];
+};
+struct arrow_d
+{
+	glm::vec2 p0, p1; float arrow_hwidth, arrow_size; bool type;
+};
+struct rect_v4
+{
+	glm::vec4 rc;
+	glm::vec4 r;
+};
+struct triangle_r
+{
+	glm::vec2 pos;
+	glm::vec2 size;
+	glm::vec2 spos;
+};
+struct circle_r
+{
+	glm::vec2 pos;
+	float r;
+};
+struct ellipse_r
+{
+	glm::vec2 pos;
+	glm::vec2 radius;
+	float rotationAngle;
+};
+struct polyline_r
+{
+	glm::vec2 pos;
+	int points_count;
+	uint32_t col;
+	float thickness;
+	bool closed;
+};
+struct polyline_index_r
+{
+	glm::vec2 pos;
+	int points_count;
+	int idx_count;
+	uint32_t col;
+	float thickness;
+};
+struct image_r
+{
+	image_ptr_t* img;
+	glm::ivec4 rc;
+	glm::ivec4 sliced;
+	glm::ivec2 dsize;
+	glm::ivec2 pos;
+	uint32_t color;
+};
+struct polyline_pd
+{
+	size_t count;
+	bool closed;
+};
+
+struct d2_rt {
+	glm::ivec2 pos;		// 纹理偏移
+	glm::ivec2 size;	// 区域大小
+	glm::ivec2 offset;	// 渲染偏移
+	int surface = 0;
+	int index = 0;
+};
+struct surface_ctx {
+	void* surface;
+	void* ctx;
+};
+
+struct vitext_t
+{
+	fitem_t* t = 0;		// 位图或文本
+	d2_rt* d2 = 0;		// 矢量图
+	size_t first = 0;	// 第一个位置
+	size_t count = 0;	// 渲染数量
+};
+struct cmdrect_v {
+	glm::ivec4 rc = {};	// 渲染区域
+	glm::ivec2 offset;	// 偏移
+	int type = 0;		// 0矢量图，1文本/位图
+	int first = 0, count = 0;// 命令索引
+};
 
 class vkvg_ctx
 {
@@ -260,125 +384,6 @@ private:
 
 };
 
-// SDL渲染器专用
-typedef struct texture_cb texture_cb;
-struct text_vx
-{
-	glm::vec2 pos;
-	glm::vec2 uv;
-	glm::vec4 color;
-};
-struct submit_color_d
-{
-	uint32_t fill, color; int linewidth;
-};
-struct paint_shadow_d
-{
-	glm::vec2 size;
-	glm::vec2 dst_size;
-	glm::vec4 shadow;
-	glm::vec4 color_to;
-	float r = 0;
-	bool rev = false;
-};
-struct grid_fill_r
-{
-	glm::vec2  size; glm::ivec2 cols; int width;
-};
-struct linear_fill_r
-{
-	glm::vec2 size; int count; glm::vec4 cols[0];
-};
-struct arrow_d
-{
-	glm::vec2 p0, p1; float arrow_hwidth, arrow_size; bool type;
-};
-struct rect_v4
-{
-	glm::vec4 rc;
-	glm::vec4 r;
-};
-struct triangle_r
-{
-	glm::vec2 pos;
-	glm::vec2 size;
-	glm::vec2 spos;
-};
-struct circle_r
-{
-	glm::vec2 pos;
-	float r;
-};
-struct ellipse_r
-{
-	glm::vec2 pos;
-	glm::vec2 radius;
-	float rotationAngle;
-};
-struct polyline_r
-{
-	glm::vec2 pos;
-	int points_count;
-	uint32_t col;
-	float thickness;
-	bool closed;
-};
-struct polyline_index_r
-{
-	glm::vec2 pos;
-	int points_count;
-	int idx_count;
-	uint32_t col;
-	float thickness;
-};
-struct image_r
-{
-	image_ptr_t* img;
-	glm::ivec4 rc;
-	glm::ivec4 sliced;
-	glm::ivec2 dsize;
-	glm::ivec2 pos;
-	uint32_t color;
-};
-struct polyline_pd
-{
-	size_t count;
-	bool closed;
-};
-
-struct d2_rt {
-	glm::ivec2 pos;		// 纹理偏移
-	glm::ivec2 size;	// 区域大小
-	glm::ivec2 offset;	// 渲染偏移
-	int surface = 0;
-	int index = 0;
-};
-struct surface_ctx {
-	void* surface;
-	void* ctx;
-};
-
-struct path_d;
-struct image_block;
-struct image_ptr_t;
-struct text_style;
-union fitem_t;
-struct vitext_t
-{
-	fitem_t* t = 0;		// 位图或文本
-	d2_rt* d2 = 0;		// 矢量图
-	size_t first = 0;	// 第一个位置
-	size_t count = 0;	// 渲染数量
-};
-struct cmdrect_v {
-	glm::ivec4 rc = {};	// 渲染区域
-	glm::ivec2 offset;	// 偏移
-	int type = 0;		// 0矢量图，1文本/位图
-	int first = 0, count = 0;// 命令索引
-};
-struct dev_info_cx;
-
-class packer_base;
 
 
 class rvg_cx
@@ -541,10 +546,10 @@ public:
 };
 
 
-void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta);
-// 渲染一段文本
-void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt);
-void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename);
+//void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta);
+//// 渲染一段文本
+//void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt);
+//void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename);
 
 // 区域是否相交
 bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2);

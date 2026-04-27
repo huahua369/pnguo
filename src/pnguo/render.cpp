@@ -1511,9 +1511,10 @@ void mr_v4(glm::vec4& rc, const glm::vec2& it) {
 
 rvg_cx::rvg_cx()
 {
-	_vg_rect.push_back({ INT_MAX,INT_MAX,0,0 });
-	_vg_bs.push_back({});
-	_prc = &_vg_rect.back();
+	push_vrc();
+	//_vg_rect.push_back({ INT_MAX,INT_MAX,0,0 });
+	//_vg_bs.push_back({});
+	//_prc = &_vg_rect.back();
 }
 
 rvg_cx::~rvg_cx()
@@ -1989,7 +1990,7 @@ bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
 }
 void rvg_cx::push_vrc()
 {
-	if (_prc->z > 0.0f && _prc->w > 0.0f)
+	if (!_prc || (_prc->z > 0.0f && _prc->w > 0.0f))
 	{
 		auto rc = glm::ivec4(INT_MAX, INT_MAX, 0, 0);
 		_vg_rect.push_back(rc);
@@ -2017,8 +2018,10 @@ void rvg_cx::merge_vrc(const glm::ivec4& c)
 void rvg_cx::nk_bs()
 {
 	auto n = _cmdtype.size();
-	auto& k = _vg_bs.back();
-	k.y = n; k.z = is_image();
+	if(_vg_bs.size()){
+		auto& k = _vg_bs.back();
+		k.y = n; k.z = is_image();
+	}
 	_vg_bs.push_back({ n,0,0 });
 }
 bool rvg_cx::is_image()
