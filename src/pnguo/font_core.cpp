@@ -9388,3 +9388,35 @@ void ead_font(const std::string& internalDataPath)
 //const char* gpu_shader_vertex_source(gpu_shader_lang_t lang) {
 //	return hb_gpu_shader_vertex_source((hb_gpu_shader_lang_t)lang);
 //}
+
+void mrt_clear(multi_rich_text_t* p)
+{}
+
+void mrt_add_box(multi_rich_text_t * p, const glm::ivec2 & size)
+{}
+
+void mrt_add_text(multi_rich_text_t * p, int box_idx, const void* str, int size, int first, text_style * ts)
+{}
+
+size_t mrt_add_image(multi_rich_text_t * p, int box_idx, image_ptr_t * img, const glm::ivec4 & rc, const glm::ivec4 & sliced, uint32_t color, const glm::ivec2 & dsize, const glm::ivec2 & pos, bool abspos)
+{
+	return size_t();
+}
+
+size_t mrt_add_image_vg(multi_rich_text_t* p, int box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
+{
+	return size_t();
+}
+
+void mrt_build(multi_rich_text_t* p)
+{}
+
+size_t mrt_box_count(multi_rich_text_t* p)
+{
+	return size_t();
+}
+
+box_text_d* mrt_get_box_index(multi_rich_text_t * p, size_t index)
+{
+	return nullptr;
+}

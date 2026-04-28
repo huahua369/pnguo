@@ -146,6 +146,7 @@ union fitem_t;
 struct dev_info_cx;
 struct vg_style_data;
 struct rich_text_t;
+struct box_text_d;
 class packer_base;
 
 // SDL渲染器专用
@@ -528,6 +529,7 @@ public:
 	// 富文本渲染
 	void update(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
+	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
 	// 批量渲染矢量图、位图、文本
 	void update_rvg(rvg_cx* rvg, rvg_data_cx* dst);
 	// 释放渲染器的纹理

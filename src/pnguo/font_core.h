@@ -744,22 +744,35 @@ size_t rt_add_image_vg(rich_text_t* p, void* img_vg, const glm::ivec4& rc, const
 text_block* rt_get_text(rich_text_t* p, size_t idx);	// 直接修改文本保证build前保留文本内存可用
 // 设置新的文本，复制到缓冲区
 bool rt_set_text(rich_text_t* p, size_t idx, const void* str, int size, int first);
-// 获取图片块
+// 获取图片块信息
 image_block* rt_get_image(rich_text_t* p, size_t idx);
 // 构建渲染数据
 void rt_build(rich_text_t* p);
 
-
-//typedef enum {
-//	GPU_SHADER_LANG_GLSL,
-//	GPU_SHADER_LANG_WGSL,
-//	GPU_SHADER_LANG_MSL,
-//	GPU_SHADER_LANG_HLSL,
-//} gpu_shader_lang_t;
-//
-//const char* gpu_shader_fragment_source(gpu_shader_lang_t lang);
-//
-//const char* gpu_shader_vertex_source(gpu_shader_lang_t lang);
-
+struct box_text_d
+{
+	fitem_t* d = 0; size_t first = 0; size_t count = 0;
+	glm::ivec4 view = {};						// p->box.rc;
+	std::vector<text_block>* tbs = 0;
+};
+struct tbox_s {
+	text_box_t box = {};
+	std::vector<size_t> data_index;
+	box_text_d dst = {};
+};
+// 多图文对象：可设置多个区域渲染图文
+struct multi_rich_text_t {
+	rich_text_t rich = {};			// 继承富文本
+	std::vector<tbox_s> boxtext;	// 每个区域的文本data_index
+};
+void mrt_clear(multi_rich_text_t* p);
+void mrt_add_box(multi_rich_text_t* p, const glm::ivec2& size);
+void mrt_add_text(multi_rich_text_t* p, int box_idx, const void* str, int size, int first, text_style* ts);
+size_t mrt_add_image(multi_rich_text_t* p, int box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+size_t mrt_add_image_vg(multi_rich_text_t* p, int box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+void mrt_build(multi_rich_text_t* p);
+// 获取每个区域渲染数据
+size_t mrt_box_count(multi_rich_text_t* p);
+box_text_d* mrt_get_box_index(multi_rich_text_t* p, size_t index);
 
 #endif // !FONT_CORE_H

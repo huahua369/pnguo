@@ -31,6 +31,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 
 
 #include "render.h"
+#include "font_core.h"
 
 #define SP_RGBA32_R_U(v) ((v) & 0xff)
 #define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
@@ -3074,6 +3075,116 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	auto tbp = p->tbs.data();
 	clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
 	for (auto& vt : tm) {
+		if (vt.i.ctype)
+		{
+			auto& it = *vt.i.ib;
+			if (!it.img)continue;
+			auto ipt = _vt.find(it.img);
+			void* tp = 0;
+			if (ipt != _vt.end())
+			{
+				tp = ipt->second;
+			}
+			else {
+				auto kpt = _vgt.find(it.img);
+				if (kpt != _vgt.end())
+					tp = kpt->second;
+			}
+			if (tex != tp || devrtex)
+			{
+				if (tex && opt.size()) {
+					auto nv = opt.size();
+					rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+						((float*)&opt.data()->uv), vsize, nv
+						, idx.data(), idx.size(), sizeof(uint32_t));
+					opt.clear();
+					idx.clear();
+				}
+				tex = tp;
+			}
+			auto lpos = it.layout_pos + it.pos + pos0;
+			auto c = it.color ? it.color : color;
+			if (it.sliced.x > 0 || it.sliced.y > 0 || it.sliced.z > 0 || it.sliced.w > 0)
+			{
+				texture_9grid_dt t9 = {};
+				t9.src_rect = it.rc;
+				t9.dst_rect = glm::vec4(lpos, it.dsize);
+				t9.scale = 0.0;
+				t9.left_width = it.sliced.x, t9.right_width = it.sliced.y, t9.top_height = it.sliced.z, t9.bottom_height = it.sliced.w;
+				t9.tileScale = -1; // 大于0则是9gridtiled中间平铺
+				rcb->render_texture_9grid(renderer, tex, &t9, 1);
+			}
+			else
+			{
+				if (devrtex)
+				{
+					texture_dt p = {};
+					p.dst_rect = glm::vec4(lpos, it.dsize);
+					p.src_rect = it.rc;
+					auto c4 = ucolor2fx(c);
+					rcb->set_texture_color4(tex, &c4);
+					rcb->render_texture(renderer, tex, &p, 1);
+				}
+				else
+				{
+					gen3data(it.img, lpos, it.rc, it.dsize, c, &opt, &idx);
+					tex = tp;
+				}
+			}
+		}
+		else if (vt.f.ctype == 0) {
+			auto& git = vt.f;
+			if (git._image) {
+				auto& tp = _vt[git._image];
+				if (tex != tp)
+				{
+					if (tex && opt.size()) {
+						auto nv = opt.size();
+						rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+							((float*)&opt.data()->uv), vsize, nv
+							, idx.data(), idx.size(), sizeof(uint32_t));
+						opt.clear();
+						idx.clear();
+					}
+					tex = tp;
+				}
+				auto ps = git._dwpos + git._apos;
+				ps += pos;
+				color = tbp[git.tb_idx].style.color;
+				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
+			}
+		}
+	}
+	if (tex && opt.size()) {
+		auto nv = opt.size();
+		rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+			((float*)&opt.data()->uv), vsize, nv
+			, idx.data(), idx.size(), sizeof(uint32_t));
+		opt.clear();
+		idx.clear();
+	}
+}
+
+void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
+{
+	void* renderer = rptr;
+	if (!p || !rcb || !renderer)return;
+	uint32_t color = -1;
+	const int vsize = sizeof(text_vx);
+	void* tex = 0;
+	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
+	auto rect = p->view;
+	glm::ivec4 rc = {};
+	glm::ivec2 pos0 = pos;
+	rect.x += pos.x; rect.y += pos.y;
+	pos0.x += rect.x; pos0.y += rect.y;
+	auto tm = p->d + p->first;
+	auto tbp = p->tbs->data();
+	clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
+
+	for (size_t i = 0; i < p->count; i++)
+	{
+		auto &vt = *(tm + i);
 		if (vt.i.ctype)
 		{
 			auto& it = *vt.i.ib;
