@@ -2041,6 +2041,7 @@ void rvg_cx::new_rc()
 void rvg_cx::push_ct(uint8_t op)
 {
 	_cmdtype.push_back(op);
+	_cmd_pos.push_back(_cmd.size());
 }
 
 
@@ -2603,15 +2604,15 @@ size_t cmd_op_text_style(uint8_t* d, VkvgContext ctx)
 	text_style t = next_value<text_style>(d);
 	return sizeof(text_style);
 }
-size_t cmd_op_add_text(uint8_t* d, VkvgContext ctx)
 //void rvg_cx::add_text(text_st* p, size_t count, text_style* ts)
+size_t cmd_op_add_text(uint8_t* d, void* ctx)
 {
 	auto f = d;
 	text_st t = next_value<text_st>(d);
-	return d - f;
+	return (d - f) + t.text_len;
 }
 
-size_t cmd_op_add_image(uint8_t* d, VkvgContext ctx)
+size_t cmd_op_add_image(uint8_t* d, void* ctx)
 {
 	auto f = d;
 	image_r t = next_value<image_r>(d);
@@ -2685,8 +2686,8 @@ size_t cmd_op_set_color_vec4(uint8_t* d, VkvgContext ctx)
 	vkvg_set_source_rgba(ctx, rgba.x, rgba.y, rgba.z, rgba.w);
 	return sizeof(glm::vec4);
 }
-
-size_t cmd_func(uint8_t c, uint8_t* d, VkvgContext ctx)
+typedef size_t(*cmd_func_type)(uint8_t* d, VkvgContext ctx);
+size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 {
 	//OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
 	//	OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
@@ -2695,15 +2696,15 @@ size_t cmd_func(uint8_t c, uint8_t* d, VkvgContext ctx)
 	//	OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 	//	OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
 	//	OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
-	static size_t(*cbs[])(uint8_t * d, VkvgContext ctx) = { nullptr, cmd_op_submit_style, cmd_op_submit_color, cmd_op_grid_fill, cmd_op_linear_fill, cmd_op_add_arrow,
+	static cmd_func_type cbs[] = { nullptr, cmd_op_submit_style, cmd_op_submit_color, cmd_op_grid_fill, cmd_op_linear_fill, cmd_op_add_arrow,
 		cmd_op_draw_block, cmd_op_draw_path, cmd_op_add_line_ptr, cmd_op_add_rect_double,
 		cmd_op_add_rect_vec4, cmd_op_add_circle, cmd_op_add_ellipse, cmd_op_add_triangle, cmd_op_polyline_vec2,
 		cmd_op_add_polyline_path, cmd_op_add_polyline_vec2_ptr, cmd_op_polylines,
 		cmd_op_paint_shadow, cmd_op_translate,cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
 		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
-		cmd_op_text_style, cmd_op_add_text, cmd_op_add_image, };
+		cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, };
 
-	return c > 0 && c < rvg_cx::OP_MAX_COUNT ? cbs[c](d, ctx) : 0;
+	return c > 0 && c < rvg_cx::OP_MAX_COUNT ? cbs[c](d, (VkvgContext)ctx) : 0;
 }
 
 #endif
@@ -3263,6 +3264,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	} while (dcc > 0);
 	surfaces.resize(sf + 1);
 }
+
 void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 {
 	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
@@ -3280,7 +3282,11 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		it.ctx = ctx_begin(it.surface);
 		vkvg_clear((VkvgContext)it.ctx);
 	}
+
 	auto d = rvg->_cmd.data();
+	auto didx = rvg->_cmd_pos.data();
+	size_t ps = 0;
+	//std::vector<size_t> fvv;
 	dst->dst_data.push_back({});
 	for (auto& it : rvg->_data) {
 		size_t ridx = it.index;
@@ -3321,16 +3327,24 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			if (ct == 0xff)
 			{
 			}
-			size_t n = cmd_func(ct, d, ctx);
-			d += n;
+			auto pss = didx[i];
+			//fvv.push_back(ps);
+			size_t n = call_cmd_func(ct, d + pss, ctx);
+			//d += n;
+			//ps += n;
 		}
 	}
 	for (auto& it : dst->surfaces)
 	{
-		vkvg_surface_resolve((VkvgSurface)it.surface);
-		if (first)
+		if (it.ctx)
+			vkvg_flush((VkvgContext)it.ctx);
+		if (it.surface)
 		{
-			vkvg_surface_write_to_png((VkvgSurface)it.surface, "temp/vgtest1630.png");
+			vkvg_surface_resolve((VkvgSurface)it.surface);
+			if (first)
+			{
+				vkvg_surface_write_to_png((VkvgSurface)it.surface, "temp/vgtest1630.png");
+			}
 		}
 		if (it.ctx)
 			ctx_end(it.ctx);
@@ -3349,6 +3363,23 @@ void canvas2d_t::free_tex()
 		}
 		_vt.clear();
 	}
+}
+
+void canvas2d_t::free_rvg(rvg_data_cx* p)
+{
+	if (!p || p->surfaces.empty())return;
+	for (auto& it : p->surfaces)
+	{
+		if (it.surface)
+		{
+			free_surface(it.surface);
+		}
+	}
+}
+
+glm::ivec2 canvas2d_t::get_size()
+{
+	return glm::ivec2(_view.z, _view.w);
 }
 
 

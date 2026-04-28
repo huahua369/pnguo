@@ -403,8 +403,7 @@ public:
 	};
 	std::vector<uint8_t> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
-	//std::vector<glm::ivec4> _vg_rect;	// 统计矢量图批次渲染的区域
-	//std::vector<glm::ivec3> _vg_bs;		// 统计矢量图批次渲染的索引
+	std::vector<size_t> _cmd_pos;		// 起始数据
 	std::stack<glm::vec2> translate_pos;
 	std::vector<cmdrect_v> _data;		// 渲染数据列表
 	glm::vec2 tpos = {};				// 当前偏移
@@ -487,7 +486,7 @@ public:
 public:
 	rvg_data_cx();
 	~rvg_data_cx();
-	void update(rvg_cx* rvg);
+	void update(rvg_cx* rvg); 
 private:
 
 };
@@ -533,6 +532,8 @@ public:
 	void update_rvg(rvg_cx* rvg, rvg_data_cx* dst);
 	// 释放渲染器的纹理
 	void free_tex();
+	void free_rvg(rvg_data_cx* p);
+	glm::ivec2 get_size();
 };
 
 class clicprect_cx

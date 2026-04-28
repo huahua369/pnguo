@@ -887,40 +887,7 @@ int main()
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
 			glm::ivec2 sc_size = { 1024,1024 };
-			auto ck = td3->new_surface(sc_size.x, sc_size.y);
-			//gbtn->_bst = (int)BTN_STATE::STATE_ACTIVE;
-			{
 
-#define white 1, 1, 1
-#define red   1, 0, 0
-#define green 0, 1, 0
-#define blue  0, 0, 1
-				auto ctx = (VkvgContext)td3->ctx_begin(ck);
-				vkvg_set_line_width(ctx, 2);
-				vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.8);
-				float scale = 1.0;
-				draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
-				vkvg_set_line_width(ctx, 1);
-				vkvg_set_source_rgba(ctx, white, 0.8);
-				double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
-				const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
-				int           contours_size = 3;
-				for (int i = 0; i < contours_size - 1; i++) {
-					auto p = contours_array[i];
-					vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
-					p += 2;
-					while (p < contours_array[i + 1]) {
-						draw_arrow_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
-						p += 2;
-					}
-					vkvg_stroke(ctx);
-				}
-				VkvgSurface t = vkvg_get_target(ctx);
-				vkvg_flush(ctx);
-				vkvg_surface_resolve(t);
-				vkvg_surface_write_to_png(t, "temp/vkvgtest1150.png");
-				td3->ctx_end(ctx);
-			}
 			auto dvv = new div_cx();
 			dvv->set_size({ 500,300 });
 			dvv->set_pos({ 10,360 });
@@ -988,6 +955,7 @@ int main()
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
+					td3->draw_surface(rvgd->surfaces[0].surface, { 600,20 }, glm::ivec4(0, 0, td3->get_size()), td3->get_size() * 0.5);
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -1000,8 +968,8 @@ int main()
 					static int ity = 6;
 					light->_intensity = ity;
 					dvv->update(delta);
-					auto ctx = (VkvgContext)td3->ctx_begin(ck);
-					vkvg_clear(ctx);
+
+
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
 					//rvg.ctx = ctx;
@@ -1012,17 +980,16 @@ int main()
 					rvg.fill();
 					rvg.restore();
 					dvv->draw(&rvg);
-					VkvgSurface t = vkvg_get_target(ctx);
-					vkvg_flush(ctx);
-					vkvg_surface_resolve(t);
-					td3->ctx_end(ctx);
 					td3->update_rvg(&rvg, rvgd);
 
 
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
+					static double kti = 0.0;
+					kti += delta;
+					if (kti > 0.1)
 					{
-						td3->update(ck, delta);
+						kti = 0.0;
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label();
@@ -1113,7 +1080,8 @@ void main()
 			}
 			// 运行消息循环
 			run_app(app, 0);
-			td3->free_surface(ck);
+			td3->free_rvg(rvgd);
+			delete rvgd;
 			delete ptb;
 			delete td3;
 
