@@ -766,10 +766,11 @@ struct multi_rich_text_t {
 	std::vector<tbox_s> boxtext;	// 每个区域的文本data_index
 };
 void mrt_clear(multi_rich_text_t* p);
-void mrt_add_box(multi_rich_text_t* p, const glm::ivec2& size);
-void mrt_add_text(multi_rich_text_t* p, int box_idx, const void* str, int size, int first, text_style* ts);
-size_t mrt_add_image(multi_rich_text_t* p, int box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
-size_t mrt_add_image_vg(multi_rich_text_t* p, int box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+void mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size);
+void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int size, int first, text_style* ts);
+void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+void mrt_add_image_vg(multi_rich_text_t* p, size_t box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
+// 处理数据生成缓存
 void mrt_build(multi_rich_text_t* p);
 // 获取每个区域渲染数据
 size_t mrt_box_count(multi_rich_text_t* p);
