@@ -9417,7 +9417,7 @@ void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int siz
 
 void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p || box_idx >= p->boxtext.size())return;
+	if (!p || box_idx >= p->boxtext.size() || !img)return;
 	auto r = (rich_text_t*)p;
 	auto& rcb = p->boxtext[box_idx];
 	rcb.data_index.push_back(r->data_index.size());
@@ -9427,17 +9427,102 @@ void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const
 
 void mrt_add_image_vg(multi_rich_text_t* p, size_t box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p || box_idx >= p->boxtext.size())return;
+	if (!p || box_idx >= p->boxtext.size() || !img_vg)return;
 	auto r = (rich_text_t*)p;
 	auto& rcb = p->boxtext[box_idx];
 	rcb.data_index.push_back(r->data_index.size());
 	rt_add_image_vg(r, img_vg, rc, sliced, color, dsize, pos, abspos);
 	return;
 }
+struct item_temp_t {
+	layout_block_st* lt = 0; glm::vec2 rct = {};
+	std::vector<glm::ivec3> linex;
+	std::vector<std::vector<glm::ivec4>>  line_data;
+	std::vector<glm::ivec4> bd;
+	glm::ivec2* blhv = 0; glm::ivec4 c4; size_t ct = 0; size_t ct1 = 0;
+	size_t line_count = 0; int64_t cbidx = 0;
+	int line_height = 0; int baseline = 0; float xxx = 0.0f;
+};
+void item_ft(fitem_t& ft, item_temp_t* st) {
+	if (ft.i.ctype == 1)	// 图片占位符
+	{
+		auto img = ft.i.ib;
+		if (st->cbidx >= 0)
+		{
+			st->c4.w = st->ct;
+			st->bd.push_back(st->c4);
+			st->c4.z = st->c4.w = -1;
+		}
+		if (img->is_surface)
+		{
+			st->lt->gv.insert(img->img);
+		}
+		else
+		{
+			st->lt->ov.insert(img->img);
+		}
+		if (img->abspos)
+		{
 
+		}
+		else {
+			glm::ivec4 c = {};
+			c.x = img->dsize.x;
+			c.y = img->dsize.y;
+			c.z = st->ct;
+			c.w = st->ct + 1;
+			// 图片高
+			st->line_height = std::max(c.y, st->line_height);
+			st->bd.push_back(c);
+		}
+		st->cbidx = -1;
+	}
+	// 文本分行
+	else if (ft.f.ctype == 0) {
+		auto& it = ft.f;
+		st->c4.w = st->ct;
+		auto& tbm = st->lt->temp_map[it.tb_idx];
+		auto& bk = tbm._block[it.block_idx];
+		st->baseline = std::max(bk.baseline, st->baseline);
+		st->line_height = std::max(bk.lineheight, st->line_height);
+		if (it.block_idx == st->cbidx)
+		{
+			st->c4.x += it.advance;
+		}
+		else {
+			st->c4.y = st->line_height;
+			st->bd.push_back(st->c4);
+			st->c4.x = it.advance;
+			st->c4.z = st->ct;
+			st->cbidx = it.block_idx;
+		}
+		if (it.cpt == '\n')
+		{
+			st->blhv[st->line_count].x = st->baseline;
+			st->blhv[st->line_count].y = st->line_height;
+			st->c4.y = st->line_height;
+			st->bd.push_back(st->c4);
+			st->c4.x = it.advance;
+			st->c4.z = st->ct;
+			st->cbidx = it.block_idx + 1;
+			st->line_data.push_back(st->bd);
+			st->bd.clear();
+			st->rct.x = std::max(st->rct.x, st->xxx);
+			st->line_count++;
+			st->linex.push_back({ st->ct1,st->ct,st->xxx });
+			st->ct1 = st->ct; st->xxx = 0;
+			st->line_height = 0; st->baseline = 0;
+		}
+		else
+		{
+			st->xxx += it.advance;
+		}
+	}
+	st->ct++;
+}
 // 所有文本排版到一个容器
 void mrt_layout1(tbox_s* pbox, layout_block_st* p) {
-	if (!p)return;
+	if (!p || !pbox)return;
 
 	glm::vec2 rct = {};
 	float xxx = 0;
@@ -9472,90 +9557,15 @@ void mrt_layout1(tbox_s* pbox, layout_block_st* p) {
 	c4.y = line_height;
 	c4.z = 0;
 	auto& tmd = p->temp_map;
+	auto& ut = tmd[0];
 	size_t cline = 0;
-	auto& ov = p->ov;
+	auto ov = &p->ov;
 	p->baselines.resize(p->line_count);
 	auto blhv = p->baselines.data();
 	auto blct = p->baselines.size();
+	auto pdb = &b_data;
+	//for (auto& ft : p->dst_vstr)
 
-	for (auto& ft : p->dst_vstr)
-	{
-		if (ft.i.ctype == 1)	// 图片占位符
-		{
-			auto img = ft.i.ib;
-			if (cbidx >= 0)
-			{
-				c4.w = ct;
-				b_data.push_back(c4);
-				c4.z = c4.w = -1;
-			}
-			if (img->is_surface)
-			{
-				p->gv.insert(img->img);
-			}
-			else
-			{
-				ov.insert(img->img);
-			}
-			if (img->abspos)
-			{
-
-			}
-			else {
-				glm::ivec4 c = {};
-				c.x = img->dsize.x;
-				c.y = img->dsize.y;
-				c.z = ct;
-				c.w = ct + 1;
-				// 图片高
-				line_height = std::max(c.y, line_height);
-				b_data.push_back(c);
-			}
-			cbidx = -1;
-		}
-		// 文本分行
-		else if (ft.f.ctype == 0) {
-			auto& it = ft.f;
-			c4.w = ct;
-			auto& tbm = tmd[it.tb_idx];
-			auto& bk = tbm._block[it.block_idx];
-			baseline = std::max(bk.baseline, baseline);
-			line_height = std::max(bk.lineheight, line_height);
-			if (it.block_idx == cbidx)
-			{
-				c4.x += it.advance;
-			}
-			else {
-				c4.y = line_height;
-				b_data.push_back(c4);
-				c4.x = it.advance;
-				c4.z = ct;
-				cbidx = it.block_idx;
-			}
-			if (it.cpt == '\n')
-			{
-				blhv[line_count].x = baseline;
-				blhv[line_count].y = line_height;
-				c4.y = line_height;
-				b_data.push_back(c4);
-				c4.x = it.advance;
-				c4.z = ct;
-				cbidx = it.block_idx + 1;
-				line_data.push_back(b_data);
-				b_data.clear();
-				rct.x = std::max(rct.x, xxx);
-				line_count++;
-				linex.push_back({ ct1,ct,xxx });
-				ct1 = ct; xxx = 0;
-				line_height = 0; baseline = 0;
-			}
-			else
-			{
-				xxx += it.advance;
-			}
-		}
-		ct++;
-	}
 	if (xxx > 0) {
 		if (c4.z != c4.w) {
 			c4.y = line_height;
