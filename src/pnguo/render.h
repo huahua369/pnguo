@@ -145,7 +145,9 @@ struct text_style;
 union fitem_t;
 struct dev_info_cx;
 struct vg_style_data;
+struct font_family_t;
 struct rich_text_t;
+struct multi_rich_text_t;
 struct box_text_d;
 class packer_base;
 
@@ -476,6 +478,7 @@ private:
 class rvg_data_cx
 {
 public:
+	multi_rich_text_t* mrt = 0;			// 文本渲染管理器
 	packer_base* packer = 0;			// 矩形打包器
 	glm::ivec2 max_rect = {};			// 最大的区域
 	std::vector<d2_rt> dcv;				// 矢量缓存信息 
@@ -504,7 +507,8 @@ public:
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	texture_cb* rcb = 0;
 	void* tex = 0;
-	void* rptr = 0;
+	void* rptr = 0; 
+	font_family_t* familys = 0;				// 默认字体
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
 	uint32_t color = 0;

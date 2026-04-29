@@ -732,6 +732,7 @@ void rt_set_layout(rich_text_t* p, flex_data* rfp = 0, flex_data* cfp = 0);
 void rt_clear(rich_text_t* p);
 // 设置字体大小颜色
 bool rt_text_style(rich_text_t* p, font_family_t* family, int fontsize, uint32_t color);
+bool rt_text_style_ts(rich_text_t* p, text_style* ts);
 // 添加文本，返回索引
 size_t rt_add_text0(rich_text_t* p, const void* str, int size, int first);
 size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text_style* ts);
@@ -766,7 +767,7 @@ struct multi_rich_text_t {
 	std::vector<tbox_s> boxtext;	// 每个区域的文本data_index
 };
 void mrt_clear(multi_rich_text_t* p);
-void mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size);
+size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size);
 void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int size, int first, text_style* ts);
 void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 void mrt_add_image_vg(multi_rich_text_t* p, size_t box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);

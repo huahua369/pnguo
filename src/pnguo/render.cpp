@@ -2600,25 +2600,6 @@ size_t cmd_op_polylines(uint8_t* d, VkvgContext ctx)
 	return d - f;
 }
 
-size_t cmd_op_text_style(uint8_t* d, VkvgContext ctx)
-{
-	text_style t = next_value<text_style>(d);
-	return sizeof(text_style);
-}
-//void rvg_cx::add_text(text_st* p, size_t count, text_style* ts)
-size_t cmd_op_add_text(uint8_t* d, void* ctx)
-{
-	auto f = d;
-	text_st t = next_value<text_st>(d);
-	return (d - f) + t.text_len;
-}
-
-size_t cmd_op_add_image(uint8_t* d, void* ctx)
-{
-	auto f = d;
-	image_r t = next_value<image_r>(d);
-	return d - f;
-}
 size_t cmd_op_paint_shadow(uint8_t* d, VkvgContext ctx)
 {
 	auto p = next_value_p<paint_shadow_d>(d);
@@ -2687,6 +2668,38 @@ size_t cmd_op_set_color_vec4(uint8_t* d, VkvgContext ctx)
 	vkvg_set_source_rgba(ctx, rgba.x, rgba.y, rgba.z, rgba.w);
 	return sizeof(glm::vec4);
 }
+size_t cmd_op_text_style(uint8_t* d, void* ctx)
+{
+	auto pc = (multi_rich_text_t*)ctx;
+	text_style t = next_value<text_style>(d);
+	rt_text_style_ts((rich_text_t*)ctx, &t);
+	return sizeof(text_style);
+}
+//void rvg_cx::add_text(text_st* p, size_t count, text_style* ts)
+size_t cmd_op_add_text(uint8_t* d, void* ctx)
+{
+	auto pc = (multi_rich_text_t*)ctx;
+	auto f = d;
+	text_st t = next_value<text_st>(d);
+	auto idx = mrt_add_box(pc, t.pos, t.size);
+	char* str = 0;
+	if (t.text)
+		str = (char*)d;
+	mrt_add_text(pc, idx, str, t.text_len, 0, 0);
+	return (d - f) + t.text_len;
+}
+
+size_t cmd_op_add_image(uint8_t* d, void* ctx)
+{
+	auto pc = (multi_rich_text_t*)ctx;
+	auto f = d;
+	image_r t = next_value<image_r>(d);
+	auto idx = mrt_add_box(pc, t.pos, t.dsize);
+	mrt_add_image(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
+	return d - f;
+}
+
+
 typedef size_t(*cmd_func_type)(uint8_t* d, VkvgContext ctx);
 size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 {
@@ -2703,7 +2716,7 @@ size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 		cmd_op_add_polyline_path, cmd_op_add_polyline_vec2_ptr, cmd_op_polylines,
 		cmd_op_paint_shadow, cmd_op_translate,cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
 		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
-		cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, };
+		 (cmd_func_type)cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, };
 
 	return c > 0 && c < rvg_cx::OP_MAX_COUNT ? cbs[c](d, (VkvgContext)ctx) : 0;
 }
@@ -3184,7 +3197,7 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 
 	for (size_t i = 0; i < p->count; i++)
 	{
-		auto &vt = *(tm + i);
+		auto& vt = *(tm + i);
 		if (vt.i.ctype)
 		{
 			auto& it = *vt.i.ib;
@@ -3279,10 +3292,16 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 rvg_data_cx::rvg_data_cx()
 {
 	packer = new_packer(10, 10);
+	mrt = new multi_rich_text_t();
 }
 
 rvg_data_cx::~rvg_data_cx()
 {
+	if (mrt)
+	{
+		delete mrt;
+		mrt = 0;
+	}
 	if (packer)
 	{
 		delete packer;
@@ -3383,6 +3402,8 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	dst->pos = rvg->pos;
 	dst->update(rvg);
 	bool first = false;
+	dst->mrt->rich._ct_style.family = familys;
+	mrt_clear(dst->mrt);
 	for (auto& it : dst->surfaces)
 	{
 		if (!it.surface)
@@ -3401,13 +3422,13 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	dst->dst_data.push_back({});
 	for (auto& it : rvg->_data) {
 		size_t ridx = it.index;
-		VkvgContext ctx = nullptr;
+		void* ctx = nullptr;
 		glm::vec2 clips = {};
 		glm::vec2 apos = {};
 		d2_rt* d2 = 0;
 		if (it.type == 0) {
 			auto& rcc = dst->dcv[ridx];
-			ctx = (VkvgContext)dst->surfaces[rcc.surface].ctx;
+			ctx = dst->surfaces[rcc.surface].ctx;
 			if (ridx + 1 < dst->dcv.size())
 			{
 				auto& v = dst->dst_data.back();
@@ -3427,20 +3448,19 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		else {
 			dst->dst_data.push_back({});
 		}
-		static std::set<uint32_t> aa = { rvg_cx::OP_SUBMIT_STYLE,  rvg_cx::OP_SUBMIT_COLOR,rvg_cx::OP_FILL, rvg_cx::OP_STROKE,rvg_cx::OP_FILL_PRESERVE,rvg_cx::OP_STROKE_PRESERVE };
 		for (size_t i = it.first; i < it.second; i++)
 		{
 			auto ct = rvg->_cmdtype[i];
 			if (ct == 0)
 			{
-				vkvg_translate(ctx, apos.x, apos.y);
+				vkvg_translate((VkvgContext)ctx, apos.x, apos.y);
 			}
 			if (ct == 0xff)
 			{
 			}
 			auto pss = didx[i];
 			//fvv.push_back(ps);
-			size_t n = call_cmd_func(ct, d + pss, ctx);
+			size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? ctx : dst->mrt);
 			//d += n;
 			//ps += n;
 		}
@@ -3461,6 +3481,7 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			ctx_end(it.ctx);
 		update((VkvgSurface)it.surface, 0);
 	}
+	mrt_build(dst->mrt);
 	return;
 }
 

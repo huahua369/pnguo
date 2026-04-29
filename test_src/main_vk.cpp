@@ -869,6 +869,7 @@ int main()
 			auto rvgd = new rvg_data_cx();
 			td3->set_renderer(form0->renderer, pcb, { 0,0,ws.x, ws.y });
 			td3->init_vgdev(&devinfo, 8);
+			td3->familys = family;
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
 			//VkvgSurface sf = td3->vgdev->new_surface(vki.vkimage, 0, vki.size.x, vki.size.y);

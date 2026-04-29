@@ -7303,7 +7303,6 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->set_color(borderDark);
 	rv->add_rect({ tps.x,tps.y, w , h }, rounding);
 	rv->stroke();
-
 	text_style st = {};
 	st.fontsize = p->font_size;
 	st.align = p->text_align;

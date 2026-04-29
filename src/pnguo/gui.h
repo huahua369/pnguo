@@ -568,7 +568,7 @@ struct gradient_btn :public widget_t
 	//icon_rt icon = {};
 	//size_t len = 0; 
 	uint32_t back_color = 0;
-	uint32_t text_color = 0;
+	uint32_t text_color = 0xff000000;
 	uint32_t text_color_shadow = 0x88111111;
 	double opacity = 1.0;
 	// x=默认，y=鼠标进入，z=按下
