@@ -944,7 +944,7 @@ int main()
 				}
 			}
 			auto gr = new group_radio_t();
-			for (int i = 0; i < 2;i++) {
+			for (int i = 0; i < 3; i++) {
 				auto r = new radio_tl();
 				r->gr = gr;
 				r->set_size({ 36,36 });

@@ -1736,9 +1736,9 @@ void rvg_cx::add_circle(const glm::vec2& pos, float r)
 	push_ct(OP_ADD_CIRCLE);
 	circle_r t = { pos,r };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
-
+	r += 2;
 	auto ps = tpos + pos;
-	merge_vrc(glm::ivec4(ps - r, ps.x + r, ps.y + r));
+	merge_vrc(glm::ivec4(ps - r, ps + r));
 }
 
 void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle)
@@ -2417,7 +2417,8 @@ size_t cmd_op_add_circle(uint8_t* d, VkvgContext ctx)
 {
 	glm::vec2* pos = (glm::vec2*)d;
 	float r = *(float*)(pos + 1);
-	vkvg_arc(ctx, pos->x, pos->y, r, 0, 2 * M_PI);
+	vkvg_ellipse(ctx, r, r, pos->x, pos->y, 0);
+	//vkvg_arc(ctx, pos->x, pos->y, r, 0, 2 * M_PI);
 	return sizeof(glm::vec2) + sizeof(float);
 }
 size_t cmd_op_add_ellipse(uint8_t* d, VkvgContext ctx)

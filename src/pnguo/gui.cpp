@@ -7361,7 +7361,7 @@ void radio_tl::draw(rvg_cx* rv)
 		glm::ivec2 poss = p->_pos;
 		rv->translate((glm::vec2)poss);
 		//rv->add_rect({ 0,0,get_size() }, 0);
-		//rv->set_color(-1);
+		//rv->set_color(0);
 		//rv->fill();
 		rv->translate(glm::vec2(_size.x * 0.5 - style.radius, _size.y * 0.5 - style.radius));//+ glm::vec2(0.5f, 0.5f)
 		int x = 0;
