@@ -2684,6 +2684,8 @@ size_t cmd_op_add_text(uint8_t* d, void* ctx)
 	text_st t = next_value<text_st>(d);
 	auto idx = mrt_add_box(pc, t.pos, t.size);
 	char* str = 0;
+	auto pb = mrt_get_boxinfo(pc, idx);
+ 
 	if (t.text)
 		str = (char*)d;
 	mrt_add_text(pc, idx, str, t.text_len, 0, 0);
@@ -3097,7 +3099,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
 	auto rect = p->box.tbox.rc;
 	glm::ivec4 rc = {};
-	glm::ivec2 pos0 = pos;
+	glm::ivec2 pos0 = {};
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto& tm = p->layout.dst_vstr;
@@ -3178,7 +3180,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 					tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
-				ps += pos;
+				ps += pos0;
 				color = tbp[git.tb_idx].style.color;
 				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
@@ -3204,7 +3206,7 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
 	auto rect = p->view;
 	glm::ivec4 rc = {};
-	glm::ivec2 pos0 = pos;
+	glm::ivec2 pos0 = {};
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto tm = p->d + p->first;
@@ -3288,7 +3290,7 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 					tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
-				ps += pos;
+				ps += pos0;
 				color = tbp[git.tb_idx].style.color;
 				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
@@ -3438,7 +3440,6 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	size_t ps = 0;
 	//std::vector<size_t> fvv;
 	dst->dst_data.clear();
-	dst->dst_data.push_back({});
 	auto dp = dst->dcv.data();
 	for (auto& it : rvg->_data) {
 		size_t ridx = it.index;
@@ -3448,8 +3449,9 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		if (it.type == 0) {
 			auto& rcc = dst->dcv[ridx];
 			ctx = dst->surfaces[rcc.surface].ctx;
-			if (it.rc.z > 0 && it.rc.w > 0 && ridx + 1 < dst->dcv.size())
+			if (it.rc.z > 0 && it.rc.w > 0 && ridx < dst->dcv.size())
 			{
+				dst->dst_data.push_back({});
 				auto& v = dst->dst_data.back();
 				if (!v.d2)
 				{
@@ -3469,7 +3471,6 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			vt.count = 1;
 			vt.t = (box_text_d*)1;
 			dst->dst_data.push_back(vt);
-			dst->dst_data.push_back({});
 		}
 		for (size_t i = it.first; i < it.second; i++)
 		{

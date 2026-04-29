@@ -884,20 +884,21 @@ int main()
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
 			auto mtext = new rich_text_t();
-			auto mrtext = new multi_rich_text_t();
-			text_style nst = {};
-			nst.family = family;
-			nst.fontsize = 20;
+			//auto mrtext = new multi_rich_text_t();
+			//text_style nst = {};
+			//nst.family = family;
+			//nst.fontsize = 20;
 
-			auto bidx = mrt_add_box(mrtext, { 400,20 }, { 850,300 });
-			mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
-			str = "abcdefg";
-			bidx = mrt_add_box(mrtext, { 400,200 }, { 850,300 });
-			mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
-			auto pbox = mrt_get_boxinfo(mrtext, 0);
-			pbox->auto_break = 1;
-			pbox->ellipsis;
-			mrt_build(mrtext);
+			//auto bidx = mrt_add_box(mrtext, { 400,20 }, { 850,300 });
+			//mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
+			//str = "abcdefg";
+			//bidx = mrt_add_box(mrtext, { 400,200 }, { 850,300 });
+			//mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
+			//auto pbox = mrt_get_boxinfo(mrtext, 0);
+			//pbox->auto_break = 1;
+			//pbox->word_wrap = 1;
+			//pbox->ellipsis;
+			//mrt_build(mrtext);
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
@@ -934,7 +935,7 @@ int main()
 				btn->gradBot = gradBot;
 				btn->font_size = 16;
 				btn->text_color = -1;
-				btn->str = "button " + std::to_string(i);
+				btn->str = (char*)u8"按钮gbutton " + std::to_string(i);
 				if (i == 4) {
 					//btn->borderLight = blackb.y;
 					//btn->borderDark = blackb.x;
@@ -973,8 +974,8 @@ int main()
 					td3->draw_surface(rvgd->surfaces[0].surface, { 600,20 }, glm::ivec4(0, 0, td3->get_size()), td3->get_size() * 0.5);
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
-					td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
-					td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
+					//td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
+					//td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{

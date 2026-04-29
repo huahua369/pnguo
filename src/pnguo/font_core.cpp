@@ -8499,6 +8499,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p) {
 	{
 		tf[1] = *box.flex_child;
 	}
+	rc.x = 0; rc.y = 0;
 	std::vector<node_dt> fv;
 	std::vector<glm::ivec3> linex;
 	fv.resize(dst_vstr.size() + 1);
@@ -9431,6 +9432,7 @@ void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int siz
 	auto r = (rich_text_t*)p;
 	auto& rcb = p->boxtext[box_idx];
 	rcb.data_index.push_back(r->data_index.size());
+	rcb.box.tbox.text_align = ts ? ts->align : r->_ct_style.align;
 	auto c = ts ? rt_add_text_ts(r, str, size, first, ts) : rt_add_text0(r, str, size, first);
 
 }
@@ -9547,7 +9549,7 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 	glm::vec2 rct = {};
 	auto& box = pbox->box;
 	auto text_align = box.tbox.text_align;
-	auto& dst_vstr = p->dst_vstr;
+	auto tbs = pbox->dst.tbs->data();
 	item_temp_t st = {};
 	glm::ivec4 rc = box.tbox.rc;
 	glm::vec2 ss = { rc.z,rc.w };
@@ -9561,7 +9563,7 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 	//	tf[1] = *r->flex_child;
 	//}
 	st.lt = p;
-
+	rc.x = 0; rc.y = 0;
 	std::vector<node_dt> fv;
 	tf->wrap = box.tbox.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
 	//size_t ct = 0, ct1 = 0;
@@ -9582,10 +9584,10 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 		std::vector<size_t> data_index;
 		box_text_d dst = {};
 	};
-	auto dstv = p->dst_vstr.data();
+	auto dstv = p->dst_vstr.data() + pbox->dst.first;
 	size_t dcount = pbox->dst.count;
 	{
-		auto tt = dstv + pbox->dst.first;
+		auto tt = dstv;
 		for (size_t i = 0; i < dcount; i++)
 		{
 			auto& it = tt[i];
@@ -9623,9 +9625,11 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 	ps.x += rc.x;
 	ps.y += rc.y;
 	int64_t yh = 0;
+	glm::vec2 asize = {};
 	auto lc = st.line_data.size();
 	size_t xp = 0;
-	auto kt = dst_vstr.data();
+	auto kt = dstv;
+	int mx = 0;
 	for (size_t i = 0; i < lc; i++)
 	{
 		auto& it = st.line_data[i];
@@ -9644,6 +9648,14 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 			t->index = 1;
 		}
 		auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
+		asize.x = std::max(asize.x, nrc.z);
+		if(kt->f.ctype==0){
+			auto tts = tbs + kt->f.tb_idx;
+			asize.y += tts->style.fontsize;
+		}
+		else {
+			asize.y += kt->i.ib->dsize.y;
+		}
 		for (size_t y = 0; y < fnode->child_count; y++)
 		{
 			auto t0 = fnode->child + y;
@@ -9664,6 +9676,7 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 					dt._apos.x += px;
 					dt._apos.y += fnode->baseline;
 					px += dt.advance;
+					mx = std::max(mx, dt._apos.y);
 				}break;
 				case 1:
 				{
@@ -9674,6 +9687,20 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 			}
 		}
 		yh += nrc.w;
+	}
+
+	if (text_align.x > 0 || text_align.y > 0) {
+		glm::vec2 lw = { rc.z,rc.w }; 
+		glm::vec2 arc = lw - asize;
+		arc *= text_align;
+		for (size_t i = 0; i < dcount; i++)
+		{
+			auto it = dstv + i;
+			if (it->i.ctype == 0)
+				it->f._apos += arc;
+			else if (it->i.ctype)
+				it->i.ib->layout_pos += arc;
+		}
 	}
 	return;
 }
