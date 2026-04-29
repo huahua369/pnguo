@@ -7260,39 +7260,6 @@ void gradient_btn::draw(rvg_cx* rv)
 	}
 	ns -= thickness * 4;
 	glm::vec4 rc = { ps, ns };
-
-#if 1
-	//text_style_t st = {};
-	//st.font = 0;
-	//st.text_align = p->text_align;
-	//st.font_size = p->font_size;
-	//st.text_color = p->text_color;
-	//st.shadow_pos = { thickness, thickness };
-	//st.text_color_shadow = text_color_shadow;
-	//{
-	//	int font = 0;
-	//	glm::vec2 text_align = { 0.0,0.5 };
-	//	glm::vec2 shadow_pos = { 1.0,1.0 };
-	//	int font_size = 18;
-	//	uint32_t text_color = 0xffffffff;
-	//	uint32_t text_color_shadow = 0;
-	//};
-	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
-
-#else
-
-	ltx->tem_rtv.clear();
-	ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
-	ltx->update_text();
-	if (text_color_shadow)
-	{
-		cairo_as _aa_(g);
-		cairo_translate(g, thickness, thickness);
-		ltx->draw_text(g, ltx->tem_rtv, text_color_shadow);
-	}
-	ltx->draw_text(g, ltx->tem_rtv, p->text_color);
-
-#endif // 1
 	// 边框
 	w -= 1;
 	h -= 1;
@@ -7308,7 +7275,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	st.align = p->text_align;
 	st.color = p->text_color;
 	text_st tx = {};
-	tx.pos = {};
+	tx.pos = { 0,thickness * .5 };
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, &st);
@@ -7326,7 +7293,7 @@ void draw_radios(rvg_cx* rv, radio_info_t* p, radio_style_t* ps)
 		if (p->value || p->swidth > 0)
 			rv->submit(ps->col, 0, ps->thickness);
 		else
-			rv->submit(0, ps->line_col, ps->thickness);
+			rv->submit(ps->innc, ps->line_col, ps->thickness);
 	}
 	if (p->swidth > 0) {
 		rv->add_circle(p->pos, p->swidth);
@@ -7392,13 +7359,16 @@ void radio_tl::draw(rvg_cx* rv)
 
 		rv->save();
 		glm::ivec2 poss = p->_pos;
-		poss.y += _size.y * 0.5 - style.radius;
-		rv->translate((glm::vec2)poss + glm::vec2(0.5f, 0.5f));
+		rv->translate((glm::vec2)poss);
+		//rv->add_rect({ 0,0,get_size() }, 0);
+		//rv->set_color(-1);
+		//rv->fill();
+		rv->translate(glm::vec2(_size.x * 0.5 - style.radius, _size.y * 0.5 - style.radius));//+ glm::vec2(0.5f, 0.5f)
 		int x = 0;
 		{
 			auto& it = v;
 			it.pos = {};
-			it.pos.x = x * style.radius * 5;
+			it.pos.x = x * style.radius * 0.5;
 			it.pos += style.radius;
 			draw_radios(rv, &it, &style);
 			x++;

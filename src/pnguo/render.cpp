@@ -1738,7 +1738,7 @@ void rvg_cx::add_circle(const glm::vec2& pos, float r)
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 
 	auto ps = tpos + pos;
-	merge_vrc(glm::ivec4(ps, ps.x + r, ps.y + r));
+	merge_vrc(glm::ivec4(ps - r, ps.x + r, ps.y + r));
 }
 
 void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle)
@@ -1749,7 +1749,7 @@ void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotatio
 
 	auto ps = tpos + pos;
 	float xr = std::max(r.x, r.y);
-	merge_vrc(glm::ivec4(ps, ps.x + xr, ps.y + xr));
+	merge_vrc(glm::ivec4(ps - xr, ps.x + xr, ps.y + xr));
 }
 void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
 {
@@ -2685,7 +2685,7 @@ size_t cmd_op_add_text(uint8_t* d, void* ctx)
 	auto idx = mrt_add_box(pc, t.pos, t.size);
 	char* str = 0;
 	auto pb = mrt_get_boxinfo(pc, idx);
- 
+
 	if (t.text)
 		str = (char*)d;
 	mrt_add_text(pc, idx, str, t.text_len, 0, 0);
@@ -3360,7 +3360,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		if (it.type == 0)
 			it.second = it1.first;
 	}
-	for (size_t i = 1; i < data.size() - 1; i++)
+	for (size_t i = 1; i < data.size(); i++)
 	{
 		auto& it = data[i];
 		auto& it1 = data[i - 1];

@@ -943,6 +943,16 @@ int main()
 					btn->gradBot = gradBot1;
 				}
 			}
+			auto gr = new group_radio_t();
+			for (int i = 0; i < 2;i++) {
+				auto r = new radio_tl();
+				r->gr = gr;
+				r->set_size({ 36,36 });
+				r->style.line_col = 0xffff8020;
+				r->style.thickness = 1;
+				r->style.radius = 7;
+				dvv->add_widget(r);
+			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
 				div->on_event(type, e);

@@ -9649,7 +9649,7 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 		}
 		auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
 		asize.x = std::max(asize.x, nrc.z);
-		if(kt->f.ctype==0){
+		if (kt->f.ctype == 0) {
 			auto tts = tbs + kt->f.tb_idx;
 			asize.y += tts->style.fontsize;
 		}
@@ -9690,7 +9690,7 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 	}
 
 	if (text_align.x > 0 || text_align.y > 0) {
-		glm::vec2 lw = { rc.z,rc.w }; 
+		glm::vec2 lw = { rc.z,rc.w };
 		glm::vec2 arc = lw - asize;
 		arc *= text_align;
 		for (size_t i = 0; i < dcount; i++)
