@@ -3011,16 +3011,19 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 	if (!rcb || !renderer)return;
 	if (!dst || dst->dst_data.empty())return;
 	glm::vec2 pos = dst->pos;
-	for (auto& dt : dst->dst_data) {
-		if (dt.t)
+	auto length = dst->dst_data.size();
+	for (size_t m = 0; m < length; m++)
+	{
+		auto& vt = dst->dst_data[m];
+		if (vt.t)
 		{
-			draw_boxtext(dt.t, pos);
+			draw_boxtext(vt.t, pos);
 		}
-		else if (dt.d2)
+		else if (vt.d2)
 		{
-			for (size_t i = 0; i < dt.count; i++)
+			for (size_t i = 0; i < vt.count; i++)
 			{
-				auto it = dt.d2 + dt.first + i;
+				auto it = vt.d2 + vt.first + i;
 				auto surface = dst->surfaces[it->surface].surface;
 				auto& tp = _vgt[surface];
 				if (tp)
@@ -3366,10 +3369,12 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	f = {};
 	f.first = data.back().second;
 	f.second = cmd_count;
-	data.push_back(f);
+	if (f.first != f.second)
+		data.push_back(f);
 	data.swap(rvg->_data);
 	for (auto& it : rvg->_data) {
-		if (it.rc.z < 1 || it.rc.w < 1)continue;
+		if (it.rc.z < 1 || it.rc.w < 1)
+			continue;
 		d2_rt d = {};
 		d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
 		d.size += stwidth * 2;
@@ -3434,22 +3439,22 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	//std::vector<size_t> fvv;
 	dst->dst_data.clear();
 	dst->dst_data.push_back({});
+	auto dp = dst->dcv.data();
 	for (auto& it : rvg->_data) {
 		size_t ridx = it.index;
 		void* ctx = nullptr;
 		glm::vec2 clips = {};
 		glm::vec2 apos = {};
-		d2_rt* d2 = 0;
 		if (it.type == 0) {
 			auto& rcc = dst->dcv[ridx];
 			ctx = dst->surfaces[rcc.surface].ctx;
-			if (ridx + 1 < dst->dcv.size())
+			if (it.rc.z > 0 && it.rc.w > 0 && ridx + 1 < dst->dcv.size())
 			{
 				auto& v = dst->dst_data.back();
 				if (!v.d2)
 				{
-					v.d2 = &rcc;
-					v.first = 0;
+					v.d2 = dp;
+					v.first = ridx;
 				}
 				v.count++;
 				ridx++;
@@ -3457,7 +3462,6 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			clips = rcc.size;
 			apos = rcc.pos - rcc.offset;
 			apos += stwidth;
-			d2 = &rcc;
 		}
 		else {
 			vitext_t vt = {};

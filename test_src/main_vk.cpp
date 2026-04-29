@@ -889,14 +889,14 @@ int main()
 			nst.family = family;
 			nst.fontsize = 20;
 
-			mrt_add_box(mrtext, { 400,20 }, { 850,300 });
-			mrt_add_text(mrtext, 0, str.c_str(), str.size(), 0, &nst);
+			auto bidx = mrt_add_box(mrtext, { 400,20 }, { 850,300 });
+			mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
 			str = "abcdefg";
-			mrt_add_box(mrtext, { 400,200 }, { 850,300 });
-			mrt_add_text(mrtext, 0, str.c_str(), str.size(), 0, &nst);
+			bidx = mrt_add_box(mrtext, { 400,200 }, { 850,300 });
+			mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
 			auto pbox = mrt_get_boxinfo(mrtext, 0);
-	/*		pbox->auto_break = 1;
-			pbox->ellipsis;*/
+			pbox->auto_break = 1;
+			pbox->ellipsis;
 			mrt_build(mrtext);
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
@@ -970,9 +970,9 @@ int main()
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					td3->draw_surface(rvgd->surfaces[0].surface, { 600,20 }, glm::ivec4(0, 0, td3->get_size()), td3->get_size() * 0.5);
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
-					td3->draw_surface(rvgd->surfaces[0].surface, { 600,20 }, glm::ivec4(0, 0, td3->get_size()), td3->get_size() * 0.5);
 					td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
 					td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
 				};
@@ -991,11 +991,10 @@ int main()
 
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
-					//rvg.ctx = ctx;
 					rvg.save();
 					rvg.push_null(0);
 					rvg.add_rect({ 0,0,dvv->get_size() }, 5);
-					rvg.set_color(0xff888888);
+					rvg.set_color(0xaf888888);
 					rvg.fill();
 					rvg.restore();
 					dvv->draw(&rvg);
