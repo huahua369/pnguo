@@ -252,7 +252,7 @@ struct surface_ctx {
 
 struct vitext_t
 {
-	fitem_t* t = 0;		// 位图或文本
+	box_text_d* t = 0;		// 位图或文本
 	d2_rt* d2 = 0;		// 矢量图
 	size_t first = 0;	// 第一个位置
 	size_t count = 0;	// 渲染数量

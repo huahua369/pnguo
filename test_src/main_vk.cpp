@@ -884,6 +884,20 @@ int main()
 			text_t1_set(ptb, &tbox);
 			auto ptb1 = new text_t1();
 			auto mtext = new rich_text_t();
+			auto mrtext = new multi_rich_text_t();
+			text_style nst = {};
+			nst.family = family;
+			nst.fontsize = 20;
+
+			mrt_add_box(mrtext, { 400,20 }, { 850,300 });
+			mrt_add_text(mrtext, 0, str.c_str(), str.size(), 0, &nst);
+			str = "abcdefg";
+			mrt_add_box(mrtext, { 400,200 }, { 850,300 });
+			mrt_add_text(mrtext, 0, str.c_str(), str.size(), 0, &nst);
+			auto pbox = mrt_get_boxinfo(mrtext, 0);
+	/*		pbox->auto_break = 1;
+			pbox->ellipsis;*/
+			mrt_build(mrtext);
 			rt_set(mtext, &tbox);
 			tbox.rc = { 10,320,1500,600 };
 			text_t1_set(ptb1, &tbox);
@@ -918,6 +932,8 @@ int main()
 				btn->borderDark = blackb.y;
 				btn->gradTop = gradTop;
 				btn->gradBot = gradBot;
+				btn->font_size = 16;
+				btn->text_color = -1;
 				btn->str = "button " + std::to_string(i);
 				if (i == 4) {
 					//btn->borderLight = blackb.y;
@@ -957,6 +973,8 @@ int main()
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					td3->draw_surface(rvgd->surfaces[0].surface, { 600,20 }, glm::ivec4(0, 0, td3->get_size()), td3->get_size() * 0.5);
+					td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
+					td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
 				};
 			form0->up_cb = [=, &wait2d](float delta, int* ret)
 				{
@@ -977,7 +995,7 @@ int main()
 					rvg.save();
 					rvg.push_null(0);
 					rvg.add_rect({ 0,0,dvv->get_size() }, 5);
-					rvg.set_color(0xaf555555);
+					rvg.set_color(0xff888888);
 					rvg.fill();
 					rvg.restore();
 					dvv->draw(&rvg);
@@ -998,6 +1016,7 @@ int main()
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
 						str = (char*)u8"渐变色表情: 💻🔥➗️👪️🍕";
+						//str = (char*)u8"abcdefg";
 						// 添加文本
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
 						//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本

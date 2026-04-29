@@ -1865,13 +1865,14 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	auto pd = (text_st*)(_cmd.data() + idx);
 	size_t ct = 0;
 	auto tps = _cmd.size();
+	auto pos = p->pos + tpos;
+	pd->pos += pos;
 	for (size_t i = 0; i < 1; i++)
 	{
 		_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
 		pd->text = (char*)tps + ct;
 		ct += pd->text_len;
 	}
-	auto pos = p->pos + tpos;
 	glm::vec4 rc = { pos ,pos + p->size };
 	merge_vrc(rc);
 }
@@ -3008,23 +3009,35 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 {
 	void* renderer = rptr;
 	if (!rcb || !renderer)return;
-	if (!dst || dst->dcv.empty())return;
-	for (auto& it : dst->dcv) {
-		auto surface = dst->surfaces[it.surface].surface;
-		auto& tp = _vgt[surface];
-		if (tp)
+	if (!dst || dst->dst_data.empty())return;
+	glm::vec2 pos = dst->pos;
+	for (auto& dt : dst->dst_data) {
+		if (dt.t)
 		{
-			texture_dt dt = {};
-			auto ost = it.offset;
-			ost += dst->pos;
-			ost -= stwidth;
-			auto ss = it.size;
-			ss -= stwidth;
-			dt.dst_rect = glm::vec4(ost, ss);
-			auto pos = it.pos;
-			pos += stwidth;
-			dt.src_rect = glm::vec4(it.pos, ss);
-			rcb->render_texture(renderer, tp, &dt, 1);
+			draw_boxtext(dt.t, pos);
+		}
+		else if (dt.d2)
+		{
+			for (size_t i = 0; i < dt.count; i++)
+			{
+				auto it = dt.d2 + dt.first + i;
+				auto surface = dst->surfaces[it->surface].surface;
+				auto& tp = _vgt[surface];
+				if (tp)
+				{
+					texture_dt dt = {};
+					auto ost = it->offset;
+					ost += dst->pos;
+					ost -= stwidth;
+					auto ss = it->size;
+					ss -= stwidth;
+					dt.dst_rect = glm::vec4(ost, ss);
+					auto pos = it->pos;
+					pos += stwidth;
+					dt.src_rect = glm::vec4(it->pos, ss);
+					rcb->render_texture(renderer, tp, &dt, 1);
+				}
+			}
 		}
 	}
 }
@@ -3079,7 +3092,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	const int vsize = sizeof(text_vx);
 	void* tex = 0;
 	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
-	auto rect = p->box.rc;
+	auto rect = p->box.tbox.rc;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = pos;
 	rect.x += pos.x; rect.y += pos.y;
@@ -3193,7 +3206,7 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto tm = p->d + p->first;
 	auto tbp = p->tbs->data();
-	clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
+	//clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
 
 	for (size_t i = 0; i < p->count; i++)
 	{
@@ -3419,6 +3432,7 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
 	//std::vector<size_t> fvv;
+	dst->dst_data.clear();
 	dst->dst_data.push_back({});
 	for (auto& it : rvg->_data) {
 		size_t ridx = it.index;
@@ -3446,6 +3460,11 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			d2 = &rcc;
 		}
 		else {
+			vitext_t vt = {};
+			vt.first = mrt_box_count(dst->mrt);
+			vt.count = 1;
+			vt.t = (box_text_d*)1;
+			dst->dst_data.push_back(vt);
 			dst->dst_data.push_back({});
 		}
 		for (size_t i = it.first; i < it.second; i++)
@@ -3482,6 +3501,12 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		update((VkvgSurface)it.surface, 0);
 	}
 	mrt_build(dst->mrt);
+	for (auto& it : dst->dst_data) {
+		if (it.t)
+		{
+			it.t = mrt_get_box_index(dst->mrt, (size_t)it.first);
+		}
+	}
 	return;
 }
 

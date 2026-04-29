@@ -6,6 +6,7 @@
 
 #include <string> 
 #include <vector> 
+#include <set> 
 
 glm::vec4 ucolor2fx(uint32_t color);
 glm::vec4 ucolor2f(uint32_t c);
@@ -612,7 +613,7 @@ struct text_style
 {
 	font_family_t* family = 0;
 	float fontsize = 0;
-	uint32_t color = 0;
+	uint32_t color = 0xFFffffff;
 	glm::vec2 align = { 0.0,0.0 };// 文本对齐
 };
 // 文本区域
@@ -710,14 +711,17 @@ struct layout_block_st {
 	std::set<image_ptr_t*> ov;				// *用到的字体纹理对象
 	std::set<void*> gv;						// *用到的vkvg纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
+};
+struct box_info_t {
+	text_box_t tbox = {};			// *文本区域信息
+	flex_data* flex = 0;			// *容器的flex布局参数
+	flex_data* flex_child = 0;		// *文本的flex布局参数
 	std::vector<glm::ivec2> baselines;		// 每行的基线，行高
-	size_t line_count = 0;
+	size_t line_count = 0;			// 统计行数
 };
 // 图文对象
 struct rich_text_t {
-	text_box_t box = {};			// *文本区域信息
-	flex_data* flex = 0;			// *容器的flex布局参数
-	flex_data* flex_child = 0;		// *文本的flex布局参数
+	box_info_t box = {};
 	std::vector<text_block> tbs;	// *文本块信息
 	std::vector<image_block> ibs;	// *图片块信息
 	std::vector<glm::ivec2> data_index;	// *文本块和图片块在渲染数据中的索引位置，x为文本块索引，y为图片块索引，-1则不使用
@@ -757,7 +761,7 @@ struct box_text_d
 	std::vector<text_block>* tbs = 0;
 };
 struct tbox_s {
-	text_box_t box = {};
+	box_info_t box = {};
 	std::vector<size_t> data_index;
 	box_text_d dst = {};
 };
@@ -768,6 +772,7 @@ struct multi_rich_text_t {
 };
 void mrt_clear(multi_rich_text_t* p);
 size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size);
+text_box_t* mrt_get_boxinfo(multi_rich_text_t* p, size_t idx);
 void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int size, int first, text_style* ts);
 void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
 void mrt_add_image_vg(multi_rich_text_t* p, size_t box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);

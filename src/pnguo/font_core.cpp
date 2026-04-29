@@ -8175,15 +8175,15 @@ void rt_set(rich_text_t* p, text_box_t* box)
 	if (!p || !box)return;
 	if (box)
 	{
-		p->box = *box;
+		p->box.tbox = *box;
 	}
 }
 
 void rt_set_layout(rich_text_t* p, flex_data* rfp, flex_data* cfp)
 {
 	if (!p)return;
-	if (rfp) { p->flex = rfp; }
-	if (cfp) { p->flex_child = cfp; }
+	if (rfp) { p->box.flex = rfp; }
+	if (cfp) { p->box.flex_child = cfp; }
 }
 
 void rt_clear(rich_text_t* p)
@@ -8195,7 +8195,8 @@ void rt_clear(rich_text_t* p)
 		p->data_index.clear();
 		p->layout.dst_vstr.clear();
 		p->layout.temp_map.clear();
-		p->layout.baselines.clear();
+		p->box.baselines.clear();
+		p->box.line_count = 0;
 	}
 }
 bool rt_text_style(rich_text_t* p, font_family_t* family, int fontsize, uint32_t color)
@@ -8344,9 +8345,9 @@ void rt_bidi(std::u16string* bidi_str, std::vector<bidi_item>& bv, const char* s
 
 	return;
 }
-void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
+void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size_t tb_idx)
 {
-	if (!pt || !rt)return;
+	if (!pt || !rt || !pbox)return;
 	std::vector<hb_tag_t> vv;
 	text_block* tb = &rt->tbs[tb_idx];
 	if (!tb->style.family)return;
@@ -8358,7 +8359,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 	auto str16 = (uint16_t*)p->bidi_str.c_str();
 	auto& ov = pt->ov;
 	auto& dst_vstr = pt->dst_vstr;
-	auto& box = rt->box;
+	auto& box = pbox->tbox;
 	ut.first = dst_vstr.size();
 	vstr.clear();
 	do {
@@ -8416,7 +8417,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 			}
 			if (ch == '\n')
 			{
-				pt->line_count++;
+				pbox->line_count++;
 				//pt->baselines.push_back({ baseline, dh });
 				dh = tb->line_height;
 				baseline = tb->baseline;
@@ -8467,7 +8468,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, size_t tb_idx)
 		bidx++;
 	}
 	if (last_is_break)
-		pt->line_count++;
+		pbox->line_count++;
 	//	pt->baselines.push_back({ baseline, dh });
 	tb->line_height = dh;
 	tb->baseline = baseline;
@@ -8482,27 +8483,27 @@ void rt_layout1(rich_text_t* r, layout_block_st* p) {
 	float xxx = 0;
 	int line_count = 0;
 	auto& box = r->box;
-	auto ta = box.text_align;
+	auto ta = box.tbox.text_align;
 	auto& dst_vstr = p->dst_vstr;
 	int baseline = 0;
 	int line_height = 0;
 	glm::vec2 tps = {};
-	glm::ivec4 rc = box.rc;
+	glm::ivec4 rc = box.tbox.rc;
 	glm::vec2 ss = { rc.z,rc.w }, bearing = { 0,baseline };
 	flex_data tf[2] = {};
-	if (r->flex)
+	if (box.flex)
 	{
-		tf[0] = *r->flex;
+		tf[0] = *box.flex;
 	}
-	if (r->flex_child)
+	if (box.flex_child)
 	{
-		tf[1] = *r->flex_child;
+		tf[1] = *box.flex_child;
 	}
 	std::vector<node_dt> fv;
 	std::vector<glm::ivec3> linex;
 	fv.resize(dst_vstr.size() + 1);
 	node_dt* fnode = fv.data();
-	tf->wrap = box.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
+	tf->wrap = box.tbox.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
 	size_t ct = 0, ct1 = 0;
 	int64_t cbidx = 0;
 	std::vector<glm::ivec4> b_data;
@@ -8513,10 +8514,9 @@ void rt_layout1(rich_text_t* r, layout_block_st* p) {
 	auto& tmd = p->temp_map;
 	size_t cline = 0;
 	auto& ov = p->ov;
-	p->baselines.resize(p->line_count);
-	auto blhv = p->baselines.data();
-	auto blct = p->baselines.size();
-
+	box.baselines.resize(box.line_count);
+	auto blhv = box.baselines.data();
+	auto blct = box.baselines.size();
 	for (auto& ft : p->dst_vstr)
 	{
 		if (ft.i.ctype == 1)	// 图片占位符
@@ -8555,7 +8555,7 @@ void rt_layout1(rich_text_t* r, layout_block_st* p) {
 		// 文本分行
 		else if (ft.f.ctype == 0) {
 			auto& it = ft.f;
-			c4.w = ct;
+			c4.w = ct + 1;
 			auto& tbm = tmd[it.tb_idx];
 			auto& bk = tbm._block[it.block_idx];
 			baseline = std::max(bk.baseline, baseline);
@@ -8685,7 +8685,7 @@ void rt_build(rich_text_t* p)
 	for (auto& it : p->data_index) {
 		if (it.x >= 0)
 		{
-			rt_update_text(p, pt, it.x);
+			rt_update_text(p, pt, &p->box, it.x);
 		}
 		if (it.y >= 0)
 		{
@@ -9413,9 +9413,16 @@ size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2
 		cc = p->boxtext.size();
 		p->boxtext.push_back({});
 		auto& rc = p->boxtext.back();
-		rc.box.rc = glm::ivec4(pos, size);
+		rc.box.tbox.rc = glm::ivec4(pos, size);
 	}
 	return cc;
+}
+
+text_box_t* mrt_get_boxinfo(multi_rich_text_t* p, size_t idx)
+{
+	if (!p || idx >= p->boxtext.size())
+		return nullptr;
+	return &p->boxtext[idx].box.tbox;
 }
 
 void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int size, int first, text_style* ts)
@@ -9493,7 +9500,7 @@ void item_ft(fitem_t& ft, item_temp_t* st) {
 	// 文本分行
 	else if (ft.f.ctype == 0) {
 		auto& it = ft.f;
-		st->c4.w = st->ct;
+		st->c4.w = st->ct + 1;
 		auto& tbm = st->lt->temp_map[it.tb_idx];
 		auto& bk = tbm._block[it.block_idx];
 		st->baseline = std::max(bk.baseline, st->baseline);
@@ -9538,13 +9545,11 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 	if (!p || !pbox)return;
 
 	glm::vec2 rct = {};
-	float xxx = 0;
-	int line_count = 0;
 	auto& box = pbox->box;
-	auto text_align = box.text_align;
+	auto text_align = box.tbox.text_align;
 	auto& dst_vstr = p->dst_vstr;
 	item_temp_t st = {};
-	glm::ivec4 rc = box.rc;
+	glm::ivec4 rc = box.tbox.rc;
 	glm::vec2 ss = { rc.z,rc.w };
 	flex_data tf[2] = {};
 	//if (r->flex)
@@ -9556,22 +9561,21 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 	//	tf[1] = *r->flex_child;
 	//}
 	st.lt = p;
-	st.blhv = p->baselines.data();
 
 	std::vector<node_dt> fv;
-	tf->wrap = box.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
+	tf->wrap = box.tbox.auto_break ? flex_wrap::WRAP : flex_wrap::NO_WRAP;
 	//size_t ct = 0, ct1 = 0;
 	//int64_t cbidx = 0;
 	//std::vector<glm::ivec4> b_data;
 	//std::vector<std::vector<glm::ivec4>> line_data;
 	//glm::ivec4 c4 = {};// x宽，y高，z起始索引，w结束索引 
 	//c4.y = st.line_height;
-	//c4.z = 0;
-	auto& tmd = p->temp_map;
-	auto& ut = tmd[0];
+	//c4.z = 0; 
 	size_t cline = 0;
 	auto ov = &p->ov;
-	p->baselines.resize(p->line_count);
+	pbox->box.baselines.resize(pbox->box.line_count);
+	st.blhv = pbox->box.baselines.data();
+
 	//for (auto& ft : p->dst_vstr)
 	struct tbox_as {
 		text_box_t box = {};
@@ -9579,20 +9583,16 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 		box_text_d dst = {};
 	};
 	auto dstv = p->dst_vstr.data();
-	for (auto xt : pbox->data_index) {
-		auto v2 = mrt->rich.data_index[xt];
-		if (v2.x >= 0)
+	size_t dcount = pbox->dst.count;
+	{
+		auto tt = dstv + pbox->dst.first;
+		for (size_t i = 0; i < dcount; i++)
 		{
-			auto& tmu = p->temp_map[v2.x];
-			auto tt = dstv + tmu.first;
-			for (size_t i = 0; i < tmu.count; i++)
-			{
-				auto& it = tt[i];
-				item_ft(it, &st);
-			}
+			auto& it = tt[i];
+			item_ft(it, &st);
 		}
 	}
-	if (xxx > 0) {
+	if (st.xxx > 0) {
 		if (st.c4.z != st.c4.w) {
 			st.c4.y = st.line_height;
 			st.bd.push_back(st.c4);
@@ -9601,17 +9601,17 @@ void mrt_layout1(multi_rich_text_t* mrt, tbox_s* pbox, layout_block_st* p) {
 		{
 			st.line_data.push_back(st.bd);
 		}
-		st.blhv[line_count].x = st.baseline;
-		st.blhv[line_count].y = st.line_height;
-		line_count++;
-		st.linex.push_back({ st.ct1,st.ct,xxx });
+		st.blhv[st.line_count].x = st.baseline;
+		st.blhv[st.line_count].y = st.line_height;
+		st.line_count++;
+		st.linex.push_back({ st.ct1,st.ct,st.xxx });
 	}
 
-	fv.resize(dst_vstr.size() + 1);
+	fv.resize(dcount + 1);
 	node_dt* fnode = fv.data();
 
-	rct.x = std::max(rct.x, xxx);
-	rct.y = line_count * st.line_height;
+	rct.x = std::max(rct.x, st.xxx);
+	rct.y = st.line_count * st.line_height;
 	if (rc.z < 0) {
 		rc.z = rct.x;
 	}
@@ -9682,22 +9682,31 @@ void mrt_build(multi_rich_text_t* pm)
 	if (!pm || pm->boxtext.empty())return;
 	auto p = &pm->rich;
 	auto pt = &p->layout;
-	for (auto& it : p->data_index) {
-		if (it.x >= 0)
-		{
-			rt_update_text(p, pt, it.x);
+	for (auto& bt : pm->boxtext)
+	{
+		bt.dst.tbs = &p->tbs;
+		bt.dst.first = pt->dst_vstr.size();
+		for (auto xt : bt.data_index) {
+			auto it = pm->rich.data_index[xt];
+			if (it.x >= 0)
+			{
+				rt_update_text(p, pt, &bt.box, it.x);
+			}
+			if (it.y >= 0)
+			{
+				fitem_t kit = {};
+				kit.i.ctype = 1;
+				kit.i.ib = &p->ibs[it.y];
+				pt->dst_vstr.push_back(kit); // 占位图片
+			}
 		}
-		if (it.y >= 0)
-		{
-			fitem_t kit = {};
-			kit.i.ctype = 1;
-			kit.i.ib = &p->ibs[it.y];
-			pt->dst_vstr.push_back(kit); // 占位图片
-		}
+		bt.dst.count = pt->dst_vstr.size() - bt.dst.first;
 	}
 
 	for (auto& it : pm->boxtext)
 	{
+		it.dst.d = p->layout.dst_vstr.data();
+		it.dst.view = it.box.tbox.rc;
 		mrt_layout1(pm, &it, &pm->rich.layout);
 	}
 }
