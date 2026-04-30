@@ -1025,19 +1025,18 @@ int main()
 					vkd->_state.WireframeMode;				// 0 1 2 6
 					static int ity = 6;
 					light->_intensity = ity;
-					dvv->update(delta);
 
+					dvv->update(delta);
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
 					dvv->draw(&rvg);
 					td3->update_rvg(&rvg, rvgd);
 
-
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
-					if (kti > 0.1)
+					//if (kti > 0.1)
 					{
 						kti = 0.0;
 						rt_clear(mtext);
