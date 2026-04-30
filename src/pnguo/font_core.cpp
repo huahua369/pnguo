@@ -8333,6 +8333,16 @@ image_block* rt_get_image(rich_text_t* p, size_t idx)
 	return &p->ibs[idx];
 }
 
+size_t rt_get_text_count(rich_text_t* p)
+{
+	return p ? p->tbs.size() : 0;
+}
+
+size_t rt_get_image_count(rich_text_t* p)
+{
+	return p ? p->ibs.size() : 0;
+}
+
 
 
 void rt_bidi(std::u16string* bidi_str, std::vector<bidi_item>& bv, const char* str, size_t first, size_t count/*, font_family_t* family*/)

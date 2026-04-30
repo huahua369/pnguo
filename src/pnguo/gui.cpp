@@ -6643,7 +6643,7 @@ void progress_tl::set_value(double b)
 		double k = get_v();
 		std::string vv;
 		text = pg::to_string(k) + format;
-		width = _size.x;
+		//width = _size.x;
 		if (text.size() && !text_inside) {
 			//todo auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
 			//size.x = width + rk.x + rounding * 0.5;
@@ -7526,10 +7526,15 @@ void progress_tl::draw(rvg_cx* rv)
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
 	ss.x = width;
+	ss.y = height;
 #if 1
-
+	glm::vec2 npos = _size - (glm::vec2)ss;
+	npos *= 0.5;
 	rv->save();
 	rv->translate(poss);
+	//rv->add_rect({ 0,0, _size.x, _size.y }, 0);
+	//rv->submit(0xff000000, 0, 0);
+	rv->translate(npos);
 	rv->add_rect({ 0.5,0.5, ss.x, ss.y }, rounding);
 	rv->submit(color.y, 0, 0);
 	double xx = ss.x * value;
@@ -7549,32 +7554,40 @@ void progress_tl::draw(rvg_cx* rv)
 		rv->submit(color.x, 0, 0);
 		rv->restore();
 	}
-	//if (text.size()) {
-	//	auto rk = ltx->get_text_rect(0, font_size, text.c_str(), -1);
-	//	if (text_inside) {
-	//		ss.x = xx;
-	//		ss.x -= r * 0.5;
-	//	}
-	//	else {
-	//		ss.x = size.x;
-	//	}
-	//	if (kx) {
+	if (text.size()) {
+		glm::ivec2 rk = {};// ltx->get_text_rect(0, font_size, text.c_str(), -1);
+		if (text_inside) {
+			ss.x = xx;
+			ss.x -= r + thickness;
+		}
+		else {
+			ss.x = _size.x;
+		}
+		if (kx) {
+			ss.x += rk.x;
+		}
+		if (right_inside) {
+			ss.x = _size.x - r - thickness;
+		}
+		glm::vec2 ta = { 1,0.5 };
+		glm::vec4 rc = { 0, 0, _size };
+		//text_style_t st = {};
+		//st.font = 0;
+		//st.text_align = ta;
+		//st.font_size = font_size;
+		//st.text_color = text_color;
+		//draw_text(cr, ltx, text.c_str(), -1, rc, &st);
 
-	//		ss.x += rk.x;
-	//	}
-	//	if (right_inside) {
-	//		ss.x = size.x - r * 0.5;
-	//	}
-	//	glm::vec2 ta = { 1,0.5 };
-	//	glm::vec4 rc = { 0, 0, ss };
-	//	text_style_t st = {};
-	//	st.font = 0;
-	//	st.text_align = ta;
-	//	st.font_size = font_size;
-	//	st.text_color = text_color;
-	//	//draw_text(cr, ltx, text.c_str(), -1, rc, &st);
-
-	//}
+		text_style st = {};
+		st.fontsize = font_size;
+		st.align = ta;// text_align;
+		st.color = text_color;
+		text_st tx = {};
+		tx.pos = { 0,thickness };
+		tx.size = ss;
+		tx.text = text.c_str(); tx.text_len = text.size();
+		rv->add_text(&tx, &st);
+	}
 	rv->restore();
 
 #endif

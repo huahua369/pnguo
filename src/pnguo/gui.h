@@ -708,13 +708,14 @@ public:
 // 进度条
 struct progress_tl :public widget_t
 {
-	std::string format;				// 格式
+	std::string format = "%";				// 格式
 	glm::vec2 vr = { 0, 100 };		// 范围
 	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色
 	uint32_t text_color = 0xffffffff;
 	double value = 0.0;				// 当前进度
 	int width = 0;					// 宽度
-	int right_inside = 0;			// 右对齐
+	int height = 0;					// 高度
+	bool right_inside = false;			// 右对齐
 	bool text_inside = true;
 public:
 	progress_tl();

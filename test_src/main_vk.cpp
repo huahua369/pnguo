@@ -868,7 +868,7 @@ int main()
 
 			canvas2d_t* td3 = new canvas2d_t();
 			auto rvgd = new rvg_data_cx();
-			td3->set_renderer(form0->renderer, pcb, { 0,0,ws.x, ws.y });
+			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			td3->familys = family;
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
@@ -877,7 +877,7 @@ int main()
 			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
 			text_box_t tbox = {};
 			tbox.text_align = { 0,0.5 };
-			tbox.rc = { 10,10,1500,600 };
+			tbox.rc = { 10,10,1500,1600 };
 			tbox.auto_break = 1;
 			tbox.word_wrap = 1;
 
@@ -901,7 +901,7 @@ int main()
 			//pbox->ellipsis;
 			//mrt_build(mrtext);
 			rt_set(mtext, &tbox);
-			tbox.rc = { 10,320,1500,600 };
+			tbox.rc = { 10,320,1500,1600 };
 			text_t1_set(ptb1, &tbox);
 			glm::ivec2 sc_size = { 1024,1024 };
 
@@ -911,8 +911,8 @@ int main()
 			dvv->flex.wrap = flex_wrap::WRAP;
 			dvv->flex.direction = flex_direction::ROW;
 			dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+			dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
 			dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
-			dvv->flex.align_items = flex_align::ALIGN_START;		// y轴，交叉轴对齐
 
 			dvv->flex_child.margin_left = 2;		// 子元素外边距
 			dvv->flex_child.margin_right = 2;
@@ -945,7 +945,7 @@ int main()
 				}
 			}
 			auto gr = new group_radio_t();
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 5; i++) {
 				auto r = new radio_tl();
 				r->gr = gr;
 				r->set_size({ 36,36 });
@@ -954,25 +954,15 @@ int main()
 				r->style.radius = 7;
 				dvv->add_widget(r);
 			}
-			for (int i = 0; i < 5; i++) {
-				auto btn = new gradient_btn();
+			for (int i = 0; i < 7; i++) {
+				auto btn = new color_btn();
 				btn->rounding = 4;
+				btn->set_btn_color_bgr(fmod(i, 5));
 				dvv->add_widget(btn);
-				btn->set_size({ 200,36 });
-				btn->back_color = colors[i];
-				btn->borderLight = blackb.x;
-				btn->borderDark = blackb.y;
-				btn->gradTop = gradTop;
-				btn->gradBot = gradBot;
+				btn->set_size({ 128,36 });
 				btn->font_size = 16;
 				btn->text_color = -1;
-				btn->str = (char*)u8"💻按钮gbutton " + std::to_string(5 + i);
-				if (i == 4) {
-					//btn->borderLight = blackb.y;
-					//btn->borderDark = blackb.x;
-					btn->gradTop = gradTop1;
-					btn->gradBot = gradBot1;
-				}
+				btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 			}
 			for (int i = 0; i < 4; i++) {
 				auto r = new checkbox_tl();
@@ -981,6 +971,17 @@ int main()
 				r->style.thickness = 1;
 				dvv->add_widget(r);
 			}
+			auto pro = new progress_tl();
+			dvv->add_widget(pro);
+			pro->set_size({ 120,26 });
+			pro->right_inside = true;
+			pro->rounding = 10;
+			pro->height = 20;
+			pro->width = 110;
+			pro->color = { 0xffff9e40, 0xff6c6c6c };
+			pro->set_value(0.5);
+
+
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
 				div->on_event(type, e);
@@ -1059,12 +1060,12 @@ int main()
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
 						//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
-						static glm::ivec2 imgpos = { 600,250 };
+						static glm::ivec2 imgpos = { 600,600 };
 						// 文字缓存
 						rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
-						rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size() * 0.5, { 600,20 }, true);
+						rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 

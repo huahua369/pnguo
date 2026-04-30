@@ -720,6 +720,18 @@ struct box_info_t {
 	std::vector<glm::ivec2> baselines;		// 每行的基线，行高
 	size_t line_count = 0;			// 统计行数
 };
+struct box_text_d
+{
+	fitem_t* d = 0; size_t first = 0; size_t count = 0;
+	glm::ivec4 view = {};						// p->box.rc;
+	std::vector<text_block>* tbs = 0;
+};
+struct tbox_s {
+	box_info_t box = {};
+	std::vector<size_t> data_index;
+	box_text_d dst = {};
+};
+
 // 图文对象
 struct rich_text_t {
 	box_info_t box = {};
@@ -729,7 +741,6 @@ struct rich_text_t {
 	layout_block_st layout = {};	// *布局结果数据
 	text_style	_ct_style = {};		// 当前文本样式，添加文本时如果文本块没有设置样式则使用当前样式
 };
-
 // 设置文本区域参数，flex参数可选需要保持指针可用
 void rt_set(rich_text_t* p, text_box_t* box);
 void rt_set_layout(rich_text_t* p, flex_data* rfp = 0, flex_data* cfp = 0);
@@ -752,20 +763,11 @@ text_block* rt_get_text(rich_text_t* p, size_t idx);	// 直接修改文本保证
 bool rt_set_text(rich_text_t* p, size_t idx, const void* str, int size, int first);
 // 获取图片块信息
 image_block* rt_get_image(rich_text_t* p, size_t idx);
+size_t rt_get_text_count(rich_text_t* p);
+size_t rt_get_image_count(rich_text_t* p);
 // 构建渲染数据
 void rt_build(rich_text_t* p);
 
-struct box_text_d
-{
-	fitem_t* d = 0; size_t first = 0; size_t count = 0;
-	glm::ivec4 view = {};						// p->box.rc;
-	std::vector<text_block>* tbs = 0;
-};
-struct tbox_s {
-	box_info_t box = {};
-	std::vector<size_t> data_index;
-	box_text_d dst = {};
-};
 // 多图文对象：可设置多个区域渲染图文
 struct multi_rich_text_t {
 	rich_text_t rich = {};			// 继承富文本
