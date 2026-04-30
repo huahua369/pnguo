@@ -972,6 +972,14 @@ int main()
 				r->style.thickness = 1;
 				dvv->add_widget(r);
 			}
+			{
+				auto r = new checkbox_tl();
+				r->set_size({ 36,36 });
+				r->style.line_col = 0xffff8020;
+				r->style.thickness = 1;
+				r->v.mixed = true;
+				dvv->add_widget(r);
+			}
 			auto pro = new progress_tl();
 			dvv->add_widget(pro);
 			pro->set_size({ 120,26 });

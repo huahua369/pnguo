@@ -635,7 +635,7 @@ struct checkbox_info_t
 	float duration = 0.28;	// 动画时间
 	float new_alpha = -1;		// 动画控制	
 	bool* pv = 0;
-	bool mixed = false;			// 是否满
+	bool mixed = false;			// 混合状态，不满时用
 	bool value = 0; // 选中值
 	bool value1 = 1; // 选中值动画
 };
