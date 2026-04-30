@@ -8715,12 +8715,25 @@ bool div_cx::update(float delta)
 void div_cx::draw(rvg_cx* rv)
 {
 	auto sps = get_spos();	// 获取滚动量
+	auto ss = get_size();
+	if (border.w || border.x) {
+		rv->save();
+		rv->set_draw_rect(glm::ivec4(0, 0, ss));
+		rv->push_null(0);
+		rv->set_line_width(border.y);
+		glm::vec2 rc = ss;
+		rc -= border.y;
+		rv->add_rect({ 0.5,0.5,rc }, border.z);
+		rv->fill_stroke(border.w, border.x);
+		rv->restore();
+	}
+
 	for (auto& it : widgets) {
 		if (it->visible)
 		{
 			rv->save();
 			auto ps = it->get_pos(false);
-			rv->set_cliprect(glm::ivec4(ps, it->get_size()));
+			rv->set_draw_rect(glm::ivec4(ps, it->get_size()));
 			rv->push_null(0);
 			auto scp = sps * it->hscroll;
 			if (scp.x != 0 || scp.y != 0)

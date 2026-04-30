@@ -463,12 +463,13 @@ public:
 	void stroke();
 	void fill_preserve();
 	void stroke_preserve();
+	void fill_stroke(uint32_t fill, uint32_t color);
 	void set_line_width(float w);
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
 
 	void set_cliprect0(const glm::ivec4& c);
-	void set_cliprect(const glm::ivec4& c);
+	void set_draw_rect(const glm::ivec4& c);
 	void push_ct(uint8_t op);
 	bool is_image();
 	void push_null(int v);

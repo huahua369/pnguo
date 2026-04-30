@@ -908,12 +908,12 @@ int main()
 			auto dvv = new div_cx();
 			dvv->set_size({ 500,300 });
 			dvv->set_pos({ 10,360 });
+			dvv->border = { 0xffacacac,1,5,0xef666666 };	// 颜色，线粗，圆角，背景色
 			dvv->flex.wrap = flex_wrap::WRAP;
 			dvv->flex.direction = flex_direction::ROW;
 			dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
 			dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
 			dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
-
 			dvv->flex_child.margin_left = 2;		// 子元素外边距
 			dvv->flex_child.margin_right = 2;
 			dvv->flex_child.margin_top = 2;
@@ -1027,16 +1027,8 @@ int main()
 					light->_intensity = ity;
 					dvv->update(delta);
 
-
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
-					rvg.save();
-					rvg.set_cliprect(glm::ivec4(0, 0, dvv->get_size()));
-					rvg.push_null(0);
-					rvg.add_rect({ 0,0,dvv->get_size() }, 5);
-					rvg.set_color(0xef2c2c2c);
-					rvg.fill();
-					rvg.restore();
 					dvv->draw(&rvg);
 					td3->update_rvg(&rvg, rvgd);
 
