@@ -1885,9 +1885,9 @@ void rvg_cx::push_null(int v)
 }
 
 uint32_t rvg_cx::get_crc()
-{ 
+{
 	auto ct0 = ecc_crc32u(_cmdtype.data(), _cmdtype.size());
-	auto ct1 = ecc_crc32u(_cmd.data(), _cmd.size()); 
+	auto ct1 = ecc_crc32u(_cmd.data(), _cmd.size());
 	return ct0 ^ ct1;
 }
 
@@ -3197,37 +3197,9 @@ rvg_data_cx::~rvg_data_cx()
 		packer = 0;
 	}
 }
-void rvg_data_cx::update(rvg_cx* rvg)
-{
-	packer->init_target(_view.z, _view.w, 0);
-	int sf = 0;
-	size_t i = 0;
-	dcv.clear();
-	std::vector<cmdrect_v> data, dtext;
-	int lpush = 0;
-	bool mix_text = true;
-	if (mix_text)
-	{
-		auto f = rvg->_data.front();
-		for (auto& it : rvg->_data) {
-			auto c = it.rc;
-			if (it.type == f.type && check_rect_cross(f.rc, it.rc))
-			{
-				f.rc.x = std::min(f.rc.x, c.x);
-				f.rc.y = std::min(f.rc.y, c.y);
-				f.rc.z = std::max(f.rc.z, c.z);
-				f.rc.w = std::max(f.rc.w, c.w);
+void mb_dc(std::vector<cmdrect_v>& data, size_t cmd_count) {
 
-			}
-			else {
-				data.push_back(f);
-				f = it;
-			}
-			lpush++;
-		}
-		data.push_back(f);
-		data.front().first = 0;
-	}
+	data.front().first = 0;
 
 	for (size_t i = 0; i < data.size() - 1; i++)
 	{
@@ -3243,7 +3215,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		if (it.type == 0)
 			it.first = it1.second;
 	}
-	auto cmd_count = rvg->_cmdtype.size();
+
 	{
 		cmdrect_v f = {};
 		auto& db = data.back();
@@ -3257,6 +3229,36 @@ void rvg_data_cx::update(rvg_cx* rvg)
 				db.second = cmd_count;
 		}
 	}
+}
+void rvg_data_cx::update(rvg_cx* rvg)
+{
+	packer->init_target(_view.z, _view.w, 0);
+	int sf = 0;
+	size_t i = 0;
+	dcv.clear();
+	std::vector<cmdrect_v> data, dtext;
+	auto cmd_count = rvg->_cmdtype.size();
+	int lpush = 0;
+	mb_dc(rvg->_data, cmd_count);
+	auto f = rvg->_data.front();
+	for (auto& it : rvg->_data) {
+		auto c = it.rc;
+		if (it.type == f.type && check_rect_cross(f.rc, it.rc))
+		{
+			f.rc.x = std::min(f.rc.x, c.x);
+			f.rc.y = std::min(f.rc.y, c.y);
+			f.rc.z = std::max(f.rc.z, c.z);
+			f.rc.w = std::max(f.rc.w, c.w);
+			f.second = it.second;
+		}
+		else {
+			data.push_back(f);
+			f = it;
+		}
+		lpush++;
+	}
+	data.push_back(f);
+	//if (mix_text) 
 	data.swap(rvg->_data);
 	for (auto& it : rvg->_data) {
 		if (it.rc.z < 1 || it.rc.w < 1)

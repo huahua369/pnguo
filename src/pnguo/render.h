@@ -489,6 +489,7 @@ public:
 	glm::ivec2 pos = {};
 	float stwidth = 2.0;
 	uint32_t cmd_crc = 0;
+	bool mix_text = true;
 public:
 	rvg_data_cx();
 	~rvg_data_cx();

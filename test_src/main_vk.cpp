@@ -869,6 +869,7 @@ int main()
 
 			canvas2d_t* td3 = new canvas2d_t();
 			auto rvgd = new rvg_data_cx();
+			rvgd->mix_text = false;
 			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			td3->familys = family;
