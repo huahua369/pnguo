@@ -8705,6 +8705,8 @@ void div_cx::draw(rvg_cx* rv)
 		if (it->visible)
 		{
 			rv->save();
+			auto ps = it->get_pos(false);
+			rv->set_cliprect(glm::ivec4(ps, it->get_size()));
 			rv->push_null(0);
 			auto scp = sps * it->hscroll;
 			if (scp.x != 0 || scp.y != 0)

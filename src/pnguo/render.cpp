@@ -1547,10 +1547,10 @@ void rvg_cx::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
 	grid_fill_r t = { size,cols,width };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 
-	glm::vec4 rv = { tpos, size };
-	rv.z += rv.x;
-	rv.w += rv.y;
-	merge_vrc(rv);
+	//glm::vec4 rv = { tpos, size };
+	//rv.z += rv.x;
+	//rv.w += rv.y;
+	//set_cliprect(rv);
 }
 
 void rvg_cx::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count)
@@ -1562,10 +1562,10 @@ void rvg_cx::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count
 	{
 		_cmd.insert(_cmd.end(), (char*)(cols), (char*)(cols + count));
 	}
-	glm::vec4 rv = { tpos,size };
-	rv.z += rv.x;
-	rv.w += rv.y;
-	merge_vrc(rv);
+	//glm::vec4 rv = { tpos,size };
+	//rv.z += rv.x;
+	//rv.w += rv.y;
+	//set_cliprect(rv);
 
 }
 void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type)
@@ -1574,28 +1574,28 @@ void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwi
 	arrow_d t = { p0,p1,arrow_hwidth,arrow_size,type };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	glm::vec2 dir = (p0 - p1);
-	glm::vec2 n = glm::normalize(dir);
-	glm::vec2 perp = avec2_perp(n) * arrow_hwidth;
-	auto dir1 = p1 - p0;
-	float len = glm::length(dir1);
-	mr_v4(rc, p0 + tpos);
-	float e = arrow_size * 0.5;
-	if (len > e && type == 0) {
-		dir1 = glm::normalize(dir1);
-		glm::vec2 e2 = { e, arrow_hwidth };
-		float newLength = len - e;
-		glm::vec2 p1n = p0 + dir1 * newLength;
-		mr_v4(rc, p1n + tpos);
-	}
-	mr_v4(rc, p1 + tpos);
-	glm::vec2 p = (p1 + (n * arrow_size));
-	glm::vec2 a = (p + perp);
-	mr_v4(rc, a + tpos);
-	a = (p + (perp * -1));
-	mr_v4(rc, a + tpos);
-	merge_vrc(rc);
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//glm::vec2 dir = (p0 - p1);
+	//glm::vec2 n = glm::normalize(dir);
+	//glm::vec2 perp = avec2_perp(n) * arrow_hwidth;
+	//auto dir1 = p1 - p0;
+	//float len = glm::length(dir1);
+	//mr_v4(rc, p0 + tpos);
+	//float e = arrow_size * 0.5;
+	//if (len > e && type == 0) {
+	//	dir1 = glm::normalize(dir1);
+	//	glm::vec2 e2 = { e, arrow_hwidth };
+	//	float newLength = len - e;
+	//	glm::vec2 p1n = p0 + dir1 * newLength;
+	//	mr_v4(rc, p1n + tpos);
+	//}
+	//mr_v4(rc, p1 + tpos);
+	//glm::vec2 p = (p1 + (n * arrow_size));
+	//glm::vec2 a = (p + perp);
+	//mr_v4(rc, a + tpos);
+	//a = (p + (perp * -1));
+	//mr_v4(rc, a + tpos);
+	//set_cliprect(rc);
 }
 void rvg_cx::draw_block(dblock_d* p, fill_style_d* st)
 {
@@ -1608,49 +1608,49 @@ void rvg_cx::draw_block(dblock_d* p, fill_style_d* st)
 	_cmd.insert(_cmd.end(), (char*)p->points, (char*)p->points + sizeof(glm::vec2) * p->count);
 	submit(st);
 	restore();
-	auto ps = tpos;
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	ps += p->view_pos;
-	if (p->scale_pos > 0)
-	{
-		auto sp = p->scale_pos;
-		ps += p->pos * sp;
-		for (size_t i = 0; i < p->count; i++)
-		{
-			auto pt = ps + p->points[i] * sp;
-			if (pt.y > 0)
-			{
-				mr_v4(rc, pt);
-				mr_v4(rc, pt + p->rc * sp);
-			}
-			else {
-				auto rr = sp * p->rc.x;
-				glm::vec2 c2 = { rr, rr };
-				mr_v4(rc, pt - c2);
-				mr_v4(rc, pt + c2);
-			}
-		}
-	}
-	else
-	{
-		ps += p->pos;
-		for (size_t i = 0; i < p->count; i++)
-		{
-			auto pt = p->points[i];
-			if (pt.y > 0)
-			{
-				mr_v4(rc, pt);
-				mr_v4(rc, pt + p->rc);
-			}
-			else {
-				auto rr = p->rc.x;
-				glm::vec2 c2 = { rr, rr };
-				mr_v4(rc, pt - c2);
-				mr_v4(rc, pt + c2);
-			}
-		}
-	}
-	merge_vrc(rc);
+	//auto ps = tpos;
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//ps += p->view_pos;
+	//if (p->scale_pos > 0)
+	//{
+	//	auto sp = p->scale_pos;
+	//	ps += p->pos * sp;
+	//	for (size_t i = 0; i < p->count; i++)
+	//	{
+	//		auto pt = ps + p->points[i] * sp;
+	//		if (pt.y > 0)
+	//		{
+	//			mr_v4(rc, pt);
+	//			mr_v4(rc, pt + p->rc * sp);
+	//		}
+	//		else {
+	//			auto rr = sp * p->rc.x;
+	//			glm::vec2 c2 = { rr, rr };
+	//			mr_v4(rc, pt - c2);
+	//			mr_v4(rc, pt + c2);
+	//		}
+	//	}
+	//}
+	//else
+	//{
+	//	ps += p->pos;
+	//	for (size_t i = 0; i < p->count; i++)
+	//	{
+	//		auto pt = p->points[i];
+	//		if (pt.y > 0)
+	//		{
+	//			mr_v4(rc, pt);
+	//			mr_v4(rc, pt + p->rc);
+	//		}
+	//		else {
+	//			auto rr = p->rc.x;
+	//			glm::vec2 c2 = { rr, rr };
+	//			mr_v4(rc, pt - c2);
+	//			mr_v4(rc, pt + c2);
+	//		}
+	//	}
+	//}
+	//set_cliprect(rc);
 }
 
 void rvg_cx::draw_path(path_d* path, fill_style_d* style)
@@ -1664,17 +1664,17 @@ void rvg_cx::draw_path(path_d* path, fill_style_d* style)
 	_cmd.insert(_cmd.end(), (char*)path->v, (char*)path->v + sizeof(path_vertex_t) * path->count);
 	submit(style);
 	restore();
-	auto ps = tpos;
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	auto pt = path->v;
-	for (size_t i = 0; i < path->count; i++)
-	{
-		auto it = pt[i];
-		mr_v4(rc, it.c + ps);
-		mr_v4(rc, it.c1 + ps);
-		mr_v4(rc, it.p + ps);
-	}
-	merge_vrc(rc);
+	//auto ps = tpos;
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//auto pt = path->v;
+	//for (size_t i = 0; i < path->count; i++)
+	//{
+	//	auto it = pt[i];
+	//	mr_v4(rc, it.c + ps);
+	//	mr_v4(rc, it.c1 + ps);
+	//	mr_v4(rc, it.p + ps);
+	//}
+	//set_cliprect(rc);
 
 }
 
@@ -1683,18 +1683,18 @@ void rvg_cx::add_line(glm::vec4* p, size_t count)
 	push_ct(OP_ADD_LINE_PTR);
 	_cmd.insert(_cmd.end(), (char*)&count, (char*)&count + sizeof(size_t));
 	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(glm::vec4) * count);
-	auto ps = tpos;
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	auto pt = (glm::vec2*)p;
-	for (size_t i = 0; i < count * 2; i++)
-	{
-		auto it = pt[i] + ps;
-		rc.x = std::min(rc.x, it.x);
-		rc.y = std::min(rc.y, it.y);
-		rc.z = std::max(rc.z, it.x);
-		rc.w = std::max(rc.w, it.y);
-	}
-	merge_vrc(rc);
+	//auto ps = tpos;
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//auto pt = (glm::vec2*)p;
+	//for (size_t i = 0; i < count * 2; i++)
+	//{
+	//	auto it = pt[i] + ps;
+	//	rc.x = std::min(rc.x, it.x);
+	//	rc.y = std::min(rc.y, it.y);
+	//	rc.z = std::max(rc.z, it.x);
+	//	rc.w = std::max(rc.w, it.y);
+	//}
+	//set_cliprect(rc);
 }
 
 void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
@@ -1711,10 +1711,8 @@ void rvg_cx::add_rect(const glm::vec4& rc, double r)
 
 	auto rv = rc;
 	rv.x += tpos.x;
-	rv.y += tpos.y;
-	rv.z += rv.x;
-	rv.w += rv.y;
-	merge_vrc(rv);
+	rv.y += tpos.y; 
+	set_cliprect0(rv);
 }
 void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
 {
@@ -1722,12 +1720,12 @@ void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
 	rect_v4 t = { rc, r };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 
-	auto rv = rc;
-	rv.x += tpos.x;
-	rv.y += tpos.y;
-	rv.z += rv.x;
-	rv.w += rv.y;
-	merge_vrc(rv);
+	//auto rv = rc;
+	//rv.x += tpos.x;
+	//rv.y += tpos.y;
+	//rv.z += rv.x;
+	//rv.w += rv.y;
+	//set_cliprect(rv);
 }
 
 void rvg_cx::add_circle(const glm::vec2& pos, float r)
@@ -1736,9 +1734,9 @@ void rvg_cx::add_circle(const glm::vec2& pos, float r)
 	push_ct(OP_ADD_CIRCLE);
 	circle_r t = { pos,r };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
-	r += 2;
-	auto ps = tpos + pos;
-	merge_vrc(glm::ivec4(ps - r, ps + r));
+	//r += 2;
+	//auto ps = tpos + pos;
+	//set_cliprect(glm::ivec4(ps - r, ps + r));
 }
 
 void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle)
@@ -1747,9 +1745,9 @@ void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotatio
 	ellipse_r t = { pos, r, rotationAngle };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 
-	auto ps = tpos + pos;
-	float xr = std::max(r.x, r.y);
-	merge_vrc(glm::ivec4(ps - xr, ps.x + xr, ps.y + xr));
+	//auto ps = tpos + pos;
+	//float xr = std::max(r.x, r.y);
+	//set_cliprect(glm::ivec4(ps - xr, ps.x + xr, ps.y + xr));
 }
 void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
 {
@@ -1757,8 +1755,8 @@ void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm
 	triangle_r t = { pos,size,dirspos };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 
-	auto ps = tpos + pos;
-	merge_vrc(glm::ivec4(ps, ps.x + size.x, ps.y + size.y));
+	//auto ps = tpos + pos;
+	//set_cliprect(glm::ivec4(ps, ps.x + size.x, ps.y + size.y));
 }
 
 void rvg_cx::draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
@@ -1768,17 +1766,17 @@ void rvg_cx::draw_polyline(const glm::vec2& pos, const glm::vec2* points, int po
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 	_cmd.insert(_cmd.end(), (char*)points, (char*)points + sizeof(glm::vec2) * points_count);
 
-	auto ps = tpos + pos;
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	for (size_t i = 0; i < points_count; i++)
-	{
-		auto it = points[i] + ps;
-		rc.x = std::min(rc.x, it.x - thickness);
-		rc.y = std::min(rc.y, it.y - thickness);
-		rc.z = std::max(rc.z, it.x + thickness);
-		rc.w = std::max(rc.w, it.y + thickness);
-	}
-	merge_vrc(rc);
+	//auto ps = tpos + pos;
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//for (size_t i = 0; i < points_count; i++)
+	//{
+	//	auto it = points[i] + ps;
+	//	rc.x = std::min(rc.x, it.x - thickness);
+	//	rc.y = std::min(rc.y, it.y - thickness);
+	//	rc.z = std::max(rc.z, it.x + thickness);
+	//	rc.w = std::max(rc.w, it.y + thickness);
+	//}
+	//set_cliprect(rc);
 }
 
 void rvg_cx::add_polyline(const PathsD* p, bool closed)
@@ -1815,17 +1813,17 @@ void rvg_cx::add_polyline(const glm::vec2* p, size_t count)
 	push_ct(OP_ADD_POLYLINE_VEC2_PTR);
 	PUSH_VALUE(count);
 	PUSH_VALUE_P(p, count);
-	auto ps = tpos;
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	for (size_t i = 0; i < count; i++)
-	{
-		auto it = p[i] + ps;
-		rc.x = std::min(rc.x, it.x);
-		rc.y = std::min(rc.y, it.y);
-		rc.z = std::max(rc.z, it.x);
-		rc.w = std::max(rc.w, it.y);
-	}
-	merge_vrc(rc);
+	//auto ps = tpos;
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//for (size_t i = 0; i < count; i++)
+	//{
+	//	auto it = p[i] + ps;
+	//	rc.x = std::min(rc.x, it.x);
+	//	rc.y = std::min(rc.y, it.y);
+	//	rc.z = std::max(rc.z, it.x);
+	//	rc.w = std::max(rc.w, it.y);
+	//}
+	//set_cliprect(rc);
 }
 void rvg_cx::draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
 {
@@ -1835,17 +1833,17 @@ void rvg_cx::draw_polylines(const glm::vec2& pos, const glm::vec2* points, int p
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
 	_cmd.insert(_cmd.end(), (char*)points, (char*)points + sizeof(glm::vec2) * points_count);
 	_cmd.insert(_cmd.end(), (char*)idx, (char*)idx + sizeof(int) * idx_count);
-	auto ps = pos + tpos;
-	glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
-	for (size_t i = 0; i < idx_count; i++)
-	{
-		auto it = points[idx[i]] + ps;
-		rc.x = std::min(rc.x, it.x - thickness);
-		rc.y = std::min(rc.y, it.y - thickness);
-		rc.z = std::max(rc.z, it.x + thickness);
-		rc.w = std::max(rc.w, it.y + thickness);
-	}
-	merge_vrc(rc);
+	//auto ps = pos + tpos;
+	//glm::vec4 rc = { INT_MAX,INT_MAX,0,0 };
+	//for (size_t i = 0; i < idx_count; i++)
+	//{
+	//	auto it = points[idx[i]] + ps;
+	//	rc.x = std::min(rc.x, it.x - thickness);
+	//	rc.y = std::min(rc.y, it.y - thickness);
+	//	rc.z = std::max(rc.z, it.x + thickness);
+	//	rc.w = std::max(rc.w, it.y + thickness);
+	//}
+	//set_cliprect(rc);
 }
 
 void rvg_cx::set_text_style(text_style* ts)
@@ -1873,8 +1871,8 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 		pd->text = (char*)tps + ct;
 		ct += pd->text_len;
 	}
-	glm::vec4 rc = { pos ,pos + p->size };
-	merge_vrc(rc);
+	glm::vec4 rc = { pos , p->size };
+	set_cliprect(rc);
 }
 
 void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos)
@@ -1888,7 +1886,7 @@ void rvg_cx::add_image(image_r* r)
 	if (!r || !r->img)return;
 	push_ct(OP_ADD_IMAGE);
 	_cmd.insert(_cmd.end(), (char*)r, (char*)r + sizeof(image_r));
-	merge_vrc(glm::ivec4(r->pos, r->dsize));
+	set_cliprect(glm::ivec4(r->pos, r->dsize));
 }
 
 void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
@@ -1902,7 +1900,7 @@ void rvg_cx::paint_shadow(double size_x, double size_y, double width, double hei
 	d.rev = rev;
 	d.r = r;
 	_cmd.insert(_cmd.end(), (char*)&d, (char*)&d + sizeof(d));
-	merge_vrc({ tpos,tpos.x + width,tpos.y + height });
+	//set_cliprect({ tpos,tpos.x + width,tpos.y + height });
 }
 
 void rvg_cx::translate(const glm::vec2& offset)
@@ -1987,7 +1985,20 @@ bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
 inline bool is_textimage(uint8_t c) {
 	return c >= rvg_cx::OP_TEXT_STYLE;
 }
-void rvg_cx::merge_vrc(const glm::ivec4& c)
+void rvg_cx::set_cliprect0(const glm::ivec4& c)
+{
+	assert((c.z > 0 && c.w > 0));
+
+	_data0.push_back({});
+	auto& d = _data0.back();
+	d.first = _cmdtype.size() - 1;
+	d.type = is_textimage(_cmdtype.back());
+	d.second = _cmdtype.size();
+	d.rc = c;
+	d.rc.z += c.x;
+	d.rc.w += c.y;
+}
+void rvg_cx::set_cliprect(const glm::ivec4& c)
 {
 	assert((c.z > 0 && c.w > 0));
 
@@ -1997,7 +2008,8 @@ void rvg_cx::merge_vrc(const glm::ivec4& c)
 	d.type = is_textimage(_cmdtype.back());
 	d.second = _cmdtype.size();
 	d.rc = c;
-
+	d.rc.z += c.x;
+	d.rc.w += c.y;
 	//auto ct =  > 0 ? _cmdtype.back() : 0;
 	//bool ct0 = _data.back().type;
 	//bool test = == ct0;

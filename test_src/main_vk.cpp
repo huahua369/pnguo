@@ -953,6 +953,26 @@ int main()
 				r->style.radius = 7;
 				dvv->add_widget(r);
 			}
+			for (int i = 0; i < 5; i++) {
+				auto btn = new gradient_btn();
+				btn->rounding = 4;
+				dvv->add_widget(btn);
+				btn->set_size({ 200,36 });
+				btn->back_color = colors[i];
+				btn->borderLight = blackb.x;
+				btn->borderDark = blackb.y;
+				btn->gradTop = gradTop;
+				btn->gradBot = gradBot;
+				btn->font_size = 16;
+				btn->text_color = -1;
+				btn->str = (char*)u8"按钮gbutton " + std::to_string(5 + i);
+				if (i == 4) {
+					//btn->borderLight = blackb.y;
+					//btn->borderDark = blackb.x;
+					btn->gradTop = gradTop1;
+					btn->gradBot = gradBot1;
+				}
+			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
 				div->on_event(type, e);
@@ -1003,6 +1023,7 @@ int main()
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
 					rvg.save();
+					rvg.set_cliprect(glm::ivec4(0, 0, dvv->get_size()));
 					rvg.push_null(0);
 					rvg.add_rect({ 0,0,dvv->get_size() }, 5);
 					rvg.set_color(0xaf888888);
