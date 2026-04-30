@@ -691,6 +691,7 @@ int main()
 		//std::vector<font_t*> familys = { ksun ,seg };
 
 
+		fctx->set_cache_size(600, 1024);
 
 		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
@@ -935,7 +936,7 @@ int main()
 				btn->gradBot = gradBot;
 				btn->font_size = 16;
 				btn->text_color = -1;
-				btn->str = (char*)u8"按钮gbutton " + std::to_string(i);
+				btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
 				if (i == 4) {
 					//btn->borderLight = blackb.y;
 					//btn->borderDark = blackb.x;
@@ -965,13 +966,20 @@ int main()
 				btn->gradBot = gradBot;
 				btn->font_size = 16;
 				btn->text_color = -1;
-				btn->str = (char*)u8"按钮gbutton " + std::to_string(5 + i);
+				btn->str = (char*)u8"💻按钮gbutton " + std::to_string(5 + i);
 				if (i == 4) {
 					//btn->borderLight = blackb.y;
 					//btn->borderDark = blackb.x;
 					btn->gradTop = gradTop1;
 					btn->gradBot = gradBot1;
 				}
+			}
+			for (int i = 0; i < 4; i++) {
+				auto r = new checkbox_tl();
+				r->set_size({ 36,36 });
+				r->style.line_col = 0xffff8020;
+				r->style.thickness = 1;
+				dvv->add_widget(r);
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
@@ -1001,7 +1009,6 @@ int main()
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
-					td3->draw_surface(rvgd->surfaces[0].surface, { 600,20 }, glm::ivec4(0, 0, td3->get_size()), td3->get_size() * 0.5);
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					//td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
@@ -1026,7 +1033,7 @@ int main()
 					rvg.set_cliprect(glm::ivec4(0, 0, dvv->get_size()));
 					rvg.push_null(0);
 					rvg.add_rect({ 0,0,dvv->get_size() }, 5);
-					rvg.set_color(0xaf888888);
+					rvg.set_color(0xef2c2c2c);
 					rvg.fill();
 					rvg.restore();
 					dvv->draw(&rvg);
@@ -1046,16 +1053,18 @@ int main()
 						str += (char*)u8"emoji表情💻🔥➗️👪️🍕";
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
-						str = (char*)u8"渐变色表情: 💻🔥➗️👪️🍕";
+						str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";
 						//str = (char*)u8"abcdefg";
 						// 添加文本
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
 						//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
-						static glm::ivec2 imgpos = { 100,100 };
-						//rt_add_image(mtext, img, { 0,20,64,64 }, { 10,10,26,26 }, 0x50ffffff, { 64 * 5,64 * 3 }, imgpos, true);
+						static glm::ivec2 imgpos = { 600,250 };
+						// 文字缓存
+						rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
-
+						// 矢量图缓存
+						rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size() * 0.5, { 600,20 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 

@@ -617,7 +617,7 @@ struct check_style_t {
 };
 struct radio_info_t
 {
-	glm::vec2 pos;	// 坐标
+	glm::vec2 pos = {};	// 坐标
 	std::string text;
 	std::function<void(void* p, bool v)> on_change_cb;
 	float swidth = 0.;
@@ -628,7 +628,7 @@ struct radio_info_t
 };
 struct checkbox_info_t
 {
-	glm::vec2 pos;	// 坐标
+	glm::vec2 pos = {};	// 坐标
 	std::string text;
 	std::function<void(void* p, bool v)> on_change_cb;
 	float dt = 0;	// 动画进度
@@ -649,7 +649,7 @@ struct group_radio_t
 struct radio_tl :public widget_t
 {
 	radio_style_t style = {};	// 风格id
-	radio_info_t v;
+	radio_info_t v = {};
 	group_radio_t* gr = 0;		// 组 
 public:
 	radio_tl();
@@ -668,7 +668,7 @@ public:
 struct checkbox_tl :public widget_t
 {
 	check_style_t style = {};	// 风格id
-	checkbox_info_t v;
+	checkbox_info_t v = {};
 public:
 	checkbox_tl();
 	~checkbox_tl();

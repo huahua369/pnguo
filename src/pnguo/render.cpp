@@ -1356,9 +1356,8 @@ image_sliced_t new_rect(const rect_shadow_t& rs)
 }
 #endif
 
-void gen3data(image_ptr_t* img, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, std::vector<text_vx>* opt, std::vector<uint32_t>* idx)
+void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, std::vector<text_vx>* opt, std::vector<uint32_t>* idx)
 {
-	glm::ivec2 tex_size = { img->width,img->height };
 	// 1. 计算矩形顶点（像素坐标）
 	glm::ivec2 A = glm::ivec2(rc.x, rc.y); // 左下
 	glm::ivec2 B = A + glm::ivec2(rc.z, 0); // 右下
@@ -1711,7 +1710,7 @@ void rvg_cx::add_rect(const glm::vec4& rc, double r)
 
 	auto rv = rc;
 	rv.x += tpos.x;
-	rv.y += tpos.y; 
+	rv.y += tpos.y;
 	set_cliprect0(rv);
 }
 void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
@@ -3171,7 +3170,14 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 				}
 				else
 				{
-					gen3data(it.img, lpos, it.rc, it.dsize, c, &opt, &idx);
+					glm::ivec2 tex_size = {};
+					if (it.is_surface)
+					{
+						tex_size.x = vkvg_surface_get_width((VkvgSurface)it.img);
+						tex_size.y = vkvg_surface_get_height((VkvgSurface)it.img);
+					}
+					else { tex_size.x = it.img->width; tex_size.y = it.img->height; };
+					gen3data(tex_size, lpos, it.rc, it.dsize, c, &opt, &idx);
 					tex = tp;
 				}
 			}
@@ -3195,7 +3201,9 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 				auto ps = git._dwpos + git._apos;
 				ps += pos0;
 				color = tbp[git.tb_idx].style.color;
-				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
+				auto img = git._image;
+				glm::ivec2 tex_size = { img->width,  img->height };
+				gen3data(tex_size, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
 		}
 	}
@@ -3281,7 +3289,14 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 				}
 				else
 				{
-					gen3data(it.img, lpos, it.rc, it.dsize, c, &opt, &idx);
+					glm::ivec2 tex_size = {};
+					if (it.is_surface)
+					{
+						tex_size.x = vkvg_surface_get_width((VkvgSurface)it.img);
+						tex_size.y = vkvg_surface_get_height((VkvgSurface)it.img);
+					}
+					else { tex_size.x = it.img->width; tex_size.y = it.img->height; };
+					gen3data(tex_size, lpos, it.rc, it.dsize, c, &opt, &idx);
 					tex = tp;
 				}
 			}
@@ -3305,7 +3320,9 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 				auto ps = git._dwpos + git._apos;
 				ps += pos0;
 				color = tbp[git.tb_idx].style.color;
-				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
+				auto img = git._image;
+				glm::ivec2 tex_size = { img->width,  img->height };
+				gen3data(tex_size, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
 		}
 	}
@@ -3381,11 +3398,19 @@ void rvg_data_cx::update(rvg_cx* rvg)
 			it.first = it1.second;
 	}
 	auto cmd_count = rvg->_cmdtype.size();
-	f = {};
-	f.first = data.back().second;
-	f.second = cmd_count;
-	if (f.first != f.second)
-		data.push_back(f);
+	{
+		f = {};
+		auto& db = data.back();
+		f.first = db.second;
+		f.second = cmd_count;
+		if (f.first != f.second)
+		{
+			if (db.type == 1)
+				data.push_back(f);
+			else
+				db.second = cmd_count;
+		}
+	}
 	data.swap(rvg->_data);
 	for (auto& it : rvg->_data) {
 		if (it.rc.z < 1 || it.rc.w < 1)
@@ -3496,7 +3521,6 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			{
 			}
 			auto pss = didx[i];
-			//fvv.push_back(ps);
 			size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? ctx : dst->mrt);
 			//d += n;
 			//ps += n;
@@ -3620,7 +3644,9 @@ void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt)
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos;
-				gen3data(git._image, ps, git._rect, {}, git.color ? git.color : color, &pt->opt, &pt->idx);
+				auto img = git._image;
+				glm::ivec2 tex_size = { img->width,  img->height };
+				gen3data(tex_size, ps, git._rect, {}, git.color ? git.color : color, &pt->opt, &pt->idx);
 			}
 		}
 		if (tex && pt->opt.size()) {

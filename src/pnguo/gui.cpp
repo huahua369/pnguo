@@ -7187,6 +7187,92 @@ void image_btn::draw(rvg_cx* rv) {
 
 }
 
+void color_btn::draw(rvg_cx* rv)
+{
+	auto p = this;
+	auto ns = p->_size;
+	static int bid = 1234;
+	if (id == bid)
+	{
+		id = id;
+	}
+#if 1
+
+	rv->save();
+	rv->translate(p->_pos);
+	if (p->dfill)
+	{
+		if (p->_circle)
+		{
+			auto sp = p->_pos;
+			auto r = lround(p->_size.y * 0.5);
+			sp += r;
+			rv->add_circle(sp, r);
+		}
+		else
+		{
+			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
+		}
+		rv->submit(p->dfill, 0, 0);
+	}
+	// 渲染标签
+	glm::vec2 ps = { thickness * 2, thickness * 2 };
+	if (p->mPushed) {
+		ps += pushedps;
+	}
+
+	ns -= thickness * 4;
+
+	glm::vec4 rc = { ps, ns };
+
+
+	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
+
+	/*
+	text_style_t st = {};
+	st.font = 0;
+	st.text_align = p->text_align;
+	st.font_size = p->font_size;
+	st.text_color = p->text_color;	ltx->tem_rtv.clear();
+		ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
+		ltx->update_text();
+		ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
+		//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
+
+	if (p->dcol)
+	{
+		if (p->_circle)
+		{
+			auto sp = p->_pos;
+			auto r = lround(p->_size.y * 0.5);
+			sp += r;
+			rv->add_circle(sp, r);
+		}
+		else
+		{
+			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
+		}
+		rv->submit(0, p->dcol, p->thickness);
+	}
+	//if ((bst & (int)BTN_STATE::STATE_HOVER))
+	//{
+	//	rv->add_rect( { 0,0,size.x,size.y }, p->rounding);
+	//	rv->submit( 0, 0x80ff8000, 1, 0);
+	//} 
+	text_style st = {};
+	st.fontsize = p->font_size;
+	st.align = p->text_align;
+	st.color = p->text_color;
+	text_st tx = {};
+	tx.pos = {};
+	tx.size = get_size();
+	tx.text = p->str.c_str(); tx.text_len = p->str.size();
+	rv->add_text(&tx, &st);
+	rv->restore();
+
+#endif
+}
+
 void gradient_btn::draw(rvg_cx* rv)
 {
 #if 1
@@ -7293,7 +7379,7 @@ void draw_radios(rvg_cx* rv, radio_info_t* p, radio_style_t* ps)
 		if (p->value || p->swidth > 0)
 			rv->submit(ps->col, 0, ps->thickness);
 		else
-			rv->submit(ps->innc, ps->line_col, ps->thickness);
+			rv->submit(ps->innc * 0, ps->line_col, ps->thickness);
 	}
 	if (p->swidth > 0) {
 		rv->add_circle(p->pos, p->swidth);
@@ -7379,92 +7465,6 @@ void radio_tl::draw(rvg_cx* rv)
 	}
 }
 
-void color_btn::draw(rvg_cx* rv)
-{
-	auto p = this;
-	auto ns = p->_size;
-	static int bid = 1234;
-	if (id == bid)
-	{
-		id = id;
-	}
-#if 1
-
-	rv->save();
-	rv->translate(p->_pos);
-	if (p->dfill)
-	{
-		if (p->_circle)
-		{
-			auto sp = p->_pos;
-			auto r = lround(p->_size.y * 0.5);
-			sp += r;
-			rv->add_circle(sp, r);
-		}
-		else
-		{
-			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
-		}
-		rv->submit(p->dfill, 0, 0);
-	}
-	// 渲染标签
-	glm::vec2 ps = { thickness * 2, thickness * 2 };
-	if (p->mPushed) {
-		ps += pushedps;
-	}
-
-	ns -= thickness * 4;
-
-	glm::vec4 rc = { ps, ns };
-
-
-	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
-
-	/*
-	text_style_t st = {};
-	st.font = 0;
-	st.text_align = p->text_align;
-	st.font_size = p->font_size;
-	st.text_color = p->text_color;	ltx->tem_rtv.clear();
-		ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
-		ltx->update_text();
-		ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
-		//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
-
-	if (p->dcol)
-	{
-		if (p->_circle)
-		{
-			auto sp = p->_pos;
-			auto r = lround(p->_size.y * 0.5);
-			sp += r;
-			rv->add_circle(sp, r);
-		}
-		else
-		{
-			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
-		}
-		rv->submit(0, p->dcol, p->thickness);
-	}
-	//if ((bst & (int)BTN_STATE::STATE_HOVER))
-	//{
-	//	rv->add_rect( { 0,0,size.x,size.y }, p->rounding);
-	//	rv->submit( 0, 0x80ff8000, 1, 0);
-	//} 
-	text_style st = {};
-	st.fontsize = p->font_size;
-	st.align = p->text_align;
-	st.color = p->text_color;
-	text_st tx = {};
-	tx.pos = {};
-	tx.size = get_size();
-	tx.text = p->str.c_str(); tx.text_len = p->str.size();
-	rv->add_text(&tx, &st);
-	rv->restore();
-
-#endif
-}
-
 void checkbox_tl::draw(rvg_cx* rv)
 {
 	auto p = this;
@@ -7473,6 +7473,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 
 		rv->save();
 		glm::ivec2 poss = p->_pos;
+		poss.x += (_size.x - style.square_sz) * 0.5;
 		poss.y += (_size.y - style.square_sz) * 0.5;
 		rv->translate((glm::vec2)poss + glm::vec2(0.5f, 0.5f));
 		int x = 0;

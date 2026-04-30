@@ -319,6 +319,7 @@ public:
 	void set_script_cn(const char* family);
 	void set_script_en(const char* family);
 	const char* select_font_by_script(int scriptCode);
+	void set_cache_size(int width, int height);
 public:
 	font_t* get_mfont(const std::string& name);
 	// 手动添加字体使用。纹理缓存同一个，但不能用上面函数查询

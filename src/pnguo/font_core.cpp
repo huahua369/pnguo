@@ -5193,8 +5193,6 @@ void free_packer(packer_base* p)
 bitmap_cache_cx::bitmap_cache_cx()
 {
 	resize(width, height);
-	// 填充20x20白色
-	fill_color(20, 20, -1);
 }
 
 bitmap_cache_cx::~bitmap_cache_cx()
@@ -5203,9 +5201,9 @@ bitmap_cache_cx::~bitmap_cache_cx()
 void bitmap_cache_cx::resize(int w, int h)
 {
 	if (w < 10 || h < 10 || (w == width && h == height))return;
-	clear();
 	width = w;
 	height = h;
+	clear();
 }
 
 glm::ivec2 bitmap_cache_cx::fill_color(int w, int h, uint32_t color)
@@ -5236,6 +5234,8 @@ void bitmap_cache_cx::clear()
 	}
 	_packer.clear();
 	_data.clear();
+	// 填充白色
+	fill_color(10, 10, -1);
 }
 stb_packer* bitmap_cache_cx::get_last_packer(bool isnew)
 {
@@ -6026,6 +6026,10 @@ const char* font_rctx::select_font_by_script(int scriptCode)
 	}
 	auto default_font = "Microsoft YaHei";
 	return default_font;
+}
+void font_rctx::set_cache_size(int width, int height)
+{
+	bcc.resize(width, height);
 }
 font_t* font_rctx::get_mfont(const std::string& name) {
 	auto it = fzv.find(name);
