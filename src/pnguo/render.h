@@ -473,7 +473,7 @@ public:
 	void push_ct(uint8_t op);
 	bool is_image();
 	void push_null(int v);
-	void new_rc();
+	uint32_t get_crc();
 private:
 
 };
@@ -490,6 +490,7 @@ public:
 	glm::ivec4 _view = {};
 	glm::ivec2 pos = {};
 	float stwidth = 2.0;
+	uint32_t cmd_crc = 0;
 public:
 	rvg_data_cx();
 	~rvg_data_cx();

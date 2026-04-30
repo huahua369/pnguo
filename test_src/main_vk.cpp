@@ -978,7 +978,7 @@ int main()
 			pro->rounding = 10;
 			pro->height = 20;
 			pro->width = 110;
-			pro->color = { 0xffff9e40, 0xff6c6c6c };
+			pro->color = { 0xffff9e40, 0x5f6c6c6c };
 			pro->set_value(0.5);
 
 
@@ -1003,13 +1003,13 @@ int main()
 			//			jt.detach();
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					auto sem = vkd->get_fbo_semaphore();
-					form0->add_vk_semaphores(sem, 0, 0);
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					//vkd->on_render();		// 渲染到fbo纹理tex3d
+					//auto sem = vkd->get_fbo_semaphore();
+					//form0->add_vk_semaphores(sem, 0, 0);
+					//texture_dt tdt = {};
+					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					//if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					//td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
@@ -1036,7 +1036,7 @@ int main()
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
-					//if (kti > 0.1)
+					if (kti > 0.1)
 					{
 						kti = 0.0;
 						rt_clear(mtext);
@@ -1044,7 +1044,7 @@ int main()
 						std::string str = vkd->get_label();
 						str += (char*)u8"emoji表情💻🔥➗️👪️🍕";
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff222222);
+						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff00fc2c);// 0xff222222);
 						str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";
 						//str = (char*)u8"abcdefg";
 						// 添加文本
@@ -1073,7 +1073,7 @@ int main()
 					{
 						savepng = false;
 					}
-					//app->wait_device();
+					app->wait_device();
 					//app->wait_queue(0);
 					wait2d = 0;
 					//while (wait2d == 0) {

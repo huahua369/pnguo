@@ -33,6 +33,8 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include "render.h"
 #include "font_core.h"
 
+#include "ecc_sv.h"
+
 #define SP_RGBA32_R_U(v) ((v) & 0xff)
 #define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
 #define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
@@ -1894,16 +1896,13 @@ void rvg_cx::push_null(int v)
 	push_ct(v);
 }
 
-void rvg_cx::new_rc()
+uint32_t rvg_cx::get_crc()
 {
-	//auto rc = glm::ivec4(INT_MAX, INT_MAX, 0, 0); 
-	_data.push_back({});
-	auto& d = _data.back();
-	d.second = 0;
-	d.first = _cmdtype.size();
-	d.type = 0;
-	//auto rc = glm::ivec4(INT_MAX, INT_MAX, 0, 0); 
-	_prc = &d.rc;
+	_data;		// 渲染数据列表
+	auto ct0 = ecc_crc32u(_cmdtype.data(), _cmdtype.size());
+	auto ct1 = ecc_crc32u(_cmd.data(), _cmd.size());
+	auto ct2 = ecc_crc32u(_cmd_pos.data(), _cmd_pos.size() * sizeof(size_t));
+	return ct0 ^ ct1 ^ ct2;
 }
 
 
@@ -3317,6 +3316,12 @@ void rvg_data_cx::update(rvg_cx* rvg)
 void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 {
 	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
+	auto rcrc = rvg->get_crc();
+	if (dst->cmd_crc == rcrc)
+	{
+		return;
+	}
+	dst->cmd_crc = rcrc;
 	dst->_view = _view;
 	dst->pos = rvg->pos;
 	dst->update(rvg);
