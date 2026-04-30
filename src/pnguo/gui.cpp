@@ -7263,6 +7263,7 @@ void color_btn::draw(rvg_cx* rv)
 	st.fontsize = p->font_size;
 	st.align = p->text_align;
 	st.color = p->text_color;
+	st.family = p->family;
 	text_st tx = {};
 	tx.pos = {};
 	tx.size = get_size();
@@ -7360,6 +7361,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	st.fontsize = p->font_size;
 	st.align = p->text_align;
 	st.color = p->text_color;
+	st.family = p->family;
 	text_st tx = {};
 	tx.pos = { 0,thickness * .5 };
 	tx.size = get_size();
@@ -7582,6 +7584,7 @@ void progress_tl::draw(rvg_cx* rv)
 		st.fontsize = font_size;
 		st.align = ta;// text_align;
 		st.color = text_color;
+		st.family = family;
 		text_st tx = {};
 		tx.pos = { 0,thickness };
 		tx.size = ss;

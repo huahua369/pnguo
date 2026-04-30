@@ -1842,19 +1842,7 @@ bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2)
 inline bool is_textimage(uint8_t c) {
 	return c >= rvg_cx::OP_TEXT_STYLE;
 }
-void rvg_cx::set_cliprect0(const glm::ivec4& c)
-{
-	assert((c.z > 0 && c.w > 0));
 
-	_data0.push_back({});
-	auto& d = _data0.back();
-	d.first = _cmdtype.size() - 1;
-	d.type = is_textimage(_cmdtype.back());
-	d.second = _cmdtype.size();
-	d.rc = c;
-	d.rc.z += c.x;
-	d.rc.w += c.y;
-}
 void rvg_cx::set_draw_rect(const glm::ivec4& c)
 {
 	assert((c.z > 0 && c.w > 0));
@@ -1897,12 +1885,10 @@ void rvg_cx::push_null(int v)
 }
 
 uint32_t rvg_cx::get_crc()
-{
-	_data;		// 渲染数据列表
+{ 
 	auto ct0 = ecc_crc32u(_cmdtype.data(), _cmdtype.size());
-	auto ct1 = ecc_crc32u(_cmd.data(), _cmd.size());
-	auto ct2 = ecc_crc32u(_cmd_pos.data(), _cmd_pos.size() * sizeof(size_t));
-	return ct0 ^ ct1 ^ ct2;
+	auto ct1 = ecc_crc32u(_cmd.data(), _cmd.size()); 
+	return ct0 ^ ct1;
 }
 
 

@@ -695,11 +695,12 @@ int main()
 
 		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
-		std::string k80 = (char*)u8"👨‍👨‍👧q";
+		std::string k8aaa0 = (char*)u8"👨‍👨‍👧q";
+		std::string k80 = (char*)u8"👪️q";
 		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
 		std::string k821 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ\t我\n的大刀";
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas,Malgun Gothic");
-
+		auto rctts = get_text_rect(family, 16, k80.c_str(), k80.size(), 0);
 		//text_style ts = {};
 		//ts.family = family;
 		//ts.fontsize = 16;
@@ -1042,7 +1043,7 @@ int main()
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label();
-						str += (char*)u8"emoji表情💻🔥➗️👪️🍕";
+						str += (char*)u8"emoji表情💻🔥➗️👪️q🍕";
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff00fc2c);// 0xff222222);
 						str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";

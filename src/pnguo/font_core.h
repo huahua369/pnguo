@@ -609,6 +609,10 @@ class text_run_cx;
 //  new_font_family(font_rctx* ctx,(char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic");
 font_family_t* new_font_family(font_rctx* ctx, const char* familys, const char* style = nullptr);
 void delete_font_family(font_family_t* p);
+// 获取一段utf8文本渲染大小
+glm::ivec2 get_text_rect(font_family_t* p,int fontsize, const void* str, int size, int first);
+glm::ivec4 font_get_char_extent(char32_t ch, unsigned char font_size, font_family_t* fallbacks, font_t** oft);
+
 // 文本样式
 struct text_style
 {

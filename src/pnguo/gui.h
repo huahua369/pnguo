@@ -261,7 +261,7 @@ public:
 	glm::ivec2 mmpos = {};	// 当前鼠标坐标
 	glm::ivec2 ppos = {};	// 父级坐标 
 	std::string text;		// 内部显示用字符串
-	std::string family;
+	font_family_t* family = 0;
 	float font_size = 16;
 	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
 	int rounding = 4;		// 圆角

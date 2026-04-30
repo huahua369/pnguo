@@ -406,10 +406,9 @@ public:
 	};
 	std::vector<uint8_t> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
-	std::vector<size_t> _cmd_pos;		// 起始数据
+	std::vector<size_t> _cmd_pos;		// 命令的数据偏移
 	std::stack<glm::vec2> translate_pos;
-	std::vector<cmdrect_v> _data;		// 渲染数据列表
-	std::vector<cmdrect_v> _data0;		// 渲染数据列表
+	std::vector<cmdrect_v> _data;		// 渲染数据列表 
 	glm::vec2 tpos = {};				// 当前偏移
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
@@ -468,7 +467,6 @@ public:
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
 
-	void set_cliprect0(const glm::ivec4& c);
 	void set_draw_rect(const glm::ivec4& c);
 	void push_ct(uint8_t op);
 	bool is_image();
