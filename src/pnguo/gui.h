@@ -470,7 +470,7 @@ public:
 	// 更新渲染啥的
 	bool update(float delta);
 	// 获取纹理/或者渲染到cairo
-	image_ptr_t* get_render_data();
+	//image_ptr_t* get_render_data();
 	void draw(rvg_cx* rv);
 
 	glm::ivec4 input_pos();

@@ -198,6 +198,8 @@ public:
 public:
 	// 获取字符大小{xy大小，z=advance,w=基线}
 	glm::ivec4 get_char_extent(char32_t ch, unsigned char font_size, /*unsigned short font_dpi,*/ std::vector<font_t*>* fallbacks, font_t** oft);
+
+	glm::ivec4 get_char_extent0(char32_t ch, unsigned char font_size, font_family_t* fallbacks, font_t** oft);
 	void clear_char_lut();
 	void clear_gcache();
 	// todo 获取文字渲染信息。glyph_index=-1时则用unicode_codepoint；
@@ -610,8 +612,14 @@ class text_run_cx;
 font_family_t* new_font_family(font_rctx* ctx, const char* familys, const char* style = nullptr);
 void delete_font_family(font_family_t* p);
 // 获取一段utf8文本渲染大小
-glm::ivec2 get_text_rect(font_family_t* p,int fontsize, const void* str, int size, int first);
+glm::ivec2 get_text_rect(font_family_t* p, int fontsize, const void* str, int size, int first);
 glm::ivec4 font_get_char_extent(char32_t ch, unsigned char font_size, font_family_t* fallbacks, font_t** oft);
+
+glm::ivec3 font_get_text_rect1(font_family_t* family, int fontsize, const void* str8);
+int font_get_text_posv(font_family_t* family, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
+
+int font_get_baseline(font_family_t* family, int fontsize);
+int font_get_lineheight(font_family_t* family, int fontsize);
 
 // 文本样式
 struct text_style

@@ -2924,7 +2924,7 @@ glm::ivec3 font_t::get_text_rect(int fontsize, const void* str8, int len)
 			continue;
 		}
 		font_t* oft = 0;
-		auto rc = font->get_char_extent(ch, fontsize, 0, &oft);
+		auto rc = font->get_char_extent0(ch, fontsize, 0, &oft);
 		if (oft != oft0 && oft) {
 			oft0 = oft;
 			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
@@ -3220,6 +3220,30 @@ glm::ivec4 font_t::get_char_extent(char32_t ch, unsigned char font_size, /*unsig
 	glm::ivec4 ret = {};
 	font_t* rfont = nullptr;
 	auto g = get_glyph_index(ch, &rfont, fallbacks);
+	if (g)
+	{
+		if (oft)*oft = rfont;
+		double fns = font_size;// round((double)font_size * font_dpi / 72.0);
+		double scale = rfont->get_scale(fns);
+		int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
+		stb_font::buildGlyphBitmap(rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+		double adv = scale * advance;
+		auto bl = rfont->get_base_line(font_size);
+		ret = { x1 - x0, y1 - y0, adv, bl };
+		//_char_lut[cs.u] = ret;
+	}
+	return ret;
+}
+
+glm::ivec4 font_t::get_char_extent0(char32_t ch, unsigned char font_size, font_family_t* fallbacks, font_t** oft)
+{
+	ft_char_s cs;
+	cs.v.font_dpi = 0;// font_dpi;
+	cs.v.font_size = font_size;
+	cs.v.unicode_codepoint = ch;
+	glm::ivec4 ret = {};
+	font_t* rfont = nullptr;
+	auto g = get_glyph_index0(ch, &rfont, fallbacks);
 	if (g)
 	{
 		if (oft)*oft = rfont;
@@ -7715,6 +7739,138 @@ glm::ivec2 get_text_rect(font_family_t* family, int fontsize, const void* str, i
 	return ret;
 }
 
+glm::ivec3 font_get_text_rect1(font_family_t* family, int fontsize, const void* str8)
+{
+	glm::ivec3 ret = {};
+	if (!family)
+		return ret;
+	auto str = (const char*)str8;
+
+	int x = 0;
+	int y = 0;
+	int n = 1;
+	int lineheight = 0;// get_lineheight(idx, fontsize);
+	auto font = family->familys[0];
+	font_t* oft0 = 0;
+	do
+	{
+		if (!str || !(*str)) { break; }
+		uint32_t ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		if (ch == '\n')
+		{
+			ret.x = std::max(ret.x, x);
+			x = 0;
+			n++;
+			break;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent0(ch, fontsize, family, &oft);
+		if (oft != oft0) {
+			oft0 = oft;
+			double scale = fontsize == 0 ? 1.0 : oft->get_scale(fontsize);
+			//lineheight = std::max((int)(oft->ascender * scale), lineheight);
+			lineheight = std::max((int)((oft->ascender - oft->descender + oft->lineGap) * scale), lineheight);
+			ret.z = oft->ascender * scale;
+		}
+		x = rc.x;
+		ret.y = rc.y;
+		break;
+	} while (0);// str&&* str);
+	ret.x = x;
+	return ret;
+}
+int font_get_text_posv(font_family_t* family, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow)
+{
+	int ret = {};
+	if (!family)
+		return ret;
+	auto str = (const char*)str8;
+	auto str0 = (const char*)str8;
+
+	auto t = (char*)str;
+	uint32_t u = 0;
+	glm::ivec2 rc = { 0, fontsize };
+	std::vector<strfont_t> vstr;
+	get_font_fallbacks(family, str, len, false, vstr);
+	for (auto& kt : vstr)
+	{
+		if (kt.font)
+		{
+			font_t::GlyphPositions gp = {};// 执行harfbuzz 
+			kt.font->set_hb_fontsize(fontsize);
+			auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
+			kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
+			for (size_t i = 0; i < gp.len; i++)
+			{
+				gp.pos[i].x_advance;
+			}
+		}
+	}
+
+
+	int x = 0;
+	double ktt = 0.6;
+	ow.clear();
+	std::vector<int> w0;
+	w0.push_back(0);
+	//do
+	//{
+	//	if (!str || !(*str)) { break; }
+
+	//	uint32_t ch = 0;
+	//	auto kk = md::utf8_to_unicode(str, &ch);
+	//	if (kk < 1)break;
+	//	str += kk;
+	//	if (ch == '\n')
+	//	{
+	//		ow.push_back(w0);
+	//		w0.clear();
+	//		w0.push_back(0); x = 0;
+	//		continue;
+	//	}
+	//	font_t* oft = 0;
+	//	auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
+	//	x += rc.z;
+	//	w0.push_back(x);
+	//} while (str && *str);
+	if (w0.size())ow.push_back(w0);
+	return ret;
+}
+
+int font_get_baseline(font_family_t* family, int fontsize)
+{
+	int baseline = 0;
+	if (!family || fontsize == 0)
+		return baseline;
+	for (size_t i = 0; i < family->count; i++)
+	{
+		auto it = family->familys[i];
+		auto b = it->get_base_line(fontsize);
+		if (b > baseline)
+			baseline = b;
+	}
+	return baseline;
+}
+
+int font_get_lineheight(font_family_t* family, int fontsize)
+{
+	int r = 0;
+	if (!family || fontsize == 0)
+		return r;
+	for (size_t i = 0; i < family->count; i++)
+	{
+		auto it = family->familys[i];
+		auto b = it->get_line_height(fontsize);
+		if (b > r)
+			r = b;
+	}
+	return r;
+}
+
+
 
 void text_set_bidi(text_render_o* p, const char* str, size_t first, size_t count/*, font_family_t* family*/)
 {
@@ -7760,15 +7916,6 @@ glm::ivec4 font_get_char_extent(char32_t ch, unsigned char font_size, font_famil
 	cs.v.font_dpi = 0;// font_dpi;
 	cs.v.font_size = font_size;
 	cs.v.unicode_codepoint = ch;
-#if 0
-	{
-		auto it = _char_lut.find(cs.u);
-		if (it != _char_lut.end())
-		{
-			return it->second;
-		}
-	}
-#endif
 	glm::ivec4 ret = {};
 	font_t* rfont = nullptr;
 	auto g = fallbacks->familys[0]->get_glyph_index0(ch, &rfont, fallbacks);

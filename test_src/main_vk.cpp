@@ -910,6 +910,7 @@ int main()
 			auto dvv = new div_cx();
 			dvv->set_size({ 500,300 });
 			dvv->set_pos({ 10,360 });
+			dvv->family = family;
 			dvv->border = { 0xffacacac,1,5,0xef666666 };	// 颜色，线粗，圆角，背景色
 			dvv->flex.wrap = flex_wrap::WRAP;
 			dvv->flex.direction = flex_direction::ROW;
@@ -994,6 +995,7 @@ int main()
 			{
 				auto r = new edit_tl();
 				r->set_size({ 236,36 });
+				r->set_text("1", 1);
 				dvv->add_widget(r);
 			}
 

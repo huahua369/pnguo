@@ -1846,33 +1846,17 @@ inline bool is_textimage(uint8_t c) {
 void rvg_cx::set_draw_rect(const glm::ivec4& c)
 {
 	assert((c.z > 0 && c.w > 0));
-
-	_data.push_back({});
-	auto& d = _data.back();
-	d.first = _cmdtype.size() - 1;
-	d.type = is_textimage(_cmdtype.back());
-	d.second = _cmdtype.size();
-	d.rc = c;
-	d.rc.z += c.x;
-	d.rc.w += c.y;
-	//auto ct =  > 0 ? _cmdtype.back() : 0;
-	//bool ct0 = _data.back().type;
-	//bool test = == ct0;
-	//if (_prc && test && check_rect_cross(*_prc, c))
-	//{
-	//	_prc->x = std::min(_prc->x, c.x);
-	//	_prc->y = std::min(_prc->y, c.y);
-	//	_prc->z = std::max(_prc->z, c.z);
-	//	_prc->w = std::max(_prc->w, c.w);
-	//	auto& d = _data.back();
-	//	d.type = is_textimage(ct);
-	//}
-	//else {
-	//	new_rc();
-	//	auto& d = _data.back();
-	//	d.type = is_textimage(ct);
-	//	*_prc = c;
-	//}
+	if (c.z > 0 && c.w > 0)
+	{
+		_data.push_back({});
+		auto& d = _data.back();
+		d.first = _cmdtype.size() - 1;
+		d.type = is_textimage(_cmdtype.back());
+		d.second = _cmdtype.size();
+		d.rc = c;
+		d.rc.z += c.x;
+		d.rc.w += c.y;
+	}
 }
 bool rvg_cx::is_image()
 {
