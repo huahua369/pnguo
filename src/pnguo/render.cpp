@@ -3239,6 +3239,15 @@ void rvg_data_cx::update(rvg_cx* rvg)
 			data.push_back(f);
 			f = it;
 		}
+		if (f.type && f.first + 1 < f.second)
+		{
+			auto tt = f;
+			f.second = f.first + 1;
+			tt.first = f.second;
+			tt.type = 0;
+			data.push_back(f);
+			f = tt;
+		}
 		lpush++;
 	}
 	data.push_back(f);

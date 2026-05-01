@@ -2390,8 +2390,8 @@ void text_ctx_cx::draw(rvg_cx* rv)
 	rv->save();
 	rv->translate(pos);
 	// 裁剪区域
-	rv->add_rect({ 0,0,size.x,size.y }, 0);
-	rv->clip();
+	//rv->add_rect({ 0,0,size.x,size.y }, 0);
+	//rv->clip();
 
 	auto ps = _align_pos - scroll_pos;
 	//auto oldop = cairo_get_operator(cr);
@@ -2447,7 +2447,8 @@ void text_ctx_cx::draw(rvg_cx* rv)
 	rv->set_color(bbc);
 	rv->add_rect({ -0.5,   -0.5, size.x + 1, size.y + 1 }, 0);
 	rv->set_line_width(1);
-	rv->stroke();
+	//rv->stroke(); 
+	rv->fill();
 	// 编辑中的文本
 	if (editingstr.size())
 	{
