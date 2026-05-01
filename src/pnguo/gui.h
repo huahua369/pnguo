@@ -263,6 +263,7 @@ public:
 	std::string text;		// 内部显示用字符串
 	font_family_t* family = 0;
 	float font_size = 16;
+	uint32_t text_color = 0xffc2c2c2;
 	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
 	int rounding = 4;		// 圆角
 	float thickness = 1.0;	// 边框线粗
@@ -541,7 +542,7 @@ struct color_btn :public widget_t
 
 	uint32_t dfill = 0, dcol = 0;	// 渲染用
 	uint32_t dtext_color = 0;		// 渲染用
-	uint32_t text_color = 0xffffffff;
+
 	int disabled_alpha = 0x30;
 	uTheme effect = uTheme::dark;
 	glm::vec2 pushedps = {};
@@ -568,7 +569,6 @@ struct gradient_btn :public widget_t
 	//icon_rt icon = {};
 	//size_t len = 0; 
 	uint32_t back_color = 0;
-	uint32_t text_color = 0xffc2c2c2;
 	uint32_t text_color_shadow = 0x88111111;
 	double opacity = 1.0;
 	// x=默认，y=鼠标进入，z=按下
@@ -711,7 +711,7 @@ struct progress_tl :public widget_t
 	std::string format = "%";				// 格式
 	glm::vec2 vr = { 0, 100 };		// 范围
 	glm::ivec2 color = { 0xffff9e40, 0x806c6c6c };//前景色，背景色
-	uint32_t text_color = 0xffffffff;
+
 	double value = 0.0;				// 当前进度
 	int width = 0;					// 宽度
 	int height = 0;					// 高度
@@ -758,7 +758,7 @@ struct colorpick_tl :public widget_t
 {
 	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
 	glm::vec4 hsv = {}, oldhsv = {};	// 0-1保存hsv
-	uint32_t text_color = 0xffeeeeee;//文本颜色 
+	//uint32_t text_color = 0xffeeeeee;//文本颜色 
 	uint32_t bc_color = 0xff232323;//边框 
 	int width = 0;					// 宽度
 	int height = 0;					// 单行高度 

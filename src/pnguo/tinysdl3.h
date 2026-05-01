@@ -251,6 +251,7 @@ private:
 	bool visible = true;
 	bool visible_old = true;
 	bool _rmode = false;
+	bool is_render = true;
 public:
 	form_x();
 	~form_x();

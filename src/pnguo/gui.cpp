@@ -7185,6 +7185,19 @@ void widget_t::draw(rvg_cx* rv)
 
 void image_btn::draw(rvg_cx* rv) {
 
+	//image_ptr_t* img = 0;
+	//image_sliced_t state_img[5] = {};
+	text_style st = {};
+	st.fontsize = font_size;
+	st.align = text_align;
+	st.color = text_color;
+	st.family = family;
+	text_st tx = {};
+	tx.pos = {};
+	tx.size = get_size();
+	tx.text = str.c_str(); tx.text_len = str.size();
+	rv->add_text(&tx, &st);
+
 }
 
 void color_btn::draw(rvg_cx* rv)

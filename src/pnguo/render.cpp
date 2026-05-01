@@ -3301,13 +3301,13 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	surfaces.resize(sf + 1);
 }
 
-void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
+bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 {
 	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
 	auto rcrc = rvg->get_crc();
 	if (dst->cmd_crc == rcrc)
 	{
-		return;
+		return false;
 	}
 	dst->cmd_crc = rcrc;
 	dst->_view = _view;
@@ -3403,7 +3403,7 @@ void canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			it.t = mrt_get_box_index(dst->mrt, (size_t)it.first);
 		}
 	}
-	return;
+	return true;
 }
 
 

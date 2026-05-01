@@ -2234,6 +2234,7 @@ void form_x::update(float delta)
 	{
 		up_cb(delta, &dwt);
 	}
+	is_render = dwt > 0;
 #if 0
 	for (int i = 0; i < 2; i++) {
 		for (auto it = _planes[i].begin(); it != _planes[i].end(); it++)
@@ -2266,7 +2267,7 @@ void form_x::update(float delta)
 	//for (auto kt : skeletons) {
 	//	kt->update(delta);
 	//}
-	app_cx::sleep_ms(dwt);
+	//app_cx::sleep_ms(dwt);
 }
 void form_x::draw_rects(const glm::vec4* rects, int n, const glm::vec4& color)
 {
@@ -2357,7 +2358,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 }
 void form_x::present(double delta)
 {
-	if (!visible || !renderer || !app ||/* !app->r2d ||*/ display_size.x < 1 || display_size.y < 1)return;
+	if (!is_render || !visible || !renderer || !app ||/* !app->r2d ||*/ display_size.x < 1 || display_size.y < 1)return;
 	float rsx = 1.0f;
 	float rsy = 1.0f;
 	SDL_GetRenderScale(renderer, &rsx, &rsy);

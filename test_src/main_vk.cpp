@@ -991,6 +991,11 @@ int main()
 			pro->color = { 0xffff9e40, 0x5f6c6c6c };
 			pro->set_value(0.5);
 
+			{
+				auto r = new edit_tl();
+				r->set_size({ 236,36 });
+				dvv->add_widget(r);
+			}
 
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
@@ -1011,9 +1016,9 @@ int main()
 			//
 			//				});
 			//			jt.detach();
+
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-					//vkd->on_render();		// 渲染到fbo纹理tex3d
 					//auto sem = vkd->get_fbo_semaphore();
 					//form0->add_vk_semaphores(sem, 0, 0);
 					//texture_dt tdt = {};
@@ -1025,9 +1030,10 @@ int main()
 					//td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
 					//td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
 				};
-			form0->up_cb = [=, &wait2d](float delta, int* ret)
+			form0->up_cb = [=](float delta, int* ret)
 				{
 					int d = delta * 1000;
+					//vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto light = vkd->get_light(0);
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;					// 曝光度：默认1.0
@@ -1040,13 +1046,13 @@ int main()
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
 					dvv->draw(&rvg);
-					td3->update_rvg(&rvg, rvgd);
+					*ret = td3->update_rvg(&rvg, rvgd);
 
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
-					if (kti > 0.1)
+					if (kti > 0.06)
 					{
 						kti = 0.0;
 						rt_clear(mtext);
@@ -1083,9 +1089,9 @@ int main()
 					{
 						savepng = false;
 					}
-					app->wait_device();
+					//app->wait_device();
 					//app->wait_queue(0);
-					wait2d = 0;
+					//wait2d = 0;
 					//while (wait2d == 0) {
 					//	Sleep(1);
 					//}

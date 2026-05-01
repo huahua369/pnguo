@@ -538,7 +538,7 @@ public:
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
 	// 批量渲染矢量图、位图、文本
-	void update_rvg(rvg_cx* rvg, rvg_data_cx* dst);
+	bool update_rvg(rvg_cx* rvg, rvg_data_cx* dst);
 	// 释放渲染器的纹理
 	void free_tex();
 	void free_rvg(rvg_data_cx* p);
