@@ -9061,6 +9061,7 @@ input_state_t* get_input_state_cx(void* ptr, int t)
 }
 bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 {
+	auto mpos = mps - _pos;
 	auto t = (event_type2)type;
 	bool ret = false;
 	auto p = (mouse_move_et*)e;
@@ -9072,7 +9073,7 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	}break;
 	case event_type2::on_leave:
 	{
-		p->cursor = (int)cursor_st::cursor_arrow;//设置输入光标
+		p->cursor = (int)cursor_st::cursor_arrow;//设置光标
 	}break;
 	case event_type2::on_down:
 	{
@@ -9084,12 +9085,12 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 		else {
 			ctx->c_d = 0; is_input = false;
 		}
-		stb_textedit_click(ctx, &ctx->state, mps.x, mps.y);
+		stb_textedit_click(ctx, &ctx->state, mpos.x, mpos.y);
 		ret = true;
 	}break;
 	case event_type2::on_drag:
 	{
-		stb_textedit_drag(ctx, &ctx->state, mps.x, mps.y);
+		stb_textedit_drag(ctx, &ctx->state, mpos.x, mpos.y);
 		ret = true;
 	}break;
 	case event_type2::mouse_wheel:
