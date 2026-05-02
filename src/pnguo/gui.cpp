@@ -4778,7 +4778,7 @@ scroll_bar::~scroll_bar()
 {}
 
 
-bool image_btn::on_mevent(int type, const glm::vec2& mps)
+bool image_btn::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	return false;
 }
@@ -5125,7 +5125,7 @@ void radio_tl::set_value()
 	}
 }
 
-bool radio_tl::on_mevent(int type, const glm::vec2& mps)
+bool radio_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	if (et == event_type2::on_click)
@@ -5202,7 +5202,7 @@ void checkbox_tl::set_value()
 	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
-bool checkbox_tl::on_mevent(int type, const glm::vec2& mps)
+bool checkbox_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	if (et == event_type2::on_click)
@@ -5276,7 +5276,7 @@ void switch_tl::set_value()
 	if (v.on_change_cb) { v.on_change_cb(this, v.value); }
 }
 
-bool switch_tl::on_mevent(int type, const glm::vec2& mps)
+bool switch_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	if (et == event_type2::on_click)
@@ -5349,7 +5349,7 @@ double progress_tl::get_v()
 	return glm::mix(vr.x, vr.y, value);
 }
 
-bool progress_tl::on_mevent(int type, const glm::vec2& mps)
+bool progress_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	return false;
@@ -5387,7 +5387,7 @@ double slider_tl::get_v()
 	return glm::mix(vr.x, vr.y, value);
 }
 
-bool slider_tl::on_mevent(int type, const glm::vec2& mps)
+bool slider_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	glm::ivec2 poss = mps - _pos;
@@ -5566,7 +5566,7 @@ void colorpick_tl::set_posv(const glm::ivec2& poss)
 		hsv[dx] = xf;
 	}
 }
-bool colorpick_tl::on_mevent(int type, const glm::vec2& mps)
+bool colorpick_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	glm::ivec2 poss = mps - _pos;
@@ -5659,7 +5659,7 @@ void scroll_bar::set_viewsize(int64_t vs, int64_t cs, int rcw)
 	valid = true;
 }
 
-bool scroll_bar::on_mevent(int type, const glm::vec2& mps)
+bool scroll_bar::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	auto et = (event_type2)type;
 	glm::ivec2 poss = mps - _pos;
@@ -6485,7 +6485,7 @@ glm::vec2 widget_t::get_size()
 {
 	return _size;
 }
-bool widget_t::on_mevent(int type, const glm::vec2& mps)
+bool widget_t::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	return false;
 }
@@ -6513,6 +6513,11 @@ glm::ivec2 widget_t::get_spos()
 	return glm::ivec2();
 }
 
+void widget_t::set_family(font_family_t* family, int fontsize)
+{
+	this->family = family; this->font_size = fontsize;
+}
+
 // 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
 	bool hover = false;
@@ -6535,7 +6540,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 			if (!hoverold)
 			{
 				// 鼠标进入
-				wp->on_mevent((int)event_type2::on_enter, mps);
+				wp->on_mevent((int)event_type2::on_enter, mps, p);
 				if (wp->mevent_cb) {
 					wp->mevent_cb(wp, (int)event_type2::on_enter, mps);
 				}
@@ -6546,7 +6551,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 			{
 				wp->_bst &= ~(int)BTN_STATE::STATE_HOVER;
 				// 鼠标离开
-				wp->on_mevent((int)event_type2::on_leave, mps);
+				wp->on_mevent((int)event_type2::on_leave, mps, p);
 				if (wp->mevent_cb) {
 					wp->mevent_cb(wp, (int)event_type2::on_leave, mps);
 				}
@@ -6556,7 +6561,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 		{
 			if (wp->_bst & (int)BTN_STATE::STATE_HOVER)
 			{
-				wp->on_mevent((int)event_type2::on_move, mps);
+				wp->on_mevent((int)event_type2::on_move, mps, p);
 				if (wp->mevent_cb)
 				{
 					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
@@ -6564,7 +6569,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 			}
 			if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE) {
 				auto dps = mps - wp->curpos;
-				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
+				wp->on_mevent((int)event_type2::on_drag, dps, p);		// 拖动事件
 				if (wp->mevent_cb)
 				{
 					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
@@ -6579,6 +6584,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 	if (!wp)return;
 	auto e = &ep->v;
 	auto t = (devent_type_e)type;
+	wp->form = ep->form;
 	switch (t)
 	{
 	case devent_type_e::mouse_move_e:
@@ -6600,14 +6606,14 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 					wp->_bst |= (int)BTN_STATE::STATE_ACTIVE;
 					wp->curpos = mps - (glm::ivec2)wp->_pos;
 					wp->cks = 0;
-					wp->on_mevent((int)event_type2::on_down, mps);
+					wp->on_mevent((int)event_type2::on_down, mps, p);
 					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
 				}
 				else {
 					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
 					{
 						wp->cks = p->clicks;
-						wp->on_mevent((int)event_type2::on_up, mps);
+						wp->on_mevent((int)event_type2::on_up, mps, p);
 						if (wp->mevent_cb) {
 							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
 						}
@@ -6615,7 +6621,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
 						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
 						wp->_clicks = p->clicks;
-						wp->on_mevent(tc, mps);
+						wp->on_mevent(tc, mps, p);
 						if (wp->mevent_cb) {
 							wp->mevent_cb(wp, tc, mps);
 						}
@@ -6631,7 +6637,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 		if (p->down == 0) {
 			wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 			wp->_bst |= (int)BTN_STATE::STATE_NOMAL;
-			wp->on_mevent((int)event_type2::mouse_up, mps);
+			wp->on_mevent((int)event_type2::mouse_up, mps, p);
 			if (wp->mevent_cb) {
 				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
 			}
@@ -6644,7 +6650,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 		glm::vec2 mps = { p->x, p->y };
 		if (wp->_bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
 		{
-			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
+			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps, p);
 			if (wp->mevent_cb) {
 				wp->mevent_cb(wp, (int)event_type2::on_scroll, mps);
 			}
@@ -6665,7 +6671,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 }
 void send_hover(widget_t* wp, const glm::vec2& mps) {
 
-	wp->on_mevent((int)event_type2::on_hover, mps);
+	wp->on_mevent((int)event_type2::on_hover, mps, nullptr);
 	if (wp->mevent_cb)
 	{
 		wp->mevent_cb(wp, (int)event_type2::on_hover, mps);
@@ -6705,7 +6711,7 @@ void div_cx::add_widget(widget_t* p)
 	if (p)
 	{
 		if (!p->family)
-			p->family = family;
+			p->set_family(family, font_size);
 		p->parent = this;
 		widgets.push_back(p); uplayout = true;
 	}
@@ -7077,7 +7083,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 				pw->cmpos = mps;
 				pw->_bst &= ~(int)BTN_STATE::STATE_HOVER;
 				// 鼠标离开
-				pw->on_mevent((int)event_type2::on_leave, mps);
+				pw->on_mevent((int)event_type2::on_leave, mps, p);
 				if (pw->mevent_cb) {
 					pw->mevent_cb(pw, (int)event_type2::on_leave, mps);
 				}
@@ -7588,12 +7594,18 @@ struct StbTexteditRow
 // define our editor structure
 struct text_control
 {
-	STB_TexteditState state;
+	STB_TexteditState state = {};
 	std::string str;
 	size_t curline = 0;				// 当前行号
 	size_t curline_idx = 0;			// 当前行号偏移
 	font_family_t* family = 0;
 	int font_size = 16;
+	int c_ct = 0;
+	int c_d = 0;
+	int64_t ccursor8 = 0;	//当前光标字符
+	int64_t caret_old = {};		//保存输入光标
+	glm::ivec3 cursor_pos = {};
+	glm::vec2 view = {};	// 区域
 	int8_t LastMoveDirectionLR = 0;
 };
 
@@ -7602,8 +7614,8 @@ struct text_control
 #define KEYDOWN_BIT                    0x80000000
 
 #define STB_TEXTEDIT_STRINGLEN(tc)     ((tc)->str.size())
-#define STB_TEXTEDIT_LAYOUTROW         layout_func
-#define STB_TEXTEDIT_GETWIDTH			get_str_width
+#define STB_TEXTEDIT_LAYOUTROW         stb_textedit_layoutrow
+#define STB_TEXTEDIT_GETWIDTH		   stb_textedit_getwidth
 #define STB_TEXTEDIT_KEYTOTEXT(key)    (((key) & KEYDOWN_BIT) ? 0 : (key))
 #define STB_TEXTEDIT_GETCHAR(tc,i)     ((tc)->str[i])
 #define STB_TEXTEDIT_NEWLINE           '\n'
@@ -7646,10 +7658,11 @@ struct text_control
 #endif
 
 
+float stb_textedit_getwidth(STB_TEXTEDIT_STRING* str, int n, int idx);
 
 
 // define the functions we need
-void layout_func(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
+void stb_textedit_layoutrow(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
 {
 	int remaining_chars = str->str.size() - start_i;
 	row->num_chars = remaining_chars > 20 ? 20 : remaining_chars; // should do real word wrap here
@@ -7658,6 +7671,18 @@ void layout_func(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
 	row->baseline_y_delta = 1.25;
 	row->ymin = -1;
 	row->ymax = 0;
+	auto r = row;
+	int i = start_i;
+	float row_width = 0.0f;
+	while (str->str[i] != '\n' && i < STB_TEXTEDIT_STRINGLEN(str)) {
+		row_width += STB_TEXTEDIT_GETWIDTH(str, start_i, i);
+		if (str->view.x>0&&row_width > str->view.x) break; // 自动换行触发条件
+		i++;
+	}
+	r->x1 = row_width;
+	r->num_chars = i - start_i;
+	//r->start_idx = start_i;
+	//r->end_idx = i;
 }
 
 int delete_chars(STB_TEXTEDIT_STRING* str, int pos, int num)
@@ -7672,7 +7697,7 @@ int insert_chars(STB_TEXTEDIT_STRING* str, int pos, const STB_TEXTEDIT_CHARTYPE*
 	return 1; // always succeeds
 }
 // 行号，字符位置
-float get_str_width(STB_TEXTEDIT_STRING* str, int n, int idx)
+float stb_textedit_getwidth(STB_TEXTEDIT_STRING* str, int n, int idx)
 {
 	if (str && str->family)
 	{
@@ -8886,7 +8911,6 @@ void edit_cx::set_pwd(char ch)
 
 void edit_cx::set_text(const void* str, int len)
 {
-	editingstr.clear();
 	stb_textedit_delete(ctx, &ctx->state, 0, ctx->str.size());
 	stb_textedit_text(ctx, &ctx->state, (char*)str, len);
 	if (pwdch) {
@@ -8899,7 +8923,6 @@ void edit_cx::set_text(const void* str, int len)
 
 void edit_cx::add_text(const void* str, int len)
 {
-	editingstr.clear();
 	stb_textedit_text(ctx, &ctx->state, (char*)str, len);
 	if (pwdch) {
 		stext.resize(ctx->str.size());
@@ -8936,10 +8959,16 @@ void edit_cx::set_color(const glm::ivec4& c)
 }
 
 void edit_cx::set_family(font_family_t* family, int fontsize)
-{}
+{
+	widget_t::set_family(family, fontsize);
+	ctx->family = family;
+	ctx->font_size = fontsize;
+}
 
 void edit_cx::set_show_input_cursor(bool ab)
-{}
+{
+	show_input_cursor = ab;
+}
 
 void edit_cx::set_autobr(bool ab)
 {}
@@ -8955,18 +8984,206 @@ bool edit_cx::remove_bounds()
 	return false;
 }
 
-void edit_cx::on_event_e(uint32_t type, et_un_t* e)
-{
 
+void edit_cx::on_event_e(uint32_t type, et_un_t* ep)
+{
+	auto e = ep->v;
+	auto t = (devent_type_e)type;
+	switch (t) {
+	case devent_type_e::text_input_e:
+	{
+		auto p = e.t;
+		auto ipos = input_pos();// 计算输入法坐标
+		p->x = ipos.x;
+		p->y = ipos.y + 3;
+		p->w = ipos.z;
+		p->h = ipos.w;
+		add_text(p->text, strlen(p->text));
+
+	}break;
+	case devent_type_e::text_editing_e: {
+
+		if (!is_input)break;
+		auto& p = e.e;
+		bool setimepos = false;
+		if (ctx->caret_old != ctx->state.cursor)
+		{
+			ctx->caret_old = ctx->state.cursor;
+			setimepos = true;
+		}
+		std::string str;
+		if (p->text) {
+			str = p->text;
+		}
+		if (str.size())
+		{
+			setimepos = true;
+		}
+		if (setimepos)
+		{
+			auto ipos = input_pos();// 计算输入法坐标
+			p->x = ipos.x;
+			p->y = ipos.y;
+			p->w = ipos.z;
+			p->h = ipos.w;
+			//printf("text_editing_e:%s\t%d\n", str.c_str(), ipos.x);
+		}
+		editingstr = str;
+	}break;
+	};
+
+}
+
+input_state_t* get_input_state_cx(void* ptr, int t)
+{
+	static input_state_t r = {};
+	if (t)
+	{
+		if (r.ptr)
+		{
+			auto p = (edit_cx*)r.ptr;
+			p->editingstr.clear();
+			p->is_input = false;
+		}
+		r.ptr = ptr;
+	}
+	if (ptr && r.ptr)
+	{
+		auto p = (edit_cx*)r.ptr;
+		if (p) {
+			*((glm::ivec4*)&r.x) = p->input_pos();
+			r.y += 3;
+		}
+		if (!r.cb)
+			r.cb = [](uint32_t type, et_un_t* e, void* ud) { if (ud) { ((edit_cx*)ud)->on_event_e(type, e); }	};
+	}
+	return &r;
+}
+bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
+{
+	auto t = (event_type2)type;
+	bool ret = false;
+	auto p = (mouse_move_et*)e;
+	switch (t)
+	{
+	case event_type2::on_move:
+	{
+		p->cursor = (int)cursor_st::cursor_ibeam;//设置输入光标
+	}break;
+	case event_type2::on_leave:
+	{
+		p->cursor = (int)cursor_st::cursor_arrow;//设置输入光标
+	}break;
+	case event_type2::on_down:
+	{
+		if (form)
+		{
+			form_set_input_ptr(form, get_input_state_cx(this, 1));
+			ctx->c_d = -1; is_input = true;
+		}
+		else {
+			ctx->c_d = 0; is_input = false;
+		}
+		stb_textedit_click(ctx, &ctx->state, mps.x, mps.y);
+		ret = true;
+	}break;
+	case event_type2::on_drag:
+	{
+		stb_textedit_drag(ctx, &ctx->state, mps.x, mps.y);
+		ret = true;
+	}break;
+	case event_type2::mouse_wheel:
+	{
+
+	}break;
+	default:
+		break;
+	};
+	return ret;
 }
 
 bool edit_cx::update(float delta)
 {
+	ctx->c_ct += delta * 1000.0 * ctx->c_d;
+	if (ctx->c_ct > _cursor.z)
+	{
+		ctx->c_d = -1;
+		ctx->c_ct = _cursor.z;
+		valid = true;
+	}
+	if (ctx->c_ct < 0)
+	{
+		ctx->c_d = 1; ctx->c_ct = 0;
+		valid = true;
+	}
 	return false;
 }
 
 void edit_cx::draw(rvg_cx* rv)
-{}
+{
+	glm::ivec2 poss = _pos;
+	glm::ivec2 ss = _size;
+	rv->translate(poss);
+	rv->add_rect({ 0,0,ss.x ,ss.y }, rounding);
+	rv->set_color(_color.x);
+	rv->fill();
+	{
+		rv->save();
+		// 裁剪区域
+		rv->add_rect({ 1,1,ss.x - 2,ss.y - 2 }, 0);
+		rv->clip();
+		//rv->translate({ -scroll_pos.x + _align_pos.x, -scroll_pos.y + _align_pos.y });
+
+		//auto v = get_bounds();
+		//if (v.x != v.y && rangerc.size()) {
+		//	rv->set_color(select_color);
+		//	if (roundselect)
+		//	{
+		//		if (range_path.size() && range_path[0].size() > 3) {
+		//			rv->add_polyline(&range_path, true);
+		//			rv->fill();
+		//		}
+		//	}
+		//	else {
+		//		for (auto& it : rangerc)
+		//		{
+		//			rv->add_rect(it, std::min(it.z, it.w) * 0.18);
+		//			rv->fill();
+		//		}
+		//	}
+		//}
+		rv->set_color(text_color);
+		//auto lhh = get_pixel_size(stext.c_str(), stext.size());
+		// 渲染文本
+		glm::vec4 rc = { 0,0,  ss };
+		text_style st = {};
+		st.fontsize = font_size;
+		st.align = {};
+		st.color = text_color;
+		st.family = family;
+		text_st tx = {};
+		tx.pos = {};
+		tx.size = ss;
+		if (pwdch)
+		{
+			tx.text = stext.c_str(); tx.text_len = stext.size();
+		}
+		else {
+			tx.text = ctx->str.c_str();
+			tx.text_len = ctx->str.size();
+		}
+		rv->add_text(&tx, &st);
+		rv->restore();
+	}
+	double x = ctx->curline_idx * font_size, y = ctx->curline * font_get_lineheight(family, font_size);
+	if (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0)
+	{
+		rv->set_color(_cursor.y);
+		rv->add_rect({ x, y, _cursor.x, ctx->cursor_pos.z }, 0);
+		rv->fill();
+	}
+
+}
 
 glm::ivec4 edit_cx::input_pos()
 {

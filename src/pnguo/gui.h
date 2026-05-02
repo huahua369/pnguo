@@ -123,6 +123,7 @@ public:
 	std::function<void(uint32_t type, et_un_t* e, const glm::vec2& pos)> on_event_cb;	//自定义事件处理
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
 	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
+	form_x* form = 0;
 	int _clicks = 0;		// 点击数量
 
 	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
@@ -148,11 +149,12 @@ public:
 	virtual void set_size(const glm::vec2& ss);
 	virtual glm::vec2 get_size();
 	//event_type2
-	virtual bool on_mevent(int type, const glm::vec2& mps);
+	virtual bool on_mevent(int type, const glm::vec2& mps, void* e);
 	virtual bool update(float delta);
 	virtual void draw(rvg_cx* rv);
 	virtual glm::ivec2 get_pos(bool has_parent = true);
 	virtual glm::ivec2 get_spos();	// 滚动坐标
+	virtual void set_family(font_family_t* family, int fontsize);
 };
 void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
 void send_hover(widget_t* wp, const glm::vec2& mps);
@@ -381,7 +383,7 @@ struct image_btn :public widget_t {
 public:
 	image_btn();
 	~image_btn();
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -512,7 +514,7 @@ public:
 	void set_value(bool v);
 	void set_value();
 
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -529,7 +531,7 @@ public:
 	void set_value(bool v);
 	void set_value();
 
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -553,7 +555,7 @@ public:
 	void set_value(bool b);
 	void set_value();
 
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -576,7 +578,7 @@ public:
 	void set_vr(const glm::ivec2& r);
 	double get_v();
 
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -601,7 +603,7 @@ public:
 	void set_cw(int cw);
 	double get_v();
 
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -632,7 +634,7 @@ public:
 	void set_hsv(const glm::vec4& c);
 	void set_posv(const glm::ivec2& poss);
 
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
@@ -666,7 +668,7 @@ public:
 	scroll_bar();
 	~scroll_bar();
 	void set_viewsize(int64_t vs, int64_t cs, int rcw);
-	bool on_mevent(int type, const glm::vec2& mps);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 
 	void draw(rvg_cx* rv);
@@ -688,13 +690,14 @@ public:
 	text_control* ctx = 0;			// stb_textedit	
 	std::string stext;				// 显示的文本，密码显示用
 	std::string editingstr;			// 输入中的文本，输入法编辑时用
-	glm::ivec4 _color = {};				// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
-	glm::ivec3 _cursor = {};				// 闪烁光标。宽度、颜色、毫秒
+	glm::ivec4 _color = { 0xff282828,0xffffffff,0x80ffb399,0xffffffff };				// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
+	glm::ivec3 _cursor = { 1,-1,300 };				// 闪烁光标。宽度、颜色、毫秒
 	char pwdch = {};				// 密码显示字符
 	int _istate = 0;
 	bool mdown = false;
 	bool _read_only = false;
 	bool is_input = false;
+	bool show_input_cursor = true;
 public:
 	edit_cx();
 	~edit_cx();
@@ -726,6 +729,7 @@ public:
 	bool remove_bounds();
 	// 发送事件到本edit
 	void on_event_e(uint32_t type, et_un_t* e);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	// 更新渲染啥的
 	bool update(float delta);
 	void draw(rvg_cx* rv);
