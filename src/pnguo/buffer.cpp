@@ -9,6 +9,301 @@
 #include <print_time.h>
 #define let auto
 namespace hz {
+
+	class PieceTreeBase
+	{
+	public:
+		node_tp root = 0;
+	public:
+		PieceTreeBase();
+		~PieceTreeBase();
+	public:
+		void rbDelete(node_tp z);
+		void fixInsert(node_tp x);
+		void updateTreeMetadata(node_tp x, size_t delta, size_t lineFeedCntDelta);
+		virtual void detach(node_rbt* p) {
+			p->parent = 0;
+			p->left = 0;
+			p->right = 0;
+		}
+	private:
+		void leftRotate(node_tp x);
+		void rightRotate(node_tp y);
+		void recomputeTreeMetadata(node_tp x);
+		void resetSentinel();
+
+	};
+	using Range = glm::ivec4;
+	class Position :public glm::ivec2 {
+	public:
+		Position() {}
+		Position(size_t y, size_t x) {
+			this->x = x;
+			this->y = y;
+		}
+
+	};
+	class NodePosition
+	{
+	public:
+
+		/**
+		 * Piece Index
+		 */
+		node_tp node = 0;
+		/**
+		 * remainer in current piece.
+		*/
+		size_t remainder = 0;
+		/**
+		 * node start offset in document.
+		 */
+		size_t nodeStartOffset = 0;
+	public:
+		NodePosition()
+		{}
+
+		~NodePosition()
+		{}
+
+	private:
+
+	};
+	class PieceTreeSearchCache;
+	class PieceTree :public PieceTreeBase
+	{
+	protected:
+		std::list<block_t> _buffers;
+		//std::vector<block_t> _buffers; // 0 is change buffer, others are readonly original buffer.
+
+		size_t _lineCnt = 1;
+		size_t _length = 0;
+		size_t _count = 0;
+		std::string _EOL = "\n";
+		size_t _EOLLength = 1;
+		bool _EOLNormalized = false;
+
+		const int AverageBufferSize = 65535;
+	private:
+		glm::ivec2	_lastChangeBufferPos;
+		PieceTreeSearchCache* _searchCache = 0;
+		struct vline_t
+		{
+			int lineNumber = 0; std::string value;
+		};
+		vline_t _lastVisitedLine = {};
+		size_t _node_count = 0;
+		std::set<node_rbt*> _gf;
+	public:
+		PieceTree();
+		~PieceTree();
+
+		void init(const std::string& chunks, const std::string& eol = "\n"/*: '\r\n' | '\n'*/, bool eolNormalized = false);
+		void init(const char* chunks, int len, const std::string& eol = "\n"/*: '\r\n' | '\n'*/, bool eolNormalized = false);
+
+		virtual void detach(node_rbt* t);
+		std::string get_range(glm::ivec2 startPosition, glm::ivec2 endPosition);
+	public:
+		std::vector<std::string> getLinesContent();
+		// 字节
+		size_t getLength();
+		// 字数
+		size_t get_count();
+		// 行数
+		size_t getLineCount();
+		std::string getLineContent(size_t lineNumber);
+
+		std::string getValueInRange2(NodePosition startPosition, NodePosition endPosition);
+
+		void normalizeEOL(const std::string& eol/*: '\r\n' | '\n'*/);
+		std::string getEOL();
+		void setEOL(const std::string& newEOL);
+		bool equal(PieceTree& other);
+		size_t getOffsetAt(size_t lineNumber, size_t column);
+		size_t getOffsetAt(const glm::ivec2& pos);
+		Position getPositionAt(size_t offset);
+
+
+		void computeBufferMetadata();
+
+		bool iterate(node_tp node, std::function<bool(node_tp node)> callback);
+
+
+
+		std::string getNodeContent(node_tp node);
+		std::string getPieceContent(const piece_t& piece);
+
+		node_tp rbInsertLeft(node_tp node, const piece_t& p);
+		node_tp rbInsertRight(node_tp node, const piece_t& p);
+
+		size_t getLineFeedCnt(block_it bt, glm::ivec2 start, glm::ivec2 end);
+		size_t getLineFeedCnt(block_t* bt, glm::ivec2 start, glm::ivec2 end);
+		size_t offsetInBuffer(block_t* bt, const glm::ivec2& cursor);
+		size_t offsetInBuffer(block_it bt, const glm::ivec2& cursor);
+		void deleteNodes(std::vector<node_tp> nodes);
+		std::vector<piece_t> createNewPieces(std::string text);
+		std::string	getLinesRawContent();
+
+		std::string getLineRawContent(int lineNumber, int endOffset = 0);
+		size_t getAccumulatedValue(node_tp node, int64_t index);
+
+
+
+		void deleteNodeTail(node_tp node, glm::ivec2 pos);
+		void deleteNodeHead(node_tp node, glm::ivec2 pos);
+		void shrinkNode(node_tp node, glm::ivec2 start, glm::ivec2 end);
+		void appendToNode(node_tp node, std::string value);
+		NodePosition nodeAt(size_t offset);
+		NodePosition nodeAt2(size_t lineNumber, size_t column);
+		size_t nodeCharCodeAt(node_tp node, size_t offset);
+		size_t offsetOfNode(node_tp node);
+		// #endregion
+		// #region CRLF
+		bool shouldCheckCRLF();
+		bool startWithLF(node_tp val);
+		bool endWithCR(node_tp val);
+		bool startWithLF(const std::string& val);
+		bool endWithCR(const std::string& val);
+		void validateCRLFWithPrevNode(node_tp nextNode);
+		void validateCRLFWithNextNode(node_tp node);
+		void fixCRLF(node_tp prev, node_tp next);
+		bool adjustCarriageReturnFromNext(std::string value, node_tp node);
+
+
+		glm::ivec2 getIndexOf(node_tp node, size_t accumulatedValue);
+
+		std::string getValueInRange(Range range, const std::string& eol);
+
+		size_t getLineCharCode(size_t lineNumber, size_t index);
+		size_t getLineLength(size_t lineNumber);
+
+		size_t insert_v(size_t offset, std::string value, bool eolNormalized = false);
+
+		void remove_v(size_t offset, size_t cnt);
+
+
+		void insertContentToNodeLeft(std::string value, node_tp node);
+		void insertContentToNodeRight(std::string value, node_tp node);
+		glm::ivec2 positionInBuffer(node_tp node, size_t remainder, glm::ivec2* ret = nullptr);
+		std::string getContentOfSubTree(node_tp node);
+	private:
+		// 字数索引，数量，str输出
+		void get_sub_string(block_t* bt, size_t idx, size_t count, std::string& str);
+		std::string get_sub_string(block_t* bt, size_t idx, size_t count);
+	private:
+		node_rbt* new_node(const piece_t& piece, NColor color);
+		//void free_node(node_rbt* p);
+	};
+
+
+
+}
+namespace hz {
+	inline operate_stack::operate_stack() {}
+	inline operate_stack::~operate_stack() {}
+	void operate_stack::push_operate(undoable_operate* p)            //插入操作
+	{
+		assert(p);
+		if (p->_op_type == e_undo::OP_UNDO)
+		{
+			_undo.push(p);
+		}
+		else
+		{
+			_redo.push(p);
+		}
+	}
+
+	inline void operate_stack::execute(e_undo type)                            //Ctrl-Z、Ctrl-Y执行一次撤消或重做
+	{
+		if (type == e_undo::OP_UNDO)
+		{
+			if (_undo.empty())return;
+			undoable_operate* p = _undo.top();
+			p->undo();
+			p->_op_type = e_undo::OP_REDO;
+			push_operate(p);
+			pop_operate(type);
+		}
+		else if (type == e_undo::OP_REDO)
+		{
+			if (_redo.empty())return;
+			undoable_operate* p = _redo.top();
+			p->redo();
+			p->_op_type = e_undo::OP_UNDO;
+			push_operate(p);
+			pop_operate(type);
+		}
+	}
+
+	inline void operate_stack::clear_stack(int type)                                 //清空操作
+	{
+		int n = (type == 0 ? 0x01 | 0x02 : 0);
+		if ((e_undo)type == e_undo::OP_UNDO)
+		{
+			n |= 0x01;
+		}
+		if ((e_undo)type == e_undo::OP_REDO)
+		{
+			n |= 0x02;
+		}
+		if (free_cb)
+		{
+			if (n & 0x01)
+			{
+				while (!_undo.empty())
+				{
+					free_cb(_undo.top());
+					_undo.pop();
+				}
+			}
+
+			if (n & 0x02)
+			{
+				while (!_redo.empty())
+				{
+					free_cb(_redo.top());
+					_redo.pop();
+				}
+			}
+
+		}
+		else {
+			if (n & 0x01)
+			{
+				while (!_undo.empty())
+				{
+					delete (_undo.top());
+					_undo.pop();
+				}
+			}
+
+			if (n & 0x02)
+			{
+				while (!_redo.empty())
+				{
+					delete (_redo.top());
+					_redo.pop();
+				}
+			}
+		}
+	}
+
+	inline void operate_stack::pop_operate(e_undo type)
+	{
+		if (type == e_undo::OP_UNDO)
+		{
+			_undo.pop();
+		}
+		else
+		{
+			_redo.pop();
+		}
+	}
+
+
+
+
 	enum BufferType {
 		ORIGINAL,
 		ADD
@@ -415,7 +710,7 @@ namespace hz {
 	{
 		cmd_remove(vpos);
 	}
-	 
+
 	glm::ivec2 buffer_t::undo()
 	{
 		update();
@@ -566,7 +861,7 @@ namespace hz {
 	}
 
 	size_t buffer_t::view_rows(size_t first, size_t n, std::string& ostr)
-	{ 
+	{
 		ostr.clear();
 		if (first < _view.line_start || first > _view.line_start + _view.line_cnt)
 		{
@@ -591,7 +886,7 @@ namespace hz {
 			if (x < ret.size() && x > 0) {
 				ret = ret.substr(x, len - x);
 			}
-		} 
+		}
 		return ret;
 	}
 	// 获取所有字符串
