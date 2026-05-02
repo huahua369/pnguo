@@ -8861,11 +8861,10 @@ void testedit() {
 
 #endif // 1
 
-edit_cx::edit_cx()
+edit_cx::edit_cx() :widget_t(WIDGET_TYPE::WT_EDIT)
 {
 	ctx = new text_control();
 	set_single(true);
-	pwdch[0] = '*';
 }
 
 edit_cx::~edit_cx()
@@ -8878,23 +8877,47 @@ void edit_cx::set_single(bool is)
 	stb_textedit_initialize_state(&ctx->state, is);
 }
 
-void edit_cx::set_pwd(uint32_t ch)
+void edit_cx::set_pwd(char ch)
 {
-	if(ch)
-	md::unicode_to_utf8(pwdch, ch);
+	pwdch = ch;
+	//if (ch)
+	//	md::unicode_to_utf8(pwdch, ch);
 }
 
 void edit_cx::set_text(const void* str, int len)
-{}
+{
+	editingstr.clear();
+	stb_textedit_delete(ctx, &ctx->state, 0, ctx->str.size());
+	stb_textedit_text(ctx, &ctx->state, (char*)str, len);
+	if (pwdch) {
+		stext.resize(ctx->str.size());
+		for (auto& it : stext) {
+			it = pwdch;
+		}
+	}
+}
 
 void edit_cx::add_text(const void* str, int len)
-{}
+{
+	editingstr.clear();
+	stb_textedit_text(ctx, &ctx->state, (char*)str, len);
+	if (pwdch) {
+		stext.resize(ctx->str.size());
+		for (auto& it : stext) {
+			it = pwdch;
+		}
+	}
+}
 
 void edit_cx::set_size(const glm::ivec2& ss)
-{}
+{
+	widget_t::set_size(ss);
+}
 
 void edit_cx::set_pos(const glm::ivec2& pos)
-{}
+{
+	widget_t::set_pos(pos);
+}
 
 void edit_cx::set_align_pos(const glm::vec2& pos)
 {}
@@ -8903,10 +8926,14 @@ void edit_cx::set_align(const glm::vec2& a)
 {}
 
 void edit_cx::set_cursor(const glm::ivec3& c)
-{}
+{
+	_cursor = c;
+}
 
 void edit_cx::set_color(const glm::ivec4& c)
-{}
+{
+	_color = c;
+}
 
 void edit_cx::set_family(font_family_t* family, int fontsize)
 {}

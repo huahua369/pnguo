@@ -993,9 +993,10 @@ int main()
 			pro->set_value(0.5);
 
 			{
-				auto r = new edit_tl();
+				auto r = new edit_cx();
 				r->set_size({ 236,32 });
 				r->set_text("1", 1);
+				r->set_text("2", 1);
 				dvv->add_widget(r);
 			}
 
