@@ -2397,8 +2397,17 @@ void text_ctx_cx::draw(rvg_cx* rv)
 	//auto oldop = cairo_get_operator(cr);
 	//cairo_set_source_surface(cr, sur, pos.x, pos.y);
 	//cairo_paint(cr);
+	auto bbc = box_color;
+	rv->set_color(bbc);
+	rv->add_rect({ -0.5,   -0.5, size.x + 1, size.y + 1 }, 0);
+	rv->set_line_width(1);
+	//rv->stroke(); 
+	rv->fill();
 	{
 		rv->save();
+		// 裁剪区域
+		rv->add_rect({ 1,1,size.x - 2,size.y - 2 }, 0);
+		rv->clip();
 		rv->translate({ -scroll_pos.x + _align_pos.x, -scroll_pos.y + _align_pos.y });
 
 		auto v = get_bounds();
@@ -2430,7 +2439,7 @@ void text_ctx_cx::draw(rvg_cx* rv)
 		st.family = family;
 		text_st tx = {};
 		tx.pos = {};
-		tx.size = lhh;
+		tx.size = size;
 		tx.text = stext.c_str(); tx.text_len = stext.size();
 
 		rv->add_text(&tx, &st);
@@ -2443,12 +2452,6 @@ void text_ctx_cx::draw(rvg_cx* rv)
 		rv->add_rect({ x, y, cursor.x, cursor_pos.z }, 0);
 		rv->fill();
 	}
-	auto bbc = box_color;
-	rv->set_color(bbc);
-	rv->add_rect({ -0.5,   -0.5, size.x + 1, size.y + 1 }, 0);
-	rv->set_line_width(1);
-	//rv->stroke(); 
-	rv->fill();
 	// 编辑中的文本
 	if (editingstr.size())
 	{
@@ -2471,8 +2474,8 @@ void text_ctx_cx::draw(rvg_cx* rv)
 		rv->set_color(editing_text_color);
 		text_st tx = {};
 		tx.pos = { rc.x,rc.y };
-		tx.size = { rc.z,rc.w };
-		tx.text = stext.c_str(); tx.text_len = stext.size();
+		tx.size = glm::ivec2(rc.z, rc.w);
+		tx.text = editingstr.c_str(); tx.text_len = editingstr.size();
 		rv->add_text(&tx, &st);
 		rv->add_line({ lss.x + 1, lss.y }, { lss.z, lss.w });
 		rv->set_line_width(1);
@@ -3429,7 +3432,7 @@ edit_tl::edit_tl()
 	set_color({ 0xff353535,-1,0xa0ff8000 ,0xff020202 });
 	on_event_cb = [=](uint32_t type, et_un_t* e, const glm::vec2& pos) {
 		this->ppos = pos;
-		this->on_event_e(type, e); 
+		this->on_event_e(type, e);
 		};
 }
 
@@ -8727,7 +8730,9 @@ void div_cx::draw(rvg_cx* rv)
 		{
 			rv->save();
 			auto ps = it->get_pos(false);
-			rv->set_draw_rect(glm::ivec4(ps, it->get_size()));
+			auto clip = glm::ivec4(ps, it->get_size());
+			rv->set_draw_rect(clip);
+			//rv->clip(clip);
 			rv->push_null(0);
 			auto scp = sps * it->hscroll;
 			if (scp.x != 0 || scp.y != 0)

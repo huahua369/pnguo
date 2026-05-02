@@ -7790,25 +7790,25 @@ int font_get_text_posv(font_family_t* family, int fontsize, const void* str8, in
 	auto str = (const char*)str8;
 	auto str0 = (const char*)str8;
 
-	auto t = (char*)str;
-	uint32_t u = 0;
-	glm::ivec2 rc = { 0, fontsize };
-	std::vector<strfont_t> vstr;
-	get_font_fallbacks(family, str, len, false, vstr);
-	for (auto& kt : vstr)
-	{
-		if (kt.font)
-		{
-			font_t::GlyphPositions gp = {};// 执行harfbuzz 
-			kt.font->set_hb_fontsize(fontsize);
-			auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
-			kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
-			for (size_t i = 0; i < gp.len; i++)
-			{
-				gp.pos[i].x_advance;
-			}
-		}
-	}
+	//auto t = (char*)str;
+	//uint32_t u = 0;
+	//glm::ivec2 rc = { 0, fontsize };
+	//std::vector<strfont_t> vstr;
+	//get_font_fallbacks(family, str, len, false, vstr);
+	//for (auto& kt : vstr)
+	//{
+	//	if (kt.font)
+	//	{
+	//		font_t::GlyphPositions gp = {};// 执行harfbuzz 
+	//		kt.font->set_hb_fontsize(fontsize);
+	//		auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
+	//		kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
+	//		for (size_t i = 0; i < gp.len; i++)
+	//		{
+	//			gp.pos[i].x_advance;
+	//		}
+	//	}
+	//}
 
 
 	int x = 0;
@@ -7816,26 +7816,27 @@ int font_get_text_posv(font_family_t* family, int fontsize, const void* str8, in
 	ow.clear();
 	std::vector<int> w0;
 	w0.push_back(0);
-	//do
-	//{
-	//	if (!str || !(*str)) { break; }
+	auto font = family->familys[0];
+	do
+	{
+		if (!str || !(*str)) { break; }
 
-	//	uint32_t ch = 0;
-	//	auto kk = md::utf8_to_unicode(str, &ch);
-	//	if (kk < 1)break;
-	//	str += kk;
-	//	if (ch == '\n')
-	//	{
-	//		ow.push_back(w0);
-	//		w0.clear();
-	//		w0.push_back(0); x = 0;
-	//		continue;
-	//	}
-	//	font_t* oft = 0;
-	//	auto rc = font->get_char_extent(ch, fontsize,/* fdpi,*/ &familyv[idx], &oft);
-	//	x += rc.z;
-	//	w0.push_back(x);
-	//} while (str && *str);
+		uint32_t ch = 0;
+		auto kk = md::utf8_to_unicode(str, &ch);
+		if (kk < 1)break;
+		str += kk;
+		if (ch == '\n')
+		{
+			ow.push_back(w0);
+			w0.clear();
+			w0.push_back(0); x = 0;
+			continue;
+		}
+		font_t* oft = 0;
+		auto rc = font->get_char_extent0(ch, fontsize,/* fdpi,*/ family, &oft);
+		x += rc.z;
+		w0.push_back(x);
+	} while (str && *str);
 	if (w0.size())ow.push_back(w0);
 	return ret;
 }
@@ -8119,6 +8120,7 @@ void update_text(text_render_o* p, text_block* tb)
 			font_item_t git = {};
 			git.cpt = ch;
 			git.block_idx = bidx;
+			assert(bidx < vstr.size());
 			if (git.cpt == '\t' && git.advance < 1)
 			{
 				git.advance = t->fontsize;
@@ -8156,7 +8158,7 @@ void update_text(text_render_o* p, text_block* tb)
 			git.advance = pos->x_advance;// ceil(pos->x_advance * scale_h);
 			git.block_idx = bidx /*+ gt.cluster*/;
 			git.cpt = ch;
-
+			assert(bidx < vstr.size());
 			p->ov.insert(git._image);
 			//git.y_advance = ceil(pos->y_advance * scale_h);
 			p->dst_vstr.push_back(git);
@@ -8549,7 +8551,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 	if (!tb->style.family)return;
 	auto& ut = pt->temp_map[tb_idx];
 	auto p = &ut;
-	auto& vstr = p->_block;
+	auto& blockstr = p->_block;
 	auto t = &tb->style;
 	rt_bidi(&p->bidi_str, p->bv, tb->str, tb->first, tb->size);
 	auto str16 = (uint16_t*)p->bidi_str.c_str();
@@ -8557,7 +8559,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 	auto& dst_vstr = pt->dst_vstr;
 	auto& box = pbox->tbox;
 	ut.first = dst_vstr.size();
-	vstr.clear();
+	blockstr.clear();
 	do {
 		if (box.auto_break)
 		{
@@ -8567,8 +8569,8 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 			{
 				for (auto& it : p->bv)
 				{
-					listWordBoundaries(bk, str16 + it.first, it.second - it.first, [=, &vstr](const uint16_t* str, int len) {
-						get_font_fallbacks16(t->family, str, len, it.rtl, vstr);
+					listWordBoundaries(bk, str16 + it.first, it.second - it.first, [=, &blockstr](const uint16_t* str, int len) {
+						get_font_fallbacks16(t->family, str, len, it.rtl, blockstr);
 						});
 				}
 				close_break(bk);
@@ -8576,10 +8578,10 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 			}
 		}
 		// 不执行断行或无自动换行时，查询字体
-		for (auto& it : p->bv) { get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, vstr); }
+		for (auto& it : p->bv) { get_font_fallbacks(t->family, it.s.c_str(), it.s.size(), it.rtl, blockstr); }
 	} while (0);
 	auto bwp = p->bidi_str.c_str();
-	for (auto& kt : vstr)
+	for (auto& kt : blockstr)
 	{
 		if (kt.font)
 		{
@@ -8593,7 +8595,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 	int baseline = tb->baseline;
 	bool last_is_break = false;
 	size_t bidx = 0;
-	for (auto& kt : vstr)
+	for (auto& kt : blockstr)
 	{
 		char* nstr = (char*)kt.v;
 		if (!kt.font) {
@@ -8607,6 +8609,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 			font_item_t& git = kit.f;
 			git.cpt = ch;
 			git.block_idx = bidx;
+			git.tb_idx = tb_idx;
 			if (git.cpt == '\t' && git.advance < 1)
 			{
 				git.advance = t->fontsize;
@@ -8619,6 +8622,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 				baseline = tb->baseline;
 				last_is_break = false;
 			}
+			assert(bidx < blockstr.size());
 			dst_vstr.push_back(kit);
 			bidx++;
 			continue;
@@ -8659,10 +8663,17 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 			ov.insert(git._image);
 			fitem_t kit = {};
 			kit.f = git;
+			assert(bidx < blockstr.size());
 			dst_vstr.push_back(kit);
 		}
 		bidx++;
 	}
+	//for (size_t i = 0; i < blockstr.size(); i++)
+	//{
+	//	auto it = dst_vstr[i];
+
+	//	assert(it.f.block_idx < blockstr.size());
+	//}
 	if (last_is_break)
 		pbox->line_count++;
 	//	pt->baselines.push_back({ baseline, dh });
@@ -8753,10 +8764,18 @@ void rt_layout1(rich_text_t* r, layout_block_st* p) {
 		else if (ft.f.ctype == 0) {
 			auto& it = ft.f;
 			c4.w = ct + 1;
-			auto& tbm = tmd[it.tb_idx];
-			auto& bk = tbm._block[it.block_idx];
-			baseline = std::max(bk.baseline, baseline);
-			line_height = std::max(bk.lineheight, line_height);
+			if (it.tb_idx < tmd.size())
+			{
+				auto& tbm = tmd[it.tb_idx];
+				if (it.block_idx < tbm._block.size()) {
+					auto& bk = tbm._block[it.block_idx];
+					baseline = std::max(bk.baseline, baseline);
+					line_height = std::max(bk.lineheight, line_height);
+				}
+				else {
+					assert(0);
+				}
+			}
 			if (it.block_idx == cbidx)
 			{
 				c4.x += it.advance;
@@ -9603,7 +9622,7 @@ void mrt_clear(multi_rich_text_t* p)
 		p->boxtext.clear();
 	}
 }
-size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size)
+size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size, const glm::ivec4& clip)
 {
 	size_t cc = 0;
 	if (p) {
@@ -9611,6 +9630,8 @@ size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2
 		p->boxtext.push_back({});
 		auto& rc = p->boxtext.back();
 		rc.box.tbox.rc = glm::ivec4(pos, size);
+		rc.dst.clip = clip;
+		rc.dst.view = rc.box.tbox.rc;
 	}
 	return cc;
 }
@@ -9699,10 +9720,18 @@ void item_ft(fitem_t& ft, item_temp_t* st) {
 	else if (ft.f.ctype == 0) {
 		auto& it = ft.f;
 		st->c4.w = st->ct + 1;
-		auto& tbm = st->lt->temp_map[it.tb_idx];
-		auto& bk = tbm._block[it.block_idx];
-		st->baseline = std::max(bk.baseline, st->baseline);
-		st->line_height = std::max(bk.lineheight, st->line_height);
+		if (it.tb_idx < st->lt->temp_map.size())
+		{
+			auto& tbm = st->lt->temp_map[it.tb_idx];
+			if (it.block_idx < tbm._block.size()) {
+				auto& bk = tbm._block[it.block_idx];
+				st->baseline = std::max(bk.baseline, st->baseline);
+				st->line_height = std::max(bk.lineheight, st->line_height);
+			}
+			else {
+				st = st;
+			}
+		}
 		if (it.block_idx == st->cbidx)
 		{
 			st->c4.x += it.advance;
@@ -9929,7 +9958,6 @@ void mrt_build(multi_rich_text_t* pm)
 	for (auto& it : pm->boxtext)
 	{
 		it.dst.d = p->layout.dst_vstr.data();
-		it.dst.view = it.box.tbox.rc;
 		mrt_layout1(pm, &it, &pm->rich.layout);
 	}
 }

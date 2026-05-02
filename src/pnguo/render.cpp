@@ -1404,10 +1404,13 @@ void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::
 
 clicprect_cx::clicprect_cx(void* renderer, texture_cb* cb, const glm::ivec4& rc) :rcb(cb), _renderer(renderer)
 {
-	if (rcb && renderer)
+	if (rcb && renderer && rc.z > 0 && rc.w > 0)
 	{
 		rcb->get_cliprect(renderer, &oldrc);
 		rcb->set_cliprect(renderer, &rc);
+	}
+	else {
+		rcb = nullptr;
 	}
 }
 
@@ -1605,12 +1608,18 @@ void rvg_cx::add_rect(const glm::vec4& rc, double r)
 	push_ct(OP_ADD_RECT_DOUBLE);
 	_cmd.insert(_cmd.end(), (char*)&rc, (char*)&rc + sizeof(rc));
 	_cmd.insert(_cmd.end(), (char*)&r, (char*)&r + sizeof(r));
+	_tem_clip = rc;
+	_tem_clip.x += _cur.pos.x;
+	_tem_clip.y += _cur.pos.y;
 }
 void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
 {
 	push_ct(OP_ADD_RECT_VEC4);
 	rect_v4 t = { rc, r };
 	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	_tem_clip = rc;
+	_tem_clip.x += _cur.pos.x;
+	_tem_clip.y += _cur.pos.y;
 }
 
 void rvg_cx::add_circle(const glm::vec2& pos, float r)
@@ -1704,15 +1713,18 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	auto pd = (text_st*)(_cmd.data() + idx);
 	size_t ct = 0;
 	auto tps = _cmd.size();
-	auto pos = p->pos + tpos;
-	pd->pos += pos;
+	auto pos = p->pos + _cur.pos;
+	pd->pos = pos;
+	pd->clip = _cur.clip;
 	for (size_t i = 0; i < 1; i++)
 	{
 		_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
 		pd->text = (char*)tps + ct;
 		ct += pd->text_len;
 	}
-	glm::vec4 rc = { pos , p->size };
+	glm::vec4 rc = { pos ,0,0 };
+	rc.z += p->size.x;
+	rc.w += p->size.y;
 	set_draw_rect(rc);
 }
 
@@ -1747,27 +1759,35 @@ void rvg_cx::translate(const glm::vec2& offset)
 {
 	push_ct(OP_TRANSLATE);
 	_cmd.insert(_cmd.end(), (char*)&offset, (char*)&offset + sizeof(offset));
-	tpos += offset;
+	_cur.pos += offset;
 }
 
 void rvg_cx::clip()
 {
 	push_ct(OP_CLIP);
+	_cur.clip = _tem_clip;
+}
+
+void rvg_cx::clip(const glm::ivec4& c)
+{
+	add_rect(c, 0);
+	push_ct(OP_CLIP);
+	_cur.clip = _tem_clip;
 }
 
 void rvg_cx::save()
 {
 	push_ct(OP_SAVE);
-	translate_pos.push(tpos);
+	_stk.push(_cur);
 }
 
 void rvg_cx::restore()
 {
 	push_ct(OP_RESTORE);
-	if (translate_pos.size())
+	if (_stk.size())
 	{
-		tpos = translate_pos.top();
-		translate_pos.pop();
+		_cur = _stk.top();
+		_stk.pop();
 	}
 }
 
@@ -2519,7 +2539,7 @@ size_t cmd_op_add_text(uint8_t* d, void* ctx)
 	auto pc = (multi_rich_text_t*)ctx;
 	auto f = d;
 	text_st t = next_value<text_st>(d);
-	auto idx = mrt_add_box(pc, t.pos, t.size);
+	auto idx = mrt_add_box(pc, t.pos, t.size, t.clip);
 	char* str = 0;
 	auto pb = mrt_get_boxinfo(pc, idx);
 
@@ -2528,13 +2548,13 @@ size_t cmd_op_add_text(uint8_t* d, void* ctx)
 	mrt_add_text(pc, idx, str, t.text_len, 0, 0);
 	return (d - f) + t.text_len;
 }
-
+// todo clip
 size_t cmd_op_add_image(uint8_t* d, void* ctx)
 {
 	auto pc = (multi_rich_text_t*)ctx;
 	auto f = d;
 	image_r t = next_value<image_r>(d);
-	auto idx = mrt_add_box(pc, t.pos, t.dsize);
+	auto idx = mrt_add_box(pc, t.pos, t.dsize, {});
 	mrt_add_image(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
 	return d - f;
 }
@@ -2860,6 +2880,9 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 		}
 		else if (vt.d2)
 		{
+			auto clip = vt.d2->clip;
+			clip.x += pos.x; clip.y += pos.y; 
+			clicprect_cx cp(renderer, rcb, clip); // 设置裁剪区域
 			for (size_t i = 0; i < vt.count; i++)
 			{
 				auto it = vt.d2 + vt.first + i;
@@ -3055,9 +3078,11 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	glm::ivec2 pos0 = {};
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
+	auto clip = p->clip;
+	clip.x += pos.x; clip.y += pos.y;
 	auto tm = p->d + p->first;
 	auto tbp = p->tbs->data();
-	//clicprect_cx cp(renderer, rcb, rect); // 设置裁剪区域
+	clicprect_cx cp(renderer, rcb, clip); // 设置裁剪区域
 
 	for (size_t i = 0; i < p->count; i++)
 	{
@@ -3257,6 +3282,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		if (it.rc.z < 1 || it.rc.w < 1)
 			continue;
 		d2_rt d = {};
+		d.clip = {}; // todo clip
 		d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
 		d.size += stwidth * 2;
 		d.size.x = align_up(d.size.x, 4);

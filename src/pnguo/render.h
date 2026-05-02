@@ -241,6 +241,7 @@ struct d2_rt {
 	glm::ivec2 pos;		// 纹理偏移
 	glm::ivec2 size;	// 区域大小
 	glm::ivec2 offset;	// 渲染偏移
+	glm::ivec4 clip = {};	// 裁剪区
 	int surface = 0;
 	int type = 0;		// 0矢量图，1文本/位图
 	int index = 0;
@@ -252,7 +253,7 @@ struct surface_ctx {
 
 struct vitext_t
 {
-	box_text_d* t = 0;		// 位图或文本
+	box_text_d* t = 0;	// 位图或文本
 	d2_rt* d2 = 0;		// 矢量图
 	size_t first = 0;	// 第一个位置
 	size_t count = 0;	// 渲染数量
@@ -372,6 +373,7 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style);
 struct text_st {
 	glm::vec2 pos;
 	glm::vec2 size;
+	glm::vec4 clip;		// 裁剪区域
 	const char* text;
 	int text_len;
 };
@@ -388,7 +390,11 @@ private:
 
 };
 
-
+struct stack_item
+{
+	glm::vec2 pos = {};				// 当前偏移
+	glm::vec4 clip = {};				// 当前裁剪区域
+};
 
 class rvg_cx
 {
@@ -407,9 +413,10 @@ public:
 	std::vector<uint8_t> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
 	std::vector<size_t> _cmd_pos;		// 命令的数据偏移
-	std::stack<glm::vec2> translate_pos;
+	std::stack<stack_item> _stk;
 	std::vector<cmdrect_v> _data;		// 渲染数据列表 
-	glm::vec2 tpos = {};				// 当前偏移
+	stack_item _cur = {};				// 当前状态
+	glm::ivec4 _tem_clip = {};
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
 	glm::ivec2 pos = {};
@@ -456,6 +463,7 @@ public:
 
 	void translate(const glm::vec2& offset);
 	void clip();
+	void clip(const glm::ivec4& c);
 	void save();
 	void restore();
 	void fill();

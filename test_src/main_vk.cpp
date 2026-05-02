@@ -994,7 +994,7 @@ int main()
 
 			{
 				auto r = new edit_tl();
-				r->set_size({ 236,36 });
+				r->set_size({ 236,32 });
 				r->set_text("1", 1);
 				dvv->add_widget(r);
 			}

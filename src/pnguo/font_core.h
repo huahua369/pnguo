@@ -735,7 +735,8 @@ struct box_info_t {
 struct box_text_d
 {
 	fitem_t* d = 0; size_t first = 0; size_t count = 0;
-	glm::ivec4 view = {};						// p->box.rc;
+	glm::ivec4 view = {};			// 视区
+	glm::ivec4 clip = {};			// 裁剪区
 	std::vector<text_block>* tbs = 0;
 };
 struct tbox_s {
@@ -786,7 +787,7 @@ struct multi_rich_text_t {
 	std::vector<tbox_s> boxtext;	// 每个区域的文本data_index
 };
 void mrt_clear(multi_rich_text_t* p);
-size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size);
+size_t mrt_add_box(multi_rich_text_t* p, const glm::ivec2& pos, const glm::ivec2& size, const glm::ivec4& clip);
 text_box_t* mrt_get_boxinfo(multi_rich_text_t* p, size_t idx);
 void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int size, int first, text_style* ts);
 void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos);
