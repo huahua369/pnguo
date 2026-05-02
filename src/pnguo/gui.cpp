@@ -133,14 +133,93 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 #endif
 
 
-text_dta::text_dta()
-{}
 
-text_dta::~text_dta()
-{}
+// todo 字体纹理缓存管理
+class layout_text_x
+{
+public:
+	font_rctx* ctx = 0;
+	std::vector<std::vector<font_t*>> familyv;
+	std::vector<glm::ivec3> cfb;
+	int fdpi = 72;
+	int heightline = 0;		// 固定行高
+	text_path_t ctp = {};	// 临时缓存
+	text_image_t cti = {};
+	std::vector<d2_surface_t*> msu;
+	std::vector<font_item_t> tv;
+	std::vector<font_item_t> tem_rtv;	// 临时缓存用
+	// todo
+	std::vector<atlas_cx> tem_iptr;
+	std::vector<float> tem_pv;
+	glm::ivec2 ctrc = {}, oldrc = {};
 
+	image_sliced_t sli = {};
+	int sli_radius = 10;
+	gshadow_cx* gs = 0;
+	// 菜单边框填充：线颜色，线粗，圆角，背景色
+	glm::ivec4 m_color = { 0xff606060,1,0,0xf0121212 };
+	// 菜单项偏移
+	glm::ivec2 m_cpos = { 3, 3 };
 
+	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存
+	std::vector<font_t*> _t1;
+	std::vector<uint32_t> s32;
+public:
+	layout_text_x();
+	~layout_text_x();
+	void set_ctx(font_rctx* p);
+	// 添加字体,返回序号
+	size_t add_familys(const char* familys, const char* style);
+	void cpy_familys(layout_text_x* p);
+	void clear_family();
+	void clear_text();
+	// 创建新缓存
+	bitmap_cache_cx* new_cache(const glm::ivec2& vsize);
+	void free_cache(bitmap_cache_cx* p);
+	//text_dta* new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old = 0);
+	//text_dta* new_text_dta1(font_t* p, int fontsize, const void* str8, int len, text_dta* old = 0);
+	// 获取基线
+	int get_baseline(size_t idx, int fontsize);
+	// 获取行高
+	int get_lineheight(size_t idx, int fontsize);
+	// 获取文本区域大小,z为基线
+	glm::ivec3 get_text_rect(size_t idx, int fontsize, const void* str8, int len);
+	glm::ivec3 get_text_rect1(size_t idx, int fontsize, const void* str8);
+	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
+	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
+	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
+	// 添加文本到渲染
+	glm::ivec2 add_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len);
+	glm::ivec2 build_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
+	glm::ivec2 build_text1(font_t* p, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
+	// 输出到图集
+	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
+	// 获取路径数据
+	text_path_t* get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale = 1);
+	// 获取渲染数据
+	text_image_t* get_glyph_item(size_t idx, int fontsize, const void* str8, text_image_t* opt);
+	text_image_t* get_glyph_item1(font_t* p, int fontsize, const void* str8, text_image_t* opt);
+	// 渲染部分文本
+#if 0
+	void draw_text(rvg_cx* rv, const glm::ivec2& r, uint32_t color);
+	void draw_text(rvg_cx* rv, const std::vector<font_item_t>& r, uint32_t color);
 
+	void draw_rect_rc(rvg_cx* rv, const std::vector<font_item_t>& rtv, uint32_t color);
+	// 渲染全部文本
+	void draw_text(rvg_cx* rv, uint32_t color);
+#endif
+	// todo获取图集
+	atlas_t* get_atlas();
+	bool update_text();
+	// 创建阴影
+	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
+	// 创建菜单
+	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb);
+	pvm_t new_menu(int width, int height, const char** v, size_t n, bool has_shadow, std::function<void(int type, int id)> cb);
+	void free_menu(pvm_t pt);
+private:
+	void c_line_metrics(size_t idx, int fontsize);
+};
 layout_text_x::layout_text_x()
 {
 	gs = new gshadow_cx();
@@ -228,50 +307,50 @@ void layout_text_x::free_cache(bitmap_cache_cx* p)
 		delete p;
 	}
 }
-
-text_dta* layout_text_x::new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old)
-{
-	if (!old)
-	{
-		old = new text_dta();
-	}
-	old->ltx = this;
-	auto str = (const char*)str8;
-	if (str8)
-	{
-		if (idx != old->idx)
-		{
-			old->idx = idx;
-		}
-		if (fontsize != old->fontsize)
-		{
-			old->fontsize = fontsize;
-		}
-		old->tv.clear();
-		auto nrc = build_text(idx, fontsize, old->rc, old->text_align, str8, len, old->tv);
-	}
-	return old;
-}
-
-text_dta* layout_text_x::new_text_dta1(font_t* p, int fontsize, const void* str8, int len, text_dta* old)
-{
-	if (!old)
-	{
-		old = new text_dta();
-	}
-	old->ltx = this;
-	auto str = (const char*)str8;
-	if (str8)
-	{
-		if (fontsize != old->fontsize)
-		{
-			old->fontsize = fontsize;
-		}
-		old->tv.clear();
-		auto nrc = build_text1(p, fontsize, old->rc, old->text_align, str8, len, old->tv);
-	}
-	return old;
-}
+//
+//text_dta* layout_text_x::new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old)
+//{
+//	if (!old)
+//	{
+//		old = new text_dta();
+//	}
+//	old->ltx = this;
+//	auto str = (const char*)str8;
+//	if (str8)
+//	{
+//		if (idx != old->idx)
+//		{
+//			old->idx = idx;
+//		}
+//		if (fontsize != old->fontsize)
+//		{
+//			old->fontsize = fontsize;
+//		}
+//		old->tv.clear();
+//		auto nrc = build_text(idx, fontsize, old->rc, old->text_align, str8, len, old->tv);
+//	}
+//	return old;
+//}
+//
+//text_dta* layout_text_x::new_text_dta1(font_t* p, int fontsize, const void* str8, int len, text_dta* old)
+//{
+//	if (!old)
+//	{
+//		old = new text_dta();
+//	}
+//	old->ltx = this;
+//	auto str = (const char*)str8;
+//	if (str8)
+//	{
+//		if (fontsize != old->fontsize)
+//		{
+//			old->fontsize = fontsize;
+//		}
+//		old->tv.clear();
+//		auto nrc = build_text1(p, fontsize, old->rc, old->text_align, str8, len, old->tv);
+//	}
+//	return old;
+//}
 
 void layout_text_x::c_line_metrics(size_t idx, int fontsize) {
 	if (idx >= familyv.size())idx = 0;
@@ -1286,36 +1365,6 @@ void free_tiny_image(tiny_image_t* p)
 }
 #endif // 1
 
-widget_base::widget_base()
-{}
-widget_base::widget_base(WIDGET_TYPE wt) :wtype(wt)
-{}
-widget_base::~widget_base()
-{}
-bool widget_base::on_mevent(int type, const glm::vec2& mps)
-{
-	return false;
-}
-
-bool widget_base::update(float delta)
-{
-	return false;
-}
-
-void widget_base::draw(rvg_cx* rv)
-{}
-glm::ivec2 widget_base::get_pos(bool has_parent)
-{
-	glm::ivec2 ps = pos;
-	//if (parent) {
-	//	auto pss = parent->get_pos();
-	//	auto ss = parent->get_spos();
-	//	ss *= hscroll;
-	//	ps += ss;
-	//	if (has_parent) { ps += pss; }
-	//}
-	return ps;
-}
 
 
 
@@ -4548,9 +4597,6 @@ void tview_x::hit_test(const glm::vec2& ps)
 #endif // !NO_TVIEW
 
 
-void widget_on_event(widget_base* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
-void send_hover(widget_base* wp, const glm::vec2& mps);
- 
 
 // 杂算法
 #if 1
@@ -5007,179 +5053,6 @@ bool color_btn::update(float delta)
 	}
 	return true;
 }
-
-
-
-
-
-
-
-
-#if 1
-// 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
-bool widget_on_move(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
-	bool hover = false;
-	if (!wp)return hover;
-	auto e = &ep->v;
-	auto t = (devent_type_e)type;
-	if (t == devent_type_e::mouse_move_e)
-	{
-		auto p = e->m;
-		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
-		wp->mmpos = mps;
-		// 判断是否鼠标进入 
-		glm::vec4 trc = { wp->pos  ,wp->size };
-		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
-		if (k.x) {
-			bool hoverold = wp->bst & (int)BTN_STATE::STATE_HOVER;
-			wp->bst |= (int)BTN_STATE::STATE_HOVER;   hover = true;
-			if (!(wp->bst & (int)BTN_STATE::STATE_ACTIVE))// 不是鼠标则独占
-				ep->ret = 1;
-			if (!hoverold)
-			{
-				// 鼠标进入
-				wp->on_mevent((int)event_type2::on_enter, mps);
-				if (wp->mevent_cb) {
-					wp->mevent_cb(wp, (int)event_type2::on_enter, mps);
-				}
-			}
-		}
-		else {
-			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
-			{
-				wp->bst &= ~(int)BTN_STATE::STATE_HOVER;
-				// 鼠标离开
-				wp->on_mevent((int)event_type2::on_leave, mps);
-				if (wp->mevent_cb) {
-					wp->mevent_cb(wp, (int)event_type2::on_leave, mps);
-				}
-			}
-		}
-
-		{
-			if (wp->bst & (int)BTN_STATE::STATE_HOVER)
-			{
-				wp->on_mevent((int)event_type2::on_move, mps);
-				if (wp->mevent_cb)
-				{
-					wp->mevent_cb(wp, (int)event_type2::on_move, mps);
-				}
-			}
-			if (wp->bst & (int)BTN_STATE::STATE_ACTIVE) {
-				auto dps = mps - wp->curpos;
-				wp->on_mevent((int)event_type2::on_drag, dps);		// 拖动事件
-				if (wp->mevent_cb)
-				{
-					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
-				}
-			}
-		}
-	}
-	return hover;
-}
-
-void widget_on_event(widget_base* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
-	if (!wp)return;
-	auto e = &ep->v;
-	auto t = (devent_type_e)type;
-	switch (t)
-	{
-	case devent_type_e::mouse_move_e:
-		widget_on_move(wp, type, ep, pos);
-		break;
-	case devent_type_e::mouse_button_e:
-	{
-		auto p = e->b;
-		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
-		bool isd = wp->cmpos == mps;
-		wp->cmpos = mps;
-		if (wp->bst & (int)BTN_STATE::STATE_HOVER) {
-			if (p->down == 1)
-			{
-				ep->ret = 1;
-			}
-			if (p->button == 1) {
-				if (p->down == 1) {
-					wp->bst |= (int)BTN_STATE::STATE_ACTIVE;
-					wp->curpos = mps - (glm::ivec2)wp->pos;
-					wp->cks = 0;
-					wp->on_mevent((int)event_type2::on_down, mps);
-					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
-				}
-				else {
-					if ((wp->bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
-					{
-						wp->cks = p->clicks;
-						wp->on_mevent((int)event_type2::on_up, mps);
-						if (wp->mevent_cb) {
-							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
-						}
-						int tc = (int)event_type2::on_click; //左键单击
-						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
-						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
-						wp->_clicks = p->clicks;
-						wp->on_mevent(tc, mps);
-						if (wp->mevent_cb) {
-							wp->mevent_cb(wp, tc, mps);
-						}
-						if (wp->click_cb)
-						{
-							wp->click_cb(wp, p->clicks);
-						}
-					}
-					wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
-				}
-			}
-		}
-		if (p->down == 0) {
-			wp->bst &= ~(int)BTN_STATE::STATE_ACTIVE;
-			wp->bst |= (int)BTN_STATE::STATE_NOMAL;
-			wp->on_mevent((int)event_type2::mouse_up, mps);
-			if (wp->mevent_cb) {
-				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
-			}
-		}
-	}
-	break;
-	case devent_type_e::mouse_wheel_e:
-	{
-		auto p = e->w;
-		glm::vec2 mps = { p->x, p->y };
-		if (wp->bst & (int)BTN_STATE::STATE_HOVER || wp->has_hover_sc)
-		{
-			ep->ret = wp->on_mevent((int)event_type2::on_scroll, mps);
-			if (wp->mevent_cb) {
-				wp->mevent_cb(wp, (int)event_type2::on_scroll, mps);
-			}
-			ep->ret = 1;
-		}
-	}
-	break;
-	case devent_type_e::keyboard_e:
-	{
-		// todo
-		//on_keyboard(ep);
-	}
-	break;
-	default:
-		break;
-	}
-
-}
-void send_hover(widget_base* wp, const glm::vec2& mps) {
-
-	wp->on_mevent((int)event_type2::on_hover, mps);
-	if (wp->mevent_cb)
-	{
-		wp->mevent_cb(wp, (int)event_type2::on_hover, mps);
-	}
-}
-
-
-#endif // 1
-
-
-
 
 #endif // 1
 
@@ -8975,6 +8848,7 @@ void stb_textedit_initialize_state(STB_TexteditState* state, int is_single_line)
 int stb_textedit_paste(STB_TEXTEDIT_STRING* str, STB_TexteditState* state, STB_TEXTEDIT_CHARTYPE const* ctext, int len);
 
 
+
 void testedit() {
 
 	stb_textedit_click(0, 0, 0, 0);
@@ -8986,3 +8860,98 @@ void testedit() {
 }
 
 #endif // 1
+
+edit_cx::edit_cx()
+{
+	ctx = new text_control();
+	set_single(true);
+	pwdch[0] = '*';
+}
+
+edit_cx::~edit_cx()
+{
+	if (ctx)delete ctx; ctx = nullptr;
+}
+
+void edit_cx::set_single(bool is)
+{
+	stb_textedit_initialize_state(&ctx->state, is);
+}
+
+void edit_cx::set_pwd(uint32_t ch)
+{
+	if(ch)
+	md::unicode_to_utf8(pwdch, ch);
+}
+
+void edit_cx::set_text(const void* str, int len)
+{}
+
+void edit_cx::add_text(const void* str, int len)
+{}
+
+void edit_cx::set_size(const glm::ivec2& ss)
+{}
+
+void edit_cx::set_pos(const glm::ivec2& pos)
+{}
+
+void edit_cx::set_align_pos(const glm::vec2& pos)
+{}
+
+void edit_cx::set_align(const glm::vec2& a)
+{}
+
+void edit_cx::set_cursor(const glm::ivec3& c)
+{}
+
+void edit_cx::set_color(const glm::ivec4& c)
+{}
+
+void edit_cx::set_family(font_family_t* family, int fontsize)
+{}
+
+void edit_cx::set_show_input_cursor(bool ab)
+{}
+
+void edit_cx::set_autobr(bool ab)
+{}
+
+void edit_cx::set_round_path(float v)
+{}
+
+void edit_cx::remove_char(size_t idx, int count)
+{}
+
+bool edit_cx::remove_bounds()
+{
+	return false;
+}
+
+void edit_cx::on_event_e(uint32_t type, et_un_t* e)
+{
+
+}
+
+bool edit_cx::update(float delta)
+{
+	return false;
+}
+
+void edit_cx::draw(rvg_cx* rv)
+{}
+
+glm::ivec4 edit_cx::input_pos()
+{
+	return glm::ivec4();
+}
+
+std::string edit_cx::get_select_str()
+{
+	return std::string();
+}
+
+std::wstring edit_cx::get_select_wstr()
+{
+	return std::wstring();
+}

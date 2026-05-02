@@ -220,7 +220,7 @@ struct image_sliced_t
 	uint32_t color = 0;	// 颜色混合/透明度
 };
 struct atlas_t;
- 
+
 struct vertex_v2
 {
 	glm::vec2 position = {};		// 坐标	
@@ -856,7 +856,6 @@ void save_png_v(path_v* pv, int count, const std::string& fn, bool fy, float sc)
 
 class gshadow_cx;
 class plane_cx;
-class layout_text_x;
 struct text_style_t;
 struct text_style_tx;
 struct vg_style_t;

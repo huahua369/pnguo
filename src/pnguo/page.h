@@ -25,72 +25,7 @@ struct itd_t
 {
 	std::string str;
 	mitem_t* child = 0;
-};
-// 菜单项
-class mitem_t
-{
-public:
-	std::vector<itd_t> v;
-	std::function<void(mitem_t* p, int type, int id)> ckm_cb;
-	int width = -1;		// 菜单宽度
-	int height = 0;	// 菜单项高
-	glm::ivec2 pos = {};
-	menu_cx* m = 0;
-	form_x* f = 0;
-	mitem_t* parent = 0;	// 父级
-	mitem_t* cct = 0;		// 当前子菜单
-	pvm_t pv = {};
-	canvas_atlas* backgs = 0, * fronts = 0;// 背景和前景
-	layout_text_x* ltx = 0;
-public:
-	mitem_t();
-	~mitem_t();
-	void show(const glm::vec2& pos);
-	void hide(bool hp);
-	void close();
-	void set_data(int width, int height, const std::vector<std::string>& mvs);
-	void set_data(int width, int height, const char** mvs, size_t n);
-	glm::ivec2 get_idx_pos(int idx);
-	// 设置子菜单
-	void set_child(mitem_t* cp, int idx);
-	bool get_visible();
-};
-struct menu_info
-{
-	const char** mstr = 0;	// 菜单字符串
-	size_t count = 0;		// 菜单项数量 
-	mitem_t* ptr = 0;		// 返回的菜单指针
-	int parent = -1;		// 父级id
-	int parent_idx = -1;	// 父级菜单项索引
-};
-// 菜单组
-struct mitem_g {
-	mitem_t* ptr = 0;
-	int count = 0;			// 菜单数量
-	int cx = -1;				// 当前显示
-};
-// 菜单管理器
-class menu_cx
-{
-public:
-	form_x* form = 0;			// 主窗口 
-	plane_cx* u = 0;
-	std::vector<std::string> familys;
-public:
-	menu_cx();
-	~menu_cx();
-	void set_main(form_x* f);
-	void add_familys(const char* family);
-	// 创建菜单组
-	mitem_g* new_menu_g(menu_info* p, int count, const glm::vec2& msize, std::function<void(mitem_t* p, int type, int id)> cb);
-	void show_mg(mitem_g* p, int idx, const glm::vec2& pos);
-	void free_menu_g(mitem_g* p);
-	void show_item(mitem_t* it, const glm::vec2& pos);
-private:
-	mitem_t* new_menu(int width, int height, const std::vector<std::string>& mvs, std::function<void(mitem_t* p, int type, int id)> cb);
-	void free_item(mitem_t* p);
-
-};
+}; 
 // 显示工具提示面板 
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc);
 void hide_tooltip(form_x* form);
@@ -225,15 +160,6 @@ action_t* move2inc(const glm::vec2& pad, float mt, float wait);
 action_t* at_size(const glm::vec2& dst, float mt);
 action_show_t* wait_show(bool visible, float wait);
 
-struct menumain_info
-{
-	form_x* form0; const char* fontn;
-	uint32_t bc_color = 0xff000000;
-	std::vector<std::string>* mvs;
-	menu_info* pm = 0; int count = 0;   glm::vec2 msize = {};
-	std::function<void(mitem_t* p, int type, int id)> cb;
-	std::function<void(void* p, int clicks, int id)> mcb;
-};
 class listview_x
 {
 public:
@@ -243,14 +169,6 @@ public:
 private:
 };
 
-namespace mg {
-	//创建主菜单
-	menu_cx* new_mm(menumain_info* mm);
-	void free_mm(menu_cx* p);
-
-
-}
-//!mg
 namespace hz {
 	// LinearRGB转换为sRGB：0-1的数值
 	float rgb2srgbf(float linear);

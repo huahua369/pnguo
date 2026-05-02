@@ -393,6 +393,7 @@ namespace md {
 
 	int utf8_to_unicode(const char* utf8, uint32_t* unicode);
 	int utf16_to_unicode(const uint16_t* str, uint32_t* unicode);
+	void unicode_to_utf8(char* utf8, uint32_t unicode);
 	uint32_t fons_decutf8(uint32_t* down, uint32_t* codep, uint32_t byte);
 	const char* utf8_next_char(const char* p);
 	const char* get_utf8_first(const char* str);

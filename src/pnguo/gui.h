@@ -47,109 +47,7 @@ struct pvm_t
 	glm::vec2 cpos = {};
 	int w, h;
 };
-class text_dta
-{
-public:
-	std::vector<font_item_t> tv;
-	glm::vec4 rc = {};
-	glm::vec2 text_align = {};
-	size_t idx = 0;
-	int fontsize = 16;
-	layout_text_x* ltx = 0;
-public:
-	text_dta();
-	~text_dta();
 
-private:
-
-};
-
-// todo 字体纹理缓存管理
-class layout_text_x
-{
-public:
-	font_rctx* ctx = 0;
-	std::vector<std::vector<font_t*>> familyv;
-	std::vector<glm::ivec3> cfb;
-	int fdpi = 72;
-	int heightline = 0;		// 固定行高
-	text_path_t ctp = {};	// 临时缓存
-	text_image_t cti = {};
-	std::vector<d2_surface_t*> msu;
-	std::vector<font_item_t> tv;
-	std::vector<font_item_t> tem_rtv;	// 临时缓存用
-	// todo
-	std::vector<atlas_cx> tem_iptr;
-	std::vector<float> tem_pv;
-	glm::ivec2 ctrc = {}, oldrc = {};
-
-	image_sliced_t sli = {};
-	int sli_radius = 10;
-	gshadow_cx* gs = 0;
-	// 菜单边框填充：线颜色，线粗，圆角，背景色
-	glm::ivec4 m_color = { 0xff606060,1,0,0xf0121212 };
-	// 菜单项偏移
-	glm::ivec2 m_cpos = { 3, 3 };
-
-	bitmap_cache_cx* bc_ctx = 0;  //纹理缓存
-	std::vector<font_t*> _t1;
-	std::vector<uint32_t> s32;
-public:
-	layout_text_x();
-	~layout_text_x();
-	void set_ctx(font_rctx* p);
-	// 添加字体,返回序号
-	size_t add_familys(const char* familys, const char* style);
-	void cpy_familys(layout_text_x* p);
-	void clear_family();
-	void clear_text();
-	// 创建新缓存
-	bitmap_cache_cx* new_cache(const glm::ivec2& vsize);
-	void free_cache(bitmap_cache_cx* p);
-	text_dta* new_text_dta(size_t idx, int fontsize, const void* str8, int len, text_dta* old = 0);
-	text_dta* new_text_dta1(font_t* p, int fontsize, const void* str8, int len, text_dta* old = 0);
-	// 获取基线
-	int get_baseline(size_t idx, int fontsize);
-	// 获取行高
-	int get_lineheight(size_t idx, int fontsize);
-	// 获取文本区域大小,z为基线
-	glm::ivec3 get_text_rect(size_t idx, int fontsize, const void* str8, int len);
-	glm::ivec3 get_text_rect1(size_t idx, int fontsize, const void* str8);
-	int get_text_pos(size_t idx, int fontsize, const void* str8, int len, int xpos);
-	int get_text_ipos(size_t idx, int fontsize, const void* str8, int len, int ipos);
-	int get_text_posv(size_t idx, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
-	// 添加文本到渲染
-	glm::ivec2 add_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len);
-	glm::ivec2 build_text(size_t idx, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
-	glm::ivec2 build_text1(font_t* p, int fontsize, glm::vec4& rc, const glm::vec2& text_align, const void* str8, int len, std::vector<font_item_t>& rtv);
-	// 输出到图集
-	void text2atlas(const glm::ivec2& r, uint32_t color, std::vector<atlas_cx>* opt);
-	// 获取路径数据
-	text_path_t* get_shape(size_t idx, int fontsize, const void* str8, text_path_t* opt, float scale = 1);
-	// 获取渲染数据
-	text_image_t* get_glyph_item(size_t idx, int fontsize, const void* str8, text_image_t* opt);
-	text_image_t* get_glyph_item1(font_t* p, int fontsize, const void* str8, text_image_t* opt);
-	// 渲染部分文本
-#if 0
-	void draw_text(rvg_cx* rv, const glm::ivec2& r, uint32_t color);
-	void draw_text(rvg_cx* rv, const std::vector<font_item_t>& r, uint32_t color);
-
-	void draw_rect_rc(rvg_cx* rv, const std::vector<font_item_t>& rtv, uint32_t color);
-	// 渲染全部文本
-	void draw_text(rvg_cx* rv, uint32_t color);
-#endif
-	// todo获取图集
-	atlas_t* get_atlas();
-	bool update_text();
-	// 创建阴影
-	atlas_cx* new_shadow(const glm::ivec2& ss, const glm::ivec2& pos);
-	// 创建菜单
-	pvm_t new_menu(int width, int height, const std::vector<std::string>& v, bool has_shadow, std::function<void(int type, int id)> cb);
-	pvm_t new_menu(int width, int height, const char** v, size_t n, bool has_shadow, std::function<void(int type, int id)> cb);
-	void free_menu(pvm_t pt);
-private:
-	void c_line_metrics(size_t idx, int fontsize);
-};
 
 // 文字路径转path_v对象
 void text_path2path_v(text_path_t* t, path_v* opt);
@@ -198,52 +96,6 @@ struct pickup_t
 	glm::vec3 angle = {};	// 距离x-y，角度z
 
 };
-//  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
-struct widget_base
-{
-public:
-	int id = 0;
-	WIDGET_TYPE wtype = WIDGET_TYPE::WT_NULL;
-	int bst = 1;			// 鼠标状态
-	glm::vec2 pos = {};		// 控件坐标
-	glm::vec2 size = {};	// 控件大小
-	glm::ivec2 curpos = {};	// 当前拖动鼠标坐标
-	glm::ivec2 cmpos = {};	// 当前鼠标坐标
-	glm::ivec2 mmpos = {};	// 当前鼠标坐标
-	glm::ivec2 ppos = {};	// 父级坐标 
-	std::string text;		// 内部显示用字符串
-	std::string family;
-	float font_size = 16;
-	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
-	int rounding = 4;		// 圆角
-	float thickness = 1.0;	// 边框线粗
-	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
-	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
-	int _clicks = 0;		// 点击数量
-	layout_text_x* ltx = 0;
-
-	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
-	int _old_bst = 0;			// 鼠标状态
-	int cks = 0;				// 鼠标点击状态
-	plane_cx* parent = 0;
-	double dtime = 0.0;
-	bool _disabled_events = false;
-	bool visible = true;
-	bool _absolute = false;		// true绝对坐标，false布局计算
-	bool has_drag = false;	// 是否有拖动事件
-	bool _autofree = false;
-	bool has_hover_sc = 0;	// 滚动在父级接收
-public:
-	widget_base();
-	widget_base(WIDGET_TYPE wt);
-	virtual ~widget_base();
-	//event_type2
-	virtual bool on_mevent(int type, const glm::vec2& mps);
-	virtual bool update(float delta);
-	virtual void draw(rvg_cx* rv);
-	virtual glm::ivec2 get_pos(bool has_parent = true);
-};
-
 #ifndef NOT_UI
 class form_x;
 
@@ -826,9 +678,61 @@ public:
 	void set_posv(const glm::ivec2& poss);
 };
 
+struct text_control;
+class edit_cx :public widget_t
+{
+public:
+	std::vector<std::string> lines;	// 行文本
+	std::vector<font_item_t> rtv;	// 渲染用文本
+	std::function<void(edit_cx* ptr)> changed_cb;	// 文本改变时执行回调函数 
+	std::function<void(edit_cx* ptr, std::string& str)> input_cb;	// 文本输入时执行回调函数，可修改此字符串返回
+	text_control* ctx = 0;
+	char pwdch[5] = {};				// 密码显示字符
+	int _istate = 0;
+	bool mdown = false;
+	bool _read_only = false;
+	bool is_input = false;
+public:
+	edit_cx();
+	~edit_cx();
+	void set_single(bool is);
+	// 设置为密码框比如'*'
+	void set_pwd(uint32_t ch);
+	// 设置utf8文本
+	void set_text(const void* str, int len);
+	void add_text(const void* str, int len);
+	// 设置文本框大小
+	void set_size(const glm::ivec2& ss);
+	// 设置文本框坐标
+	void set_pos(const glm::ivec2& pos);
+	void set_align_pos(const glm::vec2& pos);
+	void set_align(const glm::vec2& a);
+	// 闪烁光标。宽度、颜色、毫秒
+	void set_cursor(const glm::ivec3& c);
+	// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
+	void set_color(const glm::ivec4& c);
+	void set_family(font_family_t* family, int fontsize);
+	// 设置是否显示输入光标
+	void set_show_input_cursor(bool ab);
+	// 设置自动换行
+	void set_autobr(bool ab);
+	void set_round_path(float v);
+	// 删除位置，字符数量
+	void remove_char(size_t idx, int count);
+	// 删除选择的文本
+	bool remove_bounds();
+	// 发送事件到本edit
+	void on_event_e(uint32_t type, et_un_t* e);
+	// 更新渲染啥的
+	bool update(float delta);
+	void draw(rvg_cx* rv);
+	glm::ivec4 input_pos();
+	std::string get_select_str();
+	std::wstring get_select_wstr();
+};
 
 #endif // 1
- 
+
 
 #endif
 

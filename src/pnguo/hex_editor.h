@@ -8,7 +8,7 @@ struct rect_select_x;
 struct hex_style_t {
 	cairo_t* cr = 0;		// 0不渲染
 	text_style_t* st = 0;
-	layout_text_x* ltx = 0;
+	//layout_text_x* ltx = 0;
 	int64_t fl = 0;		// 行高
 	int64_t pxx = 0;
 	int64_t pyy = 0;
@@ -43,14 +43,14 @@ public:
 	uint32_t color[7] = {};			// 渲染颜色
 	uint32_t select_color = 0xfff77d5a;
 	float round_path = 0.2;			// 圆角选区
-	dtext_cache dtc = {};
+	//dtext_cache dtc = {};
 private:
 	unsigned char* _data = 0;
 	size_t _size = 0;
 	int64_t count = 0;				// 当前显示行数量
 	size_t line_offset = 0;			// 当前行的偏移
 	glm::ivec2 view_size = { 600,1080 }; // 视图高 
-	text_draw_t tdt = {};
+	//text_draw_t tdt = {};
 private:
 	glm::i64vec2 range2 = {};		// 选中范围,从小到大
 	glm::i64vec2 range_c1 = {};		// 选中范围c
@@ -89,7 +89,7 @@ public:
 	char* data();
 	size_t size();
 	bool update_hex_editor();
-	text_draw_t* get_drawt();
+	//text_draw_t* get_drawt();
 	glm::i64vec2 get_range2();
 	// 获取渲染大小
 	glm::ivec2 get_draw_rect();
