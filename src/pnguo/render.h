@@ -241,7 +241,6 @@ struct d2_rt {
 	glm::ivec2 pos;		// 纹理偏移
 	glm::ivec2 size;	// 区域大小
 	glm::ivec2 offset;	// 渲染偏移
-	glm::ivec4 clip = {};	// 裁剪区
 	int surface = 0;
 	int type = 0;		// 0矢量图，1文本/位图
 	int index = 0;

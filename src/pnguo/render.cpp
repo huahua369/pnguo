@@ -2880,9 +2880,6 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 		}
 		else if (vt.d2)
 		{
-			auto clip = vt.d2->clip;
-			clip.x += pos.x; clip.y += pos.y; 
-			clicprect_cx cp(renderer, rcb, clip); // 设置裁剪区域
 			for (size_t i = 0; i < vt.count; i++)
 			{
 				auto it = vt.d2 + vt.first + i;
@@ -3282,7 +3279,6 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		if (it.rc.z < 1 || it.rc.w < 1)
 			continue;
 		d2_rt d = {};
-		d.clip = {}; // todo clip
 		d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
 		d.size += stwidth * 2;
 		d.size.x = align_up(d.size.x, 4);
