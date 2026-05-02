@@ -8951,44 +8951,20 @@ struct text_control
 {
 	STB_TexteditState state;
 	std::string str;
+	size_t curline = 0;				// 当前行号
+	size_t curline_idx = 0;			// 当前行号偏移
 	font_family_t* family = 0;
+	int font_size = 16;
 	int8_t LastMoveDirectionLR = 0;
 };
 
-// define the functions we need
-void layout_func(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
-{
-	int remaining_chars = str->str.size() - start_i;
-	row->num_chars = remaining_chars > 20 ? 20 : remaining_chars; // should do real word wrap here
-	row->x0 = 0;
-	row->x1 = 20; // need to account for actual size of characters
-	row->baseline_y_delta = 1.25;
-	row->ymin = -1;
-	row->ymax = 0;
-}
-
-int delete_chars(STB_TEXTEDIT_STRING* str, int pos, int num)
-{
-	str->str.erase(pos, num);
-	return 1; // always succeeds
-}
-
-int insert_chars(STB_TEXTEDIT_STRING* str, int pos, const STB_TEXTEDIT_CHARTYPE* newtext, int num)
-{
-	str->str.insert(pos, newtext, num);
-	return 1; // always succeeds
-}
-float get_str_width(STB_TEXTEDIT_STRING* str, int n, int i)
-{
-	return 1;
-}
 // define all the #defines needed 
 
 #define KEYDOWN_BIT                    0x80000000
 
 #define STB_TEXTEDIT_STRINGLEN(tc)     ((tc)->str.size())
 #define STB_TEXTEDIT_LAYOUTROW         layout_func
-#define STB_TEXTEDIT_GETWIDTH(tc,n,i)  get_str_width(tc,n,i) // quick hack for monospaced
+#define STB_TEXTEDIT_GETWIDTH			get_str_width
 #define STB_TEXTEDIT_KEYTOTEXT(key)    (((key) & KEYDOWN_BIT) ? 0 : (key))
 #define STB_TEXTEDIT_GETCHAR(tc,i)     ((tc)->str[i])
 #define STB_TEXTEDIT_NEWLINE           '\n'
@@ -9023,17 +8999,88 @@ float get_str_width(STB_TEXTEDIT_STRING* str, int n, int i)
 #define STB_TEXTEDIT_memmove memmove
 #endif
 
-// [DEAR IMGUI]
-// Functions must be implemented for UTF8 support
-// Code in this file that uses those functions is modified for [DEAR IMGUI] and deviates from the original stb_textedit.
-// There is not necessarily a '[DEAR IMGUI]' at the usage sites.
 #ifndef STB_TEXTEDIT_GETPREVCHARINDEX
-#define STB_TEXTEDIT_GETPREVCHARINDEX(OBJ, IDX) ((IDX) - 1)
+#define STB_TEXTEDIT_GETPREVCHARINDEX stb_textedit_getprevcharindex
 #endif
 #ifndef STB_TEXTEDIT_GETNEXTCHARINDEX
-#define STB_TEXTEDIT_GETNEXTCHARINDEX(OBJ, IDX) ((IDX) + 1)
+#define STB_TEXTEDIT_GETNEXTCHARINDEX stb_textedit_getnextcharindex
 #endif
 
+
+
+
+// define the functions we need
+void layout_func(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
+{
+	int remaining_chars = str->str.size() - start_i;
+	row->num_chars = remaining_chars > 20 ? 20 : remaining_chars; // should do real word wrap here
+	row->x0 = 0;
+	row->x1 = 20; // need to account for actual size of characters
+	row->baseline_y_delta = 1.25;
+	row->ymin = -1;
+	row->ymax = 0;
+}
+
+int delete_chars(STB_TEXTEDIT_STRING* str, int pos, int num)
+{
+	str->str.erase(pos, num);
+	return 1; // always succeeds
+}
+
+int insert_chars(STB_TEXTEDIT_STRING* str, int pos, const STB_TEXTEDIT_CHARTYPE* newtext, int num)
+{
+	str->str.insert(pos, newtext, num);
+	return 1; // always succeeds
+}
+// 行号，字符位置
+float get_str_width(STB_TEXTEDIT_STRING* str, int n, int idx)
+{
+	if (str && str->family)
+	{
+		const char* p = str->str.c_str();
+		if (!str->state.single_line) {
+			if (n != str->curline) {
+				str->curline = n;
+				auto length = str->str.size();
+				size_t lx = 0;
+				str->curline_idx = length;
+				for (size_t i = 0; i < length; i++, p)
+				{
+					if (p[i] == STB_TEXTEDIT_NEWLINE)
+					{
+						lx++;
+					}
+					if (lx == n) {
+						str->curline_idx = i;
+						break;
+					}
+				}
+			}
+			p += str->curline_idx;
+		}
+		p += idx;
+		uint32_t ch = 0;
+		auto nn = md::utf8_to_unicode(p, &ch);
+		if (ch)
+		{
+			auto rc = font_get_char_extent(ch, str->font_size, str->family, 0);
+			return rc.x;
+		}
+	}
+	return 1;
+}
+// 返回上一个字符位置
+int stb_textedit_getprevcharindex(STB_TEXTEDIT_STRING* str, int idx) {
+	auto p = str->str.c_str() + idx;
+	auto p1 = md::get_utf8_prev(p);
+	return (p - p1) + idx;
+}
+// 返回下一个字符位置
+int stb_textedit_getnextcharindex(STB_TEXTEDIT_STRING* str, int idx) {
+	auto p = str->str.c_str() + idx;
+	auto p1 = md::utf8_next_char(p);
+	return (p1 - p) + idx;
+}
 /////////////////////////////////////////////////////////////////////////////
 //
 //      Mouse input handling
