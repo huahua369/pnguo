@@ -694,6 +694,7 @@ public:
 	glm::ivec3 _cursor = { 1,-1,300 };				// 闪烁光标。宽度、颜色、毫秒
 	glm::ivec2 _cmpos = {};				// 当前鼠标坐标
 	std::wstring wstr;
+	glm::ivec3 _cursor_px = {};		// 光标坐标xy，当前行z
 	char pwdch = {};				// 密码显示字符
 	int _istate = 0;
 	bool mdown = false;

@@ -6518,6 +6518,7 @@ void widget_t::set_family(font_family_t* family, int fontsize)
 	this->family = family; this->font_size = fontsize;
 }
 
+input_state_t* get_input_state_cx(void* ptr, int t);
 // 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& pos) {
 	bool hover = false;
@@ -6683,17 +6684,21 @@ bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
 	bool r = false;
 	auto e = &ep->v;
 	auto t = (devent_type_e)type;
+	widget_on_event(pw, type, ep, ppos);
 	if (pw->on_event_cb)
 	{
 		pw->on_event_cb(type, ep, ppos);
 	}
-	else {
-		widget_on_event(pw, type, ep, ppos);
+	else
+	{
 		if (ep->ret && t == devent_type_e::mouse_button_e)
 		{
 			auto p = e->b;
 			if (p->down == 1)
+			{
 				get_input_state(0, 1);
+				get_input_state_cx(0, 1);
+			}
 		}
 	}
 	return (ep->ret);
@@ -7725,9 +7730,9 @@ float stb_textedit_getwidth(STB_TEXTEDIT_STRING* str, int line_start_idx, int ch
 }
 // 返回上一个字符位置
 int stb_textedit_getprevcharindex(STB_TEXTEDIT_STRING* str, int idx) {
-	auto p = str->str.c_str() + idx;
-	auto p1 = md::get_utf8_prev(p);
-	return (p - p1) + idx;
+	auto p = str->str.c_str();
+	auto p1 = md::get_utf8_prev(p + idx);
+	return (p1 - p);
 }
 // 返回下一个字符位置
 int stb_textedit_getnextcharindex(STB_TEXTEDIT_STRING* str, int idx) {
@@ -8880,6 +8885,10 @@ edit_cx::edit_cx() :widget_t(WIDGET_TYPE::WT_EDIT)
 {
 	ctx = new text_control();
 	set_single(true);
+	on_event_cb = [=](uint32_t type, et_un_t* e, const glm::vec2& pos)
+		{
+			on_event_e(type, e);
+		};
 }
 
 edit_cx::~edit_cx()
@@ -9057,14 +9066,14 @@ input_state_t* get_input_state_cx(void* ptr, int t)
 }
 bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 {
-	auto mpos = mps - _pos;
 	auto t = (event_type2)type;
 	bool ret = false;
 	auto p = (mouse_move_et*)e;
+
+	auto mpos = mps;
 	glm::vec2 tpos = ctx->_align_pos - ctx->scroll_pos;
 	tpos += thickness;
-	mpos -= tpos;
-	_cmpos = mpos;
+
 	switch (t)
 	{
 	case event_type2::on_move:
@@ -9077,6 +9086,8 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	}break;
 	case event_type2::on_down:
 	{
+		mpos -= tpos + _pos;
+		_cmpos = mpos;
 		if (form)
 		{
 			form_set_input_ptr(form, get_input_state_cx(this, 1));
@@ -9090,6 +9101,10 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	}break;
 	case event_type2::on_drag:
 	{
+		mpos += curpos; mpos -= tpos + _pos;
+		glm::ivec2 cm = mpos;
+		if (_cmpos != cm)
+			_cmpos = mpos;
 		stb_textedit_drag(ctx, &ctx->state, mpos.x, mpos.y);
 		ret = true;
 	}break;
@@ -9158,7 +9173,7 @@ void edit_cx::on_keyboard(et_un_t* ep)
 			}
 		} while (0);
 	}
-	if (!p->down || editingstr.size())
+	if (!key && (!p->down || editingstr.size()))
 	{
 		return;
 	}
@@ -9166,6 +9181,15 @@ void edit_cx::on_keyboard(et_un_t* ep)
 	bool isupcursor = false;
 	switch (p->keycode)
 	{
+	case SDLK_PRINTSCREEN:
+	{}
+	break;
+	case SDLK_SCROLLLOCK:
+	{}
+	break;
+	case SDLK_PAUSE:
+	{}
+	break;
 	case SDLK_TAB:
 	{
 		add_text("\t", 1);
@@ -9175,15 +9199,6 @@ void edit_cx::on_keyboard(et_un_t* ep)
 	{
 		key = STB_TEXTEDIT_K_BACKSPACE;
 	}
-	break;
-	case SDLK_PRINTSCREEN:
-	{}
-	break;
-	case SDLK_SCROLLLOCK:
-	{}
-	break;
-	case SDLK_PAUSE:
-	{}
 	break;
 	case SDLK_INSERT:
 	{

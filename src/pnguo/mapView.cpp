@@ -584,7 +584,7 @@ namespace md {
 	// 获取前一个utf8位置
 	const char* get_utf8_prev(const char* str)
 	{
-		const char* p = str;
+		const char* p = str - 1;
 		for (; *p && !(UTF8_ASCII(*p) || (UTF8_FIRST(*p))); p--);
 		return p;
 	}
