@@ -992,11 +992,10 @@ int main()
 			pro->color = { 0xffff9e40, 0x5f6c6c6c };
 			pro->set_value(0.5);
 
+			auto edit1 = new edit_cx();
 			{
-				auto r = new edit_cx();
+				auto r = edit1;
 				r->set_size({ 236,32 });
-				r->set_text("1", 1);
-				r->set_text("2", 1);
 				dvv->add_widget(r);
 			}
 
@@ -1057,11 +1056,20 @@ int main()
 					kti += delta;
 					if (kti > 0.06)
 					{
+						static glm::ivec3 sct = {};
+						glm::ivec3 mps = { edit1->_cmpos,edit1->get_cursor_idx() };
+						if (mps != sct)
+						{
+							sct = mps;
+							*ret = true;
+						}
 						kti = 0.0;
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
 						std::string str = vkd->get_label();
 						str += (char*)u8"emoji表情💻🔥➗️👪️q🍕";
+						const char* strr = (char*)u8"\nmousepos: %d, %d\t光标:%d\n";
+						str += vkr::format(strr, mps.x, mps.y, mps.z);
 						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
 						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff00fc2c);// 0xff222222);
 						str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";

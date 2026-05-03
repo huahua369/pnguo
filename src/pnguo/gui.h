@@ -692,6 +692,8 @@ public:
 	std::string editingstr;			// 输入中的文本，输入法编辑时用
 	glm::ivec4 _color = { 0xff282828,0xffffffff,0x80ffb399,0xffffffff };				// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
 	glm::ivec3 _cursor = { 1,-1,300 };				// 闪烁光标。宽度、颜色、毫秒
+	glm::ivec2 _cmpos = {};				// 当前鼠标坐标
+	std::wstring wstr;
 	char pwdch = {};				// 密码显示字符
 	int _istate = 0;
 	bool mdown = false;
@@ -730,10 +732,12 @@ public:
 	// 发送事件到本edit
 	void on_event_e(uint32_t type, et_un_t* e);
 	bool on_mevent(int type, const glm::vec2& mps, void* e);
+	void on_keyboard(et_un_t* ep);
 	// 更新渲染啥的
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 	glm::ivec4 input_pos();
+	int get_cursor_idx();
 	std::string get_select_str();
 	std::wstring get_select_wstr();
 };

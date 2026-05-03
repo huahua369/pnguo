@@ -7553,7 +7553,7 @@ struct STB_TexteditState
 	// dragging the mouse, start is where the initial click was, and you
 	// can drag in either direction)
 
-	unsigned char insert_mode;
+	bool insert_mode;
 	// each textfield keeps its own insert mode state. to keep an app-wide
 	// insert mode, copy this value in/out of the app state
 
@@ -7565,11 +7565,11 @@ struct STB_TexteditState
 	//
 	// private data
 	//
-	unsigned char cursor_at_end_of_line; // not implemented yet
-	unsigned char initialized;
-	unsigned char has_preferred_x;
-	unsigned char single_line;
-	unsigned char padding1, padding2, padding3;
+	bool cursor_at_end_of_line; // not implemented yet
+	bool initialized;
+	bool has_preferred_x;
+	bool single_line;
+	bool padding1, padding2, padding3;
 	float preferred_x; // this determines where the cursor up/down tries to seek to along x
 	StbUndoState undostate;
 };
@@ -7605,7 +7605,10 @@ struct text_control
 	int64_t ccursor8 = 0;	//当前光标字符
 	int64_t caret_old = {};		//保存输入光标
 	glm::ivec3 cursor_pos = {};
+	glm::ivec2 scroll_pos = {};				// 滚动坐标
+	glm::ivec2 _align_pos = {};				// 对齐坐标
 	glm::vec2 view = {};	// 区域
+	int lineheight = 0;
 	int8_t LastMoveDirectionLR = 0;
 };
 
@@ -7643,7 +7646,7 @@ struct text_control
 #define STB_TEXTEDIT_K_PGUP            (KEYDOWN_BIT | 10) // VK_PGUP -- not implemented
 #define STB_TEXTEDIT_K_PGDOWN          (KEYDOWN_BIT | 11) // VK_PGDOWN -- not implemented
 
-
+#define STB_TEXTEDIT_GETWIDTH_NEWLINE -1
 
 #ifndef STB_TEXTEDIT_memmove
 #include <string.h>
@@ -7667,71 +7670,58 @@ void stb_textedit_layoutrow(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int s
 	int remaining_chars = str->str.size() - start_i;
 	row->num_chars = remaining_chars > 20 ? 20 : remaining_chars; // should do real word wrap here
 	row->x0 = 0;
-	row->x1 = 20; // need to account for actual size of characters
-	row->baseline_y_delta = 1.25;
-	row->ymin = -1;
-	row->ymax = 0;
+	row->ymin = 0;
 	auto r = row;
 	int i = start_i;
 	float row_width = 0.0f;
 	while (str->str[i] != '\n' && i < STB_TEXTEDIT_STRINGLEN(str)) {
 		row_width += STB_TEXTEDIT_GETWIDTH(str, start_i, i);
-		if (str->view.x>0&&row_width > str->view.x) break; // 自动换行触发条件
+		if (str->view.x > 0 && row_width > str->view.x) break; // 自动换行触发条件
 		i++;
 	}
 	r->x1 = row_width;
+	row->ymax = row->baseline_y_delta = str->font_size;
 	r->num_chars = i - start_i;
-	//r->start_idx = start_i;
-	//r->end_idx = i;
 }
 
 int delete_chars(STB_TEXTEDIT_STRING* str, int pos, int num)
 {
 	str->str.erase(pos, num);
-	return 1; // always succeeds
+	return num;
 }
 
 int insert_chars(STB_TEXTEDIT_STRING* str, int pos, const STB_TEXTEDIT_CHARTYPE* newtext, int num)
 {
 	str->str.insert(pos, newtext, num);
-	return 1; // always succeeds
+	return num;
 }
-// 行号，字符位置
-float stb_textedit_getwidth(STB_TEXTEDIT_STRING* str, int n, int idx)
+//float STB_TEXTEDIT_GETWIDTH(ImGuiInputTextState* obj, int line_start_idx, int char_idx)
+//{
+//	unsigned int c; ImTextCharFromUtf8(&c, obj->TextSrc + line_start_idx + char_idx, obj->TextSrc + obj->TextLen);
+//	if ((ImWchar)c == '\n') 
+//		return IMSTB_TEXTEDIT_GETWIDTH_NEWLINE;
+//	ImGuiContext& g = *obj->Ctx;
+//	return g.FontBaked->GetCharAdvance((ImWchar)c) * g.FontBakedScale;
+//}
+
+// 行开始位置，字符位置
+float stb_textedit_getwidth(STB_TEXTEDIT_STRING* str, int line_start_idx, int char_idx)
 {
 	if (str && str->family)
 	{
 		const char* p = str->str.c_str();
-		if (!str->state.single_line) {
-			if (n != str->curline) {
-				str->curline = n;
-				auto length = str->str.size();
-				size_t lx = 0;
-				str->curline_idx = length;
-				for (size_t i = 0; i < length; i++, p)
-				{
-					if (p[i] == STB_TEXTEDIT_NEWLINE)
-					{
-						lx++;
-					}
-					if (lx == n) {
-						str->curline_idx = i;
-						break;
-					}
-				}
-			}
-			p += str->curline_idx;
-		}
-		p += idx;
 		uint32_t ch = 0;
-		auto nn = md::utf8_to_unicode(p, &ch);
+		auto nn = md::utf8_to_unicode(p + line_start_idx + char_idx, &ch);
+		if (ch == '\n') {
+			return STB_TEXTEDIT_GETWIDTH_NEWLINE;
+		}
 		if (ch)
 		{
 			auto rc = font_get_char_extent(ch, str->font_size, str->family, 0);
-			return rc.x;
+			return rc.z;
 		}
 	}
-	return 1;
+	return 0;
 }
 // 返回上一个字符位置
 int stb_textedit_getprevcharindex(STB_TEXTEDIT_STRING* str, int idx) {
@@ -8783,7 +8773,7 @@ static void stb_textedit_clear_state(STB_TexteditState* state, int is_single_lin
 	state->preferred_x = 0;
 	state->cursor_at_end_of_line = 0;
 	state->initialized = 1;
-	state->single_line = (unsigned char)is_single_line;
+	state->single_line = (bool)is_single_line;
 	state->insert_mode = 0;
 	state->row_count_per_page = 0;
 }
@@ -8999,7 +8989,7 @@ void edit_cx::on_event_e(uint32_t type, et_un_t* ep)
 		p->w = ipos.z;
 		p->h = ipos.w;
 		add_text(p->text, strlen(p->text));
-
+		wstr = md::u8_w(ctx->str.c_str(), ctx->str.size());
 	}break;
 	case devent_type_e::text_editing_e: {
 
@@ -9030,6 +9020,12 @@ void edit_cx::on_event_e(uint32_t type, et_un_t* ep)
 		}
 		editingstr = str;
 	}break;
+	case devent_type_e::keyboard_e:
+	{
+		on_keyboard(ep);
+	}break;
+	default:
+		break;
 	};
 
 }
@@ -9065,6 +9061,10 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	auto t = (event_type2)type;
 	bool ret = false;
 	auto p = (mouse_move_et*)e;
+	glm::vec2 tpos = ctx->_align_pos - ctx->scroll_pos;
+	tpos += thickness;
+	mpos -= tpos;
+	_cmpos = mpos;
 	switch (t)
 	{
 	case event_type2::on_move:
@@ -9103,6 +9103,183 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	return ret;
 }
 
+void edit_cx::on_keyboard(et_un_t* ep)
+{
+	auto p = ep->v.k;
+	const bool is_osx = false;
+	// Control=1 Shift=2 Alt=4 8Cmd/Super/Windows
+	bool KeyShift = p->kmod == 2;
+	bool KeyAlt = p->kmod == 4;
+	bool KeyCtrl = p->kmod == 1;
+	bool KeySuper = p->kmod == 8;
+	const int k_mask = (KeyShift ? STB_TEXTEDIT_K_SHIFT : 0);
+	const bool is_wordmove_key_down = is_osx ? KeyAlt : KeyCtrl;                     // OS X style: Text editing cursor movement using Alt instead of Ctrl
+	const bool is_startend_key_down = is_osx && KeyCtrl && !KeySuper && !KeyAlt;  // OS X style: Line/Text Start and End using Cmd+Arrows instead of Home/End
+
+	int key = 0;
+
+
+	if (!p->down)
+	{
+		do {
+			if (!KeyCtrl)break;
+			switch (p->keycode) {
+			case SDLK_A:
+			{
+				ctx->state.select_end = ctx->str.size();
+				ctx->state.select_start = 0;
+			}
+			break;
+			case SDLK_X:
+			case SDLK_C:
+			{
+				std::string str;
+				stb_textedit_sortselection(&ctx->state);
+				str.assign(ctx->str.c_str() + ctx->state.select_start, ctx->state.select_end - ctx->state.select_start);
+				set_clipboard(str.c_str());
+				if (p->keycode == SDLK_X)
+					stb_textedit_cut(ctx, &ctx->state);
+			}
+			break;
+			case SDLK_V:
+			{
+				auto str = get_clipboard();
+				stb_textedit_paste(ctx, &ctx->state, str.c_str(), str.size());
+			}
+			break;
+			case SDLK_Y:
+				key = STB_TEXTEDIT_K_REDO;
+				//is_redo = true;	//_storage_buf->redo();
+				break;
+			case SDLK_Z:
+				key = STB_TEXTEDIT_K_UNDO;
+				//is_undo = true;	//_storage_buf->undo();
+				break;
+			}
+		} while (0);
+	}
+	if (!p->down || editingstr.size())
+	{
+		return;
+	}
+
+	bool isupcursor = false;
+	switch (p->keycode)
+	{
+	case SDLK_TAB:
+	{
+		add_text("\t", 1);
+	}
+	break;
+	case SDLK_BACKSPACE:
+	{
+		key = STB_TEXTEDIT_K_BACKSPACE;
+	}
+	break;
+	case SDLK_PRINTSCREEN:
+	{}
+	break;
+	case SDLK_SCROLLLOCK:
+	{}
+	break;
+	case SDLK_PAUSE:
+	{}
+	break;
+	case SDLK_INSERT:
+	{
+		key = STB_TEXTEDIT_K_INSERT;
+	}
+	break;
+	case SDLK_PAGEDOWN:
+	{
+		key = STB_TEXTEDIT_K_PGDOWN;
+	}
+	break;
+	case SDLK_PAGEUP:
+	{
+		key = STB_TEXTEDIT_K_PGUP;
+	}
+	break;
+	case SDLK_DELETE:
+	{
+		key = STB_TEXTEDIT_K_DELETE;
+	}
+	break;
+	case SDLK_HOME:
+	{
+		key = STB_TEXTEDIT_K_TEXTSTART;
+	}
+	break;
+	case SDLK_END:
+	{
+		key = STB_TEXTEDIT_K_TEXTEND;
+	}
+	break;
+	case SDLK_RIGHT:
+	{
+		key = STB_TEXTEDIT_K_RIGHT;
+	}
+	break;
+	case SDLK_LEFT:
+	{
+		key = STB_TEXTEDIT_K_LEFT;
+	}
+	break;
+	case SDLK_DOWN:
+	{
+		key = STB_TEXTEDIT_K_DOWN;
+	}
+	break;
+	case SDLK_UP:
+	{
+		key = STB_TEXTEDIT_K_UP;
+	}
+	break;
+	case SDLK_RETURN:
+	{
+		remove_bounds();
+		if (!ctx->state.single_line)
+		{
+			add_text("\n", 1);
+		}
+	}
+	break;
+	default:
+		break;
+	}
+	if (key)
+	{
+		/*STB_TEXTEDIT_K_SHIFT
+		 STB_TEXTEDIT_K_CONTROL
+		 STB_TEXTEDIT_K_LEFT
+		 STB_TEXTEDIT_K_RIGHT
+		 STB_TEXTEDIT_K_UP
+		 STB_TEXTEDIT_K_DOWN
+		 STB_TEXTEDIT_K_LINESTART
+		 STB_TEXTEDIT_K_LINEEND
+		 STB_TEXTEDIT_K_TEXTSTART
+		 STB_TEXTEDIT_K_TEXTEND
+		 STB_TEXTEDIT_K_DELETE
+		 STB_TEXTEDIT_K_BACKSPACE
+		 STB_TEXTEDIT_K_UNDO
+		 STB_TEXTEDIT_K_REDO
+		 STB_TEXTEDIT_K_INSERT
+		 STB_TEXTEDIT_K_WORDLEFT
+		  STB_TEXTEDIT_K_WORDRIGHT
+		  STB_TEXTEDIT_K_PGUP
+		  STB_TEXTEDIT_K_PGDOWN */
+		if (KeyCtrl)
+		{
+			key |= STB_TEXTEDIT_K_CONTROL;
+		}
+		if (KeyShift)
+		{
+			key |= STB_TEXTEDIT_K_SHIFT;
+		}
+		stb_textedit_key(ctx, &ctx->state, key);
+	}
+}
+
 bool edit_cx::update(float delta)
 {
 	ctx->c_ct += delta * 1000.0 * ctx->c_d;
@@ -9116,6 +9293,13 @@ bool edit_cx::update(float delta)
 	{
 		ctx->c_d = 1; ctx->c_ct = 0;
 		valid = true;
+	}
+	if (ctx->state.single_line && ctx->lineheight < 1)
+	{
+		ctx->lineheight = font_get_lineheight(family, font_size);
+		glm::vec2 ext = { 0,font_size }, ss = _size;
+		auto ps = ss * text_align - (ext * text_align);
+		ctx->_align_pos.y = ps.y;
 	}
 	return false;
 }
@@ -9131,9 +9315,11 @@ void edit_cx::draw(rvg_cx* rv)
 	{
 		rv->save();
 		// 裁剪区域
-		rv->add_rect({ 1,1,ss.x - 2,ss.y - 2 }, 0);
+		rv->add_rect({ thickness,thickness,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
 		rv->clip();
-		//rv->translate({ -scroll_pos.x + _align_pos.x, -scroll_pos.y + _align_pos.y });
+		auto tpos = ctx->_align_pos - ctx->scroll_pos;
+		tpos += thickness;
+		rv->translate(tpos);
 
 		//auto v = get_bounds();
 		//if (v.x != v.y && rangerc.size()) {
@@ -9188,7 +9374,15 @@ void edit_cx::draw(rvg_cx* rv)
 
 glm::ivec4 edit_cx::input_pos()
 {
-	return glm::ivec4();
+	glm::ivec2 cpos = ctx->cursor_pos;
+	auto pos = get_pos();
+	return { pos + cpos - ctx->scroll_pos + ctx->_align_pos
+		,2,  ctx->cursor_pos.z + 2 };
+}
+
+int edit_cx::get_cursor_idx()
+{
+	return ctx->state.cursor;
 }
 
 std::string edit_cx::get_select_str()
