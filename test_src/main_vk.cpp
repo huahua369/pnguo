@@ -928,6 +928,7 @@ int main()
 			glm::uvec3 gradTop = { 0xff4a4a4a,0x80404040,0xff292929 }, gradBot = { 0xff3a3a3a,0x80303030,0xff1d1d1d };
 			glm::uvec3 gradTop1 = { 0xff8a8a8a,0x80bebebe,0xff303030 }, gradBot1 = { 0xff5a5a5a,0x80303030,0xff1d1d1d };
 			glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
+#if 0
 			for (int i = 0; i < 5; i++) {
 				auto btn = new gradient_btn();
 				btn->rounding = 4;
@@ -983,6 +984,15 @@ int main()
 				r->v.mixed = true;
 				dvv->add_widget(r);
 			}
+#endif
+
+			auto edit1 = new edit_cx();
+			{
+				auto r = edit1;
+				r->set_size({ 236,32 });
+				//r->set_single(false);
+				dvv->add_widget(r);
+			}
 			auto pro = new progress_tl();
 			dvv->add_widget(pro);
 			pro->set_size({ 120,26 });
@@ -992,17 +1002,11 @@ int main()
 			pro->width = 110;
 			pro->color = { 0xffff9e40, 0x5f6c6c6c };
 			pro->set_value(0.5);
-
-			auto edit1 = new edit_cx();
+			auto colorpick = new colorpick_tl();
 			{
-				auto r = edit1;
-				r->set_size({ 236,50 });
-				//r->set_single(false);
-				dvv->add_widget(r);
-			}
-			{
-				auto c = new colorpick_tl();
-				c->init(0x800080ff, 200, 20, true);
+				auto c = colorpick;
+				c->init(0xff282828, 250, 20, true);
+				c->font_size = 15;
 				dvv->add_widget(c);
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
@@ -1051,6 +1055,7 @@ int main()
 					light->_intensity = ity;
 
 					dvv->update(delta);
+					edit1->_color.x = colorpick->get_color();
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
 					dvv->draw(&rvg);

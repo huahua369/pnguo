@@ -6374,7 +6374,7 @@ void colorpick_tl::draw(rvg_cx* rv)
 		, glm::vec4(0,1,1,style_alpha8), glm::vec4(0,0,1,style_alpha8), glm::vec4(1,0,1,style_alpha8), glm::vec4(1,0,0,style_alpha8) };
 	int yh = height + step;
 	glm::vec4 hc = {};
-	glm::vec2 tps = { cpx,yh };
+	glm::vec2 tps = { cpx + step,yh };
 	HSVtoRGB(hsv, hc);
 	{
 		glm::vec4 cc = {};
@@ -9477,9 +9477,9 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->restore();
 	}
 	double x = tpos.x + ctx->cursor_pos.x, y = tpos.y + ctx->cursor_pos.y;
-	if (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0)
+	bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
 	{
-		rv->set_color(_cursor.y);
+		rv->set_color(ccd ? _cursor.y : 0);
 		rv->add_rect({ x, y, _cursor.x, ctx->cursor_pos.z }, 0);
 		rv->fill();
 	}

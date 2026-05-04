@@ -1872,7 +1872,7 @@ void rvg_cx::set_draw_rect(const glm::ivec4& c)
 		auto& d = _data.back();
 		d.first = _cmdtype.size() - 1;
 		d.type = is_textimage(_cmdtype.back());
-		d.second = _cmdtype.size();
+		//todo d.second = _cmdtype.size();
 		d.rc = c;
 		d.rc.z += c.x;
 		d.rc.w += c.y;
@@ -3362,14 +3362,27 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	//std::vector<size_t> fvv;
 	dst->dst_data.clear();
 	auto dp = dst->dcv.data();
+	void* ctx = nullptr;
+	glm::ivec2 tcount = {};
+	for (auto it : rvg->_cmdtype) {
+		if (it == rvg_cx::OP_SAVE)
+		{
+			tcount.x++;
+		}
+		if (it == rvg_cx::OP_RESTORE)
+		{
+			tcount.y++;
+		}
+	}
 	for (auto& it : rvg->_data) {
 		size_t ridx = it.index;
-		void* ctx = nullptr;
 		glm::vec2 clips = {};
 		glm::vec2 apos = {};
 		if (it.type == 0) {
 			auto& rcc = dst->dcv[ridx];
-			ctx = dst->surfaces[rcc.surface].ctx;
+			auto kctx = dst->surfaces[rcc.surface].ctx;
+			if (kctx)
+				ctx = kctx;
 			if (it.rc.z > 0 && it.rc.w > 0 && ridx < dst->dcv.size())
 			{
 				dst->dst_data.push_back({});
