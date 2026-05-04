@@ -1872,7 +1872,7 @@ void rvg_cx::set_draw_rect(const glm::ivec4& c)
 		auto& d = _data.back();
 		d.first = _cmdtype.size() - 1;
 		d.type = is_textimage(_cmdtype.back());
-		//todo d.second = _cmdtype.size();
+		d.second = _cmdtype.size();
 		d.rc = c;
 		d.rc.z += c.x;
 		d.rc.w += c.y;
@@ -3363,7 +3363,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	dst->dst_data.clear();
 	auto dp = dst->dcv.data();
 	void* ctx = nullptr;
-	glm::ivec2 tcount = {};
+	glm::ivec3 tcount = {};
 	for (auto it : rvg->_cmdtype) {
 		if (it == rvg_cx::OP_SAVE)
 		{
@@ -3372,6 +3372,10 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 		if (it == rvg_cx::OP_RESTORE)
 		{
 			tcount.y++;
+		}
+		if (it == rvg_cx::OP_NULL)
+		{
+			tcount.z++;
 		}
 	}
 	for (auto& it : rvg->_data) {

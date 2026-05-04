@@ -9453,7 +9453,7 @@ void edit_cx::draw(rvg_cx* rv)
 			rv->restore();
 		}
 		rv->translate(tpos1);
-		rv->set_color(text_color);
+		//rv->set_color(text_color);
 		//auto lhh = get_pixel_size(stext.c_str(), stext.size());
 		// 渲染文本
 		glm::vec4 rc = { 0,0,  ss };
