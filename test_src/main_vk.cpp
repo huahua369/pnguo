@@ -909,7 +909,7 @@ int main()
 			glm::ivec2 sc_size = { 1024,1024 };
 
 			auto dvv = new div_cx();
-			dvv->set_size({ 500,300 });
+			dvv->set_size({ 500,400 });
 			dvv->set_pos({ 10,360 });
 			dvv->family = family;
 			dvv->border = { 0xffacacac,1,5,0xef666666 };	// 颜色，线粗，圆角，背景色
@@ -1000,7 +1000,11 @@ int main()
 				//r->set_single(false);
 				dvv->add_widget(r);
 			}
-
+			{
+				auto c = new colorpick_tl();
+				c->init(0x800080ff, 200, 20, true);
+				dvv->add_widget(c);
+			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
 				div->on_event(type, e);

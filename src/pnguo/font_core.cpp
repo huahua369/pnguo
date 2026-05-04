@@ -8412,6 +8412,7 @@ bool rt_text_style_ts(rich_text_t* p, text_style* ts)
 	{
 		ret = rt_text_style(p, ts->family, ts->fontsize, ts->color);
 		p->_ct_style.align = ts->align;
+		p->_ct_style.lineheight = ts->lineheight;
 	}
 	return ret;
 }
@@ -8434,7 +8435,8 @@ size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text
 	tb.first = 0;
 	tb.size = ut.str.size();
 	tb.style = *ts;
-	tb.line_height = 0;// font_get_lineheight(ts->family, ts->fontsize);
+	if (ts->lineheight > 0)
+		tb.line_height = ts->lineheight;// font_get_lineheight(ts->family, ts->fontsize);
 	auto tidx = p->tbs.size();
 	p->tbs.push_back(tb);
 	p->data_index.push_back({ tidx ,-1 });
@@ -8596,6 +8598,8 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 	int baseline = tb->baseline;
 	bool last_is_break = false;
 	size_t bidx = 0;
+	if (dh > 0)
+		dh = dh;
 	for (auto& kt : blockstr)
 	{
 		char* nstr = (char*)kt.v;
@@ -8642,7 +8646,7 @@ void rt_update_text(rich_text_t* rt, layout_block_st* pt, box_info_t* pbox, size
 			baseline = std::max(baseline, bl);
 		}
 		kt.baseline = bl;
-		kt.lineheight = h;
+		kt.lineheight = dh;
 		// 光栅化glyph index并缓存
 		for (auto& gt : kt._tnpos)
 		{

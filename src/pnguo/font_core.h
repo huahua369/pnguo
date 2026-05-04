@@ -626,6 +626,7 @@ struct text_style
 {
 	font_family_t* family = 0;
 	float fontsize = 0;
+	float lineheight = 0;
 	uint32_t color = 0xFFffffff;
 	glm::vec2 align = { 0.0,0.0 };// 文本对齐
 };

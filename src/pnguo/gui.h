@@ -617,7 +617,7 @@ struct colorpick_tl :public widget_t
 	int width = 0;					// 宽度
 	int height = 0;					// 单行高度 
 	int step = 4;					// 行间隔 
-	int cw = 0;						// 颜色宽
+	int colorw = 100;				// 颜色宽
 	int cpx = 0;					// 颜色x坐标
 	int dx = -1;
 	std::string hsvstr, colorstr;

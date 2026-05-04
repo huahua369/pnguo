@@ -5555,7 +5555,7 @@ void colorpick_tl::set_hsv(const glm::vec4& c)
 void colorpick_tl::set_posv(const glm::ivec2& poss)
 {
 	double htp = height + step;
-	double cw0 = cw - step, x = poss.x;
+	double cw0 = colorw - step, x = poss.x;
 	if (x < 0) { x = 0; }
 	double xf = (double)poss.x / cw0;
 	if (xf > 1)xf = 1;
@@ -5615,8 +5615,10 @@ bool colorpick_tl::update(float delta)
 		char buf[256] = {};
 		glm::ivec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
 		sprintf(buf, "#%02X%02X%02X%02X %d,%d,%d,%d", c.x, c.y, c.z, c.w, c.x, c.y, c.z, c.w);
-#if 0
 		colorstr = buf;
+		glm::ivec2 ss = _size;
+		colorw = ss.x - cpx - step * 2;
+#if 0
 		if (ltx)
 		{
 			glm::ivec2 ss = size;
@@ -6362,18 +6364,10 @@ void slider_tl::draw(rvg_cx* rv)
 void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
-
-	rv->save();
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
 	rv->translate(poss);
-	//if (ltx)
-	//{
-	//	glm::vec2 ta = { 0, 0.5 };
-	//	glm::vec4 rc = { 0, height + step, ss };
-	//	rc.w -= rc.y;
-	//	//ltx->draw_text(cr, tem_rtv, text_color);
-	//}
+	rv->save();
 	float style_alpha8 = 1;
 	//uint32_t col_hues[] = { 0xff0000ff,0xff00ffff,0xff00ff00,0xffffff00,0xffff0000,0xffff00ff,0xff0000ff };
 	const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,style_alpha8), glm::vec4(1,1,0,style_alpha8), glm::vec4(0,1,0,style_alpha8)
@@ -6391,8 +6385,8 @@ void colorpick_tl::draw(rvg_cx* rv)
 	}
 	{
 		rv->translate(tps);
-		rv->linear_fill({ cw,height }, col_hues, 7);	// H 
-		glm::ivec4 rcc = { (cw - step) * hsv.x,-step * 0.5,step - 2, height + step };
+		rv->linear_fill({ colorw,height }, col_hues, 7);	// H 
+		glm::ivec4 rcc = { (colorw - step) * hsv.x,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		rv->add_rect(rcf, 0);
@@ -6402,9 +6396,9 @@ void colorpick_tl::draw(rvg_cx* rv)
 	{
 		rv->translate(tps);
 		glm::vec4 cc[] = { {1,1,1,1}, hc };
-		rv->grid_fill({ cw, height }, { -1,-1 }, height * 0.5);// 背景色
-		rv->linear_fill({ cw, height }, cc, 2);	// S
-		glm::ivec4 rcc = { (cw - step) * hsv.y,-step * 0.5,step - 2, height + step };
+		rv->grid_fill({ colorw, height }, { -1,-1 }, height * 0.5);// 背景色
+		rv->linear_fill({ colorw, height }, cc, 2);	// S
+		glm::ivec4 rcc = { (colorw - step) * hsv.y,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		rv->add_rect(rcf, 0);
@@ -6413,9 +6407,9 @@ void colorpick_tl::draw(rvg_cx* rv)
 	{
 		rv->translate(tps);
 		glm::vec4 cc[] = { {0,0,0,1}, hc };
-		rv->grid_fill({ cw, height }, { -1,-1 }, height * 0.5);// 背景色
-		rv->linear_fill({ cw, height }, cc, 2);	// V
-		glm::ivec4 rcc = { (cw - step) * hsv.z,-step * 0.5,step - 2, height + step };
+		rv->grid_fill({ colorw, height }, { -1,-1 }, height * 0.5);// 背景色
+		rv->linear_fill({ colorw, height }, cc, 2);	// V
+		glm::ivec4 rcc = { (colorw - step) * hsv.z,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		rv->add_rect(rcf, 0);
@@ -6424,15 +6418,42 @@ void colorpick_tl::draw(rvg_cx* rv)
 	{
 		rv->translate(tps);
 		glm::vec4 cc[] = { {0,0,0,0}, {1,1,1,1} };
-		rv->grid_fill({ cw, height }, { -1,0xffdfdfdf }, height * 0.5);//背景色
-		rv->linear_fill({ cw, height }, cc, 2);	// A
-		glm::ivec4 rcc = { (cw - step) * hsv.w,-step * 0.5,step - 2, height + step };
+		rv->grid_fill({ colorw, height }, { -1,0xffdfdfdf }, height * 0.5);//背景色
+		rv->linear_fill({ colorw, height }, cc, 2);	// A
+		glm::ivec4 rcc = { (colorw - step) * hsv.w,-step * 0.5,step - 2, height + step };
 		glm::vec4 rcf = rcc;
 		rcf.x += 0.5; rcf.y += 0.5;
 		rv->add_rect(rcf, 0);
 		rv->submit(-1, bc_color, thickness);
 	}
 	rv->restore();
+	{
+		glm::ivec2 ss = _size;
+		glm::vec2 ta = { 0.0, 0.0 };
+		glm::vec4 rc = { step, height + step, ss };
+		rc.w -= rc.y;
+		text_style st = {};
+		st.fontsize = font_size;
+		st.align = ta;// text_align;
+		st.color = text_color;
+		st.family = family;
+		st.lineheight = rc.y;//设置固定行高
+		rc.y += step;
+		text_st tx = {};
+		tx.pos = { 0,thickness };
+		tx.pos = { rc.x,rc.y };
+		tx.size = { rc.z,rc.w };
+		tx.text = hsvstr.c_str(); tx.text_len = hsvstr.size();
+		rv->add_text(&tx, &st);
+		rc.y = 0; rc.x += cpx;
+		rc.z = colorw;
+		rc.w = height; ta.y = 0.5;
+		st.lineheight = 0; // 使用默认行高
+		tx.pos = { rc.x,rc.y };
+		tx.size = { rc.z,rc.w };
+		tx.text = colorstr.c_str(); tx.text_len = colorstr.size();
+		rv->add_text(&tx, &st);
+	}
 
 #endif
 }
@@ -9476,7 +9497,7 @@ void edit_cx::draw(rvg_cx* rv)
 		if (lps.y < ctx->lineheight)
 			lps.y = ctx->lineheight;
 		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
-		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };		 
+		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };
 		auto clip0 = glm::ivec4(rv->_cur.pos.x + x, rv->_cur.pos.y + y, rc.z, rc.w);
 		rv->restore(); // 恢复状态，绘制输入中编辑文本的背景和边框
 		rv->save();
