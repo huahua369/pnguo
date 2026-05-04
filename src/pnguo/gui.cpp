@@ -9076,6 +9076,7 @@ void edit_cx::on_event_e(uint32_t type, et_un_t* ep)
 			p->h = ipos.w;
 			//printf("text_editing_e:%s\t%d\n", str.c_str(), ipos.x);
 		}
+		//if (str.size())
 		editingstr = str;
 	}break;
 	case devent_type_e::keyboard_e:
@@ -9454,7 +9455,6 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->add_text(&tx, &st);
 		rv->restore();
 	}
-
 	double x = tpos.x + ctx->cursor_pos.x, y = tpos.y + ctx->cursor_pos.y;
 	if (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0)
 	{
@@ -9462,12 +9462,9 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->add_rect({ x, y, _cursor.x, ctx->cursor_pos.z }, 0);
 		rv->fill();
 	}
-
 	// 编辑中的文本
 	if (editingstr.size())
 	{
-		rv->save();
-		rv->translate({ x, y });
 		// 渲染文本 
 		text_style st = {};
 		st.fontsize = font_size;
@@ -9479,7 +9476,13 @@ void edit_cx::draw(rvg_cx* rv)
 		if (lps.y < ctx->lineheight)
 			lps.y = ctx->lineheight;
 		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
-		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };
+		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };		 
+		auto clip0 = glm::ivec4(rv->_cur.pos.x + x, rv->_cur.pos.y + y, rc.z, rc.w);
+		rv->restore(); // 恢复状态，绘制输入中编辑文本的背景和边框
+		rv->save();
+		rv->set_draw_rect(clip0);
+		rv->push_null(0);
+		rv->translate({ clip0.x, clip0.y });
 		rv->set_color(get_reverse_color(_color.w));
 		rv->add_rect({ 0, 0, lps.x + 2, lps.y + 2 }, 0);
 		rv->fill();
@@ -9492,7 +9495,6 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->add_line({ lss.x + 1, lss.y }, { lss.z, lss.w });
 		rv->set_line_width(1);
 		rv->stroke();
-		rv->restore();
 	}
 }
 
