@@ -2873,12 +2873,14 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 	if (!dst || dst->dst_data.empty())return;
 	glm::vec2 pos = dst->pos;
 	auto length = dst->dst_data.size();
+	int kc = 0;
 	for (size_t m = 0; m < length; m++)
 	{
 		auto& vt = dst->dst_data[m];
 		if (vt.t)
 		{
 			draw_boxtext(vt.t, pos);
+			kc++;
 		}
 		else if (vt.d2)
 		{
@@ -2904,6 +2906,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 			}
 		}
 	}
+	printf("kc\t%d\tdc:%d\n", kc, (int)length);
 }
 
 
@@ -3078,7 +3081,9 @@ void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto clip = p->clip;
-	clip.x += pos.x; clip.y += pos.y;
+	if (clip.z > 0 && clip.w > 0) {
+		clip.x += pos.x; clip.y += pos.y;
+	}
 	auto tm = p->d + p->first;
 	auto tbp = p->tbs->data();
 	clicprect_cx cp(renderer, rcb, clip); // 设置裁剪区域
@@ -3251,7 +3256,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	auto f = rvg->_data.front();
 	for (auto& it : rvg->_data) {
 		auto c = it.rc;
-		if (it.type == f.type && check_rect_cross(f.rc, it.rc))
+		if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
 		{
 			f.rc.x = std::min(f.rc.x, c.x);
 			f.rc.y = std::min(f.rc.y, c.y);
