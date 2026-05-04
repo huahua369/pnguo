@@ -7612,9 +7612,20 @@ struct text_control
 	glm::ivec3 cursor_pos = {};
 	glm::ivec2 scroll_pos = {};				// 滚动坐标
 	glm::ivec2 _align_pos = {};				// 对齐坐标
+	glm::ivec2 _align_pos1 = {};			// 对齐坐标
 	glm::vec2 view = {};	// 区域
+
+	std::vector<glm::ivec2> lvs;// 行开始结束
+	std::vector<std::vector<int>> widths;// 字符偏移
+	std::vector<glm::ivec4> rangerc;
+	PathsD range_path;						// 圆角选区缓存
+	path_v ptr_path;
+	float round_path = 0.28;				// 圆角比例
+	float _r_posy = -1;						// 选区偏移
+
 	int lineheight = 0;
 	int8_t LastMoveDirectionLR = 0;
+	bool is_scroll = true;
 };
 
 // define all the #defines needed 
@@ -7670,10 +7681,10 @@ float stb_textedit_getwidth(STB_TEXTEDIT_STRING* str, int n, int idx);
 
 
 // define the functions we need
-void stb_textedit_layoutrow(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
+void stb_textedit_layoutrow1(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i)
 {
 	int remaining_chars = str->str.size() - start_i;
-	row->num_chars = remaining_chars > 20 ? 20 : remaining_chars; // should do real word wrap here
+	row->num_chars = remaining_chars; // should do real word wrap here
 	row->x0 = 0;
 	row->ymin = 0;
 	auto r = row;
@@ -7685,8 +7696,41 @@ void stb_textedit_layoutrow(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int s
 		i++;
 	}
 	r->x1 = row_width;
-	row->ymax = row->baseline_y_delta = str->font_size;
-	r->num_chars = i - start_i;
+	row->ymax = row->baseline_y_delta = str->lineheight;
+	r->num_chars = (i - start_i) + 1;
+
+}
+void stb_textedit_layoutrow(StbTexteditRow* row, STB_TEXTEDIT_STRING* str, int start_i) {
+	int remaining_chars = str->str.size() - start_i;
+	row->num_chars = remaining_chars;
+	row->x0 = 0;
+	row->ymin = 0;
+	auto r = row;
+	int i = start_i;
+	float row_width = 0.0f;
+	int len = STB_TEXTEDIT_STRINGLEN(str);
+
+	while (i < len) {
+		if (str->str[i] == '\n') break;  // 遇到换行符退出
+
+		float char_width = STB_TEXTEDIT_GETWIDTH(str, 0, i);
+		float next_width = row_width + char_width;
+
+		// 预判宽度是否超限
+		if (str->view.x > 0 && next_width > str->view.x) break;
+
+		row_width = next_width;
+		i++;
+	}
+
+	// 显式处理换行符 
+	if (i < len && str->str[i] == '\n') {
+		i++;
+	}
+
+	r->x1 = row_width;
+	row->ymax = row->baseline_y_delta = str->lineheight;
+	r->num_chars = i - start_i;  // 修正字符数计算 
 }
 
 int delete_chars(STB_TEXTEDIT_STRING* str, int pos, int num)
@@ -8291,6 +8335,7 @@ retry:
 
 			// now find character position down a row
 			state->cursor = start;
+			stb_textedit_clamp(str, state);
 			STB_TEXTEDIT_LAYOUTROW(&row, str, state->cursor);
 			x = row.x0;
 			for (i = 0; i < row.num_chars; ) {
@@ -8918,6 +8963,8 @@ void edit_cx::set_text(const void* str, int len)
 			it = pwdch;
 		}
 	}
+	up_text = true;
+	up_cursor(true);
 }
 
 void edit_cx::add_text(const void* str, int len)
@@ -8929,6 +8976,8 @@ void edit_cx::add_text(const void* str, int len)
 			it = pwdch;
 		}
 	}
+	up_text = true;
+	up_cursor(true);
 }
 
 void edit_cx::set_size(const glm::ivec2& ss)
@@ -9115,6 +9164,9 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	default:
 		break;
 	};
+	if (ret) {
+		up_cursor(true);
+	}
 	return ret;
 }
 
@@ -9153,21 +9205,27 @@ void edit_cx::on_keyboard(et_un_t* ep)
 				str.assign(ctx->str.c_str() + ctx->state.select_start, ctx->state.select_end - ctx->state.select_start);
 				set_clipboard(str.c_str());
 				if (p->keycode == SDLK_X)
+				{
 					stb_textedit_cut(ctx, &ctx->state);
+					up_text = true;
+				}
 			}
 			break;
 			case SDLK_V:
 			{
 				auto str = get_clipboard();
 				stb_textedit_paste(ctx, &ctx->state, str.c_str(), str.size());
+				up_text = true;
 			}
 			break;
 			case SDLK_Y:
 				key = STB_TEXTEDIT_K_REDO;
+				up_text = true;
 				//is_redo = true;	//_storage_buf->redo();
 				break;
 			case SDLK_Z:
 				key = STB_TEXTEDIT_K_UNDO;
+				up_text = true;
 				//is_undo = true;	//_storage_buf->undo();
 				break;
 			}
@@ -9198,11 +9256,13 @@ void edit_cx::on_keyboard(et_un_t* ep)
 	case SDLK_BACKSPACE:
 	{
 		key = STB_TEXTEDIT_K_BACKSPACE;
+		up_text = true;
 	}
 	break;
 	case SDLK_INSERT:
 	{
 		key = STB_TEXTEDIT_K_INSERT;
+		up_text = true;
 	}
 	break;
 	case SDLK_PAGEDOWN:
@@ -9292,6 +9352,7 @@ void edit_cx::on_keyboard(et_un_t* ep)
 			key |= STB_TEXTEDIT_K_SHIFT;
 		}
 		stb_textedit_key(ctx, &ctx->state, key);
+		up_cursor(true);
 	}
 }
 
@@ -9309,12 +9370,21 @@ bool edit_cx::update(float delta)
 		ctx->c_d = 1; ctx->c_ct = 0;
 		valid = true;
 	}
-	if (ctx->state.single_line && ctx->lineheight < 1)
-	{
+	if (ctx->lineheight < 1)
 		ctx->lineheight = font_get_lineheight(family, font_size);
-		glm::vec2 ext = { 0,font_size }, ss = _size;
-		auto ps = ss * text_align - (ext * text_align);
+	if (ctx->state.single_line)
+	{
+		glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,font_size }, ss = _size;
+		ss -= thickness * 2;
+		auto ps = (ss - ext) * text_align;
+		auto ps1 = (ss - ext1) * text_align;
 		ctx->_align_pos.y = ps.y;
+		ctx->_align_pos1.y = ps1.y;
+	}
+	if (up_text)
+	{
+		up_text = false;
+		ctx->widths.clear();
 	}
 	return false;
 }
@@ -9327,33 +9397,40 @@ void edit_cx::draw(rvg_cx* rv)
 	rv->add_rect({ 0,0,ss.x ,ss.y }, rounding);
 	rv->set_color(_color.x);
 	rv->fill();
+	auto tpos = ctx->_align_pos - ctx->scroll_pos;
+	auto tpos1 = ctx->_align_pos1 - ctx->scroll_pos;
 	{
 		rv->save();
 		// 裁剪区域
 		rv->add_rect({ thickness,thickness,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
 		rv->clip();
-		auto tpos = ctx->_align_pos - ctx->scroll_pos;
 		tpos += thickness;
-		rv->translate(tpos);
-
-		//auto v = get_bounds();
-		//if (v.x != v.y && rangerc.size()) {
-		//	rv->set_color(select_color);
-		//	if (roundselect)
-		//	{
-		//		if (range_path.size() && range_path[0].size() > 3) {
-		//			rv->add_polyline(&range_path, true);
-		//			rv->fill();
-		//		}
-		//	}
-		//	else {
-		//		for (auto& it : rangerc)
-		//		{
-		//			rv->add_rect(it, std::min(it.z, it.w) * 0.18);
-		//			rv->fill();
-		//		}
-		//	}
-		//}
+		//tpos1 += thickness; 
+		tpos1 = tpos;
+		tpos1.y += (ctx->lineheight - font_size) * text_align.y;
+		auto v = get_bounds();
+		rv->translate({ 0,1 });
+		if (v.x != v.y && ctx->rangerc.size()) {
+			rv->save();
+			rv->translate(tpos);
+			rv->set_color(_color.z);
+			if (roundselect)
+			{
+				if (ctx->range_path.size() && ctx->range_path[0].size() > 3) {
+					rv->add_polyline(&ctx->range_path, true);
+					rv->fill();
+				}
+			}
+			else {
+				for (auto& it : ctx->rangerc)
+				{
+					rv->add_rect(it, std::min(it.z, it.w) * 0.18);
+					rv->fill();
+				}
+			}
+			rv->restore();
+		}
+		rv->translate(tpos1);
 		rv->set_color(text_color);
 		//auto lhh = get_pixel_size(stext.c_str(), stext.size());
 		// 渲染文本
@@ -9377,7 +9454,8 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->add_text(&tx, &st);
 		rv->restore();
 	}
-	double x = ctx->curline_idx * font_size, y = ctx->curline * font_get_lineheight(family, font_size);
+
+	double x = tpos.x + ctx->cursor_pos.x, y = tpos.y + ctx->cursor_pos.y;
 	if (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0)
 	{
 		rv->set_color(_cursor.y);
@@ -9385,6 +9463,37 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->fill();
 	}
 
+	// 编辑中的文本
+	if (editingstr.size())
+	{
+		rv->save();
+		rv->translate({ x, y });
+		// 渲染文本 
+		text_style st = {};
+		st.fontsize = font_size;
+		st.align = {};
+		st.color = _color.w;
+		st.family = family;
+		glm::ivec2 lps = {};
+		lps = get_pixel_size(editingstr.c_str(), editingstr.size());
+		if (lps.y < ctx->lineheight)
+			lps.y = ctx->lineheight;
+		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
+		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };
+		rv->set_color(get_reverse_color(_color.w));
+		rv->add_rect({ 0, 0, lps.x + 2, lps.y + 2 }, 0);
+		rv->fill();
+		text_st tx = {};
+		tx.pos = { rc.x,rc.y };
+		tx.size = glm::ivec2(rc.z, rc.w);
+		tx.text = editingstr.c_str(); tx.text_len = editingstr.size();
+		rv->add_text(&tx, &st);
+		rv->set_color(_color.w);
+		rv->add_line({ lss.x + 1, lss.y }, { lss.z, lss.w });
+		rv->set_line_width(1);
+		rv->stroke();
+		rv->restore();
+	}
 }
 
 glm::ivec4 edit_cx::input_pos()
@@ -9408,4 +9517,263 @@ std::string edit_cx::get_select_str()
 std::wstring edit_cx::get_select_wstr()
 {
 	return std::wstring();
+}
+
+glm::ivec2 edit_cx::get_bounds()
+{
+	glm::ivec2 v = { ctx->state.select_start, ctx->state.select_end };
+	if (v.x > v.y) { std::swap(v.x, v.y); }
+	return v;
+}
+glm::ivec3 edit_cx::get_line_length(int index)
+{
+	int x_pos = 0;
+	int lidx = 0;
+	int cu = -1;
+	int cx = 0;
+	auto sp = ctx->str.c_str();
+	for (size_t i = 0; i < ctx->lvs.size(); i++)
+	{
+		auto c = ctx->lvs[i];
+		if (index >= c.x && index < c.x + c.y + 1)//因为有换行+1
+		{
+			x_pos = index - c.x;
+			lidx = c.x;
+			cu = i;// 行号
+			break;
+		}
+	}
+	if (cu < 0 && ctx->lvs.size()) {
+		cu = ctx->lvs.size() - 1;
+		auto c = ctx->lvs[cu];
+		x_pos = index - c.x;
+		lidx = c.x;
+	}
+	glm::ivec3 ret = { lidx,cu, x_pos };
+	return ret;
+}
+// 获取范围的像素大小
+std::vector<glm::ivec4> edit_cx::get_bounds_px()
+{
+	float pwidth = font_size * 0.5;// 补行尾宽度
+	auto pstr = ctx->str.c_str();
+	auto tsize = ctx->str.size();
+	if (up_text || ctx->widths.empty())
+	{
+		up_text = false;
+		ctx->widths.clear();
+		ctx->lvs.clear();
+		auto length = pwdch ? stext.size() : ctx->str.size();
+		auto p = pwdch ? stext.c_str() : ctx->str.c_str();
+		size_t f = 0, s = 0; size_t i = 0;
+		for (; i < length; i++)
+		{
+			if (p[i] == '\n')
+			{
+				ctx->lvs.push_back({ f,i - f });
+				f = i + 1;
+			}
+		}
+		ctx->lvs.push_back({ f,i - f });
+		font_get_text_posv(family, font_size, pstr, tsize, ctx->widths);
+		pwidth = font_get_text_rect1(family, font_size, "1").x;
+	}
+	std::vector<glm::ivec4> r;
+	std::vector<glm::ivec4> rs, rss;
+	auto v = get_bounds();
+	if (v.x == v.y) { ctx->rangerc = rss; return rs; }
+	if ((v.x >= tsize || v.y > tsize)) {
+		ctx->rangerc = rss; return rs;
+	}
+	auto v1 = get_line_length(v.x);
+	auto v2 = get_line_length(v.y);
+	auto line_no = ctx->lvs.size();
+	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size);
+	// 计算选中范围的每行的坐标宽高
+	if (v1 == v2) {}
+	else {
+		if (v1.y == v2.y)
+		{
+			auto ks = ctx->lvs[v1.y];
+			auto w1 = ctx->widths[v1.y];
+			auto xc = char2pos(v.x - ks.x, pstr + ks.x);
+			auto yc = char2pos(v.y - ks.x, pstr + ks.x);
+			int w = w1[xc];
+			int ww = w1[yc] - w;
+			rss.push_back({ w ,v1.y * h,ww,h });// 同一行时
+		}
+		else {
+			auto ks = ctx->lvs[v1.y];
+			auto w1 = ctx->widths[v1.y];
+			auto w = w1[char2pos(v.x - ks.x, pstr + ks.x)];
+			auto wd = *w1.rbegin() - w;
+			rss.push_back({ w,v1.y * h,wd + pwidth,h });// 第一行
+		}
+		for (int i = v1.y + 1; i < line_no && i < v2.y; i++)
+		{
+			auto ks = ctx->lvs[i];
+			auto w1 = ctx->widths[i];
+			rss.push_back({ 0,i * h,*w1.rbegin() + pwidth, h });// 中间全行
+		}
+		if (v1.y < v2.y)
+		{
+			auto ks = ctx->lvs[v2.y];
+			auto w1 = ctx->widths[v2.y];
+			rss.push_back({ 0,v2.y * h,w1[char2pos(v.y - ks.x ,pstr + ks.x)],h });//最后一行
+		}
+	}
+	if (roundselect)
+	{
+		PathsD subjects;
+		PathD a;
+		int py = ctx->_r_posy;
+		for (size_t i = 0; i < rss.size(); i++)
+		{
+			auto& it = rss[i];
+			if (it.z < 1)
+				it.z = pwidth;
+			a.push_back({ it.x,it.y + py });
+			a.push_back({ it.x + it.z,it.y + py });
+			a.push_back({ it.x + it.z,it.y + it.w + py });
+			a.push_back({ it.x,it.y + it.w + py });
+			subjects.push_back(a);
+			a.clear();
+		}
+		subjects = Union(subjects, FillRule::NonZero, 6);
+		//range_path = InflatePaths(subjects, 0.5, JoinType::Round, EndType::Polygon);
+		auto sn = subjects.size();
+		if (sn > 0)
+		{
+			path_v& ptr = ctx->ptr_path;
+			ptr._data.clear();
+			for (size_t i = 0; i < sn; i++)
+			{
+				auto& it = subjects[i];
+				ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
+			}
+			ctx->range_path = gp::path_round(&ptr, -1, font_size * ctx->round_path, 16, 0, 0);
+		}
+		else { ctx->range_path.clear(); }
+	}
+	ctx->rangerc = rss;
+	return r;
+}
+
+glm::ivec2 edit_cx::get_pixel_size(const char* str, int len)
+{
+	int w = 0, h = 0;
+	if (str && *str)
+	{
+		auto rc = get_text_rect(family, font_size, str, len, 0);
+		w = rc.x; h = rc.y;
+	}
+	return glm::ivec2(w, h);
+}
+size_t edit_cx::get_xy_to_index(int x, int y, const char* str)
+{
+	auto pstr = ctx->str.c_str();
+	if (ctx->widths.empty())
+	{
+		font_get_text_posv(family, font_size, pstr, ctx->str.size(), ctx->widths);
+	}
+	if (ctx->widths.size() != ctx->lvs.size())
+		return -1;
+	x += ctx->scroll_pos.x - ctx->_align_pos.x;
+	y += ctx->scroll_pos.y - ctx->_align_pos.y;
+	int index = 0, trailing = 0;
+	if (x < 0)
+	{
+		x = 0;
+	}
+	if (y < 0)
+	{
+		y = 0;
+	}
+	glm::ivec2 lps = get_pixel_size(pstr, text.size());
+	if (y > lps.y)
+		y = lps.y - 1;
+	y /= ctx->lineheight;
+	if (y >= ctx->lvs.size())y = ctx->lvs.size() - 1;
+	auto ky = ctx->lvs[y];
+	auto& ws = ctx->widths[y];
+	int cw = 0;
+	for (size_t i = 0; i < ws.size(); i++)
+	{
+		if (x < ws[i]) {
+			index = i;  break;
+		}
+	}
+	if (x > *(ws.rbegin())) {
+		index = ws.size() - 1;
+	}
+	else if (index > 0) {
+		int tr = (ws[index] - ws[index - 1]) * 0.5;
+		int xx = x - ws[index - 1];
+		if (xx >= tr)
+		{
+			cw = ws[index];
+			index++;
+		}
+		else {
+			cw = ws[index - 1];
+		}
+		index--;
+	}
+	auto newx = md::utf8_char_pos(str + ky.x, index, -1);
+	newx -= (uint64_t)str;
+	index = (uint64_t)newx;
+	//curx = cw;
+	return (size_t)index;
+}
+
+void edit_cx::up_caret()
+{
+	glm::ivec4 caret = {};
+	get_bounds_px();
+	auto v1 = get_line_length(ctx->state.cursor);
+	auto line_no = ctx->lvs.size();
+	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size);
+	// 计算选中范围的每行的坐标宽高 
+	if (line_no > 0 && ctx->widths.size() > v1.y)
+	{
+		auto ks = ctx->lvs[v1.y];
+		auto w1 = ctx->widths[v1.y];
+		{
+			auto pstr = ctx->str.c_str();
+			caret.x = get_text_rect(family, font_size, pstr + ks.x, std::min(ks.y, ctx->state.cursor - ks.x), 0).x;
+		}
+		//caret.x = w1[ctx->state.cursor - ks.x];
+		caret.y = ctx->cursor_pos.z * v1.y;
+		//printf("cursor:\t%d\n", cursor_pos.x);
+	}
+	ctx->cursor_pos = caret; ctx->cursor_pos.z = h;
+}
+
+void edit_cx::up_cursor(bool is)
+{
+	if (is)
+	{
+		up_caret();
+		glm::ivec2 cs = ctx->cursor_pos;
+		auto evs = get_size();		// 视图大小
+		auto h = ctx->cursor_pos.z;	// 行高
+		if (h < 1)h = 1;
+		evs.x -= ctx->_align_pos.x;
+		int ey = evs.y - ctx->cursor_pos.z;
+		//ey *= h;
+		glm::ivec2 pos = {};
+		if (ctx->is_scroll) {
+			dcscroll(cs.x, evs.x, 2, ctx->scroll_pos.x);
+			dcscroll(cs.y, ey, h, ctx->scroll_pos.y);
+		}
+		else
+		{
+			ctx->scroll_pos = { .0, .0 };
+		}
+		if (!(cs.x < 0 || cs.y < 0))
+		{
+			pos.x += cs.x;
+			pos.y += cs.y;
+		}
+	}
 }

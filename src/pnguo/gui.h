@@ -690,17 +690,21 @@ public:
 	text_control* ctx = 0;			// stb_textedit	
 	std::string stext;				// 显示的文本，密码显示用
 	std::string editingstr;			// 输入中的文本，输入法编辑时用
-	glm::ivec4 _color = { 0xff282828,0xffffffff,0x80ffb399,0xffffffff };				// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
-	glm::ivec3 _cursor = { 1,-1,300 };				// 闪烁光标。宽度、颜色、毫秒
+	glm::ivec4 _color = { 0xff282828, 0xffffffff, 0xf0ff7a4d, 0xffffffff };				// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
+	glm::ivec3 _cursor = { 1,-1,500 };				// 闪烁光标。宽度、颜色、毫秒
 	glm::ivec2 _cmpos = {};				// 当前鼠标坐标
 	std::wstring wstr;
 	glm::ivec3 _cursor_px = {};		// 光标坐标xy，当前行z
 	char pwdch = {};				// 密码显示字符
 	int _istate = 0;
+	int fix_line_height = 0;		// 固定行高，0则自动计算
+	int _baseline = 0;
 	bool mdown = false;
 	bool _read_only = false;
 	bool is_input = false;
 	bool show_input_cursor = true;
+	bool roundselect = true;	// 圆角选区
+	bool up_text = true;	// 更新文本了
 public:
 	edit_cx();
 	~edit_cx();
@@ -741,6 +745,13 @@ public:
 	int get_cursor_idx();
 	std::string get_select_str();
 	std::wstring get_select_wstr();
+	glm::ivec2 get_bounds();
+	std::vector<glm::ivec4> get_bounds_px();
+	glm::ivec2 get_pixel_size(const char* str, int len);
+	size_t get_xy_to_index(int x, int y, const char* str);
+	glm::ivec3 get_line_length(int idx);
+	void up_caret();
+	void up_cursor(bool is);
 };
 
 #endif // 1

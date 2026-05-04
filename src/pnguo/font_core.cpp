@@ -7712,30 +7712,30 @@ glm::ivec2 get_text_rect(font_family_t* family, int fontsize, const void* str, i
 	t += first;
 	uint32_t u = 0;
 	glm::ivec2 ret = { 0, fontsize };
-	std::vector<strfont_t> vstr;
-	get_font_fallbacks(family, str, size, false, vstr);
-	for (auto& kt : vstr)
-	{
-		if (kt.font)
-		{
-			font_t::GlyphPositions gp = {};// 执行harfbuzz 
-			kt.font->set_hb_fontsize(fontsize);
-			auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
-			kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
-			for (size_t i = 0; i < gp.len; i++)
-			{
-				ret.x += gp.pos[i].x_advance;
-			}
-		}
-	}
-	//for (; *t && size > 0;) {
-	//	auto n = md::utf8_to_unicode(t, &u);
-	//	t += n;
-	//	size -= n;
-	//	auto rc = font_get_char_extent(u, fontsize, p, 0);
-	//	ret.x += rc.x;
-	//	ret.y = std::max(ret.y, rc.y);
+	//std::vector<strfont_t> vstr;
+	//get_font_fallbacks(family, str, size, false, vstr);
+	//for (auto& kt : vstr)
+	//{
+	//	if (kt.font)
+	//	{
+	//		font_t::GlyphPositions gp = {};// 执行harfbuzz 
+	//		kt.font->set_hb_fontsize(fontsize);
+	//		auto nn0 = kt.font->CollectGlyphsFromFont(kt.v, kt.len, kt.type, kt.rtl, 0, &gp);
+	//		kt._tnpos.insert(kt._tnpos.end(), gp.pos, gp.pos + gp.len);
+	//		for (size_t i = 0; i < gp.len; i++)
+	//		{
+	//			ret.x += gp.pos[i].x_advance;
+	//		}
+	//	}
 	//}
+	for (; *t && size > 0;) {
+		auto n = md::utf8_to_unicode(t, &u);
+		t += n;
+		size -= n;
+		auto rc = font_get_char_extent(u, fontsize, family, 0);
+		ret.x += rc.z;
+		ret.y = std::max(ret.y, rc.y);
+	}
 	return ret;
 }
 
@@ -8430,10 +8430,11 @@ size_t rt_add_text_ts(rich_text_t* p, const void* str, int size, int first, text
 		ut.str = (char*)str + first;
 	text_block tb = {};
 	tb.str = (char*)ut.str.c_str();
-	tb.baseline = 0;
+	tb.baseline = 0;// font_get_baseline(ts->family, ts->fontsize);
 	tb.first = 0;
 	tb.size = ut.str.size();
 	tb.style = *ts;
+	tb.line_height = 0;// font_get_lineheight(ts->family, ts->fontsize);
 	auto tidx = p->tbs.size();
 	p->tbs.push_back(tb);
 	p->data_index.push_back({ tidx ,-1 });

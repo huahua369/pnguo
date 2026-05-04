@@ -1668,11 +1668,11 @@ void rvg_cx::add_polyline(const PathsD* p, bool closed)
 		glm::vec2 pos = { points[0].x, points[0].y };
 		auto points_count = points.size();
 		_cmd.insert(_cmd.end(), (char*)&points_count, (char*)&points_count + sizeof(points_count));
-		_cmd.insert(_cmd.end(), (char*)&pos, (char*)&pos + sizeof(glm::vec2) * 2);
+		_cmd.insert(_cmd.end(), (char*)&pos, (char*)&pos + sizeof(glm::vec2));
 		for (size_t i = 1; i < points_count; i++)
 		{
 			pos = { points[i].x, points[i].y };
-			_cmd.insert(_cmd.end(), (char*)&pos, (char*)&pos + sizeof(glm::vec2) * 2);
+			_cmd.insert(_cmd.end(), (char*)&pos, (char*)&pos + sizeof(glm::vec2));
 		}
 	}
 }
@@ -2546,6 +2546,8 @@ size_t cmd_op_add_text(uint8_t* d, void* ctx)
 	if (t.text)
 		str = (char*)d;
 	mrt_add_text(pc, idx, str, t.text_len, 0, 0);
+	//std::string kk(str, t.text_len);
+	//printf("%s\t%p\n", kk.c_str(), (void*)pc->rich._ct_style.color);
 	return (d - f) + t.text_len;
 }
 // todo clip
@@ -3324,6 +3326,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	{
 		return false;
 	}
+	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
 	dst->_view = _view;
 	dst->pos = rvg->pos;
