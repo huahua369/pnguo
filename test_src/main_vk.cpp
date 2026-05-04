@@ -997,7 +997,7 @@ int main()
 			{
 				auto r = edit1;
 				r->set_size({ 236,50 });
-				r->set_single(false);
+				//r->set_single(false);
 				dvv->add_widget(r);
 			}
 

@@ -2906,7 +2906,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 			}
 		}
 	}
-	printf("kc\t%d\tdc:%d\n", kc, (int)length);
+	//printf("kc\t%d\tdc:%d\n", kc, (int)length);
 }
 
 

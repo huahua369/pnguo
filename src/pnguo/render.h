@@ -474,9 +474,20 @@ public:
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
 
-	void set_draw_rect(const glm::ivec4& c);
 	void push_ct(uint8_t op);
 	bool is_image();
+	/*
+		rv->save();
+		rv->set_draw_rect(glm::ivec4(0, 0, ss));// 设置渲染区域
+		rv->push_null(0);
+		rv->set_line_width(border.y);
+		glm::vec2 rc = ss;
+		rc -= border.y;
+		rv->add_rect({ 0.5,0.5,rc }, border.z);
+		rv->fill_stroke(border.w, border.x);
+		rv->restore();
+	*/
+	void set_draw_rect(const glm::ivec4& c);
 	void push_null(int v);
 	uint32_t get_crc();
 private:
