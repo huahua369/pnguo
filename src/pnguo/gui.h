@@ -155,6 +155,7 @@ public:
 	virtual glm::ivec2 get_pos(bool has_parent = true);
 	virtual glm::ivec2 get_spos();	// 滚动坐标
 	virtual void set_family(font_family_t* family, int fontsize);
+	virtual void set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight); 
 };
 void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
 void send_hover(widget_t* wp, const glm::vec2& mps);
@@ -202,7 +203,10 @@ public:
 	std::vector<drag_v6*> dragsp;	// 拖动区域
 	std::function<void(div_ev* e)> on_click;
 	std::function<void(div_ev* e)> on_click_outer;//模态窗口点中外围时
-
+	std::string editingstr;						// 编辑状态文本
+	uint32_t editing_color = 0xff121212;		// 编辑状态文本颜色
+	int line_height = 0;
+	glm::ivec2 editpos = {};
 	std::vector<node_dt> tempfv;
 	bool update_drag = false;		// 是否更新拖动坐标
 	bool draggable = false;
@@ -236,7 +240,8 @@ public:
 
 	bool update(float delta);
 	void draw(rvg_cx* rv);
-
+	void draw_last(rvg_cx* rv);
+	void set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight);
 	void clayout();
 private:
 	void sortdg();

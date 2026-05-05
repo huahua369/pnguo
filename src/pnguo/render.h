@@ -257,12 +257,6 @@ struct vitext_t
 	size_t first = 0;	// 第一个位置
 	size_t count = 0;	// 渲染数量
 };
-struct cmdrect_v {
-	int type = 0;		// 0矢量图，1文本/位图
-	int first = 0, second = 0;// 命令索引
-	glm::ivec4 rc = {};	// 渲染区域
-	int index = 0;
-};
 
 class vkvg_ctx
 {
@@ -392,14 +386,19 @@ private:
 struct stack_item
 {
 	glm::vec2 pos = {};				// 当前偏移
-	glm::vec4 clip = {};				// 当前裁剪区域
+	glm::vec4 clip = {};			// 当前裁剪区域
 };
 
+struct cmdview_v {
+	glm::ivec4 rc = {};	// 渲染区域
+	size_t inc = 0;
+	size_t dcv_index = 0;
+};
 class rvg_cx
 {
 public:
 	enum Opcode : uint8_t {
-		OP_NULL,
+		OP_NULL, OP_VIEW, OP_VIEW_POP,
 		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
 		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
 		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
@@ -409,16 +408,18 @@ public:
 		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
 		OP_MAX_COUNT
 	};
-	std::vector<uint8_t> _cmdtype;		// 操作类型
+	std::vector<Opcode> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
 	std::vector<size_t> _cmd_pos;		// 命令的数据偏移
 	std::stack<stack_item> _stk;
-	std::vector<cmdrect_v> _data;		// 渲染数据列表 
+	std::vector<cmdview_v> _view;		// 视图列表
 	stack_item _cur = {};				// 当前状态
 	glm::ivec4 _tem_clip = {};
+	glm::ivec4 _tview = {};				// 当前渲染区域
 	float _thickness = 1.0;
 	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
 	glm::ivec2 pos = {};
+	glm::ivec2 scroll_pos = {};
 public:
 	rvg_cx();
 	~rvg_cx();
@@ -447,7 +448,7 @@ public:
 	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
 	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
 	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
-	// 折线
+	// 折线,polygon=closed
 	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
 	void add_polyline(const PathsD* p, bool closed);
 	void add_polyline(const glm::vec2* p, size_t count);
@@ -478,22 +479,29 @@ public:
 	bool is_image();
 	/*
 		rv->save();
-		rv->set_draw_rect(glm::ivec4(0, 0, ss));// 设置渲染区域
-		rv->push_null(0);
+		rv->push_view(glm::ivec4(0, 0, ss));// 设置渲染区域
 		rv->set_line_width(border.y);
 		glm::vec2 rc = ss;
 		rc -= border.y;
 		rv->add_rect({ 0.5,0.5,rc }, border.z);
 		rv->fill_stroke(border.w, border.x);
+		rv->pop_view();
 		rv->restore();
 	*/
-	void set_draw_rect(const glm::ivec4& c);
+	void push_view(const glm::ivec4& c);
+	void pop_view();
 	void push_null(int v);
 	uint32_t get_crc();
 private:
 
 };
 
+struct translate_cc
+{
+	void* surface = 0;
+	void* ctx = 0;
+	glm::vec2 apos = {};
+};
 class rvg_data_cx
 {
 public:
@@ -512,6 +520,7 @@ public:
 	rvg_data_cx();
 	~rvg_data_cx();
 	void update(rvg_cx* rvg);
+	translate_cc get_ctx(size_t idx, const glm::ivec4& rc);
 private:
 
 };

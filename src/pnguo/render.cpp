@@ -1706,26 +1706,19 @@ void rvg_cx::set_text_style(text_style* ts)
 void rvg_cx::add_text(text_st* p, text_style* ts)
 {
 	if (!p || p->text == 0 || p->text_len < 1)return;
+	auto pos = p->pos + _cur.pos;
+	glm::vec4 rc = { pos , 0,0 };//p->size
+	push_view(rc);
 	set_text_style(ts);
 	push_ct(OP_ADD_TEXT);
 	auto idx = _cmd.size();
 	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st));
 	auto pd = (text_st*)(_cmd.data() + idx);
-	size_t ct = 0;
 	auto tps = _cmd.size();
-	auto pos = p->pos + _cur.pos;
 	pd->pos = pos;
 	pd->clip = _cur.clip;
-	for (size_t i = 0; i < 1; i++)
-	{
-		_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
-		pd->text = (char*)tps + ct;
-		ct += pd->text_len;
-	}
-	glm::vec4 rc = { pos ,0,0 };
-	rc.z += p->size.x;
-	rc.w += p->size.y;
-	set_draw_rect(rc);
+	_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
+	pd->text = (char*)tps;
 }
 
 void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos)
@@ -1737,9 +1730,9 @@ void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4&
 void rvg_cx::add_image(image_r* r)
 {
 	if (!r || !r->img)return;
+	push_view(glm::ivec4(r->pos, 0, 0));//r->dsize
 	push_ct(OP_ADD_IMAGE);
 	_cmd.insert(_cmd.end(), (char*)r, (char*)r + sizeof(image_r));
-	set_draw_rect(glm::ivec4(r->pos, r->dsize));
 }
 
 void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
@@ -1863,21 +1856,19 @@ inline bool is_textimage(uint8_t c) {
 	return c >= rvg_cx::OP_TEXT_STYLE;
 }
 
-void rvg_cx::set_draw_rect(const glm::ivec4& c)
+void rvg_cx::push_view(const glm::ivec4& c)
 {
-	assert((c.z > 0 && c.w > 0));
-	if (c.z > 0 && c.w > 0)
-	{
-		_data.push_back({});
-		auto& d = _data.back();
-		d.first = _cmdtype.size() - 1;
-		d.type = is_textimage(_cmdtype.back());
-		d.second = _cmdtype.size();
-		d.rc = c;
-		d.rc.z += c.x;
-		d.rc.w += c.y;
-	}
+	//assert((c.z > 0 && c.w > 0));
+	_tview = c;
+	_view.push_back({ _tview,_cmdtype.size(),0 });
+	push_ct(OP_VIEW);
 }
+
+void rvg_cx::pop_view()
+{
+	push_ct(OP_VIEW_POP);
+}
+
 bool rvg_cx::is_image()
 {
 	auto t = _cmdtype.back();
@@ -1898,7 +1889,7 @@ uint32_t rvg_cx::get_crc()
 
 void rvg_cx::push_ct(uint8_t op)
 {
-	_cmdtype.push_back(op);
+	_cmdtype.push_back((Opcode)op);
 	_cmd_pos.push_back(_cmd.size());
 }
 
@@ -2561,6 +2552,17 @@ size_t cmd_op_add_image(uint8_t* d, void* ctx)
 	return d - f;
 }
 
+size_t cmd_op_view(uint8_t* d, VkvgContext ctx)
+{
+
+	return 0;
+}
+
+size_t cmd_op_view_pop(uint8_t* d, VkvgContext ctx)
+{
+
+	return 0;
+}
 
 typedef size_t(*cmd_func_type)(uint8_t* d, VkvgContext ctx);
 size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
@@ -2572,15 +2574,20 @@ size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 	//	OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 	//	OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
 	//	OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
-	static cmd_func_type cbs[] = { nullptr, cmd_op_submit_style, cmd_op_submit_color, cmd_op_grid_fill, cmd_op_linear_fill, cmd_op_add_arrow,
+	static cmd_func_type cbs[] = { nullptr,cmd_op_view,cmd_op_view_pop, cmd_op_submit_style, cmd_op_submit_color, cmd_op_grid_fill, cmd_op_linear_fill, cmd_op_add_arrow,
 		cmd_op_draw_block, cmd_op_draw_path, cmd_op_add_line_ptr, cmd_op_add_rect_double,
 		cmd_op_add_rect_vec4, cmd_op_add_circle, cmd_op_add_ellipse, cmd_op_add_triangle, cmd_op_polyline_vec2,
 		cmd_op_add_polyline_path, cmd_op_add_polyline_vec2_ptr, cmd_op_polylines,
 		cmd_op_paint_shadow, cmd_op_translate,cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
 		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
 		 (cmd_func_type)cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, };
-
-	return c > 0 && c < rvg_cx::OP_MAX_COUNT ? cbs[c](d, (VkvgContext)ctx) : 0;
+	size_t r = 0;
+	if (c > 0 && c < rvg_cx::OP_MAX_COUNT)
+	{
+		auto cb = cbs[c];
+		r = cb ? cb(d, (VkvgContext)ctx) : 0;
+	}
+	return r;
 }
 
 #endif
@@ -3210,106 +3217,88 @@ rvg_data_cx::~rvg_data_cx()
 		packer = 0;
 	}
 }
-void mb_dc(std::vector<cmdrect_v>& data, size_t cmd_count) {
 
-	data.front().first = 0;
-
-	for (size_t i = 0; i < data.size() - 1; i++)
-	{
-		auto& it = data[i];
-		auto& it1 = data[i + 1];
-		if (it.type == 0)
-			it.second = it1.first;
-	}
-	for (size_t i = 1; i < data.size(); i++)
-	{
-		auto& it = data[i];
-		auto& it1 = data[i - 1];
-		if (it.type == 0)
-			it.first = it1.second;
-	}
-
-	{
-		cmdrect_v f = {};
-		auto& db = data.back();
-		f.first = db.second;
-		f.second = cmd_count;
-		if (f.first != f.second)
-		{
-			if (db.type == 1)
-				data.push_back(f);
-			else
-				db.second = cmd_count;
-		}
-	}
-}
 void rvg_data_cx::update(rvg_cx* rvg)
 {
 	packer->init_target(_view.z, _view.w, 0);
 	int sf = 0;
-	size_t i = 0;
 	dcv.clear();
-	std::vector<cmdrect_v> data, dtext;
 	auto cmd_count = rvg->_cmdtype.size();
-	int lpush = 0;
-	mb_dc(rvg->_data, cmd_count);
-	auto f = rvg->_data.front();
-	for (auto& it : rvg->_data) {
-		auto c = it.rc;
-		if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
-		{
-			f.rc.x = std::min(f.rc.x, c.x);
-			f.rc.y = std::min(f.rc.y, c.y);
-			f.rc.z = std::max(f.rc.z, c.z);
-			f.rc.w = std::max(f.rc.w, c.w);
-			f.second = it.second;
-		}
-		else {
-			data.push_back(f);
-			if (f.second != it.first) {
-				cmdrect_v f0 = {};
-				f0.first = f.second;
-				f0.second = it.first;
-				data.push_back(f0);
-			}
-			f = it;
-		}
-		if (f.type && f.first + 1 < f.second)
-		{
-			auto tt = f;
-			f.second = f.first + 1;
-			tt.first = f.second;
-			tt.type = 0;
-			data.push_back(f);
-			f = tt;
-		}
-		lpush++;
-	}
-	data.push_back(f);
-	//if (mix_text) 
-	data.swap(rvg->_data);
-	for (auto& it : rvg->_data) {
-		if (it.rc.z < 1 || it.rc.w < 1)
-			continue;
+
+	for (auto& it : rvg->_view)
+	{
+		auto rc = it.rc;
+		it.dcv_index = -1;
+		if (rc.z < 1 || rc.w < 1)continue;
 		d2_rt d = {};
-		d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
+		d.size = { rc.z, rc.w };
 		d.size += stwidth * 2;
 		d.size.x = align_up(d.size.x, 4);
 		d.size.y = align_up(d.size.y, 4);
 		d.size.x = std::min(_view.z, d.size.x);
 		d.size.y = std::min(_view.w, d.size.y);
-		d.offset = glm::ivec2(it.rc.x, it.rc.y);
+		d.offset = glm::ivec2(rc.x, rc.y);
 		max_rect.x = std::max(max_rect.x, d.size.x);
 		max_rect.y = std::max(max_rect.y, d.size.y);
-		d.type = it.type;
-		d.index = i;
-		i++;
-		if (!it.type)
-		{
-			it.index = dcv.size();
-			dcv.push_back(d);
-		}
+		it.dcv_index = dcv.size();
+		dcv.push_back(d);
 	}
+	//for (auto& it : rvg->_data) {
+	//	auto c = it.rc;
+	//	if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
+	//	{
+	//		f.rc.x = std::min(f.rc.x, c.x);
+	//		f.rc.y = std::min(f.rc.y, c.y);
+	//		f.rc.z = std::max(f.rc.z, c.z);
+	//		f.rc.w = std::max(f.rc.w, c.w);
+	//		f.second = it.second;
+	//	}
+	//	else {
+	//		data.push_back(f);
+	//		if (f.second != it.first) {
+	//			cmdrect_v f0 = {};
+	//			f0.first = f.second;
+	//			f0.second = it.first;
+	//			data.push_back(f0);
+	//		}
+	//		f = it;
+	//	}
+	//	if (f.type && f.first + 1 < f.second)
+	//	{
+	//		auto tt = f;
+	//		f.second = f.first + 1;
+	//		tt.first = f.second;
+	//		tt.type = 0;
+	//		data.push_back(f);
+	//		f = tt;
+	//	}
+	//	lpush++;
+	//}
+	//data.push_back(f);
+	//if (mix_text) 
+	//data.swap(rvg->_data);
+	//for (auto& it : rvg->_data) {
+	//	if (it.rc.z < 1 || it.rc.w < 1)
+	//		continue;
+	//	d2_rt d = {};
+	//	d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
+	//	d.size += stwidth * 2;
+	//	d.size.x = align_up(d.size.x, 4);
+	//	d.size.y = align_up(d.size.y, 4);
+	//	d.size.x = std::min(_view.z, d.size.x);
+	//	d.size.y = std::min(_view.w, d.size.y);
+	//	d.offset = glm::ivec2(it.rc.x, it.rc.y);
+	//	max_rect.x = std::max(max_rect.x, d.size.x);
+	//	max_rect.y = std::max(max_rect.y, d.size.y);
+	//	//d.type = it.type;
+	//	//d.index = i;
+	//	//i++;
+	//	//if (!it.type)
+	//	//{
+	//	//	it.index = dcv.size();
+	//	//	dcv.push_back(d);
+	//	//}
+	//}
 	auto dcp = dcv.data();
 	size_t dcc = dcv.size();
 	do
@@ -3328,6 +3317,31 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	} while (dcc > 0);
 	surfaces.resize(sf + 1);
 }
+translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
+{
+	translate_cc r = {};
+	glm::vec2 clips = {};
+	if (idx < dcv.size())
+	{
+		auto& rcc = dcv[idx];
+		if (rc.z > 0 && rc.w > 0)
+		{
+			dst_data.push_back({});
+			auto& v = dst_data.back();
+			if (!v.d2)
+			{
+				v.d2 = dcv.data();
+				v.first = idx;
+			}
+			v.count++;
+		}
+		clips = rcc.size;
+		r.apos = rcc.pos - rcc.offset;
+		r.apos += stwidth;
+		r.surface = surfaces[rcc.surface].surface;
+	}
+	return r;
+}
 
 bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 {
@@ -3335,7 +3349,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	auto rcrc = rvg->get_crc();
 	if (dst->cmd_crc == rcrc)
 	{
-		return false;
+		//return false;
 	}
 	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
@@ -3352,17 +3366,19 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			it.surface = new_surface(_view.z, _view.w);
 			first = true;
 		}
-		it.ctx = ctx_begin(it.surface);
-		vkvg_clear((VkvgContext)it.ctx);
+		auto ctx = ctx_begin(it.surface);
+		if (ctx)
+		{
+			vkvg_clear((VkvgContext)ctx);
+			ctx_end(ctx);
+		}
 	}
 
 	auto d = rvg->_cmd.data();
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
-	//std::vector<size_t> fvv;
 	dst->dst_data.clear();
 	auto dp = dst->dcv.data();
-	void* ctx = nullptr;
 	glm::ivec3 tcount = {};
 	for (auto it : rvg->_cmdtype) {
 		if (it == rvg_cx::OP_SAVE)
@@ -3378,58 +3394,54 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 			tcount.z++;
 		}
 	}
-	for (auto& it : rvg->_data) {
-		size_t ridx = it.index;
-		glm::vec2 clips = {};
-		glm::vec2 apos = {};
-		if (it.type == 0) {
-			auto& rcc = dst->dcv[ridx];
-			auto kctx = dst->surfaces[rcc.surface].ctx;
-			if (kctx)
-				ctx = kctx;
-			if (it.rc.z > 0 && it.rc.w > 0 && ridx < dst->dcv.size())
+	auto pct = rvg->_cmdtype.data();
+	auto length = rvg->_cmdtype.size();
+	glm::vec2 apos = {};
+	vitext_t vg = {};
+	vg.d2 = dp;
+	size_t vidx = 0;
+	translate_cc tcc = {};
+	for (size_t i = 0; i < length; i++)
+	{
+		auto ct = pct[i];
+		if (ct == rvg_cx::OP_VIEW) {
+			auto vv = rvg->_view[vidx];
+			if (vv.dcv_index < dst->dcv.size())
 			{
-				dst->dst_data.push_back({});
-				auto& v = dst->dst_data.back();
-				if (!v.d2)
+				tcc = dst->get_ctx(vv.dcv_index, vv.rc);
+				tcc.ctx = ctx_begin(tcc.surface);
+				if (tcc.ctx)
 				{
-					v.d2 = dp;
-					v.first = ridx;
+					//vkvg_clear((VkvgContext)tcc.ctx);
+					vkvg_save((VkvgContext)tcc.ctx);
+					vkvg_translate((VkvgContext)tcc.ctx, tcc.apos.x, tcc.apos.y);
 				}
-				v.count++;
-				ridx++;
 			}
-			clips = rcc.size;
-			apos = rcc.pos - rcc.offset;
-			apos += stwidth;
+			else {
+				vitext_t vt = {};
+				vt.first = mrt_box_count(dst->mrt);
+				vt.count = 1;
+				vt.t = (box_text_d*)1;
+				dst->dst_data.push_back(vt);
+			}
+			vidx++;
+			continue;
 		}
-		else {
-			vitext_t vt = {};
-			vt.first = mrt_box_count(dst->mrt);
-			vt.count = 1;
-			vt.t = (box_text_d*)1;
-			dst->dst_data.push_back(vt);
-		}
-		for (size_t i = it.first; i < it.second; i++)
+		if (ct == rvg_cx::OP_VIEW_POP)
 		{
-			auto ct = rvg->_cmdtype[i];
-			if (ct == 0)
+			assert(tcc.ctx);
+			if (tcc.ctx)
 			{
-				vkvg_translate((VkvgContext)ctx, apos.x, apos.y);
+				vkvg_restore((VkvgContext)tcc.ctx);
+				ctx_end(tcc.ctx);
 			}
-			if (ct == 0xff)
-			{
-			}
-			auto pss = didx[i];
-			size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? ctx : dst->mrt);
-			//d += n;
-			//ps += n;
+			continue;
 		}
+		auto pss = didx[i];
+		size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? tcc.ctx : dst->mrt);
 	}
 	for (auto& it : dst->surfaces)
 	{
-		if (it.ctx)
-			vkvg_flush((VkvgContext)it.ctx);
 		if (it.surface)
 		{
 			vkvg_surface_resolve((VkvgSurface)it.surface);
@@ -3438,8 +3450,6 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 				vkvg_surface_write_to_png((VkvgSurface)it.surface, "temp/vgtest1630.png");
 			}
 		}
-		if (it.ctx)
-			ctx_end(it.ctx);
 		update((VkvgSurface)it.surface, 0);
 	}
 	mrt_build(dst->mrt);

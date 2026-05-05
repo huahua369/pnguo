@@ -5874,6 +5874,9 @@ void widget_t::draw(rvg_cx* rv)
 
 void image_btn::draw(rvg_cx* rv) {
 
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
 	//image_ptr_t* img = 0;
 	//image_sliced_t state_img[5] = {};
 	text_style st = {};
@@ -5887,6 +5890,7 @@ void image_btn::draw(rvg_cx* rv) {
 	tx.text = str.c_str(); tx.text_len = str.size();
 	rv->add_text(&tx, &st);
 
+	rv->pop_view();
 }
 
 void color_btn::draw(rvg_cx* rv)
@@ -5899,6 +5903,10 @@ void color_btn::draw(rvg_cx* rv)
 		id = id;
 	}
 #if 1
+
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
 
 	rv->save();
 	rv->translate(p->_pos);
@@ -5973,6 +5981,7 @@ void color_btn::draw(rvg_cx* rv)
 	rv->add_text(&tx, &st);
 	rv->restore();
 
+	rv->pop_view();
 #endif
 }
 
@@ -5998,6 +6007,10 @@ void gradient_btn::draw(rvg_cx* rv)
 		rounding = nr;
 	}
 	glm::vec2 tps = { 0.5,0.5 };
+
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
 
 	rv->save();
 	rv->translate({ x, y });
@@ -6072,6 +6085,7 @@ void gradient_btn::draw(rvg_cx* rv)
 
 	rv->restore();
 
+	rv->pop_view();
 
 #endif
 }
@@ -6147,6 +6161,10 @@ void radio_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 
+		auto psv = get_pos(false);
+		auto view = glm::ivec4(psv, get_size());
+		rv->push_view(view);
+
 		rv->save();
 		glm::ivec2 poss = p->_pos;
 		rv->translate((glm::vec2)poss);
@@ -6165,6 +6183,7 @@ void radio_tl::draw(rvg_cx* rv)
 		}
 		rv->restore();
 
+		rv->pop_view();
 #endif
 	}
 }
@@ -6174,6 +6193,10 @@ void checkbox_tl::draw(rvg_cx* rv)
 	auto p = this;
 	if (rv && p) {
 #if 1
+
+		auto psv = get_pos(false);
+		auto view = glm::ivec4(psv, get_size());
+		rv->push_view(view);
 
 		rv->save();
 		glm::ivec2 poss = p->_pos;
@@ -6189,14 +6212,17 @@ void checkbox_tl::draw(rvg_cx* rv)
 		}
 		rv->restore();
 
+		rv->pop_view();
 #endif
 	}
 }
 void switch_tl::draw(rvg_cx* rv)
 {
 #if 1
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
 
-	rv->save();
 	glm::ivec2 poss = _pos;
 	auto h = height;
 	auto fc = h * cv * 0.5;
@@ -6222,6 +6248,7 @@ void switch_tl::draw(rvg_cx* rv)
 	}
 	rv->stroke();
 
+	rv->pop_view();
 #endif
 }
 void progress_tl::draw(rvg_cx* rv)
@@ -6232,6 +6259,10 @@ void progress_tl::draw(rvg_cx* rv)
 	ss.x = width;
 	ss.y = height;
 #if 1
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
+
 	glm::vec2 npos = _size - (glm::vec2)ss;
 	npos *= 0.5;
 	rv->save();
@@ -6295,12 +6326,16 @@ void progress_tl::draw(rvg_cx* rv)
 	}
 	rv->restore();
 
+	rv->pop_view();
 #endif
 }
 
 void slider_tl::draw(rvg_cx* rv)
 {
 #if 1
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
 
 	rv->save();
 	glm::ivec2 poss = _pos;
@@ -6357,6 +6392,7 @@ void slider_tl::draw(rvg_cx* rv)
 	}
 	rv->restore();
 
+	rv->pop_view();
 #endif
 }
 
@@ -6364,6 +6400,10 @@ void slider_tl::draw(rvg_cx* rv)
 void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
+
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
 	rv->translate(poss);
@@ -6455,12 +6495,17 @@ void colorpick_tl::draw(rvg_cx* rv)
 		rv->add_text(&tx, &st);
 	}
 
+	rv->pop_view();
 #endif
 }
 void scroll_bar::draw(rvg_cx* rv)
 {
 	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
+
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view);
 
 	// 背景
 	if (!hideble || thumb_size_m.z) {
@@ -6481,6 +6526,7 @@ void scroll_bar::draw(rvg_cx* rv)
 		rv->add_rect(trc, _rc_width * 0.5 * scale_s);
 		rv->submit(_tcc, 0, 0);
 	}
+	rv->pop_view();
 }
 
 
@@ -6531,13 +6577,23 @@ glm::ivec2 widget_t::get_pos(bool has_parent)
 
 glm::ivec2 widget_t::get_spos()
 {
-	return glm::ivec2();
+	glm::ivec2 ps = {};
+	if (parent) {
+		auto ss = parent->get_spos();
+		ss *= hscroll;
+		ps += ss;
+	}
+	return ps;
 }
 
 void widget_t::set_family(font_family_t* family, int fontsize)
 {
 	this->family = family; this->font_size = fontsize;
 }
+
+void widget_t::set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight)
+{}
+
 
 input_state_t* get_input_state_cx(void* ptr, int t);
 // 通用控件鼠标事件处理 type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
@@ -7385,35 +7441,35 @@ void div_cx::draw(rvg_cx* rv)
 	auto sps = get_spos();	// 获取滚动量
 	auto ss = get_size();
 	if (border.w || border.x) {
+		rv->push_view(glm::ivec4(0, 0, ss));
 		rv->save();
-		rv->set_draw_rect(glm::ivec4(0, 0, ss));
-		rv->push_null(0);
 		rv->set_line_width(border.y);
 		glm::vec2 rc = ss;
 		rc -= border.y;
 		rv->add_rect({ 0.5,0.5,rc }, border.z);
 		rv->fill_stroke(border.w, border.x);
 		rv->restore();
+		rv->pop_view();
 	}
 
 	for (auto& it : widgets) {
 		if (it->visible)
 		{
-			rv->save();
-			auto ps = it->get_pos(false);
-			auto clip = glm::ivec4(ps, it->get_size());
-			rv->set_draw_rect(clip);
-			//rv->clip(clip);
-			rv->push_null(0);
-			auto scp = sps * it->hscroll;
-			if (scp.x != 0 || scp.y != 0)
-				rv->translate(scp);// 滚动条影响
 			it->draw(rv);
-			rv->push_null(-1);
-			rv->restore();
 		}
 	}
+	draw_last(rv);
 }
+
+void div_cx::draw_last(rvg_cx* rv)
+{}
+void div_cx::set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight)
+{
+	editingstr = str;
+	editpos = cpos;
+	line_height = lineheight;
+}
+
 glm::vec2 get_margin_size(flex_data* c) {
 	glm::vec2 m = {};
 	if (c)
@@ -9413,28 +9469,44 @@ bool edit_cx::update(float delta)
 
 void edit_cx::draw(rvg_cx* rv)
 {
-	glm::ivec2 poss = _pos;
+	glm::ivec2 nposs = _pos;
 	glm::ivec2 ss = _size;
-	rv->translate(poss);
+	auto psv = get_pos(false);
+	auto view = glm::ivec4(psv, get_size());
+	rv->push_view(view); 
+	rv->translate(psv);
 	rv->add_rect({ 0,0,ss.x ,ss.y }, rounding);
 	rv->set_color(_color.x);
 	rv->fill();
 	auto tpos = ctx->_align_pos - ctx->scroll_pos;
 	auto tpos1 = ctx->_align_pos1 - ctx->scroll_pos;
+
+	glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,font_size }, iss = _size;
+	iss -= thickness * 2;
+	auto ps = glm::ceil((iss - ext) * text_align);
+	auto ps1 = glm::ceil((iss - ext1) * text_align);
+	glm::ivec2 npos = {};
+	glm::ivec2 srcpos = {};
+	if (ctx->state.single_line)
 	{
+		npos.y += ps1.y;
+		srcpos.y += ps.y;
+	}
+	{
+
 		rv->save();
-		// 裁剪区域
+		// 裁剪区域渲染选中效果背景
 		rv->add_rect({ thickness,thickness,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
 		rv->clip();
-		tpos += thickness;
-		//tpos1 += thickness; 
+		srcpos += thickness;
+		npos += thickness;
 		tpos1 = tpos;
 		tpos1.y += (ctx->lineheight - font_size) * text_align.y;
 		auto v = get_bounds();
-		rv->translate({ 0,1 });
+		//rv->translate({ 0,1 });
 		if (v.x != v.y && ctx->rangerc.size()) {
 			rv->save();
-			rv->translate(tpos);
+			rv->translate(srcpos);
 			rv->set_color(_color.z);
 			if (roundselect)
 			{
@@ -9452,70 +9524,82 @@ void edit_cx::draw(rvg_cx* rv)
 			}
 			rv->restore();
 		}
-		rv->translate(tpos1);
-		//rv->set_color(text_color);
-		//auto lhh = get_pixel_size(stext.c_str(), stext.size());
-		// 渲染文本
-		glm::vec4 rc = { 0,0,  ss };
-		text_style st = {};
-		st.fontsize = font_size;
-		st.align = {};
-		st.color = text_color;
-		st.family = family;
-		text_st tx = {};
-		tx.pos = {};
-		tx.size = ss;
-		if (pwdch)
-		{
-			tx.text = stext.c_str(); tx.text_len = stext.size();
-		}
-		else {
-			tx.text = ctx->str.c_str();
-			tx.text_len = ctx->str.size();
-		}
-		rv->add_text(&tx, &st);
+
 		rv->restore();
 	}
-	double x = tpos.x + ctx->cursor_pos.x, y = tpos.y + ctx->cursor_pos.y;
-	bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
+	rv->pop_view();
+	// 渲染文本
+	glm::vec4 rc = { 0,0,  ss };
+	text_style st = {};
+	st.fontsize = font_size;
+	st.align = {};
+	st.color = text_color;
+	st.family = family;
+	text_st tx = {};
+	tx.pos = {  };
+	tx.size = ss;
+	if (pwdch)
 	{
-		rv->set_color(ccd ? _cursor.y : 0);
-		rv->add_rect({ x, y, _cursor.x, ctx->cursor_pos.z }, 0);
+		tx.text = stext.c_str(); tx.text_len = stext.size();
+	}
+	else {
+		tx.text = ctx->str.c_str();
+		tx.text_len = ctx->str.size();
+	}
+	rv->add_text(&tx, &st);
+
+	glm::vec2 cpos = ctx->cursor_pos;
+	cpos += srcpos;
+	bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
+	if (ccd)
+	{
+		rv->push_view({ cpos.x,cpos.y,align_up(_cursor.x,4),align_up(ctx->cursor_pos.z,4) });
+		rv->set_color(_cursor.y);
+		rv->add_rect({ cpos.x,cpos.y, _cursor.x, ctx->cursor_pos.z }, 0);
 		rv->fill();
+		rv->pop_view();
 	}
 	// 编辑中的文本
-	if (editingstr.size())
+	if (is_input)
 	{
-		// 渲染文本 
-		text_style st = {};
-		st.fontsize = font_size;
-		st.align = {};
-		st.color = _color.w;
-		st.family = family;
-		glm::ivec2 lps = {};
-		lps = get_pixel_size(editingstr.c_str(), editingstr.size());
-		if (lps.y < ctx->lineheight)
-			lps.y = ctx->lineheight;
-		glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
-		glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };
-		auto clip0 = glm::ivec4(rv->_cur.pos.x + x, rv->_cur.pos.y + y, rc.z, rc.w);
-		rv->restore(); // 恢复状态，绘制输入中编辑文本的背景和边框
-		rv->save();
-		rv->set_draw_rect(clip0);
-		rv->push_null(0);
-		rv->translate({ clip0.x, clip0.y });
-		rv->set_color(get_reverse_color(_color.w));
-		rv->add_rect({ 0, 0, lps.x + 2, lps.y + 2 }, 0);
-		rv->fill();
-		text_st tx = {};
-		tx.pos = { rc.x,rc.y };
-		tx.size = glm::ivec2(rc.z, rc.w);
-		tx.text = editingstr.c_str(); tx.text_len = editingstr.size();
-		rv->add_text(&tx, &st);
-		rv->set_color(_color.w);
-		rv->add_line({ lss.x + 1, lss.y }, { lss.z, lss.w });
-		rv->set_line_width(1);
-		rv->stroke();
+		auto epos = npos + glm::ivec2(cpos);
+		uint32_t editing_color = _color.w;
+		if (editingstr.size())
+		{
+			// 渲染文本 
+			text_style st = {};
+			st.fontsize = font_size;
+			st.align = {};
+			st.color = editing_color;
+			st.family = family;
+			glm::ivec2 lps = get_text_rect(family, font_size, editingstr.c_str(), editingstr.size(), 0);
+
+			if (lps.y < ctx->lineheight)
+				lps.y = ctx->lineheight;
+			glm::vec4 lss = { 0,  lps.y + 0.5, lps.x, lps.y + 0.5 };
+			glm::vec4 rc = { 1,1,lps.x + 2, lps.y + 2 };
+			auto clip0 = glm::ivec4(epos, rc.z, rc.w);
+
+			rv->push_view(clip0);
+			rv->save();
+			rv->translate({ clip0.x, clip0.y });
+			rv->set_color(get_reverse_color(editing_color));
+			rv->add_rect({ 0, 0, lps.x + 2, lps.y + 2 }, 0);
+			rv->fill();
+			rv->set_color(editing_color);
+			rv->add_line({ lss.x + 1, lss.y }, { lss.z, lss.w });
+			rv->set_line_width(1);
+			rv->stroke();
+
+			rv->restore();
+			rv->pop_view();
+			text_st tx = {};
+			tx.pos = { rc.x,rc.y };
+			tx.size = glm::ivec2(rc.z, rc.w);
+			tx.text = editingstr.c_str(); tx.text_len = editingstr.size();
+			rv->add_text(&tx, &st);
+
+		}
 	}
 }
 
