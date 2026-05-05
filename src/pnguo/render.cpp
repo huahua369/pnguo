@@ -1719,6 +1719,7 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	pd->clip = _cur.clip;
 	_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
 	pd->text = (char*)tps;
+	pop_view();
 }
 
 void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos)
@@ -1733,6 +1734,7 @@ void rvg_cx::add_image(image_r* r)
 	push_view(glm::ivec4(r->pos, 0, 0));//r->dsize
 	push_ct(OP_ADD_IMAGE);
 	_cmd.insert(_cmd.end(), (char*)r, (char*)r + sizeof(image_r));
+	pop_view();
 }
 
 void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
@@ -1862,10 +1864,12 @@ void rvg_cx::push_view(const glm::ivec4& c)
 	_tview = c;
 	_view.push_back({ _tview,_cmdtype.size(),0 });
 	push_ct(OP_VIEW);
+	save();
 }
 
 void rvg_cx::pop_view()
 {
+	restore();
 	push_ct(OP_VIEW_POP);
 }
 
@@ -3242,9 +3246,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		max_rect.y = std::max(max_rect.y, d.size.y);
 		it.dcv_index = dcv.size();
 		dcv.push_back(d);
-	}
-	//for (auto& it : rvg->_data) {
-	//	auto c = it.rc;
+	} 
 	//	if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
 	//	{
 	//		f.rc.x = std::min(f.rc.x, c.x);
@@ -3252,53 +3254,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	//		f.rc.z = std::max(f.rc.z, c.z);
 	//		f.rc.w = std::max(f.rc.w, c.w);
 	//		f.second = it.second;
-	//	}
-	//	else {
-	//		data.push_back(f);
-	//		if (f.second != it.first) {
-	//			cmdrect_v f0 = {};
-	//			f0.first = f.second;
-	//			f0.second = it.first;
-	//			data.push_back(f0);
-	//		}
-	//		f = it;
-	//	}
-	//	if (f.type && f.first + 1 < f.second)
-	//	{
-	//		auto tt = f;
-	//		f.second = f.first + 1;
-	//		tt.first = f.second;
-	//		tt.type = 0;
-	//		data.push_back(f);
-	//		f = tt;
-	//	}
-	//	lpush++;
-	//}
-	//data.push_back(f);
-	//if (mix_text) 
-	//data.swap(rvg->_data);
-	//for (auto& it : rvg->_data) {
-	//	if (it.rc.z < 1 || it.rc.w < 1)
-	//		continue;
-	//	d2_rt d = {};
-	//	d.size = { it.rc.z - std::max(0,it.rc.x),it.rc.w - std::max(0,it.rc.y) };
-	//	d.size += stwidth * 2;
-	//	d.size.x = align_up(d.size.x, 4);
-	//	d.size.y = align_up(d.size.y, 4);
-	//	d.size.x = std::min(_view.z, d.size.x);
-	//	d.size.y = std::min(_view.w, d.size.y);
-	//	d.offset = glm::ivec2(it.rc.x, it.rc.y);
-	//	max_rect.x = std::max(max_rect.x, d.size.x);
-	//	max_rect.y = std::max(max_rect.y, d.size.y);
-	//	//d.type = it.type;
-	//	//d.index = i;
-	//	//i++;
-	//	//if (!it.type)
-	//	//{
-	//	//	it.index = dcv.size();
-	//	//	dcv.push_back(d);
-	//	//}
-	//}
+	//	} 
 	auto dcp = dcv.data();
 	size_t dcc = dcv.size();
 	do
@@ -3349,7 +3305,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	auto rcrc = rvg->get_crc();
 	if (dst->cmd_crc == rcrc)
 	{
-		//return false;
+		return false;
 	}
 	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
@@ -3380,26 +3336,27 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	dst->dst_data.clear();
 	auto dp = dst->dcv.data();
 	glm::ivec3 tcount = {};
-	for (auto it : rvg->_cmdtype) {
-		if (it == rvg_cx::OP_SAVE)
-		{
-			tcount.x++;
-		}
-		if (it == rvg_cx::OP_RESTORE)
-		{
-			tcount.y++;
-		}
-		if (it == rvg_cx::OP_NULL)
-		{
-			tcount.z++;
-		}
-	}
+	//for (auto it : rvg->_cmdtype) {
+	//	if (it == rvg_cx::OP_SAVE)
+	//	{
+	//		tcount.x++;
+	//	}
+	//	if (it == rvg_cx::OP_RESTORE)
+	//	{
+	//		tcount.y++;
+	//	}
+	//	if (it == rvg_cx::OP_NULL)
+	//	{
+	//		tcount.z++;
+	//	}
+	//}
 	auto pct = rvg->_cmdtype.data();
 	auto length = rvg->_cmdtype.size();
 	glm::vec2 apos = {};
 	vitext_t vg = {};
 	vg.d2 = dp;
 	size_t vidx = 0;
+	std::stack<translate_cc> stt = {};
 	translate_cc tcc = {};
 	for (size_t i = 0; i < length; i++)
 	{
@@ -3412,10 +3369,10 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 				tcc.ctx = ctx_begin(tcc.surface);
 				if (tcc.ctx)
 				{
-					//vkvg_clear((VkvgContext)tcc.ctx);
 					vkvg_save((VkvgContext)tcc.ctx);
 					vkvg_translate((VkvgContext)tcc.ctx, tcc.apos.x, tcc.apos.y);
 				}
+				stt.push(tcc);
 			}
 			else {
 				vitext_t vt = {};
@@ -3423,17 +3380,22 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 				vt.count = 1;
 				vt.t = (box_text_d*)1;
 				dst->dst_data.push_back(vt);
+				stt.push({});
 			}
 			vidx++;
 			continue;
 		}
 		if (ct == rvg_cx::OP_VIEW_POP)
 		{
-			assert(tcc.ctx);
-			if (tcc.ctx)
+			if (stt.size())
 			{
-				vkvg_restore((VkvgContext)tcc.ctx);
-				ctx_end(tcc.ctx);
+				tcc = stt.top();
+				stt.pop();
+				if (tcc.ctx)
+				{
+					vkvg_restore((VkvgContext)tcc.ctx);
+					ctx_end(tcc.ctx);
+				}
 			}
 			continue;
 		}
