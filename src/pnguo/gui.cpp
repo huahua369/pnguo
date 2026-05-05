@@ -9450,17 +9450,18 @@ bool edit_cx::update(float delta)
 	}
 	if (ctx->lineheight < 1)
 		ctx->lineheight = font_get_lineheight(family, font_size);
-	if (ctx->state.single_line)
-	{
-		glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,font_size }, ss = _size;
-		ss -= thickness * 2;
-		auto ps = (ss - ext) * text_align;
-		auto ps1 = (ss - ext1) * text_align;
-		ctx->_align_pos.y = ps.y;
-		ctx->_align_pos1.y = ps1.y;
-	}
+
 	if (up_text)
 	{
+		if (ctx->state.single_line)
+		{
+			glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,font_size }, ss = _size;
+			ss -= thickness * 2;
+			auto ps = glm::ceil((ss - ext) * text_align);
+			auto ps1 = glm::ceil((ss - ext1) * text_align);
+			ctx->_align_pos.y = ps.y;
+			ctx->_align_pos1.y = ps1.y;
+		}
 		up_text = false;
 		ctx->widths.clear();
 	}
@@ -9472,12 +9473,17 @@ void edit_cx::draw(rvg_cx* rv)
 	glm::ivec2 nposs = _pos;
 	glm::ivec2 ss = _size;
 	auto psv = get_pos(false);
-	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view); 
+	auto vsize = get_size();
+	vsize += thickness * 2;
+	auto view = glm::ivec4(psv, vsize);
+	rv->push_view(view);
+	rv->save();
 	rv->translate(psv);
 	rv->add_rect({ 0,0,ss.x ,ss.y }, rounding);
 	rv->set_color(_color.x);
 	rv->fill();
+	psv += thickness;
+	rv->translate({ thickness ,thickness });
 	auto tpos = ctx->_align_pos - ctx->scroll_pos;
 	auto tpos1 = ctx->_align_pos1 - ctx->scroll_pos;
 
@@ -9496,17 +9502,15 @@ void edit_cx::draw(rvg_cx* rv)
 
 		rv->save();
 		// 裁剪区域渲染选中效果背景
-		rv->add_rect({ thickness,thickness,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
+		rv->add_rect({ 0,0,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
 		rv->clip();
-		srcpos += thickness;
-		npos += thickness;
 		tpos1 = tpos;
-		tpos1.y += (ctx->lineheight - font_size) * text_align.y;
+		tpos1.y += ceil((ctx->lineheight - font_size) * text_align.y);
 		auto v = get_bounds();
-		//rv->translate({ 0,1 });
+		rv->translate({ 0,1 });
 		if (v.x != v.y && ctx->rangerc.size()) {
 			rv->save();
-			rv->translate(srcpos);
+			rv->translate(tpos);
 			rv->set_color(_color.z);
 			if (roundselect)
 			{
@@ -9525,35 +9529,37 @@ void edit_cx::draw(rvg_cx* rv)
 			rv->restore();
 		}
 
+		// 渲染文本
+		glm::vec4 rc = { 0,0,  ss };
+		text_style st = {};
+		st.fontsize = font_size;
+		st.align = {};
+		st.color = text_color;
+		st.family = family;
+		text_st tx = {};
+		tx.pos = { tpos1 };
+		tx.size = ss;
+		if (pwdch)
+		{
+			tx.text = stext.c_str(); tx.text_len = stext.size();
+		}
+		else {
+			tx.text = ctx->str.c_str();
+			tx.text_len = ctx->str.size();
+		}
+		rv->add_text(&tx, &st);
 		rv->restore();
 	}
+	rv->restore();
 	rv->pop_view();
-	// 渲染文本
-	glm::vec4 rc = { 0,0,  ss };
-	text_style st = {};
-	st.fontsize = font_size;
-	st.align = {};
-	st.color = text_color;
-	st.family = family;
-	text_st tx = {};
-	tx.pos = {  };
-	tx.size = ss;
-	if (pwdch)
-	{
-		tx.text = stext.c_str(); tx.text_len = stext.size();
-	}
-	else {
-		tx.text = ctx->str.c_str();
-		tx.text_len = ctx->str.size();
-	}
-	rv->add_text(&tx, &st);
 
-	glm::vec2 cpos = ctx->cursor_pos;
-	cpos += srcpos;
+	glm::ivec2 cpos = ctx->cursor_pos;
+	cpos += tpos + psv;// +(glm::ivec2)rv->_cur.pos;
 	bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
 	if (ccd)
 	{
-		rv->push_view({ cpos.x,cpos.y,align_up(_cursor.x,4),align_up(ctx->cursor_pos.z,4) });
+		auto rpos = cpos;
+		rv->push_view({ rpos ,align_up(_cursor.x,4),align_up(ctx->cursor_pos.z,4) });
 		rv->set_color(_cursor.y);
 		rv->add_rect({ cpos.x,cpos.y, _cursor.x, ctx->cursor_pos.z }, 0);
 		rv->fill();
@@ -9562,7 +9568,7 @@ void edit_cx::draw(rvg_cx* rv)
 	// 编辑中的文本
 	if (is_input)
 	{
-		auto epos = npos + glm::ivec2(cpos);
+		auto epos = glm::ivec2(cpos);
 		uint32_t editing_color = _color.w;
 		if (editingstr.size())
 		{
@@ -9591,14 +9597,14 @@ void edit_cx::draw(rvg_cx* rv)
 			rv->set_line_width(1);
 			rv->stroke();
 
-			rv->restore();
-			rv->pop_view();
 			text_st tx = {};
 			tx.pos = { rc.x,rc.y };
 			tx.size = glm::ivec2(rc.z, rc.w);
 			tx.text = editingstr.c_str(); tx.text_len = editingstr.size();
 			rv->add_text(&tx, &st);
 
+			rv->restore();
+			rv->pop_view();
 		}
 	}
 }
