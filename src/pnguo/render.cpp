@@ -1967,10 +1967,12 @@ bool rvg_cx::load_file(const char* fn)
 		auto crc = h["crc"].get<uint32_t>();
 		std::vector<size_t> ps = gp::get_vsize(h, "offset");
 		if (ps.empty())break;
+		size_t a0 = h["data_size"].get<size_t>();
 		size_t a = 0;
 		for (auto it : ps) {
 			a += it;
 		}
+		if (a != a0 || a < (f.size() - ss - 1))break;
 		f.seek(ss + 1);
 		_view.resize(ps[0] / sizeof(_view[0]));
 		_cmd_pos.resize(ps[1] / sizeof(_cmd_pos[0]));
