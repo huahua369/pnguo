@@ -246,6 +246,7 @@ namespace gp {
 	njson str2ints(const std::string& s);
 
 	std::vector<float> get_vs(njson& n, const char* k);
+	std::vector<size_t> get_vsize(njson& n, const char* k);
 	std::vector<glm::vec2> get_v2(njson& n, const char* k);
 	std::vector<glm::ivec2> get_iv2(njson& n, const char* k);
 	std::vector<glm::vec3> get_v3(njson& n, const char* k);
@@ -253,6 +254,7 @@ namespace gp {
 	std::vector<glm::ivec4> get_iv4(njson& n, const char* k);
 
 	std::vector<float> get_vs(njson0& n, const char* k);
+	std::vector<size_t> get_vsize(njson0& n, const char* k);
 	std::vector<glm::vec2> get_v2(njson0& n, const char* k);
 	std::vector<glm::ivec2> get_iv2(njson0& n, const char* k);
 	std::vector<glm::vec3> get_v3(njson0& n, const char* k);

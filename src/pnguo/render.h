@@ -411,19 +411,17 @@ public:
 	std::vector<Opcode> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
 	std::vector<size_t> _cmd_pos;		// 命令的数据偏移
-	std::stack<stack_item> _stk;
 	std::vector<cmdview_v> _view;		// 视图列表
+	glm::ivec2 pos = {};
+private:
+	std::stack<stack_item> _stk;
 	stack_item _cur = {};				// 当前状态
 	glm::ivec4 _tem_clip = {};
-	glm::ivec4 _tview = {};				// 当前渲染区域
-	float _thickness = 1.0;
-	glm::ivec4* _prc = 0;				// 当前批次渲染区域 
-	glm::ivec2 pos = {};
-	glm::ivec2 scroll_pos = {};
+	glm::ivec4 _tview = {};				// 当前渲染区域 
 public:
 	rvg_cx();
 	~rvg_cx();
-
+	void clear();
 	void submit(fill_style_d* st);
 	void submit(uint32_t fill, uint32_t color, int linewidth = 1);
 	// 填充网格
@@ -492,6 +490,9 @@ public:
 	void pop_view();
 	void push_null(int v);
 	uint32_t get_crc();
+public:
+	void save_file(const char* fn);
+	bool load_file(const char* fn);
 private:
 
 };

@@ -34,6 +34,8 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include "font_core.h"
 
 #include "ecc_sv.h"
+#include "mapView.h"
+
 
 #define SP_RGBA32_R_U(v) ((v) & 0xff)
 #define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
@@ -1520,6 +1522,21 @@ rvg_cx::rvg_cx()
 rvg_cx::~rvg_cx()
 {}
 
+void rvg_cx::clear()
+{
+	_cmdtype.clear();		// 操作类型
+	_cmd.clear();			// 命令数据
+	_cmd_pos.clear();		// 命令的数据偏移
+	_view.clear();		// 视图列表
+	pos = {};
+	while (_stk.size()) {
+		_stk.pop();
+	}
+	_cur = {};				// 当前状态
+	_tem_clip = {};
+	_tview = {};				// 当前渲染区域 
+}
+
 #if 1
 
 void rvg_cx::submit(fill_style_d* st)
@@ -1860,7 +1877,6 @@ inline bool is_textimage(uint8_t c) {
 
 void rvg_cx::push_view(const glm::ivec4& c)
 {
-	//assert((c.z > 0 && c.w > 0));
 	_tview = c;
 	_view.push_back({ _tview,_cmdtype.size(),0 });
 	push_ct(OP_VIEW);
@@ -1885,17 +1901,97 @@ void rvg_cx::push_null(int v)
 
 uint32_t rvg_cx::get_crc()
 {
-	auto ct0 = ecc_crc32u(_cmdtype.data(), _cmdtype.size());
-	auto ct1 = ecc_crc32u(_cmd.data(), _cmd.size());
-	return ct0 ^ ct1;
+	auto ct0 = ecc_crc32u(_view.data(), _view.size());
+	auto ct1 = ecc_crc32u(_cmd_pos.data(), _cmd_pos.size());
+	auto ct2 = ecc_crc32u(_cmdtype.data(), _cmdtype.size());
+	auto ct3 = ecc_crc32u(_cmd.data(), _cmd.size());
+	return ct0 ^ ct1 ^ ct2 ^ ct3;
 }
-
-
 void rvg_cx::push_ct(uint8_t op)
 {
 	_cmdtype.push_back((Opcode)op);
 	_cmd_pos.push_back(_cmd.size());
 }
+
+void rvg_cx::save_file(const char* fn)
+{
+	hz::mfile_t f;
+	if (f.open_m(fn, false)) {
+		njson0 h;
+		h["pos"] = { pos.x,pos.y };
+		std::vector<size_t> ps = { _view.size() * sizeof(_view[0])
+			,_cmd_pos.size() * sizeof(_cmd_pos[0])
+			, _cmdtype.size() * sizeof(_cmdtype[0])
+			, _cmd.size() * sizeof(_cmd[0])
+		};
+		h["offset"] = ps;
+		size_t a = 0;
+		for (auto it : ps) {
+			a += it;
+		}
+		h["data_size"] = a;
+		auto crc = get_crc();
+		h["crc"] = crc;
+		auto dumstr = h.dump(2);
+		a += dumstr.size() + 1;
+		auto d = f.map(a, 0);
+		if (d)
+		{
+			f.write(dumstr.c_str(), dumstr.size() + 1);
+			f.write(_view.data(), ps[0]);
+			f.write(_cmd_pos.data(), ps[1]);
+			f.write(_cmdtype.data(), ps[2]);
+			f.write(_cmd.data(), ps[3]);
+			f.flush();
+		}
+	}
+}
+
+namespace gp
+{
+	glm::vec2 get_vec2(njson& n, const char* k);
+	glm::vec2 get_vec2(njson0& n, const char* k);
+}
+bool rvg_cx::load_file(const char* fn)
+{
+	hz::mfile_t f;
+	bool ret = false;
+	auto d = f.open_d(fn, true);
+	do {
+		if (!d || d[0] != '{')break;
+		clear();
+		auto ss = strlen(d);
+		njson0 h = njson0::parse(d, d + f.size());
+		if (h.empty() || !h.is_object())break;
+		pos = gp::get_vec2(h, "pos");
+		auto crc = h["crc"].get<uint32_t>();
+		std::vector<size_t> ps = gp::get_vsize(h, "offset");
+		if (ps.empty())break;
+		size_t a = 0;
+		for (auto it : ps) {
+			a += it;
+		}
+		f.seek(ss + 1);
+		_view.resize(ps[0] / sizeof(_view[0]));
+		_cmd_pos.resize(ps[1] / sizeof(_cmd_pos[0]));
+		_cmdtype.resize(ps[2] / sizeof(_cmdtype[0]));
+		_cmd.resize(ps[3] / sizeof(_cmd[0]));
+		f.read(_view.data(), ps[0]);
+		f.read(_cmd_pos.data(), ps[1]);
+		f.read(_cmdtype.data(), ps[2]);
+		f.read(_cmd.data(), ps[3]);
+		auto crc1 = get_crc();
+		if (crc != crc1)
+		{
+			assert(0);
+		}
+		else {
+			ret = true;
+		}
+	} while (0);
+	return ret;
+}
+
 
 
 size_t cmd_op_submit_style(uint8_t* d, VkvgContext ctx)
@@ -3246,7 +3342,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 		max_rect.y = std::max(max_rect.y, d.size.y);
 		it.dcv_index = dcv.size();
 		dcv.push_back(d);
-	} 
+	}
 	//	if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
 	//	{
 	//		f.rc.x = std::min(f.rc.x, c.x);

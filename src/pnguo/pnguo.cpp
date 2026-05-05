@@ -204,12 +204,10 @@ private:
 };
 
 transform2d_t::transform2d_t()
-{
-}
+{}
 
 transform2d_t::~transform2d_t()
-{
-}
+{}
 
 class tfAccessor
 {
@@ -295,8 +293,7 @@ public:
 public:
 	tfChannel() {}
 	~tfChannel()
-	{
-	}
+	{}
 };
 
 struct tfAnimation
@@ -408,12 +405,10 @@ private:
 };
 
 component2d_editer_t::component2d_editer_t()
-{
-}
+{}
 
 component2d_editer_t::~component2d_editer_t()
-{
-}
+{}
 
 void component2d_t::update(float delta)
 {
@@ -692,12 +687,10 @@ void skeleton_t::set_active(uint32_t idx, uint32_t aidx)
 
 
 skeleton_data::skeleton_data()
-{
-}
+{}
 
 skeleton_data::~skeleton_data()
-{
-}
+{}
 
 
 
@@ -714,12 +707,10 @@ private:
 };
 
 packget2d_t::packget2d_t()
-{
-}
+{}
 
 packget2d_t::~packget2d_t()
-{
-}
+{}
 // 加载骨骼动画
 skeleton_t* load_skeleton_file(const void* filepath)
 {
@@ -761,12 +752,10 @@ vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4 c) :position(p), tex_co
 
 
 mesh2d_cx::mesh2d_cx()
-{
-}
+{}
 
 mesh2d_cx::~mesh2d_cx()
-{
-}
+{}
 
 void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip)
 {
@@ -813,8 +802,7 @@ void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, 
 }
 
 canvas_atlas::canvas_atlas()
-{
-}
+{}
 
 canvas_atlas::~canvas_atlas()
 {
@@ -3986,8 +3974,7 @@ namespace gp {
 				Ring& lower,
 				Ring& upper)
 				: pts{ points }, onring{ &upper }, offring{ &lower }
-			{
-			}
+			{}
 		};
 
 		void triangulate_wall(std::vector<Vec>& pts,
@@ -4300,8 +4287,7 @@ namespace gp {
 	};
 
 	polygon_ct::polygon_ct()
-	{
-	}
+	{}
 
 	polygon_ct::~polygon_ct()
 	{
@@ -6716,6 +6702,48 @@ namespace gp {
 		else { v.push_back(toFloat(ns)); }
 		return v;
 	}
+	std::vector<float> get_vs(njson0& n, const char* k)
+	{
+		std::vector<float> v;
+		if (n.find(k) == n.end() || n[k].empty()) { return v; }
+		auto ns = n[k];
+		if (ns.is_array())
+		{
+			for (auto& it : ns) {
+				v.push_back(toFloat(it));
+			}
+		}
+		else { v.push_back(toFloat(ns)); }
+		return v;
+	}
+	std::vector<size_t> get_vsize(njson& n, const char* k)
+	{
+		std::vector<size_t> v;
+		if (n.find(k) == n.end() || n[k].empty()) { return v; }
+		auto ns = n[k];
+		if (ns.is_array())
+		{
+			for (auto& it : ns) {
+				v.push_back(toInt(it));
+			}
+		}
+		else { v.push_back(toInt(ns)); }
+		return v;
+	}
+	std::vector<size_t> get_vsize(njson0& n, const char* k)
+	{
+		std::vector<size_t> v;
+		if (n.find(k) == n.end() || n[k].empty()) { return v; }
+		auto ns = n[k];
+		if (ns.is_array())
+		{
+			for (auto& it : ns) {
+				v.push_back(toInt(it));
+			}
+		}
+		else { v.push_back(toInt(ns)); }
+		return v;
+	}
 	std::vector<glm::vec2> get_v2(njson& n, const char* k)
 	{
 		std::vector<glm::vec2> v;
@@ -6724,7 +6752,7 @@ namespace gp {
 		auto c = ns.size();
 		for (size_t i = 0; i < c; i += 2)
 		{
-			glm::ivec2 vt = { toFloat(ns[i]),toFloat(ns[i + 1]) };
+			glm::vec2 vt = { toFloat(ns[i]),toFloat(ns[i + 1]) };
 			v.push_back(vt);
 		}
 		return v;
@@ -6791,9 +6819,25 @@ namespace gp {
 		auto c = ns.size();
 		for (size_t i = 0; i < c; i += 2)
 		{
-			glm::ivec2 vt = { toFloat(ns[i]),toFloat(ns[i + 1]) };
+			glm::vec2 vt = { toFloat(ns[i]),toFloat(ns[i + 1]) };
 			v.push_back(vt);
 		}
+		return v;
+	}
+	glm::vec2 get_vec2(njson& n, const char* k)
+	{
+		glm::vec2 v = {};
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
+		auto ns = n[k]; 
+		v = { toFloat(ns[0]),toFloat(ns[1]) };
+		return v;
+	}
+	glm::vec2 get_vec2(njson0& n, const char* k)
+	{
+		glm::vec2 v = {};
+		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
+		auto ns = n[k]; 
+		v = { toFloat(ns[0]),toFloat(ns[1]) };
 		return v;
 	}
 	std::vector<glm::ivec2> get_iv2(njson0& n, const char* k)
@@ -7712,8 +7756,7 @@ namespace gp {
 
 
 path_v::path_v()
-{
-}
+{}
 
 path_v::~path_v()
 {
@@ -9764,12 +9807,10 @@ void set_grid_repeat(grid_div* p, size_t rows, size_t columns, float w, float h)
 
 // 格子布局
 grid_view::grid_view()
-{
-}
+{}
 
 grid_view::~grid_view()
-{
-}
+{}
 
 void grid_view::set_size(size_t x, size_t y)
 {
@@ -9869,8 +9910,7 @@ glm::vec4 grid_view::get(const glm::ivec2& pos)
 
 
 astar_search::astar_search()
-{
-}
+{}
 
 astar_search::~astar_search()
 {
@@ -10082,12 +10122,10 @@ bool astar_search::NextPath(glm::ivec2* pos)
 
 
 maze_cx::maze_cx()
-{
-}
+{}
 
 maze_cx::~maze_cx()
-{
-}
+{}
 void maze_cx::init(int w, int h)
 {
 	width = w;

@@ -871,6 +871,8 @@ int main()
 			canvas2d_t* td3 = new canvas2d_t();
 			auto rvgd = new rvg_data_cx();
 			rvgd->mix_text = false;
+			auto rvgd1 = new rvg_data_cx();
+			rvgd1->mix_text = false;
 			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			td3->familys = family;
@@ -1009,6 +1011,20 @@ int main()
 				c->font_size = 15;
 				dvv->add_widget(c);
 			}
+			static bool loadf = false;
+			{
+				auto btn = new color_btn();
+				btn->rounding = 4;
+				btn->set_btn_color_bgr(fmod(2, 5));
+				dvv->add_widget(btn);
+				btn->set_size({ 128,36 });
+				btn->font_size = 16;
+				btn->text_color = -1;
+				btn->str = (char*)u8"🍕截取保存文件 ";
+				btn->click_cb = [=](void* p, int clicks) {
+					loadf = true;
+					};
+			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
 				div->on_event(type, e);
@@ -1039,6 +1055,7 @@ int main()
 					//if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
+					td3->draw_rvg(rvgd1);
 					//td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
 					//td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
 				};
@@ -1059,6 +1076,14 @@ int main()
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
 					dvv->draw(&rvg);
+					if (loadf) {
+						loadf = false;
+						rvg.save_file("temp/rvg_output.jbin");
+						rvg_cx rvg1;
+						rvg1.load_file("temp/rvg_output.jbin");
+						rvg1.pos = { 600,10 };
+						*ret = td3->update_rvg(&rvg1, rvgd1);
+					}
 					*ret = td3->update_rvg(&rvg, rvgd);
 
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
@@ -1094,7 +1119,7 @@ int main()
 						rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
-						rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
+						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 
