@@ -1138,6 +1138,7 @@ int main()
 							save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
 						}
 					}
+					vkd->_state.has_fence = !(*ret);
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					if (!vkd->_state.has_fence) {
 						auto sem = vkd->get_fbo_semaphore();
