@@ -133,7 +133,7 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 #endif
 
 
-
+#if 0
 // todo 字体纹理缓存管理
 class layout_text_x
 {
@@ -1147,7 +1147,7 @@ text_image_t* layout_text_x::get_glyph_item1(font_t* p, int fontsize, const void
 	} while (str && *str);
 	return opt;
 }
-
+#endif
 
 void text_path2path_v(text_path_t* t, path_v* opt)
 {
@@ -4310,7 +4310,7 @@ input_state_t* get_input_state(void* ptr, int t)
 
 #endif // !NO_EDIT
 
-#ifndef NO_TVIEW
+#ifdef NO_TVIEW
 
 class tview_x
 {

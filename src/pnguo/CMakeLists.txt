@@ -7,7 +7,6 @@ set(pnguo_src
 "tinysdl3.cpp"
 "pnguo.cpp"
 "tria.cpp"
-"backend_2d.cpp"
 "mesh3d.cpp"
 "font_core.cpp"
 "mnet.cpp"

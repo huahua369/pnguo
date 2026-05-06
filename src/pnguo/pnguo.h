@@ -1191,7 +1191,6 @@ a	b	y
 
 
 #include "font_core.h"
-#include "backend_2d.h"
 #include "gui.h"
 #include "audio.h"
 

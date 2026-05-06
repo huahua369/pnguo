@@ -739,6 +739,89 @@ skeleton_t* load_skeleton_mem(const void* d, size_t len)
 void premultiply_data(int w, unsigned char* data, int type, bool multiply);
 
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif // !M_PI
+
+#ifndef EPSILON
+#define EPSILON 1e-8
+#define EPSILON_NUMERIC 1e-4
+#endif
+#ifndef THREE_SQRT
+#define THREE_SQRT sqrt(3)
+#define ONE_THIRD (1.0 / 3.0)
+#define INTMAX_2 INTMAX_MAX
+#endif
+#ifndef c_KAPPA90
+#define c_KAPPA90 (0.5522847493f)	// Length proportional to radius of a cubic bezier handle for 90deg arcs.
+#endif
+
+
+#define SP_RGBA32_R_U(v) ((v) & 0xff)
+#define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
+#define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
+#define SP_RGBA32_A_U(v) (((v) >> 24) & 0xff)
+#define SP_COLOR_U_TO_F(v) ((v) / 255.0)
+#define SP_COLOR_F_TO_U(v) ((uint32_t) ((v) * 255. + .5))
+#define SP_RGBA32_R_F(v) SP_COLOR_U_TO_F (SP_RGBA32_R_U (v))
+#define SP_RGBA32_G_F(v) SP_COLOR_U_TO_F (SP_RGBA32_G_U (v))
+#define SP_RGBA32_B_F(v) SP_COLOR_U_TO_F (SP_RGBA32_B_U (v))
+#define SP_RGBA32_A_F(v) SP_COLOR_U_TO_F (SP_RGBA32_A_U (v))
+
+glm::vec4 colorv4(uint32_t rgba) {
+	return { SP_RGBA32_R_F(rgba), SP_RGBA32_G_F(rgba), SP_RGBA32_B_F(rgba), SP_RGBA32_A_F(rgba) };
+}
+glm::vec4 colorv4_bgr(uint32_t bgra) {
+	return { SP_RGBA32_B_F(bgra), SP_RGBA32_G_F(bgra),SP_RGBA32_R_F(bgra), SP_RGBA32_A_F(bgra) };
+}
+
+glm::vec2 v2xm3(const glm::vec2& v, const glm::mat3& m) {
+	glm::vec3 ps(v, 1.0);
+	return m * ps;
+}
+
+glm::vec4 get_boxm3(const glm::vec4& v, const glm::mat3& m) {
+	glm::vec3 ps = { v.x,v.y,1.0 };
+	glm::vec3 ps1 = { v.z,v.w ,1.0 };
+	ps = m * ps;
+	ps1 = m * ps1;
+	return glm::vec4(ps.x, ps.y, ps1.x, ps1.y);
+}
+
+inline int multiply_alpha(int alpha, int color)
+{
+	int temp = (alpha * color) + 0x80;
+	return ((temp + (temp >> 8)) >> 8);
+}
+// 预乘输出bgra，type=0为原数据是rgba
+void premultiply_data(int w, unsigned char* data, int type, bool multiply)
+{
+	for (size_t i = 0; i < w; i += 4) {
+		uint8_t* base = &data[i];
+		uint8_t  alpha = base[3];
+		uint32_t p;
+
+		if (alpha == 0) {
+			p = 0;
+		}
+		else {
+			uint8_t  red = base[0];
+			uint8_t  green = base[1];
+			uint8_t  blue = base[2];
+
+			if (alpha != 0xff && multiply) {
+				red = multiply_alpha(alpha, red);
+				green = multiply_alpha(alpha, green);
+				blue = multiply_alpha(alpha, blue);
+			}
+			if (type == 0)
+				p = ((uint32_t)alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
+			else
+				p = ((uint32_t)alpha << 24) | (blue << 16) | (green << 8) | (red << 0);
+		}
+		memcpy(base, &p, sizeof(uint32_t));
+	}
+}
 
 
 vertex_v2::vertex_v2() {}
@@ -1803,27 +1886,15 @@ bool check_rc(const glm::vec4& rc, const glm::vec3& c)
 
 
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif // !M_PI
-
-#ifndef THREE_SQRT
-#define EPSILON8 1e-8
-#define EPSILON_NUMERIC 1e-4
-
-#define THREE_SQRT sqrt(3)
-#define ONE_THIRD (1.0 / 3.0)
-#define INTMAX_2 INTMAX_MAX
-#endif
 
 #if 1
 
 #if 1 
 bool isAroundZero(float val) {
-	return val > -EPSILON8 && val < EPSILON8;
+	return val > -EPSILON && val < EPSILON;
 }
 bool isNotAroundZero(float val) {
-	return val > EPSILON8 || val < -EPSILON8;
+	return val > EPSILON || val < -EPSILON;
 }
 /**
  * 向量距离平方
