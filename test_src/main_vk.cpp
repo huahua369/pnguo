@@ -1139,8 +1139,10 @@ int main()
 						}
 					}
 					vkd->on_render();		// 渲染到fbo纹理tex3d
-					//auto sem = vkd->get_fbo_semaphore();
-					//form0->add_vk_semaphores(sem, 0, 0);
+					if (!vkd->_state.has_fence) {
+						auto sem = vkd->get_fbo_semaphore();
+						form0->add_vk_semaphores(sem, 0, 0);
+					}
 					static bool savepng = false;
 					auto afilename = savepng ? filename : 0;
 					//test_drawvkvg(ctx, surf, bs, afilename);

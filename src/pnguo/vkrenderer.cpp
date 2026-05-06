@@ -22042,7 +22042,7 @@ namespace vkr {
 			submit_info2.pWaitDstStageMask = &submitWaitStage;
 			submit_info2.commandBufferCount = 1;
 			submit_info2.pCommandBuffers = &cmdBuf2;
-			if (1)
+			if (pState->has_fence)
 			{
 				submit_info2.signalSemaphoreCount = 0;
 				submit_info2.pSignalSemaphores = 0;					// 渲染完成信号

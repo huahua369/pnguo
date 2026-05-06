@@ -244,6 +244,7 @@ struct scene_state {
 	bool  bUseMagnifier = false;
 	bool  bLockMagnifierPosition;
 	bool  bLockMagnifierPositionHistory;
+	bool  has_fence = true;
 };
 
 struct image_dr
