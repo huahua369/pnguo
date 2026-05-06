@@ -1056,12 +1056,10 @@ int main()
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-					//auto sem = vkd->get_fbo_semaphore();
-					//form0->add_vk_semaphores(sem, 0, 0);
-					//texture_dt tdt = {};
-					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					//if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					td3->draw_rvg(rvgd1);
@@ -1071,12 +1069,13 @@ int main()
 			form0->up_cb = [=](float delta, int* ret)
 				{
 					int d = delta * 1000;
-					//vkd->on_render();		// 渲染到fbo纹理tex3d
 					auto light = vkd->get_light(0);
 					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
 					vkd->_state.Exposure;					// 曝光度：默认1.0
 					vkd->_state.bUseTAA;
 					vkd->_state.WireframeMode;				// 0 1 2 6
+
+
 					static int ity = 6;
 					light->_intensity = ity;
 
@@ -1099,15 +1098,16 @@ int main()
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
+					static glm::ivec3 sct = {};
+					glm::ivec3 mps1 = { edit1->_cmpos,edit1->get_cursor_idx() };
+					glm::ivec3 mps = { dvv->evupdate,0,0 };
+					if (mps != sct)
+					{
+						sct = mps;
+					}
 					if (kti > 0.06)
 					{
-						static glm::ivec3 sct = {};
-						glm::ivec3 mps = { edit1->_cmpos,edit1->get_cursor_idx() };
-						if (mps != sct)
-						{
-							sct = mps;
-							*ret = true;
-						}
+						*ret = true;
 						kti = 0.0;
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
@@ -1125,7 +1125,7 @@ int main()
 						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
 						static glm::ivec2 imgpos = { 600,600 };
 						// 文字缓存
-						rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
+						//rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
 						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
@@ -1138,6 +1138,9 @@ int main()
 							save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
 						}
 					}
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					//auto sem = vkd->get_fbo_semaphore();
+					//form0->add_vk_semaphores(sem, 0, 0);
 					static bool savepng = false;
 					auto afilename = savepng ? filename : 0;
 					//test_drawvkvg(ctx, surf, bs, afilename);
@@ -1152,56 +1155,6 @@ int main()
 					//	Sleep(1);
 					//}
 				};
-			{
-				static const char* vertex_glsl = R"glsl(
-layout(push_constant) uniform uPushConstant
-//layout(binding=0) uniform u_UniformBuffer 
-{
-    mat4 u_mvpMatrix;
-};
-
-layout(location = 0) in vec3 pos;
-layout(location = 1) in vec2 uv;
-layout(location = 2) in vec4 col; 
-
-out gl_PerVertex
-{
-    vec4 gl_Position;
-};
-
-layout(location = 0) out struct{
-    vec4 col;
-    vec2 uv;
-} o;
-
-void main(){
-    gl_Position = u_mvpMatrix * vec4(pos.xyz, 1);
-    o.uv = uv;
-    o.col = col;  
-}
-)glsl";
-				static const char* fragment_glsl = R"glsl(
-layout(binding=1) uniform sampler2D u_Texture;
-layout(location = 0) in struct{
-    vec4 col;
-    vec2 uv;
-} d;
-layout(location = 0) out vec4 o_Color;
-void main()
-{
-  vec4 c = texture(u_Texture, d.uv.st);
-  o_Color = d.col * c; 
-}
-
-)glsl";
-				std::string v1 = "#version 450\n";
-				std::string f1 = "#version 450\n";
-				//v1 += v;
-				v1 += vertex_glsl;
-				//f1 += f;
-				f1 += fragment_glsl;
-				//vkg::new_shader(dctx, f1.c_str(), v1.c_str(), 1);
-			}
 			// 运行消息循环
 			run_app(app, 0);
 			td3->free_rvg(rvgd);

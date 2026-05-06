@@ -7372,7 +7372,7 @@ bool div_cx::press_test(const glm::ivec2& pos)
 	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)_size;
 	glm::vec4 rc = { ips ,ips + ss };
 
-	if (_bst & (int)BTN_STATE::STATE_ACTIVE) {
+	if (ckinc > 0 || _bst & (int)BTN_STATE::STATE_ACTIVE) {
 		r = true;
 	}
 	else

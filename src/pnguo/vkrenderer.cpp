@@ -22042,18 +22042,25 @@ namespace vkr {
 			submit_info2.pWaitDstStageMask = &submitWaitStage;
 			submit_info2.commandBufferCount = 1;
 			submit_info2.pCommandBuffers = &cmdBuf2;
-			submit_info2.signalSemaphoreCount = 1;
-			submit_info2.pSignalSemaphores = &_fbo.sem_out;					// 渲染完成信号
-
-			auto st = vkGetFenceStatus(m_pDevice->m_device, _fbo.fence);
-			if (!st)
+			if (1)
 			{
-				vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
+				submit_info2.signalSemaphoreCount = 0;
+				submit_info2.pSignalSemaphores = 0;					// 渲染完成信号
+				auto st = vkGetFenceStatus(m_pDevice->m_device, _fbo.fence);
+				if (!st)
+				{
+					vkResetFences(m_pDevice->m_device, 1, &_fbo.fence);
+				}
+				//printf("Renderer_cx fence %p: %d\n", _fbo.fence, st);
+				res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, _fbo.fence);
+				vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
 			}
-			//printf("Renderer_cx fence %p: %d\n", _fbo.fence, st);
-			res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, _fbo.fence);
+			else {
+				submit_info2.signalSemaphoreCount = 1;
+				submit_info2.pSignalSemaphores = &_fbo.sem_out;					// 渲染完成信号
+				res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, 0);
+			}
 			assert(res == VK_SUCCESS);
-			//vkWaitForFences(m_pDevice->m_device, 1, &_fbo.fence, VK_TRUE, UINT64_MAX);
 		}
 	}
 	void Renderer_cx::set_fbo(fbo_info_cx* p, int idx)
