@@ -1068,8 +1068,6 @@ int main()
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					td3->draw_rvg(rvgd1);
-					//td3->draw_boxtext(mrt_get_box_index(mrtext, 0), {});
-					//td3->draw_boxtext(mrt_get_box_index(mrtext, 1), {});
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1085,19 +1083,22 @@ int main()
 					light->_intensity = ity;
 
 					*ret |= dvv->update(delta);
-					edit1->_color.x = colorpick->get_color();
-					rvg_cx rvg;
-					rvg.pos = dvv->get_pos();
-					dvv->draw(&rvg);
-					if (loadf) {
-						loadf = false;
-						rvg.save_file("temp/rvg_output.jbin");
-						rvg_cx rvg1;
-						rvg1.load_file("temp/rvg_output.jbin");
-						rvg1.pos = { 600,10 };
-						*ret |= td3->update_rvg(&rvg1, rvgd1);
+					{
+
+						edit1->_color.x = colorpick->get_color();
+						rvg_cx rvg;
+						rvg.pos = dvv->get_pos();
+						dvv->draw(&rvg);
+						if (loadf) {
+							loadf = false;
+							rvg.save_file("temp/rvg_output.jbin");
+							rvg_cx rvg1;
+							rvg1.load_file("temp/rvg_output.jbin");
+							rvg1.pos = { 600,10 };
+							*ret |= td3->update_rvg(&rvg1, rvgd1);
+						}
+						*ret |= td3->update_rvg(&rvg, rvgd);
 					}
-					*ret |= td3->update_rvg(&rvg, rvgd);
 
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
@@ -1143,7 +1144,7 @@ int main()
 							save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
 						}
 					}
-					 
+
 					static bool savepng = false;
 					auto afilename = savepng ? filename : 0;
 					//test_drawvkvg(ctx, surf, bs, afilename);
