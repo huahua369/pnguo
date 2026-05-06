@@ -29,7 +29,7 @@
 #include <pnguo/win_core.h>
 
 #include <SDL3/SDL.h>
-
+#include <pnguo/hex_editor.h>
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 #ifdef min
@@ -867,7 +867,15 @@ int main()
 			bspline_ct* bs = new bspline_ct();
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
-
+			//auto hex16 = new hex_editor();
+			//auto hexstyle = new hex_style_t();
+			//hexstyle->st = new text_style();
+			//hex16->set_file("temp/rvg_output.jbin", true);
+			//hexstyle->st->family = family;
+			//hexstyle->st->fontsize = 16;
+			//hexstyle->st->lineheight = 20;
+			//hexstyle->pxx = 1;
+			//hexstyle->pyy = 1;
 			canvas2d_t* td3 = new canvas2d_t();
 			auto rvgd = new rvg_data_cx();
 			rvgd->mix_text = false;
@@ -924,6 +932,7 @@ int main()
 			dvv->flex_child.margin_right = 2;
 			dvv->flex_child.margin_top = 2;
 			dvv->flex_child.margin_bottom = 2;
+			dvv->draggable = true;
 			//dvv->flex.direction = flex_direction::COLUMN;
 			uint32_t colors[5] = { 0x905050fc,0x9050fc50,0x90fc5050,0x90ffffff,0x90282828 };
 			//x=默认，y=鼠标进入，z=按下
@@ -1071,7 +1080,7 @@ int main()
 					static int ity = 6;
 					light->_intensity = ity;
 
-					dvv->update(delta);
+					*ret |= dvv->update(delta);
 					edit1->_color.x = colorpick->get_color();
 					rvg_cx rvg;
 					rvg.pos = dvv->get_pos();
@@ -1082,9 +1091,9 @@ int main()
 						rvg_cx rvg1;
 						rvg1.load_file("temp/rvg_output.jbin");
 						rvg1.pos = { 600,10 };
-						*ret = td3->update_rvg(&rvg1, rvgd1);
+						*ret |= td3->update_rvg(&rvg1, rvgd1);
 					}
-					*ret = td3->update_rvg(&rvg, rvgd);
+					*ret |= td3->update_rvg(&rvg, rvgd);
 
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
 					vkd->update(form0->io);	// 更新事件
@@ -1196,7 +1205,9 @@ void main()
 			// 运行消息循环
 			run_app(app, 0);
 			td3->free_rvg(rvgd);
+			td3->free_rvg(rvgd1);
 			delete rvgd;
+			delete rvgd1;
 			delete ptb;
 			delete td3;
 

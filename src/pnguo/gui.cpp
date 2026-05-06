@@ -6542,11 +6542,11 @@ widget_t::~widget_t()
 {}
 void widget_t::set_pos(const glm::ivec2& ps)
 {
-	_pos = ps;
+	_pos = ps; valid = true;
 }
 void widget_t::set_size(const glm::vec2& ss)
 {
-	_size = ss;
+	_size = ss; valid = true;
 }
 glm::vec2 widget_t::get_size()
 {
@@ -6963,15 +6963,15 @@ void div_cx::on_motion(const glm::vec2& pos)
 	}
 
 	//tv->on_motion(ps - tpos);
-	update(0);
+	//update(0);
 }
 void div_cx::on_button(int idx, int down, const glm::vec2& pos, int clicks, int r)
 {
-	glm::ivec2 ps = pos;
+	glm::ivec2 ps = pos - (glm::vec2)get_pos();
 	if (idx == 1)
 	{
-		glm::vec4 trc = viewport;
-		auto k2 = check_box_cr1(pos, &trc, 1, sizeof(glm::vec4));
+		glm::vec4 trc = glm::vec4(0, 0, get_size());
+		auto k2 = check_box_cr1(ps, &trc, 1, sizeof(glm::vec4));
 
 		if (k2.x)
 		{
@@ -7011,12 +7011,12 @@ void div_cx::on_button(int idx, int down, const glm::vec2& pos, int clicks, int 
 		}
 	}
 	//tv->on_button(idx, down, ps - tpos, clicks);
-	update(0);
+	//update(0);
 	//_draw_valid = true;
 }
 void div_cx::on_wheel(double x, double y)
 {
-	update(0);
+	//update(0);
 }
 scroll_bar* div_cx::new_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos)
 {
@@ -7086,17 +7086,18 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	auto e = &ep->v;
 	if (!visible)return;
 	auto t = (devent_type_e)type;
-	glm::ivec2 vgpos = viewport;
+	//glm::ivec2 vgpos = viewport;
 	int r1 = 0;
 	auto ppos = get_pos();
 	auto sps = get_spos();
 	_hover_eq.w = type;
 	widget_t* hpw = 0;
+
 	if (t == devent_type_e::mouse_move_e)
 	{
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y };
-		glm::vec4 trc = viewport;
+		glm::vec4 trc = glm::vec4(0, 0, get_size());
 		auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 		if (k2.x) {
 			_bst |= (int)BTN_STATE::STATE_HOVER;
@@ -7148,7 +7149,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 				event_wts1.push_back(*it);
 		}
 		if (this) {
-			this->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(this) : event_wts1.push_back(this);//本容器
+			//this->_bst& (int)BTN_STATE::STATE_HOVER ? event_wts.push_back(this) : event_wts1.push_back(this);//本容器
 		}
 		auto length = event_wts.size();
 		{
@@ -7433,6 +7434,10 @@ bool div_cx::update(float delta)
 	if (uplayout)
 	{
 		clayout(); ic++;
+	}
+	if (valid) {
+		valid = false;
+		ic++;
 	}
 	return ic > 0;
 }

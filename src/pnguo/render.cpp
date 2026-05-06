@@ -1522,6 +1522,15 @@ rvg_cx::rvg_cx()
 rvg_cx::~rvg_cx()
 {}
 
+void rvg_cx::set_pos(const glm::ivec2& ps)
+{
+	if (pos != ps)
+	{
+		pos = ps;
+
+	}
+}
+
 void rvg_cx::clear()
 {
 	_cmdtype.clear();		// 操作类型
@@ -1934,6 +1943,7 @@ void rvg_cx::save_file(const char* fn)
 		h["crc"] = crc;
 		auto dumstr = h.dump(2);
 		a += dumstr.size() + 1;
+		f.ftruncate_m(a);
 		auto d = f.map(a, 0);
 		if (d)
 		{
@@ -2980,7 +2990,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 	void* renderer = rptr;
 	if (!rcb || !renderer)return;
 	if (!dst || dst->dst_data.empty())return;
-	glm::vec2 pos = dst->pos;
+	glm::vec2 pos0 = dst->_pos;
 	auto length = dst->dst_data.size();
 	int kc = 0;
 	for (size_t m = 0; m < length; m++)
@@ -2988,7 +2998,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 		auto& vt = dst->dst_data[m];
 		if (vt.t)
 		{
-			draw_boxtext(vt.t, pos);
+			draw_boxtext(vt.t, pos0);
 			kc++;
 		}
 		else if (vt.d2)
@@ -3002,7 +3012,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 				{
 					texture_dt dt = {};
 					auto ost = it->offset;
-					ost += dst->pos;
+					ost += dst->_pos;
 					ost -= stwidth;
 					auto ss = it->size;
 					ss -= stwidth;
@@ -3401,14 +3411,15 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 {
 	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
 	auto rcrc = rvg->get_crc();
+	bool ret = dst->_pos != rvg->pos;
+	dst->_pos = rvg->pos;
 	if (dst->cmd_crc == rcrc)
 	{
-		return false;
+		return ret;
 	}
 	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
 	dst->_view = _view;
-	dst->pos = rvg->pos;
 	dst->update(rvg);
 	bool first = false;
 	dst->mrt->rich._ct_style.family = familys;

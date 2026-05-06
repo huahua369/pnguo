@@ -421,6 +421,7 @@ private:
 public:
 	rvg_cx();
 	~rvg_cx();
+	void set_pos(const glm::ivec2 &ps);
 	void clear();
 	void submit(fill_style_d* st);
 	void submit(uint32_t fill, uint32_t color, int linewidth = 1);
@@ -513,7 +514,7 @@ public:
 	std::vector<surface_ctx> surfaces;
 	std::vector<vitext_t> dst_data;		// 渲染数据列表
 	glm::ivec4 _view = {};
-	glm::ivec2 pos = {};
+	glm::ivec2 _pos = {};
 	float stwidth = 2.0;
 	uint32_t cmd_crc = 0;
 	bool mix_text = true;

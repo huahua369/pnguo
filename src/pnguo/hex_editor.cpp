@@ -2,7 +2,8 @@
 #include "pch1.h"
 #include "hex_editor.h" 
 #include "pnguo.h"
-
+#include "render.h"
+#include "mapView.h"
 // 16进制编辑
 #if 1
 
@@ -475,16 +476,16 @@ bool hex_editor::update_hex_editor()
 	}
 	return true;
 }
-text_draw_t* hex_editor::get_drawt()
-{
-	if (ruler_di.empty())
-		ruler_di = get_ruler_di();
-	tdt.text = &ruler;
-	tdt.text_rc = text_rc;
-	tdt.color = color;
-	tdt.count = 7;
-	return &tdt;
-}
+//text_draw_t* hex_editor::get_drawt()
+//{
+//	if (ruler_di.empty())
+//		ruler_di = get_ruler_di();
+//	tdt.text = &ruler;
+//	tdt.text_rc = text_rc;
+//	tdt.color = color;
+//	tdt.count = 7;
+//	return &tdt;
+//}
 
 glm::i64vec2 hex_editor::get_range2()
 {
@@ -515,22 +516,22 @@ glm::ivec2 hex_editor::get_draw_rect()
 	return r - pos;
 }
 
-void hex_editor::draw_rc(cairo_t* cr)
+void hex_editor::draw_rc(rvg_cx* rv)
 {
 	if (!rsx || rsx->rangerc.empty())return;
-	set_color(cr, select_color);
+	rv->set_color(select_color);
 	if (round_path > 0)
 	{
 		if (rsx->range_path.size() && rsx->range_path[0].size() > 3) {
-			draw_polyline(cr, &rsx->range_path, true);
-			cairo_fill(cr);
+			rv->add_polyline(&rsx->range_path, true);
+			rv->fill();
 		}
 	}
 	else {
 		for (auto& it : rsx->rangerc)
 		{
-			draw_rectangle(cr, it, std::min(it.z, it.w) * 0.18);
-			cairo_fill(cr);
+			rv->add_rect(it, std::min(it.z, it.w) * 0.18);
+			rv->fill();
 		}
 	}
 }
@@ -645,10 +646,10 @@ void hex_editor::make_rc()
 	//printf("fs\t%lld\t%lld\n", f, s);
 }
 
-void hex_editor::update_draw(hex_style_t* hst)
+void hex_editor::update_draw(hex_style_t* hst, rvg_cx* rv)
 {
-	if (!hst || !hst->st || !hst->ltx)return;
-	cairo_t* cr = hst->cr;
+	if (!hst || !hst->st || !rv)return;
+
 	auto fl = hst->fl;
 	auto pxx = hst->pxx;
 	auto pyy = hst->pyy;
@@ -658,7 +659,7 @@ void hex_editor::update_draw(hex_style_t* hst)
 	update_hex_editor();
 	// 主绘制代码 
 	auto nn = line_number_n;
-	int cw = hst->st->font_size * 0.5;
+	int cw = hst->st->fontsize * 0.5;
 	int line_number_width = nn * cw;
 	int data_width = bytes_per_line * cw * 3;
 	auto height = hst->view_size.y;
@@ -674,36 +675,30 @@ void hex_editor::update_draw(hex_style_t* hst)
 	text_rc[5] = { dataps,hst->MARGIN ,hst->RULER_DI_WIDTH, height }; // dititle 
 	dataps += hst->DATA_INSPECTOR_TITLE_WIDTH;
 	text_rc[6] = { dataps, hst->MARGIN + fl, hst->RULER_DI_WIDTH, height }; // data_inspector 
-	if (!cr)return;
-	text_draw_t* dt = get_drawt();
-	dt->cr = cr; dt->ltx = hst->ltx;
-	dt->st = hst->st;
+
 	glm::vec4 chs = { 0,0,hst->hex_size };
-	draw_rect(cr, hst->bgrc, hst->bg_fill, hst->bg_color, hst->bg_r, hst->bg_linewidth);
-	clip_cr(cr, chs);
-	cairo_translate(cr, -pxx, 0);
+
+	auto view = glm::ivec4(hst->pos, hst->hex_size);
+	//if (get_draw_update())
 	{
-		auto nrc = get_draw_rect();
-		dtc.reset(cr, nrc);
-		dt->cr = dtc.cr;
-		if (get_draw_update()) {
-			dtc.clear_color(0);
-			auto ncr = dtc.cr;
-			{
-				cairo_as _ss_(ncr);
-				auto clip4 = text_rc[2];
-				auto sbx = select_border * 2;
-				clip4.x -= sbx;
-				clip4.z += sbx * 2;
-				clip_cr(ncr, clip4);
-				cairo_translate(ncr, text_rc[2].x, text_rc[2].y - pyy);
-				draw_rc(ncr);
-			}
-			draw_draw_texts(dt);
+		rv->push_view(view);
+		rv->add_rect(hst->bgrc, hst->bg_r);
+		rv->submit(hst->bg_fill, hst->bg_color, hst->bg_linewidth);
+		rv->clip(chs);
+		rv->translate({ -pxx, 0 });
+		{
+			auto nrc = get_draw_rect();// 显示区域大小
+			rv->save();
+			auto clip4 = text_rc[2];
+			auto sbx = select_border * 2;
+			clip4.x -= sbx;
+			clip4.z += sbx * 2;
+			rv->clip(clip4);
+			rv->translate({ text_rc[2].x, text_rc[2].y - pyy });
+			draw_rc(rv);
+			rv->restore();
+			//draw_draw_texts(dt);
 		}
-		glm::vec4 nnrc = { 0,0,nrc };
-		if (dtc.surface)
-			draw_image(cr, dtc.surface, {}, nnrc);
 	}
 }
 

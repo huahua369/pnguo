@@ -186,7 +186,6 @@ struct div_ev
 class div_cx :public widget_t
 {
 public:
-	glm::vec4 viewport = {};
 	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
 	glm::ivec4 border = {};	// 颜色，线粗，圆角，背景色
 	glm::ivec2 curpos = {}, tpos = {};// 鼠标状态
