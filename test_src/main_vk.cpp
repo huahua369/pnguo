@@ -1056,6 +1056,11 @@ int main()
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					if (!vkd->_state.has_fence) {
+						auto sem = vkd->get_fbo_semaphore();
+						form0->add_vk_semaphores(sem, 0, 0);
+					}
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
@@ -1139,11 +1144,6 @@ int main()
 						}
 					}
 					 
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
-					}
 					static bool savepng = false;
 					auto afilename = savepng ? filename : 0;
 					//test_drawvkvg(ctx, surf, bs, afilename);
