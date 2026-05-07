@@ -4956,8 +4956,8 @@ bool color_btn::update(float delta)
 	}
 	else
 	{
-		if (_bst == _old_bst)return false;
 	}
+	if (_bst == _old_bst)return false;
 	_old_bst = _bst;
 	auto p = this;
 	btn_cols_t* pdc = &p->pdc;
@@ -5907,7 +5907,7 @@ void color_btn::draw(rvg_cx* rv)
 	auto psv = get_pos(false);
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-	
+
 	rv->save();
 	rv->translate(p->_pos);
 	if (p->dfill)

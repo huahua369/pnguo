@@ -45,6 +45,48 @@ extern "C" {
 #endif
 	struct vkvg_func_t
 	{
+		void(*vkvg_matrix_init_identity)(vkvg_matrix_t* matrix);
+		void(*vkvg_matrix_init)(vkvg_matrix_t* matrix, float xx, float yx, float xy, float yy, float x0, float y0);
+		void(*vkvg_matrix_init_translate)(vkvg_matrix_t* matrix, float tx, float ty);
+		void(*vkvg_matrix_init_scale)(vkvg_matrix_t* matrix, float sx, float sy);
+		void(*vkvg_matrix_init_rotate)(vkvg_matrix_t* matrix, float radians);
+		void(*vkvg_matrix_translate)(vkvg_matrix_t* matrix, float tx, float ty);
+		void(*vkvg_matrix_scale)(vkvg_matrix_t* matrix, float sx, float sy);
+		void(*vkvg_matrix_rotate)(vkvg_matrix_t* matrix, float radians);
+		void(*vkvg_matrix_multiply)(vkvg_matrix_t* result, const vkvg_matrix_t* a, const vkvg_matrix_t* b);
+		void(*vkvg_matrix_transform_distance)(const vkvg_matrix_t* matrix, float* dx, float* dy);
+		void(*vkvg_matrix_transform_point)(const vkvg_matrix_t* matrix, float* x, float* y);
+		vkvg_status_t(*vkvg_matrix_invert)(vkvg_matrix_t* matrix);
+		void(*vkvg_matrix_get_scale)(const vkvg_matrix_t* matrix, float* sx, float* sy);
+		void(*vkvg_device_set_context_cache_size)(VkvgDevice dev, uint32_t maxCount);
+		VkvgDevice(*vkvg_device_create)(vkvg_device_create_info_t* info);
+		void(*vkvg_device_destroy)(VkvgDevice dev);
+		vkvg_status_t(*vkvg_device_status)(VkvgDevice dev);
+		VkvgDevice(*vkvg_device_reference)(VkvgDevice dev);
+		uint32_t(*vkvg_device_get_reference_count)(VkvgDevice dev);
+		void(*vkvg_device_set_dpy)(VkvgDevice dev, int hdpy, int vdpy);
+		void(*vkvg_device_get_dpy)(VkvgDevice dev, int* hdpy, int* vdpy);
+		void(*vkvg_get_required_instance_extensions)(const char** pExtensions, uint32_t* pExtCount);
+		vkvg_status_t(*vkvg_get_required_device_extensions)(VkPhysicalDevice phy, const char** pExtensions, uint32_t* pExtCount);
+		const void* (*vkvg_get_device_requirements)(VkPhysicalDeviceFeatures* pEnabledFeatures);
+		VkvgSurface(*vkvg_surface_create)(VkvgDevice dev, uint32_t width, uint32_t height);
+		VkvgSurface(*vkvg_surface_create_from_image)(VkvgDevice dev, const char* filePath);
+		VkvgSurface(*vkvg_surface_create_for_VkhImage)(VkvgDevice dev, void* vkhImg);
+		VkvgSurface(*vkvg_surface_create_from_bitmap)(VkvgDevice dev, unsigned char* img, uint32_t width, uint32_t height);
+		vkvg_status_t(*vkvg_surface_status)(VkvgSurface surf);
+		VkvgSurface(*vkvg_surface_reference)(VkvgSurface surf);
+		uint32_t(*vkvg_surface_get_reference_count)(VkvgSurface surf);
+		void(*vkvg_surface_destroy)(VkvgSurface surf);
+		
+		void(*vkvg_surface_clear)(VkvgSurface surf);
+		VkImage(*vkvg_surface_get_vk_image)(VkvgSurface surf);
+		VkFormat(*vkvg_surface_get_vk_format)(VkvgSurface surf);
+		uint32_t(*vkvg_surface_get_width)(VkvgSurface surf);
+		uint32_t(*vkvg_surface_get_height)(VkvgSurface surf);
+		vkvg_status_t(*vkvg_surface_write_to_png)(VkvgSurface surf, const char* path);
+		vkvg_status_t(*vkvg_surface_write_to_memory)(VkvgSurface surf, unsigned char* const bitmap);
+		void(*vkvg_surface_resolve)(VkvgSurface surf);
+
 		VkvgContext(*vkvg_create)(VkvgSurface surf);
 		void(*vkvg_destroy)(VkvgContext ctx);
 		vkvg_status_t(*vkvg_status)(VkvgContext ctx);
@@ -89,7 +131,7 @@ extern "C" {
 		void(*vkvg_set_source_rgb)(VkvgContext ctx, float r, float g, float b);
 		void(*vkvg_set_line_width)(VkvgContext ctx, float width);
 		void(*vkvg_set_miter_limit)(VkvgContext ctx, float limit);
-		//float(*vkvg_get_miter_limit)(VkvgContext ctx);
+		float(*vkvg_get_miter_limit)(VkvgContext ctx);
 		void(*vkvg_set_line_cap)(VkvgContext ctx, vkvg_line_cap_t cap);
 		void(*vkvg_set_line_join)(VkvgContext ctx, vkvg_line_join_t join);
 		void(*vkvg_set_source_surface)(VkvgContext ctx, VkvgSurface surf, float x, float y);
@@ -115,6 +157,50 @@ extern "C" {
 		void(*vkvg_set_matrix)(VkvgContext ctx, const vkvg_matrix_t* matrix);
 		void(*vkvg_get_matrix)(VkvgContext ctx, vkvg_matrix_t* const matrix);
 		void(*vkvg_identity_matrix)(VkvgContext ctx);
+
+		void(*vkvg_select_font_face)(VkvgContext ctx, const char* name);
+		void(*vkvg_load_font_from_path)(VkvgContext ctx, const char* path, const char* name);
+		void(*vkvg_load_font_from_memory)(VkvgContext ctx, unsigned char* fontBuffer, long fontBufferByteSize, const char* name);
+		void(*vkvg_set_font_size)(VkvgContext ctx, uint32_t size);
+		void(*vkvg_show_text)(VkvgContext ctx, const char* utf8);
+		void(*vkvg_text_extents)(VkvgContext ctx, const char* utf8, vkvg_text_extents_t* extents);
+		void(*vkvg_font_extents)(VkvgContext ctx, vkvg_font_extents_t* extents);
+		VkvgText(*vkvg_text_run_create)(VkvgContext ctx, const char* text);
+		VkvgText(*vkvg_text_run_create_with_length)(VkvgContext ctx, const char* text, uint32_t length);
+		void(*vkvg_text_run_destroy)(VkvgText textRun);
+		void(*vkvg_show_text_run)(VkvgContext ctx, VkvgText textRun);
+		void(*vkvg_text_run_get_extents)(VkvgText textRun, vkvg_text_extents_t* extents);
+		uint32_t(*vkvg_text_run_get_glyph_count)(VkvgText textRun);
+		void(*vkvg_text_run_get_glyph_position)(VkvgText textRun, uint32_t index, vkvg_glyph_info_t* pGlyphInfo);
+		vkvg_status_t(*vkvg_pattern_status)(VkvgPattern pat);
+		VkvgPattern(*vkvg_pattern_reference)(VkvgPattern pat);
+		uint32_t(*vkvg_pattern_get_reference_count)(VkvgPattern pat);
+		VkvgPattern(*vkvg_pattern_create_for_surface)(VkvgSurface surf);
+		VkvgPattern(*vkvg_pattern_create_linear)(float x0, float y0, float x1, float y1);
+		vkvg_status_t(*vkvg_pattern_edit_linear)(VkvgPattern pat, float x0, float y0, float x1, float y1);
+		vkvg_status_t(*vkvg_pattern_get_linear_points)(VkvgPattern pat, float* x0, float* y0, float* x1, float* y1);
+		VkvgPattern(*vkvg_pattern_create_radial)(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1);
+		vkvg_status_t(*vkvg_pattern_edit_radial)(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1);
+		vkvg_status_t(*vkvg_pattern_get_color_stop_count)(VkvgPattern pat, uint32_t* count);
+		vkvg_status_t(*vkvg_pattern_get_color_stop_rgba)(VkvgPattern pat, uint32_t index, float* offset, float* r, float* g, float* b, float* a);
+		void(*vkvg_pattern_destroy)(VkvgPattern pat);
+		vkvg_status_t(*vkvg_pattern_add_color_stop)(VkvgPattern pat, float offset, float r, float g, float b, float a);
+		void(*vkvg_pattern_set_extend)(VkvgPattern pat, vkvg_extend_t extend);
+		void(*vkvg_pattern_set_filter)(VkvgPattern pat, vkvg_filter_t filter);
+		vkvg_extend_t(*vkvg_pattern_get_extend)(VkvgPattern pat);
+		vkvg_filter_t(*vkvg_pattern_get_filter)(VkvgPattern pat);
+		vkvg_pattern_type_t(*vkvg_pattern_get_type)(VkvgPattern pat);
+		void(*vkvg_pattern_set_matrix)(VkvgPattern pat, const vkvg_matrix_t* matrix);
+		void(*vkvg_pattern_get_matrix)(VkvgPattern pat, vkvg_matrix_t* matrix);
+		void(*vkvg_set_source_color_name)(VkvgContext ctx, const char* color);
+		void(*vkvg_start_recording)(VkvgContext ctx);
+		VkvgRecording(*vkvg_stop_recording)(VkvgContext ctx);
+		void(*vkvg_replay)(VkvgContext ctx, VkvgRecording rec);
+		void(*vkvg_replay_command)(VkvgContext ctx, VkvgRecording rec, uint32_t cmdIndex);
+		void(*vkvg_recording_get_command)(VkvgRecording rec, uint32_t cmdIndex, uint32_t* cmd, void** dataOffset);
+		uint32_t(*vkvg_recording_get_count)(VkvgRecording rec);
+		void* (*vkvg_recording_get_data)(VkvgRecording rec);
+		void(*vkvg_recording_destroy)(VkvgRecording rec);
 	};
 
 #ifdef __cplusplus

@@ -297,6 +297,49 @@ vkvg_func_t* vkvg_dev::get_fun()
 		fun = new vkvg_func_t();
 #if 1
 #define funcset(n) fun->##n=n
+
+		funcset(vkvg_matrix_init_identity);
+		funcset(vkvg_matrix_init);
+		funcset(vkvg_matrix_init_translate);
+		funcset(vkvg_matrix_init_scale);
+		funcset(vkvg_matrix_init_rotate);
+		funcset(vkvg_matrix_translate);
+		funcset(vkvg_matrix_scale);
+		funcset(vkvg_matrix_rotate);
+		funcset(vkvg_matrix_multiply);
+		funcset(vkvg_matrix_transform_distance);
+		funcset(vkvg_matrix_transform_point);
+		funcset(vkvg_matrix_invert);
+		funcset(vkvg_matrix_get_scale);
+		funcset(vkvg_device_set_context_cache_size);
+		funcset(vkvg_device_create);
+		funcset(vkvg_device_destroy);
+		funcset(vkvg_device_status);
+		funcset(vkvg_device_reference);
+		funcset(vkvg_device_get_reference_count);
+		funcset(vkvg_device_set_dpy);
+		funcset(vkvg_device_get_dpy);
+		funcset(vkvg_get_required_instance_extensions);
+		funcset(vkvg_get_required_device_extensions);
+		funcset(vkvg_get_device_requirements);
+		funcset(vkvg_surface_create);
+		funcset(vkvg_surface_create_from_image);
+		funcset(vkvg_surface_create_for_VkhImage);
+		funcset(vkvg_surface_create_from_bitmap);
+		funcset(vkvg_surface_status);
+		funcset(vkvg_surface_reference);
+		funcset(vkvg_surface_get_reference_count);
+		funcset(vkvg_surface_destroy);
+
+		funcset(vkvg_surface_clear);
+		funcset(vkvg_surface_get_vk_image);
+		funcset(vkvg_surface_get_vk_format);
+		funcset(vkvg_surface_get_width);
+		funcset(vkvg_surface_get_height);
+		funcset(vkvg_surface_write_to_png);
+		funcset(vkvg_surface_write_to_memory);
+		funcset(vkvg_surface_resolve);
+
 		funcset(vkvg_create);
 		funcset(vkvg_destroy);
 		funcset(vkvg_status);
@@ -341,7 +384,7 @@ vkvg_func_t* vkvg_dev::get_fun()
 		funcset(vkvg_set_source_rgb);
 		funcset(vkvg_set_line_width);
 		funcset(vkvg_set_miter_limit);
-		//funcset(vkvg_get_miter_limit);
+		funcset(vkvg_get_miter_limit);
 		funcset(vkvg_set_line_cap);
 		funcset(vkvg_set_line_join);
 		funcset(vkvg_set_source_surface);
@@ -367,6 +410,51 @@ vkvg_func_t* vkvg_dev::get_fun()
 		funcset(vkvg_set_matrix);
 		funcset(vkvg_get_matrix);
 		funcset(vkvg_identity_matrix);
+
+		funcset(vkvg_select_font_face);
+		funcset(vkvg_load_font_from_path);
+		funcset(vkvg_load_font_from_memory);
+		funcset(vkvg_set_font_size);
+		funcset(vkvg_show_text);
+		funcset(vkvg_text_extents);
+		funcset(vkvg_font_extents);
+		funcset(vkvg_text_run_create);
+		funcset(vkvg_text_run_create_with_length);
+		funcset(vkvg_text_run_destroy);
+		funcset(vkvg_show_text_run);
+		funcset(vkvg_text_run_get_extents);
+		funcset(vkvg_text_run_get_glyph_count);
+		funcset(vkvg_text_run_get_glyph_position);
+		funcset(vkvg_pattern_status);
+		funcset(vkvg_pattern_reference);
+		funcset(vkvg_pattern_get_reference_count);
+		funcset(vkvg_pattern_create_for_surface);
+		funcset(vkvg_pattern_create_linear);
+		funcset(vkvg_pattern_edit_linear);
+		funcset(vkvg_pattern_get_linear_points);
+		funcset(vkvg_pattern_create_radial);
+		funcset(vkvg_pattern_edit_radial);
+		funcset(vkvg_pattern_get_color_stop_count);
+		funcset(vkvg_pattern_get_color_stop_rgba);
+		funcset(vkvg_pattern_destroy);
+		funcset(vkvg_pattern_add_color_stop);
+		funcset(vkvg_pattern_set_extend);
+		funcset(vkvg_pattern_set_filter);
+		funcset(vkvg_pattern_get_extend);
+		funcset(vkvg_pattern_get_filter);
+		funcset(vkvg_pattern_get_type);
+		funcset(vkvg_pattern_set_matrix);
+		funcset(vkvg_pattern_get_matrix);
+		//funcset(vkvg_set_source_color_name);
+		funcset(vkvg_start_recording);
+		funcset(vkvg_stop_recording);
+		funcset(vkvg_replay);
+		funcset(vkvg_replay_command);
+		funcset(vkvg_recording_get_command);
+		funcset(vkvg_recording_get_count);
+		funcset(vkvg_recording_get_data);
+		funcset(vkvg_recording_destroy);
+
 #undef funcset
 #endif
 	}
