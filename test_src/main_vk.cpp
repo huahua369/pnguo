@@ -653,7 +653,7 @@ void fill(size_t pos, struct kpair* val, void* dat)
 	val->x = pos;
 	val->y = arc4random() / (double)UINT32_MAX;
 }
-int plot_main(canvas2d_t* ctx)
+VkvgSurface plot_main(canvas2d_t* ctx, int width, int height)
 {
 	struct kpair	 points1[50], points2[50];
 	struct kdata* d1, * d2;
@@ -700,34 +700,36 @@ int plot_main(canvas2d_t* ctx)
 	kdata_destroy(d1);
 	kdata_destroy(d2);
 	d1 = d2 = NULL;
-	surf = (VkvgSurface)ctx->new_surface(2 * 600, 400);
+	surf = (VkvgSurface)ctx->new_surface(width, height);
 
 	st = vkvg_surface_status(surf);
 	if (VKVG_STATUS_SUCCESS != st) {
 		fprintf(stderr, "%s", vkvg_status_to_string(st));
 		vkvg_surface_destroy(surf);
 		kplot_free(p);
-		return(EXIT_FAILURE);
+		return 0;
 	}
 
 	cr = vkvg_create(surf);
-	vkvg_surface_destroy(surf);
+	//vkvg_surface_destroy(surf);
 
 	st = vkvg_status(cr);
 	if (VKVG_STATUS_SUCCESS != st) {
 		fprintf(stderr, "%s", vkvg_status_to_string(st));
 		vkvg_destroy(cr);
 		kplot_free(p);
-		return(EXIT_FAILURE);
+		return 0;
 
 	}
 
-	vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
-	vkvg_rectangle(cr, 0.0, 0.0, 600.0, 400.0);
-	vkvg_fill(cr);
-	kplot_draw(p, 600.0, 400.0, cr);
+	{
+		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
+		vkvg_rectangle(cr, 0.0, 0.0, 600.0, 400.0);
+		vkvg_fill(cr);
+		kplot_draw(p, 600.0, 400.0, cr);
 
-	kplot_free(p);
+		kplot_free(p);
+	}
 	{
 		auto d = kdata_array_alloc(NULL, 20);
 		assert(NULL != d);
@@ -752,18 +754,21 @@ int plot_main(canvas2d_t* ctx)
 
 		kdata_destroy(d);
 		vkvg_translate(cr, 600.0, 0.0);
+		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
+		vkvg_rectangle(cr, 1.0, 0.0, 600.0, 400.0);
+		vkvg_fill(cr);
 		kplot_draw(p, 600.0, 400.0, cr);
 	}
 	vkvg_flush(cr);
 	vkvg_surface_resolve(surf);
 	st = vkvg_surface_write_to_png
-	(vkvg_get_target(cr), "temp/example0.png");
+	(vkvg_get_target(cr), "temp/example0_1.png");
 
 	if (VKVG_STATUS_SUCCESS != st) {
 		fprintf(stderr, "%s", vkvg_status_to_string(st));
 		vkvg_destroy(cr);
 		kplot_free(p);
-		return(EXIT_FAILURE);
+		return surf;
 	}
 
 	vkvg_destroy(cr);
@@ -773,7 +778,7 @@ out:
 	kdata_destroy(d1);
 	kdata_destroy(d2);
 
-	return(rc);
+	return surf;
 }
 
 
@@ -1022,7 +1027,7 @@ int main()
 			td3->familys = family;
 
 
-			plot_main(td3);
+			auto ptm = plot_main(td3, 1200, 400);
 
 
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
@@ -1197,11 +1202,11 @@ int main()
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
-					}
+					//vkd->on_render();		// 渲染到fbo纹理tex3d
+					//if (!vkd->_state.has_fence) {
+					//	auto sem = vkd->get_fbo_semaphore();
+					//	form0->add_vk_semaphores(sem, 0, 0);
+					//}
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
@@ -1254,7 +1259,7 @@ int main()
 					}
 					if (kti > 0.06)
 					{
-						*ret = true;
+						//*ret = true;
 						kti = 0.0;
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
@@ -1276,6 +1281,7 @@ int main()
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
 						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
+						rt_add_image_vg(mtext, ptm, glm::ivec4(0, 0, 1200, 400), {}, -1, { 1200,400 }, { 0,0 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 

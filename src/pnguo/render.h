@@ -284,6 +284,7 @@ class vkvg_dev
 public:
 	VkDevice vkdev = 0;
 	vkvgctx* ctx = 0;
+	vkvgctx* ctx1 = 0;
 	vkvg_func_t* fun = {};
 	void* memoryProperties = 0;
 	VkSampleCountFlags samplecount = {};
@@ -564,6 +565,7 @@ public:
 	void init_vgdev(dev_info_cx* d, int sample = 8);
 	// 创建vkvg surface，输入宽高
 	void* new_surface(int width, int height);
+	void* new_surface1(int width, int height);
 	void free_surface(void* surface);
 	// begin/end渲染，输入surface指针，返回渲染上下文指针，中间可以调用vkvg的渲染函数
 	void* ctx_begin(void* surface);

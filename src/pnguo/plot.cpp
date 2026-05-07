@@ -2472,7 +2472,9 @@ bbox_extents(struct kplotctx* ctx, const char* v,
 	*h = fabs(e.width * sin(rot)) + fabs(e.height * cos(rot));
 	*w = fabs(e.width * cos(rot)) + fabs(e.height * sin(rot));
 }
-
+void vkvg_move_to_i(VkvgContext ctx, float x, float y) {
+	vkvg_move_to(ctx, roundf(x), roundf(y));
+}
 void
 kplotctx_label_init(struct kplotctx* ctx)
 {
@@ -2672,7 +2674,7 @@ kplotctx_label_init(struct kplotctx* ctx)
 
 		if (TICLABEL_BOTTOM & ctx->cfg.ticlabel) {
 			if (ctx->cfg.xticlabelrot > 0.0) {
-				vkvg_move_to(ctx->cr,
+				vkvg_move_to_i(ctx->cr,
 					ctx->offs.x +
 					offs * ctx->dims.x,
 					ctx->offs.y + ctx->dims.y +
@@ -2684,7 +2686,7 @@ kplotctx_label_init(struct kplotctx* ctx)
 				vkvg_rotate(ctx->cr, ctx->cfg.xticlabelrot);
 			}
 			else
-				vkvg_move_to(ctx->cr,
+				vkvg_move_to_i(ctx->cr,
 					ctx->offs.x + offs * ctx->dims.x -
 					(e.width / 2.0),
 					ctx->offs.y + ctx->dims.y +
@@ -2696,7 +2698,7 @@ kplotctx_label_init(struct kplotctx* ctx)
 		}
 
 		if (TICLABEL_TOP & ctx->cfg.ticlabel) {
-			vkvg_move_to(ctx->cr,
+			vkvg_move_to_i(ctx->cr,
 				ctx->offs.x + offs * ctx->dims.x -
 				(e.width / 2.0),
 				ctx->offs.y - maxh);
@@ -2722,7 +2724,7 @@ kplotctx_label_init(struct kplotctx* ctx)
 		vkvg_text_extents(ctx->cr, buf, &e);
 
 		if (TICLABEL_LEFT & ctx->cfg.ticlabel) {
-			vkvg_move_to(ctx->cr,
+			vkvg_move_to_i(ctx->cr,
 				ctx->offs.x - e.width -
 				ctx->cfg.yticlabelpad,
 				(ctx->offs.y + ctx->dims.y) -
@@ -2731,7 +2733,7 @@ kplotctx_label_init(struct kplotctx* ctx)
 			vkvg_show_text(ctx->cr, buf);
 		}
 		if (TICLABEL_RIGHT & ctx->cfg.ticlabel) {
-			vkvg_move_to(ctx->cr,
+			vkvg_move_to_i(ctx->cr,
 				ctx->offs.x + ctx->dims.x +
 				ctx->cfg.yticlabelpad,
 				(ctx->offs.y + ctx->dims.y) -
@@ -2753,14 +2755,14 @@ kplotctx_label_init(struct kplotctx* ctx)
 			&h, &w, ctx->cfg.xaxislabelrot);
 		vkvg_save(ctx->cr);
 		vkvg_translate(ctx->cr,
-			ctx->offs.x + ctx->dims.x / 2.0,
-			(MARGIN_BOTTOM & ctx->cfg.margin ?
-				ctx->h - ctx->cfg.marginsz : ctx->h) - h / 2.0);
+			round(ctx->offs.x + ctx->dims.x / 2.0),
+			round((MARGIN_BOTTOM & ctx->cfg.margin ?
+				ctx->h - ctx->cfg.marginsz : ctx->h) - h / 2.0));
 		vkvg_rotate(ctx->cr, ctx->cfg.xaxislabelrot);
 		vkvg_text_extents(ctx->cr, ctx->cfg.xaxislabel, &e);
 		w = -e.width / 2.0;
 		h = e.height / 2.0;
-		vkvg_translate(ctx->cr, w, h);
+		vkvg_translate(ctx->cr, round(w), round(h));
 		vkvg_move_to(ctx->cr, 0.0, 0.0);
 		vkvg_show_text(ctx->cr, ctx->cfg.xaxislabel);
 		vkvg_restore(ctx->cr);
@@ -2771,14 +2773,14 @@ kplotctx_label_init(struct kplotctx* ctx)
 			&h, &w, ctx->cfg.xaxislabelrot);
 		vkvg_save(ctx->cr);
 		vkvg_translate(ctx->cr,
-			ctx->offs.x + ctx->dims.x / 2.0,
-			(MARGIN_TOP & ctx->cfg.margin ?
-				ctx->cfg.marginsz : 0.0) + h / 2.0);
+			round(ctx->offs.x + ctx->dims.x / 2.0),
+			round((MARGIN_TOP & ctx->cfg.margin ?
+				ctx->cfg.marginsz : 0.0) + h / 2.0));
 		vkvg_rotate(ctx->cr, ctx->cfg.xaxislabelrot);
 		vkvg_text_extents(ctx->cr, ctx->cfg.x2axislabel, &e);
 		w = -e.width / 2.0;
 		h = e.height / 2.0;
-		vkvg_translate(ctx->cr, w, h);
+		vkvg_translate(ctx->cr, round(w), round(h));
 		vkvg_move_to(ctx->cr, 0.0, 0.0);
 		vkvg_show_text(ctx->cr, ctx->cfg.x2axislabel);
 		vkvg_restore(ctx->cr);
@@ -2789,14 +2791,14 @@ kplotctx_label_init(struct kplotctx* ctx)
 			&h, &w, ctx->cfg.yaxislabelrot);
 		vkvg_save(ctx->cr);
 		vkvg_translate(ctx->cr,
-			(MARGIN_LEFT & ctx->cfg.margin ?
-				ctx->cfg.marginsz : 0.0) + w / 2.0,
-			ctx->offs.y + ctx->dims.y / 2.0);
+			round((MARGIN_LEFT & ctx->cfg.margin ?
+				ctx->cfg.marginsz : 0.0) + w / 2.0),
+			round(ctx->offs.y + ctx->dims.y / 2.0));
 		vkvg_rotate(ctx->cr, ctx->cfg.yaxislabelrot);
 		vkvg_text_extents(ctx->cr, ctx->cfg.yaxislabel, &e);
 		w = -e.width / 2.0;
 		h = e.height / 2.0;
-		vkvg_translate(ctx->cr, w, h);
+		vkvg_translate(ctx->cr, round(w), round(h));
 		vkvg_move_to(ctx->cr, 0.0, 0.0);
 		vkvg_show_text(ctx->cr, ctx->cfg.yaxislabel);
 		vkvg_restore(ctx->cr);
@@ -2807,14 +2809,14 @@ kplotctx_label_init(struct kplotctx* ctx)
 			&h, &w, ctx->cfg.yaxislabelrot);
 		vkvg_save(ctx->cr);
 		vkvg_translate(ctx->cr,
-			(MARGIN_RIGHT & ctx->cfg.margin ?
-				ctx->w - ctx->cfg.marginsz : ctx->w) - w / 2.0,
-			ctx->offs.y + ctx->dims.y / 2.0);
+			round((MARGIN_RIGHT & ctx->cfg.margin ?
+				ctx->w - ctx->cfg.marginsz : ctx->w) - w / 2.0),
+			round(ctx->offs.y + ctx->dims.y / 2.0));
 		vkvg_rotate(ctx->cr, ctx->cfg.yaxislabelrot);
 		vkvg_text_extents(ctx->cr, ctx->cfg.y2axislabel, &e);
 		w = -e.width / 2.0;
 		h = e.height / 2.0;
-		vkvg_translate(ctx->cr, w, h);
+		vkvg_translate(ctx->cr, round(w), round(h));
 		vkvg_move_to(ctx->cr, 0.0, 0.0);
 		vkvg_show_text(ctx->cr, ctx->cfg.y2axislabel);
 		vkvg_restore(ctx->cr);

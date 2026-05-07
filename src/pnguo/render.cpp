@@ -268,22 +268,26 @@ glm::mat3x2 vkvg_ctx::get_matrix()
 vkvg_dev::vkvg_dev()
 {
 	ctx = new vkvgctx();
+	ctx1 = new vkvgctx();
 }
-
+void free_gctx(vkvgctx* p) {
+	if (p)
+	{
+		if (p->dev)
+		{
+			vkvg_device_destroy(p->dev); p->dev = 0;
+		}
+		if (p->vkhdev) {
+			vkh_device_destroy(p->vkhdev); p->vkhdev = 0;
+		}
+		delete p; p = 0;
+	}
+}
 vkvg_dev::~vkvg_dev()
 {
 	if (fun)delete fun; fun = 0;
-	if (ctx)
-	{
-		if (ctx->dev)
-		{
-			vkvg_device_destroy(ctx->dev); ctx->dev = 0;
-		}
-		if (ctx->vkhdev) {
-			vkh_device_destroy(ctx->vkhdev);
-		}
-		delete ctx; ctx = 0;
-	}
+	free_gctx(ctx);
+	free_gctx(ctx1);
 
 }
 vkvg_func_t* vkvg_dev::get_fun()
@@ -463,6 +467,7 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 	static std::vector<VkSampleCountFlags> sv = { VK_SAMPLE_COUNT_64_BIT  ,	VK_SAMPLE_COUNT_32_BIT ,VK_SAMPLE_COUNT_16_BIT
 		, VK_SAMPLE_COUNT_8_BIT ,VK_SAMPLE_COUNT_4_BIT,VK_SAMPLE_COUNT_2_BIT,VK_SAMPLE_COUNT_1_BIT };
 	VkvgDevice dev = {};
+	VkvgDevice dev1 = {};
 	bool hasdev = (c && c->inst && c->phy && c->vkdev);
 	dev_info_c _c = {};
 	if (!hasdev)c = &_c;
@@ -489,15 +494,20 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 			break;
 		}
 	}
-
 	if (dev)
 	{
 		p = new vkvg_dev();
+		if (cus != VK_SAMPLE_COUNT_1_BIT)
+		{
+			vkvg_device_create_info_t info = { VK_SAMPLE_COUNT_1_BIT, true ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
+			dev1 = vkvg_device_create(&info);
+		}
 		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
 		vkGetPhysicalDeviceMemoryProperties(c->phy, &m_memoryProperties);
 		p->memoryProperties = new VkPhysicalDeviceMemoryProperties(m_memoryProperties);
 		p->ctx->dev = dev;
 		p->vkdev = vkdev;
+		p->ctx1->dev = dev1;
 		p->samplecount = cus;
 		//p->ctx->vkhdev = vkh_device_import(c->inst, c->phy, c->vkdev);
 	}
@@ -2992,6 +3002,15 @@ void* canvas2d_t::new_surface(int width, int height)
 	if (width > 1 && height > 1 && vgdev && vgdev->ctx && vgdev->ctx->dev)
 	{
 		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height);
+		return (void*)surf;
+	}
+	return nullptr;
+}
+void* canvas2d_t::new_surface1(int width, int height)
+{
+	if (width > 1 && height > 1 && vgdev && vgdev->ctx1 && vgdev->ctx1->dev)
+	{
+		auto surf = vkvg_surface_create(vgdev->ctx1->dev, width, height);
 		return (void*)surf;
 	}
 	return nullptr;
