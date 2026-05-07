@@ -715,6 +715,8 @@ int plot_main(canvas2d_t* ctx)
 	vkvg_fill(cr);
 	kplot_draw(p, 600.0, 400.0, cr);
 
+	vkvg_flush(cr);
+	vkvg_surface_resolve(surf);
 	st = vkvg_surface_write_to_png
 	(vkvg_get_target(cr), "temp/example0.png");
 
@@ -981,7 +983,7 @@ int main()
 			td3->familys = family;
 
 
-			//plot_main(td3);
+			plot_main(td3);
 
 
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
