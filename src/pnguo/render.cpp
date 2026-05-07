@@ -1782,6 +1782,50 @@ void rvg_cx::translate(const glm::vec2& offset)
 	_cmd.insert(_cmd.end(), (char*)&offset, (char*)&offset + sizeof(offset));
 	_cur.pos += offset;
 }
+void rvg_cx::scale(float sx, float sy)
+{
+	push_ct(OP_SCALE);
+	glm::vec2 sc = { sx,sy };
+	_cmd.insert(_cmd.end(), (char*)&sc, (char*)&sc + sizeof(sc));
+	_cur.scale *= sc;
+}
+
+void rvg_cx::scale(const glm::vec2& sc)
+{
+	push_ct(OP_SCALE);
+	_cmd.insert(_cmd.end(), (char*)&sc, (char*)&sc + sizeof(sc));
+	_cur.scale *= sc;
+}
+
+void rvg_cx::rotate(float radians)
+{
+	push_ct(OP_ROTATE);
+	_cmd.insert(_cmd.end(), (char*)&radians, (char*)&radians + sizeof(radians));
+	_cur.rotate_radians += radians;
+}
+
+void rvg_cx::transform(const glm::mat3x2* matrix)
+{
+	push_ct(OP_TRANSFORM);
+	_cmd.insert(_cmd.end(), (char*)matrix, (char*)matrix + sizeof(glm::mat3x2));
+	_cur._transform = glm::matrixCompMult(_cur._transform, *matrix);
+}
+
+void rvg_cx::set_matrix(const glm::mat3x2* matrix)
+{
+	push_ct(OP_SET_MATRIX);
+	_cmd.insert(_cmd.end(), (char*)matrix, (char*)matrix + sizeof(glm::mat3x2));
+	_cur._transform = *matrix;
+}
+
+void rvg_cx::get_matrix(glm::mat3x2* matrix)
+{
+	if (matrix)
+	{
+		*matrix = _cur._transform;
+	}
+}
+
 
 void rvg_cx::clip()
 {
@@ -2573,6 +2617,30 @@ size_t cmd_op_translate(uint8_t* d, VkvgContext ctx)
 	vkvg_translate(ctx, offset.x, offset.y);
 	return sizeof(glm::vec2);
 }
+size_t cmd_op_scale(uint8_t* d, VkvgContext ctx)//; (float sx, float sy);
+{
+	auto sc = next_value<glm::vec2>(d);
+	vkvg_scale(ctx, sc.x, sc.y);
+	return sizeof(glm::vec2);
+}
+size_t cmd_op_rotate(uint8_t* d, VkvgContext ctx)//(float radians);
+{
+	auto r = next_value<float>(d);
+	vkvg_rotate(ctx, r);
+	return sizeof(float);
+}
+size_t cmd_op_transform(uint8_t* d, VkvgContext ctx)//(const glm::mat3x2* matrix);
+{
+	vkvg_transform(ctx, (vkvg_matrix_t*)d);
+	return sizeof(glm::mat3x2);
+}
+size_t cmd_op_set_matrix(uint8_t* d, VkvgContext ctx)//(const glm::mat3x2* matrix);
+{
+	vkvg_set_matrix(ctx, (vkvg_matrix_t*)d);
+	return sizeof(glm::mat3x2);
+}
+
+
 size_t cmd_op_clip(uint8_t* d, VkvgContext ctx)
 {
 	vkvg_clip(ctx);
@@ -2690,7 +2758,8 @@ size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 		cmd_op_draw_block, cmd_op_draw_path, cmd_op_add_line_ptr, cmd_op_add_rect_double,
 		cmd_op_add_rect_vec4, cmd_op_add_circle, cmd_op_add_ellipse, cmd_op_add_triangle, cmd_op_polyline_vec2,
 		cmd_op_add_polyline_path, cmd_op_add_polyline_vec2_ptr, cmd_op_polylines,
-		cmd_op_paint_shadow, cmd_op_translate,cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
+		cmd_op_paint_shadow, cmd_op_translate,cmd_op_scale, cmd_op_rotate, cmd_op_transform, cmd_op_set_matrix,
+		cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
 		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
 		 (cmd_func_type)cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, };
 	size_t r = 0;

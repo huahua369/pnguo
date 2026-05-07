@@ -387,6 +387,9 @@ struct stack_item
 {
 	glm::vec2 pos = {};				// 当前偏移
 	glm::vec4 clip = {};			// 当前裁剪区域
+	glm::vec2 scale = { 1.0f, 1.0f };
+	float rotate_radians = 0.0f;
+	glm::mat3x2 _transform = glm::mat3x2(1.0f);
 };
 
 struct cmdview_v {
@@ -403,11 +406,12 @@ public:
 		OP_DRAW_BLOCK, OP_DRAW_PATH, OP_ADD_LINE_PTR, OP_ADD_RECT_DOUBLE,
 		OP_ADD_RECT_VEC4, OP_ADD_CIRCLE, OP_ADD_ELLIPSE, OP_ADD_TRIANGLE, OP_POLYLINE_VEC2,
 		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
-		OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
+		OP_PAINT_SHADOW, OP_TRANSLATE, OP_SCALE, OP_ROTATE, OP_TRANSFORM, OP_SET_MATRIX, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
 		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
 		OP_MAX_COUNT
 	};
+
 	std::vector<Opcode> _cmdtype;		// 操作类型
 	std::vector<uint8_t> _cmd;			// 命令数据
 	std::vector<size_t> _cmd_pos;		// 命令的数据偏移
@@ -421,7 +425,7 @@ private:
 public:
 	rvg_cx();
 	~rvg_cx();
-	void set_pos(const glm::ivec2 &ps);
+	void set_pos(const glm::ivec2& ps);
 	void clear();
 	void submit(fill_style_d* st);
 	void submit(uint32_t fill, uint32_t color, int linewidth = 1);
@@ -460,7 +464,6 @@ public:
 	void add_image(image_r* r);
 	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
 
-	void translate(const glm::vec2& offset);
 	void clip();
 	void clip(const glm::ivec4& c);
 	void save();
@@ -473,6 +476,13 @@ public:
 	void set_line_width(float w);
 	void set_color(uint32_t color);
 	void set_color(const glm::vec4& rgba);
+	void translate(const glm::vec2& offset);
+	void scale(float sx, float sy);
+	void scale(const glm::vec2& sc);
+	void rotate(float radians);
+	void transform(const glm::mat3x2* matrix);
+	void set_matrix(const glm::mat3x2* matrix);
+	void get_matrix(glm::mat3x2* matrix);
 
 	void push_ct(uint8_t op);
 	bool is_image();

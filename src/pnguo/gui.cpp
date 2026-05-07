@@ -5907,7 +5907,7 @@ void color_btn::draw(rvg_cx* rv)
 	auto psv = get_pos(false);
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
+	
 	rv->save();
 	rv->translate(p->_pos);
 	if (p->dfill)
@@ -6011,7 +6011,6 @@ void gradient_btn::draw(rvg_cx* rv)
 	auto psv = get_pos(false);
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
 	rv->save();
 	rv->translate({ x, y });
 	if (is_alpha(bc))
