@@ -723,9 +723,7 @@ kdata_array_fill_ydoubles(struct kdata* d, const double* v)
 	return(rc);
 }
 
-int
-kdata_array_fill(struct kdata* d, void* arg,
-	void (*fp)(size_t, struct kpair*, void*))
+int kdata_array_fill(struct kdata* d, void* arg, void (*fp)(size_t, struct kpair*, void*))
 {
 	size_t		i;
 	int		rc = 1;
@@ -776,6 +774,509 @@ kdata_array_set(struct kdata* d, size_t v, double x, double y)
 }
 
 // !array
+
+struct kdata*
+	kdata_bucket_alloc(size_t rmin, size_t rmax)
+{
+	struct kdata* d;
+	size_t		 i;
+
+	if (NULL == (d = (struct kdata*)calloc(1, sizeof(struct kdata))))
+		return(NULL);
+
+	d->refs = 1;
+	d->pairsz = rmax - rmin;
+	d->pairs = (struct kpair*)calloc(d->pairsz, sizeof(struct kpair));
+	if (NULL == d->pairs) {
+		free(d);
+		return(NULL);
+	}
+
+	for (i = 0; i < d->pairsz; i++)
+		d->pairs[i].x = rmin + i;
+
+	d->type = KDATA_BUCKET;
+	d->d.bucket.rmin = rmin;
+	d->d.bucket.rmax = rmax;
+	return(d);
+}
+
+static int
+kdata_bucket_checkrange(const struct kdata* d, size_t v)
+{
+
+	return(KDATA_BUCKET == d->type &&
+		v >= d->d.bucket.rmin && v < d->d.bucket.rmax);
+}
+
+int
+kdata_bucket_set(struct kdata* d, size_t v, double x, double y)
+{
+
+	if (!kdata_bucket_checkrange(d, v))
+		return(0);
+	return(kdata_set(d, v - d->d.bucket.rmin, x, y));
+}
+
+int
+kdata_bucket_add(struct kdata* d, size_t v, double val)
+{
+	double 	 x, y;
+
+	if (!kdata_bucket_checkrange(d, v))
+		return(0);
+	x = d->pairs[v - d->d.bucket.rmin].x;
+	y = d->pairs[v - d->d.bucket.rmin].y + val;
+	return(kdata_set(d, v - d->d.bucket.rmin, x, y));
+}
+
+struct kdata*
+	kdata_buffer_alloc(size_t hint)
+{
+	struct kdata* d;
+
+	if (NULL == (d = (struct kdata*)calloc(1, sizeof(struct kdata))))
+		return(NULL);
+
+	d->pairsz = hint;
+	d->pairs = (struct kpair*)calloc(d->pairsz, sizeof(struct kpair));
+	if (NULL == d->pairs) {
+		free(d);
+		return(NULL);
+	}
+
+	d->refs = 1;
+	d->type = KDATA_BUFFER;
+	return(d);
+}
+
+int
+kdata_buffer_copy(struct kdata* dst, const struct kdata* src)
+{
+	void* p;
+	size_t	 i;
+	int	 rc = 1;
+
+	if (KDATA_BUFFER != dst->type)
+		return(0);
+
+	/*
+	 * FIXME: use a pairbufsz-type of construct.
+	 * We're not tied to any particular buffer size, so this should
+	 * grow and shrink efficiently.
+	 * Obviously, the current method is not efficient.
+	 */
+	if (src->pairsz > dst->pairsz) {
+		dst->pairsz = src->pairsz;
+		p = reallocarray(dst->pairs,
+			dst->pairsz, sizeof(struct kpair));
+		if (NULL == p)
+			return(0);
+		dst->pairs = (struct kpair*)p;
+	}
+	dst->pairsz = src->pairsz;
+
+	if (dst->depsz)
+		for (i = 0; 0 != rc && i < dst->pairsz; i++)
+			rc = kdata_set(dst, i,
+				src->pairs[i].x,
+				src->pairs[i].y);
+	else
+		memcpy(dst->pairs, src->pairs,
+			dst->pairsz * sizeof(struct kpair));
+
+	return(rc);
+}
+
+
+struct kdata*
+	kdata_hist_alloc(double rmin, double rmax, size_t bins)
+{
+	struct kdata* d;
+	size_t		 i;
+
+	assert(rmax > rmin);
+
+	if (NULL == (d = (struct kdata*)calloc(1, sizeof(struct kdata))))
+		return(NULL);
+
+	d->refs = 1;
+	d->pairsz = bins;
+	d->pairs = (struct kpair*)calloc(d->pairsz, sizeof(struct kpair));
+	if (NULL == d->pairs) {
+		free(d);
+		return(NULL);
+	}
+
+	for (i = 0; i < bins; i++)
+		d->pairs[i].x = rmin +
+		i / (double)bins * (rmax - rmin);
+
+	d->type = KDATA_HIST;
+	d->d.hist.rmin = rmin;
+	d->d.hist.rmax = rmax;
+	return(d);
+}
+
+static size_t
+kdata_hist_checkrange(const struct kdata* d, double v)
+{
+	double	 frac;
+	size_t 	 bucket;
+
+	if (KDATA_HIST != d->type)
+		return(-1);
+	else if (v < d->d.hist.rmin)
+		return(-1);
+	else if (v >= d->d.hist.rmax)
+		return(-1);
+
+	frac = (v - d->d.hist.rmin) /
+		(d->d.hist.rmax - d->d.hist.rmin);
+	assert(frac >= 0.0 && frac < 1.0);
+	bucket = floor((double)d->pairsz * frac);
+
+	if ((size_t)bucket == d->pairsz - 1) {
+		assert(d->pairs[bucket].x <= v);
+	}
+	else {
+		assert(d->pairs[bucket].x <= v);
+		assert(d->pairs[bucket + 1].x >= v);
+	}
+
+	return(bucket);
+}
+
+int
+kdata_hist_add(struct kdata* d, double v, double val)
+{
+	size_t 	 bucket;
+	double	 x, y;
+
+	if ((bucket = kdata_hist_checkrange(d, v)) < 0)
+		return(0);
+	x = d->pairs[bucket].x;
+	y = d->pairs[bucket].y + val;
+	return(kdata_set(d, bucket, x, y));
+}
+
+int
+kdata_hist_set(struct kdata* d, double v, double y)
+{
+	size_t 	 bucket;
+	double 	 x;
+
+	if ((bucket = kdata_hist_checkrange(d, v)) < 0)
+		return(0);
+	x = d->pairs[bucket].x;
+	return(kdata_set(d, bucket, x, y));
+}
+
+static int
+kdata_mean_set(struct kdata* d, size_t pos, double x, double y)
+{
+	double	 delta, delta_n, newy;
+	void* p;
+
+	assert(KDATA_MEAN == d->type);
+
+	if (pos >= d->pairsz) {
+		/*
+		 * A note on this.
+		 * Our only growable data source is the vector, which
+		 * can only grow one at a time.
+		 * Thus, if we attach to a vector, we'll never exceed
+		 * this.
+		 * If we have non-monotonically increasing data source
+		 * sizes, this will need to be addressed.
+		 * FIXME: this is very inefficient!
+		 */
+		assert(pos == d->pairsz);
+		d->pairsz = pos + 1;
+		p = reallocarray(d->pairs,
+			d->pairsz, sizeof(struct kpair));
+		if (NULL == p)
+			return(0);
+		d->pairs = (struct kpair*)p;
+		p = reallocarray(d->d.mean.ns,
+			d->pairsz, sizeof(size_t));
+		if (NULL == p)
+			return(0);
+		d->d.mean.ns = (size_t*)p;
+	}
+
+	d->d.mean.ns[pos]++;
+	delta = y - d->pairs[pos].y;
+	delta_n = delta / (double)d->d.mean.ns[pos];
+	newy = d->pairs[pos].y + delta_n;
+	return(kdata_set(d, pos, x, newy));
+}
+
+struct kdata*
+	kdata_mean_alloc(struct kdata* dep)
+{
+	struct kdata* d;
+	size_t		 i;
+
+	if (NULL == (d = (struct kdata*)calloc(1, sizeof(struct kdata))))
+		return(NULL);
+
+	d->refs = 1;
+	d->type = KDATA_MEAN;
+	if (NULL == dep)
+		return(d);
+
+	d->pairsz = dep->pairsz;
+	d->pairs = (struct kpair*)calloc(d->pairsz, sizeof(struct kpair));
+	d->d.mean.ns = (size_t*)calloc(d->pairsz, sizeof(size_t));
+	if (NULL == d->pairs || NULL == d->d.mean.ns) {
+		free(d->pairs);
+		free(d->d.mean.ns);
+		free(d);
+		return(NULL);
+	}
+	kdata_dep_add(d, dep, kdata_mean_set);
+
+	for (i = 0; i < dep->pairsz; i++)
+		d->pairs[i].x = dep->pairs[i].x;
+
+	return(d);
+}
+
+int
+kdata_mean_attach(struct kdata* d, struct kdata* dep)
+{
+	void* p;
+	size_t	 i;
+
+	if (KDATA_MEAN != d->type)
+		return(0);
+	if (NULL == dep)
+		return(1);
+
+	if (d->pairsz < dep->pairsz) {
+		p = reallocarray(d->pairs,
+			dep->pairsz, sizeof(struct kpair));
+		if (NULL == p)
+			return(0);
+		d->pairs = (struct kpair*)p;
+		/* FIXME: don't loop, just do the math. */
+		for (i = d->pairsz; i < dep->pairsz; i++)
+			memset(&d->pairs[i], 0, sizeof(struct kpair));
+		p = reallocarray(d->d.mean.ns,
+			dep->pairsz, sizeof(size_t));
+		if (NULL == p)
+			return(0);
+		d->d.mean.ns = (size_t*)p;
+		for (i = d->pairsz; i < dep->pairsz; i++)
+			d->d.mean.ns[i] = 0;
+		d->pairsz = dep->pairsz;
+		for (i = 0; i < dep->pairsz; i++)
+			d->pairs[i].x = dep->pairs[i].x;
+	}
+
+	kdata_dep_add(d, dep, kdata_mean_set);
+	return(1);
+}
+
+static int
+kdata_stddev_set(struct kdata* d, size_t pos, double x, double y)
+{
+	double	 delta, delta_n, term1, newy;
+	void* p;
+	size_t	 n1;
+
+	assert(KDATA_STDDEV == d->type);
+
+	if (pos >= d->pairsz) {
+		/*
+		 * A note on this.
+		 * Our only growable data source is the vector, which
+		 * can only grow one at a time.
+		 * Thus, if we attach to a vector, we'll never exceed
+		 * this.
+		 * If we have non-monotonically increasing data source
+		 * sizes, this will need to be addressed.
+		 * FIXME: this is very inefficient!
+		 */
+		assert(pos == d->pairsz);
+		d->pairsz = pos + 1;
+		p = reallocarray(d->pairs,
+			d->pairsz, sizeof(struct kpair));
+		if (NULL == p)
+			return(0);
+		d->pairs = (struct kpair*)p;
+		p = reallocarray(d->d.stddev.ns,
+			d->pairsz, sizeof(size_t));
+		if (NULL == p)
+			return(0);
+		d->d.stddev.ns = (size_t*)p;
+		p = reallocarray(d->d.stddev.m2s,
+			d->pairsz, sizeof(double));
+		if (NULL == p)
+			return(0);
+		d->d.stddev.m2s = (double*)p;
+		p = reallocarray(d->d.stddev.m1s,
+			d->pairsz, sizeof(double));
+		if (NULL == p)
+			return(0);
+		d->d.stddev.m1s = (double*)p;
+	}
+
+	n1 = d->d.stddev.ns[pos]++;
+	delta = y - d->d.stddev.m1s[pos];
+	delta_n = delta / (double)d->d.stddev.ns[pos];
+	term1 = delta * delta_n * (double)n1;
+
+	d->d.stddev.m1s[pos] += delta_n;
+	d->d.stddev.m2s[pos] += term1;
+	if (d->d.stddev.ns[pos] < 2)
+		newy = 0.0;
+	else
+		newy = sqrt(d->d.stddev.m2s[pos] /
+			((double)d->d.stddev.ns[pos] - 1.0));
+
+	return(kdata_set(d, pos, x, newy));
+}
+
+struct kdata*
+	kdata_stddev_alloc(struct kdata* dep)
+{
+	struct kdata* d;
+	size_t		 i;
+
+	if (NULL == (d = (struct kdata*)calloc(1, sizeof(struct kdata))))
+		return(NULL);
+
+	d->refs = 1;
+	d->type = KDATA_STDDEV;
+	if (NULL == dep)
+		return(d);
+
+	d->pairsz = dep->pairsz;
+	d->pairs = (struct kpair*)calloc(d->pairsz, sizeof(struct kpair));
+	d->d.stddev.ns = (size_t*)calloc(d->pairsz, sizeof(size_t));
+	d->d.stddev.m1s = (double*)calloc(d->pairsz, sizeof(double));
+	d->d.stddev.m2s = (double*)calloc(d->pairsz, sizeof(double));
+	if (NULL == d->pairs ||
+		NULL == d->d.stddev.ns ||
+		NULL == d->d.stddev.m1s ||
+		NULL == d->d.stddev.m2s) {
+		free(d->pairs);
+		free(d->d.stddev.ns);
+		free(d->d.stddev.m1s);
+		free(d->d.stddev.m2s);
+		free(d);
+		return(NULL);
+	}
+	kdata_dep_add(d, dep, kdata_stddev_set);
+
+	for (i = 0; i < dep->pairsz; i++)
+		d->pairs[i].x = dep->pairs[i].x;
+
+	return(d);
+}
+
+int
+kdata_stddev_attach(struct kdata* d, struct kdata* dep)
+{
+	void* p;
+	size_t	 i;
+
+	if (KDATA_STDDEV != d->type)
+		return(0);
+	if (NULL == dep)
+		return(1);
+
+	if (d->pairsz < dep->pairsz) {
+		p = reallocarray(d->pairs,
+			dep->pairsz, sizeof(struct kpair));
+		if (NULL == p)
+			return(0);
+		d->pairs = (struct kpair*)p;
+		/* FIXME: don't loop, just do the math. */
+		for (i = d->pairsz; i < dep->pairsz; i++)
+			memset(&d->pairs[i], 0, sizeof(struct kpair));
+
+		p = reallocarray(d->d.stddev.ns,
+			dep->pairsz, sizeof(size_t));
+		if (NULL == p)
+			return(0);
+		d->d.stddev.ns = (size_t*)p;
+		for (i = d->pairsz; i < dep->pairsz; i++)
+			d->d.stddev.ns[i] = 0;
+
+		p = reallocarray(d->d.stddev.m1s,
+			dep->pairsz, sizeof(double));
+		if (NULL == p)
+			return(0);
+		d->d.stddev.m1s = (double*)p;
+		for (i = d->pairsz; i < dep->pairsz; i++)
+			d->d.stddev.m1s[i] = 0.0;
+
+		p = reallocarray(d->d.stddev.m2s,
+			dep->pairsz, sizeof(double));
+		if (NULL == p)
+			return(0);
+		d->d.stddev.m2s = (double*)p;
+		for (i = d->pairsz; i < dep->pairsz; i++)
+			d->d.stddev.m2s[i] = 0.0;
+
+		d->pairsz = dep->pairsz;
+		for (i = 0; i < dep->pairsz; i++)
+			d->pairs[i].x = dep->pairs[i].x;
+	}
+
+	kdata_dep_add(d, dep, kdata_stddev_set);
+	return(1);
+}
+
+struct kdata*
+	kdata_vector_alloc(size_t step)
+{
+	struct kdata* d;
+
+	if (NULL == (d = (struct kdata*)calloc(1, sizeof(struct kdata))))
+		return(NULL);
+
+	d->refs = 1;
+	d->type = KDATA_VECTOR;
+	d->d.vector.stepsz = step;
+	return(d);
+}
+
+int
+kdata_vector_append(struct kdata* d, double x, double y)
+{
+	void* p;
+
+	if (KDATA_VECTOR != d->type)
+		return(0);
+
+	if (d->pairsz + 1 >= d->d.vector.pairbufsz) {
+		while (d->pairsz + 1 >= d->d.vector.pairbufsz)
+			d->d.vector.pairbufsz += d->d.vector.stepsz;
+		assert(d->d.vector.pairbufsz > d->pairsz + 1);
+		p = reallocarray(d->pairs,
+			d->d.vector.pairbufsz, sizeof(struct kpair));
+		if (NULL == p)
+			return(0);
+		d->pairs = (struct kpair*)p;
+	}
+
+	d->pairsz++;
+	return(kdata_set(d, d->pairsz - 1, x, y));
+}
+
+int
+kdata_vector_set(struct kdata* d, size_t v, double x, double y)
+{
+
+	if (KDATA_VECTOR != d->type || v >= d->pairsz)
+		return(0);
+	return(kdata_set(d, v, x, y));
+}
+
 
 // draw
 #if 1 
@@ -1358,7 +1859,7 @@ kplotfont_defaults(struct kplotfont* font)
 
 	/* Point 12 size serif font. */
 	font->family = "serif";
-	font->sz = 12.0;
+	font->sz = 16.0;
 	font->slant = 0;// vkvg_FONT_SLANT_NORMAL;
 	font->weight = 0;// vkvg_FONT_WEIGHT_NORMAL;
 }

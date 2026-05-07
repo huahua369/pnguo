@@ -641,6 +641,18 @@ struct listm_t
 	listm_t* next = 0;	// 下一个节点
 };
 
+uint32_t arc4random() {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	static std::uniform_int_distribution<uint32_t> dis(0, UINT32_MAX);
+	return dis(gen);
+}
+void fill(size_t pos, struct kpair* val, void* dat)
+{
+
+	val->x = pos;
+	val->y = arc4random() / (double)UINT32_MAX;
+}
 int plot_main(canvas2d_t* ctx)
 {
 	struct kpair	 points1[50], points2[50];
@@ -688,7 +700,7 @@ int plot_main(canvas2d_t* ctx)
 	kdata_destroy(d1);
 	kdata_destroy(d2);
 	d1 = d2 = NULL;
-	surf = (VkvgSurface)ctx->new_surface(600, 400);
+	surf = (VkvgSurface)ctx->new_surface(2 * 600, 400);
 
 	st = vkvg_surface_status(surf);
 	if (VKVG_STATUS_SUCCESS != st) {
@@ -715,6 +727,33 @@ int plot_main(canvas2d_t* ctx)
 	vkvg_fill(cr);
 	kplot_draw(p, 600.0, 400.0, cr);
 
+	kplot_free(p);
+	{
+		auto d = kdata_array_alloc(NULL, 20);
+		assert(NULL != d);
+		auto c = kdata_array_fill(d, NULL, fill);
+		assert(c);
+
+		if (NULL == (p = kplot_alloc(NULL))) {
+			perror(NULL);
+			goto out;
+		}
+
+		if (!kplot_attach_data(p, d, KPLOT_LINESPOINTS, NULL)) {
+			perror(NULL);
+			goto out;
+		}
+
+		if (!kplot_attach_smooth(p, d, KPLOT_LINESPOINTS,
+			NULL, KSMOOTH_MOVAVG, NULL)) {
+			perror(NULL);
+			goto out;
+		}
+
+		kdata_destroy(d);
+		vkvg_translate(cr, 600.0, 0.0);
+		kplot_draw(p, 600.0, 400.0, cr);
+	}
 	vkvg_flush(cr);
 	vkvg_surface_resolve(surf);
 	st = vkvg_surface_write_to_png

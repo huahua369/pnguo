@@ -1,4 +1,9 @@
 ﻿#pragma once
+/*
+plot基于kplot实现修改
+创建于2026-05-07
+修改成使用vkvg渲染
+*/
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -177,8 +182,7 @@ int		 kdata_get(const struct kdata*, size_t, struct kpair*);
 
 int		 kdata_array_add(struct kdata*, size_t, double);
 struct kdata* kdata_array_alloc(const struct kpair*, size_t);
-int		 kdata_array_fill(struct kdata*, void*,
-	void (*)(size_t, struct kpair*, void*));
+int		 kdata_array_fill(struct kdata* d, void* arg, void (*fp)(size_t, struct kpair*, void*));
 int		 kdata_array_fill_ydoubles(struct kdata*, const double*);
 int		 kdata_array_fill_ysizes(struct kdata*, const size_t*);
 int		 kdata_array_set(struct kdata*, size_t, double, double);
@@ -226,15 +230,12 @@ void		 kplotfont_defaults(struct kplotfont*);
 
 struct kplot* kplot_alloc(const struct kplotcfg*);
 int		 kplot_detach(struct kplot*, const struct kdata*);
-int		 kplot_attach_data(struct kplot*, struct kdata*,
-	enum kplottype, const struct kdatacfg*);
-int		 kplot_attach_smooth(struct kplot*, struct kdata*,
-	enum kplottype, const struct kdatacfg*,
-	enum ksmthtype, const struct ksmthcfg*);
-int		 kplot_attach_datas(struct kplot*, size_t,
-	struct kdata**, const enum kplottype*,
-	const struct kdatacfg* const*,
-	enum kplotstype);
+int		 kplot_attach_data(struct kplot* p, struct kdata* d,
+	enum kplottype t, const struct kdatacfg* cfg);
+int		 kplot_attach_smooth(struct kplot* p, struct kdata* d,
+	enum kplottype t, const struct kdatacfg* cfg,
+	enum ksmthtype smthtype, const struct ksmthcfg* smth);
+int		 kplot_attach_datas(struct kplot* p, size_t sz, struct kdata** d, const enum kplottype* t, const struct kdatacfg* const* cfg, enum kplotstype st);
 void		 kplotctx_draw(struct kplotctx*, struct kplot*,
 	double, double, VkvgContext);
 int		 kplotctx_translate(const struct kplotctx*, double,
