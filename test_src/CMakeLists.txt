@@ -18,7 +18,7 @@ list(APPEND src_cmp
 list(APPEND src_vkcmp   
     "main_vk.cpp" 
     "../src/pnguo/ecc_sv.cpp"
-    "../src/pnguo/hex_editor.cpp"
+    "../src/pnguo/plot.cpp"
     "../third_party/spine/spine-sdl3/spinesdl3.cpp" 
     "mshell.cpp"
     "../rc/resource1.rc"

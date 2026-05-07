@@ -29,7 +29,7 @@
 #include <pnguo/win_core.h>
 
 #include <SDL3/SDL.h>
-#include <pnguo/hex_editor.h>
+#include <pnguo/plot.h>
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 #ifdef min
@@ -641,6 +641,101 @@ struct listm_t
 	listm_t* next = 0;	// 下一个节点
 };
 
+int plot_main(canvas2d_t* ctx)
+{
+	struct kpair	 points1[50], points2[50];
+	struct kdata* d1, * d2;
+	struct kplot* p;
+
+	VkvgSurface surf;
+	size_t		 i;
+	VkvgContext cr;
+	vkvg_status_t	 st;
+	int		 rc;
+
+	rc = EXIT_FAILURE;
+
+	d1 = d2 = NULL;
+	p = NULL;
+
+	for (i = 0; i < 50; i++) {
+		points1[i].x = points2[i].x = (i + 1) / 50.0;
+		points1[i].y = log((i + 1) / 50.0);
+		points2[i].y = -log((i + 1) / 50.0) + points1[0].y;
+	}
+
+	if (NULL == (d1 = kdata_array_alloc(points1, 50))) {
+		perror(NULL);
+		goto out;
+	}
+	else if (NULL == (d2 = kdata_array_alloc(points2, 50))) {
+		perror(NULL);
+		goto out;
+	}
+	else if (NULL == (p = kplot_alloc(NULL))) {
+		perror(NULL);
+		goto out;
+	}
+	else if (!kplot_attach_data(p, d1, KPLOT_LINES, NULL)) {
+		perror(NULL);
+		goto out;
+	}
+	else if (!kplot_attach_data(p, d2, KPLOT_POINTS, NULL)) {
+		perror(NULL);
+		goto out;
+	}
+
+	kdata_destroy(d1);
+	kdata_destroy(d2);
+	d1 = d2 = NULL;
+	surf = (VkvgSurface)ctx->new_surface(600, 400);
+
+	st = vkvg_surface_status(surf);
+	if (VKVG_STATUS_SUCCESS != st) {
+		fprintf(stderr, "%s", vkvg_status_to_string(st));
+		vkvg_surface_destroy(surf);
+		kplot_free(p);
+		return(EXIT_FAILURE);
+	}
+
+	cr = vkvg_create(surf);
+	vkvg_surface_destroy(surf);
+
+	st = vkvg_status(cr);
+	if (VKVG_STATUS_SUCCESS != st) {
+		fprintf(stderr, "%s", vkvg_status_to_string(st));
+		vkvg_destroy(cr);
+		kplot_free(p);
+		return(EXIT_FAILURE);
+
+	}
+
+	vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
+	vkvg_rectangle(cr, 0.0, 0.0, 600.0, 400.0);
+	vkvg_fill(cr);
+	kplot_draw(p, 600.0, 400.0, cr);
+
+	st = vkvg_surface_write_to_png
+	(vkvg_get_target(cr), "temp/example0.png");
+
+	if (VKVG_STATUS_SUCCESS != st) {
+		fprintf(stderr, "%s", vkvg_status_to_string(st));
+		vkvg_destroy(cr);
+		kplot_free(p);
+		return(EXIT_FAILURE);
+	}
+
+	vkvg_destroy(cr);
+	rc = EXIT_SUCCESS;
+out:
+	kplot_free(p);
+	kdata_destroy(d1);
+	kdata_destroy(d2);
+
+	return(rc);
+}
+
+
 int main()
 {
 	auto k = time(0);
@@ -884,6 +979,11 @@ int main()
 			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			td3->familys = family;
+
+
+			//plot_main(td3);
+
+
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
 			//VkvgSurface sf = td3->vgdev->new_surface(vki.vkimage, 0, vki.size.x, vki.size.y);
