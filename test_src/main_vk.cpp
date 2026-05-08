@@ -1230,7 +1230,7 @@ int main()
 			auto colorpick = new colorpick_tl();
 			{
 				auto c = colorpick;
-				c->init(0xff282828, 250, 20, true);
+				c->init(0xff282828, 300, 20, true);
 				c->font_size = 15;
 				dvv->add_widget(c);
 			}
@@ -1245,7 +1245,7 @@ int main()
 				btn->text_color = -1;
 				btn->str = (char*)u8"🍕截取保存文件 ";
 				btn->click_cb = [=](void* p, int clicks) {
-					loadf = true;
+					//loadf = true;
 					};
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {

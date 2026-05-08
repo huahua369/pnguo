@@ -5480,9 +5480,8 @@ void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
 	float h = hsv.x, s = hsv.y, v = hsv.z;
 	otc.w = hsv.w;
 	if (s == 0.0f)
-	{
-		// gray
-		otc.x = otc.y = otc.z = v;
+	{	
+		otc.x = otc.y = otc.z = v;	// gray
 		return;
 	}
 	h = fmod(h, 1.0f) / (60.0f / 360.0f);
@@ -5491,7 +5490,6 @@ void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
 	float p = v * (1.0f - s);
 	float q = v * (1.0f - s * f);
 	float t = v * (1.0f - s * (1.0f - f));
-
 	switch (i)
 	{
 	case 0: otc.x = v; otc.y = t; otc.z = p; break;
@@ -5571,7 +5569,7 @@ bool colorpick_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 	auto et = (event_type2)type;
 	glm::ivec2 poss = mps - _pos;
 	glm::ivec2 ss = _size;
-	poss.x -= cpx;
+	poss.x -= cpx + step;
 	poss.y -= height + step;
 	double htp = height + step;
 	if (poss.y < 0)poss.y = 0;
