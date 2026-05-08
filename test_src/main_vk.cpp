@@ -688,15 +688,60 @@ VkvgSurface plot_main(canvas2d_t* ctx, int width, int height)
 		perror(NULL);
 		goto out;
 	}
-	else if (!kplot_attach_data(p, d1, KPLOT_LINES, NULL)) {
-		perror(NULL);
-		goto out;
-	}
-	else if (!kplot_attach_data(p, d2, KPLOT_POINTS, NULL)) {
-		perror(NULL);
-		goto out;
-	}
 
+	struct kdatacfg	 cfg;
+	{
+
+		kdatacfg_defaults(&cfg);
+		cfg.line.clr.type = KPLOTCTYPE_PATTERN;
+		cfg.line.clr.pattern = vkvg_pattern_create_linear(0.0, 0.0, 600.0, 400.0);
+		st = vkvg_pattern_status(cfg.line.clr.pattern);
+		if (VKVG_STATUS_SUCCESS != st) {
+			fprintf(stderr, "%s", vkvg_status_to_string(st));
+			vkvg_pattern_destroy(cfg.line.clr.pattern);
+			kplot_free(p);
+			return 0;
+		}
+		vkvg_pattern_add_color_stop_rgba(cfg.line.clr.pattern, 0.25, 1.0, 0.0, 0.0, 1.0);
+		vkvg_pattern_add_color_stop_rgba(cfg.line.clr.pattern, 0.5, 0.0, 1.0, 0.0, 1.0);
+		vkvg_pattern_add_color_stop_rgba(cfg.line.clr.pattern, 0.75, 0.0, 0.0, 1.0, 1.0);
+
+		auto d = kdata_bucket_alloc(0, 100);
+		assert(NULL != d);
+		for (i = 0; i < 100; i++)
+			kdata_bucket_set(d, i, i, i);
+		//if (!kplot_attach_data(p, d, KPLOT_LINES, &cfg)) {
+		//	perror(NULL);
+		//	goto out;
+		//}
+
+		vkvg_pattern_destroy(cfg.line.clr.pattern);
+
+		kdata_destroy(d);
+		double		 u;
+		d = kdata_hist_alloc(0.0, 1.0, 100);
+		assert(NULL != d);
+		for (i = 0; i < 4000; i++) {
+			u = -log(1.0 - (arc4random() / (double)UINT32_MAX)) / 2.5;
+			kdata_hist_add(d, u, 1.0);
+		}
+		kplot_attach_smooth(p, d, KPLOT_LINES, NULL, KSMOOTH_CDF, NULL);
+	}
+	//else if (!kplot_attach_data(p, d1, KPLOT_LINES, NULL)) {
+	//	perror(NULL);
+	//	goto out;
+	//}
+	//else if (!kplot_attach_data(p, d2, KPLOT_POINTS, NULL)) {
+	//	perror(NULL);
+	//	goto out;
+	//}
+	{
+		enum kplottype	 ts[2];
+		ts[0] = KPLOT_POINTS;
+		ts[1] = KPLOT_LINES;
+		kdata* md[] = { d1,d2 };
+		//kplot_attach_datas(p, 2, md, ts, NULL, KPLOTS_YERRORBAR);
+	}
 	kdata_destroy(d1);
 	kdata_destroy(d2);
 	d1 = d2 = NULL;
@@ -723,10 +768,32 @@ VkvgSurface plot_main(canvas2d_t* ctx, int width, int height)
 	}
 
 	{
+		grid_info_t g = {};
+		g.width = 200;
+		g.count = 10;
+		g.linewidth = 1;
+		g.back_color = 0xff353535;
+		g.inline_color = 0xff404040;
+		g.line_color = 0xff181818;
+
 		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
-		vkvg_rectangle(cr, 0.0, 0.0, 600.0, 400.0);
+		vkvg_rectangle(cr, 0.0, 0.0, 1200.0, 1200.0);
 		vkvg_fill(cr);
-		kplot_draw(p, 600.0, 400.0, cr);
+		vkvg_save(cr);
+		vkvg_translate(cr, 0, 0);
+		for (size_t i = 0; i < 6; i++)
+		{
+			vkvg_save(cr);
+			vkvg_translate(cr, 0, g.width * i);
+			for (size_t x = 0; x < 6; x++) {
+				draw_grid(cr, &g, ctx->vgcb);
+				vkvg_translate(cr, g.width, 0);
+			}
+			vkvg_restore(cr);
+		}
+		vkvg_restore(cr);
+
+		//kplot_draw(p, 600.0, 400.0, cr);
 
 		kplot_free(p);
 	}
@@ -754,9 +821,9 @@ VkvgSurface plot_main(canvas2d_t* ctx, int width, int height)
 
 		kdata_destroy(d);
 		vkvg_translate(cr, 600.0, 0.0);
-		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
-		vkvg_rectangle(cr, 1.0, 0.0, 600.0, 400.0);
-		vkvg_fill(cr);
+		//vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
+		//vkvg_rectangle(cr, 1.0, 0.0, 600.0, 400.0);
+		//vkvg_fill(cr);
 		kplot_draw(p, 600.0, 400.0, cr);
 	}
 	vkvg_flush(cr);
@@ -1027,7 +1094,7 @@ int main()
 			td3->familys = family;
 
 
-			auto ptm = plot_main(td3, 1200, 400);
+			auto ptm = plot_main(td3, 1200, 1200);
 
 
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
@@ -1068,7 +1135,7 @@ int main()
 			dvv->set_size({ 500,400 });
 			dvv->set_pos({ 10,360 });
 			dvv->family = family;
-			dvv->border = { 0xffacacac,1,5,0xef666666 };	// 颜色，线粗，圆角，背景色
+			dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
 			dvv->flex.wrap = flex_wrap::WRAP;
 			dvv->flex.direction = flex_direction::ROW;
 			dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
@@ -1281,7 +1348,7 @@ int main()
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
 						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
-						rt_add_image_vg(mtext, ptm, glm::ivec4(0, 0, 1200, 400), {}, -1, { 1200,400 }, { 0,0 }, true);
+						rt_add_image_vg(mtext, ptm, glm::ivec4(0, 0, 1200, 1200), {}, -1, { 1200,1200 }, { 0,0 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 

@@ -422,6 +422,16 @@ void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols,
 // 画线性渐变填充
 void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count);
 
+struct grid_info_t
+{
+	int width = 200;
+	int count = 10;
+	int linewidth = 1;
+	uint32_t back_color = 0xff353535;
+	uint32_t inline_color = 0xff404040;
+	uint32_t line_color = 0xff181818;
+};
+void draw_grid(void* ctx, grid_info_t* t, vkvg_func_t* func);
 
 
 /*
@@ -635,6 +645,7 @@ public:
 	std::map<void*, void*> _vgt;
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	texture_cb* rcb = 0;
+	vkvg_func_t* vgcb = 0;
 	void* tex = 0;
 	void* rptr = 0;
 	font_family_t* familys = 0;				// 默认字体

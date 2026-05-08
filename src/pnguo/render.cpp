@@ -1420,6 +1420,39 @@ void draw_rectangle_gradient(void* ctx, int width, int height, const rect_shadow
 	vkvg_pattern_destroy(lg_left);
 	vkvg_pattern_destroy(lg_right);
 }
+
+
+void draw_grid(void* ctx, grid_info_t* t, vkvg_func_t* func)
+{
+	auto cr = (VkvgContext)ctx;
+	if (!cr || !func || !t || t->count < 2 || t->width < t->count)return;
+	func->vkvg_save(cr);
+	func->vkvg_rectangle(cr, 0, 0, t->width, t->width);
+	func->vkvg_clip_preserve(cr);
+	func->vkvg_set_source_color(cr, t->back_color);
+	func->vkvg_fill(cr);
+	func->vkvg_translate(cr, 0.5, 0.5);
+	int inw = t->width / t->count;
+	// 内线
+	for (size_t i = 1; i < t->count; i++)
+	{
+		func->vkvg_move_to(cr, inw * i, 0);
+		func->vkvg_line_to(cr, inw * i, t->width);
+		func->vkvg_move_to(cr, 0, inw * i);
+		func->vkvg_line_to(cr, t->width, inw * i);
+	}
+	func->vkvg_set_source_color(cr, t->inline_color);
+	func->vkvg_stroke(cr);
+	// 外框线
+	func->vkvg_move_to(cr, t->width, 0);
+	func->vkvg_line_to(cr, 0, 0);
+	func->vkvg_line_to(cr, 0, t->width);
+	func->vkvg_set_source_color(cr, t->line_color);
+	func->vkvg_stroke(cr);
+	func->vkvg_restore(cr);
+}
+
+
 #if 0
 image_sliced_t new_rect(const rect_shadow_t& rs)
 {
@@ -3082,6 +3115,7 @@ void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
 	{
 		p->qindex = cc.qIndex;
 		vgdev = p;
+		vgcb = p->get_fun();
 	}
 }
 //

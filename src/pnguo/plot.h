@@ -229,21 +229,15 @@ void		 ksmthcfg_defaults(struct ksmthcfg*);
 void		 kplotfont_defaults(struct kplotfont*);
 
 struct kplot* kplot_alloc(const struct kplotcfg*);
-int		 kplot_detach(struct kplot*, const struct kdata*);
-int		 kplot_attach_data(struct kplot* p, struct kdata* d,
-	enum kplottype t, const struct kdatacfg* cfg);
-int		 kplot_attach_smooth(struct kplot* p, struct kdata* d,
-	enum kplottype t, const struct kdatacfg* cfg,
-	enum ksmthtype smthtype, const struct ksmthcfg* smth);
-int		 kplot_attach_datas(struct kplot* p, size_t sz, struct kdata** d, const enum kplottype* t, const struct kdatacfg* const* cfg, enum kplotstype st);
-void		 kplotctx_draw(struct kplotctx*, struct kplot*,
-	double, double, VkvgContext);
-int		 kplotctx_translate(const struct kplotctx*, double,
-	double, double*, double*);
-void		 kplot_draw(struct kplot*, double, double, VkvgContext);
-void		 kplot_free(struct kplot*);
-int		 kplot_get_datacfg(struct kplot*, size_t,
-	struct kdatacfg**, size_t*);
+int	kplot_detach(struct kplot*, const struct kdata*);
+int	kplot_attach_data(struct kplot* p, struct kdata* d, enum kplottype t, const struct kdatacfg* cfg);
+int	kplot_attach_smooth(struct kplot* p, struct kdata* d, enum kplottype t, const struct kdatacfg* cfg, enum ksmthtype smthtype, const struct ksmthcfg* smth);
+int	kplot_attach_datas(struct kplot* p, size_t sz, struct kdata** d, const enum kplottype* t, const struct kdatacfg* const* cfg, enum kplotstype st);
+void kplotctx_draw(struct kplotctx*, struct kplot*, double, double, VkvgContext);
+int	kplotctx_translate(const struct kplotctx*, double, double, double*, double*);
+void kplot_draw(struct kplot*, double, double, VkvgContext);
+void kplot_free(struct kplot*);
+int kplot_get_datacfg(struct kplot*, size_t, struct kdatacfg**, size_t*);
 struct kplotcfg* kplot_get_plotcfg(struct kplot*);
 
 
