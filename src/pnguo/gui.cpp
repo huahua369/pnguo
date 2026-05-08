@@ -7435,6 +7435,12 @@ bool div_cx::update(float delta)
 		clayout(); ic++;
 	}
 	if (valid) {
+		sort_draw.clear();
+		sort_draw.reserve(widgets.size());
+		for (auto p : widgets) {
+			sort_draw.push_back(p);
+		}
+		std::stable_sort(sort_draw.begin(), sort_draw.end(), [](widget_t* p1, widget_t* p2) {return p1->dindex < p2->dindex; });
 		valid = false;
 		ic++;
 	}
@@ -7456,7 +7462,7 @@ void div_cx::draw(rvg_cx* rv)
 		rv->pop_view();
 	}
 
-	for (auto& it : widgets) {
+	for (auto& it : sort_draw) {
 		if (it->visible)
 		{
 			it->draw(rv);
@@ -7544,6 +7550,7 @@ void div_cx::clayout()
 {
 	if (!uplayout)return;
 	uplayout = false;
+	valid = true;
 	widget_t** p = widgets.data();
 	glm::vec2 pos = {};
 	if (lines.empty())
@@ -7558,6 +7565,7 @@ void div_cx::clayout()
 			pos.y += cs.y;
 		}
 	}
+	return;
 }
 
 

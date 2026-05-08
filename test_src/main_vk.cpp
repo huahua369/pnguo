@@ -1216,6 +1216,7 @@ int main()
 				r->set_size({ 236,32 });
 				//r->set_single(false);
 				dvv->add_widget(r);
+				r->dindex = 100;
 			}
 			auto pro = new progress_tl();
 			dvv->add_widget(pro);
@@ -1251,21 +1252,8 @@ int main()
 				auto div = (div_cx*)ud;
 				div->on_event(type, e);
 				});
-			std::atomic_int wait2d = 0;
 
-			//			std::thread jt([=, &wait2d]() {
-			//
-			//#if 1
-			//				while (0) {
-			//					if (wait2d == 0) {
-			//						wait2d = 1;
-			//					}
-			//					Sleep(1);
-			//				}
-			//#endif
-			//
-			//				});
-			//			jt.detach();
+
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
@@ -1277,7 +1265,6 @@ int main()
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					texture_tiled_dt ttd = {};
 					ttd.src_rect = { 0,0,200,200 };
 					auto tss = form0->get_size();
@@ -1285,6 +1272,7 @@ int main()
 					ttd.dst_rect = { -10,-10,tss };
 					auto ptex = td3->get_texture(ptm);
 					pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
+					//if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					td3->draw_rvg(rvgd1);
