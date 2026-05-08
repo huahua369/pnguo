@@ -3772,6 +3772,22 @@ glm::ivec2 canvas2d_t::get_size()
 	return glm::ivec2(_view.z, _view.w);
 }
 
+void* canvas2d_t::get_texture(void* surface)
+{
+	auto ipt = _vt.find((image_ptr_t*)surface);
+	void* tp = 0;
+	if (ipt != _vt.end())
+	{
+		tp = ipt->second;
+	}
+	else {
+		auto kpt = _vgt.find(surface);
+		if (kpt != _vgt.end())
+			tp = kpt->second;
+	}
+	return tp;
+}
+
 
 
 #endif

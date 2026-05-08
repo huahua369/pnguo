@@ -1278,6 +1278,13 @@ int main()
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					texture_tiled_dt ttd = {};
+					ttd.src_rect = { 0,0,200,200 };
+					auto tss = form0->get_size();
+					tss += 10;
+					ttd.dst_rect = { -10,-10,tss };
+					auto ptex = td3->get_texture(ptm);
+					pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
 					td3->draw_textdata(mtext, { 0,0 });
 					td3->draw_rvg(rvgd);
 					td3->draw_rvg(rvgd1);
@@ -1294,7 +1301,7 @@ int main()
 
 					static int ity = 6;
 					light->_intensity = ity;
-
+					td3->update(ptm, 0);
 					*ret |= dvv->update(delta);
 					{
 
@@ -1326,7 +1333,7 @@ int main()
 					}
 					if (kti > 0.06)
 					{
-						//*ret = true;
+						*ret = true;
 						kti = 0.0;
 						rt_clear(mtext);
 						auto img = fctx->bcc._data[0];
@@ -1348,7 +1355,7 @@ int main()
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
 						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
-						rt_add_image_vg(mtext, ptm, glm::ivec4(0, 0, 1200, 1200), {}, -1, { 1200,1200 }, { 0,0 }, true);
+						//rt_add_image_vg(mtext, ptm, glm::ivec4(0, 0, 1200, 1200), {}, -1, { 1200,1200 }, { -10,-16 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 

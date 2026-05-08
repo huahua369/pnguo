@@ -681,6 +681,7 @@ public:
 	void free_tex();
 	void free_rvg(rvg_data_cx* p);
 	glm::ivec2 get_size();
+	void* get_texture(void* surface);
 };
 
 class clicprect_cx
