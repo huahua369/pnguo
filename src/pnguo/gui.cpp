@@ -5552,7 +5552,6 @@ void colorpick_tl::set_hsv(const glm::vec4& c)
 }
 void colorpick_tl::set_posv(const glm::ivec2& poss)
 {
-	double htp = height + step;
 	double cw0 = colorw - step, x = poss.x;
 	if (x < 0) { x = 0; }
 	double xf = (double)poss.x / cw0;
