@@ -1835,7 +1835,7 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 			else {
 				pw->release_capture();	// 释放鼠标			
 				// 开始输入法
-				if (pw->input_ptr)
+				if (pw->input_ptr && pw->input_ptr->ptr)
 				{
 					pw->start_text_input();
 					auto irc = (glm::ivec4*)&pw->input_ptr->x;

@@ -5480,7 +5480,7 @@ void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
 	float h = hsv.x, s = hsv.y, v = hsv.z;
 	otc.w = hsv.w;
 	if (s == 0.0f)
-	{	
+	{
 		otc.x = otc.y = otc.z = v;	// gray
 		return;
 	}
@@ -5871,7 +5871,7 @@ void widget_t::draw(rvg_cx* rv)
 
 void image_btn::draw(rvg_cx* rv) {
 
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	//image_ptr_t* img = 0;
@@ -5900,25 +5900,25 @@ void color_btn::draw(rvg_cx* rv)
 		id = id;
 	}
 #if 1
-
-	auto psv = get_pos(false);
+	auto ss = get_size();
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
 	rv->save();
-	rv->translate(p->_pos);
+	rv->translate(psv);
+	//ss -= thickness;
 	if (p->dfill)
 	{
 		if (p->_circle)
 		{
-			auto sp = p->_pos;
-			auto r = lround(p->_size.y * 0.5);
+			glm::vec2 sp = {};
+			auto r = lround(ss.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
 		else
 		{
-			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
+			rv->add_rect({ 0.,0., ss }, p->rounding);
 		}
 		rv->submit(p->dfill, 0, 0);
 	}
@@ -5927,37 +5927,20 @@ void color_btn::draw(rvg_cx* rv)
 	if (p->mPushed) {
 		ps += pushedps;
 	}
-
 	ns -= thickness * 4;
-
 	glm::vec4 rc = { ps, ns };
-
-
-	//draw_text(g, ltx, p->str.c_str(), -1, rc, &st);
-
-	/*
-	text_style_t st = {};
-	st.font = 0;
-	st.text_align = p->text_align;
-	st.font_size = p->font_size;
-	st.text_color = p->text_color;	ltx->tem_rtv.clear();
-		ltx->build_text(0, rc, text_align, p->str.c_str(), -1, p->font_size, ltx->tem_rtv);
-		ltx->update_text();
-		ltx->draw_text(g, ltx->tem_rtv, p->text_color);*/
-		//auto rc = draw_text_align(g, p->str.c_str(), ps, ns, text_align, p->text_color, p->family.c_str(), p->font_size);
-
 	if (p->dcol)
 	{
 		if (p->_circle)
 		{
-			auto sp = p->_pos;
-			auto r = lround(p->_size.y * 0.5);
+			glm::vec2 sp = {};
+			auto r = lround(ss.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
 		else
 		{
-			rv->add_rect({ 0.5,0.5, p->_size }, p->rounding);
+			rv->add_rect({ 0.5,0.5, ss }, p->rounding);
 		}
 		rv->submit(0, p->dcol, p->thickness);
 	}
@@ -5969,7 +5952,7 @@ void color_btn::draw(rvg_cx* rv)
 	text_style st = {};
 	st.fontsize = p->font_size;
 	st.align = p->text_align;
-	st.color = p->text_color;
+	st.color = p->dtext_color;
 	st.family = p->family;
 	text_st tx = {};
 	tx.pos = {};
@@ -5986,7 +5969,8 @@ void gradient_btn::draw(rvg_cx* rv)
 {
 #if 1
 	auto p = this;
-	float x = p->_pos.x, y = p->_pos.y, w = p->_size.x, h = p->_size.y;
+	auto psv = get_ppos();
+	float x = psv.x, y = psv.y, w = p->_size.x, h = p->_size.y;
 	int pushed = p->mPushed ? 0 : 1;
 	uint32_t gradTop = p->_gradTop;
 	uint32_t gradBot = p->_gradBot;
@@ -6005,7 +5989,6 @@ void gradient_btn::draw(rvg_cx* rv)
 	}
 	glm::vec2 tps = { 0.5,0.5 };
 
-	auto psv = get_pos(false);
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	rv->save();
@@ -6157,13 +6140,12 @@ void radio_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 
-		auto psv = get_pos(false);
+		auto psv = get_ppos();
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view);
 
 		rv->save();
-		glm::ivec2 poss = p->_pos;
-		rv->translate((glm::vec2)poss);
+		rv->translate((glm::vec2)psv);
 		//rv->add_rect({ 0,0,get_size() }, 0);
 		//rv->set_color(0);
 		//rv->fill();
@@ -6190,12 +6172,12 @@ void checkbox_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 
-		auto psv = get_pos(false);
+		auto psv = get_ppos();
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view);
 
 		rv->save();
-		glm::ivec2 poss = p->_pos;
+		glm::ivec2 poss = psv;
 		poss.x += (_size.x - style.square_sz) * 0.5;
 		poss.y += (_size.y - style.square_sz) * 0.5;
 		rv->translate((glm::vec2)poss + glm::vec2(0.5f, 0.5f));
@@ -6215,11 +6197,11 @@ void checkbox_tl::draw(rvg_cx* rv)
 void switch_tl::draw(rvg_cx* rv)
 {
 #if 1
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 
-	glm::ivec2 poss = _pos;
+	glm::ivec2 poss = psv;
 	auto h = height;
 	auto fc = h * cv * 0.5;
 	auto ss = h * wf;
@@ -6249,20 +6231,17 @@ void switch_tl::draw(rvg_cx* rv)
 }
 void progress_tl::draw(rvg_cx* rv)
 {
-
-	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
 	ss.x = width;
 	ss.y = height;
 #if 1
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
 	glm::vec2 npos = _size - (glm::vec2)ss;
 	npos *= 0.5;
 	rv->save();
-	rv->translate(poss);
+	rv->translate(psv);
 	//rv->add_rect({ 0,0, _size.x, _size.y }, 0);
 	//rv->submit(0xff000000, 0, 0);
 	rv->translate(npos);
@@ -6329,14 +6308,12 @@ void progress_tl::draw(rvg_cx* rv)
 void slider_tl::draw(rvg_cx* rv)
 {
 #if 1
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
 	rv->save();
-	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
-	rv->translate(poss);
+	rv->translate(psv);
 	glm::vec4 brc = {}, cliprc, crc;
 	int x = 0, y = 0;
 	double xx = (ss[vertical]) * value;
@@ -6396,13 +6373,11 @@ void slider_tl::draw(rvg_cx* rv)
 void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
-	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
-	rv->translate(poss);
+	rv->translate(psv);
 	rv->save();
 	float style_alpha8 = 1;
 	//uint32_t col_hues[] = { 0xff0000ff,0xff00ffff,0xff00ff00,0xffffff00,0xffff0000,0xffff00ff,0xff0000ff };
@@ -6496,21 +6471,19 @@ void colorpick_tl::draw(rvg_cx* rv)
 }
 void scroll_bar::draw(rvg_cx* rv)
 {
-	glm::ivec2 poss = _pos;
 	glm::ivec2 ss = _size;
-
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
-
+	rv->translate(psv);
 	// 背景
 	if (!hideble || thumb_size_m.z) {
-		rv->add_rect({ poss,ss }, rounding);
+		rv->add_rect({ 0,0,ss }, rounding);
 		rv->submit(_color.x, 0, 0);
 	}
 	// 滑块
 	double rw = _rc_width * scale_s;
-	glm::ivec4 trc = { poss.x,poss.y,rw,rw };
+	glm::ivec4 trc = { 0,0,rw,rw };
 	int px = _dir ? 0 : 1;
 	auto pxs = ceil((ss[px] - rw) * 0.5);
 	trc.x += pxs;
@@ -6552,7 +6525,9 @@ bool widget_t::on_mevent(int type, const glm::vec2& mps, void* e)
 {
 	return false;
 }
+void widget_t::on_event(uint32_t type, et_un_t* ep) {
 
+}
 bool widget_t::update(float delta)
 {
 	return false;
@@ -6567,6 +6542,19 @@ glm::ivec2 widget_t::get_pos(bool has_parent)
 		ss *= hscroll;
 		ps += ss;
 		if (has_parent) { ps += pss; }
+	}
+	return ps;
+}
+
+glm::ivec2 widget_t::get_ppos()
+{
+	glm::ivec2 ps = {};
+	if (parent) {
+		auto pss = parent->get_ppos();
+		auto ss = parent->get_spos();
+		ss *= hscroll;
+		ps += _pos;
+		ps += ss + pss;
 	}
 	return ps;
 }
@@ -6767,7 +6755,7 @@ bool on_wpe(widget_t* pw, int type, et_un_t* ep, const glm::ivec2& ppos)
 		if (ep->ret && t == devent_type_e::mouse_button_e)
 		{
 			auto p = e->b;
-			if (p->down == 1)
+			if (p->down == 1 && pw->_bst & (int)event_type2::on_down)
 			{
 				get_input_state(0, 1);
 				get_input_state_cx(0, 1);
@@ -7208,7 +7196,10 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	}
 	if (!ep->ret)
 		ep->ret = r1;
-
+	for (auto pt : widgets) {
+		if (pt)
+			pt->on_event(type, ep);
+	}
 	switch (t)
 	{
 	case devent_type_e::mouse_move_e:
@@ -7445,17 +7436,17 @@ bool div_cx::update(float delta)
 }
 void div_cx::draw(rvg_cx* rv)
 {
+	auto pos = get_ppos();
 	auto sps = get_spos();	// 获取滚动量
 	auto ss = get_size();
 	if (border.w || border.x) {
-		rv->push_view(glm::ivec4(0, 0, ss));
-		rv->save();
+		rv->push_view(glm::ivec4(pos, ss));
 		rv->set_line_width(border.y);
+		rv->translate(pos);
 		glm::vec2 rc = ss;
 		rc -= border.y;
 		rv->add_rect({ 0.5,0.5,rc }, border.z);
 		rv->fill_stroke(border.w, border.x);
-		rv->restore();
 		rv->pop_view();
 	}
 
@@ -9196,7 +9187,11 @@ input_state_t* get_input_state_cx(void* ptr, int t)
 			r.y += 3;
 		}
 		if (!r.cb)
-			r.cb = [](uint32_t type, et_un_t* e, void* ud) { if (ud) { ((edit_cx*)ud)->on_event_e(type, e); }	};
+			r.cb = [](uint32_t type, et_un_t* e, void* ud) {
+			if (ud) {
+				((edit_cx*)ud)->on_event_e(type, e);
+			}
+			};
 	}
 	return &r;
 }
@@ -9481,7 +9476,7 @@ void edit_cx::draw(rvg_cx* rv)
 {
 	glm::ivec2 nposs = _pos;
 	glm::ivec2 ss = _size;
-	auto psv = get_pos(false);
+	auto psv = get_ppos();
 	auto vsize = get_size();
 	vsize += thickness * 2;
 	auto view = glm::ivec4(psv, vsize);

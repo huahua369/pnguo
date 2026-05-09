@@ -821,9 +821,9 @@ VkvgSurface plot_main(canvas2d_t* ctx, int width, int height)
 
 		kdata_destroy(d);
 		vkvg_translate(cr, 600.0, 0.0);
-		//vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
-		//vkvg_rectangle(cr, 1.0, 0.0, 600.0, 400.0);
-		//vkvg_fill(cr);
+		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
+		vkvg_rectangle(cr, 1.0, 0.0, 600.0, 400.0);
+		vkvg_fill(cr);
 		kplot_draw(p, 600.0, 400.0, cr);
 	}
 	vkvg_flush(cr);
@@ -1190,7 +1190,7 @@ int main()
 				dvv->add_widget(btn);
 				btn->set_size({ 128,36 });
 				btn->font_size = 16;
-				btn->text_color = -1;
+				btn->text_color = 0;
 				btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 			}
 			for (int i = 0; i < 4; i++) {
@@ -1235,18 +1235,31 @@ int main()
 				dvv->add_widget(c);
 			}
 			static bool loadf = false;
+
 			{
-				auto btn = new color_btn();
-				btn->rounding = 4;
-				btn->set_btn_color_bgr(fmod(2, 5));
-				dvv->add_widget(btn);
-				btn->set_size({ 128,36 });
-				btn->font_size = 16;
-				btn->text_color = -1;
-				btn->str = (char*)u8"🍕截取保存文件 ";
-				btn->click_cb = [=](void* p, int clicks) {
-					//loadf = true;
-					};
+				auto dvv1 = new div_cx();
+				dvv1->set_size({ 180,50 });
+				dvv1->set_pos({ 10,360 });
+				dvv1->family = family;
+				dvv1->border = { 0xffacacac,1,5,0x9f66f666 };	// 颜色，线粗，圆角，背景色
+				dvv1->flex_child.margin_left = 2;		// 子元素外边距
+				dvv1->flex_child.margin_right = 2;
+				dvv1->flex_child.margin_top = 2;
+				dvv1->flex_child.margin_bottom = 2;
+				dvv->add_widget(dvv1);
+				{
+					auto btn = new color_btn();
+					btn->rounding = 4;
+					//btn->set_btn_color_bgr(fmod(4, 5));
+					dvv1->add_widget(btn);
+					btn->set_size({ 128,36 });
+					btn->font_size = 16;
+					btn->text_color = -1;
+					btn->str = (char*)u8"🍕截取保存文件 ";
+					btn->click_cb = [=](void* p, int clicks) {
+						loadf = true;
+						};
+				}
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
 				auto div = (div_cx*)ud;
@@ -1274,8 +1287,8 @@ int main()
 					pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
 					//if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					td3->draw_textdata(mtext, { 0,0 });
-					td3->draw_rvg(rvgd);
 					td3->draw_rvg(rvgd1);
+					td3->draw_rvg(rvgd);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
@@ -1343,7 +1356,7 @@ int main()
 						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
 						// 矢量图缓存
 						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
-						//rt_add_image_vg(mtext, ptm, glm::ivec4(0, 0, 1200, 1200), {}, -1, { 1200,1200 }, { -10,-16 }, true);
+						rt_add_image_vg(mtext, ptm, glm::ivec4(600, 0, 600, 400), {}, -1, { 600,400 }, { 100,20 }, true);
 						rt_build(mtext);
 						td3->update(mtext, 0);
 

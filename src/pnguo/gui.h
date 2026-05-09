@@ -151,12 +151,14 @@ public:
 	virtual glm::vec2 get_size();
 	//event_type2
 	virtual bool on_mevent(int type, const glm::vec2& mps, void* e);
+	virtual void on_event(uint32_t type, et_un_t* ep);
 	virtual bool update(float delta);
 	virtual void draw(rvg_cx* rv);
 	virtual glm::ivec2 get_pos(bool has_parent = true);
+	virtual glm::ivec2 get_ppos();
 	virtual glm::ivec2 get_spos();	// 滚动坐标
 	virtual void set_family(font_family_t* family, int fontsize);
-	virtual void set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight); 
+	virtual void set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight);
 };
 void widget_on_event(widget_t* p, uint32_t type, et_un_t* e, const glm::vec2& pos);
 void send_hover(widget_t* wp, const glm::vec2& mps);
@@ -230,7 +232,7 @@ public:
 	scroll_bar* new_scroll_bar(const glm::ivec2& size, int vs, int cs, int rcw, bool v, const glm::ivec2& npos = {});
 	scroll2_t new_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
 public:
-	virtual void on_event(uint32_t type, et_un_t* ep);
+	void on_event(uint32_t type, et_un_t* ep);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
 	bool press_test(const glm::ivec2& pos);
@@ -351,11 +353,11 @@ input_state_t* get_input_state(void* ptr, int t);
 
 struct btn_cols_t {
 	uint32_t font_color = 0xFF222222;
-	uint32_t background_color = 0xFFffffff;
-	uint32_t border_color = 0xFF222222;
-	uint32_t hover_color = 0xFFf78989;
+	uint32_t background_color = 0;
+	uint32_t border_color = 0;
+	uint32_t hover_color = 0;
 	uint32_t active_font_color = 0xFFe6e6e6;
-	uint32_t active_background_color = 0xFFf2f2f2;
+	uint32_t active_background_color = 0;
 	uint32_t active_border_color = 0;// 0xFF3c3c3c;
 	uint32_t hover_border_color = 0;
 };
