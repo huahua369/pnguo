@@ -3159,7 +3159,7 @@ void canvas2d_t::ctx_end(void* ctx)
 	}
 }
 
-void canvas2d_t::update(void* surface, float delta)
+void canvas2d_t::update_surface(void* surface, float delta)
 {
 	void* renderer = rptr;
 	auto surf = (VkvgSurface)surface;
@@ -3240,7 +3240,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 
 
 
-void canvas2d_t::update(rich_text_t* p, float delta)
+void canvas2d_t::update_text(rich_text_t* p, float delta)
 {
 	void* renderer = rptr;
 	if (!p || !rcb || !renderer)return;
@@ -3623,6 +3623,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	auto rcrc = rvg->get_crc();
 	bool ret = dst->_pos != rvg->pos;
 	dst->_pos = rvg->pos;
+	_drawv.push_back(dst);
 	if (dst->cmd_crc == rcrc)
 	{
 		return ret;
@@ -3731,9 +3732,10 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 				vkvg_surface_write_to_png((VkvgSurface)it.surface, "temp/vgtest1630.png");
 			}
 		}
-		update((VkvgSurface)it.surface, 0);
+		update_surface((VkvgSurface)it.surface, 0);
 	}
 	mrt_build(dst->mrt);
+	update_text((rich_text_t*)dst->mrt, 0);
 	for (auto& it : dst->dst_data) {
 		if (it.t)
 		{
@@ -3786,6 +3788,18 @@ void* canvas2d_t::get_texture(void* surface)
 			tp = kpt->second;
 	}
 	return tp;
+}
+
+void canvas2d_t::draw()
+{
+	for (auto& p : _drawv) {
+		draw_rvg(p);
+	}
+}
+
+void canvas2d_t::clear_draw()
+{
+	_drawv.clear();
 }
 
 

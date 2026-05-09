@@ -7368,7 +7368,7 @@ bool vht(widget_t** widgets, size_t count, const glm::ivec2& p) {
 	for (size_t i = 0; i < count; i++) {
 		auto pw = widgets[i];
 		if (!pw || !pw->visible || pw->_disabled_events)continue;
-		glm::vec2 mps = p; 
+		glm::vec2 mps = p;
 		mps -= pw->get_pos();
 		// 判断是否鼠标在控件上
 		glm::vec4 ppos = { 0,0,pw->_size };
@@ -9217,6 +9217,9 @@ input_state_t* get_input_state_cx(void* ptr, int t)
 			auto p = (edit_cx*)r.ptr;
 			p->editingstr.clear();
 			p->is_input = false;
+			//p->dindex--;
+			//if (p->parent)
+			//	p->parent->valid = true;
 		}
 		r.ptr = ptr;
 	}
@@ -9224,6 +9227,9 @@ input_state_t* get_input_state_cx(void* ptr, int t)
 	{
 		auto p = (edit_cx*)r.ptr;
 		if (p) {
+			//p->dindex++;
+			//if (p->parent)
+			//	p->parent->valid = true;
 			*((glm::ivec4*)&r.x) = p->input_pos();
 			r.y += 3;
 		}
@@ -9632,7 +9638,6 @@ void edit_cx::draw(rvg_cx* rv)
 			auto clip0 = glm::ivec4(epos, rc.z, rc.w);
 
 			rv->push_view(clip0);
-			rv->save();
 			rv->translate({ clip0.x, clip0.y });
 			rv->set_color(get_reverse_color(editing_color));
 			rv->add_rect({ 0, 0, lps.x + 2, lps.y + 2 }, 0);
@@ -9641,14 +9646,11 @@ void edit_cx::draw(rvg_cx* rv)
 			rv->add_line({ lss.x + 1, lss.y }, { lss.z, lss.w });
 			rv->set_line_width(1);
 			rv->stroke();
-
 			text_st tx = {};
 			tx.pos = { rc.x,rc.y };
 			tx.size = glm::ivec2(rc.z, rc.w);
 			tx.text = editingstr.c_str(); tx.text_len = editingstr.size();
 			rv->add_text(&tx, &st);
-
-			rv->restore();
 			rv->pop_view();
 		}
 	}

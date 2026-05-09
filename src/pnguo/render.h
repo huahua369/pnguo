@@ -640,6 +640,8 @@ class canvas2d_t
 public:
 	// 矢量图渲染用
 	vkvg_dev* vgdev = 0;
+	// 渲染的数据列表
+	std::vector<rvg_data_cx*> _drawv;
 	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
 	std::map<void*, void*> _vgt;
@@ -668,11 +670,11 @@ public:
 	void* ctx_begin(void* surface);
 	void ctx_end(void* ctx);
 
-	void update(void* surface, float delta);
+	void update_surface(void* surface, float delta);
 	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
 	void draw_rvg(rvg_data_cx* dst);
 	// 富文本渲染
-	void update(rich_text_t* p, float delta);
+	void update_text(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
 	// 批量渲染矢量图、位图、文本
@@ -682,6 +684,8 @@ public:
 	void free_rvg(rvg_data_cx* p);
 	glm::ivec2 get_size();
 	void* get_texture(void* surface);
+	void draw();
+	void clear_draw();
 };
 
 class clicprect_cx

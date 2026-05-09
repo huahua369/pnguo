@@ -1092,7 +1092,7 @@ int main()
 			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y });
 			td3->init_vgdev(&devinfo, 8);
 			td3->familys = family;
-
+			form0->add(td3);
 
 			auto ptm = plot_main(td3, 1200, 1200);
 
@@ -1133,7 +1133,7 @@ int main()
 
 			auto dvv = new div_cx();
 			dvv->set_size({ 500,400 });
-			dvv->set_pos({ 10,360 });
+			dvv->set_pos({ 100,60 });
 			dvv->family = family;
 			dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
 			dvv->flex.wrap = flex_wrap::WRAP;
@@ -1216,7 +1216,7 @@ int main()
 				r->set_size({ 236,32 });
 				//r->set_single(false);
 				dvv->add_widget(r);
-				r->dindex = 100;
+				r->dindex = 0;
 			}
 			auto pro = new progress_tl();
 			dvv->add_widget(pro);
@@ -1239,7 +1239,7 @@ int main()
 			{
 				auto dvv1 = new div_cx();
 				dvv1->set_size({ 180,150 });
-				dvv1->set_pos({ 10,360 });
+				dvv1->set_pos({ 100,60 });
 				dvv1->family = family;
 				dvv1->border = { 0xffacacac,1,5,0x9f66f666 };	// 颜色，线粗，圆角，背景色
 				dvv1->flex_child.margin_left = 2;		// 子元素外边距
@@ -1247,6 +1247,7 @@ int main()
 				dvv1->flex_child.margin_top = 2;
 				dvv1->flex_child.margin_bottom = 2;
 				dvv1->draggable = true;
+				dvv1->_absolute = true;
 				dvv->add_widget(dvv1);
 				{
 					auto btn = new color_btn();
@@ -1284,41 +1285,33 @@ int main()
 					//	auto sem = vkd->get_fbo_semaphore();
 					//	form0->add_vk_semaphores(sem, 0, 0);
 					//}
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					texture_tiled_dt ttd = {};
-					ttd.src_rect = { 0,0,200,200 };
-					auto tss = form0->get_size();
-					tss += 10;
-					ttd.dst_rect = { -10,-10,tss };
-					auto ptex = td3->get_texture(ptm);
-					pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
-					//if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
-					td3->draw_textdata(mtext, { 0,0 });
-					td3->draw_rvg(rvgd1);
-					td3->draw_rvg(rvgd);
+					//texture_dt tdt = {};
+					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					//texture_tiled_dt ttd = {};
+					//ttd.src_rect = { 0,0,200,200 };
+					//auto tss = form0->get_size();
+					//tss += 10;
+					//ttd.dst_rect = { -10,-10,tss };
+					//auto ptex = td3->get_texture(ptm);
+					//pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
+					////if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					//td3->draw_textdata(mtext, { 0,0 });
+					//td3->draw_rvg(rvgd1);
+					//td3->draw_rvg(rvgd);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
 					int d = delta * 1000;
-					auto light = vkd->get_light(0);
-					vkd->_state.SelectedTonemapperIndex;	// 0-5: Tonemapper算法选择
-					vkd->_state.Exposure;					// 曝光度：默认1.0
-					vkd->_state.bUseTAA;
-					vkd->_state.WireframeMode;				// 0 1 2 6
-
-
-					static int ity = 6;
-					light->_intensity = ity;
-					td3->update(ptm, 0);
-					*ret |= dvv->update(delta);
+					td3->clear_draw();
+					*ret += dvv->update(delta);
+					//printf("%d\n", *ret);
 					{
 
 						edit1->_color.x = colorpick->get_color();
 						rvg_cx rvg;
-						rvg.pos = dvv->get_pos();
-						dvv->draw(&rvg);
+						rvg.set_pos(dvv->get_pos());
+						dvv->draw(&rvg);	// 录制渲染
 						if (loadf) {
 							loadf = false;
 							rvg.save_file("temp/rvg_output.jbin");
@@ -1327,7 +1320,8 @@ int main()
 							rvg1.pos = { 600,10 };
 							*ret |= td3->update_rvg(&rvg1, rvgd1);
 						}
-						*ret |= td3->update_rvg(&rvg, rvgd);
+						// 绑定窗口了
+						*ret += td3->update_rvg(&rvg, rvgd);
 					}
 
 					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
@@ -1341,40 +1335,41 @@ int main()
 					{
 						sct = mps;
 					}
-					if (kti > 0.06)
-					{
-						*ret = true;
-						kti = 0.0;
-						rt_clear(mtext);
-						auto img = fctx->bcc._data[0];
-						std::string str = vkd->get_label();
-						str += (char*)u8"emoji表情💻🔥➗️👪️q🍕";
-						const char* strr = (char*)u8"\nmousepos: %d, %d\t光标:%d\n";
-						str += vkr::format(strr, mps.x, mps.y, mps.z);
-						//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff00fc2c);// 0xff222222);
-						str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";
-						//str = (char*)u8"abcdefg";
-						// 添加文本
-						rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
-						//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
-						// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
-						static glm::ivec2 imgpos = { 600,600 };
-						// 文字缓存
-						//rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
-						//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
-						// 矢量图缓存
-						//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
-						rt_add_image_vg(mtext, ptm, glm::ivec4(600, 0, 600, 400), {}, -1, { 600,400 }, { 100,20 }, true);
-						rt_build(mtext);
-						td3->update(mtext, 0);
+					//if (kti > 0.06)
+					//{
+					//	*ret = true;
+					//	kti = 0.0;
+					//	rt_clear(mtext);
+					//	auto img = fctx->bcc._data[0];
+					//	std::string str = vkd->get_label();
+					//	str += (char*)u8"emoji表情💻🔥➗️👪️q🍕";
+					//	const char* strr = (char*)u8"\nmousepos: %d, %d\t光标:%d\n";
+					//	str += vkr::format(strr, mps.x, mps.y, mps.z);
+					//	//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
+					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff00fc2c);// 0xff222222);
+					//	str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";
+					//	//str = (char*)u8"abcdefg";
+					//	// 添加文本
+					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
+					//	//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
+					//	// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
+					//	static glm::ivec2 imgpos = { 600,600 };
+					//	// 文字缓存
+					//	//rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
+					//	//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
+					//	// 矢量图缓存
+					//	//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
+					//	rt_add_image_vg(mtext, ptm, glm::ivec4(600, 0, 600, 400), {}, -1, { 600,400 }, { 100,20 }, true);
+					//	rt_build(mtext);
+					//	td3->update(mtext, 0);
+					//	td3->update(ptm, 0);
 
-						static bool save_test = false;
-						if (save_test)
-						{
-							save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
-						}
-					}
+					//	static bool save_test = false;
+					//	if (save_test)
+					//	{
+					//		save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
+					//	}
+					//}
 
 					static bool savepng = false;
 					auto afilename = savepng ? filename : 0;

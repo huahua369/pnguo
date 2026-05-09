@@ -25,7 +25,7 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #include <pnguo.h>
 #include <tinysdl3.h>
 #include <event.h>
-
+#include "render.h"
 
 #include "vg.h"
 
@@ -33,6 +33,11 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #undef max
 #undef min
 #endif // max 
+
+
+void render_drawable(Drawable auto& drawable) {
+	drawable.draw();
+}
 
 std::string get_clipboard()
 {
@@ -2143,6 +2148,19 @@ void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore,
 	if (renderer)
 		SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
 }
+void form_x::add(canvas2d_t* p)
+{
+	if (p)
+	{
+		_draw_data.push_back(p);
+	}
+}
+void form_x::remove(canvas2d_t* p)
+{
+	if (p) {
+		_draw_data.erase(std::remove(_draw_data.begin(), _draw_data.end(), p), _draw_data.end());
+	}
+}
 void form_x::update_w()
 {
 	int w, h;
@@ -2356,6 +2374,7 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 	}
 	//SDL_SetRenderViewport(renderer, (SDL_Rect*)0);
 }
+
 void form_x::present(double delta)
 {
 	if (!is_render || !visible || !renderer || !app ||/* !app->r2d ||*/ display_size.x < 1 || display_size.y < 1)return;
@@ -2376,6 +2395,9 @@ void form_x::present(double delta)
 	SDL_Rect viewport = { 0,0,display_size.x,display_size.y };
 	SDL_SetRenderViewport(renderer, &viewport);
 	SDL_SetRenderClipRect(renderer, &viewport);
+	for (auto it : _draw_data) {
+		render_drawable(*it);
+	}
 	if (render_cb)
 	{
 		render_cb(renderer, delta);
