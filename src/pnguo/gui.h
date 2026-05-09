@@ -191,7 +191,7 @@ class div_cx :public widget_t
 public:
 	glm::dvec4 _hover_eq = { 0,0.5,0,0 };	// 时间
 	glm::ivec4 border = {};	// 颜色，线粗，圆角，背景色
-	glm::ivec2 curpos = {}, tpos = {};// 鼠标状态
+	//glm::ivec2 curpos = {}, tpos0 = {};// 鼠标状态
 	glm::ivec2 _move_pos = {};
 	int evupdate = 0;
 	int ckinc = 0;
@@ -233,6 +233,7 @@ public:
 	scroll2_t new_scroll2(const glm::ivec2& viewsize, int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos);
 public:
 	void on_event(uint32_t type, et_un_t* ep);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
 	bool press_test(const glm::ivec2& pos);

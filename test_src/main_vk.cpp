@@ -1238,7 +1238,7 @@ int main()
 
 			{
 				auto dvv1 = new div_cx();
-				dvv1->set_size({ 180,50 });
+				dvv1->set_size({ 180,150 });
 				dvv1->set_pos({ 10,360 });
 				dvv1->family = family;
 				dvv1->border = { 0xffacacac,1,5,0x9f66f666 };	// 颜色，线粗，圆角，背景色
@@ -1246,6 +1246,7 @@ int main()
 				dvv1->flex_child.margin_right = 2;
 				dvv1->flex_child.margin_top = 2;
 				dvv1->flex_child.margin_bottom = 2;
+				dvv1->draggable = true;
 				dvv->add_widget(dvv1);
 				{
 					auto btn = new color_btn();
@@ -1255,10 +1256,18 @@ int main()
 					btn->set_size({ 128,36 });
 					btn->font_size = 16;
 					btn->text_color = -1;
-					btn->str = (char*)u8"🍕截取保存文件 ";
+					btn->str = (char*)u8"🍕透明按钮 ";
 					btn->click_cb = [=](void* p, int clicks) {
-						loadf = true;
+						//loadf = true;
 						};
+					{
+						auto r = new checkbox_tl();
+						r->set_size({ 36,36 });
+						r->style.line_col = 0xffff8020;
+						r->style.thickness = 1;
+						r->v.mixed = true;
+						dvv1->add_widget(r);
+					}
 				}
 			}
 			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
