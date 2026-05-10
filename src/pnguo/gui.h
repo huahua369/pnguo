@@ -281,72 +281,6 @@ bool dragdrop_begin(const wchar_t* str, size_t size);
 #endif // !NOT_UI
 
 
-// 输入布局样式等信息+文字
-#ifndef NO_EDIT
-
-class text_ctx_cx;
-
-class edit_tl :public widget_t
-{
-public:
-	text_ctx_cx* ctx = 0;							// 布局/渲染/事件处理
-	std::string _text;								// 保存行文本
-	std::string ipt_text;								// 输入缓存文件
-	std::function<void(edit_tl* ptr)> changed_cb;	// 文本改变时执行回调函数 
-	std::function<void(edit_tl* ptr, std::string& str)> input_cb;	// 文本输入时执行回调函数，可修改此字符串返回
-	int _istate = 0;
-	bool single_line = false;
-	bool mdown = false;
-	bool _read_only = false;
-	bool is_input = false;
-public:
-	edit_tl();
-	~edit_tl();
-	void set_single(bool is);
-	// 设置为密码框比如'*'
-	void set_pwd(char ch);
-	// 设置utf8文本
-	void set_text(const void* str, int len);
-	void add_text(const void* str, int len);
-	// 设置文本框大小
-	void set_size(const glm::ivec2& ss);
-	// 设置文本框坐标
-	void set_pos(const glm::ivec2& pos);
-	void set_align_pos(const glm::vec2& pos);
-	void set_align(const glm::vec2& a);
-	// 闪烁光标。宽度、颜色、毫秒
-	void set_cursor(const glm::ivec3& c);
-	// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
-	void set_color(const glm::ivec4& c);
-	void set_family(int fontid, int fontsize);
-	// 设置是否显示输入光标
-	void set_show_input_cursor(bool ab);
-	// 设置自动换行
-	void set_autobr(bool ab);
-	void set_round_path(float v);
-	// 删除位置，字符数量
-	void remove_char(size_t idx, int count);
-	// 删除选择的文本
-	bool remove_bounds();
-	// 发送事件到本edit
-	void on_event_e(uint32_t type, et_un_t* e);
-	// 更新渲染啥的
-	bool update(float delta);
-	// 获取纹理/或者渲染到cairo
-	//image_ptr_t* get_render_data();
-	void draw(rvg_cx* rv);
-
-	glm::ivec4 input_pos();
-	std::string get_select_str();
-	std::wstring get_select_wstr();
-private:
-	void on_keyboard(et_un_t* ep);
-	void inputchar(const char* str);
-};
-
-input_state_t* get_input_state(void* ptr, int t);
-
-#endif // !NO_EDIT
 #if 1
 
 
@@ -766,11 +700,6 @@ public:
 #endif // 1
 
 
-#endif
-
-// 定义实现
-#ifdef GUI_STATIC_LIB
-#include "gui.cpp"
 #endif
 
 
