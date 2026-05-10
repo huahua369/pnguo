@@ -1281,14 +1281,14 @@ int main()
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
-					//vkd->on_render();		// 渲染到fbo纹理tex3d
-					//if (!vkd->_state.has_fence) {
-					//	auto sem = vkd->get_fbo_semaphore();
-					//	form0->add_vk_semaphores(sem, 0, 0);
-					//}
-					//texture_dt tdt = {};
-					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					if (!vkd->_state.has_fence) {
+						auto sem = vkd->get_fbo_semaphore();
+						form0->add_vk_semaphores(sem, 0, 0);
+					}
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					//texture_tiled_dt ttd = {};
 					//ttd.src_rect = { 0,0,200,200 };
 					//auto tss = form0->get_size();
@@ -1296,7 +1296,7 @@ int main()
 					//ttd.dst_rect = { -10,-10,tss };
 					//auto ptex = td3->get_texture(ptm);
 					//pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
-					////if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
 					//td3->draw_textdata(mtext, { 0,0 });
 					//td3->draw_rvg(rvgd1);
 					//td3->draw_rvg(rvgd);
@@ -1319,55 +1319,7 @@ int main()
 					{
 						sct = mps;
 					}
-					//if (kti > 0.06)
-					//{
-					//	*ret = true;
-					//	kti = 0.0;
-					//	rt_clear(mtext);
-					//	auto img = fctx->bcc._data[0];
-					//	std::string str = vkd->get_label();
-					//	str += (char*)u8"emoji表情💻🔥➗️👪️q🍕";
-					//	const char* strr = (char*)u8"\nmousepos: %d, %d\t光标:%d\n";
-					//	str += vkr::format(strr, mps.x, mps.y, mps.z);
-					//	//rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 64 * 2,64 }, { 60,20 }, true);
-					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 16, 0xff00fc2c);// 0xff222222);
-					//	str = (char*)u8"渐变色表情: 🔥➗️👪️🍕";
-					//	//str = (char*)u8"abcdefg";
-					//	// 添加文本
-					//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xafffffff);
-					//	//	rt_add_text(mtext, str.c_str(), str.size(), 0, family, 32, 0xaf0080ff);//添加不同字号和颜色的文本
-					//	// 添加图片，提供图片对象、渲染位置\大小、九宫格设置、颜色混合、dsize渲染大小、是否固定坐标不参与布局等参数
-					//	static glm::ivec2 imgpos = { 600,600 };
-					//	// 文字缓存
-					//	//rt_add_image(mtext, img, { 0,0,img->width,img->height }, {}, -1, { img->width,img->height }, imgpos, true);
-					//	//	rt_add_image(mtext, img, { 0,20,64,64 }, {}, -1, { 32,32 }, {}, false);
-					//	// 矢量图缓存
-					//	//rt_add_image_vg(mtext, rvgd->surfaces[0].surface, glm::ivec4(0, 0, td3->get_size()), {}, -1, td3->get_size(), { 600,0 }, true);
-					//	rt_add_image_vg(mtext, ptm, glm::ivec4(600, 0, 600, 400), {}, -1, { 600,400 }, { 100,20 }, true);
-					//	rt_build(mtext);
-					//	td3->update(mtext, 0);
-					//	td3->update(ptm, 0);
-
-					//	static bool save_test = false;
-					//	if (save_test)
-					//	{
-					//		save_img_png(img, "temp/test_font_cache2026.png"); save_test = false;
-					//	}
-					//}
-
-					static bool savepng = false;
-					auto afilename = savepng ? filename : 0;
-					//test_drawvkvg(ctx, surf, bs, afilename);
-					if (savepng)
-					{
-						savepng = false;
-					}
-					//app->wait_device();
-					//app->wait_queue(0);
-					//wait2d = 0;
-					//while (wait2d == 0) {
-					//	Sleep(1);
-					//}
+					 
 				};
 			// 运行消息循环
 			run_app(app, 0);

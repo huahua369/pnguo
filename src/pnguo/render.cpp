@@ -3771,7 +3771,8 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			vkvg_surface_resolve((VkvgSurface)it.surface);
 			if (first)
 			{
-				vkvg_surface_write_to_png((VkvgSurface)it.surface, "temp/vgtest1630.png");
+				std::string str = "temp/vgtest-" + std::to_string((uint64_t)it.surface) + ".png";
+				vkvg_surface_write_to_png((VkvgSurface)it.surface, str.c_str());
 			}
 		}
 		update_surface((VkvgSurface)it.surface, 0);

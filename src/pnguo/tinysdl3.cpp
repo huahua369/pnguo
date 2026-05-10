@@ -2244,6 +2244,7 @@ void form_x::update(float delta)
 	int dwt = 0;
 	if (io) {
 		io->DeltaTime = delta;
+		io->WantCaptureMouse = false;
 	}
 	for (auto it : _draw_data) {
 		dwt += render_update(*it, delta);
@@ -2400,12 +2401,12 @@ void form_x::present(double delta)
 	SDL_Rect viewport = { 0,0,display_size.x,display_size.y };
 	SDL_SetRenderViewport(renderer, &viewport);
 	SDL_SetRenderClipRect(renderer, &viewport);
-	for (auto it : _draw_data) {
-		render_drawable(*it);
-	}
 	if (render_cb)
 	{
 		render_cb(renderer, delta);
+	}
+	for (auto it : _draw_data) {
+		render_drawable(*it);
 	}
 #if 0
 	{
