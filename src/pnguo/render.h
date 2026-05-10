@@ -210,13 +210,13 @@ extern "C" {
 
 template<typename T>
 concept Drawable = requires(T obj) {
-	obj.clear_draw();
 	{ obj.draw() } -> std::same_as<void>; // 要求有 draw() 方法 
 	{ obj.update(float{}) } -> std::same_as<int>;
+	{ obj.press_test() } -> std::same_as<bool>;
 };
 void render_drawable(Drawable auto& drawable);
-void render_clear(Drawable auto& drawable);
 int render_update(Drawable auto& drawable, float delta);
+int render_build(Drawable auto& drawable);
 
 
 // 混合模式
@@ -630,6 +630,7 @@ struct translate_cc
 class rvg_data_cx
 {
 public:
+	rvg_cx* d = 0;
 	multi_rich_text_t* mrt = 0;			// 文本渲染管理器
 	packer_base* packer = 0;			// 矩形打包器
 	glm::ivec2 max_rect = {};			// 最大的区域
@@ -644,18 +645,23 @@ public:
 public:
 	rvg_data_cx();
 	~rvg_data_cx();
-	void update(rvg_cx* rvg);
+	rvg_cx* get();
+	void update();
 	translate_cc get_ctx(size_t idx, const glm::ivec4& rc);
 private:
 
 };
-
+class form_x;
+class div_cx;
 // 输入矢量图返回渲染数据
-class canvas2d_t
+class drawable_cx
 {
 public:
+	// 控件列表
+	std::vector<div_cx*> widgets, tdrawlist;
 	// 渲染的数据列表
 	std::vector<rvg_data_cx*> _drawv;
+	std::unordered_map<div_cx*, rvg_data_cx*> _dobj;
 	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
 	std::map<void*, void*> _vgt;
@@ -665,6 +671,7 @@ public:
 	texture_cb* rcb = 0;
 	void* tex = 0;
 	void* rptr = 0;
+	form_x* form0 = 0;
 	font_family_t* familys = 0;				// 默认字体
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
@@ -672,9 +679,9 @@ public:
 	float stwidth = 2.0;
 	bool tex_batch = true;
 public:
-	canvas2d_t();
-	~canvas2d_t();
-	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev);
+	drawable_cx();
+	~drawable_cx();
+	void init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev);
 	void* new_surface(int width, int height);
 	void* new_surface1(int width, int height);
 	void update_surface(void* surface, float delta);
@@ -684,16 +691,21 @@ public:
 	void update_text(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
-	// 批量渲染矢量图、位图、文本
-	bool update_rvg(rvg_cx* rvg, rvg_data_cx* dst);
+	// 批量生成渲染矢量图、位图、文本
+	bool update_rvgdata(rvg_data_cx* dst);
 	// 释放渲染器的纹理
 	void free_tex();
 	void free_rvg(rvg_data_cx* p);
 	glm::ivec2 get_size();
 	void* get_texture(void* surface);
+public:
+	void add_widget(div_cx* w);
+	void remove_widget(div_cx* w);
 	void draw();
 	void clear_draw();
 	int update(float delta);
+	int build();
+	bool press_test();
 };
 
 class clicprect_cx
@@ -708,9 +720,9 @@ public:
 };
 
 
-//void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta);
+//void r_update_data_text(text_render_o* p, drawable_cx* pt, float delta);
 //// 渲染一段文本
-//void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt);
+//void r_render_data_text(text_render_o* p, const glm::vec2& pos, drawable_cx* pt);
 //void test_drawvkvg(VkvgContext ctx, VkvgSurface surf, bspline_ct* bs, const char* filename);
 
 // 区域是否相交

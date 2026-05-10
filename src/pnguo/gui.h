@@ -236,7 +236,7 @@ public:
 	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	// 返回是否命中ui
 	bool hittest(const glm::ivec2& pos);
-	bool press_test(const glm::ivec2& pos);
+	bool press_test();
 	size_t add_dragpos(const glm::ivec2& pos, const glm::ivec2& size = {});
 	void remove_dragpos(size_t idx);
 	glm::ivec3 get_dragpos(size_t idx);

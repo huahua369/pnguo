@@ -654,7 +654,7 @@ void fill(size_t pos, struct kpair* val, void* dat)
 	val->x = pos;
 	val->y = arc4random() / (double)UINT32_MAX;
 }
-VkvgSurface plot_main(canvas2d_t* ctx, int width, int height)
+VkvgSurface plot_main(drawable_cx* ctx, int width, int height)
 {
 	struct kpair	 points1[50], points2[50];
 	struct kdata* d1, * d2;
@@ -1076,18 +1076,12 @@ int main()
 			bspline_ct* bs = new bspline_ct();
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
-		
+
 			auto view = new viewdev_cx();
 			view->init_vgdev(&devinfo, 8);
-			canvas2d_t* td3 = new canvas2d_t();
-			auto rvgd = new rvg_data_cx();
-			rvgd->mix_text = false;
-			auto rvgd1 = new rvg_data_cx();
-			rvgd1->mix_text = false;
-			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y }, view->_vgdev);
-	 
+			drawable_cx* td3 = new drawable_cx();
+			td3->init(form0, pcb, { 0,0,600, ws.y }, view->_vgdev);
 			td3->familys = family;
-			form0->add(td3);
 
 			auto ptm = plot_main(td3, 1200, 1200);
 
@@ -1236,14 +1230,13 @@ int main()
 				dvv1->set_size({ 180,150 });
 				dvv1->set_pos({ 100,60 });
 				dvv1->family = family;
-				dvv1->border = { 0xffacacac,1,5,0x9f66f666 };	// 颜色，线粗，圆角，背景色
+				dvv1->border = { 0xffacacac,1,5,0xaf66f666 };	// 颜色，线粗，圆角，背景色
 				dvv1->flex_child.margin_left = 2;		// 子元素外边距
 				dvv1->flex_child.margin_right = 2;
 				dvv1->flex_child.margin_top = 2;
 				dvv1->flex_child.margin_bottom = 2;
 				dvv1->draggable = true;
 				dvv1->_absolute = true;
-				dvv->add_widget(dvv1);
 				{
 					auto btn = new color_btn();
 					btn->rounding = 4;
@@ -1265,11 +1258,24 @@ int main()
 						dvv1->add_widget(r);
 					}
 				}
+				dvv->add_widget(dvv1);
 			}
-			form0->add_event(dvv, [=](uint32_t type, et_un_t* e, void* ud) {
-				auto div = (div_cx*)ud;
-				div->on_event(type, e);
-				});
+			{
+				auto dvv1 = new div_cx();
+				dvv1->set_size({ 180,150 });
+				dvv1->set_pos({ 100,60 });
+				dvv1->family = family;
+				dvv1->border = { 0xffacacac,1,5,0x9ff66666 };	// 颜色，线粗，圆角，背景色
+				dvv1->flex_child.margin_left = 2;		// 子元素外边距
+				dvv1->flex_child.margin_right = 2;
+				dvv1->flex_child.margin_top = 2;
+				dvv1->flex_child.margin_bottom = 2;
+				dvv1->draggable = true;
+				dvv1->_absolute = true;
+				td3->add_widget(dvv1);
+			}
+			td3->add_widget(dvv);
+
 
 
 
@@ -1298,26 +1304,11 @@ int main()
 			form0->up_cb = [=](float delta, int* ret)
 				{
 					int d = delta * 1000;
-					td3->clear_draw();
-					*ret += dvv->update(delta);
+
 					{
 						edit1->_color.x = colorpick->get_color();
-						rvg_cx rvg;
-						rvg.set_pos(dvv->get_pos());
-						dvv->draw(&rvg);	// 录制渲染
-						if (loadf) {
-							loadf = false;
-							rvg.save_file("temp/rvg_output.jbin");
-							rvg_cx rvg1;
-							rvg1.load_file("temp/rvg_output.jbin");
-							rvg1.pos = { 600,10 };
-							*ret |= td3->update_rvg(&rvg1, rvgd1);
-						}
-						// 资源绑定窗口
-						*ret += td3->update_rvg(&rvg, rvgd);
 					}
-
-					form0->io->WantCaptureMouse = dvv->press_test(form0->io->MousePos);
+					//*ret = true;
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
@@ -1380,10 +1371,7 @@ int main()
 				};
 			// 运行消息循环
 			run_app(app, 0);
-			td3->free_rvg(rvgd);
-			td3->free_rvg(rvgd1);
-			delete rvgd;
-			delete rvgd1;
+
 			delete ptb;
 			delete td3;
 

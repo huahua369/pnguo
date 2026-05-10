@@ -35,20 +35,6 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #endif // max 
 
 
-void render_drawable(Drawable auto& drawable)
-{
-	drawable.draw();
-}
-
-void render_clear(Drawable auto& drawable)
-{
-	drawable.clear_draw();
-}
-
-int render_update(Drawable auto& drawable, float delta)
-{
-	return drawable.update(delta);
-}
 
 std::string get_clipboard()
 {
@@ -2159,14 +2145,14 @@ void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore,
 	if (renderer)
 		SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
 }
-void form_x::add(canvas2d_t* p)
+void form_x::add(drawable_cx* p)
 {
 	if (p)
 	{
 		_draw_data.push_back(p);
 	}
 }
-void form_x::remove(canvas2d_t* p)
+void form_x::remove(drawable_cx* p)
 {
 	if (p) {
 		_draw_data.erase(std::remove(_draw_data.begin(), _draw_data.end(), p), _draw_data.end());
@@ -2260,11 +2246,16 @@ void form_x::update(float delta)
 		io->DeltaTime = delta;
 	}
 	for (auto it : _draw_data) {
-		dwt = render_update(*it, delta);
+		dwt += render_update(*it, delta);
+		if (it->press_test() && io)
+			io->WantCaptureMouse = true;
 	}
 	if (up_cb)
 	{
 		up_cb(delta, &dwt);
+	}
+	for (auto it : _draw_data) {
+		dwt += render_build(*it);
 	}
 	is_render = dwt > 0;
 #if 0

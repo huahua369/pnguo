@@ -6592,7 +6592,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
 		wp->mmpos = mps;
 		// 判断是否鼠标进入 
-		glm::vec4 trc = { wp->_pos  ,wp->_size };
+		glm::vec4 trc = { wp->get_pos(false), wp->_size };
 		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 		if (k.x) {
 			bool hoverold = wp->_bst & (int)BTN_STATE::STATE_HOVER;
@@ -6630,7 +6630,7 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 				}
 			}
 			if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE) {
-				auto dps = mps - wp->curpos;
+				auto dps = mps - wp->curpos; wp->has_drag = true;
 				wp->on_mevent((int)event_type2::on_drag, dps, p);		// 拖动事件
 				if (wp->mevent_cb)
 				{
@@ -6677,24 +6677,31 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
 				}
 				else {
-					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd || !wp->has_drag))
+					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd))
 					{
 						wp->cks = p->clicks;
-						wp->on_mevent((int)event_type2::on_up, mps, p);
-						if (wp->mevent_cb) {
-							wp->mevent_cb(wp, (int)event_type2::on_up, mps);
-						}
-						int tc = (int)event_type2::on_click; //左键单击
-						if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
-						else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
-						wp->_clicks = p->clicks;
-						wp->on_mevent(tc, mps, p);
-						if (wp->mevent_cb) {
-							wp->mevent_cb(wp, tc, mps);
-						}
-						if (wp->click_cb)
+						if (wp->has_drag)
 						{
-							wp->click_cb(wp, p->clicks);
+							wp->on_mevent((int)event_type2::on_dragend, mps, p);
+						}
+						else
+						{
+							wp->on_mevent((int)event_type2::on_up, mps, p);
+							if (wp->mevent_cb) {
+								wp->mevent_cb(wp, (int)event_type2::on_up, mps);
+							}
+							int tc = (int)event_type2::on_click; //左键单击
+							if (p->clicks == 2) { tc = (int)event_type2::on_dblclick; }
+							else if (p->clicks == 3) { tc = (int)event_type2::on_tripleclick; }
+							wp->_clicks = p->clicks;
+							wp->on_mevent(tc, mps, p);
+							if (wp->mevent_cb) {
+								wp->mevent_cb(wp, tc, mps);
+							}
+							if (wp->click_cb)
+							{
+								wp->click_cb(wp, p->clicks);
+							}
 						}
 					}
 					wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
@@ -6704,6 +6711,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 		if (p->down == 0) {
 			wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 			wp->_bst |= (int)BTN_STATE::STATE_NOMAL;
+			wp->has_drag = false;
 			wp->on_mevent((int)event_type2::mouse_up, mps, p);
 			if (wp->mevent_cb) {
 				wp->mevent_cb(wp, (int)event_type2::mouse_up, mps);
@@ -7086,7 +7094,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	{
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y };
-		glm::vec4 trc = glm::vec4(0, 0, get_size());
+		glm::vec4 trc = glm::vec4(ppos, get_size());
 		if (!parent)
 		{
 			auto k2 = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
@@ -7350,13 +7358,23 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	case event_type2::on_down:
 	{
 		mpos -= tpos + _pos;
-
 		ret = true;
 	}break;
 	case event_type2::on_drag:
 	{
 		if (draggable)
+		{
 			set_pos(mps);
+			dindex = 1;
+		}
+		ret = true;
+	}break;
+	case event_type2::mouse_up:
+	{
+		if (draggable)
+		{
+			dindex = 0;
+		}
 		ret = true;
 	}break;
 	};
@@ -7393,7 +7411,7 @@ bool div_cx::hittest(const glm::ivec2& pos)
 	return r;
 }
 
-bool div_cx::press_test(const glm::ivec2& pos)
+bool div_cx::press_test()
 {
 	bool r = false;
 	auto sps = get_spos();
@@ -7492,7 +7510,8 @@ void div_cx::draw(rvg_cx* rv)
 	}
 
 	for (auto& it : sort_draw) {
-		if (it->visible)
+		auto dp = dynamic_cast<div_cx*>(it);
+		if (it->visible && !dp)
 		{
 			it->draw(rv);
 		}

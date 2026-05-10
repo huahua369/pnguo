@@ -167,7 +167,7 @@ private:
 
 class skeleton_t;
 class canvas_atlas;
-class canvas2d_t;
+class drawable_cx;
 struct input_state_t;
 struct mouse_state_t;
 namespace hz {
@@ -227,7 +227,7 @@ public:
 	std::vector<event_fw> first_cs;	// 优先
 	std::vector<form_x*> childfs;
 	std::vector<menu_cx*> menus;
-	std::vector<canvas2d_t*> _draw_data;
+	std::vector<drawable_cx*> _draw_data;
 	form_x* parent = 0;
 	form_x* tooltip = 0;	// 提示窗口
 	// 接收拖动OLE管理
@@ -352,8 +352,8 @@ public:
 
 	// 同步
 	void add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask);
-	void add(canvas2d_t* p);
-	void remove(canvas2d_t* p);
+	void add(drawable_cx* p);
+	void remove(drawable_cx* p);
 public:
 	void update_w();
 	void update(float delta);

@@ -29,7 +29,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 
 #include "tinysdl3.h"
 
-
+#include "event.h"
 #include "render.h"
 #include "font_core.h"
 
@@ -1706,7 +1706,6 @@ void rvg_cx::set_pos(const glm::ivec2& ps)
 	if (pos != ps)
 	{
 		pos = ps;
-
 	}
 }
 
@@ -3126,15 +3125,38 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 }
 #endif
 
-canvas2d_t::canvas2d_t()
+drawable_cx::drawable_cx()
 {}
 
-canvas2d_t::~canvas2d_t()
-{}
-
-void canvas2d_t::set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
+drawable_cx::~drawable_cx()
 {
-	rptr = renderer;
+	if (form0)
+	{
+		form0->remove_event(this);
+	}
+}
+
+void drawable_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
+{
+	if (f)
+	{
+		if (f->renderer)
+			rptr = f->renderer;
+		form0 = f;
+		f->add(this);
+		if (form0)
+		{
+			form0->add_event(this, [=](uint32_t type, et_un_t* e, void* ud) {
+				bool btn = !((devent_type_e)type == devent_type_e::mouse_button_e && e->v.b->down == 0);
+				for (auto it = widgets.rbegin(); it != widgets.rend(); it++)
+				{
+					(*it)->on_event(type, e);
+					if (e->ret && btn)
+						break;
+				}
+				});
+		}
+	}
 	rcb = cb;
 	if (view.z > 0 && view.w > 0)
 	{
@@ -3146,7 +3168,7 @@ void canvas2d_t::set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& 
 	}
 }
 
-void* canvas2d_t::new_surface(int width, int height)
+void* drawable_cx::new_surface(int width, int height)
 {
 	auto dev = _vgdev;
 	if (width > 1 && height > 1 && dev && dev->ctx && dev->ctx->dev)
@@ -3157,7 +3179,7 @@ void* canvas2d_t::new_surface(int width, int height)
 	return nullptr;
 }
 
-void* canvas2d_t::new_surface1(int width, int height)
+void* drawable_cx::new_surface1(int width, int height)
 {
 	auto dev = _vgdev;
 	if (width > 1 && height > 1 && dev && dev->ctx1 && dev->ctx1->dev)
@@ -3168,7 +3190,7 @@ void* canvas2d_t::new_surface1(int width, int height)
 	return nullptr;
 }
 
-void canvas2d_t::update_surface(void* surface, float delta)
+void drawable_cx::update_surface(void* surface, float delta)
 {
 	void* renderer = rptr;
 	auto surf = (VkvgSurface)surface;
@@ -3190,7 +3212,7 @@ void canvas2d_t::update_surface(void* surface, float delta)
 	}
 }
 
-void canvas2d_t::draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size)
+void drawable_cx::draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size)
 {
 	void* renderer = rptr;
 	if (!surface || !rcb || !renderer)return;
@@ -3204,7 +3226,7 @@ void canvas2d_t::draw_surface(void* surface, const glm::vec2& pos, const glm::iv
 	}
 }
 
-void canvas2d_t::draw_rvg(rvg_data_cx* dst)
+void drawable_cx::draw_rvg(rvg_data_cx* dst)
 {
 	void* renderer = rptr;
 	if (!rcb || !renderer)return;
@@ -3249,7 +3271,7 @@ void canvas2d_t::draw_rvg(rvg_data_cx* dst)
 
 
 
-void canvas2d_t::update_text(rich_text_t* p, float delta)
+void drawable_cx::update_text(rich_text_t* p, float delta)
 {
 	void* renderer = rptr;
 	if (!p || !rcb || !renderer)return;
@@ -3289,7 +3311,7 @@ void canvas2d_t::update_text(rich_text_t* p, float delta)
 	}
 }
 
-void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
+void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 {
 	void* renderer = rptr;
 	if (!p || !rcb || !renderer)return;
@@ -3405,7 +3427,7 @@ void canvas2d_t::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	}
 }
 
-void canvas2d_t::draw_boxtext(box_text_d* p, const glm::vec2& pos)
+void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 {
 	void* renderer = rptr;
 	if (!p || !rcb || !renderer)return;
@@ -3533,6 +3555,7 @@ rvg_data_cx::rvg_data_cx()
 {
 	packer = new_packer(10, 10);
 	mrt = new multi_rich_text_t();
+	d = new rvg_cx();
 }
 
 rvg_data_cx::~rvg_data_cx()
@@ -3547,10 +3570,18 @@ rvg_data_cx::~rvg_data_cx()
 		delete packer;
 		packer = 0;
 	}
+	if (d)delete d;
+	d = 0;
 }
 
-void rvg_data_cx::update(rvg_cx* rvg)
+rvg_cx* rvg_data_cx::get()
 {
+	return d;
+}
+
+void rvg_data_cx::update()
+{
+	auto rvg = d;
 	packer->init_target(_view.z, _view.w, 0);
 	int sf = 0;
 	dcv.clear();
@@ -3627,9 +3658,10 @@ translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 	return r;
 }
 
-bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
+bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 {
-	assert(_view.z > 0 && _view.w > 0 && rvg && dst);
+	assert(_view.z > 0 && _view.w > 0 && dst);
+	auto rvg = dst->get();
 	auto rcrc = rvg->get_crc();
 	bool ret = dst->_pos != rvg->pos;
 	dst->_pos = rvg->pos;
@@ -3641,7 +3673,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
 	dst->_view = _view;
-	dst->update(rvg);
+	dst->update();
 	bool first = false;
 	dst->mrt->rich._ct_style.family = familys;
 	mrt_clear(dst->mrt);
@@ -3756,7 +3788,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 }
 
 
-void canvas2d_t::free_tex()
+void drawable_cx::free_tex()
 {
 	if (rcb && _vt.size())
 	{
@@ -3767,7 +3799,7 @@ void canvas2d_t::free_tex()
 	}
 }
 
-void canvas2d_t::free_rvg(rvg_data_cx* p)
+void drawable_cx::free_rvg(rvg_data_cx* p)
 {
 	if (!p || p->surfaces.empty())return;
 	for (auto& it : p->surfaces)
@@ -3779,12 +3811,12 @@ void canvas2d_t::free_rvg(rvg_data_cx* p)
 	}
 }
 
-glm::ivec2 canvas2d_t::get_size()
+glm::ivec2 drawable_cx::get_size()
 {
 	return glm::ivec2(_view.z, _view.w);
 }
 
-void* canvas2d_t::get_texture(void* surface)
+void* drawable_cx::get_texture(void* surface)
 {
 	auto ipt = _vt.find((image_ptr_t*)surface);
 	void* tp = 0;
@@ -3800,32 +3832,130 @@ void* canvas2d_t::get_texture(void* surface)
 	return tp;
 }
 
-void canvas2d_t::draw()
+void drawable_cx::add_widget(div_cx* w)
+{
+	if (w)
+	{
+		widgets.push_back(w);
+	}
+}
+
+void drawable_cx::remove_widget(div_cx* w)
+{
+	if (w)
+	{
+		auto& v = widgets;
+		v.erase(std::remove(v.begin(), v.end(), w), v.end());
+	}
+}
+
+void drawable_cx::draw()
 {
 	for (auto& p : _drawv) {
 		draw_rvg(p);
 	}
 }
 
-void canvas2d_t::clear_draw()
+void drawable_cx::clear_draw()
 {
 	_drawv.clear();
 }
 
-int canvas2d_t::update(float delta)
+int drawable_cx::update(float delta)
 {
-	for (auto& p : _drawv) {
-		//update_rvg(p, p);
+	int ret = 0;
+	std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) {
+		return a->dindex < b->dindex;
+		});
+	for (auto& p : widgets) {
+		ret += p->update(delta);
 	}
-	return 0;
+	return ret;
+}
+void get_div(widget_t* p, std::vector<div_cx*>* v)
+{
+	auto d = dynamic_cast<div_cx*>(p);
+	if (d && d->visible)
+	{
+		v->push_back(d);
+		for (auto it : d->widgets)
+		{
+			get_div(it, v);
+		}
+	}
+}
+int drawable_cx::build()
+{
+	int ret = 0;
+	clear_draw();
+	tdrawlist.clear();
+	for (auto& p : widgets) {
+		if (p && p->visible)
+		{
+			get_div(p, &tdrawlist);
+		}
+	}
+	for (auto& p : tdrawlist) {
+		if (p)
+		{
+			glm::ivec2 dpos = {};
+			if (p->parent)
+				dpos = p->_pos;
+			auto& rvgd = _dobj[p];
+			if (!rvgd)
+				rvgd = new rvg_data_cx();
+			rvg_cx* rvg = rvgd->get();
+			if (rvg && rvgd)
+			{
+				//print_time _bb("build");
+				rvg->clear();
+				rvg->set_pos(p->get_pos() - dpos);
+				p->draw(rvg);	// 录制渲染
+				// 资源绑定窗口
+				ret += update_rvgdata(rvgd);
+			}
+		}
+	}
+	return ret;
 }
 
+bool drawable_cx::press_test()
+{
+	for (auto& p : widgets) {
+		if (p && p->visible && p->press_test())
+		{
+			return true;
+		}
+	}
+	return false;
+}
 
+void render_drawable(Drawable auto& drawable)
+{
+	drawable.draw();
+}
+
+int render_update(Drawable auto& drawable, float delta)
+{
+	return drawable.update(delta);
+}
+int render_build(Drawable auto& drawable)
+{
+	return drawable.build();
+}
+
+void ttbr()
+{
+	drawable_cx* it = 0;
+	render_update(*it, 0.0f);
+	render_build(*it);
+	render_drawable(*it);
+}
 
 #endif
 
 
-void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta)
+void r_update_data_text(text_render_o* p, drawable_cx* pt, float delta)
 {
 	std::vector<font_item_t>& tm = p->dst_vstr;
 	for (auto& it : p->ov)
@@ -3844,7 +3974,7 @@ void r_update_data_text(text_render_o* p, canvas2d_t* pt, float delta)
 		}
 	}
 }
-void r_render_data_text(text_render_o* p, const glm::vec2& pos, canvas2d_t* pt)
+void r_render_data_text(text_render_o* p, const glm::vec2& pos, drawable_cx* pt)
 {
 	void* renderer = pt->rptr;
 	std::vector<font_item_t>& tm = p->dst_vstr;

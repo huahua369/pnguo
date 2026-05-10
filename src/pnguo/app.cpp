@@ -23,4 +23,3 @@ void viewdev_cx::init_vgdev(dev_info_cx* d, int sample)
 	_vgdev = new_vgdev_cx(d, sample);
 }
 
-
