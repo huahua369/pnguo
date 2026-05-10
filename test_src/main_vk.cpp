@@ -1251,6 +1251,7 @@ int main()
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
+					return;
 					vkd->on_render();		// 渲染到fbo纹理tex3d
 					if (!vkd->_state.has_fence) {
 						auto sem = vkd->get_fbo_semaphore();
@@ -1259,22 +1260,12 @@ int main()
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					//texture_tiled_dt ttd = {};
-					//ttd.src_rect = { 0,0,200,200 };
-					//auto tss = form0->get_size();
-					//tss += 10;
-					//ttd.dst_rect = { -10,-10,tss };
-					//auto ptex = td3->get_texture(ptm);
-					//pcb->render_texture_tiled(renderer, ptex, &ttd, 1);
 					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
-					//td3->draw_textdata(mtext, { 0,0 });
-					//td3->draw_rvg(rvgd1);
-					//td3->draw_rvg(rvgd);
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
+					return;
 					int d = delta * 1000;
-
 					{
 						edit1->_color.x = colorpick->get_color();
 					}
@@ -1293,7 +1284,7 @@ int main()
 				};
 			// 运行消息循环
 			run_app(app, 0);
-
+			delete view;
 
 		}
 

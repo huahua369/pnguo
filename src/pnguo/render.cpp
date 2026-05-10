@@ -3922,7 +3922,7 @@ int drawable_cx::build()
 
 bool drawable_cx::press_test()
 {
-	for (auto& p : widgets) {
+	for (auto& p : tdrawlist) {
 		if (p && p->visible && p->press_test())
 		{
 			return true;

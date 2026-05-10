@@ -22029,7 +22029,6 @@ namespace vkr {
 			m_GPUTimer.OnEndFrame();
 			vkCmdEndRenderPass(cmdBuf2);
 			res = vkEndCommandBuffer(cmdBuf2);
-
 			assert(res == VK_SUCCESS);
 			VkSemaphore ImageAvailableSemaphore;
 			VkSemaphore RenderFinishedSemaphores;
@@ -22078,8 +22077,6 @@ namespace vkr {
 		m_UploadHeap.OnDestroy();
 	}
 #endif
-
-
 
 
 
