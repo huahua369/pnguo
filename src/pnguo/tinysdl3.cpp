@@ -25,9 +25,9 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #include <pnguo.h>
 #include <tinysdl3.h>
 #include <event.h>
-#include "render.h"
-
 #include "vg.h"
+#include "render.h"
+#include "app.h"
 
 #ifdef max
 #undef max
@@ -35,8 +35,19 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #endif // max 
 
 
-void render_drawable(Drawable auto& drawable) {
+void render_drawable(Drawable auto& drawable)
+{
 	drawable.draw();
+}
+
+void render_clear(Drawable auto& drawable)
+{
+	drawable.clear_draw();
+}
+
+int render_update(Drawable auto& drawable, float delta)
+{
+	return drawable.update(delta);
 }
 
 std::string get_clipboard()
@@ -2247,6 +2258,9 @@ void form_x::update(float delta)
 	int dwt = 0;
 	if (io) {
 		io->DeltaTime = delta;
+	}
+	for (auto it : _draw_data) {
+		dwt = render_update(*it, delta);
 	}
 	if (up_cb)
 	{

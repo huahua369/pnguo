@@ -35,7 +35,7 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 
 #include "ecc_sv.h"
 #include "mapView.h"
-
+#include "app.h"
 
 #define SP_RGBA32_R_U(v) ((v) & 0xff)
 #define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
@@ -604,6 +604,53 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 void free_vkvgdev(vkvg_dev* p)
 {
 	if (p)delete p;
+}
+
+vkvg_dev* new_vgdev_cx(dev_info_cx* d, int sample)
+{
+	vkvg_dev* ret = 0;
+	dev_info_c cc = {};
+	if (d)
+	{
+		cc.inst = (VkInstance)d->inst; cc.phy = (VkPhysicalDevice)d->phy; cc.vkdev = (VkDevice)d->vkdev;
+		cc.qFamIdx = d->qFamIdx;
+		if (d->qCount > 2)
+			cc.qIndex = 2;
+	}
+	auto p = new_vkvgdev(&cc, sample);
+	//if (_vgdev && p)
+	//{
+	//	free_vkvgdev(_vgdev); _vgdev = nullptr;
+	//}
+	if (p)
+	{
+		p->qindex = cc.qIndex;
+		ret = p;
+		p->get_fun();
+	}
+	return ret;
+}
+
+void free_surface(void* c)
+{
+	if (c) {
+		vkvg_surface_destroy((VkvgSurface)c);
+	}
+}
+
+void* ctx_begin(void* surface)
+{
+	if (!surface)return nullptr;
+	auto c = vkvg_create((VkvgSurface)surface);
+	return c;
+}
+
+void ctx_end(void* ctx)
+{
+	if (ctx)
+	{
+		vkvg_destroy((VkvgContext)ctx);
+	}
 }
 
 #if 0
@@ -1636,6 +1683,7 @@ void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r)
 		vkvg_rectangle(cr, rc.x, rc.y, rc.z, rc.w);
 	}
 }
+
 
 
 #if 1
@@ -3082,11 +3130,9 @@ canvas2d_t::canvas2d_t()
 {}
 
 canvas2d_t::~canvas2d_t()
-{
-	free_vkvgdev(vgdev); vgdev = nullptr;
-}
+{}
 
-void canvas2d_t::set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view)
+void canvas2d_t::set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
 {
 	rptr = renderer;
 	rcb = cb;
@@ -3094,69 +3140,32 @@ void canvas2d_t::set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& 
 	{
 		_view = view;
 	}
+	if (vgdev) {
+		_vgdev = vgdev;
+		vgcb = vgdev->get_fun();
+	}
 }
 
-void canvas2d_t::init_vgdev(dev_info_cx* d, int sample)
-{
-	dev_info_c cc = {};
-	if (d)
-	{
-		cc.inst = (VkInstance)d->inst; cc.phy = (VkPhysicalDevice)d->phy; cc.vkdev = (VkDevice)d->vkdev;
-		cc.qFamIdx = d->qFamIdx;
-		if (d->qCount > 2)
-			cc.qIndex = 2;
-	}
-	auto p = new_vkvgdev(&cc, sample);
-	if (vgdev && p)
-	{
-		free_vkvgdev(vgdev); vgdev = nullptr;
-	}
-	if (p)
-	{
-		p->qindex = cc.qIndex;
-		vgdev = p;
-		vgcb = p->get_fun();
-	}
-}
-//
 void* canvas2d_t::new_surface(int width, int height)
 {
-	if (width > 1 && height > 1 && vgdev && vgdev->ctx && vgdev->ctx->dev)
+	auto dev = _vgdev;
+	if (width > 1 && height > 1 && dev && dev->ctx && dev->ctx->dev)
 	{
-		auto surf = vkvg_surface_create(vgdev->ctx->dev, width, height);
+		auto surf = vkvg_surface_create(dev->ctx->dev, width, height);
 		return (void*)surf;
 	}
 	return nullptr;
 }
+
 void* canvas2d_t::new_surface1(int width, int height)
 {
-	if (width > 1 && height > 1 && vgdev && vgdev->ctx1 && vgdev->ctx1->dev)
+	auto dev = _vgdev;
+	if (width > 1 && height > 1 && dev && dev->ctx1 && dev->ctx1->dev)
 	{
-		auto surf = vkvg_surface_create(vgdev->ctx1->dev, width, height);
+		auto surf = vkvg_surface_create(dev->ctx1->dev, width, height);
 		return (void*)surf;
 	}
 	return nullptr;
-}
-void canvas2d_t::free_surface(void* c)
-{
-	if (c) {
-		vkvg_surface_destroy((VkvgSurface)c);
-	}
-}
-
-void* canvas2d_t::ctx_begin(void* surface)
-{
-	auto c = vkvg_create((VkvgSurface)surface);
-	cctx = c;
-	return c;
-}
-
-void canvas2d_t::ctx_end(void* ctx)
-{
-	if (ctx)
-	{
-		vkvg_destroy((VkvgContext)ctx);
-	}
 }
 
 void canvas2d_t::update_surface(void* surface, float delta)
@@ -3545,6 +3554,7 @@ void rvg_data_cx::update(rvg_cx* rvg)
 	packer->init_target(_view.z, _view.w, 0);
 	int sf = 0;
 	dcv.clear();
+	dst_data.clear();
 	auto cmd_count = rvg->_cmdtype.size();
 
 	for (auto& it : rvg->_view)
@@ -3653,7 +3663,7 @@ bool canvas2d_t::update_rvg(rvg_cx* rvg, rvg_data_cx* dst)
 	auto d = rvg->_cmd.data();
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
-	dst->dst_data.clear();
+
 	auto dp = dst->dcv.data();
 	glm::ivec3 tcount = {};
 	//for (auto it : rvg->_cmdtype) {
@@ -3800,6 +3810,14 @@ void canvas2d_t::draw()
 void canvas2d_t::clear_draw()
 {
 	_drawv.clear();
+}
+
+int canvas2d_t::update(float delta)
+{
+	for (auto& p : _drawv) {
+		//update_rvg(p, p);
+	}
+	return 0;
 }
 
 

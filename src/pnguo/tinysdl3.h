@@ -187,11 +187,6 @@ enum class fcv_type {
 	e_size,
 	e_pos
 };
-template<typename T>
-concept Drawable = requires(T obj) {
-	{ obj.draw() } -> std::same_as<void>; // 要求有 draw() 方法 
-};
-void render_drawable(Drawable auto& drawable);
 
 class form_x
 {
@@ -440,7 +435,6 @@ enum class cdtype_e :uint32_t
 	new_form,		//创建窗口
 };
 
-
 struct cpuinfo_t
 {
 	char name[128];
@@ -470,6 +464,18 @@ struct cpuinfo_t
 	bool LASX;
 };
 
+// 创建主窗口，-1默认坐标
+form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags);
+// 菜单窗口
+form_x* new_form_popup(form_x* parent, int width, int height);
+form_x* new_form1(void* app, int width, int height, form_x* parent);
+// 提示窗口
+form_x* new_form_tooltip(form_x* parent, int width, int height);
+
+//void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1);
+
+
+
 // 获取CPU信息
 cpuinfo_t get_cpuinfo();
 std::string formatBytes(uint64_t bytes);
@@ -481,13 +487,3 @@ app_cx* new_app();
 MC_EXPORT int run_app(void* app, int count);
 MC_EXPORT void* new_app0();
 MC_EXPORT void free_app(void* app);
-// 创建主窗口，-1默认坐标
-form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags);
-// 菜单窗口
-form_x* new_form_popup(form_x* parent, int width, int height);
-form_x* new_form1(void* app, int width, int height, form_x* parent);
-// 提示窗口
-form_x* new_form_tooltip(form_x* parent, int width, int height);
-
-//void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1);
-

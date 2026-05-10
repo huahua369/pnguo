@@ -15,6 +15,7 @@
 //#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
+#include <pnguo/app.h>
 #include <pnguo/vkrenderer.h>
 #include <pnguo/gpu_vk.h>
 #include <pnguo/page.h>
@@ -1075,22 +1076,16 @@ int main()
 			bspline_ct* bs = new bspline_ct();
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
 			auto bptr = bs->new_bspline(pts.data(), pts.size());
-			//auto hex16 = new hex_editor();
-			//auto hexstyle = new hex_style_t();
-			//hexstyle->st = new text_style();
-			//hex16->set_file("temp/rvg_output.jbin", true);
-			//hexstyle->st->family = family;
-			//hexstyle->st->fontsize = 16;
-			//hexstyle->st->lineheight = 20;
-			//hexstyle->pxx = 1;
-			//hexstyle->pyy = 1;
+		
+			auto view = new viewdev_cx();
+			view->init_vgdev(&devinfo, 8);
 			canvas2d_t* td3 = new canvas2d_t();
 			auto rvgd = new rvg_data_cx();
 			rvgd->mix_text = false;
 			auto rvgd1 = new rvg_data_cx();
 			rvgd1->mix_text = false;
-			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y });
-			td3->init_vgdev(&devinfo, 8);
+			td3->set_renderer(form0->renderer, pcb, { 0,0,600, ws.y }, view->_vgdev);
+	 
 			td3->familys = family;
 			form0->add(td3);
 
@@ -1099,7 +1094,7 @@ int main()
 
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
-			//VkvgSurface sf = td3->vgdev->new_surface(vki.vkimage, 0, vki.size.x, vki.size.y);
+			//VkvgSurface sf = td3->_vgdev->new_surface(vki.vkimage, 0, vki.size.x, vki.size.y);
 			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
 			text_box_t tbox = {};
 			tbox.text_align = { 0,0.5 };
@@ -1305,9 +1300,7 @@ int main()
 					int d = delta * 1000;
 					td3->clear_draw();
 					*ret += dvv->update(delta);
-					//printf("%d\n", *ret);
 					{
-
 						edit1->_color.x = colorpick->get_color();
 						rvg_cx rvg;
 						rvg.set_pos(dvv->get_pos());
@@ -1320,7 +1313,7 @@ int main()
 							rvg1.pos = { 600,10 };
 							*ret |= td3->update_rvg(&rvg1, rvgd1);
 						}
-						// 绑定窗口了
+						// 资源绑定窗口
 						*ret += td3->update_rvg(&rvg, rvgd);
 					}
 

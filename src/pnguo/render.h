@@ -77,7 +77,7 @@ extern "C" {
 		VkvgSurface(*vkvg_surface_reference)(VkvgSurface surf);
 		uint32_t(*vkvg_surface_get_reference_count)(VkvgSurface surf);
 		void(*vkvg_surface_destroy)(VkvgSurface surf);
-		
+
 		void(*vkvg_surface_clear)(VkvgSurface surf);
 		VkImage(*vkvg_surface_get_vk_image)(VkvgSurface surf);
 		VkFormat(*vkvg_surface_get_vk_format)(VkvgSurface surf);
@@ -207,6 +207,16 @@ extern "C" {
 }
 #endif
 
+
+template<typename T>
+concept Drawable = requires(T obj) {
+	obj.clear_draw();
+	{ obj.draw() } -> std::same_as<void>; // 要求有 draw() 方法 
+	{ obj.update(float{}) } -> std::same_as<int>;
+};
+void render_drawable(Drawable auto& drawable);
+void render_clear(Drawable auto& drawable);
+int render_update(Drawable auto& drawable, float delta);
 
 
 // 混合模式
@@ -421,6 +431,12 @@ void draw_arrow(VkvgContext ctx, const glm::vec2& p0, const glm::vec2& p1, float
 void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols, int width);
 // 画线性渐变填充
 void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count);
+
+vkvg_dev* new_vgdev_cx(dev_info_cx* d, int sample = 8);
+void free_surface(void* surface);
+// begin/end渲染，输入surface指针，返回渲染上下文指针，中间可以调用vkvg的渲染函数
+void* ctx_begin(void* surface);
+void ctx_end(void* ctx);
 
 struct grid_info_t
 {
@@ -638,16 +654,15 @@ private:
 class canvas2d_t
 {
 public:
-	// 矢量图渲染用
-	vkvg_dev* vgdev = 0;
 	// 渲染的数据列表
 	std::vector<rvg_data_cx*> _drawv;
 	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
 	std::map<void*, void*> _vgt;
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
-	texture_cb* rcb = 0;
+	vkvg_dev* _vgdev = 0;
 	vkvg_func_t* vgcb = 0;
+	texture_cb* rcb = 0;
 	void* tex = 0;
 	void* rptr = 0;
 	font_family_t* familys = 0;				// 默认字体
@@ -659,17 +674,9 @@ public:
 public:
 	canvas2d_t();
 	~canvas2d_t();
-	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view);
-	// 初始化矢量图渲染器，输入vk设备
-	void init_vgdev(dev_info_cx* d, int sample = 8);
-	// 创建vkvg surface，输入宽高
+	void set_renderer(void* renderer, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev);
 	void* new_surface(int width, int height);
 	void* new_surface1(int width, int height);
-	void free_surface(void* surface);
-	// begin/end渲染，输入surface指针，返回渲染上下文指针，中间可以调用vkvg的渲染函数
-	void* ctx_begin(void* surface);
-	void ctx_end(void* ctx);
-
 	void update_surface(void* surface, float delta);
 	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
 	void draw_rvg(rvg_data_cx* dst);
@@ -686,6 +693,7 @@ public:
 	void* get_texture(void* surface);
 	void draw();
 	void clear_draw();
+	int update(float delta);
 };
 
 class clicprect_cx

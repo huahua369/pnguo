@@ -2,9 +2,7 @@
 
 set(pnguo_src
 "mapView.cpp"
-"render.cpp"
 "vg.cpp"  
-"tinysdl3.cpp"
 "pnguo.cpp"
 "tria.cpp"
 "mesh3d.cpp"
@@ -18,6 +16,9 @@ set(pnguo_src
 "testshader.cpp"
 "audio.cpp"
 "gui.cpp"
+"render.cpp"
+"tinysdl3.cpp"
+"app.cpp"
 )
  
 set(Shaders_PostProc_src
