@@ -2098,6 +2098,10 @@ void form_x::remove_f(form_x* p)
 }
 void form_x::clear_wt()
 {
+	for (auto pt : _draw_data) {
+		delete pt;
+	}
+	_draw_data.clear();
 	//for (int i = 0; i < 2; i++)
 	//{
 	//	auto pks = _planes[i];

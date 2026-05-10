@@ -9982,8 +9982,37 @@ box_text_d* mrt_get_box_index(multi_rich_text_t* p, size_t index)
 #if 0
 
 void test_rttext()
-{
-	*ret = true;
+{			//VkvgSurface sf = td3->_vgdev->new_surface(vki.vkimage, 0, vki.size.x, vki.size.y);
+	std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
+	text_box_t tbox = {};
+	tbox.text_align = { 0,0.5 };
+	tbox.rc = { 10,10,1500,1600 };
+	tbox.auto_break = 1;
+	tbox.word_wrap = 1;
+
+	auto ptb = new text_t1();
+	text_t1_set(ptb, &tbox);
+	auto ptb1 = new text_t1();
+	auto mtext = new rich_text_t();
+	//auto mrtext = new multi_rich_text_t();
+	//text_style nst = {};
+	//nst.family = family;
+	//nst.fontsize = 20;
+
+	//auto bidx = mrt_add_box(mrtext, { 400,20 }, { 850,300 });
+	//mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
+	//str = "abcdefg";
+	//bidx = mrt_add_box(mrtext, { 400,200 }, { 850,300 });
+	//mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
+	//auto pbox = mrt_get_boxinfo(mrtext, 0);
+	//pbox->auto_break = 1;
+	//pbox->word_wrap = 1;
+	//pbox->ellipsis;
+	//mrt_build(mrtext);
+	rt_set(mtext, &tbox);
+	tbox.rc = { 10,320,1500,1600 };
+	text_t1_set(ptb1, &tbox);
+	glm::ivec2 sc_size = { 1024,1024 };
 	kti = 0.0;
 	rt_clear(mtext);
 	auto img = fctx->bcc._data[0];

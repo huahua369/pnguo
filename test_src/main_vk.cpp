@@ -1083,42 +1083,12 @@ int main()
 			td3->init(form0, pcb, { 0,0,600, ws.y }, view->_vgdev);
 			td3->familys = family;
 
-			auto ptm = plot_main(td3, 1200, 1200);
+			//auto ptm = plot_main(td3, 1200, 1200);
 
 
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
 			pcb->set_texture_blend(tex3d, 0, 0);
-			//VkvgSurface sf = td3->_vgdev->new_surface(vki.vkimage, 0, vki.size.x, vki.size.y);
-			std::string str = (char*)u8"这个例子实现了：矢量图渲染（基于vkvg），spine动画渲染，3D动画渲染！\nThis example demonstrates: vector graphics rendering (vkvg), Spine animation rendering, and 3D animation rendering!";
-			text_box_t tbox = {};
-			tbox.text_align = { 0,0.5 };
-			tbox.rc = { 10,10,1500,1600 };
-			tbox.auto_break = 1;
-			tbox.word_wrap = 1;
 
-			auto ptb = new text_t1();
-			text_t1_set(ptb, &tbox);
-			auto ptb1 = new text_t1();
-			auto mtext = new rich_text_t();
-			//auto mrtext = new multi_rich_text_t();
-			//text_style nst = {};
-			//nst.family = family;
-			//nst.fontsize = 20;
-
-			//auto bidx = mrt_add_box(mrtext, { 400,20 }, { 850,300 });
-			//mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
-			//str = "abcdefg";
-			//bidx = mrt_add_box(mrtext, { 400,200 }, { 850,300 });
-			//mrt_add_text(mrtext, bidx, str.c_str(), str.size(), 0, &nst);
-			//auto pbox = mrt_get_boxinfo(mrtext, 0);
-			//pbox->auto_break = 1;
-			//pbox->word_wrap = 1;
-			//pbox->ellipsis;
-			//mrt_build(mrtext);
-			rt_set(mtext, &tbox);
-			tbox.rc = { 10,320,1500,1600 };
-			text_t1_set(ptb1, &tbox);
-			glm::ivec2 sc_size = { 1024,1024 };
 
 			auto dvv = new div_cx();
 			dvv->set_size({ 500,400 });
@@ -1308,7 +1278,7 @@ int main()
 					{
 						edit1->_color.x = colorpick->get_color();
 					}
-					//*ret = true;
+					*ret = true;
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
@@ -1324,8 +1294,6 @@ int main()
 			// 运行消息循环
 			run_app(app, 0);
 
-			delete ptb;
-			delete td3;
 
 		}
 
