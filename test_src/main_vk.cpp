@@ -1082,7 +1082,6 @@ int main()
 			drawable_cx* td3 = new drawable_cx();
 			td3->init(form0, pcb, { 0,0,600, ws.y }, view->_vgdev);
 			td3->familys = family;
-
 			//auto ptm = plot_main(td3, 1200, 1200);
 
 
@@ -1195,6 +1194,7 @@ int main()
 			}
 			static bool loadf = false;
 
+			auto dvv2 = new div_cx();
 			{
 				auto dvv1 = new div_cx();
 				dvv1->set_size({ 180,150 });
@@ -1210,7 +1210,7 @@ int main()
 				{
 					auto btn = new color_btn();
 					btn->rounding = 4;
-					//btn->set_btn_color_bgr(fmod(4, 5));
+					btn->set_btn_color_bgr(fmod(4, 5));
 					dvv1->add_widget(btn);
 					btn->set_size({ 128,36 });
 					btn->font_size = 16;
@@ -1218,6 +1218,8 @@ int main()
 					btn->str = (char*)u8"🍕透明按钮 ";
 					btn->click_cb = [=](void* p, int clicks) {
 						//loadf = true;
+						td3->remove_widget(dvv2);
+						dvv1->add_widget(dvv2);
 						};
 					{
 						auto r = new checkbox_tl();
@@ -1231,18 +1233,24 @@ int main()
 				dvv->add_widget(dvv1);
 			}
 			{
-				auto dvv1 = new div_cx();
-				dvv1->set_size({ 180,150 });
-				dvv1->set_pos({ 100,60 });
-				dvv1->family = family;
-				dvv1->border = { 0xffacacac,1,5,0x9ff66666 };	// 颜色，线粗，圆角，背景色
-				dvv1->flex_child.margin_left = 2;		// 子元素外边距
-				dvv1->flex_child.margin_right = 2;
-				dvv1->flex_child.margin_top = 2;
-				dvv1->flex_child.margin_bottom = 2;
-				dvv1->draggable = true;
-				dvv1->_absolute = true;
-				td3->add_widget(dvv1);
+				dvv2->set_size({ 180,150 });
+				dvv2->set_pos({ 100,60 });
+				dvv2->family = family;
+				dvv2->border = { 0xffacacac,1,5,0x9ff66666 };	// 颜色，线粗，圆角，背景色
+				dvv2->flex_child.margin_left = 2;		// 子元素外边距
+				dvv2->flex_child.margin_right = 2;
+				dvv2->flex_child.margin_top = 2;
+				dvv2->flex_child.margin_bottom = 2;
+				dvv2->draggable = true;
+				dvv2->_absolute = true;
+				td3->add_widget(dvv2); {
+					auto r = new checkbox_tl();
+					r->set_size({ 36,36 });
+					r->style.line_col = 0xffff8020;
+					r->style.thickness = 1;
+					r->v.mixed = true;
+					dvv2->add_widget(r);
+				}
 			}
 			td3->add_widget(dvv);
 
@@ -1264,11 +1272,11 @@ int main()
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
-					return;
 					int d = delta * 1000;
 					{
 						edit1->_color.x = colorpick->get_color();
 					}
+					return;
 					*ret = true;
 					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;

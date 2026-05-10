@@ -658,7 +658,7 @@ class drawable_cx
 {
 public:
 	// 控件列表
-	std::vector<div_cx*> widgets, tdrawlist;
+	std::vector<div_cx*> widgets, tdrawlist, tadd, tremove;
 	// 渲染的数据列表
 	std::vector<rvg_data_cx*> _drawv;
 	std::unordered_map<div_cx*, rvg_data_cx*> _dobj;

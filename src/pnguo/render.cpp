@@ -3148,6 +3148,7 @@ void drawable_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_d
 		{
 			form0->add_event(this, [=](uint32_t type, et_un_t* e, void* ud) {
 				bool btn = !((devent_type_e)type == devent_type_e::mouse_button_e && e->v.b->down == 0);
+
 				for (auto it = widgets.rbegin(); it != widgets.rend(); it++)
 				{
 					(*it)->on_event(type, e);
@@ -3837,7 +3838,7 @@ void drawable_cx::add_widget(div_cx* w)
 {
 	if (w)
 	{
-		widgets.push_back(w);
+		tadd.push_back(w);
 	}
 }
 
@@ -3845,8 +3846,7 @@ void drawable_cx::remove_widget(div_cx* w)
 {
 	if (w)
 	{
-		auto& v = widgets;
-		v.erase(std::remove(v.begin(), v.end(), w), v.end());
+		tremove.push_back(w);
 	}
 }
 
@@ -3865,6 +3865,26 @@ void drawable_cx::clear_draw()
 int drawable_cx::update(float delta)
 {
 	int ret = 0;
+	if (!tremove.empty())
+	{
+		for (auto w : tremove) {
+			auto it = std::find(widgets.begin(), widgets.end(), w);
+			if (it != widgets.end()) {
+				widgets.erase(it);
+			}
+		}
+		tremove.clear();
+	}
+	if (!tadd.empty())
+	{
+		for (auto w : tadd) {
+			auto it = std::find(widgets.begin(), widgets.end(), w);
+			if (it == widgets.end()) {
+				widgets.push_back(w);
+			}
+		}
+		tadd.clear();
+	}
 	std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) {
 		return a->dindex < b->dindex;
 		});
@@ -3910,7 +3930,7 @@ int drawable_cx::build()
 			{
 				//print_time _bb("build");
 				rvg->clear();
-				rvg->set_pos(p->get_pos() - dpos);
+				rvg->set_pos(p->get_pos());
 				p->draw(rvg);	// 录制渲染
 				// 资源绑定窗口
 				ret += update_rvgdata(rvgd);

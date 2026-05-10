@@ -3022,7 +3022,7 @@ void widget_t::draw(rvg_cx* rv)
 
 void image_btn::draw(rvg_cx* rv) {
 
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	//image_ptr_t* img = 0;
@@ -3052,7 +3052,7 @@ void color_btn::draw(rvg_cx* rv)
 	}
 #if 1
 	auto ss = get_size();
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos;
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	rv->save();
@@ -3120,7 +3120,7 @@ void gradient_btn::draw(rvg_cx* rv)
 {
 #if 1
 	auto p = this;
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	float x = psv.x, y = psv.y, w = p->_size.x, h = p->_size.y;
 	int pushed = p->mPushed ? 0 : 1;
 	uint32_t gradTop = p->_gradTop;
@@ -3291,7 +3291,7 @@ void radio_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 
-		auto psv = get_ppos();
+		auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view);
 
@@ -3323,7 +3323,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 	if (rv && p) {
 #if 1
 
-		auto psv = get_ppos();
+		auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view);
 
@@ -3348,7 +3348,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 void switch_tl::draw(rvg_cx* rv)
 {
 #if 1
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 
@@ -3386,7 +3386,7 @@ void progress_tl::draw(rvg_cx* rv)
 	ss.x = width;
 	ss.y = height;
 #if 1
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	glm::vec2 npos = _size - (glm::vec2)ss;
@@ -3459,7 +3459,7 @@ void progress_tl::draw(rvg_cx* rv)
 void slider_tl::draw(rvg_cx* rv)
 {
 #if 1
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	rv->save();
@@ -3524,7 +3524,7 @@ void slider_tl::draw(rvg_cx* rv)
 void colorpick_tl::draw(rvg_cx* rv)
 {
 #if 1
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	glm::ivec2 ss = _size;
@@ -3623,7 +3623,7 @@ void colorpick_tl::draw(rvg_cx* rv)
 void scroll_bar::draw(rvg_cx* rv)
 {
 	glm::ivec2 ss = _size;
-	auto psv = get_ppos();
+	auto psv = _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view);
 	rv->translate(psv);
@@ -3942,7 +3942,11 @@ void div_cx::add_widget(widget_t* p)
 		if (!p->family)
 			p->set_family(family, font_size);
 		p->parent = this;
-		widgets.push_back(p); uplayout = true;
+		auto it = std::find(widgets.begin(), widgets.end(), p);
+		if (it == widgets.end()) {
+			widgets.push_back(p);
+		}
+		uplayout = true;
 	}
 }
 void div_cx::remove_widget(widget_t* p)
@@ -4649,9 +4653,9 @@ void div_cx::draw(rvg_cx* rv)
 	auto sps = get_spos();	// 获取滚动量
 	auto ss = get_size();
 	if (border.w || border.x) {
-		rv->push_view(glm::ivec4(pos, ss));
+		rv->push_view(glm::ivec4(0, 0, ss));
 		rv->set_line_width(border.y);
-		rv->translate(pos);
+		//rv->translate(pos);
 		glm::vec2 rc = ss;
 		rc -= border.y;
 		rv->add_rect({ 0.5,0.5,rc }, border.z);
@@ -6692,7 +6696,7 @@ void edit_cx::draw(rvg_cx* rv)
 {
 	glm::ivec2 nposs = _pos;
 	glm::ivec2 ss = _size;
-	auto psv = get_ppos();
+	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto vsize = get_size();
 	vsize += thickness * 2;
 	auto view = glm::ivec4(psv, vsize);
