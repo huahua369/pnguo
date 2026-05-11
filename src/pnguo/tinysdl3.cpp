@@ -450,6 +450,10 @@ uint32_t get_flags(int fgs)
 		flags |= SDL_WINDOW_POPUP_MENU;
 	else if (fgs & ef_utility)
 		flags |= SDL_WINDOW_UTILITY;
+	else if (fgs & ef_minimized)
+		flags |= SDL_WINDOW_MINIMIZED;
+	else if (fgs & ef_maximized)
+		flags |= SDL_WINDOW_MAXIMIZED;
 	return flags;
 }
 
@@ -2540,17 +2544,11 @@ void form_x::new_tool_tip(const glm::ivec2& pos, const void* str)
 bool form_x::hittest(const glm::ivec2& pos)
 {
 	_HitTest = false;
-	if (_ptr)
-	{
-		//for (int i = 1; i >= 0; i--) {
-		//	for (auto it = _planes[i].rbegin(); it != _planes[i].rend(); it++)
-		//	{
-		//		if ((*it)->visible && (*it)->hittest(pos))
-		//		{
-		//			_HitTest = true; break;
-		//		}
-		//	}
-		//}
+	for (auto it : _draw_data) {
+		if (it->hittest(pos)) {
+			_HitTest = true;
+			break;
+		}
 	}
 	return _HitTest;
 }

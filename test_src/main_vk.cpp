@@ -1082,6 +1082,7 @@ int main()
 			drawable_cx* td3 = new drawable_cx();
 			td3->init(form0, pcb, { 0,0,600, ws.y }, view->_vgdev);
 			td3->familys = family;
+
 			//auto ptm = plot_main(td3, 1200, 1200);
 
 
@@ -1217,9 +1218,31 @@ int main()
 					btn->text_color = -1;
 					btn->str = (char*)u8"🍕透明按钮 ";
 					btn->click_cb = [=](void* p, int clicks) {
-						//loadf = true;
-						td3->remove_widget(dvv2);
-						dvv1->add_widget(dvv2);
+						static bool a = true;
+						static form_x* f1 = 0;
+						static drawable_cx* td2 = 0;
+						if (a)
+						{
+							if (!f1)
+							{
+								f1 = (form_x*)new_form(app, "", 500, 500, -1, -1, ef_vulkan | /*ef_resizable |*/ ef_borderless /*| ef_transparent*/);
+								td2 = new drawable_cx();
+								td2->init(f1, pcb, { 0,0,600, ws.y }, view->_vgdev);
+								td2->familys = family;
+							}
+							f1->set_size(dvv2->get_size());
+							f1->show();
+							f1->raise();
+							td3->remove_widget(dvv2);
+							td2->add_widget(dvv2);
+							a = false;
+						}
+						else {
+							td2->remove_widget(dvv2);
+							td3->add_widget(dvv2);
+							f1->hide();
+							a = true;
+						}
 						};
 					{
 						auto r = new checkbox_tl();
@@ -1234,7 +1257,7 @@ int main()
 			}
 			{
 				dvv2->set_size({ 180,150 });
-				dvv2->set_pos({ 100,60 });
+				dvv2->set_pos({ 0,0 });
 				dvv2->family = family;
 				dvv2->border = { 0xffacacac,1,5,0x9ff66666 };	// 颜色，线粗，圆角，背景色
 				dvv2->flex_child.margin_left = 2;		// 子元素外边距
@@ -1243,11 +1266,11 @@ int main()
 				dvv2->flex_child.margin_bottom = 2;
 				dvv2->draggable = true;
 				dvv2->_absolute = true;
-				td3->add_widget(dvv2); {
-					auto r = new checkbox_tl();
-					r->set_size({ 36,36 });
-					r->style.line_col = 0xffff8020;
-					r->style.thickness = 1;
+				td3->add_widget(dvv2);
+				{
+					auto r = new switch_tl();
+					r->set_size({ 60,36 });
+					r->set_value(true);
 					r->v.mixed = true;
 					dvv2->add_widget(r);
 				}
@@ -1255,6 +1278,7 @@ int main()
 			td3->add_widget(dvv);
 
 
+			render_update(*td3, 0);
 
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
@@ -1288,7 +1312,7 @@ int main()
 					{
 						sct = mps;
 					}
-					 
+
 				};
 			// 运行消息循环
 			run_app(app, 0);

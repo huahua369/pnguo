@@ -200,6 +200,7 @@ public:
 	flex_data flex_child = {};
 	scroll_bar* horizontal = 0, * vertical = 0;//水平滚动条 ，垂直滚动条 
 	std::vector<widget_t*> widgets, event_wts, event_wts1;
+	std::vector<widget_t*> tadd, tremove;
 	std::vector<widget_t*> sort_draw;	// 排序渲染
 	std::vector<glm::ivec2> lines;	// 控件分行
 	std::vector<drag_v6> drags;	// 拖动坐标

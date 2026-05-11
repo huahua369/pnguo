@@ -213,6 +213,7 @@ concept Drawable = requires(T obj) {
 	{ obj.draw() } -> std::same_as<void>; // 要求有 draw() 方法 
 	{ obj.update(float{}) } -> std::same_as<int>;
 	{ obj.press_test() } -> std::same_as<bool>;
+	{ obj.hittest(glm::ivec2{}) } -> std::same_as<bool>;
 };
 void render_drawable(Drawable auto& drawable);
 int render_update(Drawable auto& drawable, float delta);
@@ -626,6 +627,7 @@ struct translate_cc
 	void* surface = 0;
 	void* ctx = 0;
 	glm::vec2 apos = {};
+	glm::vec2 clips = {};
 };
 class rvg_data_cx
 {
@@ -706,6 +708,7 @@ public:
 	int update(float delta);
 	int build();
 	bool press_test();
+	bool hittest(const glm::ivec2& mpos);
 };
 
 class clicprect_cx

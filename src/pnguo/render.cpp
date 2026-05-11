@@ -3636,7 +3636,6 @@ void rvg_data_cx::update()
 translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 {
 	translate_cc r = {};
-	glm::vec2 clips = {};
 	if (idx < dcv.size())
 	{
 		auto& rcc = dcv[idx];
@@ -3651,7 +3650,7 @@ translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 			}
 			v.count++;
 		}
-		clips = rcc.size;
+		r.clips = rcc.size;
 		r.apos = rcc.pos - rcc.offset;
 		r.apos += stwidth;
 		r.surface = surfaces[rcc.surface].surface;
@@ -3732,8 +3731,9 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				tcc.ctx = ctx_begin(tcc.surface);
 				if (tcc.ctx)
 				{
-					vkvg_save((VkvgContext)tcc.ctx);
-					vkvg_translate((VkvgContext)tcc.ctx, tcc.apos.x, tcc.apos.y);
+					auto ctx = (VkvgContext)tcc.ctx;
+					vkvg_save(ctx);
+					vkvg_translate(ctx, tcc.apos.x, tcc.apos.y);
 				}
 				stt.push(tcc);
 			}
@@ -3756,7 +3756,8 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				stt.pop();
 				if (tcc.ctx)
 				{
-					vkvg_restore((VkvgContext)tcc.ctx);
+					auto ctx = (VkvgContext)tcc.ctx;
+					vkvg_restore(ctx);
 					ctx_end(tcc.ctx);
 				}
 			}
@@ -3944,6 +3945,17 @@ bool drawable_cx::press_test()
 {
 	for (auto& p : tdrawlist) {
 		if (p && p->visible && p->press_test())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool drawable_cx::hittest(const glm::ivec2& mpos)
+{
+	for (auto& p : tdrawlist) {
+		if (p && p->visible && p->hittest(mpos))
 		{
 			return true;
 		}

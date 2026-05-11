@@ -3944,19 +3944,17 @@ void div_cx::add_widget(widget_t* p)
 		p->parent = this;
 		auto it = std::find(widgets.begin(), widgets.end(), p);
 		if (it == widgets.end()) {
-			widgets.push_back(p);
+			tadd.push_back(p);
 		}
 		uplayout = true;
 	}
 }
 void div_cx::remove_widget(widget_t* p)
 {
-	auto& v = widgets;
-	auto ps = v.size();
-	v.erase(std::remove(v.begin(), v.end(), p), v.end());
-	if (v.size() != ps)
+	if (p)
 	{
-		valid = true; uplayout = true;
+		tremove.push_back(p);
+		uplayout = true;
 	}
 }
 void div_cx::set_scroll(int width, int rcw, const glm::ivec2& pos_width, const glm::ivec2& vnpos, const glm::ivec2& hnpos)
@@ -4621,6 +4619,21 @@ drag_v6* div_cx::get_dragv6(size_t idx)
 bool div_cx::update(float delta)
 {
 	int ic = 0;
+
+	if (tadd.size()) {
+		for (auto p : tadd)
+			widgets.push_back(p);
+		tadd.clear();
+	}
+	if (tremove.size())
+	{
+		auto& v = widgets;
+		auto ps = v.size();
+		for (auto p : tremove) {
+			v.erase(std::remove(v.begin(), v.end(), p), v.end());
+		}
+		tremove.clear();
+	}
 	if (update_drag)
 	{
 		dragsp.clear();

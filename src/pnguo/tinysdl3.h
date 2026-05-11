@@ -413,6 +413,8 @@ enum form_flags_e
 	ef_dx11 = BIT_INC(11),
 	ef_dx12 = BIT_INC(12),
 	ef_vsync = BIT_INC(13),
+	ef_minimized = BIT_INC(14),
+	ef_maximized = BIT_INC(15),
 	ef_default = ef_resizable | ef_vulkan
 };
 // 创建窗口的信息
