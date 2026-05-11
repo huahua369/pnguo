@@ -1259,7 +1259,7 @@ int main()
 							glm::vec2 main_pos = app->main->get_pos();
 							glm::vec2 main_size = app->main->get_size();
 							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
-							{
+							{								
 								view->set_div(dvv2);
 							}
 						}

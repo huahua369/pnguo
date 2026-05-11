@@ -3781,11 +3781,23 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 				}
 			}
 			if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE) {
-				auto dps = mps - wp->curpos; wp->has_drag = true;
-				wp->on_mevent((int)event_type2::on_drag, dps, p);		// 拖动事件
-				if (wp->mevent_cb)
+				auto dps = mps - wp->curpos;
+				bool first = !wp->has_drag;
+				wp->has_drag = true;
+				if (first) {
+					wp->on_mevent((int)event_type2::on_dragstart, dps, p);
+					if (wp->mevent_cb)
+					{
+						wp->mevent_cb(wp, (int)event_type2::on_dragstart, dps);
+					}
+				}
+				else
 				{
-					wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+					wp->on_mevent((int)event_type2::on_drag, dps, p);		// 拖动事件
+					if (wp->mevent_cb)
+					{
+						wp->mevent_cb(wp, (int)event_type2::on_drag, dps);		// 拖动事件
+					}
 				}
 			}
 		}
@@ -3832,7 +3844,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 					{
 						wp->cks = p->clicks;
 						if (wp->has_drag)
-						{ 
+						{
 						}
 						else
 						{
