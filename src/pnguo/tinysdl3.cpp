@@ -276,6 +276,8 @@ bool wMessageHook(void* userdata, MSG* msg) {
 	{
 		switch (msg->message)
 		{
+		case WM_NCLBUTTONDBLCLK:
+			return app->has_maximized(msg->hwnd);	// 禁用双击最大化
 		case WM_NCLBUTTONDOWN:
 		case WM_NCRBUTTONDOWN:
 		case WM_NCMBUTTONDOWN:
@@ -599,8 +601,8 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	{
 		SDL_SetWindowHitTest(window, HitTestCallback2, pw);
 	}
-
 #endif
+	pw->_flags = fgs;
 	pw->init_dragdrop();
 	forms.push_back(pw);
 
@@ -757,6 +759,19 @@ void app_cx::kncdown()
 		//printf("event:1\t \n");
 		nc_down = false;
 	}
+}
+
+int app_cx::has_maximized(void* hwnd)
+{
+	int ret = 1;
+	for (auto it : forms)
+	{
+		if (it->get_nptr() == hwnd && it->_flags & ef_borderless)
+		{
+			ret = 0;
+		}
+	}
+	return ret;
 }
 
 SDL_AudioSpec get_spec(int format_idx, int channels, int freq) {
@@ -2669,6 +2684,7 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 	const int RESIZE_AREAC = RESIZE_AREA * 2;
 	SDL_HitTestResult ret = SDL_HITTEST_NORMAL;
 	auto fw = (form_x*)data;
+	int tbh = 0;
 	do
 	{
 		if (fw && fw->mmove_type == false)break;
@@ -2690,22 +2706,6 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 			ret = SDL_HITTEST_RESIZE_TOP; break;
 		}
 
-		int tbh = 0;
-		if (fw)
-		{
-			tbh = fw->titlebarheight;
-			if (tbh > 0) {
-				if (area->y < tbh && area->x < winWidth - 128)
-				{
-					// Title bar
-					ret = SDL_HITTEST_DRAGGABLE; break;
-				}
-			}
-			else if (!fw->hittest({ area->x,area->y }))
-			{
-				ret = SDL_HITTEST_DRAGGABLE; break;
-			}
-		}
 
 		if (area->x < RESIZE_AREAC && area->y > winHeight - RESIZE_AREAC)
 		{
@@ -2722,6 +2722,21 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 		if (area->y > winHeight - RESIZE_AREA)
 		{
 			ret = SDL_HITTEST_RESIZE_BOTTOM; break;
+		}
+		if (fw)
+		{
+			tbh = fw->titlebarheight;
+			if (tbh > 0) {
+				if (area->y < tbh && area->x < winWidth - 128)
+				{
+					// Title bar
+					ret = SDL_HITTEST_DRAGGABLE; break;
+				}
+			}
+			else if (!fw->hittest({ area->x,area->y }))
+			{
+				ret = SDL_HITTEST_DRAGGABLE; break;
+			}
 		}
 
 	} while (0);
@@ -3668,6 +3683,23 @@ form_x* new_form(void* app, const char* title, int width, int height, int x, int
 		ptf.has_renderer = true;
 		ptf.flags = flags ? flags : ef_vulkan | ef_resizable;
 		ptf.parent = 0;
+		ptf.pos = { x,y };
+		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
+	}
+	return form1;
+}
+form_x* new_form_c(form_x* parent, const char* title, int width, int height, int x, int y, uint32_t flags)
+{
+
+	form_x* form1 = 0;
+	if (width > 0 && height > 0)
+	{
+		form_newinfo_t ptf = {};
+		ptf.app = parent->app; ptf.title = title;
+		ptf.size = { width,height };
+		ptf.has_renderer = true;
+		ptf.flags = flags ? flags : ef_vulkan | ef_resizable;
+		ptf.parent = parent;
 		ptf.pos = { x,y };
 		form1 = (form_x*)call_data((int)cdtype_e::new_form, &ptf);
 	}

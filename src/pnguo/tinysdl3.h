@@ -137,6 +137,8 @@ public:
 	const char* get_power_str();
 	// 隐藏子窗口
 	void kncdown();
+	int has_maximized(void* hwnd);
+public:
 	// 音频播放
 	uint32_t open_audio(int format, int channels, int freq);
 	void close_audio(uint32_t dev);
@@ -242,13 +244,14 @@ public:
 	std::mutex lkecb, lkqcv;
 	// 标题栏高度
 	int titlebarheight = 0;
+	int _flags = 0;
 	// 锁定鼠标
 	bool capture_type = true;
 	bool close_type = true;		// 关闭按钮风格：true关闭退出，false则隐藏窗口
 	bool mmove_type = true;		// 鼠标拖动
 	bool _HitTest = true;
 	bool _ref = false;
-	bool _focus_lost_hide = false;	// 失去焦点隐藏
+	bool _focus_lost_hide = false;	// 失去焦点隐藏 
 private:
 	bool visible = true;
 	bool visible_old = true;
@@ -468,6 +471,8 @@ struct cpuinfo_t
 
 // 创建主窗口，-1默认坐标
 form_x* new_form(void* app, const char* title, int width, int height, int x, int y, uint32_t flags);
+// 创建子窗口
+form_x* new_form_c(form_x* parent, const char* title, int width, int height, int x, int y, uint32_t flags);
 // 菜单窗口
 form_x* new_form_popup(form_x* parent, int width, int height);
 form_x* new_form1(void* app, int width, int height, form_x* parent);

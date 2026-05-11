@@ -1225,23 +1225,29 @@ int main()
 						{
 							if (!f1)
 							{
-								f1 = (form_x*)new_form(app, "", 500, 500, -1, -1, ef_vulkan | /*ef_resizable |*/ ef_borderless /*| ef_transparent*/);
+								f1 = (form_x*)new_form(app, "", 500, 500, -1, -1, ef_utility | ef_resizable | ef_borderless | ef_vulkan/*ef_dx11 | ef_transparent*/);
 								td2 = new drawable_cx();
 								td2->init(f1, pcb, { 0,0,600, ws.y }, view->_vgdev);
 								td2->familys = family;
 							}
-							f1->set_size(dvv2->get_size());
-							f1->show();
-							f1->raise();
-							td3->remove_widget(dvv2);
-							td2->add_widget(dvv2);
-							a = false;
+							if (f1)
+							{
+								f1->set_size(dvv2->get_size());
+								f1->show();
+								f1->raise();
+								td3->remove_widget(dvv2);
+								td2->add_widget(dvv2);
+								a = false;
+							}
 						}
 						else {
-							td2->remove_widget(dvv2);
-							td3->add_widget(dvv2);
-							f1->hide();
-							a = true;
+							if (f1)
+							{
+								td2->remove_widget(dvv2);
+								td3->add_widget(dvv2);
+								f1->hide();
+								a = true;
+							}
 						}
 						};
 					{
