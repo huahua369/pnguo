@@ -691,14 +691,28 @@ void app_cx::set_defcursor(uint32_t t)
 
 void app_cx::remove(form_x* fw)
 {
-	if (fw)
+	auto& v = forms;
+	if (fw && v.size())
 	{
-		auto& v = forms;
-		v.erase(std::remove(v.begin(), v.end(), fw), v.end());
-		if (!fw->_ref)
+		if (v[0] == fw) {
+			for (auto it : v)
+			{
+				if (!fw->_ref)
+				{
+					fw->_ref = 1;
+					reforms.push(fw);
+				}
+			}
+			v.clear();
+		}
+		else
 		{
-			fw->_ref = 1;
-			reforms.push(fw);
+			v.erase(std::remove(v.begin(), v.end(), fw), v.end());
+			if (!fw->_ref)
+			{
+				fw->_ref = 1;
+				reforms.push(fw);
+			}
 		}
 	}
 }

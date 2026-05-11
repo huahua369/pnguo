@@ -1237,6 +1237,7 @@ int main()
 								f1->raise();
 								td3->remove_widget(dvv2);
 								td2->add_widget(dvv2);
+								dvv2->set_pos({});
 								a = false;
 							}
 						}
