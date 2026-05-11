@@ -3130,6 +3130,11 @@ drawable_cx::drawable_cx()
 
 drawable_cx::~drawable_cx()
 {
+	for (auto& [k, v] : _dobj) {
+		free_rvg(v);
+		delete v;
+	}
+	_dobj.clear();
 	if (form0)
 	{
 		form0->remove_event(this);

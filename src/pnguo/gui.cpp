@@ -3832,8 +3832,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 					{
 						wp->cks = p->clicks;
 						if (wp->has_drag)
-						{
-							wp->on_mevent((int)event_type2::on_dragend, mps, p);
+						{ 
 						}
 						else
 						{
@@ -3862,6 +3861,13 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 		if (p->down == 0) {
 			wp->_bst &= ~(int)BTN_STATE::STATE_ACTIVE;
 			wp->_bst |= (int)BTN_STATE::STATE_NOMAL;
+			if (wp->has_drag)
+			{
+				wp->on_mevent((int)event_type2::on_dragend, mps, p);
+				if (wp->mevent_cb) {
+					wp->mevent_cb(wp, (int)event_type2::on_dragend, mps);
+				}
+			}
 			wp->has_drag = false;
 			wp->on_mevent((int)event_type2::mouse_up, mps, p);
 			if (wp->mevent_cb) {

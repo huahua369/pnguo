@@ -88,12 +88,14 @@ class app_cx
 public:
 	std::set<std::string> rdv;
 	std::vector<form_x*> forms;		// 窗口列表
+	form_x* main = 0;
 	//render_2d* r2d = 0;				// 2d动画渲染
 	font_rctx* font_ctx = 0;
 	SDL_Cursor** system_cursor = 0;	// 系统光标
 	Timer* fct = {};
 	std::queue<form_x*> reforms;
 	std::vector<PlatformMonitor> monitors;
+	std::function<void(form_x*, int type)> e_window_cb;
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
 	int _fps = 60;
@@ -195,6 +197,7 @@ class form_x
 public:
 	SDL_Window* _ptr = 0;
 	app_cx* app = 0;				// 应用ctx
+	glm::ivec2 _pos = {};			// 窗口位置
 	glm::ivec2 _size = {};			// 窗口大小
 	glm::ivec2 display_size = {};	// 窗口显示大小
 	glm::ivec2 save_size = {};		// 保存窗口大小
@@ -203,6 +206,7 @@ public:
 	std::function<int()> on_close_cb;		// 关闭事件
 	std::function<void(float delta, int* ret)> up_cb;	// 更新动画等
 	std::function<void(SDL_Renderer* renderer, double delta)> render_cb;	// 更新和渲染
+
 #if 0
 	//std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
 	std::vector<canvas_atlas*> atlas[2];		// 图集渲染列表		简单贴图或ui用
@@ -270,6 +274,7 @@ public:
 	void set_capture();
 	void release_capture();
 	void on_size(const glm::ivec2& ss);
+	void on_moved(const glm::ivec2& ss);
 	//销毁窗口
 	void destroy();
 	// 关闭窗口

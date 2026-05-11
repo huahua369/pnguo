@@ -11,6 +11,9 @@
 #include <stack>
 #include "vkvg.h"
 
+#include <clipper2/clipper.h> 
+using namespace Clipper2Lib;
+
 #ifndef GLM_FORCE_XYZW_ONLY
 #define GLM_ENABLE_EXPERIMENTAL 
 #define GLM_FORCE_XYZW_ONLY
@@ -232,7 +235,7 @@ enum class blendmode_e :int {
 	additive_prem,
 };
 #ifndef CLIPPER_CORE_H
-using PathsD = std::vector<std::vector<double>>;
+//using PathsD = std::vector<std::vector<double>>;
 #endif // !CLIPPER_CORE_H
 
 struct path_d;

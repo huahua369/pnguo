@@ -697,11 +697,7 @@ void app_cx::remove(form_x* fw)
 		if (v[0] == fw) {
 			for (auto it : v)
 			{
-				if (!fw->_ref)
-				{
-					fw->_ref = 1;
-					reforms.push(fw);
-				}
+				reforms.push(it);
 			}
 			v.clear();
 		}
@@ -1977,69 +1973,77 @@ int app_cx::on_call_we(const SDL_Event* e, form_x* pw)
 {
 	if (!pw)return 0;
 	int r = 0;
-	//if (e->type == SDL_WINDOWEVENT)
+	switch (e->type)
 	{
-		//switch (e->window.event)
-		switch (e->type)
+	case SDL_EVENT_WINDOW_DESTROYED:
+	{
+	}break;
+	case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+	{
+		int cbr = 0;
+		if (pw->on_close_cb)
 		{
-		case SDL_EVENT_WINDOW_DESTROYED:
+			cbr = pw->on_close_cb();
+		}
+		if (pw->close_type || cbr == 1)
 		{
-		}break;
-		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-		{
-			int cbr = 0;
-			if (pw->on_close_cb)
+			if (pw->parent)
 			{
-				cbr = pw->on_close_cb();
-			}
-			if (pw->close_type || cbr == 1)
-			{
-				if (pw->parent)
-				{
-					pw->parent->remove_f(pw);
-				}
-				else {
-					pw->destroy();
-					pw->app->remove(pw);
-				}
+				pw->parent->remove_f(pw);
 			}
 			else {
-				pw->hide();
-				r = 1;
+				pw->destroy();
+				pw->app->remove(pw);
 			}
 		}
-		break;
-		case SDL_EVENT_WINDOW_MOUSE_ENTER:
-		{
-		}break;
-		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-		{
-		}break;
-		case SDL_EVENT_WINDOW_FOCUS_GAINED:
-		{
-		}break;
-		case SDL_EVENT_WINDOW_FOCUS_LOST:
-		{
-			pw->focus_lost();
-		}break;
-		case SDL_EVENT_WINDOW_MINIMIZED:
-		{
-			pw->save_size = pw->_size;
-			pw->on_size({});
-		}break;
-		case SDL_EVENT_WINDOW_RESTORED:
-		{
-			pw->on_size(pw->save_size); pw->present_e();
-		}break;
-		case SDL_EVENT_WINDOW_RESIZED:
-		{
-			pw->save_size = pw->_size;
-			pw->on_size({ e->window.data1,e->window.data2 });
-		}break;
-		default:
-			on_call_emit(e, pw);
-			break;
+		else {
+			pw->hide();
+			r = 1;
 		}
+	}
+	break;
+	case SDL_EVENT_WINDOW_MOUSE_ENTER:
+	{
+	}break;
+	case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+	{
+	}break;
+	case SDL_EVENT_WINDOW_FOCUS_GAINED:
+	{
+	}break;
+	case SDL_EVENT_WINDOW_FOCUS_LOST:
+	{
+		pw->focus_lost();
+	}break;
+	case SDL_EVENT_WINDOW_MINIMIZED:
+	{
+		pw->save_size = pw->_size;
+		pw->on_size({});
+	}break;
+	case SDL_EVENT_WINDOW_RESTORED:
+	{
+		pw->on_size(pw->save_size); pw->present_e();
+	}break;
+	case SDL_EVENT_WINDOW_RESIZED:
+	{
+		pw->save_size = pw->_size;
+		pw->on_size({ e->window.data1,e->window.data2 });
+	}break;
+	case SDL_EVENT_WINDOW_MOVED:
+	{
+		pw->on_moved({ e->window.data1,e->window.data2 });
+	}break;
+	default:
+		break;
+	}
+	if (e->type < SDL_EVENT_WINDOW_FIRST || e->type > SDL_EVENT_WINDOW_LAST)
+	{
+		on_call_emit(e, pw);
+	}
+	else
+	{
+		if (e_window_cb)
+			e_window_cb(pw, e->type);
 	}
 	return 0;
 }
@@ -2076,6 +2080,14 @@ void form_x::on_size(const glm::ivec2& ss)
 {
 	if (ss != _size)
 		_size = ss;
+}
+
+void form_x::on_moved(const glm::ivec2& ss)
+{
+	if (ss != _pos)
+	{
+		_pos = ss;
+	}
 }
 
 

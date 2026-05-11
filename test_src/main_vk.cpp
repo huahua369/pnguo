@@ -971,7 +971,7 @@ int main()
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_vsync| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-
+		app->main = form0;
 		auto kd = sdldev.vkdev;
 
 		//void* aaaa = vkr::new_ms_pipe(vkd->dev, vkd->renderpass_fbo);
@@ -1067,10 +1067,7 @@ int main()
 			vkd->_state.Exposure = 0.8;
 			vkd->_state.EmissiveFactor = 1;
 			vkd->_state.IBLFactor = 0.5;
-			//new_ui(form0, vkd);
-			auto pcb = new texture_cb();
-			assert(pcb);
-			get_sdl_texture_cb(pcb);
+			//new_ui(form0, vkd); 
 			//void* vg2dtex = nullptr;
 			const char* filename = "temp/vkvg_gb.png";
 			bspline_ct* bs = new bspline_ct();
@@ -1079,6 +1076,9 @@ int main()
 
 			auto view = new viewdev_cx();
 			view->init_vgdev(&devinfo, 8);
+			view->familys = family;
+			view->app = app;
+			auto pcb = view->pcb;
 			drawable_cx* td3 = new drawable_cx();
 			td3->init(form0, pcb, { 0,0,600, ws.y }, view->_vgdev);
 			td3->familys = family;
@@ -1218,38 +1218,7 @@ int main()
 					btn->text_color = -1;
 					btn->str = (char*)u8"🍕透明按钮 ";
 					btn->click_cb = [=](void* p, int clicks) {
-						static bool a = true;
-						static form_x* f1 = 0;
-						static drawable_cx* td2 = 0;
-						if (a)
-						{
-							if (!f1)
-							{
-								f1 = (form_x*)new_form(app, "", 500, 500, -1, -1, ef_utility | ef_resizable | ef_borderless | ef_vulkan/*ef_dx11 | ef_transparent*/);
-								td2 = new drawable_cx();
-								td2->init(f1, pcb, { 0,0,600, ws.y }, view->_vgdev);
-								td2->familys = family;
-							}
-							if (f1)
-							{
-								f1->set_size(dvv2->get_size());
-								f1->show();
-								f1->raise();
-								td3->remove_widget(dvv2);
-								td2->add_widget(dvv2);
-								dvv2->set_pos({});
-								a = false;
-							}
-						}
-						else {
-							if (f1)
-							{
-								td2->remove_widget(dvv2);
-								td3->add_widget(dvv2);
-								f1->hide();
-								a = true;
-							}
-						}
+
 						};
 					{
 						auto r = new checkbox_tl();
@@ -1272,6 +1241,7 @@ int main()
 				dvv2->flex_child.margin_top = 2;
 				dvv2->flex_child.margin_bottom = 2;
 				dvv2->draggable = true;
+				dvv2->docking = true;
 				dvv2->_absolute = true;
 				td3->add_widget(dvv2);
 				{
@@ -1281,12 +1251,31 @@ int main()
 					r->v.mixed = true;
 					dvv2->add_widget(r);
 				}
+				dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
+					{
+						if (type == (int)event_type2::on_dragend) {
+							glm::vec2 pos = dvv2->get_pos();
+							glm::vec2 size = dvv2->get_size();
+							glm::vec2 main_pos = app->main->get_pos();
+							glm::vec2 main_size = app->main->get_size();
+							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
+							{
+								view->set_div(dvv2);
+							}
+						}
+					};
 			}
 			td3->add_widget(dvv);
-
-
 			render_update(*td3, 0);
-
+			{
+				app->e_window_cb = [=](form_x* fw, int type)
+					{
+						if (type == SDL_EVENT_WINDOW_MOVED)
+						{
+							view->get_div(fw);
+						}
+					};
+			}
 
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{

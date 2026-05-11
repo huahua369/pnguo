@@ -214,6 +214,7 @@ public:
 	std::vector<node_dt> tempfv;
 	bool update_drag = false;		// 是否更新拖动坐标
 	bool draggable = false;
+	bool docking = false;
 public:
 	div_cx();
 	~div_cx();
