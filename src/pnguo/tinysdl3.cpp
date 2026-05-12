@@ -921,10 +921,6 @@ int app_cx::get_event()
 #endif 
 	}
 #endif
-	if (c_fps != _fps)
-	{
-		set_fps(c_fps);
-	}
 	clearf();
 	if (forms.empty())
 	{
@@ -978,17 +974,19 @@ float app_cx::update_event()
 		prev_time = curr_time;
 		if (_fps > 0 && gev < 1)
 		{
-			auto kt = (fct->get_time() + fct->extra_time);
-			do {
-				get_event();
+			if (cfps > _fps)
 				sleep_ms(waitms);
-			} while ((fct->get_time() + fct->extra_time) < fct->screen_ticks_per_frame);
-			if (fct->get_time() < (fct->screen_ticks_per_frame)) {
-				fct->extra_time -= fct->screen_ticks_per_frame - fct->get_time();
-			}
-			else {
-				fct->extra_time += fct->get_time() - fct->screen_ticks_per_frame;
-			}
+			//while ((fct->get_time() + fct->extra_time) < fct->screen_ticks_per_frame)
+			//{
+			//	get_event();
+			//	sleep_ms(waitms);
+			//}
+			//if (fct->get_time() < (fct->screen_ticks_per_frame)) {
+			//	fct->extra_time -= fct->screen_ticks_per_frame - fct->get_time();
+			//}
+			//else {
+			//	fct->extra_time += fct->get_time() - fct->screen_ticks_per_frame;
+			//}
 		}
 	} while (0);//prev_time > 0
 	return delta;

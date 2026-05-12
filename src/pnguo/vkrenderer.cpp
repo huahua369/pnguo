@@ -20098,7 +20098,7 @@ namespace vkr {
 
 
 namespace vkr {
-	static const int backBufferCount = 3;
+	static const int backBufferCount = 4;
 	// todo clring
 
 	//--------------------------------------------------------------------------------------
@@ -21579,6 +21579,7 @@ namespace vkr {
 		//printf("OnRender \t\thdr\t%p\n", m_GBuffer->m_HDR.Resource());
 		// Let our resource managers do some house keeping 
 		m_ConstantBufferRing.OnBeginFrame();
+		m_CommandListRing.OnBeginFrame();
 
 		// command buffer calls
 		VkCommandBuffer cmdBuf1 = m_CommandListRing.GetNewCommandList();
@@ -21976,7 +21977,6 @@ namespace vkr {
 		ImgCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputResource() : m_GBuffer->m_HDR.Resource(); // these haven't changed, re-assign as sanity check
 		SRVCurrentInput = pState->bUseMagnifier ? m_MagnifierPS.GetPassOutputSRV() : m_GBuffer->m_HDRSRV;         // these haven't changed, re-assign as sanity check
 
-		m_CommandListRing.OnBeginFrame();
 		VkCommandBuffer cmdBuf2 = m_CommandListRing.GetNewCommandList();
 		{
 			VkCommandBufferBeginInfo cmd_buf_info;
@@ -22058,6 +22058,9 @@ namespace vkr {
 				submit_info2.signalSemaphoreCount = 1;
 				submit_info2.pSignalSemaphores = &_fbo.sem_out;					// 渲染完成信号
 				res = vkQueueSubmit(m_pDevice->graphics_queue, 1, &submit_info2, 0);
+			}
+			if (res != VK_SUCCESS) {
+				res = res;
 			}
 			assert(res == VK_SUCCESS);
 		}

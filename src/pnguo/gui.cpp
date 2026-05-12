@@ -3053,7 +3053,7 @@ void color_btn::draw(rvg_cx* rv)
 #if 1
 	auto ss = get_size();
 	auto psv = get_spos(); psv += _pos;
-	auto view = glm::ivec4(psv, get_size());
+	auto view = glm::ivec4(psv, ss + thickness);
 	rv->push_view(view);
 	rv->save();
 	rv->translate(psv);
@@ -3106,8 +3106,8 @@ void color_btn::draw(rvg_cx* rv)
 	st.color = p->dtext_color;
 	st.family = p->family;
 	text_st tx = {};
-	tx.pos = {};
-	tx.size = get_size();
+	tx.pos = ps;
+	tx.size = ns;
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, &st);
 	rv->restore();

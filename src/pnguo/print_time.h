@@ -51,6 +51,37 @@ public:
 private:
 
 };
+
+class c_runtime_cx
+{
+private:
+	std::chrono::time_point<std::chrono::high_resolution_clock> _begin;
+public:
+	c_runtime_cx()
+	{}
+	~c_runtime_cx()
+	{}
+	void begin() {
+		_begin = (std::chrono::high_resolution_clock::now());
+	}
+	int64_t get_ms() {
+
+		double aa = elapsed_micro();
+		aa *= 0.001;
+		return aa;
+	}
+	int64_t elapsed() const
+	{
+		return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - _begin).count();
+	}
+	//微秒
+	int64_t elapsed_micro() const
+	{
+		return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - _begin).count();
+	}
+private:
+
+};
 namespace ts {
 	static const char* CharsCheck(const char* str)
 	{

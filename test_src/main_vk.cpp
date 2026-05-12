@@ -1216,7 +1216,7 @@ int main()
 					btn->set_size({ 128,36 });
 					btn->font_size = 16;
 					btn->text_color = -1;
-					btn->str = (char*)u8"🍕透明按钮 ";
+					btn->str = (char*)u8"🍕按钮 ";
 					btn->click_cb = [=](void* p, int clicks) {
 
 						};
@@ -1228,28 +1228,42 @@ int main()
 						r->v.mixed = true;
 						dvv1->add_widget(r);
 					}
+					{
+						auto r = new switch_tl();
+						r->set_size({ 60,36 });
+						r->set_value(true);
+						r->v.mixed = true;
+						dvv1->add_widget(r);
+					}
 				}
 				dvv->add_widget(dvv1);
 			}
+			auto fpslab = new color_btn();
 			{
-				dvv2->set_size({ 180,150 });
+				dvv2->set_size({ 500,360 });
 				dvv2->set_pos({ 0,0 });
 				dvv2->family = family;
-				dvv2->border = { 0xffacacac,1,5,0x9ff66666 };	// 颜色，线粗，圆角，背景色
-				dvv2->flex_child.margin_left = 2;		// 子元素外边距
-				dvv2->flex_child.margin_right = 2;
-				dvv2->flex_child.margin_top = 2;
-				dvv2->flex_child.margin_bottom = 2;
+				dvv2->border = { 0x80acacac,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
+				dvv2->flex_child.margin_left = 4;		// 子元素外边距
+				dvv2->flex_child.margin_right = 4;
+				dvv2->flex_child.margin_top = 4;
+				dvv2->flex_child.margin_bottom = 4;
 				dvv2->draggable = true;
 				dvv2->docking = true;
 				dvv2->_absolute = true;
 				td3->add_widget(dvv2);
 				{
-					auto r = new switch_tl();
-					r->set_size({ 60,36 });
-					r->set_value(true);
-					r->v.mixed = true;
-					dvv2->add_widget(r);
+					auto btn = fpslab;
+					btn->rounding = 4;
+					btn->text_align = {};
+					btn->set_btn_color_bgr(fmod(2, 5));
+					btn->effect = uTheme::light;
+					btn->_disabled_events = true;
+					dvv2->add_widget(btn);
+					btn->set_size({ 492,352 });
+					btn->font_size = 16;
+					btn->text_color = -1;
+					/*btn->str = (char*)u8"🍕透明按钮 ";*/
 				}
 				dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 					{
@@ -1265,7 +1279,7 @@ int main()
 						}
 					};
 			}
-			td3->add_widget(dvv);
+			//td3->add_widget(dvv);
 			render_update(*td3, 0);
 			{
 				app->e_window_cb = [=](form_x* fw, int type)
@@ -1280,25 +1294,10 @@ int main()
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					return;
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
-					}
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(renderer, tex3d, &tdt, 1);//3d
+
 				};
 			form0->up_cb = [=](float delta, int* ret)
 				{
-					int d = delta * 1000;
-					{
-						edit1->_color.x = colorpick->get_color();
-					}
-					return;
-					*ret = true;
-					vkd->update(form0->io);	// 更新事件
 					static double kti = 0.0;
 					kti += delta;
 					static glm::ivec3 sct = {};
@@ -1311,9 +1310,16 @@ int main()
 
 				};
 #endif
+			app->set_fps(0);
+			vkd->_state.has_fence = false;
+			std::string gpustr;
+			c_runtime_cx rtc;
+			int uims = 0, ms3d = 0;
 			// 运行消息循环			
 			do {
 				auto delta = app->update_event();
+				if (!app->form_count())break;
+				auto fps = app->get_fps();
 				form0->update(delta);
 				if (form0->is_minimized())
 				{
@@ -1324,9 +1330,30 @@ int main()
 				// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
 				if (td3->press_test() && io)
 					io->WantCaptureMouse = true;
+
+				edit1->_color.x = colorpick->get_color();
+				vkd->update(form0->io);	// 更新事件
+				gpustr = vkd->get_label();
+				fpslab->str = vkr::format("CPU FPS\t\t:  %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\n", fps, uims, ms3d) + gpustr;
+				rtc.begin();
 				auto ct = td3->update(delta);
+				uims = rtc.get_ms();
+				{
+					rtc.begin();
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					if (!vkd->_state.has_fence) {
+						auto sem = vkd->get_fbo_semaphore();
+						form0->add_vk_semaphores(sem, 0, 0);
+					}
+					ms3d = rtc.get_ms();
+					ct++;
+				}
 				if (ct) {
 					form0->set_state();// 清空/设置交换链接状态 
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
 					form0->present();
 				}

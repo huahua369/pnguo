@@ -98,7 +98,6 @@ public:
 	float avg_delta = 0.0f;
 	float talpha = 0.05f;  // 采样系数（调整平滑度）
 	int _fps = 60;
-	int c_fps = 60;
 	int fms = 0;
 	int waitms = 1;
 	int cfps = 0;
