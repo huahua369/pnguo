@@ -596,11 +596,11 @@ form_x* app_cx::new_form_renderer(const std::string& title, const glm::ivec2& po
 	pce::set_property(window, "form_x", pw);
 	SDL_SetWindowTitle(window, title.c_str());
 #ifdef _WIN32
-	HWND hWnd = (HWND)pce::get_windowptr(window);
-	if (fgs & ef_borderless)
-	{
-		SDL_SetWindowHitTest(window, HitTestCallback2, pw);
-	}
+	//HWND hWnd = (HWND)pce::get_windowptr(window);
+	//if (fgs & ef_borderless)
+	//{
+	//	SDL_SetWindowHitTest(window, HitTestCallback2, pw);
+	//}
 #endif
 	pw->_flags = fgs;
 	pw->init_dragdrop();
@@ -718,7 +718,11 @@ void app_cx::clearf()
 	for (; reforms.size();) {
 		auto it = reforms.front();
 		if (it)
+		{
+			if (it == main)
+				main = 0;
 			delete it;
+		}
 		reforms.pop();
 	}
 }
@@ -916,8 +920,7 @@ int app_cx::get_event()
 		}
 #ifndef EVWATCH
 		call_cb(&e);
-#endif
-		//break;
+#endif 
 	}
 #endif
 	if (c_fps != _fps)
@@ -943,33 +946,38 @@ void app_cx::render(double delta)
 {
 	for (auto it : forms)
 	{
-		it->present(delta);
+		it->present();
 	}
 	//if (_set_dev.vkdev)
 	//	vkDeviceWaitIdle((VkDevice)_set_dev.vkdev);
 }
 
-int app_cx::run_loop(int t)
+float app_cx::update_event()
 {
-	int t1 = t;
+	float delta = 0.0f;
 	do {
+		int gev = get_event();
+		if (forms.empty())break;
 		fct->restart();
 		uint32_t curr_time = SDL_GetTicks();
 		if (prev_time > 0)
 		{
 			if (WantUpdateMonitors)
 				UpdateMonitors();
-			double delta = (float)(curr_time - prev_time) / 1000.0f;
-			auto length = forms.size();
-			for (size_t i = 0; i < length; i++)
-			{
-				auto it = forms[i];
-				it->update(delta);
-			}
-			render(delta);
+			delta = (float)(curr_time - prev_time) / 1000.0f;
+			//auto length = forms.size();
+			//for (size_t i = 0; i < length; i++)
+			//{
+			//	auto it = forms[i];
+			//	it->update(delta);
+			//}
+			//render(delta);
+			 // float avg_delta = delta ; 
+			avg_delta = avg_delta * (1.0 - talpha) + delta * talpha;
+			cfps = 1.0 / avg_delta;
+			cfps1 = 1.0 / delta;
 		}
 		prev_time = curr_time;
-		int gev = get_event();
 		if (_fps > 0 && gev < 1)
 		{
 			auto kt = (fct->get_time() + fct->extra_time);
@@ -984,17 +992,20 @@ int app_cx::run_loop(int t)
 				fct->extra_time += fct->get_time() - fct->screen_ticks_per_frame;
 			}
 		}
-		if (t1 > 0)
-		{
-			if (t == 1)
-			{
-				break;
-			}
-			t--;
-		}
-	} while (prev_time > 0);
-	return t;
+	} while (0);//prev_time > 0
+	return delta;
 }
+
+size_t app_cx::form_count()
+{
+	return forms.size();
+}
+
+int app_cx::get_fps()
+{
+	return cfps;
+}
+
 #endif
 
 // 2D骨骼渲染
@@ -1430,8 +1441,7 @@ form_x::form_x()
 
 form_x::~form_x()
 {
-	//lock_auto_x lx(&lkecb);
-	clear_wt();
+	//lock_auto_x lx(&lkecb); 
 	for (auto it : childfs) {
 		it->_ptr = 0;
 		app->remove(it);
@@ -1769,7 +1779,7 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 		mt.x = mouse_pos.x;
 		mt.y = mouse_pos.y;			// 鼠标移动坐标
 
-		pw->hittest(mouse_pos);
+		//pw->hittest(mouse_pos);
 		if (pw->io) {
 			pw->io->MousePos = mouse_pos;
 			pw->io->MouseDelta = { mt.xrel,mt.yrel };
@@ -2141,38 +2151,7 @@ void form_x::remove_f(form_x* p)
 		app->remove(p);
 	}
 }
-void form_x::clear_wt()
-{
-	for (auto pt : _draw_data) {
-		delete pt;
-	}
-	_draw_data.clear();
-	//for (int i = 0; i < 2; i++)
-	//{
-	//	auto pks = _planes[i];
-	//	for (auto it : pks)
-	//	{
-	//		unbind(it);
-	//		if (it->autofree)
-	//			delete it;
-	//	}
-	//}
-	//_planes[0].clear();
-	//_planes[1].clear();
-	//for (size_t i = 0; i < 2; i++)
-	//{
-	//	auto& tt = atlas[i];
-	//	for (auto it : tt) {
-	//		if (it && it->autofree)
-	//			delete it;
-	//	}
-	//	tt.clear();
-	//}
-}
-size_t form_x::count_wt()
-{
-	return 0;// _planes[0].size() + _planes[1].size();
-}
+
 void* form_x::get_nptr()
 {
 	void* p = 0;
@@ -2181,11 +2160,7 @@ void* form_x::get_nptr()
 #endif
 	return p;
 }
-void form_x::push_menu(menu_cx* p)
-{
-	if (p)
-		menus.push_back(p);
-}
+
 
 void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask)
 {
@@ -2194,19 +2169,7 @@ void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore,
 	if (renderer)
 		SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
 }
-void form_x::add(drawable_cx* p)
-{
-	if (p)
-	{
-		_draw_data.push_back(p);
-	}
-}
-void form_x::remove(drawable_cx* p)
-{
-	if (p) {
-		_draw_data.erase(std::remove(_draw_data.begin(), _draw_data.end(), p), _draw_data.end());
-	}
-}
+
 void form_x::update_w()
 {
 	int w, h;
@@ -2295,53 +2258,53 @@ void form_x::update(float delta)
 		io->DeltaTime = delta;
 		io->WantCaptureMouse = false;
 	}
-	for (auto it : _draw_data) {
-		dwt += render_update(*it, delta);
-		if (it->press_test() && io)
-			io->WantCaptureMouse = true;
-	}
-	if (up_cb)
-	{
-		up_cb(delta, &dwt);
-	}
-	for (auto it : _draw_data) {
-		dwt += render_build(*it);
-	}
-	is_render = dwt > 0;
-#if 0
-	for (int i = 0; i < 2; i++) {
-		for (auto it = _planes[i].begin(); it != _planes[i].end(); it++)
-		{
-			(*it)->update(delta);
-		}
-	}
-
-	for (size_t i = 0; i < 2; i++)
-	{
-		auto& it = atlas[i];
-		for (auto kt : it)
-		{
-			if (_size.x > 0 && _size.y > 0)
-			{
-				if (kt->viewport.z <= 0)
-				{
-					kt->viewport.z = display_size.x;
-				}
-				if (kt->viewport.w <= 0)
-				{
-					kt->viewport.w = display_size.y;
-				}
-			}
-			if (kt->visible)
-				canvas_atlas_update(kt, renderer, delta);
-		}
-	}
-#endif
-	//for (auto kt : skeletons) {
-	//	kt->update(delta);
+	//for (auto it : _draw_data) {
+	//	dwt += render_update(*it, delta);
+	//	if (it->press_test() && io)
+	//		io->WantCaptureMouse = true;
 	//}
-	//app_cx::sleep_ms(dwt);
+	//if (up_cb)
+	//{
+	//	up_cb(delta, &dwt);
+	//}
+	//for (auto it : _draw_data) {
+	//	dwt += render_build(*it);
+	//}
+	is_render = false;
 }
+void form_x::set_state()
+{
+	if (!visible || !renderer || !app || display_size.x < 1 || display_size.y < 1)return;
+	float rsx = 1.0f;
+	float rsy = 1.0f;
+	SDL_GetRenderScale(renderer, &rsx, &rsy);
+	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+	glm::vec2 render_scale;
+	render_scale.x = (rsx == 1.0f) ? display_framebuffer_scale.x : 1.0f;
+	render_scale.y = (rsy == 1.0f) ? display_framebuffer_scale.y : 1.0f;
+	// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
+	int fb_width = (int)(display_size.x * render_scale.x);
+	int fb_height = (int)(display_size.y * render_scale.y);
+	if (fb_width == 0 || fb_height == 0)
+		return;
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+	SDL_RenderClear(renderer);
+	SDL_Rect viewport = { 0,0,display_size.x,display_size.y };
+	SDL_SetRenderViewport(renderer, &viewport);
+	SDL_SetRenderClipRect(renderer, &viewport);
+	is_render = true;
+}
+void form_x::draw_data(drawable_cx** p, int count)
+{
+	if (!is_render || !visible || !renderer || !app || display_size.x < 1 || display_size.y < 1 || !p)return;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto it = p[i];
+		if (it)
+			render_drawable(*it);
+	}
+}
+
 void form_x::draw_rects(const glm::vec4* rects, int n, const glm::vec4& color)
 {
 	assert(renderer);
@@ -2430,97 +2393,10 @@ void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_he
 	//SDL_SetRenderViewport(renderer, (SDL_Rect*)0);
 }
 
-void form_x::present(double delta)
+void form_x::present()
 {
-	if (!is_render || !visible || !renderer || !app ||/* !app->r2d ||*/ display_size.x < 1 || display_size.y < 1)return;
-	float rsx = 1.0f;
-	float rsy = 1.0f;
-	SDL_GetRenderScale(renderer, &rsx, &rsy);
-	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-	glm::vec2 render_scale;
-	render_scale.x = (rsx == 1.0f) ? display_framebuffer_scale.x : 1.0f;
-	render_scale.y = (rsy == 1.0f) ? display_framebuffer_scale.y : 1.0f;
-	// Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
-	int fb_width = (int)(display_size.x * render_scale.x);
-	int fb_height = (int)(display_size.y * render_scale.y);
-	if (fb_width == 0 || fb_height == 0)
-		return;
-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-	SDL_RenderClear(renderer);
-	SDL_Rect viewport = { 0,0,display_size.x,display_size.y };
-	SDL_SetRenderViewport(renderer, &viewport);
-	SDL_SetRenderClipRect(renderer, &viewport);
-	if (render_cb)
-	{
-		render_cb(renderer, delta);
-	}
-	for (auto it : _draw_data) {
-		render_drawable(*it);
-	}
-#if 0
-	{
-		auto ktd = textures[0].data();
-		auto length = textures[0].size();
-		for (size_t i = 0; i < length; i++)
-		{
-			auto& it = ktd[i];
-			auto src = it.src.w > 0 && it.src.z > 0 ? &it.src : nullptr;
-			auto dst = it.dst.w > 0 && it.dst.z > 0 ? &it.dst : nullptr;
-			SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
-		}
-	}
-	//if (!skeletons.empty()) {
-
-	//	if (skelet_viewport.z > 0 && skelet_viewport.w > 0)
-	//		SDL_SetRenderViewport(renderer, (SDL_Rect*)&skelet_viewport);
-	//	if (skelet_clip.z > 0 && skelet_clip.w > 0)
-	//		SDL_SetRenderClipRect(renderer, (SDL_Rect*)&skelet_clip);
-	//	// 渲染骨骼动画
-	//	for (auto kt : skeletons) {
-	//		app->r2d->draw_data(renderer, kt);
-	//	}
-	//}
-	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
-	SDL_SetRenderClipRect(renderer, &viewport);
-	// 渲染图集/UI
-	for (int i = 0; i < 2; i++) {
-		auto& it = atlas[i];
-		for (auto a : it)
-		{
-			if (a->visible)
-				draw_data(renderer, a, fb_width, fb_height, render_scale, display_size);
-		}
-	}
-
-	SDL_SetRenderViewport(renderer, &viewport); //恢复默认视图
-	SDL_SetRenderClipRect(renderer, &viewport);
-	{
-		auto ktd = textures[1].data();
-		auto length = textures[1].size();
-		for (size_t i = 0; i < length; i++)
-			//for (auto& it : textures[1])
-		{
-			auto& it = ktd[i];
-			auto src = it.src.w > 0 && it.src.z > 0 ? &it.src : nullptr;
-			auto dst = it.dst.w > 0 && it.dst.z > 0 ? &it.dst : nullptr;
-			if (it.scale > 0)
-			{
-				if (it.left_width > 0 && it.right_width > 0 && it.top_height > 0 && it.bottom_height)
-				{
-					SDL_RenderTexture9Grid(renderer, it.tex, (SDL_FRect*)src, it.left_width, it.right_width, it.top_height, it.bottom_height, it.scale, (SDL_FRect*)dst);
-				}
-				else {
-					SDL_RenderTextureTiled(renderer, it.tex, (SDL_FRect*)src, it.scale, (SDL_FRect*)dst);
-				}
-			}
-			else {
-				SDL_RenderTexture(renderer, it.tex, (SDL_FRect*)src, (SDL_FRect*)dst);
-			}
-		}
-	}
-#endif
+	if (!is_render || !renderer)return;
 	SDL_RenderPresent(renderer);
-
 }
 
 void form_x::present_e()
@@ -2582,17 +2458,17 @@ void form_x::new_tool_tip(const glm::ivec2& pos, const void* str)
 
 }
 
-bool form_x::hittest(const glm::ivec2& pos)
-{
-	_HitTest = false;
-	for (auto it : _draw_data) {
-		if (it->hittest(pos)) {
-			_HitTest = true;
-			break;
-		}
-	}
-	return _HitTest;
-}
+//bool form_x::hittest(const glm::ivec2& pos)
+//{
+//	_HitTest = false;
+//	for (auto it : _draw_data) {
+//		if (it->hittest(pos)) {
+//			_HitTest = true;
+//			break;
+//		}
+//	}
+//	return _HitTest;
+//}
 
 void form_x::focus_lost()
 {
@@ -2705,10 +2581,10 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 {
 	int winWidth = 0, winHeight = 0;
 	SDL_GetWindowSize(win, &winWidth, &winHeight);
-
+	SDL_HitTestResult ret = SDL_HITTEST_NORMAL;
+#if 0
 	const int RESIZE_AREA = 8;
 	const int RESIZE_AREAC = RESIZE_AREA * 2;
-	SDL_HitTestResult ret = SDL_HITTEST_NORMAL;
 	auto fw = (form_x*)data;
 	int tbh = 0;
 	do
@@ -2766,7 +2642,7 @@ SDL_HitTestResult HitTestCallback2(SDL_Window* win, const SDL_Point* area, void*
 		}
 
 	} while (0);
-
+#endif
 	//printf("%d\n", ret);
 	return ret;
 }
@@ -3665,16 +3541,16 @@ uint64_t call_data(int type, void* data)
 	}
 	return ret;
 }
-int run_app(void* p, int c)
-{
-	auto app = (app_cx*)p;
-	int r = 0;
-	if (app)
-	{
-		r = app->run_loop(c);
-	}
-	return r;
-}
+//int run_app(void* p, int c)
+//{
+//	auto app = (app_cx*)p;
+//	int r = 0;
+//	if (app)
+//	{
+//		r = app->run_loop(c);
+//	}
+//	return r;
+//}
 app_cx* new_app()
 {
 	return new app_cx();

@@ -3148,7 +3148,7 @@ void drawable_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_d
 		if (f->renderer)
 			rptr = f->renderer;
 		form0 = f;
-		f->add(this);
+		//f->add(this);
 		if (form0)
 		{
 			form0->add_event(this, [=](uint32_t type, et_un_t* e, void* ud) {
@@ -3856,7 +3856,7 @@ void drawable_cx::remove_widget(div_cx* w)
 	}
 }
 
-void drawable_cx::draw()
+void drawable_cx::cmd_draw()
 {
 	for (auto& p : _drawv) {
 		draw_rvg(p);
@@ -3897,6 +3897,9 @@ int drawable_cx::update(float delta)
 	for (auto& p : widgets) {
 		ret += p->update(delta);
 	}
+	ret += build();
+	if (ret > 0)
+		cmd_draw();
 	return ret;
 }
 void get_div(widget_t* p, std::vector<div_cx*>* v)
@@ -3970,23 +3973,19 @@ bool drawable_cx::hittest(const glm::ivec2& mpos)
 
 void render_drawable(Drawable auto& drawable)
 {
-	drawable.draw();
+	drawable.cmd_draw();
 }
 
 int render_update(Drawable auto& drawable, float delta)
 {
 	return drawable.update(delta);
 }
-int render_build(Drawable auto& drawable)
-{
-	return drawable.build();
-}
+
 
 void ttbr()
 {
 	drawable_cx* it = 0;
 	render_update(*it, 0.0f);
-	render_build(*it);
 	render_drawable(*it);
 }
 

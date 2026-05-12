@@ -45,8 +45,8 @@ div_cx* viewdev_cx::get_div(form_x* f)
 		frc.z += frc.x; frc.w += frc.y;
 		if (rect_includes(mrc, frc))
 		{
-			drawable_cx* td2 = f->_draw_data[0];
-			drawable_cx* td3 = app->main->_draw_data[0];
+			drawable_cx* td2 = 0;
+			drawable_cx* td3 = 0;
 			td2->remove_widget(dv);
 			td3->add_widget(dv);
 			dv->set_pos(f->get_pos() - app->main->get_pos());
@@ -88,25 +88,25 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	}
 	if (!f1)
 		return nullptr;
-	td2 = f1->_draw_data[0];
-	auto pos = d->get_pos();
-	auto size = d->get_size();
-	f1->set_size(size);
-	if (d->form && d->form != f1) {
-		pos += d->form->get_pos();
-		td3 = d->form->_draw_data[0];
-		td3->remove_widget(d);
-	}
-	if (d->form != f1)
-	{
-		mfd[f1] = d;
-		td2->add_widget(d);
-		d->set_pos({});
-		f1->show();
-		//f1->raise();
-		d->form = f1;
-	}
-	f1->set_pos(pos);
+	//td2 = f1->_draw_data[0];
+	//auto pos = d->get_pos();
+	//auto size = d->get_size();
+	//f1->set_size(size);
+	//if (d->form && d->form != f1) {
+	//	pos += d->form->get_pos();
+	//	td3 = d->form->_draw_data[0];
+	//	td3->remove_widget(d);
+	//}
+	//if (d->form != f1)
+	//{
+	//	mfd[f1] = d;
+	//	td2->add_widget(d);
+	//	d->set_pos({});
+	//	f1->show();
+	//	//f1->raise();
+	//	d->form = f1;
+	//}
+	//f1->set_pos(pos);
 	return f1;
 }
 

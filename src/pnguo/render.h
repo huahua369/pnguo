@@ -213,7 +213,7 @@ extern "C" {
 
 template<typename T>
 concept Drawable = requires(T obj) {
-	{ obj.draw() } -> std::same_as<void>; // 要求有 draw() 方法 
+	{ obj.cmd_draw() } -> std::same_as<void>; // 要求有 draw() 方法 
 	{ obj.update(float{}) } -> std::same_as<int>;
 	{ obj.press_test() } -> std::same_as<bool>;
 	{ obj.hittest(glm::ivec2{}) } -> std::same_as<bool>;
@@ -706,7 +706,7 @@ public:
 public:
 	void add_widget(div_cx* w);
 	void remove_widget(div_cx* w);
-	void draw();
+	void cmd_draw();
 	void clear_draw();
 	int update(float delta);
 	int build();

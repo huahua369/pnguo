@@ -98,11 +98,14 @@ public:
 	std::function<void(form_x*, int type)> e_window_cb;
 	double crtms = 0.0;
 	uint32_t prev_time = 0;
+	float avg_delta = 0.0f;
+	float talpha = 0.05f;  // 采样系数（调整平滑度）
 	int _fps = 60;
 	int c_fps = 60;
 	int fms = 0;
 	int waitms = 1;
-
+	int cfps = 0;
+	int cfps1 = 0;
 	// 内部数据路径、外部数据路径、外部缓存路径；
 	std::string internalDataPath;
 	std::string externalDataPath;
@@ -122,7 +125,10 @@ public:
 public:
 	void wait_device();
 	void wait_queue(size_t idx);
-	int run_loop(int t);
+	// 更新事件，返回一帧的毫秒数
+	float update_event();
+	size_t form_count();
+	int get_fps();
 	void call_cb(SDL_Event* e);
 	// 睡眠毫秒
 	static void sleep_ms(int ms);
@@ -203,26 +209,7 @@ public:
 	glm::ivec2 save_size = {};		// 保存窗口大小
 	glm::vec2 display_framebuffer_scale = {};
 	SDL_Renderer* renderer = 0;
-	std::function<int()> on_close_cb;		// 关闭事件
-	std::function<void(float delta, int* ret)> up_cb;	// 更新动画等
-	std::function<void(SDL_Renderer* renderer, double delta)> render_cb;	// 更新和渲染
-
-#if 0
-	//std::vector<skeleton_t*> skeletons;		// 2D动画渲染列表
-	std::vector<canvas_atlas*> atlas[2];		// 图集渲染列表		简单贴图或ui用
-	std::vector<plane_cx*> _planes[2];		// 0是背景，1是顶层
-
-	struct tex_rs {
-		SDL_Texture* tex = 0;
-		glm::vec4 src = {}, dst = {};
-		float scale = 0.0f;					// Tiled、9Grid
-		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
-	};
-	std::vector<tex_rs> textures[2];		// 纹理渲染列表,0是背景，1是前景
-	glm::ivec4 skelet_viewport = {};
-	glm::ivec4 skelet_clip = {};
-#endif
-
+	std::function<int()> on_close_cb;		// 关闭事件 
 	std::string title;
 	char* clipstr = 0;
 	input_state_t* input_ptr = 0;	// 接收输入法的对象
@@ -232,8 +219,6 @@ public:
 	std::vector<event_fw>* events_a = 0;
 	std::vector<event_fw> first_cs;	// 优先
 	std::vector<form_x*> childfs;
-	std::vector<menu_cx*> menus;
-	std::vector<drawable_cx*> _draw_data;
 	form_x* parent = 0;
 	form_x* tooltip = 0;	// 提示窗口
 	// 接收拖动OLE管理
@@ -253,7 +238,7 @@ public:
 	bool capture_type = true;
 	bool close_type = true;		// 关闭按钮风格：true关闭退出，false则隐藏窗口
 	bool mmove_type = true;		// 鼠标拖动
-	bool _HitTest = true;
+	bool _HitTest = false;
 	bool _ref = false;
 	bool _focus_lost_hide = false;	// 失去焦点隐藏 
 private:
@@ -319,22 +304,6 @@ public:
 	// 获取纹理vk image
 	void* get_texture_vk(SDL_Texture* p);
 
-#if 0
-	// 添加纹理渲染。target = 0背景层，1上层
-	void push_texture(SDL_Texture* p, const glm::vec4& src, const glm::vec4& dst, int target);
-	// 弹出纹理渲染
-	void pop_texture(SDL_Texture* p);
-	bool add_vkimage(const glm::ivec2& size, void* vkimage, const glm::vec2& pos, int type);
-#endif
-	// 添加动画、图集渲染
-	//void add_canvas_atlas(canvas_atlas* p, int level = 0);
-	//void add_skeleton(skeleton_t* p);
-	//void remove(skeleton_t* p);
-	//void remove(canvas_atlas* p);
-	// 绑定面板组件
-	//void bind(plane_cx* p, int level = 0);
-	//void unbind(plane_cx* p);
-	//void move2end(plane_cx* p);
 	dev_info_cx get_dev();
 	glm::ivec2 get_size();
 	glm::ivec2 get_pos();
@@ -345,13 +314,8 @@ public:
 
 	void remove_f(form_x* c);
 
-	size_t count_wt();
-	// 清空控件
-	void clear_wt();
 	// 获取hwnd
 	void* get_nptr();
-	// 增加菜单管理器
-	void push_menu(menu_cx* p);
 	void draw_rects(const glm::vec4* rects, int n, const glm::vec4& color);
 	// 鼠标移到窗口坐标-1中心
 	void warp_mouse_in_window(float x, float y);
@@ -360,12 +324,12 @@ public:
 
 	// 同步
 	void add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask);
-	void add(drawable_cx* p);
-	void remove(drawable_cx* p);
 public:
 	void update_w();
 	void update(float delta);
-	void present(double delta);
+	void set_state();
+	void draw_data(drawable_cx** p, int count);
+	void present();
 	void present_e();
 
 	// 获取粘贴板文本
@@ -378,7 +342,7 @@ public:
 	bool do_dragdrop_begin(const wchar_t* str, size_t size);
 	void new_tool_tip(const glm::ivec2& pos, const void* str);
 	// 返回是否命中ui
-	bool hittest(const glm::ivec2& pos);
+	//bool hittest(const glm::ivec2& pos);
 	void focus_lost();
 	void hide_child();
 	// 反截图
@@ -496,6 +460,6 @@ app_cx* new_app();
 
 // 导出接口 
 // 运行消息循环count==0则死循环, 执行循环次数
-MC_EXPORT int run_app(void* app, int count);
+//MC_EXPORT int run_app(void* app, int count);
 MC_EXPORT void* new_app0();
 MC_EXPORT void free_app(void* app);

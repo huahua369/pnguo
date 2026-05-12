@@ -1259,8 +1259,8 @@ int main()
 							glm::vec2 main_pos = app->main->get_pos();
 							glm::vec2 main_size = app->main->get_size();
 							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
-							{								
-								view->set_div(dvv2);
+							{
+								//view->set_div(dvv2);
 							}
 						}
 					};
@@ -1272,11 +1272,11 @@ int main()
 					{
 						if (type == SDL_EVENT_WINDOW_MOVED)
 						{
-							view->get_div(fw);
+							//view->get_div(fw);
 						}
 					};
 			}
-
+#if 0
 			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
 				{
 					return;
@@ -1310,8 +1310,19 @@ int main()
 					}
 
 				};
-			// 运行消息循环
-			run_app(app, 0);
+#endif
+			// 运行消息循环			
+			do {
+				auto delta = app->update_event();
+				form0->update(delta);
+				auto ct = td3->update(delta);
+				if (ct) {
+					form0->set_state();// 清空/设置交换链接状态
+					form0->draw_data(&td3, 1);
+					form0->present();
+				}
+			} while (app->form_count());
+
 			delete view;
 
 		}
