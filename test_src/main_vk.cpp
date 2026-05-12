@@ -1314,7 +1314,7 @@ int main()
 			vkd->_state.has_fence = false;
 			std::string gpustr;
 			c_runtime_cx rtc;
-			int uims = 0, ms3d = 0;
+			int uims = 0, ms3d = 0, SDLms = 0;
 			// 运行消息循环			
 			do {
 				auto delta = app->update_event();
@@ -1334,7 +1334,7 @@ int main()
 				edit1->_color.x = colorpick->get_color();
 				vkd->update(form0->io);	// 更新事件
 				gpustr = vkd->get_label();
-				fpslab->str = vkr::format("CPU FPS\t\t:  %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\n", fps, uims, ms3d) + gpustr;
+				fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, uims + ms3d + SDLms) + gpustr;
 				rtc.begin();
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();
@@ -1349,6 +1349,7 @@ int main()
 					ct++;
 				}
 				if (ct) {
+					rtc.begin();
 					form0->set_state();// 清空/设置交换链接状态 
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
@@ -1356,6 +1357,7 @@ int main()
 					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
 					form0->present();
+					SDLms = rtc.get_ms();
 				}
 			} while (app->form_count());
 			//run_app(app, 0);
