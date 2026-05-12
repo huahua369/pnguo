@@ -1315,6 +1315,11 @@ int main()
 			do {
 				auto delta = app->update_event();
 				form0->update(delta);
+				if (!form0->has_render())
+				{
+					td3->pause();
+					continue;
+				}
 				auto ct = td3->update(delta);
 				if (ct) {
 					form0->set_state();// 清空/设置交换链接状态

@@ -3839,6 +3839,11 @@ void* drawable_cx::get_texture(void* surface)
 	return tp;
 }
 
+void drawable_cx::pause()
+{
+	_pause = true;
+}
+
 void drawable_cx::add_widget(div_cx* w)
 {
 	if (w)
@@ -3869,7 +3874,8 @@ void drawable_cx::clear_draw()
 
 int drawable_cx::update(float delta)
 {
-	int ret = 0;
+	int ret = _pause;
+	_pause = false;
 	if (!tremove.empty())
 	{
 		for (auto w : tremove) {

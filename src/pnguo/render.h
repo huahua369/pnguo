@@ -683,6 +683,7 @@ public:
 	uint32_t color = 0;
 	float stwidth = 2.0;
 	bool tex_batch = true;
+	bool _pause = false;
 public:
 	drawable_cx();
 	~drawable_cx();
@@ -703,6 +704,8 @@ public:
 	void free_rvg(rvg_data_cx* p);
 	glm::ivec2 get_size();
 	void* get_texture(void* surface);
+	// 暂停渲染
+	void pause();
 public:
 	void add_widget(div_cx* w);
 	void remove_widget(div_cx* w);

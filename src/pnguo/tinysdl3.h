@@ -331,6 +331,7 @@ public:
 	void draw_data(drawable_cx** p, int count);
 	void present();
 	void present_e();
+	bool has_render();
 
 	// 获取粘贴板文本
 	char* get_clipboard0();

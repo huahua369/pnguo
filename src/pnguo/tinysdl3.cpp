@@ -2410,6 +2410,11 @@ void form_x::present_e()
 	}
 }
 
+bool form_x::has_render()
+{
+	return visible && !(SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED);
+}
+
 
 char* form_x::get_clipboard0()
 {
