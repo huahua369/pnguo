@@ -1326,8 +1326,8 @@ int main()
 					io->WantCaptureMouse = true;
 				auto ct = td3->update(delta);
 				if (ct) {
-					form0->set_state();// 清空/设置交换链接状态
-					form0->draw_data(&td3, 1);
+					form0->set_state();// 清空/设置交换链接状态 
+					td3->cmd_draw();
 					form0->present();
 				}
 			} while (app->form_count());

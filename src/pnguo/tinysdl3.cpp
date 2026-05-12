@@ -24,9 +24,7 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #endif  
 #include <pnguo.h>
 #include <tinysdl3.h>
-#include <event.h>
-#include "vg.h"
-#include "render.h"
+#include <event.h> 
 #include "app.h"
 
 #ifdef max
@@ -2299,16 +2297,8 @@ void form_x::set_state()
 	SDL_SetRenderClipRect(renderer, &viewport);
 	is_render = true;
 }
-void form_x::draw_data(drawable_cx** p, int count)
-{
-	if (!is_render || !visible || !renderer || !app || display_size.x < 1 || display_size.y < 1 || !p)return;
-	for (size_t i = 0; i < count; i++)
-	{
-		auto it = p[i];
-		if (it)
-			render_drawable(*it);
-	}
-}
+
+
 
 void form_x::draw_rects(const glm::vec4* rects, int n, const glm::vec4& color)
 {

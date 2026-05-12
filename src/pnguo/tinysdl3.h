@@ -68,9 +68,6 @@ struct dev_info_cx
 struct et_un_t;
 struct image_ptr_t;
 class font_rctx;
-class render_2d;
-//class plane_cx;
-class menu_cx;
 struct mnode_t;
 class form_x;
 class Timer;
@@ -175,9 +172,6 @@ private:
 	void UpdateMonitors();
 };
 
-class skeleton_t;
-class canvas_atlas;
-class drawable_cx;
 struct input_state_t;
 struct mouse_state_t;
 namespace hz {
@@ -329,7 +323,6 @@ public:
 	void update_w();
 	void update(float delta);
 	void set_state();
-	void draw_data(drawable_cx** p, int count);
 	void present();
 	void present_e();
 	bool is_minimized();
