@@ -1240,10 +1240,10 @@ int main()
 			}
 			auto fpslab = new color_btn();
 			{
-				dvv2->set_size({ 500,360 });
-				dvv2->set_pos({ 0,0 });
+				dvv2->set_size({ 500,400 });
+				dvv2->set_pos({ 10,10 });
 				dvv2->family = family;
-				dvv2->border = { 0x80acacac,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
+				dvv2->border = { 0xF11212ac,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
 				dvv2->flex_child.margin_left = 4;		// 子元素外边距
 				dvv2->flex_child.margin_right = 4;
 				dvv2->flex_child.margin_top = 4;
@@ -1260,7 +1260,7 @@ int main()
 					btn->effect = uTheme::light;
 					btn->_disabled_events = true;
 					dvv2->add_widget(btn);
-					btn->set_size({ 492,352 });
+					btn->set_size({ 492,392 });
 					btn->font_size = 16;
 					btn->text_color = -1;
 					/*btn->str = (char*)u8"🍕透明按钮 ";*/
@@ -1279,7 +1279,7 @@ int main()
 						}
 					};
 			}
-			//td3->add_widget(dvv);
+			td3->add_widget(dvv);
 			render_update(*td3, 0);
 			{
 				app->e_window_cb = [=](form_x* fw, int type)
@@ -1334,7 +1334,13 @@ int main()
 				edit1->_color.x = colorpick->get_color();
 				vkd->update(form0->io);	// 更新事件
 				gpustr = vkd->get_label();
-				fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, uims + ms3d + SDLms) + gpustr;
+				static double upt = 0.0;
+				upt += delta;
+				if (upt > 1.0)
+				{
+					upt = 0.0;
+					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, uims + ms3d + SDLms) + gpustr;
+				}
 				rtc.begin();
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();

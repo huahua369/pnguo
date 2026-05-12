@@ -21958,7 +21958,7 @@ namespace vkr {
 			//print_time a("qsubmit 0");
 			VkResult res = vkEndCommandBuffer(cmdBuf1);
 			assert(res == VK_SUCCESS);
-
+			vkQueueWaitIdle(m_pDevice->graphics_queue);	// 等待命令缓冲区执行完成，确保信号正确发出
 			VkSubmitInfo submit_info;
 			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submit_info.pNext = NULL;
@@ -22306,7 +22306,7 @@ namespace vkr {
 					pgc->_scale = scale;
 					pgc->instanceCount = instanceCount;
 					pgc->instance_mat.resize(instanceCount);
-#ifdef DEBUG
+#if 1
 					float x = 2;
 					float x1 = 1;
 					pgc->instance_mat[0] = glm::mat4(1.0f);

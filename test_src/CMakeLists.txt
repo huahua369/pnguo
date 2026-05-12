@@ -111,7 +111,7 @@ list(APPEND lklib
     #Vulkan::Vulkan 
     #Vulkan::Headers 
     GPUOpen::VulkanMemoryAllocator
-    PkgConfig::LIBRSVG
+   # PkgConfig::LIBRSVG
    # PkgConfig::hwloc
     glm::glm-header-only
     nlohmann_json::nlohmann_json

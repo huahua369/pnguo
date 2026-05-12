@@ -201,6 +201,7 @@ std::map<std::string, fontns> get_allfont()
 			const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();
 			FcBool fontAddStatus = FcConfigAppFontAddFile(FcConfigGetCurrent(), file);
 		}
+#if 0
 		if (0)
 		{
 			CoInitialize(nullptr);
@@ -274,6 +275,7 @@ std::map<std::string, fontns> get_allfont()
 			if (pDWriteFactory) pDWriteFactory->Release();
 			CoUninitialize();
 		}
+#endif
 		//{
 		//	std::string yourFontFilePath = "Noto-COLRv1-emojicompat.ttf";
 		//	const FcChar8* file = (const FcChar8*)yourFontFilePath.c_str();

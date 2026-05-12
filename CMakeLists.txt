@@ -122,8 +122,10 @@ set(HBDIR_ROOT "E:/code/g/hb/harfbuzz/out/install/x64-${CBT}")
 set(harfbuzz_DIR "${HBDIR_ROOT}/lib/cmake/harfbuzz")
 list(PREPEND CMAKE_PREFIX_PATH "${harfbuzz_DIR}")
 message("harfbuzz路径 ${HBDIR_ROOT}" )
+message("harfbuzz路径 ${harfbuzz_DIR}" )
 
 find_package(harfbuzz REQUIRED)
+include_directories("${HBDIR_ROOT}/include/harfbuzz")
 message("${CMAKE_PREFIX_PATH}" )
   find_package(PNG QUIET)
     if (PNG_FOUND)
@@ -188,6 +190,7 @@ find_package(ZLIB REQUIRED)
 find_path(EXPRTK_INCLUDE_DIRS "exprtk.hpp")
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h") 
 find_package(EnTT CONFIG REQUIRED)
+find_package(Fontconfig REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Clipper2 REQUIRED IMPORTED_TARGET Clipper2)
@@ -249,6 +252,7 @@ target_include_directories(tpv PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIR
 target_link_libraries(tpv PRIVATE Vulkan::Vulkan Vulkan::Headers GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
 #PkgConfig::GTHREAD 
 PkgConfig::GLIB  
+Fontconfig::Fontconfig
 #mimalloc-static 
 #PkgConfig::LIBGIT2
 mktx
