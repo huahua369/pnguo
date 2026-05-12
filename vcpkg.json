@@ -10,7 +10,6 @@
     "tinygltf",
     "pkgconf",
     "fontconfig",
-    "librsvg",
     "openssl",
     "rapidjson",
     "libzip",

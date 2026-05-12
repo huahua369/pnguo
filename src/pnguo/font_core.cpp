@@ -8457,7 +8457,7 @@ size_t rt_add_text(rich_text_t* p, const void* str, int size, int first, font_fa
 
 size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p || !img)return -1;
+	if (!p)return -1;
 	image_block ib = {};
 	ib.color = premultiply_rgba(color);			// 颜色混合
 	ib.img = img;			// 图片对象
@@ -8473,7 +8473,7 @@ size_t rt_add_image(rich_text_t* p, image_ptr_t* img, const glm::ivec4& rc, cons
 }
 size_t rt_add_image_vg(rich_text_t* p, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p || !img_vg)return -1;
+	if (!p)return -1;
 	image_block ib = {};
 	ib.color = premultiply_rgba(color);			// 颜色混合
 	ib.img = (image_ptr_t*)img_vg;			// 图片对象
@@ -9663,7 +9663,7 @@ void mrt_add_text(multi_rich_text_t* p, size_t box_idx, const void* str, int siz
 
 void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p || box_idx >= p->boxtext.size() || !img)return;
+	if (!p || box_idx >= p->boxtext.size())return;
 	auto r = (rich_text_t*)p;
 	auto& rcb = p->boxtext[box_idx];
 	rcb.data_index.push_back(r->data_index.size());
@@ -9673,7 +9673,7 @@ void mrt_add_image(multi_rich_text_t* p, size_t box_idx, image_ptr_t* img, const
 
 void mrt_add_image_vg(multi_rich_text_t* p, size_t box_idx, void* img_vg, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos, bool abspos)
 {
-	if (!p || box_idx >= p->boxtext.size() || !img_vg)return;
+	if (!p || box_idx >= p->boxtext.size())return;
 	auto r = (rich_text_t*)p;
 	auto& rcb = p->boxtext[box_idx];
 	rcb.data_index.push_back(r->data_index.size());

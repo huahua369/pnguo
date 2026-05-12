@@ -1310,7 +1310,7 @@ int main()
 
 				};
 #endif
-			app->set_fps(0);
+			app->set_fps(1000);
 			vkd->_state.has_fence = false;
 			std::string gpustr;
 			c_runtime_cx rtc;
@@ -1345,22 +1345,22 @@ int main()
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();
 				{
-					rtc.begin();
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
-					}
-					ms3d = rtc.get_ms();
-					ct++;
+					//rtc.begin();
+					//vkd->on_render();		// 渲染到fbo纹理tex3d
+					//if (!vkd->_state.has_fence) {
+					//	auto sem = vkd->get_fbo_semaphore();
+					//	form0->add_vk_semaphores(sem, 0, 0);
+					//}
+					//ms3d = rtc.get_ms();
+					//ct++;
 				}
 				if (ct) {
 					rtc.begin();
 					form0->set_state();// 清空/设置交换链接状态 
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					//texture_dt tdt = {};
+					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					//if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
 					form0->present();
 					SDLms = rtc.get_ms();
