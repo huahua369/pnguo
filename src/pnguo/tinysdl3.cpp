@@ -2410,9 +2410,9 @@ void form_x::present_e()
 	}
 }
 
-bool form_x::has_render()
+bool form_x::is_minimized()
 {
-	return visible && !(SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED);
+	return !visible || (SDL_GetWindowFlags(_ptr) & SDL_WINDOW_MINIMIZED);
 }
 
 

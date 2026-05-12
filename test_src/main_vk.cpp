@@ -1315,7 +1315,7 @@ int main()
 			do {
 				auto delta = app->update_event();
 				form0->update(delta);
-				if (!form0->has_render())
+				if (form0->is_minimized())
 				{
 					td3->pause();
 					continue;
