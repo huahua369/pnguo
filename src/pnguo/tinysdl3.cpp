@@ -2170,6 +2170,11 @@ void form_x::add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore,
 		SDL_AddVulkanRenderSemaphores(renderer, wait_stage_mask, wait_semaphore, signal_semaphore);
 }
 
+mouse_state_t* form_x::get_io()
+{
+	return io;
+}
+
 void form_x::update_w()
 {
 	int w, h;

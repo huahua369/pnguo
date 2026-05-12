@@ -325,6 +325,7 @@ public:
 	// 同步
 	void add_vk_semaphores(int64_t wait_semaphore, int64_t signal_semaphore, uint32_t wait_stage_mask);
 public:
+	mouse_state_t* get_io();
 	void update_w();
 	void update(float delta);
 	void set_state();

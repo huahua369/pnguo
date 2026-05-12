@@ -1320,6 +1320,10 @@ int main()
 					td3->pause();
 					continue;
 				}
+				auto io = form0->get_io();
+				// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
+				if (td3->press_test() && io)
+					io->WantCaptureMouse = true;
 				auto ct = td3->update(delta);
 				if (ct) {
 					form0->set_state();// 清空/设置交换链接状态
@@ -1327,6 +1331,7 @@ int main()
 					form0->present();
 				}
 			} while (app->form_count());
+			//run_app(app, 0);
 			delete td3;
 			delete view;
 
