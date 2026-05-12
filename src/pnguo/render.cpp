@@ -3135,10 +3135,6 @@ drawable_cx::~drawable_cx()
 		delete v;
 	}
 	_dobj.clear();
-	if (form0)
-	{
-		form0->remove_event(this);
-	}
 }
 
 void drawable_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
@@ -3147,6 +3143,9 @@ void drawable_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_d
 	{
 		if (f->renderer)
 			rptr = f->renderer;
+		if (form0 && form0 != f) {
+			form0->remove_event(this);
+		}
 		form0 = f;
 		//f->add(this);
 		if (form0)

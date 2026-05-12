@@ -1322,7 +1322,7 @@ int main()
 					form0->present();
 				}
 			} while (app->form_count());
-
+			delete td3;
 			delete view;
 
 		}
