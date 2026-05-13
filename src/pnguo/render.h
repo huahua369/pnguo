@@ -349,14 +349,25 @@ struct surface_ctx {
 	void* surface;
 	void* ctx;
 };
+struct draw_cmd
+{
+	glm::ivec4 viewport;
+	glm::ivec4 clip_rect;
+	void* tex_ref;			// image_ptr_t*或vgsurface
+	unsigned int vtx_first;
+	unsigned int idx_first;
+	unsigned int elemCount;
+};
 // 原始三角形数据
 struct geometry_d {
-	void* image;
-	glm::ivec4 clip;	// 裁剪区域
-	text_vx* vdata;		// 顶点数据
-	uint32_t* idx;		// 索引数据
-	int vcount;			// 顶点数量
-	int icount;			// 索引数量
+	void* image = 0;		// 可选
+	glm::ivec4 clip = {};	// 裁剪区域
+	text_vx* vdata = 0;		// 顶点数据
+	uint32_t* idx = 0;		// 索引数据
+	int vcount = 0;			// 顶点数量
+	int icount = 0;			// 索引数量
+	draw_cmd* cmds = 0;		// 命令（可选）
+	int cmd_count = 0;		// 命令数量
 };
 
 

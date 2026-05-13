@@ -3674,8 +3674,21 @@ void drawable_cx::draw_geometry(geometry_d* geo)
 	if (!rcb || !geo->vdata || !geo->idx || geo->vcount < 3 || geo->icount < 3)return;
 	void* texp = get_texture(geo->image);
 	clicprect_cx cp(rptr, rcb, geo->clip);
-	rcb->draw_geometry(rptr, texp, (float*)geo->vdata, vsize, ((float*)&geo->vdata->color), vsize,
-		((float*)&geo->vdata->uv), vsize, nv, geo->idx, geo->icount, sizeof(uint32_t));
+	if (!geo->cmds || geo->cmd_count < 1)
+	{
+		rcb->draw_geometry(rptr, texp, (float*)geo->vdata, vsize, ((float*)&geo->vdata->color), vsize,
+			((float*)&geo->vdata->uv), vsize, nv, geo->idx, geo->icount, sizeof(uint32_t));
+	}
+	else if (geo->cmds && geo->cmd_count > 0) {
+		auto ct = geo->cmds;
+		for (size_t i = 0; i < geo->cmd_count; i++)
+		{
+			rcb->set_viewport(rptr, (ct->viewport.z > 0 && ct->viewport.w > 0) ? &ct->viewport : nullptr);
+			rcb->set_cliprect(rptr, &ct->clip_rect);
+			auto d = geo->vdata + ct->vtx_first;
+			rcb->draw_geometry(rptr, ct->tex_ref, (float*)(d), vsize, (float*)(&d->color), vsize, (float*)(&d->uv), vsize, ct->elemCount, geo->idx + ct->idx_first, ct->elemCount, sizeof(uint32_t));
+		}
+	}
 }
 
 bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
