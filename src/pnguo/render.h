@@ -359,18 +359,6 @@ struct geometry_d {
 	int icount;			// 索引数量
 };
 
-struct vitext_t
-{
-	union
-	{
-		box_text_d* t = 0;	// 位图或文本
-		d2_rt* d2;			// 矢量图
-		geometry_d* gem;	// 三角形数据
-	}v;
-	size_t first = 0;	// 第一个位置
-	size_t count = 0;	// 渲染数量
-	int type = 0;		// 0文本/位图，1矢量图，2三角形
-};
 
 class vkvg_ctx
 {
@@ -539,7 +527,7 @@ public:
 		OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
 		OP_PAINT_SHADOW, OP_TRANSLATE, OP_SCALE, OP_ROTATE, OP_TRANSFORM, OP_SET_MATRIX, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 		OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
-		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
+		OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE, OP_ADD_GEOMETRY,
 		OP_MAX_COUNT
 	};
 
@@ -593,6 +581,8 @@ public:
 	void add_text(text_st* p, text_style* ts);
 	void add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos);
 	void add_image(image_r* r);
+	// 添加gem指针的内容。顶点坐标不受状态影响
+	void add_geometry(geometry_d* geo);
 	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
 
 	void clip();
@@ -646,16 +636,28 @@ struct translate_cc
 	glm::vec2 apos = {};
 	glm::vec2 clips = {};
 };
+struct gdata_ptr
+{
+	union
+	{
+		box_text_d* t = 0;	// 位图或文本
+		d2_rt* d2;			// 矢量图
+		geometry_d* geo;	// 三角形数据
+	}v;
+	size_t first = 0;	// 第一个位置
+	size_t count = 0;	// 渲染数量
+	int type = 0;		// 0文本/位图，1矢量图，2三角形
+};
 class rvg_data_cx
 {
 public:
-	rvg_cx* d = 0;
+	rvg_cx* d = 0;						// 矢量图/文本/位图渲染命令
 	multi_rich_text_t* mrt = 0;			// 文本渲染管理器
 	packer_base* packer = 0;			// 矩形打包器
 	glm::ivec2 max_rect = {};			// 最大的区域
 	std::vector<d2_rt> dcv;				// 矢量缓存信息 
 	std::vector<surface_ctx> surfaces;
-	std::vector<vitext_t> dst_data;		// 渲染数据列表
+	std::vector<gdata_ptr> dst_data;	// 使用rvg_cx生成渲染数据列表
 	glm::ivec4 _view = {};
 	glm::ivec2 _pos = {};
 	float stwidth = 2.0;

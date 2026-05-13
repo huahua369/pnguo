@@ -1935,10 +1935,19 @@ void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4&
 void rvg_cx::add_image(image_r* r)
 {
 	if (!r || !r->img)return;
-	push_view(glm::ivec4(r->pos, 0, 0));//r->dsize
+	glm::vec4 rc = { _cur.pos + (glm::vec2)r->pos , 0,0 };
+	push_view(rc);
 	push_ct(OP_ADD_IMAGE);
-	_cmd.insert(_cmd.end(), (char*)r, (char*)r + sizeof(image_r));
+	_cmd.insert(_cmd.end(), (char*)r, (char*)(r + 1));
 	pop_view();
+}
+
+void rvg_cx::add_geometry(geometry_d* geo)
+{
+	//push_view(glm::ivec4(_cur.pos, 0, 0));
+	push_ct(OP_ADD_GEOMETRY);
+	_cmd.insert(_cmd.end(), (char*)geo, (char*)(geo + 1));
+	//pop_view();
 }
 
 void rvg_cx::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r)
@@ -2909,6 +2918,12 @@ size_t cmd_op_add_image(uint8_t* d, void* ctx)
 	mrt_add_image(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
 	return d - f;
 }
+size_t cmd_op_add_geometry(uint8_t* d, void* ctx)
+{
+	auto f = (geometry_d*)d;
+
+	return sizeof(geometry_d);
+}
 
 size_t cmd_op_view(uint8_t* d, VkvgContext ctx)
 {
@@ -2931,7 +2946,7 @@ size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 	//	OP_ADD_POLYLINE_PATH, OP_ADD_POLYLINE_VEC2_PTR, OP_POLYLINES,
 	//	OP_PAINT_SHADOW, OP_TRANSLATE, OP_CLIP, OP_SAVE, OP_RESTORE, OP_FILL, OP_STROKE, OP_FILL_PRESERVE, OP_STROKE_PRESERVE,
 	//	OP_SET_LINE_WIDTH, OP_SET_COLOR_UINT, OP_SET_COLOR_VEC4,
-	//	OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,
+	//	OP_TEXT_STYLE, OP_ADD_TEXT, OP_ADD_IMAGE,OP_ADD_GEOMETRY
 	static cmd_func_type cbs[] = { nullptr,cmd_op_view,cmd_op_view_pop, cmd_op_submit_style, cmd_op_submit_color, cmd_op_grid_fill, cmd_op_linear_fill, cmd_op_add_arrow,
 		cmd_op_draw_block, cmd_op_draw_path, cmd_op_add_line_ptr, cmd_op_add_rect_double,
 		cmd_op_add_rect_vec4, cmd_op_add_circle, cmd_op_add_ellipse, cmd_op_add_triangle, cmd_op_polyline_vec2,
@@ -2939,7 +2954,7 @@ size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 		cmd_op_paint_shadow, cmd_op_translate,cmd_op_scale, cmd_op_rotate, cmd_op_transform, cmd_op_set_matrix,
 		cmd_op_clip, cmd_op_save, cmd_op_restore, cmd_op_fill, cmd_op_stroke, cmd_op_fill_preserve, cmd_op_stroke_preserve,
 		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
-		 (cmd_func_type)cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, };
+		 (cmd_func_type)cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, (cmd_func_type)cmd_op_add_geometry, };
 	size_t r = 0;
 	if (c > 0 && c < rvg_cx::OP_MAX_COUNT)
 	{
@@ -3395,8 +3410,10 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 				}
 			}break;
 		case 2:
-			if (vt.v.gem) {
-				draw_geometry(vt.v.gem);
+			if (vt.v.geo) {
+				draw_geometry(vt.v.geo);
+				for (size_t i = 1; i < vt.count; i++)
+					draw_geometry(vt.v.geo + vt.first + i);
 			}
 			break;
 		};
@@ -3718,7 +3735,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	auto pct = rvg->_cmdtype.data();
 	auto length = rvg->_cmdtype.size();
 	glm::vec2 apos = {};
-	vitext_t vg = {};
+	gdata_ptr vg = {};
 	vg.v.d2 = dp;
 	vg.type = 1;
 	size_t vidx = 0;
@@ -3742,7 +3759,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				stt.push(tcc);
 			}
 			else {
-				vitext_t vt = {};
+				gdata_ptr vt = {};
 				vt.first = mrt_box_count(dst->mrt);
 				vt.count = 1;
 				vt.v.t = (box_text_d*)1;
@@ -3769,6 +3786,15 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			continue;
 		}
 		auto pss = didx[i];
+		if (ct == rvg_cx::OP_ADD_GEOMETRY) {
+			gdata_ptr vt = {};
+			vt.first = 0;
+			vt.count = 1;
+			vt.v.geo = (geometry_d*)(d + pss);
+			vt.type = 2;
+			dst->dst_data.push_back(vt);
+			continue;
+		}
 		size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? tcc.ctx : dst->mrt);
 	}
 	for (auto& it : dst->surfaces)
