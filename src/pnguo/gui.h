@@ -123,7 +123,7 @@ public:
 
 	std::function<void(uint32_t type, et_un_t* e, const glm::vec2& pos)> on_event_cb;	//自定义事件处理
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
-	std::function<void(void* p, int clicks)> click_cb;						//左键点击事件
+	std::function<void(void* p, int clicks, const glm::vec2& mpos)> click_cb;						//左键点击事件
 	form_x* form = 0;
 	int _clicks = 0;		// 点击数量
 
@@ -701,6 +701,8 @@ public:
 
 #endif // 1
 
+glm::vec4 RGBtoHSV(glm::u8vec4* c);
+void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc);
 
 #endif
 

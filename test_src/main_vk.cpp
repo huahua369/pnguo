@@ -1080,7 +1080,7 @@ int main()
 			view->app = app;
 			auto pcb = view->pcb;
 			drawable_cx* td3 = new drawable_cx();
-			td3->init(form0, pcb, { 0,0,600, ws.y }, view->_vgdev);
+			td3->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev);
 			td3->familys = family;
 
 			//auto ptm = plot_main(td3, 1200, 1200);
@@ -1217,7 +1217,7 @@ int main()
 					btn->font_size = 16;
 					btn->text_color = -1;
 					btn->str = (char*)u8"🍕按钮 ";
-					btn->click_cb = [=](void* p, int clicks) {
+					btn->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
 
 						};
 					{
@@ -1279,17 +1279,17 @@ int main()
 						}
 					};
 			}
-			//td3->add_widget(dvv);
+			td3->add_widget(dvv);
 			auto colorpicker = new div_cx();
 			{
 				// 调色板
 
 				auto dvv = colorpicker;
 				td3->add_widget(dvv);
-				dvv->set_size({ 500,400 });
+				dvv->set_size({ 1000,400 });
 				dvv->set_pos({ 100,60 });
 				dvv->family = family;
-				dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
+				dvv->border = { 0xffacacac,1,5,0xf9666666 };	// 颜色，线粗，圆角，背景色
 				dvv->flex.wrap = flex_wrap::WRAP;
 				dvv->flex.direction = flex_direction::ROW;
 				dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
@@ -1300,8 +1300,6 @@ int main()
 				dvv->flex_child.margin_top = 2;
 				dvv->flex_child.margin_bottom = 2;
 				dvv->draggable = true;
-
-
 			}
 			render_update(*td3, 0);
 			{
@@ -1339,7 +1337,10 @@ int main()
 			std::vector<text_vx> vtx;
 			std::vector<uint32_t> idx;
 			glm::ivec4 rc = { 0,0,360,360 };
-			uint32_t c1 = 0xffcc0000;
+			glm::ivec2 psize = { 360,360 };
+			glm::vec4 c1 = glm::vec4(0, 0, 0.8, 1.0);// 0xffcc0000;
+			glm::vec4 ohsv = { 0.7,1,1,1 };
+			HSVtoRGB(ohsv, c1);
 			{
 				auto rect_mcolor = [](const glm::ivec4& rc, const glm::ivec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
 					{
@@ -1355,10 +1356,107 @@ int main()
 						t->pos = c; t->uv = uv; t->color = ucolor2fx(color.z); t++;
 						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = ucolor2fx(color.w); t++;
 					};
-				glm::ivec4 color = { 0xffffffff ,c1,c1,0xffffffff };
-				rect_mcolor(rc, color, vtx, idx);
-				color = { 0,0,0xff000000,0xff000000 };
-				rect_mcolor(rc, color, vtx, idx);
+				auto rect_mcolor4f = [](const glm::ivec4& rc, const glm::vec4* color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
+					{
+						glm::vec2 uv = {};
+						glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
+						uint32_t vps = vtx.size();
+						uint32_t ips = idx.size();
+						vtx.resize(vps + 4);
+						idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
+						auto t = vtx.data() + vps;
+						t->pos = a; t->uv = uv; t->color = (color[0]); t++;
+						t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = (color[1]); t++;
+						t->pos = c; t->uv = uv; t->color = (color[2]); t++;
+						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = (color[3]); t++;
+					};
+				auto rect_color4f = [](const glm::ivec4& rc, const glm::vec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
+					{
+						glm::vec2 uv = {};
+						glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
+						uint32_t vps = vtx.size();
+						uint32_t ips = idx.size();
+						vtx.resize(vps + 4);
+						idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
+						auto t = vtx.data() + vps;
+						t->pos = a; t->uv = uv; t->color = color; t++;
+						t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = color; t++;
+						t->pos = c; t->uv = uv; t->color = color; t++;
+						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = color; t++;
+					};
+				std::vector<glm::vec4> color = { glm::vec4(1.0) ,c1,c1,glm::vec4(1.0) };
+				rect_mcolor4f(rc, color.data(), vtx, idx);	//白色->颜色
+				color = { glm::vec4(0.0),glm::vec4(0.0),glm::vec4(0,0,0,1) ,glm::vec4(0,0,0,1) };
+				rect_mcolor4f(rc, color.data(), vtx, idx);	//透明->黑
+				static const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1),
+					glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
+				rc.x += rc.z + 4;
+				auto rc1 = rc;
+				auto fx = rc.z / 6.0;
+				rc.z = fx;
+				for (size_t i = 0; i < 6; i++)
+				{
+					glm::vec4 c4f[4] = { col_hues[i],col_hues[i + 1] };
+					c4f[2] = c4f[1];
+					c4f[3] = c4f[0];
+					rect_mcolor4f(rc, c4f, vtx, idx);
+					rc.x += fx;
+				}
+				rect_mcolor4f(rc1, color.data(), vtx, idx);	//透明->黑
+				auto vtx_pos = vtx.size();
+				rc1.x += rc1.z + 6;
+				rc1.z = rc1.w = 50;
+				rect_color4f(rc1, c1, vtx, idx);	//颜色块
+				rc1.x += 56;
+				rect_color4f(rc1, c1, vtx, idx);	//颜色块
+
+				auto vtxd = vtx.data();
+				// 获取色盘颜色
+				static auto get_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, const glm::vec4& ohsb) {
+					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
+					glm::vec4 hc = {};
+					glm::vec4 hsv = ohsb;
+					hsv.y = n.x;
+					hsv.z = 1.0 - n.y;
+					HSVtoRGB(hsv, hc);
+					return hc;
+					};
+				// 获取色调颜色
+				static auto get_hue_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, const glm::vec4* col_hues) {
+					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
+					glm::vec4 hc = {};
+					glm::vec4 hsv = { n.x,0,0,1 };
+					hsv.y = 1;
+					hsv.z = 1.0 - n.y;
+					HSVtoRGB(hsv, hc);
+					return hc;
+					};
+
+				colorpicker->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
+					auto mps = mpos - (glm::vec2)colorpicker->get_pos();
+					mps -= 6;
+					auto d = vtxd + vtx_pos;
+					if (mps.x < psize.x)
+					{
+						auto pc = get_color_cb(mps, psize, ohsv);
+						for (size_t i = 0; i < 4; i++)
+						{
+							d[i].color = pc;
+						}
+					}
+					d += 4;
+					mps.x -= 4 + psize.x;
+					if (mps.x > 0 && mps.x < psize.x)
+					{
+						auto pc1 = get_hue_color_cb(mps, psize, col_hues);
+						for (size_t i = 0; i < 4; i++)
+						{
+							d[i].color = pc1;
+						}
+					}
+					colorpicker->valid = true;
+					};
+
 			}
 
 			c_runtime_cx rtc;
@@ -1393,24 +1491,25 @@ int main()
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();
 				{
-					rtc.begin();
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
-					}
-					ms3d = rtc.get_ms();
-					ct++;
+					//rtc.begin();
+					//vkd->on_render();		// 渲染到fbo纹理tex3d
+					//if (!vkd->_state.has_fence) {
+					//	auto sem = vkd->get_fbo_semaphore();
+					//	form0->add_vk_semaphores(sem, 0, 0);
+					//}
+					//ms3d = rtc.get_ms();
+					//ct++;
 				}
 				if (ct) {
 					rtc.begin();		// 开始计时录制SDL渲染命令
 					form0->set_state();	// 清空/设置交换链接状态 
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					//texture_dt tdt = {};
+					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					//if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
-					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos() + 6, 500, 500), &vtx, &idx);
+					auto vd = vtx.data();
+					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos() + 6, colorpicker->get_size()), &vtx, &idx);
 					form0->present();
 					SDLms = rtc.get_ms();
 				}

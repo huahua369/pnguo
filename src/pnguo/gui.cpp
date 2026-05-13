@@ -3530,10 +3530,9 @@ void colorpick_tl::draw(rvg_cx* rv)
 	glm::ivec2 ss = _size;
 	rv->translate(psv);
 	rv->save();
-	float style_alpha8 = 1;
 	//uint32_t col_hues[] = { 0xff0000ff,0xff00ffff,0xff00ff00,0xffffff00,0xffff0000,0xffff00ff,0xff0000ff };
-	const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,style_alpha8), glm::vec4(1,1,0,style_alpha8), glm::vec4(0,1,0,style_alpha8)
-		, glm::vec4(0,1,1,style_alpha8), glm::vec4(0,0,1,style_alpha8), glm::vec4(1,0,1,style_alpha8), glm::vec4(1,0,0,style_alpha8) };
+	const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1)
+		, glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
 	int yh = height + step;
 	glm::vec4 hc = {};
 	glm::vec2 tps = { cpx + step,yh };
@@ -3862,7 +3861,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 							}
 							if (wp->click_cb)
 							{
-								wp->click_cb(wp, p->clicks);
+								wp->click_cb(wp, p->clicks, mps);
 							}
 						}
 					}
