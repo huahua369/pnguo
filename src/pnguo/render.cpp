@@ -3657,12 +3657,13 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	}
 }
 
-void drawable_cx::draw_geometry(void* image, const glm::ivec2& pos, std::vector<text_vx>* v, std::vector<uint32_t>* index)
+void drawable_cx::draw_geometry(void* image, const glm::ivec4& viewport, std::vector<text_vx>* v, std::vector<uint32_t>* index)
 {
 	const int vsize = sizeof(text_vx);
 	auto nv = v->size();
 	if (!rcb || !v || !index || v->empty() || index->empty())return;
 	void* texp = get_texture(image);
+	rcb->set_viewport(rptr, &viewport);
 	rcb->draw_geometry(rptr, texp, (float*)&v->data()->pos, vsize, ((float*)&v->data()->color), vsize,
 		((float*)&v->data()->uv), vsize, nv, index->data(), index->size(), sizeof(uint32_t));
 }
