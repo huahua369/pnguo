@@ -349,13 +349,27 @@ struct surface_ctx {
 	void* surface;
 	void* ctx;
 };
+// 原始三角形数据
+struct geometry_d {
+	void* image;
+	glm::ivec4 clip;	// 裁剪区域
+	text_vx* vdata;		// 顶点数据
+	uint32_t* idx;		// 索引数据
+	int vcount;			// 顶点数量
+	int icount;			// 索引数量
+};
 
 struct vitext_t
 {
-	box_text_d* t = 0;	// 位图或文本
-	d2_rt* d2 = 0;		// 矢量图
+	union
+	{
+		box_text_d* t = 0;	// 位图或文本
+		d2_rt* d2;			// 矢量图
+		geometry_d* gem;	// 三角形数据
+	}v;
 	size_t first = 0;	// 第一个位置
 	size_t count = 0;	// 渲染数量
+	int type = 0;		// 0文本/位图，1矢量图，2三角形
 };
 
 class vkvg_ctx
@@ -673,9 +687,9 @@ public:
 	std::vector<text_vx> opt; std::vector<uint32_t> idx;
 	vkvg_dev* _vgdev = 0;
 	vkvg_func_t* vgcb = 0;
-	texture_cb* rcb = 0;
+	texture_cb* rcb = 0;	// 渲染器接口
+	void* rptr = 0;			// 渲染器指针
 	void* tex = 0;
-	void* rptr = 0;
 	form_x* form0 = 0;
 	font_family_t* familys = 0;				// 默认字体
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
@@ -690,13 +704,17 @@ public:
 	void init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev);
 	void* new_surface(int width, int height);
 	void* new_surface1(int width, int height);
-	void update_surface(void* surface, float delta);
+	void update_surface(void* surface);
+	void update_image(image_ptr_t* img);
 	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
 	void draw_rvg(rvg_data_cx* dst);
 	// 富文本渲染
 	void update_text(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
+	// 渲染原始三角形数据，opt顶点数据，idx索引数据。image{image_ptr_t*或surface}。提前创建对应纹理
+	void draw_geometry(void* image, const glm::ivec2& pos, std::vector<text_vx>* opt, std::vector<uint32_t>* idx);
+	void draw_geometry(geometry_d* geo);
 	// 批量生成渲染矢量图、位图、文本
 	bool update_rvgdata(rvg_data_cx* dst);
 	// 释放渲染器的纹理

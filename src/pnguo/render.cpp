@@ -3125,6 +3125,112 @@ void gradient_btn_draw(VkvgContext cr, gradient_btn_t* p)
 }
 #endif
 
+rvg_data_cx::rvg_data_cx()
+{
+	packer = new_packer(10, 10);
+	mrt = new multi_rich_text_t();
+	d = new rvg_cx();
+}
+
+rvg_data_cx::~rvg_data_cx()
+{
+	if (mrt)
+	{
+		delete mrt;
+		mrt = 0;
+	}
+	if (packer)
+	{
+		delete packer;
+		packer = 0;
+	}
+	if (d)delete d;
+	d = 0;
+}
+
+rvg_cx* rvg_data_cx::get()
+{
+	return d;
+}
+
+void rvg_data_cx::update()
+{
+	auto rvg = d;
+	packer->init_target(_view.z, _view.w, 0);
+	int sf = 0;
+	dcv.clear();
+	dst_data.clear();
+	auto cmd_count = rvg->_cmdtype.size();
+
+	for (auto& it : rvg->_view)
+	{
+		auto rc = it.rc;
+		it.dcv_index = -1;
+		if (rc.z < 1 || rc.w < 1)continue;
+		d2_rt d = {};
+		d.size = { rc.z, rc.w };
+		d.size += stwidth * 2;
+		d.size.x = align_up(d.size.x, 4);
+		d.size.y = align_up(d.size.y, 4);
+		d.size.x = std::min(_view.z, d.size.x);
+		d.size.y = std::min(_view.w, d.size.y);
+		d.offset = glm::ivec2(rc.x, rc.y);
+		max_rect.x = std::max(max_rect.x, d.size.x);
+		max_rect.y = std::max(max_rect.y, d.size.y);
+		it.dcv_index = dcv.size();
+		dcv.push_back(d);
+	}
+	//	if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
+	//	{
+	//		f.rc.x = std::min(f.rc.x, c.x);
+	//		f.rc.y = std::min(f.rc.y, c.y);
+	//		f.rc.z = std::max(f.rc.z, c.z);
+	//		f.rc.w = std::max(f.rc.w, c.w);
+	//		f.second = it.second;
+	//	} 
+	auto dcp = dcv.data();
+	size_t dcc = dcv.size();
+	do
+	{
+		auto ab = packer->push_rect((glm::ivec4*)dcp, 1, sizeof(d2_rt));
+		if (ab)
+		{
+			packer->clear();
+			sf++; // 满了重新用一张新纹理
+		}
+		else {
+			dcp->surface = sf;
+			dcp++;
+			dcc--;
+		}
+	} while (dcc > 0);
+	surfaces.resize(sf + 1);
+}
+translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
+{
+	translate_cc r = {};
+	if (idx < dcv.size())
+	{
+		auto& rcc = dcv[idx];
+		if (rc.z > 0 && rc.w > 0)
+		{
+			dst_data.push_back({});
+			auto& v = dst_data.back();
+			if (!v.v.d2)
+			{
+				v.v.d2 = dcv.data();
+				v.first = idx;
+			}
+			v.count++;
+		}
+		r.clips = rcc.size;
+		r.apos = rcc.pos - rcc.offset;
+		r.apos += stwidth;
+		r.surface = surfaces[rcc.surface].surface;
+	}
+	return r;
+}
+
 drawable_cx::drawable_cx()
 {}
 
@@ -3195,7 +3301,7 @@ void* drawable_cx::new_surface1(int width, int height)
 	return nullptr;
 }
 
-void drawable_cx::update_surface(void* surface, float delta)
+void drawable_cx::update_surface(void* surface)
 {
 	void* renderer = rptr;
 	auto surf = (VkvgSurface)surface;
@@ -3207,12 +3313,26 @@ void drawable_cx::update_surface(void* surface, float delta)
 		VkFormat fmt = vkvg_surface_get_vk_format(surf);
 		uint32_t w = vkvg_surface_get_width(surf);
 		uint32_t h = vkvg_surface_get_height(surf);
-
 		auto t = rcb->new_texture_vk(renderer, w, h, img, fmt == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);
 		if (t && t != tp)
 		{
 			rcb->set_texture_blend(t, 0, true);
 			tp = t;
+		}
+	}
+}
+
+void drawable_cx::update_image(image_ptr_t* img)
+{
+	if (img) {
+		auto& tp = _vt[img];
+		if (img->valid || !tp)
+		{
+			auto t = rcb->make_tex(rptr, img);
+			if (t && t != tp)
+			{
+				tp = t;
+			}
 		}
 	}
 }
@@ -3242,34 +3362,44 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 	for (size_t m = 0; m < length; m++)
 	{
 		auto& vt = dst->dst_data[m];
-		if (vt.t)
+		switch (vt.type)
 		{
-			draw_boxtext(vt.t, pos0);
-			kc++;
-		}
-		else if (vt.d2)
-		{
-			for (size_t i = 0; i < vt.count; i++)
+		case 0:
+			if (vt.v.t)
 			{
-				auto it = vt.d2 + vt.first + i;
-				auto surface = dst->surfaces[it->surface].surface;
-				auto& tp = _vgt[surface];
-				if (tp)
-				{
-					texture_dt dt = {};
-					auto ost = it->offset;
-					ost += dst->_pos;
-					ost -= stwidth;
-					auto ss = it->size;
-					ss -= stwidth;
-					dt.dst_rect = glm::vec4(ost, ss);
-					auto pos = it->pos;
-					pos += stwidth;
-					dt.src_rect = glm::vec4(it->pos, ss);
-					rcb->render_texture(renderer, tp, &dt, 1);
-				}
+				draw_boxtext(vt.v.t, pos0);
+				kc++;
 			}
-		}
+			break;
+		case 1:
+			if (vt.v.d2) {
+				for (size_t i = 0; i < vt.count; i++)
+				{
+					auto it = vt.v.d2 + vt.first + i;
+					auto surface = dst->surfaces[it->surface].surface;
+					auto& tp = _vgt[surface];
+					if (tp)
+					{
+						texture_dt dt = {};
+						auto ost = it->offset;
+						ost += dst->_pos;
+						ost -= stwidth;
+						auto ss = it->size;
+						ss -= stwidth;
+						dt.dst_rect = glm::vec4(ost, ss);
+						auto pos = it->pos;
+						pos += stwidth;
+						dt.src_rect = glm::vec4(it->pos, ss);
+						rcb->render_texture(renderer, tp, &dt, 1);
+					}
+				}
+			}break;
+		case 2:
+			if (vt.v.gem) {
+				draw_geometry(vt.v.gem);
+			}
+			break;
+		};
 	}
 	//printf("kc\t%d\tdc:%d\n", kc, (int)length);
 }
@@ -3283,36 +3413,11 @@ void drawable_cx::update_text(rich_text_t* p, float delta)
 	auto& ov = p->layout.ov;
 	for (auto& it : ov)
 	{
-		if (it) {
-			auto& tp = _vt[it];
-			if (it->valid || !tp)
-			{
-				auto t = rcb->make_tex(renderer, it);
-				if (t && t != tp)
-				{
-					rcb->set_texture_blend(t, 0, true);
-					tp = t;
-				}
-			}
-		}
+		update_image(it);
 	}
 	for (auto t : p->layout.gv) {
 		auto surface = (VkvgSurface)t;
-		if (!surface || !rcb || !renderer)return;
-		auto& tp = _vgt[surface];
-		if (!tp)
-		{
-			VkImage img = vkvg_surface_get_vk_image(surface);
-			VkFormat fmt = vkvg_surface_get_vk_format(surface);
-			uint32_t w = vkvg_surface_get_width(surface);
-			uint32_t h = vkvg_surface_get_height(surface);
-			auto t = rcb->new_texture_vk(renderer, w, h, img, fmt == VK_FORMAT_B8G8R8A8_UNORM ? 1 : 0);
-			if (t && t != tp)
-			{
-				rcb->set_texture_blend(t, 0, true);
-				tp = t;
-			}
-		}
+		update_surface(surface);
 	}
 }
 
@@ -3337,17 +3442,7 @@ void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 		{
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
-			auto ipt = _vt.find(it.img);
-			void* tp = 0;
-			if (ipt != _vt.end())
-			{
-				tp = ipt->second;
-			}
-			else {
-				auto kpt = _vgt.find(it.img);
-				if (kpt != _vgt.end())
-					tp = kpt->second;
-			}
+			void* tp = get_texture(it.img);
 			if (tex != tp || devrtex)
 			{
 				if (tex && opt.size()) {
@@ -3460,17 +3555,7 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 		{
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
-			auto ipt = _vt.find(it.img);
-			void* tp = 0;
-			if (ipt != _vt.end())
-			{
-				tp = ipt->second;
-			}
-			else {
-				auto kpt = _vgt.find(it.img);
-				if (kpt != _vgt.end())
-					tp = kpt->second;
-			}
+			void* tp = get_texture(it.img);
 			if (tex != tp || devrtex)
 			{
 				if (tex && opt.size()) {
@@ -3555,111 +3640,25 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	}
 }
 
-
-rvg_data_cx::rvg_data_cx()
+void drawable_cx::draw_geometry(void* image, const glm::ivec2& pos, std::vector<text_vx>* v, std::vector<uint32_t>* index)
 {
-	packer = new_packer(10, 10);
-	mrt = new multi_rich_text_t();
-	d = new rvg_cx();
+	const int vsize = sizeof(text_vx);
+	auto nv = v->size();
+	if (!rcb || !v || !index || v->empty() || index->empty())return;
+	void* texp = get_texture(image);
+	rcb->draw_geometry(rptr, texp, (float*)&v->data()->pos, vsize, ((float*)&v->data()->color), vsize,
+		((float*)&v->data()->uv), vsize, nv, index->data(), index->size(), sizeof(uint32_t));
 }
 
-rvg_data_cx::~rvg_data_cx()
+void drawable_cx::draw_geometry(geometry_d* geo)
 {
-	if (mrt)
-	{
-		delete mrt;
-		mrt = 0;
-	}
-	if (packer)
-	{
-		delete packer;
-		packer = 0;
-	}
-	if (d)delete d;
-	d = 0;
-}
-
-rvg_cx* rvg_data_cx::get()
-{
-	return d;
-}
-
-void rvg_data_cx::update()
-{
-	auto rvg = d;
-	packer->init_target(_view.z, _view.w, 0);
-	int sf = 0;
-	dcv.clear();
-	dst_data.clear();
-	auto cmd_count = rvg->_cmdtype.size();
-
-	for (auto& it : rvg->_view)
-	{
-		auto rc = it.rc;
-		it.dcv_index = -1;
-		if (rc.z < 1 || rc.w < 1)continue;
-		d2_rt d = {};
-		d.size = { rc.z, rc.w };
-		d.size += stwidth * 2;
-		d.size.x = align_up(d.size.x, 4);
-		d.size.y = align_up(d.size.y, 4);
-		d.size.x = std::min(_view.z, d.size.x);
-		d.size.y = std::min(_view.w, d.size.y);
-		d.offset = glm::ivec2(rc.x, rc.y);
-		max_rect.x = std::max(max_rect.x, d.size.x);
-		max_rect.y = std::max(max_rect.y, d.size.y);
-		it.dcv_index = dcv.size();
-		dcv.push_back(d);
-	}
-	//	if (it.type == 0 && it.type == f.type && check_rect_cross(f.rc, it.rc))
-	//	{
-	//		f.rc.x = std::min(f.rc.x, c.x);
-	//		f.rc.y = std::min(f.rc.y, c.y);
-	//		f.rc.z = std::max(f.rc.z, c.z);
-	//		f.rc.w = std::max(f.rc.w, c.w);
-	//		f.second = it.second;
-	//	} 
-	auto dcp = dcv.data();
-	size_t dcc = dcv.size();
-	do
-	{
-		auto ab = packer->push_rect((glm::ivec4*)dcp, 1, sizeof(d2_rt));
-		if (ab)
-		{
-			packer->clear();
-			sf++; // 满了重新用一张新纹理
-		}
-		else {
-			dcp->surface = sf;
-			dcp++;
-			dcc--;
-		}
-	} while (dcc > 0);
-	surfaces.resize(sf + 1);
-}
-translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
-{
-	translate_cc r = {};
-	if (idx < dcv.size())
-	{
-		auto& rcc = dcv[idx];
-		if (rc.z > 0 && rc.w > 0)
-		{
-			dst_data.push_back({});
-			auto& v = dst_data.back();
-			if (!v.d2)
-			{
-				v.d2 = dcv.data();
-				v.first = idx;
-			}
-			v.count++;
-		}
-		r.clips = rcc.size;
-		r.apos = rcc.pos - rcc.offset;
-		r.apos += stwidth;
-		r.surface = surfaces[rcc.surface].surface;
-	}
-	return r;
+	const int vsize = sizeof(text_vx);
+	auto nv = geo->vcount;
+	if (!rcb || !geo->vdata || !geo->idx || geo->vcount < 3 || geo->icount < 3)return;
+	void* texp = get_texture(geo->image);
+	clicprect_cx cp(rptr, rcb, geo->clip);
+	rcb->draw_geometry(rptr, texp, (float*)geo->vdata, vsize, ((float*)&geo->vdata->color), vsize,
+		((float*)&geo->vdata->uv), vsize, nv, geo->idx, geo->icount, sizeof(uint32_t));
 }
 
 bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
@@ -3720,7 +3719,8 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	auto length = rvg->_cmdtype.size();
 	glm::vec2 apos = {};
 	vitext_t vg = {};
-	vg.d2 = dp;
+	vg.v.d2 = dp;
+	vg.type = 1;
 	size_t vidx = 0;
 	std::stack<translate_cc> stt = {};
 	translate_cc tcc = {};
@@ -3745,7 +3745,8 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				vitext_t vt = {};
 				vt.first = mrt_box_count(dst->mrt);
 				vt.count = 1;
-				vt.t = (box_text_d*)1;
+				vt.v.t = (box_text_d*)1;
+				vt.type = 0;
 				dst->dst_data.push_back(vt);
 				stt.push({});
 			}
@@ -3781,14 +3782,14 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				vkvg_surface_write_to_png((VkvgSurface)it.surface, str.c_str());
 			}
 		}
-		update_surface((VkvgSurface)it.surface, 0);
+		update_surface((VkvgSurface)it.surface);
 	}
 	mrt_build(dst->mrt);
 	update_text((rich_text_t*)dst->mrt, 0);
 	for (auto& it : dst->dst_data) {
-		if (it.t)
+		if (it.type == 0)
 		{
-			it.t = mrt_get_box_index(dst->mrt, (size_t)it.first);
+			it.v.t = mrt_get_box_index(dst->mrt, (size_t)it.first);
 		}
 	}
 	return true;

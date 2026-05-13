@@ -4980,6 +4980,8 @@ public:
 		img->width = width;
 		img->height = height;
 		img->valid = 1;
+		img->multiply = true;
+		img->blendmode = 0;
 		this->width = width;
 		this->height = height;
 #ifdef STL_VU

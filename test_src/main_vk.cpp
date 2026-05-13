@@ -1279,7 +1279,29 @@ int main()
 						}
 					};
 			}
-			td3->add_widget(dvv);
+			//td3->add_widget(dvv);
+			{
+				// 调色板
+
+				auto dvv = new div_cx();
+				td3->add_widget(dvv);
+				dvv->set_size({ 500,400 });
+				dvv->set_pos({ 100,60 });
+				dvv->family = family;
+				dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
+				dvv->flex.wrap = flex_wrap::WRAP;
+				dvv->flex.direction = flex_direction::ROW;
+				dvv->flex.justify_content = flex_align::ALIGN_START;	// x轴，主轴对齐
+				dvv->flex.align_items = flex_align::ALIGN_CENTER;		// y轴，交叉轴对齐
+				dvv->flex.align_content = flex_align::ALIGN_START;		// y轴，多行交叉轴对齐
+				dvv->flex_child.margin_left = 2;		// 子元素外边距
+				dvv->flex_child.margin_right = 2;
+				dvv->flex_child.margin_top = 2;
+				dvv->flex_child.margin_bottom = 2;
+				dvv->draggable = true;
+
+
+			}
 			render_update(*td3, 0);
 			{
 				app->e_window_cb = [=](form_x* fw, int type)
@@ -1355,8 +1377,8 @@ int main()
 					//ct++;
 				}
 				if (ct) {
-					rtc.begin();
-					form0->set_state();// 清空/设置交换链接状态 
+					rtc.begin();		// 开始计时录制SDL渲染命令
+					form0->set_state();	// 清空/设置交换链接状态 
 					//texture_dt tdt = {};
 					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
