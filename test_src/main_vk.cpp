@@ -1412,17 +1412,17 @@ int main()
 
 				auto vtxd = vtx.data();
 				// 获取色盘颜色
-				static auto get_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, const glm::vec4& ohsb) {
+				static auto get_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, float h) {
 					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
 					glm::vec4 hc = {};
-					glm::vec4 hsv = ohsb;
+					glm::vec4 hsv = { h,0,0,1 };
 					hsv.y = n.x;
 					hsv.z = 1.0 - n.y;
 					HSVtoRGB(hsv, hc);
 					return hc;
 					};
 				// 获取色调颜色
-				static auto get_hue_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, const glm::vec4* col_hues) {
+				static auto get_hue_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size) {
 					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
 					glm::vec4 hc = {};
 					glm::vec4 hsv = { n.x,0,0,1 };
@@ -1438,7 +1438,7 @@ int main()
 					auto d = vtxd + vtx_pos;
 					if (mps.x < psize.x)
 					{
-						auto pc = get_color_cb(mps, psize, ohsv);
+						auto pc = get_color_cb(mps, psize, ohsv.x);
 						for (size_t i = 0; i < 4; i++)
 						{
 							d[i].color = pc;
@@ -1448,7 +1448,7 @@ int main()
 					mps.x -= 4 + psize.x;
 					if (mps.x > 0 && mps.x < psize.x)
 					{
-						auto pc1 = get_hue_color_cb(mps, psize, col_hues);
+						auto pc1 = get_hue_color_cb(mps, psize);
 						for (size_t i = 0; i < 4; i++)
 						{
 							d[i].color = pc1;
