@@ -3235,6 +3235,7 @@ translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 			{
 				v.v.d2 = dcv.data();
 				v.first = idx;
+				v.type = 1;
 			}
 			v.count++;
 		}
@@ -3687,7 +3688,7 @@ void drawable_cx::draw_geometry(geometry_d* geo)
 			rcb->set_viewport(rptr, (ct->viewport.z > 0 && ct->viewport.w > 0) ? &ct->viewport : nullptr);
 			rcb->set_cliprect(rptr, &ct->clip_rect);
 			auto d = geo->vdata + ct->vtx_first;
-			rcb->draw_geometry(rptr, ct->tex_ref, (float*)(d), vsize, (float*)(&d->color), vsize, (float*)(&d->uv), vsize, ct->elemCount, geo->idx + ct->idx_first, ct->elemCount, sizeof(uint32_t));
+			rcb->draw_geometry(rptr, ct->tex_ref, (float*)(d), vsize, (float*)(&d->color), vsize, (float*)(&d->uv), vsize, geo->vcount - ct->vtx_first, geo->idx + ct->idx_first, ct->elemCount, sizeof(uint32_t));
 		}
 	}
 }

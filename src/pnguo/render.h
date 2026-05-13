@@ -726,7 +726,7 @@ public:
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
 	// 渲染原始三角形数据，opt顶点数据，idx索引数据。image{image_ptr_t*或surface}。提前创建对应纹理
-	void draw_geometry(void* image, const glm::ivec4& viewport, std::vector<text_vx>* opt, std::vector<uint32_t>* idx);
+	void draw_geometry(void* image, const glm::ivec4& viewport, std::vector<text_vx>* v, std::vector<uint32_t>* idx);
 	void draw_geometry(geometry_d* geo);
 	// 批量生成渲染矢量图、位图、文本
 	bool update_rvgdata(rvg_data_cx* dst);

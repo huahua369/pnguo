@@ -1280,10 +1280,11 @@ int main()
 					};
 			}
 			//td3->add_widget(dvv);
+			auto colorpicker = new div_cx();
 			{
 				// 调色板
 
-				auto dvv = new div_cx();
+				auto dvv = colorpicker;
 				td3->add_widget(dvv);
 				dvv->set_size({ 500,400 });
 				dvv->set_pos({ 100,60 });
@@ -1335,6 +1336,31 @@ int main()
 			app->set_fps(1000);
 			vkd->_state.has_fence = false;
 			std::string gpustr;
+			std::vector<text_vx> vtx;
+			std::vector<uint32_t> idx;
+			glm::ivec4 rc = { 0,0,360,360 };
+			uint32_t c1 = 0xffcc0000;
+			{
+				auto rect_mcolor = [](const glm::ivec4& rc, const glm::ivec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
+					{
+						glm::vec2 uv = {};
+						glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
+						uint32_t vps = vtx.size();
+						uint32_t ips = idx.size();
+						vtx.resize(vps + 4);
+						idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
+						auto t = vtx.data() + vps;
+						t->pos = a; t->uv = uv; t->color = ucolor2fx(color.x); t++;
+						t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = ucolor2fx(color.y); t++;
+						t->pos = c; t->uv = uv; t->color = ucolor2fx(color.z); t++;
+						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = ucolor2fx(color.w); t++;
+					};
+				glm::ivec4 color = { 0xffffffff ,c1,c1,0xffffffff };
+				rect_mcolor(rc, color, vtx, idx);
+				color = { 0,0,0xff000000,0xff000000 };
+				rect_mcolor(rc, color, vtx, idx);
+			}
+
 			c_runtime_cx rtc;
 			int uims = 0, ms3d = 0, SDLms = 0;
 			// 运行消息循环			
@@ -1367,23 +1393,24 @@ int main()
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();
 				{
-					//rtc.begin();
-					//vkd->on_render();		// 渲染到fbo纹理tex3d
-					//if (!vkd->_state.has_fence) {
-					//	auto sem = vkd->get_fbo_semaphore();
-					//	form0->add_vk_semaphores(sem, 0, 0);
-					//}
-					//ms3d = rtc.get_ms();
-					//ct++;
+					rtc.begin();
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					if (!vkd->_state.has_fence) {
+						auto sem = vkd->get_fbo_semaphore();
+						form0->add_vk_semaphores(sem, 0, 0);
+					}
+					ms3d = rtc.get_ms();
+					ct++;
 				}
 				if (ct) {
 					rtc.begin();		// 开始计时录制SDL渲染命令
 					form0->set_state();	// 清空/设置交换链接状态 
-					//texture_dt tdt = {};
-					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					//if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
+					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos() + 6, 500, 500), &vtx, &idx);
 					form0->present();
 					SDLms = rtc.get_ms();
 				}

@@ -2871,6 +2871,36 @@ bool render_geometryraw(void* renderer, void* texture, geometryraw_dt* p, int co
 	return r;
 }
 
+bool set_rviewport(void* renderer, const glm::ivec4* rect) {
+	glm::ivec4 r = rect ? *rect : glm::ivec4();
+	if (r.x < 0)
+	{
+		r.z += r.x;
+		r.x = 0;
+	}
+	if (r.y < 0)
+	{
+		r.w += r.y;
+		r.y = 0;
+	}
+	if (r.z < 1 || r.w < 1)rect = 0;
+	return SDL_SetRenderViewport((SDL_Renderer*)renderer, rect ? (SDL_Rect*)&r : 0);
+}
+bool set_rcliprect(void* renderer, const glm::ivec4* rect) {
+	glm::ivec4 r = rect ? *rect : glm::ivec4();
+	if (r.x < 0)
+	{
+		r.z += r.x;
+		r.x = 0;
+	}
+	if (r.y < 0)
+	{
+		r.w += r.y;
+		r.y = 0;
+	}
+	if (r.z < 1 || r.w < 1)rect = 0;
+	return SDL_SetRenderClipRect((SDL_Renderer*)renderer, rect ? (SDL_Rect*)&r : 0);
+}
 void get_sdl_texture_cb(texture_cb* p)
 {
 	texture_cb cb = {};
@@ -2894,8 +2924,8 @@ void get_sdl_texture_cb(texture_cb* p)
 	cb.draw_geometry = (bool (*)(void* renderer, void* texture, const float* xy, int xy_stride
 		, const float* color, int color_stride, const float* uv, int uv_stride, int num_vertices, const void* indices, int num_indices, int size_indices))SDL_RenderGeometryRaw;
 
-	cb.set_viewport = (bool(*)(void* renderer, const glm::ivec4 * rect))SDL_SetRenderViewport;
-	cb.set_cliprect = (bool(*)(void* renderer, const glm::ivec4 * rect))SDL_SetRenderClipRect;
+	cb.set_viewport = (bool(*)(void* renderer, const glm::ivec4 * rect))set_rviewport;
+	cb.set_cliprect = (bool(*)(void* renderer, const glm::ivec4 * rect))set_rcliprect;
 	cb.get_viewport = (bool(*)(void* renderer, glm::ivec4 * rect)) SDL_GetRenderViewport;
 	cb.get_cliprect = (bool(*)(void* renderer, glm::ivec4 * rect))SDL_GetRenderClipRect;
 	if (p)
