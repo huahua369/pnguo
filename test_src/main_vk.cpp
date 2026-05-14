@@ -1345,56 +1345,14 @@ int main()
 			auto vtx_pos = vtx.size();
 			auto vtxd = vtx.data();
 			{
-				auto rect_mcolor = [](const glm::ivec4& rc, const glm::ivec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
-					{
-						glm::vec2 uv = {};
-						glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
-						uint32_t vps = vtx.size();
-						uint32_t ips = idx.size();
-						vtx.resize(vps + 4);
-						idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
-						auto t = vtx.data() + vps;
-						t->pos = a; t->uv = uv; t->color = ucolor2fx(color.x); t++;
-						t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = ucolor2fx(color.y); t++;
-						t->pos = c; t->uv = uv; t->color = ucolor2fx(color.z); t++;
-						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = ucolor2fx(color.w); t++;
-					};
-				auto rect_mcolor4f = [](const glm::ivec4& rc, const glm::vec4* color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
-					{
-						glm::vec2 uv = {};
-						glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
-						uint32_t vps = vtx.size();
-						uint32_t ips = idx.size();
-						vtx.resize(vps + 4);
-						idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
-						auto t = vtx.data() + vps;
-						t->pos = a; t->uv = uv; t->color = (color[0]); t++;
-						t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = (color[1]); t++;
-						t->pos = c; t->uv = uv; t->color = (color[2]); t++;
-						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = (color[3]); t++;
-					};
-				auto rect_color4f = [](const glm::ivec4& rc, const glm::vec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
-					{
-						glm::vec2 uv = {};
-						glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
-						uint32_t vps = vtx.size();
-						uint32_t ips = idx.size();
-						vtx.resize(vps + 4);
-						idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
-						auto t = vtx.data() + vps;
-						t->pos = a; t->uv = uv; t->color = color; t++;
-						t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = color; t++;
-						t->pos = c; t->uv = uv; t->color = color; t++;
-						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = color; t++;
-					};
 				auto build_huedata = [=, &vtx_pos, &vtxd, &pick0, &pick1](const glm::vec4& incolor, const glm::ivec4& rc0, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx) {
 					std::vector<glm::vec4> color = { glm::vec4(1.0) ,incolor,incolor,glm::vec4(1.0) };
 					auto rc = rc0;
 					vtx.clear();
 					idx.clear();
-					rect_mcolor4f(rc, color.data(), vtx, idx);	//白色->颜色
+					gen_rect_mcolor(rc, color.data(), vtx, idx);	//白色->颜色
 					color = { glm::vec4(0.0),glm::vec4(0.0),glm::vec4(0,0,0,1) ,glm::vec4(0,0,0,1) };
-					rect_mcolor4f(rc, color.data(), vtx, idx);	//透明->黑
+					gen_rect_mcolor(rc, color.data(), vtx, idx);	//透明->黑
 					static const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1),
 						glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
 					rc.x += rc.z + 4;
@@ -1406,16 +1364,16 @@ int main()
 						glm::vec4 c4f[4] = { col_hues[i],col_hues[i + 1] };
 						c4f[2] = c4f[1];
 						c4f[3] = c4f[0];
-						rect_mcolor4f(rc, c4f, vtx, idx);
+						gen_rect_mcolor(rc, c4f, vtx, idx);
 						rc.x += fx;
 					}
-					rect_mcolor4f(rc1, color.data(), vtx, idx);	//透明->黑
+					gen_rect_mcolor(rc1, color.data(), vtx, idx);	//透明->黑
 					vtx_pos = vtx.size();
 					rc1.x += rc1.z + 6;
 					rc1.z = rc1.w = 50;
-					rect_color4f(rc1, pick0, vtx, idx);	//颜色块
+					gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
 					rc1.x += 56;
-					rect_color4f(rc1, pick1, vtx, idx);	//颜色块
+					gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
 
 					vtxd = vtx.data();
 					};
@@ -1447,7 +1405,16 @@ int main()
 							glm::ivec4 rc = { 0,0,psize };
 							rc.x = pos.x;
 							rc.y = pos.y;
+							vtx.clear();
+							idx.clear();
 							build_huedata(c1, rc, vtx, idx);
+							rc.x += rc.z + 4;
+							auto rc1 = rc;
+							rc1.x += rc1.z + 6;
+							rc1.z = rc1.w = 50;
+							gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
+							rc1.x += 56;
+							gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
 						}
 						else if (type == (int)event_type2::on_down) {
 							auto mps = mpos - (glm::vec2)colorpicker->get_pos();
@@ -1480,7 +1447,16 @@ int main()
 				glm::ivec4 rc = { 0,0,psize };
 				rc.x = pos.x;
 				rc.y = pos.y;
+				vtx.clear();
+				idx.clear();
 				build_huedata(c1, rc, vtx, idx);
+				rc.x += rc.z + 4;
+				auto rc1 = rc;
+				rc1.x += rc1.z + 6;
+				rc1.z = rc1.w = 50;
+				gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
+				rc1.x += 56;
+				gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
 			}
 
 			c_runtime_cx rtc; // 高精度计时器
@@ -1526,6 +1502,7 @@ int main()
 				}
 				form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
 				if (ct) {
+					rtc.begin();		// 开始计时录制SDL渲染命令
 					form0->set_state();	// 清空/设置交换链接状态 
 					//texture_dt tdt = {};
 					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
@@ -1535,7 +1512,6 @@ int main()
 					auto vd = vtx.data();
 					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos(), colorpicker->get_size()), &vtx, &idx);
 					form0->present();
-					rtc.begin();		// 开始计时录制SDL渲染命令
 					view->_vgdev->wait_dev();
 					SDLms = rtc.get_ms();
 				}

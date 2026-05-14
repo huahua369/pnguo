@@ -4466,9 +4466,100 @@ pipelinestate_p* new_spv_base(VkDevice device)
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+size_t gen_rect_color(const glm::ivec4& rc, const glm::vec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
+{
+	glm::vec2 uv = {};
+	glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
+	uint32_t vps = vtx.size();
+	uint32_t ips = idx.size();
+	vtx.resize(vps + 4);
+	idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
+	auto t = vtx.data() + vps;
+	t->pos = a; t->uv = uv; t->color = color; t++;
+	t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = color; t++;
+	t->pos = c; t->uv = uv; t->color = color; t++;
+	t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = color; t++;
+	return vps;
+}
+
+size_t gen_rect_mcolor(const glm::ivec4& rc, const glm::ivec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
+{
+	glm::vec2 uv = {};
+	glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
+	uint32_t vps = vtx.size();
+	uint32_t ips = idx.size();
+	vtx.resize(vps + 4);
+	idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
+	auto t = vtx.data() + vps;
+	t->pos = a; t->uv = uv; t->color = ucolor2fx(color.x); t++;
+	t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = ucolor2fx(color.y); t++;
+	t->pos = c; t->uv = uv; t->color = ucolor2fx(color.z); t++;
+	t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = ucolor2fx(color.w); t++;
+	return vps;
+}
+size_t gen_rect_mcolor(const glm::ivec4& rc, const glm::vec4* color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
+{
+	glm::vec2 uv = {};
+	glm::vec2 a = { rc.x,rc.y }, c = { rc.x + rc.z,rc.y + rc.w };
+	uint32_t vps = vtx.size();
+	uint32_t ips = idx.size();
+	vtx.resize(vps + 4);
+	idx.insert(idx.end(), { vps + 0,vps + 1,vps + 2,vps + 0,vps + 2,vps + 3 });
+	auto t = vtx.data() + vps;
+	t->pos = a; t->uv = uv; t->color = (color[0]); t++;
+	t->pos = glm::vec2(c.x, a.y); t->uv = uv; t->color = (color[1]); t++;
+	t->pos = c; t->uv = uv; t->color = (color[2]); t++;
+	t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = (color[3]); t++;
+	return vps;
+}
 
 
-
+size_t build_huedata(const glm::vec4& incolor, const glm::ivec4& rc0, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx) {
+	std::vector<glm::vec4> color = { glm::vec4(1.0) ,incolor,incolor,glm::vec4(1.0) };
+	auto rc = rc0;
+	gen_rect_mcolor(rc, color.data(), vtx, idx);	//白色->颜色
+	color = { glm::vec4(0.0),glm::vec4(0.0),glm::vec4(0,0,0,1) ,glm::vec4(0,0,0,1) };
+	gen_rect_mcolor(rc, color.data(), vtx, idx);	//透明->黑
+	static const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1),
+		glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
+	rc.x += rc.z + 4;
+	auto rc1 = rc;
+	auto fx = rc.z / 6.0;
+	rc.z = fx;
+	for (size_t i = 0; i < 6; i++)
+	{
+		glm::vec4 c4f[4] = { col_hues[i],col_hues[i + 1] };
+		c4f[2] = c4f[1];
+		c4f[3] = c4f[0];
+		gen_rect_mcolor(rc, c4f, vtx, idx);
+		rc.x += fx;
+	}
+	gen_rect_mcolor(rc1, color.data(), vtx, idx);	//透明->黑
+	return vtx.size();
+	 
+}
+// 获取色盘颜色
+glm::vec4 get_color_cb(const glm::ivec2& pos, const glm::ivec2& size, float h) 
+{
+	glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
+	glm::vec4 hc = {};
+	glm::vec4 hsv = { h,0,0,1 };
+	hsv.y = n.x;
+	hsv.z = 1.0 - n.y;
+	HSVtoRGB(hsv, hc);
+	return hc;
+}
+// 获取色调颜色
+glm::vec4 get_hue_color_cb(const glm::ivec2& pos, const glm::ivec2& size) 
+{
+	glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
+	glm::vec4 hc = {};
+	glm::vec4 hsv = { n.x,0,0,1 };
+	hsv.y = 1;
+	hsv.z = 1.0 - n.y;
+	HSVtoRGB(hsv, hc);
+	return hc;
+}
 
 
 

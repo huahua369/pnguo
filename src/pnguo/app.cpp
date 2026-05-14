@@ -110,8 +110,5 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	return f1;
 }
 
-void* viewdev_cx::new_semaphore()
-{
-	return nullptr;
-}
+
 

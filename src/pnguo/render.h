@@ -768,3 +768,14 @@ public:
 // 区域是否相交
 bool check_rect_cross(const glm::vec4& r1, const glm::vec4& r2);
 
+// 单色矩形
+size_t gen_rect_color(const glm::ivec4& rc, const glm::vec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx);
+// 四个角不同颜色
+size_t gen_rect_mcolor(const glm::ivec4& rc, const glm::ivec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx);
+size_t gen_rect_mcolor(const glm::ivec4& rc, const glm::vec4* color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx);
+
+// 获取色盘颜色
+glm::vec4 get_color_cb(const glm::ivec2& pos, const glm::ivec2& size, float h);
+// 获取色调颜色
+glm::vec4 get_hue_color_cb(const glm::ivec2& pos, const glm::ivec2& size);
+size_t build_huedata(const glm::vec4& incolor, const glm::ivec4& rc0, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx);
