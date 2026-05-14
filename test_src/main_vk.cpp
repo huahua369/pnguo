@@ -1340,7 +1340,10 @@ int main()
 			glm::ivec2 psize = { 360,360 };
 			glm::vec4 c1 = glm::vec4(0, 0, 0.8, 1.0);// 0xffcc0000;
 			glm::vec4 ohsv = { 0.7,1,1,1 };
+			glm::vec4 pick0 = c1, pick1 = c1;
 			HSVtoRGB(ohsv, c1);
+			auto vtx_pos = vtx.size();
+			auto vtxd = vtx.data();
 			{
 				auto rect_mcolor = [](const glm::ivec4& rc, const glm::ivec4& color, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx)
 					{
@@ -1384,33 +1387,38 @@ int main()
 						t->pos = c; t->uv = uv; t->color = color; t++;
 						t->pos = glm::vec2(a.x, c.y); t->uv = uv; t->color = color; t++;
 					};
-				std::vector<glm::vec4> color = { glm::vec4(1.0) ,c1,c1,glm::vec4(1.0) };
-				rect_mcolor4f(rc, color.data(), vtx, idx);	//白色->颜色
-				color = { glm::vec4(0.0),glm::vec4(0.0),glm::vec4(0,0,0,1) ,glm::vec4(0,0,0,1) };
-				rect_mcolor4f(rc, color.data(), vtx, idx);	//透明->黑
-				static const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1),
-					glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
-				rc.x += rc.z + 4;
-				auto rc1 = rc;
-				auto fx = rc.z / 6.0;
-				rc.z = fx;
-				for (size_t i = 0; i < 6; i++)
-				{
-					glm::vec4 c4f[4] = { col_hues[i],col_hues[i + 1] };
-					c4f[2] = c4f[1];
-					c4f[3] = c4f[0];
-					rect_mcolor4f(rc, c4f, vtx, idx);
-					rc.x += fx;
-				}
-				rect_mcolor4f(rc1, color.data(), vtx, idx);	//透明->黑
-				auto vtx_pos = vtx.size();
-				rc1.x += rc1.z + 6;
-				rc1.z = rc1.w = 50;
-				rect_color4f(rc1, c1, vtx, idx);	//颜色块
-				rc1.x += 56;
-				rect_color4f(rc1, c1, vtx, idx);	//颜色块
+				auto build_huedata = [=, &vtx_pos, &vtxd, &pick0, &pick1](const glm::vec4& incolor, const glm::ivec4& rc0, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx) {
+					std::vector<glm::vec4> color = { glm::vec4(1.0) ,incolor,incolor,glm::vec4(1.0) };
+					auto rc = rc0;
+					vtx.clear();
+					idx.clear();
+					rect_mcolor4f(rc, color.data(), vtx, idx);	//白色->颜色
+					color = { glm::vec4(0.0),glm::vec4(0.0),glm::vec4(0,0,0,1) ,glm::vec4(0,0,0,1) };
+					rect_mcolor4f(rc, color.data(), vtx, idx);	//透明->黑
+					static const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1),
+						glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
+					rc.x += rc.z + 4;
+					auto rc1 = rc;
+					auto fx = rc.z / 6.0;
+					rc.z = fx;
+					for (size_t i = 0; i < 6; i++)
+					{
+						glm::vec4 c4f[4] = { col_hues[i],col_hues[i + 1] };
+						c4f[2] = c4f[1];
+						c4f[3] = c4f[0];
+						rect_mcolor4f(rc, c4f, vtx, idx);
+						rc.x += fx;
+					}
+					rect_mcolor4f(rc1, color.data(), vtx, idx);	//透明->黑
+					vtx_pos = vtx.size();
+					rc1.x += rc1.z + 6;
+					rc1.z = rc1.w = 50;
+					rect_color4f(rc1, pick0, vtx, idx);	//颜色块
+					rc1.x += 56;
+					rect_color4f(rc1, pick1, vtx, idx);	//颜色块
 
-				auto vtxd = vtx.data();
+					vtxd = vtx.data();
+					};
 				// 获取色盘颜色
 				static auto get_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, float h) {
 					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
@@ -1432,34 +1440,52 @@ int main()
 					return hc;
 					};
 
-				colorpicker->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
+				colorpicker->mevent_cb = [=, &vtx, &idx](void* p, int type, const glm::vec2& mps)
+					{
+						if (type == (int)event_type2::on_drag) {
+							glm::vec2 pos = colorpicker->get_pos() + 6;
+							glm::ivec4 rc = { 0,0,psize };
+							rc.x = pos.x;
+							rc.y = pos.y;
+							build_huedata(c1, rc, vtx, idx);
+						}
+					};
+				colorpicker->click_cb = [=, &pick0, &pick1, &vtx_pos, &vtx](void* p, int clicks, const glm::vec2& mpos) {
 					auto mps = mpos - (glm::vec2)colorpicker->get_pos();
 					mps -= 6;
-					auto d = vtxd + vtx_pos;
+					if (mps.y > psize.y)
+						return;
+					auto d = vtx.data() + vtx_pos;
 					if (mps.x < psize.x)
 					{
-						auto pc = get_color_cb(mps, psize, ohsv.x);
+						pick0 = get_color_cb(mps, psize, ohsv.x);
 						for (size_t i = 0; i < 4; i++)
 						{
-							d[i].color = pc;
+							d[i].color = pick0;
 						}
 					}
 					d += 4;
 					mps.x -= 4 + psize.x;
 					if (mps.x > 0 && mps.x < psize.x)
 					{
-						auto pc1 = get_hue_color_cb(mps, psize);
+						pick1 = get_hue_color_cb(mps, psize);
 						for (size_t i = 0; i < 4; i++)
 						{
-							d[i].color = pc1;
+							d[i].color = pick1;
 						}
 					}
 					colorpicker->valid = true;
 					};
 
+				glm::vec2 pos = colorpicker->get_pos() + 6;
+				glm::ivec4 rc = { 0,0,psize };
+				rc.x = pos.x;
+				rc.y = pos.y;
+				build_huedata(c1, rc, vtx, idx);
 			}
 
-			c_runtime_cx rtc;
+
+			c_runtime_cx rtc; // 高精度计时器
 			int uims = 0, ms3d = 0, SDLms = 0;
 			// 运行消息循环			
 			do {
@@ -1491,25 +1517,25 @@ int main()
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();
 				{
-					//rtc.begin();
-					//vkd->on_render();		// 渲染到fbo纹理tex3d
-					//if (!vkd->_state.has_fence) {
-					//	auto sem = vkd->get_fbo_semaphore();
-					//	form0->add_vk_semaphores(sem, 0, 0);
-					//}
-					//ms3d = rtc.get_ms();
-					//ct++;
+					rtc.begin();
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					if (!vkd->_state.has_fence) {
+						auto sem = vkd->get_fbo_semaphore();
+						form0->add_vk_semaphores(sem, 0, 0);
+					}
+					ms3d = rtc.get_ms();
+					ct++;
 				}
 				if (ct) {
 					rtc.begin();		// 开始计时录制SDL渲染命令
 					form0->set_state();	// 清空/设置交换链接状态 
-					//texture_dt tdt = {};
-					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					//if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
 					auto vd = vtx.data();
-					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos() + 6, colorpicker->get_size()), &vtx, &idx);
+					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos(), colorpicker->get_size()), &vtx, &idx);
 					form0->present();
 					SDLms = rtc.get_ms();
 				}
