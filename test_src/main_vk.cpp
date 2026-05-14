@@ -1345,38 +1345,6 @@ int main()
 			auto vtx_pos = vtx.size();
 			auto vtxd = vtx.data();
 			{
-				auto build_huedata = [=, &vtx_pos, &vtxd, &pick0, &pick1](const glm::vec4& incolor, const glm::ivec4& rc0, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx) {
-					std::vector<glm::vec4> color = { glm::vec4(1.0) ,incolor,incolor,glm::vec4(1.0) };
-					auto rc = rc0;
-					vtx.clear();
-					idx.clear();
-					gen_rect_mcolor(rc, color.data(), vtx, idx);	//白色->颜色
-					color = { glm::vec4(0.0),glm::vec4(0.0),glm::vec4(0,0,0,1) ,glm::vec4(0,0,0,1) };
-					gen_rect_mcolor(rc, color.data(), vtx, idx);	//透明->黑
-					static const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1),
-						glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
-					rc.x += rc.z + 4;
-					auto rc1 = rc;
-					auto fx = rc.z / 6.0;
-					rc.z = fx;
-					for (size_t i = 0; i < 6; i++)
-					{
-						glm::vec4 c4f[4] = { col_hues[i],col_hues[i + 1] };
-						c4f[2] = c4f[1];
-						c4f[3] = c4f[0];
-						gen_rect_mcolor(rc, c4f, vtx, idx);
-						rc.x += fx;
-					}
-					gen_rect_mcolor(rc1, color.data(), vtx, idx);	//透明->黑
-					vtx_pos = vtx.size();
-					rc1.x += rc1.z + 6;
-					rc1.z = rc1.w = 50;
-					gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
-					rc1.x += 56;
-					gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
-
-					vtxd = vtx.data();
-					};
 				// 获取色盘颜色
 				static auto get_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, float h) {
 					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
@@ -1407,7 +1375,7 @@ int main()
 							rc.y = pos.y;
 							vtx.clear();
 							idx.clear();
-							build_huedata(c1, rc, vtx, idx);
+							vtx_pos = build_huedata(c1, rc, vtx, idx);
 							rc.x += rc.z + 4;
 							auto rc1 = rc;
 							rc1.x += rc1.z + 6;
@@ -1415,6 +1383,7 @@ int main()
 							gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
 							rc1.x += 56;
 							gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
+							colorpicker->valid = true;
 						}
 						else if (type == (int)event_type2::on_down) {
 							auto mps = mpos - (glm::vec2)colorpicker->get_pos();
@@ -1441,7 +1410,8 @@ int main()
 								}
 							}
 							colorpicker->valid = true;
-						}};
+						}
+					};
 
 				glm::vec2 pos = colorpicker->get_pos() + 6;
 				glm::ivec4 rc = { 0,0,psize };
@@ -1449,7 +1419,7 @@ int main()
 				rc.y = pos.y;
 				vtx.clear();
 				idx.clear();
-				build_huedata(c1, rc, vtx, idx);
+				vtx_pos = build_huedata(c1, rc, vtx, idx);
 				rc.x += rc.z + 4;
 				auto rc1 = rc;
 				rc1.x += rc1.z + 6;
