@@ -1440,7 +1440,7 @@ int main()
 					return hc;
 					};
 
-				colorpicker->mevent_cb = [=, &vtx, &idx](void* p, int type, const glm::vec2& mps)
+				colorpicker->mevent_cb = [=, &pick0, &pick1, &vtx_pos, &vtx, &idx](void* p, int type, const glm::vec2& mpos)
 					{
 						if (type == (int)event_type2::on_drag) {
 							glm::vec2 pos = colorpicker->get_pos() + 6;
@@ -1449,33 +1449,32 @@ int main()
 							rc.y = pos.y;
 							build_huedata(c1, rc, vtx, idx);
 						}
-					};
-				colorpicker->click_cb = [=, &pick0, &pick1, &vtx_pos, &vtx](void* p, int clicks, const glm::vec2& mpos) {
-					auto mps = mpos - (glm::vec2)colorpicker->get_pos();
-					mps -= 6;
-					if (mps.y > psize.y)
-						return;
-					auto d = vtx.data() + vtx_pos;
-					if (mps.x < psize.x)
-					{
-						pick0 = get_color_cb(mps, psize, ohsv.x);
-						for (size_t i = 0; i < 4; i++)
-						{
-							d[i].color = pick0;
-						}
-					}
-					d += 4;
-					mps.x -= 4 + psize.x;
-					if (mps.x > 0 && mps.x < psize.x)
-					{
-						pick1 = get_hue_color_cb(mps, psize);
-						for (size_t i = 0; i < 4; i++)
-						{
-							d[i].color = pick1;
-						}
-					}
-					colorpicker->valid = true;
-					};
+						else if (type == (int)event_type2::on_down) {
+							auto mps = mpos - (glm::vec2)colorpicker->get_pos();
+							mps -= 6;
+							if (mps.y > psize.y)
+								return;
+							auto d = vtx.data() + vtx_pos;
+							if (mps.x < psize.x)
+							{
+								pick0 = get_color_cb(mps, psize, ohsv.x);
+								for (size_t i = 0; i < 4; i++)
+								{
+									d[i].color = pick0;
+								}
+							}
+							d += 4;
+							mps.x -= 4 + psize.x;
+							if (mps.x > 0 && mps.x < psize.x)
+							{
+								pick1 = get_hue_color_cb(mps, psize);
+								for (size_t i = 0; i < 4; i++)
+								{
+									d[i].color = pick1;
+								}
+							}
+							colorpicker->valid = true;
+						}};
 
 				glm::vec2 pos = colorpicker->get_pos() + 6;
 				glm::ivec4 rc = { 0,0,psize };
@@ -1483,7 +1482,6 @@ int main()
 				rc.y = pos.y;
 				build_huedata(c1, rc, vtx, idx);
 			}
-
 
 			c_runtime_cx rtc; // 高精度计时器
 			int uims = 0, ms3d = 0, SDLms = 0;
@@ -1516,27 +1514,29 @@ int main()
 				rtc.begin();
 				auto ct = td3->update(delta);
 				uims = rtc.get_ms();
+				int64_t sem3d = 0;
 				{
-					rtc.begin();
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						auto sem = vkd->get_fbo_semaphore();
-						form0->add_vk_semaphores(sem, 0, 0);
-					}
-					ms3d = rtc.get_ms();
-					ct++;
+					//rtc.begin();
+					//vkd->on_render();		// 渲染到fbo纹理tex3d
+					//if (!vkd->_state.has_fence) {
+					//	sem3d = vkd->get_fbo_semaphore();
+					//}
+					//ms3d = rtc.get_ms();
+					//ct++;
 				}
+				form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
 				if (ct) {
-					rtc.begin();		// 开始计时录制SDL渲染命令
 					form0->set_state();	// 清空/设置交换链接状态 
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					//texture_dt tdt = {};
+					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					//if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
 					auto vd = vtx.data();
 					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos(), colorpicker->get_size()), &vtx, &idx);
 					form0->present();
+					rtc.begin();		// 开始计时录制SDL渲染命令
+					view->_vgdev->wait_dev();
 					SDLms = rtc.get_ms();
 				}
 			} while (app->form_count());

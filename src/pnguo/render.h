@@ -418,6 +418,7 @@ public:
 	void* get_vkimage(void* surface);
 	void image_save(void* surface, const char* fn);
 	glm::ivec2 get_image_data(void* surface, std::vector<uint32_t>* opt);
+	void wait_dev();
 private:
 
 };

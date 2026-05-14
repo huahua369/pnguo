@@ -549,6 +549,13 @@ glm::ivec2 vkvg_dev::get_image_data(void* surface, std::vector<uint32_t>* opt)
 	return rs;
 }
 
+void vkvg_dev::wait_dev()
+{
+	if (vkdev)
+		vkDeviceWaitIdle(vkdev);
+}
+
+
 vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 {
 	vkvg_dev* p = 0;
