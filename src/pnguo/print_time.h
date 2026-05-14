@@ -58,17 +58,24 @@ private:
 	std::chrono::time_point<std::chrono::high_resolution_clock> _begin;
 public:
 	c_runtime_cx()
-	{}
+	{
+		begin();
+	}
 	~c_runtime_cx()
 	{}
 	void begin() {
 		_begin = (std::chrono::high_resolution_clock::now());
 	}
-	int64_t get_ms() {
+	int64_t end() {
 
 		double aa = elapsed_micro();
 		aa *= 0.001;
 		return aa;
+	}
+	int64_t get_ms() {
+		auto t = std::chrono::high_resolution_clock::now().time_since_epoch();
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t).count();
+		return ms;
 	}
 	int64_t elapsed() const
 	{

@@ -1430,11 +1430,14 @@ int main()
 			}
 
 			c_runtime_cx rtc; // 高精度计时器
-			int uims = 0, ms3d = 0, SDLms = 0;
+			c_runtime_cx rt_cpu; // cpu计时器
+			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
 			// 运行消息循环			
 			do {
 				auto delta = app->update_event();
 				if (!app->form_count())break;
+				cpums = rt_cpu.end();
+				rt_cpu.begin();
 				auto fps = app->get_fps();
 				form0->update(delta);
 				if (form0->is_minimized())
@@ -1455,35 +1458,35 @@ int main()
 				if (upt > 1.0)
 				{
 					upt = 0.0;
-					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, uims + ms3d + SDLms) + gpustr;
+					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
 				}
 				rtc.begin();
 				auto ct = td3->update(delta);
-				uims = rtc.get_ms();
+				uims = rtc.end();
 				int64_t sem3d = 0;
 				{
-					//rtc.begin();
-					//vkd->on_render();		// 渲染到fbo纹理tex3d
-					//if (!vkd->_state.has_fence) {
-					//	sem3d = vkd->get_fbo_semaphore();
-					//}
-					//ms3d = rtc.get_ms();
-					//ct++;
+					rtc.begin();
+					vkd->on_render();		// 渲染到fbo纹理tex3d
+					if (!vkd->_state.has_fence) {
+						sem3d = vkd->get_fbo_semaphore();
+					}
+					ms3d = rtc.end();
+					ct++;
 				}
 				form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
 				if (ct) {
 					rtc.begin();		// 开始计时录制SDL渲染命令
 					form0->set_state();	// 清空/设置交换链接状态 
-					//texture_dt tdt = {};
-					//tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					//tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					//if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					texture_dt tdt = {};
+					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
 					auto vd = vtx.data();
 					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos(), colorpicker->get_size()), &vtx, &idx);
 					form0->present();
 					view->_vgdev->wait_dev();
-					SDLms = rtc.get_ms();
+					SDLms = rtc.end();
 				}
 			} while (app->form_count());
 			//run_app(app, 0);
