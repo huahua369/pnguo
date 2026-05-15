@@ -527,6 +527,17 @@ struct cmdview_v {
 	size_t inc = 0;
 	size_t dcv_index = 0;
 };
+struct rvgraw_t {
+	glm::ivec2 pos = {};
+	size_t cmd_count = 0;
+	size_t view_count = 0;
+	size_t datasize = 0;
+	uint8_t* cmdtype = 0;	// cmd_count
+	size_t* cmdpos = 0;		// cmd_count
+	uint8_t* cmddata = 0;
+	cmdview_v* view = 0;
+};
+
 class rvg_cx
 {
 public:

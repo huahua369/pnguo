@@ -1428,7 +1428,9 @@ int main()
 				rc1.x += 56;
 				gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
 			}
-
+			bool r3d = true;
+			if (!r3d)
+				tex3d = 0;;
 			c_runtime_cx rtc; // 高精度计时器
 			c_runtime_cx rt_cpu; // cpu计时器
 			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
@@ -1464,6 +1466,7 @@ int main()
 				auto ct = td3->update(delta);
 				uims = rtc.end();
 				int64_t sem3d = 0;
+				if(r3d)
 				{
 					rtc.begin();
 					vkd->on_render();		// 渲染到fbo纹理tex3d

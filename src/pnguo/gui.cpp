@@ -2583,7 +2583,6 @@ uint32_t colorpick_tl::get_color()
 {
 	glm::vec4 hc = {};
 	HSVtoRGB(hsv, hc);
-	//auto hc1 = convertHSVtoRGB(hsv);
 	glm::u8vec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
 	return *((uint32_t*)&c);
 }
