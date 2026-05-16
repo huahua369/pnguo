@@ -1334,101 +1334,7 @@ int main()
 			app->set_fps(1000);
 			vkd->_state.has_fence = false;
 			std::string gpustr;
-			std::vector<text_vx> vtx;
-			std::vector<uint32_t> idx;
-			glm::ivec4 rc = { 0,0,360,360 };
-			glm::ivec2 psize = { 360,360 };
-			glm::vec4 c1 = glm::vec4(0, 0, 0.8, 1.0);// 0xffcc0000;
-			glm::vec4 ohsv = { 0.7,1,1,1 };
-			glm::vec4 pick0 = c1, pick1 = c1;
-			HSVtoRGB(ohsv, c1);
-			auto vtx_pos = vtx.size();
-			auto vtxd = vtx.data();
-			{
-				// 获取色盘颜色
-				static auto get_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size, float h) {
-					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
-					glm::vec4 hc = {};
-					glm::vec4 hsv = { h,0,0,1 };
-					hsv.y = n.x;
-					hsv.z = 1.0 - n.y;
-					HSVtoRGB(hsv, hc);
-					return hc;
-					};
-				// 获取色调颜色
-				static auto get_hue_color_cb = [](const glm::ivec2& pos, const glm::ivec2& size) {
-					glm::vec2 n = (glm::vec2)pos / (glm::vec2)size;
-					glm::vec4 hc = {};
-					glm::vec4 hsv = { n.x,0,0,1 };
-					hsv.y = 1;
-					hsv.z = 1.0 - n.y;
-					HSVtoRGB(hsv, hc);
-					return hc;
-					};
-
-				colorpicker->mevent_cb = [=, &pick0, &pick1, &vtx_pos, &vtx, &idx](void* p, int type, const glm::vec2& mpos)
-					{
-						if (type == (int)event_type2::on_drag) {
-							glm::vec2 pos = colorpicker->get_pos() + 6;
-							glm::ivec4 rc = { 0,0,psize };
-							rc.x = pos.x;
-							rc.y = pos.y;
-							vtx.clear();
-							idx.clear();
-							vtx_pos = build_huedata(c1, rc, vtx, idx);
-							rc.x += rc.z + 4;
-							auto rc1 = rc;
-							rc1.x += rc1.z + 6;
-							rc1.z = rc1.w = 50;
-							gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
-							rc1.x += 56;
-							gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
-							colorpicker->valid = true;
-						}
-						else if (type == (int)event_type2::on_down) {
-							auto mps = mpos - (glm::vec2)colorpicker->get_pos();
-							mps -= 6;
-							if (mps.y > psize.y)
-								return;
-							auto d = vtx.data() + vtx_pos;
-							if (mps.x < psize.x)
-							{
-								pick0 = get_color_cb(mps, psize, ohsv.x);
-								for (size_t i = 0; i < 4; i++)
-								{
-									d[i].color = pick0;
-								}
-							}
-							d += 4;
-							mps.x -= 4 + psize.x;
-							if (mps.x > 0 && mps.x < psize.x)
-							{
-								pick1 = get_hue_color_cb(mps, psize);
-								for (size_t i = 0; i < 4; i++)
-								{
-									d[i].color = pick1;
-								}
-							}
-							colorpicker->valid = true;
-						}
-					};
-
-				glm::vec2 pos = colorpicker->get_pos() + 6;
-				glm::ivec4 rc = { 0,0,psize };
-				rc.x = pos.x;
-				rc.y = pos.y;
-				vtx.clear();
-				idx.clear();
-				vtx_pos = build_huedata(c1, rc, vtx, idx);
-				rc.x += rc.z + 4;
-				auto rc1 = rc;
-				rc1.x += rc1.z + 6;
-				rc1.z = rc1.w = 50;
-				gen_rect_color(rc1, pick0, vtx, idx);	//颜色块
-				rc1.x += 56;
-				gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
-			}
-			bool r3d = true;
+			bool r3d = 0;
 			if (!r3d)
 				tex3d = 0;;
 			c_runtime_cx rtc; // 高精度计时器
@@ -1466,7 +1372,7 @@ int main()
 				auto ct = td3->update(delta);
 				uims = rtc.end();
 				int64_t sem3d = 0;
-				if(r3d)
+				if (r3d)
 				{
 					rtc.begin();
 					vkd->on_render();		// 渲染到fbo纹理tex3d
@@ -1485,8 +1391,6 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
 					td3->cmd_draw();
-					auto vd = vtx.data();
-					td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos(), colorpicker->get_size()), &vtx, &idx);
 					form0->present();
 					view->_vgdev->wait_dev();
 					SDLms = rtc.end();
