@@ -910,7 +910,7 @@ int main()
 		std::string k821 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ\t我\n的大刀,Malgun Gothic";
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
 		auto rctts = get_text_rect(family, 16, k80.c_str(), k80.size(), 0);
-		auto bll = font_get_lineheight(family, 16);
+		auto bll = font_get_lineheight(family, 16, true);
 		//text_style ts = {};
 		//ts.family = family;
 		//ts.fontsize = 16;

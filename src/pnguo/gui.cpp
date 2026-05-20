@@ -6702,7 +6702,7 @@ bool edit_cx::update(float delta)
 		valid = true;
 	}
 	if (ctx->lineheight < 1)
-		ctx->lineheight = font_get_lineheight(family, font_size);
+		ctx->lineheight = font_get_lineheight(family, font_size, true);
 
 	if (up_text)
 	{
@@ -6932,6 +6932,7 @@ glm::ivec3 edit_cx::get_line_length(int index)
 // 获取范围的像素大小
 std::vector<glm::ivec4> edit_cx::get_bounds_px()
 {
+	bool font_hfirst = true;//取第一字体行高
 	float pwidth = font_size * 0.5;// 补行尾宽度
 	auto pstr = ctx->str.c_str();
 	auto tsize = ctx->str.size();
@@ -6965,7 +6966,7 @@ std::vector<glm::ivec4> edit_cx::get_bounds_px()
 	auto v1 = get_line_length(v.x);
 	auto v2 = get_line_length(v.y);
 	auto line_no = ctx->lvs.size();
-	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size);
+	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size, font_hfirst);
 	// 计算选中范围的每行的坐标宽高
 	if (v1 == v2) {}
 	else {
@@ -7109,7 +7110,7 @@ void edit_cx::up_caret()
 	get_bounds_px();
 	auto v1 = get_line_length(ctx->state.cursor);
 	auto line_no = ctx->lvs.size();
-	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size);
+	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size, true);
 	// 计算选中范围的每行的坐标宽高 
 	if (line_no > 0 && ctx->widths.size() > v1.y)
 	{

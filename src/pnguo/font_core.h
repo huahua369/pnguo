@@ -620,7 +620,7 @@ glm::ivec3 font_get_text_rect1(font_family_t* family, int fontsize, const void* 
 int font_get_text_posv(font_family_t* family, int fontsize, const void* str8, int len, std::vector<std::vector<int>>& ow);
 
 int font_get_baseline(font_family_t* family, int fontsize);
-int font_get_lineheight(font_family_t* family, int fontsize);
+int font_get_lineheight(font_family_t* family, int fontsize, bool first);
 
 // 文本样式
 struct text_style

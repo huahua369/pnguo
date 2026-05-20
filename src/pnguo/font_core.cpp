@@ -7900,7 +7900,7 @@ int font_get_baseline(font_family_t* family, int fontsize)
 	return baseline;
 }
 
-int font_get_lineheight(font_family_t* family, int fontsize)
+int font_get_lineheight(font_family_t* family, int fontsize, bool first)
 {
 	int r = 0;
 	if (!family || fontsize == 0)
@@ -7911,6 +7911,7 @@ int font_get_lineheight(font_family_t* family, int fontsize)
 		auto b = it->get_line_height(fontsize);
 		if (b > r)
 			r = b;
+		if (r > 0 && first)break;
 	}
 	return r;
 }
