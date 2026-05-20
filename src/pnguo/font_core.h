@@ -12,6 +12,7 @@ glm::vec4 ucolor2fx(uint32_t color);
 glm::vec4 ucolor2f(uint32_t c);
 glm::vec4 ucolor2fp(const uint32_t* c);
 uint32_t premultiply_rgba(uint32_t color);
+uint32_t color2u(const glm::vec4& color);
 
 struct vertex_f
 {

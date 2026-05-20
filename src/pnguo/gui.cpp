@@ -6792,15 +6792,30 @@ void edit_cx::draw(rvg_cx* rv)
 		text_st tx = {};
 		tx.pos = { tpos1 };
 		tx.size = ss;
-		if (pwdch)
-		{
-			tx.text = stext.c_str(); tx.text_len = stext.size();
-		}
-		else {
-			tx.text = ctx->str.c_str();
-			tx.text_len = ctx->str.size();
-		}
-		rv->add_text(&tx, &st);
+		auto ptxt = placeholder.c_str();
+		size_t plen = placeholder.size();
+		do {
+			if (pwdch)
+			{
+				if (stext.size() > 0)
+				{
+					ptxt = stext.c_str();
+					plen = stext.size(); break;
+				}
+			}
+			else {
+				if (ctx->str.size() > 0)
+				{
+					ptxt = ctx->str.c_str();
+					plen = ctx->str.size(); break;
+				}
+			}
+			st.color = set_alpha_x(text_color, 200);
+		} while (0);
+		tx.text = ptxt;
+		tx.text_len = plen;
+		if (*ptxt && plen > 0)
+			rv->add_text(&tx, &st);
 		rv->restore();
 	}
 	rv->restore();

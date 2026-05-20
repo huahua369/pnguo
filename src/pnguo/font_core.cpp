@@ -51,6 +51,12 @@ glm::vec4 ucolor2fx(uint32_t color)
 	c.w = a;
 	return c;
 }
+uint32_t color2u(const glm::vec4& color)
+{
+	glm::vec4 c = color; c *= 255.0f;
+	glm::u8vec4 cc = c;
+	return *((uint32_t*)&cc);
+}
 glm::vec4 ucolor2f(uint32_t color)
 {
 	glm::vec4 c = *(glm::u8vec4*)&color; c /= 255.0f;
@@ -2433,12 +2439,15 @@ void* font_t::mk_glyph_image_hb(uint32_t gid, int font_size, int* ot)
 {
 	hb_raster_image_t* img = nullptr;
 	hb_glyph_extents_t gext = {};
+	hb_font_extents_t extents[2] = {};
 	auto rdr = hp->rdr;
 	auto font = hp->hb_font;
 	auto pnt = hp->pnt;
 	do {
 		hb_font_set_scale(font, font_size, font_size);
 		hb_raster_draw_reset(rdr);
+		hb_bool_t bhe = hb_font_get_h_extents(hp->hb_font, &extents[0]);
+		hb_bool_t bve = hb_font_get_v_extents(hp->hb_font, &extents[1]);
 		bool bext = hb_font_get_glyph_extents(font, gid, &gext);
 		if (pnt)
 		{
@@ -2446,7 +2455,7 @@ void* font_t::mk_glyph_image_hb(uint32_t gid, int font_size, int* ot)
 			if (bext && hb_raster_paint_set_glyph_extents(pnt, &gext))
 			{
 				hb_raster_paint_set_transform(pnt, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
-				hb_raster_paint_glyph(pnt, font, gid);
+				hb_raster_paint_glyph(pnt, font, gid);	// 光栅化颜色字形
 				img = hb_raster_paint_render(pnt);
 			}
 			if (img)
@@ -2457,12 +2466,9 @@ void* font_t::mk_glyph_image_hb(uint32_t gid, int font_size, int* ot)
 		}
 		{
 			hb_raster_draw_set_transform(rdr, 1.f, 0.f, 0.f, 1.f, 0.f, 0.f);
-			hb_raster_draw_glyph(rdr, font, gid);
+			hb_raster_draw_glyph(rdr, font, gid);	// 单色
 			img = hb_raster_draw_render(rdr);
-			if (img)
-			{
-				hb_raster_draw_recycle_image(rdr, img);
-			}
+			if (img) { hb_raster_draw_recycle_image(rdr, img); }
 		}
 	} while (0);
 	hb_raster_extents_t ext = {};
@@ -2885,15 +2891,47 @@ double font_t::get_base_line(double height)
 {
 	float scale = get_scale(height);
 	double f = ascender;
-	//return ceil(f * scale);
-	return floor(f * scale); // 向下取整
+	auto b = ceil(f * scale);
+	//auto b = floor(f * scale); // 向下取整
+#ifdef HB_RASTER_H
+	auto font = hp->hb_font;
+	hb_font_extents_t extents[2] = {};
+	hb_font_set_scale(font, height, height);
+	hb_bool_t bhe = hb_font_get_h_extents(font, &extents[0]);
+	hb_bool_t bve = hb_font_get_v_extents(font, &extents[1]);
+	if (bhe)
+	{
+		b = extents->ascender;
+	}
+	else if (bve)
+	{
+		b = extents[1].ascender;
+	}
+#endif
+	return b;
 }
 
 double font_t::get_line_height(double height)
 {
 	float scale = get_scale(height);
 	double f = ascender - descender + lineGap;
-	return ceil(f * scale);// 向上取整
+	auto r = ceil(f * scale);// 向上取整
+#ifdef HB_RASTER_H
+	auto font = hp->hb_font;
+	hb_font_extents_t extents[2] = {};
+	hb_font_set_scale(font, height, height);
+	hb_bool_t bhe = hb_font_get_h_extents(font, &extents[0]);
+	hb_bool_t bve = hb_font_get_v_extents(font, &extents[1]);
+	if (bhe)
+	{
+		r = extents->ascender - extents->descender + extents->line_gap;
+	}
+	else if (bve)
+	{
+		r = extents[1].ascender - extents[1].descender + extents[1].line_gap;
+	}
+#endif
+	return r;
 }
 
 
@@ -3416,6 +3454,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 		bool bret = false;
 		glm::ivec2 pos = {};
 		int advance = 0;
+		int v_advance = 0;
 		bool has_color = false;
 		do {
 			if (rp)break;
@@ -3430,6 +3469,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 			if (!bit)
 			{
 				advance = hb_font_get_glyph_h_advance(hp->hb_font, glyph_index);// 水平
+				v_advance = hb_font_get_glyph_v_advance(hp->hb_font, glyph_index);// 垂直
 				bit = rfont->get_glyph_image_hb(glyph_index, fontsize, &rc, (void**)&rimg, unicode_codepoint);
 				auto rcs = glm::ivec2(rc.z, rc.w);
 				img = use_ctx->push_cache_size(rcs, &pos, linegap);//申请缓存位置

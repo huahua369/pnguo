@@ -635,6 +635,7 @@ public:
 	text_control* ctx = 0;			// stb_textedit	
 	std::string stext;				// 显示的文本，密码显示用
 	std::string editingstr;			// 输入中的文本，输入法编辑时用
+	std::string placeholder;		// 占位符
 	glm::ivec4 _color = { 0xff282828, 0xffffffff, 0xf0ff7a4d, 0xff2c2c2c };				// 背景色、文本颜色、选择背景色、输入法编辑文本颜色
 	glm::ivec3 _cursor = { 1,-1,500 };				// 闪烁光标。宽度、颜色、毫秒
 	glm::ivec2 _cmpos = {};				// 当前鼠标坐标

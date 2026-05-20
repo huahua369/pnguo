@@ -4377,50 +4377,42 @@ namespace vkr {
 	};
 
 
-
+	// 前向渲染Forward Rendering
 	class GBuffer
 	{
 	public:
-
-		void OnCreate(Device* pDevice, ResourceViewHeaps* pHeaps, const std::map<GBufferFlags, VkFormat>& m_formats, int sampleCount);
-		void OnDestroy();
-
-		void OnCreateWindowSizeDependentResources(/*SwapChain* pSwapChain,*/ uint32_t Width, uint32_t Height);
-		void OnDestroyWindowSizeDependentResources();
-
-		void GetAttachmentList(GBufferFlags flags, std::vector<VkImageView>* pAttachments, std::vector<VkClearValue>* pClearValues);
-		VkRenderPass CreateRenderPass(GBufferFlags flags, bool bClear);
-
-		//void GetCompilerDefines(DefineList& defines);
-		VkSampleCountFlagBits  GetSampleCount() { return m_sampleCount; }
-		Device* GetDevice() { return m_pDevice; }
-
 		// depth buffer
 		Texture                         m_DepthBuffer;
 		VkImageView                     m_DepthBufferDSV;
 		VkImageView                     m_DepthBufferSRV;
-
 		// diffuse
 		Texture                         m_Diffuse;
 		VkImageView                     m_DiffuseSRV;
-
 		// specular
 		Texture                         m_SpecularRoughness;
 		VkImageView                     m_SpecularRoughnessSRV;
-
 		// motion vectors
 		Texture                         m_MotionVectors;
 		VkImageView                     m_MotionVectorsSRV;
-
 		// normal buffer
 		Texture                         m_NormalBuffer;
 		VkImageView                     m_NormalBufferSRV;
-
 		// HDR
 		Texture                         m_HDR;		// color
 		VkImageView                     m_HDRSRV;
-		Texture                         m_HDRt;		// transmission
+		Texture                         m_HDRt;		// 透射材质用transmission
 		VkImageView                     m_HDRSRVt;
+	public:
+		void OnCreate(Device* pDevice, ResourceViewHeaps* pHeaps, const std::map<GBufferFlags, VkFormat>& m_formats, int sampleCount);
+		void OnDestroy();
+		void OnCreateWindowSizeDependentResources(/*SwapChain* pSwapChain,*/ uint32_t Width, uint32_t Height);
+		void OnDestroyWindowSizeDependentResources();
+		void GetAttachmentList(GBufferFlags flags, std::vector<VkImageView>* pAttachments, std::vector<VkClearValue>* pClearValues);
+		VkRenderPass CreateRenderPass(GBufferFlags flags, bool bClear);
+		//void GetCompilerDefines(DefineList& defines);
+		VkSampleCountFlagBits  GetSampleCount() { return m_sampleCount; }
+		Device* GetDevice() { return m_pDevice; }
+
 #if 0
 		Texture                         m_HDR_oit_accum;
 		VkImageView                     m_HDR_oit_accumSRV;
