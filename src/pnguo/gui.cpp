@@ -1,26 +1,5 @@
 ﻿
 #include "pch1.h"
-#ifdef _cairoh_ 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <cairo/cairo.h>
-#ifdef _WIN32
-#include <cairo/cairo-win32.h>
-#endif
-#include <cairo/cairo-svg.h>
-#include <cairo/cairo-pdf.h>
-
-#ifndef NO_SVG
-#include <librsvg/rsvg.h>
-#endif
-	//#include <pango/pango-layout.h>
-	//#include <pango/pangocairo.h>
-
-#ifdef __cplusplus
-}
-#endif
-#endif
 
 #include <SDL3/SDL_keycode.h>
 #include <mapView.h>
