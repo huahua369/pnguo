@@ -291,6 +291,7 @@ private:
 };
 class gshadow_cx;
 class atlas_cx;
+
 // 图集画布
 class canvas_atlas
 {

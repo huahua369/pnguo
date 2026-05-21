@@ -884,153 +884,6 @@ void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, 
 
 }
 
-canvas_atlas::canvas_atlas()
-{}
-
-canvas_atlas::~canvas_atlas()
-{
-	if (destroy_texture_cb)
-	{
-		for (auto it : _texs_t)
-		{
-			if (it)
-			{
-				auto p = it;
-				destroy_texture_cb(p);
-			}
-		}
-	}
-	for (auto it : _gs) {
-		if (it && it->autofree)delete it;
-	}
-	_gs.clear();
-	for (auto it : _atlas_cx) {
-		if (it && it->autofree)delete it;
-	}
-	_atlas_cx.clear();
-}
-gshadow_cx* canvas_atlas::new_gs()
-{
-	auto p = new gshadow_cx();
-	p->autofree = 1;
-	_gs.push_back(p);
-	return p;
-}
-void canvas_atlas::add_atlas(atlas_cx* p)
-{
-	if (p)
-	{
-		_atlas_cx.push_back(p); valid = true;
-	}
-}
-void canvas_atlas::remove_atlas(atlas_cx* p)
-{
-	if (p)
-	{
-		auto& v = _atlas_cx;
-		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
-	}
-}
-void canvas_atlas::add_atlas(atlas_t* p) {
-	if (p)
-	{
-		_atlas_t.push_back(p); valid = true;
-	}
-}
-void canvas_atlas::remove_atlas(atlas_t* p) {
-	if (p)
-	{
-		auto& v = _atlas_t;
-		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
-	}
-}
-size_t canvas_atlas::count()
-{
-	return _atlas_t.size() + _atlas_cx.size();
-}
-image_ptr_t* canvas_atlas::new_image2(const void* file)
-{
-	return stbimage_load::new_load(file, 0);
-}
-image_ptr_t* canvas_atlas::new_image2mem(const void* d, size_t s)
-{
-	return stbimage_load::new_load(d, s);
-}
-void canvas_atlas::free_image(image_ptr_t* p)
-{
-	auto t = (stbimage_load*)p;
-	stbimage_load::free_img(t);
-}
-void canvas_atlas::convert_bgr_multiply(image_ptr_t* img)
-{
-	if (!img)return;
-	auto t = (unsigned char*)img->data;
-	if (img->type == 0 || !img->multiply) {
-		bool mul = !img->multiply;
-		for (size_t i = 0; i < img->height; i++)
-		{
-			premultiply_data(img->width, t, img->type, mul);
-			t += img->stride;
-		}
-		img->type = 1;
-	}
-}
-
-// 需要先创建纹理
-void canvas_atlas::apply()
-{
-	if (!valid || (_atlas_t.empty() && _atlas_cx.empty()))return;
-	clear();
-
-	for (auto it : _atlas_cx)
-	{
-		image_rs r = {};
-		if (it->_imgv.empty() || !it->img) { continue; }
-		r.img = it->img;
-		uint32_t color = -1;
-		for (auto& kt : it->_imgv) {
-
-			auto vt = kt.img_rc;
-			r.rect = kt.tex_rc;
-			r.size = { vt.z,vt.w };
-			glm::vec2 npos = vt;
-			r.sliced = kt.sliced;
-			add_image(&r, npos, kt.color ? kt.color : color, it->clip);
-		}
-	}
-	for (auto it : _atlas_t)
-	{
-		image_rs r = {};
-		if (it->count < 1 || !it->img) { continue; }
-		r.img = it->img;
-		uint32_t color = -1;
-		if (it->sliced)
-		{
-			for (size_t i = 0; i < it->count; i++)
-			{
-				auto vt = it->img_rc[i];
-				r.rect = it->tex_rc[i];
-				r.size = { vt.z,vt.w };
-				glm::vec2 npos = vt;
-				r.sliced = it->sliced[i];
-				add_image(&r, npos, it->colors ? it->colors[i] : color, it->clip);
-			}
-		}
-		else {
-			r.sliced = {};
-			for (size_t i = 0; i < it->count; i++)
-			{
-				auto vt = it->img_rc[i];
-				r.rect = it->tex_rc[i];
-				r.size = { vt.z,vt.w };
-				glm::vec2 npos = vt;
-				add_image(&r, npos, it->colors ? it->colors[i] : color, it->clip);
-			}
-		}
-	}
-	valid = false;
-}
-
 
 inline uint8_t is_rect_intersect(int x01, int x02, int y01, int y02,
 	int x11, int x12, int y11, int y12)
@@ -1059,17 +912,6 @@ inline bool is_rect_intersect(glm::vec4 r1, glm::vec4 r2)
 	}
 	return is_rect_intersect(r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z, r2.w);
 	//return !(((r1.z < r2.x) || (r1.w > r2.y)) || ((r2.z < r1.x) || (r2.w > r1.y)));
-}
-bool canvas_atlas::nohas_clip(glm::ivec4 a)
-{
-	auto clip = _clip_rect;
-	if (clip.z > viewport.z || clip.z < 0)clip.z = viewport.z;
-	if (clip.w > viewport.w || clip.w < 0)clip.w = viewport.w;
-	if (clip.z < 0 || clip.w < 0)
-	{
-		return false;
-	}
-	return (!is_rect_intersect(clip, a));
 }
 void setVec(glm::vec3& d, const glm::vec2& s)
 {
@@ -1155,194 +997,6 @@ glm::vec4 color2f4(uint32_t c)
 	color4.z = color->b / 255.0f;
 	color4.w = color->a / 255.0f;
 	return color4;
-}
-
-void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color32, const glm::ivec4& clip)
-{
-	auto& rect = p->rect;
-	auto a = glm::vec4(npos, p->size);
-	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
-	glm::vec4 v4 = { 0, 0, 1, 1 };
-	glm::vec4 uv = v4;
-	glm::vec2 s = size;
-	auto ts = p->img;
-	auto texsize = *((glm::ivec2*)ts);
-	if (!(rect.x < 0))
-	{
-		v4 = rect;
-		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
-		v4.z = glm::min(v4.z, (float)texsize.x);
-		v4.w = glm::min(v4.w, (float)texsize.y);
-		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y };
-		if (uv.x < 0) { uv.x = 0; }
-		if (uv.y < 0) { uv.y = 0; }
-	}
-	if (a.z < 0)
-		a.z *= -std::min(rect.z, texsize.x);
-	if (a.w < 0)
-		a.w *= -std::min(rect.w, texsize.y);
-	if (nohas_clip(a))
-		return;
-	glm::vec4 color3 = color2f4(color32);
-	if (p->sliced.x < 1)
-	{
-		glm::vec2 av = pos, cv = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_c{ uv.z, uv.w };
-		auto& col = color3;
-		glm::vec2 bv(cv.x, av.y), dv(av.x, cv.y), uv_b(uv_c.x, uv_a.y), uv_d(uv_a.x, uv_c.y);
-		static std::vector<int> deidx = { 0,1,2,0,2,3 };
-		std::vector<vertex_v2> vertex = {
-			{av, uv_a, col},
-			{bv, uv_b, col},
-			{cv, uv_c, col},
-			{dv, uv_d, col},
-		};
-		_mesh.add(vertex, deidx, p->img->texid, clip);// 添加矩形(两个三角形)到mesh
-	}
-	else
-	{
-		make_image_sliced(p->img->texid, a, texsize, p->sliced, rect, color32, clip);// 生成九宫格到mesh
-	}
-
-}
-void canvas_atlas::clear()
-{
-	_mesh.cmd_data.clear();
-	_mesh.vtxs.clear();
-	_mesh.idxs.clear();
-	_clip_rect = viewport;
-	_clip_rect.x = _clip_rect.y = 0;
-}
-/*
-
-
-九宫格渲染:
-+--+---------------+--+
-|0 |       1       |2 |
-+--+---------------+--+
-|  |               |  |
-|  |               |  |
-|3 |    center     |4 |
-|  |               |  |
-+--+---------------+--+
-|5 |       6       |7 |
-+--+---------------+--+
-
-九宫格:索引
-0  12                     14  2
-8  4                      6   10
-
-9  5                      7   11
-1  13                     15  3
-+--+-------------------------+--+
-|  |                         |  |
-+--+-------------------------+--+
-|  |                         |  |
-|  |                         |  |
-+--+-------------------------+--+
-|  |                         |  |
-+--+-------------------------+--+
-sliced.x=左宽，y上高，z右宽，w下高
-
-SDL_Vertex
-*/
-void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip)
-{
-	static std::vector<int> vt_index =// { 0,8,12,4,14,6,2,10,11,6,7,4,5,8,9,1,5,13,7,15,11,3 };//E_TRIANGLE_STRIP
-	{ 0, 8, 12, 8, 12, 4, 12, 4, 14, 4, 14, 6, 14, 6, 2, 6, 2, 10,
-		6, 7, 10, 7, 10, 11, 4, 5, 6, 5, 6, 7, 8, 9, 4, 9, 4, 5,
-		9, 1, 5, 1, 5, 13, 5, 13, 7, 13, 7, 15, 7, 15, 11, 15, 11, 3 };//E_TRIANGLE_LIST
-
-	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
-	glm::vec4 uv = { 0, 0, 1, 1 };
-	glm::vec4 v4 = { 0, 0, texsize.x, texsize.y };
-	if (!(rect.x < 0))
-	{
-		v4 = rect;
-		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
-		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y, };
-	}
-	float left = sliced.x,
-		top = sliced.y,
-		right = sliced.z,
-		bottom = sliced.w;
-	float x = pos.x, y = pos.y, width = size.x, height = size.y;
-	glm::vec4 suv = { (left + v4.x) / texsize.x, (top + v4.y) / texsize.y,
-		(v4.z - right) / texsize.x, (v4.w - bottom) / texsize.y };
-
-	//t_vector<vertex_v2>v;
-	std::vector<vertex_v2> vertex = {
-#if 1
-		//0
-		{{x, y}, {uv.x, uv.y}, col},
-		//1
-		{{x, y + height}, {uv.x, uv.w}, col},
-		//2
-		{{x + width, y}, {uv.z, uv.y}, col},
-		//3
-		{{x + width, y + height}, {uv.z, uv.w}, col},
-		//4
-		{{x + left, y + top}, {suv.x, suv.y}, col},
-		//5
-		{{x + left, y + height - bottom}, {suv.x, suv.w}, col},
-		//6
-		{{x + width - right, y + top}, {suv.z, suv.y}, col},
-		//7
-		{{x + width - right, y + height - bottom}, {suv.z, suv.w}, col},
-		//8
-		{{x, y + top}, {uv.x, suv.y}, col},
-		//9
-		{{x, y + height - bottom}, {uv.x, suv.w}, col},
-		//10
-		{{x + width, y + top}, {uv.z, suv.y}, col},
-		//11
-		{{x + width, y + height - bottom}, {uv.z, suv.w}, col},
-		//12
-		{{x + left, y}, {suv.x, uv.y}, col},
-		//13
-		{{x + left, y + height}, {suv.x, uv.w}, col},
-		//14
-		{{x + width - right, y}, {suv.z, uv.y}, col},
-		//15
-		{{x + width - right, y + height}, {suv.z, uv.w}, col},
-#else
-		//0
-		{{x, y}, {0.0f, 0.f}, col},
-		//1
-		{{x, y + height}, {0.f, 1.0f}, col},
-		//2
-		{{x + width, y}, {1.0f, 0.f}, col},
-		//3
-		{{x + width, y + height}, {1.0f, 1.0f}, col},
-		//4
-		{{x + left, y + top}, {0.0f + suv.x, 0.f + suv.y}, col},
-		//5
-		{{x + left, y + height - bottom}, {0.f + suv.x, 1.0f - suv.w}, col},
-		//6
-		{{x + width - right, y + top}, {1.0f - suv.z, 0.f + suv.z}, col},
-		//7
-		{{x + width - right, y + height - bottom}, {1.0f - suv.z, 1.0f - suv.w}, col},
-		//8
-		{{x, y + top}, {0.0f, 0.f + suv.y}, col},
-		//9
-		{{x, y + height - bottom}, {0.f, 1.0f - suv.w}, col},
-		//10
-		{{x + width, y + top}, {1.0f, 0.f + suv.y}, col},
-		//11
-		{{x + width, y + height - bottom}, {1.0f, 1.0f - suv.w}, col},
-		//12
-		{{x + left, y}, {0.0f + suv.x, 0.f}, col},
-		//13
-		{{x + left, y + height}, {0.f + suv.x, 1.0f}, col},
-		//14
-		{{x + width - right, y}, {1.0f - suv.z, 0.f}, col},
-		//15
-		{{x + width - right, y + height}, {1.0f - suv.z, 1.0f}, col},
-#endif
-	};
-
-	_mesh.add(vertex, vt_index, user_image, clip);
-
-	return;
 }
 
 #endif
@@ -10326,5 +9980,492 @@ void maze_cx::generateMazeD(uint8_t* maze, int rows, int cols)
 			stack_x.pop();
 		}
 	}
+	return;
+}
+
+class atlas_cx
+{
+public:
+	image_ptr_t* img = 0;
+	glm::ivec4 clip = {};	// 裁剪区域
+	std::vector<image_sliced_t> _imgv;
+	bool autofree = 0;
+public:
+	atlas_cx();
+	virtual ~atlas_cx();
+	void add(image_rc_t* d, size_t count);
+	void add(image_sliced_t* d, size_t count);
+	void add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color = -1);
+	void clear();
+private:
+
+};
+
+// 阴影管理
+class gshadow_cx
+{
+public:
+	bitmap_cache_cx bcc = {};				// 纹理缓存
+	atlas_cx atc = {};
+	std::vector<uint32_t> timg;
+	image_ptr_t* img = 0;
+	bool autofree = 0;
+public:
+	gshadow_cx();
+	~gshadow_cx();
+	image_sliced_t new_rect(const rect_shadow_t& rs);
+private:
+
+};
+
+struct pvm_t
+{
+	atlas_cx* back = 0;	// 背景
+	atlas_cx* front = 0;	// 前景
+	plane_cx* p = 0;		// 控件
+	glm::vec2 fsize = {};
+	glm::vec2 cpos = {};
+	int w, h;
+};
+
+
+// 图集数据
+
+atlas_cx::atlas_cx()
+{}
+
+atlas_cx::~atlas_cx()
+{}
+void atlas_cx::add(image_rc_t* d, size_t count)
+{
+	if (d && count > 0)
+	{
+		_imgv.reserve(_imgv.size() + count);
+		for (size_t i = 0; i < count; i++)
+		{
+			auto it = d[i];
+			image_sliced_t dt = {};
+			dt.img_rc = it.img_rc;
+			dt.tex_rc = it.tex_rc;
+			dt.color = it.color;
+			_imgv.push_back(dt);
+		}
+	}
+}
+void atlas_cx::add(image_sliced_t* d, size_t count) {
+
+	if (d && count > 0)
+	{
+		_imgv.reserve(_imgv.size() + count);
+		for (size_t i = 0; i < count; i++)
+		{
+			auto dt = d[i];
+			_imgv.push_back(dt);
+		}
+	}
+}
+void atlas_cx::add(const glm::ivec4& rc, const glm::ivec4& texrc, const glm::ivec4& sliced, uint32_t color) {
+
+	image_sliced_t dt = {};
+	dt.img_rc = rc;
+	dt.tex_rc = texrc;
+	dt.color = color;
+	dt.sliced = sliced;
+	_imgv.push_back(dt);
+}
+void atlas_cx::clear() {
+	_imgv.clear();
+}
+
+#if 1
+gshadow_cx::gshadow_cx()
+{}
+
+gshadow_cx::~gshadow_cx()
+{}
+
+image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
+{
+	image_sliced_t r = {};
+	glm::ivec2 ss = { rs.radius * 3, rs.radius * 3 };
+	timg.resize(ss.x * ss.y);
+#ifdef _CR__
+	auto sur = new_image_cr(ss, timg.data());
+	cairo_t* cr = new_cr(sur);
+	// 边框阴影
+	draw_rectangle_gradient(cr, ss.x, ss.y, &rs);
+
+	image_ptr_t px = {};
+	px.width = ss.x;
+	px.height = ss.y;
+	px.type = 1;
+	px.stride = ss.x * sizeof(int);
+	px.data = timg.data();
+	px.comp = 4;
+	glm::ivec2 ps = {};
+	auto px0 = bcc.push_cache_bitmap(&px, &ps);
+	if (px0) {
+		r.img_rc = { 0,0,ss.x,ss.y };
+		r.tex_rc = { ps.x,ps.y,ss.x,ss.y };
+		r.sliced.x = r.sliced.y = r.sliced.z = r.sliced.w = rs.radius + 1;
+		r.color = -1;
+		img = px0;
+	}
+#ifdef _DEBUG
+	image_save_png(sur, "temp/gshadow.png");
+#endif
+	free_image_cr(sur);
+	free_cr(cr);
+#endif
+	return r;
+}
+
+
+#endif
+
+canvas_atlas::canvas_atlas()
+{}
+
+canvas_atlas::~canvas_atlas()
+{
+	if (destroy_texture_cb)
+	{
+		for (auto it : _texs_t)
+		{
+			if (it)
+			{
+				auto p = it;
+				destroy_texture_cb(p);
+			}
+		}
+	}
+	for (auto it : _gs) {
+		if (it && it->autofree)delete it;
+	}
+	_gs.clear();
+	for (auto it : _atlas_cx) {
+		if (it && it->autofree)delete it;
+	}
+	_atlas_cx.clear();
+}
+gshadow_cx* canvas_atlas::new_gs()
+{
+	auto p = new gshadow_cx();
+	p->autofree = 1;
+	_gs.push_back(p);
+	return p;
+}
+void canvas_atlas::add_atlas(atlas_cx* p)
+{
+	if (p)
+	{
+		_atlas_cx.push_back(p); valid = true;
+	}
+}
+void canvas_atlas::remove_atlas(atlas_cx* p)
+{
+	if (p)
+	{
+		auto& v = _atlas_cx;
+		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
+	}
+}
+void canvas_atlas::add_atlas(atlas_t* p) {
+	if (p)
+	{
+		_atlas_t.push_back(p); valid = true;
+	}
+}
+void canvas_atlas::remove_atlas(atlas_t* p) {
+	if (p)
+	{
+		auto& v = _atlas_t;
+		v.erase(std::remove(v.begin(), v.end(), p), v.end()); valid = true;
+	}
+}
+size_t canvas_atlas::count()
+{
+	return _atlas_t.size() + _atlas_cx.size();
+}
+image_ptr_t* canvas_atlas::new_image2(const void* file)
+{
+	return stbimage_load::new_load(file, 0);
+}
+image_ptr_t* canvas_atlas::new_image2mem(const void* d, size_t s)
+{
+	return stbimage_load::new_load(d, s);
+}
+void canvas_atlas::free_image(image_ptr_t* p)
+{
+	auto t = (stbimage_load*)p;
+	stbimage_load::free_img(t);
+}
+void canvas_atlas::convert_bgr_multiply(image_ptr_t* img)
+{
+	if (!img)return;
+	auto t = (unsigned char*)img->data;
+	if (img->type == 0 || !img->multiply) {
+		bool mul = !img->multiply;
+		for (size_t i = 0; i < img->height; i++)
+		{
+			premultiply_data(img->width, t, img->type, mul);
+			t += img->stride;
+		}
+		img->type = 1;
+	}
+}
+
+// 需要先创建纹理
+void canvas_atlas::apply()
+{
+	if (!valid || (_atlas_t.empty() && _atlas_cx.empty()))return;
+	clear();
+
+	for (auto it : _atlas_cx)
+	{
+		image_rs r = {};
+		if (it->_imgv.empty() || !it->img) { continue; }
+		r.img = it->img;
+		uint32_t color = -1;
+		for (auto& kt : it->_imgv) {
+
+			auto vt = kt.img_rc;
+			r.rect = kt.tex_rc;
+			r.size = { vt.z,vt.w };
+			glm::vec2 npos = vt;
+			r.sliced = kt.sliced;
+			add_image(&r, npos, kt.color ? kt.color : color, it->clip);
+		}
+	}
+	for (auto it : _atlas_t)
+	{
+		image_rs r = {};
+		if (it->count < 1 || !it->img) { continue; }
+		r.img = it->img;
+		uint32_t color = -1;
+		if (it->sliced)
+		{
+			for (size_t i = 0; i < it->count; i++)
+			{
+				auto vt = it->img_rc[i];
+				r.rect = it->tex_rc[i];
+				r.size = { vt.z,vt.w };
+				glm::vec2 npos = vt;
+				r.sliced = it->sliced[i];
+				add_image(&r, npos, it->colors ? it->colors[i] : color, it->clip);
+			}
+		}
+		else {
+			r.sliced = {};
+			for (size_t i = 0; i < it->count; i++)
+			{
+				auto vt = it->img_rc[i];
+				r.rect = it->tex_rc[i];
+				r.size = { vt.z,vt.w };
+				glm::vec2 npos = vt;
+				add_image(&r, npos, it->colors ? it->colors[i] : color, it->clip);
+			}
+		}
+	}
+	valid = false;
+}
+
+bool canvas_atlas::nohas_clip(glm::ivec4 a)
+{
+	auto clip = _clip_rect;
+	if (clip.z > viewport.z || clip.z < 0)clip.z = viewport.z;
+	if (clip.w > viewport.w || clip.w < 0)clip.w = viewport.w;
+	if (clip.z < 0 || clip.w < 0)
+	{
+		return false;
+	}
+	return (!is_rect_intersect(clip, a));
+}
+
+void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color32, const glm::ivec4& clip)
+{
+	auto& rect = p->rect;
+	auto a = glm::vec4(npos, p->size);
+	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
+	glm::vec4 v4 = { 0, 0, 1, 1 };
+	glm::vec4 uv = v4;
+	glm::vec2 s = size;
+	auto ts = p->img;
+	auto texsize = *((glm::ivec2*)ts);
+	if (!(rect.x < 0))
+	{
+		v4 = rect;
+		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
+		v4.z = glm::min(v4.z, (float)texsize.x);
+		v4.w = glm::min(v4.w, (float)texsize.y);
+		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y };
+		if (uv.x < 0) { uv.x = 0; }
+		if (uv.y < 0) { uv.y = 0; }
+	}
+	if (a.z < 0)
+		a.z *= -std::min(rect.z, texsize.x);
+	if (a.w < 0)
+		a.w *= -std::min(rect.w, texsize.y);
+	if (nohas_clip(a))
+		return;
+	glm::vec4 color3 = color2f4(color32);
+	if (p->sliced.x < 1)
+	{
+		glm::vec2 av = pos, cv = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_c{ uv.z, uv.w };
+		auto& col = color3;
+		glm::vec2 bv(cv.x, av.y), dv(av.x, cv.y), uv_b(uv_c.x, uv_a.y), uv_d(uv_a.x, uv_c.y);
+		static std::vector<int> deidx = { 0,1,2,0,2,3 };
+		std::vector<vertex_v2> vertex = {
+			{av, uv_a, col},
+			{bv, uv_b, col},
+			{cv, uv_c, col},
+			{dv, uv_d, col},
+		};
+		_mesh.add(vertex, deidx, p->img->texid, clip);// 添加矩形(两个三角形)到mesh
+	}
+	else
+	{
+		make_image_sliced(p->img->texid, a, texsize, p->sliced, rect, color32, clip);// 生成九宫格到mesh
+	}
+
+}
+void canvas_atlas::clear()
+{
+	_mesh.cmd_data.clear();
+	_mesh.vtxs.clear();
+	_mesh.idxs.clear();
+	_clip_rect = viewport;
+	_clip_rect.x = _clip_rect.y = 0;
+}
+/*
+
+
+九宫格渲染:
++--+---------------+--+
+|0 |       1       |2 |
++--+---------------+--+
+|  |               |  |
+|  |               |  |
+|3 |    center     |4 |
+|  |               |  |
++--+---------------+--+
+|5 |       6       |7 |
++--+---------------+--+
+
+九宫格:索引
+0  12                     14  2
+8  4                      6   10
+
+9  5                      7   11
+1  13                     15  3
++--+-------------------------+--+
+|  |                         |  |
++--+-------------------------+--+
+|  |                         |  |
+|  |                         |  |
++--+-------------------------+--+
+|  |                         |  |
++--+-------------------------+--+
+sliced.x=左宽，y上高，z右宽，w下高
+
+SDL_Vertex
+*/
+void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip)
+{
+	static std::vector<int> vt_index =// { 0,8,12,4,14,6,2,10,11,6,7,4,5,8,9,1,5,13,7,15,11,3 };//E_TRIANGLE_STRIP
+	{ 0, 8, 12, 8, 12, 4, 12, 4, 14, 4, 14, 6, 14, 6, 2, 6, 2, 10,
+		6, 7, 10, 7, 10, 11, 4, 5, 6, 5, 6, 7, 8, 9, 4, 9, 4, 5,
+		9, 1, 5, 1, 5, 13, 5, 13, 7, 13, 7, 15, 7, 15, 11, 15, 11, 3 };//E_TRIANGLE_LIST
+
+	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
+	glm::vec4 uv = { 0, 0, 1, 1 };
+	glm::vec4 v4 = { 0, 0, texsize.x, texsize.y };
+	if (!(rect.x < 0))
+	{
+		v4 = rect;
+		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
+		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y, };
+	}
+	float left = sliced.x,
+		top = sliced.y,
+		right = sliced.z,
+		bottom = sliced.w;
+	float x = pos.x, y = pos.y, width = size.x, height = size.y;
+	glm::vec4 suv = { (left + v4.x) / texsize.x, (top + v4.y) / texsize.y,
+		(v4.z - right) / texsize.x, (v4.w - bottom) / texsize.y };
+
+	//t_vector<vertex_v2>v;
+	std::vector<vertex_v2> vertex = {
+#if 1
+		//0
+		{{x, y}, {uv.x, uv.y}, col},
+		//1
+		{{x, y + height}, {uv.x, uv.w}, col},
+		//2
+		{{x + width, y}, {uv.z, uv.y}, col},
+		//3
+		{{x + width, y + height}, {uv.z, uv.w}, col},
+		//4
+		{{x + left, y + top}, {suv.x, suv.y}, col},
+		//5
+		{{x + left, y + height - bottom}, {suv.x, suv.w}, col},
+		//6
+		{{x + width - right, y + top}, {suv.z, suv.y}, col},
+		//7
+		{{x + width - right, y + height - bottom}, {suv.z, suv.w}, col},
+		//8
+		{{x, y + top}, {uv.x, suv.y}, col},
+		//9
+		{{x, y + height - bottom}, {uv.x, suv.w}, col},
+		//10
+		{{x + width, y + top}, {uv.z, suv.y}, col},
+		//11
+		{{x + width, y + height - bottom}, {uv.z, suv.w}, col},
+		//12
+		{{x + left, y}, {suv.x, uv.y}, col},
+		//13
+		{{x + left, y + height}, {suv.x, uv.w}, col},
+		//14
+		{{x + width - right, y}, {suv.z, uv.y}, col},
+		//15
+		{{x + width - right, y + height}, {suv.z, uv.w}, col},
+#else
+		//0
+		{{x, y}, {0.0f, 0.f}, col},
+		//1
+		{{x, y + height}, {0.f, 1.0f}, col},
+		//2
+		{{x + width, y}, {1.0f, 0.f}, col},
+		//3
+		{{x + width, y + height}, {1.0f, 1.0f}, col},
+		//4
+		{{x + left, y + top}, {0.0f + suv.x, 0.f + suv.y}, col},
+		//5
+		{{x + left, y + height - bottom}, {0.f + suv.x, 1.0f - suv.w}, col},
+		//6
+		{{x + width - right, y + top}, {1.0f - suv.z, 0.f + suv.z}, col},
+		//7
+		{{x + width - right, y + height - bottom}, {1.0f - suv.z, 1.0f - suv.w}, col},
+		//8
+		{{x, y + top}, {0.0f, 0.f + suv.y}, col},
+		//9
+		{{x, y + height - bottom}, {0.f, 1.0f - suv.w}, col},
+		//10
+		{{x + width, y + top}, {1.0f, 0.f + suv.y}, col},
+		//11
+		{{x + width, y + height - bottom}, {1.0f, 1.0f - suv.w}, col},
+		//12
+		{{x + left, y}, {0.0f + suv.x, 0.f}, col},
+		//13
+		{{x + left, y + height}, {0.f + suv.x, 1.0f}, col},
+		//14
+		{{x + width - right, y}, {1.0f - suv.z, 0.f}, col},
+		//15
+		{{x + width - right, y + height}, {1.0f - suv.z, 1.0f}, col},
+#endif
+	};
+
+	_mesh.add(vertex, vt_index, user_image, clip);
+
 	return;
 }
