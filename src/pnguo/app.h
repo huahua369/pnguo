@@ -38,3 +38,29 @@ private:
 
 };
 
+class drawable_cx;
+class dom_cx
+{
+public:
+	drawable_cx* dc = 0;
+	// 控件列表
+	std::vector<div_cx*> widgets, tdrawlist, tadd, tremove;
+	form_x* form0 = 0;
+public:
+	dom_cx();
+	~dom_cx();
+	void init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev, font_family_t* familys);
+
+	void add_widget(div_cx* w);
+	void remove_widget(div_cx* w);
+	bool press_test();
+	bool hittest(const glm::ivec2& mpos);
+
+	int update(float delta);
+	int build();
+	// 暂停渲染
+	void pause();
+	void cmd_draw();
+private:
+
+};
