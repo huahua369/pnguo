@@ -3817,7 +3817,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 	{
 		auto p = e->b;
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
-		bool isd = wp->cmpos == mps;
+		bool isd = wp->cmpos == mps; // 判断坐标是否改变
 		wp->cmpos = mps;
 		auto dv = dynamic_cast<div_cx*>(wp);
 		bool cs = false;
@@ -3838,7 +3838,7 @@ void widget_on_event(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& 
 					if (wp->mevent_cb) { wp->mevent_cb(wp, (int)event_type2::on_down, mps); }
 				}
 				else {
-					if ((wp->_bst & (int)BTN_STATE::STATE_ACTIVE) && (isd))
+					if (wp->_bst & (int)BTN_STATE::STATE_ACTIVE)
 					{
 						wp->cks = p->clicks;
 						if (wp->has_drag)
@@ -4526,6 +4526,7 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	case event_type2::on_down:
 	{
 		mpos -= tpos + _pos;
+		dindex = 1;
 		ret = true;
 	}break;
 	case event_type2::on_drag:
@@ -4533,7 +4534,6 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 		if (draggable)
 		{
 			set_pos(mps);
-			dindex = 1;
 		}
 		ret = true;
 	}break;

@@ -45,8 +45,8 @@ div_cx* viewdev_cx::get_div(form_x* f)
 		frc.z += frc.x; frc.w += frc.y;
 		if (rect_includes(mrc, frc))
 		{
-			drawable_cx* td2 = 0;
-			drawable_cx* td3 = 0;
+			dom_cx* td2 = 0;
+			dom_cx* td3 = 0;
 			td2->remove_widget(dv);
 			td3->add_widget(dv);
 			dv->set_pos(f->get_pos() - app->main->get_pos());
@@ -73,15 +73,15 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	{
 		f1 = cform.front(); cform.pop();
 	}
-	drawable_cx* td2 = 0;
-	drawable_cx* td3 = 0;
+	dom_cx* td2 = 0;
+	dom_cx* td3 = 0;
 	if (!f1)
 	{
 		f1 = (form_x*)new_form(app, "", 500, 500, -1, -1, ef_utility | ef_resizable | ef_borderless | ef_vulkan/*ef_dx11 | ef_transparent*/);
 		if (f1) {
-			td2 = new drawable_cx();
+			td2 = new dom_cx();
 			if (td2)
-				td2->init(f1, pcb, { 0,0,cache_size }, _vgdev);
+				td2->init(f1, pcb, { 0,0,cache_size }, _vgdev, familys);
 			else
 				app->remove(f1);
 		}

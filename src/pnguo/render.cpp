@@ -3266,31 +3266,8 @@ drawable_cx::~drawable_cx()
 	_dobj.clear();
 }
 
-void drawable_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
+void drawable_cx::init(texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
 {
-	if (f)
-	{
-		if (f->renderer)
-			rptr = f->renderer;
-		if (form0 && form0 != f) {
-			form0->remove_event(this);
-		}
-		form0 = f;
-		//f->add(this);
-		if (form0)
-		{
-			form0->add_event(this, [=](uint32_t type, et_un_t* e, void* ud) {
-				bool btn = !((devent_type_e)type == devent_type_e::mouse_button_e && e->v.b->down == 0);
-
-				for (auto it = widgets.rbegin(); it != widgets.rend(); it++)
-				{
-					(*it)->on_event(type, e);
-					if (e->ret && btn)
-						break;
-				}
-				});
-		}
-	}
 	rcb = cb;
 	if (view.z > 0 && view.w > 0)
 	{
@@ -3847,12 +3824,21 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 
 void drawable_cx::free_tex()
 {
-	if (rcb && _vt.size())
+	if (rcb)
 	{
-		for (auto& [k, v] : _vt) {
-			rcb->free_texture(v);
+		if (_vt.size())
+		{
+			for (auto& [k, v] : _vt) {
+				rcb->free_texture(v);
+			}
+			_vt.clear();
 		}
-		_vt.clear();
+		if (_vgt.size()) {
+			for (auto& [k, v] : _vgt) {
+				rcb->free_texture(v);
+			}
+			_vgt.clear();
+		}
 	}
 }
 
@@ -3894,22 +3880,6 @@ void drawable_cx::pause()
 	_pause = true;
 }
 
-void drawable_cx::add_widget(div_cx* w)
-{
-	if (w)
-	{
-		tadd.push_back(w);
-	}
-}
-
-void drawable_cx::remove_widget(div_cx* w)
-{
-	if (w)
-	{
-		tremove.push_back(w);
-	}
-}
-
 void drawable_cx::cmd_draw()
 {
 	for (auto& p : _drawv) {
@@ -3922,10 +3892,110 @@ void drawable_cx::clear_draw()
 	_drawv.clear();
 }
 
-int drawable_cx::update(float delta)
+void get_div(widget_t* p, std::vector<div_cx*>* v)
 {
-	int ret = _pause;
-	_pause = false;
+	auto d = dynamic_cast<div_cx*>(p);
+	if (d && d->visible)
+	{
+		v->push_back(d);
+		for (auto it : d->widgets)
+		{
+			get_div(it, v);
+		}
+	}
+}
+void render_drawable(Drawable auto& drawable)
+{
+	drawable.cmd_draw();
+}
+
+int render_update(Drawable auto& drawable, float delta)
+{
+	return drawable.update(delta);
+}
+
+
+dom_cx::dom_cx()
+{}
+
+dom_cx::~dom_cx()
+{}
+
+
+void dom_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev, font_family_t* familys)
+{
+	if (f)
+	{
+		if (form0 && form0 != f) {
+			form0->remove_event(this);
+		}
+		form0 = f;
+		//f->add(this);
+		if (form0)
+		{
+			form0->add_event(this, [=](uint32_t type, et_un_t* e, void* ud) {
+				bool btn = !((devent_type_e)type == devent_type_e::mouse_button_e && e->v.b->down == 0);
+
+				for (auto it = widgets.rbegin(); it != widgets.rend(); it++)
+				{
+					(*it)->on_event(type, e);
+					if (e->ret && btn)
+						break;
+				}
+				});
+		}
+		if (dc.rptr && dc.rptr != f->renderer) {
+			dc.free_tex();
+		}
+		dc.rptr = f->renderer;
+	}
+	dc.init(cb, view, vgdev);
+	dc.familys = familys;
+}
+
+
+void dom_cx::add_widget(div_cx* w)
+{
+	if (w)
+	{
+		tadd.push_back(w);
+	}
+}
+
+void dom_cx::remove_widget(div_cx* w)
+{
+	if (w)
+	{
+		tremove.push_back(w);
+	}
+}
+
+bool dom_cx::press_test()
+{
+	for (auto& p : tdrawlist) {
+		if (p && p->visible && p->press_test())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool dom_cx::hittest(const glm::ivec2& mpos)
+{
+	for (auto& p : tdrawlist) {
+		if (p && p->visible && p->hittest(mpos))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+int dom_cx::update(float delta)
+{
+	int ret = dc._pause;
+	dc._pause = false;
 	if (!tremove.empty())
 	{
 		for (auto w : tremove) {
@@ -3954,25 +4024,13 @@ int drawable_cx::update(float delta)
 	}
 	ret += build();
 	if (ret > 0)
-		cmd_draw();
+		dc.cmd_draw();
 	return ret;
 }
-void get_div(widget_t* p, std::vector<div_cx*>* v)
-{
-	auto d = dynamic_cast<div_cx*>(p);
-	if (d && d->visible)
-	{
-		v->push_back(d);
-		for (auto it : d->widgets)
-		{
-			get_div(it, v);
-		}
-	}
-}
-int drawable_cx::build()
+int dom_cx::build()
 {
 	int ret = 0;
-	clear_draw();
+	dc.clear_draw();
 	tdrawlist.clear();
 	for (auto& p : widgets) {
 		if (p && p->visible)
@@ -3986,7 +4044,7 @@ int drawable_cx::build()
 			glm::ivec2 dpos = {};
 			if (p->parent)
 				dpos = p->_pos;
-			auto& rvgd = _dobj[p];
+			auto& rvgd = dc._dobj[p];
 			if (!rvgd)
 				rvgd = new rvg_data_cx();
 			rvg_cx* rvg = rvgd->get();
@@ -3997,51 +4055,31 @@ int drawable_cx::build()
 				rvg->set_pos(p->get_pos());
 				p->draw(rvg);	// 录制渲染
 				// 资源绑定窗口
-				ret += update_rvgdata(rvgd);
+				ret += dc.update_rvgdata(rvgd);
 			}
 		}
 	}
 	return ret;
 }
 
-bool drawable_cx::press_test()
+void dom_cx::pause()
 {
-	for (auto& p : tdrawlist) {
-		if (p && p->visible && p->press_test())
-		{
-			return true;
-		}
-	}
-	return false;
+	dc.pause();
 }
 
-bool drawable_cx::hittest(const glm::ivec2& mpos)
+void dom_cx::cmd_draw()
 {
-	for (auto& p : tdrawlist) {
-		if (p && p->visible && p->hittest(mpos))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-void render_drawable(Drawable auto& drawable)
-{
-	drawable.cmd_draw();
-}
-
-int render_update(Drawable auto& drawable, float delta)
-{
-	return drawable.update(delta);
+	dc.cmd_draw();
 }
 
 
+
+// todo test
 void ttbr()
 {
 	drawable_cx* it = 0;
-	render_update(*it, 0.0f);
-	render_drawable(*it);
+	//render_update(*it, 0.0f);
+	//render_drawable(*it);
 }
 
 #endif

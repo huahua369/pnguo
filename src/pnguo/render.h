@@ -700,8 +700,6 @@ class div_cx;
 class drawable_cx
 {
 public:
-	// 控件列表
-	std::vector<div_cx*> widgets, tdrawlist, tadd, tremove;
 	// 渲染的数据列表
 	std::vector<rvg_data_cx*> _drawv;
 	std::unordered_map<div_cx*, rvg_data_cx*> _dobj;
@@ -714,7 +712,6 @@ public:
 	texture_cb* rcb = 0;	// 渲染器接口
 	void* rptr = 0;			// 渲染器指针
 	void* tex = 0;
-	form_x* form0 = 0;
 	font_family_t* familys = 0;				// 默认字体
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
@@ -725,7 +722,7 @@ public:
 public:
 	drawable_cx();
 	~drawable_cx();
-	void init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev);
+	void init(texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev);
 	void* new_surface(int width, int height);
 	void* new_surface1(int width, int height);
 	void update_surface(void* surface);
@@ -749,14 +746,8 @@ public:
 	// 暂停渲染
 	void pause();
 public:
-	void add_widget(div_cx* w);
-	void remove_widget(div_cx* w);
 	void cmd_draw();
 	void clear_draw();
-	int update(float delta);
-	int build();
-	bool press_test();
-	bool hittest(const glm::ivec2& mpos);
 };
 
 class clicprect_cx
@@ -768,6 +759,31 @@ public:
 public:
 	clicprect_cx(void* renderer, texture_cb* cb, const glm::ivec4& rc);
 	~clicprect_cx();
+};
+class dom_cx
+{
+public:
+	drawable_cx dc = {};
+	// 控件列表
+	std::vector<div_cx*> widgets, tdrawlist, tadd, tremove;
+	form_x* form0 = 0;
+public:
+	dom_cx();
+	~dom_cx();
+	void init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev, font_family_t* familys);
+
+	void add_widget(div_cx* w);
+	void remove_widget(div_cx* w);
+	bool press_test();
+	bool hittest(const glm::ivec2& mpos);
+
+	int update(float delta);
+	int build();
+	// 暂停渲染
+	void pause();
+	void cmd_draw();
+private:
+
 };
 
 

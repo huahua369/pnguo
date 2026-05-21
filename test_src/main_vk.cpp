@@ -1079,9 +1079,8 @@ int main()
 			view->familys = family;
 			view->app = app;
 			auto pcb = view->pcb;
-			drawable_cx* td3 = new drawable_cx();
-			td3->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev);
-			td3->familys = family;
+			dom_cx* td3 = new dom_cx();
+			td3->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev, family);
 
 			//auto ptm = plot_main(td3, 1200, 1200);
 
@@ -1325,7 +1324,7 @@ int main()
 				dvv->draggable = true;
 				td3->add_widget(dvv);
 			}
-			render_update(*td3, 0);
+			td3->update(0.0f);
 			{
 				app->e_window_cb = [=](form_x* fw, int type)
 					{
