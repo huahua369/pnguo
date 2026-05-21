@@ -3903,6 +3903,83 @@ int render_update(Drawable auto& drawable, float delta)
 
 
 
+// H in [0,360)
+// S, V, R, G, B in [0,1]
+glm::vec4 convertHSVtoRGB(const glm::vec4& hsv)
+{
+	double H = hsv.x * 360.0, S = hsv.y, V = hsv.z;
+	double R = 0.0, G = 0.0, B = 0.0;
+	int Hi = int(floor(H / 60.)) % 6;
+	double f = H / 60. - Hi;
+	double p = V * (1 - S);
+	double q = V * (1 - f * S);
+	double t = V * (1 - (1 - f) * S);
+	switch (Hi) {
+	case 0: R = V, G = t, B = p; break;
+	case 1: R = q, G = V, B = p; break;
+	case 2: R = p, G = V, B = t; break;
+	case 3: R = p, G = q, B = V; break;
+	case 4: R = t, G = p, B = V; break;
+	case 5: R = V, G = p, B = q; break;
+	}
+	return { R,G,B,hsv.w };
+}
+
+
+
+// Convert rgb floats ([0-1],[0-1],[0-1]) to hsv floats ([0-1],[0-1],[0-1]), from Foley & van Dam p592
+// Optimized http://lolengine.net/blog/2013/01/13/fast-rgb-to-hsv
+glm::vec4 RGBtoHSV(uint32_t col)
+{
+	glm::u8vec4* c = (glm::u8vec4*)&col;
+	double r = c->x / 255.0, g = c->y / 255.0, b = c->z / 255.0, a = c->w / 255.0;
+	double K = 0.;
+	if (g < b)
+	{
+		std::swap(g, b);
+		K = -1.;
+	}
+	if (r < g)
+	{
+		std::swap(r, g);
+		K = -2. / 6. - K;
+	}
+	const float chroma = r - (g < b ? g : b);
+	glm::vec4 hsv = { fabs(K + (g - b) / (6.0 * chroma + 1e-20f)), chroma / (r + 1e-20f), r ,a };
+	return hsv;
+}
+// Convert hsv floats ([0-1],[0-1],[0-1]) to rgb floats ([0-1],[0-1],[0-1]), from Foley & van Dam p593
+// also http://en.wikipedia.org/wiki/HSL_and_HSV
+glm::vec4 HSVtoRGB(const glm::vec4& hsv)
+{
+	glm::vec4 c = {};
+	float h = hsv.x, s = hsv.y, v = hsv.z;
+	c.w = hsv.w;
+	if (s == 0.0f)
+	{
+		c.x = c.y = c.z = v;	// gray
+		return c;
+	}
+	h = fmod(h, 1.0f) / (60.0f / 360.0f);
+	int   i = (int)h;
+	float f = h - (float)i;
+	float p = v * (1.0f - s);
+	float q = v * (1.0f - s * f);
+	float t = v * (1.0f - s * (1.0f - f));
+	switch (i)
+	{
+	case 0: c.x = v; c.y = t; c.z = p; break;
+	case 1: c.x = q; c.y = v; c.z = p; break;
+	case 2: c.x = p; c.y = v; c.z = t; break;
+	case 3: c.x = p; c.y = q; c.z = v; break;
+	case 4: c.x = t; c.y = p; c.z = v; break;
+	case 5: default: c.x = v; c.y = p; c.z = q; break;
+	}
+	return c;
+}
+
+
+
 // todo test
 void ttbr()
 {
@@ -4413,7 +4490,7 @@ glm::vec4 get_color_cb(const glm::ivec2& pos, const glm::ivec2& size, float h)
 	glm::vec4 hsv = { h,0,0,1 };
 	hsv.y = n.x;
 	hsv.z = 1.0 - n.y;
-	HSVtoRGB(hsv, hc);
+	hc = HSVtoRGB(hsv);
 	return hc;
 }
 // 获取色调颜色
@@ -4424,7 +4501,7 @@ glm::vec4 get_hue_color_cb(const glm::ivec2& pos, const glm::ivec2& size)
 	glm::vec4 hsv = { n.x,0,0,1 };
 	hsv.y = 1;
 	hsv.z = 1.0 - n.y;
-	HSVtoRGB(hsv, hc);
+	hc = HSVtoRGB(hsv);
 	return hc;
 }
 

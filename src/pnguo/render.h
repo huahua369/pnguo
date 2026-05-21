@@ -781,3 +781,6 @@ glm::vec4 get_color_cb(const glm::ivec2& pos, const glm::ivec2& size, float h);
 // 获取色调颜色
 glm::vec4 get_hue_color_cb(const glm::ivec2& pos, const glm::ivec2& size);
 size_t build_huedata(const glm::vec4& incolor, const glm::ivec4& rc0, std::vector<text_vx>& vtx, std::vector<uint32_t>& idx);
+
+glm::vec4 RGBtoHSV(uint32_t c);
+glm::vec4 HSVtoRGB(const glm::vec4& hsv);

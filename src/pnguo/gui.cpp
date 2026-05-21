@@ -867,80 +867,6 @@ bool slider_tl::update(float delta)
 
 
 
-
-
-// H in [0,360)
-// S, V, R, G, B in [0,1]
-glm::vec4 convertHSVtoRGB(const glm::vec4& hsv)
-{
-	double H = hsv.x * 360.0, S = hsv.y, V = hsv.z;
-	double R = 0.0, G = 0.0, B = 0.0;
-	int Hi = int(floor(H / 60.)) % 6;
-	double f = H / 60. - Hi;
-	double p = V * (1 - S);
-	double q = V * (1 - f * S);
-	double t = V * (1 - (1 - f) * S);
-	switch (Hi) {
-	case 0: R = V, G = t, B = p; break;
-	case 1: R = q, G = V, B = p; break;
-	case 2: R = p, G = V, B = t; break;
-	case 3: R = p, G = q, B = V; break;
-	case 4: R = t, G = p, B = V; break;
-	case 5: R = V, G = p, B = q; break;
-	}
-	return { R,G,B,hsv.w };
-}
-
-
-
-// Convert rgb floats ([0-1],[0-1],[0-1]) to hsv floats ([0-1],[0-1],[0-1]), from Foley & van Dam p592
-// Optimized http://lolengine.net/blog/2013/01/13/fast-rgb-to-hsv
-glm::vec4 RGBtoHSV(glm::u8vec4* c)
-{
-	double r = c->x / 255.0, g = c->y / 255.0, b = c->z / 255.0, a = c->w / 255.0;
-	double K = 0.;
-	if (g < b)
-	{
-		std::swap(g, b);
-		K = -1.;
-	}
-	if (r < g)
-	{
-		std::swap(r, g);
-		K = -2. / 6. - K;
-	}
-	const float chroma = r - (g < b ? g : b);
-	glm::vec4 hsv = { fabs(K + (g - b) / (6.0 * chroma + 1e-20f)), chroma / (r + 1e-20f), r ,a };
-	return hsv;
-}
-// Convert hsv floats ([0-1],[0-1],[0-1]) to rgb floats ([0-1],[0-1],[0-1]), from Foley & van Dam p593
-// also http://en.wikipedia.org/wiki/HSL_and_HSV
-void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc)
-{
-	float h = hsv.x, s = hsv.y, v = hsv.z;
-	otc.w = hsv.w;
-	if (s == 0.0f)
-	{
-		otc.x = otc.y = otc.z = v;	// gray
-		return;
-	}
-	h = fmod(h, 1.0f) / (60.0f / 360.0f);
-	int   i = (int)h;
-	float f = h - (float)i;
-	float p = v * (1.0f - s);
-	float q = v * (1.0f - s * f);
-	float t = v * (1.0f - s * (1.0f - f));
-	switch (i)
-	{
-	case 0: otc.x = v; otc.y = t; otc.z = p; break;
-	case 1: otc.x = q; otc.y = v; otc.z = p; break;
-	case 2: otc.x = p; otc.y = v; otc.z = t; break;
-	case 3: otc.x = p; otc.y = q; otc.z = v; break;
-	case 4: otc.x = t; otc.y = p; otc.z = v; break;
-	case 5: default: otc.x = v; otc.y = p; otc.z = q; break;
-	}
-}
-
 void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
 {
 	set_color2hsv(c);
@@ -962,8 +888,7 @@ void colorpick_tl::init(uint32_t c, int w, int h, bool alpha)
 
 uint32_t colorpick_tl::get_color()
 {
-	glm::vec4 hc = {};
-	HSVtoRGB(hsv, hc);
+	glm::vec4 hc = HSVtoRGB(hsv);
 	glm::u8vec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
 	return *((uint32_t*)&c);
 }
@@ -972,7 +897,7 @@ void colorpick_tl::set_color2hsv(uint32_t c)
 {
 	color.y = color.x;
 	color.x = c;
-	hsv = RGBtoHSV((glm::u8vec4*)&c);
+	hsv = RGBtoHSV(c);
 }
 
 void colorpick_tl::set_hsv(const glm::vec3& c)
@@ -1044,8 +969,7 @@ bool colorpick_tl::update(float delta)
 			hsvstr += "\nA:" + std::to_string(a) + "%";
 		}
 		else { hsv.w = 1; }
-		glm::vec4 hc = {};
-		HSVtoRGB(hsv, hc);
+		glm::vec4 hc = HSVtoRGB(hsv);
 		char buf[256] = {};
 		glm::ivec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
 		sprintf(buf, "#%02X%02X%02X%02X %d,%d,%d,%d", c.x, c.y, c.z, c.w, c.x, c.y, c.z, c.w);
@@ -1914,9 +1838,8 @@ void colorpick_tl::draw(rvg_cx* rv)
 	const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1)
 		, glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
 	int yh = height + step;
-	glm::vec4 hc = {};
 	glm::vec2 tps = { cpx + step,yh };
-	HSVtoRGB(hsv, hc);
+	glm::vec4 hc = HSVtoRGB(hsv);
 	{
 		glm::vec4 cc = {};
 		rv->grid_fill({ cpx, height }, { -1,0xffdfdfdf }, height * 0.5);// 填充格子

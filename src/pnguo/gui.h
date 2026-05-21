@@ -631,8 +631,6 @@ public:
 
 #endif // 1
 
-glm::vec4 RGBtoHSV(glm::u8vec4* c);
-void HSVtoRGB(const glm::vec4& hsv, glm::vec4& otc);
 
 #endif
 

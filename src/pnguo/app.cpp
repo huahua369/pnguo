@@ -303,7 +303,7 @@ void test_hueui()
 	glm::vec4 c1 = glm::vec4(0, 0, 0.8, 1.0);// 0xffcc0000;
 	glm::vec4 ohsv = { 0.7,1,1,1 };
 	glm::vec4 pick0 = c1, pick1 = c1;
-	HSVtoRGB(ohsv, c1);
+	c1 = HSVtoRGB(ohsv);
 	auto vtx_pos = vtx.size();
 	auto vtxd = vtx.data();
 	// 获取色盘颜色
@@ -313,7 +313,7 @@ void test_hueui()
 		glm::vec4 hsv = { h,0,0,1 };
 		hsv.y = n.x;
 		hsv.z = 1.0 - n.y;
-		HSVtoRGB(hsv, hc);
+		hc = HSVtoRGB(hsv);
 		return hc;
 		};
 	// 获取色调颜色
@@ -323,7 +323,7 @@ void test_hueui()
 		glm::vec4 hsv = { n.x,0,0,1 };
 		hsv.y = 1;
 		hsv.z = 1.0 - n.y;
-		HSVtoRGB(hsv, hc);
+		hc = HSVtoRGB(hsv);
 		return hc;
 		};
 
