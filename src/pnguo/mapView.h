@@ -403,6 +403,16 @@ namespace md {
 	int64_t file_size(FILE* fp);
 }
 
+namespace pg
+{
+	std::string to_string(double _Val);
+	std::string to_string_p(uint32_t _Val);
+	std::string to_string_p(uint64_t _Val);
+	std::string to_string_hex(uint32_t _Val);
+	std::string to_string_hex(uint64_t _Val, int n, const char* x);
+	std::string to_string_hex2(uint32_t _Val);
+	std::string to_string(double _Val, const char* fmt);
+}
 uint64_t align_up(uint64_t val, uint64_t alignment);
 uint64_t align_down(uint64_t val, uint64_t alignment);
 uint64_t divideroundingup(uint64_t a, uint64_t b);

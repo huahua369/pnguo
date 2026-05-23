@@ -28,6 +28,18 @@ struct pickup_t
 #ifndef NOT_UI
 class form_x;
 
+struct image_btn;
+struct color_btn;
+struct gradient_btn;
+struct radio_tl;
+struct checkbox_tl;
+struct switch_tl;
+struct progress_tl;
+struct slider_tl;
+struct colorpick_tl;
+struct scroll_bar;
+class edit_cx;
+
 //  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 struct widget_t
 {

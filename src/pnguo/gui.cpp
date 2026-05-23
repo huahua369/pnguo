@@ -2,13 +2,13 @@
 #include "pch1.h"
 
 #include <SDL3/SDL_keycode.h>
-#include <mapView.h>
-#include <event.h>
-
 #include <stb_image_write.h>
 
+#include <mapView.h>
+#include <event.h>
+#include "font_core.h"
 #include "pnguo.h"
-#include "gui.h"  
+#include "gui.h"
 #include "render.h"
 #ifdef min
 #undef min
@@ -940,12 +940,17 @@ bool colorpick_tl::update(float delta)
 		int s = hsv.y * 100;
 		int v = hsv.z * 100;
 		int a = hsv.w * 100;
-		hsvstr = "H:" + std::to_string(h) + (char*)u8"°";
-		hsvstr += "\nS:" + std::to_string(s) + "%";
-		hsvstr += "\nV:" + std::to_string(v) + "%";
+		std::string th = std::to_string(h) + (char*)u8"°";
+		std::string ts = std::to_string(s) + "%";
+		std::string tv = std::to_string(v) + "%";
+		std::string ta = std::to_string(a) + "%";
+
+		hsvstr = "H:" + th;
+		hsvstr += "\nS:" + ts;
+		hsvstr += "\nV:" + tv;
 		if (alpha)
 		{
-			hsvstr += "\nA:" + std::to_string(a) + "%";
+			hsvstr += "\nA:" + ta;
 		}
 		else { hsv.w = 1; }
 		glm::vec4 hc = HSVtoRGB(hsv);
@@ -955,6 +960,9 @@ bool colorpick_tl::update(float delta)
 		colorstr = buf;
 		glm::ivec2 ss = _size;
 		colorw = ss.x - cpx - step * 2;
+		int yh = height + step;
+
+
 #if 0
 		if (ltx)
 		{

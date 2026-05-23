@@ -325,7 +325,12 @@ struct node_dt
 // 输入样式数据，根节点指针，所有节点数量
 glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
 
+double get_alpha_f(uint32_t c);
+bool is_alpha(uint32_t c);
+uint32_t set_alpha(uint32_t c, uint32_t a);
 
+bool rect_includes(const glm::vec4& rc, const glm::vec2& p);
+glm::ivec2 check_box_cr1(const glm::vec2& p, const glm::vec4* d, size_t count, int stride);
 
 struct texture_dt
 {

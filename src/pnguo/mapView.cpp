@@ -4017,6 +4017,67 @@ namespace hz
 
 }//!hz
 
+namespace pg
+{
+	std::string to_string(double _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%.16g", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%.16g", _Val);
+		return _Str;
+	}
+	std::string to_string_p(uint32_t _Val)
+	{
+		uint64_t p = 0; p = _Val;
+		const auto _Len = static_cast<size_t>(_scprintf("%p", (void*)p));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%p", (void*)p);
+		return _Str;
+	}
+	std::string to_string_p(uint64_t _Val)
+	{
+		void* p = (void*)_Val;
+		const auto _Len = static_cast<size_t>(_scprintf("%p", p));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%p", p);
+		return _Str;
+	}
+	std::string to_string_hex(uint32_t _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%x", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%x", _Val);
+		return _Str;
+	}
+	std::string to_string_hex(uint64_t _Val, int n, const char* x)
+	{
+		std::string fmt = "%";
+		if (n > 0)
+		{
+			fmt += "0" + std::to_string(n);
+		}
+		fmt += x ? x : "x";
+		const auto _Len = static_cast<size_t>(_scprintf(fmt.c_str(), _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, fmt.c_str(), _Val);
+		return _Str;
+	}
+	std::string to_string_hex2(uint32_t _Val)
+	{
+		const auto _Len = static_cast<size_t>(_scprintf("%02x", _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, "%02x", _Val);
+		return _Str;
+	}
+	std::string to_string(double _Val, const char* fmt)
+	{
+		if (!fmt || !*fmt)fmt = "%.16g";
+		const auto _Len = static_cast<size_t>(_scprintf(fmt, _Val));
+		std::string _Str(_Len, '\0');
+		sprintf_s(&_Str[0], _Len + 1, fmt, _Val);
+		return _Str;
+	}
+}
 // align val to the next multiple of alignment
 uint64_t align_up(uint64_t val, uint64_t alignment)
 {
