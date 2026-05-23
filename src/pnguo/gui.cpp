@@ -893,11 +893,11 @@ void colorpick_tl::set_hsv(const glm::vec4& c)
 	color.y = color.x;
 	color.x = get_color();
 }
-void colorpick_tl::set_posv(const glm::ivec2& poss)
+void colorpick_tl::set_posv(int poss_x)
 {
-	double cw0 = colorw - step, x = poss.x;
+	double cw0 = colorw - step, x = poss_x;
 	if (x < 0) { x = 0; }
-	double xf = glm::clamp((double)poss.x / cw0, 0.0, 1.0);
+	double xf = glm::clamp((double)poss_x / cw0, 0.0, 1.0);
 	int x4 = alpha ? 4 : 3;
 	if (dx >= 0 && dx < x4)
 	{
@@ -914,7 +914,7 @@ bool colorpick_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 	double htp = height + step;
 	if (et == event_type2::on_click && (poss.x > 0) && poss.y > 0)
 	{
-		set_posv(poss);
+		set_posv(poss.x);
 	}
 	if (et == event_type2::on_down) {
 		if (poss.y > 0 && poss.x > 0)
@@ -926,8 +926,9 @@ bool colorpick_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 		poss.y = 0;
 	if (et == event_type2::on_drag)
 	{
+		auto oldps = poss;
 		poss += curpos;
-		set_posv(poss);
+		set_posv(poss.x);
 	}
 	return false;
 }

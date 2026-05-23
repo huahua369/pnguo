@@ -516,7 +516,7 @@ public:
 	void set_color2hsv(uint32_t c);
 	void set_hsv(const glm::vec3& c);
 	void set_hsv(const glm::vec4& c);
-	void set_posv(const glm::ivec2& poss);
+	void set_posv(int poss_x);
 
 	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
