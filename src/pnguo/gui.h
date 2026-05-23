@@ -497,9 +497,8 @@ public:
 struct colorpick_tl :public widget_t
 {
 	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
-	glm::vec4 hsv = {}, oldhsv = {};	// 0-1保存hsv
-	//uint32_t text_color = 0xffeeeeee;//文本颜色 
-	uint32_t bc_color = 0xff232323;//边框 
+	glm::vec4 hsv = {}, oldhsv = {};// 0-1保存hsv
+	uint32_t bc_color = 0xff232323;	//边框 
 	int width = 0;					// 宽度
 	int height = 0;					// 单行高度 
 	int step = 4;					// 行间隔 
@@ -507,7 +506,6 @@ struct colorpick_tl :public widget_t
 	int cpx = 0;					// 颜色x坐标
 	int dx = -1;
 	std::string hsvstr, colorstr;
-	std::vector<font_item_t> tem_rtv;
 	std::function<void(colorpick_tl* p, uint32_t col)> on_change_cb;
 	bool alpha = true;				// 显示透明通道
 public:
@@ -523,6 +521,35 @@ public:
 	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);
+};
+class colorpick_cx :public div_cx
+{
+public:
+	glm::ivec2 color = { -1, -1 };	//当前颜色，旧颜色
+	glm::vec4 hsv = {}, oldhsv = {};// 0-1保存hsv
+	uint32_t bc_color = 0xff232323;	//边框 
+	int width = 0;					// 宽度
+	int height = 0;					// 单行高度 
+	int step = 4;					// 行间隔 
+	int colorw = 100;				// 颜色宽
+	int cpx = 0;					// 颜色x坐标
+	int dx = -1;
+	std::string hsvstr, colorstr;
+	std::function<void(colorpick_cx* p, uint32_t col)> on_change_cb;
+public:
+	colorpick_cx();
+	~colorpick_cx();
+	void init(uint32_t c, int w, int h);
+
+	uint32_t get_color();	// 获取颜色
+	void set_color2hsv(uint32_t c);
+	void set_hsv(const glm::vec3& c);
+	void set_hsv(const glm::vec4& c);
+	void set_posv(const glm::ivec2& poss);
+	bool on_mevent(int type, const glm::vec2& mps, void* e);
+	bool update(float delta);
+private:
+
 };
 
 // 滚动条

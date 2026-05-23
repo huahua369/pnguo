@@ -912,21 +912,23 @@ bool colorpick_tl::on_mevent(int type, const glm::vec2& mps, void* e)
 	poss.x -= cpx + step;
 	poss.y -= height + step;
 	double htp = height + step;
-	if (poss.y < 0)poss.y = 0;
-	if (et == event_type2::on_down) {
-		dx = poss.y / htp;
-	}
-	if (et == event_type2::on_click)
+	if (et == event_type2::on_click && (poss.x > 0) && poss.y > 0)
 	{
 		set_posv(poss);
 	}
+	if (et == event_type2::on_down) {
+		if (poss.y > 0 && poss.x > 0)
+			dx = poss.y / htp;
+		else
+			dx = -1;
+	}
+	if (poss.y < 0)
+		poss.y = 0;
 	if (et == event_type2::on_drag)
 	{
 		poss += curpos;
 		set_posv(poss);
 	}
-
-
 	return false;
 }
 
@@ -960,31 +962,6 @@ bool colorpick_tl::update(float delta)
 		colorstr = buf;
 		glm::ivec2 ss = _size;
 		colorw = ss.x - cpx - step * 2;
-		int yh = height + step;
-
-
-#if 0
-		if (ltx)
-		{
-			glm::ivec2 ss = size;
-			glm::vec2 ta = { 0.0, 0.0 };
-			glm::vec4 rc = { step, height + step, ss };
-			cw = ss.x - cpx - step * 2;
-			rc.w -= rc.y;
-			tem_rtv.clear();
-			//auto rk = ltx->get_text_rect(1, "H:00%%"/* hsvstr.c_str()*/, -1, font_size);
-			ltx->heightline = rc.y;//设置固定行高
-			rc.y += step;
-			ltx->build_text(1, font_size, rc, ta, hsvstr.c_str(), -1, tem_rtv);
-			rc.y = 0; rc.x += cpx;
-			rc.z = cw;
-			rc.w = height; ta.y = 0.5;
-			ltx->heightline = 0; // 使用默认行高
-			ltx->build_text(1, font_size, rc, ta, colorstr.c_str(), -1, tem_rtv);
-			ltx->heightline = 0;
-			assert(cw > 0);
-		}
-#endif
 		if (on_change_cb) {
 			on_change_cb(this, get_color());
 		}
@@ -993,6 +970,128 @@ bool colorpick_tl::update(float delta)
 }
 
 
+colorpick_cx::colorpick_cx()
+{}
+
+colorpick_cx::~colorpick_cx()
+{}
+
+void colorpick_cx::init(uint32_t c, int w, int h)
+{
+	set_color2hsv(c);
+	width = w;
+	height = h;
+	//if (height < font_size)
+	//	height = ltx->get_lineheight(0, font_size);
+	h = height + step;
+	cpx = height * 2.5;
+	int minw = cpx + step * 2;
+	if (width < minw) {
+		width = minw + h;
+	}
+	_size.x = width;
+	int hn = 5;
+	_size.y = h * hn;
+}
+
+uint32_t colorpick_cx::get_color()
+{
+	glm::vec4 hc = HSVtoRGB(hsv);
+	glm::u8vec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
+	return *((uint32_t*)&c);
+}
+
+void colorpick_cx::set_color2hsv(uint32_t c)
+{
+	color.y = color.x;
+	color.x = c;
+	hsv = RGBtoHSV(c);
+}
+
+void colorpick_cx::set_hsv(const glm::vec3& c)
+{
+	hsv.x = c.x;
+	hsv.y = c.y;
+	hsv.z = c.z;
+	color.y = color.x;
+	color.x = get_color();
+}
+void colorpick_cx::set_hsv(const glm::vec4& c)
+{
+	hsv = c;
+	color.y = color.x;
+	color.x = get_color();
+}
+void colorpick_cx::set_posv(const glm::ivec2& poss)
+{
+	double cw0 = colorw - step, x = poss.x;
+	if (x < 0) { x = 0; }
+	double xf = glm::clamp((double)poss.x / cw0, 0.0, 1.0);
+	int x4 = 4;// alpha ? 4 : 3;
+	if (dx >= 0 && dx < x4)
+	{
+		hsv[dx] = xf;
+	}
+}
+
+bool colorpick_cx::on_mevent(int type, const glm::vec2& mps, void* e)
+{
+	auto et = (event_type2)type;
+	glm::ivec2 poss = mps - _pos;
+	glm::ivec2 ss = _size;
+	poss.x -= cpx + step;
+	poss.y -= height + step;
+	double htp = height + step;
+	if (poss.y < 0)poss.y = 0;
+	if (et == event_type2::on_down) {
+		dx = poss.y / htp;
+	}
+	if (et == event_type2::on_click)
+	{
+		set_posv(poss);
+	}
+	if (et == event_type2::on_drag)
+	{
+		poss += curpos;
+		set_posv(poss);
+	}
+
+
+	return false;
+}
+
+bool colorpick_cx::update(float delta)
+{
+	if (hsv != oldhsv || hsvstr.empty())
+	{
+		int* k = nullptr;
+		oldhsv = hsv;
+		int h = hsv.x * 360;
+		int s = hsv.y * 100;
+		int v = hsv.z * 100;
+		int a = hsv.w * 100;
+		std::string th = std::to_string(h) + (char*)u8"°";
+		std::string ts = std::to_string(s) + "%";
+		std::string tv = std::to_string(v) + "%";
+		std::string ta = std::to_string(a) + "%";
+
+		hsvstr = "H:" + th;
+		hsvstr += "\nS:" + ts;
+		hsvstr += "\nV:" + tv;
+		hsvstr += "\nA:" + ta;
+		glm::vec4 hc = HSVtoRGB(hsv);
+		char buf[256] = {};
+		glm::ivec4 c = { (int)(hc.x * 255), (int)(hc.y * 255), (int)(hc.z * 255), (int)(hc.w * 255) };
+		sprintf(buf, "#%02X%02X%02X%02X %d,%d,%d,%d", c.x, c.y, c.z, c.w, c.x, c.y, c.z, c.w);
+		colorstr = buf;
+		glm::ivec2 ss = _size;
+		colorw = ss.x - cpx - step * 2;
+		if (on_change_cb) {
+			on_change_cb(this, get_color());
+		}
+	}
+	return false;
+}
 
 
 
