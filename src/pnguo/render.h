@@ -524,8 +524,10 @@ struct stack_item
 
 struct cmdview_v {
 	glm::ivec4 rc = {};	// 渲染区域
-	size_t inc = 0;
+	size_t first = 0;
+	size_t count = 0;
 	size_t dcv_index = 0;
+	void* ptr = 0;
 };
 struct rvgraw_t {
 	glm::ivec2 pos = {};
@@ -640,7 +642,7 @@ public:
 		rv->pop_view();
 		rv->restore();
 	*/
-	void push_view(const glm::ivec4& c);
+	void push_view(const glm::ivec4& c, void* ptr = nullptr);
 	void pop_view();
 	void push_null(int v);
 	uint32_t get_crc();

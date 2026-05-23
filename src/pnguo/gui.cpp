@@ -1415,7 +1415,7 @@ void image_btn::draw(rvg_cx* rv) {
 
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 	//image_ptr_t* img = 0;
 	//image_sliced_t state_img[5] = {};
 	text_style st = {};
@@ -1445,7 +1445,7 @@ void color_btn::draw(rvg_cx* rv)
 	auto ss = get_size();
 	auto psv = get_spos(); psv += _pos;
 	auto view = glm::ivec4(psv, ss + thickness);
-	rv->push_view(view);
+	rv->push_view(view, this);
 	rv->save();
 	rv->translate(psv);
 	//ss -= thickness;
@@ -1532,7 +1532,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	glm::vec2 tps = { 0.5,0.5 };
 
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 	rv->save();
 	rv->translate({ x, y });
 	if (is_alpha(bc))
@@ -1684,7 +1684,7 @@ void radio_tl::draw(rvg_cx* rv)
 
 		auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 		auto view = glm::ivec4(psv, get_size());
-		rv->push_view(view);
+		rv->push_view(view, this);
 
 		rv->save();
 		rv->translate((glm::vec2)psv);
@@ -1716,7 +1716,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 
 		auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 		auto view = glm::ivec4(psv, get_size());
-		rv->push_view(view);
+		rv->push_view(view, this);
 
 		rv->save();
 		glm::ivec2 poss = psv;
@@ -1741,7 +1741,7 @@ void switch_tl::draw(rvg_cx* rv)
 #if 1
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 
 	glm::ivec2 poss = psv;
 	auto h = height;
@@ -1779,7 +1779,7 @@ void progress_tl::draw(rvg_cx* rv)
 #if 1
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 	glm::vec2 npos = _size - (glm::vec2)ss;
 	npos *= 0.5;
 	rv->save();
@@ -1852,7 +1852,7 @@ void slider_tl::draw(rvg_cx* rv)
 #if 1
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 	rv->save();
 	glm::ivec2 ss = _size;
 	rv->translate(psv);
@@ -1917,7 +1917,7 @@ void colorpick_tl::draw(rvg_cx* rv)
 #if 1
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 	glm::ivec2 ss = _size;
 	rv->translate(psv);
 	rv->save();
@@ -2014,7 +2014,7 @@ void scroll_bar::draw(rvg_cx* rv)
 	glm::ivec2 ss = _size;
 	auto psv = _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
-	rv->push_view(view);
+	rv->push_view(view, this);
 	rv->translate(psv);
 	// 背景
 	if (!hideble || thumb_size_m.z) {
@@ -3073,7 +3073,7 @@ void div_cx::draw(rvg_cx* rv)
 	auto sps = get_spos();	// 获取滚动量
 	auto ss = get_size();
 	if (border.w || border.x) {
-		rv->push_view(glm::ivec4(0, 0, ss));
+		rv->push_view(glm::ivec4(0, 0, ss), this);
 		rv->set_line_width(border.y);
 		//rv->translate(pos);
 		glm::vec2 rc = ss;
@@ -5120,7 +5120,7 @@ void edit_cx::draw(rvg_cx* rv)
 	auto vsize = get_size();
 	vsize += thickness * 2;
 	auto view = glm::ivec4(psv, vsize);
-	rv->push_view(view);
+	rv->push_view(view, this);
 	rv->save();
 	rv->translate(psv);
 	rv->add_rect({ 0,0,ss.x ,ss.y }, rounding);

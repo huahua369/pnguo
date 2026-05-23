@@ -2120,10 +2120,18 @@ inline bool is_textimage(uint8_t c) {
 	return c >= rvg_cx::OP_TEXT_STYLE;
 }
 
-void rvg_cx::push_view(const glm::ivec4& c)
+void rvg_cx::push_view(const glm::ivec4& c, void* ptr)
 {
 	_tview = c;
-	_view.push_back({ _tview,_cmdtype.size(),0 });
+	if (!ptr && _view.size()) {
+		ptr = _view.back().ptr;
+	}
+	cmdview_v cv = {};
+	cv.rc = c;
+	cv.first = _cmdtype.size();
+	cv.dcv_index = 0;
+	cv.ptr = ptr;
+	_view.push_back(cv);
 	push_ct(OP_VIEW);
 	save();
 }
@@ -2132,6 +2140,13 @@ void rvg_cx::pop_view()
 {
 	restore();
 	push_ct(OP_VIEW_POP);
+	if (_view.size())
+	{
+		auto& v = _view.back(); v.count = _cmdtype.size() - v.first;
+	}
+	else {
+		assert(0);// 没有显示区
+	}
 }
 
 bool rvg_cx::is_image()
