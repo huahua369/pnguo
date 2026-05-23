@@ -562,6 +562,7 @@ public:
 	glm::ivec2 pos = {};
 private:
 	std::stack<stack_item> _stk;
+	std::stack<size_t> _st_view;
 	stack_item _cur = {};				// 当前状态
 	glm::ivec4 _tem_clip = {};
 	glm::ivec4 _tview = {};				// 当前渲染区域 

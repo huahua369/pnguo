@@ -1724,6 +1724,9 @@ void rvg_cx::clear()
 	while (_stk.size()) {
 		_stk.pop();
 	}
+	while (_st_view.size()) {
+		_st_view.pop();
+	}
 	_cur = {};				// 当前状态
 	_tem_clip = {};
 	_tview = {};				// 当前渲染区域 
@@ -2131,6 +2134,7 @@ void rvg_cx::push_view(const glm::ivec4& c, void* ptr)
 	cv.first = _cmdtype.size();
 	cv.dcv_index = 0;
 	cv.ptr = ptr;
+	_st_view.push(_view.size());
 	_view.push_back(cv);
 	push_ct(OP_VIEW);
 	save();
@@ -2140,9 +2144,16 @@ void rvg_cx::pop_view()
 {
 	restore();
 	push_ct(OP_VIEW_POP);
-	if (_view.size())
+	size_t cidx = -1;
+	if (_st_view.size())
 	{
-		auto& v = _view.back(); v.count = _cmdtype.size() - v.first;
+		cidx = _st_view.top();
+		_st_view.pop();
+	}
+	if (cidx < _view.size())
+	{
+		auto& v = _view[cidx];
+		v.count = _cmdtype.size() - v.first;
 	}
 	else {
 		assert(0);// 没有显示区
