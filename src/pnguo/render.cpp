@@ -3804,7 +3804,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			vt.count = 1;
 			vt.v.t = (box_text_d*)1;
 			vt.type = 0;
-			dst->dst_data.push_back(vt);			
+			dst->dst_data.push_back(vt);
 		}
 		auto pss = didx[i];
 		if (ct == rvg_cx::OP_ADD_GEOMETRY) {
@@ -3819,6 +3819,17 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 		size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? tcc.ctx : dst->mrt);
 	}
 	assert(stt.empty());// 命令异常
+	for (; stt.size();) {
+
+		tcc = stt.top();
+		stt.pop();
+		if (tcc.ctx)
+		{
+			auto ctx = (VkvgContext)tcc.ctx;
+			vkvg_restore(ctx);
+			ctx_end(tcc.ctx);
+		}
+	}
 	for (auto& it : dst->surfaces)
 	{
 		if (it.surface)
