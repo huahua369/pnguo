@@ -1920,7 +1920,7 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	if (!p || p->text == 0 || p->text_len < 1)return;
 	auto pos = p->pos + _cur.pos;
 	glm::vec4 rc = { pos , 0,0 };//p->size
-	push_view(rc);
+	//push_view(rc);
 	set_text_style(ts);
 	push_ct(OP_ADD_TEXT);
 	auto idx = _cmd.size();
@@ -1931,7 +1931,7 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	pd->clip = _cur.clip;
 	_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
 	pd->text = (char*)tps;
-	pop_view();
+	//pop_view();
 }
 
 void rvg_cx::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos)
@@ -1944,10 +1944,10 @@ void rvg_cx::add_image(image_r* r)
 {
 	if (!r || !r->img)return;
 	glm::vec4 rc = { _cur.pos + (glm::vec2)r->pos , 0,0 };
-	push_view(rc);
+	//push_view(rc);
 	push_ct(OP_ADD_IMAGE);
 	_cmd.insert(_cmd.end(), (char*)r, (char*)(r + 1));
-	pop_view();
+	//pop_view();
 }
 
 void rvg_cx::add_geometry(geometry_d* geo)
@@ -3741,19 +3741,15 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	size_t ps = 0;
 
 	auto dp = dst->dcv.data();
-	glm::ivec3 tcount = {};
+	//glm::ivec3 tcount = {};
 	//for (auto it : rvg->_cmdtype) {
-	//	if (it == rvg_cx::OP_SAVE)
+	//	if (it == rvg_cx::OP_VIEW)
 	//	{
 	//		tcount.x++;
 	//	}
-	//	if (it == rvg_cx::OP_RESTORE)
+	//	if (it == rvg_cx::OP_VIEW_POP)
 	//	{
 	//		tcount.y++;
-	//	}
-	//	if (it == rvg_cx::OP_NULL)
-	//	{
-	//		tcount.z++;
 	//	}
 	//}
 	auto pct = rvg->_cmdtype.data();
@@ -3783,13 +3779,6 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				stt.push(tcc);
 			}
 			else {
-				gdata_ptr vt = {};
-				vt.first = mrt_box_count(dst->mrt);
-				vt.count = 1;
-				vt.v.t = (box_text_d*)1;
-				vt.type = 0;
-				dst->dst_data.push_back(vt);
-				stt.push({});
 			}
 			vidx++;
 			continue;
@@ -3809,6 +3798,14 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			}
 			continue;
 		}
+		if (ct == rvg_cx::OP_ADD_TEXT || ct == rvg_cx::OP_ADD_IMAGE) {
+			gdata_ptr vt = {};
+			vt.first = mrt_box_count(dst->mrt);
+			vt.count = 1;
+			vt.v.t = (box_text_d*)1;
+			vt.type = 0;
+			dst->dst_data.push_back(vt);			
+		}
 		auto pss = didx[i];
 		if (ct == rvg_cx::OP_ADD_GEOMETRY) {
 			gdata_ptr vt = {};
@@ -3821,6 +3818,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 		}
 		size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? tcc.ctx : dst->mrt);
 	}
+	assert(stt.empty());// 命令异常
 	for (auto& it : dst->surfaces)
 	{
 		if (it.surface)

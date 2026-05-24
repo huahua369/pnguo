@@ -900,7 +900,7 @@ int main()
 		//std::vector<font_t*> familys = { ksun ,seg };
 
 
-		fctx->set_cache_size(600, 1024);
+		fctx->set_cache_size(512, 512);
 
 		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
 
