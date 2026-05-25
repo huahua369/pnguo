@@ -598,7 +598,7 @@ struct text_control;
 class edit_cx :public widget_t
 {
 public:
-	std::function<void(edit_cx* ptr)> changed_cb;	// 文本改变时执行回调函数 
+	std::function<void(edit_cx* ptr)> change_cb;	// 文本改变时执行回调函数 
 	std::function<void(edit_cx* ptr, std::string& str)> input_cb;	// 文本输入时执行回调函数，可修改此字符串返回
 	text_control* ctx = 0;			// stb_textedit	
 	std::string stext;				// 显示的文本，密码显示用
