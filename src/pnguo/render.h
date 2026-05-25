@@ -658,6 +658,7 @@ struct translate_cc
 {
 	void* surface = 0;
 	void* ctx = 0;
+	void* ptr = 0;
 	glm::vec2 apos = {};
 	glm::vec2 clips = {};
 };
@@ -668,10 +669,11 @@ struct gdata_ptr
 		box_text_d* t = 0;	// 位图或文本
 		d2_rt* d2;			// 矢量图
 		geometry_d* geo;	// 三角形数据
-	}v;
-	size_t first = 0;	// 第一个位置
-	size_t count = 0;	// 渲染数量
+	}v; 
+	cmdview_v view = {};
+	size_t raw_index = 0;	// dcv\mrt索引
 	int type = 0;		// 0文本/位图，1矢量图，2三角形
+	uint32_t cmd_crc = 0;
 };
 class rvg_data_cx
 {

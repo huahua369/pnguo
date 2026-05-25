@@ -3265,10 +3265,9 @@ translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 			if (!v.v.d2)
 			{
 				v.v.d2 = dcv.data();
-				v.first = idx;
+				v.raw_index = idx;
 				v.type = 1;
 			}
-			v.count++;
 		}
 		r.clips = rcc.size;
 		r.apos = rcc.pos - rcc.offset;
@@ -3396,33 +3395,29 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 			}
 			break;
 		case 1:
-			if (vt.v.d2) {
-				for (size_t i = 0; i < vt.count; i++)
+			if (vt.v.d2)
+			{
+				auto it = vt.v.d2 + vt.raw_index;
+				auto surface = dst->surfaces[it->surface].surface;
+				auto& tp = _vgt[surface];
+				if (tp)
 				{
-					auto it = vt.v.d2 + vt.first + i;
-					auto surface = dst->surfaces[it->surface].surface;
-					auto& tp = _vgt[surface];
-					if (tp)
-					{
-						texture_dt dt = {};
-						auto ost = it->offset;
-						ost += dst->_pos;
-						ost -= stwidth;
-						auto ss = it->size;
-						ss -= stwidth;
-						dt.dst_rect = glm::vec4(ost, ss);
-						auto pos = it->pos;
-						pos += stwidth;
-						dt.src_rect = glm::vec4(it->pos, ss);
-						rcb->render_texture(renderer, tp, &dt, 1);
-					}
+					texture_dt dt = {};
+					auto ost = it->offset;
+					ost += dst->_pos;
+					ost -= stwidth;
+					auto ss = it->size;
+					ss -= stwidth;
+					dt.dst_rect = glm::vec4(ost, ss);
+					auto pos = it->pos;
+					pos += stwidth;
+					dt.src_rect = glm::vec4(it->pos, ss);
+					rcb->render_texture(renderer, tp, &dt, 1);
 				}
 			}break;
 		case 2:
 			if (vt.v.geo) {
 				draw_geometry(vt.v.geo);
-				for (size_t i = 1; i < vt.count; i++)
-					draw_geometry(vt.v.geo + vt.first + i);
 			}
 			break;
 		};
@@ -3766,10 +3761,12 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 		auto ct = pct[i];
 		if (ct == rvg_cx::OP_VIEW) {
 			auto vv = rvg->_view[vidx];
-			if (vv.dcv_index < dst->dcv.size())
-			{
+			if (vv.dcv_index < dst->dcv.size()) {
 				tcc = dst->get_ctx(vv.dcv_index, vv.rc);
+				auto& dstv = dst->dst_data.back();
+				dstv.view = vv;
 				tcc.ctx = ctx_begin(tcc.surface);
+				tcc.ptr = vv.ptr;
 				if (tcc.ctx)
 				{
 					auto ctx = (VkvgContext)tcc.ctx;
@@ -3800,17 +3797,16 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 		}
 		if (ct == rvg_cx::OP_ADD_TEXT || ct == rvg_cx::OP_ADD_IMAGE) {
 			gdata_ptr vt = {};
-			vt.first = mrt_box_count(dst->mrt);
-			vt.count = 1;
+			vt.raw_index = mrt_box_count(dst->mrt);
 			vt.v.t = (box_text_d*)1;
 			vt.type = 0;
+			vt.view.ptr = tcc.ptr;
 			dst->dst_data.push_back(vt);
 		}
 		auto pss = didx[i];
 		if (ct == rvg_cx::OP_ADD_GEOMETRY) {
 			gdata_ptr vt = {};
-			vt.first = 0;
-			vt.count = 1;
+			vt.raw_index = 0;
 			vt.v.geo = (geometry_d*)(d + pss);
 			vt.type = 2;
 			dst->dst_data.push_back(vt);
@@ -3830,6 +3826,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			ctx_end(tcc.ctx);
 		}
 	}
+	int ki = 0;
 	for (auto& it : dst->surfaces)
 	{
 		if (it.surface)
@@ -3837,7 +3834,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			vkvg_surface_resolve((VkvgSurface)it.surface);
 			if (first)
 			{
-				std::string str = "temp/vgtest-" + std::to_string((uint64_t)it.surface) + ".png";
+				std::string str = "temp/vgtest-" + std::to_string(ki++) + ".png";
 				vkvg_surface_write_to_png((VkvgSurface)it.surface, str.c_str());
 			}
 		}
@@ -3848,7 +3845,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	for (auto& it : dst->dst_data) {
 		if (it.type == 0)
 		{
-			it.v.t = mrt_get_box_index(dst->mrt, (size_t)it.first);
+			it.v.t = mrt_get_box_index(dst->mrt, (size_t)it.raw_index);
 		}
 	}
 	return true;
