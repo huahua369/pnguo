@@ -2134,6 +2134,7 @@ void rvg_cx::push_view(const glm::ivec4& c, void* ptr)
 	cv.first = _cmdtype.size();
 	cv.dcv_index = 0;
 	cv.ptr = ptr;
+	cv.pos = pos;
 	_st_view.push(_view.size());
 	_view.push_back(cv);
 	push_ct(OP_VIEW);
@@ -2172,11 +2173,23 @@ void rvg_cx::push_null(int v)
 
 uint32_t rvg_cx::get_crc()
 {
-	auto ct0 = ecc_crc32u(_view.data(), _view.size());
-	auto ct1 = ecc_crc32u(_cmd_pos.data(), _cmd_pos.size());
-	auto ct2 = ecc_crc32u(_cmdtype.data(), _cmdtype.size());
-	auto ct3 = ecc_crc32u(_cmd.data(), _cmd.size());
-	return ct0 ^ ct1 ^ ct2 ^ ct3;
+	return ecc_crc32u(_view.data(), _view.size());
+	//auto ct1 = ecc_crc32u(_cmd_pos.data(), _cmd_pos.size());
+	//return ct0 ^ ct1 ^ ct2 ^ ct3;
+}
+uint32_t rvg_cx::get_crc2index(size_t i)
+{
+	uint32_t r = 0;
+	if (i < _view.size() && _cmd.size() && _cmd_pos.size()) {
+		auto& it = _view[i];
+		auto ct1 = ecc_crc32u(&it, sizeof(it));
+		auto ct2 = ecc_crc32u(_cmdtype.data() + it.first, std::min(it.count, _cmdtype.size() - it.first));
+		auto dpos = _cmd_pos[it.first];
+		auto dpos1 = _cmd_pos[it.first + it.count];
+		auto ct3 = ecc_crc32u(_cmd.data() + dpos, std::min(dpos1 - dpos, _cmd.size() - dpos));
+		r = ct1 ^ ct2 ^ ct3;
+	}
+	return r;
 }
 void rvg_cx::push_ct(uint8_t op)
 {
@@ -3379,12 +3392,13 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 	void* renderer = rptr;
 	if (!rcb || !renderer)return;
 	if (!dst || dst->dst_data.empty())return;
-	glm::vec2 pos0 = dst->_pos;
+	glm::vec2 pos0 = {};// dst->_pos;
 	auto length = dst->dst_data.size();
 	int kc = 0;
 	for (size_t m = 0; m < length; m++)
 	{
 		auto& vt = dst->dst_data[m];
+		pos0 = vt.view.pos;
 		switch (vt.type)
 		{
 		case 0:
@@ -3404,7 +3418,7 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 				{
 					texture_dt dt = {};
 					auto ost = it->offset;
-					ost += dst->_pos;
+					ost += pos0;// dst->_pos;
 					ost -= stwidth;
 					auto ss = it->size;
 					ss -= stwidth;
@@ -3702,12 +3716,11 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	assert(_view.z > 0 && _view.w > 0 && dst);
 	auto rvg = dst->get();
 	auto rcrc = rvg->get_crc();
-	bool ret = dst->_pos != rvg->pos;
-	dst->_pos = rvg->pos;
+	bool ret = false;// dst->_pos != rvg->pos;	dst->_pos = rvg->pos;
 	_drawv.push_back(dst);
 	if (dst->cmd_crc == rcrc)
 	{
-		return ret;
+		//return ret;
 	}
 	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
@@ -3756,6 +3769,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	size_t vidx = 0;
 	std::stack<translate_cc> stt = {};
 	translate_cc tcc = {};
+	glm::ivec2 lpos = {};
 	for (size_t i = 0; i < length; i++)
 	{
 		auto ct = pct[i];
@@ -3765,6 +3779,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 				tcc = dst->get_ctx(vv.dcv_index, vv.rc);
 				auto& dstv = dst->dst_data.back();
 				dstv.view = vv;
+				lpos = vv.pos;
 				tcc.ctx = ctx_begin(tcc.surface);
 				tcc.ptr = vv.ptr;
 				if (tcc.ctx)
@@ -3801,6 +3816,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 			vt.v.t = (box_text_d*)1;
 			vt.type = 0;
 			vt.view.ptr = tcc.ptr;
+			vt.view.pos = lpos;
 			dst->dst_data.push_back(vt);
 		}
 		auto pss = didx[i];

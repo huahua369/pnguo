@@ -528,6 +528,7 @@ struct cmdview_v {
 	size_t count = 0;
 	size_t dcv_index = 0;
 	void* ptr = 0;
+	glm::ivec2 pos = {};
 };
 struct rvgraw_t {
 	glm::ivec2 pos = {};
@@ -647,6 +648,7 @@ public:
 	void pop_view();
 	void push_null(int v);
 	uint32_t get_crc();
+	uint32_t get_crc2index(size_t i);
 public:
 	void save_file(const char* fn);
 	bool load_file(const char* fn);
@@ -686,7 +688,7 @@ public:
 	std::vector<surface_ctx> surfaces;
 	std::vector<gdata_ptr> dst_data;	// 使用rvg_cx生成渲染数据列表
 	glm::ivec4 _view = {};
-	glm::ivec2 _pos = {};
+	//glm::ivec2 _pos = {};
 	float stwidth = 2.0;
 	uint32_t cmd_crc = 0;
 	bool mix_text = true;

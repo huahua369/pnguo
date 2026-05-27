@@ -259,27 +259,27 @@ int dom_cx::build()
 			get_div(p, &tdrawlist);
 		}
 	}
+	auto& rvgd = dc->_dobj[0];
+	if (!rvgd)
+		rvgd = new rvg_data_cx();
+	rvg_cx* rvg = rvgd->get();
+	rvg->clear();
 	for (auto& p : tdrawlist) {
 		if (p)
 		{
 			glm::ivec2 dpos = {};
 			if (p->parent)
 				dpos = p->_pos;
-			auto& rvgd = dc->_dobj[p];
-			if (!rvgd)
-				rvgd = new rvg_data_cx();
-			rvg_cx* rvg = rvgd->get();
 			if (rvg && rvgd)
 			{
 				//print_time _bb("build");
-				rvg->clear();
 				rvg->set_pos(p->get_pos());
 				p->draw(rvg);	// 录制渲染
-				// 资源绑定窗口
-				ret += dc->update_rvgdata(rvgd);
 			}
 		}
 	}
+	// 资源绑定窗口
+	ret += dc->update_rvgdata(rvgd);
 	return ret;
 }
 
