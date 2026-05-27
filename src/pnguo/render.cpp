@@ -3220,12 +3220,14 @@ void rvg_data_cx::update()
 	dcv.clear();
 	dst_data.clear();
 	auto cmd_count = rvg->_cmdtype.size();
-
+	size_t gdx = 0;
 	for (auto& it : rvg->_view)
 	{
 		auto rc = it.rc;
 		it.dcv_index = -1;
 		if (rc.z < 1 || rc.w < 1)continue;
+		it.gdindex = gdx++;
+		//get_crc2index;
 		d2_rt d = {};
 		d.size = { rc.z, rc.w };
 		d.size += stwidth * 2;

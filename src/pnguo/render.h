@@ -325,11 +325,11 @@ struct polyline_index_r
 struct image_r
 {
 	image_ptr_t* img;
-	glm::ivec4 rc;
-	glm::ivec4 sliced;
-	glm::ivec2 dsize;
-	glm::ivec2 pos;
-	uint32_t color;
+	glm::ivec4 rc;		// 所在纹理区域
+	glm::ivec4 sliced;	// 九宫格
+	glm::ivec2 dsize;	// 渲染大小
+	glm::ivec2 pos;		// 渲染坐标
+	uint32_t color;		// 混合颜色
 };
 struct polyline_pd
 {
@@ -529,6 +529,7 @@ struct cmdview_v {
 	size_t dcv_index = 0;
 	void* ptr = 0;
 	glm::ivec2 pos = {};
+	size_t gdindex = 0; //gdata_ptr
 };
 struct rvgraw_t {
 	glm::ivec2 pos = {};
