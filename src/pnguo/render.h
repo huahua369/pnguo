@@ -32,8 +32,16 @@ VK_DEFINE_HANDLE(VkQueue)
 #endif // !VK_DEFINE_HANDLE 
 
 #ifdef __cplusplus
+
+namespace hz {
+	class usp_ac;
+}
+
+
+
 extern "C" {
 #endif
+
 #ifndef VKVG_H
 	typedef struct _vkvg_device_t* VkvgDevice;
 	typedef struct _vkvg_surface_t* VkvgSurface;
@@ -347,7 +355,7 @@ struct d2_rt {
 };
 struct surface_ctx {
 	void* surface;
-	void* ctx;
+	void* ctx0;
 };
 struct draw_cmd
 {
@@ -526,10 +534,10 @@ struct cmdview_v {
 	glm::ivec4 rc = {};	// 渲染区域
 	size_t first = 0;
 	size_t count = 0;
-	size_t dcv_index = 0;
+	size_t dcv_index = {};
 	void* ptr = 0;
 	glm::ivec2 pos = {};
-	size_t gdindex = 0; //gdata_ptr
+	//gdata_ptr* gd = 0; //
 };
 struct rvgraw_t {
 	glm::ivec2 pos = {};
@@ -672,15 +680,25 @@ struct gdata_ptr
 		box_text_d* t = 0;	// 位图或文本
 		d2_rt* d2;			// 矢量图
 		geometry_d* geo;	// 三角形数据
-	}v; 
+	}v;
 	cmdview_v view = {};
 	size_t raw_index = 0;	// dcv\mrt索引
-	int type = 0;		// 0文本/位图，1矢量图，2三角形
+	int type = 0;			// 0文本/位图，1矢量图，2三角形
 	uint32_t cmd_crc = 0;
 };
+struct gdata_ptr1
+{
+	box_text_d* t = 0;		// 位图或文本
+	d2_rt* d2 = 0;			// 矢量图
+	geometry_d* geo = 0;	// 三角形数据
+	cmdview_v view = {};
+	uint32_t cmd_crc = 0;
+};
+
 class rvg_data_cx
 {
 public:
+	hz::usp_ac* ac = 0;					// 内存分配
 	rvg_cx* d = 0;						// 矢量图/文本/位图渲染命令
 	multi_rich_text_t* mrt = 0;			// 文本渲染管理器
 	packer_base* packer = 0;			// 矩形打包器
@@ -688,11 +706,15 @@ public:
 	std::vector<d2_rt> dcv;				// 矢量缓存信息 
 	std::vector<surface_ctx> surfaces;
 	std::vector<gdata_ptr> dst_data;	// 使用rvg_cx生成渲染数据列表
+	d2_rt* dcv_p = 0;
+	size_t dcv_c = 0;
+	size_t dcv_ac = 0;
 	glm::ivec4 _view = {};
 	//glm::ivec2 _pos = {};
 	float stwidth = 2.0;
 	uint32_t cmd_crc = 0;
 	bool mix_text = true;
+	bool up = true;
 public:
 	rvg_data_cx();
 	~rvg_data_cx();
