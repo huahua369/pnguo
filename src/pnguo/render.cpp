@@ -2193,6 +2193,18 @@ uint32_t rvg_cx::get_crc2index(size_t i)
 	}
 	return r;
 }
+uint32_t get_crc(cmdview_v* cv, const char* cmd, size_t cmdc, const char* dt, size_t dtc, const size_t* cpos)
+{
+	uint32_t r = 0;
+	auto& it = *cv;
+	auto ct1 = ecc_crc32u(&it, sizeof(it));
+	auto ct2 = ecc_crc32u(dt + it.first, std::min(it.count, dtc - it.first));
+	auto dpos = cpos[it.first];
+	auto dpos1 = cpos[it.first + it.count];
+	auto ct3 = ecc_crc32u(cmd + dpos, std::min(dpos1 - dpos, cmdc - dpos));
+	r = ct1 ^ ct2 ^ ct3;
+	return r;
+}
 void rvg_cx::push_ct(uint8_t op)
 {
 	_cmdtype.push_back((Opcode)op);
@@ -3234,14 +3246,19 @@ void rvg_data_cx::update()
 	dcv.clear();
 	auto cmd_count = rvg->_cmdtype.size();
 	size_t gdx = 0;
+	auto cmd = rvg->_cmd.data();
+	auto cmdc = rvg->_cmd.size();
+	auto dt = rvg->_cmdtype.data();
+	auto dtc = rvg->_cmdtype.size();
+	auto cpos = rvg->_cmd_pos.data();
+	size_t upinc = 0;
 	// 计算每个渲染区，取偶数大小
 	for (auto& it : rvg->_view)
 	{
 		auto rc = it.rc;
+		uint32_t c = get_crc(&it, (char*)cmd, cmdc, (char*)dt, dtc, cpos);
 		it.dcv_index = -1;
 		if (rc.z < 1 || rc.w < 1)continue;
-		//it.gdindex = gdx++;
-		//get_crc2index;
 		d2_rt d = {};
 		d.size = { rc.z, rc.w };
 		d.size += stwidth * 2;
@@ -3250,19 +3267,21 @@ void rvg_data_cx::update()
 		d.size.x = std::min(_view.z, d.size.x);
 		d.size.y = std::min(_view.w, d.size.y);
 		d.offset = glm::ivec2(rc.x, rc.y);
+		d.crc = c;
+		d.up = 1;
 		max_rect.x = std::max(max_rect.x, d.size.x);
 		max_rect.y = std::max(max_rect.y, d.size.y);
 		it.dcv_index = dcv.size();
+		if (dcv_p) {
+			if (d.up = dcv_p[it.dcv_index].crc != c);
+		}
+		if (d.up)upinc++;
 		dcv.push_back(d);
 	}
 
-	if (dcv_p)
+	if (dcv_p && upinc == 0)
 	{
-		auto cr = memcmp(dcv_p, dcv.data(), dcv.size() * sizeof(d2_rt));
-		if (0 == cr)
-		{
-			return;
-		}
+		return;
 	}
 	auto dcp = dcv.data();
 	size_t dcc = dcv.size();
@@ -3332,7 +3351,10 @@ translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 {
 	auto rvg = dst->get();
+	if (!dst->up)return;
+
 	dst->mrt->rich._ct_style.family = dra->familys;
+	dst->up = false;// 全部更新	
 	mrt_clear(dst->mrt);
 	dst->dst_data.clear();
 	bool first = false;

@@ -352,6 +352,8 @@ struct d2_rt {
 	int surface = 0;
 	int type = 0;		// 0矢量图，1文本/位图
 	int index = 0;
+	uint32_t crc = 0;
+	bool up = false;
 };
 struct surface_ctx {
 	void* surface;
