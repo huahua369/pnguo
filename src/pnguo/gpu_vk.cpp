@@ -1110,7 +1110,7 @@ namespace vkg {
 		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
 		robustness2.nullDescriptor = VK_TRUE;
 		// vkvg需要
-		auto pNext2 = get_device_requirements(&physicalDeviceFeatures, pDp->GetNext(), true, false);
+		auto pNext2 = get_device_requirements(&physicalDeviceFeatures, pDp->GetNext(), true, true);
 		if (robustness_2)
 		{
 			robustness2.pNext = pNext2;

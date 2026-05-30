@@ -357,7 +357,7 @@ struct d2_rt {
 };
 struct surface_ctx {
 	void* surface;
-	void* ctx0;
+	void* ctx;
 };
 struct draw_cmd
 {
