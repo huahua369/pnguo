@@ -3239,7 +3239,7 @@ rvg_cx* rvg_data_cx::get()
 //		f.rc.w = std::max(f.rc.w, c.w);
 //		f.second = it.second;
 //	} 
-void rvg_data_cx::update()
+int rvg_data_cx::update()
 {
 	auto rvg = d;
 	int sf = 0;
@@ -3281,7 +3281,7 @@ void rvg_data_cx::update()
 	//upinc++;
 	if (dcv_p && upinc == 0)
 	{
-		return;
+		return 0;
 	}
 	auto dcp = dcv.data();
 	size_t dcc = dcv.size();
@@ -3295,10 +3295,10 @@ void rvg_data_cx::update()
 		}
 		else {
 			assert(0);
-			return;
+			return 0;
 		}
 	}
-	if (!dcv_p)return;
+	if (!dcv_p)return 0;
 	//auto ddp = ac->new_mem<gdata_ptr>(dcc);
 	dcv_c = dcc;
 	up = true;
@@ -3321,6 +3321,7 @@ void rvg_data_cx::update()
 	} while (dcc > 0);
 	memcpy(dcv_p, dcv.data(), sizeof(d2_rt) * dcv.size());
 	surfaces.resize(sf + 1);
+	return 1;
 }
 translate_cc rvg_data_cx::get_ctx(size_t idx, const glm::ivec4& rc)
 {
@@ -3914,7 +3915,7 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	assert(_view.z > 0 && _view.w > 0 && dst);
 	auto rvg = dst->get();
 	auto rcrc = rvg->get_crc();
-	bool ret = false;// dst->_pos != rvg->pos;	dst->_pos = rvg->pos;
+	// dst->_pos != rvg->pos;	dst->_pos = rvg->pos;
 	_drawv.push_back(dst);
 	if (dst->cmd_crc == rcrc)
 	{
@@ -3923,149 +3924,9 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 	//printf("crc\t%d\n", rcrc);
 	dst->cmd_crc = rcrc;
 	dst->_view = _view;
-	dst->update();
+	auto ret = dst->update();
 	build_vg(dst, this);
-	//bool first = false;
-	//dst->mrt->rich._ct_style.family = familys;
-	//mrt_clear(dst->mrt);
-	//dst->dst_data.clear();
-	//for (auto& it : dst->surfaces)
-	//{
-	//	if (!it.surface)
-	//	{
-	//		it.surface = new_surface(_view.z, _view.w);
-	//		first = true;
-	//	}
-	//	auto ctx = ctx_begin(it.surface);
-	//	if (ctx)
-	//	{
-	//		vkvg_clear((VkvgContext)ctx);
-	//		ctx_end(ctx);
-	//	}
-	//}
-
-	//auto d = rvg->_cmd.data();
-	//auto didx = rvg->_cmd_pos.data();
-	//size_t ps = 0;
-
-	//auto dp = dst->dcv.data();
-	////glm::ivec3 tcount = {};
-	////for (auto it : rvg->_cmdtype) {
-	////	if (it == rvg_cx::OP_VIEW)
-	////	{
-	////		tcount.x++;
-	////	}
-	////	if (it == rvg_cx::OP_VIEW_POP)
-	////	{
-	////		tcount.y++;
-	////	}
-	////}
-	//auto pct = rvg->_cmdtype.data();
-	//auto length = rvg->_cmdtype.size();
-	//glm::vec2 apos = {};
-	//gdata_ptr vg = {};
-	//vg.v.d2 = dp;
-	//vg.type = 1;
-	//size_t vidx = 0;
-	//std::stack<translate_cc> stt = {};
-	//translate_cc tcc = {};
-	//glm::ivec2 lpos = {};
-
-	//for (size_t i = 0; i < length; i++)
-	//{
-	//	auto ct = pct[i];
-	//	if (ct == rvg_cx::OP_VIEW) {
-	//		auto vv = rvg->_view[vidx];
-	//		if (vv.dcv_index < dst->dcv.size()) {
-	//			tcc = dst->get_ctx(vv.dcv_index, vv.rc);
-	//			auto& dstv = dst->dst_data.back();
-	//			dstv.view = vv;
-	//			lpos = vv.pos;
-	//			tcc.ctx = ctx_begin(tcc.surface);
-	//			tcc.ptr = vv.ptr;
-	//			if (tcc.ctx)
-	//			{
-	//				auto ctx = (VkvgContext)tcc.ctx;
-	//				vkvg_save(ctx);
-	//				vkvg_translate(ctx, tcc.apos.x, tcc.apos.y);
-	//			}
-	//			stt.push(tcc);
-	//		}
-	//		else {
-	//		}
-	//		vidx++;
-	//		continue;
-	//	}
-	//	if (ct == rvg_cx::OP_VIEW_POP)
-	//	{
-	//		if (stt.size())
-	//		{
-	//			tcc = stt.top();
-	//			stt.pop();
-	//			if (tcc.ctx)
-	//			{
-	//				auto ctx = (VkvgContext)tcc.ctx;
-	//				vkvg_restore(ctx);
-	//				ctx_end(tcc.ctx);
-	//			}
-	//		}
-	//		continue;
-	//	}
-	//	if (ct == rvg_cx::OP_ADD_TEXT || ct == rvg_cx::OP_ADD_IMAGE) {
-	//		gdata_ptr vt = {};
-	//		vt.raw_index = mrt_box_count(dst->mrt);
-	//		vt.v.t = (box_text_d*)1;
-	//		vt.type = 0;
-	//		vt.view.ptr = tcc.ptr;
-	//		vt.view.pos = lpos;
-	//		dst->dst_data.push_back(vt);
-	//	}
-	//	auto pss = didx[i];
-	//	if (ct == rvg_cx::OP_ADD_GEOMETRY) {
-	//		gdata_ptr vt = {};
-	//		vt.raw_index = 0;
-	//		vt.v.geo = (geometry_d*)(d + pss);
-	//		vt.type = 2;
-	//		dst->dst_data.push_back(vt);
-	//		continue;
-	//	}
-	//	size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? tcc.ctx : dst->mrt);
-	//}
-	//assert(stt.empty());// 命令异常
-	//for (; stt.size();) {
-
-	//	tcc = stt.top();
-	//	stt.pop();
-	//	if (tcc.ctx)
-	//	{
-	//		auto ctx = (VkvgContext)tcc.ctx;
-	//		vkvg_restore(ctx);
-	//		ctx_end(tcc.ctx);
-	//	}
-	//}
-	//int ki = 0;
-	//for (auto& it : dst->surfaces)
-	//{
-	//	if (it.surface)
-	//	{
-	//		vkvg_surface_resolve((VkvgSurface)it.surface);
-	//		if (first)
-	//		{
-	//			std::string str = "temp/vgtest-" + std::to_string(ki++) + ".png";
-	//			vkvg_surface_write_to_png((VkvgSurface)it.surface, str.c_str());
-	//		}
-	//	}
-	//	update_surface((VkvgSurface)it.surface);
-	//}
-	//mrt_build(dst->mrt);
-	//update_text((rich_text_t*)dst->mrt, 0);
-	//for (auto& it : dst->dst_data) {
-	//	if (it.type == 0)
-	//	{
-	//		it.v.t = mrt_get_box_index(dst->mrt, (size_t)it.raw_index);
-	//	}
-	//}
-	return true;
+	return ret;
 }
 
 
@@ -4977,3 +4838,17 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		vctx->free_surface(surf);
 		free_vkvgdev(vctx);
 */
+
+
+
+rdg_cx::rdg_cx()
+{}
+
+rdg_cx::~rdg_cx()
+{}
+
+GraphResource::GraphResource()
+{}
+
+GraphResource::~GraphResource()
+{}

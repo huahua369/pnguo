@@ -1354,7 +1354,7 @@ int main()
 
 				};
 #endif
-			app->set_fps(1000);
+			app->set_fps(60);
 			vkd->_state.has_fence = false;
 			std::string gpustr;
 			bool r3d = 0;

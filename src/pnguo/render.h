@@ -721,7 +721,7 @@ public:
 	rvg_data_cx();
 	~rvg_data_cx();
 	rvg_cx* get();
-	void update();
+	int update();
 	translate_cc get_ctx(size_t idx, const glm::ivec4& rc);
 private:
 
@@ -793,6 +793,56 @@ public:
 	~clicprect_cx();
 };
 
+// 图资源：包装Vulkan的Image/Buffer
+class GraphResource
+{
+public:
+	GraphResource();
+	~GraphResource();
+
+private:
+
+};
+// 渲染pass节点
+class RenderPassNode 
+{
+	virtual void prepare() = 0;			//在此处创建RenderPass所需的RHI资源
+	virtual void execute(void*) = 0;	//执行渲染逻辑CommandBuffer
+
+	virtual void setupInputParam(const std::string& str, void* p) = 0;      //由外部填充该Pass的输入参数
+	virtual void* getOutputParam(const std::string& str) = 0;				//由外部获取该Pass的输出参数
+protected:
+	std::unordered_map<std::string, void*> mInputs;							//输入参数
+	std::unordered_map<std::string, void*> mOutputs;						//输出参数
+};
+
+/*
+RDG包括以下功能：
+
+安排异步计算栅栏的执行
+以最佳生命周期和内存别名分配临时资源
+使用拆分屏障转换子资源，在GPU上隐藏延迟并改善重叠
+命令列表并行记录
+剔除图中未使用的资源和通道
+验证API的使用和资源依赖关系
+在RDG Insights中实现图结构和内存生命周期的可视化
+*/
+class rdg_cx
+{
+public:
+	rdg_cx();
+	~rdg_cx();
+	// 增加pass
+	void add(RenderPassNode*p);
+	// 计算关系
+	void compile();
+	// 执行
+	void execute();
+	// 清理
+	void clear();
+private:
+
+};
 
 //void r_update_data_text(text_render_o* p, drawable_cx* pt, float delta);
 //// 渲染一段文本
