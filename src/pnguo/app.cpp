@@ -111,6 +111,12 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	return f1;
 }
 
+void viewdev_cx::wait_dev()
+{
+	if (_vgdev)
+		_vgdev->wait_dev();
+}
+
 
 
 dom_cx::dom_cx()

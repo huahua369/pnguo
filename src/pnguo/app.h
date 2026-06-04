@@ -34,6 +34,7 @@ public:
 	void init_vgdev(dev_info_cx* d, int sample = 8);
 	div_cx* get_div(form_x* f);
 	form_x* set_div(div_cx* d);
+	void wait_dev();
 private:
 
 };

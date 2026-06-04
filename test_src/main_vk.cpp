@@ -40,815 +40,7 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 #undef max
 #endif
 
-//void new_ui(form_x* form0, vkdg_cx* vkd) {
-//	auto p = new plane_cx();
-//	uint32_t pbc = 0xc02c2c2c;
-//	p->set_color({ 0x80ff802C,1,5,pbc });
-//	//form0->bind(p);	// 绑定到窗口  
-//	p->set_rss(5);
-//	p->_lms = { 6,6 };
-//	p->add_familys(fontn, 0);
-//	p->draggable = true; //可拖动
-//	p->set_size({ 320,660 });
-//	p->set_pos({ 1000,100 });
-//	p->fontsize = 16;
-//	int width = 16;
-//	int rcw = 14;
-//	{
-//		// 设置带滚动条
-//		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-//		p->set_scroll_hide(1);
-//	}
-//	p->set_view({ 320,660 }, { 600, 660 });
-//	glm::vec2 bs = { 150,22 };
-//	glm::vec2 bs1 = { 50,22 };
-//	std::vector<std::string> boolstr = { "TAA", "LightFrustum",	"BoundingBoxes","ShowMilliseconds" };
-//	if (vkd)
-//	{
-//		std::vector<bool*> bps = { &vkd->_state.bUseTAA, &vkd->_state.bDrawLightFrustum, &vkd->_state.bDrawBoundingBoxes, &vkd->_state.bShowMilliseconds };
-//		for (size_t i = 0; i < boolstr.size(); i++)
-//		{
-//			auto& it = boolstr[i];
-//			auto kcb = p->add_label(it.c_str(), bs, 0);
-//			{
-//				kcb->_disabled_events = true;
-//				kcb->text_color = 0xff7373ff;
-//				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), *(bps[i]));
-//				//sw1->_disabled_events = true;
-//				sw1->get_pos();
-//				sw1->bind_ptr(bps[i]);
-//			}
-//		}
-//		std::vector<color_btn*>* pbs = new std::vector<color_btn*>();
-//		bs.x = 300;
-//		auto& lbs = *pbs;
-//		for (size_t i = 0; i < 30; i++)
-//		{
-//			auto kcb = p->add_label("", bs, 0);
-//			kcb->text_color = 0xff80F61F;
-//			kcb->_disabled_events = true;
-//			lbs.push_back(kcb);
-//		}
-//	}
-//
-//
-//	uint32_t* cc = get_wcolor() + 8;
-//	for (int i = 0; i < 0 * 8; i++) {
-//		auto p = new plane_cx();
-//		uint32_t tc = cc[i];
-//		p->set_color({ 0x80ff802C,1,5,0xff2c2c2c });
-//		//form0->bind(p);	// 绑定到窗口  
-//		p->set_rss(5);
-//		p->_lms = { 6,6 };
-//		p->add_familys(fontn, 0);
-//		p->draggable = true; //可拖动
-//		p->set_size({ 500,300 });
-//		p->set_pos({ 100 + i * 20,100 + i * 20 });
-//		for (size_t j = 0; j < boolstr.size(); j++)
-//		{
-//			auto& it = boolstr[j];
-//			auto kcb = p->add_label(it.c_str(), bs, 0);
-//			{
-//				kcb->_disabled_events = true;
-//				kcb->text_color = tc;
-//				auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), 0);
-//				sw1->get_pos();
-//				//sw1->bind_ptr(bps[j]);
-//			}
-//		}
-//	}
-//}
-//
-//void show_cpuinfo(form_x* form0)
-//{
-//	cpuinfo_t cpuinfo = get_cpuinfo();
-//	if (!form0)return;
-//	auto p = new plane_cx();
-//	uint32_t pbc = 0xf02c2c2c;
-//	p->set_color({ 0x80ff802C,1,5,pbc });
-//	//form0->bind(p);	// 绑定到窗口  
-//	p->set_rss(5);
-//	p->_lms = { 8,8 };
-//	p->add_familys(fontn, 0);
-//	p->draggable = true; //可拖动
-//	p->set_size({ 420,660 });
-//	p->set_pos({ 100,100 });
-//	p->fontsize = 16;
-//	int width = 16;
-//	int rcw = 14;
-//	{
-//		// 设置带滚动条
-//		p->set_scroll(width, rcw, { 0, 0 }, { 2,0 }, { 0,2 });
-//		p->set_scroll_hide(1);
-//	}
-//	// 视图大小，内容大小
-//	p->set_view({ 420,660 }, { 420, 660 });
-//	glm::vec2 bs = { 150,22 };
-//	glm::vec2 bs1 = { 50,22 };
-//	std::vector<std::string> ncsstr = { (char*)u8"CPU信息","NumLogicalCPUCores","CPUCacheLineSize","SystemRAM","SIMDAlignment" };
-//	std::vector<std::string> boolstr = { "AltiVec","MMX","SSE","SSE2","SSE3","SSE41","SSE42","AVX","AVX2","AVX512F","ARMSIMD","NEON","LSX","LASX" };
-//
-//	static std::vector<color_btn*> lbs;
-//	bs.x = 300;
-//	uint32_t txtcolor = 0xfff2f2f2;// 0xff7373ff;
-//	int64_t ds[] = { 0, cpuinfo.NumLogicalCPUCores,cpuinfo.CPUCacheLineSize,cpuinfo.SystemRAM ,cpuinfo.SIMDAlignment };
-//	{
-//		int i = 0;
-//		for (auto& it : ncsstr)
-//		{
-//			std::string txt = vkr::format("%-20s: %lld", it.c_str(), ds[i]);
-//			auto tc = txtcolor;
-//			if (i == 0) {
-//				txt = it + ": " + cpuinfo.name;
-//				tc = 0xffF6801F;
-//			}
-//			i++;
-//			auto kcb = p->add_label(txt, bs, 0);
-//			kcb->text_color = tc;
-//			kcb->_disabled_events = true;
-//			lbs.push_back(kcb);
-//		}
-//	}
-//	bool* bps = &cpuinfo.AltiVec;
-//	bs.x = 160;
-//	for (size_t i = 0; i < boolstr.size(); i++)
-//	{
-//		auto& it = boolstr[i];
-//		auto kcb = p->add_label(it.c_str(), bs, 0);
-//		{
-//			kcb->_disabled_events = true;
-//			kcb->text_color = txtcolor;
-//			auto sw1 = (switch_tl*)p->add_switch(bs1, it.c_str(), bps[i]);
-//			sw1->_disabled_events = true;
-//			sw1->get_pos();
-//			kcb = p->add_label("", bs, 0);
-//			kcb->_disabled_events = true;
-//		}
-//	}
-//}
 #include <entt/entt.hpp>
-struct node_t
-{
-	int16_t type, count;//种类、数量
-};
-struct belt_t
-{
-	node_t* p = 0;	// 节点
-	size_t n = 0;	// 节点数量
-	glm::ivec2 pos[3] = {};// 曲线
-	belt_t* link_ptr = 0;	// 尾部连接
-	size_t link_idx = 0;		// 连接位置
-};
-// 传送带
-class belt_cx
-{
-public:
-	std::vector<entt::entity> lines;
-	glm::vec2 pos = { 0.5,0 };
-	int w = 56;
-	uint32_t linecolor = 0xcc222222;
-	std::vector<glm::vec2> bline;
-	std::vector<int> bline_idx;
-	int dxx = 0;
-	double ts = 0.0;
-public:
-	belt_cx();
-	~belt_cx();
-
-	void update(float delta);
-	void draw(void* cr);
-private:
-
-};
-
-belt_cx::belt_cx()
-{
-	int n = w * 10 / 6.0; size_t nc = 0;
-	int nx = w / 6;
-	int xx = 0;
-
-	{
-		for (size_t i = 0; i < n; i++, nc++)
-		{
-			bline.push_back({ xx + i * nx,1 });
-			bline.push_back({ xx + i * nx,w - 2 });
-			bline_idx.push_back(i + nc);
-			bline_idx.push_back(i + nc + 1);
-			bline_idx.push_back(-1);
-		}
-	}
-
-}
-
-belt_cx::~belt_cx()
-{}
-void belt_cx::update(float delta) {
-	ts += delta;
-	if (ts > 0.12 * 0.5)
-	{
-		dxx++;
-		ts = 0;
-	}
-	if (dxx > 7)dxx = 0;
-}
-#ifdef _CR__
-void belt_cx::draw(cairo_t* cr) {
-
-	for (size_t i = 0; i < 10; i++)
-	{
-		draw_rect(cr, { i * w,0,w,w }, 0xf0cccccc, 0xffff802C, 2, 1);
-	}
-	auto ps = pos;
-	ps.x += dxx;
-	// 裁剪区域
-	cairo_rectangle(cr, 0, 0, 10 * w, w);
-	cairo_clip(cr);
-	draw_polylines(cr, ps, bline.data(), bline.size(), bline_idx.data(), bline_idx.size(), linecolor, 1);
-}
-#endif 
-
-
-void test_img() {
-
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr.png", 0);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr10.jpg", 10);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr30.jpg", 30);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr60.jpg", 60);
-	hz::get_fullscreen_image(0, 0, 0, "temp/fuckstr80.jpg", 80);
-}
-glm::vec4 p2v(float yaw, float pitch)
-{
-	return glm::vec4(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch), 0);
-}
-#if 0
-vec3 AMDTonemapper(vec3 color) {}//太长了0
-vec3 DX11DSK(vec3 color)
-{
-	float  MIDDLE_GRAY = 0.72f;
-	float  LUM_WHITE = 1.5f;
-	// Tone mapping
-	color.rgb *= MIDDLE_GRAY;
-	color.rgb *= (1.0f + color / LUM_WHITE);
-	color.rgb /= (1.0f + color);
-	return color;
-}
-vec3 Reinhard(vec3 color)
-{
-	return color / (1 + color);
-}
-vec3 Uncharted2TonemapOp(vec3 x)
-{
-	float A = 0.15;	float B = 0.50;	float C = 0.10;	float D = 0.20;	float E = 0.02;	float F = 0.30;
-	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
-}
-vec3 Uncharted2Tonemap(vec3 color)
-{
-	float W = 11.2;
-	return Uncharted2TonemapOp(2.0 * color) / Uncharted2TonemapOp(vec3(W));
-}
-vec3 tonemapACES(vec3 x)
-{
-	float a = 2.51;	float b = 0.03;	float c = 2.43;	float d = 0.59;	float e = 0.14;
-	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
-}
-//case 0: return AMDTonemapper(color);
-//case 1: return DX11DSK(color);
-//case 2: return Reinhard(color);
-//case 3: return Uncharted2Tonemap(color);
-//case 4: return tonemapACES(color);
-//case 5: return color;	// 不做色调映射
-#endif
-
-// 定义顶点结构
-struct Vertex_c {
-	glm::vec3 position;
-	glm::vec3 normal;
-	glm::vec2 texCoord;
-};
-
-// 生成圆角立方体的函数
-void GenerateRoundedCube(
-	float size,
-	float radius,
-	int segments,
-	std::vector<Vertex_c>& vertices,
-	std::vector<unsigned int>& indices)
-{
-	vertices.clear();
-	indices.clear();
-
-	// 确保半径不超过立方体大小的一半
-	radius = glm::min(radius, size * 0.5f);
-
-	// 立方体的核心尺寸（减去圆角后的部分）
-	float coreSize = size - 2.0f * radius;
-
-	// 立方体的8个角点（未圆角前的原始角点）
-	glm::vec3 corners[8] = {
-		glm::vec3(-0.5f * coreSize, -0.5f * coreSize, -0.5f * coreSize),
-		glm::vec3(0.5f * coreSize, -0.5f * coreSize, -0.5f * coreSize),
-		glm::vec3(0.5f * coreSize,  0.5f * coreSize, -0.5f * coreSize),
-		glm::vec3(-0.5f * coreSize,  0.5f * coreSize, -0.5f * coreSize),
-		glm::vec3(-0.5f * coreSize, -0.5f * coreSize,  0.5f * coreSize),
-		glm::vec3(0.5f * coreSize, -0.5f * coreSize,  0.5f * coreSize),
-		glm::vec3(0.5f * coreSize,  0.5f * coreSize,  0.5f * coreSize),
-		glm::vec3(-0.5f * coreSize,  0.5f * coreSize,  0.5f * coreSize)
-	};
-
-	// 生成每个角的球面部分
-	for (int corner = 0; corner < 8; ++corner) {
-		// 确定当前角的符号（决定球面部分的方向）
-		glm::vec3 sign(
-			(corner & 1) ? 1.0f : -1.0f,
-			(corner & 2) ? 1.0f : -1.0f,
-			(corner & 4) ? 1.0f : -1.0f
-		);
-
-		// 当前角的中心点
-		glm::vec3 cornerCenter = corners[corner] + sign * radius;
-
-		// 生成球面部分的顶点
-		int baseIndex = vertices.size();
-
-		for (int i = 0; i <= segments; ++i) {
-			float phi = i * glm::pi<float>() / (2.0f * segments);
-
-			for (int j = 0; j <= segments; ++j) {
-				float theta = j * glm::pi<float>() / (2.0f * segments);
-
-				// 计算球面上的点
-				glm::vec3 spherePoint(
-					radius * sin(phi) * cos(theta),
-					radius * sin(phi) * sin(theta),
-					radius * cos(phi)
-				);
-
-				// 根据当前角的方向调整点的位置
-				spherePoint.x *= sign.x;
-				spherePoint.y *= sign.y;
-				spherePoint.z *= sign.z;
-
-				// 计算最终顶点位置
-				Vertex_c vertex;
-				vertex.position = cornerCenter + spherePoint;
-				vertex.normal = glm::normalize(spherePoint);
-
-				// 简单的纹理坐标映射
-				vertex.texCoord = glm::vec2(
-					static_cast<float>(j) / segments,
-					static_cast<float>(i) / segments
-				);
-
-				vertices.push_back(vertex);
-			}
-		}
-
-		// 生成球面部分的索引
-		for (int i = 0; i < segments; ++i) {
-			for (int j = 0; j < segments; ++j) {
-				int idx = baseIndex + i * (segments + 1) + j;
-
-				indices.push_back(idx);
-				indices.push_back(idx + 1);
-				indices.push_back(idx + segments + 1);
-
-				indices.push_back(idx + 1);
-				indices.push_back(idx + segments + 2);
-				indices.push_back(idx + segments + 1);
-			}
-		}
-	}
-
-	// 生成连接角点的平面部分（这里需要为6个面分别生成平面）
-	// 由于实现较为复杂，这里只提供了球面部分的实现
-	// 完整的实现还需要生成连接这些球面部分的平面区域
-
-	// 注意：完整的圆角立方体实现需要生成:
-	// 1. 8个角上的球面部分（已实现）
-	// 2. 12条边上的圆柱面部分
-	// 3. 6个面上的平面部分
-}
-
-// 水管截面参数
-struct PipeProfile {
-	float outerRadius;
-	float innerRadius;
-	int segments; // 截面细分段数
-};
-
-// 水管路径点
-struct PathPoint {
-	glm::vec3 position;
-	glm::vec3 direction; // 归一化的方向向量
-};
-
-// 生成水管网格
-class PipeGenerator {
-public:
-	std::vector<glm::vec3> vertices;
-	std::vector<glm::vec3> normals;
-	std::vector<unsigned int> indices;
-
-	// 生成直线水管
-	void generateStraightPipe(const glm::vec3& start, const glm::vec3& end,
-		const PipeProfile& profile) {
-		glm::vec3 direction = glm::normalize(end - start);
-		float length = glm::distance(start, end);
-
-		generatePipeSegment(start, direction, length, profile);
-	}
-
-	// 生成转角水管（带圆角）
-	void generateBendPipe(const glm::vec3& start, const glm::vec3& bendCenter,
-		const glm::vec3& end, float bendRadius,
-		const PipeProfile& profile, int bendSegments = 8) {
-		// 计算起始方向
-		glm::vec3 startDir = glm::normalize(bendCenter - start);
-		glm::vec3 endDir = glm::normalize(end - bendCenter);
-
-		// 生成直线部分
-		float straightLength = glm::distance(start, bendCenter) - bendRadius;
-		if (straightLength > 0) {
-			generatePipeSegment(start, startDir, straightLength, profile);
-		}
-
-		// 生成弯曲部分
-		// 计算弯曲平面和角度
-		glm::vec3 bendAxis = glm::normalize(glm::cross(startDir, endDir));
-		float bendAngle = acos(glm::dot(startDir, endDir));
-
-		if (bendAngle > 0.01f) { // 避免除零和微小角度
-			// 生成弯曲段
-			for (int i = 0; i <= bendSegments; i++) {
-				float t = static_cast<float>(i) / bendSegments;
-				float angle = t * bendAngle;
-
-				// 旋转方向向量
-				glm::vec3 dir = glm::rotate(startDir, angle, bendAxis);
-
-				// 计算位置
-				glm::vec3 centerOffset = startDir * bendRadius;
-				glm::vec3 pos = bendCenter - centerOffset + glm::rotate(centerOffset, angle, bendAxis);
-
-				// 生成截面
-				generateCrossSection(pos, dir, profile);
-			}
-		}
-
-		// 生成结束直线部分
-		straightLength = glm::distance(bendCenter, end) - bendRadius;
-		if (straightLength > 0) {
-			generatePipeSegment(bendCenter + endDir * bendRadius, endDir, straightLength, profile);
-		}
-	}
-
-private:
-	// 生成管道段
-	void generatePipeSegment(const glm::vec3& start, const glm::vec3& direction,
-		float length, const PipeProfile& profile) {
-		// 开始截面
-		generateCrossSection(start, direction, profile);
-
-		// 结束截面
-		generateCrossSection(start + direction * length, direction, profile);
-
-		// 连接两个截面形成管道
-		connectSections(profile.segments);
-	}
-
-	// 生成管道截面
-	void generateCrossSection(const glm::vec3& center, const glm::vec3& direction,
-		const PipeProfile& profile) {
-		// 计算局部坐标系
-		glm::vec3 up(0.0f, 1.0f, 0.0f);
-		if (glm::abs(glm::dot(direction, up)) > 0.99f) {
-			up = glm::vec3(0.0f, 0.0f, 1.0f);
-		}
-
-		glm::vec3 right = glm::normalize(glm::cross(direction, up));
-		up = glm::normalize(glm::cross(right, direction));
-
-		// 存储当前截面起始索引
-		size_t startIndex = vertices.size();
-
-		// 生成内外圆顶点
-		for (int i = 0; i <= profile.segments; i++) {
-			float angle = static_cast<float>(i) / profile.segments * glm::two_pi<float>();
-
-			// 计算圆上的点
-			glm::vec2 circlePoint(std::cos(angle), std::sin(angle));
-
-			// 外圆顶点
-			glm::vec3 outerPos = center + right * (circlePoint.x * profile.outerRadius)
-				+ up * (circlePoint.y * profile.outerRadius);
-			vertices.push_back(outerPos);
-			normals.push_back(glm::normalize(right * circlePoint.x + up * circlePoint.y));
-
-			// 内圆顶点
-			glm::vec3 innerPos = center + right * (circlePoint.x * profile.innerRadius)
-				+ up * (circlePoint.y * profile.innerRadius);
-			vertices.push_back(innerPos);
-			normals.push_back(glm::normalize(-(right * circlePoint.x + up * circlePoint.y)));
-		}
-
-		// 如果是第一个截面，不需要连接，否则连接前一个截面
-		if (startIndex > 0) {
-			connectSections(profile.segments);
-		}
-	}
-
-	// 连接两个截面
-	void connectSections(int segments) {
-		size_t prevStart = vertices.size() - 2 * (segments + 1);
-		size_t currStart = vertices.size() - (segments + 1) * 2;
-
-		for (int i = 0; i < segments; i++) {
-			// 外表面四边形
-			indices.push_back(prevStart + i * 2);
-			indices.push_back(prevStart + (i + 1) * 2);
-			indices.push_back(currStart + i * 2);
-
-			indices.push_back(prevStart + (i + 1) * 2);
-			indices.push_back(currStart + (i + 1) * 2);
-			indices.push_back(currStart + i * 2);
-
-			// 内表面四边形
-			indices.push_back(prevStart + i * 2 + 1);
-			indices.push_back(currStart + i * 2 + 1);
-			indices.push_back(prevStart + (i + 1) * 2 + 1);
-
-			indices.push_back(prevStart + (i + 1) * 2 + 1);
-			indices.push_back(currStart + i * 2 + 1);
-			indices.push_back(currStart + (i + 1) * 2 + 1);
-
-			// 连接内外圆的侧面（管壁）
-			indices.push_back(prevStart + i * 2);
-			indices.push_back(currStart + i * 2);
-			indices.push_back(prevStart + i * 2 + 1);
-
-			indices.push_back(currStart + i * 2);
-			indices.push_back(currStart + i * 2 + 1);
-			indices.push_back(prevStart + i * 2 + 1);
-		}
-	}
-};
-
-// 示例用法
-int maing() {
-	PipeGenerator generator;
-	PipeProfile profile{ 1.0f, 0.8f, 16 }; // 外径1.0，内径0.8，16段细分
-
-	// 生成直线水管
-	generator.generateStraightPipe(
-		glm::vec3(0.0f, 0.0f, 0.0f),
-		glm::vec3(5.0f, 0.0f, 0.0f),
-		profile
-	);
-
-	// 生成带圆角的转角水管
-	generator.generateBendPipe(
-		glm::vec3(5.0f, 0.0f, 0.0f),
-		glm::vec3(7.0f, 0.0f, 0.0f),
-		glm::vec3(7.0f, 3.0f, 0.0f),
-		1.5f, // 弯曲半径
-		profile,
-		12 // 弯曲段细分
-	);
-
-	std::cout << "Generated pipe with " << generator.vertices.size()
-		<< " vertices and " << generator.indices.size() / 3
-		<< " triangles." << std::endl;
-
-	return 0;
-}
-// 示例使用
-int mainc() {
-	std::vector<Vertex_c> vertices;
-	std::vector<unsigned int> indices;
-
-	// 生成立方体，大小为2.0，圆角半径为0.2，分段数为8
-	GenerateRoundedCube(2.0f, 0.2f, 8, vertices, indices);
-
-	// 这里可以添加代码将顶点和索引数据上传到GPU进行渲染
-
-	return 0;
-}
-void test_vkvg(const char* fn, dev_info_c* dc);
-struct listm_t
-{
-	void* data = 0;
-	int cap_count = 0;	// 容量
-	int count = 0;		// 当前使用数量
-	listm_t* next = 0;	// 下一个节点
-};
-
-uint32_t arc4random() {
-	static std::random_device rd;
-	static std::mt19937 gen(rd());
-	static std::uniform_int_distribution<uint32_t> dis(0, UINT32_MAX);
-	return dis(gen);
-}
-void fill(size_t pos, struct kpair* val, void* dat)
-{
-
-	val->x = pos;
-	val->y = arc4random() / (double)UINT32_MAX;
-}
-VkvgSurface plot_main(drawable_cx* ctx, int width, int height)
-{
-	struct kpair	 points1[50], points2[50];
-	struct kdata* d1, * d2;
-	struct kplot* p;
-
-	VkvgSurface surf;
-	size_t		 i;
-	VkvgContext cr;
-	vkvg_status_t	 st;
-	int		 rc;
-
-	rc = EXIT_FAILURE;
-
-	d1 = d2 = NULL;
-	p = NULL;
-
-	for (i = 0; i < 50; i++) {
-		points1[i].x = points2[i].x = (i + 1) / 50.0;
-		points1[i].y = log((i + 1) / 50.0);
-		points2[i].y = -log((i + 1) / 50.0) + points1[0].y;
-	}
-
-	if (NULL == (d1 = kdata_array_alloc(points1, 50))) {
-		perror(NULL);
-		goto out;
-	}
-	else if (NULL == (d2 = kdata_array_alloc(points2, 50))) {
-		perror(NULL);
-		goto out;
-	}
-	else if (NULL == (p = kplot_alloc(NULL))) {
-		perror(NULL);
-		goto out;
-	}
-
-	struct kdatacfg	 cfg;
-	{
-
-		kdatacfg_defaults(&cfg);
-		cfg.line.clr.type = KPLOTCTYPE_PATTERN;
-		cfg.line.clr.pattern = vkvg_pattern_create_linear(0.0, 0.0, 600.0, 400.0);
-		st = vkvg_pattern_status(cfg.line.clr.pattern);
-		if (VKVG_STATUS_SUCCESS != st) {
-			fprintf(stderr, "%s", vkvg_status_to_string(st));
-			vkvg_pattern_destroy(cfg.line.clr.pattern);
-			kplot_free(p);
-			return 0;
-		}
-		vkvg_pattern_add_color_stop_rgba(cfg.line.clr.pattern, 0.25, 1.0, 0.0, 0.0, 1.0);
-		vkvg_pattern_add_color_stop_rgba(cfg.line.clr.pattern, 0.5, 0.0, 1.0, 0.0, 1.0);
-		vkvg_pattern_add_color_stop_rgba(cfg.line.clr.pattern, 0.75, 0.0, 0.0, 1.0, 1.0);
-
-		auto d = kdata_bucket_alloc(0, 100);
-		assert(NULL != d);
-		for (i = 0; i < 100; i++)
-			kdata_bucket_set(d, i, i, i);
-		//if (!kplot_attach_data(p, d, KPLOT_LINES, &cfg)) {
-		//	perror(NULL);
-		//	goto out;
-		//}
-
-		vkvg_pattern_destroy(cfg.line.clr.pattern);
-
-		kdata_destroy(d);
-		double		 u;
-		d = kdata_hist_alloc(0.0, 1.0, 100);
-		assert(NULL != d);
-		for (i = 0; i < 4000; i++) {
-			u = -log(1.0 - (arc4random() / (double)UINT32_MAX)) / 2.5;
-			kdata_hist_add(d, u, 1.0);
-		}
-		kplot_attach_smooth(p, d, KPLOT_LINES, NULL, KSMOOTH_CDF, NULL);
-	}
-	//else if (!kplot_attach_data(p, d1, KPLOT_LINES, NULL)) {
-	//	perror(NULL);
-	//	goto out;
-	//}
-	//else if (!kplot_attach_data(p, d2, KPLOT_POINTS, NULL)) {
-	//	perror(NULL);
-	//	goto out;
-	//}
-	{
-		enum kplottype	 ts[2];
-		ts[0] = KPLOT_POINTS;
-		ts[1] = KPLOT_LINES;
-		kdata* md[] = { d1,d2 };
-		//kplot_attach_datas(p, 2, md, ts, NULL, KPLOTS_YERRORBAR);
-	}
-	kdata_destroy(d1);
-	kdata_destroy(d2);
-	d1 = d2 = NULL;
-	surf = (VkvgSurface)ctx->new_surface(width, height);
-
-	st = vkvg_surface_status(surf);
-	if (VKVG_STATUS_SUCCESS != st) {
-		fprintf(stderr, "%s", vkvg_status_to_string(st));
-		vkvg_surface_destroy(surf);
-		kplot_free(p);
-		return 0;
-	}
-
-	cr = vkvg_create(surf);
-	//vkvg_surface_destroy(surf);
-
-	st = vkvg_status(cr);
-	if (VKVG_STATUS_SUCCESS != st) {
-		fprintf(stderr, "%s", vkvg_status_to_string(st));
-		vkvg_destroy(cr);
-		kplot_free(p);
-		return 0;
-
-	}
-
-	{
-		grid_info_t g = {};
-		g.width = 200;
-		g.count = 10;
-		g.linewidth = 1;
-		g.back_color = 0xff353535;
-		g.inline_color = 0xff404040;
-		g.line_color = 0xff181818;
-
-		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
-		vkvg_rectangle(cr, 0.0, 0.0, 1200.0, 1200.0);
-		vkvg_fill(cr);
-		vkvg_save(cr);
-		vkvg_translate(cr, 0, 0);
-		for (size_t i = 0; i < 6; i++)
-		{
-			vkvg_save(cr);
-			vkvg_translate(cr, 0, g.width * i);
-			for (size_t x = 0; x < 6; x++) {
-				draw_grid(cr, &g, ctx->vgcb);
-				vkvg_translate(cr, g.width, 0);
-			}
-			vkvg_restore(cr);
-		}
-		vkvg_restore(cr);
-
-		//kplot_draw(p, 600.0, 400.0, cr);
-
-		kplot_free(p);
-	}
-	{
-		auto d = kdata_array_alloc(NULL, 20);
-		assert(NULL != d);
-		auto c = kdata_array_fill(d, NULL, fill);
-		assert(c);
-
-		if (NULL == (p = kplot_alloc(NULL))) {
-			perror(NULL);
-			goto out;
-		}
-
-		if (!kplot_attach_data(p, d, KPLOT_LINESPOINTS, NULL)) {
-			perror(NULL);
-			goto out;
-		}
-
-		if (!kplot_attach_smooth(p, d, KPLOT_LINESPOINTS,
-			NULL, KSMOOTH_MOVAVG, NULL)) {
-			perror(NULL);
-			goto out;
-		}
-
-		kdata_destroy(d);
-		vkvg_translate(cr, 600.0, 0.0);
-		vkvg_set_source_rgb(cr, 1.0, 1.0, 1.0);
-		vkvg_rectangle(cr, 1.0, 0.0, 600.0, 400.0);
-		vkvg_fill(cr);
-		kplot_draw(p, 600.0, 400.0, cr);
-	}
-	vkvg_flush(cr);
-	vkvg_surface_resolve(surf);
-	st = vkvg_surface_write_to_png
-	(vkvg_get_target(cr), "temp/example0_1.png");
-
-	if (VKVG_STATUS_SUCCESS != st) {
-		fprintf(stderr, "%s", vkvg_status_to_string(st));
-		vkvg_destroy(cr);
-		kplot_free(p);
-		return surf;
-	}
-
-	vkvg_destroy(cr);
-	rc = EXIT_SUCCESS;
-out:
-	kplot_free(p);
-	kdata_destroy(d1);
-	kdata_destroy(d2);
-
-	return surf;
-}
-
 
 int main()
 {
@@ -893,57 +85,8 @@ int main()
 
 
 		auto fctx = app->font_ctx;
-		//auto ksun = fctx->get_font((char*)u8"新宋体", 0);
-		//auto seg = fctx->get_font((char*)u8"Segoe UI Emoji", 0);
-		//auto sues = fctx->add2file(R"(data\seguiemj.ttf)", 0);
-		//auto sue = sues[0]; 
-		//std::vector<font_t*> familys = { ksun ,seg };
-
-
 		fctx->set_cache_size(512, 512);
-
-		std::string k8a = (char*)u8"أَبْجَدِيَّة عَرَبِيَّة➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb ab我\n的大刀";
-
-		std::string k8aaa0 = (char*)u8"👨‍👨‍👧q";
-		std::string k80 = (char*)u8"👪️q";
-		std::string k8 = (char*)u8"➗😊😎😭\n💣🚩❓❌\t🟦⬜👨‍👨‍👧qb abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ我\n的大刀";
-		std::string k821 = (char*)u8"abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ\t我\n的大刀,Malgun Gothic";
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
-		auto rctts = get_text_rect(family, 16, k80.c_str(), k80.size(), 0);
-		auto bll = font_get_lineheight(family, 16, true);
-		//text_style ts = {};
-		//ts.family = family;
-		//ts.fontsize = 16;
-		//ts.color = 0xfffF5000;
-		//// 文本块
-		//text_block tb = {};
-		//tb.style = &ts;
-		//tb.str = k8.c_str();
-		//tb.first = 0;
-		//tb.size = k8.size();
-		//text_render_o trt = {};
-		//trt.box.rc = { 0,0,300,500 };
-		//trt.box.auto_break = 1;
-		//trt.box.word_wrap = 0;
-		//build_text_render(&tb, &trt);
-		std::vector<uint32_t> vd;
-		image_ptr_t dst = {};
-		glm::ivec2 imgsize = { 500,100 };
-		if (vd.size() < imgsize.x * imgsize.y)
-		{
-			vd.resize(imgsize.x * imgsize.y);
-		}
-		dst.data = vd.data();
-		dst.width = imgsize.x; dst.height = imgsize.y;
-		dst.comp = 4; dst.stride = dst.width * sizeof(uint32_t);
-		//c_render_data(&trt, &dst);
-		//delete_font_family(family);
-		uint32_t* pcolor = get_wcolor();
-		for (size_t i = 0; i < 16; i++)
-		{
-			auto str = get_wcname(i, 0);
-			printf("\x1b[01;3%dm%s\x1b[0m\n", (int)i % 8, str);
-		}
 
 		glm::ivec2 ws = dpis[4];// { 1280, 860 };
 		const char* wtitle = (char*)u8"窗口0";
@@ -962,11 +105,6 @@ int main()
 		// 准备使用3D渲染器的设备创建SDL渲染器
 		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 
-		auto f = glm::mat4(1.4420948028564453, 0.0, 0.0, 0.0, 0.0, -0.00016932648114409524, 1.4420948028564453, 0.0, 0.0, -1.4420948028564453, -0.00016932648114409524, 0.0, 0.0, 0.0, 0.0, 1.0);
-		auto f1 = glm::mat4(0.009999999776482582, 0.0, 0.0, 0.0, 0.0, -0.009999999776482582, 0.0, 0.0, 0.0, 0.0, -0.009999999776482582, 0.0, 0.0, 0.0, 0.0, 1.0);
-		auto f2 = f * f1;
-
-		glm::mat2x2 aaa;
 		//vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
 		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_vsync| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
@@ -1079,10 +217,10 @@ int main()
 			view->familys = family;
 			view->app = app;
 			auto pcb = view->pcb;
-			dom_cx* td3 = new dom_cx();
-			td3->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev, family);
+			dom_cx* dom0 = new dom_cx();
+			dom0->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev, family);
 
-			//auto ptm = plot_main(td3, 1200, 1200);
+			//auto ptm = plot_main(dom0, 1200, 1200);
 
 
 			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
@@ -1251,7 +389,7 @@ int main()
 				dvv2->draggable = true;
 				dvv2->docking = true;
 				dvv2->_absolute = true;
-				td3->add_widget(dvv2);
+				dom0->add_widget(dvv2);
 				{
 					auto btn = fpslab;
 					btn->rounding = 4;
@@ -1279,13 +417,13 @@ int main()
 						}
 					};
 			}
-			td3->add_widget(dvv);
+			dom0->add_widget(dvv);
 			auto colorpicker = new div_cx();
 			{
 				// 调色板
 
 				auto dvv = colorpicker;
-				td3->add_widget(dvv);
+				dom0->add_widget(dvv);
 				dvv->set_size({ 1000,400 });
 				dvv->set_pos({ 100,60 });
 				dvv->family = family;
@@ -1307,7 +445,7 @@ int main()
 			for (int i = 0; i < 3; i++)
 			{
 				auto dvv = new div_cx();
-				td3->add_widget(dvv);
+				dom0->add_widget(dvv);
 				dvv->set_size({ 100,100 });
 				dvv->set_pos({ 100,60 });
 				dvv->family = family;
@@ -1322,9 +460,9 @@ int main()
 				dvv->flex_child.margin_top = 2;
 				dvv->flex_child.margin_bottom = 2;
 				dvv->draggable = true;
-				td3->add_widget(dvv);
+				dom0->add_widget(dvv);
 			}
-			td3->update(0.0f);
+			dom0->update(0.0f);
 			{
 				app->e_window_cb = [=](form_x* fw, int type)
 					{
@@ -1334,26 +472,6 @@ int main()
 						}
 					};
 			}
-#if 0
-			form0->render_cb = [=](SDL_Renderer* renderer, double delta)
-				{
-					return;
-
-				};
-			form0->up_cb = [=](float delta, int* ret)
-				{
-					static double kti = 0.0;
-					kti += delta;
-					static glm::ivec3 sct = {};
-					glm::ivec3 mps1 = { edit1->_cmpos,edit1->get_cursor_idx() };
-					glm::ivec3 mps = { dvv->evupdate,0,0 };
-					if (mps != sct)
-					{
-						sct = mps;
-					}
-
-				};
-#endif
 			app->set_fps(60);
 			vkd->_state.has_fence = false;
 			std::string gpustr;
@@ -1373,12 +491,12 @@ int main()
 				form0->update(delta);
 				if (form0->is_minimized())
 				{
-					td3->pause();
+					dom0->pause();
 					continue;
 				}
 				auto io = form0->get_io();
 				// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
-				if (td3->press_test() && io)
+				if (dom0->press_test() && io)
 					io->WantCaptureMouse = true;
 
 				edit1->_color.x = colorpick->get_color();
@@ -1392,7 +510,7 @@ int main()
 					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
 				}
 				rtc.begin();
-				auto ct = td3->update(delta);
+				auto ct = dom0->update(delta);
 				uims = rtc.end();
 				int64_t sem3d = 0;
 				if (r3d)
@@ -1413,29 +531,21 @@ int main()
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
-					td3->cmd_draw();
+					dom0->cmd_draw();
 					form0->present();
-					view->_vgdev->wait_dev();
+					view->wait_dev();
 					SDLms = rtc.end();
 				}
 			} while (app->form_count());
-			//run_app(app, 0);
-			delete td3;
+			delete dom0;
 			delete view;
 
 		}
-
-		//show_belt(form0);
-		//show_cpuinfo(form0);
-
 		free_vkdg(vkd);
 		gd->release(sampler);
 		gd->release(dctx);
 		free_gdev(gd);
 		free_app(app);
 	}
-#ifdef _WIN32
-	//ExitProcess(0);
-#endif
 	return 0;
 }
