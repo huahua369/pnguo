@@ -494,14 +494,17 @@ int main()
 					dom0->pause();
 					continue;
 				}
-				auto io = form0->get_io();
-				// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
-				if (dom0->press_test() && io)
-					io->WantCaptureMouse = true;
+				if (r3d) 
+				{
+					auto io = form0->get_io();
+					// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
+					if (dom0->press_test() && io)
+						io->WantCaptureMouse = true;
 
-				edit1->_color.x = colorpick->get_color();
-				vkd->update(form0->io);	// 更新事件
-				gpustr = vkd->get_label();
+					edit1->_color.x = colorpick->get_color();
+					vkd->update(form0->io);	// 更新事件
+					gpustr = vkd->get_label();
+				}
 				static double upt = 0.0;
 				upt += delta;
 				if (upt > 1.0)
