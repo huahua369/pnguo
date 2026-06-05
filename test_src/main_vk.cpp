@@ -344,6 +344,7 @@ int main()
 				dvv1->flex_child.margin_right = 2;
 				dvv1->flex_child.margin_top = 2;
 				dvv1->flex_child.margin_bottom = 2;
+				dvv1->flex.wrap = flex_wrap::WRAP;
 				dvv1->draggable = true;
 				dvv1->_absolute = true;
 				{
@@ -476,8 +477,6 @@ int main()
 			vkd->_state.has_fence = false;
 			std::string gpustr;
 			bool r3d = 0;
-			if (!r3d)
-				tex3d = 0;;
 			c_runtime_cx rtc; // 高精度计时器
 			c_runtime_cx rt_cpu; // cpu计时器
 			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
@@ -494,8 +493,10 @@ int main()
 					dom0->pause();
 					continue;
 				}
-				if (r3d) 
+				void* dtex3d = 0;
+				if (r3d)
 				{
+					dtex3d = tex3d;
 					auto io = form0->get_io();
 					// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
 					if (dom0->press_test() && io)
@@ -533,10 +534,11 @@ int main()
 					texture_dt tdt = {};
 					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (tex3d) pcb->render_texture(form0->renderer, tex3d, &tdt, 1);//3d
+					if (dtex3d) pcb->render_texture(form0->renderer, dtex3d, &tdt, 1);//3d
 					dom0->cmd_draw();
 					form0->present();
-					view->wait_dev();
+					if (!r3d)
+						view->wait_dev();
 					SDLms = rtc.end();
 				}
 			} while (app->form_count());
