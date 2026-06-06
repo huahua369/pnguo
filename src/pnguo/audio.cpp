@@ -3169,30 +3169,50 @@ namespace hz {
 		fftw_destroy_plan(plan);
 		return;
 	}
+	std::vector<float> generate1DGaussian(int size, float sigma) {
+		std::vector<float> kernel(size);
+		float sum = 0.0f;
+		int center = size / 2;
+
+		for (int i = 0; i < size; ++i) {
+			kernel[i] = exp(-pow(i - center, 2) / (2.0 * sigma * sigma));
+			sum += kernel[i];
+		}
+
+		for (float& val : kernel) val /= sum; // 归一化
+		return kernel;
+	}
 	void createGaussianWeight(std::vector<double>& weight, int halfSize, double sigma, double centerOffset) {
 		auto PI = glm::pi<double>();
 		weight.resize(halfSize);
 		double center = halfSize / 2.0 + centerOffset; // 可调整中心偏移 
-
+		//auto pv = generate1DGaussian(101, sigma);
 		for (int i = 0; i < halfSize; ++i) {
 			double diff = i - center;
-			auto e = (1 / (2 * PI * sigma * sigma)) * std::exp(-(i * i) / (2 * sigma * sigma));
-			auto e1 = std::exp(-diff * diff / (2 * sigma * sigma));
+			auto e = std::exp(-diff * diff / (2 * sigma * sigma));
 			weight[i] = e;
 		}
 
 		// 归一化权重，使总和为1 
-		double sum = std::accumulate(weight.begin(), weight.end(), 0.0);
-		for (auto& w : weight) {
-			w /= sum;
-		}
+		//double sum = std::accumulate(weight.begin(), weight.end(), 0.0);
+		//for (auto& w : weight) {
+		//	w /= sum;
+		//}
 		return;
+	}
+	std::vector<double> createHanningWindow(int windowSize) {
+		std::vector<double> window(windowSize);
+		for (int i = 0; i < windowSize; ++i) {
+			window[i] = 0.5 * (1.0 - std::cos(2.0 * M_PI * i / (windowSize - 1)));
+		}
+		return window;
 	}
 	void ftd_init(fft_data* p, int fft_size, double sigma)
 	{
 		if (!p)return;
 		p->fft_size = fft_size;
-		createGaussianWeight(p->weight, fft_size / 2, sigma, 20.0);
+		//createGaussianWeight(p->weight, fft_size / 2, sigma, 0.0);
+		p->weight = createHanningWindow(fft_size / 2);
 	}
 	void ftd_free(fft_data* p)
 	{
@@ -3326,12 +3346,23 @@ namespace hz {
 			auto b = *audio_frame; audio_frame++;
 			df[i] = b * norm;
 		}
+		double max_mag = 0.0;
+		double min_mag = 0.0;
 		computeSpectrum(p, p->tem.data(), frame_size, p->fft_size);
 		p->dst.resize(p->magnitude.size());
 		for (size_t i = 0; i < p->magnitude.size(); ++i) {
-			double visualValue = p->magnitude[i] /** p->weight[i]*/; // 加权 
+			double visualValue = p->magnitude[i] * p->weight[i]; // 加权 
 			p->dst[i] = visualValue;
 			// 后续将此值映射到颜色/亮度 
+			if (std::isnan(visualValue) || isinf(visualValue))
+				visualValue = 0.0;
+			max_mag = std::max(max_mag, visualValue);
+			min_mag = std::min(min_mag, visualValue);
+		}
+		max_mag -= min_mag;
+		auto pd = p->dst.data();
+		for (int k = 0; k < p->magnitude.size(); k++) {
+			pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
 		}
 		float* a = p->dst.data();
 		int dct = glm::clamp((double)dcount, 0.0, p->fft_size * 10.0);// p->fft_size / 2;

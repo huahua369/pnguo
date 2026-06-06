@@ -567,12 +567,12 @@ int main()
 				if (!app->form_count())break;
 				actx->run_play();
 				auto avd = actx->_current;
-				if (avd && /*actx->has_play &&*/ avd->cpos > fft_size)
+				if (avd && actx->has_play && avd->cpos > fft_size)
 				{
 					auto add = (short*)avd->data->data;
 					size_t apos = (avd->ctime / avd->atime) * avd->data->total_samples;
 					fft.bits_per_sample = avd->data->bits_per_sample;
-					ftd_update(&fft, add + apos, fft_size * 2, 100);
+					ftd_update(&fft, add + apos, fft_size * 2, 120);
 					ct++;
 				}
 				cpums = rt_cpu.end();
