@@ -3164,7 +3164,7 @@ namespace hz {
 		}
 		max_mag -= min_mag;
 		for (int k = 0; k < count; k++) {
-			_data[k] = ((_data[k] - min_mag) / max_mag); // 归一化高度  
+			//_data[k] = ((_data[k] - min_mag) / max_mag); // 归一化高度  
 		}
 		fftw_destroy_plan(plan);
 		return;
@@ -3179,14 +3179,14 @@ namespace hz {
 			sum += kernel[i];
 		}
 
-		for (float& val : kernel) val /= sum; // 归一化
+		//for (float& val : kernel) val /= sum; // 归一化
 		return kernel;
 	}
 	void createGaussianWeight(std::vector<double>& weight, int halfSize, double sigma, double centerOffset) {
 		auto PI = glm::pi<double>();
 		weight.resize(halfSize);
 		double center = halfSize / 2.0 + centerOffset; // 可调整中心偏移 
-		//auto pv = generate1DGaussian(101, sigma);
+		//auto pv = generate1DGaussian(halfSize, sigma);
 		for (int i = 0; i < halfSize; ++i) {
 			double diff = i - center;
 			auto e = std::exp(-diff * diff / (2 * sigma * sigma));
@@ -3194,10 +3194,10 @@ namespace hz {
 		}
 
 		// 归一化权重，使总和为1 
-		//double sum = std::accumulate(weight.begin(), weight.end(), 0.0);
-		//for (auto& w : weight) {
-		//	w /= sum;
-		//}
+		double sum = std::accumulate(weight.begin(), weight.end(), 0.0);
+		for (auto& w : weight) {
+			w /= sum;
+		}
 		return;
 	}
 	std::vector<double> createHanningWindow(int windowSize) {
@@ -3211,8 +3211,8 @@ namespace hz {
 	{
 		if (!p)return;
 		p->fft_size = fft_size;
-		//createGaussianWeight(p->weight, fft_size / 2, sigma, 0.0);
-		p->weight = createHanningWindow(fft_size / 2);
+		createGaussianWeight(p->weight, fft_size / 2, sigma, 0.0);
+		//p->weight = createHanningWindow(fft_size / 2);
 	}
 	void ftd_free(fft_data* p)
 	{
@@ -3224,7 +3224,7 @@ namespace hz {
 		if (out)
 			fftw_free(out);
 	}
-	void calculate_heights1(fft_data* p, int dcount, std::vector<float>& lastY, glm::vec4* rects, int x, bool is_reverse)
+	void calculate_heights1(fft_data* p, int dcount, std::vector<float>& lastY, glm::vec4* rects, int x, bool is_reverse, bool is_cos)
 	{
 		auto& dh = p->dst;
 		auto oy = p->_oy;
@@ -3252,13 +3252,25 @@ namespace hz {
 			else {
 				output = t + taps + len * 2;
 				if (dst_rate > src_rate) { // 升采样 
-					apply_lpf(dh.data(), len, taps, t, t + taps, output); // 预滤波 
-					output = upsample(output, len, factor, t + taps + len);
+					if (is_cos)
+					{
+						apply_lpf(dh.data(), len, taps, t, t + taps, output); // 预滤波 
+						output = upsample(output, len, factor, t + taps + len);
+					}
+					else {
+						output = upsample(dh.data(), len, factor, t + taps + len);
+					}
 					length = len * factor;
 				}
 				else { // 降采样 
-					apply_lpf(dh.data(), len, taps, t, t + taps, output); // 抗混叠滤波 
-					output = downsample(output, len, factor, t + taps + len);
+					if (is_cos)
+					{
+						apply_lpf(dh.data(), len, taps, t, t + taps, output); // 抗混叠滤波 
+						output = downsample(output, len, factor, t + taps + len);
+					}
+					else {
+						output = downsample(dh.data(), len, factor, t + taps + len);
+					}
 					length = len / factor;
 				}
 			}
@@ -3278,7 +3290,7 @@ namespace hz {
 					height = 0;
 				if (isinf(height))
 					height = 1.0;
-				*doy = height * p->draw_height;
+				*doy = height;
 				doy += inc;
 			}
 
@@ -3346,28 +3358,19 @@ namespace hz {
 			auto b = *audio_frame; audio_frame++;
 			df[i] = b * norm;
 		}
-		double max_mag = 0.0;
-		double min_mag = 0.0;
 		computeSpectrum(p, p->tem.data(), frame_size, p->fft_size);
 		p->dst.resize(p->magnitude.size());
 		for (size_t i = 0; i < p->magnitude.size(); ++i) {
 			double visualValue = p->magnitude[i] * p->weight[i]; // 加权 
-			p->dst[i] = visualValue;
 			// 后续将此值映射到颜色/亮度 
 			if (std::isnan(visualValue) || isinf(visualValue))
 				visualValue = 0.0;
-			max_mag = std::max(max_mag, visualValue);
-			min_mag = std::min(min_mag, visualValue);
-		}
-		max_mag -= min_mag;
-		auto pd = p->dst.data();
-		for (int k = 0; k < p->magnitude.size(); k++) {
-			pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
+			p->dst[i] = visualValue;
 		}
 		float* a = p->dst.data();
 		int dct = glm::clamp((double)dcount, 0.0, p->fft_size * 10.0);// p->fft_size / 2;
 		p->_rects.resize(dct);
-		calculate_heights1(p, dct, p->_lastY[0], p->_rects.data(), 0, false);
+		calculate_heights1(p, dct, p->_lastY[0], p->_rects.data(), 0, false, false);
 		//a = fft(vd2.data() + frame_size, frame_size);
 		//calculate_heights1(p, dct, p->_lastY[1], p->_rects.data() + dct, dct, false);
 	}
