@@ -6,6 +6,13 @@ vkvg设备需要扩展scalarBlockLayout：VkPhysicalDeviceVulkan12Features或VkP
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <complex.h>
+#ifdef __cplusplus
+}
+#endif
 // 实现
 //#define GLM_ENABLE_EXPERIMENTAL 
 //#include <glm/glm.hpp>
@@ -4852,3 +4859,4 @@ GraphResource::GraphResource()
 
 GraphResource::~GraphResource()
 {}
+ 

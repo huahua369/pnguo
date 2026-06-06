@@ -442,8 +442,9 @@ form_x* new_form1(void* app, int width, int height, form_x* parent);
 // 提示窗口
 form_x* new_form_tooltip(form_x* parent, int width, int height);
 
-//void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1);
-
+#ifdef SDL_render_h_
+void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, const glm::vec4& color, const glm::vec4& color1);
+#endif
 
 
 // 获取CPU信息

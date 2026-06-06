@@ -11,6 +11,7 @@
 #include <random>
 #include <pnguo/win_core.h>
 #include "win32msg.h"
+#include <SDL3/SDL.h>
 #include <pnguo/event.h>
 //#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
@@ -29,7 +30,6 @@
 #include <pnguo/render.h>
 #include <pnguo/win_core.h>
 
-#include <SDL3/SDL.h>
 #include <pnguo/plot.h>
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
@@ -42,6 +42,80 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 
 #include <entt/entt.hpp>
 
+hz::audio_cx* audiofft(app_cx* app) {
+
+	static hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
+,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
+,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+	auto audio_ctx = new hz::audio_cx();
+	audio_ctx->init(&abc, "data/config_music.json");
+	audio_ctx->play_thread = false;
+	audio_ctx->run_thread();
+	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
+	// 设置播放歌单，只有一个歌单，所以设置0
+	audio_ctx->set_gd(0);
+	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
+	audio_ctx->set_type(3);
+	// 播放当前歌单指定索引开始播放
+	audio_ctx->play(0);
+	return audio_ctx;
+	auto mad1 = audio_ctx->get_list_it(0)->v[0]->data;
+	hz::fft_cx* fft = new hz::fft_cx();
+	hz::fft_cx* fft1 = new hz::fft_cx();
+	double dtime = 0.06;
+	int fs = mad1->sample_rate * dtime;
+	{
+		while (1)
+		{
+			int rc1 = decoder_data(mad1);
+			if (rc1 <= 0)
+			{
+				break;
+			}
+		}
+		fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
+		fft->draw_pos;
+		fft->is_raw = true;
+		fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
+		fft1->draw_pos.y += 110;
+		fft1->bar_width = 6;
+		fft1->bar_step = 0;
+		fft->bar_width = 6;
+		fft->bar_step = 3;
+	}
+	{
+		// 渲染回调
+		SDL_Renderer* renderer = 0; double delta = 0.0;
+		static double deltas = 0;
+		deltas += delta;
+		if (deltas > dtime)
+		{
+			static int64_t kn = 0;
+			static int64_t kn1 = 0;
+			static int64_t sn = 256;
+			static int64_t sn1 = 2048;
+			deltas = 0;
+			fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
+			fft1->calculate_heights((short*)mad1->data + kn1, sn1 * 2, 100);
+			kn += fs;
+			kn1 += fs;
+			if (kn >= mad1->total_samples)
+			{
+				kn = 0;
+			}
+			if (kn1 >= mad1->total_samples)
+			{
+				kn1 = 0;
+			}
+		}
+		glm::vec4 color = { 0,0.5,1.0,0.8 };
+		static std::vector<SDL_Vertex> vertices;
+		gen_rects(fft->_rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+		SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+		gen_rects(fft1->_rects, vertices, { 0.5, 0.0, 0, 0.00 }, { 1, 0.15, 0, 0.9 });
+		SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+	}
+}
 int main()
 {
 	auto k = time(0);
@@ -475,6 +549,12 @@ int main()
 			}
 			app->set_fps(60);
 			vkd->_state.has_fence = false;
+			auto actx = audiofft(app);
+			hz::fft_data fft = {};
+			int fft_size = 1024;
+			ftd_init(&fft, fft_size, 5.0);
+			//ftd_free(&fft);
+
 			std::string gpustr;
 			bool r3d = 0;
 			c_runtime_cx rtc; // 高精度计时器
@@ -482,8 +562,19 @@ int main()
 			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
 			// 运行消息循环			
 			do {
+				int ct = 0;
 				auto delta = app->update_event();
 				if (!app->form_count())break;
+				actx->run_play();
+				auto avd = actx->_current;
+				if (avd && avd->cpos > fft_size)
+				{
+					auto add = (short*)avd->data->data;
+					size_t apos = (avd->ctime / avd->atime) * avd->data->total_samples;
+					fft.bits_per_sample = avd->data->bits_per_sample;
+					ftd_update(&fft, add + apos, fft_size * 2);
+					ct++;
+				}
 				cpums = rt_cpu.end();
 				rt_cpu.begin();
 				auto fps = app->get_fps();
@@ -514,7 +605,7 @@ int main()
 					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
 				}
 				rtc.begin();
-				auto ct = dom0->update(delta);
+				ct = dom0->update(delta);
 				uims = rtc.end();
 				int64_t sem3d = 0;
 				if (r3d)
@@ -536,6 +627,15 @@ int main()
 					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
 					if (dtex3d) pcb->render_texture(form0->renderer, dtex3d, &tdt, 1);//3d
 					dom0->cmd_draw();
+					{
+						glm::vec4 color = { 0,0.5,1.0,0.8 };
+						static std::vector<SDL_Vertex> vertices;
+						if (fft._rects.size())
+						{
+							gen_rects(fft._rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+							SDL_RenderGeometry(form0->renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+						}
+					}
 					form0->present();
 					if (!r3d)
 						view->wait_dev();

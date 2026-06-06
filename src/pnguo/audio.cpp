@@ -297,12 +297,10 @@ namespace hz {
 	{
 	public:
 		audio_data_cx()
-		{
-		}
+		{}
 
 		~audio_data_cx()
-		{
-		}
+		{}
 		int put(const void* buf, int len)
 		{
 			char* d = (char*)buf;
@@ -343,8 +341,7 @@ namespace hz {
 	{
 	public:
 		music_de_t()
-		{
-		}
+		{}
 
 		~music_de_t()
 		{
@@ -1150,12 +1147,10 @@ namespace hz {
 			uint64_t(*tell_func)(void* ud) = nullptr;
 		public:
 			en_data_t()
-			{
-			}
+			{}
 
 			~en_data_t()
-			{
-			}
+			{}
 
 		private:
 
@@ -1163,12 +1158,10 @@ namespace hz {
 
 	public:
 		flac_en_t(flac_loader* ctx) :flac(ctx)
-		{
-		}
+		{}
 
 		~flac_en_t()
-		{
-		}
+		{}
 		static FLAC__StreamEncoderWriteStatus enWriteCallback(const FLAC__StreamEncoder* encoder, const FLAC__byte buffer[], size_t bytes
 			, uint32_t samples, uint32_t current_frame, void* client_data)
 		{
@@ -1494,8 +1487,7 @@ namespace hz {
 			}
 
 			~wav2flac_t()
-			{
-			}
+			{}
 		private:
 
 		};
@@ -1807,8 +1799,7 @@ namespace hz {
 	};
 
 	ogg_decoder::ogg_decoder()
-	{
-	}
+	{}
 
 	ogg_decoder::~ogg_decoder()
 	{
@@ -2452,8 +2443,7 @@ void free_coders(coders_t* p)
 }
 
 coders_t::coders_t()
-{
-}
+{}
 
 coders_t::~coders_t()
 {
@@ -2653,8 +2643,7 @@ void fft_filter_f(int n, const float* in, float* out, float sample_rate, float f
 
 namespace hz {
 	fft_cx::fft_cx()
-	{
-	}
+	{}
 
 	fft_cx::~fft_cx()
 	{
@@ -2874,8 +2863,7 @@ namespace hz {
 	};
 
 	fft_tiny::fft_tiny()
-	{
-	}
+	{}
 
 	fft_tiny::~fft_tiny()
 	{
@@ -3135,6 +3123,217 @@ namespace hz {
 		return heights.data();
 	}
 
+
+	void computeSpectrum(fft_data* p, const double* audioData, int dsize, int fftSize)
+	{
+		if (!p)return;
+		// 申请输入/输出数组 
+		fftw_complex* in = (fftw_complex*)p->_in;
+		fftw_complex* out = (fftw_complex*)p->_out;
+		if (p->_size != fftSize) {
+			p->_size = fftSize;
+			if (in)
+				fftw_free(in);
+			if (out)
+				fftw_free(out);
+			in = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
+			out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
+			p->_in = in;
+			p->_out = out;
+		}
+
+		// 填充数据（注意加窗可选，这里略）
+		for (int i = 0; i < fftSize && i < dsize; ++i) {
+			in[i][0] = audioData[i];
+			in[i][1] = 0.0;
+		}
+
+		// 执行 FFT 
+		fftw_plan plan = fftw_plan_dft_1d(fftSize, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+		fftw_execute(plan);
+
+		// 计算幅度（取前 N/2 个有效频点）
+		p->magnitude.resize(fftSize / 2);
+		for (int i = 0; i < fftSize / 2; ++i) {
+			p->magnitude[i] = std::sqrt(out[i][0] * out[i][0] + out[i][1] * out[i][1]);
+		}
+		fftw_destroy_plan(plan);
+		return;
+	}
+	void createGaussianWeight(std::vector<double>& weight, int halfSize, double sigma, double centerOffset) {
+		auto PI = glm::pi<double>();
+		weight.resize(halfSize);
+		double center = halfSize / 2.0 + centerOffset; // 可调整中心偏移 
+
+		for (int i = 0; i < halfSize; ++i) {
+			double diff = i - center;
+			auto e = (1 / (2 * PI * sigma * sigma)) * std::exp(-(i * i) / (2 * sigma * sigma));
+			auto e1 = std::exp(-diff * diff / (2 * sigma * sigma));
+			weight[i] = e;
+		}
+
+		// 归一化权重，使总和为1 
+		double sum = std::accumulate(weight.begin(), weight.end(), 0.0);
+		for (auto& w : weight) {
+			w /= sum;
+		}
+		return;
+	}
+	void ftd_init(fft_data* p, int fft_size, double sigma)
+	{
+		if (!p)return;
+		p->fft_size = fft_size;
+		createGaussianWeight(p->weight, fft_size / 2, sigma, 20.0);
+	}
+	void ftd_free(fft_data* p)
+	{
+		if (!p)return;
+		fftw_complex* in = (fftw_complex*)p->_in;
+		fftw_complex* out = (fftw_complex*)p->_out;
+		if (in)
+			fftw_free(in);
+		if (out)
+			fftw_free(out);
+	}
+	void calculate_heights1(fft_data* p, int dcount, std::vector<float>& lastY, glm::vec4* rects, int x, bool is_reverse)
+	{
+		auto& dh = p->dst;
+		auto oy = p->_oy;
+		if (dcount > 2)
+		{
+			int len = dh.size();
+			int dst_rate = dcount, src_rate = len;
+			// 计算采样率转换因子 
+			int factor = (dst_rate > src_rate) ?
+				dst_rate / src_rate :
+				src_rate / dst_rate;
+			auto taps = p->taps;
+			int ass = taps + len * (factor + 2);
+			if (p->sample_tem.size() != ass)
+			{
+				p->sample_tem.resize(ass);
+			}
+			auto t = p->sample_tem.data();
+			float* output = 0;
+			size_t length = 0;
+			if (dst_rate == src_rate)
+			{
+				output = dh.data(); length = src_rate;
+			}
+			else {
+				output = t + taps + len * 2;
+				if (dst_rate > src_rate) { // 升采样 
+					apply_lpf(dh.data(), len, taps, t, t + taps, output); // 预滤波 
+					output = upsample(output, len, factor, t + taps + len);
+					length = len * factor;
+				}
+				else { // 降采样 
+					apply_lpf(dh.data(), len, taps, t, t + taps, output); // 抗混叠滤波 
+					output = downsample(output, len, factor, t + taps + len);
+					length = len / factor;
+				}
+			}
+			length = length > dcount ? dcount : length;
+			if (oy.size() != length)
+				oy.resize(length);
+			int inc = is_reverse ? -1 : 1;
+			auto doy = oy.data();
+			if (inc < 0)
+			{
+				doy += length - 1;
+			}
+			for (size_t i = 0; i < length; i++)
+			{
+				auto height = output[i];
+				if (isnan(height))
+					height = 0;
+				if (isinf(height))
+					height = 1.0;
+				*doy = height * p->draw_height;
+				doy += inc;
+			}
+
+			int n = oy.size();
+			double f = 0.5;
+			int half = n * f;
+			auto rd = oy.data();
+			double mn = 0.0;
+			double mx = 0.0;
+			for (auto& it : oy) {
+				if (it < mn)
+					mn = it;
+				if (it > mx)
+					mx = it;
+			}
+			mx -= mn;
+			for (auto& it : oy) {
+				it -= mn;
+				if (mx > 0) {
+					it /= mx;
+				}
+				if (isnan(it)) {
+					it = 0;
+				}
+				it *= p->draw_height;
+
+			}
+
+			auto& y = oy;
+			if (lastY.size() && p->is_smooth) {
+				if (length != lastY.size())
+					lastY.resize(length);
+				for (int i = 0; i < length; i++) {
+					if (y[i] < lastY[i]) {
+						lastY[i] = y[i] * p->smoothConstantDown + lastY[i] * (1.0 - p->smoothConstantDown);
+					}
+					else {
+						lastY[i] = y[i] * p->smoothConstantUp + lastY[i] * (1.0 - p->smoothConstantUp);
+					}
+				}
+			}
+			else {
+				lastY = y;
+			}
+			x *= p->bar_width;
+			length = glm::clamp((int)length, 0, dcount);
+			for (size_t i = 0; i < length; i++)
+			{
+				auto height = lastY[i];
+				rects[i] = { x + p->draw_pos.x + i * p->bar_width,p->draw_pos.y - height, p->bar_width - p->bar_step, height };
+			}
+		}
+	}
+
+	void ftd_update(fft_data* p, const short* audio_frame, int frame_size)
+	{
+		if (!p)return;
+		p->tem.resize(frame_size);
+		auto df = p->tem.data();
+		uint32_t bps = (1 << (p->bits_per_sample - 1));
+		float norm = 1.0 / bps;
+		auto oldt = audio_frame;
+		for (size_t i = 0; i < frame_size; i++)
+		{
+			auto b = *audio_frame; audio_frame++;
+			df[i] = b * norm;
+		}
+		computeSpectrum(p, p->tem.data(), frame_size, p->fft_size);
+		p->dst.resize(p->magnitude.size());
+		p->_rects.resize(p->magnitude.size());
+		auto d = p->_rects.data();
+		for (size_t i = 0; i < p->magnitude.size(); ++i) {
+			double visualValue = p->magnitude[i] * p->weight[i]; // 加权 
+			p->dst[i] = visualValue;
+			// 后续将此值映射到颜色/亮度 
+			d[i] = glm::vec4();
+		}
+		float* a = p->dst.data();
+		int dct = p->fft_size / 2;
+		calculate_heights1(p, dct, p->_lastY[0], p->_rects.data(), 0, false);
+		//a = fft(vd2.data() + frame_size, frame_size);
+		//calculate_heights1(p, dct, p->_lastY[1], p->_rects.data() + dct, dct, false);
+	}
+
 	audio_cx::audio_cx()
 	{
 		config = njson::object();
@@ -3144,6 +3343,8 @@ namespace hz {
 	audio_cx::~audio_cx()
 	{
 		_run = false;
+		put_jt.request_stop();
+		de_jt.request_stop();
 		save_config();
 		free_coders(coders); coders = 0;
 	}
@@ -3314,6 +3515,13 @@ namespace hz {
 			_de_list.push(p);
 		}
 	}
+	void audio_cx::run_play()
+	{
+		if (!play_thread)
+		{
+			play_thr();
+		}
+	}
 	void audio_cx::play_thr()
 	{
 		auto curr_time = bk.get_ticks();
@@ -3376,8 +3584,8 @@ namespace hz {
 					ct = 0;
 					break;
 				}
-				int psa1 = 0;
-				int psq1 = 0;
+				static int psa1 = 0;	// 剩余可用长度
+				static int psq1 = 0;	// 剩余排除长度
 				auto len = pt->desize;
 				auto plen = pt->sample_rate * pt->channels * (pt->bits_per_sample / 8);
 				const int large_input_thresh = 64 * 1024 - 536;
@@ -3414,19 +3622,23 @@ namespace hz {
 			} while (0);
 		}
 		prev_time = curr_time;
-		bk.sleep_ms(waitms);
+		if (play_thread)
+			bk.sleep_ms(waitms);
 	}
 	void audio_cx::run_thread()
 	{
 		if (!bk.sleep_ms)bk.sleep_ms = a_sleep_ms;
 		if (!bk.get_ticks)bk.get_ticks = a_get_ticks;
 		if (!bk.put_audio)return;
-		if (!put_jt.native_handle()) {
+		if (play_thread && !put_jt.native_handle()) {
 			std::jthread j([=](std::stop_token st)
 				{
 					while (!st.stop_requested()) { play_thr(); }
 				});
 			put_jt.swap(j);// 音频推送播放线程
+		}
+		else {
+			put_jt.request_stop();
 		}
 		if (!de_jt.native_handle()) {
 			std::jthread dj([=](std::stop_token st)
