@@ -262,6 +262,7 @@ namespace hz {
 		std::jthread put_jt, de_jt;
 		bool _run = true;
 		bool play_thread = true;
+		bool has_play = true;
 	public:
 		audio_cx();
 		~audio_cx();
@@ -276,6 +277,7 @@ namespace hz {
 		audio_list* get_list_it(size_t i);
 		// 播放当前歌单指定索引
 		void play(size_t idx);
+		void pause(bool v);
 		// 创建线程运行
 		void run_thread();
 		void push_decoder(audio_item* p);
@@ -305,15 +307,15 @@ namespace hz {
 		int draw_height = 100;
 		float bar_width = 6;
 		float bar_step = 4;
-		glm::vec2 draw_pos = {};
+		glm::vec2 draw_pos = { 100,200 };
 		float smoothConstantDown = 0.08;
 		float smoothConstantUp = 0.8;
 		bool is_smooth = true;			// 是否平滑
-		bool is_raw = false; 
+		bool is_raw = false;
 	};
 	void ftd_init(fft_data* p, int fft_size, double sigma);
 	void ftd_free(fft_data* p);
-	void ftd_update(fft_data* p, const short* audio_frame, int frame_size);
+	void ftd_update(fft_data* p, const short* audio_frame, int frame_size, int dcount);
 
 	// 常用函数
 	void s2flac8_array(const short* src, int32_t* dest, int count);

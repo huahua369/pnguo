@@ -554,7 +554,7 @@ int main()
 			int fft_size = 1024;
 			ftd_init(&fft, fft_size, 5.0);
 			//ftd_free(&fft);
-
+			actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
 			c_runtime_cx rtc; // 高精度计时器
@@ -567,12 +567,12 @@ int main()
 				if (!app->form_count())break;
 				actx->run_play();
 				auto avd = actx->_current;
-				if (avd && avd->cpos > fft_size)
+				if (avd && /*actx->has_play &&*/ avd->cpos > fft_size)
 				{
 					auto add = (short*)avd->data->data;
 					size_t apos = (avd->ctime / avd->atime) * avd->data->total_samples;
 					fft.bits_per_sample = avd->data->bits_per_sample;
-					ftd_update(&fft, add + apos, fft_size * 2);
+					ftd_update(&fft, add + apos, fft_size * 2, 100);
 					ct++;
 				}
 				cpums = rt_cpu.end();
@@ -605,7 +605,7 @@ int main()
 					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
 				}
 				rtc.begin();
-				ct = dom0->update(delta);
+				ct += dom0->update(delta);
 				uims = rtc.end();
 				int64_t sem3d = 0;
 				if (r3d)

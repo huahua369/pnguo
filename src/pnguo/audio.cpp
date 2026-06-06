@@ -2891,33 +2891,28 @@ namespace hz {
 			fft_output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * count);
 		}
 
+		//double frequency = ((double)i / count) * sample_rate;
 		// 读取音频数据并进行频谱计算
 		{
 			// 创建 FFTW 3.0 的计划
 			fftw_plan plan = fftw_plan_dft_1d(count, fft_input, fft_output, FFTW_FORWARD, FFTW_ESTIMATE);
-
 			// 将输入音频数据复制到 FFTW 输入数组
 			for (int i = 0; i < count; i++) {
 				fft_input[i][0] = data[i];
 				fft_input[i][1] = 0.0;  // 虚部设置为零
 			}
-
 			// 执行 FFT 变换
 			fftw_execute(plan);
-
 			double max_mag = 0.0;
 			double min_mag = 0.0;
 			// 计算频谱
 			for (int i = 0; i < count; i++) {
 				double magnitude = sqrt(fft_output[i][0] * fft_output[i][0] + fft_output[i][1] * fft_output[i][1]);
-				double frequency = ((double)i / count) * sample_rate;
 				_data[i] = magnitude;
 				if (std::isnan(magnitude) || isinf(magnitude))
 					magnitude = 0.0;
-				if (magnitude > max_mag) max_mag = magnitude;
-				if (magnitude < min_mag) min_mag = magnitude;
-				// 在这里可以对频谱数据做进一步处理，例如绘图、输出等
-				//printf("Frequency: %.2f Hz, Magnitude: %.4f\n", frequency, magnitude);
+				max_mag = std::max(max_mag, magnitude);
+				min_mag = std::min(min_mag, magnitude);
 			}
 			max_mag -= min_mag;
 			for (int k = 0; k < count; k++) {
@@ -3151,11 +3146,25 @@ namespace hz {
 		// 执行 FFT 
 		fftw_plan plan = fftw_plan_dft_1d(fftSize, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
 		fftw_execute(plan);
-
+		auto count = fftSize / 2;
+		auto& fft_output = out;
 		// 计算幅度（取前 N/2 个有效频点）
 		p->magnitude.resize(fftSize / 2);
-		for (int i = 0; i < fftSize / 2; ++i) {
-			p->magnitude[i] = std::sqrt(out[i][0] * out[i][0] + out[i][1] * out[i][1]);
+		auto _data = p->magnitude.data();
+		double max_mag = 0.0;
+		double min_mag = 0.0;
+		// 计算频谱
+		for (int i = 0; i < count; i++) {
+			double magnitude = sqrt(fft_output[i][0] * fft_output[i][0] + fft_output[i][1] * fft_output[i][1]);
+			_data[i] = magnitude;
+			if (std::isnan(magnitude) || isinf(magnitude))
+				magnitude = 0.0;
+			max_mag = std::max(max_mag, magnitude);
+			min_mag = std::min(min_mag, magnitude);
+		}
+		max_mag -= min_mag;
+		for (int k = 0; k < count; k++) {
+			_data[k] = ((_data[k] - min_mag) / max_mag); // 归一化高度  
 		}
 		fftw_destroy_plan(plan);
 		return;
@@ -3304,9 +3313,9 @@ namespace hz {
 		}
 	}
 
-	void ftd_update(fft_data* p, const short* audio_frame, int frame_size)
+	void ftd_update(fft_data* p, const short* audio_frame, int frame_size, int dcount)
 	{
-		if (!p)return;
+		if (!p || dcount < 2)return;
 		p->tem.resize(frame_size);
 		auto df = p->tem.data();
 		uint32_t bps = (1 << (p->bits_per_sample - 1));
@@ -3319,16 +3328,14 @@ namespace hz {
 		}
 		computeSpectrum(p, p->tem.data(), frame_size, p->fft_size);
 		p->dst.resize(p->magnitude.size());
-		p->_rects.resize(p->magnitude.size());
-		auto d = p->_rects.data();
 		for (size_t i = 0; i < p->magnitude.size(); ++i) {
-			double visualValue = p->magnitude[i] * p->weight[i]; // 加权 
+			double visualValue = p->magnitude[i] /** p->weight[i]*/; // 加权 
 			p->dst[i] = visualValue;
 			// 后续将此值映射到颜色/亮度 
-			d[i] = glm::vec4();
 		}
 		float* a = p->dst.data();
-		int dct = p->fft_size / 2;
+		int dct = glm::clamp((double)dcount, 0.0, p->fft_size * 10.0);// p->fft_size / 2;
+		p->_rects.resize(dct);
 		calculate_heights1(p, dct, p->_lastY[0], p->_rects.data(), 0, false);
 		//a = fft(vd2.data() + frame_size, frame_size);
 		//calculate_heights1(p, dct, p->_lastY[1], p->_rects.data() + dct, dct, false);
@@ -3434,6 +3441,11 @@ namespace hz {
 			}
 		}
 		play(gd_idx, pidx);
+	}
+	void audio_cx::pause(bool v)
+	{
+		has_play = !v;
+		bk.pause_audio(_current->st, v ? 1 : 0);
 	}
 	// 设置播放类型
 	void audio_cx::set_type(int type) {
