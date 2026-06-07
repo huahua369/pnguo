@@ -111,7 +111,7 @@ struct audio_item
 	std::string name, path;		// 歌名、路径
 	audio_data_t* data = 0;
 	void* st = 0;
-	size_t cpos = 0;	// 当前播放位置
+	size_t cpos = 0;	// 当前提交位置
 	double ctime = 0.0;	// 当前播放时间
 	double atime = 0.0;	// 总播放时间
 
@@ -134,10 +134,7 @@ void testaudioencoder()
 	while (1)
 	{
 		int rc1 = decoder_data(mad2);
-		if (rc1 <= 0)
-		{
-			break;
-		}
+		if (rc1 <= 0) { break; }
 	}
 	int bits[] = { 16,24,32 };
 	e.bits_per_sample = bits[mad2->format];

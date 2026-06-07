@@ -2455,6 +2455,7 @@ coders_t::~coders_t()
 	}
 	codes.clear();
 }
+// 解码数据
 int decoder_data(audio_data_t* p)
 {
 	int rc = 0;
@@ -3543,7 +3544,7 @@ namespace hz {
 					}
 					if (st)
 					{
-						pt->cpos = 0;	// 当前播放位置
+						pt->cpos = 0;	// 当前提交位置
 						pt->ctime = 0.0;	// 当前播放时间
 						pt->st = st;
 						pt->atime = p->total_samples / p->sample_rate;
@@ -3643,6 +3644,10 @@ namespace hz {
 				if (psq > 0) {
 					ct += delta;
 					_current->ctime += delta;
+				}
+				if (_current->ctime >= _current->atime) {
+					ct = 0;
+					_current->ctime = 0;
 				}
 				if (_current->cpos >= len)
 				{

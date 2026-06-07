@@ -551,10 +551,11 @@ int main()
 			vkd->_state.has_fence = false;
 			auto actx = audiofft(app);
 			hz::fft_data fft = {};
-			int fft_size = 1024;
+			int fft_size = 2048;
 			ftd_init(&fft, fft_size, fft_size * 0.05);
+			fft.draw_height = 50;
 			//ftd_free(&fft);
-			//actx->pause(1);
+			actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
 			c_runtime_cx rtc; // 高精度计时器
@@ -567,13 +568,20 @@ int main()
 				if (!app->form_count())break;
 				actx->run_play();
 				auto avd = actx->_current;
-				if (avd && actx->has_play && avd->cpos > fft_size)
+				if (avd && /*actx->has_play &&*/ avd->cpos > fft_size)
 				{
 					auto add = (short*)avd->data->data;
-					size_t apos = (avd->ctime / avd->atime) * avd->data->total_samples;
+					int64_t apos = (avd->ctime / avd->atime) * avd->data->len;
 					fft.bits_per_sample = avd->data->bits_per_sample;
-					ftd_update(&fft, add + apos, fft_size, 120);
-					ct++;
+					int64_t cpos = avd->data->len;
+					auto ccc = cpos - apos;
+					auto fs = fft_size;
+					if (apos < cpos)
+					{
+						if (cpos < apos + fft_size)fs = cpos - apos;
+						ftd_update(&fft, add + apos, fs, 100);
+						ct++;
+					}
 				}
 				cpums = rt_cpu.end();
 				rt_cpu.begin();
