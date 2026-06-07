@@ -76,7 +76,6 @@ struct coder_t
 
 	// 编码器（可选）,返回0则跳出编码
 	encoder_func encoder;
-
 };
 /*format int16=0,int=1,float=2,double=3*/
 struct audio_data_t
@@ -301,16 +300,16 @@ namespace hz {
 		size_t fft_size = 0;
 		int bits_per_sample = 0;
 		int taps = 64;
-		int draw_height = 100;
+		int draw_height = 80;
 		float bar_width = 6;
 		float bar_step = 4;
-		glm::vec2 draw_pos = { 100,200 };
+		glm::vec2 draw_pos = { 120,200 };
 		float smoothConstantDown = 0.08;
 		float smoothConstantUp = 0.8;
 		bool is_smooth = true;			// 是否平滑
 		bool is_raw = false;
 	};
-	void ftd_init(fft_data* p, int fft_size, double sigma);
+	void ftd_init(fft_data* p, int fft_size);
 	void ftd_free(fft_data* p);
 	void ftd_update(fft_data* p, const short* audio_frame, int frame_size, int dcount);
 

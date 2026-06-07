@@ -158,6 +158,7 @@ public:
 	static int get_audio_dst_framesize(void* st);
 	static int get_audio_stream_available(void* st);
 	static void put_audio(void* stream, void* data, int len);
+	static void set_audio_gain(void* stream, float v);
 	// v=0播放、1暂停
 	static void pause_audio(void* st_, int v);
 	// format：0=S16 , 1=S32 ,2=F32，volume取0-1

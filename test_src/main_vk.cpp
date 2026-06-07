@@ -51,6 +51,7 @@ hz::audio_cx* audiofft(app_cx* app) {
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->play_thread = false;
 	audio_ctx->run_thread();
+	//audio_ctx->add_song(0, R"(E:\song\豆包-太想念.flac)");
 	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
@@ -547,20 +548,21 @@ int main()
 						}
 					};
 			}
-			app->set_fps(90);
+			app->set_fps(60);
 			vkd->_state.has_fence = false;
 			auto actx = audiofft(app);
 			hz::fft_data fft = {};
-			int fft_size = 2048;
-			ftd_init(&fft, fft_size, fft_size * 0.05);
+			int fft_size = 1024;
+			ftd_init(&fft, fft_size);
 			fft.draw_height = 50;
-			//ftd_free(&fft);
-			actx->pause(1);
+			//ftd_free(&fft); 
+			//actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
 			c_runtime_cx rtc; // 高精度计时器
 			c_runtime_cx rt_cpu; // cpu计时器
 			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
+			//app_cx::set_audio_gain(actx->_current->st, 0.05);
 			// 运行消息循环			
 			do {
 				int ct = 0;
@@ -571,14 +573,14 @@ int main()
 				if (avd && /*actx->has_play &&*/ avd->cpos > fft_size)
 				{
 					auto add = (short*)avd->data->data;
-					int64_t apos = (avd->ctime / avd->atime) * avd->data->len;
+					int64_t apos = (avd->ctime / avd->atime) * (avd->data->total_samples);
 					fft.bits_per_sample = avd->data->bits_per_sample;
 					int64_t cpos = avd->data->len;
 					auto ccc = cpos - apos;
 					auto fs = fft_size;
 					if (apos < cpos)
 					{
-						if (cpos < apos + fft_size)fs = cpos - apos;
+						if (cpos < apos + fs)fs = cpos - apos;
 						ftd_update(&fft, add + apos, fs, 100);
 						ct++;
 					}

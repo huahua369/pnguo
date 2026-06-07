@@ -3126,6 +3126,9 @@ namespace hz {
 		// 申请输入/输出数组 
 		fftw_complex* in = (fftw_complex*)p->_in;
 		fftw_complex* out = (fftw_complex*)p->_out;
+		if (dsize < fftSize) {
+			fftSize = 1 << static_cast<int>(std::ceil(std::log2(dsize)));
+		}
 		if (p->_size != fftSize) {
 			p->_size = fftSize;
 			if (in)
@@ -3137,13 +3140,16 @@ namespace hz {
 			p->_in = in;
 			p->_out = out;
 		}
-
+		auto mc = std::min(dsize, fftSize);
 		// 填充数据（注意加窗可选，这里略）
-		for (int i = 0; i < fftSize && i < dsize; ++i) {
+		for (int i = 0; i < mc; ++i) {
 			in[i][0] = audioData[i];
 			in[i][1] = 0.0;
 		}
-
+		//for (int i = mc; i < fftSize; ++i) {
+		//	in[i][0] = 0.0;
+		//	in[i][1] = 0.0;
+		//}
 		// 执行 FFT 
 		fftw_plan plan = fftw_plan_dft_1d(fftSize, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
 		fftw_execute(plan);
@@ -3152,20 +3158,10 @@ namespace hz {
 		// 计算幅度（取前 N/2 个有效频点）
 		p->magnitude.resize(fftSize / 2);
 		auto _data = p->magnitude.data();
-		double max_mag = 0.0;
-		double min_mag = 0.0;
 		// 计算频谱
 		for (int i = 0; i < count; i++) {
 			double magnitude = sqrt(fft_output[i][0] * fft_output[i][0] + fft_output[i][1] * fft_output[i][1]);
 			_data[i] = magnitude;
-			if (std::isnan(magnitude) || isinf(magnitude))
-				magnitude = 0.0;
-			max_mag = std::max(max_mag, magnitude);
-			min_mag = std::min(min_mag, magnitude);
-		}
-		max_mag -= min_mag;
-		for (int k = 0; k < count; k++) {
-			//_data[k] = ((_data[k] - min_mag) / max_mag); // 归一化高度  
 		}
 		fftw_destroy_plan(plan);
 		return;
@@ -3179,8 +3175,6 @@ namespace hz {
 			kernel[i] = exp(-pow(i - center, 2) / (2.0 * sigma * sigma));
 			sum += kernel[i];
 		}
-
-		//for (float& val : kernel) val /= sum; // 归一化
 		return kernel;
 	}
 	void createGaussianWeight(std::vector<double>& weight, int halfSize, double sigma, double centerOffset) {
@@ -3208,12 +3202,12 @@ namespace hz {
 		}
 		return window;
 	}
-	void ftd_init(fft_data* p, int fft_size, double sigma)
+	void ftd_init(fft_data* p, int fft_size)
 	{
 		if (!p)return;
 		p->fft_size = fft_size;
-		createGaussianWeight(p->weight, fft_size / 2, sigma, 0.0);
-		//p->weight = createHanningWindow(fft_size / 2);
+		//createGaussianWeight(p->weight, fft_size / 2, sigma, 0.0);
+		p->weight = createHanningWindow(fft_size / 2);
 	}
 	void ftd_free(fft_data* p)
 	{
@@ -3288,7 +3282,7 @@ namespace hz {
 			{
 				auto height = output[i];
 				if (isnan(height))
-					height = 0;
+					height = 0.0;
 				if (isinf(height))
 					height = 1.0;
 				*doy = height;
@@ -3316,10 +3310,11 @@ namespace hz {
 				if (isnan(it)) {
 					it = 0;
 				}
+				if (isinf(it)) {
+					it = 1;
+				}
 				it *= p->draw_height;
-
 			}
-
 			auto& y = oy;
 			if (lastY.size() && p->is_smooth) {
 				if (length != lastY.size())
@@ -3351,29 +3346,62 @@ namespace hz {
 		if (!p || dcount < 2)return;
 		p->tem.resize(frame_size);
 		auto df = p->tem.data();
+		for (auto& it : p->tem) { it = 0.0; }
 		uint32_t bps = (1 << (p->bits_per_sample - 1));
 		float norm = 1.0 / bps;
-		auto oldt = audio_frame;
-		for (size_t i = 0; i < frame_size; i++)
+		auto ft = audio_frame;
+		auto count = frame_size / 2;
+		for (size_t i = 0; i < count; i++)
 		{
-			auto b = *audio_frame; audio_frame++;
+			auto b = *ft; ft += 2;
 			df[i] = b * norm;
 		}
-		computeSpectrum(p, p->tem.data(), frame_size, p->fft_size);
-		p->dst.resize(p->magnitude.size());
-		for (size_t i = 0; i < p->magnitude.size(); ++i) {
-			double visualValue = p->magnitude[i] * p->weight[i]; // 加权 
-			// 后续将此值映射到颜色/亮度 
-			if (std::isnan(visualValue) || isinf(visualValue))
-				visualValue = 0.0;
-			p->dst[i] = visualValue;
+		ft = audio_frame + 1;
+		df += count;
+		for (size_t i = 0; i < count; i++)
+		{
+			auto b = *ft; ft += 2;
+			df[i] = b * norm;
+		}
+		p->dst.resize(count);
+		auto pd = p->dst.data();
+		computeSpectrum(p, p->tem.data(), count, p->fft_size);	// 左声道
+		{
+			double min_mag = bps;
+			double max_mag = 0.0;
+			for (size_t i = 0; i < p->magnitude.size(); ++i) {
+				pd[i] = p->magnitude[i];
+				min_mag = std::min(min_mag, p->magnitude[i]);
+				max_mag = std::max(max_mag, p->magnitude[i]);
+			}
+			max_mag -= min_mag;
+			for (int k = 0; k < count; k++) {
+				pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
+			}
+		}
+		pd = p->dst.data() + count / 2;
+		computeSpectrum(p, p->tem.data() + count, count, p->fft_size);	// 右声道
+		{
+			double min_mag = bps;
+			double max_mag = 0.0;
+			for (size_t i = 0; i < p->magnitude.size(); ++i) {
+				pd[i] = p->magnitude[i];
+				min_mag = std::min(min_mag, p->magnitude[i]);
+				max_mag = std::max(max_mag, p->magnitude[i]);
+			}
+			max_mag -= min_mag;
+			for (int k = 0; k < count; k++) {
+				pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
+			}
 		}
 		float* a = p->dst.data();
-		int dct = glm::clamp((double)dcount, 0.0, p->fft_size * 10.0);// p->fft_size / 2;
+		std::reverse(a, a + count / 2);	// 左声道翻转
+		for (int i = 0; i < count;i++) {
+			//a[i] *= p->weight[i];
+		}
+		int dct = dcount > 0 ? dcount : p->fft_size;
 		p->_rects.resize(dct);
 		calculate_heights1(p, dct, p->_lastY[0], p->_rects.data(), 0, false, false);
-		//a = fft(vd2.data() + frame_size, frame_size);
-		//calculate_heights1(p, dct, p->_lastY[1], p->_rects.data() + dct, dct, false);
 	}
 
 	audio_cx::audio_cx()
@@ -3547,7 +3575,7 @@ namespace hz {
 						pt->cpos = 0;	// 当前提交位置
 						pt->ctime = 0.0;	// 当前播放时间
 						pt->st = st;
-						pt->atime = p->total_samples / p->sample_rate;
+						pt->atime = (double)p->total_samples / p->sample_rate;
 						_current = pt;
 					}
 				}
@@ -3578,7 +3606,7 @@ namespace hz {
 			double delta = (float)(ctp) / 1000.0f;
 			// todo put data
 			do {
-				if (!_current || !_current->data)break;
+				if (!_current || !_current->data || !has_play)break;
 				auto pt = _current->data;
 				auto psq = bk.get_audio_stream_queued(_current->st);
 				if (frame_size == 0) {

@@ -875,6 +875,14 @@ void app_cx::put_audio(void* stream, void* data, int len)
 		SDL_PutAudioStreamData((SDL_AudioStream*)st, data, (int)len);
 	}
 }
+void app_cx::set_audio_gain(void* stream, float v)
+{
+	auto st = (SDL_AudioStream*)stream;
+	if (stream) {
+		SDL_SetAudioStreamGain(st, v);
+	}
+}
+
 void app_cx::pause_audio(void* st_, int v)
 {
 	auto st = (SDL_AudioStream*)st_;
@@ -3760,6 +3768,7 @@ void gen_rects(std::vector<glm::vec4>& _rect, std::vector<SDL_Vertex>& opt, cons
 	for (auto& it : _rect) {
 		SDL_FColor* j = (SDL_FColor*)&color;
 		SDL_FColor* b = (SDL_FColor*)&color1;
+		if (it.z < 2 || it.w < 2)continue;
 		auto rect2 = GenerateRectangleVertices(it.x, it.y, it.z, it.w, *j, *j, *b, *b);
 		opt.insert(opt.end(), rect2.begin(), rect2.end());
 	}
