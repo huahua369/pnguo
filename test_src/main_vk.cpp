@@ -559,6 +559,7 @@ int main()
 			//actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
+			std::vector<SDL_Vertex>* vertices = new  std::vector<SDL_Vertex>();
 			c_runtime_cx rtc; // 高精度计时器
 			c_runtime_cx rt_cpu; // cpu计时器
 			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
@@ -639,11 +640,10 @@ int main()
 					dom0->cmd_draw();
 					{
 						glm::vec4 color = { 0,0.5,1.0,0.8 };
-						static std::vector<SDL_Vertex> vertices;
 						if (fft._rects.size())
 						{
-							gen_rects(fft._rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
-							SDL_RenderGeometry(form0->renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
+							gen_rects(fft._rects, *vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+							SDL_RenderGeometry(form0->renderer, nullptr, vertices->data(), vertices->size(), nullptr, 0);
 						}
 					}
 					form0->present();

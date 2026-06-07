@@ -3126,10 +3126,7 @@ namespace hz {
 		// 申请输入/输出数组 
 		fftw_complex* in = (fftw_complex*)p->_in;
 		fftw_complex* out = (fftw_complex*)p->_out;
-		if (dsize < fftSize) {
-			fftSize = 1 << static_cast<int>(std::ceil(std::log2(dsize)));
-		}
-		if (p->_size != fftSize) {
+		if (p->_size < fftSize) {
 			p->_size = fftSize;
 			if (in)
 				fftw_free(in);
@@ -3139,6 +3136,9 @@ namespace hz {
 			out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
 			p->_in = in;
 			p->_out = out;
+		}
+		if (dsize < fftSize) {
+			fftSize = 1 << static_cast<int>(std::ceil(std::log2(dsize)));
 		}
 		auto mc = std::min(dsize, fftSize);
 		// 填充数据（注意加窗可选，这里略）
