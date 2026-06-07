@@ -75,6 +75,11 @@
 #include <zlib.h>
 #include <regex>
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 namespace md {
 
 	int64_t file_size(FILE* fp)

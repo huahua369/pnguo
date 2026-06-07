@@ -13,7 +13,12 @@
 
 #include "buffer.h"
 #include <mapView.h>
- 
+
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 void show_tooltip(form_x* form, const std::string& str, const glm::ivec2& pos, style_tooltip* bc)
 {
 	if (!form || !bc || str.empty())return;

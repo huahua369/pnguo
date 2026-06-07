@@ -24,6 +24,10 @@
 
 #include "ecc_sv.h"
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 //#include <mem_pe.h>
 
 //#include <nlohmann/json.hpp>

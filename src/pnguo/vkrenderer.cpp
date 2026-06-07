@@ -142,6 +142,11 @@ typedef uint32_t DXGI_FORMAT;
 #include "vkrh.h"
 #include "vkrenderer.h"
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 #define CACHE_ENABLE
 //#define CACHE_LOG 
 
@@ -2469,7 +2474,8 @@ namespace vkr
 	};
 
 	double MillisecondsNow();
-	bool readfile(const char* name, char** data, size_t* size, bool isbinary);
+	bool readfile_0(const char* name, char** data, size_t* size, bool isbinary);
+	bool readfile(const char* name, std::vector<char>& data, bool isbinary);
 	bool savefile(const char* name, void const* data, size_t size, bool isbinary);
 	void Trace(const std::string& str);
 	void Trace(const char* pFormat, ...);
@@ -2571,8 +2577,9 @@ namespace vkr
 
 		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID * ppData, UINT * pBytes)
 		{
+			// todo open
 			std::string fullpath = hz::genfn(GetShaderCompilerLibDir() + "/" + pFileName);
-			return readfile(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
+			return readfile_0(fullpath.c_str(), (char**)ppData, (size_t*)pBytes, false) ? S_OK : E_FAIL;
 		}
 		HRESULT Close(LPCVOID pData)
 		{
@@ -2594,7 +2601,8 @@ namespace vkr
 			std::string kfp = hz::genfn(GetShaderCompilerLibDir() + "/" + hz::u16_to_gbk(pFilename));
 			LPCVOID pData;
 			size_t bytes;
-			HRESULT hr = readfile(kfp.c_str(), (char**)&pData, (size_t*)&bytes, false) ? S_OK : E_FAIL;
+			std::vector<char> data;
+			HRESULT hr = readfile(kfp.c_str(), data, false) ? S_OK : E_FAIL;
 
 			if (hr == E_FAIL)
 			{
@@ -2604,7 +2612,7 @@ namespace vkr
 			}
 
 			IDxcBlobEncoding* pSource;
-			ThrowIfFailed(m_pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)pData, (UINT32)bytes, CP_UTF8, &pSource));
+			ThrowIfFailed(m_pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)data.data(), (UINT32)data.size(), CP_UTF8, &pSource));
 
 			*ppIncludeSource = pSource;
 
@@ -2612,7 +2620,7 @@ namespace vkr
 		}
 	};
 
-	bool DXCompileToDXO(size_t hash, const char* pSrcCode, const DefineList* pDefines, const char* pEntryPoint, const char* pParams, char** outSpvData, size_t* outSpvSize)
+	bool DXCompileToDXO(size_t hash, const char* pSrcCode, const DefineList* pDefines, const char* pEntryPoint, const char* pParams, std::vector<char>& outSpvData)
 	{
 		//detect output bytecode type (DXBC/SPIR-V) and use proper extension
 		std::string filenameOut;
@@ -2625,7 +2633,7 @@ namespace vkr
 		}
 
 #ifdef USE_DXC_SPIRV_FROM_DISK
-		if (readfile(filenameOut.c_str(), outSpvData, outSpvSize, true) && *outSpvSize > 0)
+		if (readfile(filenameOut.c_str(), outSpvData, true) && !outSpvData.empty())
 		{
 			//Trace(format("thread 0x%04x compile: %p disk\n", GetCurrentThreadId(), hash));
 			return true;
@@ -2767,10 +2775,9 @@ namespace vkr
 
 			if (pResult != NULL && pResult->GetBufferSize() > 0)
 			{
-				*outSpvSize = pResult->GetBufferSize();
-				*outSpvData = (char*)malloc(*outSpvSize);
-
-				memcpy(*outSpvData, pResult->GetBufferPointer(), *outSpvSize);
+				auto outSpvSize = pResult->GetBufferSize();
+				outSpvData.resize(outSpvSize);
+				memcpy(outSpvData.data(), pResult->GetBufferPointer(), outSpvSize);
 
 				pResult->Release();
 
@@ -2779,7 +2786,7 @@ namespace vkr
 					pError->Release();
 
 #ifdef USE_DXC_SPIRV_FROM_DISK
-				savefile(filenameOut.c_str(), *outSpvData, *outSpvSize, true);
+				savefile(filenameOut.c_str(), outSpvData.data(), outSpvData.size(), true);
 #endif
 				return true;
 			}
@@ -2814,7 +2821,8 @@ namespace vkr
 	//
 	// Compiles a shader into SpirV
 	//
-	bool VKCompileToSpirv(size_t hash, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const std::string& shaderCode, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, char** outSpvData, size_t* outSpvSize)
+	bool VKCompileToSpirv(size_t hash, ShaderSourceType sourceType, const VkShaderStageFlagBits shader_type, const std::string& shaderCode,
+		const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, std::vector<char>& outSpvData)
 	{
 		// create glsl file for shader compiler to compile
 		//
@@ -2866,16 +2874,16 @@ namespace vkr
 
 			if (LaunchProcess(commandLine.c_str(), filenameErr.c_str()) == true)
 			{
-				readfile(filenameSpv.c_str(), outSpvData, outSpvSize, true);
-				assert(*outSpvSize != 0);
+				readfile(filenameSpv.c_str(), outSpvData, true);
+				assert(outSpvData.size() != 0);
 				return true;
 			}
 		}
 		else
 		{
 			std::string scp = format("-spirv -fspv-target-env=vulkan1.1 -I %s %s %s", GetShaderCompilerLibDir().c_str(), defines.c_str(), shaderCompilerParams);
-			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData, outSpvSize);
-			assert(*outSpvSize != 0);
+			DXCompileToDXO(hash, shaderCode.c_str(), pDefines, pShaderEntryPoint, scp.c_str(), outSpvData);
+			assert(outSpvData.size() != 0);
 
 			return true;
 		}
@@ -2959,30 +2967,30 @@ namespace vkr
 		{
 			auto strk = format("%p", hash);
 			print_time Pt("new shaderModule " + strk, 1);
-			char* SpvData = NULL;
-			size_t SpvSize = 0;
+
+			std::vector<char> spv_data;
 #ifdef USE_SPIRV_FROM_DISK
 			std::string filenameSpv = hz::genfn(format("%s\\%p.spv", GetShaderCompilerCacheDir().c_str(), hash));
-			if (readfile(filenameSpv.c_str(), &SpvData, &SpvSize, true) == false)
+			if (readfile(filenameSpv.c_str(), spv_data, true) == false)
 #endif
 			{
 				print_time Pt("Compile Pipeline " + strk, 1);
 				std::string shader = GenerateSource(sourceType, shader_type, pshader, shaderCompilerParams, pDefines);
-				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, &SpvData, &SpvSize);
+				VKCompileToSpirv(hash, sourceType, shader_type, shader.c_str(), pShaderEntryPoint, shaderCompilerParams, 0, spv_data);
 
-				if (SpvSize == 0) {
+				if (spv_data.size()) {
 					printf("\n%s\n", shader.c_str());
 				}
-				assert(SpvSize != 0);
+				assert(spv_data.size());
 			}
 			else {
-				if (SpvSize == 0) {
+				if (spv_data.empty()) {
 					printf("\n%s\n", strk.c_str());
 				}
 			}
 			//auto c = crc32(-1, (Bytef*)pshader, strlen(pshader));  
-			assert(SpvSize != 0);
-			CreateModule(m_device, SpvData, SpvSize, &pShader->module);
+			assert(spv_data.size());
+			CreateModule(m_device, spv_data.data(), spv_data.size(), &pShader->module);
 			if (!pShader->module) {
 				assert(!pShader->module);
 			}
@@ -3017,9 +3025,7 @@ namespace vkr
 	// pExtraParams
 	VkResult Device::VKCompileFromFile(const VkShaderStageFlagBits shader_type, const char* pFilename, const char* pShaderEntryPoint, const char* shaderCompilerParams, const DefineList* pDefines, VkPipelineShaderStageCreateInfo* pShader)
 	{
-		char* pShaderCode;
-		size_t size;
-
+		std::vector<char> pShaderCode;
 		ShaderSourceType sourceType;
 		std::string pfn = pFilename;
 		if (pfn.find(".glsl") != std::string::npos)
@@ -3041,9 +3047,9 @@ namespace vkr
 		//append path
 		auto fullpath = hz::genfn(GetShaderCompilerLibDir() + std::string("/") + pFilename);
 
-		if (readfile(fullpath.c_str(), &pShaderCode, &size, false))
+		if (readfile(fullpath.c_str(), pShaderCode, false))
 		{
-			VkResult res = VKCompileFromString(sourceType, shader_type, pShaderCode, pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
+			VkResult res = VKCompileFromString(sourceType, shader_type, pShaderCode.data(), pShaderEntryPoint, shaderCompilerParams, pDefines, pShader);
 			SetResourceName(m_device, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)pShader->module, pFilename);
 			return res;
 		}
@@ -16649,7 +16655,7 @@ namespace vkr {
 	}
 
 	//  Reads a file into a buffer
-	bool readfile(const char* name, char** data, size_t* size, bool isbinary)
+	bool readfile_0(const char* name, char** data, size_t* size, bool isbinary)
 	{
 		FILE* file;
 		//Open file
@@ -22225,9 +22231,17 @@ namespace vkr {
 		// shut down the shader compiler 
 		m_device->DestroyShaderCache();
 
+		for (; _lts.size();)
+		{
+			auto it = _lts.front();
+			_lts.pop();
+			if (it)
+				delete it;
+		}
 		for (auto it : _loaders)
 		{
-			delete it;
+			if (it)
+				delete it;
 		}
 		_loaders.clear();
 	}

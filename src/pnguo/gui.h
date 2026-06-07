@@ -390,11 +390,13 @@ struct radio_tl :public widget_t
 {
 	radio_style_t style = {};	// 风格id
 	radio_info_t v = {};
+private:
 	group_radio_t* gr = 0;		// 组 
 public:
 	radio_tl();
 	~radio_tl();
 public:
+	void set_group(group_radio_t* p);
 	void bind_ptr(bool* p);
 	void set_value(const std::string& str, bool v);
 	void set_value(bool v);

@@ -17,12 +17,19 @@ https://github.com/huahua369/pnguo
 #include "pnguo.h"
 #include "gui.h"
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 viewdev_cx::viewdev_cx()
 {}
 
 viewdev_cx::~viewdev_cx()
 {
 	free_vkvgdev(_vgdev); _vgdev = nullptr;
+	if (pcb)
+		delete pcb; pcb = nullptr;
 }
 
 void viewdev_cx::init_vgdev(dev_info_cx* d, int sample)
@@ -124,6 +131,11 @@ dom_cx::dom_cx()
 
 dom_cx::~dom_cx()
 {
+	for (auto pt : widgets)
+	{
+		if (pt)
+			delete pt;
+	}
 	if (dc)delete dc; dc = 0;
 }
 

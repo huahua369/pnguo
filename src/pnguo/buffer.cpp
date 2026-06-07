@@ -8,6 +8,12 @@
 #include "buffer.h"
 #include <print_time.h>
 #define let auto
+
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 namespace hz {
 
 	class PieceTreeBase

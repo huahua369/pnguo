@@ -41,6 +41,11 @@
 #include <stb_rect_pack.h>
 #include <stb_truetype.h>
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 typedef uint16_t Offset16;
 typedef uint32_t Offset32;
 glm::vec4 ucolor2fx(uint32_t color)
@@ -2353,6 +2358,7 @@ font_t::font_t()
 
 font_t::~font_t()
 {
+	clear_gcache();
 	std::map<int, std::vector<info_one*>> detail;
 	for (auto& [k, v] : detail)
 	{
@@ -5264,7 +5270,9 @@ bitmap_cache_cx::bitmap_cache_cx()
 }
 
 bitmap_cache_cx::~bitmap_cache_cx()
-{}
+{
+	clear();
+}
 
 void bitmap_cache_cx::resize(int w, int h)
 {

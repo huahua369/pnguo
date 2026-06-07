@@ -44,6 +44,11 @@ extern "C" {
 
 #include "ntype.h"
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 #define SP_RGBA32_R_U(v) ((v) & 0xff)
 #define SP_RGBA32_G_U(v) (((v) >> 8) & 0xff)
 #define SP_RGBA32_B_U(v) (((v) >> 16) & 0xff)
@@ -293,6 +298,7 @@ void free_gctx(vkvgctx* p) {
 vkvg_dev::~vkvg_dev()
 {
 	if (fun)delete fun; fun = 0;
+	if (memoryProperties)delete memoryProperties; memoryProperties = 0;
 	free_gctx(ctx);
 	free_gctx(ctx1);
 

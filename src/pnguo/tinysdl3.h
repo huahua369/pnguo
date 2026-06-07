@@ -110,6 +110,9 @@ public:
 	uint32_t audio_device = 0;
 	dev_info_cx _set_dev = {};
 	glm::vec2 mouse_pos = {};
+	std::set<void*> ac_lst;		// 分配的内存
+	std::mutex lkac;				// 分配内存锁
+	int64_t ac_count = 0;			// 分配内存总数量
 	bool nc_down = 0;
 	bool viewports_enable = false;	// docking用
 	bool WantUpdateMonitors = true;
@@ -459,3 +462,5 @@ app_cx* new_app();
 //MC_EXPORT int run_app(void* app, int count);
 MC_EXPORT void* new_app0();
 MC_EXPORT void free_app(void* app);
+
+int64_t get_ac_count();

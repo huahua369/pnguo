@@ -102,6 +102,10 @@ KHR_materials_clearcoat
 
 #include "gpu_vk_in.h"
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 
 // 新渲染器实现
 namespace vkg {

@@ -4,6 +4,13 @@
 #include "pnguo.h"
 #include "render.h"
 #include "mapView.h"
+
+
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 // 16进制编辑
 #if 1
 

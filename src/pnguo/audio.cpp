@@ -24,6 +24,11 @@
 #define M_PI 3.14159265358979323846
 #endif // !M_PI
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 namespace hz {
 
 	inline int psf_lrintf(float x)
@@ -3417,6 +3422,24 @@ namespace hz {
 		de_jt.request_stop();
 		save_config();
 		free_coders(coders); coders = 0;
+		for (auto& it : _lists)
+		{
+			if (it)
+			{
+				for (auto& it2 : it->v)
+				{
+					if (it2)
+					{
+						if (it2->data)
+						{
+							free_audio_data(it2->data);
+						}
+						delete it2;
+					}
+				}
+				delete it;
+			}
+		}
 	}
 
 	void audio_cx::init(audio_backend_t* p, const std::string& confn) {

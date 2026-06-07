@@ -17,6 +17,10 @@
 #define M_PI_2 1.57079632679489661923
 #endif // !M_PI_2
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 
 #define MUL_NO_OVERFLOW	((size_t)1 << (sizeof(size_t) * 4))
 void*

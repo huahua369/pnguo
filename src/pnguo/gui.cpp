@@ -15,6 +15,10 @@
 #undef max
 #endif // min
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 
 
 // 杂算法
@@ -494,12 +498,21 @@ void free_obt(T*& p) {
 
 radio_tl::~radio_tl()
 {
-	if (gr && gr->ct > 0) {
+	if (gr) {
 		gr->ct--;
 		if (gr->ct <= 0)
 			delete gr;
 	}
 	gr = 0;
+}
+
+void radio_tl::set_group(group_radio_t* p)
+{
+	if (p) {
+		if (gr)gr->ct--;
+		gr = p;
+		p->ct++;
+	}
 }
 
 void radio_tl::bind_ptr(bool* p)
@@ -2341,7 +2354,13 @@ div_cx::div_cx()
 }
 
 div_cx::~div_cx()
-{}
+{
+	for (auto p : widgets)
+	{
+		if (p)
+			delete p;
+	}
+}
 void div_cx::add_widget(widget_t* p)
 {
 	if (p)

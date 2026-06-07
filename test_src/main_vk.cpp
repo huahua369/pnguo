@@ -29,7 +29,6 @@
 #include <spine/spine-sdl3/spinesdl3.h>
 #include <pnguo/render.h>
 #include <pnguo/win_core.h>
-
 #include <pnguo/plot.h>
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
@@ -41,6 +40,11 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 #endif
 
 #include <entt/entt.hpp>
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 
 hz::audio_cx* audiofft(app_cx* app) {
 
@@ -51,7 +55,7 @@ hz::audio_cx* audiofft(app_cx* app) {
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->play_thread = false;
 	audio_ctx->run_thread();
-	//audio_ctx->add_song(0, R"(E:\song\豆包-太想念.flac)");
+	audio_ctx->add_song(0, R"(E:\song\豆包-太想念.flac)");
 	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
@@ -119,9 +123,17 @@ hz::audio_cx* audiofft(app_cx* app) {
 }
 int main()
 {
+	// 启用内存泄漏检测
+	int dbgFlags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+	dbgFlags |= _CRTDBG_LEAK_CHECK_DF | _CRTDBG_ALLOC_MEM_DF; // 启用内存泄漏检查
+	_CrtSetDbgFlag(dbgFlags);
+	static int kba = 0;
+	if (kba)
+		_CrtSetBreakAlloc(kba);
 	auto k = time(0);
 	main_heightmap(k);
-	Sleep(1000);
+	auto kafdfsdf = new int[15];
+	malloc(18);
 	if (1) {
 		//hz::main_ssh2();
 		//return 0;
@@ -283,9 +295,9 @@ int main()
 			//new_ui(form0, vkd); 
 			//void* vg2dtex = nullptr;
 			const char* filename = "temp/vkvg_gb.png";
-			bspline_ct* bs = new bspline_ct();
+			//bspline_ct* bs = new bspline_ct();
 			std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
-			auto bptr = bs->new_bspline(pts.data(), pts.size());
+			//auto bptr = bs->new_bspline(pts.data(), pts.size());
 
 			auto view = new viewdev_cx();
 			view->init_vgdev(&devinfo, 8);
@@ -347,7 +359,7 @@ int main()
 			auto gr = new group_radio_t();
 			for (int i = 0; i < 5; i++) {
 				auto r = new radio_tl();
-				r->gr = gr;
+				r->set_group(gr);
 				r->set_size({ 36,36 });
 				r->style.line_col = 0xffff8020;
 				r->style.thickness = 1;
@@ -556,7 +568,7 @@ int main()
 			ftd_init(&fft, fft_size);
 			fft.draw_height = 50;
 			//ftd_free(&fft); 
-			//actx->pause(1);
+			actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
 			std::vector<SDL_Vertex>* vertices = new  std::vector<SDL_Vertex>();
@@ -571,7 +583,7 @@ int main()
 				if (!app->form_count())break;
 				actx->run_play();
 				auto avd = actx->_current;
-				if (avd && /*actx->has_play &&*/ avd->cpos > fft_size)
+				if (avd && actx->has_play && avd->cpos > fft_size)
 				{
 					auto add = (short*)avd->data->data;
 					int64_t apos = (avd->ctime / avd->atime) * (avd->data->total_samples);
@@ -654,7 +666,8 @@ int main()
 			} while (app->form_count());
 			delete dom0;
 			delete view;
-
+			ftd_free(&fft);
+			delete vertices;
 		}
 		free_vkdg(vkd);
 		gd->release(sampler);
@@ -662,5 +675,7 @@ int main()
 		free_gdev(gd);
 		free_app(app);
 	}
+	int64_t acc = get_ac_count();
+
 	return 0;
 }

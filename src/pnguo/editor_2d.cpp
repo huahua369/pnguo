@@ -59,6 +59,12 @@
 #include <mapView.h>
 #include <stb_image.h>
 #include "tria.h"
+
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 // https://zh.esotericsoftware.com/spine-atlas-format
 atlas_strinfo get_atlas_strinfo()
 {

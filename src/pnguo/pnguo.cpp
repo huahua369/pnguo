@@ -92,6 +92,10 @@ namespace mapbox {
 #endif
 
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 
 
 // 2d骨骼动画

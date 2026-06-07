@@ -32,6 +32,10 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #undef min
 #endif // max 
 
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 
 
 std::string get_clipboard()
@@ -295,16 +299,88 @@ bool wMessageHook(void* userdata, MSG* msg) {
 }
 #endif
 
+static app_cx* a_app = 0;
+
+void* treal_malloc(size_t s) {
+	auto p = malloc(s);
+	if (a_app)
+	{
+		std::lock_guard lg(a_app->lkac);
+		a_app->ac_count++;
+		auto it = a_app->ac_lst.insert(p);
+		assert(a_app->ac_count == a_app->ac_lst.size());
+	}
+	return p;
+}
+void* treal_calloc(size_t n, size_t s) {
+	auto p = malloc(n * s);
+	if (p)
+		memset(p, 0, n * s);
+	if (a_app)
+	{
+		std::lock_guard lg(a_app->lkac);
+		a_app->ac_count++;
+		a_app->ac_lst.insert(p);
+		assert(a_app->ac_count == a_app->ac_lst.size());
+	}
+	return p;
+	//return calloc(n, s);
+}
+void* treal_realloc(void* p, size_t s) {
+	auto p1 = realloc(p, s);
+	if (a_app)
+	{
+		std::lock_guard lg(a_app->lkac);
+		a_app->ac_lst.insert(p1);
+		if (!p)
+		{
+			a_app->ac_count++;
+		}
+		else
+		{
+			if (p != p1)
+				a_app->ac_lst.erase(p);
+		}
+		assert(a_app->ac_count == a_app->ac_lst.size());
+	}
+	return p1;
+}
+void  treal_free(void* p) {
+	free(p);
+	if (a_app)
+	{
+		assert(a_app->ac_count == a_app->ac_lst.size());
+		std::lock_guard lg(a_app->lkac);
+		a_app->ac_count--;
+		a_app->ac_lst.erase(p);
+	}
+}
+int64_t get_ac_count() {
+	return a_app ? a_app->ac_count : 0;
+}
+void ac_free_all() {
+	if (a_app)
+	{
+		std::lock_guard lg(a_app->lkac);
+		for (auto p : a_app->ac_lst) {
+			if (p)free(p);
+			a_app->ac_count--;
+		}
+		a_app->ac_lst.clear();
+		a_app = 0;
+	}
+}
 
 app_cx::app_cx()
 {
 	set_col_u8();
 	font_ctx = new_fonts_ctx();
-
+	a_app = this;
 	fct = new Timer();
 	//r2d = new render_2d();
 	uint32_t f = -1;
 	//f &= ~SDL_INIT_CAMERA; // 相机退出有bug
+	SDL_SetMemoryFunctions(treal_malloc, treal_calloc, treal_realloc, treal_free);
 	int kr = SDL_Init(f);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, false);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_TEXT, false);
@@ -413,6 +489,8 @@ app_cx::~app_cx()
 #if _WIN32
 	OleUninitialize();
 #endif
+	ac_free_all();
+
 }
 void app_cx::set_dev(void* instance, void* physical_device, void* device)
 {
@@ -629,12 +707,13 @@ void app_cx::call_cb(SDL_Event* e)
 }
 void app_cx::sleep_ms(int ms)
 {
-	SDL_Delay(ms);
-	//std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+	//SDL_Delay(ms);
+	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 void app_cx::sleep_ns(int ns)
 {
-	SDL_DelayNS(ns);
+	std::this_thread::sleep_for(std::chrono::nanoseconds(ns));
+	//SDL_DelayNS(ns);
 }
 uint64_t app_cx::get_ticks() {
 	return SDL_GetTicks();
@@ -1468,6 +1547,16 @@ form_x::~form_x()
 	destroy();
 	sdlfree(clipstr); clipstr = 0;
 	_ptr = 0;
+	if (dragdrop)
+	{
+		delete dragdrop;
+		dragdrop = 0;
+	}
+	if (_oledrop)
+	{
+		delete _oledrop;
+		_oledrop = 0;
+	}
 }
 
 void form_x::init_dragdrop()
