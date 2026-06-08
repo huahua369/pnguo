@@ -26,7 +26,7 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #include <tinysdl3.h>
 #include <event.h> 
 #include "app.h"
-
+#include "ntype.h"
 #ifdef max
 #undef max
 #undef min
@@ -37,6 +37,7 @@ SDL_SetRenderTarget会执行vkQueueSubmit并等待完成
 #define new DEBUG_NEW
 #endif
 
+void un_icu();
 
 std::string get_clipboard()
 {
@@ -301,62 +302,96 @@ bool wMessageHook(void* userdata, MSG* msg) {
 
 static app_cx* a_app = 0;
 
+void  treal_free(void* p);
 void* treal_malloc(size_t s) {
-	auto p = malloc(s);
-	assert(p);
+	void* p = 0;
 	if (a_app)
 	{
 		std::lock_guard lg(a_app->lkac);
+		s += sizeof(size_t);
+		p = a_app ? a_app->_ac->new_mem(s) : nullptr;
+		//auto p = malloc(s);
+		assert(p);
+		if (p) {
+			auto ps = (size_t*)p;
+			*ps = s;
+			p = ps + 1;
+		}
+		//size_t ac = a_app->ac_count;
+		//assert(ac == a_app->ac_lst.size());
 		a_app->ac_count++;
-		auto it = a_app->ac_lst.insert(p);
-		assert(a_app->ac_count == a_app->ac_lst.size());
+		//a_app->ac_lst[p]++;
 	}
 	return p;
 }
 void* treal_calloc(size_t n, size_t s) {
-	auto p = malloc(n * s);
+	auto p = treal_malloc(n * s);
+	//auto p = malloc(n * s);
 	if (p)
 		memset(p, 0, n * s);
-	assert(p);
-	if (a_app)
-	{
-		std::lock_guard lg(a_app->lkac);
-		a_app->ac_count++;
-		a_app->ac_lst.insert(p);
-		assert(a_app->ac_count == a_app->ac_lst.size());
-	}
+	//assert(p);
+	//if (a_app)
+	//{
+	//	std::lock_guard lg(a_app->lkac);
+	//	size_t ac = a_app->ac_count;
+	//	//assert(ac == a_app->ac_lst.size());
+	//	a_app->ac_count++;
+	//	//a_app->ac_lst[p]++;
+	//}
 	return p;
 	//return calloc(n, s);
 }
 void* treal_realloc(void* p, size_t s) {
-	auto p1 = realloc(p, s);
-	if (a_app)
-	{
-		std::lock_guard lg(a_app->lkac);
-		a_app->ac_lst.insert(p1);
-		assert(p1);
-		if (!p)
+	auto p1 = p;
+	size_t ts = 0;
+	do {
+		if (p)
 		{
-			a_app->ac_count++;
+			auto t = (size_t*)p;
+			t--;
+			ts = *t - sizeof(size_t);
+			if (ts > s)
+				break;
 		}
-		else
-		{
-			if (p != p1)
-				a_app->ac_lst.erase(p);
-		}
-		assert(a_app->ac_count == a_app->ac_lst.size());
-	}
+		p1 = treal_malloc(s);
+		memcpy(p1, p, ts);
+		treal_free(p);
+	} while (0);
 	return p1;
+	//auto p1 = realloc(p, s);
+	//if (a_app)
+	//{
+	//	std::lock_guard lg(a_app->lkac);
+	//	assert(p1);
+	//	if (p)
+	//	{
+	//		//a_app->ac_lst.erase(p);
+	//		//a_app->fac_count++;
+	//	}
+	//	if (p1)
+	//	{
+	//		//a_app->ac_count++;
+	//		//a_app->ac_lst[p1]++;
+	//	}
+	//	//size_t ac = a_app->ac_count;
+	//	//assert(ac == a_app->ac_lst.size());
+	//}
+	//return p1;
 }
 void  treal_free(void* p) {
 	if (!p)return;
-	free(p);
+	//free(p);
 	if (a_app)
 	{
-		assert(a_app->ac_count == a_app->ac_lst.size());
 		std::lock_guard lg(a_app->lkac);
-		a_app->ac_count--;
-		a_app->ac_lst.erase(p);
+		auto pf = (size_t*)p;
+		pf--;
+		auto c = *pf;
+		a_app->_ac->free_mem0(pf, c);
+		//size_t ac = a_app->ac_count;
+		//assert(ac == a_app->ac_lst.size());
+		a_app->fac_count++;
+		//a_app->ac_lst.erase(p);
 	}
 }
 int64_t get_ac_count() {
@@ -366,26 +401,34 @@ void ac_free_all() {
 	if (a_app)
 	{
 		std::lock_guard lg(a_app->lkac);
-		for (auto p : a_app->ac_lst) {
-			if (p)free(p);
-			a_app->ac_count--;
-		}
-		a_app->ac_lst.clear();
+		//for (auto& [p, count] : a_app->ac_lst) {
+		//	if (p)free(p);
+		//	a_app->ac_count--;
+		//}
+		//a_app->ac_lst.clear();
 		a_app = 0;
 	}
+	un_icu();
 }
 
 app_cx::app_cx()
 {
 	set_col_u8();
+	_ac = new hz::usp_ac();
 	font_ctx = new_fonts_ctx();
 	a_app = this;
 	fct = new Timer();
-	//r2d = new render_2d();
 	uint32_t f = -1;
 	//f &= ~SDL_INIT_CAMERA; // 相机退出有bug
 	SDL_SetMemoryFunctions(treal_malloc, treal_calloc, treal_realloc, treal_free);
+	f = SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_HAPTIC;
+	//SDL_INIT_JOYSTICK
+	//SDL_INIT_HAPTIC     
+	//SDL_INIT_GAMEPAD  
+	//SDL_INIT_SENSOR  
+	//SDL_INIT_CAMERA 
 	int kr = SDL_Init(f);
+
 	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, false);
 	SDL_SetEventEnabled(SDL_EVENT_DROP_TEXT, false);
 	auto ct = SDL_GetNumRenderDrivers();
@@ -494,7 +537,7 @@ app_cx::~app_cx()
 	OleUninitialize();
 #endif
 	ac_free_all();
-
+	if (_ac)delete _ac; _ac = 0;
 }
 void app_cx::set_dev(void* instance, void* physical_device, void* device)
 {

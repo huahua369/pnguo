@@ -16630,7 +16630,7 @@ namespace vkr {
 		// Output to attached debugger
 		OutputDebugStringA(str.c_str());
 		// Also log to file
-		Log::Trace(str.c_str());
+		//Log::Trace(str.c_str());
 #endif
 	}
 
@@ -16650,7 +16650,7 @@ namespace vkr {
 		// Output to attached debugger
 		OutputDebugStringA(buf.data());
 		// Also log to file
-		Log::Trace(buf.data());
+		//Log::Trace(buf.data());
 #endif
 	}
 
@@ -19896,6 +19896,8 @@ namespace vkr {
 
 	dvk_texture::~dvk_texture()
 	{
+		if (descriptor)delete descriptor; descriptor = 0;
+		if (_info)delete _info; _info = 0;
 		if (ycbcr_sampler_conversion)
 		{
 			//_dev->destroy_samplerYcbcrConversion(_dev->device, ycbcr_sampler_conversion, 0);
@@ -20169,6 +20171,8 @@ namespace vkr {
 		{
 			vkFreeCommandBuffers(m_pDevice->m_device, m_pCommandBuffers[a].m_commandPool, m_commandListsPerBackBuffer, m_pCommandBuffers[a].m_pCommandBuffer);
 			vkDestroyCommandPool(m_pDevice->m_device, m_pCommandBuffers[a].m_commandPool, NULL);
+			CommandBuffersPerFrame* pCBPF = &m_pCommandBuffers[a];
+			delete pCBPF->m_pCommandBuffer;
 		}
 		m_pCommandBuffers.clear();
 	}
@@ -22732,6 +22736,8 @@ vkdg_cx::~vkdg_cx()
 		delete ctx;
 	ctx = 0;
 	DeviceShutdown((vkr::Device*)dev);
+	auto p = (vkr::Device*)dev;
+	if (p)delete p; dev = 0;
 }
 
 
@@ -22987,7 +22993,7 @@ vkdg_cx* new_vkdg(void* inst, void* phy, void* dev, const char* shaderLibDir, co
 	c->phy = phy;
 	c->vkdev = dev;
 	auto p = new vkdg_cx();
-	vkr::Log::InitLogSystem();
+	//vkr::Log::InitLogSystem();
 	if (c) {
 		vkr::SystemInfo m_systemInfo;
 		auto dev = new vkr::Device();

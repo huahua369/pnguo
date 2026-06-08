@@ -889,6 +889,7 @@ namespace vkg {
 
 		if (d->is_newdevice && d->_device)
 			vkDestroyDevice(d->_device, 0);
+		delete d;
 	}
 
 	bool f_ExtDebugUtilsCheckInstanceExtensions(InstanceProperties* pDP)

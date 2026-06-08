@@ -401,7 +401,7 @@ namespace hz {
 		int samples = 8192;
 		int pcmtype = 0;
 		uint32_t pos = 0, len = 0, remain = 0;
-		size_t bufferpos;
+		size_t bufferpos = 0;
 		char* ptr = 0;
 		size_t wlen = 0;
 		double seconds = 0.0;
@@ -734,13 +734,6 @@ namespace hz {
 				if (music->_decoder) {
 					flac->FLAC__stream_decoder_finish((FLAC__StreamDecoder*)music->_decoder);
 					flac->FLAC__stream_decoder_delete((FLAC__StreamDecoder*)music->_decoder);
-				}
-				//if (music->stream) {
-				//	delete music->stream;
-				//}
-				if (music->src)
-				{
-					delete music->src;
 				}
 				delete music;
 			}
@@ -2453,9 +2446,13 @@ coders_t::coders_t()
 coders_t::~coders_t()
 {
 	for (auto p : codes) {
-		if (p->unload)
+		if (p)
 		{
-			p->unload(p->handle);
+			if (p->unload)
+			{
+				p->unload(p->handle);
+			}
+			delete p;
 		}
 	}
 	codes.clear();
@@ -3129,18 +3126,19 @@ namespace hz {
 	{
 		if (!p)return;
 		// 申请输入/输出数组 
-		fftw_complex* in = (fftw_complex*)p->_in;
-		fftw_complex* out = (fftw_complex*)p->_out;
+		p->ftd.resize(fftSize * 4);
+		fftw_complex* in = (fftw_complex*)p->ftd.data();
+		fftw_complex* out = (fftw_complex*)in + fftSize;
 		if (p->_size < fftSize) {
 			p->_size = fftSize;
-			if (in)
-				fftw_free(in);
-			if (out)
-				fftw_free(out);
-			in = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
-			out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
-			p->_in = in;
-			p->_out = out;
+			//if (in)
+			//	fftw_free(in);
+			//if (out)
+			//	fftw_free(out);
+			//in = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
+			//out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * fftSize);
+			//p->_in = in;
+			//p->_out = out;
 		}
 		if (dsize < fftSize) {
 			fftSize = 1 << static_cast<int>(std::ceil(std::log2(dsize)));
@@ -3217,12 +3215,12 @@ namespace hz {
 	void ftd_free(fft_data* p)
 	{
 		if (!p)return;
-		fftw_complex* in = (fftw_complex*)p->_in;
-		fftw_complex* out = (fftw_complex*)p->_out;
-		if (in)
-			fftw_free(in);
-		if (out)
-			fftw_free(out);
+		//fftw_complex* in = (fftw_complex*)p->_in;
+		//fftw_complex* out = (fftw_complex*)p->_out;
+		//if (in)
+		//	fftw_free(in);
+		//if (out)
+		//	fftw_free(out);
 	}
 	void calculate_heights1(fft_data* p, int dcount, std::vector<float>& lastY, glm::vec4* rects, int x, bool is_reverse, bool is_cos)
 	{
@@ -3368,7 +3366,7 @@ namespace hz {
 			auto b = *ft; ft += 2;
 			df[i] = b * norm;
 		}
-		p->dst.resize(count);
+		p->dst.resize(count * 2);
 		auto pd = p->dst.data();
 		computeSpectrum(p, p->tem.data(), count, p->fft_size);	// 左声道
 		{
@@ -3401,7 +3399,7 @@ namespace hz {
 		}
 		float* a = p->dst.data();
 		std::reverse(a, a + count / 2);	// 左声道翻转
-		for (int i = 0; i < count;i++) {
+		for (int i = 0; i < count; i++) {
 			//a[i] *= p->weight[i];
 		}
 		int dct = dcount > 0 ? dcount : p->fft_size;
@@ -3421,7 +3419,9 @@ namespace hz {
 		put_jt.request_stop();
 		de_jt.request_stop();
 		save_config();
-		free_coders(coders); coders = 0;
+		for (auto& [k, v] : _streams) {
+			bk.free_audio_stream(v);
+		}
 		for (auto& it : _lists)
 		{
 			if (it)
@@ -3440,6 +3440,8 @@ namespace hz {
 				delete it;
 			}
 		}
+		fftw_cleanup();
+		free_coders(coders); coders = 0;
 	}
 
 	void audio_cx::init(audio_backend_t* p, const std::string& confn) {

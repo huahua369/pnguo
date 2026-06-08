@@ -55,7 +55,7 @@ hz::audio_cx* audiofft(app_cx* app) {
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->play_thread = false;
 	audio_ctx->run_thread();
-	audio_ctx->add_song(0, R"(E:\song\豆包-太想念.flac)");
+	audio_ctx->add_song(0, R"(E:\d\KuGou\张含韵 - 一百万个可能.flac)");
 	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
@@ -131,18 +131,16 @@ int main()
 	if (kba)
 		_CrtSetBreakAlloc(kba);
 	//auto k = time(0);
-	//main_heightmap(k);
-	auto kafdfsdf = new int[15];
-	auto m18 = malloc(18);
-	//_CrtDumpMemoryLeaks();
-
-	auto m28 = malloc(28);
+	//main_heightmap(k); 
+	//auto m18 = malloc(18);
+	//_CrtDumpMemoryLeaks();  
 	if (1) {
 		//hz::main_ssh2();
 		//return 0;
 		//test_img();
 
 		auto app = new_app();
+
 		// 常用分辨率
 		glm::ivec2 dpis[] = {
 			{1024,768},
@@ -164,16 +162,17 @@ int main()
 		int fbo_scale[3] = { 50,200,5 };
 #ifdef _WIN32
 #ifdef _DEBUG
-		system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
-		system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
-		system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
-		system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
+		//system("rd /s /q E:\\temcpp\\SymbolCache\\tcmp.pdb");
+		//system("rd /s /q E:\\temcpp\\SymbolCache\\vkcmp.pdb");
+		//system("rd /s /q E:\\temcpp\\SymbolCache\\cedit.pdb");
+		//system("rd /s /q E:\\temcpp\\SymbolCache\\p86.pdb");
 		//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
 #endif 
 #endif // _WIN32
 
-
+		//free_app(app);
+		//return 0;
 		auto fctx = app->font_ctx;
 		fctx->set_cache_size(512, 512);
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
@@ -571,7 +570,7 @@ int main()
 			ftd_init(&fft, fft_size);
 			fft.draw_height = 50;
 			//ftd_free(&fft); 
-			actx->pause(1);
+			//actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
 			std::vector<SDL_Vertex>* vertices = new  std::vector<SDL_Vertex>();
@@ -670,6 +669,7 @@ int main()
 			delete dom0;
 			delete view;
 			ftd_free(&fft);
+			delete actx;
 			delete vertices;
 		}
 		delete_font_family(family);
@@ -680,6 +680,6 @@ int main()
 		free_app(app);
 	}
 	int64_t acc = get_ac_count();
-
+	//_CrtDumpMemoryLeaks();
 	return 0;
 }

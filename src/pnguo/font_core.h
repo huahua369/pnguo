@@ -49,7 +49,7 @@ class font_imp;
 class fd_info0;
 union ft_key_s;
 struct gcolors_t;
-struct bitmap_ttinfo;
+class bitmap_ttinfo;
 struct Bitmap_p;
 class stb_packer;
 class bitmap_cache_cx;

@@ -2349,6 +2349,218 @@ std::string get_info_str(int language, int idx, std::map<int, std::vector<info_o
 	return ret;
 }
 
+class SBitDecoder;
+
+#ifdef NO_CPU_LENDIAN
+#define UINT8_BITFIELD_BENDIAN
+#else
+#define UINT8_BITFIELD_LENDIAN
+#endif
+#ifdef UINT8_BITFIELD_LENDIAN
+#define UINT8_BITFIELD(f0, f1, f2, f3, f4, f5, f6, f7) \
+        uint8_t f0 : 1; \
+        uint8_t f1 : 1; \
+        uint8_t f2 : 1; \
+        uint8_t f3 : 1; \
+        uint8_t f4 : 1; \
+        uint8_t f5 : 1; \
+        uint8_t f6 : 1; \
+        uint8_t f7 : 1;
+#else
+#define UINT8_BITFIELD(f0, f1, f2, f3, f4, f5, f6, f7) \
+        uint8_t f7 : 1; \
+        uint8_t f6 : 1; \
+        uint8_t f5 : 1; \
+        uint8_t f4 : 1; \
+        uint8_t f3 : 1; \
+        uint8_t f2 : 1; \
+        uint8_t f1 : 1; \
+        uint8_t f0 : 1;
+#endif
+#define BYTE_BITFIELD UINT8_BITFIELD
+// EBLC头用到的结构
+struct SbitLineMetrics {
+	char ascender;
+	char descender;
+	uint8_t widthMax;
+	char caretSlopeNumerator;
+	char caretSlopeDenominator;
+	char caretOffset;
+	char minOriginSB;
+	char minAdvanceSB;
+	char maxBeforeBL;
+	char minAfterBL;
+	char pad1;
+	char pad2;
+};
+
+struct BigGlyphMetrics {
+	uint8_t height;
+	uint8_t width;
+	char horiBearingX;
+	char horiBearingY;
+	uint8_t horiAdvance;
+	char vertBearingX;
+	char vertBearingY;
+	uint8_t vertAdvance;
+};
+
+struct SmallGlyphMetrics {
+	uint8_t height;
+	uint8_t width;
+	char bearingX;
+	char bearingY;
+	uint8_t advance;
+};
+struct BitmapSizeTable {
+	uint32_t indexSubTableArrayOffset; //offset to indexSubtableArray from beginning of EBLC.
+	uint32_t indexTablesSize; //number of bytes in corresponding index subtables and array
+	uint32_t numberOfIndexSubTables; //an index subtable for each range or format change
+	uint32_t colorRef; //not used; set to 0.
+	SbitLineMetrics hori; //line metrics for text rendered horizontally
+	SbitLineMetrics vert; //line metrics for text rendered vertically
+	unsigned short startGlyphIndex; //lowest glyph index for this size
+	unsigned short endGlyphIndex; //highest glyph index for this size
+	uint8_t ppemX; //horizontal pixels per Em
+	uint8_t ppemY; //vertical pixels per Em
+	struct BitDepth {
+		enum Value : uint8_t {
+			BW = 1,
+			Gray4 = 2,
+			Gray16 = 4,
+			Gray256 = 8,
+		};
+		uint8_t value;
+	} bitDepth; //the Microsoft rasterizer v.1.7 or greater supports
+	union Flags {
+		struct Field {
+			//0-7
+			BYTE_BITFIELD(
+				Horizontal, // Horizontal small glyph metrics
+				Vertical,  // Vertical small glyph metrics
+				Reserved02,
+				Reserved03,
+				Reserved04,
+				Reserved05,
+				Reserved06,
+				Reserved07)
+		} field;
+		struct Raw {
+			static const char Horizontal = 1u << 0;
+			static const char Vertical = 1u << 1;
+			char value;
+		} raw;
+	} flags;
+}; //bitmapSizeTable[numSizes];
+
+struct IndexSubTableArray {
+	unsigned short firstGlyphIndex; //first glyph code of this range
+	unsigned short lastGlyphIndex; //last glyph code of this range (inclusive)
+	uint32_t additionalOffsetToIndexSubtable; //add to BitmapSizeTable::indexSubTableArrayOffset to get offset from beginning of 'EBLC'
+}; //indexSubTableArray[BitmapSizeTable::numberOfIndexSubTables];
+
+struct IndexSubHeader {
+	unsigned short indexFormat; //format of this indexSubTable
+	unsigned short imageFormat; //format of 'EBDT' image data
+	uint32_t imageDataOffset; //offset to image data in 'EBDT' table
+};
+
+// Variable metrics glyphs with 4 byte offsets
+struct IndexSubTable1 {
+	IndexSubHeader header;
+	//uint32_t offsetArray[lastGlyphIndex - firstGlyphIndex + 1 + 1]; //last element points to one past end of last glyph
+	//glyphData = offsetArray[glyphIndex - firstGlyphIndex] + imageDataOffset
+};
+
+// All Glyphs have identical metrics
+struct IndexSubTable2 {
+	IndexSubHeader header;
+	uint32_t imageSize; // all glyphs are of the same size
+	BigGlyphMetrics bigMetrics; // all glyphs have the same metrics; glyph data may be compressed, byte-aligned, or bit-aligned
+};
+
+// Variable metrics glyphs with 2 byte offsets
+struct IndexSubTable3 {
+	IndexSubHeader header;
+	//unsigned short offsetArray[lastGlyphIndex - firstGlyphIndex + 1 + 1]; //last element points to one past end of last glyph, may have extra element to force even number of elements
+	//glyphData = offsetArray[glyphIndex - firstGlyphIndex] + imageDataOffset
+};
+
+// Variable metrics glyphs with sparse glyph codes
+struct IndexSubTable4 {
+	IndexSubHeader header;
+	uint32_t numGlyphs;
+	struct CodeOffsetPair {
+		unsigned short glyphCode;
+		unsigned short offset; //location in EBDT
+	}; //glyphArray[numGlyphs+1]
+};
+
+// Constant metrics glyphs with sparse glyph codes
+struct IndexSubTable5 {
+	IndexSubHeader header;
+	uint32_t imageSize; //all glyphs have the same data size
+	BigGlyphMetrics bigMetrics; //all glyphs have the same metrics
+	uint32_t numGlyphs;
+	//unsigned short glyphCodeArray[numGlyphs] //must have even number of entries (set pad to 0)
+};
+
+union IndexSubTable {
+	IndexSubHeader header;
+	IndexSubTable1 format1;
+	IndexSubTable2 format2;
+	IndexSubTable3 format3;
+	IndexSubTable4 format4;
+	IndexSubTable5 format5;
+};
+
+union GlyphMetrics
+{
+	struct BigGlyphMetrics _big;
+	struct SmallGlyphMetrics _small;
+};
+class bitmap_ttinfo
+{
+public:
+	sbit_table_type _sttype = sbit_table_type::TYPE_NONE;
+	// _sbit_table可能是CBLC、EBLC、bloc、sbix
+	sfnt_header* _sbit_table = 0;
+	sfnt_header* _ebdt_table = 0;
+	sfnt_header* _ebsc_table = 0;
+	std::vector<BitmapSizeTable> _bsts;
+	std::vector<std::vector<IndexSubTableArray>> _index_sub_table;
+	std::unordered_map<uint8_t, uint32_t> _msidx_table;
+	//std::set<SBitDecoder*> _dec_table;
+	//std::queue<SBitDecoder*> _free_dec;
+	SBitDecoder* _dec = {};
+	font_t* _t = 0;
+	// 自定义位图
+	image_ptr_t _bimg = {};
+	std::vector<uint32_t> _buf;
+	// 支持的大小
+	std::vector<glm::ivec2> _chsize;
+	// 范围
+	std::vector<glm::ivec2> _unicode_rang;
+public:
+	bitmap_ttinfo() {}
+	~bitmap_ttinfo();
+
+
+	int get_sidx(int height)
+	{
+		auto it = _msidx_table.find(height);
+		return it != _msidx_table.end() ? it->second : -1;
+	}
+	std::unordered_map<uint8_t, uint32_t>* get_msidx_table()
+	{
+		return &_msidx_table;
+	}
+
+	// 创建sbit解码器
+	SBitDecoder* get_dec();
+
+};
+
 font_t::font_t()
 {
 	font = new font_impl();
@@ -3517,174 +3729,6 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 
 #ifndef _FONT_NO_BITMAP
 
-#ifdef NO_CPU_LENDIAN
-#define UINT8_BITFIELD_BENDIAN
-#else
-#define UINT8_BITFIELD_LENDIAN
-#endif
-#ifdef UINT8_BITFIELD_LENDIAN
-#define UINT8_BITFIELD(f0, f1, f2, f3, f4, f5, f6, f7) \
-        uint8_t f0 : 1; \
-        uint8_t f1 : 1; \
-        uint8_t f2 : 1; \
-        uint8_t f3 : 1; \
-        uint8_t f4 : 1; \
-        uint8_t f5 : 1; \
-        uint8_t f6 : 1; \
-        uint8_t f7 : 1;
-#else
-#define UINT8_BITFIELD(f0, f1, f2, f3, f4, f5, f6, f7) \
-        uint8_t f7 : 1; \
-        uint8_t f6 : 1; \
-        uint8_t f5 : 1; \
-        uint8_t f4 : 1; \
-        uint8_t f3 : 1; \
-        uint8_t f2 : 1; \
-        uint8_t f1 : 1; \
-        uint8_t f0 : 1;
-#endif
-#define BYTE_BITFIELD UINT8_BITFIELD
-// EBLC头用到的结构
-struct SbitLineMetrics {
-	char ascender;
-	char descender;
-	uint8_t widthMax;
-	char caretSlopeNumerator;
-	char caretSlopeDenominator;
-	char caretOffset;
-	char minOriginSB;
-	char minAdvanceSB;
-	char maxBeforeBL;
-	char minAfterBL;
-	char pad1;
-	char pad2;
-};
-
-struct BigGlyphMetrics {
-	uint8_t height;
-	uint8_t width;
-	char horiBearingX;
-	char horiBearingY;
-	uint8_t horiAdvance;
-	char vertBearingX;
-	char vertBearingY;
-	uint8_t vertAdvance;
-};
-
-struct SmallGlyphMetrics {
-	uint8_t height;
-	uint8_t width;
-	char bearingX;
-	char bearingY;
-	uint8_t advance;
-};
-struct BitmapSizeTable {
-	uint32_t indexSubTableArrayOffset; //offset to indexSubtableArray from beginning of EBLC.
-	uint32_t indexTablesSize; //number of bytes in corresponding index subtables and array
-	uint32_t numberOfIndexSubTables; //an index subtable for each range or format change
-	uint32_t colorRef; //not used; set to 0.
-	SbitLineMetrics hori; //line metrics for text rendered horizontally
-	SbitLineMetrics vert; //line metrics for text rendered vertically
-	unsigned short startGlyphIndex; //lowest glyph index for this size
-	unsigned short endGlyphIndex; //highest glyph index for this size
-	uint8_t ppemX; //horizontal pixels per Em
-	uint8_t ppemY; //vertical pixels per Em
-	struct BitDepth {
-		enum Value : uint8_t {
-			BW = 1,
-			Gray4 = 2,
-			Gray16 = 4,
-			Gray256 = 8,
-		};
-		uint8_t value;
-	} bitDepth; //the Microsoft rasterizer v.1.7 or greater supports
-	union Flags {
-		struct Field {
-			//0-7
-			BYTE_BITFIELD(
-				Horizontal, // Horizontal small glyph metrics
-				Vertical,  // Vertical small glyph metrics
-				Reserved02,
-				Reserved03,
-				Reserved04,
-				Reserved05,
-				Reserved06,
-				Reserved07)
-		} field;
-		struct Raw {
-			static const char Horizontal = 1u << 0;
-			static const char Vertical = 1u << 1;
-			char value;
-		} raw;
-	} flags;
-}; //bitmapSizeTable[numSizes];
-
-struct IndexSubTableArray {
-	unsigned short firstGlyphIndex; //first glyph code of this range
-	unsigned short lastGlyphIndex; //last glyph code of this range (inclusive)
-	uint32_t additionalOffsetToIndexSubtable; //add to BitmapSizeTable::indexSubTableArrayOffset to get offset from beginning of 'EBLC'
-}; //indexSubTableArray[BitmapSizeTable::numberOfIndexSubTables];
-
-struct IndexSubHeader {
-	unsigned short indexFormat; //format of this indexSubTable
-	unsigned short imageFormat; //format of 'EBDT' image data
-	uint32_t imageDataOffset; //offset to image data in 'EBDT' table
-};
-
-// Variable metrics glyphs with 4 byte offsets
-struct IndexSubTable1 {
-	IndexSubHeader header;
-	//uint32_t offsetArray[lastGlyphIndex - firstGlyphIndex + 1 + 1]; //last element points to one past end of last glyph
-	//glyphData = offsetArray[glyphIndex - firstGlyphIndex] + imageDataOffset
-};
-
-// All Glyphs have identical metrics
-struct IndexSubTable2 {
-	IndexSubHeader header;
-	uint32_t imageSize; // all glyphs are of the same size
-	BigGlyphMetrics bigMetrics; // all glyphs have the same metrics; glyph data may be compressed, byte-aligned, or bit-aligned
-};
-
-// Variable metrics glyphs with 2 byte offsets
-struct IndexSubTable3 {
-	IndexSubHeader header;
-	//unsigned short offsetArray[lastGlyphIndex - firstGlyphIndex + 1 + 1]; //last element points to one past end of last glyph, may have extra element to force even number of elements
-	//glyphData = offsetArray[glyphIndex - firstGlyphIndex] + imageDataOffset
-};
-
-// Variable metrics glyphs with sparse glyph codes
-struct IndexSubTable4 {
-	IndexSubHeader header;
-	uint32_t numGlyphs;
-	struct CodeOffsetPair {
-		unsigned short glyphCode;
-		unsigned short offset; //location in EBDT
-	}; //glyphArray[numGlyphs+1]
-};
-
-// Constant metrics glyphs with sparse glyph codes
-struct IndexSubTable5 {
-	IndexSubHeader header;
-	uint32_t imageSize; //all glyphs have the same data size
-	BigGlyphMetrics bigMetrics; //all glyphs have the same metrics
-	uint32_t numGlyphs;
-	//unsigned short glyphCodeArray[numGlyphs] //must have even number of entries (set pad to 0)
-};
-
-union IndexSubTable {
-	IndexSubHeader header;
-	IndexSubTable1 format1;
-	IndexSubTable2 format2;
-	IndexSubTable3 format3;
-	IndexSubTable4 format4;
-	IndexSubTable5 format5;
-};
-
-union GlyphMetrics
-{
-	struct BigGlyphMetrics _big;
-	struct SmallGlyphMetrics _small;
-};
 class SBitDecoder
 {
 public:
@@ -3715,7 +3759,9 @@ public:
 	}
 
 	~SBitDecoder()
-	{}
+	{
+		printf("free SBitDecoder\n");
+	}
 
 	int init(font_t* ttp, uint32_t strike_index);
 public:
@@ -3755,101 +3801,6 @@ private:
 int get_index(SBitDecoder* decoder, uint32_t glyph_index, int x_pos, int y_pos);
 int load_metrics(uint8_t** pp, uint8_t* limit, int big, BigGlyphMetrics* metrics);
 
-class bitmap_ttinfo
-{
-public:
-
-	sbit_table_type _sttype = sbit_table_type::TYPE_NONE;
-	// _sbit_table可能是CBLC、EBLC、bloc、sbix
-	sfnt_header* _sbit_table = 0;
-	sfnt_header* _ebdt_table = 0;
-	sfnt_header* _ebsc_table = 0;
-	std::vector<BitmapSizeTable> _bsts;
-	std::vector<std::vector<IndexSubTableArray>> _index_sub_table;
-	std::unordered_map<uint8_t, uint32_t> _msidx_table;
-	std::set<SBitDecoder*> _dec_table;
-	std::queue<SBitDecoder*> _free_dec;
-	//LockS _sbit_lock;
-	font_t* _t = 0;
-	// 自定义位图
-	image_ptr_t _bimg = {};
-	uint32_t* _buf = 0;
-	// 支持的大小
-	std::vector<glm::ivec2> _chsize;
-	// 范围
-	std::vector<glm::ivec2> _unicode_rang;
-public:
-	bitmap_ttinfo() {
-
-	}
-	~bitmap_ttinfo() {
-		//Image::destroy(_buf);
-		if (_buf)
-		{
-			delete _buf; _buf = 0;
-		}
-		destroy_all_dec();
-	}
-	int get_sidx(int height)
-	{
-		auto it = _msidx_table.find(height);
-		return it != _msidx_table.end() ? it->second : -1;
-	}
-	std::unordered_map<uint8_t, uint32_t>* get_msidx_table()
-	{
-		return &_msidx_table;
-	}
-
-	// 创建sbit解码器
-	SBitDecoder* new_SBitDecoder()
-	{
-		SBitDecoder* p = nullptr;
-		//LOCK_W(_sbit_lock);
-#ifndef NO_SBIT_RECYCLE
-		if (_free_dec.size())
-		{
-			p = _free_dec.front();
-			_free_dec.pop();
-			p->_recycle = 0;
-		}
-		else
-#endif // !NO_SBIT_RECYCLE
-		{
-			p = new SBitDecoder();
-			_dec_table.insert(p);
-		}
-		return p;
-	}
-	// 回收
-	void recycle(SBitDecoder* p)
-	{
-		if (p)
-		{
-			//LOCK_W(_sbit_lock);
-			// 不是自己的不回收
-			auto it = _dec_table.find(p);
-			if (it != _dec_table.end() && p->_recycle == 0)
-			{
-#ifndef NO_SBIT_RECYCLE
-				p->_recycle = 1;
-				_free_dec.push(p);
-#else
-				_dec_table.erase(p);
-				delete p;
-#endif
-			}
-
-		}
-	}
-	void destroy_all_dec()
-	{
-		//LOCK_W(_sbit_lock);
-		for (auto it : _dec_table)
-			if (it)delete it;
-		_dec_table.clear();
-	}
-
-};
 int SBitDecoder::init(font_t* ttp, uint32_t strike_index)
 {
 	int ret = 0;
@@ -4625,14 +4576,13 @@ char r[2] = { 0x21, 0x7e };
 void nsimsun_ascii(bitmap_ttinfo* obt)
 {
 	std::string str = R"(!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)";
-	uint32_t* img = obt->_buf;
-	if (!img)
+	if (obt->_buf.empty())
 	{
 		stbimage_load lad;
 		if (lad.load_mem((char*)fdata, 2180))
 		{
-			img = new uint32_t[lad.width * lad.height];
-			obt->_buf = img;
+			obt->_buf.resize(lad.width * lad.height);
+			auto img = obt->_buf.data();
 			memcpy(img, lad.data, sizeof(uint32_t) * lad.width * lad.height);
 			obt->_bimg.data = img;
 			obt->_bimg.width = lad.width;
@@ -4642,7 +4592,7 @@ void nsimsun_ascii(bitmap_ttinfo* obt)
 		}
 	}
 
-	if (!img)
+	if (obt->_buf.empty())
 	{
 		obt->_chsize.clear();
 		obt->_unicode_rang.clear();
@@ -4787,7 +4737,7 @@ int font_t::get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap_p* out
 		return 0;
 	}
 	int x = 10, y = 10;
-	SBitDecoder* decoder = bitinfo->new_SBitDecoder();
+	SBitDecoder* decoder = bitinfo->get_dec();
 	decoder->init(this, sidx);
 	bitmap = decoder->bitmap;
 	BigGlyphMetrics* metrics = decoder->metrics;
@@ -4818,7 +4768,6 @@ int font_t::get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap_p* out
 	{
 		ret = 0;
 	}
-	bitinfo->recycle(decoder);
 	return ret;
 }
 
@@ -5572,6 +5521,9 @@ font_imp::~font_imp()
 	{
 		delete[] it.data;
 	}
+	fd_data.clear();
+	fonts.clear();
+	fd_data_m.clear();
 }
 size_t font_imp::size()
 {
@@ -10102,3 +10054,21 @@ void test_rttext()
 	}
 }
 #endif
+
+bitmap_ttinfo::~bitmap_ttinfo() {
+	if (_dec)
+	{
+		delete _dec;
+		_dec = nullptr;
+	}
+}
+
+// 创建sbit解码器
+SBitDecoder* bitmap_ttinfo::get_dec()
+{
+	if (!_dec)
+	{
+		_dec = new SBitDecoder();
+	}
+	return _dec;
+}

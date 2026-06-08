@@ -294,8 +294,7 @@ namespace hz {
 		std::vector<float> _lastY[2];
 		std::vector<float> _oy;
 		std::vector<float> heights;
-		void* _in = 0;
-		void* _out = 0;
+		std::vector<double> ftd;
 		size_t _size = 0;
 		size_t fft_size = 0;
 		int bits_per_sample = 0;

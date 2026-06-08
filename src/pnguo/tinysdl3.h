@@ -78,6 +78,9 @@ struct PlatformMonitor
 	float   DpiScale;               // 1.0f = 96 DPI
 	void* PlatformHandle;         // Backend dependant data (e.g. HMONITOR, GLFWmonitor*, SDL Display Index, NSScreen*)
 };
+namespace hz {
+	class usp_ac;
+} 
 
 // 管理实例：管理窗口等资源
 class app_cx
@@ -110,9 +113,11 @@ public:
 	uint32_t audio_device = 0;
 	dev_info_cx _set_dev = {};
 	glm::vec2 mouse_pos = {};
-	std::set<void*> ac_lst;		// 分配的内存
+	std::unordered_map<void*, int> ac_lst;		// 分配的内存
 	std::mutex lkac;				// 分配内存锁
-	int64_t ac_count = 0;			// 分配内存总数量
+	size_t ac_count = 0;			// 分配内存总数量
+	size_t fac_count = 0;			// 释放内存总数量
+	hz::usp_ac* _ac = 0;
 	bool nc_down = 0;
 	bool viewports_enable = false;	// docking用
 	bool WantUpdateMonitors = true;

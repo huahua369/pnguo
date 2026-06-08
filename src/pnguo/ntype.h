@@ -53,7 +53,7 @@ namespace hz {
 	class usp_ac
 	{
 	public:
-		uspool_t _alloc;				// pmr内存分配
+		uspool_t _alloc = {};				// pmr内存分配
 		size_t _Align = 16;
 	public:
 		usp_ac() {}
@@ -64,6 +64,12 @@ namespace hz {
 			n = std::max((size_t)1, n);
 			auto p = _alloc.allocate(n, _Align);
 			memset(p, 0, n);
+			return p;
+		}
+		void* new_mem0(size_t n)
+		{
+			n = std::max((size_t)1, n);
+			auto p = _alloc.allocate(n, _Align);
 			return p;
 		}
 		template<class T>
@@ -102,6 +108,14 @@ namespace hz {
 			if (t && n > 0)
 			{
 				_alloc.deallocate(t, sizeof(T) * n, _Align);
+			}
+		}
+		void free_mem0(void* t, size_t n)
+		{
+			auto ptr = t;
+			if (t && n > 0)
+			{
+				_alloc.deallocate(t, n, _Align);
 			}
 		}
 		template<class T, class... Ts>
