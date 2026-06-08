@@ -2357,7 +2357,7 @@ div_cx::~div_cx()
 {
 	for (auto p : widgets)
 	{
-		if (p)
+		if (p && p->_autofree)
 			delete p;
 	}
 }

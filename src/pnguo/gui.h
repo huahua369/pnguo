@@ -77,7 +77,7 @@ public:
 	bool visible = true;
 	bool _absolute = false;		// true绝对坐标，false布局计算
 	bool has_drag = false;	// 是否有拖动事件
-	bool _autofree = false;
+	bool _autofree = true;	// 自动释放，添加到面板后由面板管理生命周期
 	bool has_hover_sc = 0;	// 滚动在父级接收
 	bool _hover = true;
 	bool uplayout = true;
