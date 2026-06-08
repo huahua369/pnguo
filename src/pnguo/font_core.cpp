@@ -5271,7 +5271,10 @@ bitmap_cache_cx::bitmap_cache_cx()
 
 bitmap_cache_cx::~bitmap_cache_cx()
 {
-	clear();
+	for (auto it : _packer)
+	{
+		if (it)delete it;
+	}
 }
 
 void bitmap_cache_cx::resize(int w, int h)

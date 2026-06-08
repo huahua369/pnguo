@@ -303,6 +303,7 @@ static app_cx* a_app = 0;
 
 void* treal_malloc(size_t s) {
 	auto p = malloc(s);
+	assert(p);
 	if (a_app)
 	{
 		std::lock_guard lg(a_app->lkac);
@@ -316,6 +317,7 @@ void* treal_calloc(size_t n, size_t s) {
 	auto p = malloc(n * s);
 	if (p)
 		memset(p, 0, n * s);
+	assert(p);
 	if (a_app)
 	{
 		std::lock_guard lg(a_app->lkac);
@@ -332,6 +334,7 @@ void* treal_realloc(void* p, size_t s) {
 	{
 		std::lock_guard lg(a_app->lkac);
 		a_app->ac_lst.insert(p1);
+		assert(p1);
 		if (!p)
 		{
 			a_app->ac_count++;
@@ -346,6 +349,7 @@ void* treal_realloc(void* p, size_t s) {
 	return p1;
 }
 void  treal_free(void* p) {
+	if (!p)return;
 	free(p);
 	if (a_app)
 	{

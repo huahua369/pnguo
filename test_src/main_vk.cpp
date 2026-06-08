@@ -130,10 +130,13 @@ int main()
 	static int kba = 0;
 	if (kba)
 		_CrtSetBreakAlloc(kba);
-	auto k = time(0);
-	main_heightmap(k);
+	//auto k = time(0);
+	//main_heightmap(k);
 	auto kafdfsdf = new int[15];
-	malloc(18);
+	auto m18 = malloc(18);
+	//_CrtDumpMemoryLeaks();
+
+	auto m28 = malloc(28);
 	if (1) {
 		//hz::main_ssh2();
 		//return 0;
@@ -669,6 +672,7 @@ int main()
 			ftd_free(&fft);
 			delete vertices;
 		}
+		delete_font_family(family);
 		free_vkdg(vkd);
 		gd->release(sampler);
 		gd->release(dctx);
