@@ -55,8 +55,8 @@ hz::audio_cx* audiofft(app_cx* app) {
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->play_thread = false;
 	audio_ctx->run_thread();
-	audio_ctx->add_song(0, R"(E:\d\KuGou\张含韵 - 一百万个可能.flac)");
 	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
+	audio_ctx->add_song(0, R"(E:\d\KuGou\张含韵 - 一百万个可能.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
