@@ -219,6 +219,30 @@ namespace hz {
 		std::string name;			// 歌单名
 		std::vector<audio_item*> v;
 	};
+	struct fft_data {
+		std::vector<double> magnitude;
+		std::vector<double> weight;
+		std::vector<float> dst;
+		std::vector<double> tem;
+		std::vector<float> sample_tem;
+		std::vector<glm::vec4> _rects;
+		std::vector<float> _lastY[2];
+		std::vector<float> _oy;
+		std::vector<float> heights;
+		std::vector<double> ftd;
+		size_t _size = 0;
+		size_t fft_size = 0;
+		int bits_per_sample = 0;
+		int taps = 64;
+		int draw_height = 80;
+		float bar_width = 6;
+		float bar_step = 4;
+		glm::vec2 draw_pos = { 120,200 };
+		float smoothConstantDown = 0.08;
+		float smoothConstantUp = 0.8;
+		bool is_smooth = true;			// 是否平滑
+		bool is_raw = false;
+	};
 	/*
 	音频管理类
 		todo 按时间轴推送音频、异步解码音频
@@ -231,6 +255,9 @@ namespace hz {
 		// 解码器
 		coders_t* coders = 0;
 		fft_cx* _fft = 0;
+		hz::fft_data fft = {};
+		int fft_size = 1024;
+		int outwidth = 100;
 		// 设置播放后端
 		audio_backend_t bk = {};
 		// 歌单列表
@@ -280,37 +307,13 @@ namespace hz {
 		void push_decoder(audio_item* p);
 		// 不设置播放线程时执行
 		void run_play();
+		int update(float delta);
 	private:
 		void play(size_t idx, size_t i);
 		void play_thr();
 	};
 
-	struct fft_data {
-		std::vector<double> magnitude;
-		std::vector<double> weight;
-		std::vector<float> dst;
-		std::vector<double> tem;
-		std::vector<float> sample_tem;
-		std::vector<glm::vec4> _rects;
-		std::vector<float> _lastY[2];
-		std::vector<float> _oy;
-		std::vector<float> heights;
-		std::vector<double> ftd;
-		size_t _size = 0;
-		size_t fft_size = 0;
-		int bits_per_sample = 0;
-		int taps = 64;
-		int draw_height = 80;
-		float bar_width = 6;
-		float bar_step = 4;
-		glm::vec2 draw_pos = { 120,200 };
-		float smoothConstantDown = 0.08;
-		float smoothConstantUp = 0.8;
-		bool is_smooth = true;			// 是否平滑
-		bool is_raw = false;
-	};
 	void ftd_init(fft_data* p, int fft_size);
-	void ftd_free(fft_data* p);
 	void ftd_update(fft_data* p, const short* audio_frame, int frame_size, int dcount);
 
 	// 常用函数

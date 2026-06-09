@@ -48,6 +48,7 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 
 void audio_addsong(hz::audio_cx* audio_ctx) {
 
+	audio_ctx->add_song(0, R"(E:\song\DJ小栖-Fuego en el mar（海上的火焰 纯音乐）.flac)");
 	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
 	audio_ctx->add_song(0, R"(E:\d\KuGou\张含韵 - 一百万个可能.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
@@ -506,11 +507,6 @@ int main(int argc, char* argv[])
 			vkd->_state.has_fence = false;
 			auto actx = appx->audio_ctx;
 			audio_addsong(actx);
-			hz::fft_data fft = {};
-			int fft_size = 1024;
-			ftd_init(&fft, fft_size);
-			fft.draw_height = 50;
-			//ftd_free(&fft); 
 			//actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
@@ -524,23 +520,8 @@ int main(int argc, char* argv[])
 				int ct = 0;
 				auto delta = app->update_event();
 				if (!app->form_count())break;
-				actx->run_play();
-				auto avd = actx->_current;
-				if (avd && actx->has_play && avd->cpos > fft_size)
-				{
-					auto add = (short*)avd->data->data;
-					int64_t apos = (avd->ctime / avd->atime) * (avd->data->total_samples);
-					fft.bits_per_sample = avd->data->bits_per_sample;
-					int64_t cpos = avd->data->len;
-					auto ccc = cpos - apos;
-					auto fs = fft_size;
-					if (apos < cpos)
-					{
-						if (cpos < apos + fs)fs = cpos - apos;
-						ftd_update(&fft, add + apos, fs, 100);
-						ct++;
-					}
-				}
+				ct += actx->update(delta);
+
 				cpums = rt_cpu.end();
 				rt_cpu.begin();
 				auto fps = app->get_fps();
@@ -595,9 +576,9 @@ int main(int argc, char* argv[])
 					dom0->cmd_draw();
 					{
 						glm::vec4 color = { 0,0.5,1.0,0.8 };
-						if (fft._rects.size())
+						if (actx->fft._rects.size())
 						{
-							gen_rects(fft._rects, *vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+							gen_rects(actx->fft._rects, *vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
 							SDL_RenderGeometry(form0->renderer, nullptr, vertices->data(), vertices->size(), nullptr, 0);
 						}
 					}
@@ -609,7 +590,6 @@ int main(int argc, char* argv[])
 			} while (app->form_count());
 			delete dom0;
 			delete view;
-			ftd_free(&fft);
 			delete actx;
 			delete vertices;
 		}

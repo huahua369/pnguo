@@ -3122,15 +3122,15 @@ namespace hz {
 	}
 
 
-	void computeSpectrum(fft_data* p, const double* audioData, int dsize, int fftSize)
+	void computeSpectrum(fft_data* p, const double* audioData, int dsize/*, int fftSize*/)
 	{
 		if (!p)return;
 		// 申请输入/输出数组 
-		p->ftd.resize(fftSize * 4);
+		p->ftd.resize(dsize * 4);
 		fftw_complex* in = (fftw_complex*)p->ftd.data();
-		fftw_complex* out = (fftw_complex*)in + fftSize;
-		if (p->_size < fftSize) {
-			p->_size = fftSize;
+		fftw_complex* out = (fftw_complex*)in + dsize;
+		if (p->_size < dsize) {
+			p->_size = dsize;
 			//if (in)
 			//	fftw_free(in);
 			//if (out)
@@ -3140,12 +3140,12 @@ namespace hz {
 			//p->_in = in;
 			//p->_out = out;
 		}
-		if (dsize < fftSize) {
-			fftSize = 1 << static_cast<int>(std::ceil(std::log2(dsize)));
-		}
-		auto mc = std::min(dsize, fftSize);
+		//if (dsize < fftSize) {
+		//	fftSize = 1 << static_cast<int>(std::ceil(std::log2(dsize)));
+		//}
+		//auto mc = std::min(dsize, fftSize);
 		// 填充数据（注意加窗可选，这里略）
-		for (int i = 0; i < mc; ++i) {
+		for (int i = 0; i < dsize; ++i) {
 			in[i][0] = audioData[i];
 			in[i][1] = 0.0;
 		}
@@ -3154,12 +3154,12 @@ namespace hz {
 		//	in[i][1] = 0.0;
 		//}
 		// 执行 FFT 
-		fftw_plan plan = fftw_plan_dft_1d(fftSize, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+		fftw_plan plan = fftw_plan_dft_1d(dsize, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
 		fftw_execute(plan);
-		auto count = fftSize / 2;
+		auto count = dsize / 2;
 		auto& fft_output = out;
 		// 计算幅度（取前 N/2 个有效频点）
-		p->magnitude.resize(fftSize / 2);
+		p->magnitude.resize(count);
 		auto _data = p->magnitude.data();
 		// 计算频谱
 		for (int i = 0; i < count; i++) {
@@ -3366,34 +3366,36 @@ namespace hz {
 			auto b = *ft; ft += 2;
 			df[i] = b * norm;
 		}
-		p->dst.resize(count * 2);
+		p->dst.resize(count);
 		auto pd = p->dst.data();
-		computeSpectrum(p, p->tem.data(), count, p->fft_size);	// 左声道
+		computeSpectrum(p, p->tem.data(), count);	// 左声道
 		{
 			double min_mag = bps;
 			double max_mag = 0.0;
-			for (size_t i = 0; i < p->magnitude.size(); ++i) {
+			auto dcc = p->magnitude.size();
+			for (size_t i = 0; i < dcc; ++i) {
 				pd[i] = p->magnitude[i];
 				min_mag = std::min(min_mag, p->magnitude[i]);
 				max_mag = std::max(max_mag, p->magnitude[i]);
 			}
 			max_mag -= min_mag;
-			for (int k = 0; k < count; k++) {
+			for (int k = 0; k < dcc; k++) {
 				pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
 			}
 		}
 		pd = p->dst.data() + count / 2;
-		computeSpectrum(p, p->tem.data() + count, count, p->fft_size);	// 右声道
+		computeSpectrum(p, p->tem.data() + count, count);	// 右声道
 		{
 			double min_mag = bps;
 			double max_mag = 0.0;
-			for (size_t i = 0; i < p->magnitude.size(); ++i) {
+			auto dcc = p->magnitude.size();
+			for (size_t i = 0; i < dcc; ++i) {
 				pd[i] = p->magnitude[i];
 				min_mag = std::min(min_mag, p->magnitude[i]);
 				max_mag = std::max(max_mag, p->magnitude[i]);
 			}
 			max_mag -= min_mag;
-			for (int k = 0; k < count; k++) {
+			for (int k = 0; k < dcc; k++) {
 				pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
 			}
 		}
@@ -3454,6 +3456,8 @@ namespace hz {
 			_confn = confn;
 			config = read_json(confn);
 		}
+		ftd_init(&fft, fft_size);
+		fft.draw_height = 50;
 	}
 	void audio_cx::save_config()
 	{
@@ -3614,6 +3618,32 @@ namespace hz {
 			std::lock_guard <std::mutex> lock(_de_mutex);
 			_de_list.push(p);
 		}
+	}
+	int audio_cx::update(float delta)
+	{
+		int ct = 0;
+		auto avd = _current;
+		run_play();
+		int fs = fft_size;
+		//fs *= avd->data->sample_rate / 1000.0;
+		//if (fs < 10)return 0;
+		//fs = std::min((int)avd->cpos, fs * 2);
+		//fs += fs & 1 ? 1 : 0; 
+		if (avd && has_play && avd->cpos > fs)
+		{
+			auto add = (short*)avd->data->data;
+			int64_t apos = (avd->ctime / avd->atime) * (avd->data->total_samples);
+			fft.bits_per_sample = avd->data->bits_per_sample;
+			int64_t cpos = avd->data->len;
+			auto ccc = cpos - apos;
+			if (apos < cpos)
+			{
+				if (cpos < apos + fs)fs = cpos - apos;
+				ftd_update(&fft, add + apos, fs, outwidth);
+				ct++;
+			}
+		}
+		return ct;
 	}
 	void audio_cx::run_play()
 	{
