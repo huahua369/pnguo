@@ -16,7 +16,7 @@ https://github.com/huahua369/pnguo
 #include "mapView.h"
 #include "pnguo.h"
 #include "gui.h"
-
+#include "audio.h"
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -408,4 +408,22 @@ void test_hueui()
 	gen_rect_color(rc1, pick1, vtx, idx);	//颜色块
 	auto vd = vtx.data();
 	td3->draw_geometry(0, glm::ivec4(colorpicker->get_pos(), colorpicker->get_size()), &vtx, &idx);
+}
+
+
+app_x::app_x()
+{}
+
+app_x::~app_x()
+{}
+
+void app_x::init(app_cx* a)
+{
+	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
+,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
+,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+	audio_ctx = new hz::audio_cx();
+	audio_ctx->init(&abc, "data/config_music.json");
+	audio_ctx->play_thread = false;
+	audio_ctx->run_thread();
 }

@@ -2,6 +2,9 @@
 /*
 	管理控件等信息
 */
+namespace hz {
+	class audio_cx;
+}
 class app_cx;
 class div_cx;
 class form_x;
@@ -62,6 +65,18 @@ public:
 	// 暂停渲染
 	void pause();
 	void cmd_draw();
+private:
+
+};
+class app_x
+{
+public:
+	app_cx* app = 0;
+	hz::audio_cx* audio_ctx = 0;
+public:
+	app_x();
+	~app_x();
+	void init(app_cx* a);
 private:
 
 };

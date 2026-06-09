@@ -1,6 +1,7 @@
-﻿// 音频
+﻿#pragma once
+// 音频
 #ifndef AUDIO_H_V1_
-
+#define AUDIO_H_V1_
 /*
 音频
 

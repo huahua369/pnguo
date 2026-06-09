@@ -46,15 +46,8 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 #endif
 
 
-hz::audio_cx* audiofft(app_cx* app) {
+void audio_addsong(hz::audio_cx* audio_ctx) {
 
-	static hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
-,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
-,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
-	auto audio_ctx = new hz::audio_cx();
-	audio_ctx->init(&abc, "data/config_music.json");
-	audio_ctx->play_thread = false;
-	audio_ctx->run_thread();
 	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
 	audio_ctx->add_song(0, R"(E:\d\KuGou\张含韵 - 一百万个可能.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
@@ -63,65 +56,10 @@ hz::audio_cx* audiofft(app_cx* app) {
 	audio_ctx->set_type(3);
 	// 播放当前歌单指定索引开始播放
 	audio_ctx->play(0);
-	return audio_ctx;
-	auto mad1 = audio_ctx->get_list_it(0)->v[0]->data;
-	hz::fft_cx* fft = new hz::fft_cx();
-	hz::fft_cx* fft1 = new hz::fft_cx();
-	double dtime = 0.06;
-	int fs = mad1->sample_rate * dtime;
-	{
-		while (1)
-		{
-			int rc1 = decoder_data(mad1);
-			if (rc1 <= 0)
-			{
-				break;
-			}
-		}
-		fft->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
-		fft->draw_pos;
-		fft->is_raw = true;
-		fft1->init(mad1->sample_rate, mad1->bits_per_sample, 0, 0);
-		fft1->draw_pos.y += 110;
-		fft1->bar_width = 6;
-		fft1->bar_step = 0;
-		fft->bar_width = 6;
-		fft->bar_step = 3;
-	}
-	{
-		// 渲染回调
-		SDL_Renderer* renderer = 0; double delta = 0.0;
-		static double deltas = 0;
-		deltas += delta;
-		if (deltas > dtime)
-		{
-			static int64_t kn = 0;
-			static int64_t kn1 = 0;
-			static int64_t sn = 256;
-			static int64_t sn1 = 2048;
-			deltas = 0;
-			fft->calculate_heights((short*)mad1->data + kn, sn * 2, 100);
-			fft1->calculate_heights((short*)mad1->data + kn1, sn1 * 2, 100);
-			kn += fs;
-			kn1 += fs;
-			if (kn >= mad1->total_samples)
-			{
-				kn = 0;
-			}
-			if (kn1 >= mad1->total_samples)
-			{
-				kn1 = 0;
-			}
-		}
-		glm::vec4 color = { 0,0.5,1.0,0.8 };
-		static std::vector<SDL_Vertex> vertices;
-		gen_rects(fft->_rects, vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
-		SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
-		gen_rects(fft1->_rects, vertices, { 0.5, 0.0, 0, 0.00 }, { 1, 0.15, 0, 0.9 });
-		SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(), nullptr, 0);
-	}
+
 }
-int main()
+
+int main(int argc, char* argv[])
 {
 	// 启用内存泄漏检测
 	int dbgFlags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
@@ -134,30 +72,32 @@ int main()
 	//main_heightmap(k); 
 	//auto m18 = malloc(18);
 	//_CrtDumpMemoryLeaks();  
+	auto app = new_app();
+	auto appx = new app_x();
+	appx->init(app);
+	// 常用分辨率
+	glm::ivec2 dpis[] = {
+		{1024,768},
+		{1152,864},
+		{1280,720},
+		{1280,768},
+		{1280,800},
+		{1280,960},
+		{1280,1024},
+		{1360,768},
+		{1366,768},
+		{1400,1050},
+		{1440,900},
+		{1600,900},
+		{1680,1050},
+		{1920,1080},
+	};
 	if (1) {
 		//hz::main_ssh2();
 		//return 0;
 		//test_img();
 
-		auto app = new_app();
 
-		// 常用分辨率
-		glm::ivec2 dpis[] = {
-			{1024,768},
-			{1152,864},
-			{1280,720},
-			{1280,768},
-			{1280,800},
-			{1280,960},
-			{1280,1024},
-			{1360,768},
-			{1366,768},
-			{1400,1050},
-			{1440,900},
-			{1600,900},
-			{1680,1050},
-			{1920,1080},
-		};
 		// 渲染fbo尺寸比例从50%到200%,步长5%
 		int fbo_scale[3] = { 50,200,5 };
 #ifdef _WIN32
@@ -564,7 +504,8 @@ int main()
 			}
 			app->set_fps(60);
 			vkd->_state.has_fence = false;
-			auto actx = audiofft(app);
+			auto actx = appx->audio_ctx;
+			audio_addsong(actx);
 			hz::fft_data fft = {};
 			int fft_size = 1024;
 			ftd_init(&fft, fft_size);
