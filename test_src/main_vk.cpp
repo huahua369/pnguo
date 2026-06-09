@@ -75,6 +75,7 @@ int main(int argc, char* argv[])
 	//_CrtDumpMemoryLeaks();  
 	auto app = new_app();
 	auto appx = new app_x();
+	std::shared_ptr<app_x> spappx(appx);
 	appx->init(app);
 	// 常用分辨率
 	glm::ivec2 dpis[] = {
@@ -260,7 +261,9 @@ int main(int argc, char* argv[])
 			auto dvv = new div_cx();
 			dvv->set_size({ 500,400 });
 			dvv->set_pos({ 100,60 });
-			dvv->family = family;
+			dvv->style.family = family;
+			dvv->style.fontsize = 16;
+
 			dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
 			dvv->flex.wrap = flex_wrap::WRAP;
 			dvv->flex.direction = flex_direction::ROW;
@@ -289,8 +292,8 @@ int main(int argc, char* argv[])
 				btn->borderDark = blackb.y;
 				btn->gradTop = gradTop;
 				btn->gradBot = gradBot;
-				btn->font_size = 16;
-				btn->text_color = -1;
+				btn->style.fontsize = 16;
+				btn->style.color = -1;
 				btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
 				if (i == 4) {
 					//btn->borderLight = blackb.y;
@@ -315,8 +318,8 @@ int main(int argc, char* argv[])
 				btn->set_btn_color_bgr(fmod(i, 5));
 				dvv->add_widget(btn);
 				btn->set_size({ 128,36 });
-				btn->font_size = 16;
-				btn->text_color = 0;
+				btn->style.fontsize = 16;
+				btn->style.color = 0;
 				btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 			}
 			for (int i = 0; i < 4; i++) {
@@ -358,7 +361,7 @@ int main(int argc, char* argv[])
 			{
 				auto c = colorpick;
 				c->init(0xff282828, 300, 20, true);
-				c->font_size = 15;
+				c->style.fontsize = 15;
 				dvv->add_widget(c);
 			}
 			static bool loadf = false;
@@ -368,7 +371,8 @@ int main(int argc, char* argv[])
 				auto dvv1 = new div_cx();
 				dvv1->set_size({ 180,150 });
 				dvv1->set_pos({ 100,60 });
-				dvv1->family = family;
+				dvv1->style.family = family;
+				dvv1->style.fontsize = 16;
 				dvv1->border = { 0xffacacac,1,5,0xaf66f666 };	// 颜色，线粗，圆角，背景色
 				dvv1->flex_child.margin_left = 2;		// 子元素外边距
 				dvv1->flex_child.margin_right = 2;
@@ -383,8 +387,8 @@ int main(int argc, char* argv[])
 					btn->set_btn_color_bgr(fmod(4, 5));
 					dvv1->add_widget(btn);
 					btn->set_size({ 128,36 });
-					btn->font_size = 16;
-					btn->text_color = -1;
+					btn->style.fontsize = 16;
+					btn->style.color = -1;
 					btn->str = (char*)u8"🍕按钮 ";
 					btn->click_cb = [=](void* p, int clicks, const glm::vec2& mpos) {
 
@@ -411,7 +415,8 @@ int main(int argc, char* argv[])
 			{
 				dvv2->set_size({ 500,400 });
 				dvv2->set_pos({ 10,10 });
-				dvv2->family = family;
+				dvv2->style.family = family;
+				dvv2->style.fontsize = 16;
 				dvv2->border = { 0xF11212ac,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
 				dvv2->flex_child.margin_left = 4;		// 子元素外边距
 				dvv2->flex_child.margin_right = 4;
@@ -424,14 +429,14 @@ int main(int argc, char* argv[])
 				{
 					auto btn = fpslab;
 					btn->rounding = 4;
-					btn->text_align = {};
+					btn->style.align = {};
 					btn->set_btn_color_bgr(fmod(2, 5));
 					btn->effect = uTheme::light;
 					btn->_disabled_events = true;
 					dvv2->add_widget(btn);
 					btn->set_size({ 492,392 });
-					btn->font_size = 16;
-					btn->text_color = -1;
+					btn->style.fontsize = 16;
+					btn->style.color = -1;
 					/*btn->str = (char*)u8"🍕透明按钮 ";*/
 				}
 				dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
@@ -457,7 +462,8 @@ int main(int argc, char* argv[])
 				dom0->add_widget(dvv);
 				dvv->set_size({ 1000,400 });
 				dvv->set_pos({ 100,60 });
-				dvv->family = family;
+				dvv->style.family = family;
+				dvv->style.fontsize = 16;
 				dvv->border = { 0xffacacac,1,5,0xf9666666 };	// 颜色，线粗，圆角，背景色
 				dvv->flex.wrap = flex_wrap::WRAP;
 				dvv->flex.direction = flex_direction::ROW;
@@ -479,7 +485,8 @@ int main(int argc, char* argv[])
 				dom0->add_widget(dvv);
 				dvv->set_size({ 100,100 });
 				dvv->set_pos({ 100,60 });
-				dvv->family = family;
+				dvv->style.family = family;
+				dvv->style.fontsize = 16;
 				dvv->border = { 0xffacacac,1,5, color2u(dcc[i]) };	// 颜色，线粗，圆角，背景色
 				dvv->flex.wrap = flex_wrap::WRAP;
 				dvv->flex.direction = flex_direction::ROW;

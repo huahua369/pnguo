@@ -55,10 +55,11 @@ public:
 	glm::ivec2 mmpos = {};	// 当前鼠标坐标
 	glm::ivec2 ppos = {};	// 父级坐标 
 	std::string text;		// 内部显示用字符串
-	font_family_t* family = 0;
-	float font_size = 16;
-	uint32_t text_color = 0xffc2c2c2;
-	glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
+	text_style style = {};		// 文本样式
+	//font_family_t* family = 0;
+	//float font_size = 16;
+	//uint32_t text_color = 0xffc2c2c2;
+	//glm::vec2 text_align = { 0.5,.5 }; // 文本对齐
 	int rounding = 4;		// 圆角
 	float thickness = 1.0;	// 边框线粗
 

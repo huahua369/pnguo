@@ -330,7 +330,7 @@ void gradient_btn::init(glm::ivec4 rect, const std::string& text, uint32_t back_
 	info._size = { rect.z, rect.w };
 	info.rounding = 4;
 	info.back_color = back_color;
-	info.text_color = text_color;
+	info.style.color = text_color;
 	info.opacity = 1;
 	info.str = text.c_str();
 	info.borderLight = 0xff5c5c5c;
@@ -385,6 +385,7 @@ bool color_btn::update(float delta)
 	auto p = this;
 	btn_cols_t* pdc = &p->pdc;
 	p->_disabled = (_bst & (int)BTN_STATE::STATE_DISABLE);
+	auto text_color = p->style.color;
 	if (p->_disabled)
 	{
 		p->hover = false;
@@ -393,18 +394,18 @@ bool color_btn::update(float delta)
 		if (p->effect == uTheme::dark)
 		{
 			p->dcol = 0;
-			p->dtext_color = (p->text_color) ? p->text_color : pdc->font_color;
+			p->dtext_color = (text_color) ? text_color : pdc->font_color;
 		}
 		if (p->effect == uTheme::light)
 		{
 			p->dcol = set_alpha_xf(p->dcol, p->light * 3);
 			p->dfill = set_alpha_xf(p->dfill, p->light);
-			p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+			p->dtext_color = (text_color) ? text_color : pdc->border_color;
 		}
 		if (p->effect == uTheme::plain)
 		{
 			p->dfill = 0;
-			p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+			p->dtext_color = (text_color) ? text_color : pdc->border_color;
 		}
 		p->dcol = set_alpha_x(p->dcol, p->disabled_alpha);
 		p->dfill = set_alpha_x(p->dfill, p->disabled_alpha);
@@ -423,7 +424,7 @@ bool color_btn::update(float delta)
 				p->dfill = set_alpha_xf(p->dcol, p->light);
 			}
 			else {
-				p->dtext_color = (p->text_color) ? p->text_color : pdc->active_font_color;
+				p->dtext_color = (text_color) ? text_color : pdc->active_font_color;
 			}
 			if (p->effect == uTheme::light)
 			{
@@ -450,7 +451,7 @@ bool color_btn::update(float delta)
 			if (p->effect == uTheme::light)
 			{
 				p->dfill = set_alpha_f(p->dfill, p->light * 5);
-				p->dtext_color = (p->text_color) ? p->text_color : pdc->font_color;
+				p->dtext_color = (text_color) ? text_color : pdc->font_color;
 			}
 		}
 		else {
@@ -459,18 +460,18 @@ bool color_btn::update(float delta)
 			if (p->effect == uTheme::dark)
 			{
 				p->dcol = 0;
-				p->dtext_color = (p->text_color) ? p->text_color : pdc->font_color;
+				p->dtext_color = (text_color) ? text_color : pdc->font_color;
 			}
 			if (p->effect == uTheme::light)
 			{
 				p->dcol = set_alpha_xf(p->dcol, p->light * 3);
 				p->dfill = set_alpha_xf(p->dfill, p->light);
-				p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+				p->dtext_color = (text_color) ? text_color : pdc->border_color;
 			}
 			if (p->effect == uTheme::plain)
 			{
 				p->dfill = 0;
-				p->dtext_color = (p->text_color) ? p->text_color : pdc->border_color;
+				p->dtext_color = (text_color) ? text_color : pdc->border_color;
 			}
 		}
 	}
@@ -1430,17 +1431,12 @@ void image_btn::draw(rvg_cx* rv) {
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view, this);
 	//image_ptr_t* img = 0;
-	//image_sliced_t state_img[5] = {};
-	text_style st = {};
-	st.fontsize = font_size;
-	st.align = text_align;
-	st.color = text_color;
-	st.family = family;
+	//image_sliced_t state_img[5] = {}; 
 	text_st tx = {};
 	tx.pos = {};
 	tx.size = get_size();
 	tx.text = str.c_str(); tx.text_len = str.size();
-	rv->add_text(&tx, &st);
+	rv->add_text(&tx, &style);
 
 	rv->pop_view();
 }
@@ -1503,17 +1499,12 @@ void color_btn::draw(rvg_cx* rv)
 	//{
 	//	rv->add_rect( { 0,0,size.x,size.y }, p->rounding);
 	//	rv->submit( 0, 0x80ff8000, 1, 0);
-	//} 
-	text_style st = {};
-	st.fontsize = p->font_size;
-	st.align = p->text_align;
-	st.color = p->dtext_color;
-	st.family = p->family;
+	//}  
 	text_st tx = {};
 	tx.pos = ps;
 	tx.size = ns;
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
-	rv->add_text(&tx, &st);
+	rv->add_text(&tx, &style);
 	rv->restore();
 
 	rv->pop_view();
@@ -1606,16 +1597,11 @@ void gradient_btn::draw(rvg_cx* rv)
 	rv->set_color(borderDark);
 	rv->add_rect({ tps.x,tps.y, w , h }, rounding);
 	rv->stroke();
-	text_style st = {};
-	st.fontsize = p->font_size;
-	st.align = p->text_align;
-	st.color = p->text_color;
-	st.family = p->family;
 	text_st tx = {};
 	tx.pos = { 0,thickness * .5 };
 	tx.size = get_size();
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
-	rv->add_text(&tx, &st);
+	rv->add_text(&tx, &style);
 
 	rv->restore();
 
@@ -1843,11 +1829,8 @@ void progress_tl::draw(rvg_cx* rv)
 		//st.text_color = text_color;
 		//draw_text(cr, ltx, text.c_str(), -1, rc, &st);
 
-		text_style st = {};
-		st.fontsize = font_size;
-		st.align = ta;// text_align;
-		st.color = text_color;
-		st.family = family;
+		text_style st = style;
+		st.align = ta;
 		text_st tx = {};
 		tx.pos = { 0,thickness };
 		tx.size = ss;
@@ -1996,11 +1979,8 @@ void colorpick_tl::draw(rvg_cx* rv)
 		glm::vec2 ta = { 0.0, 0.0 };
 		glm::vec4 rc = { step, height + step, ss };
 		rc.w -= rc.y;
-		text_style st = {};
-		st.fontsize = font_size;
-		st.align = ta;// text_align;
-		st.color = text_color;
-		st.family = family;
+		text_style st = style;
+		st.align = ta;// text_align; 
 		st.lineheight = rc.y;//设置固定行高
 		rc.y += step;
 		text_st tx = {};
@@ -2125,7 +2105,7 @@ glm::ivec2 widget_t::get_spos()
 
 void widget_t::set_family(font_family_t* family, int fontsize)
 {
-	this->family = family; this->font_size = fontsize;
+	this->style.family = family; this->style.fontsize = fontsize;
 }
 
 void widget_t::set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight)
@@ -2365,8 +2345,10 @@ void div_cx::add_widget(widget_t* p)
 {
 	if (p)
 	{
-		if (!p->family)
-			p->set_family(family, font_size);
+		if (!p->style.family)
+			p->style.family = style.family;
+		if (p->style.fontsize == 0)
+			p->style.fontsize = style.fontsize;
 		p->parent = this;
 		auto it = std::find(widgets.begin(), widgets.end(), p);
 		if (it == widgets.end()) {
@@ -5112,16 +5094,16 @@ bool edit_cx::update(float delta)
 		valid = true;
 	}
 	if (ctx->lineheight < 1)
-		ctx->lineheight = font_get_lineheight(family, font_size, true);
+		ctx->lineheight = font_get_lineheight(style.family, style.fontsize, true);
 
 	if (up_text)
 	{
 		if (ctx->state.single_line)
 		{
-			glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,font_size }, ss = _size;
+			glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,style.fontsize }, ss = _size;
 			ss -= thickness * 2;
-			auto ps = glm::ceil((ss - ext) * text_align);
-			auto ps1 = glm::ceil((ss - ext1) * text_align);
+			auto ps = glm::ceil((ss - ext) * style.align);
+			auto ps1 = glm::ceil((ss - ext1) * style.align);
 			ctx->_align_pos.y = ps.y;
 			ctx->_align_pos1.y = ps1.y;
 		}
@@ -5150,10 +5132,10 @@ void edit_cx::draw(rvg_cx* rv)
 	auto tpos = ctx->_align_pos - ctx->scroll_pos;
 	auto tpos1 = ctx->_align_pos1 - ctx->scroll_pos;
 
-	glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,font_size }, iss = _size;
+	glm::vec2 ext = { 0,ctx->lineheight }, ext1 = { 0,style.fontsize }, iss = _size;
 	iss -= thickness * 2;
-	auto ps = glm::ceil((iss - ext) * text_align);
-	auto ps1 = glm::ceil((iss - ext1) * text_align);
+	auto ps = glm::ceil((iss - ext) * style.align);
+	auto ps1 = glm::ceil((iss - ext1) * style.align);
 	glm::ivec2 npos = {};
 	glm::ivec2 srcpos = {};
 	if (ctx->state.single_line)
@@ -5168,7 +5150,7 @@ void edit_cx::draw(rvg_cx* rv)
 		rv->add_rect({ 0,0,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
 		rv->clip();
 		tpos1 = tpos;
-		tpos1.y += ceil((ctx->lineheight - font_size) * text_align.y);
+		tpos1.y += ceil((ctx->lineheight - style.fontsize) * style.align.y);
 		auto v = get_bounds();
 		rv->translate({ 0,1 });
 		if (v.x != v.y && ctx->rangerc.size()) {
@@ -5194,11 +5176,8 @@ void edit_cx::draw(rvg_cx* rv)
 
 		// 渲染文本
 		glm::vec4 rc = { 0,0,  ss };
-		text_style st = {};
-		st.fontsize = font_size;
+		text_style st = style;
 		st.align = {};
-		st.color = text_color;
-		st.family = family;
 		text_st tx = {};
 		tx.pos = { tpos1 };
 		tx.size = ss;
@@ -5220,7 +5199,7 @@ void edit_cx::draw(rvg_cx* rv)
 					plen = ctx->str.size(); break;
 				}
 			}
-			st.color = set_alpha_x(text_color, 200);
+			st.color = set_alpha_x(style.color, 200);
 		} while (0);
 		tx.text = ptxt;
 		tx.text_len = plen;
@@ -5251,12 +5230,10 @@ void edit_cx::draw(rvg_cx* rv)
 		if (editingstr.size())
 		{
 			// 渲染文本 
-			text_style st = {};
-			st.fontsize = font_size;
+			text_style st = style;
 			st.align = {};
 			st.color = editing_color;
-			st.family = family;
-			glm::ivec2 lps = get_text_rect(family, font_size, editingstr.c_str(), editingstr.size(), 0);
+			glm::ivec2 lps = get_text_rect(style.family, style.fontsize, editingstr.c_str(), editingstr.size(), 0);
 
 			if (lps.y < ctx->lineheight)
 				lps.y = ctx->lineheight;
@@ -5343,7 +5320,7 @@ glm::ivec3 edit_cx::get_line_length(int index)
 std::vector<glm::ivec4> edit_cx::get_bounds_px()
 {
 	bool font_hfirst = true;//取第一字体行高
-	float pwidth = font_size * 0.5;// 补行尾宽度
+	float pwidth = style.fontsize * 0.5;// 补行尾宽度
 	auto pstr = ctx->str.c_str();
 	auto tsize = ctx->str.size();
 	if (up_text || ctx->widths.empty())
@@ -5363,8 +5340,8 @@ std::vector<glm::ivec4> edit_cx::get_bounds_px()
 			}
 		}
 		ctx->lvs.push_back({ f,i - f });
-		font_get_text_posv(family, font_size, pstr, tsize, ctx->widths);
-		pwidth = font_get_text_rect1(family, font_size, "1").x;
+		font_get_text_posv(style.family, style.fontsize, pstr, tsize, ctx->widths);
+		pwidth = font_get_text_rect1(style.family, style.fontsize, "1").x;
 	}
 	std::vector<glm::ivec4> r;
 	std::vector<glm::ivec4> rs, rss;
@@ -5376,7 +5353,7 @@ std::vector<glm::ivec4> edit_cx::get_bounds_px()
 	auto v1 = get_line_length(v.x);
 	auto v2 = get_line_length(v.y);
 	auto line_no = ctx->lvs.size();
-	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size, font_hfirst);
+	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(style.family, style.fontsize, font_hfirst);
 	// 计算选中范围的每行的坐标宽高
 	if (v1 == v2) {}
 	else {
@@ -5439,7 +5416,7 @@ std::vector<glm::ivec4> edit_cx::get_bounds_px()
 				auto& it = subjects[i];
 				ptr.add_lines((glm::dvec2*)it.data(), it.size(), false);
 			}
-			ctx->range_path = gp::path_round(&ptr, -1, font_size * ctx->round_path, 16, 0, 0);
+			ctx->range_path = gp::path_round(&ptr, -1, style.fontsize * ctx->round_path, 16, 0, 0);
 		}
 		else { ctx->range_path.clear(); }
 	}
@@ -5452,7 +5429,7 @@ glm::ivec2 edit_cx::get_pixel_size(const char* str, int len)
 	int w = 0, h = 0;
 	if (str && *str)
 	{
-		auto rc = get_text_rect(family, font_size, str, len, 0);
+		auto rc = get_text_rect(style.family, style.fontsize, str, len, 0);
 		w = rc.x; h = rc.y;
 	}
 	return glm::ivec2(w, h);
@@ -5462,7 +5439,7 @@ size_t edit_cx::get_xy_to_index(int x, int y, const char* str)
 	auto pstr = ctx->str.c_str();
 	if (ctx->widths.empty())
 	{
-		font_get_text_posv(family, font_size, pstr, ctx->str.size(), ctx->widths);
+		font_get_text_posv(style.family, style.fontsize, pstr, ctx->str.size(), ctx->widths);
 	}
 	if (ctx->widths.size() != ctx->lvs.size())
 		return -1;
@@ -5520,7 +5497,7 @@ void edit_cx::up_caret()
 	get_bounds_px();
 	auto v1 = get_line_length(ctx->state.cursor);
 	auto line_no = ctx->lvs.size();
-	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(family, font_size, true);
+	auto h = fix_line_height > 0 ? fix_line_height : font_get_lineheight(style.family, style.fontsize, true);
 	// 计算选中范围的每行的坐标宽高 
 	if (line_no > 0 && ctx->widths.size() > v1.y)
 	{
@@ -5528,7 +5505,7 @@ void edit_cx::up_caret()
 		auto w1 = ctx->widths[v1.y];
 		{
 			auto pstr = ctx->str.c_str();
-			caret.x = get_text_rect(family, font_size, pstr + ks.x, std::min(ks.y, ctx->state.cursor - ks.x), 0).x;
+			caret.x = get_text_rect(style.family, style.fontsize, pstr + ks.x, std::min(ks.y, ctx->state.cursor - ks.x), 0).x;
 		}
 		//caret.x = w1[ctx->state.cursor - ks.x];
 		caret.y = ctx->cursor_pos.z * v1.y;
