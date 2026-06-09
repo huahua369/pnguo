@@ -8421,6 +8421,10 @@ bool rt_text_style_ts(rich_text_t* p, text_style* ts)
 		ret = rt_text_style(p, ts->family, ts->fontsize, ts->color);
 		p->_ct_style.align = ts->align;
 		p->_ct_style.lineheight = ts->lineheight;
+		p->_ct_style.shadow_pos = ts->shadow_pos;
+		p->_ct_style.stroke = ts->stroke;
+		p->_ct_style.color_stroke = ts->color_stroke;
+		p->_ct_style.color_shadow = ts->color_shadow;
 	}
 	return ret;
 }

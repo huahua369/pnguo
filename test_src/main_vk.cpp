@@ -319,7 +319,10 @@ int main(int argc, char* argv[])
 				dvv->add_widget(btn);
 				btn->set_size({ 128,36 });
 				btn->style.fontsize = 16;
-				btn->style.color = 0;
+				btn->style.color = -1;
+				//btn->style.stroke = 1;
+				//btn->style.shadow_pos = { 3, 3 };
+				//btn->style.color_shadow = 0xcc121212;
 				btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 			}
 			for (int i = 0; i < 4; i++) {
@@ -435,9 +438,12 @@ int main(int argc, char* argv[])
 					btn->_disabled_events = true;
 					dvv2->add_widget(btn);
 					btn->set_size({ 492,392 });
-					btn->style.fontsize = 16;
+					btn->style.fontsize = 26;
 					btn->style.color = -1;
-					/*btn->str = (char*)u8"🍕透明按钮 ";*/
+					btn->style.stroke = 1;
+					btn->style.color_stroke = 0xff0012ff;
+					btn->style.shadow_pos = { 2, 2 };
+					btn->style.color_shadow = 0x8012f212;
 				}
 				dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 					{

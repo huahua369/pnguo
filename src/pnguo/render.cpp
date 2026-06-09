@@ -3871,9 +3871,28 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 				}
 				auto ps = git._dwpos + git._apos;
 				ps += pos0;
-				color = tbp[git.tb_idx].style.color;
+				auto tstyle = tbp[git.tb_idx].style;
+				color = tstyle.color;
 				auto img = git._image;
 				glm::ivec2 tex_size = { img->width,  img->height };
+				if (tstyle.color_shadow)
+				{
+					auto ps1 = ps;
+					ps1 += tstyle.shadow_pos;
+					gen3data(tex_size, ps1, git._rect, {}, tstyle.color_shadow, &opt, &idx);
+				}
+				if (tstyle.stroke && tstyle.color_stroke)
+				{
+					int pxx[4] = { -tstyle.stroke, 0, tstyle.stroke, 0 };
+					int pyy[4] = { 0, -tstyle.stroke, 0, tstyle.stroke };
+					for (int e = 0; e < 4; e++)
+					{
+						auto ps1 = ps;
+						ps1.x += pxx[e];
+						ps1.y += pyy[e];
+						gen3data(tex_size, ps1, git._rect, {}, tstyle.color_stroke, &opt, &idx);
+					}
+				}
 				gen3data(tex_size, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
 		}
@@ -4865,4 +4884,3 @@ GraphResource::GraphResource()
 
 GraphResource::~GraphResource()
 {}
- 
