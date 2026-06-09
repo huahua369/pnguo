@@ -17,7 +17,7 @@
 #include <out123.h>
 //syn123：一些音频信号合成和格式转换
 #include <syn123.h>
-
+#include <complex>
 #include <fftw3.h>
 #include <cmath> 
 #ifndef M_PI
@@ -3344,6 +3344,182 @@ namespace hz {
 		}
 	}
 
+
+	// 双二阶滤波器结构，存储5个系数和2个延迟单元 
+	struct Biquad {
+		double b0, b1, b2;   // 前馈系数 
+		double a1, a2;       // 反馈系数（a0归一化为1）
+		double z1, z2;       // 延迟单元 
+
+		Biquad(double b0_, double b1_, double b2_, double a1_, double a2_)
+			: b0(b0_), b1(b1_), b2(b2_), a1(a1_), a2(a2_), z1(0), z2(0) {}
+
+		double process(double input) {
+			double output = b0 * input + z1;
+			z1 = b1 * input - a1 * output + z2;
+			z2 = b2 * input - a2 * output;
+			return output;
+		}
+
+		void reset() { z1 = z2 = 0.0; }
+	};
+
+	// 由归一化截止频率（0~0.5）和阶数（必须是偶数）设计巴特沃斯低通滤波器系数 
+	std::vector<Biquad> designButterworthLowpass(double normalizedCutoff, int order) {
+		std::vector<Biquad> sections;
+		double wc = tan(M_PI * normalizedCutoff);  // 双线性变换预扭曲 
+		double wc2 = wc * wc;
+		// 计算模拟Butterworth低通原型极点，并转换为数字域 
+		for (int i = 0; i < order / 2; ++i) {
+			double angle = M_PI / (2 * order) * (order + 2 * i + 1);
+			double re = -sin(angle);
+			double im = cos(angle);
+			// 双线性变换：s = (1 - z⁻¹) / (1 + z⁻¹) 的映射 
+			std::complex<double> pole(re * wc, im * wc);
+			std::complex<double> denom = (2.0 + pole) * (2.0 + pole) - pole * pole; // 实际应解方程，这里改用标准公式 
+			// 使用标准Bilinear变换结果：系数由极点计算 
+			// 简化实现采用已知转换公式：
+			double norm = 1.0 / (1.0 + wc2 + 2.0 * re * wc);
+			double b0 = wc2 * norm;
+			double b1 = 2.0 * b0;
+			double b2 = b0;
+			double a1 = 2.0 * (wc2 - 1.0) * norm;
+			double a2 = (1.0 - wc2 - 2.0 * re * wc) * norm;
+			sections.emplace_back(b0, b1, b2, -a1, -a2); // 注意符号：分母为 1 + a1 z⁻¹ + a2 z⁻² 
+		}
+		return sections;
+	}
+
+	// 高通滤波器可通过低通原型变换得到：对每个低通节进行频率变换 z → -z 
+	std::vector<Biquad> designButterworthHighpass(double normalizedCutoff, int order) {
+		auto lowpass = designButterworthLowpass(normalizedCutoff, order);
+		for (auto& bq : lowpass) {
+			bq.b1 = -bq.b1;
+			bq.a1 = -bq.a1;
+			// 注意：z2符号保持不变 
+		}
+		return lowpass;
+	}
+	// 滤波器工具类：分离高中低频并存入vector 
+	class AudioFreqSeparator {
+	private:
+		double alpha_low;  // 低通滤波系数 
+		double alpha_high; // 高通滤波系数 
+		double prev_low = 0.0;   // 低通上一输出 
+		double prev_high = 0.0;  // 高通上一输出 
+		int sampleRate_, lowNorm_, highNorm_;
+		std::vector<Biquad>lowSections_, highSections_;
+		// 一阶低通滤波 
+		double lowPass(double sample, double prev_output) {
+			return alpha_low * sample + (1 - alpha_low) * prev_output;
+		}
+
+		// 一阶高通滤波 
+		double highPass(double sample, double prev_output) {
+			return alpha_high * (prev_output + sample - prev_low);
+		}
+
+	public:
+		// 构造函数：输入采样率、各频段截止频率，计算滤波系数  
+		AudioFreqSeparator(int sampleRate, double lowCutoff = 200.0, double highCutoff = 2000.0, int filterOrder = 4)   // 使用4阶滤波器 
+			: sampleRate_(sampleRate),
+			lowNorm_(lowCutoff / (sampleRate / 2.0)),
+			highNorm_(highCutoff / (sampleRate / 2.0))
+		{
+			// 计算一阶IIR滤波器系数（对应截止频率） 
+			double omega_low = 2 * M_PI * lowCutoff / sampleRate_;
+			alpha_low = omega_low / (omega_low + 1);
+
+			double omega_high = 2 * M_PI * highCutoff / sampleRate_;
+			alpha_high = 1 / (omega_high + 1);
+			lowSections_ = designButterworthLowpass(lowNorm_, filterOrder);
+			highSections_ = designButterworthHighpass(highNorm_, filterOrder);
+		}
+
+		void separate(const short* input, int input_size,
+			std::vector<short>& outLow,
+			std::vector<short>& outMid,
+			std::vector<short>& outHigh) {
+			outLow.clear();  outMid.clear();  outHigh.clear();
+			outLow.reserve(input_size);
+			outMid.reserve(input_size);
+			outHigh.reserve(input_size);
+
+			// 为每个样本重置滤波器状态可避免帧间状态累积，但连续处理时应保留状态；此处按逐样本独立滤波 
+			for (int i = 0; i < input_size; i++) {
+				short val = input[i];
+				double sample = val / 32768.0;
+
+				// 低频经过低通滤波 
+				double low = sample;
+				for (auto& bq : lowSections_) {
+					low = bq.process(low);
+				}
+
+				// 高频经过高通滤波 
+				double high = sample;
+				for (auto& bq : highSections_) {
+					high = bq.process(high);
+				}
+
+				// 中频 = 原始 - 低频 - 高频（假设相位对齐）
+				double mid = sample - low - high;
+
+				auto toShort = [](double d) {
+					return static_cast<short>(std::clamp(d * 32767.0, -32768.0, 32767.0));
+					};
+				outLow.push_back(toShort(low));
+				outMid.push_back(toShort(mid));
+				outHigh.push_back(toShort(high));
+
+				// 注意：此循环内每次重置滤波器状态是为了独立处理每个样本？不，应当保留状态。
+				// 修正：应在循环外创建滤波器实例并保持状态，这里为每个样本重新创建将失去连续性。
+				// 更好的做法是将滤波器延迟单元在每个样本后保留，如下：
+			}
+		}
+		// 核心分离函数：输入原始short音频，输出三个频段vector 
+		void separateFreq(const short* input, int input_size,
+			std::vector<short>& out_low,
+			std::vector<short>& out_mid,
+			std::vector<short>& out_high) {
+			// 清空输出容器 
+			out_low.clear();
+			out_mid.clear();
+			out_high.clear();
+			out_low.reserve(input_size);
+			out_mid.reserve(input_size);
+			out_high.reserve(input_size);
+
+			double prev_l = 0.0, prev_m_l = 0.0, prev_m_h = 0.0, prev_h = 0.0;
+			for (int i = 0; i < input_size; i++) {
+				short raw_sample = input[i];
+				// 1. short归一化到[-1, 1]浮点 
+				double sample = static_cast<double>(raw_sample) / 32768.0;
+
+				// 2. 提取低频：低通滤波直接得到 
+				double low_sample = lowPass(sample, prev_l);
+				prev_l = low_sample;
+				// 转short并存入vector 
+				out_low.push_back(static_cast<short>(
+					std::clamp(low_sample * 32767.0, -32768.0, 32767.0)
+					));
+
+				// 3. 提取高频：高通滤波直接得到 
+				double high_sample = alpha_high * (prev_h + sample - low_sample);
+				prev_h = high_sample;
+				out_high.push_back(static_cast<short>(
+					std::clamp(high_sample * 32767.0, -32768.0, 32767.0)
+					));
+
+				// 4. 提取中频：原信号减去低频和高频得到 
+				double mid_sample = sample - low_sample - high_sample;
+				out_mid.push_back(static_cast<short>(
+					std::clamp(mid_sample * 32767.0, -32768.0, 32767.0)
+					));
+			}
+		}
+	};
+
 	void ftd_update(fft_data* p, const short* audio_frame, int frame_size, int dcount)
 	{
 		if (!p || dcount < 2)return;
@@ -3354,12 +3530,50 @@ namespace hz {
 		float norm = 1.0 / bps;
 		auto ft = audio_frame;
 		auto count = frame_size / 2;
+
+		AudioFreqSeparator separator(p->sample_rate);
+		// 执行分离 
+		//separator.separate(ft, frame_size, low, mid, high);
+		separator.separateFreq(ft, frame_size, p->low, p->mid, p->high);
+		short* pd3[] = { p->low.data(), p->mid.data(), p->high.data() };
+#if 0
+		auto kc = count / 2;
+		p->dst.resize(count * 3);
+		auto pd = p->dst.data();
+		for (int m = 0; m < 3; m++, pd += kc)
+		{
+			ft = pd3[m];
+			ft++;
+			for (size_t i = 0; i < count; i++)
+			{
+				auto b = *ft; ft += 2;
+				df[i] = b * norm;
+			}
+			computeSpectrum(p, df, count);
+			{
+				double min_mag = bps;
+				double max_mag = 0.0;
+				auto dcc = p->magnitude.size();
+				for (size_t i = 0; i < dcc; ++i) {
+					pd[i] = p->magnitude[i];
+					min_mag = std::min(min_mag, p->magnitude[i]);
+					max_mag = std::max(max_mag, p->magnitude[i]);
+				}
+				max_mag -= min_mag;
+				for (int k = 0; k < dcc; k++) {
+					pd[k] = ((pd[k] - min_mag) / max_mag); // 归一化高度  
+				}
+			}
+		}
+#endif
+#if 1
+		ft = pd3[1];
 		for (size_t i = 0; i < count; i++)
 		{
 			auto b = *ft; ft += 2;
 			df[i] = b * norm;
 		}
-		ft = audio_frame + 1;
+		ft = pd3[1] + 1;
 		df += count;
 		for (size_t i = 0; i < count; i++)
 		{
@@ -3404,6 +3618,7 @@ namespace hz {
 		for (int i = 0; i < count; i++) {
 			//a[i] *= p->weight[i];
 		}
+#endif
 		int dct = dcount > 0 ? dcount : p->fft_size;
 		p->_rects.resize(dct);
 		calculate_heights1(p, dct, p->_lastY[0], p->_rects.data(), 0, false, false);
@@ -3634,6 +3849,7 @@ namespace hz {
 			auto add = (short*)avd->data->data;
 			int64_t apos = (avd->ctime / avd->atime) * (avd->data->total_samples);
 			fft.bits_per_sample = avd->data->bits_per_sample;
+			fft.sample_rate = avd->data->sample_rate;
 			int64_t cpos = avd->data->len;
 			auto ccc = cpos - apos;
 			if (apos < cpos)

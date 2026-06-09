@@ -230,9 +230,13 @@ namespace hz {
 		std::vector<float> _oy;
 		std::vector<float> heights;
 		std::vector<double> ftd;
+
+		std::vector<short> low, mid, high;
+
 		size_t _size = 0;
 		size_t fft_size = 0;
 		int bits_per_sample = 0;
+		int sample_rate = 0;
 		int taps = 64;
 		int draw_height = 80;
 		float bar_width = 6;

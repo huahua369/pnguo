@@ -48,9 +48,9 @@ auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Got
 
 void audio_addsong(hz::audio_cx* audio_ctx) {
 
-	audio_ctx->add_song(0, R"(E:\song\DJ小栖-Fuego en el mar（海上的火焰 纯音乐）.flac)");
-	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
 	audio_ctx->add_song(0, R"(E:\d\KuGou\张含韵 - 一百万个可能.flac)");
+	audio_ctx->add_song(0, R"(E:\song\G.E.M.邓紫棋-桃花诺.flac)");
+	audio_ctx->add_song(0, R"(E:\song\DJ小栖-Fuego en el mar（海上的火焰 纯音乐）.flac)");
 	// 设置播放歌单，只有一个歌单，所以设置0
 	audio_ctx->set_gd(0);
 	// 设置播放类型: 0单曲播放，1单曲循环，2顺序播放，3循环播放，4随机播放
