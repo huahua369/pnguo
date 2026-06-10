@@ -634,6 +634,7 @@ struct text_style
 	uint32_t color = 0xffc2c2c2;		// 文本颜色
 	uint32_t color_stroke = 0xff000000;	// 描边颜色
 	uint32_t color_shadow = 0;			//0xcc121212;	// 阴影颜色
+	bool mcolor_effect = true;			// 是否启用彩色字体参与阴影描边效果
 };
 // 文本区域
 struct text_box_t {

@@ -8425,6 +8425,7 @@ bool rt_text_style_ts(rich_text_t* p, text_style* ts)
 		p->_ct_style.stroke = ts->stroke;
 		p->_ct_style.color_stroke = ts->color_stroke;
 		p->_ct_style.color_shadow = ts->color_shadow;
+		p->_ct_style.mcolor_effect = ts->mcolor_effect;
 	}
 	return ret;
 }

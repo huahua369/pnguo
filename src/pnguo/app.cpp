@@ -277,6 +277,7 @@ int dom_cx::build()
 			get_div(p, &tdrawlist);
 		}
 	}
+#if 0
 	auto& rvgd = dc->_dobj[0];
 	if (!rvgd)
 		rvgd = new rvg_data_cx();
@@ -298,6 +299,30 @@ int dom_cx::build()
 	}
 	// 资源绑定窗口
 	ret += dc->update_rvgdata(rvgd);
+#else
+
+	for (auto& p : tdrawlist) {
+		if (p)
+		{
+			auto& rvgd = dc->_dobj[p];
+			if (!rvgd)
+				rvgd = new rvg_data_cx();
+			rvg_cx* rvg = rvgd->get();
+			rvg->clear();
+			glm::ivec2 dpos = {};
+			if (p->parent)
+				dpos = p->_pos;
+			if (rvg && rvgd)
+			{
+				//print_time _bb("build");
+				rvg->set_pos(p->get_pos());
+				p->draw(rvg);	// 录制渲染
+			}
+			// 资源绑定窗口
+			ret += dc->update_rvgdata(rvgd);
+		}
+	}
+#endif
 	return ret;
 }
 

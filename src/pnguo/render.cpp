@@ -3691,7 +3691,7 @@ void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
 			void* tp = get_texture(it.img);
-			if (tex != tp || devrtex)
+			if (tex != tp)
 			{
 				submit_data(tex);
 				tex = tp;
@@ -3783,7 +3783,7 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 			auto& it = *vt.i.ib;
 			if (!it.img)continue;
 			void* tp = get_texture(it.img);
-			if (tex != tp || devrtex)
+			if (tex != tp)
 			{
 				submit_data(tex);
 				tex = tp;
@@ -3831,7 +3831,7 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 				auto& tp = _vt[git._image];
 				if (tex != tp)
 				{
-					submit_data(tex);
+					submit_data(tex);	// 提交合并的渲染数据
 					tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
@@ -3840,24 +3840,28 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 				color = tstyle.color;
 				auto img = git._image;
 				glm::ivec2 tex_size = { img->width,  img->height };
-				if (tstyle.color_shadow)
+				if (!git.color || tstyle.mcolor_effect)
 				{
-					auto ps1 = ps;
-					ps1 += tstyle.shadow_pos;
-					gen3data(tex_size, ps1, git._rect, {}, tstyle.color_shadow, &opt, &idx);
-				}
-				if (tstyle.stroke && tstyle.color_stroke)
-				{
-					int pxx[4] = { -tstyle.stroke, 0, tstyle.stroke, 0 };
-					int pyy[4] = { 0, -tstyle.stroke, 0, tstyle.stroke };
-					for (int e = 0; e < 4; e++)
+					if (tstyle.color_shadow)
 					{
 						auto ps1 = ps;
-						ps1.x += pxx[e];
-						ps1.y += pyy[e];
-						gen3data(tex_size, ps1, git._rect, {}, tstyle.color_stroke, &opt, &idx);
+						ps1 += tstyle.shadow_pos;	// 生成阴影数据
+						gen3data(tex_size, ps1, git._rect, {}, tstyle.color_shadow, &opt, &idx);
+					}
+					if (tstyle.stroke && tstyle.color_stroke)
+					{
+						int pxx[4] = { -tstyle.stroke, 0, tstyle.stroke, 0 };
+						int pyy[4] = { 0, -tstyle.stroke, 0, tstyle.stroke };
+						for (int e = 0; e < 4; e++)
+						{
+							auto ps1 = ps;
+							ps1.x += pxx[e];
+							ps1.y += pyy[e];	// 生成描边数据
+							gen3data(tex_size, ps1, git._rect, {}, tstyle.color_stroke, &opt, &idx);
+						}
 					}
 				}
+				// 生成文本数据
 				gen3data(tex_size, ps, git._rect, {}, git.color ? git.color : color, &opt, &idx);
 			}
 		}
