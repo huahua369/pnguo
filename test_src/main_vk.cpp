@@ -322,12 +322,10 @@ int main(int argc, char* argv[])
 				btn->style.fontsize = 16;
 				btn->style.color = -1;
 				//btn->style.stroke = 1;
+				btn->style.color_stroke = 0x80000000;
 				//btn->style.shadow_pos = { 3, 3 };
-				if (i < 4)
-				{
-					btn->style.color_shadow = 0xcc121212;
-				}
-				btn->style.mcolor_effect = false;
+				btn->style.color_shadow = 0xcc121212;
+				//btn->style.mcolor_effect = false;
 				btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 			}
 			for (int i = 0; i < 4; i++) {
