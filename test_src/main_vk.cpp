@@ -73,10 +73,9 @@ int main(int argc, char* argv[])
 	//main_heightmap(k); 
 	//auto m18 = malloc(18);
 	//_CrtDumpMemoryLeaks();  
-	auto app = new_app();
 	auto appx = new app_x();
 	std::shared_ptr<app_x> spappx(appx);
-	appx->init(app);
+	appx->init();
 	// 常用分辨率
 	glm::ivec2 dpis[] = {
 		{1024,768},
@@ -115,7 +114,7 @@ int main(int argc, char* argv[])
 
 		//free_app(app);
 		//return 0;
-		auto fctx = app->font_ctx;
+		auto fctx = appx->app->font_ctx;
 		fctx->set_cache_size(512, 512);
 		auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
 
@@ -134,13 +133,13 @@ int main(int argc, char* argv[])
 		auto sampler = gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
 
 		// 准备使用3D渲染器的设备创建SDL渲染器
-		app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
+		appx->app->set_dev(vkd->_dev_info.inst, vkd->_dev_info.phy, vkd->_dev_info.vkdev);
 
 		//vkr::new_ms_pipe(vkd->_dev_info.vkdev, vkd->renderpass_opaque);
-		form_x* form0 = (form_x*)new_form(app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_vsync| ef_borderless*/);
+		form_x* form0 = (form_x*)new_form(appx->app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable /*| ef_vsync| ef_borderless*/);
 		//form_x* form1 = (form_x*)new_form(app, wtitle1, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 		auto sdldev = form0->get_dev();		// 获取SDL渲染器的vk设备
-		app->main = form0;
+		appx->app->main = form0;
 		auto kd = sdldev.vkdev;
 
 		//void* aaaa = vkr::new_ms_pipe(vkd->dev, vkd->renderpass_fbo);
@@ -246,7 +245,7 @@ int main(int argc, char* argv[])
 			auto view = new viewdev_cx();
 			view->init_vgdev(&devinfo, 8);
 			view->familys = family;
-			view->app = app;
+			view->app = appx->app;
 			auto pcb = view->pcb;
 			dom_cx* dom0 = new dom_cx();
 			dom0->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev, family);
@@ -453,8 +452,8 @@ int main(int argc, char* argv[])
 						if (type == (int)event_type2::on_dragend) {
 							glm::vec2 pos = dvv2->get_pos();
 							glm::vec2 size = dvv2->get_size();
-							glm::vec2 main_pos = app->main->get_pos();
-							glm::vec2 main_size = app->main->get_size();
+							glm::vec2 main_pos = appx->app->main->get_pos();
+							glm::vec2 main_size = appx->app->main->get_size();
 							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
 							{
 								//view->set_div(dvv2);
@@ -511,7 +510,7 @@ int main(int argc, char* argv[])
 			}
 			dom0->update(0.0f);
 			{
-				app->e_window_cb = [=](form_x* fw, int type)
+				appx->app->e_window_cb = [=](form_x* fw, int type)
 					{
 						if (type == SDL_EVENT_WINDOW_MOVED)
 						{
@@ -519,7 +518,7 @@ int main(int argc, char* argv[])
 						}
 					};
 			}
-			app->set_fps(60);
+			appx->app->set_fps(60);
 			vkd->_state.has_fence = false;
 			auto actx = appx->audio_ctx;
 			audio_addsong(actx);
@@ -534,13 +533,13 @@ int main(int argc, char* argv[])
 			// 运行消息循环			
 			do {
 				int ct = 0;
-				auto delta = app->update_event();
-				if (!app->form_count())break;
+				auto delta = appx->app->update_event();
+				if (!appx->app->form_count())break;
 				ct += actx->update(delta);
 
 				cpums = rt_cpu.end();
 				rt_cpu.begin();
-				auto fps = app->get_fps();
+				auto fps = appx->app->get_fps();
 				form0->update(delta);
 				if (form0->is_minimized())
 				{
@@ -603,10 +602,9 @@ int main(int argc, char* argv[])
 						view->wait_dev();
 					SDLms = rtc.end();
 				}
-			} while (app->form_count());
+			} while (appx->app->form_count());
 			delete dom0;
 			delete view;
-			delete actx;
 			delete vertices;
 		}
 		delete_font_family(family);
@@ -614,7 +612,6 @@ int main(int argc, char* argv[])
 		gd->release(sampler);
 		gd->release(dctx);
 		free_gdev(gd);
-		free_app(app);
 	}
 	int64_t acc = get_ac_count();
 	//_CrtDumpMemoryLeaks();

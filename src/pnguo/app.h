@@ -76,7 +76,7 @@ public:
 public:
 	app_x();
 	~app_x();
-	void init(app_cx* a);
+	void init();
 private:
 
 };
