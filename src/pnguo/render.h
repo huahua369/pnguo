@@ -743,7 +743,7 @@ public:
 	vkvg_func_t* vgcb = 0;
 	texture_cb* rcb = 0;	// 渲染器接口
 	void* rptr = 0;			// 渲染器指针
-	void* tex = 0;
+	void* _tex = 0;
 	font_family_t* familys = 0;				// 默认字体
 	glm::ivec4 _view = { 0,0,1024,1024 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
@@ -777,6 +777,7 @@ public:
 	void* get_texture(void* surface);
 	// 暂停渲染
 	void pause();
+	void submit_data(void* tex);
 public:
 	void cmd_draw();
 	void clear_draw();

@@ -3675,11 +3675,11 @@ void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 	if (!p || !rcb || !renderer)return;
 	uint32_t color = -1;
 	const int vsize = sizeof(text_vx);
-	void* tex = 0;
 	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
 	auto rect = p->box.tbox.rc;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = {};
+	void* tex = 0;
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto& tm = p->layout.dst_vstr;
@@ -3693,14 +3693,7 @@ void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 			void* tp = get_texture(it.img);
 			if (tex != tp || devrtex)
 			{
-				if (tex && opt.size()) {
-					auto nv = opt.size();
-					rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
-						((float*)&opt.data()->uv), vsize, nv
-						, idx.data(), idx.size(), sizeof(uint32_t));
-					opt.clear();
-					idx.clear();
-				}
+				submit_data(tex);
 				tex = tp;
 			}
 			auto lpos = it.layout_pos + it.pos + pos0;
@@ -3746,14 +3739,7 @@ void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 				auto& tp = _vt[git._image];
 				if (tex != tp)
 				{
-					if (tex && opt.size()) {
-						auto nv = opt.size();
-						rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
-							((float*)&opt.data()->uv), vsize, nv
-							, idx.data(), idx.size(), sizeof(uint32_t));
-						opt.clear();
-						idx.clear();
-					}
+					submit_data(tex);
 					tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
@@ -3765,14 +3751,7 @@ void drawable_cx::draw_textdata(rich_text_t* p, const glm::vec2& pos)
 			}
 		}
 	}
-	if (tex && opt.size()) {
-		auto nv = opt.size();
-		rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
-			((float*)&opt.data()->uv), vsize, nv
-			, idx.data(), idx.size(), sizeof(uint32_t));
-		opt.clear();
-		idx.clear();
-	}
+	submit_data(tex);
 }
 
 void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
@@ -3781,11 +3760,11 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	if (!p || !rcb || !renderer)return;
 	uint32_t color = -1;
 	const int vsize = sizeof(text_vx);
-	void* tex = 0;
 	bool devrtex = !tex_batch && (rcb->set_texture_color4 && rcb->render_texture);
 	auto rect = p->view;
 	glm::ivec4 rc = {};
 	glm::ivec2 pos0 = {};
+	void* tex = 0;
 	rect.x += pos.x; rect.y += pos.y;
 	pos0.x += rect.x; pos0.y += rect.y;
 	auto clip = p->clip;
@@ -3806,14 +3785,7 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 			void* tp = get_texture(it.img);
 			if (tex != tp || devrtex)
 			{
-				if (tex && opt.size()) {
-					auto nv = opt.size();
-					rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
-						((float*)&opt.data()->uv), vsize, nv
-						, idx.data(), idx.size(), sizeof(uint32_t));
-					opt.clear();
-					idx.clear();
-				}
+				submit_data(tex);
 				tex = tp;
 			}
 			auto lpos = it.layout_pos + it.pos + pos0;
@@ -3859,14 +3831,7 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 				auto& tp = _vt[git._image];
 				if (tex != tp)
 				{
-					if (tex && opt.size()) {
-						auto nv = opt.size();
-						rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
-							((float*)&opt.data()->uv), vsize, nv
-							, idx.data(), idx.size(), sizeof(uint32_t));
-						opt.clear();
-						idx.clear();
-					}
+					submit_data(tex);
 					tex = tp;
 				}
 				auto ps = git._dwpos + git._apos;
@@ -3897,14 +3862,7 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 			}
 		}
 	}
-	if (tex && opt.size()) {
-		auto nv = opt.size();
-		rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
-			((float*)&opt.data()->uv), vsize, nv
-			, idx.data(), idx.size(), sizeof(uint32_t));
-		opt.clear();
-		idx.clear();
-	}
+	submit_data(tex);
 }
 
 void drawable_cx::draw_geometry(void* image, const glm::ivec4& clip, std::vector<text_vx>* v, std::vector<uint32_t>* index)
@@ -4018,6 +3976,21 @@ void* drawable_cx::get_texture(void* surface)
 void drawable_cx::pause()
 {
 	_pause = true;
+}
+
+void drawable_cx::submit_data(void* tex)
+{
+	void* renderer = rptr;
+	if (!rcb || !renderer)return;
+	const int vsize = sizeof(text_vx);
+	if (opt.size()) {
+		auto nv = opt.size();
+		rcb->draw_geometry(renderer, tex, (float*)&opt.data()->pos, vsize, ((float*)&opt.data()->color), vsize,
+			((float*)&opt.data()->uv), vsize, nv
+			, idx.data(), idx.size(), sizeof(uint32_t));
+		opt.clear();
+		idx.clear();
+	}
 }
 
 void drawable_cx::cmd_draw()
@@ -4151,76 +4124,6 @@ void r_update_data_text(text_render_o* p, drawable_cx* pt, float delta)
 			}
 		}
 	}
-}
-void r_render_data_text(text_render_o* p, const glm::vec2& pos, drawable_cx* pt)
-{
-	void* renderer = pt->rptr;
-	std::vector<font_item_t>& tm = p->dst_vstr;
-	uint32_t color = p->tb->style.color;
-	if (color != pt->color || p->update) {
-		pt->color = color;
-		pt->opt.clear();
-		pt->idx.clear();
-		p->update = false;
-	}
-	void* tex = 0;
-	const int vsize = sizeof(text_vx);
-	auto rect = p->box.rc;
-	rect.x += pos.x; rect.y += pos.y;
-	clicprect_cx cp(renderer, pt->rcb, rect); // 设置裁剪区域
-	if (pt->opt.empty())
-	{
-		size_t ct = 0;
-		for (size_t i = 0; i < tm.size(); i++)
-		{
-			auto& git = tm[i];
-			if (git._image) {
-				auto& tp = pt->_vt[git._image];
-				if (tex != tp)
-				{
-					if (tex && pt->opt.size()) {
-						auto nv = pt->opt.size();
-						pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
-							((float*)&pt->opt.data()->uv), vsize, nv
-							, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-						pt->opt.clear();
-						pt->idx.clear();
-						ct++;
-					}
-					tex = tp;
-				}
-				auto ps = git._dwpos + git._apos;
-				ps += pos;
-				auto img = git._image;
-				glm::ivec2 tex_size = { img->width,  img->height };
-				gen3data(tex_size, ps, git._rect, {}, git.color ? git.color : color, &pt->opt, &pt->idx);
-			}
-		}
-		if (tex && pt->opt.size()) {
-			auto nv = pt->opt.size();
-			pt->rcb->draw_geometry(renderer, tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
-				((float*)&pt->opt.data()->uv), vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-		}
-		if (ct > 0)
-		{
-			pt->opt.clear();
-			pt->idx.clear();
-		}
-		else {
-			pt->tex = tex;
-		}
-	}
-	else {
-		auto nv = pt->opt.size();
-		if (pt->tex && pt->opt.size())
-		{
-			pt->rcb->draw_geometry(renderer, pt->tex, (float*)&pt->opt.data()->pos, vsize, ((float*)&pt->opt.data()->color), vsize,
-				((float*)&pt->opt.data()->uv), vsize, nv, pt->idx.data(), pt->idx.size(), sizeof(uint32_t));
-		}
-	}
-
-	pt->opt.clear();
-	pt->idx.clear();
 }
 
 
