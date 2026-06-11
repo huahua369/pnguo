@@ -440,11 +440,11 @@ int main(int argc, char* argv[])
 					btn->_disabled_events = true;
 					dvv2->add_widget(btn);
 					btn->set_size({ 492,392 });
-					btn->style.fontsize = 26;
+					btn->style.fontsize = 20;
 					btn->style.color = 0xffffffff;
-					btn->style.stroke = 1;
+					//btn->style.stroke = 1;
 					btn->style.color_stroke = 0x8f0012ff;
-					btn->style.shadow_pos = { 2, 2 };
+					btn->style.shadow_pos = { 1,1 };
 					btn->style.color_shadow = 0x80ff2301;
 				}
 				dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
