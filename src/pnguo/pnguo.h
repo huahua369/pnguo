@@ -258,41 +258,12 @@ struct image_9grid {
 	float scale = 0.0f;					// 9Grid
 	float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
 };
-class mesh2d_cx
-{
-public:
-	struct tex_rs {
-		void* tex = 0;
-		glm::vec4 src = {}, dst = {};
-		float scale = 0.0f;					// Tiled、9Grid
-		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
-		int blend_mode = 0;					// 混合模式	
-	};
-	struct draw_cmd_c
-	{
-		glm::ivec4 clip_rect = {};
-		void* texid = 0;
-		uint32_t vtxOffset = 0;
-		uint32_t idxOffset = 0;
-		uint32_t elemCount = 0;
-		uint32_t vCount = 0;
-		int blend_mode = 0;				// 混合模式	
-	};
-	std::vector<draw_cmd_c> cmd_data;	// 渲染命令
-	std::vector<vertex_v2> vtxs;		// 顶点数据
-	std::vector<int> idxs;				// 索引
-public:
-	mesh2d_cx();
-	virtual ~mesh2d_cx();
-	// 添加相同纹理/裁剪区域则自动合批
-	void add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip);
-private:
-
-};
+class mesh2d_cx;
 class gshadow_cx;
 class atlas_cx;
 
 // 图集画布
+#if 0
 class canvas_atlas
 {
 public:
@@ -303,7 +274,7 @@ public:
 		glm::ivec4 rect = { 0,0,-1,-1 };	// *区域/坐标大小
 		glm::ivec4 sliced = {};				// 九宫格渲染 left top right bottom 
 	};
-	mesh2d_cx _mesh;
+	mesh2d_cx* _mesh = 0;
 
 	std::vector<gshadow_cx*> _gs;		// 阴影管理
 	std::vector<atlas_cx*> _atlas_cx;	// 显示的图集
@@ -341,7 +312,7 @@ private:
 	// 创建九宫格顶点
 	void make_image_sliced(void* img, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip);
 };
-
+#endif
 /*
 bspline
 阶数degree\曲线类型

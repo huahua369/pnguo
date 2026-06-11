@@ -777,55 +777,6 @@ vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, uint32_t  c) :position(p), tex_co
 vertex_v2::vertex_v2(glm::vec2 p, glm::vec2 u, glm::vec4 c) :position(p), tex_coord(u), color(c) {}
 
 
-mesh2d_cx::mesh2d_cx()
-{}
-
-mesh2d_cx::~mesh2d_cx()
-{}
-
-void mesh2d_cx::add(std::vector<vertex_v2>& vertex, std::vector<int>& vt_index, void* user_image, const glm::ivec4& clip)
-{
-	auto ps0 = vertex.size();
-	auto ix0 = vt_index.size();
-	auto ps = vtxs.size();
-	auto ix = idxs.size();
-	auto ic = vt_index.size();
-	vtxs.resize(ps + vertex.size());
-	idxs.resize(ix + vt_index.size());
-	auto& cd = cmd_data;
-	if (cd.empty())
-	{
-		cd.push_back({});
-	}
-	auto dt = &cd[cd.size() - 1];
-	auto pidx = idxs.data() + ix;
-	if (dt->texid != user_image || dt->clip_rect != clip)
-	{
-		if (dt->elemCount > 0)
-			cd.push_back({});
-		dt = &cd[cd.size() - 1];
-		dt->texid = user_image;
-		dt->clip_rect = clip;
-		dt->vtxOffset = ps;
-		dt->idxOffset = ix;
-		dt->elemCount = ic;
-		dt->vCount = ps0;
-	}
-	else
-	{
-		// 合批
-		dt->elemCount += ic;
-		dt->vCount += ps0;
-		auto idt = vt_index.data();
-		for (size_t i = 0; i < ic; i++)
-		{
-			idt[i] += ix;
-		}
-	}
-	memcpy(vtxs.data() + ps, vertex.data(), vertex.size() * sizeof(vertex[0]));
-	memcpy(pidx, vt_index.data(), vt_index.size() * sizeof(vt_index[0]));
-
-}
 
 
 inline uint8_t is_rect_intersect(int x01, int x02, int y01, int y02,
@@ -905,28 +856,28 @@ struct vidptr_t {
 	size_t vc = 0;
 	size_t ic = 0;
 };
-vidptr_t PrimReserve(mesh2d_cx* ctx, int idx_count, int vtx_count)
-{
-	auto dc = &ctx->cmd_data[ctx->cmd_data.size() - 1];
-	dc->elemCount += idx_count;
-	dc->vCount += vtx_count;
-	dc->idxOffset;
-	dc->vtxOffset;
-	auto v = ctx->vtxs.size();
-	auto i = ctx->idxs.size();
-	//if (v + vtx_count >= _vtx_data.size())
-	{
-		auto ns = v + vtx_count;
-		ctx->vtxs.resize(ns);
-	}
-	//if (i + idx_count >= _idx_data.size())
-	{
-		auto ns = i + idx_count;
-		ctx->idxs.resize(ns);
-	}
-	auto r = vidptr_t{ &ctx->vtxs[v], &ctx->idxs[i], v, i, (size_t)vtx_count, (size_t)idx_count };
-	return r;
-}
+//vidptr_t PrimReserve(mesh2d_cx* ctx, int idx_count, int vtx_count)
+//{
+//	auto dc = &ctx->cmd_data[ctx->cmd_data.size() - 1];
+//	dc->elemCount += idx_count;
+//	dc->vCount += vtx_count;
+//	dc->idxOffset;
+//	dc->vtxOffset;
+//	auto v = ctx->vtxs.size();
+//	auto i = ctx->idxs.size();
+//	//if (v + vtx_count >= _vtx_data.size())
+//	{
+//		auto ns = v + vtx_count;
+//		ctx->vtxs.resize(ns);
+//	}
+//	//if (i + idx_count >= _idx_data.size())
+//	{
+//		auto ns = i + idx_count;
+//		ctx->idxs.resize(ns);
+//	}
+//	auto r = vidptr_t{ &ctx->vtxs[v], &ctx->idxs[i], v, i, (size_t)vtx_count, (size_t)idx_count };
+//	return r;
+//}
 glm::vec4 color2f4(uint32_t c)
 {
 	glm::vec4 color4 = {};
@@ -10065,7 +10016,7 @@ image_sliced_t gshadow_cx::new_rect(const rect_shadow_t& rs)
 
 
 #endif
-
+#if 0
 canvas_atlas::canvas_atlas()
 {}
 
@@ -10224,191 +10175,4 @@ bool canvas_atlas::nohas_clip(glm::ivec4 a)
 	}
 	return (!is_rect_intersect(clip, a));
 }
-
-void canvas_atlas::add_image(image_rs* p, const glm::vec2& npos, uint32_t color32, const glm::ivec4& clip)
-{
-	auto& rect = p->rect;
-	auto a = glm::vec4(npos, p->size);
-	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
-	glm::vec4 v4 = { 0, 0, 1, 1 };
-	glm::vec4 uv = v4;
-	glm::vec2 s = size;
-	auto ts = p->img;
-	auto texsize = *((glm::ivec2*)ts);
-	if (!(rect.x < 0))
-	{
-		v4 = rect;
-		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
-		v4.z = glm::min(v4.z, (float)texsize.x);
-		v4.w = glm::min(v4.w, (float)texsize.y);
-		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y };
-		if (uv.x < 0) { uv.x = 0; }
-		if (uv.y < 0) { uv.y = 0; }
-	}
-	if (a.z < 0)
-		a.z *= -std::min(rect.z, texsize.x);
-	if (a.w < 0)
-		a.w *= -std::min(rect.w, texsize.y);
-	if (nohas_clip(a))
-		return;
-	glm::vec4 color3 = color2f4(color32);
-	if (p->sliced.x < 1)
-	{
-		glm::vec2 av = pos, cv = { pos.x + s.x, pos.y + s.y }, uv_a = { uv.x, uv.y }, uv_c{ uv.z, uv.w };
-		auto& col = color3;
-		glm::vec2 bv(cv.x, av.y), dv(av.x, cv.y), uv_b(uv_c.x, uv_a.y), uv_d(uv_a.x, uv_c.y);
-		static std::vector<int> deidx = { 0,1,2,0,2,3 };
-		std::vector<vertex_v2> vertex = {
-			{av, uv_a, col},
-			{bv, uv_b, col},
-			{cv, uv_c, col},
-			{dv, uv_d, col},
-		};
-		_mesh.add(vertex, deidx, p->img->texid, clip);// 添加矩形(两个三角形)到mesh
-	}
-	else
-	{
-		make_image_sliced(p->img->texid, a, texsize, p->sliced, rect, color32, clip);// 生成九宫格到mesh
-	}
-
-}
-void canvas_atlas::clear()
-{
-	_mesh.cmd_data.clear();
-	_mesh.vtxs.clear();
-	_mesh.idxs.clear();
-	_clip_rect = viewport;
-	_clip_rect.x = _clip_rect.y = 0;
-}
-/*
-
-
-九宫格渲染:
-+--+---------------+--+
-|0 |       1       |2 |
-+--+---------------+--+
-|  |               |  |
-|  |               |  |
-|3 |    center     |4 |
-|  |               |  |
-+--+---------------+--+
-|5 |       6       |7 |
-+--+---------------+--+
-
-九宫格:索引
-0  12                     14  2
-8  4                      6   10
-
-9  5                      7   11
-1  13                     15  3
-+--+-------------------------+--+
-|  |                         |  |
-+--+-------------------------+--+
-|  |                         |  |
-|  |                         |  |
-+--+-------------------------+--+
-|  |                         |  |
-+--+-------------------------+--+
-sliced.x=左宽，y上高，z右宽，w下高
-
-SDL_Vertex
-*/
-void canvas_atlas::make_image_sliced(void* user_image, const glm::ivec4& a, glm::ivec2 texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip)
-{
-	static std::vector<int> vt_index =// { 0,8,12,4,14,6,2,10,11,6,7,4,5,8,9,1,5,13,7,15,11,3 };//E_TRIANGLE_STRIP
-	{ 0, 8, 12, 8, 12, 4, 12, 4, 14, 4, 14, 6, 14, 6, 2, 6, 2, 10,
-		6, 7, 10, 7, 10, 11, 4, 5, 6, 5, 6, 7, 8, 9, 4, 9, 4, 5,
-		9, 1, 5, 1, 5, 13, 5, 13, 7, 13, 7, 15, 7, 15, 11, 15, 11, 3 };//E_TRIANGLE_LIST
-
-	glm::ivec2 pos = { a.x, a.y }, size = { a.z, a.w };
-	glm::vec4 uv = { 0, 0, 1, 1 };
-	glm::vec4 v4 = { 0, 0, texsize.x, texsize.y };
-	if (!(rect.x < 0))
-	{
-		v4 = rect;
-		v4.z += v4.x; v4.w += v4.y;//加上原点坐标
-		uv = { v4.x / texsize.x, v4.y / texsize.y, v4.z / texsize.x, v4.w / texsize.y, };
-	}
-	float left = sliced.x,
-		top = sliced.y,
-		right = sliced.z,
-		bottom = sliced.w;
-	float x = pos.x, y = pos.y, width = size.x, height = size.y;
-	glm::vec4 suv = { (left + v4.x) / texsize.x, (top + v4.y) / texsize.y,
-		(v4.z - right) / texsize.x, (v4.w - bottom) / texsize.y };
-
-	//t_vector<vertex_v2>v;
-	std::vector<vertex_v2> vertex = {
-#if 1
-		//0
-		{{x, y}, {uv.x, uv.y}, col},
-		//1
-		{{x, y + height}, {uv.x, uv.w}, col},
-		//2
-		{{x + width, y}, {uv.z, uv.y}, col},
-		//3
-		{{x + width, y + height}, {uv.z, uv.w}, col},
-		//4
-		{{x + left, y + top}, {suv.x, suv.y}, col},
-		//5
-		{{x + left, y + height - bottom}, {suv.x, suv.w}, col},
-		//6
-		{{x + width - right, y + top}, {suv.z, suv.y}, col},
-		//7
-		{{x + width - right, y + height - bottom}, {suv.z, suv.w}, col},
-		//8
-		{{x, y + top}, {uv.x, suv.y}, col},
-		//9
-		{{x, y + height - bottom}, {uv.x, suv.w}, col},
-		//10
-		{{x + width, y + top}, {uv.z, suv.y}, col},
-		//11
-		{{x + width, y + height - bottom}, {uv.z, suv.w}, col},
-		//12
-		{{x + left, y}, {suv.x, uv.y}, col},
-		//13
-		{{x + left, y + height}, {suv.x, uv.w}, col},
-		//14
-		{{x + width - right, y}, {suv.z, uv.y}, col},
-		//15
-		{{x + width - right, y + height}, {suv.z, uv.w}, col},
-#else
-		//0
-		{{x, y}, {0.0f, 0.f}, col},
-		//1
-		{{x, y + height}, {0.f, 1.0f}, col},
-		//2
-		{{x + width, y}, {1.0f, 0.f}, col},
-		//3
-		{{x + width, y + height}, {1.0f, 1.0f}, col},
-		//4
-		{{x + left, y + top}, {0.0f + suv.x, 0.f + suv.y}, col},
-		//5
-		{{x + left, y + height - bottom}, {0.f + suv.x, 1.0f - suv.w}, col},
-		//6
-		{{x + width - right, y + top}, {1.0f - suv.z, 0.f + suv.z}, col},
-		//7
-		{{x + width - right, y + height - bottom}, {1.0f - suv.z, 1.0f - suv.w}, col},
-		//8
-		{{x, y + top}, {0.0f, 0.f + suv.y}, col},
-		//9
-		{{x, y + height - bottom}, {0.f, 1.0f - suv.w}, col},
-		//10
-		{{x + width, y + top}, {1.0f, 0.f + suv.y}, col},
-		//11
-		{{x + width, y + height - bottom}, {1.0f, 1.0f - suv.w}, col},
-		//12
-		{{x + left, y}, {0.0f + suv.x, 0.f}, col},
-		//13
-		{{x + left, y + height}, {0.f + suv.x, 1.0f}, col},
-		//14
-		{{x + width - right, y}, {1.0f - suv.z, 0.f}, col},
-		//15
-		{{x + width - right, y + height}, {1.0f - suv.z, 1.0f}, col},
 #endif
-	};
-
-	_mesh.add(vertex, vt_index, user_image, clip);
-
-	return;
-}

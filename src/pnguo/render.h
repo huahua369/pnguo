@@ -379,6 +379,68 @@ struct geometry_d {
 	int cmd_count = 0;		// 命令数量
 };
 
+class mesh2d_cx
+{
+public:
+	enum FlipMode
+	{
+		FLIP_NONE,                                                                  /**< Do not flip */
+		FLIP_HORIZONTAL,                                                            /**< flip horizontally */
+		FLIP_VERTICAL,                                                              /**< flip vertically */
+		FLIP_HORIZONTAL_AND_VERTICAL = (FLIP_HORIZONTAL | FLIP_VERTICAL)    /**< flip horizontally and vertically (not a diagonal flip) */
+	};
+	struct vertex_t
+	{
+		glm::vec2 position = {};		// 坐标	
+		glm::vec2 tex_coord = {};		// 纹理uv
+		glm::vec4 color = { 1.0,1.0,1.0,1.0 };	// 顶点颜色
+	public:
+		vertex_t();
+		vertex_t(glm::vec3 p, glm::vec2 u, uint32_t c);
+		vertex_t(glm::vec2 p, glm::vec2 u, uint32_t c);
+		vertex_t(glm::vec2 p, glm::vec2 u, glm::vec4 c);
+	};
+	struct tex_rs {
+		void* tex = 0;
+		glm::vec4 src = {}, dst = {};
+		float scale = 0.0f;					// Tiled、9Grid
+		float left_width = 0.0f, right_width = 0.0f, top_height = 0.0f, bottom_height = 0.0f;
+		int blend_mode = 0;					// 混合模式	
+	};
+	struct draw_cmd_c
+	{
+		glm::ivec4 clip_rect = {};
+		void* texid = 0;
+		uint32_t vtxOffset = 0;
+		uint32_t idxOffset = 0;
+		uint32_t elemCount = 0;
+		uint32_t vCount = 0;
+		uint16_t blend_mode = 0;				// 混合模式	
+		int16_t multiply = 0;			// 预乘，0表示不使用
+	};
+	std::vector<draw_cmd_c> cmd_data;	// 渲染命令
+	std::vector<vertex_t> vtxs;		// 顶点数据
+	std::vector<int> idxs;				// 索引
+	glm::ivec4 viewport = { 0,0,0,0 };
+	glm::ivec4 _clip_rect = { };// 当前裁剪 
+public:
+	mesh2d_cx();
+	virtual ~mesh2d_cx();
+	// 清除数据,保留viewport
+	void clear();
+	bool nohas_clip(glm::ivec4 a);
+	// 添加相同纹理/裁剪区域则自动合批
+	void add(void* user_image, std::vector<vertex_t>& vertex, std::vector<int>& vt_index, const glm::ivec4& clip);
+	void add(void* user_image, vertex_t* vertex, size_t vcount, int* vt_index, size_t icount, const glm::ivec4& clip);
+	// 添加图片渲染，自动生成顶点数据
+	void add_image(image_ptr_t* img, const glm::ivec4& clip, const glm::ivec4& dst, const glm::ivec4& src, const glm::ivec4& sliced, uint32_t color = 0xffffffff);
+	// 添加九宫格图片渲染
+	void add_image_sliced(void* user_image, const glm::ivec4& a, const glm::ivec2& texsize, const glm::ivec4& sliced, const glm::ivec4& rect, uint32_t col, const glm::ivec4& clip);
+	// 添加旋转图片渲染，angle为旋转角度，center为旋转中心坐标（相对于dst）
+	void add_image_angle(image_ptr_t* img, const glm::ivec4& src, const glm::ivec4& dst, float angle, const glm::vec2* center, uint32_t col, const glm::ivec4& clip, int flip);
+private:
+
+};
 
 class vkvg_ctx
 {
@@ -768,6 +830,7 @@ public:
 	// 渲染原始三角形数据，opt顶点数据，idx索引数据。image{image_ptr_t*或surface}。提前创建对应纹理
 	void draw_geometry(void* image, const glm::ivec4& clip, std::vector<text_vx>* v, std::vector<uint32_t>* idx);
 	void draw_geometry(geometry_d* geo);
+	void draw_mesh2ddata(mesh2d_cx* dc, const glm::vec2& render_scale);
 	// 批量生成渲染矢量图、位图、文本
 	bool update_rvgdata(rvg_data_cx* dst);
 	// 释放渲染器的纹理
@@ -805,7 +868,7 @@ private:
 
 };
 // 渲染pass节点
-class RenderPassNode 
+class RenderPassNode
 {
 	virtual void prepare() = 0;			//在此处创建RenderPass所需的RHI资源
 	virtual void execute(void*) = 0;	//执行渲染逻辑CommandBuffer
@@ -834,7 +897,7 @@ public:
 	rdg_cx();
 	~rdg_cx();
 	// 增加pass
-	void add(RenderPassNode*p);
+	void add(RenderPassNode* p);
 	// 计算关系
 	void compile();
 	// 执行
