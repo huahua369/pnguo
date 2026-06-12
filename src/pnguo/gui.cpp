@@ -1537,7 +1537,7 @@ void gradient_btn::draw(rvg_cx* rv)
 
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view, this);
-	rv->save();
+	//rv->save();
 	rv->translate({ x, y });
 	if (is_alpha(bc))
 	{
@@ -1572,13 +1572,15 @@ void gradient_btn::draw(rvg_cx* rv)
 	glm::vec4 gtop = to_c4(gradTop);
 	glm::vec4 gbot = to_c4(gradBot);
 
-	rv->save();
+	//rv->save();
 	if (effect == uTheme::dark || p->mPushed)
 		rv->translate({ thickness, thickness });
 	//else
 	//	rv->translate({ 0, 0 });
 	rv->paint_shadow(0, rct.y, rct.x, rct.y, gtop, gbot, 0, rounding);// 垂直方向
-	rv->restore();
+	if (effect == uTheme::dark || p->mPushed)
+		rv->translate({ -thickness, -thickness });
+	//rv->restore();
 	// 渲染标签
 
 	glm::vec2 ps = { thickness * 2,thickness * 2 };
@@ -1603,7 +1605,7 @@ void gradient_btn::draw(rvg_cx* rv)
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, &style);
 
-	rv->restore();
+	//rv->restore();
 
 	rv->pop_view();
 
@@ -1685,7 +1687,7 @@ void radio_tl::draw(rvg_cx* rv)
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view, this);
 
-		rv->save();
+		//rv->save();
 		rv->translate((glm::vec2)psv);
 		//rv->add_rect({ 0,0,get_size() }, 0);
 		//rv->set_color(0);
@@ -1700,7 +1702,7 @@ void radio_tl::draw(rvg_cx* rv)
 			draw_radios(rv, &it, &style);
 			x++;
 		}
-		rv->restore();
+		//rv->restore();
 
 		rv->pop_view();
 #endif
@@ -1717,7 +1719,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 		auto view = glm::ivec4(psv, get_size());
 		rv->push_view(view, this);
 
-		rv->save();
+		//rv->save();
 		glm::ivec2 poss = psv;
 		poss.x += (_size.x - style.square_sz) * 0.5;
 		poss.y += (_size.y - style.square_sz) * 0.5;
@@ -1729,7 +1731,7 @@ void checkbox_tl::draw(rvg_cx* rv)
 			draw_checkbox(rv, &p->style, &it);
 			x++;
 		}
-		rv->restore();
+		//rv->restore();
 
 		rv->pop_view();
 #endif
@@ -1781,7 +1783,7 @@ void progress_tl::draw(rvg_cx* rv)
 	rv->push_view(view, this);
 	glm::vec2 npos = _size - (glm::vec2)ss;
 	npos *= 0.5;
-	rv->save();
+	//rv->save();
 	rv->translate(psv);
 	//rv->add_rect({ 0,0, _size.x, _size.y }, 0);
 	//rv->submit(0xff000000, 0, 0);
@@ -1793,7 +1795,7 @@ void progress_tl::draw(rvg_cx* rv)
 	int r = rounding;
 	if (xx > 0)
 	{
-		rv->save();
+		//rv->save();
 		if (xx < rounding * 2)
 		{
 			rv->add_rect({ 0,0, xx, ss.y }, r);
@@ -1803,7 +1805,7 @@ void progress_tl::draw(rvg_cx* rv)
 		}
 		rv->add_rect({ 0.5,0.5, xx, ss.y }, r);
 		rv->submit(color.x, 0, 0);
-		rv->restore();
+		//rv->restore();
 	}
 	if (text.size()) {
 		glm::ivec2 rk = {};// ltx->get_text_rect(0, font_size, text.c_str(), -1);
@@ -1837,7 +1839,7 @@ void progress_tl::draw(rvg_cx* rv)
 		tx.text = text.c_str(); tx.text_len = text.size();
 		rv->add_text(&tx, &st);
 	}
-	rv->restore();
+	//rv->restore();
 
 	rv->pop_view();
 #endif
@@ -1849,7 +1851,7 @@ void slider_tl::draw(rvg_cx* rv)
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
 	auto view = glm::ivec4(psv, get_size());
 	rv->push_view(view, this);
-	rv->save();
+	//rv->save();
 	glm::ivec2 ss = _size;
 	rv->translate(psv);
 	glm::vec4 brc = {}, cliprc, crc;
@@ -1901,7 +1903,7 @@ void slider_tl::draw(rvg_cx* rv)
 			rv->submit(sl.y, color.x, thickness);
 		}
 	}
-	rv->restore();
+	//rv->restore();
 
 	rv->pop_view();
 #endif
@@ -1916,7 +1918,8 @@ void colorpick_tl::draw(rvg_cx* rv)
 	rv->push_view(view, this);
 	glm::ivec2 ss = _size;
 	rv->translate(psv);
-	rv->save();
+	auto oldpos = rv->get_translate();
+	//rv->save();
 	//uint32_t col_hues[] = { 0xff0000ff,0xff00ffff,0xff00ff00,0xffffff00,0xffff0000,0xffff00ff,0xff0000ff };
 	const glm::vec4 col_hues[6 + 1] = { glm::vec4(1,0,0,1), glm::vec4(1,1,0,1), glm::vec4(0,1,0,1)
 		, glm::vec4(0,1,1,1), glm::vec4(0,0,1,1), glm::vec4(1,0,1,1), glm::vec4(1,0,0,1) };
@@ -1973,7 +1976,9 @@ void colorpick_tl::draw(rvg_cx* rv)
 		rv->add_rect(rcf, 0);
 		rv->submit(-1, bc_color, thickness);
 	}
-	rv->restore();
+	auto oldpos1 = rv->get_translate();
+	rv->translate(oldpos - oldpos1);
+	//rv->restore();
 	{
 		glm::ivec2 ss = _size;
 		glm::vec2 ta = { 0.0, 0.0 };

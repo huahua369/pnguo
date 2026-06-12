@@ -1993,6 +1993,7 @@ void rvg_cx::translate(const glm::vec2& offset)
 	_cmd.insert(_cmd.end(), (char*)&offset, (char*)&offset + sizeof(offset));
 	_cur.pos += offset;
 }
+
 void rvg_cx::scale(float sx, float sy)
 {
 	push_ct(OP_SCALE);
@@ -2035,6 +2036,11 @@ void rvg_cx::get_matrix(glm::mat3x2* matrix)
 	{
 		*matrix = _cur._transform;
 	}
+}
+
+glm::vec2 rvg_cx::get_translate()
+{
+	return _cur.pos;
 }
 
 
@@ -3608,7 +3614,7 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 	if (!dst || dst->dst_data.empty())return;
 	glm::vec2 pos0 = {};// dst->_pos;
 	auto length = dst->dst_data.size();
-	int kc = 0;
+	//int kc = 0;
 	for (size_t m = 0; m < length; m++)
 	{
 		auto& vt = dst->dst_data[m];
@@ -3619,7 +3625,7 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 			if (vt.v.t)
 			{
 				draw_boxtext(vt.v.t, pos0);
-				kc++;
+				//kc++;
 			}
 			break;
 		case 1:

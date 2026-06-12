@@ -703,6 +703,7 @@ public:
 	void transform(const glm::mat3x2* matrix);
 	void set_matrix(const glm::mat3x2* matrix);
 	void get_matrix(glm::mat3x2* matrix);
+	glm::vec2 get_translate();
 
 	void push_ct(uint8_t op);
 	bool is_image();
