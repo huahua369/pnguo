@@ -930,3 +930,5 @@ size_t build_huedata(const glm::vec4& incolor, const glm::ivec4& rc0, std::vecto
 
 glm::vec4 RGBtoHSV(uint32_t c);
 glm::vec4 HSVtoRGB(const glm::vec4& hsv);
+
+void test_vkvg(const char* fn, dev_info_c* dc);

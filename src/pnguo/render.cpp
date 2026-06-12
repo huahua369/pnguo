@@ -576,7 +576,7 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 		, VK_SAMPLE_COUNT_8_BIT ,VK_SAMPLE_COUNT_4_BIT,VK_SAMPLE_COUNT_2_BIT,VK_SAMPLE_COUNT_1_BIT };
 	VkvgDevice dev = {};
 	VkvgDevice dev1 = {};
-	bool hasdev = (c && c->inst && c->phy && c->vkdev);
+	bool hasdev = (c && (c->inst && c->phy && c->vkdev));
 	dev_info_c _c = {};
 	if (!hasdev)c = &_c;
 	VkSampleCountFlags cus = VK_SAMPLE_COUNT_1_BIT;
@@ -609,6 +609,7 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 		{
 			vkvg_device_create_info_t info = { VK_SAMPLE_COUNT_1_BIT, true ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
 			dev1 = vkvg_device_create(&info);
+			c->phy = info.phy;
 		}
 		VkPhysicalDeviceMemoryProperties m_memoryProperties = {};
 		vkGetPhysicalDeviceMemoryProperties(c->phy, &m_memoryProperties);
@@ -4657,7 +4658,8 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	vkvg_dev* vctx = new_vkvgdev(dc, 8);
 	auto dev = vctx->ctx->dev;
 	if (!dev)return;
-	new_spv_base(vctx->vkdev);
+	//new_spv_base(vctx->vkdev);
+	//vkvg_log_level = -1;
 	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);
 	VkvgContext ctx = vkvg_create(surf);
 	vkvg_clear(ctx);

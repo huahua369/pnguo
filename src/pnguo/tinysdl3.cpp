@@ -2469,68 +2469,7 @@ void form_x::set_mouse_mode(bool grab_enable, bool rmode)
 	SDL_SetWindowMouseGrab(_ptr, grab_enable);		// 设置鼠标范围在窗口内
 	if (rmode)warp_mouse_in_window(-1, -1);
 }
-// todo 图集渲染
-void draw_data(SDL_Renderer* renderer, canvas_atlas* dc, int fb_width, int fb_height, const glm::vec2& render_scale, const glm::ivec2& display_size)
-{
-	glm::vec2 clip_off = {};
-	glm::vec2 clip_scale = render_scale;
-	SDL_Rect vp = { 0,0,-1,-1 };
-	if (dc->viewport.z > 0 && dc->viewport.w > 0)
-	{
-		vp.x = dc->viewport.x;
-		vp.y = dc->viewport.y;
-		vp.w = dc->viewport.z;
-		vp.h = dc->viewport.w;
-		SDL_SetRenderViewport(renderer, &vp);
-	}
 
-	auto av = &dc->_mesh;
-	auto vd = (SDL_Vertex*)av->vtxs.data();
-	auto vdt = av->vtxs.data();
-	auto idv = av->idxs.data();
-	auto vbs = av->vtxs.size();
-	auto ibs = av->idxs.size();
-	std::vector<int> idxs;
-	struct { SDL_Texture* texture; SDL_BlendMode blendMode; } states = {};
-	for (auto& pcmd : av->cmd_data)
-	{
-		glm::vec2 clip_min((pcmd.clip_rect.x - clip_off.x) * clip_scale.x, (pcmd.clip_rect.y - clip_off.y) * clip_scale.y);
-		glm::vec2 clip_max((pcmd.clip_rect.z - clip_off.x) * clip_scale.x, (pcmd.clip_rect.w - clip_off.y) * clip_scale.y);
-		if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
-		{
-			SDL_SetRenderClipRect(renderer, 0);
-		}
-		else
-		{
-			SDL_Rect r = { (int)(clip_min.x), (int)(clip_min.y), (int)(clip_max.x - clip_min.x), (int)(clip_max.y - clip_min.y) };
-			SDL_SetRenderClipRect(renderer, &r);
-		}
-		//SDL_SetTextureBlendMode(states.texture, states.blendMode);
-		auto texture = (SDL_Texture*)pcmd.texid;
-#if 0
-		SDL_RenderGeometry(renderer, tex, vd + pcmd.vtxOffset, pcmd.vCount, ibs ? idv + pcmd.idxOffset : nullptr, pcmd.elemCount);
-#else
-		auto vertices = vdt + pcmd.vtxOffset;
-		const float* xy = &vertices->position.x;
-		int stride = sizeof(vertex_v2);
-		const SDL_FColor* color = (SDL_FColor*)&vertices->color;
-		const float* uv = &vertices->tex_coord.x;
-		int size_indices = 4;
-		auto indices = ibs ? idv + pcmd.idxOffset : nullptr;
-		auto num_indices = pcmd.elemCount;
-		if ((BlendMode_e)pcmd.blend_mode != BlendMode_e::none) {
-			auto blend = get_blend_x((BlendMode_e)pcmd.blend_mode, false);
-			if (states.blendMode != blend || states.texture != texture) {
-				states.texture = texture; states.blendMode = blend;
-				SDL_SetTextureBlendMode(states.texture, states.blendMode);
-			}
-		}
-		SDL_RenderGeometryRaw(renderer, texture, xy, stride, color, stride, uv, stride, pcmd.vCount, indices, num_indices, size_indices);
-
-#endif
-	}
-	//SDL_SetRenderViewport(renderer, (SDL_Rect*)0);
-}
 
 void form_x::present()
 {

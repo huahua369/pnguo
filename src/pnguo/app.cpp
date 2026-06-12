@@ -17,6 +17,7 @@ https://github.com/huahua369/pnguo
 #include "pnguo.h"
 #include "gui.h"
 #include "audio.h"
+#include <pnguo/print_time.h> 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -277,6 +278,9 @@ int dom_cx::build()
 			get_div(p, &tdrawlist);
 		}
 	}
+	//printf("draw 0\n");
+	c_runtime_cx rtc;
+	rtc.begin();
 #if 0
 	auto& rvgd = dc->_dobj[0];
 	if (!rvgd)
@@ -323,6 +327,13 @@ int dom_cx::build()
 		}
 	}
 #endif
+	int ms = rtc.end();
+	static int oms = -1;
+	//if (ms != oms)
+	//{
+	//	oms = ms;
+	//	printf("draw %d ms\n", ms);
+	//}
 	return ret;
 }
 

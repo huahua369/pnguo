@@ -127,7 +127,7 @@ int main(int argc, char* argv[])
 		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
 		dev_info_cx devinfo = {};
 		get_dev_info(dctx, &devinfo);
-
+		test_vkvg("temp/aafsf.png", 0);
 		vkdg_cx* vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, devname);	// 创建vk渲染器 
 
 		auto sampler = gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
