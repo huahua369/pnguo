@@ -228,7 +228,7 @@ int dom_cx::update(float delta)
 		for (auto w : tremove) {
 			auto it = std::find(widgets.begin(), widgets.end(), w);
 			if (it != widgets.end()) {
-				widgets.erase(it);
+				widgets.erase(it); ret++;
 			}
 		}
 		tremove.clear();
@@ -238,17 +238,17 @@ int dom_cx::update(float delta)
 		for (auto w : tadd) {
 			auto it = std::find(widgets.begin(), widgets.end(), w);
 			if (it == widgets.end()) {
-				widgets.push_back(w);
+				widgets.push_back(w); ret++;
 			}
 		}
 		tadd.clear();
 	}
-	std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) {
-		return a->dindex < b->dindex;
-		});
 	for (auto& p : widgets) {
 		ret += p->update(delta);
 	}
+	if (ret > 0)
+		std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) { return a->dindex < b->dindex; });
+ 
 	ret += build();
 	if (ret > 0)
 		dc->cmd_draw();

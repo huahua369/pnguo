@@ -469,7 +469,7 @@ int main(int argc, char* argv[])
 				auto dvv = colorpicker;
 				dom0->add_widget(dvv);
 				dvv->set_size({ 1000,400 });
-				dvv->set_pos({ 100,60 });
+				dvv->set_pos({ 200,160 });
 				dvv->style.family = family;
 				dvv->style.fontsize = 16;
 				dvv->border = { 0xffacacac,1,5,0xf9666666 };	// 颜色，线粗，圆角，背景色
@@ -482,12 +482,12 @@ int main(int argc, char* argv[])
 				dvv->flex_child.margin_right = 2;
 				dvv->flex_child.margin_top = 2;
 				dvv->flex_child.margin_bottom = 2;
-				dvv->draggable = true;
+				dvv->draggable = 0;
 			}
 			glm::vec4 dcc[] = { glm::vec4(1, 0, 0, 0.5),
 				glm::vec4(0, 1, 0, 0.5),
 				glm::vec4(0, 0, 1, 0.5) };
-			for (int i = 0; i < 3; i++)
+			for (int i = 0; i < 0; i++)
 			{
 				auto dvv = new div_cx();
 				dom0->add_widget(dvv);
@@ -580,7 +580,6 @@ int main(int argc, char* argv[])
 					ms3d = rtc.end();
 					ct++;
 				}
-				ct++;
 				form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
 				if (ct) {
 					rtc.begin();		// 开始计时录制SDL渲染命令

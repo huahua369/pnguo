@@ -2927,7 +2927,8 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	case event_type2::on_down:
 	{
 		mpos -= tpos + _pos;
-		dindex = 1;
+		if (draggable)
+			dindex = 1;
 		ret = true;
 	}break;
 	case event_type2::on_drag:
@@ -2947,7 +2948,6 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 		ret = true;
 	}break;
 	};
-
 	return false;
 }
 bool vht(widget_t** widgets, size_t count, const glm::ivec2& p) {
@@ -3058,8 +3058,11 @@ bool div_cx::update(float delta)
 		sortdg();
 		update_drag = false; ic++;
 	}
-	for (auto& it : widgets) {
-		ic += it->update(delta);
+	if (delta > 0)
+	{
+		for (auto& it : widgets) {
+			ic += it->update(delta);
+		}
 	}
 	if (uplayout)
 	{
@@ -3075,6 +3078,7 @@ bool div_cx::update(float delta)
 		valid = false;
 		ic++;
 	}
+	if (dindex)ic++;
 	return ic > 0;
 }
 void div_cx::draw(rvg_cx* rv)
