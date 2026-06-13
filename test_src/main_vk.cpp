@@ -422,7 +422,7 @@ int main(int argc, char* argv[])
 				dvv2->set_pos({ 10,10 });
 				dvv2->style.family = family;
 				dvv2->style.fontsize = 16;
-				dvv2->border = { 0xF11212ac,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
+				dvv2->border = { 0xffffffff,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
 				dvv2->flex_child.margin_left = 4;		// 子元素外边距
 				dvv2->flex_child.margin_right = 4;
 				dvv2->flex_child.margin_top = 4;
@@ -434,6 +434,7 @@ int main(int argc, char* argv[])
 				{
 					auto btn = fpslab;
 					btn->rounding = 4;
+					btn->light = 0;
 					btn->style.align = {};
 					btn->set_btn_color_bgr(fmod(2, 5));
 					btn->effect = uTheme::light;
