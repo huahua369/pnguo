@@ -1455,7 +1455,7 @@ void color_btn::draw(rvg_cx* rv)
 	auto psv = get_spos(); psv += _pos;
 	auto view = glm::ivec4(psv, ss + thickness);
 	rv->push_view(view, this);
-	rv->save();
+	//rv->save();
 	rv->translate(psv);
 	//ss -= thickness;
 	if (p->dfill)
@@ -1505,7 +1505,7 @@ void color_btn::draw(rvg_cx* rv)
 	tx.size = ns;
 	tx.text = p->str.c_str(); tx.text_len = p->str.size();
 	rv->add_text(&tx, &style);
-	rv->restore();
+	//rv->restore();
 
 	rv->pop_view();
 #endif
@@ -1796,15 +1796,19 @@ void progress_tl::draw(rvg_cx* rv)
 	if (xx > 0)
 	{
 		//rv->save();
+		glm::ivec4 oclip = {};
 		if (xx < rounding * 2)
 		{
 			rv->add_rect({ 0,0, xx, ss.y }, r);
 			rv->clip();
+			oclip = rv->get_clip();
 			xx = r * 2;
 			kx = 1;
 		}
 		rv->add_rect({ 0.5,0.5, xx, ss.y }, r);
 		rv->submit(color.x, 0, 0);
+		if (oclip.z > 0)
+			rv->clip(oclip);
 		//rv->restore();
 	}
 	if (text.size()) {
@@ -5127,7 +5131,7 @@ void edit_cx::draw(rvg_cx* rv)
 	vsize += thickness * 2;
 	auto view = glm::ivec4(psv, vsize);
 	rv->push_view(view, this);
-	rv->save();
+	//rv->save();
 	rv->translate(psv);
 	rv->add_rect({ 0,0,ss.x ,ss.y }, rounding);
 	rv->set_color(_color.x);
@@ -5149,17 +5153,17 @@ void edit_cx::draw(rvg_cx* rv)
 		srcpos.y += ps.y;
 	}
 	{
-
-		rv->save();
+		//rv->save();
 		// 裁剪区域渲染选中效果背景
 		rv->add_rect({ 0,0,ss.x - thickness * 2,ss.y - thickness * 2 }, 0);
 		rv->clip();
+		auto oclip = rv->get_clip();
 		tpos1 = tpos;
 		tpos1.y += ceil((ctx->lineheight - style.fontsize) * style.align.y);
 		auto v = get_bounds();
 		rv->translate({ 0,1 });
 		if (v.x != v.y && ctx->rangerc.size()) {
-			rv->save();
+			//rv->save();
 			rv->translate(tpos);
 			rv->set_color(_color.z);
 			if (roundselect)
@@ -5176,7 +5180,8 @@ void edit_cx::draw(rvg_cx* rv)
 					rv->fill();
 				}
 			}
-			rv->restore();
+			rv->translate(-tpos);
+			//rv->restore();
 		}
 
 		// 渲染文本
@@ -5210,9 +5215,10 @@ void edit_cx::draw(rvg_cx* rv)
 		tx.text_len = plen;
 		if (*ptxt && plen > 0)
 			rv->add_text(&tx, &st);
-		rv->restore();
+		//rv->restore();
+		rv->clip(oclip);// 恢复裁剪区域
 	}
-	rv->restore();
+	//rv->restore();
 	rv->pop_view();
 
 	glm::ivec2 cpos = ctx->cursor_pos;

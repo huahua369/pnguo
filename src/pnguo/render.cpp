@@ -792,17 +792,14 @@ void submit_style(VkvgContext cr, fill_style_d* st) {
 	if (!cr || !st)return;
 	if (st->fill)
 	{
-		vkvg_save(cr);
 		vkvg_set_source_color(cr, st->fill);
 		if (stroke)
 			vkvg_fill_preserve(cr);
 		else
 			vkvg_fill(cr);
-		vkvg_restore(cr);
 	}
 	if (stroke)
 	{
-		vkvg_save(cr);
 		vkvg_set_line_width(cr, st->thickness);
 		if (st->cap > 0)
 			vkvg_set_line_cap(cr, (vkvg_line_cap_t)st->cap);
@@ -832,7 +829,6 @@ void submit_style(VkvgContext cr, fill_style_d* st) {
 		}
 		vkvg_set_source_color(cr, st->color);
 		vkvg_stroke(cr);
-		vkvg_restore(cr);
 	}
 
 }
@@ -947,7 +943,6 @@ void draw_grid_fill(VkvgContext cr, const glm::vec2& ss, const glm::ivec2& cols,
 }
 void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int count)
 {
-	vkvg_save(cr);
 	VkvgPattern gr = vkvg_pattern_create_linear(0, 0, ss.x, ss.y);
 	double n = count - 1;
 	for (size_t i = 0; i < count; i++)
@@ -959,7 +954,6 @@ void draw_linear(VkvgContext cr, const glm::vec2& ss, const glm::vec4* cols, int
 	vkvg_set_source(cr, gr);
 	vkvg_fill(cr);
 	vkvg_pattern_destroy(gr);
-	vkvg_restore(cr);
 }
 
 #define getrgba(a,b,sp) lerp(a.sp,b.sp,ratio)
@@ -2057,6 +2051,11 @@ void rvg_cx::clip(const glm::ivec4& c)
 	_cur.clip = _tem_clip;
 }
 
+glm::ivec4 rvg_cx::get_clip()
+{
+	return _cur.clip;
+}
+
 void rvg_cx::save()
 {
 	push_ct(OP_SAVE);
@@ -2066,6 +2065,20 @@ void rvg_cx::save()
 void rvg_cx::restore()
 {
 	push_ct(OP_RESTORE);
+	if (_stk.size())
+	{
+		_cur = _stk.top();
+		_stk.pop();
+	}
+}
+
+void rvg_cx::save0()
+{
+	_stk.push(_cur);
+}
+
+void rvg_cx::restore0()
+{
 	if (_stk.size())
 	{
 		_cur = _stk.top();
@@ -2160,12 +2173,12 @@ void rvg_cx::push_view(const glm::ivec4& c, void* ptr)
 	_st_view.push(_view.size());
 	_view.push_back(cv);
 	push_ct(OP_VIEW);
-	save();
+	save0();
 }
 
 void rvg_cx::pop_view()
 {
-	restore();
+	restore0();
 	push_ct(OP_VIEW_POP);
 	size_t cidx = -1;
 	if (_st_view.size())
@@ -2435,7 +2448,6 @@ size_t cmd_op_linear_fill(uint8_t* d, VkvgContext cr)
 	{
 		return sizeof(linear_fill_r);
 	}
-	vkvg_save(cr);
 	VkvgPattern gr = vkvg_pattern_create_linear(0, 0, size.x, size.y);
 	double n = count - 1;
 	for (size_t i = 0; i < count; i++)
@@ -2447,7 +2459,6 @@ size_t cmd_op_linear_fill(uint8_t* d, VkvgContext cr)
 	vkvg_set_source(cr, gr);
 	vkvg_fill(cr);
 	vkvg_pattern_destroy(gr);
-	vkvg_restore(cr);
 	return sizeof(linear_fill_r) + sizeof(glm::vec4) * count;
 }
 size_t cmd_op_add_arrow(uint8_t* d, VkvgContext cr)
@@ -3399,11 +3410,19 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
 	size_t dd_count = 0;
+	size_t rs = 0;
+	std::vector<size_t> rsv;
 	//glm::ivec3 tcount = {};
+	size_t xk = 0;
 	for (auto ct : rvg->_cmdtype) {
+		if (ct == rvg_cx::OP_RESTORE)
+		{
+			rs++; rsv.push_back(xk);
+		}
 		if (ct == rvg_cx::OP_VIEW || ct == rvg_cx::OP_ADD_TEXT || ct == rvg_cx::OP_ADD_IMAGE || ct == rvg_cx::OP_ADD_GEOMETRY) {
 			dd_count++;
 		}
+		xk++;
 	}
 	auto pct = rvg->_cmdtype.data();
 	auto length = rvg->_cmdtype.size();
@@ -3447,6 +3466,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 				if (tcc.ctx)
 				{
 					auto ctx = (VkvgContext)tcc.ctx;
+					//vkvg_translate(ctx, -tcc.apos.x, -tcc.apos.y);
 					vkvg_restore(ctx);
 					//ctx_end(tcc.ctx);
 				}
@@ -3481,6 +3501,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 		if (tcc.ctx)
 		{
 			auto ctx = (VkvgContext)tcc.ctx;
+			//vkvg_translate(ctx, -tcc.apos.x, -tcc.apos.y);
 			vkvg_restore(ctx);
 			//ctx_end(tcc.ctx);
 		}

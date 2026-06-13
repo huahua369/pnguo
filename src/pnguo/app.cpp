@@ -302,6 +302,8 @@ int dom_cx::build()
 		}
 	}
 	// 资源绑定窗口
+	int ms = rtc.end();
+	rtc.begin();
 	ret += dc->update_rvgdata(rvgd);
 #else
 
@@ -322,12 +324,23 @@ int dom_cx::build()
 				rvg->set_pos(p->get_pos());
 				p->draw(rvg);	// 录制渲染
 			}
-			// 资源绑定窗口
+		}
+	}
+
+	int ms = rtc.end();
+	rtc.begin();
+	for (auto& p : tdrawlist) {
+		if (p)
+		{
+			auto& rvgd = dc->_dobj[p];
+			if (!rvgd)
+				continue;
+			// 生成资源
 			ret += dc->update_rvgdata(rvgd);
 		}
 	}
 #endif
-	int ms = rtc.end();
+	int ms1 = rtc.end();
 	static int oms = -1;
 	//if (ms != oms)
 	//{

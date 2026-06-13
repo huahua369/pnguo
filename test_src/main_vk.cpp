@@ -580,6 +580,7 @@ int main(int argc, char* argv[])
 					ms3d = rtc.end();
 					ct++;
 				}
+				ct++;
 				form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
 				if (ct) {
 					rtc.begin();		// 开始计时录制SDL渲染命令

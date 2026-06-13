@@ -686,8 +686,11 @@ public:
 
 	void clip();
 	void clip(const glm::ivec4& c);
+	glm::ivec4 get_clip();
 	void save();
 	void restore();
+	void save0();
+	void restore0();
 	void fill();
 	void stroke();
 	void fill_preserve();
