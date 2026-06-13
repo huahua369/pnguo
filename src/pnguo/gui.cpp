@@ -5222,7 +5222,7 @@ void edit_cx::draw(rvg_cx* rv)
 	rv->pop_view();
 
 	glm::ivec2 cpos = ctx->cursor_pos;
-	cpos += tpos + psv;// +(glm::ivec2)rv->_cur.pos;
+	cpos += tpos + psv;
 	bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
 	if (ccd)
 	{
