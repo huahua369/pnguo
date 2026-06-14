@@ -59,6 +59,27 @@ void audio_addsong(hz::audio_cx* audio_ctx) {
 	audio_ctx->play(0);
 
 }
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data,
+	width, height,
+	left, right, top, bottom,
+	padding_left, padding_right, padding_top, padding_bottom,
+	margin_left, margin_right, margin_top, margin_bottom,
+	grow, shrink, order, basis, baseline,
+	justify_content, align_content, align_items, align_self,
+	position, direction, wrap,
+	should_order_children
+)
+// 保存：将结构体转为 JSON 字符串 
+std::string save_flex_data(const flex_data& data) {
+	nlohmann::json j = data;
+	return j.dump(2);  // 缩进2 
+}
+
+// 加载：从 JSON 字符串解析结构体 
+flex_data load_flex_data(const std::string& json_str) {
+	nlohmann::json j = nlohmann::json::parse(json_str);
+	return j.get<flex_data>();
+}
 
 int main(int argc, char* argv[])
 {
@@ -350,8 +371,9 @@ int main(int argc, char* argv[])
 				r->set_size({ 236,32 });
 				//r->set_single(false);
 				r->placeholder = (char*)u8"输入文本";
-				dvv->add_widget(r);
+				//dvv->add_widget(r);
 				r->dindex = 0;
+				 
 			}
 			auto pro = new progress_tl();
 			dvv->add_widget(pro);
@@ -483,7 +505,26 @@ int main(int argc, char* argv[])
 				dvv->flex_child.margin_right = 2;
 				dvv->flex_child.margin_top = 2;
 				dvv->flex_child.margin_bottom = 2;
-				dvv->draggable = 0;
+				dvv->draggable = 1;
+
+				auto r = new edit_cx();
+				r->set_size({ 360,360 });
+				//r->set_single(false);
+				r->placeholder = (char*)u8"输入文本";
+				r->dindex = 0;
+				r->set_single(false);
+
+				flex_data data;
+				data.width = 100.0f;
+				data.height = 200.0f;
+				data.grow = 1.0f;
+				data.justify_content = flex_align::ALIGN_CENTER;
+
+				std::string json_str = save_flex_data(data);
+				r->set_text(json_str.c_str(), json_str.length());
+				flex_data loaded = load_flex_data(json_str);
+
+				dvv->add_widget(r);
 			}
 			glm::vec4 dcc[] = { glm::vec4(1, 0, 0, 0.5),
 				glm::vec4(0, 1, 0, 0.5),

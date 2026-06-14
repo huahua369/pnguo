@@ -3283,6 +3283,13 @@ int rvg_data_cx::update()
 	auto dtc = rvg->_cmdtype.size();
 	auto cpos = rvg->_cmd_pos.data();
 	size_t upinc = 0;
+	auto rcrc = rvg->get_crc();
+	if (cmd_crc != rcrc)
+	{
+		upinc++;
+		cmd_crc = rcrc;
+	}
+	//printf("crc\t%d\n", rcrc);
 	// 计算每个渲染区，取偶数大小
 	for (auto& it : rvg->_view)
 	{
@@ -4022,15 +4029,8 @@ bool drawable_cx::update_rvgdata(rvg_data_cx* dst)
 {
 	assert(_view.z > 0 && _view.w > 0 && dst);
 	auto rvg = dst->get();
-	auto rcrc = rvg->get_crc();
 	// dst->_pos != rvg->pos;	dst->_pos = rvg->pos;
 	_drawv.push_back(dst);
-	if (dst->cmd_crc == rcrc)
-	{
-		//return ret;
-	}
-	//printf("crc\t%d\n", rcrc);
-	dst->cmd_crc = rcrc;
 	dst->_view = _view;
 	auto ret = dst->update();
 	build_vg(dst, this);

@@ -283,8 +283,8 @@ typedef uint8_t flex_direction;
 typedef uint8_t flex_wrap;
 #endif // __cplusplus
 struct flex_data {
-	float width = NAN, height = NAN;	// 大小
-	float left = NAN, right = NAN, top = NAN, bottom = NAN;	// 偏移
+	float width = 0, height = 0;	// 大小NAN
+	float left = 0, right = 0, top = 0, bottom = 0;	// 偏移
 	float padding_left = 0;		// 本元素内边距
 	float padding_right = 0;
 	float padding_top = 0;
@@ -296,7 +296,7 @@ struct flex_data {
 	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
 	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
 	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
-	float basis = NAN;	// 子元素:定义最小空间
+	float basis = -1;	// 子元素:定义最小空间NAN
 	float baseline = 0.0; // 基线位置
 	flex_align justify_content = flex_align::ALIGN_START;	// 父元素:主轴上的元素的排列方式 start\end\center\space-between\space-around\space-evenly
 	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\space-evenly\stretch 

@@ -2114,7 +2114,10 @@ glm::ivec2 widget_t::get_spos()
 
 void widget_t::set_family(font_family_t* family, int fontsize)
 {
-	this->style.family = family; this->style.fontsize = fontsize;
+	if (family)
+		style.family = family;
+	if (style.fontsize == 0 && fontsize != 0)
+		style.fontsize = fontsize;
 }
 
 void widget_t::set_editing(const std::string& str, const glm::ivec2& cpos, int lineheight)
@@ -2354,10 +2357,11 @@ void div_cx::add_widget(widget_t* p)
 {
 	if (p)
 	{
-		if (!p->style.family)
-			p->style.family = style.family;
-		if (p->style.fontsize == 0)
-			p->style.fontsize = style.fontsize;
+		p->set_family(style.family, style.fontsize);
+		auto par = dynamic_cast<div_cx*>(p->parent);
+		if (par) {
+			par->remove_widget(p);
+		}
 		p->parent = this;
 		auto it = std::find(widgets.begin(), widgets.end(), p);
 		if (it == widgets.end()) {
@@ -5094,6 +5098,7 @@ void edit_cx::on_keyboard(et_un_t* ep)
 
 bool edit_cx::update(float delta)
 {
+	int ret = 0;
 	ctx->c_ct += delta * 1000.0 * ctx->c_d;
 	if (ctx->c_ct > _cursor.z)
 	{
@@ -5122,8 +5127,9 @@ bool edit_cx::update(float delta)
 		}
 		up_text = false;
 		ctx->widths.clear();
+		valid = true;
 	}
-	return false;
+	return valid;
 }
 
 void edit_cx::draw(rvg_cx* rv)
