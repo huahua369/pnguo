@@ -493,15 +493,15 @@ int main(int argc, char* argv[])
 				r->dindex = 0;
 				r->set_single(false);
 
-				flex_data data;
+				flex_data1 data;
 				data.width = 100.0f;
 				data.height = 200.0f;
 				data.grow = 1.0f;
 				data.justify_content = flex_align::ALIGN_CENTER;
 
-				std::string json_str = save_flex_data(data);
+				std::string json_str = save_flex_data1(data);
 				r->set_text(json_str.c_str(), json_str.length());
-				flex_data loaded = load_flex_data(json_str);
+				//flex_data loaded = load_flex_data(json_str);
 
 				dvv->add_widget(r);
 			}

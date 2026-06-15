@@ -83,5 +83,6 @@ private:
 
 // 保存：将结构体转为 JSON 字符串 
 std::string save_flex_data(const flex_data& data);
+std::string save_flex_data1(const flex_data1& data);
 // 加载：从 JSON 字符串解析结构体 
 flex_data load_flex_data(const std::string& json_str);

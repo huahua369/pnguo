@@ -307,6 +307,25 @@ struct flex_data {
 	flex_wrap wrap = flex_wrap::NO_WRAP;					// 父元素:是否换行，超出宽度自动换行
 	bool should_order_children = false;
 };
+struct flex_data1 {
+	float width = 0, height = 0;	// 大小NAN
+	float left = 0, right = 0, top = 0, bottom = 0;	// 偏移
+	float margin[4] = { 0, 0, 0, 0 };		// 本元素内边距
+	float padding[4] = {0, 0, 0, 0};		// 本元素外边距
+	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
+	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
+	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
+	float basis = -1;	// 子元素:定义最小空间NAN
+	float baseline = 0.0; // 基线位置
+	flex_align justify_content = flex_align::ALIGN_START;	// 父元素:主轴上的元素的排列方式 start\end\center\space-between\space-around\space-evenly
+	flex_align align_content = flex_align::ALIGN_STRETCH;	// 父元素:适用多行的flex容器 start\end\center\space-between\space-around\space-evenly\stretch 
+	flex_align align_items = flex_align::ALIGN_STRETCH;		// 父元素:副轴上的元素的排列方式 start\end\center\stretch\baseline
+	flex_align align_self = flex_align::ALIGN_AUTO;			// 子元素:覆盖父容器align-items的设置
+	flex_position position = flex_position::POS_RELATIVE;	// 子元素:
+	flex_direction direction = flex_direction::ROW;			// 父元素:
+	flex_wrap wrap = flex_wrap::NO_WRAP;					// 父元素:是否换行，超出宽度自动换行
+	bool should_order_children = false;
+};
 
 struct node_dt
 {

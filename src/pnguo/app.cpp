@@ -24,6 +24,15 @@ https://github.com/huahua369/pnguo
 #endif
 
 
+
+namespace nlohmann {
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::ivec2, x, y)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::vec2, x, y)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::ivec3, x, y, z)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::vec3, x, y, z)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::ivec4, x, y, z, w)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(glm::vec4, x, y, z, w)
+}
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data,
 	width, height,
 	left, right, top, bottom,
@@ -34,10 +43,23 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data,
 	position, direction, wrap,
 	should_order_children
 )
-
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data1,
+	width, height,
+	left, right, top, bottom,
+	margin, padding,
+	grow, shrink, order, basis, baseline,
+	justify_content, align_content, align_items, align_self,
+	position, direction, wrap,
+	should_order_children
+)
 
 // 保存：将结构体转为 JSON 字符串 
 std::string save_flex_data(const flex_data& data) {
+	njson0 j = data;
+	return j.dump(2);  // 缩进2 
+}
+
+std::string save_flex_data1(const flex_data1& data) {
 	njson0 j = data;
 	return j.dump(2);  // 缩进2 
 }
@@ -47,7 +69,13 @@ flex_data load_flex_data(const std::string& json_str) {
 	njson0 j = njson0::parse(json_str);
 	return j.get<flex_data>();
 }
-
+void testnj() {
+	//kaa_t c = { {1,2,3,4}, 5.0f };
+	//njson0 j = c;
+	//std::string json_str = j.dump(2);
+	//printf("json_str:\n%s\n", json_str.c_str());
+}
+//-------------------------------------------------------------------------------------------------------------------------------------
 viewdev_cx::viewdev_cx()
 {}
 
