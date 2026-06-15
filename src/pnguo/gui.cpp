@@ -4897,9 +4897,13 @@ bool edit_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 		stb_textedit_drag(ctx, &ctx->state, mpos.x, mpos.y);
 		ret = true;
 	}break;
-	case event_type2::mouse_wheel:
+	case event_type2::on_scroll:
 	{
-
+		ctx->scroll_pos.y -= mps.y * ctx->lineheight;
+		int lc = ctx->lvs.size();
+		lc--;
+		if (lc >= 0)
+			ctx->scroll_pos.y = glm::clamp(ctx->scroll_pos.y, 0, lc * ctx->lineheight);
 	}break;
 	default:
 		break;
@@ -5157,6 +5161,7 @@ void edit_cx::draw(rvg_cx* rv)
 	auto ps1 = glm::ceil((iss - ext1) * style.align);
 	glm::ivec2 npos = {};
 	glm::ivec2 srcpos = {};
+	glm::ivec2 cpos = ctx->cursor_pos;
 	if (ctx->state.single_line)
 	{
 		npos.y += ps1.y;
@@ -5225,24 +5230,26 @@ void edit_cx::draw(rvg_cx* rv)
 		tx.text_len = plen;
 		if (*ptxt && plen > 0)
 			rv->add_text(&tx, &st);
+
+
+		cpos += tpos + psv;
+		bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
+		if (ccd)
+		{
+			auto rpos = cpos;
+			rpos -= rv->get_translate();
+			//rv->push_view({ rpos ,align_up(_cursor.x,4),align_up(ctx->cursor_pos.z,4) });
+			rv->set_color(_cursor.y);
+			rv->add_rect(glm::ivec4(rpos, _cursor.x, ctx->cursor_pos.z), 0);
+			rv->fill();
+			//rv->pop_view();
+		}
 		//rv->restore();
 		rv->clip(oclip);// 恢复裁剪区域
 	}
 	//rv->restore();
 	rv->pop_view();
 
-	glm::ivec2 cpos = ctx->cursor_pos;
-	cpos += tpos + psv;
-	bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
-	if (ccd)
-	{
-		auto rpos = cpos;
-		rv->push_view({ rpos ,align_up(_cursor.x,4),align_up(ctx->cursor_pos.z,4) });
-		rv->set_color(_cursor.y);
-		rv->add_rect({ cpos.x,cpos.y, _cursor.x, ctx->cursor_pos.z }, 0);
-		rv->fill();
-		rv->pop_view();
-	}
 	// 编辑中的文本
 	if (is_input)
 	{
@@ -5529,7 +5536,7 @@ void edit_cx::up_caret()
 			caret.x = get_text_rect(style.family, style.fontsize, pstr + ks.x, std::min(ks.y, ctx->state.cursor - ks.x), 0).x;
 		}
 		//caret.x = w1[ctx->state.cursor - ks.x];
-		caret.y = ctx->cursor_pos.z * v1.y;
+		caret.y = h * v1.y;
 		//printf("cursor:\t%d\n", cursor_pos.x);
 	}
 	ctx->cursor_pos = caret; ctx->cursor_pos.z = h;

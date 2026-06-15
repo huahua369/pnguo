@@ -59,27 +59,6 @@ void audio_addsong(hz::audio_cx* audio_ctx) {
 	audio_ctx->play(0);
 
 }
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data,
-	width, height,
-	left, right, top, bottom,
-	padding_left, padding_right, padding_top, padding_bottom,
-	margin_left, margin_right, margin_top, margin_bottom,
-	grow, shrink, order, basis, baseline,
-	justify_content, align_content, align_items, align_self,
-	position, direction, wrap,
-	should_order_children
-)
-// 保存：将结构体转为 JSON 字符串 
-std::string save_flex_data(const flex_data& data) {
-	nlohmann::json j = data;
-	return j.dump(2);  // 缩进2 
-}
-
-// 加载：从 JSON 字符串解析结构体 
-flex_data load_flex_data(const std::string& json_str) {
-	nlohmann::json j = nlohmann::json::parse(json_str);
-	return j.get<flex_data>();
-}
 
 int main(int argc, char* argv[])
 {
