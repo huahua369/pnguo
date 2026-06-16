@@ -457,7 +457,7 @@ int main(int argc, char* argv[])
 							glm::vec2 main_size = appx->app->main->get_size();
 							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
 							{
-								view->set_div(dvv2);
+								//view->set_div(dvv2);
 							}
 						}
 					};
@@ -534,7 +534,7 @@ int main(int argc, char* argv[])
 					{
 						if (type == SDL_EVENT_WINDOW_MOVED)
 						{
-							view->get_div(fw);
+							//view->get_div(fw);
 						}
 					};
 			}

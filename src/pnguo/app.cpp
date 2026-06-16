@@ -133,10 +133,15 @@ form_x* viewdev_cx::set_div(div_cx* d)
 {
 	if (!d)
 		return nullptr;
-	form_x* f1 = 0;
-	if (cform.size())
+	form_x* f1 = d->form;
+	bool rm0 = f1 == app->main;
+	if (rm0)
 	{
-		f1 = cform.front(); cform.pop();
+		f1 = 0;
+		if ( cform.size())
+		{
+			f1 = cform.front(); cform.pop();
+		}
 	}
 	dom_cx* td2 = 0;
 	dom_cx* td3 = 0;
@@ -157,7 +162,7 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	auto pos = d->get_pos();
 	auto size = d->get_size();
 	f1->set_size(size);
-	if (d->form && d->form != f1) {
+	if (d->form && rm0) {
 		pos += d->form->get_pos();
 		td3 = d->form->_dom;
 		td3->remove_widget(d);
