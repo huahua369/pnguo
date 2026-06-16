@@ -176,6 +176,26 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	return f1;
 }
 
+dom_cx* viewdev_cx::get_dom(form_x* f)
+{
+	dom_cx* r = 0;
+	if (f)
+	{
+		if (!f->_dom)
+		{
+			r = new dom_cx();
+			if (r)
+				r->init(f, pcb, { 0,0,cache_size }, _vgdev, familys);
+			f->_dom = r;
+		}
+		else
+		{
+			r = f->_dom;
+		}
+	}
+	return r;
+}
+
 void viewdev_cx::wait_dev()
 {
 	if (_vgdev)

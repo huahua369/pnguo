@@ -247,8 +247,7 @@ int main(int argc, char* argv[])
 			view->familys = family;
 			view->app = appx->app;
 			auto pcb = view->pcb;
-			dom_cx* dom0 = new dom_cx();
-			dom0->init(form0, pcb, { 0,0,ws.x, ws.y }, view->_vgdev, family);
+			dom_cx* dom0 = view->get_dom(form0);
 
 			//auto ptm = plot_main(dom0, 1200, 1200);
 
@@ -632,7 +631,7 @@ int main(int argc, char* argv[])
 			//		SDLms = rtc.end();
 			//	}
 			//} while (appx->app->form_count());
-			//delete dom0;
+
 			delete view;
 			delete vertices;
 		}
