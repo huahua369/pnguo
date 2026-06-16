@@ -3543,6 +3543,7 @@ drawable_cx::drawable_cx()
 
 drawable_cx::~drawable_cx()
 {
+	free_tex();
 	for (auto& [k, v] : _dobj) {
 		free_rvg(v);
 		delete v;
@@ -3610,13 +3611,13 @@ void drawable_cx::update_image(image_ptr_t* img)
 {
 	if (img) {
 		auto& tp = _vt[img];
-		if (img->valid || !tp)
+		if (!tp)
 		{
-			auto t = rcb->make_tex(rptr, img);
-			if (t && t != tp)
-			{
-				tp = t;
-			}
+			tp = rcb->new_tex(rptr, img);
+		}
+		else if (img->valid)
+		{
+			rcb->update_texture(tp, 0, img->data, img->stride);
 		}
 	}
 }
@@ -3635,11 +3636,12 @@ void drawable_cx::draw_surface(void* surface, const glm::vec2& pos, const glm::i
 	}
 }
 
-void drawable_cx::draw_rvg(rvg_data_cx* dst)
+int drawable_cx::draw_rvg(rvg_data_cx* dst)
 {
+	int c = 0;
 	void* renderer = rptr;
-	if (!rcb || !renderer)return;
-	if (!dst || dst->dst_data.empty())return;
+	if (!rcb || !renderer)return c;
+	if (!dst || dst->dst_data.empty())return c;
 	glm::vec2 pos0 = {};// dst->_pos;
 	auto length = dst->dst_data.size();
 	//int kc = 0;
@@ -3653,6 +3655,7 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 			if (vt.v.t)
 			{
 				draw_boxtext(vt.v.t, pos0);
+				c++;
 				//kc++;
 			}
 			break;
@@ -3675,16 +3678,18 @@ void drawable_cx::draw_rvg(rvg_data_cx* dst)
 					pos += stwidth;
 					dt.src_rect = glm::vec4(it->pos, ss);
 					rcb->render_texture(renderer, tp, &dt, 1);
+					c++;
 				}
 			}break;
 		case 2:
 			if (vt.v.geo) {
-				draw_geometry(vt.v.geo);
+				c += draw_geometry(vt.v.geo);
 			}
 			break;
 		};
 	}
 	//printf("kc\t%d\tdc:%d\n", kc, (int)length);
+	return c;
 }
 
 
@@ -3926,23 +3931,24 @@ void drawable_cx::draw_boxtext(box_text_d* p, const glm::vec2& pos)
 	submit_data(tex);
 }
 
-void drawable_cx::draw_geometry(void* image, const glm::ivec4& clip, std::vector<text_vx>* v, std::vector<uint32_t>* index)
+int drawable_cx::draw_geometry(void* image, const glm::ivec4& clip, std::vector<text_vx>* v, std::vector<uint32_t>* index)
 {
 	const int vsize = sizeof(text_vx);
 	auto nv = v->size();
-	if (!rcb || !v || !index || v->empty() || index->empty())return;
+	if (!rcb || !v || !index || v->empty() || index->empty())return 0;
 	void* texp = get_texture(image);
 	//rcb->set_viewport(rptr, &viewport);
 	rcb->set_cliprect(rptr, &clip);
 	rcb->draw_geometry(rptr, texp, (float*)&v->data()->pos, vsize, ((float*)&v->data()->color), vsize,
 		((float*)&v->data()->uv), vsize, nv, index->data(), index->size(), sizeof(uint32_t));
+	return 1;
 }
 
-void drawable_cx::draw_geometry(geometry_d* geo)
+int drawable_cx::draw_geometry(geometry_d* geo)
 {
 	const int vsize = sizeof(text_vx);
 	auto nv = geo->vcount;
-	if (!rcb || !geo->vdata || !geo->idx || geo->vcount < 3 || geo->icount < 3)return;
+	if (!rcb || !geo->vdata || !geo->idx || geo->vcount < 3 || geo->icount < 3)return 0;
 	void* texp = get_texture(geo->image);
 	clicprect_cx cp(rptr, rcb, geo->clip);
 	if (!geo->cmds || geo->cmd_count < 1)
@@ -3960,6 +3966,7 @@ void drawable_cx::draw_geometry(geometry_d* geo)
 			rcb->draw_geometry(rptr, ct->tex_ref, (float*)(d), vsize, (float*)(&d->color), vsize, (float*)(&d->uv), vsize, geo->vcount - ct->vtx_first, geo->idx + ct->idx_first, ct->elemCount, sizeof(uint32_t));
 		}
 	}
+	return 1;
 }
 
 
@@ -4111,11 +4118,13 @@ void drawable_cx::submit_data(void* tex)
 	}
 }
 
-void drawable_cx::cmd_draw()
+int drawable_cx::cmd_draw()
 {
+	int c = 0;
 	for (auto& p : _drawv) {
-		draw_rvg(p);
+		c += draw_rvg(p);
 	}
+	return c;
 }
 
 void drawable_cx::clear_draw()
@@ -4227,18 +4236,18 @@ void ttbr()
 void r_update_data_text(text_render_o* p, drawable_cx* pt, float delta)
 {
 	std::vector<font_item_t>& tm = p->dst_vstr;
-	for (auto& it : p->ov)
+	for (auto& img : p->ov)
 	{
-		if (it) {
-			auto& tp = pt->_vt[it];
-			if (it->valid || !tp)
+		if (img) {
+			auto& tp = pt->_vt[img];
+			if (!tp)
 			{
-				auto t = pt->rcb->make_tex(pt->rptr, it);
-				if (t && t != tp)
-				{
-					pt->rcb->set_texture_blend(t, 0, true);
-					tp = t;
-				}
+				tp = pt->rcb->new_tex(pt->rptr, img);
+				pt->rcb->set_texture_blend(tp, 0, true);
+			}
+			else if (img->valid)
+			{
+				pt->rcb->update_texture(tp, 0, img->data, img->stride);
 			}
 		}
 	}
@@ -5027,7 +5036,7 @@ void mesh2d_cx::add_image(image_ptr_t* img, const glm::ivec4& clip, const glm::i
 	glm::vec4 color3 = ucolor2f(color);
 	if (sliced.x > 0)
 	{
-		add_image_sliced(img->texid, a, texsize, sliced, src, color, clip);// 生成九宫格到mesh
+		add_image_sliced(img, a, texsize, sliced, src, color, clip);// 生成九宫格到mesh
 	}
 	else
 	{
@@ -5052,7 +5061,7 @@ void mesh2d_cx::add_image(image_ptr_t* img, const glm::ivec4& clip, const glm::i
 		   {dv, uv_d, col},
 		};
 		int rect_index_order[] = { 0, 1, 2, 0, 2, 3 };
-		add(img->texid, vertex, 4, rect_index_order, 6, clip);// 添加矩形(两个三角形)到mesh
+		add(img, vertex, 4, rect_index_order, 6, clip);// 添加矩形(两个三角形)到mesh
 	}
 }
 
@@ -5246,7 +5255,7 @@ void mesh2d_cx::add_image_angle(image_ptr_t* img, const glm::ivec4& srcrect, con
 	v[1].color = c4;
 	v[2].color = c4;
 	v[3].color = c4;
-	add(img->texid, v, 4, rect_index_order, 6, clip);
+	add(img, v, 4, rect_index_order, 6, clip);
 }
 
 

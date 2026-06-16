@@ -42,7 +42,19 @@ private:
 
 };
 
+class vkdg_cx;
 class drawable_cx;
+struct image_btn;
+struct color_btn;
+struct gradient_btn;
+struct radio_tl;
+struct checkbox_tl;
+struct switch_tl;
+struct progress_tl;
+struct slider_tl;
+struct colorpick_tl;
+struct scroll_bar;
+class edit_cx;
 class dom_cx
 {
 public:
@@ -64,7 +76,7 @@ public:
 	int build();
 	// 暂停渲染
 	void pause();
-	void cmd_draw();
+	int cmd_draw();
 private:
 
 };
@@ -73,10 +85,18 @@ class app_x
 public:
 	app_cx* app = 0;
 	hz::audio_cx* audio_ctx = 0;
+	viewdev_cx* view = 0;
+	vkdg_cx* vkd = 0;	// 3d渲染器
+	color_btn* fpslab = 0;
+	std::string gpustr;
+	int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
+	int iec = 0;
+	bool r3d = 0;
 public:
 	app_x();
 	~app_x();
 	void init();
+	size_t run();
 private:
 
 };

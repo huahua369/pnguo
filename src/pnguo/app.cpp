@@ -18,6 +18,7 @@ https://github.com/huahua369/pnguo
 #include "gui.h"
 #include "audio.h"
 #include <pnguo/print_time.h> 
+#include "vkrenderer.h"
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -99,7 +100,7 @@ void viewdev_cx::init_vgdev(dev_info_cx* d, int sample)
 div_cx* viewdev_cx::get_div(form_x* f)
 {
 	auto dv = mfd[f];
-	if (dv && app->main && f)
+	if (dv && app->main && f && app->main != f)
 	{
 		glm::vec4 mrc = glm::ivec4(app->main->get_pos(), app->main->get_size());
 		glm::vec4 frc = glm::ivec4(f->get_pos(), f->get_size());
@@ -107,12 +108,12 @@ div_cx* viewdev_cx::get_div(form_x* f)
 		frc.z += frc.x; frc.w += frc.y;
 		if (rect_includes(mrc, frc))
 		{
-			dom_cx* td2 = 0;
-			dom_cx* td3 = 0;
-			td2->remove_widget(dv);
+			dom_cx* td3 = app->main->_dom;
+			dv->remove_widget(dv);
 			td3->add_widget(dv);
 			dv->set_pos(f->get_pos() - app->main->get_pos());
 			f->hide();
+			dv->draggable = true;
 			if (cform.size() < max_form_cache)
 				cform.push(f);
 			else {
@@ -125,7 +126,9 @@ div_cx* viewdev_cx::get_div(form_x* f)
 	}
 	return dv;
 }
-
+void afree_dom(dom_cx* p) {
+	if (p)delete p;
+}
 form_x* viewdev_cx::set_div(div_cx* d)
 {
 	if (!d)
@@ -150,25 +153,26 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	}
 	if (!f1)
 		return nullptr;
-	//td2 = f1->_draw_data[0];
-	//auto pos = d->get_pos();
-	//auto size = d->get_size();
-	//f1->set_size(size);
-	//if (d->form && d->form != f1) {
-	//	pos += d->form->get_pos();
-	//	td3 = d->form->_draw_data[0];
-	//	td3->remove_widget(d);
-	//}
-	//if (d->form != f1)
-	//{
-	//	mfd[f1] = d;
-	//	td2->add_widget(d);
-	//	d->set_pos({});
-	//	f1->show();
-	//	//f1->raise();
-	//	d->form = f1;
-	//}
-	//f1->set_pos(pos);
+	td2 = f1->_dom;
+	auto pos = d->get_pos();
+	auto size = d->get_size();
+	f1->set_size(size);
+	if (d->form && d->form != f1) {
+		pos += d->form->get_pos();
+		td3 = d->form->_dom;
+		td3->remove_widget(d);
+	}
+	if (d->form != f1)
+	{
+		mfd[f1] = d;
+		td2->add_widget(d);
+		d->set_pos({});
+		d->draggable = false;
+		f1->show();
+		//f1->raise();
+		d->form = f1;
+	}
+	f1->set_pos(pos);
 	return f1;
 }
 
@@ -202,26 +206,27 @@ void dom_cx::init(form_x* f, texture_cb* cb, const glm::ivec4& view, vkvg_dev* v
 	{
 		if (form0 && form0 != f) {
 			form0->remove_event(this);
+			form0->_dom = 0;
 		}
 		form0 = f;
-		//f->add(this);
 		if (form0)
 		{
+			form0->free_dom = afree_dom;
+			form0->_dom = this;
 			form0->add_event(this, [=](uint32_t type, et_un_t* e, void* ud) {
 				bool btn = !((devent_type_e)type == devent_type_e::mouse_button_e && e->v.b->down == 0);
-
-				for (auto it = widgets.rbegin(); it != widgets.rend(); it++)
-				{
-					(*it)->on_event(type, e);
-					if (e->ret && btn)
-						break;
+				auto dom = (dom_cx*)ud;
+				if (dom) {
+					for (auto it = dom->widgets.rbegin(); it != dom->widgets.rend(); it++)
+					{
+						(*it)->on_event(type, e);
+						if (e->ret && btn)
+							break;
+					}
 				}
 				});
 		}
 		if (dc) {
-			if (dc->rptr && dc->rptr != f->renderer) {
-				dc->free_tex();
-			}
 			dc->rptr = f->renderer;
 		}
 	}
@@ -303,8 +308,7 @@ int dom_cx::update(float delta)
 		std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) { return a->dindex < b->dindex; });
 
 	ret += build();
-	if (ret > 0)
-		dc->cmd_draw();
+
 	return ret;
 }
 void get_div(widget_t* p, std::vector<div_cx*>* v)
@@ -408,9 +412,10 @@ void dom_cx::pause()
 	if (dc)	dc->pause();
 }
 
-void dom_cx::cmd_draw()
+int dom_cx::cmd_draw()
 {
 	if (dc)dc->cmd_draw();
+	return 0;
 }
 
 
@@ -535,4 +540,95 @@ void app_x::init()
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->play_thread = false;
 	audio_ctx->run_thread();
+}
+
+size_t app_x::run()
+{
+	size_t fc = 0;
+	c_runtime_cx rtc; // 高精度计时器
+	c_runtime_cx rt_cpu; // cpu计时器
+	do {
+		int ct = 0;
+		auto delta = app->update_event();
+		fc = app->form_count();
+		if (!fc)break;
+		if (audio_ctx)
+			ct += audio_ctx->update(delta);
+
+		cpums = rt_cpu.end();
+		rt_cpu.begin();
+		auto fps = app->get_fps();
+		for (auto p : app->forms)
+		{
+			if (p && p->_dom)
+			{
+				auto dom0 = p->_dom;
+				p->update(delta);
+				if (p->is_minimized())
+				{
+					dom0->pause();
+					continue;
+				}
+				auto io = p->get_io();
+				// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
+				if (dom0->press_test() && io)
+					io->WantCaptureMouse = true;
+
+			}
+		}
+		void* dtex3d = 0;
+		if (r3d && vkd)
+		{
+			//dtex3d = tex3d;
+			auto io = app->main->get_io();
+			vkd->update(io);	// 更新事件
+			gpustr = vkd->get_label();
+		}
+		static double upt = 0.0;
+		upt += delta;
+		if (upt > 1.0)
+		{
+			upt = 0.0;
+			if (fpslab)
+				fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
+		}
+		rtc.begin();
+		for (auto p : app->forms)
+		{
+			if (p && p->_dom)
+			{
+				auto dom0 = p->_dom;
+				p->uct = dom0->update(delta) + ct;
+			}
+		}
+		uims = rtc.end();
+		int64_t sem3d = 0;
+		if (r3d && vkd)
+		{
+			rtc.begin();
+			vkd->on_render();		// 渲染到fbo纹理tex3d
+			if (!vkd->_state.has_fence) {
+				sem3d = vkd->get_fbo_semaphore();
+			}
+			ms3d = rtc.end();
+			app->main->uct++;
+		}
+		app->main->add_vk_semaphores(sem3d, (int64_t)0, 0);
+		{
+			rtc.begin();		// 开始计时录制SDL渲染命令
+			for (auto p : app->forms)
+			{
+				if (p && p->uct > 0)
+				{
+					p->set_state();	// 清空/设置交换链接状态 
+					p->_dom ? p->_dom->cmd_draw() : 0;
+					p->present();
+				}
+			}
+			if (!r3d && view)
+				view->wait_dev();
+			SDLms = rtc.end();
+		}
+	} while (0);
+	return app->form_count();
 }

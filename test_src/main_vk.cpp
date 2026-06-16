@@ -352,7 +352,7 @@ int main(int argc, char* argv[])
 				r->placeholder = (char*)u8"输入文本";
 				//dvv->add_widget(r);
 				r->dindex = 0;
-				 
+
 			}
 			auto pro = new progress_tl();
 			dvv->add_widget(pro);
@@ -458,7 +458,7 @@ int main(int argc, char* argv[])
 							glm::vec2 main_size = appx->app->main->get_size();
 							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
 							{
-								//view->set_div(dvv2);
+								view->set_div(dvv2);
 							}
 						}
 					};
@@ -493,13 +493,13 @@ int main(int argc, char* argv[])
 				r->dindex = 0;
 				r->set_single(false);
 
-				flex_data1 data;
+				flex_data data;
 				data.width = 100.0f;
 				data.height = 200.0f;
 				data.grow = 1.0f;
 				data.justify_content = flex_align::ALIGN_CENTER;
 
-				std::string json_str = save_flex_data1(data);
+				std::string json_str = save_flex_data(data);
 				r->set_text(json_str.c_str(), json_str.length());
 				//flex_data loaded = load_flex_data(json_str);
 
@@ -535,14 +535,14 @@ int main(int argc, char* argv[])
 					{
 						if (type == SDL_EVENT_WINDOW_MOVED)
 						{
-							//view->get_div(fw);
+							view->get_div(fw);
 						}
 					};
 			}
 			appx->app->set_fps(60);
 			vkd->_state.has_fence = false;
 			auto actx = appx->audio_ctx;
-			audio_addsong(actx);
+			//audio_addsong(actx);
 			//actx->pause(1);
 			std::string gpustr;
 			bool r3d = 0;
@@ -551,80 +551,88 @@ int main(int argc, char* argv[])
 			c_runtime_cx rt_cpu; // cpu计时器
 			int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
 			//app_cx::set_audio_gain(actx->_current->st, 0.05);
-			// 运行消息循环			
+			// 运行消息循环	
+			size_t frame_count = 0;
+			appx->view = view;
+			appx->fpslab = fpslab;
 			do {
-				int ct = 0;
-				auto delta = appx->app->update_event();
-				if (!appx->app->form_count())break;
-				ct += actx->update(delta);
+				frame_count = appx->run();
+			} while (frame_count);
 
-				cpums = rt_cpu.end();
-				rt_cpu.begin();
-				auto fps = appx->app->get_fps();
-				form0->update(delta);
-				if (form0->is_minimized())
-				{
-					dom0->pause();
-					continue;
-				}
-				void* dtex3d = 0;
-				if (r3d)
-				{
-					dtex3d = tex3d;
-					auto io = form0->get_io();
-					// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
-					if (dom0->press_test() && io)
-						io->WantCaptureMouse = true;
 
-					edit1->_color.x = colorpick->get_color();
-					vkd->update(form0->io);	// 更新事件
-					gpustr = vkd->get_label();
-				}
-				static double upt = 0.0;
-				upt += delta;
-				if (upt > 1.0)
-				{
-					upt = 0.0;
-					fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
-				}
-				rtc.begin();
-				ct += dom0->update(delta);
-				uims = rtc.end();
-				int64_t sem3d = 0;
-				if (r3d)
-				{
-					rtc.begin();
-					vkd->on_render();		// 渲染到fbo纹理tex3d
-					if (!vkd->_state.has_fence) {
-						sem3d = vkd->get_fbo_semaphore();
-					}
-					ms3d = rtc.end();
-					ct++;
-				}
-				form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
-				if (ct) {
-					rtc.begin();		// 开始计时录制SDL渲染命令
-					form0->set_state();	// 清空/设置交换链接状态 
-					texture_dt tdt = {};
-					tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
-					tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
-					if (dtex3d) pcb->render_texture(form0->renderer, dtex3d, &tdt, 1);//3d
-					dom0->cmd_draw();
-					{
-						glm::vec4 color = { 0,0.5,1.0,0.8 };
-						if (actx->fft._rects.size())
-						{
-							gen_rects(actx->fft._rects, *vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
-							SDL_RenderGeometry(form0->renderer, nullptr, vertices->data(), vertices->size(), nullptr, 0);
-						}
-					}
-					form0->present();
-					if (!r3d)
-						view->wait_dev();
-					SDLms = rtc.end();
-				}
-			} while (appx->app->form_count());
-			delete dom0;
+			//do {
+			//	int ct = 0;
+			//	auto delta = appx->app->update_event();
+			//	if (!appx->app->form_count())break;
+			//	ct += actx->update(delta);
+
+			//	cpums = rt_cpu.end();
+			//	rt_cpu.begin();
+			//	auto fps = appx->app->get_fps();
+			//	form0->update(delta);
+			//	if (form0->is_minimized())
+			//	{
+			//		dom0->pause();
+			//		continue;
+			//	}
+			//	void* dtex3d = 0;
+			//	if (r3d)
+			//	{
+			//		dtex3d = tex3d;
+			//		auto io = form0->get_io();
+			//		// 判断鼠标是否点中控件，点中了就设置io->WantCaptureMouse = true，让3d渲染器不处理鼠标事件，交给控件处理
+			//		if (dom0->press_test() && io)
+			//			io->WantCaptureMouse = true;
+
+			//		edit1->_color.x = colorpick->get_color();
+			//		vkd->update(form0->io);	// 更新事件
+			//		gpustr = vkd->get_label();
+			//	}
+			//	static double upt = 0.0;
+			//	upt += delta;
+			//	if (upt > 1.0)
+			//	{
+			//		upt = 0.0;
+			//		fpslab->str = vkr::format("CPU FPS\t\t: %d\nUIcmd\t\t\t: %d ms\n3Dcmd\t\t\t: %d ms\nSDLms\t\t\t: %d ms\nCPUms\t\t\t: %d ms\n", fps, uims, ms3d, SDLms, cpums) + gpustr;
+			//	}
+			//	rtc.begin();
+			//	ct += dom0->update(delta);
+			//	uims = rtc.end();
+			//	int64_t sem3d = 0;
+			//	if (r3d)
+			//	{
+			//		rtc.begin();
+			//		vkd->on_render();		// 渲染到fbo纹理tex3d
+			//		if (!vkd->_state.has_fence) {
+			//			sem3d = vkd->get_fbo_semaphore();
+			//		}
+			//		ms3d = rtc.end();
+			//		ct++;
+			//	}
+			//	form0->add_vk_semaphores(sem3d, (int64_t)0, 0);
+			//	if (ct) {
+			//		rtc.begin();		// 开始计时录制SDL渲染命令
+			//		form0->set_state();	// 清空/设置交换链接状态 
+			//		texture_dt tdt = {};
+			//		tdt.src_rect = { 0,0,vki.size.x,vki.size.y };
+			//		tdt.dst_rect = { 0,0,vki.size.x,vki.size.y };
+			//		if (dtex3d) pcb->render_texture(form0->renderer, dtex3d, &tdt, 1);//3d
+			//		dom0->cmd_draw();
+			//		{
+			//			glm::vec4 color = { 0,0.5,1.0,0.8 };
+			//			if (actx->fft._rects.size())
+			//			{
+			//				gen_rects(actx->fft._rects, *vertices, { 0.1, 1, 0.1, 0.9 }, { 1, 0.5, 0, 1 });
+			//				SDL_RenderGeometry(form0->renderer, nullptr, vertices->data(), vertices->size(), nullptr, 0);
+			//			}
+			//		}
+			//		form0->present();
+			//		if (!r3d)
+			//			view->wait_dev();
+			//		SDLms = rtc.end();
+			//	}
+			//} while (appx->app->form_count());
+			//delete dom0;
 			delete view;
 			delete vertices;
 		}

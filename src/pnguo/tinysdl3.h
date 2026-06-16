@@ -80,7 +80,7 @@ struct PlatformMonitor
 };
 namespace hz {
 	class usp_ac;
-} 
+}
 
 // 管理实例：管理窗口等资源
 class app_cx
@@ -199,6 +199,7 @@ enum class fcv_type {
 	e_size,
 	e_pos
 };
+class dom_cx;
 
 class form_x
 {
@@ -231,11 +232,14 @@ public:
 	int _dx = -1, _dy = -1;
 	glm::ivec2 _last_pos = { -1,-1 };	// 上次鼠标位置
 	void* uptr = 0;						// 用户设置指针
+	dom_cx* _dom = 0;
+	void(*free_dom)(dom_cx*) = 0;
 	std::queue<glm::ivec4> qcmd_value;	// 操作列表
 	std::mutex lkecb, lkqcv;
 	// 标题栏高度
 	int titlebarheight = 0;
 	int _flags = 0;
+	int uct = 0;// 更新计数
 	// 锁定鼠标
 	bool capture_type = true;
 	bool close_type = true;		// 关闭按钮风格：true关闭退出，false则隐藏窗口

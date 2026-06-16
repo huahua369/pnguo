@@ -10,7 +10,7 @@ struct image_ptr_t
 	int type = 0;				// 0=rgba，1=bgra
 	int stride = 0;
 	uint32_t* data = 0;			// 像素数据
-	void* texid = 0;			// 纹理指针，由调用方自动生成管理
+	//void* texid = 0;			// 纹理指针，由调用方自动生成管理
 	void* ptr = 0;				// 用户数据
 	int comp = 4;				// 通道数0单色位图，1灰度图，4rgba/bgra
 	int  blendmode = 0;			// 混合模式
@@ -417,8 +417,8 @@ struct texture_cb
 	void (*set_texture_color32)(void* texture, const uint32_t* c);
 	// 删除纹理
 	void (*free_texture)(void* texture);
-	// 创建或更新纹理
-	void* (*make_tex)(void* renderer, image_ptr_t* img);
+	// 创建纹理
+	void* (*new_tex)(void* renderer, image_ptr_t* img);
 	// 从图片文件创建纹理
 	void* (*new_texture_file)(void* renderer, const char* fn);
 	// 纹理渲染

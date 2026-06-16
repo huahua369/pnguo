@@ -845,6 +845,9 @@ void app_cx::clearf()
 		{
 			if (it == main)
 				main = 0;
+			if (it->free_dom && it->_dom) {
+				it->free_dom(it->_dom);
+			}
 			delete it;
 		}
 		reforms.pop();
@@ -1417,39 +1420,40 @@ SDL_PixelFormat get_rgbafe() {
 	int depth = 32;
 	return SDL_GetPixelFormatForMasks(depth, rmask, gmask, bmask, amask);
 }
-SDL_Texture* newuptex(SDL_Renderer* renderer, image_ptr_t* img) {
+SDL_Texture* new_tex(SDL_Renderer* renderer, image_ptr_t* img) {
 	SDL_Texture* pr = 0;
 	if (img && img->width > 0 && img->height > 0)
 	{
-		SDL_Texture* ptx = (SDL_Texture*)img->texid;
+		SDL_Texture* ptx = 0;// (SDL_Texture*)img->texid;
 		if (renderer)
 		{
-			if (ptx)
-			{
-				if (renderer != SDL_GetRendererFromTexture(ptx))
-				{
-					SDL_DestroyTexture(ptx);
-					ptx = nullptr;
-				}
-				else
-				{
-					glm::vec2 oldss = {};
-					if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
-						glm::ivec2 iss = oldss;
-						if (img->width != iss.x || img->height != iss.y) {
-							SDL_DestroyTexture(ptx);
-							ptx = nullptr;
-						}
-					}
-				}
-			}
+			//if (ptx)
+			//{
+			//	if (renderer != SDL_GetRendererFromTexture(ptx))
+			//	{
+			//		SDL_DestroyTexture(ptx);
+			//		ptx = nullptr;
+			//	}
+			//	else
+			//	{
+			//		glm::vec2 oldss = {};
+			//		if (SDL_GetTextureSize(ptx, &oldss.x, &oldss.y)) {
+			//			glm::ivec2 iss = oldss;
+			//			if (img->width != iss.x || img->height != iss.y) {
+			//				SDL_DestroyTexture(ptx);
+			//				ptx = nullptr;
+			//			}
+			//		}
+			//	}
+			//}
 			if (!ptx)
 			{
 				auto ty = img->type;
 				if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
 				if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
 				ptx = SDL_CreateTexture(renderer, (SDL_PixelFormat)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
-				img->texid = ptx; img->stride = 0;
+				//img->texid = ptx; 
+				img->stride = 0;
 				img->valid = true;
 				pr = ptx;
 				// 设置texture 混合模式
@@ -2421,7 +2425,8 @@ void form_x::update(float delta)
 }
 void form_x::set_state()
 {
-	if (!visible || !renderer || !app || display_size.x < 1 || display_size.y < 1)return;
+	if (!visible || !renderer || !app || display_size.x < 1 || display_size.y < 1)
+		return;
 	float rsx = 1.0f;
 	float rsy = 1.0f;
 	SDL_GetRenderScale(renderer, &rsx, &rsy);
@@ -2481,7 +2486,7 @@ void form_x::present_e()
 {
 	if (renderer)
 	{
-		printf("reset form\n");
+		//printf("reset form\n");
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 		SDL_RenderClear(renderer);
 		SDL_RenderPresent(renderer);
@@ -2989,7 +2994,7 @@ bool set_rcliprect(void* renderer, const glm::ivec4* rect) {
 void get_sdl_texture_cb(texture_cb* p)
 {
 	texture_cb cb = {};
-	cb.make_tex = (void* (*)(void*, image_ptr_t*))newuptex;
+	cb.new_tex = (void* (*)(void*, image_ptr_t*))new_tex;
 	cb.new_texture = new_texture_r;
 	cb.update_texture = update_texture_r;
 	cb.set_texture_blend = set_texture_blend_r;

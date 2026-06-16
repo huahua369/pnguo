@@ -3655,9 +3655,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 	int linegap = 4;
 	font_t* rfont = this;
 	Bitmap_p bitmap[1] = {};
-	std::vector<char> bitbuf[1];
-	glm::ivec4 rc = {};
-	std::vector<font_item_t>  ps;
+	glm::ivec4 rc = {}; 
 	glm::ivec3 rets;
 	font_item_t ret = {};
 	if (!use_ctx)
@@ -3681,7 +3679,7 @@ font_item_t font_t::get_glyph_item(uint32_t glyph_index, uint32_t unicode_codepo
 #else
 			glm::ivec4 rc1 = {};
 			//auto bit0 = rfont->get_glyph_image(glyph_index, fontsize, &rc1, bitmap, 0, lcd_type, unicode_codepoint);
-			auto bit = rfont->get_glyph_image_bitmap(glyph_index, fontsize, &rc, bitmap, bitbuf, unicode_codepoint);
+			auto bit = rfont->get_glyph_image_bitmap(glyph_index, fontsize, &rc, bitmap, &bitbuf, unicode_codepoint);
 			hb_raster_image_t* rimg = 0;
 			image_ptr_t* img = 0;
 			if (!bit)
@@ -4866,8 +4864,8 @@ int font_t::get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, gl
 					out->resize(size);
 				}
 				out_bitmap->buffer = (unsigned char*)out->data();
-				std::vector<uint32_t> tem;
-				tem.reserve(bc.y * bc.x);
+				tempx.clear();
+				tempx.reserve(bc.y * bc.x);
 				size_t x1 = std::min(img->width, px + bc.y);
 				size_t y1 = std::min(img->height, py + bc.x);
 				for (size_t y = py; y < y1; y++)
@@ -4879,10 +4877,10 @@ int font_t::get_custom_decoder_bitmap(uint32_t unicode_codepoint, int height, gl
 						{
 							c = 0;
 						}
-						tem.push_back(c);
+						tempx.push_back(c);
 					}
 				}
-				memcpy(out_bitmap->buffer, tem.data(), size);
+				memcpy(out_bitmap->buffer, tempx.data(), size);
 			}
 			ret = 1;
 		}

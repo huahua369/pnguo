@@ -826,14 +826,14 @@ public:
 	void update_surface(void* surface);
 	void update_image(image_ptr_t* img);
 	void draw_surface(void* surface, const glm::vec2& pos, const glm::ivec4& rc, const glm::ivec2& size);
-	void draw_rvg(rvg_data_cx* dst);
+	int draw_rvg(rvg_data_cx* dst);
 	// 富文本渲染
 	void update_text(rich_text_t* p, float delta);
 	void draw_textdata(rich_text_t* p, const glm::vec2& pos);
 	void draw_boxtext(box_text_d* p, const glm::vec2& pos);
 	// 渲染原始三角形数据，opt顶点数据，idx索引数据。image{image_ptr_t*或surface}。提前创建对应纹理
-	void draw_geometry(void* image, const glm::ivec4& clip, std::vector<text_vx>* v, std::vector<uint32_t>* idx);
-	void draw_geometry(geometry_d* geo);
+	int draw_geometry(void* image, const glm::ivec4& clip, std::vector<text_vx>* v, std::vector<uint32_t>* idx);
+	int draw_geometry(geometry_d* geo);
 	void draw_mesh2ddata(mesh2d_cx* dc, const glm::vec2& render_scale);
 	// 批量生成渲染矢量图、位图、文本
 	bool update_rvgdata(rvg_data_cx* dst);
@@ -846,7 +846,7 @@ public:
 	void pause();
 	void submit_data(void* tex);
 public:
-	void cmd_draw();
+	int cmd_draw();
 	void clear_draw();
 };
 

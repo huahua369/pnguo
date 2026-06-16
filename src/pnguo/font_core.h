@@ -178,6 +178,8 @@ public:
 		int maxlen;
 	};
 	std::vector<GlyphPosition> _tnpos;
+	std::vector<char> bitbuf;
+	std::vector<uint32_t> tempx;
 public:
 	font_t();
 	~font_t();
