@@ -100,8 +100,9 @@ void viewdev_cx::init_vgdev(dev_info_cx* d, int sample)
 div_cx* viewdev_cx::get_div(form_x* f)
 {
 	auto dv = mfd[f];
-	if (dv && app->main && f && app->main != f)
+	if (dv && app->main && f)
 	{
+		f = dv->form;
 		glm::vec4 mrc = glm::ivec4(app->main->get_pos(), app->main->get_size());
 		glm::vec4 frc = glm::ivec4(f->get_pos(), f->get_size());
 		mrc.z += mrc.x; mrc.w += mrc.y;
@@ -109,16 +110,29 @@ div_cx* viewdev_cx::get_div(form_x* f)
 		if (rect_includes(mrc, frc))
 		{
 			dom_cx* td3 = app->main->_dom;
-			dv->remove_widget(dv);
-			td3->add_widget(dv);
-			dv->set_pos(f->get_pos() - app->main->get_pos());
-			f->hide();
-			dv->draggable = true;
-			if (cform.size() < max_form_cache)
-				cform.push(f);
-			else {
-				app->remove(f);
+			if (f->get_visible()) {
+				dv->remove_widget(dv);
+				td3->add_widget(dv);
+				f->hide();
+				if (cform.size() < max_form_cache)
+					cform.push(f);
+				else {
+					app->remove(f);
+				}
 			}
+			dv->set_pos(f->get_pos() - app->main->get_pos());
+			f->viewports_enable = false;
+			dv->form = app->main;
+			dv->fpos = {};
+
+			//dvv2->dindex = 1;
+			//dvv2->fpos = {};
+			//if (dvv2->form)
+			//{
+			//	dvv2->form->viewports_enable = false;
+			//	dvv2->draggable = true;
+			//}
+			//dv->form = appx->app->main;
 		}
 		else {
 			dv = 0;
@@ -134,11 +148,15 @@ form_x* viewdev_cx::set_div(div_cx* d)
 	if (!d)
 		return nullptr;
 	form_x* f1 = d->form;
-	bool rm0 = f1 == app->main;
+	if (f1->viewports_enable) {
+
+		return 0;
+	}
+	bool rm0 = (f1 == app->main) || !f1;
 	if (rm0)
 	{
 		f1 = 0;
-		if ( cform.size())
+		if (cform.size())
 		{
 			f1 = cform.front(); cform.pop();
 		}
@@ -150,21 +168,25 @@ form_x* viewdev_cx::set_div(div_cx* d)
 		f1 = (form_x*)new_form(app, "", 500, 500, -1, -1, ef_utility | ef_resizable | ef_borderless | ef_vulkan/*ef_dx11 | ef_transparent*/);
 		if (f1) {
 			td2 = new dom_cx();
-			if (td2)
-				td2->init(f1, pcb, { 0,0,cache_size }, _vgdev, familys);
-			else
+			if (!td2)
 				app->remove(f1);
+			else
+				f1->_dom = td2;
 		}
 	}
 	if (!f1)
 		return nullptr;
 	td2 = f1->_dom;
+	if (td2)
+		td2->init(f1, pcb, { 0,0,cache_size }, _vgdev, familys);
 	auto pos = d->get_pos();
 	auto size = d->get_size();
+	f1->viewports_enable = true;
 	f1->set_size(size);
 	if (d->form && rm0) {
 		pos += d->form->get_pos();
 		td3 = d->form->_dom;
+		//_rd.push({ td3,d });
 		td3->remove_widget(d);
 	}
 	if (d->form != f1)
@@ -172,11 +194,12 @@ form_x* viewdev_cx::set_div(div_cx* d)
 		mfd[f1] = d;
 		td2->add_widget(d);
 		d->set_pos({});
-		d->draggable = false;
 		f1->show();
 		//f1->raise();
 		d->form = f1;
 	}
+	d->draggable = false;
+	d->fpos = pos;
 	f1->set_pos(pos);
 	return f1;
 }
@@ -205,6 +228,16 @@ void viewdev_cx::wait_dev()
 {
 	if (_vgdev)
 		_vgdev->wait_dev();
+}
+
+void viewdev_cx::remove_q()
+{
+	for (; _rd.size();) {
+		auto it = _rd.front();
+		_rd.pop();
+		if (it.d && it.p)
+			it.d->remove_widget(it.p);
+	}
 }
 
 

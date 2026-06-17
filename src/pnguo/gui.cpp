@@ -2136,8 +2136,9 @@ bool widget_on_move(widget_t* wp, uint32_t type, et_un_t* ep, const glm::vec2& p
 		auto p = e->m;
 		glm::ivec2 mps = { p->x,p->y }; mps -= pos;
 		wp->mmpos = mps;
+		auto gpos = wp->get_pos(false);
 		// 判断是否鼠标进入 
-		glm::vec4 trc = { wp->get_pos(false), wp->_size };
+		glm::vec4 trc = { gpos + wp->fpos, wp->_size };
 		auto k = check_box_cr1(mps, &trc, 1, sizeof(glm::vec4));
 		if (k.x) {
 			bool hoverold = wp->_bst & (int)BTN_STATE::STATE_HOVER;
@@ -2658,7 +2659,7 @@ void div_cx::on_event(uint32_t type, et_un_t* ep)
 	auto t = (devent_type_e)type;
 	//glm::ivec2 vgpos = viewport;
 	int r1 = 0;
-	auto ppos = get_pos();
+	auto ppos = get_pos() + fpos;
 	auto sps = get_spos();
 	_hover_eq.w = type;
 	widget_t* hpw = 0;
@@ -2919,7 +2920,6 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	auto mpos = mps;
 	glm::vec2 tpos = {};
 	tpos += thickness;
-
 	switch (t)
 	{
 	case event_type2::on_move:
@@ -2939,6 +2939,7 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	{
 		if (draggable)
 		{
+			printf("draggable %.1f %.1f\n", mps.x, mps.y);
 			set_pos(mps);
 		}
 		ret = true;
@@ -2972,7 +2973,8 @@ bool div_cx::hittest(const glm::ivec2& pos)
 {
 	bool r = false;
 	auto sps = get_spos();
-	glm::ivec2 ips = get_pos(); auto ss = (glm::ivec2)_size;
+	glm::ivec2 ips = get_pos() + fpos;
+	auto ss = (glm::ivec2)_size;
 	glm::vec4 rc = { ips ,ips + ss };
 	if (rect_includes(rc, pos)) {
 		r = vht(widgets.data(), widgets.size(), pos);

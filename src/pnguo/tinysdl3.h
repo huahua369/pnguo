@@ -112,14 +112,13 @@ public:
 
 	uint32_t audio_device = 0;
 	dev_info_cx _set_dev = {};
-	glm::vec2 mouse_pos = {};
+	glm::ivec2 mouse_pos = {};
 	std::unordered_map<void*, int> ac_lst;		// 分配的内存
 	std::mutex lkac;				// 分配内存锁
 	size_t ac_count = 0;			// 分配内存总数量
 	size_t fac_count = 0;			// 释放内存总数量
 	hz::usp_ac* _ac = 0;
 	bool nc_down = 0;
-	bool viewports_enable = false;	// docking用
 	bool WantUpdateMonitors = true;
 public:
 	app_cx();
@@ -247,6 +246,7 @@ public:
 	bool _HitTest = false;
 	bool _ref = false;
 	bool _focus_lost_hide = false;	// 失去焦点隐藏 
+	bool viewports_enable = false;	// docking用
 private:
 	bool visible = true;
 	bool visible_old = true;

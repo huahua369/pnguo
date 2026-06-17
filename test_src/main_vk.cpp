@@ -430,6 +430,13 @@ int main(int argc, char* argv[])
 				dvv2->draggable = true;
 				dvv2->docking = true;
 				dvv2->_absolute = true;
+				{
+					auto r = new switch_tl();
+					r->set_size({ 60,36 });
+					r->set_value(true);
+					//r->v.mixed = true;
+					dvv2->add_widget(r);
+				}
 				dom0->add_widget(dvv2);
 				{
 					auto btn = fpslab;
@@ -450,16 +457,57 @@ int main(int argc, char* argv[])
 				}
 				dvv2->mevent_cb = [=](void* p, int type, const glm::vec2& mps)
 					{
-						if (type == (int)event_type2::on_dragend) {
+						auto dv = (div_cx*)p;
+						if (!dv || !dv->form)return;
+
+						printf("ad %p\t%d %.2f %.2f\n", dvv2->form, type, mps.x, mps.y);
+						if (!dv->form->viewports_enable) {
 							glm::vec2 pos = dvv2->get_pos();
 							glm::vec2 size = dvv2->get_size();
 							glm::vec2 main_pos = appx->app->main->get_pos();
 							glm::vec2 main_size = appx->app->main->get_size();
-							if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
+
+
+							if (type == (int)event_type2::on_drag) {
+
+								if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
+								{
+								}
+							}
+							if (type == (int)event_type2::on_dragend) {
+								if (pos.x < 0 || pos.y < 0 || pos.x + size.x >  main_size.x || pos.y + size.y >  main_size.y)
+								{
+									view->set_div(dvv2);
+									view->remove_q();
+								}
+								else {
+								}
+							}
+							return;
+						}
+						if (type == (int)event_type2::on_down) {
+							if (appx->app->main != dvv2->form)
 							{
-								//view->set_div(dvv2);
+								dvv2->fpos = dvv2->form->get_pos();
+								dvv2->curpos = (glm::ivec2)mps - dvv2->fpos;
 							}
 						}
+						if (type == (int)event_type2::on_drag) {
+							glm::vec2 main_pos = appx->app->main->get_pos();
+							glm::ivec2 ps = {};
+							ps += dvv2->mmpos - dvv2->curpos;
+							if (appx->app->main != dvv2->form)
+							{
+								printf("d %p\t%d %d\n", dvv2->form, ps.x, ps.y);
+								dvv2->form->set_pos(ps);
+								if (dvv2->form->get_visible())
+									dvv2->fpos = ps;
+							}
+							else {
+								dv->set_pos(ps);
+							}
+						}
+						//view->get_div(dv->form);
 					};
 			}
 			dom0->add_widget(dvv);
@@ -534,7 +582,7 @@ int main(int argc, char* argv[])
 					{
 						if (type == SDL_EVENT_WINDOW_MOVED)
 						{
-							//view->get_div(fw);
+							view->get_div(fw);
 						}
 					};
 			}

@@ -37,6 +37,11 @@ public:
 	std::unordered_map<form_x*, div_cx*> mfd;
 	std::vector<drawable_cx*> cavs;
 	std::queue<form_x*> cform;	// 缓存窗口
+	struct rem_div {
+		dom_cx* d = 0;
+		div_cx* p = 0;
+	};
+	std::queue<rem_div> _rd;	// 缓存删除
 	// 矢量图渲染用
 	vkvg_dev* _vgdev = 0;
 	vkvg_func_t* vgcb = 0;
@@ -53,6 +58,7 @@ public:
 	form_x* set_div(div_cx* d);
 	dom_cx* get_dom(form_x* f);
 	void wait_dev();
+	void remove_q();
 private:
 
 };

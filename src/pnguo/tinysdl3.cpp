@@ -1813,7 +1813,7 @@ void form_x::show() {
 	qcmd_value.push({ (int)fcv_type::e_show,0,0,0 });
 }
 void form_x::hide() {
-
+	printf("hide %p\n", this);
 	lock_auto_x lx(&lkqcv);
 	qcmd_value.push({ (int)fcv_type::e_hide,0,0,0 });
 }
@@ -1915,7 +1915,7 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 		mt.xrel = e->motion.xrel;
 		mt.yrel = e->motion.yrel;		// The relative motion in the XY direction 
 		mt.which = e->motion.which;		// 鼠标实例 
-		if (viewports_enable)
+		if (pw->viewports_enable)
 		{
 			int window_x = 0, window_y = 0;
 			SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
@@ -1935,8 +1935,19 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 			pw->io->KeyAlt = (ms & SDL_KMOD_LALT || ms & SDL_KMOD_RALT);
 			pw->io->KeySuper = (ms & SDL_KMOD_LGUI || ms & SDL_KMOD_RGUI);
 		}
-		pw->trigger((uint32_t)devent_type_e::mouse_move_e, &mt);
+		if (pw->_last_pos != mouse_pos)
+		{
+			pw->trigger((uint32_t)devent_type_e::mouse_move_e, &mt);
+			//printf("win:%p\t%d %d\n", pw, (int)mt.x, (int)mt.y);
+		}
+		else
+		{
+			//printf("win: \t%d %d\n", (int)mt.x, (int)mt.y);
+		}
+
 		pw->_last_pos = mouse_pos;
+
+
 		if (mt.cursor > 0) {
 			pw->app->set_defcursor(mt.cursor);
 		}
@@ -2075,7 +2086,7 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 		ole_drop_et t = {};
 		t.x = e->drop.x;
 		t.y = e->drop.y;
-		if (viewports_enable)
+		if (pw->viewports_enable)
 		{
 			int window_x = 0, window_y = 0;
 			SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
@@ -2090,7 +2101,7 @@ bool app_cx::on_call_emit(const SDL_Event* e, form_x* pw)
 		ole_drop_et t = {};
 		t.x = e->drop.x;
 		t.y = e->drop.y;//结束
-		if (viewports_enable)
+		if (pw->viewports_enable)
 		{
 			int window_x = 0, window_y = 0;
 			SDL_GetWindowPosition(SDL_GetWindowFromID(e->motion.windowID), &window_x, &window_y);
@@ -2381,7 +2392,9 @@ void form_x::update_w()
 		}
 		else {
 			if (old_pos != ps)
+			{
 				SDL_SetWindowPosition(_ptr, ps.x, ps.y);
+			}
 		}
 	}
 }

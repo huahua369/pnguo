@@ -54,6 +54,7 @@ public:
 	glm::ivec2 cmpos = {};	// 当前鼠标坐标
 	glm::ivec2 mmpos = {};	// 当前鼠标坐标
 	glm::ivec2 ppos = {};	// 父级坐标 
+	glm::ivec2 fpos = {};	// 窗口坐标 
 	std::string text;		// 内部显示用字符串
 	text_style style = {};		// 文本样式
 	//font_family_t* family = 0;

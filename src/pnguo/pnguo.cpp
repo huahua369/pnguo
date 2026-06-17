@@ -1267,6 +1267,10 @@ int make_grid(const glm::vec2& vsize, const glm::vec3& step_width, glm::vec2 nps
 
 
 
+bool in_rect_box(const glm::ivec4& rect, const glm::ivec2& mousePos) {
+	return mousePos.x >= rect.x && mousePos.x <= (rect.x + rect.z) && mousePos.y >= rect.y && mousePos.y <= (rect.y + rect.w);
+}
+
 //CircleRect判断点是否在圆/矩形内
 bool in_box_cr(const glm::vec2& p, const glm::vec4* c)
 {
@@ -1276,7 +1280,7 @@ bool in_box_cr(const glm::vec2& p, const glm::vec4* c)
 		if ((int)c->w > 0)
 		{
 			auto r = *c;
-			ret = !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z - 1) || (p.y > r.y + r.w - 1));
+			ret = in_rect_box(r,p);// !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z - 1) || (p.y > r.y + r.w - 1));
 		}
 		else {
 			//计算点p和 当前圆圆心c 的距离
@@ -1303,7 +1307,7 @@ glm::ivec2 check_box_cr(const glm::vec2& p, const glm::vec4* d, size_t count)
 		if ((int)c->w > 0)
 		{
 			auto r = *c;
-			ret = !((p.x < r.x) || (p.y < r.y) || (p.x > r.z /*- 1*/) || (p.y > r.w /*- 1*/));
+			ret = in_rect_box(r, p); //!((p.x < r.x) || (p.y < r.y) || (p.x > r.z /*- 1*/) || (p.y > r.w /*- 1*/));
 			if (ret)
 			{
 				rs.x = ret;
@@ -1341,7 +1345,7 @@ glm::ivec2 check_box_cr1(const glm::vec2& p, const glm::vec4* d, size_t count, i
 		if ((int)c->w > 0)
 		{
 			auto r = *c;
-			ret = !((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z /*- 1*/) || (p.y > r.y + r.w /*- 1*/));
+			ret = in_rect_box(r, p); //!((p.x < r.x) || (p.y < r.y) || (p.x > r.x + r.z /*- 1*/) || (p.y > r.y + r.w /*- 1*/));
 			if (ret)
 			{
 				rs.x = ret;
@@ -1364,7 +1368,6 @@ glm::ivec2 check_box_cr1(const glm::vec2& p, const glm::vec4* d, size_t count, i
 	}
 	return  rs;
 }
-
 // rc= left,top,right,bottom
 bool rect_includes(const glm::vec4& rc, const glm::vec2& p)
 {
@@ -6447,7 +6450,7 @@ namespace gp {
 	{
 		glm::vec2 v = {};
 		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
-		auto ns = n[k]; 
+		auto ns = n[k];
 		v = { toFloat(ns[0]),toFloat(ns[1]) };
 		return v;
 	}
@@ -6455,7 +6458,7 @@ namespace gp {
 	{
 		glm::vec2 v = {};
 		if (n.find(k) == n.end() || !n[k].is_array() || n[k].size() < 2) { return v; }
-		auto ns = n[k]; 
+		auto ns = n[k];
 		v = { toFloat(ns[0]),toFloat(ns[1]) };
 		return v;
 	}
