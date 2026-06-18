@@ -1,0 +1,6544 @@
+
+
+#include "cross_os.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#define _CRT_SECURE_NO_WARNINGS
+
+int directoryExists(const char* path) {
+#if defined(_WIN32) || defined(_WIN64) || __APPLE__ || __unix__
+    struct stat st = { 0 };
+    return stat(path, &st) + 1;
+#else
+    return -1;
+#endif
+}
+const char* getUserDir() {
+#if defined(_WIN32) || defined(_WIN64)
+    return getenv("HOME");
+#elif __APPLE__
+#elif __unix__
+    struct passwd* pw = getpwuid(getuid());
+    return pw->pw_dir;
+#endif
+}
+
+#if defined(__linux__) && defined(__GLIBC__)
+#include <stdio.h>
+#include <execinfo.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void handler(int sig) {
+    void* array[100];
+    size_t size;
+
+    // get void*'s for all entries on the stack
+    size = backtrace(array, 100);
+
+    // print out all the frames to stderr
+    fprintf(stderr, "Error: signal %d:\n", sig);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    exit(1);
+}
+
+void _linux_register_error_handler() {
+    signal(SIGSEGV, handler); // install our handler
+    signal(SIGABRT, handler); // install our handler
+}
+#endif
+
+// ctx
+#if 1
+// Copyright (c) 2018-2024 Jean-Philippe Bruyère <jp_bruyere@hotmail.com>
+//
+// This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+
+#include "vkvg_device_internal.h"
+#include "vkvg_context_internal.h"
+#include "vkvg_surface_internal.h"
+#include "vkvg_pattern.h"
+#include "vkh_queue.h"
+
+#ifdef DEBUG
+static vec2     debugLinePoints[1000];
+static uint32_t dlpCount = 0;
+#if defined(VKVG_DBG_UTILS)
+const float DBG_LAB_COLOR_SAV[4] = { 1, 0, 1, 1 };
+const float DBG_LAB_COLOR_CLIP[4] = { 0, 1, 1, 1 };
+#endif
+#endif
+
+// todo:this could be used to define a default background
+static VkClearValue clearValues[3] = {
+	{.color.float32 = {0, 0, 0, 0}}, {.depthStencil = {1.0f, 0}}, {.color.float32 = {0, 0, 0, 0}} };
+
+void _init_ctx(VkvgContext ctx) {
+	ctx->lineWidth = 1.f;
+	ctx->miterLimit = 10.f;
+	ctx->curOperator = VKVG_OPERATOR_OVER;
+	ctx->curFillRule = VKVG_FILL_RULE_NON_ZERO;
+	ctx->bounds = (VkRect2D){ {0, 0}, {ctx->pSurf->width, ctx->pSurf->height} };
+	ctx->pushConsts = (push_constants){ {.a = 1},
+															{(float)ctx->pSurf->width, (float)ctx->pSurf->height},
+															VKVG_PATTERN_TYPE_SOLID,
+															1.0f,
+															VKVG_IDENTITY_MATRIX,
+															VKVG_IDENTITY_MATRIX };
+	ctx->clearRect = (VkClearRect){ {{0}, {ctx->pSurf->width, ctx->pSurf->height}}, 0, 1 };
+	ctx->renderPassBeginInfo.framebuffer = ctx->pSurf->fb;
+	ctx->renderPassBeginInfo.renderArea.extent.width = ctx->pSurf->width;
+	ctx->renderPassBeginInfo.renderArea.extent.height = ctx->pSurf->height;
+	ctx->renderPassBeginInfo.pClearValues = clearValues;
+
+	LOCK_SURFACE(ctx->pSurf)
+
+		if (ctx->pSurf->newSurf) {
+			ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
+			ctx->pSurf->newSurf = false;
+		}
+		else {
+			ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearStencil;
+		}
+
+	UNLOCK_SURFACE(ctx->pSurf);
+
+	vkvg_surface_reference(ctx->pSurf);
+
+	ctx->renderPassBeginInfo.clearValueCount = ctx->dev->samples == VK_SAMPLE_COUNT_1_BIT ? 2 : 3;
+
+	ctx->selectedCharSize = 10 << 6;
+	ctx->currentFont = NULL;
+	ctx->selectedFontName[0] = 0;
+	ctx->pattern = NULL;
+	ctx->curColor = 0xff000000; // opaque black
+	ctx->cmdStarted = false;
+	ctx->curClipState = vkvg_clip_state_none;
+
+
+	ctx->vertCount = ctx->indCount = 0;
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	ctx->timelineStep = 0;
+#endif
+}
+
+VkvgContext vkvg_create(VkvgSurface surf) {
+	LOG(VKVG_LOG_INFO, "CREATE Context\n");
+	if (vkvg_surface_status(surf)) {
+		LOG(VKVG_LOG_ERR, "CREATE Context failed, invalid surface\n");
+		return (VkvgContext)&_vkvg_status_invalid_surface;
+	}
+	VkvgDevice  dev = surf->dev;
+	if (vkvg_device_status(dev)) {
+		LOG(VKVG_LOG_ERR, "CREATE Context failed, invalid device\n");
+		return (VkvgContext)&_vkvg_status_device_error;
+	}
+	VkvgContext ctx = NULL;
+
+	if (_device_try_get_cached_context(dev, &ctx)) {
+		ctx->pSurf = surf;
+		ctx->status = VKVG_STATUS_SUCCESS;
+		_init_ctx(ctx);
+		_update_descriptor_set(ctx, surf->dev->emptyImg, ctx->dsSrc);
+		_clear_path(ctx);
+		ctx->cmd = ctx->cmdBuffers[0]; // current recording buffer
+		return ctx;
+	}
+	ctx = (vkvg_context*)calloc(1, sizeof(vkvg_context));
+
+	if (!ctx) {
+		LOG(VKVG_LOG_ERR, "CREATE context failed, no memory\n");
+		return (VkvgContext)&_vkvg_status_no_memory;
+	}
+
+	LOG(VKVG_LOG_INFO, "CREATE Context: ctx = %p; surf = %p\n", ctx, surf);
+	ctx->pSurf = surf;
+
+	ctx->sizePoints = VKVG_PTS_SIZE;
+	ctx->sizeVertices = ctx->sizeVBO = VKVG_VBO_SIZE;
+	ctx->sizeIndices = ctx->sizeIBO = VKVG_IBO_SIZE;
+	ctx->sizePathes = VKVG_PATHES_SIZE;
+	ctx->renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+
+	ctx->dev = surf->dev;
+
+	ctx->points = (vec2*)malloc(VKVG_VBO_SIZE * sizeof(vec2));
+	ctx->pathes = (uint32_t*)malloc(VKVG_PATHES_SIZE * sizeof(uint32_t));
+	ctx->vertexCache = (Vertex*)malloc(ctx->sizeVertices * sizeof(Vertex));
+	ctx->indexCache = (VKVG_IBO_INDEX_TYPE*)malloc(ctx->sizeIndices * sizeof(VKVG_IBO_INDEX_TYPE));
+
+	if (!ctx->points || !ctx->pathes || !ctx->vertexCache || !ctx->indexCache) {
+		if (ctx->points)
+			free(ctx->points);
+		if (ctx->pathes)
+			free(ctx->pathes);
+		if (ctx->vertexCache)
+			free(ctx->vertexCache);
+		if (ctx->indexCache)
+			free(ctx->indexCache);
+		free(ctx);
+		LOG(VKVG_LOG_ERR, "CREATE context failed, no memory\n");
+		return (VkvgContext)&_vkvg_status_no_memory;
+	}
+
+	_init_ctx(ctx);
+
+	VkhDevice vkhd = (VkhDevice)&dev->vkDev;
+	// for context to be thread safe, command pool and descriptor pool have to be created in the thread of the context.
+	ctx->cmdPool = vkh_cmd_pool_create(vkhd, dev->gQueue->familyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+#ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	ctx->flushFence = vkh_fence_create_signaled((VkhDevice)&ctx->dev->vkDev);
+#endif
+
+	_create_vertices_buff(ctx);
+	_create_gradient_buff(ctx);
+	_create_cmd_buff(ctx);
+	_createDescriptorPool(ctx);
+	_init_descriptor_sets(ctx);
+	_font_cache_update_context_descset(ctx);
+	_update_descriptor_set(ctx, surf->dev->emptyImg, ctx->dsSrc);
+	_update_gradient_desc_set(ctx);
+
+	_clear_path(ctx);
+
+	ctx->cmd = ctx->cmdBuffers[0]; // current recording buffer
+
+	ctx->references = 1;
+	ctx->status = VKVG_STATUS_SUCCESS;
+
+	LOG(VKVG_LOG_DBG_ARRAYS, "INIT\tctx = %p; pathes:%ju pts:%ju vch:%d vbo:%d ich:%d ibo:%d\n", ctx,
+		(uint64_t)ctx->sizePathes, (uint64_t)ctx->sizePoints, ctx->sizeVertices, ctx->sizeVBO, ctx->sizeIndices,
+		ctx->sizeIBO);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t)ctx->cmdPool, "CTX Cmd Pool");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)ctx->cmdBuffers[0], "CTX Cmd Buff A");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)ctx->cmdBuffers[1], "CTX Cmd Buff B");
+#ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_FENCE, (uint64_t)ctx->flushFence, "CTX Flush Fence");
+#endif
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)ctx->descriptorPool,
+		"CTX Descriptor Pool");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsSrc, "CTX DescSet SOURCE");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsFont, "CTX DescSet FONT");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsGrad, "CTX DescSet GRADIENT");
+
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_BUFFER, (uint64_t)ctx->indices.buffer, "CTX Index Buff");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_BUFFER, (uint64_t)ctx->vertices.buffer, "CTX Vertex Buff");
+#endif
+
+	return ctx;
+}
+void vkvg_flush(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	_flush_cmd_buff(ctx);
+	_wait_ctx_flush_end(ctx);
+	/*
+	#ifdef DEBUG
+
+		vec4 red = {0,0,1,1};
+		vec4 green = {0,1,0,1};
+		vec4 white = {1,1,1,1};
+
+		int j = 0;
+		while (j < dlpCount) {
+			add_line(ctx, debugLinePoints[j], debugLinePoints[j+1],green);
+			j+=2;
+			add_line(ctx, debugLinePoints[j], debugLinePoints[j+1],red);
+			j+=2;
+			add_line(ctx, debugLinePoints[j], debugLinePoints[j+1],white);
+			j+=2;
+		}
+		dlpCount = 0;
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipelineLineList);
+		CmdDrawIndexed(ctx->cmd, ctx->indCount-ctx->curIndStart, 1, ctx->curIndStart, 0, 1);
+		_flush_cmd_buff(ctx);
+	#endif
+	*/
+}
+
+void _clear_context(VkvgContext ctx) {
+	// free saved context stack elmt
+	vkvg_context_save_t* next = ctx->pSavedCtxs;
+	ctx->pSavedCtxs = NULL;
+	while (next != NULL) {
+		vkvg_context_save_t* cur = next;
+		next = cur->pNext;
+		_free_ctx_save(cur);
+	}
+	// free additional stencil use in save/restore process
+	if (ctx->savedStencils) {
+		uint8_t curSaveStencil = ctx->curSavBit / 6;
+		for (int i = curSaveStencil; i > 0; i--)
+			vkh_image_destroy(ctx->savedStencils[i - 1]);
+		free(ctx->savedStencils);
+		ctx->savedStencils = NULL;
+		ctx->curSavBit = 0;
+	}
+
+	// remove context from double linked list of context in device
+	/*if (ctx->dev->lastCtx == ctx){
+		ctx->dev->lastCtx = ctx->pPrev;
+		if (ctx->pPrev != NULL)
+			ctx->pPrev->pNext = NULL;
+	}else if (ctx->pPrev == NULL){
+		//first elmt, and it's not last one so pnext is not null
+		ctx->pNext->pPrev = NULL;
+	}else{
+		ctx->pPrev->pNext = ctx->pNext;
+		ctx->pNext->pPrev = ctx->pPrev;
+	}*/
+	if (ctx->dashCount > 0) {
+		free(ctx->dashes);
+		ctx->dashCount = 0;
+	}
+}
+
+void vkvg_destroy(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	ctx->references--;
+	if (ctx->references > 0)
+		return;
+
+	LOG(VKVG_LOG_INFO, "DESTROY Context: ctx = %p (status:%d); surf = %p\n", ctx, ctx->status, ctx->pSurf);
+
+	vkvg_flush(ctx);
+
+	LOG(VKVG_LOG_DBG_ARRAYS, "END\tctx = %p; pathes:%d pts:%d vch:%d vbo:%d ich:%d ibo:%d\n", ctx, ctx->sizePathes,
+		ctx->sizePoints, ctx->sizeVertices, ctx->sizeVBO, ctx->sizeIndices, ctx->sizeIBO);
+
+#if VKVG_RECORDING
+	if (ctx->recording)
+		_destroy_recording(ctx->recording);
+#endif
+
+	if (ctx->pattern)
+		vkvg_pattern_destroy(ctx->pattern);
+
+	_clear_context(ctx);
+
+#if VKVG_DBG_STATS
+	if (ctx->dev->threadAware)
+		mtx_lock(&ctx->dev->mutex);
+
+	vkvg_debug_stats_t* dbgstats = &ctx->dev->debug_stats;
+	if (dbgstats->sizePoints < ctx->sizePoints)
+		dbgstats->sizePoints = ctx->sizePoints;
+	if (dbgstats->sizePathes < ctx->sizePathes)
+		dbgstats->sizePathes = ctx->sizePathes;
+	if (dbgstats->sizeVertices < ctx->sizeVertices)
+		dbgstats->sizeVertices = ctx->sizeVertices;
+	if (dbgstats->sizeIndices < ctx->sizeIndices)
+		dbgstats->sizeIndices = ctx->sizeIndices;
+	if (dbgstats->sizeVBO < ctx->sizeVBO)
+		dbgstats->sizeVBO = ctx->sizeVBO;
+	if (dbgstats->sizeIBO < ctx->sizeIBO)
+		dbgstats->sizeIBO = ctx->sizeIBO;
+
+	if (ctx->dev->threadAware)
+		mtx_unlock(&ctx->dev->mutex);
+#endif
+
+	vkvg_surface_destroy(ctx->pSurf);
+
+	if (!ctx->status && ctx->dev->cachedContextCount < VKVG_MAX_CACHED_CONTEXT_COUNT) {
+		_device_store_context(ctx);
+		ctx->status = VKVG_STATUS_IN_CACHE;
+		return;
+	}
+
+	_release_context_ressources(ctx);
+
+	ctx = NULL;
+}
+void vkvg_set_opacity(VkvgContext ctx, float opacity) {
+	if (vkvg_status(ctx))
+		return;
+
+	if (EQUF(ctx->pushConsts.opacity, opacity))
+		return;
+
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	ctx->pushConsts.opacity = opacity;
+	ctx->pushCstDirty = true;
+}
+float vkvg_get_opacity(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return 0;
+	return ctx->pushConsts.opacity;
+}
+vkvg_status_t vkvg_status(VkvgContext ctx) { return !ctx ? VKVG_STATUS_NULL_POINTER : ctx->status; }
+VkvgContext   vkvg_reference(VkvgContext ctx) {
+	if (!ctx->status)
+		ctx->references++;
+	return ctx;
+}
+uint32_t vkvg_get_reference_count(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return 0;
+	return ctx->references;
+}
+void vkvg_new_sub_path(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_NEW_SUB_PATH);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: new_sub_path:\n");
+
+	_finish_path(ctx);
+}
+void vkvg_new_path(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_NEW_PATH);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: new_path:\n");
+
+	_clear_path(ctx);
+}
+void vkvg_close_path(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_CLOSE_PATH);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: close_path:\n");
+
+	if (ctx->pathes[ctx->pathPtr] & PATH_CLOSED_BIT) // already closed
+		return;
+	// check if at least 3 points are present
+	if (ctx->pathes[ctx->pathPtr] < 3)
+		return;
+
+	// prevent closing on the same point
+	if (vec2_equ(ctx->points[ctx->pointCount - 1], ctx->points[ctx->pointCount - ctx->pathes[ctx->pathPtr]])) {
+		if (ctx->pathes[ctx->pathPtr] < 4) // ensure enough points left for closing
+			return;
+		_remove_last_point(ctx);
+	}
+
+	ctx->pathes[ctx->pathPtr] |= PATH_CLOSED_BIT;
+
+	_finish_path(ctx);
+}
+void vkvg_rel_line_to(VkvgContext ctx, float dx, float dy) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_REL_LINE_TO, dx, dy);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rel_line_to: %f, %f\n", dx, dy);
+
+	if (_current_path_is_empty(ctx))
+		_add_point(ctx, 0, 0);
+	vec2 cp = _get_current_position(ctx);
+	_line_to(ctx, cp.x + dx, cp.y + dy);
+}
+void vkvg_line_to(VkvgContext ctx, float x, float y) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_LINE_TO, x, y);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: line_to: %f, %f\n", x, y);
+	_line_to(ctx, x, y);
+}
+void vkvg_arc(VkvgContext ctx, float xc, float yc, float radius, float a1, float a2) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_ARC, xc, yc, radius, a1, a2);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: arc: %f,%f %f %f %f\n", xc, yc, radius, a1, a2);
+
+	while (a2 < a1) // positive arc must have a1<a2
+		a2 += 2.f * M_PIF;
+
+	if (a2 - a1 > 2.f * M_PIF) // limit arc to 2PI
+		a2 = a1 + 2.f * M_PIF;
+
+	vec2 v = { cosf(a1) * radius + xc, sinf(a1) * radius + yc };
+
+	float step = _get_arc_step(ctx, radius);
+	float a = a1;
+
+	if (_current_path_is_empty(ctx)) {
+		_set_curve_start(ctx);
+		_add_point(ctx, v.x, v.y);
+		if (!ctx->pathPtr)
+			ctx->simpleConvex = true;
+		else
+			ctx->simpleConvex = false;
+	}
+	else {
+		_line_to(ctx, v.x, v.y);
+		_set_curve_start(ctx);
+		ctx->simpleConvex = false;
+	}
+
+	a += step;
+
+	if (EQUF(a2, a1))
+		return;
+
+	while (a < a2) {
+		v.x = cosf(a) * radius + xc;
+		v.y = sinf(a) * radius + yc;
+		_add_point(ctx, v.x, v.y);
+		a += step;
+	}
+
+	if (EQUF(a2 - a1, M_PIF * 2.f)) { // if arc is complete circle, last point is the same as the first one
+		_set_curve_end(ctx);
+		vkvg_close_path(ctx);
+		return;
+	}
+	a = a2;
+	// vec2 lastP = v;
+	v.x = cosf(a) * radius + xc;
+	v.y = sinf(a) * radius + yc;
+	// if (!vec2_equ (v,lastP))//this test should not be required
+	_add_point(ctx, v.x, v.y);
+	_set_curve_end(ctx);
+}
+void vkvg_arc_negative(VkvgContext ctx, float xc, float yc, float radius, float a1, float a2) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_ARC_NEG, xc, yc, radius, a1, a2);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: %f,%f %f %f %f\n", xc, yc, radius, a1, a2);
+	while (a2 > a1)
+		a2 -= 2.f * M_PIF;
+	if (a1 - a2 > a1 + 2.f * M_PIF) // limit arc to 2PI
+		a2 = a1 - 2.f * M_PIF;
+
+	vec2 v = { cosf(a1) * radius + xc, sinf(a1) * radius + yc };
+
+	float step = _get_arc_step(ctx, radius);
+	float a = a1;
+
+	if (_current_path_is_empty(ctx)) {
+		_set_curve_start(ctx);
+		_add_point(ctx, v.x, v.y);
+		if (!ctx->pathPtr)
+			ctx->simpleConvex = true;
+		else
+			ctx->simpleConvex = false;
+	}
+	else {
+		_line_to(ctx, v.x, v.y);
+		_set_curve_start(ctx);
+		ctx->simpleConvex = false;
+	}
+
+	a -= step;
+
+	if (EQUF(a2, a1))
+		return;
+
+	while (a > a2) {
+		v.x = cosf(a) * radius + xc;
+		v.y = sinf(a) * radius + yc;
+		_add_point(ctx, v.x, v.y);
+		a -= step;
+	}
+
+	if (EQUF(a1 - a2, M_PIF * 2.f)) { // if arc is complete circle, last point is the same as the first one
+		_set_curve_end(ctx);
+		vkvg_close_path(ctx);
+		return;
+	}
+
+	a = a2;
+	// vec2 lastP = v;
+	v.x = cosf(a) * radius + xc;
+	v.y = sinf(a) * radius + yc;
+	// if (!vec2_equ (v,lastP))
+	_add_point(ctx, v.x, v.y);
+	_set_curve_end(ctx);
+}
+void vkvg_rel_move_to(VkvgContext ctx, float x, float y) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_REL_MOVE_TO, x, y);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rel_mote_to: %f, %f\n", x, y);
+	if (_current_path_is_empty(ctx))
+		_add_point(ctx, 0, 0);
+	vec2 cp = _get_current_position(ctx);
+	_finish_path(ctx);
+	_add_point(ctx, cp.x + x, cp.y + y);
+}
+void vkvg_move_to(VkvgContext ctx, float x, float y) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_MOVE_TO, x, y);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: move_to: %f,%f\n", x, y);
+	_finish_path(ctx);
+	_add_point(ctx, x, y);
+}
+bool vkvg_has_current_point(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return false;
+	return !_current_path_is_empty(ctx);
+}
+void vkvg_get_current_point(VkvgContext ctx, float* x, float* y) {
+	if (vkvg_status(ctx))
+		return;
+	assert(x);
+	assert(y);
+	if (_current_path_is_empty(ctx)) {
+		*x = *y = 0;
+		return;
+	}
+	vec2 cp = _get_current_position(ctx);
+	*x = cp.x;
+	*y = cp.y;
+}
+void _curve_to(VkvgContext ctx, float x1, float y1, float x2, float y2, float x3, float y3) {
+	// prevent running _recursive_bezier when all 4 curve points are equal
+	if (EQUF(x1, x2) && EQUF(x2, x3) && EQUF(y1, y2) && EQUF(y2, y3)) {
+		if (_current_path_is_empty(ctx) ||
+			(EQUF(_get_current_position(ctx).x, x1) && EQUF(_get_current_position(ctx).y, y1)))
+			return;
+	}
+	ctx->simpleConvex = false;
+	_set_curve_start(ctx);
+	if (_current_path_is_empty(ctx))
+		_add_point(ctx, x1, y1);
+
+	vec2 cp = _get_current_position(ctx);
+
+	// compute dyn distanceTolerance depending on current scale
+	float sx = 1, sy = 1;
+	vkvg_matrix_get_scale(&ctx->pushConsts.mat, &sx, &sy);
+	float distanceTolerance = fabs(0.25f / fmaxf(sx, sy));
+
+	_recursive_bezier(ctx, distanceTolerance, cp.x, cp.y, x1, y1, x2, y2, x3, y3, 0);
+	/*cp.x = x3;
+	cp.y = y3;
+	if (!vec2_equ(ctx->points[ctx->pointCount-1],cp))*/
+	_add_point(ctx, x3, y3);
+	_set_curve_end(ctx);
+}
+const double quadraticFact = 2.0 / 3.0;
+void _quadratic_to(VkvgContext ctx, float x1, float y1, float x2, float y2) {
+	float x0, y0;
+	if (_current_path_is_empty(ctx)) {
+		x0 = x1;
+		y0 = y1;
+	}
+	else
+		vkvg_get_current_point(ctx, &x0, &y0);
+	_curve_to(ctx, x0 + (x1 - x0) * quadraticFact, y0 + (y1 - y0) * quadraticFact, x2 + (x1 - x2) * quadraticFact,
+		y2 + (y1 - y2) * quadraticFact, x2, y2);
+}
+void vkvg_quadratic_to(VkvgContext ctx, float x1, float y1, float x2, float y2) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_QUADRATIC_TO, x1, y1, x2, y2);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: quadratic_to: %f, %f, %f, %f\n", x1, y1, x2, y2);
+	_quadratic_to(ctx, x1, y1, x2, y2);
+}
+void vkvg_rel_quadratic_to(VkvgContext ctx, float x1, float y1, float x2, float y2) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_REL_QUADRATIC_TO, x1, y1, x2, y2);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rel_quadratic_to: %f, %f, %f, %f\n", x1, y1, x2, y2);
+	vec2 cp = _get_current_position(ctx);
+	_quadratic_to(ctx, cp.x + x1, cp.y + y1, cp.x + x2, cp.y + y2);
+}
+void vkvg_curve_to(VkvgContext ctx, float x1, float y1, float x2, float y2, float x3, float y3) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_CURVE_TO, x1, y1, x2, y2, x3, y3);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: curve_to %f,%f %f,%f %f,%f:\n", x1, y1, x2, y2, x3, y3);
+	_curve_to(ctx, x1, y1, x2, y2, x3, y3);
+}
+void vkvg_rel_curve_to(VkvgContext ctx, float x1, float y1, float x2, float y2, float x3, float y3) {
+	if (vkvg_status(ctx))
+		return;
+	if (_current_path_is_empty(ctx)) {
+		ctx->status = VKVG_STATUS_NO_CURRENT_POINT;
+		return;
+	}
+	RECORD(ctx, (uint32_t)VKVG_CMD_REL_CURVE_TO, x1, y1, x2, y2, x3, y3);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rel curve_to %f,%f %f,%f %f,%f:\n", x1, y1, x2, y2, x3, y3);
+	vec2 cp = _get_current_position(ctx);
+	_curve_to(ctx, cp.x + x1, cp.y + y1, cp.x + x2, cp.y + y2, cp.x + x3, cp.y + y3);
+}
+void vkvg_fill_rectangle(VkvgContext ctx, float x, float y, float w, float h) {
+	if (vkvg_status(ctx))
+		return;
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: fill_rectangle:\n");
+	_vao_add_rectangle(ctx, x, y, w, h);
+	//_record_draw_cmd(ctx);
+}
+
+vkvg_status_t vkvg_rectangle(VkvgContext ctx, float x, float y, float w, float h) {
+	if (vkvg_status(ctx))
+		return ctx->status;
+	RECORD2(ctx, VKVG_CMD_RECTANGLE, x, y, w, h);
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rectangle: %f,%f,%f,%f\n", x, y, w, h);
+	_finish_path(ctx);
+
+	if (w <= 0 || h <= 0)
+		return VKVG_STATUS_INVALID_RECT;
+
+	_add_point(ctx, x, y);
+	_add_point(ctx, x + w, y);
+	_add_point(ctx, x + w, y + h);
+	_add_point(ctx, x, y + h);
+
+	ctx->pathes[ctx->pathPtr] |= (PATH_CLOSED_BIT | PATH_IS_CONVEX_BIT);
+
+	_finish_path(ctx);
+	return VKVG_STATUS_SUCCESS;
+}
+vkvg_status_t vkvg_rounded_rectangle(VkvgContext ctx, float x, float y, float w, float h, float radius) {
+	if (vkvg_status(ctx))
+		return ctx->status;
+	LOG(VKVG_LOG_INFO_CMD, "CMD: rounded_rectangle:\n");
+	_finish_path(ctx);
+
+	if (w <= 0 || h <= 0)
+		return VKVG_STATUS_INVALID_RECT;
+
+	if ((radius > w / 2.0f) || (radius > h / 2.0f))
+		radius = fmin(w / 2.0f, h / 2.0f);
+
+	vkvg_move_to(ctx, x, y + radius);
+	vkvg_arc(ctx, x + radius, y + radius, radius, M_PIF, -M_PIF_2);
+	vkvg_line_to(ctx, x + w - radius, y);
+	vkvg_arc(ctx, x + w - radius, y + radius, radius, -M_PIF_2, 0);
+	vkvg_line_to(ctx, x + w, y + h - radius);
+	vkvg_arc(ctx, x + w - radius, y + h - radius, radius, 0, M_PIF_2);
+	vkvg_line_to(ctx, x + radius, y + h);
+	vkvg_arc(ctx, x + radius, y + h - radius, radius, M_PIF_2, M_PIF);
+	vkvg_line_to(ctx, x, y + radius);
+	vkvg_close_path(ctx);
+
+	return VKVG_STATUS_SUCCESS;
+}
+void vkvg_rounded_rectangle2(VkvgContext ctx, float x, float y, float w, float h, float rx, float ry) {
+	if (vkvg_status(ctx))
+		return;
+	LOG(VKVG_LOG_INFO_CMD, "CMD: rounded_rectangle2:\n");
+	vkvg_move_to(ctx, x + rx, y);
+	vkvg_line_to(ctx, x + w - rx, y);
+	vkvg_elliptic_arc_to(ctx, x + w, y + ry, false, true, rx, ry, 0);
+
+	vkvg_line_to(ctx, x + w, y + h - ry);
+	vkvg_elliptic_arc_to(ctx, x + w - rx, y + h, false, true, rx, ry, 0);
+
+	vkvg_line_to(ctx, x + rx, y + h);
+	vkvg_elliptic_arc_to(ctx, x, y + h - ry, false, true, rx, ry, 0);
+
+	vkvg_line_to(ctx, x, y + ry);
+	vkvg_elliptic_arc_to(ctx, x + rx, y, false, true, rx, ry, 0);
+
+	vkvg_close_path(ctx);
+}
+void vkvg_path_extents(VkvgContext ctx, float* const x1, float* const y1, float* const x2, float* const y2) {
+	if (vkvg_status(ctx))
+		return;
+
+	_finish_path(ctx);
+
+	if (!ctx->pathPtr) { // no path
+		*x1 = *x2 = *y1 = *y2 = 0;
+		return;
+	}
+
+	_vkvg_path_extents(ctx, false, x1, y1, x2, y2);
+}
+
+vkvg_clip_state_t _get_previous_clip_state(VkvgContext ctx) {
+	if (!ctx->pSavedCtxs) // no clip saved => clear
+		return vkvg_clip_state_clear;
+	return ctx->pSavedCtxs->clippingState;
+}
+static const VkClearAttachment clearStencil = { VK_IMAGE_ASPECT_STENCIL_BIT, 1, {{{0}}} };
+static const VkClearAttachment clearColorAttach = { VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{0}}} };
+
+void _reset_clip(VkvgContext ctx) {
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	if (!ctx->cmdStarted) {
+		// if command buffer is not already started and in a renderpass, we use the renderpass
+		// with the loadop clear for stencil
+		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearStencil;
+		// force run of one renderpass (even empty) to perform clear load op
+		_start_cmd_for_render_pass(ctx);
+		return;
+	}
+	vkCmdClearAttachments(ctx->cmd, 1, &clearStencil, 1, &ctx->clearRect);
+}
+
+void vkvg_reset_clip(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_RESET_CLIP);
+
+	if (ctx->curClipState == vkvg_clip_state_clear)
+		return;
+	if (_get_previous_clip_state(ctx) == vkvg_clip_state_clear)
+		ctx->curClipState = vkvg_clip_state_none;
+	else
+		ctx->curClipState = vkvg_clip_state_clear;
+
+	_reset_clip(ctx);
+}
+void vkvg_clear(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_CLEAR);
+
+	if (_get_previous_clip_state(ctx) == vkvg_clip_state_clear)
+		ctx->curClipState = vkvg_clip_state_none;
+	else
+		ctx->curClipState = vkvg_clip_state_clear;
+
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	if (!ctx->cmdStarted) {
+		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
+		_start_cmd_for_render_pass(ctx);
+		return;
+	}
+	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
+	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
+}
+void _clip_preserve(VkvgContext ctx) {
+	_finish_path(ctx);
+
+	if (!ctx->pathPtr) // nothing to clip
+		return;
+
+	_emit_draw_cmd_undrawn_vertices(ctx);
+
+	LOG(VKVG_LOG_INFO, "CLIP: ctx = %p; path cpt = %d;\n", ctx, ctx->pathPtr / 2);
+
+	_ensure_renderpass_is_started(ctx);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
+#endif
+
+	if (ctx->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+		_poly_fill(ctx, NULL);
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+	}
+	else {
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+		CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+		CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+		CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+		_fill_non_zero(ctx);
+		_emit_draw_cmd_undrawn_vertices(ctx);
+	}
+	CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+	CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
+
+	_draw_full_screen_quad(ctx, NULL);
+
+	_bind_draw_pipeline(ctx);
+	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_end(ctx->cmd);
+#endif
+
+	ctx->curClipState = vkvg_clip_state_clip;
+}
+void _fill_preserve(VkvgContext ctx) {
+	_finish_path(ctx);
+
+	if (!ctx->pathPtr) // nothing to fill
+		return;
+
+	LOG(VKVG_LOG_INFO, "FILL: ctx = %p; path cpt = %d;\n", ctx, ctx->subpathCount);
+
+	if (ctx->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+		_emit_draw_cmd_undrawn_vertices(ctx);
+		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
+		_poly_fill(ctx, &bounds);
+		_bind_draw_pipeline(ctx);
+		CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+		_draw_full_screen_quad(ctx, &bounds);
+		CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+		return;
+	}
+
+	if (ctx->vertCount - ctx->curVertOffset + ctx->pointCount > VKVG_IBO_MAX)
+		_emit_draw_cmd_undrawn_vertices(ctx); // limit draw call to addressable vx with choosen index type
+
+	if (ctx->pattern) // if not solid color, source img or gradient has to be bound
+		_ensure_renderpass_is_started(ctx);
+	_fill_non_zero(ctx);
+}
+void _stroke_preserve(VkvgContext ctx) {
+	_finish_path(ctx);
+
+	if (!ctx->pathPtr) // nothing to stroke
+		return;
+
+	LOG(VKVG_LOG_INFO, "STROKE: ctx = %p; path ptr = %d;\n", ctx, ctx->pathPtr);
+
+	stroke_context_t str = { 0 };
+	str.hw = ctx->lineWidth * 0.5f;
+	str.lhMax = ctx->miterLimit * ctx->lineWidth;
+	uint32_t ptrPath = 0;
+
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t ptrSegment = 0, lastSegmentPointIdx = 0;
+		uint32_t firstPathPointIdx = str.cp;
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		uint32_t lastPathPointIdx = str.cp + pathPointCount - 1;
+
+		dash_context_t dc = { 0 };
+
+		if (_path_has_curves(ctx, ptrPath)) {
+			ptrSegment = 1;
+			lastSegmentPointIdx = str.cp + (ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK) - 1;
+		}
+
+		str.firstIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+
+		// LOG(VKVG_LOG_INFO_PATH, "\tPATH: points count=%10d end point idx=%10d", ctx->pathes[ptrPath]&PATH_ELT_MASK,
+		// lastPathPointIdx);
+
+		if (ctx->dashCount > 0) {
+			// init dash stroke
+			dc.dashOn = true;
+			dc.curDash = 0; // current dash index
+			dc.totDashLength = 0; // limit offset to total length of dashes
+			for (uint32_t i = 0; i < ctx->dashCount; i++)
+				dc.totDashLength += ctx->dashes[i];
+			if (dc.totDashLength == 0) {
+				ctx->status = VKVG_STATUS_INVALID_DASH;
+				return;
+			}
+			dc.curDashOffset = fmodf(
+				ctx->dashOffset,
+				dc.totDashLength); // cur dash offset between defined path point and last dash segment(on/off) start
+			str.iL = lastPathPointIdx;
+		}
+		else if (_path_is_closed(ctx, ptrPath)) {
+			str.iL = lastPathPointIdx;
+		}
+		else {
+			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
+				vec2_line_norm(ctx->points[str.cp], ctx->points[str.cp + 1]), true);
+			str.iL = str.cp++;
+		}
+
+		if (_path_has_curves(ctx, ptrPath)) {
+			while (str.cp < lastPathPointIdx) {
+
+				bool curved = ctx->pathes[ptrPath + ptrSegment] & PATH_HAS_CURVES_BIT;
+				if (lastSegmentPointIdx == lastPathPointIdx) // last segment of path, dont draw end point here
+					lastSegmentPointIdx--;
+				while (str.cp <= lastSegmentPointIdx)
+					_draw_segment(ctx, &str, &dc, curved);
+
+				ptrSegment++;
+				uint32_t cptSegPts = ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK;
+				lastSegmentPointIdx = str.cp + cptSegPts - 1;
+				if (lastSegmentPointIdx == lastPathPointIdx && cptSegPts == 1) {
+					// single point last segment
+					ptrSegment++;
+					break;
+				}
+			}
+		}
+		else
+			while (str.cp < lastPathPointIdx)
+				_draw_segment(ctx, &str, &dc, false);
+
+		if (ctx->dashCount > 0) {
+			if (_path_is_closed(ctx, ptrPath)) {
+				str.iR = firstPathPointIdx;
+
+				_draw_dashed_segment(ctx, &str, &dc, false);
+
+				str.iL++;
+				str.cp++;
+			}
+			if (!dc.dashOn) {
+				// finishing last dash that is already started, draw end caps but not too close to start
+				// the default gap is the next void
+				int32_t prevDash = (int32_t)dc.curDash - 1;
+				if (prevDash < 0)
+					dc.curDash = ctx->dashCount - 1;
+				float m = fminf(ctx->dashes[prevDash] - dc.curDashOffset, ctx->dashes[dc.curDash]);
+				vec2  p = vec2_sub(ctx->points[str.iR], vec2_mult_s(dc.normal, m));
+				_draw_stoke_cap(ctx, &str, p, dc.normal, false);
+			}
+		}
+		else if (_path_is_closed(ctx, ptrPath)) {
+			str.iR = firstPathPointIdx;
+			bool inverse = _build_vb_step(ctx, &str, false);
+
+			VKVG_IBO_INDEX_TYPE* inds = &ctx->indexCache[ctx->indCount - 6];
+			VKVG_IBO_INDEX_TYPE  ii = str.firstIdx;
+			if (inverse) {
+				inds[1] = ii + 1;
+				inds[4] = ii + 1;
+				inds[5] = ii;
+			}
+			else {
+				inds[1] = ii;
+				inds[4] = ii;
+				inds[5] = ii + 1;
+			}
+			str.cp++;
+		}
+		else
+			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
+				vec2_line_norm(ctx->points[str.cp - 1], ctx->points[str.cp]), false);
+
+		str.cp = firstPathPointIdx + pathPointCount;
+
+		if (ptrSegment > 0)
+			ptrPath += ptrSegment;
+		else
+			ptrPath++;
+
+		// limit batch size here to 1/3 of the ibo index type ability
+		if (ctx->vertCount - ctx->curVertOffset > VKVG_IBO_MAX / 3)
+			_emit_draw_cmd_undrawn_vertices(ctx);
+	}
+}
+
+void vkvg_clip(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_CLIP);
+	_clip_preserve(ctx);
+	_clear_path(ctx);
+}
+void vkvg_stroke(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_STROKE);
+	_stroke_preserve(ctx);
+	_clear_path(ctx);
+}
+void vkvg_fill(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_FILL);
+	_fill_preserve(ctx);
+	_clear_path(ctx);
+}
+void vkvg_clip_preserve(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_CLIP_PRESERVE);
+	_clip_preserve(ctx);
+}
+void vkvg_fill_preserve(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_FILL_PRESERVE);
+	_fill_preserve(ctx);
+}
+void vkvg_stroke_preserve(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_STROKE_PRESERVE);
+	_stroke_preserve(ctx);
+}
+
+void vkvg_paint(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_PAINT);
+	_finish_path(ctx);
+
+	if (ctx->pathPtr) {
+		vkvg_fill(ctx);
+		return;
+	}
+
+	_ensure_renderpass_is_started(ctx);
+	_draw_full_screen_quad(ctx, NULL);
+}
+// 将32位RGBA颜色转换为预乘Alpha格式 
+uint32_t rgba_to_premultiplied(uint32_t color) {
+	uint8_t a = (color >> 24) & 0xFF;
+	uint8_t r = color & 0xFF;
+	uint8_t g = (color >> 8) & 0xFF;
+	uint8_t b = (color >> 16) & 0xFF;
+	// 若Alpha为0或255，可直接优化 
+	if (a == 0) return 0;          // 全透明
+	if (a == 255) return color;    // 不透明，无需预乘 
+	r = (uint8_t)((r * a + 128) / 255);
+	g = (uint8_t)((g * a + 128) / 255);
+	b = (uint8_t)((b * a + 128) / 255);
+	return (a << 24) | (b << 16) | (g << 8) | r;
+}
+void vkvg_set_source_color(VkvgContext ctx, uint32_t c) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_SOURCE_COLOR, c);
+	ctx->curColor = c;
+#ifdef VKVG_PREMULT_ALPHA
+	ctx->curColor = rgba_to_premultiplied(ctx->curColor);
+#endif
+	_update_cur_pattern(ctx, NULL);
+}
+void vkvg_set_source_rgb(VkvgContext ctx, float r, float g, float b) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_SOURCE_RGB, r, g, b);
+	ctx->curColor = CreateRgbaf(r, g, b, 1);
+	_update_cur_pattern(ctx, NULL);
+}
+void vkvg_set_source_rgba(VkvgContext ctx, float r, float g, float b, float a) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_SOURCE_RGBA, r, g, b, a);
+	ctx->curColor = CreateRgbaf(r, g, b, a);
+#ifdef VKVG_PREMULT_ALPHA
+	ctx->curColor = rgba_to_premultiplied(ctx->curColor);
+#endif
+	_update_cur_pattern(ctx, NULL);
+}
+void vkvg_set_source_surface(VkvgContext ctx, VkvgSurface surf, float x, float y) {
+	if (vkvg_status(ctx) || vkvg_surface_status(surf))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_SOURCE_SURFACE, x, y, surf);
+	ctx->pushConsts.source.x = x;
+	ctx->pushConsts.source.y = y;
+	_update_cur_pattern(ctx, vkvg_pattern_create_for_surface(surf));
+	ctx->pushCstDirty = true;
+}
+void vkvg_set_source(VkvgContext ctx, VkvgPattern pat) {
+	if (vkvg_status(ctx) || vkvg_pattern_status(pat))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_SOURCE, pat);
+	_update_cur_pattern(ctx, pat);
+	vkvg_pattern_reference(pat);
+}
+void vkvg_set_line_width(VkvgContext ctx, float width) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_LINE_WIDTH, width);
+	ctx->lineWidth = width;
+}
+void vkvg_set_miter_limit(VkvgContext ctx, float limit) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_LINE_WIDTH, limit);
+	ctx->miterLimit = limit;
+}
+void vkvg_set_line_cap(VkvgContext ctx, vkvg_line_cap_t cap) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_LINE_CAP, cap);
+	ctx->lineCap = cap;
+}
+void vkvg_set_line_join(VkvgContext ctx, vkvg_line_join_t join) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_LINE_JOIN, join);
+	ctx->lineJoin = join;
+}
+void vkvg_set_operator(VkvgContext ctx, vkvg_operator_t op) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_OPERATOR, op);
+	if (op == ctx->curOperator)
+		return;
+
+	_emit_draw_cmd_undrawn_vertices(
+		ctx); // draw call with different ops cant be combined, so emit draw cmd for previous vertices.
+
+	ctx->curOperator = op;
+
+	if (ctx->cmdStarted)
+		_bind_draw_pipeline(ctx);
+}
+void vkvg_set_fill_rule(VkvgContext ctx, vkvg_fill_rule_t fr) {
+	if (vkvg_status(ctx))
+		return;
+#ifndef __APPLE__
+	RECORD(ctx, VKVG_CMD_SET_FILL_RULE, fr);
+	ctx->curFillRule = fr;
+#endif
+}
+vkvg_fill_rule_t vkvg_get_fill_rule(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return VKVG_FILL_RULE_NON_ZERO;
+	return ctx->curFillRule;
+}
+float vkvg_get_line_width(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return 0;
+	return ctx->lineWidth;
+}
+float vkvg_get_miter_limit(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return 0;
+	return ctx->miterLimit;
+}
+void vkvg_set_dash(VkvgContext ctx, const float* dashes, uint32_t num_dashes, float offset) {
+	if (vkvg_status(ctx))
+		return;
+	if (ctx->dashCount > 0)
+		free(ctx->dashes);
+	RECORD(ctx, VKVG_CMD_SET_DASH, num_dashes, offset, dashes);
+	ctx->dashCount = num_dashes;
+	ctx->dashOffset = offset;
+	if (ctx->dashCount == 0)
+		return;
+	ctx->dashes = (float*)malloc(sizeof(float) * ctx->dashCount);
+	memcpy(ctx->dashes, dashes, sizeof(float) * ctx->dashCount);
+}
+void vkvg_get_dash(VkvgContext ctx, const float* dashes, uint32_t* num_dashes, float* offset) {
+	if (vkvg_status(ctx))
+		return;
+	*num_dashes = ctx->dashCount;
+	*offset = ctx->dashOffset;
+	if (ctx->dashCount == 0 || dashes == NULL)
+		return;
+	memcpy((float*)dashes, ctx->dashes, sizeof(float) * ctx->dashCount);
+}
+
+vkvg_line_cap_t vkvg_get_line_cap(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return (vkvg_line_cap_t)0;
+	return ctx->lineCap;
+}
+vkvg_line_join_t vkvg_get_line_join(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return (vkvg_line_join_t)0;
+	return ctx->lineJoin;
+}
+vkvg_operator_t vkvg_get_operator(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return VKVG_OPERATOR_OVER;
+	return ctx->curOperator;
+}
+VkvgPattern vkvg_get_source(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return NULL;
+	vkvg_pattern_reference(ctx->pattern);
+	return ctx->pattern;
+}
+
+void vkvg_select_font_face(VkvgContext ctx, const char* name) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_FONT_FACE, name);
+	_select_font_face(ctx, name);
+}
+void vkvg_load_font_from_path(VkvgContext ctx, const char* path, const char* name) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_FONT_PATH, name);
+	_vkvg_font_identity_t* fid = _font_cache_add_font_identity(ctx, path, name);
+	if (!_font_cache_load_font_file_in_memory(fid)) {
+		ctx->status = VKVG_STATUS_FILE_NOT_FOUND;
+		return;
+	}
+	_select_font_face(ctx, name);
+}
+void vkvg_load_font_from_memory(VkvgContext ctx, unsigned char* fontBuffer, long fontBufferByteSize, const char* name) {
+	if (vkvg_status(ctx))
+		return;
+	// RECORD(ctx, VKVG_CMD_SET_FONT_PATH, name);
+	_vkvg_font_identity_t* fid = _font_cache_add_font_identity(ctx, NULL, name);
+	fid->fontBuffer = fontBuffer;
+	fid->fontBufSize = fontBufferByteSize;
+
+	_select_font_face(ctx, name);
+}
+void vkvg_set_font_size(VkvgContext ctx, uint32_t size) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_FONT_SIZE, size);
+#ifdef VKVG_USE_FREETYPE
+	long newSize = size << 6;
+#else
+	long newSize = size;
+#endif
+	if (ctx->selectedCharSize == newSize)
+		return;
+	ctx->selectedCharSize = newSize;
+	ctx->currentFont = NULL;
+	ctx->currentFontSize = NULL;
+}
+
+void vkvg_set_text_direction(vkvg_context* ctx, vkvg_direction_t direction) {}
+
+void vkvg_show_text(VkvgContext ctx, const char* text) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SHOW_TEXT, text);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: show_text:\n");
+	//_ensure_renderpass_is_started(ctx);
+	_font_cache_show_text(ctx, text);
+	//_flush_undrawn_vertices (ctx);
+}
+
+VkvgText vkvg_text_run_create(VkvgContext ctx, const char* text) {
+	if (vkvg_status(ctx))
+		return NULL;
+	VkvgText tr = (vkvg_text_run_t*)calloc(1, sizeof(vkvg_text_run_t));
+	_font_cache_create_text_run(ctx, text, -1, tr);
+	return tr;
+}
+VkvgText vkvg_text_run_create_with_length(VkvgContext ctx, const char* text, uint32_t length) {
+	if (vkvg_status(ctx))
+		return NULL;
+	VkvgText tr = (vkvg_text_run_t*)calloc(1, sizeof(vkvg_text_run_t));
+	_font_cache_create_text_run(ctx, text, length, tr);
+	return tr;
+}
+uint32_t vkvg_text_run_get_glyph_count(VkvgText textRun) { return textRun->glyph_count; }
+void     vkvg_text_run_get_glyph_position(VkvgText textRun, uint32_t index, vkvg_glyph_info_t* pGlyphInfo) {
+	if (index >= textRun->glyph_count) {
+		*pGlyphInfo = (vkvg_glyph_info_t){ 0 };
+		return;
+	}
+#if VKVG_USE_HARFBUZZ
+	memcpy(pGlyphInfo, &textRun->glyphs[index], sizeof(vkvg_glyph_info_t));
+#else
+	* pGlyphInfo = textRun->glyphs[index];
+#endif
+}
+void vkvg_text_run_destroy(VkvgText textRun) {
+	_font_cache_destroy_text_run(textRun);
+	free(textRun);
+}
+void vkvg_show_text_run(VkvgContext ctx, VkvgText textRun) {
+	if (vkvg_status(ctx))
+		return;
+	_font_cache_show_text_run(ctx, textRun);
+}
+void vkvg_text_run_get_extents(VkvgText textRun, vkvg_text_extents_t* extents) { *extents = textRun->extents; }
+
+void vkvg_text_extents(VkvgContext ctx, const char* text, vkvg_text_extents_t* extents) {
+	if (vkvg_status(ctx))
+		return;
+	_font_cache_text_extents(ctx, text, -1, extents);
+}
+void vkvg_font_extents(VkvgContext ctx, vkvg_font_extents_t* extents) {
+	if (vkvg_status(ctx))
+		return;
+	_font_cache_font_extents(ctx, extents);
+}
+
+void vkvg_save(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SAVE);
+	LOG(VKVG_LOG_INFO, "SAVE CONTEXT: ctx = %p\n", ctx);
+
+	VkvgDevice           dev = ctx->dev;
+	vkvg_context_save_t* sav = (vkvg_context_save_t*)calloc(1, sizeof(vkvg_context_save_t));
+
+	_flush_cmd_buff(ctx);
+	if (!_wait_ctx_flush_end(ctx)) {
+		free(sav);
+		return;
+	}
+
+	if (ctx->curClipState == vkvg_clip_state_clip) {
+		sav->clippingState = vkvg_clip_state_clip_saved;
+
+		uint8_t curSaveStencil = ctx->curSavBit / 6;
+
+		if (ctx->curSavBit > 0 && ctx->curSavBit % 6 == 0) { // new save/restore stencil image have to be created
+			VkhImage* savedStencilsPtr = NULL;
+			if (savedStencilsPtr)
+				savedStencilsPtr = (VkhImage*)realloc(ctx->savedStencils, curSaveStencil * sizeof(VkhImage));
+			else
+				savedStencilsPtr = (VkhImage*)malloc(curSaveStencil * sizeof(VkhImage));
+			if (savedStencilsPtr == NULL) {
+				free(sav);
+				ctx->status = VKVG_STATUS_NO_MEMORY;
+				return;
+			}
+			ctx->savedStencils = savedStencilsPtr;
+			VkhImage savStencil = vkh_image_ms_create(
+				(VkhDevice)&ctx->dev->vkDev, dev->stencilFormat, dev->samples, ctx->pSurf->width, ctx->pSurf->height,
+				VKH_MEMORY_USAGE_GPU_ONLY, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+			ctx->savedStencils[curSaveStencil - 1] = savStencil;
+
+			vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+			ctx->cmdStarted = true;
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_start(ctx->cmd, "new save/restore stencil", DBG_LAB_COLOR_SAV);
+#endif
+
+			vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, dev->stencilAspectFlag,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+			vkh_image_set_layout(ctx->cmd, savStencil, dev->stencilAspectFlag, VK_IMAGE_LAYOUT_GENERAL,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+				VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+			VkImageCopy cregion = { .srcSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
+								   .dstSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
+								   .extent = {ctx->pSurf->width, ctx->pSurf->height, 1} };
+			vkCmdCopyImage(ctx->cmd, vkh_image_get_vkimage(ctx->pSurf->stencil), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vkh_image_get_vkimage(savStencil), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cregion);
+
+			vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, dev->stencilAspectFlag,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_end(ctx->cmd);
+#endif
+
+			VK_CHECK_RESULT(vkEndCommandBuffer(ctx->cmd));
+			_wait_and_submit_cmd(ctx);
+		}
+
+		uint8_t curSaveBit = 1 << (ctx->curSavBit % 6 + 2);
+
+		_start_cmd_for_render_pass(ctx);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+		vkh_cmd_label_start(ctx->cmd, "save rp", DBG_LAB_COLOR_SAV);
+#endif
+
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+
+		CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT | curSaveBit);
+		CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+		CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, curSaveBit);
+
+		_draw_full_screen_quad(ctx, NULL);
+
+		_bind_draw_pipeline(ctx);
+		CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+		vkh_cmd_label_end(ctx->cmd);
+#endif
+		ctx->curSavBit++;
+	}
+	else if (ctx->curClipState == vkvg_clip_state_none)
+		sav->clippingState = (_get_previous_clip_state(ctx) & 0x03);
+	else
+		sav->clippingState = vkvg_clip_state_clear;
+
+	sav->dashOffset = ctx->dashOffset;
+	sav->dashCount = ctx->dashCount;
+	if (ctx->dashCount > 0) {
+		sav->dashes = (float*)malloc(sizeof(float) * ctx->dashCount);
+		memcpy(sav->dashes, ctx->dashes, sizeof(float) * ctx->dashCount);
+	}
+	sav->lineWidth = ctx->lineWidth;
+	sav->miterLimit = ctx->miterLimit;
+	sav->curOperator = ctx->curOperator;
+	sav->lineCap = ctx->lineCap;
+	sav->lineWidth = ctx->lineWidth;
+	sav->curFillRule = ctx->curFillRule;
+
+	sav->selectedCharSize = ctx->selectedCharSize;
+	strcpy(sav->selectedFontName, ctx->selectedFontName);
+
+	sav->currentFont = ctx->currentFont;
+	sav->textDirection = ctx->textDirection;
+	sav->pushConsts = ctx->pushConsts;
+	if (ctx->pattern) {
+		sav->pattern = ctx->pattern; // TODO:pattern sav must be imutable (copy?)
+		vkvg_pattern_reference(ctx->pattern);
+	}
+	else
+		sav->curColor = ctx->curColor;
+
+	sav->pNext = ctx->pSavedCtxs;
+	ctx->pSavedCtxs = sav;
+}
+void vkvg_restore(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+
+	RECORD(ctx, VKVG_CMD_RESTORE);
+
+	if (ctx->pSavedCtxs == NULL) {
+		ctx->status = VKVG_STATUS_INVALID_RESTORE;
+		return;
+	}
+
+	LOG(VKVG_LOG_INFO, "RESTORE CONTEXT: ctx = %p\n", ctx);
+
+	vkvg_context_save_t* sav = ctx->pSavedCtxs;
+	ctx->pSavedCtxs = sav->pNext;
+
+	_flush_cmd_buff(ctx);
+	if (!_wait_ctx_flush_end(ctx))
+		return;
+
+	ctx->pushConsts = sav->pushConsts;
+	ctx->pushCstDirty = true;
+
+	if (ctx->curClipState) { //!=none
+		if (ctx->curClipState == vkvg_clip_state_clip && sav->clippingState == vkvg_clip_state_clear) {
+			_reset_clip(ctx);
+		}
+		else {
+
+			uint8_t curSaveBit = 1 << ((ctx->curSavBit - 1) % 6 + 2);
+
+			_start_cmd_for_render_pass(ctx);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_start(ctx->cmd, "restore rp", DBG_LAB_COLOR_SAV);
+#endif
+
+			CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+
+			CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT | curSaveBit);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, curSaveBit);
+			CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+
+			_draw_full_screen_quad(ctx, NULL);
+
+			_bind_draw_pipeline(ctx);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_end(ctx->cmd);
+#endif
+
+			_flush_cmd_buff(ctx);
+			if (!_wait_ctx_flush_end(ctx))
+				return;
+		}
+	}
+	if (sav->clippingState == vkvg_clip_state_clip_saved) {
+		ctx->curSavBit--;
+
+		uint8_t curSaveStencil = ctx->curSavBit / 6;
+		if (ctx->curSavBit > 0 &&
+			ctx->curSavBit % 6 ==
+			0) { // addtional save/restore stencil image have to be copied back to surf stencil first
+			VkhImage savStencil = ctx->savedStencils[curSaveStencil - 1];
+
+			vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+			ctx->cmdStarted = true;
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_start(ctx->cmd, "additional stencil copy while restoring", DBG_LAB_COLOR_SAV);
+#endif
+
+			vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+			vkh_image_set_layout(ctx->cmd, savStencil, ctx->dev->stencilAspectFlag,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+			VkImageCopy cregion = { .srcSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
+								   .dstSubresource = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1},
+								   .extent = {ctx->pSurf->width, ctx->pSurf->height, 1} };
+			vkCmdCopyImage(ctx->cmd, vkh_image_get_vkimage(savStencil), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vkh_image_get_vkimage(ctx->pSurf->stencil), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+				&cregion);
+			vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_end(ctx->cmd);
+#endif
+
+			VK_CHECK_RESULT(vkEndCommandBuffer(ctx->cmd));
+			_wait_and_submit_cmd(ctx);
+			if (!_wait_ctx_flush_end(ctx))
+				return;
+			vkh_image_destroy(savStencil);
+		}
+	}
+
+	ctx->curClipState = vkvg_clip_state_none;
+
+	ctx->dashOffset = sav->dashOffset;
+	if (ctx->dashCount > 0)
+		free(ctx->dashes);
+	ctx->dashCount = sav->dashCount;
+	if (ctx->dashCount > 0) {
+		ctx->dashes = (float*)malloc(sizeof(float) * ctx->dashCount);
+		memcpy(ctx->dashes, sav->dashes, sizeof(float) * ctx->dashCount);
+	}
+
+	ctx->lineWidth = sav->lineWidth;
+	ctx->miterLimit = sav->miterLimit;
+	ctx->curOperator = sav->curOperator;
+	ctx->lineCap = sav->lineCap;
+	ctx->lineJoin = sav->lineJoint;
+	ctx->curFillRule = sav->curFillRule;
+
+	ctx->selectedCharSize = sav->selectedCharSize;
+	strcpy(ctx->selectedFontName, sav->selectedFontName);
+
+	ctx->currentFont = sav->currentFont;
+	ctx->textDirection = sav->textDirection;
+
+	if (sav->pattern) {
+		if (sav->pattern != ctx->pattern)
+			_update_cur_pattern(ctx, sav->pattern);
+		else
+			vkvg_pattern_destroy(sav->pattern);
+	}
+	else {
+		ctx->curColor = sav->curColor;
+		_update_cur_pattern(ctx, NULL);
+	}
+
+	_free_ctx_save(sav);
+}
+
+void vkvg_translate(VkvgContext ctx, float dx, float dy) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_TRANSLATE, dx, dy);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: translate: %f, %f\n", dx, dy);
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	vkvg_matrix_translate(&ctx->pushConsts.mat, dx, dy);
+	_set_mat_inv_and_vkCmdPush(ctx);
+}
+void vkvg_scale(VkvgContext ctx, float sx, float sy) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SCALE, sx, sy);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: scale: %f, %f\n", sx, sy);
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	vkvg_matrix_scale(&ctx->pushConsts.mat, sx, sy);
+	_set_mat_inv_and_vkCmdPush(ctx);
+}
+void vkvg_rotate(VkvgContext ctx, float radians) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_ROTATE, radians);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: rotate: %f\n", radians);
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	vkvg_matrix_rotate(&ctx->pushConsts.mat, radians);
+	_set_mat_inv_and_vkCmdPush(ctx);
+}
+void vkvg_transform(VkvgContext ctx, const vkvg_matrix_t* matrix) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_TRANSFORM, matrix);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: transform: %f, %f, %f, %f, %f, %f\n", matrix->xx, matrix->yx, matrix->xy, matrix->yy,
+		matrix->x0, matrix->y0);
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	vkvg_matrix_t res;
+	vkvg_matrix_multiply(&res, &ctx->pushConsts.mat, matrix);
+	ctx->pushConsts.mat = res;
+	_set_mat_inv_and_vkCmdPush(ctx);
+}
+void vkvg_identity_matrix(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_IDENTITY_MATRIX);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: identity_matrix:\n");
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	vkvg_matrix_t im = VKVG_IDENTITY_MATRIX;
+	ctx->pushConsts.mat = im;
+	_set_mat_inv_and_vkCmdPush(ctx);
+}
+void vkvg_set_matrix(VkvgContext ctx, const vkvg_matrix_t* matrix) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_SET_MATRIX, matrix);
+	LOG(VKVG_LOG_INFO_CMD, "CMD: set_matrix: %f, %f, %f, %f, %f, %f\n", matrix->xx, matrix->yx, matrix->xy, matrix->yy,
+		matrix->x0, matrix->y0);
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	ctx->pushConsts.mat = (*matrix);
+	_set_mat_inv_and_vkCmdPush(ctx);
+}
+void vkvg_get_matrix(VkvgContext ctx, vkvg_matrix_t* const matrix) {
+	if (vkvg_status(ctx) || !matrix)
+		return;
+	*matrix = ctx->pushConsts.mat;
+}
+
+void vkvg_elliptic_arc_to(VkvgContext ctx, float x2, float y2, bool largeArc, bool sweepFlag, float rx, float ry,
+	float phi) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_ELLIPTICAL_ARC_TO, x2, y2, rx, ry, phi, largeArc, sweepFlag);
+	LOG(VKVG_LOG_INFO_CMD,
+		"\tCMD: elliptic_arc_to: x2:%10.5f y2:%10.5f large:%d sweep:%d rx:%10.5f ry:%10.5f phi:%10.5f \n", x2, y2,
+		largeArc, sweepFlag, rx, ry, phi);
+	float x1, y1;
+	vkvg_get_current_point(ctx, &x1, &y1);
+	_elliptic_arc(ctx, x1, y1, x2, y2, largeArc, sweepFlag, rx, ry, phi);
+}
+void vkvg_rel_elliptic_arc_to(VkvgContext ctx, float x2, float y2, bool largeArc, bool sweepFlag, float rx, float ry,
+	float phi) {
+	if (vkvg_status(ctx))
+		return;
+	RECORD(ctx, VKVG_CMD_REL_ELLIPTICAL_ARC_TO, x2, y2, rx, ry, phi, largeArc, sweepFlag);
+	LOG(VKVG_LOG_INFO_CMD,
+		"\tCMD: rel_elliptic_arc_to: x2:%10.5f y2:%10.5f large:%d sweep:%d rx:%10.5f ry:%10.5f phi:%10.5f \n", x2, y2,
+		largeArc, sweepFlag, rx, ry, phi);
+
+	float x1, y1;
+	vkvg_get_current_point(ctx, &x1, &y1);
+	_elliptic_arc(ctx, x1, y1, x2 + x1, y2 + y1, largeArc, sweepFlag, rx, ry, phi);
+}
+
+void vkvg_ellipse(VkvgContext ctx, float radiusX, float radiusY, float x, float y, float rotationAngle) {
+	if (vkvg_status(ctx))
+		return;
+	LOG(VKVG_LOG_INFO_CMD, "CMD: ellipse:\n");
+
+	float width_two_thirds = radiusX * 4 / 3;
+
+	float dx1 = sinf(rotationAngle) * radiusY;
+	float dy1 = cosf(rotationAngle) * radiusY;
+	float dx2 = cosf(rotationAngle) * width_two_thirds;
+	float dy2 = sinf(rotationAngle) * width_two_thirds;
+
+	float topCenterX = x - dx1;
+	float topCenterY = y + dy1;
+	float topRightX = topCenterX + dx2;
+	float topRightY = topCenterY + dy2;
+	float topLeftX = topCenterX - dx2;
+	float topLeftY = topCenterY - dy2;
+
+	float bottomCenterX = x + dx1;
+	float bottomCenterY = y - dy1;
+	float bottomRightX = bottomCenterX + dx2;
+	float bottomRightY = bottomCenterY + dy2;
+	float bottomLeftX = bottomCenterX - dx2;
+	float bottomLeftY = bottomCenterY - dy2;
+
+	_finish_path(ctx);
+	_add_point(ctx, bottomCenterX, bottomCenterY);
+
+	_curve_to(ctx, bottomRightX, bottomRightY, topRightX, topRightY, topCenterX, topCenterY);
+	_curve_to(ctx, topLeftX, topLeftY, bottomLeftX, bottomLeftY, bottomCenterX, bottomCenterY);
+
+	ctx->pathes[ctx->pathPtr] |= PATH_CLOSED_BIT;
+	_finish_path(ctx);
+}
+
+VkvgSurface vkvg_get_target(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return NULL;
+	return ctx->pSurf;
+}
+
+const char* vkvg_status_to_string(vkvg_status_t status) {
+	switch (status) {
+	case VKVG_STATUS_SUCCESS:
+		return "no error has occurred";
+		/*case VKVG_STATUS_NO_MEMORY:
+			return "out of memory";*/
+	case VKVG_STATUS_INVALID_RESTORE:
+		return "vkvg_restore() without matching vkvg_save()";
+	case VKVG_STATUS_NO_CURRENT_POINT:
+		return "no current point defined";
+	case VKVG_STATUS_INVALID_MATRIX:
+		return "invalid matrix (not invertible)";
+	case VKVG_STATUS_INVALID_STATUS:
+		return "invalid value for an input vkvg_status_t";
+	case VKVG_STATUS_INVALID_INDEX:
+		return "invalid index passed to getter";
+	case VKVG_STATUS_NULL_POINTER:
+		return "NULL pointer";
+	case VKVG_STATUS_WRITE_ERROR:
+		return "error while writing to output stream";
+	case VKVG_STATUS_PATTERN_TYPE_MISMATCH:
+		return "the pattern type is not appropriate for the operation";
+	case VKVG_STATUS_PATTERN_INVALID_GRADIENT:
+		return "the stops count is zero";
+	case VKVG_STATUS_INVALID_FORMAT:
+		return "invalid value for an input vkvg_format_t";
+	case VKVG_STATUS_FILE_NOT_FOUND:
+		return "file not found";
+	case VKVG_STATUS_INVALID_DASH:
+		return "invalid value for a dash setting";
+	case VKVG_STATUS_INVALID_RECT:
+		return "a rectangle has the height or width equal to 0";
+	case VKVG_STATUS_TIMEOUT:
+		return "waiting for a Vulkan operation to finish resulted in a fence timeout (5 seconds)";
+	case VKVG_STATUS_DEVICE_ERROR:
+		return "the initialization of the device resulted in an error";
+	case VKVG_STATUS_INVALID_IMAGE:
+		return "invalid image";
+	case VKVG_STATUS_INVALID_SURFACE:
+		return "invalid surface";
+	case VKVG_STATUS_INVALID_FONT:
+		return "unresolved font name";
+	default:
+		return "<unknown error status>";
+	}
+}
+
+/*
+ * Copyright (c) 2018-2022 Jean-Philippe Bruyère <jp_bruyere@hotmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+ * Software, and to permit persons to whom the Software is furnished to do so, subject
+ * to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+ // credits for bezier algorithms to:
+ //		Anti-Grain Geometry (AGG) - Version 2.5
+ //		A high quality rendering engine for C++
+ //		Copyright (C) 2002-2006 Maxim Shemanarev
+ //		Contact: mcseem@antigrain.com
+ //				 mcseemagg@yahoo.com
+ //				 http://antigrain.com
+
+#include "vkvg_surface_internal.h"
+#include "vkvg_context_internal.h"
+#include "vkvg_device_internal.h"
+#include "vkvg_pattern.h"
+#include "vkh_queue.h"
+#include "vkh_image.h"
+
+#ifdef VKVG_FILL_NZ_GLUTESS
+#include "glutess.h"
+#endif
+
+void _resize_vertex_cache(VkvgContext ctx, uint32_t newSize) {
+	Vertex* tmp = (Vertex*)realloc(ctx->vertexCache, (size_t)newSize * sizeof(Vertex));
+	LOG(VKVG_LOG_DBG_ARRAYS,
+		"resize vertex cache (vx count=%u): old size: %u -> new size: %u size(byte): %zu Ptr: %p -> %p\n",
+		ctx->vertCount, ctx->sizeVertices, newSize, (size_t)newSize * sizeof(Vertex), ctx->vertexCache, tmp);
+	if (tmp == NULL) {
+		ctx->status = VKVG_STATUS_NO_MEMORY;
+		LOG(VKVG_LOG_ERR, "resize vertex cache failed: vert count: %u byte size: %zu\n", newSize,
+			newSize * sizeof(Vertex));
+		return;
+	}
+	ctx->vertexCache = tmp;
+	ctx->sizeVertices = newSize;
+}
+void _resize_index_cache(VkvgContext ctx, uint32_t newSize) {
+	VKVG_IBO_INDEX_TYPE* tmp =
+		(VKVG_IBO_INDEX_TYPE*)realloc(ctx->indexCache, (size_t)newSize * sizeof(VKVG_IBO_INDEX_TYPE));
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize IBO: new size: %lu Ptr: %p -> %p\n", (size_t)newSize * sizeof(VKVG_IBO_INDEX_TYPE),
+		ctx->indexCache, tmp);
+	if (tmp == NULL) {
+		ctx->status = VKVG_STATUS_NO_MEMORY;
+		LOG(VKVG_LOG_ERR, "resize IBO failed: idx count: %u size(byte): %zu\n", newSize,
+			(size_t)newSize * sizeof(VKVG_IBO_INDEX_TYPE));
+		return;
+	}
+	ctx->indexCache = tmp;
+	ctx->sizeIndices = newSize;
+}
+void _ensure_vertex_cache_size(VkvgContext ctx, uint32_t addedVerticesCount) {
+	if (ctx->sizeVertices - ctx->vertCount > VKVG_ARRAY_THRESHOLD + addedVerticesCount)
+		return;
+	uint32_t newSize = ctx->sizeVertices + addedVerticesCount;
+	uint32_t modulo = addedVerticesCount % VKVG_VBO_SIZE;
+	if (modulo > 0)
+		newSize += VKVG_VBO_SIZE - modulo;
+	_resize_vertex_cache(ctx, newSize);
+}
+void _check_vertex_cache_size(VkvgContext ctx) {
+	assert(ctx->sizeVertices > ctx->vertCount);
+	if (ctx->sizeVertices - VKVG_ARRAY_THRESHOLD > ctx->vertCount)
+		return;
+	_resize_vertex_cache(ctx, ctx->sizeVertices + VKVG_VBO_SIZE);
+}
+void _ensure_index_cache_size(VkvgContext ctx, uint32_t addedIndicesCount) {
+	assert(ctx->sizeIndices > ctx->indCount);
+	if (ctx->sizeIndices - VKVG_ARRAY_THRESHOLD > ctx->indCount + addedIndicesCount)
+		return;
+	uint32_t newSize = ctx->sizeIndices + addedIndicesCount;
+	uint32_t modulo = addedIndicesCount % VKVG_IBO_SIZE;
+	if (modulo > 0)
+		newSize += VKVG_IBO_SIZE - modulo;
+	_resize_index_cache(ctx, newSize);
+}
+void _check_index_cache_size(VkvgContext ctx) {
+	if (ctx->sizeIndices - VKVG_ARRAY_THRESHOLD > ctx->indCount)
+		return;
+	_resize_index_cache(ctx, ctx->sizeIndices + VKVG_IBO_SIZE);
+}
+// check host path array size, return true if error. pathPtr is already incremented
+bool _check_pathes_array(VkvgContext ctx) {
+	if (ctx->sizePathes - ctx->pathPtr - ctx->segmentPtr > VKVG_ARRAY_THRESHOLD)
+		return false;
+	ctx->sizePathes += VKVG_PATHES_SIZE;
+	uint32_t* tmp = (uint32_t*)realloc(ctx->pathes, (size_t)ctx->sizePathes * sizeof(uint32_t));
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize PATH: new size: %u Ptr: %p -> %p\n", ctx->sizePathes, ctx->pathes, tmp);
+	if (tmp == NULL) {
+		ctx->status = VKVG_STATUS_NO_MEMORY;
+		LOG(VKVG_LOG_ERR, "resize PATH failed: new size(byte): %zu\n", ctx->sizePathes * sizeof(uint32_t));
+		_clear_path(ctx);
+		return true;
+	}
+	ctx->pathes = tmp;
+	return false;
+}
+// check host point array size, return true if error
+bool _check_point_array(VkvgContext ctx) {
+	if (ctx->sizePoints - VKVG_ARRAY_THRESHOLD > ctx->pointCount)
+		return false;
+	ctx->sizePoints += VKVG_PTS_SIZE;
+	vec2* tmp = (vec2*)realloc(ctx->points, (size_t)ctx->sizePoints * sizeof(vec2));
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize Points: new size(point): %u Ptr: %p -> %p\n", ctx->sizePoints, ctx->points, tmp);
+	if (tmp == NULL) {
+		ctx->status = VKVG_STATUS_NO_MEMORY;
+		LOG(VKVG_LOG_ERR, "resize PATH failed: new size(byte): %zu\n", ctx->sizePoints * sizeof(vec2));
+		_clear_path(ctx);
+		return true;
+	}
+	ctx->points = tmp;
+	return false;
+}
+bool _current_path_is_empty(VkvgContext ctx) { return ctx->pathes[ctx->pathPtr] == 0; }
+// this function expect that current point exists
+vec2 _get_current_position(VkvgContext ctx) { return ctx->points[ctx->pointCount - 1]; }
+// set curve start point and set path has curve bit
+void _set_curve_start(VkvgContext ctx) {
+	if (ctx->segmentPtr > 0) {
+		// check if current segment has points (straight)
+		if ((ctx->pathes[ctx->pathPtr + ctx->segmentPtr] & PATH_ELT_MASK) > 0)
+			ctx->segmentPtr++;
+	}
+	else {
+		// not yet segmented path, first segment length is copied
+		if (ctx->pathes[ctx->pathPtr] > 0) { // create first straight segment first
+			ctx->pathes[ctx->pathPtr + 1] = ctx->pathes[ctx->pathPtr];
+			ctx->segmentPtr = 2;
+		}
+		else
+			ctx->segmentPtr = 1;
+	}
+	_check_pathes_array(ctx);
+	ctx->pathes[ctx->pathPtr + ctx->segmentPtr] = 0;
+}
+// compute segment length and set is curved bit
+void _set_curve_end(VkvgContext ctx) {
+	// ctx->pathes [ctx->pathPtr + ctx->segmentPtr] = ctx->pathes [ctx->pathPtr] - ctx->pathes [ctx->pathPtr +
+	// ctx->segmentPtr];
+	ctx->pathes[ctx->pathPtr + ctx->segmentPtr] |= PATH_HAS_CURVES_BIT;
+	ctx->segmentPtr++;
+	_check_pathes_array(ctx);
+	ctx->pathes[ctx->pathPtr + ctx->segmentPtr] = 0;
+}
+// path start pointed at ptrPath has curve bit
+bool _path_has_curves(VkvgContext ctx, uint32_t ptrPath) { return ctx->pathes[ptrPath] & PATH_HAS_CURVES_BIT; }
+void _finish_path(VkvgContext ctx) {
+	if (ctx->pathes[ctx->pathPtr] == 0) // empty
+		return;
+	if ((ctx->pathes[ctx->pathPtr] & PATH_ELT_MASK) < 2) {
+		// only current pos is in path
+		ctx->pointCount -= ctx->pathes[ctx->pathPtr]; // what about the bounds?
+		ctx->pathes[ctx->pathPtr] = 0;
+		ctx->segmentPtr = 0;
+		return;
+	}
+
+	LOG(VKVG_LOG_INFO_PATH, "PATH: points count=%10d\n", ctx->pathes[ctx->pathPtr] & PATH_ELT_MASK);
+
+	if (ctx->pathPtr == 0 && ctx->simpleConvex)
+		ctx->pathes[0] |= PATH_IS_CONVEX_BIT;
+
+	if (ctx->segmentPtr > 0) { // pathes having curves are segmented
+		ctx->pathes[ctx->pathPtr] |= PATH_HAS_CURVES_BIT;
+		// curved segment increment segmentPtr on curve end,
+		// so if last segment is not a curve and point count > 0
+		if ((ctx->pathes[ctx->pathPtr + ctx->segmentPtr] & PATH_HAS_CURVES_BIT) == 0 &&
+			(ctx->pathes[ctx->pathPtr + ctx->segmentPtr] & PATH_ELT_MASK) > 0)
+			ctx->segmentPtr++; // current segment has to be included
+		ctx->pathPtr += ctx->segmentPtr;
+	}
+	else
+		ctx->pathPtr++;
+
+	if (_check_pathes_array(ctx))
+		return;
+
+	ctx->pathes[ctx->pathPtr] = 0;
+	ctx->segmentPtr = 0;
+	ctx->subpathCount++;
+	ctx->simpleConvex = false;
+}
+// clear path datas in context
+void _clear_path(VkvgContext ctx) {
+	ctx->pathPtr = 0;
+	ctx->pathes[ctx->pathPtr] = 0;
+	ctx->pointCount = 0;
+	ctx->segmentPtr = 0;
+	ctx->subpathCount = 0;
+	ctx->simpleConvex = false;
+}
+void _remove_last_point(VkvgContext ctx) {
+	ctx->pathes[ctx->pathPtr]--;
+	ctx->pointCount--;
+	if (ctx->segmentPtr > 0) {                            // if path is segmented
+		if (!ctx->pathes[ctx->pathPtr + ctx->segmentPtr]) // if current segment is empty
+			ctx->segmentPtr--;
+		ctx->pathes[ctx->pathPtr + ctx->segmentPtr]--;                          // decrement last segment point count
+		if ((ctx->pathes[ctx->pathPtr + ctx->segmentPtr] & PATH_ELT_MASK) == 0) // if no point left (was only one)
+			ctx->pathes[ctx->pathPtr + ctx->segmentPtr] = 0;                    // reset current segment
+		else if (ctx->pathes[ctx->pathPtr + ctx->segmentPtr] & PATH_HAS_CURVES_BIT) // if segment is a curve
+			ctx->segmentPtr++; // then segPtr has to be forwarded to new segment
+	}
+}
+bool _path_is_closed(VkvgContext ctx, uint32_t ptrPath) { return ctx->pathes[ptrPath] & PATH_CLOSED_BIT; }
+void _add_point(VkvgContext ctx, float x, float y) {
+	if (_check_point_array(ctx))
+		return;
+	if (isnan(x) || isnan(y)) {
+		LOG(VKVG_LOG_DEBUG, "_add_point: (%f, %f)\n", x, y);
+		return;
+	}
+	vec2 v = { x, y };
+	/*if (!_current_path_is_empty(ctx) && vec2_length(vec2_sub(ctx->points[ctx->pointCount-1], v))<1.f)
+		return;*/
+	LOG(VKVG_LOG_INFO_PTS, "_add_point: (%f, %f)\n", x, y);
+
+	ctx->points[ctx->pointCount] = v;
+	ctx->pointCount++;           // total point count of pathes, (for array bounds check)
+	ctx->pathes[ctx->pathPtr]++; // total point count in path
+	if (ctx->segmentPtr > 0)
+		ctx->pathes[ctx->pathPtr + ctx->segmentPtr]++; // total point count in path's segment
+}
+float _normalizeAngle(float a) {
+	float res = ROUND_DOWN(fmodf(a, 2.0f * M_PIF), 100);
+	if (res < 0.0f)
+		res += 2.0f * M_PIF;
+	return res;
+}
+float _get_arc_step(VkvgContext ctx, float radius) {
+	float sx, sy;
+	vkvg_matrix_get_scale(&ctx->pushConsts.mat, &sx, &sy);
+	float r = radius * fabsf(fmaxf(sx, sy));
+	if (r < 30.0f)
+		return fminf(M_PIF / 3.f, M_PIF / r);
+	return fminf(M_PIF / 3.f, M_PIF / (r * 0.4f));
+}
+void _create_gradient_buff(VkvgContext ctx) {
+	vkh_buffer_init((VkhDevice)&ctx->dev->vkDev, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU,
+		sizeof(vkvg_gradient_t), &ctx->uboGrad, true);
+}
+void _create_vertices_buff(VkvgContext ctx) {
+	vkh_buffer_init((VkhDevice)&ctx->dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU,
+		ctx->sizeVBO * sizeof(Vertex), &ctx->vertices, true);
+	vkh_buffer_init((VkhDevice)&ctx->dev->vkDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU,
+		ctx->sizeIBO * sizeof(VKVG_IBO_INDEX_TYPE), &ctx->indices, true);
+}
+void _resize_vbo(VkvgContext ctx, uint32_t new_size) {
+	if (!_wait_ctx_flush_end(ctx)) // wait previous cmd if not completed
+		return;
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize VBO: %d -> ", ctx->sizeVBO);
+	ctx->sizeVBO = new_size;
+	uint32_t mod = ctx->sizeVBO % VKVG_VBO_SIZE;
+	if (mod > 0)
+		ctx->sizeVBO += VKVG_VBO_SIZE - mod;
+	LOG(VKVG_LOG_DBG_ARRAYS, "%d\n", ctx->sizeVBO);
+	vkh_buffer_resize(&ctx->vertices, ctx->sizeVBO * sizeof(Vertex), true);
+}
+void _resize_ibo(VkvgContext ctx, size_t new_size) {
+	if (!_wait_ctx_flush_end(ctx)) // wait previous cmd if not completed
+		return;
+	ctx->sizeIBO = new_size;
+	uint32_t mod = ctx->sizeIBO % VKVG_IBO_SIZE;
+	if (mod > 0)
+		ctx->sizeIBO += VKVG_IBO_SIZE - mod;
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize IBO: new size: %d\n", ctx->sizeIBO);
+	vkh_buffer_resize(&ctx->indices, ctx->sizeIBO * sizeof(VKVG_IBO_INDEX_TYPE), true);
+}
+void _add_vertexf(VkvgContext ctx, float x, float y) {
+	Vertex* pVert = &ctx->vertexCache[ctx->vertCount];
+	pVert->pos.x = x;
+	pVert->pos.y = y;
+	pVert->color = ctx->curColor;
+	pVert->uv.z = -1;
+	LOG(VKVG_LOG_INFO_VBO, "Add Vertexf %10d: pos:(%10.4f, %10.4f) uv:(%10.4f,%10.4f,%10.4f) color:0x%.8x \n",
+		ctx->vertCount, pVert->pos.x, pVert->pos.y, pVert->uv.x, pVert->uv.y, pVert->uv.z, pVert->color);
+	ctx->vertCount++;
+	_check_vertex_cache_size(ctx);
+}
+void _add_vertexf_unchecked(VkvgContext ctx, float x, float y) {
+	Vertex* pVert = &ctx->vertexCache[ctx->vertCount];
+	pVert->pos.x = x;
+	pVert->pos.y = y;
+	pVert->color = ctx->curColor;
+	pVert->uv.z = -1;
+	LOG(VKVG_LOG_INFO_VBO, "Add Vertexf %10d: pos:(%10.4f, %10.4f) uv:(%10.4f,%10.4f,%10.4f) color:0x%.8x \n",
+		ctx->vertCount, pVert->pos.x, pVert->pos.y, pVert->uv.x, pVert->uv.y, pVert->uv.z, pVert->color);
+	ctx->vertCount++;
+}
+void _add_vertex(VkvgContext ctx, Vertex v) {
+	ctx->vertexCache[ctx->vertCount] = v;
+	LOG(VKVG_LOG_INFO_VBO, "Add Vertex  %10d: pos:(%10.4f, %10.4f) uv:(%10.4f,%10.4f,%10.4f) color:0x%.8x \n",
+		ctx->vertCount, v.pos.x, v.pos.y, v.uv.x, v.uv.y, v.uv.z, v.color);
+	ctx->vertCount++;
+	_check_vertex_cache_size(ctx);
+}
+void _set_vertex(VkvgContext ctx, uint32_t idx, Vertex v) { ctx->vertexCache[idx] = v; }
+#ifdef VKVG_FILL_NZ_GLUTESS
+void _add_indice(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i) {
+	ctx->indexCache[ctx->indCount++] = i;
+	_check_index_cache_size(ctx);
+}
+void _add_indice_for_fan(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i) {
+	VKVG_IBO_INDEX_TYPE* inds = &ctx->indexCache[ctx->indCount];
+	inds[0] = ctx->tesselator_fan_start;
+	inds[1] = ctx->indexCache[ctx->indCount - 1];
+	inds[2] = i;
+	ctx->indCount += 3;
+	_check_index_cache_size(ctx);
+}
+void _add_indice_for_strip(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i, bool odd) {
+	VKVG_IBO_INDEX_TYPE* inds = &ctx->indexCache[ctx->indCount];
+	if (odd) {
+		inds[0] = ctx->indexCache[ctx->indCount - 2];
+		inds[1] = i;
+		inds[2] = ctx->indexCache[ctx->indCount - 1];
+	}
+	else {
+		inds[0] = ctx->indexCache[ctx->indCount - 1];
+		inds[1] = ctx->indexCache[ctx->indCount - 2];
+		inds[2] = i;
+	}
+	ctx->indCount += 3;
+	_check_index_cache_size(ctx);
+}
+#endif
+void _add_tri_indices_for_rect(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i) {
+	VKVG_IBO_INDEX_TYPE* inds = &ctx->indexCache[ctx->indCount];
+	inds[0] = i;
+	inds[1] = i + 2;
+	inds[2] = i + 1;
+	inds[3] = i + 1;
+	inds[4] = i + 2;
+	inds[5] = i + 3;
+	ctx->indCount += 6;
+
+	_check_index_cache_size(ctx);
+	LOG(VKVG_LOG_INFO_IBO, "Rectangle IDX: %d %d %d | %d %d %d (count=%d)\n", inds[0], inds[1], inds[2], inds[3],
+		inds[4], inds[5], ctx->indCount);
+}
+void _add_triangle_indices(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i0, VKVG_IBO_INDEX_TYPE i1, VKVG_IBO_INDEX_TYPE i2) {
+	VKVG_IBO_INDEX_TYPE* inds = &ctx->indexCache[ctx->indCount];
+	inds[0] = i0;
+	inds[1] = i1;
+	inds[2] = i2;
+	ctx->indCount += 3;
+
+	_check_index_cache_size(ctx);
+	LOG(VKVG_LOG_INFO_IBO, "Triangle IDX: %d %d %d (indCount=%d)\n", i0, i1, i2, ctx->indCount);
+}
+void _add_triangle_indices_unchecked(VkvgContext ctx, VKVG_IBO_INDEX_TYPE i0, VKVG_IBO_INDEX_TYPE i1,
+	VKVG_IBO_INDEX_TYPE i2) {
+	VKVG_IBO_INDEX_TYPE* inds = &ctx->indexCache[ctx->indCount];
+	inds[0] = i0;
+	inds[1] = i1;
+	inds[2] = i2;
+	ctx->indCount += 3;
+
+	LOG(VKVG_LOG_INFO_IBO, "Triangle IDX: %d %d %d (indCount=%d)\n", i0, i1, i2, ctx->indCount);
+}
+void _vao_add_rectangle(VkvgContext ctx, float x, float y, float width, float height) {
+	Vertex              v[4] = { {{x, y}, ctx->curColor, {0, 0, -1}},
+									{{x, y + height}, ctx->curColor, {0, 0, -1}},
+									{{x + width, y}, ctx->curColor, {0, 0, -1}},
+									{{x + width, y + height}, ctx->curColor, {0, 0, -1}} };
+	VKVG_IBO_INDEX_TYPE firstIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+	Vertex* pVert = &ctx->vertexCache[ctx->vertCount];
+	memcpy(pVert, v, 4 * sizeof(Vertex));
+	ctx->vertCount += 4;
+
+	_check_vertex_cache_size(ctx);
+
+	_add_tri_indices_for_rect(ctx, firstIdx);
+}
+// start render pass if not yet started or update push const if requested
+void _ensure_renderpass_is_started(VkvgContext ctx) {
+	LOG(VKVG_LOG_INFO, "_ensure_renderpass_is_started\n");
+	if (!ctx->cmdStarted)
+		_start_cmd_for_render_pass(ctx);
+	else if (ctx->pushCstDirty)
+		_update_push_constants(ctx);
+}
+void _create_cmd_buff(VkvgContext ctx) {
+	vkh_cmd_buffs_create((VkhDevice)&ctx->dev->vkDev, ctx->cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 2,
+		ctx->cmdBuffers);
+#if defined(DEBUG) && defined(ENABLE_VALIDATION)
+	vkh_device_set_object_name((VkhDevice)&ctx->pSurf->dev->vkDev, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT,
+		(uint64_t)ctx->cmd, "vkvgCtxCmd");
+#endif
+}
+void _clear_attachment(VkvgContext ctx) {}
+
+bool _wait_ctx_flush_end(VkvgContext ctx) {
+	LOG(VKVG_LOG_INFO, "CTX: _wait_flush_fence\n");
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	if (vkh_timeline_wait((VkhDevice)&ctx->dev->vkDev, ctx->pSurf->timeline, ctx->timelineStep) == VK_SUCCESS)
+		return true;
+#else
+	if (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS)
+		return true;
+#endif
+	LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
+	ctx->status = VKVG_STATUS_TIMEOUT;
+	return false;
+}
+
+bool _wait_and_submit_cmd(VkvgContext ctx) {
+	if (!ctx->cmdStarted) // current cmd buff is empty, be aware that wait is also canceled!!
+		return true;
+
+	LOG(VKVG_LOG_INFO, "CTX: _wait_and_submit_cmd\n");
+
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	VkvgSurface surf = ctx->pSurf;
+	VkvgDevice  dev = surf->dev;
+	// vkh_timeline_wait ((VkhDevice)&dev->vkDev, surf->timeline, ct->timelineStep);
+	if (ctx->pattern && ctx->pattern->type == VKVG_PATTERN_TYPE_SURFACE) {
+		// add source surface timeline sync.
+		VkvgSurface source = (VkvgSurface)ctx->pattern->data;
+		LOCK_SURFACE(surf)
+			LOCK_SURFACE(source)
+			LOCK_DEVICE
+			vkh_cmd_submit_timelined2(dev->gQueue, &ctx->cmd, (VkSemaphore[2]) { surf->timeline, source->timeline },
+				(uint64_t[2]) {
+			surf->timelineStep, source->timelineStep
+		},
+				(uint64_t[2]) {
+			surf->timelineStep + 1, source->timelineStep + 1
+		});
+		surf->timelineStep++;
+		source->timelineStep++;
+		ctx->timelineStep = surf->timelineStep;
+		UNLOCK_DEVICE
+			UNLOCK_SURFACE(source)
+			UNLOCK_SURFACE(surf)
+	}
+	else {
+		LOCK_SURFACE(surf)
+			LOCK_DEVICE
+			vkh_cmd_submit_timelined(dev->gQueue, &ctx->cmd, surf->timeline, surf->timelineStep, surf->timelineStep + 1);
+		surf->timelineStep++;
+		ctx->timelineStep = surf->timelineStep;
+		UNLOCK_DEVICE
+			UNLOCK_SURFACE(surf)
+	}
+#else
+
+	if (!_wait_ctx_flush_end(ctx))
+		return false;
+	ResetFences(ctx->dev->vkDev, 1, &ctx->flushFence);
+	_device_submit_cmd(ctx->dev, &ctx->cmd, ctx->flushFence);
+#endif
+
+	if (ctx->cmd == ctx->cmdBuffers[0])
+		ctx->cmd = ctx->cmdBuffers[1];
+	else
+		ctx->cmd = ctx->cmdBuffers[0];
+
+	ResetCommandBuffer(ctx->cmd, 0);
+	ctx->cmdStarted = false;
+	return true;
+}
+/*void _explicit_ms_resolve (VkvgContext ctx){//should init cmd before calling this (unused, using automatic resolve by
+renderpass) vkh_image_set_layout (ctx->cmd, ctx->pSurf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT,
+						  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkh_image_set_layout (ctx->cmd, ctx->pSurf->img, VK_IMAGE_ASPECT_COLOR_BIT,
+						  VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+	VkImageResolve re = {
+		.extent = {ctx->pSurf->width, ctx->pSurf->height,1},
+		.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT,0,0,1},
+		.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT,0,0,1}
+	};
+
+	vkCmdResolveImage(ctx->cmd,
+					  vkh_image_get_vkimage (ctx->pSurf->imgMS), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					  vkh_image_get_vkimage (ctx->pSurf->img) ,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					  1,&re);
+	vkh_image_set_layout (ctx->cmd, ctx->pSurf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT,
+						  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ,
+						  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+}*/
+
+// pre flush vertices because of vbo or ibo too small, all vertices except last draw call are flushed
+// this function expects a vertex offset > 0
+void _flush_vertices_caches_until_vertex_base(VkvgContext ctx) {
+	_wait_ctx_flush_end(ctx);
+
+	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->curVertOffset * sizeof(Vertex));
+	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache,
+		ctx->curIndStart * sizeof(VKVG_IBO_INDEX_TYPE));
+
+	// copy remaining vertices and indices to caches starts
+	// this could be optimized at the cost of additional offsets.
+	ctx->vertCount -= ctx->curVertOffset;
+	ctx->indCount -= ctx->curIndStart;
+	memcpy(ctx->vertexCache, &ctx->vertexCache[ctx->curVertOffset], ctx->vertCount * sizeof(Vertex));
+	memcpy(ctx->indexCache, &ctx->indexCache[ctx->curIndStart], ctx->indCount * sizeof(VKVG_IBO_INDEX_TYPE));
+
+	ctx->curVertOffset = 0;
+	ctx->curIndStart = 0;
+}
+// copy vertex and index caches to the vbo and ibo vkbuffers used by gpu for drawing
+// current running cmd has to be completed to free usage of those
+void _flush_vertices_caches(VkvgContext ctx) {
+	if (!_wait_ctx_flush_end(ctx))
+		return;
+
+	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->vertCount * sizeof(Vertex));
+	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache, ctx->indCount * sizeof(VKVG_IBO_INDEX_TYPE));
+
+	ctx->vertCount = ctx->indCount = ctx->curIndStart = ctx->curVertOffset = 0;
+}
+// this func expect cmdStarted to be true
+void _end_render_pass(VkvgContext ctx) {
+	LOG(VKVG_LOG_INFO, "END RENDER PASS: ctx = %p;\n", ctx);
+	CmdEndRenderPass(ctx->cmd);
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_end(ctx->cmd);
+#endif
+	ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass;
+}
+
+void _check_vao_size(VkvgContext ctx) {
+	if (ctx->vertCount > ctx->sizeVBO || ctx->indCount > ctx->sizeIBO) {
+		// vbo or ibo buffers too small
+		if (ctx->cmdStarted)
+			// if cmd is started buffers, are already bound, so no resize is possible
+			// instead we flush, and clear vbo and ibo caches
+			_flush_cmd_until_vx_base(ctx);
+		if (ctx->vertCount > ctx->sizeVBO)
+			_resize_vbo(ctx, ctx->sizeVertices);
+		if (ctx->indCount > ctx->sizeIBO)
+			_resize_ibo(ctx, ctx->sizeIndices);
+	}
+}
+
+// stroke and non-zero draw call for solid color flush
+void _emit_draw_cmd_undrawn_vertices(VkvgContext ctx) {
+	if (ctx->indCount == ctx->curIndStart)
+		return;
+
+	_check_vao_size(ctx);
+
+	_ensure_renderpass_is_started(ctx);
+
+#ifdef VKVG_WIRED_DEBUG
+	if (vkvg_wired_debug & vkvg_wired_debug_mode_normal)
+		CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
+	if (vkvg_wired_debug & vkvg_wired_debug_mode_lines) {
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipelineLineList);
+		CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
+	}
+	if (vkvg_wired_debug & vkvg_wired_debug_mode_points) {
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipelineWired);
+		CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
+	}
+	if (vkvg_wired_debug & vkvg_wired_debug_mode_both)
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipe_OVER);
+#else
+	CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
+#endif
+	LOG(VKVG_LOG_INFO,
+		"RECORD DRAW CMD: ctx = %p; vertices = %d; indices = %d (vxOff = %d idxStart = %d idxTot = %d )\n", ctx,
+		ctx->vertCount - ctx->curVertOffset, ctx->indCount - ctx->curIndStart, ctx->curVertOffset, ctx->curIndStart,
+		ctx->indCount);
+
+	ctx->curIndStart = ctx->indCount;
+	ctx->curVertOffset = ctx->vertCount;
+}
+// preflush vertices with drawcommand already emited
+void _flush_cmd_until_vx_base(VkvgContext ctx) {
+	_end_render_pass(ctx);
+	if (ctx->curVertOffset > 0) {
+		LOG(VKVG_LOG_INFO, "FLUSH UNTIL VX BASE CTX: ctx = %p; vertices = %d; indices = %d\n", ctx, ctx->vertCount,
+			ctx->indCount);
+		_flush_vertices_caches_until_vertex_base(ctx);
+	}
+	vkh_cmd_end(ctx->cmd);
+	_wait_and_submit_cmd(ctx);
+}
+void _flush_cmd_buff(VkvgContext ctx) {
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	if (!ctx->cmdStarted)
+		return;
+	_end_render_pass(ctx);
+	LOG(VKVG_LOG_INFO, "FLUSH CTX: ctx = %p; vertices = %d; indices = %d\n", ctx, ctx->vertCount, ctx->indCount);
+	_flush_vertices_caches(ctx);
+	vkh_cmd_end(ctx->cmd);
+
+	_wait_and_submit_cmd(ctx);
+}
+
+// bind correct draw pipeline depending on current OPERATOR
+void _bind_draw_pipeline(VkvgContext ctx) {
+	switch (ctx->curOperator) {
+	case VKVG_OPERATOR_OVER:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
+		break;
+	case VKVG_OPERATOR_CLEAR:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_CLEAR);
+		break;
+	case VKVG_OPERATOR_DIFFERENCE:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_SUB);
+		break;
+	default:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
+		break;
+	}
+}
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+const float DBG_LAB_COLOR_RP[4] = { 0, 0, 1, 1 };
+const float DBG_LAB_COLOR_FSQ[4] = { 1, 0, 0, 1 };
+#endif
+
+void _start_cmd_for_render_pass(VkvgContext ctx) {
+	LOG(VKVG_LOG_INFO, "START RENDER PASS: ctx = %p\n", ctx);
+	vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	if (ctx->pSurf->img->layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL || ctx->dev->threadAware) {
+		VkhImage imgMs = ctx->pSurf->imgMS;
+		if (imgMs != NULL)
+			vkh_image_set_layout(ctx->cmd, imgMs, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+		vkh_image_set_layout(ctx->cmd, ctx->pSurf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+		vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+	}
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_start(ctx->cmd, "ctx render pass", DBG_LAB_COLOR_RP);
+#endif
+
+	CmdBeginRenderPass(ctx->cmd, &ctx->renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	VkViewport viewport = { 0, 0, (float)ctx->pSurf->width, (float)ctx->pSurf->height, 0, 1.f };
+	CmdSetViewport(ctx->cmd, 0, 1, &viewport);
+
+	CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
+
+	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
+	CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
+
+	VkDeviceSize offsets[1] = { 0 };
+	CmdBindVertexBuffers(ctx->cmd, 0, 1, &ctx->vertices.buffer, offsets);
+	CmdBindIndexBuffer(ctx->cmd, ctx->indices.buffer, 0, VKVG_VK_INDEX_TYPE);
+
+	_update_push_constants(ctx);
+
+	_bind_draw_pipeline(ctx);
+	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+	ctx->cmdStarted = true;
+}
+// compute inverse mat used in shader when context matrix has changed
+// then trigger push constants command
+void _set_mat_inv_and_vkCmdPush(VkvgContext ctx) {
+	ctx->pushConsts.matInv = ctx->pushConsts.mat;
+	vkvg_matrix_invert(&ctx->pushConsts.matInv);
+	ctx->pushCstDirty = true;
+}
+void _update_push_constants(VkvgContext ctx) {
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
+		&ctx->pushConsts);
+	ctx->pushCstDirty = false;
+}
+void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
+	VkvgPattern lastPat = ctx->pattern;
+	ctx->pattern = pat;
+
+	uint32_t newPatternType = VKVG_PATTERN_TYPE_SOLID;
+
+	LOG(VKVG_LOG_INFO, "CTX: _update_cur_pattern: %p -> %p\n", lastPat, pat);
+
+	if (pat == NULL) {       // solid color
+		if (lastPat == NULL) // solid
+			return;          // solid to solid transition, no extra action requested
+	}
+	else
+		newPatternType = pat->type;
+
+	switch (newPatternType) {
+	case VKVG_PATTERN_TYPE_SOLID:
+		_flush_cmd_buff(ctx);
+		if (!_wait_ctx_flush_end(ctx))
+			return;
+		if (lastPat->type ==
+			VKVG_PATTERN_TYPE_SURFACE) // unbind current source surface by replacing it with empty texture
+			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
+		break;
+	case VKVG_PATTERN_TYPE_SURFACE: {
+		_emit_draw_cmd_undrawn_vertices(ctx);
+
+		VkvgSurface surf = (VkvgSurface)pat->data;
+
+		// flush ctx in two steps to add the src transitioning in the cmd buff
+		if (ctx->cmdStarted) { // transition of img without appropriate dependencies in subpass must be done outside
+			// renderpass.
+			_end_render_pass(ctx);
+			_flush_vertices_caches(ctx);
+		}
+		else {
+			vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+			ctx->cmdStarted = true;
+		}
+
+		// transition source surface for sampling
+		vkh_image_set_layout(ctx->cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+		vkh_cmd_end(ctx->cmd);
+		_wait_and_submit_cmd(ctx);
+		if (!_wait_ctx_flush_end(ctx))
+			return;
+
+		VkSamplerAddressMode addrMode = 0;
+		VkFilter             filter = VK_FILTER_NEAREST;
+		switch (pat->extend) {
+		case VKVG_EXTEND_NONE:
+			addrMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			break;
+		case VKVG_EXTEND_PAD:
+			addrMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			break;
+		case VKVG_EXTEND_REPEAT:
+			addrMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			break;
+		case VKVG_EXTEND_REFLECT:
+			addrMode = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+			break;
+		}
+		switch (pat->filter) {
+		case VKVG_FILTER_BILINEAR:
+		case VKVG_FILTER_BEST:
+			filter = VK_FILTER_LINEAR;
+			break;
+		default:
+			filter = VK_FILTER_NEAREST;
+			break;
+		}
+		vkh_image_create_sampler(surf->img, filter, filter, VK_SAMPLER_MIPMAP_MODE_NEAREST, addrMode);
+
+		_update_descriptor_set(ctx, surf->img, ctx->dsSrc);
+
+		ctx->pushConsts.source.width = (float)surf->width;
+		ctx->pushConsts.source.height = (float)surf->height;
+
+		vkvg_matrix_t mat;
+		if (pat->hasMatrix) {
+			vkvg_pattern_get_matrix(pat, &mat);
+			// if (vkvg_matrix_invert(&mat) != VKVG_STATUS_SUCCESS)
+			//     mat = VKVG_IDENTITY_MATRIX;
+			// vkvg_matrix_transform_point(&mat, &ctx->pushConsts.source.x, &ctx->pushConsts.source.y);
+			// vkvg_matrix_transform_distance(&mat, &ctx->pushConsts.source.width, &ctx->pushConsts.source.height);
+			vkvg_matrix_multiply(&ctx->pushConsts.matInv, &ctx->pushConsts.matInv, &mat);
+		}
+
+		break;
+	}
+	case VKVG_PATTERN_TYPE_LINEAR:
+	case VKVG_PATTERN_TYPE_RADIAL:
+		_flush_cmd_buff(ctx);
+		if (!_wait_ctx_flush_end(ctx))
+			return;
+
+		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
+			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
+
+		vec4 bounds = { {(float)ctx->pSurf->width},
+								  {(float)ctx->pSurf->height},
+								  {0},
+								  {0} }; // store img bounds in unused source field
+		ctx->pushConsts.source = bounds;
+
+		// transform control point with current ctx matrix
+		vkvg_gradient_t grad = *(vkvg_gradient_t*)pat->data;
+
+		if (grad.count < 2) {
+			ctx->status = VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+			return;
+		}
+
+		vkvg_matrix_t mat;
+		if (pat->hasMatrix) {
+			vkvg_pattern_get_matrix(pat, &mat);
+			if (vkvg_matrix_invert(&mat) != VKVG_STATUS_SUCCESS)
+				mat = VKVG_IDENTITY_MATRIX;
+			vkvg_matrix_transform_point(&mat, &grad.cp[0].x, &grad.cp[0].y);
+		}
+
+		vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[0].x, &grad.cp[0].y);
+		if (pat->type == VKVG_PATTERN_TYPE_LINEAR) {
+			if (pat->hasMatrix)
+				vkvg_matrix_transform_point(&mat, &grad.cp[0].z, &grad.cp[0].w);
+			vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
+		}
+		else {
+			if (pat->hasMatrix)
+				vkvg_matrix_transform_point(&mat, &grad.cp[1].x, &grad.cp[1].y);
+			vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[1].x, &grad.cp[1].y);
+
+			// radii
+			if (pat->hasMatrix) {
+				vkvg_matrix_transform_distance(&mat, &grad.cp[0].z, &grad.cp[0].w);
+				vkvg_matrix_transform_distance(&mat, &grad.cp[1].z, &grad.cp[0].w);
+			}
+			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
+			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[1].z, &grad.cp[0].w);
+		}
+
+		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
+		vkh_buffer_flush(&ctx->uboGrad);
+		break;
+	}
+	ctx->pushConsts.fsq_patternType = (ctx->pushConsts.fsq_patternType & FULLSCREEN_BIT) + newPatternType;
+	ctx->pushCstDirty = true;
+	if (lastPat)
+		vkvg_pattern_destroy(lastPat);
+}
+void _update_descriptor_set(VkvgContext ctx, VkhImage img, VkDescriptorSet ds) {
+	VkDescriptorImageInfo descSrcTex = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	VkWriteDescriptorSet  writeDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+												.dstSet = ds,
+												.dstBinding = 0,
+												.descriptorCount = 1,
+												.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+												.pImageInfo = &descSrcTex };
+	vkUpdateDescriptorSets(ctx->dev->vkDev, 1, &writeDescriptorSet, 0, NULL);
+}
+
+void _update_gradient_desc_set(VkvgContext ctx) {
+	VkDescriptorBufferInfo dbi = { ctx->uboGrad.buffer, 0, VK_WHOLE_SIZE };
+	VkWriteDescriptorSet   writeDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+												 .dstSet = ctx->dsGrad,
+												 .dstBinding = 0,
+												 .descriptorCount = 1,
+												 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+												 .pBufferInfo = &dbi };
+	vkUpdateDescriptorSets(ctx->dev->vkDev, 1, &writeDescriptorSet, 0, NULL);
+}
+/*
+ * Reset currently bound descriptor which image could be destroyed
+ */
+ /*void _reset_src_descriptor_set (VkvgContext ctx){
+	 VkvgDevice dev = ctx->pSurf->dev;
+	 //VkDescriptorSet dss[] = {ctx->dsSrc};
+	 vkFreeDescriptorSets	(dev->vkDev, ctx->descriptorPool, 1, &ctx->dsSrc);
+
+	 VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+															   .descriptorPool = ctx->descriptorPool,
+															   .descriptorSetCount = 1,
+															   .pSetLayouts = &dev->dslSrc };
+	 VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsSrc));
+ }*/
+
+void _createDescriptorPool(VkvgContext ctx) {
+	VkvgDevice                 dev = ctx->dev;
+	const VkDescriptorPoolSize descriptorPoolSize[] = { {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2},
+														   {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1} };
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+														   .maxSets = 3,
+														   .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+														   .poolSizeCount = 2,
+														   .pPoolSizes = descriptorPoolSize };
+	VK_CHECK_RESULT(vkCreateDescriptorPool(dev->vkDev, &descriptorPoolCreateInfo, NULL, &ctx->descriptorPool));
+}
+void _init_descriptor_sets(VkvgContext ctx) {
+	VkvgDevice                  dev = ctx->dev;
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+															 .descriptorPool = ctx->descriptorPool,
+															 .descriptorSetCount = 1,
+															 .pSetLayouts = &dev->dslFont };
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsFont));
+	descriptorSetAllocateInfo.pSetLayouts = &dev->dslSrc;
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsSrc));
+	descriptorSetAllocateInfo.pSetLayouts = &dev->dslGrad;
+	VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsGrad));
+}
+void _release_context_ressources(VkvgContext ctx) {
+	VkDevice dev = ctx->dev->vkDev;
+
+#ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	vkDestroyFence(dev, ctx->flushFence, NULL);
+#endif
+
+	vkFreeCommandBuffers(dev, ctx->cmdPool, 2, ctx->cmdBuffers);
+	vkDestroyCommandPool(dev, ctx->cmdPool, NULL);
+
+	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
+	vkFreeDescriptorSets(dev, ctx->descriptorPool, 3, dss);
+
+	vkDestroyDescriptorPool(dev, ctx->descriptorPool, NULL);
+
+	vkh_buffer_reset(&ctx->uboGrad);
+	vkh_buffer_reset(&ctx->indices);
+	vkh_buffer_reset(&ctx->vertices);
+
+	free(ctx->vertexCache);
+	free(ctx->indexCache);
+
+	vkh_image_destroy(ctx->fontCacheImg);
+	// TODO:check this for source counter
+	// vkh_image_destroy	  (ctx->source);
+
+	free(ctx->pathes);
+	free(ctx->points);
+
+	free(ctx);
+}
+// populate vertice buff for stroke
+bool _build_vb_step(VkvgContext ctx, stroke_context_t* str, bool isCurve) {
+	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+	vec2   p0 = ctx->points[str->cp];
+	vec2   v0 = vec2_sub(p0, ctx->points[str->iL]);
+	vec2   v1 = vec2_sub(ctx->points[str->iR], p0);
+	float  length_v0 = vec2_length(v0);
+	float  length_v1 = vec2_length(v1);
+	if (length_v0 < FLT_EPSILON || length_v1 < FLT_EPSILON) {
+		LOG(VKVG_LOG_STROKE, "vb_step discard, length<epsilon: l0:%f l1:%f\n", length_v0, length_v1);
+		return false;
+	}
+	vec2  v0n = vec2_div_s(v0, length_v0);
+	vec2  v1n = vec2_div_s(v1, length_v1);
+	float dot = vec2_dot(v0n, v1n);
+	float det = v0n.x * v1n.y - v0n.y * v1n.x;
+	if (EQUF(dot, 1.0f)) { // colinear
+		LOG(VKVG_LOG_STROKE, "vb_step discard, dot==1\n");
+		return false;
+	}
+
+	if (EQUF(dot, -1.0f)) { // cusp (could draw line butt?)
+		vec2 vPerp = vec2_mult_s(vec2_perp(v0n), str->hw);
+
+		VKVG_IBO_INDEX_TYPE idx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+
+		v.pos = vec2_add(p0, vPerp);
+		_add_vertex(ctx, v);
+		v.pos = vec2_sub(p0, vPerp);
+		_add_vertex(ctx, v);
+
+		_add_triangle_indices(ctx, idx, idx + 1, idx + 2);
+		_add_triangle_indices(ctx, idx, idx + 2, idx + 3);
+		LOG(VKVG_LOG_STROKE, "vb_step cusp, dot==-1\n");
+		return true;
+	}
+
+	vec2  bisec_n = vec2_norm(vec2_add(v0n, v1n)); // bisec/bisec_perp are inverted names
+	float alpha = acosf(dot);
+
+	if (det < 0)
+		alpha = -alpha;
+
+	float halfAlpha = alpha / 2.f;
+	float cosHalfAlpha = cosf(halfAlpha);
+	float lh = str->hw / cosHalfAlpha;
+	vec2  bisec_n_perp = vec2_perp(bisec_n);
+
+	// limit bisectrice length
+	float rlh = lh; // rlh is for inside pos tweeks
+	if (dot < 0.f)
+		rlh = fminf(rlh, fminf(length_v0, length_v1));
+	//---
+
+	vec2 bisec = vec2_mult_s(bisec_n_perp, rlh);
+
+	VKVG_IBO_INDEX_TYPE idx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+
+	vec2 rlh_inside_pos, rlh_outside_pos;
+	if (rlh < lh) {
+		vec2 vnPerp;
+		if (length_v0 < length_v1)
+			vnPerp = vec2_perp(v1n);
+		else
+			vnPerp = vec2_perp(v0n);
+		vec2 vHwPerp = vec2_mult_s(vnPerp, str->hw);
+
+		double lbc = cosHalfAlpha * rlh;
+		if (det < 0.f) {
+			rlh_inside_pos = vec2_add(vec2_add(vec2_mult_s(vnPerp, -lbc), vec2_add(p0, bisec)), vHwPerp);
+			rlh_outside_pos = vec2_sub(p0, vec2_mult_s(bisec_n_perp, lh));
+		}
+		else {
+			rlh_inside_pos = vec2_sub(vec2_add(vec2_mult_s(vnPerp, lbc), vec2_sub(p0, bisec)), vHwPerp);
+			rlh_outside_pos = vec2_add(p0, vec2_mult_s(bisec_n_perp, lh));
+		}
+	}
+	else {
+		if (det < 0.0) {
+			rlh_inside_pos = vec2_add(p0, bisec);
+			rlh_outside_pos = vec2_sub(p0, bisec);
+		}
+		else {
+			rlh_inside_pos = vec2_sub(p0, bisec);
+			rlh_outside_pos = vec2_add(p0, bisec);
+		}
+	}
+
+	vkvg_line_join_t join = ctx->lineJoin;
+
+	if (isCurve) {
+		if (dot < 0.8f)
+			join = VKVG_LINE_JOIN_ROUND;
+		else
+			join = VKVG_LINE_JOIN_MITER;
+	}
+
+	if (join == VKVG_LINE_JOIN_MITER) {
+		if (lh > str->lhMax) { // miter limit
+			double x = (lh - str->lhMax) * cosHalfAlpha;
+			vec2   bisecPerp = vec2_mult_s(bisec_n, x);
+			bisec = vec2_mult_s(bisec_n_perp, str->lhMax);
+			if (det < 0) {
+				v.pos = rlh_inside_pos;
+				_add_vertex(ctx, v);
+
+				vec2 p = vec2_sub(p0, bisec);
+
+				v.pos = vec2_sub(p, bisecPerp);
+				_add_vertex(ctx, v);
+				v.pos = vec2_add(p, bisecPerp);
+				_add_vertex(ctx, v);
+
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 4, idx);
+				_add_triangle_indices(ctx, idx, idx + 3, idx + 4);
+				return true;
+			}
+			else {
+				vec2 p = vec2_add(p0, bisec);
+				v.pos = vec2_sub(p, bisecPerp);
+				_add_vertex(ctx, v);
+
+				v.pos = rlh_inside_pos;
+				_add_vertex(ctx, v);
+
+				v.pos = vec2_add(p, bisecPerp);
+				_add_vertex(ctx, v);
+
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 3, idx + 1);
+				_add_triangle_indices(ctx, idx + 1, idx + 3, idx + 4);
+				return false;
+			}
+
+		}
+		else { // normal miter
+			if (det < 0) {
+				v.pos = rlh_inside_pos;
+				_add_vertex(ctx, v);
+				v.pos = rlh_outside_pos;
+				_add_vertex(ctx, v);
+			}
+			else {
+				v.pos = rlh_outside_pos;
+				_add_vertex(ctx, v);
+				v.pos = rlh_inside_pos;
+				_add_vertex(ctx, v);
+			}
+
+			_add_tri_indices_for_rect(ctx, idx);
+			return false;
+		}
+	}
+	else {
+		vec2 vp = vec2_perp(v0n);
+
+		if (det < 0) {
+			if (dot < 0 && rlh < lh)
+				v.pos = rlh_inside_pos;
+			else
+				v.pos = vec2_add(p0, bisec);
+			_add_vertex(ctx, v);
+			v.pos = vec2_sub(p0, vec2_mult_s(vp, str->hw));
+		}
+		else {
+			v.pos = vec2_add(p0, vec2_mult_s(vp, str->hw));
+			_add_vertex(ctx, v);
+			if (dot < 0 && rlh < lh)
+				v.pos = rlh_inside_pos;
+			else
+				v.pos = vec2_sub(p0, bisec);
+		}
+		_add_vertex(ctx, v);
+
+		if (join == VKVG_LINE_JOIN_BEVEL) {
+			if (det < 0) {
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 4, idx + 0);
+				_add_triangle_indices(ctx, idx, idx + 3, idx + 4);
+			}
+			else {
+				_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				_add_triangle_indices(ctx, idx + 2, idx + 3, idx + 1);
+				_add_triangle_indices(ctx, idx + 1, idx + 3, idx + 4);
+			}
+		}
+		else if (join == VKVG_LINE_JOIN_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = _get_arc_step(ctx, str->hw);
+			float a = acosf(vp.x);
+			if (vp.y < 0)
+				a = -a;
+
+			if (det < 0) {
+				a += M_PIF;
+				float a1 = a + alpha;
+				a -= str->arcStep;
+				while (a > a1) {
+					_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+					a -= str->arcStep;
+				}
+			}
+			else {
+				float a1 = a + alpha;
+				a += str->arcStep;
+				while (a < a1) {
+					_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+					a += str->arcStep;
+				}
+			}
+			VKVG_IBO_INDEX_TYPE p0Idx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+			_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+			if (det < 0) {
+				for (VKVG_IBO_INDEX_TYPE p = idx + 2; p < p0Idx; p++)
+					_add_triangle_indices(ctx, p, p + 1, idx);
+				_add_triangle_indices(ctx, p0Idx, p0Idx + 2, idx);
+				_add_triangle_indices(ctx, idx, p0Idx + 1, p0Idx + 2);
+			}
+			else {
+				for (VKVG_IBO_INDEX_TYPE p = idx + 2; p < p0Idx; p++)
+					_add_triangle_indices(ctx, p, p + 1, idx + 1);
+				_add_triangle_indices(ctx, p0Idx, p0Idx + 1, idx + 1);
+				_add_triangle_indices(ctx, idx + 1, p0Idx + 1, p0Idx + 2);
+			}
+		}
+
+		vp = vec2_mult_s(vec2_perp(v1n), str->hw);
+		if (det < 0)
+			v.pos = vec2_sub(p0, vp);
+		else
+			v.pos = vec2_add(p0, vp);
+		_add_vertex(ctx, v);
+	}
+
+	/*
+	#ifdef DEBUG
+
+		debugLinePoints[dlpCount] = p0;
+		debugLinePoints[dlpCount+1] = _v2add(p0, _vec2dToVec2(_v2Multd(v0n,10)));
+		dlpCount+=2;
+		debugLinePoints[dlpCount] = p0;
+		debugLinePoints[dlpCount+1] = _v2add(p0, _vec2dToVec2(_v2Multd(v1n,10)));
+		dlpCount+=2;
+		debugLinePoints[dlpCount] = p0;
+		debugLinePoints[dlpCount+1] = pR;
+		dlpCount+=2;
+	#endif*/
+	/*if (reducedLH)
+		return -det;
+	else*/
+	return (det < 0);
+}
+
+void _draw_stoke_cap(VkvgContext ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart) {
+	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+
+	VKVG_IBO_INDEX_TYPE firstIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+
+	if (isStart) {
+		vec2 vhw = vec2_mult_s(n, str->hw);
+
+		if (ctx->lineCap == VKVG_LINE_CAP_SQUARE)
+			p0 = vec2_sub(p0, vhw);
+
+		vhw = vec2_perp(vhw);
+
+		if (ctx->lineCap == VKVG_LINE_CAP_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = _get_arc_step(ctx, str->hw);
+
+			float a = acosf(n.x) + M_PIF_2;
+			if (n.y < 0)
+				a = M_PIF - a;
+			float a1 = a + M_PIF;
+
+			a += str->arcStep;
+			while (a < a1) {
+				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+				a += str->arcStep;
+			}
+			VKVG_IBO_INDEX_TYPE p0Idx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+			for (VKVG_IBO_INDEX_TYPE p = firstIdx; p < p0Idx; p++)
+				_add_triangle_indices(ctx, p0Idx + 1, p, p + 1);
+			firstIdx = p0Idx;
+		}
+
+		v.pos = vec2_add(p0, vhw);
+		_add_vertex(ctx, v);
+		v.pos = vec2_sub(p0, vhw);
+		_add_vertex(ctx, v);
+
+		_add_tri_indices_for_rect(ctx, firstIdx);
+	}
+	else {
+		vec2 vhw = vec2_mult_s(n, str->hw);
+
+		if (ctx->lineCap == VKVG_LINE_CAP_SQUARE)
+			p0 = vec2_add(p0, vhw);
+
+		vhw = vec2_perp(vhw);
+
+		v.pos = vec2_add(p0, vhw);
+		_add_vertex(ctx, v);
+		v.pos = vec2_sub(p0, vhw);
+		_add_vertex(ctx, v);
+
+		firstIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+
+		if (ctx->lineCap == VKVG_LINE_CAP_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = _get_arc_step(ctx, str->hw);
+
+			float a = acosf(n.x) + M_PIF_2;
+			if (n.y < 0)
+				a = M_PIF - a;
+			float a1 = a - M_PIF;
+
+			a -= str->arcStep;
+			while (a > a1) {
+				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+				a -= str->arcStep;
+			}
+
+			VKVG_IBO_INDEX_TYPE p0Idx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset - 1);
+			for (VKVG_IBO_INDEX_TYPE p = firstIdx - 1; p < p0Idx; p++)
+				_add_triangle_indices(ctx, p + 1, p, firstIdx - 2);
+		}
+	}
+}
+float _draw_dashed_segment(VkvgContext ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
+	// vec2 pL = ctx->points[str->iL];
+	vec2 p = ctx->points[str->cp];
+	vec2 pR = ctx->points[str->iR];
+
+	if (!dc->dashOn) // we test in fact the next dash start, if dashOn = true => next segment is a void.
+		_build_vb_step(ctx, str, isCurve);
+
+	vec2 d = vec2_sub(pR, p);
+	dc->normal = vec2_norm(d);
+	float segmentLength = vec2_length(d);
+
+	while (dc->curDashOffset < segmentLength) {
+		vec2 p0 = vec2_add(p, vec2_mult_s(dc->normal, dc->curDashOffset));
+
+		_draw_stoke_cap(ctx, str, p0, dc->normal, dc->dashOn);
+		dc->dashOn ^= true;
+		dc->curDashOffset += ctx->dashes[dc->curDash];
+		if (++dc->curDash == ctx->dashCount)
+			dc->curDash = 0;
+	}
+	dc->curDashOffset -= segmentLength;
+	dc->curDashOffset = fmodf(dc->curDashOffset, dc->totDashLength);
+	return segmentLength;
+}
+void _draw_segment(VkvgContext ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
+	str->iR = str->cp + 1;
+	if (ctx->dashCount > 0)
+		_draw_dashed_segment(ctx, str, dc, isCurve);
+	else
+		_build_vb_step(ctx, str, isCurve);
+	str->iL = str->cp++;
+	if (ctx->vertCount - ctx->curVertOffset > VKVG_IBO_MAX / 3) {
+		Vertex v0 = ctx->vertexCache[ctx->curVertOffset + str->firstIdx];
+		Vertex v1 = ctx->vertexCache[ctx->curVertOffset + str->firstIdx + 1];
+		_emit_draw_cmd_undrawn_vertices(ctx);
+		// repeat first 2 vertices for closed pathes
+		str->firstIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+		_add_vertex(ctx, v0);
+		_add_vertex(ctx, v1);
+		ctx->curVertOffset = ctx->vertCount; // prevent redrawing them at the start of the batch
+	}
+}
+
+bool ptInTriangle(vec2 p, vec2 p0, vec2 p1, vec2 p2) {
+	float dX = p.x - p2.x;
+	float dY = p.y - p2.y;
+	float dX21 = p2.x - p1.x;
+	float dY12 = p1.y - p2.y;
+	float D = dY12 * (p0.x - p2.x) + dX21 * (p0.y - p2.y);
+	float s = dY12 * dX + dX21 * dY;
+	float t = (p2.y - p0.y) * dX + (p0.x - p2.x) * dY;
+	if (D < 0)
+		return (s <= 0) && (t <= 0) && (s + t >= D);
+	return (s >= 0) && (t >= 0) && (s + t <= D);
+}
+
+void _free_ctx_save(vkvg_context_save_t* sav) {
+	if (sav->dashCount > 0)
+		free(sav->dashes);
+	if (sav->pattern)
+		vkvg_pattern_destroy(sav->pattern);
+	free(sav);
+}
+
+#define M_APPROXIMATION_SCALE         1.0
+#define M_ANGLE_TOLERANCE             0.01
+#define M_CUSP_LIMIT                  0.01
+#define CURVE_RECURSION_LIMIT         100
+#define CURVE_COLLINEARITY_EPSILON    1.7
+#define CURVE_ANGLE_TOLERANCE_EPSILON 0.001
+// no floating point arithmetic operation allowed in macro.
+#pragma warning(disable : 4127)
+void _recursive_bezier(VkvgContext ctx, float distanceTolerance, float x1, float y1, float x2, float y2, float x3,
+	float y3, float x4, float y4, unsigned level) {
+	if (level > CURVE_RECURSION_LIMIT) {
+		return;
+	}
+
+	// Calculate all the mid-points of the line segments
+	//----------------------
+	float x12 = (x1 + x2) / 2;
+	float y12 = (y1 + y2) / 2;
+	float x23 = (x2 + x3) / 2;
+	float y23 = (y2 + y3) / 2;
+	float x34 = (x3 + x4) / 2;
+	float y34 = (y3 + y4) / 2;
+	float x123 = (x12 + x23) / 2;
+	float y123 = (y12 + y23) / 2;
+	float x234 = (x23 + x34) / 2;
+	float y234 = (y23 + y34) / 2;
+	float x1234 = (x123 + x234) / 2;
+	float y1234 = (y123 + y234) / 2;
+
+	if (level > 0) // Enforce subdivision first time
+	{
+		// Try to approximate the full cubic curve by a single straight line
+		//------------------
+		float dx = x4 - x1;
+		float dy = y4 - y1;
+
+		float d2 = fabsf(((x2 - x4) * dy - (y2 - y4) * dx));
+		float d3 = fabsf(((x3 - x4) * dy - (y3 - y4) * dx));
+
+		float da1, da2;
+
+		if (d2 > CURVE_COLLINEARITY_EPSILON && d3 > CURVE_COLLINEARITY_EPSILON) {
+			// Regular care
+			//-----------------
+			if ((d2 + d3) * (d2 + d3) <= (dx * dx + dy * dy) * distanceTolerance) {
+				// If the curvature doesn't exceed the distance_tolerance value
+				// we tend to finish subdivisions.
+				//----------------------
+				if (M_ANGLE_TOLERANCE < CURVE_ANGLE_TOLERANCE_EPSILON) {
+					_add_point(ctx, x1234, y1234);
+					return;
+				}
+
+				// Angle & Cusp Condition
+				//----------------------
+				float a23 = atan2f(y3 - y2, x3 - x2);
+				da1 = fabsf(a23 - atan2f(y2 - y1, x2 - x1));
+				da2 = fabsf(atan2f(y4 - y3, x4 - x3) - a23);
+				if (da1 >= M_PIF)
+					da1 = M_2_PIF - da1;
+				if (da2 >= M_PIF)
+					da2 = M_2_PIF - da2;
+
+				if (da1 + da2 < (float)M_ANGLE_TOLERANCE) {
+					// Finally we can stop the recursion
+					//----------------------
+					_add_point(ctx, x1234, y1234);
+					return;
+				}
+
+				if (M_CUSP_LIMIT != 0.0) {
+					if (da1 > M_CUSP_LIMIT) {
+						_add_point(ctx, x2, y2);
+						return;
+					}
+
+					if (da2 > M_CUSP_LIMIT) {
+						_add_point(ctx, x3, y3);
+						return;
+					}
+				}
+			}
+		}
+		else {
+			if (d2 > CURVE_COLLINEARITY_EPSILON) {
+				// p1,p3,p4 are collinear, p2 is considerable
+				//----------------------
+				if (d2 * d2 <= distanceTolerance * (dx * dx + dy * dy)) {
+					if (M_ANGLE_TOLERANCE < CURVE_ANGLE_TOLERANCE_EPSILON) {
+						_add_point(ctx, x1234, y1234);
+						return;
+					}
+
+					// Angle Condition
+					//----------------------
+					da1 = fabsf(atan2f(y3 - y2, x3 - x2) - atan2f(y2 - y1, x2 - x1));
+					if (da1 >= M_PIF)
+						da1 = M_2_PIF - da1;
+
+					if (da1 < M_ANGLE_TOLERANCE) {
+						_add_point(ctx, x2, y2);
+						_add_point(ctx, x3, y3);
+						return;
+					}
+
+					if (M_CUSP_LIMIT != 0.0) {
+						if (da1 > M_CUSP_LIMIT) {
+							_add_point(ctx, x2, y2);
+							return;
+						}
+					}
+				}
+			}
+			else if (d3 > CURVE_COLLINEARITY_EPSILON) {
+				// p1,p2,p4 are collinear, p3 is considerable
+				//----------------------
+				if (d3 * d3 <= distanceTolerance * (dx * dx + dy * dy)) {
+					if (M_ANGLE_TOLERANCE < CURVE_ANGLE_TOLERANCE_EPSILON) {
+						_add_point(ctx, x1234, y1234);
+						return;
+					}
+
+					// Angle Condition
+					//----------------------
+					da1 = fabsf(atan2f(y4 - y3, x4 - x3) - atan2f(y3 - y2, x3 - x2));
+					if (da1 >= M_PIF)
+						da1 = M_2_PIF - da1;
+
+					if (da1 < M_ANGLE_TOLERANCE) {
+						_add_point(ctx, x2, y2);
+						_add_point(ctx, x3, y3);
+						return;
+					}
+
+					if (M_CUSP_LIMIT != 0.0) {
+						if (da1 > M_CUSP_LIMIT) {
+							_add_point(ctx, x3, y3);
+							return;
+						}
+					}
+				}
+			}
+			else {
+				// Collinear case
+				//-----------------
+				dx = x1234 - (x1 + x4) / 2;
+				dy = y1234 - (y1 + y4) / 2;
+				if (dx * dx + dy * dy <= distanceTolerance) {
+					_add_point(ctx, x1234, y1234);
+					return;
+				}
+			}
+		}
+	}
+
+	// Continue subdivision
+	//----------------------
+	_recursive_bezier(ctx, distanceTolerance, x1, y1, x12, y12, x123, y123, x1234, y1234, level + 1);
+	_recursive_bezier(ctx, distanceTolerance, x1234, y1234, x234, y234, x34, y34, x4, y4, level + 1);
+}
+#pragma warning(default : 4127)
+void _line_to(VkvgContext ctx, float x, float y) {
+	vec2 p = { x, y };
+	if (!_current_path_is_empty(ctx)) {
+		// prevent adding the same point
+		if (vec2_equ(_get_current_position(ctx), p))
+			return;
+	}
+	_add_point(ctx, x, y);
+	ctx->simpleConvex = false;
+}
+void _elliptic_arc(VkvgContext ctx, float x1, float y1, float x2, float y2, bool largeArc, bool counterClockWise,
+	float _rx, float _ry, float phi) {
+	if (ctx->status)
+		return;
+
+	if (_rx == 0 || _ry == 0) {
+		if (_current_path_is_empty(ctx))
+			vkvg_move_to(ctx, x1, y1);
+		vkvg_line_to(ctx, x2, y2);
+		return;
+	}
+	float rx = fabsf(_rx);
+	float ry = fabsf(_ry);
+
+	mat2 m = { {cosf(phi), sinf(phi)}, {-sinf(phi), cosf(phi)} };
+	vec2 p = { (x1 - x2) / 2, (y1 - y2) / 2 };
+	vec2 p1 = mat2_mult_vec2(m, p);
+
+	// radii corrections
+	double lambda = powf(p1.x, 2) / powf(rx, 2) + powf(p1.y, 2) / powf(ry, 2);
+	if (lambda > 1) {
+		lambda = sqrtf(lambda);
+		rx *= lambda;
+		ry *= lambda;
+	}
+
+	p = (vec2){ rx * p1.y / ry, -ry * p1.x / rx };
+
+	vec2 cp = vec2_mult_s(
+		p, sqrtf(fabsf((powf(rx, 2) * powf(ry, 2) - powf(rx, 2) * powf(p1.y, 2) - powf(ry, 2) * powf(p1.x, 2)) /
+			(powf(rx, 2) * powf(p1.y, 2) + powf(ry, 2) * powf(p1.x, 2)))));
+
+	if (largeArc == counterClockWise)
+		vec2_inv(&cp);
+
+	m = (mat2){ {cosf(phi), -sinf(phi)}, {sinf(phi), cosf(phi)} };
+	p = (vec2){ (x1 + x2) / 2, (y1 + y2) / 2 };
+	vec2 c = vec2_add(mat2_mult_vec2(m, cp), p);
+
+	vec2   u = vec2_unit_x;
+	vec2   v = { (p1.x - cp.x) / rx, (p1.y - cp.y) / ry };
+	double sa = acosf(vec2_dot(u, v) / (fabsf(vec2_length(v)) * fabsf(vec2_length(u))));
+	if (isnan(sa))
+		sa = M_PIF;
+	if (u.x * v.y - u.y * v.x < 0)
+		sa = -sa;
+
+	u = v;
+	v = (vec2){ (-p1.x - cp.x) / rx, (-p1.y - cp.y) / ry };
+	double delta_theta = acosf(vec2_dot(u, v) / (fabsf(vec2_length(v)) * fabsf(vec2_length(u))));
+	if (isnan(delta_theta))
+		delta_theta = M_PIF;
+	if (u.x * v.y - u.y * v.x < 0)
+		delta_theta = -delta_theta;
+
+	if (counterClockWise) {
+		if (delta_theta < 0)
+			delta_theta += M_PIF * 2.0;
+	}
+	else if (delta_theta > 0)
+		delta_theta -= M_PIF * 2.0;
+
+	m = (mat2){ {cosf(phi), -sinf(phi)}, {sinf(phi), cosf(phi)} };
+
+	double theta = sa;
+	double ea = sa + delta_theta;
+
+	float step = fmaxf(0.001f, fminf(M_PIF, _get_arc_step(ctx, fminf(rx, ry)) * 0.1f));
+
+	p = (vec2){ rx * cosf(theta), ry * sinf(theta) };
+	vec2 xy = vec2_add(mat2_mult_vec2(m, p), c);
+
+	if (_current_path_is_empty(ctx)) {
+		_set_curve_start(ctx);
+		_add_point(ctx, xy.x, xy.y);
+		if (!ctx->pathPtr)
+			ctx->simpleConvex = true;
+		else
+			ctx->simpleConvex = false;
+	}
+	else {
+		_line_to(ctx, xy.x, xy.y);
+		_set_curve_start(ctx);
+		ctx->simpleConvex = false;
+	}
+
+	_set_curve_start(ctx);
+
+	if (sa < ea) {
+		theta += step;
+		while (theta < ea) {
+			p = (vec2){ rx * cosf(theta), ry * sinf(theta) };
+			xy = vec2_add(mat2_mult_vec2(m, p), c);
+			_add_point(ctx, xy.x, xy.y);
+			theta += step;
+		}
+	}
+	else {
+		theta -= step;
+		while (theta > ea) {
+			p = (vec2){ rx * cosf(theta), ry * sinf(theta) };
+			xy = vec2_add(mat2_mult_vec2(m, p), c);
+			_add_point(ctx, xy.x, xy.y);
+			theta -= step;
+		}
+	}
+	p = (vec2){ rx * cosf(ea), ry * sinf(ea) };
+	xy = vec2_add(mat2_mult_vec2(m, p), c);
+	_add_point(ctx, xy.x, xy.y);
+	_set_curve_end(ctx);
+}
+
+// Even-Odd inside test with stencil buffer implementation.
+void _poly_fill(VkvgContext ctx, vec4* bounds) {
+	// we anticipate the check for vbo buffer size, ibo is not used in poly_fill
+	// the polyfill emit a single vertex for each point in the path.
+	if (ctx->sizeVBO - VKVG_ARRAY_THRESHOLD < ctx->vertCount + ctx->pointCount) {
+		if (ctx->cmdStarted) {
+			_end_render_pass(ctx);
+			if (ctx->vertCount > 0)
+				_flush_vertices_caches(ctx);
+			vkh_cmd_end(ctx->cmd);
+			_wait_and_submit_cmd(ctx);
+			_wait_ctx_flush_end(ctx);
+			if (ctx->sizeVBO - VKVG_ARRAY_THRESHOLD < ctx->pointCount) {
+				_resize_vbo(ctx, ctx->pointCount + VKVG_ARRAY_THRESHOLD);
+				_resize_vertex_cache(ctx, ctx->sizeVBO);
+			}
+		}
+		else {
+			_resize_vbo(ctx, ctx->vertCount + ctx->pointCount + VKVG_ARRAY_THRESHOLD);
+			_resize_vertex_cache(ctx, ctx->sizeVBO);
+		}
+
+		_start_cmd_for_render_pass(ctx);
+	}
+	else {
+		_ensure_vertex_cache_size(ctx, ctx->pointCount);
+		_ensure_renderpass_is_started(ctx);
+	}
+
+	CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
+
+	Vertex   v = { {0}, ctx->curColor, {0, 0, -1} };
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		if (pathPointCount > 2) {
+			VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)ctx->vertCount;
+
+			for (uint32_t i = 0; i < pathPointCount; i++) {
+				v.pos = ctx->points[i + firstPtIdx];
+				ctx->vertexCache[ctx->vertCount++] = v;
+				if (!bounds)
+					continue;
+				// bounds are computed here to scissor the painting operation
+				// that speed up fill drastically.
+				vkvg_matrix_transform_point(&ctx->pushConsts.mat, &v.pos.x, &v.pos.y);
+
+				if (v.pos.x < bounds->xMin)
+					bounds->xMin = v.pos.x;
+				if (v.pos.x > bounds->xMax)
+					bounds->xMax = v.pos.x;
+				if (v.pos.y < bounds->yMin)
+					bounds->yMin = v.pos.y;
+				if (v.pos.y > bounds->yMax)
+					bounds->yMax = v.pos.y;
+			}
+
+			LOG(VKVG_LOG_INFO_PATH, "\tpoly fill: point count = %d; 1st vert = %d; vert count = %d\n", pathPointCount,
+				firstVertIdx, ctx->vertCount - firstVertIdx);
+			CmdDraw(ctx->cmd, pathPointCount, 1, firstVertIdx, 0);
+		}
+		firstPtIdx += pathPointCount;
+
+		if (_path_has_curves(ctx, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+	ctx->curVertOffset = ctx->vertCount;
+}
+#ifdef VKVG_FILL_NZ_GLUTESS
+void fan_vertex2(VKVG_IBO_INDEX_TYPE v, VkvgContext ctx) {
+	VKVG_IBO_INDEX_TYPE i = (VKVG_IBO_INDEX_TYPE)v;
+	switch (ctx->tesselator_idx_counter) {
+	case 0:
+		_add_indice(ctx, i);
+		ctx->tesselator_fan_start = i;
+		ctx->tesselator_idx_counter++;
+		break;
+	case 1:
+	case 2:
+		_add_indice(ctx, i);
+		ctx->tesselator_idx_counter++;
+		break;
+	default:
+		_add_indice_for_fan(ctx, i);
+		break;
+	}
+}
+void strip_vertex2(VKVG_IBO_INDEX_TYPE v, VkvgContext ctx) {
+	VKVG_IBO_INDEX_TYPE i = (VKVG_IBO_INDEX_TYPE)v;
+	if (ctx->tesselator_idx_counter < 3) {
+		_add_indice(ctx, i);
+	}
+	else
+		_add_indice_for_strip(ctx, i, ctx->tesselator_idx_counter % 2);
+	ctx->tesselator_idx_counter++;
+}
+void triangle_vertex2(VKVG_IBO_INDEX_TYPE v, VkvgContext ctx) {
+	VKVG_IBO_INDEX_TYPE i = (VKVG_IBO_INDEX_TYPE)v;
+	_add_indice(ctx, i);
+}
+void skip_vertex2(VKVG_IBO_INDEX_TYPE v, VkvgContext ctx) {}
+void begin2(GLenum which, void* poly_data) {
+	VkvgContext ctx = (VkvgContext)poly_data;
+	switch (which) {
+	case GL_TRIANGLES:
+		ctx->vertex_cb = &triangle_vertex2;
+		break;
+	case GL_TRIANGLE_STRIP:
+		ctx->tesselator_idx_counter = 0;
+		ctx->vertex_cb = &strip_vertex2;
+		break;
+	case GL_TRIANGLE_FAN:
+		ctx->tesselator_idx_counter = ctx->tesselator_fan_start = 0;
+		ctx->vertex_cb = &fan_vertex2;
+		break;
+	default:
+		fprintf(stderr, "ERROR, can't handle %d\n", (int)which);
+		ctx->vertex_cb = &skip_vertex2;
+	}
+}
+
+void combine2(const GLdouble newVertex[3], const void* neighborVertex_s[4], const GLfloat neighborWeight[4],
+	void** outData, void* poly_data) {
+	VkvgContext ctx = (VkvgContext)poly_data;
+	Vertex      v = { {newVertex[0], newVertex[1]}, ctx->curColor, {0, 0, -1} };
+	*outData = (void*)((unsigned long)(ctx->vertCount - ctx->curVertOffset));
+	_add_vertex(ctx, v);
+}
+void vertex2(void* vertex_data, void* poly_data) {
+	VKVG_IBO_INDEX_TYPE i = (VKVG_IBO_INDEX_TYPE)vertex_data;
+	VkvgContext         ctx = (VkvgContext)poly_data;
+	ctx->vertex_cb(i, ctx);
+}
+void _fill_non_zero(VkvgContext ctx) {
+	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+
+	if (ctx->pathPtr == 1 && ctx->pathes[0] & PATH_IS_CONVEX_BIT) {
+		// simple concave rectangle or circle
+		VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+		uint32_t            pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+
+		_ensure_vertex_cache_size(ctx, pathPointCount);
+		_ensure_index_cache_size(ctx, (pathPointCount - 2) * 3);
+
+		VKVG_IBO_INDEX_TYPE i = 0;
+		while (i < 2) {
+			v.pos = ctx->points[i++];
+			_set_vertex(ctx, ctx->vertCount++, v);
+		}
+		while (i < pathPointCount) {
+			v.pos = ctx->points[i];
+			_set_vertex(ctx, ctx->vertCount++, v);
+			_add_triangle_indices_unchecked(ctx, firstVertIdx, firstVertIdx + i - 1, firstVertIdx + i);
+			i++;
+		}
+		return;
+	}
+
+	GLUtesselator* tess = gluNewTess();
+	gluTessProperty(tess, GLU_TESS_WINDING_RULE, GLU_TESS_WINDING_NONZERO);
+	gluTessCallback(tess, GLU_TESS_VERTEX_DATA, (GLvoid(*)()) & vertex2);
+	gluTessCallback(tess, GLU_TESS_BEGIN_DATA, (GLvoid(*)()) & begin2);
+	gluTessCallback(tess, GLU_TESS_COMBINE_DATA, (GLvoid(*)()) & combine2);
+
+	gluTessBeginPolygon(tess, ctx);
+
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+
+		if (pathPointCount > 2) {
+			VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+			gluTessBeginContour(tess);
+
+			VKVG_IBO_INDEX_TYPE i = 0;
+
+			while (i < pathPointCount) {
+				v.pos = ctx->points[i + firstPtIdx];
+				double dp[] = { v.pos.x, v.pos.y, 0 };
+				_add_vertex(ctx, v);
+				gluTessVertex(tess, dp, (void*)((unsigned long)firstVertIdx + i));
+				i++;
+			}
+			gluTessEndContour(tess);
+
+			// limit batch size here to 1/3 of the ibo index type ability
+			// if (ctx->vertCount - ctx->curVertOffset > VKVG_IBO_MAX / 3)
+			//	_emit_draw_cmd_undrawn_vertices(ctx);
+		}
+
+		firstPtIdx += pathPointCount;
+		if (_path_has_curves(ctx, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+
+	gluTessEndPolygon(tess);
+
+	gluDeleteTess(tess);
+}
+#else
+// create fill from current path with ear clipping technic
+void _fill_non_zero(VkvgContext ctx) {
+	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+	uint32_t capPathPointCount = 0;
+	ear_clip_point* ecps = 0;
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+
+		if (pathPointCount > 2) {
+			VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
+			// ear_clip_point* ecps = (ear_clip_point*)malloc(pathPointCount*sizeof(ear_clip_point));
+			if (!ecps || pathPointCount > capPathPointCount)
+			{
+				ear_clip_point* kp = (ear_clip_point*)realloc(ecps, pathPointCount * sizeof(ear_clip_point));
+				if (kp)
+				{
+					ecps = kp;
+					capPathPointCount = pathPointCount;
+				}
+			}
+			if (!ecps)break;
+			//ear_clip_point      ecps[pathPointCount];
+			uint32_t            ecps_count = pathPointCount;
+			VKVG_IBO_INDEX_TYPE i = 0;
+
+			// init points link list
+			while (i < pathPointCount - 1) {
+				v.pos = ctx->points[i + firstPtIdx];
+				ear_clip_point ecp = { v.pos, firstVertIdx + i, &ecps[i + 1] };
+				ecps[i] = ecp;
+				_add_vertex(ctx, v);
+				i++;
+			}
+
+			v.pos = ctx->points[i + firstPtIdx];
+			ear_clip_point ecp = { v.pos, firstVertIdx + i, ecps };
+			ecps[i] = ecp;
+			_add_vertex(ctx, v);
+
+			ear_clip_point* ecp_current = ecps;
+			uint32_t        tries = 0;
+
+			while (ecps_count > 3) {
+				if (tries > ecps_count) {
+					break;
+				}
+				ear_clip_point* v0 = ecp_current->next, * v1 = ecp_current, * v2 = ecp_current->next->next;
+				if (ecp_zcross(v0, v2, v1) < 0) {
+					ecp_current = ecp_current->next;
+					tries++;
+					continue;
+				}
+				ear_clip_point* vP = v2->next;
+				bool            isEar = true;
+				while (vP != v1) {
+					if (ptInTriangle(vP->pos, v0->pos, v2->pos, v1->pos)) {
+						isEar = false;
+						break;
+					}
+					vP = vP->next;
+				}
+				if (isEar) {
+					_add_triangle_indices(ctx, v0->idx, v1->idx, v2->idx);
+					v1->next = v2;
+					ecps_count--;
+					tries = 0;
+				}
+				else {
+					ecp_current = ecp_current->next;
+					tries++;
+				}
+			}
+			if (ecps_count == 3)
+				_add_triangle_indices(ctx, ecp_current->next->idx, ecp_current->idx, ecp_current->next->next->idx);
+
+			// limit batch size here to 1/3 of the ibo index type ability
+			if (ctx->vertCount - ctx->curVertOffset > VKVG_IBO_MAX / 3)
+				_emit_draw_cmd_undrawn_vertices(ctx);
+		}
+
+		firstPtIdx += pathPointCount;
+		if (_path_has_curves(ctx, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+	if (ecps)free(ecps);
+}
+#endif
+
+void _vkvg_path_extents(VkvgContext ctx, bool transformed, float* x1, float* y1, float* x2, float* y2) {
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+
+	float xMin = FLT_MAX, yMin = FLT_MAX;
+	float xMax = FLT_MIN, yMax = FLT_MIN;
+
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+
+		for (uint32_t i = firstPtIdx; i < firstPtIdx + pathPointCount; i++) {
+			vec2 p = ctx->points[i];
+			if (transformed)
+				vkvg_matrix_transform_point(&ctx->pushConsts.mat, &p.x, &p.y);
+			if (p.x < xMin)
+				xMin = p.x;
+			if (p.x > xMax)
+				xMax = p.x;
+			if (p.y < yMin)
+				yMin = p.y;
+			if (p.y > yMax)
+				yMax = p.y;
+		}
+
+		firstPtIdx += pathPointCount;
+		if (_path_has_curves(ctx, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+	*x1 = xMin;
+	*x2 = xMax;
+	*y1 = yMin;
+	*y2 = yMax;
+}
+
+void _draw_full_screen_quad(VkvgContext ctx, vec4* scissor) {
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_start(ctx->cmd, "_draw_full_screen_quad", DBG_LAB_COLOR_FSQ);
+#endif
+	if (scissor) {
+		VkRect2D r = { {(int32_t)MAX(scissor->xMin, 0), (int32_t)MAX(scissor->yMin, 0)},
+					  {(int32_t)MAX(scissor->xMax - (int32_t)scissor->xMin + 1, 1),
+					   (int32_t)MAX(scissor->yMax - (int32_t)scissor->yMin + 1, 1)} };
+		CmdSetScissor(ctx->cmd, 0, 1, &r);
+	}
+
+	uint32_t firstVertIdx = ctx->vertCount;
+	_ensure_vertex_cache_size(ctx, 3);
+
+	_add_vertexf_unchecked(ctx, -1, -1);
+	_add_vertexf_unchecked(ctx, 3, -1);
+	_add_vertexf_unchecked(ctx, -1, 3);
+
+	ctx->curVertOffset = ctx->vertCount;
+
+	ctx->pushConsts.fsq_patternType |= FULLSCREEN_BIT;
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4,
+		&ctx->pushConsts.fsq_patternType);
+	CmdDraw(ctx->cmd, 3, 1, firstVertIdx, 0);
+	ctx->pushConsts.fsq_patternType &= ~FULLSCREEN_BIT;
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4,
+		&ctx->pushConsts.fsq_patternType);
+	if (scissor)
+		CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_end(ctx->cmd);
+#endif
+}
+
+void _select_font_face(VkvgContext ctx, const char* name) {
+	if (strcmp(ctx->selectedFontName, name) == 0)
+		return;
+	strcpy(ctx->selectedFontName, name);
+	ctx->currentFont = NULL;
+	ctx->currentFontSize = NULL;
+}
+
+#endif // 1
+
+// dev
+#if 1 
+
+#include "vkvg_device_internal.h"
+#include "vkvg_context_internal.h"
+#include "vkh_queue.h"
+#include "vkh_phyinfo.h"
+#include "vk_mem_alloc.h"
+
+#define TRY_LOAD_DEVICE_EXT(ext)                                                                                       \
+    {                                                                                                                  \
+        if (vkh_phyinfo_try_get_extension_properties(pi, #ext, NULL))                                                  \
+            enabledExts[enabledExtsCount++] = #ext;                                                                    \
+    }
+
+#define _CHECK_INST_EXT(ext)                                                                                           \
+if (vkh_instance_extension_supported(#ext)) {                                                                      \
+        if (pExtensions)                                                                                               \
+        pExtensions[*pExtCount] = #ext;                                                                            \
+        (*pExtCount)++;                                                                                                \
+}
+
+#define _CHECK_DEV_EXT(ext)                                                                                            \
+{                                                                                                                  \
+        if (_get_dev_extension_is_supported(pExtensionProperties, extensionCount, #ext)) {                             \
+            if (pExtensions)                                                                                           \
+            pExtensions[*pExtCount] = #ext;                                                                        \
+            (*pExtCount)++;                                                                                            \
+    }                                                                                                              \
+}
+
+void vkvg_device_set_context_cache_size(VkvgDevice dev, uint32_t maxCount) {
+	if (maxCount == dev->cachedContextMaxCount)
+		return;
+
+	dev->cachedContextMaxCount = maxCount;
+
+	_cached_ctx* cur = dev->cachedContextLast;
+	while (cur && dev->cachedContextCount > dev->cachedContextMaxCount) {
+		_release_context_ressources(cur->ctx);
+		_cached_ctx* prev = cur;
+		cur = cur->pNext;
+		free(prev);
+		dev->cachedContextCount--;
+	}
+	dev->cachedContextLast = cur;
+}
+void _device_init(VkvgDevice dev, const vkvg_device_create_info_t* info) {
+	dev->vkDev = info->vkdev;
+	dev->phy = info->phy;
+	dev->instance = info->inst;
+	dev->hdpi = 72;
+	dev->vdpi = 72;
+	dev->samples = info->samples;
+	if (dev->samples == VK_SAMPLE_COUNT_1_BIT)
+		dev->deferredResolve = false;
+	else
+		dev->deferredResolve = info->deferredResolve;
+
+	dev->cachedContextMaxCount = VKVG_MAX_CACHED_CONTEXT_COUNT;
+
+#if VKVG_DBG_STATS
+	dev->debug_stats = (vkvg_debug_stats_t){ 0 };
+#endif
+
+	VkFormat format = FB_COLOR_FORMAT;
+
+	_device_check_best_image_tiling(dev, format);
+	if (dev->status != VKVG_STATUS_SUCCESS)
+		return;
+
+	VkhDevice vkhd = (VkhDevice)&dev->vkDev;
+
+	if (!_device_init_function_pointers(dev)) {
+		dev->status = VKVG_STATUS_NULL_POINTER;
+		return;
+	}
+
+	VkhPhyInfo phyInfos = vkh_phyinfo_create(dev->phy, NULL);
+
+	dev->phyMemProps = phyInfos->memProps;
+	dev->gQueue = vkh_queue_create(vkhd, info->qFamIdx, info->qIndex);
+	// mtx_init (&dev->gQMutex, mtx_plain);
+
+	vkh_phyinfo_destroy(phyInfos);
+
+#ifdef VKH_USE_VMA
+	VmaAllocatorCreateInfo allocatorInfo = { .physicalDevice = info->phy, .device = info->vkdev };
+	vmaCreateAllocator(&allocatorInfo, (VmaAllocator*)&dev->allocator);
+#endif
+
+	dev->cmdPool = vkh_cmd_pool_create(vkhd, dev->gQueue->familyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	dev->cmd = vkh_cmd_buff_create(vkhd, dev->cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	dev->fence = vkh_fence_create_signaled(vkhd);
+
+	_device_create_pipeline_cache(dev);
+	_fonts_cache_create(dev);
+	if (dev->deferredResolve || dev->samples == VK_SAMPLE_COUNT_1_BIT) {
+		dev->renderPass =
+			_device_createRenderPassNoResolve(dev, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_LOAD);
+		dev->renderPass_ClearStencil =
+			_device_createRenderPassNoResolve(dev, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR);
+		dev->renderPass_ClearAll =
+			_device_createRenderPassNoResolve(dev, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_LOAD_OP_CLEAR);
+	}
+	else {
+		dev->renderPass = _device_createRenderPassMS(dev, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_LOAD);
+		dev->renderPass_ClearStencil =
+			_device_createRenderPassMS(dev, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR);
+		dev->renderPass_ClearAll =
+			_device_createRenderPassMS(dev, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_LOAD_OP_CLEAR);
+	}
+	_device_createDescriptorSetLayout(dev);
+	_device_setupPipelines(dev);
+
+	_device_create_empty_texture(dev, format, dev->supportedTiling);
+
+#ifdef DEBUG
+#if defined(__linux__) && defined(__GLIBC__)
+	_linux_register_error_handler();
+#endif
+#ifdef VKVG_DBG_UTILS
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_POOL, (uint64_t)dev->cmdPool, "Device Cmd Pool");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)dev->cmd, "Device Cmd Buff");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_FENCE, (uint64_t)dev->fence, "Device Fence");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)dev->renderPass, "RP load img/stencil");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)dev->renderPass_ClearStencil,
+		"RP clear stencil");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_RENDER_PASS, (uint64_t)dev->renderPass_ClearAll, "RP clear all");
+
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)dev->dslSrc, "DSLayout SOURCE");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)dev->dslFont, "DSLayout FONT");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (uint64_t)dev->dslGrad, "DSLayout GRADIENT");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)dev->pipelineLayout, "PLLayout dev");
+
+#ifndef __APPLE__
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE, (uint64_t)dev->pipelinePolyFill, "PL Poly fill");
+#endif
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE, (uint64_t)dev->pipelineClipping, "PL Clipping");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE, (uint64_t)dev->pipe_OVER, "PL draw Over");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE, (uint64_t)dev->pipe_SUB, "PL draw Substract");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_PIPELINE, (uint64_t)dev->pipe_CLEAR, "PL draw Clear");
+
+	vkh_image_set_name(dev->emptyImg, "empty IMG");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)vkh_image_get_view(dev->emptyImg),
+		"empty IMG VIEW");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_SAMPLER, (uint64_t)vkh_image_get_sampler(dev->emptyImg),
+		"empty IMG SAMPLER");
+#endif
+#endif
+	dev->status = VKVG_STATUS_SUCCESS;
+}
+
+
+void vkvg_get_required_instance_extensions(const char** pExtensions, uint32_t* pExtCount) {
+	*pExtCount = 0;
+
+	vkh_instance_extensions_check_init();
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	_CHECK_INST_EXT(VK_EXT_debug_utils)
+#endif
+		_CHECK_INST_EXT(VK_KHR_get_physical_device_properties2)
+
+		vkh_instance_extensions_check_release();
+}
+
+bool _get_dev_extension_is_supported(VkExtensionProperties* pExtensionProperties, uint32_t extensionCount,
+	const char* name) {
+	for (uint32_t i = 0; i < extensionCount; i++) {
+		if (strcmp(name, pExtensionProperties[i].extensionName) == 0)
+			return true;
+	}
+	return false;
+}
+
+
+vkvg_status_t vkvg_get_required_device_extensions(VkPhysicalDevice phy, const char** pExtensions, uint32_t* pExtCount) {
+	VkExtensionProperties* pExtensionProperties;
+	uint32_t               extensionCount;
+
+	*pExtCount = 0;
+
+	VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(phy, NULL, &extensionCount, NULL));
+	pExtensionProperties = (VkExtensionProperties*)malloc(extensionCount * sizeof(VkExtensionProperties));
+	VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(phy, NULL, &extensionCount, pExtensionProperties));
+
+	// https://vulkan.lunarg.com/doc/view/1.2.162.0/mac/1.2-extensions/vkspec.html#VK_KHR_portability_subset
+	_CHECK_DEV_EXT(VK_KHR_portability_subset);
+	VkPhysicalDeviceFeatures2 phyFeat2 = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+
+#ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
+	// ensure feature is implemented by driver.
+	VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockLayoutSupport = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES };
+	phyFeat2.pNext = &scalarBlockLayoutSupport;
+#endif
+
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphoreSupport = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
+	timelineSemaphoreSupport.pNext = phyFeat2.pNext;
+	phyFeat2.pNext = &timelineSemaphoreSupport;
+#endif
+
+	vkGetPhysicalDeviceFeatures2(phy, &phyFeat2);
+
+#ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
+	if (!scalarBlockLayoutSupport.scalarBlockLayout) {
+		LOG(VKVG_LOG_ERR, "CREATE Device failed, vkvg compiled with VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT and feature is "
+			"not implemented for physical device.\n");
+		return VKVG_STATUS_DEVICE_ERROR;
+	}
+	_CHECK_DEV_EXT(VK_EXT_scalar_block_layout)
+#endif
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+		if (!timelineSemaphoreSupport.timelineSemaphore) {
+			LOG(VKVG_LOG_ERR, "CREATE Device failed, VK_SEMAPHORE_TYPE_TIMELINE not supported.\n");
+			return VKVG_STATUS_DEVICE_ERROR;
+		}
+	_CHECK_DEV_EXT(VK_KHR_timeline_semaphore)
+#endif
+
+		return VKVG_STATUS_SUCCESS;
+}
+
+// enabledFeature12 is guarantied to be the first in pNext chain
+const void* vkvg_get_device_requirements(VkPhysicalDeviceFeatures* pEnabledFeatures) {
+
+	pEnabledFeatures->fillModeNonSolid = VK_TRUE;
+	pEnabledFeatures->sampleRateShading = VK_TRUE;
+	pEnabledFeatures->logicOp = VK_TRUE;
+
+	void* pNext = NULL;
+
+#ifdef VK_VERSION_1_2
+	static VkPhysicalDeviceVulkan12Features enabledFeatures12 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+#ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
+		,
+		.scalarBlockLayout = VK_TRUE
+#endif
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+		,
+		.timelineSemaphore = VK_TRUE
+#endif
+	};
+	enabledFeatures12.pNext = pNext;
+	pNext = &enabledFeatures12;
+#else
+#ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
+	static VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalarBlockFeat = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT, .scalarBlockLayout = VK_TRUE };
+	scalarBlockFeat.pNext = pNext;
+	pNext = &scalarBlockFeat;
+#endif
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	static VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaFeat = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR, .timelineSemaphore = VK_TRUE };
+	timelineSemaFeat.pNext = pNext;
+	pNext = &timelineSemaFeat;
+#endif
+#endif
+
+	return pNext;
+}
+
+VkvgDevice vkvg_device_create(vkvg_device_create_info_t* info) {
+	LOG(VKVG_LOG_INFO, "CREATE Device\n");
+	if (!info) {
+		LOG(VKVG_LOG_ERR, "CREATE Device failed, provided vkvg_device_create_info_t is null\n");
+		return (VkvgDevice)&_vkvg_status_invalid_dev_ci;
+	}
+	VkvgDevice dev = (vkvg_device*)calloc(1, sizeof(vkvg_device));
+	if (!dev) {
+		LOG(VKVG_LOG_ERR, "CREATE Device failed, no memory\n");
+		return (VkvgDevice)&_vkvg_status_no_memory;
+	}
+
+	dev->references = 1;
+
+	dev->threadAware = info->threadAware;
+
+	if (!info->vkdev) {
+		const char* enabledExts[10];
+		const char* enabledLayers[10];
+		uint32_t    enabledExtsCount = 0, enabledLayersCount = 0, phyCount = 0;
+
+		vkh_layers_check_init();
+
+#ifdef VKVG_USE_VALIDATION
+		if (vkh_layer_is_present("VK_LAYER_KHRONOS_validation"))
+			enabledLayers[enabledLayersCount++] = "VK_LAYER_KHRONOS_validation";
+#endif
+
+#ifdef VKVG_USE_RENDERDOC
+		if (vkh_layer_is_present("VK_LAYER_RENDERDOC_Capture"))
+			enabledLayers[enabledLayersCount++] = "VK_LAYER_RENDERDOC_Capture";
+#endif
+		vkh_layers_check_release();
+
+		vkvg_get_required_instance_extensions(enabledExts, &enabledExtsCount);
+
+#ifdef VK_VERSION_1_2
+		VkhApp app = vkh_app_create(1, 2, "vkvg", enabledLayersCount, enabledLayers, enabledExtsCount, enabledExts);
+#else
+		VkhApp app = vkh_app_create(1, 1, "vkvg", enabledLayersCount, enabledLayers, enabledExtsCount, enabledExts);
+#endif
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+		vkh_app_enable_debug_messenger(app, VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT, NULL);
+#endif
+
+		VkhPhyInfo* phys = vkh_app_get_phyinfos(app, &phyCount, VK_NULL_HANDLE);
+		if (phyCount == 0) {
+			dev->status = VKVG_STATUS_DEVICE_ERROR;
+			vkh_app_destroy(app);
+			return dev;
+		}
+
+		VkhPhyInfo pi = 0;
+		if (!_device_try_get_phyinfo(phys, phyCount, VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, &pi))
+			if (!_device_try_get_phyinfo(phys, phyCount, VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, &pi))
+				pi = phys[0];
+
+		if (!info->samples) // if not set, default to 1 sample
+			info->samples = VK_SAMPLE_COUNT_1_BIT;
+
+		if (!(pi->properties.limits.framebufferColorSampleCounts & info->samples)) {
+			LOG(VKVG_LOG_ERR, "CREATE Device failed: sample count not supported: %d\n", info->samples);
+			dev->status = VKVG_STATUS_DEVICE_ERROR;
+			vkh_app_free_phyinfos(phyCount, phys);
+			vkh_app_destroy(app);
+			return dev;
+		}
+
+		uint32_t                qCount = 0;
+		float                   qPriorities[] = { 0.0 };
+		VkDeviceQueueCreateInfo pQueueInfos[] = { {0}, {0}, {0} };
+
+		if (vkh_phyinfo_create_queues(pi, pi->gQueue, 1, qPriorities, &pQueueInfos[qCount]))
+			qCount++;
+
+		enabledExtsCount = 0;
+
+		if (vkvg_get_required_device_extensions(pi->phy, enabledExts, &enabledExtsCount) != VKVG_STATUS_SUCCESS) {
+			dev->status = VKVG_STATUS_DEVICE_ERROR;
+			vkh_app_free_phyinfos(phyCount, phys);
+			vkh_app_destroy(app);
+			return dev;
+		}
+
+		VkPhysicalDeviceFeatures enabledFeatures = { 0 };
+		const void* pNext = vkvg_get_device_requirements(&enabledFeatures);
+
+		VkDeviceCreateInfo device_info = { .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+										  .queueCreateInfoCount = qCount,
+										  .pQueueCreateInfos = (VkDeviceQueueCreateInfo*)&pQueueInfos,
+										  .enabledExtensionCount = enabledExtsCount,
+										  .ppEnabledExtensionNames = enabledExts,
+										  .pEnabledFeatures = &enabledFeatures,
+										  .pNext = pNext };
+		dev->vkhDev = vkh_device_create(app, pi, &device_info);
+
+		info->inst = vkh_app_get_inst(app);
+		info->phy = vkh_device_get_phy(dev->vkhDev);
+		info->vkdev = vkh_device_get_vkdev(dev->vkhDev);
+		info->qFamIdx = pi->gQueue;
+		info->qIndex = 0;
+
+		vkh_app_free_phyinfos(phyCount, phys);
+	}
+
+	_device_init(dev, info);
+	if (dev->threadAware) {
+		mtx_init(&dev->mutex, mtx_plain);
+		mtx_init(&dev->fontCache->mutex, mtx_plain);
+		dev->threadAware = true;
+	}
+	return dev;
+}
+
+void vkvg_device_destroy(VkvgDevice dev) {
+	if (vkvg_device_status(dev)) {
+		LOG(VKVG_LOG_ERR, "DESTROY Device failed, see Status for info");
+		return;
+	}
+	LOCK_DEVICE
+		dev->references--;
+	if (dev->references > 0) {
+		UNLOCK_DEVICE
+			return;
+	}
+	UNLOCK_DEVICE
+
+		LOG(VKVG_LOG_INFO, "DESTROY Device\n");
+
+	if (dev->cachedContextCount > 0) {
+		_cached_ctx* cur = dev->cachedContextLast;
+		while (cur) {
+			assert(cur->ctx->status == VKVG_STATUS_IN_CACHE);
+			cur->ctx->status = VKVG_STATUS_SUCCESS;
+			_release_context_ressources(cur->ctx);
+			_cached_ctx* prev = cur;
+			cur = cur->pNext;
+			free(prev);
+		}
+	}
+
+	vkDeviceWaitIdle(dev->vkDev);
+
+	vkh_image_destroy(dev->emptyImg);
+
+	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslGrad, NULL);
+	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslFont, NULL);
+	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslSrc, NULL);
+#ifndef __APPLE__
+	vkDestroyPipeline(dev->vkDev, dev->pipelinePolyFill, NULL);
+#endif
+	vkDestroyPipeline(dev->vkDev, dev->pipelineClipping, NULL);
+
+	vkDestroyPipeline(dev->vkDev, dev->pipe_OVER, NULL);
+	vkDestroyPipeline(dev->vkDev, dev->pipe_SUB, NULL);
+	vkDestroyPipeline(dev->vkDev, dev->pipe_CLEAR, NULL);
+
+#ifdef VKVG_WIRED_DEBUG
+	vkDestroyPipeline(dev->vkDev, dev->pipelineWired, NULL);
+	vkDestroyPipeline(dev->vkDev, dev->pipelineLineList, NULL);
+#endif
+
+	vkDestroyPipelineLayout(dev->vkDev, dev->pipelineLayout, NULL);
+	vkDestroyPipelineCache(dev->vkDev, dev->pipelineCache, NULL);
+	vkDestroyRenderPass(dev->vkDev, dev->renderPass, NULL);
+	vkDestroyRenderPass(dev->vkDev, dev->renderPass_ClearStencil, NULL);
+	vkDestroyRenderPass(dev->vkDev, dev->renderPass_ClearAll, NULL);
+
+	vkWaitForFences(dev->vkDev, 1, &dev->fence, VK_TRUE, UINT64_MAX);
+	vkDestroyFence(dev->vkDev, dev->fence, NULL);
+
+	vkFreeCommandBuffers(dev->vkDev, dev->cmdPool, 1, &dev->cmd);
+	vkDestroyCommandPool(dev->vkDev, dev->cmdPool, NULL);
+
+	vkh_queue_destroy(dev->gQueue);
+
+	_font_cache_destroy(dev);
+
+#ifdef VKH_USE_VMA
+	vmaDestroyAllocator(dev->allocator);
+#endif
+
+	if (dev->threadAware) {
+		mtx_destroy(&dev->mutex);
+		mtx_destroy(&dev->fontCache->mutex);
+	}
+
+	if (dev->vkhDev) {
+		VkhApp app = vkh_device_get_app(dev->vkhDev);
+		vkh_device_destroy(dev->vkhDev);
+		vkh_app_destroy(app);
+	}
+
+	free(dev);
+	dev = NULL;
+}
+
+vkvg_status_t vkvg_device_status(VkvgDevice dev) { return !dev ? VKVG_STATUS_NULL_POINTER : dev->status; }
+VkvgDevice    vkvg_device_reference(VkvgDevice dev) {
+	if (!vkvg_device_status(dev)) {
+		LOCK_DEVICE
+			dev->references++;
+		UNLOCK_DEVICE
+	}
+	return dev;
+}
+uint32_t vkvg_device_get_reference_count(VkvgDevice dev) { return vkvg_device_status(dev) ? 0 : dev->references; }
+// TODO dpy reorganisation
+void vkvg_device_set_dpy(VkvgDevice dev, int hdpy, int vdpy) {
+	if (vkvg_device_status(dev))
+		return;
+	dev->hdpi = hdpy;
+	dev->vdpi = vdpy;
+
+	// TODO: reset font cache
+}
+void vkvg_device_get_dpy(VkvgDevice dev, int* hdpy, int* vdpy) {
+	if (vkvg_device_status(dev))
+		return;
+	*hdpy = dev->hdpi;
+	*vdpy = dev->vdpi;
+}
+#if VKVG_DBG_STATS
+vkvg_debug_stats_t vkvg_device_get_stats(VkvgDevice dev) {
+	return vkvg_device_status(dev) ? (vkvg_debug_stats_t) { 0 } : dev->debug_stats;
+}
+void vkvg_device_reset_stats(VkvgDevice dev) {
+	if (vkvg_device_status(dev))
+		return;
+	dev->debug_stats = (vkvg_debug_stats_t){ 0 };
+}
+#endif
+/*
+ * Copyright (c) 2018-2022 Jean-Philippe Bruyère <jp_bruyere@hotmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+ * Software, and to permit persons to whom the Software is furnished to do so, subject
+ * to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+#define GetInstProcAddress(inst, func) (PFN_##func) vkGetInstanceProcAddr(inst, #func);
+
+#define GetVkProcAddress(dev, inst, func)                                                                              \
+    (vkGetDeviceProcAddr(dev, #func) == NULL) ? (PFN_##func)vkGetInstanceProcAddr(inst, #func)                         \
+                                              : (PFN_##func)vkGetDeviceProcAddr(dev, #func)
+
+#include "vkvg_device_internal.h"
+#include "vkvg_context_internal.h"
+#include "shaders.h"
+
+uint32_t vkvg_log_level = VKVG_LOG_DEBUG;
+#ifdef VKVG_WIRED_DEBUG
+vkvg_wired_debug_mode vkvg_wired_debug = vkvg_wired_debug_mode_normal;
+#endif
+
+PFN_vkCmdBindPipeline       CmdBindPipeline;
+PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets;
+PFN_vkCmdBindIndexBuffer    CmdBindIndexBuffer;
+PFN_vkCmdBindVertexBuffers  CmdBindVertexBuffers;
+
+PFN_vkCmdDrawIndexed CmdDrawIndexed;
+PFN_vkCmdDraw        CmdDraw;
+
+PFN_vkCmdSetStencilCompareMask CmdSetStencilCompareMask;
+PFN_vkCmdSetStencilReference   CmdSetStencilReference;
+PFN_vkCmdSetStencilWriteMask   CmdSetStencilWriteMask;
+PFN_vkCmdBeginRenderPass       CmdBeginRenderPass;
+PFN_vkCmdEndRenderPass         CmdEndRenderPass;
+PFN_vkCmdSetViewport           CmdSetViewport;
+PFN_vkCmdSetScissor            CmdSetScissor;
+
+PFN_vkCmdPushConstants CmdPushConstants;
+
+PFN_vkWaitForFences      WaitForFences;
+PFN_vkResetFences        ResetFences;
+PFN_vkResetCommandBuffer ResetCommandBuffer;
+
+bool _device_try_get_phyinfo(VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy) {
+	for (uint32_t i = 0; i < phyCount; i++) {
+		if (vkh_phyinfo_get_properties(phys[i]).deviceType == gpuType) {
+			*phy = phys[i];
+			return true;
+		}
+	}
+	return false;
+}
+// TODO:save/reload cache in user temp directory
+void _device_create_pipeline_cache(VkvgDevice dev) {
+
+	VkPipelineCacheCreateInfo pipelineCacheCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
+	VK_CHECK_RESULT(vkCreatePipelineCache(dev->vkDev, &pipelineCacheCreateInfo, NULL, &dev->pipelineCache));
+}
+
+VkRenderPass _device_createRenderPassNoResolve(VkvgDevice dev, VkAttachmentLoadOp loadOp,
+	VkAttachmentLoadOp stencilLoadOp) {
+	VkAttachmentDescription attColor = { .format = FB_COLOR_FORMAT,
+										.samples = dev->samples,
+										.loadOp = loadOp,
+										.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+										.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+										.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+										.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+										.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentDescription attDS = { .format = dev->stencilFormat,
+										.samples = dev->samples,
+										.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+										.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+										.stencilLoadOp = stencilLoadOp,
+										.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+										.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+										.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
+	VkAttachmentDescription attachments[] = { attColor, attDS };
+	VkAttachmentReference   colorRef = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference   dsRef = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
+	VkSubpassDescription subpassDescription = { .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+											   .colorAttachmentCount = 1,
+											   .pColorAttachments = &colorRef,
+											   .pDepthStencilAttachment = &dsRef };
+
+	VkSubpassDependency dependencies[] = {
+		{VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		 VK_ACCESS_MEMORY_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		 VK_DEPENDENCY_BY_REGION_BIT},
+		{0, VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+		 VK_DEPENDENCY_BY_REGION_BIT},
+	};
+
+	VkRenderPassCreateInfo renderPassInfo = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+											 .attachmentCount = 2,
+											 .pAttachments = attachments,
+											 .subpassCount = 1,
+											 .pSubpasses = &subpassDescription,
+											 .dependencyCount = 2,
+											 .pDependencies = dependencies };
+	VkRenderPass           rp;
+	VK_CHECK_RESULT(vkCreateRenderPass(dev->vkDev, &renderPassInfo, NULL, &rp));
+	return rp;
+}
+VkRenderPass _device_createRenderPassMS(VkvgDevice dev, VkAttachmentLoadOp loadOp, VkAttachmentLoadOp stencilLoadOp) {
+	VkAttachmentDescription attColor = { .format = FB_COLOR_FORMAT,
+											   .samples = dev->samples,
+											   .loadOp = loadOp,
+											   .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+											   .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+											   .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+											   .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+											   .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentDescription attColorResolve = { .format = FB_COLOR_FORMAT,
+											   .samples = VK_SAMPLE_COUNT_1_BIT,
+											   .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+											   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+											   .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+											   .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+											   .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+											   .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentDescription attDS = { .format = dev->stencilFormat,
+											   .samples = dev->samples,
+											   .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+											   .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+											   .stencilLoadOp = stencilLoadOp,
+											   .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+											   .initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+											   .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
+	VkAttachmentDescription attachments[] = { attColorResolve, attDS, attColor };
+	VkAttachmentReference   resolveRef = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference   dsRef = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference   colorRef = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+	VkSubpassDescription subpassDescription = { .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+											   .colorAttachmentCount = 1,
+											   .pColorAttachments = &colorRef,
+											   .pResolveAttachments = &resolveRef,
+											   .pDepthStencilAttachment = &dsRef };
+
+	VkSubpassDependency dependencies[] = {
+		{VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		 VK_ACCESS_MEMORY_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		 VK_DEPENDENCY_BY_REGION_BIT},
+		{0, VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT,
+		 VK_DEPENDENCY_BY_REGION_BIT},
+	};
+
+	VkRenderPassCreateInfo renderPassInfo = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+											 .attachmentCount = 3,
+											 .pAttachments = attachments,
+											 .subpassCount = 1,
+											 .pSubpasses = &subpassDescription,
+											 .dependencyCount = 2,
+											 .pDependencies = dependencies };
+	VkRenderPass           rp;
+	VK_CHECK_RESULT(vkCreateRenderPass(dev->vkDev, &renderPassInfo, NULL, &rp));
+	return rp;
+}
+
+void _device_setupPipelines(VkvgDevice dev) {
+	VkGraphicsPipelineCreateInfo pipelineCreateInfo = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+													   .renderPass = dev->renderPass };
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN };
+
+	VkPipelineRasterizationStateCreateInfo rasterizationState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_NONE,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.depthBiasEnable = VK_FALSE,
+		.lineWidth = 1.0f };
+
+	VkPipelineColorBlendAttachmentState blendAttachmentState = {
+		.colorWriteMask = 0x0,
+		.blendEnable = VK_TRUE,
+#ifdef VKVG_PREMULT_ALPHA
+		.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+#else
+		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+#endif
+	};
+
+	VkPipelineColorBlendStateCreateInfo colorBlendState = { .sType =
+															   VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+														   .attachmentCount = 1,
+														   .pAttachments = &blendAttachmentState };
+
+	/*failOp,passOp,depthFailOp,compareOp, compareMask, writeMask, reference;*/
+	VkStencilOpState polyFillOpState = { VK_STENCIL_OP_KEEP,
+										VK_STENCIL_OP_INVERT,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_CLIP_BIT,
+										STENCIL_FILL_BIT,
+										0 };
+	VkStencilOpState clipingOpState = { VK_STENCIL_OP_ZERO,
+										VK_STENCIL_OP_REPLACE,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_FILL_BIT,
+										STENCIL_ALL_BIT,
+										0x2 };
+	VkStencilOpState stencilOpState = { VK_STENCIL_OP_KEEP,
+										VK_STENCIL_OP_ZERO,
+										VK_STENCIL_OP_KEEP,
+										VK_COMPARE_OP_EQUAL,
+										STENCIL_FILL_BIT,
+										STENCIL_FILL_BIT,
+										0x1 };
+
+	VkPipelineDepthStencilStateCreateInfo dsStateCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_FALSE,
+		.depthWriteEnable = VK_FALSE,
+		.depthCompareOp = VK_COMPARE_OP_ALWAYS,
+		.stencilTestEnable = VK_TRUE,
+		.front = polyFillOpState,
+		.back = polyFillOpState };
+
+	VkDynamicState dynamicStateEnables[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+		VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+		VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+		VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+	};
+	VkPipelineDynamicStateCreateInfo dynamicState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+													 .dynamicStateCount = 2,
+													 .pDynamicStates = dynamicStateEnables };
+
+	VkPipelineViewportStateCreateInfo viewportState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1 };
+
+	VkPipelineMultisampleStateCreateInfo multisampleState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = dev->samples };
+	/*if (dev->samples != VK_SAMPLE_COUNT_1_BIT){
+		multisampleState.sampleShadingEnable = VK_TRUE;
+		multisampleState.minSampleShading = 0.5f;
+	}*/
+	VkVertexInputBindingDescription vertexInputBinding = {
+		.binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
+
+	VkVertexInputAttributeDescription vertexInputAttributs[3] = { {0, 0, VK_FORMAT_R32G32_SFLOAT, 0},
+																 {1, 0, VK_FORMAT_R8G8B8A8_UNORM, 8},
+																 {2, 0, VK_FORMAT_R32G32B32_SFLOAT, 12} };
+
+	VkPipelineVertexInputStateCreateInfo vertexInputState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = 1,
+		.pVertexBindingDescriptions = &vertexInputBinding,
+		.vertexAttributeDescriptionCount = 3,
+		.pVertexAttributeDescriptions = vertexInputAttributs };
+#ifdef VKVG_WIRED_DEBUG
+	VkShaderModule modVert, modFrag, modFragWired;
+#else
+	VkShaderModule modVert, modFrag;
+#endif
+	VkShaderModuleCreateInfo createInfo = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+										   .pCode = (uint32_t*)vkvg_main_vert_spv,
+										   .codeSize = vkvg_main_vert_spv_len };
+	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modVert));
+#if defined(VKVG_LCD_FONT_FILTER) && defined(FT_CONFIG_OPTION_SUBPIXEL_RENDERING)
+	createInfo.pCode = (uint32_t*)vkvg_main_lcd_frag_spv;
+	createInfo.codeSize = vkvg_main_lcd_frag_spv_len;
+#else
+	createInfo.pCode = (uint32_t*)vkvg_main_frag_spv;
+	createInfo.codeSize = vkvg_main_frag_spv_len;
+#endif
+	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modFrag));
+
+	VkPipelineShaderStageCreateInfo vertStage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = modVert,
+		.pName = "main",
+	};
+	VkPipelineShaderStageCreateInfo fragStage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = modFrag,
+		.pName = "main",
+	};
+
+	// Use specialization constants to pass number of samples to the shader (used for MSAA resolve)
+	/*VkSpecializationMapEntry specializationEntry = {
+		.constantID = 0,
+		.offset = 0,
+		.size = sizeof(uint32_t)};
+	uint32_t specializationData = VKVG_SAMPLES;
+	VkSpecializationInfo specializationInfo = {
+		.mapEntryCount = 1,
+		.pMapEntries = &specializationEntry,
+		.dataSize = sizeof(specializationData),
+		.pData = &specializationData};*/
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertStage, fragStage };
+
+	pipelineCreateInfo.stageCount = 1;
+	pipelineCreateInfo.pStages = shaderStages;
+	pipelineCreateInfo.pVertexInputState = &vertexInputState;
+	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+	pipelineCreateInfo.pViewportState = &viewportState;
+	pipelineCreateInfo.pRasterizationState = &rasterizationState;
+	pipelineCreateInfo.pMultisampleState = &multisampleState;
+	pipelineCreateInfo.pColorBlendState = &colorBlendState;
+	pipelineCreateInfo.pDepthStencilState = &dsStateCreateInfo;
+	pipelineCreateInfo.pDynamicState = &dynamicState;
+	pipelineCreateInfo.layout = dev->pipelineLayout;
+
+#ifndef __APPLE__
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL,
+		&dev->pipelinePolyFill));
+#endif
+
+	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	dsStateCreateInfo.back = dsStateCreateInfo.front = clipingOpState;
+	dynamicState.dynamicStateCount = 5;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL,
+		&dev->pipelineClipping));
+
+	dsStateCreateInfo.back = dsStateCreateInfo.front = stencilOpState;
+	blendAttachmentState.colorWriteMask = 0xf;
+	dynamicState.dynamicStateCount = 3;
+	pipelineCreateInfo.stageCount = 2;
+	VK_CHECK_RESULT(
+		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipe_OVER));
+
+	blendAttachmentState.alphaBlendOp = blendAttachmentState.colorBlendOp = VK_BLEND_OP_SUBTRACT;
+	VK_CHECK_RESULT(
+		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipe_SUB));
+
+	colorBlendState.logicOpEnable = VK_TRUE;
+	blendAttachmentState.blendEnable = VK_FALSE;
+	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
+	VK_CHECK_RESULT(
+		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipe_CLEAR));
+
+#ifdef VKVG_WIRED_DEBUG
+	colorBlendState.logicOpEnable = VK_FALSE;
+	blendAttachmentState.blendEnable = VK_TRUE;
+	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
+
+	createInfo.pCode = (uint32_t*)wired_frag_spv;
+
+	createInfo.codeSize = wired_frag_spv_len;
+	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modFragWired));
+
+	shaderStages[1].module = modFragWired;
+
+	rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL,
+		&dev->pipelineLineList));
+
+	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+	VK_CHECK_RESULT(
+		vkCreateGraphicsPipelines(dev->vkDev, dev->pipelineCache, 1, &pipelineCreateInfo, NULL, &dev->pipelineWired));
+
+	vkDestroyShaderModule(dev->vkDev, modFragWired, NULL);
+#endif
+
+	vkDestroyShaderModule(dev->vkDev, modVert, NULL);
+	vkDestroyShaderModule(dev->vkDev, modFrag, NULL);
+}
+
+void _device_createDescriptorSetLayout(VkvgDevice dev) {
+
+	VkDescriptorSetLayoutBinding    dsLayoutBinding = { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+														  VK_SHADER_STAGE_FRAGMENT_BIT, NULL };
+	VkDescriptorSetLayoutCreateInfo dsLayoutCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &dsLayoutBinding };
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslFont));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslSrc));
+	dsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslGrad));
+
+	VkPushConstantRange pushConstantRange[] = {
+		{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants)},
+		//{VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(push_constants)}
+	};
+	VkDescriptorSetLayout dsls[] = { dev->dslFont, dev->dslSrc, dev->dslGrad };
+
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+														   .pushConstantRangeCount = 1,
+														   .pPushConstantRanges =
+															   (VkPushConstantRange*)&pushConstantRange,
+														   .setLayoutCount = 3,
+														   .pSetLayouts = dsls };
+	VK_CHECK_RESULT(vkCreatePipelineLayout(dev->vkDev, &pipelineLayoutCreateInfo, NULL, &dev->pipelineLayout));
+}
+
+void _device_wait_idle(VkvgDevice dev) { vkDeviceWaitIdle(dev->vkDev); }
+void _device_wait_and_reset_device_fence(VkvgDevice dev) {
+	vkWaitForFences(dev->vkDev, 1, &dev->fence, VK_TRUE, UINT64_MAX);
+	ResetFences(dev->vkDev, 1, &dev->fence);
+}
+
+bool _device_try_get_cached_context(VkvgDevice dev, VkvgContext* pCtx) {
+	LOCK_DEVICE
+
+		if (dev->cachedContextCount) {
+			thrd_t       curThread = thrd_current();
+			_cached_ctx* prev = NULL;
+			_cached_ctx* cur = dev->cachedContextLast;
+			while (cur) {
+				if (thrd_equal(cur->thread, curThread)) {
+					if (prev)
+						prev->pNext = cur->pNext;
+					else
+						dev->cachedContextLast = cur->pNext;
+
+					dev->cachedContextCount--;
+
+					LOG(VKVG_LOG_THREAD, "get cached context: %p, thd:%lu cached ctx: %d\n", cur->ctx, cur->thread,
+						dev->cachedContextCount);
+
+					*pCtx = cur->ctx;
+					free(cur);
+					UNLOCK_DEVICE
+						return true;
+				}
+				prev = cur;
+				cur = cur->pNext;
+			}
+		}
+	*pCtx = NULL;
+	UNLOCK_DEVICE
+		return false;
+}
+void _device_store_context(VkvgContext ctx) {
+	VkvgDevice dev = ctx->dev;
+
+	LOCK_DEVICE
+
+		_cached_ctx* cur = (_cached_ctx*)calloc(1, sizeof(_cached_ctx));
+	cur->ctx = ctx;
+	cur->thread = thrd_current();
+	cur->pNext = dev->cachedContextLast;
+
+	dev->cachedContextLast = cur;
+	dev->cachedContextCount++;
+
+	LOG(VKVG_LOG_THREAD, "store context: %p, thd:%lu cached ctx: %d\n", cur->ctx, cur->thread, dev->cachedContextCount);
+
+	ctx->references++;
+
+	UNLOCK_DEVICE
+}
+void _device_submit_cmd(VkvgDevice dev, VkCommandBuffer* cmd, VkFence fence) {
+	LOCK_DEVICE
+		vkh_cmd_submit(dev->gQueue, cmd, fence);
+	UNLOCK_DEVICE
+}
+
+bool _device_init_function_pointers(VkvgDevice dev) {
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	if (vkGetInstanceProcAddr(dev->instance, "vkSetDebugUtilsObjectNameEXT") == VK_NULL_HANDLE) {
+		LOG(VKVG_LOG_ERR, "vkvg create device failed: 'VK_EXT_debug_utils' has to be loaded for Debug build\n");
+		return false;
+	}
+	vkh_device_init_debug_utils((VkhDevice)&dev->vkDev);
+#endif
+	CmdBindPipeline = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdBindPipeline);
+	CmdBindDescriptorSets = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdBindDescriptorSets);
+	CmdBindIndexBuffer = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdBindIndexBuffer);
+	CmdBindVertexBuffers = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdBindVertexBuffers);
+	CmdDrawIndexed = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdDrawIndexed);
+	CmdDraw = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdDraw);
+	CmdSetStencilCompareMask = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdSetStencilCompareMask);
+	CmdSetStencilReference = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdSetStencilReference);
+	CmdSetStencilWriteMask = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdSetStencilWriteMask);
+	CmdBeginRenderPass = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdBeginRenderPass);
+	CmdEndRenderPass = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdEndRenderPass);
+	CmdSetViewport = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdSetViewport);
+	CmdSetScissor = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdSetScissor);
+	CmdPushConstants = GetVkProcAddress(dev->vkDev, dev->instance, vkCmdPushConstants);
+	WaitForFences = GetVkProcAddress(dev->vkDev, dev->instance, vkWaitForFences);
+	ResetFences = GetVkProcAddress(dev->vkDev, dev->instance, vkResetFences);
+	ResetCommandBuffer = GetVkProcAddress(dev->vkDev, dev->instance, vkResetCommandBuffer);
+	return true;
+}
+
+void _device_create_empty_texture(VkvgDevice dev, VkFormat format, VkImageTiling tiling) {
+	// create empty image to bind to context source descriptor when not in use
+	dev->emptyImg = vkh_image_create((VkhDevice)&dev->vkDev, format, 16, 16, tiling, VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+	vkh_image_create_descriptor(dev->emptyImg, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+	_device_wait_and_reset_device_fence(dev);
+
+	vkh_cmd_begin(dev->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vkh_image_set_layout(dev->cmd, dev->emptyImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+	vkh_cmd_end(dev->cmd);
+	_device_submit_cmd(dev, &dev->cmd, dev->fence);
+}
+void _device_check_best_image_tiling(VkvgDevice dev, VkFormat format) {
+	VkFlags            stencilFormats[] = { VK_FORMAT_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT,
+										   VK_FORMAT_D32_SFLOAT_S8_UINT };
+	VkFormatProperties phyStencilProps = { 0 }, phyImgProps = { 0 };
+
+	// check png blit format
+	VkFlags pngBlitFormats[] = { VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB };
+	dev->pngStagFormat = VK_FORMAT_UNDEFINED;
+	for (int i = 0; i < 2; i++) {
+		vkGetPhysicalDeviceFormatProperties(dev->phy, pngBlitFormats[i], &phyImgProps);
+		if ((phyImgProps.linearTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) == VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
+			dev->pngStagFormat = pngBlitFormats[i];
+			dev->pngStagTiling = VK_IMAGE_TILING_LINEAR;
+			break;
+		}
+		else if ((phyImgProps.optimalTilingFeatures & VKVG_PNG_WRITE_IMG_REQUIREMENTS) ==
+			VKVG_PNG_WRITE_IMG_REQUIREMENTS) {
+			dev->pngStagFormat = pngBlitFormats[i];
+			dev->pngStagTiling = VK_IMAGE_TILING_OPTIMAL;
+			break;
+		}
+	}
+
+	if (dev->pngStagFormat == VK_FORMAT_UNDEFINED)
+		LOG(VKVG_LOG_DEBUG, "vkvg create device failed: no suitable image format for png write\n");
+
+	dev->stencilFormat = VK_FORMAT_UNDEFINED;
+	dev->stencilAspectFlag = VK_IMAGE_ASPECT_STENCIL_BIT;
+	dev->supportedTiling = 0xff;
+
+	vkGetPhysicalDeviceFormatProperties(dev->phy, format, &phyImgProps);
+
+	if ((phyImgProps.optimalTilingFeatures & VKVG_SURFACE_IMGS_REQUIREMENTS) == VKVG_SURFACE_IMGS_REQUIREMENTS) {
+		for (int i = 0; i < 4; i++) {
+			vkGetPhysicalDeviceFormatProperties(dev->phy, stencilFormats[i], &phyStencilProps);
+			if (phyStencilProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+				dev->stencilFormat = stencilFormats[i];
+				if (i > 0)
+					dev->stencilAspectFlag |= VK_IMAGE_ASPECT_DEPTH_BIT;
+				dev->supportedTiling = VK_IMAGE_TILING_OPTIMAL;
+				return;
+			}
+		}
+	}
+	if ((phyImgProps.linearTilingFeatures & VKVG_SURFACE_IMGS_REQUIREMENTS) == VKVG_SURFACE_IMGS_REQUIREMENTS) {
+		for (int i = 0; i < 4; i++) {
+			vkGetPhysicalDeviceFormatProperties(dev->phy, stencilFormats[i], &phyStencilProps);
+			if (phyStencilProps.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+				dev->stencilFormat = stencilFormats[i];
+				if (i > 0)
+					dev->stencilAspectFlag |= VK_IMAGE_ASPECT_DEPTH_BIT;
+				dev->supportedTiling = VK_IMAGE_TILING_LINEAR;
+				return;
+			}
+		}
+	}
+	dev->status = VKVG_STATUS_INVALID_FORMAT;
+	LOG(VKVG_LOG_ERR, "vkvg create device failed: image format not supported: %d\n", format);
+}
+
+void _dump_image_format_properties(VkvgDevice dev, VkFormat format) {
+	/*VkImageFormatProperties imgProps;
+	VK_CHECK_RESULT(vkGetPhysicalDeviceImageFormatProperties(dev->phy,
+															 format, VK_IMAGE_TYPE_2D, VKVG_TILING,
+															 VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+															 0, &imgProps));
+	printf ("tiling			  = %d\n", VKVG_TILING);
+	printf ("max extend		  = (%d, %d, %d)\n", imgProps.maxExtent.width, imgProps.maxExtent.height,
+	imgProps.maxExtent.depth); printf ("max mip levels	  = %d\n", imgProps.maxMipLevels); printf ("max array layers =
+	%d\n", imgProps.maxArrayLayers); printf ("sample counts	  = "); if (imgProps.sampleCounts & VK_SAMPLE_COUNT_1_BIT)
+		printf ("1,");
+	if (imgProps.sampleCounts & VK_SAMPLE_COUNT_2_BIT)
+		printf ("2,");
+	if (imgProps.sampleCounts & VK_SAMPLE_COUNT_4_BIT)
+		printf ("4,");
+	if (imgProps.sampleCounts & VK_SAMPLE_COUNT_8_BIT)
+		printf ("8,");
+	if (imgProps.sampleCounts & VK_SAMPLE_COUNT_16_BIT)
+		printf ("16,");
+	if (imgProps.sampleCounts & VK_SAMPLE_COUNT_32_BIT)
+		printf ("32,");
+	printf ("\n");
+	printf ("max resource size= %lu\n", imgProps.maxResourceSize);
+*/
+}
+
+#endif // 1
+
+
+#include "vkvg_matrix.h"
+
+#define ISFINITE(x) ((x) * (x) >= 0.) /* check for NaNs */
+
+// matrix computations mainly taken from http://cairographics.org
+static void _vkvg_matrix_scalar_multiply(vkvg_matrix_t* matrix, float scalar) {
+	matrix->xx *= scalar;
+	matrix->yx *= scalar;
+
+	matrix->xy *= scalar;
+	matrix->yy *= scalar;
+
+	matrix->x0 *= scalar;
+	matrix->y0 *= scalar;
+}
+void _vkvg_matrix_get_affine(const vkvg_matrix_t* matrix, float* xx, float* yx, float* xy, float* yy, float* x0,
+	float* y0) {
+	*xx = matrix->xx;
+	*yx = matrix->yx;
+
+	*xy = matrix->xy;
+	*yy = matrix->yy;
+
+	if (x0)
+		*x0 = matrix->x0;
+	if (y0)
+		*y0 = matrix->y0;
+}
+static void _vkvg_matrix_compute_adjoint(vkvg_matrix_t* matrix) {
+	/* adj (A) = transpose (C:cofactor (A,i,j)) */
+	float a, b, c, d, tx, ty;
+
+	_vkvg_matrix_get_affine(matrix, &a, &b, &c, &d, &tx, &ty);
+
+	vkvg_matrix_init(matrix, d, -b, -c, a, c * ty - d * tx, b * tx - a * ty);
+}
+float _vkvg_matrix_compute_determinant(const vkvg_matrix_t* matrix) {
+	float a, b, c, d;
+
+	a = matrix->xx;
+	b = matrix->yx;
+	c = matrix->xy;
+	d = matrix->yy;
+
+	return a * d - b * c;
+}
+vkvg_status_t vkvg_matrix_invert(vkvg_matrix_t* matrix) {
+	float det;
+
+	/* Simple scaling|translation matrices are quite common... */
+	if (matrix->xy == 0. && matrix->yx == 0.) {
+		matrix->x0 = -matrix->x0;
+		matrix->y0 = -matrix->y0;
+
+		if (matrix->xx != 1.f) {
+			if (matrix->xx == 0.)
+				return VKVG_STATUS_INVALID_MATRIX;
+
+			matrix->xx = 1.f / matrix->xx;
+			matrix->x0 *= matrix->xx;
+		}
+
+		if (matrix->yy != 1.f) {
+			if (matrix->yy == 0.)
+				return VKVG_STATUS_INVALID_MATRIX;
+
+			matrix->yy = 1.f / matrix->yy;
+			matrix->y0 *= matrix->yy;
+		}
+
+		return VKVG_STATUS_SUCCESS;
+	}
+
+	/* inv (A) = 1/det (A) * adj (A) */
+	det = _vkvg_matrix_compute_determinant(matrix);
+
+	if (!ISFINITE(det))
+		return VKVG_STATUS_INVALID_MATRIX;
+
+	if (det == 0)
+		return VKVG_STATUS_INVALID_MATRIX;
+
+	_vkvg_matrix_compute_adjoint(matrix);
+	_vkvg_matrix_scalar_multiply(matrix, 1 / det);
+
+	return VKVG_STATUS_SUCCESS;
+}
+void vkvg_matrix_init_identity(vkvg_matrix_t* matrix) { vkvg_matrix_init(matrix, 1, 0, 0, 1, 0, 0); }
+
+void vkvg_matrix_init(vkvg_matrix_t* matrix, float xx, float yx, float xy, float yy, float x0, float y0) {
+	matrix->xx = xx;
+	matrix->yx = yx;
+	matrix->xy = xy;
+	matrix->yy = yy;
+	matrix->x0 = x0;
+	matrix->y0 = y0;
+}
+
+void vkvg_matrix_init_translate(vkvg_matrix_t* matrix, float tx, float ty) {
+	vkvg_matrix_init(matrix, 1, 0, 0, 1, tx, ty);
+}
+void vkvg_matrix_init_scale(vkvg_matrix_t* matrix, float sx, float sy) { vkvg_matrix_init(matrix, sx, 0, 0, sy, 0, 0); }
+void vkvg_matrix_init_rotate(vkvg_matrix_t* matrix, float radians) {
+	float s;
+	float c;
+
+	s = sinf(radians);
+	c = cosf(radians);
+
+	vkvg_matrix_init(matrix, c, s, -s, c, 0, 0);
+}
+void vkvg_matrix_translate(vkvg_matrix_t* matrix, float tx, float ty) {
+	vkvg_matrix_t tmp;
+
+	vkvg_matrix_init_translate(&tmp, tx, ty);
+
+	vkvg_matrix_multiply(matrix, &tmp, matrix);
+}
+void vkvg_matrix_scale(vkvg_matrix_t* matrix, float sx, float sy) {
+	vkvg_matrix_t tmp;
+
+	vkvg_matrix_init_scale(&tmp, sx, sy);
+
+	vkvg_matrix_multiply(matrix, &tmp, matrix);
+}
+void vkvg_matrix_rotate(vkvg_matrix_t* matrix, float radians) {
+	vkvg_matrix_t tmp;
+
+	vkvg_matrix_init_rotate(&tmp, radians);
+
+	vkvg_matrix_multiply(matrix, &tmp, matrix);
+}
+void vkvg_matrix_multiply(vkvg_matrix_t* result, const vkvg_matrix_t* a, const vkvg_matrix_t* b) {
+	vkvg_matrix_t r;
+
+	r.xx = a->xx * b->xx + a->yx * b->xy;
+	r.yx = a->xx * b->yx + a->yx * b->yy;
+
+	r.xy = a->xy * b->xx + a->yy * b->xy;
+	r.yy = a->xy * b->yx + a->yy * b->yy;
+
+	r.x0 = a->x0 * b->xx + a->y0 * b->xy + b->x0;
+	r.y0 = a->x0 * b->yx + a->y0 * b->yy + b->y0;
+
+	*result = r;
+}
+void vkvg_matrix_transform_distance(const vkvg_matrix_t* matrix, float* dx, float* dy) {
+	float new_x, new_y;
+
+	new_x = (matrix->xx * *dx + matrix->xy * *dy);
+	new_y = (matrix->yx * *dx + matrix->yy * *dy);
+
+	*dx = new_x;
+	*dy = new_y;
+}
+void vkvg_matrix_transform_point(const vkvg_matrix_t* matrix, float* x, float* y) {
+	vkvg_matrix_transform_distance(matrix, x, y);
+
+	*x += matrix->x0;
+	*y += matrix->y0;
+}
+void vkvg_matrix_get_scale(const vkvg_matrix_t* matrix, float* sx, float* sy) {
+	*sx = sqrt(matrix->xx * matrix->xx + matrix->xy * matrix->xy);
+	/*if (matrix->xx < 0)
+	 *sx = -*sx;*/
+	*sy = sqrt(matrix->yx * matrix->yx + matrix->yy * matrix->yy);
+	/*if (matrix->yy < 0)
+	 *sy = -*sy;*/
+}
+// pattern
+#if 1
+
+#include "vkvg_surface_internal.h"
+#include "vkvg_context_internal.h"
+#include "vkvg_device_internal.h"
+#include "vkvg_pattern.h"
+
+VkvgPattern vkvg_pattern_create_for_surface(VkvgSurface surf) {
+	if (!surf) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, invalid surface\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	VkvgPattern pat = (vkvg_pattern_t*)calloc(1, sizeof(vkvg_pattern_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+
+	pat->type = VKVG_PATTERN_TYPE_SURFACE;
+	pat->extend = VKVG_EXTEND_NONE;
+	pat->data = surf;
+	pat->references = 1;
+
+	vkvg_surface_reference(surf);
+	if (vkvg_surface_status(surf))
+		pat->status = VKVG_STATUS_INVALID_SURFACE;
+
+	return pat;
+}
+vkvg_status_t vkvg_pattern_get_linear_points(VkvgPattern pat, float* x0, float* y0, float* x1, float* y1) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type != VKVG_PATTERN_TYPE_LINEAR)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+
+	*x0 = grad->cp[0].x;
+	*y0 = grad->cp[0].y;
+	*x1 = grad->cp[0].z;
+	*y1 = grad->cp[0].w;
+	return VKVG_STATUS_SUCCESS;
+}
+vkvg_status_t vkvg_pattern_edit_linear(VkvgPattern pat, float x0, float y0, float x1, float y1) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type != VKVG_PATTERN_TYPE_LINEAR)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+
+	grad->cp[0] = (vec4){ {x0}, {y0}, {x1}, {y1} };
+	return VKVG_STATUS_SUCCESS;
+}
+VkvgPattern vkvg_pattern_create_linear(float x0, float y0, float x1, float y1) {
+	VkvgPattern pat = (vkvg_pattern_t*)calloc(1, sizeof(vkvg_pattern_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	pat->type = VKVG_PATTERN_TYPE_LINEAR;
+	pat->extend = VKVG_EXTEND_NONE;
+
+	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
+
+	if (pat->data) {
+		vkvg_pattern_edit_linear(pat, x0, y0, x1, y1);
+		pat->references = 1;
+	}
+	else {
+		pat->status = VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+	}
+
+	return pat;
+}
+vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1,
+	float radius1) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type != VKVG_PATTERN_TYPE_RADIAL)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+
+	vec2 c0 = { cx0, cy0 };
+	vec2 c1 = { cx1, cy1 };
+
+	if (radius0 > radius1 - 1.0f)
+		radius0 = radius1 - 1.0f;
+	vec2  u = vec2_sub(c0, c1);
+	float l = vec2_length(u);
+	if (l + radius0 + 1.0f >= radius1) {
+		vec2 v = vec2_div_s(u, l);
+		c0 = vec2_add(c1, vec2_mult_s(v, radius1 - radius0 - 1.0f));
+	}
+
+	grad->cp[0] = (vec4){ {c0.x}, {c0.y}, {radius0}, {0} };
+	grad->cp[1] = (vec4){ {c1.x}, {c1.y}, {radius1}, {0} };
+	return VKVG_STATUS_SUCCESS;
+}
+VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1) {
+	VkvgPattern pat = (vkvg_pattern_t*)calloc(1, sizeof(vkvg_pattern_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	pat->type = VKVG_PATTERN_TYPE_RADIAL;
+	pat->extend = VKVG_EXTEND_NONE;
+
+	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
+
+	if (pat->data) {
+		vkvg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1);
+		pat->references = 1;
+	}
+	else
+		pat->status = VKVG_STATUS_NO_MEMORY;
+
+	return pat;
+}
+VkvgPattern vkvg_pattern_reference(VkvgPattern pat) {
+	if (!vkvg_pattern_status(pat))
+		pat->references++;
+	return pat;
+}
+uint32_t vkvg_pattern_get_reference_count(VkvgPattern pat) {
+	if (vkvg_pattern_status(pat))
+		return 0;
+	return pat->references;
+}
+vkvg_status_t vkvg_pattern_add_color_stop(VkvgPattern pat, float offset, float r, float g, float b, float a) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+#ifdef VKVG_PREMULT_ALPHA
+	vkvg_color_t c = { a * r, a * g, a * b, a };
+#else
+	vkvg_color_t c = { r, g, b, a };
+#endif
+	grad->colors[grad->count] = c;
+#ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
+	grad->stops[grad->count] = offset;
+#else
+	grad->stops[grad->count].r = offset;
+#endif
+	grad->count++;
+	return VKVG_STATUS_SUCCESS;
+}
+void vkvg_pattern_set_extend(VkvgPattern pat, vkvg_extend_t extend) {
+	if (vkvg_pattern_status(pat))
+		return;
+	pat->extend = extend;
+}
+void vkvg_pattern_set_filter(VkvgPattern pat, vkvg_filter_t filter) {
+	if (vkvg_pattern_status(pat))
+		return;
+	pat->filter = filter;
+}
+
+vkvg_extend_t vkvg_pattern_get_extend(VkvgPattern pat) {
+	if (vkvg_pattern_status(pat))
+		return (vkvg_extend_t)0;
+	return pat->extend;
+}
+vkvg_filter_t vkvg_pattern_get_filter(VkvgPattern pat) {
+	if (vkvg_pattern_status(pat))
+		return (vkvg_filter_t)0;
+	return pat->filter;
+}
+vkvg_pattern_type_t vkvg_pattern_get_type(VkvgPattern pat) {
+	if (vkvg_pattern_status(pat))
+		return (vkvg_pattern_type_t)0;
+	return pat->type;
+}
+vkvg_status_t vkvg_pattern_get_color_stop_count(VkvgPattern pat, uint32_t* count) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	*count = grad->count;
+	return VKVG_STATUS_SUCCESS;
+}
+vkvg_status_t vkvg_pattern_get_color_stop_rgba(VkvgPattern pat, uint32_t index, float* offset, float* r, float* g,
+	float* b, float* a) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	if (index >= grad->count)
+		return VKVG_STATUS_INVALID_INDEX;
+#ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
+	* offset = grad->stops[index];
+#else
+	* offset = grad->stops[index].r;
+#endif
+	vkvg_color_t c = grad->colors[index];
+	*r = c.r;
+	*g = c.g;
+	*b = c.b;
+	*a = c.a;
+	return VKVG_STATUS_SUCCESS;
+}
+void vkvg_pattern_set_matrix(VkvgPattern pat, const vkvg_matrix_t* matrix) {
+	if (vkvg_pattern_status(pat))
+		return;
+	pat->matrix = *matrix;
+	pat->hasMatrix = true;
+}
+void vkvg_pattern_get_matrix(VkvgPattern pat, vkvg_matrix_t* matrix) {
+	if (vkvg_pattern_status(pat))
+		return;
+	if (pat->hasMatrix)
+		*matrix = pat->matrix;
+	else
+		*matrix = VKVG_IDENTITY_MATRIX;
+}
+vkvg_status_t vkvg_pattern_status(VkvgPattern pat) { return !pat ? VKVG_STATUS_NULL_POINTER : pat->status; }
+
+void vkvg_pattern_destroy(VkvgPattern pat) {
+	if (vkvg_pattern_status(pat))
+		return;
+	pat->references--;
+	if (pat->references > 0)
+		return;
+
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE) {
+		VkvgSurface surf = (VkvgSurface)pat->data;
+		vkvg_surface_destroy(surf);
+	}
+	else
+		free(pat->data);
+
+	free(pat);
+	pat = NULL;
+}
+
+#endif // 1
+// surface
+#if 1
+
+
+#include "vkvg_surface_internal.h"
+#include "vkvg_device_internal.h"
+#include "vkvg_context_internal.h"
+//#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+//#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+#include "vkh_image.h"
+
+void vkvg_surface_clear(VkvgSurface surf) {
+	if (vkvg_surface_status(surf))
+		return;
+	_clear_surface(surf, VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+VkvgSurface vkvg_surface_create(VkvgDevice dev, uint32_t width, uint32_t height) {
+	VkvgSurface surf = _create_surface(dev, FB_COLOR_FORMAT);
+	if (surf->status)
+		return surf;
+
+	surf->width = MAX(1, width);
+	surf->height = MAX(1, height);
+	surf->newSurf = true; // used to clear all attacments on first render pass
+
+	_create_surface_images(surf);
+	_transition_surf_images(surf);
+
+	surf->status = VKVG_STATUS_SUCCESS;
+	return surf;
+}
+VkvgSurface vkvg_surface_create_for_VkhImage(VkvgDevice dev, void* vkhImg) {
+	VkvgSurface surf = _create_surface(dev, FB_COLOR_FORMAT);
+	if (surf->status)
+		return surf;
+
+	if (!vkhImg) {
+		surf->status = VKVG_STATUS_INVALID_IMAGE;
+		return surf;
+	}
+
+	VkhImage img = (VkhImage)vkhImg;
+	surf->width = img->infos.extent.width;
+	surf->height = img->infos.extent.height;
+
+	surf->img = img;
+
+	vkh_image_create_sampler(img, VK_FILTER_NEAREST, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+	_create_surface_secondary_images(surf);
+	_create_framebuffer(surf);
+
+	_transition_surf_images(surf);
+	//_clear_surface						(surf, VK_IMAGE_ASPECT_STENCIL_BIT);
+
+	surf->status = VKVG_STATUS_SUCCESS;
+	return surf;
+}
+// TODO: it would be better to blit in original size and create ms final image with dest surf dims
+VkvgSurface vkvg_surface_create_from_bitmap(VkvgDevice dev, unsigned char* img, uint32_t width, uint32_t height) {
+	VkvgSurface surf = _create_surface(dev, FB_COLOR_FORMAT);
+	if (surf->status)
+		return surf;
+	if (!img || width <= 0 || height <= 0) {
+		surf->status = VKVG_STATUS_INVALID_IMAGE;
+		return surf;
+	}
+
+	surf->width = MAX(1, width);
+	surf->height = MAX(1, height);
+
+	_create_surface_images(surf);
+
+	uint32_t                 imgSize = width * height * 4;
+	VkImageSubresourceLayers imgSubResLayers = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	// original format image
+	VkhImage stagImg = vkh_image_create((VkhDevice)&surf->dev->vkDev, VK_FORMAT_R8G8B8A8_UNORM, surf->width,
+		surf->height, VK_IMAGE_TILING_LINEAR, VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	// bgra bliting target
+	VkhImage tmpImg =
+		vkh_image_create((VkhDevice)&surf->dev->vkDev, surf->format, surf->width, surf->height, VK_IMAGE_TILING_LINEAR,
+			VKH_MEMORY_USAGE_GPU_ONLY, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	vkh_image_create_descriptor(tmpImg, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
+	// staging buffer
+	vkh_buffer_t buff = { 0 };
+	vkh_buffer_init((VkhDevice)&dev->vkDev, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU, imgSize,
+		&buff, true);
+
+	memcpy(vkh_buffer_get_mapped_pointer(&buff), img, imgSize);
+
+	VkCommandBuffer cmd = surf->cmd;
+
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+	VkBufferImageCopy bufferCopyRegion = { .imageSubresource = imgSubResLayers,
+										  .imageExtent = {surf->width, surf->height, 1} };
+
+	vkCmdCopyBufferToImage(cmd, buff.buffer, vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+		&bufferCopyRegion);
+
+	vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkh_image_set_layout(cmd, tmpImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+	VkImageBlit blit = {
+		.srcSubresource = imgSubResLayers,
+		.srcOffsets[1] = {(int32_t)surf->width, (int32_t)surf->height, 1},
+		.dstSubresource = imgSubResLayers,
+		.dstOffsets[1] = {(int32_t)surf->width, (int32_t)surf->height, 1},
+	};
+	vkCmdBlitImage(cmd, vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vkh_image_get_vkimage(tmpImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+	vkh_image_set_layout(cmd, tmpImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+	vkh_cmd_end(cmd);
+
+	_surface_submit_cmd(surf); // lock surface?
+
+	vkh_buffer_reset(&buff);
+	vkh_image_destroy(stagImg);
+
+	surf->newSurf = true;
+
+	// create tmp context with rendering pipeline to create the multisample img
+	VkvgContext ctx = vkvg_create(surf);
+
+	/*	  VkClearAttachment ca = {VK_IMAGE_ASPECT_COLOR_BIT,0, { 0.0f, 0.0f, 0.0f, 0.0f }};
+		VkClearRect cr = {{{0,0},{surf->width,surf->height}},0,1};
+		vkCmdClearAttachments(ctx->cmd, 1, &ca, 1, &cr);*/
+
+	vec4 srcRect = { .x = 0, .y = 0, .width = (float)surf->width, .height = (float)surf->height };
+	ctx->pushConsts.source = srcRect;
+	ctx->pushConsts.fsq_patternType = (ctx->pushConsts.fsq_patternType & FULLSCREEN_BIT) + VKVG_PATTERN_TYPE_SURFACE;
+
+	//_update_push_constants (ctx);
+	_update_descriptor_set(ctx, tmpImg, ctx->dsSrc);
+	_ensure_renderpass_is_started(ctx);
+
+	vkvg_paint(ctx);
+	vkvg_destroy(ctx);
+
+	vkh_image_destroy(tmpImg);
+
+	surf->status = VKVG_STATUS_SUCCESS;
+	return surf;
+}
+VkvgSurface vkvg_surface_create_from_image(VkvgDevice dev, const char* filePath) {
+	int            w = 0, h = 0, channels = 0;
+	unsigned char* img = stbi_load(filePath, &w, &h, &channels, 4); // force 4 components per pixel
+	if (!img) {
+		LOG(VKVG_LOG_ERR, "Could not load texture from %s, %s\n", filePath, stbi_failure_reason());
+		return (VkvgSurface)&_vkvg_status_null_pointer;
+	}
+
+	VkvgSurface surf = vkvg_surface_create_from_bitmap(dev, img, (uint32_t)w, (uint32_t)h);
+
+	stbi_image_free(img);
+
+	return surf;
+}
+
+void vkvg_surface_destroy(VkvgSurface surf) {
+	if (vkvg_surface_status(surf)) {
+		LOG(VKVG_LOG_ERR, "DESTROY surface failed, invalid surface\n");
+		return;
+	}
+	if (vkvg_device_status(surf->dev)) {
+		LOG(VKVG_LOG_ERR, "DESTROY surface failed, device error\n");
+		return;
+	}
+
+	LOCK_SURFACE(surf)
+		surf->references--;
+	if (surf->references > 0) {
+		UNLOCK_SURFACE(surf)
+			return;
+	}
+	UNLOCK_SURFACE(surf)
+
+		LOG(VKVG_LOG_INFO, "DESTROY Surface\n");
+
+	vkDestroyCommandPool(surf->dev->vkDev, surf->cmdPool, NULL);
+	vkDestroyFramebuffer(surf->dev->vkDev, surf->fb, NULL);
+
+	if (!surf->img->imported)
+		vkh_image_destroy(surf->img);
+
+	vkh_image_destroy(surf->imgMS);
+	vkh_image_destroy(surf->stencil);
+
+	if (surf->dev->threadAware)
+		mtx_destroy(&surf->mutex);
+
+#if VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	vkDestroySemaphore(surf->dev->vkDev, surf->timeline, NULL);
+#else
+	vkDestroyFence(surf->dev->vkDev, surf->flushFence, NULL);
+#endif
+
+	vkvg_device_destroy(surf->dev);
+	free(surf);
+	surf = NULL;
+}
+
+vkvg_status_t vkvg_surface_status(VkvgSurface surf) { return !surf ? VKVG_STATUS_NULL_POINTER : surf->status; }
+
+VkvgSurface vkvg_surface_reference(VkvgSurface surf) {
+	if (!vkvg_surface_status(surf)) {
+		LOCK_SURFACE(surf)
+			surf->references++;
+		UNLOCK_SURFACE(surf)
+	}
+	return surf;
+}
+uint32_t vkvg_surface_get_reference_count(VkvgSurface surf) {
+	if (vkvg_surface_status(surf))
+		return 0;
+	return surf->references;
+}
+
+VkImage vkvg_surface_get_vk_image(VkvgSurface surf) {
+	if (vkvg_surface_status(surf))
+		return NULL;
+	if (surf->dev->deferredResolve)
+		_explicit_ms_resolve(surf);
+	return vkh_image_get_vkimage(surf->img);
+}
+void vkvg_surface_resolve(VkvgSurface surf) {
+	if (vkvg_surface_status(surf) || !surf->dev->deferredResolve)
+		return;
+	_explicit_ms_resolve(surf);
+}
+VkFormat vkvg_surface_get_vk_format(VkvgSurface surf) {
+	if (vkvg_surface_status(surf))
+		return VK_FORMAT_UNDEFINED;
+	return surf->format;
+}
+uint32_t vkvg_surface_get_width(VkvgSurface surf) {
+	if (vkvg_surface_status(surf))
+		return 0;
+	return surf->width;
+}
+uint32_t vkvg_surface_get_height(VkvgSurface surf) {
+	if (vkvg_surface_status(surf))
+		return 0;
+	return surf->height;
+}
+
+vkvg_status_t vkvg_surface_write_to_png(VkvgSurface surf, const char* path) {
+	if (vkvg_surface_status(surf)) {
+		LOG(VKVG_LOG_ERR, "vkvg_surface_write_to_png failed, invalid status: %d\n", vkvg_surface_status(surf));
+		return VKVG_STATUS_INVALID_STATUS;
+	}
+	if (vkvg_device_status(surf->dev)) {
+		LOG(VKVG_LOG_ERR, "vkvg_surface_write_to_png failed, invalid device status: %d\n", vkvg_device_status(surf->dev));
+		return VKVG_STATUS_INVALID_STATUS;
+	}
+	if (surf->dev->pngStagFormat == VK_FORMAT_UNDEFINED) {
+		LOG(VKVG_LOG_ERR, "no suitable image format for png write\n");
+		return VKVG_STATUS_INVALID_FORMAT;
+	}
+	if (!path) {
+		LOG(VKVG_LOG_ERR, "vkvg_surface_write_to_png failed, null path\n");
+		return VKVG_STATUS_WRITE_ERROR;
+	}
+	LOCK_SURFACE(surf)
+		VkImageSubresourceLayers imgSubResLayers = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	VkvgDevice               dev = surf->dev;
+
+	// RGBA to blit to, surf img is bgra
+	VkhImage stagImg;
+
+	if (dev->pngStagTiling == VK_IMAGE_TILING_LINEAR)
+		stagImg = vkh_image_create((VkhDevice)&surf->dev->vkDev, dev->pngStagFormat, surf->width, surf->height,
+			dev->pngStagTiling, VKH_MEMORY_USAGE_GPU_TO_CPU,
+			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	else
+		stagImg = vkh_image_create((VkhDevice)&surf->dev->vkDev, dev->pngStagFormat, surf->width, surf->height,
+			dev->pngStagTiling, VKH_MEMORY_USAGE_GPU_ONLY,
+			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+
+	VkCommandBuffer cmd = surf->cmd;
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+	VkImageBlit blit = {
+		.srcSubresource = imgSubResLayers,
+		.srcOffsets[1] = {(int32_t)surf->width, (int32_t)surf->height, 1},
+		.dstSubresource = imgSubResLayers,
+		.dstOffsets[1] = {(int32_t)surf->width, (int32_t)surf->height, 1},
+	};
+	vkCmdBlitImage(cmd, vkh_image_get_vkimage(surf->img), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+
+	vkh_cmd_end(cmd);
+
+	_surface_submit_cmd(surf);
+
+	VkhImage stagImgLinear = stagImg;
+
+	if (dev->pngStagTiling == VK_IMAGE_TILING_OPTIMAL) {
+		stagImgLinear = vkh_image_create((VkhDevice)&surf->dev->vkDev, dev->pngStagFormat, surf->width, surf->height,
+			VK_IMAGE_TILING_LINEAR, VKH_MEMORY_USAGE_GPU_TO_CPU,
+			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+		VkImageCopy cpy = { .srcSubresource = imgSubResLayers,
+						   .srcOffset = {0},
+						   .dstSubresource = imgSubResLayers,
+						   .dstOffset = {0},
+						   .extent = {(int32_t)surf->width, (int32_t)surf->height, 1} };
+
+		vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+		vkh_image_set_layout(cmd, stagImgLinear, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		vkCmdCopyImage(cmd, vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			vkh_image_get_vkimage(stagImgLinear), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cpy);
+
+		vkh_cmd_end(cmd);
+
+		_surface_submit_cmd(surf);
+
+		vkh_image_destroy(stagImg);
+	}
+
+	unsigned char* img = (unsigned char*)vkh_image_map(stagImgLinear);
+
+	uint64_t stride = vkh_image_get_stride(stagImgLinear);
+
+#ifdef VKVG_PREMULT_ALPHA
+	//unpremult alpha for saving on disk.
+	for (int y = 0; y < surf->height; y++) {
+		for (int x = 0; x < surf->width; x++) {
+			unsigned char* p = img + y * stride + x * 4;
+			double alpha = (double)p[3] / 255.f;
+			p[0] = (unsigned char)((double)p[0] / alpha);
+			p[1] = (unsigned char)((double)p[1] / alpha);
+			p[2] = (unsigned char)((double)p[2] / alpha);
+		}
+	}
+#endif
+
+	stbi_write_png(path, (int32_t)surf->width, (int32_t)surf->height, 4, img, (int32_t)stride);
+
+	vkh_image_unmap(stagImgLinear);
+	vkh_image_destroy(stagImgLinear);
+
+	UNLOCK_SURFACE(surf)
+		return VKVG_STATUS_SUCCESS;
+}
+
+vkvg_status_t vkvg_surface_write_to_memory(VkvgSurface surf, unsigned char* const bitmap) {
+	if (vkvg_surface_status(surf)) {
+		LOG(VKVG_LOG_ERR, "vkvg_surface_write_to_memory failed, invalid status: %d\n", vkvg_surface_status(surf));
+		return VKVG_STATUS_INVALID_STATUS;
+	}
+	if (!bitmap) {
+		LOG(VKVG_LOG_ERR, "vkvg_surface_write_to_memory failed, null path\n");
+		return VKVG_STATUS_WRITE_ERROR;
+	}
+
+	LOCK_SURFACE(surf)
+
+		VkImageSubresourceLayers imgSubResLayers = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	VkvgDevice               dev = surf->dev;
+
+	// RGBA to blit to, surf img is bgra
+	VkhImage stagImg = vkh_image_create((VkhDevice)&surf->dev->vkDev, VK_FORMAT_R8G8B8A8_UNORM, surf->width,
+		surf->height, VK_IMAGE_TILING_LINEAR, VKH_MEMORY_USAGE_GPU_TO_CPU,
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+
+	VkCommandBuffer cmd = surf->cmd;
+
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vkh_image_set_layout(cmd, stagImg, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+	VkImageBlit blit = {
+		.srcSubresource = imgSubResLayers,
+		.srcOffsets[1] = {(int32_t)surf->width, (int32_t)surf->height, 1},
+		.dstSubresource = imgSubResLayers,
+		.dstOffsets[1] = {(int32_t)surf->width, (int32_t)surf->height, 1},
+	};
+	vkCmdBlitImage(cmd, vkh_image_get_vkimage(surf->img), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+
+	vkh_cmd_end(cmd);
+
+	_surface_submit_cmd(surf);
+
+	uint64_t stride = vkh_image_get_stride(stagImg);
+	uint32_t dest_stride = surf->width * 4;
+
+	unsigned char* img = vkh_image_map(stagImg);
+
+#ifdef VKVG_PREMULT_ALPHA
+	//unpremult alpha for saving on disk.
+	for (int y = 0; y < surf->height; y++) {
+		for (int x = 0; x < surf->width; x++) {
+			unsigned char* p = img + y * stride + x * 4;
+			double alpha = (double)p[3] / 255.f;
+			p[0] = (unsigned char)((double)p[0] / alpha);
+			p[1] = (unsigned char)((double)p[1] / alpha);
+			p[2] = (unsigned char)((double)p[2] / alpha);
+		}
+	}
+#endif
+
+	unsigned char* row = (unsigned char*)bitmap;
+	for (uint32_t y = 0; y < surf->height; y++) {
+		memcpy(row, img, dest_stride);
+		row += dest_stride;
+		img += stride;
+	}
+
+	vkh_image_unmap(stagImg);
+	vkh_image_destroy(stagImg);
+
+	UNLOCK_SURFACE(surf)
+
+		return VKVG_STATUS_SUCCESS;
+}
+
+#include "vkvg_device_internal.h"
+#include "vkvg_surface_internal.h"
+#include "vkh_image.h"
+#include "vkh_queue.h"
+
+void _explicit_ms_resolve(VkvgSurface surf) {
+	LOCK_SURFACE(surf)
+
+		VkCommandBuffer cmd = surf->cmd;
+
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vkh_image_set_layout(cmd, surf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+	VkImageResolve re = { .extent = {surf->width, surf->height, 1},
+						 .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+						 .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1} };
+
+	vkCmdResolveImage(cmd, vkh_image_get_vkimage(surf->imgMS), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vkh_image_get_vkimage(surf->img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &re);
+	vkh_image_set_layout(cmd, surf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	vkh_cmd_end(cmd);
+
+	_surface_submit_cmd(surf);
+
+	UNLOCK_SURFACE(surf)
+}
+void _transition_surf_images(VkvgSurface surf) {
+	LOCK_SURFACE(surf)
+		VkvgDevice dev = surf->dev;
+
+	//_surface_wait_cmd (surf);
+
+	vkh_cmd_begin(surf->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	VkhImage imgMs = surf->imgMS;
+	if (imgMs != NULL)
+		vkh_image_set_layout(surf->cmd, imgMs, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+	vkh_image_set_layout(surf->cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	vkh_image_set_layout(surf->cmd, surf->stencil, dev->stencilAspectFlag, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+	vkh_cmd_end(surf->cmd);
+
+	_surface_submit_cmd(surf);
+
+	UNLOCK_SURFACE(surf)
+}
+void _clear_surface(VkvgSurface surf, VkImageAspectFlags aspect) {
+	LOCK_SURFACE(surf)
+
+		VkCommandBuffer cmd = surf->cmd;
+
+	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	if (aspect & VK_IMAGE_ASPECT_COLOR_BIT) {
+		VkClearColorValue       cclr = { {0, 0, 0, 0} };
+		VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+		VkhImage img = surf->imgMS;
+		if (surf->dev->samples == VK_SAMPLE_COUNT_1_BIT)
+			img = surf->img;
+
+		vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		vkCmdClearColorImage(cmd, vkh_image_get_vkimage(img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cclr, 1, &range);
+
+		vkh_image_set_layout(cmd, img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	}
+	if (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) {
+		VkClearDepthStencilValue clr = { 0, 0 };
+		VkImageSubresourceRange  range = { VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 };
+
+		vkh_image_set_layout(cmd, surf->stencil, VK_IMAGE_ASPECT_STENCIL_BIT,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		vkCmdClearDepthStencilImage(cmd, vkh_image_get_vkimage(surf->stencil), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			&clr, 1, &range);
+
+		vkh_image_set_layout(cmd, surf->stencil, VK_IMAGE_ASPECT_STENCIL_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+	}
+	vkh_cmd_end(cmd);
+
+	_surface_submit_cmd(surf);
+
+	UNLOCK_SURFACE(surf)
+}
+
+void _create_surface_main_image(VkvgSurface surf) {
+	VkhDevice vkhd = (VkhDevice)&surf->dev->vkDev;
+	surf->img = vkh_image_create(vkhd, surf->format, surf->width, surf->height, surf->dev->supportedTiling,
+		VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	vkh_image_create_descriptor(surf->img, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_image_set_name(surf->img, "SURF main color");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)vkh_image_get_view(surf->img),
+		"SURF main color VIEW");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_SAMPLER, (uint64_t)vkh_image_get_sampler(surf->img),
+		"SURF main color SAMPLER");
+#endif
+}
+// create multisample color img if sample count > 1 and the stencil buffer multisampled or not
+void _create_surface_secondary_images(VkvgSurface surf) {
+	VkhDevice vkhd = (VkhDevice)&surf->dev->vkDev;
+	if (surf->dev->samples > VK_SAMPLE_COUNT_1_BIT) {
+		surf->imgMS = vkh_image_ms_create(
+			vkhd, surf->format, surf->dev->samples, surf->width, surf->height, VKH_MEMORY_USAGE_GPU_ONLY,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+		vkh_image_create_descriptor(surf->imgMS, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST,
+			VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+			VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+		vkh_image_set_name(surf->imgMS, "SURF MS color IMG");
+		vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)vkh_image_get_view(surf->imgMS),
+			"SURF MS color VIEW");
+		vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_SAMPLER, (uint64_t)vkh_image_get_sampler(surf->imgMS),
+			"SURF MS color SAMPLER");
+#endif
+	}
+	surf->stencil = vkh_image_ms_create(vkhd, surf->dev->stencilFormat, surf->dev->samples, surf->width, surf->height,
+		VKH_MEMORY_USAGE_GPU_ONLY,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+	vkh_image_create_descriptor(surf->stencil, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_STENCIL_BIT, VK_FILTER_NEAREST,
+		VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_image_set_name(surf->stencil, "SURF stencil");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)vkh_image_get_view(surf->stencil),
+		"SURF stencil VIEW");
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_SAMPLER, (uint64_t)vkh_image_get_sampler(surf->stencil),
+		"SURF stencil SAMPLER");
+#endif
+}
+void _create_framebuffer(VkvgSurface surf) {
+	VkImageView attachments[] = {
+		vkh_image_get_view(surf->img),
+		vkh_image_get_view(surf->stencil),
+		vkh_image_get_view(surf->imgMS),
+	};
+	VkFramebufferCreateInfo frameBufferCreateInfo = { .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+													 .renderPass = surf->dev->renderPass,
+													 .attachmentCount = 3,
+													 .pAttachments = attachments,
+													 .width = surf->width,
+													 .height = surf->height,
+													 .layers = 1 };
+	if (surf->dev->samples == VK_SAMPLE_COUNT_1_BIT)
+		frameBufferCreateInfo.attachmentCount = 2;
+	else if (surf->dev->deferredResolve) {
+		attachments[0] = attachments[2];
+		frameBufferCreateInfo.attachmentCount = 2;
+	}
+	VK_CHECK_RESULT(vkCreateFramebuffer(surf->dev->vkDev, &frameBufferCreateInfo, NULL, &surf->fb));
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_device_set_object_name((VkhDevice)&surf->dev->vkDev, VK_OBJECT_TYPE_FRAMEBUFFER, (uint64_t)surf->fb, "SURF FB");
+#endif
+}
+void _create_surface_images(VkvgSurface surf) {
+
+	_create_surface_main_image(surf);
+	_create_surface_secondary_images(surf);
+	_create_framebuffer(surf);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_image_set_name(surf->img, "surfImg");
+	vkh_image_set_name(surf->imgMS, "surfImgMS");
+	vkh_image_set_name(surf->stencil, "surfStencil");
+#endif
+}
+VkvgSurface _create_surface(VkvgDevice dev, VkFormat format) {
+	LOG(VKVG_LOG_INFO, "CREATE Surface\n");
+	if (vkvg_device_status(dev)) {
+		LOG(VKVG_LOG_ERR, "CREATE Surface failed, invalid Device\n");
+		return (VkvgSurface)&_vkvg_status_device_error;
+	}
+
+	VkvgSurface surf = (vkvg_surface*)calloc(1, sizeof(vkvg_surface));
+	if (!surf) {
+		LOG(VKVG_LOG_ERR, "CREATE Surface failed, no memory\n");
+		return (VkvgSurface)&_vkvg_status_no_memory;
+	}
+
+	surf->references = 1;
+	surf->dev = dev;
+	surf->format = format;
+
+	if (dev->threadAware)
+		mtx_init(&surf->mutex, mtx_plain);
+
+	VkhDevice vkhd = (VkhDevice)&surf->dev->vkDev;
+
+	surf->cmdPool =
+		vkh_cmd_pool_create(vkhd, dev->gQueue->familyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	vkh_cmd_buffs_create(vkhd, surf->cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &surf->cmd);
+
+#if VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	surf->timeline = vkh_timeline_create(vkhd, 0);
+#else
+	surf->flushFence = vkh_fence_create(vkhd);
+#endif
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)surf->cmd, "vkvgSurfCmd");
+#endif
+	vkvg_device_reference(surf->dev);
+	return surf;
+}
+// if fence sync, surf mutex must be locked.
+/*bool _surface_wait_cmd (VkvgSurface surf) {
+	LOG(VKVG_LOG_INFO, "SURF: _surface__wait_flush_fence\n");
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	if (vkh_timeline_wait ((VkhDevice)surf->dev, surf->timeline, surf->timelineStep) == VK_SUCCESS)
+		return true;
+#else
+	if (WaitForFences (surf->dev->vkDev, 1, &surf->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS) {
+		ResetFences (surf->dev->vkDev, 1, &surf->flushFence);
+		return true;
+	}
+#endif
+	LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
+	surf->status = VKVG_STATUS_TIMEOUT;
+	return false;
+}*/
+// surface mutex must be locked to call this method, locking to guard also the surf->cmd local buffer usage.
+void _surface_submit_cmd(VkvgSurface surf) {
+	VkvgDevice dev = surf->dev;
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	LOCK_DEVICE
+		vkh_cmd_submit_timelined(dev->gQueue, &surf->cmd, surf->timeline, surf->timelineStep, surf->timelineStep + 1);
+	surf->timelineStep++;
+	UNLOCK_DEVICE
+		vkh_timeline_wait((VkhDevice)&dev->vkDev, surf->timeline, surf->timelineStep);
+#else
+	LOCK_DEVICE
+		vkh_cmd_submit(surf->dev->gQueue, &surf->cmd, surf->flushFence);
+	UNLOCK_DEVICE
+		WaitForFences(surf->dev->vkDev, 1, &surf->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT);
+	ResetFences(surf->dev->vkDev, 1, &surf->flushFence);
+#endif
+}
+
+#endif // 1
+
+// recording
+#if 1
+
+#include "vkvg.h"
+#include "vkvg_context_internal.h"
+#include "vkvg_record_internal.h"
+
+#ifdef VKVG_RECORDING
+void vkvg_start_recording(VkvgContext ctx) {
+	if (ctx->status)
+		return;
+	_start_recording(ctx);
+}
+VkvgRecording vkvg_stop_recording(VkvgContext ctx) {
+	if (ctx->status)
+		return NULL;
+	return _stop_recording(ctx);
+}
+uint32_t vkvg_recording_get_count(VkvgRecording rec) {
+	if (!rec)
+		return 0;
+	return rec->commandsCount;
+}
+void* vkvg_recording_get_data(VkvgRecording rec) {
+	if (!rec)
+		return 0;
+	return rec->buffer;
+}
+void vkvg_recording_get_command(VkvgRecording rec, uint32_t cmdIndex, uint32_t* cmd, void** dataOffset) {
+	if (!rec)
+		return;
+	if (cmdIndex < rec->commandsCount) {
+		*cmd = rec->commands[cmdIndex].cmd;
+		*dataOffset = (void*)rec->commands[cmdIndex].dataOffset;
+	}
+	else {
+		*cmd = 0;
+		*dataOffset = NULL;
+	}
+}
+void vkvg_replay(VkvgContext ctx, VkvgRecording rec) {
+	if (!rec)
+		return;
+	for (uint32_t i = 0; i < rec->commandsCount; i++)
+		_replay_command(ctx, rec, i);
+}
+void vkvg_replay_command(VkvgContext ctx, VkvgRecording rec, uint32_t cmdIndex) {
+	if (!rec)
+		return;
+	if (cmdIndex < rec->commandsCount)
+		_replay_command(ctx, rec, cmdIndex);
+}
+void vkvg_recording_destroy(VkvgRecording rec) {
+	if (!rec)
+		return;
+	_destroy_recording(rec);
+}
+#endif
+
+#include "vkvg.h"
+#include "vkvg_record_internal.h"
+#include "vkvg_context_internal.h"
+
+#define VKVG_RECORDING_INIT_BUFFER_SIZE_TRESHOLD 64
+#define VKVG_RECORDING_INIT_BUFFER_SIZE          1024
+#define VKVG_RECORDING_INIT_COMMANDS_COUNT       64
+
+vkvg_recording_t* _new_recording() {
+
+	vkvg_recording_t* rec = (vkvg_recording_t*)calloc(1, sizeof(vkvg_recording_t));
+
+	rec->commandsReservedCount = VKVG_RECORDING_INIT_COMMANDS_COUNT;
+	rec->bufferReservedSize = VKVG_RECORDING_INIT_BUFFER_SIZE;
+	rec->commands = (vkvg_record_t*)malloc(rec->commandsReservedCount * sizeof(vkvg_record_t));
+	rec->buffer = malloc(rec->bufferReservedSize);
+
+	return rec;
+}
+void _destroy_recording(vkvg_recording_t* rec) {
+	if (!rec)
+		return;
+	for (uint32_t i = 0; i < rec->commandsCount; i++) {
+		if (rec->commands[i].cmd == VKVG_CMD_SET_SOURCE)
+			vkvg_pattern_destroy((VkvgPattern)(rec->buffer + rec->commands[i].dataOffset));
+		else if (rec->commands[i].cmd == VKVG_CMD_SET_SOURCE_SURFACE)
+			vkvg_surface_destroy((VkvgSurface)(rec->buffer + rec->commands[i].dataOffset + 2 * sizeof(float)));
+	}
+	free(rec->commands);
+	free(rec->buffer);
+	free(rec);
+}
+void _start_recording(VkvgContext ctx) {
+	if (ctx->recording)
+		_destroy_recording(ctx->recording);
+	ctx->recording = _new_recording();
+}
+vkvg_recording_t* _stop_recording(VkvgContext ctx) {
+	vkvg_recording_t* rec = ctx->recording;
+	if (!rec)
+		return NULL;
+	if (!rec->commandsCount) {
+		_destroy_recording(rec);
+		ctx->recording = NULL;
+		return NULL;
+	}
+	/*rec->buffer = realloc(rec->buffer, rec->bufferSize);
+	rec->commands = (vkvg_record_t*)realloc(rec->commands, rec->commandsCount * sizeof (vkvg_record_t));*/
+	ctx->recording = NULL;
+	return rec;
+}
+void* _ensure_recording_buffer(vkvg_recording_t* rec, size_t size) {
+	if (rec->bufferReservedSize >= rec->bufferSize - VKVG_RECORDING_INIT_BUFFER_SIZE_TRESHOLD - size) {
+		rec->bufferReservedSize += VKVG_RECORDING_INIT_BUFFER_SIZE;
+		rec->buffer = realloc(rec->buffer, rec->bufferReservedSize);
+	}
+	return rec->buffer + rec->bufferSize;
+}
+void* _advance_recording_buffer_unchecked(vkvg_recording_t* rec, size_t size) {
+	rec->bufferSize += size;
+	return rec->buffer + rec->bufferSize;
+}
+
+#define STORE_FLOATS(floatcount)                                                                                       \
+    for (i = 0; i < floatcount; i++) {                                                                                 \
+        buff           = _ensure_recording_buffer(rec, sizeof(float));                                                 \
+        *(float *)buff = (float)va_arg(args, double);                                                                  \
+        buff           = _advance_recording_buffer_unchecked(rec, sizeof(float));                                      \
+    }
+#define STORE_BOOLS(count)                                                                                             \
+    for (i = 0; i < count; i++) {                                                                                      \
+        buff          = _ensure_recording_buffer(rec, sizeof(bool));                                                   \
+        *(bool *)buff = (bool)va_arg(args, int);                                                                       \
+        _advance_recording_buffer_unchecked(rec, sizeof(bool));                                                        \
+    }
+#define STORE_UINT32(count)                                                                                            \
+    for (i = 0; i < count; i++) {                                                                                      \
+        buff              = _ensure_recording_buffer(rec, sizeof(uint32_t));                                           \
+        *(uint32_t *)buff = (uint32_t)va_arg(args, uint32_t);                                                          \
+        buff              = _advance_recording_buffer_unchecked(rec, sizeof(uint32_t));                                \
+    }
+
+void _record(vkvg_recording_t* rec, ...) {
+	va_list args;
+	va_start(args, rec);
+
+	uint32_t cmd = va_arg(args, uint32_t);
+
+	if (rec->commandsCount == rec->commandsReservedCount) {
+		rec->commandsReservedCount += VKVG_RECORDING_INIT_COMMANDS_COUNT;
+		rec->commands = (vkvg_record_t*)realloc(rec->commands, rec->commandsReservedCount * sizeof(vkvg_record_t));
+	}
+	vkvg_record_t* r = &rec->commands[rec->commandsCount++];
+	r->cmd = cmd;
+	r->dataOffset = rec->bufferSize;
+
+	char* buff;
+	int   i = 0;
+
+	if (cmd & VKVG_CMD_PATH_COMMANDS) {
+		if ((cmd & VKVG_CMD_PATHPROPS_COMMANDS) == VKVG_CMD_PATHPROPS_COMMANDS) {
+			switch (r->cmd) {
+			case VKVG_CMD_SET_LINE_WIDTH:
+			case VKVG_CMD_SET_MITER_LIMIT:
+				STORE_FLOATS(1);
+				break;
+			case VKVG_CMD_SET_LINE_JOIN:
+				STORE_UINT32(1);
+				break;
+			case VKVG_CMD_SET_LINE_CAP:
+				STORE_UINT32(1);
+				break;
+			case VKVG_CMD_SET_OPERATOR:
+				STORE_UINT32(1);
+				break;
+			case VKVG_CMD_SET_FILL_RULE:
+				STORE_UINT32(1);
+				break;
+			case VKVG_CMD_SET_DASH:
+				break;
+			}
+		}
+		else {
+			switch (cmd) {
+			case VKVG_CMD_MOVE_TO:
+			case VKVG_CMD_LINE_TO:
+			case VKVG_CMD_REL_MOVE_TO:
+			case VKVG_CMD_REL_LINE_TO:
+				STORE_FLOATS(2);
+				break;
+			case VKVG_CMD_RECTANGLE:
+			case VKVG_CMD_QUADRATIC_TO:
+			case VKVG_CMD_REL_QUADRATIC_TO:
+				STORE_FLOATS(4);
+				break;
+			case VKVG_CMD_ARC:
+			case VKVG_CMD_ARC_NEG:
+				STORE_FLOATS(5);
+				break;
+			case VKVG_CMD_CURVE_TO:
+			case VKVG_CMD_REL_CURVE_TO:
+				STORE_FLOATS(6);
+				break;
+			case VKVG_CMD_ELLIPTICAL_ARC_TO:
+			case VKVG_CMD_REL_ELLIPTICAL_ARC_TO:
+				STORE_FLOATS(5);
+				STORE_BOOLS(2);
+				break;
+			case VKVG_CMD_NEW_PATH:
+			case VKVG_CMD_NEW_SUB_PATH:
+			case VKVG_CMD_CLOSE_PATH:
+				break;
+			}
+		}
+	}
+	else if (!(r->cmd & VKVG_CMD_DRAW_COMMANDS)) {
+		if (r->cmd & VKVG_CMD_TRANSFORM_COMMANDS) {
+			switch (r->cmd) {
+			case VKVG_CMD_TRANSLATE:
+			case VKVG_CMD_SCALE:
+				STORE_FLOATS(2);
+				break;
+			case VKVG_CMD_ROTATE:
+				STORE_FLOATS(1);
+				break;
+			case VKVG_CMD_IDENTITY_MATRIX:
+				break;
+			case VKVG_CMD_SET_MATRIX:
+			case VKVG_CMD_TRANSFORM: {
+				buff = _ensure_recording_buffer(rec, sizeof(vkvg_matrix_t));
+				vkvg_matrix_t* mat = (vkvg_matrix_t*)va_arg(args, vkvg_matrix_t*);
+				memcpy(buff, mat, sizeof(vkvg_matrix_t));
+				buff = _advance_recording_buffer_unchecked(rec, sizeof(vkvg_matrix_t));
+
+			} break;
+			}
+		}
+		else if (r->cmd & VKVG_CMD_PATTERN_COMMANDS) {
+			switch (r->cmd) {
+			case VKVG_CMD_SET_SOURCE_RGBA:
+				STORE_FLOATS(4);
+				break;
+			case VKVG_CMD_SET_SOURCE_RGB:
+				STORE_FLOATS(3);
+				break;
+			case VKVG_CMD_SET_SOURCE_COLOR:
+				STORE_UINT32(1);
+				break;
+			case VKVG_CMD_SET_SOURCE: {
+				buff = _ensure_recording_buffer(rec, sizeof(VkvgPattern));
+				VkvgPattern pat = (VkvgPattern)va_arg(args, VkvgPattern);
+				vkvg_pattern_reference(pat);
+				VkvgPattern* pPat = (VkvgPattern*)buff;
+				*pPat = pat;
+				_advance_recording_buffer_unchecked(rec, sizeof(VkvgPattern));
+			} break;
+			case VKVG_CMD_SET_SOURCE_SURFACE:
+				STORE_FLOATS(2);
+				{
+					buff = _ensure_recording_buffer(rec, sizeof(VkvgSurface));
+					VkvgSurface surf = (VkvgSurface)va_arg(args, VkvgSurface);
+					vkvg_surface_reference(surf);
+					*(VkvgSurface*)buff = surf;
+					_advance_recording_buffer_unchecked(rec, sizeof(VkvgSurface));
+				}
+				break;
+			}
+		}
+		else if (r->cmd & VKVG_CMD_TEXT_COMMANDS) {
+			char* txt;
+			int   txtLen;
+			switch (r->cmd) {
+			case VKVG_CMD_SET_FONT_SIZE:
+				STORE_UINT32(1);
+				break;
+			case VKVG_CMD_SHOW_TEXT:
+			case VKVG_CMD_SET_FONT_FACE:
+				txt = (char*)va_arg(args, char*);
+				txtLen = strlen(txt);
+				buff = _ensure_recording_buffer(rec, txtLen * sizeof(char));
+				strcpy(buff, txt);
+				_advance_recording_buffer_unchecked(rec, txtLen * sizeof(char));
+				break;
+			case VKVG_CMD_SET_FONT_PATH:
+				break;
+			}
+		}
+	}
+	va_end(args);
+}
+void _replay_command(VkvgContext ctx, VkvgRecording rec, uint32_t index) {
+	vkvg_record_t* r = &rec->commands[index];
+	float* floats = (float*)(rec->buffer + r->dataOffset);
+	uint32_t* uints = (uint32_t*)floats;
+	if (r->cmd & VKVG_CMD_PATH_COMMANDS) {
+		if ((r->cmd & VKVG_CMD_RELATIVE_COMMANDS) == VKVG_CMD_RELATIVE_COMMANDS) {
+			switch (r->cmd) {
+			case VKVG_CMD_REL_MOVE_TO:
+				vkvg_rel_move_to(ctx, floats[0], floats[1]);
+				return;
+			case VKVG_CMD_REL_LINE_TO:
+				vkvg_rel_line_to(ctx, floats[0], floats[1]);
+				return;
+			case VKVG_CMD_REL_CURVE_TO:
+				vkvg_rel_curve_to(ctx, floats[0], floats[1], floats[2], floats[3], floats[4], floats[5]);
+				return;
+			case VKVG_CMD_REL_QUADRATIC_TO:
+				vkvg_rel_quadratic_to(ctx, floats[0], floats[1], floats[2], floats[3]);
+				return;
+			case VKVG_CMD_REL_ELLIPTICAL_ARC_TO: {
+				bool* flags = (bool*)&floats[5];
+				vkvg_rel_elliptic_arc_to(ctx, floats[0], floats[1], flags[0], flags[1], floats[2], floats[3],
+					floats[4]);
+			}
+											   return;
+			}
+		}
+		else if ((r->cmd & VKVG_CMD_PATHPROPS_COMMANDS) == VKVG_CMD_PATHPROPS_COMMANDS) {
+			switch (r->cmd) {
+			case VKVG_CMD_SET_LINE_WIDTH:
+				vkvg_set_line_width(ctx, floats[0]);
+				return;
+			case VKVG_CMD_SET_MITER_LIMIT:
+				vkvg_set_miter_limit(ctx, floats[0]);
+				return;
+			case VKVG_CMD_SET_LINE_JOIN:
+				vkvg_set_line_join(ctx, (vkvg_line_join_t)uints[0]);
+				return;
+			case VKVG_CMD_SET_LINE_CAP:
+				vkvg_set_line_cap(ctx, (vkvg_line_cap_t)uints[0]);
+				return;
+			case VKVG_CMD_SET_OPERATOR:
+				vkvg_set_operator(ctx, (vkvg_operator_t)uints[0]);
+				return;
+			case VKVG_CMD_SET_FILL_RULE:
+				vkvg_set_fill_rule(ctx, (vkvg_fill_rule_t)uints[0]);
+				return;
+			case VKVG_CMD_SET_DASH:
+				vkvg_set_dash(ctx, &floats[2], uints[0], floats[1]);
+				return;
+			}
+		}
+		else {
+			switch (r->cmd) {
+			case VKVG_CMD_NEW_PATH:
+				vkvg_new_path(ctx);
+				return;
+			case VKVG_CMD_NEW_SUB_PATH:
+				vkvg_new_sub_path(ctx);
+				return;
+			case VKVG_CMD_CLOSE_PATH:
+				vkvg_close_path(ctx);
+				return;
+			case VKVG_CMD_RECTANGLE:
+				vkvg_rectangle(ctx, floats[0], floats[1], floats[2], floats[3]);
+				return;
+			case VKVG_CMD_ARC:
+				vkvg_arc(ctx, floats[0], floats[1], floats[2], floats[3], floats[4]);
+				return;
+			case VKVG_CMD_ARC_NEG:
+				vkvg_arc(ctx, floats[0], floats[1], floats[2], floats[3], floats[4]);
+				return;
+				/*case VKVG_CMD_ELLIPSE:
+					vkvg_ellipse (ctx, floats[0], floats[1], floats[2], floats[3], floats[4]);
+					break;*/
+			case VKVG_CMD_MOVE_TO:
+				vkvg_move_to(ctx, floats[0], floats[1]);
+				return;
+			case VKVG_CMD_LINE_TO:
+				vkvg_line_to(ctx, floats[0], floats[1]);
+				return;
+			case VKVG_CMD_CURVE_TO:
+				vkvg_curve_to(ctx, floats[0], floats[1], floats[2], floats[3], floats[4], floats[5]);
+				return;
+			case VKVG_CMD_ELLIPTICAL_ARC_TO: {
+				bool* flags = (bool*)&floats[5];
+				vkvg_elliptic_arc_to(ctx, floats[0], floats[1], flags[0], flags[1], floats[2], floats[3], floats[4]);
+			}
+										   return;
+			case VKVG_CMD_QUADRATIC_TO:
+				vkvg_quadratic_to(ctx, floats[0], floats[1], floats[2], floats[3]);
+				return;
+			}
+		}
+	}
+	else if (r->cmd & VKVG_CMD_DRAW_COMMANDS) {
+		switch (r->cmd) {
+		case VKVG_CMD_PAINT:
+			vkvg_paint(ctx);
+			return;
+		case VKVG_CMD_FILL:
+			vkvg_fill(ctx);
+			return;
+		case VKVG_CMD_STROKE:
+			vkvg_stroke(ctx);
+			return;
+		case VKVG_CMD_CLIP:
+			vkvg_clip(ctx);
+			return;
+		case VKVG_CMD_CLEAR:
+			vkvg_clear(ctx);
+			return;
+		case VKVG_CMD_FILL_PRESERVE:
+			vkvg_fill_preserve(ctx);
+			return;
+		case VKVG_CMD_STROKE_PRESERVE:
+			vkvg_stroke_preserve(ctx);
+			return;
+		case VKVG_CMD_CLIP_PRESERVE:
+			vkvg_clip_preserve(ctx);
+			return;
+		}
+	}
+	else if (r->cmd & VKVG_CMD_TRANSFORM_COMMANDS) {
+		switch (r->cmd) {
+		case VKVG_CMD_TRANSLATE:
+			vkvg_translate(ctx, floats[0], floats[1]);
+			return;
+		case VKVG_CMD_SCALE:
+			vkvg_scale(ctx, floats[0], floats[1]);
+			return;
+		case VKVG_CMD_ROTATE:
+			vkvg_rotate(ctx, floats[0]);
+			return;
+		case VKVG_CMD_IDENTITY_MATRIX:
+			vkvg_identity_matrix(ctx);
+			return;
+		case VKVG_CMD_TRANSFORM: {
+			vkvg_matrix_t* mat = (vkvg_matrix_t*)&floats[0];
+			vkvg_transform(ctx, mat);
+		}
+							   return;
+		case VKVG_CMD_SET_MATRIX: {
+			vkvg_matrix_t* mat = (vkvg_matrix_t*)&floats[0];
+			vkvg_set_matrix(ctx, mat);
+		}
+								return;
+		}
+	}
+	else if (r->cmd & VKVG_CMD_PATTERN_COMMANDS) {
+		switch (r->cmd) {
+		case VKVG_CMD_SET_SOURCE_RGB:
+			vkvg_set_source_rgb(ctx, floats[0], floats[1], floats[2]);
+			return;
+		case VKVG_CMD_SET_SOURCE_RGBA:
+			vkvg_set_source_rgba(ctx, floats[0], floats[1], floats[2], floats[3]);
+			return;
+		case VKVG_CMD_SET_SOURCE_COLOR:
+			vkvg_set_source_color(ctx, uints[0]);
+			return;
+		case VKVG_CMD_SET_SOURCE: {
+			VkvgPattern pat = *((VkvgPattern*)(rec->buffer + r->dataOffset));
+			vkvg_set_source(ctx, pat);
+		}
+								return;
+		case VKVG_CMD_SET_SOURCE_SURFACE: {
+			VkvgSurface surf = *((VkvgSurface*)&floats[2]);
+			vkvg_set_source_surface(ctx, surf, floats[0], floats[1]);
+		}
+										return;
+		}
+	}
+	else if (r->cmd & VKVG_CMD_TEXT_COMMANDS) {
+		char* txt = (char*)floats;
+		switch (r->cmd) {
+		case VKVG_CMD_SET_FONT_SIZE:
+			vkvg_set_font_size(ctx, uints[0]);
+			return;
+		case VKVG_CMD_SET_FONT_FACE:
+			vkvg_select_font_face(ctx, txt);
+			return;
+			/*case VKVG_CMD_SET_FONT_PATH:
+				vkvg_load_font_from_path (ctx, txt);
+				return;	*/
+		case VKVG_CMD_SHOW_TEXT:
+			vkvg_show_text(ctx, txt);
+			return;
+		}
+	}
+	else {
+		switch (r->cmd) {
+		case VKVG_CMD_SAVE:
+			vkvg_save(ctx);
+			return;
+		case VKVG_CMD_RESTORE:
+			vkvg_restore(ctx);
+			return;
+		}
+	}
+	LOG(VKVG_LOG_ERR, "[REPLAY] unimplemented command: %.4x\n", r->cmd);
+}
+#endif // 1

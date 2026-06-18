@@ -2939,7 +2939,7 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 	{
 		if (draggable)
 		{
-			printf("draggable %.1f %.1f\n", mps.x, mps.y);
+			//printf("draggable %.1f %.1f\n", mps.x, mps.y);
 			set_pos(mps);
 		}
 		ret = true;

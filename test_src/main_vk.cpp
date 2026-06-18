@@ -127,7 +127,7 @@ int main(int argc, char* argv[])
 		auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
 		dev_info_cx devinfo = {};
 		get_dev_info(dctx, &devinfo);
-		test_vkvg("temp/aafsf.png", 0);
+	/*	test_vkvg("temp/aafsf.png", 0);*/
 		vkdg_cx* vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, devname);	// 创建vk渲染器 
 
 		auto sampler = gd->new_object((aDevice*)dctx, (int)obj_type_e::OBJ_SAMPLER, "sampler");	// 创建vk渲染器对象
@@ -588,6 +588,8 @@ int main(int argc, char* argv[])
 			}
 			appx->app->set_fps(60);
 			vkd->_state.has_fence = false;
+			appx->view = view;
+			appx->fpslab = fpslab;
 			auto actx = appx->audio_ctx;
 			//audio_addsong(actx);
 			//actx->pause(1);
@@ -600,8 +602,6 @@ int main(int argc, char* argv[])
 			//app_cx::set_audio_gain(actx->_current->st, 0.05);
 			// 运行消息循环	
 			size_t frame_count = 0;
-			appx->view = view;
-			appx->fpslab = fpslab;
 			do {
 				frame_count = appx->run();
 			} while (frame_count);

@@ -22,6 +22,8 @@ extern "C" {
 
 #include <pnguo.h>
 
+#include <zlib.h>
+
 #define FLEX_IMPLEMENTATION
 #include <vg.h>
 #include <vkvg/vkvg.h> 
@@ -2205,23 +2207,24 @@ void rvg_cx::push_null(int v)
 {
 	push_ct(v);
 }
-
+inline uint32_t r_crc32(const void* d, uint32_t l) {
+	return  crc32(0, (Bytef*)d, l);
+}
 uint32_t rvg_cx::get_crc()
 {
-	return ecc_crc32u(_view.data(), _view.size());
-	//auto ct1 = ecc_crc32u(_cmd_pos.data(), _cmd_pos.size());
-	//return ct0 ^ ct1 ^ ct2 ^ ct3;
+	return r_crc32(_view.data(), _view.size());
+	//return ecc_crc32u(_view.data(), _view.size()); 
 }
 uint32_t rvg_cx::get_crc2index(size_t i)
 {
 	uint32_t r = 0;
 	if (i < _view.size() && _cmd.size() && _cmd_pos.size()) {
 		auto& it = _view[i];
-		auto ct1 = ecc_crc32u(&it, sizeof(it));
-		auto ct2 = ecc_crc32u(_cmdtype.data() + it.first, std::min(it.count, _cmdtype.size() - it.first));
+		auto ct1 = r_crc32(&it, sizeof(it));
+		auto ct2 = r_crc32(_cmdtype.data() + it.first, std::min(it.count, _cmdtype.size() - it.first));
 		auto dpos = _cmd_pos[it.first];
 		auto dpos1 = _cmd_pos[it.first + it.count];
-		auto ct3 = ecc_crc32u(_cmd.data() + dpos, std::min(dpos1 - dpos, _cmd.size() - dpos));
+		auto ct3 = r_crc32(_cmd.data() + dpos, std::min(dpos1 - dpos, _cmd.size() - dpos));
 		r = ct1 ^ ct2 ^ ct3;
 	}
 	return r;
@@ -2230,11 +2233,11 @@ uint32_t get_crc(cmdview_v* cv, const char* cmd, size_t cmdc, const char* dt, si
 {
 	uint32_t r = 0;
 	auto& it = *cv;
-	auto ct1 = ecc_crc32u(&it, sizeof(it));
-	auto ct2 = ecc_crc32u(dt + it.first, std::min(it.count, dtc - it.first));
+	auto ct1 = r_crc32(&it, sizeof(it));
+	auto ct2 = r_crc32(dt + it.first, std::min(it.count, dtc - it.first));
 	auto dpos = cpos[it.first];
 	auto dpos1 = cpos[it.first + it.count];
-	auto ct3 = ecc_crc32u(cmd + dpos, std::min(dpos1 - dpos, cmdc - dpos));
+	auto ct3 = r_crc32(cmd + dpos, std::min(dpos1 - dpos, cmdc - dpos));
 	r = ct1 ^ ct2 ^ ct3;
 	return r;
 }
@@ -4681,200 +4684,6 @@ glm::vec4 get_hue_color_cb(const glm::ivec2& pos, const glm::ivec2& size)
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
-
-#define white 1, 1, 1
-#define red   1, 0, 0
-#define green 0, 1, 0
-#define blue  0, 0, 1
-
-void test_vkvg(const char* fn, dev_info_c* dc)
-{
-
-	vkvg_dev* vctx = new_vkvgdev(dc, 8);
-	auto dev = vctx->ctx->dev;
-	if (!dev)return;
-	//new_spv_base(vctx->vkdev);
-	//vkvg_log_level = -1;
-	VkvgSurface surf = vkvg_surface_create(dev, 1024, 1024);
-	VkvgContext ctx = vkvg_create(surf);
-	vkvg_clear(ctx);
-	//vkvg_save(ctx);
-	if (1) {
-		print_time ptt("vkvg");
-		VkvgPattern pat;
-		VkvgContext  cr = ctx;
-		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-		vkvg_rectangle(cr, 0, 0, 256, 256);
-		vkvg_set_source(cr, pat);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-		vkvg_set_source(cr, pat);
-		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * 3.1415926);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-		//vkvg_move_to(cr, 20, 100);
-		//vkvg_set_source_color(cr, 0xff0cC616);
-		//vkvg_select_font_face(ctx, (char*)u8"新宋体");
-		//vkvg_set_font_size(cr, 26);
-		//vkvg_show_text(cr, (char*)u8"abc123g0加0123");
-		vkvg_set_line_width(ctx, 2);
-		vkvg_set_source_rgba(ctx, red, 0.8);
-		float scale = 2.0;
-		draw_arrow(ctx, glm::vec2(100.5, 300.5), glm::vec2(512.5, 520.5), 5, 20);
-		vkvg_set_line_width(ctx, 1);
-		vkvg_set_source_rgba(ctx, green, 0.8);
-		double        vertices_array[] = { 100, 100, 400, 100, 400, 400, 100, 400, 300, 200, 200, 200, 200, 300, 300, 300 };
-		const double* contours_array[] = { vertices_array, vertices_array + 8, vertices_array + 16 };
-		int           contours_size = 3;
-		for (int i = 0; i < contours_size - 1; i++) {
-			auto p = contours_array[i];
-			vkvg_move_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale + 0.5));
-			p += 2;
-			while (p < contours_array[i + 1]) {
-				draw_arrow_to(ctx, (p[0] * scale) + 0.5, (p[1] * scale) + 0.5);
-				p += 2;
-			}
-			vkvg_stroke(ctx);
-		}
-
-		float dashes[] = { 50.0,  /* ink */
-				   10.0,  /* skip */
-				   10.0,  /* ink */
-				   10.0   /* skip*/
-		};
-		int    ndash = sizeof(dashes) / sizeof(dashes[0]);
-		double offset = -50.0;
-		vkvg_save(cr);
-		vkvg_set_dash(cr, dashes, ndash, offset);
-		vkvg_set_line_width(cr, 10.0);
-
-		vkvg_move_to(cr, 128.0, 25.6);
-		vkvg_line_to(cr, 230.4, 230.4);
-		vkvg_rel_line_to(cr, -102.4, 0.0);
-		vkvg_curve_to(cr, 51.2, 230.4, 51.2, 128.0, 128.0, 128.0);
-
-		vkvg_stroke(cr);
-		vkvg_restore(cr);
-		bspline_ct bs;
-		std::vector<glm::vec2> pts = { {100,500},{200,600},{300,400},{400,700},{500,500} };
-		auto bptr = bs.new_bspline(pts.data(), pts.size());
-		if (bptr)
-		{
-			auto v = bs.sample2(64);
-			vkvg_move_to(cr, v[0].x, v[0].y);
-			for (size_t i = 1; i < v.size(); i++)
-			{
-				vkvg_line_to(cr, v[i].x, v[i].y);
-			}
-			vkvg_set_source_color(cr, 0xff0080ff);
-			vkvg_scale(cr, 1.52, 1.52);
-			vkvg_set_line_width(cr, 2.0);
-			vkvg_stroke(cr);
-		}
-		vkvg_set_source_color(cr, 0xff0020ff);
-		vkvg_select_font_face(ctx, "times");
-		vkvg_move_to(ctx, 100.f, 100);
-		vkvg_set_font_size(ctx, 30);
-		static const char* txt = "The quick brown fox jumps over the lazy dog";
-		//vkvg_show_text(ctx, txt);
-
-	}
-
-	vkvg_flush(ctx);
-	if (!fn || !*fn)
-		fn = "temp/offscreen_vkvg.png";
-	vkvg_surface_resolve(surf);//msaa采样转换输出
-
-	vkvg_surface_write_to_png(surf, fn);
-	vkvg_destroy(ctx);
-	vkvg_surface_destroy(surf);
-	//vkvg_set_source_rgb(ctx, 0, 0, 0);
-	//vkvg_paint(ctx);
-	//vkvg_set_source_rgba(ctx, 1, 0.5, 0, 0.9);
-
-	//vkvg_load_font_from_path(ctx, "C:\\Windows\\Fonts\\consola.ttf", "consola");
-	//vkvg_set_font_size(ctx, 12);
-	//vkvg_select_font_face(ctx, "consola");
-	//vkvg_set_font_size(ctx, 16);
-
-	//vkvg_move_to(ctx, 100.0, 100.0);
-	//vkvg_show_text(ctx, "vkvg");
-
-	//vkvg_font_extents_t fe;
-	//vkvg_font_extents(ctx, &fe);
-	//print_boxed(ctx, "abcdefghijklmnopqrstuvwxyz", 20, 60, 20);
-	//print_boxed(ctx, "ABC", 20, 160, 60);
-	//vkvg_select_font_face(ctx, "mono");
-	//print_boxed(ctx, "This is a test string!", 20, 250, 20);
-	//print_boxed(ctx, "ANOTHER ONE TO CHECK..", 20, 350, 20);
-	//free_vkvgdev(vctx);
-
-	{
-		const char* filename = "temp/vkvg_gradient.png";
-		VkvgSurface surf = vctx->new_surface(256, 256);
-		auto ctx = vkvg_create(surf);
-		{
-			print_time ptt(filename);
-			VkvgPattern grad = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-			vkvg_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
-			vkvg_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
-			vkvg_set_source(ctx, grad);
-			vkvg_rectangle(ctx, 0, 0, 256, 256);
-			vkvg_fill(ctx);
-			VkvgPattern rg = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-			vkvg_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
-			vkvg_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
-			vkvg_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
-			vkvg_set_source(ctx, rg);
-			vkvg_rectangle(ctx, 0, 0, 256, 256);
-			vkvg_fill(ctx);
-			vkvg_pattern_destroy(grad);
-			vkvg_pattern_destroy(rg);
-		}
-		vkvg_flush(ctx);
-		vkvg_surface_resolve(surf);//msaa采样转换输出
-		vkvg_surface_write_to_png(surf, filename);
-		vkvg_destroy(ctx);
-		vctx->free_surface(surf);
-	}
-#if 0
-	{
-		const char* filename = "temp/cairo_gradient.png";
-		cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 256, 256);
-		cairo_t* ctx = cairo_create(surface);
-		//struct cairo_gradient_t* grad;
-		{
-			print_time ptt(filename);
-			cairo_pattern_t* grad = cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-			cairo_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
-			cairo_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
-			cairo_set_source(ctx, grad);
-			cairo_rectangle(ctx, 0, 0, 256, 256);
-			cairo_fill(ctx);
-			//cairo_pattern_t* rg = cairo_pattern_create_radial(15.2, 12.4, 25.6, 102.4, 102.4, 128.0);
-			cairo_pattern_t* rg = cairo_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-			cairo_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
-			cairo_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
-			cairo_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
-			cairo_set_source(ctx, rg);
-			//cairo_arc(ctx, 128.0, 128.0, 76.8, 0, 2 * glm::pi<double>());
-			cairo_rectangle(ctx, 0, 0, 256, 256);
-			cairo_fill(ctx);
-			cairo_pattern_destroy(grad);
-			cairo_pattern_destroy(rg);
-		}
-		cairo_surface_write_to_png(surface, filename);
-		cairo_destroy(ctx);
-		cairo_surface_destroy(surface);
-	}
-#endif
-}
 
 /*
 		int texwidth = 1024;

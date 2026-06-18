@@ -212,6 +212,9 @@ message("--glib  ${GLIB_LIBRARIES}")
 FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c
   third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp 
 )
+FILE(GLOB VKH_SRC 
+  third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp
+)
 SET (VKVG_PUBLIC_HEADERS "third_party/vkvg/vkvg.h;third_party/vkvg/vkvg-svg.h")
 
 list(APPEND tpv_src    

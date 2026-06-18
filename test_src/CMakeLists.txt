@@ -67,7 +67,43 @@ list(APPEND src_mmd
     "../rc/resource1.rc"
     "../njson.natvis"
 ) 
-
+list(APPEND src_vkvg   
+    "main_vg.cpp" 
+    ${VKH_SRC}
+    "../third_party/vkvg/src/deps/tinycthread.c"
+    "../third_party/tinyspline/parson.c"
+    "../third_party/tinyspline/tinyspline.c"
+    "../third_party/tinyspline/tinysplinecxx.cpp"  
+    "../src/pnguo/audio.cpp"
+    "../src/pnguo/mapView.cpp"
+    "../src/pnguo/vg.cpp"
+    "../src/pnguo/pnguo.cpp"
+    "../src/pnguo/render.cpp"
+    "../src/pnguo/font_core.cpp"
+    "../src/pnguo/tinysdl3.cpp"
+    "../src/pnguo/vkrenderer.cpp"
+    "../src/pnguo/gpu_vk.cpp"
+    "../src/pnguo/win_core.cpp"
+    "../src/pnguo/gui.cpp"
+    "../src/pnguo/app.cpp"
+    "../third_party/vkvg/vkvg_cx0.cpp"
+    "../third_party/stb_src/stb_src.c" 
+    "../third_party/mcut/bvh.cpp"  
+    "../third_party/mcut/frontend.cpp"  
+    "../third_party/mcut/hmesh.cpp"  
+    "../third_party/mcut/kernel.cpp"  
+    "../third_party/mcut/math.cpp"  
+    "../third_party/mcut/preproc.cpp"  
+    "../third_party/mcut/shewchuk.c"  
+    "../third_party/mcut/mcut.cpp"  
+    "../third_party/mcut/stlrw.cpp"  
+    "../third_party/mcut/obj.c"
+    "../third_party/mcut/mcut_cx.cpp"  
+    "../rc/resource1.rc"
+    "../njson.natvis"
+) 
+message("vkvgtest")
+message(${VKH_SRC})
 
 
 # 将源代码添加到此项目的可执行文件。
@@ -77,6 +113,7 @@ add_executable (mtl ${src_mtl} )
 add_executable (audios ${src_audios} ) 
 #add_executable (mmd ${src_mmd} ) 
 add_executable (mw ${src_mw} ) 
+add_executable (vgtest ${src_vkvg} ) 
 #管理员权限
 #SET_TARGET_PROPERTIES(mtl PROPERTIES LINK_FLAGS "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"")
 #include_directories("${SDL3DIR_ROOT}/include")
@@ -146,9 +183,32 @@ endif()
 add_definitions(-DSOUNDIO_STATIC_LIBRARY=1)
 #find_package(libsoundio CONFIG REQUIRED)
 find_package(Ogg CONFIG REQUIRED)
+find_package(draco CONFIG REQUIRED)
+
+find_package(FLAC CONFIG REQUIRED)
+find_package(mpg123 CONFIG REQUIRED)
+find_package(FFTW3 CONFIG REQUIRED)
+find_package(FFTW3f CONFIG REQUIRED)
+find_package(FFTW3l CONFIG REQUIRED)
+
 list(APPEND lkalib  
 #libsoundio::libsoundio
 Ogg::ogg
+)
+list(APPEND vkvglib  
+ glm::glm-header-only
+ nlohmann_json::nlohmann_json
+ Fontconfig::Fontconfig
+ Vulkan::Vulkan
+ SDL3::SDL3
+ PkgConfig::Clipper2  PkgConfig::Clipper2Z 
+ harfbuzz::harfbuzz-raster
+ libzip::zip
+ ZLIB::ZLIB
+ dxcompiler
+ draco::draco
+ FFTW3::fftw3 FFTW3::fftw3f FFTW3::fftw3l
+ FLAC::FLAC MPG123::libmpg123
 )
 #include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 #target_link_libraries(tcmp PRIVATE ${lklib})
@@ -158,6 +218,8 @@ target_link_libraries(vkcmp PRIVATE ${lklib} )
 target_link_libraries(mtl PRIVATE ${lklib}  )
 target_link_libraries(mw PRIVATE ${lklib} )
 target_link_libraries(audios PRIVATE ${lkalib})
+
+target_link_libraries(vgtest PRIVATE ${vkvglib})
 #target_link_libraries(mmd PRIVATE ${lklib}  )  
  
 #复制测试文本

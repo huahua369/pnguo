@@ -1,4 +1,5 @@
 #pragma once
+#include "tinysdl3.h"
 /*
 	管理控件等信息
 */
