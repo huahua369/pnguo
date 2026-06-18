@@ -86,7 +86,7 @@ list(APPEND src_vkvg
     "../src/pnguo/win_core.cpp"
     "../src/pnguo/gui.cpp"
     "../src/pnguo/app.cpp"
-    "../third_party/vkvg/vkvg_cx0.cpp"
+    "../third_party/vkvg/vkvg_cx.cpp"
     "../third_party/stb_src/stb_src.c" 
     "../third_party/mcut/bvh.cpp"  
     "../third_party/mcut/frontend.cpp"  

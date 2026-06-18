@@ -7389,43 +7389,6 @@ void _font_cache_show_text(VkvgContext ctx, const char* text) {
 
 	//_show_texture(ctx); return;
 }
-
-/*void testfonts(){
-	FT_Library		library;
-	FT_Face			face;
-	FT_GlyphSlot	slot;
-
-	assert(!FT_Init_FreeType(&library));
-	assert(!FT_New_Face(library, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 0, &face));
-	assert(!FT_Set_Char_Size(face, 0, ptSize, device_hdpi, device_vdpi ));
-
-	//_build_face_tex(face);
-
-	hb_font_t *hb_font = hb_ft_font_create(face, NULL);
-	hb_buffer_t *buf = hb_buffer_create();
-
-	const char *text = "Ленивый рыжий кот";
-	const char *lng	 = "en";
-	//"كسول الزنجبيل القط","懶惰的姜貓",
-
-
-	hb_buffer_set_direction (buf, HB_DIRECTION_LTR);
-	hb_buffer_set_script	(buf, HB_SCRIPT_LATIN);
-	hb_buffer_set_language	(buf, hb_language_from_string(lng,strlen(lng)));
-	hb_buffer_add_utf8		(buf, text, strlen(text), 0, strlen(text));
-
-	hb_unicode_funcs_t * unifc = hb_unicode_funcs_get_default();
-	hb_script_t sc = hb_buffer_get_script(buf);
-
-	sc = hb_unicode_script(unifc,0x0260);
-
-	FT_CharMap* cm = face->charmap;
-
-	//hb_script_to_iso15924_tag()
-
-
-	FT_Done_Face	( face );
-	FT_Done_FreeType( library );
-}*/
+ 
 
 #endif // 1
