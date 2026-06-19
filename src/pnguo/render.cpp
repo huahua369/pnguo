@@ -1590,10 +1590,12 @@ void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::
 	glm::vec4 c = ucolor2f(color);
 	// 5. 生成顶点数组（4顶点，32个浮点数）
 	uint32_t ps = opt->size();
-	opt->insert(opt->end(), text_vx{ A1 ,A_norm , c });
-	opt->insert(opt->end(), text_vx{ B1 ,B_norm , c });
-	opt->insert(opt->end(), text_vx{ C1 ,C_norm , c });
-	opt->insert(opt->end(), text_vx{ D1 ,D_norm , c });
+	opt->reserve(ps + 4);
+	idx->reserve(idx->size() + 6);
+	opt->push_back(text_vx{ A1 ,A_norm , c });
+	opt->push_back(text_vx{ B1 ,B_norm , c });
+	opt->push_back(text_vx{ C1 ,C_norm , c });
+	opt->push_back(text_vx{ D1 ,D_norm , c });
 	idx->insert(idx->end(), { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 });
 	return;
 }

@@ -12,12 +12,6 @@ extern "C" {
 }
 #endif
 #include "vkh_queue.h"
-
-#include "vkvg_surface_internal.h"
-#include "vkvg_context_internal.h"
-#include "vkvg_device_internal.h"
-#include "vkvg_pattern.h"
-#include "vkh_queue.h"
 #include "vkh_image.h"
 
 #ifdef VKVG_FILL_NZ_GLUTESS
@@ -28,49 +22,19 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "vkvg_device_internal.h"
-#include "vkvg_context_internal.h"
-#include "vkh_queue.h"
 #include "vkh_phyinfo.h"
 #include "vk_mem_alloc.h"
 
-#include "vkvg_device_internal.h"
-#include "vkvg_context_internal.h"
 #include "shaders.h"
 #include "vkvg_matrix.h"
-
-#include "vkvg_surface_internal.h"
-#include "vkvg_context_internal.h"
-#include "vkvg_device_internal.h"
-#include "vkvg_pattern.h"
-
-#include "vkvg_surface_internal.h"
-#include "vkvg_device_internal.h"
-#include "vkvg_context_internal.h"
 //#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 //#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-#include "vkh_image.h"
-
-#include "vkvg_device_internal.h"
-#include "vkvg_surface_internal.h"
-#include "vkh_image.h"
-#include "vkh_queue.h"
-
-#include "vkvg.h"
-#include "vkvg_context_internal.h"
-#include "vkvg_record_internal.h"
 
 #include "vkvg.h"
 #include "vkvg_record_internal.h"
-#include "vkvg_context_internal.h"
-
 #include "vkvg_fonts.h"
-#include "vkvg_context_internal.h"
-#include "vkvg_surface_internal.h"
-#include "vkvg_device_internal.h"
-
 #include "vkh.h"
 
 #include <locale.h>
@@ -4959,7 +4923,6 @@ void _dump_image_format_properties(VkvgDevice dev, VkFormat format) {
 
 #endif // 1
 
-
 #define ISFINITE(x) ((x) * (x) >= 0.) /* check for NaNs */
 
 // matrix computations mainly taken from http://cairographics.org
@@ -7061,7 +7024,21 @@ _vkvg_font_t* _find_or_create_font_size(VkvgContext ctx) {
 #endif
 
 #ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_FREETYPE
 	newSize.hb_font = hb_ft_font_create(newSize.face, NULL);
+#else
+	int _index = 0;
+	hb_blob_t* blob = hb_blob_create((char*)font->fontBuffer, font->fontBufSize, HB_MEMORY_MODE_READONLY, 0, 0);
+	if (hb_blob_get_length(blob) > 0)
+	{
+		hb_face_t* face = hb_face_create(blob, _index);
+		newSize.hb_font = hb_font_create(face);
+		if (newSize.hb_font == NULL) {
+			if (face)hb_face_destroy(face);
+		}
+	}
+	if (blob)hb_blob_destroy(blob);
+#endif
 #endif
 
 	_init_next_line_in_tex_cache(dev, &newSize);
@@ -7389,6 +7366,6 @@ void _font_cache_show_text(VkvgContext ctx, const char* text) {
 
 	//_show_texture(ctx); return;
 }
- 
+
 
 #endif // 1

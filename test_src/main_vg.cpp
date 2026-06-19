@@ -284,24 +284,23 @@ void testgui() {
 	glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
 #if 1
 	for (int i = 0; i < 5; i++) {
-		auto btn = new gradient_btn();
+		//auto btn = new gradient_btn();
+		auto btn = new color_btn();
 		btn->rounding = 4;
 		dvv->add_widget(btn);
 		btn->set_size({ 200,36 });
-		btn->back_color = colors[i];
-		btn->borderLight = blackb.x;
-		btn->borderDark = blackb.y;
-		btn->gradTop = gradTop;
-		btn->gradBot = gradBot;
+		//btn->back_color = colors[i];
+		//btn->borderLight = blackb.x;
+		//btn->borderDark = blackb.y;
+		//btn->gradTop = gradTop;
+		//btn->gradBot = gradBot;
 		btn->style.fontsize = 16;
 		btn->style.color = -1;
 		btn->style.color_shadow = 0xcc000000;
 		btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
 		if (i == 4) {
-			//btn->borderLight = blackb.y;
-			//btn->borderDark = blackb.x;
-			btn->gradTop = gradTop1;
-			btn->gradBot = gradBot1;
+			//btn->gradTop = gradTop1;
+			//btn->gradBot = gradBot1;
 		}
 	}
 	auto gr = new group_radio_t();
@@ -370,7 +369,7 @@ void testgui() {
 		auto c = colorpick;
 		c->init(0xff282828, 300, 20, true);
 		c->style.fontsize = 15;
-		dvv->add_widget(c);
+		//dvv->add_widget(c);
 	}
 	static bool loadf = false;
 

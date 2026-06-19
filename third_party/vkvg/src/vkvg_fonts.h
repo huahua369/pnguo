@@ -44,8 +44,8 @@
 #endif
 
 #ifdef VKVG_USE_HARFBUZZ
-#include <harfbuzz/hb.h>
-#include <harfbuzz/hb-ft.h>
+#include <hb.h>
+//#include <hb-ft.h>
 #else
 #endif
 
