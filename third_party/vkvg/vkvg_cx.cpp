@@ -1,5 +1,5 @@
 
-
+#define VKVG_USE_HARFBUZZ
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -92,6 +92,33 @@ void _linux_register_error_handler() {
 	signal(SIGABRT, handler); // install our handler
 }
 #endif
+
+
+// vk
+
+PFN_vkCmdBindPipeline       CmdBindPipeline;
+PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets;
+PFN_vkCmdBindIndexBuffer    CmdBindIndexBuffer;
+PFN_vkCmdBindVertexBuffers  CmdBindVertexBuffers;
+
+PFN_vkCmdDrawIndexed CmdDrawIndexed;
+PFN_vkCmdDraw        CmdDraw;
+
+PFN_vkCmdSetStencilCompareMask CmdSetStencilCompareMask;
+PFN_vkCmdSetStencilReference   CmdSetStencilReference;
+PFN_vkCmdSetStencilWriteMask   CmdSetStencilWriteMask;
+PFN_vkCmdBeginRenderPass       CmdBeginRenderPass;
+PFN_vkCmdEndRenderPass         CmdEndRenderPass;
+PFN_vkCmdSetViewport           CmdSetViewport;
+PFN_vkCmdSetScissor            CmdSetScissor;
+
+PFN_vkCmdPushConstants CmdPushConstants;
+
+PFN_vkWaitForFences      WaitForFences;
+PFN_vkResetFences        ResetFences;
+PFN_vkResetCommandBuffer ResetCommandBuffer;
+
+
 
 // ctx
 #if 1
@@ -1359,7 +1386,7 @@ void     vkvg_text_run_get_glyph_position(VkvgText textRun, uint32_t index, vkvg
 		*pGlyphInfo = {};// (vkvg_glyph_info_t) { 0 };
 		return;
 	}
-#if VKVG_USE_HARFBUZZ
+#if VKVG_USE_HARFBUZZ_CX
 	memcpy(pGlyphInfo, &textRun->glyphs[index], sizeof(vkvg_glyph_info_t));
 #else
 	* pGlyphInfo = textRun->glyphs[index];
@@ -4304,27 +4331,6 @@ void vkvg_device_reset_stats(VkvgDevice dev) {
 	dev->debug_stats = (vkvg_debug_stats_t){ 0 };
 }
 #endif
-/*
- * Copyright (c) 2018-2022 Jean-Philippe Bruyère <jp_bruyere@hotmail.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to use,
- * copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
- * Software, and to permit persons to whom the Software is furnished to do so, subject
- * to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
 
 #define GetInstProcAddress(inst, func) (PFN_##func) vkGetInstanceProcAddr(inst, #func);
 
@@ -4336,28 +4342,6 @@ uint32_t vkvg_log_level = VKVG_LOG_DEBUG;
 #ifdef VKVG_WIRED_DEBUG
 vkvg_wired_debug_mode vkvg_wired_debug = vkvg_wired_debug_mode_normal;
 #endif
-
-PFN_vkCmdBindPipeline       CmdBindPipeline;
-PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets;
-PFN_vkCmdBindIndexBuffer    CmdBindIndexBuffer;
-PFN_vkCmdBindVertexBuffers  CmdBindVertexBuffers;
-
-PFN_vkCmdDrawIndexed CmdDrawIndexed;
-PFN_vkCmdDraw        CmdDraw;
-
-PFN_vkCmdSetStencilCompareMask CmdSetStencilCompareMask;
-PFN_vkCmdSetStencilReference   CmdSetStencilReference;
-PFN_vkCmdSetStencilWriteMask   CmdSetStencilWriteMask;
-PFN_vkCmdBeginRenderPass       CmdBeginRenderPass;
-PFN_vkCmdEndRenderPass         CmdEndRenderPass;
-PFN_vkCmdSetViewport           CmdSetViewport;
-PFN_vkCmdSetScissor            CmdSetScissor;
-
-PFN_vkCmdPushConstants CmdPushConstants;
-
-PFN_vkWaitForFences      WaitForFences;
-PFN_vkResetFences        ResetFences;
-PFN_vkResetCommandBuffer ResetCommandBuffer;
 
 bool _device_try_get_phyinfo(VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy) {
 	for (uint32_t i = 0; i < phyCount; i++) {
@@ -6810,7 +6794,7 @@ void _font_cache_destroy(VkvgDevice dev) {
 			}
 #endif
 
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 			hb_font_destroy(s->hb_font);
 #endif
 
@@ -7023,7 +7007,7 @@ _vkvg_font_t* _find_or_create_font_size(VkvgContext ctx) {
 	newSize.lineGap = roundf(newSize.scale * font->lineGap);
 #endif
 
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 #ifdef VKVG_USE_FREETYPE
 	newSize.hb_font = hb_ft_font_create(newSize.face, NULL);
 #else
@@ -7121,7 +7105,7 @@ void _update_current_font(VkvgContext ctx) {
 	}
 }
 
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 // Get harfBuzz buffer for provided text.
 hb_buffer_t* _get_hb_buffer(_vkvg_font_t* font, const char* text, int length) {
 	hb_buffer_t* buf = hb_buffer_create();
@@ -7203,7 +7187,7 @@ void _font_cache_create_text_run(VkvgContext ctx, const char* text, int length, 
 
 	LOCK_FONTCACHE(ctx->dev)
 
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 		textRun->hbBuf = _get_hb_buffer(ctx->currentFontSize, text, length);
 	textRun->glyphs = hb_buffer_get_glyph_positions(textRun->hbBuf, &textRun->glyph_count);
 #else
@@ -7258,7 +7242,7 @@ void _font_cache_create_text_run(VkvgContext ctx, const char* text, int length, 
 	textRun->extents.width = textRun->extents.x_advance;
 }
 void _font_cache_destroy_text_run(VkvgText textRun) {
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 	hb_buffer_destroy(textRun->hbBuf);
 #else
 	if (textRun->glyph_count > 0)
@@ -7284,7 +7268,7 @@ void _show_texture(vkvg_context* ctx) {
 #endif
 void _font_cache_show_text_run(VkvgContext ctx, VkvgText tr) {
 	unsigned int glyph_count;
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 	hb_glyph_info_t* glyph_info = hb_buffer_get_glyph_infos(tr->hbBuf, &glyph_count);
 #else
 	vkvg_glyph_info_t* glyph_info = tr->glyphs;
@@ -7302,7 +7286,7 @@ void _font_cache_show_text_run(VkvgContext ctx, VkvgText tr) {
 		for (uint32_t i = 0; i < glyph_count; ++i) {
 			_char_ref* cr = tr->font->charLookup[glyph_info[i].codepoint];
 
-#ifdef VKVG_USE_HARFBUZZ
+#ifdef VKVG_USE_HARFBUZZ_CX
 			if (cr == NULL)
 				cr = _prepare_char(tr->dev, tr, glyph_info[i].codepoint);
 #endif
