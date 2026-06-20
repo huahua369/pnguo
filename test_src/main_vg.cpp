@@ -14,6 +14,7 @@
 #define red   1, 0, 0
 #define green 0, 1, 0
 #define blue  0, 0, 1
+VkvgPattern vkvg_pattern_create_sweep(float cx, float cy, float start_angle, float end_angle);
 
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
@@ -159,31 +160,49 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 
 	{
 		const char* filename = "temp/vkvg_gradient.png";
-		VkvgSurface surf = vctx->new_surface(256, 256);
-		auto ctx = vkvg_create(surf);
+		VkvgSurface surf = vctx->new_surface(256, 856);
+		auto cr = vkvg_create(surf);
 		{
 			print_time ptt(filename);
-			VkvgPattern grad = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-			vkvg_pattern_add_color_stop_rgba(grad, 0, 1, 1, 1, 1);
-			vkvg_pattern_add_color_stop_rgba(grad, 1, 0, 0, 0, 1);
-			vkvg_set_source(ctx, grad);
-			vkvg_rectangle(ctx, 0, 0, 256, 256);
-			vkvg_fill(ctx);
-			VkvgPattern rg = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-			vkvg_pattern_add_color_stop_rgba(rg, 0, 1, 1, 0, 1);
-			vkvg_pattern_add_color_stop_rgba(rg, 0.2, 0, 1, 0, 1);
-			vkvg_pattern_add_color_stop_rgba(rg, 1, 1, 0, 0, 1);
-			vkvg_set_source(ctx, rg);
-			vkvg_rectangle(ctx, 0, 0, 256, 256);
-			vkvg_fill(ctx);
-			vkvg_pattern_destroy(grad);
-			vkvg_pattern_destroy(rg);
+			VkvgPattern pat;
+
+			pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+			vkvg_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 1);
+			vkvg_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 1);
+			vkvg_rectangle(cr, 0, 0, 256, 256);
+			vkvg_set_source(cr, pat);
+			vkvg_fill(cr);
+			vkvg_pattern_destroy(pat);
+
+			//vkvg_translate(cr, 0, 260);
+			pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+			vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
+			vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
+			vkvg_set_source(cr, pat);
+			vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+			//vkvg_rectangle(cr, 0, 0, 256, 256);
+			vkvg_fill(cr);
+			vkvg_pattern_destroy(pat);
+
+			vkvg_translate(cr, 0, 260);
+			VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, glm::pi<float>() * 2);
+			vkvg_pattern_add_color_stop(sg, 0.0, 0.0, 0, 1, 1);
+			vkvg_pattern_add_color_stop(sg, 0.25, 0.9, 0, 0.0, 1);
+			vkvg_pattern_add_color_stop(sg, 0.55, 1.0, 0.1, 0.0, 1);
+			vkvg_pattern_add_color_stop(sg, 0.75, 0.0, 1.0, 0.0, 0.51);
+			vkvg_pattern_add_color_stop(sg, 1.0, 0.0, 0, 0.90, 1);
+
+			vkvg_set_source(cr, sg);
+			vkvg_rectangle(cr, 0, 0, 256, 256);
+			vkvg_fill(cr);
+			vkvg_pattern_destroy(sg);
 		}
-		vkvg_flush(ctx);
+		vkvg_flush(cr);
 		vkvg_surface_resolve(surf);//msaa采样转换输出
 		vkvg_surface_write_to_png(surf, filename);
-		vkvg_destroy(ctx);
+		vkvg_destroy(cr);
 		vctx->free_surface(surf);
+		exit(1);
 	}
 #if 0
 	{
@@ -284,23 +303,23 @@ void testgui() {
 	glm::uvec2 blackb = { 0x805c5c5c , 0x801d1d1d };
 #if 1
 	for (int i = 0; i < 5; i++) {
-		//auto btn = new gradient_btn();
-		auto btn = new color_btn();
+		auto btn = new gradient_btn();
+		//auto btn = new color_btn();
 		btn->rounding = 4;
 		dvv->add_widget(btn);
 		btn->set_size({ 200,36 });
-		//btn->back_color = colors[i];
-		//btn->borderLight = blackb.x;
-		//btn->borderDark = blackb.y;
-		//btn->gradTop = gradTop;
-		//btn->gradBot = gradBot;
+		btn->back_color = colors[i];
+		btn->borderLight = blackb.x;
+		btn->borderDark = blackb.y;
+		btn->gradTop = gradTop;
+		btn->gradBot = gradBot;
 		btn->style.fontsize = 16;
 		btn->style.color = -1;
 		btn->style.color_shadow = 0xcc000000;
 		btn->str = (char*)u8"🔥按钮gbutton " + std::to_string(i);
 		if (i == 4) {
-			//btn->gradTop = gradTop1;
-			//btn->gradBot = gradBot1;
+			btn->gradTop = gradTop1;
+			btn->gradBot = gradBot1;
 		}
 	}
 	auto gr = new group_radio_t();
@@ -578,9 +597,9 @@ void testgui() {
 		dvv->draggable = true;
 		dom0->add_widget(dvv);
 	}
-	dom0->update(0.0f);		
-	size_t frame_count = 0; 
-	appx->app->set_fps(60); 
+	dom0->update(0.0f);
+	size_t frame_count = 0;
+	appx->app->set_fps(60);
 	appx->view = view;
 	appx->fpslab = fpslab;
 	do {
@@ -589,7 +608,7 @@ void testgui() {
 }
 int main() {
 	dev_info_cx devinfo = {};
-	//test_vkvg("temp/vgtest0618.png", 0);
+	test_vkvg("temp/vgtest0618.png", 0);
 	testgui();
 	return 0;
 }

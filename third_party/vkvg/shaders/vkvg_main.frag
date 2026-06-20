@@ -75,10 +75,8 @@ void main()
 			inMat[0][0] * p.x + inMat[1][0] * p.y + inMat[2][0],
 			inMat[0][1] * p.x + inMat[1][1] * p.y + inMat[2][1]
 		);
-                uv /= inSrc.zw;
-                /*if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1)
-                    discard;*/
-                c = texture (source, uv);
+
+		c = texture (source, uv / inSrc.zw);
 		break;
 	case LINEAR:
 		float dist = 1;
@@ -145,7 +143,7 @@ void main()
 	}
 
 	if (inFontUV.z >= 0.0)
-            c *= texture(fontMap, inFontUV).r;
+		c *= texture(fontMap, inFontUV).r;
 
 #ifdef VKVG_PREMULT_ALPHA
 	c *= inOpacity;

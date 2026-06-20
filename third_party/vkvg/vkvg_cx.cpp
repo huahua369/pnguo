@@ -24,7 +24,6 @@ extern "C" {
 
 #include "vkh_phyinfo.h"
 #include "vk_mem_alloc.h"
-
 #include "shaders.h"
 #include "vkvg_matrix.h"
 //#define STB_IMAGE_IMPLEMENTATION
@@ -36,7 +35,6 @@ extern "C" {
 #include "vkvg_record_internal.h"
 #include "vkvg_fonts.h"
 #include "vkh.h"
-
 #include <locale.h>
 #include <string.h>
 #include <wchar.h>
@@ -45,10 +43,14 @@ extern "C" {
  //#define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #endif
+/*
+命令行
+glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
+ 
 
+*/
 
 #define _CRT_SECURE_NO_WARNINGS
-
 int directoryExists(const char* path) {
 #if defined(_WIN32) || defined(_WIN64) || __APPLE__ || __unix__
 	struct stat st = { 0 };
@@ -66,7 +68,6 @@ const char* getUserDir() {
 	return pw->pw_dir;
 #endif
 }
-
 #if defined(__linux__) && defined(__GLIBC__)
 #include <stdio.h>
 #include <execinfo.h>
@@ -118,6 +119,7 @@ PFN_vkWaitForFences      WaitForFences;
 PFN_vkResetFences        ResetFences;
 PFN_vkResetCommandBuffer ResetCommandBuffer;
 
+#include "shaders/vkvg_main.frag.h"
 
 
 // ctx
@@ -2607,10 +2609,10 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 	}
 	case VKVG_PATTERN_TYPE_LINEAR:
 	case VKVG_PATTERN_TYPE_RADIAL:
+	case VKVG_PATTERN_TYPE_SWEEP:
 		_flush_cmd_buff(ctx);
 		if (!_wait_ctx_flush_end(ctx))
 			return;
-
 		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
 			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
 
@@ -2619,15 +2621,12 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 								  {0},
 								  {0} }; // store img bounds in unused source field
 		ctx->pushConsts.source = bounds;
-
-		// transform control point with current ctx matrix
+		// transform control point with current ctx matrix 
 		vkvg_gradient_t grad = *(vkvg_gradient_t*)pat->data;
-
 		if (grad.count < 2) {
 			ctx->status = VKVG_STATUS_PATTERN_INVALID_GRADIENT;
 			return;
 		}
-
 		vkvg_matrix_t mat;
 		if (pat->hasMatrix) {
 			vkvg_pattern_get_matrix(pat, &mat);
@@ -2635,7 +2634,6 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 				mat = VKVG_IDENTITY_MATRIX;
 			vkvg_matrix_transform_point(&mat, &grad.cp[0].x, &grad.cp[0].y);
 		}
-
 		vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[0].x, &grad.cp[0].y);
 		if (pat->type == VKVG_PATTERN_TYPE_LINEAR) {
 			if (pat->hasMatrix)
@@ -2646,7 +2644,6 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			if (pat->hasMatrix)
 				vkvg_matrix_transform_point(&mat, &grad.cp[1].x, &grad.cp[1].y);
 			vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[1].x, &grad.cp[1].y);
-
 			// radii
 			if (pat->hasMatrix) {
 				vkvg_matrix_transform_distance(&mat, &grad.cp[0].z, &grad.cp[0].w);
@@ -2655,7 +2652,6 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
 			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[1].z, &grad.cp[0].w);
 		}
-
 		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
 		vkh_buffer_flush(&ctx->uboGrad);
 		break;
@@ -2731,22 +2727,17 @@ void _release_context_ressources(VkvgContext ctx) {
 #ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	vkDestroyFence(dev, ctx->flushFence, NULL);
 #endif
-
 	vkFreeCommandBuffers(dev, ctx->cmdPool, 2, ctx->cmdBuffers);
 	vkDestroyCommandPool(dev, ctx->cmdPool, NULL);
 
 	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
 	vkFreeDescriptorSets(dev, ctx->descriptorPool, 3, dss);
-
 	vkDestroyDescriptorPool(dev, ctx->descriptorPool, NULL);
-
 	vkh_buffer_reset(&ctx->uboGrad);
 	vkh_buffer_reset(&ctx->indices);
 	vkh_buffer_reset(&ctx->vertices);
-
 	free(ctx->vertexCache);
 	free(ctx->indexCache);
-
 	vkh_image_destroy(ctx->fontCacheImg);
 	// TODO:check this for source counter
 	// vkh_image_destroy	  (ctx->source);
@@ -4588,6 +4579,8 @@ void _device_setupPipelines(VkvgDevice dev) {
 #else
 	createInfo.pCode = (uint32_t*)vkvg_main_frag_spv;
 	createInfo.codeSize = vkvg_main_frag_spv_len;
+	createInfo.pCode = (uint32_t*)vkvg_main_frag1_spv;
+	createInfo.codeSize = sizeof(vkvg_main_frag1_spv);
 #endif
 	VK_CHECK_RESULT(vkCreateShaderModule(dev->vkDev, &createInfo, NULL, &modFrag));
 
@@ -5166,7 +5159,6 @@ vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, fl
 		vec2 v = vec2_div_s(u, l);
 		c0 = vec2_add(c1, vec2_mult_s(v, radius1 - radius0 - 1.0f));
 	}
-
 	grad->cp[0] = vec4{ {c0.x}, {c0.y}, {radius0}, {0} };
 	grad->cp[1] = vec4{ {c1.x}, {c1.y}, {radius1}, {0} };
 	return VKVG_STATUS_SUCCESS;
@@ -5188,7 +5180,34 @@ VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, floa
 	}
 	else
 		pat->status = VKVG_STATUS_NO_MEMORY;
+	return pat;
+}
+vkvg_status_t vkvg_pattern_edit_sweep(VkvgPattern pat, float cx, float cy, float start_angle, float end_angle) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type != VKVG_PATTERN_TYPE_SWEEP)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	grad->cp[0] = vec4{ cx, cy, start_angle, end_angle };
+
+	return VKVG_STATUS_SUCCESS;
+}
+VkvgPattern vkvg_pattern_create_sweep(float cx, float cy, float start_angle, float end_angle) {
+	VkvgPattern pat = (vkvg_pattern_t*)calloc(1, sizeof(vkvg_pattern_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	pat->type = VKVG_PATTERN_TYPE_SWEEP;
+	pat->extend = VKVG_EXTEND_NONE;
+	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
+	if (pat->data) {
+		vkvg_pattern_edit_sweep(pat, cx, cy, start_angle, end_angle);
+		pat->references = 1;
+	}
+	else
+		pat->status = VKVG_STATUS_NO_MEMORY;
 	return pat;
 }
 VkvgPattern vkvg_pattern_reference(VkvgPattern pat) {
@@ -5232,7 +5251,6 @@ void vkvg_pattern_set_filter(VkvgPattern pat, vkvg_filter_t filter) {
 		return;
 	pat->filter = filter;
 }
-
 vkvg_extend_t vkvg_pattern_get_extend(VkvgPattern pat) {
 	if (vkvg_pattern_status(pat))
 		return (vkvg_extend_t)0;
@@ -7353,3 +7371,4 @@ void _font_cache_show_text(VkvgContext ctx, const char* text) {
 
 
 #endif // 1
+

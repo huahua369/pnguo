@@ -186,6 +186,7 @@ typedef enum {
     VKVG_PATTERN_TYPE_RADIAL,        /*!< radial gradient pattern */
     VKVG_PATTERN_TYPE_MESH,          /*!< not implemented */
     VKVG_PATTERN_TYPE_RASTER_SOURCE, /*!< not implemented */
+    VKVG_PATTERN_TYPE_SWEEP, /*!< not implemented */
 } vkvg_pattern_type_t;
 
 /**
