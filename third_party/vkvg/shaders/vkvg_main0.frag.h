@@ -144,8 +144,8 @@ vec4 gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend
 	ivec4 m = ivec4(1024, 0, 0, 1024);
 	vec2 c0_r = uboGrad.cp[0].xy / box;
 	vec2 cd = uboGrad.cp[1].xy / box;
-	float r0 = uboGrad.cp[0].z / box.x;
-	float r1 = uboGrad.cp[1].z / box.x;
+	float r0 = uboGrad.cp[0].z;
+	float r1 = uboGrad.cp[1].z;
 
 	float dr = r1 - r0;
 	//vec2 p = gpu_apply_minv(m, renderCoord - c0_r);
@@ -215,16 +215,16 @@ vec4 gpu_sample_sweep(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	vec4 t0 = uboGrad.cp[0];
 	ivec4 m = ivec4(1024, 0, 0, 1024);
-	vec2 c_r = vec2(t0.xy / box);
+	vec2 p0 = vec2(t0.xy / box);
 	float a0 = t0.z;  /* fraction of pi */
 	float a1 = t0.w;
 	float span = a1 - a0;
 	if (abs(span) < 1e-6) return vec4(0.0);
-	//vec2 p = gpu_apply_minv(m, renderCoord - c_r);
-	vec2 p = (renderCoord - c_r);
+	//vec2 p = gpu_apply_minv(m, renderCoord - p0);
+	vec2 p = (renderCoord - p0);
 	/* atan2 returns (-pi, pi]; normalize to [0, 2) fractions of pi. */
 	float ang = atan(p.y, p.x) / 3.14159265358979;
-	if (ang < 0.0) ang += 2.0;
+	if (ang < 0.0) ang += 2.0;  // 归一化到 [0, 2]
 	float t = (ang - a0) / span;
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
@@ -306,7 +306,7 @@ vec4 gpu_paint(vec2 renderCoord)
 	if (subtype == LINEAR)       /* linear */
 		col = gpu_sample_linear(renderCoord, box, stop_count, extend);
 	else if (subtype == RADIAL)  /* radial */
-		col = gpu_sample_radial(renderCoord, box, stop_count, extend);
+		col = gpu_sample_radial_hb(renderCoord, box, stop_count, extend);
 	else if (subtype == SWEEP)  /* sweep */
 	{
 		col = gpu_sample_sweep(renderCoord, box, stop_count, extend);

@@ -46,7 +46,6 @@ extern "C" {
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
- 
 
 */
 
@@ -2604,7 +2603,6 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			// vkvg_matrix_transform_distance(&mat, &ctx->pushConsts.source.width, &ctx->pushConsts.source.height);
 			vkvg_matrix_multiply(&ctx->pushConsts.matInv, &ctx->pushConsts.matInv, &mat);
 		}
-
 		break;
 	}
 	case VKVG_PATTERN_TYPE_LINEAR:
@@ -2729,7 +2727,6 @@ void _release_context_ressources(VkvgContext ctx) {
 #endif
 	vkFreeCommandBuffers(dev, ctx->cmdPool, 2, ctx->cmdBuffers);
 	vkDestroyCommandPool(dev, ctx->cmdPool, NULL);
-
 	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
 	vkFreeDescriptorSets(dev, ctx->descriptorPool, 3, dss);
 	vkDestroyDescriptorPool(dev, ctx->descriptorPool, NULL);
@@ -2741,10 +2738,8 @@ void _release_context_ressources(VkvgContext ctx) {
 	vkh_image_destroy(ctx->fontCacheImg);
 	// TODO:check this for source counter
 	// vkh_image_destroy	  (ctx->source);
-
 	free(ctx->pathes);
 	free(ctx->points);
-
 	free(ctx);
 }
 // populate vertice buff for stroke
@@ -2767,34 +2762,27 @@ bool _build_vb_step(VkvgContext ctx, stroke_context_t* str, bool isCurve) {
 		LOG(VKVG_LOG_STROKE, "vb_step discard, dot==1\n");
 		return false;
 	}
-
 	if (EQUF(dot, -1.0f)) { // cusp (could draw line butt?)
 		vec2 vPerp = vec2_mult_s(vec2_perp(v0n), str->hw);
-
 		VKVG_IBO_INDEX_TYPE idx = (VKVG_IBO_INDEX_TYPE)(ctx->vertCount - ctx->curVertOffset);
-
 		v.pos = vec2_add(p0, vPerp);
 		_add_vertex(ctx, v);
 		v.pos = vec2_sub(p0, vPerp);
 		_add_vertex(ctx, v);
-
 		_add_triangle_indices(ctx, idx, idx + 1, idx + 2);
 		_add_triangle_indices(ctx, idx, idx + 2, idx + 3);
 		LOG(VKVG_LOG_STROKE, "vb_step cusp, dot==-1\n");
 		return true;
 	}
-
 	vec2  bisec_n = vec2_norm(vec2_add(v0n, v1n)); // bisec/bisec_perp are inverted names
 	float alpha = acosf(dot);
 
 	if (det < 0)
 		alpha = -alpha;
-
 	float halfAlpha = alpha / 2.f;
 	float cosHalfAlpha = cosf(halfAlpha);
 	float lh = str->hw / cosHalfAlpha;
 	vec2  bisec_n_perp = vec2_perp(bisec_n);
-
 	// limit bisectrice length
 	float rlh = lh; // rlh is for inside pos tweeks
 	if (dot < 0.f)
@@ -5145,12 +5133,9 @@ vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, fl
 		return vkvg_pattern_status(pat);
 	if (pat->type != VKVG_PATTERN_TYPE_RADIAL)
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
-
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
-
 	vec2 c0 = { cx0, cy0 };
 	vec2 c1 = { cx1, cy1 };
-
 	if (radius0 > radius1 - 1.0f)
 		radius0 = radius1 - 1.0f;
 	vec2  u = vec2_sub(c0, c1);
@@ -5171,7 +5156,6 @@ VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, floa
 	}
 	pat->type = VKVG_PATTERN_TYPE_RADIAL;
 	pat->extend = VKVG_EXTEND_NONE;
-
 	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
 
 	if (pat->data) {
