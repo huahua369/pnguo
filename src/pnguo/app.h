@@ -47,7 +47,7 @@ public:
 	vkvg_dev* _vgdev = 0;
 	vkvg_func_t* vgcb = 0;
 	font_family_t* familys = 0;				// 默认字体
-	glm::ivec2 cache_size = { 1024,1024 };		// 矢量图渲染缓存大小
+	glm::ivec2 cache_size = { 2048,2048 };		// 矢量图渲染缓存大小
 	int max_form_cache = 2;
 public:
 	viewdev_cx();
