@@ -1426,17 +1426,35 @@ void widget_t::draw(rvg_cx* rv)
 {}
 
 void image_btn::draw(rvg_cx* rv) {
-
+	auto ss = get_size();
 	auto psv = get_spos(); psv += _pos; //auto psv = get_ppos();
-	auto view = glm::ivec4(psv, get_size());
+	auto view = glm::ivec4(psv, ss);
 	rv->push_view(view, this);
+	rv->translate(psv);
+	//rv->add_rect({ 0.,0., ss }, rounding);
+	//rv->submit(0x80ffffff, 0, 0);
 	//image_ptr_t* img = 0;
 	//image_sliced_t state_img[5] = {}; 
+	image_r r = {};
+	r.img = (image_ptr_t*)(img ? img : surf);
+	r.rc = glm::ivec4(0, 0, ss);		// 所在纹理区域
+	r.sliced = {};	// 九宫格
+	r.dsize = ss;	// 渲染大小
+	r.pos = psv;		// 渲染坐标
+	r.color = -1;		// 混合颜色
+	if (!img)
+	{
+		r.is_surf = true;
+	}
+	rv->add_image(&r);
 	text_st tx = {};
 	tx.pos = {};
 	tx.size = get_size();
-	tx.text = str.c_str(); tx.text_len = str.size();
-	rv->add_text(&tx, &style);
+	tx.text_len = str.size();
+	if (tx.text_len > 0) {
+		tx.text = str.c_str();
+		rv->add_text(&tx, &style);
+	}
 
 	rv->pop_view();
 }

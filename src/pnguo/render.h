@@ -338,6 +338,7 @@ struct image_r
 	glm::ivec2 dsize;	// 渲染大小
 	glm::ivec2 pos;		// 渲染坐标
 	uint32_t color;		// 混合颜色
+	bool is_surf;
 };
 struct polyline_pd
 {

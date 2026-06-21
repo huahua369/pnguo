@@ -47,6 +47,7 @@ extern "C" {
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
 
+
 */
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -2737,7 +2738,7 @@ void _release_context_ressources(VkvgContext ctx) {
 	free(ctx->indexCache);
 	vkh_image_destroy(ctx->fontCacheImg);
 	// TODO:check this for source counter
-	// vkh_image_destroy	  (ctx->source);
+	// vkh_image_destroy (ctx->source);
 	free(ctx->pathes);
 	free(ctx->points);
 	free(ctx);

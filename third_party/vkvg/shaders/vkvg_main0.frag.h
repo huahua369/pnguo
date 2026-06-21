@@ -144,12 +144,12 @@ vec4 gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend
 	ivec4 m = ivec4(1024, 0, 0, 1024);
 	vec2 c0_r = uboGrad.cp[0].xy / box;
 	vec2 cd = uboGrad.cp[1].xy / box;
-	float r0 = uboGrad.cp[0].z;
-	float r1 = uboGrad.cp[1].z;
-
+	float r0 = uboGrad.cp[0].z / box.x;
+	float r1 = uboGrad.cp[1].z / box.y;
+	//renderCoord *= box;
 	float dr = r1 - r0;
 	//vec2 p = gpu_apply_minv(m, renderCoord - c0_r);
-	vec2 p = renderCoord - c0_r;
+	vec2 p = normalize(renderCoord - c0_r);
 
 	float A = dot(cd, cd) - dr * dr;
 	float B = -2.0 * (dot(p, cd) + r0 * dr);
@@ -302,11 +302,11 @@ vec4 gpu_paint(vec2 renderCoord)
 	int extend = 0;
 	int stop_count = int(uboGrad.count);
 	int subtype = inPatType;
-	vec4 col = vec4(0.0);
+	vec4 col = inSrc;
 	if (subtype == LINEAR)       /* linear */
 		col = gpu_sample_linear(renderCoord, box, stop_count, extend);
 	else if (subtype == RADIAL)  /* radial */
-		col = gpu_sample_radial_hb(renderCoord, box, stop_count, extend);
+		col = gpu_sample_radial(renderCoord, box, stop_count, extend);
 	else if (subtype == SWEEP)  /* sweep */
 	{
 		col = gpu_sample_sweep(renderCoord, box, stop_count, extend);

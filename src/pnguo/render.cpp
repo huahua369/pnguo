@@ -3008,8 +3008,14 @@ size_t cmd_op_add_image(uint8_t* d, void* ctx)
 	auto pc = (multi_rich_text_t*)ctx;
 	auto f = d;
 	image_r t = next_value<image_r>(d);
-	auto idx = mrt_add_box(pc, t.pos, t.dsize, {});
-	mrt_add_image(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
+	auto idx = mrt_add_box(pc,  {}, t.dsize, {});
+	if (t.is_surf) {
+		mrt_add_image_vg(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
+	}
+	else
+	{
+		mrt_add_image(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
+	}
 	return d - f;
 }
 size_t cmd_op_add_geometry(uint8_t* d, void* ctx)
@@ -3487,6 +3493,8 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 		}
 		if (ct == rvg_cx::OP_ADD_TEXT || ct == rvg_cx::OP_ADD_IMAGE) {
 			gdata_ptr vt = {};
+			if (ct == rvg_cx::OP_ADD_IMAGE)
+				vt.view.pos = lpos;
 			vt.raw_index = mrt_box_count(dst->mrt);
 			vt.v.t = (box_text_d*)1;
 			vt.type = 0;

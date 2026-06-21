@@ -265,6 +265,7 @@ enum class BTN_STATE :uint8_t
 struct image_btn :public widget_t {
 	std::string str;
 	image_ptr_t* img = 0;
+	void* surf = 0;			// vkvg表面
 	image_sliced_t state_img[5] = {};
 	std::vector<glm::ivec4> data;
 	int show_idx = 0;	// 参考BTN_STATE
