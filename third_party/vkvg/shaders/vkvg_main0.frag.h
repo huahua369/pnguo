@@ -31,7 +31,10 @@ layout(scalar, set = 2, binding = 0) uniform _uboGrad {
 	vec4	colors[16];
 	float	stops[16];
 	vec4    cp[2];
+	ivec4   m;
+	vec2    scale;
 	uint	count;
+	int		extend;
 }uboGrad;
 #define COLORSTOP(i) uboGrad.stops[i] 
 
@@ -123,8 +126,9 @@ vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
 	vec2 d = vec2(t0.zw / box);
 	float denom = dot(d, d);
 	if (denom < 1e-6) return vec4(0.0);
-	//vec2 p_ = gpu_apply_minv(m, renderCoord - p0_r);
-	vec2 p = renderCoord - p0_r;
+	ivec4 m = uboGrad.m;
+	vec2 p = gpu_apply_minv(m, renderCoord - p0_r);
+	//vec2 p = renderCoord - p0_r;
 	float t = dot(p, d) / denom;
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
@@ -185,6 +189,8 @@ vec4 gpu_sample_radial(vec2 renderCoord, vec2 box, int stop_count, int extend)
 	float gradLength = 1.0;
 	vec2 diff = c0 - c1;
 	vec2 rayDir = normalize(renderCoord - c0);
+	ivec4 m = uboGrad.m;
+	rayDir = gpu_apply_minv(m, rayDir);
 	float a = dot(rayDir, rayDir);
 	float b = 2.0 * dot(rayDir, diff);
 	float cc = dot(diff, diff) - r1 * r1;
@@ -214,14 +220,14 @@ vec4 gpu_sample_radial(vec2 renderCoord, vec2 box, int stop_count, int extend)
 vec4 gpu_sample_sweep(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	vec4 t0 = uboGrad.cp[0];
-	ivec4 m = ivec4(1024, 0, 0, 1024);
+	ivec4 m = uboGrad.m;// ivec4(1024, 0, 0, 1024);
 	vec2 p0 = vec2(t0.xy / box);
 	float a0 = t0.z;  /* fraction of pi */
 	float a1 = t0.w;
 	float span = a1 - a0;
 	if (abs(span) < 1e-6) return vec4(0.0);
-	//vec2 p = gpu_apply_minv(m, renderCoord - p0);
-	vec2 p = (renderCoord - p0);
+	vec2 p = gpu_apply_minv(m, renderCoord - p0);
+	//vec2 p = (renderCoord - p0);
 	/* atan2 returns (-pi, pi]; normalize to [0, 2) fractions of pi. */
 	float ang = atan(p.y, p.x) / 3.14159265358979;
 	if (ang < 0.0) ang += 2.0;  // 归一化到 [0, 2]
@@ -297,9 +303,10 @@ vec4 gpu_paint(vec2 renderCoord)
 {
 	float bmax = max(inSrc.x, inSrc.y);	// 画布大小
 	vec2 box = vec2(bmax, bmax);		// 最大边界
+	box *= uboGrad.scale;
 	renderCoord = renderCoord / box;
 	vec4 acc = vec4(0.0);
-	int extend = 0;
+	int extend = uboGrad.extend;
 	int stop_count = int(uboGrad.count);
 	int subtype = inPatType;
 	vec4 col = inSrc;

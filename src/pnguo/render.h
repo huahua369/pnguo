@@ -190,8 +190,8 @@ extern "C" {
 		VkvgPattern(*vkvg_pattern_create_linear)(float x0, float y0, float x1, float y1);
 		vkvg_status_t(*vkvg_pattern_edit_linear)(VkvgPattern pat, float x0, float y0, float x1, float y1);
 		vkvg_status_t(*vkvg_pattern_get_linear_points)(VkvgPattern pat, float* x0, float* y0, float* x1, float* y1);
-		VkvgPattern(*vkvg_pattern_create_radial)(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1);
-		vkvg_status_t(*vkvg_pattern_edit_radial)(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1);
+		VkvgPattern(*vkvg_pattern_create_radial)(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+		vkvg_status_t(*vkvg_pattern_edit_radial)(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 		vkvg_status_t(*vkvg_pattern_get_color_stop_count)(VkvgPattern pat, uint32_t* count);
 		vkvg_status_t(*vkvg_pattern_get_color_stop_rgba)(VkvgPattern pat, uint32_t index, float* offset, float* r, float* g, float* b, float* a);
 		void(*vkvg_pattern_destroy)(VkvgPattern pat);

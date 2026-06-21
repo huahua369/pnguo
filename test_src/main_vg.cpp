@@ -14,8 +14,12 @@
 #define red   1, 0, 0
 #define green 0, 1, 0
 #define blue  0, 0, 1
+
+VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 // 中心，角度[0,2]
 VkvgPattern vkvg_pattern_create_sweep(float cx, float cy, float start_angle, float end_angle);
+vkvg_status_t vkvg_pattern_set_scale(VkvgPattern pat, float scale_x, float scale_y);
+
 using glm::vec2;
 using glm::vec3;
 using glm::vec4;
@@ -280,10 +284,10 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 			vkvg_fill(cr);
 			vkvg_pattern_destroy(pat);
 			//vkvg_translate(cr, 0, 260);
-			pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
+			pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0, true);
 			vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
 			vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-			vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
+			//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
 			vkvg_set_source(cr, pat);
 			//vkvg_set_source_color(cr, 0xffff8000);
 			vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
@@ -399,6 +403,7 @@ void testgui() {
 	glm::ivec2 surfsize = { 260 * 3,256 };
 	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
 	if (surf) {
+		const char* filename = "temp/vkvg_gradient.png";
 		auto cr = vkvg_create(surf);
 		VkvgPattern pat;
 		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
@@ -409,14 +414,15 @@ void testgui() {
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
 		//vkvg_translate(cr, 0, 260);
-		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0);
-		vkvg_pattern_add_color_stop(pat, 0, 1, 1, 1, 1);
-		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0, 1);
-		vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
+		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0, true);
+		vkvg_pattern_add_color_stop(pat, 0, 1, .1, .1, 0.81);
+		vkvg_pattern_add_color_stop(pat, 0.50, green, 1);
+		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0.1, 1);
+		//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
 		vkvg_set_source(cr, pat);
 		//vkvg_set_source_color(cr, 0xffff8000);
-		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
-		//vkvg_rectangle(cr, 0, 0, 256, 256);
+		//vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+		vkvg_rectangle(cr, 0, 0, 256, 256);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
 
@@ -424,8 +430,8 @@ void testgui() {
 		VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
 		vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
 		vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
-		vkvg_pattern_add_color_stop(sg, 0.55, green, 1);
-		vkvg_pattern_add_color_stop(sg, 0.70, blue, 1);
+		vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
+		vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
 		vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
 
 		vkvg_set_source(cr, sg);
@@ -436,8 +442,8 @@ void testgui() {
 		sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
 		vkvg_pattern_add_color_stop(sg, 0.0, white, 0.5);
 		vkvg_pattern_add_color_stop(sg, 0.25, red, 0.5);
-		vkvg_pattern_add_color_stop(sg, 0.55, green, 0.5);
-		vkvg_pattern_add_color_stop(sg, 0.70, blue, 0.5);
+		vkvg_pattern_add_color_stop(sg, 0.50, green, 0.5);
+		vkvg_pattern_add_color_stop(sg, 0.75, blue, 0.5);
 		vkvg_pattern_add_color_stop(sg, 1.00, white, 0.5);
 		vkvg_set_source(cr, sg);
 		//vkvg_rectangle(cr, 0, 0, 256, 256);
@@ -447,7 +453,7 @@ void testgui() {
 
 		vkvg_flush(cr);
 		vkvg_surface_resolve(surf);//msaa采样转换输出
-		//vkvg_surface_write_to_png(surf, filename);
+		vkvg_surface_write_to_png(surf, filename);
 		vkvg_destroy(cr);
 		//vctx->free_surface(surf);
 	}
@@ -788,7 +794,7 @@ void testgui() {
 }
 int main() {
 	dev_info_cx devinfo = {};
-	test_vkvg("temp/vgtest0618.png", 0);
+	//test_vkvg("temp/vgtest0618.png", 0);
 	testgui();
 	return 0;
 }

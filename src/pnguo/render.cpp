@@ -305,6 +305,8 @@ vkvg_dev::~vkvg_dev()
 	free_gctx(ctx1);
 
 }
+VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 vkvg_func_t* vkvg_dev::get_fun()
 {
 	if (!fun)

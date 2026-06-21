@@ -49,6 +49,19 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 
 
 */
+struct ivec4 { int x, y, z, w; };
+
+
+struct vkvg_gradient_x {
+	vkvg_color_t colors[16];
+	float stops[16];
+	vec4 cp[2];
+	ivec4 m;
+	vec2 scale;	// 缩放目标
+	uint32_t count;
+	int extend;
+};
+#define vkvg_gradient_t vkvg_gradient_x
 
 #define _CRT_SECURE_NO_WARNINGS
 int directoryExists(const char* path) {
@@ -2626,6 +2639,7 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			ctx->status = VKVG_STATUS_PATTERN_INVALID_GRADIENT;
 			return;
 		}
+		grad.extend = pat->extend;
 		vkvg_matrix_t mat;
 		if (pat->hasMatrix) {
 			vkvg_pattern_get_matrix(pat, &mat);
@@ -5103,8 +5117,10 @@ vkvg_status_t vkvg_pattern_edit_linear(VkvgPattern pat, float x0, float y0, floa
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
-
 	grad->cp[0] = vec4{ {x0}, {y0}, {x1}, {y1} };
+	grad->m = ivec4(1024, 0, 0, 1024);
+	grad->extend = pat->extend;
+	grad->scale = vec2{ 1.0,1.0 };
 	return VKVG_STATUS_SUCCESS;
 }
 VkvgPattern vkvg_pattern_create_linear(float x0, float y0, float x1, float y1) {
@@ -5128,8 +5144,7 @@ VkvgPattern vkvg_pattern_create_linear(float x0, float y0, float x1, float y1) {
 
 	return pat;
 }
-vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1,
-	float radius1) {
+vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
 	if (vkvg_pattern_status(pat))
 		return vkvg_pattern_status(pat);
 	if (pat->type != VKVG_PATTERN_TYPE_RADIAL)
@@ -5147,9 +5162,14 @@ vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, fl
 	}
 	grad->cp[0] = vec4{ {c0.x}, {c0.y}, {radius0}, {0} };
 	grad->cp[1] = vec4{ {c1.x}, {c1.y}, {radius1}, {0} };
+	grad->m = ivec4(1024, 0, 0, 1024);
+	grad->extend = pat->extend;
+	grad->scale = vec2{ 1.0,1.0 };
+	if (is_ellipse)grad->scale.x *= 2;
 	return VKVG_STATUS_SUCCESS;
 }
-VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1) {
+// circle 或 ellipse
+VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
 	VkvgPattern pat = (vkvg_pattern_t*)calloc(1, sizeof(vkvg_pattern_t));
 	if (!pat) {
 		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
@@ -5160,12 +5180,16 @@ VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, floa
 	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
 
 	if (pat->data) {
-		vkvg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1);
+		vkvg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
 		pat->references = 1;
 	}
 	else
 		pat->status = VKVG_STATUS_NO_MEMORY;
 	return pat;
+}
+VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1)
+{
+	return vkvg_pattern_create_radial(cx0, cy0, radius0, cx1, cy1, radius1, false);
 }
 vkvg_status_t vkvg_pattern_edit_sweep(VkvgPattern pat, float cx, float cy, float start_angle, float end_angle) {
 	if (vkvg_pattern_status(pat))
@@ -5175,7 +5199,9 @@ vkvg_status_t vkvg_pattern_edit_sweep(VkvgPattern pat, float cx, float cy, float
 
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
 	grad->cp[0] = vec4{ cx, cy, start_angle, end_angle };
-
+	grad->m = ivec4(1024, 0, 0, 1024);
+	grad->extend = pat->extend;
+	grad->scale = vec2{ 1.0,1.0 };
 	return VKVG_STATUS_SUCCESS;
 }
 VkvgPattern vkvg_pattern_create_sweep(float cx, float cy, float start_angle, float end_angle) {
@@ -5204,6 +5230,15 @@ uint32_t vkvg_pattern_get_reference_count(VkvgPattern pat) {
 	if (vkvg_pattern_status(pat))
 		return 0;
 	return pat->references;
+}
+vkvg_status_t vkvg_pattern_set_scale(VkvgPattern pat, float scale_x, float scale_y) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	grad->scale = vec2{ scale_x ,scale_y };
+	return VKVG_STATUS_SUCCESS;
 }
 vkvg_status_t vkvg_pattern_add_color_stop(VkvgPattern pat, float offset, float r, float g, float b, float a) {
 	if (vkvg_pattern_status(pat))
