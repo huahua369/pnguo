@@ -93,10 +93,11 @@ vec4 gpu_eval_stops(int stop_count, float t)
 			float span = off - off_prev;
 			float f = span > 1e-6 ? (t - off_prev) / span : 0.0;
 			/* Interpolate in premultiplied space per OpenType COLR spec. */
-			vec4 p0 = vec4(col_prev.rgb * col_prev.a, col_prev.a);
-			vec4 p1 = vec4(col.rgb * col.a, col.a);
-			vec4 pm = mix(p0, p1, f);
-			return pm.a > 1e-6 ? vec4(pm.rgb / pm.a, pm.a) : vec4(0.0);
+			//vec4 p0 = vec4(col_prev.rgb * col_prev.a, col_prev.a);
+			//vec4 p1 = vec4(col.rgb * col.a, col.a);
+			vec4 pm = mix(col_prev, col, f);
+			//return pm.a > 1e-6 ? vec4(pm.rgb / pm.a, pm.a) : vec4(0.0);
+			return pm.a > 1e-6 ? pm : vec4(0.0);
 		}
 		col_prev = col;
 		off_prev = off;
@@ -291,7 +292,27 @@ vec4 gpu_composite(vec4 src, vec4 dst, int mode)
 
 	return r;
 }
+// todo
+vec4 gpu_sample_mesh(vec2 renderCoord, vec2 box, int stop_count, int extend)
+{
+	vec4 t0 = uboGrad.cp[0];
+	ivec4 m = uboGrad.m;// ivec4(1024, 0, 0, 1024);
+	vec2 p0 = vec2(t0.xy / box);
+	float a0 = t0.z;  /* fraction of pi */
+	float a1 = t0.w;
+	float span = a1 - a0;
+	if (abs(span) < 1e-6) return vec4(0.0);
+	vec2 p = gpu_apply_minv(m, renderCoord - p0);
+	float t = renderCoord.x * float(stop_count - 1);
+	int index = int(floor(t));
+	float fraction = t - float(index);
 
+	index = clamp(index, 0, stop_count - 2);
+	t = clamp(fraction, 0.0, 1.0);
+
+	t = gpu_extend_t(t, extend);
+	return gpu_eval_stops(stop_count, t);
+}
 /* Walks the paint blob's flat op stream and returns a
  * premultiplied RGBA coverage value for the current fragment.
  *
@@ -308,19 +329,32 @@ vec4 gpu_paint(vec2 renderCoord)
 	vec4 acc = vec4(0.0);
 	int extend = uboGrad.extend;
 	int stop_count = int(uboGrad.count);
-	int subtype = inPatType;
 	vec4 col = inSrc;
-	if (subtype == LINEAR)       /* linear */
+	switch (inPatType) {
+	case SURFACE:
+		vec2 p = (gl_FragCoord.xy - inSrc.xy);
+		vec2 uv = vec2(
+			inMat[0][0] * p.x + inMat[1][0] * p.y + inMat[2][0],
+			inMat[0][1] * p.x + inMat[1][1] * p.y + inMat[2][1]
+		);
+		uv /= inSrc.zw;
+		/*if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1)
+			discard;*/
+		col = texture(source, uv);
+		break;
+	case LINEAR:
 		col = gpu_sample_linear(renderCoord, box, stop_count, extend);
-	else if (subtype == RADIAL)  /* radial */
+		break;
+	case RADIAL:
 		col = gpu_sample_radial(renderCoord, box, stop_count, extend);
-	else if (subtype == SWEEP)  /* sweep */
-	{
+		break;
+	case SWEEP:
 		col = gpu_sample_sweep(renderCoord, box, stop_count, extend);
-	}
+		break;
+	};
 	vec4 src = vec4(col.rgb * col.a, col.a);
 	acc = src + acc * (1.0 - src.a);
-	return col;
+	return src;
 }
 vec4 old_gpu_paint()
 {
@@ -419,22 +453,7 @@ vec4 old_gpu_paint()
 }
 void main()
 {
-	vec4 c = inSrc;
-	switch (inPatType) {
-	case SURFACE:
-		vec2 p = (gl_FragCoord.xy - inSrc.xy);
-		vec2 uv = vec2(
-			inMat[0][0] * p.x + inMat[1][0] * p.y + inMat[2][0],
-			inMat[0][1] * p.x + inMat[1][1] * p.y + inMat[2][1]
-		);
-		uv /= inSrc.zw;
-		/*if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1)
-			discard;*/
-		c = texture(source, uv);
-		break;
-	default:
-		c = gpu_paint(gl_FragCoord.xy);
-	}
+	vec4 c = gpu_paint(gl_FragCoord.xy);
 	if (inFontUV.z >= 0.0)
 		c *= texture(fontMap, inFontUV).r;
 

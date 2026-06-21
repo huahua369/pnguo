@@ -653,7 +653,7 @@ size_t app_x::run()
 		rtc.begin();
 		for (auto p : app->forms)
 		{
-			if (p && p->_dom && p->is_render)
+			if (p && p->_dom && p->_size.x > 0)
 			{
 				auto dom0 = p->_dom;
 				p->uct = dom0->update(delta) + ct;

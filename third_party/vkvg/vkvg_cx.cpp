@@ -1181,8 +1181,9 @@ void vkvg_set_source_color(VkvgContext ctx, uint32_t c) {
 		return;
 	RECORD(ctx, VKVG_CMD_SET_SOURCE_COLOR, c);
 	ctx->curColor = c;
+	// shader处理预乘了
 #ifdef VKVG_PREMULT_ALPHA
-	ctx->curColor = rgba_to_premultiplied(ctx->curColor);
+	//ctx->curColor = rgba_to_premultiplied(ctx->curColor);
 #endif
 	_update_cur_pattern(ctx, NULL);
 }
@@ -1199,7 +1200,7 @@ void vkvg_set_source_rgba(VkvgContext ctx, float r, float g, float b, float a) {
 	RECORD(ctx, VKVG_CMD_SET_SOURCE_RGBA, r, g, b, a);
 	ctx->curColor = CreateRgbaf(r, g, b, a);
 #ifdef VKVG_PREMULT_ALPHA
-	ctx->curColor = rgba_to_premultiplied(ctx->curColor);
+	//ctx->curColor = rgba_to_premultiplied(ctx->curColor);
 #endif
 	_update_cur_pattern(ctx, NULL);
 }
@@ -5242,6 +5243,31 @@ vkvg_status_t vkvg_pattern_set_scale(VkvgPattern pat, float scale_x, float scale
 	return VKVG_STATUS_SUCCESS;
 }
 
+vkvg_status_t vkvg_pattern_set_color_stop(VkvgPattern pat, int idx, float r, float g, float b, float a) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	if (idx < 0 || idx >= grad->count)return VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+	//#ifdef VKVG_PREMULT_ALPHA
+	//	vkvg_color_t c = { a * r, a * g, a * b, a };
+	//#else
+	//#endif
+	vkvg_color_t c = { r, g, b, a };
+	grad->colors[idx] = c;
+	return VKVG_STATUS_SUCCESS;
+}
+vkvg_status_t vkvg_pattern_set_color_stop_offset(VkvgPattern pat, int idx, float offset) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	if (idx < 0 || idx >= grad->count)return VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+	grad->stops[idx] = offset;
+	return VKVG_STATUS_SUCCESS;
+}
 vkvg_status_t vkvg_pattern_add_color_stop(VkvgPattern pat, float offset, float r, float g, float b, float a) {
 	if (vkvg_pattern_status(pat))
 		return vkvg_pattern_status(pat);
@@ -5249,11 +5275,7 @@ vkvg_status_t vkvg_pattern_add_color_stop(VkvgPattern pat, float offset, float r
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
-#ifdef VKVG_PREMULT_ALPHA
-	vkvg_color_t c = { a * r, a * g, a * b, a };
-#else
 	vkvg_color_t c = { r, g, b, a };
-#endif
 	grad->colors[grad->count] = c;
 #ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
 	grad->stops[grad->count] = offset;

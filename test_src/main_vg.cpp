@@ -417,7 +417,7 @@ void testgui() {
 		pat = vkvg_pattern_create_radial(128, 128, 25.6, 128, 128, 128.0, true);
 		vkvg_pattern_add_color_stop(pat, 0, 1, .51, .1, 0.81);
 		vkvg_pattern_add_color_stop(pat, 0.50, red, 1);
-		vkvg_pattern_add_color_stop(pat, 1, 1, 0.5, 0, 0.51);
+		vkvg_pattern_add_color_stop(pat, 1, 1, 0.5, 0, 0.0);
 		//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
 		vkvg_set_source(cr, pat);
 		//vkvg_set_source_color(cr, 0xffff8000);
@@ -443,7 +443,7 @@ void testgui() {
 		vkvg_pattern_add_color_stop(sg, 0.0, white, 0.5);
 		vkvg_pattern_add_color_stop(sg, 0.25, red, 0.5);
 		vkvg_pattern_add_color_stop(sg, 0.50, green, 0.5);
-		vkvg_pattern_add_color_stop(sg, 0.75, blue, 0.5);
+		vkvg_pattern_add_color_stop(sg, 0.75, blue, 0.0);
 		vkvg_pattern_add_color_stop(sg, 1.00, white, 0.5);
 		vkvg_set_source(cr, sg);
 		//vkvg_rectangle(cr, 0, 0, 256, 256);
@@ -717,7 +717,7 @@ void testgui() {
 
 		auto dvv = colorpicker;
 		dom0->add_widget(dvv);
-		dvv->set_size({ 1000,400 });
+		dvv->set_size({ 1200,400 });
 		dvv->set_pos({ 200,160 });
 		dvv->style.family = family;
 		dvv->style.fontsize = 16;

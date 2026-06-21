@@ -2412,7 +2412,6 @@ void form_x::update(float delta)
 	display_size = _size;
 	if (_size.x > 0 && _size.y > 0)
 	{
-		is_render = true;
 		display_framebuffer_scale = glm::vec2((float)display_w / _size.x, (float)display_h / _size.y);
 	}
 	else
@@ -2439,7 +2438,7 @@ void form_x::update(float delta)
 }
 void form_x::set_state()
 {
-	if (!visible || !renderer || !is_render || !app || display_size.x < 1 || display_size.y < 1)
+	if (!visible || !renderer || !app || display_size.x < 1 || display_size.y < 1)
 		return;
 	float rsx = 1.0f;
 	float rsy = 1.0f;
@@ -2458,6 +2457,7 @@ void form_x::set_state()
 	SDL_Rect viewport = { 0,0,display_size.x,display_size.y };
 	SDL_SetRenderViewport(renderer, &viewport);
 	SDL_SetRenderClipRect(renderer, &viewport);
+	is_render = true;
 }
 
 
