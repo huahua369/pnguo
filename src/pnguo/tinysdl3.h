@@ -247,11 +247,11 @@ public:
 	bool _ref = false;
 	bool _focus_lost_hide = false;	// 失去焦点隐藏 
 	bool viewports_enable = false;	// docking用
+	bool is_render = true;
 private:
 	bool visible = true;
 	bool visible_old = true;
 	bool _rmode = false;
-	bool is_render = true;
 public:
 	form_x();
 	~form_x();

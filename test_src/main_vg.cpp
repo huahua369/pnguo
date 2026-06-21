@@ -414,15 +414,15 @@ void testgui() {
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
 		//vkvg_translate(cr, 0, 260);
-		pat = vkvg_pattern_create_radial(115.2, 102.4, 25.6, 102.4, 102.4, 128.0, true);
-		vkvg_pattern_add_color_stop(pat, 0, 1, .1, .1, 0.81);
-		vkvg_pattern_add_color_stop(pat, 0.50, green, 1);
-		vkvg_pattern_add_color_stop(pat, 1, 0, 0, 0.1, 1);
+		pat = vkvg_pattern_create_radial(128, 128, 25.6, 128, 128, 128.0, true);
+		vkvg_pattern_add_color_stop(pat, 0, 1, .51, .1, 0.81);
+		vkvg_pattern_add_color_stop(pat, 0.50, red, 1);
+		vkvg_pattern_add_color_stop(pat, 1, 1, 0.5, 0, 0.51);
 		//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
 		vkvg_set_source(cr, pat);
 		//vkvg_set_source_color(cr, 0xffff8000);
-		//vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
-		vkvg_rectangle(cr, 0, 0, 256, 256);
+		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+		//vkvg_rectangle(cr, 0, 0, 256, 256);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
 

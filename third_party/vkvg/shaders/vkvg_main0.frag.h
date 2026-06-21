@@ -145,15 +145,15 @@ vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
  * proper ellipse-in-rendered-space instead of a scalar-fudge. */
 vec4 gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
-	ivec4 m = ivec4(1024, 0, 0, 1024);
+	ivec4 m = uboGrad.m;
 	vec2 c0_r = uboGrad.cp[0].xy / box;
 	vec2 cd = uboGrad.cp[1].xy / box;
 	float r0 = uboGrad.cp[0].z / box.x;
 	float r1 = uboGrad.cp[1].z / box.y;
 	//renderCoord *= box;
 	float dr = r1 - r0;
-	//vec2 p = gpu_apply_minv(m, renderCoord - c0_r);
-	vec2 p = normalize(renderCoord - c0_r);
+	vec2 p = gpu_apply_minv(m, normalize(renderCoord - c0_r));
+	//vec2 p = normalize(renderCoord - c0_r);
 
 	float A = dot(cd, cd) - dr * dr;
 	float B = -2.0 * (dot(p, cd) + r0 * dr);
@@ -203,7 +203,7 @@ vec4 gpu_sample_radial(vec2 renderCoord, vec2 box, int stop_count, int extend)
 	}
 	else
 	{
-		return vec4(0.0);
+		//return vec4(0.0);
 		//gradient is undefined for this coordinate
 	}
 	float grad = (distance(renderCoord, c0) - r0) / gradLength;

@@ -5231,6 +5231,7 @@ uint32_t vkvg_pattern_get_reference_count(VkvgPattern pat) {
 		return 0;
 	return pat->references;
 }
+
 vkvg_status_t vkvg_pattern_set_scale(VkvgPattern pat, float scale_x, float scale_y) {
 	if (vkvg_pattern_status(pat))
 		return vkvg_pattern_status(pat);
@@ -5240,6 +5241,7 @@ vkvg_status_t vkvg_pattern_set_scale(VkvgPattern pat, float scale_x, float scale
 	grad->scale = vec2{ scale_x ,scale_y };
 	return VKVG_STATUS_SUCCESS;
 }
+
 vkvg_status_t vkvg_pattern_add_color_stop(VkvgPattern pat, float offset, float r, float g, float b, float a) {
 	if (vkvg_pattern_status(pat))
 		return vkvg_pattern_status(pat);
