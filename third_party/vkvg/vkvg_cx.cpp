@@ -43,6 +43,7 @@ extern "C" {
  //#define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #endif
+#include "vkvg_cx.h"
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
@@ -51,10 +52,10 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 */
 struct ivec4 { int x, y, z, w; };
 
-
+#define MAX_STOPS 32
 struct vkvg_gradient_x {
-	vkvg_color_t colors[16];
-	float stops[16];
+	vkvg_color_t colors[MAX_STOPS];
+	float stops[MAX_STOPS];
 	vec4 cp[2];
 	ivec4 m;
 	vec2 scale;	// 缩放目标
@@ -2230,6 +2231,7 @@ void _vao_add_rectangle(VkvgContext ctx, float x, float y, float width, float he
 	_add_tri_indices_for_rect(ctx, firstIdx);
 }
 // start render pass if not yet started or update push const if requested
+// 如果还没开始渲染通道，就开始渲染通道；或者如果有请求，就更新推送常量
 void _ensure_renderpass_is_started(VkvgContext ctx) {
 	LOG(VKVG_LOG_INFO, "_ensure_renderpass_is_started\n");
 	if (!ctx->cmdStarted)
@@ -2527,6 +2529,20 @@ void _update_push_constants(VkvgContext ctx) {
 		&ctx->pushConsts);
 	ctx->pushCstDirty = false;
 }
+void _sort_gradient_stops(vkvg_color_t* colors, float* stops, uint32_t count) {
+	for (uint32_t i = 1; i < count; i++) {
+		float   key_stop = stops[i];
+		vkvg_color_t key_color = colors[i];
+		int j = (int)i - 1;
+		while (j >= 0 && stops[j] > key_stop) {
+			stops[j + 1] = stops[j];
+			colors[j + 1] = colors[j];
+			j--;
+		}
+		stops[j + 1] = key_stop;
+		colors[j + 1] = key_color;
+	}
+}
 void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 	VkvgPattern lastPat = ctx->pattern;
 	ctx->pattern = pat;
@@ -2666,6 +2682,7 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
 			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[1].z, &grad.cp[0].w);
 		}
+		_sort_gradient_stops(grad.colors, grad.stops, grad.count);
 		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
 		vkh_buffer_flush(&ctx->uboGrad);
 		break;
@@ -5275,14 +5292,17 @@ vkvg_status_t vkvg_pattern_add_color_stop(VkvgPattern pat, float offset, float r
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
-	vkvg_color_t c = { r, g, b, a };
-	grad->colors[grad->count] = c;
+	if (grad->count < MAX_STOPS)
+	{
+		vkvg_color_t c = { r, g, b, a };
+		grad->colors[grad->count] = c;
 #ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
-	grad->stops[grad->count] = offset;
+		grad->stops[grad->count] = offset;
 #else
-	grad->stops[grad->count].r = offset;
+		grad->stops[grad->count].r = offset;
 #endif
-	grad->count++;
+		grad->count++;
+	}
 	return VKVG_STATUS_SUCCESS;
 }
 void vkvg_pattern_set_extend(VkvgPattern pat, vkvg_extend_t extend) {

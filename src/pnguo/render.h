@@ -19,9 +19,6 @@ using namespace Clipper2Lib;
 #define GLM_FORCE_XYZW_ONLY
 #include <glm/glm.hpp>   
 #endif
-#ifndef vkvg_pattern_add_color_stop_rgba
-#define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop
-#endif 
 
 #ifndef VK_DEFINE_HANDLE
 #define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;
@@ -218,6 +215,7 @@ extern "C" {
 }
 #endif
 
+void vkvg_grid_fill(VkvgContext cr, glm::vec2 size, glm::ivec2 cols, int width);
 
 template<typename T>
 concept Drawable = requires(T obj) {

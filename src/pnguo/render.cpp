@@ -26,7 +26,8 @@ extern "C" {
 
 #define FLEX_IMPLEMENTATION
 #include <vg.h>
-#include <vkvg/vkvg.h> 
+
+#include <vkvg_cx.h>
 
 #include <stb_rect_pack.h> 
 #include <print_time.h> 
@@ -305,8 +306,6 @@ vkvg_dev::~vkvg_dev()
 	free_gctx(ctx1);
 
 }
-VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
-vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
 vkvg_func_t* vkvg_dev::get_fun()
 {
 	if (!fun)
@@ -1705,6 +1704,32 @@ void draw_rectangle(VkvgContext cr, const glm::vec4& rc, int r)
 	}
 }
 
+void vkvg_grid_fill(VkvgContext cr, glm::vec2  size, glm::ivec2 cols, int width)
+{
+	int x = fmod(size.x, width);
+	int y = fmod(size.y, width);
+	int xn = size.x / width;
+	int yn = size.y / width;
+	if (x > 0)xn++;
+	if (y > 0)yn++;
+	vkvg_save(cr);
+	draw_rectangle(cr, { 0,0, size.x, size.y }, 0);
+	vkvg_clip(cr);
+	for (size_t i = 0; i < yn; i++)
+	{
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k = (j & 1);
+			if (!(i & 1))
+				k = !k;
+			auto c = cols[k];
+			draw_rectangle(cr, { j * width,i * width,width,width }, 0);
+			set_color(cr, c);
+			vkvg_fill(cr);
+		}
+	}
+	vkvg_restore(cr);
+}
 
 
 #if 1
@@ -3010,7 +3035,7 @@ size_t cmd_op_add_image(uint8_t* d, void* ctx)
 	auto pc = (multi_rich_text_t*)ctx;
 	auto f = d;
 	image_r t = next_value<image_r>(d);
-	auto idx = mrt_add_box(pc,  {}, t.dsize, {});
+	auto idx = mrt_add_box(pc, {}, t.dsize, {});
 	if (t.is_surf) {
 		mrt_add_image_vg(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
 	}
