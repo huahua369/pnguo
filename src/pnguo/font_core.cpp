@@ -9997,8 +9997,8 @@ void mrt_build(multi_rich_text_t* pm)
 		bt.dst.count = pt->dst_vstr.size() - bt.dst.first;
 	}
 	int ms = rtc.end();
-	if (ms > 0)
-		printf("mrt_build u ms: %d\n", ms);
+	//if (ms > 0)
+	//	printf("mrt_build u ms: %d\n", ms);
 	rtc.begin();
 	for (auto& it : pm->boxtext)
 	{
@@ -10006,8 +10006,8 @@ void mrt_build(multi_rich_text_t* pm)
 		mrt_layout1(pm, &it, &pm->rich.layout);
 	}
 	ms = rtc.end();
-	if (ms > 0)
-		printf("mrt_build l ms: %d\n", ms);
+	//if (ms > 0)
+	//	printf("mrt_build l ms: %d\n", ms);
 }
 
 size_t mrt_box_count(multi_rich_text_t* p)

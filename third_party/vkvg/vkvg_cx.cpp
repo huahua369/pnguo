@@ -2283,8 +2283,8 @@ bool _wait_ctx_flush_end(VkvgContext ctx) {
 	ret = (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS);
 #endif
 	int ms = rtc.end();
-	if (ms > 0)
-		printf("wait ms: %d\n", ms);
+	//if (ms > 0)
+	//	printf("wait ms: %d\n", ms);
 	if (!ret) {
 		LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
 		ctx->status = VKVG_STATUS_TIMEOUT;
@@ -2677,8 +2677,8 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			if (!_wait_ctx_flush_end(ctx))
 				return;
 			int ms = rtc.end();
-			if (ms > 0)
-				printf("pattern wait ms: %d\n", ms);
+			//if (ms > 0)
+			//	printf("pattern wait ms: %d\n", ms);
 		}
 		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
 			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
