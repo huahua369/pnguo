@@ -1,8 +1,115 @@
 ﻿#pragma once
 #ifndef VG_H
 #define VG_H
+#include "ntype.h"
 
 class rvg_cx;
+template <class T>
+struct vg_vector;
+
+
+template <class T>
+struct vg_vector {
+	T* a = 0;			// 动态数组指针 
+	size_t _size = 0;    // 当前元素个数
+	size_t cap = 0;     // 当前容量
+	hz::usp_ac* ac = 0;
+
+	~vg_vector() {
+		if (a && cap)
+		{
+			ac->free_mem0(a, sizeof(T) * cap);
+		}
+		a = 0;
+		_size = 0;
+		cap = 0;
+	}
+	void init(hz::usp_ac* p) {
+		_size = 0;
+		ac = p;
+	}
+	void reserve(size_t new_cap) {
+		if (new_cap <= cap) return;
+		auto np = (T*)ac->new_mem0(sizeof(T) * new_cap);
+		if (!np)return;
+		if (np != a)
+		{
+			if (a)
+			{
+				memcpy(np, a, sizeof(T) * _size);
+				ac->free_mem0(a, sizeof(T) * cap);
+			}
+			a = np;
+		}
+		cap = new_cap;
+		return;
+	}
+	void resize(size_t new_size) {
+		reserve(new_size);
+		_size = new_size;
+	}
+
+	void grow() {
+		size_t new_cap = (cap == 0) ? 4 : cap * 2;
+		reserve(new_cap);
+	}
+	void push_back(const T& val) {
+		if (_size >= cap) {
+			grow();
+		}
+		a[_size++] = val;
+	}
+	void insert(size_t index, const T& val) {
+		if (index > _size) return;  // 允许在末尾插入
+		if (_size >= cap) {
+			grow();
+		}
+		// 将index及之后的元素整体后移一位
+		memmove(&a[index + 1], &a[index], (_size - index) * sizeof(T));
+		a[index] = val;
+		_size++;
+	}
+	void erase(size_t index) {
+		if (index >= _size) return;
+		// 将index之后的元素整体前移一位
+		memmove(&a[index], &a[index + 1], (_size - index - 1) * sizeof(T));
+		_size--;
+	}
+
+	// 获取元素
+	T& get(size_t index) {
+		return a[index];  // 调用者需保证index合法
+	}
+
+	// 清空但不释放内存
+	void clear() {
+		_size = 0;
+	}
+	T* data() {
+		return a;
+	}
+	// 释放内存
+	void vfree() {
+
+		a = NULL;
+		_size = 0;
+		cap = 0;
+	}
+	size_t size() { return _size; }
+
+	_NODISCARD _CONSTEXPR20 T* begin() noexcept {
+		return a;
+	}
+
+	_NODISCARD _CONSTEXPR20 T* end() noexcept {
+		return a + _size;
+	}
+
+	_NODISCARD _CONSTEXPR20 T& operator[](size_t _Off) const noexcept {
+		return *(a + _Off);
+	}
+};
+
 
 struct image_ptr_t
 {
@@ -311,7 +418,7 @@ struct flex_data1 {
 	float width = 0, height = 0;	// 大小NAN
 	float left = 0, right = 0, top = 0, bottom = 0;	// 偏移
 	float margin[4] = { 0, 0, 0, 0 };		// 本元素内边距
-	float padding[4] = {0, 0, 0, 0};		// 本元素外边距
+	float padding[4] = { 0, 0, 0, 0 };		// 本元素外边距
 	float grow = 0;		// 子元素:自身放大比例，默认为0不放大
 	float shrink = 0;	// 子元素:空间不足时自身缩小比例，默认为1自动缩小，0不缩小
 	int	  order = 0;	// 子元素:自身排列顺序。数值越小，越靠前
@@ -341,8 +448,14 @@ struct node_dt
 	size_t parent = 0;		// out 自动计算父节点索引
 	size_t line_count = 0;	// out 行数量
 };
-// 输入样式数据，根节点指针，所有节点数量
-glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count);
+
+struct flex_ctx;
+flex_ctx* new_flex_ctx();
+void free_flex_ctx(flex_ctx* p);
+void* flex_ctx_ac(flex_ctx* p);
+void flex_ctx_set_ac(flex_ctx* p, hz::usp_ac* a);
+// 输入样式数据，根节点指针，所有节点数量 
+glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count, flex_ctx* ctx);
 
 double get_alpha_f(uint32_t c);
 bool is_alpha(uint32_t c);

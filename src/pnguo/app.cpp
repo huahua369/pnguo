@@ -396,6 +396,7 @@ int dom_cx::build()
 	//printf("draw 0\n");
 	c_runtime_cx rtc;
 	rtc.begin();
+	printf("begin\n");
 #if 0
 	auto& rvgd = dc->_dobj[0];
 	if (!rvgd)
@@ -455,6 +456,7 @@ int dom_cx::build()
 		}
 	}
 #endif
+	printf("end\n");
 	int ms1 = rtc.end();
 	static int oms = -1;
 	//if (ms != oms)

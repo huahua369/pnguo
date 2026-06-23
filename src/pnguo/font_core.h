@@ -8,6 +8,8 @@
 #include <vector> 
 #include <set> 
 
+#include "vg.h"
+
 glm::vec4 ucolor2fx(uint32_t color);
 glm::vec4 ucolor2f(uint32_t c);
 glm::vec4 ucolor2fp(const uint32_t* c);
@@ -675,7 +677,7 @@ struct image_block
 struct strfont_t {
 	void* v = 0;		// 字符数据指针，类型由type指定
 	size_t len = 0;		// 字符数量
-	std::vector<font_t::GlyphPosition> _tnpos;	// 输出hb获取的字形位置数据
+	vg_vector<font_t::GlyphPosition> _tnpos;	// 输出hb获取的字形位置数据
 	font_t* font = 0;	// 字符串使用的字体对象
 	char16_t* v16 = 0;
 	char* v8 = 0;
@@ -713,7 +715,7 @@ void build_text_t1(text_t1* p, const void* str, int size, int first, font_family
 
 
 struct text_temp_t {
-	std::vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
+	vg_vector<strfont_t> _block;	// hb整形结果，字符串分块，分块内字体相同
 	std::vector<bidi_item> bv;		// 存放bidi后的数据
 	std::u16string bidi_str;		// 存放转换成bidi使用的字符串,update_text使用
 	std::string str;
@@ -728,11 +730,17 @@ union fitem_t {
 	font_item_t f;
 	image_t1 i;
 };
+struct flex_ctx;
+
 struct layout_block_st {
 	std::vector<fitem_t> dst_vstr;			// *渲染数据
 	std::set<image_ptr_t*> ov;				// *用到的字体纹理对象
 	std::set<void*> gv;						// *用到的vkvg纹理对象
 	std::map<size_t, text_temp_t> temp_map;	// 临时数据，key为文本块索引
+	flex_ctx* lctx = 0;
+	vg_vector<node_dt>* fv = 0;
+	hz::usp_ac ac;
+	~layout_block_st();
 };
 struct box_info_t {
 	text_box_t tbox = {};			// *文本区域信息

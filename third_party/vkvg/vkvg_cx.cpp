@@ -1,4 +1,5 @@
 
+//#define VKVG_WIRED_DEBUG
 #define VKVG_USE_HARFBUZZ
 #ifdef __cplusplus
 extern "C" {
@@ -11,6 +12,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
 #include "vkh_queue.h"
 #include "vkh_image.h"
 
@@ -44,6 +46,7 @@ extern "C" {
 #include "stb_truetype.h"
 #endif
 #include "vkvg_cx.h"
+#include <pnguo/print_time.h> 
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
@@ -154,6 +157,11 @@ const float DBG_LAB_COLOR_CLIP[4] = { 0, 1, 1, 1 };
 #ifdef VKVG_IDENTITY_MATRIX
 #undef VKVG_IDENTITY_MATRIX
 #define VKVG_IDENTITY_MATRIX vkvg_matrix_t( 1, 0, 0, 1, 0, 0 )
+#endif
+#ifdef CreateRgbaf
+#undef CreateRgbaf
+#define CreateRgbaf(r, g, b, a)                                                                                        \
+    (((int)(a * 255.0f) << 24) | ((int)(b * 255.0f) << 16) | ((int)(g * 255.0f) << 8) | (int)(r * 255.0f))
 #endif
 void _init_ctx(VkvgContext ctx) {
 	static VkClearValue clearValues[3] = {};
@@ -1441,10 +1449,16 @@ void vkvg_save(VkvgContext ctx) {
 	vkvg_context_save_t* sav = (vkvg_context_save_t*)calloc(1, sizeof(vkvg_context_save_t));
 
 	_flush_cmd_buff(ctx);
+	//c_runtime_cx rtc;
+	//rtc.begin();
+	//auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
 	if (!_wait_ctx_flush_end(ctx)) {
 		free(sav);
 		return;
 	}
+	//int ms = rtc.end();
+	//if (ms > 0)
+	//	printf("save wait ms: %d\n", ms);
 
 	if (ctx->curClipState == vkvg_clip_state_clip) {
 		sav->clippingState = vkvg_clip_state_clip_saved;
@@ -1575,8 +1589,14 @@ void vkvg_restore(VkvgContext ctx) {
 	ctx->pSavedCtxs = sav->pNext;
 
 	_flush_cmd_buff(ctx);
+	//c_runtime_cx rtc;
+	//rtc.begin();
+	//auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
 	if (!_wait_ctx_flush_end(ctx))
 		return;
+	//int ms = rtc.end();
+	//if (ms > 0)
+	//	printf("restore wait ms: %d\n", ms);
 
 	ctx->pushConsts = sav->pushConsts;
 	ctx->pushCstDirty = true;
@@ -2251,16 +2271,25 @@ void _clear_attachment(VkvgContext ctx) {}
 
 bool _wait_ctx_flush_end(VkvgContext ctx) {
 	LOG(VKVG_LOG_INFO, "CTX: _wait_flush_fence\n");
+	bool ret = false;
+	c_runtime_cx rtc;
+	rtc.begin();
+	auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
+
 #ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
-	if (vkh_timeline_wait((VkhDevice)&ctx->dev->vkDev, ctx->pSurf->timeline, ctx->timelineStep) == VK_SUCCESS)
-		return true;
+	ret = (vkh_timeline_wait((VkhDevice)&ctx->dev->vkDev, ctx->pSurf->timeline, ctx->timelineStep) == VK_SUCCESS);
+
 #else
-	if (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS)
-		return true;
+	ret = (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS);
 #endif
-	LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
-	ctx->status = VKVG_STATUS_TIMEOUT;
-	return false;
+	int ms = rtc.end();
+	if (ms > 0)
+		printf("wait ms: %d\n", ms);
+	if (!ret) {
+		LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
+		ctx->status = VKVG_STATUS_TIMEOUT;
+	}
+	return ret;
 }
 
 bool _wait_and_submit_cmd(VkvgContext ctx) {
@@ -2640,8 +2669,17 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 	case VKVG_PATTERN_TYPE_RADIAL:
 	case VKVG_PATTERN_TYPE_SWEEP:
 		_flush_cmd_buff(ctx);
-		if (!_wait_ctx_flush_end(ctx))
-			return;
+		auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
+		if (st)
+		{
+			c_runtime_cx rtc;
+			rtc.begin();
+			if (!_wait_ctx_flush_end(ctx))
+				return;
+			int ms = rtc.end();
+			if (ms > 0)
+				printf("pattern wait ms: %d\n", ms);
+		}
 		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
 			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
 
@@ -3376,7 +3414,7 @@ void _elliptic_arc(VkvgContext ctx, float x1, float y1, float x2, float y2, bool
 	vec2   u = vec2_unit_x;
 	vec2   v = { (p1.x - cp.x) / rx, (p1.y - cp.y) / ry };
 	double sa = acosf(vec2_dot(u, v) / (fabsf(vec2_length(v)) * fabsf(vec2_length(u))));
-	if (isnan(sa))
+	if (isnan((float)sa))
 		sa = M_PIF;
 	if (u.x * v.y - u.y * v.x < 0)
 		sa = -sa;
@@ -3384,7 +3422,7 @@ void _elliptic_arc(VkvgContext ctx, float x1, float y1, float x2, float y2, bool
 	u = v;
 	v = vec2{ (-p1.x - cp.x) / rx, (-p1.y - cp.y) / ry };
 	double delta_theta = acosf(vec2_dot(u, v) / (fabsf(vec2_length(v)) * fabsf(vec2_length(u))));
-	if (isnan(delta_theta))
+	if (isnan((float)delta_theta))
 		delta_theta = M_PIF;
 	if (u.x * v.y - u.y * v.x < 0)
 		delta_theta = -delta_theta;
@@ -6621,7 +6659,7 @@ vkvg_inline vec2d vec2d_norm(vec2d a) {
 }
 // compute perpendicular vector
 vkvg_inline vec2d vec2d_perp(vec2d a) { return vec2d{ a.y, -a.x }; }
-vkvg_inline bool  vec2d_isnan(vec2d v) { return (bool)(isnan(v.x) || isnan(v.y)); }
+vkvg_inline bool  vec2d_isnan(vec2d v) { return (bool)(isnan((float)v.x) || isnan((float)v.y)); }
 
 // test equality of two single precision vectors
 vkvg_inline bool vec2_equ(vec2 a, vec2 b) { return (EQUF(a.x, b.x) & EQUF(a.y, b.y)); }
@@ -6737,7 +6775,7 @@ void _increase_font_tex_array(VkvgDevice dev) {
 
 	_font_cache_t* cache = dev->fontCache;
 
-	vkWaitForFences(dev->vkDev, 1, &cache->uploadFence, VK_TRUE, UINT64_MAX);
+	WaitForFences(dev->vkDev, 1, &cache->uploadFence, VK_TRUE, UINT64_MAX);
 	ResetFences(dev->vkDev, 1, &cache->uploadFence);
 
 	vkResetCommandBuffer(cache->cmd, 0);
@@ -6779,7 +6817,7 @@ void _increase_font_tex_array(VkvgDevice dev) {
 	VK_CHECK_RESULT(vkEndCommandBuffer(cache->cmd));
 
 	_device_submit_cmd(dev, &cache->cmd, cache->uploadFence);
-	vkWaitForFences(dev->vkDev, 1, &cache->uploadFence, VK_TRUE, UINT64_MAX);
+	WaitForFences(dev->vkDev, 1, &cache->uploadFence, VK_TRUE, UINT64_MAX);
 
 	cache->pensY = (int*)realloc(cache->pensY, newSize * sizeof(int));
 	void* tmp = memset(&cache->pensY[cache->texLength], 0, FONT_CACHE_INIT_LAYERS * sizeof(int));
@@ -6800,7 +6838,7 @@ void _flush_chars_to_tex(VkvgDevice dev, _vkvg_font_t* f) {
 		return;
 
 	LOG(VKVG_LOG_INFO, "_flush_chars_to_tex pen(%d, %d)\n", f->curLine.penX, f->curLine.penY);
-	vkWaitForFences(dev->vkDev, 1, &cache->uploadFence, VK_TRUE, UINT64_MAX);
+	WaitForFences(dev->vkDev, 1, &cache->uploadFence, VK_TRUE, UINT64_MAX);
 	ResetFences(dev->vkDev, 1, &cache->uploadFence);
 
 	vkResetCommandBuffer(cache->cmd, 0);
@@ -7436,3 +7474,127 @@ void _font_cache_show_text(VkvgContext ctx, const char* text) {
 
 #endif // 1
 
+
+vg_ctx::vg_ctx()
+{}
+
+vg_ctx::~vg_ctx()
+{}
+
+
+struct vkvg_context_cx {
+	vkvg_status_t status;
+	uint32_t      references; // reference count
+
+	VkvgDevice  dev;
+	VkvgSurface pSurf; // surface bound to context, set on creation of ctx
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	uint64_t timelineStep; // context cmd last submission timeline id.
+#else
+	VkFence flushFence; // context fence
+#endif
+	// VkDescriptorImageInfo sourceDescriptor;	//Store view/sampler in context
+
+	VkCommandPool    cmdPool;        // local pools ensure thread safety
+	VkCommandBuffer  cmdBuffers[2];  // double cmd buff for context operations
+	VkCommandBuffer  cmd;            // current recording buffer
+	VkDescriptorPool descriptorPool; // one pool per thread
+	VkDescriptorSet  dsFont;         // fonts glyphs texture atlas descriptor (local for thread safety)
+	VkDescriptorSet  dsSrc;          // source ds
+	VkDescriptorSet  dsGrad;         // gradient uniform buffer
+
+	VkhImage fontCacheImg; // current font cache, may not be the last one, updated only if new glyphs are
+	// uploaded by the current context
+
+	VkRect2D bounds;
+
+	uint32_t curColor;
+
+#if VKVG_FILL_NZ_GLUTESS
+	void (*vertex_cb)(VKVG_IBO_INDEX_TYPE, VkvgContext); // tesselator vertex callback
+	VKVG_IBO_INDEX_TYPE tesselator_fan_start;
+	uint32_t            tesselator_idx_counter;
+#endif
+
+#if VKVG_RECORDING
+	vkvg_recording_t* recording;
+#endif
+
+	vkh_buffer_t uboGrad; // uniform buff obj holdings gradient infos
+
+	// vk buffers, holds data until flush
+	vkh_buffer_t indices;     // index buffer with persistent map memory
+	uint32_t     sizeIBO;     // size of vk ibo
+	uint32_t     sizeIndices; // reserved size
+	uint32_t     indCount;    // current indice count
+
+	uint32_t            curIndStart;   // last index recorded in cmd buff
+	VKVG_IBO_INDEX_TYPE curVertOffset; // vertex offset in draw indexed command
+
+	vkh_buffer_t vertices;     // vertex buffer with persistent mapped memory
+	uint32_t     sizeVBO;      // size of vk vbo size
+	uint32_t     sizeVertices; // reserved size
+	uint32_t     vertCount;    // effective vertices count
+
+	Vertex* vertexCache;
+	VKVG_IBO_INDEX_TYPE* indexCache;
+
+	// pathes, exists until stroke of fill
+	vec2* points;     // points array
+	uint32_t sizePoints; // reserved size
+	uint32_t pointCount; // effective points count
+
+	// pathes array is a list of point count per segment
+	uint32_t  pathPtr; // pointer in the path array
+	uint32_t* pathes;
+	uint32_t  sizePathes;
+
+	uint32_t segmentPtr;   // current segment count in current path having curves
+	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
+	bool     simpleConvex; // true if path is single rect or concave closed curve.
+
+	bool     cmdStarted;     // prevent flushing empty renderpass
+	bool     pushCstDirty;   // prevent pushing to gpu if not requested
+
+	float    lineWidth;
+	float    miterLimit;
+	uint32_t dashCount;  // value count in dash array, 0 if dash not set.
+	float    dashOffset; // an offset for dash
+	float* dashes;     // an array of alternate lengths of on and off stroke.
+
+	vkvg_operator_t  curOperator;
+	vkvg_line_cap_t  lineCap;
+	vkvg_line_join_t lineJoin;
+	vkvg_fill_rule_t curFillRule;
+
+	long selectedCharSize; /* Font size*/
+	char selectedFontName[FONT_NAME_MAX_SIZE];
+	//_vkvg_font_t		  selectedFont;		//hold current face and size before cache addition
+	_vkvg_font_identity_t* currentFont;     // font pointing to cached fonts identity
+	_vkvg_font_t* currentFontSize; // font structure by size ready for lookup
+	vkvg_direction_t       textDirection;
+
+	push_constants pushConsts;
+	VkvgPattern    pattern;
+
+	vkvg_context_save_t* pSavedCtxs;   // last ctx saved ptr
+	uint8_t              curSavBit;    // current stencil bit used to save context, 6 bits used by stencil for save/restore
+	VkhImage* savedStencils;// additional image for saving contexes once more than 6 save/restore are reached
+	vkvg_clip_state_t    curClipState; // current clipping status relative to the previous saved one or clear state if
+	// none.
+
+	VkClearRect           clearRect;
+	VkRenderPassBeginInfo renderPassBeginInfo;
+};
+
+void _flush_cmd_buff0(VkvgContext ctx) {
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	if (!ctx->cmdStarted)
+		return;
+	_end_render_pass(ctx);
+	LOG(VKVG_LOG_INFO, "FLUSH CTX: ctx = %p; vertices = %d; indices = %d\n", ctx, ctx->vertCount, ctx->indCount);
+	_flush_vertices_caches(ctx);
+	vkh_cmd_end(ctx->cmd);
+
+	_wait_and_submit_cmd(ctx);
+}

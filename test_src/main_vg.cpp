@@ -438,7 +438,7 @@ void testgui() {
 		vkvg_pattern_add_color_stop(sg, 0.0, yellow, 1);
 		float xf = 1.0 / (sgw * 2.0);
 		float txf = xf;
-		for (size_t i = 0; i < sgw ; i++)
+		for (size_t i = 0; i < sgw; i++)
 		{
 			vkvg_pattern_add_color_stop(sg, txf, 1, 0.5, 0, 1);
 			txf += xf;

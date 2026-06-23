@@ -3374,7 +3374,8 @@ int rvg_data_cx::update()
 			return 0;
 		}
 	}
-	if (!dcv_p)return 0;
+	if (!dcv_p)
+		return 0;
 	//auto ddp = ac->new_mem<gdata_ptr>(dcc);
 	dcv_c = dcc;
 	up = true;
@@ -3476,7 +3477,6 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 	std::stack<translate_cc> stt = {};
 	translate_cc tcc = {};
 	glm::ivec2 lpos = {};
-
 	for (size_t i = 0; i < length; i++)
 	{
 		auto ct = pct[i];
@@ -3560,15 +3560,17 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 		{
 			ctx_end(it.ctx);
 			vkvg_surface_resolve((VkvgSurface)it.surface);
-			if (first)
-			{
-				std::string str = "temp/vgtest-" + std::to_string(ki++) + ".png";
-				vkvg_surface_write_to_png((VkvgSurface)it.surface, str.c_str());
-			}
+			//if (first)
+			//{
+			//	std::string str = "temp/vgtest-" + std::to_string(ki++) + ".png";
+			//	vkvg_surface_write_to_png((VkvgSurface)it.surface, str.c_str());
+			//}
 		}
 		dra->update_surface((VkvgSurface)it.surface);
 	}
+
 	mrt_build(dst->mrt);
+
 	dra->update_text((rich_text_t*)dst->mrt, 0);
 	for (auto& it : dst->dst_data) {
 		if (it.type == 0)

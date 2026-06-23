@@ -7,6 +7,7 @@
 */
 
 #include "pch1.h"
+#include "ntype.h"
 #include "vg.h"
 #include "mapView.h"
 #include <stb_image.h>
@@ -89,6 +90,7 @@ bool stbimage_load::load_mem(const char* d, size_t s)
 
 #ifndef NO_FLEX_IMP
 
+
 class flex_item :public flex_data
 {
 public:
@@ -99,13 +101,14 @@ public:
 	float frame[4] = {};	// 输出坐标、大小
 	flex_item* parent = 0;	// 父级
 	size_t line_count = 0;
-	std::vector<flex_item*>* children = 0;	// 子级 
-	std::vector<char> temp_layout;
+	vg_vector<flex_item*> children;	// 子级  
+	vg_vector<char> temp_layout;
+	hz::usp_ac* ac = 0;
 public:
 	flex_item();
 	~flex_item();
 
-	flex_item* init();
+	void init(hz::usp_ac* pac);
 	void setdata(flex_data* d);
 	void update_should_order_children();	// 子元素属性改变时执行
 
@@ -126,11 +129,7 @@ flex_item::flex_item()
 {}
 
 flex_item::~flex_item()
-{
-	if (children)
-		delete children;
-	children = 0;
-}
+{}
 
 
 
@@ -141,16 +140,16 @@ void flex_item::update_should_order_children()
 	}
 }
 
-flex_item* flex_item::init()
+void flex_item::init(hz::usp_ac* pac)
 {
-	flex_item* item = this;
-	assert(item != NULL);
-	*item = {};
-	item->parent = NULL;
-	if (item->children)
-		item->children->clear();
-	item->should_order_children = true;
-	return item;
+	ac = pac;
+	children.ac = ac;
+	temp_layout.ac = ac;
+	children.clear();
+	temp_layout.clear();
+	parent = NULL;
+	should_order_children = true;
+	return;
 }
 
 void flex_item::setdata(flex_data* d)
@@ -158,14 +157,10 @@ void flex_item::setdata(flex_data* d)
 	*((flex_data*)this) = *d;
 }
 
-
 void flex_item::item_add(flex_item* child)
 {
 	flex_item* item = this;
-	if (!item->children) {
-		item->children = new std::vector<flex_item*>();
-	}
-	item->children->push_back(child);
+	children.push_back(child);
 	child->parent = item;
 	should_order_children = true;
 	child->update_should_order_children();
@@ -175,11 +170,7 @@ void flex_item::item_add(flex_item* child)
 void flex_item::item_insert(uint32_t index, flex_item* child)
 {
 	flex_item* item = this;
-	if (!item->children) {
-		item->children = new std::vector<flex_item*>();
-	}
-	assert(index <= item->children->size());
-	item->children->insert(item->children->begin() + index, child);
+	children.insert(index, child);
 	child->parent = item;
 	child->update_should_order_children();
 }
@@ -187,31 +178,35 @@ void flex_item::item_insert(uint32_t index, flex_item* child)
 
 flex_item* flex_item::item_delete(uint32_t index)
 {
-	flex_item* item = this;
-	if (!children || children->empty())return nullptr;
-	assert(index < item->children->size());
-	assert(item->children->size() > 0);
-	auto& v = *children;
-	flex_item* child = v[index];
-	children->erase(children->begin() + index);
+	flex_item* child = children.data()[index];
+	children.erase(index);
+	if (child)
+		child->parent = 0;
 	return child;
 }
 
-flex_item* flex_item::detach(flex_item* child)
+flex_item* flex_item::detach(flex_item* c)
 {
-	flex_item* item = this;
-	if (!children || !child || !(item->children->size() > 0))return child;
-	auto& v = *children;
-	v.erase(std::remove(v.begin(), v.end(), child), v.end());
-	child->parent = NULL;
+	size_t i = 0;
+	flex_item* child = 0;
+	auto p = children.data();
+	for (i = 0; i < children._size; i++)
+	{
+		if (p[i] == c)
+		{
+			child = c;
+			break;
+		}
+	}
+	children.erase(i);
+	if (child)
+		child->parent = 0;
 	return child;
 }
 
 void flex_item::clear()
 {
-	if (children && children->size()) {
-		children->clear();
-	}
+	children.clear();
 }
 
 
@@ -325,8 +320,8 @@ void layout_init(flex_item* item, float width, float height, struct flex_layout*
 	}
 
 	//layout->ordered_indices.clear();
-	if (item->children && item->should_order_children && item->children->size() > 0) {
-		item->temp_layout.resize(item->children->size() * (sizeof(flex_layout::flex_layout_line) + sizeof(uint32_t)));
+	if (item->should_order_children && item->children.size() > 0) {
+		item->temp_layout.resize(item->children.size() * (sizeof(flex_layout::flex_layout_line) + sizeof(uint32_t)));
 		layout->ordered_indices = (uint32_t*)item->temp_layout.data();
 		auto indices = layout->ordered_indices;
 		assert(indices != NULL);
@@ -335,8 +330,8 @@ void layout_init(flex_item* item, float width, float height, struct flex_layout*
 		// stability (insertion order must be preserved) and cross-platform
 		// support. We should eventually switch to merge sort (or something
 		// else) if the number of items becomes significant enough.
-		auto& icv = *item->children;
-		for (uint32_t i = 0; i < item->children->size(); i++) {
+		auto icv = item->children.data();
+		for (uint32_t i = 0; i < item->children.size(); i++) {
 			indices[i] = i;
 			for (uint32_t j = i; j > 0; j--) {
 				uint32_t prev = indices[j - 1];
@@ -368,15 +363,15 @@ void layout_init(flex_item* item, float width, float height, struct flex_layout*
 	}
 
 	layout->need_lines = layout->wrap && item->align_content != flex_align::ALIGN_START;
-	layout->lines = (flex_layout::flex_layout_line*)(item->temp_layout.data() + sizeof(uint32_t) * item->children->size());
+	layout->lines = (flex_layout::flex_layout_line*)(item->temp_layout.data() + sizeof(uint32_t) * item->children.size());
 	layout->lines_idx = 0;
 	layout->lines_idx0 = 1;
 	layout->lines_sizes = 0;
 	auto align_items = child_align(item, item->parent);
-	if (align_items == flex_align::ALIGN_BASELINE && item->children)
+	if (align_items == flex_align::ALIGN_BASELINE)
 	{
 		layout->baseline = 0;
-		for (auto& it : *item->children) {
+		for (auto& it : item->children) {
 			layout->baseline = std::max(layout->baseline, it->baseline);
 		}
 	}
@@ -401,7 +396,8 @@ void layout_cleanup(struct flex_layout* layout)
     } \
     while (0)
 
-#define LAYOUT_CHILD_AT(item, i) ((*item->children)[(layout->ordered_count ? layout->ordered_indices[i] : i)])
+#define LAYOUT_CHILD_AT(item, i) (item->children[(layout->ordered_count ? layout->ordered_indices[i] : i)])
+//#define LAYOUT_CHILD_AT(item, i) ((*item->children)[(layout->ordered_count ? layout->ordered_indices[i] : i)])
 //#define LAYOUT_CHILD_AT(item, i) ((*item->children)[(layout->ordered_indices.size() ? layout->ordered_indices[i] : i)])
 //#define LAYOUT_CHILD_AT(item, i) (item->children.ary[(layout->ordered_indices != NULL ? layout->ordered_indices[i] : i)])  
 
@@ -616,7 +612,7 @@ void flex_item::layout_items(uint32_t child_begin, uint32_t child_end, uint32_t 
 void flex_item::layout_item(float width, float height)
 {
 	flex_item* item = this;
-	if (!item->children || item->children->size() == 0) {
+	if (item->children.size() == 0) {
 		return;
 	}
 
@@ -627,7 +623,7 @@ void flex_item::layout_item(float width, float height)
 	uint32_t last_count = 0;
 	uint32_t last_layout_child = 0;
 	uint32_t relative_children_count = 0;
-	for (uint32_t i = 0; i < item->children->size(); i++) {
+	for (uint32_t i = 0; i < item->children.size(); i++) {
 		flex_item* child = LAYOUT_CHILD_AT(item, i);
 
 		// Items with an absolute position have their frames determined
@@ -762,7 +758,7 @@ void flex_item::layout_item(float width, float height)
 	}
 
 	// Layout remaining items in wrap mode, or everything otherwise.
-	item->layout_items(last_layout_child, item->children ? item->children->size() : 0, relative_children_count, layout, last_count);
+	item->layout_items(last_layout_child, item->children.size(), relative_children_count, layout, last_count);
 
 	// In wrap mode we may need to tweak the position of each line according to
 	// the align_content property as well as the cross-axis size of items that
@@ -841,19 +837,41 @@ void flex_item::layout()
 	assert(self_sizing == NULL);
 	layout_item(width, height);
 }
-glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count)
+struct flex_ctx {
+	std::vector<flex_item> items;
+	std::stack<node_dt*> q;
+	hz::usp_ac* ac = 0;
+};
+flex_ctx* new_flex_ctx() {
+	auto p = new flex_ctx();
+	return p;
+}
+void free_flex_ctx(flex_ctx* p) {
+	if (p)delete p;
+}
+void* flex_ctx_ac(flex_ctx* p) {
+	return p ? p->ac : 0;
+}
+void flex_ctx_set_ac(flex_ctx* p, hz::usp_ac* a) {
+	p->ac = a;
+}
+glm::vec4 flex_layout_calc(flex_data* fd, size_t count, node_dt* p, size_t node_count, flex_ctx* ctx)
 {
 	glm::vec4 rect = {};
-	if (!fd || count == 0 || !p || !node_count || !p->child || !p->child_count)
+	if (!fd || count == 0 || !p || !node_count || !p->child || !p->child_count || !ctx)
 		return rect;
-	std::vector<flex_item> items(node_count);
+	auto& items = ctx->items;
+	items.resize(node_count);
 	auto fitem = items.data();
 	if (!fitem) return rect;
 	for (size_t i = 0; i < node_count; i++) {
-		fitem[i].init();
+		fitem[i].init(ctx->ac);
 	}
 	size_t idx = 0;
-	std::stack<node_dt*> q;  // 队列存储待处理坐标 	 
+	auto q = ctx->q;  // 队列存储待处理坐标 
+	while (q.size()) {
+		q.pop();
+	}
 	q.push(p);
 	p->tidx = idx;
 	while (q.size()) {

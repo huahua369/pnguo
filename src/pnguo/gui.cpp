@@ -2366,6 +2366,10 @@ div_cx::div_cx()
 
 div_cx::~div_cx()
 {
+	auto ac = (hz::usp_ac*)flex_ctx_ac(lctx);
+	free_flex_ctx(lctx);
+	if (ac)
+		delete ac;
 	for (auto p : widgets)
 	{
 		if (p && p->_autofree)
@@ -3150,7 +3154,8 @@ glm::vec2 get_margin_size(flex_data* c) {
 	return m;
 }
 // 计算一行布局，range为当前行的控件起始索引和数量，tempfv为临时使用的数组
-glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ivec2& box_size, flex_data* boxflex, flex_data* flex_child, const glm::ivec2& pos, std::vector<node_dt>& tempfv)
+glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ivec2& box_size, flex_data* boxflex, flex_data* flex_child
+	, const glm::ivec2& pos, std::vector<node_dt>& tempfv, flex_ctx* ctx)
 {
 	int count = range.y;
 	tempfv.resize(count + 1);
@@ -3191,7 +3196,7 @@ glm::vec2 calc_line_layout(widget_t** p, const glm::ivec2& range, const glm::ive
 		cp[i].size = it->get_size() + margin_size;
 		cp[i].position = it->_absolute ? 1 : 0;
 	}
-	auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1);
+	auto nrc = flex_layout_calc(tf, 2, fnode, fnode->child_count + 1, ctx);
 	for (size_t y = 0; y < fnode->child_count; y++)
 	{
 		auto t0 = fnode->child + y;
@@ -3213,15 +3218,19 @@ void div_cx::clayout()
 	valid = true;
 	widget_t** p = widgets.data();
 	glm::vec2 pos = {};
+	if (!lctx) {
+		lctx = new_flex_ctx();
+		flex_ctx_set_ac(lctx, new hz::usp_ac());
+	}
 	if (lines.empty())
 	{
 		// 竖排
-		calc_line_layout(p, { 0,widgets.size() }, { _size.x,_size.y }, &flex, &flex_child, pos, tempfv);
+		calc_line_layout(p, { 0,widgets.size() }, { _size.x,_size.y }, &flex, &flex_child, pos, tempfv, lctx);
 	}
 	else {
 		for (auto& it : lines)
 		{
-			auto cs = calc_line_layout(p, it, { _size.x,_size.y }, &flex, &flex_child, pos, tempfv);
+			auto cs = calc_line_layout(p, it, { _size.x,_size.y }, &flex, &flex_child, pos, tempfv, lctx);
 			pos.y += cs.y;
 		}
 	}
