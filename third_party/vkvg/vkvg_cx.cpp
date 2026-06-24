@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "vkvg_device_internal.h"
+#include "vkvg_device_internal0.h"
 #include "vkvg_context_internal.h"
 #include "vkvg_surface_internal.h"
 #include "vkvg_pattern.h"
@@ -113,7 +113,7 @@ void _linux_register_error_handler() {
 
 
 // vk
-
+#if 1
 PFN_vkCmdBindPipeline       CmdBindPipeline;
 PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets;
 PFN_vkCmdBindIndexBuffer    CmdBindIndexBuffer;
@@ -131,11 +131,10 @@ PFN_vkCmdSetViewport           CmdSetViewport;
 PFN_vkCmdSetScissor            CmdSetScissor;
 
 PFN_vkCmdPushConstants CmdPushConstants;
-
 PFN_vkWaitForFences      WaitForFences;
 PFN_vkResetFences        ResetFences;
 PFN_vkResetCommandBuffer ResetCommandBuffer;
-
+#endif
 #include "shaders/vkvg_main.frag.h"
 
 
@@ -2274,17 +2273,21 @@ bool _wait_ctx_flush_end(VkvgContext ctx) {
 	bool ret = false;
 	c_runtime_cx rtc;
 	rtc.begin();
-	auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
-
+	VkResult st = {};
 #ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	ret = (vkh_timeline_wait((VkhDevice)&ctx->dev->vkDev, ctx->pSurf->timeline, ctx->timelineStep) == VK_SUCCESS);
-
 #else
-	ret = (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS);
+	do
+	{
+		st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
+	} while (0);
+	ret = !st;
+	if (st)
+		ret = (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS);
 #endif
 	int ms = rtc.end();
-	//if (ms > 0)
-	//	printf("wait ms: %d\n", ms);
+	if (ms > 0)
+		printf("wait ms: %d\n", ms);
 	if (!ret) {
 		LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
 		ctx->status = VKVG_STATUS_TIMEOUT;
@@ -2669,17 +2672,28 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 	case VKVG_PATTERN_TYPE_RADIAL:
 	case VKVG_PATTERN_TYPE_SWEEP:
 		_flush_cmd_buff(ctx);
-		auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
-		if (st)
-		{
-			c_runtime_cx rtc;
-			rtc.begin();
-			if (!_wait_ctx_flush_end(ctx))
-				return;
-			int ms = rtc.end();
-			//if (ms > 0)
-			//	printf("pattern wait ms: %d\n", ms);
-		}
+		if (!_wait_ctx_flush_end(ctx))
+			return;
+		//c_runtime_cx rtc;
+		//rtc.begin();
+		//if (1) {
+		//	VkResult st = {};
+		//	do
+		//	{
+		//		st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
+		//	} while (st);
+		//}
+		//else {
+		//	auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
+		//	if (st)
+		//	{
+		//		if (!_wait_ctx_flush_end(ctx))
+		//			return;
+		//	}
+		//}
+		//int ms = rtc.end();
+		//if (ms > 0)
+		//	printf("pattern wait ms: %d\n", ms);
 		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
 			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
 

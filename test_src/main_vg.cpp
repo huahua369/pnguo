@@ -1,4 +1,11 @@
-﻿
+﻿/*
+
+_start_cmd_for_render_pass
+_clip_preserve
+_fill_preserve
+_stroke_preserve
+
+*/
 #include <pch1.h> 
 #include <vg.h>
 #include <render.h>
