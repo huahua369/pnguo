@@ -16,6 +16,10 @@ struct vg_vector {
 	hz::usp_ac* ac = 0;
 
 	~vg_vector() {
+		allfree();
+	}
+
+	void allfree() {
 		if (a && cap)
 		{
 			ac->free_mem0(a, sizeof(T) * cap);

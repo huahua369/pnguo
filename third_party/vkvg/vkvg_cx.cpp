@@ -47,6 +47,11 @@ extern "C" {
 #endif
 #include "vkvg_cx.h"
 #include <pnguo/print_time.h> 
+
+#ifdef max
+#undef max
+#endif
+
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
@@ -2674,33 +2679,10 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 		_flush_cmd_buff(ctx);
 		if (!_wait_ctx_flush_end(ctx))
 			return;
-		//c_runtime_cx rtc;
-		//rtc.begin();
-		//if (1) {
-		//	VkResult st = {};
-		//	do
-		//	{
-		//		st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
-		//	} while (st);
-		//}
-		//else {
-		//	auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
-		//	if (st)
-		//	{
-		//		if (!_wait_ctx_flush_end(ctx))
-		//			return;
-		//	}
-		//}
-		//int ms = rtc.end();
-		//if (ms > 0)
-		//	printf("pattern wait ms: %d\n", ms);
 		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
 			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
-
-		vec4 bounds = { {(float)ctx->pSurf->width},
-								  {(float)ctx->pSurf->height},
-								  {0},
-								  {0} }; // store img bounds in unused source field
+		float fm = std::max((float)ctx->pSurf->width, (float)ctx->pSurf->height);
+		vec4 bounds = { fm,fm,0.0f,0.0f }; // store img bounds in unused source field
 		ctx->pushConsts.source = bounds;
 		// transform control point with current ctx matrix 
 		vkvg_gradient_t grad = *(vkvg_gradient_t*)pat->data;

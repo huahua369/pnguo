@@ -3596,7 +3596,10 @@ drawable_cx::~drawable_cx()
 	}
 	_dobj.clear();
 	if (ac)
+	{
+		opt.allfree();  idx.allfree();
 		delete ac; ac = 0;
+	}
 }
 
 void drawable_cx::init(texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)

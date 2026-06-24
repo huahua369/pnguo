@@ -322,8 +322,7 @@ vec4 gpu_sample_mesh(vec2 renderCoord, vec2 box, int stop_count, int extend)
  */
 vec4 gpu_paint(vec2 renderCoord)
 {
-	float bmax = max(inSrc.x, inSrc.y);	// 画布大小
-	vec2 box = vec2(bmax, bmax);		// 最大边界
+	vec2 box = inSrc.xy; 	// 画布大小,一般用最大值
 	box *= uboGrad.scale;
 	renderCoord = renderCoord / box;
 	vec4 acc = vec4(0.0);
