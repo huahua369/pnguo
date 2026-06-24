@@ -1556,7 +1556,7 @@ image_sliced_t new_rect(const rect_shadow_t& rs)
 }
 #endif
 
-void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, std::vector<text_vx>* opt, std::vector<uint32_t>* idx)
+void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, t_vector<text_vx>* opt, t_vector<uint32_t>* idx)
 {
 	// 1. 计算矩形顶点（像素坐标）
 	glm::ivec2 A = glm::ivec2(rc.x, rc.y); // 左下

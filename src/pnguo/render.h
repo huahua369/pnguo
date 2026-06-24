@@ -803,7 +803,7 @@ public:
 	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
 	std::map<void*, void*> _vgt;
-	std::vector<text_vx> opt; std::vector<uint32_t> idx;
+	t_vector<text_vx> opt; t_vector<uint32_t> idx;
 	vkvg_dev* _vgdev = 0;
 	vkvg_func_t* vgcb = 0;
 	texture_cb* rcb = 0;	// 渲染器接口
