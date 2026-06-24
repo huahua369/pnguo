@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <stack>
+
 #include "vkvg.h"
 
 #include <clipper2/clipper.h> 
@@ -33,7 +34,6 @@ VK_DEFINE_HANDLE(VkQueue)
 namespace hz {
 	class usp_ac;
 }
-
 
 
 extern "C" {
@@ -803,7 +803,8 @@ public:
 	// 文本渲染用
 	std::map<image_ptr_t*, void*> _vt;
 	std::map<void*, void*> _vgt;
-	t_vector<text_vx> opt; t_vector<uint32_t> idx;
+	vg_vector<text_vx> opt; vg_vector<uint32_t> idx;
+	hz::usp_ac* ac = 0;
 	vkvg_dev* _vgdev = 0;
 	vkvg_func_t* vgcb = 0;
 	texture_cb* rcb = 0;	// 渲染器接口

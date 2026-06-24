@@ -69,6 +69,23 @@ struct vg_vector {
 		a[index] = val;
 		_size++;
 	}
+	void insert(size_t index, const T* first, const T* end) {
+		if (index > _size)index = _size;
+		if (!first || !end || first >= end) return;  // 允许在末尾插入
+		size_t n = end - first;
+		if (_size + n >= cap) {
+			grow();
+		}
+		auto t = first;
+		// 将index及之后的元素整体后移一位
+		memmove(&a[index + n], &a[index], (_size - index) * sizeof(T));
+		for (size_t i = 0; i < n; i++)
+		{
+			a[index + i] = *t;
+			t++;
+		}
+		_size += n;
+	}
 	void erase(size_t index) {
 		if (index >= _size) return;
 		// 将index之后的元素整体前移一位

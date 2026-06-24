@@ -1556,7 +1556,7 @@ image_sliced_t new_rect(const rect_shadow_t& rs)
 }
 #endif
 
-void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, t_vector<text_vx>* opt, t_vector<uint32_t>* idx)
+void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::ivec4& rc, const glm::ivec2& dsize, uint32_t color, vg_vector<text_vx>* opt, vg_vector<uint32_t>* idx)
 {
 	// 1. 计算矩形顶点（像素坐标）
 	glm::ivec2 A = glm::ivec2(rc.x, rc.y); // 左下
@@ -1591,13 +1591,12 @@ void gen3data(const glm::ivec2& tex_size, const glm::ivec2& dst_pos, const glm::
 	glm::vec4 c = ucolor2f(color);
 	// 5. 生成顶点数组（4顶点，32个浮点数）
 	uint32_t ps = opt->size();
-	opt->reserve(ps + 4);
-	idx->reserve(idx->size() + 6);
-	opt->push_back(text_vx{ A1 ,A_norm , c });
-	opt->push_back(text_vx{ B1 ,B_norm , c });
-	opt->push_back(text_vx{ C1 ,C_norm , c });
-	opt->push_back(text_vx{ D1 ,D_norm , c });
-	idx->insert(idx->end(), { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 });
+	//opt->reserve(ps + 4);
+	//idx->reserve(idx->size() + 6);
+	text_vx v[4] = { { B1 ,B_norm , c }, { C1 ,C_norm , c }, { D1 ,D_norm , c }, { A1 ,A_norm , c } };
+	opt->insert(-1, v, v + 4);
+	uint32_t indexs[] = { ps + 0,ps + 1,ps + 2,ps + 0,ps + 2,ps + 3 };
+	idx->insert(-1, indexs, indexs + 6);
 	return;
 }
 
@@ -3581,7 +3580,12 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 }
 
 drawable_cx::drawable_cx()
-{}
+{
+	ac = new hz::usp_ac();
+	if (ac) {
+		opt.ac = ac; idx.ac = ac;
+	}
+}
 
 drawable_cx::~drawable_cx()
 {
@@ -3591,6 +3595,8 @@ drawable_cx::~drawable_cx()
 		delete v;
 	}
 	_dobj.clear();
+	if (ac)
+		delete ac; ac = 0;
 }
 
 void drawable_cx::init(texture_cb* cb, const glm::ivec4& view, vkvg_dev* vgdev)
