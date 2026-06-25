@@ -548,9 +548,12 @@ namespace vkg {
 		pDp->AddDeviceExtensionName(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
 		pDp->AddDeviceExtensionName({ VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 			VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,							// 支持yuv纹理采样
-			VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+			//VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 			VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
-			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME });
+			VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+			VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+			VK_KHR_MAINTENANCE_5_EXTENSION_NAME
+			});
 		pDp->AddDeviceExtensionName({
 			// mesh shader
 			 VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,VK_EXT_MESH_SHADER_EXTENSION_NAME,VK_KHR_SPIRV_1_4_EXTENSION_NAME,
@@ -559,8 +562,8 @@ namespace vkg {
 			 // dynamic_rendering
 			 // The sample uses the extension (instead of Vulkan 1.2, where dynamic rendering is core)
 			 VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-			 VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
-			 VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
+			 //VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
+			 //VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
 			 VK_KHR_MULTIVIEW_EXTENSION_NAME,
 			 VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
 			 VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
@@ -1111,6 +1114,7 @@ namespace vkg {
 		bool robustness_2 = pDp->has_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 		bool descriptor_heap = pDp->IsExtensionPresent(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
 		bool bds = pDp->has_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+		bool pushset = pDp->has_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 		VkPhysicalDeviceRobustness2FeaturesEXT robustness2 = {};
 		robustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
 		robustness2.nullDescriptor = VK_TRUE;
@@ -1192,6 +1196,12 @@ namespace vkg {
 				px->is_newdevice = true;
 		}
 		if (!px->_device)return;
+		//PFN_vkCmdPushDescriptorSet pdset = nullptr;
+		//PFN_vkCmdPushDescriptorSetKHR pdsetKhr = nullptr;
+		//if (pushset) {
+		//	pdset = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSet");
+		//	pdsetKhr = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSetKHR");
+		//}
 		//if (dr)
 		//{
 		//	_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdBeginRenderingKHR");
