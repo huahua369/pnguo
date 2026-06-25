@@ -5182,9 +5182,7 @@ VkvgPattern vkvg_pattern_create_linear(float x0, float y0, float x1, float y1) {
 	}
 	pat->type = VKVG_PATTERN_TYPE_LINEAR;
 	pat->extend = VKVG_EXTEND_NONE;
-
 	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
-
 	if (pat->data) {
 		vkvg_pattern_edit_linear(pat, x0, y0, x1, y1);
 		pat->references = 1;
@@ -5192,7 +5190,6 @@ VkvgPattern vkvg_pattern_create_linear(float x0, float y0, float x1, float y1) {
 	else {
 		pat->status = VKVG_STATUS_PATTERN_INVALID_GRADIENT;
 	}
-
 	return pat;
 }
 vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
@@ -5219,6 +5216,7 @@ vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, fl
 	if (is_ellipse)grad->scale.x *= 2;
 	return VKVG_STATUS_SUCCESS;
 }
+
 // circle 或 ellipse
 VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
 	VkvgPattern pat = (vkvg_pattern_t*)calloc(1, sizeof(vkvg_pattern_t));
@@ -5229,7 +5227,6 @@ VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, floa
 	pat->type = VKVG_PATTERN_TYPE_RADIAL;
 	pat->extend = VKVG_EXTEND_NONE;
 	pat->data = (void*)calloc(1, sizeof(vkvg_gradient_t));
-
 	if (pat->data) {
 		vkvg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
 		pat->references = 1;
@@ -5238,16 +5235,17 @@ VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, floa
 		pat->status = VKVG_STATUS_NO_MEMORY;
 	return pat;
 }
+
 VkvgPattern vkvg_pattern_create_radial(float cx0, float cy0, float radius0, float cx1, float cy1, float radius1)
 {
 	return vkvg_pattern_create_radial(cx0, cy0, radius0, cx1, cy1, radius1, false);
 }
+
 vkvg_status_t vkvg_pattern_edit_sweep(VkvgPattern pat, float cx, float cy, float start_angle, float end_angle) {
 	if (vkvg_pattern_status(pat))
 		return vkvg_pattern_status(pat);
 	if (pat->type != VKVG_PATTERN_TYPE_SWEEP)
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
-
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
 	grad->cp[0] = vec4{ cx, cy, start_angle, end_angle };
 	grad->m = ivec4(1024, 0, 0, 1024);
@@ -5306,6 +5304,32 @@ vkvg_status_t vkvg_pattern_set_color_stop(VkvgPattern pat, int idx, float r, flo
 	//#endif
 	vkvg_color_t c = { r, g, b, a };
 	grad->colors[idx] = c;
+	return VKVG_STATUS_SUCCESS;
+}
+
+ivec4 rota2x2(int r) {
+	// 角度转弧度 
+	float rad = r * 0.01745329251994329576923690768489;
+	// 计算余弦和正弦 
+	float c = cos(rad);
+	float s = sin(rad);
+	// 构造2x2旋转矩阵（列主序），各元素乘1024并取整 
+	int a = static_cast<int>(round(c * 1024.0f));
+	int b = static_cast<int>(round(-s * 1024.0f));
+	int c1 = static_cast<int>(round(s * 1024.0f));
+	int d = static_cast<int>(round(c * 1024.0f));
+	// 列主序布局：mat = [ a, c, b, d ]
+	// 转置后：逆矩阵 = [ a, b, c, d ] → 交换第 1 和第 2 个分量的位置 
+	return ivec4(a, b, c1, d);
+}
+vkvg_status_t vkvg_pattern_set_rotate(VkvgPattern pat, int angle) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	if (!grad)return VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+	grad->m = rota2x2(angle);
 	return VKVG_STATUS_SUCCESS;
 }
 vkvg_status_t vkvg_pattern_set_color_stop_offset(VkvgPattern pat, int idx, float offset) {

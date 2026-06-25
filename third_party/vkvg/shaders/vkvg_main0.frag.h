@@ -122,17 +122,44 @@ vec2 gpu_apply_minv(ivec4 m, vec2 v)
 vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	vec4 t0 = uboGrad.cp[0];
-	//ivec4 m = ivec4(1024, 0, 0, 1024);
 	vec2 p0_r = vec2(t0.xy / box);
 	vec2 d = vec2(t0.zw / box);
 	float denom = dot(d, d);
 	if (denom < 1e-6) return vec4(0.0);
 	ivec4 m = uboGrad.m;
-	vec2 p = gpu_apply_minv(m, renderCoord - p0_r);
-	//vec2 p = renderCoord - p0_r;
+	vec2 p = renderCoord - p0_r;
+	p = gpu_apply_minv(m, p);
 	float t = dot(p, d) / denom;
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
+
+	//float dist = 1;
+	//vec2 p0 = uboGrad.cp[0].xy / box;
+	//vec2 p1 = uboGrad.cp[0].zw / box;
+	//vec2 p = renderCoord;
+
+	//float l = length(p1 - p0);
+	//vec2 u = normalize(p1 - p0);
+
+	//if (u.y == 0)
+	//	if (u.x < 0)
+	//		dist = -(p.x - p0.x) / l;
+	//	else
+	//		dist = (p.x - p0.x) / l;
+	//else {
+	//	float m = -u.x / u.y;
+	//	float bb = p0.y - m * p0.x;
+	//	dist = ((p.y - m * p.x - bb) / sqrt(1 + m * m)) / l;
+	//	if (u.y < 0)
+	//		dist = -dist;
+	//}
+
+	//dist = gpu_extend_t(dist, extend);
+	//return gpu_eval_stops(stop_count, dist);
+	//vec4 c = mix(uboGrad.colors[0], uboGrad.colors[1], mix(COLORSTOP(0), COLORSTOP(1), dist));//smoothstep
+	//for (int i = 1; i < uboGrad.count - 1; ++i)
+	//	c = mix(c, uboGrad.colors[i + 1], mix(COLORSTOP(i), COLORSTOP(i + 1), dist));
+	//return c;
 }
 /* Sample a two-circle radial gradient whose param blob starts at
  * @grad_base:
@@ -149,12 +176,11 @@ vec4 gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend
 	ivec4 m = uboGrad.m;
 	vec2 c0_r = uboGrad.cp[0].xy / box;
 	vec2 cd = uboGrad.cp[1].xy / box;
-	float r0 = uboGrad.cp[0].z / box.x;
-	float r1 = uboGrad.cp[1].z / box.y;
-	//renderCoord *= box;
+	float r0 = uboGrad.cp[0].z;
+	float r1 = uboGrad.cp[1].z;
 	float dr = r1 - r0;
-	vec2 p = gpu_apply_minv(m, normalize(renderCoord - c0_r));
-	//vec2 p = normalize(renderCoord - c0_r);
+	vec2 p = (renderCoord - c0_r);
+	p = gpu_apply_minv(m, p);
 
 	float A = dot(cd, cd) - dr * dr;
 	float B = -2.0 * (dot(p, cd) + r0 * dr);
@@ -227,8 +253,8 @@ vec4 gpu_sample_sweep(vec2 renderCoord, vec2 box, int stop_count, int extend)
 	float a1 = t0.w;
 	float span = a1 - a0;
 	if (abs(span) < 1e-6) return vec4(0.0);
-	vec2 p = gpu_apply_minv(m, renderCoord - p0);
-	//vec2 p = (renderCoord - p0);
+	vec2 p = normalize(renderCoord - p0);
+	p = gpu_apply_minv(m, p);
 	/* atan2 returns (-pi, pi]; normalize to [0, 2) fractions of pi. */
 	float ang = atan(p.y, p.x) / 3.14159265358979;
 	if (ang < 0.0) ang += 2.0;  // 归一化到 [0, 2]

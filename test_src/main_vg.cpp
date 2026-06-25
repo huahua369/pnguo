@@ -407,6 +407,7 @@ void testgui() {
 		const char* filename = "temp/vkvg_gradient.png";
 		auto cr = vkvg_create(surf);
 		vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
+		//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
 		VkvgPattern pat;
 		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
 		vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
@@ -415,10 +416,12 @@ void testgui() {
 		vkvg_set_source(cr, pat);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
-		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+		pat = vkvg_pattern_create_linear(0.0, 128.0, 256, 256.0); 
+		//vkvg_pattern_set_rotate(pat, 179);
+	 
 		vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);// 预乘后蓝
 		vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
-		vkvg_rectangle(cr, 130, 0, 128, 256);
+		vkvg_rectangle(cr, 130, 0, 256, 256);
 		vkvg_set_source(cr, pat);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);

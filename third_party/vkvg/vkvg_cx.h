@@ -11,6 +11,7 @@ vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, fl
 VkvgPattern vkvg_pattern_create_sweep(float cx, float cy, float start_angle, float end_angle);
 // 设置缩放box比例
 vkvg_status_t vkvg_pattern_set_scale(VkvgPattern pat, float scale_x, float scale_y);
+vkvg_status_t vkvg_pattern_set_rotate(VkvgPattern pat, int angle);
 
 #ifndef vkvg_pattern_add_color_stop_rgba
 #define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop

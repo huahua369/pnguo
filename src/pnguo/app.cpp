@@ -681,8 +681,10 @@ size_t app_x::run()
 				if (p && p->uct > 0)
 				{
 					p->set_state();	// 清空/设置交换链接状态 
-					p->_dom ? p->_dom->cmd_draw() : 0;
-					p->present();
+					if (p->is_render) {
+						p->_dom ? p->_dom->cmd_draw() : 0;
+						p->present();
+					}
 				}
 			}
 			if (!r3d && view)
