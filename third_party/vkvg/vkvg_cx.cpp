@@ -52,7 +52,7 @@ extern "C" {
 #ifdef max
 #undef max
 #endif
-
+//#include <vg.h>
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
@@ -7772,6 +7772,198 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 	//if (lastPat)
 	//	vkvg_pattern_destroy(lastPat);
 }
+#if 0
+void a_fill_non_zero(uint32_t color) {
+	Vertex v = { {0}, color, {0, 0, -1} };
+	vec2* points;     // points array 
+	uint32_t pointCount; // effective points count
+	uint32_t  pathPtr; // pointer in the path array
+	uint32_t* pathes;
+	uint32_t  sizePathes;
+	vg_vector<ear_clip_point> ecpsd;
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+	VKVG_IBO_INDEX_TYPE cur_idx = 0;
+
+	while (ptrPath < pathPtr) {
+		uint32_t pathPointCount = pathes[ptrPath] & PATH_ELT_MASK;
+
+		if (pathPointCount > 2) {
+			VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)cur_idx;
+			ecpsd.reserve(ecpsd.cap * 2);
+			ecpsd.resize(pathPointCount);
+			auto ecps = ecpsd.data();
+			if (!ecps)break;
+			uint32_t            ecps_count = pathPointCount;
+			VKVG_IBO_INDEX_TYPE i = 0;
+
+			// init points link list
+			while (i < pathPointCount - 1) {
+				v.pos = points[i + firstPtIdx];
+				ear_clip_point ecp = { v.pos, firstVertIdx + i, &ecps[i + 1] };
+				ecps[i] = ecp;
+				_add_vertex(ctx, v);
+				i++;
+			}
+
+			v.pos = points[i + firstPtIdx];
+			ear_clip_point ecp = { v.pos, firstVertIdx + i, ecps };
+			ecps[i] = ecp;
+			_add_vertex(ctx, v);
+
+			ear_clip_point* ecp_current = ecps;
+			uint32_t        tries = 0;
+
+			while (ecps_count > 3) {
+				if (tries > ecps_count) {
+					break;
+				}
+				ear_clip_point* v0 = ecp_current->next, * v1 = ecp_current, * v2 = ecp_current->next->next;
+				if (ecp_zcross(v0, v2, v1) < 0) {
+					ecp_current = ecp_current->next;
+					tries++;
+					continue;
+				}
+				ear_clip_point* vP = v2->next;
+				bool            isEar = true;
+				while (vP != v1) {
+					if (ptInTriangle(vP->pos, v0->pos, v2->pos, v1->pos)) {
+						isEar = false;
+						break;
+					}
+					vP = vP->next;
+				}
+				if (isEar) {
+					_add_triangle_indices(ctx, v0->idx, v1->idx, v2->idx);
+					v1->next = v2;
+					ecps_count--;
+					tries = 0;
+				}
+				else {
+					ecp_current = ecp_current->next;
+					tries++;
+				}
+			}
+			if (ecps_count == 3)
+				_add_triangle_indices(ctx, ecp_current->next->idx, ecp_current->idx, ecp_current->next->next->idx);
+
+			// limit batch size here to 1/3 of the ibo index type ability
+			if (ctx->vertCount - ctx->curVertOffset > VKVG_IBO_MAX / 3)
+				_emit_draw_cmd_undrawn_vertices(ctx);
+		}
+
+		firstPtIdx += pathPointCount;
+		if (_path_has_curves(ctx, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	} 
+}
+#endif
+
+#if 0
+void _fill_non_zero(const ImVec2* points, const int points_count, ImU32 col)
+{
+	if (points_count < 3 || (col & IM_COL32_A_MASK) == 0)
+		return;
+
+	const ImVec2 uv = _Data->TexUvWhitePixel;
+	ImTriangulator triangulator;
+	unsigned int triangle[3];
+	if (Flags & ImDrawListFlags_AntiAliasedFill)
+	{
+		// Anti-aliased Fill
+		const float AA_SIZE = _FringeScale;
+		const ImU32 col_trans = col & ~IM_COL32_A_MASK;
+		const int idx_count = (points_count - 2) * 3 + points_count * 6;
+		const int vtx_count = (points_count * 2);
+		PrimReserve(idx_count, vtx_count);
+
+		// Add indexes for fill
+		unsigned int vtx_inner_idx = _VtxCurrentIdx;
+		unsigned int vtx_outer_idx = _VtxCurrentIdx + 1;
+
+		_Data->TempBuffer.reserve_discard((ImTriangulator::EstimateScratchBufferSize(points_count) + sizeof(ImVec2)) / sizeof(ImVec2));
+		triangulator.Init(points, points_count, _Data->TempBuffer.Data);
+		while (triangulator._TrianglesLeft > 0)
+		{
+			triangulator.GetNextTriangle(triangle);
+			_IdxWritePtr[0] = (ImDrawIdx)(vtx_inner_idx + (triangle[0] << 1));
+			_IdxWritePtr[1] = (ImDrawIdx)(vtx_inner_idx + (triangle[1] << 1));
+			_IdxWritePtr[2] = (ImDrawIdx)(vtx_inner_idx + (triangle[2] << 1));
+			_IdxWritePtr += 3;
+		}
+		// Compute normals
+		_Data->TempBuffer.reserve_discard(points_count);
+		ImVec2* temp_normals = _Data->TempBuffer.Data;
+		for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
+		{
+			const ImVec2& p0 = points[i0];
+			const ImVec2& p1 = points[i1];
+			float dx = p1.x - p0.x;
+			float dy = p1.y - p0.y;
+			IM_NORMALIZE2F_OVER_ZERO(dx, dy);
+			temp_normals[i0].x = dy;
+			temp_normals[i0].y = -dx;
+		}
+
+		for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
+		{
+			// Average normals
+			const ImVec2& n0 = temp_normals[i0];
+			const ImVec2& n1 = temp_normals[i1];
+			float dm_x = (n0.x + n1.x) * 0.5f;
+			float dm_y = (n0.y + n1.y) * 0.5f;
+			IM_FIXNORMAL2F(dm_x, dm_y);
+			dm_x *= AA_SIZE * 0.5f;
+			dm_y *= AA_SIZE * 0.5f;
+			// Add vertices
+			_VtxWritePtr[0].pos.x = (points[i1].x - dm_x); _VtxWritePtr[0].pos.y = (points[i1].y - dm_y); _VtxWritePtr[0].uv = uv; _VtxWritePtr[0].col = col;        // Inner
+			_VtxWritePtr[1].pos.x = (points[i1].x + dm_x); _VtxWritePtr[1].pos.y = (points[i1].y + dm_y); _VtxWritePtr[1].uv = uv; _VtxWritePtr[1].col = col_trans;  // Outer
+			_VtxWritePtr += 2;
+
+			// Add indexes for fringes
+			_IdxWritePtr[0] = (ImDrawIdx)(vtx_inner_idx + (i1 << 1));
+			_IdxWritePtr[1] = (ImDrawIdx)(vtx_inner_idx + (i0 << 1));
+			_IdxWritePtr[2] = (ImDrawIdx)(vtx_outer_idx + (i0 << 1));
+			_IdxWritePtr[3] = (ImDrawIdx)(vtx_outer_idx + (i0 << 1));
+			_IdxWritePtr[4] = (ImDrawIdx)(vtx_outer_idx + (i1 << 1));
+			_IdxWritePtr[5] = (ImDrawIdx)(vtx_inner_idx + (i1 << 1));
+			_IdxWritePtr += 6;
+		}
+		_VtxCurrentIdx += (ImDrawIdx)vtx_count;
+	}
+	else
+	{
+		// Non Anti-aliased Fill
+		const int idx_count = (points_count - 2) * 3;
+		const int vtx_count = points_count;
+		PrimReserve(idx_count, vtx_count);
+		for (int i = 0; i < vtx_count; i++)
+		{
+			_VtxWritePtr[0].pos = points[i]; _VtxWritePtr[0].uv = uv; _VtxWritePtr[0].col = col;
+			_VtxWritePtr++;
+		}
+		_Data->TempBuffer.reserve_discard((ImTriangulator::EstimateScratchBufferSize(points_count) + sizeof(ImVec2)) / sizeof(ImVec2));
+		triangulator.Init(points, points_count, _Data->TempBuffer.Data);
+		while (triangulator._TrianglesLeft > 0)
+		{
+			triangulator.GetNextTriangle(triangle);
+			_IdxWritePtr[0] = (ImDrawIdx)(_VtxCurrentIdx + triangle[0]);
+			_IdxWritePtr[1] = (ImDrawIdx)(_VtxCurrentIdx + triangle[1]);
+			_IdxWritePtr[2] = (ImDrawIdx)(_VtxCurrentIdx + triangle[2]);
+			_IdxWritePtr += 3;
+		}
+		_VtxCurrentIdx += (ImDrawIdx)vtx_count;
+	}
+}
+#endif
+
 
 // pathes, exists until stroke of fill
 vec2* points;

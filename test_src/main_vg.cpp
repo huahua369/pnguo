@@ -408,6 +408,16 @@ void testgui() {
 		auto cr = vkvg_create(surf);
 		vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
 		//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
+		//auto lake=view->_vgdev->new_surface( R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
+		//if (lake) {
+		//	vkvg_rectangle(cr, 0, 0, surfsize.x, surfsize.y);
+		//	vkvg_clip(cr);
+		//	vkvg_set_source_surface(cr, lake,0,0);
+		//	vkvg_rectangle(cr, 0, 0, 128,128);
+		//	vkvg_paint(cr);
+
+		//}
+		vkvg_translate(cr, 20, 0);
 		VkvgPattern pat;
 		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
 		vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
@@ -416,9 +426,9 @@ void testgui() {
 		vkvg_set_source(cr, pat);
 		vkvg_fill(cr);
 		vkvg_pattern_destroy(pat);
-		pat = vkvg_pattern_create_linear(0.0, 128.0, 256, 256.0); 
+		pat = vkvg_pattern_create_linear(0.0, 128.0, 256, 256.0);
 		//vkvg_pattern_set_rotate(pat, 179);
-	 
+
 		vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);// 预乘后蓝
 		vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
 		vkvg_rectangle(cr, 130, 0, 256, 256);

@@ -119,7 +119,7 @@ vec2 gpu_apply_minv(ivec4 m, vec2 v)
  *   texel 1: L^-1 as i16 Q10 (row-major)
  *   texels 2..: stops (2 texels each)
  * Evaluate t in untransformed space. */
-vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
+vec4 gpu_sample_linear_0(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	vec4 t0 = uboGrad.cp[0];
 	vec2 p0_r = vec2(t0.xy / box);
@@ -132,35 +132,35 @@ vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
 	float t = dot(p, d) / denom;
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
-
-	//float dist = 1;
-	//vec2 p0 = uboGrad.cp[0].xy / box;
-	//vec2 p1 = uboGrad.cp[0].zw / box;
-	//vec2 p = renderCoord;
-
-	//float l = length(p1 - p0);
-	//vec2 u = normalize(p1 - p0);
-
-	//if (u.y == 0)
-	//	if (u.x < 0)
-	//		dist = -(p.x - p0.x) / l;
-	//	else
-	//		dist = (p.x - p0.x) / l;
-	//else {
-	//	float m = -u.x / u.y;
-	//	float bb = p0.y - m * p0.x;
-	//	dist = ((p.y - m * p.x - bb) / sqrt(1 + m * m)) / l;
-	//	if (u.y < 0)
-	//		dist = -dist;
-	//}
-
-	//dist = gpu_extend_t(dist, extend);
-	//return gpu_eval_stops(stop_count, dist);
-	//vec4 c = mix(uboGrad.colors[0], uboGrad.colors[1], mix(COLORSTOP(0), COLORSTOP(1), dist));//smoothstep
-	//for (int i = 1; i < uboGrad.count - 1; ++i)
-	//	c = mix(c, uboGrad.colors[i + 1], mix(COLORSTOP(i), COLORSTOP(i + 1), dist));
-	//return c;
 }
+vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
+{
+	float dist = 1;
+	vec2 p0 = uboGrad.cp[0].xy / box;
+	vec2 p1 = uboGrad.cp[0].zw / box;
+	vec2 p = renderCoord;
+	float l = length(p1 - p0);
+	vec2 u = normalize(p1 - p0);
+	if (u.y == 0)
+		if (u.x < 0)
+			dist = -(p.x - p0.x) / l;
+		else
+			dist = (p.x - p0.x) / l;
+	else {
+		float m = -u.x / u.y;
+		float bb = p0.y - m * p0.x;
+		dist = ((p.y - m * p.x - bb) / sqrt(1 + m * m)) / l;
+		if (u.y < 0)
+			dist = -dist;
+	}
+
+	dist = gpu_extend_t(dist, extend);
+	return gpu_eval_stops(stop_count, dist);
+}
+//vec4 c = mix(uboGrad.colors[0], uboGrad.colors[1], mix(COLORSTOP(0), COLORSTOP(1), dist));//smoothstep
+//for (int i = 1; i < uboGrad.count - 1; ++i)
+//	c = mix(c, uboGrad.colors[i + 1], mix(COLORSTOP(i), COLORSTOP(i + 1), dist));
+//return c;
 /* Sample a two-circle radial gradient whose param blob starts at
  * @grad_base:
  *   texel 0: (c0_rendered.x, c0_rendered.y, d_canonical.x, d_canonical.y)
