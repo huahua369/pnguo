@@ -962,15 +962,16 @@ namespace vkg {
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &px->_memoryProperties);
 		vkGetPhysicalDeviceProperties(physicalDevice, &px->_deviceProperties);
 
+		VkPhysicalDevicePushDescriptorProperties pushDescriptorProps = {};
+		pushDescriptorProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR;
 		// Get subgroup properties to check if subgroup operations are supported 
 		px->_subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-		px->_subgroupProperties.pNext = NULL;
+		px->_subgroupProperties.pNext = &pushDescriptorProps;
 
 		px->_deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 		px->_deviceProperties2.pNext = &px->_subgroupProperties;
-
 		vkGetPhysicalDeviceProperties2(physicalDevice, &px->_deviceProperties2);
-
+		px->maxPushDescriptors = pushDescriptorProps.maxPushDescriptors;
 		if (pw) {
 
 #if defined(_WIN32)
@@ -1196,12 +1197,12 @@ namespace vkg {
 				px->is_newdevice = true;
 		}
 		if (!px->_device)return;
-		//PFN_vkCmdPushDescriptorSet pdset = nullptr;
-		//PFN_vkCmdPushDescriptorSetKHR pdsetKhr = nullptr;
-		//if (pushset) {
-		//	pdset = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSet");
-		//	pdsetKhr = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSetKHR");
-		//}
+		PFN_vkCmdPushDescriptorSet pdset = nullptr;
+		PFN_vkCmdPushDescriptorSetKHR pdsetKhr = nullptr;
+		if (pushset) {
+			pdset = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSet");
+			pdsetKhr = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(px->_device, "vkCmdPushDescriptorSetKHR");
+		}
 		//if (dr)
 		//{
 		//	_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(px->_device, "vkCmdBeginRenderingKHR");

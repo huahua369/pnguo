@@ -1,6 +1,7 @@
 
 //#define VKVG_WIRED_DEBUG
 #define VKVG_USE_HARFBUZZ
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,7 +48,7 @@ extern "C" {
 #endif
 #include "vkvg_cx.h"
 #include <pnguo/print_time.h> 
-
+#include <array>
 #ifdef max
 #undef max
 #endif
@@ -70,7 +71,114 @@ struct vkvg_gradient_x {
 	uint32_t count;
 	int extend;
 };
-#define vkvg_gradient_t vkvg_gradient_x
+#define vkvg_gradient_t vkvg_gradient_x 
+struct vkvg_context_cx {
+	vkvg_status_t status;
+	uint32_t      references; // reference count
+
+	VkvgDevice  dev;
+	VkvgSurface pSurf; // surface bound to context, set on creation of ctx
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	uint64_t timelineStep; // context cmd last submission timeline id.
+#else
+	VkFence flushFence; // context fence
+#endif
+	// VkDescriptorImageInfo sourceDescriptor;	//Store view/sampler in context
+
+	VkCommandPool    cmdPool;        // local pools ensure thread safety
+	VkCommandBuffer  cmdBuffers[2];  // double cmd buff for context operations
+	VkCommandBuffer  cmd;            // current recording buffer
+	VkDescriptorPool descriptorPool; // one pool per thread
+	VkDescriptorSet  dsFont;         // fonts glyphs texture atlas descriptor (local for thread safety)
+	VkDescriptorSet  dsSrc;          // source ds
+	VkDescriptorSet  dsGrad;         // gradient uniform buffer
+
+	VkhImage fontCacheImg; // current font cache, may not be the last one, updated only if new glyphs are
+	// uploaded by the current context
+
+	VkRect2D bounds;
+
+	uint32_t curColor;
+
+#if VKVG_FILL_NZ_GLUTESS
+	void (*vertex_cb)(VKVG_IBO_INDEX_TYPE, VkvgContext); // tesselator vertex callback
+	VKVG_IBO_INDEX_TYPE tesselator_fan_start;
+	uint32_t            tesselator_idx_counter;
+#endif
+
+#if VKVG_RECORDING
+	vkvg_recording_t* recording;
+#endif
+
+	vkh_buffer_t uboGrad; // uniform buff obj holdings gradient infos
+
+	// vk buffers, holds data until flush
+	vkh_buffer_t indices;     // index buffer with persistent map memory
+	uint32_t     sizeIBO;     // size of vk ibo
+	uint32_t     sizeIndices; // reserved size
+	uint32_t     indCount;    // current indice count
+
+	uint32_t            curIndStart;   // last index recorded in cmd buff
+	VKVG_IBO_INDEX_TYPE curVertOffset; // vertex offset in draw indexed command
+
+	vkh_buffer_t vertices;     // vertex buffer with persistent mapped memory
+	uint32_t     sizeVBO;      // size of vk vbo size
+	uint32_t     sizeVertices; // reserved size
+	uint32_t     vertCount;    // effective vertices count
+
+	Vertex* vertexCache;
+	VKVG_IBO_INDEX_TYPE* indexCache;
+
+	// pathes, exists until stroke of fill
+	vec2* points;     // points array
+	uint32_t sizePoints; // reserved size
+	uint32_t pointCount; // effective points count
+
+	// pathes array is a list of point count per segment
+	uint32_t  pathPtr; // pointer in the path array
+	uint32_t* pathes;
+	uint32_t  sizePathes;
+
+	uint32_t segmentPtr;   // current segment count in current path having curves
+	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
+	bool     simpleConvex; // true if path is single rect or concave closed curve.
+
+	bool     cmdStarted;     // prevent flushing empty renderpass
+	bool     pushCstDirty;   // prevent pushing to gpu if not requested
+
+	float    lineWidth;
+	float    miterLimit;
+	uint32_t dashCount;  // value count in dash array, 0 if dash not set.
+	float    dashOffset; // an offset for dash
+	float* dashes;     // an array of alternate lengths of on and off stroke.
+
+	vkvg_operator_t  curOperator;
+	vkvg_line_cap_t  lineCap;
+	vkvg_line_join_t lineJoin;
+	vkvg_fill_rule_t curFillRule;
+
+	long selectedCharSize; /* Font size*/
+	char selectedFontName[FONT_NAME_MAX_SIZE];
+	//_vkvg_font_t		  selectedFont;		//hold current face and size before cache addition
+	_vkvg_font_identity_t* currentFont;     // font pointing to cached fonts identity
+	_vkvg_font_t* currentFontSize; // font structure by size ready for lookup
+	vkvg_direction_t       textDirection;
+
+	push_constants pushConsts;
+	VkvgPattern    pattern;
+
+	vkvg_context_save_t* pSavedCtxs;   // last ctx saved ptr
+	uint8_t              curSavBit;    // current stencil bit used to save context, 6 bits used by stencil for save/restore
+	VkhImage* savedStencils;// additional image for saving contexes once more than 6 save/restore are reached
+	vkvg_clip_state_t    curClipState; // current clipping status relative to the previous saved one or clear state if
+	// none.
+
+	VkClearRect           clearRect;
+	VkRenderPassBeginInfo renderPassBeginInfo;
+	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
+	uint32_t maxPushDescriptors = 0;
+};
+
 
 #define _CRT_SECURE_NO_WARNINGS
 int directoryExists(const char* path) {
@@ -135,10 +243,10 @@ PFN_vkCmdEndRenderPass         CmdEndRenderPass;
 PFN_vkCmdSetViewport           CmdSetViewport;
 PFN_vkCmdSetScissor            CmdSetScissor;
 
-PFN_vkCmdPushConstants CmdPushConstants;
-PFN_vkWaitForFences      WaitForFences;
-PFN_vkResetFences        ResetFences;
-PFN_vkResetCommandBuffer ResetCommandBuffer;
+PFN_vkCmdPushConstants		CmdPushConstants;
+PFN_vkWaitForFences			WaitForFences;
+PFN_vkResetFences			ResetFences;
+PFN_vkResetCommandBuffer	ResetCommandBuffer;
 #endif
 #include "shaders/vkvg_main.frag.h"
 
@@ -221,6 +329,19 @@ void _init_ctx(VkvgContext ctx) {
 #ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	ctx->timelineStep = 0;
 #endif
+	auto cx = (vkvg_context_cx*)ctx;
+	cx->_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(cx->dev->vkDev, "vkCmdPushDescriptorSet");
+	// Get device push descriptor properties (to display them)
+	PFN_vkGetPhysicalDeviceProperties2 _vkGetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>(vkGetInstanceProcAddr(cx->dev->instance, "vkGetPhysicalDeviceProperties2"));
+	if (cx->_vkCmdPushDescriptorSet && _vkGetPhysicalDeviceProperties2) {
+		VkPhysicalDevicePushDescriptorProperties pushDescriptorProps = {};
+		VkPhysicalDeviceProperties2KHR deviceProps2{};
+		pushDescriptorProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR;
+		deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
+		deviceProps2.pNext = &pushDescriptorProps;
+		_vkGetPhysicalDeviceProperties2(cx->dev->phy, &deviceProps2);
+		cx->maxPushDescriptors = pushDescriptorProps.maxPushDescriptors;
+	}
 }
 
 VkvgContext vkvg_create(VkvgSurface surf) {
@@ -245,7 +366,7 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 		ctx->cmd = ctx->cmdBuffers[0]; // current recording buffer
 		return ctx;
 	}
-	ctx = (vkvg_context*)calloc(1, sizeof(vkvg_context));
+	ctx = (vkvg_context*)calloc(1, sizeof(vkvg_context_cx));
 
 	if (!ctx) {
 		LOG(VKVG_LOG_ERR, "CREATE context failed, no memory\n");
@@ -7500,111 +7621,36 @@ vg_ctx::vg_ctx()
 vg_ctx::~vg_ctx()
 {}
 
-
-struct vkvg_context_cx {
-	vkvg_status_t status;
-	uint32_t      references; // reference count
-
-	VkvgDevice  dev;
-	VkvgSurface pSurf; // surface bound to context, set on creation of ctx
-#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
-	uint64_t timelineStep; // context cmd last submission timeline id.
-#else
-	VkFence flushFence; // context fence
-#endif
-	// VkDescriptorImageInfo sourceDescriptor;	//Store view/sampler in context
-
-	VkCommandPool    cmdPool;        // local pools ensure thread safety
-	VkCommandBuffer  cmdBuffers[2];  // double cmd buff for context operations
-	VkCommandBuffer  cmd;            // current recording buffer
-	VkDescriptorPool descriptorPool; // one pool per thread
-	VkDescriptorSet  dsFont;         // fonts glyphs texture atlas descriptor (local for thread safety)
-	VkDescriptorSet  dsSrc;          // source ds
-	VkDescriptorSet  dsGrad;         // gradient uniform buffer
-
-	VkhImage fontCacheImg; // current font cache, may not be the last one, updated only if new glyphs are
-	// uploaded by the current context
-
-	VkRect2D bounds;
-
-	uint32_t curColor;
-
-#if VKVG_FILL_NZ_GLUTESS
-	void (*vertex_cb)(VKVG_IBO_INDEX_TYPE, VkvgContext); // tesselator vertex callback
-	VKVG_IBO_INDEX_TYPE tesselator_fan_start;
-	uint32_t            tesselator_idx_counter;
-#endif
-
-#if VKVG_RECORDING
-	vkvg_recording_t* recording;
-#endif
-
-	vkh_buffer_t uboGrad; // uniform buff obj holdings gradient infos
-
-	// vk buffers, holds data until flush
-	vkh_buffer_t indices;     // index buffer with persistent map memory
-	uint32_t     sizeIBO;     // size of vk ibo
-	uint32_t     sizeIndices; // reserved size
-	uint32_t     indCount;    // current indice count
-
-	uint32_t            curIndStart;   // last index recorded in cmd buff
-	VKVG_IBO_INDEX_TYPE curVertOffset; // vertex offset in draw indexed command
-
-	vkh_buffer_t vertices;     // vertex buffer with persistent mapped memory
-	uint32_t     sizeVBO;      // size of vk vbo size
-	uint32_t     sizeVertices; // reserved size
-	uint32_t     vertCount;    // effective vertices count
-
-	Vertex* vertexCache;
-	VKVG_IBO_INDEX_TYPE* indexCache;
-
-	// pathes, exists until stroke of fill
-	vec2* points;     // points array
-	uint32_t sizePoints; // reserved size
-	uint32_t pointCount; // effective points count
-
-	// pathes array is a list of point count per segment
-	uint32_t  pathPtr; // pointer in the path array
-	uint32_t* pathes;
-	uint32_t  sizePathes;
-
-	uint32_t segmentPtr;   // current segment count in current path having curves
-	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
-	bool     simpleConvex; // true if path is single rect or concave closed curve.
-
-	bool     cmdStarted;     // prevent flushing empty renderpass
-	bool     pushCstDirty;   // prevent pushing to gpu if not requested
-
-	float    lineWidth;
-	float    miterLimit;
-	uint32_t dashCount;  // value count in dash array, 0 if dash not set.
-	float    dashOffset; // an offset for dash
-	float* dashes;     // an array of alternate lengths of on and off stroke.
-
-	vkvg_operator_t  curOperator;
-	vkvg_line_cap_t  lineCap;
-	vkvg_line_join_t lineJoin;
-	vkvg_fill_rule_t curFillRule;
-
-	long selectedCharSize; /* Font size*/
-	char selectedFontName[FONT_NAME_MAX_SIZE];
-	//_vkvg_font_t		  selectedFont;		//hold current face and size before cache addition
-	_vkvg_font_identity_t* currentFont;     // font pointing to cached fonts identity
-	_vkvg_font_t* currentFontSize; // font structure by size ready for lookup
-	vkvg_direction_t       textDirection;
-
-	push_constants pushConsts;
-	VkvgPattern    pattern;
-
-	vkvg_context_save_t* pSavedCtxs;   // last ctx saved ptr
-	uint8_t              curSavBit;    // current stencil bit used to save context, 6 bits used by stencil for save/restore
-	VkhImage* savedStencils;// additional image for saving contexes once more than 6 save/restore are reached
-	vkvg_clip_state_t    curClipState; // current clipping status relative to the previous saved one or clear state if
-	// none.
-
-	VkClearRect           clearRect;
-	VkRenderPassBeginInfo renderPassBeginInfo;
-};
+//layout(set = 0, binding = 0) uniform sampler2DArray fontMap;
+//layout(set = 1, binding = 0) uniform sampler2D		source;
+//layout(scalar, set = 2, binding = 0) uniform _uboGrad  
+void push_update_descriptor_set(VkvgContext ctx, VkhImage img, uint32_t idx) {
+	auto cx = (vkvg_context_cx*)ctx;
+	if (!cx || !cx->maxPushDescriptors || !cx->_vkCmdPushDescriptorSet)return;
+	VkDescriptorImageInfo descSrcTex = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	VkWriteDescriptorSet  writeDescriptorSet = {
+	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+	.dstSet = 0,
+	.dstBinding = 0,
+	.descriptorCount = 1,
+	.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+	.pImageInfo = &descSrcTex };
+	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, idx, 1, &writeDescriptorSet);
+}
+//VK_WHOLE_SIZE
+void push_update_gradient_desc_set(VkvgContext ctx, uint64_t offset, uint64_t size) {
+	auto cx = (vkvg_context_cx*)ctx;
+	if (!cx || !cx->maxPushDescriptors || !cx->_vkCmdPushDescriptorSet)return;
+	VkDescriptorBufferInfo dbi = { ctx->uboGrad.buffer, offset, size };
+	VkWriteDescriptorSet   writeDescriptorSet = {
+	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+	.dstSet = 0,
+	.dstBinding = 0,
+	.descriptorCount = 1,
+	.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	.pBufferInfo = &dbi };
+	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 2, 1, &writeDescriptorSet);
+}
 
 void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 	if (!ctx)return;
@@ -7619,7 +7665,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 		newPatternType = pat->type;
 	switch (newPatternType) {
 	case VKVG_PATTERN_TYPE_SOLID:
-		_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
+		push_update_descriptor_set(ctx, ctx->dev->emptyImg, 1);
 		break;
 	case VKVG_PATTERN_TYPE_SURFACE:
 	{
@@ -7655,7 +7701,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 			break;
 		}
 		vkh_image_create_sampler(surf->img, filter, filter, VK_SAMPLER_MIPMAP_MODE_NEAREST, addrMode);
-		_update_descriptor_set(ctx, surf->img, ctx->dsSrc);
+		push_update_descriptor_set(ctx, surf->img, 1);
 		ctx->pushConsts.source.width = (float)surf->width;
 		ctx->pushConsts.source.height = (float)surf->height;
 		vkvg_matrix_t mat;
@@ -7706,7 +7752,8 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 		}
 		_sort_gradient_stops(grad.colors, grad.stops, grad.count);
 		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
-		vkh_buffer_flush(&ctx->uboGrad);
+		vkh_buffer_flush(&ctx->uboGrad); 
+		push_update_gradient_desc_set(ctx, 0, sizeof(vkvg_gradient_t));
 	}
 	break;
 	}

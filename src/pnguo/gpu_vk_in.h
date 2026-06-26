@@ -42,6 +42,7 @@ namespace vkg {
 		VkPhysicalDeviceProperties _deviceProperties = {};
 		VkPhysicalDeviceProperties2 _deviceProperties2 = {};
 		VkPhysicalDeviceSubgroupProperties _subgroupProperties = {};
+		uint32_t maxPushDescriptors = 0;
 		std::string name;
 		uint32_t graphics_queueFlags = 0;
 		uint32_t _queue_family_index = 0;
