@@ -119,21 +119,21 @@ vec2 gpu_apply_minv(ivec4 m, vec2 v)
  *   texel 1: L^-1 as i16 Q10 (row-major)
  *   texels 2..: stops (2 texels each)
  * Evaluate t in untransformed space. */
-vec4 gpu_sample_linear_0(vec2 renderCoord, vec2 box, int stop_count, int extend)
+vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	vec4 t0 = uboGrad.cp[0];
-	vec2 p0_r = vec2(t0.xy / box);
-	vec2 d = vec2(t0.zw / box);
+	vec2 p0 = vec2(t0.xy / box);
+	vec2 d = vec2(t0.zw / box) - p0;
 	float denom = dot(d, d);
 	if (denom < 1e-6) return vec4(0.0);
 	ivec4 m = uboGrad.m;
-	vec2 p = renderCoord - p0_r;
+	vec2 p = renderCoord - p0;
 	p = gpu_apply_minv(m, p);
 	float t = dot(p, d) / denom;
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
 }
-vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
+vec4 gpu_sample_linear0(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	float dist = 1;
 	vec2 p0 = uboGrad.cp[0].xy / box;
@@ -153,7 +153,6 @@ vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
 		if (u.y < 0)
 			dist = -dist;
 	}
-
 	dist = gpu_extend_t(dist, extend);
 	return gpu_eval_stops(stop_count, dist);
 }
@@ -171,13 +170,14 @@ vec4 gpu_sample_linear(vec2 renderCoord, vec2 box, int stop_count, int extend)
  * Solves |p - t*cd|^2 = (r0 + t*(r1-r0))^2 with p in untransformed
  * space, so non-uniform scale / shear on the transform becomes a
  * proper ellipse-in-rendered-space instead of a scalar-fudge. */
-vec4 gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend)
+vec4 gpu_sample_radial(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	ivec4 m = uboGrad.m;
 	vec2 c0_r = uboGrad.cp[0].xy / box;
 	vec2 cd = uboGrad.cp[1].xy / box;
-	float r0 = uboGrad.cp[0].z;
-	float r1 = uboGrad.cp[1].z;
+	cd -= c0_r;
+	float r0 = uboGrad.cp[0].z / box.x;
+	float r1 = uboGrad.cp[1].z / box.x;
 	float dr = r1 - r0;
 	vec2 p = (renderCoord - c0_r);
 	p = gpu_apply_minv(m, p);
@@ -207,7 +207,7 @@ vec4 gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend
 	t = gpu_extend_t(t, extend);
 	return gpu_eval_stops(stop_count, t);
 }
-vec4 gpu_sample_radial(vec2 renderCoord, vec2 box, int stop_count, int extend)
+vec4 gpu_sample_radiala(vec2 renderCoord, vec2 box, int stop_count, int extend)
 {
 	vec2 c0 = uboGrad.cp[0].xy / box;
 	vec2 c1 = uboGrad.cp[1].xy / box;

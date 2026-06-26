@@ -7862,7 +7862,7 @@ void a_fill_non_zero(uint32_t color) {
 		}
 		else
 			ptrPath++;
-	} 
+	}
 }
 #endif
 
@@ -7963,6 +7963,7 @@ void _fill_non_zero(const ImVec2* points, const int points_count, ImU32 col)
 	}
 }
 #endif
+
 
 
 // pathes, exists until stroke of fill

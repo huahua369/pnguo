@@ -16,6 +16,7 @@ _stroke_preserve
 #include <app.h>
 #include <event.h>
 #include <vkvg_cx.h>
+#include <win_core.h>
 #define white 1, 1, 1
 #define red   1, 0, 0
 #define green 0, 1, 0
@@ -360,6 +361,97 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 	}
 #endif
 }
+void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) {
+
+	const char* filename = "temp/vkvg_gradient.png";
+	auto cr = vkvg_create(surf);
+	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
+	//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
+	if (img) {
+		vkvg_rectangle(cr, 0, 0, surfsize.x, surfsize.y);
+		vkvg_clip(cr);
+		vkvg_set_source_surface(cr, img, 0, 0);
+		vkvg_rectangle(cr, 0, 0, 128, 128);
+		vkvg_paint(cr);
+	}
+	vkvg_translate(cr, 126, 0);
+	VkvgPattern pat;
+	pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
+	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
+	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
+	vkvg_rectangle(cr, 0, 0, 128, 256);
+	vkvg_set_source(cr, pat);
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(pat);
+	pat = vkvg_pattern_create_linear(0.0, 128.0, 256, 256.0);
+	//vkvg_pattern_set_rotate(pat, 179);
+
+	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);// 预乘后蓝
+	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
+	vkvg_rectangle(cr, 130, 0, 256, 256);
+	vkvg_set_source(cr, pat);
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(pat);
+	vkvg_translate(cr, 260, 0);
+	//pat = vkvg_pattern_create_radial(128, 128, 25.6, 128, 128, 128.0, true);
+	//vkvg_pattern_add_color_stop(pat, 0, 1, .51, .1, 0.81);
+	//vkvg_pattern_add_color_stop(pat, 0.50, red, 1);
+	//vkvg_pattern_add_color_stop(pat, 1, 1, 0.5, 0, 0.0);
+	//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
+	pat = vkvg_pattern_create_radial(116, 102, 25, 102, 102, 128.0);
+	vkvg_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 1);
+	vkvg_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 1);
+	vkvg_set_source(cr, pat);
+	//vkvg_set_source_color(cr, 0xffff8000);
+	vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+	//vkvg_rectangle(cr, 0, 0, 256, 256);
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(pat);
+
+	vkvg_translate(cr, 260, 0);
+#define yellow 0.5,0.25,0
+	int sgw = 3;
+	VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
+	vkvg_pattern_add_color_stop(sg, 0.0, yellow, 1);
+	float xf = 1.0 / (sgw * 2.0);
+	float txf = xf;
+	for (size_t i = 0; i < sgw; i++)
+	{
+		vkvg_pattern_add_color_stop(sg, txf, 1, 0.5, 0, 1);
+		txf += xf;
+		vkvg_pattern_add_color_stop(sg, txf, yellow, 1);
+		txf += xf;
+	}
+	//vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
+	//vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
+	//vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
+	//vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
+	//vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
+
+	vkvg_set_source(cr, sg);
+	//vkvg_rectangle(cr, 0, 0, 256, 256);
+	vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(sg);
+	vkvg_translate(cr, 260, 0);
+
+	//sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
+	//vkvg_pattern_add_color_stop(sg, 0.0, white, 0.5);
+	//vkvg_pattern_add_color_stop(sg, 0.25, red, 0.5);
+	//vkvg_pattern_add_color_stop(sg, 0.50, green, 0.5);
+	//vkvg_pattern_add_color_stop(sg, 0.75, blue, 0.0);
+	//vkvg_pattern_add_color_stop(sg, 1.00, white, 0.5);
+	//vkvg_set_source(cr, sg);
+	////vkvg_rectangle(cr, 0, 0, 256, 256);
+	//vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
+	//vkvg_fill(cr);
+	//vkvg_pattern_destroy(sg);
+
+	vkvg_flush(cr);
+	vkvg_surface_resolve(surf);//msaa采样转换输出
+	vkvg_surface_write_to_png(surf, filename);
+	vkvg_destroy(cr);
+}
 void testgui() {
 	// 常用分辨率
 	glm::ivec2 dpis[] = {
@@ -403,97 +495,9 @@ void testgui() {
 	dom_cx* dom0 = view->get_dom(form0);
 	glm::ivec2 surfsize = { 260 * 3,256 };
 	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
+	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
 	if (surf) {
-		const char* filename = "temp/vkvg_gradient.png";
-		auto cr = vkvg_create(surf);
-		vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
-		//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
-		//auto lake=view->_vgdev->new_surface( R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
-		//if (lake) {
-		//	vkvg_rectangle(cr, 0, 0, surfsize.x, surfsize.y);
-		//	vkvg_clip(cr);
-		//	vkvg_set_source_surface(cr, lake,0,0);
-		//	vkvg_rectangle(cr, 0, 0, 128,128);
-		//	vkvg_paint(cr);
-
-		//}
-		vkvg_translate(cr, 20, 0);
-		VkvgPattern pat;
-		pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-		vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
-		vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
-		vkvg_rectangle(cr, 0, 0, 128, 256);
-		vkvg_set_source(cr, pat);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-		pat = vkvg_pattern_create_linear(0.0, 128.0, 256, 256.0);
-		//vkvg_pattern_set_rotate(pat, 179);
-
-		vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);// 预乘后蓝
-		vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
-		vkvg_rectangle(cr, 130, 0, 256, 256);
-		vkvg_set_source(cr, pat);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-		vkvg_translate(cr, 260, 0);
-		//pat = vkvg_pattern_create_radial(128, 128, 25.6, 128, 128, 128.0, true);
-		//vkvg_pattern_add_color_stop(pat, 0, 1, .51, .1, 0.81);
-		//vkvg_pattern_add_color_stop(pat, 0.50, red, 1);
-		//vkvg_pattern_add_color_stop(pat, 1, 1, 0.5, 0, 0.0);
-		//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
-		pat = vkvg_pattern_create_radial(116, 102, 25, 102, 102, 128.0);
-		vkvg_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 0.5);
-		vkvg_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 1);
-		vkvg_set_source(cr, pat);
-		//vkvg_set_source_color(cr, 0xffff8000);
-		vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
-		//vkvg_rectangle(cr, 0, 0, 256, 256);
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(pat);
-
-		vkvg_translate(cr, 260, 0);
-#define yellow 0.5,0.25,0
-		int sgw = 3;
-		VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-		vkvg_pattern_add_color_stop(sg, 0.0, yellow, 1);
-		float xf = 1.0 / (sgw * 2.0);
-		float txf = xf;
-		for (size_t i = 0; i < sgw; i++)
-		{
-			vkvg_pattern_add_color_stop(sg, txf, 1, 0.5, 0, 1);
-			txf += xf;
-			vkvg_pattern_add_color_stop(sg, txf, yellow, 1);
-			txf += xf;
-		}
-		//vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
-		//vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
-		//vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
-		//vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
-		//vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
-
-		vkvg_set_source(cr, sg);
-		//vkvg_rectangle(cr, 0, 0, 256, 256);
-		vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-		vkvg_fill(cr);
-		vkvg_pattern_destroy(sg);
-		vkvg_translate(cr, 260, 0);
-
-		//sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-		//vkvg_pattern_add_color_stop(sg, 0.0, white, 0.5);
-		//vkvg_pattern_add_color_stop(sg, 0.25, red, 0.5);
-		//vkvg_pattern_add_color_stop(sg, 0.50, green, 0.5);
-		//vkvg_pattern_add_color_stop(sg, 0.75, blue, 0.0);
-		//vkvg_pattern_add_color_stop(sg, 1.00, white, 0.5);
-		//vkvg_set_source(cr, sg);
-		////vkvg_rectangle(cr, 0, 0, 256, 256);
-		//vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-		//vkvg_fill(cr);
-		//vkvg_pattern_destroy(sg);
-
-		vkvg_flush(cr);
-		vkvg_surface_resolve(surf);//msaa采样转换输出
-		vkvg_surface_write_to_png(surf, filename);
-		vkvg_destroy(cr);
+		draw_vgtest(surf, img, surfsize);
 		//vctx->free_surface(surf);
 	}
 	auto dvv = new div_cx();
@@ -830,10 +834,12 @@ void testgui() {
 	appx->fpslab = fpslab;
 	do {
 		frame_count = appx->run();
+		draw_vgtest(surf, img, surfsize);
 	} while (frame_count);
 }
 int main() {
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
+	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 	dev_info_cx devinfo = {};
 	//test_vkvg("temp/vgtest0618.png", 0);
 	testgui();
