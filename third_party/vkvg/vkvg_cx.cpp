@@ -5670,7 +5670,7 @@ VkvgSurface vkvg_surface_create_from_bitmap(VkvgDevice dev, unsigned char* img, 
 		&buff, true);
 
 	memcpy(vkh_buffer_get_mapped_pointer(&buff), img, imgSize);
-
+	vkh_buffer_flush(&buff);
 	VkCommandBuffer cmd = surf->cmd;
 
 	vkh_cmd_begin(cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -5731,6 +5731,7 @@ VkvgSurface vkvg_surface_create_from_bitmap(VkvgDevice dev, unsigned char* img, 
 
 	vkvg_paint(ctx);
 	vkvg_destroy(ctx);
+	vkvg_surface_resolve(surf);
 
 	vkh_image_destroy(tmpImg);
 

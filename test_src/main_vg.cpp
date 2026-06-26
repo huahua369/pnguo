@@ -369,12 +369,19 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
 	if (img) {
 		vkvg_rectangle(cr, 0, 0, surfsize.x, surfsize.y);
-		vkvg_clip(cr);
+		//vkvg_clip(cr);
 		vkvg_set_source_surface(cr, img, 0, 0);
 		vkvg_rectangle(cr, 0, 0, 128, 128);
 		vkvg_paint(cr);
+		vkvg_paint(cr);
 	}
 	vkvg_translate(cr, 126, 0);
+	vkvg_translate(cr, 0, 30);
+	vkvg_set_source_color(cr, 0xff0020ff);
+	vkvg_select_font_face(cr, "Consolas");
+	vkvg_set_font_size(cr, 26);
+	vkvg_show_text(cr, "abcd0gyl");
+	vkvg_translate(cr, 0, -30);
 	VkvgPattern pat;
 	pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
 	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
@@ -834,7 +841,7 @@ void testgui() {
 	appx->fpslab = fpslab;
 	do {
 		frame_count = appx->run();
-		draw_vgtest(surf, img, surfsize);
+		//draw_vgtest(surf, img, surfsize);
 	} while (frame_count);
 }
 int main() {
