@@ -175,8 +175,12 @@ struct vkvg_context_cx {
 
 	VkClearRect           clearRect;
 	VkRenderPassBeginInfo renderPassBeginInfo;
+
 	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
 	uint32_t maxPushDescriptors = 0;
+
+	uint32_t capPathPointCount = 0;
+	ear_clip_point* ecps = 0;
 };
 
 
@@ -2926,6 +2930,10 @@ void _release_context_ressources(VkvgContext ctx) {
 	vkh_image_destroy(ctx->fontCacheImg);
 	// TODO:check this for source counter
 	// vkh_image_destroy (ctx->source);
+	auto pcx = (vkvg_context_cx*)ctx;
+	if (pcx->ecps)free(pcx->ecps);
+	pcx->ecps = 0;
+	pcx->capPathPointCount = 0;
 	free(ctx->pathes);
 	free(ctx->points);
 	free(ctx);
@@ -3822,11 +3830,12 @@ void _fill_non_zero(VkvgContext ctx) {
 // create fill from current path with ear clipping technic
 void _fill_non_zero(VkvgContext ctx) {
 	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+	auto pcx = (vkvg_context_cx*)ctx;
 
+	uint32_t& capPathPointCount = pcx->capPathPointCount;
+	auto& ecps = pcx->ecps;
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
-	uint32_t capPathPointCount = 0;
-	ear_clip_point* ecps = 0;
 	while (ptrPath < ctx->pathPtr) {
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 
@@ -3835,11 +3844,12 @@ void _fill_non_zero(VkvgContext ctx) {
 			// ear_clip_point* ecps = (ear_clip_point*)malloc(pathPointCount*sizeof(ear_clip_point));
 			if (!ecps || pathPointCount > capPathPointCount)
 			{
-				ear_clip_point* kp = (ear_clip_point*)realloc(ecps, pathPointCount * sizeof(ear_clip_point));
+				auto newCount = pathPointCount + 64;
+				ear_clip_point* kp = (ear_clip_point*)realloc(ecps, newCount * sizeof(ear_clip_point));
 				if (kp)
 				{
 					ecps = kp;
-					capPathPointCount = pathPointCount;
+					capPathPointCount = newCount;
 				}
 			}
 			if (!ecps)break;
@@ -3913,7 +3923,7 @@ void _fill_non_zero(VkvgContext ctx) {
 		else
 			ptrPath++;
 	}
-	if (ecps)free(ecps);
+	//if (ecps)free(ecps);
 }
 #endif
 
@@ -7752,7 +7762,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 		}
 		_sort_gradient_stops(grad.colors, grad.stops, grad.count);
 		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
-		vkh_buffer_flush(&ctx->uboGrad); 
+		vkh_buffer_flush(&ctx->uboGrad);
 		push_update_gradient_desc_set(ctx, 0, sizeof(vkvg_gradient_t));
 	}
 	break;
@@ -7762,39 +7772,23 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 	//if (lastPat)
 	//	vkvg_pattern_destroy(lastPat);
 }
+
+// pathes, exists until stroke of fill
+vec2* points;
+// vbo/ibo
+Vertex* vertexCache;
+VKVG_IBO_INDEX_TYPE* indexCache;
+
 void expandStroke() {
 
 }
-void renderStroke(VkvgContext ctx) {
-	if (ctx->indCount == ctx->curIndStart)
-		return;
-	_start_cmd_for_render_pass(ctx);
-#ifdef VKVG_WIRED_DEBUG
-	if (vkvg_wired_debug & vkvg_wired_debug_mode_normal)
-		CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
-	if (vkvg_wired_debug & vkvg_wired_debug_mode_lines) {
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipelineLineList);
-		CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
-	}
-	if (vkvg_wired_debug & vkvg_wired_debug_mode_points) {
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipelineWired);
-		CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
-	}
-	if (vkvg_wired_debug & vkvg_wired_debug_mode_both)
-		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pSurf->dev->pipe_OVER);
-#else
-	CmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
-#endif
-	LOG(VKVG_LOG_INFO, "RECORD DRAW CMD: ctx = %p; vertices = %d; indices = %d (vxOff = %d idxStart = %d idxTot = %d )\n", ctx,
-		ctx->vertCount - ctx->curVertOffset, ctx->indCount - ctx->curIndStart, ctx->curVertOffset, ctx->curIndStart, ctx->indCount);
 
-	ctx->curIndStart = ctx->indCount;
-	ctx->curVertOffset = ctx->vertCount;
-	_end_render_pass(ctx);
-	// 
+void renderStroke(VkvgContext ctx, VkvgPattern pat) {
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->vertCount * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache, ctx->indCount * sizeof(VKVG_IBO_INDEX_TYPE));
-	ctx->vertCount = ctx->indCount = ctx->curIndStart = ctx->curVertOffset = 0;
-
+	_start_cmd_for_render_pass(ctx);
+	update_pattern(ctx, pat);
+	vkCmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
+	_end_render_pass(ctx);
 	vkh_cmd_end(ctx->cmd);
 }

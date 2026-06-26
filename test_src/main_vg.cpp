@@ -823,6 +823,7 @@ void testgui() {
 	} while (frame_count);
 }
 int main() {
+	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
 	dev_info_cx devinfo = {};
 	//test_vkvg("temp/vgtest0618.png", 0);
 	testgui();
