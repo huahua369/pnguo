@@ -3491,6 +3491,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 				if (tcc.ctx)
 				{
 					auto ctx = (VkvgContext)tcc.ctx;
+					//vkvg_clear_rect((VkvgContext)ctx, vv.rc.x, vv.rc.y, vv.rc.z, vv.rc.w);
 					vkvg_save(ctx);
 					vkvg_translate(ctx, tcc.apos.x, tcc.apos.y);
 				}

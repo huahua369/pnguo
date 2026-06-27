@@ -368,7 +368,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
 	//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
 	if (img) {
-		vkvg_rectangle(cr, 0, 0, surfsize.x, surfsize.y);
+		//vkvg_rectangle(cr, 10, 10, surfsize.x * 0.5, surfsize.y * 0.5);
 		//vkvg_clip(cr);
 		vkvg_set_source_surface(cr, img, 0, 0);
 		vkvg_rectangle(cr, 0, 0, 128, 128);
@@ -846,7 +846,7 @@ void testgui() {
 }
 int main() {
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
-	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 	dev_info_cx devinfo = {};
 	//test_vkvg("temp/vgtest0618.png", 0);
 	testgui();

@@ -51,6 +51,7 @@ extern "C" {
 #include <array>
 #ifdef max
 #undef max
+#undef min
 #endif
 //#include <vg.h>
 /*
@@ -7985,4 +7986,23 @@ void renderStroke(VkvgContext ctx, VkvgPattern pat) {
 	vkCmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
 	_end_render_pass(ctx);
 	vkh_cmd_end(ctx->cmd);
+}
+
+void vkvg_clear_rect(VkvgContext ctx, int x, int y, int width, int height) {
+	if (vkvg_status(ctx))
+		return;
+	if (!ctx->cmdStarted) {
+		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass;
+		// force run of one renderpass (even empty) to perform clear load op
+		_start_cmd_for_render_pass(ctx);
+	}
+	VkClearRect cr = ctx->clearRect;
+	if (width > 0 && height > 0 && x >= 0 && y >= 0) {
+		cr.rect.offset = { x,y };
+		cr.rect.extent = { std::min((uint32_t)width,cr.rect.extent.width - x)
+			,std::min((uint32_t)height,cr.rect.extent.height - y) };
+	}
+	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
+	ca[1].clearValue.depthStencil.depth = 1;
+	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &cr);
 }
