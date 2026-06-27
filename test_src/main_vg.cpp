@@ -440,19 +440,40 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
 	vkvg_fill(cr);
 	vkvg_pattern_destroy(sg);
-	vkvg_translate(cr, 260, 0);
+	vkvg_translate(cr, -300, 0);
 
-	//sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-	//vkvg_pattern_add_color_stop(sg, 0.0, white, 0.5);
-	//vkvg_pattern_add_color_stop(sg, 0.25, red, 0.5);
-	//vkvg_pattern_add_color_stop(sg, 0.50, green, 0.5);
-	//vkvg_pattern_add_color_stop(sg, 0.75, blue, 0.0);
-	//vkvg_pattern_add_color_stop(sg, 1.00, white, 0.5);
-	//vkvg_set_source(cr, sg);
-	////vkvg_rectangle(cr, 0, 0, 256, 256);
-	//vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-	//vkvg_fill(cr);
-	//vkvg_pattern_destroy(sg);
+	sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
+	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
+	vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
+	vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
+	vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
+	vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
+	vkvg_set_source(cr, sg);
+	//vkvg_rectangle(cr, 0, 0, 256, 256);
+	vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
+	vkvg_fill(cr);
+	vkvg_pattern_destroy(sg);
+
+	vkvg_translate(cr, -300, 0);
+	vkvg_set_line_width(cr, 6);
+	auto M_PI = glm::pi<float>();
+	vkvg_rectangle(cr, 12, 12, 232, 70);
+	vkvg_new_sub_path(cr); vkvg_arc(cr, 64, 64, 40, 0, 2 * M_PI);
+	vkvg_new_sub_path(cr); vkvg_arc_negative(cr, 192, 64, 40, 0, -2 * M_PI);
+
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	vkvg_set_source_rgb(cr, 0, 0.7, 0); vkvg_fill_preserve(cr);
+	vkvg_set_source_rgb(cr, 0, 0, 0); vkvg_stroke(cr);
+
+	vkvg_translate(cr, 0, 128);
+	vkvg_rectangle(cr, 12, 12, 232, 70);
+	vkvg_new_sub_path(cr); vkvg_arc(cr, 64, 64, 40, 0, 2 * M_PI);
+	vkvg_new_sub_path(cr); vkvg_arc_negative(cr, 192, 64, 40, 0, -2 * M_PI);
+
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
+	vkvg_set_source_rgb(cr, 0, 0, 0.9); vkvg_fill_preserve(cr);
+	vkvg_set_source_rgb(cr, 0, 0, 0); vkvg_stroke(cr);
+
 
 	vkvg_flush(cr);
 	vkvg_surface_resolve(surf);//msaa采样转换输出
@@ -460,6 +481,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_destroy(cr);
 }
 void testgui() {
+	//test_vkvg("temp/vgtest0618.png", 0);
 	// 常用分辨率
 	glm::ivec2 dpis[] = {
 		{1024,768},
@@ -848,7 +870,6 @@ int main() {
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
 	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 	dev_info_cx devinfo = {};
-	//test_vkvg("temp/vgtest0618.png", 0);
 	testgui();
 	return 0;
 }

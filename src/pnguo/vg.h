@@ -49,12 +49,20 @@ struct vg_vector {
 		return;
 	}
 	void resize(size_t new_size) {
-		reserve(new_size);
+		grow(new_size);
 		_size = new_size;
 	}
 
 	void grow() {
 		size_t new_cap = (cap == 0) ? 4 : cap * 2;
+		reserve(new_cap);
+	}
+
+	void grow(size_t new_size) {
+		size_t new_cap = (cap == 0) ? new_size : cap * 2;
+		while (new_size >= new_cap) {
+			new_cap *= 2;
+		}
 		reserve(new_cap);
 	}
 	void push_back(const T& val) {
@@ -77,9 +85,7 @@ struct vg_vector {
 		if (index > _size)index = _size;
 		if (!first || !end || first >= end) return;  // 允许在末尾插入
 		size_t n = end - first;
-		if (_size + n >= cap) {
-			grow();
-		}
+		grow(_size + n);
 		auto t = first;
 		// 将index及之后的元素整体后移一位
 		memmove(&a[index + n], &a[index], (_size - index) * sizeof(T));

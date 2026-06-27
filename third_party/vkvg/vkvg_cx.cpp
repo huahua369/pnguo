@@ -1,6 +1,8 @@
-
+﻿
 //#define VKVG_WIRED_DEBUG
 #define VKVG_USE_HARFBUZZ
+
+#include <pch1.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,14 +48,11 @@ extern "C" {
  //#define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #endif
-#include "vkvg_cx.h"
+
+#include <array> 
+#include <vg.h>
 #include <pnguo/print_time.h> 
-#include <array>
-#ifdef max
-#undef max
-#undef min
-#endif
-//#include <vg.h>
+#include "vkvg_cx.h"
 /*
 命令行
 glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_main_frag1_spv -o vkvg_main.frag.h
@@ -7774,44 +7773,126 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 	//if (lastPat)
 	//	vkvg_pattern_destroy(lastPat);
 }
-#if 0
-void a_fill_non_zero(uint32_t color) {
-	Vertex v = { {0}, color, {0, 0, -1} };
-	vec2* points;     // points array 
-	uint32_t pointCount; // effective points count
-	uint32_t  pathPtr; // pointer in the path array
-	uint32_t* pathes;
-	uint32_t  sizePathes;
+#if 1
+
+bool a_path_has_curves(uint32_t* pathes, uint32_t ptrPath) { return   pathes[ptrPath] & PATH_HAS_CURVES_BIT; }
+
+#define VG_COL32_A_MASK     0xFF000000
+
+void NORMALIZE2F_OVER_ZERO(float& VX, float& VY)
+{
+	float d2 = VX * VX + VY * VY;
+	if (d2 > 0.0f) {
+		float inv_len = 1.0f / sqrtf(d2);
+		VX *= inv_len; VY *= inv_len;
+	}
+}
+#define FIXNORMAL2F_MAX_INVLEN2          100.0f // 500.0f (see #4053, #3366)
+void FIXNORMAL2F(float& VX, float& VY)
+{
+	float d2 = VX * VX + VY * VY;
+	if (d2 > 0.000001f) {
+		float inv_len2 = 1.0f / d2;
+		if (inv_len2 > FIXNORMAL2F_MAX_INVLEN2)
+			inv_len2 = FIXNORMAL2F_MAX_INVLEN2;
+		VX *= inv_len2; VY *= inv_len2;
+	}
+}
+struct vg_value_t
+{
+	float    lineWidth;
+	float    miterLimit;
+	uint32_t dashCount;  // value count in dash array, 0 if dash not set.
+	float    dashOffset; // an offset for dash
+	float* dashes;     // an array of alternate lengths of on and off stroke.
+
+	vkvg_operator_t  curOperator;
+	vkvg_line_cap_t  lineCap;
+	vkvg_line_join_t lineJoin;
+	vkvg_fill_rule_t curFillRule;
+	float scale_x = 1.0, scale_y = 1.0;
+	bool aa = true;
+};
+struct paths_t {
+	vec2* points = 0;			// 路径坐标点points array 
+	uint32_t pointCount = 0;	// 数量effective points count
+	uint32_t  pathPtr = 0;		// pointer in the path array
+	uint32_t* pathes = 0;		// 每条路径的数量
+	uint32_t  sizePathes = 0;	// 路径条数量
+	uint32_t* color = 0;		// 独立颜色数组大小与sizePathes一致，0则用默认颜色curColor
+	uint32_t curColor = 0xFFffffff;
+	vg_value_t* t = 0;
+};
+class vgpath_ctx
+{
+public:
+	// 输出
+	vg_vector<Vertex> _vertex;
+	vg_vector<uint32_t> _indices;
+	// 临时缓冲用
 	vg_vector<ear_clip_point> ecpsd;
+	vg_vector<vec2> _normals;
+	uint32_t curVertOffset = 0;
+public:
+	vgpath_ctx();
+	~vgpath_ctx();
+
+	void fill_preserve(paths_t* p, vg_value_t* t);
+	void stroke_preserve(paths_t* p, vg_value_t* t, uint32_t color);
+private:
+	void poly_fill(paths_t* ctx, vec4* bounds);
+	void fill_non_zero(paths_t* p);
+	bool _build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve);
+	void _draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart);
+	float _draw_dashed_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
+	void _draw_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
+
+	void a_add_triangle_indices(paths_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2);
+	void a_add_tri_indices_for_rect(VKVG_IBO_INDEX_TYPE i);
+	void _add_vertexf(paths_t* ctx, float x, float y);
+};
+
+vgpath_ctx::vgpath_ctx()
+{}
+
+vgpath_ctx::~vgpath_ctx()
+{}
+void vgpath_ctx::fill_non_zero(paths_t* p)
+{
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
-	VKVG_IBO_INDEX_TYPE cur_idx = 0;
-
-	while (ptrPath < pathPtr) {
-		uint32_t pathPointCount = pathes[ptrPath] & PATH_ELT_MASK;
-
+	const vec3 uv = { 0,0,-1 };
+	vg_value_t* t = p->t;
+	uint32_t color = p->curColor; bool aa = t->aa;
+	Vertex v = { {0}, color, {0, 0, -1} };
+	VKVG_IBO_INDEX_TYPE cur_idx = _vertex.size();
+	while (ptrPath < p->pathPtr) {
+		uint32_t pathPointCount = p->pathes[ptrPath] & PATH_ELT_MASK;
+		auto col = p->color ? p->color[ptrPath] : color;
+		v.color = col;
 		if (pathPointCount > 2) {
 			VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)cur_idx;
-			ecpsd.reserve(ecpsd.cap * 2);
 			ecpsd.resize(pathPointCount);
 			auto ecps = ecpsd.data();
 			if (!ecps)break;
 			uint32_t            ecps_count = pathPointCount;
 			VKVG_IBO_INDEX_TYPE i = 0;
-
+			auto points = p->points + firstPtIdx;
 			// init points link list
 			while (i < pathPointCount - 1) {
-				v.pos = points[i + firstPtIdx];
+				v.pos = points[i];
 				ear_clip_point ecp = { v.pos, firstVertIdx + i, &ecps[i + 1] };
 				ecps[i] = ecp;
-				_add_vertex(ctx, v);
+				if (!aa)
+					_vertex.push_back(v);
 				i++;
 			}
 
-			v.pos = points[i + firstPtIdx];
+			v.pos = points[i];
 			ear_clip_point ecp = { v.pos, firstVertIdx + i, ecps };
 			ecps[i] = ecp;
-			_add_vertex(ctx, v);
+			if (!aa)
+				_vertex.push_back(v);
 
 			ear_clip_point* ecp_current = ecps;
 			uint32_t        tries = 0;
@@ -7836,7 +7917,13 @@ void a_fill_non_zero(uint32_t color) {
 					vP = vP->next;
 				}
 				if (isEar) {
-					_add_triangle_indices(ctx, v0->idx, v1->idx, v2->idx);
+					uint32_t t3[3] = { v0->idx, v1->idx, v2->idx };
+					if (aa) {
+						t3[0] = v0->idx << 1;
+						t3[1] = v1->idx << 1;
+						t3[1] = v2->idx << 1;
+					}
+					_indices.insert(-1, t3, t3 + 3);
 					v1->next = v2;
 					ecps_count--;
 					tries = 0;
@@ -7847,15 +7934,129 @@ void a_fill_non_zero(uint32_t color) {
 				}
 			}
 			if (ecps_count == 3)
-				_add_triangle_indices(ctx, ecp_current->next->idx, ecp_current->idx, ecp_current->next->next->idx);
+			{
+				uint32_t t3[3] = { ecp_current->next->idx, ecp_current->idx, ecp_current->next->next->idx };
+				if (aa) {
+					t3[0] = t3[0] << 1;
+					t3[1] = t3[1] << 1;
+					t3[1] = t3[1] << 1;
+				}
+				_indices.insert(-1, t3, t3 + 3);
+			}
+			// Anti-aliased Fill
+			if (aa)
+			{
+				auto points_count = pathPointCount;
+				const float AA_SIZE = 1.0;
+				const uint32_t col_trans = col & ~VG_COL32_A_MASK;
+				const int idx_count = (points_count - 2) * 3 + points_count * 6;
+				const int vtx_count = (points_count * 2);
+				//PrimReserve(idx_count, vtx_count);
+				auto ips = _indices.size();
+				_indices.resize(idx_count);
+				auto idxw = _indices.data() + ips;
+				// Add indexes for fill
+				unsigned int vtx_inner_idx = firstVertIdx;
+				unsigned int vtx_outer_idx = firstVertIdx + 1;
 
-			// limit batch size here to 1/3 of the ibo index type ability
-			if (ctx->vertCount - ctx->curVertOffset > VKVG_IBO_MAX / 3)
-				_emit_draw_cmd_undrawn_vertices(ctx);
+				// Compute normals
+				_normals.resize(points_count);
+				vec2* temp_normals = _normals.data();
+				for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
+				{
+					const vec2& p0 = points[i0];
+					const vec2& p1 = points[i1];
+					float dx = p1.x - p0.x;
+					float dy = p1.y - p0.y;
+					NORMALIZE2F_OVER_ZERO(dx, dy);
+					temp_normals[i0].x = dy;
+					temp_normals[i0].y = -dx;
+				}
+
+				for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
+				{
+					// Average normals
+					const vec2& n0 = temp_normals[i0];
+					const vec2& n1 = temp_normals[i1];
+					float dm_x = (n0.x + n1.x) * 0.5f;
+					float dm_y = (n0.y + n1.y) * 0.5f;
+					FIXNORMAL2F(dm_x, dm_y);
+					dm_x *= AA_SIZE * 0.5f;
+					dm_y *= AA_SIZE * 0.5f;
+					// Add vertices
+					v.pos = { (points[i1].x - dm_x),(points[i1].y - dm_y) };
+					v.color = col;      // Inner
+					_vertex.push_back(v);
+					v.pos = { (points[i1].x + dm_x),(points[i1].y + dm_y) };
+					v.color = col_trans;  // Outer					 
+					_vertex.push_back(v);
+
+					// Add indexes for fringes
+					idxw[0] = (vtx_inner_idx + (i1 << 1));
+					idxw[1] = (vtx_inner_idx + (i0 << 1));
+					idxw[2] = (vtx_outer_idx + (i0 << 1));
+					idxw[3] = (vtx_outer_idx + (i0 << 1));
+					idxw[4] = (vtx_outer_idx + (i1 << 1));
+					idxw[5] = (vtx_inner_idx + (i1 << 1));
+					idxw += 6;
+				}
+				cur_idx += vtx_count;
+			}
+			else {
+				cur_idx += pathPointCount;
+			}
 		}
 
 		firstPtIdx += pathPointCount;
-		if (_path_has_curves(ctx, ptrPath)) {
+		if (a_path_has_curves(p->pathes, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (p->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+}
+// Even-Odd inside test with stencil buffer implementation.
+void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
+	// we anticipate the check for vbo buffer size, ibo is not used in poly_fill
+	// the polyfill emit a single vertex for each point in the path.
+
+	//CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
+
+	Vertex   v = { {0}, ctx->curColor, {0, 0, -1} };
+	uint32_t ptrPath = 0;
+	uint32_t firstPtIdx = 0;
+
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		if (pathPointCount > 2) {
+			VKVG_IBO_INDEX_TYPE firstVertIdx = (VKVG_IBO_INDEX_TYPE)_vertex.size();
+
+			for (uint32_t i = 0; i < pathPointCount; i++) {
+				v.pos = ctx->points[i + firstPtIdx];
+				//ctx->vertexCache[ctx->vertCount++] = v;
+				if (!bounds)
+					continue;
+				// bounds are computed here to scissor the painting operation
+				// that speed up fill drastically.
+				//vkvg_matrix_transform_point(&ctx->pushConsts.mat, &v.pos.x, &v.pos.y);
+				if (v.pos.x < bounds->xMin)
+					bounds->xMin = v.pos.x;
+				if (v.pos.x > bounds->xMax)
+					bounds->xMax = v.pos.x;
+				if (v.pos.y < bounds->yMin)
+					bounds->yMin = v.pos.y;
+				if (v.pos.y > bounds->yMax)
+					bounds->yMax = v.pos.y;
+			}			 
+			//CmdDraw(ctx->cmd, pathPointCount, 1, firstVertIdx, 0);
+		}
+		firstPtIdx += pathPointCount;
+
+		if (a_path_has_curves(ctx->pathes, ptrPath)) {
 			// skip segments lengths used in stroke
 			ptrPath++;
 			uint32_t totPts = 0;
@@ -7865,105 +8066,532 @@ void a_fill_non_zero(uint32_t color) {
 		else
 			ptrPath++;
 	}
+	//ctx->curVertOffset = ctx->vertCount;
 }
-#endif
-
-#if 0
-void _fill_non_zero(const ImVec2* points, const int points_count, ImU32 col)
+void vgpath_ctx::fill_preserve(paths_t* ctx, vg_value_t* t)
 {
-	if (points_count < 3 || (col & IM_COL32_A_MASK) == 0)
+	if (!ctx || !ctx->pathPtr || !t) // nothing to fill
 		return;
+	ctx->t = t;
+	if (ctx->t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 
-	const ImVec2 uv = _Data->TexUvWhitePixel;
-	ImTriangulator triangulator;
-	unsigned int triangle[3];
-	if (Flags & ImDrawListFlags_AntiAliasedFill)
-	{
-		// Anti-aliased Fill
-		const float AA_SIZE = _FringeScale;
-		const ImU32 col_trans = col & ~IM_COL32_A_MASK;
-		const int idx_count = (points_count - 2) * 3 + points_count * 6;
-		const int vtx_count = (points_count * 2);
-		PrimReserve(idx_count, vtx_count);
-
-		// Add indexes for fill
-		unsigned int vtx_inner_idx = _VtxCurrentIdx;
-		unsigned int vtx_outer_idx = _VtxCurrentIdx + 1;
-
-		_Data->TempBuffer.reserve_discard((ImTriangulator::EstimateScratchBufferSize(points_count) + sizeof(ImVec2)) / sizeof(ImVec2));
-		triangulator.Init(points, points_count, _Data->TempBuffer.Data);
-		while (triangulator._TrianglesLeft > 0)
-		{
-			triangulator.GetNextTriangle(triangle);
-			_IdxWritePtr[0] = (ImDrawIdx)(vtx_inner_idx + (triangle[0] << 1));
-			_IdxWritePtr[1] = (ImDrawIdx)(vtx_inner_idx + (triangle[1] << 1));
-			_IdxWritePtr[2] = (ImDrawIdx)(vtx_inner_idx + (triangle[2] << 1));
-			_IdxWritePtr += 3;
-		}
-		// Compute normals
-		_Data->TempBuffer.reserve_discard(points_count);
-		ImVec2* temp_normals = _Data->TempBuffer.Data;
-		for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
-		{
-			const ImVec2& p0 = points[i0];
-			const ImVec2& p1 = points[i1];
-			float dx = p1.x - p0.x;
-			float dy = p1.y - p0.y;
-			IM_NORMALIZE2F_OVER_ZERO(dx, dy);
-			temp_normals[i0].x = dy;
-			temp_normals[i0].y = -dx;
-		}
-
-		for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
-		{
-			// Average normals
-			const ImVec2& n0 = temp_normals[i0];
-			const ImVec2& n1 = temp_normals[i1];
-			float dm_x = (n0.x + n1.x) * 0.5f;
-			float dm_y = (n0.y + n1.y) * 0.5f;
-			IM_FIXNORMAL2F(dm_x, dm_y);
-			dm_x *= AA_SIZE * 0.5f;
-			dm_y *= AA_SIZE * 0.5f;
-			// Add vertices
-			_VtxWritePtr[0].pos.x = (points[i1].x - dm_x); _VtxWritePtr[0].pos.y = (points[i1].y - dm_y); _VtxWritePtr[0].uv = uv; _VtxWritePtr[0].col = col;        // Inner
-			_VtxWritePtr[1].pos.x = (points[i1].x + dm_x); _VtxWritePtr[1].pos.y = (points[i1].y + dm_y); _VtxWritePtr[1].uv = uv; _VtxWritePtr[1].col = col_trans;  // Outer
-			_VtxWritePtr += 2;
-
-			// Add indexes for fringes
-			_IdxWritePtr[0] = (ImDrawIdx)(vtx_inner_idx + (i1 << 1));
-			_IdxWritePtr[1] = (ImDrawIdx)(vtx_inner_idx + (i0 << 1));
-			_IdxWritePtr[2] = (ImDrawIdx)(vtx_outer_idx + (i0 << 1));
-			_IdxWritePtr[3] = (ImDrawIdx)(vtx_outer_idx + (i0 << 1));
-			_IdxWritePtr[4] = (ImDrawIdx)(vtx_outer_idx + (i1 << 1));
-			_IdxWritePtr[5] = (ImDrawIdx)(vtx_inner_idx + (i1 << 1));
-			_IdxWritePtr += 6;
-		}
-		_VtxCurrentIdx += (ImDrawIdx)vtx_count;
+		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
+		poly_fill(ctx, &bounds);
+		//_bind_draw_pipeline(ctx);
+		//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+		//_draw_full_screen_quad(ctx, &bounds);
+		//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+		return;
 	}
-	else
-	{
-		// Non Anti-aliased Fill
-		const int idx_count = (points_count - 2) * 3;
-		const int vtx_count = points_count;
-		PrimReserve(idx_count, vtx_count);
-		for (int i = 0; i < vtx_count; i++)
-		{
-			_VtxWritePtr[0].pos = points[i]; _VtxWritePtr[0].uv = uv; _VtxWritePtr[0].col = col;
-			_VtxWritePtr++;
+	fill_non_zero(ctx);
+}
+
+
+bool a_path_is_closed(paths_t* ctx, uint32_t ptrPath) { return ctx->pathes[ptrPath] & PATH_CLOSED_BIT; }
+void vgpath_ctx::a_add_triangle_indices(paths_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2) {
+	_indices.push_back(i0);
+	_indices.push_back(i1);
+	_indices.push_back(i2);
+}
+void vgpath_ctx::a_add_tri_indices_for_rect(VKVG_IBO_INDEX_TYPE i) {
+	_indices.resize(_indices.size() + 6);
+	VKVG_IBO_INDEX_TYPE* inds = _indices.data() + _indices.size() - 6;
+	inds[0] = i;
+	inds[1] = i + 2;
+	inds[2] = i + 1;
+	inds[3] = i + 1;
+	inds[4] = i + 2;
+	inds[5] = i + 3;
+}
+void vgpath_ctx::_add_vertexf(paths_t* ctx, float x, float y) {
+	Vertex v = {};
+	v.pos = { x,y };
+	v.color = ctx->curColor;
+	v.uv.z = -1;
+	_vertex.push_back(v);
+}
+float a_get_arc_step(paths_t* ctx, float radius) {
+	float r = radius * fabsf(fmaxf(ctx->t->scale_x, ctx->t->scale_y));
+	if (r < 30.0f)
+		return fminf(M_PIF / 3.f, M_PIF / r);
+	return fminf(M_PIF / 3.f, M_PIF / (r * 0.4f));
+}
+bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve) {
+	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+	vec2   p0 = ctx->points[str->cp];
+	vec2   v0 = vec2_sub(p0, ctx->points[str->iL]);
+	vec2   v1 = vec2_sub(ctx->points[str->iR], p0);
+	float  length_v0 = vec2_length(v0);
+	float  length_v1 = vec2_length(v1);
+	if (length_v0 < FLT_EPSILON || length_v1 < FLT_EPSILON) {
+		LOG(VKVG_LOG_STROKE, "vb_step discard, length<epsilon: l0:%f l1:%f\n", length_v0, length_v1);
+		return false;
+	}
+	vec2  v0n = vec2_div_s(v0, length_v0);
+	vec2  v1n = vec2_div_s(v1, length_v1);
+	float dot = vec2_dot(v0n, v1n);
+	float det = v0n.x * v1n.y - v0n.y * v1n.x;
+	if (EQUF(dot, 1.0f)) { // colinear
+		LOG(VKVG_LOG_STROKE, "vb_step discard, dot==1\n");
+		return false;
+	}
+	if (EQUF(dot, -1.0f)) { // cusp (could draw line butt?)
+		vec2 vPerp = vec2_mult_s(vec2_perp(v0n), str->hw);
+		VKVG_IBO_INDEX_TYPE idx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+		v.pos = vec2_add(p0, vPerp);
+		_vertex.push_back(v);
+		v.pos = vec2_sub(p0, vPerp);
+		_vertex.push_back(v);
+		a_add_triangle_indices(ctx, idx, idx + 1, idx + 2);
+		a_add_triangle_indices(ctx, idx, idx + 2, idx + 3);
+		LOG(VKVG_LOG_STROKE, "vb_step cusp, dot==-1\n");
+		return true;
+	}
+	vec2  bisec_n = vec2_norm(vec2_add(v0n, v1n)); // bisec/bisec_perp are inverted names
+	float alpha = acosf(dot);
+
+	if (det < 0)
+		alpha = -alpha;
+	float halfAlpha = alpha / 2.f;
+	float cosHalfAlpha = cosf(halfAlpha);
+	float lh = str->hw / cosHalfAlpha;
+	vec2  bisec_n_perp = vec2_perp(bisec_n);
+	// limit bisectrice length
+	float rlh = lh; // rlh is for inside pos tweeks
+	if (dot < 0.f)
+		rlh = fminf(rlh, fminf(length_v0, length_v1));
+	//---
+
+	vec2 bisec = vec2_mult_s(bisec_n_perp, rlh);
+
+	VKVG_IBO_INDEX_TYPE idx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+
+	vec2 rlh_inside_pos, rlh_outside_pos;
+	if (rlh < lh) {
+		vec2 vnPerp;
+		if (length_v0 < length_v1)
+			vnPerp = vec2_perp(v1n);
+		else
+			vnPerp = vec2_perp(v0n);
+		vec2 vHwPerp = vec2_mult_s(vnPerp, str->hw);
+
+		double lbc = cosHalfAlpha * rlh;
+		if (det < 0.f) {
+			rlh_inside_pos = vec2_add(vec2_add(vec2_mult_s(vnPerp, -lbc), vec2_add(p0, bisec)), vHwPerp);
+			rlh_outside_pos = vec2_sub(p0, vec2_mult_s(bisec_n_perp, lh));
 		}
-		_Data->TempBuffer.reserve_discard((ImTriangulator::EstimateScratchBufferSize(points_count) + sizeof(ImVec2)) / sizeof(ImVec2));
-		triangulator.Init(points, points_count, _Data->TempBuffer.Data);
-		while (triangulator._TrianglesLeft > 0)
-		{
-			triangulator.GetNextTriangle(triangle);
-			_IdxWritePtr[0] = (ImDrawIdx)(_VtxCurrentIdx + triangle[0]);
-			_IdxWritePtr[1] = (ImDrawIdx)(_VtxCurrentIdx + triangle[1]);
-			_IdxWritePtr[2] = (ImDrawIdx)(_VtxCurrentIdx + triangle[2]);
-			_IdxWritePtr += 3;
+		else {
+			rlh_inside_pos = vec2_sub(vec2_add(vec2_mult_s(vnPerp, lbc), vec2_sub(p0, bisec)), vHwPerp);
+			rlh_outside_pos = vec2_add(p0, vec2_mult_s(bisec_n_perp, lh));
 		}
-		_VtxCurrentIdx += (ImDrawIdx)vtx_count;
+	}
+	else {
+		if (det < 0.0) {
+			rlh_inside_pos = vec2_add(p0, bisec);
+			rlh_outside_pos = vec2_sub(p0, bisec);
+		}
+		else {
+			rlh_inside_pos = vec2_sub(p0, bisec);
+			rlh_outside_pos = vec2_add(p0, bisec);
+		}
+	}
+
+	vkvg_line_join_t join = ctx->t->lineJoin;
+
+	if (isCurve) {
+		if (dot < 0.8f)
+			join = VKVG_LINE_JOIN_ROUND;
+		else
+			join = VKVG_LINE_JOIN_MITER;
+	}
+
+	if (join == VKVG_LINE_JOIN_MITER) {
+		if (lh > str->lhMax) { // miter limit
+			double x = (lh - str->lhMax) * cosHalfAlpha;
+			vec2   bisecPerp = vec2_mult_s(bisec_n, x);
+			bisec = vec2_mult_s(bisec_n_perp, str->lhMax);
+			if (det < 0) {
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+
+				vec2 p = vec2_sub(p0, bisec);
+
+				v.pos = vec2_sub(p, bisecPerp);
+				_vertex.push_back(v);
+				v.pos = vec2_add(p, bisecPerp);
+				_vertex.push_back(v);
+
+				a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				a_add_triangle_indices(ctx, idx + 2, idx + 4, idx);
+				a_add_triangle_indices(ctx, idx, idx + 3, idx + 4);
+				return true;
+			}
+			else {
+				vec2 p = vec2_add(p0, bisec);
+				v.pos = vec2_sub(p, bisecPerp);
+				_vertex.push_back(v);
+
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+
+				v.pos = vec2_add(p, bisecPerp);
+				_vertex.push_back(v);
+
+				a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				a_add_triangle_indices(ctx, idx + 2, idx + 3, idx + 1);
+				a_add_triangle_indices(ctx, idx + 1, idx + 3, idx + 4);
+				return false;
+			}
+
+		}
+		else { // normal miter
+			if (det < 0) {
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+				v.pos = rlh_outside_pos;
+				_vertex.push_back(v);
+			}
+			else {
+				v.pos = rlh_outside_pos;
+				_vertex.push_back(v);
+				v.pos = rlh_inside_pos;
+				_vertex.push_back(v);
+			}
+
+			a_add_tri_indices_for_rect(idx);
+			return false;
+		}
+	}
+	else {
+		vec2 vp = vec2_perp(v0n);
+
+		if (det < 0) {
+			if (dot < 0 && rlh < lh)
+				v.pos = rlh_inside_pos;
+			else
+				v.pos = vec2_add(p0, bisec);
+			_vertex.push_back(v);
+			v.pos = vec2_sub(p0, vec2_mult_s(vp, str->hw));
+		}
+		else {
+			v.pos = vec2_add(p0, vec2_mult_s(vp, str->hw));
+			_vertex.push_back(v);
+			if (dot < 0 && rlh < lh)
+				v.pos = rlh_inside_pos;
+			else
+				v.pos = vec2_sub(p0, bisec);
+		}
+		_vertex.push_back(v);
+
+		if (join == VKVG_LINE_JOIN_BEVEL) {
+			if (det < 0) {
+				a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				a_add_triangle_indices(ctx, idx + 2, idx + 4, idx + 0);
+				a_add_triangle_indices(ctx, idx, idx + 3, idx + 4);
+			}
+			else {
+				a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+				a_add_triangle_indices(ctx, idx + 2, idx + 3, idx + 1);
+				a_add_triangle_indices(ctx, idx + 1, idx + 3, idx + 4);
+			}
+		}
+		else if (join == VKVG_LINE_JOIN_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = a_get_arc_step(ctx, str->hw);
+			float a = acosf(vp.x);
+			if (vp.y < 0)
+				a = -a;
+
+			if (det < 0) {
+				a += M_PIF;
+				float a1 = a + alpha;
+				a -= str->arcStep;
+				while (a > a1) {
+					_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+					a -= str->arcStep;
+				}
+			}
+			else {
+				float a1 = a + alpha;
+				a += str->arcStep;
+				while (a < a1) {
+					_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+					a += str->arcStep;
+				}
+			}
+			VKVG_IBO_INDEX_TYPE p0Idx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+			a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
+			if (det < 0) {
+				for (VKVG_IBO_INDEX_TYPE p = idx + 2; p < p0Idx; p++)
+					a_add_triangle_indices(ctx, p, p + 1, idx);
+				a_add_triangle_indices(ctx, p0Idx, p0Idx + 2, idx);
+				a_add_triangle_indices(ctx, idx, p0Idx + 1, p0Idx + 2);
+			}
+			else {
+				for (VKVG_IBO_INDEX_TYPE p = idx + 2; p < p0Idx; p++)
+					a_add_triangle_indices(ctx, p, p + 1, idx + 1);
+				a_add_triangle_indices(ctx, p0Idx, p0Idx + 1, idx + 1);
+				a_add_triangle_indices(ctx, idx + 1, p0Idx + 1, p0Idx + 2);
+			}
+		}
+
+		vp = vec2_mult_s(vec2_perp(v1n), str->hw);
+		if (det < 0)
+			v.pos = vec2_sub(p0, vp);
+		else
+			v.pos = vec2_add(p0, vp);
+		_vertex.push_back(v);
+	}
+
+	return (det < 0);
+}
+
+void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart) {
+	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
+
+	VKVG_IBO_INDEX_TYPE firstIdx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+
+	if (isStart) {
+		vec2 vhw = vec2_mult_s(n, str->hw);
+
+		if (ctx->t->lineCap == VKVG_LINE_CAP_SQUARE)
+			p0 = vec2_sub(p0, vhw);
+
+		vhw = vec2_perp(vhw);
+
+		if (ctx->t->lineCap == VKVG_LINE_CAP_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = a_get_arc_step(ctx, str->hw);
+
+			float a = acosf(n.x) + M_PIF_2;
+			if (n.y < 0)
+				a = M_PIF - a;
+			float a1 = a + M_PIF;
+
+			a += str->arcStep;
+			while (a < a1) {
+				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+				a += str->arcStep;
+			}
+			VKVG_IBO_INDEX_TYPE p0Idx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+			for (VKVG_IBO_INDEX_TYPE p = firstIdx; p < p0Idx; p++)
+				a_add_triangle_indices(ctx, p0Idx + 1, p, p + 1);
+			firstIdx = p0Idx;
+		}
+
+		v.pos = vec2_add(p0, vhw);
+		_vertex.push_back(v);
+		v.pos = vec2_sub(p0, vhw);
+		_vertex.push_back(v);
+
+		a_add_tri_indices_for_rect(firstIdx);
+	}
+	else {
+		vec2 vhw = vec2_mult_s(n, str->hw);
+
+		if (ctx->t->lineCap == VKVG_LINE_CAP_SQUARE)
+			p0 = vec2_add(p0, vhw);
+
+		vhw = vec2_perp(vhw);
+
+		v.pos = vec2_add(p0, vhw);
+		_vertex.push_back(v);
+		v.pos = vec2_sub(p0, vhw);
+		_vertex.push_back(v);
+
+		firstIdx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+
+		if (ctx->t->lineCap == VKVG_LINE_CAP_ROUND) {
+			if (!str->arcStep)
+				str->arcStep = a_get_arc_step(ctx, str->hw);
+
+			float a = acosf(n.x) + M_PIF_2;
+			if (n.y < 0)
+				a = M_PIF - a;
+			float a1 = a - M_PIF;
+
+			a -= str->arcStep;
+			while (a > a1) {
+				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
+				a -= str->arcStep;
+			}
+
+			VKVG_IBO_INDEX_TYPE p0Idx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+			for (VKVG_IBO_INDEX_TYPE p = firstIdx - 1; p < p0Idx; p++)
+				a_add_triangle_indices(ctx, p + 1, p, firstIdx - 2);
+		}
 	}
 }
+float vgpath_ctx::_draw_dashed_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
+	// vec2 pL = ctx->points[str->iL];
+	vec2 p = ctx->points[str->cp];
+	vec2 pR = ctx->points[str->iR];
+
+	if (!dc->dashOn) // we test in fact the next dash start, if dashOn = true => next segment is a void.
+		_build_vb_step(ctx, str, isCurve);
+
+	vec2 d = vec2_sub(pR, p);
+	dc->normal = vec2_norm(d);
+	float segmentLength = vec2_length(d);
+
+	while (dc->curDashOffset < segmentLength) {
+		vec2 p0 = vec2_add(p, vec2_mult_s(dc->normal, dc->curDashOffset));
+
+		_draw_stoke_cap(ctx, str, p0, dc->normal, dc->dashOn);
+		dc->dashOn ^= true;
+		dc->curDashOffset += ctx->t->dashes[dc->curDash];
+		if (++dc->curDash == ctx->t->dashCount)
+			dc->curDash = 0;
+	}
+	dc->curDashOffset -= segmentLength;
+	dc->curDashOffset = fmodf(dc->curDashOffset, dc->totDashLength);
+	return segmentLength;
+}
+void vgpath_ctx::_draw_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve) {
+	str->iR = str->cp + 1;
+	if (ctx->t->dashCount > 0)
+		_draw_dashed_segment(ctx, str, dc, isCurve);
+	else
+		_build_vb_step(ctx, str, isCurve);
+	str->iL = str->cp++;
+	//if (_vertex.size() - curVertOffset > VKVG_IBO_MAX / 3) {
+	//	Vertex v0 = _vertex[curVertOffset + str->firstIdx];
+	//	Vertex v1 = _vertex[curVertOffset + str->firstIdx + 1];
+	//	_emit_draw_cmd_undrawn_vertices(ctx);
+	//	// repeat first 2 vertices for closed pathes
+	//	str->firstIdx = (VKVG_IBO_INDEX_TYPE)(_vertex.size() - curVertOffset);
+	//	_vertex.push_back( v0);
+	//	_vertex.push_back(v1);
+	//	curVertOffset = _vertex.size(); // prevent redrawing them at the start of the batch
+	//}
+}
+
+void vgpath_ctx::stroke_preserve(paths_t* ctx, vg_value_t* t, uint32_t color) {
+	if (!ctx || !ctx->pathPtr || !t) // nothing to stroke
+		return;
+	ctx->t = t;
+	stroke_context_t str = { 0 };
+	str.hw = t->lineWidth * 0.5f;
+	str.lhMax = t->miterLimit * t->lineWidth;
+	uint32_t ptrPath = 0;
+	ctx->curColor = color;
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t ptrSegment = 0, lastSegmentPointIdx = 0;
+		uint32_t firstPathPointIdx = str.cp;
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		uint32_t lastPathPointIdx = str.cp + pathPointCount - 1;
+
+		dash_context_t dc = { 0 };
+
+		if (a_path_has_curves(ctx->pathes, ptrPath)) {
+			ptrSegment = 1;
+			lastSegmentPointIdx = str.cp + (ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK) - 1;
+		}
+
+		str.firstIdx = (VKVG_IBO_INDEX_TYPE)_vertex.size();// (p->vertCount - ctx->curVertOffset);
+
+		// LOG(VKVG_LOG_INFO_PATH, "\tPATH: points count=%10d end point idx=%10d", ctx->pathes[ptrPath]&PATH_ELT_MASK,
+		// lastPathPointIdx);
+
+		if (t->dashCount > 0) {
+			// init dash stroke
+			dc.dashOn = true;
+			dc.curDash = 0; // current dash index
+			dc.totDashLength = 0; // limit offset to total length of dashes
+			for (uint32_t i = 0; i < t->dashCount; i++)
+				dc.totDashLength += t->dashes[i];
+			if (dc.totDashLength == 0) {
+				//ctx->status = VKVG_STATUS_INVALID_DASH;
+				return;
+			}
+			dc.curDashOffset = fmodf(
+				t->dashOffset,
+				dc.totDashLength); // cur dash offset between defined path point and last dash segment(on/off) start
+			str.iL = lastPathPointIdx;
+		}
+		else if (a_path_is_closed(ctx, ptrPath)) {
+			str.iL = lastPathPointIdx;
+		}
+		else {
+			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
+				vec2_line_norm(ctx->points[str.cp], ctx->points[str.cp + 1]), true);
+			str.iL = str.cp++;
+		}
+
+		if (a_path_has_curves(ctx->pathes, ptrPath)) {
+			while (str.cp < lastPathPointIdx) {
+
+				bool curved = ctx->pathes[ptrPath + ptrSegment] & PATH_HAS_CURVES_BIT;
+				if (lastSegmentPointIdx == lastPathPointIdx) // last segment of path, dont draw end point here
+					lastSegmentPointIdx--;
+				while (str.cp <= lastSegmentPointIdx)
+					_draw_segment(ctx, &str, &dc, curved);
+
+				ptrSegment++;
+				uint32_t cptSegPts = ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK;
+				lastSegmentPointIdx = str.cp + cptSegPts - 1;
+				if (lastSegmentPointIdx == lastPathPointIdx && cptSegPts == 1) {
+					// single point last segment
+					ptrSegment++;
+					break;
+				}
+			}
+		}
+		else
+			while (str.cp < lastPathPointIdx)
+				_draw_segment(ctx, &str, &dc, false);
+
+		if (t->dashCount > 0) {
+			if (a_path_is_closed(ctx, ptrPath)) {
+				str.iR = firstPathPointIdx;
+
+				_draw_dashed_segment(ctx, &str, &dc, false);
+
+				str.iL++;
+				str.cp++;
+			}
+			if (!dc.dashOn) {
+				// finishing last dash that is already started, draw end caps but not too close to start
+				// the default gap is the next void
+				int32_t prevDash = (int32_t)dc.curDash - 1;
+				if (prevDash < 0)
+					dc.curDash = t->dashCount - 1;
+				float m = fminf(t->dashes[prevDash] - dc.curDashOffset, t->dashes[dc.curDash]);
+				vec2  p2 = vec2_sub(ctx->points[str.iR], vec2_mult_s(dc.normal, m));
+				_draw_stoke_cap(ctx, &str, p2, dc.normal, false);
+			}
+		}
+		else if (a_path_is_closed(ctx, ptrPath)) {
+			str.iR = firstPathPointIdx;
+			bool inverse = _build_vb_step(ctx, &str, false);
+			VKVG_IBO_INDEX_TYPE* inds = &_indices[_indices.size() - 6];
+			VKVG_IBO_INDEX_TYPE  ii = str.firstIdx;
+			if (inverse) {
+				inds[1] = ii + 1;
+				inds[4] = ii + 1;
+				inds[5] = ii;
+			}
+			else {
+				inds[1] = ii;
+				inds[4] = ii;
+				inds[5] = ii + 1;
+			}
+			str.cp++;
+		}
+		else
+			_draw_stoke_cap(ctx, &str, ctx->points[str.cp],
+				vec2_line_norm(ctx->points[str.cp - 1], ctx->points[str.cp]), false);
+
+		str.cp = firstPathPointIdx + pathPointCount;
+
+		if (ptrSegment > 0)
+			ptrPath += ptrSegment;
+		else
+			ptrPath++;
+
+	}
+}
+
 #endif
 
 

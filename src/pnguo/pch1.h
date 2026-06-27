@@ -49,6 +49,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <cmath>
 #include <map>
 #include <set> 
 #include <string> 
