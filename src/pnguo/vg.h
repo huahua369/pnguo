@@ -59,7 +59,7 @@ struct vg_vector {
 	}
 
 	void grow(size_t new_size) {
-		size_t new_cap = (cap == 0) ? new_size : cap * 2;
+		size_t new_cap = (cap == 0) ? new_size : cap;
 		while (new_size >= new_cap) {
 			new_cap *= 2;
 		}

@@ -209,6 +209,7 @@ list(APPEND vkvglib
  draco::draco
  FFTW3::fftw3 FFTW3::fftw3f FFTW3::fftw3l
  FLAC::FLAC MPG123::libmpg123
+ glutess
 )
 #include_directories(tcmp PRIVATE ${Stb_INCLUDE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 #target_link_libraries(tcmp PRIVATE ${lklib})

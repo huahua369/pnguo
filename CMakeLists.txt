@@ -187,6 +187,7 @@ add_definitions(-DVKVG_USE_FONTCONFIG)
 add_definitions(-DVKVG_USE_HARFBUZZ_CX)
 #add_definitions(-DVKVG_ENABLE_VK_TIMELINE_SEMAPHORE)
 add_definitions(-DVKH_USE_VMA)
+add_definitions(-DVKVG_FILL_NZ_GLUTESS)
 
 add_definitions(-DXATLAS_C_API=1) 
 
@@ -250,6 +251,7 @@ include_directories("third_party/mcut")
 include_directories("third_party/vkvg")
 include_directories("third_party/vkvg/src")
 include_directories("third_party/vkvg/src/recording")
+include_directories("third_party/glutess/include")
 include_directories("third_party/vkh/include")
 include_directories("third_party/vkh/src")
 include_directories("test_src")
@@ -275,6 +277,7 @@ mktx
 #2d渲染器
 add_subdirectory(third_party/spine/spine-c ${CMAKE_BINARY_DIR}/spine-c)
 add_subdirectory(third_party/ktx)
+add_subdirectory(third_party/glutess)
 #3d渲染器
 add_subdirectory(src/pnguo)
 #add_definitions(-DTINYGLTF_NO_INCLUDE_STB_IMAGE)

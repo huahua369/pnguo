@@ -20,7 +20,7 @@ extern "C" {
 #include "vkh_image.h"
 
 #ifdef VKVG_FILL_NZ_GLUTESS
-#include "glutess.h"
+#include <glutess.h>
 #endif
 
 #include "cross_os.h"
@@ -181,6 +181,7 @@ struct vkvg_context_cx {
 
 	uint32_t capPathPointCount = 0;
 	ear_clip_point* ecps = 0;
+	bool fill_rule_winding = false;
 };
 
 
@@ -1043,6 +1044,7 @@ void vkvg_clear(VkvgContext ctx) {
 	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 }
+void ear_fill_non_zero(VkvgContext ctx);
 void _clip_preserve(VkvgContext ctx) {
 	_finish_path(ctx);
 
@@ -1068,7 +1070,7 @@ void _clip_preserve(VkvgContext ctx) {
 		CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 		CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 		CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-		_fill_non_zero(ctx);
+		ear_fill_non_zero(ctx);
 		_emit_draw_cmd_undrawn_vertices(ctx);
 	}
 	CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
@@ -1110,7 +1112,11 @@ void _fill_preserve(VkvgContext ctx) {
 
 	if (ctx->pattern) // if not solid color, source img or gradient has to be bound
 		_ensure_renderpass_is_started(ctx);
-	_fill_non_zero(ctx);
+	auto cx = (vkvg_context_cx*)ctx;
+	if (cx->fill_rule_winding)
+		_fill_non_zero(ctx);
+	else
+		ear_fill_non_zero(ctx);
 }
 void _stroke_preserve(VkvgContext ctx) {
 	_finish_path(ctx);
@@ -3826,9 +3832,10 @@ void _fill_non_zero(VkvgContext ctx) {
 
 	gluDeleteTess(tess);
 }
-#else
+#endif
+#if 1
 // create fill from current path with ear clipping technic
-void _fill_non_zero(VkvgContext ctx) {
+void ear_fill_non_zero(VkvgContext ctx) {
 	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
 	auto pcx = (vkvg_context_cx*)ctx;
 
@@ -5462,6 +5469,13 @@ vkvg_status_t vkvg_pattern_set_rotate(VkvgPattern pat, int angle) {
 	if (!grad)return VKVG_STATUS_PATTERN_INVALID_GRADIENT;
 	grad->m = rota2x2(angle);
 	return VKVG_STATUS_SUCCESS;
+}
+vkvg_status_t vkvg_set_glutess(VkvgContext ctx, bool enable)
+{
+	auto cx = (vkvg_context_cx*)ctx;
+	if (cx)
+		cx->fill_rule_winding = enable;
+	return cx ? VKVG_STATUS_SUCCESS : VKVG_STATUS_NULL_POINTER;
 }
 vkvg_status_t vkvg_pattern_set_color_stop_offset(VkvgPattern pat, int idx, float offset) {
 	if (vkvg_pattern_status(pat))
@@ -8051,7 +8065,7 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 					bounds->yMin = v.pos.y;
 				if (v.pos.y > bounds->yMax)
 					bounds->yMax = v.pos.y;
-			}			 
+			}
 			//CmdDraw(ctx->cmd, pathPointCount, 1, firstVertIdx, 0);
 		}
 		firstPtIdx += pathPointCount;
@@ -8076,7 +8090,7 @@ void vgpath_ctx::fill_preserve(paths_t* ctx, vg_value_t* t)
 	if (ctx->t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 
 		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
-		poly_fill(ctx, &bounds);
+		//poly_fill(ctx, &bounds);
 		//_bind_draw_pipeline(ctx);
 		//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 		//_draw_full_screen_quad(ctx, &bounds);

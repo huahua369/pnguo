@@ -370,17 +370,25 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	if (img) {
 		//vkvg_rectangle(cr, 10, 10, surfsize.x * 0.5, surfsize.y * 0.5);
 		//vkvg_clip(cr);
-		vkvg_set_source_surface(cr, img, 0, 0);
+		auto pattern = vkvg_pattern_create_for_surface(img);
+		vkvg_pattern_set_extend(pattern, VKVG_EXTEND_NONE);
+		vkvg_matrix_t   matrix;
+		float w = vkvg_surface_get_width(img), h = vkvg_surface_get_height(img);
+		vkvg_matrix_init_scale(&matrix, w / 128.0, h / 128.0);
+		vkvg_pattern_set_matrix(pattern, &matrix);
+		vkvg_set_source(cr, pattern);
 		vkvg_rectangle(cr, 0, 0, 128, 128);
-		vkvg_paint(cr);
-		vkvg_paint(cr);
+		vkvg_set_opacity(cr, 0.2);
+		//vkvg_paint(cr);
+		vkvg_set_opacity(cr, 1.0);
+		vkvg_pattern_destroy(pattern);
 	}
 	vkvg_translate(cr, 126, 0);
 	vkvg_translate(cr, 0, 30);
 	vkvg_set_source_color(cr, 0xff0020ff);
 	vkvg_select_font_face(cr, "Consolas");
 	vkvg_set_font_size(cr, 26);
-	vkvg_show_text(cr, "abcd0gyl");
+	//vkvg_show_text(cr, "abcd0gyl");
 	vkvg_translate(cr, 0, -30);
 	VkvgPattern pat;
 	pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
@@ -469,7 +477,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_rectangle(cr, 12, 12, 232, 70);
 	vkvg_new_sub_path(cr); vkvg_arc(cr, 64, 64, 40, 0, 2 * M_PI);
 	vkvg_new_sub_path(cr); vkvg_arc_negative(cr, 192, 64, 40, 0, -2 * M_PI);
-
+	vkvg_set_glutess(cr, true);
 	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
 	vkvg_set_source_rgb(cr, 0, 0, 0.9); vkvg_fill_preserve(cr);
 	vkvg_set_source_rgb(cr, 0, 0, 0); vkvg_stroke(cr);
