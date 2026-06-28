@@ -550,6 +550,8 @@ typedef struct {
 
 } vec4;
 
+struct ivec4 { int x, y, z, w; };
+
 typedef struct {
 	uint16_t x;
 	uint16_t y;
@@ -1142,6 +1144,12 @@ typedef struct _vkvg_context_save_t {
 
 } vkvg_context_save_t;
 
+typedef struct _ear_clip_point {
+	vec2                    pos;
+	VKVG_IBO_INDEX_TYPE     idx;
+	struct _ear_clip_point* next;
+} ear_clip_point;
+
 typedef struct _vkvg_context_t {
 	vkvg_status_t status;
 	uint32_t      references; // reference count
@@ -1245,13 +1253,15 @@ typedef struct _vkvg_context_t {
 
 	VkClearRect           clearRect;
 	VkRenderPassBeginInfo renderPassBeginInfo;
+
+	PFN_vkCmdPushDescriptorSet _vkCmdPushDescriptorSet = {};
+	uint32_t maxPushDescriptors = 0;
+
+	uint32_t capPathPointCount = 0;
+	ear_clip_point* ecps = 0;
+	bool fill_rule_winding = false;
 } vkvg_context;
 
-typedef struct _ear_clip_point {
-	vec2                    pos;
-	VKVG_IBO_INDEX_TYPE     idx;
-	struct _ear_clip_point* next;
-} ear_clip_point;
 
 typedef struct {
 	bool     dashOn;
@@ -1407,7 +1417,7 @@ typedef struct _vkvg_pattern_t {
 	bool                hasMatrix;
 	void* data;
 } vkvg_pattern_t;
-
+#if 0
 typedef struct _vkvg_gradient_t {
 	vkvg_color_t colors[16];
 #ifdef VKVG_ENABLE_VK_SCALAR_BLOCK_LAYOUT
@@ -1418,3 +1428,14 @@ typedef struct _vkvg_gradient_t {
 	vec4     cp[2];
 	uint32_t count;
 } vkvg_gradient_t;
+#endif
+#define MAX_STOPS 32
+typedef struct vkvg_gradient_t {
+	vkvg_color_t colors[MAX_STOPS];
+	float stops[MAX_STOPS];
+	vec4 cp[2];
+	ivec4 m;
+	vec2 scale;	// 缩放目标
+	uint32_t count;
+	int extend;
+};
