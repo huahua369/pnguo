@@ -69,8 +69,7 @@ list(APPEND src_mmd
 ) 
 list(APPEND src_vkvg   
     "main_vg.cpp" 
-    ${VKH_SRC}
-    "../third_party/vkvg/src/deps/tinycthread.c"
+    ${VKH_SRC} 
     "../third_party/tinyspline/parson.c"
     "../third_party/tinyspline/tinyspline.c"
     "../third_party/tinyspline/tinysplinecxx.cpp"  

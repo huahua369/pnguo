@@ -212,9 +212,7 @@ pkg_check_modules(Clipper2Z REQUIRED IMPORTED_TARGET Clipper2Z)
 message("--glib  ${GLIB_LIBRARIES}")
 #pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)  
 #vkvg 
-FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c
-  third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp 
-)
+#FILE(GLOB VKVG_SRC third_party/vkvg/src/*.c third_party/vkvg/src/deps/*.c third_party/vkvg/src/recording/*.c third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp )
 FILE(GLOB VKH_SRC 
   third_party/vkh/src/*.c third_party/vkh/src/vma/*.cpp
 )

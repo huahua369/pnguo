@@ -405,7 +405,9 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
 	vkvg_rectangle(cr, 130, 0, 256, 256);
 	vkvg_set_source(cr, pat);
-	vkvg_fill(cr);
+	//vkvg_fill(cr); 
+	vkvg_set_line_width(cr, 10);
+	vkvg_stroke(cr);
 	vkvg_pattern_destroy(pat);
 	vkvg_translate(cr, 260, 0);
 	//pat = vkvg_pattern_create_radial(128, 128, 25.6, 128, 128, 128.0, true);
