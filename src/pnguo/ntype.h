@@ -264,6 +264,8 @@ namespace hz {
 
 #endif // _HAS_CXX17
 
+#define USP_CX hz::usp_ac
+
 	// todu 一次清空对象自动调用析构函数
 #ifndef AUTO_DC
 #define AUTO_DC

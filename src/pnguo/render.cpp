@@ -2556,7 +2556,7 @@ size_t cmd_op_draw_path(uint8_t* d, VkvgContext ctx)
 	auto t = path->v;
 	bool stroke = false;
 	//vkvg_save(cr);
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	//vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
 	glm::vec2 pos, scale = {};
 	pos += path->pos;
 	if (path->flip_y)

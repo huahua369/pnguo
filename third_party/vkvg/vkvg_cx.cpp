@@ -56,7 +56,6 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 
 
 
-#if 1
 
 #include <stdlib.h>
 
@@ -83,6 +82,55 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 #define FALSE 0
 #endif
 
+
+struct state_save_t {
+	float		lineWidth;
+	float		miterLimit;
+	uint32_t	dashCount;  // value count in dash array, 0 if dash not set.
+	float		dashOffset; // an offset for dash
+	float*		dashes;     // an array of alternate lengths of on and off stroke.
+	vkvg_operator_t		curOperator;
+	vkvg_line_cap_t		lineCap;
+	vkvg_line_join_t	lineJoint;
+	vkvg_fill_rule_t	curFillRule;
+	push_constants		pushConsts;
+	uint32_t			curColor;
+	VkvgPattern			pattern;
+	vkvg_clip_state_t	clippingState;
+};
+
+class vgdata_t
+{
+public:
+	t_vector<Vertex> vertexCache;	// 一帧的顶点
+	t_vector<VKVG_IBO_INDEX_TYPE> indexCache; // 索引
+	struct cmd_t {
+		ivec2 vertex = {};			// 顶点开始、数量
+		ivec2 index = {};			// 索引开始、数量
+		state_save_t state = {};	// 渲染参数
+		int8_t type = 0;			// 类型：填充0、描边1、裁剪2
+	};
+	t_vector<cmd_t> cmdlist;		// 命令
+	USP_CX ac;						// 零散内存分配器
+public:
+	vgdata_t();
+	~vgdata_t();
+
+private:
+
+};
+
+vgdata_t::vgdata_t()
+{}
+
+vgdata_t::~vgdata_t()
+{}
+
+
+
+
+
+#if 1
 int mtx_init(mtx_t* mtx, int type) {
 #if defined(_TTHREAD_WIN32_)
 	mtx->mAlreadyLocked = FALSE;
@@ -1422,6 +1470,7 @@ void vkvg_clear(VkvgContext ctx) {
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 }
 void ear_fill_non_zero(VkvgContext ctx);
+#if 1
 void _clip_preserve(VkvgContext ctx) {
 	_finish_path(ctx);
 
@@ -1627,7 +1676,7 @@ void _stroke_preserve(VkvgContext ctx) {
 			_emit_draw_cmd_undrawn_vertices(ctx);
 	}
 }
-
+#endif
 void vkvg_clip(VkvgContext ctx) {
 	if (vkvg_status(ctx))
 		return;

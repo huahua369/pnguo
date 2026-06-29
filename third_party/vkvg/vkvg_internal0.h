@@ -550,6 +550,7 @@ typedef struct {
 
 } vec4;
 
+struct ivec2 { int x, y; };
 struct ivec4 { int x, y, z, w; };
 
 typedef struct {
