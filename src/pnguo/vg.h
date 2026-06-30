@@ -71,6 +71,10 @@ struct vg_vector {
 		}
 		a[_size++] = val;
 	}
+	T& back() {
+		assert(_size > 0);
+		return a[_size - 1];
+	}
 	void insert(size_t index, const T& val) {
 		if (index > _size) return;  // 允许在末尾插入
 		if (_size >= cap) {
@@ -81,10 +85,9 @@ struct vg_vector {
 		a[index] = val;
 		_size++;
 	}
-	void insert(size_t index, const T* first, const T* end) {
+	void insert(size_t index, const T* first, size_t n) {
 		if (index > _size)index = _size;
-		if (!first || !end || first >= end) return;  // 允许在末尾插入
-		size_t n = end - first;
+		if (!first || !n) return;  // 允许在末尾插入
 		grow(_size + n);
 		auto t = first;
 		// 将index及之后的元素整体后移一位
@@ -95,6 +98,10 @@ struct vg_vector {
 			t++;
 		}
 		_size += n;
+	}
+	void insert(size_t index, const T* first, const T* second) {
+		if (second > first)
+			insert(index, first, second - first);
 	}
 	void erase(size_t index) {
 		if (index >= _size) return;

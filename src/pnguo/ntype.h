@@ -96,6 +96,13 @@ namespace hz {
 			}
 			return p;
 		}
+		template<class T >
+		T* new_mem_o(size_t n)
+		{
+			n = std::max((size_t)1, n);
+			auto p = (T*)_alloc.allocate(sizeof(T) * n, _Align);
+			return p;
+		}
 		template<class T>
 		T* new_mem(T*& p, size_t n)
 		{

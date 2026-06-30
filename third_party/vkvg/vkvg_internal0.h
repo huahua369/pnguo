@@ -1130,7 +1130,7 @@ typedef struct _vkvg_context_save_t {
 
 	vkvg_operator_t  curOperator;
 	vkvg_line_cap_t  lineCap;
-	vkvg_line_join_t lineJoint;
+	vkvg_line_join_t lineJoin;
 	vkvg_fill_rule_t curFillRule;
 
 	long                   selectedCharSize; /* Font size*/
