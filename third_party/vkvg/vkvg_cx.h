@@ -98,3 +98,8 @@ public:
 private:
 
 };
+
+class vgpath_ctx;
+
+vgpath_ctx* new_vgctx();
+void free_vgctx(vgpath_ctx* p);

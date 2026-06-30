@@ -8225,11 +8225,18 @@ struct paths_t {
 class vgpath_ctx
 {
 public:
+	USP_CX ac;						// 零散内存分配器
 	// 输出
 	vg_vector<Vertex> _vertex;
 	vg_vector<uint32_t> _indices;
-
+	struct scmd {
+		uint32_t vertexCount;
+		uint32_t firstVertex;
+	};
 	struct cmd_t {
+		scmd* v = 0;
+		int vc = 0;
+		int full_screen_quad = 0;
 		ivec2 vertex = {};			// 顶点开始、数量
 		ivec2 index = {};			// 索引开始、数量
 		state_save_t* state = {};	// 渲染参数
@@ -8237,15 +8244,13 @@ public:
 		int8_t type = 0;			// 类型：填充0、描边1、裁剪2
 	};
 	t_vector<cmd_t> cmdlist;		// 命令
-	USP_CX ac;						// 零散内存分配器
 	// 临时缓冲用
 	vg_vector<ear_clip_point> ecpsd;
 	vg_vector<vec2> _normals;
-	uint32_t curVertOffset = 0;
 #if VKVG_FILL_NZ_GLUTESS
-	void (*vertex_cb)(uint32_t, vgpath_ctx*); // tesselator vertex callback
-	uint32_t tesselator_fan_start;
-	uint32_t            tesselator_idx_counter;
+	void (*vertex_cb)(uint32_t, vgpath_ctx*) = 0; // tesselator vertex callback
+	uint32_t tesselator_fan_start = 0;
+	uint32_t tesselator_idx_counter = 0;
 #endif
 	uint32_t curColor = 0xFFffffff;
 	bool is_glutess = false;
@@ -8256,6 +8261,9 @@ public:
 	void clip_preserve(paths_t* ctx, state_save_t* t);
 	void fill_preserve(paths_t* p, state_save_t* t);
 	void stroke_preserve(paths_t* p, state_save_t* t, uint32_t color);
+	void draw(VkvgContext ctx);
+	void begin_frame();
+	void end_frame();
 private:
 	void poly_fill(paths_t* ctx, vec4* bounds);
 	void _fill_non_zero(paths_t*);
@@ -8273,14 +8281,25 @@ private:
 
 vgpath_ctx::vgpath_ctx()
 {
-	ecpsd.ac = &ac;
-	_normals.ac = &ac;
-	cmdlist.reserve(1024);
+	_vertex.ac = _indices.ac = ecpsd.ac = _normals.ac = &ac;
+	_vertex.reserve(128);
+	_indices.reserve(1024);
+	_normals.reserve(128);
+	ecpsd.reserve(128);
+	cmdlist.reserve(128);
 }
 
 vgpath_ctx::~vgpath_ctx()
 {}
 
+void add_vertexf_unchecked(Vertex* pVert, float x, float y, uint32_t c)
+{
+	*pVert = {};
+	pVert->pos.x = x;
+	pVert->pos.y = y;
+	pVert->color = c;
+	pVert->uv.z = -1;
+}
 void vgpath_ctx::clip_preserve(paths_t* ctx, state_save_t* t)
 {
 	if (!ctx->pathPtr) // nothing to clip
@@ -8299,6 +8318,17 @@ void vgpath_ctx::clip_preserve(paths_t* ctx, state_save_t* t)
 		fill_non_zero(ctx);
 		//_emit_draw_cmd_undrawn_vertices(ctx);
 	}
+	cmdlist.back().full_screen_quad = _vertex.size();
+	Vertex v = {};
+	v.pos = { -1,-1 };
+	v.color = t->curColor;
+	v.uv.z = -1;
+	_vertex.push_back(v);
+	v.pos = { 3,-1 };
+	_vertex.push_back(v);
+	v.pos = { -1,3 };
+	_vertex.push_back(v);
+
 	//CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 	//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 	//CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
@@ -8393,7 +8423,7 @@ void combine2a(const GLdouble newVertex[3], const void* neighborVertex_s[4], con
 	void** outData, void* poly_data) {
 	vgpath_ctx* ctx = (vgpath_ctx*)poly_data;
 	Vertex      v = { {newVertex[0], newVertex[1]}, ctx->curColor, {0, 0, -1} };
-	*outData = (void*)((unsigned long)(ctx->_vertex.size() - ctx->curVertOffset));
+	*outData = (void*)(ctx->_vertex.size());
 	ctx->_vertex.push_back(v);
 }
 void vertex2a(void* vertex_data, void* poly_data) {
@@ -8642,18 +8672,35 @@ void vgpath_ctx::fill_non_zero(paths_t* p)
 }
 // Even-Odd inside test with stencil buffer implementation.
 void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
-	// we anticipate the check for vbo buffer size, ibo is not used in poly_fill
-	// the polyfill emit a single vertex for each point in the path.
-
-	cmd_t c = {};
-	c.type = 0;
-	cp_cmdt(&c, ctx->t);
-	//CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
-
 	Vertex   v = { {0}, ctx->curColor, {0, 0, -1} };
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
+	size_t nc = 0;
+	while (ptrPath < ctx->pathPtr) {
+		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
+		if (pathPointCount > 2) {
+			nc++;
+		}
+		if (a_path_has_curves(ctx->pathes, ptrPath)) {
+			// skip segments lengths used in stroke
+			ptrPath++;
+			uint32_t totPts = 0;
+			while (totPts < pathPointCount)
+				totPts += (ctx->pathes[ptrPath++] & PATH_ELT_MASK);
+		}
+		else
+			ptrPath++;
+	}
+	if (!nc)return;
+	ptrPath = 0;
 
+	cmd_t c = {};
+	c.type = 0;
+	c.v = ac.new_mem_o<scmd>(nc);
+	if (!c.v)return;
+	cp_cmdt(&c, ctx->t);
+	c.vc = nc;
+	auto cv = c.v;
 	while (ptrPath < ctx->pathPtr) {
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 		if (pathPointCount > 2) {
@@ -8661,7 +8708,6 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 			c.vertex.x = _vertex.size();
 			for (uint32_t i = 0; i < pathPointCount; i++) {
 				v.pos = ctx->points[i + firstPtIdx];
-				//ctx->vertexCache[ctx->vertCount++] = v;
 				_vertex.push_back(v);
 				if (!bounds)
 					continue;
@@ -8677,9 +8723,9 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 				if (v.pos.y > bounds->yMax)
 					bounds->yMax = v.pos.y;
 			}
-			c.vertex.y = pathPointCount;
-			cmdlist.push_back(c);
-			//CmdDraw(ctx->cmd, pathPointCount, 1, firstVertIdx, 0);
+			cv->firstVertex = firstVertIdx;
+			cv->vertexCount = pathPointCount;
+			cv++;
 		}
 		firstPtIdx += pathPointCount;
 
@@ -8693,8 +8739,9 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 		else
 			ptrPath++;
 	}
-	if (cmdlist.size() && bounds)
-		cmdlist.back().bounds = *bounds;
+	if (bounds)
+		c.bounds = *bounds;
+	cmdlist.push_back(c);
 }
 void vgpath_ctx::cp_cmdt(cmd_t* c, state_save_t* t)
 {
@@ -8723,6 +8770,16 @@ void vgpath_ctx::fill_preserve(paths_t* ctx, state_save_t* t)
 		//_draw_full_screen_quad(ctx, &bounds);
 		//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 
+		cmdlist.back().full_screen_quad = _vertex.size();
+		Vertex v = {};
+		v.pos = { -1,-1 };
+		v.color = t->curColor;
+		v.uv.z = -1;
+		_vertex.push_back(v);
+		v.pos = { 3,-1 };
+		_vertex.push_back(v);
+		v.pos = { -1,3 };
+		_vertex.push_back(v);
 	}
 	else
 	{
@@ -8791,7 +8848,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 	}
 	if (EQUF(dot, -1.0f)) { // cusp (could draw line butt?)
 		vec2 vPerp = vec2_mult_s(vec2_perp(v0n), str->hw);
-		uint32_t idx = (uint32_t)(_vertex.size() - curVertOffset);
+		uint32_t idx = (uint32_t)(_vertex.size());
 		v.pos = vec2_add(p0, vPerp);
 		_vertex.push_back(v);
 		v.pos = vec2_sub(p0, vPerp);
@@ -8818,7 +8875,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 
 	vec2 bisec = vec2_mult_s(bisec_n_perp, rlh);
 
-	uint32_t idx = (uint32_t)(_vertex.size() - curVertOffset);
+	uint32_t idx = (uint32_t)(_vertex.size());
 
 	vec2 rlh_inside_pos, rlh_outside_pos;
 	if (rlh < lh) {
@@ -8973,7 +9030,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 					a += str->arcStep;
 				}
 			}
-			uint32_t p0Idx = (uint32_t)(_vertex.size() - curVertOffset);
+			uint32_t p0Idx = (uint32_t)(_vertex.size());
 			a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
 			if (det < 0) {
 				for (uint32_t p = idx + 2; p < p0Idx; p++)
@@ -9003,7 +9060,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart) {
 	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
 
-	uint32_t firstIdx = (uint32_t)(_vertex.size() - curVertOffset);
+	uint32_t firstIdx = (uint32_t)(_vertex.size());
 
 	if (isStart) {
 		vec2 vhw = vec2_mult_s(n, str->hw);
@@ -9027,7 +9084,7 @@ void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, v
 				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
 				a += str->arcStep;
 			}
-			uint32_t p0Idx = (uint32_t)(_vertex.size() - curVertOffset);
+			uint32_t p0Idx = (uint32_t)(_vertex.size());
 			for (uint32_t p = firstIdx; p < p0Idx; p++)
 				a_add_triangle_indices(ctx, p0Idx + 1, p, p + 1);
 			firstIdx = p0Idx;
@@ -9053,7 +9110,7 @@ void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, v
 		v.pos = vec2_sub(p0, vhw);
 		_vertex.push_back(v);
 
-		firstIdx = (uint32_t)(_vertex.size() - curVertOffset);
+		firstIdx = (uint32_t)(_vertex.size());
 
 		if (ctx->t->lineCap == VKVG_LINE_CAP_ROUND) {
 			if (!str->arcStep)
@@ -9070,7 +9127,7 @@ void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, v
 				a -= str->arcStep;
 			}
 
-			uint32_t p0Idx = (uint32_t)(_vertex.size() - curVertOffset);
+			uint32_t p0Idx = (uint32_t)(_vertex.size());
 			for (uint32_t p = firstIdx - 1; p < p0Idx; p++)
 				a_add_triangle_indices(ctx, p + 1, p, firstIdx - 2);
 		}
@@ -9132,7 +9189,7 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 			lastSegmentPointIdx = str.cp + (ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK) - 1;
 		}
 
-		str.firstIdx = (uint32_t)_vertex.size();// (p->vertCount - ctx->curVertOffset);
+		str.firstIdx = (uint32_t)_vertex.size();
 
 		// LOG(VKVG_LOG_INFO_PATH, "\tPATH: points count=%10d end point idx=%10d", ctx->pathes[ptrPath]&PATH_ELT_MASK,
 		// lastPathPointIdx);
@@ -9236,6 +9293,150 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 	}
 }
 
+void bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
+	switch (t->curOperator) {
+	case VKVG_OPERATOR_OVER:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
+		break;
+	case VKVG_OPERATOR_CLEAR:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_CLEAR);
+		break;
+	case VKVG_OPERATOR_DIFFERENCE:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_SUB);
+		break;
+	default:
+		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
+		break;
+	}
+}
+
+void cmd_draw_full_screen_quad(VkvgContext ctx, vgpath_ctx::cmd_t* c, vec4* scissor)
+{
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_start(ctx->cmd, "_draw_full_screen_quad", DBG_LAB_COLOR_FSQ);
+#endif
+	if (scissor) {
+		VkRect2D r = { {(int32_t)MAX(scissor->xMin, 0), (int32_t)MAX(scissor->yMin, 0)},
+					  {(int32_t)MAX(scissor->xMax - (int32_t)scissor->xMin + 1, 1),
+					   (int32_t)MAX(scissor->yMax - (int32_t)scissor->yMin + 1, 1)} };
+		CmdSetScissor(ctx->cmd, 0, 1, &r);
+	}
+
+	uint32_t firstVertIdx = c->full_screen_quad;
+	ctx->pushConsts.fsq_patternType |= FULLSCREEN_BIT;
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &ctx->pushConsts.fsq_patternType);
+	CmdDraw(ctx->cmd, 3, 1, firstVertIdx, 0);
+	ctx->pushConsts.fsq_patternType &= ~FULLSCREEN_BIT;
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &ctx->pushConsts.fsq_patternType);
+	if (scissor)
+		CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_end(ctx->cmd);
+#endif
+}
+void resize_vbo(VkvgContext ctx, uint32_t new_size) {
+
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize VBO: %d -> ", ctx->sizeVBO);
+	ctx->sizeVBO = new_size;
+	uint32_t mod = ctx->sizeVBO % VKVG_VBO_SIZE;
+	if (mod > 0)
+		ctx->sizeVBO += VKVG_VBO_SIZE - mod;
+	LOG(VKVG_LOG_DBG_ARRAYS, "%d\n", ctx->sizeVBO);
+	vkh_buffer_resize(&ctx->vertices, ctx->sizeVBO * sizeof(Vertex), true);
+}
+void resize_ibo(VkvgContext ctx, size_t new_size) {
+
+	ctx->sizeIBO = new_size;
+	uint32_t mod = ctx->sizeIBO % VKVG_IBO_SIZE;
+	if (mod > 0)
+		ctx->sizeIBO += VKVG_IBO_SIZE - mod;
+	LOG(VKVG_LOG_DBG_ARRAYS, "resize IBO: new size: %d\n", ctx->sizeIBO);
+	vkh_buffer_resize(&ctx->indices, ctx->sizeIBO * sizeof(VKVG_IBO_INDEX_TYPE), true);
+}
+void check_vao_size(VkvgContext ctx, size_t vertCount, size_t indCount) {
+	if (vertCount > ctx->sizeVBO || indCount > ctx->sizeIBO) {
+		if (vertCount > ctx->sizeVBO)
+			resize_vbo(ctx, vertCount);
+		if (indCount > ctx->sizeIBO)
+			resize_ibo(ctx, indCount);
+	}
+}
+void vgpath_ctx::draw(VkvgContext ctx)
+{
+	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
+	check_vao_size(ctx, _vertex.size(), _indices.size());
+	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), _vertex.data(), _vertex.size() * sizeof(Vertex));
+	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), _indices.data(), _indices.size() * sizeof(uint32_t));
+	_start_cmd_for_render_pass(ctx);
+	for (auto& it : cmdlist)
+	{
+		ctx->pushConsts = it.state->pushConsts;
+		update_pattern(ctx, it.state->pattern);
+		auto t = it.state;
+		switch (it.type) {
+		case 0:
+		{
+			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
+				for (size_t i = 0; i < it.vc; i++)
+				{
+					vkCmdDraw(ctx->cmd, it.v[i].vertexCount, 1, it.v[i].firstVertex, 0);
+				}
+				bind_draw_pipeline(ctx, it.state);
+				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+				cmd_draw_full_screen_quad(ctx, &it, &it.bounds);
+				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+			}
+			else {
+				bind_draw_pipeline(ctx, it.state);
+				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
+			}
+		}
+		break;
+		case 1:
+		{
+			bind_draw_pipeline(ctx, it.state);
+			vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
+		}
+		break;
+		case 2:
+		{
+			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
+				for (size_t i = 0; i < it.vc; i++)
+				{
+					vkCmdDraw(ctx->cmd, it.v[i].vertexCount, 1, it.v[i].firstVertex, 0);
+				}
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+			}
+			else {
+				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+				CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
+			}
+			CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+			CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
+			cmd_draw_full_screen_quad(ctx, &it, NULL);
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+		}
+		break;
+		}
+	}
+	_end_render_pass(ctx);
+	vkh_cmd_end(ctx->cmd);
+	_wait_and_submit_cmd(ctx);
+}
+
+void vgpath_ctx::begin_frame()
+{}
+
+void vgpath_ctx::end_frame()
+{}
+
 #endif
 
 
@@ -9270,4 +9471,11 @@ void vkvg_clear_rect(VkvgContext ctx, int x, int y, int width, int height) {
 	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
 	ca[1].clearValue.depthStencil.depth = 1;
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &cr);
+}
+vgpath_ctx* new_vgctx() {
+	auto p = new vgpath_ctx();
+	return p;
+}
+void free_vgctx(vgpath_ctx* p) {
+	if (p)delete p;
 }

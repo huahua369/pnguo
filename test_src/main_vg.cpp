@@ -490,7 +490,45 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_surface_write_to_png(surf, filename);
 	vkvg_destroy(cr);
 }
+class A
+{
+public:
+	int x = 0;
+	A()
+	{}
+
+	~A()
+	{
+		printf("%d\n", x);
+	}
+
+private:
+
+};
+class B
+{
+public:
+	A a;
+	A b;
+public:
+	B()
+	{
+		a.x = 1;
+		b.x = 2;
+	}
+
+	~B()
+	{}
+
+private:
+
+};
+
 void testgui() {
+	{
+		vgpath_ctx* a = new_vgctx();
+		free_vgctx(a);
+	}
 	//test_vkvg("temp/vgtest0618.png", 0);
 	// 常用分辨率
 	glm::ivec2 dpis[] = {

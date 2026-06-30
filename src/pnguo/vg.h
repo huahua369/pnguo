@@ -130,6 +130,7 @@ struct vg_vector {
 		cap = 0;
 	}
 	size_t size() { return _size; }
+	bool empty() { return !_size; }
 
 	_NODISCARD _CONSTEXPR20 T* begin() noexcept {
 		return a;
