@@ -3558,8 +3558,9 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 	{
 		if (it.surface)
 		{
-			ctx_end(it.ctx);
+			vkvg_flush((VkvgContext)it.ctx);
 			vkvg_surface_resolve((VkvgSurface)it.surface);
+			ctx_end(it.ctx);
 			//if (first)
 			//{
 			//	std::string str = "temp/vgtest-" + std::to_string(ki++) + ".png";

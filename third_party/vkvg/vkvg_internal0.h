@@ -1259,7 +1259,8 @@ typedef struct _vkvg_context_t {
 	uint32_t maxPushDescriptors = 0;
 
 	uint32_t capPathPointCount = 0;
-	ear_clip_point* ecps = 0;
+	ear_clip_point* ecps = 0; 
+	//vgpath_ctx* pathCtx = 0;
 	bool fill_rule_winding = false;
 } vkvg_context;
 
@@ -1439,4 +1440,34 @@ typedef struct vkvg_gradient_t {
 	vec2 scale;	// 缩放目标
 	uint32_t count;
 	int extend;
+};
+
+
+struct state_save_t {
+	float		lineWidth;
+	float		miterLimit;
+	uint32_t	dashCount;  // value count in dash array, 0 if dash not set.
+	float		dashOffset; // an offset for dash
+	float* dashes;     // an array of alternate lengths of on and off stroke.
+	vkvg_operator_t		curOperator;
+	vkvg_line_cap_t		lineCap;
+	vkvg_line_join_t	lineJoin;
+	vkvg_fill_rule_t	curFillRule;
+	push_constants		pushConsts;
+	uint32_t			curColor;
+	VkvgPattern			pattern;
+	vkvg_clip_state_t	clippingState;
+	uint32_t			references = 1;
+	bool aa = true;
+};
+
+struct paths_t {
+	vec2* points = 0;			// 路径坐标点points array 
+	uint32_t pointCount = 0;	// 数量effective points count
+	uint32_t  pathPtr = 0;		// pointer in the path array
+	uint32_t* pathes = 0;		// 每条路径的数量
+	uint32_t  sizePathes = 0;	// 路径条数量
+	uint32_t* color = 0;		// 独立颜色数组大小与sizePathes一致，0则用默认颜色curColor
+	uint32_t curColor = 0xFFffffff;
+	state_save_t* t = 0;
 };

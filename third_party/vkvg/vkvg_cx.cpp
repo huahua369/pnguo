@@ -3,7 +3,8 @@
 #define VKVG_USE_HARFBUZZ
 
 #include <pch1.h>
-
+#include <ntype.h>
+class vgpath_ctx;
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -84,6 +85,63 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 
 
 
+
+class vgpath_ctx
+{
+public:
+	USP_CX ac;						// 零散内存分配器
+	// 输出
+	vg_vector<Vertex> _vertex;
+	vg_vector<uint32_t> _indices;
+	struct scmd {
+		uint32_t vertexCount;
+		uint32_t firstVertex;
+	};
+	struct cmd_t {
+		scmd* v = 0;
+		int vc = 0;
+		int full_screen_quad = 0;
+		ivec2 vertex = {};			// 顶点开始、数量
+		ivec2 index = {};			// 索引开始、数量
+		state_save_t* state = {};	// 渲染参数
+		vec4 bounds = {};			// 全屏填充,odd/clip专用
+		int8_t type = 0;			// 类型：填充0、描边1、裁剪2
+	};
+	t_vector<cmd_t> cmdlist;		// 命令
+	// 临时缓冲用
+	vg_vector<ear_clip_point> ecpsd;
+	vg_vector<vec2> _normals;
+#if VKVG_FILL_NZ_GLUTESS
+	void (*vertex_cb)(uint32_t, vgpath_ctx*) = 0; // tesselator vertex callback
+	uint32_t tesselator_fan_start = 0;
+	uint32_t tesselator_idx_counter = 0;
+#endif
+	uint32_t curColor = 0xFFffffff;
+	bool is_glutess = false;
+public:
+	vgpath_ctx();
+	~vgpath_ctx();
+
+	void clip_preserve(paths_t* ctx, state_save_t* t);
+	void fill_preserve(paths_t* p, state_save_t* t);
+	void stroke_preserve(paths_t* p, state_save_t* t, uint32_t color);
+	void draw(VkvgContext ctx);
+	void begin_frame();
+	void end_frame();
+private:
+	void poly_fill(paths_t* ctx, vec4* bounds);
+	void _fill_non_zero(paths_t*);
+	void fill_non_zero(paths_t* p);
+	bool _build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve);
+	void _draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart);
+	float _draw_dashed_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
+	void _draw_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
+
+	void a_add_triangle_indices(paths_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2);
+	void a_add_tri_indices_for_rect(uint32_t i);
+	void _add_vertexf(paths_t* ctx, float x, float y);
+	void cp_cmdt(cmd_t* c, state_save_t* t);
+};
 
 
 
@@ -790,6 +848,7 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 		return (VkvgContext)&_vkvg_status_no_memory;
 	}
 
+	//ctx->pathCtx = new_vgctx();
 	_init_ctx(ctx);
 
 	VkhDevice vkhd = (VkhDevice)&dev->vkDev;
@@ -839,11 +898,20 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 
 	return ctx;
 }
+void _flush_cmd_buff0(VkvgContext ctx);
 void vkvg_flush(VkvgContext ctx) {
 	if (vkvg_status(ctx))
 		return;
-	_flush_cmd_buff(ctx);
-	_wait_ctx_flush_end(ctx);
+	//c_runtime_cx rtc;
+	//rtc.begin();
+	//ctx->pathCtx->draw(ctx);
+	//ctx->pathCtx->end_frame();
+	//int ms = rtc.end();
+	//if (ms > 0)
+	//	printf("vkvg_flush wait ms: %d\n", ms);
+	//return;
+	_flush_cmd_buff0(ctx);
+	//_wait_ctx_flush_end(ctx);
 	/*
 	#ifdef DEBUG
 
@@ -1416,7 +1484,8 @@ void vkvg_clear(VkvgContext ctx) {
 		ctx->curClipState = vkvg_clip_state_none;
 	else
 		ctx->curClipState = vkvg_clip_state_clear;
-
+	//ctx->pathCtx->begin_frame();
+	//return;
 	_emit_draw_cmd_undrawn_vertices(ctx);
 	if (!ctx->cmdStarted) {
 		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
@@ -1434,6 +1503,32 @@ void _clip_preserve(VkvgContext ctx) {
 	if (!ctx->pathPtr) // nothing to clip
 		return;
 
+	//paths_t p = {};
+	//p.points = ctx->points;
+	//p.pointCount = ctx->pointCount;
+	//p.pathPtr = ctx->pathPtr;
+	//p.pathes = ctx->pathes;
+	//p.sizePathes = ctx->sizePathes;
+	//p.color = 0;
+	//p.curColor = ctx->curColor;
+	//state_save_t t = {};
+	//t.lineWidth = ctx->lineWidth;
+	//t.miterLimit = ctx->miterLimit;
+	//t.dashCount = ctx->dashCount;
+	//t.dashOffset = ctx->dashOffset;
+	//t.dashes = ctx->dashes;
+	//t.curOperator = ctx->curOperator;
+	//t.lineCap = ctx->lineCap;
+	//t.lineJoin = ctx->lineJoin;
+	//t.curFillRule = ctx->curFillRule;
+	//t.pushConsts = ctx->pushConsts;
+	//t.curColor = ctx->curColor;
+	//t.pattern = ctx->pattern;
+	//t.clippingState = ctx->curClipState;
+	//t.references = 1;
+	//t.aa = true;
+	//ctx->pathCtx->clip_preserve(&p, &t);
+	//return;
 	_emit_draw_cmd_undrawn_vertices(ctx);
 
 	LOG(VKVG_LOG_INFO, "CLIP: ctx = %p; path cpt = %d;\n", ctx, ctx->pathPtr / 2);
@@ -1477,6 +1572,32 @@ void _fill_preserve(VkvgContext ctx) {
 	if (!ctx->pathPtr) // nothing to fill
 		return;
 
+	/*paths_t p = {};
+	p.points = ctx->points;
+	p.pointCount = ctx->pointCount;
+	p.pathPtr = ctx->pathPtr;
+	p.pathes = ctx->pathes;
+	p.sizePathes = ctx->sizePathes;
+	p.color = 0;
+	p.curColor = ctx->curColor;
+	state_save_t t = {};
+	t.lineWidth = ctx->lineWidth;
+	t.miterLimit = ctx->miterLimit;
+	t.dashCount = ctx->dashCount;
+	t.dashOffset = ctx->dashOffset;
+	t.dashes = ctx->dashes;
+	t.curOperator = ctx->curOperator;
+	t.lineCap = ctx->lineCap;
+	t.lineJoin = ctx->lineJoin;
+	t.curFillRule = ctx->curFillRule;
+	t.pushConsts = ctx->pushConsts;
+	t.curColor = ctx->curColor;
+	t.pattern = ctx->pattern;
+	t.clippingState = ctx->curClipState;
+	t.references = 1;
+	t.aa = true;
+	ctx->pathCtx->fill_preserve(&p, &t);
+	return;*/
 	LOG(VKVG_LOG_INFO, "FILL: ctx = %p; path cpt = %d;\n", ctx, ctx->subpathCount);
 
 	if (ctx->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
@@ -1506,6 +1627,32 @@ void _stroke_preserve(VkvgContext ctx) {
 	if (!ctx->pathPtr) // nothing to stroke
 		return;
 
+	/*paths_t p = {};
+	p.points = ctx->points;
+	p.pointCount = ctx->pointCount;
+	p.pathPtr = ctx->pathPtr;
+	p.pathes = ctx->pathes;
+	p.sizePathes = ctx->sizePathes;
+	p.color = 0;
+	p.curColor = ctx->curColor;
+	state_save_t t = {};
+	t.lineWidth = ctx->lineWidth;
+	t.miterLimit = ctx->miterLimit;
+	t.dashCount = ctx->dashCount;
+	t.dashOffset = ctx->dashOffset;
+	t.dashes = ctx->dashes;
+	t.curOperator = ctx->curOperator;
+	t.lineCap = ctx->lineCap;
+	t.lineJoin = ctx->lineJoin;
+	t.curFillRule = ctx->curFillRule;
+	t.pushConsts = ctx->pushConsts;
+	t.curColor = ctx->curColor;
+	t.pattern = ctx->pattern;
+	t.clippingState = ctx->curClipState;
+	t.references = 1;
+	t.aa = true;
+	ctx->pathCtx->stroke_preserve(&p, &t, t.curColor);
+	return;*/
 	LOG(VKVG_LOG_INFO, "STROKE: ctx = %p; path ptr = %d;\n", ctx, ctx->pathPtr);
 
 	stroke_context_t str = { 0 };
@@ -1966,16 +2113,11 @@ void vkvg_save(VkvgContext ctx) {
 	vkvg_context_save_t* sav = (vkvg_context_save_t*)calloc(1, sizeof(vkvg_context_save_t));
 
 	_flush_cmd_buff(ctx);
-	//c_runtime_cx rtc;
-	//rtc.begin();
-	//auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
-	if (!_wait_ctx_flush_end(ctx)) {
-		free(sav);
-		return;
-	}
-	//int ms = rtc.end();
-	//if (ms > 0)
-	//	printf("save wait ms: %d\n", ms);
+
+	//if (!_wait_ctx_flush_end(ctx)) {
+	//	free(sav);
+	//	return;
+	//}
 
 	if (ctx->curClipState == vkvg_clip_state_clip) {
 		sav->clippingState = vkvg_clip_state_clip_saved;
@@ -2106,14 +2248,9 @@ void vkvg_restore(VkvgContext ctx) {
 	ctx->pSavedCtxs = sav->pNext;
 
 	_flush_cmd_buff(ctx);
-	//c_runtime_cx rtc;
-	//rtc.begin();
-	//auto st = vkGetFenceStatus(ctx->dev->vkDev, ctx->flushFence);
-	if (!_wait_ctx_flush_end(ctx))
-		return;
-	//int ms = rtc.end();
-	//if (ms > 0)
-	//	printf("restore wait ms: %d\n", ms);
+
+	//if (!_wait_ctx_flush_end(ctx))
+	//	return;
 
 	ctx->pushConsts = sav->pushConsts;
 	ctx->pushCstDirty = true;
@@ -2869,6 +3006,59 @@ bool _wait_and_submit_cmd(VkvgContext ctx) {
 	ctx->cmdStarted = false;
 	return true;
 }
+
+bool _submit_cmd(VkvgContext ctx) {
+	if (!ctx->cmdStarted) // current cmd buff is empty, be aware that wait is also canceled!!
+		return true;
+
+	LOG(VKVG_LOG_INFO, "CTX: _wait_and_submit_cmd\n");
+
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	VkvgSurface surf = ctx->pSurf;
+	VkvgDevice  dev = surf->dev;
+	// vkh_timeline_wait ((VkhDevice)&dev->vkDev, surf->timeline, ct->timelineStep);
+	if (ctx->pattern && ctx->pattern->type == VKVG_PATTERN_TYPE_SURFACE) {
+		// add source surface timeline sync.
+		VkvgSurface source = (VkvgSurface)ctx->pattern->data;
+		LOCK_SURFACE(surf)
+			LOCK_SURFACE(source)
+			LOCK_DEVICE
+			vkh_cmd_submit_timelined2(dev->gQueue, &ctx->cmd, (VkSemaphore[2]) { surf->timeline, source->timeline },
+				(uint64_t[2]) {
+			surf->timelineStep, source->timelineStep
+		},
+				(uint64_t[2]) {
+			surf->timelineStep + 1, source->timelineStep + 1
+		});
+		surf->timelineStep++;
+		source->timelineStep++;
+		ctx->timelineStep = surf->timelineStep;
+		UNLOCK_DEVICE
+			UNLOCK_SURFACE(source)
+			UNLOCK_SURFACE(surf)
+	}
+	else {
+		LOCK_SURFACE(surf)
+			LOCK_DEVICE
+			vkh_cmd_submit_timelined(dev->gQueue, &ctx->cmd, surf->timeline, surf->timelineStep, surf->timelineStep + 1);
+		surf->timelineStep++;
+		ctx->timelineStep = surf->timelineStep;
+		UNLOCK_DEVICE
+			UNLOCK_SURFACE(surf)
+	}
+#else	 
+	_device_submit_cmd(ctx->dev, &ctx->cmd, 0);
+#endif
+
+	if (ctx->cmd == ctx->cmdBuffers[0])
+		ctx->cmd = ctx->cmdBuffers[1];
+	else
+		ctx->cmd = ctx->cmdBuffers[0];
+
+	ResetCommandBuffer(ctx->cmd, 0);
+	ctx->cmdStarted = false;
+	return true;
+}
 /*void _explicit_ms_resolve (VkvgContext ctx){//should init cmd before calling this (unused, using automatic resolve by
 renderpass) vkh_image_set_layout (ctx->cmd, ctx->pSurf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT,
 						  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -2915,11 +3105,13 @@ void _flush_vertices_caches_until_vertex_base(VkvgContext ctx) {
 // current running cmd has to be completed to free usage of those
 void _flush_vertices_caches(VkvgContext ctx) {
 	if (!_wait_ctx_flush_end(ctx))
+	{
 		return;
-
-	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->vertCount * sizeof(Vertex));
-	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache, ctx->indCount * sizeof(VKVG_IBO_INDEX_TYPE));
-
+	}
+	if (ctx->vertCount)
+		memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->vertCount * sizeof(Vertex));
+	if (ctx->indCount)
+		memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache, ctx->indCount * sizeof(VKVG_IBO_INDEX_TYPE));
 	ctx->vertCount = ctx->indCount = ctx->curIndStart = ctx->curVertOffset = 0;
 }
 // this func expect cmdStarted to be true
@@ -3000,6 +3192,17 @@ void _flush_cmd_buff(VkvgContext ctx) {
 	vkh_cmd_end(ctx->cmd);
 
 	_wait_and_submit_cmd(ctx);
+}
+void _flush_cmd_buff0(VkvgContext ctx) {
+	_emit_draw_cmd_undrawn_vertices(ctx);
+	if (!ctx->cmdStarted)
+		return;
+	_end_render_pass(ctx);
+	LOG(VKVG_LOG_INFO, "FLUSH CTX: ctx = %p; vertices = %d; indices = %d\n", ctx, ctx->vertCount, ctx->indCount);
+	_flush_vertices_caches(ctx);
+	vkh_cmd_end(ctx->cmd);
+
+	_submit_cmd(ctx);
 }
 
 // bind correct draw pipeline depending on current OPERATOR
@@ -3324,6 +3527,10 @@ void _release_context_ressources(VkvgContext ctx) {
 	pcx->capPathPointCount = 0;
 	free(ctx->pathes);
 	free(ctx->points);
+	//if (ctx->pathCtx) {
+	//	free_vgctx(ctx->pathCtx);
+	//	ctx->pathCtx = 0;
+	//}
 	free(ctx);
 }
 // populate vertice buff for stroke
@@ -6668,6 +6875,8 @@ VkvgSurface _create_surface(VkvgDevice dev, VkFormat format) {
 // surface mutex must be locked to call this method, locking to guard also the surf->cmd local buffer usage.
 void _surface_submit_cmd(VkvgSurface surf) {
 	VkvgDevice dev = surf->dev;
+	c_runtime_cx rtc;
+	rtc.begin();
 #ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	LOCK_DEVICE
 		vkh_cmd_submit_timelined(dev->gQueue, &surf->cmd, surf->timeline, surf->timelineStep, surf->timelineStep + 1);
@@ -6680,7 +6889,10 @@ void _surface_submit_cmd(VkvgSurface surf) {
 	UNLOCK_DEVICE
 		WaitForFences(surf->dev->vkDev, 1, &surf->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT);
 	ResetFences(surf->dev->vkDev, 1, &surf->flushFence);
-#endif
+#endif	 
+	int ms = rtc.end();
+	if (ms > 0)
+		printf("surface wait ms: %d\n", ms);
 }
 
 #endif // 1
@@ -8194,91 +8406,6 @@ void FIXNORMAL2F(float& VX, float& VY)
 }
 
 
-struct state_save_t {
-	float		lineWidth;
-	float		miterLimit;
-	uint32_t	dashCount;  // value count in dash array, 0 if dash not set.
-	float		dashOffset; // an offset for dash
-	float* dashes;     // an array of alternate lengths of on and off stroke.
-	vkvg_operator_t		curOperator;
-	vkvg_line_cap_t		lineCap;
-	vkvg_line_join_t	lineJoin;
-	vkvg_fill_rule_t	curFillRule;
-	push_constants		pushConsts;
-	uint32_t			curColor;
-	VkvgPattern			pattern;
-	vkvg_clip_state_t	clippingState;
-	uint32_t			references = 1;
-	bool aa = true;
-};
-
-struct paths_t {
-	vec2* points = 0;			// 路径坐标点points array 
-	uint32_t pointCount = 0;	// 数量effective points count
-	uint32_t  pathPtr = 0;		// pointer in the path array
-	uint32_t* pathes = 0;		// 每条路径的数量
-	uint32_t  sizePathes = 0;	// 路径条数量
-	uint32_t* color = 0;		// 独立颜色数组大小与sizePathes一致，0则用默认颜色curColor
-	uint32_t curColor = 0xFFffffff;
-	state_save_t* t = 0;
-};
-class vgpath_ctx
-{
-public:
-	USP_CX ac;						// 零散内存分配器
-	// 输出
-	vg_vector<Vertex> _vertex;
-	vg_vector<uint32_t> _indices;
-	struct scmd {
-		uint32_t vertexCount;
-		uint32_t firstVertex;
-	};
-	struct cmd_t {
-		scmd* v = 0;
-		int vc = 0;
-		int full_screen_quad = 0;
-		ivec2 vertex = {};			// 顶点开始、数量
-		ivec2 index = {};			// 索引开始、数量
-		state_save_t* state = {};	// 渲染参数
-		vec4 bounds = {};			// 全屏填充,odd/clip专用
-		int8_t type = 0;			// 类型：填充0、描边1、裁剪2
-	};
-	t_vector<cmd_t> cmdlist;		// 命令
-	// 临时缓冲用
-	vg_vector<ear_clip_point> ecpsd;
-	vg_vector<vec2> _normals;
-#if VKVG_FILL_NZ_GLUTESS
-	void (*vertex_cb)(uint32_t, vgpath_ctx*) = 0; // tesselator vertex callback
-	uint32_t tesselator_fan_start = 0;
-	uint32_t tesselator_idx_counter = 0;
-#endif
-	uint32_t curColor = 0xFFffffff;
-	bool is_glutess = false;
-public:
-	vgpath_ctx();
-	~vgpath_ctx();
-
-	void clip_preserve(paths_t* ctx, state_save_t* t);
-	void fill_preserve(paths_t* p, state_save_t* t);
-	void stroke_preserve(paths_t* p, state_save_t* t, uint32_t color);
-	void draw(VkvgContext ctx);
-	void begin_frame();
-	void end_frame();
-private:
-	void poly_fill(paths_t* ctx, vec4* bounds);
-	void _fill_non_zero(paths_t*);
-	void fill_non_zero(paths_t* p);
-	bool _build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve);
-	void _draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart);
-	float _draw_dashed_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
-	void _draw_segment(paths_t* ctx, stroke_context_t* str, dash_context_t* dc, bool isCurve);
-
-	void a_add_triangle_indices(paths_t* ctx, uint32_t i0, uint32_t i1, uint32_t i2);
-	void a_add_tri_indices_for_rect(uint32_t i);
-	void _add_vertexf(paths_t* ctx, float x, float y);
-	void cp_cmdt(cmd_t* c, state_save_t* t);
-};
-
 vgpath_ctx::vgpath_ctx()
 {
 	_vertex.ac = _indices.ac = ecpsd.ac = _normals.ac = &ac;
@@ -8311,12 +8438,15 @@ void vgpath_ctx::clip_preserve(paths_t* ctx, state_save_t* t)
 		//CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
 	}
 	else {
-		//CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
-		//CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-		//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-		//CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+		cmd_t c = {};
+		c.vertex.x = _vertex.size();
+		c.index.x = _indices.size();
+		c.type = 0;
+		cp_cmdt(&c, t);
 		fill_non_zero(ctx);
-		//_emit_draw_cmd_undrawn_vertices(ctx);
+		c.vertex.y = _vertex.size() - c.vertex.x;
+		c.index.y = _indices.size() - c.index.x;
+		cmdlist.push_back(c);
 	}
 	cmdlist.back().full_screen_quad = _vertex.size();
 	Vertex v = {};
@@ -9432,10 +9562,19 @@ void vgpath_ctx::draw(VkvgContext ctx)
 }
 
 void vgpath_ctx::begin_frame()
-{}
+{
+	_vertex.clear();
+	_indices.clear();
+	cmdlist.clear();
+}
 
 void vgpath_ctx::end_frame()
-{}
+{
+
+	_vertex.clear();
+	_indices.clear();
+	cmdlist.clear();
+}
 
 #endif
 
