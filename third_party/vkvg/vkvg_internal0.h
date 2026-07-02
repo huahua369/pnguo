@@ -502,10 +502,10 @@ const char* getUserDir();
 #include "vkvg.h"
 #include "vkh.h"
 
-typedef struct {
+struct vec2 {
 	float x;
 	float y;
-} vec2;
+};
 
 static const vec2 vec2_unit_x = { 1.f, 0 };
 static const vec2 vec2_unit_y = { 0, 1.f };
@@ -1259,7 +1259,7 @@ typedef struct _vkvg_context_t {
 	uint32_t maxPushDescriptors = 0;
 
 	uint32_t capPathPointCount = 0;
-	ear_clip_point* ecps = 0; 
+	ear_clip_point* ecps = 0;
 	//vgpath_ctx* pathCtx = 0;
 	bool fill_rule_winding = false;
 } vkvg_context;
@@ -1461,13 +1461,3 @@ struct state_save_t {
 	bool aa = true;
 };
 
-struct paths_t {
-	vec2* points = 0;			// 路径坐标点points array 
-	uint32_t pointCount = 0;	// 数量effective points count
-	uint32_t  pathPtr = 0;		// pointer in the path array
-	uint32_t* pathes = 0;		// 每条路径的数量
-	uint32_t  sizePathes = 0;	// 路径条数量
-	uint32_t* color = 0;		// 独立颜色数组大小与sizePathes一致，0则用默认颜色curColor
-	uint32_t curColor = 0xFFffffff;
-	state_save_t* t = 0;
-};

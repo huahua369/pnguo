@@ -89,7 +89,8 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 class vgpath_ctx
 {
 public:
-	USP_CX ac;						// 零散内存分配器
+	USP_CX ac;						// 
+	hz::mbpool_t mac;				// 帧内存池
 	// 输出
 	vg_vector<Vertex> _vertex;
 	vg_vector<uint32_t> _indices;
@@ -8826,7 +8827,7 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 
 	cmd_t c = {};
 	c.type = 0;
-	c.v = ac.new_mem_o<scmd>(nc);
+	c.v = (scmd*)mac.allocate(sizeof(scmd) * nc);
 	if (!c.v)return;
 	cp_cmdt(&c, ctx->t);
 	c.vc = nc;
@@ -8875,11 +8876,11 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 }
 void vgpath_ctx::cp_cmdt(cmd_t* c, state_save_t* t)
 {
-	c->state = ac.new_mem<state_save_t>(1);
+	c->state = (state_save_t*)mac.allocate(sizeof(state_save_t) * 1);
 	if (!c->state)return;
 	*c->state = *t;
 	if (t->dashes && t->dashCount > 0) {
-		c->state->dashes = ac.new_mem_o<float>(t->dashCount);
+		c->state->dashes = (float*)mac.allocate(sizeof(float) * t->dashCount);
 		if (c->state->dashes)
 			memcpy(c->state->dashes, t->dashes, sizeof(float) * t->dashCount);
 		else
@@ -9574,6 +9575,7 @@ void vgpath_ctx::end_frame()
 	_vertex.clear();
 	_indices.clear();
 	cmdlist.clear();
+	mac.release();
 }
 
 #endif
@@ -9617,4 +9619,352 @@ vgpath_ctx* new_vgctx() {
 }
 void free_vgctx(vgpath_ctx* p) {
 	if (p)delete p;
+}
+void dc_clip_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
+	if (ctx && p && t)
+		ctx->clip_preserve(p, t);
+}
+void dc_fill_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
+	if (ctx && p && t)
+		ctx->fill_preserve(p, t);
+}
+void dc_stroke_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t, uint32_t color) {
+	if (ctx && p && t)
+		ctx->stroke_preserve(p, t, color);
+}
+void dc_draw(vgpath_ctx* ctx, VkvgContext ctxvg) {
+	if (ctx && ctxvg)
+		ctx->draw(ctxvg);
+}
+void dc_begin_frame(vgpath_ctx* ctx) {
+	if (ctx)ctx->begin_frame();
+}
+void dc_end_frame(vgpath_ctx* ctx) {
+	if (ctx)ctx->end_frame();
+}
+struct path_pri :public paths_t
+{
+	uint32_t segmentPtr;   // current segment count in current path having curves
+	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
+	t_vector<vec2> points;
+	t_vector<uint32_t> pathes;
+
+	bool     simpleConvex; // true if path is single rect or concave closed curve.
+};
+void dc_finish_path(paths_t* ctx) {
+	auto pri = (path_pri*)ctx;
+	if (pri->pathes.empty())
+		pri->pathes.push_back(0);
+	if (pri->pathes[ctx->pathPtr] == 0) // empty
+		return;
+	if ((pri->pathes[ctx->pathPtr] & PATH_ELT_MASK) < 2) {
+		// only current pos is in path
+		ctx->pointCount -= ctx->pathes[ctx->pathPtr]; // what about the bounds?
+		pri->pathes[ctx->pathPtr] = 0;
+		pri->segmentPtr = 0;
+		return;
+	}
+
+	if (ctx->pathPtr == 0 && pri->simpleConvex)
+		pri->pathes[0] |= PATH_IS_CONVEX_BIT;
+
+	if (pri->segmentPtr > 0) { // pathes having curves are segmented
+		pri->pathes[ctx->pathPtr] |= PATH_HAS_CURVES_BIT;
+		// curved segment increment segmentPtr on curve end,
+		// so if last segment is not a curve and point count > 0
+		if ((pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_HAS_CURVES_BIT) == 0 &&
+			(pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_ELT_MASK) > 0)
+			pri->segmentPtr++; // current segment has to be included
+		ctx->pathPtr += pri->segmentPtr;
+	}
+	else
+		ctx->pathPtr++;
+
+	if (pri->pathes.size() <= ctx->pathPtr)
+		pri->pathes.resize(ctx->pathPtr + 1);
+
+	pri->pathes[ctx->pathPtr] = 0;
+	pri->segmentPtr = 0;
+	pri->subpathCount++;
+	pri->simpleConvex = false;
+}
+// clear path datas in context
+void dc_clear_path(paths_t* ctx) {
+	ctx->pathPtr = 0;
+	auto pri = (path_pri*)ctx;
+	pri->pathes.resize(1);
+	pri->pathes[ctx->pathPtr] = 0;
+	ctx->pointCount = 0;
+	pri->segmentPtr = 0;
+	pri->subpathCount = 0;
+	pri->simpleConvex = false;
+}
+void dc_remove_last_point(paths_t* ctx) {
+	ctx->pointCount--;
+	auto pri = (path_pri*)ctx;
+	pri->pathes[ctx->pathPtr]--;
+	pri->points.pop_back();
+	if (pri->segmentPtr > 0) {                            // if path is segmented
+		if (!pri->pathes[ctx->pathPtr + pri->segmentPtr]) // if current segment is empty
+			pri->segmentPtr--;
+		pri->pathes[ctx->pathPtr + pri->segmentPtr]--;                          // decrement last segment point count
+		if ((pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_ELT_MASK) == 0) // if no point left (was only one)
+			pri->pathes[ctx->pathPtr + pri->segmentPtr] = 0;                    // reset current segment
+		else if (pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_HAS_CURVES_BIT) // if segment is a curve
+			pri->segmentPtr++; // then segPtr has to be forwarded to new segment
+	}
+	if (pri->pathes.size() < pri->segmentPtr + ctx->pathPtr)
+		pri->pathes.resize(pri->segmentPtr + ctx->pathPtr + 1);
+}
+void dc_set_curve_start(path_pri* ctx) {
+	if (ctx->segmentPtr > 0) {
+		// check if current segment has points (straight)
+		if ((ctx->pathes[ctx->pathPtr + ctx->segmentPtr] & PATH_ELT_MASK) > 0)
+			ctx->segmentPtr++;
+	}
+	else {
+		// not yet segmented path, first segment length is copied
+		if (ctx->pathes[ctx->pathPtr] > 0) { // create first straight segment first
+			ctx->pathes.push_back(ctx->pathes[ctx->pathPtr]);
+			ctx->segmentPtr = 2;
+		}
+		else
+			ctx->segmentPtr = 1;
+	}
+	//_check_pathes_array(ctx);
+	if (ctx->pathes.size() <= ctx->pathPtr + ctx->segmentPtr)
+		ctx->pathes.resize(ctx->pathPtr + ctx->segmentPtr + 1);
+	ctx->pathes[ctx->pathPtr + ctx->segmentPtr] = 0;
+}
+void dc_set_curve_end(path_pri* ctx) {
+	ctx->pathes[ctx->pathPtr + ctx->segmentPtr] |= PATH_HAS_CURVES_BIT;
+	ctx->segmentPtr++;
+	ctx->pathes.push_back(0);
+}
+bool dc_path_is_closed(paths_t* ctx, uint32_t ptrPath) { return ctx->pathes[ptrPath] & PATH_CLOSED_BIT; }
+void dc_add_point(paths_t* ctx, float x, float y) {
+	if (isnan(x) || isnan(y)) {
+		return;
+	}
+	auto pri = (path_pri*)ctx;
+	vec2 v = { x, y };
+	pri->points.push_back(v);
+	ctx->pointCount++;           // total point count of pathes, (for array bounds check)
+	if (pri->pathes.size() <= ctx->pathPtr + pri->segmentPtr)
+		pri->pathes.resize(ctx->pathPtr + pri->segmentPtr + 1);
+	pri->pathes[ctx->pathPtr]++; // total point count in path
+	if (pri->segmentPtr > 0)
+		pri->pathes[ctx->pathPtr + pri->segmentPtr]++; // total point count in path's segment
+}
+
+void dc_move_to(paths_t* ctx, float x, float y) {
+	if (!ctx)
+		return;
+	dc_finish_path(ctx);
+	dc_add_point(ctx, x, y);
+}
+bool dc_current_path_is_empty(path_pri* ctx) {
+	return ctx->pathes.empty() || ctx->pathes[ctx->pathPtr] == 0;
+}
+// this function expect that current point exists
+vec2 dc_get_current_position(path_pri* ctx) {
+	return ctx->points[ctx->pointCount - 1];
+}
+void dc0_line_to(path_pri* ctx, float x, float y) {
+	vec2 p = { x, y };
+	if (!dc_current_path_is_empty(ctx)) {
+		// prevent adding the same point
+		if (vec2_equ(dc_get_current_position(ctx), p))
+			return;
+	}
+	dc_add_point(ctx, x, y);
+	ctx->simpleConvex = false;
+}
+void dc_line_to(paths_t* ctx, float x, float y) {
+	if (!ctx)
+		return;
+	dc0_line_to((path_pri*)ctx, x, y);
+}
+
+void dc_close_path(path_pri* ctx) {
+	if (!ctx)
+		return;
+	if (ctx->pathes[ctx->pathPtr] & PATH_CLOSED_BIT) // already closed
+		return;
+	// check if at least 3 points are present
+	if (ctx->pathes[ctx->pathPtr] < 3)
+		return;
+
+	// prevent closing on the same point
+	if (vec2_equ(ctx->points[ctx->pointCount - 1], ctx->points[ctx->pointCount - ctx->pathes[ctx->pathPtr]])) {
+		if (ctx->pathes[ctx->pathPtr] < 4) // ensure enough points left for closing
+			return;
+		dc_remove_last_point(ctx);
+	}
+
+	ctx->pathes[ctx->pathPtr] |= PATH_CLOSED_BIT;
+
+	dc_finish_path(ctx);
+}
+//float dc_normalizeAngle(float a) {
+//	float res = ROUND_DOWN(fmodf(a, 2.0f * M_PIF), 100);
+//	if (res < 0.0f)
+//		res += 2.0f * M_PIF;
+//	return res;
+//}
+float dc_get_arc_step(path_pri* ctx, float radius) {
+	float sx = 1.0, sy = 1.0;
+	//vkvg_matrix_get_scale(&ctx->pushConsts.mat, &sx, &sy);
+	float r = radius * fabsf(fmaxf(sx, sy));
+	if (r < 30.0f)
+		return fminf(M_PIF / 3.f, M_PIF / r);
+	return fminf(M_PIF / 3.f, M_PIF / (r * 0.4f));
+}
+void dc_arc(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2) {
+	if (!ctx0)
+		return;
+	while (a2 < a1) // positive arc must have a1<a2
+		a2 += 2.f * M_PIF;
+
+	if (a2 - a1 > 2.f * M_PIF) // limit arc to 2PI
+		a2 = a1 + 2.f * M_PIF;
+
+	auto ctx = (path_pri*)ctx0;
+	vec2 v = { cosf(a1) * radius + xc, sinf(a1) * radius + yc };
+
+	float step = dc_get_arc_step(ctx, radius);
+	float a = a1;
+
+	if (dc_current_path_is_empty(ctx)) {
+		dc_set_curve_start(ctx);
+		dc_add_point(ctx, v.x, v.y);
+		if (!ctx->pathPtr)
+			ctx->simpleConvex = true;
+		else
+			ctx->simpleConvex = false;
+	}
+	else {
+		dc0_line_to(ctx, v.x, v.y);
+		dc_set_curve_start(ctx);
+		ctx->simpleConvex = false;
+	}
+
+	a += step;
+
+	if (EQUF(a2, a1))
+		return;
+
+	while (a < a2) {
+		v.x = cosf(a) * radius + xc;
+		v.y = sinf(a) * radius + yc;
+		dc_add_point(ctx, v.x, v.y);
+		a += step;
+	}
+
+	if (EQUF(a2 - a1, M_PIF * 2.f)) { // if arc is complete circle, last point is the same as the first one
+		dc_set_curve_end(ctx);
+		dc_close_path(ctx);
+		return;
+	}
+	a = a2;
+	// vec2 lastP = v;
+	v.x = cosf(a) * radius + xc;
+	v.y = sinf(a) * radius + yc;
+	// if (!vec2_equ (v,lastP))//this test should not be required
+	dc_add_point(ctx, v.x, v.y);
+	dc_set_curve_end(ctx);
+}
+int dc_rounded_rectangle(paths_t* ctx, float x, float y, float w, float h, float radius) {
+	if (!ctx)
+		return -1;
+	dc_finish_path(ctx);
+
+	if (w <= 0 || h <= 0)
+		return VKVG_STATUS_INVALID_RECT;
+
+	if ((radius > w / 2.0f) || (radius > h / 2.0f))
+		radius = fmin(w / 2.0f, h / 2.0f);
+
+	auto pri = (path_pri*)ctx;
+	dc_move_to(ctx, x, y + radius);
+	dc_arc(ctx, x + radius, y + radius, radius, M_PIF, -M_PIF_2);
+	dc_line_to(ctx, x + w - radius, y);
+	dc_arc(ctx, x + w - radius, y + radius, radius, -M_PIF_2, 0);
+	dc_line_to(ctx, x + w, y + h - radius);
+	dc_arc(ctx, x + w - radius, y + h - radius, radius, 0, M_PIF_2);
+	dc_line_to(ctx, x + radius, y + h);
+	dc_arc(ctx, x + radius, y + h - radius, radius, M_PIF_2, M_PIF);
+	dc_line_to(ctx, x, y + radius);
+	dc_close_path((path_pri*)ctx);
+	ctx->pathes = pri->pathes.data();
+	ctx->points = pri->points.data();
+	return VKVG_STATUS_SUCCESS;
+}
+int dc_rectangle(paths_t* ctx, float x, float y, float w, float h, float r) {
+	if (!ctx)
+		return -1;
+	if (r > 0)
+		return dc_rounded_rectangle(ctx, x, y, w, h, r);
+	dc_finish_path(ctx);
+
+	if (w <= 0 || h <= 0)
+		return VKVG_STATUS_INVALID_RECT;
+
+	auto pri = (path_pri*)ctx;
+	dc_add_point(ctx, x, y);
+	dc_add_point(ctx, x + w, y);
+	dc_add_point(ctx, x + w, y + h);
+	dc_add_point(ctx, x, y + h);
+
+	pri->pathes[ctx->pathPtr] |= (PATH_CLOSED_BIT | PATH_IS_CONVEX_BIT);
+
+	dc_finish_path(ctx);
+	ctx->pathes = pri->pathes.data();
+	ctx->points = pri->points.data();
+	return VKVG_STATUS_SUCCESS;
+}
+
+state_save_t* dc_new_state(vgpath_ctx* ctx) {
+	auto t = (state_save_t*)ctx->mac.allocate(sizeof(state_save_t));
+	*t = {};
+	t->curColor = 0xFFFFFFFF;
+	//VkRect2D b = {};
+	//b.extent = { ctx->pSurf->width, ctx->pSurf->height };
+	push_constants pc = {};
+	pc.source.a = 1;
+	pc.size = { (float)100, (float)100 };
+	pc.fsq_patternType = VKVG_PATTERN_TYPE_SOLID;
+	pc.opacity = 1.0f;
+	pc.mat = VKVG_IDENTITY_MATRIX;
+	pc.matInv = VKVG_IDENTITY_MATRIX;
+
+	t->lineWidth = 1.f;
+	t->miterLimit = 10.f;
+	t->curOperator = VKVG_OPERATOR_OVER;
+	t->curFillRule = VKVG_FILL_RULE_NON_ZERO;
+	//t->bounds = b;
+	//t->pushConsts = pc;
+	return t;
+}
+paths_t* dc_new_paths(vgpath_ctx* ctx) {
+	auto t = (path_pri*)ctx->ac.new_obj<path_pri>();
+
+	return (paths_t*)t;
+}
+drawctx_t get_drawctx(vgpath_ctx* p)
+{
+	drawctx_t r = {};
+	if (p) {
+		r.ptr = p;
+		r.clip_preserve = dc_clip_preserve;
+		r.fill_preserve = dc_fill_preserve;
+		r.stroke_preserve = dc_stroke_preserve;
+		r.draw = dc_draw;
+		r.begin_frame = dc_begin_frame;
+		r.end_frame = dc_end_frame;
+		r.new_paths = dc_new_paths;
+		r.new_state = dc_new_state;
+		r.add_rectangle = dc_rectangle;
+	}
+	return r;
 }

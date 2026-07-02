@@ -896,6 +896,7 @@ private:
 };
 class form_x;
 class div_cx;
+class vgpath_ctx;
 // 输入矢量图返回渲染数据
 class drawable_cx
 {
@@ -916,6 +917,7 @@ public:
 	font_family_t* familys = 0;				// 默认字体
 	glm::ivec4 _view = { 0,0,2048,2048 };	// 视口，超出范围部分不会渲染
 	void* cctx = 0;
+	vgpath_ctx* dctx = 0;
 	uint32_t color = 0;
 	float stwidth = 2.0;
 	bool tex_batch = true;

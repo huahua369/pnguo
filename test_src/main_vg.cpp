@@ -916,7 +916,7 @@ void testgui() {
 }
 int main() {
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
-	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
+	auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 	dev_info_cx devinfo = {};
 	testgui();
 	return 0;

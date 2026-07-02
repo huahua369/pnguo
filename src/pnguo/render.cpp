@@ -3451,6 +3451,23 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 			//ctx_end(ctx);
 		}
 	}
+	if (!dra->dctx)
+		dra->dctx = new_vgctx();
+	//void free_vgctx(vgpath_ctx * p);
+	drawctx_t dcb = get_drawctx(dra->dctx);
+	dcb.begin_frame(dra->dctx);
+
+	state_save_t* ss = dcb.new_state(dra->dctx);
+	paths_t* path = dcb.new_paths(dra->dctx);
+
+	dcb.add_rectangle(path, 0, 0, 100, 100, 4);
+
+	//dcb.clip_preserve(dra->dctx, nullptr, nullptr);
+	dcb.fill_preserve(dra->dctx, path, ss);
+	dcb.stroke_preserve(dra->dctx, path, ss, 0xff111111);
+
+	dcb.draw(dra->dctx, nullptr);
+	dcb.end_frame(dra->dctx);
 	auto d = rvg->_cmd.data();
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
@@ -3476,6 +3493,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 	std::stack<translate_cc> stt = {};
 	translate_cc tcc = {};
 	glm::ivec2 lpos = {};
+#if 0
 	for (size_t i = 0; i < length; i++)
 	{
 		auto ct = pct[i];
@@ -3553,6 +3571,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 			//ctx_end(tcc.ctx);
 		}
 	}
+#endif
 	int ki = 0;
 	for (auto& it : dst->surfaces)
 	{

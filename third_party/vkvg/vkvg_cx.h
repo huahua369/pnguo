@@ -99,7 +99,41 @@ private:
 
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	typedef struct state_save_t state_save_t;
+	typedef struct vec2 vec2;
+	struct paths_t {
+		vec2* points = 0;			// 路径坐标点points array 
+		uint32_t pointCount = 0;	// 数量effective points count
+		uint32_t  pathPtr = 0;		// pointer in the path array
+		uint32_t* pathes = 0;		// 每条路径的数量
+		uint32_t  sizePathes = 0;	// 路径条数量
+		uint32_t* color = 0;		// 独立颜色数组大小与sizePathes一致，0则用默认颜色curColor
+		uint32_t curColor = 0xFFffffff;
+		state_save_t* t = 0;
+	};
+#ifdef __cplusplus 
+}
+#endif
 class vgpath_ctx;
+struct drawctx_t {
+	vgpath_ctx* ptr;
+	void (*clip_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	void (*fill_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	void (*stroke_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t, uint32_t color);
+	void (*draw)(vgpath_ctx* ctx, VkvgContext ctxvg);
+	void (*begin_frame)(vgpath_ctx* ctx);
+	void (*end_frame)(vgpath_ctx* ctx);
+	state_save_t* (*new_state)(vgpath_ctx* ctx);
+	paths_t* (*new_paths)(vgpath_ctx* ctx);
+
+	int (*add_rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
+};
 
 vgpath_ctx* new_vgctx();
 void free_vgctx(vgpath_ctx* p);
+drawctx_t get_drawctx(vgpath_ctx* p);
+
