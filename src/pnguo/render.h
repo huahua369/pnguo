@@ -341,6 +341,7 @@ struct image_r
 struct polyline_pd
 {
 	size_t count;
+	size_t capsize;
 	bool closed;
 };
 

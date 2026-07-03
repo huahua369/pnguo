@@ -1942,13 +1942,19 @@ void rvg_cx::add_polyline(const PathsD* p, bool closed)
 	pd.count = d.size();
 	pd.closed = closed;
 	size_t as = sizeof(polyline_pd);
+
+	if (length == 2)
+		length = 2;
 	for (size_t i = 0; i < length; i++)
 	{
 		auto points = d[i];
 		glm::vec2 pos = { points[0].x, points[0].y };
 		auto points_count = points.size();
+		if (points_count == 0)
+			points_count = 1;
 		as += sizeof(points_count) + sizeof(glm::vec2) * points_count;
 	}
+	pd.capsize = as;
 	auto idx = _cmd.size();
 	_cmd.resize(_cmd.size() + as);
 	auto pt = _cmd.data() + idx + sizeof(polyline_pd);
@@ -1962,10 +1968,11 @@ void rvg_cx::add_polyline(const PathsD* p, bool closed)
 		memcpy(pt, &points_count, sizeof(points_count));
 		memcpy(pt + sizeof(points_count), &pos, sizeof(glm::vec2));
 		auto pos_ptr = (glm::vec2*)((char*)pt + sizeof(points_count) + sizeof(glm::vec2));
-		for (size_t i = 1; i < points_count; i++)
+		for (size_t x = 1; x < points_count; x++)
 		{
-			pos_ptr[i - 1] = { points[i].x, points[i].y };
+			pos_ptr[x - 1] = { points[x].x, points[x].y };
 		}
+		pt += sizeof(points_count) + sizeof(glm::vec2) + sizeof(glm::vec2) * (points_count);
 	}
 }
 
@@ -2009,12 +2016,12 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	set_text_style(ts);
 	push_ct(OP_ADD_TEXT);
 	auto idx = _cmd.size();
-	_cmd.resize(_cmd.size() + sizeof(text_st) + p->text_len); 
+	_cmd.resize(_cmd.size() + sizeof(text_st) + p->text_len);
 	auto pd = (text_st*)(_cmd.data() + idx);
 	*pd = *p;
 	auto tps = idx + sizeof(text_st);
 	pd->pos = pos;
-	pd->clip = _cur.clip; 
+	pd->clip = _cur.clip;
 	pd->text = (char*)tps;
 	memcpy(_cmd.data() + tps, p->text, pd->text_len);
 	//pop_view();
@@ -2908,7 +2915,7 @@ size_t cmd_op_add_polyline_path(uint8_t* d, VkvgContext ctx)
 	auto t = next_value<polyline_pd>(d);
 	auto cr = ctx;
 	if (!cr || t.count < 1)return d - f;
-	for (size_t i = 0; i < t.count; i++)
+	for (size_t x = 0; x < t.count; x++)
 	{
 		auto points_count = next_value<size_t>(d);
 		auto points = (glm::vec2*)d;
@@ -2918,7 +2925,8 @@ size_t cmd_op_add_polyline_path(uint8_t* d, VkvgContext ctx)
 			vkvg_line_to(cr, points[i].x, points[i].y);
 		}
 		if (t.closed) { vkvg_close_path(cr); }
-		d = (uint8_t*)(points + points_count);
+		points += points_count;
+		d = (uint8_t*)(points);
 	}
 	return d - f;
 }
