@@ -8,7 +8,7 @@ class vgpath_ctx;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+//#define VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 #include "vkvg_internal0.h" 
 
 #ifdef __cplusplus
@@ -55,6 +55,7 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 
 */
 
+//#define PWAIT_MS
 
 
 
@@ -2942,8 +2943,10 @@ bool _wait_ctx_flush_end(VkvgContext ctx) {
 		ret = (WaitForFences(ctx->dev->vkDev, 1, &ctx->flushFence, VK_TRUE, VKVG_FENCE_TIMEOUT) == VK_SUCCESS);
 #endif
 	int ms = rtc.end();
+#ifdef PWAIT_MS
 	if (ms > 0)
 		printf("wait ms: %d\n", ms);
+#endif
 	if (!ret) {
 		LOG(VKVG_LOG_DEBUG, "CTX: _wait_flush_fence timeout\n");
 		ctx->status = VKVG_STATUS_TIMEOUT;
@@ -2964,16 +2967,13 @@ bool _wait_and_submit_cmd(VkvgContext ctx) {
 	if (ctx->pattern && ctx->pattern->type == VKVG_PATTERN_TYPE_SURFACE) {
 		// add source surface timeline sync.
 		VkvgSurface source = (VkvgSurface)ctx->pattern->data;
+		VkSemaphore sems[2] = { surf->timeline, source->timeline };
+		uint64_t waits[2] = { surf->timelineStep, source->timelineStep };
+		uint64_t sigs[2] = { surf->timelineStep + 1, source->timelineStep + 1 };
 		LOCK_SURFACE(surf)
 			LOCK_SURFACE(source)
 			LOCK_DEVICE
-			vkh_cmd_submit_timelined2(dev->gQueue, &ctx->cmd, (VkSemaphore[2]) { surf->timeline, source->timeline },
-				(uint64_t[2]) {
-			surf->timelineStep, source->timelineStep
-		},
-				(uint64_t[2]) {
-			surf->timelineStep + 1, source->timelineStep + 1
-		});
+			vkh_cmd_submit_timelined2(dev->gQueue, &ctx->cmd, sems, waits, sigs);
 		surf->timelineStep++;
 		source->timelineStep++;
 		ctx->timelineStep = surf->timelineStep;
@@ -3021,16 +3021,13 @@ bool _submit_cmd(VkvgContext ctx) {
 	if (ctx->pattern && ctx->pattern->type == VKVG_PATTERN_TYPE_SURFACE) {
 		// add source surface timeline sync.
 		VkvgSurface source = (VkvgSurface)ctx->pattern->data;
+		VkSemaphore sems[2] = { surf->timeline, source->timeline };
+		uint64_t waits[2] = { surf->timelineStep, source->timelineStep };
+		uint64_t sigs[2] = { surf->timelineStep + 1, source->timelineStep + 1 };
 		LOCK_SURFACE(surf)
 			LOCK_SURFACE(source)
 			LOCK_DEVICE
-			vkh_cmd_submit_timelined2(dev->gQueue, &ctx->cmd, (VkSemaphore[2]) { surf->timeline, source->timeline },
-				(uint64_t[2]) {
-			surf->timelineStep, source->timelineStep
-		},
-				(uint64_t[2]) {
-			surf->timelineStep + 1, source->timelineStep + 1
-		});
+			vkh_cmd_submit_timelined2(dev->gQueue, &ctx->cmd, sems, waits, sigs);
 		surf->timelineStep++;
 		source->timelineStep++;
 		ctx->timelineStep = surf->timelineStep;
@@ -6387,7 +6384,7 @@ void vkvg_surface_destroy(VkvgSurface surf) {
 	if (surf->dev->threadAware)
 		mtx_destroy(&surf->mutex);
 
-#if VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	vkDestroySemaphore(surf->dev->vkDev, surf->timeline, NULL);
 #else
 	vkDestroyFence(surf->dev->vkDev, surf->flushFence, NULL);
@@ -6845,7 +6842,7 @@ VkvgSurface _create_surface(VkvgDevice dev, VkFormat format) {
 		vkh_cmd_pool_create(vkhd, dev->gQueue->familyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	vkh_cmd_buffs_create(vkhd, surf->cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &surf->cmd);
 
-#if VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+#ifdef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	surf->timeline = vkh_timeline_create(vkhd, 0);
 #else
 	surf->flushFence = vkh_fence_create(vkhd);
@@ -6892,8 +6889,10 @@ void _surface_submit_cmd(VkvgSurface surf) {
 	ResetFences(surf->dev->vkDev, 1, &surf->flushFence);
 #endif	 
 	int ms = rtc.end();
+#ifdef PWAIT_MS
 	if (ms > 0)
 		printf("surface wait ms: %d\n", ms);
+#endif
 }
 
 #endif // 1

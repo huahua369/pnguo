@@ -1782,39 +1782,49 @@ void rvg_cx::submit(fill_style_d* st)
 	if (t.dash_p) {
 		t.dash_p = (float*)(sizeof(t));
 	}
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t) + sizeof(float) * st->dash_num);
+	*(fill_style_d*)(_cmd.data() + idx) = t;
 	if (t.dash_p) {
-		_cmd.insert(_cmd.end(), (char*)st->dash_p, (char*)st->dash_p + sizeof(float) * st->dash_num);
+		memcpy(_cmd.data() + idx + sizeof(t), st->dash_p, sizeof(float) * st->dash_num);
 	}
 }
 void rvg_cx::submit(uint32_t fill, uint32_t color, int linewidth)
 {
 	push_ct(OP_SUBMIT_COLOR);
 	submit_color_d t = { fill,color,linewidth };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(submit_color_d*)(_cmd.data() + idx) = t;
 }
 void rvg_cx::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width)
 {
 	push_ct(OP_GRID_FILL);
 	grid_fill_r t = { size,cols,width };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(grid_fill_r*)(_cmd.data() + idx) = t;
 }
 
 void rvg_cx::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count)
 {
 	push_ct(OP_LINEAR_FILL);
 	linear_fill_r t = { size,count };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t) + sizeof(glm::vec4) * count);
+	*(linear_fill_r*)(_cmd.data() + idx) = t;
 	if (count > 0)
 	{
-		_cmd.insert(_cmd.end(), (char*)(cols), (char*)(cols + count));
+		memcpy(_cmd.data() + idx + sizeof(t), cols, sizeof(glm::vec4) * count);
 	}
 }
 void rvg_cx::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type)
 {
 	push_ct(OP_ADD_ARROW);
 	arrow_d t = { p0,p1,arrow_hwidth,arrow_size,type };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(arrow_d*)(_cmd.data() + idx) = t;
 }
 void rvg_cx::draw_block(dblock_d* p, fill_style_d* st)
 {
@@ -1823,8 +1833,10 @@ void rvg_cx::draw_block(dblock_d* p, fill_style_d* st)
 	push_ct(OP_DRAW_BLOCK);
 	auto t = *p;
 	t.points = (glm::vec2*)(_cmd.size() + sizeof(t));
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(dblock_d));
-	_cmd.insert(_cmd.end(), (char*)p->points, (char*)p->points + sizeof(glm::vec2) * p->count);
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(dblock_d) + sizeof(glm::vec2) * p->count);
+	*(dblock_d*)(_cmd.data() + idx) = t;
+	memcpy(_cmd.data() + idx + sizeof(dblock_d), p->points, sizeof(glm::vec2) * p->count);
 	submit(st);
 	restore();
 }
@@ -1836,8 +1848,10 @@ void rvg_cx::draw_path(path_d* path, fill_style_d* style)
 	push_ct(OP_DRAW_PATH);
 	auto t = *path;
 	t.v = (path_vertex_t*)(_cmd.size() + sizeof(t));
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(path_d));
-	_cmd.insert(_cmd.end(), (char*)path->v, (char*)path->v + sizeof(path_vertex_t) * path->count);
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(path_d) + sizeof(path_vertex_t) * path->count);
+	*(path_d*)(_cmd.data() + idx) = t;
+	memcpy(_cmd.data() + idx + sizeof(path_d), path->v, sizeof(path_vertex_t) * path->count);
 	submit(style);
 	restore();
 }
@@ -1845,8 +1859,10 @@ void rvg_cx::draw_path(path_d* path, fill_style_d* style)
 void rvg_cx::add_line(glm::vec4* p, size_t count)
 {
 	push_ct(OP_ADD_LINE_PTR);
-	_cmd.insert(_cmd.end(), (char*)&count, (char*)&count + sizeof(size_t));
-	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(glm::vec4) * count);
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(count) + sizeof(glm::vec4) * count);
+	*(size_t*)(_cmd.data() + idx) = count;
+	memcpy(_cmd.data() + idx + sizeof(count), p, sizeof(glm::vec4) * count);
 }
 
 void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
@@ -1858,8 +1874,10 @@ void rvg_cx::add_line(const glm::vec2& ps0, const glm::vec2& ps1)
 void rvg_cx::add_rect(const glm::vec4& rc, double r)
 {
 	push_ct(OP_ADD_RECT_DOUBLE);
-	_cmd.insert(_cmd.end(), (char*)&rc, (char*)&rc + sizeof(rc));
-	_cmd.insert(_cmd.end(), (char*)&r, (char*)&r + sizeof(r));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(rc) + sizeof(r));
+	memcpy(_cmd.data() + idx, &rc, sizeof(rc));
+	memcpy(_cmd.data() + idx + sizeof(rc), &r, sizeof(r));
 	_tem_clip = rc;
 	_tem_clip.x += _cur.pos.x;
 	_tem_clip.y += _cur.pos.y;
@@ -1868,7 +1886,9 @@ void rvg_cx::add_rect(const glm::vec4& rc, const glm::vec4& r)
 {
 	push_ct(OP_ADD_RECT_VEC4);
 	rect_v4 t = { rc, r };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(rect_v4*)(_cmd.data() + idx) = t;
 	_tem_clip = rc;
 	_tem_clip.x += _cur.pos.x;
 	_tem_clip.y += _cur.pos.y;
@@ -1879,28 +1899,36 @@ void rvg_cx::add_circle(const glm::vec2& pos, float r)
 	if (!(r > 0))return;
 	push_ct(OP_ADD_CIRCLE);
 	circle_r t = { pos,r };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(circle_r*)(_cmd.data() + idx) = t;
 }
 
 void rvg_cx::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle)
 {
 	push_ct(OP_ADD_ELLIPSE);
 	ellipse_r t = { pos, r, rotationAngle };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(ellipse_r*)(_cmd.data() + idx) = t;
 }
 void rvg_cx::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos)
 {
 	push_ct(OP_ADD_TRIANGLE);
 	triangle_r t = { pos,size,dirspos };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t));
+	*(triangle_r*)(_cmd.data() + idx) = t;
 }
 
 void rvg_cx::draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness)
 {
 	push_ct(OP_POLYLINE_VEC2);
 	polyline_r t = { pos,points_count,col,thickness,closed };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
-	_cmd.insert(_cmd.end(), (char*)points, (char*)points + sizeof(glm::vec2) * points_count);
+	size_t idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(t) + sizeof(glm::vec2) * points_count);
+	*(polyline_r*)(_cmd.data() + idx) = t;
+	memcpy(_cmd.data() + idx + sizeof(t), points, sizeof(glm::vec2) * points_count);
 }
 
 void rvg_cx::add_polyline(const PathsD* p, bool closed)
@@ -1913,46 +1941,63 @@ void rvg_cx::add_polyline(const PathsD* p, bool closed)
 	polyline_pd pd = {};
 	pd.count = d.size();
 	pd.closed = closed;
-	_cmd.insert(_cmd.end(), (char*)&pd, (char*)&pd + sizeof(polyline_pd));
+	size_t as = sizeof(polyline_pd);
 	for (size_t i = 0; i < length; i++)
 	{
 		auto points = d[i];
 		glm::vec2 pos = { points[0].x, points[0].y };
 		auto points_count = points.size();
-		_cmd.insert(_cmd.end(), (char*)&points_count, (char*)&points_count + sizeof(points_count));
-		_cmd.insert(_cmd.end(), (char*)&pos, (char*)&pos + sizeof(glm::vec2));
+		as += sizeof(points_count) + sizeof(glm::vec2) * points_count;
+	}
+	auto idx = _cmd.size();
+	_cmd.resize(_cmd.size() + as);
+	auto pt = _cmd.data() + idx + sizeof(polyline_pd);
+	auto pdt = (polyline_pd*)(_cmd.data() + idx);
+	memcpy(pdt, &pd, sizeof(polyline_pd));
+	for (size_t i = 0; i < length; i++)
+	{
+		auto points = d[i];
+		glm::vec2 pos = { points[0].x, points[0].y };
+		auto points_count = points.size();
+		memcpy(pt, &points_count, sizeof(points_count));
+		memcpy(pt + sizeof(points_count), &pos, sizeof(glm::vec2));
+		auto pos_ptr = (glm::vec2*)((char*)pt + sizeof(points_count) + sizeof(glm::vec2));
 		for (size_t i = 1; i < points_count; i++)
 		{
-			pos = { points[i].x, points[i].y };
-			_cmd.insert(_cmd.end(), (char*)&pos, (char*)&pos + sizeof(glm::vec2));
+			pos_ptr[i - 1] = { points[i].x, points[i].y };
 		}
 	}
 }
-#define PUSH_VALUE(v) _cmd.insert(_cmd.end(), (char*)&v, (char*)&v + sizeof(v))
-#define PUSH_VALUE_P(v,c) _cmd.insert(_cmd.end(), (char*)v, (char*)v + sizeof(*v)*c)
 
-void rvg_cx::add_polyline(const glm::vec2* p, size_t count)
+void rvg_cx::add_polyline(const glm::vec2* pc, size_t count)
 {
-	if (!p || count < 2)return;
+	if (!pc || count < 2)return;
 	push_ct(OP_ADD_POLYLINE_VEC2_PTR);
-	PUSH_VALUE(count);
-	PUSH_VALUE_P(p, count);
+	auto idx = _cmd.size();
+	_cmd.resize(_cmd.size() + sizeof(count) + sizeof(glm::vec2) * count);
+	*(size_t*)(_cmd.data() + idx) = count;
+	auto p = (glm::vec2*)(_cmd.data() + idx + sizeof(count));
+	memcpy(p, pc, sizeof(glm::vec2) * count);
 }
 void rvg_cx::draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness)
 {
 	if (!points || points_count < 2 || !idx || idx_count < 2)return;
 	push_ct(OP_POLYLINES);
 	polyline_index_r t = { pos,points_count,idx_count,col,thickness };
-	_cmd.insert(_cmd.end(), (char*)&t, (char*)&t + sizeof(t));
-	_cmd.insert(_cmd.end(), (char*)points, (char*)points + sizeof(glm::vec2) * points_count);
-	_cmd.insert(_cmd.end(), (char*)idx, (char*)idx + sizeof(int) * idx_count);
+	size_t sc[3] = { sizeof(t),sizeof(glm::vec2) * points_count,sizeof(int) * idx_count };
+	_cmd.resize(_cmd.size() + sc[0] + sc[1] + sc[2]);
+	auto p = (polyline_index_r*)(_cmd.data() + _cmd.size() - sizeof(t));
+	*p = t;
+	memcpy(_cmd.data() + _cmd.size() - sc[1] - sc[2], points, sizeof(glm::vec2) * points_count);
+	memcpy(_cmd.data() + _cmd.size() - sc[2], idx, sizeof(int) * idx_count);
 }
 
 void rvg_cx::set_text_style(text_style* ts)
 {
 	if (!ts)return;
 	push_ct(OP_TEXT_STYLE);
-	_cmd.insert(_cmd.end(), (char*)ts, (char*)ts + sizeof(text_style));
+	_cmd.resize(_cmd.size() + sizeof(text_style));
+	*(text_style*)(_cmd.data() + _cmd.size() - sizeof(text_style)) = *ts;
 }
 
 void rvg_cx::add_text(text_st* p, text_style* ts)
@@ -1964,13 +2009,14 @@ void rvg_cx::add_text(text_st* p, text_style* ts)
 	set_text_style(ts);
 	push_ct(OP_ADD_TEXT);
 	auto idx = _cmd.size();
-	_cmd.insert(_cmd.end(), (char*)p, (char*)p + sizeof(text_st));
+	_cmd.resize(_cmd.size() + sizeof(text_st) + p->text_len); 
 	auto pd = (text_st*)(_cmd.data() + idx);
-	auto tps = _cmd.size();
+	*pd = *p;
+	auto tps = idx + sizeof(text_st);
 	pd->pos = pos;
-	pd->clip = _cur.clip;
-	_cmd.insert(_cmd.end(), pd->text, pd->text + pd->text_len);
+	pd->clip = _cur.clip; 
 	pd->text = (char*)tps;
+	memcpy(_cmd.data() + tps, p->text, pd->text_len);
 	//pop_view();
 }
 
@@ -1986,7 +2032,9 @@ void rvg_cx::add_image(image_r* r)
 	glm::vec4 rc = { _cur.pos + (glm::vec2)r->pos , 0,0 };
 	//push_view(rc);
 	push_ct(OP_ADD_IMAGE);
-	_cmd.insert(_cmd.end(), (char*)r, (char*)(r + 1));
+	_cmd.resize(_cmd.size() + sizeof(image_r));
+	auto p = (image_r*)(_cmd.data() + _cmd.size() - sizeof(image_r));
+	*p = *r;
 	//pop_view();
 }
 
@@ -1994,7 +2042,9 @@ void rvg_cx::add_geometry(geometry_d* geo)
 {
 	//push_view(glm::ivec4(_cur.pos, 0, 0));
 	push_ct(OP_ADD_GEOMETRY);
-	_cmd.insert(_cmd.end(), (char*)geo, (char*)(geo + 1));
+	_cmd.resize(_cmd.size() + sizeof(geometry_d));
+	auto p = (geometry_d*)(_cmd.data() + _cmd.size() - sizeof(geometry_d));
+	*p = *geo;
 	//pop_view();
 }
 
@@ -2008,13 +2058,17 @@ void rvg_cx::paint_shadow(double size_x, double size_y, double width, double hei
 	d.color_to = color_to;
 	d.rev = rev;
 	d.r = r;
-	_cmd.insert(_cmd.end(), (char*)&d, (char*)&d + sizeof(d));
+	_cmd.resize(_cmd.size() + sizeof(d));
+	auto p = (paint_shadow_d*)(_cmd.data() + _cmd.size() - sizeof(d));
+	*p = d;
 }
 
 void rvg_cx::translate(const glm::vec2& offset)
 {
 	push_ct(OP_TRANSLATE);
-	_cmd.insert(_cmd.end(), (char*)&offset, (char*)&offset + sizeof(offset));
+	_cmd.resize(_cmd.size() + sizeof(offset));
+	glm::vec2* p = (glm::vec2*)(_cmd.data() + _cmd.size() - sizeof(offset));
+	*p = offset;
 	_cur.pos += offset;
 }
 
@@ -2022,35 +2076,45 @@ void rvg_cx::scale(float sx, float sy)
 {
 	push_ct(OP_SCALE);
 	glm::vec2 sc = { sx,sy };
-	_cmd.insert(_cmd.end(), (char*)&sc, (char*)&sc + sizeof(sc));
+	_cmd.resize(_cmd.size() + sizeof(sc));
+	glm::vec2* p = (glm::vec2*)(_cmd.data() + _cmd.size() - sizeof(sc));
+	*p = sc;
 	_cur.scale *= sc;
 }
 
 void rvg_cx::scale(const glm::vec2& sc)
 {
 	push_ct(OP_SCALE);
-	_cmd.insert(_cmd.end(), (char*)&sc, (char*)&sc + sizeof(sc));
+	_cmd.resize(_cmd.size() + sizeof(sc));
+	glm::vec2* p = (glm::vec2*)(_cmd.data() + _cmd.size() - sizeof(sc));
+	*p = sc;
 	_cur.scale *= sc;
 }
 
 void rvg_cx::rotate(float radians)
 {
 	push_ct(OP_ROTATE);
-	_cmd.insert(_cmd.end(), (char*)&radians, (char*)&radians + sizeof(radians));
+	_cmd.resize(_cmd.size() + sizeof(radians));
+	float* p = (float*)(_cmd.data() + _cmd.size() - sizeof(radians));
+	*p = radians;
 	_cur.rotate_radians += radians;
 }
 
 void rvg_cx::transform(const glm::mat3x2* matrix)
 {
 	push_ct(OP_TRANSFORM);
-	_cmd.insert(_cmd.end(), (char*)matrix, (char*)matrix + sizeof(glm::mat3x2));
+	_cmd.resize(_cmd.size() + sizeof(glm::mat3x2));
+	glm::mat3x2* p = (glm::mat3x2*)(_cmd.data() + _cmd.size() - sizeof(glm::mat3x2));
+	*p = *matrix;
 	_cur._transform = glm::matrixCompMult(_cur._transform, *matrix);
 }
 
 void rvg_cx::set_matrix(const glm::mat3x2* matrix)
 {
 	push_ct(OP_SET_MATRIX);
-	_cmd.insert(_cmd.end(), (char*)matrix, (char*)matrix + sizeof(glm::mat3x2));
+	_cmd.resize(_cmd.size() + sizeof(glm::mat3x2));
+	glm::mat3x2* p = (glm::mat3x2*)(_cmd.data() + _cmd.size() - sizeof(glm::mat3x2));
+	*p = *matrix;
 	_cur._transform = *matrix;
 }
 
@@ -2156,19 +2220,25 @@ void rvg_cx::fill_stroke(uint32_t fill_color, uint32_t color)
 void rvg_cx::set_line_width(float w)
 {
 	push_ct(OP_SET_LINE_WIDTH);
-	_cmd.insert(_cmd.end(), (char*)&w, (char*)&w + sizeof(w));
+	_cmd.resize(_cmd.size() + sizeof(w));
+	float* p = (float*)(_cmd.data() + _cmd.size() - sizeof(w));
+	*p = w;
 }
 
 void rvg_cx::set_color(uint32_t color)
 {
 	push_ct(OP_SET_COLOR_UINT);
-	_cmd.insert(_cmd.end(), (char*)&color, (char*)&color + sizeof(color));
+	_cmd.resize(_cmd.size() + sizeof(color));
+	uint32_t* p = (uint32_t*)(_cmd.data() + _cmd.size() - sizeof(color));
+	*p = color;
 }
 
 void rvg_cx::set_color(const glm::vec4& rgba)
 {
 	push_ct(OP_SET_COLOR_VEC4);
-	_cmd.insert(_cmd.end(), (char*)&rgba, (char*)&rgba + sizeof(rgba));
+	_cmd.resize(_cmd.size() + sizeof(rgba));
+	glm::vec4* p = (glm::vec4*)(_cmd.data() + _cmd.size() - sizeof(rgba));
+	*p = rgba;
 }
 
 
@@ -2261,7 +2331,7 @@ uint32_t get_crc(cmdview_v* cv, const char* cmd, size_t cmdc, const char* dt, si
 {
 	uint32_t r = 0;
 	auto& it = *cv;
-	auto ct1 = r_crc32(&it, sizeof(it));
+	auto ct1 = r_crc32(&it, sizeof(it) - sizeof(glm::ivec2));// 最后一个坐标不算
 	auto ct2 = r_crc32(dt + it.first, std::min(it.count, dtc - it.first));
 	auto dpos = cpos[it.first];
 	auto dpos1 = cpos[it.first + it.count];
@@ -3082,7 +3152,7 @@ size_t call_cmd_func(uint8_t c, uint8_t* d, void* ctx)
 		cmd_op_set_line_width, cmd_op_set_color_uint, cmd_op_set_color_vec4 ,
 		 (cmd_func_type)cmd_op_text_style, (cmd_func_type)cmd_op_add_text,(cmd_func_type)cmd_op_add_image, (cmd_func_type)cmd_op_add_geometry, };
 	size_t r = 0;
-	if (c > 0 && c < rvg_cx::OP_MAX_COUNT)
+	if (ctx && c > 0 && c < rvg_cx::OP_MAX_COUNT)
 	{
 		auto cb = cbs[c];
 		r = cb ? cb(d, (VkvgContext)ctx) : 0;
@@ -3326,8 +3396,10 @@ int rvg_data_cx::update()
 		upinc++;
 		cmd_crc = rcrc;
 	}
-	//printf("crc\t%d\n", rcrc);
-	// 计算每个渲染区，取偶数大小
+	for (auto& it : dst_data) {
+		it.view.pos = rvg->pos; // 更新div坐标不会触发div渲染
+	}
+	// 计算每个渲染区，取偶数大小，计算crc判断是否更新
 	for (auto& it : rvg->_view)
 	{
 		auto rc = it.rc;
@@ -3350,7 +3422,13 @@ int rvg_data_cx::update()
 		if (dcv_p) {
 			if (d.up = dcv_p[it.dcv_index].crc != c);
 		}
-		if (d.up)upinc++;
+		if (d.up)
+		{
+			if (rvg->_view.size() > 20) {
+				upinc = upinc;
+			}
+			upinc++;
+		}
 		dcv.push_back(d);
 	}
 	//upinc++;
@@ -3451,23 +3529,11 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 			//ctx_end(ctx);
 		}
 	}
-	if (!dra->dctx)
-		dra->dctx = new_vgctx();
+	//if (!dra->dctx)
+	//	dra->dctx = new_vgctx();
+	translate_cc tcc = {};
 	//void free_vgctx(vgpath_ctx * p);
 	drawctx_t dcb = get_drawctx(dra->dctx);
-	dcb.begin_frame(dra->dctx);
-
-	state_save_t* ss = dcb.new_state(dra->dctx);
-	paths_t* path = dcb.new_paths(dra->dctx);
-
-	dcb.add_rectangle(path, 0, 0, 100, 100, 4);
-
-	//dcb.clip_preserve(dra->dctx, nullptr, nullptr);
-	dcb.fill_preserve(dra->dctx, path, ss);
-	dcb.stroke_preserve(dra->dctx, path, ss, 0xff111111);
-
-	dcb.draw(dra->dctx, nullptr);
-	dcb.end_frame(dra->dctx);
 	auto d = rvg->_cmd.data();
 	auto didx = rvg->_cmd_pos.data();
 	size_t ps = 0;
@@ -3491,9 +3557,8 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 
 	size_t vidx = 0;
 	std::stack<translate_cc> stt = {};
-	translate_cc tcc = {};
 	glm::ivec2 lpos = {};
-#if 0
+#if 1
 	for (size_t i = 0; i < length; i++)
 	{
 		auto ct = pct[i];
@@ -3569,6 +3634,94 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 			//vkvg_translate(ctx, -tcc.apos.x, -tcc.apos.y);
 			vkvg_restore(ctx);
 			//ctx_end(tcc.ctx);
+		}
+	}
+#else
+	for (size_t i = 0; i < length; i++)
+	{
+		auto ct = pct[i];
+		if (ct == rvg_cx::OP_VIEW) {
+			auto vv = rvg->_view[vidx];
+			if (vv.dcv_index < dst->dcv.size()) {
+				tcc = dst->get_ctx(vv.dcv_index, vv.rc);
+				auto& dstv = dst->dst_data.back();
+				dstv.view = vv;
+				lpos = vv.pos;
+				//tcc.ctx = ctx_begin(tcc.surface);
+				tcc.ptr = vv.ptr;
+				if (tcc.ctx)
+				{
+					auto ctx = (VkvgContext)tcc.ctx;
+					//vkvg_clear_rect((VkvgContext)ctx, vv.rc.x, vv.rc.y, vv.rc.z, vv.rc.w);
+					//vkvg_save(ctx);
+					//vkvg_translate(ctx, tcc.apos.x, tcc.apos.y);
+				}
+				stt.push(tcc);
+			}
+			else {
+			}
+			vidx++;
+			continue;
+		}
+		if (ct == rvg_cx::OP_VIEW_POP)
+		{
+			if (stt.size())
+			{
+				tcc = stt.top();
+				stt.pop();
+				if (tcc.ctx)
+				{
+					auto ctx = (VkvgContext)tcc.ctx;
+					//vkvg_restore(ctx); 
+
+					dcb.begin_frame(dra->dctx);
+
+					state_save_t* ss = dcb.new_state(dra->dctx);
+					paths_t* path = dcb.new_paths(dra->dctx);
+
+					dcb.add_rectangle(path, tcc.apos.x, tcc.apos.y, tcc.clips.x, tcc.clips.y, 10);
+
+					//dcb.clip_preserve(dra->dctx, nullptr, nullptr);
+					dcb.fill_preserve(dra->dctx, path, ss);
+					dcb.stroke_preserve(dra->dctx, path, ss, 0xff11f111);
+
+					dcb.draw(dra->dctx, (VkvgContext)tcc.ctx);
+					dcb.end_frame(dra->dctx);
+				}
+			}
+			continue;
+		}
+		if (ct == rvg_cx::OP_ADD_TEXT || ct == rvg_cx::OP_ADD_IMAGE) {
+			gdata_ptr vt = {};
+			if (ct == rvg_cx::OP_ADD_IMAGE)
+				vt.view.pos = lpos;
+			vt.raw_index = mrt_box_count(dst->mrt);
+			vt.v.t = (box_text_d*)1;
+			vt.type = 0;
+			vt.view.ptr = tcc.ptr;
+			vt.view.pos = lpos;
+			dst->dst_data.push_back(vt);
+		}
+		auto pss = didx[i];
+		if (ct == rvg_cx::OP_ADD_GEOMETRY) {
+			gdata_ptr vt = {};
+			vt.raw_index = 0;
+			vt.v.geo = (geometry_d*)(d + pss);
+			vt.type = 2;
+			dst->dst_data.push_back(vt);
+			continue;
+		}
+		size_t n = call_cmd_func(ct, d + pss, ct < rvg_cx::OP_TEXT_STYLE ? nullptr : dst->mrt);
+	}
+	assert(stt.empty());// 命令异常
+	for (; stt.size();) {
+
+		tcc = stt.top();
+		stt.pop();
+		if (tcc.ctx)
+		{
+			auto ctx = (VkvgContext)tcc.ctx;
+			//vkvg_restore(ctx); 
 		}
 	}
 #endif

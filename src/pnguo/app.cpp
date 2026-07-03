@@ -462,7 +462,11 @@ int dom_cx::build()
 	//if (ms != oms)
 	//{
 	//	oms = ms;
-	//	printf("draw %d ms\n", ms);
+	if (ms1 > 0)
+	{
+		ms1 = ms1;
+		//printf("all draw %d ms\n", ms1);
+	}
 	//}
 	return ret;
 }
