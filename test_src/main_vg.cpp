@@ -21,94 +21,7 @@ _stroke_preserve
 #define red   1, 0, 0
 #define green 0, 1, 0
 #define blue  0, 0, 1
-
-using glm::vec2;
-using glm::vec3;
-using glm::vec4;
-using glm::ivec4;
-float gpu_extend_t(float t, int extend)
-{
-	if (extend == 1) {           /* HB_PAINT_EXTEND_REPEAT */
-		return t - floor(t);
-	}
-	else if (extend == 2) {    /* HB_PAINT_EXTEND_REFLECT */
-		float u = t - 2.0 * floor(t * 0.5);
-		return u > 1.0 ? 2.0 - u : u;
-	}
-	return glm::clamp(t, 0.0f, 1.0f);  /* PAD (default) */
-}
-
-
-float gpu_sample_radial_hb(vec2 renderCoord, vec2 box, int stop_count, int extend, vec3* cp)
-{
-	ivec4 m = ivec4(1024, 0, 0, 1024);
-	vec2 c0_r = cp[0];
-	vec2 cd = cp[1];
-	c0_r /= box;
-	cd /= box;
-	float r0 = cp[1].z / box.x;
-	float r1 = cp[0].z / box.x;
-	float dr = r1 - r0;
-	//vec2 p = gpu_apply_minv(m, renderCoord - c0_r);
-	vec2 p = normalize(renderCoord - c0_r);
-
-	float A = dot(cd, cd) - dr * dr;
-	float B = -2.0 * (dot(p, cd) + r0 * dr);
-	float C = dot(p, p) - r0 * r0;
-
-	float t;
-	if (abs(A) > 1e-6)
-	{
-		float disc = B * B - 4.0 * A * C;
-		if (disc < 0.0) return (0.0);
-		float sq = sqrt(disc);
-		/* Prefer the larger root; fall back to the smaller if the
-		 * larger gives a negative interpolated radius. */
-		float t1 = (-B + sq) / (2.0 * A);
-		float t2 = (-B - sq) / (2.0 * A);
-		t = (r0 + t1 * dr >= 0.0) ? t1 : t2;
-	}
-	else
-	{
-		if (abs(B) < 1e-6) return (0.0);
-		t = -C / B;
-	}
-
-	t = gpu_extend_t(t, extend);
-	return t;
-	//return gpu_eval_stops(stop_count, t);
-}
-
-float gpu_sample_radial(vec2 renderCoord, vec2 box, int stop_count, int extend, vec3* cp)
-{
-	vec2 c0 = cp[0]; c0 /= box;
-	vec2 c1 = cp[1]; c1 /= box;
-	float r0 = cp[0].z / box.x;
-	float r1 = cp[1].z / box.x;
-	float gradLength = 1.0;
-	vec2 diff = c0 - c1;
-	vec2 rayDir = normalize(renderCoord - c0);
-	float a = dot(rayDir, rayDir);
-	float b = 2.0 * dot(rayDir, diff);
-	float cc = dot(diff, diff) - r1 * r1;
-	float disc = b * b - 4.0 * a * cc;
-	if (disc >= 0.0)
-	{
-		float t = (-b + sqrt(abs(disc))) / (2.0 * a);
-		vec2 projection = c0 + rayDir * t;
-		gradLength = distance(projection, c0) - r0;
-	}
-	else
-	{
-		return  (0.0);
-		//gradient is undefined for this coordinate
-	}
-	float grad = (distance(renderCoord, c0) - r0) / gradLength;
-	float t = grad;
-	t = gpu_extend_t(t, extend);
-	/*return gpu_eval_stops(stop_count, t);*/
-	return t;
-}
+ 
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
 
@@ -255,26 +168,7 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		const char* filename = "temp/vkvg_gradient.png";
 		VkvgSurface surf = vctx->new_surface(256, 856);
 		auto cr = vkvg_create(surf);
-		{
-			vec2 renderCoord = {};
-			vec2 box = { 856,856 };
-			int stop_count = 1;
-			int extend = 0;
-			vec3 cp[2] = {};
-			cp[0] = vec3(115.2, 102.4, 25.6);
-			cp[1] = vec3(102.4, 102.4, 128.0);
-			std::vector<vec2> tv;
-			for (size_t y = 0; y < 256; y++)
-			{
-				for (size_t x = 0; x < 256; x++)
-				{
-					renderCoord = { x,y };
-					renderCoord /= box;
-					auto t1 = gpu_sample_radial_hb(renderCoord, box, stop_count, extend, cp);
-					auto t2 = gpu_sample_radial(renderCoord, box, stop_count, extend, cp);
-					tv.push_back({ t1,t2 });
-				}
-			}
+		{ 
 			print_time ptt(filename);
 			VkvgPattern pat;
 
@@ -906,7 +800,7 @@ void testgui() {
 	}
 	dom0->update(0.0f);
 	size_t frame_count = 0;
-	appx->app->set_fps(60);
+	appx->app->set_fps(0);
 	appx->view = view;
 	appx->fpslab = fpslab;
 	do {

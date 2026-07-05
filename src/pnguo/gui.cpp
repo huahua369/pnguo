@@ -3090,6 +3090,8 @@ bool div_cx::update(float delta)
 	{
 		for (auto& it : widgets) {
 			ic += it->update(delta);
+			if (ic > 0)
+				ic = ic;
 		}
 	}
 	if (uplayout)
@@ -5162,7 +5164,10 @@ bool edit_cx::update(float delta)
 		ctx->widths.clear();
 		valid = true;
 	}
-	return valid;
+	if (valid) {
+		ret++; valid = false;
+	}
+	return ret > 0;
 }
 
 void edit_cx::draw(rvg_cx* rv)
@@ -5263,7 +5268,7 @@ void edit_cx::draw(rvg_cx* rv)
 
 		cpos += tpos + psv;
 		bool ccd = (show_input_cursor && ctx->c_d == 1 && _cursor.x > 0 && ctx->cursor_pos.z > 0);
-		if (ccd)
+		if (ccd && is_input)
 		{
 			auto rpos = cpos;
 			rpos -= rv->get_translate();
