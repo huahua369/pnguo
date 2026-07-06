@@ -307,6 +307,8 @@ public:
 	//std::string family = "NSimSun";
 	//int fontsize = 12;
 	std::map<int, std::string> script_family;	// hb_script_t family
+
+	std::string family_str, styles_str;
 public:
 	font_rctx();
 	~font_rctx();
@@ -612,10 +614,18 @@ struct text_run_t {
 typedef struct text_run_t* text_bp;
 typedef struct font_t* font_p;
 class text_run_cx;
+
+struct text_family_str {
+	const char* family;
+	const char* styles;
+};
+
 // familys多个字体时用小写逗号分隔，style逗号分隔字体的风格(可空)
 //  new_font_family(font_rctx* ctx,(char*)u8"Consolas,新宋体,Segoe UI Emoji,Times New Roman,Malgun Gothic");
 font_family_t* new_font_family(font_rctx* ctx, const char* familys, const char* style = nullptr);
 void delete_font_family(font_family_t* p);
+text_family_str get_font_family_str(font_rctx* ctx, const font_family_t* family);
+
 // 获取一段utf8文本渲染大小
 glm::ivec2 get_text_rect(font_family_t* p, int fontsize, const void* str, int size, int first);
 glm::ivec4 font_get_char_extent(char32_t ch, unsigned char font_size, font_family_t* fallbacks, font_t** oft);
@@ -630,6 +640,20 @@ int font_get_lineheight(font_family_t* family, int fontsize, bool first);
 struct text_style
 {
 	font_family_t* family = 0;
+	float fontsize = 0;
+	float lineheight = 0;
+	glm::vec2 align = { 0.50,0.50 };// 文本对齐
+	glm::vec2 shadow_pos = { 1.0,1.0 };
+	int stroke = 0;						// 描边宽度
+	uint32_t color = 0xffc2c2c2;		// 文本颜色
+	uint32_t color_stroke = 0xff000000;	// 描边颜色
+	uint32_t color_shadow = 0;			//0xcc121212;	// 阴影颜色
+	bool mcolor_effect = true;			// 是否启用彩色字体参与阴影描边效果
+};
+struct text_style_str
+{
+	std::string family;				// 字体名称，逗号分隔
+	std::string styles;				// 字体风格，逗号分隔
 	float fontsize = 0;
 	float lineheight = 0;
 	glm::vec2 align = { 0.50,0.50 };// 文本对齐

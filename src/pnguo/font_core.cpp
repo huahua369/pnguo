@@ -7661,6 +7661,25 @@ bool isWholeWord(break_c* bp, const uint16_t* s, int32_t sLen, int32_t start, in
 	return result;
 }
 
+text_family_str get_font_family_str(font_rctx* ctx, const font_family_t* family)
+{
+	text_family_str ret = {};
+	if (!ctx || !family || !family->count)
+		return ret;
+	ctx->family_str.clear();
+	ctx->styles_str.clear();
+	for (size_t i = 0; i < family->count; i++)
+	{
+		auto it = family->familys[i];
+		ctx->family_str += it->fullname;
+		if (i < family->count - 1)
+			ctx->family_str += ",";
+		ctx->styles_str += it->_style;
+	}
+	ret.family = ctx->family_str.c_str();
+	ret.styles = ctx->styles_str.c_str();
+	return ret;
+}
 font_family_t* new_font_family(font_rctx* ctx, const char* family, const char* styles)
 {
 	font_family_t* p = 0;
@@ -10022,9 +10041,12 @@ box_text_d* mrt_get_box_index(multi_rich_text_t* p, size_t index)
 	return nullptr;
 }
 layout_block_st::~layout_block_st() {
-	auto ac = fv->ac;
-	ac->free_obj(fv);
-	fv = 0;
+	if (fv)
+	{
+		auto ac = fv->ac;
+		ac->free_obj(fv);
+		fv = 0;
+	}
 	free_flex_ctx(lctx); lctx = 0;
 }
 

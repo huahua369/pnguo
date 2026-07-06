@@ -1,5 +1,5 @@
 #pragma once
-#include "tinysdl3.h"
+#include "tinysdl3.h" 
 /*
 	管理控件等信息
 */
@@ -109,9 +109,13 @@ public:
 private:
 
 };
+struct text_style;
+
+std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent);
+bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style* t);
 
 // 保存：将结构体转为 JSON 字符串 
-std::string save_flex_data(const flex_data& data);
-std::string save_flex_data1(const flex_data1& data);
+std::string save_flex_data(const flex_data& data, int indent = 0);
+std::string save_flex_data1(const flex_data1& data, int indent = 0);
 // 加载：从 JSON 字符串解析结构体 
 flex_data load_flex_data(const std::string& json_str);

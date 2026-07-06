@@ -8,11 +8,11 @@ _stroke_preserve
 */
 #include <pch1.h> 
 #include <vg.h>
-#include <render.h>
 #include <print_time.h>
 #include <gpu_vk.h>
 #include <pnguo.h>
 #include <gui.h>
+#include <render.h>
 #include <app.h>
 #include <event.h>
 #include <vkvg_cx.h>
@@ -21,7 +21,7 @@ _stroke_preserve
 #define red   1, 0, 0
 #define green 0, 1, 0
 #define blue  0, 0, 1
- 
+
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
 
@@ -168,7 +168,7 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 		const char* filename = "temp/vkvg_gradient.png";
 		VkvgSurface surf = vctx->new_surface(256, 856);
 		auto cr = vkvg_create(surf);
-		{ 
+		{
 			print_time ptt(filename);
 			VkvgPattern pat;
 
@@ -777,10 +777,9 @@ void testgui() {
 	glm::vec4 dcc[] = { glm::vec4(1, 0, 0, 0.5),
 		glm::vec4(0, 1, 0, 0.5),
 		glm::vec4(0, 0, 1, 0.5) };
-	for (int i = 0; i < 0; i++)
+	for (int i = 0; i < 3; i++)
 	{
 		auto dvv = new div_cx();
-		dom0->add_widget(dvv);
 		dvv->set_size({ 100,100 });
 		dvv->set_pos({ 100,60 });
 		dvv->style.family = family;
@@ -800,7 +799,7 @@ void testgui() {
 	}
 	dom0->update(0.0f);
 	size_t frame_count = 0;
-	appx->app->set_fps(0);
+	appx->app->set_fps(60);
 	appx->view = view;
 	appx->fpslab = fpslab;
 	do {

@@ -54,15 +54,71 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data1,
 	should_order_children
 )
 
-// 保存：将结构体转为 JSON 字符串 
-std::string save_flex_data(const flex_data& data) {
+// 文本样式
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(text_style_str,
+	family, styles,
+	fontsize,
+	lineheight,
+	align,
+	shadow_pos,
+	stroke,
+	color,
+	color_stroke,
+	color_shadow,
+	mcolor_effect
+)
+
+std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent) {
+	text_style_str data;
+	if (!ctx || !t)
+		return "";
+	auto fs = get_font_family_str(ctx, t->family);
+	data.family = fs.family;
+	data.styles = fs.styles;
+	data.fontsize = t->fontsize;
+	data.lineheight = t->lineheight;
+	data.align = t->align;
+	data.shadow_pos = t->shadow_pos;
+	data.stroke = t->stroke;
+	data.color = t->color;
+	data.color_stroke = t->color_stroke;
+	data.color_shadow = t->color_shadow;
+	data.mcolor_effect = t->mcolor_effect;
 	njson0 j = data;
-	return j.dump(2);  // 缩进2 
+	return j.dump(indent);
 }
 
-std::string save_flex_data1(const flex_data1& data) {
+bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style* t)
+{
+	if (!ctx || !t || json_str.empty())return false;
+	njson0 j = njson0::parse(json_str);
+	auto ss = j.get<text_style_str>();
+	text_style ts;
+	if (ctx)
+		ts.family = new_font_family(ctx, ss.family.c_str(), ss.styles.c_str());
+	ts.fontsize = ss.fontsize;
+	ts.lineheight = ss.lineheight;
+	ts.align = ss.align;
+	ts.shadow_pos = ss.shadow_pos;
+	ts.stroke = ss.stroke;
+	ts.color = ss.color;
+	ts.color_stroke = ss.color_stroke;
+	ts.color_shadow = ss.color_shadow;
+	ts.mcolor_effect = ss.mcolor_effect;
+	if (t)
+		*t = ts;
+	return true;
+}
+
+// 保存：将结构体转为 JSON 字符串 
+std::string save_flex_data(const flex_data& data, int indent) {
 	njson0 j = data;
-	return j.dump(2);  // 缩进2 
+	return j.dump(indent);  // 缩进2 
+}
+
+std::string save_flex_data1(const flex_data1& data, int indent) {
+	njson0 j = data;
+	return j.dump(indent);  // 缩进2 
 }
 
 // 加载：从 JSON 字符串解析结构体 

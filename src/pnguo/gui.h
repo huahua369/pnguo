@@ -2,7 +2,7 @@
 #ifndef GUI_H
 #define GUI_H
 #include "vg.h"
-
+#include "font_core.h"
 
 #if 1
 enum class WIDGET_TYPE :uint32_t {

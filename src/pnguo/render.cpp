@@ -39,8 +39,8 @@ extern "C" {
 
 #include "tinysdl3.h"
 
-#include "render.h"
 #include "font_core.h"
+#include "render.h"
 
 #include "ecc_sv.h"
 #include "mapView.h"

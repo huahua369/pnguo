@@ -16,7 +16,6 @@
 //#define GUI_STATIC_LIB
 #include <pnguo/pnguo.h>
 #include <pnguo/tinysdl3.h>
-#include <pnguo/app.h>
 #include <pnguo/vkrenderer.h>
 #include <pnguo/gpu_vk.h>
 #include <pnguo/page.h>
@@ -30,6 +29,7 @@
 #include <pnguo/render.h>
 #include <pnguo/win_core.h>
 #include <pnguo/plot.h>
+#include <pnguo/app.h>
 auto fontn = (char*)u8"新宋体,Segoe UI Emoji,Times New Roman";// , Malgun Gothic";
 
 #ifdef min
