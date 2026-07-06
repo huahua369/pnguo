@@ -4,10 +4,17 @@
 创建：2026-05-10
 https://github.com/huahua369/pnguo
 
-
+struct ctrl_t {
+	std::string name;
+	std::string tips;
+};
+struct elem_t {
+	int id = -1;		// 控件id
+	int parent = -1;	// 父级id
+};
+json结构，css保存文本样式和布局，ctrl保存控件信息，panel保存面板信息
 {
-css:[{flex_data},{flex_data}],
-css_text:[{text_style},{text_style}],
+css:[{text_style},{flex_data},{text_style},{flex_data}],
 ctrl:[{ctrl_t},{ctrl_t}],
 panel:[],
 }
@@ -83,8 +90,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(text_style_str,
 std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent)
 {
 	text_style_str data;
-	if (!ctx || !t)
-		return "";
+	if (!ctx || !t) return "";
 	auto fs = get_font_family_str(ctx, t->family);
 	data.family = fs.family;
 	data.styles = fs.styles;
@@ -118,8 +124,7 @@ bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style
 	ts.color_stroke = ss.color_stroke;
 	ts.color_shadow = ss.color_shadow;
 	ts.mcolor_effect = ss.mcolor_effect;
-	if (t)
-		*t = ts;
+	if (t) *t = ts;
 	return true;
 }
 

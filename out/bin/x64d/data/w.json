@@ -1,5 +1,10 @@
 {
-  "text_style": [],
+  "text_style": [
+    {
+      "family": "新宋体,Segoe UI Emoji,Times New Roman,Consolas",
+      "fontsize": 16
+    }
+  ],
   "css": {
     "default_flex": {
       "text_style": 0,
@@ -45,7 +50,7 @@
       {
         "id": "sub_panel",
         "type": "div",
-        "layout": { "direction": "column" },
+        "style": "default_flex", 
         "children": [
           "button_1",
           "input_1"
