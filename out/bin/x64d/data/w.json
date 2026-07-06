@@ -1,0 +1,56 @@
+{
+  "text_style": [],
+  "css": {
+    "default_flex": {
+      "text_style": 0,
+      "flex_data": {}
+    },
+    "title_text": {
+      "text_style": 0,
+      "flex_data": {}
+    },
+    "primary_btn": {
+      "text_style": 0,
+      "flex_data": {}
+    },
+    "input_style": {
+      "text_style": 0,
+      "flex_data": {}
+    }
+  },
+  "ctrl": {
+    "main": {},
+    "foot": { "ctrl_t": 0 },
+    "button_1": {
+      "id": "button_1",
+      "type": "button",
+      "style": "primary_btn"
+    },
+    "input_1": {
+      "id": "input_1",
+      "type": "input",
+      "style": "input_style"
+    }
+  },
+  "panel": {
+    "id": "main",
+    "type": "div",
+    "style": "default_flex",
+    "children": [
+      {
+        "id": "text_1",
+        "type": "text",
+        "style": "title_text"
+      },
+      {
+        "id": "sub_panel",
+        "type": "div",
+        "layout": { "direction": "column" },
+        "children": [
+          "button_1",
+          "input_1"
+        ]
+      }
+    ]
+  }
+}
