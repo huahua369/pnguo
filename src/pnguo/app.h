@@ -110,7 +110,14 @@ private:
 
 };
 struct text_style;
-
+struct ctrl_t {
+	std::string name;
+	std::string tips;
+};
+struct elem_t {
+	int id = -1;		// 控件id
+	int parent = -1;	// 父级id
+};
 std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent);
 bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style* t);
 

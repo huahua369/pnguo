@@ -650,20 +650,6 @@ struct text_style
 	uint32_t color_shadow = 0;			//0xcc121212;	// 阴影颜色
 	bool mcolor_effect = true;			// 是否启用彩色字体参与阴影描边效果
 };
-struct text_style_str
-{
-	std::string family;				// 字体名称，逗号分隔
-	std::string styles;				// 字体风格，逗号分隔
-	float fontsize = 0;
-	float lineheight = 0;
-	glm::vec2 align = { 0.50,0.50 };// 文本对齐
-	glm::vec2 shadow_pos = { 1.0,1.0 };
-	int stroke = 0;						// 描边宽度
-	uint32_t color = 0xffc2c2c2;		// 文本颜色
-	uint32_t color_stroke = 0xff000000;	// 描边颜色
-	uint32_t color_shadow = 0;			//0xcc121212;	// 阴影颜色
-	bool mcolor_effect = true;			// 是否启用彩色字体参与阴影描边效果
-};
 // 文本区域
 struct text_box_t {
 	glm::ivec4 rc = {};		// 设置文本渲染区域，偏移/大小

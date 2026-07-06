@@ -3,6 +3,16 @@
 应用管理
 创建：2026-05-10
 https://github.com/huahua369/pnguo
+
+
+{
+css:[{flex_data},{flex_data}],
+css_text:[{text_style},{text_style}],
+ctrl:[{ctrl_t},{ctrl_t}],
+panel:[],
+}
+
+
 */
 
 
@@ -68,7 +78,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(text_style_str,
 	mcolor_effect
 )
 
-std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent) {
+
+
+std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent)
+{
 	text_style_str data;
 	if (!ctx || !t)
 		return "";
