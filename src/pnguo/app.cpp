@@ -298,6 +298,13 @@ dom_cx* viewdev_cx::get_dom(form_x* f)
 	return r;
 }
 
+void viewdev_cx::push_m(div_cx* d)
+{
+	auto dom = get_dom(app->main);
+	if (dom)
+		dom->add_widget(d);
+}
+
 void viewdev_cx::wait_dev()
 {
 	if (_vgdev)
@@ -437,7 +444,10 @@ int dom_cx::update(float delta)
 		ret += p->update(delta);
 	}
 	if (ret > 0)
-		std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) { return a->dindex < b->dindex; });
+		std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) {
+		glm::ivec2 a0 = { a->order,a->dindex }, b0 = { b->order,b->dindex };
+		return  a0 < b0;
+			});
 
 	ret += build();
 

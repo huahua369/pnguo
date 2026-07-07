@@ -156,6 +156,7 @@ public:
 	glm::ivec2 editpos = {};
 	std::vector<node_dt> tempfv;
 	flex_ctx* lctx = 0;
+	int order = 0;
 	bool update_drag = false;		// 是否更新拖动坐标
 	bool draggable = false;
 	bool docking = false;

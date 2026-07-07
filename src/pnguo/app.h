@@ -58,6 +58,8 @@ public:
 	div_cx* get_div(form_x* f);
 	form_x* set_div(div_cx* d);
 	dom_cx* get_dom(form_x* f);
+	// 添加div到主窗口
+	void push_m(div_cx* d);
 	void wait_dev();
 	void remove_q();
 private:

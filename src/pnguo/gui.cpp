@@ -3124,6 +3124,18 @@ void div_cx::draw(rvg_cx* rv)
 		rc -= border.y;
 		rv->add_rect({ 0.5,0.5,rc }, border.z);
 		rv->fill_stroke(border.w, border.x);
+		if (text.size()) {
+			glm::ivec2 rk = {}; 
+			glm::vec2 ta = { 0.5,0.5 };
+			glm::vec4 rc = { 0, 0, _size }; 
+			text_style st = style;
+			st.align = ta;
+			text_st tx = {};
+			tx.pos = { 0,thickness };
+			tx.size = ss;
+			tx.text = text.c_str(); tx.text_len = text.size();
+			rv->add_text(&tx, &st);
+		}
 		rv->pop_view();
 	}
 
@@ -5134,17 +5146,19 @@ void edit_cx::on_keyboard(et_un_t* ep)
 bool edit_cx::update(float delta)
 {
 	int ret = 0;
-	ctx->c_ct += delta * 1000.0 * ctx->c_d;
-	if (ctx->c_ct > _cursor.z)
-	{
-		ctx->c_d = -1;
-		ctx->c_ct = _cursor.z;
-		valid = true;
-	}
-	if (ctx->c_ct < 0)
-	{
-		ctx->c_d = 1; ctx->c_ct = 0;
-		valid = true;
+	if (is_input) {
+		ctx->c_ct += delta * 1000.0 * ctx->c_d;
+		if (ctx->c_ct > _cursor.z)
+		{
+			ctx->c_d = -1;
+			ctx->c_ct = _cursor.z;
+			valid = true;
+		}
+		if (ctx->c_ct < 0)
+		{
+			ctx->c_d = 1; ctx->c_ct = 0;
+			valid = true;
+		}
 	}
 	if (ctx->lineheight < 1)
 		ctx->lineheight = font_get_lineheight(style.family, style.fontsize, true);

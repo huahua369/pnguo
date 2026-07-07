@@ -463,7 +463,7 @@ void testgui() {
 	view->familys = family;
 	view->app = appx->app;
 	auto pcb = view->pcb;
-	dom_cx* dom0 = view->get_dom(form0);
+	//dom_cx* dom0 = view->get_dom(form0);
 	glm::ivec2 surfsize = { 260 * 3,256 };
 	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
 	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
@@ -651,7 +651,7 @@ void testgui() {
 			//r->v.mixed = true;
 			dvv2->add_widget(r);
 		}
-		dom0->add_widget(dvv2);
+		view->push_m(dvv2);
 		{
 			auto btn = fpslab;
 			btn->rounding = 4;
@@ -725,13 +725,13 @@ void testgui() {
 				//view->get_div(dv->form);
 			};
 	}
-	dom0->add_widget(dvv);
+	view->push_m(dvv);
 	auto colorpicker = new div_cx();
 	{
 		// 调色板
 
 		auto dvv = colorpicker;
-		dom0->add_widget(dvv);
+		view->push_m(dvv);
 		dvv->set_size({ 1200,400 });
 		dvv->set_pos({ 200,160 });
 		dvv->style.family = family;
@@ -795,9 +795,11 @@ void testgui() {
 		dvv->flex_child.margin_top = 2;
 		dvv->flex_child.margin_bottom = 2;
 		dvv->draggable = true;
-		dom0->add_widget(dvv);
+		dvv->order = 3 - i;
+		dvv->text = std::to_string(i);
+		view->push_m(dvv);
 	}
-	dom0->update(0.0f);
+
 	size_t frame_count = 0;
 	appx->app->set_fps(60);
 	appx->view = view;
