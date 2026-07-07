@@ -100,6 +100,8 @@ public:
 	vkdg_cx* vkd = 0;	// 3d渲染器
 	color_btn* fpslab = 0;
 	std::string gpustr;
+	glm::ivec4 rc3d = {};
+	void* dtex3d = 0;
 	int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
 	int iec = 0;
 	bool r3d = 0;

@@ -452,8 +452,7 @@ void testgui() {
 	auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
 	dev_info_cx devinfo = {};
 	get_dev_info(dctx, &devinfo);
-	appx->vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, 0);	// 创建vk渲染器 
-	appx->r3d = true;
+
 	// 准备使用3D渲染器的设备创建SDL渲染器
 	appx->app->set_dev(devinfo.inst, devinfo.phy, devinfo.vkdev);
 	auto fctx = appx->app->font_ctx;
@@ -463,8 +462,10 @@ void testgui() {
 	const char* wtitle = (char*)u8"窗口0";
 	form_x* form0 = (form_x*)new_form(appx->app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	appx->app->main = form0;
+	if (0)
 	{
-
+		appx->vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, 0);	// 创建vk渲染器 
+		appx->r3d = true;
 		auto rmd = hz::read_json("data/vksample.json");
 		auto& scenes = rmd["scenes"];
 		if (scenes.empty())
@@ -512,10 +513,10 @@ void testgui() {
 				appx->vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toUInt(it["instanceCount"], 1.0), hz::toBool(it["shadowMap"]));
 			}
 		}
-	}
-	appx->vkd->resize({ 1024,720 });				// 设置fbo缓冲区大小
-	auto vki = appx->vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 
+		appx->vkd->resize({ 1024,720 });				// 设置fbo缓冲区大小
+		auto vki = appx->vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+	}
 
 
 	auto view = new viewdev_cx();
@@ -826,12 +827,20 @@ void testgui() {
 		//flex_data loaded = load_flex_data(json_str);
 
 		//dvv->add_widget(r);
+
+		//{
+		//	void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
+		//	pcb->set_texture_blend(tex3d, 0, 0);
+		//	appx->dtex3d = tex3d;
+		//	appx->rc3d = { 0,0,vki.size.x, vki.size.y };
+		//}
 		auto ibtn = new image_btn();
 		if (ibtn) {
-			//ibtn->set_surface(surf, surfsize.x, surfsize.y);
-			ibtn->set_vkimage(vki.vkimage, vki.size.x, vki.size.y, 0);
+			ibtn->set_surface(surf, surfsize.x, surfsize.y);
+			ibtn->set_size({ surfsize.x, surfsize.y });
+			//ibtn->set_vkimage(vki.vkimage, vki.size.x, vki.size.y, 0);
 			//ibtn->str = "abcc";
-			ibtn->set_size({ 1024,720 });
+			//ibtn->set_size({ 1024,720 });
 			dvv->add_widget(ibtn);
 		}
 	}

@@ -724,10 +724,8 @@ size_t app_x::run()
 
 			}
 		}
-		void* dtex3d = 0;
 		if (r3d && vkd)
 		{
-			//dtex3d = tex3d;
 			auto io = app->main->get_io();
 			vkd->update(io);	// 更新事件
 			gpustr = vkd->get_label();
@@ -770,6 +768,13 @@ size_t app_x::run()
 				{
 					p->set_state();	// 清空/设置交换链接状态 
 					if (p->is_render) {
+						if (dtex3d) {
+							texture_dt tdt = {};
+							tdt.src_rect = { 0,0,vkd->width,vkd->height };
+							tdt.dst_rect = tdt.src_rect;
+							if (rc3d.z > 0 && rc3d.w > 0) { tdt.dst_rect = rc3d; }
+							if (dtex3d) view->pcb->render_texture(app->main->renderer, dtex3d, &tdt, 1);//3d
+						}
 						p->_dom ? p->_dom->cmd_draw() : 0;
 						p->present();
 					}
