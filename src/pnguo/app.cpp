@@ -751,7 +751,7 @@ size_t app_x::run()
 		}
 		uims = rtc.end();
 		int64_t sem3d = 0;
-		if (r3d && vkd)
+		if (r3d && vkd && app->main->get_visible())
 		{
 			rtc.begin();
 			vkd->on_render();		// 渲染到fbo纹理tex3d

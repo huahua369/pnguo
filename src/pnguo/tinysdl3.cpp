@@ -1420,6 +1420,7 @@ SDL_PixelFormat get_rgbafe() {
 	int depth = 32;
 	return SDL_GetPixelFormatForMasks(depth, rmask, gmask, bmask, amask);
 }
+void* new_texture_vk(void* renderer, int width, int height, void* vkptr, int format);
 SDL_Texture* new_tex(SDL_Renderer* renderer, image_ptr_t* img) {
 	SDL_Texture* pr = 0;
 	if (img && img->width > 0 && img->height > 0)
@@ -1451,7 +1452,10 @@ SDL_Texture* new_tex(SDL_Renderer* renderer, image_ptr_t* img) {
 				auto ty = img->type;
 				if (ty == 0) ty = SDL_PIXELFORMAT_ABGR8888;
 				if (ty == 1) ty = SDL_PIXELFORMAT_ARGB8888;
-				ptx = SDL_CreateTexture(renderer, (SDL_PixelFormat)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
+				if (img->ptr)
+					ptx = (SDL_Texture*)new_texture_vk(renderer, img->width, img->height, img->ptr, (SDL_PixelFormat)ty);
+				else
+					ptx = SDL_CreateTexture(renderer, (SDL_PixelFormat)ty, img->static_tex ? SDL_TEXTUREACCESS_STATIC : SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
 				//img->texid = ptx; 
 				img->stride = 0;
 				img->valid = true;
@@ -1830,7 +1834,7 @@ bool form_x::get_visible()
 {
 	auto f = SDL_GetWindowFlags(_ptr);
 	bool v = !(f & SDL_WINDOW_HIDDEN);
-	return v;
+	return v && _size.x > 0 && _size.y > 0;
 }
 
 

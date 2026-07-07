@@ -266,14 +266,29 @@ enum class BTN_STATE :uint8_t
 // todo图片按钮
 struct image_btn :public widget_t {
 	std::string str;
-	image_ptr_t* img = 0;
-	void* surf = 0;			// vkvg表面
+	union {
+		void* vkimage;	// vk图像
+		image_ptr_t* img;
+		void* surf;			// vkvg表面
+	}imgptr = {};
 	image_sliced_t state_img[5] = {};
+	image_ptr_t st = {};
 	std::vector<glm::ivec4> data;
 	int show_idx = 0;	// 参考BTN_STATE
+	int img_type = 0;	//  0 image_ptr_t, 1 VkvgSurface, 2 vkimage
+	int multi = 0;		// 多状态按钮，0=单状态，1=多状态
 public:
 	image_btn();
 	~image_btn();
+	void set_size(const glm::vec2& ss);
+	// 设置按钮状态分区，rc空则平分
+	void set_state(BTN_STATE m, const glm::ivec2& rc);
+	// 设置单个状态区域 
+	void set_state1(BTN_STATE m, const glm::ivec4& rc);
+
+	void set_image(image_ptr_t* img);
+	void set_vkimage(void* vkimage, int width, int height, int type);
+	void set_surface(void* surf, int width, int height);
 	bool on_mevent(int type, const glm::vec2& mps, void* e);
 	bool update(float delta);
 	void draw(rvg_cx* rv);

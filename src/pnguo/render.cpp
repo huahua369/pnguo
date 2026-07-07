@@ -3112,7 +3112,7 @@ size_t cmd_op_add_image(uint8_t* d, void* ctx)
 	auto f = d;
 	image_r t = next_value<image_r>(d);
 	auto idx = mrt_add_box(pc, {}, t.dsize, {});
-	if (t.is_surf) {
+	if (t.type == 1) {
 		mrt_add_image_vg(pc, idx, t.img, t.rc, t.sliced, t.color, t.dsize, t.pos, true);
 	}
 	else

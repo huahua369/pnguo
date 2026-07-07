@@ -77,6 +77,8 @@ list(APPEND src_vkvg
     "../src/pnguo/mapView.cpp"
     "../src/pnguo/vg.cpp"
     "../src/pnguo/pnguo.cpp"
+    "../src/pnguo/buffer.cpp"
+    "../src/pnguo/page.cpp"
     "../src/pnguo/render.cpp"
     "../src/pnguo/font_core.cpp"
     "../src/pnguo/tinysdl3.cpp"

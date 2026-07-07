@@ -165,6 +165,104 @@ image_btn::image_btn() :widget_t(WIDGET_TYPE::WT_IMAGE_BTN)
 }
 image_btn::~image_btn()
 {}
+void image_btn::set_size(const glm::vec2& ss)
+{
+	widget_t::set_size(ss);
+	if (multi == 0) {
+		auto p = &state_img[0];
+		p->tex_rc = glm::ivec4(0, 0, ss);
+	}
+}
+void image_btn::set_state(BTN_STATE m, const glm::ivec2& rc)
+{
+	int width = st.width;
+	int n = 0;
+	if (_bst & (int)BTN_STATE::STATE_NOMAL) {
+		n++;
+	}
+	if (_bst & (int)BTN_STATE::STATE_HOVER) {
+		n++;
+	}
+	if (_bst & (int)BTN_STATE::STATE_ACTIVE) {
+		n++;
+	}
+	if (_bst & (int)BTN_STATE::STATE_FOCUS) {
+		n++;
+	}
+	if (_bst & (int)BTN_STATE::STATE_DISABLE) {
+		n++;
+	}
+	if (n > 0)
+	{
+		width /= n;
+		glm::ivec4 rc2 = { 0,0,width,st.height };
+		if (rc.x > 0)
+			rc2.z = rc.x;
+		if (rc.y > 0)
+			rc2.w = rc.y;
+		if (_bst & (int)BTN_STATE::STATE_NOMAL) {
+			state_img[0].tex_rc = rc2;
+		}
+		if (_bst & (int)BTN_STATE::STATE_HOVER) {
+			rc2.x += width;
+			state_img[1].tex_rc = rc2;
+		}
+		if (_bst & (int)BTN_STATE::STATE_ACTIVE) {
+			rc2.x += width;
+			state_img[2].tex_rc = rc2;
+		}
+		if (_bst & (int)BTN_STATE::STATE_FOCUS) {
+			rc2.x += width;
+			state_img[3].tex_rc = rc2;
+		}
+		if (_bst & (int)BTN_STATE::STATE_DISABLE) {
+			rc2.x += width;
+			state_img[4].tex_rc = rc2;
+		}
+	}
+}
+void image_btn::set_state1(BTN_STATE m, const glm::ivec4& rc)
+{
+	if (_bst & (int)BTN_STATE::STATE_NOMAL) {
+		state_img[0].tex_rc = rc;
+	}
+	if (_bst & (int)BTN_STATE::STATE_HOVER) {
+		state_img[1].tex_rc = rc;
+	}
+	if (_bst & (int)BTN_STATE::STATE_ACTIVE) {
+		state_img[2].tex_rc = rc;
+	}
+	if (_bst & (int)BTN_STATE::STATE_FOCUS) {
+		state_img[3].tex_rc = rc;
+	}
+	if (_bst & (int)BTN_STATE::STATE_DISABLE) {
+		state_img[4].tex_rc = rc;
+	}
+}
+void image_btn::set_image(image_ptr_t* img)
+{
+	img_type = 0;
+	st = *img;
+	imgptr.img = &st;
+}
+void image_btn::set_vkimage(void* vkimage, int width, int height, int type)
+{
+	st = {};
+	st.width = width;
+	st.height = height;
+	st.type = type;
+	st.ptr = vkimage;
+	imgptr.img = &st;
+	img_type = 2;
+}
+void image_btn::set_surface(void* surf, int width, int height)
+{
+	st = {};
+	st.width = width;
+	st.height = height;
+	imgptr.surf = surf;
+	img_type = 1;
+}
 color_btn::color_btn() :widget_t(WIDGET_TYPE::WT_COLOR_BTN)
 {}
 color_btn::~color_btn()
@@ -207,6 +305,28 @@ bool image_btn::on_mevent(int type, const glm::vec2& mps, void* e)
 }
 
 bool image_btn::update(float) {
+	show_idx = 0;
+	if (_bst & (int)BTN_STATE::STATE_HOVER) {
+		show_idx = 1;
+	}
+	if (_bst & (int)BTN_STATE::STATE_ACTIVE) {
+		show_idx = 2;
+	}
+	if (_bst & (int)BTN_STATE::STATE_FOCUS) {
+		show_idx = 3;
+	}
+	if (_bst & (int)BTN_STATE::STATE_DISABLE) {
+		show_idx = 4;
+	}
+	if (multi == 0)
+	{
+		show_idx = 0;
+	}
+	//  STATE_NOMAL = BIT_INC(0),
+	//	STATE_HOVER = BIT_INC(1),
+	//	STATE_ACTIVE = BIT_INC(2),
+	//	STATE_FOCUS = BIT_INC(3),
+	//	STATE_DISABLE = BIT_INC(4),
 	return false;
 }
 
@@ -1432,21 +1552,18 @@ void image_btn::draw(rvg_cx* rv) {
 	rv->push_view(view, this);
 	rv->translate(psv);
 	//rv->add_rect({ 0.,0., ss }, rounding);
-	//rv->submit(0x80ffffff, 0, 0);
-	//image_ptr_t* img = 0;
-	//image_sliced_t state_img[5] = {}; 
+	//rv->submit(0x80ffffff, 0, 0); 
+	auto p = &state_img[show_idx];
 	image_r r = {};
-	r.img = (image_ptr_t*)(img ? img : surf);
-	r.rc = glm::ivec4(0, 0, ss);		// 所在纹理区域
-	r.sliced = {};	// 九宫格
-	r.dsize = ss;	// 渲染大小
-	r.pos = psv;		// 渲染坐标
+	r.img = (image_ptr_t*)(imgptr.img);
+	r.rc = p->tex_rc;// glm::ivec4(0, 0, ss);		// 所在纹理区域
+	r.sliced = p->sliced;	// 九宫格
+	r.dsize = { p->img_rc.z, p->img_rc.w };	// 渲染大小
+	r.pos = psv + glm::ivec2(p->img_rc);		// 渲染坐标
 	r.color = -1;		// 混合颜色
-	if (!img)
-	{
-		r.is_surf = true;
-	}
+	r.type = img_type;
 	rv->add_image(&r);
+
 	text_st tx = {};
 	tx.pos = {};
 	tx.size = get_size();
@@ -3125,9 +3242,9 @@ void div_cx::draw(rvg_cx* rv)
 		rv->add_rect({ 0.5,0.5,rc }, border.z);
 		rv->fill_stroke(border.w, border.x);
 		if (text.size()) {
-			glm::ivec2 rk = {}; 
+			glm::ivec2 rk = {};
 			glm::vec2 ta = { 0.5,0.5 };
-			glm::vec4 rc = { 0, 0, _size }; 
+			glm::vec4 rc = { 0, 0, _size };
 			text_style st = style;
 			st.align = ta;
 			text_st tx = {};

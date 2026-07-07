@@ -18,6 +18,9 @@ _stroke_preserve
 #include <vkvg_cx.h>
 #include <win_core.h>
 #include <vkrenderer.h>
+#include <page.h>
+#include <mapView.h>
+
 #define white 1, 1, 1
 #define red   1, 0, 0
 #define green 0, 1, 0
@@ -460,6 +463,60 @@ void testgui() {
 	const char* wtitle = (char*)u8"窗口0";
 	form_x* form0 = (form_x*)new_form(appx->app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	appx->app->main = form0;
+	{
+
+		auto rmd = hz::read_json("data/vksample.json");
+		auto& scenes = rmd["scenes"];
+		if (scenes.empty())
+		{
+			{
+				njson item;
+				item["name"] = "busterDrone";
+				item["dir"] = R"(E:\model\testgltf\)";
+				item["filename"] = "busterDrone.gltf";
+				item["pos"] = { 0.0,1.8,0.0 };
+				item["scale"] = 1.0;
+				item["shadowMap"] = true;
+				item["visible"] = true;
+				scenes.push_back(item);
+			}
+			{
+				njson item;
+				item["name"] = "droide";
+				item["dir"] = R"(E:\model\testgltf\)";
+				item["filename"] = "free_droide_de_seguridad_k-2so_by_oscar_creativo.glb";
+				item["pos"] = { 0.0,0.0,0.0 };
+				item["scale"] = 10.0;
+				item["shadowMap"] = true;
+				item["visible"] = true;
+				scenes.push_back(item);
+			}
+			hz::save_json("data/vksample.json", rmd, 2);
+		}
+		for (auto& it : scenes)
+		{
+			std::string path = it["dir"];
+			std::string fn = it["filename"];
+			if (fn.empty() || !hz::toBool(it["visible"]))continue;
+			if (path.size()) {
+				char xx = *path.rbegin();
+				char fx = fn[0];
+				if (!(xx == '\\' || xx == '/') && !(fx == '\\' || fx == '/')) {
+					path += "/";
+				}
+			}
+			path += fn;
+			if (hz::access_2(path.c_str()))
+			{
+				auto pos = hz::toVec3(it["pos"]);
+				appx->vkd->add_gltf(path.c_str(), pos, hz::toDouble(it["scale"], 1.0), hz::toUInt(it["instanceCount"], 1.0), hz::toBool(it["shadowMap"]));
+			}
+		}
+	}
+	appx->vkd->resize({ 1024,720 });				// 设置fbo缓冲区大小
+	auto vki = appx->vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+
+
 
 	auto view = new viewdev_cx();
 	view->init_vgdev(&devinfo, 8);
@@ -652,7 +709,7 @@ void testgui() {
 			r->set_size({ 60,36 });
 			r->set_value(true);
 			//r->v.mixed = true;
-			dvv2->add_widget(r);
+			//dvv2->add_widget(r);
 		}
 		view->push_m(dvv2);
 		{
@@ -735,7 +792,7 @@ void testgui() {
 
 		auto dvv = colorpicker;
 		view->push_m(dvv);
-		dvv->set_size({ 1200,400 });
+		dvv->set_size({ 1028,728 });
 		dvv->set_pos({ 200,160 });
 		dvv->style.family = family;
 		dvv->style.fontsize = 16;
@@ -768,12 +825,13 @@ void testgui() {
 		r->set_text(json_str.c_str(), json_str.length());
 		//flex_data loaded = load_flex_data(json_str);
 
-		dvv->add_widget(r);
+		//dvv->add_widget(r);
 		auto ibtn = new image_btn();
 		if (ibtn) {
-			ibtn->surf = surf;
+			//ibtn->set_surface(surf, surfsize.x, surfsize.y);
+			ibtn->set_vkimage(vki.vkimage, vki.size.x, vki.size.y, 0);
 			//ibtn->str = "abcc";
-			ibtn->set_size(surfsize);
+			ibtn->set_size({ 1024,720 });
 			dvv->add_widget(ibtn);
 		}
 	}
