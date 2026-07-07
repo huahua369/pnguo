@@ -23,7 +23,7 @@ extern "C" {
 #include <pnguo.h>
 
 #include <zlib.h>
-
+ 
 #define FLEX_IMPLEMENTATION
 #include <vg.h>
 
@@ -45,7 +45,6 @@ extern "C" {
 #include "ecc_sv.h"
 #include "mapView.h"
 
-#include "ntype.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

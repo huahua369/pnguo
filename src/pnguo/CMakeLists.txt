@@ -67,7 +67,6 @@ set(Images_src
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/default_specular.dds 
 )
 
-
 find_package(FLAC CONFIG REQUIRED)
 find_package(mpg123 CONFIG REQUIRED)
 find_package(FFTW3 CONFIG REQUIRED)

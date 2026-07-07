@@ -7,6 +7,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "ntype.h"
 #include "render.h"
 #include "plot.h"
 

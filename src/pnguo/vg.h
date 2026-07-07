@@ -465,8 +465,8 @@ struct flex_data {
 	bool should_order_children = false;
 };
 struct flex_data1 {
-	float width = 0, height = 0;	// 大小NAN
-	float left = 0, right = 0, top = 0, bottom = 0;	// 偏移
+	float width = 0, height = 0;		// 大小NAN
+	float offset[4] = { 0, 0, 0, 0 };	// 偏移left, right, top, bottom
 	float margin[4] = { 0, 0, 0, 0 };		// 本元素内边距
 	float padding[4] = { 0, 0, 0, 0 };		// 本元素外边距
 	float grow = 0;		// 子元素:自身放大比例，默认为0不放大

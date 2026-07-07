@@ -63,7 +63,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data,
 )
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(flex_data1,
 	width, height,
-	left, right, top, bottom,
+	offset,
 	margin, padding,
 	grow, shrink, order, basis, baseline,
 	justify_content, align_content, align_items, align_self,

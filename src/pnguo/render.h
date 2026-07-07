@@ -11,6 +11,7 @@
 #include <stack>
 
 #include "vkvg.h"
+#include "vg.h"
 
 #include <clipper2/clipper.h> 
 using namespace Clipper2Lib;

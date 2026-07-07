@@ -17,6 +17,7 @@ _stroke_preserve
 #include <event.h>
 #include <vkvg_cx.h>
 #include <win_core.h>
+#include <vkrenderer.h>
 #define white 1, 1, 1
 #define red   1, 0, 0
 #define green 0, 1, 0
@@ -448,6 +449,8 @@ void testgui() {
 	auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
 	dev_info_cx devinfo = {};
 	get_dev_info(dctx, &devinfo);
+	appx->vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, 0);	// 创建vk渲染器 
+	appx->r3d = true;
 	// 准备使用3D渲染器的设备创建SDL渲染器
 	appx->app->set_dev(devinfo.inst, devinfo.phy, devinfo.vkdev);
 	auto fctx = appx->app->font_ctx;
