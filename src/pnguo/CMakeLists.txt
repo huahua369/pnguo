@@ -89,10 +89,8 @@ GPUOpen::VulkanMemoryAllocator glm::glm-header-only nlohmann_json::nlohmann_json
     FFTW3::fftw3 FFTW3::fftw3f FFTW3::fftw3l
     draco::draco
 )
-target_include_directories (pnguo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 copyTargetCommand("${Shaders_GLTF_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_gltf_src)
 copyTargetCommand("${Shaders_PostProc_src}" ${EXECUTABLE_OUTPUT_PATH}/ShaderLibVK copied_vk_shaders_postproc_src)
 copyTargetCommand("${Images_src}" ${EXECUTABLE_OUTPUT_PATH}/images copied_Images_src)
+target_include_directories (pnguo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
 add_dependencies(pnguo copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src copied_Images_src)
-
- 

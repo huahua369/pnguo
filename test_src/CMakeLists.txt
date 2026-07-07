@@ -235,3 +235,6 @@ file(COPY xh1.json DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
 file(COPY seguiemj.ttf DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
 file(COPY mari.png DESTINATION ${EXECUTABLE_OUTPUT_PATH}/data)
   
+target_include_directories (vgtest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}) 
+add_dependencies(vgtest copied_vk_shaders_gltf_src copied_vk_shaders_postproc_src copied_Images_src)
+ 

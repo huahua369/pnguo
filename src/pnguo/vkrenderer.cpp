@@ -6012,6 +6012,7 @@ namespace vkr {
 #ifdef _WIN32
 		HANDLE m_handle = INVALID_HANDLE_VALUE;
 #endif
+		hz::mfile_t mf;
 	};
 
 	// Loads a JPEGs, PNGs, BMPs and any image the Windows Imaging Component can load.
@@ -15980,8 +15981,7 @@ namespace vkr {
 			UINT32           arraySize;
 			UINT32           reserved;
 		} DDS_HEADER_DXT10;
-
-#ifdef _WIN32
+#ifdef A_WIN32
 		if (GetFileAttributesA(pFilename) == 0xFFFFFFFF)
 			return false;
 
@@ -16039,17 +16039,74 @@ namespace vkr {
 		}
 
 		SetFilePointer(m_handle, fileSize - rawTextureSize, 0, FILE_BEGIN);
+#else
+		hz::mfile_t mt;
+		auto kd = mt.open_d(pFilename, true);
+		if (!kd)return false;
+
+		UINT32 fileSize = mt.size();
+		UINT32 rawTextureSize = fileSize;
+
+		// read the header
+		char headerData[4 + sizeof(DDS_HEADER) + sizeof(DDS_HEADER_DXT10)];
+		DWORD dwBytesRead = 0;
+		if (mt.read(headerData, 4 + sizeof(DDS_HEADER) + sizeof(DDS_HEADER_DXT10)))
+		{
+			char* pByteData = headerData;
+			UINT32 dwMagic = *reinterpret_cast<UINT32*>(pByteData);
+			if (dwMagic != ' SDD')   // "DDS "
+			{
+				return false;
+			}
+
+			pByteData += 4;
+			rawTextureSize -= 4;
+
+			DDS_HEADER* header = reinterpret_cast<DDS_HEADER*>(pByteData);
+			pByteData += sizeof(DDS_HEADER);
+			rawTextureSize -= sizeof(DDS_HEADER);
+
+			pInfo->width = header->dwWidth;
+			pInfo->height = header->dwHeight;
+			pInfo->depth = header->dwDepth ? header->dwDepth : 1;
+			pInfo->mipMapCount = header->dwMipMapCount ? header->dwMipMapCount : 1;
+
+			if (header->ddspf.fourCC == '01XD')
+			{
+				DDS_HEADER_DXT10* header10 = reinterpret_cast<DDS_HEADER_DXT10*>((char*)header + sizeof(DDS_HEADER));
+				rawTextureSize -= sizeof(DDS_HEADER_DXT10);
+
+				pInfo->arraySize = header10->arraySize;
+				pInfo->format = header10->dxgiFormat;
+				pInfo->bitCount = header->ddspf.bitCount;
+			}
+			else
+			{
+				pInfo->arraySize = (header->dwCubemapFlags == 0xfe00) ? 6 : 1;
+				pInfo->format = GetDxgiFormat(header->ddspf);
+				pInfo->bitCount = (UINT32)BitsPerPixel(pInfo->format);
+			}
+		}
+		auto fr = fileSize - rawTextureSize;
+		mf.swap(mt);
+		mf.seek(fr, 0);
+		//SetFilePointer(m_handle, fileSize - rawTextureSize, 0, FILE_BEGIN);
 #endif
 		return true;
 	}
 
 	void DDSLoader::CopyPixels(void* pDest, uint32_t stride, uint32_t bytesWidth, uint32_t height)
 	{
-#ifdef _WIN32
+#ifdef A_WIN32
 		assert(m_handle != INVALID_HANDLE_VALUE);
 		for (uint32_t y = 0; y < height; y++)
 		{
 			::ReadFile(m_handle, (char*)pDest + y * stride, bytesWidth, NULL, NULL);
+		}
+#else
+		for (uint32_t y = 0; y < height; y++)
+		{
+			mf.read((char*)pDest + y * stride, bytesWidth);
 		}
 #endif
 	}
