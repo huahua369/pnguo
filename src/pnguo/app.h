@@ -91,10 +91,17 @@ public:
 private:
 
 };
+namespace vkg {
+	class cxDevice;
+}
+struct adevice3_t;
+
 class app_x
 {
 public:
 	app_cx* app = 0;
+	adevice3_t* gd = 0;
+	vkg::cxDevice* dctx = 0;
 	hz::audio_cx* audio_ctx = 0;
 	viewdev_cx* view = 0;
 	vkdg_cx* vkd = 0;	// 3d渲染器
@@ -102,13 +109,15 @@ public:
 	std::string gpustr;
 	glm::ivec4 rc3d = {};
 	void* dtex3d = 0;
+	font_family_t* family = 0;
 	int uims = 0, ms3d = 0, SDLms = 0, cpums = 0;
+	glm::ivec2 font_csize = { 1024,1024 };
 	int iec = 0;
 	bool r3d = 0;
 public:
 	app_x();
 	~app_x();
-	void init();
+	void init(bool has3d);
 	size_t run();
 private:
 

@@ -20,6 +20,11 @@ _stroke_preserve
 #include <vkrenderer.h>
 #include <page.h>
 #include <mapView.h>
+#include <SDL3/SDL.h>
+#ifdef _DEBUG
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
 
 #define white 1, 1, 1
 #define red   1, 0, 0
@@ -447,25 +452,13 @@ void testgui() {
 	};
 	auto appx = new app_x();
 	std::shared_ptr<app_x> spappx(appx);
-	appx->init();
-	adevice3_t* gd = new_gdev(0, 0);
-	auto dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
-	dev_info_cx devinfo = {};
-	get_dev_info(dctx, &devinfo);
-
-	// 准备使用3D渲染器的设备创建SDL渲染器
-	appx->app->set_dev(devinfo.inst, devinfo.phy, devinfo.vkdev);
-	auto fctx = appx->app->font_ctx;
-	fctx->set_cache_size(512, 512);
-	auto family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
+	appx->init(false);
 	glm::ivec2 ws = dpis[4];// { 1280, 860 };
 	const char* wtitle = (char*)u8"窗口0";
 	form_x* form0 = (form_x*)new_form(appx->app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	appx->app->main = form0;
-	if (0)
+	if (appx->vkd)
 	{
-		appx->vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, 0);	// 创建vk渲染器 
-		appx->r3d = true;
 		auto rmd = hz::read_json("data/vksample.json");
 		auto& scenes = rmd["scenes"];
 		if (scenes.empty())
@@ -518,11 +511,7 @@ void testgui() {
 		auto vki = appx->vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
 	}
 
-
-	auto view = new viewdev_cx();
-	view->init_vgdev(&devinfo, 8);
-	view->familys = family;
-	view->app = appx->app;
+	auto view = appx->view;
 	auto pcb = view->pcb;
 	//dom_cx* dom0 = view->get_dom(form0);
 	glm::ivec2 surfsize = { 260 * 3,256 };
@@ -530,12 +519,11 @@ void testgui() {
 	auto img = view->_vgdev->new_surface(R"(E:\za\noto-emoji-2.042\third_party\region-flags\png\GB-WLS.png)");
 	if (surf) {
 		draw_vgtest(surf, img, surfsize);
-		//vctx->free_surface(surf);
 	}
 	auto dvv = new div_cx();
 	dvv->set_size({ 500,400 });
 	dvv->set_pos({ 100,60 });
-	dvv->style.family = family;
+	dvv->style.family = appx->family;
 	dvv->style.fontsize = 16;
 
 	dvv->border = { 0xffacacac,1,5,0x9f666666 };	// 颜色，线粗，圆角，背景色
@@ -618,16 +606,16 @@ void testgui() {
 	}
 #endif
 
-	auto edit1 = new edit_cx();
-	{
-		auto r = edit1;
-		r->set_size({ 236,32 });
-		//r->set_single(false);
-		r->placeholder = (char*)u8"输入文本";
-		//dvv->add_widget(r);
-		r->dindex = 0;
+	//auto edit1 = new edit_cx();
+	//{
+	//	auto r = edit1;
+	//	r->set_size({ 236,32 });
+	//	//r->set_single(false);
+	//	r->placeholder = (char*)u8"输入文本";
+	//	//dvv->add_widget(r);
+	//	r->dindex = 0;
 
-	}
+	//}
 	auto pro = new progress_tl();
 	dvv->add_widget(pro);
 	pro->set_size({ 120,26 });
@@ -637,13 +625,13 @@ void testgui() {
 	pro->width = 110;
 	pro->color = { 0xffff9e40, 0x5f6c6c6c };
 	pro->set_value(0.5);
-	auto colorpick = new colorpick_tl();
-	{
-		auto c = colorpick;
-		c->init(0xff282828, 300, 20, true);
-		c->style.fontsize = 15;
-		//dvv->add_widget(c);
-	}
+	//auto colorpick = new colorpick_tl();
+	//{
+	//	auto c = colorpick;
+	//	c->init(0xff282828, 300, 20, true);
+	//	c->style.fontsize = 15;
+	//	//dvv->add_widget(c);
+	//}
 	static bool loadf = false;
 
 	auto dvv2 = new div_cx();
@@ -651,7 +639,7 @@ void testgui() {
 		auto dvv1 = new div_cx();
 		dvv1->set_size({ 180,150 });
 		dvv1->set_pos({ 100,60 });
-		dvv1->style.family = family;
+		dvv1->style.family = appx->family;
 		dvv1->style.fontsize = 16;
 		dvv1->border = { 0xffacacac,1,5,0xaf66f666 };	// 颜色，线粗，圆角，背景色
 		dvv1->flex_child.margin_left = 2;		// 子元素外边距
@@ -695,7 +683,7 @@ void testgui() {
 	{
 		dvv2->set_size({ 500,400 });
 		dvv2->set_pos({ 10,10 });
-		dvv2->style.family = family;
+		dvv2->style.family = appx->family;
 		dvv2->style.fontsize = 16;
 		dvv2->border = { 0xffffffff,1,5,0x50f66666 };	// 颜色，线粗，圆角，背景色
 		dvv2->flex_child.margin_left = 4;		// 子元素外边距
@@ -706,9 +694,9 @@ void testgui() {
 		dvv2->docking = true;
 		dvv2->_absolute = true;
 		{
-			auto r = new switch_tl();
-			r->set_size({ 60,36 });
-			r->set_value(true);
+			//auto r = new switch_tl();
+			//r->set_size({ 60,36 });
+			//r->set_value(true);
 			//r->v.mixed = true;
 			//dvv2->add_widget(r);
 		}
@@ -795,7 +783,7 @@ void testgui() {
 		view->push_m(dvv);
 		dvv->set_size({ 1028,728 });
 		dvv->set_pos({ 200,160 });
-		dvv->style.family = family;
+		dvv->style.family = appx->family;
 		dvv->style.fontsize = 16;
 		dvv->border = { 0xffacacac,1,5,0xf9666666 };	// 颜色，线粗，圆角，背景色
 		dvv->flex.wrap = flex_wrap::NO_WRAP;
@@ -809,12 +797,12 @@ void testgui() {
 		dvv->flex_child.margin_bottom = 2;
 		dvv->draggable = 1;
 
-		auto r = new edit_cx();
-		r->set_size({ 360,360 });
+		//auto r = new edit_cx();
+		//r->set_size({ 360,360 });
+		////r->set_single(false);
+		//r->placeholder = (char*)u8"输入文本";
+		//r->dindex = 0;
 		//r->set_single(false);
-		r->placeholder = (char*)u8"输入文本";
-		r->dindex = 0;
-		r->set_single(false);
 
 		flex_data data;
 		data.width = 100.0f;
@@ -823,17 +811,17 @@ void testgui() {
 		data.justify_content = flex_align::ALIGN_CENTER;
 
 		std::string json_str = save_flex_data(data);
-		r->set_text(json_str.c_str(), json_str.length());
-		//flex_data loaded = load_flex_data(json_str);
+		//r->set_text(json_str.c_str(), json_str.length());
+	//flex_data loaded = load_flex_data(json_str);
 
-		//dvv->add_widget(r);
+	//dvv->add_widget(r);
 
-		//{
-		//	void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
-		//	pcb->set_texture_blend(tex3d, 0, 0);
-		//	appx->dtex3d = tex3d;
-		//	appx->rc3d = { 0,0,vki.size.x, vki.size.y };
-		//}
+	//{
+	//	void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
+	//	pcb->set_texture_blend(tex3d, 0, 0);
+	//	appx->dtex3d = tex3d;
+	//	appx->rc3d = { 0,0,vki.size.x, vki.size.y };
+	//}
 		auto ibtn = new image_btn();
 		if (ibtn) {
 			ibtn->set_surface(surf, surfsize.x, surfsize.y);
@@ -852,7 +840,7 @@ void testgui() {
 		auto dvv = new div_cx();
 		dvv->set_size({ 100,100 });
 		dvv->set_pos({ 100,60 });
-		dvv->style.family = family;
+		dvv->style.family = appx->family;
 		dvv->style.fontsize = 16;
 		dvv->border = { 0xffacacac,1,5, color2u(dcc[i]) };	// 颜色，线粗，圆角，背景色
 		dvv->flex.wrap = flex_wrap::WRAP;
@@ -872,17 +860,26 @@ void testgui() {
 
 	size_t frame_count = 0;
 	appx->app->set_fps(60);
-	appx->view = view;
 	appx->fpslab = fpslab;
 	do {
 		frame_count = appx->run();
 		//draw_vgtest(surf, img, surfsize);
 	} while (frame_count);
+
+	view->_vgdev->free_surface(surf);
+	view->_vgdev->free_surface(img);
 }
 int main() {
+	// 启用内存泄漏检测
+	int dbgFlags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+	dbgFlags |= _CRTDBG_LEAK_CHECK_DF | _CRTDBG_ALLOC_MEM_DF; // 启用内存泄漏检查
+	_CrtSetDbgFlag(dbgFlags);
+	static int kba = 0;
+	if (kba)
+		_CrtSetBreakAlloc(kba);
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
 	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
-	dev_info_cx devinfo = {};
-	testgui();
+
+	testgui(); 
 	return 0;
 }

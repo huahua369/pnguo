@@ -421,7 +421,10 @@ app_cx::app_cx()
 	uint32_t f = -1;
 	//f &= ~SDL_INIT_CAMERA; // 相机退出有bug
 	SDL_SetMemoryFunctions(treal_malloc, treal_calloc, treal_realloc, treal_free);
-	f = SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_HAPTIC;
+	f = SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+#ifdef __ANDROID__
+	f |= SDL_INIT_HAPTIC;
+#endif
 	//SDL_INIT_JOYSTICK
 	//SDL_INIT_HAPTIC     
 	//SDL_INIT_GAMEPAD  
@@ -845,9 +848,6 @@ void app_cx::clearf()
 		{
 			if (it == main)
 				main = 0;
-			if (it->free_dom && it->_dom) {
-				it->free_dom(it->_dom);
-			}
 			delete it;
 		}
 		reforms.pop();
@@ -1581,6 +1581,9 @@ form_x::form_x()
 
 form_x::~form_x()
 {
+	if (free_dom && _dom) {
+		free_dom(_dom); _dom = 0;
+	}
 	//lock_auto_x lx(&lkecb); 
 	for (auto it : childfs) {
 		it->_ptr = 0;
@@ -2163,7 +2166,7 @@ int app_cx::on_call_we(const SDL_Event* e, form_x* pw)
 				pw->parent->remove_f(pw);
 			}
 			else {
-				pw->destroy();
+				//pw->destroy();
 				pw->app->remove(pw);
 			}
 		}

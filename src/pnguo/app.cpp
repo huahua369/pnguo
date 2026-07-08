@@ -1,4 +1,4 @@
-
+﻿
 /*
 应用管理
 创建：2026-05-10
@@ -36,6 +36,8 @@ panel:[],
 #include "audio.h"
 #include <pnguo/print_time.h> 
 #include "vkrenderer.h"
+#include "gpu_vk.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -674,20 +676,44 @@ app_x::~app_x()
 	if (audio_ctx)
 		delete audio_ctx;
 	audio_ctx = 0;
+	delete_font_family(family); family = 0;
+	if (view)delete view; view = 0;
+	free_vkdg(vkd);
+	gd->release(dctx);
+	free_gdev(gd); gd = 0;
 	free_app(app);
 }
 
-void app_x::init()
+void app_x::init(bool has3d)
 {
 	if (app)return;
 	app = new_app();
+	if (!app)return;
 	hz::audio_backend_t abc = { app->get_audio_device(),app_cx::new_audio_stream,app_cx::free_audio_stream,app_cx::bindaudio,app_cx::unbindaudio,app_cx::unbindaudios
-,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
-,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
+		,app_cx::get_audio_stream_queued,app_cx::get_audio_stream_available,app_cx::get_audio_dst_framesize
+		,app_cx::put_audio,app_cx::pause_audio,app_cx::mix_audio,app_cx::clear_audio,app_cx::sleep_ms,app_cx::get_ticks };
 	audio_ctx = new hz::audio_cx();
 	audio_ctx->init(&abc, "data/config_music.json");
 	audio_ctx->play_thread = false;
 	audio_ctx->run_thread();
+	gd = new_gdev(0, 0);
+	dctx = (vkg::cxDevice*)gd->new_device(gd->ctx, 0, 0, 0, 0);
+	dev_info_cx devinfo = {};
+	get_dev_info(dctx, &devinfo);
+
+	auto fctx = app->font_ctx;
+	fctx->set_cache_size(font_csize.x, font_csize.y);
+	family = new_font_family(fctx, (char*)u8"新宋体,Segoe UI Emoji,Times New Roman,Consolas");
+	// 准备使用3D渲染器的设备创建SDL渲染器
+	app->set_dev(devinfo.inst, devinfo.phy, devinfo.vkdev);
+	if (has3d) {
+		vkd = new_vkdg(devinfo.inst, devinfo.phy, devinfo.vkdev, 0, 0, 0);	// 创建vk渲染器 
+		r3d = true;
+	}
+	view = new viewdev_cx();
+	view->init_vgdev(&devinfo, 8);
+	view->familys = family;
+	view->app = app;
 }
 
 size_t app_x::run()
