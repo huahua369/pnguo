@@ -271,6 +271,11 @@ gradient_btn::gradient_btn() :widget_t(WIDGET_TYPE::WT_GRADIENT_BTN)
 {}
 gradient_btn::~gradient_btn()
 {}
+menu_btn::menu_btn() :widget_t(WIDGET_TYPE::WT_MENU_BTN)
+{}
+
+menu_btn::~menu_btn()
+{}
 radio_tl::radio_tl() :widget_t(WIDGET_TYPE::WT_RADIO)
 {}
 checkbox_tl::checkbox_tl() :widget_t(WIDGET_TYPE::WT_CHECKBOX)
@@ -596,6 +601,11 @@ bool color_btn::update(float delta)
 		}
 	}
 	return true;
+}
+
+bool menu_btn::update(float delta)
+{
+	return false;
 }
 
 #endif // 1
@@ -1746,6 +1756,14 @@ void gradient_btn::draw(rvg_cx* rv)
 
 #endif
 }
+
+
+void menu_btn::draw(rvg_cx* rv)
+{
+
+}
+
+
 
 void draw_radios(rvg_cx* rv, radio_info_t* p, radio_style_t* ps)
 {
@@ -3073,6 +3091,7 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 		if (draggable)
 			dindex = 1;
 		ret = true;
+		valid = true;
 	}break;
 	case event_type2::on_drag:
 	{
@@ -3089,6 +3108,7 @@ bool div_cx::on_mevent(int type, const glm::vec2& mps, void* e)
 		{
 			dindex = 0;
 		}
+		valid = true;
 		ret = true;
 	}break;
 	};

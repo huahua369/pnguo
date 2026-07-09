@@ -16,6 +16,7 @@ enum class WIDGET_TYPE :uint32_t {
 	WT_SLIDER,
 	WT_COLORPICK,
 	WT_SCROLL_BAR,
+	WT_MENU_BTN,
 };
 
 // 判断拾取
@@ -39,6 +40,7 @@ struct slider_tl;
 struct colorpick_tl;
 struct scroll_bar;
 class edit_cx;
+class menu_btn;
 
 //  cb;支持的type有on_move/on_scroll/on_drag/on_down/on_up/on_click/on_dblclick/on_tripleclick
 struct widget_t
@@ -353,6 +355,17 @@ public:
 
 	bool update(float delta);
 	void draw(rvg_cx* rv);
+};
+class menu_btn :public widget_t
+{
+public:
+	menu_btn();
+	~menu_btn();
+
+	bool update(float delta);
+	void draw(rvg_cx* rv);
+private:
+
 };
 
 struct radio_style_t

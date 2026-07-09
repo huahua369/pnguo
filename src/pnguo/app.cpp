@@ -446,13 +446,15 @@ int dom_cx::update(float delta)
 		ret += p->update(delta);
 	}
 	if (ret > 0)
-		std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b) {
-		glm::ivec2 a0 = { a->order,a->dindex }, b0 = { b->order,b->dindex };
-		return  a0 < b0;
+	{
+		std::stable_sort(widgets.begin(), widgets.end(), [](div_cx* a, div_cx* b)
+			{
+				if (a->order != b->order)
+					return a->order < b->order;
+				return a->dindex < b->dindex;
 			});
-
+	}
 	ret += build();
-
 	return ret;
 }
 void get_div(widget_t* p, std::vector<div_cx*>* v)
