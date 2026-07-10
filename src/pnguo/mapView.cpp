@@ -2631,6 +2631,52 @@ namespace hz
 			}
 		}
 	}
+	void save_json0(const std::string& fn, const njson0& n, int indent_cbor)
+	{
+#ifdef _WIN32
+		if (fn[1] != ':' && fn[0] != '/')
+		{
+			//fn = hz::File::getAP(fn);
+		}
+#endif
+		mfile_t mt;
+		auto vt = mt.open_m(fn, false);
+		if (vt)
+		{
+			if (indent_cbor < 0)
+			{
+				auto s = njson::to_cbor(n);
+				if (s.size())
+				{
+					mt.ftruncate_m(s.size());
+					auto d = mt.map(s.size(), 0);
+					if (d)
+						memcpy(d, (char*)s.data(), s.size());
+					mt.flush();
+				}
+			}
+			else
+			{
+				std::string s;
+				if (indent_cbor <= 0)
+				{
+					s = n.dump();
+				}
+				else
+				{
+					s = n.dump(indent_cbor);
+				}
+				if (s.size())
+				{
+					mt.ftruncate_m(s.size());
+					auto d = mt.map(s.size(), 0);
+					if (d)
+						memcpy(d, (char*)s.data(), s.size());
+					mt.flush();
+				}
+			}
+		}
+	}
 	std::string get_dir(const char* t)
 	{
 		std::string ret = t;

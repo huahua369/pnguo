@@ -70,14 +70,14 @@ public:
 	std::function<void(void* p, int type, const glm::vec2& mps)> mevent_cb;	//通用事件处理
 	std::function<void(void* p, int clicks, const glm::vec2& mpos)> click_cb;						//左键点击事件
 	form_x* form = 0;
-	int _clicks = 0;		// 点击数量
-
 	glm::ivec2 hscroll = { 1,1 };// x=1则受水平滚动条影响，y=1则受垂直滚动条影响
 	int _old_bst = 0;			// 鼠标状态
+	int _clicks = 0;		// 点击数量
 	int cks = 0;				// 鼠标点击状态
 	widget_t* parent = 0;
 	double dtime = 0.0;
 	bool _disabled_events = false;
+	bool _disabled = false;
 	bool visible = true;
 	bool _absolute = false;		// true绝对坐标，false布局计算
 	bool has_drag = false;	// 是否有拖动事件
@@ -295,24 +295,34 @@ public:
 	bool update(float delta);
 	void draw(rvg_cx* rv);
 };
+struct color_style {
+	btn_cols_t pdc = {};			// 颜色配置
+	uint32_t dfill = 0, dcol = 0;	// 渲染用
+	uint32_t dtext_color = 0;		// 渲染用
+	float light = 0.512;
+	glm::vec2 pushedps = {};
+	int rounding = 0;
+	int thickness = 1;
+	text_style* ptext_style = 0;
+	double dtime = 0.0;
+	const char* str = 0;
+	int str_len = 0;
+	int _bst = 1;					// 鼠标状态	
+	int _old_bst = 0;			// 鼠标状态
+	uTheme effect = uTheme::dark;
+	uint8_t disabled_alpha = 0x30;
+
+	bool circle = false;			// 圆形按钮
+	bool mPushed = false;
+	bool _disabled = false;
+	bool hover = false;
+};
+std::string save_color_style(const color_style* data, int indent);
 // 纯色按钮
 struct color_btn :public widget_t
 {
 	std::string str;
-	float light = 0.512;
-	btn_cols_t pdc = {};			// 颜色配置
-
-	uint32_t dfill = 0, dcol = 0;	// 渲染用
-	uint32_t dtext_color = 0;		// 渲染用
-
-	int disabled_alpha = 0x30;
-	uTheme effect = uTheme::dark;
-	glm::vec2 pushedps = {};
-
-	bool _circle = false;			// 圆形按钮
-	bool _disabled = false;
-	bool mPushed = false;
-	bool hover = false;
+	color_style cs = {};
 public:
 	color_btn();
 	~color_btn();
@@ -358,6 +368,9 @@ public:
 };
 class menu_btn :public widget_t
 {
+public:
+	std::vector<std::string> mstr;
+	USP_CX ac;
 public:
 	menu_btn();
 	~menu_btn();

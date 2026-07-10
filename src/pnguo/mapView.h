@@ -324,6 +324,7 @@ namespace hz
 	std::string shift_jis_to_u8(const char* str, size_t len);
 	njson read_json(const std::string& fn);
 	void save_json(const std::string& fn, const njson& n, int indent_cbor);
+	void save_json0(const std::string& fn, const njson0& n, int indent_cbor);
 	std::string get_dir(const char* t);
 
 	bool save_file(const std::string& fn, const char* data, uint64_t size, uint64_t pos, bool is_plus);

@@ -87,7 +87,27 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(text_style_str,
 	mcolor_effect
 )
 
-
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(btn_cols_t,
+	font_color,
+	background_color,
+	border_color,
+	hover_color,
+	active_font_color,
+	active_background_color,
+	active_border_color,
+	hover_border_color
+)
+// 颜色按钮样式
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(color_style,
+	pdc,
+	light,
+	pushedps,
+	rounding,
+	thickness,
+	effect,
+	disabled_alpha,
+	circle
+)
 
 std::string save_text_style_str(font_rctx* ctx, const text_style* t, int indent)
 {
@@ -128,6 +148,12 @@ bool load_text_style_str(font_rctx* ctx, const std::string& json_str, text_style
 	ts.mcolor_effect = ss.mcolor_effect;
 	if (t) *t = ts;
 	return true;
+}
+
+std::string save_color_style(const color_style* data, int indent) {
+	njson0 j = *data;
+	hz::save_json0("temp/test_color_style.json", j, indent);
+	return j.dump(indent);  // 缩进2 
 }
 
 // 保存：将结构体转为 JSON 字符串 

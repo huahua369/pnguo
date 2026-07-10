@@ -577,6 +577,7 @@ void testgui() {
 	for (int i = 0; i < 7; i++) {
 		auto btn = new color_btn();
 		btn->rounding = 4;
+		btn->cs.effect = (uTheme)fmod(i, 3);
 		btn->set_btn_color_bgr(fmod(i, 5));
 		dvv->add_widget(btn);
 		btn->set_size({ 128,36 });
@@ -587,6 +588,8 @@ void testgui() {
 		//btn->style.shadow_pos = { 3, 3 };
 		btn->style.color_shadow = 0xcc121212;
 		//btn->style.mcolor_effect = false;
+		auto str = save_color_style(&btn->cs, 2);
+
 		btn->str = (char*)u8"🍕按钮 " + std::to_string(5 + i);
 	}
 	for (int i = 0; i < 4; i++) {
@@ -704,10 +707,10 @@ void testgui() {
 		{
 			auto btn = fpslab;
 			btn->rounding = 4;
-			btn->light = 0;
+			btn->cs.light = 0;
 			btn->style.align = {};
 			btn->set_btn_color_bgr(fmod(2, 5));
-			btn->effect = uTheme::light;
+			btn->cs.effect = uTheme::light;
 			btn->_disabled_events = true;
 			dvv2->add_widget(btn);
 			btn->set_size({ 492,392 });
@@ -880,6 +883,6 @@ int main() {
 	system(R"(rd /s /q C:\Users\hua\AppData\Local\Temp\SymbolCache\vgtest.pdb)");
 	//auto rd = hz::shared_load(R"(E:\Program Files\RenderDoc_1.37_64\renderdoc.dll)");
 
-	testgui(); 
+	testgui();
 	return 0;
 }
