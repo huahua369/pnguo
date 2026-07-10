@@ -1557,7 +1557,8 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 
 void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm::ivec2& size)
 {
-	auto ns = size;
+	auto ns = size; 
+	auto ss = size;
 	int thickness = t->thickness;
 	auto psv = pos;
 	auto view = glm::ivec4(psv, ns + thickness);
@@ -1568,13 +1569,13 @@ void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm
 		if (t->circle)
 		{
 			glm::vec2 sp = {};
-			auto r = lround(ns.y * 0.5);
+			auto r = lround(ss.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
 		else
 		{
-			rv->add_rect({ 0.,0., ns }, t->rounding);
+			rv->add_rect({ 0.,0., ss }, t->rounding);
 		}
 		rv->submit(t->dfill, 0, 0);
 	}
@@ -1590,13 +1591,13 @@ void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm
 		if (t->circle)
 		{
 			glm::vec2 sp = {};
-			auto r = lround(ns.y * 0.5);
+			auto r = lround(ss.y * 0.5);
 			sp += r;
 			rv->add_circle(sp, r);
 		}
 		else
 		{
-			rv->add_rect({ 0.5,0.5, ns }, t->rounding);
+			rv->add_rect({ 0.5,0.5, ss }, t->rounding);
 		}
 		rv->submit(0, t->dcol, thickness);
 	}
