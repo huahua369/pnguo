@@ -125,6 +125,7 @@ struct drawctx_t {
 	void (*clip_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*fill_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*stroke_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t, uint32_t color);
+	void (*clear_path)(paths_t* ctx);
 	void (*draw)(vgpath_ctx* ctx, VkvgContext ctxvg);
 	void (*begin_frame)(vgpath_ctx* ctx);
 	void (*end_frame)(vgpath_ctx* ctx);

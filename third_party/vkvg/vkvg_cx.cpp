@@ -9557,13 +9557,14 @@ void vgpath_ctx::draw(VkvgContext ctx)
 	check_vao_size(ctx, _vertex.size(), _indices.size());
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), _vertex.data(), _vertex.size() * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), _indices.data(), _indices.size() * sizeof(uint32_t));
-
-	if (ctx->cmd == ctx->cmdBuffers[0])
-		ctx->cmd = ctx->cmdBuffers[1];
-	else
-		ctx->cmd = ctx->cmdBuffers[0];
-
-	ResetCommandBuffer(ctx->cmd, 0);
+	if (ctx->cmdStarted)
+	{
+		if (ctx->cmd == ctx->cmdBuffers[0])
+			ctx->cmd = ctx->cmdBuffers[1];
+		else
+			ctx->cmd = ctx->cmdBuffers[0];
+		ResetCommandBuffer(ctx->cmd, 0);
+	}
 	ctx->cmdStarted = false;
 
 	_start_cmd_for_render_pass(ctx);
@@ -9725,12 +9726,12 @@ void dc_end_frame(vgpath_ctx* ctx) {
 }
 struct path_pri :public paths_t
 {
-	uint32_t segmentPtr;   // current segment count in current path having curves
-	uint32_t subpathCount; // store count of subpath, not straight forward to retrieve from segmented path array
+	uint32_t segmentPtr = 0;   // current segment count in current path having curves
+	uint32_t subpathCount = 0; // store count of subpath, not straight forward to retrieve from segmented path array
 	t_vector<vec2> points;
 	t_vector<uint32_t> pathes;
 
-	bool     simpleConvex; // true if path is single rect or concave closed curve.
+	bool simpleConvex = false; // true if path is single rect or concave closed curve.
 };
 void dc_finish_path(paths_t* ctx) {
 	auto pri = (path_pri*)ctx;
@@ -10035,6 +10036,7 @@ paths_t* dc_new_paths(vgpath_ctx* ctx) {
 void dc_set_lineWidth(state_save_t* t, float	lineWidth) {
 	if (t && lineWidth > 0)t->lineWidth = lineWidth;
 }
+
 drawctx_t get_drawctx(vgpath_ctx* p)
 {
 	drawctx_t r = {};
@@ -10043,6 +10045,7 @@ drawctx_t get_drawctx(vgpath_ctx* p)
 		r.clip_preserve = dc_clip_preserve;
 		r.fill_preserve = dc_fill_preserve;
 		r.stroke_preserve = dc_stroke_preserve;
+		r.clear_path = dc_clear_path;
 		r.draw = dc_draw;
 		r.begin_frame = dc_begin_frame;
 		r.end_frame = dc_end_frame;

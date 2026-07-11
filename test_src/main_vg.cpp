@@ -265,28 +265,22 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 #endif
 }
 void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) {
-
 	const char* filename = "temp/vkvg_gradient.png";
-
-
 	auto dctx = new_vgctx();
 	//free_vgctx(dctx);
-
 	drawctx_t dcb = get_drawctx(dctx);
-
 	dcb.begin_frame(dctx);
 	state_save_t* ss = dcb.new_state(dctx);
 	paths_t* path = dcb.new_paths(dctx);
-
 	dcb.add_rectangle(path, 10.5, 10.5, 300, 200, 10);
 	dcb.set_lineWidth(ss, 6);
 	//dcb.clip_preserve(dctx, nullptr, nullptr);
 	dcb.fill_preserve(dctx, path, ss);
 	dcb.stroke_preserve(dctx, path, ss, 0xff1181f1);
-
+	dcb.clear_path(path);
 	auto cr = vkvg_create(surf);
-	//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
-	//vkvg_flush(cr);
+	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
+	vkvg_flush(cr);
 
 	dcb.draw(dctx, (VkvgContext)cr);
 	dcb.end_frame(dctx);
