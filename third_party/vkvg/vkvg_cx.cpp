@@ -8,7 +8,7 @@ class vgpath_ctx;
 #ifdef __cplusplus
 extern "C" {
 #endif
-//#define VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
+	//#define VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 #include "vkvg_internal0.h" 
 
 #ifdef __cplusplus
@@ -55,7 +55,7 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 
 */
 
-//#define PWAIT_MS
+#define PWAIT_MS
 
 
 
@@ -913,7 +913,7 @@ void vkvg_flush(VkvgContext ctx) {
 	//	printf("vkvg_flush wait ms: %d\n", ms);
 	//return;
 	_flush_cmd_buff0(ctx);
-	//_wait_ctx_flush_end(ctx);
+	_wait_ctx_flush_end(ctx);
 	/*
 	#ifdef DEBUG
 
@@ -6478,7 +6478,8 @@ vkvg_status_t vkvg_surface_write_to_png(VkvgSurface surf, const char* path) {
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 	VkImageBlit blit = {
@@ -6491,7 +6492,6 @@ vkvg_status_t vkvg_surface_write_to_png(VkvgSurface surf, const char* path) {
 		vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
 
 	vkh_cmd_end(cmd);
-
 	_surface_submit_cmd(surf);
 
 	VkhImage stagImgLinear = stagImg;
@@ -8570,7 +8570,7 @@ void vgpath_ctx::_fill_non_zero(paths_t* ctx)
 
 	if (ctx->pathPtr == 1 && ctx->pathes[0] & PATH_IS_CONVEX_BIT) {
 		// simple concave rectangle or circle
-		uint32_t firstVertIdx = (uint32_t)(_vertex.size());
+		uint32_t firstVertIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 		uint32_t            pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 
 		//_ensure_vertex_cache_size(ctx, pathPointCount);
@@ -8602,7 +8602,7 @@ void vgpath_ctx::_fill_non_zero(paths_t* ctx)
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 
 		if (pathPointCount > 2) {
-			uint32_t firstVertIdx = (uint32_t)(_vertex.size());
+			uint32_t firstVertIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 			gluTessBeginContour(tess);
 			uint32_t i = 0;
 
@@ -8643,10 +8643,10 @@ void vgpath_ctx::fill_non_zero(paths_t* p)
 	uint32_t firstPtIdx = 0;
 	const vec3 uv = { 0,0,-1 };
 	auto t = p->t;
-	uint32_t color = p->curColor;
+	uint32_t color = t->curColor;
 	bool aa = t->aa;
 	Vertex v = { {0}, color, {0, 0, -1} };
-	uint32_t cur_idx = _vertex.size();
+	uint32_t cur_idx = _vertex.size() - p->curVertOffset;
 	while (ptrPath < p->pathPtr) {
 		uint32_t pathPointCount = p->pathes[ptrPath] & PATH_ELT_MASK;
 		auto col = p->color ? p->color[ptrPath] : color;
@@ -8802,7 +8802,7 @@ void vgpath_ctx::fill_non_zero(paths_t* p)
 }
 // Even-Odd inside test with stencil buffer implementation.
 void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
-	Vertex   v = { {0}, ctx->curColor, {0, 0, -1} };
+	Vertex   v = { {0}, ctx->t->curColor, {0, 0, -1} };
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
 	size_t nc = 0;
@@ -8830,11 +8830,12 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 	if (!c.v)return;
 	cp_cmdt(&c, ctx->t);
 	c.vc = nc;
+	ctx->curVertOffset = _vertex.size();
 	auto cv = c.v;
 	while (ptrPath < ctx->pathPtr) {
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 		if (pathPointCount > 2) {
-			uint32_t firstVertIdx = (uint32_t)_vertex.size();
+			uint32_t firstVertIdx = (uint32_t)_vertex.size() - ctx->curVertOffset;
 			c.vertex.x = _vertex.size();
 			for (uint32_t i = 0; i < pathPointCount; i++) {
 				v.pos = ctx->points[i + firstPtIdx];
@@ -8918,6 +8919,7 @@ void vgpath_ctx::fill_preserve(paths_t* ctx, state_save_t* t)
 		c.index.x = _indices.size();
 		c.type = 0;
 		cp_cmdt(&c, t);
+		ctx->curVertOffset = c.vertex.x;
 		fill_non_zero(ctx);
 		c.vertex.y = _vertex.size() - c.vertex.x;
 		c.index.y = _indices.size() - c.index.x;
@@ -8978,7 +8980,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 	}
 	if (EQUF(dot, -1.0f)) { // cusp (could draw line butt?)
 		vec2 vPerp = vec2_mult_s(vec2_perp(v0n), str->hw);
-		uint32_t idx = (uint32_t)(_vertex.size());
+		uint32_t idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 		v.pos = vec2_add(p0, vPerp);
 		_vertex.push_back(v);
 		v.pos = vec2_sub(p0, vPerp);
@@ -9005,7 +9007,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 
 	vec2 bisec = vec2_mult_s(bisec_n_perp, rlh);
 
-	uint32_t idx = (uint32_t)(_vertex.size());
+	uint32_t idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 
 	vec2 rlh_inside_pos, rlh_outside_pos;
 	if (rlh < lh) {
@@ -9160,7 +9162,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 					a += str->arcStep;
 				}
 			}
-			uint32_t p0Idx = (uint32_t)(_vertex.size());
+			uint32_t p0Idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 			a_add_triangle_indices(ctx, idx, idx + 2, idx + 1);
 			if (det < 0) {
 				for (uint32_t p = idx + 2; p < p0Idx; p++)
@@ -9190,7 +9192,7 @@ bool vgpath_ctx::_build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurv
 void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, vec2 n, bool isStart) {
 	Vertex v = { {0}, ctx->curColor, {0, 0, -1} };
 
-	uint32_t firstIdx = (uint32_t)(_vertex.size());
+	uint32_t firstIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 
 	if (isStart) {
 		vec2 vhw = vec2_mult_s(n, str->hw);
@@ -9214,7 +9216,7 @@ void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, v
 				_add_vertexf(ctx, cosf(a) * str->hw + p0.x, sinf(a) * str->hw + p0.y);
 				a += str->arcStep;
 			}
-			uint32_t p0Idx = (uint32_t)(_vertex.size());
+			uint32_t p0Idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 			for (uint32_t p = firstIdx; p < p0Idx; p++)
 				a_add_triangle_indices(ctx, p0Idx + 1, p, p + 1);
 			firstIdx = p0Idx;
@@ -9240,7 +9242,7 @@ void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, v
 		v.pos = vec2_sub(p0, vhw);
 		_vertex.push_back(v);
 
-		firstIdx = (uint32_t)(_vertex.size());
+		firstIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 
 		if (ctx->t->lineCap == VKVG_LINE_CAP_ROUND) {
 			if (!str->arcStep)
@@ -9257,7 +9259,7 @@ void vgpath_ctx::_draw_stoke_cap(paths_t* ctx, stroke_context_t* str, vec2 p0, v
 				a -= str->arcStep;
 			}
 
-			uint32_t p0Idx = (uint32_t)(_vertex.size());
+			uint32_t p0Idx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
 			for (uint32_t p = firstIdx - 1; p < p0Idx; p++)
 				a_add_triangle_indices(ctx, p + 1, p, firstIdx - 2);
 		}
@@ -9301,6 +9303,14 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 	if (!ctx || !ctx->pathPtr || !t) // nothing to stroke
 		return;
 	ctx->t = t;
+
+
+	cmd_t c = {};
+	c.vertex.x = _vertex.size();
+	c.index.x = _indices.size();
+	c.type = 0;
+	cp_cmdt(&c, t);
+	ctx->curVertOffset = c.vertex.x;
 	stroke_context_t str = { 0 };
 	str.hw = t->lineWidth * 0.5f;
 	str.lhMax = t->miterLimit * t->lineWidth;
@@ -9319,7 +9329,7 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 			lastSegmentPointIdx = str.cp + (ctx->pathes[ptrPath + ptrSegment] & PATH_ELT_MASK) - 1;
 		}
 
-		str.firstIdx = (uint32_t)_vertex.size();
+		str.firstIdx = (uint32_t)_vertex.size() - ctx->curVertOffset;
 
 		// LOG(VKVG_LOG_INFO_PATH, "\tPATH: points count=%10d end point idx=%10d", ctx->pathes[ptrPath]&PATH_ELT_MASK,
 		// lastPathPointIdx);
@@ -9333,7 +9343,8 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 				dc.totDashLength += t->dashes[i];
 			if (dc.totDashLength == 0) {
 				//ctx->status = VKVG_STATUS_INVALID_DASH;
-				return;
+				break;
+				//return;
 			}
 			dc.curDashOffset = fmodf(
 				t->dashOffset,
@@ -9421,6 +9432,9 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 			ptrPath++;
 
 	}
+	c.vertex.y = _vertex.size() - c.vertex.x;
+	c.index.y = _indices.size() - c.index.x;
+	cmdlist.push_back(c);
 }
 
 void bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
@@ -9492,16 +9506,71 @@ void check_vao_size(VkvgContext ctx, size_t vertCount, size_t indCount) {
 			resize_ibo(ctx, indCount);
 	}
 }
+
+void dc_explicit_ms_resolve(VkCommandBuffer cmd, VkvgSurface surf) {
+	LOCK_SURFACE(surf);
+	vkh_image_set_layout(cmd, surf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	VkImageResolve re = {
+					 .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+					 .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+					 .extent = {surf->width, surf->height, 1} };
+	vkCmdResolveImage(cmd, vkh_image_get_vkimage(surf->imgMS), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vkh_image_get_vkimage(surf->img), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &re);
+	vkh_image_set_layout(cmd, surf->imgMS, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+	UNLOCK_SURFACE(surf)
+}
+
+void dc_explicit_shader_read(VkCommandBuffer cmd, VkvgSurface surf) {
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = surf->img->image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+	vkCmdPipelineBarrier(
+		cmd,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+
 void vgpath_ctx::draw(VkvgContext ctx)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
 	check_vao_size(ctx, _vertex.size(), _indices.size());
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), _vertex.data(), _vertex.size() * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), _indices.data(), _indices.size() * sizeof(uint32_t));
+
+	if (ctx->cmd == ctx->cmdBuffers[0])
+		ctx->cmd = ctx->cmdBuffers[1];
+	else
+		ctx->cmd = ctx->cmdBuffers[0];
+
+	ResetCommandBuffer(ctx->cmd, 0);
+	ctx->cmdStarted = false;
+
 	_start_cmd_for_render_pass(ctx);
 	for (auto& it : cmdlist)
 	{
-		ctx->pushConsts = it.state->pushConsts;
+		//ctx->pushConsts = it.state->pushConsts;
+		ctx->curColor;
 		update_pattern(ctx, it.state->pattern);
 		auto t = it.state;
 		switch (it.type) {
@@ -9557,12 +9626,27 @@ void vgpath_ctx::draw(VkvgContext ctx)
 		}
 	}
 	_end_render_pass(ctx);
+	if (ctx->dev->deferredResolve)
+		dc_explicit_ms_resolve(ctx->cmd, ctx->pSurf);
 	vkh_cmd_end(ctx->cmd);
-	_wait_and_submit_cmd(ctx);
+	if (!ctx->cmdStarted) // current cmd buff is empty, be aware that wait is also canceled!!
+		return;
+	ResetFences(ctx->dev->vkDev, 1, &ctx->flushFence);
+	_device_submit_cmd(ctx->dev, &ctx->cmd, ctx->flushFence);
+	if (!_wait_ctx_flush_end(ctx))
+		return;
+	//if (ctx->cmd == ctx->cmdBuffers[0])
+	//	ctx->cmd = ctx->cmdBuffers[1];
+	//else
+	//	ctx->cmd = ctx->cmdBuffers[0];
+	//ResetCommandBuffer(ctx->cmd, 0);
+	ctx->cmdStarted = false;
+	//_start_cmd_for_render_pass(ctx);
 }
 
 void vgpath_ctx::begin_frame()
 {
+	mac.release();
 	_vertex.clear();
 	_indices.clear();
 	cmdlist.clear();
@@ -9570,11 +9654,9 @@ void vgpath_ctx::begin_frame()
 
 void vgpath_ctx::end_frame()
 {
-
 	_vertex.clear();
 	_indices.clear();
 	cmdlist.clear();
-	mac.release();
 }
 
 #endif
@@ -9926,7 +10008,7 @@ int dc_rectangle(paths_t* ctx, float x, float y, float w, float h, float r) {
 state_save_t* dc_new_state(vgpath_ctx* ctx) {
 	auto t = (state_save_t*)ctx->mac.allocate(sizeof(state_save_t));
 	*t = {};
-	t->curColor = 0xFFFFFFFF;
+	t->curColor = -1;
 	//VkRect2D b = {};
 	//b.extent = { ctx->pSurf->width, ctx->pSurf->height };
 	push_constants pc = {};
@@ -9936,11 +10018,11 @@ state_save_t* dc_new_state(vgpath_ctx* ctx) {
 	pc.opacity = 1.0f;
 	pc.mat = VKVG_IDENTITY_MATRIX;
 	pc.matInv = VKVG_IDENTITY_MATRIX;
-
 	t->lineWidth = 1.f;
 	t->miterLimit = 10.f;
 	t->curOperator = VKVG_OPERATOR_OVER;
 	t->curFillRule = VKVG_FILL_RULE_NON_ZERO;
+	t->aa = false;
 	//t->bounds = b;
 	//t->pushConsts = pc;
 	return t;
@@ -9949,6 +10031,9 @@ paths_t* dc_new_paths(vgpath_ctx* ctx) {
 	auto t = (path_pri*)ctx->ac.new_obj<path_pri>();
 
 	return (paths_t*)t;
+}
+void dc_set_lineWidth(state_save_t* t, float	lineWidth) {
+	if (t && lineWidth > 0)t->lineWidth = lineWidth;
 }
 drawctx_t get_drawctx(vgpath_ctx* p)
 {
@@ -9964,6 +10049,7 @@ drawctx_t get_drawctx(vgpath_ctx* p)
 		r.new_paths = dc_new_paths;
 		r.new_state = dc_new_state;
 		r.add_rectangle = dc_rectangle;
+		r.set_lineWidth = dc_set_lineWidth;
 	}
 	return r;
 }

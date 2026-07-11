@@ -114,6 +114,7 @@ extern "C" {
 		uint32_t* color = 0;		// 独立颜色数组大小与sizePathes一致，0则用默认颜色curColor
 		uint32_t curColor = 0xFFffffff;
 		state_save_t* t = 0;
+		uint32_t curVertOffset = 0;
 	};
 #ifdef __cplusplus 
 }
@@ -129,7 +130,7 @@ struct drawctx_t {
 	void (*end_frame)(vgpath_ctx* ctx);
 	state_save_t* (*new_state)(vgpath_ctx* ctx);
 	paths_t* (*new_paths)(vgpath_ctx* ctx);
-
+	void(*set_lineWidth)(state_save_t* t, float	lineWidth);
 	int (*add_rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
 };
 

@@ -1557,7 +1557,7 @@ void scroll_bar::set_posv(const glm::ivec2& poss)
 
 void draw_color_btn(rvg_cx* rv, color_style* t, const glm::ivec2& pos, const glm::ivec2& size)
 {
-	auto ns = size; 
+	auto ns = size;
 	auto ss = size;
 	int thickness = t->thickness;
 	auto psv = pos;
