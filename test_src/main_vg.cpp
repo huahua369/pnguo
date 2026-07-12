@@ -266,18 +266,51 @@ void test_vkvg(const char* fn, dev_info_c* dc)
 }
 void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) {
 	const char* filename = "temp/vkvg_gradient.png";
-	auto dctx = new_vgctx();
+	static auto dctx = new_vgctx();
 	//free_vgctx(dctx);
 	drawctx_t dcb = get_drawctx(dctx);
 	dcb.begin_frame(dctx);
 	state_save_t* ss = dcb.new_state(dctx);
+	state_save_t* ss1 = dcb.new_state(dctx);
 	paths_t* path = dcb.new_paths(dctx);
-	dcb.add_rectangle(path, 10.5, 10.5, 300, 200, 10);
-	dcb.set_lineWidth(ss, 6);
-	//dcb.clip_preserve(dctx, nullptr, nullptr);
+	dcb.clip_preserve(dctx, nullptr, nullptr);
+	dcb.set_fill_rule(ss, VKVG_FILL_RULE_NON_ZERO);
+	dcb.rectangle(path, 200, 12, 300, 200, 10);
+	dcb.set_line_width(ss, 6);
+	dcb.set_source_rgba(ss, 1, 1, 1, 1);
 	dcb.fill_preserve(dctx, path, ss);
-	dcb.stroke_preserve(dctx, path, ss, 0xff1181f1);
-	dcb.clear_path(path);
+	dcb.set_color(ss, 0xff1181f1);
+	dcb.stroke(dctx, path, ss);
+
+	dcb.set_line_width(ss, 6);
+	auto M_PI = glm::pi<float>();
+	dcb.rectangle(path, 12, 12, 232, 70, 0);
+	dcb.new_sub_path(path);
+	dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
+	dcb.new_sub_path(path);
+	dcb.arc_negative(path, 192, 64, 40, 0, -2 * M_PI);
+
+	dcb.set_fill_rule(ss, VKVG_FILL_RULE_EVEN_ODD);
+	dcb.set_source_rgba(ss, 0, 0.7, 0, 1);
+	dcb.fill_preserve(dctx, path, ss);
+	dcb.set_source_rgba(ss, 0, 0, 0, 1);
+	dcb.stroke(dctx, path, ss);
+
+
+#if 1
+	dcb.set_line_width(ss1, 6);
+	dcb.translate(ss1, 0, 128);
+	dcb.rectangle(path, 12, 12, 232, 70, 0);
+	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
+	dcb.new_sub_path(path); dcb.arc_negative(path, 192, 64, 40, 0, -2 * M_PI);
+	dcb.set_glutess(dctx, true);
+	dcb.set_fill_rule(ss1, VKVG_FILL_RULE_NON_ZERO);
+	dcb.set_source_rgba(ss1, 0, 0, 0.9, 1);
+	dcb.fill_preserve(dctx, path, ss1);
+	dcb.set_source_rgba(ss1, 0, 0, 0, 1);
+	dcb.stroke(dctx, path, ss1);
+#endif
+
 	auto cr = vkvg_create(surf);
 	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
 	vkvg_flush(cr);
@@ -389,7 +422,17 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 
 	vkvg_translate(cr, -300, 0);
 	vkvg_set_line_width(cr, 6);
-	auto M_PI = glm::pi<float>();
+
+
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
+	vkvg_rounded_rectangle(cr, 200, 12, 300, 200, 10);
+	vkvg_set_line_width(cr, 6);
+	vkvg_set_source_rgba(cr, 1, 1, 1, 1);
+	vkvg_fill_preserve(cr);
+	vkvg_set_source_rgba(cr, 1, 0.5, 0, 1);
+	vkvg_stroke(cr);
+
+	M_PI = glm::pi<float>();
 	vkvg_rectangle(cr, 12, 12, 232, 70);
 	vkvg_new_sub_path(cr); vkvg_arc(cr, 64, 64, 40, 0, 2 * M_PI);
 	vkvg_new_sub_path(cr); vkvg_arc_negative(cr, 192, 64, 40, 0, -2 * M_PI);

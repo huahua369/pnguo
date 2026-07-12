@@ -119,6 +119,7 @@ public:
 	uint32_t tesselator_idx_counter = 0;
 #endif
 	uint32_t curColor = 0xFFffffff;
+	uint32_t curVertOffset = 0;
 	bool is_glutess = false;
 public:
 	vgpath_ctx();
@@ -126,12 +127,13 @@ public:
 
 	void clip_preserve(paths_t* ctx, state_save_t* t);
 	void fill_preserve(paths_t* p, state_save_t* t);
-	void stroke_preserve(paths_t* p, state_save_t* t, uint32_t color);
+	void stroke_preserve(paths_t* p, state_save_t* t);
 	void draw(VkvgContext ctx);
 	void begin_frame();
 	void end_frame();
+	void set_glutess(bool b);
 private:
-	void poly_fill(paths_t* ctx, vec4* bounds);
+	void poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c);
 	void _fill_non_zero(paths_t*);
 	void fill_non_zero(paths_t* p);
 	bool _build_vb_step(paths_t* ctx, stroke_context_t* str, bool isCurve);
@@ -1505,32 +1507,6 @@ void _clip_preserve(VkvgContext ctx) {
 	if (!ctx->pathPtr) // nothing to clip
 		return;
 
-	//paths_t p = {};
-	//p.points = ctx->points;
-	//p.pointCount = ctx->pointCount;
-	//p.pathPtr = ctx->pathPtr;
-	//p.pathes = ctx->pathes;
-	//p.sizePathes = ctx->sizePathes;
-	//p.color = 0;
-	//p.curColor = ctx->curColor;
-	//state_save_t t = {};
-	//t.lineWidth = ctx->lineWidth;
-	//t.miterLimit = ctx->miterLimit;
-	//t.dashCount = ctx->dashCount;
-	//t.dashOffset = ctx->dashOffset;
-	//t.dashes = ctx->dashes;
-	//t.curOperator = ctx->curOperator;
-	//t.lineCap = ctx->lineCap;
-	//t.lineJoin = ctx->lineJoin;
-	//t.curFillRule = ctx->curFillRule;
-	//t.pushConsts = ctx->pushConsts;
-	//t.curColor = ctx->curColor;
-	//t.pattern = ctx->pattern;
-	//t.clippingState = ctx->curClipState;
-	//t.references = 1;
-	//t.aa = true;
-	//ctx->pathCtx->clip_preserve(&p, &t);
-	//return;
 	_emit_draw_cmd_undrawn_vertices(ctx);
 
 	LOG(VKVG_LOG_INFO, "CLIP: ctx = %p; path cpt = %d;\n", ctx, ctx->pathPtr / 2);
@@ -1574,32 +1550,6 @@ void _fill_preserve(VkvgContext ctx) {
 	if (!ctx->pathPtr) // nothing to fill
 		return;
 
-	/*paths_t p = {};
-	p.points = ctx->points;
-	p.pointCount = ctx->pointCount;
-	p.pathPtr = ctx->pathPtr;
-	p.pathes = ctx->pathes;
-	p.sizePathes = ctx->sizePathes;
-	p.color = 0;
-	p.curColor = ctx->curColor;
-	state_save_t t = {};
-	t.lineWidth = ctx->lineWidth;
-	t.miterLimit = ctx->miterLimit;
-	t.dashCount = ctx->dashCount;
-	t.dashOffset = ctx->dashOffset;
-	t.dashes = ctx->dashes;
-	t.curOperator = ctx->curOperator;
-	t.lineCap = ctx->lineCap;
-	t.lineJoin = ctx->lineJoin;
-	t.curFillRule = ctx->curFillRule;
-	t.pushConsts = ctx->pushConsts;
-	t.curColor = ctx->curColor;
-	t.pattern = ctx->pattern;
-	t.clippingState = ctx->curClipState;
-	t.references = 1;
-	t.aa = true;
-	ctx->pathCtx->fill_preserve(&p, &t);
-	return;*/
 	LOG(VKVG_LOG_INFO, "FILL: ctx = %p; path cpt = %d;\n", ctx, ctx->subpathCount);
 
 	if (ctx->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
@@ -1629,32 +1579,6 @@ void _stroke_preserve(VkvgContext ctx) {
 	if (!ctx->pathPtr) // nothing to stroke
 		return;
 
-	/*paths_t p = {};
-	p.points = ctx->points;
-	p.pointCount = ctx->pointCount;
-	p.pathPtr = ctx->pathPtr;
-	p.pathes = ctx->pathes;
-	p.sizePathes = ctx->sizePathes;
-	p.color = 0;
-	p.curColor = ctx->curColor;
-	state_save_t t = {};
-	t.lineWidth = ctx->lineWidth;
-	t.miterLimit = ctx->miterLimit;
-	t.dashCount = ctx->dashCount;
-	t.dashOffset = ctx->dashOffset;
-	t.dashes = ctx->dashes;
-	t.curOperator = ctx->curOperator;
-	t.lineCap = ctx->lineCap;
-	t.lineJoin = ctx->lineJoin;
-	t.curFillRule = ctx->curFillRule;
-	t.pushConsts = ctx->pushConsts;
-	t.curColor = ctx->curColor;
-	t.pattern = ctx->pattern;
-	t.clippingState = ctx->curClipState;
-	t.references = 1;
-	t.aa = true;
-	ctx->pathCtx->stroke_preserve(&p, &t, t.curColor);
-	return;*/
 	LOG(VKVG_LOG_INFO, "STROKE: ctx = %p; path ptr = %d;\n", ctx, ctx->pathPtr);
 
 	stroke_context_t str = { 0 };
@@ -8269,7 +8193,7 @@ void push_update_gradient_desc_set(VkvgContext ctx, uint64_t offset, uint64_t si
 	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 2, 1, &writeDescriptorSet);
 }
 
-void update_pattern(VkvgContext ctx, VkvgPattern pat) {
+void update_pattern(VkvgContext ctx, VkvgPattern pat, state_save_t* st) {
 	if (!ctx)return;
 	VkvgPattern lastPat = ctx->pattern;
 	ctx->pattern = pat;
@@ -8319,12 +8243,12 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 		}
 		vkh_image_create_sampler(surf->img, filter, filter, VK_SAMPLER_MIPMAP_MODE_NEAREST, addrMode);
 		push_update_descriptor_set(ctx, surf->img, 1);
-		ctx->pushConsts.source.width = (float)surf->width;
-		ctx->pushConsts.source.height = (float)surf->height;
+		st->pushConsts.source.width = (float)surf->width;
+		st->pushConsts.source.height = (float)surf->height;
 		vkvg_matrix_t mat;
 		if (pat->hasMatrix) {
 			vkvg_pattern_get_matrix(pat, &mat);
-			vkvg_matrix_multiply(&ctx->pushConsts.matInv, &ctx->pushConsts.matInv, &mat);
+			vkvg_matrix_multiply(&st->pushConsts.matInv, &st->pushConsts.matInv, &mat);
 		}
 	}
 	break;
@@ -8334,7 +8258,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 	{
 		float fm = std::max((float)ctx->pSurf->width, (float)ctx->pSurf->height);
 		vec4 bounds = { fm,fm,0.0f,0.0f }; // store img bounds in unused source field
-		ctx->pushConsts.source = bounds;
+		st->pushConsts.source = bounds;
 		// transform control point with current ctx matrix 
 		vkvg_gradient_t grad = *(vkvg_gradient_t*)pat->data;
 		if (grad.count < 2) {
@@ -8349,23 +8273,23 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 				mat = VKVG_IDENTITY_MATRIX;
 			vkvg_matrix_transform_point(&mat, &grad.cp[0].x, &grad.cp[0].y);
 		}
-		vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[0].x, &grad.cp[0].y);
+		vkvg_matrix_transform_point(&st->pushConsts.mat, &grad.cp[0].x, &grad.cp[0].y);
 		if (pat->type == VKVG_PATTERN_TYPE_LINEAR) {
 			if (pat->hasMatrix)
 				vkvg_matrix_transform_point(&mat, &grad.cp[0].z, &grad.cp[0].w);
-			vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
+			vkvg_matrix_transform_point(&st->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
 		}
 		else {
 			if (pat->hasMatrix)
 				vkvg_matrix_transform_point(&mat, &grad.cp[1].x, &grad.cp[1].y);
-			vkvg_matrix_transform_point(&ctx->pushConsts.mat, &grad.cp[1].x, &grad.cp[1].y);
+			vkvg_matrix_transform_point(&st->pushConsts.mat, &grad.cp[1].x, &grad.cp[1].y);
 			// radii
 			if (pat->hasMatrix) {
 				vkvg_matrix_transform_distance(&mat, &grad.cp[0].z, &grad.cp[0].w);
 				vkvg_matrix_transform_distance(&mat, &grad.cp[1].z, &grad.cp[0].w);
 			}
-			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
-			vkvg_matrix_transform_distance(&ctx->pushConsts.mat, &grad.cp[1].z, &grad.cp[0].w);
+			vkvg_matrix_transform_distance(&st->pushConsts.mat, &grad.cp[0].z, &grad.cp[0].w);
+			vkvg_matrix_transform_distance(&st->pushConsts.mat, &grad.cp[1].z, &grad.cp[0].w);
 		}
 		_sort_gradient_stops(grad.colors, grad.stops, grad.count);
 		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
@@ -8374,7 +8298,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat) {
 	}
 	break;
 	}
-	ctx->pushConsts.fsq_patternType = (ctx->pushConsts.fsq_patternType & FULLSCREEN_BIT) + newPatternType;
+	st->pushConsts.fsq_patternType = (st->pushConsts.fsq_patternType & FULLSCREEN_BIT) + newPatternType;
 	ctx->pushCstDirty = true;
 	//if (lastPat)
 	//	vkvg_pattern_destroy(lastPat);
@@ -8433,15 +8357,14 @@ void vgpath_ctx::clip_preserve(paths_t* ctx, state_save_t* t)
 		return;
 	ctx->t = t;
 
+	cmd_t c = {};
+	c.type = 2;
 	if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
-		poly_fill(ctx, NULL);
-		//CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+		poly_fill(ctx, NULL, c);
 	}
 	else {
-		cmd_t c = {};
 		c.vertex.x = _vertex.size();
 		c.index.x = _indices.size();
-		c.type = 0;
 		cp_cmdt(&c, t);
 		fill_non_zero(ctx);
 		c.vertex.y = _vertex.size() - c.vertex.x;
@@ -8553,7 +8476,7 @@ void combine2a(const GLdouble newVertex[3], const void* neighborVertex_s[4], con
 	void** outData, void* poly_data) {
 	vgpath_ctx* ctx = (vgpath_ctx*)poly_data;
 	Vertex      v = { {newVertex[0], newVertex[1]}, ctx->curColor, {0, 0, -1} };
-	*outData = (void*)(ctx->_vertex.size());
+	*outData = (void*)(ctx->_vertex.size() - ctx->curVertOffset);
 	ctx->_vertex.push_back(v);
 }
 void vertex2a(void* vertex_data, void* poly_data) {
@@ -8567,7 +8490,7 @@ void vgpath_ctx::_fill_non_zero(paths_t* ctx)
 	curColor = ctx->curColor;
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
-
+	curVertOffset = _vertex.size();
 	if (ctx->pathPtr == 1 && ctx->pathes[0] & PATH_IS_CONVEX_BIT) {
 		// simple concave rectangle or circle
 		uint32_t firstVertIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
@@ -8634,6 +8557,9 @@ void vgpath_ctx::_fill_non_zero(paths_t* ctx)
 
 void vgpath_ctx::fill_non_zero(paths_t* p)
 {
+	auto t = p->t;
+	uint32_t color = t->curColor;
+	p->curColor = color;
 	if (is_glutess)
 	{
 		_fill_non_zero(p);
@@ -8642,8 +8568,6 @@ void vgpath_ctx::fill_non_zero(paths_t* p)
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
 	const vec3 uv = { 0,0,-1 };
-	auto t = p->t;
-	uint32_t color = t->curColor;
 	bool aa = t->aa;
 	Vertex v = { {0}, color, {0, 0, -1} };
 	uint32_t cur_idx = _vertex.size() - p->curVertOffset;
@@ -8801,7 +8725,7 @@ void vgpath_ctx::fill_non_zero(paths_t* p)
 	}
 }
 // Even-Odd inside test with stencil buffer implementation.
-void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
+void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c) {
 	Vertex   v = { {0}, ctx->t->curColor, {0, 0, -1} };
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
@@ -8824,8 +8748,6 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds) {
 	if (!nc)return;
 	ptrPath = 0;
 
-	cmd_t c = {};
-	c.type = 0;
 	c.v = (scmd*)mac.allocate(sizeof(scmd) * nc);
 	if (!c.v)return;
 	cp_cmdt(&c, ctx->t);
@@ -8895,7 +8817,10 @@ void vgpath_ctx::fill_preserve(paths_t* ctx, state_save_t* t)
 	if (ctx->t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 
 		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
-		poly_fill(ctx, &bounds);
+
+		cmd_t c = {};
+		c.type = 0;
+		poly_fill(ctx, &bounds, c);
 		//_bind_draw_pipeline(ctx);
 		//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 		//_draw_full_screen_quad(ctx, &bounds);
@@ -9299,7 +9224,7 @@ void vgpath_ctx::_draw_segment(paths_t* ctx, stroke_context_t* str, dash_context
 	str->iL = str->cp++;
 }
 
-void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) {
+void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t) {
 	if (!ctx || !ctx->pathPtr || !t) // nothing to stroke
 		return;
 	ctx->t = t;
@@ -9308,14 +9233,14 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t, uint32_t color) 
 	cmd_t c = {};
 	c.vertex.x = _vertex.size();
 	c.index.x = _indices.size();
-	c.type = 0;
+	c.type = 1;
 	cp_cmdt(&c, t);
 	ctx->curVertOffset = c.vertex.x;
 	stroke_context_t str = { 0 };
 	str.hw = t->lineWidth * 0.5f;
 	str.lhMax = t->miterLimit * t->lineWidth;
 	uint32_t ptrPath = 0;
-	ctx->curColor = color;
+	ctx->curColor = t->curColor;
 	while (ptrPath < ctx->pathPtr) {
 		uint32_t ptrSegment = 0, lastSegmentPointIdx = 0;
 		uint32_t firstPathPointIdx = str.cp;
@@ -9550,6 +9475,54 @@ void dc_explicit_shader_read(VkCommandBuffer cmd, VkvgSurface surf) {
 		0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
+void dc_start_cmd_for_render_pass(VkvgContext ctx) {
+	LOG(VKVG_LOG_INFO, "START RENDER PASS: ctx = %p\n", ctx);
+	vkh_cmd_begin(ctx->cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	if (ctx->pSurf->img->layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL || ctx->dev->threadAware) {
+		VkhImage imgMs = ctx->pSurf->imgMS;
+		if (imgMs != NULL)
+			vkh_image_set_layout(ctx->cmd, imgMs, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+		vkh_image_set_layout(ctx->cmd, ctx->pSurf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+		vkh_image_set_layout(ctx->cmd, ctx->pSurf->stencil, ctx->dev->stencilAspectFlag,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+	}
+
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+	vkh_cmd_label_start(ctx->cmd, "dc render pass", DBG_LAB_COLOR_RP);
+#endif
+
+	CmdBeginRenderPass(ctx->cmd, &ctx->renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	VkViewport viewport = { 0, 0, (float)ctx->pSurf->width, (float)ctx->pSurf->height, 0, 1.f };
+	CmdSetViewport(ctx->cmd, 0, 1, &viewport);
+
+	CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
+
+	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
+	CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
+
+	VkDeviceSize offsets[1] = { 0 };
+	CmdBindVertexBuffers(ctx->cmd, 0, 1, &ctx->vertices.buffer, offsets);
+	CmdBindIndexBuffer(ctx->cmd, ctx->indices.buffer, 0, VKVG_VK_INDEX_TYPE);
+
+	_update_push_constants(ctx);
+
+	_bind_draw_pipeline(ctx);
+	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+	ctx->cmdStarted = true;
+}
+void dc_update_push_constants(VkvgContext ctx, state_save_t* t) {
+	t->pushConsts.size = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants)
+		, &t->pushConsts);
+}
 
 void vgpath_ctx::draw(VkvgContext ctx)
 {
@@ -9567,17 +9540,17 @@ void vgpath_ctx::draw(VkvgContext ctx)
 	}
 	ctx->cmdStarted = false;
 
-	_start_cmd_for_render_pass(ctx);
+	dc_start_cmd_for_render_pass(ctx);
 	for (auto& it : cmdlist)
 	{
-		//ctx->pushConsts = it.state->pushConsts;
-		ctx->curColor;
-		update_pattern(ctx, it.state->pattern);
 		auto t = it.state;
-		switch (it.type) {
+		update_pattern(ctx, t->pattern, t);
+		dc_update_push_constants(ctx, t);
+		switch (it.type)
+		{
 		case 0:
 		{
-			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD && it.vc > 0) {
 				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
 				for (size_t i = 0; i < it.vc; i++)
 				{
@@ -9588,7 +9561,7 @@ void vgpath_ctx::draw(VkvgContext ctx)
 				cmd_draw_full_screen_quad(ctx, &it, &it.bounds);
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 			}
-			else {
+			else if (it.index.y > 0) {
 				bind_draw_pipeline(ctx, it.state);
 				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
 			}
@@ -9660,6 +9633,8 @@ void vgpath_ctx::end_frame()
 	cmdlist.clear();
 }
 
+void vgpath_ctx::set_glutess(bool b) { is_glutess = b; }
+
 #endif
 
 
@@ -9671,7 +9646,7 @@ void renderStroke(VkvgContext ctx, VkvgPattern pat) {
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->vertCount * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache, ctx->indCount * sizeof(uint32_t));
 	_start_cmd_for_render_pass(ctx);
-	update_pattern(ctx, pat);
+	update_pattern(ctx, pat, 0);
 	vkCmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
 	_end_render_pass(ctx);
 	vkh_cmd_end(ctx->cmd);
@@ -9702,6 +9677,10 @@ vgpath_ctx* new_vgctx() {
 void free_vgctx(vgpath_ctx* p) {
 	if (p)delete p;
 }
+void dc_set_glutess(vgpath_ctx* ctx, bool enable)
+{
+	if (ctx)ctx->set_glutess(enable);
+}
 void dc_clip_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
 	if (ctx && p && t)
 		ctx->clip_preserve(p, t);
@@ -9710,10 +9689,11 @@ void dc_fill_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
 	if (ctx && p && t)
 		ctx->fill_preserve(p, t);
 }
-void dc_stroke_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t, uint32_t color) {
+void dc_stroke_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
 	if (ctx && p && t)
-		ctx->stroke_preserve(p, t, color);
+		ctx->stroke_preserve(p, t);
 }
+
 void dc_draw(vgpath_ctx* ctx, VkvgContext ctxvg) {
 	if (ctx && ctxvg)
 		ctx->draw(ctxvg);
@@ -9730,45 +9710,50 @@ struct path_pri :public paths_t
 	uint32_t subpathCount = 0; // store count of subpath, not straight forward to retrieve from segmented path array
 	t_vector<vec2> points;
 	t_vector<uint32_t> pathes;
-
+	vgpath_ctx* ctx = 0;
 	bool simpleConvex = false; // true if path is single rect or concave closed curve.
 };
 void dc_finish_path(paths_t* ctx) {
 	auto pri = (path_pri*)ctx;
-	if (pri->pathes.empty())
-		pri->pathes.push_back(0);
-	if (pri->pathes[ctx->pathPtr] == 0) // empty
-		return;
-	if ((pri->pathes[ctx->pathPtr] & PATH_ELT_MASK) < 2) {
-		// only current pos is in path
-		ctx->pointCount -= ctx->pathes[ctx->pathPtr]; // what about the bounds?
+	do {
+		if (pri->pathes.empty())
+			pri->pathes.push_back(0);
+		if (pri->pathes[ctx->pathPtr] == 0) // empty
+			break;
+		if ((pri->pathes[ctx->pathPtr] & PATH_ELT_MASK) < 2) {
+			// only current pos is in path
+			ctx->pointCount -= ctx->pathes[ctx->pathPtr]; // what about the bounds?
+			pri->pathes[ctx->pathPtr] = 0;
+			pri->segmentPtr = 0;
+			break;
+		}
+
+		if (ctx->pathPtr == 0 && pri->simpleConvex)
+			pri->pathes[0] |= PATH_IS_CONVEX_BIT;
+
+		if (pri->segmentPtr > 0) { // pathes having curves are segmented
+			pri->pathes[ctx->pathPtr] |= PATH_HAS_CURVES_BIT;
+			// curved segment increment segmentPtr on curve end,
+			// so if last segment is not a curve and point count > 0
+			if ((pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_HAS_CURVES_BIT) == 0 &&
+				(pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_ELT_MASK) > 0)
+				pri->segmentPtr++; // current segment has to be included
+			ctx->pathPtr += pri->segmentPtr;
+		}
+		else
+			ctx->pathPtr++;
+
+		if (pri->pathes.size() <= ctx->pathPtr)
+			pri->pathes.resize(ctx->pathPtr + 1);
+
 		pri->pathes[ctx->pathPtr] = 0;
 		pri->segmentPtr = 0;
-		return;
-	}
+		pri->subpathCount++;
+		pri->simpleConvex = false;
+	} while (0);
 
-	if (ctx->pathPtr == 0 && pri->simpleConvex)
-		pri->pathes[0] |= PATH_IS_CONVEX_BIT;
-
-	if (pri->segmentPtr > 0) { // pathes having curves are segmented
-		pri->pathes[ctx->pathPtr] |= PATH_HAS_CURVES_BIT;
-		// curved segment increment segmentPtr on curve end,
-		// so if last segment is not a curve and point count > 0
-		if ((pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_HAS_CURVES_BIT) == 0 &&
-			(pri->pathes[ctx->pathPtr + pri->segmentPtr] & PATH_ELT_MASK) > 0)
-			pri->segmentPtr++; // current segment has to be included
-		ctx->pathPtr += pri->segmentPtr;
-	}
-	else
-		ctx->pathPtr++;
-
-	if (pri->pathes.size() <= ctx->pathPtr)
-		pri->pathes.resize(ctx->pathPtr + 1);
-
-	pri->pathes[ctx->pathPtr] = 0;
-	pri->segmentPtr = 0;
-	pri->subpathCount++;
-	pri->simpleConvex = false;
+	ctx->pathes = pri->pathes.data();
+	ctx->points = pri->points.data();
 }
 // clear path datas in context
 void dc_clear_path(paths_t* ctx) {
@@ -9776,11 +9761,28 @@ void dc_clear_path(paths_t* ctx) {
 	auto pri = (path_pri*)ctx;
 	pri->pathes.resize(1);
 	pri->pathes[ctx->pathPtr] = 0;
+	pri->points.clear();
 	ctx->pointCount = 0;
 	pri->segmentPtr = 0;
 	pri->subpathCount = 0;
 	pri->simpleConvex = false;
 }
+
+void dc_fill(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
+	if (ctx && p && t)
+	{
+		ctx->fill_preserve(p, t);
+		dc_clear_path(p);
+	}
+}
+void dc_stroke(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
+	if (ctx && p && t)
+	{
+		ctx->stroke_preserve(p, t);
+		dc_clear_path(p);
+	}
+}
+
 void dc_remove_last_point(paths_t* ctx) {
 	ctx->pointCount--;
 	auto pri = (path_pri*)ctx;
@@ -9850,7 +9852,7 @@ bool dc_current_path_is_empty(path_pri* ctx) {
 }
 // this function expect that current point exists
 vec2 dc_get_current_position(path_pri* ctx) {
-	return ctx->points[ctx->pointCount - 1];
+	return ctx->points.back();
 }
 void dc0_line_to(path_pri* ctx, float x, float y) {
 	vec2 p = { x, y };
@@ -9876,7 +9878,7 @@ void dc_close_path(path_pri* ctx) {
 	// check if at least 3 points are present
 	if (ctx->pathes[ctx->pathPtr] < 3)
 		return;
-
+	ctx->pointCount = ctx->points.size();
 	// prevent closing on the same point
 	if (vec2_equ(ctx->points[ctx->pointCount - 1], ctx->points[ctx->pointCount - ctx->pathes[ctx->pathPtr]])) {
 		if (ctx->pathes[ctx->pathPtr] < 4) // ensure enough points left for closing
@@ -9888,12 +9890,7 @@ void dc_close_path(path_pri* ctx) {
 
 	dc_finish_path(ctx);
 }
-//float dc_normalizeAngle(float a) {
-//	float res = ROUND_DOWN(fmodf(a, 2.0f * M_PIF), 100);
-//	if (res < 0.0f)
-//		res += 2.0f * M_PIF;
-//	return res;
-//}
+
 float dc_get_arc_step(path_pri* ctx, float radius) {
 	float sx = 1.0, sy = 1.0;
 	//vkvg_matrix_get_scale(&ctx->pushConsts.mat, &sx, &sy);
@@ -9956,6 +9953,75 @@ void dc_arc(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2)
 	dc_add_point(ctx, v.x, v.y);
 	dc_set_curve_end(ctx);
 }
+
+void dc_arc_negative(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2) {
+	if (!ctx0)
+		return;
+	auto ctx = (path_pri*)ctx0;
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: %f,%f %f %f %f\n", xc, yc, radius, a1, a2);
+	while (a2 > a1)
+		a2 -= 2.f * M_PIF;
+	if (a1 - a2 > a1 + 2.f * M_PIF) // limit arc to 2PI
+		a2 = a1 - 2.f * M_PIF;
+
+	vec2 v = { cosf(a1) * radius + xc, sinf(a1) * radius + yc };
+
+	float step = dc_get_arc_step(ctx, radius);
+	float a = a1;
+
+	if (dc_current_path_is_empty(ctx)) {
+		dc_set_curve_start(ctx);
+		dc_add_point(ctx, v.x, v.y);
+		if (!ctx->pathPtr)
+			ctx->simpleConvex = true;
+		else
+			ctx->simpleConvex = false;
+	}
+	else {
+		dc0_line_to(ctx, v.x, v.y);
+		dc_set_curve_start(ctx);
+		ctx->simpleConvex = false;
+	}
+
+	a -= step;
+
+	if (EQUF(a2, a1))
+		return;
+
+	while (a > a2) {
+		v.x = cosf(a) * radius + xc;
+		v.y = sinf(a) * radius + yc;
+		dc_add_point(ctx, v.x, v.y);
+		a -= step;
+	}
+
+	if (EQUF(a1 - a2, M_PIF * 2.f)) { // if arc is complete circle, last point is the same as the first one
+		dc_set_curve_end(ctx);
+		dc_close_path(ctx);
+		return;
+	}
+
+	a = a2;
+	// vec2 lastP = v;
+	v.x = cosf(a) * radius + xc;
+	v.y = sinf(a) * radius + yc;
+	// if (!vec2_equ (v,lastP))
+	dc_add_point(ctx, v.x, v.y);
+	dc_set_curve_end(ctx);
+}
+void dc_rel_move_to(paths_t* ctx0, float x, float y) {
+	if (!ctx0)
+		return;
+	auto ctx = (path_pri*)ctx0;
+	LOG(VKVG_LOG_INFO_CMD, "\tCMD: rel_mote_to: %f, %f\n", x, y);
+	if (dc_current_path_is_empty(ctx))
+		dc_add_point(ctx, 0, 0);
+	vec2 cp = dc_get_current_position(ctx);
+	dc_finish_path(ctx);
+	dc_add_point(ctx, cp.x + x, cp.y + y);
+}
+
+
 int dc_rounded_rectangle(paths_t* ctx, float x, float y, float w, float h, float radius) {
 	if (!ctx)
 		return -1;
@@ -10001,8 +10067,6 @@ int dc_rectangle(paths_t* ctx, float x, float y, float w, float h, float r) {
 	pri->pathes[ctx->pathPtr] |= (PATH_CLOSED_BIT | PATH_IS_CONVEX_BIT);
 
 	dc_finish_path(ctx);
-	ctx->pathes = pri->pathes.data();
-	ctx->points = pri->points.data();
 	return VKVG_STATUS_SUCCESS;
 }
 
@@ -10025,16 +10089,57 @@ state_save_t* dc_new_state(vgpath_ctx* ctx) {
 	t->curFillRule = VKVG_FILL_RULE_NON_ZERO;
 	t->aa = false;
 	//t->bounds = b;
-	//t->pushConsts = pc;
+	t->pushConsts = pc;
 	return t;
 }
+
+void dc_set_line_cap(state_save_t* t, vkvg_line_cap_t lineCap) {
+	if (t) t->lineCap = lineCap;
+}
+void dc_set_line_join(state_save_t* t, vkvg_line_join_t lineJoin) {
+	if (t) t->lineJoin = lineJoin;
+}
+void dc_set_fill_rule(state_save_t* t, vkvg_fill_rule_t fillRule) {
+	if (t) t->curFillRule = fillRule;
+}
+void dc_set_color(state_save_t* t, uint32_t color) {
+	if (t) t->curColor = color;
+}
+void dc_set_mat_inv_and_vkCmdPush(state_save_t* t) {
+	if (t) {
+		t->pushConsts.matInv = t->pushConsts.mat;
+		vkvg_matrix_invert(&t->pushConsts.matInv);
+	}
+}
+void dc_translate(state_save_t* t, float dx, float dy)
+{
+	if (t) {
+		vkvg_matrix_translate(&t->pushConsts.mat, dx, dy);
+		dc_set_mat_inv_and_vkCmdPush(t);
+	}
+}
+void dc_set_source_rgba(state_save_t* t, float r, float g, float b, float a) {
+	if (!t)
+		return;
+	t->curColor = CreateRgbaf(r, g, b, a);
+}
+void dc_set_operator(state_save_t* t, vkvg_operator_t op) {
+	if (t) t->curOperator = op;
+}
+
+
 paths_t* dc_new_paths(vgpath_ctx* ctx) {
 	auto t = (path_pri*)ctx->ac.new_obj<path_pri>();
-
+	if (t)t->ctx = ctx;
 	return (paths_t*)t;
 }
-void dc_set_lineWidth(state_save_t* t, float	lineWidth) {
-	if (t && lineWidth > 0)t->lineWidth = lineWidth;
+void dc_free_paths(paths_t* p) {
+	auto pri = (path_pri*)p;
+	if (p && pri->ctx)
+		pri->ctx->ac.free_obj(pri);
+}
+void dc_set_line_width(state_save_t* t, float width) {
+	if (t && width > 0)t->lineWidth = width;
 }
 
 drawctx_t get_drawctx(vgpath_ctx* p)
@@ -10042,17 +10147,32 @@ drawctx_t get_drawctx(vgpath_ctx* p)
 	drawctx_t r = {};
 	if (p) {
 		r.ptr = p;
+		r.set_glutess = dc_set_glutess;
 		r.clip_preserve = dc_clip_preserve;
 		r.fill_preserve = dc_fill_preserve;
 		r.stroke_preserve = dc_stroke_preserve;
+		r.fill = dc_fill;
+		r.stroke = dc_stroke;
 		r.clear_path = dc_clear_path;
 		r.draw = dc_draw;
 		r.begin_frame = dc_begin_frame;
 		r.end_frame = dc_end_frame;
 		r.new_paths = dc_new_paths;
+		r.new_sub_path = dc_finish_path;
+		r.arc = dc_arc;
+		r.arc_negative = dc_arc_negative;
 		r.new_state = dc_new_state;
-		r.add_rectangle = dc_rectangle;
-		r.set_lineWidth = dc_set_lineWidth;
+		r.set_line_cap = dc_set_line_cap;
+		r.set_line_join = dc_set_line_join;
+		r.set_fill_rule = dc_set_fill_rule;
+		r.set_color = dc_set_color;
+		r.set_source_rgba = dc_set_source_rgba;
+		r.set_operator = dc_set_operator;
+
+
+		r.rectangle = dc_rectangle;
+		r.translate = dc_translate;
+		r.set_line_width = dc_set_line_width;
 	}
 	return r;
 }

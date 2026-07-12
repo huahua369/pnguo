@@ -122,17 +122,35 @@ extern "C" {
 class vgpath_ctx;
 struct drawctx_t {
 	vgpath_ctx* ptr;
+	void (*set_glutess)(vgpath_ctx* ctx, bool enable);
 	void (*clip_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*fill_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
-	void (*stroke_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t, uint32_t color);
+	void (*stroke_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	void (*fill)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	void (*stroke)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*clear_path)(paths_t* ctx);
 	void (*draw)(vgpath_ctx* ctx, VkvgContext ctxvg);
 	void (*begin_frame)(vgpath_ctx* ctx);
 	void (*end_frame)(vgpath_ctx* ctx);
 	state_save_t* (*new_state)(vgpath_ctx* ctx);
+
+	void (*set_line_cap)(state_save_t* t, vkvg_line_cap_t lineCap);
+	void (*set_line_join)(state_save_t* t, vkvg_line_join_t lineJoin);
+	void (*set_fill_rule)(state_save_t* t, vkvg_fill_rule_t fillRule);
+	void (*set_color)(state_save_t* t, uint32_t color);
+	void (*set_source_rgba)(state_save_t* t, float r, float g, float b, float a);
+	void (*set_operator)(state_save_t* t, vkvg_operator_t op);
+
 	paths_t* (*new_paths)(vgpath_ctx* ctx);
-	void(*set_lineWidth)(state_save_t* t, float	lineWidth);
-	int (*add_rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
+	void (*free_paths)(paths_t* ctx);
+	void (*new_sub_path)(paths_t* ctx);
+	void (*arc)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
+	void (*arc_negative)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
+
+	void (*translate)(state_save_t* t, float dx, float dy);
+
+	void(*set_line_width)(state_save_t* t, float width);
+	int (*rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
 };
 
 vgpath_ctx* new_vgctx();
