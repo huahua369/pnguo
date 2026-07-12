@@ -85,6 +85,7 @@ glslangValidator vkvg_main0.frag.h -DVKVG_PREMULT_ALPHA -S frag -V --vn vkvg_mai
 #endif
 
 
+void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence);
 
 
 class vgpath_ctx
@@ -121,6 +122,7 @@ public:
 	uint32_t curColor = 0xFFffffff;
 	uint32_t curVertOffset = 0;
 	bool is_glutess = false;
+	bool is_fence = true;
 public:
 	vgpath_ctx();
 	~vgpath_ctx();
@@ -128,7 +130,7 @@ public:
 	void clip_preserve(paths_t* ctx, state_save_t* t);
 	void fill_preserve(paths_t* p, state_save_t* t);
 	void stroke_preserve(paths_t* p, state_save_t* t);
-	void draw(VkvgContext ctx);
+	void draw(VkvgContext ctx, void* waitSemaphore);
 	void begin_frame();
 	void end_frame();
 	void set_glutess(bool b);
@@ -792,7 +794,6 @@ void _init_ctx(VkvgContext ctx) {
 		cx->maxPushDescriptors = pushDescriptorProps.maxPushDescriptors;
 	}
 }
-
 VkvgContext vkvg_create(VkvgSurface surf) {
 	LOG(VKVG_LOG_INFO, "CREATE Context\n");
 	if (vkvg_surface_status(surf)) {
@@ -6771,7 +6772,7 @@ VkvgSurface _create_surface(VkvgDevice dev, VkFormat format) {
 #else
 	surf->flushFence = vkh_fence_create(vkhd);
 #endif
-
+	surf->sem = vkh_semaphore_create(vkhd);
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)surf->cmd, "vkvgSurfCmd");
 #endif
@@ -9560,7 +9561,7 @@ void dc_update_push_constants(VkvgContext ctx, state_save_t* t) {
 		, &t->pushConsts);
 }
 
-void vgpath_ctx::draw(VkvgContext ctx)
+void vgpath_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
 	check_vao_size(ctx, _vertex.size(), _indices.size());
@@ -9641,17 +9642,25 @@ void vgpath_ctx::draw(VkvgContext ctx)
 	vkh_cmd_end(ctx->cmd);
 	if (!ctx->cmdStarted) // current cmd buff is empty, be aware that wait is also canceled!!
 		return;
-	ResetFences(ctx->dev->vkDev, 1, &ctx->flushFence);
-	_device_submit_cmd(ctx->dev, &ctx->cmd, ctx->flushFence);
-	if (!_wait_ctx_flush_end(ctx))
-		return;
-	//if (ctx->cmd == ctx->cmdBuffers[0])
-	//	ctx->cmd = ctx->cmdBuffers[1];
-	//else
-	//	ctx->cmd = ctx->cmdBuffers[0];
-	//ResetCommandBuffer(ctx->cmd, 0);
+	if (is_fence)
+	{
+		vkResetFences(ctx->dev->vkDev, 1, &ctx->flushFence);
+		_device_submit_cmd(ctx->dev, &ctx->cmd, ctx->flushFence);
+		if (!_wait_ctx_flush_end(ctx))
+			return;
+	}
+	else
+	{
+		_device_submit_cmd_sem(ctx->dev, &ctx->cmd, (VkSemaphore)waitSemaphore, ctx->pSurf->sem, VK_NULL_HANDLE);
+	}
 	ctx->cmdStarted = false;
-	//_start_cmd_for_render_pass(ctx);
+}
+
+void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence fence)
+{
+	LOCK_DEVICE
+		vkh_cmd_submit_with_semaphores(dev->gQueue, cmd, waitSemaphore, signalSemaphore, fence);
+	UNLOCK_DEVICE
 }
 
 void vgpath_ctx::begin_frame()
@@ -9730,9 +9739,9 @@ void dc_stroke_preserve(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
 		ctx->stroke_preserve(p, t);
 }
 
-void dc_draw(vgpath_ctx* ctx, VkvgContext ctxvg) {
+void dc_draw(vgpath_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore) {
 	if (ctx && ctxvg)
-		ctx->draw(ctxvg);
+		ctx->draw(ctxvg, waitSemaphore);
 }
 void dc_begin_frame(vgpath_ctx* ctx) {
 	if (ctx)ctx->begin_frame();

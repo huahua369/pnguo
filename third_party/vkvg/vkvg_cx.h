@@ -129,7 +129,7 @@ struct drawctx_t {
 	void (*fill)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*stroke)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*clear_path)(paths_t* ctx);
-	void (*draw)(vgpath_ctx* ctx, VkvgContext ctxvg);
+	void (*draw)(vgpath_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore);
 	void (*begin_frame)(vgpath_ctx* ctx);
 	void (*end_frame)(vgpath_ctx* ctx);
 	state_save_t* (*new_state)(vgpath_ctx* ctx);

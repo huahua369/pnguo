@@ -315,7 +315,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
 	vkvg_flush(cr);
 
-	dcb.draw(dctx, (VkvgContext)cr);
+	dcb.draw(dctx, (VkvgContext)cr, nullptr);
 	dcb.end_frame(dctx);
 #if 0
 	//vkvg_rounded_rectangle(cr, 10, 10, 300, 200, 10);
