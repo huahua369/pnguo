@@ -8757,7 +8757,7 @@ void vgpath_ctx::poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c) {
 	while (ptrPath < ctx->pathPtr) {
 		uint32_t pathPointCount = ctx->pathes[ptrPath] & PATH_ELT_MASK;
 		if (pathPointCount > 2) {
-			uint32_t firstVertIdx = (uint32_t)_vertex.size() - ctx->curVertOffset;
+			uint32_t firstVertIdx = (uint32_t)_vertex.size();
 			c.vertex.x = _vertex.size();
 			for (uint32_t i = 0; i < pathPointCount; i++) {
 				v.pos = ctx->points[i + firstPtIdx];
@@ -8819,7 +8819,7 @@ void vgpath_ctx::fill_preserve(paths_t* ctx, state_save_t* t)
 		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
 		cmd_t c = {};
 		c.type = 0;
-		poly_fill(ctx, &bounds, c); 
+		poly_fill(ctx, &bounds, c);
 		cmdlist.back().full_screen_quad = _vertex.size();
 		Vertex v = {};
 		v.pos = { -1,-1 };
@@ -9513,7 +9513,7 @@ void dc_start_cmd_for_render_pass(VkvgContext ctx) {
 	ctx->cmdStarted = true;
 }
 
-void dc_start_cmd_for_render_pass0(VkvgContext ctx) { 
+void dc_start_cmd_for_render_pass0(VkvgContext ctx) {
 	if (ctx->pSurf->img->layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL || ctx->dev->threadAware) {
 		VkhImage imgMs = ctx->pSurf->imgMS;
 		if (imgMs != NULL)
@@ -9529,7 +9529,7 @@ void dc_start_cmd_for_render_pass0(VkvgContext ctx) {
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
 	}
-	 
+
 	CmdBeginRenderPass(ctx->cmd, &ctx->renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 	VkViewport viewport = { 0, 0, (float)ctx->pSurf->width, (float)ctx->pSurf->height, 0, 1.f };
 	CmdSetViewport(ctx->cmd, 0, 1, &viewport);
@@ -9551,7 +9551,7 @@ void dc_start_cmd_for_render_pass0(VkvgContext ctx) {
 }
 void _end_render_pass0(VkvgContext ctx) {
 	LOG(VKVG_LOG_INFO, "END RENDER PASS: ctx = %p;\n", ctx);
-	CmdEndRenderPass(ctx->cmd); 
+	CmdEndRenderPass(ctx->cmd);
 	ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass;
 }
 void dc_update_push_constants(VkvgContext ctx, state_save_t* t) {
@@ -9580,15 +9580,13 @@ void vgpath_ctx::draw(VkvgContext ctx)
 	for (auto& it : cmdlist)
 	{
 		auto t = it.state;
+		update_pattern(ctx, t->pattern, t);
+		dc_update_push_constants(ctx, t);
 		switch (it.type)
 		{
 		case 0:
 		{// 填充
 			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
-				//_end_render_pass0(ctx);
-				//dc_start_cmd_for_render_pass0(ctx);
-				update_pattern(ctx, t->pattern, t);
-				dc_update_push_constants(ctx, t);
 				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
 				for (size_t i = 0; i < it.vc; i++)
 				{
@@ -9598,31 +9596,21 @@ void vgpath_ctx::draw(VkvgContext ctx)
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 				cmd_draw_full_screen_quad(ctx, &it, &it.bounds);
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-				//_end_render_pass0(ctx);
-				//dc_start_cmd_for_render_pass0(ctx);
 			}
 			else {
-				update_pattern(ctx, t->pattern, t);
-				dc_update_push_constants(ctx, t);
 				bind_draw_pipeline(ctx, it.state);
-				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
 			}
 		}
 		break;
 		case 1:
 		{// 描边
-			update_pattern(ctx, t->pattern, t);
-			dc_update_push_constants(ctx, t);
-			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 			bind_draw_pipeline(ctx, it.state);
 			vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
 		}
 		break;
 		case 2:
 		{// 裁剪
-			update_pattern(ctx, t->pattern, t);
-			dc_update_push_constants(ctx, t);
 			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
 				for (size_t i = 0; i < it.vc; i++)
