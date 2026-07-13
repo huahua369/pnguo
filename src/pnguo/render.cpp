@@ -23,7 +23,7 @@ extern "C" {
 #include <pnguo.h>
 
 #include <zlib.h>
- 
+
 #define FLEX_IMPLEMENTATION
 #include <vg.h>
 
@@ -970,26 +970,9 @@ glm::dvec4 mix_colors0(glm::vec4 a, glm::vec4 b, float ratio)
 	result.w = getrgba(a, b, w);
 	return result;
 }
-VkvgPattern new_cubic_gradient(
-	glm::vec4 rect,
-	glm::vec4 from,
-	glm::vec4 to,
-	glm::vec2 ctrl1,
-	glm::vec2 ctrl2,
-	glm::vec2 p0 = {},
-	glm::vec2 p1 = { 1,1 },
-	int steps = 8
-);
-VkvgPattern new_cubic_gradient(
-	glm::vec4 rect,
-	glm::vec4 from,
-	glm::vec4 to,
-	glm::vec2 ctrl1,
-	glm::vec2 ctrl2,
-	glm::vec2 p0,
-	glm::vec2 p1,
-	int steps
-) {
+VkvgPattern new_cubic_gradient(glm::vec4 rect, glm::vec4 from, glm::vec4 to, glm::vec2 ctrl1, glm::vec2 ctrl2, glm::vec2 p0 = {}, glm::vec2 p1 = { 1,1 }, int steps = 8);
+VkvgPattern new_cubic_gradient(glm::vec4 rect, glm::vec4 from, glm::vec4 to, glm::vec2 ctrl1, glm::vec2 ctrl2, glm::vec2 p0, glm::vec2 p1, int steps)
+{
 	// validate input points
 	for (auto&& pt : { p0, ctrl1, ctrl2, p1 }) {
 		if (pt.x < 0 || pt.x > 1 ||
@@ -997,8 +980,8 @@ VkvgPattern new_cubic_gradient(
 			throw std::invalid_argument("Invalid points for cubic gradient; 0..1 coordinates expected.");
 		}
 	}
-	if (steps < 2 || steps > 999) {
-		throw std::invalid_argument("Invalid number of steps for cubic gradient; 2 to 999 steps expected.");
+	if (steps < 2 || steps > 32) {
+		throw std::invalid_argument("Invalid number of steps for cubic gradient; 2 to 32 steps expected.");
 	}
 	if (rect.x > rect.z)
 	{
@@ -1009,7 +992,6 @@ VkvgPattern new_cubic_gradient(
 		std::swap(rect.y, rect.w);
 	}
 	VkvgPattern g = vkvg_pattern_create_linear(rect.x, rect.y, rect.z, rect.w);
-	//VkvgPattern vkvg_pattern_create_radial(double cx0, double cy0, double radius0, double cx1, double cy1, double radius1);
 	--steps;
 	for (int step = 0; step <= steps; ++step) {
 		auto t = 1.0 * step / steps;

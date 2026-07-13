@@ -127,6 +127,7 @@ public:
 	vgpath_ctx();
 	~vgpath_ctx();
 
+	void clip0();
 	void clip_preserve(paths_t* ctx, state_save_t* t);
 	void fill_preserve(paths_t* p, state_save_t* t);
 	void stroke_preserve(paths_t* p, state_save_t* t);
@@ -6314,7 +6315,8 @@ void vkvg_surface_destroy(VkvgSurface surf) {
 #else
 	vkDestroyFence(surf->dev->vkDev, surf->flushFence, NULL);
 #endif
-
+	if (surf->sem)
+		vkDestroySemaphore(surf->dev->vkDev, surf->sem, NULL);
 	vkvg_device_destroy(surf->dev);
 	free(surf);
 	surf = NULL;
@@ -8382,14 +8384,22 @@ void vgpath_ctx::clip_preserve(paths_t* ctx, state_save_t* t)
 	_vertex.push_back(v);
 	v.pos = { -1,3 };
 	_vertex.push_back(v);
-
-	//CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-	//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-	//CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
-	//_draw_full_screen_quad(ctx, NULL);
-	//_bind_draw_pipeline(ctx);
-	//CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-
+}
+void vgpath_ctx::clip0()
+{
+	cmd_t c = {};
+	c.type = 2;
+	c.full_screen_quad = _vertex.size();
+	Vertex v = {};
+	v.pos = { -1,-1 };
+	v.color = -1;
+	v.uv.z = -1;
+	_vertex.push_back(v);
+	v.pos = { 3,-1 };
+	_vertex.push_back(v);
+	v.pos = { -1,3 };
+	_vertex.push_back(v);
+	cmdlist.push_back(c);
 }
 
 
@@ -9387,11 +9397,14 @@ void cmd_draw_full_screen_quad(VkvgContext ctx, vgpath_ctx::cmd_t* c, vec4* scis
 	}
 
 	uint32_t firstVertIdx = c->full_screen_quad;
-	c->state->pushConsts.fsq_patternType |= FULLSCREEN_BIT;
-	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &c->state->pushConsts.fsq_patternType);
+	uint32_t fsq_patternType = ctx->pushConsts.fsq_patternType;
+	if (c->state)
+		fsq_patternType = c->state->pushConsts.fsq_patternType;
+	fsq_patternType |= FULLSCREEN_BIT;
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &fsq_patternType);
 	CmdDraw(ctx->cmd, 3, 1, firstVertIdx, 0);
-	c->state->pushConsts.fsq_patternType &= ~FULLSCREEN_BIT;
-	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &c->state->pushConsts.fsq_patternType);
+	fsq_patternType &= ~FULLSCREEN_BIT;
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 24, 4, &fsq_patternType);
 	if (scissor)
 		CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
 
@@ -9576,18 +9589,20 @@ void vgpath_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 		ResetCommandBuffer(ctx->cmd, 0);
 	}
 	ctx->cmdStarted = false;
-
 	dc_start_cmd_for_render_pass(ctx);
 	for (auto& it : cmdlist)
 	{
 		auto t = it.state;
-		update_pattern(ctx, t->pattern, t);
-		dc_update_push_constants(ctx, t);
+		if (t)
+		{
+			update_pattern(ctx, t->pattern, t);
+			dc_update_push_constants(ctx, t);
+		}
 		switch (it.type)
 		{
 		case 0:
 		{// 填充
-			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+			if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
 				for (size_t i = 0; i < it.vc; i++)
 				{
@@ -9612,26 +9627,31 @@ void vgpath_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 		break;
 		case 2:
 		{// 裁剪
-			if (t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
-				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
-				for (size_t i = 0; i < it.vc; i++)
-				{
-					vkCmdDraw(ctx->cmd, it.v[i].vertexCount, 1, it.v[i].firstVertex, 0);
+			if (it.vc > 0 || it.index.y > 0) {
+				if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
+					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
+					for (size_t i = 0; i < it.vc; i++)
+					{
+						vkCmdDraw(ctx->cmd, it.v[i].vertexCount, 1, it.v[i].firstVertex, 0);
+					}
+					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
 				}
-				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+				else {
+					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
+					CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+					CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+					CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+					vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
+				}
+				CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
+				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
+				cmd_draw_full_screen_quad(ctx, &it, NULL);
+				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 			}
 			else {
-				CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineClipping);
-				CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
+				vkCmdClearAttachments(ctx->cmd, 1, &clearStencil, 1, &ctx->clearRect);
 			}
-			CmdSetStencilReference(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
-			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
-			CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
-			cmd_draw_full_screen_quad(ctx, &it, NULL);
-			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 		}
 		break;
 		}
@@ -9683,19 +9703,6 @@ void vgpath_ctx::set_glutess(bool b) { is_glutess = b; }
 #endif
 
 
-void expandStroke() {
-
-}
-
-void renderStroke(VkvgContext ctx, VkvgPattern pat) {
-	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), ctx->vertexCache, ctx->vertCount * sizeof(Vertex));
-	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), ctx->indexCache, ctx->indCount * sizeof(uint32_t));
-	_start_cmd_for_render_pass(ctx);
-	update_pattern(ctx, pat, 0);
-	vkCmdDrawIndexed(ctx->cmd, ctx->indCount - ctx->curIndStart, 1, ctx->curIndStart, (int32_t)ctx->curVertOffset, 0);
-	_end_render_pass(ctx);
-	vkh_cmd_end(ctx->cmd);
-}
 
 void vkvg_clear_rect(VkvgContext ctx, int x, int y, int width, int height) {
 	if (vkvg_status(ctx))
@@ -9813,6 +9820,13 @@ void dc_clear_path(paths_t* ctx) {
 	pri->simpleConvex = false;
 }
 
+void dc_clip(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
+	if (ctx && p && t)
+	{
+		ctx->clip_preserve(p, t);
+		dc_clear_path(p);
+	}
+}
 void dc_fill(vgpath_ctx* ctx, paths_t* p, state_save_t* t) {
 	if (ctx && p && t)
 	{
@@ -10186,7 +10200,11 @@ void dc_free_paths(paths_t* p) {
 void dc_set_line_width(state_save_t* t, float width) {
 	if (t && width > 0)t->lineWidth = width;
 }
-
+void dc_clip0(vgpath_ctx* ctx) {
+	if (!ctx) // nothing to clip
+		return;
+	ctx->clip0();
+}
 drawctx_t get_drawctx(vgpath_ctx* p)
 {
 	drawctx_t r = {};
@@ -10196,6 +10214,8 @@ drawctx_t get_drawctx(vgpath_ctx* p)
 		r.clip_preserve = dc_clip_preserve;
 		r.fill_preserve = dc_fill_preserve;
 		r.stroke_preserve = dc_stroke_preserve;
+		r.clip = dc_clip;
+		r.clip0 = dc_clip0;
 		r.fill = dc_fill;
 		r.stroke = dc_stroke;
 		r.clear_path = dc_clear_path;

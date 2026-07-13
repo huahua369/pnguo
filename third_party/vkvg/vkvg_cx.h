@@ -126,6 +126,8 @@ struct drawctx_t {
 	void (*clip_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*fill_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*stroke_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	void (*clip)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	void (*clip0)(vgpath_ctx* ctx);
 	void (*fill)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*stroke)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
 	void (*clear_path)(paths_t* ctx);
