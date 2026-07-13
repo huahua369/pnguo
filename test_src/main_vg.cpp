@@ -278,8 +278,15 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.rectangle(path, 0, 0, 300, 160, 10);	dcb.clip(dctx, path, ss);// 圆角矩形裁剪
 	dcb.rectangle(path, 200, 12, 300, 200, 10);
 	dcb.set_line_width(ss, 6);	dcb.set_source_rgba(ss, 0, 0.51, 1, 1);
+
+	auto pat = dcb.new_pattern_linear(dctx,0.0, 0.0, 0.0, 256.0);
+	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
+	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
+	dcb.set_source(ss, pat);
+
 	dcb.fill_preserve(dctx, path, ss);// 填充
-	dcb.set_color(ss, 0xff1181f1);	dcb.stroke(dctx, path, ss);//描边
+	dcb.set_color(ss, 0xff1181f1);
+	dcb.stroke(dctx, path, ss);//描边
 	dcb.set_line_width(ss, 6);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
 	dcb.new_sub_path(path);	dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
@@ -287,15 +294,14 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.set_fill_rule(ss, VKVG_FILL_RULE_EVEN_ODD);
 	dcb.set_source_rgba(ss, 0, 0.7, 0, 1);	dcb.fill_preserve(dctx, path, ss);//填充
 	dcb.set_source_rgba(ss, 0, 0, 0, 1);	dcb.stroke(dctx, path, ss); //描边
+	dcb.clip0(dctx);	// 取消所有裁剪
 	dcb.set_line_width(ss, 6);	dcb.translate(ss, 0, 128);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
 	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);
 	dcb.new_sub_path(path); dcb.arc_negative(path, 192, 64, 40, 0, -2 * M_PI);
 	dcb.set_glutess(dctx, true);	dcb.set_fill_rule(ss, VKVG_FILL_RULE_NON_ZERO);
 	dcb.set_source_rgba(ss, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path, ss);// 填充
-	dcb.clip0(dctx);	// 取消所有裁剪
-	dcb.set_source_rgba(ss, 0, 0, 0, 1);
-	dcb.stroke(dctx, path, ss); //描边
+	dcb.set_source_rgba(ss, 0, 0, 0, 1);	dcb.stroke(dctx, path, ss); //描边
 	auto cr = vkvg_create(surf);
 	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
 	vkvg_flush(cr);//保留原版api调用

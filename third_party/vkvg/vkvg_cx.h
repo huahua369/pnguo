@@ -141,7 +141,13 @@ struct drawctx_t {
 	void (*set_fill_rule)(state_save_t* t, vkvg_fill_rule_t fillRule);
 	void (*set_color)(state_save_t* t, uint32_t color);
 	void (*set_source_rgba)(state_save_t* t, float r, float g, float b, float a);
+	void (*set_source)(state_save_t* t, VkvgPattern pat);
 	void (*set_operator)(state_save_t* t, vkvg_operator_t op);
+
+	VkvgPattern(*new_pattern_linear)(vgpath_ctx* ctx, float x0, float y0, float x1, float y1);
+	VkvgPattern(*new_pattern_radial)(vgpath_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+	VkvgPattern(*new_pattern_sweep)(vgpath_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
+	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float r, float g, float b, float a);
 
 	paths_t* (*new_paths)(vgpath_ctx* ctx);
 	void (*free_paths)(paths_t* ctx);

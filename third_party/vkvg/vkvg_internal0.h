@@ -708,9 +708,11 @@ typedef struct _vkvg_device_t {
 
 	VkPipelineCache       pipelineCache;  /**< speed up startup by caching configured pipelines on disk */
 	VkPipelineLayout      pipelineLayout; /**< layout common to all pipelines */
+	VkPipelineLayout      pipelineLayout0; /**< layout common to all pipelines */
 	VkDescriptorSetLayout dslFont;        /**< font cache descriptors layout */
 	VkDescriptorSetLayout dslSrc;         /**< context source surface descriptors layout */
 	VkDescriptorSetLayout dslGrad;        /**< context gradient descriptors layout */
+	VkDescriptorSetLayout dslGrad0;        /**< context gradient descriptors layout */
 
 	int hdpi, /**< only used for FreeType fonts and svg loading */
 		vdpi;

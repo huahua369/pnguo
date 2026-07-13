@@ -5393,6 +5393,8 @@ void _device_createDescriptorSetLayout(VkvgDevice dev) {
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslSrc));
 	dsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslGrad));
+	dsLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslGrad0));
 
 	VkPushConstantRange pushConstantRange[] = {
 		{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants)},
@@ -5816,8 +5818,8 @@ vkvg_status_t vkvg_pattern_edit_linear(VkvgPattern pat, float x0, float y0, floa
 		return vkvg_pattern_status(pat);
 	if (pat->type != VKVG_PATTERN_TYPE_LINEAR)
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
-
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	*grad = {};
 	grad->cp[0] = vec4{ {x0}, {y0}, {x1}, {y1} };
 	grad->m = ivec4(1024, 0, 0, 1024);
 	grad->extend = pat->extend;
@@ -5848,6 +5850,7 @@ vkvg_status_t vkvg_pattern_edit_radial(VkvgPattern pat, float cx0, float cy0, fl
 	if (pat->type != VKVG_PATTERN_TYPE_RADIAL)
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	*grad = {};
 	vec2 c0 = { cx0, cy0 };
 	vec2 c1 = { cx1, cy1 };
 	if (radius0 > radius1 - 1.0f)
@@ -5897,6 +5900,7 @@ vkvg_status_t vkvg_pattern_edit_sweep(VkvgPattern pat, float cx, float cy, float
 	if (pat->type != VKVG_PATTERN_TYPE_SWEEP)
 		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
 	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	*grad = {};
 	grad->cp[0] = vec4{ cx, cy, start_angle, end_angle };
 	grad->m = ivec4(1024, 0, 0, 1024);
 	grad->extend = pat->extend;
@@ -10152,6 +10156,77 @@ state_save_t* dc_new_state(vgpath_ctx* ctx) {
 	return t;
 }
 
+VkvgPattern dc_pattern_create_linear(vgpath_ctx* ctx, float x0, float y0, float x1, float y1) {
+
+	auto pat = (vkvg_pattern_t*)ctx->mac.allocate(sizeof(vkvg_pattern_t) + sizeof(vkvg_gradient_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	*pat = {};
+	pat->type = VKVG_PATTERN_TYPE_LINEAR;
+	pat->extend = VKVG_EXTEND_NONE;
+	pat->data = pat + 1;
+	if (pat->data) {
+		vkvg_pattern_edit_linear(pat, x0, y0, x1, y1);
+		pat->references = 1;
+	}
+	else {
+		pat->status = VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+	}
+	return pat;
+}
+// circle 或 ellipse
+VkvgPattern dc_pattern_create_radial(vgpath_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse) {
+	auto pat = (vkvg_pattern_t*)ctx->mac.allocate(sizeof(vkvg_pattern_t) + sizeof(vkvg_gradient_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	*pat = {};
+	pat->type = VKVG_PATTERN_TYPE_RADIAL;
+	pat->extend = VKVG_EXTEND_NONE;
+	pat->data = pat + 1;
+	if (pat->data) {
+		vkvg_pattern_edit_radial(pat, cx0, cy0, radius0, cx1, cy1, radius1, is_ellipse);
+		pat->references = 1;
+	}
+	else
+		pat->status = VKVG_STATUS_NO_MEMORY;
+	return pat;
+}
+
+VkvgPattern dc_pattern_create_sweep(vgpath_ctx* ctx, float cx, float cy, float start_angle, float end_angle) {
+	auto pat = (vkvg_pattern_t*)ctx->mac.allocate(sizeof(vkvg_pattern_t) + sizeof(vkvg_gradient_t));
+	if (!pat) {
+		LOG(VKVG_LOG_ERR, "CREATE Pattern failed, no memory\n");
+		return (VkvgPattern)&_vkvg_status_null_pointer;
+	}
+	*pat = {};
+	pat->type = VKVG_PATTERN_TYPE_SWEEP;
+	pat->extend = VKVG_EXTEND_NONE;
+	pat->data = pat + 1;
+	if (pat->data) {
+		vkvg_pattern_edit_sweep(pat, cx, cy, start_angle, end_angle);
+		pat->references = 1;
+	}
+	else
+		pat->status = VKVG_STATUS_NO_MEMORY;
+	return pat;
+}
+
+vkvg_status_t dc_pattern_set_color_stop(VkvgPattern pat, int idx, float r, float g, float b, float a) {
+	if (vkvg_pattern_status(pat))
+		return vkvg_pattern_status(pat);
+	if (pat->type == VKVG_PATTERN_TYPE_SURFACE || pat->type == VKVG_PATTERN_TYPE_SOLID)
+		return VKVG_STATUS_PATTERN_TYPE_MISMATCH;
+	vkvg_gradient_t* grad = (vkvg_gradient_t*)pat->data;
+	if (idx < 0 || idx >= grad->count)return VKVG_STATUS_PATTERN_INVALID_GRADIENT;
+	vkvg_color_t c = { r, g, b, a };
+	grad->colors[idx] = c;
+	return VKVG_STATUS_SUCCESS;
+}
+
 void dc_set_line_cap(state_save_t* t, vkvg_line_cap_t lineCap) {
 	if (t) t->lineCap = lineCap;
 }
@@ -10162,7 +10237,7 @@ void dc_set_fill_rule(state_save_t* t, vkvg_fill_rule_t fillRule) {
 	if (t) t->curFillRule = fillRule;
 }
 void dc_set_color(state_save_t* t, uint32_t color) {
-	if (t) t->curColor = color;
+	if (t) { t->curColor = color; t->pattern = 0; }
 }
 void dc_set_mat_inv_and_vkCmdPush(state_save_t* t) {
 	if (t) {
@@ -10180,7 +10255,12 @@ void dc_translate(state_save_t* t, float dx, float dy)
 void dc_set_source_rgba(state_save_t* t, float r, float g, float b, float a) {
 	if (!t)
 		return;
-	t->curColor = CreateRgbaf(r, g, b, a);
+	t->curColor = CreateRgbaf(r, g, b, a); t->pattern = 0;
+}
+void dc_set_source(state_save_t* t, VkvgPattern pat) {
+	if (!t)
+		return;
+	t->pattern = pat;
 }
 void dc_set_operator(state_save_t* t, vkvg_operator_t op) {
 	if (t) t->curOperator = op;
@@ -10233,7 +10313,11 @@ drawctx_t get_drawctx(vgpath_ctx* p)
 		r.set_color = dc_set_color;
 		r.set_source_rgba = dc_set_source_rgba;
 		r.set_operator = dc_set_operator;
-
+		r.set_source = dc_set_source;
+		r.new_pattern_linear = dc_pattern_create_linear;
+		r.new_pattern_radial = dc_pattern_create_radial;
+		r.new_pattern_sweep = dc_pattern_create_sweep;
+		r.pattern_set_color_stop = dc_pattern_set_color_stop;
 
 		r.rectangle = dc_rectangle;
 		r.translate = dc_translate;
