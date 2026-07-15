@@ -25,9 +25,10 @@
 #extension GL_ARB_shading_language_420pack : enable
 #extension GL_EXT_scalar_block_layout : enable
 
+
 layout(set = 0, binding = 0) uniform sampler2DArray fontMap;
-layout(set = 1, binding = 0) uniform sampler2D		source;
-layout(scalar, set = 2, binding = 0) uniform _uboGrad {
+layout(set = 0, binding = 1) uniform sampler2D		source;
+layout(scalar, set = 0, binding = 2) uniform _uboGrad {
 	vec4	colors[32];
 	float	stops[32];
 	vec4    cp[2];

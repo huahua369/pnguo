@@ -712,7 +712,7 @@ typedef struct _vkvg_device_t {
 	VkDescriptorSetLayout dslFont;        /**< font cache descriptors layout */
 	VkDescriptorSetLayout dslSrc;         /**< context source surface descriptors layout */
 	VkDescriptorSetLayout dslGrad;        /**< context gradient descriptors layout */
-	VkDescriptorSetLayout dslGrad0;        /**< context gradient descriptors layout */
+	VkDescriptorSetLayout dslPushDset;        // push dset
 
 	int hdpi, /**< only used for FreeType fonts and svg loading */
 		vdpi;
@@ -1206,6 +1206,12 @@ typedef struct _vkvg_context_t {
 	uint32_t     sizeVBO;      // size of vk vbo size
 	uint32_t     sizeVertices; // reserved size
 	uint32_t     vertCount;    // effective vertices count
+	uint32_t     gCount;    // 渐变ubo数量
+	uint32_t     gxCount;    // ubo计数
+
+	VkhImage d_img;
+	uint64_t d_offset;
+	bool isdset;
 
 	Vertex* vertexCache;
 	VKVG_IBO_INDEX_TYPE* indexCache;

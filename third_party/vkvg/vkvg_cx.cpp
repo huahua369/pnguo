@@ -13,8 +13,7 @@ extern "C" {
 
 #ifdef __cplusplus
 }
-#endif
-
+#endif 
 #include "vkh_queue.h"
 #include "vkh_image.h"
 
@@ -121,6 +120,7 @@ public:
 #endif
 	uint32_t curColor = 0xFFffffff;
 	uint32_t curVertOffset = 0;
+	uint32_t gCount = 0;		// ubo数量
 	bool is_glutess = false;
 	bool is_fence = true;
 public:
@@ -727,6 +727,11 @@ const float DBG_LAB_COLOR_CLIP[4] = { 0, 1, 1, 1 };
 #define CreateRgbaf(r, g, b, a)                                                                                        \
     (((int)(a * 255.0f) << 24) | ((int)(b * 255.0f) << 16) | ((int)(g * 255.0f) << 8) | (int)(r * 255.0f))
 #endif
+
+
+
+void push_update_descriptor_set_a(VkvgContext ctx, VkhImage img, uint64_t offset);
+
 void _init_ctx(VkvgContext ctx) {
 	static VkClearValue clearValues[3] = {};
 	clearValues[1].depthStencil = { 1.0f, 0 };
@@ -812,7 +817,8 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 		ctx->pSurf = surf;
 		ctx->status = VKVG_STATUS_SUCCESS;
 		_init_ctx(ctx);
-		_update_descriptor_set(ctx, surf->dev->emptyImg, ctx->dsSrc);
+		//_update_descriptor_set(ctx, surf->dev->emptyImg, ctx->dsSrc);
+		push_update_descriptor_set_a(ctx, 0, 0);
 		_clear_path(ctx);
 		ctx->cmd = ctx->cmdBuffers[0]; // current recording buffer
 		return ctx;
@@ -864,19 +870,21 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 #ifndef VKVG_ENABLE_VK_TIMELINE_SEMAPHORE
 	ctx->flushFence = vkh_fence_create_signaled((VkhDevice)&ctx->dev->vkDev);
 #endif
-
+	ctx->d_img = 0;
+	ctx->d_offset = 0;
+	ctx->isdset = false;
 	_create_vertices_buff(ctx);
 	_create_gradient_buff(ctx);
 	_create_cmd_buff(ctx);
 	_createDescriptorPool(ctx);
 	_init_descriptor_sets(ctx);
+	ctx->cmd = ctx->cmdBuffers[0]; // current recording buffer
 	_font_cache_update_context_descset(ctx);
-	_update_descriptor_set(ctx, surf->dev->emptyImg, ctx->dsSrc);
-	_update_gradient_desc_set(ctx);
-
+	//_update_descriptor_set(ctx, surf->dev->emptyImg, ctx->dsSrc); 
+	//_update_gradient_desc_set(ctx);
+	push_update_descriptor_set_a(ctx, 0, 0);
 	_clear_path(ctx);
 
-	ctx->cmd = ctx->cmdBuffers[0]; // current recording buffer
 
 	ctx->references = 1;
 	ctx->status = VKVG_STATUS_SUCCESS;
@@ -894,9 +902,9 @@ VkvgContext vkvg_create(VkvgSurface surf) {
 #endif
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)ctx->descriptorPool,
 		"CTX Descriptor Pool");
-	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsSrc, "CTX DescSet SOURCE");
-	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsFont, "CTX DescSet FONT");
-	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsGrad, "CTX DescSet GRADIENT");
+	//vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsSrc, "CTX DescSet SOURCE");
+	//vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsFont, "CTX DescSet FONT");
+	//vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)ctx->dsGrad, "CTX DescSet GRADIENT");
 
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_BUFFER, (uint64_t)ctx->indices.buffer, "CTX Index Buff");
 	vkh_device_set_object_name(vkhd, VK_OBJECT_TYPE_BUFFER, (uint64_t)ctx->vertices.buffer, "CTX Vertex Buff");
@@ -2695,15 +2703,32 @@ float _get_arc_step(VkvgContext ctx, float radius) {
 		return fminf(M_PIF / 3.f, M_PIF / r);
 	return fminf(M_PIF / 3.f, M_PIF / (r * 0.4f));
 }
+template <typename T>
+static inline T vgAlignUp(T val, T align)
+{
+	return (val + align - 1) / align * align;
+}
 void _create_gradient_buff(VkvgContext ctx) {
+	int us = sizeof(vkvg_gradient_t) * 8;
 	vkh_buffer_init((VkhDevice)&ctx->dev->vkDev, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU,
-		sizeof(vkvg_gradient_t), &ctx->uboGrad, true);
+		vgAlignUp(us, 64), &ctx->uboGrad, true);
+	ctx->gCount = 8;
 }
 void _create_vertices_buff(VkvgContext ctx) {
 	vkh_buffer_init((VkhDevice)&ctx->dev->vkDev, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU,
 		ctx->sizeVBO * sizeof(Vertex), &ctx->vertices, true);
 	vkh_buffer_init((VkhDevice)&ctx->dev->vkDev, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VKH_MEMORY_USAGE_CPU_TO_GPU,
 		ctx->sizeIBO * sizeof(VKVG_IBO_INDEX_TYPE), &ctx->indices, true);
+}
+void _resize_ubo(VkvgContext ctx, uint32_t new_count) {
+	if (!_wait_ctx_flush_end(ctx)) // wait previous cmd if not completed
+		return;
+	if (ctx->gCount < new_count)
+	{
+		ctx->gCount = new_count;
+		int us = ctx->gCount * sizeof(vkvg_gradient_t);
+		vkh_buffer_resize(&ctx->uboGrad, vgAlignUp(us, 64), true);
+	}
 }
 void _resize_vbo(VkvgContext ctx, uint32_t new_size) {
 	if (!_wait_ctx_flush_end(ctx)) // wait previous cmd if not completed
@@ -3182,7 +3207,7 @@ void _start_cmd_for_render_pass(VkvgContext ctx) {
 	CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
 
 	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
-	CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
+	//CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
 
 	VkDeviceSize offsets[1] = { 0 };
 	CmdBindVertexBuffers(ctx->cmd, 0, 1, &ctx->vertices.buffer, offsets);
@@ -3193,6 +3218,7 @@ void _start_cmd_for_render_pass(VkvgContext ctx) {
 	_bind_draw_pipeline(ctx);
 	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 	ctx->cmdStarted = true;
+	push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
 }
 // compute inverse mat used in shader when context matrix has changed
 // then trigger push constants command
@@ -3240,9 +3266,11 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 		_flush_cmd_buff(ctx);
 		if (!_wait_ctx_flush_end(ctx))
 			return;
-		if (lastPat->type ==
-			VKVG_PATTERN_TYPE_SURFACE) // unbind current source surface by replacing it with empty texture
-			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
+		if (lastPat->type == VKVG_PATTERN_TYPE_SURFACE) // unbind current source surface by replacing it with empty texture
+		{
+			//_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
+			push_update_descriptor_set_a(ctx, 0, 0);
+		}
 		break;
 	case VKVG_PATTERN_TYPE_SURFACE: {
 		_emit_draw_cmd_undrawn_vertices(ctx);
@@ -3296,8 +3324,8 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 			break;
 		}
 		vkh_image_create_sampler(surf->img, filter, filter, VK_SAMPLER_MIPMAP_MODE_NEAREST, addrMode);
-
-		_update_descriptor_set(ctx, surf->img, ctx->dsSrc);
+		push_update_descriptor_set_a(ctx, surf->img, 0);
+		//_update_descriptor_set(ctx, surf->img, ctx->dsSrc);
 
 		ctx->pushConsts.source.width = (float)surf->width;
 		ctx->pushConsts.source.height = (float)surf->height;
@@ -3320,7 +3348,9 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 		if (!_wait_ctx_flush_end(ctx))
 			return;
 		if (lastPat && lastPat->type == VKVG_PATTERN_TYPE_SURFACE)
-			_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc);
+		{
+			//_update_descriptor_set(ctx, ctx->dev->emptyImg, ctx->dsSrc); 
+		}
 		float fm = std::max((float)ctx->pSurf->width, (float)ctx->pSurf->height);
 		vec4 bounds = { fm,fm,0.0f,0.0f }; // store img bounds in unused source field
 		ctx->pushConsts.source = bounds;
@@ -3359,6 +3389,7 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 		_sort_gradient_stops(grad.colors, grad.stops, grad.count);
 		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
 		vkh_buffer_flush(&ctx->uboGrad);
+		push_update_descriptor_set_a(ctx, 0, 0);
 		break;
 	}
 	ctx->pushConsts.fsq_patternType = (ctx->pushConsts.fsq_patternType & FULLSCREEN_BIT) + newPatternType;
@@ -3367,6 +3398,7 @@ void _update_cur_pattern(VkvgContext ctx, VkvgPattern pat) {
 		vkvg_pattern_destroy(lastPat);
 }
 void _update_descriptor_set(VkvgContext ctx, VkhImage img, VkDescriptorSet ds) {
+
 	VkDescriptorImageInfo descSrcTex = vkh_image_get_descriptor(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	VkWriteDescriptorSet  writeDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 												.dstSet = ds,
@@ -3420,11 +3452,11 @@ void _init_descriptor_sets(VkvgContext ctx) {
 															 .descriptorPool = ctx->descriptorPool,
 															 .descriptorSetCount = 1,
 															 .pSetLayouts = &dev->dslFont };
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsFont));
+	//VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsFont));
 	descriptorSetAllocateInfo.pSetLayouts = &dev->dslSrc;
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsSrc));
+	//VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsSrc));
 	descriptorSetAllocateInfo.pSetLayouts = &dev->dslGrad;
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsGrad));
+	//VK_CHECK_RESULT(vkAllocateDescriptorSets(dev->vkDev, &descriptorSetAllocateInfo, &ctx->dsGrad));
 }
 void _release_context_ressources(VkvgContext ctx) {
 	VkDevice dev = ctx->dev->vkDev;
@@ -4940,6 +4972,7 @@ void vkvg_device_destroy(VkvgDevice dev) {
 	vkh_image_destroy(dev->emptyImg);
 
 	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslGrad, NULL);
+	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslPushDset, NULL);
 	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslFont, NULL);
 	vkDestroyDescriptorSetLayout(dev->vkDev, dev->dslSrc, NULL);
 #ifndef __APPLE__
@@ -5391,10 +5424,19 @@ void _device_createDescriptorSetLayout(VkvgDevice dev) {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &dsLayoutBinding };
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslFont));
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslSrc));
+	std::array<VkDescriptorSetLayoutBinding, 3> setLayoutBindings = { };
+	setLayoutBindings[0] = dsLayoutBinding;
+	dsLayoutBinding.binding = 1;
+	setLayoutBindings[1] = dsLayoutBinding;
+	dsLayoutBinding.binding = 2;
 	dsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	setLayoutBindings[2] = dsLayoutBinding;
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslGrad));
+
+	dsLayoutCreateInfo.bindingCount = 3;
+	dsLayoutCreateInfo.pBindings = setLayoutBindings.data();
 	dsLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslGrad0));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(dev->vkDev, &dsLayoutCreateInfo, NULL, &dev->dslPushDset));
 
 	VkPushConstantRange pushConstantRange[] = {
 		{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants)},
@@ -5403,10 +5445,11 @@ void _device_createDescriptorSetLayout(VkvgDevice dev) {
 	VkDescriptorSetLayout dsls[] = { dev->dslFont, dev->dslSrc, dev->dslGrad };
 
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-														   .setLayoutCount = 3,
-														   .pSetLayouts = dsls,
-														   .pushConstantRangeCount = 1,
-														   .pPushConstantRanges = (VkPushConstantRange*)&pushConstantRange };
+														   .setLayoutCount = 1,
+		//.pSetLayouts = dsls,
+		.pSetLayouts = &dev->dslPushDset,
+		.pushConstantRangeCount = 1,
+		.pPushConstantRanges = (VkPushConstantRange*)&pushConstantRange };
 	VK_CHECK_RESULT(vkCreatePipelineLayout(dev->vkDev, &pipelineLayoutCreateInfo, NULL, &dev->pipelineLayout));
 }
 
@@ -6255,8 +6298,9 @@ VkvgSurface vkvg_surface_create_from_bitmap(VkvgDevice dev, unsigned char* img, 
 	ctx->pushConsts.fsq_patternType = (ctx->pushConsts.fsq_patternType & FULLSCREEN_BIT) + VKVG_PATTERN_TYPE_SURFACE;
 
 	//_update_push_constants (ctx);
-	_update_descriptor_set(ctx, tmpImg, ctx->dsSrc);
+	//_update_descriptor_set(ctx, tmpImg, ctx->dsSrc); 
 	_ensure_renderpass_is_started(ctx);
+	push_update_descriptor_set_a(ctx, tmpImg, 0);
 
 	vkvg_paint(ctx);
 	vkvg_destroy(ctx);
@@ -7647,7 +7691,8 @@ void _font_cache_update_context_descset(VkvgContext ctx) {
 		ctx->fontCacheImg = ctx->dev->fontCache->texture;
 	vkh_image_reference(ctx->fontCacheImg);
 
-	_update_descriptor_set(ctx, ctx->fontCacheImg, ctx->dsFont);
+	//_update_descriptor_set(ctx, ctx->fontCacheImg, ctx->dsFont); 
+	push_update_descriptor_set_a(ctx, ctx->fontCacheImg, 0);
 
 	UNLOCK_FONTCACHE(ctx->dev)
 }
@@ -8136,12 +8181,12 @@ void _font_cache_show_text_run(VkvgContext ctx, VkvgText tr) {
 	_finish_path(ctx);
 	_add_point(ctx, pen.x, pen.y);
 	_flush_chars_to_tex(tr->dev, tr->font);
-	UNLOCK_FONTCACHE(ctx->dev)
-
-		if (ctx->fontCacheImg != ctx->dev->fontCache->texture) {
-			vkvg_flush(ctx);
-			_font_cache_update_context_descset(ctx);
-		}
+	UNLOCK_FONTCACHE(ctx->dev);
+	push_update_descriptor_set_a(ctx, ctx->fontCacheImg, 0);
+	if (ctx->fontCacheImg != ctx->dev->fontCache->texture) {
+		vkvg_flush(ctx);
+		_font_cache_update_context_descset(ctx);
+	}
 }
 
 void _font_cache_show_text(VkvgContext ctx, const char* text) {
@@ -8169,9 +8214,48 @@ vg_ctx::vg_ctx()
 vg_ctx::~vg_ctx()
 {}
 
+
 //layout(set = 0, binding = 0) uniform sampler2DArray fontMap;
 //layout(set = 1, binding = 0) uniform sampler2D		source;
 //layout(scalar, set = 2, binding = 0) uniform _uboGrad  
+
+void push_update_descriptor_set_a(VkvgContext ctx, VkhImage img, uint64_t offset) {
+	auto cx = (vkvg_context*)ctx;
+	if (!cx || !cx->maxPushDescriptors || !cx->_vkCmdPushDescriptorSet)return;
+	ctx->d_img = img;
+	ctx->d_offset = offset;
+	if (!ctx->cmdStarted)
+	{
+		ctx->isdset = true;
+		return;
+	}
+	VkDescriptorImageInfo dst1 = vkh_image_get_descriptor(img ? img : ctx->dev->emptyImg, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	VkDescriptorImageInfo dst0 = vkh_image_get_descriptor(ctx->fontCacheImg, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	VkWriteDescriptorSet  wimg = {
+	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+	.dstSet = 0,
+	.dstBinding = 0,
+	.descriptorCount = 1,
+	.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+	.pImageInfo = 0 };
+	VkDescriptorBufferInfo dbi = { ctx->uboGrad.buffer, offset, sizeof(vkvg_gradient_t) };
+	VkWriteDescriptorSet   wu = {
+	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+	.dstSet = 0,
+	.dstBinding = 2,
+	.descriptorCount = 1,
+	.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	.pBufferInfo = &dbi };
+	VkWriteDescriptorSet  wds[3] = {};
+	wimg.pImageInfo = &dst0;
+	wds[0] = wimg;
+	wimg.dstBinding = 1;
+	wimg.pImageInfo = &dst1;
+	wds[1] = wimg;
+	wds[2] = wu;
+	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, wds);
+}
+#if 0
 void push_update_descriptor_set(VkvgContext ctx, VkhImage img, uint32_t idx) {
 	auto cx = (vkvg_context*)ctx;
 	if (!cx || !cx->maxPushDescriptors || !cx->_vkCmdPushDescriptorSet)return;
@@ -8179,11 +8263,13 @@ void push_update_descriptor_set(VkvgContext ctx, VkhImage img, uint32_t idx) {
 	VkWriteDescriptorSet  writeDescriptorSet = {
 	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 	.dstSet = 0,
-	.dstBinding = 0,
+	.dstBinding = idx,
 	.descriptorCount = 1,
 	.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 	.pImageInfo = &descSrcTex };
-	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, idx, 1, &writeDescriptorSet);
+	VkWriteDescriptorSet  wds[3] = {};
+
+	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, wds);
 }
 //VK_WHOLE_SIZE
 void push_update_gradient_desc_set(VkvgContext ctx, uint64_t offset, uint64_t size) {
@@ -8193,13 +8279,13 @@ void push_update_gradient_desc_set(VkvgContext ctx, uint64_t offset, uint64_t si
 	VkWriteDescriptorSet   writeDescriptorSet = {
 	.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 	.dstSet = 0,
-	.dstBinding = 0,
+	.dstBinding = 2,
 	.descriptorCount = 1,
 	.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 	.pBufferInfo = &dbi };
-	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 2, 1, &writeDescriptorSet);
+	cx->_vkCmdPushDescriptorSet(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 1, &writeDescriptorSet);
 }
-
+#endif
 void update_pattern(VkvgContext ctx, VkvgPattern pat, state_save_t* st) {
 	if (!ctx)return;
 	VkvgPattern lastPat = ctx->pattern;
@@ -8213,7 +8299,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat, state_save_t* st) {
 		newPatternType = pat->type;
 	switch (newPatternType) {
 	case VKVG_PATTERN_TYPE_SOLID:
-		push_update_descriptor_set(ctx, ctx->dev->emptyImg, 1);
+		push_update_descriptor_set_a(ctx, 0, 0);
 		break;
 	case VKVG_PATTERN_TYPE_SURFACE:
 	{
@@ -8249,7 +8335,7 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat, state_save_t* st) {
 			break;
 		}
 		vkh_image_create_sampler(surf->img, filter, filter, VK_SAMPLER_MIPMAP_MODE_NEAREST, addrMode);
-		push_update_descriptor_set(ctx, surf->img, 1);
+		push_update_descriptor_set_a(ctx, surf->img, 0);
 		st->pushConsts.source.width = (float)surf->width;
 		st->pushConsts.source.height = (float)surf->height;
 		vkvg_matrix_t mat;
@@ -8299,9 +8385,10 @@ void update_pattern(VkvgContext ctx, VkvgPattern pat, state_save_t* st) {
 			vkvg_matrix_transform_distance(&st->pushConsts.mat, &grad.cp[1].z, &grad.cp[0].w);
 		}
 		_sort_gradient_stops(grad.colors, grad.stops, grad.count);
-		memcpy(vkh_buffer_get_mapped_pointer(&ctx->uboGrad), &grad, sizeof(vkvg_gradient_t));
-		vkh_buffer_flush(&ctx->uboGrad);
-		push_update_gradient_desc_set(ctx, 0, sizeof(vkvg_gradient_t));
+		memcpy(((char*)vkh_buffer_get_mapped_pointer(&ctx->uboGrad)) + ctx->gxCount, &grad, sizeof(vkvg_gradient_t));
+		//vkh_buffer_flush(&ctx->uboGrad); 
+		push_update_descriptor_set_a(ctx, 0, ctx->gxCount);
+		ctx->gxCount += sizeof(vkvg_gradient_t);
 	}
 	break;
 	}
@@ -8829,6 +8916,8 @@ void vgpath_ctx::fill_preserve(paths_t* ctx, state_save_t* t)
 	if (!ctx || !ctx->pathPtr || !t) // nothing to fill
 		return;
 	ctx->t = t;
+	if (t->pattern)
+		gCount++;
 	if (ctx->t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 
 		vec4 bounds = { FLT_MAX, FLT_MAX, FLT_MIN, FLT_MIN };
@@ -9238,6 +9327,8 @@ void vgpath_ctx::stroke_preserve(paths_t* ctx, state_save_t* t) {
 		return;
 	ctx->t = t;
 
+	if (t->pattern)
+		gCount++;
 
 	cmd_t c = {};
 	c.vertex.x = _vertex.size();
@@ -9518,17 +9609,17 @@ void dc_start_cmd_for_render_pass(VkvgContext ctx) {
 	CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
 
 	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
-	CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
+	//CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
 
 	VkDeviceSize offsets[1] = { 0 };
 	CmdBindVertexBuffers(ctx->cmd, 0, 1, &ctx->vertices.buffer, offsets);
 	CmdBindIndexBuffer(ctx->cmd, ctx->indices.buffer, 0, VKVG_VK_INDEX_TYPE);
 
 	_update_push_constants(ctx);
-
 	_bind_draw_pipeline(ctx);
 	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 	ctx->cmdStarted = true;
+	push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
 }
 
 void dc_start_cmd_for_render_pass0(VkvgContext ctx) {
@@ -9582,6 +9673,8 @@ void vgpath_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
 	check_vao_size(ctx, _vertex.size(), _indices.size());
+	_resize_ubo(ctx, gCount);
+	ctx->gxCount = 0;
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->vertices), _vertex.data(), _vertex.size() * sizeof(Vertex));
 	memcpy(vkh_buffer_get_mapped_pointer(&ctx->indices), _indices.data(), _indices.size() * sizeof(uint32_t));
 	if (ctx->cmdStarted)
@@ -9661,6 +9754,8 @@ void vgpath_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 		}
 	}
 	_end_render_pass(ctx);
+	// 更新渐变ubo
+	vkh_buffer_flush(&ctx->uboGrad);
 	if (ctx->dev->deferredResolve)
 		dc_explicit_ms_resolve(ctx->cmd, ctx->pSurf);
 	vkh_cmd_end(ctx->cmd);
@@ -9689,6 +9784,7 @@ void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore wa
 
 void vgpath_ctx::begin_frame()
 {
+	gCount = 0;
 	mac.release();
 	_vertex.clear();
 	_indices.clear();
