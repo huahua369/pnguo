@@ -18,86 +18,124 @@ void vkvg_clear_rect(VkvgContext ctx, int x, int y, int width, int height);
 #ifndef vkvg_pattern_add_color_stop_rgba
 #define vkvg_pattern_add_color_stop_rgba vkvg_pattern_add_color_stop
 #endif 
-
-class vg_ctx
+struct text_st;
+struct image_r;
+struct dblock_d;
+struct geometry_d;
+class rvg_x
 {
 public:
-	vg_ctx();
-	~vg_ctx();
+	struct stack_item
+	{
+		glm::vec2 pos = {};				// 当前偏移
+		glm::vec4 clip = {};			// 当前裁剪区域
+		glm::vec2 scale = { 1.0f, 1.0f };
+		float rotate_radians = 0.0f;
+		glm::mat3x2 _transform = glm::mat3x2(1.0f);
+	};
+	glm::ivec2 pos = {};
+private:
+	hz::usp_ac* ac = 0;
+	std::stack<stack_item> _stk;
+	std::stack<size_t> _st_view;
+	stack_item _cur = {};				// 当前状态
+	glm::ivec4 _tem_clip = {};
+	glm::ivec4 _tview = {};				// 当前渲染区域 
+	glm::ivec4 _clip = {};
+	glm::vec2 _translate = {};
+public:
+	rvg_x();
+	~rvg_x();
+	void set_pos(const glm::ivec2& ps);
+	void clear();
+	void submit(fill_style_d* st);
+	void submit(uint32_t fill, uint32_t color, int linewidth = 1);
+	// 填充网格
+	void grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width);
+	// 线性渐变填充
+	void linear_fill(const glm::vec2& size, const glm::vec4* cols, int count);
+	// 画2d箭头type=0线终点在三角形中间
+	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type);
+	// 批量渲染同样式的块(圆或矩形)
+	void draw_block(dblock_d* p, fill_style_d* st);
+	// 描边或填充路径
+	void draw_path(path_d* path, fill_style_d* style);
+	// 批量画单条线
+	void add_line(glm::vec4* p, size_t count);
+	void add_line(const glm::vec2& ps0, const glm::vec2& ps1);
 
-	VkvgContext vkvg_create(VkvgSurface surf);
-	void vkvg_destroy(VkvgContext ctx);
-	vkvg_status_t vkvg_status(VkvgContext ctx);
-	const char* vkvg_status_to_string(vkvg_status_t status);
-	VkvgContext vkvg_reference(VkvgContext ctx);
-	uint32_t vkvg_get_reference_count(VkvgContext ctx);
-	void vkvg_flush(VkvgContext ctx);
-	void vkvg_new_path(VkvgContext ctx);
-	void vkvg_close_path(VkvgContext ctx);
-	void vkvg_new_sub_path(VkvgContext ctx);
-	void vkvg_path_extents(VkvgContext ctx, float* const x1, float* const y1, float* const x2, float* const y2);
-	void vkvg_get_current_point(VkvgContext ctx, float* x, float* y);
-	void vkvg_line_to(VkvgContext ctx, float x, float y);
-	void vkvg_rel_line_to(VkvgContext ctx, float dx, float dy);
-	void vkvg_move_to(VkvgContext ctx, float x, float y);
-	void vkvg_rel_move_to(VkvgContext ctx, float x, float y);
-	void vkvg_arc(VkvgContext ctx, float xc, float yc, float radius, float a1, float a2);
-	void vkvg_arc_negative(VkvgContext ctx, float xc, float yc, float radius, float a1, float a2);
-	void vkvg_curve_to(VkvgContext ctx, float x1, float y1, float x2, float y2, float x3, float y3);
-	void vkvg_rel_curve_to(VkvgContext ctx, float x1, float y1, float x2, float y2, float x3, float y3);
-	void vkvg_quadratic_to(VkvgContext ctx, float x1, float y1, float x2, float y2);
-	void vkvg_rel_quadratic_to(VkvgContext ctx, float x1, float y1, float x2, float y2);
-	vkvg_status_t vkvg_rectangle(VkvgContext ctx, float x, float y, float w, float h);
-	vkvg_status_t vkvg_rounded_rectangle(VkvgContext ctx, float x, float y, float w, float h, float radius);
-	void vkvg_rounded_rectangle2(VkvgContext ctx, float x, float y, float w, float h, float rx, float ry);
-	void vkvg_ellipse(VkvgContext ctx, float radiusX, float radiusY, float x, float y, float rotationAngle);
-	void vkvg_elliptic_arc_to(VkvgContext ctx, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
-	void vkvg_rel_elliptic_arc_to(VkvgContext ctx, float x, float y, bool large_arc_flag, bool sweep_flag, float rx, float ry, float phi);
-	void vkvg_stroke(VkvgContext ctx);
-	void vkvg_stroke_preserve(VkvgContext ctx);
-	void vkvg_fill(VkvgContext ctx);
-	void vkvg_fill_preserve(VkvgContext ctx);
-	void vkvg_paint(VkvgContext ctx);
-	void vkvg_clear(VkvgContext ctx);
-	void vkvg_reset_clip(VkvgContext ctx);
-	void vkvg_clip(VkvgContext ctx);
-	void vkvg_clip_preserve(VkvgContext ctx);
-	void vkvg_set_opacity(VkvgContext ctx, float opacity);
-	float vkvg_get_opacity(VkvgContext ctx);
-	void vkvg_set_source_color(VkvgContext ctx, uint32_t c);
-	void vkvg_set_source_rgba(VkvgContext ctx, float r, float g, float b, float a);
-	void vkvg_set_source_rgb(VkvgContext ctx, float r, float g, float b);
-	void vkvg_set_source_surface(VkvgContext ctx, VkvgSurface surf, float x, float y);
-	void vkvg_set_source(VkvgContext ctx, VkvgPattern pat);
-	void vkvg_set_line_width(VkvgContext ctx, float width);
-	void vkvg_set_miter_limit(VkvgContext ctx, float limit);
-	float vkvg_get_miter_limit(VkvgContext ctx);
-	void vkvg_set_line_cap(VkvgContext ctx, vkvg_line_cap_t cap);
-	void vkvg_set_line_join(VkvgContext ctx, vkvg_line_join_t join);
-	void vkvg_set_operator(VkvgContext ctx, vkvg_operator_t op);
-	void vkvg_set_fill_rule(VkvgContext ctx, vkvg_fill_rule_t fr);
-	void vkvg_set_dash(VkvgContext ctx, const float* dashes, uint32_t num_dashes, float offset);
-	void vkvg_get_dash(VkvgContext ctx, const float* dashes, uint32_t* num_dashes, float* offset);
-	float vkvg_get_line_width(VkvgContext ctx);
-	vkvg_line_cap_t vkvg_get_line_cap(VkvgContext ctx);
-	vkvg_line_join_t vkvg_get_line_join(VkvgContext ctx);
-	vkvg_operator_t vkvg_get_operator(VkvgContext ctx);
-	vkvg_fill_rule_t vkvg_get_fill_rule(VkvgContext ctx);
-	VkvgPattern vkvg_get_source(VkvgContext ctx);
-	VkvgSurface vkvg_get_target(VkvgContext ctx);
-	bool vkvg_has_current_point(VkvgContext ctx);
-	void vkvg_save(VkvgContext ctx);
-	void vkvg_restore(VkvgContext ctx);
-	void vkvg_translate(VkvgContext ctx, float dx, float dy);
-	void vkvg_scale(VkvgContext ctx, float sx, float sy);
-	void vkvg_rotate(VkvgContext ctx, float radians);
-	void vkvg_transform(VkvgContext ctx, const vkvg_matrix_t* matrix);
-	void vkvg_set_matrix(VkvgContext ctx, const vkvg_matrix_t* matrix);
-	void vkvg_get_matrix(VkvgContext ctx, vkvg_matrix_t* const matrix);
-	void vkvg_identity_matrix(VkvgContext ctx);
+	void add_rect(const glm::vec4& rc, double r);
+	void add_rect(const glm::vec4& rc, const glm::vec4& r);
+	void add_circle(const glm::vec2& pos, float r);
+	void add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle);
+	// 三角形基于矩形内 
+	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
+	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
+	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
+	// 折线,polygon=closed
+	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
+	void add_polyline(const Clipper2Lib::PathsD* p, bool closed);
+	void add_polyline(const glm::vec2* p, size_t count);
+	// 渲染索引多段线，索引-1则跳过
+	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
+	// 文本渲染
+	void set_text_style(text_style* ts);
+	void add_text(text_st* p, text_style* ts);
+	void add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos);
+	void add_image(image_r* r);
+	// 添加gem指针的内容。顶点坐标不受状态影响
+	void add_geometry(geometry_d* geo);
+	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
+
+	void clip();
+	void clip(const glm::ivec4& c);
+	glm::ivec4 get_clip();
+	void save();
+	void restore();
+	void save0();
+	void restore0();
+	void fill();
+	void stroke();
+	void fill_preserve();
+	void stroke_preserve();
+	void fill_stroke(uint32_t fill, uint32_t color);
+	void set_line_width(float w);
+	void set_color(uint32_t color);
+	void set_color(const glm::vec4& rgba);
+	void translate(const glm::vec2& offset);
+	void scale(float sx, float sy);
+	void scale(const glm::vec2& sc);
+	void rotate(float radians);
+	void transform(const glm::mat3x2* matrix);
+	void set_matrix(const glm::mat3x2* matrix);
+	void get_matrix(glm::mat3x2* matrix);
+	glm::vec2 get_translate();
+
+	void push_ct(uint8_t op);
+	/*
+		rv->save();
+		rv->push_view(glm::ivec4(0, 0, ss));// 设置渲染区域
+		rv->set_line_width(border.y);
+		glm::vec2 rc = ss;
+		rc -= border.y;
+		rv->add_rect({ 0.5,0.5,rc }, border.z);
+		rv->fill_stroke(border.w, border.x);
+		rv->pop_view();
+		rv->restore();
+	*/
+	void push_view(const glm::ivec4& c, void* ptr = nullptr);
+	void pop_view();
+	void push_null(int v);
+	uint32_t get_crc();
+	uint32_t get_crc2index(size_t i);
+public:
+	void save_file(const char* fn);
+	bool load_file(const char* fn);
 private:
 
 };
+
+
 
 #ifdef __cplusplus
 extern "C" {

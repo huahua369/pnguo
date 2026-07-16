@@ -44,8 +44,11 @@ extern "C" {
 #endif
 
 #include <array> 
-#include <vg.h>
 #include <pnguo/print_time.h> 
+#include <vg.h> 
+#include <clipper2/clipper.h> 
+
+#include <font_core.h>
 #include "vkvg_cx.h"
 /*
 命令行
@@ -8213,11 +8216,6 @@ void _font_cache_show_text(VkvgContext ctx, const char* text) {
 #endif // 1
 
 
-vg_ctx::vg_ctx()
-{}
-
-vg_ctx::~vg_ctx()
-{}
 
 
 //layout(set = 0, binding = 0) uniform sampler2DArray fontMap;
@@ -10436,3 +10434,90 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 	}
 	return r;
 }
+
+// rvg_x
+#if 1
+
+
+rvg_x::rvg_x() {}
+rvg_x::~rvg_x() {}
+void rvg_x::set_pos(const glm::ivec2& ps) {}
+void rvg_x::clear() {}
+void rvg_x::submit(fill_style_d* st) {}
+void rvg_x::submit(uint32_t fill, uint32_t color, int linewidth) {}
+// 填充网格
+void rvg_x::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width) {}
+// 线性渐变填充
+void rvg_x::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count) {}
+// 画2d箭头type=0线终点在三角形中间
+void rvg_x::add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type) {}
+// 批量渲染同样式的块(圆或矩形)
+void rvg_x::draw_block(dblock_d* p, fill_style_d* st) {}
+// 描边或填充路径
+void rvg_x::draw_path(path_d* path, fill_style_d* style) {}
+// 批量画单条线
+void rvg_x::add_line(glm::vec4* p, size_t count) {}
+void rvg_x::add_line(const glm::vec2& ps0, const glm::vec2& ps1) {}
+
+void rvg_x::add_rect(const glm::vec4& rc, double r) {}
+void rvg_x::add_rect(const glm::vec4& rc, const glm::vec4& r) {}
+void rvg_x::add_circle(const glm::vec2& pos, float r) {}
+void rvg_x::add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle) {}
+// 三角形基于矩形内 
+//	 dir = 0{}		// 尖角方向，0上，1右，2下，3左
+//	 spos = 50{}		// 尖角点位置0-1，中间就是0.5
+void rvg_x::add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos) {}
+// 折线,polygon=closed
+void rvg_x::draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness) {}
+void rvg_x::add_polyline(const Clipper2Lib::PathsD* p, bool closed) {}
+void rvg_x::add_polyline(const glm::vec2* p, size_t count) {}
+// 渲染索引多段线，索引-1则跳过
+void rvg_x::draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness) {}
+// 文本渲染
+void rvg_x::set_text_style(text_style* ts) {}
+void rvg_x::add_text(text_st* p, text_style* ts) {}
+void rvg_x::add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos) {}
+void rvg_x::add_image(image_r* r) {}
+// 添加gem指针的内容。顶点坐标不受状态影响
+void rvg_x::add_geometry(geometry_d* geo) {}
+void rvg_x::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r) {}
+
+void rvg_x::clip() {}
+void rvg_x::clip(const glm::ivec4& c) {}
+glm::ivec4 rvg_x::get_clip() { return _clip; }
+void rvg_x::save() {}
+void rvg_x::restore() {}
+void rvg_x::save0() {}
+void rvg_x::restore0() {}
+void rvg_x::fill() {}
+void rvg_x::stroke() {}
+void rvg_x::fill_preserve() {}
+void rvg_x::stroke_preserve() {}
+void rvg_x::fill_stroke(uint32_t fill, uint32_t color) {}
+void rvg_x::set_line_width(float w) {}
+void rvg_x::set_color(uint32_t color) {}
+void rvg_x::set_color(const glm::vec4& rgba) {}
+void rvg_x::translate(const glm::vec2& offset) {}
+void rvg_x::scale(float sx, float sy) {}
+void rvg_x::scale(const glm::vec2& sc) {}
+void rvg_x::rotate(float radians) {}
+void rvg_x::transform(const glm::mat3x2* matrix) {}
+void rvg_x::set_matrix(const glm::mat3x2* matrix) {}
+void rvg_x::get_matrix(glm::mat3x2* matrix) {}
+glm::vec2 rvg_x::get_translate() {
+	return _translate;
+}
+
+void rvg_x::push_ct(uint8_t op) {}
+void rvg_x::push_view(const glm::ivec4& c, void* ptr) {}
+void rvg_x::pop_view() {}
+void rvg_x::push_null(int v) {}
+uint32_t get_crc() {
+	return 0;
+}
+uint32_t get_crc2index(size_t i) {
+	return 0;
+}
+
+#endif 
+// !1 rvg_x

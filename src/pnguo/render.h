@@ -586,14 +586,6 @@ private:
 
 };
 
-struct stack_item
-{
-	glm::vec2 pos = {};				// 当前偏移
-	glm::vec4 clip = {};			// 当前裁剪区域
-	glm::vec2 scale = { 1.0f, 1.0f };
-	float rotate_radians = 0.0f;
-	glm::mat3x2 _transform = glm::mat3x2(1.0f);
-};
 
 struct cmdview_v {
 	glm::ivec4 rc = {};	// 渲染区域
@@ -618,6 +610,14 @@ struct rvgraw_t {
 class rvg_cx
 {
 public:
+	struct stack_item
+	{
+		glm::vec2 pos = {};				// 当前偏移
+		glm::vec4 clip = {};			// 当前裁剪区域
+		glm::vec2 scale = { 1.0f, 1.0f };
+		float rotate_radians = 0.0f;
+		glm::mat3x2 _transform = glm::mat3x2(1.0f);
+	};
 	enum Opcode : uint8_t {
 		OP_NULL, OP_VIEW, OP_VIEW_POP,
 		OP_SUBMIT_STYLE, OP_SUBMIT_COLOR, OP_GRID_FILL, OP_LINEAR_FILL, OP_ADD_ARROW,
@@ -734,109 +734,7 @@ private:
 
 };
 
-class rvg_x
-{
-public:
-	glm::ivec2 pos = {};
-private:
-	hz::usp_ac* ac = 0;
-	std::stack<stack_item> _stk;
-	std::stack<size_t> _st_view;
-	stack_item _cur = {};				// 当前状态
-	glm::ivec4 _tem_clip = {};
-	glm::ivec4 _tview = {};				// 当前渲染区域 
-public:
-	rvg_x();
-	~rvg_x();
-	void set_pos(const glm::ivec2& ps);
-	void clear();
-	void submit(fill_style_d* st);
-	void submit(uint32_t fill, uint32_t color, int linewidth = 1);
-	// 填充网格
-	void grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width);
-	// 线性渐变填充
-	void linear_fill(const glm::vec2& size, const glm::vec4* cols, int count);
-	// 画2d箭头type=0线终点在三角形中间
-	void add_arrow(const glm::vec2& p0, const glm::vec2& p1, float arrow_hwidth, float arrow_size, bool type);
-	// 批量渲染同样式的块(圆或矩形)
-	void draw_block(dblock_d* p, fill_style_d* st);
-	// 描边或填充路径
-	void draw_path(path_d* path, fill_style_d* style);
-	// 批量画单条线
-	void add_line(glm::vec4* p, size_t count);
-	void add_line(const glm::vec2& ps0, const glm::vec2& ps1);
 
-	void add_rect(const glm::vec4& rc, double r);
-	void add_rect(const glm::vec4& rc, const glm::vec4& r);
-	void add_circle(const glm::vec2& pos, float r);
-	void add_ellipse(const glm::vec2& pos, const glm::vec2& r, float rotationAngle);
-	// 三角形基于矩形内 
-	//	 dir = 0;		// 尖角方向，0上，1右，2下，3左
-	//	 spos = 50;		// 尖角点位置0-1，中间就是0.5
-	void add_triangle(const glm::vec2& pos, const glm::vec2& size, const glm::vec2& dirspos);
-	// 折线,polygon=closed
-	void draw_polyline(const glm::vec2& pos, const glm::vec2* points, int points_count, uint32_t col, bool closed, float thickness);
-	void add_polyline(const PathsD* p, bool closed);
-	void add_polyline(const glm::vec2* p, size_t count);
-	// 渲染索引多段线，索引-1则跳过
-	void draw_polylines(const glm::vec2& pos, const glm::vec2* points, int points_count, int* idx, int idx_count, uint32_t col, float thickness);
-	// 文本渲染
-	void set_text_style(text_style* ts);
-	void add_text(text_st* p, text_style* ts);
-	void add_image(image_ptr_t* img, const glm::ivec4& rc, const glm::ivec4& sliced, uint32_t color, const glm::ivec2& dsize, const glm::ivec2& pos);
-	void add_image(image_r* r);
-	// 添加gem指针的内容。顶点坐标不受状态影响
-	void add_geometry(geometry_d* geo);
-	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
-
-	void clip();
-	void clip(const glm::ivec4& c);
-	glm::ivec4 get_clip();
-	void save();
-	void restore();
-	void save0();
-	void restore0();
-	void fill();
-	void stroke();
-	void fill_preserve();
-	void stroke_preserve();
-	void fill_stroke(uint32_t fill, uint32_t color);
-	void set_line_width(float w);
-	void set_color(uint32_t color);
-	void set_color(const glm::vec4& rgba);
-	void translate(const glm::vec2& offset);
-	void scale(float sx, float sy);
-	void scale(const glm::vec2& sc);
-	void rotate(float radians);
-	void transform(const glm::mat3x2* matrix);
-	void set_matrix(const glm::mat3x2* matrix);
-	void get_matrix(glm::mat3x2* matrix);
-	glm::vec2 get_translate();
-
-	void push_ct(uint8_t op);
-	bool is_image();
-	/*
-		rv->save();
-		rv->push_view(glm::ivec4(0, 0, ss));// 设置渲染区域
-		rv->set_line_width(border.y);
-		glm::vec2 rc = ss;
-		rc -= border.y;
-		rv->add_rect({ 0.5,0.5,rc }, border.z);
-		rv->fill_stroke(border.w, border.x);
-		rv->pop_view();
-		rv->restore();
-	*/
-	void push_view(const glm::ivec4& c, void* ptr = nullptr);
-	void pop_view();
-	void push_null(int v);
-	uint32_t get_crc();
-	uint32_t get_crc2index(size_t i);
-public:
-	void save_file(const char* fn);
-	bool load_file(const char* fn);
-private:
-
-};
 struct translate_cc
 {
 	void* surface = 0;
