@@ -271,8 +271,8 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	auto M_PI = glm::pi<float>();
 	drawctx_t dcb = get_drawctx(dctx);
 	dcb.begin_frame(dctx);
-	paths_t* path = dcb.new_paths(dctx);
-
+	paths_t* path = dcb.get_paths(dctx);
+	dcb.grid_fill(dctx, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 	dcb.rectangle(path, 0, 0, 300, 160, 10);	dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.rectangle(path, 200, 12, 300, 200, 10);
@@ -302,8 +302,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 	auto cr = vkvg_create(surf);
-	vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
-	vkvg_flush(cr);//保留原版api调用
+
 	dcb.draw(dctx, (VkvgContext)cr, nullptr);//批量执行
 	dcb.end_frame(dctx);
 #if 0

@@ -125,6 +125,7 @@ public:
 	uint32_t curVertOffset = 0;
 	uint32_t gCount = 0;		// ubo数量
 	state_save_t* t = 0;
+	paths_t* _dpath = 0;		// 默认路径缓存
 	bool is_glutess = false;
 	bool is_fence = true;
 public:
@@ -139,6 +140,7 @@ public:
 	void begin_frame();
 	void end_frame();
 	void set_glutess(bool b);
+	paths_t* get_path();
 private:
 	void poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c);
 	void _fill_non_zero(paths_t*);
@@ -8427,6 +8429,9 @@ void FIXNORMAL2F(float& VX, float& VY)
 }
 
 
+paths_t* dc_new_paths(vgdev_ctx* ctx);
+void dc_free_paths(paths_t* p);
+
 vgdev_ctx::vgdev_ctx()
 {
 	_vertex.ac = _indices.ac = ecpsd.ac = _normals.ac = &ac;
@@ -8435,10 +8440,13 @@ vgdev_ctx::vgdev_ctx()
 	_normals.reserve(128);
 	ecpsd.reserve(128);
 	cmdlist.reserve(128);
+	_dpath = dc_new_paths(this);
 }
 
 vgdev_ctx::~vgdev_ctx()
-{}
+{
+	dc_free_paths(_dpath); _dpath = 0;
+}
 
 void add_vertexf_unchecked(Vertex* pVert, float x, float y, uint32_t c)
 {
@@ -9804,6 +9812,11 @@ void vgdev_ctx::end_frame()
 
 void vgdev_ctx::set_glutess(bool b) { is_glutess = b; }
 
+paths_t* vgdev_ctx::get_path()
+{
+	return _dpath;
+}
+
 #endif
 
 
@@ -10375,6 +10388,10 @@ void dc_set_operator(vgdev_ctx* ctx, vkvg_operator_t op) {
 }
 
 
+paths_t* dc_get_paths(vgdev_ctx* ctx) {
+	return ctx ? ctx->_dpath : nullptr;
+}
+
 paths_t* dc_new_paths(vgdev_ctx* ctx) {
 	auto t = (path_pri*)ctx->ac.new_obj<path_pri>();
 	if (t)t->ctx = ctx;
@@ -10394,6 +10411,50 @@ void dc_clip0(vgdev_ctx* ctx) {
 		return;
 	ctx->clip0();
 }
+
+void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
+{
+	int x = fmod(size.x, width);
+	int y = fmod(size.y, width);
+	int xn = size.x / width;
+	int yn = size.y / width;
+	if (x > 0)xn++;
+	if (y > 0)yn++;
+	auto path = cr->get_path();
+	dc_rectangle(path, 0, 0, size.x, size.y, 0);
+	dc_clip(cr, path);
+	for (size_t i = 0; i < yn; i++)
+	{
+		auto iw = i * width;
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k0 = (j & 1);
+			bool k1 = !(j & 1);
+			auto k = !(i & 1) ? k0 : k1;
+			if (k)
+				dc_rectangle(path, j * width, iw, width, width, 0);
+		}
+	}
+	auto c = cols[0];
+	dc_set_color(cr, c);
+	dc_fill(cr, path);
+	for (size_t i = 0; i < yn; i++)
+	{
+		auto iw = i * width;
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k0 = (j & 1);
+			bool k1 = !(j & 1);
+			auto k = (i & 1) ? k0 : k1;
+			if (k)
+				dc_rectangle(path, j * width, iw, width, width, 0);
+		}
+	}
+	c = cols[1];
+	dc_set_color(cr, c);
+	dc_fill(cr, path);
+}
+
 drawctx_t get_drawctx(vgdev_ctx* p)
 {
 	drawctx_t r = {};
@@ -10411,11 +10472,11 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 		r.draw = dc_draw;
 		r.begin_frame = dc_begin_frame;
 		r.end_frame = dc_end_frame;
+		r.get_paths = dc_get_paths;
 		r.new_paths = dc_new_paths;
 		r.new_sub_path = dc_finish_path;
 		r.arc = dc_arc;
 		r.arc_negative = dc_arc_negative;
-		r.new_state = dc_new_state;
 		r.set_line_cap = dc_set_line_cap;
 		r.set_line_join = dc_set_line_join;
 		r.set_fill_rule = dc_set_fill_rule;
@@ -10427,7 +10488,7 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 		r.new_pattern_radial = dc_pattern_create_radial;
 		r.new_pattern_sweep = dc_pattern_create_sweep;
 		r.pattern_set_color_stop = dc_pattern_set_color_stop;
-
+		r.grid_fill = dc_grid_fill;
 		r.rectangle = dc_rectangle;
 		r.translate = dc_translate;
 		r.set_line_width = dc_set_line_width;

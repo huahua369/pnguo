@@ -172,7 +172,6 @@ struct drawctx_t {
 	void (*draw)(vgdev_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore);
 	void (*begin_frame)(vgdev_ctx* ctx);
 	void (*end_frame)(vgdev_ctx* ctx);
-	state_save_t* (*new_state)(vgdev_ctx* ctx);
 
 	void (*set_line_cap)(vgdev_ctx* ctx, vkvg_line_cap_t lineCap);
 	void (*set_line_join)(vgdev_ctx* ctx, vkvg_line_join_t lineJoin);
@@ -187,11 +186,14 @@ struct drawctx_t {
 	VkvgPattern(*new_pattern_sweep)(vgdev_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
 	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float r, float g, float b, float a);
 
+	paths_t* (*get_paths)(vgdev_ctx* ctx);
 	paths_t* (*new_paths)(vgdev_ctx* ctx);
 	void (*free_paths)(paths_t* ctx);
 	void (*new_sub_path)(paths_t* ctx);
 	void (*arc)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
 	void (*arc_negative)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
+
+	void (*grid_fill)(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width);
 
 	void (*translate)(vgdev_ctx* ctx, float dx, float dy);
 

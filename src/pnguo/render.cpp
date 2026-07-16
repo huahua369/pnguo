@@ -1695,19 +1695,49 @@ void vkvg_grid_fill(VkvgContext cr, glm::vec2  size, glm::ivec2 cols, int width)
 	vkvg_save(cr);
 	draw_rectangle(cr, { 0,0, size.x, size.y }, 0);
 	vkvg_clip(cr);
+	//for (size_t i = 0; i < yn; i++)
+	//{
+	//	for (size_t j = 0; j < xn; j++)
+	//	{
+	//		bool k = (j & 1);
+	//		if (!(i & 1))
+	//			k = !k;
+	//		auto c = cols[k];
+	//		draw_rectangle(cr, { j * width,i * width,width,width }, 0);
+	//		set_color(cr, c);
+	//		vkvg_fill(cr);
+	//	}
+	//}
 	for (size_t i = 0; i < yn; i++)
 	{
+		auto iw = i * width;
 		for (size_t j = 0; j < xn; j++)
 		{
-			bool k = (j & 1);
-			if (!(i & 1))
-				k = !k;
-			auto c = cols[k];
-			draw_rectangle(cr, { j * width,i * width,width,width }, 0);
-			set_color(cr, c);
-			vkvg_fill(cr);
+			bool k0 = (j & 1);
+			bool k1 = !(j & 1);
+			auto k = !(i & 1) ? k0 : k1;
+			if (k)
+				draw_rectangle(cr, { j * width,iw,width,width }, 0);
 		}
 	}
+	auto c = cols[0];
+	set_color(cr, c);
+	vkvg_fill(cr);
+	for (size_t i = 0; i < yn; i++)
+	{
+		auto iw = i * width;
+		for (size_t j = 0; j < xn; j++)
+		{
+			bool k0 = (j & 1);
+			bool k1 = !(j & 1);
+			auto k = (i & 1) ? k0 : k1;
+			if (k)
+				draw_rectangle(cr, { j * width,iw,width,width }, 0);
+		}
+	}
+	c = cols[1];
+	set_color(cr, c);
+	vkvg_fill(cr);
 	vkvg_restore(cr);
 }
 
