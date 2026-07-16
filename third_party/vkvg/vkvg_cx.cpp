@@ -10439,10 +10439,19 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 #if 1
 
 
-rvg_x::rvg_x() {}
-rvg_x::~rvg_x() {}
-void rvg_x::set_pos(const glm::ivec2& ps) {}
-void rvg_x::clear() {}
+rvg_x::rvg_x() {
+	ctx = new_vgctx();
+
+}
+rvg_x::~rvg_x()
+{
+	free_vgctx(ctx); ctx = 0;
+}
+void rvg_x::set_pos(const glm::ivec2& ps) { pos = ps; }
+void rvg_x::clear()
+{
+	pos = {};
+}
 void rvg_x::submit(fill_style_d* st) {}
 void rvg_x::submit(uint32_t fill, uint32_t color, int linewidth) {}
 // 填充网格

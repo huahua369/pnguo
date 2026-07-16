@@ -22,6 +22,7 @@ struct text_st;
 struct image_r;
 struct dblock_d;
 struct geometry_d;
+class vgdev_ctx;
 class rvg_x
 {
 public:
@@ -35,7 +36,7 @@ public:
 	};
 	glm::ivec2 pos = {};
 private:
-	hz::usp_ac* ac = 0;
+	vgdev_ctx* ctx = 0;
 	std::stack<stack_item> _stk;
 	std::stack<size_t> _st_view;
 	stack_item _cur = {};				// 当前状态
@@ -157,7 +158,6 @@ extern "C" {
 #ifdef __cplusplus 
 }
 #endif
-class vgdev_ctx;
 struct drawctx_t {
 	vgdev_ctx* ptr;
 	void (*set_glutess)(vgdev_ctx* ctx, bool enable);
