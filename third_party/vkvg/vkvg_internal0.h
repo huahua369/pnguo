@@ -1268,7 +1268,7 @@ typedef struct _vkvg_context_t {
 
 	uint32_t capPathPointCount = 0;
 	ear_clip_point* ecps = 0;
-	//vgpath_ctx* pathCtx = 0;
+	//vgdev_ctx* pathCtx = 0;
 	bool fill_rule_winding = false;
 } vkvg_context;
 

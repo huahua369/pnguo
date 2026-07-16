@@ -119,49 +119,49 @@ extern "C" {
 #ifdef __cplusplus 
 }
 #endif
-class vgpath_ctx;
+class vgdev_ctx;
 struct drawctx_t {
-	vgpath_ctx* ptr;
-	void (*set_glutess)(vgpath_ctx* ctx, bool enable);
-	void (*clip_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
-	void (*fill_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
-	void (*stroke_preserve)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
-	void (*clip)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
-	void (*clip0)(vgpath_ctx* ctx);
-	void (*fill)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
-	void (*stroke)(vgpath_ctx* ctx, paths_t* p, state_save_t* t);
+	vgdev_ctx* ptr;
+	void (*set_glutess)(vgdev_ctx* ctx, bool enable);
+	void (*clip_preserve)(vgdev_ctx* ctx, paths_t* p);
+	void (*fill_preserve)(vgdev_ctx* ctx, paths_t* p);
+	void (*stroke_preserve)(vgdev_ctx* ctx, paths_t* p);
+	void (*clip)(vgdev_ctx* ctx, paths_t* p);
+	void (*clip0)(vgdev_ctx* ctx);
+	void (*fill)(vgdev_ctx* ctx, paths_t* p);
+	void (*stroke)(vgdev_ctx* ctx, paths_t* p);
 	void (*clear_path)(paths_t* ctx);
-	void (*draw)(vgpath_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore);
-	void (*begin_frame)(vgpath_ctx* ctx);
-	void (*end_frame)(vgpath_ctx* ctx);
-	state_save_t* (*new_state)(vgpath_ctx* ctx);
+	void (*draw)(vgdev_ctx* ctx, VkvgContext ctxvg, void* waitSemaphore);
+	void (*begin_frame)(vgdev_ctx* ctx);
+	void (*end_frame)(vgdev_ctx* ctx);
+	state_save_t* (*new_state)(vgdev_ctx* ctx);
 
-	void (*set_line_cap)(state_save_t* t, vkvg_line_cap_t lineCap);
-	void (*set_line_join)(state_save_t* t, vkvg_line_join_t lineJoin);
-	void (*set_fill_rule)(state_save_t* t, vkvg_fill_rule_t fillRule);
-	void (*set_color)(state_save_t* t, uint32_t color);
-	void (*set_source_rgba)(state_save_t* t, float r, float g, float b, float a);
-	void (*set_source)(state_save_t* t, VkvgPattern pat);
-	void (*set_operator)(state_save_t* t, vkvg_operator_t op);
+	void (*set_line_cap)(vgdev_ctx* ctx, vkvg_line_cap_t lineCap);
+	void (*set_line_join)(vgdev_ctx* ctx, vkvg_line_join_t lineJoin);
+	void (*set_fill_rule)(vgdev_ctx* ctx, vkvg_fill_rule_t fillRule);
+	void (*set_color)(vgdev_ctx* ctx, uint32_t color);
+	void (*set_source_rgba)(vgdev_ctx* ctx, float r, float g, float b, float a);
+	void (*set_source)(vgdev_ctx* ctx, VkvgPattern pat);
+	void (*set_operator)(vgdev_ctx* ctx, vkvg_operator_t op);
 
-	VkvgPattern(*new_pattern_linear)(vgpath_ctx* ctx, float x0, float y0, float x1, float y1);
-	VkvgPattern(*new_pattern_radial)(vgpath_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
-	VkvgPattern(*new_pattern_sweep)(vgpath_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
+	VkvgPattern(*new_pattern_linear)(vgdev_ctx* ctx, float x0, float y0, float x1, float y1);
+	VkvgPattern(*new_pattern_radial)(vgdev_ctx* ctx, float cx0, float cy0, float radius0, float cx1, float cy1, float radius1, bool is_ellipse);
+	VkvgPattern(*new_pattern_sweep)(vgdev_ctx* ctx, float cx, float cy, float start_angle, float end_angle);
 	vkvg_status_t(*pattern_set_color_stop)(VkvgPattern pat, int idx, float r, float g, float b, float a);
 
-	paths_t* (*new_paths)(vgpath_ctx* ctx);
+	paths_t* (*new_paths)(vgdev_ctx* ctx);
 	void (*free_paths)(paths_t* ctx);
 	void (*new_sub_path)(paths_t* ctx);
 	void (*arc)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
 	void (*arc_negative)(paths_t* ctx0, float xc, float yc, float radius, float a1, float a2);
 
-	void (*translate)(state_save_t* t, float dx, float dy);
+	void (*translate)(vgdev_ctx* ctx, float dx, float dy);
 
-	void(*set_line_width)(state_save_t* t, float width);
+	void(*set_line_width)(vgdev_ctx* ctx, float width);
 	int (*rectangle)(paths_t* ctx, float x, float y, float w, float h, float r);
 };
 
-vgpath_ctx* new_vgctx();
-void free_vgctx(vgpath_ctx* p);
-drawctx_t get_drawctx(vgpath_ctx* p);
+vgdev_ctx* new_vgctx();
+void free_vgctx(vgdev_ctx* p);
+drawctx_t get_drawctx(vgdev_ctx* p);
 
