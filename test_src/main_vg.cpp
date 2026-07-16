@@ -273,8 +273,10 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.begin_frame(dctx);
 	paths_t* path = dcb.get_paths(dctx);
 	dcb.grid_fill(dctx, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
-	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
-	dcb.rectangle(path, 0, 0, 300, 160, 10);	dcb.clip(dctx, path);// 圆角矩形裁剪
+	//dcb.clip0(dctx);
+	//dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
+	dcb.rectangle(path, 0, 0, 300, 160, 10);	
+	dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.rectangle(path, 200, 12, 300, 200, 10);
 	dcb.set_line_width(dctx, 6);	dcb.set_source_rgba(dctx, 0, 0.51, 1, 1);
 

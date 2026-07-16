@@ -10421,8 +10421,8 @@ void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	if (x > 0)xn++;
 	if (y > 0)yn++;
 	auto path = cr->get_path();
-	dc_rectangle(path, 0, 0, size.x, size.y, 0);
-	dc_clip(cr, path);
+	//dc_rectangle(path, 0, 0, size.x, size.y, 0);
+	//dc_clip(cr, path);
 	for (size_t i = 0; i < yn; i++)
 	{
 		auto iw = i * width;
