@@ -272,11 +272,14 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	drawctx_t dcb = get_drawctx(dctx);
 	dcb.begin_frame(dctx);
 	paths_t* path = dcb.get_paths(dctx);
-	dcb.grid_fill(dctx, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
+	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 	//dcb.clip0(dctx);
-	//dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
-	dcb.rectangle(path, 0, 0, 300, 160, 10);	
-	dcb.clip(dctx, path);// 圆角矩形裁剪
+	//dcb.rectangle(path, 200, 0, 300, 200, 10);
+	//dcb.clip(dctx, path);// 圆角矩形裁剪
+	dcb.grid_fill(dctx, surfsize, glm::ivec2(-1, 0xffdfdfdf), 20);
+	dcb.clip0(dctx);	// 取消所有裁剪
+	//dcb.rectangle(path, 0, 0, 300, 160, 10);
+	//dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.rectangle(path, 200, 12, 300, 200, 10);
 	dcb.set_line_width(dctx, 6);	dcb.set_source_rgba(dctx, 0, 0.51, 1, 1);
 
@@ -295,7 +298,11 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_EVEN_ODD);
 	dcb.set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb.fill_preserve(dctx, path);//填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
-	dcb.clip0(dctx);	// 取消所有裁剪
+
+
+	//dcb.clip0(dctx);	// 取消所有裁剪
+	dcb.rectangle(path, 20, 150, 200, 100, 10);
+	dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.set_line_width(dctx, 6);	dcb.translate(dctx, 0, 128);
 	dcb.rectangle(path, 12, 12, 232, 70, 0);
 	dcb.new_sub_path(path); dcb.arc(path, 64, 64, 40, 0, 2 * M_PI);

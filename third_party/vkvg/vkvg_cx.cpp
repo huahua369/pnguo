@@ -797,7 +797,9 @@ void _init_ctx(VkvgContext ctx) {
 	ctx->timelineStep = 0;
 #endif
 	auto cx = (vkvg_context*)ctx;
+	auto dpc = vkCmdPushDescriptorSet;
 	cx->_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetDeviceProcAddr(cx->dev->vkDev, "vkCmdPushDescriptorSet");
+	if (!cx->_vkCmdPushDescriptorSet)cx->_vkCmdPushDescriptorSet = (PFN_vkCmdPushDescriptorSet)vkGetInstanceProcAddr(cx->dev->instance, "vkCmdPushDescriptorSet");
 	// Get device push descriptor properties (to display them)
 	PFN_vkGetPhysicalDeviceProperties2 _vkGetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>(vkGetInstanceProcAddr(cx->dev->instance, "vkGetPhysicalDeviceProperties2"));
 	if (cx->_vkCmdPushDescriptorSet && _vkGetPhysicalDeviceProperties2) {
@@ -8879,7 +8881,7 @@ void vgdev_ctx::poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c) {
 					continue;
 				// bounds are computed here to scissor the painting operation
 				// that speed up fill drastically.
-				vkvg_matrix_transform_point(&ctx->t->pushConsts.mat, &v.pos.x, &v.pos.y);
+				vkvg_matrix_transform_point(&c.state->pushConsts.mat, &v.pos.x, &v.pos.y);
 				if (v.pos.x < bounds->xMin)
 					bounds->xMin = v.pos.x;
 				if (v.pos.x > bounds->xMax)
@@ -9657,7 +9659,7 @@ void dc_start_cmd_for_render_pass0(VkvgContext ctx) {
 	CmdSetScissor(ctx->cmd, 0, 1, &ctx->bounds);
 
 	VkDescriptorSet dss[] = { ctx->dsFont, ctx->dsSrc, ctx->dsGrad };
-	CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
+	//CmdBindDescriptorSets(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelineLayout, 0, 3, dss, 0, NULL);
 
 	VkDeviceSize offsets[1] = { 0 };
 	CmdBindVertexBuffers(ctx->cmd, 0, 1, &ctx->vertices.buffer, offsets);
@@ -9668,6 +9670,7 @@ void dc_start_cmd_for_render_pass0(VkvgContext ctx) {
 	_bind_draw_pipeline(ctx);
 	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 	ctx->cmdStarted = true;
+	push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
 }
 void _end_render_pass0(VkvgContext ctx) {
 	LOG(VKVG_LOG_INFO, "END RENDER PASS: ctx = %p;\n", ctx);
@@ -9725,6 +9728,9 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 				bind_draw_pipeline(ctx, it.state);
 				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
 			}
+			if (!ctx->cmdStarted)
+				ctx->cmdStarted = true;
+			push_update_descriptor_set_a(ctx, ctx->d_img, ctx->d_offset);
 		}
 		break;
 		case 1:
@@ -9735,6 +9741,13 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 		break;
 		case 2:
 		{// 裁剪
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
+#endif
+			auto cs = clearStencil;
+			cs.clearValue.depthStencil.stencil = 0;
+			vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
+
 			if (it.vc > 0 || it.index.y > 0) {
 				if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
@@ -9755,11 +9768,14 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_FILL_BIT);
 				CmdSetStencilWriteMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_ALL_BIT);
 				cmd_draw_full_screen_quad(ctx, &it, NULL);
-				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+				ctx->curClipState = vkvg_clip_state_clip;
 			}
 			else {
-				vkCmdClearAttachments(ctx->cmd, 1, &clearStencil, 1, &ctx->clearRect);
 			}
+			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
+#if defined(DEBUG) && defined(VKVG_DBG_UTILS)
+			vkh_cmd_label_end(ctx->cmd);
+#endif
 		}
 		break;
 		}
