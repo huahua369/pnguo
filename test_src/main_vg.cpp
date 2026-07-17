@@ -308,6 +308,21 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.set_glutess(dctx, true);	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
 	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
+	dcb.translate(dctx, 0, -128);
+	dcb.clip0(dctx);
+	dcb.translate(dctx, 300, 0);
+	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
+	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
+	vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
+	vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
+	vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
+	vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
+	dcb.set_source(dctx, sg);
+	//dcb.rectangle(path, 0, 0, 256, 256, 0);
+	dcb.arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
+	dcb.fill(dctx, path);
+
+
 	auto cr = vkvg_create(surf);
 
 	dcb.draw(dctx, (VkvgContext)cr, nullptr);//批量执行

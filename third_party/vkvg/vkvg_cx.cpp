@@ -9786,6 +9786,7 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 	if (ctx->dev->deferredResolve)
 		dc_explicit_ms_resolve(ctx->cmd, ctx->pSurf);
 	vkh_cmd_end(ctx->cmd);
+	ctx->pattern = 0;
 	if (!ctx->cmdStarted) // current cmd buff is empty, be aware that wait is also canceled!!
 		return;
 	if (is_fence)
