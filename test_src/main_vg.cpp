@@ -299,8 +299,6 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.set_source_rgba(dctx, 0, 0.7, 0, 1);	dcb.fill_preserve(dctx, path);//填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 
-
-	//dcb.clip0(dctx);	// 取消所有裁剪
 	dcb.rectangle(path, 20, 150, 200, 100, 10);
 	dcb.clip(dctx, path);// 圆角矩形裁剪
 	dcb.set_line_width(dctx, 6);	dcb.translate(dctx, 0, 128);
