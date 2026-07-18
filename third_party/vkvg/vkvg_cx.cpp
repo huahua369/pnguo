@@ -126,13 +126,17 @@ public:
 	uint32_t gCount = 0;		// ubo数量
 	state_save_t* t = 0;
 	paths_t* _dpath = 0;		// 默认路径缓存
+	std::stack<state_save_t*> _cst;	// 保存栈
 	bool is_glutess = false;
 	bool is_fence = true;
 public:
 	vgdev_ctx();
 	~vgdev_ctx();
 
+	void save();
+	void restore();
 	void clip0();
+	void clip(const glm::ivec4* rc);
 	void clip_preserve(paths_t* ctx);
 	void fill_preserve(paths_t* p);
 	void stroke_preserve(paths_t* p);
@@ -141,6 +145,7 @@ public:
 	void end_frame();
 	void set_glutess(bool b);
 	paths_t* get_path();
+	state_save_t* cp_save(state_save_t* src);
 private:
 	void poly_fill(paths_t* ctx, vec4* bounds, cmd_t& c);
 	void _fill_non_zero(paths_t*);
@@ -8433,6 +8438,7 @@ void FIXNORMAL2F(float& VX, float& VY)
 
 paths_t* dc_new_paths(vgdev_ctx* ctx);
 void dc_free_paths(paths_t* p);
+void dc_clear_path(paths_t* ctx);
 
 vgdev_ctx::vgdev_ctx()
 {
@@ -8448,6 +8454,17 @@ vgdev_ctx::vgdev_ctx()
 vgdev_ctx::~vgdev_ctx()
 {
 	dc_free_paths(_dpath); _dpath = 0;
+}
+
+void vgdev_ctx::save()
+{
+	auto ss = cp_save(t);
+	_cst.push(ss);
+}
+
+void vgdev_ctx::restore()
+{
+
 }
 
 void add_vertexf_unchecked(Vertex* pVert, float x, float y, uint32_t c)
@@ -8504,6 +8521,18 @@ void vgdev_ctx::clip0()
 	v.pos = { -1,3 };
 	_vertex.push_back(v);
 	cmdlist.push_back(c);
+}
+
+void vgdev_ctx::clip(const glm::ivec4* rc)
+{
+	if (rc)
+	{
+		cmd_t c = {};
+		c.type = 2;
+		c.bounds = vec4{ (float)rc->x, (float)rc->y, (float)rc->z, (float)rc->w };
+		t->clip_idx = cmdlist.size();
+		cmdlist.push_back(c);
+	}
 }
 
 
@@ -8922,6 +8951,22 @@ void vgdev_ctx::cp_cmdt(cmd_t* c, state_save_t* t)
 			memcpy(c->state->dashes, t->dashes, sizeof(float) * t->dashCount);
 		else
 			c->state->dashCount = 0;
+	}
+}
+state_save_t* vgdev_ctx::cp_save(state_save_t* src)
+{
+	state_save_t* dst = (state_save_t*)ac.allocate(sizeof(state_save_t) * 1);
+	if (!dst)return dst;
+	if (src)
+		*dst = *src;
+	else
+		*dst = {};
+	if (src->dashes && src->dashCount > 0) {
+		dst->dashes = (float*)ac.allocate(sizeof(float) * src->dashCount);
+		if (dst->dashes)
+			memcpy(dst->dashes, src->dashes, sizeof(float) * src->dashCount);
+		else
+			dst->dashCount = 0;
 	}
 }
 void vgdev_ctx::fill_preserve(paths_t* ctx)
@@ -9683,6 +9728,21 @@ void dc_update_push_constants(VkvgContext ctx, state_save_t* t) {
 		, &t->pushConsts);
 }
 
+void dc_scissor(VkvgContext ctx, vec4* scissor) {
+	if (ctx)
+	{
+		VkRect2D r = ctx->bounds;
+		if (scissor)
+		{
+			int w = scissor->x < 0 ? scissor->width + scissor->x : scissor->width;
+			int h = scissor->y < 0 ? scissor->height + scissor->y : scissor->height;
+			r.offset = { (int32_t)MAX(scissor->x, 0), (int32_t)MAX(scissor->y, 0) };
+			r.extent = { (uint32_t)MAX(w, 1), (uint32_t)MAX(h, 1) };
+		}
+		CmdSetScissor(ctx->cmd, 0, 1, &r);
+	}
+}
+
 void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
@@ -9747,8 +9807,11 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 			auto cs = clearStencil;
 			cs.clearValue.depthStencil.stencil = 0;
 			vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
-
-			if (it.vc > 0 || it.index.y > 0) {
+			int bw = it.bounds.width; int bh = it.bounds.height;
+			if (bw != 0 && bh != 0) {
+				dc_scissor(ctx, bw < 0 || bh < 0 ? nullptr : &it.bounds);
+			}
+			else if (it.vc > 0 || it.index.y > 0) {
 				if (t && t->curFillRule == VKVG_FILL_RULE_EVEN_ODD) {
 					CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipelinePolyFill);
 					for (size_t i = 0; i < it.vc; i++)
@@ -9818,6 +9881,7 @@ void vgdev_ctx::begin_frame()
 	_indices.clear();
 	cmdlist.clear();
 	t = dc_new_state(this);
+	dc_clear_path(_dpath);
 }
 
 void vgdev_ctx::end_frame()
@@ -10469,7 +10533,7 @@ void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
 	}
 	c = cols[1];
 	dc_set_color(cr, c);
-	dc_fill(cr, path); 
+	dc_fill(cr, path);
 }
 
 drawctx_t get_drawctx(vgdev_ctx* p)
@@ -10529,11 +10593,14 @@ void rvg_x::set_pos(const glm::ivec2& ps) { pos = ps; }
 void rvg_x::clear()
 {
 	pos = {};
+	ctx->begin_frame();
 }
 void rvg_x::submit(fill_style_d* st) {}
 void rvg_x::submit(uint32_t fill, uint32_t color, int linewidth) {}
 // 填充网格
-void rvg_x::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width) {}
+void rvg_x::grid_fill(const glm::vec2& size, const glm::ivec2& cols, int width) {
+	dc_grid_fill(ctx, size, cols, width);
+}
 // 线性渐变填充
 void rvg_x::linear_fill(const glm::vec2& size, const glm::vec4* cols, int count) {}
 // 画2d箭头type=0线终点在三角形中间

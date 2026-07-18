@@ -1465,6 +1465,7 @@ struct state_save_t {
 	uint32_t			curColor;
 	VkvgPattern			pattern;
 	vkvg_clip_state_t	clippingState;
+	int					clip_idx = -1;		// 裁剪的命令索引,小于0无
 	uint32_t			references = 1;
 	bool aa = true;
 };

@@ -527,11 +527,14 @@ void testgui() {
 	};
 	auto appx = new app_x();
 	std::shared_ptr<app_x> spappx(appx);
-	appx->init(false);
+	bool has3d = true;
+	appx->init(has3d);
 	glm::ivec2 ws = dpis[4];// { 1280, 860 };
 	const char* wtitle = (char*)u8"窗口0";
 	form_x* form0 = (form_x*)new_form(appx->app, wtitle, ws.x, ws.y, -1, -1, ef_vulkan | ef_resizable);
 	appx->app->main = form0;
+	auto view = appx->view;
+	auto pcb = view->pcb;
 	if (appx->vkd)
 	{
 		auto rmd = hz::read_json("data/vksample.json");
@@ -584,10 +587,15 @@ void testgui() {
 
 		appx->vkd->resize({ 1024,720 });				// 设置fbo缓冲区大小
 		auto vki = appx->vkd->get_vkimage(0);	// 获取fbo纹理弄到窗口显示 nullptr;//
+
+		{
+			void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
+			pcb->set_texture_blend(tex3d, 0, 0);
+			appx->dtex3d = tex3d;
+			appx->rc3d = { 0,0,vki.size.x, vki.size.y };
+		}
 	}
 
-	auto view = appx->view;
-	auto pcb = view->pcb;
 	//dom_cx* dom0 = view->get_dom(form0);
 	glm::ivec2 surfsize = { 260 * 3,256 };
 	VkvgSurface surf = view->_vgdev->new_surface(surfsize.x, surfsize.y);
@@ -894,12 +902,6 @@ void testgui() {
 
 	//dvv->add_widget(r);
 
-	//{
-	//	void* tex3d = pcb->new_texture_vk(form0->renderer, vki.size.x, vki.size.y, vki.vkimage, 0);// 创建SDL的rgba纹理 
-	//	pcb->set_texture_blend(tex3d, 0, 0);
-	//	appx->dtex3d = tex3d;
-	//	appx->rc3d = { 0,0,vki.size.x, vki.size.y };
-	//}
 		auto ibtn = new image_btn();
 		if (ibtn) {
 			ibtn->set_surface(surf, surfsize.x, surfsize.y);
@@ -939,6 +941,7 @@ void testgui() {
 	size_t frame_count = 0;
 	appx->app->set_fps(60);
 	appx->fpslab = fpslab;
+
 	do {
 		frame_count = appx->run();
 		//draw_vgtest(surf, img, surfsize);

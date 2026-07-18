@@ -59,6 +59,9 @@ namespace hz {
 		usp_ac() {}
 		~usp_ac() {}
 	public:
+		void* allocate(const size_t _Bytes, const size_t align = 0) {
+			return  _alloc.allocate(_Bytes, align > 0 ? align : _Align);
+		}
 		void* new_mem(size_t n)
 		{
 			n = std::max((size_t)1, n);
