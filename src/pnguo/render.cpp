@@ -3596,6 +3596,8 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 					//vkvg_clear_rect((VkvgContext)ctx, vv.rc.x, vv.rc.y, vv.rc.z, vv.rc.w);
 					vkvg_save(ctx);
 					vkvg_translate(ctx, tcc.apos.x, tcc.apos.y);
+					//draw_rectangle(ctx, { 0,0, tcc.clips.x, tcc.clips.y }, 0);
+					//vkvg_clip(ctx);
 				}
 				stt.push(tcc);
 			}

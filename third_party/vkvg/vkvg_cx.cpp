@@ -9742,7 +9742,24 @@ void dc_scissor(VkvgContext ctx, vec4* scissor) {
 		CmdSetScissor(ctx->cmd, 0, 1, &r);
 	}
 }
+void dc_clear(VkvgContext ctx) {
+	if (vkvg_status(ctx))
+		return;
 
+	RECORD(ctx, VKVG_CMD_CLEAR);
+
+	if (_get_previous_clip_state(ctx) == vkvg_clip_state_clear)
+		ctx->curClipState = vkvg_clip_state_none;
+	else
+		ctx->curClipState = vkvg_clip_state_clear; 
+	if (!ctx->cmdStarted) {
+		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
+		dc_start_cmd_for_render_pass(ctx);
+		return;
+	}
+	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
+	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
+}
 void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
@@ -9760,7 +9777,7 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 		ResetCommandBuffer(ctx->cmd, 0);
 	}
 	ctx->cmdStarted = false;
-	dc_start_cmd_for_render_pass(ctx);
+	dc_clear(ctx);
 	for (auto& it : cmdlist)
 	{
 		auto t = it.state;
@@ -9906,7 +9923,7 @@ void vkvg_clear_rect(VkvgContext ctx, int x, int y, int width, int height) {
 	if (vkvg_status(ctx))
 		return;
 	if (!ctx->cmdStarted) {
-		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass;
+		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearStencil;
 		// force run of one renderpass (even empty) to perform clear load op
 		_start_cmd_for_render_pass(ctx);
 	}
