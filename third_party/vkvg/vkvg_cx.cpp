@@ -9751,7 +9751,7 @@ void dc_clear(VkvgContext ctx) {
 	if (_get_previous_clip_state(ctx) == vkvg_clip_state_clear)
 		ctx->curClipState = vkvg_clip_state_none;
 	else
-		ctx->curClipState = vkvg_clip_state_clear; 
+		ctx->curClipState = vkvg_clip_state_clear;
 	if (!ctx->cmdStarted) {
 		ctx->renderPassBeginInfo.renderPass = ctx->dev->renderPass_ClearAll;
 		dc_start_cmd_for_render_pass(ctx);
@@ -9821,9 +9821,6 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 			vkh_cmd_label_start(ctx->cmd, "clip", DBG_LAB_COLOR_CLIP);
 #endif
-			auto cs = clearStencil;
-			cs.clearValue.depthStencil.stencil = 0;
-			vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
 			int bw = it.bounds.width; int bh = it.bounds.height;
 			if (bw != 0 && bh != 0) {
 				dc_scissor(ctx, bw < 0 || bh < 0 ? nullptr : &it.bounds);
@@ -9851,6 +9848,9 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 				ctx->curClipState = vkvg_clip_state_clip;
 			}
 			else {
+				auto cs = clearStencil;
+				cs.clearValue.depthStencil.stencil = 0;
+				vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
 			}
 			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)

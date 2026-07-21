@@ -97,7 +97,7 @@ void draw_path_vkvg(VkvgContext cr, T* p, style_path_t* st)
 	auto t = p->v;
 	bool stroke = false;
 	vkvg_save(cr);
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
 	glm::vec2 pos, scale;
 	pos += st->pos;
 	pos.x += p->x;
@@ -590,11 +590,13 @@ vkvg_dev* new_vkvgdev(dev_info_c* c, int sc)
 			break;
 		}
 	}
+	bool deferredResolve = true;
 	VkDevice vkdev = c->vkdev;
 	for (; i < sv.size(); i++)
 	{
 		auto it = sv[i];
-		vkvg_device_create_info_t info = { it, true ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
+		vkvg_device_create_info_t info = { it, false ,c->inst, c->phy, c->vkdev, c->qFamIdx,c->qIndex,false };
+		info.deferredResolve = deferredResolve;
 		dev = vkvg_device_create(&info);
 
 		if (dev)
@@ -693,7 +695,7 @@ void vkvgtest(form_x* pw) {
 			auto kc = vx->fun;
 			kc->vkvg_clear(ctx);
 			kc->vkvg_save(ctx);
-			kc->vkvg_set_fill_rule(ctx, VKVG_FILL_RULE_EVEN_ODD);
+			kc->vkvg_set_fill_rule(ctx, VKVG_FILL_RULE_NON_ZERO);
 			kc->vkvg_move_to(ctx, 10.0, 10.0);
 			kc->vkvg_line_to(ctx, 150.0, 120.0);
 			kc->vkvg_line_to(ctx, 120.0, 220.0);
@@ -1193,7 +1195,7 @@ void vgc_draw_path(void* ctx, path_d* path, fill_style_d* style)
 	auto t = path->v;
 	bool stroke = false;
 	vkvg_save(cr);
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
 	glm::vec2 pos, scale = {};
 	pos += path->pos;
 	if (path->flip_y)
@@ -1308,7 +1310,7 @@ void vgc_draw_block(void* ctx, dblock_d* p, fill_style_d* style)
 	if (!ctx || !p || !p->points || p->count == 0 || p->rc.x <= 0 || p->rc.y < 0 || !style)return;
 	auto cr = (VkvgContext)ctx;
 	vkvg_save(cr);
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
 	if (p->scale_pos > 0)
 	{
 		auto sp = p->scale_pos;
@@ -2594,7 +2596,7 @@ size_t cmd_op_draw_block(uint8_t* d, VkvgContext ctx) {
 	auto n = sizeof(dblock_d) + sizeof(glm::vec2) * p->count;
 	if (!ctx || !p->points || p->count == 0 || p->rc.x <= 0 || p->rc.y < 0)return n;
 	auto cr = (VkvgContext)ctx;
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
 	if (p->scale_pos > 0)
 	{
 		auto sp = p->scale_pos;
@@ -2644,7 +2646,7 @@ size_t cmd_op_draw_path(uint8_t* d, VkvgContext ctx)
 	auto t = path->v;
 	bool stroke = false;
 	//vkvg_save(cr);
-	//vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
+	//vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
 	glm::vec2 pos, scale = {};
 	pos += path->pos;
 	if (path->flip_y)
@@ -3588,16 +3590,12 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 				auto& dstv = dst->dst_data.back();
 				dstv.view = vv;
 				lpos = vv.pos;
-				//tcc.ctx = ctx_begin(tcc.surface);
 				tcc.ptr = vv.ptr;
 				if (tcc.ctx)
 				{
 					auto ctx = (VkvgContext)tcc.ctx;
-					//vkvg_clear_rect((VkvgContext)ctx, vv.rc.x, vv.rc.y, vv.rc.z, vv.rc.w);
 					vkvg_save(ctx);
 					vkvg_translate(ctx, tcc.apos.x, tcc.apos.y);
-					//draw_rectangle(ctx, { 0,0, tcc.clips.x, tcc.clips.y }, 0);
-					//vkvg_clip(ctx);
 				}
 				stt.push(tcc);
 			}
@@ -3615,9 +3613,7 @@ void build_vg(rvg_data_cx* dst, drawable_cx* dra)
 				if (tcc.ctx)
 				{
 					auto ctx = (VkvgContext)tcc.ctx;
-					//vkvg_translate(ctx, -tcc.apos.x, -tcc.apos.y);
 					vkvg_restore(ctx);
-					//ctx_end(tcc.ctx);
 				}
 			}
 			continue;

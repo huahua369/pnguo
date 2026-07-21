@@ -30,6 +30,7 @@ _stroke_preserve
 #define red   1, 0, 0
 #define green 0, 1, 0
 #define blue  0, 0, 1
+#define yellow 0.5,0.25,0
 
 void test_vkvg(const char* fn, dev_info_c* dc)
 {
@@ -270,9 +271,13 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	//free_vgctx(dctx);
 	auto M_PI = glm::pi<float>();
 	drawctx_t dcb = get_drawctx(dctx);
+	auto cr = vkvg_create(surf);
+
+#if 1
 	dcb.begin_frame(dctx);
 	paths_t* path = dcb.get_paths(dctx);
 	dcb.set_fill_rule(dctx, VKVG_FILL_RULE_NON_ZERO);
+	/*
 	//dcb.clip0(dctx);
 	//dcb.rectangle(path, 200, 0, 300, 200, 10);
 	//dcb.clip(dctx, path);// 圆角矩形裁剪
@@ -321,145 +326,46 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	//dcb.rectangle(path, 0, 0, 256, 256, 0);
 	dcb.arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
 	dcb.fill(dctx, path);
+	*/
 
-
-	auto cr = vkvg_create(surf);
+	dcb.set_color(dctx, 0xff0020ff);
+	dcb.rectangle(path, 5, 5, 100, 100, 0);
+	dcb.clip(dctx, path);
+	dcb.rectangle(path, 0, 0, 256, 256, 0);
+	dcb.fill(dctx, path);
+	dcb.clip0(dctx);
+	dcb.rectangle(path, 60, 60, 60, 100, 0);
+	dcb.clip(dctx, path);
+	dcb.set_color(dctx, 0xffff8000);
+	dcb.set_line_width(dctx, 10);
+	dcb.rectangle(path, 90, 90, 60, 60, 0);
+	dcb.stroke(dctx, path);
+	dcb.translate(dctx, 260, 0);
+	dcb.set_color(dctx, 0xffff8000);
+	dcb.arc(path, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
+	//vkvg_rectangle(cr, 0, 0, 256, 256);
+	dcb.fill(dctx, path);
 
 	dcb.draw(dctx, (VkvgContext)cr, nullptr);//批量执行
 	dcb.end_frame(dctx);
-#if 0
-	//vkvg_rounded_rectangle(cr, 10, 10, 300, 200, 10);
-	//vkvg_set_source_color(cr, 0xff11f111);
-	//vkvg_set_line_width(cr, 1);
-	//vkvg_stroke(cr);
-	//vkvg_grid_fill(cr, surfsize, glm::ivec2(-1, -1), 20);
-	if (img) {
-		//vkvg_rectangle(cr, 10, 10, surfsize.x * 0.5, surfsize.y * 0.5);
-		//vkvg_clip(cr);
-		auto pattern = vkvg_pattern_create_for_surface(img);
-		vkvg_pattern_set_extend(pattern, VKVG_EXTEND_NONE);
-		vkvg_matrix_t   matrix;
-		float w = vkvg_surface_get_width(img), h = vkvg_surface_get_height(img);
-		vkvg_matrix_init_scale(&matrix, w / 128.0, h / 128.0);
-		vkvg_pattern_set_matrix(pattern, &matrix);
-		vkvg_set_source(cr, pattern);
-		vkvg_rectangle(cr, 0, 0, 128, 128);
-		vkvg_set_opacity(cr, 0.2);
-		//vkvg_paint(cr);
-		vkvg_set_opacity(cr, 1.0);
-		vkvg_pattern_destroy(pattern);
-	}
-	vkvg_translate(cr, 126, 0);
-	vkvg_translate(cr, 0, 30);
+#else 
 	vkvg_set_source_color(cr, 0xff0020ff);
-	vkvg_select_font_face(cr, "Consolas");
-	vkvg_set_font_size(cr, 26);
-	//vkvg_show_text(cr, "abcd0gyl");
-	vkvg_translate(cr, 0, -30);
-	VkvgPattern pat;
-	pat = vkvg_pattern_create_linear(0.0, 0.0, 0.0, 256.0);
-	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 1, 0);// 蓝
-	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
-	vkvg_rectangle(cr, 0, 0, 128, 256);
-	vkvg_set_source(cr, pat);
+	vkvg_rectangle(cr, 5, 5, 100, 100);
+	vkvg_clip(cr);
+	vkvg_rectangle(cr, 0, 0, 256, 256);
 	vkvg_fill(cr);
-	vkvg_pattern_destroy(pat);
-	pat = vkvg_pattern_create_linear(0.0, 128.0, 256, 256.0);
-	//vkvg_pattern_set_rotate(pat, 179);
-
-	vkvg_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);// 预乘后蓝
-	vkvg_pattern_add_color_stop_rgba(pat, 1, 1, 0, 0, 1);// 红
-	vkvg_rectangle(cr, 130, 0, 256, 256);
-	vkvg_set_source(cr, pat);
-	//vkvg_fill(cr); 
+	vkvg_reset_clip(cr);
+	vkvg_rectangle(cr, 60, 60, 60, 80);
+	vkvg_clip(cr);
+	vkvg_set_source_color(cr, 0xffff8000);
 	vkvg_set_line_width(cr, 10);
+	vkvg_rectangle(cr, 90, 90, 60, 60);
 	vkvg_stroke(cr);
-	vkvg_pattern_destroy(pat);
 	vkvg_translate(cr, 260, 0);
-	//pat = vkvg_pattern_create_radial(128, 128, 25.6, 128, 128, 128.0, true);
-	//vkvg_pattern_add_color_stop(pat, 0, 1, .51, .1, 0.81);
-	//vkvg_pattern_add_color_stop(pat, 0.50, red, 1);
-	//vkvg_pattern_add_color_stop(pat, 1, 1, 0.5, 0, 0.0);
-	//vkvg_pattern_set_extend(pat, VKVG_EXTEND_REPEAT);
-	pat = vkvg_pattern_create_radial(116, 102, 25, 102, 102, 128.0);
-	vkvg_pattern_add_color_stop_rgba(pat, 0, 1, 1, 1, 1);
-	vkvg_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 1);
-	vkvg_set_source(cr, pat);
-	//vkvg_set_source_color(cr, 0xffff8000);
+	vkvg_set_source_color(cr, 0xffff8000);
 	vkvg_arc(cr, 128.0, 128.0, 76.8, 0, 2 * glm::pi<float>());
 	//vkvg_rectangle(cr, 0, 0, 256, 256);
 	vkvg_fill(cr);
-	vkvg_pattern_destroy(pat);
-
-	vkvg_translate(cr, 260, 0);
-#define yellow 0.5,0.25,0
-	int sgw = 3;
-	VkvgPattern sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-	vkvg_pattern_add_color_stop(sg, 0.0, yellow, 1);
-	float xf = 1.0 / (sgw * 2.0);
-	float txf = xf;
-	for (size_t i = 0; i < sgw; i++)
-	{
-		vkvg_pattern_add_color_stop(sg, txf, 1, 0.5, 0, 1);
-		txf += xf;
-		vkvg_pattern_add_color_stop(sg, txf, yellow, 1);
-		txf += xf;
-	}
-	//vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
-	//vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
-	//vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
-	//vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
-	//vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
-
-	vkvg_set_source(cr, sg);
-	//vkvg_rectangle(cr, 0, 0, 256, 256);
-	vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-	vkvg_fill(cr);
-	vkvg_pattern_destroy(sg);
-	vkvg_translate(cr, -300, 0);
-
-	sg = vkvg_pattern_create_sweep(128, 128, 0, 2);
-	vkvg_pattern_add_color_stop(sg, 0.0, white, 1);
-	vkvg_pattern_add_color_stop(sg, 0.25, red, 1);
-	vkvg_pattern_add_color_stop(sg, 0.50, green, 1);
-	vkvg_pattern_add_color_stop(sg, 0.75, blue, 1);
-	vkvg_pattern_add_color_stop(sg, 1.00, white, 1);
-	vkvg_set_source(cr, sg);
-	//vkvg_rectangle(cr, 0, 0, 256, 256);
-	vkvg_arc(cr, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
-	vkvg_fill(cr);
-	vkvg_pattern_destroy(sg);
-
-	vkvg_translate(cr, -300, 0);
-	vkvg_set_line_width(cr, 6);
-
-
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
-	vkvg_rounded_rectangle(cr, 200, 12, 300, 200, 10);
-	vkvg_set_line_width(cr, 6);
-	vkvg_set_source_rgba(cr, 1, 1, 1, 1);
-	vkvg_fill_preserve(cr);
-	vkvg_set_source_rgba(cr, 1, 0.5, 0, 1);
-	vkvg_stroke(cr);
-
-	M_PI = glm::pi<float>();
-	vkvg_rectangle(cr, 12, 12, 232, 70);
-	vkvg_new_sub_path(cr); vkvg_arc(cr, 64, 64, 40, 0, 2 * M_PI);
-	vkvg_new_sub_path(cr); vkvg_arc_negative(cr, 192, 64, 40, 0, -2 * M_PI);
-
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_EVEN_ODD);
-	vkvg_set_source_rgb(cr, 0, 0.7, 0); vkvg_fill_preserve(cr);
-	vkvg_set_source_rgb(cr, 0, 0, 0); vkvg_stroke(cr);
-
-	vkvg_translate(cr, 0, 128);
-	vkvg_rectangle(cr, 12, 12, 232, 70);
-	vkvg_new_sub_path(cr); vkvg_arc(cr, 64, 64, 40, 0, 2 * M_PI);
-	vkvg_new_sub_path(cr); vkvg_arc_negative(cr, 192, 64, 40, 0, -2 * M_PI);
-	vkvg_set_glutess(cr, true);
-	vkvg_set_fill_rule(cr, VKVG_FILL_RULE_NON_ZERO);
-	vkvg_set_source_rgb(cr, 0, 0, 0.9); vkvg_fill_preserve(cr);
-	vkvg_set_source_rgb(cr, 0, 0, 0); vkvg_stroke(cr);
-
 
 	vkvg_flush(cr);
 	vkvg_surface_resolve(surf);//msaa采样转换输出
