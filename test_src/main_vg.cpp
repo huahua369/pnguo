@@ -334,8 +334,10 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.rectangle(path, 0, 0, 256, 256, 0);
 	dcb.fill(dctx, path);
 	dcb.clip0(dctx);
-	dcb.rectangle(path, 60, 60, 60, 100, 0);
-	dcb.clip(dctx, path);
+	//dcb.rectangle(path, 60, 60, 60, 100, 0);
+	float rc[4] = { 60, 60, 60, 100 };
+	dcb.clip_rc(dctx, rc);
+	//dcb.clip(dctx, path);
 	dcb.set_color(dctx, 0xffff8000);
 	dcb.set_line_width(dctx, 10);
 	dcb.rectangle(path, 90, 90, 60, 60, 0);

@@ -8510,16 +8510,16 @@ void vgdev_ctx::clip0()
 {
 	cmd_t c = {};
 	c.type = 2;
-	c.full_screen_quad = _vertex.size();
-	Vertex v = {};
-	v.pos = { -1,-1 };
-	v.color = -1;
-	v.uv.z = -1;
-	_vertex.push_back(v);
-	v.pos = { 3,-1 };
-	_vertex.push_back(v);
-	v.pos = { -1,3 };
-	_vertex.push_back(v);
+	//c.full_screen_quad = _vertex.size();
+	//Vertex v = {};
+	//v.pos = { -1,-1 };
+	//v.color = -1;
+	//v.uv.z = -1;
+	//_vertex.push_back(v);
+	//v.pos = { 3,-1 };
+	//_vertex.push_back(v);
+	//v.pos = { -1,3 };
+	//_vertex.push_back(v);
 	cmdlist.push_back(c);
 }
 
@@ -10035,6 +10035,20 @@ void dc_clear_path(paths_t* ctx) {
 	pri->simpleConvex = false;
 }
 
+void dc_clip_rc(vgdev_ctx* ctx, float* rc) {
+	if (!ctx || !rc) // nothing to clip
+		return;
+	glm::ivec4 r = { rc[0],rc[1],rc[2],rc[3] };
+	ctx->clip(&r);
+	dc_clear_path(ctx->get_path());
+}
+void dc_clip0(vgdev_ctx* ctx) {
+	if (!ctx) // nothing to clip
+		return;
+	ctx->clip0();
+	dc_clear_path(ctx->get_path());
+}
+
 void dc_clip(vgdev_ctx* ctx, paths_t* p) {
 	if (ctx && p)
 	{
@@ -10504,12 +10518,6 @@ void dc_set_line_width(vgdev_ctx* ctx, float width) {
 	auto t = ctx ? ctx->t : nullptr;
 	if (t && width > 0)t->lineWidth = width;
 }
-void dc_clip0(vgdev_ctx* ctx) {
-	if (!ctx) // nothing to clip
-		return;
-	ctx->clip0();
-}
-
 void dc_grid_fill(vgdev_ctx* cr, glm::vec2 size, glm::ivec2 cols, int width)
 {
 	int x = fmod(size.x, width);
@@ -10563,6 +10571,7 @@ drawctx_t get_drawctx(vgdev_ctx* p)
 		r.fill_preserve = dc_fill_preserve;
 		r.stroke_preserve = dc_stroke_preserve;
 		r.clip = dc_clip;
+		r.clip_rc = dc_clip_rc;
 		r.clip0 = dc_clip0;
 		r.fill = dc_fill;
 		r.stroke = dc_stroke;
