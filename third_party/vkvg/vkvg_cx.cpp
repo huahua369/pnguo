@@ -8439,6 +8439,7 @@ void FIXNORMAL2F(float& VX, float& VY)
 paths_t* dc_new_paths(vgdev_ctx* ctx);
 void dc_free_paths(paths_t* p);
 void dc_clear_path(paths_t* ctx);
+void dc_finish_path(paths_t* ctx);
 
 vgdev_ctx::vgdev_ctx()
 {
@@ -8477,8 +8478,9 @@ void add_vertexf_unchecked(Vertex* pVert, float x, float y, uint32_t c)
 }
 void vgdev_ctx::clip_preserve(paths_t* ctx)
 {
+	dc_finish_path(ctx);
 	if (!ctx->pathPtr) // nothing to clip
-		return;
+		return; 
 	ctx->t = t;
 
 	cmd_t c = {};
@@ -8971,6 +8973,7 @@ state_save_t* vgdev_ctx::cp_save(state_save_t* src)
 }
 void vgdev_ctx::fill_preserve(paths_t* ctx)
 {
+	dc_finish_path(ctx);
 	if (!ctx || !ctx->pathPtr || !t) // nothing to fill
 		return;
 	ctx->t = t;
@@ -9381,6 +9384,7 @@ void vgdev_ctx::_draw_segment(paths_t* ctx, stroke_context_t* str, dash_context_
 }
 
 void vgdev_ctx::stroke_preserve(paths_t* ctx) {
+	dc_finish_path(ctx);
 	if (!ctx || !ctx->pathPtr || !t) // nothing to stroke
 		return;
 	ctx->t = t;
