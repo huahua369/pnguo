@@ -329,15 +329,15 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	*/
 
 	dcb.set_color(dctx, 0xff0020ff);
-	dcb.rectangle(path, 5, 5, 100, 100, 0);
+	dcb.rectangle(path, 5, 5, 100, 100, 10);
 	dcb.clip(dctx, path);
 	dcb.rectangle(path, 0, 0, 256, 256, 0);
 	dcb.fill(dctx, path);
-	//dcb.clip0(dctx);
-	dcb.rectangle(path, 60, 60, 60, 100, 0);
-	dcb.clip(dctx, path);
+	dcb.clip0(dctx);
+	//dcb.rectangle(path, 60, 60, 60, 100, 0);
+	//dcb.clip(dctx, path);
 	float rc[4] = { 60, 60, 60, 100 };
-	//dcb.clip_rc(dctx, rc);
+	dcb.clip_rc(dctx, rc);
 	dcb.set_color(dctx, 0xffff8000);
 	dcb.set_line_width(dctx, 10);
 	dcb.rectangle(path, 90, 90, 60, 60, 0);
@@ -435,7 +435,7 @@ void testgui() {
 	};
 	auto appx = new app_x();
 	std::shared_ptr<app_x> spappx(appx);
-	bool has3d = true;
+	bool has3d = 0;
 	appx->init(has3d);
 	glm::ivec2 ws = dpis[4];// { 1280, 860 };
 	const char* wtitle = (char*)u8"窗口0";

@@ -9539,6 +9539,7 @@ void bind_draw_pipeline(VkvgContext ctx, state_save_t* t) {
 		CmdBindPipeline(ctx->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->dev->pipe_OVER);
 		break;
 	}
+	CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 }
 
 void cmd_draw_full_screen_quad(VkvgContext ctx, vgdev_ctx::cmd_t* c, vec4* scissor)
@@ -9856,7 +9857,6 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 				cs.clearValue.depthStencil.stencil = 0;
 				vkCmdClearAttachments(ctx->cmd, 1, &cs, 1, &ctx->clearRect);
 			}
-			CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 #if defined(DEBUG) && defined(VKVG_DBG_UTILS)
 			vkh_cmd_label_end(ctx->cmd);
 #endif
