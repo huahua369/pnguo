@@ -87,8 +87,9 @@ public:
 	// 添加gem指针的内容。顶点坐标不受状态影响
 	void add_geometry(geometry_d* geo);
 	void paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r);
-
+	// 路径裁剪
 	void clip();
+	// 矩形裁剪
 	void clip(const glm::ivec4& c);
 	glm::ivec4 get_clip();
 	void save();

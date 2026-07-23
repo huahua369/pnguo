@@ -122,7 +122,7 @@ public:
 	uint32_t tesselator_idx_counter = 0;
 #endif
 	uint32_t curColor = 0xFFffffff;
-	uint32_t curVertOffset = 0;
+	uint32_t _curVertOffset = 0;
 	uint32_t gCount = 0;		// ubo数量
 	state_save_t* t = 0;
 	paths_t* _dpath = 0;		// 默认路径缓存
@@ -6482,7 +6482,10 @@ vkvg_status_t vkvg_surface_write_to_png(VkvgSurface surf, const char* path) {
 	blit.dstOffsets[1] = { (int32_t)surf->width, (int32_t)surf->height, 1 };
 	vkCmdBlitImage(cmd, vkh_image_get_vkimage(surf->img), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		vkh_image_get_vkimage(stagImg), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
-
+	// 修改
+	vkh_image_set_layout(cmd, surf->img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	vkh_cmd_end(cmd);
 	_surface_submit_cmd(surf);
 
@@ -8480,7 +8483,7 @@ void vgdev_ctx::clip_preserve(paths_t* ctx)
 {
 	dc_finish_path(ctx);
 	if (!ctx->pathPtr) // nothing to clip
-		return; 
+		return;
 	ctx->t = t;
 
 	cmd_t c = {};
@@ -8622,7 +8625,7 @@ void combine2a(const GLdouble newVertex[3], const void* neighborVertex_s[4], con
 	void** outData, void* poly_data) {
 	vgdev_ctx* ctx = (vgdev_ctx*)poly_data;
 	Vertex      v = { {newVertex[0], newVertex[1]}, ctx->curColor, {0, 0, -1} };
-	*outData = (void*)(ctx->_vertex.size() - ctx->curVertOffset);
+	*outData = (void*)(ctx->_vertex.size() - ctx->_curVertOffset);
 	ctx->_vertex.push_back(v);
 }
 void vertex2a(void* vertex_data, void* poly_data) {
@@ -8636,7 +8639,7 @@ void vgdev_ctx::_fill_non_zero(paths_t* ctx)
 	curColor = ctx->curColor;
 	uint32_t ptrPath = 0;
 	uint32_t firstPtIdx = 0;
-	curVertOffset = _vertex.size();
+	_curVertOffset = _vertex.size();
 	if (ctx->pathPtr == 1 && ctx->pathes[0] & PATH_IS_CONVEX_BIT) {
 		// simple concave rectangle or circle
 		uint32_t firstVertIdx = (uint32_t)(_vertex.size() - ctx->curVertOffset);
@@ -9765,6 +9768,8 @@ void dc_clear(VkvgContext ctx) {
 	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
 	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 }
+
+
 void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 {
 	if (!ctx || cmdlist.empty() || _vertex.empty())return;// 填充0、描边1、裁剪2
@@ -9783,11 +9788,14 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 	}
 	ctx->cmdStarted = false;
 	dc_clear(ctx);
+	VkClearAttachment ca[2] = { clearColorAttach, clearStencil };
+	vkCmdClearAttachments(ctx->cmd, 2, ca, 1, &ctx->clearRect);
 	for (auto& it : cmdlist)
 	{
 		auto t = it.state;
 		if (t)
 		{
+			bind_draw_pipeline(ctx, it.state);
 			update_pattern(ctx, t->pattern, t);
 			dc_update_push_constants(ctx, t);
 		}
@@ -9807,7 +9815,6 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 				CmdSetStencilCompareMask(ctx->cmd, VK_STENCIL_FRONT_AND_BACK, STENCIL_CLIP_BIT);
 			}
 			else {
-				bind_draw_pipeline(ctx, it.state);
 				vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
 			}
 			if (!ctx->cmdStarted)
@@ -9816,8 +9823,7 @@ void vgdev_ctx::draw(VkvgContext ctx, void* waitSemaphore)
 		}
 		break;
 		case 1:
-		{// 描边
-			bind_draw_pipeline(ctx, it.state);
+		{// 描边 
 			vkCmdDrawIndexed(ctx->cmd, it.index.y, 1, it.index.x, (int32_t)it.vertex.x, 0);
 		}
 		break;
@@ -9896,6 +9902,7 @@ void _device_submit_cmd_sem(VkvgDevice dev, VkCommandBuffer* cmd, VkSemaphore wa
 
 void vgdev_ctx::begin_frame()
 {
+	_curVertOffset = 0;
 	gCount = 0;
 	mac.release();
 	_vertex.clear();
@@ -10037,6 +10044,7 @@ void dc_clear_path(paths_t* ctx) {
 	pri->segmentPtr = 0;
 	pri->subpathCount = 0;
 	pri->simpleConvex = false;
+	ctx->curVertOffset = 0;
 }
 
 void dc_clip_rc(vgdev_ctx* ctx, float* rc) {
@@ -10666,9 +10674,19 @@ void rvg_x::add_image(image_r* r) {}
 void rvg_x::add_geometry(geometry_d* geo) {}
 void rvg_x::paint_shadow(double size_x, double size_y, double width, double height, const glm::vec4& shadow, const glm::vec4& color_to, bool rev, float r) {}
 
-void rvg_x::clip() {}
-void rvg_x::clip(const glm::ivec4& c) {}
-glm::ivec4 rvg_x::get_clip() { return _clip; }
+void rvg_x::clip()
+{
+	dc_clip(ctx, ctx->get_path());
+}
+void rvg_x::clip(const glm::ivec4& c)
+{
+	_clip = c;
+	ctx->clip(&_clip);
+}
+glm::ivec4 rvg_x::get_clip()
+{
+	return _clip;
+}
 void rvg_x::save() {}
 void rvg_x::restore() {}
 void rvg_x::save0() {}
