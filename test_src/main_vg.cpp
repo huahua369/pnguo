@@ -314,6 +314,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.set_source_rgba(dctx, 0, 0, 0.9, 1);	dcb.fill_preserve(dctx, path);// 填充
 	dcb.set_source_rgba(dctx, 0, 0, 0, 1);	dcb.stroke(dctx, path); //描边
 	dcb.translate(dctx, 0, -128);
+	*/
 	dcb.clip0(dctx);
 	dcb.translate(dctx, 300, 0);
 	auto sg = dcb.new_pattern_sweep(dctx, 128, 128, 0, 2);
@@ -326,9 +327,10 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	//dcb.rectangle(path, 0, 0, 256, 256, 0);
 	dcb.arc(path, 128.0, 128.0, 80, 0, 2 * glm::pi<float>());
 	dcb.fill(dctx, path);
-	*/
 
-	dcb.set_color(dctx, 0xff0020ff);
+	dcb.clip0(dctx);
+	dcb.translate(dctx, -300, 0);
+	dcb.set_color(dctx, 0x800020ff);
 	dcb.rectangle(path, 5, 5, 100, 100, 10);
 	dcb.clip(dctx, path);
 	dcb.rectangle(path, 0, 0, 256, 256, 0);
@@ -338,7 +340,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	dcb.clip(dctx, path);
 	float rc[4] = { 60, 60, 60, 100 };
 	//dcb.clip_rc(dctx, rc);
-	dcb.set_color(dctx, 0xffff8000);
+	dcb.set_color(dctx, 0x80ff8000);
 	dcb.set_line_width(dctx, 10);
 	dcb.rectangle(path, 90, 90, 60, 60, 0);
 	dcb.stroke(dctx, path);
@@ -373,7 +375,7 @@ void draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize) 
 	vkvg_surface_resolve(surf);//msaa采样转换输出
 #endif
 
-	//vkvg_surface_write_to_png(surf, filename);
+	vkvg_surface_write_to_png(surf, filename);
 	vkvg_destroy(cr);
 }
 class A

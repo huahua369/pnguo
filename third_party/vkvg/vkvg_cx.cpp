@@ -8495,6 +8495,7 @@ void vgdev_ctx::clip_preserve(paths_t* ctx)
 		c.vertex.x = _vertex.size();
 		c.index.x = _indices.size();
 		cp_cmdt(&c, t);
+		ctx->curVertOffset = c.vertex.x;
 		fill_non_zero(ctx);
 		c.vertex.y = _vertex.size() - c.vertex.x;
 		c.index.y = _indices.size() - c.index.x;
@@ -10343,9 +10344,8 @@ int dc_rounded_rectangle(paths_t* ctx, float x, float y, float w, float h, float
 	dc_line_to(ctx, x + radius, y + h);
 	dc_arc(ctx, x + radius, y + h - radius, radius, M_PIF_2, M_PIF);
 	dc_line_to(ctx, x, y + radius);
-	dc_close_path((path_pri*)ctx);
-	ctx->pathes = pri->pathes.data();
-	ctx->points = pri->points.data();
+	dc_close_path((path_pri*)ctx); 
+	dc_finish_path(ctx);
 	return VKVG_STATUS_SUCCESS;
 }
 int dc_rectangle(paths_t* ctx, float x, float y, float w, float h, float r) {
