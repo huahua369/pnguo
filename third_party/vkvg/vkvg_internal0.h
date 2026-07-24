@@ -1469,6 +1469,5 @@ struct state_save_t {
 	int					clip_idx = -1;		// 裁剪的命令索引,小于0无
 	uint32_t			references = 1;
 	bool aa = true;
-	bool afree = false;
 };
 
