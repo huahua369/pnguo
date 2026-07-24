@@ -26,24 +26,24 @@ class vgdev_ctx;
 class rvg_x
 {
 public:
-	struct stack_item
-	{
-		glm::vec2 pos = {};				// 当前偏移
-		glm::vec4 clip = {};			// 当前裁剪区域
-		glm::vec2 scale = { 1.0f, 1.0f };
-		float rotate_radians = 0.0f;
-		glm::mat3x2 _transform = glm::mat3x2(1.0f);
-	};
+	//struct stack_item
+	//{
+	//	glm::vec2 pos = {};				// 当前偏移
+	//	glm::vec4 clip = {};			// 当前裁剪区域
+	//	glm::vec2 scale = { 1.0f, 1.0f };
+	//	float rotate_radians = 0.0f;
+	//	glm::mat3x2 _transform = glm::mat3x2(1.0f);
+	//};
 	glm::ivec2 pos = {};
-private:
 	vgdev_ctx* ctx = 0;
-	std::stack<stack_item> _stk;
-	std::stack<size_t> _st_view;
-	stack_item _cur = {};				// 当前状态
-	glm::ivec4 _tem_clip = {};
-	glm::ivec4 _tview = {};				// 当前渲染区域 
-	glm::ivec4 _clip = {};
-	glm::vec2 _translate = {};
+private:
+	//std::stack<stack_item> _stk;
+	//std::stack<size_t> _st_view;
+	//stack_item _cur = {};				// 当前状态
+	//glm::ivec4 _tem_clip = {};
+	//glm::ivec4 _tview = {};				// 当前渲染区域 
+	//glm::ivec4 _clip = {};
+	//glm::vec2 _translate = {};
 public:
 	rvg_x();
 	~rvg_x();

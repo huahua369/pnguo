@@ -351,7 +351,7 @@ void* draw_vgtest(VkvgSurface surf, VkvgSurface img, const glm::ivec2& surfsize,
 	//vkvg_rectangle(cr, 0, 0, 256, 256);
 	dcb.fill(dctx, path);
 
-	auto sem = dcb.draw(dctx, (VkvgContext)cr, 0);//批量执行
+	auto sem = dcb.draw(dctx, (VkvgContext)cr, 0);//批量执行，返回vksem
 	dcb.end_frame(dctx);
 #else 
 	vkvg_set_source_color(cr, 0xff0020ff);

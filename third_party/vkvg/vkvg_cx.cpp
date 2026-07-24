@@ -9835,8 +9835,7 @@ void _end_render_pass0(VkvgContext ctx) {
 }
 void dc_update_push_constants(VkvgContext ctx, state_save_t* t) {
 	t->pushConsts.size = { (float)ctx->pSurf->width, (float)ctx->pSurf->height };
-	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants)
-		, &t->pushConsts);
+	CmdPushConstants(ctx->cmd, ctx->dev->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &t->pushConsts);
 }
 
 void dc_scissor(VkvgContext ctx, vec4* scissor) {
@@ -10057,8 +10056,8 @@ void vgdev_ctx::begin_frame()
 		free_state(c);
 		_cst.pop();
 	}
-	free_state(t); 
-	t = new_state(); 
+	free_state(t);
+	t = new_state();
 }
 
 void vgdev_ctx::end_frame()
